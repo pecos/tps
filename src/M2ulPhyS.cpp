@@ -31,8 +31,26 @@ M2ulPhyS::M2ulPhyS(Mesh &_mesh,
       break;
   }
   
-  // FE Collections and Spaces
-  fec  = new DG_FECollection(order, dim);
+  // initialize basis type and integration rule
+  intRuleType = 1;
+  if( intRuleType == 0 )
+  {
+    intRules = new IntegrationRules(0, Quadrature1D::GaussLegendre);
+  }else if( intRuleType == 1 )
+  {
+    intRules = new IntegrationRules(0, Quadrature1D::GaussLobatto);
+  }
+  
+  basisType = 1;
+  if( basisType == 0 )
+  {
+    fec  = new DG_FECollection(order, dim, BasisType::GaussLegendre);
+  }else if ( basisType == 1 )
+  {
+    fec  = new DG_FECollection(order, dim, BasisType::GaussLobatto);
+  }
+  
+  // FE Spaces
   fes  = new FiniteElementSpace(&mesh, fec);
   dfes = new FiniteElementSpace(&mesh, fec, dim, Ordering::byNODES);
   vfes = new FiniteElementSpace(&mesh, fec, num_equation, Ordering::byNODES);
@@ -46,11 +64,11 @@ M2ulPhyS::M2ulPhyS(Mesh &_mesh,
   rsolver = new RiemannSolver(num_equation, eqState);
   
   A = new NonlinearForm(vfes);
-  faceIntegrator = new FaceIntegrator(rsolver, dim, num_equation, max_char_speed);
+  faceIntegrator = new FaceIntegrator(intRules, rsolver, dim, num_equation, max_char_speed);
   A->AddInteriorFaceIntegrator( faceIntegrator );
   
   Aflux = new MixedBilinearForm(dfes, fes);
-  domainIntegrator = new DomainIntegrator(dim, num_equation);
+  domainIntegrator = new DomainIntegrator(intRules, dim, num_equation);
   Aflux->AddDomainIntegrator( domainIntegrator );
   Aflux->Assemble();
   //Me_inv(vfes.GetFE(0)->GetDof(), vfes.GetFE(0)->GetDof(), vfes.GetNE())
@@ -131,7 +149,7 @@ M2ulPhyS::~M2ulPhyS()
   delete dfes;
   delete fes;
   delete fec;
-  
+  delete intRules;
 }
 
 void M2ulPhyS::initSolutionAndVisualizationVectors()

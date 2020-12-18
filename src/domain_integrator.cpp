@@ -3,9 +3,12 @@
 
 
 // Implementation of class DomainIntegrator
-DomainIntegrator::DomainIntegrator(const int _dim, const int _num_equation):
+DomainIntegrator::DomainIntegrator(IntegrationRules *_intRules,
+                                   const int _dim, 
+                                   const int _num_equation):
   dim(_num_equation),
-  num_equation(_num_equation)
+  num_equation(_num_equation),
+  intRules(_intRules)
 {
   
 }
@@ -18,7 +21,7 @@ void DomainIntegrator::AssembleElementMatrix2(const FiniteElement &trial_fe,
    // Assemble the form (vec(v), grad(w))
   
    Vector shape;
-   DenseMatrix flux(num_equation,dim);
+   //DenseMatrix flux(num_equation,dim);
    DenseMatrix dshapedr;
    DenseMatrix dshapedx;
 
@@ -38,7 +41,15 @@ void DomainIntegrator::AssembleElementMatrix2(const FiniteElement &trial_fe,
 
    const int maxorder = max(trial_fe.GetOrder(), test_fe.GetOrder());
    const int intorder = 2 * maxorder;
-   const IntegrationRule *ir = &IntRules.Get(trial_fe.GetGeomType(), intorder);
+//    IntegrationRules IntRules2(0, Quadrature1D::GaussLobatto);
+//    cout << "trial_fe.GetGeomType(): " ;
+//    IntegrationRule kk3 = trial_fe.GetNodes();
+//    for(int kk=0; kk<trial_fe.GetNodes().GetNPoints();kk++)
+//    {
+//      cout<<"node "<< kk <<";x "<< kk3.IntPoint(kk).x<<" y"<< kk3.IntPoint(kk).y<<" w " << kk3.IntPoint(kk).weight;
+//      cout <<endl;
+//   } 
+   const IntegrationRule *ir = &intRules->Get(trial_fe.GetGeomType(), intorder);
 
    for (int i = 0; i < ir->GetNPoints(); i++)
    {
@@ -64,4 +75,24 @@ void DomainIntegrator::AssembleElementMatrix2(const FiniteElement &trial_fe,
          }
       }
    }
+   
+  // print matrix
+  {
+      cout.precision(2);
+      for(int j=0;j<dof_trial;j++)
+      {
+        for(int i=0; i<dof_test; i++)
+        {
+          if(fabs(elmat(i, j))>0.0000001)
+          {
+            cout<<elmat(i, j)<<" ";
+          }else
+          {
+            cout<<"****"<<" ";
+          }
+          
+        }
+        cout << endl;
+      }
+  }
 }

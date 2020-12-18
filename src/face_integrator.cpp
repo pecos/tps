@@ -2,14 +2,16 @@
 #include "face_integrator.hpp"
 
 // Implementation of class FaceIntegrator
-FaceIntegrator::FaceIntegrator(RiemannSolver *rsolver_, 
+FaceIntegrator::FaceIntegrator(IntegrationRules *_intRules,
+                               RiemannSolver *rsolver_, 
                                const int _dim,
                                const int _num_equation,
                                double &_max_char_speed ):
    rsolver(rsolver_),
    dim(_dim),
    num_equation(_num_equation),
-   max_char_speed(_max_char_speed)
+   max_char_speed(_max_char_speed),
+   intRules(_intRules)
 {
   
 }
@@ -58,7 +60,8 @@ void FaceIntegrator::AssembleFaceVector(const FiniteElement &el1,
    {
       intorder++;
    }
-   const IntegrationRule *ir = &IntRules.Get(Tr.GetGeometryType(), intorder);
+   //IntegrationRules IntRules2(0, Quadrature1D::GaussLobatto);
+   const IntegrationRule *ir = &intRules->Get(Tr.GetGeometryType(), intorder);
 
    for (int i = 0; i < ir->GetNPoints(); i++)
    {

@@ -22,9 +22,11 @@ private:
    const int num_equation;
    
    double &max_char_speed;
+   IntegrationRules *intRules;
 
 public:
-   FaceIntegrator(RiemannSolver *rsolver_, 
+   FaceIntegrator(IntegrationRules *_intRules,
+                  RiemannSolver *rsolver_, 
                   const int _dim,
                   const int _num_equation,
                   double &_max_char_speed );
