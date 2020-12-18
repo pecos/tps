@@ -24,9 +24,12 @@ private:
    
    const int dim;
    const int num_equation;
+   IntegrationRules *intRules;
 
 public:
-   DomainIntegrator(const int _dim, const int _num_equation);
+   DomainIntegrator(IntegrationRules *_intRules,
+                    const int _dim, 
+                    const int _num_equation);
 
    virtual void AssembleElementMatrix2(const FiniteElement &trial_fe,
                                        const FiniteElement &test_fe,

@@ -49,6 +49,14 @@ private:
   
   RHSoperator *rhsOperator;
   
+  // Integration rule
+  int intRuleType; // 0: GaussLegendre; 1: GaussLobatto
+  IntegrationRules *intRules;
+  
+  // Interpolant function
+  // 0: GaussLegendre; 1: GaussLobatto
+  int basisType;
+  
   // Finite element collection
   DG_FECollection *fec;
   
