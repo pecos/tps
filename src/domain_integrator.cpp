@@ -40,16 +40,26 @@ void DomainIntegrator::AssembleElementMatrix2(const FiniteElement &trial_fe,
    elmat = 0.0;
 
    const int maxorder = max(trial_fe.GetOrder(), test_fe.GetOrder());
-   const int intorder = 2 * maxorder;
+   int intorder = 2 * maxorder;
+   intorder -= 0;
+   cout << "tr_order :" << trial_fe.GetOrder() <<" te_order :"<< test_fe.GetOrder() <<endl;
 //    IntegrationRules IntRules2(0, Quadrature1D::GaussLobatto);
 //    cout << "trial_fe.GetGeomType(): " ;
-//    IntegrationRule kk3 = trial_fe.GetNodes();
-//    for(int kk=0; kk<trial_fe.GetNodes().GetNPoints();kk++)
-//    {
-//      cout<<"node "<< kk <<";x "<< kk3.IntPoint(kk).x<<" y"<< kk3.IntPoint(kk).y<<" w " << kk3.IntPoint(kk).weight;
-//      cout <<endl;
-//   } 
+IntegrationRule kk3 = trial_fe.GetNodes();
+// for(int kk=0; kk<trial_fe.GetNodes().GetNPoints();kk++)
+// {
+//   cout<<"node "<< kk <<";x "<< kk3.IntPoint(kk).x<<" y"<< kk3.IntPoint(kk).y<<" w " << kk3.IntPoint(kk).weight;
+//   cout <<endl;
+// } 
    const IntegrationRule *ir = &intRules->Get(trial_fe.GetGeomType(), intorder);
+cout<< kk3.GetNPoints() << " " << ir->GetNPoints()<<endl;
+for(int kk=0; kk<trial_fe.GetNodes().GetNPoints();kk++)
+{
+  cout<<"elem "<< kk <<";x "<< kk3.IntPoint(kk).x<<" y"<< kk3.IntPoint(kk).y<<" w " << kk3.IntPoint(kk).weight;
+  cout <<endl;
+  cout<<"intr "<< kk <<";x "<< ir->IntPoint(kk).x<<" y"<< ir->IntPoint(kk).y<<" w " << ir->IntPoint(kk).weight;
+  cout <<endl;
+} 
 
    for (int i = 0; i < ir->GetNPoints(); i++)
    {
