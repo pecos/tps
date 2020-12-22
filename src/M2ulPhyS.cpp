@@ -32,7 +32,7 @@ M2ulPhyS::M2ulPhyS(Mesh &_mesh,
   }
   
   // initialize basis type and integration rule
-  intRuleType = 1;
+  intRuleType = 0;
   if( intRuleType == 0 )
   {
     intRules = new IntegrationRules(0, Quadrature1D::GaussLegendre);
@@ -41,7 +41,7 @@ M2ulPhyS::M2ulPhyS(Mesh &_mesh,
     intRules = new IntegrationRules(0, Quadrature1D::GaussLobatto);
   }
   
-  basisType = 1;
+  basisType = 0;
   if( basisType == 0 )
   {
     fec  = new DG_FECollection(order, dim, BasisType::GaussLegendre);
@@ -55,7 +55,6 @@ M2ulPhyS::M2ulPhyS(Mesh &_mesh,
   dfes = new FiniteElementSpace(&mesh, fec, dim, Ordering::byNODES);
   vfes = new FiniteElementSpace(&mesh, fec, num_equation, Ordering::byNODES);
   
-  // initialize classes
   eqState = new EquationOfState(_fluid);
   
   fluxClass = new Fluxes(eqState);

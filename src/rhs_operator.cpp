@@ -53,6 +53,55 @@ RHSoperator::RHSoperator( const int _dim,
       inv.Factor();
       inv.GetInverseMatrix( (*Me_inv)(i));
    }
+   
+   
+   // This is for DEBUG ONLY!!!
+   // Inverse of transformation jacobian
+   DenseMatrix kk = vfes->GetElementTransformation(0)->Jacobian();
+   
+   // Derivation matrix
+   DenseMatrix Dx;
+   Dx.SetSize( Me.Size() );
+   //const IntegrationRule *ir = &IntRules.Get(vfes->GetFE(0)->GetGeomType(), 6);
+   for(int node=0; node<Me.Size(); node++)
+   {
+     DenseMatrix column(Me.Size(),2), columnX(Me.Size(),1);
+      //vfes->GetFE(0)->CalcDShape(ir->IntPoint(node), column );
+     vfes->GetFE(0)->CalcPhysDShape( *(vfes->GetElementTransformation(node)), column);
+     
+     cout << "" <<endl;
+     for(int i=0; i<Me.Size(); i++) cout<<column(i,0)<<" ";
+     cout<<endl;
+     for(int i=0; i<Me.Size(); i++) cout<<column(i,1)<<" ";
+     cout<<endl;
+     
+      for(int i=0; i<Me.Size(); i++)
+      {
+        Dx(i, node) = column(i,0);
+        //cout<< Dx(i, node) << " ";
+      }
+      //cout<<endl;
+   }
+   
+   // Mass matrix
+   double detJac = kk.Det();
+   mi.AssembleElementMatrix(*(vfes->GetFE(0) ), *(vfes->GetElementTransformation(0) ), Me);
+   //Me *= 1./detJac;
+   
+   // Matrix Q=MD
+   DenseMatrix Q( Me.Size() );
+   mfem::Mult(Me,Dx,Q);
+   
+   cout.precision(3);
+   for(int i=0; i<Me.Size();i++)
+   {
+     for(int j=0; j<Me.Size();j++)
+     {
+       cout << Q(i,j) + Q(j,i) << " ";
+     }
+    cout << endl;
+  }
+  
 }
 
 RHSoperator::~RHSoperator()
