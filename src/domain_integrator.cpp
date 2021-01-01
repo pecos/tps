@@ -41,7 +41,7 @@ void DomainIntegrator::AssembleElementMatrix2(const FiniteElement &trial_fe,
 
    const int maxorder = max(trial_fe.GetOrder(), test_fe.GetOrder());
    int intorder = 2 * maxorder;
-   intorder -= 0;
+   intorder -= 1; //if Gauss-Lobatto integration nodes
    cout << "tr_order :" << trial_fe.GetOrder() <<" te_order :"<< test_fe.GetOrder() <<endl;
 //    IntegrationRules IntRules2(0, Quadrature1D::GaussLobatto);
 //    cout << "trial_fe.GetGeomType(): " ;

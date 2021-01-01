@@ -1,21 +1,14 @@
 PROJECT_ROOT = $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
-PROGRAM = ex18.p
+PROGRAM = ex18_docker.p
 
 # LIBRARIES
-LIBS =  -lmfem \
-	-lHYPRE \
-	-lmetis \
-	-lrt
+LIBS = -lmfem
 
 # LIBRARY PATH
-LIB_PATHS = /home/marc/Public/mfem-4.2 \
-	-L/home/marc/Public/hypre/src/hypre/lib \
-	-L/home/marc/Public/metis-5.1.0/lib
-# INCLUDES -I/home/marc/Public/hypre/include 
-INCLUDE_PATHS = /home/marc/Public/mfem-4.2 \
-	-I/home/marc/Public/hypre/src/hypre/include \
-	-I/home/marc/Public/metis-5.1.0/include
+LIB_PATHS = $(MFEM_LIB)
+# INCLUDES
+INCLUDE_PATHS = $(MFEM_INC) -I$(MPI_DIR)/include -I$(HYPRE_INC) -I$(PETSC_INC)
 
 # SOURCE FILES
 SOURCE_FILES = $(wildcard *.cpp)
@@ -30,8 +23,7 @@ MAIN_FILE = ex18.cpp
 OBJS = $(patsubst %.cpp,%.o,$(SOURCE_FILES))
 
 # COMPILER
-#CXX = g++
-CXX = mpicxx
+CXX = g++
 
 ifeq ($(BUILD_MODE),debug)
 	CFLAGS += -Wall -g -std=c++11
