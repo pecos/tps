@@ -62,12 +62,17 @@ RHSoperator::RHSoperator( const int _dim,
    // Derivation matrix
    DenseMatrix Dx;
    Dx.SetSize( Me.Size() );
-   //const IntegrationRule *ir = &IntRules.Get(vfes->GetFE(0)->GetGeomType(), 6);
+   ElementTransformation *eltrans = vfes->GetElementTransformation(0);
    for(int node=0; node<Me.Size(); node++)
    {
-     DenseMatrix column(Me.Size(),2), columnX(Me.Size(),1);
-      //vfes->GetFE(0)->CalcDShape(ir->IntPoint(node), column );
-     vfes->GetFE(0)->CalcPhysDShape( *(vfes->GetElementTransformation(node)), column);
+     DenseMatrix column(Me.Size(),2);
+     IntegrationPoint intP = eltrans->GetIntPoint();
+     IntegrationRule intRule = vfes->GetFE(0)->GetNodes();
+     intP.Set(intRule.IntPoint(node).x, 
+              intRule.IntPoint(node).y, 0., 
+              intRule.IntPoint(node).weight);
+     eltrans->SetIntPoint(&intP);
+     vfes->GetFE(0)->CalcPhysDShape( *eltrans, column);
      
      cout << "" <<endl;
      for(int i=0; i<Me.Size(); i++) cout<<column(i,0)<<" ";
@@ -77,7 +82,7 @@ RHSoperator::RHSoperator( const int _dim,
      
       for(int i=0; i<Me.Size(); i++)
       {
-        Dx(i, node) = column(i,0);
+        Dx(node, i) = column(i,0);
         //cout<< Dx(i, node) << " ";
       }
       //cout<<endl;
@@ -87,6 +92,21 @@ RHSoperator::RHSoperator( const int _dim,
    double detJac = kk.Det();
    mi.AssembleElementMatrix(*(vfes->GetFE(0) ), *(vfes->GetElementTransformation(0) ), Me);
    //Me *= 1./detJac;
+   cout<<"Mass matrix"<<endl;
+   for(int i=0; i<Me.Size(); i++)
+   {
+      for(int j=0; j<Me.Size(); j++)
+      {
+        if( fabs(Me(i,j))<1e-5 )
+        {
+          cout<<"* ";
+        }else
+        {
+          cout<<Me(i,j)<<" ";
+        }
+      }
+      cout<<endl;
+   }
    
    // Matrix Q=MD
    DenseMatrix Q( Me.Size() );
@@ -97,7 +117,13 @@ RHSoperator::RHSoperator( const int _dim,
    {
      for(int j=0; j<Me.Size();j++)
      {
-       cout << Q(i,j) + Q(j,i) << " ";
+       if( fabs(Q(i,j) + Q(j,i))<1e-5 )
+       {
+         cout<<"* ";
+      }else
+      {
+        cout << Q(i,j) + Q(j,i) << " ";
+      }
      }
     cout << endl;
   }

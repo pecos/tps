@@ -32,7 +32,7 @@ M2ulPhyS::M2ulPhyS(Mesh &_mesh,
   }
   
   // initialize basis type and integration rule
-  intRuleType = 0;
+  intRuleType = 1;
   if( intRuleType == 0 )
   {
     intRules = new IntegrationRules(0, Quadrature1D::GaussLegendre);
@@ -41,7 +41,7 @@ M2ulPhyS::M2ulPhyS(Mesh &_mesh,
     intRules = new IntegrationRules(0, Quadrature1D::GaussLobatto);
   }
   
-  basisType = 0;
+  basisType = 1;
   if( basisType == 0 )
   {
     fec  = new DG_FECollection(order, dim, BasisType::GaussLegendre);
