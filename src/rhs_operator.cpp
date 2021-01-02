@@ -52,9 +52,9 @@ RHSoperator::RHSoperator( const int _dim,
    
    for (int i = 0; i < vfes->GetNE(); i++)
    {
-     int integrationOrder = 2*vfes->GetFE(i)->GetOrder() ;
-     const IntegrationRule intRule = intRules->Get(vfes->GetFE(i)->GetGeomType(), integrationOrder);
-     mi.SetIntRule(&intRule);
+      int integrationOrder = 2*vfes->GetFE(i)->GetOrder() ;
+      const IntegrationRule intRule = intRules->Get(vfes->GetFE(i)->GetGeomType(), integrationOrder);
+      mi.SetIntRule(&intRule);
       mi.AssembleElementMatrix(*(vfes->GetFE(i) ), *(vfes->GetElementTransformation(i) ), Me);
       inv.Factor();
       inv.GetInverseMatrix( (*Me_inv)(i));
