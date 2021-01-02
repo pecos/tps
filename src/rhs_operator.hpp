@@ -23,6 +23,8 @@ private:
    double &max_char_speed;
    int num_equation;
    
+   IntegrationRules *intRules;
+   
    Fluxes *fluxClass;
    EquationOfState *eqState;
 
@@ -45,6 +47,7 @@ public:
    RHSoperator(const int _dim,
                const Equations &_eqSystem,
                double &_max_char_speed,
+               IntegrationRules *_intRules,
                Fluxes *_fluxClass,
                EquationOfState *_eqState,
                FiniteElementSpace *_vfes,

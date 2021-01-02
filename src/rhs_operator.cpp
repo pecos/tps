@@ -6,6 +6,7 @@
 RHSoperator::RHSoperator( const int _dim,
                           const Equations &_eqSystem,
                           double &_max_char_speed,
+                          IntegrationRules *_intRules,
                           Fluxes *_fluxClass,
                           EquationOfState *_eqState,
                           FiniteElementSpace *_vfes,
@@ -15,6 +16,7 @@ RHSoperator::RHSoperator( const int _dim,
      dim(_dim ),
      eqSystem(_eqSystem),
      max_char_speed(_max_char_speed),
+     intRules(_intRules),
      fluxClass(_fluxClass),
      eqState(_eqState),
      vfes(_vfes),
@@ -47,8 +49,12 @@ RHSoperator::RHSoperator( const int _dim,
    DenseMatrix Me(dof);
    DenseMatrixInverse inv(&Me);
    MassIntegrator mi;
+   
    for (int i = 0; i < vfes->GetNE(); i++)
    {
+     int integrationOrder = 2*vfes->GetFE(i)->GetOrder() ;
+     const IntegrationRule intRule = intRules->Get(vfes->GetFE(i)->GetGeomType(), integrationOrder);
+     mi.SetIntRule(&intRule);
       mi.AssembleElementMatrix(*(vfes->GetFE(i) ), *(vfes->GetElementTransformation(i) ), Me);
       inv.Factor();
       inv.GetInverseMatrix( (*Me_inv)(i));
@@ -62,10 +68,12 @@ RHSoperator::RHSoperator( const int _dim,
    // Derivation matrix
    DenseMatrix Dx;
    Dx.SetSize( Me.Size() );
-   ElementTransformation *eltrans = vfes->GetElementTransformation(0);
+   
    for(int node=0; node<Me.Size(); node++)
    {
      DenseMatrix column(Me.Size(),2);
+     
+     ElementTransformation *eltrans = vfes->GetElementTransformation(0);
      IntegrationPoint intP = eltrans->GetIntPoint();
      IntegrationRule intRule = vfes->GetFE(0)->GetNodes();
      intP.Set(intRule.IntPoint(node).x, 
@@ -89,7 +97,9 @@ RHSoperator::RHSoperator( const int _dim,
    }
    
    // Mass matrix
-   double detJac = kk.Det();
+   int integrationOrder = 2*vfes->GetFE(0)->GetOrder() ;
+   const IntegrationRule intRule = intRules->Get(vfes->GetFE(0)->GetGeomType(), integrationOrder);
+   mi.SetIntRule(&intRule);
    mi.AssembleElementMatrix(*(vfes->GetFE(0) ), *(vfes->GetElementTransformation(0) ), Me);
    //Me *= 1./detJac;
    cout<<"Mass matrix"<<endl;
@@ -97,7 +107,7 @@ RHSoperator::RHSoperator( const int _dim,
    {
       for(int j=0; j<Me.Size(); j++)
       {
-        if( fabs(Me(i,j))<1e-5 )
+        if( fabs(Me(i,j))<1e-15 )
         {
           cout<<"* ";
         }else

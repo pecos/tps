@@ -32,7 +32,7 @@ M2ulPhyS::M2ulPhyS(Mesh &_mesh,
   }
   
   // initialize basis type and integration rule
-  intRuleType = 1;
+  intRuleType = 0;
   if( intRuleType == 0 )
   {
     intRules = new IntegrationRules(0, Quadrature1D::GaussLegendre);
@@ -41,12 +41,13 @@ M2ulPhyS::M2ulPhyS(Mesh &_mesh,
     intRules = new IntegrationRules(0, Quadrature1D::GaussLobatto);
   }
   
-  basisType = 1;
+  basisType = 0;
   if( basisType == 0 )
   {
     fec  = new DG_FECollection(order, dim, BasisType::GaussLegendre);
   }else if ( basisType == 1 )
   {
+    // This basis type include end-nodes
     fec  = new DG_FECollection(order, dim, BasisType::GaussLobatto);
   }
   
@@ -89,6 +90,7 @@ M2ulPhyS::M2ulPhyS(Mesh &_mesh,
   rhsOperator = new RHSoperator(dim,
                                 eqSystem,
                                 max_char_speed,
+                                intRules,
                                 fluxClass,
                                 eqState,
                                 vfes,
