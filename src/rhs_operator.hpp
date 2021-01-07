@@ -35,6 +35,9 @@ private:
    MixedBilinearForm *Aflux;
    
    DenseTensor *Me_inv;
+   
+   const bool &isSBP;
+   const double &alpha;
 
    mutable Vector *state;
 //    mutable DenseMatrix f;
@@ -52,7 +55,10 @@ public:
                EquationOfState *_eqState,
                FiniteElementSpace *_vfes,
                NonlinearForm *_A, 
-               MixedBilinearForm *_Aflux);
+               MixedBilinearForm *_Aflux,
+               bool &_isSBP,
+               double &_alpha
+              );
 
    virtual void Mult(const Vector &x, Vector &y) const;
 

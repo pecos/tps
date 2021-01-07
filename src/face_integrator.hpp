@@ -11,12 +11,6 @@ class FaceIntegrator : public NonlinearFormIntegrator
 {
 private:
    RiemannSolver *rsolver;
-//    Vector shape1;
-//    Vector shape2;
-//    Vector funval1;
-//    Vector funval2;
-//    Vector nor;
-//    Vector fluxN;
    
    const int dim;
    const int num_equation;

@@ -32,7 +32,7 @@ M2ulPhyS::M2ulPhyS(Mesh &_mesh,
   }
   
   // initialize basis type and integration rule
-  intRuleType = 0;
+  intRuleType = 1;
   if( intRuleType == 0 )
   {
     intRules = new IntegrationRules(0, Quadrature1D::GaussLegendre);
@@ -41,7 +41,7 @@ M2ulPhyS::M2ulPhyS(Mesh &_mesh,
     intRules = new IntegrationRules(0, Quadrature1D::GaussLobatto);
   }
   
-  basisType = 0;
+  basisType = 1;
   if( basisType == 0 )
   {
     fec  = new DG_FECollection(order, dim, BasisType::GaussLegendre);
@@ -60,18 +60,25 @@ M2ulPhyS::M2ulPhyS(Mesh &_mesh,
   
   fluxClass = new Fluxes(eqState);
   
+  alpha = 0.5;
+  isSBP = true;
+  
   // Create Riemann Solver
   rsolver = new RiemannSolver(num_equation, eqState);
   
   A = new NonlinearForm(vfes);
   faceIntegrator = new FaceIntegrator(intRules, rsolver, dim, num_equation, max_char_speed);
   A->AddInteriorFaceIntegrator( faceIntegrator );
+  if( isSBP )
+  {
+    SBPoperator = new SBPintegrator(eqState,fluxClass,intRules,dim,num_equation, alpha);
+    A->AddDomainIntegrator( SBPoperator );
+  }
   
   Aflux = new MixedBilinearForm(dfes, fes);
-  domainIntegrator = new DomainIntegrator(intRules, dim, num_equation);
+  domainIntegrator = new DomainIntegrator(fluxClass,intRules, dim, num_equation);
   Aflux->AddDomainIntegrator( domainIntegrator );
   Aflux->Assemble();
-  //Me_inv(vfes.GetFE(0)->GetDof(), vfes.GetFE(0)->GetDof(), vfes.GetNE())
   
   switch (solverType)
   {
@@ -95,7 +102,9 @@ M2ulPhyS::M2ulPhyS(Mesh &_mesh,
                                 eqState,
                                 vfes,
                                 A, 
-                                Aflux);
+                                Aflux,
+                                isSBP, alpha
+                               );
   
   initSolutionAndVisualizationVectors();
   projectInitialSolution();
@@ -129,18 +138,19 @@ M2ulPhyS::M2ulPhyS(Mesh &_mesh,
     dt = CFL * hmin / max_char_speed / (2*order+1);
   }
   
-  //**** DEBUG
-  //dt = 0.001;
 }
 
 M2ulPhyS::~M2ulPhyS()
 {
-  delete sol;
   delete u_block;
   delete offsets;
+  
+  delete sol;
+  
   delete rhsOperator;
   delete domainIntegrator;
   //delete Aflux; // fails to delete (follow)
+  if( isSBP ) delete SBPoperator;
   delete faceIntegrator;
   //delete A; // fails to delete (follow)
   delete rsolver;
@@ -159,6 +169,12 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
   for (int k = 0; k <= num_equation; k++) { (*offsets)[k] = k * vfes->GetNDofs(); }
   u_block = new BlockVector(*offsets);
   
+  {
+    ofstream mesh_ofs("vortex.mesh");
+    mesh_ofs.precision(8);
+    mesh_ofs << mesh;
+  }
+  
   sol = new GridFunction(vfes, u_block->GetData());
 
   // Momentum grid function on dfes for visualization.
@@ -170,7 +186,8 @@ void M2ulPhyS::projectInitialSolution()
   // Initialize the state.
   
   void (*initialConditionFunction)(const Vector&, Vector&);
-  initialConditionFunction = &(this->InitialConditionTest);
+  initialConditionFunction = &(this->InitialConditionEulerVortex);
+  //initialConditionFunction = &(this->testInitialCondition);
   
   VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
   sol->ProjectCoefficient(u0);
@@ -203,20 +220,32 @@ void M2ulPhyS::Iterate()
     }
   }
   
-  if (t_final == 2.0)
+  if (time == t_final)
    {
      void (*initialConditionFunction)(const Vector&, Vector&);
-      initialConditionFunction = &(this->InitialConditionTest);
+      initialConditionFunction = &(this->InitialConditionEulerVortex);
   
       VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
       const double error = sol->ComputeLpError(2, u0);
       cout << "Solution error: " << error << endl;
+      
+      // 9. Save the final solution. This output can be viewed later using GLVis:
+      //    "glvis -m vortex.mesh -g vortex-1-final.gf".
+      for (int k = 0; k < num_equation; k++)
+      {
+          GridFunction uk(fes, u_block->GetBlock(k));
+          ostringstream sol_name;
+          sol_name << "vortex-" << k << "-final.gf";
+          ofstream sol_ofs(sol_name.str().c_str());
+          sol_ofs.precision(8);
+          sol_ofs << uk;
+      }
    }
 }
 
 
 // Initial conditions for debug/test case
-void M2ulPhyS::InitialConditionTest(const Vector& x, Vector& y)
+void M2ulPhyS::InitialConditionEulerVortex(const Vector& x, Vector& y)
 {
   MFEM_ASSERT(x.Size() == 2, "");
   
@@ -282,5 +311,33 @@ void M2ulPhyS::InitialConditionTest(const Vector& x, Vector& y)
    y(1) = den * velX;
    y(2) = den * velY;
    y(3) = den * energy;
+   
+   delete eqState;
+}
+
+
+// Initial conditions for debug/test case
+void M2ulPhyS::testInitialCondition(const Vector& x, Vector& y)
+{
+   EquationOfState *eqState = new EquationOfState();
+
+   // Nice units
+   const double vel_inf = 1.;
+   const double den_inf = 1.3;
+   const double Minf = 0.5;
+   
+   const double gamma = eqState->GetSpecificHeatRatio();
+   //const double Rgas = eqState->GetGasConstant();
+
+   const double pres_inf = (den_inf / gamma) * (vel_inf / Minf) *
+                           (vel_inf / Minf);
+
+   y(0) = den_inf + x(0);
+   y(1) = y(0);
+   y(2) = 0;
+   y(3) = pres_inf/(gamma-1.) + 0.5*y(1)*y(1)/y(0);
+   cout<<y(3)<<endl;
+   
+   delete eqState;
 }
 

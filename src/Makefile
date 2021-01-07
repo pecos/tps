@@ -44,11 +44,9 @@ endif
 all: $(PROGRAM)
 
 $(OBJS): $(SOURCE_FILES)
-	echo kk
 	$(CXX) $(CFLAGS) -c $(patsubst %.o,%.cpp,$@) -I$(INCLUDE_PATHS)
 
 $(PROGRAM): $(OBJS)
-	echo kk2
 	$(CXX) $(CFLAGS) $(OBJS) -L$(LIB_PATHS) $(LIBS) -o $(PROGRAM)
 
 .PHONY : clean
