@@ -14,6 +14,7 @@
 #include "face_integrator.hpp"
 #include "riemann_solver.hpp"
 #include "domain_integrator.hpp"
+#include "sbp_integrators.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -84,9 +85,14 @@ private:
   // RHS operators
   NonlinearForm *A;
   FaceIntegrator *faceIntegrator;
+  SBPintegrator  *SBPoperator;
   
   MixedBilinearForm *Aflux;
   DomainIntegrator *domainIntegrator;
+  
+  // Coefficient for SBP operators and 
+  bool isSBP;
+  double alpha;
 
   // State/solution vector
   GridFunction *sol;
@@ -107,7 +113,9 @@ private:
   double hmin;
   
   void initSolutionAndVisualizationVectors();
-  static void InitialConditionTest(const Vector &x, Vector &y);
+  
+  static void InitialConditionEulerVortex(const Vector &x, Vector &y);
+  static void testInitialCondition(const Vector &x, Vector &y);
   static void uniformInitialConditions();
   
 

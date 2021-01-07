@@ -7,6 +7,7 @@
  */
 
 #include "mfem.hpp"
+#include "fluxes.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -17,17 +18,17 @@ using namespace std;
 class DomainIntegrator : public BilinearFormIntegrator
 {
 private:
-//    Vector shape;
-//    DenseMatrix flux;
-//    DenseMatrix dshapedr;
-//    DenseMatrix dshapedx;
+  
+  Fluxes *fluxClass;
+  
    
    const int dim;
    const int num_equation;
    IntegrationRules *intRules;
 
 public:
-   DomainIntegrator(IntegrationRules *_intRules,
+   DomainIntegrator(Fluxes *_fluxClass,
+                    IntegrationRules *_intRules,
                     const int _dim, 
                     const int _num_equation);
 

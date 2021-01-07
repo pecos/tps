@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
    int ref_levels = 1;
    int order = 3;
    int ode_solver_type = 4;
-   double t_final = 2.0;
+   double t_final = 5.0;
    double dt = -0.01;
    double cfl = 0.3;
    bool visualization = true;

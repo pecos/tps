@@ -11,7 +11,10 @@ RHSoperator::RHSoperator( const int _dim,
                           EquationOfState *_eqState,
                           FiniteElementSpace *_vfes,
                           NonlinearForm *_A, 
-                          MixedBilinearForm *_Aflux )
+                          MixedBilinearForm *_Aflux,
+                          bool &_isSBP,
+                          double &_alpha
+                        )
    : TimeDependentOperator(_A->Height()),
      dim(_dim ),
      eqSystem(_eqSystem),
@@ -21,11 +24,9 @@ RHSoperator::RHSoperator( const int _dim,
      eqState(_eqState),
      vfes(_vfes),
      A(_A),
-     Aflux(_Aflux)
-//      state(num_equation)
-//      f(num_equation, dim),
-//      flux(vfes->GetNDofs(), dim, num_equation),
-//      z(A->Height())
+     Aflux(_Aflux),
+     isSBP(_isSBP),
+     alpha(_alpha)
 {
   switch(eqSystem)
   {
@@ -52,7 +53,7 @@ RHSoperator::RHSoperator( const int _dim,
    
    for (int i = 0; i < vfes->GetNE(); i++)
    {
-      int integrationOrder = 2*vfes->GetFE(i)->GetOrder() ;
+      int integrationOrder = 2*vfes->GetFE(i)->GetOrder() -1;
       const IntegrationRule intRule = intRules->Get(vfes->GetFE(i)->GetGeomType(), integrationOrder);
       mi.SetIntRule(&intRule);
       mi.AssembleElementMatrix(*(vfes->GetFE(i) ), *(vfes->GetElementTransformation(i) ), Me);
@@ -82,22 +83,14 @@ RHSoperator::RHSoperator( const int _dim,
      eltrans->SetIntPoint(&intP);
      vfes->GetFE(0)->CalcPhysDShape( *eltrans, column);
      
-     cout << "" <<endl;
-     for(int i=0; i<Me.Size(); i++) cout<<column(i,0)<<" ";
-     cout<<endl;
-     for(int i=0; i<Me.Size(); i++) cout<<column(i,1)<<" ";
-     cout<<endl;
-     
       for(int i=0; i<Me.Size(); i++)
       {
         Dx(node, i) = column(i,0);
-        //cout<< Dx(i, node) << " ";
       }
-      //cout<<endl;
    }
    
    // Mass matrix
-   int integrationOrder = 2*vfes->GetFE(0)->GetOrder() ;
+   int integrationOrder = 2*vfes->GetFE(0)->GetOrder() -1;
    const IntegrationRule intRule = intRules->Get(vfes->GetFE(0)->GetGeomType(), integrationOrder);
    mi.SetIntRule(&intRule);
    mi.AssembleElementMatrix(*(vfes->GetFE(0) ), *(vfes->GetElementTransformation(0) ), Me);
@@ -189,6 +182,7 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
       mfem::Mult((*Me_inv)(i), zmat, ymat);
       y.SetSubVector(vdofs, ymat.GetData());
    }
+   
 }
 
 // Compute the flux at solution nodes.
@@ -205,6 +199,19 @@ void RHSoperator::GetFlux(const DenseMatrix &x, DenseTensor &flux) const
    {
       for (int k = 0; k < num_equation; k++) { (*state)(k) = x(i, k); }
       fluxClass->ComputeFlux(*state, dim, f);
+     
+      if( isSBP )
+      {
+        f *= alpha; // *= alpha
+        double p = eqState->ComputePressure(*state, dim);
+        p *= 1. - alpha;
+        for(int d=0; d<dim; d++)
+        {
+          f(d+1,d) += p;
+          f(num_equation-1,d) += (1.-0.)*p*(*state)(1+d)/(*state)(0);
+        }
+      }
+        
 
       for (int d = 0; d < dim; d++)
       {

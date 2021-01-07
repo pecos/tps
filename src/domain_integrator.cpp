@@ -3,9 +3,11 @@
 
 
 // Implementation of class DomainIntegrator
-DomainIntegrator::DomainIntegrator(IntegrationRules *_intRules,
+DomainIntegrator::DomainIntegrator(Fluxes *_fluxClass,
+                                   IntegrationRules *_intRules,
                                    const int _dim, 
                                    const int _num_equation):
+  fluxClass(_fluxClass),
   dim(_num_equation),
   num_equation(_num_equation),
   intRules(_intRules)
