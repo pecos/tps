@@ -5,12 +5,14 @@
 // Implementation of class DomainIntegrator
 DomainIntegrator::DomainIntegrator(Fluxes *_fluxClass,
                                    IntegrationRules *_intRules,
+                                   int _intRuleType,
                                    const int _dim, 
                                    const int _num_equation):
   fluxClass(_fluxClass),
   dim(_num_equation),
   num_equation(_num_equation),
-  intRules(_intRules)
+  intRules(_intRules),
+  intRuleType(_intRuleType)
 {
   
 }
@@ -43,6 +45,7 @@ void DomainIntegrator::AssembleElementMatrix2(const FiniteElement &trial_fe,
 
    const int maxorder = max(trial_fe.GetOrder(), test_fe.GetOrder());
    int intorder = 2 * maxorder;
+   if( intRuleType ) intorder--; // when using Gauss-Lobatto
    const IntegrationRule *ir = &intRules->Get(trial_fe.GetGeomType(), intorder);
 
    for (int i = 0; i < ir->GetNPoints(); i++)

@@ -25,10 +25,12 @@ private:
    const int dim;
    const int num_equation;
    IntegrationRules *intRules;
+   const int intRuleType;
 
 public:
    DomainIntegrator(Fluxes *_fluxClass,
                     IntegrationRules *_intRules,
+                    int _intRuleType,
                     const int _dim, 
                     const int _num_equation);
 

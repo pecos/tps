@@ -8,8 +8,6 @@
 
 using namespace mfem;
 
-enum Equations { EULER, NS, MHD};
-
 
 // Time-dependent operator for the right-hand side of the ODE representing the
 // DG weak form.
@@ -24,6 +22,7 @@ private:
    int num_equation;
    
    IntegrationRules *intRules;
+   const int intRuleType;
    
    Fluxes *fluxClass;
    EquationOfState *eqState;
@@ -51,6 +50,7 @@ public:
                const Equations &_eqSystem,
                double &_max_char_speed,
                IntegrationRules *_intRules,
+               int _intRuleType,
                Fluxes *_fluxClass,
                EquationOfState *_eqState,
                FiniteElementSpace *_vfes,
