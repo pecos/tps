@@ -1,0 +1,53 @@
+# Example Runfile
+
+# Mesh file
+MESH square_periodic_mesh.mesh
+
+# Polynomial order
+POL_ORDER 3
+
+# Integration rule (quadrature)
+# 0 -> Gauss-Legendre
+# 1 -> Gauss-Lobatto
+INT_RULE 1
+
+# Basis type
+# 0 -> Gauss-Legendre
+# 1 -> Gauss-Lobatto
+BASIS_TYPE 1
+
+# CFL number
+CFL 0.12
+
+# Max num of iters
+NMAX 10500
+
+# Use Summation by parts operators
+# 0 -> no, 1 -> yes
+IS_SBP 1
+
+# Time integrator
+#  1: ForwardEulerSolver
+#  2: RK2Solver(1.0)
+#  3: RK3SSPSolver
+#  4: RK4Solver
+#  6: RK6Solver
+TIME_INTEGRATOR 4
+
+# Working fluid
+# for DRY_AIR -> 0
+FLUID 0
+
+# equations to be solved. Options thus far
+# EULER -> 0
+# NS    -> 1
+# MHD   -> 2
+EQ_SYSTEM 0
+
+# Constant initial conditions
+# Can be removed at will
+INIT_RHO 1.2
+INIT_RHOVX 30.
+INIT_RHOVY 0.
+INIT_RHOVZ 0.
+INIT_P 101300

@@ -8,6 +8,8 @@
 #include "mfem.hpp"
 #include "equation_of_state.hpp"
 
+enum Equations { EULER, NS, MHD};
+
 using namespace mfem;
 
 class Fluxes

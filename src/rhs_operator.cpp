@@ -7,6 +7,7 @@ RHSoperator::RHSoperator( const int _dim,
                           const Equations &_eqSystem,
                           double &_max_char_speed,
                           IntegrationRules *_intRules,
+                          int _intRuleType,
                           Fluxes *_fluxClass,
                           EquationOfState *_eqState,
                           FiniteElementSpace *_vfes,
@@ -20,6 +21,7 @@ RHSoperator::RHSoperator( const int _dim,
      eqSystem(_eqSystem),
      max_char_speed(_max_char_speed),
      intRules(_intRules),
+     intRuleType(_intRuleType),
      fluxClass(_fluxClass),
      eqState(_eqState),
      vfes(_vfes),
@@ -53,7 +55,8 @@ RHSoperator::RHSoperator( const int _dim,
    
    for (int i = 0; i < vfes->GetNE(); i++)
    {
-      int integrationOrder = 2*vfes->GetFE(i)->GetOrder() -1;
+      int integrationOrder = 2*vfes->GetFE(i)->GetOrder();
+      if(intRuleType==1) integrationOrder--; // when Gauss-Lobatto
       const IntegrationRule intRule = intRules->Get(vfes->GetFE(i)->GetGeomType(), integrationOrder);
       mi.SetIntRule(&intRule);
       mi.AssembleElementMatrix(*(vfes->GetFE(i) ), *(vfes->GetElementTransformation(i) ), Me);
@@ -67,31 +70,43 @@ RHSoperator::RHSoperator( const int _dim,
    DenseMatrix kk = vfes->GetElementTransformation(0)->Jacobian();
    
    // Derivation matrix
-   DenseMatrix Dx;
+   DenseMatrix Dx, Kx;
    Dx.SetSize( Me.Size() );
-   
-   for(int node=0; node<Me.Size(); node++)
+   Dx = 0.;
+   Kx.SetSize( Me.Size() );
+   Kx = 0.;
+   ElementTransformation *Tr = vfes->GetElementTransformation(0) ;
+   int integrationOrder = 2*vfes->GetFE(0)->GetOrder();
+   if(intRuleType==1) integrationOrder--; // when Gauss-Lobatto
+   const IntegrationRule intRule = intRules->Get(vfes->GetFE(0)->GetGeomType(), integrationOrder);
+   for(int k=0; k<intRule.GetNPoints(); k++)
    {
-     DenseMatrix column(Me.Size(),2);
-     
-     ElementTransformation *eltrans = vfes->GetElementTransformation(0);
-     IntegrationPoint intP = eltrans->GetIntPoint();
-     IntegrationRule intRule = vfes->GetFE(0)->GetNodes();
-     intP.Set(intRule.IntPoint(node).x, 
-              intRule.IntPoint(node).y, 0., 
-              intRule.IntPoint(node).weight);
-     eltrans->SetIntPoint(&intP);
-     vfes->GetFE(0)->CalcPhysDShape( *eltrans, column);
+     const IntegrationPoint &ip = intRule.IntPoint(k);
+      double wk = ip.weight;
+      Tr->SetIntPoint(&ip);
+      
+     DenseMatrix invJ = Tr->InverseJacobian();
+     double detJac = Tr->Jacobian().Det();
+     DenseMatrix dshape(Me.Size(),2);
+     Vector shape( Me.Size() );
+     vfes->GetFE(0)->CalcShape( Tr->GetIntPoint(), shape);
+     vfes->GetFE(0)->CalcDShape(Tr->GetIntPoint(), dshape);
      
       for(int i=0; i<Me.Size(); i++)
       {
-        Dx(node, i) = column(i,0);
+        for(int j=0; j<Me.Size(); j++)
+        {
+          Kx(j, i) += shape(i)*detJac*(dshape(j,0)*invJ(0,0) +
+                                       dshape(j,1)*invJ(1,0) )*wk;
+          Kx(j, i) += shape(i)*detJac*(dshape(j,0)*invJ(0,1) +
+                                       dshape(j,1)*invJ(1,1) )*wk;
+        }
       }
    }
+   mfem::Mult(Kx,(*Me_inv)(0), Dx);
+   Dx.Transpose();
    
    // Mass matrix
-   int integrationOrder = 2*vfes->GetFE(0)->GetOrder() -1;
-   const IntegrationRule intRule = intRules->Get(vfes->GetFE(0)->GetGeomType(), integrationOrder);
    mi.SetIntRule(&intRule);
    mi.AssembleElementMatrix(*(vfes->GetFE(0) ), *(vfes->GetElementTransformation(0) ), Me);
    //Me *= 1./detJac;

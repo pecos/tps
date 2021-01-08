@@ -8,6 +8,7 @@
  */
 
 #include "mfem.hpp"
+#include "run_configuration.hpp"
 #include "equation_of_state.hpp"
 #include "fluxes.hpp"
 #include "rhs_operator.hpp"
@@ -22,23 +23,26 @@ using namespace std;
 class M2ulPhyS
 {
 private:
+  // Run options
+  RunConfiguration config;
+  
   // Number of simensions
-  const int dim;
+  int dim;
   
   // Number of equations
   int num_equation;
   
   // order of solution polynomials
-  const int order;
+  int order;
   
   // Equations solved
-  const Equations eqSystem;
+  Equations eqSystem;
 
   // Maximum characteristic speed (updated by integrators)
   double max_char_speed;
   
   // reference to mesh
-  Mesh &mesh;
+  Mesh *mesh;
   
   // time integrator
   ODESolver *timeIntegrator;
@@ -104,7 +108,8 @@ private:
   double dt;
   
   // time of end of simulation
-  const double t_final;
+  double t_final;
+  int MaxIters;
   
   // Courant-Friedrich-Levy condition
   double CFL;
@@ -112,6 +117,7 @@ private:
   // minimum element size
   double hmin;
   
+  void initVariables();
   void initSolutionAndVisualizationVectors();
   
   static void InitialConditionEulerVortex(const Vector &x, Vector &y);
@@ -120,13 +126,7 @@ private:
   
 
 public:
-  M2ulPhyS(Mesh &_mesh,
-          int order,
-          int solverType,
-          double _t_final,
-          Equations _eqSystem,
-          WorkingFluid _fluid = DRY_AIR
-         );
+  M2ulPhyS(string &inputFileName );
   ~M2ulPhyS();
   
   void projectInitialSolution();
