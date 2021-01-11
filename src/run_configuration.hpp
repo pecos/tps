@@ -13,6 +13,9 @@ private:
   // mesh file file
   char *meshFile;
   
+  // output file name
+  char *outputFile;
+  
   // time integrator. Possible values
   //  1: ForwardEulerSolver
   //  2: RK2Solver(1.0)
@@ -60,6 +63,7 @@ public:
   void readInputFile(std::string inpuFileName);
   
   char* GetMeshFileName(){return meshFile;}
+  char* GetOutputName(){return outputFile;}
   
   int GetTimeIntegratorType(){return timeIntegratorType;}
   

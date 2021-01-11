@@ -51,4 +51,4 @@ $(PROGRAM): $(OBJS)
 
 .PHONY : clean
 clean:
-	rm -fr $(PROGRAM) *.o
+	rm -fr $(PROGRAM) *.p *.o

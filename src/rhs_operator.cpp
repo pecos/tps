@@ -56,7 +56,7 @@ RHSoperator::RHSoperator( const int _dim,
    for (int i = 0; i < vfes->GetNE(); i++)
    {
       int integrationOrder = 2*vfes->GetFE(i)->GetOrder();
-      if(intRuleType==1) integrationOrder--; // when Gauss-Lobatto
+      //if(intRuleType==1) integrationOrder--; // when Gauss-Lobatto
       const IntegrationRule intRule = intRules->Get(vfes->GetFE(i)->GetGeomType(), integrationOrder);
       mi.SetIntRule(&intRule);
       mi.AssembleElementMatrix(*(vfes->GetFE(i) ), *(vfes->GetElementTransformation(i) ), Me);
@@ -77,7 +77,7 @@ RHSoperator::RHSoperator( const int _dim,
    Kx = 0.;
    ElementTransformation *Tr = vfes->GetElementTransformation(0) ;
    int integrationOrder = 2*vfes->GetFE(0)->GetOrder();
-   if(intRuleType==1) integrationOrder--; // when Gauss-Lobatto
+   //if(intRuleType==1) integrationOrder--; // when Gauss-Lobatto
    const IntegrationRule intRule = intRules->Get(vfes->GetFE(0)->GetGeomType(), integrationOrder);
    for(int k=0; k<intRule.GetNPoints(); k++)
    {

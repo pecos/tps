@@ -27,6 +27,7 @@ RunConfiguration::RunConfiguration()
 RunConfiguration::~RunConfiguration()
 {
   delete[] meshFile;
+  delete[] outputFile;
 }
 
 
@@ -59,6 +60,13 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
         ss >> word;
         meshFile = new char[word.length() ];
         for(int i=0;i<(int)word.length(); i++) meshFile[i] = word[i];
+        
+      // output file name
+      }else if( word.compare("OUTPUT_NAME")==0 )
+      {
+        ss >> word;
+        outputFile = new char[word.length() ];
+        for(int i=0;i<(int)word.length(); i++) outputFile[i] = word[i];
         
       // max num. of iters
       }else if( word.compare("NMAX")==0 )
@@ -168,4 +176,6 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       
     }
   }
+  
+  runFile.close();
 }
