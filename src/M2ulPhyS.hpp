@@ -63,7 +63,9 @@ private:
   int basisType;
   
   // Finite element collection
-  DG_FECollection *fec;
+  //DG_FECollection *fec;
+  //H1_FECollection *fec;
+  FiniteElementCollection *fec;
   
   // Finite element space for a scalar (thermodynamic quantity)
   FiniteElementSpace *fes;

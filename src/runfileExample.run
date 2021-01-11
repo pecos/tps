@@ -3,6 +3,10 @@
 # Mesh file
 MESH square_periodic_mesh.mesh
 
+# output file name
+# extensions will be added by program
+OUTPUT_NAME euler_output
+
 # Polynomial order
 POL_ORDER 3
 

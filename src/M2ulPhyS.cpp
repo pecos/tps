@@ -19,7 +19,9 @@ M2ulPhyS::M2ulPhyS(string &inputFileName)
 void M2ulPhyS::initVariables()
 {
   
-  mesh = new Mesh(config.GetMeshFileName(),1,1);
+  //mesh = new Mesh(config.GetMeshFileName(),1,1);
+  mesh = new Mesh(config.GetMeshFileName());
+  mesh->PrintCharacteristics();
   dim = mesh->Dimension();
   
   eqSystem = config.GetEquationSystem();
@@ -53,10 +55,12 @@ void M2ulPhyS::initVariables()
   if( basisType == 0 )
   {
     fec  = new DG_FECollection(order, dim, BasisType::GaussLegendre);
+    //fec  = new H1_FECollection(order, dim, BasisType::GaussLegendre);
   }else if ( basisType == 1 )
   {
-    // This basis type include end-nodes
-    fec  = new DG_FECollection(order, dim, BasisType::GaussLobatto);
+    // This basis type includes end-nodes
+    //fec  = new DG_FECollection(order, dim, BasisType::GaussLobatto);
+    fec  = new H1_FECollection(order, dim, BasisType::GaussLobatto);
   }
   
   // FE Spaces
@@ -231,10 +235,6 @@ void M2ulPhyS::Iterate()
     if (done || ti % vis_steps == 0)
     {
         cout << "time step: " << ti << ", progress(%): " << 100.*time/t_final << endl;
-//         if (visualization)
-//         {
-//           sout << "solution\n" << mesh << mom << flush;
-//         }
     }
   }
   
@@ -247,13 +247,19 @@ void M2ulPhyS::Iterate()
       const double error = sol->ComputeLpError(2, u0);
       cout << "Solution error: " << error << endl;
       
+      string fileName(config.GetOutputName());
+      fileName.append(".mesh");
+      ofstream vtkmesh(fileName);
+      mesh->Print(vtkmesh);
+      vtkmesh.close();
+      
       // 9. Save the final solution. This output can be viewed later using GLVis:
       //    "glvis -m vortex.mesh -g vortex-1-final.gf".
       for (int k = 0; k < num_equation; k++)
       {
           GridFunction uk(fes, u_block->GetBlock(k));
           ostringstream sol_name;
-          sol_name << "vortex-" << k << "-final.gf";
+          sol_name << config.GetOutputName() <<"-" << k << "-final.gf";
           ofstream sol_ofs(sol_name.str().c_str());
           sol_ofs.precision(8);
           sol_ofs << uk;
