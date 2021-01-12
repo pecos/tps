@@ -33,7 +33,8 @@ private:
    
    MixedBilinearForm *Aflux;
    
-   DenseTensor *Me_inv;
+   //DenseTensor *Me_inv;
+   DenseMatrix *Me_inv;
    
    const bool &isSBP;
    const double &alpha;
