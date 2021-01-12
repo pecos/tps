@@ -42,6 +42,9 @@ private:
   // num iterations. Defaults to 0
   int numIters;
   
+  // output interval in num. of iters.
+  int itersOut;
+  
   // working fluid. Options thus far
   // DRY_AIR
   // Defaults to DRAY_AIR
@@ -73,6 +76,7 @@ public:
   
   double GetCFLNumber(){return cflNum;}
   int GetNumIters(){return numIters;}
+  int GetNumItersOutput(){return itersOut;}
   WorkingFluid GetWorkingFluid(){return workFluid;}
   Equations GetEquationSystem(){return eqSystem;}
   bool isSBP(){return SBP;}

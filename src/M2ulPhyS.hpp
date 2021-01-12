@@ -81,6 +81,9 @@ private:
   // These are stored contiguously in the BlockVector u_block.
   Array<int> *offsets;
   BlockVector *u_block;
+  
+  // paraview collection pointer
+  ParaViewDataCollection *paraviewColl = NULL;
 
   // Momentum grid function on dfes for visualization.
   //GridFunction mom;

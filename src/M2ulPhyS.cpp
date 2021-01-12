@@ -157,6 +157,8 @@ void M2ulPhyS::initVariables()
 
 M2ulPhyS::~M2ulPhyS()
 {
+  delete paraviewColl;
+  
   delete u_block;
   delete offsets;
   
@@ -193,9 +195,17 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
 //   }
   
   sol = new GridFunction(vfes, u_block->GetData());
-
-  // Momentum grid function on dfes for visualization.
-  //GridFunction mom(dfes, u_block->GetData() + (*offsets)[1]);
+  
+  // set paraview output
+  paraviewColl = new ParaViewDataCollection(config.GetOutputName(),mesh);
+  //paraviewColl->SetPrefixPath("ParaView");
+  paraviewColl->RegisterField("solution", sol);
+  paraviewColl->SetLevelsOfDetail(order);
+  paraviewColl->SetDataFormat(VTKFormat::BINARY);
+  paraviewColl->SetHighOrderOutput(true);
+  paraviewColl->SetCycle(0);
+  paraviewColl->SetTime(0.0);
+  paraviewColl->Save();
 }
 
 void M2ulPhyS::projectInitialSolution()
@@ -230,7 +240,7 @@ void M2ulPhyS::Iterate()
     dt = CFL * hmin / max_char_speed /(double)dim;
     ti++;
 
-    const int vis_steps = 50;
+    const int vis_steps = config.GetNumItersOutput();
     done = (time >= t_final - 1e-8*dt);
     if (done || ti % vis_steps == 0)
     {
@@ -250,6 +260,10 @@ void M2ulPhyS::Iterate()
           sol_ofs.precision(8);
           sol_ofs << uk;
           //exit(0);
+          
+          paraviewColl->SetCycle(ti);
+          paraviewColl->SetTime(time);
+          paraviewColl->Save();
         }
     }
   }
