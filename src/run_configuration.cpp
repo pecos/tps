@@ -18,6 +18,7 @@ RunConfiguration::RunConfiguration()
   
   cflNum = 0.12;
   numIters = 10;
+  itersOut = 50;
   workFluid = DRY_AIR;
   eqSystem = EULER;
   SBP = false;
@@ -73,6 +74,12 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       {
         ss >> word;
         numIters = stoi(word);
+        
+      // output interval
+      }else if( word.compare("ITERS_OUT")==0 )
+      {
+        ss >> word;
+        itersOut = stoi(word);
         
       // solution order
       }else if( word.compare("POL_ORDER")==0 )

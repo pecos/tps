@@ -26,6 +26,9 @@ CFL 0.12
 # Max num of iters
 NMAX 10500
 
+# output interval in num. of iters.
+ITERS_OUT 100
+
 # Use Summation by parts operators
 # 0 -> no, 1 -> yes
 IS_SBP 1
