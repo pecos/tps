@@ -59,8 +59,8 @@ void M2ulPhyS::initVariables()
   }else if ( basisType == 1 )
   {
     // This basis type includes end-nodes
-    //fec  = new DG_FECollection(order, dim, BasisType::GaussLobatto);
-    fec  = new H1_FECollection(order, dim, BasisType::GaussLobatto);
+    fec  = new DG_FECollection(order, dim, BasisType::GaussLobatto);
+    //fec  = new H1_FECollection(order, dim, BasisType::GaussLobatto);
   }
   
   // FE Spaces
@@ -235,6 +235,22 @@ void M2ulPhyS::Iterate()
     if (done || ti % vis_steps == 0)
     {
         cout << "time step: " << ti << ", progress(%): " << 100.*time/t_final << endl;
+        
+        { // DEBUG ONLY!
+          string fileName(config.GetOutputName());
+          fileName.append(".mesh");
+          ofstream vtkmesh(fileName);
+          mesh->Print(vtkmesh);
+          vtkmesh.close();
+          
+          GridFunction uk(fes, u_block->GetBlock(2));
+          ostringstream sol_name;
+          sol_name << config.GetOutputName() <<"-" << 2 << "-final.gf";
+          ofstream sol_ofs(sol_name.str().c_str());
+          sol_ofs.precision(8);
+          sol_ofs << uk;
+          //exit(0);
+        }
     }
   }
   

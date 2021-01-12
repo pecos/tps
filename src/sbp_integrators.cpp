@@ -69,7 +69,7 @@ void SBPintegrator::AssembleElementVector(const FiniteElement& el,
    
    // Integration order calculation from DGTraceIntegrator
    int intorder = 2*el.GetOrder();
-   intorder--; // SBP can only be used with collocated Gauss-Lobatto integration rules
+   if(el.GetGeomType()==Geometry::SQUARE) intorder--; // when Gauss-Lobatto
    
    const IntegrationRule *ir = &intRules->Get(Tr.GetGeometryType(), intorder);
    

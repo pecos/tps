@@ -45,40 +45,41 @@ RHSoperator::RHSoperator( const int _dim,
   
   state = new Vector(num_equation);
   
-  Me_inv = new DenseTensor(vfes->GetFE(0)->GetDof(), vfes->GetFE(0)->GetDof(), vfes->GetNE());
-  
-   // Standard local assembly and inversion for energy mass matrices.
-   const int dof = vfes->GetFE(0)->GetDof();
-   DenseMatrix Me(dof);
-   DenseMatrixInverse inv(&Me);
-   MassIntegrator mi;
+  //Me_inv = new DenseTensor(vfes->GetFE(0)->GetDof(), vfes->GetFE(0)->GetDof(), vfes->GetNE());
+  Me_inv = new DenseMatrix[vfes->GetNE()];
    
    for (int i = 0; i < vfes->GetNE(); i++)
    {
+         // Standard local assembly and inversion for energy mass matrices.
+      const int dof = vfes->GetFE(i)->GetDof();
+      DenseMatrix Me(dof);
+      DenseMatrixInverse inv(&Me);
+      MassIntegrator mi;
+    
       int integrationOrder = 2*vfes->GetFE(i)->GetOrder();
-      //if(intRuleType==1) integrationOrder--; // when Gauss-Lobatto
+      if(intRuleType==1 && vfes->GetFE(i)->GetGeomType()==Geometry::SQUARE) integrationOrder--; // when Gauss-Lobatto
       const IntegrationRule intRule = intRules->Get(vfes->GetFE(i)->GetGeomType(), integrationOrder);
       mi.SetIntRule(&intRule);
       mi.AssembleElementMatrix(*(vfes->GetFE(i) ), *(vfes->GetElementTransformation(i) ), Me);
       inv.Factor();
-      inv.GetInverseMatrix( (*Me_inv)(i));
+      //inv.GetInverseMatrix( (*Me_inv)(i));
+      inv.GetInverseMatrix( Me_inv[i]);
    }
    
    
    // This is for DEBUG ONLY!!!
-   // Inverse of transformation jacobian
-   DenseMatrix kk = vfes->GetElementTransformation(0)->Jacobian();
+   int elem = 10;
+    const int dof = vfes->GetFE(elem)->GetDof();
+    DenseMatrix Me(dof);
    
    // Derivation matrix
-   DenseMatrix Dx, Kx;
-   Dx.SetSize( Me.Size() );
+   DenseMatrix Dx(dof), Kx(dof);
    Dx = 0.;
-   Kx.SetSize( Me.Size() );
    Kx = 0.;
-   ElementTransformation *Tr = vfes->GetElementTransformation(0) ;
-   int integrationOrder = 2*vfes->GetFE(0)->GetOrder();
-   //if(intRuleType==1) integrationOrder--; // when Gauss-Lobatto
-   const IntegrationRule intRule = intRules->Get(vfes->GetFE(0)->GetGeomType(), integrationOrder);
+   ElementTransformation *Tr = vfes->GetElementTransformation(elem) ;
+   int integrationOrder = 2*vfes->GetFE(elem)->GetOrder();
+   if(intRuleType==1 && vfes->GetFE(elem)->GetGeomType()==Geometry::SQUARE) integrationOrder--; // when Gauss-Lobatto
+   const IntegrationRule intRule = intRules->Get(vfes->GetFE(elem)->GetGeomType(), integrationOrder);
    for(int k=0; k<intRule.GetNPoints(); k++)
    {
      const IntegrationPoint &ip = intRule.IntPoint(k);
@@ -87,14 +88,14 @@ RHSoperator::RHSoperator( const int _dim,
       
      DenseMatrix invJ = Tr->InverseJacobian();
      double detJac = Tr->Jacobian().Det();
-     DenseMatrix dshape(Me.Size(),2);
-     Vector shape( Me.Size() );
-     vfes->GetFE(0)->CalcShape( Tr->GetIntPoint(), shape);
-     vfes->GetFE(0)->CalcDShape(Tr->GetIntPoint(), dshape);
+     DenseMatrix dshape(dof,2);
+     Vector shape( dof );
+     vfes->GetFE(elem)->CalcShape( Tr->GetIntPoint(), shape);
+     vfes->GetFE(elem)->CalcDShape(Tr->GetIntPoint(), dshape);
      
-      for(int i=0; i<Me.Size(); i++)
+      for(int i=0; i<dof; i++)
       {
-        for(int j=0; j<Me.Size(); j++)
+        for(int j=0; j<dof; j++)
         {
           Kx(j, i) += shape(i)*detJac*(dshape(j,0)*invJ(0,0) +
                                        dshape(j,1)*invJ(1,0) )*wk;
@@ -103,12 +104,13 @@ RHSoperator::RHSoperator( const int _dim,
         }
       }
    }
-   mfem::Mult(Kx,(*Me_inv)(0), Dx);
+   mfem::Mult(Kx,Me_inv[elem], Dx);
    Dx.Transpose();
    
    // Mass matrix
+   MassIntegrator mi;
    mi.SetIntRule(&intRule);
-   mi.AssembleElementMatrix(*(vfes->GetFE(0) ), *(vfes->GetElementTransformation(0) ), Me);
+   mi.AssembleElementMatrix(*(vfes->GetFE(elem) ), *(vfes->GetElementTransformation(elem) ), Me);
    //Me *= 1./detJac;
    cout<<"Mass matrix"<<endl;
    for(int i=0; i<Me.Size(); i++)
@@ -151,7 +153,7 @@ RHSoperator::RHSoperator( const int _dim,
 RHSoperator::~RHSoperator()
 {
   delete state;
-  delete Me_inv;
+  delete[] Me_inv;
 }
 
 
@@ -183,18 +185,19 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
    }
 
    // 3. Multiply element-wise by the inverse mass matrices.
-   Vector zval;
-   Array<int> vdofs;
-   const int dof = vfes->GetFE(0)->GetDof();
-   DenseMatrix zmat, ymat(dof, num_equation);
-
    for (int i = 0; i < vfes->GetNE(); i++)
    {
+      Vector zval;
+      Array<int> vdofs;
+      const int dof = vfes->GetFE(i)->GetDof();
+      DenseMatrix zmat, ymat(dof, num_equation);
+      
       // Return the vdofs ordered byNODES
       vfes->GetElementVDofs(i, vdofs);
       z.GetSubVector(vdofs, zval);
       zmat.UseExternalData(zval.GetData(), dof, num_equation);
-      mfem::Mult((*Me_inv)(i), zmat, ymat);
+      //mfem::Mult((*Me_inv)(i), zmat, ymat);
+      mfem::Mult(Me_inv[i], zmat, ymat);
       y.SetSubVector(vdofs, ymat.GetData());
    }
    
