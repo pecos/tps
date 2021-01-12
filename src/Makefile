@@ -1,6 +1,6 @@
 PROJECT_ROOT = $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
-PROGRAM = ex18.p
+PROGRAM = MulPhyS.p
 
 # LIBRARIES
 LIBS =  -lmfem \
@@ -24,7 +24,7 @@ SOURCE_FILES = $(wildcard *.cpp)
 HEADER_FILES = $(wildcard *.hpp)
 
 # MAIN FILE
-MAIN_FILE = ex18.cpp
+MAIN_FILE = main.cpp
 
 # OBJECTS
 OBJS = $(patsubst %.cpp,%.o,$(SOURCE_FILES))
