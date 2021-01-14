@@ -4,8 +4,6 @@
 #include <fstream>
 #include <sstream>
 
-#include <vector>
-
 RunConfiguration::RunConfiguration()
 {
   // Initialize with default values
@@ -182,7 +180,7 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       }else if( word.compare("INLET")==0 )
       {
         ss >> word;
-        pair<int,InletType> patchANDtype;
+        std::pair<int,InletType> patchANDtype;
         patchANDtype.first = stoi(word) ;
         
         ss >> word;
@@ -209,7 +207,7 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       }else if( word.compare("OUTLET")==0 )
       {
         ss >> word;
-        pair<int,OutletType> patchANDtype;
+        std::pair<int,OutletType> patchANDtype;
         patchANDtype.first = stoi(word) ;
         
         ss >> word;
@@ -226,7 +224,9 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
         outletPatchType.Append( patchANDtype );
         
         ss >> word;
-        outletBC.Append( stof(word) );
+        outletBC.SetSize(outletBC.Size()+1 );
+        outletBC[outletBC.Size()-1].SetSize(1);
+        outletBC[outletBC.Size()-1][0] = stof( word );
         
       }
       

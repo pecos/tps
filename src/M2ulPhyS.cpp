@@ -89,7 +89,18 @@ void M2ulPhyS::initVariables()
     A->AddDomainIntegrator( SBPoperator );
   }
   
-  initBCs();
+  if( mesh->attributes.Size()>0 )
+  {
+    bcIntegrator = new BCintegrator(mesh,
+                                    intRules,
+                                    rsolver, 
+                                    eqState,
+                                    dim,
+                                    num_equation,
+                                    max_char_speed,
+                                    config);
+    A->AddBdrFaceIntegrator( bcIntegrator );
+  }
   
   Aflux = new MixedBilinearForm(dfes, fes);
   domainIntegrator = new DomainIntegrator(fluxClass,intRules, intRuleType, 
@@ -128,11 +139,6 @@ void M2ulPhyS::initVariables()
   
   time = 0.;
   CFL = config.GetCFLNumber();
-//   switch(order)
-//   {
-//     case 4: CFL = 0.12; break;
-//     default: break;
-//   }
   rhsOperator->SetTime(time);
   timeIntegrator->Init( *rhsOperator );
   
@@ -186,85 +192,6 @@ M2ulPhyS::~M2ulPhyS()
   delete intRules;
   
   delete mesh;
-}
-
-void M2ulPhyS::initBCs()
-{
-  // inlet BCs
-  for(int in=0; in<(*config.GetInletPatchType()).Size(); in++)
-  {
-    pair<int,InletType> patchANDtype = (*config.GetInletPatchType())[in];
-    int attr = patchANDtype.first;
-    
-    // check if the attr is indeed in the mesh
-    bool isInMesh = false;
-    for(int i=0; i<mesh->bdr_attributes.Size(); i++)
-    {
-      if( attr==mesh->bdr_attributes[i] ) isInMesh = true;
-    }
-    
-    if(isInMesh)
-    {
-      InletBC *kk = new InletBC(mesh,
-                                      intRules,
-                                      rsolver, 
-                                      eqState,
-                                      dim,
-                                      num_equation,
-                                      max_char_speed,
-                                      attr,
-                                      patchANDtype.second,
-                                      *config.GetInletData(in) ) ;
-      
-      inletVec.Append( kk );
-      inletAttr.SetSize(inletAttr.Size()+1);
-      inletAttr[inletAttr.Size()-1].SetSize(1);
-      inletAttr[inletAttr.Size()-1][0] = attr;
-      //A->AddBdrFaceIntegrator( inletVec[in], inletAttr[in] );
-    }else
-    {
-      cout<<"Runfile inlet attribute not found in mesh!"<< endl;
-      exit(1);
-    }
-  }
-  
-  // outlet BCs
-  for(int out=0; out<(*config.GetOutletPatchType()).Size(); out++)
-  {
-    pair<int,OutletType> patchANDtype = (*config.GetOutletPatchType())[out];
-    int attr = patchANDtype.first;
-    
-    // check if the attr is indeed in the mesh
-    bool isInMesh = false;
-    for(int i=0; i<mesh->bdr_attributes.Size(); i++)
-    {
-      if( attr==mesh->bdr_attributes[i] ) isInMesh = true;
-    }
-    
-    if(isInMesh)
-    {
-      outletVec.Append( new OutletBC(mesh,
-                                        intRules,
-                                        rsolver, 
-                                        eqState,
-                                        dim,
-                                        num_equation,
-                                        max_char_speed,
-                                        attr,
-                                        patchANDtype.second,
-                                        config.GetOutletData()[out] ) );
-      
-      outletAttr.SetSize(outletAttr.Size()+1);
-      outletAttr[outletAttr.Size()-1].SetSize(1);
-      outletAttr[outletAttr.Size()-1][0] = attr;
-      //A->AddBdrFaceIntegrator( outletVec[out], outletAttr[out] );
-      A->AddBdrFaceIntegrator( outletVec[out] );
-    }else
-    {
-      cout<<"Runfile outlet attribute not found in mesh!"<< endl;
-    }
-  }
-  A->Setup();
 }
 
 

@@ -1,37 +1,83 @@
-#include "InOutBC.hpp"
+#include "BCintegrator.hpp"
 
-InOutBC::InOutBC(Mesh* _mesh, 
-                 IntegrationRules* _intRules, 
-                 RiemannSolver* rsolver_, 
-                 EquationOfState *_eqState,
-                 const int _dim, 
-                 const int _num_equation, 
-                 double& _max_char_speed,
-                 int _patchNumber ):
+BCintegrator::BCintegrator( Mesh *_mesh,
+                            IntegrationRules *_intRules,
+                            RiemannSolver *rsolver_, 
+                            EquationOfState *_eqState,
+                            const int _dim,
+                            const int _num_equation,
+                            double &_max_char_speed,
+                            RunConfiguration &_runFile ):
+config(_runFile),
 rsolver(rsolver_),
 eqState(_eqState),
 dim(_dim),
 num_equation(_num_equation),
 max_char_speed(_max_char_speed),
 intRules(_intRules),
-mesh(_mesh),
-patchNumber(_patchNumber)
+mesh(_mesh)
 {
-  meanState = new Vector(num_equation);
+  // Initi inlet BCs
+  for(int in=0; in<config.GetInletPatchType()->Size(); in++)
+  {
+    std::pair<int,InletType> patchANDtype = (*config.GetInletPatchType())[in];
+    // check if attribute is in mesh
+    bool attrInMesh = false;
+    for(int i=0; i<mesh->bdr_attributes.Size(); i++) 
+    {
+      if(patchANDtype.first==mesh->bdr_attributes[i]) attrInMesh = true;
+    }
+    
+    if( attrInMesh )
+    {
+      BCmap[patchANDtype.first] = new InletBC(rsolver, 
+                                              eqState,
+                                              dim,
+                                              num_equation,
+                                              patchANDtype.first,
+                                              patchANDtype.second,
+                                              *config.GetInletData(in) );
+    }
+  }
+  
+  // Initi outlet BCs
+  for(int o=0; o<config.GetOutletPatchType()->Size(); o++)
+  {
+    std::pair<int,OutletType> patchANDtype = (*config.GetOutletPatchType())[o];
+    // check if attribute is in mesh
+    bool attrInMesh = false;
+    for(int i=0; i<mesh->bdr_attributes.Size(); i++) 
+      if(patchANDtype.first==mesh->bdr_attributes[i]) attrInMesh = true;
+    
+    if( attrInMesh )
+    {
+      BCmap[patchANDtype.first] = new OutletBC( rsolver, 
+                                                eqState,
+                                                dim,
+                                                num_equation,
+                                                patchANDtype.first,
+                                                patchANDtype.second,
+                                                *config.GetOutletData(o) );
+    }
+  }
 }
 
-InOutBC::~InOutBC()
+BCintegrator::~BCintegrator()
 {
-  delete meanState;
 }
 
-void InOutBC::AssembleFaceVector(const FiniteElement& el1, 
+void BCintegrator::computeState(const int attr, Vector& stateIn, Vector& stateOut)
+{
+  BCmap[attr]->computeState(stateIn,stateOut);
+}
+
+
+void BCintegrator::AssembleFaceVector(const FiniteElement& el1, 
                                  const FiniteElement& el2, 
                                  FaceElementTransformations& Tr, 
                                  const Vector& elfun, 
                                  Vector& elvect)
 {
-  cout<<"attr: " << Tr.Attribute << "elem x: "<< el1.GetNodes().IntPoint(0).x <<endl; 
   Vector shape1;
    Vector shape2;
    Vector funval1(num_equation);
@@ -56,7 +102,7 @@ void InOutBC::AssembleFaceVector(const FiniteElement& el1,
    {
      Vector nodeState(num_equation), bcState(num_equation);
      elfun1_mat.GetRow(n, nodeState);
-     computeState(nodeState, bcState);
+     computeState(Tr.Attribute,nodeState, bcState);
      elfun2_mat.SetRow(n,bcState);
    }
 

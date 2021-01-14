@@ -1,22 +1,20 @@
 #include "inletBC.hpp"
 
-InletBC::InletBC(mfem::Mesh* _mesh, 
-                 mfem::IntegrationRules* _intRules, 
-                 RiemannSolver* rsolver_, 
-                 EquationOfState *_eqState,
-                 const int _dim, 
-                 const int _num_equation, 
-                 double& _max_char_speed,
-                 int _patchNumber,
-                 InletType _bcType,
-                 const Array<double> &inputData ):
-InOutBC(_mesh, _intRules, rsolver_,_eqState,_dim,
-        _num_equation,_max_char_speed, _patchNumber),
-inletType(_bcType)
+InletBC::InletBC(RiemannSolver *_rsolver, 
+            EquationOfState *_eqState,
+            const int _dim,
+            const int _num_equation,
+            int _patchNumber,
+            InletType _bcType,
+            const Array<double> &_inputData ):
+BoundaryCondition(_rsolver, 
+                  _eqState,
+                  _dim,
+                  _num_equation,
+                  _patchNumber),
+inletType(_bcType),
+inputState(_inputData)
 {
-  
-  // only subsonic case considered
-  for(int i=0; i<4; i++) {inputState.Append( inputData[i] ); cout<<inputState[i]<<endl;}
 }
 
 InletBC::~InletBC()
@@ -25,7 +23,6 @@ InletBC::~InletBC()
 
 void InletBC::computeState(Vector &stateIn, Vector &stateOut)
 {
-  cout<<"inlet "<<inletType<<endl;
   switch(inletType)
   {
     case PV:

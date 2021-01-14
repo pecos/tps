@@ -16,8 +16,7 @@
 #include "riemann_solver.hpp"
 #include "domain_integrator.hpp"
 #include "sbp_integrators.hpp"
-#include "inletBC.hpp"
-#include "outletBC.hpp"
+#include "BCintegrator.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -101,11 +100,8 @@ private:
   MixedBilinearForm *Aflux;
   DomainIntegrator *domainIntegrator;
   
-  // inlet and outlet classes
-  Array<InletBC*>  inletVec;
-  Array<Array<int> > inletAttr;
-  Array<OutletBC*> outletVec;
-  Array<Array<int> > outletAttr;
+  // Boundary condition non-linear integrator
+  BCintegrator *bcIntegrator;
   
   // Coefficient for SBP operators and 
   bool isSBP;

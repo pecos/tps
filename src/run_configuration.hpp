@@ -7,7 +7,6 @@
 #include "inletBC.hpp"
 #include "outletBC.hpp"
 
-using namespace std;
 using namespace mfem;
 
 // Class to manage the run options as
@@ -67,12 +66,12 @@ private:
   
   // Inlet BC data
   Array<Array<double> > inletBC;
-  Array<pair<int,InletType> > inletPatchType;
+  Array<std::pair<int,InletType> > inletPatchType;
   
   
   // Outlet BC data
-  Array<double> outletBC;
-  Array<pair<int,OutletType> > outletPatchType;
+  Array<Array<double> > outletBC;
+  Array<std::pair<int,OutletType> > outletPatchType;
   
 public:
   RunConfiguration();
@@ -96,10 +95,11 @@ public:
   Equations GetEquationSystem(){return eqSystem;}
   bool isSBP(){return SBP;}
   double* GetConstantInitialCondition(){return &initRhoRhoVp[0];}
-  Array<pair<int,InletType> >* GetInletPatchType(){return &inletPatchType;}
+  
+  Array<std::pair<int,InletType> >* GetInletPatchType(){return &inletPatchType;}
   Array<double>* GetInletData(int in){return &inletBC[in];}
-  Array<pair<int,OutletType> >* GetOutletPatchType(){return &outletPatchType;}
-  Array<double>* GetOutletData(){return &outletBC;}
+  Array<std::pair<int,OutletType> >* GetOutletPatchType(){return &outletPatchType;}
+  Array<double>* GetOutletData(int out){return &outletBC[out];}
 };
 
 #endif // RUN_CONFIGURATION

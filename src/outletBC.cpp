@@ -1,21 +1,20 @@
 #include "outletBC.hpp"
 
-OutletBC::OutletBC(mfem::Mesh* _mesh, 
-                 mfem::IntegrationRules* _intRules, 
-                 RiemannSolver* rsolver_, 
-                 EquationOfState *_eqState,
-                 const int _dim, 
-                 const int _num_equation, 
-                 double& _max_char_speed,
-                 int _patchNumber,
-                 OutletType _bcType,
-                 const Array<double> &_inputData ):
-InOutBC(_mesh, _intRules, rsolver_,_eqState,_dim,
-        _num_equation,_max_char_speed, _patchNumber),
-outletType(_bcType)
+OutletBC::OutletBC(RiemannSolver *_rsolver, 
+            EquationOfState *_eqState,
+            const int _dim,
+            const int _num_equation,
+            int _patchNumber,
+            OutletType _bcType,
+            const Array<double> &_inputData ):
+BoundaryCondition(_rsolver, 
+                  _eqState,
+                  _dim,
+                  _num_equation,
+                  _patchNumber),
+outletType(_bcType),
+inputState(_inputData)
 {
-  // only subsonic case considered
-  inputState.Append( _inputData[0] );
 }
 
 OutletBC::~OutletBC()
@@ -24,7 +23,6 @@ OutletBC::~OutletBC()
 
 void OutletBC::computeState(Vector &stateIn, Vector &stateOut)
 {
-  //cout<<"outlet "<<outletType<<endl;
   switch(outletType)
   {
     case SUB_P:
