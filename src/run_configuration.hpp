@@ -1,8 +1,14 @@
 #ifndef RUN_CONFIGURATION
 #define RUN_CONFIGURATION
 
+#include "mfem.hpp"
 #include "equation_of_state.hpp"
 #include "fluxes.hpp"
+#include "inletBC.hpp"
+#include "outletBC.hpp"
+
+using namespace std;
+using namespace mfem;
 
 // Class to manage the run options as
 // specified in the input file
@@ -59,6 +65,15 @@ private:
   // initial constant field
   double initRhoRhoVp[5];
   
+  // Inlet BC data
+  Array<Array<double> > inletBC;
+  Array<pair<int,InletType> > inletPatchType;
+  
+  
+  // Outlet BC data
+  Array<double> outletBC;
+  Array<pair<int,OutletType> > outletPatchType;
+  
 public:
   RunConfiguration();
   ~RunConfiguration();
@@ -81,6 +96,10 @@ public:
   Equations GetEquationSystem(){return eqSystem;}
   bool isSBP(){return SBP;}
   double* GetConstantInitialCondition(){return &initRhoRhoVp[0];}
+  Array<pair<int,InletType> >* GetInletPatchType(){return &inletPatchType;}
+  Array<double>* GetInletData(int in){return &inletBC[in];}
+  Array<pair<int,OutletType> >* GetOutletPatchType(){return &outletPatchType;}
+  Array<double>* GetOutletData(){return &outletBC;}
 };
 
 #endif // RUN_CONFIGURATION

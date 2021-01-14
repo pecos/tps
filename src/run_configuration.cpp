@@ -1,11 +1,10 @@
+#include "run_configuration.hpp"
 
 #include <string>
 #include <fstream>
 #include <sstream>
 
-#include "run_configuration.hpp"
-
-using namespace std;
+#include <vector>
 
 RunConfiguration::RunConfiguration()
 {
@@ -179,6 +178,56 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       {
         ss >> word;
         initRhoRhoVp[4] = stof( word );
+        
+      }else if( word.compare("INLET")==0 )
+      {
+        ss >> word;
+        pair<int,InletType> patchANDtype;
+        patchANDtype.first = stoi(word) ;
+        
+        ss >> word;
+        int typ = stoi( word );
+        switch(typ)
+        {
+          case 0:
+            patchANDtype.second = PV;
+            break;
+          case 1:
+            patchANDtype.second = PV_NR;
+            break;
+        }
+        inletPatchType.Append( patchANDtype );
+        
+        inletBC.SetSize( inletBC.Size()+1 );
+        inletBC[inletBC.Size()-1].SetSize(4);
+        for(int i=0; i<4; i++)
+        {
+          ss >> word;
+          inletBC[inletBC.Size()-1][i] = stof( word );
+        }
+        
+      }else if( word.compare("OUTLET")==0 )
+      {
+        ss >> word;
+        pair<int,OutletType> patchANDtype;
+        patchANDtype.first = stoi(word) ;
+        
+        ss >> word;
+        int typ = stoi( word );
+        switch(typ)
+        {
+          case 0:
+            patchANDtype.second = SUB_P;
+            break;
+          case 1:
+            patchANDtype.second = SUB_P_NR;
+            break;
+        }
+        outletPatchType.Append( patchANDtype );
+        
+        ss >> word;
+        outletBC.Append( stof(word) );
+        
       }
       
     }

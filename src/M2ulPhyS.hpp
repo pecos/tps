@@ -16,6 +16,8 @@
 #include "riemann_solver.hpp"
 #include "domain_integrator.hpp"
 #include "sbp_integrators.hpp"
+#include "inletBC.hpp"
+#include "outletBC.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -99,6 +101,12 @@ private:
   MixedBilinearForm *Aflux;
   DomainIntegrator *domainIntegrator;
   
+  // inlet and outlet classes
+  Array<InletBC*>  inletVec;
+  Array<Array<int> > inletAttr;
+  Array<OutletBC*> outletVec;
+  Array<Array<int> > outletAttr;
+  
   // Coefficient for SBP operators and 
   bool isSBP;
   double alpha;
@@ -123,11 +131,12 @@ private:
   double hmin;
   
   void initVariables();
+  void initBCs();
   void initSolutionAndVisualizationVectors();
   
   static void InitialConditionEulerVortex(const Vector &x, Vector &y);
   static void testInitialCondition(const Vector &x, Vector &y);
-  static void uniformInitialConditions();
+  void uniformInitialConditions();
   
 
 public:

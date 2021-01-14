@@ -58,3 +58,17 @@ INIT_RHOVX 30.
 INIT_RHOVY 0.
 INIT_RHOVZ 0.
 INIT_P 101300
+
+# Inlet Boundary Conditions
+# types:
+# 0 -> Subsonic Inlet Specified with P and Vel(3)
+# 1 -> Non-reflect. sub. Inlet Specified with P and Vel(3)
+#INLET patchNum type press vx vy vz
+INLET 5 0 101300 30 0 0
+
+# Outlet Boundary Conditions
+# types:
+# 0 -> Subsonic outlet Specified with P 
+# 1 -> Non-reflect. sub. outlet Specified with P 
+#OUTLET patchNum type press
+OUTLET 3 0 101300

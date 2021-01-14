@@ -89,6 +89,8 @@ void M2ulPhyS::initVariables()
     A->AddDomainIntegrator( SBPoperator );
   }
   
+  initBCs();
+  
   Aflux = new MixedBilinearForm(dfes, fes);
   domainIntegrator = new DomainIntegrator(fluxClass,intRules, intRuleType, 
                                           dim, num_equation);
@@ -151,6 +153,7 @@ void M2ulPhyS::initVariables()
     Vector z(A->Width());
     A->Mult(*sol, z);
     dt = CFL * hmin / max_char_speed / (2*order+1);
+    t_final = MaxIters*dt;
   }
 }
 
@@ -166,10 +169,13 @@ M2ulPhyS::~M2ulPhyS()
   
   delete rhsOperator;
   delete domainIntegrator;
-  //delete Aflux; // fails to delete (follow)
+  //delete Aflux; // fails to delete (follow this)
   if( isSBP ) delete SBPoperator;
   delete faceIntegrator;
-  //delete A; // fails to delete (follow)
+  //delete A; // fails to delete (follow this)
+  
+  // delete inlet/outlet integrators
+  
   delete rsolver;
   delete fluxClass;
   delete eqState;
@@ -181,6 +187,86 @@ M2ulPhyS::~M2ulPhyS()
   
   delete mesh;
 }
+
+void M2ulPhyS::initBCs()
+{
+  // inlet BCs
+  for(int in=0; in<(*config.GetInletPatchType()).Size(); in++)
+  {
+    pair<int,InletType> patchANDtype = (*config.GetInletPatchType())[in];
+    int attr = patchANDtype.first;
+    
+    // check if the attr is indeed in the mesh
+    bool isInMesh = false;
+    for(int i=0; i<mesh->bdr_attributes.Size(); i++)
+    {
+      if( attr==mesh->bdr_attributes[i] ) isInMesh = true;
+    }
+    
+    if(isInMesh)
+    {
+      InletBC *kk = new InletBC(mesh,
+                                      intRules,
+                                      rsolver, 
+                                      eqState,
+                                      dim,
+                                      num_equation,
+                                      max_char_speed,
+                                      attr,
+                                      patchANDtype.second,
+                                      *config.GetInletData(in) ) ;
+      
+      inletVec.Append( kk );
+      inletAttr.SetSize(inletAttr.Size()+1);
+      inletAttr[inletAttr.Size()-1].SetSize(1);
+      inletAttr[inletAttr.Size()-1][0] = attr;
+      //A->AddBdrFaceIntegrator( inletVec[in], inletAttr[in] );
+    }else
+    {
+      cout<<"Runfile inlet attribute not found in mesh!"<< endl;
+      exit(1);
+    }
+  }
+  
+  // outlet BCs
+  for(int out=0; out<(*config.GetOutletPatchType()).Size(); out++)
+  {
+    pair<int,OutletType> patchANDtype = (*config.GetOutletPatchType())[out];
+    int attr = patchANDtype.first;
+    
+    // check if the attr is indeed in the mesh
+    bool isInMesh = false;
+    for(int i=0; i<mesh->bdr_attributes.Size(); i++)
+    {
+      if( attr==mesh->bdr_attributes[i] ) isInMesh = true;
+    }
+    
+    if(isInMesh)
+    {
+      outletVec.Append( new OutletBC(mesh,
+                                        intRules,
+                                        rsolver, 
+                                        eqState,
+                                        dim,
+                                        num_equation,
+                                        max_char_speed,
+                                        attr,
+                                        patchANDtype.second,
+                                        config.GetOutletData()[out] ) );
+      
+      outletAttr.SetSize(outletAttr.Size()+1);
+      outletAttr[outletAttr.Size()-1].SetSize(1);
+      outletAttr[outletAttr.Size()-1][0] = attr;
+      //A->AddBdrFaceIntegrator( outletVec[out], outletAttr[out] );
+      A->AddBdrFaceIntegrator( outletVec[out] );
+    }else
+    {
+      cout<<"Runfile outlet attribute not found in mesh!"<< endl;
+    }
+  }
+  A->Setup();
+}
+
 
 void M2ulPhyS::initSolutionAndVisualizationVectors()
 {
@@ -212,17 +298,18 @@ void M2ulPhyS::projectInitialSolution()
 {
   // Initialize the state.
   
-  void (*initialConditionFunction)(const Vector&, Vector&);
-  
   // particular case: Euler vortex
-  {
-    t_final = 5.*  2./17.46;
-    initialConditionFunction = &(this->InitialConditionEulerVortex);
-  }
-  //initialConditionFunction = &(this->testInitialCondition);
-  
-  VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
-  sol->ProjectCoefficient(u0);
+//   {
+    //void (M2ulPhyS::*initialConditionFunction)(const Vector&, Vector&);
+//     t_final = 5.*  2./17.46;
+//     initialConditionFunction = &(this->InitialConditionEulerVortex);
+      //initialConditionFunction = &(this->testInitialCondition);
+    
+    //VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
+    //sol->ProjectCoefficient(u0);
+//   }
+
+  uniformInitialConditions();
 }
 
 
@@ -253,7 +340,7 @@ void M2ulPhyS::Iterate()
           mesh->Print(vtkmesh);
           vtkmesh.close();
           
-          GridFunction uk(fes, u_block->GetBlock(2));
+          GridFunction uk(fes, u_block->GetBlock(3));
           ostringstream sol_name;
           sol_name << config.GetOutputName() <<"-" << 2 << "-final.gf";
           ofstream sol_ofs(sol_name.str().c_str());
@@ -394,5 +481,30 @@ void M2ulPhyS::testInitialCondition(const Vector& x, Vector& y)
    cout<<y(3)<<endl;
    
    delete eqState;
+}
+
+void M2ulPhyS::uniformInitialConditions()
+{
+  double *data = sol->GetData();
+  int dof = vfes->GetNDofs();
+  double *inputRhoRhoVp = config.GetConstantInitialCondition();
+  
+  EquationOfState *eqState = new EquationOfState(DRY_AIR);
+  const double gamma = eqState->GetSpecificHeatRatio();
+  const double rhoE = inputRhoRhoVp[4]/(gamma-1.)+
+                    0.5*(inputRhoRhoVp[1]*inputRhoRhoVp[1] +
+                         inputRhoRhoVp[2]*inputRhoRhoVp[2] +
+                         inputRhoRhoVp[3]*inputRhoRhoVp[3]
+                    )/inputRhoRhoVp[0];
+  
+  for(int i=0; i<dof; i++)
+  {
+    data[i       ] = inputRhoRhoVp[0];
+    data[i +  dof] = inputRhoRhoVp[1];
+    data[i +2*dof] = inputRhoRhoVp[2];
+    data[i +3*dof] = rhoE;
+  }
+  
+  delete eqState;
 }
 
