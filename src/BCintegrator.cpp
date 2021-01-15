@@ -1,8 +1,12 @@
 #include "BCintegrator.hpp"
+#include "inletBC.hpp"
+#include "outletBC.hpp"
+#include "wallBC.hpp"
 
 BCintegrator::BCintegrator( Mesh *_mesh,
                             IntegrationRules *_intRules,
                             RiemannSolver *rsolver_, 
+                            double &_dt,
                             EquationOfState *_eqState,
                             const int _dim,
                             const int _num_equation,
@@ -32,6 +36,7 @@ mesh(_mesh)
     {
       BCmap[patchANDtype.first] = new InletBC(rsolver, 
                                               eqState,
+                                              _dt,
                                               dim,
                                               num_equation,
                                               patchANDtype.first,
@@ -53,11 +58,36 @@ mesh(_mesh)
     {
       BCmap[patchANDtype.first] = new OutletBC( rsolver, 
                                                 eqState,
+                                                _dt,
                                                 dim,
                                                 num_equation,
                                                 patchANDtype.first,
                                                 patchANDtype.second,
                                                 *config.GetOutletData(o) );
+    }
+  }
+  
+  // Wall BCs
+  for(int w=0; w<config.GetWallPatchType()->Size(); w++)
+  {
+    std::pair<int,WallType> patchType = (*config.GetWallPatchType())[w];
+    
+    // check that patch is in mesh
+    bool patchInMesh = false;
+    for(int i=0; i<mesh->bdr_attributes.Size(); i++)
+    {
+      if( patchType.first==mesh->bdr_attributes[i] ) patchInMesh = true;
+    }
+    
+    if( patchInMesh )
+    {
+      BCmap[patchType.first] = new WallBC(rsolver, 
+                                          eqState,
+                                          _dt,
+                                          dim,
+                                          num_equation,
+                                          patchType.first,
+                                          patchType.second);
     }
   }
 }
@@ -66,9 +96,10 @@ BCintegrator::~BCintegrator()
 {
 }
 
-void BCintegrator::computeState(const int attr, Vector& stateIn, Vector& stateOut)
+void BCintegrator::computeState(const int attr, Vector &nor,
+                                Vector& stateIn, Vector& stateOut)
 {
-  BCmap[attr]->computeState(stateIn,stateOut);
+  BCmap[attr]->computeState(nor,stateIn,stateOut);
 }
 
 
@@ -91,20 +122,20 @@ void BCintegrator::AssembleFaceVector(const FiniteElement& el1,
    shape1.SetSize(dof1);
    shape2.SetSize(dof2);
 
-   elvect.SetSize((dof1 + dof2) * num_equation);
+   elvect.SetSize(dof1*num_equation);
    elvect = 0.0;
 
    DenseMatrix elfun1_mat(elfun.GetData(), dof1, num_equation);
 //    DenseMatrix elfun2_mat(elfun.GetData() + dof1 * num_equation, dof2,
 //                           num_equation);
-   DenseMatrix elfun2_mat(dof1,num_equation);
-   for(int n=0; n<dof1; n++)
-   {
-     Vector nodeState(num_equation), bcState(num_equation);
-     elfun1_mat.GetRow(n, nodeState);
-     computeState(Tr.Attribute,nodeState, bcState);
-     elfun2_mat.SetRow(n,bcState);
-   }
+//    DenseMatrix elfun2_mat(dof1,num_equation);
+//    for(int n=0; n<dof1; n++)
+//    {
+//      Vector nodeState(num_equation), bcState(num_equation);
+//      elfun1_mat.GetRow(n, nodeState);
+//      computeState(Tr.Attribute,nodeState, bcState);
+//      elfun2_mat.SetRow(n,bcState);
+//    }
 
    DenseMatrix elvect1_mat(elvect.GetData(), dof1, num_equation);
 //    DenseMatrix elvect2_mat(elvect.GetData() + dof1 * num_equation, dof2,
@@ -138,14 +169,12 @@ void BCintegrator::AssembleFaceVector(const FiniteElement& el1,
 
       // Interpolate elfun at the point
       elfun1_mat.MultTranspose(shape1, funval1);
-      elfun2_mat.MultTranspose(shape2, funval2);
+      //elfun2_mat.MultTranspose(shape2, funval2);
 
       // Get the normal vector and the flux on the face
       CalcOrtho(Tr.Jacobian(), nor);
+      computeState(Tr.Attribute,nor,funval1, funval2);
       const double mcs = rsolver->Eval(funval1, funval2, nor, fluxN);
-
-      // Update max char speed
-      if (mcs > max_char_speed) { max_char_speed = mcs; }
 
       fluxN *= ip.weight;
       for (int k = 0; k < num_equation; k++)

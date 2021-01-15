@@ -6,6 +6,7 @@
 #include "fluxes.hpp"
 #include "inletBC.hpp"
 #include "outletBC.hpp"
+#include "wallBC.hpp"
 
 using namespace mfem;
 
@@ -73,6 +74,9 @@ private:
   Array<Array<double> > outletBC;
   Array<std::pair<int,OutletType> > outletPatchType;
   
+  // Wall BC data
+  Array<std::pair<int,WallType> > wallPatchType;
+  
 public:
   RunConfiguration();
   ~RunConfiguration();
@@ -98,8 +102,11 @@ public:
   
   Array<std::pair<int,InletType> >* GetInletPatchType(){return &inletPatchType;}
   Array<double>* GetInletData(int in){return &inletBC[in];}
+  
   Array<std::pair<int,OutletType> >* GetOutletPatchType(){return &outletPatchType;}
   Array<double>* GetOutletData(int out){return &outletBC[out];}
+  
+  Array<std::pair<int,WallType> >* GetWallPatchType(){return &wallPatchType;}
 };
 
 #endif // RUN_CONFIGURATION

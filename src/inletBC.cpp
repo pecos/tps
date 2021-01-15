@@ -2,6 +2,7 @@
 
 InletBC::InletBC(RiemannSolver *_rsolver, 
             EquationOfState *_eqState,
+            double &_dt,
             const int _dim,
             const int _num_equation,
             int _patchNumber,
@@ -9,6 +10,7 @@ InletBC::InletBC(RiemannSolver *_rsolver,
             const Array<double> &_inputData ):
 BoundaryCondition(_rsolver, 
                   _eqState,
+                  _dt,
                   _dim,
                   _num_equation,
                   _patchNumber),
@@ -21,7 +23,9 @@ InletBC::~InletBC()
 {
 }
 
-void InletBC::computeState(Vector &stateIn, Vector &stateOut)
+void InletBC::computeState(Vector &nor,
+                           Vector &stateIn, 
+                           Vector &stateOut)
 {
   switch(inletType)
   {
@@ -36,6 +40,7 @@ void InletBC::computeState(Vector &stateIn, Vector &stateOut)
 void InletBC::subsonicReflectingPressureVelocity(Vector &stateIn, Vector &stateOut)
 {
   double rho   = stateIn(0);
+  rho = 1.2;
   double rhoVx = inputState[1]*rho;
   double rhoVy = inputState[2]*rho;
   double rhoVz = inputState[3]*rho;

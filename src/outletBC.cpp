@@ -2,6 +2,7 @@
 
 OutletBC::OutletBC(RiemannSolver *_rsolver, 
             EquationOfState *_eqState,
+            double &_dt,
             const int _dim,
             const int _num_equation,
             int _patchNumber,
@@ -9,6 +10,7 @@ OutletBC::OutletBC(RiemannSolver *_rsolver,
             const Array<double> &_inputData ):
 BoundaryCondition(_rsolver, 
                   _eqState,
+                  _dt,
                   _dim,
                   _num_equation,
                   _patchNumber),
@@ -21,7 +23,9 @@ OutletBC::~OutletBC()
 {
 }
 
-void OutletBC::computeState(Vector &stateIn, Vector &stateOut)
+void OutletBC::computeState(Vector &nor,
+                            Vector &stateIn, 
+                            Vector &stateOut)
 {
   switch(outletType)
   {

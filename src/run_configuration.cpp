@@ -228,6 +228,22 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
         outletBC[outletBC.Size()-1].SetSize(1);
         outletBC[outletBC.Size()-1][0] = stof( word );
         
+      }else if( word.compare("WALL")==0 )
+      {
+        ss >> word;
+        std::pair<int,WallType> patchType;
+        patchType.first = stoi( word );
+        ss >> word;
+        switch( stoi(word) )
+        {
+          case 0:
+            patchType.second = INV;
+            break;
+          case 1:
+            patchType.second = VISC_ADIAB;
+            break;
+        }
+        wallPatchType.Append( patchType );
       }
       
     }

@@ -71,4 +71,12 @@ INLET 5 0 101300 30 0 0
 # 0 -> Subsonic outlet Specified with P 
 # 1 -> Non-reflect. sub. outlet Specified with P 
 #OUTLET patchNum type press
-OUTLET 3 0 101300
+OUTLET 5 0 101300
+
+# Wall Boundary Conditions
+# types:
+# 0 -> Inviscid wall
+# 1 -> Viscous adiabatic
+# WALL patchNum type
+WALL 8 0
+WALL 9 0

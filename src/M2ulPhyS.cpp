@@ -11,7 +11,7 @@ M2ulPhyS::M2ulPhyS(string &inputFileName)
   initVariables();
   
   // This example depends on this ordering of the space.
-  MFEM_ASSERT(fes.GetOrdering() == Ordering::byNODES, "");
+  //MFEM_ASSERT(fes.GetOrdering() == Ordering::byNODES, "");
   
 }
 
@@ -20,7 +20,8 @@ void M2ulPhyS::initVariables()
 {
   
   //mesh = new Mesh(config.GetMeshFileName(),1,1);
-  mesh = new Mesh(config.GetMeshFileName());
+  //mesh = new Mesh(config.GetMeshFileName());
+  mesh = new Mesh("InviscidCylinder.mesh");
   mesh->PrintCharacteristics();
   dim = mesh->Dimension();
   
@@ -94,6 +95,7 @@ void M2ulPhyS::initVariables()
     bcIntegrator = new BCintegrator(mesh,
                                     intRules,
                                     rsolver, 
+                                    dt,
                                     eqState,
                                     dim,
                                     num_equation,

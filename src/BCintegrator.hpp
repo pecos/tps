@@ -30,12 +30,14 @@ protected:
   std::unordered_map<int,BoundaryCondition*> BCmap;
 
   //void calcMeanState();
-  void computeState(const int attr, Vector &stateIn, Vector &stateOut);
+  void computeState(const int attr, Vector &normal,
+                    Vector &stateIn, Vector &stateOut);
 
 public:
    BCintegrator(Mesh *_mesh,
                 IntegrationRules *_intRules,
                 RiemannSolver *rsolver_, 
+                double &_dt,
                 EquationOfState *_eqState,
                 const int _dim,
                 const int _num_equation,
