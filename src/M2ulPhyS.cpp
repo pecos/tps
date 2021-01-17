@@ -20,8 +20,7 @@ void M2ulPhyS::initVariables()
 {
   
   //mesh = new Mesh(config.GetMeshFileName(),1,1);
-  //mesh = new Mesh(config.GetMeshFileName());
-  mesh = new Mesh("InviscidCylinder.mesh");
+  mesh = new Mesh(config.GetMeshFileName());
   mesh->PrintCharacteristics();
   dim = mesh->Dimension();
   
