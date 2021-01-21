@@ -19,13 +19,30 @@ private:
   const Array<double> &inputState;
   
   // Mean boundary state
-  Vector *meanState;
+  Vector meanUp;
   
-  void subsonicReflectingPressure(Vector &stateIn, Vector &stateOut);
+  DenseMatrix boundaryU;
+  int bdrN;
+  bool bdrUInit;
+  
+  void subsonicReflectingPressure(Vector &normal,
+                                  Vector &stateIn, 
+                                  DenseMatrix &gradState,
+                                  Vector &bdrFlux);
+  
+  void subsonicNonReflectingPressure( Vector &normal,
+                                      Vector &stateIn, 
+                                      DenseMatrix &gradState,
+                                      Vector &bdrFlux);
+  
+  virtual void updateMean(IntegrationRules *intRules,
+                          GridFunction *Up);
 
 public:
    OutletBC( RiemannSolver *rsolver_, 
              EquationOfState *_eqState,
+             FiniteElementSpace *_vfes,
+             IntegrationRules *_intRules,
              double &_dt,
              const int _dim,
              const int _num_equation,
@@ -35,9 +52,10 @@ public:
    ~OutletBC();
    
    // computes state that imposes the boundary
-  void computeState(Vector &nor,
-                    Vector &stateIn, 
-                    Vector &stateOut);
+  void computeBdrFlux(Vector &normal,
+                      Vector &stateIn, 
+                      DenseMatrix &gradState,
+                      Vector &bdrFlux);
 };
 
 #endif // OUTLET_BC

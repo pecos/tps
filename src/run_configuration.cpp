@@ -188,10 +188,10 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
         switch(typ)
         {
           case 0:
-            patchANDtype.second = PV;
+            patchANDtype.second = SUB_DENS_VEL;
             break;
           case 1:
-            patchANDtype.second = PV_NR;
+            patchANDtype.second = SUB_DENS_VEL_NR;
             break;
         }
         inletPatchType.Append( patchANDtype );

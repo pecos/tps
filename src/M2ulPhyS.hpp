@@ -82,6 +82,7 @@ private:
   // These are stored contiguously in the BlockVector u_block.
   Array<int> *offsets;
   BlockVector *u_block;
+  BlockVector *up_block;
   
   // paraview collection pointer
   ParaViewDataCollection *paraviewColl = NULL;
@@ -107,8 +108,14 @@ private:
   bool isSBP;
   double alpha;
 
-  // State/solution vector
-  GridFunction *sol;
+  // Conservative variables
+  GridFunction *U;
+  
+  // Primitive variables
+  GridFunction *Up;
+  
+  // Gradients Up
+  Array<double> gradUp;
   
   // time variable
   double time;

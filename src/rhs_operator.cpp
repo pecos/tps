@@ -13,22 +13,28 @@ RHSoperator::RHSoperator( const int _dim,
                           FiniteElementSpace *_vfes,
                           NonlinearForm *_A, 
                           MixedBilinearForm *_Aflux,
+                          GridFunction *_Up,
+                          Array<double> &_gradUp,
+                          BCintegrator *_bcIntegrator,
                           bool &_isSBP,
                           double &_alpha
-                        )
-   : TimeDependentOperator(_A->Height()),
-     dim(_dim ),
-     eqSystem(_eqSystem),
-     max_char_speed(_max_char_speed),
-     intRules(_intRules),
-     intRuleType(_intRuleType),
-     fluxClass(_fluxClass),
-     eqState(_eqState),
-     vfes(_vfes),
-     A(_A),
-     Aflux(_Aflux),
-     isSBP(_isSBP),
-     alpha(_alpha)
+                        ):
+TimeDependentOperator(_A->Height()),
+dim(_dim ),
+eqSystem(_eqSystem),
+max_char_speed(_max_char_speed),
+intRules(_intRules),
+intRuleType(_intRuleType),
+fluxClass(_fluxClass),
+eqState(_eqState),
+vfes(_vfes),
+A(_A),
+Aflux(_Aflux),
+isSBP(_isSBP),
+alpha(_alpha),
+Up(_Up),
+gradUp(_gradUp),
+bcIntegrator(_bcIntegrator)
 {
   switch(eqSystem)
   {
@@ -45,12 +51,17 @@ RHSoperator::RHSoperator( const int _dim,
   
   state = new Vector(num_equation);
   
+  // Finite element space associated with the gradients of primitives 
+  qfes = new FiniteElementSpace(vfes->GetMesh(),vfes->FEColl(),
+                                num_equation*dim, Ordering::byNODES);
+  Aq = new NonlinearForm(qfes);
+  
   //Me_inv = new DenseTensor(vfes->GetFE(0)->GetDof(), vfes->GetFE(0)->GetDof(), vfes->GetNE());
   Me_inv = new DenseMatrix[vfes->GetNE()];
    
    for (int i = 0; i < vfes->GetNE(); i++)
    {
-         // Standard local assembly and inversion for energy mass matrices.
+      // Standard local assembly and inversion for energy mass matrices.
       const int dof = vfes->GetFE(i)->GetDof();
       DenseMatrix Me(dof);
       DenseMatrixInverse inv(&Me);
@@ -153,6 +164,7 @@ RHSoperator::RHSoperator( const int _dim,
 RHSoperator::~RHSoperator()
 {
   delete state;
+  delete qfes;
   delete[] Me_inv;
 }
 
@@ -160,46 +172,52 @@ RHSoperator::~RHSoperator()
 void RHSoperator::Mult(const Vector &x, Vector &y) const
 {
    // 0. Reset wavespeed computation before operator application.
-   max_char_speed = 0.;
+  max_char_speed = 0.;
 
-   DenseTensor flux(vfes->GetNDofs(), dim, num_equation);
-   Vector z(A->Height());
+  DenseTensor flux(vfes->GetNDofs(), dim, num_equation);
+  Vector z(A->Height());
 
-   // 1. Create the vector z with the face terms -<F.n(u), [w]>.
-   A->Mult(x, z);
+  // Update primite varibales
+  updatePrimitives(x);
+  
+  // update boundary conditions
+  bcIntegrator->updateBCMean( Up );
+  
+  // 1. Create the vector z with the face terms -<F.n(u), [w]>.
+  A->Mult(x, z);
 
-   // 2. Add the element terms.
-   // i.  computing the flux approximately as a grid function by interpolating
-   //     at the solution nodes.
-   // ii. multiplying this grid function by a (constant) mixed bilinear form for
-   //     each of the num_equation, computing (F(u), grad(w)) for each equation.
+  // 2. Add the element terms.
+  // i.  computing the flux approximately as a grid function by interpolating
+  //     at the solution nodes.
+  // ii. multiplying this grid function by a (constant) mixed bilinear form for
+  //     each of the num_equation, computing (F(u), grad(w)) for each equation.
 
-   DenseMatrix xmat(x.GetData(), vfes->GetNDofs(), num_equation);
-   GetFlux(xmat, flux);
+  DenseMatrix xmat(x.GetData(), vfes->GetNDofs(), num_equation);
+  GetFlux(xmat, flux);
 
-   for (int k = 0; k < num_equation; k++)
-   {
-      Vector fk(flux(k).GetData(), dim * vfes->GetNDofs());
-      Vector zk(z.GetData() + k * vfes->GetNDofs(), vfes->GetNDofs());
-      Aflux->AddMult(fk, zk);
-   }
+  for (int k = 0; k < num_equation; k++)
+  {
+    Vector fk(flux(k).GetData(), dim * vfes->GetNDofs());
+    Vector zk(z.GetData() + k * vfes->GetNDofs(), vfes->GetNDofs());
+    Aflux->AddMult(fk, zk);
+  }
 
-   // 3. Multiply element-wise by the inverse mass matrices.
-   for (int i = 0; i < vfes->GetNE(); i++)
-   {
-      Vector zval;
-      Array<int> vdofs;
-      const int dof = vfes->GetFE(i)->GetDof();
-      DenseMatrix zmat, ymat(dof, num_equation);
-      
-      // Return the vdofs ordered byNODES
-      vfes->GetElementVDofs(i, vdofs);
-      z.GetSubVector(vdofs, zval);
-      zmat.UseExternalData(zval.GetData(), dof, num_equation);
-      //mfem::Mult((*Me_inv)(i), zmat, ymat);
-      mfem::Mult(Me_inv[i], zmat, ymat);
-      y.SetSubVector(vdofs, ymat.GetData());
-   }
+  // 3. Multiply element-wise by the inverse mass matrices.
+  for (int i = 0; i < vfes->GetNE(); i++)
+  {
+    Vector zval;
+    Array<int> vdofs;
+    const int dof = vfes->GetFE(i)->GetDof();
+    DenseMatrix zmat, ymat(dof, num_equation);
+    
+    // Return the vdofs ordered byNODES
+    vfes->GetElementVDofs(i, vdofs);
+    z.GetSubVector(vdofs, zval);
+    zmat.UseExternalData(zval.GetData(), dof, num_equation);
+    
+    mfem::Mult(Me_inv[i], zmat, ymat);
+    y.SetSubVector(vdofs, ymat.GetData());
+  }
    
 }
 
@@ -244,3 +262,69 @@ void RHSoperator::GetFlux(const DenseMatrix &x, DenseTensor &flux) const
       if (mcs > max_char_speed) { max_char_speed = mcs; }
    }
 }
+
+void RHSoperator::updatePrimitives(const Vector &x) const
+{
+  double *dataUp = Up->GetData();
+  for(int i=0;i<vfes->GetNDofs();i++)
+  {
+    Vector iState(num_equation);
+    for(int eq=0;eq<num_equation;eq++) iState[eq] = x[i+eq*vfes->GetNDofs()];
+    double p = eqState->ComputePressure(iState,dim);
+    dataUp[i                   ] = iState[0];
+    dataUp[i+  vfes->GetNDofs()] = iState[1]/iState[0];
+    dataUp[i+2*vfes->GetNDofs()] = iState[2]/iState[0];
+    dataUp[i+3*vfes->GetNDofs()] = p;
+  }
+  
+  //compute gradients
+  for(int el=0; el<vfes->GetNE(); el++)
+  {
+    const FiniteElement *elem = vfes->GetFE(el);
+    ElementTransformation *Tr = vfes->GetElementTransformation(el);
+    
+    // get local primitive variables
+    Array<int> vdofs;
+    vfes->GetElementVDofs(el, vdofs);
+    const int eldDof = elem->GetDof();
+    DenseMatrix elUp(eldDof,num_equation);
+    for(int d=0; d<eldDof; d++)
+    {
+      int index = vdofs[d];
+      int nDofs = vfes->GetNDofs();
+      for(int eq=0;eq<num_equation;eq++) elUp(d,eq) = dataUp[index +eq*nDofs];
+    }
+
+    
+    const IntegrationRule ir = elem->GetNodes();
+    for(int i=0; i<ir.GetNPoints(); i++)
+    {
+      const IntegrationPoint &ip = ir.IntPoint(i);
+      Tr->SetIntPoint(&ip);
+      
+      DenseMatrix invJ = Tr->InverseJacobian();
+
+      // Calculate basis functions and their derivatives
+      Vector shape( eldDof );
+      DenseMatrix dshape(eldDof,dim);
+      
+      elem->CalcShape(Tr->GetIntPoint(), shape);
+      elem->CalcPhysDShape(*Tr, dshape);
+      
+      for(int eq=0; eq<num_equation; eq++)
+      {
+        for(int d=0; d<dim; d++)
+        {
+          double sum =0.;
+          for(int k=0; k<eldDof; k++)
+          {
+            sum += elUp(k,eq)*dshape(k,d);
+          }
+          int nDofs = vfes->GetNDofs();
+          gradUp[vdofs[i] +eq*nDofs + d*num_equation*nDofs] = sum;
+        }
+      }
+    }
+  }
+}
+

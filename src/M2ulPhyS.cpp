@@ -68,6 +68,9 @@ void M2ulPhyS::initVariables()
   dfes = new FiniteElementSpace(mesh, fec, dim, Ordering::byNODES);
   vfes = new FiniteElementSpace(mesh, fec, num_equation, Ordering::byNODES);
   
+  initSolutionAndVisualizationVectors();
+  projectInitialSolution();
+  
   eqState = new EquationOfState(config.GetWorkingFluid());
   
   fluxClass = new Fluxes(eqState);
@@ -92,10 +95,13 @@ void M2ulPhyS::initVariables()
   if( mesh->attributes.Size()>0 )
   {
     bcIntegrator = new BCintegrator(mesh,
+                                    vfes,
                                     intRules,
                                     rsolver, 
                                     dt,
                                     eqState,
+                                    Up,
+                                    gradUp,
                                     dim,
                                     num_equation,
                                     max_char_speed,
@@ -126,17 +132,18 @@ void M2ulPhyS::initVariables()
   rhsOperator = new RHSoperator(dim,
                                 eqSystem,
                                 max_char_speed,
-                                intRules,intRuleType,
+                                intRules,
+                                intRuleType,
                                 fluxClass,
                                 eqState,
                                 vfes,
                                 A, 
                                 Aflux,
-                                isSBP, alpha
-                               );
-  
-  initSolutionAndVisualizationVectors();
-  projectInitialSolution();
+                                Up,
+                                gradUp,
+                                bcIntegrator,
+                                isSBP, 
+                                alpha );
   
   time = 0.;
   CFL = config.GetCFLNumber();
@@ -158,7 +165,7 @@ void M2ulPhyS::initVariables()
     // Find a safe dt, using a temporary vector. Calling Mult() computes the
     // maximum char speed at all quadrature points on all faces.
     Vector z(A->Width());
-    A->Mult(*sol, z);
+    A->Mult(*U, z);
     dt = CFL * hmin / max_char_speed / (2*order+1);
     t_final = MaxIters*dt;
   }
@@ -170,17 +177,20 @@ M2ulPhyS::~M2ulPhyS()
   delete paraviewColl;
   
   delete u_block;
+  delete up_block;
   delete offsets;
   
-  delete sol;
+  delete U;
+  delete Up;
   
-  delete rhsOperator;
-  delete domainIntegrator;
-  //delete Aflux; // fails to delete (follow this)
+  //delete rhsOperator;
+  //delete domainIntegrator;
+  delete Aflux; // fails to delete (follow this)
   if( isSBP ) delete SBPoperator;
-  delete faceIntegrator;
-  //delete A; // fails to delete (follow this)
+  //delete faceIntegrator;
+  delete A; // fails to delete (follow this)
   
+  delete timeIntegrator;
   // delete inlet/outlet integrators
   
   delete rsolver;
@@ -201,6 +211,9 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
   offsets = new Array<int>(num_equation + 1);
   for (int k = 0; k <= num_equation; k++) { (*offsets)[k] = k * vfes->GetNDofs(); }
   u_block = new BlockVector(*offsets);
+  up_block = new BlockVector(*offsets);
+  
+  gradUp.SetSize(num_equation*dim*vfes->GetNDofs());
   
 //   {
 //     ofstream mesh_ofs("vortex.mesh");
@@ -208,18 +221,8 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
 //     mesh_ofs << mesh;
 //   }
   
-  sol = new GridFunction(vfes, u_block->GetData());
-  
-  // set paraview output
-  paraviewColl = new ParaViewDataCollection(config.GetOutputName(),mesh);
-  //paraviewColl->SetPrefixPath("ParaView");
-  paraviewColl->RegisterField("solution", sol);
-  paraviewColl->SetLevelsOfDetail(order);
-  paraviewColl->SetDataFormat(VTKFormat::BINARY);
-  paraviewColl->SetHighOrderOutput(true);
-  paraviewColl->SetCycle(0);
-  paraviewColl->SetTime(0.0);
-  paraviewColl->Save();
+  U  = new GridFunction(vfes, u_block->GetData());
+  Up = new GridFunction(vfes, up_block->GetData());
 }
 
 void M2ulPhyS::projectInitialSolution()
@@ -228,16 +231,29 @@ void M2ulPhyS::projectInitialSolution()
   
   // particular case: Euler vortex
 //   {
-    //void (M2ulPhyS::*initialConditionFunction)(const Vector&, Vector&);
+    //void (*initialConditionFunction)(const Vector&, Vector&);
 //     t_final = 5.*  2./17.46;
 //     initialConditionFunction = &(this->InitialConditionEulerVortex);
       //initialConditionFunction = &(this->testInitialCondition);
     
-    //VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
-    //sol->ProjectCoefficient(u0);
+//     VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
+//     U->ProjectCoefficient(u0);
 //   }
 
   uniformInitialConditions();
+  gradUp = 0.;
+  
+   // set paraview output
+  paraviewColl = new ParaViewDataCollection(config.GetOutputName(),mesh);
+  //paraviewColl->SetPrefixPath("ParaView");
+  paraviewColl->RegisterField("ConservativeVars", U);
+  paraviewColl->RegisterField("PrimitiveVars", Up);
+  paraviewColl->SetLevelsOfDetail(order);
+  paraviewColl->SetDataFormat(VTKFormat::BINARY);
+  paraviewColl->SetHighOrderOutput(true);
+  paraviewColl->SetCycle(0);
+  paraviewColl->SetTime(0.0);
+  paraviewColl->Save();
 }
 
 
@@ -250,8 +266,9 @@ void M2ulPhyS::Iterate()
     // adjusts time step to finish at t_final
     double dt_real = min(dt, t_final - time);
 
-    timeIntegrator->Step(*sol, time, dt_real);
-    //dt = CFL * hmin / max_char_speed / (2*order+1);
+    //bcIntegrator->updateBCMean( Up );
+    timeIntegrator->Step(*U, time, dt_real);
+    
     dt = CFL * hmin / max_char_speed /(double)dim;
     ti++;
 
@@ -289,7 +306,7 @@ void M2ulPhyS::Iterate()
       initialConditionFunction = &(this->InitialConditionEulerVortex);
   
       VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
-      const double error = sol->ComputeLpError(2, u0);
+      const double error = U->ComputeLpError(2, u0);
       cout << "Solution error: " << error << endl;
       
       string fileName(config.GetOutputName());
@@ -402,18 +419,18 @@ void M2ulPhyS::testInitialCondition(const Vector& x, Vector& y)
    const double pres_inf = (den_inf / gamma) * (vel_inf / Minf) *
                            (vel_inf / Minf);
 
-   y(0) = den_inf + x(0);
+   y(0) = den_inf + 0.5*(x(0)+3);
    y(1) = y(0);
    y(2) = 0;
-   y(3) = pres_inf/(gamma-1.) + 0.5*y(1)*y(1)/y(0);
-   cout<<y(3)<<endl;
+   y(3) = (pres_inf+x(0))/(gamma-1.) + 0.5*y(1)*y(1)/y(0);
    
    delete eqState;
 }
 
 void M2ulPhyS::uniformInitialConditions()
 {
-  double *data = sol->GetData();
+  double *data = U->GetData();
+  double *dataUp = Up->GetData();
   int dof = vfes->GetNDofs();
   double *inputRhoRhoVp = config.GetConstantInitialCondition();
   
@@ -431,6 +448,11 @@ void M2ulPhyS::uniformInitialConditions()
     data[i +  dof] = inputRhoRhoVp[1];
     data[i +2*dof] = inputRhoRhoVp[2];
     data[i +3*dof] = rhoE;
+    
+    dataUp[i       ] = data[i];
+    dataUp[i +  dof] = data[i+dof]/data[i];
+    dataUp[i +2*dof] = data[i+dof]/data[i];
+    dataUp[i +3*dof] = inputRhoRhoVp[4];
   }
   
   delete eqState;

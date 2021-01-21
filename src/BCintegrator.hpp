@@ -26,19 +26,33 @@ protected:
   IntegrationRules *intRules;
 
   Mesh *mesh;
+  
+  // pointer to finite element space
+  FiniteElementSpace *vfes;
+  
+  // pointer to primitive varibales
+  GridFunction *Up;
+  
+  Array<double> &gradUp;
 
   std::unordered_map<int,BoundaryCondition*> BCmap;
 
   //void calcMeanState();
-  void computeState(const int attr, Vector &normal,
-                    Vector &stateIn, Vector &stateOut);
+  void computeBdrFlux(const int attr, 
+                      Vector &normal,
+                      Vector &stateIn, 
+                      DenseMatrix &gradState,
+                      Vector &bdrFlux);
 
 public:
    BCintegrator(Mesh *_mesh,
+                FiniteElementSpace *_vfes,
                 IntegrationRules *_intRules,
                 RiemannSolver *rsolver_, 
                 double &_dt,
                 EquationOfState *_eqState,
+                GridFunction *_Up,
+                Array<double> &_gradUp,
                 const int _dim,
                 const int _num_equation,
                 double &_max_char_speed,
@@ -49,6 +63,8 @@ public:
                                    const FiniteElement &el2,
                                    FaceElementTransformations &Tr,
                                    const Vector &elfun, Vector &elvect);
+   
+   void updateBCMean( GridFunction *Up);
 };
 
 #endif // BC_INTEGRATOR

@@ -5,6 +5,7 @@
 
 #include "fluxes.hpp"
 #include "equation_of_state.hpp"
+#include "BCintegrator.hpp"
 
 using namespace mfem;
 
@@ -40,11 +41,20 @@ private:
    const double &alpha;
 
    mutable Vector *state;
-//    mutable DenseMatrix f;
-//    mutable DenseTensor flux;
-//    mutable Vector z;
+   
+   // reference to primitive varibales
+   GridFunction *Up;
+   
+   // gradients of primitives and associated forms&FE space
+   Array<double> &gradUp;
+   FiniteElementSpace *qfes;
+   NonlinearForm *Aq;
+   
+   BCintegrator *bcIntegrator;
 
    void GetFlux(const DenseMatrix &state, DenseTensor &flux) const;
+   
+   void updatePrimitives(const Vector &x) const;
 
 public:
    RHSoperator(const int _dim,
@@ -57,6 +67,9 @@ public:
                FiniteElementSpace *_vfes,
                NonlinearForm *_A, 
                MixedBilinearForm *_Aflux,
+               GridFunction *_Up,
+               Array<double> &_gradUp,
+               BCintegrator *_bcIntegrator,
                bool &_isSBP,
                double &_alpha
               );

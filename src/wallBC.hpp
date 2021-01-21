@@ -17,9 +17,16 @@ private:
   // The type of wall
   const WallType wallType;
   
+  void computeINVwallFlux(Vector &normal,
+                          Vector &stateIn, 
+                          DenseMatrix &gradState,
+                          Vector &bdrFlux);
+  
 public:
   WallBC( RiemannSolver *rsolver_, 
           EquationOfState *_eqState,
+          FiniteElementSpace *_vfes,
+          IntegrationRules *_intRules,
           double &_dt,
           const int _dim,
           const int _num_equation,
@@ -27,9 +34,13 @@ public:
           WallType _bcType );
   ~WallBC();
   
-  void computeState(Vector &nor,
-                    Vector &stateIn, 
-                    Vector &stateOut);
+  void computeBdrFlux(Vector &normal,
+                      Vector &stateIn, 
+                      DenseMatrix &gradState,
+                      Vector &bdrFlux);
+  
+  virtual void updateMean(IntegrationRules *intRules,
+                          GridFunction *Up){};
 };
 
 #endif // WALL_BC
