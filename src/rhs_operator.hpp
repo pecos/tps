@@ -55,6 +55,7 @@ private:
    void GetFlux(const DenseMatrix &state, DenseTensor &flux) const;
    
    void updatePrimitives(const Vector &x) const;
+   void calcGradientsPrimitives() const;
 
 public:
    RHSoperator(const int _dim,

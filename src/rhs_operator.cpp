@@ -1,6 +1,7 @@
 
 
 #include "rhs_operator.hpp"
+#include "faceGradientIntegration.hpp"
 
 // Implementation of class RHSoperator
 RHSoperator::RHSoperator( const int _dim,
@@ -55,27 +56,28 @@ bcIntegrator(_bcIntegrator)
   qfes = new FiniteElementSpace(vfes->GetMesh(),vfes->FEColl(),
                                 num_equation*dim, Ordering::byNODES);
   Aq = new NonlinearForm(qfes);
+  Aq->AddInteriorFaceIntegrator(
+      new GradFaceIntegrator(intRules, dim, num_equation));
   
-  //Me_inv = new DenseTensor(vfes->GetFE(0)->GetDof(), vfes->GetFE(0)->GetDof(), vfes->GetNE());
   Me_inv = new DenseMatrix[vfes->GetNE()];
    
-   for (int i = 0; i < vfes->GetNE(); i++)
-   {
-      // Standard local assembly and inversion for energy mass matrices.
-      const int dof = vfes->GetFE(i)->GetDof();
-      DenseMatrix Me(dof);
-      DenseMatrixInverse inv(&Me);
-      MassIntegrator mi;
-    
-      int integrationOrder = 2*vfes->GetFE(i)->GetOrder();
-      if(intRuleType==1 && vfes->GetFE(i)->GetGeomType()==Geometry::SQUARE) integrationOrder--; // when Gauss-Lobatto
-      const IntegrationRule intRule = intRules->Get(vfes->GetFE(i)->GetGeomType(), integrationOrder);
-      mi.SetIntRule(&intRule);
-      mi.AssembleElementMatrix(*(vfes->GetFE(i) ), *(vfes->GetElementTransformation(i) ), Me);
-      inv.Factor();
-      //inv.GetInverseMatrix( (*Me_inv)(i));
-      inv.GetInverseMatrix( Me_inv[i]);
-   }
+  for (int i = 0; i < vfes->GetNE(); i++)
+  {
+    // Standard local assembly and inversion for energy mass matrices.
+    const int dof = vfes->GetFE(i)->GetDof();
+    DenseMatrix Me(dof);
+    DenseMatrixInverse inv(&Me);
+    MassIntegrator mi;
+
+    int integrationOrder = 2*vfes->GetFE(i)->GetOrder();
+    if(intRuleType==1 && vfes->GetFE(i)->GetGeomType()==Geometry::SQUARE) integrationOrder--; // when Gauss-Lobatto
+    const IntegrationRule intRule = intRules->Get(vfes->GetFE(i)->GetGeomType(), integrationOrder);
+    mi.SetIntRule(&intRule);
+    mi.AssembleElementMatrix(*(vfes->GetFE(i) ), *(vfes->GetElementTransformation(i) ), Me);
+    inv.Factor();
+    //inv.GetInverseMatrix( (*Me_inv)(i));
+    inv.GetInverseMatrix( Me_inv[i]);
+  }
    
    
    // This is for DEBUG ONLY!!!
@@ -179,6 +181,7 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
 
   // Update primite varibales
   updatePrimitives(x);
+  calcGradientsPrimitives();
   
   // update boundary conditions
   bcIntegrator->updateBCMean( Up );
@@ -278,7 +281,69 @@ void RHSoperator::updatePrimitives(const Vector &x) const
   }
   
   //compute gradients
-  for(int el=0; el<vfes->GetNE(); el++)
+//   for(int el=0; el<vfes->GetNE(); el++)
+//   {
+//     const FiniteElement *elem = vfes->GetFE(el);
+//     ElementTransformation *Tr = vfes->GetElementTransformation(el);
+//     
+//     // get local primitive variables
+//     Array<int> vdofs;
+//     vfes->GetElementVDofs(el, vdofs);
+//     const int eldDof = elem->GetDof();
+//     DenseMatrix elUp(eldDof,num_equation);
+//     for(int d=0; d<eldDof; d++)
+//     {
+//       int index = vdofs[d];
+//       int nDofs = vfes->GetNDofs();
+//       for(int eq=0;eq<num_equation;eq++) elUp(d,eq) = dataUp[index +eq*nDofs];
+//     }
+// 
+//     
+//     const IntegrationRule ir = elem->GetNodes();
+//     for(int i=0; i<ir.GetNPoints(); i++)
+//     {
+//       const IntegrationPoint &ip = ir.IntPoint(i);
+//       Tr->SetIntPoint(&ip);
+//       
+//       DenseMatrix invJ = Tr->InverseJacobian();
+// 
+//       // Calculate basis functions and their derivatives
+//       Vector shape( eldDof );
+//       DenseMatrix dshape(eldDof,dim);
+//       
+//       elem->CalcShape(Tr->GetIntPoint(), shape);
+//       elem->CalcPhysDShape(*Tr, dshape);
+//       
+//       for(int eq=0; eq<num_equation; eq++)
+//       {
+//         for(int d=0; d<dim; d++)
+//         {
+//           double sum =0.;
+//           for(int k=0; k<eldDof; k++)
+//           {
+//             sum += elUp(k,eq)*dshape(k,d);
+//           }
+//           int nDofs = vfes->GetNDofs();
+//           gradUp[vdofs[i] +eq*nDofs + d*num_equation*nDofs] = sum;
+//         }
+//       }
+//     }
+//   }
+}
+
+void RHSoperator::calcGradientsPrimitives() const
+{
+  const int totalDofs = vfes->GetNDofs();
+  double *dataUp = Up->GetData();
+  
+  // Vars for face contributions
+  Vector faceContrib(dim*num_equation*totalDofs);
+  Vector xUp(dim*num_equation*totalDofs);
+  xUp = 0.;
+  faceContrib = 0.;
+  
+  // compute volume integral and fill out above vectors
+  for(int el=0;el<vfes->GetNE();el++)
   {
     const FiniteElement *elem = vfes->GetFE(el);
     ElementTransformation *Tr = vfes->GetElementTransformation(el);
@@ -291,37 +356,121 @@ void RHSoperator::updatePrimitives(const Vector &x) const
     for(int d=0; d<eldDof; d++)
     {
       int index = vdofs[d];
-      int nDofs = vfes->GetNDofs();
-      for(int eq=0;eq<num_equation;eq++) elUp(d,eq) = dataUp[index +eq*nDofs];
-    }
-
-    
-    const IntegrationRule ir = elem->GetNodes();
-    for(int i=0; i<ir.GetNPoints(); i++)
-    {
-      const IntegrationPoint &ip = ir.IntPoint(i);
-      Tr->SetIntPoint(&ip);
-      
-      DenseMatrix invJ = Tr->InverseJacobian();
-
-      // Calculate basis functions and their derivatives
-      Vector shape( eldDof );
-      DenseMatrix dshape(eldDof,dim);
-      
-      elem->CalcShape(Tr->GetIntPoint(), shape);
-      elem->CalcPhysDShape(*Tr, dshape);
-      
-      for(int eq=0; eq<num_equation; eq++)
+      for(int eq=0;eq<num_equation;eq++)
       {
-        for(int d=0; d<dim; d++)
+        elUp(d,eq) = dataUp[index +eq*totalDofs];
+        xUp[index+eq*totalDofs] = elUp(d,eq);
+      } 
+    }
+    
+    DenseMatrix elGradUp(eldDof,num_equation*dim);
+    elGradUp = 0.;
+    
+    // element volume integral
+    int intorder = 2*elem->GetOrder();
+    if(intRuleType==1 && elem->GetGeomType()==Geometry::SQUARE) intorder--; // when Gauss-Lobatto
+    const IntegrationRule *ir = &intRules->Get(elem->GetGeomType(), intorder);
+
+// DenseMatrix elKKgrad(eldDof,num_equation*dim);
+// Up->GetGradients(el,*ir,elKKgrad);
+// Up->GetVectorGradient(*Tr,elKKgrad);
+// Vector kkcol,kkrow;
+// elKKgrad.GetColumn(0,kkcol);
+// elKKgrad.GetRow(0,kkrow);
+// for(int i=0;i<kkrow.Size();i++)
+// {
+//   for(int j=0;j<kkcol.Size();j++) cout<<elKKgrad(i,j)<<" ";
+//   cout<<endl;
+// }
+
+    for(int i=0;i<ir->GetNPoints();i++)
+    {
+      IntegrationPoint ip = ir->IntPoint(i);
+      Tr->SetIntPoint( &ip );
+      
+      // Calculate the shape functions
+      Vector shape(eldDof);
+      DenseMatrix dshape(eldDof,dim);
+      elem->CalcShape(ip, shape);
+      elem->CalcPhysDShape(*Tr,dshape);
+      
+      // calc Up at int. point
+      Vector iUp(num_equation);
+      for(int eq=0;eq<num_equation;eq++)
+      {
+        double sum = 0.;
+        for(int k=0;k<eldDof;k++) sum += elUp(k,eq)*shape(k);
+        iUp[eq] = sum;
+      }
+      
+      double detJac = Tr->Jacobian().Det()*ip.weight;
+      
+      // Add volume contrubutions to gradient
+      for(int eq=0;eq<num_equation;eq++)
+      {
+        for(int d=0;d<dim;d++)
         {
-          double sum =0.;
-          for(int k=0; k<eldDof; k++)
+          for(int j=0;j<eldDof;j++)
           {
-            sum += elUp(k,eq)*dshape(k,d);
+            elGradUp(j,eq+d*num_equation) += iUp[eq]*dshape(j,d)*detJac;
           }
-          int nDofs = vfes->GetNDofs();
-          gradUp[vdofs[i] +eq*nDofs + d*num_equation*nDofs] = sum;
+        }
+      }
+    }
+    
+    // transfer result into gradUp
+    for(int k=0; k<eldDof; k++)
+    {
+      int index = vdofs[k];
+      for(int eq=0;eq<num_equation;eq++)
+      {
+        for(int d=0;d<dim;d++)
+        {
+          gradUp[index+eq*totalDofs+d*num_equation*totalDofs] = 
+                                        -elGradUp(k,eq+d*num_equation);
+        }
+      } 
+    }
+  }
+  
+  // Calc boundary contribution
+  Aq->Mult(xUp,faceContrib);
+  
+  // Add contributions and multiply by invers mass matrix
+  for(int el=0;el<vfes->GetNE();el++)
+  {
+    const FiniteElement *elem = vfes->GetFE(el);
+    const int eldDof = elem->GetDof();
+    
+    Array<int> vdofs;
+    vfes->GetElementVDofs(el, vdofs);
+    for(int eq=0;eq<num_equation;eq++)
+    {
+      for(int d=0;d<dim;d++)
+      {
+        Vector rhs(eldDof);
+        for(int k=0;k<eldDof;k++)
+        {
+          int index = vdofs[k];
+          rhs[k] = gradUp[index+eq*totalDofs+d*num_equation*totalDofs]+
+                  faceContrib[index+eq*totalDofs+d*num_equation*totalDofs];
+        }
+/*for(int k=0;k<eldDof;k++) cout<<rhs[k]<<" ";
+cout<<endl;  */       
+        // mult by inv mass matrix
+        Vector aux(eldDof);
+        aux = 0.;
+        for(int i=0;i<eldDof;i++)
+        {
+          for(int j=0;j<eldDof;j++) aux[i] += Me_inv[el](i,j)*rhs[j];
+        }
+/*for(int k=0;k<eldDof;k++) cout<<aux[k]<<" ";
+cout<<endl; */      
+        // save this in gradUp
+        for(int k=0;k<eldDof;k++)
+        {
+          int index = vdofs[k];
+          gradUp[index+eq*totalDofs+d*num_equation*totalDofs] = aux[k];
         }
       }
     }

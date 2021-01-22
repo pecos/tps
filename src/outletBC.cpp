@@ -189,6 +189,10 @@ void OutletBC::subsonicNonReflectingPressure( Vector &normal,
   double L5 = gradState(3,0) +rho*speedSound*gradState(1,0);
   L5 *= meanUp[1] + speedSound;
   
+//   cout<<"grads :";
+//   for(int i=0;i<num_equation;i++)cout<<gradState(i,0)<<" ";
+//   cout<<endl;
+  
   const double p = eqState->ComputePressure(stateIn, dim);
   
   // estimate ingoing characteristic
