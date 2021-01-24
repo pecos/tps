@@ -173,6 +173,21 @@ void BCintegrator::AssembleFaceVector(const FiniteElement& el1,
       }
     }
   }
+  
+//   cout<<"Elem# "<< Tr.Elem1No <<endl;
+//   for(int k=0; k<eldDof; k++)
+//   {
+//     int index = vdofs[k];
+//     int nDofs = vfes->GetNDofs();
+//     for(int d=0;d<dim;d++)
+//     {
+//       for(int eq=0;eq<num_equation;eq++)
+//       {
+//         cout<<gradUp[index + eq*nDofs + d*nDofs*num_equation]<<" ";
+//       }
+//     }
+//     cout<<endl;
+//   }
 
   // Integration order calculation from DGTraceIntegrator
   int intorder;

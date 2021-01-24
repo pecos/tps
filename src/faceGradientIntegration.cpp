@@ -35,7 +35,7 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1,
   DenseMatrix elfun1_mat(elfun.GetData(), dof1, num_equation*dim);
   DenseMatrix elfun2_mat(elfun.GetData()+dof1*num_equation*dim, 
                          dof2, num_equation*dim);
-// std::cout<<"up in"<<std::endl;
+// std::cout<<"up in 1"<<std::endl;
 // for(int i=0;i<dof1;i++)
 // {
 //   for(int j=0;j<num_equation*dim;j++)
@@ -44,9 +44,18 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1,
 //   }
 //   std::cout<<std::endl;
 // }
+// std::cout<<"up in 2"<<std::endl;
+// for(int i=0;i<dof1;i++)
+// {
+//   for(int j=0;j<num_equation*dim;j++)
+//   {
+//     std::cout<<elfun2_mat(i,j)<<" ";
+//   }
+//   std::cout<<std::endl;
+// }
 
-  DenseMatrix elvect1_mat(elvect.GetData(),dof1, num_equation);
-  DenseMatrix elvect2_mat(elvect.GetData()+dof1*num_equation, 
+  DenseMatrix elvect1_mat(elvect.GetData(),dof1, num_equation*dim);
+  DenseMatrix elvect2_mat(elvect.GetData()+dof1*num_equation*dim, 
                           dof2, num_equation*dim);
 
   // Integration order calculation from DGTraceIntegrator
@@ -76,6 +85,7 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1,
     el2.CalcShape(Tr.GetElement2IntPoint(), shape2);
 
     // Interpolate U values at the point
+    Vector iUp1(num_equation),iUp2(num_equation);
     for(int eq=0;eq<num_equation;eq++)
     {
       double sum = 0.;
@@ -83,17 +93,29 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1,
       {
         sum += shape1[k]*elfun1_mat(k,eq);
       }
+      iUp1[eq] = sum;
+      sum = 0.;
       for(int k=0;k<dof2;k++)
       {
         sum += shape2[k]*elfun2_mat(k,eq);
       }
-      mean[eq] = sum/2.;
+      iUp2[eq] = sum;
+      mean[eq] = (iUp1[eq]+iUp2[eq])/2.;
     }
+// std::cout<<"e1 ";
+// for(int eq=0;eq<num_equation;eq++)std::cout<<iUp1[eq]<<" ";
+// std::cout<<std::endl;
+// std::cout<<"e2 ";
+// for(int eq=0;eq<num_equation;eq++)std::cout<<iUp2[eq]<<" ";
+// std::cout<<std::endl;
+// std::cout<<"mean ";
+// for(int eq=0;eq<num_equation;eq++)std::cout<<mean[eq]<<" ";
+// std::cout<<std::endl;
 
     // Get the normal vector and the flux on the face
     CalcOrtho(Tr.Jacobian(), nor);
     
-    mean *= ip.weight;
+    nor *= ip.weight;
     
     for(int d=0;d<dim;d++)
     {
@@ -101,12 +123,15 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1,
       {
         for(int k=0;k<dof1;k++)
         {
-          elvect1_mat(k,eq+d*num_equation) += mean(eq)*nor[d]*shape1(k);
+          elvect1_mat(k,eq+d*num_equation) += (mean(eq)-iUp1[eq])*nor[d]*shape1(k);
+          //elvect1_mat(k,eq+d*num_equation) += mean(eq)*nor[d]*shape1(k);
+//std::cout<<d<<" "<<eq<<" "<<k<<" "<<mean[eq]<<" "<<iUp1[eq]<<std::endl;
         }
-        for(int k=0;k<dof2;k++)
-        {
-          elvect2_mat(k,eq+d*num_equation) -= mean(eq)*nor[d]*shape2(k);
-        }
+//         for(int k=0;k<dof2;k++)
+//         {
+//           //elvect2_mat(k,eq+d*num_equation) -= (mean(eq)-iUp2[eq])*nor[d]*shape2(k);
+//           elvect2_mat(k,eq+d*num_equation) -= mean(eq)*nor[d]*shape2(k);
+//         }
       }
     }
       

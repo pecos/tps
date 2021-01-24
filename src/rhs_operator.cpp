@@ -220,8 +220,7 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
     
     mfem::Mult(Me_inv[i], zmat, ymat);
     y.SetSubVector(vdofs, ymat.GetData());
-  }
-   
+  }  
 }
 
 // Compute the flux at solution nodes.
@@ -371,18 +370,6 @@ void RHSoperator::calcGradientsPrimitives() const
     if(intRuleType==1 && elem->GetGeomType()==Geometry::SQUARE) intorder--; // when Gauss-Lobatto
     const IntegrationRule *ir = &intRules->Get(elem->GetGeomType(), intorder);
 
-// DenseMatrix elKKgrad(eldDof,num_equation*dim);
-// Up->GetGradients(el,*ir,elKKgrad);
-// Up->GetVectorGradient(*Tr,elKKgrad);
-// Vector kkcol,kkrow;
-// elKKgrad.GetColumn(0,kkcol);
-// elKKgrad.GetRow(0,kkrow);
-// for(int i=0;i<kkrow.Size();i++)
-// {
-//   for(int j=0;j<kkcol.Size();j++) cout<<elKKgrad(i,j)<<" ";
-//   cout<<endl;
-// }
-
     for(int i=0;i<ir->GetNPoints();i++)
     {
       IntegrationPoint ip = ir->IntPoint(i);
@@ -396,10 +383,16 @@ void RHSoperator::calcGradientsPrimitives() const
       
       // calc Up at int. point
       Vector iUp(num_equation);
+      DenseMatrix iGradUp(num_equation,dim);
+      iGradUp = 0.;
       for(int eq=0;eq<num_equation;eq++)
       {
         double sum = 0.;
-        for(int k=0;k<eldDof;k++) sum += elUp(k,eq)*shape(k);
+        for(int k=0;k<eldDof;k++)
+        {
+          for(int d=0;d<dim;d++) iGradUp(eq,d) += elUp(k,eq)*dshape(k,d);
+          sum += elUp(k,eq)*shape(k);
+        }
         iUp[eq] = sum;
       }
       
@@ -412,7 +405,8 @@ void RHSoperator::calcGradientsPrimitives() const
         {
           for(int j=0;j<eldDof;j++)
           {
-            elGradUp(j,eq+d*num_equation) += iUp[eq]*dshape(j,d)*detJac;
+            //elGradUp(j,eq+d*num_equation) += iUp[eq]*dshape(j,d)*detJac;
+            elGradUp(j,eq+d*num_equation) += shape(j)*iGradUp(eq,d)*detJac;
           }
         }
       }
@@ -452,8 +446,10 @@ void RHSoperator::calcGradientsPrimitives() const
         for(int k=0;k<eldDof;k++)
         {
           int index = vdofs[k];
-          rhs[k] = gradUp[index+eq*totalDofs+d*num_equation*totalDofs]+
-                  faceContrib[index+eq*totalDofs+d*num_equation*totalDofs];
+//           rhs[k] = gradUp[index+eq*totalDofs+d*num_equation*totalDofs]+
+//                   faceContrib[index+eq*totalDofs+d*num_equation*totalDofs];
+          rhs[k] = -gradUp[index+eq*totalDofs+d*num_equation*totalDofs]+
+                   faceContrib[index+eq*totalDofs+d*num_equation*totalDofs];
         }
 /*for(int k=0;k<eldDof;k++) cout<<rhs[k]<<" ";
 cout<<endl;  */       

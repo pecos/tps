@@ -7,14 +7,13 @@
 using namespace mfem;
 
 enum InletType {
-  SUB_DENS_VEL, // Subsonic inlet specified by the pressure and velocity components
-  SUB_DENS_VEL_NR // Non-reflecting subsonic inlet specified by the pressure and velocity components
+  SUB_DENS_VEL, // Subsonic inlet specified by the density and velocity components
+  SUB_DENS_VEL_NR // Non-reflecting subsonic inlet specified by the density and velocity components
 };
 
 class InletBC : public BoundaryCondition
 {
 private:
-  const int patchNumber;
   const InletType inletType;
   
   // In/out conditions specified in the configuration file
@@ -22,19 +21,19 @@ private:
   
   // Mean boundary state
   Vector meanUp;
-  Vector initMeanUp;
-  int iters;
-  bool meanIsSet;
   
-  void subsonicReflectingPressureVelocity(Vector &normal,
+  DenseMatrix boundaryU;
+  int bdrN;
+  bool bdrUInit;
+  
+  void subsonicReflectingDensityVelocity( Vector &normal,
                                           Vector &stateIn, 
-                                          DenseMatrix &gradState,
                                           Vector &bdrFlux);
   
-  void subsonicNonReflectingPressureVelocity( Vector &normal,
-                                              Vector &stateIn, 
-                                              DenseMatrix &gradState,
-                                              Vector &bdrFlux);
+  void subsonicNonReflectingDensityVelocity(Vector &normal,
+                                            Vector &stateIn, 
+                                            DenseMatrix &gradState,
+                                            Vector &bdrFlux);
   
   virtual void updateMean(IntegrationRules *intRules,
                           GridFunction *Up);

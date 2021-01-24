@@ -27,7 +27,6 @@ private:
   
   void subsonicReflectingPressure(Vector &normal,
                                   Vector &stateIn, 
-                                  DenseMatrix &gradState,
                                   Vector &bdrFlux);
   
   void subsonicNonReflectingPressure( Vector &normal,

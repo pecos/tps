@@ -231,16 +231,16 @@ void M2ulPhyS::projectInitialSolution()
   
   // particular case: Euler vortex
 //   {
-    void (*initialConditionFunction)(const Vector&, Vector&);
+    //void (*initialConditionFunction)(const Vector&, Vector&);
 //     t_final = 5.*  2./17.46;
 //     initialConditionFunction = &(this->InitialConditionEulerVortex);
-      initialConditionFunction = &(this->testInitialCondition);
+      //initialConditionFunction = &(this->testInitialCondition);
     
-    VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
-    U->ProjectCoefficient(u0);
+//     VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
+//     U->ProjectCoefficient(u0);
 //   }
 
-  //uniformInitialConditions();
+  uniformInitialConditions();
   gradUp = 0.;
   
    // set paraview output
@@ -419,10 +419,10 @@ void M2ulPhyS::testInitialCondition(const Vector& x, Vector& y)
    const double pres_inf = (den_inf / gamma) * (vel_inf / Minf) *
                            (vel_inf / Minf);
 
-   y(0) = den_inf + 0.5*(x(0)+3);
+   y(0) = den_inf + 0.5*(x(0)+3) +0.25*(x(1)+3);
    y(1) = y(0);
    y(2) = 0;
-   y(3) = (pres_inf+x(0))/(gamma-1.) + 0.5*y(1)*y(1)/y(0);
+   y(3) = (pres_inf+x(0)+0.2*x(1))/(gamma-1.) + 0.5*y(1)*y(1)/y(0);
    
    delete eqState;
 }

@@ -18,23 +18,58 @@ BoundaryCondition(_rsolver,
                   _dim,
                   _num_equation,
                   _patchNumber),
-patchNumber(_patchNumber),
 inletType(_bcType),
 inputState(_inputData)
 {
   meanUp.SetSize(num_equation);
-  
-  meanIsSet = false;
-  iters = 0;
   
   meanUp[0] = 1.2;
   meanUp[1] = 60;
   meanUp[2] = 0;
   meanUp[3] = 101300;
   
-  initMeanUp = meanUp;
-}  
+  // init boundary U
+  bdrN = 0;
+  for(int bel=0;bel<vfes->GetNBE(); bel++)
+  {
+    int attr = vfes->GetBdrAttribute(bel);
+    if( attr==patchNumber )
+    {
+      FaceElementTransformations *Tr = vfes->GetMesh()->GetBdrFaceTransformations(bel);
+      Array<int> dofs;
+      
+      vfes->GetElementVDofs(Tr->Elem1No, dofs);
+      
+      int intorder = Tr->Elem1->OrderW() + 2*vfes->GetFE(Tr->Elem1No)->GetOrder();
+      if (vfes->GetFE(Tr->Elem1No)->Space() == FunctionSpace::Pk)
+      {
+        intorder++;
+      }
+      const IntegrationRule ir = intRules->Get(Tr->GetGeometryType(), intorder);
+      for(int i=0;i<ir.GetNPoints();i++)
+      {
+        bdrN++;
+      }
+    }
+  }
   
+  boundaryU.SetSize(bdrN,num_equation);
+  for(int i=0;i<bdrN;i++)
+  {
+    Vector iState(num_equation);
+    iState = meanUp;
+    double gamma = eqState->GetSpecificHeatRatio();
+    double rE = iState[3]/(gamma-1.) + 0.5*iState[0]*(
+                iState[1]*iState[1] +
+                iState[2]*iState[2] );
+    iState[1] *= iState[0];
+    iState[2] *= iState[0];
+    iState[3]  = rE;
+    boundaryU.SetRow(i,iState);
+  }
+  bdrUInit = false;
+  bdrN = 0;
+}
 
 InletBC::~InletBC()
 {
@@ -48,10 +83,10 @@ void InletBC::computeBdrFlux( Vector &normal,
   switch(inletType)
   {
     case SUB_DENS_VEL:
-      subsonicReflectingPressureVelocity(normal,stateIn,gradState,bdrFlux);
+      subsonicReflectingDensityVelocity(normal,stateIn,bdrFlux);
       break;
     case SUB_DENS_VEL_NR:
-      subsonicNonReflectingPressureVelocity(normal,stateIn,gradState,bdrFlux);
+      subsonicNonReflectingDensityVelocity(normal,stateIn,gradState,bdrFlux);
       break;
   }
 }
@@ -59,69 +94,81 @@ void InletBC::computeBdrFlux( Vector &normal,
 void InletBC::updateMean(IntegrationRules *intRules,
                          GridFunction *Up)
 {
-  //if( !meanIsSet )
-  if(iters%100==0)
+  bdrN = 0;
+  meanUp = 0.;
+  int Nbdr = 0;
+  
+  double *data = Up->GetData();
+  for(int bel=0;bel<vfes->GetNBE(); bel++)
   {
-    meanUp = 0.;
-    int Nbdr = 0;
-    
-    double *data = Up->GetData();
-    for(int bel=0;bel<vfes->GetNBE(); bel++)
+    int attr = vfes->GetBdrAttribute(bel);
+    if( attr==patchNumber )
     {
-      int attr = vfes->GetBdrAttribute(bel);
-      if( attr==patchNumber )
+      FaceElementTransformations *Tr = vfes->GetMesh()->GetBdrFaceTransformations(bel);
+      Array<int> dofs;
+      
+      vfes->GetElementVDofs(Tr->Elem1No, dofs);
+      
+      // retreive data 
+      int elDofs = vfes->GetFE(Tr->Elem1No)->GetDof();
+      DenseMatrix elUp(elDofs,num_equation);
+      for(int d=0;d<elDofs;d++)
       {
-        FaceElementTransformations *Tr = vfes->GetMesh()->GetBdrFaceTransformations(bel);
-        Array<int> dofs;
+        int index = dofs[d];
+        for(int eq=0;eq<num_equation;eq++) elUp(d,eq) = data[index+eq*vfes->GetNDofs()];
+      }
+      
+      int intorder = Tr->Elem1->OrderW() + 2*vfes->GetFE(Tr->Elem1No)->GetOrder();
+      if (vfes->GetFE(Tr->Elem1No)->Space() == FunctionSpace::Pk)
+      {
+        intorder++;
+      }
+      const IntegrationRule ir = intRules->Get(Tr->GetGeometryType(), intorder);
+      for(int i=0;i<ir.GetNPoints();i++)
+      {
+        IntegrationPoint ip = ir.IntPoint(i);
+        Tr->SetAllIntPoints(&ip);
+        Vector shape(elDofs);
+        vfes->GetFE(Tr->Elem1No)->CalcShape(Tr->GetElement1IntPoint(), shape);
+        Vector iUp(num_equation);
         
-        vfes->GetElementVDofs(Tr->Elem1No, dofs);
-        //cout<< "bel "<<bel<<" attr "<<attr <<" dofs "<<dofs.Size()<<endl;
-        
-        // retreive data 
-        int elDofs = vfes->GetFE(Tr->Elem1No)->GetDof();
-        DenseMatrix elUp(elDofs,num_equation);
-        for(int d=0;d<elDofs;d++)
+        for(int eq=0;eq<num_equation;eq++)
         {
-          int index = dofs[d];
-          for(int eq=0;eq<num_equation;eq++) elUp(d,eq) = data[index+eq*vfes->GetNDofs()];
-        }
-        
-        int intorder = Tr->Elem1->OrderW() + 2*vfes->GetFE(Tr->Elem1No)->GetOrder();
-        if (vfes->GetFE(Tr->Elem1No)->Space() == FunctionSpace::Pk)
-        {
-          intorder++;
-        }
-        const IntegrationRule ir = intRules->Get(Tr->GetGeometryType(), intorder);
-        for(int i=0;i<ir.GetNPoints();i++)
-        {
-          IntegrationPoint ip = ir.IntPoint(i);
-          Tr->SetAllIntPoints(&ip);
-          Vector shape(elDofs);
-          vfes->GetFE(Tr->Elem1No)->CalcShape(Tr->GetElement1IntPoint(), shape);
-          Vector iUp(num_equation);
-          for(int eq=0;eq<num_equation;eq++)
+          double sum = 0.;
+          for(int d=0;d<elDofs;d++)
           {
-            double sum = 0.;
-            for(int d=0;d<elDofs;d++)
-            {
-              sum += shape[d]*elUp(d,eq);
-            }
-            meanUp[eq] += sum;
+            sum += shape[d]*elUp(d,eq);
           }
-          Nbdr++;
+          meanUp[eq] += sum;
+          if( !bdrUInit ) boundaryU(Nbdr,eq) = sum;
         }
+        Nbdr++;
       }
     }
-    
-    meanUp /= double(Nbdr);
-    meanIsSet = true;
-//     for(int i=0;i<num_equation;i++)cout<<meanUp[i]<<" ";
-//     cout<<endl;
+  }
+  
+  meanUp /= double(Nbdr);
+  if( !bdrUInit )
+  {
+    for(int i=0;i<Nbdr;i++)
+    {
+      Vector iState(num_equation);
+      boundaryU.GetRow(i,iState);
+      double gamma = eqState->GetSpecificHeatRatio();
+      double rE = iState[3]/(gamma-1.) + 0.5*iState[0]*(
+                  iState[1]*iState[1] +
+                  iState[2]*iState[2] );
+      iState[1] *= iState[0];
+      iState[2] *= iState[0];
+      iState[3]  = rE;
+      boundaryU.SetRow(i,iState);
+    }
+    bdrUInit = true;
   }
 }
 
 
-void InletBC::subsonicNonReflectingPressureVelocity(Vector &normal,
+void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal,
                                                     Vector &stateIn, 
                                                     DenseMatrix &gradState,
                                                     Vector &bdrFlux)
@@ -142,7 +189,7 @@ void InletBC::subsonicNonReflectingPressureVelocity(Vector &normal,
   L1 *= meanUp[1] - speedSound;
   
   // estimate ingoing characteristic
-  const double sigma = speedSound/2.*0.;
+  const double sigma = speedSound/2.;
   const double L5 = sigma*2.*meanUp[0]*speedSound*(/*u*/meanUp[1] - inputState[1]);
   const double L3 = sigma*(/*v*/meanUp[2]-inputState[2]);
   double L2 = sigma*speedSound*speedSound*(/*rho*/meanUp[0]-inputState[0]) - 0.5*L5;
@@ -179,29 +226,21 @@ void InletBC::subsonicNonReflectingPressureVelocity(Vector &normal,
   fluxY[3] = stateIn(3)/rho*dy_rv + rho*v*dy_E + dy_vp;
   
   Vector state2(num_equation);
-  state2 = stateIn;
-//   state2[0] = initMeanUp[0];
-//   state2[1] = initMeanUp[0]*initMeanUp[1];
-//   state2[2] = initMeanUp[0]*initMeanUp[2];
-//   state2[3] = initMeanUp[3]/(gamma-1.) + 0.5*initMeanUp[0]*(initMeanUp[1]*initMeanUp[1] +
-//                                                     initMeanUp[2]*initMeanUp[2] );
-//   state2[0] = meanUp[0];
-//   state2[1] = meanUp[0]*meanUp[1];
-//   state2[2] = meanUp[0]*meanUp[2];
-//   state2[3] = meanUp[3]/(gamma-1.) + 0.5*meanUp[0]*(meanUp[1]*meanUp[1] +
-//                                                     meanUp[2]*meanUp[2] );
+//   state2 = stateIn;
+  boundaryU.GetRow(bdrN,state2);
+/*for(int i=0;i<num_equation;i++)cout<<state2[i]<<" ";
+cout<<endl;*/
+  Vector newU(num_equation);
+  for(int i=0; i<num_equation;i++) newU[i] = state2[i]- dt*(bdrFlux[i] /*+ fluxY[i]*/);
+  boundaryU.SetRow(bdrN,newU);
+  bdrN++;
   
-//   cout << -dt*(bdrFlux[1] + fluxY[1]) << " ";
-  for(int i=0; i<num_equation;i++) state2[i] -= dt*(bdrFlux[i] /*+ fluxY[i]*/);
-for(int i=0;i<num_equation;i++)cout<<state2[i]<<" ";
-cout<<endl;
-  rsolver->Eval(state2,state2,normal,bdrFlux);
+  rsolver->Eval(stateIn,state2,normal,bdrFlux);
 }
 
-void InletBC::subsonicReflectingPressureVelocity( Vector &normal,
-                                                  Vector &stateIn, 
-                                                  DenseMatrix &gradState,
-                                                  Vector &bdrFlux)
+void InletBC::subsonicReflectingDensityVelocity(Vector &normal,
+                                                Vector &stateIn,
+                                                Vector &bdrFlux)
 {
   const double gamma = eqState->GetSpecificHeatRatio();
   const double p = eqState->ComputePressure(stateIn, dim);
