@@ -85,10 +85,8 @@ private:
   BlockVector *up_block;
   
   // paraview collection pointer
-  ParaViewDataCollection *paraviewColl = NULL;
-
-  // Momentum grid function on dfes for visualization.
-  //GridFunction mom;
+  //ParaViewDataCollection *paraviewColl = NULL;
+  DataCollection *visitColl = NULL;
   
   // Riemann Solver
   RiemannSolver *rsolver;
@@ -114,6 +112,9 @@ private:
   // Primitive variables
   GridFunction *Up;
   
+  // Visualization functions
+  GridFunction *press, *dens, *vel;
+  
   // Gradients Up
   Array<double> gradUp;
   
@@ -122,6 +123,9 @@ private:
   
   // time step
   double dt;
+  
+  // iteration
+  int iter;
   
   // time of end of simulation
   double t_final;

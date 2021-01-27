@@ -37,7 +37,6 @@ inputState(_inputData)
     {
       FaceElementTransformations *Tr = vfes->GetMesh()->GetBdrFaceTransformations(bel);
       Array<int> dofs;
-      
       vfes->GetElementVDofs(Tr->Elem1No, dofs);
       
       int intorder = Tr->Elem1->OrderW() + 2*vfes->GetFE(Tr->Elem1No)->GetOrder();

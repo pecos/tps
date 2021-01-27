@@ -13,7 +13,7 @@ void Fluxes::ComputeFlux(const Vector &state, int dim, DenseMatrix &flux)
    const Vector den_vel(state.GetData() + 1, dim);
    const double den_energy = state(1 + dim);
 
-   MFEM_ASSERT(eqState->StateIsPhysical(state, dim), "");
+   MFEM_ASSERT(eqState->StateIsPhysical(state, dim), "*");
 
    const double pres =  eqState->ComputePressure(state, dim);
    //cout<<pres<<" "<<den<<" "<<den_energy<<endl;

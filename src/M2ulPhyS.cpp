@@ -18,13 +18,34 @@ M2ulPhyS::M2ulPhyS(string &inputFileName)
 
 void M2ulPhyS::initVariables()
 {
+  // check if a simulations is being restarted
+  if( config.GetRestartCycle()>0 )
+  {
+    visitColl = new VisItDataCollection(config.GetOutputName(), NULL);
+    visitColl->SetPrefixPath(config.GetOutputName());
+    visitColl->Load( config.GetRestartCycle() ); 
+    
+    mesh = visitColl->GetMesh();
+    time = visitColl->GetTime();
+    iter = visitColl->GetCycle();
+  }else
+  {
+    mesh = new Mesh(config.GetMeshFileName());
+    
+    visitColl = new VisItDataCollection(config.GetOutputName(), mesh);
+    visitColl->SetPrefixPath(config.GetOutputName());
+    visitColl->SetPrecision(8);
+    
+    time = 0.;
+    iter = 0;
+  }
   
-  //mesh = new Mesh(config.GetMeshFileName(),1,1);
-  mesh = new Mesh(config.GetMeshFileName());
   mesh->PrintCharacteristics();
   dim = mesh->Dimension();
   
   eqSystem = config.GetEquationSystem();
+  
+  eqState = new EquationOfState(config.GetWorkingFluid());
   
   order = config.GetSolutionOrder();
   
@@ -70,8 +91,6 @@ void M2ulPhyS::initVariables()
   
   initSolutionAndVisualizationVectors();
   projectInitialSolution();
-  
-  eqState = new EquationOfState(config.GetWorkingFluid());
   
   fluxClass = new Fluxes(eqState);
   
@@ -145,7 +164,6 @@ void M2ulPhyS::initVariables()
                                 isSBP, 
                                 alpha );
   
-  time = 0.;
   CFL = config.GetCFLNumber();
   rhsOperator->SetTime(time);
   timeIntegrator->Init( *rhsOperator );
@@ -174,7 +192,8 @@ void M2ulPhyS::initVariables()
 
 M2ulPhyS::~M2ulPhyS()
 {
-  delete paraviewColl;
+  //delete paraviewColl;
+  delete visitColl;
   
   delete u_block;
   delete up_block;
@@ -202,7 +221,7 @@ M2ulPhyS::~M2ulPhyS()
   delete fec;
   delete intRules;
   
-  delete mesh;
+  //delete mesh; // deleted by visitColl
 }
 
 
@@ -215,14 +234,65 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
   
   gradUp.SetSize(num_equation*dim*vfes->GetNDofs());
   
-//   {
-//     ofstream mesh_ofs("vortex.mesh");
-//     mesh_ofs.precision(8);
-//     mesh_ofs << mesh;
-//   }
-  
   U  = new GridFunction(vfes, u_block->GetData());
   Up = new GridFunction(vfes, up_block->GetData());
+  
+  if( config.GetRestartCycle()>0 )
+  {
+    dens = visitColl->GetField("dens");
+    vel  = visitColl->GetField("vel");
+    press= visitColl->GetField("press");
+    
+    //update U and Up
+    {
+    const double gamma = eqState->GetSpecificHeatRatio();
+    double *dataUp = Up->GetData();
+    double *dataU  = U->GetData();
+    double *dataR  = dens->GetData();
+    double *dataV  = vel->GetData();
+    double *dataP  = press->GetData();
+    for(int n=0;n<fes->GetNDofs();n++)
+    {
+      double r = dataR[n];
+      double u = dataV[n];
+      double v = dataV[n+fes->GetNDofs()];
+      double p = dataP[n];
+      double rE = p/(gamma-1.) +0.5*r*(u*u+v*v);
+      cout<<r<<" "<<u<<" "<<v<<" "<<p<<endl;
+      dataU[n                  ] = r;
+      dataU[n+  fes->GetNDofs()] = r*u;
+      dataU[n+2*fes->GetNDofs()] = r*v;
+      dataU[n+3*fes->GetNDofs()] = rE;
+      
+      dataUp[n                  ] = r;
+      dataUp[n+  fes->GetNDofs()] = u;
+      dataUp[n+2*fes->GetNDofs()] = v;
+      dataUp[n+3*fes->GetNDofs()] = p;
+    }
+    
+    visitColl->DeregisterField("dens");
+    visitColl->DeregisterField("vel");
+    visitColl->DeregisterField("press");
+  }
+  }else
+  {
+    visitColl->SetCycle(0);
+    visitColl->SetTime(0.);
+  }
+  
+  dens = new GridFunction(fes, Up->GetData());
+  vel = new GridFunction(dfes, Up->GetData()+fes->GetNDofs());
+  press = new GridFunction(fes,
+                Up->GetData()+(num_equation-1)*fes->GetNDofs());
+  
+  visitColl->RegisterField("dens",dens);
+  visitColl->RegisterField("vel",vel);
+  visitColl->RegisterField("press",press);
+  
+  visitColl->SetOwnData(true);
+
+//visitColl->SaveRootFile();
+  visitColl->Save();
 }
 
 void M2ulPhyS::projectInitialSolution()
@@ -240,20 +310,26 @@ void M2ulPhyS::projectInitialSolution()
 //     U->ProjectCoefficient(u0);
 //   }
 
-  uniformInitialConditions();
+  if( config.GetRestartCycle()==0 )
+  {
+    uniformInitialConditions();
+  }else
+  
+  
   gradUp = 0.;
   
    // set paraview output
-  paraviewColl = new ParaViewDataCollection(config.GetOutputName(),mesh);
-  //paraviewColl->SetPrefixPath("ParaView");
-  paraviewColl->RegisterField("ConservativeVars", U);
-  paraviewColl->RegisterField("PrimitiveVars", Up);
-  paraviewColl->SetLevelsOfDetail(order);
-  paraviewColl->SetDataFormat(VTKFormat::BINARY);
-  paraviewColl->SetHighOrderOutput(true);
-  paraviewColl->SetCycle(0);
-  paraviewColl->SetTime(0.0);
-  paraviewColl->Save();
+//   paraviewColl = new ParaViewDataCollection(config.GetOutputName(),mesh);
+//   paraviewColl->RegisterField("ConservativeVars", U);
+//   paraviewColl->RegisterField("PrimitiveVars", Up);
+//   paraviewColl->SetLevelsOfDetail(order);
+//   paraviewColl->SetDataFormat(VTKFormat::BINARY);
+//   paraviewColl->SetHighOrderOutput(true);
+//   paraviewColl->SetCycle(0);
+//   paraviewColl->SetTime(0.0);
+//   paraviewColl->Save();
+  
+  
 }
 
 
@@ -261,41 +337,38 @@ void M2ulPhyS::Iterate()
 {
   // Integrate in time.
   bool done = false;
-  for (int ti = 0; !done; )
+  while( !done )
   {
     // adjusts time step to finish at t_final
     double dt_real = min(dt, t_final - time);
 
-    //bcIntegrator->updateBCMean( Up );
     timeIntegrator->Step(*U, time, dt_real);
     
     dt = CFL * hmin / max_char_speed /(double)dim;
-    ti++;
+    iter++;
 
     const int vis_steps = config.GetNumItersOutput();
     done = (time >= t_final - 1e-8*dt);
-    if (done || ti % vis_steps == 0)
+    if (done || iter % vis_steps == 0)
     {
-        cout << "time step: " << ti << ", progress(%): " << 100.*time/t_final << endl;
+        cout << "time step: " << iter << ", progress(%): " << 100.*time/t_final << endl;
         
         { // DEBUG ONLY!
-          string fileName(config.GetOutputName());
-          fileName.append(".mesh");
-          ofstream vtkmesh(fileName);
-          mesh->Print(vtkmesh);
-          vtkmesh.close();
+//           GridFunction uk(fes, u_block->GetBlock(3));
+//           ostringstream sol_name;
+//           sol_name << config.GetOutputName() <<"-" << 2 << "-final.gf";
+//           ofstream sol_ofs(sol_name.str().c_str());
+//           sol_ofs.precision(8);
+//           sol_ofs << uk;
+//           exit(0);
           
-          GridFunction uk(fes, u_block->GetBlock(3));
-          ostringstream sol_name;
-          sol_name << config.GetOutputName() <<"-" << 2 << "-final.gf";
-          ofstream sol_ofs(sol_name.str().c_str());
-          sol_ofs.precision(8);
-          sol_ofs << uk;
-          //exit(0);
+//           paraviewColl->SetCycle(ti);
+//           paraviewColl->SetTime(time);
+//           paraviewColl->Save();
           
-          paraviewColl->SetCycle(ti);
-          paraviewColl->SetTime(time);
-          paraviewColl->Save();
+          visitColl->SetCycle(iter);
+          visitColl->SetTime(time);
+          visitColl->Save();
         }
     }
   }
@@ -317,15 +390,15 @@ void M2ulPhyS::Iterate()
       
       // 9. Save the final solution. This output can be viewed later using GLVis:
       //    "glvis -m vortex.mesh -g vortex-1-final.gf".
-      for (int k = 0; k < num_equation; k++)
-      {
-          GridFunction uk(fes, u_block->GetBlock(k));
-          ostringstream sol_name;
-          sol_name << config.GetOutputName() <<"-" << k << "-final.gf";
-          ofstream sol_ofs(sol_name.str().c_str());
-          sol_ofs.precision(8);
-          sol_ofs << uk;
-      }
+//       for (int k = 0; k < num_equation; k++)
+//       {
+//           GridFunction uk(fes, u_block->GetBlock(k));
+//           ostringstream sol_name;
+//           sol_name << config.GetOutputName() <<"-" << k << "-final.gf";
+//           ofstream sol_ofs(sol_name.str().c_str());
+//           sol_ofs.precision(8);
+//           sol_ofs << uk;
+//       }
    }
 }
 

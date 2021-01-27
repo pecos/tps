@@ -7,6 +7,11 @@ MESH square_periodic_mesh.mesh
 # extensions will be added by program
 OUTPUT_NAME euler_output
 
+# When restarting, set this parameter to the number
+# of iterations at restart.
+# If not restarting, ommit this parameter.
+RESTART_CYCLE 300
+
 # Polynomial order
 POL_ORDER 3
 

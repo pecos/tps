@@ -15,6 +15,7 @@ RunConfiguration::RunConfiguration()
   
   cflNum = 0.12;
   numIters = 10;
+  restart_cycle = 0;
   itersOut = 50;
   workFluid = DRY_AIR;
   eqSystem = EULER;
@@ -71,6 +72,12 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       {
         ss >> word;
         numIters = stoi(word);
+        
+      // cycles at restart
+      }else if( word.compare("RESTART_CYCLE")==0 )
+      {
+        ss >> word;
+        restart_cycle = stoi(word);
         
       // output interval
       }else if( word.compare("ITERS_OUT")==0 )

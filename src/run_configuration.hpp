@@ -1,6 +1,8 @@
 #ifndef RUN_CONFIGURATION
 #define RUN_CONFIGURATION
 
+#include <utility>
+
 #include "mfem.hpp"
 #include "equation_of_state.hpp"
 #include "fluxes.hpp"
@@ -9,6 +11,7 @@
 #include "wallBC.hpp"
 
 using namespace mfem;
+using namespace std;
 
 // Class to manage the run options as
 // specified in the input file
@@ -51,6 +54,9 @@ private:
   // output interval in num. of iters.
   int itersOut;
   
+  // cycle for restart
+  int restart_cycle;
+  
   // working fluid. Options thus far
   // DRY_AIR
   // Defaults to DRAY_AIR
@@ -67,15 +73,15 @@ private:
   
   // Inlet BC data
   Array<Array<double> > inletBC;
-  Array<std::pair<int,InletType> > inletPatchType;
+  Array<pair<int,InletType> > inletPatchType;
   
   
   // Outlet BC data
   Array<Array<double> > outletBC;
-  Array<std::pair<int,OutletType> > outletPatchType;
+  Array<pair<int,OutletType> > outletPatchType;
   
   // Wall BC data
-  Array<std::pair<int,WallType> > wallPatchType;
+  Array<pair<int,WallType> > wallPatchType;
   
 public:
   RunConfiguration();
@@ -100,13 +106,15 @@ public:
   bool isSBP(){return SBP;}
   double* GetConstantInitialCondition(){return &initRhoRhoVp[0];}
   
-  Array<std::pair<int,InletType> >* GetInletPatchType(){return &inletPatchType;}
+  int GetRestartCycle(){return restart_cycle;}
+  
+  Array<pair<int,InletType> >* GetInletPatchType(){return &inletPatchType;}
   Array<double>* GetInletData(int in){return &inletBC[in];}
   
-  Array<std::pair<int,OutletType> >* GetOutletPatchType(){return &outletPatchType;}
+  Array<pair<int,OutletType> >* GetOutletPatchType(){return &outletPatchType;}
   Array<double>* GetOutletData(int out){return &outletBC[out];}
   
-  Array<std::pair<int,WallType> >* GetWallPatchType(){return &wallPatchType;}
+  Array<pair<int,WallType> >* GetWallPatchType(){return &wallPatchType;}
 };
 
 #endif // RUN_CONFIGURATION
