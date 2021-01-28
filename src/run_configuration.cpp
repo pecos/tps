@@ -203,12 +203,10 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
         }
         inletPatchType.Append( patchANDtype );
         
-        inletBC.SetSize( inletBC.Size()+1 );
-        inletBC[inletBC.Size()-1].SetSize(4);
         for(int i=0; i<4; i++)
         {
           ss >> word;
-          inletBC[inletBC.Size()-1][i] = stof( word );
+          inletBC.Append( stof( word ) );
         }
         
       }else if( word.compare("OUTLET")==0 )
@@ -231,9 +229,7 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
         outletPatchType.Append( patchANDtype );
         
         ss >> word;
-        outletBC.SetSize(outletBC.Size()+1 );
-        outletBC[outletBC.Size()-1].SetSize(1);
-        outletBC[outletBC.Size()-1][0] = stof( word );
+        outletBC.Append (stof( word ) );
         
       }else if( word.compare("WALL")==0 )
       {
@@ -258,3 +254,20 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
   
   runFile.close();
 }
+
+Array<double> RunConfiguration::GetInletData(int i)
+{
+  Array<double> data(4);
+  for(int j=0;j<4;j++) data[j] = inletBC[j+4*i];
+  
+  return data;
+}
+
+Array<double> RunConfiguration::GetOutletData(int out)
+{
+  Array<double> data(1);
+  data[0] = outletBC[out];
+  
+  return data;
+}
+

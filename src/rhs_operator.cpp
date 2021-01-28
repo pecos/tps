@@ -5,6 +5,7 @@
 
 // Implementation of class RHSoperator
 RHSoperator::RHSoperator( const int _dim,
+                          const int &_num_equations,
                           const Equations &_eqSystem,
                           double &_max_char_speed,
                           IntegrationRules *_intRules,
@@ -22,6 +23,7 @@ RHSoperator::RHSoperator( const int _dim,
                         ):
 TimeDependentOperator(_A->Height()),
 dim(_dim ),
+num_equation(_num_equations),
 eqSystem(_eqSystem),
 max_char_speed(_max_char_speed),
 intRules(_intRules),
@@ -37,19 +39,6 @@ Up(_Up),
 gradUp(_gradUp),
 bcIntegrator(_bcIntegrator)
 {
-  switch(eqSystem)
-  {
-    case EULER:
-      num_equation = dim + 2;
-      break;
-    case NS:
-      num_equation = dim + 2;
-      break;
-    default:
-      std::cout << "System of equations not specified" << std::endl;
-      break;
-  }
-  
   state = new Vector(num_equation);
   
   // Finite element space associated with the gradients of primitives 

@@ -35,12 +35,13 @@ gradUp(_gradUp)
     bool attrInMesh = false;
     for(int i=0; i<mesh->bdr_attributes.Size(); i++) 
     {
-      //cout << mesh->bdr_attributes[i] << endl;
       if(patchANDtype.first==mesh->bdr_attributes[i]) attrInMesh = true;
     }
     
     if( attrInMesh )
     {
+      Array<double> data = config.GetInletData(in);
+      cout<<data[0]<<" "<<data[1]<<" "<<data[2]<<" "<<data[3]<<endl;
       BCmap[patchANDtype.first] = new InletBC(rsolver, 
                                               eqState,
                                               vfes,
@@ -50,7 +51,7 @@ gradUp(_gradUp)
                                               num_equation,
                                               patchANDtype.first,
                                               patchANDtype.second,
-                                              *config.GetInletData(in) );
+                                              data );
     }
   }
   
@@ -65,6 +66,7 @@ gradUp(_gradUp)
     
     if( attrInMesh )
     {
+      Array<double> data = config.GetOutletData(o);
       BCmap[patchANDtype.first] = new OutletBC( rsolver, 
                                                 eqState,
                                                 vfes,
@@ -74,7 +76,7 @@ gradUp(_gradUp)
                                                 num_equation,
                                                 patchANDtype.first,
                                                 patchANDtype.second,
-                                                *config.GetOutletData(o) );
+                                                data );
     }
   }
   

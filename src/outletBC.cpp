@@ -28,6 +28,9 @@ inputState(_inputData)
   meanUp[2] = 0;
   meanUp[3] = 101300;
   
+  Array<double> coords;
+  
+  
   // init boundary U
   bdrN = 0;
   for(int bel=0;bel<vfes->GetNBE(); bel++)
@@ -47,6 +50,11 @@ inputState(_inputData)
       const IntegrationRule ir = intRules->Get(Tr->GetGeometryType(), intorder);
       for(int i=0;i<ir.GetNPoints();i++)
       {
+        IntegrationPoint ip = ir.IntPoint(i);
+        double x[3];
+        Vector transip(x, 3);
+        Tr->Transform(ip,transip);
+        for(int d=0;d<3;d++) coords.Append( transip[d] );
         bdrN++;
       }
     }
@@ -68,6 +76,22 @@ inputState(_inputData)
   }
   bdrUInit = false;
   bdrN = 0;
+  
+  // init. unit tangent vector tangent1
+  Array<double> coords1,coords2;
+  for(int d=0;d<dim;d++)
+  {
+    coords1.Append( coords[d] );
+    coords2.Append( coords[d+3] );
+  }
+  tangent1.SetSize(dim);
+  double modVec = 0.;
+  for(int d=0;d<dim;d++)
+  {
+    modVec += (coords2[d]-coords1[d])*(coords2[d]-coords1[d]);
+    tangent1[d] = coords2[d]-coords1[d];
+  }
+  tangent1 *= 1./sqrt( modVec );
 }
 
 OutletBC::~OutletBC()
@@ -173,6 +197,29 @@ void OutletBC::subsonicNonReflectingPressure( Vector &normal,
 {
   const double gamma = eqState->GetSpecificHeatRatio();
   
+  Vector unitNorm = normal;
+  {
+    double mod = 0.;
+    for(int d=0;d<dim;d++) mod += normal[d]*normal[d];
+    unitNorm *= 1./sqrt(mod);
+  }
+  
+  double meanVn = 0.;
+  double meanVt1 = 0.;
+  for(int d=0;d<dim;d++)
+  {
+    meanVn += unitNorm[d]*meanUp[d+1];
+    meanVt1 += tangent1[d]*meanUp[d+1];
+  }
+  
+  // normal gradients
+  Vector normGrad(num_equation);
+  normGrad = 0.;
+  for(int eq=0;eq<num_equation;eq++)
+  {
+    for(int d=0;d<dim;d++) normGrad[eq] += unitNorm[d]*gradState(eq,d);
+  }
+  
   const double rho = stateIn[0];
   const double u = stateIn[1]/rho;
   const double v = stateIn[2]/rho;
@@ -182,10 +229,11 @@ void OutletBC::subsonicNonReflectingPressure( Vector &normal,
   const double meanK = 0.5*(meanUp[1]*meanUp[1] + meanUp[2]*meanUp[2]);
   
   // compute outgoing characteristics
-  double L2 = meanUp[1]*(speedSound*speedSound*gradState(0,0) - gradState(3,0) );
-  double L3 = meanUp[1]*gradState(2,0);
-  double L5 = gradState(3,0) +rho*speedSound*gradState(1,0);
-  L5 *= meanUp[1] + speedSound;
+  double L2 = meanVn*(speedSound*speedSound*normGrad[0] - normGrad[3] );
+  double L3 = meanVn*(normGrad[1]*tangent1[0]+normGrad[2]*tangent1[1]);
+  double L5 = normGrad[3] +rho*speedSound*(normGrad[1]*unitNorm[0] +
+                                           normGrad[2]*unitNorm[1] );
+  L5 *= meanVn + speedSound;
   
 //   cout<<"grads :";
 //   for(int i=0;i<num_equation;i++)cout<<gradState(i,1)<<" ";
@@ -194,7 +242,7 @@ void OutletBC::subsonicNonReflectingPressure( Vector &normal,
   const double p = eqState->ComputePressure(stateIn, dim);
   
   // estimate ingoing characteristic
-  const double sigma = speedSound/2./2.;
+  const double sigma = speedSound/2.;
   double L1 = sigma*(meanUp[3] - inputState[0]);
   
   // calc vector d
@@ -205,9 +253,10 @@ void OutletBC::subsonicNonReflectingPressure( Vector &normal,
   
   // dF/dx
   bdrFlux[0] = d1;
-  bdrFlux[1] = meanUp[1]*d1 + meanUp[0]*d2;
-  bdrFlux[2] = meanUp[2]*d1 + meanUp[0]*d3;
-  bdrFlux[3] = meanK*d1 + meanUp[0]*meanUp[1]*d2 + meanUp[0]*meanUp[2]*d3 + d5/(gamma-1.);
+  bdrFlux[1] = meanVn*d1  + meanUp[0]*d2;
+  bdrFlux[2] = meanVt1*d1 + meanUp[0]*d3;
+  bdrFlux[3] = meanK*d1   + meanUp[0]*meanVn*d2 + 
+                            meanUp[0]*meanVt1*d3 + d5/(gamma-1.);
   
   // flux gradients in other directions
   const double dy_rv = gradState(0,1)*v + rho*gradState(2,1);
@@ -225,12 +274,28 @@ void OutletBC::subsonicNonReflectingPressure( Vector &normal,
   fluxY[3] = stateIn(3)/rho*dy_rv + rho*v*dy_E + dy_vp;
   
   Vector state2(num_equation);
-//   state2 = stateIn;
   boundaryU.GetRow(bdrN,state2);
-/*for(int i=0;i<num_equation;i++)cout<<state2[i]<<" ";
-cout<<endl;*/
+  
+  Vector stateN = state2;
+  stateN[1] = state2[1]*unitNorm[0] + state2[2]*unitNorm[1];
+  stateN[2] = state2[1]*tangent1[0] + state2[2]*tangent1[1];
+  
   Vector newU(num_equation);
-  for(int i=0; i<num_equation;i++) newU[i] = state2[i]- dt*(bdrFlux[i] /*+ fluxY[i]*/);
+  //for(int i=0; i<num_equation;i++) newU[i] = state2[i]- dt*(bdrFlux[i] /*+ fluxY[i]*/);
+  for(int i=0; i<num_equation;i++) newU[i] = stateN[i]- dt*bdrFlux[i];
+  
+  // transform back into x-y coords
+  {
+    DenseMatrix M(dim,dim);
+    M(0,0) = unitNorm[0]; M(0,1) = unitNorm[1];
+    M(1,0) = tangent1[0]; M(1,1) = tangent1[1];
+    DenseMatrix invM(dim,dim);
+    mfem::CalcInverse(M,invM);
+    Vector momN(dim), momX(dim);
+    for(int d=0;d<dim;d++) momN[d] = newU[1+d];
+    invM.Mult(momN,momX);
+    for(int d=0;d<dim;d++) newU[1+d] = momX[d]; 
+  }
   boundaryU.SetRow(bdrN,newU);
   bdrN++;
   

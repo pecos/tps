@@ -16,7 +16,7 @@ private:
   const OutletType outletType;
   
   // In/out conditions specified in the configuration file
-  const Array<double> &inputState;
+  const Array<double> inputState;
   
   // Mean boundary state
   Vector meanUp;
@@ -24,6 +24,9 @@ private:
   DenseMatrix boundaryU;
   int bdrN;
   bool bdrUInit;
+  
+  // Unit trangent vector 1
+  Vector tangent1;
   
   void subsonicReflectingPressure(Vector &normal,
                                   Vector &stateIn, 

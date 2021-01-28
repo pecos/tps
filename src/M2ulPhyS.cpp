@@ -28,6 +28,10 @@ void M2ulPhyS::initVariables()
     mesh = visitColl->GetMesh();
     time = visitColl->GetTime();
     iter = visitColl->GetCycle();
+    
+    cout<<"================================================"<<endl;
+    cout<<"| Restarting simulation at iteration "<<iter<<endl;
+    cout<<"================================================"<<endl;
   }else
   {
     mesh = new Mesh(config.GetMeshFileName());
@@ -149,6 +153,7 @@ void M2ulPhyS::initVariables()
   cout << "Number of DoF:      " << vfes->GetNDofs() << endl;
   
   rhsOperator = new RHSoperator(dim,
+                                num_equation,
                                 eqSystem,
                                 max_char_speed,
                                 intRules,
@@ -258,7 +263,6 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
       double v = dataV[n+fes->GetNDofs()];
       double p = dataP[n];
       double rE = p/(gamma-1.) +0.5*r*(u*u+v*v);
-      cout<<r<<" "<<u<<" "<<v<<" "<<p<<endl;
       dataU[n                  ] = r;
       dataU[n+  fes->GetNDofs()] = r*u;
       dataU[n+2*fes->GetNDofs()] = r*v;
@@ -382,23 +386,11 @@ void M2ulPhyS::Iterate()
       const double error = U->ComputeLpError(2, u0);
       cout << "Solution error: " << error << endl;
       
-      string fileName(config.GetOutputName());
-      fileName.append(".mesh");
-      ofstream vtkmesh(fileName);
-      mesh->Print(vtkmesh);
-      vtkmesh.close();
-      
-      // 9. Save the final solution. This output can be viewed later using GLVis:
-      //    "glvis -m vortex.mesh -g vortex-1-final.gf".
-//       for (int k = 0; k < num_equation; k++)
-//       {
-//           GridFunction uk(fes, u_block->GetBlock(k));
-//           ostringstream sol_name;
-//           sol_name << config.GetOutputName() <<"-" << k << "-final.gf";
-//           ofstream sol_ofs(sol_name.str().c_str());
-//           sol_ofs.precision(8);
-//           sol_ofs << uk;
-//       }
+//       string fileName(config.GetOutputName());
+//       fileName.append(".mesh");
+//       ofstream vtkmesh(fileName);
+//       mesh->Print(vtkmesh);
+//       vtkmesh.close();
    }
 }
 

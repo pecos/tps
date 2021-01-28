@@ -72,12 +72,12 @@ private:
   double initRhoRhoVp[5];
   
   // Inlet BC data
-  Array<Array<double> > inletBC;
+  Array<double> inletBC;
   Array<pair<int,InletType> > inletPatchType;
   
   
   // Outlet BC data
-  Array<Array<double> > outletBC;
+  Array<double> outletBC;
   Array<pair<int,OutletType> > outletPatchType;
   
   // Wall BC data
@@ -109,10 +109,10 @@ public:
   int GetRestartCycle(){return restart_cycle;}
   
   Array<pair<int,InletType> >* GetInletPatchType(){return &inletPatchType;}
-  Array<double>* GetInletData(int in){return &inletBC[in];}
+  Array<double> GetInletData(int i);
   
   Array<pair<int,OutletType> >* GetOutletPatchType(){return &outletPatchType;}
-  Array<double>* GetOutletData(int out){return &outletBC[out];}
+  Array<double> GetOutletData(int out);
   
   Array<pair<int,WallType> >* GetWallPatchType(){return &wallPatchType;}
 };
