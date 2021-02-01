@@ -3,6 +3,7 @@
 
 #include "mfem.hpp"
 #include "BoundaryCondition.hpp"
+#include "fluxes.hpp"
 
 using namespace mfem;
 
@@ -17,14 +18,21 @@ private:
   // The type of wall
   const WallType wallType;
   
+  Fluxes *fluxClass;
+  
   void computeINVwallFlux(Vector &normal,
-                          Vector &stateIn, 
-                          DenseMatrix &gradState,
+                          Vector &stateIn,
                           Vector &bdrFlux);
+  
+  void computeAdiabaticWallFlux(Vector &normal,
+                                Vector &stateIn, 
+                                DenseMatrix &gradState,
+                                Vector &bdrFlux);
   
 public:
   WallBC( RiemannSolver *rsolver_, 
           EquationOfState *_eqState,
+          Fluxes *_fluxClass,
           FiniteElementSpace *_vfes,
           IntegrationRules *_intRules,
           double &_dt,

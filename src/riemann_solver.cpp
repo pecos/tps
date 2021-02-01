@@ -6,11 +6,12 @@ using namespace mfem;
 // Implementation of class RiemannSolver
 RiemannSolver::RiemannSolver(int &_num_equation,
                              EquationOfState *_eqState ) :
-  num_equation(_num_equation),
-  flux1(num_equation),
-  flux2(num_equation),
-  eqState(_eqState)
-{ }
+num_equation(_num_equation),
+eqState(_eqState)
+{
+  flux1.SetSize(num_equation);
+  flux2.SetSize(num_equation);
+}
    
 // Compute the scalar F(u).n
 void RiemannSolver::ComputeFluxDotN(const Vector &state, 

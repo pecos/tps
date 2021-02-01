@@ -20,7 +20,7 @@ private:
    const Equations &eqSystem;
    
    double &max_char_speed;
-   int &num_equation;
+   const int &num_equation;
    
    IntegrationRules *intRules;
    const int intRuleType;
@@ -59,7 +59,7 @@ private:
 
 public:
    RHSoperator(const int _dim,
-               cont int &_num_equations,
+               const int &_num_equations,
                const Equations &_eqSystem,
                double &_max_char_speed,
                IntegrationRules *_intRules,

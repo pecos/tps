@@ -7,6 +7,7 @@
 #include "unordered_map"
 #include "BoundaryCondition.hpp"
 #include "run_configuration.hpp"
+#include "fluxes.hpp"
 
 using namespace mfem;
 
@@ -18,6 +19,7 @@ protected:
   
   RiemannSolver *rsolver;
   EquationOfState *eqState;
+  Fluxes *fluxClass;
    
   const int dim;
   const int num_equation;
@@ -51,6 +53,7 @@ public:
                 RiemannSolver *rsolver_, 
                 double &_dt,
                 EquationOfState *_eqState,
+                Fluxes *_fluxClass,
                 GridFunction *_Up,
                 Array<double> &_gradUp,
                 const int _dim,

@@ -17,10 +17,29 @@ class Fluxes
 private:
   EquationOfState *eqState;
   
-public:
-  Fluxes(EquationOfState *_eqState);
+  Equations &eqSystem;
   
-  void ComputeFlux(const Vector &state, int dim, DenseMatrix &flux);
+  const int &dim;
+  
+  const int &num_equations;
+  
+public:
+  Fluxes(EquationOfState *_eqState,
+         Equations &_eqSystem,
+         const int &_num_equations,
+         const int &_dim
+        );
+  
+  void ComputeTotalFlux(const Vector &state,
+                        const DenseMatrix &gradUp, 
+                        DenseMatrix &flux);
+  
+  void ComputeConvectiveFluxes(const Vector &state,
+                               DenseMatrix &flux );
+  
+  void ComputeViscousFluxes(const Vector &state,
+                            const DenseMatrix &gradUp, 
+                            DenseMatrix &flux);
   
   // Compute the split fersion of the flux for SBP operations
   // Output matrices a_mat, c_mat need not have the right size

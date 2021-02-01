@@ -50,6 +50,9 @@ TIME_INTEGRATOR 4
 # for DRY_AIR -> 0
 FLUID 0
 
+# Factor that multiplies fluid viscosity
+VISC_MULT 45000.
+
 # equations to be solved. Options thus far
 # EULER -> 0
 # NS    -> 1

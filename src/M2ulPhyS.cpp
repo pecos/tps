@@ -34,6 +34,11 @@ void M2ulPhyS::initVariables()
     cout<<"================================================"<<endl;
   }else
   {
+    //remove previous solution
+    string command = "rm -r ";
+    command.append( config.GetOutputName() );
+    system(command.c_str());
+    
     mesh = new Mesh(config.GetMeshFileName());
     
     visitColl = new VisItDataCollection(config.GetOutputName(), mesh);
@@ -50,6 +55,7 @@ void M2ulPhyS::initVariables()
   eqSystem = config.GetEquationSystem();
   
   eqState = new EquationOfState(config.GetWorkingFluid());
+  eqState->setViscMult(config.GetViscMult() );
   
   order = config.GetSolutionOrder();
   
@@ -60,6 +66,9 @@ void M2ulPhyS::initVariables()
   switch(eqSystem)
   {
     case EULER:
+      num_equation = 2 + dim;
+      break;
+    case NS:
       num_equation = 2 + dim;
       break;
     default:
@@ -96,7 +105,10 @@ void M2ulPhyS::initVariables()
   initSolutionAndVisualizationVectors();
   projectInitialSolution();
   
-  fluxClass = new Fluxes(eqState);
+  fluxClass = new Fluxes(eqState,
+                         eqSystem,
+                         num_equation,
+                         dim);
   
   alpha = 0.5;
   isSBP = config.isSBP();
@@ -105,8 +117,14 @@ void M2ulPhyS::initVariables()
   rsolver = new RiemannSolver(num_equation, eqState);
   
   A = new NonlinearForm(vfes);
-  faceIntegrator = new FaceIntegrator(intRules, rsolver, dim, 
-                                      num_equation, max_char_speed);
+  faceIntegrator = new FaceIntegrator(intRules, 
+                                      rsolver,
+                                      fluxClass, 
+                                      vfes,
+                                      dim, 
+                                      num_equation, 
+                                      gradUp,
+                                      max_char_speed);
   A->AddInteriorFaceIntegrator( faceIntegrator );
   if( isSBP )
   {
@@ -123,6 +141,7 @@ void M2ulPhyS::initVariables()
                                     rsolver, 
                                     dt,
                                     eqState,
+                                    fluxClass,
                                     Up,
                                     gradUp,
                                     dim,

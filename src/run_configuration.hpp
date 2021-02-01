@@ -62,6 +62,9 @@ private:
   // Defaults to DRAY_AIR
   WorkingFluid workFluid;
   
+  // Factor by which the viscosity is multiplied.
+  double visc_mult;
+  
   // equations to be solved. Options thus far
   // EULER, NS, MHD
   Equations eqSystem;
@@ -102,6 +105,7 @@ public:
   int GetNumIters(){return numIters;}
   int GetNumItersOutput(){return itersOut;}
   WorkingFluid GetWorkingFluid(){return workFluid;}
+  double GetViscMult(){return visc_mult;}
   Equations GetEquationSystem(){return eqSystem;}
   bool isSBP(){return SBP;}
   double* GetConstantInitialCondition(){return &initRhoRhoVp[0];}

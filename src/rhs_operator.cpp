@@ -23,9 +23,9 @@ RHSoperator::RHSoperator( const int _dim,
                         ):
 TimeDependentOperator(_A->Height()),
 dim(_dim ),
-num_equation(_num_equations),
 eqSystem(_eqSystem),
 max_char_speed(_max_char_speed),
+num_equation(_num_equations),
 intRules(_intRules),
 intRuleType(_intRuleType),
 fluxClass(_fluxClass),
@@ -216,7 +216,6 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
 void RHSoperator::GetFlux(const DenseMatrix &x, DenseTensor &flux) const
 {
   
-   //DenseTensor flux(vfes->GetNDofs(), dim, num_equation);
    DenseMatrix f(num_equation, dim);
    
    const int dof = flux.SizeI();
@@ -224,8 +223,15 @@ void RHSoperator::GetFlux(const DenseMatrix &x, DenseTensor &flux) const
 
    for (int i = 0; i < dof; i++)
    {
-      for (int k = 0; k < num_equation; k++) { (*state)(k) = x(i, k); }
-      fluxClass->ComputeFlux(*state, dim, f);
+      for (int k = 0; k < num_equation; k++) (*state)(k) = x(i, k);
+      DenseMatrix gradUpi(num_equation,dim);
+      for(int eq=0;eq<num_equation;eq++)
+      {
+        for(int d=0;d<dim;d++) gradUpi(eq,d) = 
+                               gradUp[i+eq*dof+d*num_equation*dof];
+      }
+      
+      fluxClass->ComputeTotalFlux(*state,gradUpi,f);
      
       if( isSBP )
       {

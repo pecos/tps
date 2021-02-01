@@ -19,8 +19,15 @@ private:
   const WorkingFluid fluid;
   double specific_heat_ratio;
   double gas_constant;
+  double visc_mult;
+  double thermalConductivity;
+  
+  // Prandtl number
+  double Pr;
 public:
   EquationOfState(WorkingFluid _fluid = DRY_AIR );
+  
+  void setViscMult(double _visc_mult){visc_mult = _visc_mult;}
   
   double ComputePressure(const Vector &state, int dim);
   
@@ -32,6 +39,8 @@ public:
   
   double GetSpecificHeatRatio(){ return specific_heat_ratio; }
   double GetGasConstant(){return gas_constant;}
+  double GetViscosity(const double &temp);
+  double GetThermalConductivity(const double &visc);
 };
 
 #endif // EQUATION_OF_STATE
