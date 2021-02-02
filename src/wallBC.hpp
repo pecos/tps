@@ -33,7 +33,7 @@ public:
   WallBC( RiemannSolver *rsolver_, 
           EquationOfState *_eqState,
           Fluxes *_fluxClass,
-          FiniteElementSpace *_vfes,
+          ParFiniteElementSpace *_vfes,
           IntegrationRules *_intRules,
           double &_dt,
           const int _dim,
@@ -48,7 +48,7 @@ public:
                       Vector &bdrFlux);
   
   virtual void updateMean(IntegrationRules *intRules,
-                          GridFunction *Up){};
+                          ParGridFunction *Up){};
 };
 
 #endif // WALL_BC

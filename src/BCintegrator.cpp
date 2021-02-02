@@ -3,14 +3,14 @@
 #include "outletBC.hpp"
 #include "wallBC.hpp"
 
-BCintegrator::BCintegrator( Mesh *_mesh,
-                            FiniteElementSpace *_vfes,
+BCintegrator::BCintegrator( ParMesh *_mesh,
+                            ParFiniteElementSpace *_vfes,
                             IntegrationRules *_intRules,
                             RiemannSolver *rsolver_, 
                             double &_dt,
                             EquationOfState *_eqState,
                             Fluxes *_fluxClass,
-                            GridFunction *_Up,
+                            ParGridFunction *_Up,
                             Array<double> &_gradUp,
                             const int _dim,
                             const int _num_equation,
@@ -29,21 +29,24 @@ vfes(_vfes),
 Up(_Up),
 gradUp(_gradUp)
 {
+  // Check what attributes are in the local partition
+  Array<int> local_attr;
+  getAttributesInPartition(local_attr);
+  
   // Init inlet BCs
   for(int in=0; in<config.GetInletPatchType()->Size(); in++)
   {
     std::pair<int,InletType> patchANDtype = (*config.GetInletPatchType())[in];
     // check if attribute is in mesh
     bool attrInMesh = false;
-    for(int i=0; i<mesh->bdr_attributes.Size(); i++) 
+    for(int i=0; i<local_attr.Size(); i++) 
     {
-      if(patchANDtype.first==mesh->bdr_attributes[i]) attrInMesh = true;
+      if(patchANDtype.first==local_attr[i]) attrInMesh = true;
     }
     
     if( attrInMesh )
     {
       Array<double> data = config.GetInletData(in);
-      cout<<data[0]<<" "<<data[1]<<" "<<data[2]<<" "<<data[3]<<endl;
       BCmap[patchANDtype.first] = new InletBC(rsolver, 
                                               eqState,
                                               vfes,
@@ -63,8 +66,8 @@ gradUp(_gradUp)
     std::pair<int,OutletType> patchANDtype = (*config.GetOutletPatchType())[o];
     // check if attribute is in mesh
     bool attrInMesh = false;
-    for(int i=0; i<mesh->bdr_attributes.Size(); i++) 
-      if(patchANDtype.first==mesh->bdr_attributes[i]) attrInMesh = true;
+    for(int i=0; i<local_attr.Size(); i++) 
+      if(patchANDtype.first==local_attr[i]) attrInMesh = true;
     
     if( attrInMesh )
     {
@@ -89,9 +92,9 @@ gradUp(_gradUp)
     
     // check that patch is in mesh
     bool patchInMesh = false;
-    for(int i=0; i<mesh->bdr_attributes.Size(); i++)
+    for(int i=0; i<local_attr.Size(); i++)
     {
-      if( patchType.first==mesh->bdr_attributes[i] ) patchInMesh = true;
+      if( patchType.first==local_attr[i] ) patchInMesh = true;
     }
     
     if( patchInMesh )
@@ -112,7 +115,27 @@ gradUp(_gradUp)
 
 BCintegrator::~BCintegrator()
 {
+  for(auto bc=BCmap.begin();bc!=BCmap.end(); bc++)
+  {
+    delete bc->second;
+  }
 }
+
+void BCintegrator::getAttributesInPartition(Array<int>& local_attr)
+{
+  local_attr.DeleteAll();
+  for(int bel=0;bel<vfes->GetNBE(); bel++)
+  {
+    int attr = vfes->GetBdrAttribute(bel);
+    bool attrInArray = false;
+    for(int i=0;i<local_attr.Size();i++)
+    {
+      if( local_attr[i]==attr ) attrInArray = true;
+    }
+    if( !attrInArray ) local_attr.Append( attr );
+  }
+}
+
 
 void BCintegrator::computeBdrFlux(const int attr, 
                                   Vector &normal,
@@ -127,7 +150,7 @@ void BCintegrator::computeBdrFlux(const int attr,
 }
 
 
-void BCintegrator::updateBCMean(GridFunction *Up)
+void BCintegrator::updateBCMean(ParGridFunction *Up)
 {
   for(auto bc=BCmap.begin();bc!=BCmap.end(); bc++)
   {

@@ -13,7 +13,7 @@ class FaceIntegrator : public NonlinearFormIntegrator
 private:
    RiemannSolver *rsolver;
    Fluxes *fluxClass;
-   FiniteElementSpace *vfes;
+   ParFiniteElementSpace *vfes;
    
    const int dim;
    const int num_equation;
@@ -34,7 +34,7 @@ public:
    FaceIntegrator(IntegrationRules *_intRules,
                   RiemannSolver *rsolver_, 
                   Fluxes *_fluxClass,
-                  FiniteElementSpace *_vfes,
+                  ParFiniteElementSpace *_vfes,
                   const int _dim,
                   const int _num_equation,
                   Array<double> &_gradUp,

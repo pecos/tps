@@ -24,6 +24,8 @@ using namespace std;
 class M2ulPhyS
 {
 private:
+  MPI_Session &mpi;
+  
   // Run options
   RunConfiguration config;
   
@@ -43,7 +45,7 @@ private:
   double max_char_speed;
   
   // reference to mesh
-  Mesh *mesh;
+  ParMesh *mesh;
   
   // time integrator
   ODESolver *timeIntegrator;
@@ -69,13 +71,13 @@ private:
   FiniteElementCollection *fec;
   
   // Finite element space for a scalar (thermodynamic quantity)
-  FiniteElementSpace *fes;
+  ParFiniteElementSpace *fes;
   
   // Finite element space for a mesh-dim vector quantity (momentum)
-  FiniteElementSpace *dfes;
+  ParFiniteElementSpace *dfes;
   
   // Finite element space for all variables together (total thermodynamic state)
-  FiniteElementSpace *vfes;
+  ParFiniteElementSpace *vfes;
   
   
   // The solution u has components {density, x-momentum, y-momentum, energy}.
@@ -92,7 +94,7 @@ private:
   RiemannSolver *rsolver;
   
   // RHS operators
-  NonlinearForm *A;
+  ParNonlinearForm *A;
   FaceIntegrator *faceIntegrator;
   SBPintegrator  *SBPoperator;
   
@@ -107,13 +109,13 @@ private:
   double alpha;
 
   // Conservative variables
-  GridFunction *U;
+  ParGridFunction *U;
   
   // Primitive variables
-  GridFunction *Up;
+  ParGridFunction *Up;
   
   // Visualization functions
-  GridFunction *press, *dens, *vel;
+  ParGridFunction *press, *dens, *vel;
   
   // Gradients Up
   Array<double> gradUp;
@@ -147,7 +149,8 @@ private:
   
 
 public:
-  M2ulPhyS(string &inputFileName );
+  M2ulPhyS(MPI_Session &_mpi,
+           string &inputFileName );
   ~M2ulPhyS();
   
   void projectInitialSolution();

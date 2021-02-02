@@ -2,7 +2,7 @@
 
 BoundaryCondition::BoundaryCondition(RiemannSolver* _rsolver, 
                                      EquationOfState* _eqState, 
-                                     FiniteElementSpace *_vfes,
+                                     ParFiniteElementSpace *_vfes,
                                      IntegrationRules *_intRules,
                                      double &_dt,
                                      const int _dim, 

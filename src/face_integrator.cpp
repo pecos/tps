@@ -5,7 +5,7 @@
 FaceIntegrator::FaceIntegrator(IntegrationRules *_intRules,
                                RiemannSolver *rsolver_, 
                                Fluxes *_fluxClass,
-                               FiniteElementSpace *_vfes,
+                               ParFiniteElementSpace *_vfes,
                                const int _dim,
                                const int _num_equation,
                                Array<double> &_gradUp,
@@ -28,6 +28,9 @@ void FaceIntegrator::getElementsGrads(FaceElementTransformations &Tr,
                                       DenseMatrix &gradUp1, 
                                       DenseMatrix &gradUp2)
 {
+  int no1 = Tr.Elem1->ElementNo;
+  int no2 = Tr.Elem2->ElementNo;
+  int NE  = vfes->GetNE();
   const int totDofs = vfes->GetNDofs();
   Array<int> vdofs1;
   vfes->GetElementVDofs(Tr.Elem1->ElementNo, vdofs1);

@@ -4,7 +4,9 @@
 
 #include "M2ulPhyS.hpp"
 
-M2ulPhyS::M2ulPhyS(string &inputFileName)
+M2ulPhyS::M2ulPhyS(MPI_Session &_mpi,
+                   string &inputFileName):
+mpi(_mpi)
 {
   config.readInputFile(inputFileName);
   
@@ -19,13 +21,16 @@ M2ulPhyS::M2ulPhyS(string &inputFileName)
 void M2ulPhyS::initVariables()
 {
   // check if a simulations is being restarted
+  Mesh *tempmesh;
   if( config.GetRestartCycle()>0 )
   {
     visitColl = new VisItDataCollection(config.GetOutputName(), NULL);
     visitColl->SetPrefixPath(config.GetOutputName());
     visitColl->Load( config.GetRestartCycle() ); 
     
-    mesh = visitColl->GetMesh();
+    tempmesh = visitColl->GetMesh(); // does this work in parallel?
+    mesh = new ParMesh(MPI_COMM_WORLD,*tempmesh);
+    tempmesh->Clear();
     time = visitColl->GetTime();
     iter = visitColl->GetCycle();
     
@@ -35,11 +40,16 @@ void M2ulPhyS::initVariables()
   }else
   {
     //remove previous solution
-    string command = "rm -r ";
-    command.append( config.GetOutputName() );
-    system(command.c_str());
+    if( mpi.Root() )
+    {
+      string command = "rm -r ";
+      command.append( config.GetOutputName() );
+      system(command.c_str());
+    }
     
-    mesh = new Mesh(config.GetMeshFileName());
+    tempmesh = new Mesh(config.GetMeshFileName() );
+    mesh = new ParMesh(MPI_COMM_WORLD,*tempmesh);
+    tempmesh->Clear();
     
     visitColl = new VisItDataCollection(config.GetOutputName(), mesh);
     visitColl->SetPrefixPath(config.GetOutputName());
@@ -49,7 +59,8 @@ void M2ulPhyS::initVariables()
     iter = 0;
   }
   
-  mesh->PrintCharacteristics();
+  cout<<"Process "<<mpi.WorldRank()<<" #elems "<< mesh->GetNE()<<endl;
+  
   dim = mesh->Dimension();
   
   eqSystem = config.GetEquationSystem();
@@ -98,9 +109,11 @@ void M2ulPhyS::initVariables()
   }
   
   // FE Spaces
-  fes  = new FiniteElementSpace(mesh, fec);
-  dfes = new FiniteElementSpace(mesh, fec, dim, Ordering::byNODES);
-  vfes = new FiniteElementSpace(mesh, fec, num_equation, Ordering::byNODES);
+  fes  = new ParFiniteElementSpace(mesh, fec);
+  dfes = new ParFiniteElementSpace(mesh, fec, dim, Ordering::byNODES);
+  vfes = new ParFiniteElementSpace(mesh, fec, num_equation, Ordering::byNODES);
+  
+  cout<<"Rank "<< mpi.WorldRank()<<" "<<vfes->GetNDofs()<<endl;
   
   initSolutionAndVisualizationVectors();
   projectInitialSolution();
@@ -116,7 +129,7 @@ void M2ulPhyS::initVariables()
   // Create Riemann Solver
   rsolver = new RiemannSolver(num_equation, eqState);
   
-  A = new NonlinearForm(vfes);
+  A = new ParNonlinearForm(vfes);
   faceIntegrator = new FaceIntegrator(intRules, 
                                       rsolver,
                                       fluxClass, 
@@ -133,7 +146,7 @@ void M2ulPhyS::initVariables()
     A->AddDomainIntegrator( SBPoperator );
   }
   
-  if( mesh->attributes.Size()>0 )
+  if( mesh->bdr_attributes.Size()>0 )
   {
     bcIntegrator = new BCintegrator(mesh,
                                     vfes,
@@ -195,11 +208,12 @@ void M2ulPhyS::initVariables()
   // Determine the minimum element size.
    hmin = 0.0;
    {
-      hmin = mesh->GetElementSize(0, 1);
+      double local_hmin = mesh->GetElementSize(0, 1);
       for (int i = 1; i < mesh->GetNE(); i++)
       {
-         hmin = min(mesh->GetElementSize(i, 1), hmin);
+         local_hmin = min(mesh->GetElementSize(i, 1), local_hmin);
       }
+      MPI_Allreduce(&local_hmin, &hmin, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
    }
 
   // estimate initial dt
@@ -258,14 +272,14 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
   
   gradUp.SetSize(num_equation*dim*vfes->GetNDofs());
   
-  U  = new GridFunction(vfes, u_block->GetData());
-  Up = new GridFunction(vfes, up_block->GetData());
+  U  = new ParGridFunction(vfes, u_block->GetData());
+  Up = new ParGridFunction(vfes, up_block->GetData());
   
   if( config.GetRestartCycle()>0 )
   {
-    dens = visitColl->GetField("dens");
-    vel  = visitColl->GetField("vel");
-    press= visitColl->GetField("press");
+    dens = visitColl->GetParField("dens");
+    vel  = visitColl->GetParField("vel");
+    press= visitColl->GetParField("press");
     
     //update U and Up
     {
@@ -303,9 +317,9 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
     visitColl->SetTime(0.);
   }
   
-  dens = new GridFunction(fes, Up->GetData());
-  vel = new GridFunction(dfes, Up->GetData()+fes->GetNDofs());
-  press = new GridFunction(fes,
+  dens = new ParGridFunction(fes, Up->GetData());
+  vel = new ParGridFunction(dfes, Up->GetData()+fes->GetNDofs());
+  press = new ParGridFunction(fes,
                 Up->GetData()+(num_equation-1)*fes->GetNDofs());
   
   visitColl->RegisterField("dens",dens);

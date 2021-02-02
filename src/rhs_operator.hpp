@@ -28,7 +28,7 @@ private:
    Fluxes *fluxClass;
    EquationOfState *eqState;
 
-   FiniteElementSpace *vfes;
+   ParFiniteElementSpace *vfes;
 
    NonlinearForm *A;
    
@@ -43,7 +43,7 @@ private:
    mutable Vector *state;
    
    // reference to primitive varibales
-   GridFunction *Up;
+   ParGridFunction *Up;
    
    // gradients of primitives and associated forms&FE space
    Array<double> &gradUp;
@@ -66,10 +66,10 @@ public:
                int _intRuleType,
                Fluxes *_fluxClass,
                EquationOfState *_eqState,
-               FiniteElementSpace *_vfes,
+               ParFiniteElementSpace *_vfes,
                NonlinearForm *_A, 
                MixedBilinearForm *_Aflux,
-               GridFunction *_Up,
+               ParGridFunction *_Up,
                Array<double> &_gradUp,
                BCintegrator *_bcIntegrator,
                bool &_isSBP,

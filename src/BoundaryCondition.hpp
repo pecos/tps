@@ -12,7 +12,7 @@ class BoundaryCondition
 protected:
   RiemannSolver *rsolver;
   EquationOfState *eqState;
-  FiniteElementSpace *vfes;
+  ParFiniteElementSpace *vfes;
   IntegrationRules *intRules;
   double &dt;
   const int dim;
@@ -22,13 +22,13 @@ protected:
 public:
   BoundaryCondition(RiemannSolver *_rsolver, 
                     EquationOfState *_eqState,
-                    FiniteElementSpace *_vfes,
+                    ParFiniteElementSpace *_vfes,
                     IntegrationRules *_intRules,
                     double &dt,
                     const int _dim,
                     const int _num_equation,
                     const int _patchNumber);
-  ~BoundaryCondition();
+  virtual ~BoundaryCondition();
   
   virtual void computeBdrFlux(Vector &normal,
                               Vector &stateIn, 
@@ -36,7 +36,7 @@ public:
                               Vector &bdrFlux) = 0;
                               
   virtual void updateMean(IntegrationRules *intRules,
-                          GridFunction *Up) = 0;
+                          ParGridFunction *Up) = 0;
 };
 
 #endif // BOUNDARY_CONDITION

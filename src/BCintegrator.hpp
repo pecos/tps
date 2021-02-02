@@ -27,13 +27,13 @@ protected:
   double &max_char_speed;
   IntegrationRules *intRules;
 
-  Mesh *mesh;
+  ParMesh *mesh;
   
   // pointer to finite element space
-  FiniteElementSpace *vfes;
+  ParFiniteElementSpace *vfes;
   
   // pointer to primitive varibales
-  GridFunction *Up;
+  ParGridFunction *Up;
   
   Array<double> &gradUp;
 
@@ -45,16 +45,18 @@ protected:
                       Vector &stateIn, 
                       DenseMatrix &gradState,
                       Vector &bdrFlux);
+  
+  void getAttributesInPartition(Array<int> &local_attr);
 
 public:
-   BCintegrator(Mesh *_mesh,
-                FiniteElementSpace *_vfes,
+   BCintegrator(ParMesh *_mesh,
+                ParFiniteElementSpace *_vfes,
                 IntegrationRules *_intRules,
                 RiemannSolver *rsolver_, 
                 double &_dt,
                 EquationOfState *_eqState,
                 Fluxes *_fluxClass,
-                GridFunction *_Up,
+                ParGridFunction *_Up,
                 Array<double> &_gradUp,
                 const int _dim,
                 const int _num_equation,
@@ -67,7 +69,7 @@ public:
                                    FaceElementTransformations &Tr,
                                    const Vector &elfun, Vector &elvect);
    
-   void updateBCMean( GridFunction *Up);
+   void updateBCMean( ParGridFunction *Up);
 };
 
 #endif // BC_INTEGRATOR
