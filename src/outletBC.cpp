@@ -1,15 +1,15 @@
 #include "outletBC.hpp"
 
-OutletBC::OutletBC(RiemannSolver *_rsolver, 
-            EquationOfState *_eqState,
-            FiniteElementSpace *_vfes,
-            IntegrationRules *_intRules,
-            double &_dt,
-            const int _dim,
-            const int _num_equation,
-            int _patchNumber,
-            OutletType _bcType,
-            const Array<double> &_inputData ):
+OutletBC::OutletBC( RiemannSolver *_rsolver, 
+                    EquationOfState *_eqState,
+                    ParFiniteElementSpace *_vfes,
+                    IntegrationRules *_intRules,
+                    double &_dt,
+                    const int _dim,
+                    const int _num_equation,
+                    int _patchNumber,
+                    OutletType _bcType,
+                    const Array<double> &_inputData ):
 BoundaryCondition(_rsolver, 
                   _eqState,
                   _vfes,
@@ -115,7 +115,7 @@ void OutletBC::computeBdrFlux(Vector &normal,
 }
 
 void OutletBC::updateMean(IntegrationRules *intRules,
-                          GridFunction *Up)
+                          ParGridFunction *Up)
 {
   bdrN = 0;
   meanUp = 0.;

@@ -39,12 +39,12 @@ private:
                                             Vector &bdrFlux);
   
   virtual void updateMean(IntegrationRules *intRules,
-                          GridFunction *Up);
+                          ParGridFunction *Up);
 
 public:
    InletBC( RiemannSolver *rsolver_, 
             EquationOfState *_eqState,
-            FiniteElementSpace *_vfes,
+            ParFiniteElementSpace *_vfes,
             IntegrationRules *_intRules,
             double &_dt,
             const int _dim,

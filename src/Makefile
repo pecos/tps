@@ -34,7 +34,7 @@ OBJS = $(patsubst %.cpp,%.o,$(SOURCE_FILES))
 CXX = mpicxx
 
 ifeq ($(BUILD_MODE),debug)
-	CFLAGS += -Wall -g -std=c++11
+	CFLAGS += -Wall -g -O0 -std=c++11 -DDEBUG
 else ifeq ($(BUILD_MODE),run)
 	CFLAGS += -Wall -O3 -std=c++11
 #else

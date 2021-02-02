@@ -1,15 +1,15 @@
 #include "inletBC.hpp"
 
-InletBC::InletBC(RiemannSolver *_rsolver, 
-            EquationOfState *_eqState,
-            FiniteElementSpace *_vfes,
-            IntegrationRules *_intRules,
-            double &_dt,
-            const int _dim,
-            const int _num_equation,
-            int _patchNumber,
-            InletType _bcType,
-            const Array<double> &_inputData ):
+InletBC::InletBC( RiemannSolver *_rsolver, 
+                  EquationOfState *_eqState,
+                  ParFiniteElementSpace *_vfes,
+                  IntegrationRules *_intRules,
+                  double &_dt,
+                  const int _dim,
+                  const int _num_equation,
+                  int _patchNumber,
+                  InletType _bcType,
+                  const Array<double> &_inputData ):
 BoundaryCondition(_rsolver, 
                   _eqState,
                   _vfes,
@@ -116,7 +116,7 @@ void InletBC::computeBdrFlux( Vector &normal,
 }
 
 void InletBC::updateMean(IntegrationRules *intRules,
-                         GridFunction *Up)
+                         ParGridFunction *Up)
 {
   bdrN = 0;
   meanUp = 0.;
