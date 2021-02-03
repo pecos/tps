@@ -20,7 +20,8 @@ private:
    
    double &max_char_speed;
    
-   const Array<double> &gradUp;
+   const ParGridFunction *gradUp;
+   const ParFiniteElementSpace *gradUpfes;
    
    IntegrationRules *intRules;
    
@@ -37,7 +38,8 @@ public:
                   ParFiniteElementSpace *_vfes,
                   const int _dim,
                   const int _num_equation,
-                  Array<double> &_gradUp,
+                  ParGridFunction *_gradUp,
+                  ParFiniteElementSpace *_gradUpfes,
                   double &_max_char_speed );
 
    virtual void AssembleFaceVector(const FiniteElement &el1,

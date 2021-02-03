@@ -17,6 +17,7 @@
 #include "domain_integrator.hpp"
 #include "sbp_integrators.hpp"
 #include "BCintegrator.hpp"
+#include "faceGradientIntegration.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -117,8 +118,13 @@ private:
   // Visualization functions
   ParGridFunction *press, *dens, *vel;
   
-  // Gradients Up
-  Array<double> gradUp;
+  // gradient of primitive variables
+  ParGridFunction *gradUp;
+  ParFiniteElementSpace *gradUpfes;
+  ParNonlinearForm *gradUp_A;
+  
+//   // Gradients Up
+//   Array<double> gradUp;
   
   // time variable
   double time;
@@ -139,6 +145,8 @@ private:
   // minimum element size
   double hmin;
   
+  void getAttributesInPartition(Array<int> &local_attr);
+  
   void initVariables();
   void initBCs();
   void initSolutionAndVisualizationVectors();
@@ -146,6 +154,7 @@ private:
   static void InitialConditionEulerVortex(const Vector &x, Vector &y);
   static void testInitialCondition(const Vector &x, Vector &y);
   void uniformInitialConditions();
+  void initGradUp();
   
 
 public:

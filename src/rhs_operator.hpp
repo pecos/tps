@@ -30,7 +30,7 @@ private:
 
    ParFiniteElementSpace *vfes;
 
-   NonlinearForm *A;
+   ParNonlinearForm *A;
    
    MixedBilinearForm *Aflux;
    
@@ -46,9 +46,9 @@ private:
    ParGridFunction *Up;
    
    // gradients of primitives and associated forms&FE space
-   Array<double> &gradUp;
-   FiniteElementSpace *qfes;
-   NonlinearForm *Aq;
+   ParGridFunction *gradUp;
+   ParFiniteElementSpace *gradUpfes;
+   ParNonlinearForm *gradUp_A;
    
    BCintegrator *bcIntegrator;
 
@@ -67,10 +67,12 @@ public:
                Fluxes *_fluxClass,
                EquationOfState *_eqState,
                ParFiniteElementSpace *_vfes,
-               NonlinearForm *_A, 
+               ParNonlinearForm *_A, 
                MixedBilinearForm *_Aflux,
                ParGridFunction *_Up,
-               Array<double> &_gradUp,
+               ParGridFunction *_gradUp,
+               ParFiniteElementSpace *_gradUpfes,
+               ParNonlinearForm *_gradUp_A,
                BCintegrator *_bcIntegrator,
                bool &_isSBP,
                double &_alpha

@@ -8,7 +8,8 @@ FaceIntegrator::FaceIntegrator(IntegrationRules *_intRules,
                                ParFiniteElementSpace *_vfes,
                                const int _dim,
                                const int _num_equation,
-                               Array<double> &_gradUp,
+                               ParGridFunction *_gradUp,
+                               ParFiniteElementSpace *_gradUpfes,
                                double &_max_char_speed ):
 rsolver(rsolver_),
 fluxClass(_fluxClass),
@@ -17,6 +18,7 @@ dim(_dim),
 num_equation(_num_equation),
 max_char_speed(_max_char_speed),
 gradUp(_gradUp),
+gradUpfes(_gradUpfes),
 intRules(_intRules)
 {
   
@@ -28,9 +30,8 @@ void FaceIntegrator::getElementsGrads(FaceElementTransformations &Tr,
                                       DenseMatrix &gradUp1, 
                                       DenseMatrix &gradUp2)
 {
-  int no1 = Tr.Elem1->ElementNo;
-  int no2 = Tr.Elem2->ElementNo;
-  int NE  = vfes->GetNE();
+  double *dataGradUp = gradUp->GetData();
+  
   const int totDofs = vfes->GetNDofs();
   Array<int> vdofs1;
   vfes->GetElementVDofs(Tr.Elem1->ElementNo, vdofs1);
@@ -41,22 +42,46 @@ void FaceIntegrator::getElementsGrads(FaceElementTransformations &Tr,
     for(int eq=0;eq<num_equation;eq++)
     {
       for(int d=0;d<dim;d++) gradUp1(n,eq +d*num_equation) = 
-        gradUp[index + eq*totDofs + d*num_equation*totDofs];
+        dataGradUp[index + eq*totDofs + d*num_equation*totDofs];
     } 
   }
   
-  Array<int> vdofs2;
-  vfes->GetElementVDofs(Tr.Elem2->ElementNo, vdofs2);
   eldDof = el2.GetDof();
-  for(int n=0; n<eldDof; n++)
+  Array<int> vdofs2;
+  int no2 = Tr.Elem2->ElementNo;
+  int NE  = vfes->GetNE();
+  if( no2>=NE )
   {
-    int index = vdofs2[n];
-    for(int eq=0;eq<num_equation;eq++)
+    int Elem2NbrNo = no2 - NE;
+    gradUpfes->GetFaceNbrElementVDofs(Elem2NbrNo, vdofs2);
+    
+    Array<double> arrayGrad2(vdofs2.Size());
+    gradUp->FaceNbrData().GetSubVector(vdofs2, arrayGrad2.GetData() );
+    for(int n=0; n<eldDof; n++)
     {
-      for(int d=0;d<dim;d++) gradUp2(n,eq +d*num_equation) = 
-        gradUp[index + eq*totDofs + d*num_equation*totDofs];
-    } 
+      for(int eq=0;eq<num_equation;eq++)
+      {
+        for(int d=0;d<dim;d++) gradUp2(n,eq +d*num_equation) = 
+          arrayGrad2[n + eq*eldDof + d*num_equation*eldDof];
+      } 
+    }
+    
+  }else
+  {
+    vfes->GetElementVDofs(no2, vdofs2);
+    
+    for(int n=0; n<eldDof; n++)
+    {
+      int index = vdofs2[n];
+      for(int eq=0;eq<num_equation;eq++)
+      {
+        for(int d=0;d<dim;d++) gradUp2(n,eq +d*num_equation) = 
+          dataGradUp[index + eq*totDofs + d*num_equation*totDofs];
+      } 
+    }
+    
   }
+
 }
 
 

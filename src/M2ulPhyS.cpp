@@ -112,8 +112,7 @@ void M2ulPhyS::initVariables()
   fes  = new ParFiniteElementSpace(mesh, fec);
   dfes = new ParFiniteElementSpace(mesh, fec, dim, Ordering::byNODES);
   vfes = new ParFiniteElementSpace(mesh, fec, num_equation, Ordering::byNODES);
-  
-  cout<<"Rank "<< mpi.WorldRank()<<" "<<vfes->GetNDofs()<<endl;
+  gradUpfes = new ParFiniteElementSpace(mesh, fec, num_equation*dim, Ordering::byNODES);
   
   initSolutionAndVisualizationVectors();
   projectInitialSolution();
@@ -137,6 +136,7 @@ void M2ulPhyS::initVariables()
                                       dim, 
                                       num_equation, 
                                       gradUp,
+                                      gradUpfes,
                                       max_char_speed);
   A->AddInteriorFaceIntegrator( faceIntegrator );
   if( isSBP )
@@ -146,7 +146,11 @@ void M2ulPhyS::initVariables()
     A->AddDomainIntegrator( SBPoperator );
   }
   
-  if( mesh->bdr_attributes.Size()>0 )
+  // Boundary attributes in present partition
+  Array<int> local_attr;
+  getAttributesInPartition(local_attr);
+  
+  if( local_attr.Size()>0 )
   {
     bcIntegrator = new BCintegrator(mesh,
                                     vfes,
@@ -160,7 +164,8 @@ void M2ulPhyS::initVariables()
                                     dim,
                                     num_equation,
                                     max_char_speed,
-                                    config);
+                                    config, 
+                                    local_attr );
     A->AddBdrFaceIntegrator( bcIntegrator );
   }
   
@@ -181,8 +186,9 @@ void M2ulPhyS::initVariables()
         cout << "Unknown ODE solver type: " << config.GetTimeIntegratorType() << '\n';
   }
   
-  cout << "Number of unknowns: " << vfes->GetVSize() << endl;
-  cout << "Number of DoF:      " << vfes->GetNDofs() << endl;
+  gradUp_A = new ParNonlinearForm(gradUpfes);
+  gradUp_A->AddInteriorFaceIntegrator(
+      new GradFaceIntegrator(intRules, dim, num_equation) );
   
   rhsOperator = new RHSoperator(dim,
                                 num_equation,
@@ -197,6 +203,8 @@ void M2ulPhyS::initVariables()
                                 Aflux,
                                 Up,
                                 gradUp,
+                                gradUpfes,
+                                gradUp_A,
                                 bcIntegrator,
                                 isSBP, 
                                 alpha );
@@ -218,6 +226,7 @@ void M2ulPhyS::initVariables()
 
   // estimate initial dt
   {
+    gradUp->ExchangeFaceNbrData();
     // Find a safe dt, using a temporary vector. Calling Mult() computes the
     // maximum char speed at all quadrature points on all faces.
     Vector z(A->Width());
@@ -232,6 +241,8 @@ M2ulPhyS::~M2ulPhyS()
 {
   //delete paraviewColl;
   delete visitColl;
+  
+  delete gradUp;
   
   delete u_block;
   delete up_block;
@@ -253,6 +264,7 @@ M2ulPhyS::~M2ulPhyS()
   delete rsolver;
   delete fluxClass;
   delete eqState;
+  delete gradUpfes;
   delete vfes;
   delete dfes;
   delete fes;
@@ -263,6 +275,22 @@ M2ulPhyS::~M2ulPhyS()
 }
 
 
+void M2ulPhyS::getAttributesInPartition(Array<int>& local_attr)
+{
+  local_attr.DeleteAll();
+  for(int bel=0;bel<vfes->GetNBE(); bel++)
+  {
+    int attr = vfes->GetBdrAttribute(bel);
+    bool attrInArray = false;
+    for(int i=0;i<local_attr.Size();i++)
+    {
+      if( local_attr[i]==attr ) attrInArray = true;
+    }
+    if( !attrInArray ) local_attr.Append( attr );
+  }
+}
+
+
 void M2ulPhyS::initSolutionAndVisualizationVectors()
 {
   offsets = new Array<int>(num_equation + 1);
@@ -270,7 +298,8 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
   u_block = new BlockVector(*offsets);
   up_block = new BlockVector(*offsets);
   
-  gradUp.SetSize(num_equation*dim*vfes->GetNDofs());
+  //gradUp.SetSize(num_equation*dim*vfes->GetNDofs());
+  gradUp = new ParGridFunction(gradUpfes);
   
   U  = new ParGridFunction(vfes, u_block->GetData());
   Up = new ParGridFunction(vfes, up_block->GetData());
@@ -350,10 +379,9 @@ void M2ulPhyS::projectInitialSolution()
   if( config.GetRestartCycle()==0 )
   {
     uniformInitialConditions();
-  }else
+  }
   
-  
-  gradUp = 0.;
+  initGradUp();
   
    // set paraview output
 //   paraviewColl = new ParaViewDataCollection(config.GetOutputName(),mesh);
@@ -377,7 +405,11 @@ void M2ulPhyS::Iterate()
   while( !done )
   {
     // adjusts time step to finish at t_final
-    double dt_real = min(dt, t_final - time);
+    double dt_real;
+    double dt_local = min(dt, t_final - time);
+    
+    MPI_Allreduce(&dt_local, &dt_real,
+                       1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
 
     timeIntegrator->Step(*U, time, dt_real);
     
@@ -388,7 +420,7 @@ void M2ulPhyS::Iterate()
     done = (time >= t_final - 1e-8*dt);
     if (done || iter % vis_steps == 0)
     {
-        cout << "time step: " << iter << ", progress(%): " << 100.*time/t_final << endl;
+        if(mpi.Root()) cout << "time step: " << iter << ", progress(%): " << 100.*time/t_final << endl;
         
         { // DEBUG ONLY!
 //           GridFunction uk(fes, u_block->GetBlock(3));
@@ -529,6 +561,7 @@ void M2ulPhyS::uniformInitialConditions()
 {
   double *data = U->GetData();
   double *dataUp = Up->GetData();
+  double *dataGradUp = gradUp->GetData();
   int dof = vfes->GetNDofs();
   double *inputRhoRhoVp = config.GetConstantInitialCondition();
   
@@ -551,8 +584,32 @@ void M2ulPhyS::uniformInitialConditions()
     dataUp[i +  dof] = data[i+dof]/data[i];
     dataUp[i +2*dof] = data[i+dof]/data[i];
     dataUp[i +3*dof] = inputRhoRhoVp[4];
+    
+    for(int d=0;d<dim;d++)
+    {
+      for(int eq=0;eq<num_equation;eq++)
+      {
+        dataGradUp[i+eq*dof + d*num_equation*dof] = 0.;
+      }
+    }
   }
   
   delete eqState;
 }
 
+void M2ulPhyS::initGradUp()
+{
+  double *dataGradUp = gradUp->GetData();
+  int dof = vfes->GetNDofs();
+  
+  for(int i=0; i<dof; i++)
+  {
+    for(int d=0;d<dim;d++)
+    {
+      for(int eq=0;eq<num_equation;eq++)
+      {
+        dataGradUp[i+eq*dof + d*num_equation*dof] = 0.;
+      }
+    }
+  }
+}
