@@ -1,7 +1,6 @@
 
 
 #include "rhs_operator.hpp"
-#include "faceGradientIntegration.hpp"
 
 // Implementation of class RHSoperator
 RHSoperator::RHSoperator( const int _dim,
@@ -13,10 +12,12 @@ RHSoperator::RHSoperator( const int _dim,
                           Fluxes *_fluxClass,
                           EquationOfState *_eqState,
                           ParFiniteElementSpace *_vfes,
-                          NonlinearForm *_A, 
+                          ParNonlinearForm *_A, 
                           MixedBilinearForm *_Aflux,
                           ParGridFunction *_Up,
-                          Array<double> &_gradUp,
+                          ParGridFunction *_gradUp,
+                          ParFiniteElementSpace *_gradUpfes,
+                          ParNonlinearForm *_gradUp_A,
                           BCintegrator *_bcIntegrator,
                           bool &_isSBP,
                           double &_alpha
@@ -37,16 +38,11 @@ isSBP(_isSBP),
 alpha(_alpha),
 Up(_Up),
 gradUp(_gradUp),
+gradUpfes(_gradUpfes),
+gradUp_A(_gradUp_A),
 bcIntegrator(_bcIntegrator)
 {
   state = new Vector(num_equation);
-  
-  // Finite element space associated with the gradients of primitives 
-  qfes = new FiniteElementSpace(vfes->GetMesh(),vfes->FEColl(),
-                                num_equation*dim, Ordering::byNODES);
-  Aq = new NonlinearForm(qfes);
-  Aq->AddInteriorFaceIntegrator(
-      new GradFaceIntegrator(intRules, dim, num_equation));
   
   Me_inv = new DenseMatrix[vfes->GetNE()];
    
@@ -155,7 +151,6 @@ bcIntegrator(_bcIntegrator)
 RHSoperator::~RHSoperator()
 {
   delete state;
-  delete qfes;
   delete[] Me_inv;
 }
 
@@ -218,6 +213,8 @@ void RHSoperator::GetFlux(const DenseMatrix &x, DenseTensor &flux) const
   
    DenseMatrix f(num_equation, dim);
    
+   double *dataGradUp = gradUp->GetData();
+   
    const int dof = flux.SizeI();
    const int dim = flux.SizeJ();
 
@@ -228,7 +225,7 @@ void RHSoperator::GetFlux(const DenseMatrix &x, DenseTensor &flux) const
       for(int eq=0;eq<num_equation;eq++)
       {
         for(int d=0;d<dim;d++) gradUpi(eq,d) = 
-                               gradUp[i+eq*dof+d*num_equation*dof];
+                               dataGradUp[i+eq*dof+d*num_equation*dof];
       }
       
       fluxClass->ComputeTotalFlux(*state,gradUpi,f);
@@ -273,62 +270,13 @@ void RHSoperator::updatePrimitives(const Vector &x) const
     dataUp[i+2*vfes->GetNDofs()] = iState[2]/iState[0];
     dataUp[i+3*vfes->GetNDofs()] = p;
   }
-  
-  //compute gradients
-//   for(int el=0; el<vfes->GetNE(); el++)
-//   {
-//     const FiniteElement *elem = vfes->GetFE(el);
-//     ElementTransformation *Tr = vfes->GetElementTransformation(el);
-//     
-//     // get local primitive variables
-//     Array<int> vdofs;
-//     vfes->GetElementVDofs(el, vdofs);
-//     const int eldDof = elem->GetDof();
-//     DenseMatrix elUp(eldDof,num_equation);
-//     for(int d=0; d<eldDof; d++)
-//     {
-//       int index = vdofs[d];
-//       int nDofs = vfes->GetNDofs();
-//       for(int eq=0;eq<num_equation;eq++) elUp(d,eq) = dataUp[index +eq*nDofs];
-//     }
-// 
-//     
-//     const IntegrationRule ir = elem->GetNodes();
-//     for(int i=0; i<ir.GetNPoints(); i++)
-//     {
-//       const IntegrationPoint &ip = ir.IntPoint(i);
-//       Tr->SetIntPoint(&ip);
-//       
-//       DenseMatrix invJ = Tr->InverseJacobian();
-// 
-//       // Calculate basis functions and their derivatives
-//       Vector shape( eldDof );
-//       DenseMatrix dshape(eldDof,dim);
-//       
-//       elem->CalcShape(Tr->GetIntPoint(), shape);
-//       elem->CalcPhysDShape(*Tr, dshape);
-//       
-//       for(int eq=0; eq<num_equation; eq++)
-//       {
-//         for(int d=0; d<dim; d++)
-//         {
-//           double sum =0.;
-//           for(int k=0; k<eldDof; k++)
-//           {
-//             sum += elUp(k,eq)*dshape(k,d);
-//           }
-//           int nDofs = vfes->GetNDofs();
-//           gradUp[vdofs[i] +eq*nDofs + d*num_equation*nDofs] = sum;
-//         }
-//       }
-//     }
-//   }
 }
 
 void RHSoperator::calcGradientsPrimitives() const
 {
   const int totalDofs = vfes->GetNDofs();
   double *dataUp = Up->GetData();
+  double *dataGradUp = gradUp->GetData();
   
   // Vars for face contributions
   Vector faceContrib(dim*num_equation*totalDofs);
@@ -415,7 +363,7 @@ void RHSoperator::calcGradientsPrimitives() const
       {
         for(int d=0;d<dim;d++)
         {
-          gradUp[index+eq*totalDofs+d*num_equation*totalDofs] = 
+          dataGradUp[index+eq*totalDofs+d*num_equation*totalDofs] = 
                                         -elGradUp(k,eq+d*num_equation);
         }
       } 
@@ -423,7 +371,7 @@ void RHSoperator::calcGradientsPrimitives() const
   }
   
   // Calc boundary contribution
-  Aq->Mult(xUp,faceContrib);
+  gradUp_A->Mult(xUp,faceContrib);
   
   // Add contributions and multiply by invers mass matrix
   for(int el=0;el<vfes->GetNE();el++)
@@ -443,28 +391,29 @@ void RHSoperator::calcGradientsPrimitives() const
           int index = vdofs[k];
 //           rhs[k] = gradUp[index+eq*totalDofs+d*num_equation*totalDofs]+
 //                   faceContrib[index+eq*totalDofs+d*num_equation*totalDofs];
-          rhs[k] = -gradUp[index+eq*totalDofs+d*num_equation*totalDofs]+
+          rhs[k] = -dataGradUp[index+eq*totalDofs+d*num_equation*totalDofs]+
                    faceContrib[index+eq*totalDofs+d*num_equation*totalDofs];
         }
-/*for(int k=0;k<eldDof;k++) cout<<rhs[k]<<" ";
-cout<<endl;  */       
+        
         // mult by inv mass matrix
         Vector aux(eldDof);
         aux = 0.;
         for(int i=0;i<eldDof;i++)
         {
           for(int j=0;j<eldDof;j++) aux[i] += Me_inv[el](i,j)*rhs[j];
-        }
-/*for(int k=0;k<eldDof;k++) cout<<aux[k]<<" ";
-cout<<endl; */      
+        }   
+        
         // save this in gradUp
         for(int k=0;k<eldDof;k++)
         {
           int index = vdofs[k];
-          gradUp[index+eq*totalDofs+d*num_equation*totalDofs] = aux[k];
+          dataGradUp[index+eq*totalDofs+d*num_equation*totalDofs] = aux[k];
         }
       }
     }
   }
+  
+  // NOTE: not sure I need to this here. CHECK!!
+  gradUp->ExchangeFaceNbrData();
 }
 

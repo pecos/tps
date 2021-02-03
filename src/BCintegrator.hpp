@@ -35,7 +35,7 @@ protected:
   // pointer to primitive varibales
   ParGridFunction *Up;
   
-  Array<double> &gradUp;
+  ParGridFunction *gradUp;
 
   std::unordered_map<int,BoundaryCondition*> BCmap;
 
@@ -45,8 +45,6 @@ protected:
                       Vector &stateIn, 
                       DenseMatrix &gradState,
                       Vector &bdrFlux);
-  
-  void getAttributesInPartition(Array<int> &local_attr);
 
 public:
    BCintegrator(ParMesh *_mesh,
@@ -57,11 +55,12 @@ public:
                 EquationOfState *_eqState,
                 Fluxes *_fluxClass,
                 ParGridFunction *_Up,
-                Array<double> &_gradUp,
+                ParGridFunction *_gradUp,
                 const int _dim,
                 const int _num_equation,
                 double &_max_char_speed,
-                RunConfiguration &_runFile );
+                RunConfiguration &_runFile,
+                Array<int> &local_bdr_attr );
    ~BCintegrator();
 
    virtual void AssembleFaceVector(const FiniteElement &el1,

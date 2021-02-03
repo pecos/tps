@@ -11,11 +11,12 @@ BCintegrator::BCintegrator( ParMesh *_mesh,
                             EquationOfState *_eqState,
                             Fluxes *_fluxClass,
                             ParGridFunction *_Up,
-                            Array<double> &_gradUp,
+                            ParGridFunction *_gradUp,
                             const int _dim,
                             const int _num_equation,
                             double &_max_char_speed,
-                            RunConfiguration &_runFile ):
+                            RunConfiguration &_runFile,
+                            Array<int> &local_attr):
 config(_runFile),
 rsolver(rsolver_),
 eqState(_eqState),
@@ -29,10 +30,6 @@ vfes(_vfes),
 Up(_Up),
 gradUp(_gradUp)
 {
-  // Check what attributes are in the local partition
-  Array<int> local_attr;
-  getAttributesInPartition(local_attr);
-  
   // Init inlet BCs
   for(int in=0; in<config.GetInletPatchType()->Size(); in++)
   {
@@ -121,21 +118,6 @@ BCintegrator::~BCintegrator()
   }
 }
 
-void BCintegrator::getAttributesInPartition(Array<int>& local_attr)
-{
-  local_attr.DeleteAll();
-  for(int bel=0;bel<vfes->GetNBE(); bel++)
-  {
-    int attr = vfes->GetBdrAttribute(bel);
-    bool attrInArray = false;
-    for(int i=0;i<local_attr.Size();i++)
-    {
-      if( local_attr[i]==attr ) attrInArray = true;
-    }
-    if( !attrInArray ) local_attr.Append( attr );
-  }
-}
-
 
 void BCintegrator::computeBdrFlux(const int attr, 
                                   Vector &normal,
@@ -170,6 +152,8 @@ void BCintegrator::AssembleFaceVector(const FiniteElement& el1,
   Vector funval1(num_equation);
   Vector nor(dim);
   Vector fluxN(num_equation);
+  
+  double *dataGradUp = gradUp->GetData();
 
   const int dof1 = el1.GetDof();
   //const int dof2 = el2.GetDof();
@@ -197,25 +181,10 @@ void BCintegrator::AssembleFaceVector(const FiniteElement& el1,
     {
       for(int d=0;d<dim;d++)
       {
-        elGradUp(k,eq,d) = gradUp[index + eq*nDofs + d*nDofs*num_equation];
+        elGradUp(k,eq,d) = dataGradUp[index + eq*nDofs + d*nDofs*num_equation];
       }
     }
   }
-  
-//   cout<<"Elem# "<< Tr.Elem1No <<endl;
-//   for(int k=0; k<eldDof; k++)
-//   {
-//     int index = vdofs[k];
-//     int nDofs = vfes->GetNDofs();
-//     for(int d=0;d<dim;d++)
-//     {
-//       for(int eq=0;eq<num_equation;eq++)
-//       {
-//         cout<<gradUp[index + eq*nDofs + d*nDofs*num_equation]<<" ";
-//       }
-//     }
-//     cout<<endl;
-//   }
 
   // Integration order calculation from DGTraceIntegrator
   int intorder;
