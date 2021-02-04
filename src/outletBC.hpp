@@ -1,6 +1,8 @@
 #ifndef OUTLET_BC
 #define OUTLET_BC
 
+#include "mfem.hpp"
+#include "mpi_groups.hpp"
 #include "BoundaryCondition.hpp"
 
 using namespace mfem;
@@ -13,6 +15,8 @@ enum OutletType {
 class OutletBC : public BoundaryCondition
 {
 private:
+  MPI_Groups *groupsMPI;
+  
   const OutletType outletType;
   
   // In/out conditions specified in the configuration file
@@ -41,7 +45,8 @@ private:
                           ParGridFunction *Up);
 
 public:
-   OutletBC( RiemannSolver *rsolver_, 
+   OutletBC( MPI_Groups *_groupsMPI,
+             RiemannSolver *rsolver_, 
              EquationOfState *_eqState,
              ParFiniteElementSpace *_vfes,
              IntegrationRules *_intRules,

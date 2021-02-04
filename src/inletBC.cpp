@@ -1,6 +1,7 @@
 #include "inletBC.hpp"
 
-InletBC::InletBC( RiemannSolver *_rsolver, 
+InletBC::InletBC( MPI_Groups *_groupsMPI,
+                  RiemannSolver *_rsolver, 
                   EquationOfState *_eqState,
                   ParFiniteElementSpace *_vfes,
                   IntegrationRules *_intRules,
@@ -18,9 +19,12 @@ BoundaryCondition(_rsolver,
                   _dim,
                   _num_equation,
                   _patchNumber),
+groupsMPI(_groupsMPI),
 inletType(_bcType),
 inputState(_inputData)
 {
+  groupsMPI->setAsInlet();
+  
   meanUp.SetSize(num_equation);
   
   meanUp[0] = 1.2;
@@ -119,7 +123,8 @@ void InletBC::updateMean(IntegrationRules *intRules,
                          ParGridFunction *Up)
 {
   bdrN = 0;
-  meanUp = 0.;
+  Vector localMeanUp(num_equation+1);
+  localMeanUp = 0.;
   int Nbdr = 0;
   
   double *data = Up->GetData();
@@ -163,15 +168,21 @@ void InletBC::updateMean(IntegrationRules *intRules,
           {
             sum += shape[d]*elUp(d,eq);
           }
-          meanUp[eq] += sum;
+          localMeanUp[eq] += sum;
           if( !bdrUInit ) boundaryU(Nbdr,eq) = sum;
         }
         Nbdr++;
       }
     }
   }
+ 
+  localMeanUp[num_equation] = (double)Nbdr;
+  Vector sum(num_equation+1);
+  MPI_Allreduce(localMeanUp.GetData(), sum.GetData(),
+                num_equation+1, MPI_DOUBLE, MPI_SUM, groupsMPI->getInletComm());
   
-  meanUp /= double(Nbdr);
+  for(int eq=0;eq<num_equation;eq++) meanUp[eq] = sum[eq]/sum[num_equation];
+  
   if( !bdrUInit )
   {
     for(int i=0;i<Nbdr;i++)

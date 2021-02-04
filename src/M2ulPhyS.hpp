@@ -8,6 +8,7 @@
  */
 
 #include "mfem.hpp"
+#include "mpi_groups.hpp"
 #include "run_configuration.hpp"
 #include "equation_of_state.hpp"
 #include "fluxes.hpp"
@@ -25,6 +26,7 @@ using namespace std;
 class M2ulPhyS
 {
 private:
+  MPI_Groups *groupsMPI;
   MPI_Session &mpi;
   
   // Run options

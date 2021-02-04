@@ -2,6 +2,7 @@
 #define BC_INTEGRATOR
 
 #include "mfem.hpp"
+#include "mpi_groups.hpp"
 #include "riemann_solver.hpp"
 #include "equation_of_state.hpp"
 #include "unordered_map"
@@ -15,6 +16,8 @@ using namespace mfem;
 class BCintegrator : public NonlinearFormIntegrator
 {
 protected:
+  MPI_Groups *groupsMPI;
+  
   RunConfiguration &config;
   
   RiemannSolver *rsolver;
@@ -47,7 +50,8 @@ protected:
                       Vector &bdrFlux);
 
 public:
-   BCintegrator(ParMesh *_mesh,
+   BCintegrator(MPI_Groups *_groupsMPI,
+                ParMesh *_mesh,
                 ParFiniteElementSpace *_vfes,
                 IntegrationRules *_intRules,
                 RiemannSolver *rsolver_, 

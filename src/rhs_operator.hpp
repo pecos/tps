@@ -15,47 +15,47 @@ using namespace mfem;
 class RHSoperator : public TimeDependentOperator
 {
 private:
-   const int dim;
-   
-   const Equations &eqSystem;
-   
-   double &max_char_speed;
-   const int &num_equation;
-   
-   IntegrationRules *intRules;
-   const int intRuleType;
-   
-   Fluxes *fluxClass;
-   EquationOfState *eqState;
+  const int dim;
+  
+  const Equations &eqSystem;
+  
+  double &max_char_speed;
+  const int &num_equation;
+  
+  IntegrationRules *intRules;
+  const int intRuleType;
+  
+  Fluxes *fluxClass;
+  EquationOfState *eqState;
 
-   ParFiniteElementSpace *vfes;
+  ParFiniteElementSpace *vfes;
 
-   ParNonlinearForm *A;
-   
-   MixedBilinearForm *Aflux;
-   
-   //DenseTensor *Me_inv;
-   DenseMatrix *Me_inv;
-   
-   const bool &isSBP;
-   const double &alpha;
+  ParNonlinearForm *A;
+  
+  MixedBilinearForm *Aflux;
+  
+  //DenseTensor *Me_inv;
+  DenseMatrix *Me_inv;
+  
+  const bool &isSBP;
+  const double &alpha;
 
-   mutable Vector *state;
-   
-   // reference to primitive varibales
-   ParGridFunction *Up;
-   
-   // gradients of primitives and associated forms&FE space
-   ParGridFunction *gradUp;
-   ParFiniteElementSpace *gradUpfes;
-   ParNonlinearForm *gradUp_A;
-   
-   BCintegrator *bcIntegrator;
+  mutable Vector *state;
+  
+  // reference to primitive varibales
+  ParGridFunction *Up;
+  
+  // gradients of primitives and associated forms&FE space
+  ParGridFunction *gradUp;
+  ParFiniteElementSpace *gradUpfes;
+  ParNonlinearForm *gradUp_A;
+  
+  BCintegrator *bcIntegrator;
 
-   void GetFlux(const DenseMatrix &state, DenseTensor &flux) const;
-   
-   void updatePrimitives(const Vector &x) const;
-   void calcGradientsPrimitives() const;
+  void GetFlux(const DenseMatrix &state, DenseTensor &flux) const;
+  
+  void updatePrimitives(const Vector &x) const;
+  void calcGradientsPrimitives() const;
 
 public:
    RHSoperator(const int _dim,

@@ -3,7 +3,8 @@
 #include "outletBC.hpp"
 #include "wallBC.hpp"
 
-BCintegrator::BCintegrator( ParMesh *_mesh,
+BCintegrator::BCintegrator( MPI_Groups *_groupsMPI,
+                            ParMesh *_mesh,
                             ParFiniteElementSpace *_vfes,
                             IntegrationRules *_intRules,
                             RiemannSolver *rsolver_, 
@@ -17,6 +18,7 @@ BCintegrator::BCintegrator( ParMesh *_mesh,
                             double &_max_char_speed,
                             RunConfiguration &_runFile,
                             Array<int> &local_attr):
+groupsMPI(_groupsMPI),
 config(_runFile),
 rsolver(rsolver_),
 eqState(_eqState),
@@ -44,7 +46,8 @@ gradUp(_gradUp)
     if( attrInMesh )
     {
       Array<double> data = config.GetInletData(in);
-      BCmap[patchANDtype.first] = new InletBC(rsolver, 
+      BCmap[patchANDtype.first] = new InletBC(groupsMPI,
+                                              rsolver, 
                                               eqState,
                                               vfes,
                                               intRules,
@@ -69,7 +72,8 @@ gradUp(_gradUp)
     if( attrInMesh )
     {
       Array<double> data = config.GetOutletData(o);
-      BCmap[patchANDtype.first] = new OutletBC( rsolver, 
+      BCmap[patchANDtype.first] = new OutletBC( groupsMPI,
+                                                rsolver, 
                                                 eqState,
                                                 vfes,
                                                 intRules,

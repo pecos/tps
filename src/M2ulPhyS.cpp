@@ -8,9 +8,13 @@ M2ulPhyS::M2ulPhyS(MPI_Session &_mpi,
                    string &inputFileName):
 mpi(_mpi)
 {
+  groupsMPI = new MPI_Groups(&mpi);
+  
   config.readInputFile(inputFileName);
   
   initVariables();
+  
+  groupsMPI->init();
   
   // This example depends on this ordering of the space.
   //MFEM_ASSERT(fes.GetOrdering() == Ordering::byNODES, "");
@@ -150,9 +154,11 @@ void M2ulPhyS::initVariables()
   Array<int> local_attr;
   getAttributesInPartition(local_attr);
   
+  bcIntegrator = NULL;
   if( local_attr.Size()>0 )
   {
-    bcIntegrator = new BCintegrator(mesh,
+    bcIntegrator = new BCintegrator(groupsMPI,
+                                    mesh,
                                     vfes,
                                     intRules,
                                     rsolver, 
@@ -271,7 +277,7 @@ M2ulPhyS::~M2ulPhyS()
   delete fec;
   delete intRules;
   
-  //delete mesh; // deleted by visitColl
+  delete groupsMPI;
 }
 
 
@@ -412,7 +418,7 @@ void M2ulPhyS::Iterate()
                        1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
 
     timeIntegrator->Step(*U, time, dt_real);
-    
+  
     dt = CFL * hmin / max_char_speed /(double)dim;
     iter++;
 

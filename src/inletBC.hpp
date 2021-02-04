@@ -2,6 +2,7 @@
 #define INLET_BC
 
 #include "mfem.hpp"
+#include "mpi_groups.hpp"
 #include "BoundaryCondition.hpp"
 
 using namespace mfem;
@@ -14,6 +15,8 @@ enum InletType {
 class InletBC : public BoundaryCondition
 {
 private:
+  MPI_Groups *groupsMPI;
+  
   const InletType inletType;
   
   // In/out conditions specified in the configuration file
@@ -42,7 +45,8 @@ private:
                           ParGridFunction *Up);
 
 public:
-   InletBC( RiemannSolver *rsolver_, 
+   InletBC( MPI_Groups *_groupsMPI,
+            RiemannSolver *rsolver_, 
             EquationOfState *_eqState,
             ParFiniteElementSpace *_vfes,
             IntegrationRules *_intRules,

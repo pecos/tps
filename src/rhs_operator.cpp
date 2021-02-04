@@ -65,7 +65,8 @@ bcIntegrator(_bcIntegrator)
   }
    
    
-   // This is for DEBUG ONLY!!!
+#ifdef DEBUG 
+{
    int elem = 10;
     const int dof = vfes->GetFE(elem)->GetDof();
     DenseMatrix Me(dof);
@@ -145,6 +146,8 @@ bcIntegrator(_bcIntegrator)
      }
     cout << endl;
   }
+}
+#endif
   
 }
 
@@ -162,13 +165,13 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
 
   DenseTensor flux(vfes->GetNDofs(), dim, num_equation);
   Vector z(A->Height());
-
+  
   // Update primite varibales
   updatePrimitives(x);
   calcGradientsPrimitives();
   
   // update boundary conditions
-  bcIntegrator->updateBCMean( Up );
+  if(bcIntegrator!=NULL) bcIntegrator->updateBCMean( Up );
   
   // 1. Create the vector z with the face terms -<F.n(u), [w]>.
   A->Mult(x, z);
