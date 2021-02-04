@@ -29,8 +29,9 @@ private:
   int bdrN;
   bool bdrUInit;
   
-  // Unit trangent vector 1
+  // Unit trangent vector 1 & 2
   Vector tangent1;
+  Vector tangent2;
   
   void subsonicReflectingPressure(Vector &normal,
                                   Vector &stateIn, 
