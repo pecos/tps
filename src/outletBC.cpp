@@ -97,6 +97,9 @@ inputState(_inputData)
     tangent1[d] = coords2[d]-coords1[d];
   }
   tangent1 *= 1./sqrt( modVec );
+  
+  tangent2.SetSize(dim);
+  tangent2 = 0.;
 }
 
 OutletBC::~OutletBC()
@@ -216,13 +219,26 @@ void OutletBC::subsonicNonReflectingPressure( Vector &normal,
     unitNorm *= 1./sqrt(mod);
   }
   
-  double meanVn = 0.;
-  double meanVt1 = 0.;
+  // mean velocity in inlet normal and tangent directions
+  Vector meanVel(dim);
+  meanVel = 0.;
   for(int d=0;d<dim;d++)
   {
-    meanVn += unitNorm[d]*meanUp[d+1];
-    meanVt1 += tangent1[d]*meanUp[d+1];
+    meanVel[0] += unitNorm[d]*meanUp[d+1];
+    meanVel[1] += tangent1[d]*meanUp[d+1];
   }
+  if( dim==3)
+  {
+    tangent2[0] = unitNorm[1]*tangent1[2]-unitNorm[2]*tangent1[1];
+    tangent2[1] = unitNorm[2]*tangent1[0]-unitNorm[0]*tangent1[2];
+    tangent2[2] = unitNorm[0]*tangent1[1]-unitNorm[1]*tangent1[0];
+    for(int d=0;d<dim;d++) meanVel[2] += tangent2[d]*meanUp[d+1];
+  }
+  
+  // velocity difference between actual and desired values
+  Vector meanDV(dim);
+  for(int d=0;d<dim;d++) meanDV[d] = meanUp[1+d] -inputState[1+d];
+  
   
   // normal gradients
   Vector normGrad(num_equation);
@@ -232,26 +248,38 @@ void OutletBC::subsonicNonReflectingPressure( Vector &normal,
     for(int d=0;d<dim;d++) normGrad[eq] += unitNorm[d]*gradState(eq,d);
   }
   
-  const double rho = stateIn[0];
-  const double u = stateIn[1]/rho;
-  const double v = stateIn[2]/rho;
-  const double k = 0.5*(u*u + v*v);
   
-  const double speedSound = sqrt(gamma*meanUp[3]/meanUp[0]);
-  const double meanK = 0.5*(meanUp[1]*meanUp[1] + meanUp[2]*meanUp[2]);
+  const double rho = stateIn[0];
+  double k = 0.;
+  for(int d=0;d<dim;d++) k += stateIn[1+d]*stateIn[1+d];
+  k *= 0.5/rho/rho;
+  
+  const double speedSound = sqrt(gamma*meanUp[num_equation-1]/meanUp[0]);
+  double meanK = 0.;
+  for(int d=0;d<dim;d++) meanK += meanUp[1+d]*meanUp[1+d];
+  meanK *= 0.5;
   
   // compute outgoing characteristics
-  double L2 = meanVn*(speedSound*speedSound*normGrad[0] - normGrad[3] );
-  double L3 = meanVn*(normGrad[1]*tangent1[0]+normGrad[2]*tangent1[1]);
-  double L5 = normGrad[3] +rho*speedSound*(normGrad[1]*unitNorm[0] +
-                                           normGrad[2]*unitNorm[1] );
-  L5 *= meanVn + speedSound;
+  double L2 = speedSound*speedSound*normGrad[0] - normGrad[num_equation-1];
+  L2 *= meanVel[0];
   
-//   cout<<"grads :";
-//   for(int i=0;i<num_equation;i++)cout<<gradState(i,1)<<" ";
-//   cout<<endl;
+  double L3 = 0;
+  for(int d=0;d<dim;d++) L3 += tangent1[d]*normGrad[1+d];
+  L3 *= meanVel[0];
   
-  const double p = eqState->ComputePressure(stateIn, dim);
+  double L4 = 0.;
+  if(dim==3)
+  {
+    for(int d=0;d<dim;d++) L3 += tangent2[d]*normGrad[1+d];
+    L4 *= meanVel[0];
+  }
+  
+  double L5 = 0.;
+  for(int d=0;d<dim;d++) L5 += unitNorm[d]*normGrad[1+d];
+  L5 = normGrad[num_equation-1] +rho*speedSound*L5;
+  L5 *= meanVel[0] + speedSound;
+  
+  //const double p = eqState->ComputePressure(stateIn, dim);
   
   // estimate ingoing characteristic
   const double sigma = speedSound/2.;
@@ -261,29 +289,44 @@ void OutletBC::subsonicNonReflectingPressure( Vector &normal,
   const double d1 = (L2+0.5*(L5+L1))/speedSound/speedSound;
   const double d2 = 0.5*(L5-L1)/rho/speedSound;
   const double d3 = L3;
+  const double d4 = L4;
   const double d5 = 0.5*(L5+L1);
   
   // dF/dx
   bdrFlux[0] = d1;
-  bdrFlux[1] = meanVn*d1  + meanUp[0]*d2;
-  bdrFlux[2] = meanVt1*d1 + meanUp[0]*d3;
-  bdrFlux[3] = meanK*d1   + meanUp[0]*meanVn*d2 + 
-                            meanUp[0]*meanVt1*d3 + d5/(gamma-1.);
+  bdrFlux[1] = meanVel[0]*d1 + meanUp[0]*d2;
+  bdrFlux[2] = meanVel[1]*d1 + meanUp[0]*d3;
+  if(dim==3) bdrFlux[3] = meanVel[2]*d1 + meanUp[0]*d4;
+  bdrFlux[num_equation-1] = 0.;
+  for(int d=0;d<dim;d++) bdrFlux[num_equation-1] += meanUp[0]*meanVel[d];
+  bdrFlux[num_equation-1] += meanK*d1 + d5/(gamma-1.);
   
+                            
   // flux gradients in other directions
-  const double dy_rv = gradState(0,1)*v + rho*gradState(2,1);
-  const double dy_ruv = u*dy_rv + rho*v*gradState(1,1);
-  const double dy_rv2 = v*dy_rv + rho*v*gradState(2,1);
-  const double dy_p = gradState(3,1);
-  const double dy_E = dy_p/(gamma-1.) + k*gradState(0,1) +
-                      rho*(u*gradState(1,1) + v*gradState(2,1) );
-  const double dy_vp = v*dy_p + p*gradState(2,1);
-  
-  Vector fluxY(num_equation);
-  fluxY[0] = dy_rv;
-  fluxY[1] = dy_ruv;
-  fluxY[2] = dy_rv2 + dy_p;
-  fluxY[3] = stateIn(3)/rho*dy_rv + rho*v*dy_E + dy_vp;
+//   Vector fluxY(num_equation);
+//   {
+//     // gradients in tangent1 direction
+//     Vector tg1Grads(num_equation);
+//     tg1Grads = 0.;
+//     for(int eq=0;eq<num_equation;eq++)
+//     {
+//       for(int d=0;d<dim;d++) tg1Grads[eq] += tangent1[d]*gradState(eq,d);
+//     }
+//     
+//     
+//     const double dy_rv = tg1Grads(0)*meanVt1 + rho*tg1Grads(2);
+//     const double dy_ruv = meanVn*dy_rv + rho*meanVt1*tg1Grads(1);
+//     const double dy_rv2 = meanVt1*dy_rv + rho*meanVt1*tg1Grads(2);
+//     const double dy_p = tg1Grads(3);
+//     const double dy_E = dy_p/(gamma-1.) + k*tg1Grads(0) +
+//                         rho*(meanVn*tg1Grads(1) + meanVt1*tg1Grads(2) );
+//     const double dy_vp = meanVt1*dy_p + p*tg1Grads(2);
+//     
+//     fluxY[0] = dy_rv;
+//     fluxY[1] = dy_ruv;
+//     fluxY[2] = dy_rv2 + dy_p;
+//     fluxY[3] = stateIn(3)/rho*dy_rv + rho*meanVt1*dy_E + dy_vp;
+//   }
   
   Vector state2(num_equation);
   boundaryU.GetRow(bdrN,state2);
