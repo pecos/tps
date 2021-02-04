@@ -50,8 +50,12 @@ protected:
                       Vector &bdrFlux);
 
 public:
+<<<<<<< HEAD
+   BCintegrator(ParMesh *_mesh,
+=======
    BCintegrator(MPI_Groups *_groupsMPI,
                 ParMesh *_mesh,
+>>>>>>> test_M2ulPhyS
                 ParFiniteElementSpace *_vfes,
                 IntegrationRules *_intRules,
                 RiemannSolver *rsolver_, 

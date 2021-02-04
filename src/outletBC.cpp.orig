@@ -1,7 +1,11 @@
 #include "outletBC.hpp"
 
+<<<<<<< HEAD
+OutletBC::OutletBC( RiemannSolver *_rsolver, 
+=======
 OutletBC::OutletBC( MPI_Groups *_groupsMPI,
                     RiemannSolver *_rsolver, 
+>>>>>>> test_M2ulPhyS
                     EquationOfState *_eqState,
                     ParFiniteElementSpace *_vfes,
                     IntegrationRules *_intRules,

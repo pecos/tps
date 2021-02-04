@@ -26,7 +26,10 @@ using namespace std;
 class M2ulPhyS
 {
 private:
+<<<<<<< HEAD
+=======
   MPI_Groups *groupsMPI;
+>>>>>>> test_M2ulPhyS
   MPI_Session &mpi;
   
   // Run options

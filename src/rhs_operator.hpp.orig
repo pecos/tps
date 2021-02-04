@@ -28,6 +28,31 @@ private:
   Fluxes *fluxClass;
   EquationOfState *eqState;
 
+<<<<<<< HEAD
+   ParFiniteElementSpace *vfes;
+
+   ParNonlinearForm *A;
+   
+   MixedBilinearForm *Aflux;
+   
+   //DenseTensor *Me_inv;
+   DenseMatrix *Me_inv;
+   
+   const bool &isSBP;
+   const double &alpha;
+
+   mutable Vector *state;
+   
+   // reference to primitive varibales
+   ParGridFunction *Up;
+   
+   // gradients of primitives and associated forms&FE space
+   ParGridFunction *gradUp;
+   ParFiniteElementSpace *gradUpfes;
+   ParNonlinearForm *gradUp_A;
+   
+   BCintegrator *bcIntegrator;
+=======
   ParFiniteElementSpace *vfes;
 
   ParNonlinearForm *A;
@@ -51,6 +76,7 @@ private:
   ParNonlinearForm *gradUp_A;
   
   BCintegrator *bcIntegrator;
+>>>>>>> test_M2ulPhyS
 
   void GetFlux(const DenseMatrix &state, DenseTensor &flux) const;
   

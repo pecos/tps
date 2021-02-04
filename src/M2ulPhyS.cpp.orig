@@ -154,7 +154,10 @@ void M2ulPhyS::initVariables()
   Array<int> local_attr;
   getAttributesInPartition(local_attr);
   
+<<<<<<< HEAD
+=======
   bcIntegrator = NULL;
+>>>>>>> test_M2ulPhyS
   if( local_attr.Size()>0 )
   {
     bcIntegrator = new BCintegrator(groupsMPI,
@@ -278,6 +281,22 @@ M2ulPhyS::~M2ulPhyS()
   delete intRules;
   
   delete groupsMPI;
+}
+
+
+void M2ulPhyS::getAttributesInPartition(Array<int>& local_attr)
+{
+  local_attr.DeleteAll();
+  for(int bel=0;bel<vfes->GetNBE(); bel++)
+  {
+    int attr = vfes->GetBdrAttribute(bel);
+    bool attrInArray = false;
+    for(int i=0;i<local_attr.Size();i++)
+    {
+      if( local_attr[i]==attr ) attrInArray = true;
+    }
+    if( !attrInArray ) local_attr.Append( attr );
+  }
 }
 
 
