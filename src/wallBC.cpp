@@ -66,7 +66,7 @@ void WallBC::computeINVwallFlux(Vector &normal,
   stateMirror[1] = stateIn[0]*(vel[0] -2.*vn*unitN[0]);
   stateMirror[2] = stateIn[0]*(vel[1] -2.*vn*unitN[1]);
   if(dim==3) stateMirror[3] = stateIn[0]*(vel[2] -2.*vn*unitN[2]);
-  stateMirror[num_equation-1] = stateIn[3];
+  stateMirror[num_equation-1] = stateIn[num_equation-1];
   
   rsolver->Eval(stateIn,stateMirror,normal,bdrFlux);
 }

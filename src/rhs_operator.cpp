@@ -271,7 +271,8 @@ void RHSoperator::updatePrimitives(const Vector &x) const
     dataUp[i                   ] = iState[0];
     dataUp[i+  vfes->GetNDofs()] = iState[1]/iState[0];
     dataUp[i+2*vfes->GetNDofs()] = iState[2]/iState[0];
-    dataUp[i+3*vfes->GetNDofs()] = p;
+    if(dim==3) dataUp[i+3*vfes->GetNDofs()] = iState[3]/iState[0];
+    dataUp[i+(num_equation-1)*vfes->GetNDofs()] = p;
   }
 }
 

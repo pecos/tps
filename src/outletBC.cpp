@@ -30,7 +30,8 @@ inputState(_inputData)
   meanUp[0] = 1.2;
   meanUp[1] = 60;
   meanUp[2] = 0;
-  meanUp[3] = 101300;
+  if(dim==3) meanUp[3] = 0.;
+  meanUp[num_equation-1] = 101300;
   
   Array<double> coords;
   
@@ -71,12 +72,12 @@ inputState(_inputData)
     Vector iState(num_equation);
     iState = meanUp;
     double gamma = eqState->GetSpecificHeatRatio();
-    double rE = iState[3]/(gamma-1.) + 0.5*iState[0]*(
-                iState[1]*iState[1] +
-                iState[2]*iState[2] );
-    iState[1] *= iState[0];
-    iState[2] *= iState[0];
-    iState[3]  = rE;
+    double k = 0.;
+    for(int d=0;d<dim;d++) k += iState[1]*iState[1];
+    double rE = iState[3]/(gamma-1.) + 0.5*iState[0]*k;
+    
+    for(int d=0;d<dim;d++) iState[1+d] *= iState[0];
+    iState[num_equation-1]  = rE;
     boundaryU.SetRow(i,iState);
   }
   bdrUInit = false;
@@ -193,12 +194,12 @@ void OutletBC::updateMean(IntegrationRules *intRules,
       Vector iState(num_equation);
       boundaryU.GetRow(i,iState);
       double gamma = eqState->GetSpecificHeatRatio();
-      double rE = iState[3]/(gamma-1.) + 0.5*iState[0]*(
-                  iState[1]*iState[1] +
-                  iState[2]*iState[2] );
-      iState[1] *= iState[0];
-      iState[2] *= iState[0];
-      iState[3]  = rE;
+      double k = 0.;
+      for(int d=0;d<dim;d++) k += iState[1]*iState[1];
+      double rE = iState[3]/(gamma-1.) + 0.5*iState[0]*k;
+      
+      for(int d=0;d<dim;d++) iState[1+d] *= iState[0];
+      iState[num_equation-1]  = rE;
       boundaryU.SetRow(i,iState);
     }
     bdrUInit = true;
@@ -365,7 +366,7 @@ void OutletBC::subsonicReflectingPressure(Vector &normal,
   const double gamma = eqState->GetSpecificHeatRatio();
   Vector state2(num_equation);
   state2 = stateIn;
-  state2[3] = inputState[0]/(gamma-1.) + 0.5*(state2[1]*state2[1] +
+  state2[num_equation-1] = inputState[0]/(gamma-1.) + 0.5*(state2[1]*state2[1] +
                                               state2[2]*state2[2] )/state2[0];
   
   rsolver->Eval(stateIn,state2,normal,bdrFlux);

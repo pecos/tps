@@ -28,7 +28,7 @@ void M2ulPhyS::initVariables()
   Mesh *tempmesh;
   if( config.GetRestartCycle()>0 )
   {
-    visitColl = new VisItDataCollection(config.GetOutputName(), NULL);
+    visitColl = new VisItDataCollection(MPI_COMM_WORLD,config.GetOutputName(), NULL);
     visitColl->SetPrefixPath(config.GetOutputName());
     visitColl->Load( config.GetRestartCycle() ); 
     
@@ -48,7 +48,11 @@ void M2ulPhyS::initVariables()
     {
       string command = "rm -r ";
       command.append( config.GetOutputName() );
-      system(command.c_str());
+      int err = system(command.c_str());
+      if( err==1 )
+      {
+        cout<<"Error deleting previous data in "<<config.GetOutputName()<<endl;
+      }
     }
     
     tempmesh = new Mesh(config.GetMeshFileName() );
@@ -222,10 +226,13 @@ void M2ulPhyS::initVariables()
   // Determine the minimum element size.
    hmin = 0.0;
    {
-      double local_hmin = mesh->GetElementSize(0, 1);
+      //double local_hmin = mesh->GetElementSize(0, 1);
+     double local_hmin = sqrt(mesh->GetElementVolume(0));
       for (int i = 1; i < mesh->GetNE(); i++)
       {
-         local_hmin = min(mesh->GetElementSize(i, 1), local_hmin);
+        if(sqrt(mesh->GetElementVolume(i))<1e-3) cout<<sqrt(mesh->GetElementVolume(i))<<endl;
+        //local_hmin = min(mesh->GetElementSize(i, 1), local_hmin);
+        local_hmin = min(sqrt(mesh->GetElementVolume(i)), local_hmin);
       }
       MPI_Allreduce(&local_hmin, &hmin, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
    }
@@ -327,19 +334,19 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
     for(int n=0;n<fes->GetNDofs();n++)
     {
       double r = dataR[n];
-      double u = dataV[n];
-      double v = dataV[n+fes->GetNDofs()];
+      Vector vel(dim);
+      for(int d=0;d<dim;d++) vel[d] = dataV[n+d*fes->GetNDofs()];
       double p = dataP[n];
-      double rE = p/(gamma-1.) +0.5*r*(u*u+v*v);
+      double k = 0.;
+      for(int d=0;d<dim;d++) k += vel[d]*vel[d];
+      double rE = p/(gamma-1.) +0.5*r*k;
       dataU[n                  ] = r;
-      dataU[n+  fes->GetNDofs()] = r*u;
-      dataU[n+2*fes->GetNDofs()] = r*v;
-      dataU[n+3*fes->GetNDofs()] = rE;
+      for(int d=0;d<dim;d++) dataU[n+(1+d)*fes->GetNDofs()] =r*vel[d];
+      dataU[n+(num_equation-1)*fes->GetNDofs()] = rE;
       
       dataUp[n                  ] = r;
-      dataUp[n+  fes->GetNDofs()] = u;
-      dataUp[n+2*fes->GetNDofs()] = v;
-      dataUp[n+3*fes->GetNDofs()] = p;
+      for(int d=0;d<dim;d++) dataUp[n+(1+d)*fes->GetNDofs()] = vel[d];
+      dataUp[n+(num_equation-1)*fes->GetNDofs()] = p;
     }
     
     visitColl->DeregisterField("dens");
@@ -584,12 +591,14 @@ void M2ulPhyS::uniformInitialConditions()
     data[i       ] = inputRhoRhoVp[0];
     data[i +  dof] = inputRhoRhoVp[1];
     data[i +2*dof] = inputRhoRhoVp[2];
-    data[i +3*dof] = rhoE;
+    if(dim==3) data[i +3*dof] = inputRhoRhoVp[3];
+    data[i +(num_equation-1)*dof] = rhoE;
     
     dataUp[i       ] = data[i];
-    dataUp[i +  dof] = data[i+dof]/data[i];
-    dataUp[i +2*dof] = data[i+dof]/data[i];
-    dataUp[i +3*dof] = inputRhoRhoVp[4];
+    dataUp[i +  dof] = data[i+  dof]/data[i];
+    dataUp[i +2*dof] = data[i+2*dof]/data[i];
+    if(dim==3) dataUp[i +3*dof] = data[i+3*dof]/data[i];
+    dataUp[i +(num_equation-1)*dof] = inputRhoRhoVp[4];
     
     for(int d=0;d<dim;d++)
     {
