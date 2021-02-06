@@ -28,19 +28,26 @@ void M2ulPhyS::initVariables()
   Mesh *tempmesh;
   if( config.GetRestartCycle()>0 )
   {
-    visitColl = new VisItDataCollection(MPI_COMM_WORLD,config.GetOutputName(), NULL);
-    visitColl->SetPrefixPath(config.GetOutputName());
-    visitColl->Load( config.GetRestartCycle() ); 
-    
-    tempmesh = visitColl->GetMesh(); // does this work in parallel?
-    mesh = new ParMesh(MPI_COMM_WORLD,*tempmesh);
-    tempmesh->Clear();
-    time = visitColl->GetTime();
-    iter = visitColl->GetCycle();
+//     visitColl = new VisItDataCollection(MPI_COMM_WORLD,config.GetOutputName(), NULL);
+//     visitColl->SetPrefixPath(config.GetOutputName());
+//     visitColl->Load( config.GetRestartCycle() ); 
+//     
+//     tempmesh = visitColl->GetMesh(); // does this work in parallel?
+//     mesh = new ParMesh(MPI_COMM_WORLD,*tempmesh);
+//     tempmesh->Clear();
+//     time = visitColl->GetTime();
+//     iter = visitColl->GetCycle();
     
     cout<<"================================================"<<endl;
     cout<<"| Restarting simulation at iteration "<<iter<<endl;
     cout<<"================================================"<<endl;
+    
+    string filename = "pathkk/pathkk.proc00000";
+    filename.append( std::to_string(mpi.WorldRank()) );
+    filename.append(".vtu" );
+    ifstream file(filename);
+    mesh = new ParMesh(MPI_COMM_WORLD,file);
+    file.close();
   }else
   {
     //remove previous solution
@@ -59,9 +66,16 @@ void M2ulPhyS::initVariables()
     mesh = new ParMesh(MPI_COMM_WORLD,*tempmesh);
     tempmesh->Clear();
     
-    visitColl = new VisItDataCollection(config.GetOutputName(), mesh);
-    visitColl->SetPrefixPath(config.GetOutputName());
-    visitColl->SetPrecision(8);
+    // VisIt setup
+//     visitColl = new VisItDataCollection(config.GetOutputName(), mesh);
+//     visitColl->SetPrefixPath(config.GetOutputName());
+//     visitColl->SetPrecision(8);
+    
+    // Paraview setup
+    paraviewColl = new ParaViewDataCollection(config.GetOutputName(), mesh);
+    paraviewColl->SetLevelsOfDetail( config.GetSolutionOrder() );
+    paraviewColl->SetHighOrderOutput(true);
+    paraviewColl->SetPrecision(8);
     
     time = 0.;
     iter = 0;
@@ -252,8 +266,8 @@ void M2ulPhyS::initVariables()
 
 M2ulPhyS::~M2ulPhyS()
 {
-  //delete paraviewColl;
-  delete visitColl;
+  delete paraviewColl;
+  //delete visitColl;
   
   delete gradUp;
   
@@ -319,44 +333,46 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
   
   if( config.GetRestartCycle()>0 )
   {
-    dens = visitColl->GetParField("dens");
-    vel  = visitColl->GetParField("vel");
-    press= visitColl->GetParField("press");
-    
-    //update U and Up
-    {
-    const double gamma = eqState->GetSpecificHeatRatio();
-    double *dataUp = Up->GetData();
-    double *dataU  = U->GetData();
-    double *dataR  = dens->GetData();
-    double *dataV  = vel->GetData();
-    double *dataP  = press->GetData();
-    for(int n=0;n<fes->GetNDofs();n++)
-    {
-      double r = dataR[n];
-      Vector vel(dim);
-      for(int d=0;d<dim;d++) vel[d] = dataV[n+d*fes->GetNDofs()];
-      double p = dataP[n];
-      double k = 0.;
-      for(int d=0;d<dim;d++) k += vel[d]*vel[d];
-      double rE = p/(gamma-1.) +0.5*r*k;
-      dataU[n                  ] = r;
-      for(int d=0;d<dim;d++) dataU[n+(1+d)*fes->GetNDofs()] =r*vel[d];
-      dataU[n+(num_equation-1)*fes->GetNDofs()] = rE;
-      
-      dataUp[n                  ] = r;
-      for(int d=0;d<dim;d++) dataUp[n+(1+d)*fes->GetNDofs()] = vel[d];
-      dataUp[n+(num_equation-1)*fes->GetNDofs()] = p;
-    }
-    
-    visitColl->DeregisterField("dens");
-    visitColl->DeregisterField("vel");
-    visitColl->DeregisterField("press");
-  }
+//     dens = visitColl->GetParField("dens");
+//     vel  = visitColl->GetParField("vel");
+//     press= visitColl->GetParField("press");
+//     
+//     //update U and Up
+//     {
+//     const double gamma = eqState->GetSpecificHeatRatio();
+//     double *dataUp = Up->GetData();
+//     double *dataU  = U->GetData();
+//     double *dataR  = dens->GetData();
+//     double *dataV  = vel->GetData();
+//     double *dataP  = press->GetData();
+//     for(int n=0;n<fes->GetNDofs();n++)
+//     {
+//       double r = dataR[n];
+//       Vector vel(dim);
+//       for(int d=0;d<dim;d++) vel[d] = dataV[n+d*fes->GetNDofs()];
+//       double p = dataP[n];
+//       double k = 0.;
+//       for(int d=0;d<dim;d++) k += vel[d]*vel[d];
+//       double rE = p/(gamma-1.) +0.5*r*k;
+//       dataU[n                  ] = r;
+//       for(int d=0;d<dim;d++) dataU[n+(1+d)*fes->GetNDofs()] =r*vel[d];
+//       dataU[n+(num_equation-1)*fes->GetNDofs()] = rE;
+//       
+//       dataUp[n                  ] = r;
+//       for(int d=0;d<dim;d++) dataUp[n+(1+d)*fes->GetNDofs()] = vel[d];
+//       dataUp[n+(num_equation-1)*fes->GetNDofs()] = p;
+//     }
+//     
+//     visitColl->DeregisterField("dens");
+//     visitColl->DeregisterField("vel");
+//     visitColl->DeregisterField("press");
+//     }
   }else
   {
-    visitColl->SetCycle(0);
-    visitColl->SetTime(0.);
+//     visitColl->SetCycle(0);
+//     visitColl->SetTime(0.);
+    paraviewColl->SetCycle(0);
+    paraviewColl->SetTime(0.);
   }
   
   dens = new ParGridFunction(fes, Up->GetData());
@@ -364,14 +380,19 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
   press = new ParGridFunction(fes,
                 Up->GetData()+(num_equation-1)*fes->GetNDofs());
   
-  visitColl->RegisterField("dens",dens);
-  visitColl->RegisterField("vel",vel);
-  visitColl->RegisterField("press",press);
+//   visitColl->RegisterField("dens",dens);
+//   visitColl->RegisterField("vel",vel);
+//   visitColl->RegisterField("press",press);
+//   
+//   visitColl->SetOwnData(true);
+//   visitColl->Save();
   
-  visitColl->SetOwnData(true);
-
-//visitColl->SaveRootFile();
-  visitColl->Save();
+  paraviewColl->RegisterField("dens",dens);
+  paraviewColl->RegisterField("vel",vel);
+  paraviewColl->RegisterField("press",press);
+  
+  paraviewColl->SetOwnData(true);
+  paraviewColl->Save();
 }
 
 void M2ulPhyS::projectInitialSolution()
@@ -395,19 +416,6 @@ void M2ulPhyS::projectInitialSolution()
   }
   
   initGradUp();
-  
-   // set paraview output
-//   paraviewColl = new ParaViewDataCollection(config.GetOutputName(),mesh);
-//   paraviewColl->RegisterField("ConservativeVars", U);
-//   paraviewColl->RegisterField("PrimitiveVars", Up);
-//   paraviewColl->SetLevelsOfDetail(order);
-//   paraviewColl->SetDataFormat(VTKFormat::BINARY);
-//   paraviewColl->SetHighOrderOutput(true);
-//   paraviewColl->SetCycle(0);
-//   paraviewColl->SetTime(0.0);
-//   paraviewColl->Save();
-  
-  
 }
 
 
@@ -444,32 +452,39 @@ void M2ulPhyS::Iterate()
 //           sol_ofs << uk;
 //           exit(0);
           
-//           paraviewColl->SetCycle(ti);
-//           paraviewColl->SetTime(time);
-//           paraviewColl->Save();
+          paraviewColl->SetCycle(iter);
+          paraviewColl->SetTime(time);
+          paraviewColl->Save();
           
-          visitColl->SetCycle(iter);
-          visitColl->SetTime(time);
-          visitColl->Save();
+          mesh->PrintVTU("pathkk",
+                         VTKFormat::ASCII,
+                         true);
+          
+          //vel->SaveVTK(file,"vel",3);
+          //press->SaveVTK(file,"press",3);
+          
+//           visitColl->SetCycle(iter);
+//           visitColl->SetTime(time);
+//           visitColl->Save();
         }
     }
   }
   
-  if (time == t_final)
-   {
-     void (*initialConditionFunction)(const Vector&, Vector&);
-      initialConditionFunction = &(this->InitialConditionEulerVortex);
-  
-      VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
-      const double error = U->ComputeLpError(2, u0);
-      cout << "Solution error: " << error << endl;
-      
+  if(time == t_final)
+  {
+    void (*initialConditionFunction)(const Vector&, Vector&);
+    initialConditionFunction = &(this->InitialConditionEulerVortex);
+
+    VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
+    const double error = U->ComputeLpError(2, u0);
+    cout << "Solution error: " << error << endl;
+    
 //       string fileName(config.GetOutputName());
 //       fileName.append(".mesh");
 //       ofstream vtkmesh(fileName);
 //       mesh->Print(vtkmesh);
 //       vtkmesh.close();
-   }
+  }
 }
 
 

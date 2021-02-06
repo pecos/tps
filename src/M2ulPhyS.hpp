@@ -90,8 +90,8 @@ private:
   BlockVector *up_block;
   
   // paraview collection pointer
-  //ParaViewDataCollection *paraviewColl = NULL;
-  DataCollection *visitColl = NULL;
+  ParaViewDataCollection *paraviewColl = NULL;
+  //DataCollection *visitColl = NULL;
   
   // Riemann Solver
   RiemannSolver *rsolver;
