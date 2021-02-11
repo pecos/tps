@@ -391,6 +391,8 @@ void M2ulPhyS::Iterate()
 
     timeIntegrator->Step(*U, time, dt_real);
   
+    Check_NAN();
+    
     dt = CFL * hmin / max_char_speed /(double)dim;
     iter++;
 
@@ -678,6 +680,26 @@ void M2ulPhyS::read_restart_files()
         dataU[i] = r;
         for(int d=0;d<dim;d++) dataU[i+(d+1)*dof] = r*vel[d];
         dataU[i+(num_equation-1)*dof] = rE;
+      }
+    }
+  }
+}
+
+void M2ulPhyS::Check_NAN()
+{
+  double *dataU = U->GetData();
+  int dof = vfes->GetNDofs();
+  
+  bool thereIsNan = false;
+  for(int i=0;i<dof;i++)
+  {
+    for(int eq=0;eq<num_equation;eq++)
+    {
+      if( isnan(dataU[i+eq*dof]) )
+      {
+        thereIsNan = true;
+        cout<<"NaN at node: "<<i<<" partition: "<<mpi.WorldRank()<<endl;
+        MPI_Abort(MPI_COMM_WORLD,1);
       }
     }
   }

@@ -160,6 +160,8 @@ private:
   void write_restart_files();
   void read_restart_files();
   
+  void Check_NAN();
+  
 
 public:
   M2ulPhyS(MPI_Session &_mpi,

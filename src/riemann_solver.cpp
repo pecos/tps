@@ -24,7 +24,7 @@ void RiemannSolver::ComputeFluxDotN(const Vector &state,
    const Vector den_vel(state.GetData() + 1, dim);
    const double den_energy = state(1 + dim);
 
-   MFEM_ASSERT(eqState->StateIsPhysical(state, dim), "");
+   //MFEM_ASSERT(eqState->StateIsPhysical(state, dim), "");
 
    const double pres = eqState->ComputePressure(state, dim);
 
@@ -47,8 +47,8 @@ double RiemannSolver::Eval(const Vector &state1, const Vector &state2,
    // NOTE: nor in general is not a unit normal
    const int dim = nor.Size();
 
-   MFEM_ASSERT(eqState->StateIsPhysical(state1, dim), "");
-   MFEM_ASSERT(eqState->StateIsPhysical(state2, dim), "");
+   //MFEM_ASSERT(eqState->StateIsPhysical(state1, dim), "");
+   //MFEM_ASSERT(eqState->StateIsPhysical(state2, dim), "");
 
    const double maxE1 = eqState->ComputeMaxCharSpeed(state1, dim);
    const double maxE2 = eqState->ComputeMaxCharSpeed(state2, dim);
