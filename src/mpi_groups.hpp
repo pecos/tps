@@ -4,6 +4,8 @@
 #include <mpi.h>
 #include "mfem.hpp"
 
+#include <string>
+
 using namespace mfem;
 
 class MPI_Groups
@@ -32,6 +34,8 @@ public:
   
   MPI_Comm getInletComm(){return inlet_comm;}
   MPI_Comm getOutletComm(){return outlet_comm;}
+  
+  std::string getParallelName(std::string name );
 };
 
 #endif // MPI_COMM_MANAGER

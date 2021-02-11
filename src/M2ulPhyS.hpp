@@ -150,13 +150,15 @@ private:
   void getAttributesInPartition(Array<int> &local_attr);
   
   void initVariables();
-  void initBCs();
   void initSolutionAndVisualizationVectors();
   
   static void InitialConditionEulerVortex(const Vector &x, Vector &y);
   static void testInitialCondition(const Vector &x, Vector &y);
   void uniformInitialConditions();
   void initGradUp();
+  
+  void write_restart_files();
+  void read_restart_files();
   
 
 public:

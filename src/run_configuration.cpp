@@ -26,7 +26,6 @@ RunConfiguration::RunConfiguration()
 
 RunConfiguration::~RunConfiguration()
 {
-  delete[] meshFile;
   delete[] outputFile;
 }
 
@@ -58,8 +57,8 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       if( word.compare("MESH")==0 )
       {
         ss >> word;
-        meshFile = new char[word.length() ];
-        for(int i=0;i<(int)word.length(); i++) meshFile[i] = word[i];
+        meshFile.clear();
+        meshFile = word;
         
       // output file name
       }else if( word.compare("OUTPUT_NAME")==0 )

@@ -5,13 +5,28 @@ PROGRAM = MulPhyS_docker.p
 # LIBRARIES
 LIBS =  -lmfem \
 	-lHYPRE \
+	-lpetsc \
+	-lhdf5 \
+	-lnetcdf \
+	-lsuperlu_dist \
 	-lmetis \
 	-lrt
 
 # LIBRARY PATH
-LIB_PATHS = $(MFEM_LIB) -L$(HYPRE_LIB) -L$(METIS_LIB)
+LIB_PATHS = -L$(MFEM_LIB) \
+	    -L$(HYPRE_LIB) \
+	    -L$(PETSC_LIB) \
+	    -L$(HDF5_LIB) \
+	    -L$(NETCDF_LIB) \
+	    -L$(NETCDF_LIB) \
+	    -L$(SUPERLU_DIST_LIB)  \
+	    -L$(METIS_LIB)
 # INCLUDES
-INCLUDE_PATHS = $(MFEM_INC) -I$(MPI_DIR)/include -I$(HYPRE_INC) -I$(PETSC_INC) -I$(METIS_INC)
+INCLUDE_PATHS = -I$(MFEM_INC) \
+	        -I$(MPI_DIR)/include \
+	        -I$(HYPRE_INC) \
+	        -I$(PETSC_INC) \
+	        -I$(METIS_INC)
 
 # SOURCE FILES
 SOURCE_FILES = $(wildcard *.cpp)
@@ -30,7 +45,7 @@ CXX = mpicxx
 
 ifeq ($(BUILD_MODE),debug)
 	CFLAGS += -Wall -g -O0 -std=c++11 -DDEBUG
-else ifeq ($(BUILD_MODE),run)
+else #ifeq ($(BUILD_MODE),run)
 	CFLAGS += -Wall -O3 -std=c++11
 #else
 #	$(error Build mode $(BUILD_MODE) not supported by this Makefile)
@@ -39,10 +54,10 @@ endif
 all: $(PROGRAM)
 
 $(OBJS): $(SOURCE_FILES)
-	$(CXX) $(CFLAGS) -fPIC -c $(patsubst %.o,%.cpp,$@) -I$(INCLUDE_PATHS)
+	$(CXX) $(CFLAGS) -c $(patsubst %.o,%.cpp,$@) $(INCLUDE_PATHS)
 
 $(PROGRAM): $(OBJS)
-	$(CXX) $(CFLAGS) $(OBJS) -shared -L$(LIB_PATHS) $(LIBS) -o $(PROGRAM)
+	$(CXX) $(CFLAGS) $(OBJS) $(LIB_PATHS) $(LIBS) -o $(PROGRAM)
 
 .PHONY : clean
 clean:

@@ -2,6 +2,7 @@
 #define RUN_CONFIGURATION
 
 #include <utility>
+#include <string>
 
 #include "mfem.hpp"
 #include "equation_of_state.hpp"
@@ -20,7 +21,7 @@ class RunConfiguration
 {
 private:
   // mesh file file
-  char *meshFile;
+  string meshFile;
   
   // output file name
   char *outputFile;
@@ -92,7 +93,7 @@ public:
   
   void readInputFile(std::string inpuFileName);
   
-  char* GetMeshFileName(){return meshFile;}
+  string GetMeshFileName(){return meshFile;}
   char* GetOutputName(){return outputFile;}
   
   int GetTimeIntegratorType(){return timeIntegratorType;}
