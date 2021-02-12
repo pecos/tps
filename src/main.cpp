@@ -12,14 +12,8 @@ int main(int argc, char *argv[])
 {
   MPI_Session mpi(argc, argv);
   
-#ifdef DEBUG 
-  int gdb = 0;
-  cout<<"Process "<<mpi.WorldRank()+1<<"/"<<mpi.WorldSize()<<", id: "<<getpid()<<endl;
-    while( gdb==0 )
-      sleep(5);
-#endif
-  
   const char *inputFile = "../data/periodic-square.mesh";
+  int threads = 0.;
 
   int precision = 8;
   cout.precision(precision);
@@ -27,6 +21,9 @@ int main(int argc, char *argv[])
   OptionsParser args(argc, argv);
   args.AddOption(&inputFile, "-run", "--runFile",
                 "Name of the input file with run options.");
+  args.AddOption(&threads, "-thr", "--threads",
+                " Set -thr 1 so that the program stops at the \
+ beginning in debug mode for gdb attach.");
 
   args.Parse();
   if (!args.Good())
@@ -35,6 +32,16 @@ int main(int argc, char *argv[])
     return 1;
   }
   if(mpi.Root() ) args.PrintOptions(cout);
+  
+#ifdef DEBUG 
+  if( threads != 0 )
+  {
+    int gdb = 0;
+    cout<<"Process "<<mpi.WorldRank()+1<<"/"<<mpi.WorldSize()<<", id: "<<getpid()<<endl;
+    while( gdb==0 )
+        sleep(5);
+  }
+#endif
 
   string inputFileName(inputFile);
   M2ulPhyS solver( mpi, inputFileName );

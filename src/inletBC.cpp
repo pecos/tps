@@ -195,8 +195,8 @@ void InletBC::updateMean(IntegrationRules *intRules,
       boundaryU.GetRow(i,iState);
       double gamma = eqState->GetSpecificHeatRatio();
       double k = 0.;
-      for(int d=0;d<dim;d++) k += iState[1]*iState[1];
-      double rE = iState[3]/(gamma-1.) + 0.5*iState[0]*k;
+      for(int d=0;d<dim;d++) k += iState[1+d]*iState[1+d];
+      double rE = iState[num_equation-1]/(gamma-1.) + 0.5*iState[0]*k;
       
       for(int d=0;d<dim;d++) iState[1+d] *= iState[0];
       iState[num_equation-1]  = rE;
@@ -298,10 +298,12 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal,
   bdrFlux[1] = meanVel[0]*d1 + meanUp[0]*d2;
   bdrFlux[2] = meanVel[1]*d1 + meanUp[0]*d3;
   if(dim==3) bdrFlux[3] = meanVel[2]*d1 + meanUp[0]*d4;
-  bdrFlux[num_equation-1] = 0.;
-  for(int d=0;d<dim;d++) bdrFlux[num_equation-1] += meanUp[0]*meanVel[d];
+  bdrFlux[num_equation-1] =  meanUp[0]*meanVel[0]*d2;
+  bdrFlux[num_equation-1] += meanUp[0]*meanVel[1]*d3;
+  if(dim==3) bdrFlux[num_equation-1] += meanUp[0]*meanVel[2]*d4;
   bdrFlux[num_equation-1] += meanK*d1 + d5/(gamma-1.);
   
+                            
   // flux gradients in other directions
 //   Vector fluxY(num_equation);
 //   {
@@ -332,8 +334,13 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal,
   boundaryU.GetRow(bdrN,state2);
   
   Vector stateN = state2;
-  stateN[1] = state2[1]*unitNorm[0] + state2[2]*unitNorm[1];
-  stateN[2] = state2[1]*tangent1[0] + state2[2]*tangent1[1];
+  for(int d=0;d<dim;d++) stateN[1+d] = 0.;
+  for(int d=0;d<dim;d++)
+  {
+    stateN[1] += state2[1+d]*unitNorm[d];
+    stateN[2] += state2[1+d]*tangent1[d];
+    if(dim==3) stateN[3] += state2[1+d]*tangent2[d];
+  }
   
   Vector newU(num_equation);
   //for(int i=0; i<num_equation;i++) newU[i] = state2[i]- dt*(bdrFlux[i] /*+ fluxY[i]*/);
@@ -342,8 +349,13 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal,
   // transform back into x-y coords
   {
     DenseMatrix M(dim,dim);
-    M(0,0) = unitNorm[0]; M(0,1) = unitNorm[1];
-    M(1,0) = tangent1[0]; M(1,1) = tangent1[1];
+    for(int d=0;d<dim;d++)
+    {
+      M(0,d) = unitNorm[d];
+      M(1,d) = tangent1[d];
+      if(dim==3) M(2,d) = tangent2[d];
+    }
+      
     DenseMatrix invM(dim,dim);
     mfem::CalcInverse(M,invM);
     Vector momN(dim), momX(dim);
