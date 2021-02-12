@@ -691,6 +691,7 @@ void M2ulPhyS::Check_NAN()
   int dof = vfes->GetNDofs();
   
   bool thereIsNan = false;
+  int local_print = 0;
   for(int i=0;i<dof;i++)
   {
     for(int eq=0;eq<num_equation;eq++)
@@ -698,9 +699,19 @@ void M2ulPhyS::Check_NAN()
       if( isnan(dataU[i+eq*dof]) )
       {
         thereIsNan = true;
-        cout<<"NaN at node: "<<i<<" partition: "<<mpi.WorldRank()<<endl;
-        MPI_Abort(MPI_COMM_WORLD,1);
+        //cout<<"NaN at node: "<<i<<" partition: "<<mpi.WorldRank()<<endl;
+        local_print++;
+        //MPI_Abort(MPI_COMM_WORLD,1);
       }
     }
+  }
+  int print;
+  MPI_Allreduce(&local_print, &print,
+                       1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+  if( print>0 )
+  {
+    paraviewColl->Save();
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Abort(MPI_COMM_WORLD,1);
   }
 }

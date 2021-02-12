@@ -366,8 +366,9 @@ void OutletBC::subsonicReflectingPressure(Vector &normal,
   const double gamma = eqState->GetSpecificHeatRatio();
   Vector state2(num_equation);
   state2 = stateIn;
-  state2[num_equation-1] = inputState[0]/(gamma-1.) + 0.5*(state2[1]*state2[1] +
-                                              state2[2]*state2[2] )/state2[0];
+  double k = 0.;
+  for(int d=0;d<dim;d++) k += stateIn[1+d]*stateIn[1+d];
+  state2[num_equation-1] = inputState[0]/(gamma-1.) + 0.5*k/stateIn[0];
   
   rsolver->Eval(stateIn,state2,normal,bdrFlux);
 }
