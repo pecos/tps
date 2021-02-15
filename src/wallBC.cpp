@@ -17,7 +17,8 @@ BoundaryCondition(_rsolver,
                   _dt,
                   _dim,
                   _num_equation,
-                  _patchNumber),
+                  _patchNumber,
+                  1 ), // so far walls do not require ref. length. Left at 1
 wallType(_bcType),
 fluxClass(_fluxClass)
 {

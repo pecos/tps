@@ -144,6 +144,9 @@ private:
   // Courant-Friedrich-Levy condition
   double CFL;
   
+  // Reference length
+  double refLength;
+  
   // minimum element size
   double hmin;
   

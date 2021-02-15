@@ -53,6 +53,9 @@ FLUID 0
 # Factor that multiplies fluid viscosity
 VISC_MULT 45000.
 
+# Reference length
+REF_LENGTH 1.
+
 # equations to be solved. Options thus far
 # EULER -> 0
 # NS    -> 1
@@ -69,10 +72,10 @@ INIT_P 101300
 
 # Inlet Boundary Conditions
 # types:
-# 0 -> Subsonic Inlet Specified with P and Vel(3)
-# 1 -> Non-reflect. sub. Inlet Specified with P and Vel(3)
-#INLET patchNum type press vx vy vz
-INLET 5 0 101300 30 0 0
+# 0 -> Subsonic Inlet Specified with dens. and Vel(3)
+# 1 -> Non-reflect. sub. Inlet Specified with dens. and Vel(3)
+#INLET patchNum type dens vx vy vz
+INLET 5 0 1.2 30 0 0
 
 # Outlet Boundary Conditions
 # types:

@@ -9,6 +9,7 @@ OutletBC::OutletBC( MPI_Groups *_groupsMPI,
                     const int _dim,
                     const int _num_equation,
                     int _patchNumber,
+                    double _refLength,
                     OutletType _bcType,
                     const Array<double> &_inputData ):
 BoundaryCondition(_rsolver, 
@@ -18,12 +19,13 @@ BoundaryCondition(_rsolver,
                   _dt,
                   _dim,
                   _num_equation,
-                  _patchNumber),
+                  _patchNumber,
+                  _refLength ),
 groupsMPI(_groupsMPI),
 outletType(_bcType),
 inputState(_inputData)
 {
-  groupsMPI->setAsOutlet();
+  groupsMPI->setAsOutlet(_patchNumber);
   
   meanUp.SetSize(num_equation);
   
@@ -283,7 +285,7 @@ void OutletBC::subsonicNonReflectingPressure( Vector &normal,
   //const double p = eqState->ComputePressure(stateIn, dim);
   
   // estimate ingoing characteristic
-  const double sigma = speedSound/2.;
+  const double sigma = speedSound/refLength;
   double L1 = sigma*(meanUp[num_equation-1] - inputState[0]);
   
   // calc vector d

@@ -85,6 +85,8 @@ void M2ulPhyS::initVariables()
   
   dim = mesh->Dimension();
   
+  refLength = config.GetReferenceLength();
+  
   eqSystem = config.GetEquationSystem();
   
   eqState = new EquationOfState(config.GetWorkingFluid());
@@ -690,7 +692,7 @@ void M2ulPhyS::Check_NAN()
   double *dataU = U->GetData();
   int dof = vfes->GetNDofs();
   
-  bool thereIsNan = false;
+  //bool thereIsNan = false;
   int local_print = 0;
   for(int i=0;i<dof;i++)
   {
@@ -698,7 +700,7 @@ void M2ulPhyS::Check_NAN()
     {
       if( isnan(dataU[i+eq*dof]) )
       {
-        thereIsNan = true;
+        //thereIsNan = true;
         //cout<<"NaN at node: "<<i<<" partition: "<<mpi.WorldRank()<<endl;
         local_print++;
         //MPI_Abort(MPI_COMM_WORLD,1);

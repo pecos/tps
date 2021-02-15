@@ -55,6 +55,7 @@ gradUp(_gradUp)
                                               dim,
                                               num_equation,
                                               patchANDtype.first,
+                                              config.GetReferenceLength(),
                                               patchANDtype.second,
                                               data );
     }
@@ -81,6 +82,7 @@ gradUp(_gradUp)
                                                 dim,
                                                 num_equation,
                                                 patchANDtype.first,
+                                                config.GetReferenceLength(),
                                                 patchANDtype.second,
                                                 data );
     }

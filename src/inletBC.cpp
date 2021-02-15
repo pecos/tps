@@ -9,6 +9,7 @@ InletBC::InletBC( MPI_Groups *_groupsMPI,
                   const int _dim,
                   const int _num_equation,
                   int _patchNumber,
+                  double _refLength,
                   InletType _bcType,
                   const Array<double> &_inputData ):
 BoundaryCondition(_rsolver, 
@@ -18,12 +19,13 @@ BoundaryCondition(_rsolver,
                   _dt,
                   _dim,
                   _num_equation,
-                  _patchNumber),
+                  _patchNumber,
+                  _refLength ),
 groupsMPI(_groupsMPI),
 inletType(_bcType),
 inputState(_inputData)
 {
-  groupsMPI->setAsInlet();
+  groupsMPI->setAsInlet(_patchNumber);
   
   meanUp.SetSize(num_equation);
   
@@ -268,7 +270,7 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal,
   L1 *= meanVel[0] - speedSound;
   
   // estimate ingoing characteristic
-  const double sigma = speedSound/2.;
+  const double sigma = speedSound/refLength;
   double L5 = 0.;
   for(int d=0;d<dim;d++) L5 += meanDV[d]*unitNorm[d];
   L5 *= sigma*2.*meanUp[0]*speedSound;

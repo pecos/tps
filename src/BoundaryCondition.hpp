@@ -18,6 +18,7 @@ protected:
   const int dim;
   const int num_equation;
   const int patchNumber;
+  const double refLength;
   
 public:
   BoundaryCondition(RiemannSolver *_rsolver, 
@@ -27,7 +28,8 @@ public:
                     double &dt,
                     const int _dim,
                     const int _num_equation,
-                    const int _patchNumber);
+                    const int _patchNumber,
+                    const double _refLength );
   virtual ~BoundaryCondition();
   
   virtual void computeBdrFlux(Vector &normal,

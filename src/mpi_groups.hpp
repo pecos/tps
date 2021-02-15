@@ -27,8 +27,8 @@ public:
   // function that creates the groups 
   void init();
   
-  void setAsInlet(){isInlet = 1;};
-  void setAsOutlet(){isOutlet = 2;};
+  void setAsInlet(int patchNum ){isInlet = patchNum +1000;}
+  void setAsOutlet(int patchNum ){isOutlet = patchNum +2000;}
   
   MPI_Session* getSession(){return mpi;}
   

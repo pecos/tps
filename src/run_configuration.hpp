@@ -66,6 +66,9 @@ private:
   // Factor by which the viscosity is multiplied.
   double visc_mult;
   
+  // Reference length
+  double refLength;
+  
   // equations to be solved. Options thus far
   // EULER, NS, MHD
   Equations eqSystem;
@@ -107,6 +110,7 @@ public:
   int GetNumItersOutput(){return itersOut;}
   WorkingFluid GetWorkingFluid(){return workFluid;}
   double GetViscMult(){return visc_mult;}
+  double GetReferenceLength(){return refLength;}
   Equations GetEquationSystem(){return eqSystem;}
   bool isSBP(){return SBP;}
   double* GetConstantInitialCondition(){return &initRhoRhoVp[0];}

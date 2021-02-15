@@ -55,6 +55,7 @@ public:
              const int _dim,
              const int _num_equation,
              int _patchNumber,
+             double _refLength,
              OutletType _bcType,
              const Array<double> &_inputData );
    ~OutletBC();

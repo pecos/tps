@@ -20,6 +20,7 @@ RunConfiguration::RunConfiguration()
   workFluid = DRY_AIR;
   eqSystem = EULER;
   visc_mult = 1.;
+  refLength = 1.;
   SBP = false;
   for(int ii=0;ii<5;ii++) initRhoRhoVp[ii] = 0.;
 }
@@ -189,6 +190,12 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       {
         ss >> word;
         visc_mult = stof( word );
+        
+      // Reference length
+      }else if( word.compare("REF_LENGTH")==0 )
+      {
+        ss >> word;
+        refLength = stof( word );
         
       }else if( word.compare("INLET")==0 )
       {
