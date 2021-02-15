@@ -379,18 +379,17 @@ void M2ulPhyS::Iterate()
   // Integrate in time.
   while( iter<MaxIters )
   {
-    if( !config.isTimeStepConstant() )
-    {
-      double dt_local = dt;
-      MPI_Allreduce(&dt_local, &dt,
-                        1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
-    }
-
     timeIntegrator->Step(*U, time, dt);
   
     Check_NAN();
     
-    dt = CFL * hmin / max_char_speed /(double)dim;
+    if( !config.isTimeStepConstant() )
+    {
+      double dt_local = CFL * hmin / max_char_speed /(double)dim;
+      MPI_Allreduce(&dt_local, &dt,
+                        1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
+    }
+    
     iter++;
 
     const int vis_steps = config.GetNumItersOutput();
@@ -730,5 +729,5 @@ void M2ulPhyS::initialTimeStep()
   MPI_Allreduce(&partition_C, &max_char_speed,
                        1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
   
-  dt = CFL * hmin / max_char_speed / (2*order+1);
+  dt = CFL * hmin / max_char_speed /(double)dim;
 }
