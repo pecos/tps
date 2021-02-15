@@ -41,7 +41,7 @@ void RiemannSolver::ComputeFluxDotN(const Vector &state,
    fluxN(1 + dim) = den_velN * H;
 }
 
-double RiemannSolver::Eval(const Vector &state1, const Vector &state2,
+void RiemannSolver::Eval(const Vector &state1, const Vector &state2,
                            const Vector &nor, Vector &flux)
 {
    // NOTE: nor in general is not a unit normal
@@ -70,6 +70,4 @@ double RiemannSolver::Eval(const Vector &state1, const Vector &state2,
       flux(i) = 0.5 * (flux1(i) + flux2(i))
                 - 0.5 * maxE * (state2(i) - state1(i)) * normag;
    }
-
-   return maxE;
 }

@@ -227,6 +227,7 @@ void M2ulPhyS::initVariables()
                                 vfes,
                                 A, 
                                 Aflux,
+                                mesh,
                                 Up,
                                 gradUp,
                                 gradUpfes,
@@ -254,15 +255,10 @@ void M2ulPhyS::initVariables()
    }
 
   // estimate initial dt
-  {
-    gradUp->ExchangeFaceNbrData();
-    // Find a safe dt, using a temporary vector. Calling Mult() computes the
-    // maximum char speed at all quadrature points on all faces.
-    Vector z(A->Width());
-    A->Mult(*U, z);
-    dt = CFL * hmin / max_char_speed / (2*order+1);
-    t_final = MaxIters*dt;
-  }
+  gradUp->ExchangeFaceNbrData();
+    
+  initialTimeStep();
+  t_final = MaxIters*dt;
 }
 
 
@@ -716,4 +712,25 @@ void M2ulPhyS::Check_NAN()
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Abort(MPI_COMM_WORLD,1);
   }
+}
+
+
+void M2ulPhyS::initialTimeStep()
+{
+  double *dataU = U->GetData();
+  int dof = vfes->GetNDofs();
+  
+  for(int n=0;n<dof;n++)
+  {
+    Vector state(num_equation);
+    for(int eq=0;eq<num_equation;eq++) state[eq] = dataU[n+eq*dof];
+    double iC = eqState->ComputeMaxCharSpeed(state,dim);
+    if( iC>max_char_speed ) max_char_speed = iC;
+  }
+  
+  double partition_C = max_char_speed;
+  MPI_Allreduce(&partition_C, &max_char_speed,
+                       1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+  
+  dt = CFL * hmin / max_char_speed / (2*order+1);
 }

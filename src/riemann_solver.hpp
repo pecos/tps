@@ -21,7 +21,7 @@ public:
    RiemannSolver(int &_num_equation,
                  EquationOfState *_eqState);
    
-   double Eval(const Vector &state1, const Vector &state2,
+   void Eval(const Vector &state1, const Vector &state2,
                const Vector &nor, Vector &flux);
    
    void ComputeFluxDotN(const Vector &state, 

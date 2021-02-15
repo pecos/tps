@@ -14,6 +14,7 @@ RHSoperator::RHSoperator( const int _dim,
                           ParFiniteElementSpace *_vfes,
                           ParNonlinearForm *_A, 
                           MixedBilinearForm *_Aflux,
+                          ParMesh *_mesh,
                           ParGridFunction *_Up,
                           ParGridFunction *_gradUp,
                           ParFiniteElementSpace *_gradUpfes,
@@ -34,6 +35,7 @@ eqState(_eqState),
 vfes(_vfes),
 A(_A),
 Aflux(_Aflux),
+mesh(_mesh),
 isSBP(_isSBP),
 alpha(_alpha),
 Up(_Up),
@@ -258,6 +260,10 @@ void RHSoperator::GetFlux(const DenseMatrix &x, DenseTensor &flux) const
       const double mcs = eqState->ComputeMaxCharSpeed(*state, dim);
       if (mcs > max_char_speed) { max_char_speed = mcs; }
    }
+   
+   double partition_max_char = max_char_speed;
+   MPI_Allreduce(&partition_max_char, &max_char_speed,
+                       1, MPI_DOUBLE, MPI_MAX, mesh->GetComm());
 }
 
 void RHSoperator::updatePrimitives(const Vector &x) const

@@ -168,7 +168,7 @@ void FaceIntegrator::AssembleFaceVector(const FiniteElement &el1,
 
       // Get the normal vector and the convective flux on the face
       CalcOrtho(Tr.Jacobian(), nor);
-      const double mcs = rsolver->Eval(funval1, funval2, nor, fluxN);
+      rsolver->Eval(funval1, funval2, nor, fluxN);
       
       // compute viscous fluxes
       DenseMatrix viscF1(num_equation,dim);
@@ -187,9 +187,6 @@ void FaceIntegrator::AssembleFaceVector(const FiniteElement &el1,
       {
         for(int d=0;d<dim;d++) fluxN[eq] += viscF1(eq,d)*nor[d];
       }
-
-      // Update max char speed
-      if (mcs > max_char_speed) { max_char_speed = mcs; }
 
       fluxN *= ip.weight;
       for (int k = 0; k < num_equation; k++)

@@ -154,6 +154,7 @@ private:
   
   void initVariables();
   void initSolutionAndVisualizationVectors();
+  void initialTimeStep();
   
   static void InitialConditionEulerVortex(const Vector &x, Vector &y);
   static void testInitialCondition(const Vector &x, Vector &y);

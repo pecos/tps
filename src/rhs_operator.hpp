@@ -34,6 +34,8 @@ private:
   
   MixedBilinearForm *Aflux;
   
+  ParMesh *mesh;
+  
   //DenseTensor *Me_inv;
   DenseMatrix *Me_inv;
   
@@ -69,6 +71,7 @@ public:
                ParFiniteElementSpace *_vfes,
                ParNonlinearForm *_A, 
                MixedBilinearForm *_Aflux,
+               ParMesh *_mesh,
                ParGridFunction *_Up,
                ParGridFunction *_gradUp,
                ParFiniteElementSpace *_gradUpfes,
