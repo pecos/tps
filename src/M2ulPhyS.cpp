@@ -241,15 +241,13 @@ void M2ulPhyS::initVariables()
   timeIntegrator->Init( *rhsOperator );
   
   // Determine the minimum element size.
-   hmin = 0.0;
    {
-      //double local_hmin = mesh->GetElementSize(0, 1);
-     double local_hmin = sqrt(mesh->GetElementVolume(0));
+      double local_hmin = mesh->GetElementSize(0, 1);
       for (int i = 1; i < mesh->GetNE(); i++)
       {
         if(sqrt(mesh->GetElementVolume(i))<1e-3) cout<<sqrt(mesh->GetElementVolume(i))<<endl;
-        //local_hmin = min(mesh->GetElementSize(i, 1), local_hmin);
-        local_hmin = min(sqrt(mesh->GetElementVolume(i)), local_hmin);
+        local_hmin = min(mesh->GetElementSize(i, 1), local_hmin);
+        //local_hmin = min(sqrt(mesh->GetElementVolume(i)), local_hmin);
       }
       MPI_Allreduce(&local_hmin, &hmin, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
    }
@@ -258,7 +256,9 @@ void M2ulPhyS::initVariables()
   gradUp->ExchangeFaceNbrData();
     
   initialTimeStep();
-  t_final = MaxIters*dt;
+  if( mpi.Root() ) cout<<"Initial time-step: "<<dt<<"s"<<endl;
+  
+  //t_final = MaxIters*dt;
 }
 
 
@@ -377,17 +377,16 @@ void M2ulPhyS::projectInitialSolution()
 void M2ulPhyS::Iterate()
 {
   // Integrate in time.
-  bool done = false;
-  while( !done )
+  while( iter<MaxIters )
   {
-    // adjusts time step to finish at t_final
-    double dt_real;
-    double dt_local = min(dt, t_final - time);
-    
-    MPI_Allreduce(&dt_local, &dt_real,
-                       1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
+    if( !config.isTimeStepConstant() )
+    {
+      double dt_local = dt;
+      MPI_Allreduce(&dt_local, &dt,
+                        1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
+    }
 
-    timeIntegrator->Step(*U, time, dt_real);
+    timeIntegrator->Step(*U, time, dt);
   
     Check_NAN();
     
@@ -395,12 +394,11 @@ void M2ulPhyS::Iterate()
     iter++;
 
     const int vis_steps = config.GetNumItersOutput();
-    done = (time >= t_final - 1e-8*dt);
-    if (done || iter % vis_steps == 0)
+    if( iter % vis_steps == 0 )
     {
-        if(mpi.Root()) cout << "time step: " << iter << ", progress(%): " << 100.*time/t_final << endl;
-        
-        { // DEBUG ONLY!
+      if(mpi.Root()) cout <<"time step: "<<iter<<", physical time "<<time<<"s"<< endl;
+      
+      { // DEBUG ONLY!
 //           GridFunction uk(fes, u_block->GetBlock(3));
 //           ostringstream sol_name;
 //           sol_name << config.GetOutputName() <<"-" << 2 << "-final.gf";
@@ -408,16 +406,16 @@ void M2ulPhyS::Iterate()
 //           sol_ofs.precision(8);
 //           sol_ofs << uk;
 //           exit(0);
-          
-          write_restart_files();
-          
-          paraviewColl->SetCycle(iter);
-          paraviewColl->SetTime(time);
-          paraviewColl->Save();
-          
-          //vel->SaveVTK(file,"vel",3);
-          //press->SaveVTK(file,"press",3);
-          
+        
+        write_restart_files();
+        
+        paraviewColl->SetCycle(iter);
+        paraviewColl->SetTime(time);
+        paraviewColl->Save();
+        
+        //vel->SaveVTK(file,"vel",3);
+        //press->SaveVTK(file,"press",3);
+        
 //           visitColl->SetCycle(iter);
 //           visitColl->SetTime(time);
 //           visitColl->Save();
@@ -425,7 +423,7 @@ void M2ulPhyS::Iterate()
     }
   }
   
-  if(time == t_final)
+  if( iter==MaxIters )
   {
     void (*initialConditionFunction)(const Vector&, Vector&);
     initialConditionFunction = &(this->InitialConditionEulerVortex);

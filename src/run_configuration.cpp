@@ -14,6 +14,7 @@ RunConfiguration::RunConfiguration()
   basisType = 1;
   
   cflNum = 0.12;
+  constantTimeStep = false;
   numIters = 10;
   restart_cycle = 0;
   itersOut = 50;
@@ -105,13 +106,16 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
         basisType = stoi(word);
        
       // CFL number
-       
-      // CFL number
       }else if( word.compare("CFL")==0 )
       {
         ss >> word;
         cflNum = stof( word );
-      
+       
+      // constant time-step
+      }else if( word.compare("DT_CONSTANT")==0 )
+      {
+        constantTimeStep = true;
+        
       // time integrator
       }else if( word.compare("TIME_INTEGRATOR")==0 )
       {

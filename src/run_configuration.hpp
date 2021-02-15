@@ -49,6 +49,9 @@ private:
   
   double cflNum;
   
+  // variable/constant time-step
+  bool constantTimeStep;
+  
   // num iterations. Defaults to 0
   int numIters;
   
@@ -106,6 +109,7 @@ public:
   int GetBasisType(){return basisType;}
   
   double GetCFLNumber(){return cflNum;}
+  bool isTimeStepConstant(){return constantTimeStep;}
   int GetNumIters(){return numIters;}
   int GetNumItersOutput(){return itersOut;}
   WorkingFluid GetWorkingFluid(){return workFluid;}

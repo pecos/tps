@@ -28,6 +28,10 @@ BASIS_TYPE 1
 # CFL number
 CFL 0.12
 
+# Sets a constant time-step.
+# Variable time-step if commented out
+DT_CONSTANT
+
 # Max num of iters
 NMAX 10500
 

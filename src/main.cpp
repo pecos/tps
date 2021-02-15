@@ -13,7 +13,6 @@ int main(int argc, char *argv[])
   MPI_Session mpi(argc, argv);
   
   const char *inputFile = "../data/periodic-square.mesh";
-  int threads = 0.;
 
   int precision = 8;
   cout.precision(precision);
@@ -21,9 +20,12 @@ int main(int argc, char *argv[])
   OptionsParser args(argc, argv);
   args.AddOption(&inputFile, "-run", "--runFile",
                 "Name of the input file with run options.");
+#ifdef DEBUG 
+  int threads = 0.;
   args.AddOption(&threads, "-thr", "--threads",
                 " Set -thr 1 so that the program stops at the \
  beginning in debug mode for gdb attach.");
+#endif
 
   args.Parse();
   if (!args.Good())
