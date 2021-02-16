@@ -23,7 +23,6 @@ void DomainIntegrator::AssembleElementMatrix2(const FiniteElement &trial_fe,
                                               DenseMatrix &elmat)
 {
    // Assemble the form (vec(v), grad(w))
-  
    Vector shape;
    //DenseMatrix flux(num_equation,dim);
    DenseMatrix dshapedr;

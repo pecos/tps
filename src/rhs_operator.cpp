@@ -233,7 +233,7 @@ void RHSoperator::GetFlux(const DenseMatrix &x, DenseTensor &flux) const
                                dataGradUp[i+eq*dof+d*num_equation*dof];
       }
       
-      fluxClass->ComputeTotalFlux(*state,gradUpi,f);
+      fluxClass->ComputeConvectiveFluxes(*state,f);
      
       if( isSBP )
       {
@@ -243,10 +243,16 @@ void RHSoperator::GetFlux(const DenseMatrix &x, DenseTensor &flux) const
         for(int d=0; d<dim; d++)
         {
           f(d+1,d) += p;
-          f(num_equation-1,d) += (1.-0.)*p*(*state)(1+d)/(*state)(0);
+          f(num_equation-1,d) += p*(*state)(1+d)/(*state)(0);
         }
       }
         
+      if( eqSystem==NS )
+      {
+        DenseMatrix fvisc(num_equation,dim);
+        fluxClass->ComputeViscousFluxes(*state,gradUpi,fvisc);
+        f -= fvisc;
+      }
 
       for (int d = 0; d < dim; d++)
       {
