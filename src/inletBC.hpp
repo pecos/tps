@@ -9,7 +9,8 @@ using namespace mfem;
 
 enum InletType {
   SUB_DENS_VEL, // Subsonic inlet specified by the density and velocity components
-  SUB_DENS_VEL_NR // Non-reflecting subsonic inlet specified by the density and velocity components
+  SUB_DENS_VEL_NR, // Non-reflecting subsonic inlet specified by the density and velocity components
+  SUB_VEL_CONST_ENT // Subsonic non-reflecting. Specified vel, keeps entropy constant
 };
 
 class InletBC : public BoundaryCondition
@@ -38,6 +39,10 @@ private:
                                           Vector &bdrFlux);
   
   void subsonicNonReflectingDensityVelocity(Vector &normal,
+                                            Vector &stateIn, 
+                                            DenseMatrix &gradState,
+                                            Vector &bdrFlux);
+  void subsonicNonReflectingVelocityConstS( Vector &normal,
                                             Vector &stateIn, 
                                             DenseMatrix &gradState,
                                             Vector &bdrFlux);

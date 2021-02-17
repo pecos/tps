@@ -217,6 +217,9 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
           case 1:
             patchANDtype.second = SUB_DENS_VEL_NR;
             break;
+          case 2:
+            patchANDtype.second = SUB_VEL_CONST_ENT;
+            break;
         }
         inletPatchType.Append( patchANDtype );
         

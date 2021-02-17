@@ -78,6 +78,7 @@ INIT_P 101300
 # types:
 # 0 -> Subsonic Inlet Specified with dens. and Vel(3)
 # 1 -> Non-reflect. sub. Inlet Specified with dens. and Vel(3)
+# 2 -> Non-reflect. sub. Inlet Specified with Vel(3). Keeps entropy constant
 #INLET patchNum type dens vx vy vz
 INLET 5 0 1.2 30 0 0
 
