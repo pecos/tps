@@ -42,10 +42,6 @@ private:
                                             Vector &stateIn, 
                                             DenseMatrix &gradState,
                                             Vector &bdrFlux);
-  void subsonicNonReflectingVelocityConstS( Vector &normal,
-                                            Vector &stateIn, 
-                                            DenseMatrix &gradState,
-                                            Vector &bdrFlux);
   
   virtual void updateMean(IntegrationRules *intRules,
                           ParGridFunction *Up);
