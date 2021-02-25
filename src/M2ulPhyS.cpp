@@ -630,7 +630,7 @@ void M2ulPhyS::uniformInitialConditions()
     if( computeMean )
     {
       for(int eq=0;eq<num_equation;eq++) dataMean[i+eq*dof] = 0.;
-      for(int n=0;n,numRMS;n++) dataRMS[i+dof*n] = 0.;
+      for(int n=0;n<numRMS;n++) dataRMS[i+dof*n] = 0.;
     }
     
     for(int d=0;d<dim;d++)
