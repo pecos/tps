@@ -61,6 +61,11 @@ private:
   // cycle for restart
   int restart_cycle;
   
+  // mean and RMS
+  int sampleInterval;
+  int startIter;
+  bool restartMean;
+  
   // working fluid. Options thus far
   // DRY_AIR
   // Defaults to DRAY_AIR
@@ -112,6 +117,11 @@ public:
   bool isTimeStepConstant(){return constantTimeStep;}
   int GetNumIters(){return numIters;}
   int GetNumItersOutput(){return itersOut;}
+  
+  int GetMeanStartIter(){return startIter;}
+  int GetMeanSampleInterval(){return sampleInterval;}
+  bool GetRestartMean(){return restartMean;}
+  
   WorkingFluid GetWorkingFluid(){return workFluid;}
   double GetViscMult(){return visc_mult;}
   double GetReferenceLength(){return refLength;}
