@@ -12,6 +12,15 @@ OUTPUT_NAME euler_output
 # If not restarting, ommit this parameter.
 RESTART_CYCLE 300
 
+# Computation of mean and velocity RMS
+# CALC_MEAN_RMS startIter sampleInterval
+# computes mean and RMS starting from iter start iter
+# and adds a new value every sampleInterval iterations
+CALC_MEAN_RMS 12400 20
+
+# if simulation is to restart computing mean
+CONTINUE_MEAN_CALC
+
 # Polynomial order
 POL_ORDER 3
 

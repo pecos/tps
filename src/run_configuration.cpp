@@ -17,6 +17,11 @@ RunConfiguration::RunConfiguration()
   constantTimeStep = false;
   numIters = 10;
   restart_cycle = 0;
+  
+  sampleInterval = 0;
+  startIter = 0;
+  restartMean = false;
+  
   itersOut = 50;
   workFluid = DRY_AIR;
   eqSystem = EULER;
@@ -80,6 +85,19 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       {
         ss >> word;
         restart_cycle = stoi(word);
+        
+      // mean and RMS calculation
+      }else if( word.compare("CALC_MEAN_RMS")==0 )
+      {
+        ss >> word;
+        startIter = stoi( word );
+        
+        ss >> word;
+        sampleInterval = stoi( word );
+        
+      }else if( word.compare("CONTINUE_MEAN_CALC")==0 )
+      {
+        restartMean = true;
         
       // output interval
       }else if( word.compare("ITERS_OUT")==0 )
