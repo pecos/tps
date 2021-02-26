@@ -24,7 +24,7 @@ private:
   string meshFile;
   
   // output file name
-  char *outputFile;
+  string outputFile;
   
   // time integrator. Possible values
   //  1: ForwardEulerSolver
@@ -86,6 +86,9 @@ private:
   // initial constant field
   double initRhoRhoVp[5];
   
+  // Imposed pressure gradient
+  double gradPress[3];
+  
   // Inlet BC data
   Array<double> inletBC;
   Array<pair<int,InletType> > inletPatchType;
@@ -105,7 +108,7 @@ public:
   void readInputFile(std::string inpuFileName);
   
   string GetMeshFileName(){return meshFile;}
-  char* GetOutputName(){return outputFile;}
+  string GetOutputName(){return outputFile;}
   
   int GetTimeIntegratorType(){return timeIntegratorType;}
   
@@ -128,6 +131,7 @@ public:
   Equations GetEquationSystem(){return eqSystem;}
   bool isSBP(){return SBP;}
   double* GetConstantInitialCondition(){return &initRhoRhoVp[0];}
+  double* GetImposedPressureGradient(){return &gradPress[0];}
   
   int GetRestartCycle(){return restart_cycle;}
   

@@ -83,6 +83,10 @@ INIT_RHOVY 0.
 INIT_RHOVZ 0.
 INIT_P 101300
 
+# Additional imposed fixed pressure gradient
+# GRAD_PRESSURE dpx dpy dpz
+GRAD_PRESSURE 8 0 0
+
 # Inlet Boundary Conditions
 # types:
 # 0 -> Subsonic Inlet Specified with dens. and Vel(3)

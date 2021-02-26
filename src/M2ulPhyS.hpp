@@ -19,6 +19,7 @@
 #include "sbp_integrators.hpp"
 #include "BCintegrator.hpp"
 #include "faceGradientIntegration.hpp"
+#include "averaging_and_rms.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -82,10 +83,6 @@ private:
   // Finite element space for all variables together (total thermodynamic state)
   ParFiniteElementSpace *vfes;
   
-  // FES for RMS 
-  ParFiniteElementSpace *rmsFes;
-  int numRMS;
-  
   
   // The solution u has components {density, x-momentum, y-momentum, energy}.
   // These are stored contiguously in the BlockVector u_block.
@@ -95,7 +92,6 @@ private:
   
   // paraview collection pointer
   ParaViewDataCollection *paraviewColl = NULL;
-  ParaViewDataCollection *paraviewMean = NULL;
   //DataCollection *visitColl = NULL;
   
   // Riemann Solver
@@ -125,20 +121,13 @@ private:
   // Visualization functions (these are pointers to Up)
   ParGridFunction *press, *dens, *vel;
   
-  // time averaged primitive variables
-  ParGridFunction *meanUp;
-  ParGridFunction *rms;
-  
-  // time averaged p, rho, vel (pointers to meanUp) for Visualization
-  ParGridFunction *meanP, *meanRho, *meanV;
-  
   // gradient of primitive variables
   ParGridFunction *gradUp;
   ParFiniteElementSpace *gradUpfes;
   ParNonlinearForm *gradUp_A;
   
-//   // Gradients Up
-//   Array<double> gradUp;
+  // Average handler
+  Averaging *average;
   
   // time variable
   double time;
@@ -148,14 +137,6 @@ private:
   
   // iteration
   int iter;
-  
-  // number of samples in mean primitive variables
-  int samplesMean;
-  
-  // iteration interval between samples
-  int sampleInterval;
-  int startMean;
-  bool computeMean;
   
   // time of end of simulation
   double t_final;
@@ -181,12 +162,8 @@ private:
   void uniformInitialConditions();
   void initGradUp();
   
-  void addSampleMean();
-  
   void write_restart_files();
   void read_restart_files();
-  void write_meanANDrms_restart_files();
-  void read_meanANDrms_restart_files();
   
   void Check_NAN();
   

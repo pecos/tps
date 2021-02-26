@@ -81,23 +81,6 @@ void M2ulPhyS::initVariables()
     iter = 0;
   }
   
-  sampleInterval = config.GetMeanSampleInterval();
-  samplesMean = 0;
-  startMean = config.GetMeanStartIter();
-  computeMean = false;
-  if( sampleInterval!=0 ) computeMean = true;
-  
-  if( computeMean )
-  {
-    // ParaviewMean 
-    string name = "mean_";
-    name.append( config.GetOutputName() );
-    paraviewMean = new ParaViewDataCollection(name,mesh);
-    paraviewMean->SetLevelsOfDetail( config.GetSolutionOrder() );
-    paraviewMean->SetHighOrderOutput(true);
-    paraviewMean->SetPrecision(8);
-  }
-  
   cout<<"Process "<<mpi.WorldRank()<<" # elems "<< mesh->GetNE()<<endl;
   
   dim = mesh->Dimension();
@@ -155,15 +138,19 @@ void M2ulPhyS::initVariables()
   vfes = new ParFiniteElementSpace(mesh, fec, num_equation, Ordering::byNODES);
   gradUpfes = new ParFiniteElementSpace(mesh, fec, num_equation*dim, Ordering::byNODES);
   
-  if( computeMean )
-  {
-    // always assumes allways 6 components
-    numRMS = 6;
-    rmsFes = new ParFiniteElementSpace(mesh, fec, numRMS, Ordering::byNODES);
-  }
-  
   initSolutionAndVisualizationVectors();
   projectInitialSolution();
+  
+  average = new Averaging(Up,
+                          mesh,
+                          fec,
+                          fes,
+                          dfes,
+                          vfes,
+                          num_equation,
+                          dim,
+                          config,
+                          groupsMPI);
   
   fluxClass = new Fluxes(eqState,
                          eqSystem,
@@ -292,19 +279,14 @@ M2ulPhyS::~M2ulPhyS()
   
   delete gradUp;
   
-  if( computeMean )
-  {
-    delete paraviewMean;
-    delete meanUp;
-    delete rms;
-  }
-  
   delete u_block;
   delete up_block;
   delete offsets;
   
   delete U;
   delete Up;
+  
+  delete average;
   
   //delete rhsOperator;
   //delete domainIntegrator;
@@ -364,21 +346,6 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
   press = new ParGridFunction(fes,
                 Up->GetData()+(num_equation-1)*fes->GetNDofs() );
   
-  if( computeMean )
-  {
-    meanUp  = new ParGridFunction(vfes);
-    rms     = new ParGridFunction(rmsFes);
-    meanRho = new ParGridFunction(fes, meanUp->GetData() );
-    meanV   = new ParGridFunction(dfes, meanUp->GetData() +fes->GetNDofs() );
-    meanP   = new ParGridFunction(fes, 
-                    meanUp->GetData()+(num_equation-1)*fes->GetNDofs() );
-    
-    paraviewMean->RegisterField("dens",meanRho);
-    paraviewMean->RegisterField("vel",meanV);
-    paraviewMean->RegisterField("press",meanP);
-    paraviewMean->RegisterField("rms",rms);
-  }
-  
   paraviewColl->SetCycle(0);
   paraviewColl->SetTime(0.);
   
@@ -411,7 +378,7 @@ void M2ulPhyS::projectInitialSolution()
   }else
   {
     read_restart_files();
-    if( config.GetRestartMean() ) read_meanANDrms_restart_files();
+    average->read_meanANDrms_restart_files();
     
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
@@ -450,18 +417,10 @@ void M2ulPhyS::Iterate()
       paraviewColl->SetTime(time);
       paraviewColl->Save();
       
-      if( computeMean )
-      {
-        paraviewMean->Save();
-        write_meanANDrms_restart_files();
-      }
+      average->write_meanANDrms_restart_files();
     }
     
-    if( computeMean )
-    {
-      if( iter%sampleInterval==0 && iter>=startMean) addSampleMean();
-      if( iter==startMean && mpi.Root()) cout<<"Starting mean calculation."<<endl;
-    }
+    average->addSampleMean(iter);
   }
   
   
@@ -474,11 +433,7 @@ void M2ulPhyS::Iterate()
     paraviewColl->SetTime(time);
     paraviewColl->Save();
     
-    if( computeMean )
-    {
-      paraviewMean->Save();
-      write_meanANDrms_restart_files();
-    }
+    average->write_meanANDrms_restart_files();
       
     void (*initialConditionFunction)(const Vector&, Vector&);
     initialConditionFunction = &(this->InitialConditionEulerVortex);
@@ -594,14 +549,6 @@ void M2ulPhyS::uniformInitialConditions()
   double *dataUp = Up->GetData();
   double *dataGradUp = gradUp->GetData();
   
-  double *dataMean = NULL;
-  double *dataRMS  = NULL;
-  if( computeMean )
-  {
-    dataMean = meanUp->GetData();
-    dataRMS  = rms->GetData();
-  }
-  
   int dof = vfes->GetNDofs();
   double *inputRhoRhoVp = config.GetConstantInitialCondition();
   
@@ -626,12 +573,6 @@ void M2ulPhyS::uniformInitialConditions()
     dataUp[i +2*dof] = data[i+2*dof]/data[i];
     if(dim==3) dataUp[i +3*dof] = data[i+3*dof]/data[i];
     dataUp[i +(num_equation-1)*dof] = inputRhoRhoVp[4];
-    
-    if( computeMean )
-    {
-      for(int eq=0;eq<num_equation;eq++) dataMean[i+eq*dof] = 0.;
-      for(int n=0;n<numRMS;n++) dataRMS[i+dof*n] = 0.;
-    }
     
     for(int d=0;d<dim;d++)
     {
@@ -665,7 +606,11 @@ void M2ulPhyS::initGradUp()
 
 void M2ulPhyS::write_restart_files()
 {
-  string fileName = groupsMPI->getParallelName( "restart.sol" );
+  string serialName = "restart_";
+  serialName.append( config.GetOutputName() );
+  serialName.append( ".sol" );
+    
+  string fileName = groupsMPI->getParallelName( serialName );
   ofstream file( fileName, std::ofstream::trunc );
   file.precision(8);
   
@@ -683,41 +628,14 @@ void M2ulPhyS::write_restart_files()
   file.close();
 }
 
-void M2ulPhyS::write_meanANDrms_restart_files()
-{
-  string fileName = groupsMPI->getParallelName( "restart_mean.sol" );
-  string rmsName  = groupsMPI->getParallelName( "restart_rms.sol" );
-  ofstream file( fileName, std::ofstream::trunc );
-  ofstream rmsfile( rmsName, std::ofstream::trunc );
-  file.precision(8);
-  rmsfile.precision(8);
-  
-  double *data = meanUp->GetData();
-  double *dataRMS = rms->GetData();
-  
-  // write cycle and time
-  file<<samplesMean<<" "<<sampleInterval<<endl;
-  
-  
-  int dof = vfes->GetNDofs();
-  
-  for(int i=0;i<dof*num_equation;i++)
-  {
-    file << data[i] <<endl;
-  }
-  file.close();
-  
-  for(int i=0;i<dof*numRMS;i++)
-  {
-    rmsfile << dataRMS[i] <<endl;
-  }
-  rmsfile.close();
-}
-
 
 void M2ulPhyS::read_restart_files()
 {
-  string fileName = groupsMPI->getParallelName( "restart.sol" );
+  string serialName = "restart_";
+  serialName.append( config.GetOutputName() );
+  serialName.append( ".sol" );
+  
+  string fileName = groupsMPI->getParallelName( serialName );
   ifstream file( fileName );
   
   if( !file.is_open() )
@@ -783,74 +701,6 @@ void M2ulPhyS::read_restart_files()
 }
 
 
-void M2ulPhyS::read_meanANDrms_restart_files()
-{
-  string fileName = groupsMPI->getParallelName( "restart_mean.sol" ); 
-  ifstream file( fileName );
-  
-  if( !file.is_open() )
-  {
-    cout<< "Could not open file \""<<fileName<<"\""<<endl;
-    return;
-  }else
-  {
-    double *dataUp = meanUp->GetData();
-    
-    string line;
-    // read time and iters
-    {
-      getline(file,line);
-      istringstream ss(line);
-      string word;
-      ss >> word;
-      samplesMean = stoi( word );
-      
-      ss >> word;
-      sampleInterval = stof( word );
-    }
-  
-    int lines = 0;
-    while( getline(file,line) )
-    {
-      istringstream ss(line);
-      string word;
-      ss >> word;
-      
-      dataUp[lines] = stof( word );
-      lines++;
-    }
-    file.close();
-  }
-  
-  // read RMS
-  string rmsName  = groupsMPI->getParallelName( "restart_rms.sol" );
-  ifstream rmsfile( rmsName );
-  
-  if( !rmsfile.is_open() )
-  {
-    cout<< "Could not open file \""<<rmsName<<"\""<<endl;
-    return;
-  }else
-  {
-    double *dataRMS = rms->GetData();
-    
-    string line;
-  
-    int lines = 0;
-    while( getline(rmsfile,line) )
-    {
-      istringstream ss(line);
-      string word;
-      ss >> word;
-      
-      dataRMS[lines] = stof( word );
-      lines++;
-    }
-    rmsfile.close();
-  }
-}
-
-
 void M2ulPhyS::Check_NAN()
 {
   double *dataU = U->GetData();
@@ -880,61 +730,6 @@ void M2ulPhyS::Check_NAN()
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Abort(MPI_COMM_WORLD,1);
   }
-}
-
-void M2ulPhyS::addSampleMean()
-{
-  double *dataUp = Up->GetData();
-  double *dataMean = meanUp->GetData();
-  double *dataRMS = rms->GetData();
-  int dof = fes->GetNDofs();
-  
-  for(int n=0;n<dof;n++)
-  {
-    // mean
-    for(int eq=0;eq<num_equation;eq++)
-    {
-      double mVal = double(samplesMean)*dataMean[n+eq*dof];
-      dataMean[n+eq*dof] = (mVal+dataUp[n+eq*dof])/double(samplesMean+1);
-    }
-
-    // ----- RMS -----
-    // velocities
-    Vector meanVel(3), vel(3);
-    meanVel = 0.; vel = 0.;
-    for(int d=0;d<dim;d++)
-    {
-      meanVel[d] = dataMean[n+dof*(d+1)];
-      vel[d]     = dataUp[n+dof*(d+1)];
-    }
-    
-    // xx
-    double val = dataRMS[n];
-    dataRMS[n] = (val*double(samplesMean) + 
-                  (vel[0]-meanVel[0])*(vel[0]-meanVel[0]))/double(samplesMean+1);
-    // yy
-    val = dataRMS[n +dof];
-    dataRMS[n + dof] = (val*double(samplesMean) + 
-                       (vel[1]-meanVel[1])*(vel[1]-meanVel[1]))/double(samplesMean+1);
-    // zz
-    val = dataRMS[n +2*dof];
-    dataRMS[n +2*dof] = (val*double(samplesMean) + 
-                        (vel[2]-meanVel[2])*(vel[2]-meanVel[2]))/double(samplesMean+1);
-    // xy
-    val = dataRMS[n +3*dof];
-    dataRMS[n +3*dof] = (val*double(samplesMean) + 
-                        (vel[0]-meanVel[0])*(vel[1]-meanVel[1]))/double(samplesMean+1);
-    // xz
-    val = dataRMS[n +4*dof];
-    dataRMS[n +4*dof] = (val*double(samplesMean) + 
-                        (vel[0]-meanVel[0])*(vel[2]-meanVel[2]))/double(samplesMean+1);
-   // yz
-   val = dataRMS[n +5*dof];
-   dataRMS[n +5*dof] = (val*double(samplesMean) + 
-                        (vel[1]-meanVel[1])*(vel[2]-meanVel[2]))/double(samplesMean+1);
-  }
-  
-  samplesMean++;
 }
 
 

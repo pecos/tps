@@ -29,11 +29,11 @@ RunConfiguration::RunConfiguration()
   refLength = 1.;
   SBP = false;
   for(int ii=0;ii<5;ii++) initRhoRhoVp[ii] = 0.;
+  for(int ii=0;ii<3;ii++) gradPress[ii] = 0.;
 }
 
 RunConfiguration::~RunConfiguration()
 {
-  delete[] outputFile;
 }
 
 
@@ -71,8 +71,8 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       }else if( word.compare("OUTPUT_NAME")==0 )
       {
         ss >> word;
-        outputFile = new char[word.length() ];
-        for(int i=0;i<(int)word.length(); i++) outputFile[i] = word[i];
+        outputFile.clear();
+        outputFile = word;
         
       // max num. of iters
       }else if( word.compare("NMAX")==0 )
@@ -218,6 +218,17 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       {
         ss >> word;
         refLength = stof( word );
+        
+      }else if( word.compare("GRAD_PRESSURE")==0 )
+      {
+        ss >> word;
+        gradPress[0] = stof( word );
+        
+        ss >> word;
+        gradPress[1] = stof( word );
+        
+        ss >> word;
+        gradPress[2] = stof( word );
         
       }else if( word.compare("INLET")==0 )
       {
