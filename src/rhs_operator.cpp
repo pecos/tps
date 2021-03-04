@@ -5,6 +5,7 @@
 // Implementation of class RHSoperator
 RHSoperator::RHSoperator( const int _dim,
                           const int &_num_equations,
+                          const int &_order,
                           const Equations &_eqSystem,
                           double &_max_char_speed,
                           IntegrationRules *_intRules,
@@ -21,7 +22,8 @@ RHSoperator::RHSoperator( const int _dim,
                           ParNonlinearForm *_gradUp_A,
                           BCintegrator *_bcIntegrator,
                           bool &_isSBP,
-                          double &_alpha
+                          double &_alpha,
+                          RunConfiguration &_config
                         ):
 TimeDependentOperator(_A->Height()),
 dim(_dim ),
@@ -47,6 +49,16 @@ bcIntegrator(_bcIntegrator)
   state = new Vector(num_equation);
   
   Me_inv = new DenseMatrix[vfes->GetNE()];
+  
+  forcing = new ConstantPressureGradient( dim,
+                                          num_equation,
+                                          _order,
+                                          intRuleType,
+                                          intRules,
+                                          vfes,
+                                          Up,
+                                          gradUp,
+                                          _config);
    
   for (int i = 0; i < vfes->GetNE(); i++)
   {
@@ -193,6 +205,10 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
     Vector zk(z.GetData() + k * vfes->GetNDofs(), vfes->GetNDofs());
     Aflux->AddMult(fk, zk);
   }
+  
+  // add forcing terms
+  forcing->updateTerms();
+  forcing->addForcingIntegrals(z);
 
   // 3. Multiply element-wise by the inverse mass matrices.
   for (int i = 0; i < vfes->GetNE(); i++)

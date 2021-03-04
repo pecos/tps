@@ -6,6 +6,8 @@
 #include "fluxes.hpp"
 #include "equation_of_state.hpp"
 #include "BCintegrator.hpp"
+#include "forcing_terms.hpp"
+#include "run_configuration.hpp"
 
 using namespace mfem;
 
@@ -53,6 +55,8 @@ private:
   ParNonlinearForm *gradUp_A;
   
   BCintegrator *bcIntegrator;
+  
+  ForcingTerms *forcing;
 
   void GetFlux(const DenseMatrix &state, DenseTensor &flux) const;
   
@@ -62,6 +66,7 @@ private:
 public:
    RHSoperator(const int _dim,
                const int &_num_equations,
+               const int &_order,
                const Equations &_eqSystem,
                double &_max_char_speed,
                IntegrationRules *_intRules,
@@ -78,7 +83,8 @@ public:
                ParNonlinearForm *_gradUp_A,
                BCintegrator *_bcIntegrator,
                bool &_isSBP,
-               double &_alpha
+               double &_alpha,
+               RunConfiguration &_config
               );
 
    virtual void Mult(const Vector &x, Vector &y) const;

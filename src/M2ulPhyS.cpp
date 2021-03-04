@@ -151,6 +151,7 @@ void M2ulPhyS::initVariables()
                           dim,
                           config,
                           groupsMPI);
+  average->read_meanANDrms_restart_files();
   
   fluxClass = new Fluxes(eqState,
                          eqSystem,
@@ -229,6 +230,7 @@ void M2ulPhyS::initVariables()
   
   rhsOperator = new RHSoperator(dim,
                                 num_equation,
+                                order,
                                 eqSystem,
                                 max_char_speed,
                                 intRules,
@@ -245,7 +247,8 @@ void M2ulPhyS::initVariables()
                                 gradUp_A,
                                 bcIntegrator,
                                 isSBP, 
-                                alpha );
+                                alpha,
+                                config );
   
   CFL = config.GetCFLNumber();
   rhsOperator->SetTime(time);
@@ -378,7 +381,6 @@ void M2ulPhyS::projectInitialSolution()
   }else
   {
     read_restart_files();
-    average->read_meanANDrms_restart_files();
     
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
