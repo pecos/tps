@@ -366,7 +366,7 @@ void M2ulPhyS::projectInitialSolution()
   
   // particular case: Euler vortex
 //   {
-    //void (*initialConditionFunction)(const Vector&, Vector&);
+//     void (*initialConditionFunction)(const Vector&, Vector&);
 //     t_final = 5.*  2./17.46;
 //     initialConditionFunction = &(this->InitialConditionEulerVortex);
       //initialConditionFunction = &(this->testInitialCondition);
@@ -452,8 +452,10 @@ void M2ulPhyS::Iterate()
 void M2ulPhyS::InitialConditionEulerVortex(const Vector& x, Vector& y)
 {
   MFEM_ASSERT(x.Size() == 2, "");
+  int equations = 4;
+  if(x.Size()==3) equations = 5;
   
-  int problem = 2;
+  int problem = 1;
   EquationOfState *eqState = new EquationOfState(DRY_AIR);
   const double gamma = eqState->GetSpecificHeatRatio();
   const double Rg = eqState->GetGasConstant();
@@ -465,6 +467,9 @@ void M2ulPhyS::InitialConditionEulerVortex(const Vector& x, Vector& y)
       radius = 0.2;
       Minf = 0.5;
       beta = 1. / 5.;
+      
+      radius = 0.5;
+      Minf = 0.1;
    }
    else if (problem == 2)
    {
@@ -479,7 +484,14 @@ void M2ulPhyS::InitialConditionEulerVortex(const Vector& x, Vector& y)
                  "Options are: 1 - fast vortex, 2 - slow vortex");
    }
 
-   const double xc = 0.0, yc = 0.0;
+   int numVortices = 3;
+   Vector xc(numVortices),yc(numVortices);
+   yc = 0.;
+   for(int i=0;i<numVortices;i++)
+   {
+     xc[i] = 2.*M_PI/double(numVortices+1);
+     xc[i]+= double(i)*2.*M_PI/double(numVortices);
+   }
 
    const double Tt = 300.;
    const double Pt = 102200;
@@ -493,20 +505,28 @@ void M2ulPhyS::InitialConditionEulerVortex(const Vector& x, Vector& y)
    
 
    double r2rad = 0.0;
-   r2rad += (x(0) - xc) * (x(0) - xc);
-   r2rad += (x(1) - yc) * (x(1) - yc);
-   r2rad /= (radius * radius);
 
    const double shrinv1 = 1.0 / ( gamma - 1.);
 
-   const double velX = vel_inf * (1 - beta * (x(1) - yc) / radius * exp(
-                                     -0.5 * r2rad));
-   const double velY = vel_inf * beta * (x(0) - xc) / radius * exp(-0.5 * r2rad);
+   double velX = 0.;
+   double velY = 0.;
+   double temp = 0.;
+   for(int i=0;i<numVortices;i++)
+   {
+    r2rad  = (x(0)-xc[i])*(x(0)-xc[i]);
+    r2rad += (x(1)-yc[i])*(x(1)-yc[i]);
+    r2rad /= radius*radius;
+    velX -= beta*(x(1)-yc[i])/radius*exp( -0.5*r2rad);
+    velY += beta*(x(0)-xc[i])/radius*exp( -0.5*r2rad);
+    temp += exp(-r2rad);
+  }
+   
+   velX = vel_inf*(1 - velX);
+   velY = vel_inf*velY;
    const double vel2 = velX * velX + velY * velY;
 
    const double specific_heat = Rg * gamma * shrinv1;
-   const double temp = temp_inf - 0.5 * (vel_inf * beta) *
-                       (vel_inf * beta) / specific_heat * exp(-r2rad);
+   temp = temp_inf -0.5*(vel_inf*beta)*(vel_inf*beta)/specific_heat*temp;
 
    const double den = den_inf * pow(temp/temp_inf, shrinv1);
    const double pres = den * Rg * temp;
@@ -515,7 +535,8 @@ void M2ulPhyS::InitialConditionEulerVortex(const Vector& x, Vector& y)
    y(0) = den;
    y(1) = den * velX;
    y(2) = den * velY;
-   y(3) = den * energy;
+   if(x.Size()==3) y(3) = 0.;
+   y(equations-1) = den * energy;
    
    delete eqState;
 }
