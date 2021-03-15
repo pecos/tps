@@ -9,7 +9,8 @@ using namespace mfem;
 
 enum WallType {
   INV,        // Inviscid wall
-  VISC_ADIAB  // Viscous adiabatic wall
+  VISC_ADIAB, // Viscous adiabatic wall
+  VISC_ISOTH  // Viscous isothermal wall
 };
 
 class WallBC : public BoundaryCondition
@@ -20,6 +21,8 @@ private:
   
   Fluxes *fluxClass;
   
+  double wallTemp;
+  
   void computeINVwallFlux(Vector &normal,
                           Vector &stateIn,
                           Vector &bdrFlux);
@@ -28,6 +31,10 @@ private:
                                 Vector &stateIn, 
                                 DenseMatrix &gradState,
                                 Vector &bdrFlux);
+  void computeIsothermalWallFlux( Vector &normal,
+                                  Vector &stateIn, 
+                                  DenseMatrix &gradState,
+                                  Vector &bdrFlux);
   
 public:
   WallBC( RiemannSolver *rsolver_, 
@@ -39,7 +46,8 @@ public:
           const int _dim,
           const int _num_equation,
           int _patchNumber,
-          WallType _bcType );
+          WallType _bcType,
+          const Array<double> _inputData );
   ~WallBC();
   
   void computeBdrFlux(Vector &normal,

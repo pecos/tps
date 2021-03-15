@@ -104,13 +104,6 @@ void RiemannSolver::Eval_Roe(const Vector &state1, const Vector &state2,
   Vector unitN(dim);
   for(int d=0;d<dim;d++) unitN[d] = nor[d]/normag;
   
-  Vector tang(dim);
-  if(dim==2)
-  {
-    tang[0] = -unitN[1];
-    tang[1] = unitN[0];
-  }
-  
   DenseMatrix fluxes1(num_equation,dim), fluxes2(num_equation,dim);
   fluxClass->ComputeConvectiveFluxes(state1,fluxes1);
   fluxClass->ComputeConvectiveFluxes(state2,fluxes2);
