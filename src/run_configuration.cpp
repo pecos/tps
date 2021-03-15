@@ -304,8 +304,19 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
           case 1:
             patchType.second = VISC_ADIAB;
             break;
+          case 2:
+            patchType.second = VISC_ISOTH;
+            break;
         }
         wallPatchType.Append( patchType );
+        if( patchType.second==VISC_ISOTH )
+        {
+          ss >> word;
+          wallBC.Append( stof(word) );
+        }else
+        {
+          wallBC.Append( 0. );
+        }
       }
       
     }
@@ -326,6 +337,14 @@ Array<double> RunConfiguration::GetOutletData(int out)
 {
   Array<double> data(1);
   data[0] = outletBC[out];
+  
+  return data;
+}
+
+Array<double> RunConfiguration::GetWallData(int w)
+{
+  Array<double> data(1);
+  data[0] = wallBC[w];
   
   return data;
 }

@@ -9,7 +9,8 @@ WallBC::WallBC(RiemannSolver* _rsolver,
                const int _dim, 
                const int _num_equation, 
                int _patchNumber, 
-               WallType _bcType):
+               WallType _bcType,
+               const Array<double> _inputData ):
 BoundaryCondition(_rsolver, 
                   _eqState,
                   _vfes,
@@ -22,6 +23,10 @@ BoundaryCondition(_rsolver,
 wallType(_bcType),
 fluxClass(_fluxClass)
 {
+  if( wallType==VISC_ISOTH )
+  {
+    wallTemp = _inputData[0];
+  }
 }
 
 WallBC::~WallBC()
@@ -40,6 +45,9 @@ void WallBC::computeBdrFlux(Vector &normal,
       break;
     case VISC_ADIAB:
       computeAdiabaticWallFlux(normal,stateIn,gradState,bdrFlux);
+      break;
+    case VISC_ISOTH:
+      computeIsothermalWallFlux(normal,stateIn,gradState,bdrFlux);
       break;
   }
 }
@@ -119,4 +127,23 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal,
   {
     for(int d=0;d<dim;d++) bdrFlux[eq] -= 0.5*(viscFw(eq,d)+viscF(eq,d))*normal[d];
   }
+}
+
+
+void WallBC::computeIsothermalWallFlux( Vector &normal,
+                                        Vector &stateIn, 
+                                        DenseMatrix &gradState,
+                                        Vector &bdrFlux)
+{
+  const double gamma = eqState->GetSpecificHeatRatio();
+  
+  Vector wallState(num_equation);
+  wallState[0] = stateIn[0];
+  for(int d=0;d<dim;d++) wallState[1+d] = 0.;
+  
+  wallState[num_equation-1] = eqState->GetGasConstant()/(gamma-1.); //Cv
+  wallState[num_equation-1] *= stateIn[0]*wallTemp;
+  
+  // Normal convective flux
+  rsolver->Eval(stateIn,wallState,normal,bdrFlux, true);
 }

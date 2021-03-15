@@ -103,6 +103,7 @@ private:
   Array<pair<int,OutletType> > outletPatchType;
   
   // Wall BC data
+  Array<double> wallBC;
   Array<pair<int,WallType> > wallPatchType;
   
 public:
@@ -149,6 +150,7 @@ public:
   Array<double> GetOutletData(int out);
   
   Array<pair<int,WallType> >* GetWallPatchType(){return &wallPatchType;}
+  Array<double> GetWallData(int w);
 };
 
 #endif // RUN_CONFIGURATION

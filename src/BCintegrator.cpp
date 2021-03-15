@@ -102,6 +102,9 @@ gradUp(_gradUp)
     
     if( patchInMesh )
     {
+      Array<double> wallData;
+      if(patchType.second==VISC_ISOTH) wallData = config.GetWallData(w);
+      
       BCmap[patchType.first] = new WallBC(rsolver, 
                                           eqState,
                                           fluxClass,
@@ -111,7 +114,8 @@ gradUp(_gradUp)
                                           dim,
                                           num_equation,
                                           patchType.first,
-                                          patchType.second);
+                                          patchType.second,
+                                          wallData );
     }
   }
 }
