@@ -19,6 +19,8 @@ private:
   EquationOfState *eqState;
   Fluxes *fluxClass;
   
+  bool useRoe;
+  
   void Eval_LF(const Vector &state1, const Vector &state2,
                const Vector &nor, Vector &flux); 
   void Eval_Roe(const Vector &state1, const Vector &state2,
@@ -27,7 +29,8 @@ private:
 public:
    RiemannSolver(int &_num_equation,
                  EquationOfState *_eqState,
-                 Fluxes *_fluxClass );
+                 Fluxes *_fluxClass,
+                 bool _useRoe );
    
    void Eval(const Vector &state1, const Vector &state2,
                const Vector &nor, Vector &flux, bool LF=false);

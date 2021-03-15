@@ -6,10 +6,12 @@ using namespace mfem;
 // Implementation of class RiemannSolver
 RiemannSolver::RiemannSolver(int &_num_equation,
                              EquationOfState *_eqState,
-                             Fluxes *_fluxClass ):
+                             Fluxes *_fluxClass,
+                             bool _useRoe ):
 num_equation(_num_equation),
 eqState(_eqState),
-fluxClass(_fluxClass)
+fluxClass(_fluxClass),
+useRoe(_useRoe)
 {
   flux1.SetSize(num_equation);
   flux2.SetSize(num_equation);
@@ -49,12 +51,12 @@ void RiemannSolver::Eval(const Vector& state1,
                          Vector& flux, 
                          bool LF)
 {
-  if( LF )
-  {
-    Eval_LF(state1, state2, nor,flux);
-  }else
+  if( useRoe && !LF )
   {
     Eval_Roe(state1, state2, nor,flux);
+  }else
+  {
+    Eval_LF(state1, state2, nor,flux);
   }
 }
 

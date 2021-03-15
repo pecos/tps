@@ -162,18 +162,27 @@ void M2ulPhyS::initVariables()
   isSBP = config.isSBP();
   
   // Create Riemann Solver
-  rsolver = new RiemannSolver(num_equation, eqState, fluxClass);
+  rsolver = new RiemannSolver(num_equation, 
+                              eqState, 
+                              fluxClass,
+                              config.RoeRiemannSolver() );
   
   A = new ParNonlinearForm(vfes);
-  faceIntegrator = new FaceIntegrator(intRules, 
+  {
+    bool useLinearIntegration = false;
+    if( basisType==1 && intRuleType==1 ) useLinearIntegration = true;
+    
+    faceIntegrator = new FaceIntegrator(intRules, 
                                       rsolver,
                                       fluxClass, 
                                       vfes,
+                                      useLinearIntegration,
                                       dim, 
                                       num_equation, 
                                       gradUp,
                                       gradUpfes,
                                       max_char_speed);
+  }
   A->AddInteriorFaceIntegrator( faceIntegrator );
   if( isSBP )
   {

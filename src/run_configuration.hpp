@@ -58,6 +58,9 @@ private:
   // output interval in num. of iters.
   int itersOut;
   
+  // Use Roe-type Riemann solver
+  bool useRoe;
+  
   // cycle for restart
   int restart_cycle;
   
@@ -121,6 +124,7 @@ public:
   bool isTimeStepConstant(){return constantTimeStep;}
   int GetNumIters(){return numIters;}
   int GetNumItersOutput(){return itersOut;}
+  bool RoeRiemannSolver(){return useRoe; }
   
   int GetMeanStartIter(){return startIter;}
   int GetMeanSampleInterval(){return sampleInterval;}

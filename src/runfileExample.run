@@ -47,6 +47,10 @@ NMAX 10500
 # output interval in num. of iters.
 ITERS_OUT 100
 
+# Use Roe-type Riemann solver
+# 0 -> Lax-Friedrich; 1 -> Roe 
+USE_ROE 1
+
 # Use Summation by parts operators
 # 0 -> no, 1 -> yes
 IS_SBP 1

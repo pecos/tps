@@ -16,6 +16,7 @@ RunConfiguration::RunConfiguration()
   cflNum = 0.12;
   constantTimeStep = false;
   numIters = 10;
+  useRoe = false;
   restart_cycle = 0;
   
   sampleInterval = 0;
@@ -106,6 +107,12 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       {
         ss >> word;
         itersOut = stoi(word);
+        
+      // Riemann solver
+      }else if( word.compare("USE_ROE")==0 )
+      {
+        ss >> word;
+        if( stoi(word)==1 ) useRoe = true;
         
       // solution order
       }else if( word.compare("POL_ORDER")==0 )

@@ -28,18 +28,28 @@ private:
    DenseMatrix *faceMassMatrix1, *faceMassMatrix2;
    int faceNum;
    bool faceMassMatrixComputed;
+   bool useLinear;
    
    void getElementsGrads(FaceElementTransformations &Tr,
                          const FiniteElement &el1, 
                          const FiniteElement &el2, 
                          DenseMatrix &gradUp1, 
                          DenseMatrix &gradUp2);
+   void NonLinearFaceIntegration( const FiniteElement &el1,
+                                  const FiniteElement &el2,
+                                  FaceElementTransformations &Tr,
+                                  const Vector &elfun, Vector &elvect);
+   void MassMatrixFaceIntegral( const FiniteElement &el1,
+                                const FiniteElement &el2,
+                                FaceElementTransformations &Tr,
+                                const Vector &elfun, Vector &elvect);
 
 public:
    FaceIntegrator(IntegrationRules *_intRules,
                   RiemannSolver *rsolver_, 
                   Fluxes *_fluxClass,
                   ParFiniteElementSpace *_vfes,
+                  bool _useLinear,
                   const int _dim,
                   const int _num_equation,
                   ParGridFunction *_gradUp,
