@@ -25,6 +25,10 @@ private:
    
    IntegrationRules *intRules;
    
+   DenseMatrix *faceMassMatrix1, *faceMassMatrix2;
+   int faceNum;
+   bool faceMassMatrixComputed;
+   
    void getElementsGrads(FaceElementTransformations &Tr,
                          const FiniteElement &el1, 
                          const FiniteElement &el2, 
@@ -41,6 +45,7 @@ public:
                   ParGridFunction *_gradUp,
                   ParFiniteElementSpace *_gradUpfes,
                   double &_max_char_speed );
+   ~FaceIntegrator();
 
    virtual void AssembleFaceVector(const FiniteElement &el1,
                                    const FiniteElement &el2,

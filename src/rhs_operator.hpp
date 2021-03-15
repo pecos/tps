@@ -56,6 +56,7 @@ private:
   
   BCintegrator *bcIntegrator;
   
+  bool isForcing;
   ForcingTerms *forcing;
 
   void GetFlux(const DenseMatrix &state, DenseTensor &flux) const;

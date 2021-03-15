@@ -3,6 +3,7 @@
 
 #include "mfem.hpp"
 #include "equation_of_state.hpp"
+#include "fluxes.hpp"
 
 using namespace mfem;
 
@@ -16,13 +17,20 @@ private:
   Vector flux2;
 
   EquationOfState *eqState;
+  Fluxes *fluxClass;
+  
+  void Eval_LF(const Vector &state1, const Vector &state2,
+               const Vector &nor, Vector &flux); 
+  void Eval_Roe(const Vector &state1, const Vector &state2,
+               const Vector &nor, Vector &flux); 
 
 public:
    RiemannSolver(int &_num_equation,
-                 EquationOfState *_eqState);
+                 EquationOfState *_eqState,
+                 Fluxes *_fluxClass );
    
    void Eval(const Vector &state1, const Vector &state2,
-               const Vector &nor, Vector &flux);
+               const Vector &nor, Vector &flux, bool LF=false);
    
    void ComputeFluxDotN(const Vector &state, 
                         const Vector &nor,

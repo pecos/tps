@@ -50,15 +50,20 @@ bcIntegrator(_bcIntegrator)
   
   Me_inv = new DenseMatrix[vfes->GetNE()];
   
-  forcing = new ConstantPressureGradient( dim,
-                                          num_equation,
-                                          _order,
-                                          intRuleType,
-                                          intRules,
-                                          vfes,
-                                          Up,
-                                          gradUp,
-                                          _config);
+  isForcing = _config.thereIsForcing();
+  forcing = NULL;
+  if( isForcing )
+  {
+    forcing = new ConstantPressureGradient( dim,
+                                            num_equation,
+                                            _order,
+                                            intRuleType,
+                                            intRules,
+                                            vfes,
+                                            Up,
+                                            gradUp,
+                                            _config);
+  }
    
   for (int i = 0; i < vfes->GetNE(); i++)
   {
@@ -169,6 +174,7 @@ RHSoperator::~RHSoperator()
 {
   delete state;
   delete[] Me_inv;
+  if( isForcing ) delete forcing;
 }
 
 
@@ -207,8 +213,11 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
   }
   
   // add forcing terms
-  forcing->updateTerms();
-  forcing->addForcingIntegrals(z);
+  if( isForcing )
+  {
+    forcing->updateTerms();
+    forcing->addForcingIntegrals(z);
+  }
 
   // 3. Multiply element-wise by the inverse mass matrices.
   for (int i = 0; i < vfes->GetNE(); i++)

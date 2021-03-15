@@ -162,7 +162,7 @@ void M2ulPhyS::initVariables()
   isSBP = config.isSBP();
   
   // Create Riemann Solver
-  rsolver = new RiemannSolver(num_equation, eqState);
+  rsolver = new RiemannSolver(num_equation, eqState, fluxClass);
   
   A = new ParNonlinearForm(vfes);
   faceIntegrator = new FaceIntegrator(intRules, 

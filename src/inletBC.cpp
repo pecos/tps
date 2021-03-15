@@ -372,7 +372,7 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal,
   boundaryU.SetRow(bdrN,newU);
   bdrN++;
   
-  rsolver->Eval(stateIn,state2,normal,bdrFlux);
+  rsolver->Eval(stateIn,state2,normal,bdrFlux,true);
 }
 
 void InletBC::subsonicReflectingDensityVelocity(Vector &normal,
@@ -391,5 +391,5 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal,
                                   state2[2]*state2[2] )/state2[0];
   
   
-  rsolver->Eval(stateIn,state2,normal,bdrFlux);
+  rsolver->Eval(stateIn,state2,normal,bdrFlux,true);
 }
