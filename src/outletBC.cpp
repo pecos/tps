@@ -37,7 +37,6 @@ inputState(_inputData)
   
   Array<double> coords;
   
-  
   // init boundary U
   bdrN = 0;
   for(int bel=0;bel<vfes->GetNBE(); bel++)
@@ -368,7 +367,7 @@ void OutletBC::subsonicNonReflectingPressure( Vector &normal,
   boundaryU.SetRow(bdrN,newU);
   bdrN++;
   
-  rsolver->Eval(stateIn,state2,normal,bdrFlux);
+  rsolver->Eval(stateIn,state2,normal,bdrFlux,true);
 }
 
 
@@ -383,5 +382,5 @@ void OutletBC::subsonicReflectingPressure(Vector &normal,
   for(int d=0;d<dim;d++) k += stateIn[1+d]*stateIn[1+d];
   state2[num_equation-1] = inputState[0]/(gamma-1.) + 0.5*k/stateIn[0];
   
-  rsolver->Eval(stateIn,state2,normal,bdrFlux);
+  rsolver->Eval(stateIn,state2,normal,bdrFlux,true);
 }

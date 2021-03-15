@@ -86,7 +86,7 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal,
   wallState[num_equation-1] = p/(gamma-1.);
   
   // Normal convective flux
-  rsolver->Eval(stateIn,wallState,normal,bdrFlux);
+  rsolver->Eval(stateIn,wallState,normal,bdrFlux, true);
   
   // incoming visc flux
   DenseMatrix viscF(num_equation,dim);

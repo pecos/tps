@@ -86,6 +86,7 @@ private:
   // initial constant field
   double initRhoRhoVp[5];
   
+  bool isForcing;
   // Imposed pressure gradient
   double gradPress[3];
   
@@ -131,6 +132,8 @@ public:
   Equations GetEquationSystem(){return eqSystem;}
   bool isSBP(){return SBP;}
   double* GetConstantInitialCondition(){return &initRhoRhoVp[0];}
+  
+  bool thereIsForcing(){return isForcing;}
   double* GetImposedPressureGradient(){return &gradPress[0];}
   
   int GetRestartCycle(){return restart_cycle;}

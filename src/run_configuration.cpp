@@ -29,6 +29,8 @@ RunConfiguration::RunConfiguration()
   refLength = 1.;
   SBP = false;
   for(int ii=0;ii<5;ii++) initRhoRhoVp[ii] = 0.;
+  
+  isForcing = false;
   for(int ii=0;ii<3;ii++) gradPress[ii] = 0.;
 }
 
@@ -229,6 +231,7 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
         
         ss >> word;
         gradPress[2] = stof( word );
+        isForcing = true;
         
       }else if( word.compare("INLET")==0 )
       {
