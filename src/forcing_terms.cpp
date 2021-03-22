@@ -109,9 +109,9 @@ void ConstantPressureGradient::updateTerms()
         for(int d=0;d<dim;d++)
         {
           vel[d] = dataUp[i+(d+1)*dof];
-          data[i +(d+1)*dof] += pressGrad[d]*shape[j];
-          grad_pV += vel[d]*pressGrad[d];
-          grad_pV += p*dataGradUp[i+(d+1)*dof + d*dof*num_equation];
+          data[i +(d+1)*dof] -= pressGrad[d]*shape[j];
+          grad_pV -= vel[d]*pressGrad[d];
+          grad_pV -= p*dataGradUp[i+(d+1)*dof + d*dof*num_equation];
         }
         
         data[i +(num_equation-1)*dof] += grad_pV*shape[j];
