@@ -284,6 +284,9 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
           case 1:
             patchANDtype.second = SUB_P_NR;
             break;
+          case 2:
+            patchANDtype.second = SUB_MF_NR;
+            break;
         }
         outletPatchType.Append( patchANDtype );
         
