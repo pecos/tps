@@ -297,12 +297,10 @@ void FaceIntegrator::MassMatrixFaceIntegral(const FiniteElement &el1,
         for (int j=0;j<dof1;j++)
         {
           for(int ii=0;ii<dof1;ii++) faceMassMatrix1[faceNum](ii,j) += shape1[ii]*shape1[j]*ip.weight;
-//           for(int ii=0;ii<dof1;ii++) faceMass1(ii,j) += shape1[ii]*shape1[j]*ip.weight;
         }
         for (int j=0;j<dof2;j++)
         {
           for(int ii=0;ii<dof2;ii++) faceMassMatrix2[faceNum](ii,j) += shape2[ii]*shape2[j]*ip.weight;
-//           for(int ii=0;ii<dof2;ii++) faceMass2(ii,j) += shape2[ii]*shape2[j]*ip.weight;
         }
     }
    }
@@ -313,7 +311,25 @@ void FaceIntegrator::MassMatrixFaceIntegral(const FiniteElement &el1,
    
   // Riemann fluxes
   {
-    int intorder = el1.GetOrder() +1; // assuming both elements are same order
+    // make sure we have as many integration points as face points
+    DG_FECollection fec(el1.GetOrder(), dim-1, Tr.GetGeometryType());
+    int numDofFace = fec.DofForGeometry( Tr.GetGeometryType() );
+    bool getIntOrder = true;
+    int intorder = el1.GetOrder();
+    // intorder is calculated in a non-elegant way in order to keep going
+    // This should be calculated in a proper way; REVISIT THIS!
+    while( getIntOrder )
+    {
+      const IntegrationRule *ir = &intRules->Get(Tr.GetGeometryType(), intorder);
+      if( ir->GetNPoints()==numDofFace )
+      {
+        getIntOrder = false;
+      }else
+      {
+        intorder++;
+      }
+    }
+    
     const IntegrationRule *ir = &intRules->Get(Tr.GetGeometryType(), intorder);
     for (int i = 0; i < ir->GetNPoints(); i++)
     {
