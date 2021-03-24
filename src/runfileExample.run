@@ -103,6 +103,7 @@ INLET 5 0 1.2 30 0 0
 # types:
 # 0 -> Subsonic outlet Specified with P 
 # 1 -> Non-reflect. sub. outlet Specified with P 
+# 2 -> Non-reflecting mass flow outlet
 #OUTLET patchNum type press
 OUTLET 5 0 101300
 
