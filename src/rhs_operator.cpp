@@ -3,7 +3,8 @@
 #include "rhs_operator.hpp"
 
 // Implementation of class RHSoperator
-RHSoperator::RHSoperator( const int _dim,
+RHSoperator::RHSoperator( double &_time,
+                          const int _dim,
                           const int &_num_equations,
                           const int &_order,
                           const Equations &_eqSystem,
@@ -26,6 +27,7 @@ RHSoperator::RHSoperator( const int _dim,
                           RunConfiguration &_config
                         ):
 TimeDependentOperator(_A->Height()),
+time(_time),
 dim(_dim ),
 eqSystem(_eqSystem),
 max_char_speed(_max_char_speed),
@@ -50,11 +52,9 @@ bcIntegrator(_bcIntegrator)
   
   Me_inv = new DenseMatrix[vfes->GetNE()];
   
-  isForcing = _config.thereIsForcing();
-  forcing = NULL;
-  if( isForcing )
+  if( _config.thereIsForcing() )
   {
-    forcing = new ConstantPressureGradient( dim,
+    forcing.Append( new ConstantPressureGradient( dim,
                                             num_equation,
                                             _order,
                                             intRuleType,
@@ -62,8 +62,19 @@ bcIntegrator(_bcIntegrator)
                                             vfes,
                                             Up,
                                             gradUp,
-                                            _config);
+                                            _config) );
   }
+#ifdef _MASA_
+  forcing.Append(new MASA_forcings( dim,
+                                    num_equation,
+                                    _order,
+                                    intRuleType,
+                                    intRules,
+                                    vfes,
+                                    Up,
+                                    gradUp,
+                                    time) );
+#endif
    
   for (int i = 0; i < vfes->GetNE(); i++)
   {
@@ -174,7 +185,7 @@ RHSoperator::~RHSoperator()
 {
   delete state;
   delete[] Me_inv;
-  if( isForcing ) delete forcing;
+  for( int i=0; i<forcing.Size();i++) delete forcing[i];
 }
 
 
@@ -213,10 +224,10 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
   }
   
   // add forcing terms
-  if( isForcing )
+  for(int i=0; i<forcing.Size();i++)
   {
-    forcing->updateTerms();
-    forcing->addForcingIntegrals(z);
+    forcing[i]->updateTerms();
+    forcing[i]->addForcingIntegrals(z);
   }
 
   // 3. Multiply element-wise by the inverse mass matrices.

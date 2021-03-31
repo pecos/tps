@@ -6,7 +6,7 @@ PROGRAM = MulPhyS.p
 LIBS =  -lmfem \
 	-lHYPRE \
 	-lmetis \
-	-lrt
+	-lrt 
 
 # LIBRARY PATH
 LIB_PATHS = /home/marc/Public/mfem-4.2 \
@@ -34,20 +34,27 @@ OBJS = $(patsubst %.cpp,%.o,$(SOURCE_FILES))
 CXX = mpicxx
 
 ifeq ($(BUILD_MODE),debug)
-	CFLAGS += -Wall -g -O0 -std=c++11 -DDEBUG
+	CFLAGS += -Wall -g -O0 -std=c++11 
+	DEFINE += -DDEBUG
 else ifeq ($(BUILD_MODE),run)
 	CFLAGS += -Wall -O3 -std=c++11
 #else
 #	$(error Build mode $(BUILD_MODE) not supported by this Makefile)
 endif
 
+ifeq ($(MASA),true)
+	DEFINE += -D_MASA_
+	LIBS += -lmasa
+	LIB_PATHS += -L/home/marc/Public/MASA/src/.libs
+endif
+
 all: $(PROGRAM)
 
 $(OBJS): $(SOURCE_FILES)
-	$(CXX) $(CFLAGS) -c $(patsubst %.o,%.cpp,$@) -I$(INCLUDE_PATHS)
+	$(CXX) $(CFLAGS) $(DEFINE) -c $(patsubst %.o,%.cpp,$@) -I$(INCLUDE_PATHS)
 
 $(PROGRAM): $(OBJS)
-	$(CXX) $(CFLAGS) $(OBJS) -L$(LIB_PATHS) $(LIBS) -o $(PROGRAM)
+	$(CXX) $(CFLAGS) $(DEFINE) $(OBJS) -L$(LIB_PATHS) $(LIBS) -o $(PROGRAM)
 
 .PHONY : clean
 clean:

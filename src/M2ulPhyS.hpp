@@ -21,6 +21,10 @@
 #include "faceGradientIntegration.hpp"
 #include "averaging_and_rms.hpp"
 
+#ifdef _MASA_
+#include "masa.h"
+#endif
+
 using namespace mfem;
 using namespace std;
 

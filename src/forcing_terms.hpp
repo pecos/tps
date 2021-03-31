@@ -4,6 +4,10 @@
 #include "mfem.hpp"
 #include "run_configuration.hpp"
 
+#ifdef _MASA_
+#include "masa.h"
+#endif
+
 using namespace mfem;
 using namespace std;
 
@@ -35,7 +39,7 @@ public:
   ~ForcingTerms();
   
   virtual void updateTerms() = 0;
-  virtual void addForcingIntegrals(Vector &in) = 0;
+  virtual void addForcingIntegrals(Vector &in);
 };
 
 // Constant pressure gradient term 
@@ -59,7 +63,30 @@ public:
   // Terms do not need updating
   virtual void updateTerms();
   
-  virtual void addForcingIntegrals(Vector &in);
+  //virtual void addForcingIntegrals(Vector &in);
 };
+
+#ifdef _MASA_
+// Manufactured Solution using MASA
+class MASA_forcings: public ForcingTerms
+{
+private:
+  double &time;
+  
+public:
+  MASA_forcings(const int &_dim,
+                const int &_num_equation,
+                const int &_order,
+                const int &_intRuleType,
+                IntegrationRules *_intRules,
+                ParFiniteElementSpace *_vfes,
+                ParGridFunction *_Up,
+                ParGridFunction *_gradUp,
+                double &_time );
+
+  // Terms do not need updating
+  virtual void updateTerms();
+};
+#endif // _MASA_
 
 #endif // FORCING_TERMS

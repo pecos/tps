@@ -17,6 +17,8 @@ using namespace mfem;
 class RHSoperator : public TimeDependentOperator
 {
 private:
+  double &time;
+  
   const int dim;
   
   const Equations &eqSystem;
@@ -56,8 +58,7 @@ private:
   
   BCintegrator *bcIntegrator;
   
-  bool isForcing;
-  ForcingTerms *forcing;
+  Array<ForcingTerms*> forcing;
 
   void GetFlux(const DenseMatrix &state, DenseTensor &flux) const;
   
@@ -65,7 +66,8 @@ private:
   void calcGradientsPrimitives() const;
 
 public:
-   RHSoperator(const int _dim,
+   RHSoperator(double &_time,
+               const int _dim,
                const int &_num_equations,
                const int &_order,
                const Equations &_eqSystem,

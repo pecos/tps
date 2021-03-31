@@ -237,7 +237,8 @@ void M2ulPhyS::initVariables()
   gradUp_A->AddInteriorFaceIntegrator(
       new GradFaceIntegrator(intRules, dim, num_equation) );
   
-  rhsOperator = new RHSoperator(dim,
+  rhsOperator = new RHSoperator(time,
+                                dim,
                                 num_equation,
                                 order,
                                 eqSystem,
