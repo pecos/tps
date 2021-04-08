@@ -22,7 +22,7 @@
 #include "averaging_and_rms.hpp"
 
 #ifdef _MASA_
-#include "masa.h"
+#include "masa_handler.hpp"
 #endif
 
 using namespace mfem;
@@ -161,6 +161,9 @@ private:
   void initSolutionAndVisualizationVectors();
   void initialTimeStep();
   
+#ifdef _MASA_
+  static void MASA_initialCondition(const Vector &x, Vector &y);
+#endif
   static void InitialConditionEulerVortex(const Vector &x, Vector &y);
   static void testInitialCondition(const Vector &x, Vector &y);
   void uniformInitialConditions();

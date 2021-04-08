@@ -388,6 +388,14 @@ void M2ulPhyS::projectInitialSolution()
   if( config.GetRestartCycle()==0 )
   {
     uniformInitialConditions();
+#ifdef _MASA_
+    initMasaHandler("exact",dim);
+    void (*initialConditionFunction)(const Vector&, Vector&);
+    initialConditionFunction = &(this->MASA_initialCondition);
+    VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
+    //cout<<"x y z rho"<<endl;
+    U->ProjectCoefficient(u0);
+#endif
   }else
   {
     read_restart_files();
@@ -457,6 +465,29 @@ void M2ulPhyS::Iterate()
   }
 }
 
+#ifdef _MASA_
+void M2ulPhyS::MASA_initialCondition(const Vector& x, Vector& y)
+{
+  MFEM_ASSERT(x.Size() == 2, "");
+  int equations = 4;
+  if(x.Size()==3) equations = 5;
+  
+  EquationOfState eqState( DRY_AIR );
+  const double gamma = eqState.GetSpecificHeatRatio();
+  
+  y(0) =      MASA::masa_eval_exact_rho<double>(x[0],x[1],x[2]); // rho
+  //cout<<x[0]<<" "<<x[1]<<" "<<x[2]<<" "<<y[0]<<endl;
+  y(1) = y[0]*MASA::masa_eval_exact_u<double>(x[0],x[1],x[2]);
+  y(2) = y[0]*MASA::masa_eval_exact_v<double>(x[0],x[1],x[2]);
+  y(3) = y[0]*MASA::masa_eval_exact_w<double>(x[0],x[1],x[2]);
+  y(4) = MASA::masa_eval_exact_p<double>(x[0],x[1],x[2])/(gamma-1.);
+  double k = 0.;
+  for(int d=0;d<x.Size();d++) k += y[1+d]*y[1+d];
+  k *= 0.5/y[0];
+  
+  y[4] += k;
+}
+#endif
 
 // Initial conditions for debug/test case
 void M2ulPhyS::InitialConditionEulerVortex(const Vector& x, Vector& y)
