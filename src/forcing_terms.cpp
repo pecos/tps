@@ -150,54 +150,7 @@ ForcingTerms(_dim,
              _gradUp ),
 time(_time)
 {
-  // Initialize MASA
-  if( dim==2 )
-  {
-    MASA::masa_init<double>("forcing handler","navierstokes_2d_compressible");
-  }else if( dim==3 )
-  {
-//     MASA::masa_init<double>("forcing handler","navierstokes_3d_compressible");
-//     MASA::masa_init<double>("forcing handler","euler_3d");
-    MASA::masa_init<double>("forcing handler","navierstokes_3d_transient_sutherland");
-  }
-  
-  MASA::masa_set_param<double>("L",2);
-  MASA::masa_set_param<double>("mu",1e-4);
-  MASA::masa_set_param<double>("k",0);
-  MASA::masa_set_param<double>("Pr",0.71);
-  
-  MASA::masa_set_param<double>("rho_x",1.01);
-  MASA::masa_set_param<double>("rho_y",1.01);
-  MASA::masa_set_param<double>("rho_z",0);
-  MASA::masa_set_param<double>("u_x",1.01);
-  MASA::masa_set_param<double>("u_y",1.01);
-  MASA::masa_set_param<double>("u_z",0);
-  MASA::masa_set_param<double>("v_x",1.01);
-  MASA::masa_set_param<double>("v_y",1.01);
-  MASA::masa_set_param<double>("v_z",0);
-  MASA::masa_set_param<double>("w_x",1.01);
-  MASA::masa_set_param<double>("w_y",1.01);
-  MASA::masa_set_param<double>("w_z",0);
-  MASA::masa_set_param<double>("p_x",1.01);
-  MASA::masa_set_param<double>("p_y",1.01);
-  MASA::masa_set_param<double>("p_z",0);
-  
-  MASA::masa_set_param<double>("a_rhox",1.*M_PI/2);
-  MASA::masa_set_param<double>("a_rhoy",2.*M_PI/2);
-  MASA::masa_set_param<double>("a_rhoz",0.*M_PI/2);
-  MASA::masa_set_param<double>("a_ux",1.*M_PI/2);
-  MASA::masa_set_param<double>("a_uy",1.*M_PI/2);
-  MASA::masa_set_param<double>("a_uz",0.*M_PI/2);
-  MASA::masa_set_param<double>("a_vx",1.*M_PI/2);
-  MASA::masa_set_param<double>("a_vy",1.*M_PI/2);
-  MASA::masa_set_param<double>("a_vz",0.*M_PI/2);
-  MASA::masa_set_param<double>("a_wx",1.*M_PI/2);
-  MASA::masa_set_param<double>("a_wy",1.*M_PI/2);
-  MASA::masa_set_param<double>("a_wz",0.*M_PI/2);
-  MASA::masa_set_param<double>("a_px",1.*M_PI/2);
-  MASA::masa_set_param<double>("a_py",2.*M_PI/2);
-  MASA::masa_set_param<double>("a_pz",0.*M_PI/2);
-  MASA::masa_display_param<double>();
+  initMasaHandler("forcing",dim);
 }
 
 void MASA_forcings::updateTerms()
@@ -246,28 +199,27 @@ void MASA_forcings::updateTerms()
       Vector transip(x, 3);
       Tr->Transform(ip,transip);
       
-      for(int i=0;i<3;i++) transip[i] += 1.;
+//       for(int i=0;i<3;i++) transip[i] += 1.;
 //       cout<<x[0]<<" "<<x[1]<<" "<<x[2]<<endl;
 
       Array<double> ip_forcing(num_equation);
 
       // MASA forcing
-//       ip_forcing[0] = MASA::masa_eval_source_rho<double>  (x[0],x[1],x[2]); // rho
-//       ip_forcing[1] = MASA::masa_eval_source_rho_u<double>(x[0],x[1],x[2]); // rho*u
-//       ip_forcing[2] = MASA::masa_eval_source_rho_v<double>(x[0],x[1],x[2]); // rho*v
-//       ip_forcing[3] = MASA::masa_eval_source_rho_w<double>(x[0],x[1],x[2]); // rho*w
-//       ip_forcing[4] = MASA::masa_eval_source_rho_e<double>(x[0],x[1],x[2]); // rhp*e
-      ip_forcing[0] = MASA::masa_eval_source_rho<double>  (x[0],x[1],x[2],time); // rho
-      ip_forcing[1] = MASA::masa_eval_source_rho_u<double>(x[0],x[1],x[2],time); // rho*u
-      ip_forcing[2] = MASA::masa_eval_source_rho_v<double>(x[0],x[1],x[2],time); // rho*v
-      ip_forcing[3] = MASA::masa_eval_source_rho_w<double>(x[0],x[1],x[2],time); // rho*w
-      ip_forcing[4] = MASA::masa_eval_source_rho_e<double>(x[0],x[1],x[2],time); // rhp*e
+      ip_forcing[0] = MASA::masa_eval_source_rho<double>  (x[0],x[1],x[2]); // rho
+      ip_forcing[1] = MASA::masa_eval_source_rho_u<double>(x[0],x[1],x[2]); // rho*u
+      ip_forcing[2] = MASA::masa_eval_source_rho_v<double>(x[0],x[1],x[2]); // rho*v
+      ip_forcing[3] = MASA::masa_eval_source_rho_w<double>(x[0],x[1],x[2]); // rho*w
+      ip_forcing[4] = MASA::masa_eval_source_rho_e<double>(x[0],x[1],x[2]); // rhp*e
+//       ip_forcing[0] = MASA::masa_eval_source_rho<double>  (x[0],x[1],x[2],time); // rho
+//       ip_forcing[1] = MASA::masa_eval_source_rho_u<double>(x[0],x[1],x[2],time); // rho*u
+//       ip_forcing[2] = MASA::masa_eval_source_rho_v<double>(x[0],x[1],x[2],time); // rho*v
+//       ip_forcing[3] = MASA::masa_eval_source_rho_w<double>(x[0],x[1],x[2],time); // rho*w
+//       ip_forcing[4] = MASA::masa_eval_source_rho_e<double>(x[0],x[1],x[2],time); // rhp*e
 
       for (int j= 0;j<dof_elem;j++)
       {
         int i = nodes[j];
-        
-        for(int eq=0;eq<num_equation;eq++) data[i +eq*dof] += ip_forcing[eq]*shape[j];
+        for(int eq=0;eq<num_equation;eq++) data[i +eq*dof] -= ip_forcing[eq]*shape[j];
       }
       
     }

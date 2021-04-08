@@ -5,7 +5,7 @@
 #include "run_configuration.hpp"
 
 #ifdef _MASA_
-#include "masa.h"
+#include "masa_handler.hpp"
 #endif
 
 using namespace mfem;
