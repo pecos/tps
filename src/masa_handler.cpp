@@ -1,3 +1,4 @@
+#ifdef _MASA_
 #include "masa_handler.hpp"
 
 void initMasaHandler(std::string name, int dim)
@@ -57,3 +58,4 @@ void initMasaHandler(std::string name, int dim)
   MASA::masa_set_param<double>("a_pz",0.*M_PI/2);
   MASA::masa_display_param<double>();
 }
+#endif 
