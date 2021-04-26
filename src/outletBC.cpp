@@ -36,6 +36,7 @@ inputState(_inputData)
   meanUp[num_equation-1] = 101300;
   
   area = 0.;
+  parallelAreaComputed = false;
   
   Array<double> coords;
   
@@ -66,15 +67,6 @@ inputState(_inputData)
         Tr->Transform(ip,transip);
         for(int d=0;d<3;d++) coords.Append( transip[d] );
         bdrN++;
-        
-        // calc area
-        Vector nor(dim);
-        CalcOrtho(Tr->Jacobian(), nor);
-        double sum = 0.;
-        for(int d=0;d<dim;d++) sum += nor[d]*nor[d];
-        sum = sqrt(sum);
-        
-        area += sum/double(ir.GetNPoints());
       }
     }
   }
@@ -125,6 +117,8 @@ void OutletBC::computeBdrFlux(Vector &normal,
                               DenseMatrix &gradState,
                               Vector &bdrFlux)
 {
+  if( !parallelAreaComputed ) computeParallelArea();
+  
   switch(outletType)
   {
     case SUB_P:
@@ -138,6 +132,49 @@ void OutletBC::computeBdrFlux(Vector &normal,
       break;
   }
 }
+
+void OutletBC::computeParallelArea()
+{
+  // init boundary U
+  for(int bel=0;bel<vfes->GetNBE(); bel++)
+  {
+    int attr = vfes->GetBdrAttribute(bel);
+    if( attr==patchNumber )
+    {
+      FaceElementTransformations *Tr = vfes->GetMesh()->GetBdrFaceTransformations(bel);
+      Array<int> dofs;
+      
+      vfes->GetElementVDofs(Tr->Elem1No, dofs);
+      
+      int intorder = Tr->Elem1->OrderW() + 2*vfes->GetFE(Tr->Elem1No)->GetOrder();
+      if (vfes->GetFE(Tr->Elem1No)->Space() == FunctionSpace::Pk)
+      {
+        intorder++;
+      }
+      const IntegrationRule ir = intRules->Get(Tr->GetGeometryType(), intorder);
+      for(int i=0;i<ir.GetNPoints();i++)
+      {
+        IntegrationPoint ip = ir.IntPoint(i);
+        Tr->SetAllIntPoints(&ip);
+        
+        // calc area
+        Vector nor(dim);
+        CalcOrtho(Tr->Jacobian(), nor);
+        double sum = 0.;
+        for(int d=0;d<dim;d++) sum += nor[d]*nor[d];
+        sum = sqrt(sum);
+        
+        area += sum/double(ir.GetNPoints());
+      }
+    }
+  }
+  
+  double localArea = area;
+  MPI_Allreduce(&localArea, &area,1, MPI_DOUBLE, MPI_SUM, groupsMPI->getOutletComm());
+  
+  parallelAreaComputed = true;
+}
+
 
 void OutletBC::updateMean(IntegrationRules *intRules,
                           ParGridFunction *Up)
