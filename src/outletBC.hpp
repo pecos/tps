@@ -32,6 +32,7 @@ private:
   
   // area of the outlet
   double area;
+  bool parallelAreaComputed;
   
   // Unit trangent vector 1 & 2
   Vector tangent1;
@@ -53,6 +54,8 @@ private:
   
   virtual void updateMean(IntegrationRules *intRules,
                           ParGridFunction *Up);
+  
+  void computeParallelArea();
 
 public:
    OutletBC( MPI_Groups *_groupsMPI,
