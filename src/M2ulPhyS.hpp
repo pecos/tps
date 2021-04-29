@@ -43,8 +43,13 @@ private:
   // Number of equations
   int num_equation;
   
-  // order of solution polynomials
+  // order of polynomials
   int order;
+  
+  // order of polynomials for auxiliary solution
+  int auxOrder;
+  bool loadFromAuxSol;
+  bool dumpAuxSol;
   
   // Equations solved
   Equations eqSystem;
@@ -77,6 +82,7 @@ private:
   //DG_FECollection *fec;
   //H1_FECollection *fec;
   FiniteElementCollection *fec;
+  FiniteElementCollection *aux_fec;
   
   // Finite element space for a scalar (thermodynamic quantity)
   ParFiniteElementSpace *fes;
@@ -86,6 +92,7 @@ private:
   
   // Finite element space for all variables together (total thermodynamic state)
   ParFiniteElementSpace *vfes;
+  ParFiniteElementSpace *aux_vfes;
   
   
   // The solution u has components {density, x-momentum, y-momentum, energy}.
@@ -121,6 +128,8 @@ private:
   
   // Primitive variables
   ParGridFunction *Up;
+  ParGridFunction *aux_Up;
+  double *aux_Up_data;
   
   // Visualization functions (these are pointers to Up)
   ParGridFunction *press, *dens, *vel;
@@ -160,6 +169,9 @@ private:
   void initVariables();
   void initSolutionAndVisualizationVectors();
   void initialTimeStep();
+  
+  void interpolateAux2Order();
+  void interpolateOrder2Aux();
   
 #ifdef _MASA_
   static void MASA_initialCondition(const Vector &x, Vector &y);

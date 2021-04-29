@@ -64,6 +64,13 @@ private:
   // cycle for restart
   int restart_cycle;
   
+  // Auxiliary order. A solution would be interpolated
+  // from order POL_ORDER to AUX_ORDER and dumped
+  int auxOrder;
+
+  // Restart from solution of AUX_ORDER
+  bool restartFromAux;
+  
   // mean and RMS
   int sampleInterval;
   int startIter;
@@ -118,6 +125,7 @@ public:
   int GetTimeIntegratorType(){return timeIntegratorType;}
   
   int GetSolutionOrder(){return solOrder;}
+  int GetAuxSolOrder(){return auxOrder;}
   int GetIntegrationRule(){return integrationRule;}
   int GetBasisType(){return basisType;}
   
@@ -142,6 +150,7 @@ public:
   double* GetImposedPressureGradient(){return &gradPress[0];}
   
   int GetRestartCycle(){return restart_cycle;}
+  bool RestartFromAux(){return restartFromAux;}
   
   Array<pair<int,InletType> >* GetInletPatchType(){return &inletPatchType;}
   Array<double> GetInletData(int i);

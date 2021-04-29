@@ -25,6 +25,17 @@ mpi(_mpi)
 
 void M2ulPhyS::initVariables()
 {
+  loadFromAuxSol = config.RestartFromAux();
+  auxOrder = config.RestartFromAux();
+  if( loadFromAuxSol && auxOrder<1 )
+  {
+    cout<<"Option AUX_ORDER must be set when using RESTART_FROM_AUX"<<endl;
+    MPI_Abort(MPI_COMM_WORLD,1);
+  }
+  
+  dumpAuxSol = false;
+  if( auxOrder>0 ) dumpAuxSol =true;
+  
   // check if a simulations is being restarted
   Mesh *tempmesh;
   if( config.GetRestartCycle()>0 )
@@ -125,17 +136,24 @@ void M2ulPhyS::initVariables()
   {
     fec  = new DG_FECollection(order, dim, BasisType::GaussLegendre);
     //fec  = new H1_FECollection(order, dim, BasisType::GaussLegendre);
+    if( loadFromAuxSol || dumpAuxSol ) 
+      aux_fec = new DG_FECollection(1, dim, BasisType::GaussLegendre);
+    
   }else if ( basisType == 1 )
   {
     // This basis type includes end-nodes
     fec  = new DG_FECollection(order, dim, BasisType::GaussLobatto);
     //fec  = new H1_FECollection(order, dim, BasisType::GaussLobatto);
+    if( loadFromAuxSol || dumpAuxSol ) 
+      aux_fec = new DG_FECollection(1, dim, BasisType::GaussLobatto);
   }
   
   // FE Spaces
   fes  = new ParFiniteElementSpace(mesh, fec);
   dfes = new ParFiniteElementSpace(mesh, fec, dim, Ordering::byNODES);
   vfes = new ParFiniteElementSpace(mesh, fec, num_equation, Ordering::byNODES);
+  if( loadFromAuxSol || dumpAuxSol ) aux_vfes = new ParFiniteElementSpace(mesh, 
+                                                aux_fec, num_equation, Ordering::byNODES);
   gradUpfes = new ParFiniteElementSpace(mesh, fec, num_equation*dim, Ordering::byNODES);
   
   initSolutionAndVisualizationVectors();
@@ -288,7 +306,13 @@ void M2ulPhyS::initVariables()
 
 M2ulPhyS::~M2ulPhyS()
 {
-  delete paraviewColl;
+  if( loadFromAuxSol || dumpAuxSol )
+  {
+    delete aux_Up;
+    delete aux_Up_data;
+    delete aux_vfes;
+    delete aux_fec;
+  }
   
   delete gradUp;
   
@@ -320,6 +344,9 @@ M2ulPhyS::~M2ulPhyS()
   delete fes;
   delete fec;
   delete intRules;
+  
+  delete paraviewColl;
+  //delete mesh;
   
   delete groupsMPI;
 }
@@ -354,6 +381,12 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
   U  = new ParGridFunction(vfes, u_block->GetData());
   Up = new ParGridFunction(vfes, up_block->GetData());
   
+  if( loadFromAuxSol || dumpAuxSol )
+  {
+    aux_Up_data = new double[num_equation*aux_vfes->GetNDofs()];
+    aux_Up = new ParGridFunction(aux_vfes, aux_Up_data);
+  }
+  
   dens = new ParGridFunction(fes, Up->GetData());
   vel = new ParGridFunction(dfes, Up->GetData()+fes->GetNDofs() );
   press = new ParGridFunction(fes,
@@ -385,7 +418,7 @@ void M2ulPhyS::projectInitialSolution()
 //     U->ProjectCoefficient(u0);
 //   }
 
-  if( config.GetRestartCycle()==0 )
+  if( config.GetRestartCycle()==0 && !loadFromAuxSol )
   {
     uniformInitialConditions();
 #ifdef _MASA_
@@ -668,9 +701,132 @@ void M2ulPhyS::initGradUp()
 }
 
 
+void M2ulPhyS::interpolateOrder2Aux()
+{
+  double *data_Up = Up->GetData();
+  double *data_aux = aux_Up->GetData();
+
+  // fill out coords
+  for(int el=0;el<vfes->GetNE();el++) // lin_vfes and vfes should have the same num of elems
+  {
+    // get aux. points
+    const IntegrationRule aux_ir = aux_vfes->GetFE(el)->GetNodes();
+    ElementTransformation *aux_Tr = aux_vfes->GetElementTransformation(el);
+    
+    DenseMatrix aux_pos;
+    aux_Tr->Transform(aux_ir,aux_pos);
+    
+    Array<int> aux_dofs;
+    aux_vfes->GetElementVDofs(el, aux_dofs);
+    
+    Array<int> p_dofs;
+    vfes->GetElementVDofs(el, p_dofs);
+    
+    // Order p element transformation
+    ElementTransformation *p_Tr = vfes->GetElementTransformation(el);
+    const FiniteElement *p_fe = vfes->GetFE(el);
+    
+    for(int aux_n=0;aux_n<aux_ir.GetNPoints();aux_n++)
+    {
+      IntegrationPoint transformed_IP;
+      Vector coords;
+      coords.SetSize(dim);
+      for(int d=0;d<dim;d++) coords[d] = aux_pos(aux_n,d);
+      
+      p_Tr->TransformBack(coords, transformed_IP);
+      
+      p_Tr->SetIntPoint( &transformed_IP);
+      
+      Vector shape;
+      shape.SetSize( p_fe->GetDof() );
+      
+      p_fe->CalcShape(transformed_IP, shape);
+      
+      // interpolate values
+      int aux_index = aux_dofs[aux_n];
+      const int aux_Ndofs = aux_vfes->GetNDofs();
+      const int p_Ndofs = vfes->GetNDofs();
+      for(int eq=0;eq<num_equation;eq++)
+      {
+        data_aux[aux_index + eq*aux_Ndofs] = 0.;
+        for(int i=0;i<shape.Size();i++)
+        {
+          int indexHO = p_dofs[i];
+          data_aux[aux_index + eq*aux_Ndofs] += 
+              shape[i]*data_Up[indexHO+eq*p_Ndofs];
+        }
+      }
+    }
+  }
+}
+
+void M2ulPhyS::interpolateAux2Order()
+{
+  double *data_Up = Up->GetData();
+  double *data_aux = aux_Up->GetData();
+
+  // fill out coords
+  for(int el=0;el<vfes->GetNE();el++) // aux_vfes and vfes should have the same num of elems
+  {
+    // get order p points
+    const IntegrationRule ir = vfes->GetFE(el)->GetNodes();
+    ElementTransformation *Tr = vfes->GetElementTransformation(el);
+    
+    DenseMatrix pos;
+    Tr->Transform(ir,pos);
+    
+    Array<int> aux_dofs;
+    aux_vfes->GetElementVDofs(el, aux_dofs);
+    
+    Array<int> p_dofs;
+    vfes->GetElementVDofs(el, p_dofs);
+    
+    // linear element transformation
+    ElementTransformation *aux_Tr = aux_vfes->GetElementTransformation(el);
+    const FiniteElement *aux_fe = aux_vfes->GetFE(el);
+    
+    // loop over HO nodes
+    for(int n=0;n<ir.GetNPoints();n++)
+    {
+      IntegrationPoint transformed_IP;
+      Vector coords;
+      coords.SetSize(dim);
+      for(int d=0;d<dim;d++) coords[d] = pos(n,d);
+      
+      aux_Tr->TransformBack(coords, transformed_IP);
+      
+      aux_Tr->SetIntPoint( &transformed_IP);
+      
+      Vector shape;
+      shape.SetSize( aux_fe->GetDof() );
+      
+      aux_fe->CalcShape(transformed_IP, shape);
+      
+      // interpolate values
+      const int p_index = p_dofs[n];
+      const int aux_Ndofs = aux_vfes->GetNDofs();
+      const int p_Ndofs = vfes->GetNDofs();
+      for(int eq=0;eq<num_equation;eq++)
+      {
+        data_Up[p_index + eq*p_Ndofs] = 0.;
+        for(int i=0;i<shape.Size();i++)
+        {
+          int aux_index = aux_dofs[i];
+          data_Up[p_index + eq*p_Ndofs] += 
+              shape[i]*data_aux[aux_index+eq*aux_Ndofs];
+        }
+      }
+    }
+  }
+}
+
+
+
 void M2ulPhyS::write_restart_files()
 {
-  string serialName = "restart_";
+  string serialName = "restart_p";
+  serialName.append( to_string(order) );
+  serialName.append("_");
   serialName.append( config.GetOutputName() );
   serialName.append( ".sol" );
     
@@ -690,12 +846,47 @@ void M2ulPhyS::write_restart_files()
   }
   
   file.close();
+  
+  if( dumpAuxSol )
+  {
+    interpolateOrder2Aux();
+    serialName = "restart_p";
+    serialName.append( to_string(auxOrder) );
+    serialName.append("_");
+    serialName.append( config.GetOutputName() );
+    serialName.append( ".sol" );
+      
+    fileName = groupsMPI->getParallelName( serialName );
+    file.open( fileName, std::ofstream::trunc );
+    file.precision(8);
+    
+    // write cycle and time
+    file<<iter<<" "<<time<<" "<<dt<<endl;
+    
+    double *data = aux_Up->GetData();
+    int dof = aux_vfes->GetNDofs();
+    
+    for(int i=0;i<dof*num_equation;i++)
+    {
+      file << data[i] <<endl;
+    }
+    
+    file.close();
+  }
 }
 
 
 void M2ulPhyS::read_restart_files()
 {
-  string serialName = "restart_";
+  string serialName = "restart_p";
+  if( loadFromAuxSol )
+  {
+    serialName.append( to_string(auxOrder) );
+  }else
+  {
+    serialName.append( to_string(order) );
+  }
+  serialName.append("_");
   serialName.append( config.GetOutputName() );
   serialName.append( ".sol" );
   
@@ -708,7 +899,14 @@ void M2ulPhyS::read_restart_files()
     return;
   }else
   {
-    double *dataUp = Up->GetData();
+    double *data;
+    if( loadFromAuxSol )
+    {
+      data = aux_Up->GetData();
+    }else
+    {
+      data = Up->GetData();
+    }
     
     string line;
     // read time and iters
@@ -733,20 +931,26 @@ void M2ulPhyS::read_restart_files()
       string word;
       ss >> word;
       
-      dataUp[lines] = stof( word );
+      data[lines] = stof( word );
       lines++;
     }
     file.close();
+    
+    if( loadFromAuxSol ) interpolateAux2Order();
+    
+    double *dataUp = Up->GetData();
     
     // fill out U
     double *dataU = U->GetData();
     double gamma = eqState->GetSpecificHeatRatio();
     int dof = vfes->GetNDofs();
+    if( loadFromAuxSol ) dof = aux_vfes->GetNDofs();
     if( lines!=dof*num_equation )
     {
       cout<<"# of lines in files does not match domain size"<<endl;
     }else
     {
+      dof = vfes->GetNDofs();
       for(int i=0;i<dof;i++)
       {
         double p = dataUp[i + (num_equation-1)*dof];
@@ -776,7 +980,7 @@ void M2ulPhyS::Check_NAN()
   {
     for(int eq=0;eq<num_equation;eq++)
     {
-      if( isnan(dataU[i+eq*dof]) )
+      if( std::isnan(dataU[i+eq*dof]) )
       {
         //thereIsNan = true;
         //cout<<"NaN at node: "<<i<<" partition: "<<mpi.WorldRank()<<endl;

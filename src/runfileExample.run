@@ -1,7 +1,7 @@
 # Example Runfile
 
 # Mesh file
-MESH square_periodic_mesh.mesh
+MESH square_periodic_mesh.msh
 
 # output file name
 # extensions will be added by program
@@ -24,6 +24,14 @@ CONTINUE_MEAN_CALC
 # Polynomial order
 POL_ORDER 3
 
+# Auxiliary order. A solution would be interpolated
+# from order POL_ORDER to AUX_ORDER and dumped
+AUX_ORDER 1
+
+# Restart from solution of AUX_ORDER
+# If set, AUX_ORDER must be set too
+RESTART_FROM_AUX
+
 # Integration rule (quadrature)
 # 0 -> Gauss-Legendre
 # 1 -> Gauss-Lobatto
@@ -37,8 +45,8 @@ BASIS_TYPE 1
 # CFL number
 CFL 0.12
 
-# Sets a constant time-step.
-# Variable time-step if commented out
+# When specified the simulation will run with the 
+# initially computed time-step
 DT_CONSTANT
 
 # Max num of iters

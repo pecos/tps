@@ -9,6 +9,7 @@ RunConfiguration::RunConfiguration()
   // Initialize with default values
   timeIntegratorType = 4;
   solOrder = 4;
+  auxOrder = 0;
   
   integrationRule = 1;
   basisType = 1;
@@ -18,6 +19,7 @@ RunConfiguration::RunConfiguration()
   numIters = 10;
   useRoe = false;
   restart_cycle = 0;
+  restartFromAux = false;
   
   sampleInterval = 0;
   startIter = 0;
@@ -70,6 +72,13 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
         meshFile.clear();
         meshFile = word;
         
+//       // linear mesh file
+//       }else if( word.compare("LIN_MESH")==0 )
+//       {
+//         ss >> word;
+//         lin_meshFile.clear();
+//         lin_meshFile = word;
+        
       // output file name
       }else if( word.compare("OUTPUT_NAME")==0 )
       {
@@ -88,6 +97,17 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       {
         ss >> word;
         restart_cycle = stoi(word);
+        
+      // restart from aux. sol
+      }else if( word.compare("RESTART_FROM_AUX")==0 )
+      {
+        restartFromAux = true;
+        
+        // order of auxiliary solution
+      }else if( word.compare("AUX_ORDER")==0 )
+      {
+        ss >> word;
+        auxOrder = stoi( word );
         
       // mean and RMS calculation
       }else if( word.compare("CALC_MEAN_RMS")==0 )
