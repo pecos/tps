@@ -29,6 +29,8 @@ useLinear(_useLinear)
     faceMassMatrixComputed = false;
     faceNum = 0;
   }
+
+  totDofs = vfes->GetNDofs();
 }
 
 FaceIntegrator::~FaceIntegrator()
@@ -48,9 +50,7 @@ void FaceIntegrator::getElementsGrads_cpu(FaceElementTransformations &Tr,
                                           DenseTensor &gradUp2)
 {
   double *dataGradUp = gradUp->GetData();
-  
-  const int totDofs = vfes->GetNDofs();
-  Array<int> vdofs1;
+
   vfes->GetElementVDofs(Tr.Elem1->ElementNo, vdofs1);
   int eldDof = el1.GetDof();
   for(int n=0; n<eldDof; n++)
@@ -64,15 +64,15 @@ void FaceIntegrator::getElementsGrads_cpu(FaceElementTransformations &Tr,
   }
   
   eldDof = el2.GetDof();
-  Array<int> vdofs2;
   int no2 = Tr.Elem2->ElementNo;
   int NE  = vfes->GetNE();
   if( no2>=NE )
   {
     int Elem2NbrNo = no2 - NE;
     gradUpfes->GetFaceNbrElementVDofs(Elem2NbrNo, vdofs2);
-    
+
     Array<double> arrayGrad2(vdofs2.Size());
+
     gradUp->FaceNbrData().GetSubVector(vdofs2, arrayGrad2.GetData() );
     for(int n=0; n<eldDof; n++)
     {
@@ -86,7 +86,7 @@ void FaceIntegrator::getElementsGrads_cpu(FaceElementTransformations &Tr,
   }else
   {
     vfes->GetElementVDofs(no2, vdofs2);
-    
+
     for(int n=0; n<eldDof; n++)
     {
       int index = vdofs2[n];
@@ -179,14 +179,14 @@ void FaceIntegrator::AssembleFaceVector(const FiniteElement &el1,
                                         const Vector &elfun, Vector &elvect)
 {
   if( useLinear )
-  {
-    MassMatrixFaceIntegral(el1, el2, Tr, elfun, elvect);
-  }else
-  {
-    NonLinearFaceIntegration(el1, el2, Tr, elfun, elvect);
-  }
+    {
+      MassMatrixFaceIntegral(el1, el2, Tr, elfun, elvect);
+    }
+  else
+    {
+      NonLinearFaceIntegration(el1, el2, Tr, elfun, elvect);
+    }
 }
-
 
 void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1,
                                               const FiniteElement &el2,
@@ -194,13 +194,11 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1,
                                               const Vector &elfun, Vector &elvect)
 {
    // Compute the term <F.n(u),[w]> on the interior faces.
-  
-   Vector shape1;
-   Vector shape2;
-   Vector funval1(num_equation);
-   Vector funval2(num_equation);
-   Vector nor(dim);
-   Vector fluxN(num_equation);
+
+   funval1.SetSize(num_equation);
+   funval2.SetSize(num_equation);   
+   nor.SetSize(dim);
+   fluxN.SetSize(num_equation);
   
    const int dof1 = el1.GetDof();
    const int dof2 = el2.GetDof();
@@ -211,15 +209,14 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1,
    elvect.SetSize((dof1 + dof2) * num_equation);
    elvect = 0.0;
 
-   DenseMatrix elfun1_mat(elfun.GetData(), dof1, num_equation);
-   DenseMatrix elfun2_mat(elfun.GetData() + dof1 * num_equation, dof2,
-                          num_equation);
+   elfun1_mat.UseExternalData(elfun.GetData(),dof1,num_equation);
+   elfun2_mat.UseExternalData(elfun.GetData() + dof1*num_equation,dof2,num_equation);
 
-   DenseMatrix elvect1_mat(elvect.GetData(), dof1, num_equation);
-   DenseMatrix elvect2_mat(elvect.GetData() + dof1 * num_equation, dof2,
-                           num_equation);
+   elvect1_mat.UseExternalData(elvect.GetData(),dof1,num_equation);
+   elvect2_mat.UseExternalData(elvect.GetData() + dof1*num_equation,dof2,num_equation);
    
    // Get gradients of elements
+<<<<<<< HEAD
    DenseTensor gradUp1(dof1,num_equation,dim);
    DenseTensor gradUp2(dof2,num_equation,dim);
 #ifdef _GPU_
@@ -237,6 +234,13 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1,
 #else
    getElementsGrads_cpu(Tr, el1, el2, gradUp1, gradUp2);
 #endif
+=======
+
+   gradUp1.SetSize(dof1,num_equation*dim);
+   gradUp2.SetSize(dof2,num_equation*dim);
+
+   getElementsGrads(Tr, el1, el2, gradUp1, gradUp2);
+>>>>>>> 1c5f093... performance mods: updates for FaceIntegrator class
 
    // Integration order calculation from DGTraceIntegrator
    int intorder;
@@ -253,6 +257,9 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1,
    }
    //IntegrationRules IntRules2(0, Quadrature1D::GaussLobatto);
    const IntegrationRule *ir = &intRules->Get(Tr.GetGeometryType(), intorder);
+
+   //#define COLMAJOR2
+   #define COLMAJOR3
    
    for (int i = 0; i < ir->GetNPoints(); i++)
    {
@@ -269,43 +276,78 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1,
       elfun2_mat.MultTranspose(shape2, funval2);
       
       // Interpolate gradients at int. point
-      DenseMatrix gradUp1i(num_equation,dim);
-      DenseMatrix gradUp2i(num_equation,dim);
+
+      gradUp1i.SetSize(num_equation,dim);
+      gradUp2i.SetSize(num_equation,dim);
+      
       gradUp1i = 0.; gradUp2i = 0.;
+
+#ifdef COLMAJOR3
+      for(int d=0;d<dim;d++)
+	{
+	  for(int eq=0;eq<num_equation;eq++)
+	    {
+	      for(int k=0;k<dof1;k++)
+		gradUp1i(eq,d) += gradUp1(k,eq+d*num_equation)*shape1(k);
+	      for(int k=0;k<dof2;k++)
+		gradUp2i(eq,d) += gradUp2(k,eq+d*num_equation)*shape2(k);
+	    }
+	}
+#else
       for(int eq=0;eq<num_equation;eq++)
       {
         for(int d=0;d<dim;d++)
         {
+<<<<<<< HEAD
           for(int k=0;k<dof1;k++) gradUp1i(eq,d) += 
                                   gradUp1(k,eq,d)*shape1(k);
           for(int k=0;k<dof2;k++) gradUp2i(eq,d) += 
                                   gradUp2(k,eq,d)*shape2(k);
+=======
+          for(int k=0;k<dof1;k++)
+	    gradUp1i(eq,d) += gradUp1(k,eq+d*num_equation)*shape1(k);
+          for(int k=0;k<dof2;k++)
+	    gradUp2i(eq,d) += gradUp2(k,eq+d*num_equation)*shape2(k);
+>>>>>>> 1c5f093... performance mods: updates for FaceIntegrator class
         }
       }
+#endif
 
       // Get the normal vector and the convective flux on the face
       CalcOrtho(Tr.Jacobian(), nor);
       rsolver->Eval(funval1, funval2, nor, fluxN);
       
       // compute viscous fluxes
-      DenseMatrix viscF1(num_equation,dim);
-      DenseMatrix viscF2(num_equation,dim);
+
+      viscF1.Clear();
+      viscF2.Clear();
+
+      viscF1.SetSize(num_equation,dim);
+      viscF2.SetSize(num_equation,dim);
+      
       fluxClass->ComputeViscousFluxes(funval1,gradUp1i,viscF1);
       fluxClass->ComputeViscousFluxes(funval2,gradUp2i,viscF2);
       // compute mean flux
+#ifdef COLMAJOR2
+      for(int d=0;d<dim;d++) 
+	for(int eq=0;eq<num_equation;eq++)
+	  viscF1(eq,d) += viscF2(eq,d);
+#else
       for(int eq=0;eq<num_equation;eq++)
       {
         for(int d=0;d<dim;d++) viscF1(eq,d) += viscF2(eq,d);
       }
       viscF1 *= -0.5;
-      
+#endif
       // add to convective fluxes
+
+
       for(int eq=0;eq<num_equation;eq++)
-      {
-        for(int d=0;d<dim;d++) fluxN[eq] += viscF1(eq,d)*nor[d];
-      }
+	for(int d=0;d<dim;d++)
+	  fluxN[eq] += viscF1(eq,d)*nor[d];
 
       fluxN *= ip.weight;
+
       for (int k = 0; k < num_equation; k++)
       {
          for (int s = 0; s < dof1; s++)
@@ -319,6 +361,7 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1,
       }
    }
 }
+
 
 void FaceIntegrator::MassMatrixFaceIntegral(const FiniteElement &el1,
                                             const FiniteElement &el2,
@@ -485,4 +528,5 @@ void FaceIntegrator::MassMatrixFaceIntegral(const FiniteElement &el1,
     faceNum = 0;
     faceMassMatrixComputed = true;
   }
+
 }
