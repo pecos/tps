@@ -31,6 +31,28 @@ private:
    int faceNum;
    bool faceMassMatrixComputed;
    bool useLinear;
+
+  int totDofs;
+  Array<int> vdofs1;
+  Array<int> vdofs2;
+  Vector shape1;
+  Vector shape2;
+  Vector funval1;
+  Vector funval2;
+  Vector nor;
+  Vector fluxN;
+  //DenseMatrix gradUp1;
+  //DenseMatrix gradUp2;
+  DenseTensor gradUp1;
+  DenseTensor gradUp2;  
+  DenseMatrix gradUp1i;
+  DenseMatrix gradUp2i;
+  DenseMatrix viscF1;
+  DenseMatrix viscF2;
+  DenseMatrix elfun1_mat;
+  DenseMatrix elfun2_mat;
+  DenseMatrix elvect1_mat;
+  DenseMatrix elvect2_mat;
    
    void getElementsGrads_cpu( FaceElementTransformations &Tr,
                               const FiniteElement &el1, 
