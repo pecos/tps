@@ -443,6 +443,16 @@ void M2ulPhyS::projectInitialSolution()
 
 void M2ulPhyS::Iterate()
 {
+#ifdef _MASA_
+  // TODO: Evaluate the manufactured solution at the correct time
+  //
+  // This works for now since the manufactured solution (euler_3d)
+  // is steady, but in general, we need to evaluate the manufactured
+  // solution at the current time value.
+  void (*initialConditionFunction)(const Vector&, Vector&);
+  initialConditionFunction = &(this->MASA_initialCondition);
+#endif
+
   // Integrate in time.
   while( iter<MaxIters )
   {
@@ -462,7 +472,15 @@ void M2ulPhyS::Iterate()
     const int vis_steps = config.GetNumItersOutput();
     if( iter % vis_steps == 0 )
     {
+#ifdef _MASA_
+      VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
+      const double error = U->ComputeLpError(2, u0);
+      if(mpi.Root()) cout <<"time step: "<<iter<<", physical time "<<time<<"s"
+                          <<", Solution error: " << error << endl;
+#else
       if(mpi.Root()) cout <<"time step: "<<iter<<", physical time "<<time<<"s"<< endl;
+#endif
+
       
       write_restart_files();
       
@@ -471,6 +489,8 @@ void M2ulPhyS::Iterate()
       paraviewColl->Save();
       
       average->write_meanANDrms_restart_files();
+
+
     }
     
     average->addSampleMean(iter);
@@ -487,14 +507,17 @@ void M2ulPhyS::Iterate()
     paraviewColl->Save();
     
     average->write_meanANDrms_restart_files();
-      
+
+#ifndef _MASA_
+    // If _MASA_ is defined, this is handled above
     void (*initialConditionFunction)(const Vector&, Vector&);
     initialConditionFunction = &(this->InitialConditionEulerVortex);
+#endif
 
     VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
     const double error = U->ComputeLpError(2, u0);
     cout << "Solution error: " << error << endl;
-    
+
   }
 }
 
