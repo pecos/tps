@@ -9,7 +9,7 @@ void initMasaHandler(std::string name, int dim)
     MASA::masa_init<double>(name,"navierstokes_2d_compressible");
   }else if( dim==3 )
   {
-    std::cout << "Selecting euler_3d" << std::endl;
+    //std::cout << "Selecting euler_3d" << std::endl;
     MASA::masa_init<double>("forcing handler","euler_3d");
 //     MASA::masa_init<double>(name,"navierstokes_3d_compressible");
 //     MASA::masa_init<double>("forcing handler","navierstokes_3d_transient_sutherland");
@@ -58,12 +58,14 @@ void initMasaHandler(std::string name, int dim)
   MASA::masa_set_param<double>("a_px",2.);
   MASA::masa_set_param<double>("a_py",2.);
   MASA::masa_set_param<double>("a_pz",0.);
-  MASA::masa_display_param<double>();
 
   int ierr = MASA::masa_sanity_check<double>();
   if (ierr!=0) {
     std::cout << "*** WARNING: MASA sanity check returned error = "
               << ierr << " ***" << std::endl;
+
+    std::cout << "Current parameters are as follows" << std::endl;
+    MASA::masa_display_param<double>();
   }
 }
 #endif
