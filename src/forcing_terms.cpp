@@ -219,9 +219,9 @@ void MASA_forcings::updateTerms()
       for (int j= 0;j<dof_elem;j++)
       {
         int i = nodes[j];
-        for(int eq=0;eq<num_equation;eq++) data[i +eq*dof] -= ip_forcing[eq]*shape[j];
+        for(int eq=0;eq<num_equation;eq++) data[i +eq*dof] += ip_forcing[eq]*shape[j];
       }
-      
+
     }
   }
 }
