@@ -6,16 +6,17 @@ PROGRAM = MulPhyS.p
 LIBS =  -lmfem \
 	-lHYPRE \
 	-lmetis \
-	-lrt 
+	-lrt
 
 # LIBRARY PATH
-LIB_PATHS = /home/marc/Public/mfem-4.2 \
-	-L/home/marc/Public/hypre/src/hypre/lib \
-	-L/home/marc/Public/metis-5.1.0/lib
-# INCLUDES -I/home/marc/Public/hypre/include 
-INCLUDE_PATHS = /home/marc/Public/mfem-4.2 \
-	-I/home/marc/Public/hypre/src/hypre/include \
-	-I/home/marc/Public/metis-5.1.0/include
+LIB_PATHS = -L$(MFEM_LIB) \
+	    -L$(HYPRE_LIB) \
+	    -L$(METIS_LIB)
+
+# INCLUDES
+INCLUDE_PATHS = -I$(MFEM_INC) \
+	        -I$(HYPRE_INC) \
+	        -I$(METIS_INC)
 
 # SOURCE FILES
 SOURCE_FILES = $(wildcard *.cpp)
@@ -45,16 +46,17 @@ endif
 ifeq ($(MASA),true)
 	DEFINE += -D_MASA_
 	LIBS += -lmasa
-	LIB_PATHS += -L/home/marc/Public/MASA/src/.libs
+	INCLUDE_PATHS += -I$(MASA_INC)
+	LIB_PATHS += -L$(MASA_LIB)
 endif
 
 all: $(PROGRAM)
 
 $(OBJS): $(SOURCE_FILES)
-	$(CXX) $(CFLAGS) $(DEFINE) -c $(patsubst %.o,%.cpp,$@) -I$(INCLUDE_PATHS)
+	$(CXX) $(CFLAGS) $(DEFINE) -c $(patsubst %.o,%.cpp,$@) $(INCLUDE_PATHS)
 
 $(PROGRAM): $(OBJS)
-	$(CXX) $(CFLAGS) $(DEFINE) $(OBJS) -L$(LIB_PATHS) $(LIBS) -o $(PROGRAM)
+	$(CXX) $(CFLAGS) $(DEFINE) $(OBJS) $(LIB_PATHS) $(LIBS) -o $(PROGRAM)
 
 .PHONY : clean
 clean:
