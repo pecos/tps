@@ -17,22 +17,11 @@ void EquationOfState::setFluid(WorkingFluid _fluid)
       specific_heat_ratio = 1.4;
       visc_mult = 1.;
       Pr = 0.71;
+      cp_div_pr = specific_heat_ratio*gas_constant/(Pr*(specific_heat_ratio-1.));
       break;
     default:
       break;
   }
-}
-
-
-
-// Pressure (EOS) computation
-double EquationOfState::ComputePressure(const Vector& state, int dim)
-{
-   double den_vel2 = 0;
-   for (int d=0;d<dim;d++) den_vel2 += state(d+1)*state(d+1);
-   den_vel2 /= state[0];
-
-   return (specific_heat_ratio - 1.0)*(state[1+dim] - 0.5*den_vel2);
 }
 
 bool EquationOfState::StateIsPhysical(const mfem::Vector& state, const int dim)
@@ -98,6 +87,7 @@ double EquationOfState::ComputeMaxCharSpeed(const Vector &state, const int dim)
    return vel + sound;
 }
 
+#if 0
 double EquationOfState::GetViscosity(const double &temp)
 {
   // Sutherland's law
@@ -105,12 +95,14 @@ double EquationOfState::GetViscosity(const double &temp)
   return visc*visc_mult;
 }
 
+
 double EquationOfState::GetThermalConductivity(const double& visc)
 {
-  const double cp = specific_heat_ratio*gas_constant/(
-                    specific_heat_ratio-1.);
+  //static const double cp = specific_heat_ratio*gas_constant/(specific_heat_ratio-1.);
+  static const double cp_div_pr = specific_heat_ratio*gas_constant/(specific_heat_ratio-1.);
   return visc*cp/Pr;
 }
+#endif
 
 // GPU FUNCTIONS
 /*#ifdef _GPU_
