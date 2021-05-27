@@ -387,8 +387,9 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal,
   state2[1] = inputState[0]*inputState[1];
   state2[2] = inputState[0]*inputState[2];
   if(dim==3) state2[3] = inputState[0]*inputState[3];
-  state2[num_equation-1] = p/(gamma-1.) + 0.5*(state2[1]*state2[1] +
-                                  state2[2]*state2[2] )/state2[0];
+  double k = 0.;
+  for(int d=0;d<dim;d++) k += state2[1+d]*state2[1+d];
+  state2[num_equation-1] = p/(gamma-1.) + 0.5*k/state2[0];
   
   
   rsolver->Eval(stateIn,state2,normal,bdrFlux,true);
