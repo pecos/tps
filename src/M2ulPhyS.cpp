@@ -441,10 +441,10 @@ void M2ulPhyS::projectInitialSolution()
     uniformInitialConditions();
 #ifdef _MASA_
     initMasaHandler("exact",dim,config.GetEquationSystem());
-    void (*initialConditionFunction)(const Vector&, Vector&);
-    initialConditionFunction = &(this->MASA_initialCondition);
+    void (*initialConditionFunction)(const Vector&, double, Vector&);
+    initialConditionFunction = &(this->MASA_exactSoln);
     VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
-    //cout<<"x y z rho"<<endl;
+    u0.SetTime(0.0);
     U->ProjectCoefficient(u0);
 #endif
   }else
@@ -462,13 +462,16 @@ void M2ulPhyS::projectInitialSolution()
 void M2ulPhyS::Iterate()
 {
 #ifdef _MASA_
-  // TODO: Evaluate the manufactured solution at the correct time
-  //
-  // This works for now since the manufactured solution (euler_3d)
-  // is steady, but in general, we need to evaluate the manufactured
-  // solution at the current time value.
-  void (*initialConditionFunction)(const Vector&, Vector&);
-  initialConditionFunction = &(this->MASA_initialCondition);
+  // instantiate function for exact solution
+  void (*exactSolnFunction)(const Vector&, double, Vector&);
+  exactSolnFunction = &(this->MASA_exactSoln);
+  VectorFunctionCoefficient Umms(num_equation, exactSolnFunction);
+
+  // and dump error before we take any steps
+  Umms.SetTime(time);
+  const double error = U->ComputeLpError(2, Umms);
+  if(mpi.Root()) cout <<"time step: "<<iter<<", physical time "<<time<<"s"
+                      <<", Solution error: " << error << endl;
 #endif
 
   // Integrate in time.
@@ -491,8 +494,8 @@ void M2ulPhyS::Iterate()
     if( iter % vis_steps == 0 )
     {
 #ifdef _MASA_
-      VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
-      const double error = U->ComputeLpError(2, u0);
+      Umms.SetTime(time);
+      const double error = U->ComputeLpError(2, Umms);
       if(mpi.Root()) cout <<"time step: "<<iter<<", physical time "<<time<<"s"
                           <<", Solution error: " << error << endl;
 #else
@@ -530,33 +533,28 @@ void M2ulPhyS::Iterate()
     // If _MASA_ is defined, this is handled above
     void (*initialConditionFunction)(const Vector&, Vector&);
     initialConditionFunction = &(this->InitialConditionEulerVortex);
-#endif
 
     VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
     const double error = U->ComputeLpError(2, u0);
-    cout << "Solution error: " << error << endl;
+    if(mpi.Root()) cout << "Solution error: " << error << endl;
+#endif
 
   }
 }
 
 #ifdef _MASA_
-void M2ulPhyS::MASA_initialCondition(const Vector& x, Vector& y)
+void M2ulPhyS::MASA_exactSoln(const Vector& x, double tin, Vector& y)
 {
   MFEM_ASSERT(x.Size() == 3, "");
 
   EquationOfState eqState( DRY_AIR );
   const double gamma = eqState.GetSpecificHeatRatio();
 
-  // y(0) =      MASA::masa_eval_exact_rho<double>(x[0],x[1],x[2]); // rho
-  // y(1) = y[0]*MASA::masa_eval_exact_u<double>(x[0],x[1],x[2]);
-  // y(2) = y[0]*MASA::masa_eval_exact_v<double>(x[0],x[1],x[2]);
-  // y(3) = y[0]*MASA::masa_eval_exact_w<double>(x[0],x[1],x[2]);
-  // y(4) = MASA::masa_eval_exact_p<double>(x[0],x[1],x[2])/(gamma-1.);
-  y(0) =      MASA::masa_eval_exact_rho<double>(x[0],x[1],x[2], 0.0); // rho
-  y(1) = y[0]*MASA::masa_eval_exact_u<double>(x[0],x[1],x[2], 0.0);
-  y(2) = y[0]*MASA::masa_eval_exact_v<double>(x[0],x[1],x[2], 0.0);
-  y(3) = y[0]*MASA::masa_eval_exact_w<double>(x[0],x[1],x[2], 0.0);
-  y(4) = MASA::masa_eval_exact_p<double>(x[0],x[1],x[2], 0.0)/(gamma-1.);
+  y(0) =      MASA::masa_eval_exact_rho<double>(x[0],x[1],x[2], tin); // rho
+  y(1) = y[0]*MASA::masa_eval_exact_u<double>(x[0],x[1],x[2], tin);
+  y(2) = y[0]*MASA::masa_eval_exact_v<double>(x[0],x[1],x[2], tin);
+  y(3) = y[0]*MASA::masa_eval_exact_w<double>(x[0],x[1],x[2], tin);
+  y(4) = MASA::masa_eval_exact_p<double>(x[0],x[1],x[2], tin)/(gamma-1.);
 
   double k = 0.;
   for(int d=0;d<x.Size();d++) k += y[1+d]*y[1+d];

@@ -174,7 +174,7 @@ private:
   void interpolateOrder2Aux();
   
 #ifdef _MASA_
-  static void MASA_initialCondition(const Vector &x, Vector &y);
+  static void MASA_exactSoln(const Vector& x, double tin, Vector& y);
 #endif
   static void InitialConditionEulerVortex(const Vector &x, Vector &y);
   static void testInitialCondition(const Vector &x, Vector &y);
