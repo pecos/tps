@@ -82,7 +82,8 @@ public:
                 ParFiniteElementSpace *_vfes,
                 ParGridFunction *_Up,
                 ParGridFunction *_gradUp,
-                double &_time );
+                double &_time,
+                RunConfiguration &_config );
 
   // Terms do not need updating
   virtual void updateTerms();

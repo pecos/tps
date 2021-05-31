@@ -73,7 +73,8 @@ bcIntegrator(_bcIntegrator)
                                     vfes,
                                     Up,
                                     gradUp,
-                                    time) );
+                                    time,
+                                    _config ) );
 #endif
    
   for (int i = 0; i < vfes->GetNE(); i++)

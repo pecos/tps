@@ -422,7 +422,7 @@ void M2ulPhyS::projectInitialSolution()
   {
     uniformInitialConditions();
 #ifdef _MASA_
-    initMasaHandler("exact",dim);
+    initMasaHandler("exact",dim,config.GetEquationSystem());
     void (*initialConditionFunction)(const Vector&, Vector&);
     initialConditionFunction = &(this->MASA_initialCondition);
     VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
@@ -529,11 +529,16 @@ void M2ulPhyS::MASA_initialCondition(const Vector& x, Vector& y)
   EquationOfState eqState( DRY_AIR );
   const double gamma = eqState.GetSpecificHeatRatio();
 
-  y(0) =      MASA::masa_eval_exact_rho<double>(x[0],x[1],x[2]); // rho
-  y(1) = y[0]*MASA::masa_eval_exact_u<double>(x[0],x[1],x[2]);
-  y(2) = y[0]*MASA::masa_eval_exact_v<double>(x[0],x[1],x[2]);
-  y(3) = y[0]*MASA::masa_eval_exact_w<double>(x[0],x[1],x[2]);
-  y(4) = MASA::masa_eval_exact_p<double>(x[0],x[1],x[2])/(gamma-1.);
+  // y(0) =      MASA::masa_eval_exact_rho<double>(x[0],x[1],x[2]); // rho
+  // y(1) = y[0]*MASA::masa_eval_exact_u<double>(x[0],x[1],x[2]);
+  // y(2) = y[0]*MASA::masa_eval_exact_v<double>(x[0],x[1],x[2]);
+  // y(3) = y[0]*MASA::masa_eval_exact_w<double>(x[0],x[1],x[2]);
+  // y(4) = MASA::masa_eval_exact_p<double>(x[0],x[1],x[2])/(gamma-1.);
+  y(0) =      MASA::masa_eval_exact_rho<double>(x[0],x[1],x[2], 0.0); // rho
+  y(1) = y[0]*MASA::masa_eval_exact_u<double>(x[0],x[1],x[2], 0.0);
+  y(2) = y[0]*MASA::masa_eval_exact_v<double>(x[0],x[1],x[2], 0.0);
+  y(3) = y[0]*MASA::masa_eval_exact_w<double>(x[0],x[1],x[2], 0.0);
+  y(4) = MASA::masa_eval_exact_p<double>(x[0],x[1],x[2], 0.0)/(gamma-1.);
 
   double k = 0.;
   for(int d=0;d<x.Size();d++) k += y[1+d]*y[1+d];
