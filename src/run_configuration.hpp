@@ -51,6 +51,7 @@ private:
   
   // variable/constant time-step
   bool constantTimeStep;
+  double dt_fixed;
   
   // num iterations. Defaults to 0
   int numIters;
@@ -131,6 +132,7 @@ public:
   
   double GetCFLNumber(){return cflNum;}
   bool isTimeStepConstant(){return constantTimeStep;}
+  double GetFixedDT(){return dt_fixed;}
   int GetNumIters(){return numIters;}
   int GetNumItersOutput(){return itersOut;}
   bool RoeRiemannSolver(){return useRoe; }

@@ -16,6 +16,7 @@ RunConfiguration::RunConfiguration()
   
   cflNum = 0.12;
   constantTimeStep = false;
+  dt_fixed = -1.0;
   numIters = 10;
   useRoe = false;
   restart_cycle = 0;
@@ -162,7 +163,14 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       }else if( word.compare("DT_CONSTANT")==0 )
       {
         constantTimeStep = true;
-        
+
+      // fixed time-step
+      }else if( word.compare("DT_FIXED")==0 )
+      {
+        constantTimeStep = true;
+        ss >> word;
+        dt_fixed = stof( word );
+
       // time integrator
       }else if( word.compare("TIME_INTEGRATOR")==0 )
       {

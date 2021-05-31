@@ -1045,4 +1045,11 @@ void M2ulPhyS::initialTimeStep()
                        1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
   
   dt = CFL * hmin / max_char_speed /(double)dim;
+
+  // dt_fixed is initialized to -1, so if it is positive, then the
+  // user requested a fixed dt run
+  const double dt_fixed = config.GetFixedDT();
+  if( dt_fixed > 0 ){
+    dt = dt_fixed;
+  }
 }
