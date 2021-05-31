@@ -43,6 +43,15 @@ void M2ulPhyS::initVariables()
     // read serial mesh and partition. Hopefully the same
     // partitions will be created in the same order
     tempmesh = new Mesh(config.GetMeshFileName().c_str() );
+
+    if (config.GetUniformRefLevels()>0) {
+      if (mpi.Root()) {
+        std::cerr << "ERROR: Uniform mesh refinement not supported upon restart."
+                  << std::endl;
+      }
+      MPI_Abort(MPI_COMM_WORLD,1);
+    }
+
     mesh = new ParMesh(MPI_COMM_WORLD,*tempmesh);
     tempmesh->Clear();
     
@@ -72,16 +81,25 @@ void M2ulPhyS::initVariables()
         cout<<"Error deleting previous data in "<<config.GetOutputName()<<endl;
       }
     }
-    
+
     tempmesh = new Mesh(config.GetMeshFileName().c_str() );
+
+    // uniform refinement, user-specified number of times
+    for (int l = 0; l < config.GetUniformRefLevels(); l++) {
+      if (mpi.Root() ) {
+        std::cout << "Uniform refinement number " << l << std::endl;
+      }
+      tempmesh->UniformRefinement();
+    }
+
     mesh = new ParMesh(MPI_COMM_WORLD,*tempmesh);
     tempmesh->Clear();
-    
+
     // VisIt setup
 //     visitColl = new VisItDataCollection(config.GetOutputName(), mesh);
 //     visitColl->SetPrefixPath(config.GetOutputName());
 //     visitColl->SetPrecision(8);
-    
+
     // Paraview setup
     paraviewColl = new ParaViewDataCollection(config.GetOutputName(), mesh);
     paraviewColl->SetLevelsOfDetail( config.GetSolutionOrder() );

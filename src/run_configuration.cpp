@@ -7,6 +7,7 @@
 RunConfiguration::RunConfiguration()
 {
   // Initialize with default values
+  ref_levels = 0;
   timeIntegratorType = 4;
   solOrder = 4;
   auxOrder = 0;
@@ -79,7 +80,13 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
 //         ss >> word;
 //         lin_meshFile.clear();
 //         lin_meshFile = word;
-        
+
+      // number of uniform refinements
+      } else if( word.compare("REF_LEVELS")==0 )
+      {
+        ss >> word;
+        ref_levels = stoi(word);
+
       // output file name
       }else if( word.compare("OUTPUT_NAME")==0 )
       {
