@@ -1,0 +1,30 @@
+# MASA p=1, ref 0 runfile
+
+# Mesh
+MESH periodic-cube.mesh
+REF_LEVELS 0
+
+# output dir
+OUTPUT_NAME p1r0-euler-output
+
+# Basis and quadrature
+POL_ORDER 1
+BASIS_TYPE 0
+INT_RULE 0
+
+# Time scheme, time step and number of steps
+TIME_INTEGRATOR 4
+DT_FIXED 3.90625e-05
+NMAX 256
+ITERS_OUT 1
+
+# Inviscid flux (Roe or Lax)
+USE_ROE 0
+
+# Euler eqns
+EQ_SYSTEM 0
+
+# Fluid parameters
+FLUID 0
+VISC_MULT 0
+
