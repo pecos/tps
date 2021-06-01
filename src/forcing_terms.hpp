@@ -14,6 +14,8 @@ using namespace std;
 class ForcingTerms
 {
 protected:
+  double time;
+  
   const int &dim;
   const int &num_equation;
   const int &order;
@@ -37,7 +39,8 @@ public:
                 ParGridFunction *_Up,
                 ParGridFunction *_gradUp );
   ~ForcingTerms();
-  
+
+  void setTime(double _time) { time = _time; }
   virtual void updateTerms() = 0;
   virtual void addForcingIntegrals(Vector &in);
 };
@@ -71,8 +74,7 @@ public:
 class MASA_forcings: public ForcingTerms
 {
 private:
-  double &time;
-  
+
 public:
   MASA_forcings(const int &_dim,
                 const int &_num_equation,
@@ -82,10 +84,8 @@ public:
                 ParFiniteElementSpace *_vfes,
                 ParGridFunction *_Up,
                 ParGridFunction *_gradUp,
-                double &_time,
                 RunConfiguration &_config );
 
-  // Terms do not need updating
   virtual void updateTerms();
 };
 #endif // _MASA_

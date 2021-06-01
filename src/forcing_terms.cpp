@@ -139,7 +139,6 @@ MASA_forcings::MASA_forcings( const int& _dim,
                               ParFiniteElementSpace* _vfes,
                               ParGridFunction *_Up,
                               ParGridFunction *_gradUp,
-                              double &_time,
                               RunConfiguration& _config):
 ForcingTerms(_dim,
              _num_equation,
@@ -148,8 +147,7 @@ ForcingTerms(_dim,
              _intRules,
              _vfes,
              _Up,
-             _gradUp ),
-time(_time)
+             _gradUp )
 {
   initMasaHandler("forcing",dim, _config.GetEquationSystem());
 }

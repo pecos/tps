@@ -73,7 +73,6 @@ bcIntegrator(_bcIntegrator)
                                     vfes,
                                     Up,
                                     gradUp,
-                                    time,
                                     _config ) );
 #endif
    
@@ -227,6 +226,10 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
   // add forcing terms
   for(int i=0; i<forcing.Size();i++)
   {
+    // NOTE: Do not use RHSoperator::time here b/c it is not correctly
+    // updated for each RK substep.  Instead, get time from parent
+    // class using TimeDependentOperator::GetTime().
+    forcing[i]->setTime(this->GetTime());
     forcing[i]->updateTerms();
     forcing[i]->addForcingIntegrals(z);
   }
