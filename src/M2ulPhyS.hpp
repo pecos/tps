@@ -28,6 +28,9 @@
 using namespace mfem;
 using namespace std;
 
+// application exit codes
+enum ExitCodes {NORMAL = 0, ERROR = 1, JOB_RESTART = 10 };
+
 class M2ulPhyS
 {
 private:
@@ -163,6 +166,9 @@ private:
   
   // minimum element size
   double hmin;
+
+  // exit status code;
+  int exit_status_;
   
   void getAttributesInPartition(Array<int> &local_attr);
   
@@ -185,7 +191,9 @@ private:
   void read_restart_files();
   
   void Check_NAN();
-  
+  bool Check_JobResubmit();
+  void Restart_Job();
+  void Cache_Paraview_Timesteps();
 
 public:
   M2ulPhyS(MPI_Session &_mpi,
@@ -198,7 +206,10 @@ public:
   
   // Accessors
   RHSoperator getRHSoperator(){ return *rhsOperator; }
-  
+
+  // Exit code access
+  void SetStatus(int code){exit_status_=code; return;}
+  int  GetStatus(){return exit_status_;}
   
 };
 
