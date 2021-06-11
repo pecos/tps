@@ -20,6 +20,7 @@ RunConfiguration::RunConfiguration()
   dt_fixed = -1.0;
   numIters = 10;
   useRoe = false;
+  restart = false;
   restart_cycle = 0;
   restartFromAux = false;
   
@@ -37,6 +38,11 @@ RunConfiguration::RunConfiguration()
   
   isForcing = false;
   for(int ii=0;ii<3;ii++) gradPress[ii] = 0.;
+
+  // Resource manager monitoring
+  rm_enableMonitor_  = false;
+  rm_threshold_      = 15*60; // 15 minutes
+  rm_checkFrequency_ = 25;    // 25 iterations
 }
 
 RunConfiguration::~RunConfiguration()
@@ -104,7 +110,8 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       }else if( word.compare("RESTART_CYCLE")==0 )
       {
         ss >> word;
-        restart_cycle = stoi(word);
+	restart = true;
+        //restart_cycle = stoi(word);   // use value straight from restart file instead (ks mod)
         
       // restart from aux. sol
       }else if( word.compare("RESTART_FROM_AUX")==0 )
@@ -183,7 +190,22 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       {
         ss >> word;
         timeIntegratorType = stoi(word);
-        
+
+      // resource manager controls
+      }else if( word.compare("ENABLE_AUTORESTART")==0 )
+      {
+        rm_enableMonitor_ = true;
+
+      }else if( word.compare("RM_THRESHOLD")==0 )
+      {
+        ss >> word;
+	rm_threshold_ = stoi( word );
+
+      }else if( word.compare("RM_CHECK_FREQUENCY")==0 )
+      {
+        ss >> word;
+	rm_checkFrequency_ = stoi( word );
+
       // working fluid
       }else if( word.compare("FLUID")==0 )
       {
