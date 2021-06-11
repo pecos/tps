@@ -192,7 +192,6 @@ private:
   
   void Check_NAN();
   bool Check_JobResubmit();
-  void Restart_Job();
   void Cache_Paraview_Timesteps();
 
 public:

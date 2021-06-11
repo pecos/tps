@@ -61,13 +61,6 @@ void M2ulPhyS::initVariables()
     paraviewColl->SetHighOrderOutput(true);
     paraviewColl->SetPrecision(8);
     
-    if( mpi.Root() )
-    {
-      cout<<"================================================"<<endl;
-      cout<<"| Restarting simulation at iteration "<<config.GetRestartCycle()<<endl;
-      cout<<"================================================"<<endl;
-    }
-    
   }else
   {
     //remove previous solution
@@ -450,7 +443,10 @@ void M2ulPhyS::projectInitialSolution()
   }else
   {
     read_restart_files();
-    
+
+    if( mpi.Root() )
+      Cache_Paraview_Timesteps();
+
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
   }
@@ -474,13 +470,15 @@ void M2ulPhyS::Iterate()
                       <<", Solution error: " << error << endl;
 #endif
 
+  bool readyForRestart = false;
+
   // Integrate in time.
   while( iter<MaxIters )
   {
     timeIntegrator->Step(*U, time, dt);
   
     Check_NAN();
-    
+
     if( !config.isTimeStepConstant() )
     {
       double dt_local = CFL * hmin / max_char_speed /(double)dim;
@@ -513,14 +511,25 @@ void M2ulPhyS::Iterate()
 
 
     }
+
+    // check if near end of a run and ready to submit restart
+    if( (iter % config.rm_checkFreq() == 0) && (iter != MaxIters) )
+      {
+	readyForRestart = Check_JobResubmit();
+	if(readyForRestart)
+	  {
+	    MaxIters = iter;
+	    SetStatus(JOB_RESTART);
+	    break;
+	  }
+      }
     
     average->addSampleMean(iter);
-  }
+  }   // <-- end main timestep iteration loop
   
   
   if( iter==MaxIters )
   {
-    
     write_restart_files();
       
     paraviewColl->SetCycle(iter);
@@ -539,7 +548,10 @@ void M2ulPhyS::Iterate()
     if(mpi.Root()) cout << "Solution error: " << error << endl;
 #endif
 
+    if(mpi.Root())
+      cout << "Final timestep iteration = " << MaxIters << endl;
   }
+  return;
 }
 
 #ifdef _MASA_
@@ -919,6 +931,14 @@ void M2ulPhyS::write_restart_files()
 
 void M2ulPhyS::read_restart_files()
 {
+  if(mpi.Root())
+    {
+      cout << endl;
+      cout<<"================================================"<<endl;
+      cout<<"| Restarting simulation" << endl;
+      cout<<"================================================"<<endl;
+    }
+
   string serialName = "restart_p";
   if( loadFromAuxSol )
   {
@@ -957,6 +977,10 @@ void M2ulPhyS::read_restart_files()
       string word;
       ss >> word;
       iter = stoi( word );
+
+      if(mpi.Root())
+	cout << "--> restart iter = " << iter << endl;
+      config.SetRestartCycle(iter);
       
       ss >> word;
       time = stof( word );
