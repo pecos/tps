@@ -58,5 +58,5 @@ int main(int argc, char *argv[])
   tic_toc.Stop();
   if(mpi.Root() ) cout << " done, " << tic_toc.RealTime() << "s." << endl;
 
-   return 0;
+  return(solver.GetStatus());
 }
