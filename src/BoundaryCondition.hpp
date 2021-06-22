@@ -39,6 +39,10 @@ public:
                               
   virtual void updateMean(IntegrationRules *intRules,
                           ParGridFunction *Up) = 0;
+
+  // holding function for any miscellanous items needed to initialize BCs
+  // prior to use
+  virtual void initState() = 0;
 };
 
 #endif // BOUNDARY_CONDITION
