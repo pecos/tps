@@ -10,6 +10,7 @@
 #include "inletBC.hpp"
 #include "outletBC.hpp"
 #include "wallBC.hpp"
+#include <vector>
 
 using namespace mfem;
 using namespace std;
@@ -104,16 +105,16 @@ private:
   
   // Inlet BC data
   Array<double> inletBC;
-  Array<pair<int,InletType> > inletPatchType;
+  std::vector<pair<int,InletType> > inletPatchType;
   
   
   // Outlet BC data
   Array<double> outletBC;
-  Array<pair<int,OutletType> > outletPatchType;
+  std::vector< pair<int,OutletType> > outletPatchType;
   
   // Wall BC data
   Array<double> wallBC;
-  Array<pair<int,WallType> > wallPatchType;
+  std::vector<pair<int,WallType> > wallPatchType;
   
 public:
   RunConfiguration();
@@ -156,13 +157,13 @@ public:
   int GetRestartCycle(){return restart_cycle;}
   bool RestartFromAux(){return restartFromAux;}
   
-  Array<pair<int,InletType> >* GetInletPatchType(){return &inletPatchType;}
+  std::vector<pair<int,InletType> >* GetInletPatchType(){return &inletPatchType;}
   Array<double> GetInletData(int i);
   
-  Array<pair<int,OutletType> >* GetOutletPatchType(){return &outletPatchType;}
+  std::vector<pair<int,OutletType> >* GetOutletPatchType(){return &outletPatchType;}
   Array<double> GetOutletData(int out);
   
-  Array<pair<int,WallType> >* GetWallPatchType(){return &wallPatchType;}
+  std::vector<pair<int,WallType> >* GetWallPatchType(){return &wallPatchType;}
   Array<double> GetWallData(int w);
 };
 
