@@ -295,7 +295,7 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
             patchANDtype.second = SUB_VEL_CONST_ENT;
             break;
         }
-        inletPatchType.Append( patchANDtype );
+	inletPatchType.push_back( patchANDtype );
         
         for(int i=0; i<4; i++)
         {
@@ -323,7 +323,7 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
             patchANDtype.second = SUB_MF_NR;
             break;
         }
-        outletPatchType.Append( patchANDtype );
+	outletPatchType.push_back( patchANDtype );
         
         ss >> word;
         outletBC.Append (stof( word ) );
@@ -346,7 +346,7 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
             patchType.second = VISC_ISOTH;
             break;
         }
-        wallPatchType.Append( patchType );
+        wallPatchType.push_back( patchType );
         if( patchType.second==VISC_ISOTH )
         {
           ss >> word;
