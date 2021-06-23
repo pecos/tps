@@ -66,6 +66,8 @@ public:
                       Vector &stateIn, 
                       DenseMatrix &gradState,
                       Vector &bdrFlux);
+
+  virtual void initState(){};
 };
 
 #endif // INLET_BC

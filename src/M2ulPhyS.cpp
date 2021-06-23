@@ -16,7 +16,11 @@ mpi(_mpi)
   initVariables();
   
   groupsMPI->init();
-  
+
+  // now that MPI groups have been initialized, we can finalize any additional
+  // BC setup that requries coordination across processors
+  bcIntegrator->initState();
+
   // This example depends on this ordering of the space.
   //MFEM_ASSERT(fes.GetOrdering() == Ordering::byNODES, "");
   
@@ -298,7 +302,7 @@ void M2ulPhyS::initVariables()
       double local_hmin = mesh->GetElementSize(0, 1);
       for (int i = 1; i < mesh->GetNE(); i++)
       {
-        if(sqrt(mesh->GetElementVolume(i))<1e-3) cout<<sqrt(mesh->GetElementVolume(i))<<endl;
+        //if(sqrt(mesh->GetElementVolume(i))<1e-3) cout<<sqrt(mesh->GetElementVolume(i))<<endl;
         local_hmin = min(mesh->GetElementSize(i, 1), local_hmin);
         //local_hmin = min(sqrt(mesh->GetElementVolume(i)), local_hmin);
       }
@@ -307,7 +311,7 @@ void M2ulPhyS::initVariables()
 
   // estimate initial dt
   gradUp->ExchangeFaceNbrData();
-    
+
   if( config.GetRestartCycle()==0 ) initialTimeStep();
   if( mpi.Root() ) cout<<"Initial time-step: "<<dt<<"s"<<endl;
   
@@ -449,6 +453,8 @@ void M2ulPhyS::projectInitialSolution()
 
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
+    // to be used with future MFEM version...
+    //paraviewColl->SetRestartMode(true);
   }
   
   initGradUp();
@@ -500,14 +506,17 @@ void M2ulPhyS::Iterate()
       if(mpi.Root()) cout <<"time step: "<<iter<<", physical time "<<time<<"s"<< endl;
 #endif
 
+
+      if (iter != MaxIters)
+	{
+	  write_restart_files();
       
-      write_restart_files();
-      
-      paraviewColl->SetCycle(iter);
-      paraviewColl->SetTime(time);
-      paraviewColl->Save();
-      
-      average->write_meanANDrms_restart_files();
+	  paraviewColl->SetCycle(iter);
+	  paraviewColl->SetTime(time);
+	  paraviewColl->Save();
+	  
+	  average->write_meanANDrms_restart_files();
+	}
 
 
     }

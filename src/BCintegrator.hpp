@@ -73,6 +73,7 @@ public:
                                    const Vector &elfun, Vector &elvect);
    
    void updateBCMean( ParGridFunction *Up);
+   void initState ();
 };
 
 #endif // BC_INTEGRATOR

@@ -54,7 +54,7 @@ private:
   
   virtual void updateMean(IntegrationRules *intRules,
                           ParGridFunction *Up);
-  
+
   void computeParallelArea();
 
 public:
@@ -77,6 +77,9 @@ public:
                       Vector &stateIn, 
                       DenseMatrix &gradState,
                       Vector &bdrFlux);
+
+  void initState();
+
 };
 
 #endif // OUTLET_BC

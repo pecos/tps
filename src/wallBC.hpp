@@ -57,6 +57,8 @@ public:
   
   virtual void updateMean(IntegrationRules *intRules,
                           ParGridFunction *Up){};
+
+  virtual void initState(){};
 };
 
 #endif // WALL_BC

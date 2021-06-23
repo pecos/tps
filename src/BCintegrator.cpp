@@ -33,7 +33,7 @@ Up(_Up),
 gradUp(_gradUp)
 {
   // Init inlet BCs
-  for(int in=0; in<config.GetInletPatchType()->Size(); in++)
+  for(int in=0; in<config.GetInletPatchType()->size(); in++)
   {
     std::pair<int,InletType> patchANDtype = (*config.GetInletPatchType())[in];
     // check if attribute is in mesh
@@ -62,7 +62,7 @@ gradUp(_gradUp)
   }
   
   // Init outlet BCs
-  for(int o=0; o<config.GetOutletPatchType()->Size(); o++)
+  for(int o=0; o<config.GetOutletPatchType()->size(); o++)
   {
     std::pair<int,OutletType> patchANDtype = (*config.GetOutletPatchType())[o];
     // check if attribute is in mesh
@@ -89,7 +89,7 @@ gradUp(_gradUp)
   }
   
   // Wall BCs
-  for(int w=0; w<config.GetWallPatchType()->Size(); w++)
+  for(int w=0; w<config.GetWallPatchType()->size(); w++)
   {
     std::pair<int,WallType> patchType = (*config.GetWallPatchType())[w];
     
@@ -148,6 +148,15 @@ void BCintegrator::updateBCMean(ParGridFunction *Up)
   {
     bc->second->updateMean(intRules, Up);
   }
+}
+
+void BCintegrator::initState()
+{
+  for(auto bc=BCmap.begin();bc!=BCmap.end(); bc++)
+  {
+    bc->second->initState();
+  }
+
 }
 
 
@@ -223,14 +232,14 @@ void BCintegrator::AssembleFaceVector(const FiniteElement& el1,
 
     // Interpolate elfun at the point
     elfun1_mat.MultTranspose(shape1, funval1);
-    
+
     // interpolated gradients
     DenseMatrix iGradUp(num_equation,dim);
     for(int eq=0; eq<num_equation; eq++)
     {
       for(int d=0; d<dim; d++)
-      {
-        double sum = 0.;
+      { 
+       double sum = 0.;
         for(int k=0; k<eldDof; k++)
         {
           sum += elGradUp(k,eq,d)*shape1(k);
@@ -255,5 +264,5 @@ void BCintegrator::AssembleFaceVector(const FiniteElement& el1,
 //             elvect2_mat(s, k) += fluxN(k) * shape2(s);
 //          }
     }
-  }
+  } // end loop over integration points
 }

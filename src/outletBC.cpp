@@ -117,8 +117,6 @@ void OutletBC::computeBdrFlux(Vector &normal,
                               DenseMatrix &gradState,
                               Vector &bdrFlux)
 {
-  if( !parallelAreaComputed ) computeParallelArea();
-  
   switch(outletType)
   {
     case SUB_P:
@@ -135,6 +133,15 @@ void OutletBC::computeBdrFlux(Vector &normal,
 
 void OutletBC::computeParallelArea()
 {
+  if(parallelAreaComputed)
+    {
+      return;
+    }
+  else
+    {
+      std::cout << "computing parallel area" << std::endl;
+    }
+
   // init boundary U
   for(int bel=0;bel<vfes->GetNBE(); bel++)
   {
@@ -159,6 +166,7 @@ void OutletBC::computeParallelArea()
         
         // calc area
         Vector nor(dim);
+
         CalcOrtho(Tr->Jacobian(), nor);
         double sum = 0.;
         for(int d=0;d<dim;d++) sum += nor[d]*nor[d];
@@ -600,4 +608,12 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal,
   bdrN++;
   
   rsolver->Eval(stateIn,state2,normal,bdrFlux,true);
+}
+
+void OutletBC::initState()
+{
+  // Accumulate outlet area. Used with mass flow outlet.
+
+  if ( !parallelAreaComputed )
+      computeParallelArea();
 }
