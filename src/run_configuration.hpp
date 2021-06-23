@@ -65,6 +65,7 @@ private:
   bool useRoe;
   
   // cycle for restart
+  bool restart;
   int restart_cycle;
   
   // Auxiliary order. A solution would be interpolated
@@ -116,6 +117,11 @@ private:
   Array<double> wallBC;
   std::vector<pair<int,WallType> > wallPatchType;
   
+  // Resource management system - job monitoring
+  bool   rm_enableMonitor_;      // flag to trigger RMS monitoring and job resubmissions
+  int    rm_threshold_;          // remaining secs for current job to trigger re-submission
+  int    rm_checkFrequency_;     // iteration frequency to check RMS status
+  
 public:
   RunConfiguration();
   ~RunConfiguration();
@@ -150,11 +156,17 @@ public:
   Equations GetEquationSystem(){return eqSystem;}
   bool isSBP(){return SBP;}
   double* GetConstantInitialCondition(){return &initRhoRhoVp[0];}
+
+  // resource manager controls
+  bool   isAutoRestart(){return rm_enableMonitor_;}
+  int    rm_threshold() {return rm_threshold_;}
+  int    rm_checkFreq() {return rm_checkFrequency_;}
   
   bool thereIsForcing(){return isForcing;}
   double* GetImposedPressureGradient(){return &gradPress[0];}
   
-  int GetRestartCycle(){return restart_cycle;}
+  int  GetRestartCycle(){return restart;}
+  void SetRestartCycle(int iter){restart_cycle = iter; return;}
   bool RestartFromAux(){return restartFromAux;}
   
   std::vector<pair<int,InletType> >* GetInletPatchType(){return &inletPatchType;}

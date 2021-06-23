@@ -7,10 +7,20 @@ MESH square_periodic_mesh.msh
 # extensions will be added by program
 OUTPUT_NAME euler_output
 
-# When restarting, set this parameter to the number
-# of iterations at restart.
-# If not restarting, ommit this parameter.
-RESTART_CYCLE 300
+# Enable restart from previous solution.
+RESTART_CYCLE
+
+#-------------------------
+# Job management controls
+#-------------------------
+
+# enable periodic slurm check
+ENABLE_AUTORESTART
+# threshold time in seconds, if remaining time is below this
+# value, code will save restart files and terminate with exit code=10
+RM_THRESHOLD 1000
+# iteration frequency for how often to check
+RM_CHECK_FREQUENCY 500
 
 # Computation of mean and velocity RMS
 # CALC_MEAN_RMS startIter sampleInterval
