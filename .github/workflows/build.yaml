@@ -1,0 +1,22 @@
+name: CI
+
+on: push
+      branches:
+	- main
+    pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    container:
+      image koomie:mfem:4.2.r1
+    name: Build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Bootstrap
+        run:  ./bootstrap
+      - name: Configure
+        run:  ./configure CXXFLAGS="-fdiagnostics-color=always"
+      - name: Make
+        run:  make -j 2
