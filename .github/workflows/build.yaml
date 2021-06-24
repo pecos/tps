@@ -10,7 +10,7 @@ jobs:
   build:
     runs-on: ubuntu-20.04
     container:
-      image koomie/mfem:4.2.r1
+      koomie/mfem:4.2.r1
     name: Build
     steps:
       - name: Checkout code
