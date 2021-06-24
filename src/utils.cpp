@@ -8,28 +8,11 @@
 #include <sys/stat.h>
 #include <filesystem>
 #include <grvy.h>
+#include <unistd.h>
 #include "M2ulPhyS.hpp"
-
-#define HAVE_SLURM
 
 #ifdef HAVE_SLURM
 #include <slurm/slurm.h>
-#endif
-
-// Run system command and capture output
-std::string systemCmd(const char* cmd)
-{
-  std::array<char, 128> buffer;
-  std::string result;
-  std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
-  if (!pipe) {
-    throw std::runtime_error("popen() failed!");
-  }
-  while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
-    result += buffer.data();
-  }
-  return result;
-}
 
 // check if the amount of time left in SLURM job is less than desired threshold
 bool slurm_job_almost_done(int threshold,int rank)
@@ -91,12 +74,6 @@ int rm_restart(std::string jobFile,std::string mode)
   return 0;
 }
 
-// check if file exists
-bool file_exists (const std::string &name)
-{
-  return ( access( name.c_str(), F_OK ) != -1 );
-}
-
 bool M2ulPhyS::Check_JobResubmit()
 {
   if ( config.isAutoRestart() )
@@ -109,6 +86,28 @@ bool M2ulPhyS::Check_JobResubmit()
   else
     return false;
 }
+
+#else
+bool slurm_job_almost_done(int threshold, int rank)
+{
+  std::cout << "SLURM functionality not enabled in this build" << std::endl;
+  exit(1);
+}
+
+int rm_restart(std::string jobFile,std::string mode)
+{
+  std::cout << "SLURM functionality not enabled in this build" << std::endl;
+  exit(1);
+}
+
+#endif
+
+// check if file exists
+bool file_exists (const std::string &name)
+{
+  return ( access( name.c_str(), F_OK ) != -1 );
+}
+
 
 // Look for existence of output.pvd files in vis output directory and
 // keep a sequentially numbered copy. Useful when doing restart,
@@ -141,3 +140,17 @@ void M2ulPhyS::Cache_Paraview_Timesteps()
 }
 
 
+// Run system command and capture output
+std::string systemCmd(const char* cmd)
+{
+  std::array<char, 128> buffer;
+  std::string result;
+  std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
+  if (!pipe) {
+    throw std::runtime_error("popen() failed!");
+  }
+  while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+    result += buffer.data();
+  }
+  return result;
+}

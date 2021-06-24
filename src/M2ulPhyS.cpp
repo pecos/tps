@@ -521,6 +521,7 @@ void M2ulPhyS::Iterate()
 
     }
 
+#ifdef HAVE_SLURM
     // check if near end of a run and ready to submit restart
     if( (iter % config.rm_checkFreq() == 0) && (iter != MaxIters) )
       {
@@ -532,6 +533,7 @@ void M2ulPhyS::Iterate()
 	    break;
 	  }
       }
+#endif
     
     average->addSampleMean(iter);
   }   // <-- end main timestep iteration loop
