@@ -21,6 +21,9 @@ mpi(_mpi)
   // BC setup that requries coordination across processors
   bcIntegrator->initState();
 
+  // set default solver state
+  exit_status_ =  NORMAL;
+
   // This example depends on this ordering of the space.
   //MFEM_ASSERT(fes.GetOrdering() == Ordering::byNODES, "");
   
