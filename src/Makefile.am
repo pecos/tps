@@ -1,4 +1,4 @@
-AM_CPPFLAGS          = -I$(BOOST_INC) -I$(MFEM_INC) -I$(HYPRE_INC) -I$(PETSC_INC) -DHAVE_GRVY
+AM_CPPFLAGS          = -I$(MFEM_INC) -I$(HYPRE_INC) -I$(PETSC_INC) -DHAVE_GRVY
 
 # C++ main solver binary
 bin_PROGRAMS         = tps
