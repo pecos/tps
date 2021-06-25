@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-20.04
     container:
       image: koomietx/mfem:4.2.r1
-      options: --user 1001 /bin/bash
+      options: --user 1001 --entrypoint /bin/bash
     name: Build
     steps:
       - name: Checkout code
