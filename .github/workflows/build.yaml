@@ -6,6 +6,7 @@ on:
       - main
   pull_request:
 
+# make sure steps are run in a login shell to support Lmod modules
 defaults:
   run:
     shell: bash -l {0}
@@ -15,14 +16,12 @@ jobs:
     runs-on: ubuntu-20.04
     container:
       image: koomietx/mfem:4.2.r1
-      options: --user 1001 
+      options: --user 1001
     name: Build
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: debug
-        run:  echo $SHELL
-      - name: debug2
+      - name: Query modules loaded
         run:  module avail
       - name: Bootstrap
         run:  ./bootstrap
