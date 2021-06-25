@@ -11,11 +11,15 @@ jobs:
     runs-on: ubuntu-20.04
     container:
       image: koomietx/mfem:4.2.r1
-      options: --user 1001 bash --login
+      options: --user 1001
     name: Build
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+      - name: debug
+        run:  pwd
+      - name: debug2
+        run:  module avail
       - name: Bootstrap
         run:  ./bootstrap
       - name: Configure
