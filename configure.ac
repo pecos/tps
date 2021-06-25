@@ -19,7 +19,7 @@ AC_PROG_LIBTOOL
 
 
 
-AC_OUTPUT([Makefile src/Makefile])
+AC_OUTPUT([Makefile src/Makefile test/Makefile])
 
 # Final summary
 AX_SUMMARIZE_ENV
