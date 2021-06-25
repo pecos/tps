@@ -17,7 +17,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: debug
-        run:  pwd
+        run:  echo $SHELL
       - name: debug2
         run:  module avail
       - name: Bootstrap
