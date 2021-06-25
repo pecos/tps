@@ -21,6 +21,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+        with:
+          lfs: true
       - name: Query modules loaded
         run:  module avail
       - name: Bootstrap
