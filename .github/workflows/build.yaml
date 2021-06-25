@@ -29,3 +29,5 @@ jobs:
         run:  ./configure CXXFLAGS="-fdiagnostics-color=always"
       - name: Make
         run:  make -j 2
+      - name: Tests
+        run:  make check
