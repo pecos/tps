@@ -30,6 +30,6 @@ jobs:
       - name: Make
         run:  make -j 2
       - name: Debug test
-        run:  cd test; ../tps --runFile input.3d.cyl
+        run:  cd test; ../src/tps --runFile input.3d.cyl
       - name: Tests
         run:  make check || cat test/*.log
