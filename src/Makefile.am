@@ -23,8 +23,8 @@ headers              = averaging_and_rms.hpp equation_of_state.hpp forcing_terms
 lib_LTLIBRARIES      = libtps.la
 libtps_la_SOURCES    = $(cxx_sources) $(headers)
 libtps_la_LDFLAGS    = -avoid-version
-libtps_la_LDFLAGS   += -L/usr/local/lib -lgrvy -L$(MFEM_LIB) -lmfem 
-libtps_la_LDFLAGS   += -L$(HYPRE_LIB) -lHYPRE -L$(PETSC_LIB) -lpetsc -L$(SUPERLU_DIST_LIB) -lsuperlu_dist -L$(HDF5_LIB) -lhdf5
+libtps_la_LDFLAGS   += -L/usr/local/lib -L$(MFEM_LIB) -lmfem
+libtps_la_LDFLAGS   += -L$(HYPRE_LIB) -lHYPRE -L$(PETSC_LIB) -lpetsc -L$(SUPERLU_DIST_LIB) -lsuperlu_dist #-L$(HDF5_LIB) -lhdf5
 libtps_la_LDFLAGS   += -L$(NETCDF_LIB) -lnetcdf
 
 # Python wrapper for C++ solver library
