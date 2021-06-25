@@ -30,4 +30,4 @@ jobs:
       - name: Make
         run:  make -j 2
       - name: Tests
-        run:  make check
+        run:  make check || cat test/*.log
