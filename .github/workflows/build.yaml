@@ -32,4 +32,4 @@ jobs:
       - name: Make
         run:  make -j 2
       - name: Tests
-        run:  make check || cat test/*.log
+        run:  make AM_COLOR_TESTS=yes check || cat test/*.log
