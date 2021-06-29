@@ -1,14 +1,45 @@
 #!/usr/bin/env bats
+# -*- mode: sh -*-
 
 TEST="cyl3d"
-RUNFILE="input.3d.cyl"
+RUNFILE="input.4iters.cyl"
+
+setup() {
+    SOLN_FILE=restart_output.sol.h5
+    REF_FILE=ref_solns/cyl3d_coarse.4iters.h5
+}
 
 @test "[$TEST] check for input file $RUNFILE" {
     test -s $RUNFILE
 }
 
 @test "[$TEST] run tps with input -> $RUNFILE" {
+    rm -f $SOLN_FILE
     ../src/tps --runFile $RUNFILE
-    #[[ $status -eq 0 ]]
+
+    test -s $SOLN_FILE
+}
+
+@test "[$TEST] verify tps output with input -> $RUNFILE" {
+
+    test -s $SOLN_FILE
+    test -s $REF_FILE
+    h5diff $SOLN_FILE $REF_FILE
+}
+
+@test "[$TEST] verify consistent solution with restart from 2 iters" {
+    RUNFILE=input.2iters.cyl
+
+    rm -f $SOLN_FILE
+    test -s $RUNFILE
+    ../src/tps --runFile $RUNFILE
+    test -s $SOLN_FILE
+
+    run h5dump  -a iteration  restart_output.sol.h5
+    [ "${lines[5]}" = "   (0): 2" ]
+
+    RUNFILE=input.4iters.restart.cyl
+    ../src/tps --runFile $RUNFILE
+    h5diff $SOLN_FILE $REF_FILE
 }
 
