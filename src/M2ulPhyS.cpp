@@ -449,7 +449,8 @@ void M2ulPhyS::projectInitialSolution()
 #endif
   }else
   {
-    read_restart_files();
+    //read_restart_files();
+    restart_files_hdf5("read");
 
     if( mpi.Root() )
       Cache_Paraview_Timesteps();
@@ -512,7 +513,8 @@ void M2ulPhyS::Iterate()
 
       if (iter != MaxIters)
 	{
-	  write_restart_files();
+	  //write_restart_files();
+	  restart_files_hdf5("write");
       
 	  paraviewColl->SetCycle(iter);
 	  paraviewColl->SetTime(time);
@@ -544,7 +546,8 @@ void M2ulPhyS::Iterate()
   
   if( iter==MaxIters )
   {
-    write_restart_files();
+    //write_restart_files();
+    restart_files_hdf5("write");
       
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);

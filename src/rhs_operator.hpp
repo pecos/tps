@@ -61,8 +61,6 @@ private:
   Array<ForcingTerms*> forcing;
 
   void GetFlux(const DenseMatrix &state, DenseTensor &flux) const;
-  
-  void updatePrimitives(const Vector &x) const;
   void calcGradientsPrimitives() const;
 
 public:
@@ -91,8 +89,10 @@ public:
               );
 
    virtual void Mult(const Vector &x, Vector &y) const;
+   void updatePrimitives(const Vector &x) const;
 
    virtual ~RHSoperator();
+
 };
 
 #endif // RHS_OPERATOR
