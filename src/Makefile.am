@@ -1,4 +1,4 @@
-AM_CPPFLAGS          = -I$(MFEM_INC) -I$(HYPRE_INC) -I$(PETSC_INC) -DHAVE_GRVY
+AM_CPPFLAGS          = -g -I$(MFEM_INC) -I$(HYPRE_INC) -I$(HDF5_INC) -I$(PETSC_INC) # -DHAVE_GRVY
 
 # C++ main solver binary
 bin_PROGRAMS         = tps
@@ -12,7 +12,7 @@ tps_DEPENDENCIES     = libtps.la
 cxx_sources          = averaging_and_rms.cpp faceGradientIntegration.cpp M2ulPhyS.cpp rhs_operator.cpp wallBC.cpp \
 		       BCintegrator.cpp face_integrator.cpp riemann_solver.cpp BoundaryCondition.cpp fluxes.cpp \
                        masa_handler.cpp run_configuration.cpp domain_integrator.cpp forcing_terms.cpp mpi_groups.cpp \
-	               sbp_integrators.cpp equation_of_state.cpp inletBC.cpp outletBC.cpp utils.cpp
+	               sbp_integrators.cpp equation_of_state.cpp inletBC.cpp outletBC.cpp utils.cpp io.cpp
 
 headers              = averaging_and_rms.hpp equation_of_state.hpp forcing_terms.hpp mpi_groups.hpp \
 		       run_configuration.hpp BCintegrator.hpp faceGradientIntegration.hpp inletBC.hpp outletBC.hpp \

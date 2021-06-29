@@ -189,6 +189,7 @@ private:
   
   void write_restart_files();
   void read_restart_files();
+  void restart_files_hdf5(string mode);
   
   void Check_NAN();
   bool Check_JobResubmit();

@@ -1,0 +1,243 @@
+#include "M2ulPhyS.hpp"
+#include <hdf5.h>
+
+void M2ulPhyS::restart_files_hdf5(string mode)
+{
+#ifdef HAVE_GRVY
+  grvy_timer_begin(__func__);
+#endif
+
+  hid_t file, dataspace, data_soln;
+  herr_t status;
+
+  string serialName = "restart_";
+  serialName.append( config.GetOutputName() );
+  serialName.append( ".sol.h5" );
+    
+  string fileName = groupsMPI->getParallelName( serialName );
+
+  if(mpi.Root())
+    cout << "HDF5 restart files mode: " << mode << endl;
+
+  assert( (mode == "read") || (mode == "write") );
+
+  // open restart files (currently per MPI process variants)
+  if (mode == "write")
+    {
+      file = H5Fcreate(fileName.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT );
+      assert(file >= 0);
+    }
+  else if (mode == "read")
+    {
+      file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+      assert(file >= 0);
+    }
+
+  // -------------------------------------------------------------------
+  // Attributes - current iteration and timing info saved as attributes
+  // -------------------------------------------------------------------
+
+  hid_t aid, attr;
+  if (mode == "write")
+    {
+      aid  = H5Screate(H5S_SCALAR);
+      assert(aid >= 0);
+
+      // current iteration count
+      attr = H5Acreate(file,"iteration", H5T_NATIVE_INT, aid, H5P_DEFAULT, H5P_DEFAULT);
+      assert(attr >= 0);
+      status = H5Awrite(attr,H5T_NATIVE_INT,&iter);
+      assert(status >= 0);
+      H5Aclose(attr);
+
+      // total time
+      attr = H5Acreate(file,"time", H5T_NATIVE_DOUBLE, aid, H5P_DEFAULT, H5P_DEFAULT);
+      assert(attr >= 0);
+      status = H5Awrite(attr,H5T_NATIVE_DOUBLE,&time);
+      assert(status >= 0);
+      H5Aclose(attr);
+
+      // timestep
+      attr = H5Acreate(file,"dt", H5T_NATIVE_DOUBLE, aid, H5P_DEFAULT, H5P_DEFAULT);
+      assert(attr >= 0);
+      status = H5Awrite(attr,H5T_NATIVE_DOUBLE,&dt);
+      assert(status >= 0);  
+      H5Aclose(attr);
+
+      H5Sclose(aid);
+    }
+  else	// read
+    {
+      attr   = H5Aopen_name(file,"iteration");
+      status = H5Aread(attr,H5T_NATIVE_INT,&iter);
+      assert(status >= 0);
+      H5Aclose(attr);
+
+      attr   = H5Aopen_name(file,"time");
+      status = H5Aread(attr,H5T_NATIVE_DOUBLE,&time);
+      assert(status >= 0);
+      H5Aclose(attr);
+
+      attr   = H5Aopen_name(file,"dt");
+      status = H5Aread(attr,H5T_NATIVE_DOUBLE,&dt);
+      assert(status >= 0);
+      H5Aclose(attr);
+#ifdef HAVE_GRVY
+      grvy_printf(GRVY_INFO,"Restarting from iteration = %i\n",iter);
+      grvy_printf(GRVY_INFO,"--> time = %f\n",time);
+      grvy_printf(GRVY_INFO,"--> dt   = %f\n",dt);
+#else
+      printf("Restarting from iteration = %i\n",iter);
+      printf("--> time = %f\n",time);
+      printf("--> dt   = %f\n",dt);
+#endif
+    }
+
+  // -------------------------------------------------------------------
+  // Read/write solution state vector
+  // -------------------------------------------------------------------
+
+  hsize_t dims[1];
+  hsize_t maxdims[1];
+  hsize_t numInSoln;
+
+  if(mode == "write")
+    {
+      dims[0] = vfes->GetNDofs();
+
+      // save individual state varbiales from (U) in an HDF5 group named "solution"
+      dataspace = H5Screate_simple(1, dims, NULL);
+      assert(dataspace >= 0);
+
+      hid_t group = H5Gcreate(file,"solution",H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
+      assert(group >= 0);
+
+      // state vectors in U -> rho, rho-u, rho-v, rho-w, and rho-E
+      double *dataU = U->GetData();
+
+      data_soln = H5Dcreate2(group, "density", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      assert(data_soln >= 0);
+      status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataU);
+      assert(status >= 0);
+      H5Dclose(data_soln);      
+
+      data_soln = H5Dcreate2(group, "rho-u", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      assert(data_soln >= 0);
+      status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[1*dims[0]]);
+      assert(status >= 0);
+      H5Dclose(data_soln);
+
+      data_soln = H5Dcreate2(group, "rho-v", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      assert(data_soln >= 0);
+      status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[2*dims[0]]);
+      assert(status >= 0);
+      H5Dclose(data_soln);
+
+      size_t rhoeIndex = 3*dims[0];
+
+      if(dim == 3)
+	{
+	  rhoeIndex = 4*dims[0];
+	  data_soln = H5Dcreate2(group, "rho-w", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+	  assert(data_soln >= 0);
+	  status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[3*dims[0]]);
+	  assert(status >= 0);
+	  H5Dclose(data_soln);	  
+	}
+
+      data_soln = H5Dcreate2(group, "rho-E", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      assert(data_soln >= 0);
+      status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[rhoeIndex]);
+      assert(status >= 0);
+      H5Dclose(data_soln);
+
+#ifdef SAVE_PRIMITIVE_VARS
+
+      // update primitive to latest timestep prior to write
+      rhsOperator->updatePrimitives(*U);
+      
+      data_soln = H5Dcreate2(group, "u-velocity", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      assert(data_soln >= 0);
+      status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataUp[1*dims[0]]);
+      assert(status >= 0);
+      H5Dclose(data_soln);
+
+      data_soln = H5Dcreate2(group, "v-velocity", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      assert(data_soln >= 0);
+      status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataUp[2*dims[0]]);
+      assert(status >= 0);
+      H5Dclose(data_soln);
+
+      size_t pIndex = 3*dims[0];
+
+      if(dim == 3)
+	{
+	  pIndex = 4*dims[0];
+	  
+	  data_soln = H5Dcreate2(group, "w-velocity", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+	  assert(data_soln >= 0);
+	  status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataUp[3*dims[0]]);
+	  assert(status >= 0);
+	  H5Dclose(data_soln);
+	}
+
+      data_soln = H5Dcreate2(group, "pressure", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      assert(data_soln >= 0);
+      status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataUp[pIndex]);
+      assert(status >= 0);
+      H5Dclose(data_soln);
+#endif      
+
+      H5Sclose(dataspace);
+      H5Gclose(group);
+    }
+  else          // read mode
+    {
+
+      cout << "Reading in state vector from restart..." << endl;
+      double *dataU = U->GetData();
+
+      data_soln = H5Dopen2(file, "/solution/density",H5P_DEFAULT); assert(data_soln >= 0);
+      dataspace = H5Dget_space(data_soln);
+      numInSoln = H5Sget_simple_extent_npoints(dataspace);
+
+      // verify Dofs match expectations
+      int dof = vfes->GetNDofs();
+      assert(numInSoln == dof);
+      
+      status    = H5Dread(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataU);
+      assert(status >= 0);
+      H5Dclose(data_soln);
+
+      data_soln = H5Dopen2(file, "/solution/rho-u",H5P_DEFAULT); assert(data_soln >= 0);
+      status    = H5Dread(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[1*numInSoln]);
+      assert(status >= 0);
+      H5Dclose(data_soln);
+
+      data_soln = H5Dopen2(file, "/solution/rho-v",H5P_DEFAULT); assert(data_soln >= 0);
+      status    = H5Dread(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[2*numInSoln]);
+      assert(status >= 0);
+      H5Dclose(data_soln);
+
+      data_soln = H5Dopen2(file, "/solution/rho-w",H5P_DEFAULT); assert(data_soln >= 0);
+      status    = H5Dread(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[3*numInSoln]);
+      assert(status >= 0);
+      H5Dclose(data_soln);
+
+      data_soln = H5Dopen2(file, "/solution/rho-E",H5P_DEFAULT); assert(data_soln >= 0);
+      status    = H5Dread(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[4*numInSoln]);
+      assert(status >= 0);
+      H5Dclose(data_soln);
+
+    }
+
+  H5Fclose(file);
+  
+#ifdef HAVE_GRVY
+  grvy_timer_end(__func__);
+#endif
+  return;
+}
+
+
+
