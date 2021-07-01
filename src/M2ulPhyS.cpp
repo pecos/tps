@@ -19,7 +19,8 @@ mpi(_mpi)
 
   // now that MPI groups have been initialized, we can finalize any additional
   // BC setup that requries coordination across processors
-  bcIntegrator->initState();
+  if( bcIntegrator != NULL)
+    bcIntegrator->initState();
 
   // set default solver state
   exit_status_ =  NORMAL;
