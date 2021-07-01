@@ -33,6 +33,9 @@ mpi(_mpi)
 
 void M2ulPhyS::initVariables()
 {
+#ifdef HAVE_GRVY
+  grvy_timer_init("TPS");
+#endif
   loadFromAuxSol = config.RestartFromAux();
   auxOrder = config.RestartFromAux();
   if( loadFromAuxSol && auxOrder<1 )
@@ -368,6 +371,11 @@ M2ulPhyS::~M2ulPhyS()
   //delete mesh;
   
   delete groupsMPI;
+
+#ifdef HAVE_GRVY
+  if(mpi.WorldRank() == 0)
+    grvy_timer_summarize();
+#endif
 }
 
 
@@ -470,6 +478,12 @@ void M2ulPhyS::projectInitialSolution()
 
 void M2ulPhyS::Iterate()
 {
+
+#ifdef HAVE_GRVY
+  const int iterQuery = 10;
+  double tlast = grvy_timer_elapsed_global();
+#endif
+
 #ifdef _MASA_
   // instantiate function for exact solution
   void (*exactSolnFunction)(const Vector&, double, Vector&);
@@ -488,6 +502,18 @@ void M2ulPhyS::Iterate()
   // Integrate in time.
   while( iter<MaxIters )
   {
+
+#ifdef HAVE_GRVY
+    grvy_timer_begin(__func__);
+    if ( (iter % iterQuery) == 0 )
+      if(mpi.Root())
+	{
+	  double timePerIter = (grvy_timer_elapsed_global() - tlast)/iterQuery;
+	  grvy_printf(GRVY_INFO,"Iteration = %i: wall clock time/iter = %.3f (secs)\n",iter,timePerIter);
+	  tlast = grvy_timer_elapsed_global();
+	}
+#endif
+
     timeIntegrator->Step(*U, time, dt);
   
     Check_NAN();
@@ -544,6 +570,11 @@ void M2ulPhyS::Iterate()
 #endif
     
     average->addSampleMean(iter);
+
+#ifdef HAVE_GRVY
+    grvy_timer_end(__func__);
+#endif
+
   }   // <-- end main timestep iteration loop
   
   
@@ -571,6 +602,7 @@ void M2ulPhyS::Iterate()
     if(mpi.Root())
       cout << "Final timestep iteration = " << MaxIters << endl;
   }
+
   return;
 }
 

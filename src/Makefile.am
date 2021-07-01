@@ -1,4 +1,4 @@
-AM_CPPFLAGS          = -g -I$(MFEM_INC) -I$(HYPRE_INC) -I$(HDF5_INC) -I$(PETSC_INC) # -DHAVE_GRVY
+AM_CPPFLAGS          = -g -I$(MFEM_INC) -I$(HYPRE_INC) -I$(HDF5_INC) -I$(PETSC_INC)  -DHAVE_GRVY
 
 # C++ main solver binary
 bin_PROGRAMS         = tps
@@ -26,6 +26,7 @@ libtps_la_LDFLAGS    = -avoid-version
 libtps_la_LDFLAGS   += -L/usr/local/lib -L$(MFEM_LIB) -lmfem
 libtps_la_LDFLAGS   += -L$(HYPRE_LIB) -lHYPRE -L$(PETSC_LIB) -lpetsc -L$(SUPERLU_DIST_LIB) -lsuperlu_dist #-L$(HDF5_LIB) -lhdf5
 libtps_la_LDFLAGS   += -L$(NETCDF_LIB) -lnetcdf
+libtps_la_LDFLAGS   += -lgrvy
 
 # Python wrapper for C++ solver library
 ### pyexec_LTLIBRARIES   = pytps.la

@@ -25,6 +25,10 @@
 #include "masa_handler.hpp"
 #endif
 
+#ifdef HAVE_GRVY
+#include "grvy.h"
+#endif
+
 using namespace mfem;
 using namespace std;
 
