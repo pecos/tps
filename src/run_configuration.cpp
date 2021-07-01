@@ -21,6 +21,7 @@ RunConfiguration::RunConfiguration()
   numIters = 10;
   useRoe = false;
   restart = false;
+  restart_hdf5_conversion = false;
   restart_cycle = 0;
   restartFromAux = false;
   
@@ -113,6 +114,12 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
 	restart = true;
         //restart_cycle = stoi(word);   // use value straight from restart file instead (ks mod)
         
+      // restart from aux. sol
+      }else if( word.compare("RESTART_CONVERSION")==0 )
+      {
+        ss >> word;
+	restart_hdf5_conversion = true;
+
       // restart from aux. sol
       }else if( word.compare("RESTART_FROM_AUX")==0 )
       {

@@ -66,6 +66,7 @@ private:
   
   // cycle for restart
   bool restart;
+  bool restart_hdf5_conversion;   // read in older ascii format
   int restart_cycle;
   
   // Auxiliary order. A solution would be interpolated
@@ -168,6 +169,7 @@ public:
   int  GetRestartCycle(){return restart;}
   void SetRestartCycle(int iter){restart_cycle = iter; return;}
   bool RestartFromAux(){return restartFromAux;}
+  bool RestartHDFConversion(){return restart_hdf5_conversion;}
   
   std::vector<pair<int,InletType> >* GetInletPatchType(){return &inletPatchType;}
   Array<double> GetInletData(int i);

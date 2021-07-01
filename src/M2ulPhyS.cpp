@@ -449,8 +449,10 @@ void M2ulPhyS::projectInitialSolution()
 #endif
   }else
   {
-    //read_restart_files();
-    restart_files_hdf5("read");
+    if(config.RestartHDFConversion())
+      read_restart_files();
+    else
+      restart_files_hdf5("read");
 
     if( mpi.Root() )
       Cache_Paraview_Timesteps();
