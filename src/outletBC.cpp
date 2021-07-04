@@ -137,7 +137,7 @@ void OutletBC::computeParallelArea()
     return;
 
   MPI_Comm bcomm = groupsMPI->getOutletComm();
-  double area    = aggregateArea(patchNumber,bcomm);
+  area           = aggregateArea(patchNumber,bcomm);
   int nfaces     = aggregateBndryFaces(patchNumber,bcomm);
   parallelAreaComputed = true;
 
