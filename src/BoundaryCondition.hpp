@@ -40,6 +40,11 @@ public:
   virtual void updateMean(IntegrationRules *intRules,
                           ParGridFunction *Up) = 0;
 
+  // aggregate boundary area
+  double aggregateArea (int bndry_attr, MPI_Comm bc_comm);
+  // aggregate boundary face count
+  int aggregateBndryFaces (int bndry_attr, MPI_Comm bc_comm);
+
   // holding function for any miscellanous items needed to initialize BCs
   // prior to use
   virtual void initState() = 0;
