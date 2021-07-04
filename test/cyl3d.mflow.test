@@ -1,0 +1,33 @@
+#!/usr/bin/env bats
+# -*- mode: sh -*-
+
+TEST="cyl3d.mflow.outlet"
+RUNFILE="input.2iters.mflow.cyl "
+
+setup() {
+    SOLN_FILE=restart_output.sol.h5
+    REF_FILE=ref_solns/cyl3d.mflow.2iters.h5
+}
+
+@test "[$TEST] check for input file $RUNFILE" {
+    test -s $RUNFILE
+}
+
+@test "[$TEST] verify outlet area calculation with input -> $RUNFILE" {
+    rm -f $SOLN_FILE
+    run ../src/tps --runFile $RUNFILE
+
+    [[ "${output}" =~ "[OUTLET]: Total Surface Area                = 0.00978" ]]
+
+    test -s $SOLN_FILE
+}
+
+@test "[$TEST] verify tps output with input -> $RUNFILE" {
+
+    test -s $SOLN_FILE
+    test -s $REF_FILE
+    h5diff $SOLN_FILE $REF_FILE
+}
+
+
+
