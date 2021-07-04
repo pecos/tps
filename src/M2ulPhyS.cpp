@@ -1068,7 +1068,7 @@ void M2ulPhyS::Check_NAN()
       if( std::isnan(dataU[i+eq*dof]) )
       {
         //thereIsNan = true;
-        //cout<<"NaN at node: "<<i<<" partition: "<<mpi.WorldRank()<<endl;
+        cout<<"NaN at node: "<<i<<" partition: "<<mpi.WorldRank()<<endl;
         local_print++;
         //MPI_Abort(MPI_COMM_WORLD,1);
       }
