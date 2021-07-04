@@ -394,3 +394,20 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal,
   
   rsolver->Eval(stateIn,state2,normal,bdrFlux,true);
 }
+
+void InletBC::initState()
+{
+  // compute aggregate mass flow rate for inlets
+
+  MPI_Comm bcomm = groupsMPI->getInletComm();
+  double area    = aggregateArea(patchNumber,bcomm);
+  int nfaces     = aggregateBndryFaces(patchNumber,bcomm);
+
+  if(groupsMPI->isGroupRoot(bcomm))
+    {
+      grvy_printf(INFO,"\n[INLET]: Patch number                      = %i\n",patchNumber);
+      grvy_printf(INFO,"[INLET]: Total Surface Area                = %.5e\n",area);
+      grvy_printf(INFO,"[INLET]: # of boundary faces               = %i\n",nfaces);
+      grvy_printf(INFO,"[INLET]: # of participating MPI partitions = %i\n",groupsMPI->groupSize(bcomm));
+    }
+}
