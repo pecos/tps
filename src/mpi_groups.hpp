@@ -23,6 +23,9 @@ private:
 public:
   MPI_Groups(MPI_Session *mpi);
   ~MPI_Groups();
+
+  bool isGroupRoot(MPI_Comm);      // check if rank 0 on local group
+  int groupSize(MPI_Comm);         // size of BC MPI group
   
   // function that creates the groups 
   void init();
