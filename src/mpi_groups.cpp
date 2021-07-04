@@ -16,6 +16,22 @@ MPI_Groups::~MPI_Groups()
   MPI_Comm_free(&outlet_comm);
 }
 
+bool MPI_Groups::isGroupRoot(MPI_Comm group_comm)
+{
+  int rank;
+  MPI_Comm_rank(group_comm,&rank);
+  if(rank == 0)
+    return true;
+  else
+    return false;
+}
+
+int MPI_Groups::groupSize(MPI_Comm group_comm)
+{
+  int numRanks;
+  MPI_Comm_size(group_comm,&numRanks);
+  return(numRanks);
+}
 
 void MPI_Groups::init()
 {
