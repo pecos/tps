@@ -4,6 +4,7 @@
 #include "mfem.hpp"
 #include "mpi_groups.hpp"
 #include "BoundaryCondition.hpp"
+#include "logger.hpp"
 
 using namespace mfem;
 
@@ -67,7 +68,7 @@ public:
                       DenseMatrix &gradState,
                       Vector &bdrFlux);
 
-  virtual void initState(){};
+  void initState();
 };
 
 #endif // INLET_BC
