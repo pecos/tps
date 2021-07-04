@@ -4,6 +4,7 @@
 #include "mfem.hpp"
 #include "mpi_groups.hpp"
 #include "BoundaryCondition.hpp"
+#include "logger.hpp"
 
 using namespace mfem;
 
