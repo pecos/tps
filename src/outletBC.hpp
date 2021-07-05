@@ -11,7 +11,8 @@ using namespace mfem;
 enum OutletType {
   SUB_P, // subsonic outlet specified with pressure
   SUB_P_NR, // non-reflecting subsonic outlet specified with pressure
-  SUB_MF_NR // Mass-flow non-reflecting 
+  SUB_MF_NR, // Mass-flow non-reflecting 
+  SUB_MF_NR_PW // point-based non-reflecting massflow BC
 };
 
 class OutletBC : public BoundaryCondition
@@ -52,6 +53,11 @@ private:
                               Vector &stateIn, 
                               DenseMatrix &gradState,
                               Vector &bdrFlux);
+                              
+  void subsonicNonRefPWMassFlow(Vector &normal,
+                                Vector &stateIn, 
+                                DenseMatrix &gradState,
+                                Vector &bdrFlux);
   
   virtual void updateMean(IntegrationRules *intRules,
                           ParGridFunction *Up);

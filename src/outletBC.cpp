@@ -128,6 +128,9 @@ void OutletBC::computeBdrFlux(Vector &normal,
     case SUB_MF_NR:
       subsonicNonRefMassFlow(normal,stateIn,gradState,bdrFlux);
       break;
+    case SUB_MF_NR_PW:
+      subsonicNonRefPWMassFlow(normal,stateIn,gradState,bdrFlux);
+      break;
   }
 }
 
@@ -576,6 +579,147 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal,
   
   rsolver->Eval(stateIn,state2,normal,bdrFlux,true);
 }
+
+void OutletBC::subsonicNonRefPWMassFlow(Vector &normal,
+                                        Vector &stateIn, 
+                                        DenseMatrix &gradState,
+                                        Vector &bdrFlux )
+{
+  const double gamma = eqState->GetSpecificHeatRatio();
+  
+  Vector unitNorm = normal;
+  {
+    double mod = 0.;
+    for(int d=0;d<dim;d++) mod += normal[d]*normal[d];
+    unitNorm *= 1./sqrt(mod);
+  }
+  
+  // mean velocity in inlet normal and tangent directions
+  Vector meanVel(dim);
+  meanVel = 0.;
+  for(int d=0;d<dim;d++)
+  {
+    meanVel[0] += unitNorm[d]*meanUp[d+1];
+    meanVel[1] += tangent1[d]*meanUp[d+1];
+  }
+  if( dim==3)
+  {
+    tangent2[0] = unitNorm[1]*tangent1[2]-unitNorm[2]*tangent1[1];
+    tangent2[1] = unitNorm[2]*tangent1[0]-unitNorm[0]*tangent1[2];
+    tangent2[2] = unitNorm[0]*tangent1[1]-unitNorm[1]*tangent1[0];
+    for(int d=0;d<dim;d++) meanVel[2] += tangent2[d]*meanUp[d+1];
+  }
+  
+  // velocity difference between actual and desired values
+//   Vector meanDV(dim);
+//   for(int d=0;d<dim;d++) meanDV[d] = meanUp[1+d] -inputState[1+d];
+  
+  
+  // normal gradients
+  Vector normGrad(num_equation);
+  normGrad = 0.;
+  for(int eq=0;eq<num_equation;eq++)
+  {
+    for(int d=0;d<dim;d++) normGrad[eq] += unitNorm[d]*gradState(eq,d);
+  }
+  double normVel = 0.;
+  for(int d=0;d<dim;d++) normVel += stateIn[1+d]*unitNorm[d];
+  normVel /= stateIn[0];
+  
+  const double rho = stateIn[0];
+  double k = 0.;
+  for(int d=0;d<dim;d++) k += stateIn[1+d]*stateIn[1+d];
+  k *= 0.5/rho/rho;
+  
+  const double speedSound = sqrt(gamma*meanUp[num_equation-1]/meanUp[0]);
+  double meanK = 0.;
+  for(int d=0;d<dim;d++) meanK += meanUp[1+d]*meanUp[1+d];
+  meanK *= 0.5;
+  
+  // compute outgoing characteristics
+  double L2 = speedSound*speedSound*normGrad[0] - normGrad[num_equation-1];
+  L2 *= meanVel[0];
+  
+  double L3 = 0;
+  for(int d=0;d<dim;d++) L3 += tangent1[d]*normGrad[1+d];
+  L3 *= meanVel[0];
+  
+  double L4 = 0.;
+  if(dim==3)
+  {
+    for(int d=0;d<dim;d++) L4 += tangent2[d]*normGrad[1+d];
+    L4 *= meanVel[0];
+  }
+  
+  double L5 = 0.;
+  for(int d=0;d<dim;d++) L5 += unitNorm[d]*normGrad[1+d];
+  L5 = normGrad[num_equation-1] +rho*speedSound*L5;
+  L5 *= meanVel[0] + speedSound;
+  
+  //const double p = eqState->ComputePressure(stateIn, dim);
+  
+  // estimate ingoing characteristic
+  const double sigma = speedSound/refLength;
+  double L1 = -sigma*(normVel - inputState[0]/meanUp[0]/area);
+  //cout<<inputState[0]<<" "<<meanUp[0]<<" "<<area<<endl;
+  L1 *= meanUp[0]*speedSound;
+  
+  // calc vector d
+  const double d1 = (L2+0.5*(L5+L1))/speedSound/speedSound;
+  const double d2 = 0.5*(L5-L1)/rho/speedSound;
+  const double d3 = L3;
+  const double d4 = L4;
+  const double d5 = 0.5*(L5+L1);
+  
+  // dF/dx
+  bdrFlux[0] = d1;
+  bdrFlux[1] = meanVel[0]*d1 + meanUp[0]*d2;
+  bdrFlux[2] = meanVel[1]*d1 + meanUp[0]*d3;
+  if(dim==3) bdrFlux[3] = meanVel[2]*d1 + meanUp[0]*d4;
+  bdrFlux[num_equation-1] =  meanUp[0]*meanVel[0]*d2;
+  bdrFlux[num_equation-1] += meanUp[0]*meanVel[1]*d3;
+  if(dim==3) bdrFlux[num_equation-1] += meanUp[0]*meanVel[2]*d4;
+  bdrFlux[num_equation-1] += meanK*d1 + d5/(gamma-1.);
+  
+  Vector state2(num_equation);
+  for(int eq=0;eq<num_equation;eq++) state2[eq] = boundaryU[eq+bdrN*num_equation];
+  
+  Vector stateN = state2;
+  for(int d=0;d<dim;d++) stateN[1+d] = 0.;
+  for(int d=0;d<dim;d++)
+  {
+    stateN[1] += state2[1+d]*unitNorm[d];
+    stateN[2] += state2[1+d]*tangent1[d];
+    if(dim==3) stateN[3] += state2[1+d]*tangent2[d];
+  }
+  
+  Vector newU(num_equation);
+  //for(int i=0; i<num_equation;i++) newU[i] = state2[i]- dt*(bdrFlux[i] /*+ fluxY[i]*/);
+  for(int i=0; i<num_equation;i++) newU[i] = stateN[i]- dt*bdrFlux[i];
+  
+  // transform back into x-y coords
+  {
+    DenseMatrix M(dim,dim);
+    for(int d=0;d<dim;d++)
+    {
+      M(0,d) = unitNorm[d];
+      M(1,d) = tangent1[d];
+      if(dim==3) M(2,d) = tangent2[d];
+    }
+      
+    DenseMatrix invM(dim,dim);
+    mfem::CalcInverse(M,invM);
+    Vector momN(dim), momX(dim);
+    for(int d=0;d<dim;d++) momN[d] = newU[1+d];
+    invM.Mult(momN,momX);
+    for(int d=0;d<dim;d++) newU[1+d] = momX[d]; 
+  }
+  for(int eq=0;eq<num_equation;eq++) boundaryU[eq+bdrN*num_equation] = newU[eq];
+  bdrN++;
+  
+  rsolver->Eval(stateIn,state2,normal,bdrFlux,true);
+}
+
 
 void OutletBC::initState()
 {

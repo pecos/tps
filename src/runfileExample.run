@@ -130,6 +130,7 @@ OUTLET 5 0 101300
 # 0 -> Inviscid wall
 # 1 -> Viscous adiabatic
 # 2 -> Viscous iso-thermal. Requires temperature
+# 3 -> Non-reflecting point-based massflow BC
 # WALL patchNum type
 WALL 8 0
 WALL 9 2 430
