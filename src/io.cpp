@@ -13,8 +13,15 @@ void M2ulPhyS::restart_files_hdf5(string mode)
   string serialName = "restart_";
   serialName.append( config.GetOutputName() );
   serialName.append( ".sol.h5" );
-    
+
   string fileName = groupsMPI->getParallelName( serialName );
+
+  // Variables used if (and only if) restarting from different order
+  FiniteElementCollection *aux_fec=NULL;
+  ParFiniteElementSpace *aux_vfes=NULL;
+  ParGridFunction *aux_U=NULL;
+  double *aux_U_data=NULL;
+  int auxOrder = -1;
 
   if(mpi.Root())
     cout << "HDF5 restart files mode: " << mode << endl;
@@ -97,7 +104,20 @@ void M2ulPhyS::restart_files_hdf5(string mode)
       H5Aclose(attr);
 
       if( loadFromAuxSol )
-        assert(read_order==auxOrder);
+        {
+          auxOrder = read_order;
+
+          if( basisType == 0 )
+            aux_fec = new DG_FECollection(auxOrder, dim, BasisType::GaussLegendre);
+          else if ( basisType == 1 )
+            aux_fec = new DG_FECollection(auxOrder, dim, BasisType::GaussLobatto);
+
+          aux_vfes = new ParFiniteElementSpace(mesh, aux_fec, num_equation,
+                                               Ordering::byNODES);
+
+          aux_U_data = new double[num_equation*aux_vfes->GetNDofs()];
+          aux_U = new ParGridFunction(aux_vfes, aux_U_data);
+        }
       else
         assert(read_order==order);
 
@@ -216,7 +236,7 @@ void M2ulPhyS::restart_files_hdf5(string mode)
       cout << "Reading in state vector from restart..." << endl;
       double *dataU;
       if( loadFromAuxSol )
-        dataU = aux_Up->GetData();
+        dataU = aux_U->GetData();
       else
         dataU = U->GetData();
 
@@ -266,12 +286,12 @@ void M2ulPhyS::restart_files_hdf5(string mode)
         cout << "Interpolating from auxOrder = " << auxOrder << " to order = " << order << endl;
 
       // Interpolate from aux to new order
-      U->ProjectGridFunction(*aux_Up);
+      U->ProjectGridFunction(*aux_U);
 
       // If interpolation was successful, the L2 norm of the
       // difference between the auxOrder and order versions should be
       // zero (well... to within round-off-induced error)
-      VectorGridFunctionCoefficient lowOrderCoeff(aux_Up);
+      VectorGridFunctionCoefficient lowOrderCoeff(aux_U);
       double err = U->ComputeL2Error(lowOrderCoeff);
 
       if (mpi.Root())
@@ -297,6 +317,11 @@ void M2ulPhyS::restart_files_hdf5(string mode)
           dataUp[i+(num_equation-1)*vfes->GetNDofs()] = p;
         }
 
+      // clean up aux data
+      delete aux_U;
+      delete aux_U_data;
+      delete aux_vfes;
+      delete aux_fec;
     }
 
 #ifdef HAVE_GRVY

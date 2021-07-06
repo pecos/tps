@@ -68,14 +68,11 @@ private:
   bool restart;
   bool restart_hdf5_conversion;   // read in older ascii format
   int restart_cycle;
-  
-  // Auxiliary order. A solution would be interpolated
-  // from order POL_ORDER to AUX_ORDER and dumped
-  int auxOrder;
 
-  // Restart from solution of AUX_ORDER
+  // Restart from different order solution on same mesh.  New order
+  // set by POL_ORDER, old order determined from restart file.
   bool restartFromAux;
-  
+
   // mean and RMS
   int sampleInterval;
   int startIter;
@@ -136,7 +133,6 @@ public:
   int GetTimeIntegratorType(){return timeIntegratorType;}
   
   int GetSolutionOrder(){return solOrder;}
-  int GetAuxSolOrder(){return auxOrder;}
   int GetIntegrationRule(){return integrationRule;}
   int GetBasisType(){return basisType;}
   

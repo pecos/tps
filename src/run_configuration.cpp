@@ -10,8 +10,7 @@ RunConfiguration::RunConfiguration()
   ref_levels = 0;
   timeIntegratorType = 4;
   solOrder = 4;
-  auxOrder = 0;
-  
+
   integrationRule = 1;
   basisType = 1;
   
@@ -124,13 +123,7 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       }else if( word.compare("RESTART_FROM_AUX")==0 )
       {
         restartFromAux = true;
-        
-        // order of auxiliary solution
-      }else if( word.compare("AUX_ORDER")==0 )
-      {
-        ss >> word;
-        auxOrder = stoi( word );
-        
+
       // mean and RMS calculation
       }else if( word.compare("CALC_MEAN_RMS")==0 )
       {

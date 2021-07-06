@@ -54,10 +54,8 @@ private:
   int order;
   
   // order of polynomials for auxiliary solution
-  int auxOrder;
   bool loadFromAuxSol;
-  bool dumpAuxSol;
-  
+
   // Equations solved
   Equations eqSystem;
 
@@ -89,7 +87,6 @@ private:
   //DG_FECollection *fec;
   //H1_FECollection *fec;
   FiniteElementCollection *fec;
-  FiniteElementCollection *aux_fec;
   
   // Finite element space for a scalar (thermodynamic quantity)
   ParFiniteElementSpace *fes;
@@ -99,7 +96,6 @@ private:
   
   // Finite element space for all variables together (total thermodynamic state)
   ParFiniteElementSpace *vfes;
-  ParFiniteElementSpace *aux_vfes;
   
   
   // The solution u has components {density, x-momentum, y-momentum, energy}.
@@ -135,8 +131,6 @@ private:
   
   // Primitive variables
   ParGridFunction *Up;
-  ParGridFunction *aux_Up;
-  double *aux_Up_data;
   
   // Visualization functions (these are pointers to Up)
   ParGridFunction *press, *dens, *vel;

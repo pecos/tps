@@ -37,16 +37,7 @@ void M2ulPhyS::initVariables()
   grvy_timer_init("TPS");
 #endif
   loadFromAuxSol = config.RestartFromAux();
-  auxOrder = config.GetAuxSolOrder(); //config.RestartFromAux();
-  if( loadFromAuxSol && auxOrder<1 )
-  {
-    cout<<"Option AUX_ORDER must be set when using RESTART_FROM_AUX"<<endl;
-    MPI_Abort(MPI_COMM_WORLD,1);
-  }
-  
-  dumpAuxSol = false;
-  if( auxOrder>0 ) dumpAuxSol =true;
-  
+
   // check if a simulations is being restarted
   Mesh *tempmesh;
   if( config.GetRestartCycle()>0 )
@@ -158,26 +149,19 @@ void M2ulPhyS::initVariables()
   {
     fec  = new DG_FECollection(order, dim, BasisType::GaussLegendre);
     //fec  = new H1_FECollection(order, dim, BasisType::GaussLegendre);
-    if( loadFromAuxSol || dumpAuxSol )
-      aux_fec = new DG_FECollection(auxOrder, dim, BasisType::GaussLegendre);
-
   }else if ( basisType == 1 )
   {
     // This basis type includes end-nodes
     fec  = new DG_FECollection(order, dim, BasisType::GaussLobatto);
     //fec  = new H1_FECollection(order, dim, BasisType::GaussLobatto);
-    if( loadFromAuxSol || dumpAuxSol )
-      aux_fec = new DG_FECollection(auxOrder, dim, BasisType::GaussLobatto);
   }
-  
+
   // FE Spaces
   fes  = new ParFiniteElementSpace(mesh, fec);
   dfes = new ParFiniteElementSpace(mesh, fec, dim, Ordering::byNODES);
   vfes = new ParFiniteElementSpace(mesh, fec, num_equation, Ordering::byNODES);
-  if( loadFromAuxSol || dumpAuxSol ) aux_vfes = new ParFiniteElementSpace(mesh, 
-                                                aux_fec, num_equation, Ordering::byNODES);
   gradUpfes = new ParFiniteElementSpace(mesh, fec, num_equation*dim, Ordering::byNODES);
-  
+
   initSolutionAndVisualizationVectors();
   projectInitialSolution();
   
@@ -328,14 +312,7 @@ void M2ulPhyS::initVariables()
 
 M2ulPhyS::~M2ulPhyS()
 {
-  if( loadFromAuxSol || dumpAuxSol )
-  {
-    delete aux_Up;
-    delete aux_Up_data;
-    delete aux_vfes;
-    delete aux_fec;
-  }
-  
+
   delete gradUp;
   
   delete u_block;
@@ -407,13 +384,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
   
   U  = new ParGridFunction(vfes, u_block->GetData());
   Up = new ParGridFunction(vfes, up_block->GetData());
-  
-  if( loadFromAuxSol || dumpAuxSol )
-  {
-    aux_Up_data = new double[num_equation*aux_vfes->GetNDofs()];
-    aux_Up = new ParGridFunction(aux_vfes, aux_Up_data);
-  }
-  
+
   dens = new ParGridFunction(fes, Up->GetData());
   vel = new ParGridFunction(dfes, Up->GetData()+fes->GetNDofs() );
   press = new ParGridFunction(fes,
