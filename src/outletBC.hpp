@@ -28,7 +28,7 @@ private:
   // Mean boundary state
   Vector meanUp;
   
-  DenseMatrix boundaryU;
+  Vector boundaryU;
   int bdrN;
   bool bdrUInit;
   

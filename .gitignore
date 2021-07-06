@@ -21,3 +21,4 @@ stamp-h1
 config.h
 autom4te.cache
 .deps
+*kdev*

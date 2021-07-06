@@ -71,7 +71,7 @@ inputState(_inputData)
     }
   }
   
-  boundaryU.SetSize(bdrN,num_equation);
+  boundaryU.SetSize(bdrN*num_equation);
   for(int i=0;i<bdrN;i++)
   {
     Vector iState(num_equation);
@@ -83,7 +83,7 @@ inputState(_inputData)
     
     for(int d=0;d<dim;d++) iState[1+d] *= iState[0];
     iState[num_equation-1]  = rE;
-    boundaryU.SetRow(i,iState);
+    for(int eq=0;eq<num_equation;eq++) boundaryU[eq+i*num_equation] = iState[eq];
   }
   bdrUInit = false;
   bdrN = 0;
@@ -204,7 +204,7 @@ void OutletBC::updateMean(IntegrationRules *intRules,
             sum += shape[d]*elUp(d,eq);
           }
           localMeanUp[eq] += sum;
-          if( !bdrUInit ) boundaryU(Nbdr,eq) = sum;
+          if( !bdrUInit ) boundaryU[eq+Nbdr*num_equation] = sum;
         }
         Nbdr++;
       }
@@ -223,7 +223,7 @@ void OutletBC::updateMean(IntegrationRules *intRules,
     for(int i=0;i<Nbdr;i++)
     {
       Vector iState(num_equation);
-      boundaryU.GetRow(i,iState);
+      for(int eq=0;eq<num_equation;eq++) iState[eq] = boundaryU[eq+i*num_equation];
       double gamma = eqState->GetSpecificHeatRatio();
       double k = 0.;
       for(int d=0;d<dim;d++) k += iState[1+d]*iState[1+d];
@@ -231,7 +231,7 @@ void OutletBC::updateMean(IntegrationRules *intRules,
       
       for(int d=0;d<dim;d++) iState[1+d] *= iState[0];
       iState[num_equation-1]  = rE;
-      boundaryU.SetRow(i,iState);
+      for(int eq=0;eq<num_equation;eq++) boundaryU[eq+i*num_equation] = iState[eq];
     }
     bdrUInit = true;
   }
@@ -362,7 +362,7 @@ void OutletBC::subsonicNonReflectingPressure( Vector &normal,
 //   }
   
   Vector state2(num_equation);
-  boundaryU.GetRow(bdrN,state2);
+  for(int eq=0;eq<num_equation;eq++) state2[eq] = boundaryU[eq+bdrN*num_equation];
   
   Vector stateN = state2;
   for(int d=0;d<dim;d++) stateN[1+d] = 0.;
@@ -394,7 +394,7 @@ void OutletBC::subsonicNonReflectingPressure( Vector &normal,
     invM.Mult(momN,momX);
     for(int d=0;d<dim;d++) newU[1+d] = momX[d]; 
   }
-  boundaryU.SetRow(bdrN,newU);
+  for(int eq=0;eq<num_equation;eq++) boundaryU[eq+bdrN*num_equation] = newU[eq];
   bdrN++;
   
   rsolver->Eval(stateIn,state2,normal,bdrFlux,true);
@@ -542,7 +542,7 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal,
 //   }
   
   Vector state2(num_equation);
-  boundaryU.GetRow(bdrN,state2);
+  for(int eq=0;eq<num_equation;eq++) state2[eq] = boundaryU[eq+bdrN*num_equation];
   
   Vector stateN = state2;
   for(int d=0;d<dim;d++) stateN[1+d] = 0.;
@@ -574,7 +574,7 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal,
     invM.Mult(momN,momX);
     for(int d=0;d<dim;d++) newU[1+d] = momX[d]; 
   }
-  boundaryU.SetRow(bdrN,newU);
+  for(int eq=0;eq<num_equation;eq++) boundaryU[eq+bdrN*num_equation] = newU[eq];
   bdrN++;
   
   rsolver->Eval(stateIn,state2,normal,bdrFlux,true);
