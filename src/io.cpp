@@ -64,6 +64,13 @@ void M2ulPhyS::restart_files_hdf5(string mode)
       assert(status >= 0);  
       H5Aclose(attr);
 
+      // solution order
+      attr = H5Acreate(file,"order", H5T_NATIVE_INT, aid, H5P_DEFAULT, H5P_DEFAULT);
+      assert(attr >= 0);
+      status = H5Awrite(attr,H5T_NATIVE_INT,&order);
+      assert(status >= 0);
+      H5Aclose(attr);
+
       H5Sclose(aid);
     }
   else	// read
@@ -82,6 +89,15 @@ void M2ulPhyS::restart_files_hdf5(string mode)
       status = H5Aread(attr,H5T_NATIVE_DOUBLE,&dt);
       assert(status >= 0);
       H5Aclose(attr);
+
+      int read_order;
+      attr   = H5Aopen_name(file,"order");
+      status = H5Aread(attr,H5T_NATIVE_INT,&read_order);
+      assert(status >= 0);
+      H5Aclose(attr);
+
+      assert(read_order==order);
+
 #ifdef HAVE_GRVY
       grvy_printf(GRVY_INFO,"Restarting from iteration = %i\n",iter);
       grvy_printf(GRVY_INFO,"--> time = %f\n",time);
