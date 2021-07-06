@@ -1,5 +1,6 @@
 #include "M2ulPhyS.hpp"
 #include <hdf5.h>
+#include "utils.hpp"
 
 void M2ulPhyS::restart_files_hdf5(string mode)
 {
@@ -36,6 +37,18 @@ void M2ulPhyS::restart_files_hdf5(string mode)
     }
   else if (mode == "read")
     {
+
+      // verify we have all desired files
+      int gstatus;
+      int status = int(file_exists(fileName));
+      MPI_Allreduce(&status,&gstatus,1,MPI_INT,MPI_MIN,MPI_COMM_WORLD);
+
+      if(gstatus == 0)
+	{
+	  grvy_printf(ERROR,"[ERROR]: Unable to access desired restart file -> %s\n",fileName.c_str());
+	  exit(ERROR);
+	}
+
       file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
       assert(file >= 0);
     }

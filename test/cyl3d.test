@@ -27,6 +27,17 @@ setup() {
     h5diff $SOLN_FILE $REF_FILE
 }
 
+@test "[$TEST] verify exit code if restart files missing" {
+    RUNFILE=input.4iters.restart.cyl
+
+    rm -f $SOLN_FILE
+
+    # following should exit with error
+    run ../src/tps --runFile $RUNFILE
+    [[ "${status}" -eq 1 ]]
+    [[ "${output}" =~ "Unable to access desired restart file" ]]
+}
+
 @test "[$TEST] verify consistent solution with restart from 2 iters" {
     RUNFILE=input.2iters.cyl
 

@@ -10,6 +10,7 @@
 //#include <grvy.h>
 #include <unistd.h>
 #include "M2ulPhyS.hpp"
+#include "utils.hpp"
 
 #ifdef HAVE_SLURM
 #include <slurm/slurm.h>
@@ -107,7 +108,6 @@ bool file_exists (const std::string &name)
 {
   return ( access( name.c_str(), F_OK ) != -1 );
 }
-
 
 // Look for existence of output.pvd files in vis output directory and
 // keep a sequentially numbered copy. Useful when doing restart,
