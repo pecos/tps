@@ -43,3 +43,37 @@ setup() {
     h5diff $SOLN_FILE $REF_FILE
 }
 
+@test "[$TEST] verify tps output after variable p restart" {
+    RUNFILE=input.4iters.cyl
+
+    rm -f $SOLN_FILE
+    test -s $RUNFILE
+    ../src/tps --runFile $RUNFILE
+    test -s $SOLN_FILE
+
+    run h5dump  -a iteration  restart_output.sol.h5
+    [ "${lines[5]}" = "   (0): 4" ]
+
+    run h5dump  -a order  restart_output.sol.h5
+    [ "${lines[5]}" = "   (0): 1" ]
+
+    VARPLOG=varp.log
+    rm -f $VARPLOG
+    RUNFILE=input.8iters.restart.newp.cyl
+    ../src/tps --runFile $RUNFILE >& $VARPLOG
+
+    #intErr=$(cat $VARPLOG | grep "interpolation error" | awk '{print $6}')
+    # Line grabs the printed interpolation error norm, which I'd like
+    # to compare against a tolerance.  But bc isn't available in
+    # current container it seems, so I'm not doing this now.
+
+    run h5dump  -a iteration  restart_output.sol.h5
+    [ "${lines[5]}" = "   (0): 8" ]
+
+    run h5dump  -a order  restart_output.sol.h5
+    [ "${lines[5]}" = "   (0): 2" ]
+
+    REF_FILE=ref_solns/cyl3d_coarse.8iters.varp.h5
+    test -s $REF_FILE
+    h5diff $SOLN_FILE $REF_FILE
+}
