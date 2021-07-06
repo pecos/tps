@@ -179,10 +179,7 @@ private:
   void initVariables();
   void initSolutionAndVisualizationVectors();
   void initialTimeStep();
-  
-  void interpolateAux2Order();
-  void interpolateOrder2Aux();
-  
+
 #ifdef _MASA_
   static void MASA_exactSoln(const Vector& x, double tin, Vector& y);
 #endif

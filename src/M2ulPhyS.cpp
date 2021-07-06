@@ -805,128 +805,6 @@ void M2ulPhyS::initGradUp()
   }
 }
 
-
-void M2ulPhyS::interpolateOrder2Aux()
-{
-  double *data_Up = Up->GetData();
-  double *data_aux = aux_Up->GetData();
-
-  // fill out coords
-  for(int el=0;el<vfes->GetNE();el++) // lin_vfes and vfes should have the same num of elems
-  {
-    // get aux. points
-    const IntegrationRule aux_ir = aux_vfes->GetFE(el)->GetNodes();
-    ElementTransformation *aux_Tr = aux_vfes->GetElementTransformation(el);
-    
-    DenseMatrix aux_pos;
-    aux_Tr->Transform(aux_ir,aux_pos);
-    
-    Array<int> aux_dofs;
-    aux_vfes->GetElementVDofs(el, aux_dofs);
-    
-    Array<int> p_dofs;
-    vfes->GetElementVDofs(el, p_dofs);
-    
-    // Order p element transformation
-    ElementTransformation *p_Tr = vfes->GetElementTransformation(el);
-    const FiniteElement *p_fe = vfes->GetFE(el);
-    
-    for(int aux_n=0;aux_n<aux_ir.GetNPoints();aux_n++)
-    {
-      IntegrationPoint transformed_IP;
-      Vector coords;
-      coords.SetSize(dim);
-      for(int d=0;d<dim;d++) coords[d] = aux_pos(aux_n,d);
-      
-      p_Tr->TransformBack(coords, transformed_IP);
-      
-      p_Tr->SetIntPoint( &transformed_IP);
-      
-      Vector shape;
-      shape.SetSize( p_fe->GetDof() );
-      
-      p_fe->CalcShape(transformed_IP, shape);
-      
-      // interpolate values
-      int aux_index = aux_dofs[aux_n];
-      const int aux_Ndofs = aux_vfes->GetNDofs();
-      const int p_Ndofs = vfes->GetNDofs();
-      for(int eq=0;eq<num_equation;eq++)
-      {
-        data_aux[aux_index + eq*aux_Ndofs] = 0.;
-        for(int i=0;i<shape.Size();i++)
-        {
-          int indexHO = p_dofs[i];
-          data_aux[aux_index + eq*aux_Ndofs] += 
-              shape[i]*data_Up[indexHO+eq*p_Ndofs];
-        }
-      }
-    }
-  }
-}
-
-void M2ulPhyS::interpolateAux2Order()
-{
-  double *data_Up = U->GetData();
-  double *data_aux = aux_Up->GetData();
-
-  // fill out coords
-  for(int el=0;el<vfes->GetNE();el++) // aux_vfes and vfes should have the same num of elems
-  {
-    // get order p points
-    const IntegrationRule ir = vfes->GetFE(el)->GetNodes();
-    ElementTransformation *Tr = vfes->GetElementTransformation(el);
-    
-    DenseMatrix pos;
-    Tr->Transform(ir,pos);
-    
-    Array<int> aux_dofs;
-    aux_vfes->GetElementVDofs(el, aux_dofs);
-    
-    Array<int> p_dofs;
-    vfes->GetElementVDofs(el, p_dofs);
-    
-    // linear element transformation
-    ElementTransformation *aux_Tr = aux_vfes->GetElementTransformation(el);
-    const FiniteElement *aux_fe = aux_vfes->GetFE(el);
-    
-    // loop over HO nodes
-    for(int n=0;n<ir.GetNPoints();n++)
-    {
-      IntegrationPoint transformed_IP;
-      Vector coords;
-      coords.SetSize(dim);
-      for(int d=0;d<dim;d++) coords[d] = pos(n,d);
-      
-      aux_Tr->TransformBack(coords, transformed_IP);
-      
-      aux_Tr->SetIntPoint( &transformed_IP);
-      
-      Vector shape;
-      shape.SetSize( aux_fe->GetDof() );
-      
-      aux_fe->CalcShape(transformed_IP, shape);
-      
-      // interpolate values
-      const int p_index = p_dofs[n];
-      const int aux_Ndofs = aux_vfes->GetNDofs();
-      const int p_Ndofs = vfes->GetNDofs();
-      for(int eq=0;eq<num_equation;eq++)
-      {
-        data_Up[p_index + eq*p_Ndofs] = 0.;
-        for(int i=0;i<shape.Size();i++)
-        {
-          int aux_index = aux_dofs[i];
-          data_Up[p_index + eq*p_Ndofs] += 
-              shape[i]*data_aux[aux_index+eq*aux_Ndofs];
-        }
-      }
-    }
-  }
-}
-
-
-
 void M2ulPhyS::write_restart_files()
 {
   string serialName = "restart_p";
@@ -951,33 +829,6 @@ void M2ulPhyS::write_restart_files()
   }
   
   file.close();
-  
-  if( dumpAuxSol )
-  {
-    interpolateOrder2Aux();
-    serialName = "restart_p";
-    serialName.append( to_string(auxOrder) );
-    serialName.append("_");
-    serialName.append( config.GetOutputName() );
-    serialName.append( ".sol" );
-      
-    fileName = groupsMPI->getParallelName( serialName );
-    file.open( fileName, std::ofstream::trunc );
-    file.precision(8);
-    
-    // write cycle and time
-    file<<iter<<" "<<time<<" "<<dt<<endl;
-    
-    double *data = aux_Up->GetData();
-    int dof = aux_vfes->GetNDofs();
-    
-    for(int i=0;i<dof*num_equation;i++)
-    {
-      file << data[i] <<endl;
-    }
-    
-    file.close();
-  }
 }
 
 
@@ -991,14 +842,17 @@ void M2ulPhyS::read_restart_files()
       cout<<"================================================"<<endl;
     }
 
-  string serialName = "restart_p";
   if( loadFromAuxSol )
-  {
-    serialName.append( to_string(auxOrder) );
-  }else
-  {
-    serialName.append( to_string(order) );
-  }
+    {
+      cerr << "ERROR: Restart from auxOrder is not supported with ascii-based restarts." << endl;
+      cerr << "To change order, convert the ascii-based restart file to hdf5 and then change the order." << endl;
+      MPI_Abort(MPI_COMM_WORLD,1);
+    }
+
+  assert(!loadFromAuxSol);
+
+  string serialName = "restart_p";
+  serialName.append( to_string(order) );
   serialName.append("_");
   serialName.append( config.GetOutputName() );
   serialName.append( ".sol" );
@@ -1013,14 +867,8 @@ void M2ulPhyS::read_restart_files()
   }else
   {
     double *data;
-    if( loadFromAuxSol )
-    {
-      data = aux_Up->GetData();
-    }else
-    {
-      data = Up->GetData();
-    }
-    
+    data = Up->GetData();
+
     string line;
     // read time and iters
     {
@@ -1052,16 +900,13 @@ void M2ulPhyS::read_restart_files()
       lines++;
     }
     file.close();
-    
-    if( loadFromAuxSol ) interpolateAux2Order();
-    
+
     double *dataUp = Up->GetData();
-    
+
     // fill out U
     double *dataU = U->GetData();
     double gamma = eqState->GetSpecificHeatRatio();
     int dof = vfes->GetNDofs();
-    if( loadFromAuxSol ) dof = aux_vfes->GetNDofs();
     if( lines!=dof*num_equation )
     {
       cout<<"# of lines in files does not match domain size"<<endl;
