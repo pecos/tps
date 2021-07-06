@@ -134,15 +134,10 @@ void M2ulPhyS::restart_files_hdf5(string mode)
       else
         assert(read_order==order);
 
-#ifdef HAVE_GRVY
       grvy_printf(GRVY_INFO,"Restarting from iteration = %i\n",iter);
-      grvy_printf(GRVY_INFO,"--> time = %f\n",time);
-      grvy_printf(GRVY_INFO,"--> dt   = %f\n",dt);
-#else
-      printf("Restarting from iteration = %i\n",iter);
-      printf("--> time = %f\n",time);
-      printf("--> dt   = %f\n",dt);
-#endif
+      grvy_printf(GRVY_INFO,"--> time = %e\n",time);
+      grvy_printf(GRVY_INFO,"--> dt   = %e\n",dt);
+
     }
 
   // -------------------------------------------------------------------
