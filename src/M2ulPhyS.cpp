@@ -37,7 +37,7 @@ void M2ulPhyS::initVariables()
   grvy_timer_init("TPS");
 #endif
   loadFromAuxSol = config.RestartFromAux();
-  auxOrder = config.RestartFromAux();
+  auxOrder = config.GetAuxSolOrder(); //config.RestartFromAux();
   if( loadFromAuxSol && auxOrder<1 )
   {
     cout<<"Option AUX_ORDER must be set when using RESTART_FROM_AUX"<<endl;
@@ -158,16 +158,16 @@ void M2ulPhyS::initVariables()
   {
     fec  = new DG_FECollection(order, dim, BasisType::GaussLegendre);
     //fec  = new H1_FECollection(order, dim, BasisType::GaussLegendre);
-    if( loadFromAuxSol || dumpAuxSol ) 
-      aux_fec = new DG_FECollection(1, dim, BasisType::GaussLegendre);
-    
+    if( loadFromAuxSol || dumpAuxSol )
+      aux_fec = new DG_FECollection(auxOrder, dim, BasisType::GaussLegendre);
+
   }else if ( basisType == 1 )
   {
     // This basis type includes end-nodes
     fec  = new DG_FECollection(order, dim, BasisType::GaussLobatto);
     //fec  = new H1_FECollection(order, dim, BasisType::GaussLobatto);
-    if( loadFromAuxSol || dumpAuxSol ) 
-      aux_fec = new DG_FECollection(1, dim, BasisType::GaussLobatto);
+    if( loadFromAuxSol || dumpAuxSol )
+      aux_fec = new DG_FECollection(auxOrder, dim, BasisType::GaussLobatto);
   }
   
   // FE Spaces
@@ -867,7 +867,7 @@ void M2ulPhyS::interpolateOrder2Aux()
 
 void M2ulPhyS::interpolateAux2Order()
 {
-  double *data_Up = Up->GetData();
+  double *data_Up = U->GetData();
   double *data_aux = aux_Up->GetData();
 
   // fill out coords

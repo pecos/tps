@@ -96,7 +96,10 @@ void M2ulPhyS::restart_files_hdf5(string mode)
       assert(status >= 0);
       H5Aclose(attr);
 
-      assert(read_order==order);
+      if( loadFromAuxSol )
+        assert(read_order==auxOrder);
+      else
+        assert(read_order==order);
 
 #ifdef HAVE_GRVY
       grvy_printf(GRVY_INFO,"Restarting from iteration = %i\n",iter);
@@ -211,7 +214,11 @@ void M2ulPhyS::restart_files_hdf5(string mode)
     {
 
       cout << "Reading in state vector from restart..." << endl;
-      double *dataU = U->GetData();
+      double *dataU;
+      if( loadFromAuxSol )
+        dataU = aux_Up->GetData();
+      else
+        dataU = U->GetData();
 
       data_soln = H5Dopen2(file, "/solution/density",H5P_DEFAULT); assert(data_soln >= 0);
       dataspace = H5Dget_space(data_soln);
@@ -219,8 +226,11 @@ void M2ulPhyS::restart_files_hdf5(string mode)
 
       // verify Dofs match expectations
       int dof = vfes->GetNDofs();
+      if( loadFromAuxSol )
+        dof = aux_vfes->GetNDofs();
+
       assert(numInSoln == dof);
-      
+
       status    = H5Dread(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataU);
       assert(status >= 0);
       H5Dclose(data_soln);
@@ -248,7 +258,47 @@ void M2ulPhyS::restart_files_hdf5(string mode)
     }
 
   H5Fclose(file);
-  
+
+  if(mode=="read" && loadFromAuxSol)
+    {
+
+      if (mpi.Root())
+        cout << "Interpolating from auxOrder = " << auxOrder << " to order = " << order << endl;
+
+      // Interpolate from aux to new order
+      U->ProjectGridFunction(*aux_Up);
+
+      // If interpolation was successful, the L2 norm of the
+      // difference between the auxOrder and order versions should be
+      // zero (well... to within round-off-induced error)
+      VectorGridFunctionCoefficient lowOrderCoeff(aux_Up);
+      double err = U->ComputeL2Error(lowOrderCoeff);
+
+      if (mpi.Root())
+        cout << "|| interpolation error ||_2 = " << err << endl;
+
+      // Update primitive variables.  This will be done automatically
+      // before taking a time step, but we may write paraview output
+      // prior to that, in which case the primitives are incorrect.
+      // We would like to just call rhsOperator::updatePrimitives, but
+      // rhsOperator has not been constructed yet.  As a workaround,
+      // that code is duplicated here.
+      double *dataUp = Up->GetData();
+      double *x = U->GetData();
+      for(int i=0;i<vfes->GetNDofs();i++)
+        {
+          Vector iState(num_equation);
+          for(int eq=0;eq<num_equation;eq++) iState[eq] = x[i+eq*vfes->GetNDofs()];
+          double p = eqState->ComputePressure(iState,dim);
+          dataUp[i                   ] = iState[0];
+          dataUp[i+  vfes->GetNDofs()] = iState[1]/iState[0];
+          dataUp[i+2*vfes->GetNDofs()] = iState[2]/iState[0];
+          if(dim==3) dataUp[i+3*vfes->GetNDofs()] = iState[3]/iState[0];
+          dataUp[i+(num_equation-1)*vfes->GetNDofs()] = p;
+        }
+
+    }
+
 #ifdef HAVE_GRVY
   grvy_timer_end(__func__);
 #endif
