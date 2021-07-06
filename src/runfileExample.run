@@ -122,6 +122,7 @@ INLET 5 0 1.2 30 0 0
 # 0 -> Subsonic outlet Specified with P 
 # 1 -> Non-reflect. sub. outlet Specified with P 
 # 2 -> Non-reflecting mass flow outlet
+# 3 -> Non-reflecting point-based mass flow outlet
 #OUTLET patchNum type press
 OUTLET 5 0 101300
 
@@ -130,7 +131,6 @@ OUTLET 5 0 101300
 # 0 -> Inviscid wall
 # 1 -> Viscous adiabatic
 # 2 -> Viscous iso-thermal. Requires temperature
-# 3 -> Non-reflecting point-based massflow BC
 # WALL patchNum type
 WALL 8 0
 WALL 9 2 430
