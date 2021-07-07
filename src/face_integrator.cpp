@@ -1,6 +1,8 @@
 
 #include "face_integrator.hpp"
 
+#include "general/forall.hpp"
+
 // Implementation of class FaceIntegrator
 FaceIntegrator::FaceIntegrator(IntegrationRules *_intRules,
                                RiemannSolver *rsolver_, 
@@ -42,11 +44,11 @@ FaceIntegrator::~FaceIntegrator()
 }
 
 
-void FaceIntegrator::getElementsGrads(FaceElementTransformations &Tr, 
-                                      const FiniteElement &el1, 
-                                      const FiniteElement &el2, 
-                                      DenseMatrix &gradUp1, 
-                                      DenseMatrix &gradUp2)
+void FaceIntegrator::getElementsGrads_cpu(FaceElementTransformations &Tr, 
+                                          const FiniteElement &el1, 
+                                          const FiniteElement &el2, 
+                                          DenseTensor &gradUp1, 
+                                          DenseTensor &gradUp2)
 {
   double *dataGradUp = gradUp->GetData();
   
@@ -59,7 +61,7 @@ void FaceIntegrator::getElementsGrads(FaceElementTransformations &Tr,
     int index = vdofs1[n];
     for(int eq=0;eq<num_equation;eq++)
     {
-      for(int d=0;d<dim;d++) gradUp1(n,eq +d*num_equation) = 
+      for(int d=0;d<dim;d++) gradUp1(n,eq,d) = 
         dataGradUp[index + eq*totDofs + d*num_equation*totDofs];
     } 
   }
@@ -79,7 +81,7 @@ void FaceIntegrator::getElementsGrads(FaceElementTransformations &Tr,
     {
       for(int eq=0;eq<num_equation;eq++)
       {
-        for(int d=0;d<dim;d++) gradUp2(n,eq +d*num_equation) = 
+        for(int d=0;d<dim;d++) gradUp2(n,eq,d) = 
           arrayGrad2[n + eq*eldDof + d*num_equation*eldDof];
       } 
     }
@@ -93,14 +95,86 @@ void FaceIntegrator::getElementsGrads(FaceElementTransformations &Tr,
       int index = vdofs2[n];
       for(int eq=0;eq<num_equation;eq++)
       {
-        for(int d=0;d<dim;d++) gradUp2(n,eq +d*num_equation) = 
+        for(int d=0;d<dim;d++) gradUp2(n,eq ,d) = 
           dataGradUp[index + eq*totDofs + d*num_equation*totDofs];
       } 
     }
     
   }
-
 }
+
+void FaceIntegrator::getElementsGrads_gpu(const ParGridFunction *gradUp,
+                                          ParFiniteElementSpace *vfes,
+                                          const ParFiniteElementSpace *gradUpfes,
+                                          FaceElementTransformations& Tr, 
+                                          const FiniteElement& el1, const 
+                                          FiniteElement& el2, 
+                                          DenseTensor& gradUp1, 
+                                          DenseTensor& gradUp2, 
+                                          const int &num_equation, 
+                                          const int& totalDofs, 
+                                          const int& dim)
+{
+  const double *d_gradUp = gradUp->Read();
+  double *d_gradUp1 = gradUp1.ReadWrite();
+  
+  
+  Array<int> vdofs1;
+  vfes->GetElementVDofs(Tr.Elem1->ElementNo, vdofs1);
+  auto d_vdofs1 = vdofs1.Read();
+  int eldDof = el1.GetDof();
+  MFEM_FORALL(n,eldDof,
+  {
+    int index = d_vdofs1[n];
+    for(int eq=0;eq<num_equation;eq++)
+    {
+      for(int d=0;d<dim;d++) d_gradUp1[n + eq*eldDof + d*eldDof*num_equation] = 
+        d_gradUp[index + eq*totalDofs + d*num_equation*totalDofs];
+    } 
+  });
+  gradUp1.HostRead();
+  
+  eldDof = el2.GetDof();
+  Array<int> vdofs2;
+  int no2 = Tr.Elem2->ElementNo;
+  int NE  = vfes->GetNE();
+  if( no2>=NE )
+  {
+    int Elem2NbrNo = no2 - NE;
+    gradUpfes->GetFaceNbrElementVDofs(Elem2NbrNo, vdofs2);
+    
+    Vector grad2;grad2.UseDevice(false);
+    grad2.SetSize(vdofs2.Size());
+    gradUp->FaceNbrData().GetSubVector(vdofs2, grad2 );
+    
+    for(int n=0; n<eldDof; n++)
+    {
+      for(int eq=0;eq<num_equation;eq++)
+      {
+        for(int d=0;d<dim;d++) gradUp2(n,eq,d) = 
+          grad2[n + eq*eldDof + d*num_equation*eldDof];
+      }
+    }
+    
+  }else
+  {
+    vfes->GetElementVDofs(no2, vdofs2);
+    double *d_gradUp2 = gradUp2.Write();
+    auto d_vdofs2 = vdofs2.Read();
+    
+    MFEM_FORALL(n,eldDof,
+    {
+      int index = d_vdofs2[n];
+      for(int eq=0;eq<num_equation;eq++)
+      {
+        for(int d=0;d<dim;d++) d_gradUp2[n + eq*eldDof + d*eldDof*num_equation] = 
+          d_gradUp[index + eq*totalDofs + d*num_equation*totalDofs];
+      } 
+    });
+    gradUp2.Read();
+  }
+}
+
 
 void FaceIntegrator::AssembleFaceVector(const FiniteElement &el1,
                                         const FiniteElement &el2,
@@ -149,9 +223,23 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1,
                            num_equation);
    
    // Get gradients of elements
-   DenseMatrix gradUp1(dof1,num_equation*dim);
-   DenseMatrix gradUp2(dof2,num_equation*dim);
-   getElementsGrads(Tr, el1, el2, gradUp1, gradUp2);
+   DenseTensor gradUp1(dof1,num_equation,dim);
+   DenseTensor gradUp2(dof2,num_equation,dim);
+#ifdef _GPU_
+   getElementsGrads_gpu(gradUp,
+                        vfes,
+                        gradUpfes,
+                        Tr,
+                        el1, 
+                        el2, 
+                        gradUp1, 
+                        gradUp2,
+                        num_equation,
+                        vfes->GetNDofs(),
+                        dim );
+#else
+   getElementsGrads_cpu(Tr, el1, el2, gradUp1, gradUp2);
+#endif
 
    // Integration order calculation from DGTraceIntegrator
    int intorder;
@@ -192,9 +280,9 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1,
         for(int d=0;d<dim;d++)
         {
           for(int k=0;k<dof1;k++) gradUp1i(eq,d) += 
-                                  gradUp1(k,eq+d*num_equation)*shape1(k);
+                                  gradUp1(k,eq,d)*shape1(k);
           for(int k=0;k<dof2;k++) gradUp2i(eq,d) += 
-                                  gradUp2(k,eq+d*num_equation)*shape2(k);
+                                  gradUp2(k,eq,d)*shape2(k);
         }
       }
 
@@ -264,9 +352,9 @@ void FaceIntegrator::MassMatrixFaceIntegral(const FiniteElement &el1,
                            num_equation);
    
    // Get gradients of elements
-   DenseMatrix gradUp1(dof1,num_equation*dim);
-   DenseMatrix gradUp2(dof2,num_equation*dim);
-   getElementsGrads(Tr, el1, el2, gradUp1, gradUp2);
+   DenseTensor gradUp1(dof1,num_equation,dim);
+   DenseTensor gradUp2(dof2,num_equation,dim);
+   getElementsGrads_cpu(Tr, el1, el2, gradUp1, gradUp2);
    
 //    DenseMatrix faceMass1( dof1 );
 //    DenseMatrix faceMass2( dof2 );
@@ -358,8 +446,8 @@ void FaceIntegrator::MassMatrixFaceIntegral(const FiniteElement &el1,
       {
         for(int d=0;d<dim;d++)
         {
-          igradUp1(eq,d) = gradUp1(index1,eq +d*num_equation);
-          igradUp2(eq,d) = gradUp2(index2,eq +d*num_equation);
+          igradUp1(eq,d) = gradUp1(index1,eq,d);
+          igradUp2(eq,d) = gradUp2(index2,eq,d);
         }
       }
       

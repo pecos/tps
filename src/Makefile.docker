@@ -1,6 +1,10 @@
 PROJECT_ROOT = $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
+EXE = CPU
 PROGRAM = MulPhyS_docker.p
+ifeq($(EXE),GPU)
+	PROGRAM = MulPhyS_gpu.p
+endif
 
 # LIBRARIES
 LIBS =  -lmfem \
@@ -10,7 +14,6 @@ LIBS =  -lmfem \
 	-lnetcdf \
 	-lsuperlu_dist \
 	-lmetis \
-	-lslurm \
 	-lrt
 
 # LIBRARY PATH
@@ -43,11 +46,18 @@ OBJS = $(patsubst %.cpp,%.o,$(SOURCE_FILES))
 
 # COMPILER
 CXX = mpicxx
+ifeq($(EXE),GPU) 
+	C_GPU = nvcc
+endif
 
 ifeq ($(BUILD_MODE),debug)
 	CFLAGS += -Wall -g -O0 -std=c++11 -DDEBUG
 else #ifeq ($(BUILD_MODE),run)
-	CFLAGS += -Wall -O3 -std=c++17
+	CFLAGS += -Wall -O3 -std=c++11
+	ifeq($(EXE),GPU) 
+		GPU_CFLAGS += -x=cu --expt-extended-lambda -arch=sm_60 -ccbin
+		GPU_LFLAGS += --expt-extended-lambda -arch=sm_60 -ccbin
+	endif
 #else
 #	$(error Build mode $(BUILD_MODE) not supported by this Makefile)
 endif
@@ -55,11 +65,11 @@ endif
 all: $(PROGRAM)
 
 $(OBJS): $(SOURCE_FILES)
-	$(CXX) $(CFLAGS) -c $(patsubst %.o,%.cpp,$@) $(INCLUDE_PATHS)
+	$(C_GPU) $(CFLAGS) $(GPU_CFLAGS) $(CXX) -c $(patsubst %.o,%.cpp,$@) $(INCLUDE_PATHS)
 
 $(PROGRAM): $(OBJS)
-	$(CXX) $(CFLAGS) $(OBJS) $(LIB_PATHS) $(LIBS) -o $(PROGRAM)
+	$(C_GPU) $(CFLAGS) $(GPU_LFLAGS) $(CXX) $(OBJS) $(LIB_PATHS) $(LIBS) -o $(PROGRAM)
 
 .PHONY : clean
 clean:
-	rm -fr $(PROGRAM) *.o
+	rm -fr $(PROGRAM) *.p *.o

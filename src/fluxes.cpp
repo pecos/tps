@@ -1,5 +1,6 @@
 
 #include "fluxes.hpp"
+#include "general/forall.hpp"
 
 Fluxes::Fluxes(EquationOfState *_eqState,
                Equations &_eqSystem,
@@ -149,4 +150,150 @@ void Fluxes::ComputeSplitFlux(const mfem::Vector &state,
     c_mat(num_equations-1, d) = rhoE /*+p*/;
   }
   
+}
+
+void Fluxes::convectiveFluxes_gpu( const Vector &x, 
+                                  DenseTensor &flux,
+                                  const double gamma, 
+                                  const int dof, 
+                                  const int dim,
+                                  const int num_equation)
+{
+#ifdef _GPU_
+  auto dataIn = x.Read();
+  auto d_flux = flux.ReadWrite();
+  
+  MFEM_FORALL_2D(n,dof,num_equation,1,1,
+  {
+    MFEM_SHARED double Un[5];
+    MFEM_SHARED double KE[3];
+    MFEM_SHARED double p;
+    
+    MFEM_FOREACH_THREAD(eq,x,num_equation)
+    {
+      Un[eq] = dataIn[n + eq*dof];
+      MFEM_SYNC_THREAD;
+      
+      if( eq<dim ) KE[eq] = 0.5*Un[1+eq]*Un[1+eq]/Un[0];
+      if( dim!=3 && eq==1 ) KE[2] = 0.;
+      MFEM_SYNC_THREAD;
+      
+      if( eq==0 ) p = EquationOfState::pressure(&Un[0],&KE[0],gamma,dim,num_equation);
+      MFEM_SYNC_THREAD;
+      
+      double temp;
+      for(int d=0;d<dim;d++)
+      {
+        if( eq==0 ) d_flux[n + d*dof + eq*dof*dim] = Un[1+d];
+        if( eq>0 && eq<=dim )
+        {
+          temp = Un[eq]*Un[1+d]/Un[0];
+          if( eq-1==d ) temp += p;
+          d_flux[n + d*dof + eq*dof*dim] = temp;
+        }
+        if( eq==num_equation-1)
+        {
+          d_flux[n + d*dof + eq*dof*dim] = Un[1+d]*(Un[num_equation-1]+p)/Un[0];
+        }
+        
+      }
+    }
+  });
+#endif
+}
+
+void Fluxes::viscousFluxes_gpu( const Vector &x, 
+                                ParGridFunction *gradUp,
+                                DenseTensor &flux,
+                                const double gamma, 
+                                const double Rg, // gas constant
+                                const double Pr, // Prandtl number
+                                const double viscMult,
+                                const int dof, 
+                                const int dim,
+                                const int num_equation)
+{
+#ifdef _GPU_
+  const double *dataIn = x.Read();
+  double *d_flux = flux.ReadWrite();
+  const double *d_gradUp = gradUp->Read();
+  
+  MFEM_FORALL_2D(n,dof,num_equation,1,1,
+  {
+    MFEM_FOREACH_THREAD(eq,x,num_equation)
+    {
+      MFEM_SHARED double Un[5];
+      MFEM_SHARED double vel[3];
+      MFEM_SHARED double KE[3];
+      MFEM_SHARED double gradUpn[5][3];
+      MFEM_SHARED double vFlux[5][3];
+      MFEM_SHARED double stress[3][3];
+      MFEM_SHARED double divV;
+      MFEM_SHARED double gradT[3];
+      
+      // init. State
+      Un[eq] = dataIn[n+eq*dof];
+      if(eq<3) KE[eq] = 0.;
+      if(eq<dim) KE[eq] = 0.5*Un[1+eq]*Un[1+eq]/Un[0];
+      
+      for(int d=0;d<dim;d++)
+      {
+        gradUpn[eq][d] = d_gradUp[n + eq*dof + d*dof*num_equation];
+        vFlux[eq][d] = 0.;
+      }
+      MFEM_SYNC_THREAD;
+      
+      const double p  = EquationOfState::pressure(&Un[0],&KE[0],gamma,dim,num_equation);
+      const double temp = p/Un[0]/Rg;
+      double visc = EquationOfState::GetViscosity_gpu(temp);
+      visc *= viscMult;
+      const double k = EquationOfState::GetThermalConductivity_gpu(visc,gamma,Rg,Pr);
+    
+      for(int i=eq;i<dim;i+=num_equation)
+      {
+        for(int j=0;j<dim;j++)
+        {
+          stress[i][j] = gradUpn[1+j][i] + gradUpn[1+i][j];
+        }
+        // temperature gradient
+        gradT[i] = temp*(gradUpn[1+dim][i]/p - gradUpn[0][i]/Un[0]);
+        
+        vel[i] = Un[1+i]/Un[0];
+      }
+      if(eq==num_equation-1) 
+      {
+        divV = 0.;
+        for(int i=0;i<dim;i++) divV += gradUpn[1+i][i];
+      }
+      MFEM_SYNC_THREAD;
+      
+      for(int i=eq;i<dim;i+=num_equation) stress[i][i] -= 2./3.*divV;
+      MFEM_SYNC_THREAD;
+      
+      //stress *= visc;
+      
+      for(int i=eq;i<dim;i+=num_equation)
+      {
+        for(int j=0;j<dim;j++)
+        {
+          vFlux[1+i][j] = visc*stress[i][j];
+          // energy equation
+          vFlux[num_equation-1][i] += vel[j]*stress[i][j];
+        }
+      }
+      
+      if( eq==num_equation-1)
+      {
+        for(int d=0;d<dim;d++) vFlux[eq][d] += k*gradT[d];
+      }
+      MFEM_SYNC_THREAD;
+      
+      // write to global memory
+      for(int d=0;d<dim;d++)
+      {
+        d_flux[n + d*dof + eq*dof*dim] -= vFlux[eq][d];
+      }
+    }
+  });
+#endif
 }

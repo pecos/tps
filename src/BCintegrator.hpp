@@ -23,9 +23,6 @@ protected:
   RiemannSolver *rsolver;
   EquationOfState *eqState;
   Fluxes *fluxClass;
-   
-  const int dim;
-  const int num_equation;
 
   double &max_char_speed;
   IntegrationRules *intRules;
@@ -39,6 +36,16 @@ protected:
   ParGridFunction *Up;
   
   ParGridFunction *gradUp;
+  
+  Vector &shapesBC;
+  Vector &normalsWBC;
+  Array<int> &intPointsElIDBC;
+  
+  const int dim;
+  const int num_equation;
+  
+  const int &maxIntPoints;
+  const int &maxDofs;
 
   std::unordered_map<int,BoundaryCondition*> BCmap;
 
@@ -60,11 +67,16 @@ public:
                 Fluxes *_fluxClass,
                 ParGridFunction *_Up,
                 ParGridFunction *_gradUp,
+                Vector &_shapesBC,
+                Vector &_normalsWBC,
+                Array<int> &_intPointsElIDBC,
                 const int _dim,
                 const int _num_equation,
                 double &_max_char_speed,
                 RunConfiguration &_runFile,
-                Array<int> &local_bdr_attr );
+                Array<int> &local_bdr_attr,
+                const int &_maxIntPoints,
+                const int &_maxDofs );
    ~BCintegrator();
 
    virtual void AssembleFaceVector(const FiniteElement &el1,
@@ -72,8 +84,24 @@ public:
                                    FaceElementTransformations &Tr,
                                    const Vector &elfun, Vector &elvect);
    
+   void initBCs();
+   
    void updateBCMean( ParGridFunction *Up);
+  void integrateBCs( Vector &y,
+		     const Vector &x,
+		     const Array<int> &nodesIDs,
+		     const Array<int> &posDofIds);
    void initState ();
+
+
+  // GPU functions
+  static void retrieveGradientsData_gpu( ParGridFunction *gradUp,
+					 DenseTensor &elGradUp,
+					 Array<int> &vdofs,
+					 const int &num_equation,
+					 const int &dim,
+					 const int &totalDofs,
+					 const int &elDofs );
 };
 
 #endif // BC_INTEGRATOR

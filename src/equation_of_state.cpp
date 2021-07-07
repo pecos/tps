@@ -2,10 +2,13 @@
 
 #include "equation_of_state.hpp"
 
-
-EquationOfState::EquationOfState(WorkingFluid _fluid):
-  fluid(_fluid)
+EquationOfState::EquationOfState()
 {
+}
+
+void EquationOfState::setFluid(WorkingFluid _fluid)
+{
+  fluid = _fluid;
   switch(fluid)
   {
     case DRY_AIR:
@@ -19,6 +22,7 @@ EquationOfState::EquationOfState(WorkingFluid _fluid):
       break;
   }
 }
+
 
 
 // Pressure (EOS) computation
@@ -108,3 +112,16 @@ double EquationOfState::GetThermalConductivity(const double& visc)
   return visc*cp/Pr;
 }
 
+// GPU FUNCTIONS
+/*#ifdef _GPU_
+double EquationOfState::pressure( double *state, 
+                                  double *KE, 
+                                  const double gamma, 
+                                  const int dim, 
+                                  const int num_equations)
+{
+  double p = 0.;
+  for(int k=0;k<dim;k++) p += KE[k];
+  return (gamma-1.)*(state[num_equations-1] - p); 
+}
+#endif*/

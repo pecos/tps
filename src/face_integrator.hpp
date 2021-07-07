@@ -30,11 +30,12 @@ private:
    bool faceMassMatrixComputed;
    bool useLinear;
    
-   void getElementsGrads(FaceElementTransformations &Tr,
-                         const FiniteElement &el1, 
-                         const FiniteElement &el2, 
-                         DenseMatrix &gradUp1, 
-                         DenseMatrix &gradUp2);
+   void getElementsGrads_cpu( FaceElementTransformations &Tr,
+                              const FiniteElement &el1, 
+                              const FiniteElement &el2, 
+                              DenseTensor &gradUp1, 
+                              DenseTensor &gradUp2);
+   
    void NonLinearFaceIntegration( const FiniteElement &el1,
                                   const FiniteElement &el2,
                                   FaceElementTransformations &Tr,
@@ -61,6 +62,18 @@ public:
                                    const FiniteElement &el2,
                                    FaceElementTransformations &Tr,
                                    const Vector &elfun, Vector &elvect);
+   
+   static void getElementsGrads_gpu(const ParGridFunction *gradUp,
+                                    ParFiniteElementSpace *vfes,
+                                    const ParFiniteElementSpace *gradUpfes,
+                                    FaceElementTransformations &Tr,
+                                    const FiniteElement &el1, 
+                                    const FiniteElement &el2, 
+                                    DenseTensor &gradUp1, 
+                                    DenseTensor &gradUp2,
+                                    const int &num_equation,
+                                    const int &totalDofs,
+                                    const int &dim );
 };
 
 #endif // FACE_INTEGRATOR

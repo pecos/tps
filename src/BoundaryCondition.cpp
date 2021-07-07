@@ -1,4 +1,5 @@
 #include "BoundaryCondition.hpp"
+#include "general/forall.hpp"
 
 BoundaryCondition::BoundaryCondition(RiemannSolver* _rsolver, 
                                      EquationOfState* _eqState, 
@@ -19,6 +20,7 @@ num_equation(_num_equation),
 patchNumber(_patchNumber),
 refLength(_refLength)
 {
+  BCinit = false;
 }
 
 BoundaryCondition::~BoundaryCondition()
@@ -64,4 +66,22 @@ int BoundaryCondition::aggregateBndryFaces(int bndry_patchnum, MPI_Comm bc_comm)
   int nfacesTotal;
   MPI_Allreduce(&nfaces, &nfacesTotal,1, MPI_INT, MPI_SUM, bc_comm);
   return(nfacesTotal);
+}
+
+void BoundaryCondition::setElementList(Array<int> &_listElems)
+{
+  listElems.SetSize( _listElems.Size() );
+  for(int i=0;i<listElems.Size();i++) listElems[i] = _listElems[i];
+  listElems.ReadWrite();
+}
+
+void BoundaryCondition::copyValues(const Vector& orig, Vector& target, const double& mult)
+{
+  const double *dOrig = orig.Read();
+  double *dTarget = target.Write();
+  
+  MFEM_FORALL(i,target.Size(),
+  {
+    dTarget[i] = dOrig[i]*mult;
+  });
 }

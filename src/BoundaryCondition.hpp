@@ -20,6 +20,10 @@ protected:
   const int patchNumber;
   const double refLength;
   
+  bool BCinit;
+  
+  Array<int> listElems; // list of boundary elements (position in the BC array)
+  
 public:
   BoundaryCondition(RiemannSolver *_rsolver, 
                     EquationOfState *_eqState,
@@ -36,6 +40,9 @@ public:
                               Vector &stateIn, 
                               DenseMatrix &gradState,
                               Vector &bdrFlux) = 0;
+  
+  // function to initiate variables that require MPI to be already initialized
+  virtual void initBCs() = 0;
                               
   virtual void updateMean(IntegrationRules *intRules,
                           ParGridFunction *Up) = 0;
@@ -48,6 +55,23 @@ public:
   // holding function for any miscellanous items needed to initialize BCs
   // prior to use
   virtual void initState() = 0;
+
+  // integration of BC on GPU
+  void setElementList(Array<int> &listElems);
+
+  virtual void integrationBC( Vector &y, // output
+			      const Vector &x, // conservative vars (input)
+			      const Array<int> &nodesIDs,
+			      const Array<int> &posDofIds,
+			      ParGridFunction *Up,
+			      ParGridFunction *gradUp,
+			      Vector &shapesBC,
+			      Vector &normalsWBC,
+			      Array<int> &intPointsElIDBC,
+			      const int &maxIntPoints,
+			      const int &maxDofs ) = 0;
+
+  static void copyValues(const Vector &orig, Vector &target, const double &mult);
 };
 
 #endif // BOUNDARY_CONDITION

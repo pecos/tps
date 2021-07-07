@@ -21,6 +21,9 @@
 #include "faceGradientIntegration.hpp"
 #include "averaging_and_rms.hpp"
 
+#include "dgNonlinearForm.hpp"
+#include "gradNonLinearForm.hpp"
+
 #ifdef _MASA_
 #include "masa_handler.hpp"
 #endif
@@ -97,6 +100,27 @@ private:
   // Finite element space for all variables together (total thermodynamic state)
   ParFiniteElementSpace *vfes;
   
+  // nodes IDs and indirection array
+  Array<int> nodesIDs;
+  Array<int> posDofIds;
+  // count of number of elements of each type
+  Array<int> numElems;
+  //Array<int> posDofQshape1; // position, num. dof and integration points for each face
+  Vector shapeWnor1; // shape functions, weight and normal for each face at ach integration point
+  //Array<int> posDofshape2;
+  Vector shape2;
+  const int maxIntPoints = 49; // corresponding to QUAD face with p=5
+  //const int maxDofs = 64;      // corresponding to HEX with p=5
+  const int maxDofs = 216;      // corresponding to HEX with p=5
+  
+  Array<int> elemFaces; // number and faces IDs of each element
+  Array<int> elems12Q; // elements connecting a face and integration points
+  
+  // BC integration
+  Vector shapesBC;
+  Vector normalsWBC;
+  Array<int> intPointsElIDBC; // integration points and element ID
+  
   
   // The solution u has components {density, x-momentum, y-momentum, energy}.
   // These are stored contiguously in the BlockVector u_block.
@@ -112,7 +136,9 @@ private:
   RiemannSolver *rsolver;
   
   // RHS operators
-  ParNonlinearForm *A;
+  //ParNonlinearForm *A;
+  DGNonLinearForm *A;
+  
   FaceIntegrator *faceIntegrator;
   SBPintegrator  *SBPoperator;
   
@@ -138,7 +164,8 @@ private:
   // gradient of primitive variables
   ParGridFunction *gradUp;
   ParFiniteElementSpace *gradUpfes;
-  ParNonlinearForm *gradUp_A;
+  //ParNonlinearForm *gradUp_A;
+  GradNonLinearForm *gradUp_A;
   
   // Average handler
   Averaging *average;
@@ -169,6 +196,8 @@ private:
   int exit_status_;
   
   void getAttributesInPartition(Array<int> &local_attr);
+  
+  void initIndirectionArrays();
   
   void initVariables();
   void initSolutionAndVisualizationVectors();
@@ -201,6 +230,8 @@ public:
   
   // Accessors
   RHSoperator getRHSoperator(){ return *rhsOperator; }
+
+  static int Check_NaN_GPU(ParGridFunction *U, int lengthU);
 
   // Exit code access
   void SetStatus(int code){exit_status_=code; return;}
