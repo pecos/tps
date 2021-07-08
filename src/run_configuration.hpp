@@ -3,14 +3,14 @@
 
 #include <utility>
 #include <string>
-
-#include "mfem.hpp"
+#include <vector>
+#include <mfem.hpp>
+#include <tps_config.h>
 #include "equation_of_state.hpp"
 #include "fluxes.hpp"
 #include "inletBC.hpp"
 #include "outletBC.hpp"
 #include "wallBC.hpp"
-#include <vector>
 
 using namespace mfem;
 using namespace std;

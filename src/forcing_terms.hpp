@@ -1,7 +1,8 @@
 #ifndef FORCING_TERMS
 #define FORCING_TERMS
 
-#include "mfem.hpp"
+#include <mfem.hpp>
+#include <tps_config.h>
 #include "run_configuration.hpp"
 
 #ifdef _MASA_

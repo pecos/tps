@@ -2,6 +2,7 @@
 #define WALL_BC
 
 #include <mfem.hpp>
+#include <tps_config.h>
 #include <mfem/general/forall.hpp>
 #include "BoundaryCondition.hpp"
 #include "fluxes.hpp"

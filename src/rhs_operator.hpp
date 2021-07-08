@@ -1,15 +1,14 @@
 #ifndef RHS_OPERATOR
 #define RHS_OPERATOR
 
-#include "mfem.hpp"
-
+#include <mfem.hpp>
+#include <tps_config.h>
 #include "fluxes.hpp"
 #include "equation_of_state.hpp"
 #include "BCintegrator.hpp"
 #include "forcing_terms.hpp"
 #include "run_configuration.hpp"
 #include "gradients.hpp"
-
 #include "dgNonlinearForm.hpp"
 #include "gradNonLinearForm.hpp"
 

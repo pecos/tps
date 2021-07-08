@@ -1,10 +1,5 @@
-
-
+#include <mfem/general/forall.hpp>
 #include "rhs_operator.hpp"
-
-#ifdef _GPU_
-#include "general/forall.hpp"
-#endif // _GPU_
 
 // Implementation of class RHSoperator
 RHSoperator::RHSoperator( double &_time,

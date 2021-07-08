@@ -1,7 +1,8 @@
 #ifndef BC_INTEGRATOR
 #define BC_INTEGRATOR
 
-#include "mfem.hpp"
+#include <mfem.hpp>
+#include <tps_config.h>
 #include "mpi_groups.hpp"
 #include "riemann_solver.hpp"
 #include "equation_of_state.hpp"

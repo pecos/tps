@@ -3,6 +3,7 @@
 
 #include <mfem.hpp>
 #include <mfem/general/forall.hpp>
+#include <tps_config.h>
 #include "mpi_groups.hpp"
 #include "BoundaryCondition.hpp"
 #include "equation_of_state.hpp"

@@ -5,6 +5,7 @@
 
 #include <mfem.hpp>
 #include <mfem/general/forall.hpp>
+#include <tps_config.h>
 #include "gradNonLinearForm.hpp"
 
 using namespace mfem;

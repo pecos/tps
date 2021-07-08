@@ -2,6 +2,7 @@
 #define BOUNDARY_CONDITION
 
 #include <mfem.hpp>
+#include <tps_config.h>
 #include <mfem/general/forall.hpp>
 #include "riemann_solver.hpp"
 #include "equation_of_state.hpp"

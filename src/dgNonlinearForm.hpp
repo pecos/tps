@@ -2,8 +2,8 @@
 #define DGNONLINEARFORM
 
 #include <mfem.hpp>
+#include <tps_config.h>
 #include <mfem/fem/nonlinearform.hpp>
-
 #include "equation_of_state.hpp"
 #include "BCintegrator.hpp"
 

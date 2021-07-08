@@ -3,6 +3,7 @@
 
 #include <mfem.hpp>
 #include <mfem/general/forall.hpp>
+#include <tps_config.h>
 #include "fluxes.hpp"
 
 using namespace mfem;
