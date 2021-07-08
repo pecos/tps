@@ -1,11 +1,11 @@
 #ifndef INLET_BC
 #define INLET_BC
 
-#include "mfem.hpp"
+#include <mfem.hpp>
+#include <mfem/general/forall.hpp>
 #include "mpi_groups.hpp"
 #include "BoundaryCondition.hpp"
 #include "equation_of_state.hpp"
-#include "general/forall.hpp"
 #include "logger.hpp"
 
 using namespace mfem;

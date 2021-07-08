@@ -1,7 +1,5 @@
-#include "dgNonlinearForm.hpp"
 #include <vector>
-
-#include "general/forall.hpp"
+#include "dgNonlinearForm.hpp"
 #include "riemann_solver.hpp"
 
 DGNonLinearForm::DGNonLinearForm( ParFiniteElementSpace *_vfes,

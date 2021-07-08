@@ -1,8 +1,8 @@
+#include <mfem/general/forall.hpp>
 #include "BCintegrator.hpp"
 #include "inletBC.hpp"
 #include "outletBC.hpp"
 #include "wallBC.hpp"
-#include "general/forall.hpp"
 
 BCintegrator::BCintegrator( MPI_Groups *_groupsMPI,
                             ParMesh *_mesh,

@@ -1,7 +1,4 @@
-
 #include "face_integrator.hpp"
-
-#include "general/forall.hpp"
 
 // Implementation of class FaceIntegrator
 FaceIntegrator::FaceIntegrator(IntegrationRules *_intRules,

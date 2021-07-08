@@ -1,7 +1,5 @@
 #include "outletBC.hpp"
-
 #include "dgNonlinearForm.hpp"
-#include "general/forall.hpp"
 #include "riemann_solver.hpp"
 
 OutletBC::OutletBC( MPI_Groups *_groupsMPI,

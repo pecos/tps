@@ -1,7 +1,5 @@
 #include "inletBC.hpp"
-
 #include "dgNonlinearForm.hpp"
-#include "general/forall.hpp"
 #include "riemann_solver.hpp"
 
 InletBC::InletBC( MPI_Groups *_groupsMPI,

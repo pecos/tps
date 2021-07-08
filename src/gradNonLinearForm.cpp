@@ -1,6 +1,4 @@
 #include "gradNonLinearForm.hpp"
-
-#include "general/forall.hpp"
 #include "riemann_solver.hpp"
 
 GradNonLinearForm::GradNonLinearForm(ParFiniteElementSpace *_vfes,

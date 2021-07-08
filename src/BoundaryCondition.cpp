@@ -1,5 +1,4 @@
 #include "BoundaryCondition.hpp"
-#include "general/forall.hpp"
 
 BoundaryCondition::BoundaryCondition(RiemannSolver* _rsolver, 
                                      EquationOfState* _eqState, 

@@ -1,5 +1,5 @@
 #include "wallBC.hpp"
-#include "general/forall.hpp"
+//#include "general/forall.hpp"
 #include "riemann_solver.hpp"
 
 WallBC::WallBC(RiemannSolver* _rsolver, 

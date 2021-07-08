@@ -3,8 +3,8 @@
 
 // Class to manage gradients of primitives
 
-#include "mfem.hpp"
-
+#include <mfem.hpp>
+#include <mfem/general/forall.hpp>
 #include "gradNonLinearForm.hpp"
 
 using namespace mfem;

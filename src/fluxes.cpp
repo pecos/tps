@@ -1,6 +1,4 @@
-
 #include "fluxes.hpp"
-#include "general/forall.hpp"
 
 Fluxes::Fluxes(EquationOfState *_eqState,
                Equations &_eqSystem,

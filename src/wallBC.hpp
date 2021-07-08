@@ -1,10 +1,10 @@
 #ifndef WALL_BC
 #define WALL_BC
 
-#include "mfem.hpp"
+#include <mfem.hpp>
+#include <mfem/general/forall.hpp>
 #include "BoundaryCondition.hpp"
 #include "fluxes.hpp"
-#include "general/forall.hpp"
 
 using namespace mfem;
 

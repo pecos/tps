@@ -6,8 +6,8 @@
  * handy functions to deal with operations.
  */
 
-#include "mfem.hpp"
-#include "general/forall.hpp"
+#include <mfem.hpp>
+#include <mfem/general/forall.hpp>
 
 using namespace mfem;
 using namespace std;

@@ -1,8 +1,8 @@
 #ifndef DGNONLINEARFORM
 #define DGNONLINEARFORM
 
-#include "mfem.hpp"
-#include "fem/nonlinearform.hpp"
+#include <mfem.hpp>
+#include <mfem/fem/nonlinearform.hpp>
 
 #include "equation_of_state.hpp"
 #include "BCintegrator.hpp"

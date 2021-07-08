@@ -1,6 +1,4 @@
 #include "gradients.hpp"
-
-#include "general/forall.hpp"
 #include "dgNonlinearForm.hpp"
 
 Gradients::Gradients(ParFiniteElementSpace* _vfes, 

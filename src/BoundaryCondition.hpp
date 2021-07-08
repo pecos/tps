@@ -1,7 +1,8 @@
 #ifndef BOUNDARY_CONDITION
 #define BOUNDARY_CONDITION
 
-#include "mfem.hpp"
+#include <mfem.hpp>
+#include <mfem/general/forall.hpp>
 #include "riemann_solver.hpp"
 #include "equation_of_state.hpp"
 

@@ -1,10 +1,10 @@
 #ifndef OUTLET_BC
 #define OUTLET_BC
 
-#include "mfem.hpp"
+#include <mfem.hpp>
+#include <mfem/general/forall.hpp>
 #include "mpi_groups.hpp"
 #include "BoundaryCondition.hpp"
-#include "general/forall.hpp"
 #include "logger.hpp"
 
 using namespace mfem;

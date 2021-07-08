@@ -1,10 +1,9 @@
 #ifndef RIEMANN_SOLVER
 #define RIEMANN_SOLVER
 
-#include "mfem.hpp"
-#include "equation_of_state.hpp"
+#include <mfem.hpp>
+#include <mfem/general/forall.hpp>
 #include "fluxes.hpp"
-#include "general/forall.hpp"
 
 using namespace mfem;
 

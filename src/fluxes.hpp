@@ -5,9 +5,9 @@
  * Class that deals with flux operations
  */
 
-#include "mfem.hpp"
+#include <mfem.hpp>
+#include <mfem/general/forall.hpp>
 #include "equation_of_state.hpp"
-#include "general/forall.hpp"
 
 enum Equations { EULER, NS, MHD};
 

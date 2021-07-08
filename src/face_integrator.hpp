@@ -1,7 +1,8 @@
 #ifndef FACE_INTEGRATOR
 #define FACE_INTEGRATOR
 
-#include "mfem.hpp"
+#include <mfem.hpp>
+#include <mfem/general/forall.hpp>
 #include "riemann_solver.hpp"
 #include "fluxes.hpp"
 
