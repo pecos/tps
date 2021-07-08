@@ -23,7 +23,7 @@ echo Package version............... : $PACKAGE-$VERSION
 echo
 echo C++ compiler.................. : $CXX
 echo C++ compiler flags............ : $CXXFLAGS
-echo Install dir................... : $prefix 
+echo Install dir................... : $prefix
 #echo Boost C++ flags............... : $BOOST_CPPFLAGS
 echo Build user.................... : $USER
 echo Build host.................... : $BUILD_HOST
@@ -31,6 +31,7 @@ echo Configure date................ : $BUILD_DATE
 echo Build architecture............ : $BUILD_ARCH
 echo Git revision number........... : $BUILD_VERSION
 echo
+echo GPU build enabled............. : $ENABLE_GPU
 echo
 echo '-------------------------------------------------------------------------------'
 
