@@ -1227,10 +1227,12 @@ void M2ulPhyS::read_restart_files()
       }
     }
   }
+
+  // koomie TODO: inspect for GPU
   // load data to GPU
   auto dUp = Up->ReadWrite();
   auto dU = U->ReadWrite();
-  if( loadFromAuxSol ) auto dausUp = aux_Up->ReadWrite();
+  //  if( loadFromAuxSol ) auto dausUp = aux_Up->ReadWrite();
 }
 
 

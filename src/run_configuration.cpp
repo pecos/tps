@@ -316,9 +316,6 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
           case 2:
             patchANDtype.second = SUB_VEL_CONST_ENT;
             break;
-          case 3:
-            patchANDtype.second = SUB_MF_NR_PW;
-            break;
         }
 	inletPatchType.push_back( patchANDtype );
         

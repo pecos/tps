@@ -277,10 +277,6 @@ void BCintegrator::AssembleFaceVector(const FiniteElement& el1,
   Vector funval1(num_equation);
   Vector nor(dim);
   Vector fluxN(num_equation);
-  //shape1.UseDevice(true);
-  //funval1.UseDevice(true);
-  //nor.UseDevice(true);
-  //fluxN.UseDevice(true);
   
 #ifndef _GPU_
   const double *dataGradUp = gradUp->HostRead();
@@ -292,7 +288,6 @@ void BCintegrator::AssembleFaceVector(const FiniteElement& el1,
   shape1.SetSize(dof1);
   //shape2.SetSize(dof2);
 
-  //elvect.UseDevice(true);
   elvect.SetSize(dof1*num_equation);
   elvect = 0.0;
 
@@ -364,15 +359,15 @@ void BCintegrator::AssembleFaceVector(const FiniteElement& el1,
       // interpolation state
       double sum = 0.;
       for(int k=0; k<eldDof; k++)
-	{
-	  sum += elfun(k+eq*eldDof)*shape1(k);
-	}
+      {
+        sum += elfun(k+eq*eldDof)*shape1(k);
+      }
       funval1(eq) = sum;
 
       // interpolation gradients
       for(int d=0; d<dim; d++)
-      { 
-	sum = 0.;
+      {
+        sum = 0.;
         for(int k=0; k<eldDof; k++)
         {
           sum += elGradUp(k,eq,d)*shape1(k);
