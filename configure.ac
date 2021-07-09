@@ -11,30 +11,52 @@ AM_INIT_AUTOMAKE
 
 # Checks for programs.
 #AM_PATH_PYTHON([3.6.8])
+
 #AC_PROG_CXX
 AX_PROG_CXX_MPI
-AX_CXX_COMPILE_STDCXX_17
-AC_DISABLE_STATIC
-AC_PROG_LIBTOOL
 
-#-- GPU build setup
+# C++ 17 standard, just setting by hand
+#AX_CXX_COMPILE_STDCXX_17
+CXXFLAGS="-std=c++17 $CXXFLAGS"
+
+#AC_PROG_LIBTOOL
+AC_PROG_RANLIB
+
+#-- GPU/Cuda build setup
 AH_TEMPLATE([_GPU_],[Build in GPU support])
 AC_MSG_CHECKING([if requesting gpu build])
-AC_ARG_ENABLE([gpu],
-         [AS_HELP_STRING([--enable-gpu],[Enable GPU build, requires associated MFEM with gpu support.])],
-	 [],[enable_gpu=no])
-if test x$enable_gpu = xyes ;then
-    AC_MSG_RESULT([yes])
-    AC_DEFINE([_GPU_])
-    ENABLE_GPU=yes
+AC_ARG_ENABLE([gpu-cuda],
+         [AS_HELP_STRING([--enable-gpu-cuda],[Enable GPU build, requires associated MFEM with CUDA support.])],
+	 [],[enable_gpu_cuda=no])
+
+if test x$enable_gpu_cuda = xyes ;then
+
+AC_MSG_RESULT([yes])
+AC_DEFINE([_GPU_])
+
+AC_LANG_PUSH([C])
+AX_CHECK_CUDA
+AC_LANG_POP([C])
+
+#CXX=$NVCC_PATH/nvcc
+CUDA_CFLAGS="-x=cu --expt-extended-lambda -arch=sm_60 -ccbin mpicxx $CUDA_CFLAGS"
+CUDA_LDFLAGS="--expt-extended-lambda -arch=sm_60 -ccbin mpicxx $CUDA_LDFLAGS"
+
+ENABLE_GPU=yes
+ENABLE_CUDA=yes
+
 else
-    AC_MSG_RESULT([no])
-    ENABLE_GPU=no
+AC_MSG_RESULT([no])
+ENABLE_GPU=no
+ENABLE_CUDA=no
 fi
+AM_CONDITIONAL(CUDA_ENABLED,0)
+
 #--
 
 
 AC_OUTPUT([Makefile src/Makefile test/Makefile])
+#AC_OUTPUT([Makefile])
 
 # Final summary
 AX_SUMMARIZE_ENV
