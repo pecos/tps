@@ -1,7 +1,7 @@
 AM_CPPFLAGS          = -g -I$(MFEM_INC) -I$(MFEM_INC)/mfem -I$(HYPRE_INC) -I$(HDF5_INC) -I$(PETSC_INC)  -DHAVE_GRVY
 
 if CUDA_ENABLED
-AM_CPPFLAGS += $(CUDA_CFLAGS)
+AM_CPPFLAGS += $(CUDA_CXXFLAGS)
 endif
 
 # C++ main solver binary
