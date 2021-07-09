@@ -8,6 +8,7 @@
  */
 
 #include <mfem.hpp>
+#include <general/forall.hpp>
 #include <tps_config.h>
 #include "mpi_groups.hpp"
 #include "run_configuration.hpp"

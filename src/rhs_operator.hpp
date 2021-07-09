@@ -2,6 +2,7 @@
 #define RHS_OPERATOR
 
 #include <mfem.hpp>
+#include <general/forall.hpp>
 #include <tps_config.h>
 #include "fluxes.hpp"
 #include "equation_of_state.hpp"

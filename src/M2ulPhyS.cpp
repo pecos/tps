@@ -3,7 +3,6 @@
  */
 
 #include "M2ulPhyS.hpp"
-#include <mfem/general/forall.hpp>
 #include <sstream>
 
 M2ulPhyS::M2ulPhyS(MPI_Session &_mpi,

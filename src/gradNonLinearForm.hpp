@@ -2,7 +2,7 @@
 #define GRAD_NONLINEARFORM
 
 #include <mfem.hpp>
-#include <mfem/general/forall.hpp>
+#include <general/forall.hpp>
 #include <tps_config.h>
 
 using namespace mfem;

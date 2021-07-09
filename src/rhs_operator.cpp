@@ -1,4 +1,3 @@
-#include <mfem/general/forall.hpp>
 #include "rhs_operator.hpp"
 
 // Implementation of class RHSoperator
