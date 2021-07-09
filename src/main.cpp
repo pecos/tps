@@ -48,6 +48,14 @@ int main(int argc, char *argv[])
   }
 #endif
 
+#ifdef _GPU_
+  if(strcmp(device_config,"cpu") == 0)
+    {
+      std::cerr << "[ERROR]: This TPS build targeting GPUs requires --device=cuda" << std::endl;
+      exit(ERROR);
+    }
+#endif
+
   const int NUM_GPUS_NODE = 4;
   Device device(device_config, mpi.WorldRank()%NUM_GPUS_NODE);
   if (mpi.Root() )  device.Print();
