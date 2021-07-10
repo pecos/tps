@@ -32,7 +32,7 @@ echo Git revision number........... : $BUILD_VERSION
 echo
 echo GPU build enabled with CUDA... : $ENABLE_CUDA
 if test "$ENABLE_CUDA" = "yes"; then
-echo ' - 'CUDA_CFLAGS................ : $CUDA_CFLAGS
+echo ' - 'CUDA_CXXFLAGS.............. : $CUDA_CXXFLAGS
 echo ' - 'CUDA_LDFLAGS............... : $CUDA_LDFLAGS
 fi
 echo
