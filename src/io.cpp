@@ -408,9 +408,11 @@ void M2ulPhyS::partitioning_file_hdf5(std::string mode)
   {
     assert(partitioning_.Size() > 0);
 
-    if(file_exists(fileName))
+    if(file_exists(fileName)) {
       grvy_printf(gwarn,"Removing existing partition file: %s\n",fileName.c_str());
-    else
+      string command = "rm "+fileName;
+      int err = system(command.c_str());
+    } else
       grvy_printf(ginfo,"Saving original domain decomposition partition file: %s\n",fileName.c_str());
 
     file = H5Fcreate(fileName.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT );

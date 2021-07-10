@@ -21,6 +21,9 @@
 /* Define if GRVY is available */
 #undef HAVE_GRVY
 
+/* Enable GSLIB support */
+#undef HAVE_GSLIB
+
 /* Define if HDF5 is available */
 #undef HAVE_HDF5
 

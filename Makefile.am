@@ -1,4 +1,4 @@
-SUBDIRS          = src test
+SUBDIRS          = src test utils
 AUTOMAKE_OPTIONS = foreign
 ACLOCAL_AMFLAGS  = -I m4
 
