@@ -18,6 +18,7 @@ AX_PROG_CXX_MPI
 # C++ 17 standard, just setting by hand
 #AX_CXX_COMPILE_STDCXX_17
 CXXFLAGS="-std=c++17 $CXXFLAGS"
+#CXXFLAGS="-std=c++11 $CXXFLAGS"
 
 #AC_PROG_LIBTOOL
 AC_PROG_RANLIB
@@ -42,8 +43,8 @@ CXX=$NVCC_PATH/nvcc
 #CUDA_CXXFLAGS="-x=cu --expt-extended-lambda -arch=sm_60 -ccbin mpicxx $CUDA_CXXFLAGS"
 #CUDA_LDFLAGS="--expt-extended-lambda -arch=sm_60 -ccbin mpicxx $CUDA_LDFLAGS"
 
-CUDA_CXXFLAGS="-x=cu --expt-extended-lambda -arch=sm_75 -ccbin mpicxx $CUDA_CXXFLAGS"
-CUDA_LDFLAGS="--expt-extended-lambda -arch=sm_75 -ccbin mpicxx $CUDA_LDFLAGS"
+CUDA_CXXFLAGS="-x=cu --expt-extended-lambda -arch=sm_70 -ccbin mpicxx $CUDA_CXXFLAGS"
+CUDA_LDFLAGS="--expt-extended-lambda -arch=sm_70 -ccbin mpicxx $CUDA_LDFLAGS"
 
 ENABLE_GPU=yes
 ENABLE_CUDA=yes
@@ -56,6 +57,9 @@ fi
 AM_CONDITIONAL(CUDA_ENABLED,test x$ENABLE_CUDA = xyes)
 
 #--
+
+# 3rd party libraries
+AX_PATH_GRVY([0.32],[yes])
 
 
 AC_OUTPUT([Makefile src/Makefile test/Makefile])
