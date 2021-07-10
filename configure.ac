@@ -38,9 +38,12 @@ AC_LANG_PUSH([C])
 AX_CHECK_CUDA
 AC_LANG_POP([C])
 
-#CXX=$NVCC_PATH/nvcc
-CUDA_CFLAGS="-x=cu --expt-extended-lambda -arch=sm_60 -ccbin mpicxx $CUDA_CFLAGS"
-CUDA_LDFLAGS="--expt-extended-lambda -arch=sm_60 -ccbin mpicxx $CUDA_LDFLAGS"
+CXX=$NVCC_PATH/nvcc
+#CUDA_CXXFLAGS="-x=cu --expt-extended-lambda -arch=sm_60 -ccbin mpicxx $CUDA_CXXFLAGS"
+#CUDA_LDFLAGS="--expt-extended-lambda -arch=sm_60 -ccbin mpicxx $CUDA_LDFLAGS"
+
+CUDA_CXXFLAGS="-x=cu --expt-extended-lambda -arch=sm_75 -ccbin mpicxx $CUDA_CXXFLAGS"
+CUDA_LDFLAGS="--expt-extended-lambda -arch=sm_75 -ccbin mpicxx $CUDA_LDFLAGS"
 
 ENABLE_GPU=yes
 ENABLE_CUDA=yes
@@ -50,7 +53,7 @@ AC_MSG_RESULT([no])
 ENABLE_GPU=no
 ENABLE_CUDA=no
 fi
-AM_CONDITIONAL(CUDA_ENABLED,0)
+AM_CONDITIONAL(CUDA_ENABLED,test x$ENABLE_CUDA = xyes)
 
 #--
 
