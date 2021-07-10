@@ -204,15 +204,6 @@ void BCintegrator::updateBCMean(ParGridFunction *Up)
   }
 }
 
-void BCintegrator::initState()
-{
-  for(auto bc=BCmap.begin();bc!=BCmap.end(); bc++)
-  {
-    bc->second->initState();
-  }
-
-}
-
 void BCintegrator::integrateBCs( Vector &y, 
                                  const Vector &x,
                                  const Array<int> &nodesIDs,

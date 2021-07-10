@@ -92,7 +92,6 @@ public:
 		     const Vector &x,
 		     const Array<int> &nodesIDs,
 		     const Array<int> &posDofIds);
-   void initState ();
 
 
   // GPU functions

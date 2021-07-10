@@ -671,8 +671,6 @@ public:
 
 #endif  // __GPU__
 
-  void initState();
-
 };
 
 #endif // OUTLET_BC

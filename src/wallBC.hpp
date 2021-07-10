@@ -63,7 +63,6 @@ public:
                       DenseMatrix &gradState,
                       Vector &bdrFlux);
 
-  // koomie TODO: blend ths with initState()
   virtual void initBCs();
   
   virtual void updateMean(IntegrationRules *intRules,
@@ -152,7 +151,6 @@ public:
   };
 #endif
 
-  virtual void initState(){};
 };
 
 #endif // WALL_BC

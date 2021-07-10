@@ -112,8 +112,6 @@ public:
 			      const int &maxIntPoints,
 			      const int &maxDofs );
   
-  void initState();
-
   // functions for BC integration on GPU
 
   static void integrateInlets_gpu(const InletType type,

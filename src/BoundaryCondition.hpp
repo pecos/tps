@@ -42,8 +42,9 @@ public:
                               Vector &stateIn, 
                               DenseMatrix &gradState,
                               Vector &bdrFlux) = 0;
-  
-  // function to initiate variables that require MPI to be already initialized
+
+  // holding function for any miscellaneous items needed to initialize BCs
+  // prior to use (and require MPI)
   virtual void initBCs() = 0;
                               
   virtual void updateMean(IntegrationRules *intRules,
@@ -53,10 +54,6 @@ public:
   double aggregateArea (int bndry_attr, MPI_Comm bc_comm);
   // aggregate boundary face count
   int aggregateBndryFaces (int bndry_attr, MPI_Comm bc_comm);
-
-  // holding function for any miscellanous items needed to initialize BCs
-  // prior to use
-  virtual void initState() = 0;
 
   // integration of BC on GPU
   void setElementList(Array<int> &listElems);

@@ -1092,14 +1092,6 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal,
 }
 
 
-void OutletBC::initState()
-{
-  // Accumulate outlet area. Used with mass flow outlet.
-
-  if ( !parallelAreaComputed )
-      computeParallelArea();
-}
-
 void OutletBC::integrateOutlets_gpu(const OutletType type, 
                                     const Array<double>& inputState, 
                                     const double& dt, 
