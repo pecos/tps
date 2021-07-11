@@ -60,6 +60,7 @@ AM_CONDITIONAL(CUDA_ENABLED,test x$ENABLE_CUDA = xyes)
 
 # 3rd party libraries
 AX_PATH_GRVY([0.32],[yes])
+AX_PATH_HDF5([1.8.0],[yes])
 
 
 AC_OUTPUT([Makefile src/Makefile test/Makefile])
