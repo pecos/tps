@@ -2,3 +2,5 @@ ref_solns/cyl3d_coarse.4iters.h5 filter=lfs diff=lfs merge=lfs -text
 ref_solns/cyl3d.mflow.2iters.h5 filter=lfs diff=lfs merge=lfs -text
 meshes/wedge.msh filter=lfs diff=lfs merge=lfs -text
 ref_solns/cyl3d_coarse.8iters.varp.h5 filter=lfs diff=lfs merge=lfs -text
+ref_solns/cyl3d.dtconst.gpu.h5 filter=lfs diff=lfs merge=lfs -text
+ref_solns/cyl3d.dtconst.gpu.varp.h5 filter=lfs diff=lfs merge=lfs -text
