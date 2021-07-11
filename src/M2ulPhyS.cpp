@@ -831,7 +831,7 @@ void M2ulPhyS::Iterate()
 
       if (iter != MaxIters)
 	{
-	  write_restart_files();
+	  //write_restart_files();
 	  restart_files_hdf5("write");
       
 	  paraviewColl->SetCycle(iter);
@@ -870,7 +870,7 @@ void M2ulPhyS::Iterate()
   
   if( iter==MaxIters )
   {
-    write_restart_files();
+    //write_restart_files();
     restart_files_hdf5("write");
       
     paraviewColl->SetCycle(iter);
