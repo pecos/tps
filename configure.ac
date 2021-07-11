@@ -43,8 +43,8 @@ CXX=$NVCC_PATH/nvcc
 #CUDA_CXXFLAGS="-x=cu --expt-extended-lambda -arch=sm_60 -ccbin mpicxx $CUDA_CXXFLAGS"
 #CUDA_LDFLAGS="--expt-extended-lambda -arch=sm_60 -ccbin mpicxx $CUDA_LDFLAGS"
 
-CUDA_CXXFLAGS="-x=cu --expt-extended-lambda -arch=sm_70 -ccbin mpicxx $CUDA_CXXFLAGS"
-CUDA_LDFLAGS="--expt-extended-lambda -arch=sm_70 -ccbin mpicxx $CUDA_LDFLAGS"
+CUDA_CXXFLAGS="-x=cu --expt-extended-lambda -arch=sm_60 -ccbin mpicxx $CUDA_CXXFLAGS"
+CUDA_LDFLAGS="--expt-extended-lambda -arch=sm_60 -ccbin mpicxx $CUDA_LDFLAGS"
 
 ENABLE_GPU=yes
 ENABLE_CUDA=yes
