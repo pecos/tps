@@ -13,8 +13,7 @@ tps_LDADD            = libtps.a
 tps_LDFLAGS          = -L$(MFEM_LIB) -lmfem
 tps_LDFLAGS         += -L$(HYPRE_LIB) -lHYPRE
 tps_LDFLAGS         += -L$(OPENBLAS_LIB) -lopenblas
-#tps_LDFLAGS         += -L$(HDF5_LIB) -lhdf5
-tps_LDFLAGS         +=  -lhdf5
+tps_LDFLAGS         += -L$(HDF5_LIB) -lhdf5
 tps_LDFLAGS         += -L$(METIS_LIB) -lmetis
 tps_LDFLAGS         += $(GRVY_LIBS)
 # hypre depends are complicated
