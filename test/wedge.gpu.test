@@ -1,0 +1,39 @@
+#!/usr/bin/env bats
+# -*- mode: sh -*-
+
+TEST="2d/wedge"
+RUNFILE="inputs/input.dtconst.wedge"
+OPTS="-d cuda"
+
+@test "[$TEST] check for input file $RUNFILE" {
+    test -s $RUNFILE
+}
+
+@test "[$TEST] run tps with input -> $RUNFILE" {
+    rm -f $SOLN_FILE
+    rm -f wedge.log
+    ../src/tps --runFile $RUNFILE $OPTS >& wedge.log
+
+    test -s wedge.log
+    test -s $SOLN_FILE
+}
+
+@test "[$TEST] verify computed inlet area in output -> wedge.log" {
+    output=`cat wedge.log`
+    [[ "${output}" =~ "[INLET]: Total Surface Area                = 2.50000e-01" ]]
+}
+
+@test "[$TEST] verify # of inlet faces detected -> wedge.log" {
+    output=`cat wedge.log`
+    [[ "${output}" =~ "[INLET]: # of boundary faces               = 3" ]]
+}
+
+@test "[$TEST] verify computed inlet outlet in output -> wedge.log" {
+    output=`cat wedge.log`
+    [[ "${output}" =~ "[OUTLET]: Total Surface Area                = 0.45000" ]]
+}
+
+@test "[$TEST] verify # of outlet faces detected -> wedge.log" {
+    output=`cat wedge.log`
+    [[ "${output}" =~ "[OUTLET]: # of boundary faces               = 5" ]]
+}
