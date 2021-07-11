@@ -17,8 +17,8 @@ AX_PROG_CXX_MPI
 
 # C++ 17 standard, just setting by hand
 #AX_CXX_COMPILE_STDCXX_17
-CXXFLAGS="-std=c++17 $CXXFLAGS"
-#CXXFLAGS="-std=c++11 $CXXFLAGS"
+#CXXFLAGS="-std=c++17 $CXXFLAGS"
+CXXFLAGS="-std=c++11 $CXXFLAGS"
 
 #AC_PROG_LIBTOOL
 AC_PROG_RANLIB
@@ -43,8 +43,8 @@ CXX=$NVCC_PATH/nvcc
 #CUDA_CXXFLAGS="-x=cu --expt-extended-lambda -arch=sm_60 -ccbin mpicxx $CUDA_CXXFLAGS"
 #CUDA_LDFLAGS="--expt-extended-lambda -arch=sm_60 -ccbin mpicxx $CUDA_LDFLAGS"
 
-CUDA_CXXFLAGS="-x=cu --expt-extended-lambda -arch=sm_60 -ccbin mpicxx $CUDA_CXXFLAGS"
-CUDA_LDFLAGS="--expt-extended-lambda -arch=sm_60 -ccbin mpicxx $CUDA_LDFLAGS"
+CUDA_CXXFLAGS="-x=cu --expt-extended-lambda -arch=sm_70 -ccbin mpicxx $CUDA_CXXFLAGS"
+CUDA_LDFLAGS="--expt-extended-lambda -arch=sm_70 -ccbin mpicxx $CUDA_LDFLAGS"
 
 ENABLE_GPU=yes
 ENABLE_CUDA=yes
