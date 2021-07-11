@@ -1,5 +1,5 @@
 AM_CPPFLAGS          = -g -I$(MFEM_INC) -I$(MFEM_INC)/mfem
-AM_CPPFLAGS         += -I$(HYPRE_INC) -I$(HDF5_CFLAGS) -I$(PETSC_INC) $(GRVY_CFLAGS)
+AM_CPPFLAGS         += -I$(HYPRE_INC) $(HDF5_CFLAGS) $(GRVY_CFLAGS)
 
 if CUDA_ENABLED
 AM_CPPFLAGS += $(CUDA_CXXFLAGS)
@@ -17,7 +17,7 @@ tps_LDFLAGS         += $(HDF5_LIBS)
 tps_LDFLAGS         += -L$(METIS_LIB) -lmetis
 tps_LDFLAGS         += $(GRVY_LIBS)
 # hypre depends are complicated
-tps_LDFLAGS         += -L$(PETSC_LIB) -lpetsc
+#tps_LDFLAGS         += -L$(PETSC_LIB) -lpetsc
 tps_LDFLAGS         += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
 tps_LDFLAGS         += -L$(NETCDF_LIB) -lnetcdf
 
