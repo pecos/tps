@@ -72,6 +72,7 @@ RUN yum -y install aspell
 RUN yum -y install diffutils
 RUN yum -y install cmake-ohpc
 RUN yum -y install git-lfs
+RUN yum -y install bc
 
 ## Define a user
 RUN useradd -u 1000 -m test
