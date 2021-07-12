@@ -28,7 +28,7 @@ jobs:
       - name: Bootstrap
         run:  ./bootstrap
       - name: Configure
-        run:  ./configure CXXFLAGS="-fdiagnostics-color=always"
+        run:  ./configure CXXFLAGS="-fdiagnostics-color=always -I$PETSC_INC" LDFLAGS="-L$PETSC_LIB -lpetsc"
       - name: Make
         run:  make -j 2
       - name: Tests
