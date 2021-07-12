@@ -46,6 +46,7 @@ maxDofs(_maxDofs)
   hmeanUp[num_equation-1] = 101300;
   
   area = 0.;
+  parallelAreaComputed = false;
   
   Array<double> coords;
   
