@@ -6,7 +6,8 @@
  * MFEM library requires this to be its own class
  */
 
-#include "mfem.hpp"
+#include <mfem.hpp>
+#include <tps_config.h>
 #include "fluxes.hpp"
 
 using namespace mfem;

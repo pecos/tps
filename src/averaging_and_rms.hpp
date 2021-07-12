@@ -2,8 +2,8 @@
 #define AVERAGING_AND_RMS
 
 #include <string>
-
-#include "mfem.hpp"
+#include <tps_config.h>
+#include <mfem.hpp>
 #include "run_configuration.hpp"
 #include "mpi_groups.hpp"
 

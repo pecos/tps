@@ -1,7 +1,8 @@
 #ifndef SBP_INTEGRATOR
 #define SBP_INTEGRATOR
 
-#include "mfem.hpp"
+#include <mfem.hpp>
+#include <tps_config.h>
 #include "equation_of_state.hpp"
 #include "fluxes.hpp"
 

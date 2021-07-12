@@ -1,4 +1,6 @@
 #include "wallBC.hpp"
+//#include "general/forall.hpp"
+#include "riemann_solver.hpp"
 
 WallBC::WallBC(RiemannSolver* _rsolver, 
                EquationOfState* _eqState, 
@@ -10,7 +12,8 @@ WallBC::WallBC(RiemannSolver* _rsolver,
                const int _num_equation, 
                int _patchNumber, 
                WallType _bcType,
-               const Array<double> _inputData ):
+               const Array<double> _inputData,
+               const Array<int> &_intPointsElIDBC ):
 BoundaryCondition(_rsolver, 
                   _eqState,
                   _vfes,
@@ -21,7 +24,8 @@ BoundaryCondition(_rsolver,
                   _patchNumber,
                   1 ), // so far walls do not require ref. length. Left at 1
 wallType(_bcType),
-fluxClass(_fluxClass)
+fluxClass(_fluxClass),
+intPointsElIDBC(_intPointsElIDBC)
 {
   if( wallType==VISC_ISOTH )
   {
@@ -32,6 +36,59 @@ fluxClass(_fluxClass)
 WallBC::~WallBC()
 {
 }
+
+void WallBC::initBCs()
+{
+  if( !BCinit )
+  {
+    buildWallElemsArray(intPointsElIDBC);
+  }
+  BCinit = true;
+}
+
+void WallBC::buildWallElemsArray(const Array<int> &intPointsElIDBC)
+{
+  auto hlistElems = listElems.HostRead(); //this is actually a list of faces
+  auto hintPointsElIDBC = intPointsElIDBC.HostRead();
+  
+  std::vector<int> unicElems; unicElems.clear();
+  
+  for(int f=0;f<listElems.Size();f++)
+  {
+    int bcFace = hlistElems[f];
+    int elID = hintPointsElIDBC[2*bcFace+1];
+    
+    bool elInList = false;
+    for(int i=0;i<unicElems.size();i++)
+    {
+      if( unicElems[i]==elID ) elInList = true;
+    }
+    if(!elInList) unicElems.push_back(elID);
+  }
+  
+  wallElems.SetSize(7*unicElems.size());
+  wallElems = -1;
+  auto hwallElems = wallElems.HostWrite();
+  for(int el=0;el<wallElems.Size()/7;el++)
+  {
+    int elID = unicElems[el];
+    for(int f=0;f<listElems.Size();f++)
+    {
+      int bcFace = hlistElems[f];
+      int elID2 = hintPointsElIDBC[2*bcFace+1];
+      if( elID2==elID )
+      {
+        int nf = hwallElems[0+7*el];
+        if( nf==-1) nf = 0;
+        nf++;
+        hwallElems[nf+7*el] = f;
+        hwallElems[0 +7*el] = nf;
+      }
+    }
+  }
+  auto dwallElems = wallElems.ReadWrite();
+}
+
 
 void WallBC::computeBdrFlux(Vector &normal,
                             Vector &stateIn, 
@@ -51,6 +108,40 @@ void WallBC::computeBdrFlux(Vector &normal,
       break;
   }
 }
+
+void WallBC::integrationBC(Vector& y, 
+                           const Vector &x, 
+                           const Array<int> &nodesIDs,
+                           const Array<int> &posDofIds,
+                           ParGridFunction* Up,
+                           ParGridFunction* gradUp, 
+                           Vector& shapesBC, 
+                           Vector& normalsWBC, 
+                           Array<int>& intPointsElIDBC, 
+                           const int& maxIntPoints, 
+                           const int& maxDofs)
+{
+  integrateWalls_gpu( wallType,
+                      wallTemp,
+                      y, // output
+                      x,
+                      nodesIDs,
+                      posDofIds,
+                      Up,
+                      gradUp,
+                      shapesBC,
+                      normalsWBC,
+                      intPointsElIDBC,
+                      wallElems,
+                      listElems,
+                      maxIntPoints,
+                      maxDofs,
+                      dim,
+                      num_equation,
+                      eqState->GetSpecificHeatRatio(),
+                      eqState->GetGasConstant() );
+}
+
 
 void WallBC::computeINVwallFlux(Vector &normal,
                                 Vector &stateIn,
@@ -146,4 +237,257 @@ void WallBC::computeIsothermalWallFlux( Vector &normal,
   
   // Normal convective flux
   rsolver->Eval(stateIn,wallState,normal,bdrFlux, true);
+}
+
+// void WallBC::integrateWalls_gpu(const WallType type,
+//                                 const double &wallTemp,
+//                                 Vector& y, 
+//                                 const Vector &x, 
+//                                 const Array<int> &nodesIDs,
+//                                 const Array<int> &posDofIds,
+//                                 ParGridFunction* Up, 
+//                                 ParGridFunction* gradUp, 
+//                                 Vector& shapesBC, 
+//                                 Vector& normalsWBC, 
+//                                 Array<int>& intPointsElIDBC, 
+//                                 Array<int> &elemFacesBC,
+//                                 Array<int>& listElems, 
+//                                 const int& maxIntPoints, 
+//                                 const int& maxDofs, 
+//                                 const int& dim, 
+//                                 const int& num_equation,
+//                                 const double &gamma,
+//                                 const double &Rg )
+// {
+// #ifdef _GPU_
+//   double *d_y = y.Write();
+//   const double *d_U = x.Read();
+//   const int *d_nodesIDs = nodesIDs.Read();
+//   const int *d_posDofIds = posDofIds.Read();
+//   //const double *d_Up = Up->Read();
+//   //const double *d_gradUp = gradUp->Read();
+//   const double *d_shapesBC = shapesBC.Read();
+//   const double *d_normW = normalsWBC.Read();
+//   const int *d_intPointsElIDBC = intPointsElIDBC.Read();
+//   const int *d_listElems = listElems.Read();
+//   
+//   const int totDofs = x.Size()/num_equation;
+//   const int numBdrElem = listElems.Size();
+//   
+//   MFEM_FORALL_2D(n,numBdrElem,maxDofs,1,1,
+//   {
+//     MFEM_FOREACH_THREAD(i,x,maxDofs)
+//     {
+//       MFEM_SHARED double Ui[216*5], Fcontrib[216*5];
+//       MFEM_SHARED double shape[216];
+//       MFEM_SHARED double Rflux[5], u1[5],u2[5], nor[3];
+//       MFEM_SHARED double weight;
+//       
+//       const int el = d_listElems[n];
+//       const int Q    = d_intPointsElIDBC[2*el  ];
+//       const int elID = d_intPointsElIDBC[2*el+1];
+//       
+//       const int elOffset = d_posDofIds[2*elID  ];
+//       const int elDof    = d_posDofIds[2*elID+1];
+//       int indexi;
+//       if(i<elDof) indexi = d_nodesIDs[elOffset+i];
+//       
+//       // retreive data
+//       for(int eq=0;eq<num_equation;eq++)
+//       {
+//         if(i<elDof)
+//         {
+//           Ui[i+eq*elDof] = d_U[indexi+eq*totDofs];
+//           Fcontrib[i+eq*elDof] = 0.;
+//         }
+//       }
+//       
+//       for(int q=0;q<Q;q++) // loop over int. points
+//       {
+//         if(i<elDof) shape[i] = d_shapesBC[i+q*maxDofs+el*maxIntPoints*maxDofs];
+//         if(i<dim) nor[i] = d_normW[i+q*(dim+1)+el*maxIntPoints*(dim+1)];
+//         if(dim==2 && i==maxDofs-2) nor[2] = 0.;
+//         if(i==maxDofs-1) weight = d_normW[dim+q*(dim+1)+el*maxIntPoints*(dim+1)];
+//         MFEM_SYNC_THREAD;
+//         
+//         // interpolate to int. point
+//         if(i<num_equation)
+//         {
+//           u1[i] = 0.;
+//           for(int k=0;k<elDof;k++) u1[i] += Ui[k+i*elDof]*shape[k];
+//         }
+//         MFEM_SYNC_THREAD;
+//         
+//         // compute mirror state
+//         switch(type)
+//         {
+//           case WallType::INV:
+//             if(i<num_equation) computeInvWallState(i,&u1[0],&u2[0],&nor[0],dim,num_equation );
+//             break;
+//           case WallType::VISC_ISOTH:
+//             if(i<num_equation) computeIsothermalState(i,&u1[0],&u2[0],&nor[0],wallTemp,
+//                                                       gamma,Rg,dim,num_equation );
+//             break;
+//           case WallType::VISC_ADIAB:
+//             break;
+//         }
+//         MFEM_SYNC_THREAD;
+//         
+//         // compute flux
+//         if(i==0) RiemannSolver::riemannLF_gpu(&u1[0],&u2[0],&Rflux[0],&nor[0],
+//                                               gamma,Rg,dim,num_equation);
+//         MFEM_SYNC_THREAD;
+//         
+//         // sum contributions to integral
+//         if(i<elDof)
+//         {
+//           for(int eq=0;eq<num_equation;eq++) Fcontrib[i+eq*elDof] -= Rflux[eq]*shape[i]*weight;
+//         }
+//         MFEM_SYNC_THREAD;
+//       }
+//       
+//       // add to global data
+//       if(i<elDof)
+//       {
+//         for(int eq=0;eq<num_equation;eq++) d_y[indexi+eq*totDofs] += Fcontrib[i+eq*elDof];
+//       }
+//     }
+//   });
+// #endif
+// }
+
+void WallBC::integrateWalls_gpu(const WallType type,
+                                const double &wallTemp,
+                                Vector& y, 
+                                const Vector &x, 
+                                const Array<int> &nodesIDs,
+                                const Array<int> &posDofIds,
+                                ParGridFunction* Up, 
+                                ParGridFunction* gradUp, 
+                                Vector& shapesBC, 
+                                Vector& normalsWBC, 
+                                Array<int>& intPointsElIDBC, 
+                                Array<int> &wallElems,
+                                Array<int>& listElems, 
+                                const int& maxIntPoints, 
+                                const int& maxDofs, 
+                                const int& dim, 
+                                const int& num_equation,
+                                const double &gamma,
+                                const double &Rg )
+{
+#ifdef _GPU_
+  double *d_y = y.Write();
+  const double *d_U = x.Read();
+  const int *d_nodesIDs = nodesIDs.Read();
+  const int *d_posDofIds = posDofIds.Read();
+  //const double *d_Up = Up->Read();
+  //const double *d_gradUp = gradUp->Read();
+  const double *d_shapesBC = shapesBC.Read();
+  const double *d_normW = normalsWBC.Read();
+  const int *d_intPointsElIDBC = intPointsElIDBC.Read();
+  const int *d_wallElems = wallElems.Read();
+  const int *d_listElems = listElems.Read();
+  
+  const int totDofs = x.Size()/num_equation;
+  const int numBdrElem = listElems.Size();
+  
+  MFEM_FORALL_2D(el,wallElems.Size()/7,maxDofs,1,1,
+  {
+    MFEM_FOREACH_THREAD(i,x,maxDofs)
+    {
+      MFEM_SHARED double Ui[216*5], Fcontrib[216*5];
+      MFEM_SHARED double shape[216];
+      MFEM_SHARED double Rflux[5], u1[5],u2[5], nor[3];
+      MFEM_SHARED double weight;
+      
+      const int numFaces = d_wallElems[0+el*7];
+      bool elemDataRecovered = false;
+      
+      int elOffset;
+      int elDof;
+      int elID;
+      int indexi;
+      
+      for(int f=0;f<numFaces;f++)
+      {
+        const int n = d_wallElems[1+f+el*7];
+        
+        const int el = d_listElems[n];
+        const int Q    = d_intPointsElIDBC[2*el  ];
+        
+        if( !elemDataRecovered )
+        {
+          elID = d_intPointsElIDBC[2*el+1];
+          
+          elOffset = d_posDofIds[2*elID  ];
+          elDof    = d_posDofIds[2*elID+1];
+          
+          if(i<elDof) indexi = d_nodesIDs[elOffset+i];
+        }
+        
+        // retreive data
+        if(i<elDof && !elemDataRecovered )
+        {
+          for(int eq=0;eq<num_equation;eq++)
+          {
+            Ui[i+eq*elDof] = d_U[indexi+eq*totDofs];
+            Fcontrib[i+eq*elDof] = 0.;
+          }
+          elemDataRecovered = true;
+        }
+        
+        for(int q=0;q<Q;q++) // loop over int. points
+        {
+          if(i<elDof) shape[i] = d_shapesBC[i+q*maxDofs+el*maxIntPoints*maxDofs];
+          if(i<dim) nor[i] = d_normW[i+q*(dim+1)+el*maxIntPoints*(dim+1)];
+          if(dim==2 && i==maxDofs-2) nor[2] = 0.;
+          if(i==maxDofs-1) weight = d_normW[dim+q*(dim+1)+el*maxIntPoints*(dim+1)];
+          MFEM_SYNC_THREAD;
+          
+          // interpolate to int. point
+          if(i<num_equation)
+          {
+            u1[i] = 0.;
+            for(int k=0;k<elDof;k++) u1[i] += Ui[k+i*elDof]*shape[k];
+          }
+          MFEM_SYNC_THREAD;
+          
+          // compute mirror state
+          switch(type)
+          {
+            case WallType::INV:
+              if(i<num_equation) computeInvWallState(i,&u1[0],&u2[0],&nor[0],dim,num_equation );
+              break;
+            case WallType::VISC_ISOTH:
+              if(i<num_equation) computeIsothermalState(i,&u1[0],&u2[0],&nor[0],wallTemp,
+                                                        gamma,Rg,dim,num_equation );
+              break;
+            case WallType::VISC_ADIAB:
+              break;
+          }
+          MFEM_SYNC_THREAD;
+          
+          // compute flux
+          if(i==0) RiemannSolver::riemannLF_gpu(&u1[0],&u2[0],&Rflux[0],&nor[0],
+                                                gamma,Rg,dim,num_equation);
+          MFEM_SYNC_THREAD;
+          
+          // sum contributions to integral
+          if(i<elDof)
+          {
+            for(int eq=0;eq<num_equation;eq++) Fcontrib[i+eq*elDof] -= Rflux[eq]*shape[i]*weight;
+          }
+          MFEM_SYNC_THREAD;
+        }
+      }
+      
+      // add to global data
+      if(i<elDof)
+      {
+        for(int eq=0;eq<num_equation;eq++) d_y[indexi+eq*totDofs] += Fcontrib[i+eq*elDof];
+      }
+    }
+  });
+#endif
 }

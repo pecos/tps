@@ -160,7 +160,7 @@ void M2ulPhyS::restart_files_hdf5(string mode)
       assert(group >= 0);
 
       // state vectors in U -> rho, rho-u, rho-v, rho-w, and rho-E
-      double *dataU = U->GetData();
+      double *dataU = U->HostReadWrite();
 
       data_soln = H5Dcreate2(group, "density", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
       assert(data_soln >= 0);
@@ -244,9 +244,9 @@ void M2ulPhyS::restart_files_hdf5(string mode)
       cout << "Reading in state vector from restart..." << endl;
       double *dataU;
       if( loadFromAuxSol )
-        dataU = aux_U->GetData();
+	  dataU = aux_U->HostReadWrite();
       else
-        dataU = U->GetData();
+	  dataU = U->HostReadWrite();
 
       data_soln = H5Dopen2(file, "/solution/density",H5P_DEFAULT); assert(data_soln >= 0);
       dataspace = H5Dget_space(data_soln);
@@ -311,8 +311,8 @@ void M2ulPhyS::restart_files_hdf5(string mode)
       // We would like to just call rhsOperator::updatePrimitives, but
       // rhsOperator has not been constructed yet.  As a workaround,
       // that code is duplicated here.
-      double *dataUp = Up->GetData();
-      double *x = U->GetData();
+      double *dataUp = Up->HostReadWrite();
+      double *x = U->HostReadWrite();
       for(int i=0;i<vfes->GetNDofs();i++)
         {
           Vector iState(num_equation);

@@ -18,10 +18,11 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1,
                                         const Vector &elfun, Vector &elvect)
 {
   // Compute the term <nU,[w]> on the interior faces.
-  Vector shape1;
-  Vector shape2;
-  Vector nor(dim);
-  Vector mean(num_equation);
+  Vector shape1; shape1.UseDevice(false);
+  Vector shape2; shape2.UseDevice(false);
+  Vector nor(dim); nor.UseDevice(false);
+  Vector mean; mean.UseDevice(false);
+  mean.SetSize(num_equation);
 
   const int dof1 = el1.GetDof();
   const int dof2 = el2.GetDof();
@@ -29,17 +30,25 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1,
   shape1.SetSize(dof1);
   shape2.SetSize(dof2);
 
+  elfun.Read();
+  elvect.UseDevice(true);
   elvect.SetSize((dof1+dof2)*num_equation*dim);
   elvect = 0.0;
 
+// #ifdef _GPU_
+//   DenseMatrix elfun1_mat(elfun.GetData(), dof1, num_equation);
+//   DenseMatrix elfun2_mat(elfun.GetData()+dof1*num_equation, 
+//                          dof2, num_equation);
+#ifndef _GPU_
   DenseMatrix elfun1_mat(elfun.GetData(), dof1, num_equation*dim);
   DenseMatrix elfun2_mat(elfun.GetData()+dof1*num_equation*dim, 
                          dof2, num_equation*dim);
-
   DenseMatrix elvect1_mat(elvect.GetData(),dof1, num_equation*dim);
   DenseMatrix elvect2_mat(elvect.GetData()+dof1*num_equation*dim, 
                           dof2, num_equation*dim);
-  elvect1_mat = 0.;elvect2_mat = 0.;
+  elvect1_mat = 0.;
+  elvect2_mat = 0.;
+#endif
 
   // Integration order calculation from DGTraceIntegrator
   int intorder;
@@ -68,32 +77,32 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1,
     el2.CalcShape(Tr.GetElement2IntPoint(), shape2);
 
     // Interpolate U values at the point
-    Vector iUp1(num_equation),iUp2(num_equation);
+    Vector iUp1,iUp2; iUp1.UseDevice(false); iUp2.UseDevice(false);
+    iUp1.SetSize(num_equation); iUp2.SetSize(num_equation);
     for(int eq=0;eq<num_equation;eq++)
     {
       double sum = 0.;
       for(int k=0;k<dof1;k++)
       {
+#ifdef _GPU_
+        sum += shape1(k)*elfun(k+eq*dof1);
+#else
         sum += shape1[k]*elfun1_mat(k,eq);
+#endif
       }
-      iUp1[eq] = sum;
+      iUp1(eq) = sum;
       sum = 0.;
       for(int k=0;k<dof2;k++)
       {
+#ifdef _GPU_
+        sum += shape2(k)*elfun(k+eq*dof2 + dof1*num_equation);
+#else
         sum += shape2[k]*elfun2_mat(k,eq);
+#endif
       }
-      iUp2[eq] = sum;
-      mean[eq] = (iUp1[eq]+iUp2[eq])/2.;
+      iUp2(eq) = sum;
+      mean(eq) = (iUp1(eq)+iUp2(eq))/2.;
     }
-// std::cout<<"e1 ";
-// for(int eq=0;eq<num_equation;eq++)std::cout<<iUp1[eq]<<" ";
-// std::cout<<std::endl;
-// std::cout<<"e2 ";
-// for(int eq=0;eq<num_equation;eq++)std::cout<<iUp2[eq]<<" ";
-// std::cout<<std::endl;
-// std::cout<<"mean ";
-// for(int eq=0;eq<num_equation;eq++)std::cout<<mean[eq]<<" ";
-// std::cout<<std::endl;
 
     // Get the normal vector and the flux on the face
     CalcOrtho(Tr.Jacobian(), nor);
@@ -106,26 +115,22 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1,
       {
         for(int k=0;k<dof1;k++)
         {
-          elvect1_mat(k,eq+d*num_equation) += (mean(eq)-iUp1[eq])*nor[d]*shape1(k);
-          //elvect1_mat(k,eq+d*num_equation) += mean(eq)*nor[d]*shape1(k);
-//std::cout<<d<<" "<<eq<<" "<<k<<" "<<mean[eq]<<" "<<iUp1[eq]<<std::endl;
+#ifdef _GPU_
+          elvect(k+eq+d*num_equation) += (mean(eq)-iUp1(eq))*nor(d)*shape1(k);
+#else
+          elvect1_mat(k,eq+d*num_equation) += (mean(eq)-iUp1(eq))*nor(d)*shape1(k);
+#endif
         }
         for(int k=0;k<dof2;k++)
         {
-          elvect2_mat(k,eq+d*num_equation) -= (mean(eq)-iUp2[eq])*nor[d]*shape2(k);
-          //elvect2_mat(k,eq+d*num_equation) -= mean(eq)*nor[d]*shape2(k);
+#ifdef _GPU_
+          elvect(k+eq+d*num_equation + dof1*num_equation*dim) -= (mean(eq)-iUp2(eq))*nor(d)*shape2(k);
+#else
+          elvect2_mat(k,eq+d*num_equation) -= (mean(eq)-iUp2(eq))*nor(d)*shape2(k);
+#endif
         }
       }
     }
       
   }
-// std::cout<<"func out"<<std::endl;
-// for(int i=0;i<dof1;i++)
-// {
-//   for(int j=0;j<num_equation*dim;j++)
-//   {
-//     std::cout<<elvect1_mat(i,j)<<" ";
-//   }
-//   std::cout<<std::endl;
-// }
 }

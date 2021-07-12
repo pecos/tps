@@ -23,14 +23,18 @@ echo Package version............... : $PACKAGE-$VERSION
 echo
 echo C++ compiler.................. : $CXX
 echo C++ compiler flags............ : $CXXFLAGS
-echo Install dir................... : $prefix 
-#echo Boost C++ flags............... : $BOOST_CPPFLAGS
+echo Install dir................... : $prefix
 echo Build user.................... : $USER
 echo Build host.................... : $BUILD_HOST
 echo Configure date................ : $BUILD_DATE
 echo Build architecture............ : $BUILD_ARCH
 echo Git revision number........... : $BUILD_VERSION
 echo
+echo GPU build enabled with CUDA... : $ENABLE_CUDA
+if test "$ENABLE_CUDA" = "yes"; then
+echo ' - 'CUDA_CXXFLAGS.............. : $CUDA_CXXFLAGS
+echo ' - 'CUDA_LDFLAGS............... : $CUDA_LDFLAGS
+fi
 echo
 echo '-------------------------------------------------------------------------------'
 

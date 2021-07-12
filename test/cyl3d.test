@@ -24,7 +24,7 @@ setup() {
 
     test -s $SOLN_FILE
     test -s $REF_FILE
-    h5diff $SOLN_FILE $REF_FILE
+    ./soln_differ $SOLN_FILE $REF_FILE
 }
 
 @test "[$TEST] verify exit code if restart files missing" {
@@ -51,7 +51,7 @@ setup() {
 
     RUNFILE=input.4iters.restart.cyl
     ../src/tps --runFile $RUNFILE
-    h5diff $SOLN_FILE $REF_FILE
+    ./soln_differ $SOLN_FILE $REF_FILE
 }
 
 @test "[$TEST] verify tps output after variable p restart" {
@@ -86,5 +86,5 @@ setup() {
 
     REF_FILE=ref_solns/cyl3d_coarse.8iters.varp.h5
     test -s $REF_FILE
-    h5diff $SOLN_FILE $REF_FILE
+    ./soln_differ $SOLN_FILE $REF_FILE
 }

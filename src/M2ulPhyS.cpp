@@ -20,14 +20,24 @@ mpi(_mpi)
   // now that MPI groups have been initialized, we can finalize any additional
   // BC setup that requries coordination across processors
   if( bcIntegrator != NULL)
-    bcIntegrator->initState();
+    {
+      bcIntegrator->initBCs();
+    }
 
   // set default solver state
   exit_status_ =  NORMAL;
 
   // This example depends on this ordering of the space.
   //MFEM_ASSERT(fes.GetOrdering() == Ordering::byNODES, "");
-  
+#ifdef _GPU_
+  // write to GPU global memory
+  gradUp->ReadWrite();
+  U->ReadWrite();
+  Up->ReadWrite();
+  auto vgradUp = gradUp->ReadWrite();
+  auto v_U = U->ReadWrite();
+  auto vUp = Up->ReadWrite();
+#endif // _GPU_
 }
 
 
@@ -55,7 +65,7 @@ void M2ulPhyS::initVariables()
     }
 
     mesh = new ParMesh(MPI_COMM_WORLD,*tempmesh);
-    tempmesh->Clear();
+    delete tempmesh;
     
     // Paraview setup
     paraviewColl = new ParaViewDataCollection(config.GetOutputName(), mesh);
@@ -71,7 +81,7 @@ void M2ulPhyS::initVariables()
       string command = "rm -r ";
       command.append( config.GetOutputName() );
       int err = system(command.c_str());
-      if( err==1 )
+      if( err!=0 )
       {
         cout<<"Error deleting previous data in "<<config.GetOutputName()<<endl;
       }
@@ -113,7 +123,8 @@ void M2ulPhyS::initVariables()
   
   eqSystem = config.GetEquationSystem();
   
-  eqState = new EquationOfState(config.GetWorkingFluid());
+  eqState = new EquationOfState();
+  eqState->setFluid( config.GetWorkingFluid() );
   eqState->setViscMult(config.GetViscMult() );
   
   order = config.GetSolutionOrder();
@@ -162,6 +173,7 @@ void M2ulPhyS::initVariables()
   vfes = new ParFiniteElementSpace(mesh, fec, num_equation, Ordering::byNODES);
   gradUpfes = new ParFiniteElementSpace(mesh, fec, num_equation*dim, Ordering::byNODES);
 
+  initIndirectionArrays();
   initSolutionAndVisualizationVectors();
   projectInitialSolution();
   
@@ -191,10 +203,59 @@ void M2ulPhyS::initVariables()
                               fluxClass,
                               config.RoeRiemannSolver() );
   
-  A = new ParNonlinearForm(vfes);
+  // Boundary attributes in present partition
+  Array<int> local_attr;
+  getAttributesInPartition(local_attr);
+  
+  bcIntegrator = NULL;
+  if( local_attr.Size()>0 )
+  {
+    bcIntegrator = new BCintegrator(groupsMPI,
+                                    mesh,
+                                    vfes,
+                                    intRules,
+                                    rsolver, 
+                                    dt,
+                                    eqState,
+                                    fluxClass,
+                                    Up,
+                                    gradUp,
+                                    shapesBC,
+                                    normalsWBC,
+                                    intPointsElIDBC,
+                                    dim,
+                                    num_equation,
+                                    max_char_speed,
+                                    config, 
+                                    local_attr,
+                                    maxIntPoints,
+                                    maxDofs );
+  }
+  
+  //A->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  
+  A = new DGNonLinearForm(vfes,
+                          gradUpfes,
+                          gradUp,
+                          bcIntegrator,
+                          intRules,
+                          dim,
+                          num_equation,
+                          eqState,
+                          numElems,
+                          nodesIDs,
+                          posDofIds,
+                          shapeWnor1,
+                          shape2,
+                          elemFaces,
+                          elems12Q,
+                          maxIntPoints,
+                          maxDofs);
+  if( local_attr.Size()>0 ) A->AddBdrFaceIntegrator( bcIntegrator );
+  
   {
     bool useLinearIntegration = false;
-    if( basisType==1 && intRuleType==1 ) useLinearIntegration = true;
+//    if( basisType==1 && intRuleType==1 ) useLinearIntegration = true;
     
     faceIntegrator = new FaceIntegrator(intRules, 
                                       rsolver,
@@ -215,36 +276,12 @@ void M2ulPhyS::initVariables()
     A->AddDomainIntegrator( SBPoperator );
   }
   
-  // Boundary attributes in present partition
-  Array<int> local_attr;
-  getAttributesInPartition(local_attr);
-  
-  bcIntegrator = NULL;
-  if( local_attr.Size()>0 )
-  {
-    bcIntegrator = new BCintegrator(groupsMPI,
-                                    mesh,
-                                    vfes,
-                                    intRules,
-                                    rsolver, 
-                                    dt,
-                                    eqState,
-                                    fluxClass,
-                                    Up,
-                                    gradUp,
-                                    dim,
-                                    num_equation,
-                                    max_char_speed,
-                                    config, 
-                                    local_attr );
-    A->AddBdrFaceIntegrator( bcIntegrator );
-  }
-  
   Aflux = new MixedBilinearForm(dfes, fes);
   domainIntegrator = new DomainIntegrator(fluxClass,intRules, intRuleType, 
                                           dim, num_equation);
   Aflux->AddDomainIntegrator( domainIntegrator );
   Aflux->Assemble();
+  Aflux->Finalize();
   
   switch (config.GetTimeIntegratorType() )
   {
@@ -257,7 +294,27 @@ void M2ulPhyS::initVariables()
         cout << "Unknown ODE solver type: " << config.GetTimeIntegratorType() << '\n';
   }
   
-  gradUp_A = new ParNonlinearForm(gradUpfes);
+//   gradUp_A = new ParNonlinearForm(gradUpfes);
+//   gradUp_A->AddInteriorFaceIntegrator(
+//       new GradFaceIntegrator(intRules, dim, num_equation) );
+  gradUp_A = new GradNonLinearForm(
+#ifdef _GPU_ 
+                                   vfes,
+#else 
+                                   gradUpfes,
+#endif
+                                   intRules,
+                                   dim,
+                                   num_equation,
+                                   numElems,
+                                   nodesIDs,
+                                   posDofIds,
+                                   shapeWnor1,
+                                   shape2,
+                                   maxIntPoints,
+                                   maxDofs,
+                                   elemFaces,
+                                   elems12Q );
   gradUp_A->AddInteriorFaceIntegrator(
       new GradFaceIntegrator(intRules, dim, num_equation) );
   
@@ -272,6 +329,15 @@ void M2ulPhyS::initVariables()
                                 fluxClass,
                                 eqState,
                                 vfes,
+                                nodesIDs,
+                                posDofIds,
+                                numElems,
+                                shapeWnor1,
+                                shape2,
+                                elemFaces,
+                                elems12Q,
+                                maxIntPoints,
+                                maxDofs,
                                 A, 
                                 Aflux,
                                 mesh,
@@ -301,6 +367,7 @@ void M2ulPhyS::initVariables()
    }
 
   // estimate initial dt
+  Up->ExchangeFaceNbrData();
   gradUp->ExchangeFaceNbrData();
 
   if( config.GetRestartCycle()==0 ) initialTimeStep();
@@ -310,10 +377,261 @@ void M2ulPhyS::initVariables()
 }
 
 
+void M2ulPhyS::initIndirectionArrays()
+{
+  posDofIds.SetSize( 2*vfes->GetNE() );
+  posDofIds = 0;
+  auto hposDofIds = posDofIds.HostWrite();
+  
+  std::vector<int> tempNodes;
+  tempNodes.clear();
+  
+  for(int i=0;i<vfes->GetNE();i++)
+  {
+    const int dof = vfes->GetFE(i)->GetDof();
+    
+    // get the nodes IDs
+    hposDofIds[2*i   ] = tempNodes.size();
+    hposDofIds[2*i +1] = dof;
+    Array<int> dofs;
+    vfes->GetElementVDofs(i, dofs);
+    for(int n=0;n<dof;n++) tempNodes.push_back( dofs[n] );
+  }
+  
+  nodesIDs.SetSize( tempNodes.size() );
+  nodesIDs = 0;
+  auto hnodesIDs = nodesIDs.HostWrite();
+  for(int i=0;i<nodesIDs.Size();i++) hnodesIDs[i] = tempNodes[i];
+  
+  
+  // count number of each type of element
+  std::vector<int> tempNumElems;
+  tempNumElems.clear();
+  int dof1 = hposDofIds[1];
+  int typeElems = 0;
+  for(int el=0;el<posDofIds.Size()/2;el++)
+  {
+    int dofi = hposDofIds[2*el+1];
+    if( dofi==dof1 )
+    {
+      typeElems++;
+    }else
+    {
+      tempNumElems.push_back( typeElems );
+      typeElems = 1;
+      dof1 = dofi;
+    }
+  }
+  tempNumElems.push_back( typeElems );
+  numElems.SetSize( tempNumElems.size() );
+  numElems = 0;
+  auto hnumElems = numElems.HostWrite();
+  for(int i=0;i<(int)tempNumElems.size();i++) hnumElems[i] = tempNumElems[i];
+  
+  {
+    // Initialize vectors and arrays to be used in 
+    // face integrations
+//     const int maxIntPoints = 49; // corresponding to square face with p=5
+//     const int maxDofs = 216; //HEX with p=5
+    
+    elemFaces.SetSize(7*vfes->GetNE() );
+    elemFaces = 0;
+    auto helemFaces = elemFaces.HostWrite();
+    
+    std::vector<double> shapes2, shapes1;
+    shapes1.clear();shapes2.clear();
+    
+    Mesh *mesh = vfes->GetMesh();
+    
+    elems12Q.SetSize( 3*mesh->GetNumFaces() );
+    elems12Q = 0;
+    auto helems12Q = elems12Q.HostWrite();
+    
+    shapeWnor1.UseDevice(true);
+    shapeWnor1.SetSize( (maxDofs+1+dim)*maxIntPoints*mesh->GetNumFaces() );
+    
+    shape2.UseDevice(true);
+    shape2.SetSize( maxDofs*maxIntPoints*mesh->GetNumFaces() );
+    
+    auto hshapeWnor1 = shapeWnor1.HostWrite();
+    auto hshape2 = shape2.HostWrite();
+    
+    for(int face=0; face<mesh->GetNumFaces(); face++)
+    {
+      FaceElementTransformations *tr;
+      tr = mesh->GetInteriorFaceTransformations( face );
+      if (tr != NULL)
+      {
+        Array<int> vdofs;
+        Array<int> vdofs2;
+        fes->GetElementVDofs(tr->Elem1No, vdofs);
+        fes->GetElementVDofs(tr->Elem2No, vdofs2);
+        
+        {
+          int nf = helemFaces[7*tr->Elem1No];
+          if( nf<0 ) nf = 0;
+          helemFaces[7*tr->Elem1No + nf+1] = face;
+          nf++;
+          helemFaces[7*tr->Elem1No] = nf;
+          
+          nf = helemFaces[7*tr->Elem2No];
+          if( nf<0 ) nf = 0;
+          helemFaces[7*tr->Elem2No + nf+1] = face;
+          nf++;
+          helemFaces[7*tr->Elem2No] = nf;
+        }
+        
+        const FiniteElement *fe1 = fes->GetFE(tr->Elem1No);
+        const FiniteElement *fe2 = fes->GetFE(tr->Elem2No);
+        
+        const int dof1 = fe1->GetDof();
+        const int dof2 = fe2->GetDof();
+        
+        int intorder;
+        if(tr->Elem2No >= 0)
+            intorder = (min(tr->Elem1->OrderW(), tr->Elem2->OrderW()) +
+                        2*max(fe1->GetOrder(), fe2->GetOrder()));
+        else
+        {
+            intorder = tr->Elem1->OrderW() + 2*fe1->GetOrder();
+        }
+        if(fe1->Space() == FunctionSpace::Pk)
+        {
+            intorder++;
+        }
+        const IntegrationRule *ir = &intRules->Get(tr->GetGeometryType(), intorder);
+        
+        helems12Q[3*face  ] = tr->Elem1No;
+        helems12Q[3*face+1] = tr->Elem2No;
+        helems12Q[3*face+2] = ir->GetNPoints();
+        
+        Vector shape1i, shape2i; shape1i.UseDevice(false); shape2i.UseDevice(false);
+        shape1i.SetSize( dof1 ); shape2i.SetSize( dof2 );
+        for(int k=0;k<ir->GetNPoints();k++)
+        {
+          const IntegrationPoint &ip = ir->IntPoint(k);
+          tr->SetAllIntPoints(&ip);
+          // shape functions
+          fe1->CalcShape(tr->GetElement1IntPoint(), shape1i);
+          fe2->CalcShape(tr->GetElement2IntPoint(), shape2i);
+          for(int j=0;j<dof1;j++) hshapeWnor1[face*(maxDofs+dim+1)*maxIntPoints+j+k*(dim+1+maxDofs)] = 
+                                    shape1i[j];
+          for(int j=0;j<dof2;j++) hshape2[face*maxDofs*maxIntPoints+j+k*maxDofs] = shape2i[j];
+          
+          hshapeWnor1[face*(maxDofs+dim+1)*maxIntPoints+maxDofs  +k*(dim+1+maxDofs)] = ip.weight;
+          // normals (multiplied by determinant of jacobian
+          Vector nor; nor.UseDevice(false);
+          nor.SetSize( dim );
+          CalcOrtho(tr->Jacobian(), nor);
+          for(int d=0;d<dim;d++) hshapeWnor1[face*(maxDofs+dim+1)*maxIntPoints+maxDofs+1+d+k*(maxDofs+dim+1)] = 
+                                   nor[d];
+        }
+      }
+    }
+  }
+  
+  //  BC  integration arrays
+  if( fes->GetNBE()>0 )
+  {
+    const int NumBCelems = fes->GetNBE();
+
+    shapesBC.UseDevice(true);
+    shapesBC.SetSize(NumBCelems*maxIntPoints*maxDofs);
+    shapesBC = 0.;
+    auto hshapesBC = shapesBC.HostWrite();
+
+    normalsWBC.UseDevice(true);
+    normalsWBC.SetSize(NumBCelems*maxIntPoints*(dim+1));
+    normalsWBC = 0.;
+    auto hnormalsWBC = normalsWBC.HostWrite();
+    
+    intPointsElIDBC.SetSize(NumBCelems*2);
+    intPointsElIDBC = 0;
+    auto hintPointsElIDBC = intPointsElIDBC.HostWrite();
+
+    const FiniteElement *fe;
+    FaceElementTransformations *tr;
+    Mesh *mesh = fes->GetMesh();
+    
+    for(int f=0;f<NumBCelems;f++)
+    {
+      tr = mesh->GetBdrFaceTransformations (f);
+      if(tr != NULL)
+      {
+        fe = fes->GetFE(tr->Elem1No);
+
+        const int elDof = fe->GetDof();
+        int intorder;
+        if (tr->Elem2No >= 0)
+        intorder = (min(tr->Elem1->OrderW(), tr->Elem2->OrderW()) +
+              2*max(fe->GetOrder(), fe->GetOrder()));
+        else
+        {
+          intorder = tr->Elem1->OrderW() + 2*fe->GetOrder();
+        }
+        if(fe->Space() == FunctionSpace::Pk)
+        {
+          intorder++;
+        }
+        const IntegrationRule *ir = &intRules->Get(tr->GetGeometryType(), intorder);
+        
+        hintPointsElIDBC[2*f] = ir->GetNPoints();
+        hintPointsElIDBC[2*f+1] = tr->Elem1No;
+        
+        for(int q=0;q<ir->GetNPoints();q++)
+        {
+          const IntegrationPoint &ip = ir->IntPoint(q);
+          tr->SetAllIntPoints(&ip);
+          Vector nor; nor.UseDevice(false);
+          nor.SetSize(dim);
+          CalcOrtho(tr->Jacobian(), nor);
+          hnormalsWBC[dim+q*(dim+1)+f*maxIntPoints*(dim+1)] = ip.weight;
+          for(int d=0;d<dim;d++) hnormalsWBC[d+q*(dim+1)+f*maxIntPoints*(dim+1)] = nor[d];
+          
+          Vector shape1; shape1.UseDevice(false);
+          shape1.SetSize(elDof);
+          fe->CalcShape(tr->GetElement1IntPoint(), shape1);
+          for(int n=0;n<elDof;n++) hshapesBC[n+q*maxDofs+f*maxIntPoints*maxDofs] = shape1(n);
+        }
+      }
+    }
+  }else
+  {
+    shapesBC.SetSize(1);
+    shapesBC = 0.;
+
+    normalsWBC.SetSize(1);
+    normalsWBC = 0.;
+    
+    intPointsElIDBC.SetSize(1);
+    intPointsElIDBC = 0.;
+  }
+  
+#ifdef _GPU_
+  auto dnodesID = nodesIDs.Read();
+  auto dnumElems = numElems.Read();
+  auto dposDofIds = posDofIds.Read();
+  
+  auto dshapeWnor1 = shapeWnor1.Read();
+  auto dshape2 = shape2.Read();
+  
+  auto delemFaces = elemFaces.Read();
+  auto delems12Q = elems12Q.Read();
+  
+  auto dshapesBC = shapesBC.Read();
+  auto dnormalsBC = normalsWBC.Read();
+  auto dintPointsELIBC = intPointsElIDBC.Read();
+#endif
+}
+
+
+
 M2ulPhyS::~M2ulPhyS()
 {
 
   delete gradUp;
+  
+  delete gradUp_A;
   
   delete u_block;
   delete up_block;
@@ -324,7 +642,7 @@ M2ulPhyS::~M2ulPhyS()
   
   delete average;
   
-  //delete rhsOperator;
+  delete rhsOperator;
   //delete domainIntegrator;
   delete Aflux; // fails to delete (follow this)
   if( isSBP ) delete SBPoperator;
@@ -519,6 +837,7 @@ void M2ulPhyS::Iterate()
 	  paraviewColl->SetCycle(iter);
 	  paraviewColl->SetTime(time);
 	  paraviewColl->Save();
+	  auto dUp = Up->ReadWrite(); // sets memory to GPU
 	  
 	  average->write_meanANDrms_restart_files();
 	}
@@ -606,7 +925,8 @@ void M2ulPhyS::InitialConditionEulerVortex(const Vector& x, Vector& y)
   if(x.Size()==3) equations = 5;
   
   int problem = 1;
-  EquationOfState *eqState = new EquationOfState(DRY_AIR);
+  EquationOfState *eqState = new EquationOfState();
+  eqState->setFluid(DRY_AIR);
   const double gamma = eqState->GetSpecificHeatRatio();
   const double Rg = eqState->GetGasConstant();
 
@@ -695,7 +1015,8 @@ void M2ulPhyS::InitialConditionEulerVortex(const Vector& x, Vector& y)
 // Initial conditions for debug/test case
 void M2ulPhyS::testInitialCondition(const Vector& x, Vector& y)
 {
-   EquationOfState *eqState = new EquationOfState(DRY_AIR);
+   EquationOfState *eqState = new EquationOfState();
+   eqState->setFluid(DRY_AIR);
 
    // Nice units
    const double vel_inf = 1.;
@@ -718,14 +1039,16 @@ void M2ulPhyS::testInitialCondition(const Vector& x, Vector& y)
 
 void M2ulPhyS::uniformInitialConditions()
 {
-  double *data = U->GetData();
-  double *dataUp = Up->GetData();
-  double *dataGradUp = gradUp->GetData();
+  double *data = U->HostWrite();
+  double *dataUp = Up->HostWrite();
+  double *dataGradUp = gradUp->HostWrite();
   
   int dof = vfes->GetNDofs();
   double *inputRhoRhoVp = config.GetConstantInitialCondition();
   
-  EquationOfState *eqState = new EquationOfState(DRY_AIR);
+  EquationOfState *eqState = new EquationOfState();
+  eqState->setFluid(DRY_AIR);
+  
   const double gamma = eqState->GetSpecificHeatRatio();
   const double rhoE = inputRhoRhoVp[4]/(gamma-1.)+
                     0.5*(inputRhoRhoVp[1]*inputRhoRhoVp[1] +
@@ -761,7 +1084,7 @@ void M2ulPhyS::uniformInitialConditions()
 
 void M2ulPhyS::initGradUp()
 {
-  double *dataGradUp = gradUp->GetData();
+  double *dataGradUp = gradUp->HostWrite();
   int dof = vfes->GetNDofs();
   
   for(int i=0; i<dof; i++)
@@ -791,13 +1114,16 @@ void M2ulPhyS::write_restart_files()
   // write cycle and time
   file<<iter<<" "<<time<<" "<<dt<<endl;
   
-  double *data = Up->GetData();
+  //double *data = Up->GetData();
+  const double *data = Up->HostRead(); // get data from GPU
   int dof = vfes->GetNDofs();
   
   for(int i=0;i<dof*num_equation;i++)
   {
     file << data[i] <<endl;
   }
+  
+  Up->Write(); // sets data back to GPU
   
   file.close();
 }
@@ -899,16 +1225,29 @@ void M2ulPhyS::read_restart_files()
       }
     }
   }
+
+  // koomie TODO: inspect for GPU
+  // load data to GPU
+  auto dUp = Up->ReadWrite();
+  auto dU = U->ReadWrite();
+  //  if( loadFromAuxSol ) auto dausUp = aux_Up->ReadWrite();
 }
 
 
 void M2ulPhyS::Check_NAN()
 {
-  double *dataU = U->GetData();
+  int local_print = 0;
   int dof = vfes->GetNDofs();
   
+#ifdef _GPU_
+  {
+    local_print = M2ulPhyS::Check_NaN_GPU(U, dof*num_equation);
+  }
+#else
+  const double *dataU = U->HostRead();
+  
   //bool thereIsNan = false;
-  int local_print = 0;
+  
   for(int i=0;i<dof;i++)
   {
     for(int eq=0;eq<num_equation;eq++)
@@ -922,22 +1261,40 @@ void M2ulPhyS::Check_NAN()
       }
     }
   }
+#endif
   int print;
   MPI_Allreduce(&local_print, &print,
                        1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
   if( print>0 )
   {
+    auto hUp = Up->HostRead(); // get GPU data
     paraviewColl->Save();
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Abort(MPI_COMM_WORLD,1);
   }
 }
 
-
+int M2ulPhyS::Check_NaN_GPU(ParGridFunction *U, int lengthU)
+{
+  const double *dataU = U->Read();
+  Array<int> temp; 
+  temp.SetSize(1);
+  temp = 0;
+  auto d_temp = temp.ReadWrite();
+  
+  MFEM_FORALL(n,lengthU,
+  {
+    double val = dataU[n];
+    if( val!= val ) d_temp[0] += 1;
+  });
+  
+  auto htemp = temp.HostRead();
+  return htemp[0];
+}
 
 void M2ulPhyS::initialTimeStep()
 {
-  double *dataU = U->GetData();
+  auto dataU = U->HostReadWrite();
   int dof = vfes->GetNDofs();
   
   for(int n=0;n<dof;n++)
@@ -950,7 +1307,7 @@ void M2ulPhyS::initialTimeStep()
   
   double partition_C = max_char_speed;
   MPI_Allreduce(&partition_C, &max_char_speed,
-                       1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+                       1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
   
   dt = CFL * hmin / max_char_speed /(double)dim;
 

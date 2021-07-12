@@ -2,7 +2,8 @@
 #define MPI_COMM_MANAGER
 
 #include <mpi.h>
-#include "mfem.hpp"
+#include <mfem.hpp>
+#include <tps_config.h>
 
 #include <string>
 

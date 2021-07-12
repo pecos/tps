@@ -1,0 +1,44 @@
+#!/bin/bash
+
+dim=3
+report="-q"
+
+while getopts ":d:r" args; do
+    case "${args}" in
+	d)
+	    dim=${OPTARG}
+	    ;;
+	r)
+	    report="-r"
+	    ;;
+    esac
+done
+shift $((OPTIND-1))
+
+if [ $# -lt 2 ];then
+    echo "Usage: soln_differ [-d] <file1.h5> <file2.h5>"
+    echo ""
+    echo "   -d <dim>   set dimension (1,2,3=default)"
+   exit 1
+fi
+
+file1=$1
+file2=$2
+
+absTolrho=2e-13      # absolute tolerance to use for density
+absTolrhovel=2e-11   # absolute tolerance to use for rhou,rhov,rhow
+relTolrhoE=1e-14     # relative tolerance used for rhoE
+
+h5diff ${report} --delta=${absTolrho}     $file1 $file2 /solution/density || exit 1
+h5diff ${report} --delta=${absTolrhovel}  $file1 $file2 /solution/rho-u   || exit 1
+h5diff ${report} --relative=${relTolrhoE} $file1 $file2 /solution/rho-E   || exit 1
+
+if [ $dim -ge 2 ];then
+    h5diff ${report} --delta=${absTolrhovel}  $file1 $file2 /solution/rho-v   || exit 1
+fi
+if [ $dim -eq 3 ];then
+    h5diff ${report} --delta=${absTolrhovel}  $file1 $file2 /solution/rho-w   || exit 1
+fi
+
+
+

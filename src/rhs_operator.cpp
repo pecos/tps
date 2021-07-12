@@ -1,5 +1,3 @@
-
-
 #include "rhs_operator.hpp"
 
 // Implementation of class RHSoperator
@@ -14,13 +12,24 @@ RHSoperator::RHSoperator( double &_time,
                           Fluxes *_fluxClass,
                           EquationOfState *_eqState,
                           ParFiniteElementSpace *_vfes,
-                          ParNonlinearForm *_A, 
+                          Array<int> &_nodesIDs,
+                          Array<int> &_posDofIds,
+                          Array<int> &_numElems,
+                          Vector &_shapeWnor1,
+                          Vector &_shape2,
+                          Array<int> &_elemFaces,
+                          Array<int> &_elems12Q,
+                          const int &_maxIntPoints,
+                          const int &_maxDofs,
+                          //ParNonlinearForm *_A, 
+                          DGNonLinearForm *_A,
                           MixedBilinearForm *_Aflux,
                           ParMesh *_mesh,
                           ParGridFunction *_Up,
                           ParGridFunction *_gradUp,
                           ParFiniteElementSpace *_gradUpfes,
-                          ParNonlinearForm *_gradUp_A,
+                          //ParNonlinearForm *_gradUp_A,
+                          GradNonLinearForm *_gradUp_A,
                           BCintegrator *_bcIntegrator,
                           bool &_isSBP,
                           double &_alpha,
@@ -37,6 +46,15 @@ intRuleType(_intRuleType),
 fluxClass(_fluxClass),
 eqState(_eqState),
 vfes(_vfes),
+nodesIDs(_nodesIDs),
+posDofIds(_posDofIds),
+numElems(_numElems),
+shapeWnor1(_shapeWnor1),
+shape2(_shape2),
+elemFaces(_elemFaces),
+elems12Q(_elems12Q),
+maxIntPoints(_maxIntPoints),
+maxDofs(_maxDofs),
 A(_A),
 Aflux(_Aflux),
 mesh(_mesh),
@@ -48,9 +66,18 @@ gradUpfes(_gradUpfes),
 gradUp_A(_gradUp_A),
 bcIntegrator(_bcIntegrator)
 {
-  state = new Vector(num_equation);
+  flux.SetSize(vfes->GetNDofs(), dim, num_equation);
+  z.UseDevice(true);
+  z.SetSize(A->Height());
+  z = 0.;
   
-  Me_inv = new DenseMatrix[vfes->GetNE()];
+  h_numElems = numElems.HostReadWrite();
+  h_posDofIds = posDofIds.HostReadWrite();
+  
+  //Me_inv = new DenseMatrix[vfes->GetNE()];
+  Me_inv.SetSize( vfes->GetNE() );
+  posDofInvM.SetSize(2*vfes->GetNE());
+  auto hposDofInvM = posDofInvM.HostWrite();
   
   if( _config.thereIsForcing() )
   {
@@ -75,29 +102,80 @@ bcIntegrator(_bcIntegrator)
                                     gradUp,
                                     _config ) );
 #endif
-   
-  for (int i = 0; i < vfes->GetNE(); i++)
+  std::vector<double> temp;
+  temp.clear();
+  
+  for(int i=0;i<vfes->GetNE();i++)
   {
     // Standard local assembly and inversion for energy mass matrices.
     const int dof = vfes->GetFE(i)->GetDof();
     DenseMatrix Me(dof);
-    DenseMatrixInverse inv(&Me);
+    //DenseMatrixInverse inv(&Me);
+    Me_inv[i] = new DenseMatrix(dof,dof);
+    
     MassIntegrator mi;
 
     int integrationOrder = 2*vfes->GetFE(i)->GetOrder();
     if(intRuleType==1 && vfes->GetFE(i)->GetGeomType()==Geometry::SQUARE) integrationOrder--; // when Gauss-Lobatto
     const IntegrationRule intRule = intRules->Get(vfes->GetFE(i)->GetGeomType(), integrationOrder);
+    
     mi.SetIntRule(&intRule);
     mi.AssembleElementMatrix(*(vfes->GetFE(i) ), *(vfes->GetElementTransformation(i) ), Me);
-    inv.Factor();
+    //inv.Factor();
     //inv.GetInverseMatrix( (*Me_inv)(i));
-    inv.GetInverseMatrix( Me_inv[i]);
+    //inv.GetInverseMatrix( Me_inv[i]);
+    
+    Me.Invert();
+    for(int n=0;n<dof;n++) for(int j=0;j<dof;j++) (*Me_inv[i])(n,j) = Me(n,j);
+    
+    hposDofInvM[2*i   ] = temp.size();
+    hposDofInvM[2*i +1] = dof;
+    for(int j=0;j<dof;j++)
+    {
+      for(int k=0;k<dof;k++)
+      {
+        temp.push_back( (*Me_inv[i])(j,k) );
+      }
+    }
   }
-   
+  
+  invMArray.UseDevice(true);
+  invMArray.SetSize(temp.size());
+  invMArray = 0.;
+  auto hinvMArray = invMArray.HostWrite();
+  for(int i=0;i<(int)temp.size();i++) hinvMArray[i] = temp[i];
+  
+#ifdef _GPU_
+  auto dposDogInvM = posDofInvM.ReadWrite();
+  auto dinvMarray = invMArray.ReadWrite();
+#endif
+  
+  // create gradients object
+  gradients = new Gradients(vfes,
+                            gradUpfes,
+                            dim,
+                            num_equation,
+                            Up,
+                            gradUp,
+                            gradUp_A,
+                            intRules,
+                            intRuleType,
+                            nodesIDs,
+                            posDofIds,
+                            numElems,
+                            Me_inv,
+                            invMArray,
+                            posDofInvM,
+                            shapeWnor1,
+                            shape2,
+                            _elemFaces,
+                            _elems12Q,
+                            maxIntPoints,
+                            maxDofs );
    
 #ifdef DEBUG 
 {
-   int elem = 10;
+   int elem = 0;
     const int dof = vfes->GetFE(elem)->GetDof();
     DenseMatrix Me(dof);
    
@@ -133,7 +211,7 @@ bcIntegrator(_bcIntegrator)
         }
       }
    }
-   mfem::Mult(Kx,Me_inv[elem], Dx);
+   mfem::Mult(Kx, *Me_inv[elem], Dx);
    Dx.Transpose();
    
    // Mass matrix
@@ -183,45 +261,55 @@ bcIntegrator(_bcIntegrator)
 
 RHSoperator::~RHSoperator()
 {
-  delete state;
-  delete[] Me_inv;
+  delete gradients;
+  //delete[] Me_inv;
+  for(int n=0;n<Me_inv.Size();n++) delete Me_inv[n];
   for( int i=0; i<forcing.Size();i++) delete forcing[i];
 }
 
 
 void RHSoperator::Mult(const Vector &x, Vector &y) const
 {
-   // 0. Reset wavespeed computation before operator application.
   max_char_speed = 0.;
-
-  DenseTensor flux(vfes->GetNDofs(), dim, num_equation);
-  Vector z(A->Height());
   
   // Update primite varibales
   updatePrimitives(x);
-  calcGradientsPrimitives();
+  gradients->computeGradients();
   
   // update boundary conditions
   if(bcIntegrator!=NULL) bcIntegrator->updateBCMean( Up );
   
-  // 1. Create the vector z with the face terms -<F.n(u), [w]>.
   A->Mult(x, z);
 
-  // 2. Add the element terms.
-  // i.  computing the flux approximately as a grid function by interpolating
-  //     at the solution nodes.
-  // ii. multiplying this grid function by a (constant) mixed bilinear form for
-  //     each of the num_equation, computing (F(u), grad(w)) for each equation.
-
-  DenseMatrix xmat(x.GetData(), vfes->GetNDofs(), num_equation);
-  GetFlux(xmat, flux);
-
-  for (int k = 0; k < num_equation; k++)
+  GetFlux(x, flux);
+  
+#ifdef _GPU_
+  Vector fk,zk; fk.UseDevice(true);zk.UseDevice(true);
+  fk.SetSize(dim*vfes->GetNDofs());
+  zk.SetSize(vfes->GetNDofs());
+#endif
+  
+  for(int eq=0;eq<num_equation;eq++)
   {
-    Vector fk(flux(k).GetData(), dim * vfes->GetNDofs());
-    Vector zk(z.GetData() + k * vfes->GetNDofs(), vfes->GetNDofs());
+#ifdef _GPU_
+    RHSoperator::copyDataForFluxIntegration_gpu(z, 
+                                                flux,
+                                                fk,
+                                                zk,
+                                                eq,
+                                                vfes->GetNDofs(), 
+                                                dim);
+#else
+    Vector fk(flux(eq).GetData(), dim * vfes->GetNDofs());
+    Vector zk(z.HostReadWrite() + eq*vfes->GetNDofs(), vfes->GetNDofs());
+#endif
+    
     Aflux->AddMult(fk, zk);
+#ifdef _GPU_
+    RHSoperator::copyZk2Z_gpu(z,zk,eq,vfes->GetNDofs());
+#endif
   }
+  
   
   // add forcing terms
   for(int i=0; i<forcing.Size();i++)
@@ -235,37 +323,126 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
   }
 
   // 3. Multiply element-wise by the inverse mass matrices.
-  for (int i = 0; i < vfes->GetNE(); i++)
+#ifdef _GPU_
+  for(int eltype=0;eltype<numElems.Size();eltype++)
+  {
+    int elemOffset = 0;
+    if( eltype!=0 )
+    {
+      for(int i=0;i<eltype;i++) elemOffset += h_numElems[i];
+    }
+    int dof = h_posDofIds[2*elemOffset +1];
+    const int totDofs = vfes->GetNDofs();
+    
+    RHSoperator::multiPlyInvers_gpu(y,
+                                    z,
+                                    nodesIDs,
+                                    posDofIds,
+                                    invMArray,
+                                    posDofInvM,
+                                    num_equation,
+                                    totDofs,
+                                    h_numElems[eltype],
+                                    elemOffset,
+                                    dof);
+  }
+  
+#else
+  for(int el=0; el<vfes->GetNE();el++)
   {
     Vector zval;
     Array<int> vdofs;
-    const int dof = vfes->GetFE(i)->GetDof();
+    const int dof = vfes->GetFE(el)->GetDof();
     DenseMatrix zmat, ymat(dof, num_equation);
     
     // Return the vdofs ordered byNODES
-    vfes->GetElementVDofs(i, vdofs);
+    vfes->GetElementVDofs(el, vdofs);
     z.GetSubVector(vdofs, zval);
     zmat.UseExternalData(zval.GetData(), dof, num_equation);
     
-    mfem::Mult(Me_inv[i], zmat, ymat);
+    mfem::Mult(*Me_inv[el], zmat, ymat);
     y.SetSubVector(vdofs, ymat.GetData());
   }  
+#endif
+}
+
+void RHSoperator::copyZk2Z_gpu(Vector &z,Vector &zk,const int eq,const int dof)
+{
+#ifdef _GPU_
+    const double *d_zk = zk.Read();
+    double *d_z = z.ReadWrite();
+    
+    MFEM_FORALL(n,dof,
+    {
+      d_z[n + eq*dof] = d_zk[n];
+    });
+#endif
+}
+
+void RHSoperator::copyDataForFluxIntegration_gpu( const Vector &z, 
+                                                  DenseTensor &flux,
+                                                  Vector &fk,
+                                                  Vector &zk,
+                                                  const int eq,
+                                                  const int dof, 
+                                                  const int dim)
+{
+#ifdef _GPU_
+  const double *d_flux = flux.Read();
+  const double *d_z = z.Read();
+  double *d_fk = fk.ReadWrite();
+  double *d_zk = zk.ReadWrite();
+  
+  MFEM_FORALL(n,dof,
+  {
+    d_zk[n] = d_z[n + eq*dof ];
+    for(int d=0;d<dim;d++)
+    {
+      d_fk[n + d*dof] = d_flux[n + d*dof + eq*dof*dim];
+    }
+  });
+#endif
 }
 
 // Compute the flux at solution nodes.
-void RHSoperator::GetFlux(const DenseMatrix &x, DenseTensor &flux) const
+void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const
 {
+#ifdef _GPU_
   
+  // ComputeConvectiveFluxes
+  Fluxes::convectiveFluxes_gpu( x,
+                                flux,
+                                eqState->GetSpecificHeatRatio(),
+                                vfes->GetNDofs(), 
+                                dim,
+                                num_equation);
+  if( eqSystem==NS )
+  {
+    Fluxes::viscousFluxes_gpu(x,
+                              gradUp,
+                              flux,
+                              eqState->GetSpecificHeatRatio(),
+                              eqState->GetGasConstant(),
+                              eqState->GetPrandtlNum(),
+                              eqState->GetViscMultiplyer(),
+                              vfes->GetNDofs(),
+                              dim,
+                              num_equation);
+  }
+#else
+   DenseMatrix xmat(x.GetData(), vfes->GetNDofs(), num_equation);
    DenseMatrix f(num_equation, dim);
    
    double *dataGradUp = gradUp->GetData();
    
    const int dof = flux.SizeI();
    const int dim = flux.SizeJ();
+   
+   Vector state(num_equation);
 
    for (int i = 0; i < dof; i++)
    {
-      for (int k = 0; k < num_equation; k++) (*state)(k) = x(i, k);
+      for (int k = 0; k < num_equation; k++) (state)(k) = xmat(i, k);
       DenseMatrix gradUpi(num_equation,dim);
       for(int eq=0;eq<num_equation;eq++)
       {
@@ -273,24 +450,24 @@ void RHSoperator::GetFlux(const DenseMatrix &x, DenseTensor &flux) const
                                dataGradUp[i+eq*dof+d*num_equation*dof];
       }
       
-      fluxClass->ComputeConvectiveFluxes(*state,f);
+      fluxClass->ComputeConvectiveFluxes(state,f);
      
       if( isSBP )
       {
         f *= alpha; // *= alpha
-        double p = eqState->ComputePressure(*state, dim);
+        double p = eqState->ComputePressure(state, dim);
         p *= 1. - alpha;
         for(int d=0; d<dim; d++)
         {
           f(d+1,d) += p;
-          f(num_equation-1,d) += p*(*state)(1+d)/(*state)(0);
+          f(num_equation-1,d) += p*(state)(1+d)/(state)(0);
         }
       }
         
       if( eqSystem==NS )
       {
         DenseMatrix fvisc(num_equation,dim);
-        fluxClass->ComputeViscousFluxes(*state,gradUpi,fvisc);
+        fluxClass->ComputeViscousFluxes(state,gradUpi,fvisc);
         f -= fvisc;
       }
 
@@ -303,22 +480,32 @@ void RHSoperator::GetFlux(const DenseMatrix &x, DenseTensor &flux) const
       }
 
       // Update max char speed
-      const double mcs = eqState->ComputeMaxCharSpeed(*state, dim);
+      const double mcs = eqState->ComputeMaxCharSpeed(state, dim);
       if (mcs > max_char_speed) { max_char_speed = mcs; }
    }
-   
+#endif // _GPU_
+
    double partition_max_char = max_char_speed;
    MPI_Allreduce(&partition_max_char, &max_char_speed,
                        1, MPI_DOUBLE, MPI_MAX, mesh->GetComm());
 }
 
-void RHSoperator::updatePrimitives(const Vector &x) const
+void RHSoperator::updatePrimitives(const Vector &x_in) const
 {
+#ifdef _GPU_
+  
+  RHSoperator::updatePrimitives_gpu(Up, 
+                                    &x_in, 
+                                    eqState->GetSpecificHeatRatio(), 
+                                    vfes->GetNDofs(), 
+                                    dim,
+                                    num_equation );
+#else
   double *dataUp = Up->GetData();
   for(int i=0;i<vfes->GetNDofs();i++)
   {
     Vector iState(num_equation);
-    for(int eq=0;eq<num_equation;eq++) iState[eq] = x[i+eq*vfes->GetNDofs()];
+    for(int eq=0;eq<num_equation;eq++) iState[eq] = x_in[i+eq*vfes->GetNDofs()];
     double p = eqState->ComputePressure(iState,dim);
     dataUp[i                   ] = iState[0];
     dataUp[i+  vfes->GetNDofs()] = iState[1]/iState[0];
@@ -326,150 +513,89 @@ void RHSoperator::updatePrimitives(const Vector &x) const
     if(dim==3) dataUp[i+3*vfes->GetNDofs()] = iState[3]/iState[0];
     dataUp[i+(num_equation-1)*vfes->GetNDofs()] = p;
   }
+#endif // _GPU_
 }
 
-void RHSoperator::calcGradientsPrimitives() const
+void RHSoperator::updatePrimitives_gpu(Vector *Up, 
+                                      const Vector *x_in, 
+                                      const double gamma, 
+                                      const int ndofs, 
+                                      const int dim,
+                                      const int num_equations )
 {
-  const int totalDofs = vfes->GetNDofs();
-  double *dataUp = Up->GetData();
-  double *dataGradUp = gradUp->GetData();
+#ifdef _GPU_
+  auto dataUp = Up->Write(); // make sure data is available in GPU
+  auto dataIn = x_in->Read(); // make sure data is available in GPU
   
-  // Vars for face contributions
-  Vector faceContrib(dim*num_equation*totalDofs);
-  Vector xUp(dim*num_equation*totalDofs);
-  xUp = 0.;
-  faceContrib = 0.;
-  
-  // compute volume integral and fill out above vectors
-  for(int el=0;el<vfes->GetNE();el++)
+  MFEM_FORALL_2D(n,ndofs,num_equations,1,1,
   {
-    const FiniteElement *elem = vfes->GetFE(el);
-    ElementTransformation *Tr = vfes->GetElementTransformation(el);
+    MFEM_SHARED double state[5]; // assuming 5 equations
+    //MFEM_SHARED double p;
+    MFEM_SHARED double KE[3];
     
-    // get local primitive variables
-    Array<int> vdofs;
-    vfes->GetElementVDofs(el, vdofs);
-    const int eldDof = elem->GetDof();
-    DenseMatrix elUp(eldDof,num_equation);
-    for(int d=0; d<eldDof; d++)
+    MFEM_FOREACH_THREAD(eq,x,num_equations)
     {
-      int index = vdofs[d];
-      for(int eq=0;eq<num_equation;eq++)
-      {
-        elUp(d,eq) = dataUp[index +eq*totalDofs];
-        xUp[index+eq*totalDofs] = elUp(d,eq);
-      } 
+      state[eq] = dataIn[n+eq*ndofs]; // loads data into shared memory
+      MFEM_SYNC_THREAD;
+      
+      // compute pressure
+      if( eq<dim ) KE[eq] = 0.5*state[eq]*state[eq]/state[0];
+      MFEM_SYNC_THREAD;
+      
+      // each thread writes to global memory
+      if( eq==0 ) dataUp[n        ] = state[0];
+      if( eq==1 ) dataUp[n+  ndofs] = state[1]/state[0];
+      if( eq==2 ) dataUp[n+2*ndofs] = state[2]/state[0];
+      if( eq==3 && dim==3 )dataUp[n+3*ndofs] = state[3]/state[0];
+      if( eq==num_equations-1 ) dataUp[n+(num_equations-1)*ndofs] = 
+                                    EquationOfState::pressure(&state[0],&KE[0],gamma,dim,num_equations);
     }
-    
-    DenseMatrix elGradUp(eldDof,num_equation*dim);
-    elGradUp = 0.;
-    
-    // element volume integral
-    int intorder = 2*elem->GetOrder();
-    if(intRuleType==1 && elem->GetGeomType()==Geometry::SQUARE) intorder--; // when Gauss-Lobatto
-    const IntegrationRule *ir = &intRules->Get(elem->GetGeomType(), intorder);
+  });
+#endif
+}
 
-    for(int i=0;i<ir->GetNPoints();i++)
-    {
-      IntegrationPoint ip = ir->IntPoint(i);
-      Tr->SetIntPoint( &ip );
-      
-      // Calculate the shape functions
-      Vector shape(eldDof);
-      DenseMatrix dshape(eldDof,dim);
-      elem->CalcShape(ip, shape);
-      elem->CalcPhysDShape(*Tr,dshape);
-      
-      // calc Up at int. point
-      Vector iUp(num_equation);
-      DenseMatrix iGradUp(num_equation,dim);
-      iGradUp = 0.;
-      for(int eq=0;eq<num_equation;eq++)
-      {
-        double sum = 0.;
-        for(int k=0;k<eldDof;k++)
-        {
-          for(int d=0;d<dim;d++) iGradUp(eq,d) += elUp(k,eq)*dshape(k,d);
-          sum += elUp(k,eq)*shape(k);
-        }
-        iUp[eq] = sum;
-      }
-      
-      double detJac = Tr->Jacobian().Det()*ip.weight;
-      
-      // Add volume contrubutions to gradient
-      for(int eq=0;eq<num_equation;eq++)
-      {
-        for(int d=0;d<dim;d++)
-        {
-          for(int j=0;j<eldDof;j++)
-          {
-            //elGradUp(j,eq+d*num_equation) += iUp[eq]*dshape(j,d)*detJac;
-            elGradUp(j,eq+d*num_equation) += shape(j)*iGradUp(eq,d)*detJac;
-          }
-        }
-      }
-    }
-    
-    // transfer result into gradUp
-    for(int k=0; k<eldDof; k++)
-    {
-      int index = vdofs[k];
-      for(int eq=0;eq<num_equation;eq++)
-      {
-        for(int d=0;d<dim;d++)
-        {
-          dataGradUp[index+eq*totalDofs+d*num_equation*totalDofs] = 
-                                        -elGradUp(k,eq+d*num_equation);
-        }
-      } 
-    }
-  }
+void RHSoperator::multiPlyInvers_gpu( Vector &y,
+                                      Vector &z,
+                                      const Array<int> &nodesIDs,
+                                      const Array<int> &posDofIds,
+                                      const Vector &invMArray,
+                                      const Array<int> &posDofInvM,
+                                      const int num_equation,
+                                      const int totNumDof,
+                                      const int NE,
+                                      const int elemOffset,
+                                      const int dof)
+{
+#ifdef _GPU_
+  double *d_y = y.ReadWrite();
+  const double *d_z = z.Read();
+  auto d_nodesIDs = nodesIDs.Read();
+  auto d_posDofIds = posDofIds.Read();
+  auto d_posDofInvM = posDofInvM.Read();
+  const double *d_invM = invMArray.Read();
   
-  // Calc boundary contribution
-  gradUp_A->Mult(xUp,faceContrib);
-  
-  // Add contributions and multiply by invers mass matrix
-  for(int el=0;el<vfes->GetNE();el++)
+  MFEM_FORALL_2D(el,NE,dof,1,1,
   {
-    const FiniteElement *elem = vfes->GetFE(el);
-    const int eldDof = elem->GetDof();
-    
-    Array<int> vdofs;
-    vfes->GetElementVDofs(el, vdofs);
-    for(int eq=0;eq<num_equation;eq++)
+    int eli = el + elemOffset;
+    int offsetInv = d_posDofInvM[2*eli];
+    int offsetIds = d_posDofIds[2*eli];
+    // find out how to dinamically allocate shared memory to
+    // store invMatrix values
+    MFEM_FOREACH_THREAD(eq,y,num_equation)
     {
-      for(int d=0;d<dim;d++)
+      MFEM_FOREACH_THREAD(i,x,dof)
       {
-        Vector rhs(eldDof);
-        for(int k=0;k<eldDof;k++)
+        int index = d_nodesIDs[offsetIds+i];
+        double temp = 0;
+        for(int k=0;k<dof;k++)
         {
-          int index = vdofs[k];
-//           rhs[k] = gradUp[index+eq*totalDofs+d*num_equation*totalDofs]+
-//                   faceContrib[index+eq*totalDofs+d*num_equation*totalDofs];
-          rhs[k] = -dataGradUp[index+eq*totalDofs+d*num_equation*totalDofs]+
-                   faceContrib[index+eq*totalDofs+d*num_equation*totalDofs];
+          int indexk = d_nodesIDs[offsetIds +k];
+          temp += d_invM[offsetInv +i*dof +k]*d_z[indexk + eq*totNumDof];
         }
-        
-        // mult by inv mass matrix
-        Vector aux(eldDof);
-        aux = 0.;
-        for(int i=0;i<eldDof;i++)
-        {
-          for(int j=0;j<eldDof;j++) aux[i] += Me_inv[el](i,j)*rhs[j];
-        }   
-        
-        // save this in gradUp
-        for(int k=0;k<eldDof;k++)
-        {
-          int index = vdofs[k];
-          dataGradUp[index+eq*totalDofs+d*num_equation*totalDofs] = aux[k];
-        }
+        d_y[index+eq*totNumDof] = temp;
       }
     }
-  }
-  
-  // NOTE: not sure I need to this here. CHECK!!
-  gradUp->ExchangeFaceNbrData();
+  });
+#endif
 }
 

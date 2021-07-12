@@ -26,7 +26,7 @@ setup() {
 
     test -s $SOLN_FILE
     test -s $REF_FILE
-    h5diff $SOLN_FILE $REF_FILE
+    ./soln_differ $SOLN_FILE $REF_FILE
 }
 
 

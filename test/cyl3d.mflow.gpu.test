@@ -1,0 +1,34 @@
+#!/usr/bin/env bats
+# -*- mode: sh -*-
+
+TEST="cyl3d.gpu.mflow.outlet"
+RUNFILE="inputs/input.2iters.mflow.dtconst.cyl"
+OPTS="-d cuda"
+
+setup() {
+    SOLN_FILE=restart_output.sol.h5
+    REF_FILE=ref_solns/cyl3d.mflow.gpu.2iters.h5
+}
+
+@test "[$TEST] check for input file $RUNFILE" {
+    test -s $RUNFILE
+}
+
+@test "[$TEST] verify outlet area calculation with input -> $RUNFILE" {
+    rm -f $SOLN_FILE
+    run ../src/tps --runFile $RUNFILE $OPTS
+
+    [[ "${output}" =~ "[OUTLET]: Total Surface Area                = 0.00978" ]]
+
+    test -s $SOLN_FILE
+}
+
+@test "[$TEST] verify tps output with input -> $RUNFILE" {
+
+    test -s $SOLN_FILE
+    test -s $REF_FILE
+    ./soln_differ $SOLN_FILE $REF_FILE
+}
+
+
+

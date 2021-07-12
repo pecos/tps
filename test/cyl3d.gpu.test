@@ -1,0 +1,89 @@
+#!/usr/bin/env bats
+# -*- mode: sh -*-
+
+TEST="cyl3d.cuda"
+RUNFILE="inputs/input.dtconst.cyl"
+OPTS="-d cuda"
+
+setup() {
+    SOLN_FILE=restart_output.sol.h5
+    REF_FILE=ref_solns/cyl3d.dtconst.gpu.h5
+}
+
+@test "[$TEST] check for input file $RUNFILE" {
+    test -s $RUNFILE
+}
+
+@test "[$TEST] run tps with input -> $RUNFILE" {
+    rm -f $SOLN_FILE
+    ../src/tps --runFile $RUNFILE $OPTS
+
+    test -s $SOLN_FILE
+}
+
+@test "[$TEST] verify tps output with input -> $RUNFILE" {
+    test -s $SOLN_FILE
+    test -s $REF_FILE
+    ./soln_differ $SOLN_FILE $REF_FILE
+}
+
+@test "[$TEST] verify exit code if restart files missing" {
+    RUNFILE=inputs/input.dtconst.restart.cyl
+
+    rm -f $SOLN_FILE
+
+    # following should exit with error
+    run ../src/tps --runFile $RUNFILE $OPTS
+    [[ "${status}" -eq 1 ]]
+    [[ "${output}" =~ "Unable to access desired restart file" ]]
+}
+
+@test "[$TEST] verify consistent solution with restart from 2 iters" {
+    RUNFILE=inputs/input.dtconst.2iters.cyl
+
+    rm -f $SOLN_FILE
+    test -s $RUNFILE
+    ../src/tps --runFile $RUNFILE $OPTS
+    test -s $SOLN_FILE
+
+    run h5dump  -a iteration  restart_output.sol.h5
+    [ "${lines[5]}" = "   (0): 2" ]
+
+    RUNFILE=inputs/input.dtconst.restart.cyl
+    ../src/tps --runFile $RUNFILE $OPTS
+    ./soln_differ $SOLN_FILE $REF_FILE
+}
+
+@test "[$TEST] verify tps output after variable p restart" {
+
+    rm -f $SOLN_FILE
+    test -s $RUNFILE
+    ../src/tps --runFile $RUNFILE $OPTS
+    test -s $SOLN_FILE
+
+    run h5dump  -a iteration  restart_output.sol.h5
+    [ "${lines[5]}" = "   (0): 4" ]
+
+    run h5dump  -a order  restart_output.sol.h5
+    [ "${lines[5]}" = "   (0): 1" ]
+
+     VARPLOG=varp.log
+     rm -f $VARPLOG
+     RUNFILE=inputs/input.dtconst.8iters.newp.cyl
+     ../src/tps --runFile $RUNFILE $OPTS >& $VARPLOG
+
+     #intErr=$(cat $VARPLOG | grep "interpolation error" | awk '{print $6}')
+     # Line grabs the printed interpolation error norm, which I'd like
+     # to compare against a tolerance.  But bc isn't available in
+     # current container it seems, so I'm not doing this now.
+     
+     run h5dump  -a iteration  restart_output.sol.h5
+     [ "${lines[5]}" = "   (0): 8" ]
+     
+     run h5dump  -a order  restart_output.sol.h5
+     [ "${lines[5]}" = "   (0): 2" ]
+     
+     REF_FILE=ref_solns/cyl3d.dtconst.gpu.varp.h5
+     test -s $REF_FILE
+     ./soln_differ $SOLN_FILE $REF_FILE
+}

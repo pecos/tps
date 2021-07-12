@@ -1,7 +1,8 @@
 #ifndef GRAD_FACE_INTEGRATOR
 #define GRAD_FACE_INTEGRATOR
 
-#include "mfem.hpp"
+#include <mfem.hpp>
+#include <tps_config.h>
 
 using namespace mfem;
 

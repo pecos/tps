@@ -1,9 +1,8 @@
 #ifndef _MASA_HANDLER_
 #define _MASA_HANDLER_
 
-#include "masa.h"
-#include "mfem.hpp"
-
+#include <masa.h>
+#include <mfem.hpp>
 #include "fluxes.hpp" // for enum Equations
 
 using namespace mfem;

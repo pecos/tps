@@ -13,6 +13,7 @@ int main(int argc, char *argv[])
   MPI_Session mpi(argc, argv);
   
   const char *inputFile = "../data/periodic-square.mesh";
+  const char *device_config = "cpu";
 
   int precision = 8;
   cout.precision(precision);
@@ -20,6 +21,8 @@ int main(int argc, char *argv[])
   OptionsParser args(argc, argv);
   args.AddOption(&inputFile, "-run", "--runFile",
                 "Name of the input file with run options.");
+  args.AddOption(&device_config, "-d", "--device",
+                  "Device configuration string, see Device::Configure().");
 #ifdef DEBUG 
   int threads = 0.;
   args.AddOption(&threads, "-thr", "--threads",
@@ -44,6 +47,19 @@ int main(int argc, char *argv[])
         sleep(5);
   }
 #endif
+
+#ifdef _GPU_
+  if(strcmp(device_config,"cpu") == 0)
+    {
+      std::cerr << "[ERROR]: This TPS build targeting GPUs requires --device=cuda" << std::endl;
+      exit(ERROR);
+    }
+#endif
+
+  const int NUM_GPUS_NODE = 4;
+  Device device(device_config, mpi.WorldRank()%NUM_GPUS_NODE);
+  if (mpi.Root() )  device.Print();
+
 
   string inputFileName(inputFile);
   M2ulPhyS solver( mpi, inputFileName );

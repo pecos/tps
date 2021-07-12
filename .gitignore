@@ -5,6 +5,7 @@
 *.la
 *.log
 *.trs
+*.orig
 config.log
 config.status
 configure
@@ -19,6 +20,7 @@ build-aux
 libtool
 stamp-h1
 config.h
+tps_config.h
 autom4te.cache
 .deps
 *kdev*
