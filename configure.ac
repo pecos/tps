@@ -22,9 +22,6 @@ AX_PROG_CXX_MPI
 CXXFLAGS="-std=c++11 $CXXFLAGS"
 
 # 3rd party libraries
-echo "CC=$CC"
-echo "CXX=$CXX"
-
 AX_PATH_GRVY([0.32],[yes])
 AX_PATH_HDF5([1.8.0],[yes])
 
