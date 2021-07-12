@@ -5,6 +5,7 @@
 *.la
 *.log
 *.trs
+*.orig
 config.log
 config.status
 configure
