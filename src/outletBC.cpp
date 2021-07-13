@@ -1245,6 +1245,27 @@ void OutletBC::integrateOutlets_gpu(const OutletType type,
                                   dim,
                                   num_equation );
             break;
+          case OutletType::SUB_MF_NR_PW:
+            computeNR_PW_SubMF( i,
+                                  n,
+                                  &u1[0],
+                                  &gradUp[0],
+                                  d_meanUp,
+                                  dt,
+                                  &u2[0],
+                                  d_boundaryU,
+                                  d_inputState,
+                                  &nor[0],
+                                  d_tang1,
+                                  d_tang2,
+                                  d_inv,
+                                  refLength,
+                                  area,
+                                  gamma,
+                                  elDof,
+                                  dim,
+                                  num_equation );
+            break;
         }
         MFEM_SYNC_THREAD;
         
