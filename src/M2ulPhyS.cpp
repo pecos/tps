@@ -887,7 +887,8 @@ void M2ulPhyS::Iterate()
   {
     //write_restart_files();
     restart_files_hdf5("write");
-      
+    
+    auto hUp = Up->HostRead();
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
     paraviewColl->Save();
