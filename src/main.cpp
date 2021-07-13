@@ -51,8 +51,12 @@ int main(int argc, char *argv[])
 #ifdef _GPU_
   if(strcmp(device_config,"cpu") == 0)
     {
-      std::cerr << "[ERROR]: This TPS build targeting GPUs requires --device=cuda" << std::endl;
-      exit(ERROR);
+      if(mpi.Root())
+	{
+	  std::cerr << "[ERROR]: This TPS build targeting GPUs requires -d cuda" << std::endl;
+	  std::cerr << std::endl;
+	  exit(ERROR);
+	}
     }
 #endif
 

@@ -14,6 +14,18 @@ mpi(_mpi)
   Header();
   
   config.readInputFile(inputFileName);
+
+#ifdef _GPU_
+  if (!config.isTimeStepConstant())
+    {
+      if(mpi.Root())
+	{
+	  std::cerr << "[ERROR]: GPU runs must use a constant time step: Please set DT_CONSTANT in input file." << std::endl;
+	  std::cerr << std::endl;
+	  exit(ERROR);
+	}
+    }
+#endif
   
   initVariables();
   
