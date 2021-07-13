@@ -714,13 +714,13 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
   //gradUp.SetSize(num_equation*dim*vfes->GetNDofs());
   gradUp = new ParGridFunction(gradUpfes);
   
-  U  = new ParGridFunction(vfes, u_block->GetData());
-  Up = new ParGridFunction(vfes, up_block->GetData());
+  U  = new ParGridFunction(vfes, u_block->HostReadWrite());
+  Up = new ParGridFunction(vfes, up_block->HostReadWrite());
 
-  dens = new ParGridFunction(fes, Up->GetData());
-  vel = new ParGridFunction(dfes, Up->GetData()+fes->GetNDofs() );
+  dens = new ParGridFunction(fes, Up->HostReadWrite());
+  vel = new ParGridFunction(dfes, Up->HostReadWrite()+fes->GetNDofs() );
   press = new ParGridFunction(fes,
-                Up->GetData()+(num_equation-1)*fes->GetNDofs() );
+                Up->HostReadWrite()+(num_equation-1)*fes->GetNDofs() );
   
   paraviewColl->SetCycle(0);
   paraviewColl->SetTime(0.);
@@ -810,11 +810,11 @@ void M2ulPhyS::Iterate()
     grvy_timer_begin(__func__);
     if ( (iter % iterQuery) == 0 )
       if(mpi.Root())
-	{
-	  double timePerIter = (grvy_timer_elapsed_global() - tlast)/iterQuery;
-	  grvy_printf(GRVY_INFO,"Iteration = %i: wall clock time/iter = %.3f (secs)\n",iter,timePerIter);
-	  tlast = grvy_timer_elapsed_global();
-	}
+      {
+        double timePerIter = (grvy_timer_elapsed_global() - tlast)/iterQuery;
+        grvy_printf(GRVY_INFO,"Iteration = %i: wall clock time/iter = %.3f (secs)\n",iter,timePerIter);
+        tlast = grvy_timer_elapsed_global();
+      }
 #endif
 
     timeIntegrator->Step(*U, time, dt);
@@ -844,17 +844,18 @@ void M2ulPhyS::Iterate()
 
 
       if (iter != MaxIters)
-	{
-	  //write_restart_files();
-	  restart_files_hdf5("write");
-      
-	  paraviewColl->SetCycle(iter);
-	  paraviewColl->SetTime(time);
-	  paraviewColl->Save();
-	  auto dUp = Up->ReadWrite(); // sets memory to GPU
-	  
-	  average->write_meanANDrms_restart_files();
-	}
+      {
+        //write_restart_files();
+        restart_files_hdf5("write");
+          
+        auto hUp = Up->HostRead();
+        paraviewColl->SetCycle(iter);
+        paraviewColl->SetTime(time);
+        paraviewColl->Save();
+        auto dUp = Up->ReadWrite(); // sets memory to GPU
+        
+        average->write_meanANDrms_restart_files();
+      }
 
 
     }
@@ -862,15 +863,15 @@ void M2ulPhyS::Iterate()
 #ifdef HAVE_SLURM
     // check if near end of a run and ready to submit restart
     if( (iter % config.rm_checkFreq() == 0) && (iter != MaxIters) )
-      {
-	readyForRestart = Check_JobResubmit();
-	if(readyForRestart)
-	  {
-	    MaxIters = iter;
-	    SetStatus(JOB_RESTART);
-	    break;
-	  }
-      }
+    {
+      readyForRestart = Check_JobResubmit();
+      if(readyForRestart)
+        {
+          MaxIters = iter;
+          SetStatus(JOB_RESTART);
+          break;
+        }
+    }
 #endif
     
     average->addSampleMean(iter);
