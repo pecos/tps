@@ -1,0 +1,29 @@
+#!/usr/bin/env bats
+# -*- mode: sh -*-
+
+TEST="cyl3d"
+RUNFILE=" input.dtconst.cyl"
+
+setup() {
+    SOLN_FILE=restart_output.sol.h5
+    REF_FILE=ref_solns/cyl3d.dtconst.cpu.h5
+}
+
+@test "[$TEST] check for input file $RUNFILE" {
+    test -s $RUNFILE
+}
+
+@test "[$TEST] run tps with input -> $RUNFILE" {
+    rm -f $SOLN_FILE
+    ../src/tps --runFile $RUNFILE
+
+    test -s $SOLN_FILE
+}
+
+@test "[$TEST] verify tps output with input -> $RUNFILE" {
+
+    test -s $SOLN_FILE
+    test -s $REF_FILE
+    ./soln_differ $SOLN_FILE $REF_FILE
+}
+

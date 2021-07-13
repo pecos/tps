@@ -7,5 +7,6 @@ TESTS = cyl3d.gpu.test \
 else
 TESTS = cyl3d.test \
 	cyl3d.mflow.test \
+	cyl3d.dtconst.test \
 	wedge.test
 endif
