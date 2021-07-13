@@ -79,7 +79,7 @@ private:
   Fluxes *fluxClass;
   
   RHSoperator *rhsOperator;
-  
+
   // Integration rule
   int intRuleType; // 0: GaussLegendre; 1: GaussLobatto
   IntegrationRules *intRules;
@@ -229,6 +229,8 @@ public:
   void projectInitialSolution();
   
   void Iterate();
+
+  void Header();
   
   // Accessors
   RHSoperator getRHSoperator(){ return *rhsOperator; }

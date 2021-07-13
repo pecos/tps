@@ -91,6 +91,25 @@ void M2ulPhyS::restart_files_hdf5(string mode)
       assert(status >= 0);
       H5Aclose(attr);
 
+      // code revision
+#ifdef BUILD_VERSION
+      {
+	hid_t ctype     = H5Tcopy (H5T_C_S1);
+	int shaLength   = strlen(BUILD_VERSION);
+	hsize_t dims[1] = {1};
+	H5Tset_size(ctype,shaLength);
+
+	hid_t dspace1dim = H5Screate_simple(1,dims,NULL);
+
+	attr = H5Acreate(file,"revision", ctype, dspace1dim, H5P_DEFAULT, H5P_DEFAULT);
+	assert(attr >= 0);
+	status = H5Awrite(attr,ctype,BUILD_VERSION);
+	assert(status >= 0);
+	H5Sclose(dspace1dim);
+	H5Aclose(attr);
+      }
+#endif
+
       H5Sclose(aid);
     }
   else	// read

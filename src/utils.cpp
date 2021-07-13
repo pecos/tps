@@ -10,6 +10,20 @@
 #include "M2ulPhyS.hpp"
 #include "utils.hpp"
 
+void M2ulPhyS::Header()
+{
+  grvy_printf(INFO,"\n------------------------------------\n");
+  grvy_printf(INFO,"  _______ _____   _____\n");
+  grvy_printf(INFO," |__   __|  __ \\ / ____|\n");
+  grvy_printf(INFO,"    | |  | |__) | (___  \n");
+  grvy_printf(INFO,"    | |  |  ___/ \\___ \\ \n");
+  grvy_printf(INFO,"    | |  | |     ____) | \n");
+  grvy_printf(INFO,"    |_|  |_|    |_____/ \n\n");
+  grvy_printf(INFO,"Git Version:  %s\n", BUILD_VERSION);
+  grvy_printf(INFO,"MFEM Version: %s\n", mfem::GetVersionStr());
+  grvy_printf(INFO,"------------------------------------\n\n");
+}
+
 #ifdef HAVE_SLURM
 #include <slurm/slurm.h>
 

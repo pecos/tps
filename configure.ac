@@ -12,6 +12,7 @@ AM_INIT_AUTOMAKE
 # Checks for programs.
 #AM_PATH_PYTHON([3.6.8])
 
+AX_SUMMARIZE_ENV
 #AC_PROG_CXX
 AX_PROG_CC_MPI
 AX_PROG_CXX_MPI
@@ -79,12 +80,7 @@ AM_CONDITIONAL(CUDA_ENABLED,test x$ENABLE_CUDA = xyes)
 
 #--
 
-
-
-
 AC_OUTPUT([Makefile src/Makefile test/Makefile])
-#AC_OUTPUT([Makefile])
 
 # Final summary
-AX_SUMMARIZE_ENV
 AX_SUMMARIZE_CONFIG
