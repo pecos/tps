@@ -171,7 +171,7 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       }else if( word.compare("CFL")==0 )
       {
         ss >> word;
-        cflNum = stof( word );
+        cflNum = stod( word );
        
       // constant time-step
       }else if( word.compare("DT_CONSTANT")==0 )
@@ -183,7 +183,7 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       {
         constantTimeStep = true;
         ss >> word;
-        dt_fixed = stof( word );
+        dt_fixed = stod( word );
 
       // time integrator
       }else if( word.compare("TIME_INTEGRATOR")==0 )
@@ -247,54 +247,54 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       }else if( word.compare("INIT_RHO")==0 )
       {
         ss >> word;
-        initRhoRhoVp[0] = stof( word );
+        initRhoRhoVp[0] = stod( word );
         
       // Initial solution RHOVX
       }else if( word.compare("INIT_RHOVX")==0 )
       {
         ss >> word;
-        initRhoRhoVp[1] = stof( word );
+        initRhoRhoVp[1] = stod( word );
         
       // Initial solution RHOVY
       }else if( word.compare("INIT_RHOVY")==0 )
       {
         ss >> word;
-        initRhoRhoVp[2] = stof( word );
+        initRhoRhoVp[2] = stod( word );
         
       // Initial solution RHOVZ
       }else if( word.compare("INIT_RHOVZ")==0 )
       {
         ss >> word;
-        initRhoRhoVp[3] = stof( word );
+        initRhoRhoVp[3] = stod( word );
         
       // Initial solution P
       }else if( word.compare("INIT_P")==0 )
       {
         ss >> word;
-        initRhoRhoVp[4] = stof( word );
+        initRhoRhoVp[4] = stod( word );
         
       // viscity factor
       }else if( word.compare("VISC_MULT")==0 )
       {
         ss >> word;
-        visc_mult = stof( word );
+        visc_mult = stod( word );
         
       // Reference length
       }else if( word.compare("REF_LENGTH")==0 )
       {
         ss >> word;
-        refLength = stof( word );
+        refLength = stod( word );
         
       }else if( word.compare("GRAD_PRESSURE")==0 )
       {
         ss >> word;
-        gradPress[0] = stof( word );
+        gradPress[0] = stod( word );
         
         ss >> word;
-        gradPress[1] = stof( word );
+        gradPress[1] = stod( word );
         
         ss >> word;
-        gradPress[2] = stof( word );
+        gradPress[2] = stod( word );
         isForcing = true;
         
       }else if( word.compare("INLET")==0 )
@@ -322,7 +322,7 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
         for(int i=0; i<4; i++)
         {
           ss >> word;
-          inletBC.Append( stof( word ) );
+          inletBC.Append( stod( word ) );
         }
         
       }else if( word.compare("OUTLET")==0 )
@@ -351,7 +351,7 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
 	outletPatchType.push_back( patchANDtype );
         
         ss >> word;
-        outletBC.Append (stof( word ) );
+        outletBC.Append (stod( word ) );
         
       }else if( word.compare("WALL")==0 )
       {
@@ -375,7 +375,7 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
         if( patchType.second==VISC_ISOTH )
         {
           ss >> word;
-          wallBC.Append( stof(word) );
+          wallBC.Append( stod(word) );
         }else
         {
           wallBC.Append( 0. );
