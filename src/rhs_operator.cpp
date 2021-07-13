@@ -539,7 +539,8 @@ void RHSoperator::updatePrimitives_gpu(Vector *Up,
       MFEM_SYNC_THREAD;
       
       // compute pressure
-      if( eq<dim ) KE[eq] = 0.5*state[eq]*state[eq]/state[0];
+      if( eq<dim ) KE[eq] = 0.5*state[1+eq]*state[1+eq]/state[0];
+      if( eq==num_equations-1 && dim==3 ) KE[2] = 0;
       MFEM_SYNC_THREAD;
       
       // each thread writes to global memory

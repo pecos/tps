@@ -101,48 +101,48 @@ public:
 
 
   static void updateMean_gpu( ParGridFunction *Up,
-			      Vector &localMeanUp,
-			      const int _num_equation,
-			      const int numBdrElems,
-			      const int totalDofs,
-			      Vector &bdrUp,
-			      Array<int> &bdrElemsQ,
-			      Array<int> &bdrDofs,
-			      Vector &bdrShape,
-			      const int &maxIntPoints,
-			      const int &maxDofs );
+                              Vector &localMeanUp,
+                              const int _num_equation,
+                              const int numBdrElems,
+                              const int totalDofs,
+                              Vector &bdrUp,
+                              Array<int> &bdrElemsQ,
+                              Array<int> &bdrDofs,
+                              Vector &bdrShape,
+                              const int &maxIntPoints,
+                              const int &maxDofs );
   
   // functions for BC integration on GPU
 
   static void integrateInlets_gpu(const InletType type,
-				  const Vector &inputState,
-				  const double &dt,
-				  Vector &y, // output
-				  const Vector &x,
-				  const Array<int> &nodesIDs,
-				  const Array<int> &posDofIds,
-				  ParGridFunction *Up,
-				  ParGridFunction *gradUp,
-				  Vector &shapesBC,
-				  Vector &normalsWBC,
-				  Array<int> &intPointsElIDBC,
-				  Array<int> &listElems,
-				  const int &maxIntPoints,
-				  const int &maxDofs,
-				  const int &dim,
-				  const int &num_equation,
-				  const double &gamma,
-				  const double &Rg );
+                                  const Vector &inputState,
+                                  const double &dt,
+                                  Vector &y, // output
+                                  const Vector &x,
+                                  const Array<int> &nodesIDs,
+                                  const Array<int> &posDofIds,
+                                  ParGridFunction *Up,
+                                  ParGridFunction *gradUp,
+                                  Vector &shapesBC,
+                                  Vector &normalsWBC,
+                                  Array<int> &intPointsElIDBC,
+                                  Array<int> &listElems,
+                                  const int &maxIntPoints,
+                                  const int &maxDofs,
+                                  const int &dim,
+                                  const int &num_equation,
+                                  const double &gamma,
+                                  const double &Rg );
 
 #ifdef _GPU_
-  static MFEM_HOST_DEVICE void computeSubDenseVel( const int &thrd,
-						   const double *u1,
-						   double *u2,
-						   const double *nor,
-						   const double *inputState,
-						   const double &gamma,
-						   const int &dim,
-						   const int &num_equation )
+  static MFEM_HOST_DEVICE void computeSubDenseVel(const int &thrd,
+                                                  const double *u1,
+                                                  double *u2,
+                                                  const double *nor,
+                                                  const double *inputState,
+                                                  const double &gamma,
+                                                  const int &dim,
+                                                  const int &num_equation )
   {
     MFEM_SHARED double KE[3];
     MFEM_SHARED double p;
@@ -159,11 +159,11 @@ public:
     if(thrd==2) u2[2] = inputState[0]*inputState[2];
     if(dim==3 && thrd==3) u2[3] = inputState[0]*inputState[3];
     if(thrd==num_equation-1)
-      {
-	double ke = 0.;
-	for(int d=0;d<dim;d++) ke += inputState[1+d]*inputState[1+d];
-	u2[thrd] = p/(gamma-1.) + 0.5*inputState[0]*ke;
-      }
+    {
+      double ke = 0.;
+      for(int d=0;d<dim;d++) ke += inputState[1+d]*inputState[1+d];
+      u2[thrd] = p/(gamma-1.) + 0.5*inputState[0]*ke;
+    }
   };
 #endif
 };
