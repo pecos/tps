@@ -62,6 +62,54 @@ void M2ulPhyS::initVariables()
 #endif
   loadFromAuxSol = config.RestartFromAux();
 
+  // if partition file specified, read it and set partitioning vector
+  int *partition = NULL;
+  int part_ne=0, part_np=0;
+  int read_error = 0;
+
+  if (mpi.Root()) {
+    string pfilename = config.GetPartitionFileName();
+    if (!pfilename.empty()) {
+      ifstream ipart;
+      ipart.open(pfilename.c_str(), ios::in);
+      if (ipart.is_open()){
+        string word;
+        ipart >> word; // reads 'number_of_elements'
+        ipart >> word; // reads an int
+        part_ne = stoi(word);
+
+        ipart >> word; // reads 'number_of_processors'
+        ipart >> word; // reads an int
+        part_np = stoi(word);
+
+        partition = new int[part_ne];
+
+        for (int ielem=0; ielem<part_ne; ielem++) {
+          ipart >> word;
+          partition[ielem] = stoi(word);
+        }
+
+      } else {
+        read_error = 1;
+      }
+    }
+  }
+
+  MPI_Bcast( &read_error, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  assert(read_error==0);
+
+  MPI_Bcast( &part_ne, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast( &part_np, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+  if (!mpi.Root()) {
+    if (part_ne>0) {
+      partition = new int[part_ne];
+    }
+  }
+
+  MPI_Bcast( partition, part_ne, MPI_INT, 0, MPI_COMM_WORLD);
+  assert( (partition==NULL) || (part_np==mpi.WorldSize()) );
+
   // check if a simulations is being restarted
   Mesh *tempmesh;
   if( config.GetRestartCycle()>0 )
@@ -78,7 +126,9 @@ void M2ulPhyS::initVariables()
       MPI_Abort(MPI_COMM_WORLD,1);
     }
 
-    mesh = new ParMesh(MPI_COMM_WORLD,*tempmesh);
+    assert( (partition==NULL) || (part_ne==tempmesh->GetNE()) );
+
+    mesh = new ParMesh(MPI_COMM_WORLD,*tempmesh, partition);
     delete tempmesh;
     
     // Paraview setup
@@ -111,7 +161,9 @@ void M2ulPhyS::initVariables()
       tempmesh->UniformRefinement();
     }
 
-    mesh = new ParMesh(MPI_COMM_WORLD,*tempmesh);
+    assert( (partition==NULL) || (part_ne==tempmesh->GetNE()) );
+
+    mesh = new ParMesh(MPI_COMM_WORLD,*tempmesh, partition);
     tempmesh->Clear();
 
     // VisIt setup
@@ -388,6 +440,8 @@ void M2ulPhyS::initVariables()
   if( mpi.Root() ) cout<<"Initial time-step: "<<dt<<"s"<<endl;
   
   //t_final = MaxIters*dt;
+
+  delete [] partition;
 }
 
 
