@@ -837,7 +837,7 @@ void M2ulPhyS::Iterate()
 {
 
 #ifdef HAVE_GRVY
-  const int iterQuery = 10;
+  const int iterQuery = 100;
   double tlast = grvy_timer_elapsed_global();
 #endif
 
