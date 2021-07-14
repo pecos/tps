@@ -1338,6 +1338,8 @@ void M2ulPhyS::Check_NAN()
   if( print>0 )
   {
     auto hUp = Up->HostRead(); // get GPU data
+    paraviewColl->SetCycle(iter);
+    paraviewColl->SetTime(time);
     paraviewColl->Save();
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Abort(MPI_COMM_WORLD,1);
