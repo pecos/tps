@@ -21,6 +21,10 @@ tps_LDFLAGS         += $(GRVY_LIBS)
 tps_LDFLAGS         += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
 tps_LDFLAGS         += -L$(NETCDF_LIB) -lnetcdf
 
+if SLURM_ENABLED
+tps_LDFLAGS         += -lslurm
+endif
+
 if CUDA_ENABLED
 tps_LDFLAGS         += $(CUDA_LDFLAGS) -lcuda -lcusparse
 endif

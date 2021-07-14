@@ -29,7 +29,18 @@ AX_PATH_HDF5([1.8.0],[yes])
 #AC_PROG_LIBTOOL
 AC_PROG_RANLIB
 
-
+#-- Slurm job restart support
+ENABLE_SLURM=no
+AH_TEMPLATE([HAVE_SLURM],[Enable SLURM resource manager support])
+AC_CHECK_HEADER([slurm/slurm.h],[found_slurm_header=yes],[found_slurm_header=no])
+if test "x${found_slurm_header}" = "xyes" ; then
+   AC_CHECK_LIB([slurm],slurm_get_rem_time,[found_slurm_library=yes],[found_slurm_library=no])
+   if test "x${found_slurm_library}" = "xyes" ; then
+      AC_DEFINE([HAVE_SLURM])
+      ENABLE_SLURM=yes
+   fi
+fi
+AM_CONDITIONAL(SLURM_ENABLED,test x$ENABLE_SLURM = xyes)
 
 #-- GPU/Cuda build setup
 AH_TEMPLATE([_GPU_],[Build in GPU support])

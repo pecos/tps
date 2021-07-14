@@ -36,6 +36,9 @@
 /* Define if you have the MPI library. */
 #undef HAVE_MPI
 
+/* Enable SLURM resource manager support */
+#undef HAVE_SLURM
+
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
 
