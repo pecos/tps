@@ -24,7 +24,10 @@ private:
   // mesh file file
   string meshFile;
   int ref_levels;
-  
+
+  // partition file
+  string partFile;
+
   // output file name
   string outputFile;
   
@@ -128,6 +131,7 @@ public:
   
   string GetMeshFileName(){return meshFile;}
   string GetOutputName(){return outputFile;}
+  string GetPartitionFileName(){return partFile;}
   int GetUniformRefLevels(){return ref_levels;}
 
   int GetTimeIntegratorType(){return timeIntegratorType;}

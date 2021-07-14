@@ -7,6 +7,8 @@
 RunConfiguration::RunConfiguration()
 {
   // Initialize with default values
+  partFile.clear();
+
   ref_levels = 0;
   timeIntegratorType = 4;
   solOrder = 4;
@@ -92,6 +94,13 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       {
         ss >> word;
         ref_levels = stoi(word);
+
+      // partition file name
+      } else if( word.compare("PART_FILE")==0 )
+      {
+        ss >> word;
+        partFile.clear();
+        partFile = word;
 
       // output file name
       }else if( word.compare("OUTPUT_NAME")==0 )
