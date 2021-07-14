@@ -1206,7 +1206,7 @@ void OutletBC::integrateOutlets_gpu(const OutletType type,
             break;
           case OutletType::SUB_P_NR:
             computeNRSubPress(i,
-                              n,
+                              n*Q+q,
                               &u1[0],
                               &gradUp[0],
                               d_meanUp,
@@ -1226,7 +1226,7 @@ void OutletBC::integrateOutlets_gpu(const OutletType type,
             break;
           case OutletType::SUB_MF_NR:
             computeNRSubMassFlow( i,
-                                  n,
+                                  n*Q+q,
                                   &u1[0],
                                   &gradUp[0],
                                   d_meanUp,
@@ -1247,7 +1247,7 @@ void OutletBC::integrateOutlets_gpu(const OutletType type,
             break;
           case OutletType::SUB_MF_NR_PW:
             computeNR_PW_SubMF( i,
-                                  n,
+                                  n*Q+q,
                                   &u1[0],
                                   &gradUp[0],
                                   d_meanUp,
