@@ -199,7 +199,7 @@ void InletBC::initBdrElemsShape()
   auto hbdrElemsQ = bdrElemsQ.HostWrite();
   auto hbdrDofs = bdrDofs.HostWrite();
   
-  offsetsBoundaryU.SetSize(bdrN);
+  offsetsBoundaryU.SetSize(elCount);
   offsetsBoundaryU = -1;
   auto hoffsetsBoundaryU = offsetsBoundaryU.HostWrite();
   int offsetCount = 0;
