@@ -632,10 +632,10 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal,
     for(int d=0;d<dim;d++) normGrad[eq] += unitNorm[d]*gradState(eq,d);
   }
   
-  const double rho = stateIn[0];
-  double k = 0.;
-  for(int d=0;d<dim;d++) k += stateIn[1+d]*stateIn[1+d];
-  k *= 0.5/rho/rho;
+//   const double rho = stateIn[0];
+//   double k = 0.;
+//   for(int d=0;d<dim;d++) k += stateIn[1+d]*stateIn[1+d];
+//   k *= 0.5/rho/rho;
   
   const double speedSound = sqrt(gamma*meanUp[num_equation-1]/meanUp[0]);
   double meanK = 0.;
@@ -670,7 +670,8 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal,
   
   // calc vector d
   const double d1 = (L2+0.5*(L5+L1))/speedSound/speedSound;
-  const double d2 = 0.5*(L5-L1)/rho/speedSound;
+//   const double d2 = 0.5*(L5-L1)/rho/speedSound;
+  const double d2 = 0.5*(L5-L1)/meanUp[0]/speedSound;
   const double d3 = L3;
   const double d4 = L4;
   const double d5 = 0.5*(L5+L1);

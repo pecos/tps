@@ -653,10 +653,10 @@ void OutletBC::subsonicNonReflectingPressure( Vector &normal,
   }
   
   
-  const double rho = stateIn[0];
-  double k = 0.;
-  for(int d=0;d<dim;d++) k += stateIn[1+d]*stateIn[1+d];
-  k *= 0.5/rho/rho;
+//   const double rho = stateIn[0];
+//   double k = 0.;
+//   for(int d=0;d<dim;d++) k += stateIn[1+d]*stateIn[1+d];
+//   k *= 0.5/rho/rho;
   
   const double speedSound = sqrt(gamma*meanUp[num_equation-1]/meanUp[0]);
   double meanK = 0.;
@@ -680,7 +680,8 @@ void OutletBC::subsonicNonReflectingPressure( Vector &normal,
   
   double L5 = 0.;
   for(int d=0;d<dim;d++) L5 += unitNorm[d]*normGrad[1+d];
-  L5 = normGrad[num_equation-1] +rho*speedSound*L5;
+//   L5 = normGrad[num_equation-1] +rho*speedSound*L5;
+  L5 = normGrad[num_equation-1] +meanUp[0]*speedSound*L5;
   L5 *= meanVel[0] + speedSound;
   
   //const double p = eqState->ComputePressure(stateIn, dim);
@@ -691,7 +692,8 @@ void OutletBC::subsonicNonReflectingPressure( Vector &normal,
   
   // calc vector d
   const double d1 = (L2+0.5*(L5+L1))/speedSound/speedSound;
-  const double d2 = 0.5*(L5-L1)/rho/speedSound;
+//   const double d2 = 0.5*(L5-L1)/rho/speedSound;
+  const double d2 = 0.5*(L5-L1)/meanUp[0]/speedSound;
   const double d3 = L3;
   const double d4 = L4;
   const double d5 = 0.5*(L5+L1);
@@ -831,10 +833,10 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal,
   }
   
   
-  const double rho = stateIn[0];
-  double k = 0.;
-  for(int d=0;d<dim;d++) k += stateIn[1+d]*stateIn[1+d];
-  k *= 0.5/rho/rho;
+//   const double rho = stateIn[0];
+//   double k = 0.;
+//   for(int d=0;d<dim;d++) k += stateIn[1+d]*stateIn[1+d];
+//   k *= 0.5/rho/rho;
   
   const double speedSound = sqrt(gamma*meanUp[num_equation-1]/meanUp[0]);
   double meanK = 0.;
@@ -858,7 +860,8 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal,
   
   double L5 = 0.;
   for(int d=0;d<dim;d++) L5 += unitNorm[d]*normGrad[1+d];
-  L5 = normGrad[num_equation-1] +rho*speedSound*L5;
+//   L5 = normGrad[num_equation-1] +rho*speedSound*L5;
+  L5 = normGrad[num_equation-1] +meanUp[0]*speedSound*L5;
   L5 *= meanVel[0] + speedSound;
   
   //const double p = eqState->ComputePressure(stateIn, dim);
@@ -871,7 +874,8 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal,
   
   // calc vector d
   const double d1 = (L2+0.5*(L5+L1))/speedSound/speedSound;
-  const double d2 = 0.5*(L5-L1)/rho/speedSound;
+//   const double d2 = 0.5*(L5-L1)/rho/speedSound;
+  const double d2 = 0.5*(L5-L1)/meanUp[0]/speedSound;
   const double d3 = L3;
   const double d4 = L4;
   const double d5 = 0.5*(L5+L1);
@@ -998,10 +1002,10 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal,
   for(int d=0;d<dim;d++) normVel += stateIn[1+d]*unitNorm[d];
   normVel /= stateIn[0];
   
-  const double rho = stateIn[0];
-  double k = 0.;
-  for(int d=0;d<dim;d++) k += stateIn[1+d]*stateIn[1+d];
-  k *= 0.5/rho/rho;
+//   const double rho = stateIn[0];
+//   double k = 0.;
+//   for(int d=0;d<dim;d++) k += stateIn[1+d]*stateIn[1+d];
+//   k *= 0.5/rho/rho;
   
   const double speedSound = sqrt(gamma*meanUp[num_equation-1]/meanUp[0]);
   double meanK = 0.;
@@ -1025,7 +1029,8 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal,
   
   double L5 = 0.;
   for(int d=0;d<dim;d++) L5 += unitNorm[d]*normGrad[1+d];
-  L5 = normGrad[num_equation-1] +rho*speedSound*L5;
+//   L5 = normGrad[num_equation-1] +rho*speedSound*L5;
+  L5 = normGrad[num_equation-1] +meanUp[0]*speedSound*L5;
   L5 *= meanVel[0] + speedSound;
   
   //const double p = eqState->ComputePressure(stateIn, dim);
@@ -1038,7 +1043,8 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal,
   
   // calc vector d
   const double d1 = (L2+0.5*(L5+L1))/speedSound/speedSound;
-  const double d2 = 0.5*(L5-L1)/rho/speedSound;
+//   const double d2 = 0.5*(L5-L1)/rho/speedSound;
+  const double d2 = 0.5*(L5-L1)/meanUp[0]/speedSound;
   const double d3 = L3;
   const double d4 = L4;
   const double d5 = 0.5*(L5+L1);
