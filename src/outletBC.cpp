@@ -639,10 +639,6 @@ void OutletBC::subsonicNonReflectingPressure( Vector &normal,
     for(int d=0;d<dim;d++) meanVel[2] += tangent2[d]*meanUp[d+1];
   }
   
-  // velocity difference between actual and desired values
-//   Vector meanDV(dim);
-//   for(int d=0;d<dim;d++) meanDV[d] = meanUp[1+d] -inputState[1+d];
-  
   
   // normal gradients
   Vector normGrad(num_equation);
@@ -651,12 +647,6 @@ void OutletBC::subsonicNonReflectingPressure( Vector &normal,
   {
     for(int d=0;d<dim;d++) normGrad[eq] += unitNorm[d]*gradState(eq,d);
   }
-  
-  
-//   const double rho = stateIn[0];
-//   double k = 0.;
-//   for(int d=0;d<dim;d++) k += stateIn[1+d]*stateIn[1+d];
-//   k *= 0.5/rho/rho;
   
   const double speedSound = sqrt(gamma*meanUp[num_equation-1]/meanUp[0]);
   double meanK = 0.;
@@ -819,10 +809,6 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal,
     for(int d=0;d<dim;d++) meanVel[2] += tangent2[d]*meanUp[d+1];
   }
   
-  // velocity difference between actual and desired values
-//   Vector meanDV(dim);
-//   for(int d=0;d<dim;d++) meanDV[d] = meanUp[1+d] -inputState[1+d];
-  
   
   // normal gradients
   Vector normGrad(num_equation);
@@ -831,12 +817,6 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal,
   {
     for(int d=0;d<dim;d++) normGrad[eq] += unitNorm[d]*gradState(eq,d);
   }
-  
-  
-//   const double rho = stateIn[0];
-//   double k = 0.;
-//   for(int d=0;d<dim;d++) k += stateIn[1+d]*stateIn[1+d];
-//   k *= 0.5/rho/rho;
   
   const double speedSound = sqrt(gamma*meanUp[num_equation-1]/meanUp[0]);
   double meanK = 0.;
@@ -986,10 +966,6 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal,
     for(int d=0;d<dim;d++) meanVel[2] += tangent2[d]*meanUp[d+1];
   }
   
-  // velocity difference between actual and desired values
-//   Vector meanDV(dim);
-//   for(int d=0;d<dim;d++) meanDV[d] = meanUp[1+d] -inputState[1+d];
-  
   
   // normal gradients
   Vector normGrad(num_equation);
@@ -1001,11 +977,6 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal,
   double normVel = 0.;
   for(int d=0;d<dim;d++) normVel += stateIn[1+d]*unitNorm[d];
   normVel /= stateIn[0];
-  
-//   const double rho = stateIn[0];
-//   double k = 0.;
-//   for(int d=0;d<dim;d++) k += stateIn[1+d]*stateIn[1+d];
-//   k *= 0.5/rho/rho;
   
   const double speedSound = sqrt(gamma*meanUp[num_equation-1]/meanUp[0]);
   double meanK = 0.;
