@@ -839,7 +839,7 @@ void InletBC::integrateInlets_gpu(const InletType type,
       {
         if(i<elDof) shape[i] = d_shapesBC[i+q*maxDofs+el*maxIntPoints*maxDofs];
         if(i<dim) nor[i] = d_normW[i+q*(dim+1)+el*maxIntPoints*(dim+1)];
-        if(dim==3 && i==maxDofs-2) nor[2] = 0.;
+        if(dim==2 && i==maxDofs-2) nor[2] = 0.;
         if(i==maxDofs-1) weight = d_normW[dim+q*(dim+1)+el*maxIntPoints*(dim+1)];
         MFEM_SYNC_THREAD;
         
