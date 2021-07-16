@@ -146,6 +146,7 @@ public:
                                     Vector &normalsWBC,
                                     Array<int> &intPointsElIDBC,
                                     Array<int> &listElems,
+                                    Array<int> &offsetBoundaryU,
                                     const int &maxIntPoints,
                                     const int &maxDofs,
                                     const int &dim,

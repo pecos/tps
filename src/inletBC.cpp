@@ -198,6 +198,12 @@ void InletBC::initBdrElemsShape()
   bdrDofs = 0;
   auto hbdrElemsQ = bdrElemsQ.HostWrite();
   auto hbdrDofs = bdrDofs.HostWrite();
+  
+  offsetsBoundaryU.SetSize(bdrN);
+  offsetsBoundaryU = -1;
+  auto hoffsetsBoundaryU = offsetsBoundaryU.HostWrite();
+  int offsetCount = 0;
+  
   elCount = 0;
   
   Vector shape; shape.UseDevice(false);
@@ -224,6 +230,7 @@ void InletBC::initBdrElemsShape()
       
       hbdrElemsQ[2*elCount  ] = elDofs;
       hbdrElemsQ[2*elCount+1] = ir.GetNPoints();
+      hoffsetsBoundaryU[elCount] = offsetCount;
       
       for(int i=0;i<ir.GetNPoints();i++)
       {
@@ -233,6 +240,7 @@ void InletBC::initBdrElemsShape()
         vfes->GetFE(Tr->Elem1No)->CalcShape(Tr->GetElement1IntPoint(), shape);
         
         for(int n=0;n<elDofs;n++) hbdrShape[n+i*maxDofs +elCount*maxIntPoints*maxDofs] = shape(n);
+        offsetCount++;
       }
       elCount++;
     }
@@ -579,6 +587,7 @@ void InletBC::integrationBC(Vector &y, // output
                       normalsWBC,
                       intPointsElIDBC,
                       listElems,
+                      offsetsBoundaryU,
                       maxIntPoints,
                       maxDofs,
                       dim,
@@ -780,6 +789,7 @@ void InletBC::integrateInlets_gpu(const InletType type,
                                   Vector& normalsWBC, 
                                   Array<int>& intPointsElIDBC, 
                                   Array<int>& listElems, 
+                                  Array<int> &offsetsBoundaryU,
                                   const int& maxIntPoints, 
                                   const int& maxDofs,
                                   const int& dim, 
@@ -799,6 +809,7 @@ void InletBC::integrateInlets_gpu(const InletType type,
   const double *d_normW = normalsWBC.Read();
   const int *d_intPointsElIDBC = intPointsElIDBC.Read();
   const int *d_listElems = listElems.Read();
+  const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
   
   const int totDofs = x.Size()/num_equation;
   const int numBdrElem = listElems.Size();
@@ -813,6 +824,8 @@ void InletBC::integrateInlets_gpu(const InletType type,
       MFEM_SHARED double weight;
       
       const int el = d_listElems[n];
+      const int offsetBdrU = d_offsetBoundaryU[n];
+      
       const int Q    = d_intPointsElIDBC[2*el  ];
       const int elID = d_intPointsElIDBC[2*el+1];
       

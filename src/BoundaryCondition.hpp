@@ -26,6 +26,8 @@ protected:
   
   Array<int> listElems; // list of boundary elements (position in the BC array)
   
+  Array<int> offsetsBoundaryU;
+  
 public:
   BoundaryCondition(RiemannSolver *_rsolver, 
                     EquationOfState *_eqState,

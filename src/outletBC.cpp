@@ -197,6 +197,12 @@ void OutletBC::initBdrElemsShape()
   bdrDofs = 0;
   auto hbdrElemsQ = bdrElemsQ.HostWrite();
   auto hbdrDofs = bdrDofs.HostWrite();
+  
+  offsetsBoundaryU.SetSize(bdrN);
+  offsetsBoundaryU = -1;
+  auto hoffsetsBoundaryU = offsetsBoundaryU.HostWrite();
+  int offsetCount = 0;
+  
   elCount = 0;
   
   Vector shape; shape.UseDevice(false);
@@ -223,6 +229,7 @@ void OutletBC::initBdrElemsShape()
       
       hbdrElemsQ[2*elCount  ] = elDofs;
       hbdrElemsQ[2*elCount+1] = ir.GetNPoints();
+      hoffsetsBoundaryU[elCount] = offsetCount;
       
       for(int i=0;i<ir.GetNPoints();i++)
       {
@@ -232,6 +239,7 @@ void OutletBC::initBdrElemsShape()
         vfes->GetFE(Tr->Elem1No)->CalcShape(Tr->GetElement1IntPoint(), shape);
         
         for(int n=0;n<elDofs;n++) hbdrShape[n+i*maxDofs +elCount*maxIntPoints*maxDofs] = shape(n);
+        offsetCount++;
       }
       elCount++;
     }
@@ -246,6 +254,8 @@ void OutletBC::initBdrElemsShape()
   bdrUp.SetSize( size_bdrUp*num_equation*maxIntPoints );
   bdrUp = 0.;
   bdrUp.Read();
+  
+  offsetsBoundaryU.ReadWrite();
 #endif
 }
 
@@ -599,6 +609,7 @@ void OutletBC::integrationBC( Vector& y,
                         normalsWBC,
                         intPointsElIDBC,
                         listElems,
+                        offsetsBoundaryU,
                         maxIntPoints,
                         maxDofs,
                         dim,
@@ -1088,6 +1099,7 @@ void OutletBC::integrateOutlets_gpu(const OutletType type,
                                     Vector& normalsWBC, 
                                     Array<int>& intPointsElIDBC, 
                                     Array<int>& listElems, 
+                                    Array<int> &offsetsBoundaryU,
                                     const int& maxIntPoints, 
                                     const int& maxDofs,
                                     const int& dim, 
@@ -1114,6 +1126,7 @@ void OutletBC::integrateOutlets_gpu(const OutletType type,
   const double *d_normW = normalsWBC.Read();
   const int *d_intPointsElIDBC = intPointsElIDBC.Read();
   const int *d_listElems = listElems.Read();
+  const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
   
   const int totDofs = x.Size()/num_equation;
   const int numBdrElem = listElems.Size();
@@ -1122,13 +1135,14 @@ void OutletBC::integrateOutlets_gpu(const OutletType type,
   {
     MFEM_FOREACH_THREAD(i,x,maxDofs)
     {
-      // maxDofs = 64
       MFEM_SHARED double Ui[216*5], Fcontrib[216*5], gradUpi[216*3*5];
       MFEM_SHARED double shape[216];
       MFEM_SHARED double Rflux[5], u1[5],u2[5], gradUp[5*3],nor[3];
       MFEM_SHARED double weight;
       
       const int el = d_listElems[n];
+      const int offsetBdrU = d_offsetBoundaryU[n];
+      
       const int Q    = d_intPointsElIDBC[2*el  ];
       const int elID = d_intPointsElIDBC[2*el+1];
       
@@ -1183,7 +1197,7 @@ void OutletBC::integrateOutlets_gpu(const OutletType type,
             break;
           case OutletType::SUB_P_NR:
             computeNRSubPress(i,
-                              n*Q+q,
+                              offsetBdrU+q,
                               &u1[0],
                               &gradUp[0],
                               d_meanUp,
@@ -1203,7 +1217,7 @@ void OutletBC::integrateOutlets_gpu(const OutletType type,
             break;
           case OutletType::SUB_MF_NR:
             computeNRSubMassFlow( i,
-                                  n*Q+q,
+                                  offsetBdrU+q,
                                   &u1[0],
                                   &gradUp[0],
                                   d_meanUp,
@@ -1224,7 +1238,7 @@ void OutletBC::integrateOutlets_gpu(const OutletType type,
             break;
           case OutletType::SUB_MF_NR_PW:
             computeNR_PW_SubMF( i,
-                                n*Q+q,
+                                offsetBdrU+q,
                                 &u1[0],
                                 &gradUp[0],
                                 d_meanUp,
