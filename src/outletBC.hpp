@@ -146,6 +146,7 @@ public:
                                     Vector &normalsWBC,
                                     Array<int> &intPointsElIDBC,
                                     Array<int> &listElems,
+                                    Array<int> &offsetBoundaryU,
                                     const int &maxIntPoints,
                                     const int &maxDofs,
                                     const int &dim,
@@ -224,7 +225,7 @@ public:
         if(thrd==1) meanVel[1] += d_tang1[d]*meanUp[d+1];
         if(dim==3 && thrd==dim-1)
         {
-          for(int d=0;d<dim;d++) meanVel[2] += d_tang2[d]*meanUp[d+1];
+          meanVel[2] += d_tang2[d]*meanUp[d+1];
         }
       }
     }
@@ -387,7 +388,7 @@ public:
         if(thrd==1) meanVel[1] += d_tang1[d]*meanUp[d+1];
         if(dim==3 && thrd==dim-1)
         {
-          for(int d=0;d<dim;d++) meanVel[2] += d_tang2[d]*meanUp[d+1];
+          meanVel[2] += d_tang2[d]*meanUp[d+1];
         }
       }
     }
@@ -402,7 +403,7 @@ public:
     
     
     if(thrd==0) speedSound = sqrt(gamma*meanUp[num_equation-1]/meanUp[0]);
-    if(thrd==elDof) 
+    if(thrd==elDof-1) 
     {
       meanK = 0.;
       for(int d=0;d<dim;d++) meanK += meanUp[1+d]*meanUp[1+d];
@@ -551,7 +552,7 @@ public:
         if(thrd==1) meanVel[1] += d_tang1[d]*meanUp[d+1];
         if(dim==3 && thrd==dim-1)
         {
-          for(int d=0;d<dim;d++) meanVel[2] += d_tang2[d]*meanUp[d+1];
+          meanVel[2] += d_tang2[d]*meanUp[d+1];
         }
       }
     }
@@ -566,7 +567,7 @@ public:
     
     
     if(thrd==0) speedSound = sqrt(gamma*meanUp[num_equation-1]/meanUp[0]);
-    if(thrd==elDof) 
+    if(thrd==elDof-1) 
     {
       meanK = 0.;
       for(int d=0;d<dim;d++) meanK += meanUp[1+d]*meanUp[1+d];

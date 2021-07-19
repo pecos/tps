@@ -87,7 +87,10 @@ public:
     if(thrd<3) KE[thrd] = 0.;
     if(thrd<dim) KE[thrd] = 0.5*Un[1+thrd]*Un[1+thrd]/Un[0];
     //if(thrd<num_equation) for(int d=0;d<dim;d++) vFlux[thrd+d*num_equation] = 0.;
-    for(int eq=thrd;eq<num_equation;eq+=maxThreads) for(int d=0;d<dim;d++) vFlux[eq+d*num_equation] = 0.;
+    for(int eq=thrd;eq<num_equation;eq+=maxThreads)
+    {
+      for(int d=0;d<dim;d++) vFlux[eq+d*num_equation] = 0.;
+    }
     MFEM_SYNC_THREAD;
     
     const double p  = EquationOfState::pressure(&Un[0],&KE[0],gamma,dim,num_equation);
@@ -123,13 +126,13 @@ public:
       {
         vFlux[1+i+j*num_equation] = visc*stress[i][j];
         // energy equation
-        vFlux[num_equation-1+i*num_equation] += vel[j]*stress[i][j];
+        vFlux[num_equation-1+i*num_equation] += visc*vel[j]*stress[i][j];
       }
     }
     MFEM_SYNC_THREAD;
-    if( thrd==maxThreads-1)
+    for(int i=thrd;i<dim;i+=maxThreads)
     {
-      for(int d=0;d<dim;d++) vFlux[num_equation-1+d*num_equation] += k*gradT[d];
+      vFlux[num_equation-1+i*num_equation] += k*gradT[i];
     }
     MFEM_SYNC_THREAD;
   };

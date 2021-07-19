@@ -197,6 +197,12 @@ void OutletBC::initBdrElemsShape()
   bdrDofs = 0;
   auto hbdrElemsQ = bdrElemsQ.HostWrite();
   auto hbdrDofs = bdrDofs.HostWrite();
+  
+  offsetsBoundaryU.SetSize(elCount);
+  offsetsBoundaryU = -1;
+  auto hoffsetsBoundaryU = offsetsBoundaryU.HostWrite();
+  int offsetCount = 0;
+  
   elCount = 0;
   
   Vector shape; shape.UseDevice(false);
@@ -223,6 +229,7 @@ void OutletBC::initBdrElemsShape()
       
       hbdrElemsQ[2*elCount  ] = elDofs;
       hbdrElemsQ[2*elCount+1] = ir.GetNPoints();
+      hoffsetsBoundaryU[elCount] = offsetCount;
       
       for(int i=0;i<ir.GetNPoints();i++)
       {
@@ -232,6 +239,7 @@ void OutletBC::initBdrElemsShape()
         vfes->GetFE(Tr->Elem1No)->CalcShape(Tr->GetElement1IntPoint(), shape);
         
         for(int n=0;n<elDofs;n++) hbdrShape[n+i*maxDofs +elCount*maxIntPoints*maxDofs] = shape(n);
+        offsetCount++;
       }
       elCount++;
     }
@@ -246,6 +254,8 @@ void OutletBC::initBdrElemsShape()
   bdrUp.SetSize( size_bdrUp*num_equation*maxIntPoints );
   bdrUp = 0.;
   bdrUp.Read();
+  
+  offsetsBoundaryU.ReadWrite();
 #endif
 }
 
@@ -599,6 +609,7 @@ void OutletBC::integrationBC( Vector& y,
                         normalsWBC,
                         intPointsElIDBC,
                         listElems,
+                        offsetsBoundaryU,
                         maxIntPoints,
                         maxDofs,
                         dim,
@@ -639,10 +650,6 @@ void OutletBC::subsonicNonReflectingPressure( Vector &normal,
     for(int d=0;d<dim;d++) meanVel[2] += tangent2[d]*meanUp[d+1];
   }
   
-  // velocity difference between actual and desired values
-//   Vector meanDV(dim);
-//   for(int d=0;d<dim;d++) meanDV[d] = meanUp[1+d] -inputState[1+d];
-  
   
   // normal gradients
   Vector normGrad(num_equation);
@@ -651,12 +658,6 @@ void OutletBC::subsonicNonReflectingPressure( Vector &normal,
   {
     for(int d=0;d<dim;d++) normGrad[eq] += unitNorm[d]*gradState(eq,d);
   }
-  
-  
-  const double rho = stateIn[0];
-  double k = 0.;
-  for(int d=0;d<dim;d++) k += stateIn[1+d]*stateIn[1+d];
-  k *= 0.5/rho/rho;
   
   const double speedSound = sqrt(gamma*meanUp[num_equation-1]/meanUp[0]);
   double meanK = 0.;
@@ -680,7 +681,8 @@ void OutletBC::subsonicNonReflectingPressure( Vector &normal,
   
   double L5 = 0.;
   for(int d=0;d<dim;d++) L5 += unitNorm[d]*normGrad[1+d];
-  L5 = normGrad[num_equation-1] +rho*speedSound*L5;
+//   L5 = normGrad[num_equation-1] +rho*speedSound*L5;
+  L5 = normGrad[num_equation-1] +meanUp[0]*speedSound*L5;
   L5 *= meanVel[0] + speedSound;
   
   //const double p = eqState->ComputePressure(stateIn, dim);
@@ -691,7 +693,8 @@ void OutletBC::subsonicNonReflectingPressure( Vector &normal,
   
   // calc vector d
   const double d1 = (L2+0.5*(L5+L1))/speedSound/speedSound;
-  const double d2 = 0.5*(L5-L1)/rho/speedSound;
+//   const double d2 = 0.5*(L5-L1)/rho/speedSound;
+  const double d2 = 0.5*(L5-L1)/meanUp[0]/speedSound;
   const double d3 = L3;
   const double d4 = L4;
   const double d5 = 0.5*(L5+L1);
@@ -817,10 +820,6 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal,
     for(int d=0;d<dim;d++) meanVel[2] += tangent2[d]*meanUp[d+1];
   }
   
-  // velocity difference between actual and desired values
-//   Vector meanDV(dim);
-//   for(int d=0;d<dim;d++) meanDV[d] = meanUp[1+d] -inputState[1+d];
-  
   
   // normal gradients
   Vector normGrad(num_equation);
@@ -829,12 +828,6 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal,
   {
     for(int d=0;d<dim;d++) normGrad[eq] += unitNorm[d]*gradState(eq,d);
   }
-  
-  
-  const double rho = stateIn[0];
-  double k = 0.;
-  for(int d=0;d<dim;d++) k += stateIn[1+d]*stateIn[1+d];
-  k *= 0.5/rho/rho;
   
   const double speedSound = sqrt(gamma*meanUp[num_equation-1]/meanUp[0]);
   double meanK = 0.;
@@ -858,7 +851,8 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal,
   
   double L5 = 0.;
   for(int d=0;d<dim;d++) L5 += unitNorm[d]*normGrad[1+d];
-  L5 = normGrad[num_equation-1] +rho*speedSound*L5;
+//   L5 = normGrad[num_equation-1] +rho*speedSound*L5;
+  L5 = normGrad[num_equation-1] +meanUp[0]*speedSound*L5;
   L5 *= meanVel[0] + speedSound;
   
   //const double p = eqState->ComputePressure(stateIn, dim);
@@ -871,7 +865,8 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal,
   
   // calc vector d
   const double d1 = (L2+0.5*(L5+L1))/speedSound/speedSound;
-  const double d2 = 0.5*(L5-L1)/rho/speedSound;
+//   const double d2 = 0.5*(L5-L1)/rho/speedSound;
+  const double d2 = 0.5*(L5-L1)/meanUp[0]/speedSound;
   const double d3 = L3;
   const double d4 = L4;
   const double d5 = 0.5*(L5+L1);
@@ -982,10 +977,6 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal,
     for(int d=0;d<dim;d++) meanVel[2] += tangent2[d]*meanUp[d+1];
   }
   
-  // velocity difference between actual and desired values
-//   Vector meanDV(dim);
-//   for(int d=0;d<dim;d++) meanDV[d] = meanUp[1+d] -inputState[1+d];
-  
   
   // normal gradients
   Vector normGrad(num_equation);
@@ -997,11 +988,6 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal,
   double normVel = 0.;
   for(int d=0;d<dim;d++) normVel += stateIn[1+d]*unitNorm[d];
   normVel /= stateIn[0];
-  
-  const double rho = stateIn[0];
-  double k = 0.;
-  for(int d=0;d<dim;d++) k += stateIn[1+d]*stateIn[1+d];
-  k *= 0.5/rho/rho;
   
   const double speedSound = sqrt(gamma*meanUp[num_equation-1]/meanUp[0]);
   double meanK = 0.;
@@ -1025,7 +1011,8 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal,
   
   double L5 = 0.;
   for(int d=0;d<dim;d++) L5 += unitNorm[d]*normGrad[1+d];
-  L5 = normGrad[num_equation-1] +rho*speedSound*L5;
+//   L5 = normGrad[num_equation-1] +rho*speedSound*L5;
+  L5 = normGrad[num_equation-1] +meanUp[0]*speedSound*L5;
   L5 *= meanVel[0] + speedSound;
   
   //const double p = eqState->ComputePressure(stateIn, dim);
@@ -1038,7 +1025,8 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal,
   
   // calc vector d
   const double d1 = (L2+0.5*(L5+L1))/speedSound/speedSound;
-  const double d2 = 0.5*(L5-L1)/rho/speedSound;
+//   const double d2 = 0.5*(L5-L1)/rho/speedSound;
+  const double d2 = 0.5*(L5-L1)/meanUp[0]/speedSound;
   const double d3 = L3;
   const double d4 = L4;
   const double d5 = 0.5*(L5+L1);
@@ -1111,6 +1099,7 @@ void OutletBC::integrateOutlets_gpu(const OutletType type,
                                     Vector& normalsWBC, 
                                     Array<int>& intPointsElIDBC, 
                                     Array<int>& listElems, 
+                                    Array<int> &offsetsBoundaryU,
                                     const int& maxIntPoints, 
                                     const int& maxDofs,
                                     const int& dim, 
@@ -1137,6 +1126,7 @@ void OutletBC::integrateOutlets_gpu(const OutletType type,
   const double *d_normW = normalsWBC.Read();
   const int *d_intPointsElIDBC = intPointsElIDBC.Read();
   const int *d_listElems = listElems.Read();
+  const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
   
   const int totDofs = x.Size()/num_equation;
   const int numBdrElem = listElems.Size();
@@ -1145,13 +1135,14 @@ void OutletBC::integrateOutlets_gpu(const OutletType type,
   {
     MFEM_FOREACH_THREAD(i,x,maxDofs)
     {
-      // maxDofs = 64
       MFEM_SHARED double Ui[216*5], Fcontrib[216*5], gradUpi[216*3*5];
       MFEM_SHARED double shape[216];
       MFEM_SHARED double Rflux[5], u1[5],u2[5], gradUp[5*3],nor[3];
       MFEM_SHARED double weight;
       
       const int el = d_listElems[n];
+      const int offsetBdrU = d_offsetBoundaryU[n];
+      
       const int Q    = d_intPointsElIDBC[2*el  ];
       const int elID = d_intPointsElIDBC[2*el+1];
       
@@ -1206,7 +1197,7 @@ void OutletBC::integrateOutlets_gpu(const OutletType type,
             break;
           case OutletType::SUB_P_NR:
             computeNRSubPress(i,
-                              n,
+                              offsetBdrU+q,
                               &u1[0],
                               &gradUp[0],
                               d_meanUp,
@@ -1226,7 +1217,7 @@ void OutletBC::integrateOutlets_gpu(const OutletType type,
             break;
           case OutletType::SUB_MF_NR:
             computeNRSubMassFlow( i,
-                                  n,
+                                  offsetBdrU+q,
                                   &u1[0],
                                   &gradUp[0],
                                   d_meanUp,
@@ -1247,24 +1238,24 @@ void OutletBC::integrateOutlets_gpu(const OutletType type,
             break;
           case OutletType::SUB_MF_NR_PW:
             computeNR_PW_SubMF( i,
-                                  n,
-                                  &u1[0],
-                                  &gradUp[0],
-                                  d_meanUp,
-                                  dt,
-                                  &u2[0],
-                                  d_boundaryU,
-                                  d_inputState,
-                                  &nor[0],
-                                  d_tang1,
-                                  d_tang2,
-                                  d_inv,
-                                  refLength,
-                                  area,
-                                  gamma,
-                                  elDof,
-                                  dim,
-                                  num_equation );
+                                offsetBdrU+q,
+                                &u1[0],
+                                &gradUp[0],
+                                d_meanUp,
+                                dt,
+                                &u2[0],
+                                d_boundaryU,
+                                d_inputState,
+                                &nor[0],
+                                d_tang1,
+                                d_tang2,
+                                d_inv,
+                                refLength,
+                                area,
+                                gamma,
+                                elDof,
+                                dim,
+                                num_equation );
             break;
         }
         MFEM_SYNC_THREAD;

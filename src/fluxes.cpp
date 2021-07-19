@@ -221,75 +221,35 @@ void Fluxes::viscousFluxes_gpu( const Vector &x,
     MFEM_FOREACH_THREAD(eq,x,num_equation)
     {
       MFEM_SHARED double Un[5];
-      MFEM_SHARED double vel[3];
-      MFEM_SHARED double KE[3];
-      MFEM_SHARED double gradUpn[5][3];
-      MFEM_SHARED double vFlux[5][3];
-      MFEM_SHARED double stress[3][3];
-      MFEM_SHARED double divV;
-      MFEM_SHARED double gradT[3];
+      MFEM_SHARED double gradUpn[5*3];
+      MFEM_SHARED double vFlux[5*3];
       
       // init. State
       Un[eq] = dataIn[n+eq*dof];
-      if(eq<3) KE[eq] = 0.;
-      if(eq<dim) KE[eq] = 0.5*Un[1+eq]*Un[1+eq]/Un[0];
       
       for(int d=0;d<dim;d++)
       {
-        gradUpn[eq][d] = d_gradUp[n + eq*dof + d*dof*num_equation];
-        vFlux[eq][d] = 0.;
+        gradUpn[eq+d*num_equation] = d_gradUp[n + eq*dof + d*dof*num_equation];
       }
       MFEM_SYNC_THREAD;
       
-      const double p  = EquationOfState::pressure(&Un[0],&KE[0],gamma,dim,num_equation);
-      const double temp = p/Un[0]/Rg;
-      double visc = EquationOfState::GetViscosity_gpu(temp);
-      visc *= viscMult;
-      const double k = EquationOfState::GetThermalConductivity_gpu(visc,gamma,Rg,Pr);
-    
-      for(int i=eq;i<dim;i+=num_equation)
-      {
-        for(int j=0;j<dim;j++)
-        {
-          stress[i][j] = gradUpn[1+j][i] + gradUpn[1+i][j];
-        }
-        // temperature gradient
-        gradT[i] = temp*(gradUpn[1+dim][i]/p - gradUpn[0][i]/Un[0]);
-        
-        vel[i] = Un[1+i]/Un[0];
-      }
-      if(eq==num_equation-1) 
-      {
-        divV = 0.;
-        for(int i=0;i<dim;i++) divV += gradUpn[1+i][i];
-      }
-      MFEM_SYNC_THREAD;
-      
-      for(int i=eq;i<dim;i+=num_equation) stress[i][i] -= 2./3.*divV;
-      MFEM_SYNC_THREAD;
-      
-      //stress *= visc;
-      
-      for(int i=eq;i<dim;i+=num_equation)
-      {
-        for(int j=0;j<dim;j++)
-        {
-          vFlux[1+i][j] = visc*stress[i][j];
-          // energy equation
-          vFlux[num_equation-1][i] += vel[j]*stress[i][j];
-        }
-      }
-      
-      if( eq==num_equation-1)
-      {
-        for(int d=0;d<dim;d++) vFlux[eq][d] += k*gradT[d];
-      }
+      Fluxes::viscousFlux_gpu(&vFlux[0],
+                              &Un[0],
+                              &gradUpn[0],
+                              gamma,
+                              Rg,
+                              viscMult,
+                              Pr,
+                              eq,
+                              num_equation,
+                              dim,
+                              num_equation );
       MFEM_SYNC_THREAD;
       
       // write to global memory
       for(int d=0;d<dim;d++)
       {
-        d_flux[n + d*dof + eq*dof*dim] -= vFlux[eq][d];
+        d_flux[n + d*dof + eq*dof*dim] -= vFlux[eq+d*num_equation];
       }
     }
   });
