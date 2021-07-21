@@ -24,6 +24,8 @@ private:
   double visc_mult;
   double thermalConductivity;
   
+  double bulk_visc_mult;
+  
   // Prandtl number
   double Pr;
 public:
@@ -32,6 +34,7 @@ public:
   void setFluid(WorkingFluid _fluid);
   
   void setViscMult(double _visc_mult){visc_mult = _visc_mult;}
+  void setBulkViscMult(double _bulk_mult){bulk_visc_mult = _bulk_mult;}
   
   double ComputePressure(const Vector &state, int dim);
   
@@ -46,6 +49,7 @@ public:
   double GetViscosity(const double &temp);
   double GetPrandtlNum(){return Pr;}
   double GetViscMultiplyer(){return visc_mult;}
+  double GetBulkViscMultiplyer(){return bulk_visc_mult;}
   double GetThermalConductivity(const double &visc);
   
   // GPU functions

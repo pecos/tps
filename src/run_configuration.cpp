@@ -34,6 +34,7 @@ RunConfiguration::RunConfiguration()
   workFluid = DRY_AIR;
   eqSystem = EULER;
   visc_mult = 1.;
+  bulk_visc = 0.;
   refLength = 1.;
   SBP = false;
   for(int ii=0;ii<5;ii++) initRhoRhoVp[ii] = 0.;
@@ -287,6 +288,11 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       {
         ss >> word;
         visc_mult = stod( word );
+        
+      }else if( word.compare("BULK_VISC_MULT")==0 )
+      {
+        ss >> word;
+        bulk_visc = stod( word );
         
       // Reference length
       }else if( word.compare("REF_LENGTH")==0 )

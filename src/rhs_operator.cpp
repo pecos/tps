@@ -425,6 +425,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const
                               eqState->GetGasConstant(),
                               eqState->GetPrandtlNum(),
                               eqState->GetViscMultiplyer(),
+                              eqState->GetBulkViscMultiplyer(),
                               vfes->GetNDofs(),
                               dim,
                               num_equation);

@@ -192,6 +192,7 @@ void M2ulPhyS::initVariables()
   eqState = new EquationOfState();
   eqState->setFluid( config.GetWorkingFluid() );
   eqState->setViscMult(config.GetViscMult() );
+  eqState->setBulkViscMult( config.GetBulkViscMult() );
   
   order = config.GetSolutionOrder();
   
