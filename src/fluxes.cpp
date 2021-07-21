@@ -73,6 +73,7 @@ void Fluxes::ComputeViscousFluxes(const Vector& state,
       const double p  = eqState->ComputePressure(state,dim);
       const double temp = p/state[0]/Rg;
       const double visc = eqState->GetViscosity(temp);
+      const double bulkViscMult = eqState->GetBulkViscMultiplyer();
       const double k    = eqState->GetThermalConductivity(visc);
       
       // make sure density visc. flux is 0
@@ -88,7 +89,7 @@ void Fluxes::ComputeViscousFluxes(const Vector& state,
         }
         divV += gradUp(1+i,i);
       }
-      for(int i=0;i<dim;i++) stress(i,i) -= 2./3.*divV;
+      for(int i=0;i<dim;i++) stress(i,i) += (bulkViscMult -2./3.)*divV;
       stress *= visc;
       
       for(int i=0;i<dim;i++)
@@ -152,10 +153,10 @@ void Fluxes::ComputeSplitFlux(const mfem::Vector &state,
 
 void Fluxes::convectiveFluxes_gpu( const Vector &x, 
                                   DenseTensor &flux,
-                                  const double gamma, 
-                                  const int dof, 
-                                  const int dim,
-                                  const int num_equation)
+                                  const double &gamma, 
+                                  const int &dof, 
+                                  const int &dim,
+                                  const int &num_equation)
 {
 #ifdef _GPU_
   auto dataIn = x.Read();
@@ -203,13 +204,14 @@ void Fluxes::convectiveFluxes_gpu( const Vector &x,
 void Fluxes::viscousFluxes_gpu( const Vector &x, 
                                 ParGridFunction *gradUp,
                                 DenseTensor &flux,
-                                const double gamma, 
-                                const double Rg, // gas constant
-                                const double Pr, // Prandtl number
-                                const double viscMult,
-                                const int dof, 
-                                const int dim,
-                                const int num_equation)
+                                const double &gamma, 
+                                const double &Rg, // gas constant
+                                const double &Pr, // Prandtl number
+                                const double &viscMult,
+                                const double &bulkViscMult,
+                                const int &dof, 
+                                const int &dim,
+                                const int &num_equation)
 {
 #ifdef _GPU_
   const double *dataIn = x.Read();
@@ -239,6 +241,7 @@ void Fluxes::viscousFluxes_gpu( const Vector &x,
                               gamma,
                               Rg,
                               viscMult,
+                              bulkViscMult,
                               Pr,
                               eq,
                               num_equation,

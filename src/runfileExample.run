@@ -88,6 +88,11 @@ FLUID 0
 # Factor that multiplies fluid viscosity
 VISC_MULT 45000.
 
+# Bulk viscosity factor. Bulk viscosity is calculated as 
+# dynamic_viscosity (accounting for visc_mult) times bulk_visc
+# i.e., visc(sutherland)*visc_mult*bulk_visc
+BULK_VISC_MULT 5.
+
 # Reference length
 REF_LENGTH 1.
 

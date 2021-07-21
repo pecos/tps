@@ -425,6 +425,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const
                               eqState->GetGasConstant(),
                               eqState->GetPrandtlNum(),
                               eqState->GetViscMultiplyer(),
+                              eqState->GetBulkViscMultiplyer(),
                               vfes->GetNDofs(),
                               dim,
                               num_equation);
@@ -540,7 +541,7 @@ void RHSoperator::updatePrimitives_gpu(Vector *Up,
       
       // compute pressure
       if( eq<dim ) KE[eq] = 0.5*state[1+eq]*state[1+eq]/state[0];
-      if( eq==num_equations-1 && dim==3 ) KE[2] = 0;
+      if( eq==num_equations-1 && dim==2 ) KE[2] = 0;
       MFEM_SYNC_THREAD;
       
       // each thread writes to global memory

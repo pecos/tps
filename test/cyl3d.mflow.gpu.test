@@ -3,11 +3,13 @@
 
 TEST="cyl3d.gpu.mflow.outlet"
 RUNFILE="inputs/input.2iters.mflow.dtconst.cyl"
+BULK_RUNFILE="inputs/input.2iters.mflow.bulkVisc.dtconst.cyl"
 OPTS="-d cuda"
 
 setup() {
     SOLN_FILE=restart_output.sol.h5
     REF_FILE=ref_solns/cyl3d.mflow.gpu.2iters.h5
+    REF_BULK_FILE=ref_solns/cyl3d.mflow.2iters.bulkVisc.dtconst.h5
 }
 
 @test "[$TEST] check for input file $RUNFILE" {
@@ -31,4 +33,12 @@ setup() {
 }
 
 
-
+@test "[$TEST] verify tps output with input -> $BULK_RUNFILE" {
+    rm -f $SOLN_FILE
+    
+    run ../src/tps --runFile $BULK_RUNFILE $OPTS
+    
+    test -s $SOLN_FILE
+    test -s $REF_BULK_FILE
+    ./soln_differ $SOLN_FILE $REF_BULK_FILE
+}

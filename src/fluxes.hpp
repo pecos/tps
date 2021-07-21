@@ -52,20 +52,21 @@ public:
   // GPU functions
   static void convectiveFluxes_gpu(const Vector &x, 
                                   DenseTensor &flux,
-                                  const double gamma, 
-                                  const int dof, 
-                                  const int dim,
-                                  const int num_equation);
+                                  const double &gamma, 
+                                  const int &dof, 
+                                  const int &dim,
+                                  const int &num_equation);
   static void viscousFluxes_gpu(const Vector &x, 
                                 ParGridFunction *gradUp,
                                 DenseTensor &flux,
-                                const double gamma, 
-                                const double Rg, // gas constant
-                                const double Pr, // Prandtl number
-                                const double viscMult,
-                                const int dof, 
-                                const int dim,
-                                const int num_equation);
+                                const double &gamma, 
+                                const double &Rg, // gas constant
+                                const double &Pr, // Prandtl number
+                                const double &viscMult,
+                                const double &bulkViscMult,
+                                const int &dof, 
+                                const int &dim,
+                                const int &num_equation);
   
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void viscousFlux_gpu(double *vFlux,
@@ -74,6 +75,7 @@ public:
                                                const double &gamma,
                                                const double &Rg,
                                                const double &viscMult,
+                                               const double &bulkViscMult,
                                                const double &Pr,
                                                const int &thrd,
                                                const int &maxThreads,
@@ -117,7 +119,7 @@ public:
     }
     MFEM_SYNC_THREAD;
     
-    for(int i=thrd;i<dim;i+=maxThreads) stress[i][i] -= 2./3.*divV;
+    for(int i=thrd;i<dim;i+=maxThreads) stress[i][i] += (bulkViscMult -2./3.)*divV;
     MFEM_SYNC_THREAD;
     
     for(int i=thrd;i<dim;i+=maxThreads)

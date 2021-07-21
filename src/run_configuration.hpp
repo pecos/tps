@@ -89,6 +89,11 @@ private:
   // Factor by which the viscosity is multiplied.
   double visc_mult;
   
+  // Bulk viscosity factor. Bulk viscosity is calculated as 
+  // dynamic_viscosity (accounting for visc_mult) times bulk_visc
+  // i.e., visc(sutherland)*visc_mult*bulk_visc
+  double bulk_visc;
+  
   // Reference length
   double refLength;
   
@@ -153,6 +158,7 @@ public:
   
   WorkingFluid GetWorkingFluid(){return workFluid;}
   double GetViscMult(){return visc_mult;}
+  double GetBulkViscMult(){return bulk_visc;};
   double GetReferenceLength(){return refLength;}
   Equations GetEquationSystem(){return eqSystem;}
   bool isSBP(){return SBP;}

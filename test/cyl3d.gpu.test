@@ -7,7 +7,7 @@ OPTS="-d cuda"
 
 setup() {
     SOLN_FILE=restart_output.sol.h5
-    REF_FILE=ref_solns/cyl3d.dtconst.gpu.h5
+    REF_FILE=ref_solns/cyl3d.dtconst.cpu.h5
 }
 
 @test "[$TEST] check for input file $RUNFILE" {
