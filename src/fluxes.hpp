@@ -119,7 +119,7 @@ public:
     }
     MFEM_SYNC_THREAD;
     
-    for(int i=thrd;i<dim;i+=maxThreads) stress[i][i] += bulkViscMult -2./3.*divV;
+    for(int i=thrd;i<dim;i+=maxThreads) stress[i][i] += (bulkViscMult -2./3.)*divV;
     MFEM_SYNC_THREAD;
     
     for(int i=thrd;i<dim;i+=maxThreads)

@@ -89,7 +89,7 @@ void Fluxes::ComputeViscousFluxes(const Vector& state,
         }
         divV += gradUp(1+i,i);
       }
-      for(int i=0;i<dim;i++) stress(i,i) += bulkViscMult -2./3.*divV;
+      for(int i=0;i<dim;i++) stress(i,i) += (bulkViscMult -2./3.)*divV;
       stress *= visc;
       
       for(int i=0;i<dim;i++)
