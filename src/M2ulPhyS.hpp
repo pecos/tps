@@ -70,6 +70,8 @@ private:
   // reference to mesh
   ParMesh *mesh;
   
+  ParGridFunction *coordsDof;
+  
   // time integrator
   ODESolver *timeIntegrator;
   

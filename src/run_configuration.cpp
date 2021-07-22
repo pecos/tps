@@ -39,6 +39,19 @@ RunConfiguration::RunConfiguration()
   SBP = false;
   for(int ii=0;ii<5;ii++) initRhoRhoVp[ii] = 0.;
   
+  linViscData.normal.UseDevice( true );
+  linViscData.point0.UseDevice( true );
+  linViscData.pointInit.UseDevice( true );
+  
+  linViscData.normal.SetSize(3);
+  linViscData.point0.SetSize(3);
+  linViscData.pointInit.SetSize(3);
+  
+  linViscData.normal = 0.;
+  linViscData.point0 = 0.;
+  linViscData.pointInit = 0.;
+  linViscData.viscRatio = 0.;
+  
   isForcing = false;
   for(int ii=0;ii<3;ii++) gradPress[ii] = 0.;
 
@@ -120,14 +133,14 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       }else if( word.compare("RESTART_CYCLE")==0 )
       {
         ss >> word;
-	restart = true;
+        restart = true;
         //restart_cycle = stoi(word);   // use value straight from restart file instead (ks mod)
         
       // restart from aux. sol
       }else if( word.compare("RESTART_CONVERSION")==0 )
       {
         ss >> word;
-	restart_hdf5_conversion = true;
+        restart_hdf5_conversion = true;
 
       // restart from aux. sol
       }else if( word.compare("RESTART_FROM_AUX")==0 )
@@ -311,6 +324,43 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
         ss >> word;
         gradPress[2] = stod( word );
         isForcing = true;
+        
+      }else if( word.compare("PLANE_NORM")==0 )
+      {
+        ss >> word;
+        linViscData.normal(0) = stod( word );
+        ss >> word;
+        linViscData.normal(1) = stod( word );
+        ss >> word;
+        linViscData.normal(2) = stod( word );
+        // make sure modulus = 1
+        double modulus = 0.;
+        for(int d=0;d<3;d++) modulus += linViscData.normal(d)*linViscData.normal(d);
+        modulus = sqrt( modulus );
+        linViscData.normal /= modulus;
+        
+      }else if( word.compare("PLANE_P0")==0 )
+      {
+        ss >> word;
+        linViscData.point0(0) = stod( word );
+        ss >> word;
+        linViscData.point0(1) = stod( word );
+        ss >> word;
+        linViscData.point0(2) = stod( word );
+      
+      }else if( word.compare("PLANE_PINIT")==0 )
+      {
+        ss >> word;
+        linViscData.pointInit(0) = stod( word );
+        ss >> word;
+        linViscData.pointInit(1) = stod( word );
+        ss >> word;
+        linViscData.pointInit(2) = stod( word );
+        
+      }else if( word.compare("VISC_RATIO")==0 )
+      {
+        ss >> word;
+        linViscData.viscRatio = stod( word );
         
       }else if( word.compare("INLET")==0 )
       {

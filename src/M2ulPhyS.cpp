@@ -408,6 +408,7 @@ void M2ulPhyS::initVariables()
                                 A, 
                                 Aflux,
                                 mesh,
+                                coordsDof,
                                 Up,
                                 gradUp,
                                 gradUpfes,
@@ -786,6 +787,9 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
   
   paraviewColl->SetOwnData(true);
   //paraviewColl->Save();
+  
+  coordsDof = new ParGridFunction(dfes);
+  mesh->GetNodes( *coordsDof );
 }
 
 void M2ulPhyS::projectInitialSolution()

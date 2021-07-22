@@ -21,14 +21,13 @@ RHSoperator::RHSoperator( double &_time,
                           Array<int> &_elems12Q,
                           const int &_maxIntPoints,
                           const int &_maxDofs,
-                          //ParNonlinearForm *_A, 
                           DGNonLinearForm *_A,
                           MixedBilinearForm *_Aflux,
                           ParMesh *_mesh,
+                          ParGridFunction *_coordsDof,
                           ParGridFunction *_Up,
                           ParGridFunction *_gradUp,
                           ParFiniteElementSpace *_gradUpfes,
-                          //ParNonlinearForm *_gradUp_A,
                           GradNonLinearForm *_gradUp_A,
                           BCintegrator *_bcIntegrator,
                           bool &_isSBP,
@@ -58,6 +57,8 @@ maxDofs(_maxDofs),
 A(_A),
 Aflux(_Aflux),
 mesh(_mesh),
+coordsDof(_coordsDof),
+linViscData(_config.GetLinearVaryingData() ),
 isSBP(_isSBP),
 alpha(_alpha),
 Up(_Up),
@@ -469,6 +470,29 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const
       {
         DenseMatrix fvisc(num_equation,dim);
         fluxClass->ComputeViscousFluxes(state,gradUpi,fvisc);
+        
+        double alpha = 1.;
+        if( linViscData.viscRatio>0 )
+        {
+          auto hcoords = coordsDof->HostRead(); // get coords
+          double dist_pi=0., dist_p0=0., dist_pi0=0.;
+          for(int d=0;d<dim;d++)
+          {
+            dist_pi += linViscData.normal(d)*(
+              linViscData.pointInit(d)-hcoords[i+d*vfes->GetNDofs()] );
+            dist_p0 += linViscData.normal(d)*(
+              linViscData.point0(d)-hcoords[i+d*vfes->GetNDofs()] );
+            dist_pi0 += linViscData.normal(d)*(
+              linViscData.pointInit(d)-linViscData.point0(d) );
+          }
+          
+          if( dist_pi>0. && dist_p0<0 )
+          {
+            alpha += (linViscData.viscRatio-1.)/dist_pi0*dist_pi;
+            for(int eq=0;eq<num_equation;eq++) for(int d=0;d<dim;d++) fvisc(eq,d) *= alpha;
+          }
+//           cout<<hcoords[i]<<" "<<dist_pi<<" "<<dist_p0<<" "<<alpha<<endl;
+        }   
         f -= fvisc;
       }
 

@@ -62,6 +62,9 @@ private:
   
   ParMesh *mesh;
   
+  ParGridFunction *coordsDof;
+  linearlyVaryingVisc &linViscData;
+  
   Array< DenseMatrix* > Me_inv;
   Vector invMArray;
   Array<int> posDofInvM;
@@ -109,14 +112,13 @@ public:
                Array<int> &_elems12Q,
                const int &_maxIntPoints,
                const int &_maxDofs,
-               //ParNonlinearForm *_A,
                DGNonLinearForm *_A,
                MixedBilinearForm *_Aflux,
                ParMesh *_mesh,
+               ParGridFunction *_coordsDof,
                ParGridFunction *_Up,
                ParGridFunction *_gradUp,
                ParFiniteElementSpace *_gradUpfes,
-               //ParNonlinearForm *_gradUp_A,
                GradNonLinearForm *_gradUp_A,
                BCintegrator *_bcIntegrator,
                bool &_isSBP,
