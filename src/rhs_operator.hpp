@@ -12,6 +12,7 @@
 #include "gradients.hpp"
 #include "dgNonlinearForm.hpp"
 #include "gradNonLinearForm.hpp"
+#include "dataStructures.hpp"
 
 using namespace mfem;
 
@@ -62,6 +63,9 @@ private:
   
   ParMesh *mesh;
   
+  ParGridFunction *spaceVaryViscMult;
+  linearlyVaryingVisc &linViscData;
+  
   Array< DenseMatrix* > Me_inv;
   Vector invMArray;
   Array<int> posDofInvM;
@@ -109,14 +113,13 @@ public:
                Array<int> &_elems12Q,
                const int &_maxIntPoints,
                const int &_maxDofs,
-               //ParNonlinearForm *_A,
                DGNonLinearForm *_A,
                MixedBilinearForm *_Aflux,
                ParMesh *_mesh,
+               ParGridFunction *_spaceVaryViscMult,
                ParGridFunction *_Up,
                ParGridFunction *_gradUp,
                ParFiniteElementSpace *_gradUpfes,
-               //ParNonlinearForm *_gradUp_A,
                GradNonLinearForm *_gradUp_A,
                BCintegrator *_bcIntegrator,
                bool &_isSBP,
@@ -132,30 +135,30 @@ public:
 
   // GPU functions
   static void copyZk2Z_gpu(Vector &z,Vector &zk,const int eq,const int dof);
-  static void copyDataForFluxIntegration_gpu(const Vector &z,
-					 DenseTensor &flux,
-					 Vector &fk,
-					 Vector &zk,
-					 const int eq,
-					 const int dof,
-					 const int dim);
-  static void updatePrimitives_gpu(Vector *Up, 
-				   const Vector *x_in,
-				   const double gamma,
-				   const int ndofs,
-				   const int dim,
-				   const int num_equations );
-  static void multiPlyInvers_gpu(Vector &y,
-				 Vector &z,
-				 const Array<int> &nodesIDs,
-				 const Array<int> &posDofIds,
-				 const Vector &invMArray,
-				 const Array<int> &posDofInvM,
-				 const int num_equation,
-				 const int totNumDof,
-				 const int NE,
-				 const int elemOffset,
-				 const int dof);
+  static void copyDataForFluxIntegration_gpu( const Vector &z,
+                                              DenseTensor &flux,
+                                              Vector &fk,
+                                              Vector &zk,
+                                              const int eq,
+                                              const int dof,
+                                              const int dim);
+  static void updatePrimitives_gpu( Vector *Up, 
+                                    const Vector *x_in,
+                                    const double gamma,
+                                    const int ndofs,
+                                    const int dim,
+                                    const int num_equations );
+  static void multiPlyInvers_gpu( Vector &y,
+                                  Vector &z,
+                                  const Array<int> &nodesIDs,
+                                  const Array<int> &posDofIds,
+                                  const Vector &invMArray,
+                                  const Array<int> &posDofInvM,
+                                  const int num_equation,
+                                  const int totNumDof,
+                                  const int NE,
+                                  const int elemOffset,
+                                  const int dof);
 };
 
 #endif // RHS_OPERATOR

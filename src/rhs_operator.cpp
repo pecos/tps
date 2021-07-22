@@ -21,14 +21,13 @@ RHSoperator::RHSoperator( double &_time,
                           Array<int> &_elems12Q,
                           const int &_maxIntPoints,
                           const int &_maxDofs,
-                          //ParNonlinearForm *_A, 
                           DGNonLinearForm *_A,
                           MixedBilinearForm *_Aflux,
                           ParMesh *_mesh,
+                          ParGridFunction *_spaceVaryViscMult,
                           ParGridFunction *_Up,
                           ParGridFunction *_gradUp,
                           ParFiniteElementSpace *_gradUpfes,
-                          //ParNonlinearForm *_gradUp_A,
                           GradNonLinearForm *_gradUp_A,
                           BCintegrator *_bcIntegrator,
                           bool &_isSBP,
@@ -58,6 +57,8 @@ maxDofs(_maxDofs),
 A(_A),
 Aflux(_Aflux),
 mesh(_mesh),
+spaceVaryViscMult(_spaceVaryViscMult),
+linViscData(_config.GetLinearVaryingData() ),
 isSBP(_isSBP),
 alpha(_alpha),
 Up(_Up),
@@ -426,6 +427,8 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const
                               eqState->GetPrandtlNum(),
                               eqState->GetViscMultiplyer(),
                               eqState->GetBulkViscMultiplyer(),
+                              spaceVaryViscMult,
+                              linViscData,
                               vfes->GetNDofs(),
                               dim,
                               num_equation);
@@ -469,6 +472,12 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const
       {
         DenseMatrix fvisc(num_equation,dim);
         fluxClass->ComputeViscousFluxes(state,gradUpi,fvisc);
+        
+        if( spaceVaryViscMult!=NULL )
+        {
+          auto *alpha = spaceVaryViscMult->GetData();
+          for(int eq=0;eq<num_equation;eq++) for(int d=0;d<dim;d++) fvisc(eq,d) *= alpha[i];
+        }   
         f -= fvisc;
       }
 

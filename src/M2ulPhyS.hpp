@@ -76,6 +76,8 @@ private:
   // Pointers to the different classes
   EquationOfState *eqState;
   
+  ParGridFunction *spaceVaryViscMult; // space varying viscosity multiplier
+  
   Fluxes *fluxClass;
   
   RHSoperator *rhsOperator;

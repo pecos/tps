@@ -9,6 +9,7 @@
 #include <general/forall.hpp>
 #include <tps_config.h>
 #include "equation_of_state.hpp"
+#include "dataStructures.hpp"
 
 enum Equations { EULER, NS, MHD};
 
@@ -64,6 +65,8 @@ public:
                                 const double &Pr, // Prandtl number
                                 const double &viscMult,
                                 const double &bulkViscMult,
+                                const ParGridFunction *spaceVaryViscMult,
+                                const linearlyVaryingVisc &linViscData,
                                 const int &dof, 
                                 const int &dim,
                                 const int &num_equation);

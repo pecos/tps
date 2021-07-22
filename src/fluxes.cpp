@@ -209,6 +209,8 @@ void Fluxes::viscousFluxes_gpu( const Vector &x,
                                 const double &Pr, // Prandtl number
                                 const double &viscMult,
                                 const double &bulkViscMult,
+                                const ParGridFunction *spaceVaryViscMult,
+                                const linearlyVaryingVisc &linViscData,
                                 const int &dof, 
                                 const int &dim,
                                 const int &num_equation)
@@ -218,6 +220,12 @@ void Fluxes::viscousFluxes_gpu( const Vector &x,
   double *d_flux = flux.ReadWrite();
   const double *d_gradUp = gradUp->Read();
   
+  const double* d_spaceVaryViscMult;
+  if( spaceVaryViscMult!=NULL)
+  {
+    d_spaceVaryViscMult = spaceVaryViscMult->Read();
+  }else d_spaceVaryViscMult = NULL;
+  
   MFEM_FORALL_2D(n,dof,num_equation,1,1,
   {
     MFEM_FOREACH_THREAD(eq,x,num_equation)
@@ -225,6 +233,7 @@ void Fluxes::viscousFluxes_gpu( const Vector &x,
       MFEM_SHARED double Un[5];
       MFEM_SHARED double gradUpn[5*3];
       MFEM_SHARED double vFlux[5*3];
+      MFEM_SHARED double linVisc;
       
       // init. State
       Un[eq] = dataIn[n+eq*dof];
@@ -248,6 +257,14 @@ void Fluxes::viscousFluxes_gpu( const Vector &x,
                               dim,
                               num_equation );
       MFEM_SYNC_THREAD;
+      
+      if( linViscData.viscRatio>0. )
+      { 
+        if(eq==0) linVisc = d_spaceVaryViscMult[n];
+        MFEM_SYNC_THREAD;
+        
+        for(int d=0;d<dim;d++) vFlux[eq+d*num_equation] *= linVisc;
+      }
       
       // write to global memory
       for(int d=0;d<dim;d++)

@@ -17,14 +17,14 @@ mpi(_mpi)
 
 #ifdef _GPU_
   if (!config.isTimeStepConstant())
+  {
+    if(mpi.Root())
     {
-      if(mpi.Root())
-	{
-	  std::cerr << "[ERROR]: GPU runs must use a constant time step: Please set DT_CONSTANT in input file." << std::endl;
-	  std::cerr << std::endl;
-	  exit(ERROR);
-	}
+      std::cerr << "[ERROR]: GPU runs must use a constant time step: Please set DT_CONSTANT in input file." << std::endl;
+      std::cerr << std::endl;
+      exit(ERROR);
     }
+  }
 #endif
   
   initVariables();
@@ -34,9 +34,9 @@ mpi(_mpi)
   // now that MPI groups have been initialized, we can finalize any additional
   // BC setup that requries coordination across processors
   if( bcIntegrator != NULL)
-    {
-      bcIntegrator->initBCs();
-    }
+  {
+    bcIntegrator->initBCs();
+  }
 
   // set default solver state
   exit_status_ =  NORMAL;
@@ -408,6 +408,7 @@ void M2ulPhyS::initVariables()
                                 A, 
                                 Aflux,
                                 mesh,
+                                spaceVaryViscMult,
                                 Up,
                                 gradUp,
                                 gradUpfes,
@@ -697,7 +698,6 @@ void M2ulPhyS::initIndirectionArrays()
 
 M2ulPhyS::~M2ulPhyS()
 {
-
   delete gradUp;
   
   delete gradUp_A;
@@ -777,12 +777,47 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
   press = new ParGridFunction(fes,
                 Up->HostReadWrite()+(num_equation-1)*fes->GetNDofs() );
   
+  
+  // compute factor to multiply viscosity when
+  // this option is active
+  spaceVaryViscMult = NULL;
+  ParGridFunction coordsDof(dfes);
+  mesh->GetNodes( coordsDof );
+  if(config.GetLinearVaryingData().viscRatio>0.)
+  {
+    spaceVaryViscMult = new ParGridFunction(fes);
+    double *viscMult = spaceVaryViscMult->HostWrite();
+    for(int n=0;n<fes->GetNDofs();n++)
+    {
+      double alpha = 1.;
+      auto hcoords = coordsDof.HostRead(); // get coords
+      double dist_pi=0., dist_p0=0., dist_pi0=0.;
+      for(int d=0;d<dim;d++)
+      {
+        dist_pi += config.GetLinearVaryingData().normal(d)*(
+          config.GetLinearVaryingData().pointInit(d)-hcoords[n+d*vfes->GetNDofs()] );
+        dist_p0 += config.GetLinearVaryingData().normal(d)*(
+          config.GetLinearVaryingData().point0(d)-hcoords[n+d*vfes->GetNDofs()] );
+        dist_pi0 += config.GetLinearVaryingData().normal(d)*(
+          config.GetLinearVaryingData().pointInit(d)-config.GetLinearVaryingData().point0(d) );
+      }
+      
+      if( dist_pi>0. && dist_p0<0 )
+      {
+        alpha += (config.GetLinearVaryingData().viscRatio-1.)/dist_pi0*dist_pi;
+      }
+      viscMult[n] = alpha;
+    }
+  }
+  
   paraviewColl->SetCycle(0);
   paraviewColl->SetTime(0.);
   
   paraviewColl->RegisterField("dens",dens);
   paraviewColl->RegisterField("vel",vel);
   paraviewColl->RegisterField("press",press);
+  
+  if( spaceVaryViscMult!=NULL ) paraviewColl->RegisterField("viscMult",spaceVaryViscMult);
   
   paraviewColl->SetOwnData(true);
   //paraviewColl->Save();

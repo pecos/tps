@@ -114,6 +114,18 @@ INIT_P 101300
 # GRAD_PRESSURE dpx dpy dpz
 GRAD_PRESSURE 8 0 0
 
+# The following four keywords define two planes in which
+# a linearly varying viscosity can be defined between these two.
+# The planes are defined by the normal and one point being the 
+# normal equal for both planes. The visc ratio will vary linearly
+# from 0 to VISC_RATIO from the plane defined by PLANE_PINIT and 
+# the plane defined by PLANE_P0. This is intended to help in 
+# problematic boundary conditions.
+PLANE_NORM n1 n2 n3
+PLANE_P0 x0 y0 z0
+PLANE_PINIT xi yi zi
+VISC_RATIO 50.
+
 # Inlet Boundary Conditions
 # types:
 # 0 -> Subsonic Inlet Specified with dens. and Vel(3)
