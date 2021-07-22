@@ -266,16 +266,13 @@ void Fluxes::viscousFluxes_gpu( const Vector &x,
       MFEM_SYNC_THREAD;
       
       double alpha = 1.;
-      if( linViscData.viscRatio>0 )
-      {
-        if( eq<3 )
+      if( linViscData.viscRatio>0. )
+      { 
+        for(int d=0;d<dim;d++)
         {
-          for(int d=0;d<dim;d++)
-          {
-            dist[eq] += d_normal[d]*( d_pointInit[d]-d_coordsDof[n+d*dof] );
-            dist[eq] += d_normal[d]*(d_point0[d]-d_coordsDof[n+d*dof] );
-            dist[eq] += d_normal[d]*( d_pointInit[d]-d_point0[d] );
-          }
+          if(eq==0) dist[eq] += d_normal[d]*( d_pointInit[d]-d_coordsDof[n+d*dof] );
+          if(eq==1) dist[eq] += d_normal[d]*( d_point0[d]-d_coordsDof[n+d*dof] );
+          if(eq==2) dist[eq] += d_normal[d]*( d_pointInit[d]-d_point0[d] );
         }
         MFEM_SYNC_THREAD;
         

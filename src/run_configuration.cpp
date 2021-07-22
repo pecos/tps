@@ -327,35 +327,38 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
         
       }else if( word.compare("PLANE_NORM")==0 )
       {
+        auto normal = linViscData.normal.HostWrite();
         ss >> word;
-        linViscData.normal(0) = stod( word );
+        normal[0] = stod( word );
         ss >> word;
-        linViscData.normal(1) = stod( word );
+        normal[1] = stod( word );
         ss >> word;
-        linViscData.normal(2) = stod( word );
+        normal[2] = stod( word );
         // make sure modulus = 1
         double modulus = 0.;
-        for(int d=0;d<3;d++) modulus += linViscData.normal(d)*linViscData.normal(d);
+        for(int d=0;d<3;d++) modulus += normal[d]*normal[d];
         modulus = sqrt( modulus );
-        linViscData.normal /= modulus;
+        for(int d=0;d<3;d++) normal[d] /=modulus;
         
       }else if( word.compare("PLANE_P0")==0 )
       {
+        auto point0 = linViscData.point0.HostWrite();
         ss >> word;
-        linViscData.point0(0) = stod( word );
+        point0[0] = stod( word );
         ss >> word;
-        linViscData.point0(1) = stod( word );
+        point0[1] = stod( word );
         ss >> word;
-        linViscData.point0(2) = stod( word );
+        point0[2] = stod( word );
       
       }else if( word.compare("PLANE_PINIT")==0 )
       {
+        auto pointInit = linViscData.pointInit.HostWrite();
         ss >> word;
-        linViscData.pointInit(0) = stod( word );
+        pointInit[0] = stod( word );
         ss >> word;
-        linViscData.pointInit(1) = stod( word );
+        pointInit[1] = stod( word );
         ss >> word;
-        linViscData.pointInit(2) = stod( word );
+        pointInit[2] = stod( word );
         
       }else if( word.compare("VISC_RATIO")==0 )
       {
