@@ -12,6 +12,7 @@
 #include "gradients.hpp"
 #include "dgNonlinearForm.hpp"
 #include "gradNonLinearForm.hpp"
+#include "dataStructures.hpp"
 
 using namespace mfem;
 

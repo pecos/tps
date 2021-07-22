@@ -11,17 +11,10 @@
 #include "inletBC.hpp"
 #include "outletBC.hpp"
 #include "wallBC.hpp"
+#include "dataStructures.hpp"
 
 using namespace mfem;
 using namespace std;
-
-struct linearlyVaryingVisc
-{
-  Vector normal;
-  Vector point0;
-  Vector pointInit;
-  double viscRatio;
-};
 
 // Class to manage the run options as
 // specified in the input file

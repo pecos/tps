@@ -9,7 +9,7 @@
 #include <general/forall.hpp>
 #include <tps_config.h>
 #include "equation_of_state.hpp"
-#include "run_configuration.hpp"
+#include "dataStructures.hpp"
 
 enum Equations { EULER, NS, MHD};
 
