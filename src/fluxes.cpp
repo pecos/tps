@@ -209,6 +209,8 @@ void Fluxes::viscousFluxes_gpu( const Vector &x,
                                 const double &Pr, // Prandtl number
                                 const double &viscMult,
                                 const double &bulkViscMult,
+                                ParGridFunction *coordsDof,
+                                linearlyVaryingVisc &linViscData,
                                 const int &dof, 
                                 const int &dim,
                                 const int &num_equation)
@@ -218,6 +220,18 @@ void Fluxes::viscousFluxes_gpu( const Vector &x,
   double *d_flux = flux.ReadWrite();
   const double *d_gradUp = gradUp->Read();
   
+  double *d_coordsDof = NULL;
+  double *d_normal = NULL;
+  double *d_pointInit = NULL;
+  double *d_point0 = NULL;
+  if( linViscData.viscRatio>0. )
+  {
+    d_coordsDof = coordsDof->ReadWrite();
+    d_normal = linViscData.normal.ReadWrite();
+    d_point0 = linViscData.point0.ReadWrite();
+    d_pointInit = linViscData.pointInit.ReadWrite();
+  }
+  
   MFEM_FORALL_2D(n,dof,num_equation,1,1,
   {
     MFEM_FOREACH_THREAD(eq,x,num_equation)
@@ -225,6 +239,7 @@ void Fluxes::viscousFluxes_gpu( const Vector &x,
       MFEM_SHARED double Un[5];
       MFEM_SHARED double gradUpn[5*3];
       MFEM_SHARED double vFlux[5*3];
+      MFEM_SHARED double dist[3]; //dist[0]=dist_pi, dist[1]=dist_p0, dist[2]=dist_pi0
       
       // init. State
       Un[eq] = dataIn[n+eq*dof];
@@ -233,6 +248,7 @@ void Fluxes::viscousFluxes_gpu( const Vector &x,
       {
         gradUpn[eq+d*num_equation] = d_gradUp[n + eq*dof + d*dof*num_equation];
       }
+      if(eq<3) dist[eq] = 0.;
       MFEM_SYNC_THREAD;
       
       Fluxes::viscousFlux_gpu(&vFlux[0],
@@ -248,6 +264,27 @@ void Fluxes::viscousFluxes_gpu( const Vector &x,
                               dim,
                               num_equation );
       MFEM_SYNC_THREAD;
+      
+      double alpha = 1.;
+      if( linViscData.viscRatio>0 )
+      {
+        if( eq<3 )
+        {
+          for(int d=0;d<dim;d++)
+          {
+            dist[eq] += d_normal[d]*( d_pointInit[d]-d_coordsDof[n+d*dof] );
+            dist[eq] += d_normal[d]*(d_point0[d]-d_coordsDof[n+d*dof] );
+            dist[eq] += d_normal[d]*( d_pointInit[d]-d_point0[d] );
+          }
+        }
+        MFEM_SYNC_THREAD;
+        
+        if( dist[0]>0. && dist[1]<0 )
+        {
+          alpha += (linViscData.viscRatio-1.)/dist[2]*dist[0];
+          for(int d=0;d<dim;d++) vFlux[eq+d*num_equation] *= alpha;
+        }
+      }
       
       // write to global memory
       for(int d=0;d<dim;d++)

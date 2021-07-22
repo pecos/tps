@@ -427,6 +427,8 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const
                               eqState->GetPrandtlNum(),
                               eqState->GetViscMultiplyer(),
                               eqState->GetBulkViscMultiplyer(),
+                              coordsDof,
+                              linViscData,
                               vfes->GetNDofs(),
                               dim,
                               num_equation);
@@ -491,7 +493,6 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const
             alpha += (linViscData.viscRatio-1.)/dist_pi0*dist_pi;
             for(int eq=0;eq<num_equation;eq++) for(int d=0;d<dim;d++) fvisc(eq,d) *= alpha;
           }
-//           cout<<hcoords[i]<<" "<<dist_pi<<" "<<dist_p0<<" "<<alpha<<endl;
         }   
         f -= fvisc;
       }
