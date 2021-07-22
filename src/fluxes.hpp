@@ -65,8 +65,8 @@ public:
                                 const double &Pr, // Prandtl number
                                 const double &viscMult,
                                 const double &bulkViscMult,
-                                ParGridFunction *coordsDof,
-                                linearlyVaryingVisc &linViscData,
+                                const ParGridFunction *spaceVaryViscMult,
+                                const linearlyVaryingVisc &linViscData,
                                 const int &dof, 
                                 const int &dim,
                                 const int &num_equation);

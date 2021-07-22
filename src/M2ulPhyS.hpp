@@ -70,13 +70,13 @@ private:
   // reference to mesh
   ParMesh *mesh;
   
-  ParGridFunction *coordsDof;
-  
   // time integrator
   ODESolver *timeIntegrator;
   
   // Pointers to the different classes
   EquationOfState *eqState;
+  
+  ParGridFunction *spaceVaryViscMult; // space varying viscosity multiplier
   
   Fluxes *fluxClass;
   
