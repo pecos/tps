@@ -698,7 +698,6 @@ void M2ulPhyS::initIndirectionArrays()
 
 M2ulPhyS::~M2ulPhyS()
 {
-  delete spaceVaryViscMult;
   delete gradUp;
   
   delete gradUp_A;

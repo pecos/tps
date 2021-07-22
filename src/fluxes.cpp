@@ -238,7 +238,6 @@ void Fluxes::viscousFluxes_gpu( const Vector &x,
       {
         gradUpn[eq+d*num_equation] = d_gradUp[n + eq*dof + d*dof*num_equation];
       }
-      if(eq<3) dist[eq] = 0.;
       MFEM_SYNC_THREAD;
       
       Fluxes::viscousFlux_gpu(&vFlux[0],
