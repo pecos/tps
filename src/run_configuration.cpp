@@ -25,6 +25,7 @@ RunConfiguration::RunConfiguration()
   restart_hdf5_conversion = false;
   restart_cycle = 0;
   restartFromAux = false;
+  singleRestartFile = false;
   
   sampleInterval = 0;
   startIter = 0;
@@ -146,6 +147,11 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       }else if( word.compare("RESTART_FROM_AUX")==0 )
       {
         restartFromAux = true;
+
+      // write a single restart file (rather than 1 from each MPI task)
+      }else if( word.compare("SINGLE_RESTART_FILE")==0 )
+      {
+        singleRestartFile = true;
 
       // mean and RMS calculation
       }else if( word.compare("CALC_MEAN_RMS")==0 )

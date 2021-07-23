@@ -127,6 +127,7 @@ setup() {
     cp $RUNFILE $RUNFILE_PART
 
     # add partition info to the runfile
+    echo "SINGLE_RESTART_FILE" >> $RUNFILE_PART
     echo "PART_FILE meshes/cyl-tet-coarse-part1.txt" >> $RUNFILE_PART
 
     # run 1 task

@@ -76,6 +76,7 @@ private:
   // Restart from different order solution on same mesh.  New order
   // set by POL_ORDER, old order determined from restart file.
   bool restartFromAux;
+  bool singleRestartFile;
 
   // mean and RMS
   int sampleInterval;
@@ -186,6 +187,7 @@ public:
   int  GetRestartCycle(){return restart;}
   void SetRestartCycle(int iter){restart_cycle = iter; return;}
   bool RestartFromAux(){return restartFromAux;}
+  bool SingleRestartFile(){return singleRestartFile;}
   bool RestartHDFConversion(){return restart_hdf5_conversion;}
   
   std::vector<pair<int,InletType> >* GetInletPatchType(){return &inletPatchType;}
