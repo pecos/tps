@@ -780,11 +780,12 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
   
   // compute factor to multiply viscosity when
   // this option is active
-  spaceVaryViscMult = new ParGridFunction(fes);
+  spaceVaryViscMult = NULL;
   ParGridFunction coordsDof(dfes);
   mesh->GetNodes( coordsDof );
   if(config.GetLinearVaryingData().viscRatio>0.)
   {
+    spaceVaryViscMult = new ParGridFunction(fes);
     double *viscMult = spaceVaryViscMult->HostWrite();
     for(int n=0;n<fes->GetNDofs();n++)
     {
@@ -816,7 +817,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
   paraviewColl->RegisterField("vel",vel);
   paraviewColl->RegisterField("press",press);
   
-  paraviewColl->RegisterField("viscMult",spaceVaryViscMult);
+  if( spaceVaryViscMult!=NULL ) paraviewColl->RegisterField("viscMult",spaceVaryViscMult);
   
   paraviewColl->SetOwnData(true);
   //paraviewColl->Save();

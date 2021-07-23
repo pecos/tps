@@ -473,7 +473,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const
         DenseMatrix fvisc(num_equation,dim);
         fluxClass->ComputeViscousFluxes(state,gradUpi,fvisc);
         
-        if( linViscData.viscRatio>0 )
+        if( spaceVaryViscMult!=NULL )
         {
           auto *alpha = spaceVaryViscMult->GetData();
           for(int eq=0;eq<num_equation;eq++) for(int d=0;d<dim;d++) fvisc(eq,d) *= alpha[i];

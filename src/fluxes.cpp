@@ -220,7 +220,10 @@ void Fluxes::viscousFluxes_gpu( const Vector &x,
   double *d_flux = flux.ReadWrite();
   const double *d_gradUp = gradUp->Read();
   
-  const double *d_spaceVaryViscMult = spaceVaryViscMult->Read();
+  if( spaceVaryViscMult!=NULL)
+  {
+    const double *d_spaceVaryViscMult = spaceVaryViscMult->Read();
+  }
   
   MFEM_FORALL_2D(n,dof,num_equation,1,1,
   {
