@@ -198,7 +198,11 @@ private:
 
   // exit status code;
   int exit_status_;
-  
+
+  // mapping from local to global element index
+  int* locToGlobElem;
+  int* partition;
+
   void getAttributesInPartition(Array<int> &local_attr);
   
   void initIndirectionArrays();
@@ -222,6 +226,7 @@ private:
   void Check_NAN();
   bool Check_JobResubmit();
   void Cache_Paraview_Timesteps();
+
 
 public:
   M2ulPhyS(MPI_Session &_mpi,

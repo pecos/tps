@@ -63,7 +63,7 @@ void M2ulPhyS::initVariables()
   loadFromAuxSol = config.RestartFromAux();
 
   // if partition file specified, read it and set partitioning vector
-  int *partition = NULL;
+  partition = NULL;
   int part_ne=0, part_np=0;
   int read_error = 0;
 
@@ -180,9 +180,36 @@ void M2ulPhyS::initVariables()
     time = 0.;
     iter = 0;
   }
-  
+
+  // if we have a partitioning vector, use it to build local->global
+  // element numbering map
+  if (partition!=NULL)
+  {
+    // Assumption: the map "local element id" -> "global element id" is
+    // increasing, i.e. the local numbering preserves the element order from
+    // the global numbering.
+    //
+    // NB: This is the same assumption made by the ParGridFunction
+    // ctor if you pass the partitioning vector, at least as of mfem
+    // v4.2.  See mfem/fem/pgridfunction.cpp, which is the source of
+    // the above comment.
+
+    locToGlobElem = new int[mesh->GetNE()];
+    int lelem=0;
+    for (unsigned int gelem=0; gelem<part_ne; gelem++) {
+      if (mpi.WorldRank()==partition[gelem]) {
+        locToGlobElem[lelem] = gelem;
+        lelem += 1;
+      }
+    }
+  }
+  else
+  {
+    locToGlobElem = NULL;
+  }
+
   cout<<"Process "<<mpi.WorldRank()<<" # elems "<< mesh->GetNE()<<endl;
-  
+
   dim = mesh->Dimension();
   
   refLength = config.GetReferenceLength();
@@ -442,8 +469,6 @@ void M2ulPhyS::initVariables()
   if( mpi.Root() ) cout<<"Initial time-step: "<<dt<<"s"<<endl;
   
   //t_final = MaxIters*dt;
-
-  delete [] partition;
 }
 
 
@@ -735,6 +760,9 @@ M2ulPhyS::~M2ulPhyS()
   //delete mesh;
   
   delete groupsMPI;
+
+  delete [] partition;
+  delete [] locToGlobElem;
 
 #ifdef HAVE_GRVY
   if(mpi.WorldRank() == 0)
