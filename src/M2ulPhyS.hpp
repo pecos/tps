@@ -203,6 +203,17 @@ private:
   int* locToGlobElem;
   int* partition;
 
+  // a serial mesh, finite element space, and grid function
+  // for use if we want to write a serial file
+  //
+  // TODO: At the moment, these objects will be instantiated in all
+  // runs, but this is wasteful.  Really only need them if we want to
+  // collapse a parallel soln into a single file.
+  Mesh *serial_mesh;
+  FiniteElementSpace *serial_fes;
+  GridFunction *serial_soln;
+
+
   void getAttributesInPartition(Array<int> &local_attr);
   
   void initIndirectionArrays();

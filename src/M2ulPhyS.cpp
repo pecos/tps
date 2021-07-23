@@ -111,12 +111,11 @@ void M2ulPhyS::initVariables()
   assert( (partition==NULL) || (part_np==mpi.WorldSize()) );
 
   // check if a simulations is being restarted
-  Mesh *tempmesh;
   if( config.GetRestartCycle()>0 )
   {
     // read serial mesh and partition. Hopefully the same
     // partitions will be created in the same order
-    tempmesh = new Mesh(config.GetMeshFileName().c_str() );
+    serial_mesh = new Mesh(config.GetMeshFileName().c_str() );
 
     if (config.GetUniformRefLevels()>0) {
       if (mpi.Root()) {
@@ -126,17 +125,18 @@ void M2ulPhyS::initVariables()
       MPI_Abort(MPI_COMM_WORLD,1);
     }
 
-    assert( (partition==NULL) || (part_ne==tempmesh->GetNE()) );
+    assert( (partition==NULL) || (part_ne==serial_mesh->GetNE()) );
 
-    mesh = new ParMesh(MPI_COMM_WORLD,*tempmesh, partition);
-    delete tempmesh;
-    
+    mesh = new ParMesh(MPI_COMM_WORLD,*serial_mesh, partition);
+    // TODO: Add logic to delete serial_mesh unless we need it
+    //delete serial_mesh;
+
     // Paraview setup
     paraviewColl = new ParaViewDataCollection(config.GetOutputName(), mesh);
     paraviewColl->SetLevelsOfDetail( config.GetSolutionOrder() );
     paraviewColl->SetHighOrderOutput(true);
     paraviewColl->SetPrecision(8);
-    
+
   }else
   {
     //remove previous solution
@@ -151,20 +151,21 @@ void M2ulPhyS::initVariables()
       }
     }
 
-    tempmesh = new Mesh(config.GetMeshFileName().c_str() );
+    serial_mesh = new Mesh(config.GetMeshFileName().c_str() );
 
     // uniform refinement, user-specified number of times
     for (int l = 0; l < config.GetUniformRefLevels(); l++) {
       if (mpi.Root() ) {
         std::cout << "Uniform refinement number " << l << std::endl;
       }
-      tempmesh->UniformRefinement();
+      serial_mesh->UniformRefinement();
     }
 
-    assert( (partition==NULL) || (part_ne==tempmesh->GetNE()) );
+    assert( (partition==NULL) || (part_ne==serial_mesh->GetNE()) );
 
-    mesh = new ParMesh(MPI_COMM_WORLD,*tempmesh, partition);
-    tempmesh->Clear();
+    mesh = new ParMesh(MPI_COMM_WORLD,*serial_mesh, partition);
+    // TODO: Add logic to delete serial_mesh unless we need it
+    //serial_mesh->Clear();  // why Clear() rather than delete?
 
     // VisIt setup
 //     visitColl = new VisItDataCollection(config.GetOutputName(), mesh);
@@ -266,6 +267,17 @@ void M2ulPhyS::initVariables()
   dfes = new ParFiniteElementSpace(mesh, fec, dim, Ordering::byNODES);
   vfes = new ParFiniteElementSpace(mesh, fec, num_equation, Ordering::byNODES);
   gradUpfes = new ParFiniteElementSpace(mesh, fec, num_equation*dim, Ordering::byNODES);
+
+  // Serial FE space
+  // TODO: Only instantiate if we need it
+  serial_fes = new FiniteElementSpace(serial_mesh, fec, num_equation, Ordering::byNODES);
+
+  // Serial grid function
+  // TODO: Only instantiate if we need it
+  serial_soln = new GridFunction(serial_fes);
+
+  // to help detect errors, initialize to nan
+  *serial_soln = std::numeric_limits<double>::quiet_NaN();
 
   initIndirectionArrays();
   initSolutionAndVisualizationVectors();
@@ -763,6 +775,10 @@ M2ulPhyS::~M2ulPhyS()
 
   delete [] partition;
   delete [] locToGlobElem;
+
+  delete serial_mesh;
+  delete serial_fes;
+  delete serial_soln;
 
 #ifdef HAVE_GRVY
   if(mpi.WorldRank() == 0)
