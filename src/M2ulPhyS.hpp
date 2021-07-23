@@ -205,10 +205,6 @@ private:
 
   // a serial mesh, finite element space, and grid function
   // for use if we want to write a serial file
-  //
-  // TODO: At the moment, these objects will be instantiated in all
-  // runs, but this is wasteful.  Really only need them if we want to
-  // collapse a parallel soln into a single file.
   Mesh *serial_mesh;
   FiniteElementSpace *serial_fes;
   GridFunction *serial_soln;
@@ -233,7 +229,8 @@ private:
   void write_restart_files();
   void read_restart_files();
   void restart_files_hdf5(string mode);
-  
+  void serialize_soln_for_write();
+
   void Check_NAN();
   bool Check_JobResubmit();
   void Cache_Paraview_Timesteps();

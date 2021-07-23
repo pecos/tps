@@ -32,8 +32,11 @@ void M2ulPhyS::restart_files_hdf5(string mode)
   // open restart files (currently per MPI process variants)
   if (mode == "write")
     {
-      file = H5Fcreate(fileName.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT );
-      assert(file >= 0);
+      if (mpi.Root() || !config.SingleRestartFile() )
+        {
+          file = H5Fcreate(fileName.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT );
+          assert(file >= 0);
+        }
     }
   else if (mode == "read")
     {
@@ -60,57 +63,60 @@ void M2ulPhyS::restart_files_hdf5(string mode)
   hid_t aid, attr;
   if (mode == "write")
     {
-      aid  = H5Screate(H5S_SCALAR);
-      assert(aid >= 0);
+      if (mpi.Root() || !config.SingleRestartFile() )
+        {
+          aid  = H5Screate(H5S_SCALAR);
+          assert(aid >= 0);
 
-      // current iteration count
-      attr = H5Acreate(file,"iteration", H5T_NATIVE_INT, aid, H5P_DEFAULT, H5P_DEFAULT);
-      assert(attr >= 0);
-      status = H5Awrite(attr,H5T_NATIVE_INT,&iter);
-      assert(status >= 0);
-      H5Aclose(attr);
+          // current iteration count
+          attr = H5Acreate(file,"iteration", H5T_NATIVE_INT, aid, H5P_DEFAULT, H5P_DEFAULT);
+          assert(attr >= 0);
+          status = H5Awrite(attr,H5T_NATIVE_INT,&iter);
+          assert(status >= 0);
+          H5Aclose(attr);
 
-      // total time
-      attr = H5Acreate(file,"time", H5T_NATIVE_DOUBLE, aid, H5P_DEFAULT, H5P_DEFAULT);
-      assert(attr >= 0);
-      status = H5Awrite(attr,H5T_NATIVE_DOUBLE,&time);
-      assert(status >= 0);
-      H5Aclose(attr);
+          // total time
+          attr = H5Acreate(file,"time", H5T_NATIVE_DOUBLE, aid, H5P_DEFAULT, H5P_DEFAULT);
+          assert(attr >= 0);
+          status = H5Awrite(attr,H5T_NATIVE_DOUBLE,&time);
+          assert(status >= 0);
+          H5Aclose(attr);
 
-      // timestep
-      attr = H5Acreate(file,"dt", H5T_NATIVE_DOUBLE, aid, H5P_DEFAULT, H5P_DEFAULT);
-      assert(attr >= 0);
-      status = H5Awrite(attr,H5T_NATIVE_DOUBLE,&dt);
-      assert(status >= 0);  
-      H5Aclose(attr);
+          // timestep
+          attr = H5Acreate(file,"dt", H5T_NATIVE_DOUBLE, aid, H5P_DEFAULT, H5P_DEFAULT);
+          assert(attr >= 0);
+          status = H5Awrite(attr,H5T_NATIVE_DOUBLE,&dt);
+          assert(status >= 0);  
+          H5Aclose(attr);
 
-      // solution order
-      attr = H5Acreate(file,"order", H5T_NATIVE_INT, aid, H5P_DEFAULT, H5P_DEFAULT);
-      assert(attr >= 0);
-      status = H5Awrite(attr,H5T_NATIVE_INT,&order);
-      assert(status >= 0);
-      H5Aclose(attr);
+          // solution order
+          attr = H5Acreate(file,"order", H5T_NATIVE_INT, aid, H5P_DEFAULT, H5P_DEFAULT);
+          assert(attr >= 0);
+          status = H5Awrite(attr,H5T_NATIVE_INT,&order);
+          assert(status >= 0);
+          H5Aclose(attr);
 
       // code revision
 #ifdef BUILD_VERSION
-      {
-	hid_t ctype     = H5Tcopy (H5T_C_S1);
-	int shaLength   = strlen(BUILD_VERSION);
-	hsize_t dims[1] = {1};
-	H5Tset_size(ctype,shaLength);
+          {
+            hid_t ctype     = H5Tcopy (H5T_C_S1);
+            int shaLength   = strlen(BUILD_VERSION);
+            hsize_t dims[1] = {1};
+            H5Tset_size(ctype,shaLength);
 
-	hid_t dspace1dim = H5Screate_simple(1,dims,NULL);
+            hid_t dspace1dim = H5Screate_simple(1,dims,NULL);
 
-	attr = H5Acreate(file,"revision", ctype, dspace1dim, H5P_DEFAULT, H5P_DEFAULT);
-	assert(attr >= 0);
-	status = H5Awrite(attr,ctype,BUILD_VERSION);
-	assert(status >= 0);
-	H5Sclose(dspace1dim);
-	H5Aclose(attr);
-      }
+            attr = H5Acreate(file,"revision", ctype, dspace1dim, H5P_DEFAULT, H5P_DEFAULT);
+            assert(attr >= 0);
+            status = H5Awrite(attr,ctype,BUILD_VERSION);
+            assert(status >= 0);
+            H5Sclose(dspace1dim);
+            H5Aclose(attr);
+          }
 #endif
 
-      H5Sclose(aid);
+          H5Sclose(aid);
+        }
     }
   else	// read
     {
@@ -169,91 +175,35 @@ void M2ulPhyS::restart_files_hdf5(string mode)
 
   if(mode == "write")
     {
-      if ( (locToGlobElem!=NULL) && (partition!=NULL) ) {
-        // NB: A bit of hackery here... to change the dimension of the
-        // data set if writing a serial file.
-        // This dim is set on every mpi rank but only used on rank 0
+      if ( config.SingleRestartFile() ){
+        assert( (locToGlobElem!=NULL) && (partition!=NULL) );
         dims[0] = serial_fes->GetNDofs();
       } else {
         dims[0] = vfes->GetNDofs();
       }
 
-      // save individual state varbiales from (U) in an HDF5 group named "solution"
-      dataspace = H5Screate_simple(1, dims, NULL);
-      assert(dataspace >= 0);
+      hid_t group;
+      if (mpi.Root() || !config.SingleRestartFile() )
+        {
+          // save individual state varbiales from (U) in an HDF5 group named "solution"
+          dataspace = H5Screate_simple(1, dims, NULL);
+          assert(dataspace >= 0);
 
-      hid_t group = H5Gcreate(file,"solution",H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
-      assert(group >= 0);
+          group = H5Gcreate(file,"solution",H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
+          assert(group >= 0);
+        }
 
       // state vectors in U -> rho, rho-u, rho-v, rho-w, and rho-E
       double *dataU = U->HostReadWrite();
 
-
-      // --- Begin hackery ----------------
-      // Code here is intended to (eventually) collect all data on
-      // rank 0 and then write a single hdf5 restart file
-
-      // Get total number of elements
-      const int local_ne = mesh->GetNE();
-      int global_ne;
-      MPI_Reduce(&local_ne, &global_ne, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-
-      const int rank = mpi.WorldRank();
-
-      // eventually assert this if we're trying to write a single file
-      // for now, don't, since tests fail because of it
-      //assert( (locToGlobElem!=NULL) && (partition!=NULL) );
-
-      if ( (locToGlobElem!=NULL) && (partition!=NULL) ) {
-        if (rank==0) {
-          std::cout << "WARNING: I'm going to write a serial soln whether that's what you wanted or not" << std::endl;
-
-          // copy my own data
-          Array<int> lvdofs, gvdofs;
-          Vector lsoln;
-          for(int elem=0;elem<local_ne;elem++) {
-            int gelem = locToGlobElem[elem];
-            vfes->GetElementVDofs(elem,lvdofs);
-            U->GetSubVector(lvdofs, lsoln);
-            serial_fes->GetElementVDofs(gelem, gvdofs);
-            serial_soln->SetSubVector(gvdofs, lsoln);
-          }
-
-
-          // have rank 0 receive data from other tasks and copy its own
-          for (int gelem=0; gelem<global_ne; gelem++) {
-            int from_rank=partition[gelem];
-            if (from_rank!=0) {
-
-              serial_fes->GetElementVDofs(gelem, gvdofs);
-              lsoln.SetSize(gvdofs.Size());
-
-              MPI_Recv(lsoln.GetData(), gvdofs.Size(), MPI_DOUBLE,
-                       from_rank, gelem, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-              serial_soln->SetSubVector(gvdofs, lsoln);
-            }
-          }
-
-        } else {
-          // have non-zero ranks send their data to rank 0
-          Array<int> lvdofs;
-          Vector lsoln;
-          for(int elem=0;elem<local_ne;elem++) {
-            int gelem = locToGlobElem[elem];
-            vfes->GetElementVDofs(elem,lvdofs);
-            U->GetSubVector(lvdofs, lsoln); // work for gpu build?
-
-            // send to task 0
-            MPI_Send(lsoln.GetData(), lsoln.Size(), MPI_DOUBLE, 0, gelem, MPI_COMM_WORLD);
-          }
-        }
-
-        MPI_Barrier(MPI_COMM_WORLD);
-
+      // if requested single file, serialize
+      if ( config.SingleRestartFile() ){
+        serialize_soln_for_write();
         dataU = serial_soln->GetData();
+      }
 
-        if (rank==0) {  // only write on rank 0
+      if (mpi.Root() || !config.SingleRestartFile())
+        {
           data_soln = H5Dcreate2(group, "density", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
           assert(data_soln >= 0);
           status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataU);
@@ -281,7 +231,7 @@ void M2ulPhyS::restart_files_hdf5(string mode)
               assert(data_soln >= 0);
               status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[3*dims[0]]);
               assert(status >= 0);
-              H5Dclose(data_soln); 
+              H5Dclose(data_soln);
             }
 
           data_soln = H5Dcreate2(group, "rho-E", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
@@ -290,87 +240,50 @@ void M2ulPhyS::restart_files_hdf5(string mode)
           assert(status >= 0);
           H5Dclose(data_soln);
 
-        }
-      } else {
-        // --- end hackery ----------------
-        // i.e., below here is what we had before, except wrapped in an if
-
-        data_soln = H5Dcreate2(group, "density", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-        assert(data_soln >= 0);
-        status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataU);
-        assert(status >= 0);
-        H5Dclose(data_soln);      
-
-        data_soln = H5Dcreate2(group, "rho-u", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-        assert(data_soln >= 0);
-        status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[1*dims[0]]);
-        assert(status >= 0);
-        H5Dclose(data_soln);
-
-        data_soln = H5Dcreate2(group, "rho-v", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-        assert(data_soln >= 0);
-        status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[2*dims[0]]);
-        assert(status >= 0);
-        H5Dclose(data_soln);
-
-        size_t rhoeIndex = 3*dims[0];
-
-        if(dim == 3)
-          {
-            rhoeIndex = 4*dims[0];
-            data_soln = H5Dcreate2(group, "rho-w", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-            assert(data_soln >= 0);
-            status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[3*dims[0]]);
-            assert(status >= 0);
-            H5Dclose(data_soln);	  
-          }
-
-        data_soln = H5Dcreate2(group, "rho-E", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-        assert(data_soln >= 0);
-        status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[rhoeIndex]);
-        assert(status >= 0);
-        H5Dclose(data_soln);
-
 #ifdef SAVE_PRIMITIVE_VARS
 
-        // update primitive to latest timestep prior to write
-        rhsOperator->updatePrimitives(*U);
+          // not set up to save primitives to a single restart, so punt
+          assert(!config.SingleRestartFile());
 
-        data_soln = H5Dcreate2(group, "u-velocity", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-        assert(data_soln >= 0);
-        status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataUp[1*dims[0]]);
-        assert(status >= 0);
-        H5Dclose(data_soln);
+          // update primitive to latest timestep prior to write
+          rhsOperator->updatePrimitives(*U);
 
-        data_soln = H5Dcreate2(group, "v-velocity", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-        assert(data_soln >= 0);
-        status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataUp[2*dims[0]]);
-        assert(status >= 0);
-        H5Dclose(data_soln);
+          data_soln = H5Dcreate2(group, "u-velocity", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+          assert(data_soln >= 0);
+          status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataUp[1*dims[0]]);
+          assert(status >= 0);
+          H5Dclose(data_soln);
 
-        size_t pIndex = 3*dims[0];
+          data_soln = H5Dcreate2(group, "v-velocity", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+          assert(data_soln >= 0);
+          status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataUp[2*dims[0]]);
+          assert(status >= 0);
+          H5Dclose(data_soln);
 
-        if(dim == 3)
-          {
-            pIndex = 4*dims[0];
+          size_t pIndex = 3*dims[0];
 
-            data_soln = H5Dcreate2(group, "w-velocity", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-            assert(data_soln >= 0);
-            status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataUp[3*dims[0]]);
-            assert(status >= 0);
-            H5Dclose(data_soln);
-          }
+          if(dim == 3)
+            {
+              pIndex = 4*dims[0];
 
-        data_soln = H5Dcreate2(group, "pressure", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-        assert(data_soln >= 0);
-        status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataUp[pIndex]);
-        assert(status >= 0);
-        H5Dclose(data_soln);
+              data_soln = H5Dcreate2(group, "w-velocity", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+              assert(data_soln >= 0);
+              status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataUp[3*dims[0]]);
+              assert(status >= 0);
+              H5Dclose(data_soln);
+            }
+
+          data_soln = H5Dcreate2(group, "pressure", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+          assert(data_soln >= 0);
+          status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataUp[pIndex]);
+          assert(status >= 0);
+          H5Dclose(data_soln);
 #endif
-      }
 
-      H5Sclose(dataspace);
-      H5Gclose(group);
+          H5Sclose(dataspace);
+          H5Gclose(group);
+          H5Fclose(file);
+        }
     }
   else          // read mode
     {
@@ -417,9 +330,10 @@ void M2ulPhyS::restart_files_hdf5(string mode)
       assert(status >= 0);
       H5Dclose(data_soln);
 
+      H5Fclose(file);
     }
 
-  H5Fclose(file);
+
 
   if(mode=="read" && loadFromAuxSol)
     {
@@ -473,4 +387,58 @@ void M2ulPhyS::restart_files_hdf5(string mode)
 }
 
 
+void M2ulPhyS::serialize_soln_for_write()
+{
+  // Get total number of elements
+  const int local_ne = mesh->GetNE();
+  int global_ne;
+  MPI_Reduce(&local_ne, &global_ne, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+  const int rank = mpi.WorldRank();
+
+  assert( (locToGlobElem!=NULL) && (partition!=NULL) );
+
+  if (rank==0) {
+    // copy my own data
+    Array<int> lvdofs, gvdofs;
+    Vector lsoln;
+    for(int elem=0;elem<local_ne;elem++) {
+      int gelem = locToGlobElem[elem];
+      vfes->GetElementVDofs(elem,lvdofs);
+      U->GetSubVector(lvdofs, lsoln);
+      serial_fes->GetElementVDofs(gelem, gvdofs);
+      serial_soln->SetSubVector(gvdofs, lsoln);
+    }
+
+
+    // have rank 0 receive data from other tasks and copy its own
+    for (int gelem=0; gelem<global_ne; gelem++) {
+      int from_rank=partition[gelem];
+      if (from_rank!=0) {
+
+        serial_fes->GetElementVDofs(gelem, gvdofs);
+        lsoln.SetSize(gvdofs.Size());
+
+        MPI_Recv(lsoln.GetData(), gvdofs.Size(), MPI_DOUBLE,
+                 from_rank, gelem, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+        serial_soln->SetSubVector(gvdofs, lsoln);
+      }
+    }
+
+  } else {
+    // have non-zero ranks send their data to rank 0
+    Array<int> lvdofs;
+    Vector lsoln;
+    for(int elem=0;elem<local_ne;elem++) {
+      int gelem = locToGlobElem[elem];
+      vfes->GetElementVDofs(elem,lvdofs);
+      U->GetSubVector(lvdofs, lsoln); // work for gpu build?
+
+      // send to task 0
+      MPI_Send(lsoln.GetData(), lsoln.Size(), MPI_DOUBLE, 0, gelem, MPI_COMM_WORLD);
+    }
+  }
+
+}
 

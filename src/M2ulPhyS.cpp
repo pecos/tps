@@ -128,8 +128,10 @@ void M2ulPhyS::initVariables()
     assert( (partition==NULL) || (part_ne==serial_mesh->GetNE()) );
 
     mesh = new ParMesh(MPI_COMM_WORLD,*serial_mesh, partition);
-    // TODO: Add logic to delete serial_mesh unless we need it
-    //delete serial_mesh;
+
+    // only need serial mesh if on rank 0 and using single restart file option
+    if ( !mpi.Root() || !config.SingleRestartFile() )
+      delete serial_mesh;
 
     // Paraview setup
     paraviewColl = new ParaViewDataCollection(config.GetOutputName(), mesh);
@@ -164,8 +166,10 @@ void M2ulPhyS::initVariables()
     assert( (partition==NULL) || (part_ne==serial_mesh->GetNE()) );
 
     mesh = new ParMesh(MPI_COMM_WORLD,*serial_mesh, partition);
-    // TODO: Add logic to delete serial_mesh unless we need it
-    //serial_mesh->Clear();  // why Clear() rather than delete?
+
+    // only need serial mesh if on rank 0 and using single restart file option
+    if ( !mpi.Root() || !config.SingleRestartFile() )
+      delete serial_mesh;
 
     // VisIt setup
 //     visitColl = new VisItDataCollection(config.GetOutputName(), mesh);
@@ -268,16 +272,14 @@ void M2ulPhyS::initVariables()
   vfes = new ParFiniteElementSpace(mesh, fec, num_equation, Ordering::byNODES);
   gradUpfes = new ParFiniteElementSpace(mesh, fec, num_equation*dim, Ordering::byNODES);
 
-  // Serial FE space
-  // TODO: Only instantiate if we need it
-  serial_fes = new FiniteElementSpace(serial_mesh, fec, num_equation, Ordering::byNODES);
+  // instantiate objects needed by rank 0 for single restart file option
+  if ( mpi.Root() && config.SingleRestartFile() ) {
+    serial_fes = new FiniteElementSpace(serial_mesh, fec, num_equation, Ordering::byNODES);
+    serial_soln = new GridFunction(serial_fes);
+    // to help detect errors, initialize to nan
+    *serial_soln = std::numeric_limits<double>::quiet_NaN();
+  }
 
-  // Serial grid function
-  // TODO: Only instantiate if we need it
-  serial_soln = new GridFunction(serial_fes);
-
-  // to help detect errors, initialize to nan
-  *serial_soln = std::numeric_limits<double>::quiet_NaN();
 
   initIndirectionArrays();
   initSolutionAndVisualizationVectors();
@@ -776,9 +778,11 @@ M2ulPhyS::~M2ulPhyS()
   delete [] partition;
   delete [] locToGlobElem;
 
-  delete serial_mesh;
-  delete serial_fes;
-  delete serial_soln;
+  if ( mpi.Root() && config.SingleRestartFile() ) {
+    delete serial_mesh;
+    delete serial_fes;
+    delete serial_soln;
+  }
 
 #ifdef HAVE_GRVY
   if(mpi.WorldRank() == 0)
