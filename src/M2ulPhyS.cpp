@@ -138,7 +138,8 @@ void M2ulPhyS::initVariables()
     paraviewColl->SetLevelsOfDetail( config.GetSolutionOrder() );
     paraviewColl->SetHighOrderOutput(true);
     paraviewColl->SetPrecision(8);
-
+    paraviewColl->SetDataFormat(VTKFormat::ASCII);
+    
   }else
   {
     //remove previous solution
@@ -163,13 +164,24 @@ void M2ulPhyS::initVariables()
       serial_mesh->UniformRefinement();
     }
 
-    assert( (partition==NULL) || (part_ne==serial_mesh->GetNE()) );
+    // generate partitioning file (we assume conforming meshes)
+    if(mpi.Root() && (mpi.WorldSize() > 1) )
+      {
+	assert(serial_mesh->Conforming());
+	partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(mpi.WorldSize(), defaultPartMethod),
+				   serial_mesh->GetNE());
+	write_partitioning_hdf5();
+      }
+    MPI_Barrier(MPI_COMM_WORLD);
 
-    mesh = new ParMesh(MPI_COMM_WORLD,*serial_mesh, partition);
+    // koomie todo
+    //assert( (partition==NULL) || (part_ne==tempmesh->GetNE()) );
+    mesh = new ParMesh(MPI_COMM_WORLD,*serial_mesh, partitioning_);
 
     // only need serial mesh if on rank 0 and using single restart file option
-    if ( !mpi.Root() || !config.SingleRestartFile() )
+    if ( !mpi.Root() || (config.RestartSerial() == "no" )
       delete serial_mesh;
+
 
     // VisIt setup
 //     visitColl = new VisItDataCollection(config.GetOutputName(), mesh);
@@ -181,6 +193,7 @@ void M2ulPhyS::initVariables()
     paraviewColl->SetLevelsOfDetail( config.GetSolutionOrder() );
     paraviewColl->SetHighOrderOutput(true);
     paraviewColl->SetPrecision(8);
+    //paraviewColl->SetDataFormat(VTKFormat::ASCII);
     
     time = 0.;
     iter = 0;
