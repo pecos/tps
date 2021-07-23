@@ -69,6 +69,10 @@ private:
   
   // reference to mesh
   ParMesh *mesh;
+
+  // original mesh partition info (stored on rank 0)
+  Array<int> partitioning_;
+  const int defaultPartMethod = 1;
   
   // time integrator
   ODESolver *timeIntegrator;
@@ -225,12 +229,14 @@ private:
   static void testInitialCondition(const Vector &x, Vector &y);
   void uniformInitialConditions();
   void initGradUp();
-  
+
+  // i/o routines
   void write_restart_files();
   void read_restart_files();
   void restart_files_hdf5(string mode);
   void serialize_soln_for_write();
-
+  void write_partitioning_hdf5();
+  
   void Check_NAN();
   bool Check_JobResubmit();
   void Cache_Paraview_Timesteps();

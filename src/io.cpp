@@ -96,6 +96,13 @@ void M2ulPhyS::restart_files_hdf5(string mode)
           assert(status >= 0);
           H5Aclose(attr);
 
+      // spatial dimension
+      attr = H5Acreate(file,"dimension", H5T_NATIVE_INT, aid, H5P_DEFAULT, H5P_DEFAULT);
+      assert(attr >= 0);
+      status = H5Awrite(attr,H5T_NATIVE_INT,&dim);
+      assert(status >= 0);
+      H5Aclose(attr);
+
       // code revision
 #ifdef BUILD_VERSION
           {
@@ -386,6 +393,40 @@ void M2ulPhyS::restart_files_hdf5(string mode)
   return;
 }
 
+void M2ulPhyS::write_partitioning_hdf5()
+{
+  assert(partitioning_.Size() > 0);
+
+  hid_t file, dataspace, data_soln;
+  herr_t status;
+  std::string fileName("partition.h5");
+
+  if(file_exists(fileName))
+    grvy_printf(WARN,"Removing existing partition file: %s\n",fileName.c_str());
+  else
+    grvy_printf(INFO,"Saving original domain decomposition partition file: %s\n",fileName.c_str());
+
+  file = H5Fcreate(fileName.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT );
+  assert(file >= 0);
+
+  // Attributes
+  h5_save_attribute(file,"numProcs",mpi.WorldSize());
+
+  // Raw partition info
+  hsize_t dims[1];
+  hid_t data;
+
+  dims[0]   = partitioning_.Size();
+  dataspace = H5Screate_simple(1, dims, NULL);
+  assert(dataspace >= 0);
+
+  data = H5Dcreate2(file, "partitioning", H5T_NATIVE_INT, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  assert(data >= 0);
+  status = H5Dwrite(data, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, partitioning_.GetData());
+  assert(status >= 0);
+  H5Dclose(data);
+  H5Fclose(file);
+}
 
 void M2ulPhyS::serialize_soln_for_write()
 {
@@ -441,4 +482,3 @@ void M2ulPhyS::serialize_soln_for_write()
   }
 
 }
-
