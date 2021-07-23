@@ -57,53 +57,26 @@ void M2ulPhyS::restart_files_hdf5(string mode)
     }
 
   // -------------------------------------------------------------------
-  // Attributes - current iteration and timing info saved as attributes
+  // Attributes - relevant solution metadata saved as attributes
   // -------------------------------------------------------------------
 
   hid_t aid, attr;
   if (mode == "write")
     {
-      if (mpi.Root() || !config.SingleRestartFile() )
+      // note: all tasks save unless we are writing a serial restart file
+      if (mpi.Root() || (config.RestartSerial() == "no") )
         {
-          aid  = H5Screate(H5S_SCALAR);
-          assert(aid >= 0);
-
-          // current iteration count
-          attr = H5Acreate(file,"iteration", H5T_NATIVE_INT, aid, H5P_DEFAULT, H5P_DEFAULT);
-          assert(attr >= 0);
-          status = H5Awrite(attr,H5T_NATIVE_INT,&iter);
-          assert(status >= 0);
-          H5Aclose(attr);
-
-          // total time
-          attr = H5Acreate(file,"time", H5T_NATIVE_DOUBLE, aid, H5P_DEFAULT, H5P_DEFAULT);
-          assert(attr >= 0);
-          status = H5Awrite(attr,H5T_NATIVE_DOUBLE,&time);
-          assert(status >= 0);
-          H5Aclose(attr);
-
-          // timestep
-          attr = H5Acreate(file,"dt", H5T_NATIVE_DOUBLE, aid, H5P_DEFAULT, H5P_DEFAULT);
-          assert(attr >= 0);
-          status = H5Awrite(attr,H5T_NATIVE_DOUBLE,&dt);
-          assert(status >= 0);  
-          H5Aclose(attr);
-
-          // solution order
-          attr = H5Acreate(file,"order", H5T_NATIVE_INT, aid, H5P_DEFAULT, H5P_DEFAULT);
-          assert(attr >= 0);
-          status = H5Awrite(attr,H5T_NATIVE_INT,&order);
-          assert(status >= 0);
-          H5Aclose(attr);
-
-      // spatial dimension
-      attr = H5Acreate(file,"dimension", H5T_NATIVE_INT, aid, H5P_DEFAULT, H5P_DEFAULT);
-      assert(attr >= 0);
-      status = H5Awrite(attr,H5T_NATIVE_INT,&dim);
-      assert(status >= 0);
-      H5Aclose(attr);
-
-      // code revision
+	  // current iteration count
+	  h5_save_attribute(file,"iteration",iter);
+	  // total time
+	  h5_save_attribute(file,"time",time);
+	  // timestep
+	  h5_save_attribute(file,"dt",dt);
+	  // solution order
+	  h5_save_attribute(file,"order",order);
+	  // spatial dimension
+	  h5_save_attribute(file,"dimension",dim);
+	  // code revision
 #ifdef BUILD_VERSION
           {
             hid_t ctype     = H5Tcopy (H5T_C_S1);
@@ -120,10 +93,8 @@ void M2ulPhyS::restart_files_hdf5(string mode)
             H5Sclose(dspace1dim);
             H5Aclose(attr);
           }
+	}
 #endif
-
-          H5Sclose(aid);
-        }
     }
   else	// read
     {
