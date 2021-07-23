@@ -220,7 +220,7 @@ void Fluxes::viscousFluxes_gpu( const Vector &x,
   double *d_flux = flux.ReadWrite();
   const double *d_gradUp = gradUp->Read();
   
-  const double d_spaceVaryViscMult;
+  const double* d_spaceVaryViscMult;
   if( spaceVaryViscMult!=NULL)
   {
     d_spaceVaryViscMult = spaceVaryViscMult->Read();
