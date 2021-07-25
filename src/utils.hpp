@@ -25,7 +25,18 @@ template <typename T> void h5_save_attribute(hid_t dest,std::string attribute, T
   H5Sclose(dataspaceId);
 }
 
+template <typename T> void h5_read_attribute(hid_t source,std::string attribute, T &value)
+{
+  herr_t status;
+  hid_t attr;
+  hid_t attrType = h5_getType( value );
+  //  T temp;
 
+  attr   = H5Aopen_name(source,attribute.c_str());
+  status = H5Aread(attr,attrType,&value);
+  assert(status >= 0);
+  H5Aclose(attr);
+}
 
 #endif
 
