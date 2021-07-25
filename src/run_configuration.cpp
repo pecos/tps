@@ -7,7 +7,7 @@
 RunConfiguration::RunConfiguration()
 {
   // Initialize with default values
-  partFile.clear();
+  partFile = "partition";
 
   ref_levels = 0;
   timeIntegratorType = 4;
