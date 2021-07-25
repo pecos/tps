@@ -10,6 +10,11 @@ OUTPUT_NAME euler_output
 # Enable restart from previous solution.
 RESTART_CYCLE
 
+# Flag to support restarting on different processor count [mode]:
+#   write: dump serial restart file
+#   read: restart from serial restart
+RESTART_SERIAL [mode]
+
 #-------------------------
 # Job management controls
 #-------------------------

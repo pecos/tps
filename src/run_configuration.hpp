@@ -68,9 +68,10 @@ private:
   // Use Roe-type Riemann solver
   bool useRoe;
   
-  // cycle for restart
+  // restart controls
   bool restart;
   bool restart_hdf5_conversion;   // read in older ascii format
+  std::string restart_serial;     // mode for serial restarts
   int restart_cycle;
 
   // Restart from different order solution on same mesh.  New order
@@ -189,6 +190,7 @@ public:
   bool RestartFromAux(){return restartFromAux;}
   bool SingleRestartFile(){return singleRestartFile;}
   bool RestartHDFConversion(){return restart_hdf5_conversion;}
+  std::string RestartSerial(){return restart_serial;}
   
   std::vector<pair<int,InletType> >* GetInletPatchType(){return &inletPatchType;}
   Array<double> GetInletData(int i);
