@@ -146,7 +146,7 @@ public:
   
   string GetMeshFileName(){return meshFile;}
   string GetOutputName(){return outputFile;}
-  string GetPartitionFileName(){return partFile;}
+  string GetPartitionBaseName(){return partFile;}
   int GetUniformRefLevels(){return ref_levels;}
 
   int GetTimeIntegratorType(){return timeIntegratorType;}
