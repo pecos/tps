@@ -45,6 +45,9 @@ class M2ulPhyS
 private:
   MPI_Groups *groupsMPI;
   MPI_Session &mpi;
+  int  nprocs_;			// total number of MPI procs
+  int  rank_;			// local MPI rank
+  bool rank0_;			// flag to indicate rank 0
   
   // Run options
   RunConfiguration config;
@@ -234,8 +237,8 @@ private:
   void write_restart_files();
   void read_restart_files();
   void restart_files_hdf5(string mode);
+  void partitioning_file_hdf5(string mode,int numElements);
   void serialize_soln_for_write();
-  void write_partitioning_hdf5();
   
   void Check_NAN();
   bool Check_JobResubmit();
