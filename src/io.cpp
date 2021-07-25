@@ -98,26 +98,11 @@ void M2ulPhyS::restart_files_hdf5(string mode)
     }
   else	// read
     {
-      attr   = H5Aopen_name(file,"iteration");
-      status = H5Aread(attr,H5T_NATIVE_INT,&iter);
-      assert(status >= 0);
-      H5Aclose(attr);
-
-      attr   = H5Aopen_name(file,"time");
-      status = H5Aread(attr,H5T_NATIVE_DOUBLE,&time);
-      assert(status >= 0);
-      H5Aclose(attr);
-
-      attr   = H5Aopen_name(file,"dt");
-      status = H5Aread(attr,H5T_NATIVE_DOUBLE,&dt);
-      assert(status >= 0);
-      H5Aclose(attr);
-
       int read_order;
-      attr   = H5Aopen_name(file,"order");
-      status = H5Aread(attr,H5T_NATIVE_INT,&read_order);
-      assert(status >= 0);
-      H5Aclose(attr);
+      h5_read_attribute(file,"iteration",iter);
+      h5_read_attribute(file,"time",time);
+      h5_read_attribute(file,"dt",dt);
+      h5_read_attribute(file,"order",read_order);
 
       if( loadFromAuxSol )
         {
@@ -364,39 +349,102 @@ void M2ulPhyS::restart_files_hdf5(string mode)
   return;
 }
 
-void M2ulPhyS::write_partitioning_hdf5()
+void M2ulPhyS::partitioning_file_hdf5(std::string mode, int numElements)
 {
-  assert(partitioning_.Size() > 0);
 
   hid_t file, dataspace, data_soln;
   herr_t status;
-  std::string fileName("partition.h5");
+  std::string fileName = config.GetPartitionBaseName();
+  fileName += "." + std::to_string(nprocs_) + "p.h5";
 
-  if(file_exists(fileName))
-    grvy_printf(WARN,"Removing existing partition file: %s\n",fileName.c_str());
-  else
-    grvy_printf(INFO,"Saving original domain decomposition partition file: %s\n",fileName.c_str());
+  assert( (mode == "read") || (mode == "write") );
 
-  file = H5Fcreate(fileName.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT );
-  assert(file >= 0);
+  if(mode == "write")
+    {
+      assert(partitioning_.Size() > 0);
 
-  // Attributes
-  h5_save_attribute(file,"numProcs",mpi.WorldSize());
+      if(file_exists(fileName))
+	grvy_printf(WARN,"Removing existing partition file: %s\n",fileName.c_str());
+      else
+	grvy_printf(INFO,"Saving original domain decomposition partition file: %s\n",fileName.c_str());
 
-  // Raw partition info
-  hsize_t dims[1];
-  hid_t data;
+      file = H5Fcreate(fileName.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT );
+    }
+  else if (mode == "read")
+    {
+      if( file_exists(fileName))
+	{
+	  file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+	}
+      else
+	{
+	  grvy_printf(ERROR,"[ERROR]: Unable to access necessary partition file on restart -> %s\n",fileName.c_str());
+	  exit(ERROR);
+	}
 
-  dims[0]   = partitioning_.Size();
-  dataspace = H5Screate_simple(1, dims, NULL);
-  assert(dataspace >= 0);
+      assert(file >= 0);
+    }
 
-  data = H5Dcreate2(file, "partitioning", H5T_NATIVE_INT, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-  assert(data >= 0);
-  status = H5Dwrite(data, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, partitioning_.GetData());
-  assert(status >= 0);
-  H5Dclose(data);
-  H5Fclose(file);
+
+  if(mode == "write" )
+    {
+      // Attributes
+      h5_save_attribute(file,"numProcs",mpi.WorldSize());
+
+      // Raw partition info
+      hsize_t dims[1];
+      hid_t data;
+
+      dims[0]   = partitioning_.Size();
+      dataspace = H5Screate_simple(1, dims, NULL);
+      assert(dataspace >= 0);
+
+      data = H5Dcreate2(file, "partitioning", H5T_NATIVE_INT, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      assert(data >= 0);
+      status = H5Dwrite(data, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, partitioning_.GetData());
+      assert(status >= 0);
+      H5Dclose(data);
+      H5Fclose(file);
+    }
+  else if (mode == "read")
+    {
+      partitioning_.SetSize(numElements);
+
+      if(rank0_)
+	{
+	  grvy_printf(INFO,"Reading original domain decomposition partition file: %s\n",fileName.c_str());
+
+	  // verify partition info matches current proc count
+	  {
+	    int np=0;
+	    h5_read_attribute(file,"numProcs",np);
+	    grvy_printf(INFO,"--> # partitions defined = %i\n",np);
+	    if(np != nprocs_)
+	      {
+		grvy_printf(ERROR,"[ERROR]: Partition info does not match current processor count -> %i\n",nprocs_);
+		exit(ERROR);
+	      }
+	  }
+
+	  // read partition vector
+	  hid_t data;
+	  hsize_t numInFile;
+	  data = H5Dopen2(file, "partitioning",H5P_DEFAULT); assert(data >= 0);
+	  dataspace = H5Dget_space(data);
+	  numInFile = H5Sget_simple_extent_npoints(dataspace);
+
+	  assert(numInFile == numElements);
+
+	  status = H5Dread(data, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, partitioning_.GetData());
+	  assert(status >= 0);
+	  H5Dclose(data);
+	} // <-- end rank0_
+
+      // distribute partition vectory to all procs
+      MPI_Bcast( partitioning_.GetData(),numElements, MPI_INT, 0, MPI_COMM_WORLD);
+      if(rank0_)
+	grvy_printf(INFO,"--> partition file read complete\n");
+    }
 }
 
 void M2ulPhyS::serialize_soln_for_write()
