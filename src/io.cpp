@@ -14,8 +14,12 @@ void M2ulPhyS::restart_files_hdf5(string mode)
   string serialName = "restart_";
   serialName.append( config.GetOutputName() );
   serialName.append( ".sol.h5" );
+  string fileName;
 
-  string fileName = groupsMPI->getParallelName( serialName );
+  if( config.RestartSerial() == "write" )
+    fileName  = serialName;
+  else
+    fileName = groupsMPI->getParallelName( serialName );
 
   // Variables used if (and only if) restarting from different order
   FiniteElementCollection *aux_fec=NULL;
@@ -32,7 +36,7 @@ void M2ulPhyS::restart_files_hdf5(string mode)
   // open restart files (currently per MPI process variants)
   if (mode == "write")
     {
-      if (mpi.Root() || !config.SingleRestartFile() )
+      if (mpi.Root() || (config.RestartSerial() == "no") )
         {
           file = H5Fcreate(fileName.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT );
           assert(file >= 0);
@@ -138,15 +142,16 @@ void M2ulPhyS::restart_files_hdf5(string mode)
 
   if(mode == "write")
     {
-      if ( config.SingleRestartFile() ){
-        assert( (locToGlobElem!=NULL) && (partition!=NULL) );
-        dims[0] = serial_fes->GetNDofs();
-      } else {
+      if ( (config.RestartSerial() == "write") && (nprocs_ > 1) )
+	{
+	  assert( (locToGlobElem != NULL) && (partitioning_ != NULL) );
+	  dims[0] = serial_fes->GetNDofs();
+	}
+      else
         dims[0] = vfes->GetNDofs();
-      }
 
       hid_t group;
-      if (mpi.Root() || !config.SingleRestartFile() )
+      if (mpi.Root() || (config.RestartSerial() == "no") )
         {
           // save individual state varbiales from (U) in an HDF5 group named "solution"
           dataspace = H5Screate_simple(1, dims, NULL);
@@ -159,13 +164,13 @@ void M2ulPhyS::restart_files_hdf5(string mode)
       // state vectors in U -> rho, rho-u, rho-v, rho-w, and rho-E
       double *dataU = U->HostReadWrite();
 
-      // if requested single file, serialize
-      if ( config.SingleRestartFile() ){
+      // if requested single file restart, serialize
+      if ( (config.RestartSerial() == "write") && (nprocs_ > 1) ){
         serialize_soln_for_write();
         dataU = serial_soln->GetData();
       }
 
-      if (mpi.Root() || !config.SingleRestartFile())
+      if (mpi.Root() || (config.RestartSerial() =="no") )
         {
           data_soln = H5Dcreate2(group, "density", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
           assert(data_soln >= 0);
@@ -206,7 +211,7 @@ void M2ulPhyS::restart_files_hdf5(string mode)
 #ifdef SAVE_PRIMITIVE_VARS
 
           // not set up to save primitives to a single restart, so punt
-          assert(!config.SingleRestartFile());
+          assert(config.RestartSerial() == "no");
 
           // update primitive to latest timestep prior to write
           rhsOperator->updatePrimitives(*U);
@@ -349,7 +354,7 @@ void M2ulPhyS::restart_files_hdf5(string mode)
   return;
 }
 
-void M2ulPhyS::partitioning_file_hdf5(std::string mode, int numElements)
+void M2ulPhyS::partitioning_file_hdf5(std::string mode)
 {
 
   hid_t file, dataspace, data_soln;
@@ -408,7 +413,7 @@ void M2ulPhyS::partitioning_file_hdf5(std::string mode, int numElements)
     }
   else if (mode == "read")
     {
-      partitioning_.SetSize(numElements);
+      partitioning_.SetSize(nelemGlobal_);
 
       if(rank0_)
 	{
@@ -433,7 +438,7 @@ void M2ulPhyS::partitioning_file_hdf5(std::string mode, int numElements)
 	  dataspace = H5Dget_space(data);
 	  numInFile = H5Sget_simple_extent_npoints(dataspace);
 
-	  assert(numInFile == numElements);
+	  assert(numInFile == nelemGlobal_);
 
 	  status = H5Dread(data, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, partitioning_.GetData());
 	  assert(status >= 0);
@@ -441,7 +446,7 @@ void M2ulPhyS::partitioning_file_hdf5(std::string mode, int numElements)
 	} // <-- end rank0_
 
       // distribute partition vectory to all procs
-      MPI_Bcast( partitioning_.GetData(),numElements, MPI_INT, 0, MPI_COMM_WORLD);
+      MPI_Bcast( partitioning_.GetData(),nelemGlobal_, MPI_INT, 0, MPI_COMM_WORLD);
       if(rank0_)
 	grvy_printf(INFO,"--> partition file read complete\n");
     }
@@ -454,50 +459,54 @@ void M2ulPhyS::serialize_soln_for_write()
   int global_ne;
   MPI_Reduce(&local_ne, &global_ne, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
-  const int rank = mpi.WorldRank();
+  if(rank0_)
+    assert(global_ne == nelemGlobal_);
 
-  assert( (locToGlobElem!=NULL) && (partition!=NULL) );
+  assert( (locToGlobElem != NULL) && (partitioning_ != NULL) );
 
-  if (rank==0) {
-    // copy my own data
-    Array<int> lvdofs, gvdofs;
-    Vector lsoln;
-    for(int elem=0;elem<local_ne;elem++) {
-      int gelem = locToGlobElem[elem];
-      vfes->GetElementVDofs(elem,lvdofs);
-      U->GetSubVector(lvdofs, lsoln);
-      serial_fes->GetElementVDofs(gelem, gvdofs);
-      serial_soln->SetSubVector(gvdofs, lsoln);
+  if (rank0_)
+    {
+      grvy_printf(INFO,"Generating serialized restart file...\n");
+      // copy my own data
+      Array<int> lvdofs, gvdofs;
+      Vector lsoln;
+      for(int elem=0;elem<local_ne;elem++) {
+	int gelem = locToGlobElem[elem];
+	vfes->GetElementVDofs(elem,lvdofs);
+	U->GetSubVector(lvdofs, lsoln);
+	serial_fes->GetElementVDofs(gelem, gvdofs);
+	serial_soln->SetSubVector(gvdofs, lsoln);
+      }
+
+      // have rank 0 receive data from other tasks and copy its own
+      for (int gelem=0; gelem<global_ne; gelem++) {
+	int from_rank=partitioning_[gelem];
+	if (from_rank!=0) {
+	  serial_fes->GetElementVDofs(gelem, gvdofs);
+	  lsoln.SetSize(gvdofs.Size());
+
+	  MPI_Recv(lsoln.GetData(), gvdofs.Size(), MPI_DOUBLE,
+		   from_rank, gelem, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+	  serial_soln->SetSubVector(gvdofs, lsoln);
+	}
+      }
+
     }
 
+  else 				// non-zero ranks
+    {
+      // have non-zero ranks send their data to rank 0
+      Array<int> lvdofs;
+      Vector lsoln;
+      for(int elem=0;elem<local_ne;elem++) {
+	int gelem = locToGlobElem[elem];
+	assert(gelem > 0);
+	vfes->GetElementVDofs(elem,lvdofs);
+	U->GetSubVector(lvdofs, lsoln); // work for gpu build?
 
-    // have rank 0 receive data from other tasks and copy its own
-    for (int gelem=0; gelem<global_ne; gelem++) {
-      int from_rank=partition[gelem];
-      if (from_rank!=0) {
-
-        serial_fes->GetElementVDofs(gelem, gvdofs);
-        lsoln.SetSize(gvdofs.Size());
-
-        MPI_Recv(lsoln.GetData(), gvdofs.Size(), MPI_DOUBLE,
-                 from_rank, gelem, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-        serial_soln->SetSubVector(gvdofs, lsoln);
+	// send to task 0
+	MPI_Send(lsoln.GetData(), lsoln.Size(), MPI_DOUBLE, 0, gelem, MPI_COMM_WORLD);
       }
     }
-
-  } else {
-    // have non-zero ranks send their data to rank 0
-    Array<int> lvdofs;
-    Vector lsoln;
-    for(int elem=0;elem<local_ne;elem++) {
-      int gelem = locToGlobElem[elem];
-      vfes->GetElementVDofs(elem,lvdofs);
-      U->GetSubVector(lvdofs, lsoln); // work for gpu build?
-
-      // send to task 0
-      MPI_Send(lsoln.GetData(), lsoln.Size(), MPI_DOUBLE, 0, gelem, MPI_COMM_WORLD);
-    }
-  }
-
 }

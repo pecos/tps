@@ -188,7 +188,6 @@ public:
   int  GetRestartCycle(){return restart;}
   void SetRestartCycle(int iter){restart_cycle = iter; return;}
   bool RestartFromAux(){return restartFromAux;}
-  bool SingleRestartFile(){return singleRestartFile;}
   bool RestartHDFConversion(){return restart_hdf5_conversion;}
   std::string RestartSerial(){return restart_serial;}
   

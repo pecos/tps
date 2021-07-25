@@ -105,55 +105,52 @@ setup() {
     ./soln_differ $SOLN_FILE $REF_FILE
 }
 
-@test "[$TEST] verify serial restart file consistent with 1, 2, and 4 mpi tasks" {
-    RUNFILE=input.2iters.cyl
-    RUNFILE_PART=input.2iters.cyl.part
+@test "[$TEST] verify serial restart consistency using 2 mpi tasks" {
+    RUNFILE=input.4iters.cyl
+    RUNFILE_PART=${RUNFILE}.part
+    SOLN_FILE=restart_output.sol.h5
 
     rm -f $RUNFILE_PART
-
-    SOLN_FILE=restart_output.sol.h5
-    SOLN_FILE_0=restart_output.sol.0.h5
-    SOLN_FILE_1=restart_output.sol.1task.h5
-    SOLN_FILE_2=restart_output.sol.2task.h5
-    SOLN_FILE_4=restart_output.sol.4task.h5
-
     rm -f $SOLN_FILE
-    rm -f $SOLN_FILE_1
-    rm -f $SOLN_FILE_2
-    rm -f $SOLN_FILE_4
 
     # copy the run file, b/c I want to edit it
     test -s $RUNFILE
     cp $RUNFILE $RUNFILE_PART
 
     # add partition info to the runfile
-    echo "SINGLE_RESTART_FILE" >> $RUNFILE_PART
-    echo "PART_FILE meshes/cyl-tet-coarse-part1.txt" >> $RUNFILE_PART
-
-    # run 1 task
-    mpirun -np 1 ../src/tps --runFile $RUNFILE_PART
-    test -s $SOLN_FILE
-    mv $SOLN_FILE $SOLN_FILE_1
-
-    # switch partition file
-    sed -i s/part1/part2/ $RUNFILE_PART
+    echo "RESTART_SERIAL write" >> $RUNFILE_PART
 
     # run 2 tasks
     mpirun -np 2 ../src/tps --runFile $RUNFILE_PART
-    test -s $SOLN_FILE_0
-    mv $SOLN_FILE_0 $SOLN_FILE_2
+    test -s $SOLN_FILE_SERIAL
 
-    ./soln_differ $SOLN_FILE_1 $SOLN_FILE_2
+    ./soln_differ $SOLN_FILE $REF_FILE
 
-    # switch partition file
-    sed -i s/part2/part4/ $RUNFILE_PART
+    # clean up if we got this far
+    rm -f $RUNFILE_PART
+    rm -f restart_output.sol.*.h5
+}
+
+@test "[$TEST] verify serial restart consistency using 4 mpi tasks" {
+    RUNFILE=input.4iters.cyl
+    RUNFILE_PART=${RUNFILE}.part
+    SOLN_FILE=restart_output.sol.h5
+
+    rm -f $RUNFILE_PART
+    rm -f $SOLN_FILE
+
+    # copy the run file, b/c I want to edit it
+    test -s $RUNFILE
+    cp $RUNFILE $RUNFILE_PART
+
+    # add partition info to the runfile
+    echo "RESTART_SERIAL write" >> $RUNFILE_PART
 
     # run 4 tasks
     mpirun -np 4 ../src/tps --runFile $RUNFILE_PART
-    test -s $SOLN_FILE_0
-    mv $SOLN_FILE_0 $SOLN_FILE_4
+    test -s $SOLN_FILE_SERIAL
 
-    ./soln_differ $SOLN_FILE_1 $SOLN_FILE_4
+    ./soln_differ $SOLN_FILE $REF_FILE
 
     # clean up if we got this far
     rm -f $RUNFILE_PART

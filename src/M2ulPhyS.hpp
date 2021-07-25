@@ -60,6 +60,8 @@ private:
   
   // order of polynomials
   int order;
+  // total number of mesh elements (serial)
+  int nelemGlobal_;
   
   // order of polynomials for auxiliary solution
   bool loadFromAuxSol;
@@ -208,7 +210,6 @@ private:
 
   // mapping from local to global element index
   int* locToGlobElem;
-  int* partition;
 
   // a serial mesh, finite element space, and grid function
   // for use if we want to write a serial file
@@ -237,7 +238,7 @@ private:
   void write_restart_files();
   void read_restart_files();
   void restart_files_hdf5(string mode);
-  void partitioning_file_hdf5(string mode,int numElements);
+  void partitioning_file_hdf5(string mode);
   void serialize_soln_for_write();
   
   void Check_NAN();
