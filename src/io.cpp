@@ -8,15 +8,17 @@ void M2ulPhyS::restart_files_hdf5(string mode)
   grvy_timer_begin(__func__);
 #endif
 
-  hid_t file, dataspace, data_soln;
+  hid_t file = NULL;
+  hid_t dataspace, data_soln;
   herr_t status;
+  Vector dataSerial;
 
   string serialName = "restart_";
   serialName.append( config.GetOutputName() );
   serialName.append( ".sol.h5" );
   string fileName;
 
-  if( config.RestartSerial() == "write" )
+  if( ((config.RestartSerial() == "read") && (mode == "read")) || (config.RestartSerial() == "write") )
     fileName  = serialName;
   else
     fileName = groupsMPI->getParallelName( serialName );
@@ -36,7 +38,7 @@ void M2ulPhyS::restart_files_hdf5(string mode)
   // open restart files (currently per MPI process variants)
   if (mode == "write")
     {
-      if (mpi.Root() || (config.RestartSerial() == "no") )
+      if (mpi.Root() || (config.RestartSerial() != "write") )
         {
           file = H5Fcreate(fileName.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT );
           assert(file >= 0);
@@ -45,19 +47,30 @@ void M2ulPhyS::restart_files_hdf5(string mode)
   else if (mode == "read")
     {
 
-      // verify we have all desired files
-      int gstatus;
-      int status = int(file_exists(fileName));
-      MPI_Allreduce(&status,&gstatus,1,MPI_INT,MPI_MIN,MPI_COMM_WORLD);
-
-      if(gstatus == 0)
+      if(config.RestartSerial() == "read")
 	{
-	  grvy_printf(ERROR,"[ERROR]: Unable to access desired restart file -> %s\n",fileName.c_str());
-	  exit(ERROR);
+	  if(rank0_)
+	    {
+	      file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+	      assert(file >= 0);
+	    }
 	}
+      else
+	{
+	  // verify we have all desired files and open on each process
+	  int gstatus;
+	  int status = int(file_exists(fileName));
+	  MPI_Allreduce(&status,&gstatus,1,MPI_INT,MPI_MIN,MPI_COMM_WORLD);
 
-      file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
-      assert(file >= 0);
+	  if(gstatus == 0)
+	    {
+	      grvy_printf(ERROR,"[ERROR]: Unable to access desired restart file -> %s\n",fileName.c_str());
+	      exit(ERROR);
+	    }
+
+	  file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+	  assert(file >= 0);
+	}
     }
 
   // -------------------------------------------------------------------
@@ -68,7 +81,7 @@ void M2ulPhyS::restart_files_hdf5(string mode)
   if (mode == "write")
     {
       // note: all tasks save unless we are writing a serial restart file
-      if (mpi.Root() || (config.RestartSerial() == "no") )
+      if (mpi.Root() || (config.RestartSerial() != "write") )
         {
 	  // current iteration count
 	  h5_save_attribute(file,"iteration",iter);
@@ -103,13 +116,30 @@ void M2ulPhyS::restart_files_hdf5(string mode)
   else	// read
     {
       int read_order;
-      h5_read_attribute(file,"iteration",iter);
-      h5_read_attribute(file,"time",time);
-      h5_read_attribute(file,"dt",dt);
-      h5_read_attribute(file,"order",read_order);
+
+      // normal restarts have each process read there own portion of the
+      // solution; a serial restart only reads on rank 0 and distributes to
+      // the remaining processes
+
+      if (rank0_ || (config.RestartSerial() != "read") )
+	{
+	  h5_read_attribute(file,"iteration",iter);
+	  h5_read_attribute(file,"time",time);
+	  h5_read_attribute(file,"dt",dt);
+	  h5_read_attribute(file,"order",read_order);
+	}
+
+      if(config.RestartSerial() == "read")
+	{
+	  MPI_Bcast(&iter,      1, MPI_INT,    0, MPI_COMM_WORLD);
+	  MPI_Bcast(&time,      1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	  MPI_Bcast(&dt,        1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	  MPI_Bcast(&read_order,1, MPI_INT,    0, MPI_COMM_WORLD);
+	}
 
       if( loadFromAuxSol )
         {
+	  assert(config.RestartSerial() == "no");
           auxOrder = read_order;
 
           if( basisType == 0 )
@@ -126,9 +156,12 @@ void M2ulPhyS::restart_files_hdf5(string mode)
       else
         assert(read_order==order);
 
-      grvy_printf(GRVY_INFO,"Restarting from iteration = %i\n",iter);
-      grvy_printf(GRVY_INFO,"--> time = %e\n",time);
-      grvy_printf(GRVY_INFO,"--> dt   = %e\n",dt);
+      if(rank0_)
+	{
+	  grvy_printf(GRVY_INFO,"Restarting from iteration = %i\n",iter);
+	  grvy_printf(GRVY_INFO,"--> time = %e\n",time);
+	  grvy_printf(GRVY_INFO,"--> dt   = %e\n",dt);
+	}
 
     }
 
@@ -151,7 +184,7 @@ void M2ulPhyS::restart_files_hdf5(string mode)
         dims[0] = vfes->GetNDofs();
 
       hid_t group;
-      if (mpi.Root() || (config.RestartSerial() == "no") )
+      if (mpi.Root() || (config.RestartSerial() != "write") )
         {
           // save individual state varbiales from (U) in an HDF5 group named "solution"
           dataspace = H5Screate_simple(1, dims, NULL);
@@ -170,7 +203,7 @@ void M2ulPhyS::restart_files_hdf5(string mode)
         dataU = serial_soln->GetData();
       }
 
-      if (mpi.Root() || (config.RestartSerial() =="no") )
+      if (mpi.Root() || (config.RestartSerial() != "write") )
         {
           data_soln = H5Dcreate2(group, "density", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
           assert(data_soln >= 0);
@@ -256,52 +289,68 @@ void M2ulPhyS::restart_files_hdf5(string mode)
   else          // read mode
     {
 
-      cout << "Reading in state vector from restart..." << endl;
+      if(rank0_)
+	cout << "Reading in state vector from restart..." << endl;
+
       double *dataU;
       if( loadFromAuxSol )
 	  dataU = aux_U->HostReadWrite();
       else
-	  dataU = U->HostReadWrite();
+	dataU = U->HostReadWrite();
 
-      data_soln = H5Dopen2(file, "/solution/density",H5P_DEFAULT); assert(data_soln >= 0);
-      dataspace = H5Dget_space(data_soln);
-      numInSoln = H5Sget_simple_extent_npoints(dataspace);
+      // verify Dofs match expectations with current mesh
+      if (mpi.Root() || (config.RestartSerial() != "read") )
+	{
+	  data_soln = H5Dopen2(file, "/solution/density",H5P_DEFAULT); assert(data_soln >= 0);
+	  dataspace = H5Dget_space(data_soln);
+	  numInSoln = H5Sget_simple_extent_npoints(dataspace);
+	  H5Dclose(data_soln);
+	}
 
-      // verify Dofs match expectations
       int dof = vfes->GetNDofs();
+      if(config.RestartSerial() == "read")
+	{
+	  int dof_global;
+	  MPI_Reduce(&dof, &dof_global, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+	  dof = dof_global;
+	}
+
       if( loadFromAuxSol )
         dof = aux_vfes->GetNDofs();
 
-      assert(numInSoln == dof);
+      if (rank0_ || (config.RestartSerial() != "read") )
+	assert(numInSoln == dof);
 
-      status    = H5Dread(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataU);
-      assert(status >= 0);
-      H5Dclose(data_soln);
+      if(config.RestartSerial() != "read")
+	{
+	  read_partitioned_soln_data(file,"/solution/density",0,            dataU);
+	  read_partitioned_soln_data(file,"/solution/rho-u"  ,(1*numInSoln),dataU);
+	  read_partitioned_soln_data(file,"/solution/rho-v"  ,(2*numInSoln),dataU);
+	  if(dim == 3)
+	    {
+	      read_partitioned_soln_data(file,"/solution/rho-w",(3*numInSoln),dataU);
+	      read_partitioned_soln_data(file,"/solution/rho-E",(4*numInSoln),dataU);
+	    }
+	  else
+	    read_partitioned_soln_data(file,"/solution/rho-E"  ,(3*numInSoln),dataU);
+	}
+      else
+	{
+	  read_serialized_soln_data(file,"/solution/density",dof,0,dataU);
+	  read_serialized_soln_data(file,"/solution/rho-u",  dof,1,dataU);
+	  read_serialized_soln_data(file,"/solution/rho-v",  dof,2,dataU);
+	  if(dim == 3)
+	    {
+	      read_serialized_soln_data(file,"/solution/rho-w",  dof,3,dataU);
+	      read_serialized_soln_data(file,"/solution/rho-E",  dof,4,dataU);
+	    }
+	  else
+	    read_serialized_soln_data(file,"/solution/rho-E",  dof,3,dataU);
+	}
 
-      data_soln = H5Dopen2(file, "/solution/rho-u",H5P_DEFAULT); assert(data_soln >= 0);
-      status    = H5Dread(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[1*numInSoln]);
-      assert(status >= 0);
-      H5Dclose(data_soln);
-
-      data_soln = H5Dopen2(file, "/solution/rho-v",H5P_DEFAULT); assert(data_soln >= 0);
-      status    = H5Dread(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[2*numInSoln]);
-      assert(status >= 0);
-      H5Dclose(data_soln);
-
-      data_soln = H5Dopen2(file, "/solution/rho-w",H5P_DEFAULT); assert(data_soln >= 0);
-      status    = H5Dread(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[3*numInSoln]);
-      assert(status >= 0);
-      H5Dclose(data_soln);
-
-      data_soln = H5Dopen2(file, "/solution/rho-E",H5P_DEFAULT); assert(data_soln >= 0);
-      status    = H5Dread(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[4*numInSoln]);
-      assert(status >= 0);
-      H5Dclose(data_soln);
-
-      H5Fclose(file);
+      if(file != NULL)
+	H5Fclose(file);
     }
-
-
 
   if(mode=="read" && loadFromAuxSol)
     {
@@ -356,6 +405,9 @@ void M2ulPhyS::restart_files_hdf5(string mode)
 
 void M2ulPhyS::partitioning_file_hdf5(std::string mode)
 {
+  // only rank 0 writes partitioning file
+  if(! rank0_)
+    return;
 
   hid_t file, dataspace, data_soln;
   herr_t status;
@@ -493,8 +545,7 @@ void M2ulPhyS::serialize_soln_for_write()
       }
 
     }
-
-  else 				// non-zero ranks
+  else
     {
       // have non-zero ranks send their data to rank 0
       Array<int> lvdofs;
@@ -508,5 +559,114 @@ void M2ulPhyS::serialize_soln_for_write()
 	// send to task 0
 	MPI_Send(lsoln.GetData(), lsoln.Size(), MPI_DOUBLE, 0, gelem, MPI_COMM_WORLD);
       }
+    }
+}
+
+// convenience function to read solution data for parallel restarts
+void M2ulPhyS::read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data)
+{
+  assert(config.RestartSerial() != "read");
+
+  hid_t data_soln;
+  herr_t status;
+
+  data_soln = H5Dopen2(file,varName.c_str(),H5P_DEFAULT);
+  assert(data_soln >= 0);
+  status = H5Dread(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &data[index]);
+  assert(status >= 0);
+  H5Dclose(data_soln);
+}
+
+// convenience function to read and distribute solution data for serialized restarts
+void M2ulPhyS::read_serialized_soln_data(hid_t file, string varName, int numDof, int varOffset,double *data)
+{
+
+  assert(config.RestartSerial() == "read");
+
+  hid_t  data_soln;
+  herr_t status;
+  int    numStateVars;
+
+  const int tag = 20;
+
+  assert( (dim == 2) || (dim == 3) );
+  if(dim == 2)
+    numStateVars = 4;
+  else
+    numStateVars = 5;
+
+  if(rank0_)
+    {
+      grvy_printf(INFO,"[RestartSerial]: Reading %s for distribution\n",varName.c_str());
+
+      Vector data_serial;
+      data_serial.SetSize(numDof);
+      data_soln = H5Dopen2(file,varName.c_str(),H5P_DEFAULT);
+      assert(data_soln >= 0);
+      status = H5Dread(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT,data_serial.GetData());
+      assert(status >= 0);
+      H5Dclose(data_soln);
+
+      // assign solution owned by rank 0
+      assert(partitioning_ != NULL);
+
+      Array<int> lvdofs, gvdofs;
+      Vector lnodes;
+      int counter = 0;
+      int ndof_per_elem;
+
+      for(int gelem=0;gelem<nelemGlobal_;gelem++)
+	{
+	  if(partitioning_[gelem] == 0)
+	    {
+
+	      // cull out subset of local vdof vector to use for this solution var
+	      vfes->GetElementVDofs(counter,lvdofs);
+	      int numDof_per_this_elem = lvdofs.Size() / numStateVars;
+	      int ldof_start_index = varOffset*numDof_per_this_elem;
+
+	      // cull out global vdofs - [subtle note]: we only use the
+	      // indexing corresponding to the first state vector reference in
+	      // gvdofs() since data_serial() holds the solution for a single state vector
+	      serial_fes->GetElementVDofs(gelem, gvdofs);
+	      int gdof_start_index = 0;
+
+	      for(int i=0;i<numDof_per_this_elem;i++)
+		data[ lvdofs[i+ldof_start_index] ] = data_serial[ gvdofs[i+gdof_start_index] ];
+	      counter++;
+	    }
+	}
+
+      // pack remaining data and send to other processors
+      for(int rank=1;rank<nprocs_;rank++)
+	{
+	  std::vector<double> packedData;
+	  for(int gelem=0;gelem<nelemGlobal_;gelem++)
+	    if(partitioning_[gelem] == rank)
+	      {
+		serial_fes->GetElementVDofs(gelem, gvdofs);
+		int numDof_per_this_elem = gvdofs.Size() / numStateVars;
+		for(int i=0;i<numDof_per_this_elem;i++)
+		  packedData.push_back(data_serial[ gvdofs[i] ]);
+
+	      }
+	  int tag = 20;
+	  MPI_Send(packedData.data(),packedData.size(),MPI_DOUBLE,rank,tag,MPI_COMM_WORLD);
+	}
+
+    }  // <-- end rank 0
+  else
+    {
+      int numlDofs = U->Size() / numStateVars;
+      grvy_printf(DEBUG,"[%i]: local number of state vars to receive = %i (var=%s)\n",rank_,numlDofs,varName.c_str());
+
+      std::vector<double> packedData(numlDofs);
+
+      // receive solution data from rank 0
+      MPI_Recv(packedData.data(),numlDofs,MPI_DOUBLE,0,tag,MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+      // update local state vector
+      for(size_t i=0;i<numlDofs;i++)
+	data[i + varOffset*numlDofs] = packedData[i];
     }
 }

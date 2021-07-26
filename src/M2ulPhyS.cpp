@@ -85,10 +85,34 @@ void M2ulPhyS::initVariables()
       MPI_Abort(MPI_COMM_WORLD,1);
     }
 
-    // read partitioning info from original decomposition
+    // read partitioning info from original decomposition (unless restarting from serial soln)
     nelemGlobal_ = serial_mesh->GetNE();
+    if(rank0_)
+      grvy_printf(INFO,"Total # of mesh elements = %i\n",nelemGlobal_);
+
     if(nprocs_ > 1)
-      partitioning_file_hdf5("read");
+      {
+	if( config.RestartSerial() == "read" )
+	  {
+	    assert(serial_mesh->Conforming());
+	    partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod),nelemGlobal_);
+	    partitioning_file_hdf5("write");
+	    MPI_Barrier(MPI_COMM_WORLD);
+	  }
+	else
+	  {
+	    partitioning_file_hdf5("read");
+	  }
+      }
+
+    if(nprocs_ > 1)
+      {
+	assert(serial_mesh->Conforming());
+	partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod),nelemGlobal_);
+	if(rank0_)
+	  partitioning_file_hdf5("write");
+	MPI_Barrier(MPI_COMM_WORLD);
+      }
 
     mesh = new ParMesh(MPI_COMM_WORLD,*serial_mesh, partitioning_);
 

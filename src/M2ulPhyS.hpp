@@ -10,6 +10,7 @@
 #include <mfem.hpp>
 #include <general/forall.hpp>
 #include <tps_config.h>
+#include <hdf5.h>
 #include "mpi_groups.hpp"
 #include "run_configuration.hpp"
 #include "equation_of_state.hpp"
@@ -237,6 +238,8 @@ private:
   // i/o routines
   void write_restart_files();
   void read_restart_files();
+  void read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data);
+  void read_serialized_soln_data (hid_t file, string varName, int numDof,   int varOffset, double *data);
   void restart_files_hdf5(string mode);
   void partitioning_file_hdf5(string mode);
   void serialize_soln_for_write();
