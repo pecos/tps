@@ -9,7 +9,13 @@ M2ulPhyS::M2ulPhyS(MPI_Session &_mpi,
                    string &inputFileName):
 mpi(_mpi)
 {
-
+  nprocs_ = mpi.WorldSize();
+  rank_   = mpi.WorldRank();
+  if(rank_ == 0)
+    rank0_ = true;
+  else
+    rank0_ = false;
+  
   groupsMPI = new MPI_Groups(&mpi);
   Header();
   
@@ -60,63 +66,16 @@ void M2ulPhyS::initVariables()
 #ifdef HAVE_GRVY
   grvy_timer_init("TPS");
 #endif
+
   loadFromAuxSol = config.RestartFromAux();
 
-  // if partition file specified, read it and set partitioning vector
-  int *partition = NULL;
-  int part_ne=0, part_np=0;
-  int read_error = 0;
-
-  if (mpi.Root()) {
-    string pfilename = config.GetPartitionFileName();
-    if (!pfilename.empty()) {
-      ifstream ipart;
-      ipart.open(pfilename.c_str(), ios::in);
-      if (ipart.is_open()){
-        string word;
-        ipart >> word; // reads 'number_of_elements'
-        ipart >> word; // reads an int
-        part_ne = stoi(word);
-
-        ipart >> word; // reads 'number_of_processors'
-        ipart >> word; // reads an int
-        part_np = stoi(word);
-
-        partition = new int[part_ne];
-
-        for (int ielem=0; ielem<part_ne; ielem++) {
-          ipart >> word;
-          partition[ielem] = stoi(word);
-        }
-
-      } else {
-        read_error = 1;
-      }
-    }
-  }
-
-  MPI_Bcast( &read_error, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  assert(read_error==0);
-
-  MPI_Bcast( &part_ne, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast( &part_np, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-  if (!mpi.Root()) {
-    if (part_ne>0) {
-      partition = new int[part_ne];
-    }
-  }
-
-  MPI_Bcast( partition, part_ne, MPI_INT, 0, MPI_COMM_WORLD);
-  assert( (partition==NULL) || (part_np==mpi.WorldSize()) );
-
-  // check if a simulations is being restarted
-  Mesh *tempmesh;
+  // check if a simulation is being restarted  
   if( config.GetRestartCycle()>0 )
   {
-    // read serial mesh and partition. Hopefully the same
-    // partitions will be created in the same order
-    tempmesh = new Mesh(config.GetMeshFileName().c_str() );
+    // read serial mesh and corresponding partition file (the hdf file that was generated
+    // when starting from scratch). 
+
+    serial_mesh = new Mesh(config.GetMeshFileName().c_str() );
 
     if (config.GetUniformRefLevels()>0) {
       if (mpi.Root()) {
@@ -126,16 +85,47 @@ void M2ulPhyS::initVariables()
       MPI_Abort(MPI_COMM_WORLD,1);
     }
 
-    assert( (partition==NULL) || (part_ne==tempmesh->GetNE()) );
+    // read partitioning info from original decomposition (unless restarting from serial soln)
+    nelemGlobal_ = serial_mesh->GetNE();
+    if(rank0_)
+      grvy_printf(INFO,"Total # of mesh elements = %i\n",nelemGlobal_);
 
-    mesh = new ParMesh(MPI_COMM_WORLD,*tempmesh, partition);
-    delete tempmesh;
-    
+    if(nprocs_ > 1)
+      {
+	if( config.RestartSerial() == "read" )
+	  {
+	    assert(serial_mesh->Conforming());
+	    partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod),nelemGlobal_);
+	    partitioning_file_hdf5("write");
+	    MPI_Barrier(MPI_COMM_WORLD);
+	  }
+	else
+	  {
+	    partitioning_file_hdf5("read");
+	  }
+      }
+
+    if(nprocs_ > 1)
+      {
+	assert(serial_mesh->Conforming());
+	partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod),nelemGlobal_);
+	if(rank0_)
+	  partitioning_file_hdf5("write");
+	MPI_Barrier(MPI_COMM_WORLD);
+      }
+
+    mesh = new ParMesh(MPI_COMM_WORLD,*serial_mesh, partitioning_);
+
+    // only need serial mesh if on rank 0 and using single restart file option
+    if ( !mpi.Root() || (config.RestartSerial() == "no") )
+	 delete serial_mesh;
+
     // Paraview setup
     paraviewColl = new ParaViewDataCollection(config.GetOutputName(), mesh);
     paraviewColl->SetLevelsOfDetail( config.GetSolutionOrder() );
     paraviewColl->SetHighOrderOutput(true);
     paraviewColl->SetPrecision(8);
+    paraviewColl->SetDataFormat(VTKFormat::ASCII);
     
   }else
   {
@@ -151,20 +141,32 @@ void M2ulPhyS::initVariables()
       }
     }
 
-    tempmesh = new Mesh(config.GetMeshFileName().c_str() );
+    serial_mesh = new Mesh(config.GetMeshFileName().c_str() );
 
     // uniform refinement, user-specified number of times
     for (int l = 0; l < config.GetUniformRefLevels(); l++) {
       if (mpi.Root() ) {
         std::cout << "Uniform refinement number " << l << std::endl;
       }
-      tempmesh->UniformRefinement();
+      serial_mesh->UniformRefinement();
     }
 
-    assert( (partition==NULL) || (part_ne==tempmesh->GetNE()) );
+    // generate partitioning file (we assume conforming meshes)
+    nelemGlobal_ = serial_mesh->GetNE();
+    if(nprocs_ > 1)
+      {
+	assert(serial_mesh->Conforming());
+	partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod),nelemGlobal_);
+	if(rank0_)
+	  partitioning_file_hdf5("write");
+	MPI_Barrier(MPI_COMM_WORLD);
+      }
 
-    mesh = new ParMesh(MPI_COMM_WORLD,*tempmesh, partition);
-    tempmesh->Clear();
+    mesh = new ParMesh(MPI_COMM_WORLD,*serial_mesh, partitioning_);
+
+    // we only need serial mesh if on rank 0 and using the serial restart file option
+    if ( !mpi.Root() || (config.RestartSerial() == "no") )
+      delete serial_mesh;
 
     // VisIt setup
 //     visitColl = new VisItDataCollection(config.GetOutputName(), mesh);
@@ -176,13 +178,42 @@ void M2ulPhyS::initVariables()
     paraviewColl->SetLevelsOfDetail( config.GetSolutionOrder() );
     paraviewColl->SetHighOrderOutput(true);
     paraviewColl->SetPrecision(8);
+    //paraviewColl->SetDataFormat(VTKFormat::ASCII);
     
     time = 0.;
     iter = 0;
   }
-  
+
+  // if we have a partitioning vector, use it to build local->global
+  // element numbering map
+  if (partitioning_ != NULL)
+  {
+    // Assumption: the map "local element id" -> "global element id" is
+    // increasing, i.e. the local numbering preserves the element order from
+    // the global numbering.
+    //
+    // NB: This is the same assumption made by the ParGridFunction
+    // ctor if you pass the partitioning vector, at least as of mfem
+    // v4.2.  See mfem/fem/pgridfunction.cpp, which is the source of
+    // the above comment.
+
+    locToGlobElem = new int[mesh->GetNE()];
+    int lelem=0;
+    for (unsigned int gelem=0; gelem<nelemGlobal_; gelem++) {
+      if (mpi.WorldRank()==partitioning_[gelem]) {
+        locToGlobElem[lelem] = gelem;
+        lelem += 1;
+      }
+
+    }
+  }
+  else
+  {
+    locToGlobElem = NULL;
+  }
+
   cout<<"Process "<<mpi.WorldRank()<<" # elems "<< mesh->GetNE()<<endl;
-  
+
   dim = mesh->Dimension();
   
   refLength = config.GetReferenceLength();
@@ -239,6 +270,15 @@ void M2ulPhyS::initVariables()
   dfes = new ParFiniteElementSpace(mesh, fec, dim, Ordering::byNODES);
   vfes = new ParFiniteElementSpace(mesh, fec, num_equation, Ordering::byNODES);
   gradUpfes = new ParFiniteElementSpace(mesh, fec, num_equation*dim, Ordering::byNODES);
+
+  // instantiate objects needed by rank 0 for single restart file option
+  if ( mpi.Root() && (config.RestartSerial() != "no") ) {
+    serial_fes = new FiniteElementSpace(serial_mesh, fec, num_equation, Ordering::byNODES);
+    serial_soln = new GridFunction(serial_fes);
+    // to help detect errors, initialize to nan
+    *serial_soln = std::numeric_limits<double>::quiet_NaN();
+  }
+
 
   initIndirectionArrays();
   initSolutionAndVisualizationVectors();
@@ -442,8 +482,6 @@ void M2ulPhyS::initVariables()
   if( mpi.Root() ) cout<<"Initial time-step: "<<dt<<"s"<<endl;
   
   //t_final = MaxIters*dt;
-
-  delete [] partition;
 }
 
 
@@ -735,6 +773,14 @@ M2ulPhyS::~M2ulPhyS()
   //delete mesh;
   
   delete groupsMPI;
+
+  delete [] locToGlobElem;
+
+  if ( mpi.Root() && (config.RestartSerial() != "no") ){
+    delete serial_mesh;
+    delete serial_fes;
+    delete serial_soln;
+  }
 
 #ifdef HAVE_GRVY
   if(mpi.WorldRank() == 0)
@@ -1332,10 +1378,9 @@ void M2ulPhyS::read_restart_files()
     }
   }
 
-  // koomie TODO: inspect for GPU
   // load data to GPU
   auto dUp = Up->ReadWrite();
-  auto dU = U->ReadWrite();
+  auto dU  = U->ReadWrite();
   //  if( loadFromAuxSol ) auto dausUp = aux_Up->ReadWrite();
 }
 

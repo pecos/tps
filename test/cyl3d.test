@@ -104,3 +104,111 @@ setup() {
     test -s $REF_FILE
     ./soln_differ $SOLN_FILE $REF_FILE
 }
+
+@test "[$TEST] verify serial restart consistency using 2 mpi tasks" {
+    RUNFILE=input.4iters.cyl
+    RUNFILE_PART=${RUNFILE}.part
+    SOLN_FILE=restart_output.sol.h5
+
+    rm -f $RUNFILE_PART
+    rm -f $SOLN_FILE
+
+    # copy the run file, b/c I want to edit it
+    test -s $RUNFILE
+    cp $RUNFILE $RUNFILE_PART
+
+    # add partition info to the runfile
+    echo "RESTART_SERIAL write" >> $RUNFILE_PART
+
+    # run 2 tasks
+    mpirun -np 2 ../src/tps --runFile $RUNFILE_PART
+    test -s $SOLN_FILE_SERIAL
+
+    ./soln_differ $SOLN_FILE $REF_FILE
+
+    # clean up if we got this far
+    rm -f $RUNFILE_PART
+    rm -f restart_output.sol.*.h5
+}
+
+@test "[$TEST] verify serial restart consistency using 4 mpi tasks" {
+    RUNFILE=input.4iters.cyl
+    RUNFILE_PART=${RUNFILE}.part
+    SOLN_FILE=restart_output.sol.h5
+
+    rm -f $RUNFILE_PART
+    rm -f $SOLN_FILE
+
+    # copy the run file, b/c I want to edit it
+    test -s $RUNFILE
+    cp $RUNFILE $RUNFILE_PART
+
+    # add partition info to the runfile
+    echo "RESTART_SERIAL write" >> $RUNFILE_PART
+
+    # run 4 tasks
+    mpirun -np 4 ../src/tps --runFile $RUNFILE_PART
+    test -s $SOLN_FILE_SERIAL
+
+    ./soln_differ $SOLN_FILE $REF_FILE
+
+    # clean up if we got this far
+    rm -f $RUNFILE_PART
+    rm -f restart_output.sol.*.h5
+}
+
+@test "[$TEST] verify serialized restart switching processors from 2 -> 4 mpi tasks" {
+    RUNFILE=input.2iters.cyl
+    SOLFILE_BASE=restart_output.sol
+
+    RUNFILE_MOD=${RUNFILE}.serialized
+    TMPDIR=tmp_serialized_restart
+
+    rm -f  restart_output.sol*.h5
+    rm -f  partition.*.h5
+    rm -f  $RUNFILE_MOD
+    rm -rf $TMPDIR
+
+    # run 2 iterations using 2 tasks and save serialized restart file
+
+    test -s $RUNFILE
+    cp $RUNFILE $RUNFILE_MOD
+    echo "RESTART_SERIAL write" >> $RUNFILE_MOD
+    
+    mpirun -np 2 ../src/tps --runFile $RUNFILE_MOD
+    test -s ${SOLFILE_BASE}.h5
+    test -s partition.2p.h5
+
+    run h5dump  -a iteration  ${SOLFILE_BASE}.h5
+    [ "${lines[5]}" = "   (0): 2" ]
+
+    # now, restart from serialized restart at 2 iters, and run with 4 procs till 4 iterations
+
+    RUNFILE=input.4iters.cyl
+    cp $RUNFILE $RUNFILE_MOD
+    echo "RESTART_SERIAL read" >> $RUNFILE_MOD
+    echo "RESTART_CYCLE" >> $RUNFILE_MOD
+
+    mpirun -np 4 ../src/tps --runFile $RUNFILE_MOD
+    test -s partition.4p.h5
+
+    mkdir $TMPDIR
+    
+    for i in `seq 0 3`; do
+	test -s ${SOLFILE_BASE}.$i.h5
+	run h5dump  -a iteration  ${SOLFILE_BASE}.$i.h5
+	[ "${lines[5]}" = "   (0): 4" ]
+	mv ${SOLFILE_BASE}.$i.h5 $TMPDIR
+    done
+    
+    # finally, run a normal 4 proc case for 4 iterations and compare against above solution
+    rm -f  restart_output.sol*.h5
+    mpirun -np 4 ../src/tps --runFile $RUNFILE
+
+    for i in `seq 0 3`; do
+	test -s ${SOLFILE_BASE}.$i.h5
+	run h5dump  -a iteration  ${SOLFILE_BASE}.$i.h5
+	[ "${lines[5]}" = "   (0): 4" ]
+	./soln_differ ${SOLFILE_BASE}.$i.h5 ${TMPDIR}/${SOLFILE_BASE}.$i.h5 
+    done
+}

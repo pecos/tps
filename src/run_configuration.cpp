@@ -7,7 +7,7 @@
 RunConfiguration::RunConfiguration()
 {
   // Initialize with default values
-  partFile.clear();
+  partFile = "partition";
 
   ref_levels = 0;
   timeIntegratorType = 4;
@@ -23,8 +23,10 @@ RunConfiguration::RunConfiguration()
   useRoe = false;
   restart = false;
   restart_hdf5_conversion = false;
+  restart_serial = "no";
   restart_cycle = 0;
   restartFromAux = false;
+  singleRestartFile = false;
   
   sampleInterval = 0;
   startIter = 0;
@@ -141,11 +143,21 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       {
         ss >> word;
         restart_hdf5_conversion = true;
+      }else if( word.compare("RESTART_SERIAL")==0 )
+      {
+        ss >> word;
+	assert( (word == "read") || (word == "write") );
+	restart_serial = word;
 
       // restart from aux. sol
       }else if( word.compare("RESTART_FROM_AUX")==0 )
       {
         restartFromAux = true;
+
+      // write a single restart file (rather than 1 from each MPI task)
+      }else if( word.compare("SINGLE_RESTART_FILE")==0 )
+      {
+        singleRestartFile = true;
 
       // mean and RMS calculation
       }else if( word.compare("CALC_MEAN_RMS")==0 )

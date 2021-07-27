@@ -68,14 +68,16 @@ private:
   // Use Roe-type Riemann solver
   bool useRoe;
   
-  // cycle for restart
+  // restart controls
   bool restart;
   bool restart_hdf5_conversion;   // read in older ascii format
+  std::string restart_serial;     // mode for serial restarts
   int restart_cycle;
 
   // Restart from different order solution on same mesh.  New order
   // set by POL_ORDER, old order determined from restart file.
   bool restartFromAux;
+  bool singleRestartFile;
 
   // mean and RMS
   int sampleInterval;
@@ -145,7 +147,7 @@ public:
   
   string GetMeshFileName(){return meshFile;}
   string GetOutputName(){return outputFile;}
-  string GetPartitionFileName(){return partFile;}
+  string GetPartitionBaseName(){return partFile;}
   int GetUniformRefLevels(){return ref_levels;}
 
   int GetTimeIntegratorType(){return timeIntegratorType;}
@@ -187,6 +189,7 @@ public:
   void SetRestartCycle(int iter){restart_cycle = iter; return;}
   bool RestartFromAux(){return restartFromAux;}
   bool RestartHDFConversion(){return restart_hdf5_conversion;}
+  std::string RestartSerial(){return restart_serial;}
   
   std::vector<pair<int,InletType> >* GetInletPatchType(){return &inletPatchType;}
   Array<double> GetInletData(int i);

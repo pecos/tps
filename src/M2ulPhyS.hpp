@@ -10,6 +10,7 @@
 #include <mfem.hpp>
 #include <general/forall.hpp>
 #include <tps_config.h>
+#include <hdf5.h>
 #include "mpi_groups.hpp"
 #include "run_configuration.hpp"
 #include "equation_of_state.hpp"
@@ -45,6 +46,9 @@ class M2ulPhyS
 private:
   MPI_Groups *groupsMPI;
   MPI_Session &mpi;
+  int  nprocs_;			// total number of MPI procs
+  int  rank_;			// local MPI rank
+  bool rank0_;			// flag to indicate rank 0
   
   // Run options
   RunConfiguration config;
@@ -57,6 +61,8 @@ private:
   
   // order of polynomials
   int order;
+  // total number of mesh elements (serial)
+  int nelemGlobal_;
   
   // order of polynomials for auxiliary solution
   bool loadFromAuxSol;
@@ -69,6 +75,10 @@ private:
   
   // reference to mesh
   ParMesh *mesh;
+
+  // original mesh partition info (stored on rank 0)
+  Array<int> partitioning_;
+  const int defaultPartMethod = 1;
   
   // time integrator
   ODESolver *timeIntegrator;
@@ -198,7 +208,17 @@ private:
 
   // exit status code;
   int exit_status_;
-  
+
+  // mapping from local to global element index
+  int* locToGlobElem;
+
+  // a serial mesh, finite element space, and grid function
+  // for use if we want to write a serial file
+  Mesh *serial_mesh;
+  FiniteElementSpace *serial_fes;
+  GridFunction *serial_soln;
+
+
   void getAttributesInPartition(Array<int> &local_attr);
   
   void initIndirectionArrays();
@@ -214,14 +234,20 @@ private:
   static void testInitialCondition(const Vector &x, Vector &y);
   void uniformInitialConditions();
   void initGradUp();
-  
+
+  // i/o routines
   void write_restart_files();
   void read_restart_files();
+  void read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data);
+  void read_serialized_soln_data (hid_t file, string varName, int numDof,   int varOffset, double *data);
   void restart_files_hdf5(string mode);
+  void partitioning_file_hdf5(string mode);
+  void serialize_soln_for_write();
   
   void Check_NAN();
   bool Check_JobResubmit();
   void Cache_Paraview_Timesteps();
+
 
 public:
   M2ulPhyS(MPI_Session &_mpi,
