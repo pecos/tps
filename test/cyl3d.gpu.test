@@ -102,3 +102,23 @@ setup() {
      test -s $REF_FILE
      ./soln_differ $SOLN_FILE $REF_FILE
 }
+
+@test "[$TEST] verify tps output from 2 mpi tasks with input -> $RUNFILE" {
+
+    SOLN_FILE_0=restart_output.sol.0.h5
+    SOLN_FILE_1=restart_output.sol.1.h5
+
+    REF_FILE_0=ref_solns/cyl.r0.p2.iter4.h5
+    REF_FILE_1=ref_solns/cyl.r1.p2.iter4.h5
+
+    mpirun -np 2 ../src/tps --runFile $RUNFILE $OPTS
+
+    test -s $SOLN_FILE_0
+    test -s $REF_FILE_0
+    ./soln_differ $SOLN_FILE_0 $REF_FILE_0
+
+    test -s $SOLN_FILE_1
+    test -s $REF_FILE_1
+    ./soln_differ $SOLN_FILE_1 $REF_FILE_1
+}
+
