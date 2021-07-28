@@ -1318,6 +1318,10 @@ void M2ulPhyS::partitioning_file_hdf5(std::string mode)
   // only rank 0 writes partitioning file
   if(! rank0_)
     return;
+  
+  // we only write partitioning file on original (non-restart) run
+  if(config.GetRestartCycle() > 0)
+    return;
 
   hid_t file, dataspace, data_soln;
   herr_t status;
