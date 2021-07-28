@@ -263,7 +263,7 @@ setup() {
 	mv ${SOLFILE_BASE}.$i.h5 $TMPDIR
     done
 
-    # finally, run a normal 4 proc case for 4 iterations and compare against above solution
+    # finally, run a normal 2 proc case for 4 iterations and compare against above solution
    rm -f  restart_output.sol*.h5
    mpirun -np 2 ../src/tps --runFile $RUNFILE
 
