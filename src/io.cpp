@@ -405,12 +405,10 @@ void M2ulPhyS::restart_files_hdf5(string mode)
 
 void M2ulPhyS::partitioning_file_hdf5(std::string mode)
 {
-  // only rank 0 writes partitioning file
-  if(! rank0_)
-    return;
+  grvy_timer_begin(__func__);
 
-  // we only write partitioning file on original (non-restart) run
-  if(config.GetRestartCycle() > 0)
+  // only rank 0 writes partitioning file
+  if( !rank0_ && (mode == "write") )
     return;
 
   hid_t file, dataspace, data_soln;
@@ -501,11 +499,29 @@ void M2ulPhyS::partitioning_file_hdf5(std::string mode)
 	  H5Dclose(data);
 	} // <-- end rank0_
 
-      // distribute partition vectory to all procs
+#if 0
+      // distribute partition vector to all procs
       MPI_Bcast( partitioning_.GetData(),nelemGlobal_, MPI_INT, 0, MPI_COMM_WORLD);
+#endif
+
+      // distribute partition vector to all procs (serialzed per process variant)
+      int tag = 21;
+
+      if(rank0_)
+	{
+	  for(int rank=1;rank<nprocs_;rank++)
+	    {
+	      MPI_Send(partitioning_.GetData(),nelemGlobal_,MPI_INT,rank,tag,MPI_COMM_WORLD);
+	      grvy_printf(DEBUG,"Sent partitioning data to rank %i\n",rank);
+	    }
+	}
+      else
+	MPI_Recv(partitioning_.GetData(),nelemGlobal_,MPI_INT,0,tag,MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
       if(rank0_)
 	grvy_printf(INFO,"--> partition file read complete\n");
     }
+  grvy_timer_end(__func__);
 }
 
 void M2ulPhyS::serialize_soln_for_write()
