@@ -11,6 +11,7 @@
 #include <general/forall.hpp>
 #include <tps_config.h>
 #include <hdf5.h>
+#include "io.hpp"
 #include "mpi_groups.hpp"
 #include "run_configuration.hpp"
 #include "equation_of_state.hpp"
@@ -214,9 +215,10 @@ private:
 
   // a serial mesh, finite element space, and grid function
   // for use if we want to write a serial file
-  Mesh *serial_mesh;
-  FiniteElementSpace *serial_fes;
-  GridFunction *serial_soln;
+//   Mesh *serial_mesh;
+//   FiniteElementSpace *serial_fes;
+//   GridFunction *serial_soln;
+  IO_operations *restartH5files;
 
 
   void getAttributesInPartition(Array<int> &local_attr);
@@ -238,11 +240,11 @@ private:
   // i/o routines
   void write_restart_files();
   void read_restart_files();
-  void read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data);
-  void read_serialized_soln_data (hid_t file, string varName, int numDof,   int varOffset, double *data);
-  void restart_files_hdf5(string mode);
+//   void read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data);
+//   void read_serialized_soln_data (hid_t file, string varName, int numDof,   int varOffset, double *data);
+//   void restart_files_hdf5(string mode);
   void partitioning_file_hdf5(string mode);
-  void serialize_soln_for_write();
+//   void serialize_soln_for_write();
   
   void Check_NAN();
   bool Check_JobResubmit();

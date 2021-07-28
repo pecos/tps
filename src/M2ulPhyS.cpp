@@ -1,4 +1,4 @@
-/* 
+/*
  * Implementation of the class Problem
  */
 
@@ -7,7 +7,7 @@
 
 M2ulPhyS::M2ulPhyS(MPI_Session &_mpi,
                    string &inputFileName):
-mpi(_mpi)
+  mpi(_mpi)
 {
   nprocs_ = mpi.WorldSize();
   rank_   = mpi.WorldRank();
@@ -15,10 +15,10 @@ mpi(_mpi)
     rank0_ = true;
   else
     rank0_ = false;
-  
+
   groupsMPI = new MPI_Groups(&mpi);
   Header();
-  
+
   config.readInputFile(inputFileName);
 
 #ifdef _GPU_
@@ -32,9 +32,9 @@ mpi(_mpi)
     }
   }
 #endif
-  
+
   initVariables();
-  
+
   groupsMPI->init();
 
   // now that MPI groups have been initialized, we can finalize any additional
@@ -69,16 +69,18 @@ void M2ulPhyS::initVariables()
 
   loadFromAuxSol = config.RestartFromAux();
 
-  // check if a simulation is being restarted  
+  // check if a simulation is being restarted
   if( config.GetRestartCycle()>0 )
   {
     // read serial mesh and corresponding partition file (the hdf file that was generated
-    // when starting from scratch). 
+    // when starting from scratch).
+    Mesh *serial_temp_mesh;
+    serial_temp_mesh = new Mesh(config.GetMeshFileName().c_str() );
 
-    serial_mesh = new Mesh(config.GetMeshFileName().c_str() );
-
-    if (config.GetUniformRefLevels()>0) {
-      if (mpi.Root()) {
+    if (config.GetUniformRefLevels()>0)
+    {
+      if (mpi.Root())
+      {
         std::cerr << "ERROR: Uniform mesh refinement not supported upon restart."
                   << std::endl;
       }
@@ -86,39 +88,39 @@ void M2ulPhyS::initVariables()
     }
 
     // read partitioning info from original decomposition (unless restarting from serial soln)
-    nelemGlobal_ = serial_mesh->GetNE();
+    nelemGlobal_ = serial_temp_mesh->GetNE();
     if(rank0_)
       grvy_printf(INFO,"Total # of mesh elements = %i\n",nelemGlobal_);
 
     if(nprocs_ > 1)
+    {
+      if( config.RestartSerial() == "read" )
       {
-	if( config.RestartSerial() == "read" )
-	  {
-	    assert(serial_mesh->Conforming());
-	    partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod),nelemGlobal_);
-	    partitioning_file_hdf5("write");
-	    MPI_Barrier(MPI_COMM_WORLD);
-	  }
-	else
-	  {
-	    partitioning_file_hdf5("read");
-	  }
+        assert(serial_temp_mesh->Conforming());
+        partitioning_ = Array<int>(serial_temp_mesh->GeneratePartitioning(nprocs_, defaultPartMethod),nelemGlobal_);
+        partitioning_file_hdf5("write");
+        MPI_Barrier(MPI_COMM_WORLD);
       }
+      else
+      {
+        partitioning_file_hdf5("read");
+      }
+    }
 
     if(nprocs_ > 1)
-      {
-	assert(serial_mesh->Conforming());
-	partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod),nelemGlobal_);
-	if(rank0_)
-	  partitioning_file_hdf5("write");
-	MPI_Barrier(MPI_COMM_WORLD);
-      }
+    {
+      assert(serial_temp_mesh->Conforming());
+      partitioning_ = Array<int>(serial_temp_mesh->GeneratePartitioning(nprocs_, defaultPartMethod),nelemGlobal_);
+      if(rank0_)
+        partitioning_file_hdf5("write");
+      MPI_Barrier(MPI_COMM_WORLD);
+    }
 
-    mesh = new ParMesh(MPI_COMM_WORLD,*serial_mesh, partitioning_);
+    mesh = new ParMesh(MPI_COMM_WORLD,*serial_temp_mesh, partitioning_);
 
     // only need serial mesh if on rank 0 and using single restart file option
     if ( !mpi.Root() || (config.RestartSerial() == "no") )
-	 delete serial_mesh;
+      delete serial_temp_mesh;
 
     // Paraview setup
     paraviewColl = new ParaViewDataCollection(config.GetOutputName(), mesh);
@@ -126,8 +128,9 @@ void M2ulPhyS::initVariables()
     paraviewColl->SetHighOrderOutput(true);
     paraviewColl->SetPrecision(8);
     paraviewColl->SetDataFormat(VTKFormat::ASCII);
-    
-  }else
+
+  }
+  else
   {
     //remove previous solution
     if( mpi.Root() )
@@ -141,32 +144,35 @@ void M2ulPhyS::initVariables()
       }
     }
 
-    serial_mesh = new Mesh(config.GetMeshFileName().c_str() );
+    Mesh *serial_temp_mesh;
+    serial_temp_mesh = new Mesh(config.GetMeshFileName().c_str() );
 
     // uniform refinement, user-specified number of times
-    for (int l = 0; l < config.GetUniformRefLevels(); l++) {
-      if (mpi.Root() ) {
+    for (int l = 0; l < config.GetUniformRefLevels(); l++)
+    {
+      if (mpi.Root() )
+      {
         std::cout << "Uniform refinement number " << l << std::endl;
       }
-      serial_mesh->UniformRefinement();
+      serial_temp_mesh->UniformRefinement();
     }
 
     // generate partitioning file (we assume conforming meshes)
-    nelemGlobal_ = serial_mesh->GetNE();
+    nelemGlobal_ = serial_temp_mesh->GetNE();
     if(nprocs_ > 1)
-      {
-	assert(serial_mesh->Conforming());
-	partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod),nelemGlobal_);
-	if(rank0_)
-	  partitioning_file_hdf5("write");
-	MPI_Barrier(MPI_COMM_WORLD);
-      }
+    {
+      assert(serial_temp_mesh->Conforming());
+      partitioning_ = Array<int>(serial_temp_mesh->GeneratePartitioning(nprocs_, defaultPartMethod),nelemGlobal_);
+      if(rank0_)
+        partitioning_file_hdf5("write");
+      MPI_Barrier(MPI_COMM_WORLD);
+    }
 
-    mesh = new ParMesh(MPI_COMM_WORLD,*serial_mesh, partitioning_);
+    mesh = new ParMesh(MPI_COMM_WORLD,*serial_temp_mesh, partitioning_);
 
     // we only need serial mesh if on rank 0 and using the serial restart file option
     if ( !mpi.Root() || (config.RestartSerial() == "no") )
-      delete serial_mesh;
+      delete serial_temp_mesh;
 
     // VisIt setup
 //     visitColl = new VisItDataCollection(config.GetOutputName(), mesh);
@@ -179,7 +185,7 @@ void M2ulPhyS::initVariables()
     paraviewColl->SetHighOrderOutput(true);
     paraviewColl->SetPrecision(8);
     //paraviewColl->SetDataFormat(VTKFormat::ASCII);
-    
+
     time = 0.;
     iter = 0;
   }
@@ -199,8 +205,10 @@ void M2ulPhyS::initVariables()
 
     locToGlobElem = new int[mesh->GetNE()];
     int lelem=0;
-    for (unsigned int gelem=0; gelem<nelemGlobal_; gelem++) {
-      if (mpi.WorldRank()==partitioning_[gelem]) {
+    for (unsigned int gelem=0; gelem<nelemGlobal_; gelem++)
+    {
+      if (mpi.WorldRank()==partitioning_[gelem])
+      {
         locToGlobElem[lelem] = gelem;
         lelem += 1;
       }
@@ -215,50 +223,65 @@ void M2ulPhyS::initVariables()
   cout<<"Process "<<mpi.WorldRank()<<" # elems "<< mesh->GetNE()<<endl;
 
   dim = mesh->Dimension();
-  
+
   refLength = config.GetReferenceLength();
-  
+
   eqSystem = config.GetEquationSystem();
-  
+
   eqState = new EquationOfState();
   eqState->setFluid( config.GetWorkingFluid() );
   eqState->setViscMult(config.GetViscMult() );
   eqState->setBulkViscMult( config.GetBulkViscMult() );
-  
+
   order = config.GetSolutionOrder();
-  
+
   MaxIters = config.GetNumIters();
-  
+
   max_char_speed = 0.;
-  
+
   switch(eqSystem)
   {
-    case EULER:
-      num_equation = 2 + dim;
-      break;
-    case NS:
-      num_equation = 2 + dim;
-      break;
-    default:
-      break;
+  case EULER:
+    num_equation = 2 + dim;
+    break;
+  case NS:
+    num_equation = 2 + dim;
+    break;
+  default:
+    break;
   }
   
+  restartH5files = new IO_operations(string("restart_"),
+                                      groupsMPI,
+                                      &config,
+                                      locToGlobElem,
+                                      partitioning_,
+                                      defaultPartMethod,
+                                      num_equation,
+                                      time,
+                                      dt,
+                                      iter,
+                                      order,
+                                      dim );
+
   // initialize basis type and integration rule
   intRuleType = config.GetIntegrationRule();
   if( intRuleType == 0 )
   {
     intRules = new IntegrationRules(0, Quadrature1D::GaussLegendre);
-  }else if( intRuleType == 1 )
+  }
+  else if( intRuleType == 1 )
   {
     intRules = new IntegrationRules(0, Quadrature1D::GaussLobatto);
   }
-  
+
   basisType = config.GetBasisType();
   if( basisType == 0 )
   {
     fec  = new DG_FECollection(order, dim, BasisType::GaussLegendre);
     //fec  = new H1_FECollection(order, dim, BasisType::GaussLegendre);
-  }else if ( basisType == 1 )
+  }
+  else if ( basisType == 1 )
   {
     // This basis type includes end-nodes
     fec  = new DG_FECollection(order, dim, BasisType::GaussLobatto);
@@ -271,19 +294,11 @@ void M2ulPhyS::initVariables()
   vfes = new ParFiniteElementSpace(mesh, fec, num_equation, Ordering::byNODES);
   gradUpfes = new ParFiniteElementSpace(mesh, fec, num_equation*dim, Ordering::byNODES);
 
-  // instantiate objects needed by rank 0 for single restart file option
-  if ( mpi.Root() && (config.RestartSerial() != "no") ) {
-    serial_fes = new FiniteElementSpace(serial_mesh, fec, num_equation, Ordering::byNODES);
-    serial_soln = new GridFunction(serial_fes);
-    // to help detect errors, initialize to nan
-    *serial_soln = std::numeric_limits<double>::quiet_NaN();
-  }
-
 
   initIndirectionArrays();
   initSolutionAndVisualizationVectors();
   projectInitialSolution();
-  
+
   average = new Averaging(Up,
                           mesh,
                           fec,
@@ -295,25 +310,25 @@ void M2ulPhyS::initVariables()
                           config,
                           groupsMPI);
   average->read_meanANDrms_restart_files();
-  
+
   fluxClass = new Fluxes(eqState,
                          eqSystem,
                          num_equation,
                          dim);
-  
+
   alpha = 0.5;
   isSBP = config.isSBP();
-  
+
   // Create Riemann Solver
-  rsolver = new RiemannSolver(num_equation, 
-                              eqState, 
+  rsolver = new RiemannSolver(num_equation,
+                              eqState,
                               fluxClass,
                               config.RoeRiemannSolver() );
-  
+
   // Boundary attributes in present partition
   Array<int> local_attr;
   getAttributesInPartition(local_attr);
-  
+
   bcIntegrator = NULL;
   if( local_attr.Size()>0 )
   {
@@ -321,7 +336,7 @@ void M2ulPhyS::initVariables()
                                     mesh,
                                     vfes,
                                     intRules,
-                                    rsolver, 
+                                    rsolver,
                                     dt,
                                     eqState,
                                     fluxClass,
@@ -333,14 +348,14 @@ void M2ulPhyS::initVariables()
                                     dim,
                                     num_equation,
                                     max_char_speed,
-                                    config, 
+                                    config,
                                     local_attr,
                                     maxIntPoints,
                                     maxDofs );
   }
-  
+
   //A->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  
+
   A = new DGNonLinearForm(vfes,
                           gradUpfes,
                           gradUp,
@@ -359,21 +374,21 @@ void M2ulPhyS::initVariables()
                           maxIntPoints,
                           maxDofs);
   if( local_attr.Size()>0 ) A->AddBdrFaceIntegrator( bcIntegrator );
-  
+
   {
     bool useLinearIntegration = false;
 //    if( basisType==1 && intRuleType==1 ) useLinearIntegration = true;
-    
-    faceIntegrator = new FaceIntegrator(intRules, 
-                                      rsolver,
-                                      fluxClass, 
-                                      vfes,
-                                      useLinearIntegration,
-                                      dim, 
-                                      num_equation, 
-                                      gradUp,
-                                      gradUpfes,
-                                      max_char_speed);
+
+    faceIntegrator = new FaceIntegrator(intRules,
+                                        rsolver,
+                                        fluxClass,
+                                        vfes,
+                                        useLinearIntegration,
+                                        dim,
+                                        num_equation,
+                                        gradUp,
+                                        gradUpfes,
+                                        max_char_speed);
   }
   A->AddInteriorFaceIntegrator( faceIntegrator );
   if( isSBP )
@@ -382,49 +397,59 @@ void M2ulPhyS::initVariables()
                                     dim,num_equation, alpha);
     A->AddDomainIntegrator( SBPoperator );
   }
-  
+
   Aflux = new MixedBilinearForm(dfes, fes);
-  domainIntegrator = new DomainIntegrator(fluxClass,intRules, intRuleType, 
+  domainIntegrator = new DomainIntegrator(fluxClass,intRules, intRuleType,
                                           dim, num_equation);
   Aflux->AddDomainIntegrator( domainIntegrator );
   Aflux->Assemble();
   Aflux->Finalize();
-  
+
   switch (config.GetTimeIntegratorType() )
   {
-    case 1: timeIntegrator = new ForwardEulerSolver; break;
-    case 2: timeIntegrator = new RK2Solver(1.0); break;
-    case 3: timeIntegrator = new RK3SSPSolver; break;
-    case 4: timeIntegrator = new RK4Solver; break;
-    case 6: timeIntegrator = new RK6Solver; break;
-    default:
-        cout << "Unknown ODE solver type: " << config.GetTimeIntegratorType() << '\n';
+  case 1:
+    timeIntegrator = new ForwardEulerSolver;
+    break;
+  case 2:
+    timeIntegrator = new RK2Solver(1.0);
+    break;
+  case 3:
+    timeIntegrator = new RK3SSPSolver;
+    break;
+  case 4:
+    timeIntegrator = new RK4Solver;
+    break;
+  case 6:
+    timeIntegrator = new RK6Solver;
+    break;
+  default:
+    cout << "Unknown ODE solver type: " << config.GetTimeIntegratorType() << '\n';
   }
-  
+
 //   gradUp_A = new ParNonlinearForm(gradUpfes);
 //   gradUp_A->AddInteriorFaceIntegrator(
 //       new GradFaceIntegrator(intRules, dim, num_equation) );
   gradUp_A = new GradNonLinearForm(
-#ifdef _GPU_ 
-                                   vfes,
-#else 
-                                   gradUpfes,
+#ifdef _GPU_
+    vfes,
+#else
+    gradUpfes,
 #endif
-                                   intRules,
-                                   dim,
-                                   num_equation,
-                                   numElems,
-                                   nodesIDs,
-                                   posDofIds,
-                                   shapeWnor1,
-                                   shape2,
-                                   maxIntPoints,
-                                   maxDofs,
-                                   elemFaces,
-                                   elems12Q );
+    intRules,
+    dim,
+    num_equation,
+    numElems,
+    nodesIDs,
+    posDofIds,
+    shapeWnor1,
+    shape2,
+    maxIntPoints,
+    maxDofs,
+    elemFaces,
+    elems12Q );
   gradUp_A->AddInteriorFaceIntegrator(
-      new GradFaceIntegrator(intRules, dim, num_equation) );
-  
+    new GradFaceIntegrator(intRules, dim, num_equation) );
+
   rhsOperator = new RHSoperator(time,
                                 dim,
                                 num_equation,
@@ -445,7 +470,7 @@ void M2ulPhyS::initVariables()
                                 elems12Q,
                                 maxIntPoints,
                                 maxDofs,
-                                A, 
+                                A,
                                 Aflux,
                                 mesh,
                                 spaceVaryViscMult,
@@ -454,25 +479,25 @@ void M2ulPhyS::initVariables()
                                 gradUpfes,
                                 gradUp_A,
                                 bcIntegrator,
-                                isSBP, 
+                                isSBP,
                                 alpha,
                                 config );
-  
+
   CFL = config.GetCFLNumber();
   rhsOperator->SetTime(time);
   timeIntegrator->Init( *rhsOperator );
-  
+
   // Determine the minimum element size.
-   {
-      double local_hmin = mesh->GetElementSize(0, 1);
-      for (int i = 1; i < mesh->GetNE(); i++)
-      {
-        //if(sqrt(mesh->GetElementVolume(i))<1e-3) cout<<sqrt(mesh->GetElementVolume(i))<<endl;
-        local_hmin = min(mesh->GetElementSize(i, 1), local_hmin);
-        //local_hmin = min(sqrt(mesh->GetElementVolume(i)), local_hmin);
-      }
-      MPI_Allreduce(&local_hmin, &hmin, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
-   }
+  {
+    double local_hmin = mesh->GetElementSize(0, 1);
+    for (int i = 1; i < mesh->GetNE(); i++)
+    {
+      //if(sqrt(mesh->GetElementVolume(i))<1e-3) cout<<sqrt(mesh->GetElementVolume(i))<<endl;
+      local_hmin = min(mesh->GetElementSize(i, 1), local_hmin);
+      //local_hmin = min(sqrt(mesh->GetElementVolume(i)), local_hmin);
+    }
+    MPI_Allreduce(&local_hmin, &hmin, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
+  }
 
   // estimate initial dt
   Up->ExchangeFaceNbrData();
@@ -480,7 +505,7 @@ void M2ulPhyS::initVariables()
 
   if( config.GetRestartCycle()==0 ) initialTimeStep();
   if( mpi.Root() ) cout<<"Initial time-step: "<<dt<<"s"<<endl;
-  
+
   //t_final = MaxIters*dt;
 }
 
@@ -490,40 +515,41 @@ void M2ulPhyS::initIndirectionArrays()
   posDofIds.SetSize( 2*vfes->GetNE() );
   posDofIds = 0;
   auto hposDofIds = posDofIds.HostWrite();
-  
+
   std::vector<int> tempNodes;
   tempNodes.clear();
-  
-  for(int i=0;i<vfes->GetNE();i++)
+
+  for(int i=0; i<vfes->GetNE(); i++)
   {
     const int dof = vfes->GetFE(i)->GetDof();
-    
+
     // get the nodes IDs
     hposDofIds[2*i   ] = tempNodes.size();
     hposDofIds[2*i +1] = dof;
     Array<int> dofs;
     vfes->GetElementVDofs(i, dofs);
-    for(int n=0;n<dof;n++) tempNodes.push_back( dofs[n] );
+    for(int n=0; n<dof; n++) tempNodes.push_back( dofs[n] );
   }
-  
+
   nodesIDs.SetSize( tempNodes.size() );
   nodesIDs = 0;
   auto hnodesIDs = nodesIDs.HostWrite();
-  for(int i=0;i<nodesIDs.Size();i++) hnodesIDs[i] = tempNodes[i];
-  
-  
+  for(int i=0; i<nodesIDs.Size(); i++) hnodesIDs[i] = tempNodes[i];
+
+
   // count number of each type of element
   std::vector<int> tempNumElems;
   tempNumElems.clear();
   int dof1 = hposDofIds[1];
   int typeElems = 0;
-  for(int el=0;el<posDofIds.Size()/2;el++)
+  for(int el=0; el<posDofIds.Size()/2; el++)
   {
     int dofi = hposDofIds[2*el+1];
     if( dofi==dof1 )
     {
       typeElems++;
-    }else
+    }
+    else
     {
       tempNumElems.push_back( typeElems );
       typeElems = 1;
@@ -534,36 +560,37 @@ void M2ulPhyS::initIndirectionArrays()
   numElems.SetSize( tempNumElems.size() );
   numElems = 0;
   auto hnumElems = numElems.HostWrite();
-  for(int i=0;i<(int)tempNumElems.size();i++) hnumElems[i] = tempNumElems[i];
-  
+  for(int i=0; i<(int)tempNumElems.size(); i++) hnumElems[i] = tempNumElems[i];
+
   {
-    // Initialize vectors and arrays to be used in 
+    // Initialize vectors and arrays to be used in
     // face integrations
 //     const int maxIntPoints = 49; // corresponding to square face with p=5
 //     const int maxDofs = 216; //HEX with p=5
-    
+
     elemFaces.SetSize(7*vfes->GetNE() );
     elemFaces = 0;
     auto helemFaces = elemFaces.HostWrite();
-    
+
     std::vector<double> shapes2, shapes1;
-    shapes1.clear();shapes2.clear();
-    
+    shapes1.clear();
+    shapes2.clear();
+
     Mesh *mesh = vfes->GetMesh();
-    
+
     elems12Q.SetSize( 3*mesh->GetNumFaces() );
     elems12Q = 0;
     auto helems12Q = elems12Q.HostWrite();
-    
+
     shapeWnor1.UseDevice(true);
     shapeWnor1.SetSize( (maxDofs+1+dim)*maxIntPoints*mesh->GetNumFaces() );
-    
+
     shape2.UseDevice(true);
     shape2.SetSize( maxDofs*maxIntPoints*mesh->GetNumFaces() );
-    
+
     auto hshapeWnor1 = shapeWnor1.HostWrite();
     auto hshape2 = shape2.HostWrite();
-    
+
     for(int face=0; face<mesh->GetNumFaces(); face++)
     {
       FaceElementTransformations *tr;
@@ -574,70 +601,74 @@ void M2ulPhyS::initIndirectionArrays()
         Array<int> vdofs2;
         fes->GetElementVDofs(tr->Elem1No, vdofs);
         fes->GetElementVDofs(tr->Elem2No, vdofs2);
-        
+
         {
           int nf = helemFaces[7*tr->Elem1No];
           if( nf<0 ) nf = 0;
           helemFaces[7*tr->Elem1No + nf+1] = face;
           nf++;
           helemFaces[7*tr->Elem1No] = nf;
-          
+
           nf = helemFaces[7*tr->Elem2No];
           if( nf<0 ) nf = 0;
           helemFaces[7*tr->Elem2No + nf+1] = face;
           nf++;
           helemFaces[7*tr->Elem2No] = nf;
         }
-        
+
         const FiniteElement *fe1 = fes->GetFE(tr->Elem1No);
         const FiniteElement *fe2 = fes->GetFE(tr->Elem2No);
-        
+
         const int dof1 = fe1->GetDof();
         const int dof2 = fe2->GetDof();
-        
+
         int intorder;
         if(tr->Elem2No >= 0)
-            intorder = (min(tr->Elem1->OrderW(), tr->Elem2->OrderW()) +
-                        2*max(fe1->GetOrder(), fe2->GetOrder()));
+          intorder = (min(tr->Elem1->OrderW(), tr->Elem2->OrderW()) +
+                      2*max(fe1->GetOrder(), fe2->GetOrder()));
         else
         {
-            intorder = tr->Elem1->OrderW() + 2*fe1->GetOrder();
+          intorder = tr->Elem1->OrderW() + 2*fe1->GetOrder();
         }
         if(fe1->Space() == FunctionSpace::Pk)
         {
-            intorder++;
+          intorder++;
         }
         const IntegrationRule *ir = &intRules->Get(tr->GetGeometryType(), intorder);
-        
+
         helems12Q[3*face  ] = tr->Elem1No;
         helems12Q[3*face+1] = tr->Elem2No;
         helems12Q[3*face+2] = ir->GetNPoints();
-        
-        Vector shape1i, shape2i; shape1i.UseDevice(false); shape2i.UseDevice(false);
-        shape1i.SetSize( dof1 ); shape2i.SetSize( dof2 );
-        for(int k=0;k<ir->GetNPoints();k++)
+
+        Vector shape1i, shape2i;
+        shape1i.UseDevice(false);
+        shape2i.UseDevice(false);
+        shape1i.SetSize( dof1 );
+        shape2i.SetSize( dof2 );
+        for(int k=0; k<ir->GetNPoints(); k++)
         {
           const IntegrationPoint &ip = ir->IntPoint(k);
           tr->SetAllIntPoints(&ip);
           // shape functions
           fe1->CalcShape(tr->GetElement1IntPoint(), shape1i);
           fe2->CalcShape(tr->GetElement2IntPoint(), shape2i);
-          for(int j=0;j<dof1;j++) hshapeWnor1[face*(maxDofs+dim+1)*maxIntPoints+j+k*(dim+1+maxDofs)] = 
-                                    shape1i[j];
-          for(int j=0;j<dof2;j++) hshape2[face*maxDofs*maxIntPoints+j+k*maxDofs] = shape2i[j];
-          
+          for(int j=0; j<dof1; j++) hshapeWnor1[face*(maxDofs+dim+1)*maxIntPoints+j+k*(dim+1+maxDofs)] =
+              shape1i[j];
+          for(int j=0; j<dof2; j++) hshape2[face*maxDofs*maxIntPoints+j+k*maxDofs] = shape2i[j];
+
           hshapeWnor1[face*(maxDofs+dim+1)*maxIntPoints+maxDofs  +k*(dim+1+maxDofs)] = ip.weight;
           // normals (multiplied by determinant of jacobian
-          Vector nor; nor.UseDevice(false);
+          Vector nor;
+          nor.UseDevice(false);
           nor.SetSize( dim );
           CalcOrtho(tr->Jacobian(), nor);
-          for(int d=0;d<dim;d++) hshapeWnor1[face*(maxDofs+dim+1)*maxIntPoints+maxDofs+1+d+k*(maxDofs+dim+1)] = 
-                                   nor[d];
+          for(int d=0; d<dim; d++) hshapeWnor1[face*(maxDofs+dim+1)*maxIntPoints+maxDofs+1+d+k*(maxDofs+dim+1)] =
+              nor[d];
         }
       }
     }
   }
-  
+
   //  BC  integration arrays
   if( fes->GetNBE()>0 )
   {
@@ -652,7 +683,7 @@ void M2ulPhyS::initIndirectionArrays()
     normalsWBC.SetSize(NumBCelems*maxIntPoints*(dim+1));
     normalsWBC = 0.;
     auto hnormalsWBC = normalsWBC.HostWrite();
-    
+
     intPointsElIDBC.SetSize(NumBCelems*2);
     intPointsElIDBC = 0;
     auto hintPointsElIDBC = intPointsElIDBC.HostWrite();
@@ -660,8 +691,8 @@ void M2ulPhyS::initIndirectionArrays()
     const FiniteElement *fe;
     FaceElementTransformations *tr;
     Mesh *mesh = fes->GetMesh();
-    
-    for(int f=0;f<NumBCelems;f++)
+
+    for(int f=0; f<NumBCelems; f++)
     {
       tr = mesh->GetBdrFaceTransformations (f);
       if(tr != NULL)
@@ -671,8 +702,8 @@ void M2ulPhyS::initIndirectionArrays()
         const int elDof = fe->GetDof();
         int intorder;
         if (tr->Elem2No >= 0)
-        intorder = (min(tr->Elem1->OrderW(), tr->Elem2->OrderW()) +
-              2*max(fe->GetOrder(), fe->GetOrder()));
+          intorder = (min(tr->Elem1->OrderW(), tr->Elem2->OrderW()) +
+                      2*max(fe->GetOrder(), fe->GetOrder()));
         else
         {
           intorder = tr->Elem1->OrderW() + 2*fe->GetOrder();
@@ -682,50 +713,53 @@ void M2ulPhyS::initIndirectionArrays()
           intorder++;
         }
         const IntegrationRule *ir = &intRules->Get(tr->GetGeometryType(), intorder);
-        
+
         hintPointsElIDBC[2*f] = ir->GetNPoints();
         hintPointsElIDBC[2*f+1] = tr->Elem1No;
-        
-        for(int q=0;q<ir->GetNPoints();q++)
+
+        for(int q=0; q<ir->GetNPoints(); q++)
         {
           const IntegrationPoint &ip = ir->IntPoint(q);
           tr->SetAllIntPoints(&ip);
-          Vector nor; nor.UseDevice(false);
+          Vector nor;
+          nor.UseDevice(false);
           nor.SetSize(dim);
           CalcOrtho(tr->Jacobian(), nor);
           hnormalsWBC[dim+q*(dim+1)+f*maxIntPoints*(dim+1)] = ip.weight;
-          for(int d=0;d<dim;d++) hnormalsWBC[d+q*(dim+1)+f*maxIntPoints*(dim+1)] = nor[d];
-          
-          Vector shape1; shape1.UseDevice(false);
+          for(int d=0; d<dim; d++) hnormalsWBC[d+q*(dim+1)+f*maxIntPoints*(dim+1)] = nor[d];
+
+          Vector shape1;
+          shape1.UseDevice(false);
           shape1.SetSize(elDof);
           fe->CalcShape(tr->GetElement1IntPoint(), shape1);
-          for(int n=0;n<elDof;n++) hshapesBC[n+q*maxDofs+f*maxIntPoints*maxDofs] = shape1(n);
+          for(int n=0; n<elDof; n++) hshapesBC[n+q*maxDofs+f*maxIntPoints*maxDofs] = shape1(n);
         }
       }
     }
-  }else
+  }
+  else
   {
     shapesBC.SetSize(1);
     shapesBC = 0.;
 
     normalsWBC.SetSize(1);
     normalsWBC = 0.;
-    
+
     intPointsElIDBC.SetSize(1);
     intPointsElIDBC = 0.;
   }
-  
+
 #ifdef _GPU_
   auto dnodesID = nodesIDs.Read();
   auto dnumElems = numElems.Read();
   auto dposDofIds = posDofIds.Read();
-  
+
   auto dshapeWnor1 = shapeWnor1.Read();
   auto dshape2 = shape2.Read();
-  
+
   auto delemFaces = elemFaces.Read();
   auto delems12Q = elems12Q.Read();
-  
+
   auto dshapesBC = shapesBC.Read();
   auto dnormalsBC = normalsWBC.Read();
   auto dintPointsELIBC = intPointsElIDBC.Read();
@@ -737,28 +771,28 @@ void M2ulPhyS::initIndirectionArrays()
 M2ulPhyS::~M2ulPhyS()
 {
   delete gradUp;
-  
+
   delete gradUp_A;
-  
+
   delete u_block;
   delete up_block;
   delete offsets;
-  
+
   delete U;
   delete Up;
-  
+
   delete average;
-  
+
   delete rhsOperator;
   //delete domainIntegrator;
   delete Aflux; // fails to delete (follow this)
   if( isSBP ) delete SBPoperator;
   //delete faceIntegrator;
   delete A; // fails to delete (follow this)
-  
+
   delete timeIntegrator;
   // delete inlet/outlet integrators
-  
+
   delete rsolver;
   delete fluxClass;
   delete eqState;
@@ -768,19 +802,13 @@ M2ulPhyS::~M2ulPhyS()
   delete fes;
   delete fec;
   delete intRules;
-  
+
   delete paraviewColl;
   //delete mesh;
-  
+
   delete groupsMPI;
 
   delete [] locToGlobElem;
-
-  if ( mpi.Root() && (config.RestartSerial() != "no") ){
-    delete serial_mesh;
-    delete serial_fes;
-    delete serial_soln;
-  }
 
 #ifdef HAVE_GRVY
   if(mpi.WorldRank() == 0)
@@ -792,11 +820,11 @@ M2ulPhyS::~M2ulPhyS()
 void M2ulPhyS::getAttributesInPartition(Array<int>& local_attr)
 {
   local_attr.DeleteAll();
-  for(int bel=0;bel<vfes->GetNBE(); bel++)
+  for(int bel=0; bel<vfes->GetNBE(); bel++)
   {
     int attr = vfes->GetBdrAttribute(bel);
     bool attrInArray = false;
-    for(int i=0;i<local_attr.Size();i++)
+    for(int i=0; i<local_attr.Size(); i++)
     {
       if( local_attr[i]==attr ) attrInArray = true;
     }
@@ -808,22 +836,26 @@ void M2ulPhyS::getAttributesInPartition(Array<int>& local_attr)
 void M2ulPhyS::initSolutionAndVisualizationVectors()
 {
   offsets = new Array<int>(num_equation + 1);
-  for (int k = 0; k <= num_equation; k++) { (*offsets)[k] = k * vfes->GetNDofs(); }
+  for (int k = 0; k <= num_equation; k++)
+  {
+    (*offsets)[k] = k * vfes->GetNDofs();
+  }
   u_block = new BlockVector(*offsets);
   up_block = new BlockVector(*offsets);
-  
+
   //gradUp.SetSize(num_equation*dim*vfes->GetNDofs());
   gradUp = new ParGridFunction(gradUpfes);
-  
+
   U  = new ParGridFunction(vfes, u_block->HostReadWrite());
   Up = new ParGridFunction(vfes, up_block->HostReadWrite());
 
   dens = new ParGridFunction(fes, Up->HostReadWrite());
   vel = new ParGridFunction(dfes, Up->HostReadWrite()+fes->GetNDofs() );
   press = new ParGridFunction(fes,
-                Up->HostReadWrite()+(num_equation-1)*fes->GetNDofs() );
-  
-  
+                              Up->HostReadWrite()+(num_equation-1)*fes->GetNDofs() );
+
+  restartH5files->setSolutionGridFunction( U );
+
   // compute factor to multiply viscosity when
   // this option is active
   spaceVaryViscMult = NULL;
@@ -833,21 +865,21 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
   {
     spaceVaryViscMult = new ParGridFunction(fes);
     double *viscMult = spaceVaryViscMult->HostWrite();
-    for(int n=0;n<fes->GetNDofs();n++)
+    for(int n=0; n<fes->GetNDofs(); n++)
     {
       double alpha = 1.;
       auto hcoords = coordsDof.HostRead(); // get coords
       double dist_pi=0., dist_p0=0., dist_pi0=0.;
-      for(int d=0;d<dim;d++)
+      for(int d=0; d<dim; d++)
       {
         dist_pi += config.GetLinearVaryingData().normal(d)*(
-          config.GetLinearVaryingData().pointInit(d)-hcoords[n+d*vfes->GetNDofs()] );
+                     config.GetLinearVaryingData().pointInit(d)-hcoords[n+d*vfes->GetNDofs()] );
         dist_p0 += config.GetLinearVaryingData().normal(d)*(
-          config.GetLinearVaryingData().point0(d)-hcoords[n+d*vfes->GetNDofs()] );
+                     config.GetLinearVaryingData().point0(d)-hcoords[n+d*vfes->GetNDofs()] );
         dist_pi0 += config.GetLinearVaryingData().normal(d)*(
-          config.GetLinearVaryingData().pointInit(d)-config.GetLinearVaryingData().point0(d) );
+                      config.GetLinearVaryingData().pointInit(d)-config.GetLinearVaryingData().point0(d) );
       }
-      
+
       if( dist_pi>0. && dist_p0<0 )
       {
         alpha += (config.GetLinearVaryingData().viscRatio-1.)/dist_pi0*dist_pi;
@@ -855,16 +887,16 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
       viscMult[n] = alpha;
     }
   }
-  
+
   paraviewColl->SetCycle(0);
   paraviewColl->SetTime(0.);
-  
+
   paraviewColl->RegisterField("dens",dens);
   paraviewColl->RegisterField("vel",vel);
   paraviewColl->RegisterField("press",press);
-  
+
   if( spaceVaryViscMult!=NULL ) paraviewColl->RegisterField("viscMult",spaceVaryViscMult);
-  
+
   paraviewColl->SetOwnData(true);
   //paraviewColl->Save();
 }
@@ -872,14 +904,14 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
 void M2ulPhyS::projectInitialSolution()
 {
   // Initialize the state.
-  
+
   // particular case: Euler vortex
 //   {
 //     void (*initialConditionFunction)(const Vector&, Vector&);
 //     t_final = 5.*  2./17.46;
 //     initialConditionFunction = &(this->InitialConditionEulerVortex);
-      //initialConditionFunction = &(this->testInitialCondition);
-    
+  //initialConditionFunction = &(this->testInitialCondition);
+
 //     VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
 //     U->ProjectCoefficient(u0);
 //   }
@@ -895,12 +927,13 @@ void M2ulPhyS::projectInitialSolution()
     u0.SetTime(0.0);
     U->ProjectCoefficient(u0);
 #endif
-  }else
+  }
+  else
   {
     if(config.RestartHDFConversion())
       read_restart_files();
     else
-      restart_files_hdf5("read");
+      restartH5files->restart_files_hdf5("read");
 
     if( mpi.Root() )
       Cache_Paraview_Timesteps();
@@ -910,7 +943,7 @@ void M2ulPhyS::projectInitialSolution()
     // to be used with future MFEM version...
     //paraviewColl->SetRestartMode(true);
   }
-  
+
   initGradUp();
 }
 
@@ -933,7 +966,7 @@ void M2ulPhyS::Iterate()
   Umms.SetTime(time);
   const double error = U->ComputeLpError(2, Umms);
   if(mpi.Root()) cout <<"time step: "<<iter<<", physical time "<<time<<"s"
-                      <<", Solution error: " << error << endl;
+                        <<", Solution error: " << error << endl;
 #endif
 
   bool readyForRestart = false;
@@ -954,16 +987,16 @@ void M2ulPhyS::Iterate()
 #endif
 
     timeIntegrator->Step(*U, time, dt);
-  
+
     Check_NAN();
 
     if( !config.isTimeStepConstant() )
     {
       double dt_local = CFL * hmin / max_char_speed /(double)dim;
       MPI_Allreduce(&dt_local, &dt,
-                        1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
+                    1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
     }
-    
+
     iter++;
 
     const int vis_steps = config.GetNumItersOutput();
@@ -973,7 +1006,7 @@ void M2ulPhyS::Iterate()
       Umms.SetTime(time);
       const double error = U->ComputeLpError(2, Umms);
       if(mpi.Root()) cout <<"time step: "<<iter<<", physical time "<<time<<"s"
-                          <<", Solution error: " << error << endl;
+                            <<", Solution error: " << error << endl;
 #else
       if(mpi.Root()) cout <<"time step: "<<iter<<", physical time "<<time<<"s"<< endl;
 #endif
@@ -982,14 +1015,14 @@ void M2ulPhyS::Iterate()
       if (iter != MaxIters)
       {
         //write_restart_files();
-        restart_files_hdf5("write");
-          
+        restartH5files->restart_files_hdf5("write");
+
         auto hUp = Up->HostRead();
         paraviewColl->SetCycle(iter);
         paraviewColl->SetTime(time);
         paraviewColl->Save();
         auto dUp = Up->ReadWrite(); // sets memory to GPU
-        
+
         average->write_meanANDrms_restart_files();
       }
 
@@ -1002,14 +1035,14 @@ void M2ulPhyS::Iterate()
     {
       readyForRestart = Check_JobResubmit();
       if(readyForRestart)
-        {
-          MaxIters = iter;
-          SetStatus(JOB_RESTART);
-          break;
-        }
+      {
+        MaxIters = iter;
+        SetStatus(JOB_RESTART);
+        break;
+      }
     }
 #endif
-    
+
     average->addSampleMean(iter);
 
 #ifdef HAVE_GRVY
@@ -1017,18 +1050,18 @@ void M2ulPhyS::Iterate()
 #endif
 
   }   // <-- end main timestep iteration loop
-  
-  
+
+
   if( iter==MaxIters )
   {
     //write_restart_files();
-    restart_files_hdf5("write");
-    
+    restartH5files->restart_files_hdf5("write");
+
     auto hUp = Up->HostRead();
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
     paraviewColl->Save();
-    
+
     average->write_meanANDrms_restart_files();
 
 #ifndef _MASA_
@@ -1063,7 +1096,7 @@ void M2ulPhyS::MASA_exactSoln(const Vector& x, double tin, Vector& y)
   y(4) = MASA::masa_eval_exact_p<double>(x[0],x[1],x[2], tin)/(gamma-1.);
 
   double k = 0.;
-  for(int d=0;d<x.Size();d++) k += y[1+d]*y[1+d];
+  for(int d=0; d<x.Size(); d++) k += y[1+d]*y[1+d];
   k *= 0.5/y[0];
   y[4] += k;
 }
@@ -1075,66 +1108,66 @@ void M2ulPhyS::InitialConditionEulerVortex(const Vector& x, Vector& y)
   MFEM_ASSERT(x.Size() == 2, "");
   int equations = 4;
   if(x.Size()==3) equations = 5;
-  
+
   int problem = 1;
   EquationOfState *eqState = new EquationOfState();
   eqState->setFluid(DRY_AIR);
   const double gamma = eqState->GetSpecificHeatRatio();
   const double Rg = eqState->GetGasConstant();
 
-   double radius = 0, Minf = 0, beta = 0;
-   if (problem == 1)
-   {
-      // "Fast vortex"
-      radius = 0.2;
-      Minf = 0.5;
-      beta = 1. / 5.;
-      
-      radius = 0.5;
-      Minf = 0.1;
-   }
-   else if (problem == 2)
-   {
-      // "Slow vortex"
-      radius = 0.2;
-      Minf = 0.05;
-      beta = 1. / 50.;
-   }
-   else
-   {
-      mfem_error("Cannot recognize problem."
-                 "Options are: 1 - fast vortex, 2 - slow vortex");
-   }
+  double radius = 0, Minf = 0, beta = 0;
+  if (problem == 1)
+  {
+    // "Fast vortex"
+    radius = 0.2;
+    Minf = 0.5;
+    beta = 1. / 5.;
 
-   int numVortices = 3;
-   Vector xc(numVortices),yc(numVortices);
-   yc = 0.;
-   for(int i=0;i<numVortices;i++)
-   {
-     xc[i] = 2.*M_PI/double(numVortices+1);
-     xc[i]+= double(i)*2.*M_PI/double(numVortices);
-   }
+    radius = 0.5;
+    Minf = 0.1;
+  }
+  else if (problem == 2)
+  {
+    // "Slow vortex"
+    radius = 0.2;
+    Minf = 0.05;
+    beta = 1. / 50.;
+  }
+  else
+  {
+    mfem_error("Cannot recognize problem."
+               "Options are: 1 - fast vortex, 2 - slow vortex");
+  }
 
-   const double Tt = 300.;
-   const double Pt = 102200;
-   
-   const double funcGamma = 1.+0.5*(gamma-1.)*Minf*Minf;
-   
-   const double temp_inf = Tt/funcGamma;
-   const double pres_inf = Pt*pow(funcGamma,gamma/(gamma-1.));
-   const double vel_inf = Minf*sqrt(gamma*Rg*temp_inf);
-   const double den_inf = pres_inf/(Rg*temp_inf);
-   
+  int numVortices = 3;
+  Vector xc(numVortices),yc(numVortices);
+  yc = 0.;
+  for(int i=0; i<numVortices; i++)
+  {
+    xc[i] = 2.*M_PI/double(numVortices+1);
+    xc[i]+= double(i)*2.*M_PI/double(numVortices);
+  }
 
-   double r2rad = 0.0;
+  const double Tt = 300.;
+  const double Pt = 102200;
 
-   const double shrinv1 = 1.0 / ( gamma - 1.);
+  const double funcGamma = 1.+0.5*(gamma-1.)*Minf*Minf;
 
-   double velX = 0.;
-   double velY = 0.;
-   double temp = 0.;
-   for(int i=0;i<numVortices;i++)
-   {
+  const double temp_inf = Tt/funcGamma;
+  const double pres_inf = Pt*pow(funcGamma,gamma/(gamma-1.));
+  const double vel_inf = Minf*sqrt(gamma*Rg*temp_inf);
+  const double den_inf = pres_inf/(Rg*temp_inf);
+
+
+  double r2rad = 0.0;
+
+  const double shrinv1 = 1.0 / ( gamma - 1.);
+
+  double velX = 0.;
+  double velY = 0.;
+  double temp = 0.;
+  for(int i=0; i<numVortices; i++)
+  {
     r2rad  = (x(0)-xc[i])*(x(0)-xc[i]);
     r2rad += (x(1)-yc[i])*(x(1)-yc[i]);
     r2rad /= radius*radius;
@@ -1142,51 +1175,51 @@ void M2ulPhyS::InitialConditionEulerVortex(const Vector& x, Vector& y)
     velY += beta*(x(0)-xc[i])/radius*exp( -0.5*r2rad);
     temp += exp(-r2rad);
   }
-   
-   velX = vel_inf*(1 - velX);
-   velY = vel_inf*velY;
-   const double vel2 = velX * velX + velY * velY;
 
-   const double specific_heat = Rg * gamma * shrinv1;
-   temp = temp_inf -0.5*(vel_inf*beta)*(vel_inf*beta)/specific_heat*temp;
+  velX = vel_inf*(1 - velX);
+  velY = vel_inf*velY;
+  const double vel2 = velX * velX + velY * velY;
 
-   const double den = den_inf * pow(temp/temp_inf, shrinv1);
-   const double pres = den * Rg * temp;
-   const double energy = shrinv1 * pres / den + 0.5 * vel2;
+  const double specific_heat = Rg * gamma * shrinv1;
+  temp = temp_inf -0.5*(vel_inf*beta)*(vel_inf*beta)/specific_heat*temp;
 
-   y(0) = den;
-   y(1) = den * velX;
-   y(2) = den * velY;
-   if(x.Size()==3) y(3) = 0.;
-   y(equations-1) = den * energy;
-   
-   delete eqState;
+  const double den = den_inf * pow(temp/temp_inf, shrinv1);
+  const double pres = den * Rg * temp;
+  const double energy = shrinv1 * pres / den + 0.5 * vel2;
+
+  y(0) = den;
+  y(1) = den * velX;
+  y(2) = den * velY;
+  if(x.Size()==3) y(3) = 0.;
+  y(equations-1) = den * energy;
+
+  delete eqState;
 }
 
 
 // Initial conditions for debug/test case
 void M2ulPhyS::testInitialCondition(const Vector& x, Vector& y)
 {
-   EquationOfState *eqState = new EquationOfState();
-   eqState->setFluid(DRY_AIR);
+  EquationOfState *eqState = new EquationOfState();
+  eqState->setFluid(DRY_AIR);
 
-   // Nice units
-   const double vel_inf = 1.;
-   const double den_inf = 1.3;
-   const double Minf = 0.5;
-   
-   const double gamma = eqState->GetSpecificHeatRatio();
-   //const double Rgas = eqState->GetGasConstant();
+  // Nice units
+  const double vel_inf = 1.;
+  const double den_inf = 1.3;
+  const double Minf = 0.5;
 
-   const double pres_inf = (den_inf / gamma) * (vel_inf / Minf) *
-                           (vel_inf / Minf);
+  const double gamma = eqState->GetSpecificHeatRatio();
+  //const double Rgas = eqState->GetGasConstant();
 
-   y(0) = den_inf + 0.5*(x(0)+3) +0.25*(x(1)+3);
-   y(1) = y(0);
-   y(2) = 0;
-   y(3) = (pres_inf+x(0)+0.2*x(1))/(gamma-1.) + 0.5*y(1)*y(1)/y(0);
-   
-   delete eqState;
+  const double pres_inf = (den_inf / gamma) * (vel_inf / Minf) *
+                          (vel_inf / Minf);
+
+  y(0) = den_inf + 0.5*(x(0)+3) +0.25*(x(1)+3);
+  y(1) = y(0);
+  y(2) = 0;
+  y(3) = (pres_inf+x(0)+0.2*x(1))/(gamma-1.) + 0.5*y(1)*y(1)/y(0);
+
+  delete eqState;
 }
 
 void M2ulPhyS::uniformInitialConditions()
@@ -1194,20 +1227,20 @@ void M2ulPhyS::uniformInitialConditions()
   double *data = U->HostWrite();
   double *dataUp = Up->HostWrite();
   double *dataGradUp = gradUp->HostWrite();
-  
+
   int dof = vfes->GetNDofs();
   double *inputRhoRhoVp = config.GetConstantInitialCondition();
-  
+
   EquationOfState *eqState = new EquationOfState();
   eqState->setFluid(DRY_AIR);
-  
+
   const double gamma = eqState->GetSpecificHeatRatio();
   const double rhoE = inputRhoRhoVp[4]/(gamma-1.)+
-                    0.5*(inputRhoRhoVp[1]*inputRhoRhoVp[1] +
-                         inputRhoRhoVp[2]*inputRhoRhoVp[2] +
-                         inputRhoRhoVp[3]*inputRhoRhoVp[3]
-                    )/inputRhoRhoVp[0];
-  
+                      0.5*(inputRhoRhoVp[1]*inputRhoRhoVp[1] +
+                           inputRhoRhoVp[2]*inputRhoRhoVp[2] +
+                           inputRhoRhoVp[3]*inputRhoRhoVp[3]
+                          )/inputRhoRhoVp[0];
+
   for(int i=0; i<dof; i++)
   {
     data[i       ] = inputRhoRhoVp[0];
@@ -1215,22 +1248,22 @@ void M2ulPhyS::uniformInitialConditions()
     data[i +2*dof] = inputRhoRhoVp[2];
     if(dim==3) data[i +3*dof] = inputRhoRhoVp[3];
     data[i +(num_equation-1)*dof] = rhoE;
-    
+
     dataUp[i       ] = data[i];
     dataUp[i +  dof] = data[i+  dof]/data[i];
     dataUp[i +2*dof] = data[i+2*dof]/data[i];
     if(dim==3) dataUp[i +3*dof] = data[i+3*dof]/data[i];
     dataUp[i +(num_equation-1)*dof] = inputRhoRhoVp[4];
-    
-    for(int d=0;d<dim;d++)
+
+    for(int d=0; d<dim; d++)
     {
-      for(int eq=0;eq<num_equation;eq++)
+      for(int eq=0; eq<num_equation; eq++)
       {
         dataGradUp[i+eq*dof + d*num_equation*dof] = 0.;
       }
     }
   }
-  
+
   delete eqState;
 }
 
@@ -1238,12 +1271,12 @@ void M2ulPhyS::initGradUp()
 {
   double *dataGradUp = gradUp->HostWrite();
   int dof = vfes->GetNDofs();
-  
+
   for(int i=0; i<dof; i++)
   {
-    for(int d=0;d<dim;d++)
+    for(int d=0; d<dim; d++)
     {
-      for(int eq=0;eq<num_equation;eq++)
+      for(int eq=0; eq<num_equation; eq++)
       {
         dataGradUp[i+eq*dof + d*num_equation*dof] = 0.;
       }
@@ -1258,45 +1291,147 @@ void M2ulPhyS::write_restart_files()
   serialName.append("_");
   serialName.append( config.GetOutputName() );
   serialName.append( ".sol" );
-    
+
   string fileName = groupsMPI->getParallelName( serialName );
   ofstream file( fileName, std::ofstream::trunc );
   file.precision(8);
-  
+
   // write cycle and time
   file<<iter<<" "<<time<<" "<<dt<<endl;
-  
+
   //double *data = Up->GetData();
   const double *data = Up->HostRead(); // get data from GPU
   int dof = vfes->GetNDofs();
-  
-  for(int i=0;i<dof*num_equation;i++)
+
+  for(int i=0; i<dof*num_equation; i++)
   {
     file << data[i] <<endl;
   }
-  
+
   Up->Write(); // sets data back to GPU
-  
+
   file.close();
+}
+
+void M2ulPhyS::partitioning_file_hdf5(std::string mode)
+{
+  // only rank 0 writes partitioning file
+  if(! rank0_)
+    return;
+
+  hid_t file, dataspace, data_soln;
+  herr_t status;
+  std::string fileName = config.GetPartitionBaseName();
+  fileName += "." + std::to_string(nprocs_) + "p.h5";
+
+  assert( (mode == "read") || (mode == "write") );
+
+  if(mode == "write")
+  {
+    assert(partitioning_.Size() > 0);
+
+    if(file_exists(fileName))
+      grvy_printf(WARN,"Removing existing partition file: %s\n",fileName.c_str());
+    else
+      grvy_printf(INFO,"Saving original domain decomposition partition file: %s\n",fileName.c_str());
+
+    file = H5Fcreate(fileName.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT );
+  }
+  else if (mode == "read")
+  {
+    if( file_exists(fileName))
+    {
+      file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+    }
+    else
+    {
+      grvy_printf(ERROR,"[ERROR]: Unable to access necessary partition file on restart -> %s\n",fileName.c_str());
+      exit(ERROR);
+    }
+
+    assert(file >= 0);
+  }
+
+
+  if(mode == "write" )
+  {
+    // Attributes
+    h5_save_attribute(file,"numProcs",mpi.WorldSize());
+
+    // Raw partition info
+    hsize_t dims[1];
+    hid_t data;
+
+    dims[0]   = partitioning_.Size();
+    dataspace = H5Screate_simple(1, dims, NULL);
+    assert(dataspace >= 0);
+
+    data = H5Dcreate2(file, "partitioning", H5T_NATIVE_INT, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    assert(data >= 0);
+    status = H5Dwrite(data, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, partitioning_.GetData());
+    assert(status >= 0);
+    H5Dclose(data);
+    H5Fclose(file);
+  }
+  else if (mode == "read")
+  {
+    partitioning_.SetSize(nelemGlobal_);
+
+    if(rank0_)
+    {
+      grvy_printf(INFO,"Reading original domain decomposition partition file: %s\n",fileName.c_str());
+
+      // verify partition info matches current proc count
+      {
+        int np=0;
+        h5_read_attribute(file,"numProcs",np);
+        grvy_printf(INFO,"--> # partitions defined = %i\n",np);
+        if(np != nprocs_)
+        {
+          grvy_printf(ERROR,"[ERROR]: Partition info does not match current processor count -> %i\n",nprocs_);
+          exit(ERROR);
+        }
+      }
+
+      // read partition vector
+      hid_t data;
+      hsize_t numInFile;
+      data = H5Dopen2(file, "partitioning",H5P_DEFAULT);
+      assert(data >= 0);
+      dataspace = H5Dget_space(data);
+      numInFile = H5Sget_simple_extent_npoints(dataspace);
+
+      assert(numInFile == nelemGlobal_);
+
+      status = H5Dread(data, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, partitioning_.GetData());
+      assert(status >= 0);
+      H5Dclose(data);
+    } // <-- end rank0_
+
+    // distribute partition vectory to all procs
+    MPI_Bcast( partitioning_.GetData(),nelemGlobal_, MPI_INT, 0, MPI_COMM_WORLD);
+    if(rank0_)
+      grvy_printf(INFO,"--> partition file read complete\n");
+  }
 }
 
 
 void M2ulPhyS::read_restart_files()
 {
   if(mpi.Root())
-    {
-      cout << endl;
-      cout<<"================================================"<<endl;
-      cout<<"| Restarting simulation" << endl;
-      cout<<"================================================"<<endl;
-    }
+  {
+    cout << endl;
+    cout<<"================================================"<<endl;
+    cout<<"| Restarting simulation" << endl;
+    cout<<"================================================"<<endl;
+  }
 
   if( loadFromAuxSol )
-    {
-      cerr << "ERROR: Restart from auxOrder is not supported with ascii-based restarts." << endl;
-      cerr << "To change order, convert the ascii-based restart file to hdf5 and then change the order." << endl;
-      MPI_Abort(MPI_COMM_WORLD,1);
-    }
+  {
+    cerr << "ERROR: Restart from auxOrder is not supported with ascii-based restarts." << endl;
+    cerr << "To change order, convert the ascii-based restart file to hdf5 and then change the order." << endl;
+    MPI_Abort(MPI_COMM_WORLD,1);
+  }
 
   assert(!loadFromAuxSol);
 
@@ -1305,15 +1440,16 @@ void M2ulPhyS::read_restart_files()
   serialName.append("_");
   serialName.append( config.GetOutputName() );
   serialName.append( ".sol" );
-  
+
   string fileName = groupsMPI->getParallelName( serialName );
   ifstream file( fileName );
-  
+
   if( !file.is_open() )
   {
     cout<< "Could not open file \""<<fileName<<"\""<<endl;
     return;
-  }else
+  }
+  else
   {
     double *data;
     data = Up->GetData();
@@ -1328,23 +1464,23 @@ void M2ulPhyS::read_restart_files()
       iter = stoi( word );
 
       if(mpi.Root())
-	cout << "--> restart iter = " << iter << endl;
+        cout << "--> restart iter = " << iter << endl;
       config.SetRestartCycle(iter);
-      
+
       ss >> word;
       time = stof( word );
-      
+
       ss >> word;
       dt = stof( word );
     }
-  
+
     int lines = 0;
     while( getline(file,line) )
     {
       istringstream ss(line);
       string word;
       ss >> word;
-      
+
       data[lines] = stof( word );
       lines++;
     }
@@ -1359,20 +1495,21 @@ void M2ulPhyS::read_restart_files()
     if( lines!=dof*num_equation )
     {
       cout<<"# of lines in files does not match domain size"<<endl;
-    }else
+    }
+    else
     {
       dof = vfes->GetNDofs();
-      for(int i=0;i<dof;i++)
+      for(int i=0; i<dof; i++)
       {
         double p = dataUp[i + (num_equation-1)*dof];
         double r = dataUp[i];
         Array<double> vel(dim);
-        for(int d=0;d<dim;d++) vel[d] = dataUp[i+(d+1)*dof];
+        for(int d=0; d<dim; d++) vel[d] = dataUp[i+(d+1)*dof];
         double k = 0.;
-        for(int d=0;d<dim;d++) k += vel[d]*vel[d];
+        for(int d=0; d<dim; d++) k += vel[d]*vel[d];
         double rE = p/(gamma-1.) + 0.5*r*k;
         dataU[i] = r;
-        for(int d=0;d<dim;d++) dataU[i+(d+1)*dof] = r*vel[d];
+        for(int d=0; d<dim; d++) dataU[i+(d+1)*dof] = r*vel[d];
         dataU[i+(num_equation-1)*dof] = rE;
       }
     }
@@ -1389,19 +1526,19 @@ void M2ulPhyS::Check_NAN()
 {
   int local_print = 0;
   int dof = vfes->GetNDofs();
-  
+
 #ifdef _GPU_
   {
     local_print = M2ulPhyS::Check_NaN_GPU(U, dof*num_equation);
   }
 #else
   const double *dataU = U->HostRead();
-  
+
   //bool thereIsNan = false;
-  
-  for(int i=0;i<dof;i++)
+
+  for(int i=0; i<dof; i++)
   {
-    for(int eq=0;eq<num_equation;eq++)
+    for(int eq=0; eq<num_equation; eq++)
     {
       if( std::isnan(dataU[i+eq*dof]) )
       {
@@ -1415,7 +1552,7 @@ void M2ulPhyS::Check_NAN()
 #endif
   int print;
   MPI_Allreduce(&local_print, &print,
-                       1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+                1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
   if( print>0 )
   {
     auto hUp = Up->HostRead(); // get GPU data
@@ -1430,17 +1567,17 @@ void M2ulPhyS::Check_NAN()
 int M2ulPhyS::Check_NaN_GPU(ParGridFunction *U, int lengthU)
 {
   const double *dataU = U->Read();
-  Array<int> temp; 
+  Array<int> temp;
   temp.SetSize(1);
   temp = 0;
   auto d_temp = temp.ReadWrite();
-  
+
   MFEM_FORALL(n,lengthU,
   {
     double val = dataU[n];
     if( val!= val ) d_temp[0] += 1;
   });
-  
+
   auto htemp = temp.HostRead();
   return htemp[0];
 }
@@ -1449,25 +1586,26 @@ void M2ulPhyS::initialTimeStep()
 {
   auto dataU = U->HostReadWrite();
   int dof = vfes->GetNDofs();
-  
-  for(int n=0;n<dof;n++)
+
+  for(int n=0; n<dof; n++)
   {
     Vector state(num_equation);
-    for(int eq=0;eq<num_equation;eq++) state[eq] = dataU[n+eq*dof];
+    for(int eq=0; eq<num_equation; eq++) state[eq] = dataU[n+eq*dof];
     double iC = eqState->ComputeMaxCharSpeed(state,dim);
     if( iC>max_char_speed ) max_char_speed = iC;
   }
-  
+
   double partition_C = max_char_speed;
   MPI_Allreduce(&partition_C, &max_char_speed,
-                       1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-  
+                1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+
   dt = CFL * hmin / max_char_speed /(double)dim;
 
   // dt_fixed is initialized to -1, so if it is positive, then the
   // user requested a fixed dt run
   const double dt_fixed = config.GetFixedDT();
-  if( dt_fixed > 0 ){
+  if( dt_fixed > 0 )
+  {
     dt = dt_fixed;
   }
 }
