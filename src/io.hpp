@@ -2,8 +2,10 @@
 #define IO_OPERATION
 
 #include <mfem.hpp>
+#include "tps_config.h"
 #include <hdf5.h>
 #include "utils.hpp"
+#include "dataStructures.hpp"
 
 #ifdef HAVE_GRVY
 #include "grvy.h"

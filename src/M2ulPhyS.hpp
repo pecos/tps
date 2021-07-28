@@ -24,7 +24,7 @@
 #include "BCintegrator.hpp"
 #include "faceGradientIntegration.hpp"
 #include "averaging_and_rms.hpp"
-
+#include "dataStructures.hpp"
 #include "dgNonlinearForm.hpp"
 #include "gradNonLinearForm.hpp"
 
@@ -38,9 +38,6 @@
 
 using namespace mfem;
 using namespace std;
-
-// application exit codes
-enum ExitCodes {NORMAL = 0, ERROR = 1, JOB_RESTART = 10 };
 
 class M2ulPhyS
 {

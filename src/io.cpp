@@ -475,7 +475,7 @@ void IO_operations::restart_files_hdf5(string mode)
 //       dataUp[i+2*vfes->GetNDofs()] = iState[2]/iState[0];
 //       if(dim==3) dataUp[i+3*vfes->GetNDofs()] = iState[3]/iState[0];
 //       dataUp[i+(num_equation-1)*vfes->GetNDofs()] = p;
-    }
+//    }
 
     // clean up aux data
     delete aux_U;
