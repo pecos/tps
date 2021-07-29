@@ -97,7 +97,8 @@ void IO_operations::restart_files_hdf5(string mode)
   herr_t status;
   Vector dataSerial;
 
-  string serialName = "restart_";
+  //string serialName = "restart_";
+  string serialName = prefix_serial;
   serialName.append( config->GetOutputName() );
   serialName.append( ".sol.h5" );
   string fileName;
@@ -109,10 +110,10 @@ void IO_operations::restart_files_hdf5(string mode)
     fileName = groupsMPI->getParallelName( serialName );
 
   // Variables used if (and only if) restarting from different order
-  FiniteElementCollection *aux_fec=NULL;
-  ParFiniteElementSpace *aux_vfes=NULL;
-  ParGridFunction *aux_U=NULL;
-  double *aux_U_data=NULL;
+  FiniteElementCollection *aux_fec    = NULL;
+  ParFiniteElementSpace   *aux_vfes   = NULL;
+  ParGridFunction         *aux_U      = NULL;
+  double                  *aux_U_data = NULL;
   int auxOrder = -1;
 
   if(groupsMPI->getSession()->Root())
@@ -202,7 +203,7 @@ void IO_operations::restart_files_hdf5(string mode)
   {
     int read_order;
 
-    // normal restarts have each process read there own portion of the
+    // normal restarts have each process read their own portion of the
     // solution; a serial restart only reads on rank 0 and distributes to
     // the remaining processes
 
@@ -286,7 +287,7 @@ void IO_operations::restart_files_hdf5(string mode)
     if ( (config->RestartSerial() == "write") && (nprocs_ > 1) )
     {
       serialize_soln_for_write();
-      dataU = serial_soln->GetData();
+      dataU = serial_soln->HostReadWrite();
     }
 
     if (rank0_ || (config->RestartSerial() != "write") )
@@ -299,13 +300,13 @@ void IO_operations::restart_files_hdf5(string mode)
 
       data_soln = H5Dcreate2(group, "rho-u", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
       assert(data_soln >= 0);
-      status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[1*dims[0]]);
+      status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataU+dims[0]);
       assert(status >= 0);
       H5Dclose(data_soln);
 
       data_soln = H5Dcreate2(group, "rho-v", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
       assert(data_soln >= 0);
-      status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[2*dims[0]]);
+      status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataU+2*dims[0]);
       assert(status >= 0);
       H5Dclose(data_soln);
 
@@ -316,14 +317,14 @@ void IO_operations::restart_files_hdf5(string mode)
         rhoeIndex = 4*dims[0];
         data_soln = H5Dcreate2(group, "rho-w", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
         assert(data_soln >= 0);
-        status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[3*dims[0]]);
+        status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataU+3*dims[0]);
         assert(status >= 0);
         H5Dclose(data_soln);
       }
 
       data_soln = H5Dcreate2(group, "rho-E", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
       assert(data_soln >= 0);
-      status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[rhoeIndex]);
+      status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataU+rhoeIndex);
       assert(status >= 0);
       H5Dclose(data_soln);
 
@@ -508,7 +509,8 @@ void IO_operations::serialize_soln_for_write()
     grvy_printf(INFO,"Generating serialized restart file...\n");
     // copy my own data
     Array<int> lvdofs, gvdofs;
-    Vector lsoln;
+    Vector lsoln; 
+    lsoln.UseDevice(false); // make sure all data movement is happening on CPU
     for(int elem=0; elem<local_ne; elem++)
     {
       int gelem = locToGlobElem[elem];
@@ -540,6 +542,7 @@ void IO_operations::serialize_soln_for_write()
     // have non-zero ranks send their data to rank 0
     Array<int> lvdofs;
     Vector lsoln;
+    lsoln.UseDevice(false);
     for(int elem=0; elem<local_ne; elem++)
     {
       int gelem = locToGlobElem[elem];
@@ -591,6 +594,7 @@ void IO_operations::read_serialized_soln_data(hid_t file, string varName, int nu
     grvy_printf(INFO,"[RestartSerial]: Reading %s for distribution\n",varName.c_str());
 
     Vector data_serial;
+    data_serial.UseDevice(false);
     data_serial.SetSize(numDof);
     data_soln = H5Dopen2(file,varName.c_str(),H5P_DEFAULT);
     assert(data_soln >= 0);
@@ -603,6 +607,7 @@ void IO_operations::read_serialized_soln_data(hid_t file, string varName, int nu
 
     Array<int> lvdofs, gvdofs;
     Vector lnodes;
+    lnodes.UseDevice(false);
     int counter = 0;
     int ndof_per_elem;
 
