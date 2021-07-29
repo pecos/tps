@@ -99,21 +99,11 @@ void M2ulPhyS::initVariables()
         assert(serial_temp_mesh->Conforming());
         partitioning_ = Array<int>(serial_temp_mesh->GeneratePartitioning(nprocs_, defaultPartMethod),nelemGlobal_);
         partitioning_file_hdf5("write");
-        MPI_Barrier(MPI_COMM_WORLD);
       }
       else
       {
         partitioning_file_hdf5("read");
       }
-    }
-
-    if(nprocs_ > 1)
-    {
-      assert(serial_temp_mesh->Conforming());
-      partitioning_ = Array<int>(serial_temp_mesh->GeneratePartitioning(nprocs_, defaultPartMethod),nelemGlobal_);
-      if(rank0_)
-        partitioning_file_hdf5("write");
-      MPI_Barrier(MPI_COMM_WORLD);
     }
 
     mesh = new ParMesh(MPI_COMM_WORLD,*serial_temp_mesh, partitioning_);
@@ -127,7 +117,7 @@ void M2ulPhyS::initVariables()
     paraviewColl->SetLevelsOfDetail( config.GetSolutionOrder() );
     paraviewColl->SetHighOrderOutput(true);
     paraviewColl->SetPrecision(8);
-    paraviewColl->SetDataFormat(VTKFormat::ASCII);
+//     paraviewColl->SetDataFormat(VTKFormat::ASCII);
 
   }
   else
@@ -1315,12 +1305,10 @@ void M2ulPhyS::write_restart_files()
 
 void M2ulPhyS::partitioning_file_hdf5(std::string mode)
 {
-  // only rank 0 writes partitioning file
-  if(! rank0_)
-    return;
+  grvy_timer_begin(__func__);
   
-  // we only write partitioning file on original (non-restart) run
-  if(config.GetRestartCycle() > 0)
+  // only rank 0 writes partitioning file
+  if( !rank0_ && (mode == "write") )
     return;
 
   hid_t file, dataspace, data_soln;
@@ -1412,11 +1400,28 @@ void M2ulPhyS::partitioning_file_hdf5(std::string mode)
       H5Dclose(data);
     } // <-- end rank0_
 
-    // distribute partition vectory to all procs
+#if 0
     MPI_Bcast( partitioning_.GetData(),nelemGlobal_, MPI_INT, 0, MPI_COMM_WORLD);
+#endif
+
+    // distribute partition vector to all procs (serialzed per process variant)
+      int tag = 21;
+
+      if(rank0_)
+      {
+        for(int rank=1;rank<nprocs_;rank++)
+          {
+            MPI_Send(partitioning_.GetData(),nelemGlobal_,MPI_INT,rank,tag,MPI_COMM_WORLD);
+            grvy_printf(DEBUG,"Sent partitioning data to rank %i\n",rank);
+          }
+      }
+      else
+        MPI_Recv(partitioning_.GetData(),nelemGlobal_,MPI_INT,0,tag,MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      
     if(rank0_)
       grvy_printf(INFO,"--> partition file read complete\n");
   }
+  grvy_timer_end(__func__);
 }
 
 
