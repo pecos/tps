@@ -27,7 +27,8 @@ private:
   double bulk_visc_mult;
   
   // Prandtl number
-  double Pr;
+  double Pr;            // Prandtl number
+  double cp_div_pr;     // cp divided by Pr (used in conductivity calculation)
 public:
   EquationOfState();
   
@@ -37,6 +38,8 @@ public:
   void setBulkViscMult(double _bulk_mult){bulk_visc_mult = _bulk_mult;}
   
   double ComputePressure(const Vector &state, int dim);
+
+
   
   // Compute the maximum characteristic speed.
   double ComputeMaxCharSpeed(const Vector &state, const int dim);
@@ -51,6 +54,8 @@ public:
   double GetViscMultiplyer(){return visc_mult;}
   double GetBulkViscMultiplyer(){return bulk_visc_mult;}
   double GetThermalConductivity(const double &visc);
+
+
   
   // GPU functions
 #ifdef _GPU_
@@ -83,5 +88,27 @@ public:
 #endif
 
 };
+
+// additional functions inlined for speed...
+inline double EquationOfState::ComputePressure(const Vector& state, int dim)
+{
+  double den_vel2 = 0;
+  for (int d=0;d<dim;d++)
+    den_vel2 += state(d+1)*state(d+1);
+  den_vel2 /= state[0];
+  
+  return (specific_heat_ratio - 1.0)*(state[1+dim] - 0.5*den_vel2);
+}
+
+inline double EquationOfState::GetViscosity(const double &temp)
+{
+  // Sutherland's law
+  return(1.458e-6*visc_mult*pow(temp,1.5)/(temp+110.4));
+}
+
+inline double EquationOfState::GetThermalConductivity(const double &visc)
+{
+  return(visc*cp_div_pr);
+}
 
 #endif // EQUATION_OF_STATE

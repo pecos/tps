@@ -10,6 +10,11 @@ eqSystem(_eqSystem),
 dim(_dim),
 num_equations(_num_equations)
 {
+  gradT.SetSize(dim);
+  vel.SetSize(dim);
+  vtmp.SetSize(dim);
+  stress.SetSize(dim,dim);
+  Rg = eqState->GetGasConstant();
 }
 
 void Fluxes::ComputeTotalFlux(const Vector& state, 
@@ -69,48 +74,45 @@ void Fluxes::ComputeViscousFluxes(const Vector& state,
   {
     case NS:
     {
-      const double Rg = eqState->GetGasConstant();
-      const double p  = eqState->ComputePressure(state,dim);
+
+      const double p    = eqState->ComputePressure(state,dim);
       const double temp = p/state[0]/Rg;
       const double visc = eqState->GetViscosity(temp);
       const double bulkViscMult = eqState->GetBulkViscMultiplyer();
       const double k    = eqState->GetThermalConductivity(visc);
-      
+
       // make sure density visc. flux is 0
       for(int d=0;d<dim;d++) flux(0,d) = 0.;
       
       double divV = 0.;
-      DenseMatrix stress(dim,dim);
       for(int i=0;i<dim;i++)
       {
         for(int j=0;j<dim;j++)
-        {
           stress(i,j) = gradUp(1+j,i) + gradUp(1+i,j);
-        }
         divV += gradUp(1+i,i);
       }
+
       for(int i=0;i<dim;i++) stress(i,i) += (bulkViscMult -2./3.)*divV;
       stress *= visc;
-      
+
       for(int i=0;i<dim;i++)
-      {
         for(int j=0;j<dim;j++)
-        {
           flux(1+i,j) = stress(i,j);
-        }
-      }
       
       // temperature gradient
-      Vector gradT(dim);
-      for(int d=0;d<dim;d++) gradT[d] = temp*(gradUp(1+dim,d)/p - gradUp(0,d)/state[0]);
-      
-      Vector vel(dim);
-      for(int d=0;d<dim;d++) vel(d) = state[1+d]/state[0];
+
       for(int d=0;d<dim;d++)
-      {
-        for(int i=0;i<dim;i++) flux(1+dim,d) += vel[i]*stress(d,i);
-        flux(1+dim,d) += k*gradT[d];
-      }
+        gradT[d] = temp*(gradUp(1+dim,d)/p - gradUp(0,d)/state[0]);
+      
+      for(int d=0;d<dim;d++)
+        vel(d) = state[1+d]/state[0];
+
+      stress.Mult(vel,vtmp);
+      for(int d=0;d<dim;d++)
+        {
+          flux(1+dim,d) += vtmp[d];
+          flux(1+dim,d) += k*gradT[d];
+        }
     }
       break;
     default:

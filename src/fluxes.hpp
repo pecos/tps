@@ -25,6 +25,11 @@ private:
   const int &dim;
   
   const int &num_equations;
+  double Rg;
+  Vector gradT;
+  Vector vel;
+  Vector vtmp;
+  DenseMatrix stress;
   
 public:
   Fluxes(EquationOfState *_eqState,
