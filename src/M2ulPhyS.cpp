@@ -287,7 +287,8 @@ void M2ulPhyS::initVariables()
 
   initIndirectionArrays();
   initSolutionAndVisualizationVectors();
-  projectInitialSolution();
+  
+  restartH5files->setSolutionGridFunction( U );
 
   average = new Averaging(Up,
                           mesh,
@@ -298,8 +299,11 @@ void M2ulPhyS::initVariables()
                           num_equation,
                           dim,
                           config,
-                          groupsMPI);
-  average->read_meanANDrms_restart_files();
+                          groupsMPI );
+//   average->read_meanANDrms_restart_files();
+  restartH5files->setAveragesObject( average );
+  
+  projectInitialSolution();
 
   fluxClass = new Fluxes(eqState,
                          eqSystem,
@@ -844,8 +848,6 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
   press = new ParGridFunction(fes,
                               Up->HostReadWrite()+(num_equation-1)*fes->GetNDofs() );
 
-  restartH5files->setSolutionGridFunction( U );
-
   // compute factor to multiply viscosity when
   // this option is active
   spaceVaryViscMult = NULL;
@@ -1013,7 +1015,8 @@ void M2ulPhyS::Iterate()
         paraviewColl->Save();
         auto dUp = Up->ReadWrite(); // sets memory to GPU
 
-        average->write_meanANDrms_restart_files();
+//         average->write_meanANDrms_restart_files();
+        average->SaveParaviewOutput();
       }
 
 
@@ -1052,7 +1055,8 @@ void M2ulPhyS::Iterate()
     paraviewColl->SetTime(time);
     paraviewColl->Save();
 
-    average->write_meanANDrms_restart_files();
+//     average->write_meanANDrms_restart_files();
+    average->SaveParaviewOutput();
 
 #ifndef _MASA_
     // If _MASA_ is defined, this is handled above

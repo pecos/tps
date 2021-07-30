@@ -65,6 +65,18 @@ public:
   void addSampleMean(const int &iter);
   void write_meanANDrms_restart_files();
   void read_meanANDrms_restart_files();
+  
+  void SaveParaviewOutput();
+  
+  ParGridFunction *GetMeanUp(){return meanUp;}
+  ParGridFunction *GetRMS(){return rms;}
+  ParFiniteElementSpace *GetRMSFes(){return rmsFes;}
+  int &GetSamplesMean(){return samplesMean;}
+  int &GetSamplesInterval(){return sampleInterval;}
+  bool ComputeMean(){return computeMean;}
+  
+  void SetSamplesMean(int &samples){samplesMean = samples;}
+  void SetSamplesInterval(int &interval){sampleInterval = interval;}
 };
 
 #endif // AVERAGING_AND_RMS

@@ -32,20 +32,18 @@ dim(_dim)
   rank0_  = groupsMPI->getSession()->Root();
   
   loadFromAuxSol = config->RestartFromAux();
+
+  serial_mesh = NULL;
+  serial_fes  = NULL;
+  serial_soln = NULL;
   
-  // instantiate objects needed by rank 0 for single restart file option
-  if ( rank0_ && (config->RestartSerial() != "no") )
-  {
-    serial_mesh = new Mesh(config->GetMeshFileName().c_str() );
-    serial_fes = new FiniteElementSpace(serial_mesh, fec, num_equation, Ordering::byNODES);
-    serial_soln = new GridFunction(serial_fes);
-    // to help detect errors, initialize to nan
-    *serial_soln = std::numeric_limits<double>::quiet_NaN();
-  }
+  serial_rmsFes = NULL;
+  serial_rms = NULL;
   
-  U = NULL;
+  U      = NULL;
   meanUp = NULL;
-  rms = NULL;
+  rms    = NULL;
+  rmsFes = NULL;
 }
 
 IO_operations::~IO_operations()
@@ -55,6 +53,11 @@ IO_operations::~IO_operations()
     delete serial_mesh;
     delete serial_fes;
     delete serial_soln;
+    if( meanUp!=NULL )
+    {
+      delete serial_rmsFes;
+      delete serial_rms;
+    }
   }
 }
 
@@ -66,6 +69,15 @@ void IO_operations::setSolutionGridFunction(ParGridFunction* _U)
   mesh = vfes->GetParMesh();
   fec  = vfes->FEColl();
   
+  if ( rank0_ && (config->RestartSerial() != "no") )
+  {
+    serial_mesh = new Mesh(config->GetMeshFileName().c_str() );
+    serial_fes = new FiniteElementSpace(serial_mesh, fec, num_equation, Ordering::byNODES);
+    serial_soln = new GridFunction(serial_fes);
+    // to help detect errors, initialize to nan
+    *serial_soln = std::numeric_limits<double>::quiet_NaN();
+  }
+  
   // compute total number of elements
   int locElems = vfes->GetNE();
   MPI_Allreduce(&locElems, &nelemGlobal_,
@@ -73,12 +85,23 @@ void IO_operations::setSolutionGridFunction(ParGridFunction* _U)
 }
 
 
-void IO_operations::setAveragesGridFunction(ParGridFunction* _meanUp, ParGridFunction* _rms)
+void IO_operations::setAveragesObject(Averaging* _averages)
 {
-  meanUp = _meanUp;
-  rms = _rms;
+  average = _averages;
+  
+  if( average->ComputeMean() )
+  {
+    meanUp = average->GetMeanUp();
+    rms = average->GetRMS();
+    rmsFes = average->GetRMSFes();
+    
+    if ( rank0_ && (config->RestartSerial() != "no") )
+    {
+      serial_rmsFes = new FiniteElementSpace(serial_mesh, fec, 6, Ordering::byNODES);
+      serial_rms    = new GridFunction(serial_rmsFes);
+    }
+  }
 }
-
 
 
 void IO_operations::restart_files_hdf5(string mode)
@@ -88,12 +111,17 @@ void IO_operations::restart_files_hdf5(string mode)
     cout<<"IO Error: solution not set"<<endl;
     return;
   }
+  if( (meanUp==NULL || rms==NULL) && average->ComputeMean() )
+  {
+    cout<<"IO Error: averages not set"<<endl;
+    return;
+  }
 #ifdef HAVE_GRVY
   grvy_timer_begin(__func__);
 #endif
 
   hid_t file = NULL;
-  hid_t dataspace, data_soln;
+  hid_t dataspace,data_soln;
   herr_t status;
   Vector dataSerial;
 
@@ -179,6 +207,12 @@ void IO_operations::restart_files_hdf5(string mode)
       h5_save_attribute(file,"order",order);
       // spatial dimension
       h5_save_attribute(file,"dimension",dim);
+      if( average->ComputeMean() )
+      {
+        // samples meanUp
+        h5_save_attribute(file,"samplesMean",average->GetSamplesMean());
+        h5_save_attribute(file,"samplesInterval",average->GetSamplesInterval());
+      }
       // code revision
 #ifdef BUILD_VERSION
       {
@@ -213,6 +247,14 @@ void IO_operations::restart_files_hdf5(string mode)
       h5_read_attribute(file,"time",time);
       h5_read_attribute(file,"dt",dt);
       h5_read_attribute(file,"order",read_order);
+      if( average->ComputeMean())
+      {
+        int samplesMean, intervals;
+        h5_read_attribute(file,"samplesMean",samplesMean);
+        h5_read_attribute(file,"samplesInterval",intervals);
+        average->SetSamplesMean(samplesMean);
+        average->SetSamplesInterval(intervals);
+      }
     }
 
     if(config->RestartSerial() == "read")
@@ -221,6 +263,11 @@ void IO_operations::restart_files_hdf5(string mode)
       MPI_Bcast(&time,      1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
       MPI_Bcast(&dt,        1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
       MPI_Bcast(&read_order,1, MPI_INT,    0, MPI_COMM_WORLD);
+      if( average->ComputeMean())
+      {
+        MPI_Bcast(&average->GetSamplesMean(),    1, MPI_INT, 0, MPI_COMM_WORLD);
+        MPI_Bcast(&average->GetSamplesInterval(),1, MPI_INT, 0, MPI_COMM_WORLD);
+      }
     }
 
     if( loadFromAuxSol )
@@ -247,6 +294,11 @@ void IO_operations::restart_files_hdf5(string mode)
       grvy_printf(GRVY_INFO,"Restarting from iteration = %i\n",iter);
       grvy_printf(GRVY_INFO,"--> time = %e\n",time);
       grvy_printf(GRVY_INFO,"--> dt   = %e\n",dt);
+      if( average->ComputeMean() )
+      {
+        grvy_printf(GRVY_INFO,"Restarting averages with %i\n samples",
+                    average->GetSamplesMean());
+      }
     }
 
   }
@@ -269,7 +321,7 @@ void IO_operations::restart_files_hdf5(string mode)
     else
       dims[0] = vfes->GetNDofs();
 
-    hid_t group;
+    hid_t group, groupMeanUp, groupRMS;
     if ( rank0_ || (config->RestartSerial() != "write") )
     {
       // save individual state varbiales from (U) in an HDF5 group named "solution"
@@ -278,16 +330,36 @@ void IO_operations::restart_files_hdf5(string mode)
 
       group = H5Gcreate(file,"solution",H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
       assert(group >= 0);
+      if( average->ComputeMean() )
+      {
+        groupMeanUp = H5Gcreate(file,"meanSolution",H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
+        groupRMS    = H5Gcreate(file,"rmsData"     ,H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
+        assert(groupMeanUp >= 0);
+        assert(groupRMS    >= 0);
+      }
     }
 
     // state vectors in U -> rho, rho-u, rho-v, rho-w, and rho-E
     double *dataU = U->HostReadWrite();
+    double *dataMeanUp = NULL;
+    double *dataRMS = NULL;
+    if( average->ComputeMean())
+    {
+      dataMeanUp = meanUp->HostReadWrite();
+      dataRMS    = rms->HostReadWrite();
+    }
 
     // if requested single file restart, serialize
     if ( (config->RestartSerial() == "write") && (nprocs_ > 1) )
     {
-      serialize_soln_for_write();
+      serialize_soln_for_write(false);
       dataU = serial_soln->HostReadWrite();
+      if( average->ComputeMean() )
+      {
+        serialize_soln_for_write(true);
+        dataMeanUp = serial_soln->HostReadWrite();
+        dataRMS    = serial_rms->HostReadWrite();
+      }
     }
 
     if (rank0_ || (config->RestartSerial() != "write") )
@@ -327,6 +399,82 @@ void IO_operations::restart_files_hdf5(string mode)
       status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataU+rhoeIndex);
       assert(status >= 0);
       H5Dclose(data_soln);
+      
+      if( average->ComputeMean() )
+      {
+        data_soln = H5Dcreate2(groupMeanUp, "meanDens", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        assert(data_soln >= 0);
+        status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataMeanUp);
+        assert(status >= 0);
+        H5Dclose(data_soln);
+
+        data_soln = H5Dcreate2(groupMeanUp, "mean-u", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        assert(data_soln >= 0);
+        status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataMeanUp+dims[0]);
+        assert(status >= 0);
+        H5Dclose(data_soln);
+
+        data_soln = H5Dcreate2(groupMeanUp, "mean-v", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        assert(data_soln >= 0);
+        status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataMeanUp+2*dims[0]);
+        assert(status >= 0);
+        H5Dclose(data_soln);
+
+        size_t pIndex = 3*dims[0];
+
+        if(dim == 3)
+        {
+          pIndex = 4*dims[0];
+          data_soln = H5Dcreate2(groupMeanUp, "mean-w", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+          assert(data_soln >= 0);
+          status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataMeanUp+3*dims[0]);
+          assert(status >= 0);
+          H5Dclose(data_soln);
+        }
+
+        data_soln = H5Dcreate2(groupMeanUp, "mean-p", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        assert(data_soln >= 0);
+        status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataMeanUp+pIndex);
+        assert(status >= 0);
+        H5Dclose(data_soln);
+        
+        // RMS DATA
+        data_soln = H5Dcreate2(groupRMS, "uu", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        assert(data_soln >= 0);
+        status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataRMS);
+        assert(status >= 0);
+        H5Dclose(data_soln);
+
+        data_soln = H5Dcreate2(groupRMS, "vv", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        assert(data_soln >= 0);
+        status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataRMS+dims[0]);
+        assert(status >= 0);
+        H5Dclose(data_soln);
+
+        data_soln = H5Dcreate2(groupRMS, "ww", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        assert(data_soln >= 0);
+        status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataRMS+2*dims[0]);
+        assert(status >= 0);
+        H5Dclose(data_soln);
+
+        data_soln = H5Dcreate2(groupRMS, "uv", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        assert(data_soln >= 0);
+        status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataRMS+3*dims[0]);
+        assert(status >= 0);
+        H5Dclose(data_soln);
+        
+        data_soln = H5Dcreate2(groupRMS, "uw", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        assert(data_soln >= 0);
+        status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataRMS+4*dims[0]);
+        assert(status >= 0);
+        H5Dclose(data_soln);
+        
+        data_soln = H5Dcreate2(groupRMS, "vw", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        assert(data_soln >= 0);
+        status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataRMS+5*dims[0]);
+        assert(status >= 0);
+        H5Dclose(data_soln);
+      }
 
 #ifdef SAVE_PRIMITIVE_VARS
 
@@ -370,6 +518,11 @@ void IO_operations::restart_files_hdf5(string mode)
 
       H5Sclose(dataspace);
       H5Gclose(group);
+      if( average->ComputeMean() )
+      {
+        H5Gclose(groupMeanUp);
+        H5Gclose(groupRMS);
+      }
       H5Fclose(file);
     }
   }
@@ -379,11 +532,17 @@ void IO_operations::restart_files_hdf5(string mode)
     if(rank0_)
       cout << "Reading in state vector from restart..." << endl;
 
-    double *dataU;
+    double *dataU, *dataMeanUp, *dataRMS;
     if( loadFromAuxSol )
       dataU = aux_U->HostReadWrite();
     else
       dataU = U->HostReadWrite();
+    
+    if( average->ComputeMean())
+    {
+      dataMeanUp = meanUp->HostReadWrite();
+      dataRMS = rms->HostReadWrite();
+    }
 
     // verify Dofs match expectations with current mesh
     if (rank0_ || (config->RestartSerial() != "read") )
@@ -421,19 +580,59 @@ void IO_operations::restart_files_hdf5(string mode)
       }
       else
         read_partitioned_soln_data(file,"/solution/rho-E",(3*numInSoln),dataU);
+      if( average->ComputeMean() )
+      {
+        read_partitioned_soln_data(file,"/meanSolution/meanDens",0,          dataMeanUp);
+        read_partitioned_soln_data(file,"/meanSolution/mean-u",(1*numInSoln),dataMeanUp);
+        read_partitioned_soln_data(file,"/meanSolution/mean-v",(2*numInSoln),dataMeanUp);
+        if(dim == 3)
+        {
+          read_partitioned_soln_data(file,"/meanSolution/mean-w",(3*numInSoln),dataMeanUp);
+          read_partitioned_soln_data(file,"/meanSolution/mean-p",(4*numInSoln),dataMeanUp);
+        }
+        else
+          read_partitioned_soln_data(file,"/meanSolution/mean-p",(3*numInSoln),dataMeanUp);
+        
+        read_partitioned_soln_data(file,"/rmsData/uu",0,            dataRMS);
+        read_partitioned_soln_data(file,"/rmsData/vv",(1*numInSoln),dataRMS);
+        read_partitioned_soln_data(file,"/rmsData/ww",(2*numInSoln),dataRMS);
+        read_partitioned_soln_data(file,"/rmsData/uv",(3*numInSoln),dataRMS);
+        read_partitioned_soln_data(file,"/rmsData/uw",(4*numInSoln),dataRMS);
+        read_partitioned_soln_data(file,"/rmsData/vw",(5*numInSoln),dataRMS);
+      }
     }
     else
     {
-      read_serialized_soln_data(file,"/solution/density",dof,0,dataU);
-      read_serialized_soln_data(file,"/solution/rho-u",  dof,1,dataU);
-      read_serialized_soln_data(file,"/solution/rho-v",  dof,2,dataU);
+      read_serialized_soln_data(file,"/solution/density",dof,0,dataU,false);
+      read_serialized_soln_data(file,"/solution/rho-u",  dof,1,dataU,false);
+      read_serialized_soln_data(file,"/solution/rho-v",  dof,2,dataU,false);
       if(dim == 3)
       {
-        read_serialized_soln_data(file,"/solution/rho-w",  dof,3,dataU);
-        read_serialized_soln_data(file,"/solution/rho-E",  dof,4,dataU);
+        read_serialized_soln_data(file,"/solution/rho-w",  dof,3,dataU,false);
+        read_serialized_soln_data(file,"/solution/rho-E",  dof,4,dataU,false);
       }
       else
-        read_serialized_soln_data(file,"/solution/rho-E",  dof,3,dataU);
+        read_serialized_soln_data(file,"/solution/rho-E",  dof,3,dataU,false);
+      if( average->ComputeMean() )
+      {
+        read_serialized_soln_data(file,"/meanSolution/meanDens",dof,0,dataMeanUp,false);
+        read_serialized_soln_data(file,"/meanSolution/mean-u",  dof,1,dataMeanUp,false);
+        read_serialized_soln_data(file,"/meanSolution/mean-v",  dof,2,dataMeanUp,false);
+        if(dim == 3)
+        {
+          read_serialized_soln_data(file,"/meanSolution/mean-w",dof,3,dataMeanUp,false);
+          read_serialized_soln_data(file,"/meanSolution/mean-p",dof,4,dataMeanUp,false);
+        }
+        else
+          read_serialized_soln_data(file,"/meanSolution/mean-p",dof,3,dataMeanUp,false);
+        
+        read_serialized_soln_data(file,"/rmsData/uu",dof,0,dataRMS,true);
+        read_serialized_soln_data(file,"/rmsData/vv",dof,1,dataRMS,true);
+        read_serialized_soln_data(file,"/rmsData/ww",dof,2,dataRMS,true);
+        read_serialized_soln_data(file,"/rmsData/uv",dof,3,dataRMS,true);
+        read_serialized_soln_data(file,"/rmsData/uw",dof,4,dataRMS,true);
+        read_serialized_soln_data(file,"/rmsData/vw",dof,5,dataRMS,true);
+      }
     }
 
     if(file != NULL)
@@ -492,7 +691,7 @@ void IO_operations::restart_files_hdf5(string mode)
 }
 
 
-void IO_operations::serialize_soln_for_write()
+void IO_operations::serialize_soln_for_write(bool averages)
 {
   // Get total number of elements
   const int local_ne = mesh->GetNE();
@@ -508,31 +707,66 @@ void IO_operations::serialize_soln_for_write()
   {
     grvy_printf(INFO,"Generating serialized restart file...\n");
     // copy my own data
-    Array<int> lvdofs, gvdofs;
-    Vector lsoln; 
+    Array<int> lvdofs, gvdofs,lvdofsRMS, gvdofsRMS;
+    Vector lsoln, lrms; 
     lsoln.UseDevice(false); // make sure all data movement is happening on CPU
+    lrms.UseDevice(false);
     for(int elem=0; elem<local_ne; elem++)
     {
       int gelem = locToGlobElem[elem];
-      vfes->GetElementVDofs(elem,lvdofs);
-      U->GetSubVector(lvdofs, lsoln);
-      serial_fes->GetElementVDofs(gelem, gvdofs);
-      serial_soln->SetSubVector(gvdofs, lsoln);
+      if( averages && average->ComputeMean())
+      {
+        vfes->GetElementVDofs(elem,lvdofs);
+        meanUp->GetSubVector(lvdofs, lsoln);
+        serial_fes->GetElementVDofs(gelem, gvdofs);
+        serial_soln->SetSubVector(gvdofs, lsoln);
+        
+        rmsFes->GetElementVDofs(elem,lvdofsRMS);
+        rms->GetSubVector(lvdofsRMS, lrms);
+        serial_rmsFes->GetElementVDofs(gelem, gvdofsRMS);
+        serial_rms->SetSubVector(gvdofsRMS, lrms);
+      }else
+      {
+        vfes->GetElementVDofs(elem,lvdofs);
+        U->GetSubVector(lvdofs, lsoln);
+        serial_fes->GetElementVDofs(gelem, gvdofs);
+        serial_soln->SetSubVector(gvdofs, lsoln);
+      }
     }
 
+    Vector tempData; tempData.UseDevice(false);
+    Array<int> tempDofs;
     // have rank 0 receive data from other tasks and copy its own
     for (int gelem=0; gelem<global_ne; gelem++)
     {
-      int from_rank=partitioning_[gelem];
+      int from_rank = partitioning_[gelem];
       if (from_rank!=0)
       {
-        serial_fes->GetElementVDofs(gelem, gvdofs);
-        lsoln.SetSize(gvdofs.Size());
+        if( averages && average->ComputeMean() )
+        {
+          serial_fes->GetElementVDofs(gelem, gvdofs);
+          lsoln.SetSize(gvdofs.Size());
+          serial_rmsFes->GetElementVDofs(gelem, gvdofsRMS);
+          tempData.SetSize(gvdofs.Size()+gvdofsRMS.Size());
+        }else
+        {
+          serial_fes->GetElementVDofs(gelem, tempDofs);
+          tempData.SetSize(tempDofs.Size());
+        }
 
-        MPI_Recv(lsoln.GetData(), gvdofs.Size(), MPI_DOUBLE,
+        MPI_Recv(tempData.GetData(), tempData.Size(), MPI_DOUBLE,
                  from_rank, gelem, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-        serial_soln->SetSubVector(gvdofs, lsoln);
+        
+        if( averages && average->ComputeMean() )
+        {
+          serial_soln->SetSubVector(gvdofs, tempData);
+          serial_rms->SetSubVector(gvdofsRMS, 
+                                   tempData.GetData()+gvdofs.Size());
+        }else
+        {
+          serial_soln->SetSubVector(tempDofs, tempData);
+        }
+        
       }
     }
 
@@ -540,15 +774,30 @@ void IO_operations::serialize_soln_for_write()
   else
   {
     // have non-zero ranks send their data to rank 0
-    Array<int> lvdofs;
-    Vector lsoln;
+    Array<int> lvdofs, vdofsRMS;
+    Vector lsoln, tempRMS;
     lsoln.UseDevice(false);
+    tempRMS.UseDevice(false);
     for(int elem=0; elem<local_ne; elem++)
     {
       int gelem = locToGlobElem[elem];
       assert(gelem > 0);
-      vfes->GetElementVDofs(elem,lvdofs);
-      U->GetSubVector(lvdofs, lsoln); // work for gpu build?
+      if( averages && average->ComputeMean() )
+      {
+        vfes->GetElementVDofs(elem,lvdofs);
+        rmsFes->GetElementVDofs(elem,vdofsRMS);
+        meanUp->GetSubVector(lvdofs,lsoln);
+        rms->GetSubVector(vdofsRMS,tempRMS);
+        
+        Vector temp(lsoln);
+        lsoln.SetSize(lvdofs.Size()+vdofsRMS.Size());
+        for(int n=0;n<lvdofs.Size();n++) lsoln(n) = temp(n);
+        for(int n=0;n<vdofsRMS.Size();n++) lsoln(n+lvdofs.Size()) = tempRMS(n);
+      }else
+      {
+        vfes->GetElementVDofs(elem,lvdofs);
+        U->GetSubVector(lvdofs, lsoln); // work for gpu build?
+      }
 
       // send to task 0
       MPI_Send(lsoln.GetData(), lsoln.Size(), MPI_DOUBLE, 0, gelem, MPI_COMM_WORLD);
@@ -572,7 +821,7 @@ void IO_operations::read_partitioned_soln_data(hid_t file, string varName, size_
 }
 
 // convenience function to read and distribute solution data for serialized restarts
-void IO_operations::read_serialized_soln_data(hid_t file, string varName, int numDof, int varOffset,double *data)
+void IO_operations::read_serialized_soln_data(hid_t file, string varName, int numDof, int varOffset,double *data, bool isRMS)
 {
 
   assert(config->RestartSerial() == "read");
@@ -588,6 +837,7 @@ void IO_operations::read_serialized_soln_data(hid_t file, string varName, int nu
     numStateVars = 4;
   else
     numStateVars = 5;
+  if( isRMS ) numStateVars = 6;
 
   if(rank0_)
   {
@@ -617,14 +867,17 @@ void IO_operations::read_serialized_soln_data(hid_t file, string varName, int nu
       {
 
         // cull out subset of local vdof vector to use for this solution var
-        vfes->GetElementVDofs(counter,lvdofs);
+        if (isRMS ) rmsFes->GetElementVDofs(counter,lvdofs);
+        else vfes->GetElementVDofs(counter,lvdofs);
+        
         int numDof_per_this_elem = lvdofs.Size() / numStateVars;
         int ldof_start_index = varOffset*numDof_per_this_elem;
 
         // cull out global vdofs - [subtle note]: we only use the
         // indexing corresponding to the first state vector reference in
         // gvdofs() since data_serial() holds the solution for a single state vector
-        serial_fes->GetElementVDofs(gelem, gvdofs);
+        if( isRMS ) serial_rmsFes->GetElementVDofs(gelem, gvdofs);
+        else serial_fes->GetElementVDofs(gelem, gvdofs);
         int gdof_start_index = 0;
 
         for(int i=0; i<numDof_per_this_elem; i++)
@@ -640,7 +893,8 @@ void IO_operations::read_serialized_soln_data(hid_t file, string varName, int nu
       for(int gelem=0; gelem<nelemGlobal_; gelem++)
         if(partitioning_[gelem] == rank)
         {
-          serial_fes->GetElementVDofs(gelem, gvdofs);
+          if( isRMS ) serial_rmsFes->GetElementVDofs(gelem, gvdofs);
+          else serial_fes->GetElementVDofs(gelem, gvdofs);
           int numDof_per_this_elem = gvdofs.Size() / numStateVars;
           for(int i=0; i<numDof_per_this_elem; i++)
             packedData.push_back(data_serial[ gvdofs[i] ]);
@@ -654,6 +908,7 @@ void IO_operations::read_serialized_soln_data(hid_t file, string varName, int nu
   else
   {
     int numlDofs = U->Size() / numStateVars;
+    if( isRMS ) numlDofs = rms->Size()/ numStateVars;
     grvy_printf(DEBUG,"[%i]: local number of state vars to receive = %i (var=%s)\n",rank_,numlDofs,varName.c_str());
 
     std::vector<double> packedData(numlDofs);

@@ -143,6 +143,12 @@ void Averaging::addSampleMean(const int &iter)
   }
 }
 
+void Averaging::SaveParaviewOutput()
+{
+  if( computeMean ) paraviewMean->Save();
+}
+
+
 void Averaging::write_meanANDrms_restart_files()
 {
   if( computeMean )

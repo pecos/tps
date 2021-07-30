@@ -6,6 +6,7 @@
 #include <hdf5.h>
 #include "utils.hpp"
 #include "dataStructures.hpp"
+#include "averaging_and_rms.hpp"
 
 #ifdef HAVE_GRVY
 #include "grvy.h"
@@ -43,22 +44,27 @@ private:
   GridFunction *serial_soln;
   
   ParGridFunction *U;
+  
+  Averaging *average;
   ParGridFunction *meanUp;
   ParGridFunction *rms;
+  ParFiniteElementSpace *rmsFes;
+  FiniteElementSpace *serial_rmsFes;
+  GridFunction *serial_rms;
   
   ParMesh *mesh;
   ParFiniteElementSpace *vfes;
   const FiniteElementCollection *fec;
-
+  
   string prefix_serial;
   
   int nelemGlobal_;
 
 
   void read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data);
-  void read_serialized_soln_data (hid_t file, string varName, int numDof,   int varOffset, double *data);
+  void read_serialized_soln_data (hid_t file, string varName, int numDof,   int varOffset, double *data, bool isRMS);
   void partitioning_file_hdf5(string mode);
-  void serialize_soln_for_write();
+  void serialize_soln_for_write(bool avareges);
 public:
   IO_operations(string filePrefix,
                 MPI_Groups *_groupMPI,
@@ -75,7 +81,7 @@ public:
   ~IO_operations();
 
   void setSolutionGridFunction(ParGridFunction *_U);
-  void setAveragesGridFunction(ParGridFunction *_meanUp, ParGridFunction *_rms);
+  void setAveragesObject(Averaging *_averages );
   
   void restart_files_hdf5(string mode);
 };
