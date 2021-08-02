@@ -50,6 +50,7 @@ private:
   ParGridFunction *rms;
   ParFiniteElementSpace *rmsFes;
   FiniteElementSpace *serial_rmsFes;
+  GridFunction *serial_meanSol;
   GridFunction *serial_rms;
   
   ParMesh *mesh;

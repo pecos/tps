@@ -97,6 +97,7 @@ void IO_operations::setAveragesObject(Averaging* _averages)
     
     if ( rank0_ && (config->RestartSerial() != "no") )
     {
+      serial_meanSol = new GridFunction(serial_fes);
       serial_rmsFes = new FiniteElementSpace(serial_mesh, fec, 6, Ordering::byNODES);
       serial_rms    = new GridFunction(serial_rmsFes);
     }
@@ -360,7 +361,7 @@ void IO_operations::restart_files_hdf5(string mode)
       if( average->ComputeMean() )
       {
         serialize_soln_for_write(true);
-        if( rank0_ ) dataMeanUp = serial_soln->HostReadWrite();
+        if( rank0_ ) dataMeanUp = serial_meanSol->HostReadWrite();
         if( rank0_ ) dataRMS    = serial_rms->HostReadWrite();
       }
     }
@@ -724,7 +725,7 @@ void IO_operations::serialize_soln_for_write(bool averages)
         vfes->GetElementVDofs(elem,lvdofs);
         meanUp->GetSubVector(lvdofs, lsoln);
         serial_fes->GetElementVDofs(gelem, gvdofs);
-        serial_soln->SetSubVector(gvdofs, lsoln);
+        serial_meanSol->SetSubVector(gvdofs, lsoln);
         
         rmsFes->GetElementVDofs(elem,lvdofsRMS);
         rms->GetSubVector(lvdofsRMS, lrms);
@@ -764,7 +765,7 @@ void IO_operations::serialize_soln_for_write(bool averages)
         
         if( averages && average->ComputeMean() )
         {
-          serial_soln->SetSubVector(gvdofs, tempData);
+          serial_meanSol->SetSubVector(gvdofs, tempData);
           serial_rms->SetSubVector(gvdofsRMS, 
                                    tempData.GetData()+gvdofs.Size());
         }else
