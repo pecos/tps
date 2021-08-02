@@ -32,12 +32,24 @@ AC_PROG_RANLIB
 #-- Slurm job restart support
 ENABLE_SLURM=no
 AH_TEMPLATE([HAVE_SLURM],[Enable SLURM resource manager support])
-AC_CHECK_HEADER([slurm/slurm.h],[found_slurm_header=yes],[found_slurm_header=no])
-if test "x${found_slurm_header}" = "xyes" ; then
-   AC_CHECK_LIB([slurm],slurm_get_rem_time,[found_slurm_library=yes],[found_slurm_library=no])
-   if test "x${found_slurm_library}" = "xyes" ; then
-      AC_DEFINE([HAVE_SLURM])
-      ENABLE_SLURM=yes
+AC_ARG_ENABLE(slurm, [AS_HELP_STRING([--enable-slurm Whether to enable optional SLURM support or not (default=check)])],
+                     [],[enable_slurm=check])
+
+if test "x$enable_slurm" != "xno" ; then
+   AC_CHECK_HEADER([slurm/slurm.h],[found_slurm_header=yes],[found_slurm_header=no])
+   if test "x${found_slurm_header}" = "xyes" ; then
+      AC_CHECK_LIB([slurm],slurm_get_rem_time,[found_slurm_library=yes],[found_slurm_library=no])
+      if test "x${found_slurm_library}" = "xyes" ; then
+         AC_DEFINE([HAVE_SLURM])
+         ENABLE_SLURM=yes
+      else
+         ENABLE_SLURM=no
+      fi
+   fi
+   if test "x${enable_slurm}" = "xyes" ; then
+       if test "x$ENABLE_SLURM" = "xno" ; then
+           AC_MSG_ERROR([slurm requested, but not found locally])
+       fi
    fi
 fi
 AM_CONDITIONAL(SLURM_ENABLED,test x$ENABLE_SLURM = xyes)
