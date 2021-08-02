@@ -167,19 +167,19 @@ void Gradients::computeGradients_cpu()
   const int totalDofs = vfes->GetNDofs();
   double *dataUp = Up->GetData();
   double *dataGradUp = gradUp->GetData();
-  
+
   // Vars for face contributions
   Vector faceContrib(dim*num_equation*totalDofs);
   Vector xUp(dim*num_equation*totalDofs);
   xUp = 0.;
   faceContrib = 0.;
-  
+
   // compute volume integral and fill out above vectors
   for(int el=0;el<vfes->GetNE();el++)
   {
     const FiniteElement *elem = vfes->GetFE(el);
     ElementTransformation *Tr = vfes->GetElementTransformation(el);
-    
+
     // get local primitive variables
     Array<int> vdofs;
     vfes->GetElementVDofs(el, vdofs);
@@ -192,45 +192,36 @@ void Gradients::computeGradients_cpu()
       {
         elUp(d,eq) = dataUp[index +eq*totalDofs];
         xUp[index+eq*totalDofs] = elUp(d,eq);
-      } 
+      }
     }
-    
+
     DenseMatrix elGradUp(eldDof,num_equation*dim);
     elGradUp = 0.;
-    
+
+
     // element volume integral
     int intorder = 2*elem->GetOrder();
     if(intRuleType==1 && elem->GetGeomType()==Geometry::SQUARE) intorder--; // when Gauss-Lobatto
     const IntegrationRule *ir = &intRules->Get(elem->GetGeomType(), intorder);
 
+    Vector shape(eldDof);
+    DenseMatrix dshape(eldDof,dim);
+    DenseMatrix iGradUp(num_equation,dim);
+
     for(int i=0;i<ir->GetNPoints();i++)
     {
       IntegrationPoint ip = ir->IntPoint(i);
       Tr->SetIntPoint( &ip );
-      
+
       // Calculate the shape functions
-      Vector shape(eldDof);
-      DenseMatrix dshape(eldDof,dim);
       elem->CalcShape(ip, shape);
       elem->CalcPhysDShape(*Tr,dshape);
-      
-      // calc Up at int. point
-      //Vector iUp(num_equation);
-      DenseMatrix iGradUp(num_equation,dim);
-      iGradUp = 0.;
-      for(int eq=0;eq<num_equation;eq++)
-      {
-        //double sum = 0.;
-        for(int k=0;k<eldDof;k++)
-        {
-          for(int d=0;d<dim;d++) iGradUp(eq,d) += elUp(k,eq)*dshape(k,d);
-          //sum += elUp(k,eq)*shape(k);
-        }
-        //iUp[eq] = sum;
-      }
-      
+
+      // calc grad Up at int. point
+      MultAtB(elUp, dshape, iGradUp);
+
       double detJac = Tr->Jacobian().Det()*ip.weight;
-      
+
       // Add volume contrubutions to gradient
       for(int eq=0;eq<num_equation;eq++)
       {
@@ -268,14 +259,18 @@ void Gradients::computeGradients_cpu()
   {
     const FiniteElement *elem = vfes->GetFE(el);
     const int eldDof = elem->GetDof();
-    
+
     Array<int> vdofs;
     vfes->GetElementVDofs(el, vdofs);
-    for(int eq=0;eq<num_equation;eq++)
+
+    Vector aux(eldDof);
+    Vector rhs(eldDof);
+
+    for(int d=0;d<dim;d++)
     {
-      for(int d=0;d<dim;d++)
+      for(int eq=0;eq<num_equation;eq++)
       {
-        Vector rhs(eldDof);
+
         for(int k=0;k<eldDof;k++)
         {
           int index = vdofs[k];
@@ -284,15 +279,10 @@ void Gradients::computeGradients_cpu()
           rhs[k] = -dataGradUp[index+eq*totalDofs+d*num_equation*totalDofs]+
                    faceContrib[index+eq*totalDofs+d*num_equation*totalDofs];
         }
-        
+
         // mult by inv mass matrix
-        Vector aux(eldDof);
-        aux = 0.;
-        for(int i=0;i<eldDof;i++)
-        {
-          for(int j=0;j<eldDof;j++) aux[i] += (*Me_inv[el])(i,j)*rhs[j];
-        }   
-        
+        Me_inv[el]->Mult(rhs, aux);
+
         // save this in gradUp
         for(int k=0;k<eldDof;k++)
         {
