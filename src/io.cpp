@@ -175,9 +175,10 @@ void M2ulPhyS::restart_files_hdf5(string mode)
 
   if(mode == "write")
     {
-      if ( (config.RestartSerial() == "write") && (nprocs_ > 1) )
+      if ( (config.RestartSerial() == "write") && (nprocs_ > 1) && (mpi.Root()) )
 	{
 	  assert( (locToGlobElem != NULL) && (partitioning_ != NULL) );
+          assert( serial_fes != NULL );
 	  dims[0] = serial_fes->GetNDofs();
 	}
       else
