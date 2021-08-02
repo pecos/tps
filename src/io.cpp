@@ -265,8 +265,10 @@ void IO_operations::restart_files_hdf5(string mode)
       MPI_Bcast(&read_order,1, MPI_INT,    0, MPI_COMM_WORLD);
       if( average->ComputeMean())
       {
-        MPI_Bcast(&average->GetSamplesMean(),    1, MPI_INT, 0, MPI_COMM_WORLD);
-        MPI_Bcast(&average->GetSamplesInterval(),1, MPI_INT, 0, MPI_COMM_WORLD);
+        int sampMean = average->GetSamplesMean();
+        int intervals = average->GetSamplesInterval();
+        MPI_Bcast(&sampMean,    1, MPI_INT, 0, MPI_COMM_WORLD);
+        MPI_Bcast(&intervals   ,1, MPI_INT, 0, MPI_COMM_WORLD);
       }
     }
 
@@ -316,7 +318,7 @@ void IO_operations::restart_files_hdf5(string mode)
     if ( (config->RestartSerial() == "write") && (nprocs_ > 1) )
     {
       assert( (locToGlobElem != NULL) && (partitioning_ != NULL) );
-      dims[0] = serial_fes->GetNDofs();
+      if( rank0_ ) dims[0] = serial_fes->GetNDofs();
     }
     else
       dims[0] = vfes->GetNDofs();
@@ -343,6 +345,7 @@ void IO_operations::restart_files_hdf5(string mode)
     double *dataU = U->HostReadWrite();
     double *dataMeanUp = NULL;
     double *dataRMS = NULL;
+
     if( average->ComputeMean())
     {
       dataMeanUp = meanUp->HostReadWrite();
@@ -353,12 +356,12 @@ void IO_operations::restart_files_hdf5(string mode)
     if ( (config->RestartSerial() == "write") && (nprocs_ > 1) )
     {
       serialize_soln_for_write(false);
-      dataU = serial_soln->HostReadWrite();
+      if( rank0_ ) dataU = serial_soln->HostReadWrite();
       if( average->ComputeMean() )
       {
         serialize_soln_for_write(true);
-        dataMeanUp = serial_soln->HostReadWrite();
-        dataRMS    = serial_rms->HostReadWrite();
+        if( rank0_ ) dataMeanUp = serial_soln->HostReadWrite();
+        if( rank0_ ) dataRMS    = serial_rms->HostReadWrite();
       }
     }
 
@@ -613,6 +616,7 @@ void IO_operations::restart_files_hdf5(string mode)
       }
       else
         read_serialized_soln_data(file,"/solution/rho-E",  dof,3,dataU,false);
+      
       if( average->ComputeMean() )
       {
         read_serialized_soln_data(file,"/meanSolution/meanDens",dof,0,dataMeanUp,false);
@@ -705,7 +709,8 @@ void IO_operations::serialize_soln_for_write(bool averages)
 
   if (rank0_)
   {
-    grvy_printf(INFO,"Generating serialized restart file...\n");
+    if( averages ) grvy_printf(INFO,"Generating averages serialized restart file...\n");
+    else grvy_printf(INFO,"Generating serialized restart file...\n");
     // copy my own data
     Array<int> lvdofs, gvdofs,lvdofsRMS, gvdofsRMS;
     Vector lsoln, lrms; 

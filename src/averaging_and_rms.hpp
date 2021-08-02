@@ -71,8 +71,8 @@ public:
   ParGridFunction *GetMeanUp(){return meanUp;}
   ParGridFunction *GetRMS(){return rms;}
   ParFiniteElementSpace *GetRMSFes(){return rmsFes;}
-  int &GetSamplesMean(){return samplesMean;}
-  int &GetSamplesInterval(){return sampleInterval;}
+  int GetSamplesMean(){return samplesMean;}
+  int GetSamplesInterval(){return sampleInterval;}
   bool ComputeMean(){return computeMean;}
   
   void SetSamplesMean(int &samples){samplesMean = samples;}
