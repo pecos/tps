@@ -787,7 +787,7 @@ void IO_operations::serialize_soln_for_write(bool averages)
     for(int elem=0; elem<local_ne; elem++)
     {
       int gelem = locToGlobElem[elem];
-      assert(gelem > 0);
+//       assert(gelem > 0);
       if( averages && average->ComputeMean() )
       {
         vfes->GetElementVDofs(elem,lvdofs);
