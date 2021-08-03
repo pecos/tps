@@ -23,6 +23,7 @@
 #include "BCintegrator.hpp"
 #include "faceGradientIntegration.hpp"
 #include "averaging_and_rms.hpp"
+#include "io.hpp"
 
 #include "dgNonlinearForm.hpp"
 #include "gradNonLinearForm.hpp"
@@ -218,6 +219,8 @@ private:
   FiniteElementSpace *serial_fes;
   GridFunction *serial_soln;
 
+  // I/O organizer
+  IODataOrganizer ioData;
 
   void getAttributesInPartition(Array<int> &local_attr);
   
@@ -242,7 +245,8 @@ private:
   void read_serialized_soln_data (hid_t file, string varName, int numDof,   int varOffset, double *data);
   void restart_files_hdf5(string mode);
   void partitioning_file_hdf5(string mode);
-  void serialize_soln_for_write();
+  void serialize_soln_for_write(string ioFamily);
+  void write_soln_data(hid_t group, string varName, hid_t dataspace, double *data);
   
   void Check_NAN();
   bool Check_JobResubmit();

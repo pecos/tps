@@ -812,7 +812,19 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
   vel = new ParGridFunction(dfes, Up->HostReadWrite()+fes->GetNDofs() );
   press = new ParGridFunction(fes,
                 Up->HostReadWrite()+(num_equation-1)*fes->GetNDofs() );
-  
+
+  // define solution parameters for i/o
+  ioData.registerIOFamily("Solution state variables","/solution",U);
+  ioData.registerIOVar("/solution","density",0);
+  ioData.registerIOVar("/solution","rho-u",  1);
+  ioData.registerIOVar("/solution","rho-v",  2);
+  if(dim == 3)
+    {
+      ioData.registerIOVar("/solution","rho-w",3);
+      ioData.registerIOVar("/solution","rho-E",4);
+    }
+  else
+    ioData.registerIOVar("/solution","rho-E",3);
   
   // compute factor to multiply viscosity when
   // this option is active

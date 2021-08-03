@@ -8,8 +8,8 @@ void M2ulPhyS::restart_files_hdf5(string mode)
   grvy_timer_begin(__func__);
 #endif
 
-  hid_t file = NULL;
-  hid_t dataspace, data_soln;
+  hid_t file = -1;
+  hid_t data_soln;
   herr_t status;
   Vector dataSerial;
 
@@ -46,7 +46,6 @@ void M2ulPhyS::restart_files_hdf5(string mode)
     }
   else if (mode == "read")
     {
-
       if(config.RestartSerial() == "read")
 	{
 	  if(rank0_)
@@ -166,7 +165,7 @@ void M2ulPhyS::restart_files_hdf5(string mode)
     }
 
   // -------------------------------------------------------------------
-  // Read/write solution state vector
+  // Read/write solution data defined by IO families
   // -------------------------------------------------------------------
 
   hsize_t dims[1];
@@ -184,125 +183,68 @@ void M2ulPhyS::restart_files_hdf5(string mode)
       else
         dims[0] = vfes->GetNDofs();
 
-      hid_t group;
-      if (mpi.Root() || (config.RestartSerial() != "write") )
+      //-------------------------------------------------------
+      // Loop over defined IO families to save desired output
+      //-------------------------------------------------------
+      for(auto fam : ioData.families_)
         {
-          // save individual state varbiales from (U) in an HDF5 group named "solution"
-          dataspace = H5Screate_simple(1, dims, NULL);
-          assert(dataspace >= 0);
-
-          group = H5Gcreate(file,"solution",H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
-          assert(group >= 0);
-        }
-
-      // state vectors in U -> rho, rho-u, rho-v, rho-w, and rho-E
-      double *dataU = U->HostReadWrite();
-
-      // if requested single file restart, serialize
-      if ( (config.RestartSerial() == "write") && (nprocs_ > 1) ){
-        serialize_soln_for_write();
-        if(rank0_)
-          dataU = serial_soln->GetData();
-      }
-
-      if (mpi.Root() || (config.RestartSerial() != "write") )
-        {
-          data_soln = H5Dcreate2(group, "density", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-          assert(data_soln >= 0);
-          status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dataU);
-          assert(status >= 0);
-          H5Dclose(data_soln);
-
-          data_soln = H5Dcreate2(group, "rho-u", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-          assert(data_soln >= 0);
-          status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[1*dims[0]]);
-          assert(status >= 0);
-          H5Dclose(data_soln);
-
-          data_soln = H5Dcreate2(group, "rho-v", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-          assert(data_soln >= 0);
-          status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[2*dims[0]]);
-          assert(status >= 0);
-          H5Dclose(data_soln);
-
-          size_t rhoeIndex = 3*dims[0];
-
-          if(dim == 3)
+          // define groups based on defined IO families
+          if(rank0_)
             {
-              rhoeIndex = 4*dims[0];
-              data_soln = H5Dcreate2(group, "rho-w", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-              assert(data_soln >= 0);
-              status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[3*dims[0]]);
-              assert(status >= 0);
-              H5Dclose(data_soln);
+              grvy_printf(INFO,"\nCreating HDF5 group for defined IO families\n");
+              grvy_printf(INFO,"--> %s : %s\n",fam.group_.c_str(),fam.description_.c_str());
             }
 
-          data_soln = H5Dcreate2(group, "rho-E", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-          assert(data_soln >= 0);
-          status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataU[rhoeIndex]);
-          assert(status >= 0);
-          H5Dclose(data_soln);
+          hid_t group     = -1;
+          hid_t dataspace = -1;
 
-#ifdef SAVE_PRIMITIVE_VARS
-
-          // not set up to save primitives to a single restart, so punt
-          assert(config.RestartSerial() == "no");
-
-          // update primitive to latest timestep prior to write
-          rhsOperator->updatePrimitives(*U);
-
-          data_soln = H5Dcreate2(group, "u-velocity", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-          assert(data_soln >= 0);
-          status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataUp[1*dims[0]]);
-          assert(status >= 0);
-          H5Dclose(data_soln);
-
-          data_soln = H5Dcreate2(group, "v-velocity", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-          assert(data_soln >= 0);
-          status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataUp[2*dims[0]]);
-          assert(status >= 0);
-          H5Dclose(data_soln);
-
-          size_t pIndex = 3*dims[0];
-
-          if(dim == 3)
+          if (rank0_ || (config.RestartSerial() != "write") )
             {
-              pIndex = 4*dims[0];
-
-              data_soln = H5Dcreate2(group, "w-velocity", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-              assert(data_soln >= 0);
-              status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataUp[3*dims[0]]);
-              assert(status >= 0);
-              H5Dclose(data_soln);
+              dataspace = H5Screate_simple(1, dims, NULL);
+              assert(dataspace >= 0);
+              group = H5Gcreate(file,fam.group_.c_str(),H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
+              assert(group >= 0);
             }
 
-          data_soln = H5Dcreate2(group, "pressure", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-          assert(data_soln >= 0);
-          status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &dataUp[pIndex]);
-          assert(status >= 0);
-          H5Dclose(data_soln);
-#endif
+          // get pointer to raw data
+          double *data = fam.pfunc_->HostReadWrite();
+          // special case if writing a serial restart
+          if ( (config.RestartSerial() == "write") && (nprocs_ > 1) ){
+            serialize_soln_for_write(fam.group_);
+            if(rank0_)
+              data = serial_soln->GetData();
+          }
 
-          H5Sclose(dataspace);
-          H5Gclose(group);
-          H5Fclose(file);
-        }
+          // get defined variables for this IO family
+          vector<IOVar> vars = ioData.vars_[fam.group_];
+
+          // save raw data
+          if (mpi.Root() || (config.RestartSerial() != "write") )
+            {
+              for(auto var : vars)
+                write_soln_data(group,var.varName_,dataspace,&data[var.index_*dims[0]]);
+            }
+
+          if(group >= 0)
+            H5Gclose(group);
+          if(dataspace >= 0 )
+            H5Sclose(dataspace);
+
+        }  // end loop over IO families
+
+      if(file >= 0)
+        H5Fclose(file);
     }
   else          // read mode
     {
 
       if(rank0_)
-	cout << "Reading in state vector from restart..." << endl;
-
-      double *dataU;
-      if( loadFromAuxSol )
-	  dataU = aux_U->HostReadWrite();
-      else
-	dataU = U->HostReadWrite();
+	cout << "Reading in solutiond data from restart..." << endl;
 
       // verify Dofs match expectations with current mesh
       if (mpi.Root() || (config.RestartSerial() != "read") )
 	{
+          hid_t dataspace;
 	  data_soln = H5Dopen2(file, "/solution/density",H5P_DEFAULT); assert(data_soln >= 0);
 	  dataspace = H5Dget_space(data_soln);
 	  numInSoln = H5Sget_simple_extent_npoints(dataspace);
@@ -323,34 +265,37 @@ void M2ulPhyS::restart_files_hdf5(string mode)
       if (rank0_ || (config.RestartSerial() != "read") )
 	assert(numInSoln == dof);
 
-      if(config.RestartSerial() != "read")
-	{
-	  read_partitioned_soln_data(file,"/solution/density",0,            dataU);
-	  read_partitioned_soln_data(file,"/solution/rho-u"  ,(1*numInSoln),dataU);
-	  read_partitioned_soln_data(file,"/solution/rho-v"  ,(2*numInSoln),dataU);
-	  if(dim == 3)
-	    {
-	      read_partitioned_soln_data(file,"/solution/rho-w",(3*numInSoln),dataU);
-	      read_partitioned_soln_data(file,"/solution/rho-E",(4*numInSoln),dataU);
-	    }
-	  else
-	    read_partitioned_soln_data(file,"/solution/rho-E"  ,(3*numInSoln),dataU);
-	}
-      else
-	{
-	  read_serialized_soln_data(file,"/solution/density",dof,0,dataU);
-	  read_serialized_soln_data(file,"/solution/rho-u",  dof,1,dataU);
-	  read_serialized_soln_data(file,"/solution/rho-v",  dof,2,dataU);
-	  if(dim == 3)
-	    {
-	      read_serialized_soln_data(file,"/solution/rho-w",  dof,3,dataU);
-	      read_serialized_soln_data(file,"/solution/rho-E",  dof,4,dataU);
-	    }
-	  else
-	    read_serialized_soln_data(file,"/solution/rho-E",  dof,3,dataU);
-	}
+      //-------------------------------------------------------
+      // Loop over defined IO families to read desired output
+      //-------------------------------------------------------
+      for(auto fam : ioData.families_)
+        {
+          // get pointer to raw data
+          double *data = fam.pfunc_->HostReadWrite();
+          // special case if starting from aux soln
+          if( loadFromAuxSol )
+            {
+              data = aux_U->HostReadWrite();
 
-      if(file != NULL)
+              // ks note: would need to add additional logic to handle read of
+              // multiple pargridfunctions when changing the solution order
+              assert(ioData.families_.size() == 1);
+            }
+
+          vector<IOVar> vars = ioData.vars_[fam.group_];
+          for(auto var : vars)
+            {
+              std::string h5Path = fam.group_ + "/" + var.varName_;
+              if(rank0_)
+                grvy_printf(INFO,"--> Reading h5 path = %s\n",h5Path.c_str());
+              if(config.RestartSerial() != "read")
+                read_partitioned_soln_data(file,h5Path.c_str(),var.index_*numInSoln,data);
+              else
+                read_serialized_soln_data (file,h5Path.c_str(),dof,var.index_,data);
+            }
+        }
+
+      if(file >= 0)
 	H5Fclose(file);
     }
 
@@ -526,12 +471,21 @@ void M2ulPhyS::partitioning_file_hdf5(std::string mode)
   grvy_timer_end(__func__);
 }
 
-void M2ulPhyS::serialize_soln_for_write()
+void M2ulPhyS::serialize_soln_for_write(string ioFamily)
 {
   // Get total number of elements
   const int local_ne = mesh->GetNE();
   int global_ne;
   MPI_Reduce(&local_ne, &global_ne, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+  // ks note: need to double check this routine when additional solution
+  // families are added and then remove next assert
+  assert(ioFamily == "/solution");
+
+  // get pargridfunction for this IO family
+  int iFamily = ioData.getIOFamilyIndex(ioFamily);
+  assert(iFamily >= 0);
+  ParGridFunction *pfunc = ioData.families_[iFamily].pfunc_;
 
   if(rank0_)
     assert(global_ne == nelemGlobal_);
@@ -547,7 +501,7 @@ void M2ulPhyS::serialize_soln_for_write()
       for(int elem=0;elem<local_ne;elem++) {
 	int gelem = locToGlobElem[elem];
 	vfes->GetElementVDofs(elem,lvdofs);
-	U->GetSubVector(lvdofs, lsoln);
+	pfunc->GetSubVector(lvdofs, lsoln);
 	serial_fes->GetElementVDofs(gelem, gvdofs);
 	serial_soln->SetSubVector(gvdofs, lsoln);
       }
@@ -576,13 +530,13 @@ void M2ulPhyS::serialize_soln_for_write()
 	int gelem = locToGlobElem[elem];
 	assert(gelem > 0);
 	vfes->GetElementVDofs(elem,lvdofs);
-	U->GetSubVector(lvdofs, lsoln); // work for gpu build?
+	pfunc->GetSubVector(lvdofs, lsoln); // work for gpu build?
 
 	// send to task 0
 	MPI_Send(lsoln.GetData(), lsoln.Size(), MPI_DOUBLE, 0, gelem, MPI_COMM_WORLD);
       }
     }
-}
+}  // end function: serialize_soln_for_write()
 
 // convenience function to read solution data for parallel restarts
 void M2ulPhyS::read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data)
@@ -691,4 +645,60 @@ void M2ulPhyS::read_serialized_soln_data(hid_t file, string varName, int numDof,
       for(size_t i=0;i<numlDofs;i++)
 	data[i + varOffset*numlDofs] = packedData[i];
     }
+}
+
+// convenience function to write HDF5 data
+void M2ulPhyS::write_soln_data(hid_t group, string varName, hid_t dataspace, double *data)
+{
+  hid_t data_soln;
+  herr_t status;
+  assert(group >= 0);
+
+  if(rank0_)
+    grvy_printf(INFO,"  --> Saving (%s)\n",varName.c_str());
+
+  data_soln = H5Dcreate2(group,varName.c_str(), H5T_NATIVE_DOUBLE, dataspace,
+                         H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  assert(data_soln >= 0);
+
+  status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+  assert(status >= 0);
+  H5Dclose(data_soln);
+
+  return;
+}
+
+// ---------------------------------------------
+// Routines for I/O data organizer helper class
+// ---------------------------------------------
+
+// register a new IO family which maps to a ParGridFunction
+void IODataOrganizer::registerIOFamily(std::string description, std::string group, ParGridFunction *pfunc)
+{
+  IOFamily family{description,group,pfunc};
+  std::vector<IOVar> vars;
+
+  families_.push_back(family);
+  vars_[group] = vars;
+
+  return;
+}
+
+// register individual variables for IO family
+void IODataOrganizer::registerIOVar(std::string group, std::string varName, int index)
+{
+  IOVar newvar{varName,index};
+  vars_[group].push_back(newvar);
+
+  return;
+}
+
+// return the index to IO family given a group name
+int IODataOrganizer::getIOFamilyIndex(std::string group)
+{
+  for(int i=0;i<families_.size();i++)
+    if(families_[i].group_ == group)
+      return(i);
+
+  return(-1);
 }
