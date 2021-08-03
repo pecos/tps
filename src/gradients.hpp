@@ -7,6 +7,8 @@
 #include <general/forall.hpp>
 #include <tps_config.h>
 #include "gradNonLinearForm.hpp"
+#include "dataStructures.hpp"
+#include "equation_of_state.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -21,6 +23,8 @@ private:
   
   ParGridFunction *Up;
   ParGridFunction *gradUp;
+  
+  EquationOfState *eqState;
   
   //ParNonlinearForm *gradUp_A;
   GradNonLinearForm *gradUp_A;
@@ -53,6 +57,8 @@ private:
   Vector elemShapeDshapeWJ; // [...l_0(i),...,l_dof(i),l_0_x(i),...,l_dof_d(i), w_i*detJac_i ...]
   Array<int> elemPosQ_shapeDshapeWJ; // position and num. of integration points for each element
   
+  parallelFacesIntegrationArrays *parallelData;
+  
 public:
   Gradients(ParFiniteElementSpace *_vfes,
             ParFiniteElementSpace *_gradUpfes,
@@ -60,14 +66,13 @@ public:
             int _num_equation,
             ParGridFunction *_Up,
             ParGridFunction *_gradUp,
-            //ParNonlinearForm *_gradUp_A,
+            EquationOfState *_eqState,
             GradNonLinearForm *_gradUp_A,
             IntegrationRules *_intRules,
             int _intRuleType,
             Array<int> &nodesIDs,
             Array<int> &posDofIds,
             Array<int> &numElems,
-            //DenseMatrix *Me_inv,
             Array<DenseMatrix*> &Me_inv,
             Vector &_invMArray,
             Array<int> &_posDofInvM,
@@ -79,6 +84,8 @@ public:
             const int &_maxDofs );
   
   ~Gradients();
+  
+  void setParallelData(parallelFacesIntegrationArrays *_parData){parallelData = _parData;}
   
   void computeGradients();
   void computeGradients_cpu();
@@ -104,6 +111,22 @@ public:
                                    const int &maxDofs,
                                    const int &maxIntPoints,
                                    const Array<int> elems12Q );
+  
+  static void integrationGradSharedFace_gpu(const Vector *Up,
+                                            ParGridFunction *gradUp,
+                                            const int &Ndofs,
+                                            const int &dim,
+                                            const int &num_equation,
+                                            const double &gamma,
+                                            const double &Rg,
+                                            const double &viscMult,
+                                            const double &bulkViscMult,
+                                            const double &Pr,
+                                            const Array<int> &nodesIDs,
+                                            const Array<int> &posDofIds,
+                                            const parallelFacesIntegrationArrays *parallelData,
+                                            const int &maxIntPoints,
+                                            const int &maxDofs);
 #endif
 };
 

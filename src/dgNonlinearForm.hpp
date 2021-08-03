@@ -124,10 +124,6 @@ public:
                                         const int &maxIntPoints,
                                         const int &maxDofs );
   
-  static void exchangeBdrData(const Vector &x,
-                              ParFiniteElementSpace *pfes,
-                              Vector &face_nbr_data,
-                              Vector &send_data);
 #ifdef _GPU_
   void Mult_gpu(const Vector &x, Vector &y);
   static void setToZero_gpu(Vector &x, const int size);
