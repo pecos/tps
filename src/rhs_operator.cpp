@@ -615,7 +615,7 @@ void RHSoperator::multiPlyInvers_gpu( Vector &y,
 
 void RHSoperator::fillSharedData()
 {
-  ParFiniteElementSpace *pfes = ParFESpace();
+  ParFiniteElementSpace *pfes = Up->ParFESpace();
   ParMesh *mesh = pfes->GetParMesh();
   mesh->ExchangeFaceNbrNodes();
   mesh->ExchangeFaceNbrData();
