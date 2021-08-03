@@ -250,6 +250,14 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1,
    //IntegrationRules IntRules2(0, Quadrature1D::GaussLobatto);
    const IntegrationRule *ir = &intRules->Get(Tr.GetGeometryType(), intorder);
 
+
+   gradUp1i.SetSize(num_equation,dim);
+   gradUp2i.SetSize(num_equation,dim);
+
+   viscF1.SetSize(num_equation,dim);
+   viscF2.SetSize(num_equation,dim);
+
+
    for (int i = 0; i < ir->GetNPoints(); i++)
    {
       const IntegrationPoint &ip = ir->IntPoint(i);
@@ -263,12 +271,8 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1,
       // Interpolate elfun at the point
       elfun1_mat.MultTranspose(shape1, funval1);
       elfun2_mat.MultTranspose(shape2, funval2);
-      
-      // Interpolate gradients at int. point
 
-      gradUp1i.SetSize(num_equation,dim);
-      gradUp2i.SetSize(num_equation,dim);
-      
+      // Interpolate gradients at int. point
       gradUp1i = 0.; gradUp2i = 0.;
 
       for(int eq=0;eq<num_equation;eq++)
@@ -285,42 +289,26 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1,
       // Get the normal vector and the convective flux on the face
       CalcOrtho(Tr.Jacobian(), nor);
       rsolver->Eval(funval1, funval2, nor, fluxN);
-      
+
       // compute viscous fluxes
+      viscF1 = viscF2 = 0.;
 
-      viscF1.Clear();
-      viscF2.Clear();
-
-      viscF1.SetSize(num_equation,dim);
-      viscF2.SetSize(num_equation,dim);
-      
       fluxClass->ComputeViscousFluxes(funval1,gradUp1i,viscF1);
       fluxClass->ComputeViscousFluxes(funval2,gradUp2i,viscF2);
+
       // compute mean flux
-      for(int eq=0;eq<num_equation;eq++)
-      {
-        for(int d=0;d<dim;d++) viscF1(eq,d) += viscF2(eq,d);
-      }
+      viscF1 += viscF2;
       viscF1 *= -0.5;
 
-      // add to convective fluxes
-      for(int eq=0;eq<num_equation;eq++)
-        for(int d=0;d<dim;d++)
-          fluxN[eq] += viscF1(eq,d)*nor[d];
-
+      // add normal viscous flux to fluxN
+      viscF1.AddMult(nor, fluxN);
       fluxN *= ip.weight;
 
-      for (int k = 0; k < num_equation; k++)
-      {
-         for (int s = 0; s < dof1; s++)
-         {
-            elvect1_mat(s, k) -= fluxN(k) * shape1(s);
-         }
-         for (int s = 0; s < dof2; s++)
-         {
-            elvect2_mat(s, k) += fluxN(k) * shape2(s);
-         }
-      }
+
+      // add to element vectors
+      AddMultVWt( shape2, fluxN, elvect2_mat);
+      AddMult_a_VWt( -1.0, shape1, fluxN, elvect1_mat);
+
    }
 }
 

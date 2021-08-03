@@ -113,20 +113,22 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1,
     {
       for(int eq=0;eq<num_equation;eq++)
       {
+        const double du1n = (mean(eq) - iUp1(eq))*nor(d);
+        const double du2n = (mean(eq) - iUp2(eq))*nor(d);
         for(int k=0;k<dof1;k++)
         {
 #ifdef _GPU_
-          elvect(k+eq+d*num_equation) += (mean(eq)-iUp1(eq))*nor(d)*shape1(k);
+          elvect(k+eq+d*num_equation) += du1n*shape1(k);
 #else
-          elvect1_mat(k,eq+d*num_equation) += (mean(eq)-iUp1(eq))*nor(d)*shape1(k);
+          elvect1_mat(k,eq+d*num_equation) += du1n*shape1(k);
 #endif
         }
         for(int k=0;k<dof2;k++)
         {
 #ifdef _GPU_
-          elvect(k+eq+d*num_equation + dof1*num_equation*dim) -= (mean(eq)-iUp2(eq))*nor(d)*shape2(k);
+          elvect(k+eq+d*num_equation + dof1*num_equation*dim) -= du2n*shape2(k);
 #else
-          elvect2_mat(k,eq+d*num_equation) -= (mean(eq)-iUp2(eq))*nor(d)*shape2(k);
+          elvect2_mat(k,eq+d*num_equation) -= du2n*shape2(k);
 #endif
         }
       }
