@@ -37,6 +37,7 @@ private:
   
   //DenseMatrix *Me_inv;
   Array<DenseMatrix*> &Me_inv;
+  Array<DenseMatrix*> Ke;
   Vector &invMArray;
   Array<int> &posDofInvM;
   
@@ -52,7 +53,8 @@ private:
   // at each integration point
   Vector elemShapeDshapeWJ; // [...l_0(i),...,l_dof(i),l_0_x(i),...,l_dof_d(i), w_i*detJac_i ...]
   Array<int> elemPosQ_shapeDshapeWJ; // position and num. of integration points for each element
-  
+
+
 public:
   Gradients(ParFiniteElementSpace *_vfes,
             ParFiniteElementSpace *_gradUpfes,
