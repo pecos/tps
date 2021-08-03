@@ -111,7 +111,7 @@ Gradients::~Gradients()
 void Gradients::computeGradients()
 {
 #ifdef _GPU_
-  DGNonLinearForm::setToZero_gpu(*gradUp,gradUp->Size());
+//   DGNonLinearForm::setToZero_gpu(*gradUp,gradUp->Size());
   
   //gradUp_A->Mult(Up,*gradUp);
   ParMesh *pmesh = vfes->GetParMesh();
@@ -120,7 +120,7 @@ void Gradients::computeGradients()
   {
     integrationGradSharedFace_gpu(Up,
                                   gradUp,
-                                  vfes->GetNDofs(), ,
+                                  vfes->GetNDofs(),
                                   dim,
                                   num_equation,
                                   eqState->GetSpecificHeatRatio(),
@@ -644,7 +644,7 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up,
   {
     MFEM_FOREACH_THREAD(i,x,maxDofs)
     {
-      MFEM_SHARED double Upi[216*5], Upj[64*5], Fcontrib[216*5];
+      MFEM_SHARED double Upi[216*5], Upj[64*5], Fcontrib[216*5*3];
       MFEM_SHARED double l1[216],l2[216];
       MFEM_SHARED double meanUp[5], up1[5], up2[5], nor[3];
       
@@ -669,7 +669,7 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up,
           indexi = d_nodesIDs[offsetEl1+i];
           for(int eq=0;eq<num_equation;eq++)
           {
-            Fcontrib[i+eq*dof1] = 0.;
+            for(int d=0;d<dim;d++) Fcontrib[i+eq*dof1+d*num_equation*dof1] = 0.;
             Upi[i+eq*dof1] = d_up[indexi+eq*Ndofs];
           }
           elemDataRecovered = true;
@@ -709,8 +709,7 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up,
           }
           MFEM_SYNC_THREAD;
           
-          // compute Riemann flux
-          if( i<num_equation ) meanUp[i] = 0.5*(up2[i]+up1[i]);
+          if( i<num_equation ) meanUp[i] = 0.5*(up2[i]-up1[i]);
           MFEM_SYNC_THREAD;
           
           // add integration point contribution
@@ -718,7 +717,7 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up,
           {
             for(int eq=0;eq<num_equation;eq++)
             {
-              if(i<dof1) Fcontrib[i+eq*dof1] += (meanUp[eq]-up1[eq])*weight*l1[i]*nor[d];
+              if(i<dof1) Fcontrib[i+eq*dof1+d*num_equation*dof1] += meanUp[eq]*weight*l1[i]*nor[d];
             }
           }
         }
@@ -726,9 +725,15 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up,
       } 
       
       // write to global memory
-      for(int eq=0;eq<num_equation;eq++)
+      if(i<dof1)
       {
-        if(i<dof1) d_gradUp[indexi + eq*Ndofs] = Fcontrib[i + eq*dof1];
+        for(int d=0;d<dim;d++)
+        {
+          for(int eq=0;eq<num_equation;eq++)
+          {
+            d_gradUp[indexi+eq*Ndofs+d*num_equation*Ndofs] = Fcontrib[i+eq*dof1+d*num_equation*dof1];
+          }
+        }
       }
     }
   });

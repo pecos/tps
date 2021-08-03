@@ -91,11 +91,6 @@ private:
   
   mutable parallelFacesIntegrationArrays parallelData;
   void fillSharedData();
-  
-  static void exchangeBdrData(const Vector &x,
-                              ParFiniteElementSpace *pfes,
-                              Vector &face_nbr_data,
-                              Vector &send_data);
 
   //void GetFlux(const DenseMatrix &state, DenseTensor &flux) const;
   void GetFlux(const Vector &state, DenseTensor &flux) const;
@@ -139,6 +134,11 @@ public:
    void updatePrimitives(const Vector &x) const;
 
    virtual ~RHSoperator();
+   
+   static void exchangeBdrData(const Vector &x,
+                              ParFiniteElementSpace *pfes,
+                              Vector &face_nbr_data,
+                              Vector &send_data);
 
 
   // GPU functions

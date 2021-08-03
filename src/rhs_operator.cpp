@@ -285,6 +285,10 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
   exchangeBdrData(*Up,vfes, parallelData.face_nbr_data,parallelData.send_data);
 #endif
   gradients->computeGradients();
+#ifdef _GPU_
+  // GPU version requires the exchange of data before gradient computation
+  exchangeBdrData(x,vfes, parallelData.face_nbr_data,parallelData.send_data);
+#endif
   
   // update boundary conditions
   if(bcIntegrator!=NULL) bcIntegrator->updateBCMean( Up );
