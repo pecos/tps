@@ -23,6 +23,7 @@ echo Package version............... : $PACKAGE-$VERSION
 echo
 echo C++ compiler.................. : $CXX
 echo C++ compiler flags............ : $CXXFLAGS
+echo LDFLAGS....................... : $LDFLAGS
 echo Install dir................... : $prefix
 echo Build user.................... : $USER
 echo Build host.................... : $BUILD_HOST

@@ -97,21 +97,11 @@ void M2ulPhyS::initVariables()
 	    assert(serial_mesh->Conforming());
 	    partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod),nelemGlobal_);
 	    partitioning_file_hdf5("write");
-	    MPI_Barrier(MPI_COMM_WORLD);
 	  }
 	else
 	  {
 	    partitioning_file_hdf5("read");
 	  }
-      }
-
-    if(nprocs_ > 1)
-      {
-	assert(serial_mesh->Conforming());
-	partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod),nelemGlobal_);
-	if(rank0_)
-	  partitioning_file_hdf5("write");
-	MPI_Barrier(MPI_COMM_WORLD);
       }
 
     mesh = new ParMesh(MPI_COMM_WORLD,*serial_mesh, partitioning_);
@@ -125,7 +115,7 @@ void M2ulPhyS::initVariables()
     paraviewColl->SetLevelsOfDetail( config.GetSolutionOrder() );
     paraviewColl->SetHighOrderOutput(true);
     paraviewColl->SetPrecision(8);
-    paraviewColl->SetDataFormat(VTKFormat::ASCII);
+    //paraviewColl->SetDataFormat(VTKFormat::ASCII);
     
   }else
   {
