@@ -111,7 +111,7 @@ Gradients::~Gradients()
 void Gradients::computeGradients()
 {
 #ifdef _GPU_
-//   DGNonLinearForm::setToZero_gpu(*gradUp,gradUp->Size());
+  DGNonLinearForm::setToZero_gpu(*gradUp,gradUp->Size());
   
   //gradUp_A->Mult(Up,*gradUp);
   ParMesh *pmesh = vfes->GetParMesh();
@@ -644,7 +644,7 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up,
   {
     MFEM_FOREACH_THREAD(i,x,maxDofs)
     {
-      MFEM_SHARED double Upi[216*5], Upj[64*5], Fcontrib[216*5*3];
+      MFEM_SHARED double Upi[216*5], Upj[216*5], Fcontrib[216*5*3];
       MFEM_SHARED double l1[216],l2[216];
       MFEM_SHARED double meanUp[5], up1[5], up2[5], nor[3];
       
