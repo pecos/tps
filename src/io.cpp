@@ -201,7 +201,8 @@ void M2ulPhyS::restart_files_hdf5(string mode)
       // if requested single file restart, serialize
       if ( (config.RestartSerial() == "write") && (nprocs_ > 1) ){
         serialize_soln_for_write();
-        dataU = serial_soln->GetData();
+        if(rank0_)
+          dataU = serial_soln->GetData();
       }
 
       if (mpi.Root() || (config.RestartSerial() != "write") )
