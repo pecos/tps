@@ -88,6 +88,9 @@ private:
   
   mutable DenseTensor flux;
   mutable Vector z;
+  
+  parallelFacesIntegrationArrays parallelData;
+  void fillSharedData();
 
   //void GetFlux(const DenseMatrix &state, DenseTensor &flux) const;
   void GetFlux(const Vector &state, DenseTensor &flux) const;

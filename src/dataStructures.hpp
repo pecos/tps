@@ -19,4 +19,20 @@ struct linearlyVaryingVisc
   double viscRatio;
 };
 
+struct parallelFacesIntegrationArrays
+{
+  Vector sharedShapeWnor1;
+  Vector sharedShape2;
+  Array<int> sharedElem1Dof12Q;
+  Array<int> sharedVdofs;
+  Array<int> sharedVdofsGradUp;
+  Array<int> sharedElemsFaces;
+  
+  // vectors for data transfer
+  Vector face_nbr_data;
+  Vector send_data;
+  Vector face_nbr_dataGrad;
+  Vector send_dataGrad;
+};
+
 #endif

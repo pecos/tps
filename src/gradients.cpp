@@ -111,18 +111,19 @@ Gradients::~Gradients()
 void Gradients::computeGradients()
 {
 #ifdef _GPU_
-  const Vector &px = Prolongate(*Up);
+  //const Vector &px = Prolongate(*Up);
   
   // INTEGRATION DOMAIN SHARED FACES
   // WARNING! NOTE implement face integration to control loop
-  Vector faceContrib;
-  faceContrib.UseDevice(true);
-  faceContrib.NewMemoryAndSize(gradUp->GetMemory(),
-                               dim*num_equation*vfes->GetNDofs(),
-                               false );
-  DGNonLinearForm::setToZero_gpu(faceContrib,faceContrib.Size());
+//   Vector faceContrib;
+//   faceContrib.UseDevice(true);
+//   faceContrib.NewMemoryAndSize(gradUp->GetMemory(),
+//                                dim*num_equation*vfes->GetNDofs(),
+//                                false );
+//   DGNonLinearForm::setToZero_gpu(faceContrib,faceContrib.Size());
+  DGNonLinearForm::setToZero_gpu(*gradUp,gradUp->Size());
   
-  gradUp_A->Mult(Up,faceContrib);
+  gradUp_A->Mult(Up,*gradUp);
    
   for(int elType=0;elType<numElems.Size();elType++)
   {
@@ -137,7 +138,7 @@ void Gradients::computeGradients()
                         elemOffset,
                         dof_el,
                         vfes->GetNDofs(),
-                        px,
+                        *Up, //px,
                         *gradUp,
                         num_equation,
                         dim,
@@ -155,7 +156,7 @@ void Gradients::computeGradients()
                         elems12Q );
   }
   
-  //gradUp->ExchangeFaceNbrData();
+  gradUp->ExchangeFaceNbrData();
 #else
   computeGradients_cpu();
 #endif
@@ -407,7 +408,7 @@ void Gradients::computeGradients_gpu(const int numElems,
       {
         for(int d=0;d<dim;d++)
         {
-          d_gradUp[indexi+eq*totalDofs+d*num_equation*totalDofs] = 
+          d_gradUp[indexi+eq*totalDofs+d*num_equation*totalDofs] += 
                                       gradUpi[i+eq*elDof+d*num_equation*elDof];
         }
       }
