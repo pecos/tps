@@ -41,6 +41,7 @@ private:
   
   //DenseMatrix *Me_inv;
   Array<DenseMatrix*> &Me_inv;
+  Array<DenseMatrix*> Ke;
   Vector &invMArray;
   Array<int> &posDofInvM;
   
