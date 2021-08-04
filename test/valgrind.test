@@ -4,6 +4,17 @@
 TEST="valgrind"
 RUNFILE="inputs/input.dtconst.2iters.cyl"
 
+setup() {
+    OPTS=""
+    config="../tps_config.h"
+    if [ -e ${config} ];then
+        grep -q "^#define HAVE_LIBCUDA 1" ${config}
+        if [ $? -eq 0 ];then
+            OPTS="${OPTS} -d cuda"
+        fi
+    fi
+}
+
 @test "[$TEST] verify valgrind detects known error" {
     test -e ./uninit
     run valgrind --error-exitcode=1 ./uninit
@@ -13,7 +24,7 @@ RUNFILE="inputs/input.dtconst.2iters.cyl"
 @test "[$TEST] run tps with input -> $RUNFILE under valgrind" {
     test -s $RUNFILE
 
-    valgrind --error-exitcode=1 ../src/tps --runFile $RUNFILE
+    valgrind --error-exitcode=1 ../src/tps $OPTS --runFile $RUNFILE
 
 }
 
