@@ -19,6 +19,7 @@ if [ $# -lt 2 ];then
     echo "Usage: soln_differ [-d] <file1.h5> <file2.h5>"
     echo ""
     echo "   -d <dim>   set dimension (1,2,3=default)"
+    echo "   -r         report solution differences to stdout"
    exit 1
 fi
 

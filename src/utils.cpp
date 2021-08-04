@@ -89,7 +89,6 @@ int rm_restart(std::string jobFile,std::string mode)
 
   return 0;
 }
-
 bool M2ulPhyS::Check_JobResubmit()
 {
   if ( config.isAutoRestart() )
@@ -117,6 +116,25 @@ int rm_restart(std::string jobFile,std::string mode)
 }
 
 #endif
+
+// Check for existence of DIE file on rank 0
+bool M2ulPhyS::Check_ExitEarly(int iter)
+{
+  if ( (iter % config.exit_checkFreq()) == 0 )
+    {
+      int status;
+      if(rank0_)
+        {
+          status = int(file_exists("DIE"));
+          if(status == 1)
+            grvy_printf(INFO,"Detected DIE file, terminating early...\n");
+        }
+      MPI_Bcast(&status,1,MPI_INT,0,MPI_COMM_WORLD);
+      return(bool(status));
+    }
+  else
+    return(false);
+}
 
 // check if file exists
 bool file_exists (const std::string &name)
