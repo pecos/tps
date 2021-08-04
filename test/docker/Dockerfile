@@ -1,4 +1,4 @@
-FROM centos:8
+FROM centos:8.3.2011
 MAINTAINER Karl W. Schulz <karl@oden.utexas.edu>
 
 # enable OpenHPC repository 
@@ -61,18 +61,20 @@ RUN cd /tmp/bats-core-1.3.0 \
 RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/class.conf
 RUN ldconfig
 
+RUN yum -y install aspell
+RUN yum -y install diffutils
+RUN yum -y install cmake-ohpc
+RUN yum -y install git-lfs
+RUN yum -y install bc
+
 # Upgrade MFEM
 #RUN yum -y install http://obs.openhpc.community:82/OpenHPC:/2.1:/Factory/CentOS_8/x86_64/mfem-gnu9-mpich-ohpc-4.2-2.1.ohpc.2.1.x86_64.rpm
 #
 # load mfem by default
 RUN echo "module try-add mfem" >>  /etc/profile.d/lmod.sh
 RUN echo "module try-add boost" >> /etc/profile.d/lmod.sh
+RUN echo "module try-add valgrind" >> /etc/profile.d/lmod.sh
 
-RUN yum -y install aspell
-RUN yum -y install diffutils
-RUN yum -y install cmake-ohpc
-RUN yum -y install git-lfs
-RUN yum -y install bc
 
 ## Define a user
 RUN useradd -u 1000 -m test

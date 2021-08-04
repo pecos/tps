@@ -23,6 +23,7 @@
 #include "BCintegrator.hpp"
 #include "faceGradientIntegration.hpp"
 #include "averaging_and_rms.hpp"
+#include "utils.hpp"
 #include "io.hpp"
 
 #include "dgNonlinearForm.hpp"
@@ -40,7 +41,7 @@ using namespace mfem;
 using namespace std;
 
 // application exit codes
-enum ExitCodes {NORMAL = 0, ERROR = 1, JOB_RESTART = 10 };
+enum ExitCodes {NORMAL = 0, ERROR = 1, JOB_RESTART = 10, EARLY_EXIT = 11};
 
 class M2ulPhyS
 {
@@ -248,6 +249,7 @@ private:
   
   void Check_NAN();
   bool Check_JobResubmit();
+  bool Check_ExitEarly(int iter);
   void Cache_Paraview_Timesteps();
 
 

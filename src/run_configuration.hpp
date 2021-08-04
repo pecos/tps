@@ -138,6 +138,8 @@ private:
   bool   rm_enableMonitor_;      // flag to trigger RMS monitoring and job resubmissions
   int    rm_threshold_;          // remaining secs for current job to trigger re-submission
   int    rm_checkFrequency_;     // iteration frequency to check RMS status
+
+  int    exit_checkFrequency_;   // iteration frequency to check for early exit
   
 public:
   RunConfiguration();
@@ -181,6 +183,8 @@ public:
   bool   isAutoRestart(){return rm_enableMonitor_;}
   int    rm_threshold() {return rm_threshold_;}
   int    rm_checkFreq() {return rm_checkFrequency_;}
+
+  int    exit_checkFreq(){return exit_checkFrequency_;}
   
   bool thereIsForcing(){return isForcing;}
   double* GetImposedPressureGradient(){return &gradPress[0];}
