@@ -576,7 +576,7 @@ void M2ulPhyS::serialize_soln_for_write(IOFamily &fam)
     for(int elem=0; elem<local_ne; elem++)
     {
       int gelem = locToGlobElem[elem];
-      assert(gelem > 0);
+//       assert(gelem > 0);
       fam.pfunc_->ParFESpace()->GetElementVDofs(elem,lvdofs);
       pfunc->GetSubVector(lvdofs, lsoln); // work for gpu build?
 
@@ -688,7 +688,7 @@ void M2ulPhyS::read_serialized_soln_data(hid_t file,
   }  // <-- end rank 0
   else
   {
-    int numlDofs = U->Size() / numStateVars;
+    int numlDofs = fam.pfunc_->ParFESpace()->GetNDofs();
     grvy_printf(DEBUG,"[%i]: local number of state vars to receive = %i (var=%s)\n",rank_,numlDofs,varName.c_str());
 
     std::vector<double> packedData(numlDofs);
