@@ -58,9 +58,10 @@ RunConfiguration::RunConfiguration()
   for(int ii=0;ii<3;ii++) gradPress[ii] = 0.;
 
   // Resource manager monitoring
-  rm_enableMonitor_  = false;
-  rm_threshold_      = 15*60; // 15 minutes
-  rm_checkFrequency_ = 25;    // 25 iterations
+  rm_enableMonitor_    = false;
+  rm_threshold_        = 15*60; // 15 minutes
+  rm_checkFrequency_   = 25;    // 25 iterations
+  exit_checkFrequency_ = 500;   // 500 iterations
 }
 
 RunConfiguration::~RunConfiguration()
@@ -240,6 +241,11 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
       {
         ss >> word;
 	rm_checkFrequency_ = stoi( word );
+
+      }else if( word.compare("EXIT_CHECK_FREQUENCY")==0 )
+      {
+        ss >> word;
+	exit_checkFrequency_ = stoi( word );
 
       // working fluid
       }else if( word.compare("FLUID")==0 )

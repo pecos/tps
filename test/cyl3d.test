@@ -15,9 +15,11 @@ setup() {
 
 @test "[$TEST] run tps with input -> $RUNFILE" {
     rm -f $SOLN_FILE
+    touch DIE
     ../src/tps --runFile $RUNFILE
 
     test -s $SOLN_FILE
+    test ! -e DIE
 }
 
 @test "[$TEST] verify tps output with input -> $RUNFILE" {

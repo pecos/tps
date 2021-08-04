@@ -58,6 +58,14 @@ mpi(_mpi)
   auto v_U = U->ReadWrite();
   auto vUp = Up->ReadWrite();
 #endif // _GPU_
+
+  // remove DIE file if present
+  if(rank0_)
+    if(file_exists("DIE"))
+      {
+        grvy_printf(DEBUG,"Removing DIE file on startup\n");
+        remove("DIE");
+      }
 }
 
 
@@ -971,7 +979,6 @@ void M2ulPhyS::Iterate()
 
       if (iter != MaxIters)
       {
-        //write_restart_files();
         restart_files_hdf5("write");
           
         auto hUp = Up->HostRead();
@@ -999,8 +1006,17 @@ void M2ulPhyS::Iterate()
         }
     }
 #endif
-    
+
     average->addSampleMean(iter);
+
+    // periodically check for DIE file which requests to terminate early
+    if(Check_ExitEarly(iter))
+      {
+        MaxIters = iter;
+        SetStatus(EARLY_EXIT);
+        break;
+      }
+
 
 #ifdef HAVE_GRVY
     grvy_timer_end(__func__);
