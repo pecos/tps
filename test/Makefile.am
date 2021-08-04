@@ -8,5 +8,6 @@ else
 TESTS = cyl3d.test \
 	cyl3d.mflow.test \
 	cyl3d.dtconst.test \
+	die.test \
 	wedge.test
 endif
