@@ -110,8 +110,16 @@ void M2ulPhyS::restart_files_hdf5(string mode)
             H5Sclose(dspace1dim);
             H5Aclose(attr);
           }
-	}
 #endif
+	}
+      // included total dofs for partitioned files
+      if(config.RestartSerial() != "write")
+          {
+            int ldofs = vfes->GetNDofs();
+            int gdofs;
+            MPI_Allreduce(&ldofs,&gdofs,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
+            h5_save_attribute(file,"dofs_global",gdofs);
+          }
     }
   else	// read
     {

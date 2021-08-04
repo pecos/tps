@@ -240,6 +240,12 @@ setup() {
     run h5dump  -a iteration  ${SOLFILE_BASE}.1.h5
     [ "${lines[5]}" = "   (0): 2" ]
 
+    # verify we have global number of dofs correctly included
+    run h5dump  -a dofs_global  ${SOLFILE_BASE}.0.h5
+    [ "${lines[5]}" = "   (0): 24612" ]
+    run h5dump  -a dofs_global  ${SOLFILE_BASE}.1.h5
+    [ "${lines[5]}" = "   (0): 24612" ]
+
     # now, start from partitioned restart files at 2 iters, and save serialized output at 4 iters
     RUNFILE=input.4iters.cyl
     cp $RUNFILE $RUNFILE_MOD
