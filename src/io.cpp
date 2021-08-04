@@ -1,6 +1,5 @@
 #include "M2ulPhyS.hpp"
 #include <hdf5.h>
-#include "utils.hpp"
 
 void M2ulPhyS::restart_files_hdf5(string mode)
 {
