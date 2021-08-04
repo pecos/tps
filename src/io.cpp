@@ -18,7 +18,8 @@ void M2ulPhyS::restart_files_hdf5(string mode)
   serialName.append( ".sol.h5" );
   string fileName;
 
-  if( ((config.RestartSerial() == "read") && (mode == "read")) || (config.RestartSerial() == "write") )
+  if( ((config.RestartSerial() == "read")  && (mode == "read")) ||
+      ((config.RestartSerial() == "write") && (mode == "write")) )
     fileName  = serialName;
   else
     fileName = groupsMPI->getParallelName( serialName );
