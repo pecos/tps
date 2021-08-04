@@ -8,6 +8,7 @@ OPTS="-d cuda"
 setup() {
     SOLN_FILE=restart_output.sol.h5
     REF_FILE=ref_solns/cyl3d.dtconst.cpu.h5
+    NUM_GPUS=/sbin/lspci | grep "VGA compatible controller" | wc -l
 }
 
 @test "[$TEST] check for input file $RUNFILE" {
@@ -104,6 +105,8 @@ setup() {
 }
 
 @test "[$TEST] verify tps output from 2 mpi tasks with input -> $RUNFILE" {
+
+    [ $NUM_GPUS -ge 2 ] || skip "Two GPUs not available"
 
     SOLN_FILE_0=restart_output.sol.0.h5
     SOLN_FILE_1=restart_output.sol.1.h5
