@@ -1,0 +1,19 @@
+#!/usr/bin/env bats
+# -*- mode: sh -*-
+
+TEST="valgrind"
+RUNFILE="inputs/input.dtconst.2iters.cyl"
+
+@test "[$TEST] verify valgrind detects known error" {
+    test -e ./uninit
+    run valgrind --error-exitcode=1 ./uninit
+    [[ "${status}" -eq 1 ]]
+}
+
+@test "[$TEST] run tps with input -> $RUNFILE under valgrind" {
+    test -s $RUNFILE
+
+    valgrind --error-exitcode=1 ../src/tps --runFile $RUNFILE
+
+}
+
