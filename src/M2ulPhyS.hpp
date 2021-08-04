@@ -216,8 +216,6 @@ private:
   // a serial mesh, finite element space, and grid function
   // for use if we want to write a serial file
   Mesh *serial_mesh;
-  FiniteElementSpace *serial_fes;
-  GridFunction *serial_soln;
 
   // I/O organizer
   IODataOrganizer ioData;
@@ -242,10 +240,10 @@ private:
   void write_restart_files();
   void read_restart_files();
   void read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data);
-  void read_serialized_soln_data (hid_t file, string varName, int numDof,   int varOffset, double *data);
+  void read_serialized_soln_data (hid_t file, string varName, int numDof,   int varOffset, double *data, IOFamily &fam);
   void restart_files_hdf5(string mode);
   void partitioning_file_hdf5(string mode);
-  void serialize_soln_for_write(string ioFamily);
+  void serialize_soln_for_write(IOFamily &fam);
   void write_soln_data(hid_t group, string varName, hid_t dataspace, double *data);
   
   void Check_NAN();
