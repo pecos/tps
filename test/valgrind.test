@@ -8,8 +8,8 @@ setup() {
     OPTS=""
     config="../tps_config.h"
     if [ -e ${config} ];then
-        grep -q "^#define HAVE_LIBCUDA 1" ${config}
-        if [ $? -eq 0 ];then
+        run grep -q "^#define HAVE_LIBCUDA 1" ${config}
+        if [ "${status}" -eq 0 ];then
             OPTS="${OPTS} -d cuda"
         fi
     fi
