@@ -270,25 +270,6 @@ void M2ulPhyS::initVariables()
   vfes = new ParFiniteElementSpace(mesh, fec, num_equation, Ordering::byNODES);
   gradUpfes = new ParFiniteElementSpace(mesh, fec, num_equation*dim, Ordering::byNODES);
 
-  // instantiate objects needed by rank 0 for single restart file option
-//   serial_fes = NULL;
-//   serial_soln = NULL;
-//   serial_fesRMS = NULL;
-//   serial_RMS = NULL;
-//   if ( mpi.Root() && (config.RestartSerial() != "no") )
-//   {
-//     serial_fes = new FiniteElementSpace(serial_mesh, fec, num_equation, Ordering::byNODES);
-//     serial_soln = new GridFunction(serial_fes);
-//     // to help detect errors, initialize to nan
-//     *serial_soln = std::numeric_limits<double>::quiet_NaN();
-//     
-//     if( config.GetMeanSampleInterval() )
-//     {
-//       serial_fesRMS = new FiniteElementSpace(serial_mesh, fec, 6, Ordering::byNODES);
-//       serial_RMS    = new GridFunction(serial_fesRMS);
-//     }
-//   }
-
 
   initIndirectionArrays();
   initSolutionAndVisualizationVectors();
@@ -304,6 +285,33 @@ void M2ulPhyS::initVariables()
                           config,
                           groupsMPI);
   average->read_meanANDrms_restart_files();
+  
+  // register rms and mean sol into ioData
+  if( average->ComputeMean() )
+  {
+    // meanUp
+    ioData.registerIOFamily("Time-averaged primitive vars","/meanSolution",
+      average->GetMeanUp(), false );
+    ioData.registerIOVar("/meanSolution","meanDens",0);
+    ioData.registerIOVar("/meanSolution","mean-u",  1);
+    ioData.registerIOVar("/meanSolution","mean-v",  2);
+    if(dim == 3)
+    {
+      ioData.registerIOVar("/meanSolution","mean-w",3);
+      ioData.registerIOVar("/meanSolution","mean-E",4);
+    }
+    else
+      ioData.registerIOVar("/meanSolution","mean-p",3);
+    // rms
+    ioData.registerIOFamily("RMS velocity fluctuation","/rmsData",
+      average->GetRMS(), false );
+    ioData.registerIOVar("/rmsData","uu",0);
+    ioData.registerIOVar("/rmsData","vv",1);
+    ioData.registerIOVar("/rmsData","ww",2);
+    ioData.registerIOVar("/rmsData","uv",3);
+    ioData.registerIOVar("/rmsData","uw",4);
+    ioData.registerIOVar("/rmsData","vw",5);
+  }
   
   ioData.initializeSerial(mpi.Root(),serial_mesh);
   projectInitialSolution();

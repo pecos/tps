@@ -265,8 +265,8 @@ void M2ulPhyS::restart_files_hdf5(string mode)
 
 //       }  // end loop over IO families
 
-      if(file >= 0)
-        H5Fclose(file);
+//       if(file >= 0)
+//         H5Fclose(file);
     }
     else          // read mode
     {
@@ -335,10 +335,12 @@ void M2ulPhyS::restart_files_hdf5(string mode)
       }
 //       }
 
-      if(file >= 0)
-        H5Fclose(file);
+//       if(file >= 0)
+//         H5Fclose(file);
     }
   }
+  
+  if(file >= 0) H5Fclose(file);
 
   if(mode=="read" && loadFromAuxSol)
   {

@@ -70,6 +70,9 @@ public:
   int GetSamplesInterval(){return sampleInterval;}
   bool ComputeMean(){return computeMean;}
   
+  ParGridFunction *GetMeanUp(){return meanUp;}
+  ParGridFunction *GetRMS(){return rms;}
+  
   void SetSamplesMean(int &samples){samplesMean = samples;}
   void SetSamplesInterval(int &interval){sampleInterval = interval;}
 };
