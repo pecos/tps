@@ -16,7 +16,7 @@ jobs:
      runs-on: ubuntu-20.04
      container:
        image: koomietx/mfem:4.2.tps
-       options: --user 1001
+       options: --user 1001 --privileged
      name: Build/CPU
      steps:
        - name: Checkout code
