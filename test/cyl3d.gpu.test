@@ -40,13 +40,14 @@ setup() {
     run h5dump  -a revision restart_output.sol.h5
     [[ "${status}" -eq 0 ]]
 
-    hdf_dump=$output
-
-    run git log -1 --format="%h"
-    if [ $? -eq 0 ];then
-	sha=${lines[0]}
-	[[ "${hdf_dump}" =~ "\"$sha\"" ]]
-    fi
+    # disabling following bit since developer may be testing prior to commit
+##     hdf_dump=$output
+##
+##     run git log -1 --format="%h"
+##     if [ $? -eq 0 ];then
+## 	sha=${lines[0]}
+## 	[[ "${hdf_dump}" =~ "\"$sha\"" ]]
+##     fi
 }
 
 @test "[$TEST] verify exit code if restart files missing" {
