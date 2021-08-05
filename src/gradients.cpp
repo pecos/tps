@@ -7,14 +7,13 @@ Gradients::Gradients(ParFiniteElementSpace* _vfes,
                      int _num_equation,
                      ParGridFunction* _Up, 
                      ParGridFunction* _gradUp, 
-                     //ParNonlinearForm *_gradUp_A,
+                     EquationOfState *_eqState,
                      GradNonLinearForm *_gradUp_A,
                      IntegrationRules *_intRules,
                      int _intRuleType,
                      Array<int>& _nodesIDs, 
                      Array<int>& _posDofIds, 
                      Array<int>& _numElems,
-                     //DenseMatrix *_Me_inv,
                      Array<DenseMatrix*> &_Me_inv,
                      Vector &_invMArray,
                      Array<int> &_posDofInvM,
@@ -31,6 +30,7 @@ dim(_dim),
 num_equation(_num_equation),
 Up(_Up),
 gradUp(_gradUp),
+eqState(_eqState),
 gradUp_A(_gradUp_A),
 intRules(_intRules),
 intRuleType(_intRuleType),
@@ -159,18 +159,29 @@ Gradients::~Gradients()
 void Gradients::computeGradients()
 {
 #ifdef _GPU_
-  const Vector &px = Prolongate(*Up);
+  DGNonLinearForm::setToZero_gpu(*gradUp,gradUp->Size());
   
-  // INTEGRATION DOMAIN SHARED FACES
-  // WARNING! NOTE implement face integration to control loop
-  Vector faceContrib;
-  faceContrib.UseDevice(true);
-  faceContrib.NewMemoryAndSize(gradUp->GetMemory(),
-                               dim*num_equation*vfes->GetNDofs(),
-                               false );
-  DGNonLinearForm::setToZero_gpu(faceContrib,faceContrib.Size());
-  
-  gradUp_A->Mult(Up,faceContrib);
+  //gradUp_A->Mult(Up,*gradUp);
+  ParMesh *pmesh = vfes->GetParMesh();
+  const int Nshared = pmesh->GetNSharedFaces();
+  if( Nshared>0 )
+  {
+    integrationGradSharedFace_gpu(Up,
+                                  gradUp,
+                                  vfes->GetNDofs(),
+                                  dim,
+                                  num_equation,
+                                  eqState->GetSpecificHeatRatio(),
+                                  eqState->GetGasConstant(), 
+                                  eqState->GetViscMultiplyer(),
+                                  eqState->GetBulkViscMultiplyer(),
+                                  eqState->GetPrandtlNum(),
+                                  nodesIDs,
+                                  posDofIds,
+                                  parallelData,
+                                  maxIntPoints,
+                                  maxDofs);
+  }
    
   for(int elType=0;elType<numElems.Size();elType++)
   {
@@ -185,7 +196,7 @@ void Gradients::computeGradients()
                         elemOffset,
                         dof_el,
                         vfes->GetNDofs(),
-                        px,
+                        *Up, //px,
                         *gradUp,
                         num_equation,
                         dim,
@@ -203,7 +214,7 @@ void Gradients::computeGradients()
                         elems12Q );
   }
   
-  //gradUp->ExchangeFaceNbrData();
+  gradUp->ExchangeFaceNbrData();
 #else
   computeGradients_cpu();
 #endif
@@ -419,7 +430,7 @@ void Gradients::computeGradients_gpu(const int numElems,
       {
         for(int d=0;d<dim;d++)
         {
-          d_gradUp[indexi+eq*totalDofs+d*num_equation*totalDofs] = 
+          d_gradUp[indexi+eq*totalDofs+d*num_equation*totalDofs] += 
                                       gradUpi[i+eq*elDof+d*num_equation*elDof];
         }
       }
@@ -607,6 +618,135 @@ void Gradients::computeGradients_gpu(const int numElems,
                                     temp[i +eq*elDof + d*num_equation*elDof];
         }
       }*/
+    }
+  });
+}
+
+void Gradients::integrationGradSharedFace_gpu(const Vector *Up,
+                                              ParGridFunction *gradUp,
+                                              const int &Ndofs,
+                                              const int &dim,
+                                              const int &num_equation,
+                                              const double &gamma,
+                                              const double &Rg,
+                                              const double &viscMult,
+                                              const double &bulkViscMult,
+                                              const double &Pr,
+                                              const Array<int> &nodesIDs,
+                                              const Array<int> &posDofIds,
+                                              const parallelFacesIntegrationArrays *parallelData,
+                                              const int &maxIntPoints,
+                                              const int &maxDofs)
+{
+  const double *d_up = Up->Read();
+  double *d_gradUp = gradUp->ReadWrite();
+  const double *d_faceData = parallelData->face_nbr_data.Read();
+  
+  const int *d_nodesIDs = nodesIDs.Read();
+  const int *d_posDofIds = posDofIds.Read();
+  
+  const double *d_sharedShapeWnor1 = parallelData->sharedShapeWnor1.Read();
+  const double *d_sharedShape2 = parallelData->sharedShape2.Read();
+  const int *d_sharedElem1Dof12Q = parallelData->sharedElem1Dof12Q.Read();
+  const int *d_sharedVdofs = parallelData->sharedVdofs.Read();
+//   const int *d_sharedVdofsGrads = parallelData->sharedVdofsGradUp.Read();
+  const int *d_sharedElemsFaces = parallelData->sharedElemsFaces.Read();
+  
+  MFEM_FORALL_2D(el,parallelData->sharedElemsFaces.Size()/7,maxDofs,1,1,
+  {
+    MFEM_FOREACH_THREAD(i,x,maxDofs)
+    {
+      MFEM_SHARED double Upi[216*5], Upj[216*5], Fcontrib[216*5*3];
+      MFEM_SHARED double l1[216],l2[216];
+      MFEM_SHARED double meanUp[5], up1[5], up2[5], nor[3];
+      
+      const int el1      = d_sharedElemsFaces[0+el*7];
+      const int numFaces = d_sharedElemsFaces[1+el*7];
+      const int dof1 = d_sharedElem1Dof12Q[1+d_sharedElemsFaces[2+el*7]*4];
+      
+      bool elemDataRecovered = false;
+      int indexi;
+      
+      for(int elFace=0;elFace<numFaces;elFace++)
+      {
+        const int f = d_sharedElemsFaces[1+elFace+1+el*7];
+
+        const int dof2 = d_sharedElem1Dof12Q[2+f*4];
+        const int Q    = d_sharedElem1Dof12Q[3+f*4];
+        
+        const int offsetEl1 = d_posDofIds[2*el1];
+        
+        if( i<dof1 && !elemDataRecovered )
+        {
+          indexi = d_nodesIDs[offsetEl1+i];
+          for(int eq=0;eq<num_equation;eq++)
+          {
+            for(int d=0;d<dim;d++) Fcontrib[i+eq*dof1+d*num_equation*dof1] = 0.;
+            Upi[i+eq*dof1] = d_up[indexi+eq*Ndofs];
+          }
+          elemDataRecovered = true;
+        }
+        if( i<dof2 ) // recover data from neighbor
+        {
+          for(int eq=0;eq<num_equation;eq++)
+          {
+            int index = d_sharedVdofs[i+eq*maxDofs+f*num_equation*maxDofs];
+            Upj[i+eq*dof2] = d_faceData[index];
+          }
+        }
+        MFEM_SYNC_THREAD;
+        
+        for(int k=0;k<Q;k++)
+        {
+          const double weight = 
+            d_sharedShapeWnor1[maxDofs+k*(maxDofs+1+dim)+f*maxIntPoints*(maxDofs+1+dim)];
+          if(i<dof1) l1[i] = d_sharedShapeWnor1[i+k*(maxDofs+1+dim)+f*maxIntPoints*(maxDofs+1+dim)];
+          if(i<dim ) nor[i]= 
+            d_sharedShapeWnor1[maxDofs+1+i+k*(maxDofs+1+dim)+f*maxIntPoints*(maxDofs+1+dim)];
+          if(dim==2 && i==maxDofs-1) nor[2] = 0.; 
+          if(i<dof2) l2[i] = d_sharedShape2[i+k*maxDofs+f*maxIntPoints*maxDofs];
+          if(i<num_equation)
+          {
+            up1[i] = 0.;
+            up2[i] = 0.;
+            meanUp[i] = 0.;
+          }
+          MFEM_SYNC_THREAD;
+          
+          // interpolate
+          if(i<num_equation)
+          {
+            for(int n=0;n<dof1;n++) up1[i] += Upi[n+i*dof1]*l1[n];
+            for(int n=0;n<dof2;n++) up2[i] += Upj[n+i*dof2]*l2[n];
+          }
+          MFEM_SYNC_THREAD;
+          
+          if( i<num_equation ) meanUp[i] = 0.5*(up2[i]-up1[i]);
+          MFEM_SYNC_THREAD;
+          
+          // add integration point contribution
+          for(int d=0;d<dim;d++)
+          {
+            for(int eq=0;eq<num_equation;eq++)
+            {
+              if(i<dof1) Fcontrib[i+eq*dof1+d*num_equation*dof1] += meanUp[eq]*weight*l1[i]*nor[d];
+            }
+          }
+        }
+        MFEM_SYNC_THREAD;
+      } 
+      
+      // write to global memory
+      if(i<dof1)
+      {
+        for(int d=0;d<dim;d++)
+        {
+          for(int eq=0;eq<num_equation;eq++)
+          {
+            d_gradUp[indexi+eq*Ndofs+d*num_equation*Ndofs] = Fcontrib[i+eq*dof1+d*num_equation*dof1];
+          }
+        }
+      }
     }
   });
 }

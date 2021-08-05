@@ -146,6 +146,9 @@ bcIntegrator(_bcIntegrator)
   auto hinvMArray = invMArray.HostWrite();
   for(int i=0;i<(int)temp.size();i++) hinvMArray[i] = temp[i];
   
+  fillSharedData();
+  A->setParallelData( &parallelData );
+  
 #ifdef _GPU_
   auto dposDogInvM = posDofInvM.ReadWrite();
   auto dinvMarray = invMArray.ReadWrite();
@@ -158,6 +161,7 @@ bcIntegrator(_bcIntegrator)
                             num_equation,
                             Up,
                             gradUp,
+                            eqState,
                             gradUp_A,
                             intRules,
                             intRuleType,
@@ -173,6 +177,7 @@ bcIntegrator(_bcIntegrator)
                             _elems12Q,
                             maxIntPoints,
                             maxDofs );
+  gradients->setParallelData( &parallelData );
    
 #ifdef DEBUG 
 {
@@ -275,7 +280,15 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
   
   // Update primite varibales
   updatePrimitives(x);
+#ifdef _GPU_
+  // GPU version requires the exchange of data before gradient computation
+  exchangeBdrData(*Up,vfes, parallelData.face_nbr_data,parallelData.send_data);
+#endif
   gradients->computeGradients();
+#ifdef _GPU_
+  // GPU version requires the exchange of data before gradient computation
+  exchangeBdrData(x,vfes, parallelData.face_nbr_data,parallelData.send_data);
+#endif
   
   // update boundary conditions
   if(bcIntegrator!=NULL) bcIntegrator->updateBCMean( Up );
@@ -608,5 +621,249 @@ void RHSoperator::multiPlyInvers_gpu( Vector &y,
     }
   });
 #endif
+}
+
+void RHSoperator::fillSharedData()
+{
+  ParFiniteElementSpace *pfes = Up->ParFESpace();
+  ParMesh *mesh = pfes->GetParMesh();
+  mesh->ExchangeFaceNbrNodes();
+  mesh->ExchangeFaceNbrData();
+  vfes->ExchangeFaceNbrData();
+  ParFiniteElementSpace *gradFes = gradUp->ParFESpace();
+  gradFes->ExchangeFaceNbrData();
+  
+  
+  const int Nshared = mesh->GetNSharedFaces();
+  if( Nshared>0 )
+  {
+    parallelData.sharedShapeWnor1.UseDevice(true);
+    parallelData.sharedShape2.UseDevice(true);
+    
+    parallelData.face_nbr_data.UseDevice(true);
+    parallelData.send_data.UseDevice(true);
+    parallelData.face_nbr_data.SetSize(vfes->GetFaceNbrVSize());
+    parallelData.send_data.SetSize(vfes->send_face_nbr_ldof.Size_of_connections());
+    parallelData.face_nbr_data = 0.;
+    parallelData.send_data = 0.;
+    parallelData.face_nbr_dataGrad.UseDevice(true);
+    parallelData.send_dataGrad.UseDevice(true);
+    parallelData.face_nbr_dataGrad.SetSize(gradFes->GetFaceNbrVSize());
+    parallelData.send_dataGrad.SetSize(gradFes->send_face_nbr_ldof.Size_of_connections());
+    parallelData.face_nbr_dataGrad = 0.;
+    parallelData.send_dataGrad = 0.;
+    
+    parallelData.sharedShapeWnor1.SetSize(Nshared*maxIntPoints*(maxDofs+1+dim));
+    parallelData.sharedShape2.SetSize(Nshared*maxIntPoints*maxDofs);
+    parallelData.sharedElem1Dof12Q.SetSize(Nshared*4);
+    parallelData.sharedVdofs.SetSize(Nshared*num_equation*maxDofs);
+    parallelData.sharedVdofsGradUp.SetSize(Nshared*num_equation*maxDofs*dim);
+    
+    parallelData.sharedShapeWnor1 = 0.;
+    parallelData.sharedShape2 = 0.;
+    parallelData.sharedElem1Dof12Q = 0;
+    parallelData.sharedVdofs = 0;
+    parallelData.sharedVdofsGradUp = 0;
+    
+    auto hsharedShapeWnor1 = parallelData.sharedShapeWnor1.HostReadWrite();
+    auto hsharedShape2 = parallelData.sharedShape2.HostReadWrite();
+    auto hsharedElem1Dof12Q = parallelData.sharedElem1Dof12Q.HostReadWrite();
+    auto hsharedVdofs = parallelData.sharedVdofs.HostReadWrite();
+    auto hsharedVdofsGrads = parallelData.sharedVdofsGradUp.HostReadWrite();
+    
+    std::vector<int> unicElems; unicElems.clear();
+    
+    Array<int> vdofs2, vdofsGrad;
+    FaceElementTransformations *tr;
+    for (int i=0;i<Nshared;i++)
+    {
+        tr = mesh->GetSharedFaceTransformations(i, true);
+        int Elem2NbrNo = tr->Elem2No - mesh->GetNE();
+
+        const FiniteElement *fe1 = vfes->GetFE(tr->Elem1No);
+        const FiniteElement *fe2 = vfes->GetFaceNbrFE(Elem2NbrNo);
+        const int dof1 = fe1->GetDof();
+        const int dof2 = fe2->GetDof();
+
+        //vfes->GetElementVDofs(tr->Elem1No, vdofs1); // get these from nodesIDs
+        vfes->GetFaceNbrElementVDofs(Elem2NbrNo, vdofs2);
+        gradFes->GetFaceNbrElementVDofs(Elem2NbrNo,vdofsGrad);
+        
+        for(int n=0;n<dof2;n++)
+        {
+          for(int eq=0;eq<num_equation;eq++) 
+          {
+            hsharedVdofs[n+eq*maxDofs+i*num_equation*maxDofs] = 
+                                                    vdofs2[n+eq*dof2];
+            for(int d=0;d<dim;d++)
+            {
+              int index = n+eq*maxDofs+d*num_equation*maxDofs+
+                          i*dim*num_equation*maxDofs;
+              hsharedVdofsGrads[index] = 
+                    vdofsGrad[n+eq*dof2+d*num_equation*dof2];
+            }
+          }
+        }
+        
+        int intorder;
+        if (tr->Elem2No >= 0)
+            intorder = (min(tr->Elem1->OrderW(), tr->Elem2->OrderW()) +
+                        2*max(fe1->GetOrder(), fe2->GetOrder()));
+        else
+        {
+            intorder = tr->Elem1->OrderW() + 2*fe1->GetOrder();
+        }
+        if (fe1->Space() == FunctionSpace::Pk)
+        {
+            intorder++;
+        }
+        //IntegrationRules IntRules2(0, Quadrature1D::GaussLobatto);
+        const IntegrationRule *ir = &intRules->Get(tr->GetGeometryType(), intorder);
+
+        hsharedElem1Dof12Q[0 +i*4] = tr->Elem1No;
+        hsharedElem1Dof12Q[1 +i*4] = dof1;
+        hsharedElem1Dof12Q[2 +i*4] = dof2;
+        hsharedElem1Dof12Q[3 +i*4] = ir->GetNPoints();
+        
+        bool inList = false;
+        for(int n=0;n<unicElems.size();n++)
+        {
+          if( unicElems[n] == tr->Elem1No ) inList = true;
+        }
+        if(!inList) unicElems.push_back( tr->Elem1No );
+        
+        Vector shape1, shape2, nor;
+        shape1.UseDevice(false); shape2.UseDevice(false); nor.UseDevice(false);
+        shape1.SetSize(dof1);
+        shape2.SetSize(dof2);
+        nor.SetSize(dim);
+        
+        for(int q=0;q<ir->GetNPoints();q++)
+        {
+          const IntegrationPoint &ip = ir->IntPoint(q);
+          tr->SetAllIntPoints(&ip);
+          
+          fe1->CalcShape(tr->GetElement1IntPoint(), shape1);
+          fe2->CalcShape(tr->GetElement2IntPoint(), shape2);
+          CalcOrtho(tr->Jacobian(), nor);
+          
+          for(int n=0;n<dof1;n++)
+          {
+            hsharedShapeWnor1[n+q*(maxDofs+1+dim)+i*maxIntPoints*(maxDofs+1+dim)] = shape1[n];
+          }
+          hsharedShapeWnor1[maxDofs+q*(maxDofs+1+dim)+i*maxIntPoints*(maxDofs+1+dim)] = ip.weight;
+          
+          for(int d=0;d<dim;d++) hsharedShapeWnor1[maxDofs+1+d+
+                                        q*(maxDofs+1+dim)+i*maxIntPoints*(maxDofs+1+dim)] = nor[d];
+          for(int n=0;n<dof2;n++)
+          {
+            hsharedShape2[n+q*maxDofs+i*maxIntPoints*maxDofs] = shape2[n];
+          }
+        }
+    }
+    
+    parallelData.sharedElemsFaces.SetSize(7*unicElems.size());
+    parallelData.sharedElemsFaces = -1;
+    auto hsharedElemsFaces = parallelData.sharedElemsFaces.HostWrite();
+    for(int el=0;el<unicElems.size();el++)
+    {
+      const int eli = unicElems[el];
+      for(int f=0;f<parallelData.sharedElem1Dof12Q.Size()/4;f++)
+      {
+        if( eli==hsharedElem1Dof12Q[0 +f*4] )
+        {
+          hsharedElemsFaces[0+7*el] = hsharedElem1Dof12Q[0 +f*4];
+          int numFace = hsharedElemsFaces[1+7*el];
+          if( numFace==-1 ) numFace = 0;
+          numFace++;
+          hsharedElemsFaces[1+numFace+ 7*el] = f;
+          hsharedElemsFaces[1+7*el] = numFace;
+        }
+      }
+    }
+  }else
+  {
+    parallelData.sharedShapeWnor1.SetSize(1);
+    parallelData.sharedShape2.SetSize(1);
+    parallelData.sharedElem1Dof12Q.SetSize(1);
+    parallelData.sharedVdofs.SetSize(1);
+    parallelData.sharedVdofsGradUp.SetSize(1);
+    parallelData.sharedElemsFaces.SetSize(1);
+  }
+  
+#ifdef _GPU_
+  auto dsharedShapeWnor1  = parallelData.sharedShapeWnor1.ReadWrite();
+  auto dsharedShape2      = parallelData.sharedShape2.ReadWrite();
+  auto dsharedElemDof12Q  = parallelData.sharedElem1Dof12Q.ReadWrite();
+  auto dsharedVdofs       = parallelData.sharedVdofs.ReadWrite();
+  auto dsharedVdofsGradUp = parallelData.sharedVdofsGradUp.ReadWrite();
+  auto dsharedElemsFaces  = parallelData.sharedElemsFaces.ReadWrite();
+#endif
+}
+
+void RHSoperator::exchangeBdrData(const Vector &x,
+                                      ParFiniteElementSpace *pfes,
+                                      Vector &face_nbr_data,
+                                      Vector &send_data )
+{
+  if (pfes->GetFaceNbrVSize() <= 0)
+   {
+      return;
+   }
+
+   ParMesh *pmesh = pfes->GetParMesh();
+
+//    face_nbr_data.SetSize(pfes->GetFaceNbrVSize());
+//    send_data.SetSize(pfes->send_face_nbr_ldof.Size_of_connections());
+
+   int *send_offset = pfes->send_face_nbr_ldof.GetI();
+   const int *d_send_ldof = mfem::Read(pfes->send_face_nbr_ldof.GetJMemory(),
+                                       send_data.Size());
+   int *recv_offset = pfes->face_nbr_ldof.GetI();
+   MPI_Comm MyComm = pfes->GetComm();
+
+   int num_face_nbrs = pmesh->GetNFaceNeighbors();
+   MPI_Request *requests = new MPI_Request[2*num_face_nbrs];
+   MPI_Request *send_requests = requests;
+   MPI_Request *recv_requests = requests + num_face_nbrs;
+   MPI_Status  *statuses = new MPI_Status[num_face_nbrs];
+
+//    auto d_data = this->Read();
+   auto d_data = x.Read();
+   auto d_send_data = send_data.Write();
+   MFEM_FORALL(i, send_data.Size(),
+   {
+      const int ldof = d_send_ldof[i];
+      d_send_data[i] = d_data[ldof >= 0 ? ldof : -1-ldof];
+   });
+
+   bool mpi_gpu_aware = Device::GetGPUAwareMPI();
+//    auto send_data_ptr = mpi_gpu_aware ? send_data.Read() : send_data.HostRead();
+//    auto face_nbr_data_ptr = mpi_gpu_aware ? face_nbr_data.Write() :
+//                             face_nbr_data.HostWrite();
+   auto send_data_ptr = send_data.HostRead();
+   auto face_nbr_data_ptr = face_nbr_data.HostWrite();
+   
+   for (int fn = 0; fn < num_face_nbrs; fn++)
+   {
+      int nbr_rank = pmesh->GetFaceNbrRank(fn);
+      int tag = 0;
+
+      MPI_Isend(&send_data_ptr[send_offset[fn]],
+                send_offset[fn+1] - send_offset[fn],
+                MPI_DOUBLE, nbr_rank, tag, MyComm, &send_requests[fn]);
+
+      MPI_Irecv(&face_nbr_data_ptr[recv_offset[fn]],
+                recv_offset[fn+1] - recv_offset[fn],
+                MPI_DOUBLE, nbr_rank, tag, MyComm, &recv_requests[fn]);
+   }
+
+   MPI_Waitall(num_face_nbrs, send_requests, statuses);
+   MPI_Waitall(num_face_nbrs, recv_requests, statuses);
+   
+   //auto kk = face_nbr_data.Read(); // offload to GPU
+
+   delete [] statuses;
+   delete [] requests;
 }
 

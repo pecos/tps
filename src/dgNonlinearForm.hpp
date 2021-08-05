@@ -6,6 +6,7 @@
 #include <fem/nonlinearform.hpp>
 #include "equation_of_state.hpp"
 #include "BCintegrator.hpp"
+#include "dataStructures.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -41,23 +42,22 @@ private:
   Array<int> &elems12Q; // elements connecting a face
   
   // Parallel shared faces integration
-  Vector sharedShapeWnor1;
-  Vector sharedShape2;
-  Array<int> sharedElem1Dof12Q;
-  Array<int> sharedVdofs;
-  Array<int> sharedVdofsGradUp;
-  Array<int> sharedElemsFaces;
+  parallelFacesIntegrationArrays *parallelData;
+//   Vector sharedShapeWnor1;
+//   Vector sharedShape2;
+//   Array<int> sharedElem1Dof12Q;
+//   Array<int> sharedVdofs;
+//   Array<int> sharedVdofsGradUp;
+//   Array<int> sharedElemsFaces;
+//   Vector face_nbr_data;
+//   Vector send_data;
+//   Vector face_nbr_dataGrad;
+//   Vector send_dataGrad;
   
   const int &maxIntPoints;
   const int &maxDofs;
   
-  bool sharedDataFilled;
-  void fillSharedData();
   
-  Vector face_nbr_data;
-  Vector send_data;
-  Vector face_nbr_dataGrad;
-  Vector send_dataGrad;
   
 public:
   DGNonLinearForm(ParFiniteElementSpace *f,
@@ -79,6 +79,8 @@ public:
                   const int &maxDofs );
   
   void Mult(const Vector &x, Vector &y );
+  
+  void setParallelData(parallelFacesIntegrationArrays *_parallelData){ parallelData = _parallelData;}
             
   static void faceIntegration_gpu(const Vector &x,
                                   Vector &y,
@@ -106,7 +108,6 @@ public:
   
   static void sharedFaceIntegration_gpu(const Vector &x,
                                         const ParGridFunction *gradUp,
-                                        const Vector &faceData,
                                         const Vector &faceGradUp,
                                         Vector &y,
                                         const int &Ndofs,
@@ -119,19 +120,10 @@ public:
                                         const double &Pr,
                                         const Array<int> &nodesIDs,
                                         const Array<int> &posDofIds,
-                                        const Vector &sharedShapeWnor1,
-                                        const Vector &sharedShape2,
-                                        const Array<int> &sharedElem1Dof12Q,
-                                        const Array<int> &sharedVdofs,
-                                        const Array<int> &sharedVdofsGradUp,
-                                        const Array<int> &sharedElemFaces,
+                                        const parallelFacesIntegrationArrays *parallelData,
                                         const int &maxIntPoints,
                                         const int &maxDofs );
   
-  static void exchangeBdrData(const Vector &x,
-                              ParFiniteElementSpace *pfes,
-                              Vector &face_nbr_data,
-                              Vector &send_data);
 #ifdef _GPU_
   void Mult_gpu(const Vector &x, Vector &y);
   static void setToZero_gpu(Vector &x, const int size);
