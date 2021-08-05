@@ -149,120 +149,120 @@ void Averaging::write_meanANDrms_restart_files()
   {
     paraviewMean->Save();
     
-    string serialName = "restart_mean_";
-    serialName.append( config.GetOutputName() );
-    serialName.append( ".sol" );
-    
-    string serialNameRMS = "restart_rms_";
-    serialNameRMS.append( config.GetOutputName() );
-    serialNameRMS.append( ".sol" );
-    
-    string fileName = groupsMPI->getParallelName( serialName );
-    string rmsName  = groupsMPI->getParallelName( serialNameRMS );
-    ofstream file( fileName, std::ofstream::trunc );
-    ofstream rmsfile( rmsName, std::ofstream::trunc );
-    file.precision(8);
-    rmsfile.precision(8);
-    
-    double *data = meanUp->GetData();
-    double *dataRMS = rms->GetData();
-    
-    // write cycle and time
-    file<<samplesMean<<" "<<sampleInterval<<endl;
-    
-    
-    int dof = vfes->GetNDofs();
-    
-    for(int i=0;i<dof*num_equation;i++)
-    {
-      file << data[i] <<endl;
-    }
-    file.close();
-    
-    for(int i=0;i<dof*numRMS;i++)
-    {
-      rmsfile << dataRMS[i] <<endl;
-    }
-    rmsfile.close();
+//     string serialName = "restart_mean_";
+//     serialName.append( config.GetOutputName() );
+//     serialName.append( ".sol" );
+//     
+//     string serialNameRMS = "restart_rms_";
+//     serialNameRMS.append( config.GetOutputName() );
+//     serialNameRMS.append( ".sol" );
+//     
+//     string fileName = groupsMPI->getParallelName( serialName );
+//     string rmsName  = groupsMPI->getParallelName( serialNameRMS );
+//     ofstream file( fileName, std::ofstream::trunc );
+//     ofstream rmsfile( rmsName, std::ofstream::trunc );
+//     file.precision(8);
+//     rmsfile.precision(8);
+//     
+//     double *data = meanUp->GetData();
+//     double *dataRMS = rms->GetData();
+//     
+//     // write cycle and time
+//     file<<samplesMean<<" "<<sampleInterval<<endl;
+//     
+//     
+//     int dof = vfes->GetNDofs();
+//     
+//     for(int i=0;i<dof*num_equation;i++)
+//     {
+//       file << data[i] <<endl;
+//     }
+//     file.close();
+//     
+//     for(int i=0;i<dof*numRMS;i++)
+//     {
+//       rmsfile << dataRMS[i] <<endl;
+//     }
+//     rmsfile.close();
   }
 }
 
 void Averaging::read_meanANDrms_restart_files()
 {
-  if( computeMean && config.GetRestartMean() )
-  {
-    string serialName = "restart_mean_";
-    serialName.append( config.GetOutputName() );
-    serialName.append( ".sol" );
-    
-    string serialNameRMS = "restart_rms_";
-    serialNameRMS.append( config.GetOutputName() );
-    serialNameRMS.append( ".sol" );
-    
-    string fileName = groupsMPI->getParallelName( serialName ); 
-    ifstream file( fileName );
-    
-    if( !file.is_open() )
-    {
-      cout<< "Could not open file \""<<fileName<<"\""<<endl;
-      return;
-    }else
-    {
-      double *dataUp = meanUp->GetData();
-      
-      string line;
-      // read time and iters
-      {
-        getline(file,line);
-        istringstream ss(line);
-        string word;
-        ss >> word;
-        samplesMean = stoi( word );
-        
-        ss >> word;
-        sampleInterval = stof( word );
-      }
-    
-      int lines = 0;
-      while( getline(file,line) )
-      {
-        istringstream ss(line);
-        string word;
-        ss >> word;
-        
-        dataUp[lines] = stof( word );
-        lines++;
-      }
-      file.close();
-    }
-    
-    // read RMS
-    string rmsName  = groupsMPI->getParallelName( serialNameRMS );
-    ifstream rmsfile( rmsName );
-    
-    if( !rmsfile.is_open() )
-    {
-      cout<< "Could not open file \""<<rmsName<<"\""<<endl;
-      return;
-    }else
-    {
-      double *dataRMS = rms->GetData();
-      
-      string line;
-    
-      int lines = 0;
-      while( getline(rmsfile,line) )
-      {
-        istringstream ss(line);
-        string word;
-        ss >> word;
-        
-        dataRMS[lines] = stof( word );
-        lines++;
-      }
-      rmsfile.close();
-    }
-  }
+//   if( computeMean && config.GetRestartMean() )
+//   {
+//     string serialName = "restart_mean_";
+//     serialName.append( config.GetOutputName() );
+//     serialName.append( ".sol" );
+//     
+//     string serialNameRMS = "restart_rms_";
+//     serialNameRMS.append( config.GetOutputName() );
+//     serialNameRMS.append( ".sol" );
+//     
+//     string fileName = groupsMPI->getParallelName( serialName ); 
+//     ifstream file( fileName );
+//     
+//     if( !file.is_open() )
+//     {
+//       cout<< "Could not open file \""<<fileName<<"\""<<endl;
+//       return;
+//     }else
+//     {
+//       double *dataUp = meanUp->GetData();
+//       
+//       string line;
+//       // read time and iters
+//       {
+//         getline(file,line);
+//         istringstream ss(line);
+//         string word;
+//         ss >> word;
+//         samplesMean = stoi( word );
+//         
+//         ss >> word;
+//         sampleInterval = stof( word );
+//       }
+//     
+//       int lines = 0;
+//       while( getline(file,line) )
+//       {
+//         istringstream ss(line);
+//         string word;
+//         ss >> word;
+//         
+//         dataUp[lines] = stof( word );
+//         lines++;
+//       }
+//       file.close();
+//     }
+//     
+//     // read RMS
+//     string rmsName  = groupsMPI->getParallelName( serialNameRMS );
+//     ifstream rmsfile( rmsName );
+//     
+//     if( !rmsfile.is_open() )
+//     {
+//       cout<< "Could not open file \""<<rmsName<<"\""<<endl;
+//       return;
+//     }else
+//     {
+//       double *dataRMS = rms->GetData();
+//       
+//       string line;
+//     
+//       int lines = 0;
+//       while( getline(rmsfile,line) )
+//       {
+//         istringstream ss(line);
+//         string word;
+//         ss >> word;
+//         
+//         dataRMS[lines] = stof( word );
+//         lines++;
+//       }
+//       rmsfile.close();
+//     }
+//   }
 }
 
 void Averaging::initiMeanAndRMS()

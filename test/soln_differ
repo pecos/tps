@@ -16,10 +16,11 @@ done
 shift $((OPTIND-1))
 
 if [ $# -lt 2 ];then
-    echo "Usage: soln_differ [-d] <file1.h5> <file2.h5>"
+    echo "Usage: soln_differ [-d] <file1.h5> <file2.h5> [-averages]"
     echo ""
     echo "   -d <dim>   set dimension (1,2,3=default)"
     echo "   -r         report solution differences to stdout"
+    echo "   -averages  checks averages"
    exit 1
 fi
 
@@ -41,5 +42,21 @@ if [ $dim -eq 3 ];then
     h5diff ${report} --delta=${absTolrhovel}  $file1 $file2 /solution/rho-w   || exit 1
 fi
 
-
+if [ $3 = '-averages' ]; then
+   echo "averages"
+   h5diff ${report} --delta=${absTolrhovel}  $file1 $file2 /meanSolution/meanDens   || exit 1
+   h5diff ${report} --delta=${absTolrhovel}  $file1 $file2 /meanSolution/mean-u   || exit 1
+   h5diff ${report} --delta=${absTolrhovel}  $file1 $file2 /meanSolution/mean-v   || exit 1
+   h5diff ${report} --relative=${relTolrhoE}  $file1 $file2 /meanSolution/mean-p   || exit 1
+   if [ $dim -eq 3 ]; then
+     h5diff ${report} --relative=${relTolrhoE}  $file1 $file2 /meanSolution/mean-w   || exit 1
+   fi
+   
+   h5diff ${report} --delta=${absTolrhovel}  $file1 $file2 /rmsData/uu   || exit 1
+   h5diff ${report} --delta=${absTolrhovel}  $file1 $file2 /rmsData/vv   || exit 1
+   h5diff ${report} --delta=${absTolrhovel}  $file1 $file2 /rmsData/ww   || exit 1
+   h5diff ${report} --delta=${absTolrhovel}  $file1 $file2 /rmsData/uv   || exit 1
+   h5diff ${report} --delta=${absTolrhovel}  $file1 $file2 /rmsData/uw   || exit 1
+   h5diff ${report} --delta=${absTolrhovel}  $file1 $file2 /rmsData/vw   || exit 1
+fi
 
