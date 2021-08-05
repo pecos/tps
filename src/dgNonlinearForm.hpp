@@ -105,7 +105,7 @@ public:
                                   const Array<int> &elems12Q );
   
   static void sharedFaceIntegration_gpu(const Vector &x,
-                                        const Vector faceU,
+                                        const Vector &faceU,
                                         const ParGridFunction *gradUp,
                                         const Vector &faceGradUp,
                                         Vector &y,

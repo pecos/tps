@@ -59,6 +59,7 @@ private:
   Array<int> elemPosQ_shapeDshapeWJ; // position and num. of integration points for each element
 
   parallelFacesIntegrationArrays *parallelData;
+  dataTransferArrays *transferUp;
 
 public:
   Gradients(ParFiniteElementSpace *_vfes,
@@ -86,7 +87,10 @@ public:
   
   ~Gradients();
   
-  void setParallelData(parallelFacesIntegrationArrays *_parData){parallelData = _parData;}
+  void setParallelData(parallelFacesIntegrationArrays *_parData,
+                      dataTransferArrays *_transferUp ){
+    parallelData = _parData;
+    transferUp = _transferUp; }
   
   void computeGradients();
   void computeGradients_cpu();
@@ -114,6 +118,7 @@ public:
                                    const Array<int> elems12Q );
   
   static void integrationGradSharedFace_gpu(const Vector *Up,
+                                            const Vector &faceUp,
                                             ParGridFunction *gradUp,
                                             const int &Ndofs,
                                             const int &dim,

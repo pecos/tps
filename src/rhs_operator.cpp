@@ -178,7 +178,7 @@ bcIntegrator(_bcIntegrator)
                             _elems12Q,
                             maxIntPoints,
                             maxDofs );
-  gradients->setParallelData( &parallelData );
+  gradients->setParallelData( &parallelData, &transferUp);
    
 #ifdef DEBUG 
 {

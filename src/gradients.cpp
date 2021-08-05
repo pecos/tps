@@ -167,6 +167,7 @@ void Gradients::computeGradients()
   if( Nshared>0 )
   {
     integrationGradSharedFace_gpu(Up,
+                                  transferUp->face_nbr_data,
                                   gradUp,
                                   vfes->GetNDofs(),
                                   dim,
@@ -623,6 +624,7 @@ void Gradients::computeGradients_gpu(const int numElems,
 }
 
 void Gradients::integrationGradSharedFace_gpu(const Vector *Up,
+                                              const Vector &faceUp,
                                               ParGridFunction *gradUp,
                                               const int &Ndofs,
                                               const int &dim,
@@ -640,7 +642,7 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up,
 {
   const double *d_up = Up->Read();
   double *d_gradUp = gradUp->ReadWrite();
-  const double *d_faceData = parallelData->face_nbr_data.Read();
+  const double *d_faceData = faceUp.Read();
   
   const int *d_nodesIDs = nodesIDs.Read();
   const int *d_posDofIds = posDofIds.Read();
