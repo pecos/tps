@@ -15,3 +15,5 @@ ref_solns/02-12-2021/cyl3d.dtconst.cpu.h5 filter=lfs diff=lfs merge=lfs -text
 ref_solns/02-12-2021/cyl3d.dtconst.gpu.h5 filter=lfs diff=lfs merge=lfs -text
 ref_solns/02-12-2021/cyl3d.dtconst.gpu.varp.h5 filter=lfs diff=lfs merge=lfs -text
 ref_solns/02-12-2021/cyl3d.mflow.2iters.h5 filter=lfs diff=lfs merge=lfs -text
+ref_solns/cyl-2d.cpu.h5 filter=lfs diff=lfs merge=lfs -text
+meshes/cyl-2d-mixed.msh filter=lfs diff=lfs merge=lfs -text
