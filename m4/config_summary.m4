@@ -32,6 +32,7 @@ echo Build architecture............ : $BUILD_ARCH
 echo Git revision number........... : $BUILD_VERSION
 echo
 echo SLURM support enabled......... : $ENABLE_SLURM
+echo Valgrind available............ : $enable_valgrind
 echo GPU build enabled with CUDA... : $ENABLE_CUDA
 if test "$ENABLE_CUDA" = "yes"; then
 echo ' - 'CUDA_CXXFLAGS.............. : $CUDA_CXXFLAGS

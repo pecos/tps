@@ -29,6 +29,10 @@ AX_PATH_HDF5([1.8.0],[yes])
 #AC_PROG_LIBTOOL
 AC_PROG_RANLIB
 
+# Valgrind?
+AX_VALGRIND_CHECK()
+AM_CONDITIONAL(VALGRIND_ENABLED,test x$enable_valgrind = xyes)
+
 #-- Slurm job restart support
 ENABLE_SLURM=no
 AH_TEMPLATE([HAVE_SLURM],[Enable SLURM resource manager support])
