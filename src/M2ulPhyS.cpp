@@ -321,7 +321,9 @@ void M2ulPhyS::initVariables()
     ioData.registerIOVar("/rmsData","vw",5);
   }
   
-  ioData.initializeSerial(mpi.Root(),serial_mesh);
+  ioData.initializeSerial(mpi.Root(),
+                         (config.RestartSerial() != "no" ),
+                          serial_mesh);
   projectInitialSolution();
 
   fluxClass = new Fluxes(eqState,

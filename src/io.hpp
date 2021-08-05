@@ -39,7 +39,7 @@ public:
   void registerIOVar   (std::string group, std::string varName, int index);
   int  getIOFamilyIndex(std::string group);
   
-  void initializeSerial(bool root, Mesh *serial_mesh);
+  void initializeSerial(bool root, bool serial, Mesh *serial_mesh);
 };
 
 #endif

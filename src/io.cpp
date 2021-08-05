@@ -119,6 +119,15 @@ void M2ulPhyS::restart_files_hdf5(string mode)
       }
     }
 #endif
+
+    // included total dofs for partitioned files
+    if(config.RestartSerial() != "write")
+    {
+      int ldofs = vfes->GetNDofs();
+      int gdofs;
+      MPI_Allreduce(&ldofs,&gdofs,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
+      h5_save_attribute(file,"dofs_global",gdofs);
+    }
   }
   else	// read
   {
@@ -764,7 +773,7 @@ int IODataOrganizer::getIOFamilyIndex(std::string group)
 }
 
 
-void IODataOrganizer::initializeSerial(bool root, Mesh* serial_mesh)
+void IODataOrganizer::initializeSerial(bool root, bool serial, Mesh* serial_mesh)
 {
   // loop through families
   for(int n=0;n<families_.size();n++)
@@ -772,14 +781,14 @@ void IODataOrganizer::initializeSerial(bool root, Mesh* serial_mesh)
     IOFamily &fam = families_[n];
     fam.serial_fes = NULL;
     fam.serial_sol = NULL;
-    if( root )
+    if( root && serial )
     {
       const FiniteElementCollection *fec = fam.pfunc_->ParFESpace()->FEColl();
       int numVars = fam.pfunc_->Size()/fam.pfunc_->ParFESpace()->GetNDofs();
       
       fam.serial_fes = new FiniteElementSpace(serial_mesh, fec, numVars, Ordering::byNODES);
       fam.serial_sol = new GridFunction(fam.serial_fes);
-      cout<<"I/O organizer for group "<<fam.group_<<" initialized."<<endl;
+//       cout<<"I/O organizer for group "<<fam.group_<<" initialized."<<endl;
     }
   }
 }
