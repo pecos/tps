@@ -152,23 +152,10 @@ void DGNonLinearForm::Mult_gpu(const Vector& x, Vector& y )
   const int Nshared = pmesh->GetNSharedFaces();
   if( Nshared>0 )
   {
-    //if( !sharedDataFilled ) fillSharedData();
-//     const Vector &px = Prolongate(x);
-//     X.MakeRef(aux1, 0); // aux1 contains P.x
-//     X.ExchangeFaceNbrData();
-//     Vector &bdrData = X.FaceNbrData();
-//     exchangeBdrData(x,vfes, parallelData->face_nbr_data,parallelData->send_data);
-    
-    // get shared element gradients
-//     gradUp->ExchangeFaceNbrData();
-Vector &bdrGradUp = gradUp->FaceNbrData(); // data already exchanged when computing gradients
-//     exchangeBdrData(*gradUp,gradFes,face_nbr_dataGrad,send_dataGrad);
-    
     sharedFaceIntegration_gpu(x,
+                              transferU->face_nbr_data,
                               gradUp,
-                              //bdrData,
-                              bdrGradUp,
-//                               face_nbr_dataGrad,
+                              transferGradUp->face_nbr_data,
                               y, 
                               vfes->GetNDofs(), 
                               dim, 
@@ -431,6 +418,7 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
 
 
 void DGNonLinearForm::sharedFaceIntegration_gpu(const Vector& x,
+                                                const Vector &faceU,
                                                 const ParGridFunction *gradUp,
                                                 const Vector &faceGradUp,
                                                 Vector& y, 
@@ -451,7 +439,7 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(const Vector& x,
   const double *d_x = x.Read();
   const double *d_gradUp = gradUp->Read();
   const double *d_faceGradUp = faceGradUp.Read();
-  const double *d_faceData = parallelData->face_nbr_data.Read();
+  const double *d_faceData = faceU.Read();
   double *d_y = y.ReadWrite();
   const int *d_nodesIDs = nodesIDs.Read();
   const int *d_posDofIds = posDofIds.Read();

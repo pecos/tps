@@ -148,7 +148,7 @@ bcIntegrator(_bcIntegrator)
   
   fillSharedData();
   
-  A->setParallelData( &parallelData );
+  A->setParallelData( &parallelData, &transferU, &transferGradUp );
   
 #ifdef _GPU_
   auto dposDogInvM = posDofInvM.ReadWrite();
@@ -293,7 +293,7 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
   gradients->computeGradients();
 #ifdef _GPU_
   // GPU version requires the exchange of data before gradient computation
-  exchangeBdrData(x,vfes,transferU);
+  initNBlockDataTransfer(x,vfes,transferU);
   waitAllDataTransfer(transferU);
   waitAllDataTransfer(transferUp);
 #endif
