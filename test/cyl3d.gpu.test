@@ -8,7 +8,13 @@ OPTS="-d cuda"
 setup() {
     SOLN_FILE=restart_output.sol.h5
     REF_FILE=ref_solns/cyl3d.dtconst.cpu.h5
-    NUM_GPUS=/sbin/lspci | grep "VGA compatible controller" | wc -l
+
+    # various GPU card detections
+    SKIP="ASPEED"
+    NUM_GPUS=`/sbin/lspci | grep "VGA compatible controller" | grep -v $SKIP | wc -l`
+    if [ $NUM_GPUS -eq 0 ];then
+	NUM_GPUS=`/sbin/lspci | grep "controller: NVIDIA" | wc -l`
+    fi
 }
 
 @test "[$TEST] check for input file $RUNFILE" {
