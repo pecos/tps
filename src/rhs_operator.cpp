@@ -277,6 +277,10 @@ RHSoperator::~RHSoperator()
   if (transferUp.send_requests != NULL) delete[] transferUp.send_requests;
   if (transferGradUp.send_requests != NULL ) 
                                         delete[] transferGradUp.send_requests;
+  
+  if (transferU.statuses!=NULL )      delete[] transferU.statuses;
+  if (transferUp.statuses!=NULL )     delete[] transferUp.statuses;
+  if (transferGradUp.statuses!=NULL ) delete[] transferGradUp.statuses;
 }
 
 
@@ -778,6 +782,9 @@ void RHSoperator::fillSharedData()
     }
     
     // data transfer arrays
+    
+    vfes->ExchangeFaceNbrData();
+    gradUpfes->ExchangeFaceNbrData();
     transferU.face_nbr_data.UseDevice(true);
     transferU.send_data.UseDevice(true);
     transferU.face_nbr_data.SetSize(vfes->GetFaceNbrVSize());
@@ -808,6 +815,10 @@ void RHSoperator::fillSharedData()
     transferU.send_requests = requestsU;
     transferUp.send_requests = requestsUp;
     transferGradUp.send_requests = requGradUp;
+    
+    transferU.statuses      = new MPI_Status[transferU.num_face_nbrs];
+    transferUp.statuses     = new MPI_Status[transferUp.num_face_nbrs];
+    transferGradUp.statuses = new MPI_Status[transferGradUp.num_face_nbrs];
   }else
   {
     parallelData.sharedShapeWnor1.SetSize(1);
@@ -817,9 +828,13 @@ void RHSoperator::fillSharedData()
     parallelData.sharedVdofsGradUp.SetSize(1);
     parallelData.sharedElemsFaces.SetSize(1);
     
-    transferU.send_requests = NULL;
-    transferUp.send_requests = NULL;
+    transferU.send_requests      = NULL;
+    transferUp.send_requests     = NULL;
     transferGradUp.send_requests = NULL;
+    
+    transferU.statuses      = NULL;
+    transferUp.statuses     = NULL;
+    transferGradUp.statuses = NULL;
   }
   
 #ifdef _GPU_
