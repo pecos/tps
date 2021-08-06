@@ -6,10 +6,13 @@ RUNFILE_A="inputs/input.cyl-2d.caseA"
 RUNFILE_B="inputs/input.cyl-2d.caseB"
 RUNFILE_C1="inputs/input.cyl-2d.caseC1"
 RUNFILE_C2="inputs/input.cyl-2d.caseC2"
+RUNFILE_D1="inputs/input.cyl-2d.caseD1"
+RUNFILE_D2="inputs/input.cyl-2d.caseD2"
 
 setup() {
     SOLN_FILE=restart_output.sol.h5
     REF_FILE=ref_solns/cyl-2d.cpu.h5
+    REF_FILE_REST=ref_solns/cyl-2d.meanRestart.cpu.h5
 }
 
 @test "[$TEST] caseA: run serial case" {
@@ -37,6 +40,16 @@ setup() {
     ../src/tps -run $RUNFILE_C2
     test -s $SOLN_FILE
     ./soln_differ -d 2 $SOLN_FILE $REF_FILE -averages
+    
+    rm -f $SOLN_FILE
+}
+
+@test "[$TEST] caseD: restart from solution without averaged data" {
+    test -s $RUNFILE_D1
+    ../src/tps -run $RUNFILE_D1
+    ../src/tps -run $RUNFILE_D2
+    test -s $SOLN_FILE
+    ./soln_differ -d 2 $SOLN_FILE $REF_FILE_REST -averages
     
     rm -f $SOLN_FILE
 }
