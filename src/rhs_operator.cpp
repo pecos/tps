@@ -313,9 +313,7 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
   A->Mult_domain(x,z);
   waitAllDataTransfer(vfes,transferU); // make sure U boundary data has finished 
   A->Mult_bdr(x,z);
-#endif
-  
-#ifndef _GPU_
+#else
   A->Mult(x, z);
 #endif
 
