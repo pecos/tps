@@ -124,7 +124,8 @@ public:
                                         const int &maxDofs );
   
 #ifdef _GPU_
-  void Mult_gpu(const Vector &x, Vector &y);
+  void Mult_domain(const Vector &x, Vector &y);
+  void Mult_bdr(const Vector &x, Vector &y);
   static void setToZero_gpu(Vector &x, const int size);
 #endif
 };

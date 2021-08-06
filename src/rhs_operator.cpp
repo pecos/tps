@@ -309,10 +309,15 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
   if(bcIntegrator!=NULL) bcIntegrator->updateBCMean( Up );
   
 #ifdef _GPU_
-  waitAllDataTransfer(vfes,transferU); // make sure U boundary data has finished 
   waitAllDataTransfer(gradUpfes,transferGradUp);
+  A->Mult_domain(x,z);
+  waitAllDataTransfer(vfes,transferU); // make sure U boundary data has finished 
+  A->Mult_bdr(x,z);
 #endif
+  
+#ifndef _GPU_
   A->Mult(x, z);
+#endif
 
   GetFlux(x, flux);
   

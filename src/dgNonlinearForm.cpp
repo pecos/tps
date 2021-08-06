@@ -45,61 +45,57 @@ maxDofs(_maxDofs)
 
 void DGNonLinearForm::Mult(const Vector& x, Vector& y )
 {
-#ifdef _GPU_
-  Mult_gpu( x, y);
-#else
-  // ParNonlinearForm::Mult(x,y);
+  ParNonlinearForm::Mult(x,y);
   // the following is equivalent to the line above
-  NonlinearForm::Mult(x,y);
-  
-  if (fnfi.Size())
-  {
-    // Terms over shared interior faces in parallel.
-    ParFiniteElementSpace *pfes = ParFESpace();
-    ParMesh *pmesh = pfes->GetParMesh();
-    FaceElementTransformations *tr;
-    const FiniteElement *fe1, *fe2;
-    Array<int> vdofs1, vdofs2;
-    Vector el_x, el_y;
-    aux1.HostReadWrite();
-    X.MakeRef(aux1, 0); // aux1 contains P.x
-    X.ExchangeFaceNbrData();
-    const int n_shared_faces = pmesh->GetNSharedFaces();
-    for (int i = 0; i < n_shared_faces; i++)
-    {
-        tr = pmesh->GetSharedFaceTransformations(i, true);
-        int Elem2NbrNo = tr->Elem2No - pmesh->GetNE();
-
-        fe1 = pfes->GetFE(tr->Elem1No);
-        fe2 = pfes->GetFaceNbrFE(Elem2NbrNo);
-
-        pfes->GetElementVDofs(tr->Elem1No, vdofs1);
-        pfes->GetFaceNbrElementVDofs(Elem2NbrNo, vdofs2);
-
-        el_x.SetSize(vdofs1.Size() + vdofs2.Size());
-        X.GetSubVector(vdofs1, el_x.GetData());
-        X.FaceNbrData().GetSubVector(vdofs2, el_x.GetData() + vdofs1.Size());
-
-        for (int k = 0; k < fnfi.Size(); k++)
-        {
-          fnfi[k]->AssembleFaceVector(*fe1, *fe2, *tr, el_x, el_y);
-          aux2.AddElementVector(vdofs1, el_y.GetData());
-        }
-    }
-  }
-
-  P->MultTranspose(aux2, y);
-
-  y.HostReadWrite();
-  for (int i = 0; i < ess_tdof_list.Size(); i++)
-  {
-    y(ess_tdof_list[i]) = 0.0;
-  }
-#endif
+//   NonlinearForm::Mult(x,y);
+//   
+//   if (fnfi.Size())
+//   {
+//     // Terms over shared interior faces in parallel.
+//     ParFiniteElementSpace *pfes = ParFESpace();
+//     ParMesh *pmesh = pfes->GetParMesh();
+//     FaceElementTransformations *tr;
+//     const FiniteElement *fe1, *fe2;
+//     Array<int> vdofs1, vdofs2;
+//     Vector el_x, el_y;
+//     aux1.HostReadWrite();
+//     X.MakeRef(aux1, 0); // aux1 contains P.x
+//     X.ExchangeFaceNbrData();
+//     const int n_shared_faces = pmesh->GetNSharedFaces();
+//     for (int i = 0; i < n_shared_faces; i++)
+//     {
+//         tr = pmesh->GetSharedFaceTransformations(i, true);
+//         int Elem2NbrNo = tr->Elem2No - pmesh->GetNE();
+// 
+//         fe1 = pfes->GetFE(tr->Elem1No);
+//         fe2 = pfes->GetFaceNbrFE(Elem2NbrNo);
+// 
+//         pfes->GetElementVDofs(tr->Elem1No, vdofs1);
+//         pfes->GetFaceNbrElementVDofs(Elem2NbrNo, vdofs2);
+// 
+//         el_x.SetSize(vdofs1.Size() + vdofs2.Size());
+//         X.GetSubVector(vdofs1, el_x.GetData());
+//         X.FaceNbrData().GetSubVector(vdofs2, el_x.GetData() + vdofs1.Size());
+// 
+//         for (int k = 0; k < fnfi.Size(); k++)
+//         {
+//           fnfi[k]->AssembleFaceVector(*fe1, *fe2, *tr, el_x, el_y);
+//           aux2.AddElementVector(vdofs1, el_y.GetData());
+//         }
+//     }
+//   }
+// 
+//   P->MultTranspose(aux2, y);
+// 
+//   y.HostReadWrite();
+//   for (int i = 0; i < ess_tdof_list.Size(); i++)
+//   {
+//     y(ess_tdof_list[i]) = 0.0;
+//   }
 }
 
 #ifdef _GPU_
-void DGNonLinearForm::Mult_gpu(const Vector& x, Vector& y )
+void DGNonLinearForm::Mult_domain(const Vector& x, Vector& y)
 {
   setToZero_gpu(y,y.Size());
   
@@ -146,8 +142,10 @@ void DGNonLinearForm::Mult_gpu(const Vector& x, Vector& y )
   
   // INTEGRATION BOUNDARIES
   if(bfnfi.Size()) bcIntegrator->integrateBCs(y,x,nodesIDs,posDofIds);
-   
-  // INTEGRATION SHARED FACES
+}
+
+void DGNonLinearForm::Mult_bdr(const Vector& x, Vector& y)
+{
   ParMesh *pmesh = vfes->GetParMesh();
   const int Nshared = pmesh->GetNSharedFaces();
   if( Nshared>0 )
@@ -171,8 +169,9 @@ void DGNonLinearForm::Mult_gpu(const Vector& x, Vector& y )
                               maxIntPoints, 
                               maxDofs);
   }
-    
 }
+
+
 
 void DGNonLinearForm::setToZero_gpu(Vector &x, const int size)
 {
