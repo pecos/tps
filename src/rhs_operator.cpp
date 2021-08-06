@@ -289,13 +289,13 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
 #ifdef _GPU_
   // GPU version requires the exchange of data before gradient computation
   initNBlockDataTransfer(*Up, vfes, transferUp);
+  waitAllDataTransfer(transferUp);
 #endif
   gradients->computeGradients();
 #ifdef _GPU_
   // GPU version requires the exchange of data before gradient computation
   initNBlockDataTransfer(x,vfes,transferU);
   waitAllDataTransfer(transferU);
-  waitAllDataTransfer(transferUp);
 #endif
   
   // update boundary conditions
