@@ -37,8 +37,7 @@ struct dataTransferArrays
   
   // MPI communicators data
   int num_face_nbrs;
-  MPI_Request *send_requests;
-  MPI_Request *recv_requests;
+  MPI_Request *requests;
   MPI_Status  *statuses;
 };
 

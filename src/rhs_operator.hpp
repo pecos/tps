@@ -141,7 +141,8 @@ public:
    static void initNBlockDataTransfer(const Vector &x,
                                       ParFiniteElementSpace *pfes,
                                       dataTransferArrays &dataTransfer );
-   static void waitAllDataTransfer(dataTransferArrays &dataTransfer);
+   static void waitAllDataTransfer(ParFiniteElementSpace *pfes,
+                                   dataTransferArrays &dataTransfer);
 
 
   // GPU functions

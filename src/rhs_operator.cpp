@@ -273,10 +273,10 @@ RHSoperator::~RHSoperator()
   for(int n=0;n<Me_inv.Size();n++) delete Me_inv[n];
   for( int i=0; i<forcing.Size();i++) delete forcing[i];
   
-  if (transferU.send_requests != NULL)  delete[] transferU.send_requests;
-  if (transferUp.send_requests != NULL) delete[] transferUp.send_requests;
-  if (transferGradUp.send_requests != NULL ) 
-                                        delete[] transferGradUp.send_requests;
+  if (transferU.requests != NULL)  delete[] transferU.requests;
+  if (transferUp.requests != NULL) delete[] transferUp.requests;
+  if (transferGradUp.requests != NULL ) 
+                                   delete[] transferGradUp.requests;
   
   if (transferU.statuses!=NULL )      delete[] transferU.statuses;
   if (transferUp.statuses!=NULL )     delete[] transferUp.statuses;
@@ -293,13 +293,13 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
 #ifdef _GPU_
   // GPU version requires the exchange of data before gradient computation
   initNBlockDataTransfer(*Up, vfes, transferUp);
-  waitAllDataTransfer(transferUp);
+  waitAllDataTransfer(vfes,transferUp);
 #endif
   gradients->computeGradients();
 #ifdef _GPU_
   // GPU version requires the exchange of data before gradient computation
   initNBlockDataTransfer(x,vfes,transferU);
-  waitAllDataTransfer(transferU);
+  waitAllDataTransfer(vfes,transferU);
 #endif
   
   // update boundary conditions
@@ -812,9 +812,9 @@ void RHSoperator::fillSharedData()
     MPI_Request *requestsU  = new MPI_Request[2*mesh->GetNFaceNeighbors()];
     MPI_Request *requestsUp = new MPI_Request[2*mesh->GetNFaceNeighbors()];
     MPI_Request *requGradUp = new MPI_Request[2*mesh->GetNFaceNeighbors()];
-    transferU.send_requests = requestsU;
-    transferUp.send_requests = requestsUp;
-    transferGradUp.send_requests = requGradUp;
+    transferU.requests = requestsU;
+    transferUp.requests = requestsUp;
+    transferGradUp.requests = requGradUp;
     
     transferU.statuses      = new MPI_Status[transferU.num_face_nbrs];
     transferUp.statuses     = new MPI_Status[transferUp.num_face_nbrs];
@@ -828,9 +828,9 @@ void RHSoperator::fillSharedData()
     parallelData.sharedVdofsGradUp.SetSize(1);
     parallelData.sharedElemsFaces.SetSize(1);
     
-    transferU.send_requests      = NULL;
-    transferUp.send_requests     = NULL;
-    transferGradUp.send_requests = NULL;
+    transferU.requests      = NULL;
+    transferUp.requests     = NULL;
+    transferGradUp.requests = NULL;
     
     transferU.statuses      = NULL;
     transferUp.statuses     = NULL;
@@ -896,21 +896,29 @@ void RHSoperator::initNBlockDataTransfer(const Vector &x,
 
       MPI_Isend(&send_data_ptr[send_offset[fn]],
                 send_offset[fn+1] - send_offset[fn],
-                MPI_DOUBLE, nbr_rank, tag, MyComm, &dataTransfer.send_requests[fn]);
+                MPI_DOUBLE, nbr_rank, tag, MyComm, 
+                &dataTransfer.requests[fn]);
 
       MPI_Irecv(&face_nbr_data_ptr[recv_offset[fn]],
                 recv_offset[fn+1] - recv_offset[fn],
-                MPI_DOUBLE, nbr_rank, tag, MyComm, &dataTransfer.recv_requests[fn]);
+                MPI_DOUBLE, nbr_rank, tag, MyComm, 
+                &dataTransfer.requests[fn+dataTransfer.num_face_nbrs]);
    }
 }
 
-void RHSoperator::waitAllDataTransfer(dataTransferArrays& dataTransfer)
+void RHSoperator::waitAllDataTransfer(ParFiniteElementSpace *pfes,
+                                      dataTransferArrays& dataTransfer)
 {
+  if (pfes->GetFaceNbrVSize() <= 0)
+  {
+    return;
+  }
+   
   MPI_Waitall(dataTransfer.num_face_nbrs,
-              dataTransfer.send_requests,
+              dataTransfer.requests,
               dataTransfer.statuses);
   MPI_Waitall(dataTransfer.num_face_nbrs,
-              dataTransfer.recv_requests,
+              dataTransfer.requests+dataTransfer.num_face_nbrs,
               dataTransfer.statuses);
 }
 
