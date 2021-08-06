@@ -300,14 +300,17 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
   gradients->computeGradients_domain();
   waitAllDataTransfer(vfes,transferUp);
   gradients->computeGradients_bdr();
-#endif
+  initNBlockDataTransfer(*gradUp, gradUpfes, transferGradUp);
+#else
   gradients->computeGradients();
+#endif
   
   // update boundary conditions
   if(bcIntegrator!=NULL) bcIntegrator->updateBCMean( Up );
   
 #ifdef _GPU_
   waitAllDataTransfer(vfes,transferU); // make sure U boundary data has finished 
+  waitAllDataTransfer(gradUpfes,transferGradUp);
 #endif
   A->Mult(x, z);
 
