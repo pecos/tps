@@ -93,9 +93,11 @@ public:
     transferUp = _transferUp; }
   
   void computeGradients();
-  void computeGradients_cpu();
   
 #ifdef _GPU_
+  void computeGradients_domain();
+  void computeGradients_bdr();
+  
   static void computeGradients_gpu(const int numElems,
                                    const int offsetElems,
                                    const int elDof,

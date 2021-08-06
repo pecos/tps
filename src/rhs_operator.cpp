@@ -288,23 +288,27 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
 {
   max_char_speed = 0.;
   
+#ifdef _GPU_
+  // start transfer of U bdr data
+  initNBlockDataTransfer(x,vfes,transferU);
+#endif
   // Update primite varibales
   updatePrimitives(x);
 #ifdef _GPU_
   // GPU version requires the exchange of data before gradient computation
   initNBlockDataTransfer(*Up, vfes, transferUp);
+  gradients->computeGradients_domain();
   waitAllDataTransfer(vfes,transferUp);
+  gradients->computeGradients_bdr();
 #endif
   gradients->computeGradients();
-#ifdef _GPU_
-  // GPU version requires the exchange of data before gradient computation
-  initNBlockDataTransfer(x,vfes,transferU);
-  waitAllDataTransfer(vfes,transferU);
-#endif
   
   // update boundary conditions
   if(bcIntegrator!=NULL) bcIntegrator->updateBCMean( Up );
   
+#ifdef _GPU_
+  waitAllDataTransfer(vfes,transferU); // make sure U boundary data has finished 
+#endif
   A->Mult(x, z);
 
   GetFlux(x, flux);
