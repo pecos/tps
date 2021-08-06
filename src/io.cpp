@@ -94,7 +94,7 @@ void M2ulPhyS::restart_files_hdf5(string mode)
       // spatial dimension
       h5_save_attribute(file,"dimension",dim);
       
-      if( average!=NULL )
+      if( average->ComputeMean() )
       {
         // samples meanUp
         h5_save_attribute(file,"samplesMean",average->GetSamplesMean());
@@ -143,7 +143,7 @@ void M2ulPhyS::restart_files_hdf5(string mode)
       h5_read_attribute(file,"time",time);
       h5_read_attribute(file,"dt",dt);
       h5_read_attribute(file,"order",read_order);
-      if( average!=NULL )
+      if( average->ComputeMean() && config.GetRestartMean() )
       {
         int samplesMean, intervals;
         h5_read_attribute(file,"samplesMean",samplesMean);
@@ -159,7 +159,7 @@ void M2ulPhyS::restart_files_hdf5(string mode)
       MPI_Bcast(&time,      1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
       MPI_Bcast(&dt,        1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
       MPI_Bcast(&read_order,1, MPI_INT,    0, MPI_COMM_WORLD);
-      if( average!=NULL )
+      if( average->ComputeMean() && config.GetRestartMean() )
       {
         int sampMean = average->GetSamplesMean();
         int intervals = average->GetSamplesInterval();
@@ -272,13 +272,8 @@ void M2ulPhyS::restart_files_hdf5(string mode)
         H5Gclose(group);
       if(dataspace >= 0 )
         H5Sclose(dataspace);
-
-//       }  // end loop over IO families
-
-//       if(file >= 0)
-//         H5Fclose(file);
     }
-    else          // read mode
+    else if( fam.inReastartFile )         // read mode
     {
 
       if(rank0_)
@@ -315,11 +310,6 @@ void M2ulPhyS::restart_files_hdf5(string mode)
       if (rank0_ || (config.RestartSerial() != "read") )
         assert(numInSoln == dof);
 
-      //-------------------------------------------------------
-      // Loop over defined IO families to read desired output
-      //-------------------------------------------------------
-//       for(auto fam : ioData.families_)
-//       {
       // get pointer to raw data
       double *data = fam.pfunc_->HostReadWrite();
       // special case if starting from aux soln
@@ -343,10 +333,6 @@ void M2ulPhyS::restart_files_hdf5(string mode)
         else
           read_serialized_soln_data (file,h5Path.c_str(),dof,var.index_,data,fam);
       }
-//       }
-
-//       if(file >= 0)
-//         H5Fclose(file);
     }
   }
   
@@ -741,11 +727,14 @@ void M2ulPhyS::write_soln_data(hid_t group, string varName, hid_t dataspace, dou
 void IODataOrganizer::registerIOFamily(std::string description, 
                                        std::string group, 
                                        ParGridFunction *pfunc,
-                                       bool auxRestart )
+                                       bool auxRestart,
+                                       bool _inReastartFile
+                                      )
 {
   IOFamily family{description,group,pfunc};
   std::vector<IOVar> vars;
   family.allowsAuxRestart = auxRestart;
+  family.inReastartFile = _inReastartFile;
 
   families_.push_back(family);
   vars_[group] = vars;

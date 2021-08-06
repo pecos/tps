@@ -299,7 +299,7 @@ void M2ulPhyS::initVariables()
   {
     // meanUp
     ioData.registerIOFamily("Time-averaged primitive vars","/meanSolution",
-      average->GetMeanUp(), false );
+      average->GetMeanUp(), false ,config.GetRestartMean() );
     ioData.registerIOVar("/meanSolution","meanDens",0);
     ioData.registerIOVar("/meanSolution","mean-u",  1);
     ioData.registerIOVar("/meanSolution","mean-v",  2);
@@ -312,7 +312,7 @@ void M2ulPhyS::initVariables()
       ioData.registerIOVar("/meanSolution","mean-p",3);
     // rms
     ioData.registerIOFamily("RMS velocity fluctuation","/rmsData",
-      average->GetRMS(), false );
+      average->GetRMS(), false , config.GetRestartMean());
     ioData.registerIOVar("/rmsData","uu",0);
     ioData.registerIOVar("/rmsData","vv",1);
     ioData.registerIOVar("/rmsData","ww",2);

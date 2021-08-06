@@ -13,6 +13,9 @@ public:
 
   bool allowsAuxRestart;
   
+  // true if the family is to be found in restart files
+  bool inReastartFile;
+  
   FiniteElementSpace *serial_fes;
   GridFunction       *serial_sol;
 };
@@ -33,7 +36,8 @@ public:
   void registerIOFamily(std::string description, 
                         std::string group, 
                         ParGridFunction *pfunc,
-                        bool auxRestart = true );
+                        bool auxRestart = true,
+                        bool inRestartFile = true );
   ~IODataOrganizer();
   
   void registerIOVar   (std::string group, std::string varName, int index);
