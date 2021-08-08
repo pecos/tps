@@ -48,6 +48,8 @@ private:
   
   void initiMeanAndRMS();
   
+  void addSample_cpu();
+  
 public:
   Averaging( ParGridFunction *_Up,
              ParMesh *_mesh,
@@ -75,6 +77,16 @@ public:
   
   void SetSamplesMean(int &samples){samplesMean = samples;}
   void SetSamplesInterval(int &interval){sampleInterval = interval;}
+  
+#ifdef _GPU_
+  static void addSample_gpu(ParGridFunction *meanUp,
+                            ParGridFunction *rms,
+                            int &samplesMean,
+                            const ParGridFunction *Up,
+                            const int &Ndof,
+                            const int &dim,
+                            const int &num_equation );
+#endif
 };
 
 #endif // AVERAGING_AND_RMS
