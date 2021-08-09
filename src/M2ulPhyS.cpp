@@ -1133,7 +1133,8 @@ void M2ulPhyS::MASA_exactSoln(const Vector& x, double tin, Vector& y)
 {
   MFEM_ASSERT(x.Size() == 3, "");
 
-  EquationOfState eqState( DRY_AIR );
+  EquationOfState eqState;
+  eqState.setFluid( DRY_AIR );
   const double gamma = eqState.GetSpecificHeatRatio();
 
   y(0) =      MASA::masa_eval_exact_rho<double>(x[0],x[1],x[2], tin); // rho
