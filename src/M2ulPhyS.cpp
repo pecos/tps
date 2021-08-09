@@ -306,7 +306,7 @@ void M2ulPhyS::initVariables()
     if(dim == 3)
     {
       ioData.registerIOVar("/meanSolution","mean-w",3);
-      ioData.registerIOVar("/meanSolution","mean-E",4);
+      ioData.registerIOVar("/meanSolution","mean-p",4);
     }
     else
       ioData.registerIOVar("/meanSolution","mean-p",3);
