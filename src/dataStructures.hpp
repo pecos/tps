@@ -27,12 +27,18 @@ struct parallelFacesIntegrationArrays
   Array<int> sharedVdofs;
   Array<int> sharedVdofsGradUp;
   Array<int> sharedElemsFaces;
-  
+};
+
+struct dataTransferArrays
+{
   // vectors for data transfer
   Vector face_nbr_data;
   Vector send_data;
-  Vector face_nbr_dataGrad;
-  Vector send_dataGrad;
+  
+  // MPI communicators data
+  int num_face_nbrs;
+  MPI_Request *requests;
+  MPI_Status  *statuses;
 };
 
 #endif

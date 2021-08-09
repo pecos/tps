@@ -156,72 +156,8 @@ Gradients::~Gradients()
 #endif
 }
 
+
 void Gradients::computeGradients()
-{
-#ifdef _GPU_
-  DGNonLinearForm::setToZero_gpu(*gradUp,gradUp->Size());
-  
-  //gradUp_A->Mult(Up,*gradUp);
-  ParMesh *pmesh = vfes->GetParMesh();
-  const int Nshared = pmesh->GetNSharedFaces();
-  if( Nshared>0 )
-  {
-    integrationGradSharedFace_gpu(Up,
-                                  gradUp,
-                                  vfes->GetNDofs(),
-                                  dim,
-                                  num_equation,
-                                  eqState->GetSpecificHeatRatio(),
-                                  eqState->GetGasConstant(), 
-                                  eqState->GetViscMultiplyer(),
-                                  eqState->GetBulkViscMultiplyer(),
-                                  eqState->GetPrandtlNum(),
-                                  nodesIDs,
-                                  posDofIds,
-                                  parallelData,
-                                  maxIntPoints,
-                                  maxDofs);
-  }
-   
-  for(int elType=0;elType<numElems.Size();elType++)
-  {
-    int elemOffset = 0;
-    if( elType!=0 )
-    {
-      for(int i=0;i<elType;i++) elemOffset += h_numElems[i];
-    }
-    int dof_el = h_posDofIds[2*elemOffset +1];
-    
-    computeGradients_gpu(h_numElems[elType],
-                        elemOffset,
-                        dof_el,
-                        vfes->GetNDofs(),
-                        *Up, //px,
-                        *gradUp,
-                        num_equation,
-                        dim,
-                        posDofIds,
-                        nodesIDs,
-                        elemShapeDshapeWJ,
-                        elemPosQ_shapeDshapeWJ,
-                        invMArray,
-                        posDofInvM,
-                        elemFaces,
-                        shapeWnor1,
-                        shape2,
-                        maxDofs,
-                        maxIntPoints,
-                        elems12Q );
-  }
-  
-  gradUp->ExchangeFaceNbrData();
-#else
-  computeGradients_cpu();
-#endif
-}
-
-
-void Gradients::computeGradients_cpu()
 {
   const int totalDofs = vfes->GetNDofs();
   double *dataUp = Up->GetData();
@@ -331,6 +267,69 @@ void Gradients::computeGradients_cpu()
 }
 
 #ifdef _GPU_
+void Gradients::computeGradients_domain()
+{
+  DGNonLinearForm::setToZero_gpu(*gradUp,gradUp->Size());
+  
+  for(int elType=0;elType<numElems.Size();elType++)
+  {
+    int elemOffset = 0;
+    if( elType!=0 )
+    {
+      for(int i=0;i<elType;i++) elemOffset += h_numElems[i];
+    }
+    int dof_el = h_posDofIds[2*elemOffset +1];
+    
+    computeGradients_gpu(h_numElems[elType],
+                        elemOffset,
+                        dof_el,
+                        vfes->GetNDofs(),
+                        *Up, //px,
+                        *gradUp,
+                        num_equation,
+                        dim,
+                        posDofIds,
+                        nodesIDs,
+                        elemShapeDshapeWJ,
+                        elemPosQ_shapeDshapeWJ,
+                        invMArray,
+                        posDofInvM,
+                        elemFaces,
+                        shapeWnor1,
+                        shape2,
+                        maxDofs,
+                        maxIntPoints,
+                        elems12Q );
+  }
+}
+
+void Gradients::computeGradients_bdr()
+{
+  ParMesh *pmesh = vfes->GetParMesh();
+  const int Nshared = pmesh->GetNSharedFaces();
+  if( Nshared>0 )
+  {
+    integrationGradSharedFace_gpu(Up,
+                                  transferUp->face_nbr_data,
+                                  gradUp,
+                                  vfes->GetNDofs(),
+                                  dim,
+                                  num_equation,
+                                  eqState->GetSpecificHeatRatio(),
+                                  eqState->GetGasConstant(), 
+                                  eqState->GetViscMultiplyer(),
+                                  eqState->GetBulkViscMultiplyer(),
+                                  eqState->GetPrandtlNum(),
+                                  nodesIDs,
+                                  posDofIds,
+                                  parallelData,
+                                  maxIntPoints,
+                                  maxDofs);
+  }
+  
+//   gradUp->ExchangeFaceNbrData();
+}
+
 void Gradients::computeGradients_gpu(const int numElems,
                                      const int offsetElems,
                                      const int elDof,
@@ -623,6 +622,7 @@ void Gradients::computeGradients_gpu(const int numElems,
 }
 
 void Gradients::integrationGradSharedFace_gpu(const Vector *Up,
+                                              const Vector &faceUp,
                                               ParGridFunction *gradUp,
                                               const int &Ndofs,
                                               const int &dim,
@@ -640,7 +640,7 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up,
 {
   const double *d_up = Up->Read();
   double *d_gradUp = gradUp->ReadWrite();
-  const double *d_faceData = parallelData->face_nbr_data.Read();
+  const double *d_faceData = faceUp.Read();
   
   const int *d_nodesIDs = nodesIDs.Read();
   const int *d_posDofIds = posDofIds.Read();
@@ -743,7 +743,7 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up,
         {
           for(int eq=0;eq<num_equation;eq++)
           {
-            d_gradUp[indexi+eq*Ndofs+d*num_equation*Ndofs] = Fcontrib[i+eq*dof1+d*num_equation*dof1];
+            d_gradUp[indexi+eq*Ndofs+d*num_equation*Ndofs] += Fcontrib[i+eq*dof1+d*num_equation*dof1];
           }
         }
       }

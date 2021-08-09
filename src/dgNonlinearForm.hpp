@@ -43,16 +43,8 @@ private:
   
   // Parallel shared faces integration
   parallelFacesIntegrationArrays *parallelData;
-//   Vector sharedShapeWnor1;
-//   Vector sharedShape2;
-//   Array<int> sharedElem1Dof12Q;
-//   Array<int> sharedVdofs;
-//   Array<int> sharedVdofsGradUp;
-//   Array<int> sharedElemsFaces;
-//   Vector face_nbr_data;
-//   Vector send_data;
-//   Vector face_nbr_dataGrad;
-//   Vector send_dataGrad;
+  mutable dataTransferArrays *transferU;
+  mutable dataTransferArrays *transferGradUp;
   
   const int &maxIntPoints;
   const int &maxDofs;
@@ -80,7 +72,13 @@ public:
   
   void Mult(const Vector &x, Vector &y );
   
-  void setParallelData(parallelFacesIntegrationArrays *_parallelData){ parallelData = _parallelData;}
+  void setParallelData(parallelFacesIntegrationArrays *_parallelData,
+                       dataTransferArrays *_transferU,
+                       dataTransferArrays *_transferGradUp ){ 
+    parallelData = _parallelData;
+    transferU = _transferU;
+    transferGradUp = _transferGradUp;
+  }
             
   static void faceIntegration_gpu(const Vector &x,
                                   Vector &y,
@@ -107,6 +105,7 @@ public:
                                   const Array<int> &elems12Q );
   
   static void sharedFaceIntegration_gpu(const Vector &x,
+                                        const Vector &faceU,
                                         const ParGridFunction *gradUp,
                                         const Vector &faceGradUp,
                                         Vector &y,
@@ -125,7 +124,8 @@ public:
                                         const int &maxDofs );
   
 #ifdef _GPU_
-  void Mult_gpu(const Vector &x, Vector &y);
+  void Mult_domain(const Vector &x, Vector &y);
+  void Mult_bdr(const Vector &x, Vector &y);
   static void setToZero_gpu(Vector &x, const int size);
 #endif
 };

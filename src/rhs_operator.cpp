@@ -147,7 +147,8 @@ bcIntegrator(_bcIntegrator)
   for(int i=0;i<(int)temp.size();i++) hinvMArray[i] = temp[i];
   
   fillSharedData();
-  A->setParallelData( &parallelData );
+  
+  A->setParallelData( &parallelData, &transferU, &transferGradUp );
   
 #ifdef _GPU_
   auto dposDogInvM = posDofInvM.ReadWrite();
@@ -177,7 +178,7 @@ bcIntegrator(_bcIntegrator)
                             _elems12Q,
                             maxIntPoints,
                             maxDofs );
-  gradients->setParallelData( &parallelData );
+  gradients->setParallelData( &parallelData, &transferUp);
    
 #ifdef DEBUG 
 {
@@ -271,6 +272,15 @@ RHSoperator::~RHSoperator()
   //delete[] Me_inv;
   for(int n=0;n<Me_inv.Size();n++) delete Me_inv[n];
   for( int i=0; i<forcing.Size();i++) delete forcing[i];
+  
+  if (transferU.requests != NULL)  delete[] transferU.requests;
+  if (transferUp.requests != NULL) delete[] transferUp.requests;
+  if (transferGradUp.requests != NULL ) 
+                                   delete[] transferGradUp.requests;
+  
+  if (transferU.statuses!=NULL )      delete[] transferU.statuses;
+  if (transferUp.statuses!=NULL )     delete[] transferUp.statuses;
+  if (transferGradUp.statuses!=NULL ) delete[] transferGradUp.statuses;
 }
 
 
@@ -278,22 +288,34 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
 {
   max_char_speed = 0.;
   
+#ifdef _GPU_
+  // start transfer of U bdr data
+  initNBlockDataTransfer(x,vfes,transferU);
+#endif
   // Update primite varibales
   updatePrimitives(x);
 #ifdef _GPU_
   // GPU version requires the exchange of data before gradient computation
-  exchangeBdrData(*Up,vfes, parallelData.face_nbr_data,parallelData.send_data);
-#endif
+  initNBlockDataTransfer(*Up, vfes, transferUp);
+  gradients->computeGradients_domain();
+  waitAllDataTransfer(vfes,transferUp);
+  gradients->computeGradients_bdr();
+  initNBlockDataTransfer(*gradUp, gradUpfes, transferGradUp);
+#else
   gradients->computeGradients();
-#ifdef _GPU_
-  // GPU version requires the exchange of data before gradient computation
-  exchangeBdrData(x,vfes, parallelData.face_nbr_data,parallelData.send_data);
 #endif
   
   // update boundary conditions
   if(bcIntegrator!=NULL) bcIntegrator->updateBCMean( Up );
   
+#ifdef _GPU_
+  waitAllDataTransfer(gradUpfes,transferGradUp);
+  A->Mult_domain(x,z);
+  waitAllDataTransfer(vfes,transferU); // make sure U boundary data has finished 
+  A->Mult_bdr(x,z);
+#else
   A->Mult(x, z);
+#endif
 
   GetFlux(x, flux);
   
@@ -640,19 +662,6 @@ void RHSoperator::fillSharedData()
     parallelData.sharedShapeWnor1.UseDevice(true);
     parallelData.sharedShape2.UseDevice(true);
     
-    parallelData.face_nbr_data.UseDevice(true);
-    parallelData.send_data.UseDevice(true);
-    parallelData.face_nbr_data.SetSize(vfes->GetFaceNbrVSize());
-    parallelData.send_data.SetSize(vfes->send_face_nbr_ldof.Size_of_connections());
-    parallelData.face_nbr_data = 0.;
-    parallelData.send_data = 0.;
-    parallelData.face_nbr_dataGrad.UseDevice(true);
-    parallelData.send_dataGrad.UseDevice(true);
-    parallelData.face_nbr_dataGrad.SetSize(gradFes->GetFaceNbrVSize());
-    parallelData.send_dataGrad.SetSize(gradFes->send_face_nbr_ldof.Size_of_connections());
-    parallelData.face_nbr_dataGrad = 0.;
-    parallelData.send_dataGrad = 0.;
-    
     parallelData.sharedShapeWnor1.SetSize(Nshared*maxIntPoints*(maxDofs+1+dim));
     parallelData.sharedShape2.SetSize(Nshared*maxIntPoints*maxDofs);
     parallelData.sharedElem1Dof12Q.SetSize(Nshared*4);
@@ -781,6 +790,45 @@ void RHSoperator::fillSharedData()
         }
       }
     }
+    
+    // data transfer arrays
+    
+    vfes->ExchangeFaceNbrData();
+    gradUpfes->ExchangeFaceNbrData();
+    transferU.face_nbr_data.UseDevice(true);
+    transferU.send_data.UseDevice(true);
+    transferU.face_nbr_data.SetSize(vfes->GetFaceNbrVSize());
+    transferU.send_data.SetSize(vfes->send_face_nbr_ldof.Size_of_connections());
+    transferU.face_nbr_data = 0.;
+    transferU.send_data = 0.;
+    transferU.num_face_nbrs = mesh->GetNFaceNeighbors();
+    
+    transferUp.face_nbr_data.UseDevice(true);
+    transferUp.send_data.UseDevice(true);
+    transferUp.face_nbr_data.SetSize(vfes->GetFaceNbrVSize());
+    transferUp.send_data.SetSize(vfes->send_face_nbr_ldof.Size_of_connections());
+    transferUp.face_nbr_data = 0.;
+    transferUp.send_data = 0.;
+    transferUp.num_face_nbrs = mesh->GetNFaceNeighbors();
+    
+    transferGradUp.face_nbr_data.UseDevice(true);
+    transferGradUp.send_data.UseDevice(true);
+    transferGradUp.face_nbr_data.SetSize(gradUpfes->GetFaceNbrVSize());
+    transferGradUp.send_data.SetSize(gradUpfes->send_face_nbr_ldof.Size_of_connections());
+    transferGradUp.face_nbr_data = 0.;
+    transferGradUp.send_data = 0.;
+    transferGradUp.num_face_nbrs = mesh->GetNFaceNeighbors();
+    
+    MPI_Request *requestsU  = new MPI_Request[2*mesh->GetNFaceNeighbors()];
+    MPI_Request *requestsUp = new MPI_Request[2*mesh->GetNFaceNeighbors()];
+    MPI_Request *requGradUp = new MPI_Request[2*mesh->GetNFaceNeighbors()];
+    transferU.requests = requestsU;
+    transferUp.requests = requestsUp;
+    transferGradUp.requests = requGradUp;
+    
+    transferU.statuses      = new MPI_Status[transferU.num_face_nbrs];
+    transferUp.statuses     = new MPI_Status[transferUp.num_face_nbrs];
+    transferGradUp.statuses = new MPI_Status[transferGradUp.num_face_nbrs];
   }else
   {
     parallelData.sharedShapeWnor1.SetSize(1);
@@ -789,6 +837,14 @@ void RHSoperator::fillSharedData()
     parallelData.sharedVdofs.SetSize(1);
     parallelData.sharedVdofsGradUp.SetSize(1);
     parallelData.sharedElemsFaces.SetSize(1);
+    
+    transferU.requests      = NULL;
+    transferUp.requests     = NULL;
+    transferGradUp.requests = NULL;
+    
+    transferU.statuses      = NULL;
+    transferUp.statuses     = NULL;
+    transferGradUp.statuses = NULL;
   }
   
 #ifdef _GPU_
@@ -801,12 +857,11 @@ void RHSoperator::fillSharedData()
 #endif
 }
 
-void RHSoperator::exchangeBdrData(const Vector &x,
-                                      ParFiniteElementSpace *pfes,
-                                      Vector &face_nbr_data,
-                                      Vector &send_data )
+void RHSoperator::initNBlockDataTransfer(const Vector &x,
+                                         ParFiniteElementSpace *pfes,
+                                      dataTransferArrays &dataTransfer )
 {
-  if (pfes->GetFaceNbrVSize() <= 0)
+   if (pfes->GetFaceNbrVSize() <= 0)
    {
       return;
    }
@@ -818,20 +873,20 @@ void RHSoperator::exchangeBdrData(const Vector &x,
 
    int *send_offset = pfes->send_face_nbr_ldof.GetI();
    const int *d_send_ldof = mfem::Read(pfes->send_face_nbr_ldof.GetJMemory(),
-                                       send_data.Size());
+                                       dataTransfer.send_data.Size());
    int *recv_offset = pfes->face_nbr_ldof.GetI();
    MPI_Comm MyComm = pfes->GetComm();
 
-   int num_face_nbrs = pmesh->GetNFaceNeighbors();
-   MPI_Request *requests = new MPI_Request[2*num_face_nbrs];
-   MPI_Request *send_requests = requests;
-   MPI_Request *recv_requests = requests + num_face_nbrs;
-   MPI_Status  *statuses = new MPI_Status[num_face_nbrs];
+//    int num_face_nbrs = pmesh->GetNFaceNeighbors();
+//    MPI_Request *requests = new MPI_Request[2*num_face_nbrs];
+//    MPI_Request *send_requests = requests;
+//    MPI_Request *recv_requests = requests + num_face_nbrs;
+//    MPI_Status  *statuses = new MPI_Status[num_face_nbrs];
 
 //    auto d_data = this->Read();
    auto d_data = x.Read();
-   auto d_send_data = send_data.Write();
-   MFEM_FORALL(i, send_data.Size(),
+   auto d_send_data = dataTransfer.send_data.Write();
+   MFEM_FORALL(i,dataTransfer.send_data.Size(),
    {
       const int ldof = d_send_ldof[i];
       d_send_data[i] = d_data[ldof >= 0 ? ldof : -1-ldof];
@@ -841,29 +896,40 @@ void RHSoperator::exchangeBdrData(const Vector &x,
 //    auto send_data_ptr = mpi_gpu_aware ? send_data.Read() : send_data.HostRead();
 //    auto face_nbr_data_ptr = mpi_gpu_aware ? face_nbr_data.Write() :
 //                             face_nbr_data.HostWrite();
-   auto send_data_ptr = send_data.HostRead();
-   auto face_nbr_data_ptr = face_nbr_data.HostWrite();
+   auto send_data_ptr = dataTransfer.send_data.HostRead();
+   auto face_nbr_data_ptr = dataTransfer.face_nbr_data.HostWrite();
    
-   for (int fn = 0; fn < num_face_nbrs; fn++)
+   for (int fn=0;fn<dataTransfer.num_face_nbrs; fn++)
    {
       int nbr_rank = pmesh->GetFaceNbrRank(fn);
       int tag = 0;
 
       MPI_Isend(&send_data_ptr[send_offset[fn]],
                 send_offset[fn+1] - send_offset[fn],
-                MPI_DOUBLE, nbr_rank, tag, MyComm, &send_requests[fn]);
+                MPI_DOUBLE, nbr_rank, tag, MyComm, 
+                &dataTransfer.requests[fn]);
 
       MPI_Irecv(&face_nbr_data_ptr[recv_offset[fn]],
                 recv_offset[fn+1] - recv_offset[fn],
-                MPI_DOUBLE, nbr_rank, tag, MyComm, &recv_requests[fn]);
+                MPI_DOUBLE, nbr_rank, tag, MyComm, 
+                &dataTransfer.requests[fn+dataTransfer.num_face_nbrs]);
    }
-
-   MPI_Waitall(num_face_nbrs, send_requests, statuses);
-   MPI_Waitall(num_face_nbrs, recv_requests, statuses);
-   
-   //auto kk = face_nbr_data.Read(); // offload to GPU
-
-   delete [] statuses;
-   delete [] requests;
 }
+
+void RHSoperator::waitAllDataTransfer(ParFiniteElementSpace *pfes,
+                                      dataTransferArrays& dataTransfer)
+{
+  if (pfes->GetFaceNbrVSize() <= 0)
+  {
+    return;
+  }
+   
+  MPI_Waitall(dataTransfer.num_face_nbrs,
+              dataTransfer.requests,
+              dataTransfer.statuses);
+  MPI_Waitall(dataTransfer.num_face_nbrs,
+              dataTransfer.requests+dataTransfer.num_face_nbrs,
+              dataTransfer.statuses);
+}
+
 

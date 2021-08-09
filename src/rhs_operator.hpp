@@ -90,6 +90,9 @@ private:
   mutable Vector z;
   
   mutable parallelFacesIntegrationArrays parallelData;
+  mutable dataTransferArrays transferU;
+  mutable dataTransferArrays transferUp;
+  mutable dataTransferArrays transferGradUp;
   void fillSharedData();
 
   //void GetFlux(const DenseMatrix &state, DenseTensor &flux) const;
@@ -135,10 +138,11 @@ public:
 
    virtual ~RHSoperator();
    
-   static void exchangeBdrData(const Vector &x,
-                              ParFiniteElementSpace *pfes,
-                              Vector &face_nbr_data,
-                              Vector &send_data);
+   static void initNBlockDataTransfer(const Vector &x,
+                                      ParFiniteElementSpace *pfes,
+                                      dataTransferArrays &dataTransfer );
+   static void waitAllDataTransfer(ParFiniteElementSpace *pfes,
+                                   dataTransferArrays &dataTransfer);
 
 
   // GPU functions
