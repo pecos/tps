@@ -88,6 +88,7 @@ private:
   
   mutable DenseTensor flux;
   mutable Vector z;
+  mutable Vector fk,zk; // temp vectors for flux volume integral
   
   mutable parallelFacesIntegrationArrays parallelData;
   mutable dataTransferArrays transferU;
