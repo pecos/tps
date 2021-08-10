@@ -14,16 +14,16 @@ void M2ulPhyS::Header()
 {
   if (mpi.Root())
     {
-      grvy_printf(INFO,"\n------------------------------------\n");
-      grvy_printf(INFO,"  _______ _____   _____\n");
-      grvy_printf(INFO," |__   __|  __ \\ / ____|\n");
-      grvy_printf(INFO,"    | |  | |__) | (___  \n");
-      grvy_printf(INFO,"    | |  |  ___/ \\___ \\ \n");
-      grvy_printf(INFO,"    | |  | |     ____) | \n");
-      grvy_printf(INFO,"    |_|  |_|    |_____/ \n\n");
-      grvy_printf(INFO,"Git Version:  %s\n", BUILD_VERSION);
-      grvy_printf(INFO,"MFEM Version: %s\n", mfem::GetVersionStr());
-      grvy_printf(INFO,"------------------------------------\n\n");
+      grvy_printf(ginfo,"\n------------------------------------\n");
+      grvy_printf(ginfo,"  _______ _____   _____\n");
+      grvy_printf(ginfo," |__   __|  __ \\ / ____|\n");
+      grvy_printf(ginfo,"    | |  | |__) | (___  \n");
+      grvy_printf(ginfo,"    | |  |  ___/ \\___ \\ \n");
+      grvy_printf(ginfo,"    | |  | |     ____) | \n");
+      grvy_printf(ginfo,"    |_|  |_|    |_____/ \n\n");
+      grvy_printf(ginfo,"Git Version:  %s\n", BUILD_VERSION);
+      grvy_printf(ginfo,"MFEM Version: %s\n", mfem::GetVersionStr());
+      grvy_printf(ginfo,"------------------------------------\n\n");
     }
 }
 
@@ -77,7 +77,7 @@ bool slurm_job_almost_done(int threshold,int rank)
 int rm_restart(std::string jobFile,std::string mode)
 {
 
-  //grvy_printf(GRVY_INFO,"[RMS] Submitting fresh %s job using script -> %s\n",mode.c_str(),jobFile.c_str());
+  //grvy_printf(GRVY_ginfo,"[RMS] Submitting fresh %s job using script -> %s\n",mode.c_str(),jobFile.c_str());
   std::cout << "[RMS] Submitting fresh" << mode << " job using script -> " << jobFile << std::endl;
 
   if ( mode == "SLURM" )
@@ -127,7 +127,7 @@ bool M2ulPhyS::Check_ExitEarly(int iter)
         {
           status = int(file_exists("DIE"));
           if(status == 1)
-            grvy_printf(INFO,"Detected DIE file, terminating early...\n");
+            grvy_printf(ginfo,"Detected DIE file, terminating early...\n");
         }
       MPI_Bcast(&status,1,MPI_INT,0,MPI_COMM_WORLD);
       return(bool(status));

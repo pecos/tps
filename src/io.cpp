@@ -64,7 +64,7 @@ void M2ulPhyS::restart_files_hdf5(string mode)
 
       if(gstatus == 0)
       {
-        grvy_printf(ERROR,"[ERROR]: Unable to access desired restart file -> %s\n",fileName.c_str());
+        grvy_printf(gerror,"[ERROR]: Unable to access desired restart file -> %s\n",fileName.c_str());
         exit(ERROR);
       }
 
@@ -189,12 +189,12 @@ void M2ulPhyS::restart_files_hdf5(string mode)
 
     if(rank0_)
     {
-      grvy_printf(GRVY_INFO,"Restarting from iteration = %i\n",iter);
-      grvy_printf(GRVY_INFO,"--> time = %e\n",time);
-      grvy_printf(GRVY_INFO,"--> dt   = %e\n",dt);
+      grvy_printf(ginfo,"Restarting from iteration = %i\n",iter);
+      grvy_printf(ginfo,"--> time = %e\n",time);
+      grvy_printf(ginfo,"--> dt   = %e\n",dt);
       if( average!=NULL )
       {
-        grvy_printf(GRVY_INFO,"Restarting averages with %i\n samples",
+        grvy_printf(ginfo,"Restarting averages with %i\n samples",
                     average->GetSamplesMean());
       }
     }
@@ -234,8 +234,8 @@ void M2ulPhyS::restart_files_hdf5(string mode)
         // define groups based on defined IO families
       if(rank0_)
       {
-        grvy_printf(INFO,"\nCreating HDF5 group for defined IO families\n");
-        grvy_printf(INFO,"--> %s : %s\n",fam.group_.c_str(),fam.description_.c_str());
+        grvy_printf(ginfo,"\nCreating HDF5 group for defined IO families\n");
+        grvy_printf(ginfo,"--> %s : %s\n",fam.group_.c_str(),fam.description_.c_str());
       }
 
       hid_t group     = -1;
@@ -327,7 +327,7 @@ void M2ulPhyS::restart_files_hdf5(string mode)
       {
         std::string h5Path = fam.group_ + "/" + var.varName_;
         if(rank0_)
-          grvy_printf(INFO,"--> Reading h5 path = %s\n",h5Path.c_str());
+          grvy_printf(ginfo,"--> Reading h5 path = %s\n",h5Path.c_str());
         if(config.RestartSerial() != "read")
           read_partitioned_soln_data(file,h5Path.c_str(),var.index_*numInSoln,data);
         else
@@ -409,9 +409,9 @@ void M2ulPhyS::partitioning_file_hdf5(std::string mode)
     assert(partitioning_.Size() > 0);
 
     if(file_exists(fileName))
-      grvy_printf(WARN,"Removing existing partition file: %s\n",fileName.c_str());
+      grvy_printf(gwarn,"Removing existing partition file: %s\n",fileName.c_str());
     else
-      grvy_printf(INFO,"Saving original domain decomposition partition file: %s\n",fileName.c_str());
+      grvy_printf(ginfo,"Saving original domain decomposition partition file: %s\n",fileName.c_str());
 
     file = H5Fcreate(fileName.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT );
   }
@@ -423,7 +423,7 @@ void M2ulPhyS::partitioning_file_hdf5(std::string mode)
     }
     else
     {
-      grvy_printf(ERROR,"[ERROR]: Unable to access necessary partition file on restart -> %s\n",fileName.c_str());
+      grvy_printf(gerror,"[ERROR]: Unable to access necessary partition file on restart -> %s\n",fileName.c_str());
       exit(ERROR);
     }
 
@@ -457,16 +457,16 @@ void M2ulPhyS::partitioning_file_hdf5(std::string mode)
 
     if(rank0_)
     {
-      grvy_printf(INFO,"Reading original domain decomposition partition file: %s\n",fileName.c_str());
+      grvy_printf(ginfo,"Reading original domain decomposition partition file: %s\n",fileName.c_str());
 
       // verify partition info matches current proc count
       {
         int np=0;
         h5_read_attribute(file,"numProcs",np);
-        grvy_printf(INFO,"--> # partitions defined = %i\n",np);
+        grvy_printf(ginfo,"--> # partitions defined = %i\n",np);
         if(np != nprocs_)
         {
-          grvy_printf(ERROR,"[ERROR]: Partition info does not match current processor count -> %i\n",nprocs_);
+          grvy_printf(gerror,"[ERROR]: Partition info does not match current processor count -> %i\n",nprocs_);
           exit(ERROR);
         }
       }
@@ -499,14 +499,14 @@ void M2ulPhyS::partitioning_file_hdf5(std::string mode)
       for(int rank=1; rank<nprocs_; rank++)
       {
         MPI_Send(partitioning_.GetData(),nelemGlobal_,MPI_INT,rank,tag,MPI_COMM_WORLD);
-        grvy_printf(DEBUG,"Sent partitioning data to rank %i\n",rank);
+        grvy_printf(gdebug,"Sent partitioning data to rank %i\n",rank);
       }
     }
     else
       MPI_Recv(partitioning_.GetData(),nelemGlobal_,MPI_INT,0,tag,MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
     if(rank0_)
-      grvy_printf(INFO,"--> partition file read complete\n");
+      grvy_printf(ginfo,"--> partition file read complete\n");
   }
   grvy_timer_end(__func__);
 }
@@ -534,7 +534,7 @@ void M2ulPhyS::serialize_soln_for_write(IOFamily &fam)
 
   if (rank0_)
   {
-    grvy_printf(INFO,"Generating serialized restart file (group %s...\n", fam.group_.c_str());
+    grvy_printf(ginfo,"Generating serialized restart file (group %s...\n", fam.group_.c_str());
     // copy my own data
     Array<int> lvdofs, gvdofs;
     Vector lsoln;
@@ -624,7 +624,7 @@ void M2ulPhyS::read_serialized_soln_data(hid_t file,
 
   if(rank0_)
   {
-    grvy_printf(INFO,"[RestartSerial]: Reading %s for distribution\n",varName.c_str());
+    grvy_printf(ginfo,"[RestartSerial]: Reading %s for distribution\n",varName.c_str());
 
     Vector data_serial;
     data_serial.SetSize(numDof);
@@ -685,7 +685,7 @@ void M2ulPhyS::read_serialized_soln_data(hid_t file,
   else
   {
     int numlDofs = fam.pfunc_->ParFESpace()->GetNDofs();
-    grvy_printf(DEBUG,"[%i]: local number of state vars to receive = %i (var=%s)\n",rank_,numlDofs,varName.c_str());
+    grvy_printf(gdebug,"[%i]: local number of state vars to receive = %i (var=%s)\n",rank_,numlDofs,varName.c_str());
 
     std::vector<double> packedData(numlDofs);
 
@@ -706,7 +706,7 @@ void M2ulPhyS::write_soln_data(hid_t group, string varName, hid_t dataspace, dou
   assert(group >= 0);
 
   if(rank0_)
-    grvy_printf(INFO,"  --> Saving (%s)\n",varName.c_str());
+    grvy_printf(ginfo,"  --> Saving (%s)\n",varName.c_str());
 
   data_soln = H5Dcreate2(group,varName.c_str(), H5T_NATIVE_DOUBLE, dataspace,
                          H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);

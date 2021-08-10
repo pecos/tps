@@ -307,10 +307,10 @@ void OutletBC::computeParallelArea()
 
   if(groupsMPI->isGroupRoot(bcomm))
     {
-      grvy_printf(INFO,"\n[OUTLET]: Patch number                      = %i\n",patchNumber);
-      grvy_printf(INFO,"[OUTLET]: Total Surface Area                = %.5f\n",area);
-      grvy_printf(INFO,"[OUTLET]: # of boundary faces               = %i\n",nfaces);
-      grvy_printf(INFO,"[OUTLET]: # of participating MPI partitions = %i\n",groupsMPI->groupSize(bcomm));
+      grvy_printf(ginfo,"\n[OUTLET]: Patch number                      = %i\n",patchNumber);
+      grvy_printf(ginfo,"[OUTLET]: Total Surface Area                = %.5f\n",area);
+      grvy_printf(ginfo,"[OUTLET]: # of boundary faces               = %i\n",nfaces);
+      grvy_printf(ginfo,"[OUTLET]: # of participating MPI partitions = %i\n",groupsMPI->groupSize(bcomm));
     }
 }
 

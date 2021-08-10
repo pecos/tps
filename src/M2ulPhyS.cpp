@@ -63,7 +63,7 @@ M2ulPhyS::M2ulPhyS(MPI_Session &_mpi,
   if(rank0_)
     if(file_exists("DIE"))
       {
-        grvy_printf(DEBUG,"Removing DIE file on startup\n");
+        grvy_printf(gdebug,"Removing DIE file on startup\n");
         remove("DIE");
       }
 }
@@ -98,7 +98,7 @@ void M2ulPhyS::initVariables()
     // read partitioning info from original decomposition (unless restarting from serial soln)
     nelemGlobal_ = serial_mesh->GetNE();
     if(rank0_)
-      grvy_printf(INFO,"Total # of mesh elements = %i\n",nelemGlobal_);
+      grvy_printf(ginfo,"Total # of mesh elements = %i\n",nelemGlobal_);
 
     if(nprocs_ > 1)
     {
@@ -1020,7 +1020,7 @@ void M2ulPhyS::Iterate()
       if(mpi.Root())
       {
         double timePerIter = (grvy_timer_elapsed_global() - tlast)/iterQuery;
-        grvy_printf(GRVY_INFO,"Iteration = %i: wall clock time/iter = %.3f (secs)\n",iter,timePerIter);
+        grvy_printf(ginfo,"Iteration = %i: wall clock time/iter = %.3f (secs)\n",iter,timePerIter);
         tlast = grvy_timer_elapsed_global();
       }
 #endif

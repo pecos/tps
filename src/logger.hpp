@@ -3,13 +3,10 @@
 
 #include<grvy.h>
 
-#ifdef DEBUG
-#undef DEBUG
-#endif
-
-typedef enum {INFO  = GRVY_INFO,
-	      DEBUG = GRVY_DEBUG,
-	      WARN  = GRVY_WARN
+typedef enum {ginfo  = GRVY_INFO,
+	      gdebug = GRVY_DEBUG,
+	      gwarn  = GRVY_WARN,
+              gerror = GRVY_ERROR
 } loglevels;
 
 

@@ -274,10 +274,10 @@ void InletBC::initBCs()
 
     if(groupsMPI->isGroupRoot(bcomm))
       {
-	grvy_printf(INFO,"\n[INLET]: Patch number                      = %i\n",patchNumber);
-	grvy_printf(INFO,"[INLET]: Total Surface Area                = %.5e\n",area);
-	grvy_printf(INFO,"[INLET]: # of boundary faces               = %i\n",nfaces);
-	grvy_printf(INFO,"[INLET]: # of participating MPI partitions = %i\n",groupsMPI->groupSize(bcomm));
+	grvy_printf(ginfo,"\n[INLET]: Patch number                      = %i\n",patchNumber);
+	grvy_printf(ginfo,"[INLET]: Total Surface Area                = %.5e\n",area);
+	grvy_printf(ginfo,"[INLET]: # of boundary faces               = %i\n",nfaces);
+	grvy_printf(ginfo,"[INLET]: # of participating MPI partitions = %i\n",groupsMPI->groupSize(bcomm));
       }
   }
   
