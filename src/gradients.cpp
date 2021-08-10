@@ -340,8 +340,8 @@ void Gradients::computeGradients_gpu(const int numElems,
                                      const int dim,
                                      const Array<int> &posDofIds,
                                      const Array<int> &nodesIDs,
-                                     const Vector elemShapeDshapeWJ,
-                                     const Array<int> elemPosQ_shapeDshapeWJ,
+                                     const Vector &elemShapeDshapeWJ,
+                                     const Array<int> &elemPosQ_shapeDshapeWJ,
                                      const Vector &invMArray,
                                      const Array<int> &posDofInvM,
                                      const Array<int> &elemFaces,
@@ -349,7 +349,7 @@ void Gradients::computeGradients_gpu(const int numElems,
                                      const Vector &shape2,
                                      const int &maxDofs,
                                      const int &maxIntPoints,
-                                     const Array<int> elems12Q )
+                                     const Array<int> &elems12Q )
 {
   const double *d_Up = Up.Read();
   double *d_gradUp = gradUp.ReadWrite();

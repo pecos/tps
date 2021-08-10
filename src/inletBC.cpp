@@ -38,6 +38,14 @@ maxDofs(_maxDofs)
   
   groupsMPI->setAsInlet(_patchNumber);
   
+  localMeanUp.UseDevice(true);
+  localMeanUp.SetSize(num_equation+1);
+  localMeanUp = 0.;
+  
+  glob_sum.UseDevice(true);
+  glob_sum.SetSize(num_equation+1);
+  glob_sum = 0.;
+  
   meanUp.UseDevice( true );
   meanUp.SetSize(num_equation);
   meanUp = 0.;
@@ -454,10 +462,7 @@ void InletBC::updateMean(IntegrationRules *intRules,
                          ParGridFunction *Up)
 {
   bdrN = 0;
-  Vector localMeanUp;
-  localMeanUp.UseDevice(true);
-  localMeanUp.SetSize(num_equation+1);
-  localMeanUp = 0.;
+  
   int Nbdr = 0;
   
 #ifdef _GPU_
@@ -534,12 +539,10 @@ void InletBC::updateMean(IntegrationRules *intRules,
   int totNbdr = boundaryU.Size()/num_equation;
   h_localMeanUp[num_equation] = (double)totNbdr;
   
-  Vector sum; sum.UseDevice(true);
-  sum.SetSize(num_equation+1);
-  MPI_Allreduce(h_localMeanUp, sum.HostWrite(),
+  MPI_Allreduce(h_localMeanUp, glob_sum.HostWrite(),
                 num_equation+1, MPI_DOUBLE, MPI_SUM, groupsMPI->getInletComm());
   
-  BoundaryCondition::copyValues(sum,meanUp,1./sum[num_equation]);
+  BoundaryCondition::copyValues(glob_sum,meanUp, 1./glob_sum[num_equation]);
   
   if( !bdrUInit )
   {
