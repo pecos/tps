@@ -186,6 +186,11 @@ void M2ulPhyS::initVariables()
     time = 0.;
     iter = 0;
   }
+  
+#ifdef _GPU_
+  loc_print.SetSize(1);
+  loc_print = 0;
+#endif
 
   // if we have a partitioning vector, use it to build local->global
   // element numbering map
@@ -1475,7 +1480,7 @@ void M2ulPhyS::Check_NAN()
 
 #ifdef _GPU_
   {
-    local_print = M2ulPhyS::Check_NaN_GPU(U, dof*num_equation);
+    local_print = M2ulPhyS::Check_NaN_GPU(U, dof*num_equation,loc_print);
   }
 #else
   const double *dataU = U->HostRead();
@@ -1510,13 +1515,10 @@ void M2ulPhyS::Check_NAN()
   }
 }
 
-int M2ulPhyS::Check_NaN_GPU(ParGridFunction *U, int lengthU)
+int M2ulPhyS::Check_NaN_GPU(ParGridFunction *U, int lengthU,Array<int> &loc_print)
 {
   const double *dataU = U->Read();
-  Array<int> temp;
-  temp.SetSize(1);
-  temp = 0;
-  auto d_temp = temp.ReadWrite();
+  auto d_temp = loc_print.Write();
 
   MFEM_FORALL(n,lengthU,
   {
@@ -1524,7 +1526,7 @@ int M2ulPhyS::Check_NaN_GPU(ParGridFunction *U, int lengthU)
     if( val!= val ) d_temp[0] += 1;
   });
 
-  auto htemp = temp.HostRead();
+  auto htemp = loc_print.HostRead();
   return htemp[0];
 }
 

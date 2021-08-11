@@ -61,9 +61,9 @@ public:
 #ifdef _GPU_
   static MFEM_HOST_DEVICE double pressure(const double *state, 
                                           double *KE, 
-                                          const double gamma, 
-                                          const int dim, 
-                                          const int num_equations)
+                                          const double &gamma, 
+                                          const int &dim, 
+                                          const int &num_equations)
   {
     double p = 0.;
     for(int k=0;k<dim;k++) p += KE[k];

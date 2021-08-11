@@ -37,6 +37,14 @@ maxDofs(_maxDofs)
   meanUp.SetSize(num_equation);
   meanUp = 0.;
   
+  localMeanUp.UseDevice(true);
+  localMeanUp.SetSize(num_equation+1);
+  localMeanUp = 0.;
+  
+  glob_sum.UseDevice(true);
+  glob_sum.SetSize(num_equation+1);
+  glob_sum = 0.;
+  
   auto hmeanUp = meanUp.HostWrite();
   
   hmeanUp[0] = 1.2;
@@ -467,11 +475,10 @@ void OutletBC::initBoundaryU( ParGridFunction *Up )
 void OutletBC::updateMean(IntegrationRules *intRules,
                           ParGridFunction *Up)
 {
-   bdrN = 0;
-  Vector localMeanUp;
-  localMeanUp.UseDevice(true);
-  localMeanUp.SetSize(num_equation+1);
-  localMeanUp = 0.;
+  if( outletType==SUB_P ) return;
+  
+  bdrN = 0;
+   
   int Nbdr = 0;
   
 #ifdef _GPU_
@@ -497,6 +504,7 @@ void OutletBC::updateMean(IntegrationRules *intRules,
   
   Vector elUp;
   Vector shape;
+  localMeanUp = 0.;
   
   //double *data = Up->GetData();
   for(int bel=0;bel<vfes->GetNBE(); bel++)
@@ -549,15 +557,11 @@ void OutletBC::updateMean(IntegrationRules *intRules,
   int totNbdr = boundaryU.Size()/num_equation;
   h_localMeanUp[num_equation] = (double)totNbdr;
   
-  Vector sum; sum.UseDevice(true);
-  sum.SetSize(num_equation+1);
-  double *h_sum = sum.HostWrite();
+  double *h_sum = glob_sum.HostWrite();
   MPI_Allreduce(h_localMeanUp, h_sum,
                 num_equation+1, MPI_DOUBLE, MPI_SUM, groupsMPI->getOutletComm());
   
-  BoundaryCondition::copyValues(sum,meanUp,1./h_sum[num_equation]);
-//   double *hmeanUp = meanUp.HostWrite();
-//   for(int eq=0;eq<num_equation;eq++) hmeanUp[eq] = sum[eq]/sum[num_equation];
+  BoundaryCondition::copyValues(glob_sum,meanUp,1./h_sum[num_equation]);
   
   if( !bdrUInit )
   {

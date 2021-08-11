@@ -108,8 +108,8 @@ public:
                                    const int dim,
                                    const Array<int> &posDofIds,
                                    const Array<int> &nodesIDs,
-                                   const Vector elemShapeDshapeWJ,
-                                   const Array<int> elemPosQ_shapeDshapeWJ,
+                                   const Vector &elemShapeDshapeWJ,
+                                   const Array<int> &elemPosQ_shapeDshapeWJ,
                                    const Vector &invMArray,
                                    const Array<int> &posDofInvM,
                                    const Array<int> &elemFaces,
@@ -117,7 +117,7 @@ public:
                                    const Vector &shape2,
                                    const int &maxDofs,
                                    const int &maxIntPoints,
-                                   const Array<int> elems12Q );
+                                   const Array<int> &elems12Q );
   
   static void integrationGradSharedFace_gpu(const Vector *Up,
                                             const Vector &faceUp,

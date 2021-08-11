@@ -42,6 +42,11 @@ private:
   const int &maxIntPoints;
   const int &maxDofs;
   
+  // local vector for mean calculation
+  Vector localMeanUp;
+  // global mean sum (in parallel computations
+  Vector glob_sum;
+  
   // area of the outlet
   double area;
   bool parallelAreaComputed;

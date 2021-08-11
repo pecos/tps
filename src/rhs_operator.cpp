@@ -72,6 +72,12 @@ bcIntegrator(_bcIntegrator)
   z.SetSize(A->Height());
   z = 0.;
   
+  zk.UseDevice(true);
+  fk.UseDevice(true);
+  fk.SetSize(dim*vfes->GetNDofs());
+  zk.SetSize(vfes->GetNDofs());
+  
+  
   h_numElems = numElems.HostReadWrite();
   h_posDofIds = posDofIds.HostReadWrite();
   
@@ -319,11 +325,11 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
 
   GetFlux(x, flux);
   
-#ifdef _GPU_
-  Vector fk,zk; fk.UseDevice(true);zk.UseDevice(true);
-  fk.SetSize(dim*vfes->GetNDofs());
-  zk.SetSize(vfes->GetNDofs());
-#endif
+// #ifdef _GPU_
+//   Vector fk,zk; fk.UseDevice(true);zk.UseDevice(true);
+//   fk.SetSize(dim*vfes->GetNDofs());
+//   zk.SetSize(vfes->GetNDofs());
+// #endif
   
   for(int eq=0;eq<num_equation;eq++)
   {
@@ -426,8 +432,8 @@ void RHSoperator::copyDataForFluxIntegration_gpu( const Vector &z,
 #ifdef _GPU_
   const double *d_flux = flux.Read();
   const double *d_z = z.Read();
-  double *d_fk = fk.ReadWrite();
-  double *d_zk = zk.ReadWrite();
+  double *d_fk = fk.Write();
+  double *d_zk = zk.Write();
   
   MFEM_FORALL(n,dof,
   {

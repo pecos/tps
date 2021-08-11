@@ -41,6 +41,11 @@ private:
   Vector bdrShape; // shape functions evaluated at the integration points
   const int &maxIntPoints;
   const int &maxDofs;
+  
+  // local vector for mean calculation
+  Vector localMeanUp;
+  // global mean sum (in parallel computations
+  Vector glob_sum;
 
   // Unit trangent vector 1 & 2
   Vector tangent1;
