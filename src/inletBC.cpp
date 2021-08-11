@@ -461,6 +461,7 @@ void InletBC::computeBdrFlux( Vector &normal,
 void InletBC::updateMean(IntegrationRules *intRules,
                          ParGridFunction *Up)
 {
+  if( inletType==SUB_DENS_VEL ) return;
   bdrN = 0;
   
   int Nbdr = 0;

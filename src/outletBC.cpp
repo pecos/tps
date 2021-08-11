@@ -475,7 +475,9 @@ void OutletBC::initBoundaryU( ParGridFunction *Up )
 void OutletBC::updateMean(IntegrationRules *intRules,
                           ParGridFunction *Up)
 {
-   bdrN = 0;
+  if( outletType==SUB_P ) return;
+  
+  bdrN = 0;
    
   int Nbdr = 0;
   
