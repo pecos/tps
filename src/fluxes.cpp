@@ -260,7 +260,7 @@ void Fluxes::viscousFluxes_gpu( const Vector &x,
                               num_equation );
       MFEM_SYNC_THREAD;
       
-      if( linViscData.viscRatio>0. )
+      if( d_spaceVaryViscMult!=NULL )
       { 
         if(eq==0) linVisc = d_spaceVaryViscMult[n];
         MFEM_SYNC_THREAD;
