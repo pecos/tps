@@ -489,6 +489,8 @@ void InletBC::updateMean(IntegrationRules *intRules,
   Vector elUp;
   Vector shape;
   
+  localMeanUp = 0.;
+  
   //double *data = Up->GetData();
   for(int bel=0;bel<vfes->GetNBE(); bel++)
   {
@@ -540,10 +542,12 @@ void InletBC::updateMean(IntegrationRules *intRules,
   int totNbdr = boundaryU.Size()/num_equation;
   h_localMeanUp[num_equation] = (double)totNbdr;
   
-  MPI_Allreduce(h_localMeanUp, glob_sum.HostWrite(),
+  double *h_sum = glob_sum.HostWrite();
+  MPI_Allreduce(h_localMeanUp, h_sum,
                 num_equation+1, MPI_DOUBLE, MPI_SUM, groupsMPI->getInletComm());
   
-  BoundaryCondition::copyValues(glob_sum,meanUp, 1./glob_sum[num_equation]);
+  BoundaryCondition::copyValues(glob_sum,meanUp, 1./h_sum[num_equation]);
+  
   
   if( !bdrUInit )
   {

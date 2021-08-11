@@ -504,6 +504,7 @@ void OutletBC::updateMean(IntegrationRules *intRules,
   
   Vector elUp;
   Vector shape;
+  localMeanUp = 0.;
   
   //double *data = Up->GetData();
   for(int bel=0;bel<vfes->GetNBE(); bel++)
