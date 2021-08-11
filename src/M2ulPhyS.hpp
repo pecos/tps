@@ -271,7 +271,7 @@ public:
   // Accessors
   RHSoperator getRHSoperator(){ return *rhsOperator; }
 
-  static int Check_NaN_GPU(ParGridFunction *U, int &lengthU, Array<int> &loc_print);
+  static int Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_print);
 
   // Exit code access
   void SetStatus(int code){exit_status_=code; return;}
