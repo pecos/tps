@@ -139,7 +139,7 @@ maxDofs(_maxDofs)
   
   // assign list of elements to each BC
   const int NumBCelems = vfes->GetNBE();
-  if( NumBCelems>0 )
+  if( NumBCelems>0 && BCmap.size()>0 )
   {
     Mesh *mesh_bc = vfes->GetMesh();
     FaceElementTransformations *tr;
