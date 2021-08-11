@@ -220,6 +220,10 @@ private:
 
   // I/O organizer
   IODataOrganizer ioData;
+  
+#ifdef _GPU_
+  Array<int> loc_print;
+#endif 
 
   void getAttributesInPartition(Array<int> &local_attr);
   
@@ -267,7 +271,7 @@ public:
   // Accessors
   RHSoperator getRHSoperator(){ return *rhsOperator; }
 
-  static int Check_NaN_GPU(ParGridFunction *U, int lengthU);
+  static int Check_NaN_GPU(ParGridFunction *U, int &lengthU, Array<int> &loc_print);
 
   // Exit code access
   void SetStatus(int code){exit_status_=code; return;}
