@@ -315,21 +315,16 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
   if(bcIntegrator!=NULL) bcIntegrator->updateBCMean( Up );
   
 #ifdef _GPU_
-  waitAllDataTransfer(gradUpfes,transferGradUp);
   A->Mult_domain(x,z);
-  waitAllDataTransfer(vfes,transferU); // make sure U boundary data has finished 
+  
+  waitAllDataTransfer(vfes,transferU);
+  waitAllDataTransfer(gradUpfes,transferGradUp);
   A->Mult_bdr(x,z);
 #else
   A->Mult(x, z);
 #endif
 
   GetFlux(x, flux);
-  
-// #ifdef _GPU_
-//   Vector fk,zk; fk.UseDevice(true);zk.UseDevice(true);
-//   fk.SetSize(dim*vfes->GetNDofs());
-//   zk.SetSize(vfes->GetNDofs());
-// #endif
   
   for(int eq=0;eq<num_equation;eq++)
   {

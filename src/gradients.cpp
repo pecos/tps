@@ -326,8 +326,6 @@ void Gradients::computeGradients_bdr()
                                   maxIntPoints,
                                   maxDofs);
   }
-  
-//   gradUp->ExchangeFaceNbrData();
 }
 
 void Gradients::computeGradients_gpu(const int numElems,
