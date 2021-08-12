@@ -509,10 +509,7 @@ void Gradients::computeGradients_gpu(const int numElems,
           // use dl1 to store shape2 values
           for(int j=i;j<dof2;j+=elDof) dl1[j] = d_shape2[offsetShape2+j+k*maxDofs];
           MFEM_SYNC_THREAD;
-            
-//           if( i==elDof-1 ) // NOTE: only one thread does this - rethink this
-//           {
-//             for(int eq=0;eq<num_equation;eq++)
+          
           for(int eq=i;eq<num_equation;eq+=elDof)
           {
             if( swapElems )
@@ -527,7 +524,6 @@ void Gradients::computeGradients_gpu(const int numElems,
                 for(int j=0;j<dof2;j++) meanU[eq] += dl1[j]*gradUpi[j+eq*dof2];
             }
           }
-//           }
           MFEM_SYNC_THREAD;
           
           for(int eq=i;eq<num_equation;eq+=elDof) meanU[eq] = 0.5*(meanU[eq]-u1[eq]);
@@ -580,7 +576,6 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up,
   const double *d_sharedShape2 = parallelData->sharedShape2.Read();
   const int *d_sharedElem1Dof12Q = parallelData->sharedElem1Dof12Q.Read();
   const int *d_sharedVdofs = parallelData->sharedVdofs.Read();
-//   const int *d_sharedVdofsGrads = parallelData->sharedVdofsGradUp.Read();
   const int *d_sharedElemsFaces = parallelData->sharedElemsFaces.Read();
   
   MFEM_FORALL_2D(el,parallelData->sharedElemsFaces.Size()/7,maxDofs,1,1,
