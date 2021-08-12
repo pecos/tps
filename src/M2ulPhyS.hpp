@@ -176,6 +176,8 @@ private:
   
   // Visualization functions (these are pointers to Up)
   ParGridFunction *press, *dens, *vel;
+  // More visualization functions (for averaged primitive values)
+  ParGridFunction *meanDens_, *meanVel_, *meanPress_;
   
   // gradient of primitive variables
   ParGridFunction *gradUp;

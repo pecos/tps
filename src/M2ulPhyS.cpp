@@ -125,7 +125,6 @@ void M2ulPhyS::initVariables()
     paraviewColl->SetLevelsOfDetail( config.GetSolutionOrder() );
     paraviewColl->SetHighOrderOutput(true);
     paraviewColl->SetPrecision(8);
-    //paraviewColl->SetDataFormat(VTKFormat::ASCII);
 
   }
   else
@@ -170,11 +169,6 @@ void M2ulPhyS::initVariables()
     // we only need serial mesh if on rank 0 and using the serial restart file option
     if ( !mpi.Root() || (config.RestartSerial() == "no") )
       delete serial_mesh;
-
-    // VisIt setup
-//     visitColl = new VisItDataCollection(config.GetOutputName(), mesh);
-//     visitColl->SetPrefixPath(config.GetOutputName());
-//     visitColl->SetPrecision(8);
 
     // Paraview setup
     paraviewColl = new ParaViewDataCollection(config.GetOutputName(), mesh);
@@ -283,7 +277,6 @@ void M2ulPhyS::initVariables()
   vfes = new ParFiniteElementSpace(mesh, fec, num_equation, Ordering::byNODES);
   gradUpfes = new ParFiniteElementSpace(mesh, fec, num_equation*dim, Ordering::byNODES);
 
-
   initIndirectionArrays();
   initSolutionAndVisualizationVectors();
 
@@ -315,6 +308,7 @@ void M2ulPhyS::initVariables()
     }
     else
       ioData.registerIOVar("/meanSolution","mean-p",3);
+
     // rms
     ioData.registerIOFamily("RMS velocity fluctuation","/rmsData",
       average->GetRMS(), false , config.GetRestartMean());
@@ -324,6 +318,17 @@ void M2ulPhyS::initVariables()
     ioData.registerIOVar("/rmsData","uv",3);
     ioData.registerIOVar("/rmsData","uw",4);
     ioData.registerIOVar("/rmsData","vw",5);
+
+    // visualization outputs
+    ParGridFunction *mean_Up = average->GetMeanUp();
+
+    meanDens_  = new ParGridFunction(fes,  mean_Up->HostReadWrite());
+    meanVel_   = new ParGridFunction(dfes, mean_Up->HostReadWrite()+fes->GetNDofs() );
+    meanPress_ = new ParGridFunction(fes,  mean_Up->HostReadWrite()+(num_equation-1)*fes->GetNDofs() );
+
+    paraviewColl->RegisterField("mean-dens", meanDens_);
+    paraviewColl->RegisterField("mean-vel",  meanVel_);
+    paraviewColl->RegisterField("mean-press",meanPress_);
   }
   
   ioData.initializeSerial(mpi.Root(),
@@ -884,8 +889,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
 
   dens = new ParGridFunction(fes, Up->HostReadWrite());
   vel = new ParGridFunction(dfes, Up->HostReadWrite()+fes->GetNDofs() );
-  press = new ParGridFunction(fes,
-                              Up->HostReadWrite()+(num_equation-1)*fes->GetNDofs() );
+  press = new ParGridFunction(fes,Up->HostReadWrite()+(num_equation-1)*fes->GetNDofs() );
 
   // define solution parameters for i/o
   ioData.registerIOFamily("Solution state variables","/solution",U);
@@ -939,7 +943,8 @@ void M2ulPhyS::initSolutionAndVisualizationVectors()
   paraviewColl->RegisterField("vel",vel);
   paraviewColl->RegisterField("press",press);
 
-  if( spaceVaryViscMult!=NULL ) paraviewColl->RegisterField("viscMult",spaceVaryViscMult);
+  if (spaceVaryViscMult != NULL)
+    paraviewColl->RegisterField("viscMult",spaceVaryViscMult);
 
   paraviewColl->SetOwnData(true);
   //paraviewColl->Save();
