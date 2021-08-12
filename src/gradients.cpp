@@ -292,8 +292,6 @@ void Gradients::computeGradients_domain()
                         nodesIDs,
                         elemShapeDshapeWJ,
                         elemPosQ_shapeDshapeWJ,
-                        invMArray,
-                        posDofInvM,
                         elemFaces,
                         shapeWnor1,
                         shape2,
@@ -327,7 +325,28 @@ void Gradients::computeGradients_bdr()
                                   maxDofs);
   }
   
-//   gradUp->ExchangeFaceNbrData();
+  // Multiply by inverse mass matrix
+  for(int elType=0;elType<numElems.Size();elType++)
+  {
+    int elemOffset = 0;
+    if( elType!=0 )
+    {
+      for(int i=0;i<elType;i++) elemOffset += h_numElems[i];
+    }
+    int dof_el = h_posDofIds[2*elemOffset +1];
+    
+    multInversr_gpu(h_numElems[elType],
+                    elemOffset,
+                    dof_el,
+                    vfes->GetNDofs(),
+                    *gradUp,
+                    num_equation,
+                    dim,
+                    posDofIds,
+                    nodesIDs,
+                    invMArray,
+                    posDofInvM );
+  }
 }
 
 void Gradients::computeGradients_gpu(const int numElems,
@@ -342,8 +361,6 @@ void Gradients::computeGradients_gpu(const int numElems,
                                      const Array<int> &nodesIDs,
                                      const Vector &elemShapeDshapeWJ,
                                      const Array<int> &elemPosQ_shapeDshapeWJ,
-                                     const Vector &invMArray,
-                                     const Array<int> &posDofInvM,
                                      const Array<int> &elemFaces,
                                      const Vector &shapeWnor1,
                                      const Vector &shape2,
@@ -357,8 +374,6 @@ void Gradients::computeGradients_gpu(const int numElems,
   auto d_nodesIDs = nodesIDs.Read();
   const double *d_elemShapeDshapeWJ = elemShapeDshapeWJ.Read();
   auto d_elemPosQ_shapeDshapeWJ = elemPosQ_shapeDshapeWJ.Read();
-  const double *d_invMArray =invMArray.Read();
-  auto d_posDofInvM = posDofInvM.Read();
   
   // pointers for face integration
   auto d_elemFaces = elemFaces.Read();
@@ -494,22 +509,19 @@ void Gradients::computeGradients_gpu(const int numElems,
           // use dl1 to store shape2 values
           for(int j=i;j<dof2;j+=elDof) dl1[j] = d_shape2[offsetShape2+j+k*maxDofs];
           MFEM_SYNC_THREAD;
-            
-          if( i==elDof-1 ) // NOTE: only one thread does this - rethink this
+          
+          for(int eq=i;eq<num_equation;eq+=elDof)
           {
-            for(int eq=0;eq<num_equation;eq++)
+            if( swapElems )
             {
-              if( swapElems )
-              {
-                //for(int j=0;j<dof1;j++) u1[eq] += l1[j]*Uj[j+eq*dof1];
-                for(int j=0;j<dof1;j++) u1[eq] += l1[j]*gradUpi[j+eq*dof1];
-                for(int j=0;j<dof2;j++) meanU[eq] += dl1[j]*Ui[j+eq*dof2];
-              }else
-              {
-                for(int j=0;j<dof1;j++) u1[eq] += l1[j]*Ui[j+eq*dof1];
-                //for(int j=0;j<dof2;j++) meanU[eq] += dl1[j]*Uj[j+eq*dof2];
-                 for(int j=0;j<dof2;j++) meanU[eq] += dl1[j]*gradUpi[j+eq*dof2];
-              }
+              //for(int j=0;j<dof1;j++) u1[eq] += l1[j]*Uj[j+eq*dof1];
+              for(int j=0;j<dof1;j++) u1[eq] += l1[j]*gradUpi[j+eq*dof1];
+              for(int j=0;j<dof2;j++) meanU[eq] += dl1[j]*Ui[j+eq*dof2];
+            }else
+            {
+              for(int j=0;j<dof1;j++) u1[eq] += l1[j]*Ui[j+eq*dof1];
+              //for(int j=0;j<dof2;j++) meanU[eq] += dl1[j]*Uj[j+eq*dof2];
+                for(int j=0;j<dof2;j++) meanU[eq] += dl1[j]*gradUpi[j+eq*dof2];
             }
           }
           MFEM_SYNC_THREAD;
@@ -531,94 +543,9 @@ void Gradients::computeGradients_gpu(const int numElems,
           }
         }
       }
-      
-      /*// MULTIPLY BY INVERSE OF MASS MATRIX
-      for(int eq=0;eq<num_equation;eq++)
-      {
-        for(int d=0;d<dim;d++)
-        {
-          //tmpGrad[i +eq*elDof + d*num_equation*elDof] = 0.;
-          gradUpi[i +eq*elDof + d*num_equation*elDof] = 0.;
-          for(int n=0;n<elDof;n++)
-          {
-            //tmpGrad[i +eq*elDof + d*num_equation*elDof] += 
-            //                d_invMArray[offsetInv +i*elDof +n]*gradUpi[n + eq*elDof];
-            // NOTE: this is VERY EXPENSIVE! Rethink this to see if it can be done
-            //       differently with the given amount of shared memory (64KB)
-            const int indexn = d_nodesIDs[offsetIDs + n];
-            gradUpi[i +eq*elDof + d*num_equation*elDof] += 
-                                d_gradUp[indexn+eq*totalDofs+d*num_equation*totalDofs]*
-                                d_invMArray[offsetInv +i*elDof +n];
-          }
-        }
-      }
-      
-      // add integral contrubution to global memory
-      for(int eq=0;eq<num_equation;eq++)
-      {
-        for(int d=0;d<dim;d++)
-        {
-          //d_gradUp[indexi+eq*totalDofs+d*num_equation*totalDofs] = 
-          //                        tmpGrad[i+eq*num_equation+d*num_equation*elDof];
-          d_gradUp[indexi+eq*totalDofs+d*num_equation*totalDofs] = 
-                                    gradUpi[i+eq*elDof+d*num_equation*elDof];
-        }
-      }*/
-      
     }
   });
   
-  
-  // MULTIPLY BY INVERSE OF MASS MATRIX
-  //NOTE: I'm sure this can be done more efficiently. Have a think
-  MFEM_FORALL_2D(el,numElems,elDof,1,1,
-  {
-    MFEM_FOREACH_THREAD(i,x,elDof)
-    {
-      MFEM_SHARED double gradUpi[216*5*3];
-      
-      const int eli = el + offsetElems;
-      const int offsetIDs    = d_posDofIds[2*eli];
-      const int offsetInv    = d_posDofInvM[2*eli];
-      const int indexi = d_nodesIDs[offsetIDs + i];
-      
-      for(int eq=0;eq<num_equation;eq++)
-      {
-        for(int d=0;d<dim;d++)
-        {
-          //tmpGrad[i +eq*elDof + d*num_equation*elDof] = 0.;
-          gradUpi[i +eq*elDof + d*num_equation*elDof] = 
-                          d_gradUp[indexi+eq*totalDofs+d*num_equation*totalDofs];
-        }
-      }
-      MFEM_SYNC_THREAD;
-      
-      for(int eq=0;eq<num_equation;eq++)
-      {
-        for(int d=0;d<dim;d++)
-        {
-          double temp = 0;
-          for(int n=0;n<elDof;n++)
-          {
-            temp += gradUpi[n+eq*elDof+d*num_equation*elDof]*
-                                d_invMArray[offsetInv +i*elDof +n];
-          }
-          d_gradUp[indexi+eq*totalDofs+d*num_equation*totalDofs] = temp;
-        }
-      }
-      /*MFEM_SYNC_THREAD;
-      
-      // copy to global memory
-      for(int eq=0;eq<num_equation;eq++)
-      {
-        for(int d=0;d<dim;d++)
-        {
-          d_gradUp[indexi+eq*totalDofs+d*num_equation*totalDofs] = 
-                                    temp[i +eq*elDof + d*num_equation*elDof];
-        }
-      }*/
-    }
-  });
 }
 
 void Gradients::integrationGradSharedFace_gpu(const Vector *Up,
@@ -649,7 +576,6 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up,
   const double *d_sharedShape2 = parallelData->sharedShape2.Read();
   const int *d_sharedElem1Dof12Q = parallelData->sharedElem1Dof12Q.Read();
   const int *d_sharedVdofs = parallelData->sharedVdofs.Read();
-//   const int *d_sharedVdofsGrads = parallelData->sharedVdofsGradUp.Read();
   const int *d_sharedElemsFaces = parallelData->sharedElemsFaces.Read();
   
   MFEM_FORALL_2D(el,parallelData->sharedElemsFaces.Size()/7,maxDofs,1,1,
@@ -745,6 +671,64 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up,
           {
             d_gradUp[indexi+eq*Ndofs+d*num_equation*Ndofs] += Fcontrib[i+eq*dof1+d*num_equation*dof1];
           }
+        }
+      }
+    }
+  });
+}
+
+void Gradients::multInversr_gpu(const int numElems,
+                                const int offsetElems,
+                                const int elDof,
+                                const int totalDofs,
+                                Vector &gradUp,
+                                const int num_equation,
+                                const int dim,
+                                const Array<int> &posDofIds,
+                                const Array<int> &nodesIDs,
+                                const Vector &invMArray,
+                                const Array<int> &posDofInvM )
+{
+  double *d_gradUp = gradUp.ReadWrite();
+  auto d_posDofIds = posDofIds.Read();
+  auto d_nodesIDs = nodesIDs.Read();
+  const double *d_invMArray =invMArray.Read();
+  auto d_posDofInvM = posDofInvM.Read();
+  
+  //NOTE: I'm sure this can be done more efficiently. Have a think
+  MFEM_FORALL_2D(el,numElems,elDof,1,1,
+  {
+    MFEM_FOREACH_THREAD(i,x,elDof)
+    {
+      MFEM_SHARED double gradUpi[216*5*3];
+      
+      const int eli = el + offsetElems;
+      const int offsetIDs    = d_posDofIds[2*eli];
+      const int offsetInv    = d_posDofInvM[2*eli];
+      const int indexi = d_nodesIDs[offsetIDs + i];
+      
+      for(int eq=0;eq<num_equation;eq++)
+      {
+        for(int d=0;d<dim;d++)
+        {
+          //tmpGrad[i +eq*elDof + d*num_equation*elDof] = 0.;
+          gradUpi[i +eq*elDof + d*num_equation*elDof] = 
+                          d_gradUp[indexi+eq*totalDofs+d*num_equation*totalDofs];
+        }
+      }
+      MFEM_SYNC_THREAD;
+      
+      for(int eq=0;eq<num_equation;eq++)
+      {
+        for(int d=0;d<dim;d++)
+        {
+          double temp = 0;
+          for(int n=0;n<elDof;n++)
+          {
+            temp += gradUpi[n+eq*elDof+d*num_equation*elDof]*
+                                d_invMArray[offsetInv +i*elDof +n];
+          }
+          d_gradUp[indexi+eq*totalDofs+d*num_equation*totalDofs] = temp;
         }
       }
     }

@@ -110,8 +110,6 @@ public:
                                    const Array<int> &nodesIDs,
                                    const Vector &elemShapeDshapeWJ,
                                    const Array<int> &elemPosQ_shapeDshapeWJ,
-                                   const Vector &invMArray,
-                                   const Array<int> &posDofInvM,
                                    const Array<int> &elemFaces,
                                    const Vector &shapeWnor1,
                                    const Vector &shape2,
@@ -135,6 +133,18 @@ public:
                                             const parallelFacesIntegrationArrays *parallelData,
                                             const int &maxIntPoints,
                                             const int &maxDofs);
+  
+  static void multInversr_gpu(const int numElems,
+                              const int offsetElems,
+                              const int elDof,
+                              const int totalDofs,
+                              Vector &gradUp,
+                              const int num_equation,
+                              const int dim,
+                              const Array<int> &posDofIds,
+                              const Array<int> &nodesIDs,
+                              const Vector &invMArray,
+                              const Array<int> &posDofInvM );
 #endif
 };
 
