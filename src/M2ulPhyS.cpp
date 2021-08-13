@@ -1032,12 +1032,15 @@ void M2ulPhyS::Iterate()
 #ifdef HAVE_GRVY
     grvy_timer_begin(__func__);
     if ( (iter % iterQuery) == 0 )
+    {
       if(mpi.Root())
       {
         double timePerIter = (grvy_timer_elapsed_global() - tlast)/iterQuery;
         grvy_printf(ginfo,"Iteration = %i: wall clock time/iter = %.3f (secs)\n",iter,timePerIter);
         tlast = grvy_timer_elapsed_global();
       }
+      writeHistoryFile();
+    }
 #endif
 
     timeIntegrator->Step(*U, time, dt);
@@ -1078,7 +1081,6 @@ void M2ulPhyS::Iterate()
 
         average->write_meanANDrms_restart_files(iter,time);
       }
-      writeHistoryFile();
 
     }
 
