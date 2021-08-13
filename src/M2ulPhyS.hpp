@@ -7,6 +7,8 @@
  * variables and functions.
  */
 
+#include <fstream>
+
 #include <mfem.hpp>
 #include <general/forall.hpp>
 #include <tps_config.h>
@@ -54,6 +56,9 @@ private:
   
   // Run options
   RunConfiguration config;
+  
+  // History file
+  std::ofstream histFile;
   
   // Number of simensions
   int dim;
@@ -242,6 +247,7 @@ private:
   void initGradUp();
 
   // i/o routines
+  void writeHistoryFile();
   void write_restart_files();
   void read_restart_files();
   void read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data);

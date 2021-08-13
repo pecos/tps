@@ -470,7 +470,7 @@ void M2ulPhyS::initVariables()
   gradUp_A->AddInteriorFaceIntegrator(
     new GradFaceIntegrator(intRules, dim, num_equation) );
 
-  rhsOperator = new RHSoperator(time,
+  rhsOperator = new RHSoperator(iter,
                                 dim,
                                 num_equation,
                                 order,
@@ -527,6 +527,14 @@ void M2ulPhyS::initVariables()
   if( mpi.Root() ) cout<<"Initial time-step: "<<dt<<"s"<<endl;
 
   //t_final = MaxIters*dt;
+  
+  histFile.open("history.hist",std::fstream::trunc);
+  if( !histFile.is_open() )
+    std::cout<<"Could not open history file!"<<std::endl;
+  else
+  {
+    histFile<<"time,iter,drdt,drudt,drvdt,drwdt,dredt"<<std::endl;
+  }
 }
 
 
@@ -790,6 +798,8 @@ void M2ulPhyS::initIndirectionArrays()
 
 M2ulPhyS::~M2ulPhyS()
 {
+  histFile.close();
+  
   delete gradUp;
 
   delete gradUp_A;
@@ -1068,7 +1078,7 @@ void M2ulPhyS::Iterate()
 
         average->write_meanANDrms_restart_files(iter,time);
       }
-
+      writeHistoryFile();
 
     }
 

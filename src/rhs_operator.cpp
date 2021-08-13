@@ -1,7 +1,7 @@
 #include "rhs_operator.hpp"
 
 // Implementation of class RHSoperator
-RHSoperator::RHSoperator( double &_time,
+RHSoperator::RHSoperator( int &_iter,
                           const int _dim,
                           const int &_num_equations,
                           const int &_order,
@@ -35,7 +35,7 @@ RHSoperator::RHSoperator( double &_time,
                           RunConfiguration &_config
                         ):
 TimeDependentOperator(_A->Height()),
-time(_time),
+iter(_iter),
 dim(_dim ),
 eqSystem(_eqSystem),
 max_char_speed(_max_char_speed),
@@ -185,6 +185,10 @@ bcIntegrator(_bcIntegrator)
                             maxIntPoints,
                             maxDofs );
   gradients->setParallelData( &parallelData, &transferUp);
+  
+  local_timeDerivatives.UseDevice(true);
+  local_timeDerivatives.SetSize(5);
+  local_timeDerivatives = 0.;
    
 #ifdef DEBUG 
 {
@@ -401,6 +405,8 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
     y.SetSubVector(vdofs, ymat.GetData());
   }  
 #endif
+
+  computeMeanTimeDerivatives(y);
 }
 
 void RHSoperator::copyZk2Z_gpu(Vector &z,Vector &zk,const int eq,const int dof)
@@ -933,4 +939,77 @@ void RHSoperator::waitAllDataTransfer(ParFiniteElementSpace *pfes,
               dataTransfer.statuses);
 }
 
+
+void RHSoperator::computeMeanTimeDerivatives(Vector& y) const
+{
+  if(iter%100 == 0 )
+  {
+#ifdef _GPU_
+    int Ndof = y.Size()/num_equation;
+    meanTimeDerivatives_gpu(y,local_timeDerivatives,Ndof,num_equation,dim);
+#else
+    local_timeDerivatives = 0.;
+    int Ndof = y.Size()/num_equation;
+    
+    for(int n=0;n<Ndof;n++)
+    {
+      for(int eq=0;eq<num_equation;eq++)
+      {
+        local_timeDerivatives[eq] += fabs( y[n+eq*Ndof] )/((double)Ndof);
+      }
+    }
+    
+    if( dim==2 )
+    {
+      local_timeDerivatives[4] = local_timeDerivatives[3];
+      local_timeDerivatives[3] = 0.;
+    }
+#endif
+  }
+}
+
+void RHSoperator::meanTimeDerivatives_gpu(Vector& y, 
+                                          Vector& local_timeDerivatives, 
+                                          const int& NDof, 
+                                          const int& num_equation, 
+                                          const int& dim)
+{
+#ifdef _GPU_
+  
+  DGNonLinearForm::setToZero_gpu(local_timeDerivatives,local_timeDerivatives.Size());
+  
+  auto d_y = y.Read();
+  auto d_loc = local_timeDerivatives.Write();
+  
+  MFEM_FORALL_2D(n,NDof,num_equation,1,1,
+  {
+    MFEM_FOREACH_THREAD(eq,x,num_equation)
+    {
+      int interval = 1;
+      while(interval<NDof)
+      {
+        interval*=2;
+        if( n%interval == 0 )
+        {
+          int n2 = n + interval/2;
+          d_loc[eq] = fabs( d_y[n+eq*NDof] )/((double)NDof);
+          if(n2<NDof) d_loc[eq] += fabs( d_y[n2+eq*NDof] )/((double)NDof);
+        }
+        MFEM_SYNC_THREAD;
+      }
+    }
+  });
+  
+  if(dim==2)
+  {
+    MFEM_FORALL(eq,num_equation,{
+      if(eq==0)
+      {
+        d_loc[4] = d_loc[3];
+        d_loc[3] = 0.;
+      }
+    });
+  }
+#endif
+}
 

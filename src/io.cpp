@@ -719,6 +719,21 @@ void M2ulPhyS::write_soln_data(hid_t group, string varName, hid_t dataspace, dou
   return;
 }
 
+void M2ulPhyS::writeHistoryFile()
+{
+  double global_dUdt[5];
+  MPI_Allreduce(rhsOperator->getLocalTimeDerivatives(), &global_dUdt,
+              5, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+      
+  histFile<<time<<","<<iter;
+  for(int eq=0;eq<5;eq++)
+  {
+    histFile<<","<<global_dUdt[eq];
+  }
+  histFile<<endl;
+}
+
+
 // ---------------------------------------------
 // Routines for I/O data organizer helper class
 // ---------------------------------------------
