@@ -528,12 +528,24 @@ void M2ulPhyS::initVariables()
 
   //t_final = MaxIters*dt;
   
-  histFile.open("history.hist",std::fstream::trunc);
-  if( !histFile.is_open() )
-    std::cout<<"Could not open history file!"<<std::endl;
-  else
+  if( mpi.Root() )
   {
-    histFile<<"time,iter,drdt,drudt,drvdt,drwdt,dredt"<<std::endl;
+    ios_base::openmode mode = std::fstream::trunc;
+    if( config.GetRestartCycle()==1 ) mode = std::fstream::app;
+    
+    histFile.open("history.hist",mode);
+    if( !histFile.is_open() )
+      std::cout<<"Could not open history file!"<<std::endl;
+    else
+    {
+      if( histFile.tellp()==0 )
+      {
+                histFile<<"time,iter,drdt,drudt,drvdt,drwdt,dredt";
+        if( average->ComputeMean() )
+          histFile<<",avrgSamples,mean_rho,mean_u,mean_v,mean_w,mean_p,uu,vv,ww,uv,uw,vw";
+        histFile<<std::endl;
+      }
+    }
   }
 }
 
@@ -798,7 +810,7 @@ void M2ulPhyS::initIndirectionArrays()
 
 M2ulPhyS::~M2ulPhyS()
 {
-  histFile.close();
+  if(mpi.Root()) histFile.close();
   
   delete gradUp;
 

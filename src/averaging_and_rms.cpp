@@ -58,6 +58,14 @@ groupsMPI(_groupsMPI)
     paraviewMean->RegisterField("vel",meanV);
     paraviewMean->RegisterField("press",meanP);
     paraviewMean->RegisterField("rms",rms);
+    
+    local_sums.UseDevice(true);
+    local_sums.SetSize(5+6);
+    local_sums = 0.;
+    
+    tmp_vector.UseDevice(true);
+    tmp_vector.SetSize( rms->Size() );
+    tmp_vector = 0.;
   }
 }
 
@@ -249,3 +257,126 @@ void Averaging::initiMeanAndRMS()
     for(int n=0;n<numRMS;n++) dataRMS[i+dof*n] = 0.;
   }
 }
+
+const double * Averaging::getLocalSums()
+{
+#ifdef _GPU_
+  sumValues_gpu(*meanUp,*rms,local_sums,tmp_vector,num_equation,dim);
+#else
+  const int NDof = meanUp->Size()/num_equation;
+  const double ddof = (double)NDof;
+  
+  double *dataMean = meanUp->GetData();
+  double *dataRMS  = rms->GetData();
+  
+  local_sums = 0.;
+  for(int n=0;n<NDof;n++)
+  {
+    for(int eq=0;eq<num_equation;eq++) 
+      local_sums(eq) += fabs( dataMean[n+eq*NDof] ) /ddof;
+    for(int i=0;i<6;i++)
+      local_sums(5+i) += fabs(dataRMS[n+i*NDof]) /ddof;
+  }
+  if(dim==2)
+  {
+    local_sums(4) = local_sums(3);
+    local_sums(3) = 0.;
+  }
+#endif
+  
+  return local_sums.HostRead();
+}
+
+#ifdef _GPU_
+void Averaging::sumValues_gpu(const Vector& meanUp, 
+                              const Vector& rms, 
+                              Vector& local_sums, 
+                              Vector& tmp_vector, 
+                              const int &num_equation,
+                              const int &dim )
+{
+  const int NDof = meanUp.Size()/num_equation;
+  
+  auto d_Up = meanUp.Read();
+  auto d_rms = rms.Read();
+  auto d_tmp = tmp_vector.Write();
+  auto d_loc = local_sums.Write();
+  
+  // copy up values to temp vector
+  MFEM_FORALL(n,meanUp.Size(),
+  {
+    d_tmp[n] = fabs( d_Up[n] );
+  });
+  
+  // sum up all Up values
+  MFEM_FORALL(n,NDof,
+  {
+    int interval = 1;
+    while(interval<NDof)
+    {
+      interval*=2;
+      if( n%interval == 0 )
+      {
+        int n2 = n + interval/2;
+        for(int eq=0;eq<num_equation;eq++)
+        {
+          if(n2<NDof) d_tmp[n+eq*NDof] += d_tmp[n2+eq*NDof] ;
+        }
+      }
+      MFEM_SYNC_THREAD;
+    }
+  });
+  
+  // transfer to smaller vector
+  MFEM_FORALL(eq,num_equation,
+  {
+    double ddof = (double)NDof;
+    d_loc[eq] = d_tmp[eq*NDof]/ddof;
+  });
+  
+  
+  // rearrange
+  if(dim==2)
+  {
+    MFEM_FORALL(eq,num_equation,
+    {
+      if(eq==0)
+      {
+        d_loc[4] = d_loc[3];
+        d_loc[3] = 0.;
+      }
+    });
+  }
+  
+  // REPEAT FOR RMS
+  MFEM_FORALL(n,rms.Size(),
+  {
+    d_tmp[n] = fabs( d_rms[n] );
+  });
+  
+  MFEM_FORALL(n,NDof,
+  {
+    int interval = 1;
+    while(interval<NDof)
+    {
+      interval*=2;
+      if( n%interval == 0 )
+      {
+        int n2 = n + interval/2;
+        for(int eq=0;eq<6;eq++)
+        {
+          if(n2<NDof) d_tmp[n+eq*NDof] += d_tmp[n2+eq*NDof] ;
+        }
+      }
+      MFEM_SYNC_THREAD;
+    }
+  });
+  
+  MFEM_FORALL(eq,6,
+  {
+    double ddof = (double)NDof;
+    d_loc[5+eq] = d_tmp[eq*NDof]/ddof;
+  });
+}
+
+#endif // _GPU_

@@ -725,12 +725,29 @@ void M2ulPhyS::writeHistoryFile()
   MPI_Allreduce(rhsOperator->getLocalTimeDerivatives(), &global_dUdt,
               5, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
       
-  histFile<<time<<","<<iter;
-  for(int eq=0;eq<5;eq++)
+  if( mpi.Root() )
   {
-    histFile<<","<<global_dUdt[eq]/double(mpi.WorldSize());
+    histFile<<time<<","<<iter;
+    for(int eq=0;eq<5;eq++)
+    {
+      histFile<<","<<global_dUdt[eq]/double(mpi.WorldSize());
+    }
   }
-  histFile<<endl;
+  
+  if( average->ComputeMean() )
+  {
+    double global_meanData[5+6];
+    MPI_Allreduce(average->getLocalSums(), &global_meanData,
+              5+6, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    
+    if( mpi.Root() )
+    {
+      histFile<<","<<average->GetSamplesMean();
+      for(int n=0;n<5+6;n++) histFile<<","<<global_meanData[n]/double(mpi.WorldSize());
+    }
+  }
+  
+  if( mpi.Root() ) histFile<<endl;
 }
 
 
