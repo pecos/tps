@@ -143,47 +143,19 @@ void Averaging::addSampleMean(const int &iter)
   }
 }
 
-void Averaging::write_meanANDrms_restart_files()
+void Averaging::write_meanANDrms_restart_files(const int &iter, const double &time)
 {
   if( computeMean )
   {
+    if(config.isMeanHistEnabled())
+      {
+        paraviewMean->SetCycle(iter);
+        paraviewMean->SetTime(time);
+      }
+
     paraviewMean->Save();
     
-//     string serialName = "restart_mean_";
-//     serialName.append( config.GetOutputName() );
-//     serialName.append( ".sol" );
-//     
-//     string serialNameRMS = "restart_rms_";
-//     serialNameRMS.append( config.GetOutputName() );
-//     serialNameRMS.append( ".sol" );
-//     
-//     string fileName = groupsMPI->getParallelName( serialName );
-//     string rmsName  = groupsMPI->getParallelName( serialNameRMS );
-//     ofstream file( fileName, std::ofstream::trunc );
-//     ofstream rmsfile( rmsName, std::ofstream::trunc );
-//     file.precision(8);
-//     rmsfile.precision(8);
-//     
-//     double *data = meanUp->GetData();
-//     double *dataRMS = rms->GetData();
-//     
-//     // write cycle and time
-//     file<<samplesMean<<" "<<sampleInterval<<endl;
-//     
-//     
-//     int dof = vfes->GetNDofs();
-//     
-//     for(int i=0;i<dof*num_equation;i++)
-//     {
-//       file << data[i] <<endl;
-//     }
-//     file.close();
-//     
-//     for(int i=0;i<dof*numRMS;i++)
-//     {
-//       rmsfile << dataRMS[i] <<endl;
-//     }
-//     rmsfile.close();
+
   }
 }
 
