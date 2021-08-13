@@ -728,7 +728,7 @@ void M2ulPhyS::writeHistoryFile()
   histFile<<time<<","<<iter;
   for(int eq=0;eq<5;eq++)
   {
-    histFile<<","<<global_dUdt[eq];
+    histFile<<","<<global_dUdt[eq]/double(mpi.WorldSize());
   }
   histFile<<endl;
 }

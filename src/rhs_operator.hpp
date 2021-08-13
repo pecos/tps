@@ -181,6 +181,7 @@ public:
   
   static void meanTimeDerivatives_gpu(Vector &y,
                                       Vector &local_timeDerivatives,
+                                      Vector &tmp_vec,
                                       const int &NDof,
                                       const int &num_equation,
                                       const int &dim );

@@ -946,7 +946,7 @@ void RHSoperator::computeMeanTimeDerivatives(Vector& y) const
   {
 #ifdef _GPU_
     int Ndof = y.Size()/num_equation;
-    meanTimeDerivatives_gpu(y,local_timeDerivatives,Ndof,num_equation,dim);
+    meanTimeDerivatives_gpu(y,local_timeDerivatives,z,Ndof,num_equation,dim);
 #else
     local_timeDerivatives = 0.;
     int Ndof = y.Size()/num_equation;
@@ -970,16 +970,18 @@ void RHSoperator::computeMeanTimeDerivatives(Vector& y) const
 
 void RHSoperator::meanTimeDerivatives_gpu(Vector& y, 
                                           Vector& local_timeDerivatives, 
+                                          Vector &tmp_vec,
                                           const int& NDof, 
                                           const int& num_equation, 
                                           const int& dim)
 {
 #ifdef _GPU_
   
-  DGNonLinearForm::setToZero_gpu(local_timeDerivatives,local_timeDerivatives.Size());
+  DGNonLinearForm::setToZero_gpu(tmp_vec,tmp_vec.Size());
   
   auto d_y = y.Read();
   auto d_loc = local_timeDerivatives.Write();
+  auto d_tmp = tmp_vec.Write();
   
   MFEM_FORALL_2D(n,NDof,num_equation,1,1,
   {
@@ -992,17 +994,24 @@ void RHSoperator::meanTimeDerivatives_gpu(Vector& y,
         if( n%interval == 0 )
         {
           int n2 = n + interval/2;
-          d_loc[eq] = fabs( d_y[n+eq*NDof] )/((double)NDof);
-          if(n2<NDof) d_loc[eq] += fabs( d_y[n2+eq*NDof] )/((double)NDof);
+          d_tmp[n+eq*num_equation] += fabs( d_y[n+eq*NDof] );
+          if(n2<NDof) d_tmp[n+eq*num_equation] += fabs( d_y[n2+eq*NDof] );
         }
         MFEM_SYNC_THREAD;
       }
     }
   });
   
+  MFEM_FORALL(eq,num_equation,
+  {
+    double ddof = (double)NDof;
+    d_loc[eq] = d_tmp[eq*NDof]/ddof;
+  });
+  
   if(dim==2)
   {
-    MFEM_FORALL(eq,num_equation,{
+    MFEM_FORALL(eq,num_equation,
+    {
       if(eq==0)
       {
         d_loc[4] = d_loc[3];
