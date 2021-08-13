@@ -977,37 +977,44 @@ void RHSoperator::meanTimeDerivatives_gpu(Vector& y,
 {
 #ifdef _GPU_
   
-  DGNonLinearForm::setToZero_gpu(tmp_vec,tmp_vec.Size());
-  
   auto d_y = y.Read();
   auto d_loc = local_timeDerivatives.Write();
   auto d_tmp = tmp_vec.Write();
   
-  MFEM_FORALL_2D(n,NDof,num_equation,1,1,
+  // copy values to temp vector
+  MFEM_FORALL(n,y.Size(),
   {
-    MFEM_FOREACH_THREAD(eq,x,num_equation)
+    d_tmp[n] = d_y[n];
+  });
+  
+  // sum up all values
+  MFEM_FORALL(n,NDof,
+  {
+    int interval = 1;
+    while(interval<NDof)
     {
-      int interval = 1;
-      while(interval<NDof)
+      interval*=2;
+      if( n%interval == 0 )
       {
-        interval*=2;
-        if( n%interval == 0 )
+        int n2 = n + interval/2;
+        for(int eq=0;eq<num_equation;eq++)
         {
-          int n2 = n + interval/2;
-          d_tmp[n+eq*num_equation] += fabs( d_y[n+eq*NDof] );
-          if(n2<NDof) d_tmp[n+eq*num_equation] += fabs( d_y[n2+eq*NDof] );
+          if(n2<NDof) d_tmp[n+eq*NDof] += fabs( d_y[n2+eq*NDof] );
         }
-        MFEM_SYNC_THREAD;
       }
+      MFEM_SYNC_THREAD;
     }
   });
   
+  // transfer to smaller vector
   MFEM_FORALL(eq,num_equation,
   {
     double ddof = (double)NDof;
     d_loc[eq] = d_tmp[eq*NDof]/ddof;
   });
   
+  
+  // rearrange
   if(dim==2)
   {
     MFEM_FORALL(eq,num_equation,
