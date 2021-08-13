@@ -31,6 +31,7 @@ RunConfiguration::RunConfiguration()
   sampleInterval = 0;
   startIter = 0;
   restartMean = false;
+  meanHistEnable = true;
   
   itersOut = 50;
   workFluid = DRY_AIR;
@@ -168,7 +169,11 @@ void RunConfiguration::readInputFile(std::string inpuFileName)
         
         ss >> word;
         sampleInterval = stoi( word );
-        
+
+      }else if( word.compare("SAVE_MEAN_HIST")==0 )
+      {
+        meanHistEnable = true;
+
       }else if( word.compare("CONTINUE_MEAN_CALC")==0 )
       {
         restartMean = true;

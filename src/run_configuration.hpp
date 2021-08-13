@@ -83,6 +83,7 @@ private:
   int sampleInterval;
   int startIter;
   bool restartMean;
+  bool meanHistEnable;
   
   // working fluid. Options thus far
   // DRY_AIR
@@ -168,6 +169,7 @@ public:
   int GetMeanStartIter(){return startIter;}
   int GetMeanSampleInterval(){return sampleInterval;}
   bool GetRestartMean(){return restartMean;}
+  bool isMeanHistEnabled(){return meanHistEnable;}
   
   WorkingFluid GetWorkingFluid(){return workFluid;}
   double GetViscMult(){return visc_mult;}

@@ -1,3 +1,4 @@
+# -*- mode: sh -*-
 # Example Runfile
 
 # Mesh file
@@ -32,6 +33,10 @@ RM_CHECK_FREQUENCY 500
 # computes mean and RMS starting from iter start iter
 # and adds a new value every sampleInterval iterations
 CALC_MEAN_RMS 12400 20
+
+# whether to dump mean values every ITERS_OUT for paraview; if not set,
+# only the current value will be preserved.
+SAVE_MEAN_HIST
 
 # if simulation is to restart computing mean
 CONTINUE_MEAN_CALC

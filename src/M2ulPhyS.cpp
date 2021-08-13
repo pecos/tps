@@ -1066,7 +1066,7 @@ void M2ulPhyS::Iterate()
         paraviewColl->Save();
         auto dUp = Up->ReadWrite(); // sets memory to GPU
 
-        average->write_meanANDrms_restart_files();
+        average->write_meanANDrms_restart_files(iter,time);
       }
 
 
@@ -1114,7 +1114,7 @@ void M2ulPhyS::Iterate()
     paraviewColl->SetTime(time);
     paraviewColl->Save();
 
-    average->write_meanANDrms_restart_files();
+    average->write_meanANDrms_restart_files(iter,time);
 
 #ifndef _MASA_
     // If _MASA_ is defined, this is handled above

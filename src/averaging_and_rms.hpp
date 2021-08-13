@@ -63,7 +63,7 @@ public:
   ~Averaging();
   
   void addSampleMean(const int &iter);
-  void write_meanANDrms_restart_files();
+  void write_meanANDrms_restart_files(const int &iter, const double &time);
   void read_meanANDrms_restart_files();
   
   int GetSamplesMean(){return samplesMean;}
