@@ -239,7 +239,10 @@ private:
   void initialTimeStep();
 
 #ifdef _MASA_
-  static void MASA_exactSoln(const Vector& x, double tin, Vector& y);
+  static void MASA_exactSol(const Vector& x, double tin, Vector& y);
+  static void MASA_exactDen(const Vector& x, double tin, Vector& y);
+  static void MASA_exactVel(const Vector& x, double tin, Vector& y);
+  static void MASA_exactPre(const Vector& x, double tin, Vector& y);
 #endif
   static void InitialConditionEulerVortex(const Vector &x, Vector &y);
   static void testInitialCondition(const Vector &x, Vector &y);
