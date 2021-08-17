@@ -24,7 +24,7 @@ class RHSoperator : public TimeDependentOperator
 private:
   Gradients *gradients;
   
-  double &time;
+  int &iter;
   
   const int dim;
   
@@ -98,9 +98,13 @@ private:
 
   //void GetFlux(const DenseMatrix &state, DenseTensor &flux) const;
   void GetFlux(const Vector &state, DenseTensor &flux) const;
+  
+  
+  mutable Vector local_timeDerivatives;
+  void computeMeanTimeDerivatives(Vector &y) const;
 
 public:
-   RHSoperator(double &_time,
+   RHSoperator(int &_iter,
                const int _dim,
                const int &_num_equations,
                const int &_order,
@@ -139,6 +143,8 @@ public:
 
    virtual ~RHSoperator();
    
+   const double *getLocalTimeDerivatives(){return local_timeDerivatives.HostRead();}
+   
    static void initNBlockDataTransfer(const Vector &x,
                                       ParFiniteElementSpace *pfes,
                                       dataTransferArrays &dataTransfer );
@@ -172,6 +178,13 @@ public:
                                   const int NE,
                                   const int elemOffset,
                                   const int dof);
+  
+  static void meanTimeDerivatives_gpu(Vector &y,
+                                      Vector &local_timeDerivatives,
+                                      Vector &tmp_vec,
+                                      const int &NDof,
+                                      const int &num_equation,
+                                      const int &dim );
 };
 
 #endif // RHS_OPERATOR

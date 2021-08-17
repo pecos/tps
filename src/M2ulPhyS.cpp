@@ -470,7 +470,7 @@ void M2ulPhyS::initVariables()
   gradUp_A->AddInteriorFaceIntegrator(
     new GradFaceIntegrator(intRules, dim, num_equation) );
 
-  rhsOperator = new RHSoperator(time,
+  rhsOperator = new RHSoperator(iter,
                                 dim,
                                 num_equation,
                                 order,
@@ -527,6 +527,26 @@ void M2ulPhyS::initVariables()
   if( mpi.Root() ) cout<<"Initial time-step: "<<dt<<"s"<<endl;
 
   //t_final = MaxIters*dt;
+  
+  if( mpi.Root() )
+  {
+    ios_base::openmode mode = std::fstream::trunc;
+    if( config.GetRestartCycle()==1 ) mode = std::fstream::app;
+    
+    histFile.open("history.hist",mode);
+    if( !histFile.is_open() )
+      std::cout<<"Could not open history file!"<<std::endl;
+    else
+    {
+      if( histFile.tellp()==0 )
+      {
+                histFile<<"time,iter,drdt,drudt,drvdt,drwdt,dredt";
+        if( average->ComputeMean() )
+          histFile<<",avrgSamples,mean_rho,mean_u,mean_v,mean_w,mean_p,uu,vv,ww,uv,uw,vw";
+        histFile<<std::endl;
+      }
+    }
+  }
 }
 
 
@@ -790,6 +810,8 @@ void M2ulPhyS::initIndirectionArrays()
 
 M2ulPhyS::~M2ulPhyS()
 {
+  if(mpi.Root()) histFile.close();
+  
   delete gradUp;
 
   delete gradUp_A;
@@ -1022,12 +1044,15 @@ void M2ulPhyS::Iterate()
 #ifdef HAVE_GRVY
     grvy_timer_begin(__func__);
     if ( (iter % iterQuery) == 0 )
+    {
       if(mpi.Root())
       {
         double timePerIter = (grvy_timer_elapsed_global() - tlast)/iterQuery;
         grvy_printf(ginfo,"Iteration = %i: wall clock time/iter = %.3f (secs)\n",iter,timePerIter);
         tlast = grvy_timer_elapsed_global();
       }
+      writeHistoryFile();
+    }
 #endif
 
     timeIntegrator->Step(*U, time, dt);
@@ -1068,7 +1093,6 @@ void M2ulPhyS::Iterate()
 
         average->write_meanANDrms_restart_files(iter,time);
       }
-
 
     }
 

@@ -48,6 +48,9 @@ private:
   
   void initiMeanAndRMS();
   
+  Vector local_sums;
+  Vector tmp_vector;;
+  
 public:
   Averaging( ParGridFunction *_Up,
              ParMesh *_mesh,
@@ -75,6 +78,18 @@ public:
   
   void SetSamplesMean(int &samples){samplesMean = samples;}
   void SetSamplesInterval(int &interval){sampleInterval = interval;}
+  
+  const double *getLocalSums();
+  
+  // GPU functions
+#ifdef _GPU_
+  static void sumValues_gpu(const Vector &meanUp,
+                            const Vector &rms,
+                            Vector &local_sums,
+                            Vector &tmp_vector,
+                            const int &num_equation,
+                            const int &dim );
+#endif // _GPU_
 };
 
 #endif // AVERAGING_AND_RMS
