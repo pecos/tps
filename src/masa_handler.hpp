@@ -8,6 +8,9 @@
 using namespace mfem;
 using namespace std;
 
-void initMasaHandler(string name, int dim, const Equations& eqn);
+void initMasaHandler(string name, 
+                     int dim, 
+                     const Equations& eqn, 
+                     const double &viscMult);
 
 #endif

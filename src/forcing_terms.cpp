@@ -149,7 +149,7 @@ ForcingTerms(_dim,
              _Up,
              _gradUp )
 {
-  initMasaHandler("forcing",dim, _config.GetEquationSystem());
+  initMasaHandler("forcing",dim, _config.GetEquationSystem(),_config.GetViscMult());
 }
 
 void MASA_forcings::updateTerms()
