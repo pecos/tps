@@ -1040,7 +1040,7 @@ void M2ulPhyS::Iterate()
   const double errorVel = vel->ComputeLpError(2, VelMMS);
   const double errorPre = press->ComputeLpError(2, PreMMS);
   if(mpi.Root()) cout <<"time step: "<<iter<<", physical time "<<time<<"s"
-                        <<", Solution error: " << errorDen <<" "<<errorVel<<" "<<errorPre << endl;
+                        <<", Dens. error: " << errorDen <<" Vel. "<<errorVel<<" press. "<<errorPre << endl;
 #endif
 
   bool readyForRestart = false;
@@ -1085,7 +1085,7 @@ void M2ulPhyS::Iterate()
       const double errorVel = vel->ComputeLpError(2, VelMMS);
       const double errorPre = press->ComputeLpError(2, PreMMS);
       if(mpi.Root()) cout <<"time step: "<<iter<<", physical time "<<time<<"s"
-                        <<", Solution error: " << errorDen <<" "<<errorVel<<" "<<errorPre << endl;
+                        <<", Dens. error: " << errorDen <<" Vel. "<<errorVel<<" press. "<<errorPre << endl;
 #else
       if(mpi.Root()) cout <<"time step: "<<iter<<", physical time "<<time<<"s"<< endl;
 #endif
