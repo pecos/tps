@@ -6,13 +6,13 @@ RUNFILE="inputs/input.dtconst.2iters.cyl"
 
 setup() {
     OPTS=""
-    config="../tps_config.h"
-    if [ -e ${config} ];then
-        run grep -q "^#define HAVE_LIBCUDA 1" ${config}
-        if [ "${status}" -eq 0 ];then
-            OPTS="${OPTS} -d cuda"
-        fi
-    fi
+##    config="../tps_config.h"
+##    if [ -e ${config} ];then
+##        run grep -q "^#define HAVE_LIBCUDA 1" ${config}
+##        if [ "${status}" -eq 0 ];then
+##            OPTS="${OPTS} -d cuda"
+##        fi
+##    fi
 }
 
 @test "[$TEST] verify valgrind detects known error" {
