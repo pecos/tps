@@ -57,6 +57,4 @@ AC_DEFUN([AX_HIP_CHECK],[
         ENABLE_HIP=no
      fi
 
-     AM_CONDITIONAL(HIP_ENABLED,test x$ENABLE_HIP = xyes)
-     AM_CONDITIONAL(GPU_ENABLED,test x$ENABLE_HIP = xyes)
 ])

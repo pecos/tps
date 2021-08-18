@@ -100,6 +100,7 @@ CUDA_LDFLAGS="--expt-extended-lambda -arch=$CUDA_ARCH -ccbin mpicxx $CUDA_LDFLAG
 
 ENABLE_GPU=yes
 ENABLE_CUDA=yes
+AC_DEFINE([_CUDA_])
 
 else
 AC_MSG_RESULT([no])
@@ -109,8 +110,13 @@ fi
 AM_CONDITIONAL(CUDA_ENABLED,test x$ENABLE_CUDA = xyes)
 AM_CONDITIONAL(GPU_ENABLED,test x$ENABLE_CUDA = xyes)
 
-#-- GPU/HIP build setup
-AX_HIP_CHECK()
+#-- Check for GPU/HIP build setup
+ENABLE_HIP=no
+if test x$ENABLE_GPU != xyes; then
+   AX_HIP_CHECK()
+   AM_CONDITIONAL(GPU_ENABLED,test x$ENABLE_HIP = xyes)
+fi
+AM_CONDITIONAL(HIP_ENABLED,test x$ENABLE_HIP = xyes)
 
 #--
 
