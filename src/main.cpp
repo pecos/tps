@@ -13,7 +13,7 @@ int main(int argc, char *argv[])
   MPI_Session mpi(argc, argv);
   
   const char *inputFile = "../data/periodic-square.mesh";
-  const char *device_config = "cpu";
+  //const char *device_config = "cpu";
 
   int precision = 8;
   cout.precision(precision);
@@ -21,8 +21,17 @@ int main(int argc, char *argv[])
   OptionsParser args(argc, argv);
   args.AddOption(&inputFile, "-run", "--runFile",
                 "Name of the input file with run options.");
-  args.AddOption(&device_config, "-d", "--device",
-                  "Device configuration string, see Device::Configure().");
+  //  args.AddOption(&device_config, "-d", "--device",
+  // "Device configuration string, see Device::Configure().");
+
+  // device_config inferred from build setup
+  std::string device_config = "cpu";
+#ifdef _HIP_
+  device_config = "hip";
+#elif _CUDA_
+  device_config = "cuda";
+#endif
+
 #ifdef DEBUG 
   int threads = 0.;
   args.AddOption(&threads, "-thr", "--threads",
@@ -46,18 +55,6 @@ int main(int argc, char *argv[])
     while( gdb==0 )
         sleep(5);
   }
-#endif
-
-#ifdef _GPU_
-  if(strcmp(device_config,"cpu") == 0)
-    {
-      if(mpi.Root())
-	{
-	  std::cerr << "[ERROR]: This TPS build targeting GPUs requires -d cuda" << std::endl;
-	  std::cerr << std::endl;
-	  exit(ERROR);
-	}
-    }
 #endif
 
   const int NUM_GPUS_NODE = 4;

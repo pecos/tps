@@ -56,3 +56,28 @@ jobs:
         run: module restore tps-gpu; make -j 2
       - name: Tests
         run: module restore tps-gpu; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
+   build-hip:
+    runs-on: [self-hosted, linux, x64, gpu, hip]
+    name: Build/GPU (AMD/HIP)
+    env:
+      MFEM_LIB: /home/karl/sw/mfem-hip-4.3/lib
+      MFEM_INC: /home/karl/sw/mfem-hip-4.3/include
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          lfs: true
+      - name: Set ROCm path
+        run: echo '/opt/rocm/bin' >>"${GITHUB_PATH}"
+      - name: MFEM Tree
+        run: echo "MFEM_INC=$MFEM_INC, MFEM_LIB=$MFEM_LIB"
+      - name: Query modules loaded
+        run:  module restore tps-gpu; module list
+      - name: Bootstrap
+        run:  module restore tps-gpu; ./bootstrap
+      - name: Configure
+        run: module restore tps-gpu; ./configure --enable-gpu-hip HIP_ARCH=gfx803
+      - name: Make
+        run: module restore tps-gpu; make -j 2
+      - name: Tests
+        run: module restore tps-gpu; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)

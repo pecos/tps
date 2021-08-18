@@ -816,8 +816,11 @@ M2ulPhyS::~M2ulPhyS()
 
   delete gradUp_A;
 
-  delete u_block;
-  delete up_block;
+  // ks (aug 2021) - following two lines cause unknown pointer errors with
+  // MFEM 4.3 (not 4.2). Commenting out for now.
+
+  //delete u_block;
+  //delete up_block;
   delete offsets;
 
   delete U;

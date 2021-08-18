@@ -4,7 +4,7 @@
 TEST="cyl3d.gpu.mflow.outlet"
 RUNFILE="inputs/input.2iters.mflow.dtconst.cyl"
 BULK_RUNFILE="inputs/input.2iters.mflow.bulkVisc.dtconst.cyl"
-OPTS="-d cuda"
+OPTS=""
 
 setup() {
     SOLN_FILE=restart_output.sol.h5

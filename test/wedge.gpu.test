@@ -3,7 +3,7 @@
 
 TEST="2d/wedge"
 RUNFILE="inputs/input.dtconst.wedge"
-OPTS="-d cuda"
+OPTS=""
 
 @test "[$TEST] check for input file $RUNFILE" {
     test -s $RUNFILE

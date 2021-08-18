@@ -58,9 +58,13 @@ if test "x$enable_slurm" != "xno" ; then
 fi
 AM_CONDITIONAL(SLURM_ENABLED,test x$ENABLE_SLURM = xyes)
 
+AH_TEMPLATE([_GPU_], [Build in GPU support])
+AH_TEMPLATE([_CUDA_],[CUDA backend])
+AH_TEMPLATE([_HIP_], [HIP backend])
+
 #-- GPU/Cuda build setup
-AH_TEMPLATE([_GPU_],[Build in GPU support])
-AC_MSG_CHECKING([if requesting gpu build])
+
+AC_MSG_CHECKING([if requesting gpu-cuda build])
 AC_ARG_ENABLE([gpu-cuda],
          [AS_HELP_STRING([--enable-gpu-cuda],[Enable GPU build, requires associated MFEM with CUDA support.])],
 	 [],[enable_gpu_cuda=no])
@@ -68,7 +72,6 @@ AC_ARG_ENABLE([gpu-cuda],
 AC_ARG_VAR(CUDA_ARCH,"Specifies target architecture for CUDA build")
 
 if test x$enable_gpu_cuda = xyes ;then
-
 
 AC_MSG_RESULT([yes])
 AC_DEFINE([_GPU_])
@@ -97,6 +100,7 @@ CUDA_LDFLAGS="--expt-extended-lambda -arch=$CUDA_ARCH -ccbin mpicxx $CUDA_LDFLAG
 
 ENABLE_GPU=yes
 ENABLE_CUDA=yes
+AC_DEFINE([_CUDA_])
 
 else
 AC_MSG_RESULT([no])
@@ -104,6 +108,15 @@ ENABLE_GPU=no
 ENABLE_CUDA=no
 fi
 AM_CONDITIONAL(CUDA_ENABLED,test x$ENABLE_CUDA = xyes)
+AM_CONDITIONAL(GPU_ENABLED,test x$ENABLE_CUDA = xyes)
+
+#-- Check for GPU/HIP build setup
+ENABLE_HIP=no
+if test x$ENABLE_GPU != xyes; then
+   AX_HIP_CHECK()
+   AM_CONDITIONAL(GPU_ENABLED,test x$ENABLE_HIP = xyes)
+fi
+AM_CONDITIONAL(HIP_ENABLED,test x$ENABLE_HIP = xyes)
 
 #--
 
