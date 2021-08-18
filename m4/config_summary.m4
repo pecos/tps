@@ -38,6 +38,11 @@ if test "$ENABLE_CUDA" = "yes"; then
 echo ' - 'CUDA_CXXFLAGS.............. : $CUDA_CXXFLAGS
 echo ' - 'CUDA_LDFLAGS............... : $CUDA_LDFLAGS
 fi
+echo GPU build enabled with HIP.... : $ENABLE_HIP
+if test "$ENABLE_HIP" = "yes"; then
+echo ' - 'HIP_CXXFLAGS............... : $HIP_CXXFLAGS
+echo ' - 'HIP_LDFLAGS................ : $HIP_LDFLAGS
+fi
 echo
 echo '-------------------------------------------------------------------------------'
 

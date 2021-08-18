@@ -90,5 +90,11 @@
 /* Version number of package */
 #undef VERSION
 
+/* CUDA backend */
+#undef _CUDA_
+
 /* Build in GPU support */
 #undef _GPU_
+
+/* HIP backend */
+#undef _HIP_

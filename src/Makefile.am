@@ -5,15 +5,19 @@ if CUDA_ENABLED
 AM_CPPFLAGS += $(CUDA_CXXFLAGS)
 endif
 
+if HIP_ENABLED
+AM_CPPFLAGS += $(HIP_CXXFLAGS)
+endif
+
 # C++ main solver binary
 bin_PROGRAMS         = tps
 tps_SOURCES          = main.cpp
-tps_LDADD            = libtps.a
+tps_LDADD            = libtps.a -lmfem
 
-tps_LDFLAGS          = -L$(MFEM_LIB) -lmfem
+tps_LDFLAGS          = -L$(MFEM_LIB)
+tps_LDFLAGS         += $(HDF5_LIBS)
 tps_LDFLAGS         += -L$(HYPRE_LIB) -lHYPRE
 tps_LDFLAGS         += -L$(OPENBLAS_LIB) -lopenblas
-tps_LDFLAGS         += $(HDF5_LIBS)
 tps_LDFLAGS         += -L$(METIS_LIB) -lmetis
 tps_LDFLAGS         += $(GRVY_LIBS)
 # hypre depends are complicated
@@ -28,6 +32,11 @@ endif
 if CUDA_ENABLED
 tps_LDFLAGS         += $(CUDA_LDFLAGS) -lcuda -lcusparse
 endif
+
+if HIP_ENABLED
+tps_LDFLAGS         += $(HIP_LDFLAGS)
+endif
+
 
 # C++ solver library sources
 cxx_sources          = averaging_and_rms.cpp faceGradientIntegration.cpp M2ulPhyS.cpp rhs_operator.cpp wallBC.cpp \
