@@ -67,6 +67,8 @@ jobs:
         uses: actions/checkout@v2
         with:
           lfs: true
+      - name: Set ROCm path
+        run: echo '/opt/rocm/bin' >>"${GITHUB_PATH}"
       - name: MFEM Tree
         run: echo "MFEM_INC=$MFEM_INC, MFEM_LIB=$MFEM_LIB"
       - name: Query modules loaded
