@@ -1,7 +1,7 @@
 TEST_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) \
                   $(top_srcdir)/test/tap-driver.sh
 
-if CUDA_ENABLED
+if GPU_ENABLED
 TESTS = cyl3d.gpu.test \
 	cyl3d.mflow.gpu.test \
 	wedge.gpu.test

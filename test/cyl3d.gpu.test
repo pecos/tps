@@ -1,9 +1,10 @@
 #!/usr/bin/env bats
 # -*- mode: sh -*-
 
-TEST="cyl3d.cuda"
+TEST="cyl3d.gpu"
 RUNFILE="inputs/input.dtconst.cyl"
-OPTS="-d cuda"
+#OPTS="-d cuda"
+OPTS=""
 
 setup() {
     SOLN_FILE=restart_output.sol.h5
@@ -23,7 +24,7 @@ setup() {
 
 @test "[$TEST] run tps with input -> $RUNFILE" {
     rm -f $SOLN_FILE
-    ../src/tps --runFile $RUNFILE $OPTS
+    ../src/tps --runFile $RUNFILE
 
     test -s $SOLN_FILE
 }
