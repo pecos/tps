@@ -1080,6 +1080,7 @@ void M2ulPhyS::Iterate()
     if( iter % vis_steps == 0 )
     {
 #ifdef _MASA_
+      rhsOperator->updatePrimitives(*U);
       DenMMS.SetTime(time); VelMMS.SetTime(time); PreMMS.SetTime(time);
       const double errorDen = dens->ComputeLpError(2, DenMMS);
       const double errorVel = vel->ComputeLpError(2, VelMMS);
@@ -1221,18 +1222,6 @@ void M2ulPhyS::MASA_exactPre(const Vector& x, double tin, Vector& y)
   const double gamma = eqState.GetSpecificHeatRatio();
   
   y(0) = MASA::masa_eval_exact_p<double>(x[0],x[1],x[2], tin);
-//   Vector tmp; tmp.SetSize(5);
-// 
-//   tmp(0) =      MASA::masa_eval_exact_rho<double>(x[0],x[1],x[2], tin); // rho
-//   tmp(1) = tmp[0]*MASA::masa_eval_exact_u<double>(x[0],x[1],x[2], tin);
-//   tmp(2) = tmp[0]*MASA::masa_eval_exact_v<double>(x[0],x[1],x[2], tin);
-//   tmp(3) = tmp[0]*MASA::masa_eval_exact_w<double>(x[0],x[1],x[2], tin);
-//   tmp(4) =        MASA::masa_eval_exact_p<double>(x[0],x[1],x[2], tin)/(gamma-1.);
-// 
-//   double k = 0.;
-//   for(int d=0; d<x.Size(); d++) k += tmp[1+d]*tmp[1+d];
-//   k *= 0.5/tmp[0];
-//   y[0] = tmp(4) + k;
 }
 #endif
 
