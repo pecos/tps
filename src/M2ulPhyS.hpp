@@ -130,8 +130,8 @@ private:
   Vector shapeWnor1; // shape functions, weight and normal for each face at ach integration point
   //Array<int> posDofshape2;
   Vector shape2;
-  const int maxIntPoints = 49; // corresponding to QUAD face with p=5
-  //const int maxDofs = 64;      // corresponding to HEX with p=5
+//   const int maxIntPoints = 49; // corresponding to QUAD face with p=5
+  const int maxIntPoints = 64;      // corresponding to HEX with p=5
   const int maxDofs = 216;      // corresponding to HEX with p=5
   
   Array<int> elemFaces; // number and faces IDs of each element
