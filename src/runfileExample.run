@@ -44,12 +44,8 @@ CONTINUE_MEAN_CALC
 # Polynomial order
 POL_ORDER 3
 
-# Auxiliary order. A solution would be interpolated
-# from order POL_ORDER to AUX_ORDER and dumped
-AUX_ORDER 1
-
 # Restart from solution of AUX_ORDER
-# If set, AUX_ORDER must be set too
+# Auxiliary order retreived from HD5 files
 RESTART_FROM_AUX
 
 # Integration rule (quadrature)
