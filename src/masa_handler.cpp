@@ -1,7 +1,10 @@
 #ifdef _MASA_
 #include "masa_handler.hpp"
 
-void initMasaHandler(std::string name, int dim, const Equations& eqn)
+void initMasaHandler(std::string name, 
+                     int dim, 
+                     const Equations& eqn,
+                     const double &viscMult )
 {
   // Initialize MASA
   if( dim==2 )
@@ -87,7 +90,7 @@ void initMasaHandler(std::string name, int dim, const Equations& eqn)
       MASA::masa_set_param<double>("R",287.058);
       MASA::masa_set_param<double>("Pr",0.71);
       MASA::masa_set_param<double>("B_mu",110.4);
-      MASA::masa_set_param<double>("A_mu",1.458e-6);
+      MASA::masa_set_param<double>("A_mu",viscMult*1.458e-6);
 
       // soln parameters
       MASA::masa_set_param<double>("L",2);
