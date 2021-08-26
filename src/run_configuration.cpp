@@ -31,7 +31,7 @@ RunConfiguration::RunConfiguration()
   sampleInterval = 0;
   startIter = 0;
   restartMean = false;
-  meanHistEnable = true;
+  meanHistEnable = false;
   
   itersOut = 50;
   workFluid = DRY_AIR;
