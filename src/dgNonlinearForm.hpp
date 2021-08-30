@@ -28,18 +28,20 @@ private:
   const int num_equation;
   EquationOfState *eqState;
   
-  Array<int> &numElems;
-  Array<int> &nodesIDs;
-  Array<int> &posDofIds;
+  volumeFaceIntegrationArrays &gpuArrays;
+  
+//   Array<int> &numElems;
+//   Array<int> &nodesIDs;
+//   Array<int> &posDofIds;
   
   const int *h_numElems;
   const int *h_posDofIds;
   
-  Vector &shapeWnor1;
-  Vector &shape2;
+//   Vector &shapeWnor1;
+//   Vector &shape2;
   
-  Array<int> &elemFaces; // number and faces IDs of each element
-  Array<int> &elems12Q; // elements connecting a face
+//   Array<int> &elemFaces; // number and faces IDs of each element
+//   Array<int> &elems12Q; // elements connecting a face
   
   // Parallel shared faces integration
   parallelFacesIntegrationArrays *parallelData;
@@ -60,13 +62,14 @@ public:
                   const int dim,
                   const int num_equation,
                   EquationOfState *eqState,
-                  Array<int> &_numElems,
-                  Array<int> &_nodesIDs,
-                  Array<int> &_posDofIds,
-                  Vector &_shapeWnor1,
-                  Vector &_shape2,
-                  Array<int> &_elemFaces,
-                  Array<int> &_elems12Q,
+                  volumeFaceIntegrationArrays &_gpuArrays,
+//                   Array<int> &_numElems,
+//                   Array<int> &_nodesIDs,
+//                   Array<int> &_posDofIds,
+//                   Vector &_shapeWnor1,
+//                   Vector &_shape2,
+//                   Array<int> &_elemFaces,
+//                   Array<int> &_elems12Q,
                   const int &maxIntPoints,
                   const int &maxDofs );
   
@@ -95,14 +98,15 @@ public:
                                   const double &viscMult,
                                   const double &bulkViscMult,
                                   const double &Pr,
-                                  const Array<int> &elemFaces,
-                                  const Array<int> &nodesIDs,
-                                  const Array<int> &posDofIds,
-                                  const Vector &shapeWnor1,
-                                  const Vector &shape2,
+                                  volumeFaceIntegrationArrays &gpuArrays,
+//                                   const Array<int> &elemFaces,
+//                                   const Array<int> &nodesIDs,
+//                                   const Array<int> &posDofIds,
+//                                   const Vector &shapeWnor1,
+//                                   const Vector &shape2,
                                   const int &maxIntPoints,
-                                  const int &maxDofs,
-                                  const Array<int> &elems12Q );
+                                  const int &maxDofs/*,
+                                  const Array<int> &elems12Q */);
   
   static void sharedFaceIntegration_gpu(const Vector &x,
                                         const Vector &faceU,

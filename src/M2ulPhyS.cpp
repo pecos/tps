@@ -384,13 +384,14 @@ void M2ulPhyS::initVariables()
                           dim,
                           num_equation,
                           eqState,
-                          numElems,
-                          nodesIDs,
-                          posDofIds,
-                          shapeWnor1,
-                          shape2,
-                          elemFaces,
-                          elems12Q,
+                          gpuArrays,
+//                           numElems,
+//                           nodesIDs,
+//                           posDofIds,
+//                           shapeWnor1,
+//                           shape2,
+//                           elemFaces,
+//                           elems12Q,
                           maxIntPoints,
                           maxDofs);
   if( local_attr.Size()>0 ) A->AddBdrFaceIntegrator( bcIntegrator );
@@ -458,15 +459,16 @@ void M2ulPhyS::initVariables()
     intRules,
     dim,
     num_equation,
-    numElems,
-    nodesIDs,
-    posDofIds,
-    shapeWnor1,
-    shape2,
+    gpuArrays,
+//     numElems,
+//     nodesIDs,
+//     posDofIds,
+//     shapeWnor1,
+//     shape2,
     maxIntPoints,
-    maxDofs,
-    elemFaces,
-    elems12Q );
+    maxDofs
+    /*elemFaces,
+    elems12Q */);
   gradUp_A->AddInteriorFaceIntegrator(
     new GradFaceIntegrator(intRules, dim, num_equation) );
 
@@ -481,13 +483,14 @@ void M2ulPhyS::initVariables()
                                 fluxClass,
                                 eqState,
                                 vfes,
-                                nodesIDs,
-                                posDofIds,
-                                numElems,
-                                shapeWnor1,
-                                shape2,
-                                elemFaces,
-                                elems12Q,
+                                gpuArrays,
+//                                 nodesIDs,
+//                                 posDofIds,
+//                                 numElems,
+//                                 shapeWnor1,
+//                                 shape2,
+//                                 elemFaces,
+//                                 elems12Q,
                                 maxIntPoints,
                                 maxDofs,
                                 A,
@@ -552,9 +555,9 @@ void M2ulPhyS::initVariables()
 
 void M2ulPhyS::initIndirectionArrays()
 {
-  posDofIds.SetSize( 2*vfes->GetNE() );
-  posDofIds = 0;
-  auto hposDofIds = posDofIds.HostWrite();
+  gpuArrays.posDofIds.SetSize( 2*vfes->GetNE() );
+  gpuArrays.posDofIds = 0;
+  auto hposDofIds = gpuArrays.posDofIds.HostWrite();
 
   std::vector<int> tempNodes;
   tempNodes.clear();
@@ -571,10 +574,10 @@ void M2ulPhyS::initIndirectionArrays()
     for(int n=0; n<dof; n++) tempNodes.push_back( dofs[n] );
   }
 
-  nodesIDs.SetSize( tempNodes.size() );
-  nodesIDs = 0;
-  auto hnodesIDs = nodesIDs.HostWrite();
-  for(int i=0; i<nodesIDs.Size(); i++) hnodesIDs[i] = tempNodes[i];
+  gpuArrays.nodesIDs.SetSize( tempNodes.size() );
+  gpuArrays.nodesIDs = 0;
+  auto hnodesIDs = gpuArrays.nodesIDs.HostWrite();
+  for(int i=0; i<gpuArrays.nodesIDs.Size(); i++) hnodesIDs[i] = tempNodes[i];
 
 
   // count number of each type of element
@@ -582,7 +585,7 @@ void M2ulPhyS::initIndirectionArrays()
   tempNumElems.clear();
   int dof1 = hposDofIds[1];
   int typeElems = 0;
-  for(int el=0; el<posDofIds.Size()/2; el++)
+  for(int el=0; el<gpuArrays.posDofIds.Size()/2; el++)
   {
     int dofi = hposDofIds[2*el+1];
     if( dofi==dof1 )
@@ -597,9 +600,9 @@ void M2ulPhyS::initIndirectionArrays()
     }
   }
   tempNumElems.push_back( typeElems );
-  numElems.SetSize( tempNumElems.size() );
-  numElems = 0;
-  auto hnumElems = numElems.HostWrite();
+  gpuArrays.numElems.SetSize( tempNumElems.size() );
+  gpuArrays.numElems = 0;
+  auto hnumElems = gpuArrays.numElems.HostWrite();
   for(int i=0; i<(int)tempNumElems.size(); i++) hnumElems[i] = tempNumElems[i];
 
   {
@@ -608,9 +611,9 @@ void M2ulPhyS::initIndirectionArrays()
 //     const int maxIntPoints = 49; // corresponding to square face with p=5
 //     const int maxDofs = 216; //HEX with p=5
 
-    elemFaces.SetSize(7*vfes->GetNE() );
-    elemFaces = 0;
-    auto helemFaces = elemFaces.HostWrite();
+    gpuArrays.elemFaces.SetSize(7*vfes->GetNE() );
+    gpuArrays.elemFaces = 0;
+    auto helemFaces = gpuArrays.elemFaces.HostWrite();
 
     std::vector<double> shapes2, shapes1;
     shapes1.clear();
@@ -618,18 +621,18 @@ void M2ulPhyS::initIndirectionArrays()
 
     Mesh *mesh = vfes->GetMesh();
 
-    elems12Q.SetSize( 3*mesh->GetNumFaces() );
-    elems12Q = 0;
-    auto helems12Q = elems12Q.HostWrite();
+    gpuArrays.elems12Q.SetSize( 3*mesh->GetNumFaces() );
+    gpuArrays.elems12Q = 0;
+    auto helems12Q = gpuArrays.elems12Q.HostWrite();
 
-    shapeWnor1.UseDevice(true);
-    shapeWnor1.SetSize( (maxDofs+1+dim)*maxIntPoints*mesh->GetNumFaces() );
+    gpuArrays.shapeWnor1.UseDevice(true);
+    gpuArrays.shapeWnor1.SetSize( (maxDofs+1+dim)*maxIntPoints*mesh->GetNumFaces() );
 
-    shape2.UseDevice(true);
-    shape2.SetSize( maxDofs*maxIntPoints*mesh->GetNumFaces() );
+    gpuArrays.shape2.UseDevice(true);
+    gpuArrays.shape2.SetSize( maxDofs*maxIntPoints*mesh->GetNumFaces() );
 
-    auto hshapeWnor1 = shapeWnor1.HostWrite();
-    auto hshape2 = shape2.HostWrite();
+    auto hshapeWnor1 = gpuArrays.shapeWnor1.HostWrite();
+    auto hshape2 = gpuArrays.shape2.HostWrite();
 
     for(int face=0; face<mesh->GetNumFaces(); face++)
     {
@@ -788,21 +791,76 @@ void M2ulPhyS::initIndirectionArrays()
     intPointsElIDBC.SetSize(1);
     intPointsElIDBC = 0.;
   }
+  
+  // fill out gradient shape function arrays and their indirections
+  std::vector<double> temp;
+  std::vector<int> positions;
+  temp.clear(); positions.clear();
+  
+  for(int el=0;el<vfes->GetNE();el++)
+  {
+    positions.push_back( (int)temp.size() );
+    
+    const FiniteElement *elem = vfes->GetFE(el);
+    ElementTransformation *Tr = vfes->GetElementTransformation(el);
+    const int elDof = elem->GetDof();
+    
+    // element volume integral
+    int intorder = 2*elem->GetOrder();
+    if(intRuleType==1 && elem->GetGeomType()==Geometry::SQUARE) intorder--; // when Gauss-Lobatto
+    const IntegrationRule *ir = &intRules->Get(elem->GetGeomType(), intorder);
+    
+    positions.push_back( ir->GetNPoints() );
+    
+    for(int i=0;i<ir->GetNPoints();i++)
+    {
+      IntegrationPoint ip = ir->IntPoint(i);
+      Tr->SetIntPoint( &ip );
+      
+      // Calculate the shape functions
+      Vector shape; shape.UseDevice(false);
+      shape.SetSize(elDof);
+      Vector dshapeVec; dshapeVec.UseDevice(false);
+      dshapeVec.SetSize(elDof*dim);
+      dshapeVec = 0.;
+      DenseMatrix dshape(dshapeVec.HostReadWrite(),elDof,dim);
+      elem->CalcShape(ip, shape);
+      elem->CalcPhysDShape(*Tr,dshape);
+      double detJac = Tr->Jacobian().Det()*ip.weight;
+      
+      for(int n=0;n<elDof;n++) temp.push_back( shape[n] );
+      for(int d=0;d<dim;d++) for(int n=0;n<elDof;n++) temp.push_back( dshape(n,d) );
+      temp.push_back( detJac );
+    }
+  }
+  
+  gpuArrays.elemShapeDshapeWJ.UseDevice(true);
+  gpuArrays.elemShapeDshapeWJ.SetSize( (int)temp.size() );
+  gpuArrays.elemShapeDshapeWJ = 0.;
+  auto helemShapeDshapeWJ = gpuArrays.elemShapeDshapeWJ.HostWrite();
+  for(int i=0;i<gpuArrays.elemShapeDshapeWJ.Size();i++) helemShapeDshapeWJ[i] = temp[i];
+  
+  gpuArrays.elemPosQ_shapeDshapeWJ.SetSize( (int)positions.size() );
+  for(int i=0;i<gpuArrays.elemPosQ_shapeDshapeWJ.Size();i++) gpuArrays.elemPosQ_shapeDshapeWJ[i] = positions[i];
+  
 
 #ifdef _GPU_
-  auto dnodesID = nodesIDs.Read();
-  auto dnumElems = numElems.Read();
-  auto dposDofIds = posDofIds.Read();
+  auto dnodesID = gpuArrays.nodesIDs.Read();
+  auto dnumElems = gpuArrays.numElems.Read();
+  auto dposDofIds = gpuArrays.posDofIds.Read();
 
-  auto dshapeWnor1 = shapeWnor1.Read();
-  auto dshape2 = shape2.Read();
+  auto dshapeWnor1 = gpuArrays.shapeWnor1.Read();
+  auto dshape2 = gpuArrays.shape2.Read();
 
-  auto delemFaces = elemFaces.Read();
-  auto delems12Q = elems12Q.Read();
+  auto delemFaces = gpuArrays.elemFaces.Read();
+  auto delems12Q = gpuArrays.elems12Q.Read();
 
   auto dshapesBC = shapesBC.Read();
   auto dnormalsBC = normalsWBC.Read();
   auto dintPointsELIBC = intPointsElIDBC.Read();
+  
+  auto d_elemPosQ_shapeDshapeWJ = gpuArrays.elemPosQ_shapeDshapeWJ.Read();
+  auto d_elemShapeDshapeWJ = gpuArrays.elemShapeDshapeWJ.Read();
 #endif
 }
 

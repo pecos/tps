@@ -42,18 +42,19 @@ private:
   ParFiniteElementSpace *vfes;
   
   // nodes IDs and indirection array
-  Array<int> &nodesIDs;
-  Array<int> &posDofIds;
-  // count of number of elements of each type
-  Array<int> &numElems;
+  const volumeFaceIntegrationArrays &gpuArrays;
+//   Array<int> &nodesIDs;
+//   Array<int> &posDofIds;
+//   // count of number of elements of each type
+//   Array<int> &numElems;
   
-  int *h_numElems;
-  int *h_posDofIds;
+  const int *h_numElems;
+  const int *h_posDofIds;
   
-  Vector &shapeWnor1;
-  Vector &shape2;
-  Array<int> &elemFaces;
-  Array<int> &elems12Q;
+//   Vector &shapeWnor1;
+//   Vector &shape2;
+//   Array<int> &elemFaces;
+//   Array<int> &elems12Q;
   const int &maxIntPoints;
   const int &maxDofs;
 
@@ -115,13 +116,14 @@ public:
                Fluxes *_fluxClass,
                EquationOfState *_eqState,
                ParFiniteElementSpace *_vfes,
-               Array<int> &_nodesIDs,
-               Array<int> &_posDofIds,
-               Array<int> &_numElems,
-               Vector &_shapeWnor1,
-               Vector &_shape2,
-               Array<int> &_elemFaces,
-               Array<int> &_elems12Q,
+               const volumeFaceIntegrationArrays &_gpuArrays,
+//                Array<int> &_nodesIDs,
+//                Array<int> &_posDofIds,
+//                Array<int> &_numElems,
+//                Vector &_shapeWnor1,
+//                Vector &_shape2,
+//                Array<int> &_elemFaces,
+//                Array<int> &_elems12Q,
                const int &_maxIntPoints,
                const int &_maxDofs,
                DGNonLinearForm *_A,
