@@ -1,4 +1,5 @@
 #include "forcing_terms.hpp"
+#include <general/forall.hpp>
 
 ForcingTerms::ForcingTerms( const int &_dim,
                             const int &_num_equation,
@@ -247,7 +248,7 @@ void ConstantPressureGradient::updateTerms_gpu( const int numElems,
         {
           contrib[i+d*elDof] -= d_pressGrad[d]*l1[i]*weightDetJac;
           
-          grad_pV -= upk[1+d]*pressGrad[d];
+          grad_pV -= upk[1+d]*d_pressGrad[d];
           grad_pV -= upk[4]*gradUpk[i+(1+d)*elDof];
         }
         contrib[i+dim*elDof] += grad_pV*l1[i]*weightDetJac;

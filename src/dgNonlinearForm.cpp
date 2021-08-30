@@ -210,7 +210,7 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
 //                                           const Vector &shapeWnor1,
 //                                           const Vector &shape2,
                                           const int &maxIntPoints,
-                                          const int &maxDofs,
+                                          const int &maxDofs
                                           /*const Array<int> &elems12Q*/ )
 {
   const double *d_x = x.Read();
