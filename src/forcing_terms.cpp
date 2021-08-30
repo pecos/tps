@@ -7,7 +7,8 @@ ForcingTerms::ForcingTerms( const int &_dim,
                             IntegrationRules *_intRules,
                             ParFiniteElementSpace *_vfes,
                             ParGridFunction *_Up,
-                            ParGridFunction *_gradUp ):
+                            ParGridFunction *_gradUp,
+                            const volumeFaceIntegrationArrays &_gpuArrays ):
 dim(_dim),
 num_equation(_num_equation),
 order(_order),
@@ -15,8 +16,12 @@ intRuleType(_intRuleType),
 intRules(_intRules),
 vfes(_vfes),
 Up(_Up),
-gradUp(_gradUp)
+gradUp(_gradUp),
+gpuArrays(_gpuArrays)
 {
+  h_numElems  = gpuArrays.numElems.HostRead();
+  h_posDofIds = gpuArrays.posDofIds.HostRead();
+  
   b = new ParGridFunction(vfes);
   
   // Initialize to zero
@@ -47,6 +52,7 @@ ConstantPressureGradient::ConstantPressureGradient(const int& _dim,
                                                    ParFiniteElementSpace* _vfes,
                                                    ParGridFunction *_Up,
                                                    ParGridFunction *_gradUp,
+                                                   const volumeFaceIntegrationArrays &_gpuArrays,
                                                    RunConfiguration& _config ):
 ForcingTerms(_dim,
              _num_equation,
@@ -55,7 +61,8 @@ ForcingTerms(_dim,
              _intRules,
              _vfes,
              _Up,
-             _gradUp )
+             _gradUp,
+             _gpuArrays )
 {
   pressGrad.UseDevice(true);
   pressGrad.SetSize(3);
@@ -72,7 +79,27 @@ ForcingTerms(_dim,
 void ConstantPressureGradient::updateTerms()
 {
 #ifdef _GPU_
-  updateTerms_gpu();
+  for(int elType=0;elType<gpuArrays.numElems.Size();elType++)
+  {
+    int elemOffset = 0;
+    if( elType!=0 )
+    {
+      for(int i=0;i<elType;i++) elemOffset += h_numElems[i];
+    }
+    int dof_el = h_posDofIds[2*elemOffset +1];
+    
+    updateTerms_gpu(h_numElems[elType],
+                    elemOffset,
+                    dof_el,
+                    vfes->GetNDofs(),
+                    pressGrad,
+                    b,
+                    *Up,
+                    *gradUp,
+                    num_equation,
+                    dim,
+                    gpuArrays );
+  }
 #else
   int numElem = vfes->GetNE();
   int dof = vfes->GetNDofs();
@@ -149,22 +176,17 @@ void ConstantPressureGradient::updateTerms_gpu( const int numElems,
                                                 Vector &gradUp,
                                                 const int num_equation,
                                                 const int dim,
-                                                const Array<int> &posDofIds,
-                                                const Array<int> &nodesIDs,
-                                                const Vector &elemShapeDshapeWJ,
-                                                const Array<int> &elemPosQ_shapeDshapeWJ,
-                                                const int &maxDofs,
-                                                const int &maxIntPoints)
+                                                const volumeFaceIntegrationArrays &gpuArrays)
 {
   const double *d_pressGrad = pressGrad.Read();
   double *d_b = b->Write();
   
   const double *d_Up = Up.Read();
   double *d_gradUp = gradUp.ReadWrite();
-  auto d_posDofIds = posDofIds.Read();
-  auto d_nodesIDs = nodesIDs.Read();
-  const double *d_elemShapeDshapeWJ = elemShapeDshapeWJ.Read();
-  auto d_elemPosQ_shapeDshapeWJ = elemPosQ_shapeDshapeWJ.Read();
+  auto d_posDofIds = gpuArrays.posDofIds.Read();
+  auto d_nodesIDs = gpuArrays.nodesIDs.Read();
+  const double *d_elemShapeDshapeWJ = gpuArrays.elemShapeDshapeWJ.Read();
+  auto d_elemPosQ_shapeDshapeWJ = gpuArrays.elemPosQ_shapeDshapeWJ.Read();
   
   MFEM_FORALL_2D(el,numElems,elDof,1,1,
   {
@@ -191,8 +213,8 @@ void ConstantPressureGradient::updateTerms_gpu( const int numElems,
         
         for(int d=0;d<dim;d++)
         {
-          gradUpi[i +eq*elDof +d*num_equation*elDof] = 0.;
-          
+          gradUpi[i +eq*elDof +d*num_equation*elDof] = 
+             d_gradUp[indexi+eq*totalDofs+d*num_equation*totalDofs];
         }
       }
       MFEM_SYNC_THREAD;
@@ -251,7 +273,8 @@ MASA_forcings::MASA_forcings( const int& _dim,
                               ParFiniteElementSpace* _vfes,
                               ParGridFunction *_Up,
                               ParGridFunction *_gradUp,
-                              RunConfiguration& _config):
+                              const volumeFaceIntegrationArrays &gpuArrays,
+                              RunConfiguration& _config ):
 ForcingTerms(_dim,
              _num_equation,
              _order,
@@ -259,7 +282,8 @@ ForcingTerms(_dim,
              _intRules,
              _vfes,
              _Up,
-             _gradUp )
+             _gradUp,
+             gpuArrays )
 {
   initMasaHandler("forcing",dim, _config.GetEquationSystem(),_config.GetViscMult());
 }

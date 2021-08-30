@@ -4,6 +4,7 @@
 #include <mfem.hpp>
 #include <tps_config.h>
 #include "run_configuration.hpp"
+#include "dataStructures.hpp"
 
 #ifdef _MASA_
 #include "masa_handler.hpp"
@@ -26,6 +27,9 @@ protected:
   ParGridFunction *Up;
   ParGridFunction *gradUp;
   
+  const volumeFaceIntegrationArrays &gpuArrays;
+  const int *h_numElems;
+  const int *h_posDofIds;
   
   // added term
   ParGridFunction *b;
@@ -38,7 +42,8 @@ public:
                 IntegrationRules *_intRules,
                 ParFiniteElementSpace *_vfes,
                 ParGridFunction *_Up,
-                ParGridFunction *_gradUp );
+                ParGridFunction *_gradUp,
+                const volumeFaceIntegrationArrays &_gpuArrays );
   ~ForcingTerms();
 
   void setTime(double _time) { time = _time; }
@@ -63,6 +68,7 @@ public:
                             ParFiniteElementSpace *_vfes,
                             ParGridFunction *_Up,
                             ParGridFunction *_gradUp,
+                            const volumeFaceIntegrationArrays &_gpuArrays,
                             RunConfiguration &_config );
   
   // Terms do not need updating
@@ -80,12 +86,7 @@ public:
                               Vector &gradUp,
                               const int num_equation,
                               const int dim,
-                              const Array<int> &posDofIds,
-                              const Array<int> &nodesIDs,
-                              const Vector &elemShapeDshapeWJ,
-                              const Array<int> &elemPosQ_shapeDshapeWJ,
-                              const int &maxDofs,
-                              const int &maxIntPoints);
+                              const volumeFaceIntegrationArrays &gpuArrays);
 #endif
   
   //virtual void addForcingIntegrals(Vector &in);
@@ -106,6 +107,7 @@ public:
                 ParFiniteElementSpace *_vfes,
                 ParGridFunction *_Up,
                 ParGridFunction *_gradUp,
+                const volumeFaceIntegrationArrays &gpuArrays,
                 RunConfiguration &_config );
 
   virtual void updateTerms();
