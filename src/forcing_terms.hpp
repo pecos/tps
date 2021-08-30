@@ -46,12 +46,13 @@ public:
   virtual void addForcingIntegrals(Vector &in);
 };
 
+
 // Constant pressure gradient term 
 class ConstantPressureGradient: public ForcingTerms
 {
 private:
   //RunConfiguration &config;
-  double pressGrad[3];
+  Vector pressGrad;
   
 public:
   ConstantPressureGradient( const int &_dim,
@@ -66,6 +67,26 @@ public:
   
   // Terms do not need updating
   virtual void updateTerms();
+  
+  // GPU functions
+#ifdef _GPU_
+  static void updateTerms_gpu(const int numElems,
+                              const int offsetElems,
+                              const int elDof,
+                              const int totalDofs,
+                              Vector &pressGrad,
+                              ParGridFunction *b,
+                              const Vector &Up,
+                              Vector &gradUp,
+                              const int num_equation,
+                              const int dim,
+                              const Array<int> &posDofIds,
+                              const Array<int> &nodesIDs,
+                              const Vector &elemShapeDshapeWJ,
+                              const Array<int> &elemPosQ_shapeDshapeWJ,
+                              const int &maxDofs,
+                              const int &maxIntPoints);
+#endif
   
   //virtual void addForcingIntegrals(Vector &in);
 };
