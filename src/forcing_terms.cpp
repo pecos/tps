@@ -24,11 +24,13 @@ gpuArrays(_gpuArrays)
   h_posDofIds = gpuArrays.posDofIds.HostRead();
   
   b = new ParGridFunction(vfes);
+  b->UseDevice(true);
   
   // Initialize to zero
   int dof = vfes->GetNDofs();
   double *data = b->HostWrite();
   for(int ii=0;ii<dof*num_equation;ii++) data[ii] = 0.;
+  b->Read();
 }
 
 ForcingTerms::~ForcingTerms()
@@ -38,11 +40,21 @@ ForcingTerms::~ForcingTerms()
 
 void ForcingTerms::addForcingIntegrals(Vector &in)
 {
+#ifdef _GPU_
+  const double *data = b->Read();
+  double *d_in = in.Write();
+  
+  MFEM_FORALL(n,in.Size(),
+  {
+    d_in[n] += data[n];
+  });
+#else
   double *dataB = b->GetData();
   for(int i=0; i<in.Size(); i++)
   {
     in[i] = in[i] + dataB[i];
   }
+#endif
 }
 
 ConstantPressureGradient::ConstantPressureGradient(const int& _dim, 
