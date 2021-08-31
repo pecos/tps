@@ -211,8 +211,8 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
 //                                           const Vector &shapeWnor1,
 //                                           const Vector &shape2,
                                           const int &maxIntPoints,
-                                          const int &maxDofs,
-                                          const Array<int> &elems12Q )
+                                          const int &maxDofs/*,
+                                          const Array<int> &elems12Q */)
 {
   const double *d_x = x.Read();
   double *d_y = y.Write();
@@ -222,7 +222,7 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
   auto d_posDofIds       = gpuArrays.posDofIds.Read();
   auto d_shapeWnor1      = gpuArrays.shapeWnor1.Read();
   const double *d_shape2 = gpuArrays.shape2.Read();
-  auto d_elems12Q = elems12Q.Read();
+  auto d_elems12Q        = gpuArrays.elems12Q.Read();
   
   MFEM_FORALL_2D(el,NumElemType,elDof,1,1,
   {
