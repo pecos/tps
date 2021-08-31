@@ -4,6 +4,7 @@
 #include <mfem.hpp>
 #include <tps_config.h>
 #include "run_configuration.hpp"
+#include "dataStructures.hpp"
 
 #ifdef _MASA_
 #include "masa_handler.hpp"
@@ -26,6 +27,9 @@ protected:
   ParGridFunction *Up;
   ParGridFunction *gradUp;
   
+  const volumeFaceIntegrationArrays &gpuArrays;
+  const int *h_numElems;
+  const int *h_posDofIds;
   
   // added term
   ParGridFunction *b;
@@ -38,7 +42,8 @@ public:
                 IntegrationRules *_intRules,
                 ParFiniteElementSpace *_vfes,
                 ParGridFunction *_Up,
-                ParGridFunction *_gradUp );
+                ParGridFunction *_gradUp,
+                const volumeFaceIntegrationArrays &gpuArrays );
   ~ForcingTerms();
 
   void setTime(double _time) { time = _time; }
@@ -51,7 +56,7 @@ class ConstantPressureGradient: public ForcingTerms
 {
 private:
   //RunConfiguration &config;
-  double pressGrad[3];
+  Vector pressGrad;
   
 public:
   ConstantPressureGradient( const int &_dim,
@@ -62,12 +67,26 @@ public:
                             ParFiniteElementSpace *_vfes,
                             ParGridFunction *_Up,
                             ParGridFunction *_gradUp,
+                            const volumeFaceIntegrationArrays &gpuArrays,
                             RunConfiguration &_config );
   
   // Terms do not need updating
   virtual void updateTerms();
   
-  //virtual void addForcingIntegrals(Vector &in);
+  // GPU functions
+#ifdef _GPU_
+  static void updateTerms_gpu(const int numElems,
+                              const int offsetElems,
+                              const int elDof,
+                              const int totalDofs,
+                              Vector &pressGrad,
+                              ParGridFunction *b,
+                              const Vector &Up,
+                              Vector &gradUp,
+                              const int num_equation,
+                              const int dim,
+                              const volumeFaceIntegrationArrays &gpuArrays);
+#endif
 };
 
 #ifdef _MASA_
@@ -85,6 +104,7 @@ public:
                 ParFiniteElementSpace *_vfes,
                 ParGridFunction *_Up,
                 ParGridFunction *_gradUp,
+                const volumeFaceIntegrationArrays &gpuArrays,
                 RunConfiguration &_config );
 
   virtual void updateTerms();

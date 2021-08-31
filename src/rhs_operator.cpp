@@ -84,6 +84,7 @@ bcIntegrator(_bcIntegrator)
                                             vfes,
                                             Up,
                                             gradUp,
+                                            gpuArrays,
                                             _config) );
   }
 #ifdef _MASA_
@@ -95,6 +96,7 @@ bcIntegrator(_bcIntegrator)
                                     vfes,
                                     Up,
                                     gradUp,
+                                    gpuArrays,
                                     _config ) );
 #endif
   std::vector<double> temp;
