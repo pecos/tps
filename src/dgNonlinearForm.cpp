@@ -11,13 +11,6 @@ DGNonLinearForm::DGNonLinearForm( ParFiniteElementSpace *_vfes,
                                   const int _num_equation,
                                   EquationOfState *_eqState,
                                   const volumeFaceIntegrationArrays &_gpuArrays,
-//                                   Array<int> &_numElems,
-//                                   Array<int> &_nodesIDs,
-//                                   Array<int> &_posDofIds,
-//                                   Vector &_shapeWnor1,
-//                                   Vector &_shape2,
-//                                   Array<int> &_elemFaces,
-//                                   Array<int> &_elems12Q,
                                   const int &_maxIntPoints,
                                   const int &_maxDofs ):
 ParNonlinearForm(_vfes),
@@ -30,13 +23,6 @@ dim(_dim),
 num_equation(_num_equation),
 eqState(_eqState),
 gpuArrays(_gpuArrays),
-// numElems(_numElems),
-// nodesIDs(_nodesIDs),
-// posDofIds(_posDofIds),
-// shapeWnor1(_shapeWnor1),
-// shape2(_shape2),
-// elemFaces(_elemFaces),
-// elems12Q(_elems12Q),
 maxIntPoints(_maxIntPoints),
 maxDofs(_maxDofs)
 {
@@ -132,14 +118,8 @@ void DGNonLinearForm::Mult_domain(const Vector& x, Vector& y)
                           eqState->GetBulkViscMultiplyer(),
                           eqState->GetPrandtlNum(),
                           gpuArrays,
-//                           elemFaces,
-//                           nodesIDs,
-//                           posDofIds,
-//                           shapeWnor1,
-//                           shape2,
                           maxIntPoints,
-                          maxDofs/*,
-                          elems12Q */);
+                          maxDofs );
     }
   }
   
@@ -167,8 +147,6 @@ void DGNonLinearForm::Mult_bdr(const Vector& x, Vector& y)
                               eqState->GetBulkViscMultiplyer(),
                               eqState->GetPrandtlNum(),
                               gpuArrays,
-//                               nodesIDs, 
-//                               posDofIds, 
                               parallelData,
                               maxIntPoints, 
                               maxDofs);
@@ -205,14 +183,8 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
                                           const double &bulkViscMult,
                                           const double &Pr,
                                           const volumeFaceIntegrationArrays &gpuArrays,
-//                                           const Array<int> &elemFaces,
-//                                           const Array<int> &nodesIDs,
-//                                           const Array<int> &posDofIds,
-//                                           const Vector &shapeWnor1,
-//                                           const Vector &shape2,
                                           const int &maxIntPoints,
-                                          const int &maxDofs/*,
-                                          const Array<int> &elems12Q */)
+                                          const int &maxDofs)
 {
   const double *d_x = x.Read();
   double *d_y = y.Write();

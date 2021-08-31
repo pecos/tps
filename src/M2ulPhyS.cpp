@@ -385,13 +385,6 @@ void M2ulPhyS::initVariables()
                           num_equation,
                           eqState,
                           gpuArrays,
-//                           gpuArrays.numElems,
-//                           gpuArrays.nodesIDs,
-//                           gpuArrays.posDofIds,
-//                           gpuArrays.shapeWnor1,
-//                           gpuArrays.shape2,
-//                           gpuArrays.elemFaces,
-//                           gpuArrays.elems12Q,
                           maxIntPoints,
                           maxDofs);
   if( local_attr.Size()>0 ) A->AddBdrFaceIntegrator( bcIntegrator );
