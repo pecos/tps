@@ -250,7 +250,7 @@ void ConstantPressureGradient::updateTerms_gpu( const int numElems,
           {
             upk[eq] += Ui[j+eq*elDof]*l1[j];
             for(int d=0;d<dim;d++) 
-              gradUpk[eq+d*num_equation] += gradUpi[j+eq*elDof+d+num_equation*elDof];
+              gradUpk[eq+d*num_equation] += gradUpi[j+eq*elDof+d+num_equation*elDof]*l1[j];
           }
         }
         
