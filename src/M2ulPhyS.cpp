@@ -384,13 +384,14 @@ void M2ulPhyS::initVariables()
                           dim,
                           num_equation,
                           eqState,
-                          gpuArrays.numElems,
-                          gpuArrays.nodesIDs,
-                          gpuArrays.posDofIds,
-                          gpuArrays.shapeWnor1,
-                          gpuArrays.shape2,
-                          gpuArrays.elemFaces,
-                          gpuArrays.elems12Q,
+                          gpuArrays,
+//                           gpuArrays.numElems,
+//                           gpuArrays.nodesIDs,
+//                           gpuArrays.posDofIds,
+//                           gpuArrays.shapeWnor1,
+//                           gpuArrays.shape2,
+//                           gpuArrays.elemFaces,
+//                           gpuArrays.elems12Q,
                           maxIntPoints,
                           maxDofs);
   if( local_attr.Size()>0 ) A->AddBdrFaceIntegrator( bcIntegrator );
@@ -787,6 +788,10 @@ void M2ulPhyS::initIndirectionArrays()
 
     intPointsElIDBC.SetSize(1);
     intPointsElIDBC = 0.;
+  }
+  
+  {
+    
   }
 
 #ifdef _GPU_
