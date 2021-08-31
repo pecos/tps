@@ -42,19 +42,10 @@ private:
   ParFiniteElementSpace *vfes;
   
   const volumeFaceIntegrationArrays &gpuArrays;
-//   // nodes IDs and indirection array
-//   Array<int> &nodesIDs;
-//   Array<int> &posDofIds;
-//   // count of number of elements of each type
-//   Array<int> &numElems;
   
   const int *h_numElems;
   const int *h_posDofIds;
   
-//   Vector &shapeWnor1;
-//   Vector &shape2;
-//   Array<int> &elemFaces;
-//   Array<int> &elems12Q;
   const int &maxIntPoints;
   const int &maxDofs;
 
@@ -117,13 +108,6 @@ public:
                EquationOfState *_eqState,
                ParFiniteElementSpace *_vfes,
                const volumeFaceIntegrationArrays &gpuArrays,
-//                Array<int> &_nodesIDs,
-//                Array<int> &_posDofIds,
-//                Array<int> &_numElems,
-//                Vector &_shapeWnor1,
-//                Vector &_shape2,
-//                Array<int> &_elemFaces,
-//                Array<int> &_elems12Q,
                const int &_maxIntPoints,
                const int &_maxDofs,
                DGNonLinearForm *_A,
@@ -172,8 +156,6 @@ public:
   static void multiPlyInvers_gpu( Vector &y,
                                   Vector &z,
                                   const volumeFaceIntegrationArrays &gpuArrays,
-//                                   const Array<int> &nodesIDs,
-//                                   const Array<int> &posDofIds,
                                   const Vector &invMArray,
                                   const Array<int> &posDofInvM,
                                   const int num_equation,

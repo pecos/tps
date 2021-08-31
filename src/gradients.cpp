@@ -12,16 +12,9 @@ Gradients::Gradients(ParFiniteElementSpace* _vfes,
                      IntegrationRules *_intRules,
                      int _intRuleType,
                      const volumeFaceIntegrationArrays &_gpuArrays,
-//                      Array<int>& _nodesIDs, 
-//                      Array<int>& _posDofIds, 
-//                      Array<int>& _numElems,
                      Array<DenseMatrix*> &_Me_inv,
                      Vector &_invMArray,
                      Array<int> &_posDofInvM,
-//                      Vector &_shapeWnor1,
-//                      Vector &_shape2,
-//                      Array<int> &_elemFaces,
-//                      Array<int> &_elems12Q,
                      const int &_maxIntPoints,
                      const int &_maxDofs ):
 ParNonlinearForm(_vfes),
@@ -36,16 +29,9 @@ gradUp_A(_gradUp_A),
 intRules(_intRules),
 intRuleType(_intRuleType),
 gpuArrays(_gpuArrays),
-// nodesIDs(_nodesIDs),
-// posDofIds(_posDofIds),
-// numElems(_numElems),
 Me_inv(_Me_inv),
 invMArray(_invMArray),
 posDofInvM(_posDofInvM),
-// shapeWnor1(_shapeWnor1),
-// shape2(_shape2),
-// elemFaces(_elemFaces),
-// elems12Q(_elems12Q),
 maxIntPoints(_maxIntPoints),
 maxDofs(_maxDofs)
 {
@@ -264,7 +250,6 @@ void Gradients::computeGradients()
     }
   }
   
-  // NOTE: not sure I need to this here. CHECK!!
   gradUp->ExchangeFaceNbrData();
 }
 
@@ -291,13 +276,8 @@ void Gradients::computeGradients_domain()
                         num_equation,
                         dim,
                         gpuArrays,
-//                         posDofIds,
-//                         nodesIDs,
                         elemShapeDshapeWJ,
                         elemPosQ_shapeDshapeWJ,
-//                         elemFaces,
-//                         shapeWnor1,
-//                         shape2,
                         maxDofs,
                         maxIntPoints );
   }
@@ -321,8 +301,6 @@ void Gradients::computeGradients_bdr()
                                   eqState->GetBulkViscMultiplyer(),
                                   eqState->GetPrandtlNum(),
                                   gpuArrays,
-//                                   nodesIDs,
-//                                   posDofIds,
                                   parallelData,
                                   maxIntPoints,
                                   maxDofs);
@@ -346,8 +324,6 @@ void Gradients::computeGradients_bdr()
                     num_equation,
                     dim,
                     gpuArrays,
-//                     posDofIds,
-//                     nodesIDs,
                     invMArray,
                     posDofInvM );
   }
@@ -362,13 +338,8 @@ void Gradients::computeGradients_gpu(const int numElems,
                                      const int num_equation,
                                      const int dim,
                                      const volumeFaceIntegrationArrays &gpuArrays,
-//                                      const Array<int> &posDofIds,
-//                                      const Array<int> &nodesIDs,
                                      const Vector &elemShapeDshapeWJ,
                                      const Array<int> &elemPosQ_shapeDshapeWJ,
-//                                      const Array<int> &elemFaces,
-//                                      const Vector &shapeWnor1,
-//                                      const Vector &shape2,
                                      const int &maxDofs,
                                      const int &maxIntPoints )
 {
@@ -564,8 +535,6 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up,
                                               const double &bulkViscMult,
                                               const double &Pr,
                                               const volumeFaceIntegrationArrays &gpuArrays,
-//                                               const Array<int> &nodesIDs,
-//                                               const Array<int> &posDofIds,
                                               const parallelFacesIntegrationArrays *parallelData,
                                               const int &maxIntPoints,
                                               const int &maxDofs)
@@ -690,8 +659,6 @@ void Gradients::multInverse_gpu(const int numElems,
                                 const int num_equation,
                                 const int dim,
                                 const volumeFaceIntegrationArrays &gpuArrays,
-//                                 const Array<int> &posDofIds,
-//                                 const Array<int> &nodesIDs,
                                 const Vector &invMArray,
                                 const Array<int> &posDofInvM )
 {
