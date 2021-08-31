@@ -4,6 +4,7 @@
 #include <mfem.hpp>
 #include <general/forall.hpp>
 #include <tps_config.h>
+#include "dataStructures.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -16,35 +17,38 @@ private:
   const int dim;
   const int num_equation;
   
-  Array<int> &numElems;
-  Array<int> &nodesIDs;
-  Array<int> &posDofIds;
+  const volumeFaceIntegrationArrays &gpuArrays;
+  
+//   Array<int> &numElems;
+//   Array<int> &nodesIDs;
+//   Array<int> &posDofIds;
   
 //   int *h_numElems;
 //   int *h_posDofIds;
-  
+/*  
   Vector &shapeWnor1;
-  Vector &shape2;
+  Vector &shape2;*/
   const int &maxIntPoints;
   const int &maxDofs;
   
-  Array<int> &elemFaces; // number and faces IDs of each element
-  Array<int> &elems12Q; // elements connecting a face
+//   Array<int> &elemFaces; // number and faces IDs of each element
+//   Array<int> &elems12Q; // elements connecting a face
   
 public:
   GradNonLinearForm(ParFiniteElementSpace *f,
                     IntegrationRules *intRules,
                     const int dim,
                     const int num_equation,
-                    Array<int> &_numElems,
-                    Array<int> &_nodesIDs,
-                    Array<int> &_posDofIds,
-                    Vector &_shapeWnor1,
-                    Vector &_shape2,
+                    const volumeFaceIntegrationArrays &gpuArrays,
+//                     Array<int> &_numElems,
+//                     Array<int> &_nodesIDs,
+//                     Array<int> &_posDofIds,
+//                     Vector &_shapeWnor1,
+//                     Vector &_shape2,
                     const int &maxIntPoints,
-                    const int &maxDofs,
+                    const int &maxDofs/*,
                     Array<int> &_elemFaces,
-                    Array<int> &_elems12Q  );
+                    Array<int> &_elems12Q */ );
   
   void Mult(const ParGridFunction *Up, Vector &y );
   
