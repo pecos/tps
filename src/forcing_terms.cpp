@@ -24,13 +24,12 @@ gpuArrays(_gpuArrays)
   h_posDofIds = gpuArrays.posDofIds.HostRead();
   
   b = new ParGridFunction(vfes);
-  b->UseDevice(true);
   
   // Initialize to zero
   int dof = vfes->GetNDofs();
   double *data = b->HostWrite();
   for(int ii=0;ii<dof*num_equation;ii++) data[ii] = 0.;
-  b->ReadWrite();
+  auto d_b = b->ReadWrite();
 }
 
 ForcingTerms::~ForcingTerms()
@@ -241,8 +240,8 @@ void ConstantPressureGradient::updateTerms_gpu( const int numElems,
       {
         const double weightDetJac = d_elemShapeDshapeWJ[offsetDShape+elDof+dim*elDof+k*((dim+1)*elDof+1)];
         l1[i]                     = d_elemShapeDshapeWJ[offsetDShape+i+              k*((dim+1)*elDof+1)];
-        for(int j=1;j<num_equation*dim;j++) upk[j] = 0.;
-        for(int j=1;j<num_equation*dim;j++) gradUpk[j] = 0.;
+        for(int j=0;j<num_equation;j++) upk[j] = 0.;
+        for(int j=0;j<num_equation*dim;j++) gradUpk[j] = 0.;
         MFEM_SYNC_THREAD;
         
         for(int j=0;j<elDof;j++) 
@@ -262,7 +261,7 @@ void ConstantPressureGradient::updateTerms_gpu( const int numElems,
           contrib[i+d*elDof] -= d_pressGrad[d]*l1[i]*weightDetJac;
           
           grad_pV -= upk[1+d]*d_pressGrad[d];
-          grad_pV -= upk[4]*gradUpk[i+(1+d)*elDof];
+          grad_pV -= upk[num_equation-1]*gradUpk[i+(1+d)*elDof];
         }
         contrib[i+dim*elDof] += grad_pV*l1[i]*weightDetJac;
       }
