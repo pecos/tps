@@ -223,8 +223,6 @@ void Gradients::computeGradients_domain()
                         num_equation,
                         dim,
                         gpuArrays,
-//                         elemShapeDshapeWJ,
-//                         elemPosQ_shapeDshapeWJ,
                         maxDofs,
                         maxIntPoints );
   }
@@ -285,8 +283,6 @@ void Gradients::computeGradients_gpu(const int numElems,
                                      const int num_equation,
                                      const int dim,
                                      const volumeFaceIntegrationArrays &gpuArrays,
-//                                      const Vector &elemShapeDshapeWJ,
-//                                      const Array<int> &elemPosQ_shapeDshapeWJ,
                                      const int &maxDofs,
                                      const int &maxIntPoints )
 {
