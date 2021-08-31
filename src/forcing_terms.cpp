@@ -261,7 +261,7 @@ void ConstantPressureGradient::updateTerms_gpu( const int numElems,
           contrib[i+d*elDof] -= d_pressGrad[d]*l1[i]*weightDetJac;
           
           grad_pV -= upk[1+d]*d_pressGrad[d];
-          grad_pV -= upk[num_equation-1]*gradUpk[i+(1+d)*elDof];
+          grad_pV -= upk[num_equation-1]*gradUpk[1+d +d*num_equation];
         }
         contrib[i+dim*elDof] += grad_pV*l1[i]*weightDetJac;
       }
