@@ -367,7 +367,7 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
 
   // 3. Multiply element-wise by the inverse mass matrices.
 #ifdef _GPU_
-  for(int eltype=0;eltype<numElems.Size();eltype++)
+  for(int eltype=0;eltype<gpuArrays.numElems.Size();eltype++)
   {
     int elemOffset = 0;
     if( eltype!=0 )

@@ -11,16 +11,17 @@ Gradients::Gradients(ParFiniteElementSpace* _vfes,
                      GradNonLinearForm *_gradUp_A,
                      IntegrationRules *_intRules,
                      int _intRuleType,
-                     Array<int>& _nodesIDs, 
-                     Array<int>& _posDofIds, 
-                     Array<int>& _numElems,
+                     const volumeFaceIntegrationArrays &_gpuArrays,
+//                      Array<int>& _nodesIDs, 
+//                      Array<int>& _posDofIds, 
+//                      Array<int>& _numElems,
                      Array<DenseMatrix*> &_Me_inv,
                      Vector &_invMArray,
                      Array<int> &_posDofInvM,
-                     Vector &_shapeWnor1,
-                     Vector &_shape2,
-                     Array<int> &_elemFaces,
-                     Array<int> &_elems12Q,
+//                      Vector &_shapeWnor1,
+//                      Vector &_shape2,
+//                      Array<int> &_elemFaces,
+//                      Array<int> &_elems12Q,
                      const int &_maxIntPoints,
                      const int &_maxDofs ):
 ParNonlinearForm(_vfes),
@@ -34,21 +35,22 @@ eqState(_eqState),
 gradUp_A(_gradUp_A),
 intRules(_intRules),
 intRuleType(_intRuleType),
-nodesIDs(_nodesIDs),
-posDofIds(_posDofIds),
-numElems(_numElems),
+gpuArrays(_gpuArrays),
+// nodesIDs(_nodesIDs),
+// posDofIds(_posDofIds),
+// numElems(_numElems),
 Me_inv(_Me_inv),
 invMArray(_invMArray),
 posDofInvM(_posDofInvM),
-shapeWnor1(_shapeWnor1),
-shape2(_shape2),
-elemFaces(_elemFaces),
-elems12Q(_elems12Q),
+// shapeWnor1(_shapeWnor1),
+// shape2(_shape2),
+// elemFaces(_elemFaces),
+// elems12Q(_elems12Q),
 maxIntPoints(_maxIntPoints),
 maxDofs(_maxDofs)
 {
-  h_numElems = numElems.HostReadWrite();
-  h_posDofIds = posDofIds.HostReadWrite();
+  h_numElems  = gpuArrays.numElems.HostRead();
+  h_posDofIds = gpuArrays.posDofIds.HostRead();
   
   // fill out gradient shape function arrays and their indirections
   std::vector<double> temp;
@@ -271,7 +273,7 @@ void Gradients::computeGradients_domain()
 {
   DGNonLinearForm::setToZero_gpu(*gradUp,gradUp->Size());
   
-  for(int elType=0;elType<numElems.Size();elType++)
+  for(int elType=0;elType<gpuArrays.numElems.Size();elType++)
   {
     int elemOffset = 0;
     if( elType!=0 )
@@ -288,16 +290,16 @@ void Gradients::computeGradients_domain()
                         *gradUp,
                         num_equation,
                         dim,
-                        posDofIds,
-                        nodesIDs,
+                        gpuArrays,
+//                         posDofIds,
+//                         nodesIDs,
                         elemShapeDshapeWJ,
                         elemPosQ_shapeDshapeWJ,
-                        elemFaces,
-                        shapeWnor1,
-                        shape2,
+//                         elemFaces,
+//                         shapeWnor1,
+//                         shape2,
                         maxDofs,
-                        maxIntPoints,
-                        elems12Q );
+                        maxIntPoints );
   }
 }
 
@@ -318,15 +320,16 @@ void Gradients::computeGradients_bdr()
                                   eqState->GetViscMultiplyer(),
                                   eqState->GetBulkViscMultiplyer(),
                                   eqState->GetPrandtlNum(),
-                                  nodesIDs,
-                                  posDofIds,
+                                  gpuArrays,
+//                                   nodesIDs,
+//                                   posDofIds,
                                   parallelData,
                                   maxIntPoints,
                                   maxDofs);
   }
   
   // Multiply by inverse mass matrix
-  for(int elType=0;elType<numElems.Size();elType++)
+  for(int elType=0;elType<gpuArrays.numElems.Size();elType++)
   {
     int elemOffset = 0;
     if( elType!=0 )
@@ -335,15 +338,16 @@ void Gradients::computeGradients_bdr()
     }
     int dof_el = h_posDofIds[2*elemOffset +1];
     
-    multInversr_gpu(h_numElems[elType],
+    multInverse_gpu(h_numElems[elType],
                     elemOffset,
                     dof_el,
                     vfes->GetNDofs(),
                     *gradUp,
                     num_equation,
                     dim,
-                    posDofIds,
-                    nodesIDs,
+                    gpuArrays,
+//                     posDofIds,
+//                     nodesIDs,
                     invMArray,
                     posDofInvM );
   }
@@ -357,29 +361,29 @@ void Gradients::computeGradients_gpu(const int numElems,
                                      Vector &gradUp,
                                      const int num_equation,
                                      const int dim,
-                                     const Array<int> &posDofIds,
-                                     const Array<int> &nodesIDs,
+                                     const volumeFaceIntegrationArrays &gpuArrays,
+//                                      const Array<int> &posDofIds,
+//                                      const Array<int> &nodesIDs,
                                      const Vector &elemShapeDshapeWJ,
                                      const Array<int> &elemPosQ_shapeDshapeWJ,
-                                     const Array<int> &elemFaces,
-                                     const Vector &shapeWnor1,
-                                     const Vector &shape2,
+//                                      const Array<int> &elemFaces,
+//                                      const Vector &shapeWnor1,
+//                                      const Vector &shape2,
                                      const int &maxDofs,
-                                     const int &maxIntPoints,
-                                     const Array<int> &elems12Q )
+                                     const int &maxIntPoints )
 {
   const double *d_Up = Up.Read();
   double *d_gradUp = gradUp.ReadWrite();
-  auto d_posDofIds = posDofIds.Read();
-  auto d_nodesIDs = nodesIDs.Read();
+  auto d_posDofIds = gpuArrays.posDofIds.Read();
+  auto d_nodesIDs = gpuArrays.nodesIDs.Read();
   const double *d_elemShapeDshapeWJ = elemShapeDshapeWJ.Read();
   auto d_elemPosQ_shapeDshapeWJ = elemPosQ_shapeDshapeWJ.Read();
   
   // pointers for face integration
-  auto d_elemFaces = elemFaces.Read();
-  auto d_shapeWnor1 = shapeWnor1.Read();
-  const double *d_shape2 = shape2.Read();
-  auto d_elems12Q = elems12Q.Read();
+  auto d_elemFaces = gpuArrays.elemFaces.Read();
+  auto d_shapeWnor1 = gpuArrays.shapeWnor1.Read();
+  const double *d_shape2 = gpuArrays.shape2.Read();
+  auto d_elems12Q = gpuArrays.elems12Q.Read();
   
   MFEM_FORALL_2D(el,numElems,elDof,1,1,
   {
@@ -559,8 +563,9 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up,
                                               const double &viscMult,
                                               const double &bulkViscMult,
                                               const double &Pr,
-                                              const Array<int> &nodesIDs,
-                                              const Array<int> &posDofIds,
+                                              const volumeFaceIntegrationArrays &gpuArrays,
+//                                               const Array<int> &nodesIDs,
+//                                               const Array<int> &posDofIds,
                                               const parallelFacesIntegrationArrays *parallelData,
                                               const int &maxIntPoints,
                                               const int &maxDofs)
@@ -569,8 +574,8 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up,
   double *d_gradUp = gradUp->ReadWrite();
   const double *d_faceData = faceUp.Read();
   
-  const int *d_nodesIDs = nodesIDs.Read();
-  const int *d_posDofIds = posDofIds.Read();
+  const int *d_nodesIDs = gpuArrays.nodesIDs.Read();
+  const int *d_posDofIds = gpuArrays.posDofIds.Read();
   
   const double *d_sharedShapeWnor1 = parallelData->sharedShapeWnor1.Read();
   const double *d_sharedShape2 = parallelData->sharedShape2.Read();
@@ -677,21 +682,22 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up,
   });
 }
 
-void Gradients::multInversr_gpu(const int numElems,
+void Gradients::multInverse_gpu(const int numElems,
                                 const int offsetElems,
                                 const int elDof,
                                 const int totalDofs,
                                 Vector &gradUp,
                                 const int num_equation,
                                 const int dim,
-                                const Array<int> &posDofIds,
-                                const Array<int> &nodesIDs,
+                                const volumeFaceIntegrationArrays &gpuArrays,
+//                                 const Array<int> &posDofIds,
+//                                 const Array<int> &nodesIDs,
                                 const Vector &invMArray,
                                 const Array<int> &posDofInvM )
 {
   double *d_gradUp = gradUp.ReadWrite();
-  auto d_posDofIds = posDofIds.Read();
-  auto d_nodesIDs = nodesIDs.Read();
+  auto d_posDofIds = gpuArrays.posDofIds.Read();
+  auto d_nodesIDs = gpuArrays.nodesIDs.Read();
   const double *d_invMArray =invMArray.Read();
   auto d_posDofInvM = posDofInvM.Read();
   
