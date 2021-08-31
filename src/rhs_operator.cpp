@@ -12,13 +12,14 @@ RHSoperator::RHSoperator( int &_iter,
                           Fluxes *_fluxClass,
                           EquationOfState *_eqState,
                           ParFiniteElementSpace *_vfes,
-                          Array<int> &_nodesIDs,
-                          Array<int> &_posDofIds,
-                          Array<int> &_numElems,
-                          Vector &_shapeWnor1,
-                          Vector &_shape2,
-                          Array<int> &_elemFaces,
-                          Array<int> &_elems12Q,
+                          const volumeFaceIntegrationArrays &_gpuArrays,
+//                           Array<int> &_nodesIDs,
+//                           Array<int> &_posDofIds,
+//                           Array<int> &_numElems,
+//                           Vector &_shapeWnor1,
+//                           Vector &_shape2,
+//                           Array<int> &_elemFaces,
+//                           Array<int> &_elems12Q,
                           const int &_maxIntPoints,
                           const int &_maxDofs,
                           DGNonLinearForm *_A,
@@ -45,13 +46,14 @@ intRuleType(_intRuleType),
 fluxClass(_fluxClass),
 eqState(_eqState),
 vfes(_vfes),
-nodesIDs(_nodesIDs),
-posDofIds(_posDofIds),
-numElems(_numElems),
-shapeWnor1(_shapeWnor1),
-shape2(_shape2),
-elemFaces(_elemFaces),
-elems12Q(_elems12Q),
+gpuArrays(_gpuArrays),
+// nodesIDs(_nodesIDs),
+// posDofIds(_posDofIds),
+// numElems(_numElems),
+// shapeWnor1(_shapeWnor1),
+// shape2(_shape2),
+// elemFaces(_elemFaces),
+// elems12Q(_elems12Q),
 maxIntPoints(_maxIntPoints),
 maxDofs(_maxDofs),
 A(_A),
@@ -78,8 +80,8 @@ bcIntegrator(_bcIntegrator)
   zk.SetSize(vfes->GetNDofs());
   
   
-  h_numElems = numElems.HostReadWrite();
-  h_posDofIds = posDofIds.HostReadWrite();
+  h_numElems  = gpuArrays.numElems.HostRead();
+  h_posDofIds = gpuArrays.posDofIds.HostRead();
   
   //Me_inv = new DenseMatrix[vfes->GetNE()];
   Me_inv.SetSize( vfes->GetNE() );
@@ -172,16 +174,16 @@ bcIntegrator(_bcIntegrator)
                             gradUp_A,
                             intRules,
                             intRuleType,
-                            nodesIDs,
-                            posDofIds,
-                            numElems,
+                            gpuArrays.nodesIDs,
+                            gpuArrays.posDofIds,
+                            gpuArrays.numElems,
                             Me_inv,
                             invMArray,
                             posDofInvM,
-                            shapeWnor1,
-                            shape2,
-                            _elemFaces,
-                            _elems12Q,
+                            gpuArrays.shapeWnor1,
+                            gpuArrays.shape2,
+                            gpuArrays.elemFaces,
+                            gpuArrays.elems12Q,
                             maxIntPoints,
                             maxDofs );
   gradients->setParallelData( &parallelData, &transferUp);
@@ -377,8 +379,9 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
     
     RHSoperator::multiPlyInvers_gpu(y,
                                     z,
-                                    nodesIDs,
-                                    posDofIds,
+                                    gpuArrays,
+//                                     nodesIDs,
+//                                     posDofIds,
                                     invMArray,
                                     posDofInvM,
                                     num_equation,
@@ -609,8 +612,9 @@ void RHSoperator::updatePrimitives_gpu(Vector *Up,
 
 void RHSoperator::multiPlyInvers_gpu( Vector &y,
                                       Vector &z,
-                                      const Array<int> &nodesIDs,
-                                      const Array<int> &posDofIds,
+                                      const volumeFaceIntegrationArrays &gpuArrays,
+//                                       const Array<int> &nodesIDs,
+//                                       const Array<int> &posDofIds,
                                       const Vector &invMArray,
                                       const Array<int> &posDofInvM,
                                       const int num_equation,
@@ -622,8 +626,8 @@ void RHSoperator::multiPlyInvers_gpu( Vector &y,
 #ifdef _GPU_
   double *d_y = y.ReadWrite();
   const double *d_z = z.Read();
-  auto d_nodesIDs = nodesIDs.Read();
-  auto d_posDofIds = posDofIds.Read();
+  auto d_nodesIDs  = gpuArrays.nodesIDs.Read();
+  auto d_posDofIds = gpuArrays.posDofIds.Read();
   auto d_posDofInvM = posDofInvM.Read();
   const double *d_invM = invMArray.Read();
   

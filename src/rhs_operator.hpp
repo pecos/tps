@@ -41,19 +41,20 @@ private:
 
   ParFiniteElementSpace *vfes;
   
-  // nodes IDs and indirection array
-  Array<int> &nodesIDs;
-  Array<int> &posDofIds;
-  // count of number of elements of each type
-  Array<int> &numElems;
+  const volumeFaceIntegrationArrays &gpuArrays;
+//   // nodes IDs and indirection array
+//   Array<int> &nodesIDs;
+//   Array<int> &posDofIds;
+//   // count of number of elements of each type
+//   Array<int> &numElems;
   
-  int *h_numElems;
-  int *h_posDofIds;
+  const int *h_numElems;
+  const int *h_posDofIds;
   
-  Vector &shapeWnor1;
-  Vector &shape2;
-  Array<int> &elemFaces;
-  Array<int> &elems12Q;
+//   Vector &shapeWnor1;
+//   Vector &shape2;
+//   Array<int> &elemFaces;
+//   Array<int> &elems12Q;
   const int &maxIntPoints;
   const int &maxDofs;
 
@@ -115,13 +116,14 @@ public:
                Fluxes *_fluxClass,
                EquationOfState *_eqState,
                ParFiniteElementSpace *_vfes,
-               Array<int> &_nodesIDs,
-               Array<int> &_posDofIds,
-               Array<int> &_numElems,
-               Vector &_shapeWnor1,
-               Vector &_shape2,
-               Array<int> &_elemFaces,
-               Array<int> &_elems12Q,
+               const volumeFaceIntegrationArrays &gpuArrays,
+//                Array<int> &_nodesIDs,
+//                Array<int> &_posDofIds,
+//                Array<int> &_numElems,
+//                Vector &_shapeWnor1,
+//                Vector &_shape2,
+//                Array<int> &_elemFaces,
+//                Array<int> &_elems12Q,
                const int &_maxIntPoints,
                const int &_maxDofs,
                DGNonLinearForm *_A,
@@ -169,8 +171,9 @@ public:
                                     const int num_equations );
   static void multiPlyInvers_gpu( Vector &y,
                                   Vector &z,
-                                  const Array<int> &nodesIDs,
-                                  const Array<int> &posDofIds,
+                                  const volumeFaceIntegrationArrays &gpuArrays,
+//                                   const Array<int> &nodesIDs,
+//                                   const Array<int> &posDofIds,
                                   const Vector &invMArray,
                                   const Array<int> &posDofInvM,
                                   const int num_equation,
