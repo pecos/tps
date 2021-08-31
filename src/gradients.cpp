@@ -37,59 +37,6 @@ maxDofs(_maxDofs)
 {
   h_numElems  = gpuArrays.numElems.HostRead();
   h_posDofIds = gpuArrays.posDofIds.HostRead();
-  
-  // fill out gradient shape function arrays and their indirections
-  std::vector<double> temp;
-  std::vector<int> positions;
-  temp.clear(); positions.clear();
-  
-  for(int el=0;el<vfes->GetNE();el++)
-  {
-    positions.push_back( (int)temp.size() );
-    
-    const FiniteElement *elem = vfes->GetFE(el);
-    ElementTransformation *Tr = vfes->GetElementTransformation(el);
-    const int elDof = elem->GetDof();
-    
-    // element volume integral
-    int intorder = 2*elem->GetOrder();
-    if(intRuleType==1 && elem->GetGeomType()==Geometry::SQUARE) intorder--; // when Gauss-Lobatto
-    const IntegrationRule *ir = &intRules->Get(elem->GetGeomType(), intorder);
-    
-    positions.push_back( ir->GetNPoints() );
-    
-    for(int i=0;i<ir->GetNPoints();i++)
-    {
-      IntegrationPoint ip = ir->IntPoint(i);
-      Tr->SetIntPoint( &ip );
-      
-      // Calculate the shape functions
-      Vector shape; shape.UseDevice(false);
-      shape.SetSize(elDof);
-      Vector dshapeVec; dshapeVec.UseDevice(false);
-      dshapeVec.SetSize(elDof*dim);
-      dshapeVec = 0.;
-      DenseMatrix dshape(dshapeVec.HostReadWrite(),elDof,dim);
-      elem->CalcShape(ip, shape);
-      elem->CalcPhysDShape(*Tr,dshape);
-      double detJac = Tr->Jacobian().Det()*ip.weight;
-      
-      for(int n=0;n<elDof;n++) temp.push_back( shape[n] );
-      for(int d=0;d<dim;d++) for(int n=0;n<elDof;n++) temp.push_back( dshape(n,d) );
-      temp.push_back( detJac );
-    }
-  }
-  
-  elemShapeDshapeWJ.UseDevice(true);
-  elemShapeDshapeWJ.SetSize( (int)temp.size() );
-  elemShapeDshapeWJ = 0.;
-  auto helemShapeDshapeWJ = elemShapeDshapeWJ.HostWrite();
-  for(int i=0;i<elemShapeDshapeWJ.Size();i++) helemShapeDshapeWJ[i] = temp[i];
-  elemShapeDshapeWJ.Read();
-  
-  elemPosQ_shapeDshapeWJ.SetSize( (int)positions.size() );
-  for(int i=0;i<elemPosQ_shapeDshapeWJ.Size();i++) elemPosQ_shapeDshapeWJ[i] = positions[i];
-  elemPosQ_shapeDshapeWJ.Read();
 
 #ifndef _GPU_
   // element derivative stiffness matrix
@@ -276,8 +223,8 @@ void Gradients::computeGradients_domain()
                         num_equation,
                         dim,
                         gpuArrays,
-                        elemShapeDshapeWJ,
-                        elemPosQ_shapeDshapeWJ,
+//                         elemShapeDshapeWJ,
+//                         elemPosQ_shapeDshapeWJ,
                         maxDofs,
                         maxIntPoints );
   }
@@ -338,8 +285,8 @@ void Gradients::computeGradients_gpu(const int numElems,
                                      const int num_equation,
                                      const int dim,
                                      const volumeFaceIntegrationArrays &gpuArrays,
-                                     const Vector &elemShapeDshapeWJ,
-                                     const Array<int> &elemPosQ_shapeDshapeWJ,
+//                                      const Vector &elemShapeDshapeWJ,
+//                                      const Array<int> &elemPosQ_shapeDshapeWJ,
                                      const int &maxDofs,
                                      const int &maxIntPoints )
 {
@@ -347,8 +294,8 @@ void Gradients::computeGradients_gpu(const int numElems,
   double *d_gradUp = gradUp.ReadWrite();
   auto d_posDofIds = gpuArrays.posDofIds.Read();
   auto d_nodesIDs = gpuArrays.nodesIDs.Read();
-  const double *d_elemShapeDshapeWJ = elemShapeDshapeWJ.Read();
-  auto d_elemPosQ_shapeDshapeWJ = elemPosQ_shapeDshapeWJ.Read();
+  const double *d_elemShapeDshapeWJ = gpuArrays.elemShapeDshapeWJ.Read();
+  auto d_elemPosQ_shapeDshapeWJ = gpuArrays.elemPosQ_shapeDshapeWJ.Read();
   
   // pointers for face integration
   auto d_elemFaces = gpuArrays.elemFaces.Read();

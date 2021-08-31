@@ -34,8 +34,8 @@ struct volumeFaceIntegrationArrays
   Array<int> elems12Q; // elements connecting a face and integration points
 
   // used in gradient computation
-//  Vector elemShapeDshapeWJ; // [...l_0(i),...,l_dof(i),l_0_x(i),...,l_dof_d(i), w_i*detJac_i ...]
- // Array<int> elemPosQ_shapeDshapeWJ; // position and num. of integration points for each element
+  Vector elemShapeDshapeWJ; // [...l_0(i),...,l_dof(i),l_0_x(i),...,l_dof_d(i), w_i*detJac_i ...]
+  Array<int> elemPosQ_shapeDshapeWJ; // position and num. of integration points for each element
 };
 
 struct parallelFacesIntegrationArrays

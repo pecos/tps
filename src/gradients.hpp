@@ -48,8 +48,8 @@ private:
   
   // gradients of shape functions for all nodes and weight multiplied by det(Jac)
   // at each integration point
-  Vector elemShapeDshapeWJ; // [...l_0(i),...,l_dof(i),l_0_x(i),...,l_dof_d(i), w_i*detJac_i ...]
-  Array<int> elemPosQ_shapeDshapeWJ; // position and num. of integration points for each element
+//   Vector elemShapeDshapeWJ; // [...l_0(i),...,l_dof(i),l_0_x(i),...,l_dof_d(i), w_i*detJac_i ...]
+//   Array<int> elemPosQ_shapeDshapeWJ; // position and num. of integration points for each element
 
   parallelFacesIntegrationArrays *parallelData;
   dataTransferArrays *transferUp;
@@ -94,8 +94,8 @@ public:
                                    const int num_equation,
                                    const int dim,
                                    const volumeFaceIntegrationArrays &gpuArrays,
-                                   const Vector &elemShapeDshapeWJ,
-                                   const Array<int> &elemPosQ_shapeDshapeWJ,
+//                                    const Vector &elemShapeDshapeWJ,
+//                                    const Array<int> &elemPosQ_shapeDshapeWJ,
                                    const int &maxDofs,
                                    const int &maxIntPoints );
   
