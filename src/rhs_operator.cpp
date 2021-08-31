@@ -83,11 +83,6 @@ bcIntegrator(_bcIntegrator)
   h_numElems  = gpuArrays.numElems.HostRead();
   h_posDofIds = gpuArrays.posDofIds.HostRead();
   
-  //Me_inv = new DenseMatrix[vfes->GetNE()];
-  Me_inv.SetSize( vfes->GetNE() );
-  posDofInvM.SetSize(2*vfes->GetNE());
-  auto hposDofInvM = posDofInvM.HostWrite();
-  
   if( _config.thereIsForcing() )
   {
     forcing.Append( new ConstantPressureGradient( dim,
@@ -113,6 +108,12 @@ bcIntegrator(_bcIntegrator)
                                     gpuArrays,
                                     _config ) );
 #endif
+  
+  //Me_inv = new DenseMatrix[vfes->GetNE()];
+  Me_inv.SetSize( vfes->GetNE() );
+  posDofInvM.SetSize(2*vfes->GetNE());
+  auto hposDofInvM = posDofInvM.HostWrite();
+  
   std::vector<double> temp;
   temp.clear();
   

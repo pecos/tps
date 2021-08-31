@@ -30,7 +30,7 @@ gpuArrays(_gpuArrays)
   int dof = vfes->GetNDofs();
   double *data = b->HostWrite();
   for(int ii=0;ii<dof*num_equation;ii++) data[ii] = 0.;
-  b->Read();
+  b->ReadWrite();
 }
 
 ForcingTerms::~ForcingTerms()
@@ -79,12 +79,13 @@ ForcingTerms(_dim,
 {
   pressGrad.UseDevice(true);
   pressGrad.SetSize(3);
+  pressGrad = 0.;
   double *h_pressGrad = pressGrad.HostWrite();
   {
     double *data = _config.GetImposedPressureGradient();
     for(int jj=0;jj<3;jj++) h_pressGrad[jj] = data[jj];
   }
-  pressGrad.Read();
+  pressGrad.ReadWrite();
   
   updateTerms();
 }
