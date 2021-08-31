@@ -453,15 +453,8 @@ void M2ulPhyS::initVariables()
     dim,
     num_equation,
     gpuArrays,
-//     gpuArrays.numElems,
-//     gpuArrays.nodesIDs,
-//     gpuArrays.posDofIds,
-//     gpuArrays.shapeWnor1,
-//     gpuArrays.shape2,
     maxIntPoints,
-    maxDofs,
-    /*gpuArrays.elemFaces,
-    gpuArrays.elems12Q*/ );
+    maxDofs );
   gradUp_A->AddInteriorFaceIntegrator(
     new GradFaceIntegrator(intRules, dim, num_equation) );
 

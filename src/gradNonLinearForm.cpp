@@ -6,33 +6,17 @@ GradNonLinearForm::GradNonLinearForm(ParFiniteElementSpace *_vfes,
                                      const int _dim,
                                      const int _num_equation,
                                      const volumeFaceIntegrationArrays &_gpuArrays,
-//                                      Array<int> &_numElems,
-//                                      Array<int> &_nodesIDs,
-//                                      Array<int> &_posDofIds,
-//                                      Vector &_shapeWnor1,
-//                                      Vector &_shape2,
                                      const int &_maxIntPoints,
-                                     const int &_maxDofs/*,
-                                     Array<int> &_elemFaces,
-                                     Array<int> &_elems12Q*/ ):
+                                     const int &_maxDofs ):
 ParNonlinearForm(_vfes),
 vfes(_vfes),
 intRules(_intRules),
 dim(_dim),
 num_equation(_num_equation),
 gpuArrays(_gpuArrays),
-// numElems(_numElems),
-// nodesIDs(_nodesIDs),
-// posDofIds(_posDofIds),
-// shapeWnor1(_shapeWnor1),
-// shape2(_shape2),
 maxIntPoints(_maxIntPoints),
-maxDofs(_maxDofs)/*,
-elemFaces(_elemFaces),
-elems12Q(_elems12Q)*/
+maxDofs(_maxDofs)
 {
-//   h_numElems = numElems.HostReadWrite();
-//   h_posDofIds = posDofIds.HostReadWrite();
 }
 
 void GradNonLinearForm::Mult(const ParGridFunction *Up, Vector& y )

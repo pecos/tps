@@ -19,20 +19,8 @@ private:
   
   const volumeFaceIntegrationArrays &gpuArrays;
   
-//   Array<int> &numElems;
-//   Array<int> &nodesIDs;
-//   Array<int> &posDofIds;
-  
-//   int *h_numElems;
-//   int *h_posDofIds;
-/*  
-  Vector &shapeWnor1;
-  Vector &shape2;*/
   const int &maxIntPoints;
   const int &maxDofs;
-  
-//   Array<int> &elemFaces; // number and faces IDs of each element
-//   Array<int> &elems12Q; // elements connecting a face
   
 public:
   GradNonLinearForm(ParFiniteElementSpace *f,
@@ -40,15 +28,8 @@ public:
                     const int dim,
                     const int num_equation,
                     const volumeFaceIntegrationArrays &gpuArrays,
-//                     Array<int> &_numElems,
-//                     Array<int> &_nodesIDs,
-//                     Array<int> &_posDofIds,
-//                     Vector &_shapeWnor1,
-//                     Vector &_shape2,
                     const int &maxIntPoints,
-                    const int &maxDofs/*,
-                    Array<int> &_elemFaces,
-                    Array<int> &_elems12Q */ );
+                    const int &maxDofs );
   
   void Mult(const ParGridFunction *Up, Vector &y );
   
