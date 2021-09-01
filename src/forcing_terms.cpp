@@ -121,6 +121,12 @@ void ConstantPressureGradient::updateTerms()
   const double *dataUp = Up->GetData();
   const double *dataGradUp = gradUp->GetData();
   
+  Vector gradUpk; // interpolated gradient
+  gradUpk.SetSize(num_equation*dim);
+  Vector upk;        // interpolated Up
+  upk.SetSize(num_equation);
+  double grad_pV;
+
   for(int el=0; el<numElem; el++)
   {
     const FiniteElement *elem = vfes->GetFE(el);
@@ -150,25 +156,38 @@ void ConstantPressureGradient::updateTerms()
       
       Vector shape(dof_elem);
       elem->CalcShape(ip, shape);
+      
+      // interpolate primitives and their gradients
+      upk = 0.;
+      gradUpk = 0.;
+      for(int eq=0;eq<num_equation;eq++)
+      {
+        for(int j= 0;j<dof_elem;j++)
+        {
+          int i = nodes[j];
+          upk[eq] += dataUp[i+eq*dof]*shape[j];
+          for(int d=0;d<dim;d++) gradUpk[eq+d*num_equation] += 
+            dataGradUp[i+eq*dof+d*num_equation*dof]*shape[j];
+        }
+      }
 
       Tr->SetIntPoint(&ip);
       shape *= Tr->Jacobian().Det()*ip.weight;
-
+      
+      grad_pV = 0.;
+      for(int d=0;d<dim;d++)
+      {
+        grad_pV -= upk[d+1]*pressGrad[d];
+        grad_pV -= upk[num_equation-1]*gradUpk[d+1 + d*num_equation];
+      }
+          
       for (int j= 0;j<dof_elem;j++)
       {
         int i = nodes[j];
-        Vector vel(dim);
-        double p = dataUp[i+(num_equation-1)*dof];
-        double grad_pV = 0.;
-        
         for(int d=0;d<dim;d++)
         {
-          vel[d] = dataUp[i+(d+1)*dof];
           data[i +(d+1)*dof] -= pressGrad[d]*shape[j];
-          grad_pV -= vel[d]*pressGrad[d];
-          grad_pV -= p*dataGradUp[i+(d+1)*dof + d*dof*num_equation];
         }
-        
         data[i +(num_equation-1)*dof] += grad_pV*shape[j];
       }
       
