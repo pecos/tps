@@ -37,24 +37,24 @@ ForcingTerms::~ForcingTerms()
   delete b;
 }
 
-void ForcingTerms::addForcingIntegrals(Vector &in)
-{
-#ifdef _GPU_
-  const double *data = b->Read();
-  double *d_in = in.Write();
-  
-  MFEM_FORALL(n,in.Size(),
-  {
-    d_in[n] += data[n];
-  });
-#else
-  double *dataB = b->GetData();
-  for(int i=0; i<in.Size(); i++)
-  {
-    in[i] = in[i] + dataB[i];
-  }
-#endif
-}
+// void ForcingTerms::addForcingIntegrals(Vector &in)
+// {
+// #ifdef _GPU_
+//   const double *data = b->Read();
+//   double *d_in = in.Write();
+//   
+//   MFEM_FORALL(n,in.Size(),
+//   {
+//     d_in[n] += data[n];
+//   });
+// #else
+//   double *dataB = b->GetData();
+//   for(int i=0; i<in.Size(); i++)
+//   {
+//     in[i] = in[i] + dataB[i];
+//   }
+// #endif
+// }
 
 ConstantPressureGradient::ConstantPressureGradient(const int& _dim, 
                                                    const int& _num_equation, 
@@ -86,10 +86,10 @@ ForcingTerms(_dim,
   }
   pressGrad.ReadWrite();
   
-  updateTerms();
+//   updateTerms();
 }
 
-void ConstantPressureGradient::updateTerms()
+void ConstantPressureGradient::updateTerms(Vector &in)
 {
 #ifdef _GPU_
   for(int elType=0;elType<gpuArrays.numElems.Size();elType++)
@@ -101,7 +101,8 @@ void ConstantPressureGradient::updateTerms()
     }
     int dof_el = h_posDofIds[2*elemOffset +1];
     
-    updateTerms_gpu(h_numElems[elType],
+    updateTerms_gpu(in,
+                    h_numElems[elType],
                     elemOffset,
                     dof_el,
                     vfes->GetNDofs(),
@@ -117,7 +118,8 @@ void ConstantPressureGradient::updateTerms()
   int numElem = vfes->GetNE();
   int dof = vfes->GetNDofs();
   
-  double *data = b->GetData();
+//   double *data = b->GetData();
+  double *data = in.GetData();
   const double *dataUp = Up->GetData();
   const double *dataGradUp = gradUp->GetData();
   
@@ -138,11 +140,11 @@ void ConstantPressureGradient::updateTerms()
     vfes->GetElementVDofs(el, nodes);
     
     // set to 0
-    for(int n=0;n<dof_elem;n++)
-    {
-      int i = nodes[n];
-      for(int eq=1;eq<num_equation;eq++) data[i+eq*dof] = 0.;
-    }
+//     for(int n=0;n<dof_elem;n++)
+//     {
+//       int i = nodes[n];
+//       for(int eq=1;eq<num_equation;eq++) data[i+eq*dof] = 0.;
+//     }
     
     
     const int order = elem->GetOrder();
@@ -198,7 +200,8 @@ void ConstantPressureGradient::updateTerms()
 
 
 #ifdef _GPU_
-void ConstantPressureGradient::updateTerms_gpu( const int numElems,
+void ConstantPressureGradient::updateTerms_gpu( Vector &in,
+                                                const int numElems,
                                                 const int offsetElems,
                                                 const int elDof,
                                                 const int totalDofs,
@@ -291,6 +294,13 @@ void ConstantPressureGradient::updateTerms_gpu( const int numElems,
         d_b[indexi+eq*totalDofs] = contrib[i+(eq-1)*elDof];
       }
     }
+  });
+  
+  double *d_in = in.ReadWrite();
+  
+  MFEM_FORALL(n,in.Size(),
+  {
+    d_in[n] += d_b[n];
   });
 }
 

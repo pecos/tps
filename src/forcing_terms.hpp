@@ -47,8 +47,8 @@ public:
   ~ForcingTerms();
 
   void setTime(double _time) { time = _time; }
-  virtual void updateTerms() = 0;
-  virtual void addForcingIntegrals(Vector &in);
+  virtual void updateTerms(Vector &in) = 0;
+//   virtual void addForcingIntegrals(Vector &in);
 };
 
 // Constant pressure gradient term 
@@ -71,11 +71,12 @@ public:
                             RunConfiguration &_config );
   
   // Terms do not need updating
-  virtual void updateTerms();
+  virtual void updateTerms(Vector &in);
   
   // GPU functions
 #ifdef _GPU_
-  static void updateTerms_gpu(const int numElems,
+  static void updateTerms_gpu(Vector &in
+                              const int numElems,
                               const int offsetElems,
                               const int elDof,
                               const int totalDofs,
@@ -107,7 +108,7 @@ public:
                 const volumeFaceIntegrationArrays &gpuArrays,
                 RunConfiguration &_config );
 
-  virtual void updateTerms();
+  virtual void updateTerms(Vector &in);
 };
 #endif // _MASA_
 
