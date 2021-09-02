@@ -82,20 +82,20 @@ public:
   void computeGradients();
   
 #ifdef _GPU_
-  void computeGradients_domain();
+  void computeGradients_domain(const Vector &x);
   void computeGradients_bdr();
   
   static void computeGradients_gpu(const int numElems,
                                    const int offsetElems,
                                    const int elDof,
                                    const int totalDofs,
-                                   const Vector &Up,
+                                   const Vector &x,
+                                   Vector &Up,
                                    Vector &gradUp,
+                                   const double &gamma,
                                    const int num_equation,
                                    const int dim,
                                    const volumeFaceIntegrationArrays &gpuArrays,
-//                                    const Vector &elemShapeDshapeWJ,
-//                                    const Array<int> &elemPosQ_shapeDshapeWJ,
                                    const int &maxDofs,
                                    const int &maxIntPoints );
   

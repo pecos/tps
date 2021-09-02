@@ -287,12 +287,15 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
   initNBlockDataTransfer(x,vfes,transferU);
 #endif
   // Update primite varibales
+#ifndef _GPU_
   updatePrimitives(x);
+#endif
+  
 #ifdef _GPU_
-  // GPU version requires the exchange of data before gradient computation
-  initNBlockDataTransfer(*Up, vfes, transferUp);
-  gradients->computeGradients_domain();
-  waitAllDataTransfer(vfes,transferUp);
+  gradients->computeGradients_domain(x); // computes Up
+//   initNBlockDataTransfer(*Up, vfes, transferUp);
+//   waitAllDataTransfer(vfes,transferUp);
+  waitAllDataTransfer(vfes,transferU);
   gradients->computeGradients_bdr();
   initNBlockDataTransfer(*gradUp, gradUpfes, transferGradUp);
 #else
@@ -305,7 +308,6 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
 #ifdef _GPU_
   A->Mult_domain(x,z);
   
-  waitAllDataTransfer(vfes,transferU);
   waitAllDataTransfer(gradUpfes,transferGradUp);
   A->Mult_bdr(x,z);
 #else

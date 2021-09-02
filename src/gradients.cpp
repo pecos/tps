@@ -201,10 +201,8 @@ void Gradients::computeGradients()
 }
 
 #ifdef _GPU_
-void Gradients::computeGradients_domain()
+void Gradients::computeGradients_domain(const Vector &x)
 {
-//   DGNonLinearForm::setToZero_gpu(*gradUp,gradUp->Size());
-  
   for(int elType=0;elType<gpuArrays.numElems.Size();elType++)
   {
     int elemOffset = 0;
@@ -218,8 +216,10 @@ void Gradients::computeGradients_domain()
                         elemOffset,
                         dof_el,
                         vfes->GetNDofs(),
+                        x,
                         *Up, //px,
                         *gradUp,
+                        eqState->GetSpecificHeatRatio(),
                         num_equation,
                         dim,
                         gpuArrays,
@@ -278,15 +278,18 @@ void Gradients::computeGradients_gpu(const int numElems,
                                      const int offsetElems,
                                      const int elDof,
                                      const int totalDofs,
-                                     const Vector &Up,
+                                     const Vector &x,
+                                     Vector &Up,
                                      Vector &gradUp,
+                                     const double &gamma,
                                      const int num_equation,
                                      const int dim,
                                      const volumeFaceIntegrationArrays &gpuArrays,
                                      const int &maxDofs,
                                      const int &maxIntPoints )
 {
-  const double *d_Up = Up.Read();
+  double *d_Up = Up.Write();
+  const double *d_x = x.Read();
   double *d_gradUp = gradUp.ReadWrite();
   auto d_posDofIds = gpuArrays.posDofIds.Read();
   auto d_nodesIDs = gpuArrays.nodesIDs.Read();
@@ -318,7 +321,7 @@ void Gradients::computeGradients_gpu(const int numElems,
       // fill out Ui and init gradUpi
       for(int eq=0;eq<num_equation;eq++)
       {
-        Ui[i + eq*elDof] = d_Up[indexi + eq*totalDofs];
+        Ui[i + eq*elDof] = d_x[indexi + eq*totalDofs];
         for(int d=0;d<dim;d++)
         {
           gradUpi[i +eq*elDof +d*num_equation*elDof] = 0.;
@@ -326,6 +329,20 @@ void Gradients::computeGradients_gpu(const int numElems,
         }
       }
       MFEM_SYNC_THREAD;
+      
+      // compute Up
+      {
+        double state[5], KE[3];
+        for(int eq=0;eq<num_equation;eq++) state[eq] = Ui[i+eq*elDof];
+        for(int n=0;n<3;n++) KE[n] = 0.;
+        for(int d=0;d<dim;d++) KE[0] += 0.5*state[1+d]*state[1+d]/state[0];
+        Ui[i+(num_equation-1)*elDof] = EquationOfState::pressure(&state[0],&KE[0],gamma,dim,num_equation);
+        for(int d=0;d<dim;d++) Ui[i+(1+d)*elDof] /= state[0];
+      }
+      MFEM_SYNC_THREAD;
+      
+      //save new primitive variables in Up
+      for(int eq=0;eq<num_equation;eq++) d_Up[indexi+eq*totalDofs] = Ui[i+eq*elDof];
       
       // volume integral contribution to gradient
       double gradUpk[5*3];
@@ -538,6 +555,17 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up,
           }
         }
         MFEM_SYNC_THREAD;
+        
+        // transform boundary data to primitive variables
+        if(i<dof2)
+        {
+          double state[5], KE[3];
+          for(int eq=0;eq<num_equation;eq++) state[eq] = Upj[i+eq*dof2];
+          for(int n=0;n<3;n++) KE[n] = 0.;
+          for(int d=0;d<dim;d++) KE[0] += 0.5*state[1+d]*state[1+d]/state[0];
+          Upj[i+(num_equation-1)*dof2] = EquationOfState::pressure(&state[0],&KE[0],gamma,dim,num_equation);
+          for(int d=0;d<dim;d++) Upj[i+(1+d)*dof2] /= state[0];
+        }
         
         for(int k=0;k<Q;k++)
         {
