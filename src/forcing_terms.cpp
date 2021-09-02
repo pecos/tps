@@ -214,7 +214,7 @@ void ConstantPressureGradient::updateTerms_gpu( Vector &in,
                                                 const volumeFaceIntegrationArrays &gpuArrays)
 {
   const double *d_pressGrad = pressGrad.Read();
-  double *d_b = b->Write();
+//   double *d_b = b->Write();
   double *d_in = in.ReadWrite();
   
   const double *d_Up = Up.Read();
