@@ -316,6 +316,8 @@ void Gradients::computeGradients_gpu(const int numElems,
       MFEM_SHARED double weight;
       MFEM_SHARED bool swapElems;
       
+      double state[5], KE[3];
+      
       const int eli = el + offsetElems;
       
       if(i==1) offsetIDs    = d_posDofIds[2*eli];
@@ -339,7 +341,6 @@ void Gradients::computeGradients_gpu(const int numElems,
       
       // compute Up
       {
-        double state[5], KE[3];
         for(int eq=0;eq<num_equation;eq++) state[eq] = Ui[i+eq*elDof];
         for(int n=0;n<3;n++) KE[n] = 0.;
         for(int d=0;d<dim;d++) KE[0] += 0.5*state[1+d]*state[1+d]/state[0];
@@ -438,8 +439,17 @@ void Gradients::computeGradients_gpu(const int numElems,
             int index = d_nodesIDs[offsetElj+j];
             //Uj[j + eq*dofj] = d_Up[index + eq*totalDofs];
             // since gradUpi is no longer needed, use it to store Uj
-            gradUpi[j + eq*dofj] = d_Up[index + eq*totalDofs];
+            gradUpi[j + eq*dofj] = d_x[index + eq*totalDofs];
           }
+        }
+        // transform to primitives
+        for(int j=i;j<dofj;j+=elDof)
+        {
+          for(int eq=0;eq<num_equation;eq++) state[eq] = gradUpi[j+eq*dofj];
+          for(int n=0;n<3;n++) KE[n] = 0.;
+          for(int d=0;d<dim;d++) KE[0] += 0.5*state[1+d]*state[1+d]/state[0];
+          gradUpi[j+(num_equation-1)*dofj] = EquationOfState::pressure(&state[0],&KE[0],gamma,dim,num_equation);
+          for(int d=0;d<dim;d++) gradUpi[j+(1+d)*dofj] /= state[0];
         }
         MFEM_SYNC_THREAD;
         
