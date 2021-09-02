@@ -77,7 +77,6 @@ public:
                               const int elDof,
                               const int totalDofs,
                               Vector &pressGrad,
-                              ParGridFunction *b,
                               const Vector &Up,
                               Vector &gradUp,
                               const int num_equation,

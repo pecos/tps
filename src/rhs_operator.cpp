@@ -293,8 +293,7 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
   
 #ifdef _GPU_
   gradients->computeGradients_domain(x); // computes Up
-//   initNBlockDataTransfer(*Up, vfes, transferUp);
-//   waitAllDataTransfer(vfes,transferUp);
+  
   waitAllDataTransfer(vfes,transferU);
   gradients->computeGradients_bdr();
   initNBlockDataTransfer(*gradUp, gradUpfes, transferGradUp);
