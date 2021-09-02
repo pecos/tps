@@ -31,9 +31,6 @@ protected:
   const int *h_numElems;
   const int *h_posDofIds;
   
-  // added term
-  ParGridFunction *b;
-  
 public:
   ForcingTerms( const int &_dim,
                 const int &_num_equation,
@@ -48,7 +45,6 @@ public:
 
   void setTime(double _time) { time = _time; }
   virtual void updateTerms(Vector &in) = 0;
-//   virtual void addForcingIntegrals(Vector &in);
 };
 
 // Constant pressure gradient term 

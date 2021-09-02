@@ -22,39 +22,11 @@ gpuArrays(_gpuArrays)
 {
   h_numElems  = gpuArrays.numElems.HostRead();
   h_posDofIds = gpuArrays.posDofIds.HostRead();
-  
-//   b = new ParGridFunction(vfes);
-//   
-//   // Initialize to zero
-//   int dof = vfes->GetNDofs();
-//   double *data = b->HostWrite();
-//   for(int ii=0;ii<dof*num_equation;ii++) data[ii] = 0.;
-//   auto d_b = b->ReadWrite();
 }
 
 ForcingTerms::~ForcingTerms()
 {
-  delete b;
 }
-
-// void ForcingTerms::addForcingIntegrals(Vector &in)
-// {
-// #ifdef _GPU_
-//   const double *data = b->Read();
-//   double *d_in = in.Write();
-//   
-//   MFEM_FORALL(n,in.Size(),
-//   {
-//     d_in[n] += data[n];
-//   });
-// #else
-//   double *dataB = b->GetData();
-//   for(int i=0; i<in.Size(); i++)
-//   {
-//     in[i] = in[i] + dataB[i];
-//   }
-// #endif
-// }
 
 ConstantPressureGradient::ConstantPressureGradient(const int& _dim, 
                                                    const int& _num_equation, 
@@ -85,8 +57,6 @@ ForcingTerms(_dim,
     for(int jj=0;jj<3;jj++) h_pressGrad[jj] = data[jj];
   }
   pressGrad.ReadWrite();
-  
-//   updateTerms();
 }
 
 void ConstantPressureGradient::updateTerms(Vector &in)
@@ -118,7 +88,6 @@ void ConstantPressureGradient::updateTerms(Vector &in)
   int numElem = vfes->GetNE();
   int dof = vfes->GetNDofs();
   
-//   double *data = b->GetData();
   double *data = in.GetData();
   const double *dataUp = Up->GetData();
   const double *dataGradUp = gradUp->GetData();
@@ -139,16 +108,8 @@ void ConstantPressureGradient::updateTerms(Vector &in)
     Array<int> nodes;
     vfes->GetElementVDofs(el, nodes);
     
-    // set to 0
-//     for(int n=0;n<dof_elem;n++)
-//     {
-//       int i = nodes[n];
-//       for(int eq=1;eq<num_equation;eq++) data[i+eq*dof] = 0.;
-//     }
-    
     
     const int order = elem->GetOrder();
-    //cout<<"order :"<<maxorder<<" dof: "<<dof_elem<<endl;
     int intorder = 2*order;
     //if(intRuleType==1 && trial_fe.GetGeomType()==Geometry::SQUARE) intorder--; // when Gauss-Lobatto
     const IntegrationRule *ir = &intRules->Get(elem->GetGeomType(), intorder);
@@ -214,7 +175,6 @@ void ConstantPressureGradient::updateTerms_gpu( Vector &in,
                                                 const volumeFaceIntegrationArrays &gpuArrays)
 {
   const double *d_pressGrad = pressGrad.Read();
-//   double *d_b = b->Write();
   double *d_in = in.ReadWrite();
   
   const double *d_Up = Up.Read();
@@ -292,18 +252,10 @@ void ConstantPressureGradient::updateTerms_gpu( Vector &in,
       // write to global memory
       for(int eq=1;eq<num_equation;eq++)
       {
-//         d_b[indexi+eq*totalDofs] = contrib[i+(eq-1)*elDof];
         d_in[indexi+eq*totalDofs] += contrib[i+(eq-1)*elDof];
-        
       }
     }
   });
-  
-//   double *d_in = in.ReadWrite();
-//   MFEM_FORALL(n,in.Size(),
-//   {
-//     d_in[n] += d_b[n];
-//   });
 }
 
 #endif

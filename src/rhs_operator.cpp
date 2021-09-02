@@ -344,7 +344,6 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
     // class using TimeDependentOperator::GetTime().
     forcing[i]->setTime(this->GetTime());
     forcing[i]->updateTerms(z);
-//     forcing[i]->addForcingIntegrals(z);
   }
 
   // 3. Multiply element-wise by the inverse mass matrices.
