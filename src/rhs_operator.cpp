@@ -168,7 +168,7 @@ bcIntegrator(_bcIntegrator)
                             posDofInvM,
                             maxIntPoints,
                             maxDofs );
-  gradients->setParallelData( &parallelData, &transferUp);
+  gradients->setParallelData( &parallelData, &transferU);
   
   local_timeDerivatives.UseDevice(true);
   local_timeDerivatives.SetSize(5);

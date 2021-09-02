@@ -665,7 +665,7 @@ void Gradients::multInverse_gpu(const int numElems,
     MFEM_FOREACH_THREAD(i,x,elDof)
     {
       MFEM_SHARED double gradUpi[216*5*3];
-      MFEM_SHARED double offsetIDs,offsetInv;
+      MFEM_SHARED int offsetIDs,offsetInv;
       
       const int eli = el + offsetElems;
       if(i==0) offsetIDs    = d_posDofIds[2*eli];

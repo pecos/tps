@@ -206,11 +206,19 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
       MFEM_SHARED double Rflux[5], u1[5], u2[5], nor[3];
       MFEM_SHARED double vFlux1[5*3],vFlux2[5*3];
       MFEM_SHARED double gradUp1[5*3],gradUp2[5*3];
+      MFEM_SHARED double weight;
+      MFEM_SHARED int offsetEl1,elFaces,elj;
+      MFEM_SHARED int gFace,Q,offsetShape1,offsetShape2;
+      MFEM_SHARED int offsetElj,dofj,dof1,dof2;
+      MFEM_SHARED bool swapElems;
       
       const int eli = elemOffset + el;
-      const int offsetEl1 = d_posDofIds[2*eli];
+      if(i==0) offsetEl1 = d_posDofIds[2*eli];
+      if(i==1) elFaces = d_elemFaces[7*eli];
+      MFEM_SYNC_THREAD;
+      
       const int indexi = d_nodesIDs[offsetEl1+i];
-      const int elFaces = d_elemFaces[7*eli];
+      int index; // variable for auxiliary index
       
       for(int eq=0;eq<num_equation;eq++)
       {
@@ -224,27 +232,32 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
       // loop over faces
       for(int face=0;face<elFaces;face++)
       {
-        const int gFace = d_elemFaces[7*eli+face+1];
-        const int Q     = d_elems12Q[3*gFace+2];
-        const int offsetShape1 = gFace*maxIntPoints*(maxDofs+1+dim);
-        const int offsetShape2 = gFace*maxIntPoints*maxDofs;
-        bool swapElems = false;
+        if(i==0) gFace = d_elemFaces[7*eli+face+1];
+        MFEM_SYNC_THREAD;
+        if(i==0) Q     = d_elems12Q[3*gFace+2];
+        if(i==1) offsetShape1 = gFace*maxIntPoints*(maxDofs+1+dim);
+        if(i==1) offsetShape2 = gFace*maxIntPoints*maxDofs;
+        if(i==1) swapElems = false;
         
         // get neighbor
-        int elj = d_elems12Q[3*gFace];
+        if(i==2) elj = d_elems12Q[3*gFace];
+        MFEM_SYNC_THREAD;
+        
         if( elj==eli )
         {
-          elj = d_elems12Q[3*gFace+1];
+          if(i==0) elj = d_elems12Q[3*gFace+1];
         }else
         {
           swapElems = true;
         }
+        MFEM_SYNC_THREAD;
         
-        const int offsetElj = d_posDofIds[2*elj];
-        int dofj = d_posDofIds[2*elj+1];
+        if(i==0) offsetElj = d_posDofIds[2*elj];
+        if(i==1) dofj = d_posDofIds[2*elj+1];
+        MFEM_SYNC_THREAD;
         
-        int dof1 = elDof;
-        int dof2 = dofj;
+        dof1 = elDof;
+        dof2 = dofj;
         if( swapElems )
         {
           dof1 = dofj;
@@ -267,7 +280,7 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
         // loop over integration points
         for(int k=0;k<Q;k++)
         {
-          const double weight = d_shapeWnor1[offsetShape1+maxDofs +k*(maxDofs+1+dim)];
+          if(i==0) weight = d_shapeWnor1[offsetShape1+maxDofs +k*(maxDofs+1+dim)];
           
           for(int eq=i;eq<num_equation;eq+=elDof)
           {
@@ -290,7 +303,7 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
 //                 u1[eq] += l1[j]*Uj[j+eq*dof1];
 //                 for(int d=0;d<dim;d++) gradUp1[eq+d*num_equation] += 
 //                        l1[j]*gradUpj[j+eq*dof1+d*num_equation*dof1];
-                int index = d_nodesIDs[offsetElj+j];
+                index = d_nodesIDs[offsetElj+j];
                 u1[eq] += l1[j]*d_x[index + eq*Ndofs];
                 for(int d=0;d<dim;d++) gradUp1[eq+d*num_equation] += 
                        l1[j]*d_gradUp[index+eq*Ndofs+d*num_equation*Ndofs];
@@ -314,7 +327,7 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
 //                 u2[eq] += l2[j]*Uj[j+eq*dof2];
 //                 for(int d=0;d<dim;d++) gradUp2[eq+d*num_equation] += 
 //                       l2[j]*gradUpj[j+eq*dof2+d*num_equation*dof2];
-                int index = d_nodesIDs[offsetElj+j];
+                index = d_nodesIDs[offsetElj+j];
                 u2[eq] += l2[j]*d_x[index + eq*Ndofs];
                 for(int d=0;d<dim;d++) gradUp2[eq+d*num_equation] += 
                       l2[j]*d_gradUp[index+eq*Ndofs+d*num_equation*Ndofs];
@@ -438,22 +451,28 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(const Vector& x,
       MFEM_SHARED double Rflux[5], u1[5], u2[5], nor[3];
       MFEM_SHARED double gradUp1[5*3],gradUp2[5*3];
       MFEM_SHARED double vFlux1[5*3],vFlux2[5*3];
+      MFEM_SHARED double weight;
+      MFEM_SHARED int el1,numFaces,dof1;
+      MFEM_SHARED int f,dof2,Q,offsetEl1;
+      MFEM_SHARED bool elemDataRecovered;
       
-      const int el1      = d_sharedElemsFaces[0+el*7];
-      const int numFaces = d_sharedElemsFaces[1+el*7];
-      const int dof1 = d_sharedElem1Dof12Q[1+d_sharedElemsFaces[2+el*7]*4];
+      if(i==0) el1      = d_sharedElemsFaces[0+el*7];
+      if(i==1) numFaces = d_sharedElemsFaces[1+el*7];
+      if(i==2) dof1 = d_sharedElem1Dof12Q[1+d_sharedElemsFaces[2+el*7]*4];
+      MFEM_SYNC_THREAD;
       
-      bool elemDataRecovered = false;
+      elemDataRecovered = false;
       int indexi;
       
       for(int elFace=0;elFace<numFaces;elFace++)
       {
-        const int f = d_sharedElemsFaces[1+elFace+1+el*7];
+        if(i==0) f = d_sharedElemsFaces[1+elFace+1+el*7];
+        if(i==1) offsetEl1 = d_posDofIds[2*el1];
+        MFEM_SYNC_THREAD;
 
-        const int dof2 = d_sharedElem1Dof12Q[2+f*4];
-        const int Q    = d_sharedElem1Dof12Q[3+f*4];
-        
-        const int offsetEl1 = d_posDofIds[2*el1];
+        if(i==0) dof2 = d_sharedElem1Dof12Q[2+f*4];
+        if(i==1) Q    = d_sharedElem1Dof12Q[3+f*4];
+        MFEM_SYNC_THREAD;
         
         if( i<dof1 && !elemDataRecovered )
         {
@@ -471,7 +490,7 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(const Vector& x,
         
         for(int k=0;k<Q;k++)
         {
-          const double weight = 
+          if(i==maxDofs-1) weight = 
             d_sharedShapeWnor1[maxDofs+k*(maxDofs+1+dim)+f*maxIntPoints*(maxDofs+1+dim)];
           if(i<dof1) l1[i] = d_sharedShapeWnor1[i+k*(maxDofs+1+dim)+f*maxIntPoints*(maxDofs+1+dim)];
           if(i<dim ) nor[i]= 
