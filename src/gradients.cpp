@@ -203,7 +203,7 @@ void Gradients::computeGradients()
 #ifdef _GPU_
 void Gradients::computeGradients_domain()
 {
-  DGNonLinearForm::setToZero_gpu(*gradUp,gradUp->Size());
+//   DGNonLinearForm::setToZero_gpu(*gradUp,gradUp->Size());
   
   for(int elType=0;elType<gpuArrays.numElems.Size();elType++)
   {
@@ -362,7 +362,7 @@ void Gradients::computeGradients_gpu(const int numElems,
       {
         for(int d=0;d<dim;d++)
         {
-          d_gradUp[indexi+eq*totalDofs+d*num_equation*totalDofs] += 
+          d_gradUp[indexi+eq*totalDofs+d*num_equation*totalDofs] = 
                                       gradUpi[i+eq*elDof+d*num_equation*elDof];
         }
       }

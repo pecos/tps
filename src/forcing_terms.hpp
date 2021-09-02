@@ -75,7 +75,7 @@ public:
   
   // GPU functions
 #ifdef _GPU_
-  static void updateTerms_gpu(Vector &in
+  static void updateTerms_gpu(Vector &in,
                               const int numElems,
                               const int offsetElems,
                               const int elDof,

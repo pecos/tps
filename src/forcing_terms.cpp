@@ -23,13 +23,13 @@ gpuArrays(_gpuArrays)
   h_numElems  = gpuArrays.numElems.HostRead();
   h_posDofIds = gpuArrays.posDofIds.HostRead();
   
-  b = new ParGridFunction(vfes);
-  
-  // Initialize to zero
-  int dof = vfes->GetNDofs();
-  double *data = b->HostWrite();
-  for(int ii=0;ii<dof*num_equation;ii++) data[ii] = 0.;
-  auto d_b = b->ReadWrite();
+//   b = new ParGridFunction(vfes);
+//   
+//   // Initialize to zero
+//   int dof = vfes->GetNDofs();
+//   double *data = b->HostWrite();
+//   for(int ii=0;ii<dof*num_equation;ii++) data[ii] = 0.;
+//   auto d_b = b->ReadWrite();
 }
 
 ForcingTerms::~ForcingTerms()
@@ -215,6 +215,7 @@ void ConstantPressureGradient::updateTerms_gpu( Vector &in,
 {
   const double *d_pressGrad = pressGrad.Read();
   double *d_b = b->Write();
+  double *d_in = in.ReadWrite();
   
   const double *d_Up = Up.Read();
   double *d_gradUp = gradUp.ReadWrite();
@@ -291,17 +292,18 @@ void ConstantPressureGradient::updateTerms_gpu( Vector &in,
       // write to global memory
       for(int eq=1;eq<num_equation;eq++)
       {
-        d_b[indexi+eq*totalDofs] = contrib[i+(eq-1)*elDof];
+//         d_b[indexi+eq*totalDofs] = contrib[i+(eq-1)*elDof];
+        d_in[indexi+eq*totalDofs] += contrib[i+(eq-1)*elDof];
+        
       }
     }
   });
   
-  double *d_in = in.ReadWrite();
-  
-  MFEM_FORALL(n,in.Size(),
-  {
-    d_in[n] += d_b[n];
-  });
+//   double *d_in = in.ReadWrite();
+//   MFEM_FORALL(n,in.Size(),
+//   {
+//     d_in[n] += d_b[n];
+//   });
 }
 
 #endif
