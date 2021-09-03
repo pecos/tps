@@ -47,6 +47,8 @@ private:
   bool computeMean;
   
   void initiMeanAndRMS();
+
+  void addSample_cpu();
   
   Vector local_sums;
   Vector tmp_vector;;
@@ -83,6 +85,13 @@ public:
   
   // GPU functions
 #ifdef _GPU_
+  static void addSample_gpu(ParGridFunction *meanUp,
+                            ParGridFunction *rms,
+                            int &samplesMean,
+                            const ParGridFunction *Up,
+                            const int &Ndof,
+                            const int &dim,
+                            const int &num_equation );
   static void sumValues_gpu(const Vector &meanUp,
                             const Vector &rms,
                             Vector &local_sums,
