@@ -41,7 +41,9 @@ void WallBC::initBCs()
 {
   if( !BCinit )
   {
+#ifdef _GPU_
     buildWallElemsArray(intPointsElIDBC);
+#endif
   }
   BCinit = true;
 }
