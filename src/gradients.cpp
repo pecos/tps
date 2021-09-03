@@ -313,7 +313,8 @@ void Gradients::computeGradients_gpu(const int numElems,
       MFEM_SHARED int offsetIDs, offsetDShape,Q,dof1,dof2;
       MFEM_SHARED int elj,elFaces,gFace,offsetShape1,
                       offsetShape2,offsetElj,dofj;
-      MFEM_SHARED double weight;
+      MFEM_SHARED int indexes[216];
+      MFEM_SHARED double weight,weightDetJac;
       MFEM_SHARED bool swapElems;
       
       double state[5], KE[3];
@@ -356,8 +357,8 @@ void Gradients::computeGradients_gpu(const int numElems,
       double gradUpk[5*3];
       for(int k=0;k<Q;k++)
       {
-        const double weightDetJac = d_elemShapeDshapeWJ[offsetDShape+elDof+dim*elDof+k*((dim+1)*elDof+1)];
-        l1[i]                     = d_elemShapeDshapeWJ[offsetDShape+i+              k*((dim+1)*elDof+1)];
+        if(i==0) weightDetJac = d_elemShapeDshapeWJ[offsetDShape+elDof+dim*elDof+k*((dim+1)*elDof+1)];
+        l1[i]                 = d_elemShapeDshapeWJ[offsetDShape+i+              k*((dim+1)*elDof+1)];
         for(int d=0;d<dim;d++) dl1[i+d*elDof] = 
                                     d_elemShapeDshapeWJ[offsetDShape+elDof+i+d*elDof+k*((dim+1)*elDof+1)];
         for(int j=0;j<num_equation*dim;j++) gradUpk[j] = 0.;
@@ -431,12 +432,14 @@ void Gradients::computeGradients_gpu(const int numElems,
           dof2 = elDof;
         }
         
+        for(int j=i;j<dofj;j+=elDof) indexes[j] = d_nodesIDs[offsetElj+j];
+        
         // get data from neightbor
         for(int eq=0;eq<num_equation;eq++)
         {
           for(int j=i;j<dofj;j+=elDof)
           {
-            int index = d_nodesIDs[offsetElj+j];
+            int index = indexes[j];
             //Uj[j + eq*dofj] = d_Up[index + eq*totalDofs];
             // since gradUpi is no longer needed, use it to store Uj
             gradUpi[j + eq*dofj] = d_x[index + eq*totalDofs];

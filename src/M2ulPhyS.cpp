@@ -534,6 +534,7 @@ void M2ulPhyS::initVariables()
 
 void M2ulPhyS::initIndirectionArrays()
 {
+#ifdef _GPU_
   gpuArrays.posDofIds.SetSize( 2*vfes->GetNE() );
   gpuArrays.posDofIds = 0;
   auto hposDofIds = gpuArrays.posDofIds.HostWrite();
@@ -826,7 +827,6 @@ void M2ulPhyS::initIndirectionArrays()
     gpuArrays.elemPosQ_shapeDshapeWJ.Read();
   }
 
-#ifdef _GPU_
   auto dnodesID = gpuArrays.nodesIDs.Read();
   auto dnumElems = gpuArrays.numElems.Read();
   auto dposDofIds = gpuArrays.posDofIds.Read();
@@ -840,6 +840,20 @@ void M2ulPhyS::initIndirectionArrays()
   auto dshapesBC = shapesBC.Read();
   auto dnormalsBC = normalsWBC.Read();
   auto dintPointsELIBC = intPointsElIDBC.Read();
+#else
+  gpuArrays.nodesIDs.SetSize(1);
+  gpuArrays.numElems.SetSize(1);
+  gpuArrays.posDofIds.SetSize(1);
+
+  gpuArrays.shapeWnor1.SetSize(1);
+  gpuArrays.shape2.SetSize(1);
+
+  gpuArrays.elemFaces.SetSize(1);
+  gpuArrays.elems12Q.SetSize(1);
+
+  shapesBC.SetSize(1);
+  normalsWBC.SetSize(1);
+  intPointsElIDBC.SetSize(1);
 #endif
 }
 
