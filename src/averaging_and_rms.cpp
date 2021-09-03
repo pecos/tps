@@ -263,8 +263,8 @@ void Averaging::read_meanANDrms_restart_files()
 
 void Averaging::initiMeanAndRMS()
 {
-  double *dataMean = meanUp->GetData();
-  double *dataRMS  = rms->GetData();
+  double *dataMean = meanUp->HostWrite();
+  double *dataRMS  = rms->HostWrite();
   int dof = vfes->GetNDofs();
   
   for(int i=0; i<dof; i++)

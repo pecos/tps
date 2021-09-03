@@ -8,7 +8,8 @@ RUNFILE_C1="inputs/input.cyl-2d.caseC1"
 RUNFILE_C2="inputs/input.cyl-2d.caseC2"
 RUNFILE_D1="inputs/input.cyl-2d.caseD1"
 RUNFILE_D2="inputs/input.cyl-2d.caseD2"
-OPT="-d cuda"
+#OPT="-d cuda"
+OPT=""
 
 setup() {
     SOLN_FILE=restart_output.sol.h5
