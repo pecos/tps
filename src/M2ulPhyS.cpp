@@ -850,6 +850,9 @@ void M2ulPhyS::initIndirectionArrays()
 
   gpuArrays.elemFaces.SetSize(1);
   gpuArrays.elems12Q.SetSize(1);
+  
+  gpuArrays.elemShapeDshapeWJ.SetSize(1);
+  gpuArrays.elemPosQ_shapeDshapeWJ.SetSize(1);
 
   shapesBC.SetSize(1);
   normalsWBC.SetSize(1);
