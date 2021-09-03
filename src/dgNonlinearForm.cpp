@@ -264,7 +264,7 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
           dof1 = dofj;
           dof2 = elDof;
         }
-        for(int j=0;j<dofj;j++) indexes[j] = d_nodesIDs[offsetElj+j];
+        for(int j=i;j<dofj;j+=elDof) indexes[j] = d_nodesIDs[offsetElj+j];
         // get data from neightbor
 //         for(int eq=0;eq<num_equation;eq++)
 //         {
@@ -293,7 +293,6 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
           
           for(int j=i;j<dof1;j+=elDof) l1[j] = d_shapeWnor1[offsetShape1+j+k*(maxDofs+1+dim)];
           for(int j=i;j<dof2;j+=elDof) l2[j] = d_shape2[offsetShape2+j+k*maxDofs];
-          for(int j=i;j<dof2;j+=elDof) 
           MFEM_SYNC_THREAD;
             
           for(int eq=i;eq<num_equation;eq+=elDof)
