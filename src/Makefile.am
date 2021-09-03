@@ -9,6 +9,10 @@ if HIP_ENABLED
 AM_CPPFLAGS += $(HIP_CXXFLAGS)
 endif
 
+if GSLIB_ENABLED
+AM_CPPFLAGS += -I$(GSLIB_INC)
+endif
+
 # C++ main solver binary
 bin_PROGRAMS         = tps
 tps_SOURCES          = main.cpp
@@ -37,6 +41,10 @@ if HIP_ENABLED
 tps_LDFLAGS         += $(HIP_LDFLAGS)
 endif
 
+if GSLIB_ENABLED
+tps_LDADD   += -lgs
+tps_LDFLAGS += -L$(GSLIB_LIB)
+endif
 
 # C++ solver library sources
 cxx_sources          = averaging_and_rms.cpp faceGradientIntegration.cpp M2ulPhyS.cpp rhs_operator.cpp wallBC.cpp \

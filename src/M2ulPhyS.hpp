@@ -273,22 +273,33 @@ public:
   M2ulPhyS(MPI_Session &_mpi,
            string &inputFileName );
   ~M2ulPhyS();
-  
+
   void projectInitialSolution();
-  
+  void writeHDF5(){ restart_files_hdf5("write"); }
+  void writeParaview(int iter, double time){
+    paraviewColl->SetCycle(iter);
+    paraviewColl->SetTime(time);
+    paraviewColl->Save();
+  }
+
   void Iterate();
 
   void Header();
-  
+
   // Accessors
   RHSoperator getRHSoperator(){ return *rhsOperator; }
+  ParMesh* GetMesh(){ return mesh; }
+  FiniteElementCollection* GetFEC(){ return fec; }
+  ParFiniteElementSpace* GetFESpace(){ return vfes; }
+  ParGridFunction* GetSolutionGF(){ return U; }
+  RunConfiguration& GetConfig(){ return config; }
 
   static int Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_print);
 
   // Exit code access
   void SetStatus(int code){exit_status_=code; return;}
   int  GetStatus(){return exit_status_;}
-  
+
 };
 
 #endif // M2ulPhyS_CLASS
