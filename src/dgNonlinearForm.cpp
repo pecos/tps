@@ -200,7 +200,7 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
   {
     MFEM_FOREACH_THREAD(i,x,elDof)
     {
-      MFEM_SHARED double Ui[216*5], /*Uj[216*5],*/ Fcontrib[216*5];
+      MFEM_SHARED double Ui[216*5], Uj[216*5], Fcontrib[216*5];
       MFEM_SHARED double gradUpi[216*5*3]/*,gradUpj[216*5*3]*/;
       MFEM_SHARED double l1[216],l2[216];
       MFEM_SHARED double Rflux[5], u1[5], u2[5], nor[3];
@@ -252,18 +252,19 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
           dof2 = elDof;
         }
         
+        for(int j=i;j<dofj;j+=elDof) indexes_j[j] = d_nodesIDs[offsetElj+j];
+        
         // get data from neightbor
-//         for(int eq=0;eq<num_equation;eq++)
-//         {
-//           for(int j=i;j<dofj;j+=elDof)
-//           {
-//             int index = d_nodesIDs[offsetElj+j];
-//             Uj[j + eq*dofj] = d_x[index + eq*Ndofs];
+        for(int eq=0;eq<num_equation;eq++)
+        {
+          for(int j=i;j<dofj;j+=elDof)
+          {
+            int index = indexes_j[j];
+            Uj[j + eq*dofj] = d_x[index + eq*Ndofs];
 //             for(int d=0;d<dim;d++) gradUpj[j+eq*dofj+d*num_equation*dofj] =
 //                            d_gradUp[index+eq*Ndofs+d*num_equation*Ndofs];
-//           }
-//         }
-        for(int j=i;j<dofj;j+=elDof) indexes_j[j] = d_nodesIDs[offsetElj+j];
+          }
+        }
         MFEM_SYNC_THREAD;
         
         // loop over integration points
@@ -289,11 +290,11 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
             {
               for(int j=0;j<dof1;j++)
               {
-//                 u1[eq] += l1[j]*Uj[j+eq*dof1];
+                u1[eq] += l1[j]*Uj[j+eq*dof1];
 //                 for(int d=0;d<dim;d++) gradUp1[eq+d*num_equation] += 
 //                        l1[j]*gradUpj[j+eq*dof1+d*num_equation*dof1];
                 int index = indexes_j[j];
-                u1[eq] += l1[j]*d_x[index + eq*Ndofs];
+//                 u1[eq] += l1[j]*d_x[index + eq*Ndofs];
                 for(int d=0;d<dim;d++) gradUp1[eq+d*num_equation] += 
                        l1[j]*d_gradUp[index+eq*Ndofs+d*num_equation*Ndofs];
               }
@@ -313,11 +314,11 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
               }
               for(int j=0;j<dof2;j++)
               {
-//                 u2[eq] += l2[j]*Uj[j+eq*dof2];
+                u2[eq] += l2[j]*Uj[j+eq*dof2];
 //                 for(int d=0;d<dim;d++) gradUp2[eq+d*num_equation] += 
 //                       l2[j]*gradUpj[j+eq*dof2+d*num_equation*dof2];
                 int index = indexes_j[j];
-                u2[eq] += l2[j]*d_x[index + eq*Ndofs];
+//                 u2[eq] += l2[j]*d_x[index + eq*Ndofs];
                 for(int d=0;d<dim;d++) gradUp2[eq+d*num_equation] += 
                       l2[j]*d_gradUp[index+eq*Ndofs+d*num_equation*Ndofs];
               }
