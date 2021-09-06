@@ -23,38 +23,38 @@ gpuArrays(_gpuArrays)
   h_numElems  = gpuArrays.numElems.HostRead();
   h_posDofIds = gpuArrays.posDofIds.HostRead();
   
-  b = new ParGridFunction(vfes);
-  
-  // Initialize to zero
-  int dof = vfes->GetNDofs();
-  double *data = b->HostWrite();
-  for(int ii=0;ii<dof*num_equation;ii++) data[ii] = 0.;
-  auto d_b = b->ReadWrite();
+//   b = new ParGridFunction(vfes);
+//   
+//   // Initialize to zero
+//   int dof = vfes->GetNDofs();
+//   double *data = b->HostWrite();
+//   for(int ii=0;ii<dof*num_equation;ii++) data[ii] = 0.;
+//   auto d_b = b->ReadWrite();
 }
 
 ForcingTerms::~ForcingTerms()
 {
-  delete b;
+//   delete b;
 }
 
-void ForcingTerms::addForcingIntegrals(Vector &in)
-{
-#ifdef _GPU_
-  const double *data = b->Read();
-  double *d_in = in.Write();
-  
-  MFEM_FORALL(n,in.Size(),
-  {
-    d_in[n] += data[n];
-  });
-#else
-  double *dataB = b->GetData();
-  for(int i=0; i<in.Size(); i++)
-  {
-    in[i] = in[i] + dataB[i];
-  }
-#endif
-}
+// void ForcingTerms::addForcingIntegrals(Vector &in)
+// {
+// #ifdef _GPU_
+//   const double *data = b->Read();
+//   double *d_in = in.Write();
+//   
+//   MFEM_FORALL(n,in.Size(),
+//   {
+//     d_in[n] += data[n];
+//   });
+// #else
+//   double *dataB = b->GetData();
+//   for(int i=0; i<in.Size(); i++)
+//   {
+//     in[i] = in[i] + dataB[i];
+//   }
+// #endif
+// }
 
 ConstantPressureGradient::ConstantPressureGradient(const int& _dim, 
                                                    const int& _num_equation, 
@@ -86,10 +86,10 @@ ForcingTerms(_dim,
   }
   pressGrad.ReadWrite();
   
-  updateTerms();
+//   updateTerms();
 }
 
-void ConstantPressureGradient::updateTerms()
+void ConstantPressureGradient::updateTerms(Vector &in)
 {
 #ifdef _GPU_
   for(int elType=0;elType<gpuArrays.numElems.Size();elType++)
@@ -106,7 +106,7 @@ void ConstantPressureGradient::updateTerms()
                     dof_el,
                     vfes->GetNDofs(),
                     pressGrad,
-                    b,
+                    in,
                     *Up,
                     *gradUp,
                     num_equation,
@@ -117,7 +117,7 @@ void ConstantPressureGradient::updateTerms()
   int numElem = vfes->GetNE();
   int dof = vfes->GetNDofs();
   
-  double *data = b->GetData();
+  double *data = in.GetData();
   const double *dataUp = Up->GetData();
   const double *dataGradUp = gradUp->GetData();
   
@@ -137,12 +137,12 @@ void ConstantPressureGradient::updateTerms()
     Array<int> nodes;
     vfes->GetElementVDofs(el, nodes);
     
-    // set to 0
-    for(int n=0;n<dof_elem;n++)
-    {
-      int i = nodes[n];
-      for(int eq=1;eq<num_equation;eq++) data[i+eq*dof] = 0.;
-    }
+//     // set to 0
+//     for(int n=0;n<dof_elem;n++)
+//     {
+//       int i = nodes[n];
+//       for(int eq=1;eq<num_equation;eq++) data[i+eq*dof] = 0.;
+//     }
     
     
     const int order = elem->GetOrder();
@@ -203,7 +203,7 @@ void ConstantPressureGradient::updateTerms_gpu( const int numElems,
                                                 const int elDof,
                                                 const int totalDofs,
                                                 Vector &pressGrad,
-                                                ParGridFunction *b,
+                                                Vector &in,
                                                 const Vector &Up,
                                                 Vector &gradUp,
                                                 const int num_equation,
@@ -211,7 +211,7 @@ void ConstantPressureGradient::updateTerms_gpu( const int numElems,
                                                 const volumeFaceIntegrationArrays &gpuArrays)
 {
   const double *d_pressGrad = pressGrad.Read();
-  double *d_b = b->Write();
+  double *d_in = in.ReadWrite();
   
   const double *d_Up = Up.Read();
   double *d_gradUp = gradUp.ReadWrite();
@@ -288,7 +288,8 @@ void ConstantPressureGradient::updateTerms_gpu( const int numElems,
       // write to global memory
       for(int eq=1;eq<num_equation;eq++)
       {
-        d_b[indexi+eq*totalDofs] = contrib[i+(eq-1)*elDof];
+//         d_b[indexi+eq*totalDofs] = contrib[i+(eq-1)*elDof];
+        d_in[indexi+eq*totalDofs] += contrib[i+(eq-1)*elDof];
       }
     }
   });
@@ -320,12 +321,12 @@ ForcingTerms(_dim,
   initMasaHandler("forcing",dim, _config.GetEquationSystem(),_config.GetViscMult());
 }
 
-void MASA_forcings::updateTerms()
+void MASA_forcings::updateTerms(Vector &in)
 {
   int numElem = vfes->GetNE();
   int dof = vfes->GetNDofs();
   
-  double *data = b->GetData();
+  double *data = in.GetData();
   //const double *dataUp = Up->GetData();
   
   for(int el=0; el<numElem; el++)
@@ -339,11 +340,11 @@ void MASA_forcings::updateTerms()
     vfes->GetElementVDofs(el, nodes);
     
     // set to 0
-    for(int n=0;n<dof_elem;n++)
-    {
-      int i = nodes[n];
-      for(int eq=0;eq<num_equation;eq++) data[i+eq*dof] = 0.;
-    }
+//     for(int n=0;n<dof_elem;n++)
+//     {
+//       int i = nodes[n];
+//       for(int eq=0;eq<num_equation;eq++) data[i+eq*dof] = 0.;
+//     }
     
     
     const int order = elem->GetOrder();

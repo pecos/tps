@@ -343,8 +343,8 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
     // updated for each RK substep.  Instead, get time from parent
     // class using TimeDependentOperator::GetTime().
     forcing[i]->setTime(this->GetTime());
-    forcing[i]->updateTerms();
-    forcing[i]->addForcingIntegrals(z);
+    forcing[i]->updateTerms(z);
+//     forcing[i]->addForcingIntegrals(z);
   }
 
   // 3. Multiply element-wise by the inverse mass matrices.

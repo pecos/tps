@@ -32,7 +32,7 @@ protected:
   const int *h_posDofIds;
   
   // added term
-  ParGridFunction *b;
+//   ParGridFunction *b;
   
 public:
   ForcingTerms( const int &_dim,
@@ -47,8 +47,8 @@ public:
   ~ForcingTerms();
 
   void setTime(double _time) { time = _time; }
-  virtual void updateTerms() = 0;
-  virtual void addForcingIntegrals(Vector &in);
+  virtual void updateTerms(Vector &in) = 0;
+//   virtual void addForcingIntegrals(Vector &in);
 };
 
 // Constant pressure gradient term 
@@ -71,7 +71,7 @@ public:
                             RunConfiguration &_config );
   
   // Terms do not need updating
-  virtual void updateTerms();
+  virtual void updateTerms(Vector &in);
   
   // GPU functions
 #ifdef _GPU_
@@ -80,7 +80,7 @@ public:
                               const int elDof,
                               const int totalDofs,
                               Vector &pressGrad,
-                              ParGridFunction *b,
+                              Vector &in,
                               const Vector &Up,
                               Vector &gradUp,
                               const int num_equation,
@@ -107,7 +107,7 @@ public:
                 const volumeFaceIntegrationArrays &gpuArrays,
                 RunConfiguration &_config );
 
-  virtual void updateTerms();
+  virtual void updateTerms(Vector &in);
 };
 #endif // _MASA_
 
