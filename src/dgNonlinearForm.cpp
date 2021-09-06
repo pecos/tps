@@ -292,7 +292,7 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
 //                 u1[eq] += l1[j]*Uj[j+eq*dof1];
 //                 for(int d=0;d<dim;d++) gradUp1[eq+d*num_equation] += 
 //                        l1[j]*gradUpj[j+eq*dof1+d*num_equation*dof1];
-                int index = indexes_j[offsetElj+j];
+                int index = indexes_j[j];
                 u1[eq] += l1[j]*d_x[index + eq*Ndofs];
                 for(int d=0;d<dim;d++) gradUp1[eq+d*num_equation] += 
                        l1[j]*d_gradUp[index+eq*Ndofs+d*num_equation*Ndofs];
@@ -316,7 +316,7 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
 //                 u2[eq] += l2[j]*Uj[j+eq*dof2];
 //                 for(int d=0;d<dim;d++) gradUp2[eq+d*num_equation] += 
 //                       l2[j]*gradUpj[j+eq*dof2+d*num_equation*dof2];
-                int index = indexes_j[offsetElj+j];
+                int index = indexes_j[j];
                 u2[eq] += l2[j]*d_x[index + eq*Ndofs];
                 for(int d=0;d<dim;d++) gradUp2[eq+d*num_equation] += 
                       l2[j]*d_gradUp[index+eq*Ndofs+d*num_equation*Ndofs];
