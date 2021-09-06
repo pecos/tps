@@ -263,7 +263,7 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
 //                            d_gradUp[index+eq*Ndofs+d*num_equation*Ndofs];
 //           }
 //         }
-        for(int j=i;j<dof1;j+=elDof) indexes_j[j] = d_nodesIDs[offsetElj+j];
+        for(int j=i;j<dofj;j+=elDof) indexes_j[j] = d_nodesIDs[offsetElj+j];
         MFEM_SYNC_THREAD;
         
         // loop over integration points
