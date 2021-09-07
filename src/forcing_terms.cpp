@@ -228,6 +228,7 @@ void ConstantPressureGradient::updateTerms_gpu( const int numElems,
       MFEM_SHARED double Ui[216*5],gradUpi[216*5*3];
       MFEM_SHARED double l1[216];
       MFEM_SHARED double contrib[216*4];
+      MFEM_SHARED double pGrad[3];
       
       const int eli = el + offsetElems;
       const int offsetIDs    = d_posDofIds[2*eli];
@@ -235,6 +236,8 @@ void ConstantPressureGradient::updateTerms_gpu( const int numElems,
       const int Q            = d_elemPosQ_shapeDshapeWJ[2*eli +1];
       
       const int indexi = d_nodesIDs[offsetIDs + i];
+      
+      if(i<3) pGrad[i] = d_pressGrad[i];
       
       // fill out Ui and init gradUpi
       // NOTE: density is not being loaded to save mem. accesses
@@ -277,9 +280,9 @@ void ConstantPressureGradient::updateTerms_gpu( const int numElems,
         // add integration point contribution
         for(int d=0;d<dim;d++)
         {
-          contrib[i+d*elDof] -= d_pressGrad[d]*l1[i]*weightDetJac;
+          contrib[i+d*elDof] -= pGrad[d]*l1[i]*weightDetJac;
           
-          grad_pV -= upk[1+d]*d_pressGrad[d];
+          grad_pV -= upk[1+d]*pGrad[d];
           grad_pV -= upk[num_equation-1]*gradUpk[1+d +d*num_equation];
         }
         contrib[i+dim*elDof] += grad_pV*l1[i]*weightDetJac;
