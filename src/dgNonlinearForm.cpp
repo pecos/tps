@@ -279,8 +279,8 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
           uk2[n] = 0.;
           for(int d=0;d<dim;d++)
           {
-            gradUpk1[n+d*64*5] = 0.;
-            gradUpk2[n+d*64*5] = 0.;
+            gradUpk1[n+d*Q*num_equation] = 0.;
+            gradUpk2[n+d*Q*num_equation] = 0.;
           }
         }
         MFEM_SYNC_THREAD;
@@ -306,6 +306,7 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
           {
             for(int j=0;j<dof1;j++) uk1[eq+k*num_equation] += tempData[j+eq*dof1]*shape[j];
           }
+          MFEM_SYNC_THREAD;
         }
         
         // U2
@@ -329,6 +330,7 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
           {
             for(int j=0;j<dof2;j++) uk2[eq+k*num_equation] += tempData[j+eq*dof2]*shape[j];
           }
+          MFEM_SYNC_THREAD;
         }
         
         // gradUp1
@@ -354,6 +356,7 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
               for(int j=0;j<dof1;j++) gradUpk1[eq+k*num_equation +d*Q*num_equation] += 
                                                                  tempData[j+eq*dof1]*shape[j];
             }
+            MFEM_SYNC_THREAD;
           }
         }
         
@@ -381,6 +384,7 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
               for(int j=0;j<dof2;j++) gradUpk2[eq+k*num_equation +d*Q*num_equation] += 
                                          tempData[j+eq*dof2]*shape[j];
             }
+            MFEM_SYNC_THREAD;
           }
         }
         
