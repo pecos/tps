@@ -273,7 +273,7 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
 //           }
 //         }
         // set interpolation data to 0
-        for(int n=i;n<64*5;n+=elDof)
+        for(int n=i;n<Q*num_equation;n+=elDof)
         {
           uk1[n] = 0.;
           uk2[n] = 0.;
@@ -391,6 +391,14 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
           for(int eq=i;eq<dim;eq+=elDof)
               nor[eq] = d_shapeWnor1[offsetShape1+maxDofs+1+eq+k*(maxDofs+1+dim)];
           
+          if( swapElems )
+          {
+            for(int j=i;j<dof2;j+=elDof) shape[j] = d_shape2[offsetShape2+j+k*maxDofs];
+          }else
+          {
+            for(int j=i;j<dof1;j+=elDof) shape[j] = d_shapeWnor1[offsetShape1+j+k*(maxDofs+1+dim)];
+          }
+          
 //           for(int eq=i;eq<num_equation;eq+=elDof)
 //           {
 //             u1[eq] = 0.; u2[eq] = 0.; Rflux[eq] = 0.;
@@ -400,7 +408,6 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
           
 //           for(int j=i;j<dof1;j+=elDof) l1[j] = d_shapeWnor1[offsetShape1+j+k*(maxDofs+1+dim)];
 //           for(int j=i;j<dof2;j+=elDof) l2[j] = d_shape2[offsetShape2+j+k*maxDofs];
-          MFEM_SYNC_THREAD;
             
 //           for(int eq=i;eq<num_equation;eq+=elDof)
 //           {
@@ -503,8 +510,10 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
           // add integration point contribution
           for(int eq=0;eq<num_equation;eq++)
           {
-            if( swapElems ) Fcontrib[i+eq*elDof] += weight*l2[i]*Rflux[eq];
-            else Fcontrib[i+eq*elDof] -= weight*l1[i]*Rflux[eq];
+//             if( swapElems ) Fcontrib[i+eq*elDof] += weight*l2[i]*Rflux[eq];
+//             else Fcontrib[i+eq*elDof] -= weight*l1[i]*Rflux[eq];
+            if( swapElems ) Fcontrib[i+eq*elDof] += weight*shape[i]*Rflux[eq];
+            else Fcontrib[i+eq*elDof] -= weight*shape[i]*Rflux[eq];
           }
         }
       }
