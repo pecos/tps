@@ -307,6 +307,7 @@ void Gradients::computeGradients_gpu(const int numElems,
       MFEM_SHARED double Ui[216*5],/*Uj[216*5],*/ gradUpi[216*5*3]/*,tmpGrad[216*5*3]*/;
       MFEM_SHARED double l1[216],dl1[216*3];
       MFEM_SHARED double meanU[5], u1[5], nor[3];
+      MFEM_SHARED int index_j[216];
       
       const int eli = el + offsetElems;
       const int offsetIDs    = d_posDofIds[2*eli];
@@ -398,12 +399,15 @@ void Gradients::computeGradients_gpu(const int numElems,
           dof2 = elDof;
         }
         
+        for(int j=i;j<dofj;j+=elDof) index_j[j] = d_nodesIDs[offsetElj+j];
+        MFEM_SYNC_THREAD;
+        
         // get data from neightbor
         for(int eq=0;eq<num_equation;eq++)
         {
           for(int j=i;j<dofj;j+=elDof)
           {
-            int index = d_nodesIDs[offsetElj+j];
+            int index = index_j[j];
             //Uj[j + eq*dofj] = d_Up[index + eq*totalDofs];
             // since gradUpi is no longer needed, use it to store Uj
             gradUpi[j + eq*dofj] = d_Up[index + eq*totalDofs];
