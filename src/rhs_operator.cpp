@@ -611,26 +611,53 @@ void RHSoperator::multiPlyInvers_gpu( Vector &y,
   
   MFEM_FORALL_2D(el,NE,dof,1,1,
   {
-    int eli = el + elemOffset;
-    int offsetInv = d_posDofInvM[2*eli];
-    int offsetIds = d_posDofIds[2*eli];
-    // find out how to dinamically allocate shared memory to
-    // store invMatrix values
-    MFEM_FOREACH_THREAD(eq,y,num_equation)
+    MFEM_FOREACH_THREAD(i,x,dof)
     {
-      MFEM_FOREACH_THREAD(i,x,dof)
+      MFEM_SHARED double data[216*5];
+      
+      int eli = el + elemOffset;
+      int offsetInv = d_posDofInvM[2*eli];
+      int offsetIds = d_posDofIds[2*eli];
+      
+      int index = d_nodesIDs[offsetIds+i];
+      
+      for(int eq=0;eq<num_equation;eq++)
       {
-        int index = d_nodesIDs[offsetIds+i];
-        double temp = 0;
-        for(int k=0;k<dof;k++)
-        {
-          int indexk = d_nodesIDs[offsetIds +k];
-          temp += d_invM[offsetInv +i*dof +k]*d_z[indexk + eq*totNumDof];
-        }
-        d_y[index+eq*totNumDof] = temp;
+        data[i+eq*dof] = d_z[index + eq*totNumDof];
+      }
+      MFEM_SYNC_THREAD;
+      
+      for(int eq=0;eq<num_equation;eq++)
+      {
+        double tmp = 0.;
+        for(int k=0;k<dof;k++) tmp += d_invM[offsetInv +i*dof +k]*data[k+eq*dof];
+        d_y[index+eq*totNumDof] = tmp;
       }
     }
   });
+  
+//   MFEM_FORALL_2D(el,NE,dof,1,1,
+//   {
+//     int eli = el + elemOffset;
+//     int offsetInv = d_posDofInvM[2*eli];
+//     int offsetIds = d_posDofIds[2*eli];
+//     // find out how to dinamically allocate shared memory to
+//     // store invMatrix values
+//     MFEM_FOREACH_THREAD(eq,y,num_equation)
+//     {
+//       MFEM_FOREACH_THREAD(i,x,dof)
+//       {
+//         int index = d_nodesIDs[offsetIds+i];
+//         double temp = 0;
+//         for(int k=0;k<dof;k++)
+//         {
+//           int indexk = d_nodesIDs[offsetIds +k];
+//           temp += d_invM[offsetInv +i*dof +k]*d_z[indexk + eq*totNumDof];
+//         }
+//         d_y[index+eq*totNumDof] = temp;
+//       }
+//     }
+//   });
 #endif
 }
 
