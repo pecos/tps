@@ -334,18 +334,6 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
     RHSoperator::copyZk2Z_gpu(z,zk,eq,vfes->GetNDofs());
 #endif
   }
-  
-  
-  // add forcing terms
-  for(int i=0; i<forcing.Size();i++)
-  {
-    // NOTE: Do not use RHSoperator::time here b/c it is not correctly
-    // updated for each RK substep.  Instead, get time from parent
-    // class using TimeDependentOperator::GetTime().
-    forcing[i]->setTime(this->GetTime());
-    forcing[i]->updateTerms(z);
-//     forcing[i]->addForcingIntegrals(z);
-  }
 
   // 3. Multiply element-wise by the inverse mass matrices.
 #ifdef _GPU_
@@ -388,6 +376,16 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
     y.SetSubVector(vdofs, ymat.GetData());
   }  
 #endif
+
+  // add forcing terms
+  for(int i=0; i<forcing.Size();i++)
+  {
+    // NOTE: Do not use RHSoperator::time here b/c it is not correctly
+    // updated for each RK substep.  Instead, get time from parent
+    // class using TimeDependentOperator::GetTime().
+    forcing[i]->setTime(this->GetTime());
+    forcing[i]->updateTerms(y);
+  }
 
   computeMeanTimeDerivatives(y);
 }
