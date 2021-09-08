@@ -777,6 +777,9 @@ void M2ulPhyS::initIndirectionArrays()
     std::vector<int> positions;
     temp.clear(); positions.clear();
     
+    std::vector<double> tempDx,tempDy,tempDz;
+    tempDx.clear();tempDy.clear();tempDz.clear();
+    
     for(int el=0;el<vfes->GetNE();el++)
     {
       positions.push_back( (int)temp.size() );
@@ -791,6 +794,9 @@ void M2ulPhyS::initIndirectionArrays()
       const IntegrationRule *ir = &intRules->Get(elem->GetGeomType(), intorder);
       
       positions.push_back( ir->GetNPoints() );
+      
+      DenseMatrix elDx(elDof), elDy(elDof), elDz(elDof);
+      elDx = 0.; elDy = 0.; elDz = 0.;
       
       for(int i=0;i<ir->GetNPoints();i++)
       {
@@ -811,7 +817,24 @@ void M2ulPhyS::initIndirectionArrays()
         for(int n=0;n<elDof;n++) temp.push_back( shape[n] );
         for(int d=0;d<dim;d++) for(int n=0;n<elDof;n++) temp.push_back( dshape(n,d) );
         temp.push_back( detJac );
+        
+        for(int ii=0;ii<elDof;ii++)
+        {
+          for(int jj=0;jj<elDof;jj++)
+          {
+            elDx(ii,jj) += shape(jj)*dshapeVec(ii)*detJac;
+            elDy(ii,jj) += shape(jj)*dshapeVec(ii+elDof)*detJac;
+            if(dim==3) elDz(ii,jj) += shape(jj)*dshapeVec(ii+2*elDof)*detJac;
+          }
+        }
       }
+      for(int i=0;i<elDof;i++) 
+        for(int j=0;j<elDof;j++)
+        {
+          tempDx.push_back( elDx(i,j) );
+          tempDy.push_back( elDy(i,j) );
+          if(dim==3) tempDz.push_back( elDz(i,j) );
+        }
     }
     
     gpuArrays.elemShapeDshapeWJ.UseDevice(true);
@@ -824,6 +847,25 @@ void M2ulPhyS::initIndirectionArrays()
     gpuArrays.elemPosQ_shapeDshapeWJ.SetSize( (int)positions.size() );
     for(int i=0;i<gpuArrays.elemPosQ_shapeDshapeWJ.Size();i++) gpuArrays.elemPosQ_shapeDshapeWJ[i] = positions[i];
     gpuArrays.elemPosQ_shapeDshapeWJ.Read();
+    
+    gpuArrays.Dx.UseDevice(true);
+    gpuArrays.Dx.SetSize( (int)tempDx.size() );
+    gpuArrays.Dy.UseDevice(true);
+    gpuArrays.Dy.SetSize( (int)tempDy.size() );
+    gpuArrays.Dz.UseDevice(true);
+    if(dim==3) gpuArrays.Dz.SetSize( (int)tempDz.size() );
+    else gpuArrays.Dz.SetSize( 1 );
+    
+    auto hDx = gpuArrays.Dx.HostWrite();
+    auto hDy = gpuArrays.Dy.HostWrite();
+    double *hDz = NULL;
+    if(dim==3) hDz = gpuArrays.Dz.HostWrite();
+    for(int n=0;n<tempDx.size();n++)
+    {
+      hDx[n] = tempDx[n];
+      hDy[n] = tempDy[n];
+      if(dim==3) hDz[n] = tempDz[n];
+    }
   }
 
 #ifdef _GPU_
@@ -840,6 +882,11 @@ void M2ulPhyS::initIndirectionArrays()
   auto dshapesBC = shapesBC.Read();
   auto dnormalsBC = normalsWBC.Read();
   auto dintPointsELIBC = intPointsElIDBC.Read();
+  
+  auto dDx = gpuArrays.Dx.Read();
+  auto dDy = gpuArrays.Dy.Read();
+  const double *dDz = NULL;
+  if(dim==3) dDz = gpuArrays.Dz.Read();
 #endif
 }
 
