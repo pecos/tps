@@ -82,3 +82,12 @@ libtps_a_SOURCES     = $(cxx_sources) $(headers)
 ### pytps_la_LDFLAGS     = -avoid-version -module
 ### #pytps_la_DEPENDENCIES  = libtps.la
 ### AM_CPPFLAGS         += -I/usr/include/python3.6m
+
+#---------------------------------
+# Embedded license header support
+#---------------------------------
+license:
+	echo 'Running license update tool for src files'
+	$(top_srcdir)/utils/update_license.pl -S=$(top_srcdir)/src $(top_srcdir)/LICENSE \
+		 $(headers)
+
