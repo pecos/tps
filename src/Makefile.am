@@ -89,5 +89,5 @@ libtps_a_SOURCES     = $(cxx_sources) $(headers)
 license:
 	echo 'Running license update tool for src files'
 	$(top_srcdir)/utils/update_license.pl -S=$(top_srcdir)/src $(top_srcdir)/LICENSE \
-		 $(headers)
+		 $(headers) $(cxx_sources)
 
