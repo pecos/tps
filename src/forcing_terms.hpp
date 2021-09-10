@@ -29,11 +29,13 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
-#ifndef FORCING_TERMS
-#define FORCING_TERMS
+#ifndef FORCING_TERMS_HPP_
+#define FORCING_TERMS_HPP_
+
+#include <tps_config.h>
 
 #include <mfem.hpp>
-#include <tps_config.h>
+
 #include "run_configuration.hpp"
 
 #ifdef _MASA_
@@ -43,11 +45,10 @@
 using namespace mfem;
 using namespace std;
 
-class ForcingTerms
-{
-protected:
+class ForcingTerms {
+ protected:
   double time;
-  
+
   const int &dim;
   const int &num_equation;
   const int &order;
@@ -56,20 +57,14 @@ protected:
   ParFiniteElementSpace *vfes;
   ParGridFunction *Up;
   ParGridFunction *gradUp;
-  
-  
+
   // added term
   ParGridFunction *b;
-  
-public:
-  ForcingTerms( const int &_dim,
-                const int &_num_equation,
-                const int &_order,
-                const int &_intRuleType,
-                IntegrationRules *_intRules,
-                ParFiniteElementSpace *_vfes,
-                ParGridFunction *_Up,
-                ParGridFunction *_gradUp );
+
+ public:
+  ForcingTerms(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
+               IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
+               ParGridFunction *_gradUp);
   ~ForcingTerms();
 
   void setTime(double _time) { time = _time; }
@@ -77,49 +72,34 @@ public:
   virtual void addForcingIntegrals(Vector &in);
 };
 
-// Constant pressure gradient term 
-class ConstantPressureGradient: public ForcingTerms
-{
-private:
-  //RunConfiguration &config;
+// Constant pressure gradient term
+class ConstantPressureGradient : public ForcingTerms {
+ private:
+  // RunConfiguration &config;
   double pressGrad[3];
-  
-public:
-  ConstantPressureGradient( const int &_dim,
-                            const int &_num_equation,
-                            const int &_order,
-                            const int &_intRuleType,
-                            IntegrationRules *_intRules,
-                            ParFiniteElementSpace *_vfes,
-                            ParGridFunction *_Up,
-                            ParGridFunction *_gradUp,
-                            RunConfiguration &_config );
-  
+
+ public:
+  ConstantPressureGradient(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
+                           IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
+                           ParGridFunction *_gradUp, RunConfiguration &_config);
+
   // Terms do not need updating
   virtual void updateTerms();
-  
-  //virtual void addForcingIntegrals(Vector &in);
+
+  // virtual void addForcingIntegrals(Vector &in);
 };
 
 #ifdef _MASA_
 // Manufactured Solution using MASA
-class MASA_forcings: public ForcingTerms
-{
-private:
-
-public:
-  MASA_forcings(const int &_dim,
-                const int &_num_equation,
-                const int &_order,
-                const int &_intRuleType,
-                IntegrationRules *_intRules,
-                ParFiniteElementSpace *_vfes,
-                ParGridFunction *_Up,
-                ParGridFunction *_gradUp,
-                RunConfiguration &_config );
+class MASA_forcings : public ForcingTerms {
+ private:
+ public:
+  MASA_forcings(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
+                IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
+                ParGridFunction *_gradUp, RunConfiguration &_config);
 
   virtual void updateTerms();
 };
-#endif // _MASA_
+#endif  // _MASA_
 
-#endif // FORCING_TERMS
+#endif  // FORCING_TERMS_HPP_

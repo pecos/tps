@@ -29,43 +29,37 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
-#ifndef SBP_INTEGRATOR
-#define SBP_INTEGRATOR
+#ifndef SBP_INTEGRATORS_HPP_
+#define SBP_INTEGRATORS_HPP_
+
+#include <tps_config.h>
 
 #include <mfem.hpp>
-#include <tps_config.h>
+
 #include "equation_of_state.hpp"
 #include "fluxes.hpp"
 
 using namespace mfem;
 
 // Volume integrals...DESCRIBE THE OPERATIONS
-class SBPintegrator : public NonlinearFormIntegrator
-{
-private:
-   
-   const int dim;
-   const int num_equation;
-   
-   const double &alpha;
-   
-   EquationOfState *eqState;
-   Fluxes *fluxClass;
-   
-   IntegrationRules *intRules;
+class SBPintegrator : public NonlinearFormIntegrator {
+ private:
+  const int dim;
+  const int num_equation;
 
-public:
-   SBPintegrator( EquationOfState *_eqState,
-                  Fluxes *_fluxClass,
-                  IntegrationRules *_intRules,
-                  const int _dim,
-                  const int _num_equation,
-                  double &_alpha
-                );
+  const double &alpha;
 
-   virtual void AssembleElementVector(const FiniteElement &el,
-                                      ElementTransformation &Tr,
-                                      const Vector &elfun, Vector &elvect);
+  EquationOfState *eqState;
+  Fluxes *fluxClass;
+
+  IntegrationRules *intRules;
+
+ public:
+  SBPintegrator(EquationOfState *_eqState, Fluxes *_fluxClass, IntegrationRules *_intRules, const int _dim,
+                const int _num_equation, double &_alpha);
+
+  virtual void AssembleElementVector(const FiniteElement &el, ElementTransformation &Tr, const Vector &elfun,
+                                     Vector &elvect);
 };
 
-#endif // SBP_INTEGRATOR
+#endif  // SBP_INTEGRATORS_HPP_

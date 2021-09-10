@@ -29,32 +29,27 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
-#ifndef GRAD_FACE_INTEGRATOR
-#define GRAD_FACE_INTEGRATOR
+#ifndef FACEGRADIENTINTEGRATION_HPP_
+#define FACEGRADIENTINTEGRATION_HPP_
+
+#include <tps_config.h>
 
 #include <mfem.hpp>
-#include <tps_config.h>
 
 using namespace mfem;
 
 // Interior face term: <F.n(u),[w]>
-class GradFaceIntegrator : public NonlinearFormIntegrator
-{
-private:
-   
-   const int dim;
-   const int num_equation;
-   IntegrationRules *intRules;
+class GradFaceIntegrator : public NonlinearFormIntegrator {
+ private:
+  const int dim;
+  const int num_equation;
+  IntegrationRules *intRules;
 
-public:
-   GradFaceIntegrator(IntegrationRules *_intRules,
-                      const int _dim,
-                      const int _num_equation);
+ public:
+  GradFaceIntegrator(IntegrationRules *_intRules, const int _dim, const int _num_equation);
 
-   virtual void AssembleFaceVector(const FiniteElement &el1,
-                                   const FiniteElement &el2,
-                                   FaceElementTransformations &Tr,
-                                   const Vector &elfun, Vector &elvect);
+  virtual void AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,
+                                  const Vector &elfun, Vector &elvect);
 };
 
-#endif // GRAD_FACE_INTEGRATOR
+#endif  // FACEGRADIENTINTEGRATION_HPP_

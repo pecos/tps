@@ -29,16 +29,18 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
-#ifndef DOMAIN_INTEGRATOR
-#define DOMAIN_INTEGRATOR
+#ifndef DOMAIN_INTEGRATOR_HPP_
+#define DOMAIN_INTEGRATOR_HPP_
 
 /*
  * Class that includes domain integrators
  * MFEM library requires this to be its own class
  */
 
-#include <mfem.hpp>
 #include <tps_config.h>
+
+#include <mfem.hpp>
+
 #include "fluxes.hpp"
 
 using namespace mfem;
@@ -47,29 +49,21 @@ using namespace std;
 // Constant (in time) mixed bilinear form multiplying the flux grid function.
 // The form is (vec(v), grad(w)) where the trial space = vector L2 space (mesh
 // dim) and test space = scalar L2 space.
-class DomainIntegrator : public BilinearFormIntegrator
-{
-private:
-  
+class DomainIntegrator : public BilinearFormIntegrator {
+ private:
   Fluxes *fluxClass;
-  
-   
-   const int dim;
-   const int num_equation;
-   IntegrationRules *intRules;
-   const int intRuleType;
 
-public:
-   DomainIntegrator(Fluxes *_fluxClass,
-                    IntegrationRules *_intRules,
-                    int _intRuleType,
-                    const int _dim, 
-                    const int _num_equation);
+  const int dim;
+  const int num_equation;
+  IntegrationRules *intRules;
+  const int intRuleType;
 
-   virtual void AssembleElementMatrix2(const FiniteElement &trial_fe,
-                                       const FiniteElement &test_fe,
-                                       ElementTransformation &Tr,
-                                       DenseMatrix &elmat);
+ public:
+  DomainIntegrator(Fluxes *_fluxClass, IntegrationRules *_intRules, int _intRuleType, const int _dim,
+                   const int _num_equation);
+
+  virtual void AssembleElementMatrix2(const FiniteElement &trial_fe, const FiniteElement &test_fe,
+                                      ElementTransformation &Tr, DenseMatrix &elmat);
 };
 
-#endif // DOMAIN_INTEGRATOR
+#endif  // DOMAIN_INTEGRATOR_HPP_

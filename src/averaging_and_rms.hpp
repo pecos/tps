@@ -29,21 +29,22 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
-#ifndef AVERAGING_AND_RMS
-#define AVERAGING_AND_RMS
+#ifndef AVERAGING_AND_RMS_HPP_
+#define AVERAGING_AND_RMS_HPP_
 
-#include <string>
 #include <tps_config.h>
+
 #include <mfem.hpp>
-#include "run_configuration.hpp"
+#include <string>
+
 #include "mpi_groups.hpp"
+#include "run_configuration.hpp"
 
 using namespace mfem;
 using namespace std;
 
-class Averaging
-{
-private:
+class Averaging {
+ private:
   // Primitive variables
   ParGridFunction *Up;
   ParMesh *mesh;
@@ -55,72 +56,59 @@ private:
   const int &dim;
   RunConfiguration &config;
   MPI_Groups *groupsMPI;
-  
-  
-  // FES for RMS 
+
+  // FES for RMS
   ParFiniteElementSpace *rmsFes;
   int numRMS;
-  
-   // time averaged primitive variables
+
+  // time averaged primitive variables
   ParGridFunction *meanUp;
   ParGridFunction *rms;
-  
+
   // time averaged p, rho, vel (pointers to meanUp) for Visualization
   ParGridFunction *meanP, *meanRho, *meanV;
-  
+
   ParaViewDataCollection *paraviewMean = NULL;
-  
+
   int samplesMean;
-  
+
   // iteration interval between samples
   int sampleInterval;
   int startMean;
   bool computeMean;
-  
+
   void initiMeanAndRMS();
-  
+
   Vector local_sums;
-  Vector tmp_vector;;
-  
-public:
-  Averaging( ParGridFunction *_Up,
-             ParMesh *_mesh,
-             FiniteElementCollection *_fec,
-             ParFiniteElementSpace *_fes,
-             ParFiniteElementSpace *_dfes,
-             ParFiniteElementSpace *_vfes,
-             const int &_num_equation,
-             const int &_dim,
-             RunConfiguration &_config,
-             MPI_Groups *_groupsMPI
-  );
+  Vector tmp_vector;
+
+ public:
+  Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollection *_fec, ParFiniteElementSpace *_fes,
+            ParFiniteElementSpace *_dfes, ParFiniteElementSpace *_vfes, const int &_num_equation, const int &_dim,
+            RunConfiguration &_config, MPI_Groups *_groupsMPI);
   ~Averaging();
-  
+
   void addSampleMean(const int &iter);
   void write_meanANDrms_restart_files(const int &iter, const double &time);
   void read_meanANDrms_restart_files();
-  
-  int GetSamplesMean(){return samplesMean;}
-  int GetSamplesInterval(){return sampleInterval;}
-  bool ComputeMean(){return computeMean;}
-  
-  ParGridFunction *GetMeanUp(){return meanUp;}
-  ParGridFunction *GetRMS(){return rms;}
-  
-  void SetSamplesMean(int &samples){samplesMean = samples;}
-  void SetSamplesInterval(int &interval){sampleInterval = interval;}
-  
+
+  int GetSamplesMean() { return samplesMean; }
+  int GetSamplesInterval() { return sampleInterval; }
+  bool ComputeMean() { return computeMean; }
+
+  ParGridFunction *GetMeanUp() { return meanUp; }
+  ParGridFunction *GetRMS() { return rms; }
+
+  void SetSamplesMean(int &samples) { samplesMean = samples; }
+  void SetSamplesInterval(int &interval) { sampleInterval = interval; }
+
   const double *getLocalSums();
-  
+
   // GPU functions
 #ifdef _GPU_
-  static void sumValues_gpu(const Vector &meanUp,
-                            const Vector &rms,
-                            Vector &local_sums,
-                            Vector &tmp_vector,
-                            const int &num_equation,
-                            const int &dim );
-#endif // _GPU_
+  static void sumValues_gpu(const Vector &meanUp, const Vector &rms, Vector &local_sums, Vector &tmp_vector,
+                            const int &num_equation, const int &dim);
+#endif  // _GPU_
 };
 
-#endif // AVERAGING_AND_RMS
+#endif  // AVERAGING_AND_RMS_HPP_

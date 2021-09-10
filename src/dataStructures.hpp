@@ -29,8 +29,8 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
-#ifndef STRUCTURES
-#define STRUCTURES
+#ifndef DATASTRUCTURES_HPP_
+#define DATASTRUCTURES_HPP_
 
 #include <mfem.hpp>
 
@@ -38,20 +38,18 @@ using namespace mfem;
 
 // The following four keywords define two planes in which
 // a linearly varying viscosity can be defined between these two.
-// The planes are defined by the normal and one point being the 
+// The planes are defined by the normal and one point being the
 // normal equal for both planes. The visc ratio will vary linearly
-// from 0 to viscRatio from the plane defined by pointInit and 
+// from 0 to viscRatio from the plane defined by pointInit and
 // the plane defined by point0.
-struct linearlyVaryingVisc
-{
+struct linearlyVaryingVisc {
   Vector normal;
   Vector point0;
   Vector pointInit;
   double viscRatio;
 };
 
-struct parallelFacesIntegrationArrays
-{
+struct parallelFacesIntegrationArrays {
   Vector sharedShapeWnor1;
   Vector sharedShape2;
   Array<int> sharedElem1Dof12Q;
@@ -60,16 +58,15 @@ struct parallelFacesIntegrationArrays
   Array<int> sharedElemsFaces;
 };
 
-struct dataTransferArrays
-{
+struct dataTransferArrays {
   // vectors for data transfer
   Vector face_nbr_data;
   Vector send_data;
-  
+
   // MPI communicators data
   int num_face_nbrs;
   MPI_Request *requests;
-  MPI_Status  *statuses;
+  MPI_Status *statuses;
 };
 
-#endif
+#endif  // DATASTRUCTURES_HPP_

@@ -29,20 +29,21 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
-#ifndef BOUNDARY_CONDITION
-#define BOUNDARY_CONDITION
+#ifndef BOUNDARYCONDITION_HPP_
+#define BOUNDARYCONDITION_HPP_
 
-#include <mfem.hpp>
 #include <tps_config.h>
+
 #include <general/forall.hpp>
-#include "riemann_solver.hpp"
+#include <mfem.hpp>
+
 #include "equation_of_state.hpp"
+#include "riemann_solver.hpp"
 
 using namespace mfem;
 
-class BoundaryCondition
-{
-protected:
+class BoundaryCondition {
+ protected:
   RiemannSolver *rsolver;
   EquationOfState *eqState;
   ParFiniteElementSpace *vfes;
@@ -52,58 +53,42 @@ protected:
   const int num_equation;
   const int patchNumber;
   const double refLength;
-  
+
   bool BCinit;
-  
-  Array<int> listElems; // list of boundary elements (position in the BC array)
-  
+
+  Array<int> listElems;  // list of boundary elements (position in the BC array)
+
   Array<int> offsetsBoundaryU;
-  
-public:
-  BoundaryCondition(RiemannSolver *_rsolver, 
-                    EquationOfState *_eqState,
-                    ParFiniteElementSpace *_vfes,
-                    IntegrationRules *_intRules,
-                    double &dt,
-                    const int _dim,
-                    const int _num_equation,
-                    const int _patchNumber,
-                    const double _refLength );
+
+ public:
+  BoundaryCondition(RiemannSolver *_rsolver, EquationOfState *_eqState, ParFiniteElementSpace *_vfes,
+                    IntegrationRules *_intRules, double &dt, const int _dim, const int _num_equation,
+                    const int _patchNumber, const double _refLength);
   virtual ~BoundaryCondition();
-  
-  virtual void computeBdrFlux(Vector &normal,
-                              Vector &stateIn, 
-                              DenseMatrix &gradState,
-                              Vector &bdrFlux) = 0;
+
+  virtual void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) = 0;
 
   // holding function for any miscellaneous items needed to initialize BCs
   // prior to use (and require MPI)
   virtual void initBCs() = 0;
-                              
-  virtual void updateMean(IntegrationRules *intRules,
-                          ParGridFunction *Up) = 0;
+
+  virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up) = 0;
 
   // aggregate boundary area
-  double aggregateArea (int bndry_attr, MPI_Comm bc_comm);
+  double aggregateArea(int bndry_attr, MPI_Comm bc_comm);
   // aggregate boundary face count
-  int aggregateBndryFaces (int bndry_attr, MPI_Comm bc_comm);
+  int aggregateBndryFaces(int bndry_attr, MPI_Comm bc_comm);
 
   // integration of BC on GPU
   void setElementList(Array<int> &listElems);
 
-  virtual void integrationBC( Vector &y, // output
-			      const Vector &x, // conservative vars (input)
-			      const Array<int> &nodesIDs,
-			      const Array<int> &posDofIds,
-			      ParGridFunction *Up,
-			      ParGridFunction *gradUp,
-			      Vector &shapesBC,
-			      Vector &normalsWBC,
-			      Array<int> &intPointsElIDBC,
-			      const int &maxIntPoints,
-			      const int &maxDofs ) = 0;
+  virtual void integrationBC(Vector &y,        // output
+                             const Vector &x,  // conservative vars (input)
+                             const Array<int> &nodesIDs, const Array<int> &posDofIds, ParGridFunction *Up,
+                             ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
+                             const int &maxIntPoints, const int &maxDofs) = 0;
 
   static void copyValues(const Vector &orig, Vector &target, const double &mult);
 };
 
-#endif // BOUNDARY_CONDITION
+#endif  // BOUNDARYCONDITION_HPP_
