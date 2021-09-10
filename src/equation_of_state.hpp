@@ -47,12 +47,12 @@ public:
   // Physicality check (at end)
   bool StateIsPhysical(const Vector &state, const int dim);
   
-  double GetSpecificHeatRatio(){ return specific_heat_ratio; }
-  double GetGasConstant(){return gas_constant;}
+  double GetSpecificHeatRatio()const{ return specific_heat_ratio; }
+  double GetGasConstant()const{return gas_constant;}
   double GetViscosity(const double &temp);
-  double GetPrandtlNum(){return Pr;}
+  double GetPrandtlNum()const{return Pr;}
   double GetViscMultiplyer(){return visc_mult;}
-  double GetBulkViscMultiplyer(){return bulk_visc_mult;}
+  double GetBulkViscMultiplyer()const{return bulk_visc_mult;}
   double GetThermalConductivity(const double &visc);
 
 

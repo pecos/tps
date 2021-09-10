@@ -91,6 +91,8 @@ private:
   //void GetFlux(const DenseMatrix &state, DenseTensor &flux) const;
   void GetFlux(const Vector &state, DenseTensor &flux) const;
   
+  void FluxVolumeIntegrals(const Vector &x, Vector &y) const;
+  
   
   mutable Vector local_timeDerivatives;
   void computeMeanTimeDerivatives(Vector &y) const;

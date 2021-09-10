@@ -131,7 +131,8 @@ bcIntegrator(_bcIntegrator)
     {
       for(int k=0;k<dof;k++)
       {
-        temp.push_back( (*Me_inv[i])(j,k) );
+        //temp.push_back( (*Me_inv[i])(j,k) );
+        temp.push_back( (*Me_inv[i])(k,j) );
       }
     }
   }
@@ -303,79 +304,43 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const
   if(bcIntegrator!=NULL) bcIntegrator->updateBCMean( Up );
   
 #ifdef _GPU_
-  A->Mult_domain(x,z);
+  A->Mult_domain(x,y);
   
   waitAllDataTransfer(vfes,transferU);
   waitAllDataTransfer(gradUpfes,transferGradUp);
-  A->Mult_bdr(x,z);
+  A->Mult_bdr(x,y);
 #else
   A->Mult(x, z);
 #endif
 
-  GetFlux(x, flux);
-  
-  for(int eq=0;eq<num_equation;eq++)
-  {
-#ifdef _GPU_
-    RHSoperator::copyDataForFluxIntegration_gpu(z, 
-                                                flux,
-                                                fk,
-                                                zk,
-                                                eq,
-                                                vfes->GetNDofs(), 
-                                                dim);
-#else
-    Vector fk(flux(eq).GetData(), dim * vfes->GetNDofs());
-    Vector zk(z.HostReadWrite() + eq*vfes->GetNDofs(), vfes->GetNDofs());
-#endif
-    
-    Aflux->AddMult(fk, zk);
-#ifdef _GPU_
-    RHSoperator::copyZk2Z_gpu(z,zk,eq,vfes->GetNDofs());
-#endif
-  }
+  FluxVolumeIntegrals(x,y);
 
-  // 3. Multiply element-wise by the inverse mass matrices.
-#ifdef _GPU_
-  for(int eltype=0;eltype<gpuArrays.numElems.Size();eltype++)
-  {
-    int elemOffset = 0;
-    if( eltype!=0 )
-    {
-      for(int i=0;i<eltype;i++) elemOffset += h_numElems[i];
-    }
-    int dof = h_posDofIds[2*elemOffset +1];
-    const int totDofs = vfes->GetNDofs();
-    
-    RHSoperator::multiPlyInvers_gpu(y,
-                                    z,
-                                    gpuArrays,
-                                    invMArray,
-                                    posDofInvM,
-                                    num_equation,
-                                    totDofs,
-                                    h_numElems[eltype],
-                                    elemOffset,
-                                    dof);
-  }
-  
-#else
-  for(int el=0; el<vfes->GetNE();el++)
-  {
-    Vector zval;
-    Array<int> vdofs;
-    const int dof = vfes->GetFE(el)->GetDof();
-    DenseMatrix zmat, ymat(dof, num_equation);
-    
-    // Return the vdofs ordered byNODES
-    vfes->GetElementVDofs(el, vdofs);
-    z.GetSubVector(vdofs, zval);
-    zmat.UseExternalData(zval.GetData(), dof, num_equation);
-    
-    mfem::Mult(*Me_inv[el], zmat, ymat);
-    y.SetSubVector(vdofs, ymat.GetData());
-  }  
-#endif
+//   // 3. Multiply element-wise by the inverse mass matrices.
+// #ifdef _GPU_
+//   for(int eltype=0;eltype<gpuArrays.numElems.Size();eltype++)
+//   {
+//     int elemOffset = 0;
+//     if( eltype!=0 )
+//     {
+//       for(int i=0;i<eltype;i++) elemOffset += h_numElems[i];
+//     }
+//     int dof = h_posDofIds[2*elemOffset +1];
+//     const int totDofs = vfes->GetNDofs();
+//     
+//     RHSoperator::multiPlyInvers_gpu(y,
+//                                     z,
+//                                     gpuArrays,
+//                                     invMArray,
+//                                     posDofInvM,
+//                                     num_equation,
+//                                     totDofs,
+//                                     h_numElems[eltype],
+//                                     elemOffset,
+//                                     dof);
+//   }
+//   
+// #else
+// #endif
 
   // add forcing terms
   for(int i=0; i<forcing.Size();i++)
@@ -427,6 +392,69 @@ void RHSoperator::copyDataForFluxIntegration_gpu( const Vector &z,
   });
 #endif
 }
+
+
+void RHSoperator::FluxVolumeIntegrals(const Vector &x, Vector &y) const
+{
+#ifdef _GPU_
+  for(int eltype=0;eltype<gpuArrays.numElems.Size();eltype++)
+  {
+    int elemOffset = 0;
+    if( eltype!=0 )
+    {
+      for(int i=0;i<eltype;i++) elemOffset += h_numElems[i];
+    }
+    int dof = h_posDofIds[2*elemOffset +1];
+    const int totDofs = vfes->GetNDofs();
+    
+    Fluxes::FluxesVolumeIntegrals_gpu(Up, 
+                                      y, 
+                                      gradUp, 
+                                      eqState, 
+                                      spaceVaryViscMult, 
+                                      linViscData, 
+                                      &gpuArrays,
+                                      invMArray,
+                                      posDofInvM,
+                                      eqSystem,
+                                      num_equation, 
+                                      dim, 
+                                      totDofs, 
+                                      h_numElems[eltype], 
+                                      elemOffset, 
+                                      dof);
+  }
+  
+#else
+  GetFlux(x, flux);
+  
+  for(int eq=0;eq<num_equation;eq++)
+  {
+    Vector fk(flux(eq).GetData(), dim * vfes->GetNDofs());
+    Vector zk(z.HostReadWrite() + eq*vfes->GetNDofs(), vfes->GetNDofs());
+    
+    Aflux->AddMult(fk, zk);
+  }
+  
+  // multiply by inverse
+  for(int el=0; el<vfes->GetNE();el++)
+  {
+    Vector zval;
+    Array<int> vdofs;
+    const int dof = vfes->GetFE(el)->GetDof();
+    DenseMatrix zmat, ymat(dof, num_equation);
+    
+    // Return the vdofs ordered byNODES
+    vfes->GetElementVDofs(el, vdofs);
+    z.GetSubVector(vdofs, zval);
+    zmat.UseExternalData(zval.GetData(), dof, num_equation);
+    
+    mfem::Mult(*Me_inv[el], zmat, ymat);
+    y.SetSubVector(vdofs, ymat.GetData());
+  }
+#endif
+}
+
 
 // Compute the flux at solution nodes.
 void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const

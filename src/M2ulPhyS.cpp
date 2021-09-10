@@ -828,8 +828,8 @@ void M2ulPhyS::initIndirectionArrays()
           }
         }
       }
-      for(int i=0;i<elDof;i++) 
-        for(int j=0;j<elDof;j++)
+      for(int j=0;j<elDof;j++)
+        for(int i=0;i<elDof;i++) 
         {
           tempDx.push_back( elDx(i,j) );
           tempDy.push_back( elDy(i,j) );

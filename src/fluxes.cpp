@@ -277,3 +277,218 @@ void Fluxes::viscousFluxes_gpu( const Vector &x,
   });
 #endif
 }
+
+void Fluxes::FluxesVolumeIntegrals_gpu(const ParGridFunction *Up, 
+                                       Vector& z, 
+                                       const ParGridFunction* gradUp, 
+                                       const EquationOfState* eqState, 
+                                       const ParGridFunction* spaceVaryViscMult, 
+                                       const linearlyVaryingVisc& linViscData, 
+                                       const volumeFaceIntegrationArrays *gpuArrays,
+                                       const Vector &invMArray,
+                                       const Array<int> &posDofInvM,
+                                       const Equations &eqSystem,
+                                       const int num_equation, 
+                                       const int& dim, 
+                                       const int& totNumDof, 
+                                       const int& NE, 
+                                       const int& elemOffset, 
+                                       const int& dof)
+{
+#ifdef _GPU_
+  const double *d_Up = Up->Read();
+  const double *d_gradUp = gradUp->Read();
+  double *d_z = z.ReadWrite();
+  
+  auto d_posDofInvM = posDofInvM.Read();
+  auto d_posDofIds  = gpuArrays->posDofIds.Read();
+  auto d_nodesIDs   = gpuArrays->nodesIDs.Read();
+  
+  auto d_Dx = gpuArrays->Dx.Read();
+  auto d_Dy = gpuArrays->Dy.Read();
+  auto d_Dz = gpuArrays->Dz.Read();
+  auto d_invMArray = invMArray.Read();
+  
+  const double gamma = eqState->GetSpecificHeatRatio();
+  const double Rg    = eqState->GetGasConstant();
+  const double Pr    = eqState->GetPrandtlNum();
+  const double bulkViscMult = eqState->GetBulkViscMultiplyer();
+  
+  const double* d_spaceVaryViscMult;
+  if( spaceVaryViscMult!=NULL)
+  {
+    d_spaceVaryViscMult = spaceVaryViscMult->Read();
+  }else d_spaceVaryViscMult = NULL;
+  
+  
+  
+  MFEM_FORALL_2D(el,NE,dof,1,1,
+  {
+    MFEM_FOREACH_THREAD(i,x,dof)
+    {
+      MFEM_SHARED double elUp[216*5], gradUpel[216*5*3];
+      MFEM_SHARED double Dx[216];
+      MFEM_SHARED double temp[216*5], contrib[216*5];
+      
+      
+      int eli = el + elemOffset;
+      int offsetInv = d_posDofInvM[2*eli];
+      int offsetIds = d_posDofIds[2*eli];
+      
+      int indexi = d_nodesIDs[offsetIds+i];
+      
+      // fill Up
+      for(int eq=0;eq<num_equation;eq++){
+        elUp[i+eq*dof] = d_Up[indexi + eq*totNumDof];
+        
+        contrib[i+eq*dof] = 0.;
+        
+        if(eqSystem==NS)
+          for(int d=0;d<dim;d++) gradUpel[i+eq*dof+d*num_equation*dof] = 
+            d_gradUp[indexi+eq*totNumDof+d*num_equation*totNumDof];
+      }
+      MFEM_SYNC_THREAD;
+      
+      double divV = 0.;
+      double rE = elUp[i+(num_equation-1)*dof]/(gamma-1.);
+      for(int d=0;d<dim;d++){
+        rE += 0.5*elUp[i]*elUp[i+(1+d)*dof]*elUp[i+(1+d)*dof];
+        if(eqSystem==NS) divV += gradUpel[i+(1+d)*dof+d*num_equation*dof];
+      }
+      double temperature = elUp[i+(num_equation-1)*dof]/elUp[i]/Rg;
+      double linVisc = 1.;
+      
+      if( d_spaceVaryViscMult!=NULL ){ 
+        linVisc = d_spaceVaryViscMult[indexi];
+      }
+                 
+      
+      // Compute convective fluxes in x direction
+      temp[i] = elUp[i]*elUp[i+dof]; // rho*u
+      temp[i+  dof] = temp[i]*elUp[i+dof] + elUp[i+(num_equation-1)*dof]; // rho*u^2+p
+      temp[i+2*dof] = temp[i]*elUp[i+2*dof]; // rho*u*v
+      if(dim==3) temp[i+3*dof] = temp[i]*elUp[i+3*dof]; // rho*u*w
+      temp[i+(num_equation-1)*dof] = elUp[i+dof]*(rE + elUp[i+(num_equation-1)*dof]);
+      
+      if( eqSystem==NS ){ // compute visc fluxes x
+        double visc = EquationOfState::GetViscosity_gpu(temperature);
+        double k = EquationOfState::GetThermalConductivity_gpu(visc,gamma,Rg,Pr);
+        visc *= linVisc;
+        k *= linVisc;
+        double stress[3];
+        for(int d=0;d<dim;d++) stress[d] = gradUpel[i+(1+d)*dof]+gradUpel[i+dof+d*num_equation*dof];
+        stress[0] += (bulkViscMult -2./3.)*divV;
+        
+        // add viscous fluxes to temp[]
+        for(int d=0;d<dim;d++){
+          temp[i+(1+d)*dof] -= visc*stress[d];
+          temp[i+(num_equation-1)*dof] -= elUp[i+(1+d)*dof]*visc*stress[d];
+        }
+        temp[i+(num_equation-1)*dof] -= k*temperature*(gradUpel[i+(num_equation-1)*dof]/elUp[i+(num_equation-1)*dof] -
+                                                       gradUpel[i                     ]/elUp[i] );
+      }
+      
+      // mult by Dx matrix
+      for(int j=0;j<dof;j++){
+        Dx[i] = d_Dx[offsetInv +i +j*dof];
+        MFEM_SYNC_THREAD;
+        
+        for(int eq=0;eq<num_equation;eq++) contrib[i+eq*dof] += Dx[i]*temp[i+eq*dof];
+        MFEM_SYNC_THREAD;
+      }
+      
+      // Compute convective fluxes in y direction
+      temp[i] = elUp[i]*elUp[i+2*dof]; // rho*v
+      temp[i+  dof] = temp[i]*elUp[i+dof]; // rho*v*u
+      temp[i+2*dof] = temp[i]*elUp[i+2*dof] + elUp[i+(num_equation-1)*dof]; // rho*v^2+p
+      if(dim==3) temp[i+3*dof] = temp[i]*elUp[i+3*dof]; // rho*v*w
+      temp[i+(num_equation-1)*dof] = elUp[i+2*dof]*(rE + elUp[i+(num_equation-1)*dof]); // v*(rE+p)
+      
+      if( eqSystem==NS ){ // compute visc fluxes y
+        double visc = EquationOfState::GetViscosity_gpu(temperature);
+        double k = EquationOfState::GetThermalConductivity_gpu(visc,gamma,Rg,Pr);
+        visc *= linVisc;
+        k *= linVisc;
+        double stress[3];
+        for(int d=0;d<dim;d++) stress[d] = gradUpel[i+(1+d)*dof   +num_equation*dof]+
+                                           gradUpel[i+2*dof     +d*num_equation*dof];
+        stress[1] += (bulkViscMult -2./3.)*divV;
+        
+        // add viscous fluxes to temp[]
+        for(int d=0;d<dim;d++){
+          temp[i+(1+d)*dof] -= visc*stress[d];
+          temp[i+(num_equation-1)*dof] -= elUp[i+(1+d)*dof]*visc*stress[d];
+        }
+        temp[i+(num_equation-1)*dof] -= k*temperature*(gradUpel[i+(num_equation-1)*dof+num_equation*dof]/
+                                                       elUp[i+(num_equation-1)*dof] -
+                                                       gradUpel[i +num_equation*dof]/elUp[i] );
+      }
+      
+      // mult by Dx matrix
+      for(int j=0;j<dof;j++){
+        Dx[i] = d_Dy[offsetInv +i +j*dof];
+        MFEM_SYNC_THREAD;
+        
+        for(int eq=0;eq<num_equation;eq++) contrib[i+eq*dof] += Dx[i]*temp[i+eq*dof];
+        MFEM_SYNC_THREAD;
+      }
+      
+      if(dim==3){
+        // Compute convective fluxes in y direction
+        temp[i] = elUp[i]*elUp[i+3*dof]; // rho*w
+        temp[i+  dof] = temp[i]*elUp[i+dof]; // rho*w*u
+        temp[i+2*dof] = temp[i]*elUp[i+2*dof]; // rho*w*v
+        temp[i+3*dof] = temp[i]*elUp[i+3*dof] + elUp[i+(num_equation-1)*dof]; // rho*w^2+p
+        temp[i+(num_equation-1)*dof] = elUp[i+3*dof]*(rE + elUp[i+(num_equation-1)*dof]); // w*(rE+p)
+        
+        if( eqSystem==NS ){ // compute visc fluxes y
+          double visc = EquationOfState::GetViscosity_gpu(temperature);
+          double k = EquationOfState::GetThermalConductivity_gpu(visc,gamma,Rg,Pr);
+          visc *= linVisc;
+          k *= linVisc;
+          double stress[3];
+          for(int d=0;d<dim;d++) stress[d] = gradUpel[i+(1+d)*dof +2*num_equation*dof]+
+                                            gradUpel[i+3*dof      +d*num_equation*dof];
+          stress[1] += (bulkViscMult -2./3.)*divV;
+          
+          // add viscous fluxes to temp[]
+          for(int d=0;d<dim;d++){
+            temp[i+(1+d)*dof] -= visc*stress[d];
+            temp[i+(num_equation-1)*dof] -= elUp[i+(1+d)*dof]*visc*stress[d];
+          }
+          temp[i+(num_equation-1)*dof] -= k*temperature*(gradUpel[i+(num_equation-1)*dof+2*num_equation*dof]/
+                                                        elUp[i+(num_equation-1)*dof] -
+                                                        gradUpel[i +2*num_equation*dof]/elUp[i] );
+        }
+        
+        // mult by Dx matrix
+        for(int j=0;j<dof;j++){
+          Dx[i] = d_Dz[offsetInv +i +j*dof];
+          MFEM_SYNC_THREAD;
+          
+          for(int eq=0;eq<num_equation;eq++) contrib[i+eq*dof] += Dx[i]*temp[i+eq*dof];
+          MFEM_SYNC_THREAD;
+        }
+      
+        // GET PREVIOUS TERMS IN Z AND MULT. BY INVERSE OF MASS MATRIX
+        // get terms from global memory
+        for(int eq=0;eq<num_equation;eq++) temp[i+eq*dof] = d_z[indexi+eq*totNumDof];
+        MFEM_SYNC_THREAD;
+        
+        // multiply by inverse
+        for(int j=0;j<dof;j++){
+          Dx[i] = d_invMArray[offsetInv +i +j*dof];
+          MFEM_SYNC_THREAD;
+          
+          for(int eq=0;eq<num_equation;eq++) temp[i+eq*dof] += Dx[i]*contrib[i+eq*dof];
+          MFEM_SYNC_THREAD;
+        }
+        
+        // set contribution to global memory
+        for(int eq=0;eq<num_equation;eq++) d_z[indexi+eq*totNumDof] += temp[i+eq*dof];
+      }
+    }
+  });
+#endif
+}
+

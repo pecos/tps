@@ -615,42 +615,58 @@ void Gradients::multInverse_gpu(const int numElems,
   const double *d_invMArray =invMArray.Read();
   auto d_posDofInvM = posDofInvM.Read();
   
-  //NOTE: I'm sure this can be done more efficiently. Have a think
   MFEM_FORALL_2D(el,numElems,elDof,1,1,
   {
     MFEM_FOREACH_THREAD(i,x,elDof)
     {
       MFEM_SHARED double gradUpi[216*5*3];
+      MFEM_SHARED double invCol[216], temp[216*5*3];
       
       const int eli = el + offsetElems;
       const int offsetIDs    = d_posDofIds[2*eli];
       const int offsetInv    = d_posDofInvM[2*eli];
       const int indexi = d_nodesIDs[offsetIDs + i];
       
-      for(int eq=0;eq<num_equation;eq++)
-      {
-        for(int d=0;d<dim;d++)
-        {
-          //tmpGrad[i +eq*elDof + d*num_equation*elDof] = 0.;
+      for(int eq=0;eq<num_equation;eq++){
+        for(int d=0;d<dim;d++){
           gradUpi[i +eq*elDof + d*num_equation*elDof] = 
                           d_gradUp[indexi+eq*totalDofs+d*num_equation*totalDofs];
+          temp[i +eq*elDof + d*num_equation*elDof] = 0.;
         }
       }
       MFEM_SYNC_THREAD;
       
-      for(int eq=0;eq<num_equation;eq++)
-      {
-        for(int d=0;d<dim;d++)
-        {
-          double temp = 0;
-          for(int n=0;n<elDof;n++)
-          {
-            temp += gradUpi[n+eq*elDof+d*num_equation*elDof]*
-                                d_invMArray[offsetInv +i*elDof +n];
+      for(int j=0;j<elDof;j++){
+        invCol[i] = d_invMArray[offsetInv +i +j*elDof];
+        MFEM_SYNC_THREAD;
+        
+        for(int eq=0;eq<num_equation;eq++){
+          for(int d=0;d<dim;d++){
+            temp[i +eq*elDof + d*num_equation*elDof] += 
+                      invCol[i]*gradUpi[j+eq*elDof+d*num_equation*elDof];
           }
-          d_gradUp[indexi+eq*totalDofs+d*num_equation*totalDofs] = temp;
+        }
+        MFEM_SYNC_THREAD;
+      }
+      
+      // set to global memory
+      for(int eq=0;eq<num_equation;eq++){
+        for(int d=0;d<dim;d++){
+          d_gradUp[indexi+eq*totalDofs+d*num_equation*totalDofs] =
+                                  temp[i +eq*elDof + d*num_equation*elDof];
         }
       }
+      
+//       for(int eq=0;eq<num_equation;eq++){
+//         for(int d=0;d<dim;d++){
+//           double temp = 0;
+//           for(int n=0;n<elDof;n++){
+//             temp += gradUpi[n+eq*elDof+d*num_equation*elDof]*
+//                                 d_invMArray[offsetInv +i*elDof +n];
+//           }
+//           d_gradUp[indexi+eq*totalDofs+d*num_equation*totalDofs] = temp;
+//         }
+//       }
     }
   });
 }

@@ -75,6 +75,22 @@ public:
                                 const int &dof, 
                                 const int &dim,
                                 const int &num_equation);
+  static void FluxesVolumeIntegrals_gpu(const ParGridFunction *Up, 
+                                        Vector &z,
+                                        const ParGridFunction *gradUp,
+                                        const EquationOfState *eqState,
+                                        const ParGridFunction *spaceVaryViscMult,
+                                        const linearlyVaryingVisc &linViscData,
+                                        const volumeFaceIntegrationArrays *gpuArrays,
+                                        const Vector &invMArray,
+                                        const Array<int> &posDofInvM,
+                                        const Equations &eqSystem,
+                                        const int num_equation,
+                                        const int &dim,
+                                        const int &totNumDof,
+                                        const int &NE,
+                                        const int &elemOffset,
+                                        const int &dof);
   
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void viscousFlux_gpu(double *vFlux,
