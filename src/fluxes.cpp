@@ -306,12 +306,14 @@ void Fluxes::FluxesVolumeIntegrals_gpu(const ParGridFunction *Up,
   
   auto d_Dx = gpuArrays->Dx.Read();
   auto d_Dy = gpuArrays->Dy.Read();
-  auto d_Dz = gpuArrays->Dz.Read();
+  const double *d_Dz = NULL;
+  if(dim==3) d_Dz = gpuArrays->Dz.Read();
   auto d_invMArray = invMArray.Read();
   
-  const double gamma = eqState->GetSpecificHeatRatio();
-  const double Rg    = eqState->GetGasConstant();
-  const double Pr    = eqState->GetPrandtlNum();
+  const double gamma        = eqState->GetSpecificHeatRatio();
+  const double Rg           = eqState->GetGasConstant();
+  const double Pr           = eqState->GetPrandtlNum();
+  const double viscMult     = eqState->GetViscMultiplyer();
   const double bulkViscMult = eqState->GetBulkViscMultiplyer();
   
   const double* d_spaceVaryViscMult;
@@ -356,10 +358,10 @@ void Fluxes::FluxesVolumeIntegrals_gpu(const ParGridFunction *Up,
         if(eqSystem==NS) divV += gradUpel[i+(1+d)*dof+d*num_equation*dof];
       }
       double temperature = elUp[i+(num_equation-1)*dof]/elUp[i]/Rg;
-      double linVisc = 1.;
+      double linVisc = viscMult;
       
       if( d_spaceVaryViscMult!=NULL ){ 
-        linVisc = d_spaceVaryViscMult[indexi];
+        linVisc *= d_spaceVaryViscMult[indexi];
       }
                  
       
@@ -472,7 +474,10 @@ void Fluxes::FluxesVolumeIntegrals_gpu(const ParGridFunction *Up,
       
         // GET PREVIOUS TERMS IN Z AND MULT. BY INVERSE OF MASS MATRIX
         // get terms from global memory
-        for(int eq=0;eq<num_equation;eq++) temp[i+eq*dof] = d_z[indexi+eq*totNumDof];
+        for(int eq=0;eq<num_equation;eq++){
+          contrib[i+eq*dof] -= d_z[indexi+eq*totNumDof];
+          temp[i+eq*dof] = 0.;
+        }
         MFEM_SYNC_THREAD;
         
         // multiply by inverse
@@ -485,7 +490,7 @@ void Fluxes::FluxesVolumeIntegrals_gpu(const ParGridFunction *Up,
         }
         
         // set contribution to global memory
-        for(int eq=0;eq<num_equation;eq++) d_z[indexi+eq*totNumDof] += temp[i+eq*dof];
+        for(int eq=0;eq<num_equation;eq++) d_z[indexi+eq*totNumDof] = temp[i+eq*dof];
       }
     }
   });

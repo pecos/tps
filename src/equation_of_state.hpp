@@ -51,7 +51,7 @@ public:
   double GetGasConstant()const{return gas_constant;}
   double GetViscosity(const double &temp);
   double GetPrandtlNum()const{return Pr;}
-  double GetViscMultiplyer(){return visc_mult;}
+  double GetViscMultiplyer()const{return visc_mult;}
   double GetBulkViscMultiplyer()const{return bulk_visc_mult;}
   double GetThermalConductivity(const double &visc);
 
