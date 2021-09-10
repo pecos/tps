@@ -87,17 +87,27 @@ libtps_a_SOURCES     = $(cxx_sources) $(headers)
 # Linting/style target(s)
 #---------------------------------
 
-style:
-	$(top_srcdir)/utils/cpplint/cpplint.py --output sed averaging_and_rms.hpp | bash
+enforcestyle:
+	@echo ""
+	@echo "------------------------------------------------------"
+	@echo "Applying source code style updates using clang-format"
+	@echo "------------------------------------------------------"
+	@echo ""
+	clang-format -i $(headers) $(cxx_sources)
 
-checkstyle:
-	$(top_srcdir)/utils/cpplint/cpplint.py averaging_and_rms.hpp
+style:
+	@echo ""
+	@echo "-------------------------------------------"
+	@echo "Checking source code style using cpplint.py"
+	@echo "-------------------------------------------"
+	@echo ""
+	@$(top_srcdir)/utils/cpplint/cpplint.py $(headers) $(cxx_sources)
 
 #---------------------------------
 # Embedded license header support
 #---------------------------------
 license:
-	echo 'Running license update tool for src files'
-	$(top_srcdir)/utils/update_license.pl -S=$(top_srcdir)/src $(top_srcdir)/LICENSE \
+	@echo 'Running license update tool for src files'
+	@$(top_srcdir)/utils/update_license.pl -S=$(top_srcdir)/src $(top_srcdir)/LICENSE \
 		 $(headers) $(cxx_sources)
 
