@@ -84,6 +84,16 @@ libtps_a_SOURCES     = $(cxx_sources) $(headers)
 ### AM_CPPFLAGS         += -I/usr/include/python3.6m
 
 #---------------------------------
+# Linting/style target(s)
+#---------------------------------
+
+style:
+	$(top_srcdir)/utils/cpplint/cpplint.py --output sed averaging_and_rms.hpp | bash
+
+checkstyle:
+	$(top_srcdir)/utils/cpplint/cpplint.py averaging_and_rms.hpp
+
+#---------------------------------
 # Embedded license header support
 #---------------------------------
 license:
