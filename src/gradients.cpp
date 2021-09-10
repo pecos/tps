@@ -643,7 +643,7 @@ void Gradients::multInverse_gpu(const int numElems,
         for(int eq=0;eq<num_equation;eq++){
           for(int d=0;d<dim;d++){
             temp[i +eq*elDof + d*num_equation*elDof] += 
-                      invCol[i]*gradUpi[j+eq*elDof+d*num_equation*elDof];
+                      invCol[i]*gradUpi[i+eq*elDof+d*num_equation*elDof];
           }
         }
         MFEM_SYNC_THREAD;

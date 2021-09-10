@@ -822,9 +822,9 @@ void M2ulPhyS::initIndirectionArrays()
         {
           for(int jj=0;jj<elDof;jj++)
           {
-            elDx(ii,jj) += shape(jj)*dshapeVec(ii)*detJac;
-            elDy(ii,jj) += shape(jj)*dshapeVec(ii+elDof)*detJac;
-            if(dim==3) elDz(ii,jj) += shape(jj)*dshapeVec(ii+2*elDof)*detJac;
+            elDx(ii,jj) += shape(jj)*dshape(ii,0)*detJac;
+            elDy(ii,jj) += shape(jj)*dshape(ii,1)*detJac;
+            if(dim==3) elDz(ii,jj) += shape(jj)*dshape(ii,2)*detJac;
           }
         }
       }

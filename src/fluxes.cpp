@@ -366,7 +366,7 @@ void Fluxes::FluxesVolumeIntegrals_gpu(const ParGridFunction *Up,
                  
       
       // Compute convective fluxes in x direction
-      temp[i] = elUp[i]*elUp[i+dof]; // rho*u
+      temp[i]       = elUp[i]*elUp[i+dof]; // rho*u
       temp[i+  dof] = temp[i]*elUp[i+dof] + elUp[i+(num_equation-1)*dof]; // rho*u^2+p
       temp[i+2*dof] = temp[i]*elUp[i+2*dof]; // rho*u*v
       if(dim==3) temp[i+3*dof] = temp[i]*elUp[i+3*dof]; // rho*u*w
@@ -400,7 +400,7 @@ void Fluxes::FluxesVolumeIntegrals_gpu(const ParGridFunction *Up,
       }
       
       // Compute convective fluxes in y direction
-      temp[i] = elUp[i]*elUp[i+2*dof]; // rho*v
+      temp[i]       = elUp[i]*elUp[i+2*dof]; // rho*v
       temp[i+  dof] = temp[i]*elUp[i+dof]; // rho*v*u
       temp[i+2*dof] = temp[i]*elUp[i+2*dof] + elUp[i+(num_equation-1)*dof]; // rho*v^2+p
       if(dim==3) temp[i+3*dof] = temp[i]*elUp[i+3*dof]; // rho*v*w
@@ -436,14 +436,14 @@ void Fluxes::FluxesVolumeIntegrals_gpu(const ParGridFunction *Up,
       }
       
       if(dim==3){
-        // Compute convective fluxes in y direction
+        // Compute convective fluxes in z direction
         temp[i] = elUp[i]*elUp[i+3*dof]; // rho*w
         temp[i+  dof] = temp[i]*elUp[i+dof]; // rho*w*u
         temp[i+2*dof] = temp[i]*elUp[i+2*dof]; // rho*w*v
         temp[i+3*dof] = temp[i]*elUp[i+3*dof] + elUp[i+(num_equation-1)*dof]; // rho*w^2+p
         temp[i+(num_equation-1)*dof] = elUp[i+3*dof]*(rE + elUp[i+(num_equation-1)*dof]); // w*(rE+p)
         
-        if( eqSystem==NS ){ // compute visc fluxes y
+        if( eqSystem==NS ){ // compute visc fluxes z
           double visc = EquationOfState::GetViscosity_gpu(temperature);
           double k = EquationOfState::GetThermalConductivity_gpu(visc,gamma,Rg,Pr);
           visc *= linVisc;
@@ -471,27 +471,27 @@ void Fluxes::FluxesVolumeIntegrals_gpu(const ParGridFunction *Up,
           for(int eq=0;eq<num_equation;eq++) contrib[i+eq*dof] += Dx[i]*temp[i+eq*dof];
           MFEM_SYNC_THREAD;
         }
+      }
       
-        // GET PREVIOUS TERMS IN Z AND MULT. BY INVERSE OF MASS MATRIX
-        // get terms from global memory
-        for(int eq=0;eq<num_equation;eq++){
-          contrib[i+eq*dof] -= d_z[indexi+eq*totNumDof];
-          temp[i+eq*dof] = 0.;
-        }
+      // GET PREVIOUS TERMS IN Z AND MULT. BY INVERSE OF MASS MATRIX
+      // get terms from global memory
+      for(int eq=0;eq<num_equation;eq++){
+        contrib[i+eq*dof] += d_z[indexi+eq*totNumDof];
+        temp[i+eq*dof] = 0.;
+      }
+      MFEM_SYNC_THREAD;
+      
+      // multiply by inverse
+      for(int j=0;j<dof;j++){
+        Dx[i] = d_invMArray[offsetInv +i +j*dof];
         MFEM_SYNC_THREAD;
         
-        // multiply by inverse
-        for(int j=0;j<dof;j++){
-          Dx[i] = d_invMArray[offsetInv +i +j*dof];
-          MFEM_SYNC_THREAD;
-          
-          for(int eq=0;eq<num_equation;eq++) temp[i+eq*dof] += Dx[i]*contrib[i+eq*dof];
-          MFEM_SYNC_THREAD;
-        }
-        
-        // set contribution to global memory
-        for(int eq=0;eq<num_equation;eq++) d_z[indexi+eq*totNumDof] = temp[i+eq*dof];
+        for(int eq=0;eq<num_equation;eq++) temp[i+eq*dof] += Dx[i]*contrib[i+eq*dof];
+        MFEM_SYNC_THREAD;
       }
+      
+      // set contribution to global memory
+      for(int eq=0;eq<num_equation;eq++) d_z[indexi+eq*totNumDof] = temp[i+eq*dof];
     }
   });
 #endif
