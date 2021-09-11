@@ -72,7 +72,7 @@ Gradients::Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradU
   positions.clear();
 
   for (int el = 0; el < vfes->GetNE(); el++) {
-    positions.push_back(static_cast<int>temp.size());
+    positions.push_back(static_cast<int>(temp.size()));
 
     const FiniteElement *elem = vfes->GetFE(el);
     ElementTransformation *Tr = vfes->GetElementTransformation(el);
@@ -110,13 +110,13 @@ Gradients::Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradU
   }
 
   elemShapeDshapeWJ.UseDevice(true);
-  elemShapeDshapeWJ.SetSize(static_cast<int>temp.size());
+  elemShapeDshapeWJ.SetSize(static_cast<int>(temp.size()));
   elemShapeDshapeWJ = 0.;
   auto helemShapeDshapeWJ = elemShapeDshapeWJ.HostWrite();
   for (int i = 0; i < elemShapeDshapeWJ.Size(); i++) helemShapeDshapeWJ[i] = temp[i];
   elemShapeDshapeWJ.Read();
 
-  elemPosQ_shapeDshapeWJ.SetSize(static_cast<int>positions.size());
+  elemPosQ_shapeDshapeWJ.SetSize(static_cast<int>(positions.size()));
   for (int i = 0; i < elemPosQ_shapeDshapeWJ.Size(); i++) elemPosQ_shapeDshapeWJ[i] = positions[i];
   elemPosQ_shapeDshapeWJ.Read();
 

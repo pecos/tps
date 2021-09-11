@@ -138,7 +138,8 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
   invMArray.SetSize(temp.size());
   invMArray = 0.;
   auto hinvMArray = invMArray.HostWrite();
-  for (int i = 0; i < static_cast<int>temp.size(); i++) hinvMArray[i] = temp[i];
+  for (int i = 0; i < static_cast<int>(temp.size()); i++)
+    hinvMArray[i] = temp[i];
 
   fillSharedData();
 
@@ -785,7 +786,7 @@ void RHSoperator::computeMeanTimeDerivatives(Vector &y) const {
 
     for (int n = 0; n < Ndof; n++) {
       for (int eq = 0; eq < num_equation; eq++) {
-        local_timeDerivatives[eq] += fabs(y[n + eq * Ndof]) / (static_cast<double>Ndof);
+        local_timeDerivatives[eq] += fabs(y[n + eq * Ndof]) / (static_cast<double>(Ndof));
       }
     }
 

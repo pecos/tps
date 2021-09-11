@@ -498,7 +498,7 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
 
   double *h_localMeanUp = localMeanUp.HostReadWrite();
   int totNbdr = boundaryU.Size() / num_equation;
-  h_localMeanUp[num_equation] = static_cast<double>totNbdr;
+  h_localMeanUp[num_equation] = static_cast<double>(totNbdr);
 
   double *h_sum = glob_sum.HostWrite();
   MPI_Allreduce(h_localMeanUp, h_sum, num_equation + 1, MPI_DOUBLE, MPI_SUM, groupsMPI->getOutletComm());

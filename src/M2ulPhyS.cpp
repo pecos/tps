@@ -474,7 +474,8 @@ void M2ulPhyS::initIndirectionArrays() {
   numElems.SetSize(tempNumElems.size());
   numElems = 0;
   auto hnumElems = numElems.HostWrite();
-  for (int i = 0; i < static_cast<int>tempNumElems.size(); i++) hnumElems[i] = tempNumElems[i];
+  for (int i = 0; i < static_cast<int>(tempNumElems.size()); i++)
+    hnumElems[i] = tempNumElems[i];
 
   {
     // Initialize vectors and arrays to be used in
@@ -903,7 +904,7 @@ void M2ulPhyS::Iterate() {
     Check_NAN();
 
     if (!config.isTimeStepConstant()) {
-      double dt_local = CFL * hmin / max_char_speed / static_cast<double>dim;
+      double dt_local = CFL * hmin / max_char_speed / static_cast<double>(dim);
       MPI_Allreduce(&dt_local, &dt, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
     }
 
@@ -1389,7 +1390,7 @@ void M2ulPhyS::initialTimeStep() {
   double partition_C = max_char_speed;
   MPI_Allreduce(&partition_C, &max_char_speed, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
-  dt = CFL * hmin / max_char_speed / static_cast<double>dim;
+  dt = CFL * hmin / max_char_speed / static_cast<double>(dim);
 
   // dt_fixed is initialized to -1, so if it is positive, then the
   // user requested a fixed dt run

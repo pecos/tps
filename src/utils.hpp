@@ -4,6 +4,7 @@
 #define UTILS_
 
 #include <hdf5.h>
+#include <assert.h>
 
 // Misc. utilities
 bool file_exists (const std::string &name);
