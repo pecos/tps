@@ -269,7 +269,7 @@ const double *Averaging::getLocalSums() {
   sumValues_gpu(*meanUp, *rms, local_sums, tmp_vector, num_equation, dim);
 #else
   const int NDof = meanUp->Size() / num_equation;
-  const double ddof = static_cast<double>NDof;
+  const double ddof = static_cast<double>(NDof);
 
   double *dataMean = meanUp->GetData();
   double *dataRMS = rms->GetData();
