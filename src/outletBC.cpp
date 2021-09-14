@@ -1265,8 +1265,8 @@ void OutletBC::integrateOutlets_gpu(const OutletType type,
         MFEM_SYNC_THREAD;
         
         // compute flux
-        if(i==0) RiemannSolver::riemannLF_gpu(&u1[0],&u2[0],&Rflux[0],&nor[0],
-                                              gamma,Rg,dim,num_equation);
+        RiemannSolver::riemannLF_gpu(&u1[0],&u2[0],&Rflux[0],&nor[0],
+                                              gamma,Rg,dim,num_equation,i,maxDofs);
         MFEM_SYNC_THREAD;
         
         // sum contributions to integral

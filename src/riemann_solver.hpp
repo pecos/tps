@@ -44,71 +44,96 @@ public:
     static MFEM_HOST_DEVICE void convFluxDotNorm_gpu( const double *state,
                                                       const double pres,
                                                       const double *nor,
-                                                      const int dim,
-                                                      double *fluxN )
+                                                      const int &dim,
+                                                      double *fluxN,
+                                                      const int &thrd,
+                                                      const int &max_num_threads  )
     {
-      double den_velN = 0;
-      for(int d=0;d<dim;d++) den_velN += state[d+1]*nor[d]; 
+      MFEM_SHARED double den_velN;
+      if(thrd==0){
+        den_velN = 0.;
+        for(int d=0;d<dim;d++) den_velN += state[d+1]*nor[d]; 
+      }
+      MFEM_SYNC_THREAD;
 
-      fluxN[0] = den_velN;
-      for(int d=0;d<dim;d++)
+      if(thrd==max_num_threads-1) fluxN[0] = den_velN;
+      for(int d=thrd;d<dim;d+=max_num_threads)
       {
           fluxN[1+d] = den_velN*state[d+1]/state[0] +pres*nor[d];
       }
 
-      const double H = (state[dim+1] + pres)/state[0];
-      fluxN[1 + dim] = den_velN * H;
+      if(thrd==max_num_threads-1){
+        const double H = (state[dim+1] + pres)/state[0];
+        fluxN[1 + dim] = den_velN * H;
+      }
     };
     
     static MFEM_HOST_DEVICE void riemannLF_gpu( const double *U1, 
                                                 const double *U2, 
                                                 double *flux,
                                                 const double *nor,
-                                                const double gamma,
-                                                const double Rg,
-                                                const int dim, 
-                                                const int num_equation)
+                                                const double &gamma,
+                                                const double &Rg,
+                                                const int &dim, 
+                                                const int &num_equation,
+                                                const int &thrd,
+                                                const int &max_num_threads  )
     {
-      double KE1[3], KE2[3];
-      double vel1 = 0., vel2 = 0.;
-      for(int d=0;d<dim;d++)
+      MFEM_SHARED double KE1[3], KE2[3];
+      MFEM_SHARED double vel1, vel2, p1, p2;
+      MFEM_SHARED double maxE1, maxE2, maxE;
+      MFEM_SHARED double flux1[5],flux2[5];
+      MFEM_SHARED double normag;
+      
+      for(int d=thrd;d<dim;d+=max_num_threads)
       {
         KE1[d] = 0.5*U1[1+d]*U1[1+d]/U1[0];
         KE2[d] = 0.5*U2[1+d]*U2[1+d]/U2[0];
-        vel1 += 2*KE1[d]/U1[0];
-        vel2 += 2*KE2[d]/U2[0];
+        
       }
-      vel1 = sqrt(vel1);
-      vel2 = sqrt(vel2);
+      MFEM_SYNC_THREAD;
       
-      const double p1 = EquationOfState::pressure(U1, 
+      if(thrd==0){
+        vel1 = 0.;
+        for(int d=0;d<dim;d++) vel1 += 2.*KE1[d]/U1[0];
+        vel1 = sqrt(vel1);
+      }
+      if(thrd==1){
+        vel2 = 0.;
+        for(int d=0;d<dim;d++) vel2 += 2*KE2[d]/U2[0];
+        vel2 = sqrt(vel2);
+      }
+      MFEM_SYNC_THREAD;
+      
+      if(thrd==0) p1 = EquationOfState::pressure( U1, 
                                                   &KE1[0], 
                                                   gamma, 
                                                   dim, 
                                                   num_equation);
-      const double p2 = EquationOfState::pressure(U2, 
+      if(thrd==1) p2 = EquationOfState::pressure( U2, 
                                                   &KE2[0], 
                                                   gamma, 
                                                   dim, 
                                                   num_equation);
+      MFEM_SYNC_THREAD;
       
-      const double maxE1 = vel1 + sqrt(gamma*p1/U1[0]);
-      const double maxE2 = vel2 + sqrt(gamma*p2/U2[0]);
+      if(thrd==0) maxE1 = vel1 + sqrt(gamma*p1/U1[0]);
+      if(thrd==1) maxE2 = vel2 + sqrt(gamma*p2/U2[0]);
+      MFEM_SYNC_THREAD;
 
-      const double maxE = max(maxE1, maxE2);
+      if(thrd==0) maxE = max(maxE1, maxE2);
+      MFEM_SYNC_THREAD;
 
-      double flux1[5],flux2[5];
-      RiemannSolver::convFluxDotNorm_gpu(U1,p1, nor,dim, flux1);
-      RiemannSolver::convFluxDotNorm_gpu(U2,p2, nor,dim, flux2);
+      RiemannSolver::convFluxDotNorm_gpu(U1,p1, nor,dim, flux1,thrd,max_num_threads);
+      RiemannSolver::convFluxDotNorm_gpu(U2,p2, nor,dim, flux2,thrd,max_num_threads);
 
-      double normag = 0;
-      for(int i=0;i<dim;i++)
-      {
-        normag += nor[i]*nor[i];
+      if(thrd==0){
+        for(int i=0;i<dim;i++) normag += nor[i]*nor[i];
+        normag = sqrt(normag);
       }
-      normag = sqrt(normag);
+      MFEM_SYNC_THREAD;
 
-      for(int i=0;i<num_equation;i++)
+      for(int i=thrd;i<num_equation;i+=max_num_threads)
       {
         flux[i] = 0.5*(flux1[i]+flux2[i])
                   -0.5*maxE*(U2[i] -U1[i])*normag;
