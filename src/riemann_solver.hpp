@@ -120,6 +120,7 @@ public:
       if(thrd==max_num_threads-1) maxE = max(maxE1, maxE2);
 
       RiemannSolver::convFluxDotNorm_gpu(U1,p1, nor,dim, flux1,thrd,max_num_threads);
+      MFEM_SYNC_THREAD;
       RiemannSolver::convFluxDotNorm_gpu(U2,p2, nor,dim, flux2,thrd,max_num_threads);
 
       if(thrd==0){
