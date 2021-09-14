@@ -200,10 +200,6 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
   {
     MFEM_FOREACH_THREAD(i,x,elDof)
     {
-//       MFEM_SHARED double Ui[216*5], Fcontrib[216*5];
-//       MFEM_SHARED double gradUpi[216*5*3]/*,gradUpj[216*5*3]*/;
-//       MFEM_SHARED double l1[216],l2[216];
-      
       MFEM_SHARED double tempData[216*5],Fcontrib[216*5];
       MFEM_SHARED double uk1[64*5],gradUpk1[64*5*3];
       MFEM_SHARED double uk2[64*5],gradUpk2[64*5*3];
@@ -219,14 +215,7 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
       const int indexi = d_nodesIDs[offsetEl1+i];
       const int elFaces = d_elemFaces[7*eli];
       
-      for(int eq=0;eq<num_equation;eq++)
-      {
-//         Ui[i + eq*elDof] = d_x[indexi + eq*Ndofs];
-        
-        Fcontrib[i + eq*elDof] = 0.;
-//         for(int d=0;d<dim;d++) gradUpi[i+eq*elDof+d*num_equation*elDof] = 
-//                     d_gradUp[indexi + eq*Ndofs+d*num_equation*Ndofs ];
-      }
+      for(int eq=0;eq<num_equation;eq++) Fcontrib[i + eq*elDof] = 0.;
       MFEM_SYNC_THREAD;
       
       // loop over faces
@@ -261,17 +250,6 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
         
         for(int j=i;j<dofj;j+=elDof) indexes_j[j] = d_nodesIDs[offsetElj+j];
         
-//         // get data from neightbor
-//         for(int eq=0;eq<num_equation;eq++)
-//         {
-//           for(int j=i;j<dofj;j+=elDof)
-//           {
-//             int index = indexes_j[j];
-//             Ui[j + eq*dofj] = d_x[index + eq*Ndofs];
-//             for(int d=0;d<dim;d++) gradUpj[j+eq*dofj+d*num_equation*dofj] =
-//                            d_gradUp[index+eq*Ndofs+d*num_equation*Ndofs];
-//           }
-//         }
         // set interpolation data to 0
         for(int n=i;n<Q*num_equation;n+=elDof)
         {
@@ -403,51 +381,6 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
             for(int j=i;j<dof1;j+=elDof) shape[j] = d_shapeWnor1[offsetShape1+j+k*(maxDofs+1+dim)];
           }
           
-//           for(int eq=i;eq<num_equation;eq+=elDof)
-//           {
-//             u1[eq] = 0.; u2[eq] = 0.; Rflux[eq] = 0.;
-//             for(int d=0;d<dim;d++) gradUp1[eq +d*num_equation] = 0.;
-//             for(int d=0;d<dim;d++) gradUp2[eq +d*num_equation] = 0.;
-//           }
-          
-//           for(int j=i;j<dof1;j+=elDof) l1[j] = d_shapeWnor1[offsetShape1+j+k*(maxDofs+1+dim)];
-//           for(int j=i;j<dof2;j+=elDof) l2[j] = d_shape2[offsetShape2+j+k*maxDofs];
-            
-//           for(int eq=i;eq<num_equation;eq+=elDof)
-//           {
-//             if( swapElems )
-//             {
-//               for(int j=0;j<dof1;j++)
-//               {
-//                 u1[eq] += l1[j]*Uj[j+eq*dof1];
-//                 int index = indexes_j[j];
-//                 for(int d=0;d<dim;d++) gradUp1[eq+d*num_equation] += 
-//                        l1[j]*d_gradUp[index+eq*Ndofs+d*num_equation*Ndofs];
-//               }
-//               for(int j=0;j<dof2;j++)
-//               {
-//                 u2[eq] += l2[j]*Ui[j+eq*dof2];
-//                 for(int d=0;d<dim;d++) gradUp2[eq+d*num_equation] += 
-//                       l2[j]*gradUpi[j+eq*dof2+d*num_equation*dof2];
-//               }
-//             }else
-//             {
-//               for(int j=0;j<dof1;j++)
-//               {
-//                 u1[eq] += l1[j]*Ui[j+eq*dof1];
-//                 for(int d=0;d<dim;d++) gradUp1[eq+d*num_equation] += 
-//                        l1[j]*gradUpi[j+eq*dof1+d*num_equation*dof1];
-//               }
-//               for(int j=0;j<dof2;j++)
-//               {
-//                 int index = indexes_j[j];
-//                 u2[eq] += l2[j]*d_x[index + eq*Ndofs];
-//                 for(int d=0;d<dim;d++) gradUp2[eq+d*num_equation] += 
-//                       l2[j]*d_gradUp[index+eq*Ndofs+d*num_equation*Ndofs];
-//               }
-//             }
-//           }
-//           MFEM_SYNC_THREAD;
           for(int eq=i;eq<num_equation;eq+=elDof)
           {
             u1[eq] = uk1[eq +k*num_equation];
