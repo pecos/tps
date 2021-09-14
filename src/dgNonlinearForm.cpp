@@ -589,14 +589,16 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(const Vector& x,
           }
           MFEM_SYNC_THREAD;
           // compute Riemann flux
-          if(i==0) RiemannSolver::riemannLF_gpu(&u1[0], 
-                                                &u2[0], 
-                                                &Rflux[0],
-                                                &nor[0],
-                                                gamma,
-                                                Rg,
-                                                dim, 
-                                                num_equation );
+          RiemannSolver::riemannLF_gpu(&u1[0], 
+                                        &u2[0], 
+                                        &Rflux[0],
+                                        &nor[0],
+                                        gamma,
+                                        Rg,
+                                        dim, 
+                                        num_equation,
+                                        i,
+                                       maxDofs );
           Fluxes::viscousFlux_gpu(&vFlux1[0],
                                     &u1[0],
                                     &gradUp1[0],
