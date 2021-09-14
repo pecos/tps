@@ -451,7 +451,7 @@ void Fluxes::FluxesVolumeIntegrals_gpu(const ParGridFunction *Up,
           double stress[3];
           for(int d=0;d<dim;d++) stress[d] = gradUpel[i+(1+d)*dof +2*num_equation*dof]+
                                             gradUpel[i+3*dof      +d*num_equation*dof];
-          stress[1] += (bulkViscMult -2./3.)*divV;
+          stress[2] += (bulkViscMult -2./3.)*divV;
           
           // add viscous fluxes to temp[]
           for(int d=0;d<dim;d++){
