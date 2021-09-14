@@ -58,9 +58,7 @@ public:
 
       if(thrd==max_num_threads-1) fluxN[0] = den_velN;
       for(int d=thrd;d<dim;d+=max_num_threads)
-      {
           fluxN[1+d] = den_velN*state[d+1]/state[0] +pres*nor[d];
-      }
 
       if(thrd==max_num_threads-1){
         const double H = (state[dim+1] + pres)/state[0];
@@ -93,18 +91,6 @@ public:
       }
       MFEM_SYNC_THREAD;
       
-      if(thrd==0){
-        vel1 = 0.;
-        for(int d=0;d<dim;d++) vel1 += 2.*KE1[d]/U1[0];
-        vel1 = sqrt(vel1);
-      }
-      if(thrd==1){
-        vel2 = 0.;
-        for(int d=0;d<dim;d++) vel2 += 2*KE2[d]/U2[0];
-        vel2 = sqrt(vel2);
-      }
-      MFEM_SYNC_THREAD;
-      
       if(thrd==0) p1 = EquationOfState::pressure( U1, 
                                                   &KE1[0], 
                                                   gamma, 
@@ -115,19 +101,29 @@ public:
                                                   gamma, 
                                                   dim, 
                                                   num_equation);
+      if(thrd==max_num_threads-1){
+        vel1 = 0.;
+        for(int d=0;d<dim;d++) vel1 += 2.*KE1[d]/U1[0];
+        vel1 = sqrt(vel1);
+      }
+      if(thrd==max_num_threads-2){
+        vel2 = 0.;
+        for(int d=0;d<dim;d++) vel2 += 2*KE2[d]/U2[0];
+        vel2 = sqrt(vel2);
+      }
       MFEM_SYNC_THREAD;
       
       if(thrd==0) maxE1 = vel1 + sqrt(gamma*p1/U1[0]);
       if(thrd==1) maxE2 = vel2 + sqrt(gamma*p2/U2[0]);
       MFEM_SYNC_THREAD;
 
-      if(thrd==0) maxE = max(maxE1, maxE2);
-      MFEM_SYNC_THREAD;
+      if(thrd==max_num_threads-1) maxE = max(maxE1, maxE2);
 
       RiemannSolver::convFluxDotNorm_gpu(U1,p1, nor,dim, flux1,thrd,max_num_threads);
       RiemannSolver::convFluxDotNorm_gpu(U2,p2, nor,dim, flux2,thrd,max_num_threads);
 
       if(thrd==0){
+        normag = 0.;
         for(int i=0;i<dim;i++) normag += nor[i]*nor[i];
         normag = sqrt(normag);
       }
