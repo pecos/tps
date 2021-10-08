@@ -36,7 +36,7 @@ using namespace mfem;
 
 // Implementation of class RiemannSolver
 RiemannSolver::RiemannSolver(int &_num_equation, EquationOfState *_eqState, Fluxes *_fluxClass, bool _useRoe)
-    : num_equation(_num_equation), eqState(_eqState), fluxClass(_fluxClass), useRoe(_useRoe) {
+  : num_equation(_num_equation), eqState(_eqState), fluxClass(_fluxClass), useRoe(_useRoe) {
   flux1.SetSize(num_equation);
   flux2.SetSize(num_equation);
 }

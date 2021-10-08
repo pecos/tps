@@ -41,24 +41,24 @@ DGNonLinearForm::DGNonLinearForm(ParFiniteElementSpace *_vfes, ParFiniteElementS
                                  Array<int> &_numElems, Array<int> &_nodesIDs, Array<int> &_posDofIds,
                                  Vector &_shapeWnor1, Vector &_shape2, Array<int> &_elemFaces, Array<int> &_elems12Q,
                                  const int &_maxIntPoints, const int &_maxDofs)
-    : ParNonlinearForm(_vfes),
-      vfes(_vfes),
-      gradFes(_gradFes),
-      gradUp(_gradUp),
-      bcIntegrator(_bcIntegrator),
-      intRules(_intRules),
-      dim(_dim),
-      num_equation(_num_equation),
-      eqState(_eqState),
-      numElems(_numElems),
-      nodesIDs(_nodesIDs),
-      posDofIds(_posDofIds),
-      shapeWnor1(_shapeWnor1),
-      shape2(_shape2),
-      elemFaces(_elemFaces),
-      elems12Q(_elems12Q),
-      maxIntPoints(_maxIntPoints),
-      maxDofs(_maxDofs) {
+  : ParNonlinearForm(_vfes),
+    vfes(_vfes),
+    gradFes(_gradFes),
+    gradUp(_gradUp),
+    bcIntegrator(_bcIntegrator),
+    intRules(_intRules),
+    dim(_dim),
+    num_equation(_num_equation),
+    eqState(_eqState),
+    numElems(_numElems),
+    nodesIDs(_nodesIDs),
+    posDofIds(_posDofIds),
+    shapeWnor1(_shapeWnor1),
+    shape2(_shape2),
+    elemFaces(_elemFaces),
+    elems12Q(_elems12Q),
+    maxIntPoints(_maxIntPoints),
+    maxDofs(_maxDofs) {
   h_numElems = numElems.HostRead();
   h_posDofIds = posDofIds.HostRead();
 }
@@ -177,8 +177,7 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x, Vector &y, const ParG
   const double *d_shape2 = shape2.Read();
   auto d_elems12Q = elems12Q.Read();
 
-  MFEM_FORALL_2D(el,NumElemType,elDof,1,1,  // NOLINT
-  {
+  MFEM_FORALL_2D(el,NumElemType,elDof,1,1, { // NOLINT
     MFEM_FOREACH_THREAD(i,x,elDof) {  // NOLINT
       //
       MFEM_SHARED double Ui[216*5], /*Uj[216*5],*/ Fcontrib[216*5];
@@ -353,8 +352,7 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(const Vector &x, const Vector &f
   const int *d_sharedVdofsGrads = parallelData->sharedVdofsGradUp.Read();
   const int *d_sharedElemsFaces = parallelData->sharedElemsFaces.Read();
 
-  MFEM_FORALL_2D(el,parallelData->sharedElemsFaces.Size()/7,maxDofs,1,1,  // NOLINT
-  {
+  MFEM_FORALL_2D(el,parallelData->sharedElemsFaces.Size()/7,maxDofs,1,1, { // NOLINT
     MFEM_FOREACH_THREAD(i,x,maxDofs) {  // NOLINT
       //
       MFEM_SHARED double Ui[216*5], /*Uj[64*5],*/ Fcontrib[216*5];
@@ -391,7 +389,7 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(const Vector &x, const Vector &f
 
         for (int k = 0; k < Q; k++) {
           const double weight =
-              d_sharedShapeWnor1[maxDofs + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
+            d_sharedShapeWnor1[maxDofs + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
           if (i < dof1)
             l1[i] = d_sharedShapeWnor1[i + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
           if (i < dim)
@@ -421,7 +419,7 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(const Vector &x, const Vector &f
             for (int n = 0; n < dof2; n++) {
               //             u2[i] += Uj[n+i*dof2]*l2[n];
               //             for(int d=0;d<dim;d++) gradUp2[i+d*num_equation] +=
-          //                           gradUpj[n+i*dof2+d*num_equation*dof2]*l2[n];
+              //                           gradUpj[n+i*dof2+d*num_equation*dof2]*l2[n];
               int index = d_sharedVdofs[n + i * maxDofs + f * num_equation * maxDofs];
               u2[i] += l2[n] * d_faceData[index];
               for (int d = 0; d < dim; d++) {

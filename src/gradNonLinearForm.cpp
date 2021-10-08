@@ -38,20 +38,20 @@ GradNonLinearForm::GradNonLinearForm(ParFiniteElementSpace *_vfes, IntegrationRu
                                      Array<int> &_posDofIds, Vector &_shapeWnor1, Vector &_shape2,
                                      const int &_maxIntPoints, const int &_maxDofs, Array<int> &_elemFaces,
                                      Array<int> &_elems12Q)
-    : ParNonlinearForm(_vfes),
-      vfes(_vfes),
-      intRules(_intRules),
-      dim(_dim),
-      num_equation(_num_equation),
-      numElems(_numElems),
-      nodesIDs(_nodesIDs),
-      posDofIds(_posDofIds),
-      shapeWnor1(_shapeWnor1),
-      shape2(_shape2),
-      maxIntPoints(_maxIntPoints),
-      maxDofs(_maxDofs),
-      elemFaces(_elemFaces),
-      elems12Q(_elems12Q) {
+  : ParNonlinearForm(_vfes),
+    vfes(_vfes),
+    intRules(_intRules),
+    dim(_dim),
+    num_equation(_num_equation),
+    numElems(_numElems),
+    nodesIDs(_nodesIDs),
+    posDofIds(_posDofIds),
+    shapeWnor1(_shapeWnor1),
+    shape2(_shape2),
+    maxIntPoints(_maxIntPoints),
+    maxDofs(_maxDofs),
+    elemFaces(_elemFaces),
+    elems12Q(_elems12Q) {
   //   h_numElems = numElems.HostReadWrite();
   //   h_posDofIds = posDofIds.HostReadWrite();
 }

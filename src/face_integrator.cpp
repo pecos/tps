@@ -35,16 +35,16 @@
 FaceIntegrator::FaceIntegrator(IntegrationRules *_intRules, RiemannSolver *rsolver_, Fluxes *_fluxClass,
                                ParFiniteElementSpace *_vfes, bool _useLinear, const int _dim, const int _num_equation,
                                ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, double &_max_char_speed)
-    : rsolver(rsolver_),
-      fluxClass(_fluxClass),
-      vfes(_vfes),
-      dim(_dim),
-      num_equation(_num_equation),
-      max_char_speed(_max_char_speed),
-      gradUp(_gradUp),
-      gradUpfes(_gradUpfes),
-      intRules(_intRules),
-      useLinear(_useLinear) {
+  : rsolver(rsolver_),
+    fluxClass(_fluxClass),
+    vfes(_vfes),
+    dim(_dim),
+    num_equation(_num_equation),
+    max_char_speed(_max_char_speed),
+    gradUp(_gradUp),
+    gradUpfes(_gradUpfes),
+    intRules(_intRules),
+    useLinear(_useLinear) {
   if (useLinear) {
     faceMassMatrix1 = new DenseMatrix[vfes->GetNF() - vfes->GetNBE()];
     faceMassMatrix2 = new DenseMatrix[vfes->GetNF() - vfes->GetNBE()];
@@ -120,7 +120,7 @@ void FaceIntegrator::getElementsGrads_gpu(const ParGridFunction *gradUp, ParFini
     for (int eq = 0; eq < num_equation; eq++) {
       for (int d = 0; d < dim; d++)
         d_gradUp1[n + eq * eldDof + d * eldDof * num_equation] =
-            d_gradUp[index + eq * totalDofs + d * num_equation * totalDofs];
+        d_gradUp[index + eq * totalDofs + d * num_equation * totalDofs];
     }
   });
   gradUp1.HostRead();
@@ -154,7 +154,7 @@ void FaceIntegrator::getElementsGrads_gpu(const ParGridFunction *gradUp, ParFini
       for (int eq = 0; eq < num_equation; eq++) {
         for (int d = 0; d < dim; d++)
           d_gradUp2[n + eq * eldDof + d * eldDof * num_equation] =
-              d_gradUp[index + eq * totalDofs + d * num_equation * totalDofs];
+          d_gradUp[index + eq * totalDofs + d * num_equation * totalDofs];
       }
     });
     gradUp2.Read();

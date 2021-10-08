@@ -93,7 +93,8 @@ enforcestyle:
 	@echo "Applying source code style updates using clang-format"
 	@echo "------------------------------------------------------"
 	@echo ""
-	clang-format -i $(headers) $(cxx_sources)
+#	clang-format -i $(headers) $(cxx_sources)
+	astyle --project $(headers) $(cxx_sources)
 
 style:
 	@echo ""

@@ -37,12 +37,12 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, RiemannSolver *_rsolver, EquationOfSt
                    ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
                    const int _num_equation, int _patchNumber, double _refLength, OutletType _bcType,
                    const Array<double> &_inputData, const int &_maxIntPoints, const int &_maxDofs)
-    : BoundaryCondition(_rsolver, _eqState, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber, _refLength),
-      groupsMPI(_groupsMPI),
-      outletType(_bcType),
-      inputState(_inputData),
-      maxIntPoints(_maxIntPoints),
-      maxDofs(_maxDofs) {
+  : BoundaryCondition(_rsolver, _eqState, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber, _refLength),
+    groupsMPI(_groupsMPI),
+    outletType(_bcType),
+    inputState(_inputData),
+    maxIntPoints(_maxIntPoints),
+    maxDofs(_maxDofs) {
   groupsMPI->setAsOutlet(_patchNumber);
 
   meanUp.UseDevice(true);
@@ -984,8 +984,7 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, const Array<double> &
   const int totDofs = x.Size() / num_equation;
   const int numBdrElem = listElems.Size();
 
-  MFEM_FORALL_2D(n,numBdrElem,maxDofs,1,1,      // NOLINT
-  {
+  MFEM_FORALL_2D(n,numBdrElem,maxDofs,1,1, {    // NOLINT
     MFEM_FOREACH_THREAD(i,x,maxDofs) {          // NOLINT
       MFEM_SHARED double Ui[216*5], Fcontrib[216*5], gradUpi[216*3*5];
       MFEM_SHARED double shape[216];
@@ -1010,7 +1009,7 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, const Array<double> &
           Ui[i + eq * elDof] = d_U[indexi + eq * totDofs];
           for (int d = 0; d < dim; d++)
             gradUpi[i + eq * elDof + d * num_equation * elDof] =
-                d_gradUp[indexi + eq * totDofs + d * num_equation * totDofs];
+            d_gradUp[indexi + eq * totDofs + d * num_equation * totDofs];
 
           Fcontrib[i + eq * elDof] = 0.;
         }

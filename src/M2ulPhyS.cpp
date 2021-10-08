@@ -87,10 +87,10 @@ M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, string &inputFileName) : mpi(_mpi) {
 
   // remove DIE file if present
   if (rank0_) {
-      if (file_exists("DIE")) {
-        grvy_printf(gdebug, "Removing DIE file on startup\n");
-        remove("DIE");
-      }
+    if (file_exists("DIE")) {
+      grvy_printf(gdebug, "Removing DIE file on startup\n");
+      remove("DIE");
+    }
   }
 }
 
@@ -377,12 +377,12 @@ void M2ulPhyS::initVariables() {
   //       new GradFaceIntegrator(intRules, dim, num_equation) );
   gradUp_A = new GradNonLinearForm(
 #ifdef _GPU_
-      vfes,
+    vfes,
 #else
-      gradUpfes,
+    gradUpfes,
 #endif
-      intRules, dim, num_equation, numElems, nodesIDs, posDofIds, shapeWnor1, shape2, maxIntPoints, maxDofs, elemFaces,
-      elems12Q);
+    intRules, dim, num_equation, numElems, nodesIDs, posDofIds, shapeWnor1, shape2, maxIntPoints, maxDofs, elemFaces,
+    elems12Q);
   gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
 
   rhsOperator = new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType,
@@ -1074,8 +1074,8 @@ void M2ulPhyS::InitialConditionEulerVortex(const Vector &x, Vector &y) {
     beta = 1. / 50.;
   } else {
     mfem_error(
-        "Cannot recognize problem."
-        "Options are: 1 - fast vortex, 2 - slow vortex");
+      "Cannot recognize problem."
+      "Options are: 1 - fast vortex, 2 - slow vortex");
   }
 
   int numVortices = 3;
@@ -1168,10 +1168,10 @@ void M2ulPhyS::uniformInitialConditions() {
 
   const double gamma = eqState->GetSpecificHeatRatio();
   const double rhoE =
-      inputRhoRhoVp[4] / (gamma - 1.) + 0.5 *
-                                            (inputRhoRhoVp[1] * inputRhoRhoVp[1] + inputRhoRhoVp[2] * inputRhoRhoVp[2] +
-                                             inputRhoRhoVp[3] * inputRhoRhoVp[3]) /
-                                            inputRhoRhoVp[0];
+    inputRhoRhoVp[4] / (gamma - 1.) + 0.5 *
+    (inputRhoRhoVp[1] * inputRhoRhoVp[1] + inputRhoRhoVp[2] * inputRhoRhoVp[2] +
+     inputRhoRhoVp[3] * inputRhoRhoVp[3]) /
+    inputRhoRhoVp[0];
 
   for (int i = 0; i < dof; i++) {
     data[i] = inputRhoRhoVp[0];

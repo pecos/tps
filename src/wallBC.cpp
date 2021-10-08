@@ -36,11 +36,11 @@
 WallBC::WallBC(RiemannSolver *_rsolver, EquationOfState *_eqState, Fluxes *_fluxClass, ParFiniteElementSpace *_vfes,
                IntegrationRules *_intRules, double &_dt, const int _dim, const int _num_equation, int _patchNumber,
                WallType _bcType, const Array<double> _inputData, const Array<int> &_intPointsElIDBC)
-    : BoundaryCondition(_rsolver, _eqState, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
-                        1),  // so far walls do not require ref. length. Left at 1
-      wallType(_bcType),
-      fluxClass(_fluxClass),
-      intPointsElIDBC(_intPointsElIDBC) {
+  : BoundaryCondition(_rsolver, _eqState, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
+                      1),  // so far walls do not require ref. length. Left at 1
+    wallType(_bcType),
+    fluxClass(_fluxClass),
+    intPointsElIDBC(_intPointsElIDBC) {
   if (wallType == VISC_ISOTH) {
     wallTemp = _inputData[0];
   }
@@ -337,8 +337,7 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
   const int totDofs = x.Size() / num_equation;
   const int numBdrElem = listElems.Size();
 
-  MFEM_FORALL_2D(el,wallElems.Size()/7,maxDofs,1,1,     // NOLINT
-  {
+  MFEM_FORALL_2D(el,wallElems.Size()/7,maxDofs,1,1, {   // NOLINT
     MFEM_FOREACH_THREAD(i,x,maxDofs) {                  // NOLINT
       MFEM_SHARED double Ui[216*5], Fcontrib[216*5];
       MFEM_SHARED double shape[216];

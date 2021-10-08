@@ -38,11 +38,11 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, RiemannSolver *_rsolver, EquationOfStat
                  ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
                  const int _num_equation, int _patchNumber, double _refLength, InletType _bcType,
                  const Array<double> &_inputData, const int &_maxIntPoints, const int &_maxDofs)
-    : BoundaryCondition(_rsolver, _eqState, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber, _refLength),
-      groupsMPI(_groupsMPI),
-      inletType(_bcType),
-      maxIntPoints(_maxIntPoints),
-      maxDofs(_maxDofs) {
+  : BoundaryCondition(_rsolver, _eqState, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber, _refLength),
+    groupsMPI(_groupsMPI),
+    inletType(_bcType),
+    maxIntPoints(_maxIntPoints),
+    maxDofs(_maxDofs) {
   inputState.UseDevice(true);
   inputState.SetSize(_inputData.Size());
   auto hinputState = inputState.HostWrite();
@@ -710,8 +710,7 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
   const int totDofs = x.Size() / num_equation;
   const int numBdrElem = listElems.Size();
 
-  MFEM_FORALL_2D(n,numBdrElem,maxDofs,1,1,           // NOLINT
-  {
+  MFEM_FORALL_2D(n,numBdrElem,maxDofs,1,1, {         // NOLINT
     MFEM_FOREACH_THREAD(i,x,maxDofs) {               // NOLINT
       //
       MFEM_SHARED double Ui[216*5], Fcontrib[216*5];

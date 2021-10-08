@@ -34,16 +34,16 @@
 Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollection *_fec, ParFiniteElementSpace *_fes,
                      ParFiniteElementSpace *_dfes, ParFiniteElementSpace *_vfes, const int &_num_equation,
                      const int &_dim, RunConfiguration &_config, MPI_Groups *_groupsMPI)
-    : Up(_Up),
-      mesh(_mesh),
-      fec(_fec),
-      fes(_fes),
-      dfes(_dfes),
-      vfes(_vfes),
-      num_equation(_num_equation),
-      dim(_dim),
-      config(_config),
-      groupsMPI(_groupsMPI) {
+  : Up(_Up),
+    mesh(_mesh),
+    fec(_fec),
+    fes(_fes),
+    dfes(_dfes),
+    vfes(_vfes),
+    num_equation(_num_equation),
+    dim(_dim),
+    config(_config),
+    groupsMPI(_groupsMPI) {
   // Always assume 6 components of the Reynolds stress tensor
   numRMS = 6;
 
@@ -141,23 +141,23 @@ void Averaging::addSampleMean(const int &iter) {
         // zz
         val = dataRMS[n + 2 * dof];
         dataRMS[n + 2 * dof] =
-            (val * static_cast<double>(samplesMean) + (vel[2] - meanVel[2]) * (vel[2] - meanVel[2])) /
-            static_cast<double>(samplesMean + 1);
+          (val * static_cast<double>(samplesMean) + (vel[2] - meanVel[2]) * (vel[2] - meanVel[2])) /
+          static_cast<double>(samplesMean + 1);
         // xy
         val = dataRMS[n + 3 * dof];
         dataRMS[n + 3 * dof] =
-            (val * static_cast<double>(samplesMean) + (vel[0] - meanVel[0]) * (vel[1] - meanVel[1])) /
-            static_cast<double>(samplesMean + 1);
+          (val * static_cast<double>(samplesMean) + (vel[0] - meanVel[0]) * (vel[1] - meanVel[1])) /
+          static_cast<double>(samplesMean + 1);
         // xz
         val = dataRMS[n + 4 * dof];
         dataRMS[n + 4 * dof] =
-            (val * static_cast<double>(samplesMean) + (vel[0] - meanVel[0]) * (vel[2] - meanVel[2])) /
-            static_cast<double>(samplesMean + 1);
+          (val * static_cast<double>(samplesMean) + (vel[0] - meanVel[0]) * (vel[2] - meanVel[2])) /
+          static_cast<double>(samplesMean + 1);
         // yz
         val = dataRMS[n + 5 * dof];
         dataRMS[n + 5 * dof] =
-            (val * static_cast<double>(samplesMean) + (vel[1] - meanVel[1]) * (vel[2] - meanVel[2])) /
-            static_cast<double>(samplesMean + 1);
+          (val * static_cast<double>(samplesMean) + (vel[1] - meanVel[1]) * (vel[2] - meanVel[2])) /
+          static_cast<double>(samplesMean + 1);
       }
 
       samplesMean++;

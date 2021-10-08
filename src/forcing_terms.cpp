@@ -34,14 +34,14 @@
 ForcingTerms::ForcingTerms(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                            IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
                            ParGridFunction *_gradUp)
-    : dim(_dim),
-      num_equation(_num_equation),
-      order(_order),
-      intRuleType(_intRuleType),
-      intRules(_intRules),
-      vfes(_vfes),
-      Up(_Up),
-      gradUp(_gradUp) {
+  : dim(_dim),
+    num_equation(_num_equation),
+    order(_order),
+    intRuleType(_intRuleType),
+    intRules(_intRules),
+    vfes(_vfes),
+    Up(_Up),
+    gradUp(_gradUp) {
   b = new ParGridFunction(vfes);
 
   // Initialize to zero
@@ -63,7 +63,7 @@ ConstantPressureGradient::ConstantPressureGradient(const int &_dim, const int &_
                                                    const int &_intRuleType, IntegrationRules *_intRules,
                                                    ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
                                                    ParGridFunction *_gradUp, RunConfiguration &_config)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp) {
+  : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp) {
   {
     double *data = _config.GetImposedPressureGradient();
     for (int jj = 0; jj < 3; jj++) pressGrad[jj] = data[jj];
@@ -132,7 +132,7 @@ void ConstantPressureGradient::updateTerms() {
 MASA_forcings::MASA_forcings(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                              IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
                              ParGridFunction *_gradUp, RunConfiguration &_config)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp) {
+  : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp) {
   initMasaHandler("forcing", dim, _config.GetEquationSystem(), _config.GetViscMult());
 }
 
