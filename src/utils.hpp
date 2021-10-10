@@ -1,7 +1,11 @@
+// -----------------------------------------------------------------------------------bl-
+// -----------------------------------------------------------------------------------el-
 #ifndef UTILS_
 #define UTILS_
 
 #include <hdf5.h>
+#include <assert.h>
+#include <string>
 
 // Misc. utilities
 bool file_exists (const std::string &name);
