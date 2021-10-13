@@ -57,7 +57,7 @@ headers              = averaging_and_rms.hpp equation_of_state.hpp forcing_terms
 		       run_configuration.hpp BCintegrator.hpp faceGradientIntegration.hpp inletBC.hpp outletBC.hpp \
 	               sbp_integrators.hpp BoundaryCondition.hpp face_integrator.hpp M2ulPhyS.hpp rhs_operator.hpp \
 	               wallBC.hpp domain_integrator.hpp fluxes.hpp masa_handler.hpp riemann_solver.hpp \
-		       dgNonlinearForm.hpp gradNonLinearForm.hpp dataStructures.hpp io.hpp
+		       dgNonlinearForm.hpp gradNonLinearForm.hpp dataStructures.hpp io.hpp em_options.hpp
 
 noinst_LIBRARIES     = libtps.a
 libtps_a_SOURCES     = $(cxx_sources) $(headers)
