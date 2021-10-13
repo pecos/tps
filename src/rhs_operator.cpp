@@ -59,33 +59,32 @@ RHSoperator::RHSoperator( int &_iter,
                           double &_alpha,
                           RunConfiguration &_config
                         ):
-TimeDependentOperator(_A->Height()),
-iter(_iter),
-dim(_dim ),
-eqSystem(_eqSystem),
-max_char_speed(_max_char_speed),
-num_equation(_num_equations),
-intRules(_intRules),
-intRuleType(_intRuleType),
-fluxClass(_fluxClass),
-eqState(_eqState),
-vfes(_vfes),
-gpuArrays(_gpuArrays),
-maxIntPoints(_maxIntPoints),
-maxDofs(_maxDofs),
-A(_A),
-Aflux(_Aflux),
-mesh(_mesh),
-spaceVaryViscMult(_spaceVaryViscMult),
-linViscData(_config.GetLinearVaryingData() ),
-isSBP(_isSBP),
-alpha(_alpha),
-Up(_Up),
-gradUp(_gradUp),
-gradUpfes(_gradUpfes),
-gradUp_A(_gradUp_A),
-bcIntegrator(_bcIntegrator)
-{
+  TimeDependentOperator(_A->Height()),
+  iter(_iter),
+  dim(_dim ),
+  eqSystem(_eqSystem),
+  max_char_speed(_max_char_speed),
+  num_equation(_num_equations),
+  intRules(_intRules),
+  intRuleType(_intRuleType),
+  fluxClass(_fluxClass),
+  eqState(_eqState),
+  vfes(_vfes),
+  gpuArrays(_gpuArrays),
+  maxIntPoints(_maxIntPoints),
+  maxDofs(_maxDofs),
+  A(_A),
+  Aflux(_Aflux),
+  mesh(_mesh),
+  spaceVaryViscMult(_spaceVaryViscMult),
+  linViscData(_config.GetLinearVaryingData() ),
+  isSBP(_isSBP),
+  alpha(_alpha),
+  Up(_Up),
+  gradUp(_gradUp),
+  gradUpfes(_gradUpfes),
+  gradUp_A(_gradUp_A),
+  bcIntegrator(_bcIntegrator) {
   flux.SetSize(vfes->GetNDofs(), dim, num_equation);
   z.UseDevice(true);
   z.SetSize(A->Height());
@@ -95,28 +94,27 @@ bcIntegrator(_bcIntegrator)
   fk.UseDevice(true);
   fk.SetSize(dim * vfes->GetNDofs());
   zk.SetSize(vfes->GetNDofs());
-  
-  
+
+
   h_numElems  = gpuArrays.numElems.HostRead();
   h_posDofIds = gpuArrays.posDofIds.HostRead();
-  
-  //Me_inv = new DenseMatrix[vfes->GetNE()];
+
+  // Me_inv = new DenseMatrix[vfes->GetNE()];
   Me_inv.SetSize( vfes->GetNE() );
-  posDofInvM.SetSize(2*vfes->GetNE());
+  posDofInvM.SetSize(2 * vfes->GetNE());
   auto hposDofInvM = posDofInvM.HostWrite();
-  
-  if( _config.thereIsForcing() )
-  {
+
+  if ( _config.thereIsForcing() ) {
     forcing.Append( new ConstantPressureGradient( dim,
-                                            num_equation,
-                                            _order,
-                                            intRuleType,
-                                            intRules,
-                                            vfes,
-                                            Up,
-                                            gradUp,
-                                            gpuArrays,
-                                            _config) );
+                                                  num_equation,
+                                                  _order,
+                                                  intRuleType,
+                                                  intRules,
+                                                  vfes,
+                                                  Up,
+                                                  gradUp,
+                                                  gpuArrays,
+                                                  _config) );
   }
 #ifdef _MASA_
   forcing.Append(new MASA_forcings( dim,
@@ -200,7 +198,7 @@ bcIntegrator(_bcIntegrator)
                             maxIntPoints,
                             maxDofs );
   gradients->setParallelData( &parallelData, &transferUp);
-  
+
   local_timeDerivatives.UseDevice(true);
   local_timeDerivatives.SetSize(5);
   local_timeDerivatives = 0.;
@@ -344,15 +342,14 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
 
   // 3. Multiply element-wise by the inverse mass matrices.
 #ifdef _GPU_
-  for(int eltype=0;eltype<gpuArrays.numElems.Size();eltype++)
-  {
+  for (int eltype = 0; eltype < gpuArrays.numElems.Size(); eltype++) {
     int elemOffset = 0;
     if (eltype != 0) {
       for (int i = 0; i < eltype; i++) elemOffset += h_numElems[i];
     }
     int dof = h_posDofIds[2 * elemOffset + 1];
     const int totDofs = vfes->GetNDofs();
-    
+
     RHSoperator::multiPlyInvers_gpu(y,
                                     z,
                                     gpuArrays,
@@ -383,8 +380,7 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
 #endif
 
   // add forcing terms
-  for(int i=0; i<forcing.Size();i++)
-  {
+  for (int i = 0; i < forcing.Size(); i++) {
     // NOTE: Do not use RHSoperator::time here b/c it is not correctly
     // updated for each RK substep.  Instead, get time from parent
     // class using TimeDependentOperator::GetTime().
@@ -553,8 +549,7 @@ void RHSoperator::multiPlyInvers_gpu( Vector &y,
                                       const int totNumDof,
                                       const int NE,
                                       const int elemOffset,
-                                      const int dof)
-{
+                                      const int dof) {
 #ifdef _GPU_
   double *d_y = y.ReadWrite();
   const double *d_z = z.Read();
@@ -562,34 +557,30 @@ void RHSoperator::multiPlyInvers_gpu( Vector &y,
   auto d_posDofIds = gpuArrays.posDofIds.Read();
   auto d_posDofInvM = posDofInvM.Read();
   const double *d_invM = invMArray.Read();
-  
-  MFEM_FORALL_2D(el,NE,dof,1,1,
-  {
-    MFEM_FOREACH_THREAD(i,x,dof)
-    {
-      MFEM_SHARED double data[216*5];
-      
+
+  MFEM_FORALL_2D(el, NE, dof, 1, 1, {
+    MFEM_FOREACH_THREAD(i, x, dof) {
+      MFEM_SHARED double data[216 * 5];
+
       int eli = el + elemOffset;
-      int offsetInv = d_posDofInvM[2*eli];
-      int offsetIds = d_posDofIds[2*eli];
-      
-      int index = d_nodesIDs[offsetIds+i];
-      
-      for(int eq=0;eq<num_equation;eq++)
-      {
-        data[i+eq*dof] = d_z[index + eq*totNumDof];
+      int offsetInv = d_posDofInvM[2 * eli];
+      int offsetIds = d_posDofIds[2 * eli];
+
+      int index = d_nodesIDs[offsetIds + i];
+
+      for (int eq = 0; eq < num_equation; eq++) {
+        data[i + eq * dof] = d_z[index + eq * totNumDof];
       }
       MFEM_SYNC_THREAD;
-      
-      for(int eq=0;eq<num_equation;eq++)
-      {
+
+      for (int eq = 0; eq < num_equation; eq++) {
         double tmp = 0.;
-        for(int k=0;k<dof;k++) tmp += d_invM[offsetInv +i*dof +k]*data[k+eq*dof];
-        d_y[index+eq*totNumDof] = tmp;
+        for (int k = 0; k < dof; k++) tmp += d_invM[offsetInv + i * dof + k] * data[k + eq * dof];
+        d_y[index + eq * totNumDof] = tmp;
       }
     }
   });
-  
+
 //   MFEM_FORALL_2D(el,NE,dof,1,1,
 //   {
 //     int eli = el + elemOffset;

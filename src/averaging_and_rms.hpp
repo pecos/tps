@@ -78,7 +78,7 @@ class Averaging {
   void initiMeanAndRMS();
 
   void addSample_cpu();
-  
+
   Vector local_sums;
   Vector tmp_vector;
 

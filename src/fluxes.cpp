@@ -206,14 +206,14 @@ void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTe
   MFEM_FORALL_2D(n, dof, num_equation, 1, 1, {
     MFEM_FOREACH_THREAD(eq, x, num_equation) {
       MFEM_SHARED double Un[5];
-      MFEM_SHARED double gradUpn[5*3];
-      MFEM_SHARED double vFlux[5*3];
+      MFEM_SHARED double gradUpn[5 * 3];
+      MFEM_SHARED double vFlux[5 * 3];
       MFEM_SHARED double linVisc;
 
       // init. State
-      Un[eq] = dataIn[n+eq*dof];
+      Un[eq] = dataIn[n + eq * dof];
 
-      for (int d=0; d < dim; d++) {
+      for (int d = 0; d < dim; d++) {
         gradUpn[eq + d * num_equation] = d_gradUp[n + eq * dof + d * dof * num_equation];
       }
       MFEM_SYNC_THREAD;
@@ -235,7 +235,7 @@ void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTe
       }
 
       // write to global memory
-      for (int d=0; d < dim; d++) {
+      for (int d = 0; d < dim; d++) {
         d_flux[n + d * dof + eq * dof * dim] -= vFlux[eq + d * num_equation];
       }
     }  // end MFEM_FOREACH_THREAD

@@ -47,13 +47,13 @@ class GradNonLinearForm : public ParNonlinearForm {
   IntegrationRules *intRules;
   const int dim;
   const int num_equation;
-  
+
   const volumeFaceIntegrationArrays &gpuArrays;
-  
+
   const int &maxIntPoints;
   const int &maxDofs;
-  
-public:
+
+ public:
   GradNonLinearForm(ParFiniteElementSpace *f,
                     IntegrationRules *intRules,
                     const int dim,
@@ -61,9 +61,9 @@ public:
                     const volumeFaceIntegrationArrays &gpuArrays,
                     const int &maxIntPoints,
                     const int &maxDofs );
-  
+
   void Mult(const ParGridFunction *Up, Vector &y );
-  
+
 #ifdef _GPU_
   void Mult_gpu(const Vector &x, Vector &y);
   static void IndexedAddToGlobalMemory(const Array<int> &vdofs, Vector &y, const Vector &el_y, const int &dof,

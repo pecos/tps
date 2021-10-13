@@ -59,12 +59,12 @@ class DGNonLinearForm : public ParNonlinearForm {
   const int dim;
   const int num_equation;
   EquationOfState *eqState;
-  
+
   const volumeFaceIntegrationArrays &gpuArrays;
-  
+
   const int *h_numElems;
   const int *h_posDofIds;
-  
+
   // Parallel shared faces integration
   parallelFacesIntegrationArrays *parallelData;
   mutable dataTransferArrays *transferU;
@@ -72,10 +72,10 @@ class DGNonLinearForm : public ParNonlinearForm {
 
   const int &maxIntPoints;
   const int &maxDofs;
-  
-  
-  
-public:
+
+
+
+ public:
   DGNonLinearForm(ParFiniteElementSpace *f,
                   ParFiniteElementSpace *gradFes,
                   ParGridFunction *_gradUp,
@@ -87,17 +87,17 @@ public:
                   const volumeFaceIntegrationArrays &_gpuArrays,
                   const int &maxIntPoints,
                   const int &maxDofs );
-  
+
   void Mult(const Vector &x, Vector &y );
-  
+
   void setParallelData(parallelFacesIntegrationArrays *_parallelData,
                        dataTransferArrays *_transferU,
-                       dataTransferArrays *_transferGradUp ){ 
+                       dataTransferArrays *_transferGradUp ) {
     parallelData = _parallelData;
     transferU = _transferU;
     transferGradUp = _transferGradUp;
   }
-            
+
   static void faceIntegration_gpu(const Vector &x,
                                   Vector &y,
                                   const ParGridFunction *gradUp,
@@ -116,7 +116,7 @@ public:
                                   const volumeFaceIntegrationArrays &gpuArrays,
                                   const int &maxIntPoints,
                                   const int &maxDofs);
-  
+
   static void sharedFaceIntegration_gpu(const Vector &x,
                                         const Vector &faceU,
                                         const ParGridFunction *gradUp,
@@ -134,7 +134,7 @@ public:
                                         const parallelFacesIntegrationArrays *parallelData,
                                         const int &maxIntPoints,
                                         const int &maxDofs );
-  
+
 #ifdef _GPU_
   void Mult_domain(const Vector &x, Vector &y);
   void Mult_bdr(const Vector &x, Vector &y);

@@ -71,12 +71,12 @@ class RHSoperator : public TimeDependentOperator {
   EquationOfState *eqState;
 
   ParFiniteElementSpace *vfes;
-  
+
   const volumeFaceIntegrationArrays &gpuArrays;
-  
+
   const int *h_numElems;
   const int *h_posDofIds;
-  
+
   const int &maxIntPoints;
   const int &maxDofs;
 
@@ -125,50 +125,50 @@ class RHSoperator : public TimeDependentOperator {
   mutable Vector local_timeDerivatives;
   void computeMeanTimeDerivatives(Vector &y) const;
 
-public:
-   RHSoperator(int &_iter,
-               const int _dim,
-               const int &_num_equations,
-               const int &_order,
-               const Equations &_eqSystem,
-               double &_max_char_speed,
-               IntegrationRules *_intRules,
-               int _intRuleType,
-               Fluxes *_fluxClass,
-               EquationOfState *_eqState,
-               ParFiniteElementSpace *_vfes,
-               const volumeFaceIntegrationArrays &gpuArrays,
-               const int &_maxIntPoints,
-               const int &_maxDofs,
-               DGNonLinearForm *_A,
-               MixedBilinearForm *_Aflux,
-               ParMesh *_mesh,
-               ParGridFunction *_spaceVaryViscMult,
-               ParGridFunction *_Up,
-               ParGridFunction *_gradUp,
-               ParFiniteElementSpace *_gradUpfes,
-               GradNonLinearForm *_gradUp_A,
-               BCintegrator *_bcIntegrator,
-               bool &_isSBP,
-               double &_alpha,
-               RunConfiguration &_config
-              );
+ public:
+  RHSoperator(int &_iter,
+              const int _dim,
+              const int &_num_equations,
+              const int &_order,
+              const Equations &_eqSystem,
+              double &_max_char_speed,
+              IntegrationRules *_intRules,
+              int _intRuleType,
+              Fluxes *_fluxClass,
+              EquationOfState *_eqState,
+              ParFiniteElementSpace *_vfes,
+              const volumeFaceIntegrationArrays &gpuArrays,
+              const int &_maxIntPoints,
+              const int &_maxDofs,
+              DGNonLinearForm *_A,
+              MixedBilinearForm *_Aflux,
+              ParMesh *_mesh,
+              ParGridFunction *_spaceVaryViscMult,
+              ParGridFunction *_Up,
+              ParGridFunction *_gradUp,
+              ParFiniteElementSpace *_gradUpfes,
+              GradNonLinearForm *_gradUp_A,
+              BCintegrator *_bcIntegrator,
+              bool &_isSBP,
+              double &_alpha,
+              RunConfiguration &_config
+             );
 
-   virtual void Mult(const Vector &x, Vector &y) const;
-   void updatePrimitives(const Vector &x) const;
+  virtual void Mult(const Vector &x, Vector &y) const;
+  void updatePrimitives(const Vector &x) const;
 
-   virtual ~RHSoperator();
-   
-   const double *getLocalTimeDerivatives(){return local_timeDerivatives.HostRead();}
-   
-   static void initNBlockDataTransfer(const Vector &x,
-                                      ParFiniteElementSpace *pfes,
-                                      dataTransferArrays &dataTransfer );
-   static void waitAllDataTransfer(ParFiniteElementSpace *pfes,
-                                   dataTransferArrays &dataTransfer);
+  virtual ~RHSoperator();
+
+  const double *getLocalTimeDerivatives() {return local_timeDerivatives.HostRead();}
+
+  static void initNBlockDataTransfer(const Vector &x,
+                                     ParFiniteElementSpace *pfes,
+                                     dataTransferArrays &dataTransfer );
+  static void waitAllDataTransfer(ParFiniteElementSpace *pfes,
+                                  dataTransferArrays &dataTransfer);
 
   // GPU functions
-  static void copyZk2Z_gpu(Vector &z,Vector &zk,const int eq,const int dof);
+  static void copyZk2Z_gpu(Vector &z, Vector &zk, const int eq, const int dof);
   static void copyDataForFluxIntegration_gpu( const Vector &z,
                                               DenseTensor &flux,
                                               Vector &fk,
@@ -176,7 +176,7 @@ public:
                                               const int eq,
                                               const int dof,
                                               const int dim);
-  static void updatePrimitives_gpu( Vector *Up, 
+  static void updatePrimitives_gpu( Vector *Up,
                                     const Vector *x_in,
                                     const double gamma,
                                     const int ndofs,
@@ -192,7 +192,7 @@ public:
                                   const int NE,
                                   const int elemOffset,
                                   const int dof);
-  
+
   static void meanTimeDerivatives_gpu(Vector &y,
                                       Vector &local_timeDerivatives,
                                       Vector &tmp_vec,

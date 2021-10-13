@@ -58,15 +58,15 @@ class ForcingTerms {
   ParFiniteElementSpace *vfes;
   ParGridFunction *Up;
   ParGridFunction *gradUp;
-  
+
   const volumeFaceIntegrationArrays &gpuArrays;
   const int *h_numElems;
   const int *h_posDofIds;
-  
+
   // added term
 //   ParGridFunction *b;
-  
-public:
+
+ public:
   ForcingTerms( const int &_dim,
                 const int &_num_equation,
                 const int &_order,
@@ -83,14 +83,13 @@ public:
 //   virtual void addForcingIntegrals(Vector &in);
 };
 
-// Constant pressure gradient term 
-class ConstantPressureGradient: public ForcingTerms
-{
-private:
-  //RunConfiguration &config;
+// Constant pressure gradient term
+class ConstantPressureGradient: public ForcingTerms {
+ private:
+  // RunConfiguration &config;
   Vector pressGrad;
-  
-public:
+
+ public:
   ConstantPressureGradient( const int &_dim,
                             const int &_num_equation,
                             const int &_order,
@@ -101,10 +100,10 @@ public:
                             ParGridFunction *_gradUp,
                             const volumeFaceIntegrationArrays &gpuArrays,
                             RunConfiguration &_config );
-  
+
   // Terms do not need updating
   virtual void updateTerms(Vector &in);
-  
+
   // GPU functions
 #ifdef _GPU_
   static void updateTerms_gpu(const int numElems,
@@ -123,11 +122,10 @@ public:
 
 #ifdef _MASA_
 // Manufactured Solution using MASA
-class MASA_forcings: public ForcingTerms
-{
-private:
+class MASA_forcings: public ForcingTerms {
+ private:
 
-public:
+ public:
   MASA_forcings(const int &_dim,
                 const int &_num_equation,
                 const int &_order,

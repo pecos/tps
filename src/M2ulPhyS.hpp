@@ -156,7 +156,7 @@ class M2ulPhyS {
   const int maxDofs = 216;      // corresponding to HEX with p=5
 
   volumeFaceIntegrationArrays gpuArrays;
-  
+
   // BC integration
   Vector shapesBC;
   Vector normalsWBC;

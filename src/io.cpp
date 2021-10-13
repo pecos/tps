@@ -217,8 +217,7 @@ void M2ulPhyS::restart_files_hdf5(string mode) {
   //-------------------------------------------------------
   // Loop over defined IO families to save desired output
   //-------------------------------------------------------
-  for(int n=0;n<ioData.families_.size();n++)
-  {
+  for (int n = 0; n < ioData.families_.size(); n++) {
     IOFamily &fam = ioData.families_[n];
 
     if (mode == "write") {
@@ -252,7 +251,7 @@ void M2ulPhyS::restart_files_hdf5(string mode) {
       // special case if writing a serial restart
       if ((config.RestartSerial() == "write") && (nprocs_ > 1)) {
         serialize_soln_for_write(fam);
-        if(rank0_) data = fam.serial_sol->HostReadWrite();
+        if (rank0_) data = fam.serial_sol->HostReadWrite();
       }
 
       // get defined variables for this IO family
@@ -575,7 +574,7 @@ void M2ulPhyS::read_serialized_soln_data(hid_t file, string varName, int numDof,
     data_serial.SetSize(numDof);
     data_soln = H5Dopen2(file, varName.c_str(), H5P_DEFAULT);
     assert(data_soln >= 0);
-    status = H5Dread(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT,data_serial.HostReadWrite());
+    status = H5Dread(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, data_serial.HostReadWrite());
     assert(status >= 0);
     H5Dclose(data_soln);
 
