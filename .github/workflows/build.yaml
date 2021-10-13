@@ -12,6 +12,21 @@ defaults:
     shell: bash -l {0}
 
 jobs:
+   style:
+     runs-on: ubuntu-20.04
+     container:
+       image: koomietx/mfem:4.2.tps
+       options: --user 1001 --privileged
+     name: Code style
+     steps:
+       - name: Checkout code
+         uses: actions/checkout@v2
+       - name: Bootstrap
+         run:  ./bootstrap
+       - name: Configure
+         run:  ./configure
+       - name: Style check
+         run:  make style
    build:
      runs-on: ubuntu-20.04
      container:

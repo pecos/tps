@@ -1,41 +1,72 @@
-#ifndef RHS_OPERATOR
-#define RHS_OPERATOR
+// -----------------------------------------------------------------------------------bl-
+// BSD 3-Clause License
+//
+// Copyright (c) 2020-2021, The PECOS Development Team, University of Texas at Austin
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+//
+// 1. Redistributions of source code must retain the above copyright notice, this
+//    list of conditions and the following disclaimer.
+//
+// 2. Redistributions in binary form must reproduce the above copyright notice,
+//    this list of conditions and the following disclaimer in the documentation
+//    and/or other materials provided with the distribution.
+//
+// 3. Neither the name of the copyright holder nor the names of its
+//    contributors may be used to endorse or promote products derived from
+//    this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// -----------------------------------------------------------------------------------el-
+#ifndef RHS_OPERATOR_HPP_
+#define RHS_OPERATOR_HPP_
 
-#include <mfem.hpp>
-#include <general/forall.hpp>
 #include <tps_config.h>
-#include "fluxes.hpp"
-#include "equation_of_state.hpp"
+
+#include <general/forall.hpp>
+#include <mfem.hpp>
+
 #include "BCintegrator.hpp"
-#include "forcing_terms.hpp"
-#include "run_configuration.hpp"
-#include "gradients.hpp"
-#include "dgNonlinearForm.hpp"
-#include "gradNonLinearForm.hpp"
 #include "dataStructures.hpp"
+#include "dgNonlinearForm.hpp"
+#include "equation_of_state.hpp"
+#include "fluxes.hpp"
+#include "forcing_terms.hpp"
+#include "gradNonLinearForm.hpp"
+#include "gradients.hpp"
+#include "run_configuration.hpp"
 
 using namespace mfem;
 
-
 // Time-dependent operator for the right-hand side of the ODE representing the
 // DG weak form.
-class RHSoperator : public TimeDependentOperator
-{
-private:
+class RHSoperator : public TimeDependentOperator {
+ private:
   Gradients *gradients;
-  
+
   int &iter;
-  
+
   const int dim;
-  
+
   const Equations &eqSystem;
-  
+
   double &max_char_speed;
   const int &num_equation;
-  
+
   IntegrationRules *intRules;
   const int intRuleType;
-  
+
   Fluxes *fluxClass;
   EquationOfState *eqState;
 
@@ -50,48 +81,47 @@ private:
   const int &maxDofs;
 
   DGNonLinearForm *A;
-  
+
   MixedBilinearForm *Aflux;
-  
+
   ParMesh *mesh;
-  
+
   ParGridFunction *spaceVaryViscMult;
   linearlyVaryingVisc &linViscData;
-  
-  Array< DenseMatrix* > Me_inv;
+
+  Array<DenseMatrix *> Me_inv;
   Vector invMArray;
   Array<int> posDofInvM;
-  
+
   const bool &isSBP;
   const double &alpha;
-  
+
   // reference to primitive varibales
   ParGridFunction *Up;
-  
+
   // gradients of primitives and associated forms&FE space
   ParGridFunction *gradUp;
   ParFiniteElementSpace *gradUpfes;
-  //ParNonlinearForm *gradUp_A;
+  // ParNonlinearForm *gradUp_A;
   GradNonLinearForm *gradUp_A;
-  
+
   BCintegrator *bcIntegrator;
-  
-  Array<ForcingTerms*> forcing;
-  
+
+  Array<ForcingTerms *> forcing;
+
   mutable DenseTensor flux;
   mutable Vector z;
-  mutable Vector fk,zk; // temp vectors for flux volume integral
-  
+  mutable Vector fk, zk;  // temp vectors for flux volume integral
+
   mutable parallelFacesIntegrationArrays parallelData;
   mutable dataTransferArrays transferU;
   mutable dataTransferArrays transferUp;
   mutable dataTransferArrays transferGradUp;
   void fillSharedData();
 
-  //void GetFlux(const DenseMatrix &state, DenseTensor &flux) const;
+  // void GetFlux(const DenseMatrix &state, DenseTensor &flux) const;
   void GetFlux(const Vector &state, DenseTensor &flux) const;
-  
-  
+
   mutable Vector local_timeDerivatives;
   void computeMeanTimeDerivatives(Vector &y) const;
 
@@ -137,7 +167,6 @@ public:
    static void waitAllDataTransfer(ParFiniteElementSpace *pfes,
                                    dataTransferArrays &dataTransfer);
 
-
   // GPU functions
   static void copyZk2Z_gpu(Vector &z,Vector &zk,const int eq,const int dof);
   static void copyDataForFluxIntegration_gpu( const Vector &z,
@@ -172,4 +201,4 @@ public:
                                       const int &dim );
 };
 
-#endif // RHS_OPERATOR
+#endif  // RHS_OPERATOR_HPP_

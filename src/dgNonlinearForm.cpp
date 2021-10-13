@@ -1,5 +1,38 @@
-#include <vector>
+// -----------------------------------------------------------------------------------bl-
+// BSD 3-Clause License
+//
+// Copyright (c) 2020-2021, The PECOS Development Team, University of Texas at Austin
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+//
+// 1. Redistributions of source code must retain the above copyright notice, this
+//    list of conditions and the following disclaimer.
+//
+// 2. Redistributions in binary form must reproduce the above copyright notice,
+//    this list of conditions and the following disclaimer in the documentation
+//    and/or other materials provided with the distribution.
+//
+// 3. Neither the name of the copyright holder nor the names of its
+//    contributors may be used to endorse or promote products derived from
+//    this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// -----------------------------------------------------------------------------------el-
 #include "dgNonlinearForm.hpp"
+
+#include <vector>
+
 #include "riemann_solver.hpp"
 
 DGNonLinearForm::DGNonLinearForm( ParFiniteElementSpace *_vfes,
@@ -30,75 +63,70 @@ maxDofs(_maxDofs)
   h_posDofIds = gpuArrays.posDofIds.HostRead();
 }
 
-
-void DGNonLinearForm::Mult(const Vector& x, Vector& y )
-{
-  ParNonlinearForm::Mult(x,y);
+void DGNonLinearForm::Mult(const Vector &x, Vector &y) {
+  ParNonlinearForm::Mult(x, y);
   // the following is equivalent to the line above
-//   NonlinearForm::Mult(x,y);
-//   
-//   if (fnfi.Size())
-//   {
-//     // Terms over shared interior faces in parallel.
-//     ParFiniteElementSpace *pfes = ParFESpace();
-//     ParMesh *pmesh = pfes->GetParMesh();
-//     FaceElementTransformations *tr;
-//     const FiniteElement *fe1, *fe2;
-//     Array<int> vdofs1, vdofs2;
-//     Vector el_x, el_y;
-//     aux1.HostReadWrite();
-//     X.MakeRef(aux1, 0); // aux1 contains P.x
-//     X.ExchangeFaceNbrData();
-//     const int n_shared_faces = pmesh->GetNSharedFaces();
-//     for (int i = 0; i < n_shared_faces; i++)
-//     {
-//         tr = pmesh->GetSharedFaceTransformations(i, true);
-//         int Elem2NbrNo = tr->Elem2No - pmesh->GetNE();
-// 
-//         fe1 = pfes->GetFE(tr->Elem1No);
-//         fe2 = pfes->GetFaceNbrFE(Elem2NbrNo);
-// 
-//         pfes->GetElementVDofs(tr->Elem1No, vdofs1);
-//         pfes->GetFaceNbrElementVDofs(Elem2NbrNo, vdofs2);
-// 
-//         el_x.SetSize(vdofs1.Size() + vdofs2.Size());
-//         X.GetSubVector(vdofs1, el_x.GetData());
-//         X.FaceNbrData().GetSubVector(vdofs2, el_x.GetData() + vdofs1.Size());
-// 
-//         for (int k = 0; k < fnfi.Size(); k++)
-//         {
-//           fnfi[k]->AssembleFaceVector(*fe1, *fe2, *tr, el_x, el_y);
-//           aux2.AddElementVector(vdofs1, el_y.GetData());
-//         }
-//     }
-//   }
-// 
-//   P->MultTranspose(aux2, y);
-// 
-//   y.HostReadWrite();
-//   for (int i = 0; i < ess_tdof_list.Size(); i++)
-//   {
-//     y(ess_tdof_list[i]) = 0.0;
-//   }
+  //   NonlinearForm::Mult(x,y);
+  //
+  //   if (fnfi.Size())
+  //   {
+  //     // Terms over shared interior faces in parallel.
+  //     ParFiniteElementSpace *pfes = ParFESpace();
+  //     ParMesh *pmesh = pfes->GetParMesh();
+  //     FaceElementTransformations *tr;
+  //     const FiniteElement *fe1, *fe2;
+  //     Array<int> vdofs1, vdofs2;
+  //     Vector el_x, el_y;
+  //     aux1.HostReadWrite();
+  //     X.MakeRef(aux1, 0); // aux1 contains P.x
+  //     X.ExchangeFaceNbrData();
+  //     const int n_shared_faces = pmesh->GetNSharedFaces();
+  //     for (int i = 0; i < n_shared_faces; i++)
+  //     {
+  //         tr = pmesh->GetSharedFaceTransformations(i, true);
+  //         int Elem2NbrNo = tr->Elem2No - pmesh->GetNE();
+  //
+  //         fe1 = pfes->GetFE(tr->Elem1No);
+  //         fe2 = pfes->GetFaceNbrFE(Elem2NbrNo);
+  //
+  //         pfes->GetElementVDofs(tr->Elem1No, vdofs1);
+  //         pfes->GetFaceNbrElementVDofs(Elem2NbrNo, vdofs2);
+  //
+  //         el_x.SetSize(vdofs1.Size() + vdofs2.Size());
+  //         X.GetSubVector(vdofs1, el_x.GetData());
+  //         X.FaceNbrData().GetSubVector(vdofs2, el_x.GetData() + vdofs1.Size());
+  //
+  //         for (int k = 0; k < fnfi.Size(); k++)
+  //         {
+  //           fnfi[k]->AssembleFaceVector(*fe1, *fe2, *tr, el_x, el_y);
+  //           aux2.AddElementVector(vdofs1, el_y.GetData());
+  //         }
+  //     }
+  //   }
+  //
+  //   P->MultTranspose(aux2, y);
+  //
+  //   y.HostReadWrite();
+  //   for (int i = 0; i < ess_tdof_list.Size(); i++)
+  //   {
+  //     y(ess_tdof_list[i]) = 0.0;
+  //   }
 }
 
 #ifdef _GPU_
-void DGNonLinearForm::Mult_domain(const Vector& x, Vector& y)
-{
-  setToZero_gpu(y,y.Size());
-  
+void DGNonLinearForm::Mult_domain(const Vector &x, Vector &y) {
+  setToZero_gpu(y, y.Size());
+
   Mesh *mesh = fes->GetMesh();
 
   // internal face integration
-  if (fnfi.Size())
-  {
+  if (fnfi.Size()) {
     // This loop is for internal faces only
     for(int elType=0;elType<gpuArrays.numElems.Size();elType++)
     {
       int elemOffset = 0;
-      if( elType!=0 )
-      {
-        for(int i=0;i<elType;i++) elemOffset += h_numElems[i];
+      if (elType != 0) {
+        for (int i = 0; i < elType; i++) elemOffset += h_numElems[i];
       }
       int dof_el = h_posDofIds[2*elemOffset +1];
       
@@ -122,13 +150,12 @@ void DGNonLinearForm::Mult_domain(const Vector& x, Vector& y)
                           maxDofs );
     }
   }
-  
+
   // INTEGRATION BOUNDARIES
   if(bfnfi.Size()) bcIntegrator->integrateBCs(y,x,gpuArrays.nodesIDs,gpuArrays.posDofIds);
 }
 
-void DGNonLinearForm::Mult_bdr(const Vector& x, Vector& y)
-{
+void DGNonLinearForm::Mult_bdr(const Vector &x, Vector &y) {
   ParMesh *pmesh = vfes->GetParMesh();
   const int Nshared = pmesh->GetNSharedFaces();
   if( Nshared>0 )
@@ -153,19 +180,11 @@ void DGNonLinearForm::Mult_bdr(const Vector& x, Vector& y)
   }
 }
 
-
-
-void DGNonLinearForm::setToZero_gpu(Vector &x, const int size)
-{
+void DGNonLinearForm::setToZero_gpu(Vector &x, const int size) {
   double *d_x = x.Write();
-  
-  MFEM_FORALL(i,size,
-  {
-    d_x[i] = 0.;
-  });
+
+  MFEM_FORALL(i, size, { d_x[i] = 0.; });
 }
-
-
 
 void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
                                           Vector &y,
@@ -217,33 +236,29 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
       
       for(int eq=0;eq<num_equation;eq++) Fcontrib[i + eq*elDof] = 0.;
       MFEM_SYNC_THREAD;
-      
+
       // loop over faces
-      for(int face=0;face<elFaces;face++)
-      {
-        const int gFace = d_elemFaces[7*eli+face+1];
-        const int Q     = d_elems12Q[3*gFace+2];
-        const int offsetShape1 = gFace*maxIntPoints*(maxDofs+1+dim);
-        const int offsetShape2 = gFace*maxIntPoints*maxDofs;
+      for (int face=0; face < elFaces; face++) {
+        const int gFace = d_elemFaces[7 * eli + face + 1];
+        const int Q = d_elems12Q[3 * gFace + 2];
+        const int offsetShape1 = gFace * maxIntPoints * (maxDofs + 1 + dim);
+        const int offsetShape2 = gFace * maxIntPoints * maxDofs;
         bool swapElems = false;
-        
+
         // get neighbor
-        int elj = d_elems12Q[3*gFace];
-        if( elj==eli )
-        {
-          elj = d_elems12Q[3*gFace+1];
-        }else
-        {
+        int elj = d_elems12Q[3 * gFace];
+        if (elj == eli) {
+          elj = d_elems12Q[3 * gFace + 1];
+        } else {
           swapElems = true;
         }
-        
-        const int offsetElj = d_posDofIds[2*elj];
-        int dofj = d_posDofIds[2*elj+1];
-        
+
+        const int offsetElj = d_posDofIds[2 * elj];
+        int dofj = d_posDofIds[2 * elj + 1];
+
         int dof1 = elDof;
         int dof2 = dofj;
-        if( swapElems )
-        {
+        if (swapElems) {
           dof1 = dofj;
           dof2 = elDof;
         }
@@ -429,20 +444,17 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
                                   dim,
                                   num_equation );
           MFEM_SYNC_THREAD;
-          //if(i<num_equation)
-          for(int eq=i;eq<num_equation;eq+=elDof)
-          {
-            for(int d=0;d<dim;d++) vFlux1[eq+d*num_equation] = 
-              0.5*(vFlux1[eq+d*num_equation]+vFlux2[eq+d*num_equation]);
+          // if(i<num_equation)
+          for (int eq = i; eq < num_equation; eq += elDof) {
+            for (int d = 0; d < dim; d++)
+              vFlux1[eq + d * num_equation] = 0.5 * (vFlux1[eq + d * num_equation] + vFlux2[eq + d * num_equation]);
           }
           MFEM_SYNC_THREAD;
-          for(int eq=i;eq<num_equation;eq+=elDof)
-          {
-            for(int d=0;d<dim;d++) Rflux[eq] -= 
-                                  vFlux1[eq+d*num_equation]*nor[d];
+          for (int eq = i; eq < num_equation; eq += elDof) {
+            for (int d = 0; d < dim; d++) Rflux[eq] -= vFlux1[eq + d * num_equation] * nor[d];
           }
           MFEM_SYNC_THREAD;
-          
+
           // add integration point contribution
           for(int eq=0;eq<num_equation;eq++)
           {
@@ -453,11 +465,10 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x,
           }
         }
       }
-      
+
       // write to global memory
-      for(int eq=0;eq<num_equation;eq++)
-      {
-        d_y[indexi + eq*Ndofs] += Fcontrib[i + eq*elDof];
+      for (int eq=0; eq < num_equation; eq++) {
+        d_y[indexi + eq * Ndofs] += Fcontrib[i + eq * elDof];
       }
     }
   });
@@ -481,9 +492,7 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(const Vector& x,
 //                                                 const Array<int>& nodesIDs, 
 //                                                 const Array<int>& posDofIds, 
                                                 const parallelFacesIntegrationArrays *parallelData,
-                                                const int& maxIntPoints, 
-                                                const int& maxDofs)
-{
+                                                const int &maxIntPoints, const int &maxDofs) {
   const double *d_x = x.Read();
   const double *d_gradUp = gradUp->Read();
   const double *d_faceGradUp = faceGradUp.Read();
@@ -498,92 +507,80 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(const Vector& x,
   const int *d_sharedVdofs = parallelData->sharedVdofs.Read();
   const int *d_sharedVdofsGrads = parallelData->sharedVdofsGradUp.Read();
   const int *d_sharedElemsFaces = parallelData->sharedElemsFaces.Read();
-  
-  MFEM_FORALL_2D(el,parallelData->sharedElemsFaces.Size()/7,maxDofs,1,1,
-  {
-    MFEM_FOREACH_THREAD(i,x,maxDofs)
-    {
+
+  MFEM_FORALL_2D(el,parallelData->sharedElemsFaces.Size()/7,maxDofs,1,1, { // NOLINT
+    MFEM_FOREACH_THREAD(i,x,maxDofs) {  // NOLINT
+      //
       MFEM_SHARED double Ui[216*5], /*Uj[64*5],*/ Fcontrib[216*5];
       MFEM_SHARED double gradUpi[216*5*3]/*, gradUpj[64*5*3]*/;
-      MFEM_SHARED double l1[216],l2[216];
+      MFEM_SHARED double l1[216], l2[216];
       MFEM_SHARED double Rflux[5], u1[5], u2[5], nor[3];
-      MFEM_SHARED double gradUp1[5*3],gradUp2[5*3];
-      MFEM_SHARED double vFlux1[5*3],vFlux2[5*3];
-      
+      MFEM_SHARED double gradUp1[5*3], gradUp2[5*3];
+      MFEM_SHARED double vFlux1[5*3], vFlux2[5*3];
+
       const int el1      = d_sharedElemsFaces[0+el*7];
       const int numFaces = d_sharedElemsFaces[1+el*7];
-      const int dof1 = d_sharedElem1Dof12Q[1+d_sharedElemsFaces[2+el*7]*4];
-      
+      const int dof1     = d_sharedElem1Dof12Q[1+d_sharedElemsFaces[2+el*7]*4];
+
       bool elemDataRecovered = false;
       int indexi;
-      
-      for(int elFace=0;elFace<numFaces;elFace++)
-      {
-        const int f = d_sharedElemsFaces[1+elFace+1+el*7];
 
-        const int dof2 = d_sharedElem1Dof12Q[2+f*4];
-        const int Q    = d_sharedElem1Dof12Q[3+f*4];
-        
-        const int offsetEl1 = d_posDofIds[2*el1];
-        
-        if( i<dof1 && !elemDataRecovered )
-        {
-          indexi = d_nodesIDs[offsetEl1+i];
-          for(int eq=0;eq<num_equation;eq++)
-          {
-            Fcontrib[i+eq*dof1] = 0.;
-            Ui[i+eq*dof1] = d_x[indexi+eq*Ndofs];
-            for(int d=0;d<dim;d++) gradUpi[i+eq*dof1+d*num_equation*dof1] =
-                      d_gradUp[indexi + eq*Ndofs+d*num_equation*Ndofs ];
+      for (int elFace=0; elFace < numFaces; elFace++) {
+        const int f = d_sharedElemsFaces[1 + elFace + 1 + el * 7];
+        const int dof2 = d_sharedElem1Dof12Q[2 + f * 4];
+        const int Q = d_sharedElem1Dof12Q[3 + f * 4];
+        const int offsetEl1 = d_posDofIds[2 * el1];
+
+        if (i < dof1 && !elemDataRecovered) {
+          indexi = d_nodesIDs[offsetEl1 + i];
+          for (int eq = 0; eq < num_equation; eq++) {
+            Fcontrib[i + eq * dof1] = 0.;
+            Ui[i + eq * dof1] = d_x[indexi + eq * Ndofs];
+            for (int d = 0; d < dim; d++)
+              gradUpi[i + eq*dof1 + d*num_equation*dof1] = d_gradUp[indexi + eq*Ndofs + d*num_equation*Ndofs];
           }
           elemDataRecovered = true;
         }
         MFEM_SYNC_THREAD;
-        
-        for(int k=0;k<Q;k++)
-        {
-          const double weight = 
-            d_sharedShapeWnor1[maxDofs+k*(maxDofs+1+dim)+f*maxIntPoints*(maxDofs+1+dim)];
-          if(i<dof1) l1[i] = d_sharedShapeWnor1[i+k*(maxDofs+1+dim)+f*maxIntPoints*(maxDofs+1+dim)];
-          if(i<dim ) nor[i]= 
-            d_sharedShapeWnor1[maxDofs+1+i+k*(maxDofs+1+dim)+f*maxIntPoints*(maxDofs+1+dim)];
-          if(dim==2 && i==maxDofs-1) nor[2] = 0.; 
-          if(i<dof2) l2[i] = d_sharedShape2[i+k*maxDofs+f*maxIntPoints*maxDofs];
-          if(i<num_equation)
-          {
+
+        for (int k = 0; k < Q; k++) {
+          const double weight =
+            d_sharedShapeWnor1[maxDofs + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
+          if (i < dof1)
+            l1[i] = d_sharedShapeWnor1[i + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
+          if (i < dim)
+            nor[i] = d_sharedShapeWnor1[maxDofs + 1 + i + k*(maxDofs+1+dim) + f*maxIntPoints*(maxDofs+1+dim)];
+          if (dim == 2 && i == maxDofs - 1)
+            nor[2] = 0.;
+          if (i < dof2)
+            l2[i] = d_sharedShape2[i + k * maxDofs + f * maxIntPoints * maxDofs];
+          if (i < num_equation) {
             u1[i] = 0.;
             u2[i] = 0.;
             Rflux[i] = 0.;
-            for(int d=0;d<dim;d++)
-            {
-              gradUp1[i+d*num_equation] = 0.;
-              gradUp2[i+d*num_equation] = 0.;
+            for (int d = 0; d < dim; d++) {
+              gradUp1[i + d * num_equation] = 0.;
+              gradUp2[i + d * num_equation] = 0.;
             }
           }
           MFEM_SYNC_THREAD;
-          
+
           // interpolate
-          if(i<num_equation)
-          {
-            for(int n=0;n<dof1;n++)
-            {
-              u1[i] += Ui[n+i*dof1]*l1[n];
-              for(int d=0;d<dim;d++) gradUp1[i+d*num_equation] +=
-                            gradUpi[n+i*dof1+d*num_equation*dof1]*l1[n];
+          if (i < num_equation) {
+            for (int n = 0; n < dof1; n++) {
+              u1[i] += Ui[n + i * dof1] * l1[n];
+              for (int d = 0; d < dim; d++)
+                gradUp1[i + d * num_equation] += gradUpi[n + i * dof1 + d * num_equation * dof1] * l1[n];
             }
-            for(int n=0;n<dof2;n++)
-            {
-  //             u2[i] += Uj[n+i*dof2]*l2[n];
-  //             for(int d=0;d<dim;d++) gradUp2[i+d*num_equation] +=
-  //                           gradUpj[n+i*dof2+d*num_equation*dof2]*l2[n];
-              int index = d_sharedVdofs[n+i*maxDofs+f*num_equation*maxDofs];
-              u2[i] += l2[n]* d_faceData[index];
-              for(int d=0;d<dim;d++) 
-              {
-                index = d_sharedVdofsGrads[n+i*maxDofs+d*num_equation*maxDofs+
-                                          f*dim*num_equation*maxDofs];
-                gradUp2[i+d*num_equation] +=
-                            l2[n]*d_faceGradUp[index];
+            for (int n = 0; n < dof2; n++) {
+              //             u2[i] += Uj[n+i*dof2]*l2[n];
+              //             for(int d=0;d<dim;d++) gradUp2[i+d*num_equation] +=
+              //                           gradUpj[n+i*dof2+d*num_equation*dof2]*l2[n];
+              int index = d_sharedVdofs[n + i * maxDofs + f * num_equation * maxDofs];
+              u2[i] += l2[n] * d_faceData[index];
+              for (int d = 0; d < dim; d++) {
+                index = d_sharedVdofsGrads[n + i*maxDofs + d*num_equation*maxDofs + f*dim*num_equation*maxDofs];
+                gradUp2[i + d*num_equation] += l2[n]*d_faceGradUp[index];
               }
             }
           }
@@ -624,33 +621,33 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(const Vector& x,
                                     dim,
                                     num_equation );
           MFEM_SYNC_THREAD;
-          if(i<num_equation)
-          {
-            for(int d=0;d<dim;d++) vFlux1[i+d*num_equation] = 
-              0.5*(vFlux1[i+d*num_equation]+vFlux2[i+d*num_equation]);
+          if (i < num_equation) {
+            for (int d = 0; d < dim; d++)
+              vFlux1[i + d * num_equation] = 0.5 * (vFlux1[i + d * num_equation] + vFlux2[i + d * num_equation]);
           }
           MFEM_SYNC_THREAD;
-          if(i<num_equation) for(int d=0;d<dim;d++) Rflux[i] -= 
-                                        vFlux1[i+d*num_equation]*nor[d];
+          if (i < num_equation) {
+            for (int d = 0; d < dim; d++)
+              Rflux[i] -= vFlux1[i + d * num_equation] * nor[d];
+          }
           MFEM_SYNC_THREAD;
-          
+
           // add integration point contribution
-          for(int eq=0;eq<num_equation;eq++)
-          {
-            if(i<dof1) Fcontrib[i+eq*dof1] -= weight*l1[i]*Rflux[eq];
+          for (int eq = 0; eq < num_equation; eq++) {
+            if (i < dof1)
+              Fcontrib[i + eq * dof1] -= weight * l1[i] * Rflux[eq];
           }
         }
         MFEM_SYNC_THREAD;
-        
-      } 
-      
+      }
+
       // write to global memory
-      for(int eq=0;eq<num_equation;eq++)
-      {
-        if(i<dof1) d_y[indexi + eq*Ndofs] += Fcontrib[i + eq*dof1];
+      for (int eq=0; eq < num_equation; eq++) {
+        if (i < dof1)
+          d_y[indexi + eq * Ndofs] += Fcontrib[i + eq * dof1];
       }
     }
   });
 }
 
-#endif // _GPU_ 
+#endif  // _GPU_
