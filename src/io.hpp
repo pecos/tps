@@ -37,9 +37,9 @@
 
 class IOFamily {
  public:
-  std::string description_;      // family description
-  std::string group_;            // HDF5 group name
-  mfem::ParGridFunction *pfunc_; // pargrid function owning the data for this IO family
+  std::string description_;       // family description
+  std::string group_;             // HDF5 group name
+  mfem::ParGridFunction *pfunc_;  // pargrid function owning the data for this IO family
 
   bool allowsAuxRestart;
 
@@ -61,8 +61,8 @@ class IODataOrganizer {
   std::vector<IOFamily> families_;                  // registered IO families
   std::map<std::string, std::vector<IOVar>> vars_;  // solution var info for each IO family
 
-  void registerIOFamily(std::string description, std::string group, mfem::ParGridFunction *pfunc, bool auxRestart = true,
-                        bool inRestartFile = true);
+  void registerIOFamily(std::string description, std::string group, mfem::ParGridFunction *pfunc,
+                        bool auxRestart = true, bool inRestartFile = true);
   ~IODataOrganizer();
 
   void registerIOVar(std::string group, std::string varName, int index);
