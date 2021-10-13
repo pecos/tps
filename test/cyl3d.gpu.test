@@ -1,4 +1,4 @@
-#!/usr/bin/env bats
+#!../utils/bats/bin/bats
 # -*- mode: sh -*-
 
 TEST="cyl3d.gpu"
