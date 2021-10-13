@@ -43,24 +43,24 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
                            Vector &_normalsWBC, Array<int> &_intPointsElIDBC, const int _dim, const int _num_equation,
                            double &_max_char_speed, RunConfiguration &_runFile, Array<int> &local_attr,
                            const int &_maxIntPoints, const int &_maxDofs)
-  : groupsMPI(_groupsMPI),
-    config(_runFile),
-    rsolver(rsolver_),
-    eqState(_eqState),
-    fluxClass(_fluxClass),
-    max_char_speed(_max_char_speed),
-    intRules(_intRules),
-    mesh(_mesh),
-    vfes(_vfes),
-    Up(_Up),
-    gradUp(_gradUp),
-    shapesBC(_shapesBC),
-    normalsWBC(_normalsWBC),
-    intPointsElIDBC(_intPointsElIDBC),
-    dim(_dim),
-    num_equation(_num_equation),
-    maxIntPoints(_maxIntPoints),
-    maxDofs(_maxDofs) {
+    : groupsMPI(_groupsMPI),
+      config(_runFile),
+      rsolver(rsolver_),
+      eqState(_eqState),
+      fluxClass(_fluxClass),
+      max_char_speed(_max_char_speed),
+      intRules(_intRules),
+      mesh(_mesh),
+      vfes(_vfes),
+      Up(_Up),
+      gradUp(_gradUp),
+      shapesBC(_shapesBC),
+      normalsWBC(_normalsWBC),
+      intPointsElIDBC(_intPointsElIDBC),
+      dim(_dim),
+      num_equation(_num_equation),
+      maxIntPoints(_maxIntPoints),
+      maxDofs(_maxDofs) {
   BCmap.clear();
 
   // Init inlet BCs
@@ -75,8 +75,8 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
     if (attrInMesh) {
       Array<double> data = config.GetInletData(in);
       BCmap[patchANDtype.first] =
-        new InletBC(groupsMPI, rsolver, eqState, vfes, intRules, _dt, dim, num_equation, patchANDtype.first,
-                    config.GetReferenceLength(), patchANDtype.second, data, _maxIntPoints, _maxDofs);
+          new InletBC(groupsMPI, rsolver, eqState, vfes, intRules, _dt, dim, num_equation, patchANDtype.first,
+                      config.GetReferenceLength(), patchANDtype.second, data, _maxIntPoints, _maxDofs);
     }
   }
 
@@ -91,8 +91,8 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
     if (attrInMesh) {
       Array<double> data = config.GetOutletData(o);
       BCmap[patchANDtype.first] =
-        new OutletBC(groupsMPI, rsolver, eqState, vfes, intRules, _dt, dim, num_equation, patchANDtype.first,
-                     config.GetReferenceLength(), patchANDtype.second, data, _maxIntPoints, _maxDofs);
+          new OutletBC(groupsMPI, rsolver, eqState, vfes, intRules, _dt, dim, num_equation, patchANDtype.first,
+                       config.GetReferenceLength(), patchANDtype.second, data, _maxIntPoints, _maxDofs);
     }
   }
 
@@ -183,7 +183,7 @@ void BCintegrator::retrieveGradientsData_gpu(ParGridFunction *gradUp, DenseTenso
     for (int eq = 0; eq < num_equation; eq++) {
       for (int d = 0; d < dim; d++) {
         d_elGradUp[i + eq * elDofs + d * elDofs * num_equation] =
-        d_GradUp[index + eq * totalDofs + d * totalDofs * num_equation];
+            d_GradUp[index + eq * totalDofs + d * totalDofs * num_equation];
       }
     }
   });

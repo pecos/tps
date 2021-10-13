@@ -34,7 +34,7 @@
 
 // Implementation of class FaceIntegrator
 GradFaceIntegrator::GradFaceIntegrator(IntegrationRules *_intRules, const int _dim, const int _num_equation)
-  : dim(_dim), num_equation(_num_equation), intRules(_intRules) {}
+    : dim(_dim), num_equation(_num_equation), intRules(_intRules) {}
 
 void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2,
                                             FaceElementTransformations &Tr, const Vector &elfun, Vector &elvect) {

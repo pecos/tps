@@ -4,7 +4,8 @@ TEST_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) \
 if GPU_ENABLED
 TESTS = cyl3d.gpu.test \
 	cyl3d.mflow.gpu.test \
-	wedge.gpu.test
+	wedge.gpu.test \
+	averages.gpu.test
 else
 TESTS = cyl3d.test \
 	cyl3d.mflow.test \

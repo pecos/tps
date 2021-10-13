@@ -72,19 +72,11 @@ class RHSoperator : public TimeDependentOperator {
 
   ParFiniteElementSpace *vfes;
 
-  // nodes IDs and indirection array
-  Array<int> &nodesIDs;
-  Array<int> &posDofIds;
-  // count of number of elements of each type
-  Array<int> &numElems;
+  const volumeFaceIntegrationArrays &gpuArrays;
 
-  int *h_numElems;
-  int *h_posDofIds;
+  const int *h_numElems;
+  const int *h_posDofIds;
 
-  Vector &shapeWnor1;
-  Vector &shape2;
-  Array<int> &elemFaces;
-  Array<int> &elems12Q;
   const int &maxIntPoints;
   const int &maxDofs;
 
@@ -136,12 +128,11 @@ class RHSoperator : public TimeDependentOperator {
  public:
   RHSoperator(int &_iter, const int _dim, const int &_num_equations, const int &_order, const Equations &_eqSystem,
               double &_max_char_speed, IntegrationRules *_intRules, int _intRuleType, Fluxes *_fluxClass,
-              EquationOfState *_eqState, ParFiniteElementSpace *_vfes, Array<int> &_nodesIDs, Array<int> &_posDofIds,
-              Array<int> &_numElems, Vector &_shapeWnor1, Vector &_shape2, Array<int> &_elemFaces,
-              Array<int> &_elems12Q, const int &_maxIntPoints, const int &_maxDofs, DGNonLinearForm *_A,
-              MixedBilinearForm *_Aflux, ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult, ParGridFunction *_Up,
-              ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A,
-              BCintegrator *_bcIntegrator, bool &_isSBP, double &_alpha, RunConfiguration &_config);
+              EquationOfState *_eqState, ParFiniteElementSpace *_vfes, const volumeFaceIntegrationArrays &gpuArrays,
+              const int &_maxIntPoints, const int &_maxDofs, DGNonLinearForm *_A, MixedBilinearForm *_Aflux,
+              ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult, ParGridFunction *_Up, ParGridFunction *_gradUp,
+              ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A, BCintegrator *_bcIntegrator,
+              bool &_isSBP, double &_alpha, RunConfiguration &_config);
 
   virtual void Mult(const Vector &x, Vector &y) const;
   void updatePrimitives(const Vector &x) const;
@@ -159,7 +150,7 @@ class RHSoperator : public TimeDependentOperator {
                                              const int dof, const int dim);
   static void updatePrimitives_gpu(Vector *Up, const Vector *x_in, const double gamma, const int ndofs, const int dim,
                                    const int num_equations);
-  static void multiPlyInvers_gpu(Vector &y, Vector &z, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+  static void multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceIntegrationArrays &gpuArrays,
                                  const Vector &invMArray, const Array<int> &posDofInvM, const int num_equation,
                                  const int totNumDof, const int NE, const int elemOffset, const int dof);
 

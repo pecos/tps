@@ -37,17 +37,17 @@
 
 class IOFamily {
  public:
-  std::string description_;  // family description
-  std::string group_;        // HDF5 group name
-  ParGridFunction *pfunc_;   // pargrid function owning the data for this IO family
+  std::string description_;       // family description
+  std::string group_;             // HDF5 group name
+  mfem::ParGridFunction *pfunc_;  // pargrid function owning the data for this IO family
 
   bool allowsAuxRestart;
 
   // true if the family is to be found in restart files
   bool inReastartFile;
 
-  FiniteElementSpace *serial_fes;
-  GridFunction *serial_sol;
+  mfem::FiniteElementSpace *serial_fes;
+  mfem::GridFunction *serial_sol;
 };
 
 class IOVar {
@@ -58,17 +58,17 @@ class IOVar {
 
 class IODataOrganizer {
  public:
-  std::vector<IOFamily> families_;        // registered IO families
-  std::map<string, vector<IOVar>> vars_;  // solution var info for each IO family
+  std::vector<IOFamily> families_;                  // registered IO families
+  std::map<std::string, std::vector<IOVar>> vars_;  // solution var info for each IO family
 
-  void registerIOFamily(std::string description, std::string group, ParGridFunction *pfunc, bool auxRestart = true,
-                        bool inRestartFile = true);
+  void registerIOFamily(std::string description, std::string group, mfem::ParGridFunction *pfunc,
+                        bool auxRestart = true, bool inRestartFile = true);
   ~IODataOrganizer();
 
   void registerIOVar(std::string group, std::string varName, int index);
   int getIOFamilyIndex(std::string group);
 
-  void initializeSerial(bool root, bool serial, Mesh *serial_mesh);
+  void initializeSerial(bool root, bool serial, mfem::Mesh *serial_mesh);
 };
 
 #endif  // IO_HPP_

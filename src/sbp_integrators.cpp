@@ -33,12 +33,12 @@
 
 SBPintegrator::SBPintegrator(EquationOfState* _eqState, Fluxes* _fluxClass, IntegrationRules* _intRules, const int _dim,
                              const int _num_equation, double& _alpha)
-  : dim(_dim),
-    num_equation(_num_equation),
-    alpha(_alpha),
-    eqState(_eqState),
-    fluxClass(_fluxClass),
-    intRules(_intRules) {}
+    : dim(_dim),
+      num_equation(_num_equation),
+      alpha(_alpha),
+      eqState(_eqState),
+      fluxClass(_fluxClass),
+      intRules(_intRules) {}
 
 void SBPintegrator::AssembleElementVector(const FiniteElement& el, ElementTransformation& Tr, const Vector& elfun,
                                           Vector& elvect) {

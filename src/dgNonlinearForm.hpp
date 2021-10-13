@@ -60,18 +60,10 @@ class DGNonLinearForm : public ParNonlinearForm {
   const int num_equation;
   EquationOfState *eqState;
 
-  Array<int> &numElems;
-  Array<int> &nodesIDs;
-  Array<int> &posDofIds;
+  const volumeFaceIntegrationArrays &gpuArrays;
 
   const int *h_numElems;
   const int *h_posDofIds;
-
-  Vector &shapeWnor1;
-  Vector &shape2;
-
-  Array<int> &elemFaces;  // number and faces IDs of each element
-  Array<int> &elems12Q;   // elements connecting a face
 
   // Parallel shared faces integration
   parallelFacesIntegrationArrays *parallelData;
@@ -84,9 +76,8 @@ class DGNonLinearForm : public ParNonlinearForm {
  public:
   DGNonLinearForm(ParFiniteElementSpace *f, ParFiniteElementSpace *gradFes, ParGridFunction *_gradUp,
                   BCintegrator *_bcIntegrator, IntegrationRules *intRules, const int dim, const int num_equation,
-                  EquationOfState *eqState, Array<int> &_numElems, Array<int> &_nodesIDs, Array<int> &_posDofIds,
-                  Vector &_shapeWnor1, Vector &_shape2, Array<int> &_elemFaces, Array<int> &_elems12Q,
-                  const int &maxIntPoints, const int &maxDofs);
+                  EquationOfState *eqState, const volumeFaceIntegrationArrays &_gpuArrays, const int &maxIntPoints,
+                  const int &maxDofs);
 
   void Mult(const Vector &x, Vector &y);
 
@@ -101,15 +92,14 @@ class DGNonLinearForm : public ParNonlinearForm {
                                   const int &Nf, const int &NumElemsType, const int &elemOffset, const int &elDof,
                                   const int &dim, const int &num_equation, const double &gamma, const double &Rg,
                                   const double &viscMult, const double &bulkViscMult, const double &Pr,
-                                  const Array<int> &elemFaces, const Array<int> &nodesIDs, const Array<int> &posDofIds,
-                                  const Vector &shapeWnor1, const Vector &shape2, const int &maxIntPoints,
-                                  const int &maxDofs, const Array<int> &elems12Q);
+                                  const volumeFaceIntegrationArrays &gpuArrays, const int &maxIntPoints,
+                                  const int &maxDofs);
 
   static void sharedFaceIntegration_gpu(const Vector &x, const Vector &faceU, const ParGridFunction *gradUp,
                                         const Vector &faceGradUp, Vector &y, const int &Ndofs, const int &dim,
                                         const int &num_equation, const double &gamma, const double &Rg,
                                         const double &viscMult, const double &bulkViscMult, const double &Pr,
-                                        const Array<int> &nodesIDs, const Array<int> &posDofIds,
+                                        const volumeFaceIntegrationArrays &gpuArrays,
                                         const parallelFacesIntegrationArrays *parallelData, const int &maxIntPoints,
                                         const int &maxDofs);
 

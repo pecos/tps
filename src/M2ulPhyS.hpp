@@ -48,6 +48,7 @@
 
 #include "BCintegrator.hpp"
 #include "averaging_and_rms.hpp"
+#include "dataStructures.hpp"
 #include "dgNonlinearForm.hpp"
 #include "domain_integrator.hpp"
 #include "equation_of_state.hpp"
@@ -153,20 +154,10 @@ class M2ulPhyS {
   ParFiniteElementSpace *vfes;
 
   // nodes IDs and indirection array
-  Array<int> nodesIDs;
-  Array<int> posDofIds;
-  // count of number of elements of each type
-  Array<int> numElems;
-  // Array<int> posDofQshape1; // position, num. dof and integration points for each face
-  Vector shapeWnor1;  // shape functions, weight and normal for each face at ach integration point
-  // Array<int> posDofshape2;
-  Vector shape2;
-  //   const int maxIntPoints = 49; // corresponding to QUAD face with p=5
-  const int maxIntPoints = 64;  // corresponding to HEX with p=5
+  const int maxIntPoints = 64;  // corresponding to HEX face with p=5
   const int maxDofs = 216;      // corresponding to HEX with p=5
 
-  Array<int> elemFaces;  // number and faces IDs of each element
-  Array<int> elems12Q;   // elements connecting a face and integration points
+  volumeFaceIntegrationArrays gpuArrays;
 
   // BC integration
   Vector shapesBC;

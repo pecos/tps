@@ -5,3 +5,6 @@
 --keep-one-line-blocks
 --max-code-length=120
 --max-instatement-indent=80
+--pad-oper
+--pad-header
+

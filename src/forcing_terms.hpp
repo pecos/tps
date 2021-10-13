@@ -36,6 +36,7 @@
 
 #include <mfem.hpp>
 
+#include "dataStructures.hpp"
 #include "run_configuration.hpp"
 
 #ifdef _MASA_
@@ -58,35 +59,45 @@ class ForcingTerms {
   ParGridFunction *Up;
   ParGridFunction *gradUp;
 
+  const volumeFaceIntegrationArrays &gpuArrays;
+  const int *h_numElems;
+  const int *h_posDofIds;
+
   // added term
-  ParGridFunction *b;
+  //   ParGridFunction *b;
 
  public:
   ForcingTerms(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
-               ParGridFunction *_gradUp);
+               ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays);
   ~ForcingTerms();
 
   void setTime(double _time) { time = _time; }
-  virtual void updateTerms() = 0;
-  virtual void addForcingIntegrals(Vector &in);
+  virtual void updateTerms(Vector &in) = 0;
+  //   virtual void addForcingIntegrals(Vector &in);
 };
 
 // Constant pressure gradient term
 class ConstantPressureGradient : public ForcingTerms {
  private:
   // RunConfiguration &config;
-  double pressGrad[3];
+  Vector pressGrad;
 
  public:
   ConstantPressureGradient(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                            IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
-                           ParGridFunction *_gradUp, RunConfiguration &_config);
+                           ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
+                           RunConfiguration &_config);
 
   // Terms do not need updating
-  virtual void updateTerms();
+  virtual void updateTerms(Vector &in);
 
-  // virtual void addForcingIntegrals(Vector &in);
+  // GPU functions
+#ifdef _GPU_
+  static void updateTerms_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
+                              Vector &pressGrad, Vector &in, const Vector &Up, Vector &gradUp, const int num_equation,
+                              const int dim, const volumeFaceIntegrationArrays &gpuArrays);
+#endif
 };
 
 #ifdef _MASA_
@@ -96,9 +107,9 @@ class MASA_forcings : public ForcingTerms {
  public:
   MASA_forcings(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                 IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
-                ParGridFunction *_gradUp, RunConfiguration &_config);
+                ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config);
 
-  virtual void updateTerms();
+  virtual void updateTerms(Vector &in);
 };
 #endif  // _MASA_
 

@@ -29,10 +29,12 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
+#include "io.hpp"
+
 #include <hdf5.h>
+
 #include "M2ulPhyS.hpp"
 #include "utils.hpp"
-#include "io.hpp"
 
 void M2ulPhyS::restart_files_hdf5(string mode) {
 #ifdef HAVE_GRVY
@@ -217,8 +219,6 @@ void M2ulPhyS::restart_files_hdf5(string mode) {
   //-------------------------------------------------------
   // Loop over defined IO families to save desired output
   //-------------------------------------------------------
-  //   for(auto fam : ioData.families_)
-  //   {
   for (int n = 0; n < ioData.families_.size(); n++) {
     IOFamily &fam = ioData.families_[n];
 
@@ -253,7 +253,7 @@ void M2ulPhyS::restart_files_hdf5(string mode) {
       // special case if writing a serial restart
       if ((config.RestartSerial() == "write") && (nprocs_ > 1)) {
         serialize_soln_for_write(fam);
-        if (rank0_) data = fam.serial_sol->GetData();
+        if (rank0_) data = fam.serial_sol->HostReadWrite();
       }
 
       // get defined variables for this IO family
@@ -513,7 +513,7 @@ void M2ulPhyS::serialize_soln_for_write(IOFamily &fam) {
         fam.serial_fes->GetElementVDofs(gelem, gvdofs);
         lsoln.SetSize(gvdofs.Size());
 
-        MPI_Recv(lsoln.GetData(), gvdofs.Size(), MPI_DOUBLE, from_rank, gelem, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Recv(lsoln.HostReadWrite(), gvdofs.Size(), MPI_DOUBLE, from_rank, gelem, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
         fam.serial_sol->SetSubVector(gvdofs, lsoln);
       }
@@ -530,7 +530,7 @@ void M2ulPhyS::serialize_soln_for_write(IOFamily &fam) {
       pfunc->GetSubVector(lvdofs, lsoln);  // work for gpu build?
 
       // send to task 0
-      MPI_Send(lsoln.GetData(), lsoln.Size(), MPI_DOUBLE, 0, gelem, MPI_COMM_WORLD);
+      MPI_Send(lsoln.HostReadWrite(), lsoln.Size(), MPI_DOUBLE, 0, gelem, MPI_COMM_WORLD);
     }
   }
 }  // end function: serialize_soln_for_write()
@@ -575,7 +575,7 @@ void M2ulPhyS::read_serialized_soln_data(hid_t file, string varName, int numDof,
     data_serial.SetSize(numDof);
     data_soln = H5Dopen2(file, varName.c_str(), H5P_DEFAULT);
     assert(data_soln >= 0);
-    status = H5Dread(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, data_serial.GetData());
+    status = H5Dread(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, data_serial.HostReadWrite());
     assert(status >= 0);
     H5Dclose(data_soln);
 

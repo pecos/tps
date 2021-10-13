@@ -36,11 +36,11 @@
 WallBC::WallBC(RiemannSolver *_rsolver, EquationOfState *_eqState, Fluxes *_fluxClass, ParFiniteElementSpace *_vfes,
                IntegrationRules *_intRules, double &_dt, const int _dim, const int _num_equation, int _patchNumber,
                WallType _bcType, const Array<double> _inputData, const Array<int> &_intPointsElIDBC)
-  : BoundaryCondition(_rsolver, _eqState, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
-                      1),  // so far walls do not require ref. length. Left at 1
-    wallType(_bcType),
-    fluxClass(_fluxClass),
-    intPointsElIDBC(_intPointsElIDBC) {
+    : BoundaryCondition(_rsolver, _eqState, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
+                        1),  // so far walls do not require ref. length. Left at 1
+      wallType(_bcType),
+      fluxClass(_fluxClass),
+      intPointsElIDBC(_intPointsElIDBC) {
   if (wallType == VISC_ISOTH) {
     wallTemp = _inputData[0];
   }
@@ -337,21 +337,22 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
   const int totDofs = x.Size() / num_equation;
   const int numBdrElem = listElems.Size();
 
-  MFEM_FORALL_2D(el,wallElems.Size()/7,maxDofs,1,1, {   // NOLINT
-    MFEM_FOREACH_THREAD(i,x,maxDofs) {                  // NOLINT
-      MFEM_SHARED double Ui[216*5], Fcontrib[216*5];
+  // clang-format off
+  MFEM_FORALL_2D(el, wallElems.Size() / 7, maxDofs, 1, 1, {
+    MFEM_FOREACH_THREAD(i, x, maxDofs) {
+      MFEM_SHARED double Ui[216 * 5], Fcontrib[216 * 5];
       MFEM_SHARED double shape[216];
       MFEM_SHARED double Rflux[5], u1[5], u2[5], nor[3];
       MFEM_SHARED double weight;
 
-      const int numFaces = d_wallElems[0+el*7];
+      const int numFaces = d_wallElems[0 + el * 7];
       bool elemDataRecovered = false;
       int elOffset;
       int elDof;
       int elID;
       int indexi;
 
-      for (int f=0; f < numFaces; f++) {
+      for (int f = 0; f < numFaces; f++) {
         const int n = d_wallElems[1 + f + el * 7];
 
         const int el = d_listElems[n];
@@ -404,7 +405,7 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
           MFEM_SYNC_THREAD;
 
           // compute flux
-          if (i == 0) RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
+          RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation, i, maxDofs);
           MFEM_SYNC_THREAD;
 
           // sum contributions to integral
@@ -423,3 +424,4 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
   });
 #endif
 }
+// clang-format on

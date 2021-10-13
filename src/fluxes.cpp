@@ -32,7 +32,7 @@
 #include "fluxes.hpp"
 
 Fluxes::Fluxes(EquationOfState *_eqState, Equations &_eqSystem, const int &_num_equations, const int &_dim)
-  : eqState(_eqState), eqSystem(_eqSystem), dim(_dim), num_equations(_num_equations) {
+    : eqState(_eqState), eqSystem(_eqSystem), dim(_dim), num_equations(_num_equations) {
   gradT.SetSize(dim);
   vel.SetSize(dim);
   vtmp.SetSize(dim);
@@ -54,8 +54,7 @@ void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, D
       for (int eq = 0; eq < num_equations; eq++) {
         for (int d = 0; d < dim; d++) flux(eq, d) = convF(eq, d) - viscF(eq, d);
       }
-    }
-    break;
+    } break;
     case MHD:
       break;
   }
@@ -113,8 +112,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
         flux(1 + dim, d) += vtmp[d];
         flux(1 + dim, d) += k * gradT[d];
       }
-    }
-    break;
+    } break;
     default:
       flux = 0.;
       break;
@@ -203,17 +201,18 @@ void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTe
     d_spaceVaryViscMult = NULL;
   }
 
+  // clang-format off
   MFEM_FORALL_2D(n, dof, num_equation, 1, 1, {
     MFEM_FOREACH_THREAD(eq, x, num_equation) {
       MFEM_SHARED double Un[5];
-      MFEM_SHARED double gradUpn[5*3];
-      MFEM_SHARED double vFlux[5*3];
+      MFEM_SHARED double gradUpn[5 * 3];
+      MFEM_SHARED double vFlux[5 * 3];
       MFEM_SHARED double linVisc;
 
       // init. State
-      Un[eq] = dataIn[n+eq*dof];
+      Un[eq] = dataIn[n + eq * dof];
 
-      for (int d=0; d < dim; d++) {
+      for (int d = 0; d < dim; d++) {
         gradUpn[eq + d * num_equation] = d_gradUp[n + eq * dof + d * dof * num_equation];
       }
       MFEM_SYNC_THREAD;
@@ -235,10 +234,11 @@ void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTe
       }
 
       // write to global memory
-      for (int d=0; d < dim; d++) {
+      for (int d = 0; d < dim; d++) {
         d_flux[n + d * dof + eq * dof * dim] -= vFlux[eq + d * num_equation];
       }
     }  // end MFEM_FOREACH_THREAD
   });  // end MFEM_FORALL_2D
 #endif
 }
+// clang-format on

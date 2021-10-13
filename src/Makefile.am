@@ -93,8 +93,12 @@ enforcestyle:
 	@echo "Applying source code style updates using clang-format"
 	@echo "------------------------------------------------------"
 	@echo ""
-#	clang-format -i $(headers) $(cxx_sources)
-	astyle --project $(headers) $(cxx_sources)
+#	@$(top_srcdir)/utils/cpplint/cpplint.py --output=sed $(headers) $(cxx_sources) main.cpp | bash
+#	astyle --project $(headers) $(cxx_sources) main.cpp
+	clang-format -i $(headers) $(cxx_sources) main.cpp
+
+
+
 
 style:
 	@echo ""
@@ -102,7 +106,7 @@ style:
 	@echo "Checking source code style using cpplint.py"
 	@echo "-------------------------------------------"
 	@echo ""
-	@$(top_srcdir)/utils/cpplint/cpplint.py $(headers) $(cxx_sources)
+	@$(top_srcdir)/utils/cpplint/cpplint.py $(headers) $(cxx_sources) main.cpp
 
 #---------------------------------
 # Embedded license header support
@@ -110,5 +114,5 @@ style:
 license:
 	@echo 'Running license update tool for src files'
 	@$(top_srcdir)/utils/update_license.pl -S=$(top_srcdir)/src $(top_srcdir)/LICENSE \
-		 $(headers) $(cxx_sources)
+		 $(headers) $(cxx_sources) main.cpp
 

@@ -1,0 +1,70 @@
+#!/usr/bin/env bats
+# -*- mode: sh -*-
+
+TEST="averages"
+RUNFILE_A="inputs/input.cyl-2d.caseA"
+RUNFILE_B="inputs/input.cyl-2d.caseB"
+RUNFILE_C1="inputs/input.cyl-2d.caseC1"
+RUNFILE_C2="inputs/input.cyl-2d.caseC2"
+RUNFILE_D1="inputs/input.cyl-2d.caseD1"
+RUNFILE_D2="inputs/input.cyl-2d.caseD2"
+#OPT="-d cuda"
+OPT=""
+
+setup() {
+    SOLN_FILE=restart_output.sol.h5
+    REF_FILE=ref_solns/cyl-2d.cpu.h5
+    REF_FILE_REST=ref_solns/cyl-2d.meanRestart.cpu.h5
+    
+     # various GPU card detections
+    SKIP="ASPEED"
+    NUM_GPUS=`/sbin/lspci | grep "VGA compatible controller" | grep -v $SKIP | wc -l`
+    if [ $NUM_GPUS -eq 0 ];then
+	NUM_GPUS=`/sbin/lspci | grep "controller: NVIDIA" | wc -l`
+    fi
+}
+
+@test "[$TEST] caseA: run serial case" {
+    test -s $RUNFILE_A
+    rm -f $SOLN_FILE
+    ../src/tps -run $RUNFILE_A $OPT
+    test -s $SOLN_FILE
+    ./soln_differ -d 2 $SOLN_FILE $REF_FILE -averages
+    
+    rm -f $SOLN_FILE
+}
+
+@test "[$TEST] caseB: run parallel case" {
+
+    [ $NUM_GPUS -ge 4 ] || skip "Four GPUs not available" 
+    
+    test -s $RUNFILE_B
+    mpirun -n 4 ../src/tps -run $RUNFILE_B $OPT
+    test -s $SOLN_FILE
+    ./soln_differ -r -d 2 $SOLN_FILE $REF_FILE -averages
+    
+    rm -f $SOLN_FILE
+}
+
+@test "[$TEST] caseC: restart from a serialized solution" {
+
+    [ $NUM_GPUS -ge 4 ] || skip "Four GPUs not available" 
+    
+    test -s $RUNFILE_C1
+    mpirun -n 4 ../src/tps -run $RUNFILE_C1 $OPT
+    ../src/tps -run $RUNFILE_C2 $OPT
+    test -s $SOLN_FILE
+    ./soln_differ -d 2 $SOLN_FILE $REF_FILE -averages
+    
+    rm -f $SOLN_FILE
+}
+
+@test "[$TEST] caseD: restart from solution without averaged data" {
+    test -s $RUNFILE_D1
+    ../src/tps -run $RUNFILE_D1 $OPT
+    ../src/tps -run $RUNFILE_D2 $OPT
+    test -s $SOLN_FILE
+    ./soln_differ -d 2 $SOLN_FILE $REF_FILE_REST -averages
+    
+    rm -f $SOLN_FILE
+}

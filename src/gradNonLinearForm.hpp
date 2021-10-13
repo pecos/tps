@@ -37,6 +37,8 @@
 #include <general/forall.hpp>
 #include <mfem.hpp>
 
+#include "dataStructures.hpp"
+
 using namespace mfem;
 using namespace std;
 
@@ -47,26 +49,14 @@ class GradNonLinearForm : public ParNonlinearForm {
   const int dim;
   const int num_equation;
 
-  Array<int> &numElems;
-  Array<int> &nodesIDs;
-  Array<int> &posDofIds;
+  const volumeFaceIntegrationArrays &gpuArrays;
 
-  //   int *h_numElems;
-  //   int *h_posDofIds;
-
-  Vector &shapeWnor1;
-  Vector &shape2;
   const int &maxIntPoints;
   const int &maxDofs;
 
-  Array<int> &elemFaces;  // number and faces IDs of each element
-  Array<int> &elems12Q;   // elements connecting a face
-
  public:
   GradNonLinearForm(ParFiniteElementSpace *f, IntegrationRules *intRules, const int dim, const int num_equation,
-                    Array<int> &_numElems, Array<int> &_nodesIDs, Array<int> &_posDofIds, Vector &_shapeWnor1,
-                    Vector &_shape2, const int &maxIntPoints, const int &maxDofs, Array<int> &_elemFaces,
-                    Array<int> &_elems12Q);
+                    const volumeFaceIntegrationArrays &gpuArrays, const int &maxIntPoints, const int &maxDofs);
 
   void Mult(const ParGridFunction *Up, Vector &y);
 
