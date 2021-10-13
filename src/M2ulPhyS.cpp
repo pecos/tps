@@ -33,8 +33,9 @@
  * Implementation of the class Problem
  */
 
-#include <sstream>
 #include "M2ulPhyS.hpp"
+
+#include <sstream>
 
 M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, string &inputFileName) : mpi(_mpi) {
   nprocs_ = mpi.WorldSize();
@@ -329,18 +330,9 @@ void M2ulPhyS::initVariables() {
 
   // A->SetAssemblyLevel(AssemblyLevel::PARTIAL);
 
-  A = new DGNonLinearForm(vfes,
-                          gradUpfes,
-                          gradUp,
-                          bcIntegrator,
-                          intRules,
-                          dim,
-                          num_equation,
-                          eqState,
-                          gpuArrays,
-                          maxIntPoints,
-                          maxDofs);
-  if ( local_attr.Size() > 0 ) A->AddBdrFaceIntegrator( bcIntegrator );
+  A = new DGNonLinearForm(vfes, gradUpfes, gradUp, bcIntegrator, intRules, dim, num_equation, eqState, gpuArrays,
+                          maxIntPoints, maxDofs);
+  if (local_attr.Size() > 0) A->AddBdrFaceIntegrator(bcIntegrator);
 
   {
     bool useLinearIntegration = false;
@@ -386,45 +378,16 @@ void M2ulPhyS::initVariables() {
   //       new GradFaceIntegrator(intRules, dim, num_equation) );
   gradUp_A = new GradNonLinearForm(
 #ifdef _GPU_
-    vfes,
+      vfes,
 #else
-    gradUpfes,
+      gradUpfes,
 #endif
-    intRules,
-    dim,
-    num_equation,
-    gpuArrays,
-    maxIntPoints,
-    maxDofs );
-  gradUp_A->AddInteriorFaceIntegrator(
-    new GradFaceIntegrator(intRules, dim, num_equation) );
+      intRules, dim, num_equation, gpuArrays, maxIntPoints, maxDofs);
+  gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
 
-  rhsOperator = new RHSoperator(iter,
-                                dim,
-                                num_equation,
-                                order,
-                                eqSystem,
-                                max_char_speed,
-                                intRules,
-                                intRuleType,
-                                fluxClass,
-                                eqState,
-                                vfes,
-                                gpuArrays,
-                                maxIntPoints,
-                                maxDofs,
-                                A,
-                                Aflux,
-                                mesh,
-                                spaceVaryViscMult,
-                                Up,
-                                gradUp,
-                                gradUpfes,
-                                gradUp_A,
-                                bcIntegrator,
-                                isSBP,
-                                alpha,
-                                config );
+  rhsOperator = new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType,
+                                fluxClass, eqState, vfes, gpuArrays, maxIntPoints, maxDofs, A, Aflux, mesh,
+                                spaceVaryViscMult, Up, gradUp, gradUpfes, gradUp_A, bcIntegrator, isSBP, alpha, config);
 
   CFL = config.GetCFLNumber();
   rhsOperator->SetTime(time);
@@ -467,9 +430,8 @@ void M2ulPhyS::initVariables() {
   }
 }
 
-
 void M2ulPhyS::initIndirectionArrays() {
-  gpuArrays.posDofIds.SetSize( 2 * vfes->GetNE() );
+  gpuArrays.posDofIds.SetSize(2 * vfes->GetNE());
   gpuArrays.posDofIds = 0;
   auto hposDofIds = gpuArrays.posDofIds.HostWrite();
 
@@ -487,11 +449,10 @@ void M2ulPhyS::initIndirectionArrays() {
     for (int n = 0; n < dof; n++) tempNodes.push_back(dofs[n]);
   }
 
-  gpuArrays.nodesIDs.SetSize( tempNodes.size() );
+  gpuArrays.nodesIDs.SetSize(tempNodes.size());
   gpuArrays.nodesIDs = 0;
   auto hnodesIDs = gpuArrays.nodesIDs.HostWrite();
   for (int i = 0; i < gpuArrays.nodesIDs.Size(); i++) hnodesIDs[i] = tempNodes[i];
-
 
   // count number of each type of element
   std::vector<int> tempNumElems;
@@ -500,7 +461,7 @@ void M2ulPhyS::initIndirectionArrays() {
   int typeElems = 0;
   for (int el = 0; el < gpuArrays.posDofIds.Size() / 2; el++) {
     int dofi = hposDofIds[2 * el + 1];
-    if ( dofi == dof1 ) {
+    if (dofi == dof1) {
       typeElems++;
     } else {
       tempNumElems.push_back(typeElems);
@@ -508,8 +469,8 @@ void M2ulPhyS::initIndirectionArrays() {
       dof1 = dofi;
     }
   }
-  tempNumElems.push_back( typeElems );
-  gpuArrays.numElems.SetSize( tempNumElems.size() );
+  tempNumElems.push_back(typeElems);
+  gpuArrays.numElems.SetSize(tempNumElems.size());
   gpuArrays.numElems = 0;
   auto hnumElems = gpuArrays.numElems.HostWrite();
   for (int i = 0; i < (int)tempNumElems.size(); i++) hnumElems[i] = tempNumElems[i];
@@ -520,7 +481,7 @@ void M2ulPhyS::initIndirectionArrays() {
     //     const int maxIntPoints = 49; // corresponding to square face with p=5
     //     const int maxDofs = 216; //HEX with p=5
 
-    gpuArrays.elemFaces.SetSize(7 * vfes->GetNE() );
+    gpuArrays.elemFaces.SetSize(7 * vfes->GetNE());
     gpuArrays.elemFaces = 0;
     auto helemFaces = gpuArrays.elemFaces.HostWrite();
 
@@ -530,15 +491,15 @@ void M2ulPhyS::initIndirectionArrays() {
 
     Mesh *mesh = vfes->GetMesh();
 
-    gpuArrays.elems12Q.SetSize( 3 * mesh->GetNumFaces() );
+    gpuArrays.elems12Q.SetSize(3 * mesh->GetNumFaces());
     gpuArrays.elems12Q = 0;
     auto helems12Q = gpuArrays.elems12Q.HostWrite();
 
     gpuArrays.shapeWnor1.UseDevice(true);
-    gpuArrays.shapeWnor1.SetSize( (maxDofs + 1 + dim)*maxIntPoints * mesh->GetNumFaces() );
+    gpuArrays.shapeWnor1.SetSize((maxDofs + 1 + dim) * maxIntPoints * mesh->GetNumFaces());
 
     gpuArrays.shape2.UseDevice(true);
-    gpuArrays.shape2.SetSize( maxDofs * maxIntPoints * mesh->GetNumFaces() );
+    gpuArrays.shape2.SetSize(maxDofs * maxIntPoints * mesh->GetNumFaces());
 
     auto hshapeWnor1 = gpuArrays.shapeWnor1.HostWrite();
     auto hshape2 = gpuArrays.shape2.HostWrite();
@@ -690,10 +651,11 @@ void M2ulPhyS::initIndirectionArrays() {
     // fill out gradient shape function arrays and their indirections
     std::vector<double> temp;
     std::vector<int> positions;
-    temp.clear(); positions.clear();
+    temp.clear();
+    positions.clear();
 
     for (int el = 0; el < vfes->GetNE(); el++) {
-      positions.push_back( (int)temp.size() );
+      positions.push_back((int)temp.size());
 
       const FiniteElement *elem = vfes->GetFE(el);
       ElementTransformation *Tr = vfes->GetElementTransformation(el);
@@ -701,19 +663,21 @@ void M2ulPhyS::initIndirectionArrays() {
 
       // element volume integral
       int intorder = 2 * elem->GetOrder();
-      if (intRuleType == 1 && elem->GetGeomType() == Geometry::SQUARE) intorder--; // when Gauss-Lobatto
+      if (intRuleType == 1 && elem->GetGeomType() == Geometry::SQUARE) intorder--;  // when Gauss-Lobatto
       const IntegrationRule *ir = &intRules->Get(elem->GetGeomType(), intorder);
 
-      positions.push_back( ir->GetNPoints() );
+      positions.push_back(ir->GetNPoints());
 
       for (int i = 0; i < ir->GetNPoints(); i++) {
         IntegrationPoint ip = ir->IntPoint(i);
-        Tr->SetIntPoint( &ip );
+        Tr->SetIntPoint(&ip);
 
         // Calculate the shape functions
-        Vector shape; shape.UseDevice(false);
+        Vector shape;
+        shape.UseDevice(false);
         shape.SetSize(elDof);
-        Vector dshapeVec; dshapeVec.UseDevice(false);
+        Vector dshapeVec;
+        dshapeVec.UseDevice(false);
         dshapeVec.SetSize(elDof * dim);
         dshapeVec = 0.;
         DenseMatrix dshape(dshapeVec.HostReadWrite(), elDof, dim);
@@ -721,21 +685,23 @@ void M2ulPhyS::initIndirectionArrays() {
         elem->CalcPhysDShape(*Tr, dshape);
         double detJac = Tr->Jacobian().Det() * ip.weight;
 
-        for (int n = 0; n < elDof; n++) temp.push_back( shape[n] );
-        for (int d = 0; d < dim; d++) for (int n = 0; n < elDof; n++) temp.push_back( dshape(n, d) );
-        temp.push_back( detJac );
+        for (int n = 0; n < elDof; n++) temp.push_back(shape[n]);
+        for (int d = 0; d < dim; d++)
+          for (int n = 0; n < elDof; n++) temp.push_back(dshape(n, d));
+        temp.push_back(detJac);
       }
     }
 
     gpuArrays.elemShapeDshapeWJ.UseDevice(true);
-    gpuArrays.elemShapeDshapeWJ.SetSize( (int)temp.size() );
+    gpuArrays.elemShapeDshapeWJ.SetSize((int)temp.size());
     gpuArrays.elemShapeDshapeWJ = 0.;
     auto helemShapeDshapeWJ = gpuArrays.elemShapeDshapeWJ.HostWrite();
     for (int i = 0; i < gpuArrays.elemShapeDshapeWJ.Size(); i++) helemShapeDshapeWJ[i] = temp[i];
     gpuArrays.elemShapeDshapeWJ.Read();
 
-    gpuArrays.elemPosQ_shapeDshapeWJ.SetSize( (int)positions.size() );
-    for (int i = 0; i < gpuArrays.elemPosQ_shapeDshapeWJ.Size(); i++) gpuArrays.elemPosQ_shapeDshapeWJ[i] = positions[i];
+    gpuArrays.elemPosQ_shapeDshapeWJ.SetSize((int)positions.size());
+    for (int i = 0; i < gpuArrays.elemPosQ_shapeDshapeWJ.Size(); i++)
+      gpuArrays.elemPosQ_shapeDshapeWJ[i] = positions[i];
     gpuArrays.elemPosQ_shapeDshapeWJ.Read();
   }
 
@@ -1164,8 +1130,8 @@ void M2ulPhyS::InitialConditionEulerVortex(const Vector &x, Vector &y) {
     beta = 1. / 50.;
   } else {
     mfem_error(
-      "Cannot recognize problem."
-      "Options are: 1 - fast vortex, 2 - slow vortex");
+        "Cannot recognize problem."
+        "Options are: 1 - fast vortex, 2 - slow vortex");
   }
 
   int numVortices = 3;
@@ -1258,10 +1224,10 @@ void M2ulPhyS::uniformInitialConditions() {
 
   const double gamma = eqState->GetSpecificHeatRatio();
   const double rhoE =
-    inputRhoRhoVp[4] / (gamma - 1.) + 0.5 *
-    (inputRhoRhoVp[1] * inputRhoRhoVp[1] + inputRhoRhoVp[2] * inputRhoRhoVp[2] +
-     inputRhoRhoVp[3] * inputRhoRhoVp[3]) /
-    inputRhoRhoVp[0];
+      inputRhoRhoVp[4] / (gamma - 1.) + 0.5 *
+                                            (inputRhoRhoVp[1] * inputRhoRhoVp[1] + inputRhoRhoVp[2] * inputRhoRhoVp[2] +
+                                             inputRhoRhoVp[3] * inputRhoRhoVp[3]) /
+                                            inputRhoRhoVp[0];
 
   for (int i = 0; i < dof; i++) {
     data[i] = inputRhoRhoVp[0];

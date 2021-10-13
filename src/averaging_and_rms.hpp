@@ -33,8 +33,10 @@
 #define AVERAGING_AND_RMS_HPP_
 
 #include <tps_config.h>
+
 #include <mfem.hpp>
 #include <string>
+
 #include "mpi_groups.hpp"
 #include "run_configuration.hpp"
 
@@ -106,20 +108,11 @@ class Averaging {
 
   // GPU functions
 #ifdef _GPU_
-  static void addSample_gpu(ParGridFunction *meanUp,
-                            ParGridFunction *rms,
-                            int &samplesMean,
-                            const ParGridFunction *Up,
-                            const int &Ndof,
-                            const int &dim,
-                            const int &num_equation );
-  static void sumValues_gpu(const Vector &meanUp,
-                            const Vector &rms,
-                            Vector &local_sums,
-                            Vector &tmp_vector,
-                            const int &num_equation,
-                            const int &dim );
-#endif // _GPU_
+  static void addSample_gpu(ParGridFunction *meanUp, ParGridFunction *rms, int &samplesMean, const ParGridFunction *Up,
+                            const int &Ndof, const int &dim, const int &num_equation);
+  static void sumValues_gpu(const Vector &meanUp, const Vector &rms, Vector &local_sums, Vector &tmp_vector,
+                            const int &num_equation, const int &dim);
+#endif  // _GPU_
 };
 
 #endif  // AVERAGING_AND_RMS_HPP_

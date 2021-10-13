@@ -33,22 +33,17 @@
 
 #include "riemann_solver.hpp"
 
-GradNonLinearForm::GradNonLinearForm(ParFiniteElementSpace *_vfes,
-                                     IntegrationRules *_intRules,
-                                     const int _dim,
-                                     const int _num_equation,
-                                     const volumeFaceIntegrationArrays &_gpuArrays,
-                                     const int &_maxIntPoints,
-                                     const int &_maxDofs ):
-  ParNonlinearForm(_vfes),
-  vfes(_vfes),
-  intRules(_intRules),
-  dim(_dim),
-  num_equation(_num_equation),
-  gpuArrays(_gpuArrays),
-  maxIntPoints(_maxIntPoints),
-  maxDofs(_maxDofs) {
-}
+GradNonLinearForm::GradNonLinearForm(ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, const int _dim,
+                                     const int _num_equation, const volumeFaceIntegrationArrays &_gpuArrays,
+                                     const int &_maxIntPoints, const int &_maxDofs)
+    : ParNonlinearForm(_vfes),
+      vfes(_vfes),
+      intRules(_intRules),
+      dim(_dim),
+      num_equation(_num_equation),
+      gpuArrays(_gpuArrays),
+      maxIntPoints(_maxIntPoints),
+      maxDofs(_maxDofs) {}
 
 void GradNonLinearForm::Mult(const ParGridFunction *Up, Vector &y) {
   Vector x;

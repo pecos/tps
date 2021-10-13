@@ -93,9 +93,12 @@ enforcestyle:
 	@echo "Applying source code style updates using clang-format"
 	@echo "------------------------------------------------------"
 	@echo ""
-#	clang-format -i $(headers) $(cxx_sources)
 #	@$(top_srcdir)/utils/cpplint/cpplint.py --output=sed $(headers) $(cxx_sources) main.cpp | bash
-	astyle --project $(headers) $(cxx_sources) main.cpp
+#	astyle --project $(headers) $(cxx_sources) main.cpp
+	clang-format -i $(headers) $(cxx_sources) main.cpp
+
+
+
 
 style:
 	@echo ""

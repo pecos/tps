@@ -33,10 +33,11 @@
 #define GRADNONLINEARFORM_HPP_
 
 #include <tps_config.h>
-#include "dataStructures.hpp"
 
 #include <general/forall.hpp>
 #include <mfem.hpp>
+
+#include "dataStructures.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -54,15 +55,10 @@ class GradNonLinearForm : public ParNonlinearForm {
   const int &maxDofs;
 
  public:
-  GradNonLinearForm(ParFiniteElementSpace *f,
-                    IntegrationRules *intRules,
-                    const int dim,
-                    const int num_equation,
-                    const volumeFaceIntegrationArrays &gpuArrays,
-                    const int &maxIntPoints,
-                    const int &maxDofs );
+  GradNonLinearForm(ParFiniteElementSpace *f, IntegrationRules *intRules, const int dim, const int num_equation,
+                    const volumeFaceIntegrationArrays &gpuArrays, const int &maxIntPoints, const int &maxDofs);
 
-  void Mult(const ParGridFunction *Up, Vector &y );
+  void Mult(const ParGridFunction *Up, Vector &y);
 
 #ifdef _GPU_
   void Mult_gpu(const Vector &x, Vector &y);

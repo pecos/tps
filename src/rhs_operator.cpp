@@ -32,59 +32,40 @@
 #include "rhs_operator.hpp"
 
 // Implementation of class RHSoperator
-RHSoperator::RHSoperator( int &_iter,
-                          const int _dim,
-                          const int &_num_equations,
-                          const int &_order,
-                          const Equations &_eqSystem,
-                          double &_max_char_speed,
-                          IntegrationRules *_intRules,
-                          int _intRuleType,
-                          Fluxes *_fluxClass,
-                          EquationOfState *_eqState,
-                          ParFiniteElementSpace *_vfes,
-                          const volumeFaceIntegrationArrays &_gpuArrays,
-                          const int &_maxIntPoints,
-                          const int &_maxDofs,
-                          DGNonLinearForm *_A,
-                          MixedBilinearForm *_Aflux,
-                          ParMesh *_mesh,
-                          ParGridFunction *_spaceVaryViscMult,
-                          ParGridFunction *_Up,
-                          ParGridFunction *_gradUp,
-                          ParFiniteElementSpace *_gradUpfes,
-                          GradNonLinearForm *_gradUp_A,
-                          BCintegrator *_bcIntegrator,
-                          bool &_isSBP,
-                          double &_alpha,
-                          RunConfiguration &_config
-                        ):
-  TimeDependentOperator(_A->Height()),
-  iter(_iter),
-  dim(_dim ),
-  eqSystem(_eqSystem),
-  max_char_speed(_max_char_speed),
-  num_equation(_num_equations),
-  intRules(_intRules),
-  intRuleType(_intRuleType),
-  fluxClass(_fluxClass),
-  eqState(_eqState),
-  vfes(_vfes),
-  gpuArrays(_gpuArrays),
-  maxIntPoints(_maxIntPoints),
-  maxDofs(_maxDofs),
-  A(_A),
-  Aflux(_Aflux),
-  mesh(_mesh),
-  spaceVaryViscMult(_spaceVaryViscMult),
-  linViscData(_config.GetLinearVaryingData() ),
-  isSBP(_isSBP),
-  alpha(_alpha),
-  Up(_Up),
-  gradUp(_gradUp),
-  gradUpfes(_gradUpfes),
-  gradUp_A(_gradUp_A),
-  bcIntegrator(_bcIntegrator) {
+RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, const int &_order,
+                         const Equations &_eqSystem, double &_max_char_speed, IntegrationRules *_intRules,
+                         int _intRuleType, Fluxes *_fluxClass, EquationOfState *_eqState, ParFiniteElementSpace *_vfes,
+                         const volumeFaceIntegrationArrays &_gpuArrays, const int &_maxIntPoints, const int &_maxDofs,
+                         DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh,
+                         ParGridFunction *_spaceVaryViscMult, ParGridFunction *_Up, ParGridFunction *_gradUp,
+                         ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A, BCintegrator *_bcIntegrator,
+                         bool &_isSBP, double &_alpha, RunConfiguration &_config)
+    : TimeDependentOperator(_A->Height()),
+      iter(_iter),
+      dim(_dim),
+      eqSystem(_eqSystem),
+      max_char_speed(_max_char_speed),
+      num_equation(_num_equations),
+      intRules(_intRules),
+      intRuleType(_intRuleType),
+      fluxClass(_fluxClass),
+      eqState(_eqState),
+      vfes(_vfes),
+      gpuArrays(_gpuArrays),
+      maxIntPoints(_maxIntPoints),
+      maxDofs(_maxDofs),
+      A(_A),
+      Aflux(_Aflux),
+      mesh(_mesh),
+      spaceVaryViscMult(_spaceVaryViscMult),
+      linViscData(_config.GetLinearVaryingData()),
+      isSBP(_isSBP),
+      alpha(_alpha),
+      Up(_Up),
+      gradUp(_gradUp),
+      gradUpfes(_gradUpfes),
+      gradUp_A(_gradUp_A),
+      bcIntegrator(_bcIntegrator) {
   flux.SetSize(vfes->GetNDofs(), dim, num_equation);
   z.UseDevice(true);
   z.SetSize(A->Height());
@@ -95,38 +76,21 @@ RHSoperator::RHSoperator( int &_iter,
   fk.SetSize(dim * vfes->GetNDofs());
   zk.SetSize(vfes->GetNDofs());
 
-
-  h_numElems  = gpuArrays.numElems.HostRead();
+  h_numElems = gpuArrays.numElems.HostRead();
   h_posDofIds = gpuArrays.posDofIds.HostRead();
 
   // Me_inv = new DenseMatrix[vfes->GetNE()];
-  Me_inv.SetSize( vfes->GetNE() );
+  Me_inv.SetSize(vfes->GetNE());
   posDofInvM.SetSize(2 * vfes->GetNE());
   auto hposDofInvM = posDofInvM.HostWrite();
 
-  if ( _config.thereIsForcing() ) {
-    forcing.Append( new ConstantPressureGradient( dim,
-                                                  num_equation,
-                                                  _order,
-                                                  intRuleType,
-                                                  intRules,
-                                                  vfes,
-                                                  Up,
-                                                  gradUp,
-                                                  gpuArrays,
-                                                  _config) );
+  if (_config.thereIsForcing()) {
+    forcing.Append(new ConstantPressureGradient(dim, num_equation, _order, intRuleType, intRules, vfes, Up, gradUp,
+                                                gpuArrays, _config));
   }
 #ifdef _MASA_
-  forcing.Append(new MASA_forcings( dim,
-                                    num_equation,
-                                    _order,
-                                    intRuleType,
-                                    intRules,
-                                    vfes,
-                                    Up,
-                                    gradUp,
-                                    gpuArrays,
-                                    _config ) );
+  forcing.Append(
+      new MASA_forcings(dim, num_equation, _order, intRuleType, intRules, vfes, Up, gradUp, gpuArrays, _config));
 #endif
   std::vector<double> temp;
   temp.clear();
@@ -168,8 +132,7 @@ RHSoperator::RHSoperator( int &_iter,
   invMArray.SetSize(temp.size());
   invMArray = 0.;
   auto hinvMArray = invMArray.HostWrite();
-  for (int i = 0; i < static_cast<int>(temp.size()); i++)
-    hinvMArray[i] = temp[i];
+  for (int i = 0; i < static_cast<int>(temp.size()); i++) hinvMArray[i] = temp[i];
 
   fillSharedData();
 
@@ -181,23 +144,9 @@ RHSoperator::RHSoperator( int &_iter,
 #endif
 
   // create gradients object
-  gradients = new Gradients(vfes,
-                            gradUpfes,
-                            dim,
-                            num_equation,
-                            Up,
-                            gradUp,
-                            eqState,
-                            gradUp_A,
-                            intRules,
-                            intRuleType,
-                            gpuArrays,
-                            Me_inv,
-                            invMArray,
-                            posDofInvM,
-                            maxIntPoints,
-                            maxDofs );
-  gradients->setParallelData( &parallelData, &transferUp);
+  gradients = new Gradients(vfes, gradUpfes, dim, num_equation, Up, gradUp, eqState, gradUp_A, intRules, intRuleType,
+                            gpuArrays, Me_inv, invMArray, posDofInvM, maxIntPoints, maxDofs);
+  gradients->setParallelData(&parallelData, &transferUp);
 
   local_timeDerivatives.UseDevice(true);
   local_timeDerivatives.SetSize(5);
@@ -350,16 +299,8 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
     int dof = h_posDofIds[2 * elemOffset + 1];
     const int totDofs = vfes->GetNDofs();
 
-    RHSoperator::multiPlyInvers_gpu(y,
-                                    z,
-                                    gpuArrays,
-                                    invMArray,
-                                    posDofInvM,
-                                    num_equation,
-                                    totDofs,
-                                    h_numElems[eltype],
-                                    elemOffset,
-                                    dof);
+    RHSoperator::multiPlyInvers_gpu(y, z, gpuArrays, invMArray, posDofInvM, num_equation, totDofs, h_numElems[eltype],
+                                    elemOffset, dof);
   }
 
 #else
@@ -534,26 +475,19 @@ void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const dou
       if (eq == 3 && dim == 3) dataUp[n + 3 * ndofs] = state[3] / state[0];
       if (eq == num_equations - 1)
         dataUp[n + (num_equations - 1) * ndofs] =
-        EquationOfState::pressure(&state[0], &KE[0], gamma, dim, num_equations);
+            EquationOfState::pressure(&state[0], &KE[0], gamma, dim, num_equations);
     }
   });
 #endif
 }
 
-void RHSoperator::multiPlyInvers_gpu( Vector &y,
-                                      Vector &z,
-                                      const volumeFaceIntegrationArrays &gpuArrays,
-                                      const Vector &invMArray,
-                                      const Array<int> &posDofInvM,
-                                      const int num_equation,
-                                      const int totNumDof,
-                                      const int NE,
-                                      const int elemOffset,
-                                      const int dof) {
+void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceIntegrationArrays &gpuArrays,
+                                     const Vector &invMArray, const Array<int> &posDofInvM, const int num_equation,
+                                     const int totNumDof, const int NE, const int elemOffset, const int dof) {
 #ifdef _GPU_
   double *d_y = y.ReadWrite();
   const double *d_z = z.Read();
-  auto d_nodesIDs  = gpuArrays.nodesIDs.Read();
+  auto d_nodesIDs = gpuArrays.nodesIDs.Read();
   auto d_posDofIds = gpuArrays.posDofIds.Read();
   auto d_posDofInvM = posDofInvM.Read();
   const double *d_invM = invMArray.Read();
@@ -569,17 +503,17 @@ void RHSoperator::multiPlyInvers_gpu( Vector &y,
       int index = d_nodesIDs[offsetIds + i];
 
       for (int eq = 0; eq < num_equation; eq++) {
-        data[i + eq * dof] = d_z[index + eq * totNumDof];
+    data[i + eq * dof] = d_z[index + eq * totNumDof];
       }
       MFEM_SYNC_THREAD;
 
       for (int eq = 0; eq < num_equation; eq++) {
-        double tmp = 0.;
-        for (int k = 0; k < dof; k++) tmp += d_invM[offsetInv + i * dof + k] * data[k + eq * dof];
-        d_y[index + eq * totNumDof] = tmp;
+    double tmp = 0.;
+    for (int k = 0; k < dof; k++) tmp += d_invM[offsetInv + i * dof + k] * data[k + eq * dof];
+    d_y[index + eq * totNumDof] = tmp;
       }
-    }
-  });
+}
+});
 
 //   MFEM_FORALL_2D(el,NE,dof,1,1,
 //   {
@@ -712,7 +646,7 @@ void RHSoperator::fillSharedData() {
 
         for (int d = 0; d < dim; d++)
           hsharedShapeWnor1[maxDofs + 1 + d + q * (maxDofs + 1 + dim) + i * maxIntPoints * (maxDofs + 1 + dim)] =
-            nor[d];
+              nor[d];
         for (int n = 0; n < dof2; n++) {
           hsharedShape2[n + q * maxDofs + i * maxIntPoints * maxDofs] = shape2[n];
         }

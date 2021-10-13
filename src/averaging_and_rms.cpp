@@ -30,21 +30,22 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 #include "averaging_and_rms.hpp"
+
 #include <general/forall.hpp>
 
 Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollection *_fec, ParFiniteElementSpace *_fes,
                      ParFiniteElementSpace *_dfes, ParFiniteElementSpace *_vfes, const int &_num_equation,
                      const int &_dim, RunConfiguration &_config, MPI_Groups *_groupsMPI)
-  : Up(_Up),
-    mesh(_mesh),
-    fec(_fec),
-    fes(_fes),
-    dfes(_dfes),
-    vfes(_vfes),
-    num_equation(_num_equation),
-    dim(_dim),
-    config(_config),
-    groupsMPI(_groupsMPI) {
+    : Up(_Up),
+      mesh(_mesh),
+      fec(_fec),
+      fes(_fes),
+      dfes(_dfes),
+      vfes(_vfes),
+      num_equation(_num_equation),
+      dim(_dim),
+      config(_config),
+      groupsMPI(_groupsMPI) {
   // Always assume 6 components of the Reynolds stress tensor
   numRMS = 6;
 
@@ -105,17 +106,11 @@ Averaging::~Averaging() {
 }
 
 void Averaging::addSampleMean(const int &iter) {
-  if ( computeMean ) {
-    if ( iter % sampleInterval == 0 && iter >= startMean ) {
-      if ( iter == startMean && groupsMPI->getSession()->Root()) cout << "Starting mean calculation." << endl;
+  if (computeMean) {
+    if (iter % sampleInterval == 0 && iter >= startMean) {
+      if (iter == startMean && groupsMPI->getSession()->Root()) cout << "Starting mean calculation." << endl;
 #ifdef _GPU_
-      addSample_gpu(meanUp,
-                    rms,
-                    samplesMean,
-                    Up,
-                    fes->GetNDofs(),
-                    dim,
-                    num_equation);
+      addSample_gpu(meanUp, rms, samplesMean, Up, fes->GetNDofs(), dim, num_equation);
 #else
       addSample_cpu();
 #endif
@@ -140,43 +135,41 @@ void Averaging::addSample_cpu() {
     // ----- RMS -----
     // velocities
     Vector meanVel(3), vel(3);
-    meanVel = 0.; vel = 0.;
+    meanVel = 0.;
+    vel = 0.;
     for (int d = 0; d < dim; d++) {
       meanVel[d] = dataMean[n + dof * (d + 1)];
-      vel[d]     = dataUp[n + dof * (d + 1)];
+      vel[d] = dataUp[n + dof * (d + 1)];
     }
 
     // xx
     double val = dataRMS[n];
-    dataRMS[n] = (val * double(samplesMean) +
-                  (vel[0] - meanVel[0]) * (vel[0] - meanVel[0])) / double(samplesMean + 1);
+    dataRMS[n] = (val * double(samplesMean) + (vel[0] - meanVel[0]) * (vel[0] - meanVel[0])) / double(samplesMean + 1);
     // yy
     val = dataRMS[n + dof];
-    dataRMS[n + dof] = (val * double(samplesMean) +
-                        (vel[1] - meanVel[1]) * (vel[1] - meanVel[1])) / double(samplesMean + 1);
+    dataRMS[n + dof] =
+        (val * double(samplesMean) + (vel[1] - meanVel[1]) * (vel[1] - meanVel[1])) / double(samplesMean + 1);
     // zz
     val = dataRMS[n + 2 * dof];
-    dataRMS[n + 2 * dof] = (val * double(samplesMean) +
-                            (vel[2] - meanVel[2]) * (vel[2] - meanVel[2])) / double(samplesMean + 1);
+    dataRMS[n + 2 * dof] =
+        (val * double(samplesMean) + (vel[2] - meanVel[2]) * (vel[2] - meanVel[2])) / double(samplesMean + 1);
     // xy
     val = dataRMS[n + 3 * dof];
-    dataRMS[n + 3 * dof] = (val * double(samplesMean) +
-                            (vel[0] - meanVel[0]) * (vel[1] - meanVel[1])) / double(samplesMean + 1);
+    dataRMS[n + 3 * dof] =
+        (val * double(samplesMean) + (vel[0] - meanVel[0]) * (vel[1] - meanVel[1])) / double(samplesMean + 1);
     // xz
     val = dataRMS[n + 4 * dof];
-    dataRMS[n + 4 * dof] = (val * double(samplesMean) +
-                            (vel[0] - meanVel[0]) * (vel[2] - meanVel[2])) / double(samplesMean + 1);
+    dataRMS[n + 4 * dof] =
+        (val * double(samplesMean) + (vel[0] - meanVel[0]) * (vel[2] - meanVel[2])) / double(samplesMean + 1);
     // yz
     val = dataRMS[n + 5 * dof];
-    dataRMS[n + 5 * dof] = (val * double(samplesMean) +
-                            (vel[1] - meanVel[1]) * (vel[2] - meanVel[2])) / double(samplesMean + 1);
+    dataRMS[n + 5 * dof] =
+        (val * double(samplesMean) + (vel[1] - meanVel[1]) * (vel[2] - meanVel[2])) / double(samplesMean + 1);
   }
 }
 
-
-
 void Averaging::write_meanANDrms_restart_files(const int &iter, const double &time) {
-  if ( computeMean ) {
+  if (computeMean) {
     if (config.isMeanHistEnabled()) {
       paraviewMean->SetCycle(iter);
       paraviewMean->SetTime(time);
@@ -265,7 +258,7 @@ void Averaging::read_meanANDrms_restart_files() {
 
 void Averaging::initiMeanAndRMS() {
   double *dataMean = meanUp->HostWrite();
-  double *dataRMS  = rms->HostWrite();
+  double *dataRMS = rms->HostWrite();
   int dof = vfes->GetNDofs();
 
   for (int i = 0; i < dof; i++) {
@@ -299,15 +292,10 @@ const double *Averaging::getLocalSums() {
 }
 
 #ifdef _GPU_
-void Averaging::addSample_gpu(ParGridFunction* meanUp,
-                              ParGridFunction* rms,
-                              int& samplesMean,
-                              const ParGridFunction* Up,
-                              const int& Ndof,
-                              const int &dim,
-                              const int& num_equation) {
+void Averaging::addSample_gpu(ParGridFunction *meanUp, ParGridFunction *rms, int &samplesMean,
+                              const ParGridFunction *Up, const int &Ndof, const int &dim, const int &num_equation) {
   double *d_meanUp = meanUp->ReadWrite();
-  double *d_rms    = rms->ReadWrite();
+  double *d_rms = rms->ReadWrite();
   const double *d_Up = Up->Read();
 
   double dSamplesMean = (double)samplesMean;
@@ -318,78 +306,68 @@ void Averaging::addSample_gpu(ParGridFunction* meanUp,
 
       // mean
       for (int eq = i; eq < num_equation; eq += 6) {
-        double mUpi = d_meanUp[n + eq * Ndof];
-        double Upi = d_Up[n + eq * Ndof];
+    double mUpi = d_meanUp[n + eq * Ndof];
+    double Upi = d_Up[n + eq * Ndof];
 
-        double mVal = dSamplesMean * mUpi;
-        double newMeanUp = (mVal + Upi) / (dSamplesMean + 1);
+    double mVal = dSamplesMean * mUpi;
+    double newMeanUp = (mVal + Upi) / (dSamplesMean + 1);
 
-        d_meanUp[n + eq * Ndof] = newMeanUp;
+    d_meanUp[n + eq * Ndof] = newMeanUp;
 
-        // fill out mean velocity array
-        if ( i > 0 && i <= 3 ) {
-          meanVel[i - 1] = newMeanUp;
-          vel[i - 1] = Upi;
-        }
-        if ( i == 3 && dim != 3 ) {
-          meanVel[2] = 0.;
-          vel[2] = 0.;
-        }
+    // fill out mean velocity array
+    if (i > 0 && i <= 3) {
+      meanVel[i - 1] = newMeanUp;
+      vel[i - 1] = Upi;
+    }
+    if (i == 3 && dim != 3) {
+      meanVel[2] = 0.;
+      vel[2] = 0.;
+    }
       }
       MFEM_SYNC_THREAD;
 
       // ----- RMS -----
       // xx
       if (i == 0) {
-        double val = d_rms[n];
-        d_rms[n] = (val * dSamplesMean +
-                    (vel[0] - meanVel[0]) * (vel[0] - meanVel[0])) / (dSamplesMean + 1);
+    double val = d_rms[n];
+    d_rms[n] = (val * dSamplesMean + (vel[0] - meanVel[0]) * (vel[0] - meanVel[0])) / (dSamplesMean + 1);
       }
 
       // yy
       if (i == 1) {
-        double val = d_rms[n + Ndof];
-        d_rms[n + Ndof] = (val * dSamplesMean +
-                           (vel[1] - meanVel[1]) * (vel[1] - meanVel[1])) / (dSamplesMean + 1);
+    double val = d_rms[n + Ndof];
+    d_rms[n + Ndof] = (val * dSamplesMean + (vel[1] - meanVel[1]) * (vel[1] - meanVel[1])) / (dSamplesMean + 1);
       }
 
       // zz
       if (i == 2) {
-        double val = d_rms[n + 2 * Ndof];
-        d_rms[n + 2 * Ndof] = (val * dSamplesMean +
-                               (vel[2] - meanVel[2]) * (vel[2] - meanVel[2])) / (dSamplesMean + 1);
+    double val = d_rms[n + 2 * Ndof];
+    d_rms[n + 2 * Ndof] = (val * dSamplesMean + (vel[2] - meanVel[2]) * (vel[2] - meanVel[2])) / (dSamplesMean + 1);
       }
 
       // xy
       if (i == 3) {
-        double val = d_rms[n + 3 * Ndof];
-        d_rms[n + 3 * Ndof] = (val * dSamplesMean +
-                               (vel[0] - meanVel[0]) * (vel[1] - meanVel[1])) / (dSamplesMean + 1);
+    double val = d_rms[n + 3 * Ndof];
+    d_rms[n + 3 * Ndof] = (val * dSamplesMean + (vel[0] - meanVel[0]) * (vel[1] - meanVel[1])) / (dSamplesMean + 1);
       }
 
       // xz
       if (i == 4) {
-        double val = d_rms[n + 4 * Ndof];
-        d_rms[n + 4 * Ndof] = (val * dSamplesMean +
-                               (vel[0] - meanVel[0]) * (vel[2] - meanVel[2])) / (dSamplesMean + 1);
+    double val = d_rms[n + 4 * Ndof];
+    d_rms[n + 4 * Ndof] = (val * dSamplesMean + (vel[0] - meanVel[0]) * (vel[2] - meanVel[2])) / (dSamplesMean + 1);
       }
 
       // yz
       if (i == 5) {
-        double val = d_rms[n + 5 * Ndof];
-        d_rms[n + 5 * Ndof] = (val * dSamplesMean +
-                               (vel[1] - meanVel[1]) * (vel[2] - meanVel[2])) / (dSamplesMean + 1);
+    double val = d_rms[n + 5 * Ndof];
+    d_rms[n + 5 * Ndof] = (val * dSamplesMean + (vel[1] - meanVel[1]) * (vel[2] - meanVel[2])) / (dSamplesMean + 1);
       }
-    }
-  });
+}
+});
 }
 
-void Averaging::sumValues_gpu(const Vector& meanUp,
-                              const Vector& rms,
-                              Vector& local_sums,
-                              Vector& tmp_vector,
-                              const int &num_equation,
-                              const int &dim ) {
+void Averaging::sumValues_gpu(const Vector &meanUp, const Vector &rms, Vector &local_sums, Vector &tmp_vector,
+                              const int &num_equation, const int &dim) {
   const int NDof = meanUp.Size() / num_equation;
 
   auto d_Up = meanUp.Read();

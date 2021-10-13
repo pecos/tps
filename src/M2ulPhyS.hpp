@@ -41,11 +41,14 @@
 
 #include <hdf5.h>
 #include <tps_config.h>
+
 #include <fstream>
 #include <general/forall.hpp>
 #include <mfem.hpp>
+
 #include "BCintegrator.hpp"
 #include "averaging_and_rms.hpp"
+#include "dataStructures.hpp"
 #include "dgNonlinearForm.hpp"
 #include "domain_integrator.hpp"
 #include "equation_of_state.hpp"
@@ -60,7 +63,6 @@
 #include "run_configuration.hpp"
 #include "sbp_integrators.hpp"
 #include "utils.hpp"
-#include "dataStructures.hpp"
 
 #ifdef _MASA_
 #include "masa_handler.hpp"
@@ -152,7 +154,7 @@ class M2ulPhyS {
   ParFiniteElementSpace *vfes;
 
   // nodes IDs and indirection array
-  const int maxIntPoints = 64;      // corresponding to HEX face with p=5
+  const int maxIntPoints = 64;  // corresponding to HEX face with p=5
   const int maxDofs = 216;      // corresponding to HEX with p=5
 
   volumeFaceIntegrationArrays gpuArrays;

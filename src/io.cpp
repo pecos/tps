@@ -29,10 +29,12 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
+#include "io.hpp"
+
 #include <hdf5.h>
+
 #include "M2ulPhyS.hpp"
 #include "utils.hpp"
-#include "io.hpp"
 
 void M2ulPhyS::restart_files_hdf5(string mode) {
 #ifdef HAVE_GRVY
@@ -511,8 +513,7 @@ void M2ulPhyS::serialize_soln_for_write(IOFamily &fam) {
         fam.serial_fes->GetElementVDofs(gelem, gvdofs);
         lsoln.SetSize(gvdofs.Size());
 
-        MPI_Recv(lsoln.HostReadWrite(), gvdofs.Size(), MPI_DOUBLE,
-                 from_rank, gelem, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Recv(lsoln.HostReadWrite(), gvdofs.Size(), MPI_DOUBLE, from_rank, gelem, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
         fam.serial_sol->SetSubVector(gvdofs, lsoln);
       }

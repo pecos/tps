@@ -38,11 +38,11 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, RiemannSolver *_rsolver, EquationOfStat
                  ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
                  const int _num_equation, int _patchNumber, double _refLength, InletType _bcType,
                  const Array<double> &_inputData, const int &_maxIntPoints, const int &_maxDofs)
-  : BoundaryCondition(_rsolver, _eqState, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber, _refLength),
-    groupsMPI(_groupsMPI),
-    inletType(_bcType),
-    maxIntPoints(_maxIntPoints),
-    maxDofs(_maxDofs) {
+    : BoundaryCondition(_rsolver, _eqState, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber, _refLength),
+      groupsMPI(_groupsMPI),
+      inletType(_bcType),
+      maxIntPoints(_maxIntPoints),
+      maxDofs(_maxDofs) {
   inputState.UseDevice(true);
   inputState.SetSize(_inputData.Size());
   auto hinputState = inputState.HostWrite();
@@ -730,55 +730,54 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
 
       // retreive data
       for (int eq = 0; eq < num_equation; eq++) {
-        if (i < elDof) {
-          Ui[i + eq * elDof] = d_U[indexi + eq * totDofs];
-          Fcontrib[i + eq * elDof] = 0.;
-        }
+    if (i < elDof) {
+      Ui[i + eq * elDof] = d_U[indexi + eq * totDofs];
+      Fcontrib[i + eq * elDof] = 0.;
+    }
       }
 
-      for (int q = 0; q < Q; q++) { // loop over int. points
-        if (i < elDof) shape[i] = d_shapesBC[i + q * maxDofs + el * maxIntPoints * maxDofs];
-        if (i < dim) nor[i] = d_normW[i + q * (dim + 1) + el * maxIntPoints * (dim + 1)];
-        if (dim == 2 && i == maxDofs - 2) nor[2] = 0.;
-        if (i == maxDofs - 1) weight = d_normW[dim + q * (dim + 1) + el * maxIntPoints * (dim + 1)];
-        MFEM_SYNC_THREAD;
+      for (int q = 0; q < Q; q++) {  // loop over int. points
+    if (i < elDof) shape[i] = d_shapesBC[i + q * maxDofs + el * maxIntPoints * maxDofs];
+    if (i < dim) nor[i] = d_normW[i + q * (dim + 1) + el * maxIntPoints * (dim + 1)];
+    if (dim == 2 && i == maxDofs - 2) nor[2] = 0.;
+    if (i == maxDofs - 1) weight = d_normW[dim + q * (dim + 1) + el * maxIntPoints * (dim + 1)];
+    MFEM_SYNC_THREAD;
 
-        // interpolate to int. point
-        if (i < num_equation) {
-          u1[i] = 0.;
-          for (int k = 0; k < elDof; k++) u1[i] += Ui[k + i * elDof] * shape[k];
-        }
-        MFEM_SYNC_THREAD;
+    // interpolate to int. point
+    if (i < num_equation) {
+      u1[i] = 0.;
+      for (int k = 0; k < elDof; k++) u1[i] += Ui[k + i * elDof] * shape[k];
+    }
+    MFEM_SYNC_THREAD;
 
-        // compute mirror state
-        switch (type) {
-          case InletType::SUB_DENS_VEL:
-            computeSubDenseVel(i, &u1[0], &u2[0], &nor[0], d_inputState, gamma, dim, num_equation);
-            break;
-          case InletType::SUB_DENS_VEL_NR:
-            printf("INLET BC NOT IMPLEMENTED");
-            break;
-          case InletType::SUB_VEL_CONST_ENT:
-            printf("INLET BC NOT IMPLEMENTED");
-            break;
-        }
-        MFEM_SYNC_THREAD;
+    // compute mirror state
+    switch (type) {
+      case InletType::SUB_DENS_VEL:
+        computeSubDenseVel(i, &u1[0], &u2[0], &nor[0], d_inputState, gamma, dim, num_equation);
+        break;
+      case InletType::SUB_DENS_VEL_NR:
+        printf("INLET BC NOT IMPLEMENTED");
+        break;
+      case InletType::SUB_VEL_CONST_ENT:
+        printf("INLET BC NOT IMPLEMENTED");
+        break;
+    }
+    MFEM_SYNC_THREAD;
 
-        // compute flux
-        RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0],
-                                     gamma, Rg, dim, num_equation, i, maxDofs);
-        MFEM_SYNC_THREAD;
-        // sum contributions to integral
-        if (i < elDof) {
-          for (int eq = 0; eq < num_equation; eq++) Fcontrib[i + eq * elDof] -= Rflux[eq] * shape[i] * weight;
-        }
-        MFEM_SYNC_THREAD;
+    // compute flux
+    RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation, i, maxDofs);
+    MFEM_SYNC_THREAD;
+    // sum contributions to integral
+    if (i < elDof) {
+      for (int eq = 0; eq < num_equation; eq++) Fcontrib[i + eq * elDof] -= Rflux[eq] * shape[i] * weight;
+    }
+    MFEM_SYNC_THREAD;
       }
       // add to global data
       if (i < elDof) {
-        for (int eq = 0; eq < num_equation; eq++) d_y[indexi + eq * totDofs] += Fcontrib[i + eq * elDof];
+    for (int eq = 0; eq < num_equation; eq++) d_y[indexi + eq * totDofs] += Fcontrib[i + eq * elDof];
       }
-    }
-  });
+}
+});
 #endif
 }

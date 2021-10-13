@@ -65,13 +65,9 @@ class RiemannSolver {
   void ComputeFluxDotN(const Vector &state, const Vector &nor, Vector &fluxN);
 
 #ifdef _GPU_
-  static MFEM_HOST_DEVICE void convFluxDotNorm_gpu(const double *state,
-                                                   const double pres,
-                                                   const double *nor,
-                                                   const int &dim,
-                                                   double *fluxN,
-                                                   const int &thrd,
-                                                   const int &max_num_threads ) {
+  static MFEM_HOST_DEVICE void convFluxDotNorm_gpu(const double *state, const double pres, const double *nor,
+                                                   const int &dim, double *fluxN, const int &thrd,
+                                                   const int &max_num_threads) {
     MFEM_SHARED double den_velN;
     if (thrd == 0) {
       den_velN = 0.;
@@ -80,8 +76,7 @@ class RiemannSolver {
     MFEM_SYNC_THREAD;
 
     if (thrd == max_num_threads - 1) fluxN[0] = den_velN;
-    for (int d = thrd; d < dim; d += max_num_threads)
-      fluxN[1 + d] = den_velN * state[d + 1] / state[0] + pres * nor[d];
+    for (int d = thrd; d < dim; d += max_num_threads) fluxN[1 + d] = den_velN * state[d + 1] / state[0] + pres * nor[d];
 
     if (thrd == max_num_threads - 1) {
       const double H = (state[dim + 1] + pres) / state[0];
@@ -89,16 +84,9 @@ class RiemannSolver {
     }
   }
 
-  static MFEM_HOST_DEVICE void riemannLF_gpu(const double *U1,
-                                              const double *U2,
-                                              double *flux,
-                                              const double *nor,
-                                              const double &gamma,
-                                              const double &Rg,
-                                              const int &dim,
-                                              const int &num_equation,
-                                              const int &thrd,
-                                              const int &max_num_threads) {
+  static MFEM_HOST_DEVICE void riemannLF_gpu(const double *U1, const double *U2, double *flux, const double *nor,
+                                             const double &gamma, const double &Rg, const int &dim,
+                                             const int &num_equation, const int &thrd, const int &max_num_threads) {
     MFEM_SHARED double KE1[3], KE2[3];
     MFEM_SHARED double vel1, vel2, p1, p2;
     MFEM_SHARED double maxE1, maxE2, maxE;
@@ -111,19 +99,11 @@ class RiemannSolver {
     }
     MFEM_SYNC_THREAD;
 
-    if (thrd == 0) p1 = EquationOfState::pressure( U1,
-                                                     &KE1[0],
-                                                     gamma,
-                                                     dim,
-                                                     num_equation);
-    if (thrd == 1) p2 = EquationOfState::pressure( U2,
-                                                     &KE2[0],
-                                                     gamma,
-                                                     dim,
-                                                     num_equation);
+    if (thrd == 0) p1 = EquationOfState::pressure(U1, &KE1[0], gamma, dim, num_equation);
+    if (thrd == 1) p2 = EquationOfState::pressure(U2, &KE2[0], gamma, dim, num_equation);
     if (thrd == max_num_threads - 1) {
       vel1 = 0.;
-      for (int d = 0; d < dim; d++) vel1 += 2.*KE1[d] / U1[0];
+      for (int d = 0; d < dim; d++) vel1 += 2. * KE1[d] / U1[0];
       vel1 = sqrt(vel1);
     }
     if (thrd == max_num_threads - 2) {
@@ -151,8 +131,7 @@ class RiemannSolver {
     MFEM_SYNC_THREAD;
 
     for (int i = thrd; i < num_equation; i += max_num_threads) {
-      flux[i] = 0.5 * (flux1[i] + flux2[i])
-                - 0.5 * maxE * (U2[i] - U1[i]) * normag;
+      flux[i] = 0.5 * (flux1[i] + flux2[i]) - 0.5 * maxE * (U2[i] - U1[i]) * normag;
     }
   }
 
