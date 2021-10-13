@@ -33,6 +33,7 @@
 #ifndef EM_OPTIONS_HPP_
 #define EM_OPTIONS_HPP_
 
+#include <iostream>
 #include <mfem.hpp>
 
 /** Electromagnetics options
@@ -62,7 +63,7 @@ class ElectromagneticOptions {
     mesh_file("hello.msh"), order(1), ref_levels(0),
     max_iter(100), rtol(1e-6), atol(1e-10),
     top_only(false), bot_only(false),
-    By_file("By.dat"), nBy(1),
+    By_file("By.dat"), nBy(0),
     yinterp_min(0.0), yinterp_max(1.0)
   { }
 
@@ -90,6 +91,25 @@ class ElectromagneticOptions {
                    "Minimum y interpolation value");
     args.AddOption(&yinterp_max, "-y1", "--yinterpMax",
                    "Maximum y interpolation value");
+  }
+
+  void print(std::ostream &out) {
+    out << std::endl;
+    out << "Electromagnetics options:" << std::endl;
+    out << "  mesh_file   = " << mesh_file   << std::endl;
+    out << "  order       = " << order       << std::endl;
+    out << "  ref_levels  = " << ref_levels  << std::endl;
+    out << "  ref_levels  = " << ref_levels  << std::endl;
+    out << "  max_iter    = " << max_iter    << std::endl;
+    out << "  rtol        = " << rtol        << std::endl;
+    out << "  atol        = " << atol        << std::endl;
+    out << "  top_only    = " << top_only    << std::endl;
+    out << "  bot_only    = " << top_only    << std::endl;
+    out << "  By_file     = " << By_file     << std::endl;
+    out << "  nBy         = " << nBy         << std::endl;
+    out << "  yinterp_min = " << yinterp_min << std::endl;
+    out << "  yinterp_max = " << yinterp_max << std::endl;
+    out << std::endl;
   }
 };
 

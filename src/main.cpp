@@ -38,7 +38,9 @@
 #include <unistd.h>
 
 #include "M2ulPhyS.hpp"
+#include "logger.hpp"
 #include "em_options.hpp"
+#include "quasimagnetostatic.hpp"
 
 int main(int argc, char *argv[]) {
   MPI_Session mpi(argc, argv);
@@ -137,11 +139,23 @@ int main(int argc, char *argv[]) {
       return 1;
     }
 
-    // TODO(trevilo): Fix this
+    QuasiMagnetostaticSolver qms(mpi, em_opt);
+
+    tic_toc.Clear();
+    tic_toc.Start();
+
+    qms.Initialize();
+    qms.InitializeCurrent();
+    qms.Solve();
+
+    tic_toc.Stop();
+
     if (mpi.Root()) {
-      grvy_printf(gerror, "[ERROR] EM simulation capabilities not integrated yet.\n");
+      grvy_printf(ginfo, "EM simulation complete: wall clock time = %.8f seconds\n",
+                  tic_toc.RealTime());
     }
-    return 1;
+
+    return 0;
 
   } else {  // should be impossible
     if (mpi.Root()) {
