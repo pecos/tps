@@ -1,8 +1,8 @@
-#!../utils/bats/bin/bats
+#!./bats
 # -*- mode: sh -*-
 
 TEST="2d/wedge"
-RUNFILE="input.2d.wedge"
+RUNFILE="inputs/input.2d.wedge"
 
 @test "[$TEST] check for input file $RUNFILE" {
     test -s $RUNFILE

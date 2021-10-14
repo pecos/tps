@@ -1,2 +1,6 @@
 *.h5
 output/
+history.hist
+*.mod
+
+
