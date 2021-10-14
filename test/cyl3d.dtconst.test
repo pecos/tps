@@ -1,8 +1,8 @@
-#!../utils/bats/bin/bats
+#!./bats
 # -*- mode: sh -*-
 
 TEST="cyl3d"
-RUNFILE=" input.dtconst.cyl"
+RUNFILE="inputs/input.dtconst.cyl"
 
 setup() {
     SOLN_FILE=restart_output.sol.h5
@@ -26,7 +26,6 @@ setup() {
     test -s $REF_FILE
     ./soln_differ $SOLN_FILE $REF_FILE
 }
-
 
 @test "[$TEST] verify tps output from 2 mpi tasks with input -> $RUNFILE" {
 

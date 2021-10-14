@@ -1,8 +1,8 @@
-#!../utils/bats/bin/bats
+#!./bats
 # -*- mode: sh -*-
 
 TEST="cyl3d"
-RUNFILE="input.4iters.cyl"
+RUNFILE="inputs/input.4iters.cyl"
 
 setup() {
     SOLN_FILE=restart_output.sol.h5
@@ -46,7 +46,7 @@ setup() {
 }
 
 @test "[$TEST] verify exit code if restart files missing" {
-    RUNFILE=input.4iters.restart.cyl
+    RUNFILE=inputs/input.4iters.restart.cyl
 
     rm -f $SOLN_FILE
 
@@ -57,7 +57,7 @@ setup() {
 }
 
 @test "[$TEST] verify consistent solution with restart from 2 iters" {
-    RUNFILE=input.2iters.cyl
+    RUNFILE=inputs/input.2iters.cyl
 
     rm -f $SOLN_FILE
     test -s $RUNFILE
@@ -67,13 +67,13 @@ setup() {
     run h5dump  -a iteration  restart_output.sol.h5
     [ "${lines[5]}" = "   (0): 2" ]
 
-    RUNFILE=input.4iters.restart.cyl
+    RUNFILE=inputs/input.4iters.restart.cyl
     ../src/tps --runFile $RUNFILE
     ./soln_differ $SOLN_FILE $REF_FILE
 }
 
 @test "[$TEST] verify tps output after variable p restart" {
-    RUNFILE=input.4iters.cyl
+    RUNFILE=inputs/input.4iters.cyl
 
     rm -f $SOLN_FILE
     test -s $RUNFILE
@@ -88,7 +88,7 @@ setup() {
 
     VARPLOG=varp.log
     rm -f $VARPLOG
-    RUNFILE=input.8iters.restart.newp.cyl
+    RUNFILE=inputs/input.8iters.restart.newp.cyl
     ../src/tps --runFile $RUNFILE >& $VARPLOG
 
     #intErr=$(cat $VARPLOG | grep "interpolation error" | awk '{print $6}')
@@ -108,7 +108,7 @@ setup() {
 }
 
 @test "[$TEST] verify serial restart consistency using 2 mpi tasks" {
-    RUNFILE=input.4iters.cyl
+    RUNFILE=inputs/input.4iters.cyl
     RUNFILE_PART=${RUNFILE}.part
     SOLN_FILE=restart_output.sol.h5
 
@@ -134,7 +134,7 @@ setup() {
 }
 
 @test "[$TEST] verify serial restart consistency using 4 mpi tasks" {
-    RUNFILE=input.4iters.cyl
+    RUNFILE=inputs/input.4iters.cyl
     RUNFILE_PART=${RUNFILE}.part
     SOLN_FILE=restart_output.sol.h5
 
@@ -160,10 +160,10 @@ setup() {
 }
 
 @test "[$TEST] verify serialized restart switching processors from 2 -> 4 mpi tasks" {
-    RUNFILE=input.2iters.cyl
+    RUNFILE=inputs/input.2iters.cyl
     SOLFILE_BASE=restart_output.sol
 
-    RUNFILE_MOD=${RUNFILE}.serialized
+    RUNFILE_MOD=input.serialized.mod
     TMPDIR=tmp_serialized_restart
 
     rm -f  restart_output.sol*.h5
@@ -186,7 +186,7 @@ setup() {
 
     # now, restart from serialized restart at 2 iters, and run with 4 procs till 4 iterations
 
-    RUNFILE=input.4iters.cyl
+    RUNFILE=inputs/input.4iters.cyl
     cp $RUNFILE $RUNFILE_MOD
     echo "RESTART_SERIAL read" >> $RUNFILE_MOD
     echo "RESTART_CYCLE" >> $RUNFILE_MOD
@@ -218,10 +218,10 @@ setup() {
 }
 
 @test "[$TEST] verify restart from partitioned files to generate a serialized output (2 mpi tasks)" {
-    RUNFILE=input.2iters.cyl
+    RUNFILE=inputs/input.2iters.cyl
     SOLFILE_BASE=restart_output.sol
 
-    RUNFILE_MOD=${RUNFILE}.serialized
+    RUNFILE_MOD=input.serialized.mod
 
     rm -f  restart_output.sol*.h5
     rm -f  partition.*.h5
@@ -247,7 +247,7 @@ setup() {
     [ "${lines[5]}" = "   (0): 24612" ]
 
     # now, start from partitioned restart files at 2 iters, and save serialized output at 4 iters
-    RUNFILE=input.4iters.cyl
+    RUNFILE=inputs/input.4iters.cyl
     cp $RUNFILE $RUNFILE_MOD
     echo "RESTART_SERIAL write" >> $RUNFILE_MOD
     echo "RESTART_CYCLE" >> $RUNFILE_MOD
@@ -262,7 +262,7 @@ setup() {
 }
 
 @test "[$TEST] verify two back to back (partitioned) restarts using 2 tasks" {
-    RUNFILE=input.4iters.cyl
+    RUNFILE=inputs/input.4iters.cyl
     SOLFILE_BASE=restart_output.sol
 
     RUNFILE_MOD=${RUNFILE}.mod

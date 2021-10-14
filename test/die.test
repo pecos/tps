@@ -1,11 +1,11 @@
-#!../utils/bats/bin/bats
+#!./bats
 # -*- mode: sh -*-
 
 TEST="cyl3d"
 
 @test "[$TEST] verify solution terminates early with presence of DIE file" {
-    RUNFILE=input.2iters.cyl
-    RUNFILE_MOD=${RUNFILE}.mod
+    RUNFILE=inputs/input.2iters.cyl
+    RUNFILE_MOD=input.2iters.cyl.mod
     SOLFILE_BASE=restart_output.sol
 
     rm -f  restart_output.sol*.h5
