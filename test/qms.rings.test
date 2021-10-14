@@ -1,0 +1,17 @@
+#!../utils/bats/bin/bats
+# -*- mode: sh -*-
+
+TEST="qms"
+
+setup() {
+    MESH_FILE=meshes/rings.msh
+    CMD_LINE="--em-only -m $MESH_FILE --rtol 1e-9 --atol 1e-12 --maxiter 20"
+}
+
+@test "[$TEST] verify tps quasimagnetostatic solver runs" {
+    test -s $MESH_FILE
+    run mpirun -np 4 ../src/tps $CMD_LINE
+    [[ "${status}" -eq 0 ]]
+    [[ "${output}" =~ "EM simulation complete" ]]
+}
+

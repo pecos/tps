@@ -12,7 +12,8 @@ TESTS = cyl3d.test \
 	cyl3d.dtconst.test \
 	die.test \
 	averages.test \
-	wedge.test
+	wedge.test \
+	qms.rings.test
 endif
 
 if GSLIB_ENABLED
