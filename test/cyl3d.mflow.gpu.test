@@ -1,4 +1,4 @@
-#!../utils/bats/bin/bats
+#!./bats
 # -*- mode: sh -*-
 
 TEST="cyl3d.gpu.mflow.outlet"
