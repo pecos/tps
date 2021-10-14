@@ -31,8 +31,10 @@
 // -----------------------------------------------------------------------------------el-
 
 #include <grvy.h>
+#include <hdf5.h>
 #include "../utils/mfem_extras/pfem_extras.hpp"
 #include "logger.hpp"
+#include "utils.hpp"
 #include "quasimagnetostatic.hpp"
 
 using namespace mfem;
@@ -281,7 +283,103 @@ void QuasiMagnetostaticSolver::Solve() {
   paraview_dc.RegisterField("magnfield", _B);
   paraview_dc.Save();
 
-  // TODO(trevilo): Add interpolation to centerline!
+  // Compute and dump the magnetic field on the axis
+  InterpolateToYAxis();
+}
+
+void QuasiMagnetostaticSolver::InterpolateToYAxis() const {
+  const bool root = _mpi.Root();
+
+  // quick return if there are no interpolation points
+  if (_em_opts.nBy < 1) return;
+
+  // Set up array of points (on all ranks)
+  DenseMatrix phys_points(_dim, _em_opts.nBy);
+
+  const double dy = (_em_opts.yinterp_max - _em_opts.yinterp_min)/(_em_opts.nBy-1);
+
+  for (int ipt = 0; ipt < _em_opts.nBy; ipt++) {
+    phys_points(0, ipt) = 0.0;
+    phys_points(1, ipt) = _em_opts.yinterp_min + ipt*dy;
+    phys_points(2, ipt) = 0.0;
+  }
+
+  Array<int> eid;
+  Array<IntegrationPoint> ips;
+  double *Byloc = new double[_em_opts.nBy];
+  double *By = new double[_em_opts.nBy];
+  Vector Bpoint(_dim);
+
+  // Get element numbers and integration points
+  _pmesh->FindPoints(phys_points, eid, ips);
+
+  // And interpolate
+  for (int ipt = 0; ipt < _em_opts.nBy; ipt++) {
+    if (eid[ipt] >= 0) {
+      _B->GetVectorValue(eid[ipt], ips[ipt], Bpoint);
+      Byloc[ipt] = Bpoint[1];
+    } else {
+      Byloc[ipt] = 0;
+    }
+    MPI_Reduce(Byloc, By, _em_opts.nBy, MPI_DOUBLE, MPI_SUM, 0, _pmesh->GetComm());
+  }
+
+  // Finally, write the result to an hdf5 file
+  hid_t file = -1;
+  hid_t data_soln;
+  herr_t status;
+  hsize_t dims[1];
+  hid_t group = -1;
+  hid_t dataspace = -1;
+
+  if (root) {
+    file = H5Fcreate(_em_opts.By_file, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    assert(file >= 0);
+
+    h5_save_attribute(file, "nBy", _em_opts.nBy);
+
+    dims[0] = _em_opts.nBy;
+
+    // write y locations of points
+    dataspace = H5Screate_simple(1, dims, NULL);
+    assert(dataspace >= 0);
+    group = H5Gcreate(file, "Points", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    assert(group >= 0);
+
+    data_soln = H5Dcreate2(group, "y", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    assert(data_soln >= 0);
+
+    Vector yval;
+    phys_points.GetRow(1, yval);
+
+    status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, yval.GetData());
+    assert(status >= 0);
+    H5Dclose(data_soln);
+
+    H5Gclose(group);
+    H5Sclose(dataspace);
+
+    // write y component of B field
+    dataspace = H5Screate_simple(1, dims, NULL);
+    assert(dataspace >= 0);
+    group = H5Gcreate(file, "Magnetic-field", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    assert(group >= 0);
+
+    data_soln = H5Dcreate2(group, "y", H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    assert(data_soln >= 0);
+
+    status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, By);
+    assert(status >= 0);
+    H5Dclose(data_soln);
+
+    H5Gclose(group);
+    H5Sclose(dataspace);
+
+    H5Fclose(file);
+  }
+
+  delete Byloc;
+  delete By;
 }
 
 void JFun(const Vector & x, Vector & J) {

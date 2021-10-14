@@ -72,6 +72,8 @@ class QuasiMagnetostaticSolver {
   bool _operator_initialized;
   bool _current_initialized;
 
+  void InterpolateToYAxis() const;
+
  public:
   QuasiMagnetostaticSolver(mfem::MPI_Session &mpi, ElectromagneticOptions em_opts);
   ~QuasiMagnetostaticSolver();

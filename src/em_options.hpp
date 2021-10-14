@@ -63,7 +63,7 @@ class ElectromagneticOptions {
     mesh_file("hello.msh"), order(1), ref_levels(0),
     max_iter(100), rtol(1e-6), atol(1e-10),
     top_only(false), bot_only(false),
-    By_file("By.dat"), nBy(0),
+    By_file("By.h5"), nBy(0),
     yinterp_min(0.0), yinterp_max(1.0)
   { }
 
