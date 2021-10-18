@@ -6,6 +6,7 @@
 #include <hdf5.h>
 #include <assert.h>
 #include <string>
+#include <mfem.hpp>
 
 // Misc. utilities
 bool file_exists (const std::string &name);
@@ -41,6 +42,36 @@ template <typename T> void h5_read_attribute(hid_t source,std::string attribute,
   assert(status >= 0);
   H5Aclose(attr);
 }
+
+// MFEM extensions
+
+/** Project discontinous function onto FE space
+ *
+ * Project a discontinuous vector coefficient into the finite element
+ * space provided by gf and returns the maximum attribute of the
+ * elements containing each dof in dof_attr on the local mpi rank.
+ * This is a helper function for GlobalProjectDiscCoefficient.
+ *
+ * This function is based on
+ * mfem::GridFunction::ProjectDiscCoefficient but has fixes s.t. it
+ * will work with Nedelec elements.
+ */
+void LocalProjectDiscCoefficient(mfem::GridFunction &gf,
+                                 mfem::VectorCoefficient &coeff,
+                                 mfem::Array<int> &dof_attr);
+
+/** Project discontinous function onto FE space
+ *
+ * Project a discontinuous vector coefficient into the finite element
+ * space provided by gf.  The values in shared dofs are determined
+ * from the element with maximal attribute.
+ *
+ * This function is based on
+ * mfem::ParGridFunction::ProjectDiscCoefficient but calls
+ * LocalProjectDiscCoefficient.
+ */
+void GlobalProjectDiscCoefficient(mfem::ParGridFunction &gf,
+                                  mfem::VectorCoefficient &coeff);
 
 #endif
 

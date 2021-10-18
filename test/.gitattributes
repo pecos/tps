@@ -18,3 +18,4 @@ ref_solns/02-12-2021/cyl3d.mflow.2iters.h5 filter=lfs diff=lfs merge=lfs -text
 ref_solns/cyl-2d.cpu.h5 filter=lfs diff=lfs merge=lfs -text
 meshes/cyl-2d-mixed.msh filter=lfs diff=lfs merge=lfs -text
 ref_solns/cyl-2d.meanRestart.cpu.h5 filter=lfs diff=lfs merge=lfs -text
+ref_solns/rings.centerline.By.np1.h5 filter=lfs diff=lfs merge=lfs -text

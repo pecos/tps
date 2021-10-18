@@ -117,7 +117,7 @@ void QuasiMagnetostaticSolver::Initialize() {
   //-----------------------------------------------------
   _hcurl = new ND_FECollection(_em_opts.order, _dim);
   _h1    = new H1_FECollection(_em_opts.order, _dim);
-  _hdiv  = new RT_FECollection(_em_opts.order, _dim);
+  _hdiv  = new RT_FECollection(_em_opts.order-1, _dim);
 
   _Aspace = new ParFiniteElementSpace(_pmesh, _hcurl);
   _pspace = new ParFiniteElementSpace(_pmesh, _h1   );
@@ -197,7 +197,20 @@ void QuasiMagnetostaticSolver::InitializeCurrent() {
   DivergenceFreeProjector* div_free =
     new DivergenceFreeProjector(*_pspace, *_Aspace, irOrder, NULL, NULL, grad);
 
-  Jorig->ProjectCoefficient(current);
+  // This call (i.e., GlobalProjectDiscCoefficient) replaces the
+  // functionality of Jorig->ProjectCoefficient(current) in a way that
+  // gives the same results in parallel for discontinuous functions.
+  // Specifically, it handles dofs that are shared between multiple
+  // elements by using the value from the element with the largest
+  // attribute.  This reproduces the functionality of
+  // mfem::ParGridFunction::ProjectDiscCoefficient but in a way that
+  // works for Nedelec elements.  Specifically, it deals with the case
+  // where FiniteElementSpace::GetElementVDofs has negative dof
+  // indices.  In mfem v4.3 and earlier, this situation leads to
+  // failed asserts when accessing elements of the array dof_attr in
+  // GridFunction::ProjectDiscCoefficient (or worse, silently runs
+  // incorrectly).
+  GlobalProjectDiscCoefficient(*Jorig, current);
   div_free->Mult(*Jorig, *Jproj);
 
   delete div_free;
