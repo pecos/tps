@@ -169,208 +169,349 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x, Vector &y, const ParG
   const double *d_shape2 = gpuArrays.shape2.Read();
   auto d_elems12Q = gpuArrays.elems12Q.Read();
 
-  MFEM_FORALL_2D(el, NumElemType, elDof, 1, 1, {
-    MFEM_FOREACH_THREAD(i, x, elDof) {
-      MFEM_SHARED double tempData[216 * 5], Fcontrib[216 * 5];
-      MFEM_SHARED double uk1[64 * 5], gradUpk1[64 * 5 * 3];
-      MFEM_SHARED double uk2[64 * 5], gradUpk2[64 * 5 * 3];
-      MFEM_SHARED double shape[216];
-
-      MFEM_SHARED double Rflux[5], u1[5], u2[5], nor[3];
-      MFEM_SHARED double vFlux1[5 * 3], vFlux2[5 * 3];
-      MFEM_SHARED double gradUp1[5 * 3], gradUp2[5 * 3];
-      MFEM_SHARED int indexes_j[216];
-
-      const int eli = elemOffset + el;
-      const int offsetEl1 = d_posDofIds[2 * eli];
-      const int indexi = d_nodesIDs[offsetEl1 + i];
-      const int elFaces = d_elemFaces[7 * eli];
-
-      for (int eq = 0; eq < num_equation; eq++) Fcontrib[i + eq * elDof] = 0.;
-      MFEM_SYNC_THREAD;
-
-      // loop over faces
-      for (int face = 0; face < elFaces; face++) {
-    const int gFace = d_elemFaces[7 * eli + face + 1];
-    const int Q = d_elems12Q[3 * gFace + 2];
-    const int offsetShape1 = gFace * maxIntPoints * (maxDofs + 1 + dim);
-    const int offsetShape2 = gFace * maxIntPoints * maxDofs;
-    bool swapElems = false;
-
-    // get neighbor
-    int elj = d_elems12Q[3 * gFace];
-    if (elj == eli) {
-      elj = d_elems12Q[3 * gFace + 1];
-    } else {
-      swapElems = true;
-    }
-
-    const int offsetElj = d_posDofIds[2 * elj];
-    int dofj = d_posDofIds[2 * elj + 1];
-
-    int dof1 = elDof;
-    int dof2 = dofj;
-    if (swapElems) {
-      dof1 = dofj;
-      dof2 = elDof;
-    }
-
-    for (int j = i; j < dofj; j += elDof) indexes_j[j] = d_nodesIDs[offsetElj + j];
-
-    // set interpolation data to 0
-    for (int n = i; n < Q * num_equation; n += elDof) {
-      uk1[n] = 0.;
-      uk2[n] = 0.;
-      for (int d = 0; d < dim; d++) {
-        gradUpk1[n + d * Q * num_equation] = 0.;
-        gradUpk2[n + d * Q * num_equation] = 0.;
+  
+  MFEM_FORALL(el, NumElemType,{
+    double U1[216*5], U2[216*5];
+    double GradUp1[216*3*5],GradUp2[216*3*5];
+    double shape1[216], shape2[216];
+    double u1[5], gradUp1[5*3];
+    double u2[5], gradUp2[5*3];
+    double vFlux1[5 * 3], vFlux2[5 * 3];
+    double Rflux[5],nor[3], Fcontrib[216*5];
+    int indexes_i[215],indexes_j[216];
+    
+    const int eli = elemOffset + el;
+    const int offsetEl1 = d_posDofIds[2 * eli];
+    //const int indexi = d_nodesIDs[offsetEl1];
+    const int elFaces = d_elemFaces[7 * eli];
+    
+    
+    // elem1 data
+    for(int i=0;i<elDof;i++){
+      int index = d_nodesIDs[offsetEl1];
+      indexes_i[i] = index;
+      for (int eq = 0; eq < num_equation; eq++){
+        Fcontrib[i + eq * elDof] = 0.;
+        U1[i+eq*elDof] = d_x[index+eq*Ndofs];
+        for(int d=0;d<dim;d++) 
+          GradUp1[i+eq*elDof+d*num_equation*elDof] = d_gradUp[index+eq*Ndofs + d*num_equation*Ndofs];
       }
     }
-    MFEM_SYNC_THREAD;
+              
+    for(int face = 0; face < elFaces; face++) {
+      const int gFace = d_elemFaces[7*eli + face + 1];
+      const int Q = d_elems12Q[3 * gFace + 2];
+      const int offsetShape1 = gFace * maxIntPoints * (maxDofs + 1 + dim);
+      const int offsetShape2 = gFace * maxIntPoints * maxDofs;
+      bool swapElems = false;
 
-    // interpolate element data to integration points
-    // U1
-    for (int eq = 0; eq < num_equation; eq++) {
-      int index = indexi;
-      for (int j = i; j < dof1; j += elDof) {
-        if (swapElems) index = indexes_j[j];
-        tempData[j + eq * dof1] = d_x[index + eq * Ndofs];
-      }
-    }
-
-    for (int k = 0; k < Q; k++) {
-      for (int j = i; j < dof1; j += elDof) shape[j] = d_shapeWnor1[offsetShape1 + j + k * (maxDofs + 1 + dim)];
-      MFEM_SYNC_THREAD;
-
-      for (int eq = i; eq < num_equation; eq += elDof) {
-        for (int j = 0; j < dof1; j++) uk1[eq + k * num_equation] += tempData[j + eq * dof1] * shape[j];
-      }
-      MFEM_SYNC_THREAD;
-    }
-
-    // U2
-    for (int eq = 0; eq < num_equation; eq++) {
-      int index;
-      for (int j = i; j < dof2; j += elDof) {
-        index = indexes_j[j];
-        if (swapElems) index = indexi;
-        tempData[j + eq * dof2] = d_x[index + eq * Ndofs];
-      }
-    }
-
-    for (int k = 0; k < Q; k++) {
-      for (int j = i; j < dof2; j += elDof) shape[j] = d_shape2[offsetShape2 + j + k * maxDofs];
-      MFEM_SYNC_THREAD;
-
-      for (int eq = i; eq < num_equation; eq += elDof) {
-        for (int j = 0; j < dof2; j++) uk2[eq + k * num_equation] += tempData[j + eq * dof2] * shape[j];
-      }
-      MFEM_SYNC_THREAD;
-    }
-
-    // gradUp1
-    for (int d = 0; d < dim; d++) {
-      for (int eq = 0; eq < num_equation; eq++) {
-        int index = indexi;
-        for (int j = i; j < dof1; j += elDof) {
-          if (swapElems) index = indexes_j[j];
-          tempData[j + eq * dof1] = d_gradUp[index + eq * Ndofs + d * num_equation * Ndofs];
-        }
-      }
-
-      for (int k = 0; k < Q; k++) {
-        for (int j = i; j < dof1; j += elDof) shape[j] = d_shapeWnor1[offsetShape1 + j + k * (maxDofs + 1 + dim)];
-        MFEM_SYNC_THREAD;
-
-        for (int eq = i; eq < num_equation; eq += elDof) {
-          for (int j = 0; j < dof1; j++)
-            gradUpk1[eq + k * num_equation + d * Q * num_equation] += tempData[j + eq * dof1] * shape[j];
-        }
-        MFEM_SYNC_THREAD;
-      }
-    }
-
-    // gradUp2
-    for (int d = 0; d < dim; d++) {
-      for (int eq = 0; eq < num_equation; eq++) {
-        int index;
-        for (int j = i; j < dof2; j += elDof) {
-          index = indexes_j[j];
-          if (swapElems) index = indexi;
-          tempData[j + eq * dof2] = d_gradUp[index + eq * Ndofs + d * num_equation * Ndofs];
-        }
-      }
-
-      for (int k = 0; k < Q; k++) {
-        for (int j = i; j < dof2; j += elDof) shape[j] = d_shape2[offsetShape2 + j + k * maxDofs];
-        MFEM_SYNC_THREAD;
-
-        for (int eq = i; eq < num_equation; eq += elDof) {
-          for (int j = 0; j < dof2; j++)
-            gradUpk2[eq + k * num_equation + d * Q * num_equation] += tempData[j + eq * dof2] * shape[j];
-        }
-        MFEM_SYNC_THREAD;
-      }
-    }
-
-    // loop over integration points
-    for (int k = 0; k < Q; k++) {
-      const double weight = d_shapeWnor1[offsetShape1 + maxDofs + k * (maxDofs + 1 + dim)];
-      for (int eq = i; eq < dim; eq += elDof)
-        nor[eq] = d_shapeWnor1[offsetShape1 + maxDofs + 1 + eq + k * (maxDofs + 1 + dim)];
-
-      if (swapElems) {
-        for (int j = i; j < dof2; j += elDof) shape[j] = d_shape2[offsetShape2 + j + k * maxDofs];
+      // get neighbor
+      int elj = d_elems12Q[3 * gFace];
+      if (elj == eli) {
+        elj = d_elems12Q[3 * gFace + 1];
       } else {
-        for (int j = i; j < dof1; j += elDof) shape[j] = d_shapeWnor1[offsetShape1 + j + k * (maxDofs + 1 + dim)];
+        swapElems = true;
       }
 
-      for (int eq = i; eq < num_equation; eq += elDof) {
-        u1[eq] = uk1[eq + k * num_equation];
-        u2[eq] = uk2[eq + k * num_equation];
-        for (int d = 0; d < dim; d++) {
-          gradUp1[eq + d * num_equation] = gradUpk1[eq + k * num_equation + d * Q * num_equation];
-          gradUp2[eq + d * num_equation] = gradUpk2[eq + k * num_equation + d * Q * num_equation];
+      const int offsetElj = d_posDofIds[2 * elj];
+      int dofj = d_posDofIds[2*elj + 1];
+
+      int dof1 = elDof;
+      int dof2 = dofj;
+      if (swapElems) {
+        dof1 = dofj;
+        dof2 = elDof;
+      }
+
+      // elem2 data
+      for (int j=0; j < dofj; j++){
+        indexes_j[j] = d_nodesIDs[offsetElj + j];
+        int index = indexes_j[j];
+        for(int eq=0;eq<num_equation;eq++){
+          U2[j+eq*dofj] = d_x[index+eq*Ndofs];
+          for(int d=0;d<dim;d++)
+            GradUp2[j+eq*dofj+d*num_equation*dofj] = d_gradUp[index+eq*Ndofs+d*num_equation*dofj];
         }
       }
-      MFEM_SYNC_THREAD;
-
-      // compute Riemann flux
-      RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation, i, elDof);
-      Fluxes::viscousFlux_gpu(&vFlux1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, i, elDof, dim,
-                              num_equation);
-      Fluxes::viscousFlux_gpu(&vFlux2[0], &u2[0], &gradUp2[0], gamma, Rg, viscMult, bulkViscMult, Pr, i, elDof, dim,
-                              num_equation);
-      MFEM_SYNC_THREAD;
-      // if(i<num_equation)
-      for (int eq = i; eq < num_equation; eq += elDof) {
-        for (int d = 0; d < dim; d++)
-          vFlux1[eq + d * num_equation] = 0.5 * (vFlux1[eq + d * num_equation] + vFlux2[eq + d * num_equation]);
-      }
-      MFEM_SYNC_THREAD;
-      for (int eq = i; eq < num_equation; eq += elDof) {
-        for (int d = 0; d < dim; d++) Rflux[eq] -= vFlux1[eq + d * num_equation] * nor[d];
-      }
-      MFEM_SYNC_THREAD;
-
-      // add integration point contribution
-      for (int eq = 0; eq < num_equation; eq++) {
-        //             if( swapElems ) Fcontrib[i+eq*elDof] += weight*l2[i]*Rflux[eq];
-        //             else Fcontrib[i+eq*elDof] -= weight*l1[i]*Rflux[eq];
-        if (swapElems)
-          Fcontrib[i + eq * elDof] += weight * shape[i] * Rflux[eq];
-        else
-          Fcontrib[i + eq * elDof] -= weight * shape[i] * Rflux[eq];
+      
+      for (int k = 0; k < Q; k++) {
+        // get shapes and normal
+        const double weight = d_shapeWnor1[offsetShape1 + maxDofs + k * (maxDofs + 1 + dim)];
+        for(int eq = 0; eq < dim; eq++)
+          nor[eq] = d_shapeWnor1[offsetShape1+maxDofs + 1 + eq + k * (maxDofs + 1 + dim)];
+        for (int j = 0; j <dof1; j++) shape1[j] = d_shapeWnor1[offsetShape1 + j + k * (maxDofs + 1 + dim)];
+        for (int j = 0; j <dof2; j++) shape2[j] = d_shape2[offsetShape2 + j + k * maxDofs];
+        for(int eq=0;eq<num_equation;eq++){
+          u1[eq] = 0.;
+          u2[eq] = 0.;
+          for(int d=0;d<dim;d++){
+            gradUp1[eq+d*num_equation] = 0.;
+            gradUp2[eq+d*num_equation] = 0.;
+          }
+        }
+              
+        // interpolate to integration point k
+        for (int eq=0; eq<num_equation; eq++) {
+          if( swapElems ){
+            for (int j=0;j<dof1;j++) u1[eq] += U2[j + eq*dof1]*shape1[j];
+            for (int j=0;j<dof2;j++) u2[eq] += U1[j + eq*dof2]*shape2[j];
+          } else {
+            for (int j=0;j<dof1;j++) u1[eq] += U1[j + eq*dof1]*shape1[j];
+            for (int j=0;j<dof2;j++) u2[eq] += U2[j + eq*dof2]*shape2[j];
+          }
+        }
+        
+        // interpolate gradients
+        for(int d=0;d<dim;d++){
+          for (int eq=0; eq<num_equation; eq++) {
+            if( swapElems ){
+              for (int j=0;j<dof1;j++) gradUp1[eq+d*num_equation] += GradUp2[j+eq*dof1+d*num_equation*dof1]*shape1[j];
+              for (int j=0;j<dof2;j++) gradUp2[eq+d*num_equation] += GradUp1[j+eq*dof2+d*num_equation*dof2]*shape2[j];
+            } else {
+              for (int j=0;j<dof1;j++) gradUp1[eq+d*num_equation] += GradUp1[j+eq*dof1+d*num_equation*dof1]*shape1[j];
+              for (int j=0;j<dof2;j++) gradUp2[eq+d*num_equation] += GradUp2[j+eq*dof2+d*num_equation*dof2]*shape2[j];
+            }
+          }
+        }
+        
+        RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
+        Fluxes::viscousFlux_serial_gpu(&vFlux1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
+                                num_equation);
+        Fluxes::viscousFlux_serial_gpu(&vFlux2[0], &u2[0], &gradUp2[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
+                                num_equation);
+        for (int eq = 0; eq < num_equation; eq++) {
+          for (int d = 0; d < dim; d++)
+            vFlux1[eq + d * num_equation] = 0.5 * (vFlux1[eq + d * num_equation] + vFlux2[eq + d * num_equation]);
+        }
+        
+        for (int eq = 0; eq < num_equation; eq++) {
+          for (int d = 0; d < dim; d++) Rflux[eq] -= vFlux1[eq + d * num_equation] * nor[d];
+        }
+        
+        for(int i=0;i<elDof;i++){
+          for (int eq = 0; eq < num_equation; eq++) {
+            if( swapElems ) Fcontrib[i+eq*elDof] += weight*shape2[i]*Rflux[eq];
+            else Fcontrib[i+eq*elDof] -= weight*shape1[i]*Rflux[eq];
+            
+//               if (swapElems)
+//               Fcontrib[i + eq * elDof] += weight * shape[i] * Rflux[eq];
+//             else
+//               Fcontrib[i + eq * elDof] -= weight * shape[i] * Rflux[eq];
+          }
+        }
       }
     }
-      }
-
-      // write to global memory
-      for (int eq = 0; eq < num_equation; eq++) {
-    d_y[indexi + eq * Ndofs] += Fcontrib[i + eq * elDof];
-      }
-}
-});
+    
+    for(int i=0;i<elDof;i++){
+      int index = indexes_i[i];
+      for (int eq = 0; eq < num_equation; eq++)
+        d_y[index + eq * Ndofs] += Fcontrib[i + eq * elDof];
+    }
+      
+  });
+  
+//   MFEM_FORALL_2D(el, NumElemType, elDof, 1, 1, {
+//     MFEM_FOREACH_THREAD(i, x, elDof) {
+//       MFEM_SHARED double tempData[216 * 5], Fcontrib[216 * 5];
+//       MFEM_SHARED double uk1[64 * 5], gradUpk1[64 * 5 * 3];
+//       MFEM_SHARED double uk2[64 * 5], gradUpk2[64 * 5 * 3];
+//       MFEM_SHARED double shape[216];
+// 
+//       MFEM_SHARED double Rflux[5], u1[5], u2[5], nor[3];
+//       MFEM_SHARED double vFlux1[5 * 3], vFlux2[5 * 3];
+//       MFEM_SHARED double gradUp1[5 * 3], gradUp2[5 * 3];
+//       MFEM_SHARED int indexes_j[216];
+// 
+//       const int eli = elemOffset + el;
+//       const int offsetEl1 = d_posDofIds[2 * eli];
+//       const int indexi = d_nodesIDs[offsetEl1 + i];
+//       const int elFaces = d_elemFaces[7 * eli];
+// 
+//       for (int eq = 0; eq < num_equation; eq++) Fcontrib[i + eq * elDof] = 0.;
+//       MFEM_SYNC_THREAD;
+// 
+//       // loop over faces
+//       for (int face = 0; face < elFaces; face++) {
+//     const int gFace = d_elemFaces[7 * eli + face + 1];
+//     const int Q = d_elems12Q[3 * gFace + 2];
+//     const int offsetShape1 = gFace * maxIntPoints * (maxDofs + 1 + dim);
+//     const int offsetShape2 = gFace * maxIntPoints * maxDofs;
+//     bool swapElems = false;
+// 
+//     // get neighbor
+//     int elj = d_elems12Q[3 * gFace];
+//     if (elj == eli) {
+//       elj = d_elems12Q[3 * gFace + 1];
+//     } else {
+//       swapElems = true;
+//     }
+// 
+//     const int offsetElj = d_posDofIds[2 * elj];
+//     int dofj = d_posDofIds[2 * elj + 1];
+// 
+//     int dof1 = elDof;
+//     int dof2 = dofj;
+//     if (swapElems) {
+//       dof1 = dofj;
+//       dof2 = elDof;
+//     }
+// 
+//     for (int j = i; j < dofj; j += elDof) indexes_j[j] = d_nodesIDs[offsetElj + j];
+// 
+//     // set interpolation data to 0
+//     for (int n = i; n < Q * num_equation; n += elDof) {
+//       uk1[n] = 0.;
+//       uk2[n] = 0.;
+//       for (int d = 0; d < dim; d++) {
+//         gradUpk1[n + d * Q * num_equation] = 0.;
+//         gradUpk2[n + d * Q * num_equation] = 0.;
+//       }
+//     }
+//     MFEM_SYNC_THREAD;
+// 
+//     // interpolate element data to integration points
+//     // U1
+//     for (int eq = 0; eq < num_equation; eq++) {
+//       int index = indexi;
+//       for (int j = i; j < dof1; j += elDof) {
+//         if (swapElems) index = indexes_j[j];
+//         tempData[j + eq * dof1] = d_x[index + eq * Ndofs];
+//       }
+//     }
+// 
+//     for (int k = 0; k < Q; k++) {
+//       for (int j = i; j < dof1; j += elDof) shape[j] = d_shapeWnor1[offsetShape1 + j + k * (maxDofs + 1 + dim)];
+//       MFEM_SYNC_THREAD;
+// 
+//       for (int eq = i; eq < num_equation; eq += elDof) {
+//         for (int j = 0; j < dof1; j++) uk1[eq + k * num_equation] += tempData[j + eq * dof1] * shape[j];
+//       }
+//       MFEM_SYNC_THREAD;
+//     }
+// 
+//     // U2
+//     for (int eq = 0; eq < num_equation; eq++) {
+//       int index;
+//       for (int j = i; j < dof2; j += elDof) {
+//         index = indexes_j[j];
+//         if (swapElems) index = indexi;
+//         tempData[j + eq * dof2] = d_x[index + eq * Ndofs];
+//       }
+//     }
+// 
+//     for (int k = 0; k < Q; k++) {
+//       for (int j = i; j < dof2; j += elDof) shape[j] = d_shape2[offsetShape2 + j + k * maxDofs];
+//       MFEM_SYNC_THREAD;
+// 
+//       for (int eq = i; eq < num_equation; eq += elDof) {
+//         for (int j = 0; j < dof2; j++) uk2[eq + k * num_equation] += tempData[j + eq * dof2] * shape[j];
+//       }
+//       MFEM_SYNC_THREAD;
+//     }
+// 
+//     // gradUp1
+//     for (int d = 0; d < dim; d++) {
+//       for (int eq = 0; eq < num_equation; eq++) {
+//         int index = indexi;
+//         for (int j = i; j < dof1; j += elDof) {
+//           if (swapElems) index = indexes_j[j];
+//           tempData[j + eq * dof1] = d_gradUp[index + eq * Ndofs + d * num_equation * Ndofs];
+//         }
+//       }
+// 
+//       for (int k = 0; k < Q; k++) {
+//         for (int j = i; j < dof1; j += elDof) shape[j] = d_shapeWnor1[offsetShape1 + j + k * (maxDofs + 1 + dim)];
+//         MFEM_SYNC_THREAD;
+// 
+//         for (int eq = i; eq < num_equation; eq += elDof) {
+//           for (int j = 0; j < dof1; j++)
+//             gradUpk1[eq + k * num_equation + d * Q * num_equation] += tempData[j + eq * dof1] * shape[j];
+//         }
+//         MFEM_SYNC_THREAD;
+//       }
+//     }
+// 
+//     // gradUp2
+//     for (int d = 0; d < dim; d++) {
+//       for (int eq = 0; eq < num_equation; eq++) {
+//         int index;
+//         for (int j = i; j < dof2; j += elDof) {
+//           index = indexes_j[j];
+//           if (swapElems) index = indexi;
+//           tempData[j + eq * dof2] = d_gradUp[index + eq * Ndofs + d * num_equation * Ndofs];
+//         }
+//       }
+// 
+//       for (int k = 0; k < Q; k++) {
+//         for (int j = i; j < dof2; j += elDof) shape[j] = d_shape2[offsetShape2 + j + k * maxDofs];
+//         MFEM_SYNC_THREAD;
+// 
+//         for (int eq = i; eq < num_equation; eq += elDof) {
+//           for (int j = 0; j < dof2; j++)
+//             gradUpk2[eq + k * num_equation + d * Q * num_equation] += tempData[j + eq * dof2] * shape[j];
+//         }
+//         MFEM_SYNC_THREAD;
+//       }
+//     }
+// 
+//     // loop over integration points
+//     for (int k = 0; k < Q; k++) {
+//       const double weight = d_shapeWnor1[offsetShape1 + maxDofs + k * (maxDofs + 1 + dim)];
+//       for (int eq = i; eq < dim; eq += elDof)
+//         nor[eq] = d_shapeWnor1[offsetShape1 + maxDofs + 1 + eq + k * (maxDofs + 1 + dim)];
+// 
+//       if (swapElems) {
+//         for (int j = i; j < dof2; j += elDof) shape[j] = d_shape2[offsetShape2 + j + k * maxDofs];
+//       } else {
+//         for (int j = i; j < dof1; j += elDof) shape[j] = d_shapeWnor1[offsetShape1 + j + k * (maxDofs + 1 + dim)];
+//       }
+// 
+//       for (int eq = i; eq < num_equation; eq += elDof) {
+//         u1[eq] = uk1[eq + k * num_equation];
+//         u2[eq] = uk2[eq + k * num_equation];
+//         for (int d = 0; d < dim; d++) {
+//           gradUp1[eq + d * num_equation] = gradUpk1[eq + k * num_equation + d * Q * num_equation];
+//           gradUp2[eq + d * num_equation] = gradUpk2[eq + k * num_equation + d * Q * num_equation];
+//         }
+//       }
+//       MFEM_SYNC_THREAD;
+// 
+//       // compute Riemann flux
+//       RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation, i, elDof);
+//       Fluxes::viscousFlux_gpu(&vFlux1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, i, elDof, dim,
+//                               num_equation);
+//       Fluxes::viscousFlux_gpu(&vFlux2[0], &u2[0], &gradUp2[0], gamma, Rg, viscMult, bulkViscMult, Pr, i, elDof, dim,
+//                               num_equation);
+//       MFEM_SYNC_THREAD;
+//       // if(i<num_equation)
+//       for (int eq = i; eq < num_equation; eq += elDof) {
+//         for (int d = 0; d < dim; d++)
+//           vFlux1[eq + d * num_equation] = 0.5 * (vFlux1[eq + d * num_equation] + vFlux2[eq + d * num_equation]);
+//       }
+//       MFEM_SYNC_THREAD;
+//       for (int eq = i; eq < num_equation; eq += elDof) {
+//         for (int d = 0; d < dim; d++) Rflux[eq] -= vFlux1[eq + d * num_equation] * nor[d];
+//       }
+//       MFEM_SYNC_THREAD;
+// 
+//       // add integration point contribution
+//       for (int eq = 0; eq < num_equation; eq++) {
+//         //             if( swapElems ) Fcontrib[i+eq*elDof] += weight*l2[i]*Rflux[eq];
+//         //             else Fcontrib[i+eq*elDof] -= weight*l1[i]*Rflux[eq];
+//         if (swapElems)
+//           Fcontrib[i + eq * elDof] += weight * shape[i] * Rflux[eq];
+//         else
+//           Fcontrib[i + eq * elDof] -= weight * shape[i] * Rflux[eq];
+//       }
+//     }
+//       }
+// 
+//       // write to global memory
+//       for (int eq = 0; eq < num_equation; eq++) {
+//     d_y[indexi + eq * Ndofs] += Fcontrib[i + eq * elDof];
+//       }
+// }
+// });
 }
 
 void DGNonLinearForm::sharedFaceIntegration_gpu(
