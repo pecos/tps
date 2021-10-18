@@ -300,8 +300,6 @@ class M2ulPhyS {
 
   void Iterate();
 
-  void Header();
-
   // Accessors
   RHSoperator getRHSoperator() { return *rhsOperator; }
   ParMesh *GetMesh() { return mesh; }

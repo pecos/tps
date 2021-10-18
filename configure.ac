@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([tps], [1.0], [https://github.com/pecos/tps])
+AC_INIT([tps], [1.0 (dev)], [https://github.com/pecos/tps])
 AC_CONFIG_SRCDIR([src/main.cpp])
 AC_CONFIG_HEADERS([tps_config.h])
 AC_CONFIG_AUX_DIR([build-aux])
