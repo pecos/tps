@@ -38,6 +38,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <mfem.hpp>
 #include "M2ulPhyS.hpp"
 #include "utils.hpp"
 
@@ -175,4 +176,94 @@ std::string systemCmd(const char *cmd) {
     result += buffer.data();
   }
   return result;
+}
+
+void LocalProjectDiscCoefficient(GridFunction &gf,
+                                 VectorCoefficient &coeff,
+                                 Array<int> &dof_attr) {
+  Array<int> vdofs;
+  Vector vals;
+
+  gf.HostWrite();
+  FiniteElementSpace *fes = gf.FESpace();
+
+  // maximal element attribute for each dof
+  dof_attr.SetSize(fes->GetVSize());
+  dof_attr = -1;
+
+  // NB: DofTransformation does not exist until after mfem 4.3, so
+  // don't use here yet
+  // DofTransformation * doftrans = NULL;
+
+  // local projection
+  for (int i = 0; i < fes->GetNE(); i++) {
+    // doftrans = fes->GetElementVDofs(i, vdofs);
+    fes->GetElementVDofs(i, vdofs);
+    vals.SetSize(vdofs.Size());
+    fes->GetFE(i)->Project(coeff, *fes->GetElementTransformation(i), vals);
+
+    // if (doftrans) {
+    //   doftrans->TransformPrimal(vals);
+    // }
+
+    // the values in shared dofs are determined from the element with maximal
+    // attribute
+    int attr = fes->GetAttribute(i);
+    for (int j = 0; j < vdofs.Size(); j++) {
+      // Mimic how negative indices are handled in Vector::SetSubVector
+      int ind = vdofs[j];
+      if (ind < 0) {
+        ind = -1-ind;
+        vals[j] = -vals[j];
+      }
+
+      if (attr > dof_attr[ind]) {
+        gf(ind) = vals[j];
+        dof_attr[ind] = attr;
+      }
+    }
+  }
+}
+
+void GlobalProjectDiscCoefficient(ParGridFunction &gf,
+                                  VectorCoefficient &coeff) {
+  // local maximal element attribute for each dof
+  Array<int> ldof_attr;
+
+  // local projection
+  LocalProjectDiscCoefficient(gf, coeff, ldof_attr);
+
+  // global maximal element attribute for each dof
+  Array<int> gdof_attr;
+  ldof_attr.Copy(gdof_attr);
+
+  ParFiniteElementSpace *pfes = gf.ParFESpace();
+
+  GroupCommunicator &gcomm = pfes->GroupComm();
+  gcomm.Reduce<int>(gdof_attr, GroupCommunicator::Max);
+  gcomm.Bcast(gdof_attr);
+
+  // set local value to zero if global maximal element attribute is larger than
+  // the local one, and mark (in gdof_attr) if we have the correct value
+  for (int i = 0; i < pfes->GetVSize(); i++) {
+    if (gdof_attr[i] > ldof_attr[i]) {
+      gf(i) = 0.0;
+      gdof_attr[i] = 0;
+    } else {
+      gdof_attr[i] = 1;
+    }
+  }
+
+  // parallel averaging plus interpolation to determine final values
+  HypreParVector *tv = pfes->NewTrueDofVector();
+  gcomm.Reduce<int>(gdof_attr, GroupCommunicator::Sum);
+  gcomm.Bcast(gdof_attr);
+
+  FiniteElementSpace *fes = gf.FESpace();
+  for (int i = 0; i < fes->GetVSize(); i++) {
+    gf(i) /= gdof_attr[i];
+  }
+  gf.ParallelAssemble(*tv);
+  gf.Distribute(tv);
+  delete tv;
 }
