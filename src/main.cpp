@@ -32,13 +32,9 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
-
-#include "mfem.hpp"
-
 #include <unistd.h>
-
-#include "M2ulPhyS.hpp"
-#include "logger.hpp"
+#include <mfem.hpp>
+#include "tps.hpp"
 #include "em_options.hpp"
 #include "quasimagnetostatic.hpp"
 
@@ -46,22 +42,19 @@ int main(int argc, char *argv[]) {
   MPI_Session mpi(argc, argv);
 
   bool flow_only = true;
-  const char *inputFile = "../data/periodic-square.mesh";
-  // const char *device_config = "cpu";
-
+  bool em_only = false;
+  const char *inputFile = "<unknown>";
+  bool showVersion = false;
+  tps tps(mpi, argc, argv);
   int precision = 8;
   cout.precision(precision);
 
   OptionsParser args(argc, argv);
-
   args.AddOption(&flow_only, "-flow", "--flow-only", "-nflow", "--not-flow-only", "Perform flow only simulation");
   args.AddOption(&inputFile, "-run", "--runFile", "Name of the input file with run options.");
-
-  //  args.AddOption(&device_config, "-d", "--device",
-  // "Device configuration string, see Device::Configure().");
+  args.AddOption(&showVersion, "-v",  "--version", "" , "--no-version", "Print code version and exit");
 
   // Add options for EM
-  bool em_only = false;
   ElectromagneticOptions em_opt;
   args.AddOption(&em_only, "-em", "--em-only", "-nem", "--not-em-only",
                  "Perform electromagnetics only simulation");
@@ -87,17 +80,22 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  // version info
+  tps.PrintHeader();
+  if (showVersion)
+    exit(0);
+
   if (mpi.Root()) args.PrintOptions(cout);
 
   if (flow_only && em_only) {
     flow_only = false;
     if (mpi.Root()) {
-      grvy_printf(gwarn, "Using --em_only overrides --flow_only.  Performing EM only run.\n");
+      std::cout << "[WARNING] Using --em_only overrides --flow_only.  Performing EM only run." << std::endl;
     }
   }
   if (!flow_only && !em_only) {
     if (mpi.Root()) {
-      grvy_printf(gerror, "[ERROR] No physics specified. Use --flow_only or --em_only.\n");
+      std::cout << "[ERROR] No physics specified. Use --flow_only or --em_only." << std::endl;
       args.PrintUsage(cout);
     }
     return 1;
@@ -119,14 +117,8 @@ int main(int argc, char *argv[]) {
     string inputFileName(inputFile);
     M2ulPhyS solver(mpi, inputFileName);
 
-    // Start the timer.
-    tic_toc.Clear();
-    tic_toc.Start();
-
+    // Initiate solver iterations
     solver.Iterate();
-
-    tic_toc.Stop();
-    if (mpi.Root()) cout << " done, " << tic_toc.RealTime() << "s." << endl;
 
     return (solver.GetStatus());
 
@@ -141,25 +133,19 @@ int main(int argc, char *argv[]) {
 
     QuasiMagnetostaticSolver qms(mpi, em_opt);
 
-    tic_toc.Clear();
-    tic_toc.Start();
-
     qms.Initialize();
     qms.InitializeCurrent();
     qms.Solve();
 
-    tic_toc.Stop();
-
     if (mpi.Root()) {
-      grvy_printf(ginfo, "EM simulation complete: wall clock time = %.8f seconds\n",
-                  tic_toc.RealTime());
+      std::cout << "EM simulation complete" << std::endl;
     }
 
     return 0;
 
   } else {  // should be impossible
     if (mpi.Root()) {
-      grvy_printf(gerror, "[ERROR] No physics specified. Use --flow_only or --em_only.\n");
+      std::cout << "[ERROR] No physics specified. Use --flow_only or --em_only." << std::endl;
       args.PrintUsage(cout);
     }
     return 1;

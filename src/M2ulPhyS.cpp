@@ -46,7 +46,6 @@ M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, string &inputFileName) : mpi(_mpi) {
     rank0_ = false;
 
   groupsMPI = new MPI_Groups(&mpi);
-  Header();
 
   config.readInputFile(inputFileName);
 

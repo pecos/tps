@@ -29,11 +29,8 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
-#include "utils.hpp"
-
 #include <sys/stat.h>
 #include <unistd.h>
-
 #include <array>
 #include <cstdio>
 #include <cstdlib>
@@ -42,25 +39,8 @@
 #include <stdexcept>
 #include <string>
 #include <mfem.hpp>
-
 #include "M2ulPhyS.hpp"
-
-using namespace mfem;
-
-void M2ulPhyS::Header() {
-  if (mpi.Root()) {
-    grvy_printf(ginfo, "\n------------------------------------\n");
-    grvy_printf(ginfo, "  _______ _____   _____\n");
-    grvy_printf(ginfo, " |__   __|  __ \\ / ____|\n");
-    grvy_printf(ginfo, "    | |  | |__) | (___  \n");
-    grvy_printf(ginfo, "    | |  |  ___/ \\___ \\ \n");
-    grvy_printf(ginfo, "    | |  | |     ____) | \n");
-    grvy_printf(ginfo, "    |_|  |_|    |_____/ \n\n");
-    grvy_printf(ginfo, "Git Version:  %s\n", BUILD_VERSION);
-    grvy_printf(ginfo, "MFEM Version: %s\n", mfem::GetVersionStr());
-    grvy_printf(ginfo, "------------------------------------\n\n");
-  }
-}
+#include "utils.hpp"
 
 #ifdef HAVE_SLURM
 #include <slurm/slurm.h>

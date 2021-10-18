@@ -48,6 +48,14 @@ jobs:
          run:  make -j 2
        - name: Tests
          run:  make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
+       - name: Distclean
+         run:  make distclean
+       - name: VPATH configure
+         run:  mkdir build; cd build; ../configure CXXFLAGS="-I$PETSC_INC" LDFLAGS="-L$PETSC_LIB -lpetsc"
+       - name: VPATH make
+         run:  cd build; make -j 2
+       - name: VPATH tests
+         run:  cd build; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
    build-gpu:
     runs-on: [self-hosted, linux, x64, gpu, marvin-cuda]
     name: Build/GPU (Cuda)
@@ -96,3 +104,11 @@ jobs:
         run: module restore tps-gpu; make -j 2
       - name: Tests
         run: module restore tps-gpu; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
+      - name: Distclean
+        run:  make distclean
+      - name: VPATH configure
+        run:  mkdir build; cd build; module restore tps-gpu; ../configure --enable-gpu-hip HIP_ARCH=gfx803
+      - name: VPATH make
+        run:  cd build; module restore tps-gpu; make -j 2
+      - name: VPATH tests
+        run:  cd build; module restore tps-gpu; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
