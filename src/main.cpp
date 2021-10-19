@@ -37,6 +37,7 @@
 #include "tps.hpp"
 #include "em_options.hpp"
 #include "quasimagnetostatic.hpp"
+#include "seqs_maxwell_frequency.hpp"
 
 int main(int argc, char *argv[]) {
   MPI_Session mpi(argc, argv);
@@ -131,16 +132,35 @@ int main(int argc, char *argv[]) {
       return 1;
     }
 
-    QuasiMagnetostaticSolver qms(mpi, em_opt);
+    if (em_opt.qms && em_opt.seqs) {
+      if (mpi.Root()) {
+        std::cout << "[WARNING] Using -seqs overrides -qms.  Running SEQS solver." << std::endl;
+      }
+      em_opt.qms = false;
+    }
 
-    qms.Initialize();
-    qms.InitializeCurrent();
-    qms.Solve();
+    if (em_opt.qms) {
+      // Solve the quasi-magnetostatic approximation
+      QuasiMagnetostaticSolver qms(mpi, em_opt);
+      qms.Initialize();
+      qms.InitializeCurrent();
+      qms.Solve();
+    } else if (em_opt.seqs) {
+      // Solver full Maxwell (in frequency domain)
+      SeqsMaxwellFrequencySolver seqs(mpi, em_opt);
+      seqs.Initialize();
+      seqs.Solve();
+    } else {
+      if (mpi.Root()) {
+        std::cout << "[ERROR] Specified --em-only but no EM solver.  Use either -qms or -seqs." << std::endl;
+        args.PrintUsage(cout);
+      }
+      return 1;
+    }
 
     if (mpi.Root()) {
       std::cout << "EM simulation complete" << std::endl;
     }
-
     return 0;
 
   } else {  // should be impossible

@@ -267,3 +267,11 @@ void GlobalProjectDiscCoefficient(ParGridFunction &gf,
   gf.Distribute(tv);
   delete tv;
 }
+
+void mfem_mark_dofs(const mfem::Array<int> &dofs, mfem::Array<int> &mark_array) {
+  for (int i = 0; i < dofs.Size(); i++) {
+    int k = dofs[i];
+    if (k < 0) { k = -1 - k; }
+    mark_array[k] = -1;
+  }
+}

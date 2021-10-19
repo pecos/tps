@@ -100,4 +100,13 @@ void LocalProjectDiscCoefficient(mfem::GridFunction &gf,
 void GlobalProjectDiscCoefficient(mfem::ParGridFunction &gf,
                                   mfem::VectorCoefficient &coeff);
 
+/** Mark array elements corresponding to dofs
+ *
+ * Mark elements of mark_array corresponding to the indices in dofs.
+ * This is a convenience function in mfem that is helpful in marking
+ * (for instance) dofs that correspond to different material
+ * subdomains.
+ */
+void mfem_mark_dofs(const mfem::Array<int> &dofs, mfem::Array<int> &mark_array);
+
 #endif  // UTILS_HPP_
