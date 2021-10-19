@@ -45,11 +45,11 @@ fi
 if test $RC != 0 ; then
    GIT_REVISION="cat $srcdir/dist_version"
    GIT_CHECKOUT=false
-   BUILD_DEVSTATUS="External Release"
+   BUILD_DEVSTATUS="release"
 else
    GIT_REVISION="${git} log -1 --format="%h""
    GIT_CHECKOUT=true
-   BUILD_DEVSTATUS="Development Build"
+   BUILD_DEVSTATUS="dev"
 fi
 
 
