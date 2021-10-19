@@ -1,5 +1,6 @@
 AM_CPPFLAGS          = -g -I../src -I$(MFEM_INC) -I$(MFEM_INC)/mfem
 AM_CPPFLAGS         += -I$(HYPRE_INC) $(HDF5_CFLAGS) $(GRVY_CFLAGS)
+EXTRA_DIST           = bats cpplint
 
 if CUDA_ENABLED
 AM_CPPFLAGS += $(CUDA_CXXFLAGS)

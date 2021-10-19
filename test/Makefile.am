@@ -1,7 +1,9 @@
-TEST_LOG_DRIVER   = env AM_TAP_AWK='$(AWK)' $(SHELL) \
-                    $(top_srcdir)/test/tap-driver.sh
-AM_TESTS_ENVIRONMENT = PATH=$(top_srcdir)/utils/bats/bin:$$PATH; \
-   TEST_INPUTS=$(top_srcdir)/test
+TEST_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) $(top_srcdir)/test/tap-driver.sh
+
+EXTRA_DIST      = inputs ref_solns/*.h5 \
+		  vpath.sh cyl3d.gpu.test cyl3d.mflow.gpu.test wedge.gpu.test \
+	          averages.gpu.test cyl3d.test cyl3d.mflow.test cyl3d.dtconst.test \
+		  die.test averages.test wedge.test cyl3d.interp.test valgrind.test
 
 TESTS = vpath.sh
 
