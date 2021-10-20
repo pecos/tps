@@ -99,7 +99,7 @@ jobs:
        - name: Make
          run:  cd tps-*; module restore tps-gpu; make -j 2
        - name: TPS version
-         run:  cd tps-*; ./src/tps --version         
+         run:  cd tps-*; module restore tps-gpu; ./src/tps --version         
        - name: Tests
          run:  cd tps-*; module restore tps-gpu; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
        - name: Distclean
