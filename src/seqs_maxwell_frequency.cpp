@@ -59,8 +59,13 @@ SeqsMaxwellFrequencySolver::SeqsMaxwellFrequencySolver(MPI_Session &mpi, Electro
 
   rel_sig_ = NULL;
   rel_eps_ = NULL;
+  rel_mui_ = NULL;
   rel_eps_nc_ = NULL;
+  S_eta2_  = NULL;
+  S_eta2_reg_  = NULL;
   one_over_sigma_ = NULL;
+  eta_squared_ = NULL;
+  neg_eta_squared_ = NULL;
 
   phi_real_ = NULL;
   phi_imag_ = NULL;
@@ -69,17 +74,36 @@ SeqsMaxwellFrequencySolver::SeqsMaxwellFrequencySolver(MPI_Session &mpi, Electro
 
   V0_ = NULL;
   V1_ = NULL;
+
+  phi_tot_real_ = NULL;
+  phi_tot_imag_ = NULL;
+
+  A_real_ = NULL;
+  A_imag_ = NULL;
+  n_real_ = NULL;
+  n_imag_ = NULL;
 }
 
 SeqsMaxwellFrequencySolver::~SeqsMaxwellFrequencySolver() {
+  delete n_imag_;
+  delete n_real_;
+  delete A_imag_;
+  delete A_real_;
+  delete phi_tot_real_;
+  delete phi_tot_imag_;
   delete V1_;
   delete V0_;
   delete psi_imag_;
   delete psi_real_;
   delete phi_imag_;
   delete phi_real_;
+  delete neg_eta_squared_;
+  delete eta_squared_;
   delete one_over_sigma_;
+  delete S_eta2_reg_;
+  delete S_eta2_;
   delete rel_eps_nc_;
+  delete rel_mui_;
   delete rel_eps_;
   delete rel_sig_;
   delete Bspace_;
@@ -194,6 +218,13 @@ void SeqsMaxwellFrequencySolver::Initialize() {
   psi_ess_tdof_list_.Append(conductor_true_list);
   psi_ess_tdof_list_.Append(h1_ess_tdof_list_);
 
+  Array<int> A_ess_bdr;
+  A_ess_bdr.SetSize(pmesh_->bdr_attributes.Max());
+  A_ess_bdr = 1;
+  // Neumann?
+  Aspace_->GetEssentialTrueDofs(A_ess_bdr, hcurl_ess_tdof_list_);
+
+
   //-----------------------------------------------------
   // 3) Prepare material parameters and other coefficients
   //-----------------------------------------------------
@@ -205,24 +236,39 @@ void SeqsMaxwellFrequencySolver::Initialize() {
 
   Vector rsig(pmesh_->attributes.Max());
   Vector reps(pmesh_->attributes.Max());
+  Vector rmui(pmesh_->attributes.Max());
   Vector reps_nc(pmesh_->attributes.Max());
+  Vector se2(pmesh_->attributes.Max());
+  Vector se2_reg(pmesh_->attributes.Max());
   rsig = 0.0;     // domains are non-conducting by default
+  se2  = 0.0;     // domains are non-conducting by default
+  se2_reg = 1.0;  // not sure how to set this value (1 seems to do pretty well though)
   reps = 1.0;     // domains have relative permeability 1 by default
+  rmui = 1.0;     // domains have relative permeability 1 by default
   reps_nc = 1.0;  // non-conducting domains have relative permeability 1 by default
 
   for (int icond=0; icond < em_opt_.conductor_domains.Size(); icond++) {
     rsig(em_opt_.conductor_domains[icond]-1) = 1.0;
     reps_nc(em_opt_.conductor_domains[icond]-1) = 0.0;
+    se2(em_opt_.conductor_domains[icond]-1) = em_opt_.nd_conductivity*em_opt_.nd_frequency*em_opt_.nd_frequency;
+    se2_reg(em_opt_.conductor_domains[icond]-1) = em_opt_.nd_conductivity*em_opt_.nd_frequency*em_opt_.nd_frequency;
   }
   rel_sig_    = new PWConstCoefficient(rsig);
   rel_eps_    = new PWConstCoefficient(reps);
+  rel_mui_    = new PWConstCoefficient(rmui);
   rel_eps_nc_ = new PWConstCoefficient(reps_nc);
 
   one_over_sigma_ = new ConstantCoefficient(1.0/em_opt_.nd_conductivity);
+  eta_squared_ = new ConstantCoefficient(em_opt_.nd_frequency*em_opt_.nd_frequency);
+
+  S_eta2_ = new PWConstCoefficient(se2);
+  S_eta2_reg_ = new PWConstCoefficient(se2_reg);
 }
 
 void SeqsMaxwellFrequencySolver::Solve() {
   SolveSEQS();
+  SolveStabMaxwell();
+  WriteParaview();
 }
 
 void SeqsMaxwellFrequencySolver::SolveSEQS() {
@@ -453,7 +499,8 @@ void SeqsMaxwellFrequencySolver::SolveSEQS() {
     // TODO(trevilo): should this be -1?
     // Patterned off mfem/examples/ex22p.cpp, but not clear to me why
     // this is a good choice.
-    Operator *Pppi = new ScaledOperator(Pppr, -1.0);
+    // Operator *Pppi = new ScaledOperator(Pppr, -1.0);
+    Operator *Pppi = new ScaledOperator(Pppr, 1.0);
 
     // psi-psi block
     ParBilinearForm *Kss_pre = new ParBilinearForm(pspace_);
@@ -464,10 +511,12 @@ void SeqsMaxwellFrequencySolver::SolveSEQS() {
 
     Operator *Pssr = new HypreBoomerAMG(*Kss_pre_op.As<HypreParMatrix>());
 
-    // TODO(trevilo): should this be -1?
-    // Patterned off mfem/examples/ex22p.cpp, but not clear to me why
-    // this is a good choice.
-    Operator *Pssi = new ScaledOperator(Pssr, -1.0);
+    // TODO(trevilo): should this be -1?  Patterned off
+    // mfem/examples/ex22p.cpp, but not clear to me why this is a good
+    // choice.  Empirically, +1.0 works better, so going with that for
+    // the moment.
+    // Operator *Pssi = new ScaledOperator(Pssr, -1.0);
+    Operator *Pssi = new ScaledOperator(Pssr, 1.0);
 
     BlockDiagonalPreconditioner BDP(true_offsets);
     BDP.SetDiagonalBlock(0, Pppr);
@@ -512,18 +561,253 @@ void SeqsMaxwellFrequencySolver::SolveSEQS() {
   delete bp_imag;
   delete bp_real;
 
-  ParGridFunction *phi_tot_real = new ParGridFunction(pspace_);
-  *phi_tot_real  = *V0_;
-  *phi_tot_real += *phi_real_;
-  *phi_tot_real += *psi_real_;
+  // Combine the three contributions to the electric potential into a
+  // single function, which will be used by the magnetic vector
+  // potential solve
+  phi_tot_real_ = new ParGridFunction(pspace_);
+  *phi_tot_real_  = *V0_;
+  *phi_tot_real_ += *phi_real_;
+  *phi_tot_real_ += *psi_real_;
 
-  ParGridFunction *phi_tot_imag = new ParGridFunction(pspace_);
-  *phi_tot_imag  = 0.0;
-  *phi_tot_imag += *phi_imag_;
-  *phi_tot_imag += *psi_imag_;
+  phi_tot_imag_ = new ParGridFunction(pspace_);
+  *phi_tot_imag_  = 0.0;
+  *phi_tot_imag_ += *phi_imag_;
+  *phi_tot_imag_ += *psi_imag_;
 
-  // TODO(trevilo): This is temporary... move to after full soln computed
-  if (verbose) grvy_printf(ginfo, "Writing SEQS solution to paraview output.\n");
+
+  if (verbose) grvy_printf(ginfo, "Stabilized electro-quasistatic finished.\n");
+}
+
+void SeqsMaxwellFrequencySolver::SolveStabMaxwell() {
+  bool verbose = mpi_.Root();
+  if (verbose) grvy_printf(ginfo, "Solving stabilized Maxwell problem for A.\n");
+
+  if (verbose) grvy_printf(ginfo, "... Initializing solution functions.\n");
+  A_real_ = new ParGridFunction(Aspace_);
+  A_imag_ = new ParGridFunction(Aspace_);
+  n_real_ = new ParGridFunction(pspace_);
+  n_imag_ = new ParGridFunction(pspace_);
+
+  *A_real_ = 0.0;
+  *A_imag_ = 0.0;
+  *n_real_ = 0.0;
+  *n_imag_ = 0.0;
+
+  if (verbose) grvy_printf(ginfo, "... Initializing right hand side.\n");
+  ParLinearForm *bA_real = new ParLinearForm(Aspace_);
+  ParLinearForm *bA_imag = new ParLinearForm(Aspace_);
+  ParLinearForm *bn_real = new ParLinearForm(pspace_);
+  ParLinearForm *bn_imag = new ParLinearForm(pspace_);
+
+  *bA_real = 0.0;
+  *bA_imag = 0.0;
+  *bn_real = 0.0;
+  *bn_imag = 0.0;
+
+  // build RHS
+  {
+    ParMixedBilinearForm *Kap_real = new ParMixedBilinearForm(pspace_, Aspace_);
+    Kap_real->AddDomainIntegrator(new MixedVectorGradientIntegrator(*S_eta2_));
+    Kap_real->Assemble();
+    Kap_real->Finalize();
+    Kap_real->AddMult(*phi_tot_real_, *bA_real, -1.0);
+    Kap_real->AddMult(*phi_tot_imag_, *bA_imag, -1.0);
+    delete Kap_real;
+
+    ParMixedBilinearForm *Kap_imag = new ParMixedBilinearForm(pspace_, Aspace_);
+    Kap_imag->AddDomainIntegrator(new MixedVectorGradientIntegrator(*eta_squared_));
+    Kap_imag->Assemble();
+    Kap_imag->Finalize();
+    Kap_imag->AddMult(*phi_tot_real_, *bA_imag, -1.0);
+    Kap_imag->AddMult(*phi_tot_imag_, *bA_real, +1.0);
+    delete Kap_imag;
+  }
+
+  // True DOFs (for setting up block vectors and matrices below)
+  const int true_nsize = pspace_->TrueVSize();
+  const int true_Asize = Aspace_->TrueVSize();
+
+  Array<int> sm_offsets(4+1);  // num variables (+1)
+  sm_offsets[0] = 0;
+  sm_offsets[1] = true_Asize;
+  sm_offsets[2] = true_Asize;
+  sm_offsets[3] = true_nsize;
+  sm_offsets[4] = true_nsize;
+  sm_offsets.PartialSum();
+
+  BlockVector X(sm_offsets), R(sm_offsets);
+
+  A_real_->ParallelAssemble(X.GetBlock(0));
+  A_imag_->ParallelAssemble(X.GetBlock(1));
+  n_real_->ParallelAssemble(X.GetBlock(2));
+  n_imag_->ParallelAssemble(X.GetBlock(3));
+
+  bA_real->ParallelAssemble(R.GetBlock(0));
+  bA_imag->ParallelAssemble(R.GetBlock(1));
+  bn_real->ParallelAssemble(R.GetBlock(2));
+  bn_imag->ParallelAssemble(R.GetBlock(3));
+
+  if (verbose) grvy_printf(ginfo, "... Initializing stabilized Maxwell operators.\n");
+
+  {
+    ParBilinearForm *Kaa_real = new ParBilinearForm(Aspace_);
+    Kaa_real->AddDomainIntegrator(new CurlCurlIntegrator(*rel_mui_));
+    Kaa_real->AddDomainIntegrator(new VectorFEMassIntegrator(*neg_eta_squared_));
+    Kaa_real->Assemble();
+#if (MFEM_VERSION >= 40300)
+    // See comments above about why #if necessary here
+    OperatorPtr Kaa_real_op;
+    Kaa_real->FormSystemMatrix(hcurl_ess_tdof_list, Kaa_real_op);
+    Kaa_real->EliminateVDofsInRHS(hcurl_ess_tdof_list_, X.GetBlock(0), R.GetBlock(0));
+    Kaa_real->EliminateVDofsInRHS(hcurl_ess_tdof_list_, X.GetBlock(1), R.GetBlock(1));
+#else
+    Kaa_real->Finalize(0);
+
+    OperatorPtr Kaa_real_op(Operator::Hypre_ParCSR);
+    Kaa_real->ParallelAssemble(Kaa_real_op);
+
+    OperatorPtr Kaa_real_op_elim(Operator::Hypre_ParCSR);
+    Kaa_real_op_elim.EliminateRowsCols(Kaa_real_op, hcurl_ess_tdof_list_);
+    Kaa_real_op.EliminateBC(Kaa_real_op_elim, hcurl_ess_tdof_list_, X.GetBlock(0), R.GetBlock(0));
+    Kaa_real_op.EliminateBC(Kaa_real_op_elim, hcurl_ess_tdof_list_, X.GetBlock(1), R.GetBlock(1));
+#endif
+
+    ParBilinearForm *Kaa_imag = new ParBilinearForm(Aspace_);
+    Kaa_imag->AddDomainIntegrator(new VectorFEMassIntegrator(*S_eta2_));
+    Kaa_imag->Assemble();
+    OperatorPtr Kaa_imag_op;
+    Kaa_imag->FormSystemMatrix(hcurl_ess_tdof_list_, Kaa_imag_op);
+    // todo: eliminate rows
+
+    ParMixedBilinearForm *Kan_imag = new ParMixedBilinearForm(pspace_, Aspace_);
+    Kan_imag->AddDomainIntegrator(new MixedVectorGradientIntegrator(*S_eta2_));
+    Kan_imag->Assemble();
+    OperatorPtr Kan_imag_op;
+    Kan_imag->FormRectangularSystemMatrix(psi_ess_tdof_list_, hcurl_ess_tdof_list_, Kan_imag_op);
+
+    ParMixedBilinearForm *Kan_real = new ParMixedBilinearForm(pspace_, Aspace_);
+    Kan_real->AddDomainIntegrator(new MixedVectorGradientIntegrator(*neg_eta_squared_));
+    Kan_real->Assemble();
+    OperatorPtr Kan_real_op;
+    Kan_real->FormRectangularSystemMatrix(psi_ess_tdof_list_, hcurl_ess_tdof_list_, Kan_real_op);
+
+    ParMixedBilinearForm *Kna_real = new ParMixedBilinearForm(Aspace_, pspace_);
+    Kna_real->AddDomainIntegrator(new VectorFEWeakDivergenceIntegrator(*rel_eps_nc_));
+    Kna_real->Assemble();
+    OperatorPtr Kna_real_op;
+    Kna_real->FormRectangularSystemMatrix(hcurl_ess_tdof_list_, psi_ess_tdof_list_, Kna_real_op);
+
+    ParBilinearForm *Knn_real = new ParBilinearForm(pspace_);
+    Knn_real->AddDomainIntegrator(new DiffusionIntegrator(*rel_eps_nc_));
+    Knn_real->Assemble();
+
+#if (MFEM_VERSION >= 40300)
+    OperatorPtr Knn_real_op;
+    Knn_real->FormSystemMatrix(psi_ess_tdof_list_, Knn_real_op);
+    Knn_real->EliminateVDofsInRHS(psi_ess_tdof_list_, X.GetBlock(2), R.GetBlock(2));
+    Knn_real->EliminateVDofsInRHS(psi_ess_tdof_list_, X.GetBlock(3), R.GetBlock(3));
+#else
+    Knn_real->Finalize(0);
+
+    OperatorPtr Knn_real_op(Operator::Hypre_ParCSR);
+    Knn_real->ParallelAssemble(Knn_real_op);
+
+    OperatorPtr Knn_real_op_elim(Operator::Hypre_ParCSR);
+    Knn_real_op_elim.EliminateRowsCols(Knn_real_op, psi_ess_tdof_list_);
+    Knn_real_op.EliminateBC(Knn_real_op_elim, psi_ess_tdof_list_, X.GetBlock(2), R.GetBlock(2));
+    Knn_real_op.EliminateBC(Knn_real_op_elim, psi_ess_tdof_list_, X.GetBlock(3), R.GetBlock(3));
+#endif
+
+    // Put the operators formed above into a single block operator object
+    BlockOperator *maxwellOp = new BlockOperator(sm_offsets);
+
+    // Kaa block
+    HypreParMatrix *kaar = Kaa_real_op.As<HypreParMatrix>();
+    HypreParMatrix *kaai = Kaa_imag_op.As<HypreParMatrix>();
+
+    // Elim rows from off-diagonal block (b/c FormSystemMatrix call
+    // above leave 1 on diagonal and doesn't seem to respect
+    // SetDiagonalPolicy call).  This logic is repeated for all
+    // off-diagonal blocks below.
+    kaai->EliminateRows(hcurl_ess_tdof_list_);
+
+    maxwellOp->SetBlock(0, 0, kaar);
+    maxwellOp->SetBlock(0, 1, kaai, -1.0);
+    maxwellOp->SetBlock(1, 0, kaai);
+    maxwellOp->SetBlock(1, 1, kaar);
+
+    // Kan block
+    HypreParMatrix *kanr = Kan_real_op.As<HypreParMatrix>();
+    HypreParMatrix *kani = Kan_imag_op.As<HypreParMatrix>();
+
+    maxwellOp->SetBlock(0, 2, kanr);
+    maxwellOp->SetBlock(0, 3, kani, -1.0);
+    maxwellOp->SetBlock(1, 2, kani);
+    maxwellOp->SetBlock(1, 3, kanr);
+
+    // Kna block
+    HypreParMatrix *knar = Kna_real_op.As<HypreParMatrix>();
+
+    maxwellOp->SetBlock(2, 0, knar);
+    maxwellOp->SetBlock(3, 1, knar);
+
+    // Knn block
+    HypreParMatrix *knnr = Knn_real_op.As<HypreParMatrix>();
+
+    maxwellOp->SetBlock(2, 2, knnr);
+    maxwellOp->SetBlock(3, 3, knnr);
+
+    // A-A block
+    ParBilinearForm *Kaa_pre = new ParBilinearForm(Aspace_);
+    Kaa_pre->AddDomainIntegrator(new CurlCurlIntegrator(*rel_mui_));
+    Kaa_pre->AddDomainIntegrator(new VectorFEMassIntegrator(*S_eta2_reg_));
+    Kaa_pre->Assemble();
+    OperatorPtr Kaa_pre_op;
+    Kaa_pre->FormSystemMatrix(hcurl_ess_tdof_list_, Kaa_pre_op);
+
+    Operator *Paar = new HypreAMS(*Kaa_pre_op.As<HypreParMatrix>(), Aspace_);
+    // Operator *Paai = new ScaledOperator(Paar,-1.0);
+    Operator *Paai = new ScaledOperator(Paar, 1.0);
+
+    // psi-psi block
+    ParBilinearForm *Knn_pre = new ParBilinearForm(pspace_);
+    Knn_pre->AddDomainIntegrator(new DiffusionIntegrator(*rel_eps_nc_));
+    Knn_pre->Assemble();
+    OperatorPtr Knn_pre_op;
+    Knn_pre->FormSystemMatrix(psi_ess_tdof_list_, Knn_pre_op);
+
+    Operator *Pnnr = new HypreBoomerAMG(*Knn_pre_op.As<HypreParMatrix>());
+    // Operator *Pnni = new ScaledOperator(Pnnr,-1.0);
+    Operator *Pnni = new ScaledOperator(Pnnr, 1.0);
+
+    BlockDiagonalPreconditioner BDP(sm_offsets);
+    BDP.SetDiagonalBlock(0, Paar);
+    BDP.SetDiagonalBlock(1, Paai);
+    BDP.SetDiagonalBlock(2, Pnnr);
+    BDP.SetDiagonalBlock(3, Pnni);
+    BDP.owns_blocks = 1;
+
+    // 13. Solve the thing (finally!)
+    FGMRESSolver solver(MPI_COMM_WORLD);
+    solver.SetPreconditioner(BDP);
+    solver.SetOperator(*maxwellOp);
+    solver.SetRelTol(em_opt_.rtol);
+    solver.SetAbsTol(em_opt_.atol);
+    solver.SetMaxIter(em_opt_.max_iter);
+    solver.SetPrintLevel(1);
+    solver.Mult(R, X);
+
+    // Recover the solution
+    A_real_->Distribute(&(X.GetBlock(0)));
+    A_imag_->Distribute(&(X.GetBlock(1)));
+    n_real_->Distribute(&(X.GetBlock(2)));
+    n_imag_->Distribute(&(X.GetBlock(3)));
+  }
+}
+
+void SeqsMaxwellFrequencySolver::WriteParaview() {
+  bool verbose = mpi_.Root();
+  if (verbose) grvy_printf(ginfo, "Writing Maxwell solution to paraview output.\n");
   ParaViewDataCollection paraview_dc("seqs", pmesh_);
   paraview_dc.SetPrefixPath("ParaView");
   paraview_dc.SetLevelsOfDetail(em_opt_.order);
@@ -531,12 +815,9 @@ void SeqsMaxwellFrequencySolver::SolveSEQS() {
   paraview_dc.SetDataFormat(VTKFormat::BINARY);
   paraview_dc.SetHighOrderOutput(true);
   paraview_dc.SetTime(0.0);
-  paraview_dc.RegisterField("phi_tot_real", phi_tot_real);
-  paraview_dc.RegisterField("phi_tot_imag", phi_tot_imag);
+  paraview_dc.RegisterField("phi_tot_real", phi_tot_real_);
+  paraview_dc.RegisterField("phi_tot_imag", phi_tot_imag_);
+  paraview_dc.RegisterField("A_real", A_real_);
+  paraview_dc.RegisterField("A_imag", A_imag_);
   paraview_dc.Save();
-
-  delete phi_tot_real;
-  delete phi_tot_imag;
-
-  if (verbose) grvy_printf(ginfo, "Stabilized electro-quasistatic finished.\n");
 }

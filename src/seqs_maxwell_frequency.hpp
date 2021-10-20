@@ -68,15 +68,21 @@ class SeqsMaxwellFrequencySolver {
   mfem::ParFiniteElementSpace *Bspace_;
 
   mfem::Array<int> h1_ess_tdof_list_;
+  mfem::Array<int> hcurl_ess_tdof_list_;
   mfem::Array<int> port_0_;
   mfem::Array<int> port_1_;
 
   mfem::Array<int> psi_ess_tdof_list_;
 
   mfem::PWConstCoefficient *rel_sig_; /**< Relative conductivity = sigma/sigma0 */
-  mfem::PWConstCoefficient *rel_eps_; /**< Relative permeability = eps/eps0 */
+  mfem::PWConstCoefficient *rel_eps_; /**< Relative permittivity = eps/eps0 */
+  mfem::PWConstCoefficient *rel_mui_; /**< Inverse relative permeability = mu0/mu */
   mfem::PWConstCoefficient *rel_eps_nc_; /**< Relative permeability = eps/eps0 (for non-conducting domains)*/
+  mfem::PWConstCoefficient *S_eta2_; /**< */
+  mfem::PWConstCoefficient *S_eta2_reg_; /**< */
   mfem::ConstantCoefficient *one_over_sigma_; /**< 1/(non-dim conductivity) = omega*eps0/sigma0 */
+  mfem::ConstantCoefficient *eta_squared_;    /**< (non-dim freq)*(non-dim freq) = (omega^2 ell^2)/(c^2) */
+  mfem::ConstantCoefficient *neg_eta_squared_;    /**< -1.0*eta_squared_ */
 
   mfem::ParGridFunction *phi_real_;
   mfem::ParGridFunction *phi_imag_;
@@ -86,11 +92,22 @@ class SeqsMaxwellFrequencySolver {
   mfem::ParGridFunction *V0_;
   mfem::ParGridFunction *V1_;
 
+  mfem::ParGridFunction *phi_tot_real_;
+  mfem::ParGridFunction *phi_tot_imag_;
+
+  mfem::ParGridFunction *A_real_;
+  mfem::ParGridFunction *A_imag_;
+  mfem::ParGridFunction *n_real_;
+  mfem::ParGridFunction *n_imag_;
+
   // Solve for the electric potential
   void SolveSEQS();
 
   // Solve for the magnetic vector potential
-  void SolveMaxwell();
+  void SolveStabMaxwell();
+
+  // Write paraview data
+  void WriteParaview();
 
  public:
   SeqsMaxwellFrequencySolver(mfem::MPI_Session &mpi, ElectromagneticOptions em_opts);
