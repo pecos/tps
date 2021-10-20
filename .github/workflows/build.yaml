@@ -19,6 +19,10 @@ jobs:
        options: --user 1001 --privileged
      name: Code style
      steps:
+       - name: Cancel previous runs
+         uses: styfle/cancel-workflow-action@0.9.0
+         with:
+           access_token: ${{ github.token }}
        - name: Checkout code
          uses: actions/checkout@v2
        - name: Bootstrap
@@ -34,6 +38,10 @@ jobs:
        options: --user 1001 --privileged
      name: Build/CPU
      steps:
+       - name: Cancel previous runs
+         uses: styfle/cancel-workflow-action@0.9.0
+         with:
+           access_token: ${{ github.token }}     
        - name: Checkout code
          uses: actions/checkout@v2
          with:
@@ -63,6 +71,10 @@ jobs:
       MFEM_LIB: /home/karl/sw/mfem-gpu-4.2/lib
       MFEM_INC: /home/karl/sw/mfem-gpu-4.2/include
     steps:
+      - name: Cancel previous runs
+        uses: styfle/cancel-workflow-action@0.9.0
+        with:
+          access_token: ${{ github.token }}    
       - name: Checkout code
         uses: actions/checkout@v2
         with:
@@ -86,6 +98,10 @@ jobs:
       MFEM_LIB: /home/karl/sw/mfem-hip-4.3/lib
       MFEM_INC: /home/karl/sw/mfem-hip-4.3/include
     steps:
+      - name: Cancel previous runs
+        uses: styfle/cancel-workflow-action@0.9.0
+        with:
+          access_token: ${{ github.token }}    
       - name: Checkout code
         uses: actions/checkout@v2
         with:

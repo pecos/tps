@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([tps], [1.0 (dev)], [https://github.com/pecos/tps])
+AC_INIT([tps], [1.0], [https://github.com/pecos/tps])
 AC_CONFIG_SRCDIR([src/main.cpp])
 AC_CONFIG_HEADERS([tps_config.h])
 AC_CONFIG_AUX_DIR([build-aux])
@@ -26,6 +26,8 @@ CXXFLAGS="-std=c++11 $CXXFLAGS"
 # 3rd party libraries
 AX_PATH_GRVY([0.32],[yes])
 AX_PATH_HDF5([1.8.0],[yes])
+
+
 
 #AC_PROG_LIBTOOL
 AC_PROG_RANLIB
@@ -158,6 +160,16 @@ AM_CONDITIONAL(HIP_ENABLED,test x$ENABLE_HIP = xyes)
 #--
 
 AC_OUTPUT([Makefile src/Makefile test/Makefile utils/Makefile])
+
+# create soft link to local bats binary in tests/
+AC_MSG_NOTICE([Bootstrapping local bats test configuration])
+if test -d test ; then
+  if test ! -e test/bats ; then
+     if test ! -L test/bats; then
+        ln -s $srcdir/../utils/bats/bin/bats test/bats
+     fi
+  fi
+fi
 
 # Final summary
 AX_SUMMARIZE_CONFIG

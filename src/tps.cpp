@@ -49,10 +49,9 @@ void tps::PrintHeader() {
     grvy_printf(ginfo, "    | |  |  ___/ \\___ \\ \n");
     grvy_printf(ginfo, "    | |  | |     ____) | \n");
     grvy_printf(ginfo, "    |_|  |_|    |_____/ \n\n");
-    grvy_printf(ginfo, "TPS Version:  %s\n", PACKAGE_VERSION);
+    grvy_printf(ginfo, "TPS Version:  %s (%s)\n", PACKAGE_VERSION, BUILD_DEVSTATUS);
     grvy_printf(ginfo, "Git Version:  %s\n", BUILD_VERSION);
     grvy_printf(ginfo, "MFEM Version: %s\n", mfem::GetVersionStr());
     grvy_printf(ginfo, "------------------------------------\n\n");
   }
 }
-
