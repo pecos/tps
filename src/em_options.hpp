@@ -68,6 +68,10 @@ class ElectromagneticOptions {
   mfem::Array<int> neumann_bc_attr;    /**< List of boundary attributes corresponding to Neumann boundary */
   double nd_conductivity;  /**< Non-dimensional conductivity: \frac{\sigma_0}{\omega \epsilon_0} */
   double nd_frequency;     /**< Non-dimensional frequency: \frac{\omega \ell}{c} */
+  int port0;
+  int port1;
+  double Vstat0_real;
+  double Vstat1_real;
 
   ElectromagneticOptions()
     :
@@ -78,7 +82,9 @@ class ElectromagneticOptions {
     yinterp_min(0.0), yinterp_max(1.0),
     top_only(false), bot_only(false),
     conductor_domains(0), neumann_bc_attr(0),
-    nd_conductivity(1e6), nd_frequency(0.001)
+    nd_conductivity(1e6), nd_frequency(0.001),
+    port0(0), port1(1),
+    Vstat0_real(1.0), Vstat1_real(0.0)
   { }
 
   void AddElectromagneticOptions(mfem::OptionsParser &args) {
@@ -117,6 +123,14 @@ class ElectromagneticOptions {
                    "Non-dimensional conductivity, sigma_0/(omega*epsilon_0) (SEQS solver only)");
     args.AddOption(&nd_frequency, "-f", "--eta",
                    "Non-dimensional (angular) frequency, (omega*ell)/c (SEQS solver only)");
+    args.AddOption(&port0, "-p0", "--port0",
+                   "Boundary attribute of port 0 (SEQS solver only)");
+    args.AddOption(&port1, "-p1", "--port1",
+                   "Boundary attribute of port 1 (SEQS solver only)");
+    args.AddOption(&Vstat0_real, "-Vs0r", "--Vstat0real",
+                   "Voltage (real) at port 0 (SEQS solver only)");
+    args.AddOption(&Vstat1_real, "-Vs1r", "--Vstat1real",
+                   "Voltage (real) at port 1 (SEQS solver only)");
   }
 
   void print(std::ostream &out) {
@@ -154,6 +168,8 @@ class ElectromagneticOptions {
       out << ") " << std::endl;
       out << "    nd_conductivity = " << nd_conductivity << std::endl;
       out << "    nd_frequency    = " << nd_frequency << std::endl;
+      out << "    port0           = " << port0 << std::endl;
+      out << "    port1           = " << port1 << std::endl;
     }
     out << std::endl;
   }

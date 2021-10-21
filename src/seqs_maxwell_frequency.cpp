@@ -212,14 +212,14 @@ void SeqsMaxwellFrequencySolver::Initialize() {
 
   pspace_->GetEssentialTrueDofs(ess_bdr, h1_ess_tdof_list_);
 
-  // TODO(trevilo): Make these user-specified inputs
+  // Set the boundary indicators for the ports
   port_0_.SetSize(pmesh_->bdr_attributes.Max());
   port_0_ = 0;
-  port_0_[2] = 1;
+  port_0_[em_opt_.port0-1] = 1;
 
   port_1_.SetSize(pmesh_->bdr_attributes.Max());
   port_1_ = 0;
-  port_1_[1] = 1;
+  port_1_[em_opt_.port1-1] = 1;
 
   // Finally, get list of essential dofs for psi, which includes those
   // in the conductor as well as the phi Dirichlet dofs
@@ -297,8 +297,6 @@ void SeqsMaxwellFrequencySolver::SolveSEQS() {
   *psi_real_ = 0.0;
   *psi_imag_ = 0.0;
 
-  // Offset functions (e.g. \Phi_1 from Ostrowski and Hiptmair (eqn 5.2))
-  // TODO(trevilo): Assumed real and = 1 here... generalize!
   ConstantCoefficient one(1.0);
 
   V0_ = new ParGridFunction(pspace_);
@@ -325,21 +323,24 @@ void SeqsMaxwellFrequencySolver::SolveSEQS() {
     Kpp_real->AddDomainIntegrator(new DiffusionIntegrator(*rel_sig_));
     Kpp_real->Assemble();
     Kpp_real->Finalize();
-    Kpp_real->AddMult(*V0_, *bp_real, -1.0);
+    Kpp_real->AddMult(*V0_, *bp_real, -em_opt_.Vstat0_real);
+    Kpp_real->AddMult(*V1_, *bp_real, -em_opt_.Vstat1_real);
     delete Kpp_real;
 
     ParBilinearForm *Kpp_imag = new ParBilinearForm(pspace_);
     Kpp_imag->AddDomainIntegrator(new DiffusionIntegrator(*one_over_sigma_));
     Kpp_imag->Assemble();
     Kpp_imag->Finalize();
-    Kpp_imag->AddMult(*V0_, *bp_imag, -1.0);
+    Kpp_imag->AddMult(*V0_, *bp_imag, -em_opt_.Vstat0_real);
+    Kpp_imag->AddMult(*V1_, *bp_imag, -em_opt_.Vstat1_real);
     delete Kpp_imag;
 
     ParBilinearForm *Kss_real = new ParBilinearForm(pspace_);
     Kss_real->AddDomainIntegrator(new DiffusionIntegrator(*rel_eps_nc_));
     Kss_real->Assemble();
     Kss_real->Finalize();
-    Kss_real->AddMult(*V0_, *bs_real, -1.0);
+    Kss_real->AddMult(*V0_, *bs_real, -em_opt_.Vstat0_real);
+    Kss_real->AddMult(*V1_, *bs_real, -em_opt_.Vstat1_real);
     delete Kss_real;
   }
 
@@ -576,7 +577,9 @@ void SeqsMaxwellFrequencySolver::SolveSEQS() {
   // single function, which will be used by the magnetic vector
   // potential solve
   phi_tot_real_ = new ParGridFunction(pspace_);
-  *phi_tot_real_  = *V0_;
+  *phi_tot_real_ = 0.0;
+  add(*phi_tot_real_ , em_opt_.Vstat0_real, *V0_, *phi_tot_real_);
+  add(*phi_tot_real_ , em_opt_.Vstat1_real, *V1_, *phi_tot_real_);
   *phi_tot_real_ += *phi_real_;
   *phi_tot_real_ += *psi_real_;
 
