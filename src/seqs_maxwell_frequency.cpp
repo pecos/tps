@@ -82,9 +82,18 @@ SeqsMaxwellFrequencySolver::SeqsMaxwellFrequencySolver(MPI_Session &mpi, Electro
   A_imag_ = NULL;
   n_real_ = NULL;
   n_imag_ = NULL;
+
+  B_real_ = NULL;
+  B_imag_ = NULL;
+  E_real_ = NULL;
+  E_imag_ = NULL;
 }
 
 SeqsMaxwellFrequencySolver::~SeqsMaxwellFrequencySolver() {
+  delete E_imag_;
+  delete E_real_;
+  delete B_imag_;
+  delete B_real_;
   delete n_imag_;
   delete n_real_;
   delete A_imag_;
@@ -268,6 +277,8 @@ void SeqsMaxwellFrequencySolver::Initialize() {
 void SeqsMaxwellFrequencySolver::Solve() {
   SolveSEQS();
   SolveStabMaxwell();
+  EvaluateEandB();
+  EvaluateCurrent();
   WriteParaview();
 }
 
@@ -787,7 +798,7 @@ void SeqsMaxwellFrequencySolver::SolveStabMaxwell() {
     BDP.SetDiagonalBlock(3, Pnni);
     BDP.owns_blocks = 1;
 
-    // 13. Solve the thing (finally!)
+    // Solve the thing (finally!)
     FGMRESSolver solver(MPI_COMM_WORLD);
     solver.SetPreconditioner(BDP);
     solver.SetOperator(*maxwellOp);
@@ -805,6 +816,163 @@ void SeqsMaxwellFrequencySolver::SolveStabMaxwell() {
   }
 }
 
+void SeqsMaxwellFrequencySolver::EvaluateEandB() {
+  bool verbose = mpi_.Root();
+  if (verbose) grvy_printf(ginfo, "Evaluating the magnetic field.\n");
+
+  assert(A_real_ != NULL);
+  assert(A_imag_ != NULL);
+
+  // First, we evaluate the B field, which is the curl of the magnetic
+  // vector potential.  The full magnetic vector potential is given by
+  // A + grad(n).  Thus, B = curl(A + grad(n)) = curl(A).
+  B_real_ = new ParGridFunction(Bspace_);
+  *B_real_ = 0;
+
+  B_imag_ = new ParGridFunction(Bspace_);
+  *B_imag_ = 0;
+
+  ParDiscreteLinearOperator *curl = new ParDiscreteLinearOperator(Aspace_, Bspace_);
+  curl->AddDomainInterpolator(new CurlInterpolator);
+  curl->Assemble();
+  curl->Finalize();
+
+  curl->Mult(*A_real_, *B_real_);
+  curl->Mult(*A_imag_, *B_imag_);
+
+  delete curl;
+
+  if (verbose) grvy_printf(ginfo, "Evaluating the electric field.\n");
+  assert(phi_tot_real_ != NULL);
+  assert(phi_tot_imag_ != NULL);
+  assert(n_real_ != NULL);
+  assert(n_imag_ != NULL);
+
+  // Second, we evaluate the E field, which is the opposite of the
+  // gradient of the electric potential minus the time derivative of
+  // the magnetic vector potential:
+  //
+  // E = -grad(phi_tot) - dA_tot/dt,
+  //
+  // where phi_tot and A_tot are the "total" potentials (i.e. phi_tot
+  // = phi+psi+V_0+V_1) and (A_tot = A + grad(n)).  In the frequency
+  // domain, we have
+  //
+  // E = -grad(phi_tot) - j*omega*A_tot.
+  //
+  // After non-dimensionalizing, this becomes
+  //
+  // E = -grad(phi_tot) - j*A_tot,
+  //
+  // such that
+  //
+  // E_real = -grad(phi_tot_real) + A_tot_imag
+  // E_imag = -grad(phi_tot_imag) - A_tot_real
+  E_real_ = new ParGridFunction(Aspace_);
+  *E_real_ = 0;
+
+  E_imag_ = new ParGridFunction(Aspace_);
+  *E_imag_ = 0;
+
+  ParDiscreteLinearOperator *grad = new ParDiscreteLinearOperator(pspace_, Aspace_);
+  grad->AddDomainInterpolator(new GradientInterpolator);
+  grad->Assemble();
+  grad->Finalize();
+
+  grad->AddMult(*phi_tot_real_, *E_real_, -1.0);
+  grad->AddMult(*phi_tot_imag_, *E_imag_, -1.0);
+
+  *E_real_ += *A_imag_;
+  *E_imag_ -= *A_real_;
+
+  grad->AddMult(*n_imag_, *E_real_, +1.0);
+  grad->AddMult(*n_real_, *E_imag_, -1.0);
+
+  delete grad;
+}
+
+void SeqsMaxwellFrequencySolver::EvaluateCurrent() {
+  bool verbose = mpi_.Root();
+  if (verbose) grvy_printf(ginfo, "Evaluating the current.\n");
+
+  ParLinearForm *bp_real = new ParLinearForm(pspace_);
+  *bp_real = 0.0;
+
+  ParLinearForm *bp_imag = new ParLinearForm(pspace_);
+  *bp_imag = 0.0;
+
+  // First, the "static" part
+  ParBilinearForm *Kpp_real = new ParBilinearForm(pspace_);
+  Kpp_real->AddDomainIntegrator(new DiffusionIntegrator(*rel_sig_));
+  Kpp_real->Assemble();
+  Kpp_real->Finalize();
+  Kpp_real->AddMult(*phi_tot_real_, *bp_real, 1.0);
+  Kpp_real->AddMult(*phi_tot_imag_, *bp_imag, 1.0);
+  delete Kpp_real;
+
+  ParBilinearForm *Kpp_imag = new ParBilinearForm(pspace_);
+  Kpp_imag->AddDomainIntegrator(new DiffusionIntegrator(*one_over_sigma_));
+  Kpp_imag->Assemble();
+  Kpp_imag->Finalize();
+  Kpp_imag->AddMult(*phi_tot_imag_, *bp_real, -1.0);
+  Kpp_imag->AddMult(*phi_tot_real_, *bp_imag,  1.0);
+  delete Kpp_imag;
+
+  // call operator() for linear forms
+  const double I_stat_real = (*bp_real)(*V0_);
+  const double I_stat_imag = (*bp_imag)(*V0_);
+
+  if (verbose) grvy_printf(ginfo, "I_stat_real = %.8e\n", I_stat_real);
+  if (verbose) grvy_printf(ginfo, "I_stat_imag = %.8e\n", I_stat_imag);
+
+  // these linear forms are re-used, so zero them out
+  *bp_real = 0.0;
+  *bp_imag = 0.0;
+
+
+  // Second, the "induced" part
+  ParMixedBilinearForm *Kna_imag = new ParMixedBilinearForm(Aspace_, pspace_);
+  Kna_imag->AddDomainIntegrator(new VectorFEWeakDivergenceIntegrator(*rel_sig_));  // should be -sigma
+  Kna_imag->Assemble();
+  Kna_imag->Finalize();
+
+  Kna_imag->AddMult(*A_real_, *bp_imag, -1.0);  // sign flip accounts for -sigma (see above)
+  Kna_imag->AddMult(*A_imag_, *bp_real,  1.0);  // sign flip accounts for -sigma (see above)
+
+  ParMixedBilinearForm *Kna_real = new ParMixedBilinearForm(Aspace_, pspace_);
+  Kna_real->AddDomainIntegrator(new VectorFEWeakDivergenceIntegrator(*one_over_sigma_));  // should be -1/sigma
+  Kna_real->Assemble();
+  Kna_real->Finalize();
+
+  Kna_real->AddMult(*A_real_, *bp_real, 1.0);  // sign flip accounts for -1/sigma (see above)
+  Kna_real->AddMult(*A_imag_, *bp_imag, 1.0);  // sign flip accounts for -1/sigma (see above)
+
+  ParBilinearForm *Knn_real = new ParBilinearForm(pspace_);
+  Knn_real->AddDomainIntegrator(new DiffusionIntegrator(*one_over_sigma_));
+  Knn_real->Assemble();
+  Knn_real->Finalize();
+
+  Knn_real->AddMult(*n_real_, *bp_real, -1.0);
+  Knn_real->AddMult(*n_imag_, *bp_imag, -1.0);
+
+  ParBilinearForm *Knn_imag = new ParBilinearForm(pspace_);
+  Knn_imag->AddDomainIntegrator(new DiffusionIntegrator(*rel_sig_));
+  Knn_imag->Assemble();
+  Knn_imag->Finalize();
+
+  Knn_imag->AddMult(*n_real_, *bp_imag,  1.0);
+  Knn_imag->AddMult(*n_imag_, *bp_real, -1.0);
+
+  const double I_ind_real = (*bp_real)(*V0_);
+  const double I_ind_imag = (*bp_imag)(*V0_);
+
+  if (verbose) grvy_printf(ginfo, "I_ind_real  = %.8e\n", I_ind_real);
+  if (verbose) grvy_printf(ginfo, "I_ind_imag  = %.8e\n", I_ind_imag);
+
+  if (verbose) grvy_printf(ginfo, "I_tot_real  = %.8e\n", I_stat_real + I_ind_real);
+  if (verbose) grvy_printf(ginfo, "I_tot_imag  = %.8e\n", I_stat_imag + I_ind_imag);
+}
+
 void SeqsMaxwellFrequencySolver::WriteParaview() {
   bool verbose = mpi_.Root();
   if (verbose) grvy_printf(ginfo, "Writing Maxwell solution to paraview output.\n");
@@ -815,9 +983,13 @@ void SeqsMaxwellFrequencySolver::WriteParaview() {
   paraview_dc.SetDataFormat(VTKFormat::BINARY);
   paraview_dc.SetHighOrderOutput(true);
   paraview_dc.SetTime(0.0);
-  paraview_dc.RegisterField("phi_tot_real", phi_tot_real_);
-  paraview_dc.RegisterField("phi_tot_imag", phi_tot_imag_);
-  paraview_dc.RegisterField("A_real", A_real_);
-  paraview_dc.RegisterField("A_imag", A_imag_);
+  // paraview_dc.RegisterField("phi_tot_real", phi_tot_real_);
+  // paraview_dc.RegisterField("phi_tot_imag", phi_tot_imag_);
+  // paraview_dc.RegisterField("A_real", A_real_);
+  // paraview_dc.RegisterField("A_imag", A_imag_);
+  paraview_dc.RegisterField("E_real", E_real_);
+  paraview_dc.RegisterField("E_imag", E_imag_);
+  paraview_dc.RegisterField("B_real", B_real_);
+  paraview_dc.RegisterField("B_imag", B_imag_);
   paraview_dc.Save();
 }

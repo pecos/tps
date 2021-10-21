@@ -100,11 +100,22 @@ class SeqsMaxwellFrequencySolver {
   mfem::ParGridFunction *n_real_;
   mfem::ParGridFunction *n_imag_;
 
+  mfem::ParGridFunction *B_real_;
+  mfem::ParGridFunction *B_imag_;
+  mfem::ParGridFunction *E_real_;
+  mfem::ParGridFunction *E_imag_;
+
   // Solve for the electric potential
   void SolveSEQS();
 
   // Solve for the magnetic vector potential
   void SolveStabMaxwell();
+
+  // Evaluate electric and magnetic fields
+  void EvaluateEandB();
+
+  // Evaluate the current
+  void EvaluateCurrent();
 
   // Write paraview data
   void WriteParaview();
