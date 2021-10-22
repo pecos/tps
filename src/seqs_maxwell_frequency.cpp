@@ -816,6 +816,21 @@ void SeqsMaxwellFrequencySolver::SolveStabMaxwell() {
     A_imag_->Distribute(&(X.GetBlock(1)));
     n_real_->Distribute(&(X.GetBlock(2)));
     n_imag_->Distribute(&(X.GetBlock(3)));
+
+    // clean up
+    delete Knn_pre;
+    delete Kaa_pre;
+    delete maxwellOp;
+    delete Knn_real;
+    delete Kna_real;
+    delete Kan_real;
+    delete Kan_imag;
+    delete Kaa_imag;
+    delete Kaa_real;
+    delete bA_real;
+    delete bA_imag;
+    delete bn_imag;
+    delete bn_real;
   }
 }
 
@@ -941,6 +956,7 @@ void SeqsMaxwellFrequencySolver::EvaluateCurrent() {
 
   Kna_imag->AddMult(*A_real_, *bp_imag, -1.0);  // sign flip accounts for -sigma (see above)
   Kna_imag->AddMult(*A_imag_, *bp_real,  1.0);  // sign flip accounts for -sigma (see above)
+  delete Kna_imag;
 
   ParMixedBilinearForm *Kna_real = new ParMixedBilinearForm(Aspace_, pspace_);
   Kna_real->AddDomainIntegrator(new VectorFEWeakDivergenceIntegrator(*one_over_sigma_));  // should be -1/sigma
@@ -949,6 +965,7 @@ void SeqsMaxwellFrequencySolver::EvaluateCurrent() {
 
   Kna_real->AddMult(*A_real_, *bp_real, 1.0);  // sign flip accounts for -1/sigma (see above)
   Kna_real->AddMult(*A_imag_, *bp_imag, 1.0);  // sign flip accounts for -1/sigma (see above)
+  delete Kna_real;
 
   ParBilinearForm *Knn_real = new ParBilinearForm(pspace_);
   Knn_real->AddDomainIntegrator(new DiffusionIntegrator(*one_over_sigma_));
@@ -957,6 +974,7 @@ void SeqsMaxwellFrequencySolver::EvaluateCurrent() {
 
   Knn_real->AddMult(*n_real_, *bp_real, -1.0);
   Knn_real->AddMult(*n_imag_, *bp_imag, -1.0);
+  delete Knn_real;
 
   ParBilinearForm *Knn_imag = new ParBilinearForm(pspace_);
   Knn_imag->AddDomainIntegrator(new DiffusionIntegrator(*rel_sig_));
@@ -965,9 +983,13 @@ void SeqsMaxwellFrequencySolver::EvaluateCurrent() {
 
   Knn_imag->AddMult(*n_real_, *bp_imag,  1.0);
   Knn_imag->AddMult(*n_imag_, *bp_real, -1.0);
+  delete Knn_imag;
 
   const double I_ind_real = (*bp_real)(*V0_);
   const double I_ind_imag = (*bp_imag)(*V0_);
+
+  delete bp_imag;
+  delete bp_real;
 
   if (verbose) grvy_printf(ginfo, "I_ind_real  = %.8e\n", I_ind_real);
   if (verbose) grvy_printf(ginfo, "I_ind_imag  = %.8e\n", I_ind_imag);
