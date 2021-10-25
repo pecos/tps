@@ -72,6 +72,8 @@ class ElectromagneticOptions {
   int port1;
   double Vstat0_real;
   double Vstat1_real;
+  double Vstat0_imag;
+  double Vstat1_imag;
 
   ElectromagneticOptions()
     :
@@ -84,7 +86,8 @@ class ElectromagneticOptions {
     conductor_domains(0), neumann_bc_attr(0),
     nd_conductivity(1e6), nd_frequency(0.001),
     port0(0), port1(1),
-    Vstat0_real(1.0), Vstat1_real(0.0)
+    Vstat0_real(1.0), Vstat1_real(0.0),
+    Vstat0_imag(0.0), Vstat1_imag(0.0)
   { }
 
   void AddElectromagneticOptions(mfem::OptionsParser &args) {
@@ -131,6 +134,10 @@ class ElectromagneticOptions {
                    "Voltage (real) at port 0 (SEQS solver only)");
     args.AddOption(&Vstat1_real, "-Vs1r", "--Vstat1real",
                    "Voltage (real) at port 1 (SEQS solver only)");
+    args.AddOption(&Vstat0_imag, "-Vs0i", "--Vstat0imag",
+                   "Voltage (imaginary) at port 0 (SEQS solver only)");
+    args.AddOption(&Vstat1_imag, "-Vs1i", "--Vstat1imag",
+                   "Voltage (imaginary) at port 1 (SEQS solver only)");
   }
 
   void print(std::ostream &out) {
@@ -170,6 +177,8 @@ class ElectromagneticOptions {
       out << "    nd_frequency    = " << nd_frequency << std::endl;
       out << "    port0           = " << port0 << std::endl;
       out << "    port1           = " << port1 << std::endl;
+      out << "    V0              = " << Vstat0_real << " + " << Vstat0_imag << " *1j" << std::endl;
+      out << "    V1              = " << Vstat1_real << " + " << Vstat1_imag << " *1j" << std::endl;
     }
     out << std::endl;
   }

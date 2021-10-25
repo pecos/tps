@@ -7,19 +7,27 @@ setup() {
     MESH_FILE=meshes/simple_bar.msh
     CMD_LINE="--em-only -seqs -m $MESH_FILE --rtol 1e-12 --atol 1e-15 --maxiter 200"
     CMD_LINE="$CMD_LINE -cd 1 -nbc 4 -p0 3 -p1 5"
-    CMD_LINE="$CMD_LINE -s 1e8 -f 0.0001 -Vs0r 1.0 -Vs1r -1.0"
+    CMD_LINE_REAL="$CMD_LINE -s 1e8 -f 0.0001 -Vs0r 1.0 -Vs1r -1.0"
+    CMD_LINE_IMAG="$CMD_LINE -s 1e8 -f 0.0001 -Vs0r 0.0 -Vs0i 1.0 -Vs1r 0.0 -Vs1i -1.0"
 }
 
 @test "[$TEST] verify tps SEQS Maxwell solver runs with np = 1" {
     test -s $MESH_FILE
-    run mpirun -np 1 ../src/tps $CMD_LINE
+    run mpirun -np 1 ../src/tps $CMD_LINE_REAL
     [[ "${status}" -eq 0 ]]
     [[ "${output}" =~ "I_tot_real  = 1.54692270e-02" ]]
 }
 
 @test "[$TEST] verify tps SEQS Maxwell solver runs with np = 4" {
     test -s $MESH_FILE
-    run mpirun -np 4 ../src/tps $CMD_LINE
+    run mpirun -np 4 ../src/tps $CMD_LINE_REAL
     [[ "${status}" -eq 0 ]]
     [[ "${output}" =~ "I_tot_real  = 1.54692270e-02" ]]
+}
+
+@test "[$TEST] verify tps SEQS Maxwell solver runs with imaginary drive voltage" {
+    test -s $MESH_FILE
+    run mpirun -np 4 ../src/tps $CMD_LINE_IMAG
+    [[ "${status}" -eq 0 ]]
+    [[ "${output}" =~ "I_tot_imag  = 1.54692270e-02" ]]
 }

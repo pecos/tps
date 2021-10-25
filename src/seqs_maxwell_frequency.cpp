@@ -72,8 +72,11 @@ SeqsMaxwellFrequencySolver::SeqsMaxwellFrequencySolver(MPI_Session &mpi, Electro
   psi_real_ = NULL;
   psi_imag_ = NULL;
 
-  V0_ = NULL;
-  V1_ = NULL;
+  V0_real_ = NULL;
+  V1_real_ = NULL;
+
+  V0_imag_ = NULL;
+  V1_imag_ = NULL;
 
   phi_tot_real_ = NULL;
   phi_tot_imag_ = NULL;
@@ -100,8 +103,10 @@ SeqsMaxwellFrequencySolver::~SeqsMaxwellFrequencySolver() {
   delete A_real_;
   delete phi_tot_real_;
   delete phi_tot_imag_;
-  delete V1_;
-  delete V0_;
+  delete V1_imag_;
+  delete V0_imag_;
+  delete V1_real_;
+  delete V0_real_;
   delete psi_imag_;
   delete psi_real_;
   delete phi_imag_;
@@ -299,13 +304,21 @@ void SeqsMaxwellFrequencySolver::SolveSEQS() {
 
   ConstantCoefficient one(1.0);
 
-  V0_ = new ParGridFunction(pspace_);
-  *V0_ = 0.0;
-  V0_->ProjectBdrCoefficient(one, port_0_);
+  V0_real_ = new ParGridFunction(pspace_);
+  *V0_real_ = 0.0;
+  V0_real_->ProjectBdrCoefficient(one, port_0_);
 
-  V1_ = new ParGridFunction(pspace_);
-  *V1_ = 0.0;
-  V1_->ProjectBdrCoefficient(one, port_1_);
+  V0_imag_ = new ParGridFunction(pspace_);
+  *V0_imag_ = 0.0;
+  V0_imag_->ProjectBdrCoefficient(one, port_0_);
+
+  V1_real_ = new ParGridFunction(pspace_);
+  *V1_real_ = 0.0;
+  V1_real_->ProjectBdrCoefficient(one, port_1_);
+
+  V1_imag_ = new ParGridFunction(pspace_);
+  *V1_imag_ = 0.0;
+  V1_imag_->ProjectBdrCoefficient(one, port_1_);
 
   if (verbose) grvy_printf(ginfo, "... Initializing right hand side.\n");
   ParLinearForm *bp_real = new ParLinearForm(pspace_);
@@ -323,24 +336,30 @@ void SeqsMaxwellFrequencySolver::SolveSEQS() {
     Kpp_real->AddDomainIntegrator(new DiffusionIntegrator(*rel_sig_));
     Kpp_real->Assemble();
     Kpp_real->Finalize();
-    Kpp_real->AddMult(*V0_, *bp_real, -em_opt_.Vstat0_real);
-    Kpp_real->AddMult(*V1_, *bp_real, -em_opt_.Vstat1_real);
+    Kpp_real->AddMult(*V0_real_, *bp_real, -em_opt_.Vstat0_real);
+    Kpp_real->AddMult(*V1_real_, *bp_real, -em_opt_.Vstat1_real);
+    Kpp_real->AddMult(*V0_imag_, *bp_imag, -em_opt_.Vstat0_imag);
+    Kpp_real->AddMult(*V1_imag_, *bp_imag, -em_opt_.Vstat1_imag);
     delete Kpp_real;
 
     ParBilinearForm *Kpp_imag = new ParBilinearForm(pspace_);
     Kpp_imag->AddDomainIntegrator(new DiffusionIntegrator(*one_over_sigma_));
     Kpp_imag->Assemble();
     Kpp_imag->Finalize();
-    Kpp_imag->AddMult(*V0_, *bp_imag, -em_opt_.Vstat0_real);
-    Kpp_imag->AddMult(*V1_, *bp_imag, -em_opt_.Vstat1_real);
+    Kpp_imag->AddMult(*V0_real_, *bp_imag, -em_opt_.Vstat0_real);
+    Kpp_imag->AddMult(*V1_real_, *bp_imag, -em_opt_.Vstat1_real);
+    Kpp_imag->AddMult(*V0_imag_, *bp_real,  em_opt_.Vstat0_imag);
+    Kpp_imag->AddMult(*V1_imag_, *bp_real,  em_opt_.Vstat1_imag);
     delete Kpp_imag;
 
     ParBilinearForm *Kss_real = new ParBilinearForm(pspace_);
     Kss_real->AddDomainIntegrator(new DiffusionIntegrator(*rel_eps_nc_));
     Kss_real->Assemble();
     Kss_real->Finalize();
-    Kss_real->AddMult(*V0_, *bs_real, -em_opt_.Vstat0_real);
-    Kss_real->AddMult(*V1_, *bs_real, -em_opt_.Vstat1_real);
+    Kss_real->AddMult(*V0_real_, *bs_real, -em_opt_.Vstat0_real);
+    Kss_real->AddMult(*V1_real_, *bs_real, -em_opt_.Vstat1_real);
+    Kss_real->AddMult(*V0_imag_, *bs_imag, -em_opt_.Vstat0_imag);
+    Kss_real->AddMult(*V1_imag_, *bs_imag, -em_opt_.Vstat1_imag);
     delete Kss_real;
   }
 
@@ -578,13 +597,15 @@ void SeqsMaxwellFrequencySolver::SolveSEQS() {
   // potential solve
   phi_tot_real_ = new ParGridFunction(pspace_);
   *phi_tot_real_ = 0.0;
-  add(*phi_tot_real_ , em_opt_.Vstat0_real, *V0_, *phi_tot_real_);
-  add(*phi_tot_real_ , em_opt_.Vstat1_real, *V1_, *phi_tot_real_);
+  add(*phi_tot_real_ , em_opt_.Vstat0_real, *V0_real_, *phi_tot_real_);
+  add(*phi_tot_real_ , em_opt_.Vstat1_real, *V1_real_, *phi_tot_real_);
   *phi_tot_real_ += *phi_real_;
   *phi_tot_real_ += *psi_real_;
 
   phi_tot_imag_ = new ParGridFunction(pspace_);
   *phi_tot_imag_  = 0.0;
+  add(*phi_tot_imag_ , em_opt_.Vstat0_imag, *V0_imag_, *phi_tot_imag_);
+  add(*phi_tot_imag_ , em_opt_.Vstat1_imag, *V1_imag_, *phi_tot_imag_);
   *phi_tot_imag_ += *phi_imag_;
   *phi_tot_imag_ += *psi_imag_;
 
@@ -937,8 +958,8 @@ void SeqsMaxwellFrequencySolver::EvaluateCurrent() {
   delete Kpp_imag;
 
   // call operator() for linear forms
-  const double I_stat_real = (*bp_real)(*V0_);
-  const double I_stat_imag = (*bp_imag)(*V0_);
+  const double I_stat_real = (*bp_real)(*V0_real_);
+  const double I_stat_imag = (*bp_imag)(*V0_real_);
 
   if (verbose) grvy_printf(ginfo, "I_stat_real = %.8e\n", I_stat_real);
   if (verbose) grvy_printf(ginfo, "I_stat_imag = %.8e\n", I_stat_imag);
@@ -985,8 +1006,8 @@ void SeqsMaxwellFrequencySolver::EvaluateCurrent() {
   Knn_imag->AddMult(*n_imag_, *bp_real, -1.0);
   delete Knn_imag;
 
-  const double I_ind_real = (*bp_real)(*V0_);
-  const double I_ind_imag = (*bp_imag)(*V0_);
+  const double I_ind_real = (*bp_real)(*V0_real_);
+  const double I_ind_imag = (*bp_imag)(*V0_real_);
 
   delete bp_imag;
   delete bp_real;

@@ -89,8 +89,11 @@ class SeqsMaxwellFrequencySolver {
   mfem::ParGridFunction *psi_real_;
   mfem::ParGridFunction *psi_imag_;
 
-  mfem::ParGridFunction *V0_;
-  mfem::ParGridFunction *V1_;
+  mfem::ParGridFunction *V0_real_;
+  mfem::ParGridFunction *V1_real_;
+
+  mfem::ParGridFunction *V0_imag_;
+  mfem::ParGridFunction *V1_imag_;
 
   mfem::ParGridFunction *phi_tot_real_;
   mfem::ParGridFunction *phi_tot_imag_;
