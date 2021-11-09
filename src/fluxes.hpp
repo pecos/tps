@@ -140,19 +140,18 @@ class Fluxes {
     }
     MFEM_SYNC_THREAD;
   }
-  
-  
+
   static MFEM_HOST_DEVICE void viscousFlux_serial_gpu(double *vFlux, const double *Un, const double *gradUpn,
-                                               const double &gamma, const double &Rg, const double &viscMult,
-                                               const double &bulkViscMult, const double &Pr, 
-                                               const int &dim, const int &num_equation) {
+                                                      const double &gamma, const double &Rg, const double &viscMult,
+                                                      const double &bulkViscMult, const double &Pr, const int &dim,
+                                                      const int &num_equation) {
     double KE[3], vel[3], divV;
     double stress[3][3];
     double gradT[3];
 
-    for(int d=0;d<dim;d++) KE[d] = 0.;
-    for(int d=0;d<dim;d++) KE[d] = 0.5 * Un[1 + d] * Un[1 + d] / Un[0];
-    
+    for (int d = 0; d < dim; d++) KE[d] = 0.;
+    for (int d = 0; d < dim; d++) KE[d] = 0.5 * Un[1 + d] * Un[1 + d] / Un[0];
+
     for (int eq = 0; eq < num_equation; eq++) {
       for (int d = 0; d < dim; d++) vFlux[eq + d * num_equation] = 0.;
     }
@@ -172,7 +171,7 @@ class Fluxes {
 
       vel[i] = Un[1 + i] / Un[0];
     }
-    
+
     divV = 0.;
     for (int i = 0; i < dim; i++) divV += gradUpn[1 + i + i * num_equation];
 
@@ -185,7 +184,7 @@ class Fluxes {
         vFlux[num_equation - 1 + i * num_equation] += visc * vel[j] * stress[i][j];
       }
     }
-    
+
     for (int i = 0; i < dim; i++) {
       vFlux[num_equation - 1 + i * num_equation] += k * gradT[i];
     }

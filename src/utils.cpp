@@ -29,8 +29,11 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
+#include "utils.hpp"
+
 #include <sys/stat.h>
 #include <unistd.h>
+
 #include <array>
 #include <cstdio>
 #include <cstdlib>
@@ -38,8 +41,8 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+
 #include "M2ulPhyS.hpp"
-#include "utils.hpp"
 
 #ifdef HAVE_SLURM
 #include <slurm/slurm.h>

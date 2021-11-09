@@ -29,11 +29,13 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
+#include <unistd.h>
+
 #include <fstream>
 #include <iostream>
-#include <sstream>
-#include <unistd.h>
 #include <mfem.hpp>
+#include <sstream>
+
 #include "tps.hpp"
 
 int main(int argc, char *argv[]) {
@@ -46,8 +48,8 @@ int main(int argc, char *argv[]) {
   cout.precision(precision);
 
   OptionsParser args(argc, argv);
-  args.AddOption(&inputFile,  "-run", "--runFile", "Name of the input file with run options.");
-  args.AddOption(&showVersion, "-v",  "--version", "" , "--no-version", "Print code version and exit");
+  args.AddOption(&inputFile, "-run", "--runFile", "Name of the input file with run options.");
+  args.AddOption(&showVersion, "-v", "--version", "", "--no-version", "Print code version and exit");
 
   // device_config inferred from build setup
   std::string device_config = "cpu";
@@ -71,8 +73,7 @@ int main(int argc, char *argv[]) {
 
   // version info
   tps.PrintHeader();
-  if (showVersion)
-    exit(0);
+  if (showVersion) exit(0);
 
   if (mpi.Root()) args.PrintOptions(cout);
 
