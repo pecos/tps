@@ -138,7 +138,7 @@ class RunConfiguration {
   // from 0 to viscRatio from the plane defined by pointInit and
   // the plane defined by point0.
   linearlyVaryingVisc linViscData;
-  
+
   SpongeZoneData spongeData;
   void initSpongeData();
 

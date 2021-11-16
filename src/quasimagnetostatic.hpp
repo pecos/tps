@@ -34,6 +34,7 @@
 #define QUASIMAGNETOSTATIC_HPP_
 
 #include <tps_config.h>
+
 #include <iostream>
 #include <mfem.hpp>
 

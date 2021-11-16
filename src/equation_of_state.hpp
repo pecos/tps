@@ -70,7 +70,7 @@ class EquationOfState {
   void setBulkViscMult(double _bulk_mult) { bulk_visc_mult = _bulk_mult; }
 
   double ComputePressure(const Vector &state, int dim);
-  
+
   void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit, const int &dim, const int &num_equations);
   void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv, const int &dim, const int &num_equations);
 

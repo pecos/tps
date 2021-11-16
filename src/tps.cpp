@@ -33,7 +33,7 @@
 
 tps::tps(MPI_Session &mpi, int &argc, char **&argv) {
   nprocs_ = mpi.WorldSize();
-  rank_   = mpi.WorldRank();
+  rank_ = mpi.WorldRank();
   if (rank_ == 0)
     isRank0_ = true;
   else

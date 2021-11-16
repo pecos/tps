@@ -109,30 +109,27 @@ double EquationOfState::ComputeMaxCharSpeed(const Vector& state, const int dim) 
   return vel + sound;
 }
 
-void EquationOfState::GetConservativesFromPrimitives(const Vector& primit, Vector& conserv, const int& dim,const int &num_equations)
-{
+void EquationOfState::GetConservativesFromPrimitives(const Vector& primit, Vector& conserv, const int& dim,
+                                                     const int& num_equations) {
   conserv = primit;
-  
+
   double v2 = 0.;
-  for(int d=0;d<dim;d++){
-    v2 += primit[1+d];
-    conserv[1+d] *= primit[0];
+  for (int d = 0; d < dim; d++) {
+    v2 += primit[1 + d];
+    conserv[1 + d] *= primit[0];
   }
-  conserv[num_equations-1] = primit[num_equations-1]/(specific_heat_ratio-1.)+0.5*primit[0]*v2;
-  
+  conserv[num_equations - 1] = primit[num_equations - 1] / (specific_heat_ratio - 1.) + 0.5 * primit[0] * v2;
 }
 
-void EquationOfState::GetPrimitivesFromConservatives(const Vector& conserv, Vector& primit, const int& dim, const int &num_equations)
-{
-  double p = ComputePressure(conserv,dim);
+void EquationOfState::GetPrimitivesFromConservatives(const Vector& conserv, Vector& primit, const int& dim,
+                                                     const int& num_equations) {
+  double p = ComputePressure(conserv, dim);
   primit = conserv;
-  
-  for(int d=0;d<dim;d++) primit[1+d] /= conserv[0];
-  
-  primit[num_equations-1] = p;
+
+  for (int d = 0; d < dim; d++) primit[1 + d] /= conserv[0];
+
+  primit[num_equations - 1] = p;
 }
-
-
 
 // GPU FUNCTIONS
 /*#ifdef _GPU_

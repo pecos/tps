@@ -30,12 +30,14 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 
+#include "quasimagnetostatic.hpp"
+
 #include <grvy.h>
 #include <hdf5.h>
+
 #include "../utils/mfem_extras/pfem_extras.hpp"
 #include "logger.hpp"
 #include "utils.hpp"
-#include "quasimagnetostatic.hpp"
 
 using namespace mfem;
 using namespace mfem::common;
@@ -43,27 +45,25 @@ using namespace mfem::common;
 void JFun(const Vector &x, Vector &f);
 
 QuasiMagnetostaticSolver::QuasiMagnetostaticSolver(MPI_Session &mpi, ElectromagneticOptions em_opts)
-  :
-  _mpi(mpi),
-  _em_opts(em_opts) {
+    : _mpi(mpi), _em_opts(em_opts) {
   // dump options to screen for user inspection
   if (_mpi.Root()) {
     _em_opts.print(std::cout);
   }
 
-  _pmesh  = NULL;
-  _hcurl  = NULL;
-  _h1     = NULL;
-  _hdiv   = NULL;
+  _pmesh = NULL;
+  _hcurl = NULL;
+  _h1 = NULL;
+  _hdiv = NULL;
   _Aspace = NULL;
   _pspace = NULL;
   _Bspace = NULL;
-  _K      = NULL;
-  _A      = NULL;
-  _B      = NULL;
+  _K = NULL;
+  _A = NULL;
+  _B = NULL;
 
   _operator_initialized = false;
-  _current_initialized  = false;
+  _current_initialized = false;
 }
 
 QuasiMagnetostaticSolver::~QuasiMagnetostaticSolver() {
@@ -116,12 +116,12 @@ void QuasiMagnetostaticSolver::Initialize() {
   // 2) Prepare the required finite elements
   //-----------------------------------------------------
   _hcurl = new ND_FECollection(_em_opts.order, _dim);
-  _h1    = new H1_FECollection(_em_opts.order, _dim);
-  _hdiv  = new RT_FECollection(_em_opts.order-1, _dim);
+  _h1 = new H1_FECollection(_em_opts.order, _dim);
+  _hdiv = new RT_FECollection(_em_opts.order - 1, _dim);
 
   _Aspace = new ParFiniteElementSpace(_pmesh, _hcurl);
-  _pspace = new ParFiniteElementSpace(_pmesh, _h1   );
-  _Bspace = new ParFiniteElementSpace(_pmesh, _hdiv );
+  _pspace = new ParFiniteElementSpace(_pmesh, _h1);
+  _Bspace = new ParFiniteElementSpace(_pmesh, _hdiv);
 
   //-----------------------------------------------------
   // 3) Get BC dofs (everything is essential---i.e., PEC)
@@ -184,18 +184,17 @@ void QuasiMagnetostaticSolver::InitializeCurrent() {
   // 2) Build a discretely divergence-free approximation of the source
   // current that lives in the Nedelec FE space defined in
   // Initialize()
-  ParGridFunction* Jorig = new ParGridFunction(_Aspace);
-  ParGridFunction* Jproj = new ParGridFunction(_Aspace);
+  ParGridFunction *Jorig = new ParGridFunction(_Aspace);
+  ParGridFunction *Jproj = new ParGridFunction(_Aspace);
 
   _r = new ParLinearForm(_Aspace);
 
   int irOrder = _pspace->GetElementTransformation(0)->OrderW() + 2 * _em_opts.order;
-  ParDiscreteGradOperator* grad = new ParDiscreteGradOperator(_pspace, _Aspace);
+  ParDiscreteGradOperator *grad = new ParDiscreteGradOperator(_pspace, _Aspace);
   grad->Assemble();
   grad->Finalize();
 
-  DivergenceFreeProjector* div_free =
-    new DivergenceFreeProjector(*_pspace, *_Aspace, irOrder, NULL, NULL, grad);
+  DivergenceFreeProjector *div_free = new DivergenceFreeProjector(*_pspace, *_Aspace, irOrder, NULL, NULL, grad);
 
   // This call (i.e., GlobalProjectDiscCoefficient) replaces the
   // functionality of Jorig->ProjectCoefficient(current) in a way that
@@ -218,7 +217,7 @@ void QuasiMagnetostaticSolver::InitializeCurrent() {
   delete Jorig;
 
   // 3) Multiply by the mass matrix to get the RHS vector
-  ParBilinearForm* mass = new ParBilinearForm(_Aspace);
+  ParBilinearForm *mass = new ParBilinearForm(_Aspace);
   mass->AddDomainIntegrator(new VectorFEMassIntegrator);
   mass->Assemble();
   mass->Finalize();
@@ -238,7 +237,6 @@ void QuasiMagnetostaticSolver::Solve() {
   assert(_operator_initialized && _current_initialized);
 
   // Solve for the magnetic vector potential and magnetic field in 3 steps
-
 
   // 1) Solve the curl(curl(A)) = J for magnetic vector potential
   //    using operators set up by Initialize() and InitializeCurrent()
@@ -309,11 +307,11 @@ void QuasiMagnetostaticSolver::InterpolateToYAxis() const {
   // Set up array of points (on all ranks)
   DenseMatrix phys_points(_dim, _em_opts.nBy);
 
-  const double dy = (_em_opts.yinterp_max - _em_opts.yinterp_min)/(_em_opts.nBy-1);
+  const double dy = (_em_opts.yinterp_max - _em_opts.yinterp_min) / (_em_opts.nBy - 1);
 
   for (int ipt = 0; ipt < _em_opts.nBy; ipt++) {
     phys_points(0, ipt) = 0.0;
-    phys_points(1, ipt) = _em_opts.yinterp_min + ipt*dy;
+    phys_points(1, ipt) = _em_opts.yinterp_min + ipt * dy;
     phys_points(2, ipt) = 0.0;
   }
 
@@ -395,16 +393,18 @@ void QuasiMagnetostaticSolver::InterpolateToYAxis() const {
   delete By;
 }
 
-void JFun(const Vector & x, Vector & J) {
-  Vector a(3); a(0) = 0.0; a(1) = 1.0; a(2) = 0.0;
+void JFun(const Vector &x, Vector &J) {
+  Vector a(3);
+  a(0) = 0.0;
+  a(1) = 1.0;
+  a(2) = 0.0;
 
   Vector axx(3);
 
-  axx(0) = a(1)*x(2) - a(2)*x(1);
-  axx(1) = a(2)*x(0) - a(0)*x(2);
-  axx(2) = a(0)*x(1) - a(1)*x(0);
+  axx(0) = a(1) * x(2) - a(2) * x(1);
+  axx(1) = a(2) * x(0) - a(0) * x(2);
+  axx(2) = a(0) * x(1) - a(1) * x(0);
   axx /= axx.Norml2();
 
   J = axx;
 }
-
