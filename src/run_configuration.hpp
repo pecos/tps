@@ -138,6 +138,9 @@ class RunConfiguration {
   // from 0 to viscRatio from the plane defined by pointInit and
   // the plane defined by point0.
   linearlyVaryingVisc linViscData;
+  
+  SpongeZoneData spongeData;
+  void initSpongeData();
 
   // Reference length
   double refLength;
@@ -212,6 +215,7 @@ class RunConfiguration {
   double* GetConstantInitialCondition() { return &initRhoRhoVp[0]; }
 
   linearlyVaryingVisc& GetLinearVaryingData() { return linViscData; }
+  SpongeZoneData& GetSpongeZoneData() { return spongeData; }
 
   // resource manager controls
   bool isAutoRestart() { return rm_enableMonitor_; }

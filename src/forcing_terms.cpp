@@ -32,6 +32,7 @@
 #include "forcing_terms.hpp"
 
 #include <general/forall.hpp>
+#include <vector>
 
 ForcingTerms::ForcingTerms(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                            IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
@@ -212,6 +213,188 @@ void ConstantPressureGradient::updateTerms_gpu(const int numElems, const int off
 // clang-format on
 
 #endif
+
+SpongeZone::SpongeZone( const int& _dim, 
+                        const int& _num_equation, 
+                        const int& _order, 
+                        const int& _intRuleType, 
+                        Fluxes* _fluxClass, 
+                        EquationOfState *_eqState,
+                        IntegrationRules* _intRules, 
+                        ParFiniteElementSpace* _vfes, 
+                        ParGridFunction* _Up, 
+                        ParGridFunction* _gradUp, 
+                        const volumeFaceIntegrationArrays& gpuArrays, 
+                        RunConfiguration& _config):
+ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays),
+fluxes(_fluxClass),
+eqState(_eqState),
+szData(_config.GetSpongeZoneData())
+{
+  targetU.SetSize(num_equation);
+  if( szData.szType==SpongeZoneSolution::USERDEF ){
+    Vector Up(num_equation);
+    Up[0] = szData.targetUp[0];
+    for(int d=0;d<dim;d++) Up[1+d] = szData.targetUp[1+d];
+    Up[1+dim] = szData.targetUp[4];
+    eqState->GetConservativesFromPrimitives(Up,targetU,dim,num_equation);
+  }
+  
+  meanNormalFluxes.SetSize(num_equation+1);
+  
+  ParMesh *mesh = vfes->GetParMesh();
+  const FiniteElementCollection *fec = vfes->FEColl();
+  ParFiniteElementSpace dfes(mesh, fec, dim, Ordering::byNODES);
+  ParFiniteElementSpace fes(mesh,fec);
+  
+  sigma = new ParGridFunction(&fes);
+  *sigma = 0.;
+  double *hSigma = sigma->HostWrite();
+  
+  ParGridFunction coords(&dfes);
+  mesh->GetNodes(coords);
+  int ndofs = vfes->GetNDofs();
+  
+  vector<int> nodesVec;
+  nodesVec.clear();
+  for(int n=0;n<ndofs;n++){
+    Vector Xn(dim);
+    for(int d=0;d<dim;d++) Xn[d] = coords[n+d*ndofs];
+    
+    // distance to the mix-out plane
+    double dist = 0.;
+    for(int d=0;d<dim;d++)
+      dist += szData.normal[d]*( Xn[d]-szData.pointInit[d]  );
+    
+    if(fabs(dist)<szData.tol) nodesVec.push_back( n );
+    
+    // dist end plane
+    double distF = 0.;
+    for(int d=0;d<dim;d++)
+      distF += szData.normal[d]*( Xn[d]-szData.point0[d]  );
+    
+    if( dist<0. && distF>0. ){
+      double planeDistance = distF-dist;
+      hSigma[n] = -dist/planeDistance/planeDistance;
+    }
+  }
+  
+  // find plane nodes
+  if( szData.szType == SpongeZoneSolution::MIXEDOUT )
+  {
+    nodesInMixedOutPlane.SetSize( nodesVec.size() );
+    for(int n=0;n<nodesInMixedOutPlane.Size();n++) nodesInMixedOutPlane[n] = nodesVec[n];
+    
+    cout<<"__________________________________________________"<<endl;
+    cout<<"Running with Mixed-Out Sponge Zone"<<endl;
+    cout<<"       Nodes searched with tolerance: "<<szData.tol<<endl;
+    cout<<"       Num. of nodes in mix-out plane: "<<nodesInMixedOutPlane.Size()<<endl;
+    cout<<"^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"<<endl;
+  }
+}
+
+
+SpongeZone::~SpongeZone()
+{
+  delete sigma;
+}
+
+
+
+void SpongeZone::updateTerms(Vector& in)
+{
+  if( szData.szType==SpongeZoneSolution::MIXEDOUT ) computeMixedOutValues();
+  
+  addSpongeZoneForcing(in);
+}
+
+
+void SpongeZone::addSpongeZoneForcing(Vector& in)
+{
+  const double *ds = sigma->HostRead();
+  double *dataIn = in.HostReadWrite();
+  const double *dataUp = Up->HostRead();
+  
+  int nnodes = vfes->GetNDofs();
+  
+  Vector Un(num_equation), Up(num_equation);
+  
+  // compute speed of sound
+  double gamma = eqState->GetSpecificHeatRatio();
+  eqState->GetPrimitivesFromConservatives(targetU,Up,dim,num_equation);
+  double speedSound = sqrt(gamma*Up[num_equation-1]/Up[0]);
+  
+  // add forcing to RHS, i.e., @in
+  for(int n=0;n<nnodes;n++){
+    double s = ds[n];
+    if( s>0. ){
+      s *= szData.multFactor;
+      for(int eq=0;eq<num_equation;eq++) Up[eq] = dataUp[n+eq*nnodes];
+      eqState->GetConservativesFromPrimitives(Up,Un,dim,num_equation);
+      
+      for(int eq=0;eq<num_equation;eq++) dataIn[n+eq*nnodes] -= speedSound*s*(Un[eq]-targetU[eq]);
+    }
+  }
+}
+
+
+
+
+void SpongeZone::computeMixedOutValues()
+{
+  int nnodes = vfes->GetNDofs();
+  const double *dataUp = Up->HostRead();
+  double gamma = eqState->GetSpecificHeatRatio();
+  
+  // compute mean normal fluxes
+  meanNormalFluxes = 0.;
+
+  Vector Un(num_equation), Up(num_equation);
+  DenseMatrix f(num_equation,dim);
+  for(int n=0;n<nodesInMixedOutPlane.Size();n++){
+    int node = nodesInMixedOutPlane[n];
+    
+    for(int eq=0;eq<num_equation;eq++) Up[eq] = dataUp[node+eq*nnodes];
+    eqState->GetConservativesFromPrimitives(Up,Un,dim,num_equation);
+    fluxes->ComputeConvectiveFluxes(Un,f);
+    
+    for(int eq=0;eq<num_equation;eq++)
+      for(int d=0;d<dim;d++) meanNormalFluxes[eq] += szData.normal[d]*f(eq,d);
+    
+  }
+  meanNormalFluxes[num_equation] = double(nodesInMixedOutPlane.Size());
+  
+  // communicate different partitions
+  Vector sum(num_equation+1);
+  MPI_Allreduce(meanNormalFluxes.HostRead(), sum.HostWrite(), num_equation + 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  meanNormalFluxes = sum;
+  
+  // normalize
+  for(int eq=0;eq<num_equation;eq++) meanNormalFluxes[eq] /= double( meanNormalFluxes[num_equation] );
+  
+  // compute mixed-out variables considering the outlet pressure
+  double temp = 0.;
+  for(int d=0;d<dim;d++) temp += meanNormalFluxes[1+d]*szData.normal[d];
+  double A = 1.-2.*gamma/(gamma-1.);
+  double B = 2*temp/(gamma-1.);
+  double C = -2.*meanNormalFluxes[0]*meanNormalFluxes[num_equation-1];
+  for(int d=0;d<dim;d++) C += meanNormalFluxes[1+d]*meanNormalFluxes[1+d];
+//   double p = (-B+sqrt(B*B-4.*A*C))/(2.*A);
+  double p = (-B-sqrt(B*B-4.*A*C))/(2.*A); // real solution
+  
+  Up[0] = meanNormalFluxes[0]*meanNormalFluxes[0]/(temp-p );
+  Up[num_equation-1] = p;
+  
+  for(int d=0;d<dim;d++)
+    Up[1+d] = (meanNormalFluxes[1+d]-p*szData.normal[d])/meanNormalFluxes[0];
+    
+  double v2 = 0.;
+  for(int d=0;d<dim;d++) v2 += Up[1+d]*Up[1+d];
+  
+  eqState->GetConservativesFromPrimitives(Up,targetU,dim,num_equation);
+}
+
+
 
 #ifdef _MASA_
 MASA_forcings::MASA_forcings(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,

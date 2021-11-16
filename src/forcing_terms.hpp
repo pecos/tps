@@ -37,6 +37,8 @@
 #include <mfem.hpp>
 
 #include "dataStructures.hpp"
+#include "fluxes.hpp"
+#include "equation_of_state.hpp"
 #include "run_configuration.hpp"
 
 #ifdef _MASA_
@@ -99,6 +101,44 @@ class ConstantPressureGradient : public ForcingTerms {
                               const int dim, const volumeFaceIntegrationArrays &gpuArrays);
 #endif
 };
+
+
+class SpongeZone : public ForcingTerms {
+private:
+  
+  Fluxes *fluxes;
+  EquationOfState *eqState;
+  
+  SpongeZoneData &szData; 
+  Vector targetU;
+  
+  Array<int> nodesInMixedOutPlane;
+  
+  ParGridFunction *sigma; // linearly varying factor
+  
+  Vector meanNormalFluxes;
+  
+  void computeMixedOutValues();
+  void addSpongeZoneForcing(Vector &in);
+  
+public:
+  SpongeZone( const int &_dim, 
+              const int &_num_equation, 
+              const int &_order, 
+              const int &_intRuleType,
+              Fluxes *_fluxClass,
+              EquationOfState *_eqState,
+              IntegrationRules *_intRules, 
+              ParFiniteElementSpace *_vfes, 
+              ParGridFunction *_Up,
+              ParGridFunction *_gradUp, 
+              const volumeFaceIntegrationArrays &gpuArrays,
+              RunConfiguration &_config);
+  ~SpongeZone();
+  
+  virtual void updateTerms(Vector &in);
+};
+
 
 #ifdef _MASA_
 // Manufactured Solution using MASA
