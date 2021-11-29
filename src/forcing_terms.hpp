@@ -128,6 +128,35 @@ class SpongeZone : public ForcingTerms {
   virtual void updateTerms(Vector &in);
 };
 
+// Modified accoustics forcing 
+class AccousticsModification : public ForcingTerms {
+ private:
+  EquationOfState *eqState;
+  
+  double ax, ay;
+  DenseMatrix Ax, Ay;
+  
+  void updateMatrices2D(const Vector &up);
+
+ public:
+  AccousticsModification( const int &_dim, 
+                          const int &_num_equation, 
+                          const int &_order, 
+                          const int &_intRuleType,
+                          IntegrationRules *_intRules, 
+                          ParFiniteElementSpace *_vfes, 
+                          EquationOfState *_eqState,
+                          ParGridFunction *_Up,
+                          ParGridFunction *_gradUp, 
+                          const volumeFaceIntegrationArrays &gpuArrays,
+                          RunConfiguration &_config);
+
+  // Terms do not need updating
+  virtual void updateTerms(Vector &in);
+
+  ~AccousticsModification();
+};
+
 #ifdef _MASA_
 // Manufactured Solution using MASA
 class MASA_forcings : public ForcingTerms {

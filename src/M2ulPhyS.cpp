@@ -872,17 +872,17 @@ void M2ulPhyS::projectInitialSolution() {
 
   // particular case: Euler vortex
   //   {
-  //     void (*initialConditionFunction)(const Vector&, Vector&);
-  //     t_final = 5.*  2./17.46;
-  //     initialConditionFunction = &(this->InitialConditionEulerVortex);
+      void (*initialConditionFunction)(const Vector&, Vector&);
+      t_final = 5.*  2./17.46;
+      initialConditionFunction = &(this->InitialConditionEulerVortex);
   // initialConditionFunction = &(this->testInitialCondition);
 
-  //     VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
-  //     U->ProjectCoefficient(u0);
+      VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
+      U->ProjectCoefficient(u0);
   //   }
 
   if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
-    uniformInitialConditions();
+//     uniformInitialConditions();
 #ifdef _MASA_
     initMasaHandler("exact", dim, config.GetEquationSystem(), config.GetViscMult());
     void (*initialConditionFunction)(const Vector &, double, Vector &);
@@ -1107,7 +1107,7 @@ void M2ulPhyS::InitialConditionEulerVortex(const Vector &x, Vector &y) {
   int equations = 4;
   if (x.Size() == 3) equations = 5;
 
-  int problem = 1;
+  int problem = 2;
   EquationOfState *eqState = new EquationOfState();
   eqState->setFluid(DRY_AIR);
   const double gamma = eqState->GetSpecificHeatRatio();
@@ -1119,9 +1119,9 @@ void M2ulPhyS::InitialConditionEulerVortex(const Vector &x, Vector &y) {
     radius = 0.2;
     Minf = 0.5;
     beta = 1. / 5.;
-
+/*
     radius = 0.5;
-    Minf = 0.1;
+    Minf = 0.1;*/
   } else if (problem == 2) {
     // "Slow vortex"
     radius = 0.2;
@@ -1133,21 +1133,22 @@ void M2ulPhyS::InitialConditionEulerVortex(const Vector &x, Vector &y) {
         "Options are: 1 - fast vortex, 2 - slow vortex");
   }
 
-  int numVortices = 3;
+  int numVortices = 1;
   Vector xc(numVortices), yc(numVortices);
   yc = 0.;
-  for (int i = 0; i < numVortices; i++) {
-    xc[i] = 2. * M_PI / static_cast<double>(numVortices + 1);
-    xc[i] += static_cast<double>(i) * 2. * M_PI / static_cast<double>(numVortices);
-  }
-
-  const double Tt = 300.;
-  const double Pt = 102200;
+  xc = 0.;
+//   for (int i = 0; i < numVortices; i++) {
+//     xc[i] = 2. * M_PI / static_cast<double>(numVortices + 1);
+//     xc[i] += static_cast<double>(i) * 2. * M_PI / static_cast<double>(numVortices);
+//   }
 
   const double funcGamma = 1. + 0.5 * (gamma - 1.) * Minf * Minf;
 
-  const double temp_inf = Tt / funcGamma;
-  const double pres_inf = Pt * pow(funcGamma, gamma / (gamma - 1.));
+  const double Pt = 101300.*pow(funcGamma,gamma/(gamma-1));
+  const double Tt = 300.*funcGamma;
+  
+  const double temp_inf = 300.;
+  const double pres_inf = 101300.;
   const double vel_inf = Minf * sqrt(gamma * Rg * temp_inf);
   const double den_inf = pres_inf / (Rg * temp_inf);
 

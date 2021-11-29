@@ -367,6 +367,100 @@ void SpongeZone::computeMixedOutValues() {
   eqState->GetConservativesFromPrimitives(Up, targetU, dim, num_equation);
 }
 
+
+AccousticsModification::AccousticsModification(const int& _dim, 
+                                               const int& _num_equation, 
+                                               const int& _order, 
+                                               const int& _intRuleType, 
+                                               IntegrationRules* _intRules, 
+                                               ParFiniteElementSpace* _vfes, 
+                                               EquationOfState* _eqState, 
+                                               ParGridFunction* _Up, 
+                                               ParGridFunction* _gradUp, 
+                                               const volumeFaceIntegrationArrays& gpuArrays, 
+                                               RunConfiguration& _config):
+ForcingTerms(_dim, _num_equation, _order, _intRuleType, 
+             _intRules, _vfes, _Up, _gradUp, gpuArrays),
+eqState(_eqState)
+{
+  Ax.SetSize(num_equation,num_equation);
+  Ay.SetSize(num_equation,num_equation);
+  Ax = 0.;
+  Ay = 0.;
+  ax = 0.8;
+  ay = ax;
+}
+
+AccousticsModification::~AccousticsModification()
+{
+}
+
+
+void AccousticsModification::updateMatrices2D(const Vector &up)
+{
+  double gamma = eqState->GetSpecificHeatRatio();
+  double xi = gamma-1.;
+  double a = sqrt(gamma*up[1+dim]/up[0]); // speed of sound
+  double v2 = 0.;
+  for(int d=0;d<dim;d++) v2 += up[1+d]*up[1+d];
+  
+  Ax(0,0) = ax*up[1]*(1.-0.5*xi*v2/a/a);
+  Ax(0,1) = ax*(xi*up[1]*up[1]/a/a-1.);
+  Ax(0,2) = ax*xi*up[1]*up[2]/a/a;
+  Ax(0,3) = -ax*xi*up[1]/a/a;
+  
+  Ax(1,0) = ax/up[0]*(up[1]*up[1]-0.5*xi*v2);
+  Ax(1,1) = ax*up[1]/up[0]*(xi-1.);
+  Ax(1,2) = ax*xi*up[2]/up[0];
+  Ax(1,3) = -ax*xi/up[0];
+  
+  Ax(3,0) = ax*up[1]*(a*a-0.5*xi*v2);
+  Ax(3,1) = ax*(xi*up[1]*up[1]-a*a);
+  Ax(3,2) = ax*xi*up[1]*up[2];
+  Ax(3,3) = -ax*xi*up[1];
+  
+  Ay(0,0) = ax*up[1]*(1.-0.5*xi*v2/a/a);
+  Ay(0,1) = ax*xi*up[1]*up[2]/a/a;
+  Ay(0,2) = ax*(xi*up[2]*up[2]/a/a-1.);
+  Ay(0,3) = -ax*xi*up[2]/a/a;
+  
+  Ay(2,0) = ax/up[0]*(up[2]*up[2]-0.5*xi*v2);
+  Ay(2,1) = ax*xi*up[1]/up[0];
+  Ay(2,2) = ax*up[2]/up[0]*(xi-1.);
+  Ay(2,3) = -ax*xi/up[0];
+  
+  Ay(3,0) = ax*up[2]*(a*a-0.5*xi*v2);
+  Ay(3,1) = ax*xi*up[1]*up[2];
+  Ay(3,2) = ax*(xi*up[2]*up[2]-a*a);
+  Ay(3,3) = -ax*xi*up[2];
+}
+
+
+void AccousticsModification::updateTerms(Vector& in)
+{
+  Vector up(num_equation), upx(num_equation),upy(num_equation);
+  Vector contrib(num_equation);
+  auto hUp = Up->HostWrite();
+  auto hGradUp = gradUp->HostRead();
+  
+  int nnodes = vfes->GetNDofs();
+  
+  for(int n=0;n<nnodes;n++){
+    for(int eq=0;eq<num_equation;eq++){
+      up[eq] = hUp[n+eq*nnodes];
+      upx[eq] = hGradUp[n+eq*nnodes];
+      upy[eq] = hGradUp[n+eq*nnodes+num_equation*nnodes];
+    }
+    updateMatrices2D(up);
+    Ax.Mult(upx,contrib);
+    Ay.AddMult(upy,contrib);
+    
+    for(int eq=0;eq<num_equation;eq++) in[n+eq*nnodes] -= contrib[eq];
+  }
+}
+
+
+
 #ifdef _MASA_
 MASA_forcings::MASA_forcings(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                              IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
