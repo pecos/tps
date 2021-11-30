@@ -201,7 +201,7 @@ class M2ulPhyS {
   ParGridFunction *Up;
 
   // Visualization functions (these are pointers to Up)
-  ParGridFunction *press, *dens, *vel;
+  ParGridFunction *press, *dens, *vel, *passiveScalar;
 
   // gradient of primitive variables
   ParGridFunction *gradUp;

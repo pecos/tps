@@ -36,7 +36,7 @@
 DomainIntegrator::DomainIntegrator(Fluxes *_fluxClass, IntegrationRules *_intRules, int _intRuleType, const int _dim,
                                    const int _num_equation)
     : fluxClass(_fluxClass),
-      dim(_num_equation),
+      dim(_dim),
       num_equation(_num_equation),
       intRules(_intRules),
       intRuleType(_intRuleType) {}

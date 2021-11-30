@@ -31,11 +31,13 @@
 // -----------------------------------------------------------------------------------el-
 #include "BoundaryCondition.hpp"
 
-BoundaryCondition::BoundaryCondition(RiemannSolver *_rsolver, EquationOfState *_eqState, ParFiniteElementSpace *_vfes,
+BoundaryCondition::BoundaryCondition(RiemannSolver *_rsolver, EquationOfState *_eqState, Equations _eqSystem,
+                                     ParFiniteElementSpace *_vfes,
                                      IntegrationRules *_intRules, double &_dt, const int _dim, const int _num_equation,
                                      const int _patchNumber, const double _refLength)
     : rsolver(_rsolver),
       eqState(_eqState),
+      eqSystem(_eqSystem),
       vfes(_vfes),
       intRules(_intRules),
       dt(_dt),

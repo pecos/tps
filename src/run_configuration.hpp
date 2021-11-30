@@ -143,7 +143,6 @@ class RunConfiguration {
   double refLength;
 
   // equations to be solved. Options thus far
-  // EULER, NS, MHD
   Equations eqSystem;
 
   bool SBP;

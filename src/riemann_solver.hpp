@@ -37,6 +37,7 @@
 #include <general/forall.hpp>
 #include <mfem.hpp>
 
+#include "dataStructures.hpp"
 #include "fluxes.hpp"
 
 using namespace mfem;
@@ -50,6 +51,7 @@ class RiemannSolver {
   Vector flux2;
 
   EquationOfState *eqState;
+  Equations &eqSystem;
   Fluxes *fluxClass;
 
   bool useRoe;
@@ -58,7 +60,7 @@ class RiemannSolver {
   void Eval_Roe(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux);
 
  public:
-  RiemannSolver(int &_num_equation, EquationOfState *_eqState, Fluxes *_fluxClass, bool _useRoe);
+  RiemannSolver(int &_num_equation, EquationOfState *_eqState, Equations &_eqSystem,Fluxes *_fluxClass, bool _useRoe);
 
   void Eval(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux, bool LF = false);
 

@@ -270,7 +270,7 @@ void RunConfiguration::readInputFile(std::string inpuFileName) {
             eqSystem = NS;
             break;
           case 2:
-            eqSystem = MHD;
+            eqSystem = NS_PASSIVE;
             break;
           default:
             break;

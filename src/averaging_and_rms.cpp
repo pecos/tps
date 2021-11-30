@@ -34,7 +34,7 @@
 #include <general/forall.hpp>
 
 Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollection *_fec, ParFiniteElementSpace *_fes,
-                     ParFiniteElementSpace *_dfes, ParFiniteElementSpace *_vfes, const int &_num_equation,
+                     ParFiniteElementSpace *_dfes, ParFiniteElementSpace *_vfes, Equations &_eqSys, const int &_num_equation,
                      const int &_dim, RunConfiguration &_config, MPI_Groups *_groupsMPI)
     : Up(_Up),
       mesh(_mesh),
@@ -42,6 +42,7 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
       fes(_fes),
       dfes(_dfes),
       vfes(_vfes),
+      eqSystem(_eqSys),
       num_equation(_num_equation),
       dim(_dim),
       config(_config),
@@ -63,7 +64,11 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
 
     meanRho = new ParGridFunction(fes, meanUp->GetData());
     meanV = new ParGridFunction(dfes, meanUp->GetData() + fes->GetNDofs());
-    meanP = new ParGridFunction(fes, meanUp->GetData() + (num_equation - 1) * fes->GetNDofs());
+    meanP = new ParGridFunction(fes, meanUp->GetData() + (1+dim) * fes->GetNDofs());
+    
+    meanScalar = NULL;
+    if(eqSystem==NS_PASSIVE) 
+      meanScalar = new ParGridFunction(fes,meanUp->GetData() + (num_equation-1) * fes->GetNDofs());
 
     initiMeanAndRMS();
 
@@ -79,6 +84,7 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
     paraviewMean->RegisterField("vel", meanV);
     paraviewMean->RegisterField("press", meanP);
     paraviewMean->RegisterField("rms", rms);
+    if(eqSystem==NS_PASSIVE) paraviewMean->RegisterField("passScalar",meanScalar);
 
     local_sums.UseDevice(true);
     local_sums.SetSize(5 + 6);
@@ -97,6 +103,7 @@ Averaging::~Averaging() {
     delete meanP;
     delete meanV;
     delete meanRho;
+    if(eqSystem==NS_PASSIVE) delete meanScalar;
 
     delete rms;
     delete meanUp;

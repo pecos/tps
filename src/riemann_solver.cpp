@@ -35,8 +35,9 @@
 using namespace mfem;
 
 // Implementation of class RiemannSolver
-RiemannSolver::RiemannSolver(int &_num_equation, EquationOfState *_eqState, Fluxes *_fluxClass, bool _useRoe)
-    : num_equation(_num_equation), eqState(_eqState), fluxClass(_fluxClass), useRoe(_useRoe) {
+RiemannSolver::RiemannSolver(int &_num_equation, EquationOfState *_eqState, Equations &_eqSystem,Fluxes *_fluxClass, bool _useRoe)
+    : num_equation(_num_equation), eqState(_eqState), eqSystem(_eqSystem),
+    fluxClass(_fluxClass), useRoe(_useRoe) {
   flux1.SetSize(num_equation);
   flux2.SetSize(num_equation);
 }
@@ -65,6 +66,8 @@ void RiemannSolver::ComputeFluxDotN(const Vector &state, const Vector &nor, Vect
 
   const double H = (den_energy + pres) / den;
   fluxN(1 + dim) = den_velN * H;
+  
+  if( eqSystem==NS_PASSIVE ) fluxN(num_equation-1) = den_velN*state(num_equation-1)/state(0);
 }
 
 void RiemannSolver::Eval(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux, bool LF) {
@@ -103,6 +106,7 @@ void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Ve
 
 void RiemannSolver::Eval_Roe(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux) {
   const int dim = nor.Size();
+  int NS_eq = 2+dim; // number of NS equations (without species, passive scalars etc.)
 
   double normag = 0;
   for (int i = 0; i < dim; i++) normag += nor(i) * nor(i);
@@ -115,7 +119,7 @@ void RiemannSolver::Eval_Roe(const Vector &state1, const Vector &state2, const V
   fluxClass->ComputeConvectiveFluxes(state1, fluxes1);
   fluxClass->ComputeConvectiveFluxes(state2, fluxes2);
   Vector meanFlux(num_equation);
-  for (int eq = 0; eq < num_equation; eq++) {
+  for (int eq = 0; eq < NS_eq; eq++) {
     meanFlux[eq] = 0.;
     for (int d = 0; d < dim; d++) meanFlux[eq] += (fluxes1(eq, d) + fluxes2(eq, d)) * unitN[d];
   }
@@ -132,7 +136,7 @@ void RiemannSolver::Eval_Roe(const Vector &state1, const Vector &state2, const V
 
   double p1 = eqState->ComputePressure(state1, dim);
   double p2 = eqState->ComputePressure(state2, dim);
-  double H = (state1[num_equation - 1] + p1) / sqrt(state1[0]) + (state2[num_equation - 1] + p2) / sqrt(state2[0]);
+  double H = (state1[1+dim] + p1) / sqrt(state1[0]) + (state2[1+dim] + p2) / sqrt(state2[0]);
   H /= sqrt(state1[0]) + sqrt(state2[0]);
   double a2 = 0.4 * (H - 0.5 * (vel[0] * vel[0] + vel[1] * vel[1]));
   double a = sqrt(a2);
@@ -148,13 +152,13 @@ void RiemannSolver::Eval_Roe(const Vector &state1, const Vector &state2, const V
   double deltaV = state2[2] / state2[0] - state1[2] / state1[0];
   double deltaQk = deltaU * unitN[0] + deltaV * unitN[1];
 
-  Vector alpha(num_equation);
+  Vector alpha(NS_eq);
   alpha[0] = 0.5 * (deltaP - r * a * deltaU) / a2;
   alpha[1] = state2[0] - state1[0] - deltaP / a2;
   alpha[2] = r * deltaV;
   alpha[3] = 0.5 * (deltaP + r * a * deltaU) / a2;
 
-  Vector DF1(num_equation);
+  Vector DF1(NS_eq);
   DF1[0] = 1.;
   DF1[1] = vel[0];
   DF1[2] = vel[1];
@@ -166,21 +170,25 @@ void RiemannSolver::Eval_Roe(const Vector &state1, const Vector &state2, const V
 
   DF1 *= fabs(lamb[0]);
 
-  Vector DF4(num_equation);
+  Vector DF4(NS_eq);
   DF4[0] = 1.;
   DF4[1] = vel[0] + unitN[0] * a;
   DF4[2] = vel[1] + unitN[1] * a;
   DF4[3] = H + qk * a;
   DF4 *= fabs(lamb[1]) * (deltaP + r * a * deltaQk) * 0.5 / a2;
 
-  Vector DF5(num_equation);
+  Vector DF5(NS_eq);
   DF5[0] = 1.;
   DF5[1] = vel[0] - unitN[0] * a;
   DF5[2] = vel[1] - unitN[1] * a;
   DF5[3] = H - qk * a;
   DF5 *= fabs(lamb[2]) * (deltaP - r * a * deltaQk) * 0.5 / a2;
 
-  for (int i = 0; i < num_equation; i++) {
+  for (int i = 0; i < NS_eq; i++) {
     flux(i) = (meanFlux[i] - (DF1[i] + DF4[i] + DF5[i])) * 0.5 * normag;
   }
+  
+  if( eqSystem==NS_PASSIVE ) 
+    flux(num_equation-1)=meanFlux(num_equation-1)-
+      0.5*fabs(qk)*(state2(num_equation-1)-state1(num_equation-1));
 }

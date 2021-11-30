@@ -68,7 +68,7 @@ class WallBC : public BoundaryCondition {
   void computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
 
  public:
-  WallBC(RiemannSolver *rsolver_, EquationOfState *_eqState, Fluxes *_fluxClass, ParFiniteElementSpace *_vfes,
+  WallBC(RiemannSolver *rsolver_, EquationOfState *_eqState, Equations _eqSystem,Fluxes *_fluxClass, ParFiniteElementSpace *_vfes,
          IntegrationRules *_intRules, double &_dt, const int _dim, const int _num_equation, int _patchNumber,
          WallType _bcType, const Array<double> _inputData, const Array<int> &intPointsElIDBC);
   ~WallBC();

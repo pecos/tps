@@ -60,6 +60,9 @@ class EquationOfState {
   // Prandtl number
   double Pr;         // Prandtl number
   double cp_div_pr;  // cp divided by Pr (used in conductivity calculation)
+  
+  // Fick's law
+  double Sc; // Schmidt number 
 
  public:
   EquationOfState();
@@ -81,6 +84,7 @@ class EquationOfState {
   double GetGasConstant() { return gas_constant; }
   double GetViscosity(const double &temp);
   double GetPrandtlNum() { return Pr; }
+  double GetSchmidtNum() { return Sc;}
   double GetViscMultiplyer() { return visc_mult; }
   double GetBulkViscMultiplyer() { return bulk_visc_mult; }
   double GetThermalConductivity(const double &visc);
@@ -91,7 +95,7 @@ class EquationOfState {
                                           const int &num_equations) {
     double p = 0.;
     for (int k = 0; k < dim; k++) p += KE[k];
-    return (gamma - 1.) * (state[num_equations - 1] - p);
+    return (gamma - 1.) * (state[1+dim] - p);
   }
 
   // Sutherland's law

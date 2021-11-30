@@ -94,7 +94,8 @@ class InletBC : public BoundaryCondition {
   virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up);
 
  public:
-  InletBC(MPI_Groups *_groupsMPI, RiemannSolver *rsolver_, EquationOfState *_eqState, ParFiniteElementSpace *_vfes,
+  InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem,
+          RiemannSolver *rsolver_, EquationOfState *_eqState, ParFiniteElementSpace *_vfes,
           IntegrationRules *_intRules, double &_dt, const int _dim, const int _num_equation, int _patchNumber,
           double _refLength, InletType _bcType, const Array<double> &_inputData, const int &_maxIntPoints,
           const int &maxDofs);

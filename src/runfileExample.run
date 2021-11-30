@@ -103,9 +103,9 @@ BULK_VISC_MULT 5.
 REF_LENGTH 1.
 
 # equations to be solved. Options thus far
-# EULER -> 0
-# NS    -> 1
-# MHD   -> 2
+# EULER        -> 0
+# NS           -> 1
+# NS_PASSIVE   -> 2
 EQ_SYSTEM 0
 
 # Constant initial conditions

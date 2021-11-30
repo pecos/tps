@@ -33,10 +33,10 @@
 
 #include "riemann_solver.hpp"
 
-WallBC::WallBC(RiemannSolver *_rsolver, EquationOfState *_eqState, Fluxes *_fluxClass, ParFiniteElementSpace *_vfes,
+WallBC::WallBC(RiemannSolver *_rsolver, EquationOfState *_eqState, Equations _eqSystem,Fluxes *_fluxClass, ParFiniteElementSpace *_vfes,
                IntegrationRules *_intRules, double &_dt, const int _dim, const int _num_equation, int _patchNumber,
                WallType _bcType, const Array<double> _inputData, const Array<int> &_intPointsElIDBC)
-    : BoundaryCondition(_rsolver, _eqState, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
+    : BoundaryCondition(_rsolver, _eqState, _eqSystem,_vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
                         1),  // so far walls do not require ref. length. Left at 1
       wallType(_bcType),
       fluxClass(_fluxClass),
@@ -137,7 +137,8 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux
   stateMirror[1] = stateIn[0] * (vel[0] - 2. * vn * unitN[0]);
   stateMirror[2] = stateIn[0] * (vel[1] - 2. * vn * unitN[1]);
   if (dim == 3) stateMirror[3] = stateIn[0] * (vel[2] - 2. * vn * unitN[2]);
-  stateMirror[num_equation - 1] = stateIn[num_equation - 1];
+  stateMirror[1+dim] = stateIn[1+dim];
+  if(eqSystem==NS_PASSIVE) stateMirror[num_equation-1] = stateIn[num_equation - 1];
 
   rsolver->Eval(stateIn, stateMirror, normal, bdrFlux);
 }
@@ -148,7 +149,7 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
 
   Vector wallState = stateIn;
   for (int d = 0; d < dim; d++) wallState[1 + d] = 0.;
-  wallState[num_equation - 1] = p / (gamma - 1.);
+  wallState[1+dim] = p / (gamma - 1.);
 
   // Normal convective flux
   rsolver->Eval(stateIn, wallState, normal, bdrFlux, true);
@@ -191,8 +192,10 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
   wallState[0] = stateIn[0];
   for (int d = 0; d < dim; d++) wallState[1 + d] = 0.;
 
-  wallState[num_equation - 1] = eqState->GetGasConstant() / (gamma - 1.);  // Cv
-  wallState[num_equation - 1] *= stateIn[0] * wallTemp;
+  wallState[1+dim] = eqState->GetGasConstant() / (gamma - 1.);  // Cv
+  wallState[1+dim] *= stateIn[0] * wallTemp;
+  
+  if( eqSystem==NS_PASSIVE ) wallState[num_equation-1] = stateIn[num_equation-1];
 
   // Normal convective flux
   rsolver->Eval(stateIn, wallState, normal, bdrFlux, true);

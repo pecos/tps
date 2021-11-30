@@ -138,7 +138,7 @@ void ConstantPressureGradient::updateTerms(Vector &in) {
     Vector vel(dim);
     for (int n = 0; n < dof_elem; n++) {
       int index = nodes[n];
-      double p = dataUp[index + (num_equation - 1) * dof];
+      double p = dataUp[index + (1+dim) * dof];
       double grad_pV = 0.;
 
       for (int d = 0; d < dim; d++) {
@@ -148,7 +148,7 @@ void ConstantPressureGradient::updateTerms(Vector &in) {
         grad_pV -= p * dataGradUp[index + (d + 1) * dof + d * dof * num_equation];
       }
 
-      data[index + (num_equation - 1) * dof] += grad_pV;
+      data[index + (1+dim) * dof] += grad_pV;
     }
   }
 #endif

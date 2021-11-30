@@ -44,6 +44,7 @@ void EquationOfState::setFluid(WorkingFluid _fluid) {
       visc_mult = 1.;
       Pr = 0.71;
       cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
+      Sc = 0.71;
       break;
     default:
       break;

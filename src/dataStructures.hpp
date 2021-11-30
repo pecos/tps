@@ -36,6 +36,12 @@
 
 using namespace mfem;
 
+enum Equations { EULER,     // Euler equations
+                 NS,        // Navier-Stokes equations
+                 NS_PASSIVE // NS with passive scalar equation
+  
+};
+
 // The following four keywords define two planes in which
 // a linearly varying viscosity can be defined between these two.
 // The planes are defined by the normal and one point being the
