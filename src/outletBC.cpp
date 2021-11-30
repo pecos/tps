@@ -577,7 +577,7 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   meanK *= 0.5;
 
   // compute outgoing characteristics
-  double L2 = speedSound * speedSound * normGrad[0] - normGrad[num_equation - 1];
+  double L2 = speedSound * speedSound * normGrad[0] - normGrad[1+dim];
   L2 *= meanVel[0];
 
   double L3 = 0;
@@ -593,7 +593,7 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   double L5 = 0.;
   for (int d = 0; d < dim; d++) L5 += unitNorm[d] * normGrad[1 + d];
   //   L5 = normGrad[num_equation-1] +rho*speedSound*L5;
-  L5 = normGrad[num_equation - 1] + meanUp[0] * speedSound * L5;
+  L5 = normGrad[1+dim] + meanUp[0] * speedSound * L5;
   L5 *= meanVel[0] + speedSound;
   
   double L6 = 0.;
@@ -603,7 +603,7 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
 
   // estimate ingoing characteristic
   const double sigma = speedSound / refLength;
-  double L1 = sigma * (meanUp[num_equation - 1] - inputState[0]);
+  double L1 = sigma * (meanUp[1+dim] - inputState[0]);
 
   // calc vector d
   const double d1 = (L2 + 0.5 * (L5 + L1)) / speedSound / speedSound;
@@ -754,7 +754,7 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatr
   double L5 = 0.;
   for (int d = 0; d < dim; d++) L5 += unitNorm[d] * normGrad[1 + d];
   //   L5 = normGrad[num_equation-1] +rho*speedSound*L5;
-  L5 = normGrad[num_equation - 1] + meanUp[0] * speedSound * L5;
+  L5 = normGrad[1+dim] + meanUp[0] * speedSound * L5;
   L5 *= meanVel[0] + speedSound;
   
   double L6 = 0.;
@@ -783,10 +783,10 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatr
   bdrFlux[1] = meanVel[0] * d1 + meanUp[0] * d2;
   bdrFlux[2] = meanVel[1] * d1 + meanUp[0] * d3;
   if (dim == 3) bdrFlux[3] = meanVel[2] * d1 + meanUp[0] * d4;
-  bdrFlux[num_equation - 1] = meanUp[0] * meanVel[0] * d2;
-  bdrFlux[num_equation - 1] += meanUp[0] * meanVel[1] * d3;
+  bdrFlux[1+dim] = meanUp[0] * meanVel[0] * d2;
+  bdrFlux[1+dim] += meanUp[0] * meanVel[1] * d3;
   if (dim == 3) bdrFlux[num_equation - 1] += meanUp[0] * meanVel[2] * d4;
-  bdrFlux[num_equation - 1] += meanK * d1 + d5 / (gamma - 1.);
+  bdrFlux[1+dim] += meanK * d1 + d5 / (gamma - 1.);
   
   if( eqSystem==NS_PASSIVE) bdrFlux[num_equation-1] = d1*meanUp[num_equation-1] + meanUp[0]*d6;
 
@@ -909,7 +909,7 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
   double L5 = 0.;
   for (int d = 0; d < dim; d++) L5 += unitNorm[d] * normGrad[1 + d];
   //   L5 = normGrad[num_equation-1] +rho*speedSound*L5;
-  L5 = normGrad[num_equation - 1] + meanUp[0] * speedSound * L5;
+  L5 = normGrad[1+dim] + meanUp[0] * speedSound * L5;
   L5 *= meanVel[0] + speedSound;
   
   double L6 = 0.;
@@ -938,10 +938,10 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
   bdrFlux[1] = meanVel[0] * d1 + meanUp[0] * d2;
   bdrFlux[2] = meanVel[1] * d1 + meanUp[0] * d3;
   if (dim == 3) bdrFlux[3] = meanVel[2] * d1 + meanUp[0] * d4;
-  bdrFlux[num_equation - 1] = meanUp[0] * meanVel[0] * d2;
-  bdrFlux[num_equation - 1] += meanUp[0] * meanVel[1] * d3;
+  bdrFlux[1+dim] = meanUp[0] * meanVel[0] * d2;
+  bdrFlux[1+dim] += meanUp[0] * meanVel[1] * d3;
   if (dim == 3) bdrFlux[num_equation - 1] += meanUp[0] * meanVel[2] * d4;
-  bdrFlux[num_equation - 1] += meanK * d1 + d5 / (gamma - 1.);
+  bdrFlux[1+dim] += meanK * d1 + d5 / (gamma - 1.);
   
   if( eqSystem==NS_PASSIVE) bdrFlux[num_equation-1] = d1*meanUp[num_equation-1] + meanUp[0]*d6;
 
