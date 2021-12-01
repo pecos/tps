@@ -100,25 +100,17 @@ class ConstantPressureGradient : public ForcingTerms {
 #endif
 };
 
-
-// Forcing that adds a passive scalar 
+// Forcing that adds a passive scalar
 class PassiveScalar : public ForcingTerms {
  private:
   EquationOfState *eqState;
-  
-  Array<passiveScalarData*> psData;
+
+  Array<passiveScalarData *> psData;
 
  public:
-  PassiveScalar(const int &_dim, 
-                const int &_num_equation, 
-                const int &_order, 
-                const int &_intRuleType,
-                IntegrationRules *_intRules, 
-                ParFiniteElementSpace *_vfes, 
-                EquationOfState *_eqState,
-                ParGridFunction *_Up,
-                ParGridFunction *_gradUp, 
-                const volumeFaceIntegrationArrays &gpuArrays,
+  PassiveScalar(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
+                IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, EquationOfState *_eqState,
+                ParGridFunction *_Up, ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
                 RunConfiguration &_config);
 
   // Terms do not need updating

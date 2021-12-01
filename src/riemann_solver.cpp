@@ -35,9 +35,9 @@
 using namespace mfem;
 
 // Implementation of class RiemannSolver
-RiemannSolver::RiemannSolver(int &_num_equation, EquationOfState *_eqState, Equations &_eqSystem,Fluxes *_fluxClass, bool _useRoe)
-    : num_equation(_num_equation), eqState(_eqState), eqSystem(_eqSystem),
-    fluxClass(_fluxClass), useRoe(_useRoe) {
+RiemannSolver::RiemannSolver(int &_num_equation, EquationOfState *_eqState, Equations &_eqSystem, Fluxes *_fluxClass,
+                             bool _useRoe)
+    : num_equation(_num_equation), eqState(_eqState), eqSystem(_eqSystem), fluxClass(_fluxClass), useRoe(_useRoe) {
   flux1.SetSize(num_equation);
   flux2.SetSize(num_equation);
 }
@@ -66,8 +66,8 @@ void RiemannSolver::ComputeFluxDotN(const Vector &state, const Vector &nor, Vect
 
   const double H = (den_energy + pres) / den;
   fluxN(1 + dim) = den_velN * H;
-  
-  if( eqSystem==NS_PASSIVE ) fluxN(num_equation-1) = den_velN*state(num_equation-1)/state(0);
+
+  if (eqSystem == NS_PASSIVE) fluxN(num_equation - 1) = den_velN * state(num_equation - 1) / state(0);
 }
 
 void RiemannSolver::Eval(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux, bool LF) {
@@ -106,7 +106,7 @@ void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Ve
 
 void RiemannSolver::Eval_Roe(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux) {
   const int dim = nor.Size();
-  int NS_eq = 2+dim; // number of NS equations (without species, passive scalars etc.)
+  int NS_eq = 2 + dim;  // number of NS equations (without species, passive scalars etc.)
 
   double normag = 0;
   for (int i = 0; i < dim; i++) normag += nor(i) * nor(i);
@@ -136,7 +136,7 @@ void RiemannSolver::Eval_Roe(const Vector &state1, const Vector &state2, const V
 
   double p1 = eqState->ComputePressure(state1, dim);
   double p2 = eqState->ComputePressure(state2, dim);
-  double H = (state1[1+dim] + p1) / sqrt(state1[0]) + (state2[1+dim] + p2) / sqrt(state2[0]);
+  double H = (state1[1 + dim] + p1) / sqrt(state1[0]) + (state2[1 + dim] + p2) / sqrt(state2[0]);
   H /= sqrt(state1[0]) + sqrt(state2[0]);
   double a2 = 0.4 * (H - 0.5 * (vel[0] * vel[0] + vel[1] * vel[1]));
   double a = sqrt(a2);
@@ -187,8 +187,8 @@ void RiemannSolver::Eval_Roe(const Vector &state1, const Vector &state2, const V
   for (int i = 0; i < NS_eq; i++) {
     flux(i) = (meanFlux[i] - (DF1[i] + DF4[i] + DF5[i])) * 0.5 * normag;
   }
-  
-  if( eqSystem==NS_PASSIVE ) 
-    flux(num_equation-1)=meanFlux(num_equation-1)-
-      0.5*fabs(qk)*(state2(num_equation-1)-state1(num_equation-1));
+
+  if (eqSystem == NS_PASSIVE)
+    flux(num_equation - 1) =
+        meanFlux(num_equation - 1) - 0.5 * fabs(qk) * (state2(num_equation - 1) - state1(num_equation - 1));
 }

@@ -281,7 +281,7 @@ void M2ulPhyS::initVariables() {
   initIndirectionArrays();
   initSolutionAndVisualizationVectors();
 
-  average = new Averaging(Up, mesh, fec, fes, dfes, vfes,eqSystem,num_equation, dim, config, groupsMPI);
+  average = new Averaging(Up, mesh, fec, fes, dfes, vfes, eqSystem, num_equation, dim, config, groupsMPI);
   average->read_meanANDrms_restart_files();
 
   // register rms and mean sol into ioData
@@ -298,8 +298,8 @@ void M2ulPhyS::initVariables() {
     } else {
       ioData.registerIOVar("/meanSolution", "mean-p", 3);
     }
-    if(eqSystem==NS_PASSIVE) ioData.registerIOVar("/meanSolution", "mean-Z", num_equation-1);
-    
+    if (eqSystem == NS_PASSIVE) ioData.registerIOVar("/meanSolution", "mean-Z", num_equation - 1);
+
     // rms
     ioData.registerIOFamily("RMS velocity fluctuation", "/rmsData", average->GetRMS(), false, config.GetRestartMean());
     ioData.registerIOVar("/rmsData", "uu", 0);
@@ -319,7 +319,7 @@ void M2ulPhyS::initVariables() {
   isSBP = config.isSBP();
 
   // Create Riemann Solver
-  rsolver = new RiemannSolver(num_equation, eqState, eqSystem,fluxClass, config.RoeRiemannSolver());
+  rsolver = new RiemannSolver(num_equation, eqState, eqSystem, fluxClass, config.RoeRiemannSolver());
 
   // Boundary attributes in present partition
   Array<int> local_attr;
@@ -818,11 +818,10 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   dens = new ParGridFunction(fes, Up->HostReadWrite());
   vel = new ParGridFunction(dfes, Up->HostReadWrite() + fes->GetNDofs());
-  press = new ParGridFunction(fes, Up->HostReadWrite() + (1+dim) * fes->GetNDofs());
+  press = new ParGridFunction(fes, Up->HostReadWrite() + (1 + dim) * fes->GetNDofs());
   passiveScalar = NULL;
-  if( eqSystem==NS_PASSIVE ) 
-    passiveScalar = new ParGridFunction(fes, Up->HostReadWrite() + (num_equation-1) * fes->GetNDofs());
-  
+  if (eqSystem == NS_PASSIVE)
+    passiveScalar = new ParGridFunction(fes, Up->HostReadWrite() + (num_equation - 1) * fes->GetNDofs());
 
   // define solution parameters for i/o
   ioData.registerIOFamily("Solution state variables", "/solution", U);
@@ -835,7 +834,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   } else {
     ioData.registerIOVar("/solution", "rho-E", 3);
   }
-  if( eqSystem==NS_PASSIVE ) ioData.registerIOVar("/solution", "rho-Z", num_equation-1);
+  if (eqSystem == NS_PASSIVE) ioData.registerIOVar("/solution", "rho-Z", num_equation - 1);
 
   // compute factor to multiply viscosity when this option is active
   spaceVaryViscMult = NULL;
@@ -870,7 +869,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   paraviewColl->RegisterField("dens", dens);
   paraviewColl->RegisterField("vel", vel);
   paraviewColl->RegisterField("press", press);
-  if( eqSystem==NS_PASSIVE ) paraviewColl->RegisterField("passiveScalar",passiveScalar);
+  if (eqSystem == NS_PASSIVE) paraviewColl->RegisterField("passiveScalar", passiveScalar);
 
   if (spaceVaryViscMult != NULL) paraviewColl->RegisterField("viscMult", spaceVaryViscMult);
 
@@ -1235,8 +1234,7 @@ void M2ulPhyS::uniformInitialConditions() {
   const double gamma = eqState->GetSpecificHeatRatio();
   const double rhoE =
       inputRhoRhoVp[4] / (gamma - 1.) + 0.5 *
-                                            (inputRhoRhoVp[1] * inputRhoRhoVp[1] + 
-                                             inputRhoRhoVp[2] * inputRhoRhoVp[2] +
+                                            (inputRhoRhoVp[1] * inputRhoRhoVp[1] + inputRhoRhoVp[2] * inputRhoRhoVp[2] +
                                              inputRhoRhoVp[3] * inputRhoRhoVp[3]) /
                                             inputRhoRhoVp[0];
 
@@ -1245,15 +1243,15 @@ void M2ulPhyS::uniformInitialConditions() {
     data[i + dof] = inputRhoRhoVp[1];
     data[i + 2 * dof] = inputRhoRhoVp[2];
     if (dim == 3) data[i + 3 * dof] = inputRhoRhoVp[3];
-    data[i + (1+dim) * dof] = rhoE;
-    if( eqSystem==NS_PASSIVE ) data[i+(num_equation-1)*dof] = 0.;
+    data[i + (1 + dim) * dof] = rhoE;
+    if (eqSystem == NS_PASSIVE) data[i + (num_equation - 1) * dof] = 0.;
 
     dataUp[i] = data[i];
     dataUp[i + dof] = data[i + dof] / data[i];
     dataUp[i + 2 * dof] = data[i + 2 * dof] / data[i];
     if (dim == 3) dataUp[i + 3 * dof] = data[i + 3 * dof] / data[i];
-    dataUp[i + (1+dim) * dof] = inputRhoRhoVp[4];
-    dataUp[i+(num_equation-1)*dof] = 0.;
+    dataUp[i + (1 + dim) * dof] = inputRhoRhoVp[4];
+    dataUp[i + (num_equation - 1) * dof] = 0.;
 
     for (int d = 0; d < dim; d++) {
       for (int eq = 0; eq < num_equation; eq++) {
@@ -1378,7 +1376,7 @@ void M2ulPhyS::read_restart_files() {
     } else {
       dof = vfes->GetNDofs();
       for (int i = 0; i < dof; i++) {
-        double p = dataUp[i + (1+dim) * dof];
+        double p = dataUp[i + (1 + dim) * dof];
         double r = dataUp[i];
         Array<double> vel(dim);
         for (int d = 0; d < dim; d++) vel[d] = dataUp[i + (d + 1) * dof];
@@ -1387,8 +1385,8 @@ void M2ulPhyS::read_restart_files() {
         double rE = p / (gamma - 1.) + 0.5 * r * k;
         dataU[i] = r;
         for (int d = 0; d < dim; d++) dataU[i + (d + 1) * dof] = r * vel[d];
-        dataU[i + (1+dim) * dof] = rE;
-        if(eqSystem==NS_PASSIVE) dataU[i+(num_equation-1)*dof] = r*dataUp[i+(num_equation-1)*dof];
+        dataU[i + (1 + dim) * dof] = rE;
+        if (eqSystem == NS_PASSIVE) dataU[i + (num_equation - 1) * dof] = r * dataUp[i + (num_equation - 1) * dof];
       }
     }
   }

@@ -29,18 +29,21 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
+#include "utils.hpp"
+
 #include <sys/stat.h>
 #include <unistd.h>
+
 #include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <mfem.hpp>
 #include <stdexcept>
 #include <string>
-#include <mfem.hpp>
+
 #include "M2ulPhyS.hpp"
-#include "utils.hpp"
 
 #ifdef HAVE_SLURM
 #include <slurm/slurm.h>
@@ -178,9 +181,7 @@ std::string systemCmd(const char *cmd) {
   return result;
 }
 
-void LocalProjectDiscCoefficient(GridFunction &gf,
-                                 VectorCoefficient &coeff,
-                                 Array<int> &dof_attr) {
+void LocalProjectDiscCoefficient(GridFunction &gf, VectorCoefficient &coeff, Array<int> &dof_attr) {
   Array<int> vdofs;
   Vector vals;
 
@@ -213,7 +214,7 @@ void LocalProjectDiscCoefficient(GridFunction &gf,
       // Mimic how negative indices are handled in Vector::SetSubVector
       int ind = vdofs[j];
       if (ind < 0) {
-        ind = -1-ind;
+        ind = -1 - ind;
         vals[j] = -vals[j];
       }
 
@@ -225,8 +226,7 @@ void LocalProjectDiscCoefficient(GridFunction &gf,
   }
 }
 
-void GlobalProjectDiscCoefficient(ParGridFunction &gf,
-                                  VectorCoefficient &coeff) {
+void GlobalProjectDiscCoefficient(ParGridFunction &gf, VectorCoefficient &coeff) {
   // local maximal element attribute for each dof
   Array<int> ldof_attr;
 

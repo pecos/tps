@@ -36,10 +36,11 @@
 
 using namespace mfem;
 
-enum Equations { EULER,     // Euler equations
-                 NS,        // Navier-Stokes equations
-                 NS_PASSIVE // NS with passive scalar equation
-  
+enum Equations {
+  EULER,      // Euler equations
+  NS,         // Navier-Stokes equations
+  NS_PASSIVE  // NS with passive scalar equation
+
 };
 
 // The following four keywords define two planes in which
@@ -95,12 +96,11 @@ struct dataTransferArrays {
   MPI_Status *statuses;
 };
 
-
 // structure to encapsulate passive scalar data
 struct passiveScalarData {
   Vector coords;
-  double radius; // distance in which nodes will be looked for
-  double value;  // value of the passive scalar at the location
+  double radius;  // distance in which nodes will be looked for
+  double value;   // value of the passive scalar at the location
   Array<int> nodes;
 };
 

@@ -165,7 +165,7 @@ class RunConfiguration {
   // Wall BC data
   Array<double> wallBC;
   std::vector<pair<int, WallType>> wallPatchType;
-  
+
   // Passive scalar data
   Array<passiveScalarData*> arrayPassiveScalar;
 
@@ -242,9 +242,9 @@ class RunConfiguration {
 
   std::vector<pair<int, WallType>>* GetWallPatchType() { return &wallPatchType; }
   Array<double> GetWallData(int w);
-  
-  Array<passiveScalarData*> &GetPassiveScalarData(){return arrayPassiveScalar; }
-  passiveScalarData *GetPassiveScalarData(int i){return arrayPassiveScalar[i]; }
+
+  Array<passiveScalarData*>& GetPassiveScalarData() { return arrayPassiveScalar; }
+  passiveScalarData* GetPassiveScalarData(int i) { return arrayPassiveScalar[i]; }
 };
 
 #endif  // RUN_CONFIGURATION_HPP_

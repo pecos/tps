@@ -88,18 +88,9 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
     forcing.Append(new ConstantPressureGradient(dim, num_equation, _order, intRuleType, intRules, vfes, Up, gradUp,
                                                 gpuArrays, _config));
   }
-  if( _config.GetPassiveScalarData().Size()>0 )
-    forcing.Append(new PassiveScalar(dim, 
-                num_equation, 
-                _order, 
-                intRuleType,
-                intRules, 
-                vfes, 
-                eqState,
-                Up,
-                gradUp, 
-                gpuArrays,
-                _config) );
+  if (_config.GetPassiveScalarData().Size() > 0)
+    forcing.Append(new PassiveScalar(dim, num_equation, _order, intRuleType, intRules, vfes, eqState, Up, gradUp,
+                                     gpuArrays, _config));
 #ifdef _MASA_
   forcing.Append(
       new MASA_forcings(dim, num_equation, _order, intRuleType, intRules, vfes, Up, gradUp, gpuArrays, _config));
@@ -411,7 +402,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
       }
     }
 
-    if (eqSystem == NS || NS_PASSIVE ) {
+    if (eqSystem == NS || NS_PASSIVE) {
       DenseMatrix fvisc(num_equation, dim);
       fluxClass->ComputeViscousFluxes(state, gradUpi, fvisc);
 
@@ -455,8 +446,9 @@ void RHSoperator::updatePrimitives(const Vector &x_in) const {
     dataUp[i + vfes->GetNDofs()] = iState[1] / iState[0];
     dataUp[i + 2 * vfes->GetNDofs()] = iState[2] / iState[0];
     if (dim == 3) dataUp[i + 3 * vfes->GetNDofs()] = iState[3] / iState[0];
-    dataUp[i + (1+dim) * vfes->GetNDofs()] = p;
-    if( eqSystem==NS_PASSIVE ) dataUp[i + (num_equation-1) * vfes->GetNDofs()] = iState[num_equation-1]/iState[0];
+    dataUp[i + (1 + dim) * vfes->GetNDofs()] = p;
+    if (eqSystem == NS_PASSIVE)
+      dataUp[i + (num_equation - 1) * vfes->GetNDofs()] = iState[num_equation - 1] / iState[0];
   }
 #endif  // _GPU_
 }

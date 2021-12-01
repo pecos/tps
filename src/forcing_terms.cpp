@@ -138,7 +138,7 @@ void ConstantPressureGradient::updateTerms(Vector &in) {
     Vector vel(dim);
     for (int n = 0; n < dof_elem; n++) {
       int index = nodes[n];
-      double p = dataUp[index + (1+dim) * dof];
+      double p = dataUp[index + (1 + dim) * dof];
       double grad_pV = 0.;
 
       for (int d = 0; d < dim; d++) {
@@ -148,7 +148,7 @@ void ConstantPressureGradient::updateTerms(Vector &in) {
         grad_pV -= p * dataGradUp[index + (d + 1) * dof + d * dof * num_equation];
       }
 
-      data[index + (1+dim) * dof] += grad_pV;
+      data[index + (1 + dim) * dof] += grad_pV;
     }
   }
 #endif
@@ -213,77 +213,67 @@ void ConstantPressureGradient::updateTerms_gpu(const int numElems, const int off
 
 #endif
 
-PassiveScalar::PassiveScalar(const int& _dim, 
-                             const int& _num_equation, 
-                             const int& _order, 
-                             const int& _intRuleType, 
-                             IntegrationRules* _intRules, 
-                             ParFiniteElementSpace* _vfes, 
-                             EquationOfState* _eqState, 
-                             ParGridFunction* _Up, 
-                             ParGridFunction* _gradUp, 
-                             const volumeFaceIntegrationArrays& gpuArrays, 
-                             RunConfiguration& _config):
-ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays)
-{
-  psData.SetSize( _config.GetPassiveScalarData().Size() );
-  for(int i=0;i<psData.Size();i++){
-    psData[i]->coords.SetSize( 3 );
-    for(int d=0;d<3;d++) psData[i]->coords[d] = _config.GetPassiveScalarData(i)->coords[d];
+PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
+                             IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, EquationOfState *_eqState,
+                             ParGridFunction *_Up, ParGridFunction *_gradUp,
+                             const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays) {
+  psData.SetSize(_config.GetPassiveScalarData().Size());
+  for (int i = 0; i < psData.Size(); i++) {
+    psData[i]->coords.SetSize(3);
+    for (int d = 0; d < 3; d++) psData[i]->coords[d] = _config.GetPassiveScalarData(i)->coords[d];
     psData[i]->radius = _config.GetPassiveScalarData(i)->radius;
-    psData[i]->value  = _config.GetPassiveScalarData(i)->value;
+    psData[i]->value = _config.GetPassiveScalarData(i)->value;
   }
-  
+
   // find nodes for each passive scalar location
-  ParFiniteElementSpace dfes(vfes->GetParMesh(),vfes->FEColl(),dim,Ordering::byNODES);
+  ParFiniteElementSpace dfes(vfes->GetParMesh(), vfes->FEColl(), dim, Ordering::byNODES);
   ParGridFunction coordinates(&dfes);
   vfes->GetParMesh()->GetNodes(coordinates);
-  
+
   int nnodes = vfes->GetNDofs();
-  
-  for(int i=0;i<psData.Size();i++){
+
+  for (int i = 0; i < psData.Size(); i++) {
     Vector x0(dim);
-    for(int d=0;d<dim;d++) x0[d] = psData[i]->coords[d];
-    
-    std::vector<int> list; list.clear();
-    
+    for (int d = 0; d < dim; d++) x0[d] = psData[i]->coords[d];
+
+    std::vector<int> list;
+    list.clear();
+
     // loop through nodes to find the ones within radius
     Vector y(dim);
-    for(int n=0;n<nnodes;n++){
-      for(int d=0;d<dim;d++) y[d] = coordinates[n+d*nnodes];
+    for (int n = 0; n < nnodes; n++) {
+      for (int d = 0; d < dim; d++) y[d] = coordinates[n + d * nnodes];
       double dist = 0.;
-      for(int d=0;d<dim;d++) dist += (y[d]-x0[d])*(y[d]-x0[d]);
-      dist = sqrt( dist );
-      if( dist<psData[i]->radius ) list.push_back( n );
+      for (int d = 0; d < dim; d++) dist += (y[d] - x0[d]) * (y[d] - x0[d]);
+      dist = sqrt(dist);
+      if (dist < psData[i]->radius) list.push_back(n);
     }
-    
-    psData[i]->nodes.SetSize( list.size() );
-    for(int n=0;n<list.size();n++) psData[i]->nodes[n] = list[n];
+
+    psData[i]->nodes.SetSize(list.size());
+    for (int n = 0; n < list.size(); n++) psData[i]->nodes[n] = list[n];
   }
 }
 
-void PassiveScalar::updateTerms(Vector& in)
-{
+void PassiveScalar::updateTerms(Vector &in) {
   auto dataUp = Up->HostRead();
   auto dataIn = in.HostReadWrite();
   int nnode = vfes->GetNDofs();
-  
+
   double Z = 0.;
-  
-  for(int i=0;i<psData.Size();i++){
+
+  for (int i = 0; i < psData.Size(); i++) {
     Z = psData[i]->value;
-    for(int n=0;n<psData[i]->nodes.Size();n++){
+    for (int n = 0; n < psData[i]->nodes.Size(); n++) {
       int node = psData[i]->nodes[n];
       double vel = 0.;
-      for(int d=0;d<dim;d++) vel += dataUp[node+(1+d)*nnode]*dataUp[node+(1+d)*nnode];
+      for (int d = 0; d < dim; d++) vel += dataUp[node + (1 + d) * nnode] * dataUp[node + (1 + d) * nnode];
       vel = sqrt(vel);
-      dataIn[node+(num_equation-1)*nnode] -= vel*(dataUp[node+(num_equation-1)*nnode] - dataUp[node]*Z)/
-                                            psData[i]->radius;
+      dataIn[node + (num_equation - 1) * nnode] -=
+          vel * (dataUp[node + (num_equation - 1) * nnode] - dataUp[node] * Z) / psData[i]->radius;
     }
   }
 }
-
-
 
 #ifdef _MASA_
 MASA_forcings::MASA_forcings(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,

@@ -87,7 +87,7 @@ RunConfiguration::RunConfiguration() {
 
   isForcing = false;
   for (int ii = 0; ii < 3; ii++) gradPress[ii] = 0.;
-  
+
   arrayPassiveScalar.DeleteAll();
 
   // Resource manager monitoring
@@ -98,7 +98,7 @@ RunConfiguration::RunConfiguration() {
 }
 
 RunConfiguration::~RunConfiguration() {
-  for(int i=0;i<arrayPassiveScalar.Size();i++){
+  for (int i = 0; i < arrayPassiveScalar.Size(); i++) {
     delete arrayPassiveScalar[i];
   }
 }
@@ -446,10 +446,10 @@ void RunConfiguration::readInputFile(std::string inpuFileName) {
         } else {
           wallBC.Append(0.);
         }
-      } else if (word.compare("PASSIVE_SCALAR")==0 ){
+      } else if (word.compare("PASSIVE_SCALAR") == 0) {
         int arrSize = arrayPassiveScalar.Size();
-        arrayPassiveScalar.Append(new passiveScalarData );
-        
+        arrayPassiveScalar.Append(new passiveScalarData);
+
         arrayPassiveScalar[arrSize]->value = 0.;
         ss >> word;
         arrayPassiveScalar[arrSize]->coords.SetSize(3);
@@ -462,8 +462,7 @@ void RunConfiguration::readInputFile(std::string inpuFileName) {
         ss >> word;
         arrayPassiveScalar[arrSize]->radius = stod(word);
         ss >> word;
-        arrayPassiveScalar[arrSize]->value = stod( word );
-        
+        arrayPassiveScalar[arrSize]->value = stod(word);
       }
     }
   }

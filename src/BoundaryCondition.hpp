@@ -64,9 +64,8 @@ class BoundaryCondition {
 
  public:
   BoundaryCondition(RiemannSolver *_rsolver, EquationOfState *_eqState, Equations _eqSystem,
-                    ParFiniteElementSpace *_vfes,
-                    IntegrationRules *_intRules, double &dt, const int _dim, const int _num_equation,
-                    const int _patchNumber, const double _refLength);
+                    ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &dt, const int _dim,
+                    const int _num_equation, const int _patchNumber, const double _refLength);
   virtual ~BoundaryCondition();
 
   virtual void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) = 0;

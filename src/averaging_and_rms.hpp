@@ -37,9 +37,9 @@
 #include <mfem.hpp>
 #include <string>
 
+#include "dataStructures.hpp"
 #include "mpi_groups.hpp"
 #include "run_configuration.hpp"
-#include "dataStructures.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -89,8 +89,8 @@ class Averaging {
 
  public:
   Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollection *_fec, ParFiniteElementSpace *_fes,
-            ParFiniteElementSpace *_dfes, ParFiniteElementSpace *_vfes, Equations &_eqSys, const int &_num_equation, const int &_dim,
-            RunConfiguration &_config, MPI_Groups *_groupsMPI);
+            ParFiniteElementSpace *_dfes, ParFiniteElementSpace *_vfes, Equations &_eqSys, const int &_num_equation,
+            const int &_dim, RunConfiguration &_config, MPI_Groups *_groupsMPI);
   ~Averaging();
 
   void addSampleMean(const int &iter);
