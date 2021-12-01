@@ -228,10 +228,10 @@ ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _
 {
   psData.SetSize( _config.GetPassiveScalarData().Size() );
   for(int i=0;i<psData.Size();i++){
-    psData[i].coords.SetSize( 3 );
-    for(int d=0;d<3;d++) psData[i].coords[d] = _config.GetPassiveScalarData(i)->coords[d];
-    psData[i].radius = _config.GetPassiveScalarData(i)->radius;
-    psData[i].value  = _config.GetPassiveScalarData(i)->value;
+    psData[i]->coords.SetSize( 3 );
+    for(int d=0;d<3;d++) psData[i]->coords[d] = _config.GetPassiveScalarData(i)->coords[d];
+    psData[i]->radius = _config.GetPassiveScalarData(i)->radius;
+    psData[i]->value  = _config.GetPassiveScalarData(i)->value;
   }
   
   // find nodes for each passive scalar location
@@ -243,7 +243,7 @@ ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _
   
   for(int i=0;i<psData.Size();i++){
     Vector x0(dim);
-    for(int d=0;d<dim;d++) x0[d] = psData[i].coords[d];
+    for(int d=0;d<dim;d++) x0[d] = psData[i]->coords[d];
     
     std::vector<int> list; list.clear();
     
@@ -254,11 +254,11 @@ ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _
       double dist = 0.;
       for(int d=0;d<dim;d++) dist += (y[d]-x0[d])*(y[d]-x0[d]);
       dist = sqrt( dist );
-      if( dist<psData[i].radius ) list.push_back( n );
+      if( dist<psData[i]->radius ) list.push_back( n );
     }
     
-    psData[i].nodes.SetSize( list.size() );
-    for(int n=0;n<list.size();n++) psData[i].nodes[n] = list[n];
+    psData[i]->nodes.SetSize( list.size() );
+    for(int n=0;n<list.size();n++) psData[i]->nodes[n] = list[n];
   }
 }
 
@@ -271,14 +271,14 @@ void PassiveScalar::updateTerms(Vector& in)
   double Z = 0.;
   
   for(int i=0;i<psData.Size();i++){
-    Z = psData[i].value;
-    for(int n=0;n<psData[i].nodes.Size();n++){
-      int node = psData[i].nodes[n];
+    Z = psData[i]->value;
+    for(int n=0;n<psData[i]->nodes.Size();n++){
+      int node = psData[i]->nodes[n];
       double vel = 0.;
       for(int d=0;d<dim;d++) vel += dataUp[node+(1+d)*nnode]*dataUp[node+(1+d)*nnode];
       vel = sqrt(vel);
       dataIn[node+(num_equation-1)*nnode] -= vel*(dataUp[node+(num_equation-1)*nnode] - dataUp[node]*Z)/
-                                            psData[i].radius;
+                                            psData[i]->radius;
     }
   }
 }

@@ -106,7 +106,7 @@ class PassiveScalar : public ForcingTerms {
  private:
   EquationOfState *eqState;
   
-  Array<passiveScalarData> psData;
+  Array<passiveScalarData*> psData;
 
  public:
   PassiveScalar(const int &_dim, 
