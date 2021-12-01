@@ -78,7 +78,7 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
   }
   
   if(eqSystem==NS_PASSIVE)
-    for(int d=0;d<dim;d++) flux(num_equations-1,d) += state(num_equations-1)*state(1+d)/state(0);
+    for(int d=0;d<dim;d++) flux(num_equations-1,d) = state(num_equations-1)*state(1+d)/state(0);
 }
 
 void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &flux) {
@@ -121,7 +121,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
       if(eqSystem==NS_PASSIVE){
         double Sc = eqState->GetSchmidtNum();
         for(int d=0;d<dim;d++)
-          flux(num_equations-1,d) += visc/Sc * gradUp(num_equations-1,d);
+          flux(num_equations-1,d) = visc/Sc * gradUp(num_equations-1,d);
       }
     } break;
     default:

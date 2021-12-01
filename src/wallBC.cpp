@@ -153,6 +153,7 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
 
   // Normal convective flux
   rsolver->Eval(stateIn, wallState, normal, bdrFlux, true);
+  if( eqSystem==NS_PASSIVE ) bdrFlux[num_equation-1] = 0.;
 
   // incoming visc flux
   DenseMatrix viscF(num_equation, dim);
@@ -175,6 +176,8 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
   DrhoDnNew *= stateIn[0] / p;
 
   for (int d = 0; d < dim; d++) gradState(0, d) += -DrhoDn * unitNorm[d] + DrhoDnNew * unitNorm[d];
+  if(eqSystem==NS_PASSIVE) 
+    for(int d=0;d<dim;d++) gradState(num_equation-1,d) = 0.;
 
   DenseMatrix viscFw(num_equation, dim);
   fluxClass->ComputeViscousFluxes(wallState, gradState, viscFw);

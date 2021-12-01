@@ -95,4 +95,13 @@ struct dataTransferArrays {
   MPI_Status *statuses;
 };
 
+
+// structure to encapsulate passive scalar data
+struct passiveScalarData {
+  Vector coords;
+  double radius; // distance in which nodes will be looked for
+  double value;  // value of the passive scalar at the location
+  Array<int> nodes;
+};
+
 #endif  // DATASTRUCTURES_HPP_

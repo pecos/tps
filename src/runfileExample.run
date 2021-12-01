@@ -132,6 +132,11 @@ PLANE_P0 x0 y0 z0
 PLANE_PINIT xi yi zi
 VISC_RATIO 50.
 
+# Passive scalar
+# more than one entry can be created
+#PASSIVE_SCALAR x y z radius value
+PASSIVE_SCALAR 0. 0. 0. 0.1 1
+
 # Inlet Boundary Conditions
 # types:
 # 0 -> Subsonic Inlet Specified with dens. and Vel(3)
