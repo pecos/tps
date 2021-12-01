@@ -75,8 +75,9 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
     flux(1 + dim, d) = state(d + 1) * H;
   }
 
-  if (eqSystem == NS_PASSIVE)
+  if (eqSystem == NS_PASSIVE) {
     for (int d = 0; d < dim; d++) flux(num_equations - 1, d) = state(num_equations - 1) * state(1 + d) / state(0);
+  }
 }
 
 void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &flux) {

@@ -40,7 +40,6 @@ enum Equations {
   EULER,      // Euler equations
   NS,         // Navier-Stokes equations
   NS_PASSIVE  // NS with passive scalar equation
-
 };
 
 // The following four keywords define two planes in which
