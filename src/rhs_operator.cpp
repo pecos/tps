@@ -92,9 +92,9 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
     forcing.Append(new SpongeZone(dim, num_equation, _order, intRuleType, fluxClass, eqState, intRules, vfes, Up,
                                   gradUp, gpuArrays, _config));
   }
-//   forcing.Append(new AccousticsModification(dim, num_equation, _order, intRuleType, intRules, vfes, 
-//                                             eqState,Up, gradUp,
-//                                              gpuArrays, _config));
+  forcing.Append(new AccousticsModification(dim, num_equation, _order, intRuleType, intRules, vfes, 
+                                            eqState,Up, gradUp,
+                                             gpuArrays, _config));
 #ifdef _MASA_
   forcing.Append(
       new MASA_forcings(dim, num_equation, _order, intRuleType, intRules, vfes, Up, gradUp, gpuArrays, _config));

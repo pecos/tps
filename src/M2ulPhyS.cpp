@@ -1163,7 +1163,7 @@ void M2ulPhyS::InitialConditionEulerVortex(const Vector &x, Vector &y) {
     r2rad = (x(0) - xc[i]) * (x(0) - xc[i]);
     r2rad += (x(1) - yc[i]) * (x(1) - yc[i]);
     r2rad /= radius * radius;
-    velX -= beta * (x(1) - yc[i]) / radius * exp(-0.5 * r2rad);
+    velX += beta * (x(1) - yc[i]) / radius * exp(-0.5 * r2rad);
     velY += beta * (x(0) - xc[i]) / radius * exp(-0.5 * r2rad);
     temp += exp(-r2rad);
   }

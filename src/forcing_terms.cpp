@@ -387,7 +387,7 @@ eqState(_eqState)
   Ay.SetSize(num_equation,num_equation);
   Ax = 0.;
   Ay = 0.;
-  ax = 0.8;
+  ax = -0.3;
   ay = ax;
 }
 
