@@ -872,17 +872,17 @@ void M2ulPhyS::projectInitialSolution() {
 
   // particular case: Euler vortex
   //   {
-      void (*initialConditionFunction)(const Vector&, Vector&);
-      t_final = 5.*  2./17.46;
-      initialConditionFunction = &(this->InitialConditionEulerVortex);
+//       void (*initialConditionFunction)(const Vector&, Vector&);
+//       t_final = 5.*  2./17.46;
+//       initialConditionFunction = &(this->InitialConditionEulerVortex);
   // initialConditionFunction = &(this->testInitialCondition);
 
-      VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
-      U->ProjectCoefficient(u0);
+//       VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
+//       U->ProjectCoefficient(u0);
   //   }
 
   if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
-//     uniformInitialConditions();
+    uniformInitialConditions();
 #ifdef _MASA_
     initMasaHandler("exact", dim, config.GetEquationSystem(), config.GetViscMult());
     void (*initialConditionFunction)(const Vector &, double, Vector &);
