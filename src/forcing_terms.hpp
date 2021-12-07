@@ -136,7 +136,7 @@ class AccousticsModification : public ForcingTerms {
   double ax, ay;
   DenseMatrix Ax, Ay;
   
-  void updateMatrices2D(const Vector &up);
+  void updateMatrices2D(Vector &up);
 
  public:
   AccousticsModification( const int &_dim, 

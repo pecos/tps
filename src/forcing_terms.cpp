@@ -387,7 +387,7 @@ eqState(_eqState)
   Ay.SetSize(num_equation,num_equation);
   Ax = 0.;
   Ay = 0.;
-  ax = 0.4;
+  ax = 0.45;
   ay = ax;
 }
 
@@ -396,43 +396,28 @@ AccousticsModification::~AccousticsModification()
 }
 
 
-void AccousticsModification::updateMatrices2D(const Vector &up)
+void AccousticsModification::updateMatrices2D(Vector &up)
 {
+  up[0] = 1.2;
+  up[1] = 40.;
+  up[2] = 0.;
+  up[3] = 101300.;
   double gamma = eqState->GetSpecificHeatRatio();
   double xi = gamma-1.;
   double a = sqrt(gamma*up[1+dim]/up[0]); // speed of sound
   double v2 = 0.;
   for(int d=0;d<dim;d++) v2 += up[1+d]*up[1+d];
   
-//   Ax(0,0) = ax*up[1]*(1.-0.5*xi*v2/a/a);
-//   Ax(0,1) = ax*(xi*up[1]*up[1]/a/a-1.);
-//   Ax(0,2) = ax*xi*up[1]*up[2]/a/a;
-//   Ax(0,3) = -ax*xi*up[1]/a/a;
-//   
-//   Ax(1,0) = ax/up[0]*(up[1]*up[1]-0.5*xi*v2);
-//   Ax(1,1) = ax*up[1]/up[0]*(xi-1.);
-//   Ax(1,2) = ax*xi*up[2]/up[0];
-//   Ax(1,3) = -ax*xi/up[0];
-//   
-//   Ax(3,0) = ax*up[1]*(a*a-0.5*xi*v2);
-//   Ax(3,1) = ax*(xi*up[1]*up[1]-a*a);
-//   Ax(3,2) = ax*xi*up[1]*up[2];
-//   Ax(3,3) = -ax*xi*up[1];
+  Ax(0,0) = ax*up[1];
+  Ax(0,1) = -ax;
   
-//   Ay(0,0) = ax*up[1]*(1.-0.5*xi*v2/a/a);
-//   Ay(0,1) = ax*xi*up[1]*up[2]/a/a;
-//   Ay(0,2) = ax*(xi*up[2]*up[2]/a/a-1.);
-//   Ay(0,3) = -ax*xi*up[2]/a/a;
-//   
-//   Ay(2,0) = ax/up[0]*(up[2]*up[2]-0.5*xi*v2);
-//   Ay(2,1) = ax*xi*up[1]/up[0];
-//   Ay(2,2) = ax*up[2]/up[0]*(xi-1.);
-//   Ay(2,3) = -ax*xi/up[0];
-//   
-//   Ay(3,0) = ax*up[2]*(a*a-0.5*xi*v2);
-//   Ay(3,1) = ax*xi*up[1]*up[2];
-//   Ay(3,2) = ax*(xi*up[2]*up[2]-a*a);
-//   Ay(3,3) = -ax*xi*up[2];
+  Ax(1,0) = -ax*0.5*xi*v2/up[0];
+  Ax(1,1) = ax*xi*up[1]/up[0];
+  Ax(1,2) = ax*xi*up[2]/up[0];
+  Ax(1,3) = -ax/up[0];
+  
+  Ax(3,0) = ax*a*a*up[1];
+  Ax(3,1) = -ax*a*a;
   
   Ay(0,0) = ay*up[2];
   Ay(0,2) = -ay;
@@ -444,8 +429,6 @@ void AccousticsModification::updateMatrices2D(const Vector &up)
   
   Ay(3,0) = ay*a*a*up[2];
   Ay(3,2) = -ay*a*a;
-//   
-//   Ay *= ay*(up[2]+a);
 }
 
 
