@@ -127,10 +127,22 @@ GRAD_PRESSURE 8 0 0
 # from 0 to VISC_RATIO from the plane defined by PLANE_PINIT and 
 # the plane defined by PLANE_P0. This is intended to help in 
 # problematic boundary conditions.
-PLANE_NORM n1 n2 n3
-PLANE_P0 x0 y0 z0
-PLANE_PINIT xi yi zi
-VISC_RATIO 50.
+#  |-----------------------------------|
+#  |------------------------------<====|
+#  |-----------------------------------|
+#  p_init                     normal  p0
+LV_PLANE_NORM n1 n2 n3
+LV_PLANE_P0 x0 y0 z0
+LV_PLANE_PINIT xi yi zi
+LV_VISC_RATIO 50.
+
+# Sponge zone input. See dataStructures.hpp for more info
+SZ_PLANE_NORM n1 n2 n3
+SZ_PLANE_P0 x0 y0 z0
+SZ_PLANE_PINIT xi yi zi
+SZ_TYPE 0 rho u v w p
+#SZ_TYPE 1 tol
+#SZ_MULT 0.5
 
 # Inlet Boundary Conditions
 # types:

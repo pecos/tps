@@ -71,6 +71,9 @@ class EquationOfState {
 
   double ComputePressure(const Vector &state, int dim);
 
+  void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit, const int &dim, const int &num_equations);
+  void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv, const int &dim, const int &num_equations);
+
   // Compute the maximum characteristic speed.
   double ComputeMaxCharSpeed(const Vector &state, const int dim);
 
