@@ -48,11 +48,42 @@ enum Equations {
 // normal equal for both planes. The visc ratio will vary linearly
 // from 0 to viscRatio from the plane defined by pointInit and
 // the plane defined by point0.
+//  |-----------------------------------|
+//  |------------------------------<====|
+//  |-----------------------------------|
+//  p_init                     normal  p0
 struct linearlyVaryingVisc {
   Vector normal;
   Vector point0;
   Vector pointInit;
   double viscRatio;
+};
+
+enum SpongeZoneSolution {
+  USERDEF,   // User defined target solution
+  MIXEDOUT,  // Mixed-out values will be computed at the pInit plane and
+             // used as target solution in the sponge zone
+  NONE = -1  // Invalid value
+};
+
+struct SpongeZoneData {
+  Vector normal;  // These planes are defined in the same manner as
+  Vector point0;  // in the linearlyVaryingVisc struct case.
+  Vector pointInit;
+
+  SpongeZoneSolution szType;
+
+  double tol;  // Tolerance for finding nodes at pInit plane
+               // These points are used to compute mixed-out values.
+               // Required if szType==MIXEDOUT
+
+  Vector targetUp;  // Target user-defined solution defined with primitive
+                    // variables: rho, V, p. Required if szType==USERDEF
+
+  double multFactor;  // Factor multiplying the product of sigma*(U-U*) where
+                      // U* is the target solution. Currently sigam=a/l where
+                      // a is the mixed-out speed of sound and l is the lenght
+                      // of the spnge zone. [OPTIONAL]
 };
 
 struct volumeFaceIntegrationArrays {
