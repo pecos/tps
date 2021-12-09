@@ -36,6 +36,12 @@
 
 using namespace mfem;
 
+enum Equations {
+  EULER,      // Euler equations
+  NS,         // Navier-Stokes equations
+  NS_PASSIVE  // NS with passive scalar equation
+};
+
 // The following four keywords define two planes in which
 // a linearly varying viscosity can be defined between these two.
 // The planes are defined by the normal and one point being the
@@ -118,6 +124,14 @@ struct dataTransferArrays {
   int num_face_nbrs;
   MPI_Request *requests;
   MPI_Status *statuses;
+};
+
+// structure to encapsulate passive scalar data
+struct passiveScalarData {
+  Vector coords;
+  double radius;  // distance in which nodes will be looked for
+  double value;   // value of the passive scalar at the location
+  Array<int> nodes;
 };
 
 #endif  // DATASTRUCTURES_HPP_

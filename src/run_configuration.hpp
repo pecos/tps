@@ -146,7 +146,6 @@ class RunConfiguration {
   double refLength;
 
   // equations to be solved. Options thus far
-  // EULER, NS, MHD
   Equations eqSystem;
 
   bool SBP;
@@ -169,6 +168,9 @@ class RunConfiguration {
   // Wall BC data
   Array<double> wallBC;
   std::vector<pair<int, WallType>> wallPatchType;
+
+  // Passive scalar data
+  Array<passiveScalarData*> arrayPassiveScalar;
 
   // Resource management system - job monitoring
   bool rm_enableMonitor_;  // flag to trigger RMS monitoring and job resubmissions
@@ -244,6 +246,9 @@ class RunConfiguration {
 
   std::vector<pair<int, WallType>>* GetWallPatchType() { return &wallPatchType; }
   Array<double> GetWallData(int w);
+
+  Array<passiveScalarData*>& GetPassiveScalarData() { return arrayPassiveScalar; }
+  passiveScalarData* GetPassiveScalarData(int i) { return arrayPassiveScalar[i]; }
 };
 
 #endif  // RUN_CONFIGURATION_HPP_

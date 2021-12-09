@@ -37,6 +37,7 @@
 #include <mfem.hpp>
 #include <string>
 
+#include "dataStructures.hpp"
 #include "mpi_groups.hpp"
 #include "run_configuration.hpp"
 
@@ -52,6 +53,7 @@ class Averaging {
   ParFiniteElementSpace *fes;
   ParFiniteElementSpace *dfes;
   ParFiniteElementSpace *vfes;
+  Equations &eqSystem;
   const int &num_equation;
   const int &dim;
   RunConfiguration &config;
@@ -67,6 +69,7 @@ class Averaging {
 
   // time averaged p, rho, vel (pointers to meanUp) for Visualization
   ParGridFunction *meanP, *meanRho, *meanV;
+  ParGridFunction *meanScalar;
 
   ParaViewDataCollection *paraviewMean = NULL;
 
@@ -86,8 +89,8 @@ class Averaging {
 
  public:
   Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollection *_fec, ParFiniteElementSpace *_fes,
-            ParFiniteElementSpace *_dfes, ParFiniteElementSpace *_vfes, const int &_num_equation, const int &_dim,
-            RunConfiguration &_config, MPI_Groups *_groupsMPI);
+            ParFiniteElementSpace *_dfes, ParFiniteElementSpace *_vfes, Equations &_eqSys, const int &_num_equation,
+            const int &_dim, RunConfiguration &_config, MPI_Groups *_groupsMPI);
   ~Averaging();
 
   void addSampleMean(const int &iter);

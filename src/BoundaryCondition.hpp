@@ -37,6 +37,7 @@
 #include <general/forall.hpp>
 #include <mfem.hpp>
 
+#include "dataStructures.hpp"
 #include "equation_of_state.hpp"
 #include "riemann_solver.hpp"
 
@@ -46,6 +47,7 @@ class BoundaryCondition {
  protected:
   RiemannSolver *rsolver;
   EquationOfState *eqState;
+  Equations eqSystem;
   ParFiniteElementSpace *vfes;
   IntegrationRules *intRules;
   double &dt;
@@ -61,9 +63,9 @@ class BoundaryCondition {
   Array<int> offsetsBoundaryU;
 
  public:
-  BoundaryCondition(RiemannSolver *_rsolver, EquationOfState *_eqState, ParFiniteElementSpace *_vfes,
-                    IntegrationRules *_intRules, double &dt, const int _dim, const int _num_equation,
-                    const int _patchNumber, const double _refLength);
+  BoundaryCondition(RiemannSolver *_rsolver, EquationOfState *_eqState, Equations _eqSystem,
+                    ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &dt, const int _dim,
+                    const int _num_equation, const int _patchNumber, const double _refLength);
   virtual ~BoundaryCondition();
 
   virtual void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) = 0;

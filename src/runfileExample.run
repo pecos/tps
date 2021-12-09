@@ -103,9 +103,9 @@ BULK_VISC_MULT 5.
 REF_LENGTH 1.
 
 # equations to be solved. Options thus far
-# EULER -> 0
-# NS    -> 1
-# MHD   -> 2
+# EULER        -> 0
+# NS           -> 1
+# NS_PASSIVE   -> 2
 EQ_SYSTEM 0
 
 # Constant initial conditions
@@ -143,6 +143,11 @@ SZ_PLANE_PINIT xi yi zi
 SZ_TYPE 0 rho u v w p
 #SZ_TYPE 1 tol
 #SZ_MULT 0.5
+
+# Passive scalar
+# more than one entry can be created
+#PASSIVE_SCALAR x y z radius value
+PASSIVE_SCALAR 0. 0. 0. 0.1 1
 
 # Inlet Boundary Conditions
 # types:

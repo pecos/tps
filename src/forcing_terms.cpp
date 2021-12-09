@@ -30,9 +30,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 #include "forcing_terms.hpp"
-
-#include <general/forall.hpp>
 #include <vector>
+#include <general/forall.hpp>
 
 ForcingTerms::ForcingTerms(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                            IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
@@ -139,7 +138,7 @@ void ConstantPressureGradient::updateTerms(Vector &in) {
     Vector vel(dim);
     for (int n = 0; n < dof_elem; n++) {
       int index = nodes[n];
-      double p = dataUp[index + (num_equation - 1) * dof];
+      double p = dataUp[index + (1 + dim) * dof];
       double grad_pV = 0.;
 
       for (int d = 0; d < dim; d++) {
@@ -149,7 +148,7 @@ void ConstantPressureGradient::updateTerms(Vector &in) {
         grad_pV -= p * dataGradUp[index + (d + 1) * dof + d * dof * num_equation];
       }
 
-      data[index + (num_equation - 1) * dof] += grad_pV;
+      data[index + (1 + dim) * dof] += grad_pV;
     }
   }
 #endif
@@ -200,13 +199,13 @@ void ConstantPressureGradient::updateTerms_gpu(const int numElems, const int off
 
       for (int d = 0; d < dim; d++) {
         grad_pV -= Ui[i + (1 + d) * elDof] * pGrad[d];
-        grad_pV -= Ui[i + (num_equation - 1) * elDof] * gradUpi[i + (1 + d) * elDof + d * num_equation * elDof];
+        grad_pV -= Ui[i + (1+dim) * elDof] * gradUpi[i + (1 + d) * elDof + d * num_equation * elDof];
       }
 
       d_in[indexi +  totalDofs] -= pGrad[0];
       d_in[indexi + 2 * totalDofs] -= pGrad[1];
       if (dim == 3) d_in[indexi + 3 * totalDofs] -= pGrad[2];
-      d_in[indexi + (num_equation - 1)*totalDofs] += grad_pV;
+      d_in[indexi + (1+dim)*totalDofs] += grad_pV;
     }
   });
 }
@@ -301,7 +300,7 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
   // compute speed of sound
   double gamma = eqState->GetSpecificHeatRatio();
   eqState->GetPrimitivesFromConservatives(targetU, Up, dim, num_equation);
-  double speedSound = sqrt(gamma * Up[num_equation - 1] / Up[0]);
+  double speedSound = sqrt(gamma * Up[1+dim] / Up[0]);
 
   // add forcing to RHS, i.e., @in
   for (int n = 0; n < nnodes; n++) {
@@ -351,13 +350,13 @@ void SpongeZone::computeMixedOutValues() {
   for (int d = 0; d < dim; d++) temp += meanNormalFluxes[1 + d] * szData.normal[d];
   double A = 1. - 2. * gamma / (gamma - 1.);
   double B = 2 * temp / (gamma - 1.);
-  double C = -2. * meanNormalFluxes[0] * meanNormalFluxes[num_equation - 1];
+  double C = -2. * meanNormalFluxes[0] * meanNormalFluxes[1+dim];
   for (int d = 0; d < dim; d++) C += meanNormalFluxes[1 + d] * meanNormalFluxes[1 + d];
   //   double p = (-B+sqrt(B*B-4.*A*C))/(2.*A);
   double p = (-B - sqrt(B * B - 4. * A * C)) / (2. * A);  // real solution
 
   Up[0] = meanNormalFluxes[0] * meanNormalFluxes[0] / (temp - p);
-  Up[num_equation - 1] = p;
+  Up[1+dim] = p;
 
   for (int d = 0; d < dim; d++) Up[1 + d] = (meanNormalFluxes[1 + d] - p * szData.normal[d]) / meanNormalFluxes[0];
 
@@ -365,6 +364,68 @@ void SpongeZone::computeMixedOutValues() {
   for (int d = 0; d < dim; d++) v2 += Up[1 + d] * Up[1 + d];
 
   eqState->GetConservativesFromPrimitives(Up, targetU, dim, num_equation);
+}
+
+PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
+                             IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, EquationOfState *_eqState,
+                             ParGridFunction *_Up, ParGridFunction *_gradUp,
+                             const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays) {
+  psData.SetSize(_config.GetPassiveScalarData().Size());
+  for (int i = 0; i < psData.Size(); i++) {
+    psData[i]->coords.SetSize(3);
+    for (int d = 0; d < 3; d++) psData[i]->coords[d] = _config.GetPassiveScalarData(i)->coords[d];
+    psData[i]->radius = _config.GetPassiveScalarData(i)->radius;
+    psData[i]->value = _config.GetPassiveScalarData(i)->value;
+  }
+
+  // find nodes for each passive scalar location
+  ParFiniteElementSpace dfes(vfes->GetParMesh(), vfes->FEColl(), dim, Ordering::byNODES);
+  ParGridFunction coordinates(&dfes);
+  vfes->GetParMesh()->GetNodes(coordinates);
+
+  int nnodes = vfes->GetNDofs();
+
+  for (int i = 0; i < psData.Size(); i++) {
+    Vector x0(dim);
+    for (int d = 0; d < dim; d++) x0[d] = psData[i]->coords[d];
+
+    std::vector<int> list;
+    list.clear();
+
+    // loop through nodes to find the ones within radius
+    Vector y(dim);
+    for (int n = 0; n < nnodes; n++) {
+      for (int d = 0; d < dim; d++) y[d] = coordinates[n + d * nnodes];
+      double dist = 0.;
+      for (int d = 0; d < dim; d++) dist += (y[d] - x0[d]) * (y[d] - x0[d]);
+      dist = sqrt(dist);
+      if (dist < psData[i]->radius) list.push_back(n);
+    }
+
+    psData[i]->nodes.SetSize(list.size());
+    for (int n = 0; n < list.size(); n++) psData[i]->nodes[n] = list[n];
+  }
+}
+
+void PassiveScalar::updateTerms(Vector &in) {
+  auto dataUp = Up->HostRead();
+  auto dataIn = in.HostReadWrite();
+  int nnode = vfes->GetNDofs();
+
+  double Z = 0.;
+
+  for (int i = 0; i < psData.Size(); i++) {
+    Z = psData[i]->value;
+    for (int n = 0; n < psData[i]->nodes.Size(); n++) {
+      int node = psData[i]->nodes[n];
+      double vel = 0.;
+      for (int d = 0; d < dim; d++) vel += dataUp[node + (1 + d) * nnode] * dataUp[node + (1 + d) * nnode];
+      vel = sqrt(vel);
+      dataIn[node + (1+dim) * nnode] -=
+          vel * (dataUp[node + (1+dim) * nnode] - dataUp[node] * Z) / psData[i]->radius;
+    }
+  }
 }
 
 #ifdef _MASA_

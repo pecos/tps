@@ -34,11 +34,12 @@
 #include "dgNonlinearForm.hpp"
 #include "riemann_solver.hpp"
 
-InletBC::InletBC(MPI_Groups *_groupsMPI, RiemannSolver *_rsolver, EquationOfState *_eqState,
+InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rsolver, EquationOfState *_eqState,
                  ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
                  const int _num_equation, int _patchNumber, double _refLength, InletType _bcType,
                  const Array<double> &_inputData, const int &_maxIntPoints, const int &_maxDofs)
-    : BoundaryCondition(_rsolver, _eqState, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber, _refLength),
+    : BoundaryCondition(_rsolver, _eqState, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
+                        _refLength),
       groupsMPI(_groupsMPI),
       inletType(_bcType),
       maxIntPoints(_maxIntPoints),
@@ -68,7 +69,8 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, RiemannSolver *_rsolver, EquationOfStat
   hmeanUp[1] = 60;
   hmeanUp[2] = 0;
   if (dim == 3) hmeanUp[3] = 0.;
-  hmeanUp[num_equation - 1] = 101300;
+  hmeanUp[1 + dim] = 101300;
+  if (eqSystem == NS_PASSIVE) hmeanUp[num_equation - 1] = 0.;
 
   Array<double> coords;
 
@@ -120,11 +122,11 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, RiemannSolver *_rsolver, EquationOfStat
 
     double gamma = eqState->GetSpecificHeatRatio();
     double k = 0.;
-    for (int d = 0; d < dim; d++) k += iState[1] * iState[1];
-    double rE = iState[3] / (gamma - 1.) + 0.5 * iState[0] * k;
+    for (int d = 0; d < dim; d++) k += iState[1 + d] * iState[1 + d];
+    double rE = iState[1 + dim] / (gamma - 1.) + 0.5 * iState[0] * k;
 
     for (int d = 0; d < dim; d++) iState[1 + d] *= iState[0];
-    iState[num_equation - 1] = rE;
+    iState[1 + dim] = rE;
     for (int eq = 0; eq < num_equation; eq++) hboundaryU[eq + i * num_equation] = iState[eq];
   }
   bdrUInit = false;
@@ -502,10 +504,12 @@ void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
       double gamma = eqState->GetSpecificHeatRatio();
       double k = 0.;
       for (int d = 0; d < dim; d++) k += iState[1 + d] * iState[1 + d];
-      double rE = iState[num_equation - 1] / (gamma - 1.) + 0.5 * iState[0] * k;
+      double rE = iState[1 + dim] / (gamma - 1.) + 0.5 * iState[0] * k;
 
       for (int d = 0; d < dim; d++) iState[1 + d] *= iState[0];
-      iState[num_equation - 1] = rE;
+      iState[1 + dim] = rE;
+      if (eqSystem == NS_PASSIVE) iState[num_equation - 1] *= iState[0];
+
       for (int eq = 0; eq < num_equation; eq++) boundaryU[eq + i * num_equation] = iState[eq];
     }
     bdrUInit = true;
@@ -560,7 +564,7 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
     for (int d = 0; d < dim; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
   }
 
-  const double speedSound = sqrt(gamma * meanUp[num_equation - 1] / meanUp[0]);
+  const double speedSound = sqrt(gamma * meanUp[1 + dim] / meanUp[0]);
   double meanK = 0.;
   for (int d = 0; d < dim; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
   meanK *= 0.5;
@@ -568,7 +572,7 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   // compute outgoing characteristic
   double L1 = 0.;
   for (int d = 0; d < dim; d++) L1 += unitNorm[d] * normGrad[1 + d];  // dVn/dn
-  L1 = normGrad[num_equation - 1] - meanUp[0] * speedSound * L1;
+  L1 = normGrad[1 + dim] - meanUp[0] * speedSound * L1;
   L1 *= meanVel[0] - speedSound;
 
   // estimate ingoing characteristic
@@ -603,10 +607,10 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   bdrFlux[1] = meanVel[0] * d1 + meanUp[0] * d2;
   bdrFlux[2] = meanVel[1] * d1 + meanUp[0] * d3;
   if (dim == 3) bdrFlux[3] = meanVel[2] * d1 + meanUp[0] * d4;
-  bdrFlux[num_equation - 1] = meanUp[0] * meanVel[0] * d2;
-  bdrFlux[num_equation - 1] += meanUp[0] * meanVel[1] * d3;
-  if (dim == 3) bdrFlux[num_equation - 1] += meanUp[0] * meanVel[2] * d4;
-  bdrFlux[num_equation - 1] += meanK * d1 + d5 / (gamma - 1.);
+  bdrFlux[1 + dim] = meanUp[0] * meanVel[0] * d2;
+  bdrFlux[1 + dim] += meanUp[0] * meanVel[1] * d3;
+  if (dim == 3) bdrFlux[1 + dim] += meanUp[0] * meanVel[2] * d4;
+  bdrFlux[1 + dim] += meanK * d1 + d5 / (gamma - 1.);
 
   // flux gradients in other directions
   //   Vector fluxY(num_equation);
@@ -648,6 +652,7 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   Vector newU(num_equation);
   // for(int i=0; i<num_equation;i++) newU[i] = state2[i]- dt*(bdrFlux[i] /*+ fluxY[i]*/);
   for (int i = 0; i < num_equation; i++) newU[i] = stateN[i] - dt * bdrFlux[i];
+  if (eqSystem == NS_PASSIVE) newU[num_equation - 1] = 0.;
 
   // transform back into x-y coords
   {
@@ -682,7 +687,9 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
   if (dim == 3) state2[3] = inputState[0] * inputState[3];
   double k = 0.;
   for (int d = 0; d < dim; d++) k += state2[1 + d] * state2[1 + d];
-  state2[num_equation - 1] = p / (gamma - 1.) + 0.5 * k / state2[0];
+  state2[1 + dim] = p / (gamma - 1.) + 0.5 * k / state2[0];
+
+  if (eqSystem == NS_PASSIVE) state2[num_equation - 1] = 0.;
 
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }

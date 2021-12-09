@@ -45,7 +45,8 @@ void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, D
     case EULER:
       ComputeConvectiveFluxes(state, flux);
       break;
-    case NS: {
+    case NS:
+    case NS_PASSIVE: {
       DenseMatrix convF(num_equations, dim);
       ComputeConvectiveFluxes(state, convF);
 
@@ -55,8 +56,6 @@ void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, D
         for (int d = 0; d < dim; d++) flux(eq, d) = convF(eq, d) - viscF(eq, d);
       }
     } break;
-    case MHD:
-      break;
   }
 }
 
@@ -75,11 +74,16 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
   for (int d = 0; d < dim; d++) {
     flux(1 + dim, d) = state(d + 1) * H;
   }
+
+  if (eqSystem == NS_PASSIVE) {
+    for (int d = 0; d < dim; d++) flux(num_equations - 1, d) = state(num_equations - 1) * state(1 + d) / state(0);
+  }
 }
 
 void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &flux) {
   switch (eqSystem) {
-    case NS: {
+    case NS:
+    case NS_PASSIVE: {
       const double p = eqState->ComputePressure(state, dim);
       const double temp = p / state[0] / Rg;
       const double visc = eqState->GetViscosity(temp);
@@ -111,6 +115,11 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
       for (int d = 0; d < dim; d++) {
         flux(1 + dim, d) += vtmp[d];
         flux(1 + dim, d) += k * gradT[d];
+      }
+
+      if (eqSystem == NS_PASSIVE) {
+        double Sc = eqState->GetSchmidtNum();
+        for (int d = 0; d < dim; d++) flux(num_equations - 1, d) = visc / Sc * gradUp(num_equations - 1, d);
       }
     } break;
     default:

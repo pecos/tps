@@ -102,6 +102,7 @@ class ConstantPressureGradient : public ForcingTerms {
 #endif
 };
 
+
 class SpongeZone : public ForcingTerms {
  private:
   Fluxes *fluxes;
@@ -126,6 +127,25 @@ class SpongeZone : public ForcingTerms {
   ~SpongeZone();
 
   virtual void updateTerms(Vector &in);
+};
+
+// Forcing that adds a passive scalar
+class PassiveScalar : public ForcingTerms {
+ private:
+  EquationOfState *eqState;
+
+  Array<passiveScalarData *> psData;
+
+ public:
+  PassiveScalar(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
+                IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, EquationOfState *_eqState,
+                ParGridFunction *_Up, ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
+                RunConfiguration &_config);
+
+  // Terms do not need updating
+  virtual void updateTerms(Vector &in);
+
+  ~PassiveScalar();
 };
 
 #ifdef _MASA_
