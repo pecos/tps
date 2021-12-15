@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([tps], [1.0], [https://github.com/pecos/tps])
+AC_INIT([tps], [1.1], [https://github.com/pecos/tps])
 AC_CONFIG_SRCDIR([src/main.cpp])
 AC_CONFIG_HEADERS([tps_config.h])
 AC_CONFIG_AUX_DIR([build-aux])
@@ -23,13 +23,12 @@ AX_PROG_CXX_MPI
 #CXXFLAGS="-std=c++17 $CXXFLAGS"
 CXXFLAGS="-std=c++11 $CXXFLAGS"
 
+
 # 3rd party libraries
-AX_PATH_GRVY([0.32],[yes])
+AX_PATH_MFEM([4.2],  [yes])
+AX_PATH_GRVY([0.32], [yes])
 AX_PATH_HDF5([1.8.0],[yes])
 
-
-
-#AC_PROG_LIBTOOL
 AC_PROG_RANLIB
 
 # Valgrind?

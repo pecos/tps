@@ -36,6 +36,9 @@
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
 
+/* Define if MFEM is available */
+#undef HAVE_MFEM
+
 /* Define if you have the MPI library. */
 #undef HAVE_MPI
 
