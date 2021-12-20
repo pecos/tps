@@ -12,13 +12,15 @@ if GSLIB_ENABLED
 AM_CPPFLAGS += -I$(GSLIB_INC)
 endif
 
+tps_LDFLAGS=
+
 # C++ main solver binary
 bin_PROGRAMS         = tps
 tps_SOURCES          = main.cpp
 tps_LDADD            = libtps.a
-tps_LDFLAGS          = $(MFEM_LIBS)
-tps_LDFLAGS         += $(HDF5_LIBS)
-tps_LDFLAGS         += $(GRVY_LIBS)
+tps_LDADD           += $(HDF5_LIBS)
+tps_LDADD           += $(GRVY_LIBS)
+tps_LDADD           += $(MFEM_LIBS)
 
 if SLURM_ENABLED
 tps_LDFLAGS         += -lslurm
