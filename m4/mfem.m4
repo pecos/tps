@@ -57,15 +57,15 @@ AC_MSG_CHECKING(for MFEM external library configuration)
 
 dnl Query MFEM 3rd party libs
 dnl the _ENV variant potentially has paths replaced by environment variables
-MFEM_EXT_LIBS=`$srcdir/m4/snarf_mfem.py --libs --noreplace`
-MFEM_EXT_LIBS_ENV=`$srcdir/m4/snarf_mfem.py --libs`
+MFEM_EXT_LIBS=`$srcdir/m4/snarf_mfem.py --libs --noreplace --dir $MFEM_PREFIX`
+MFEM_EXT_LIBS_ENV=`$srcdir/m4/snarf_mfem.py --libs --dir $MFEM_PREFIX`
 AC_MSG_RESULT($MFEM_EXT_LIBS)
 
 dnl Query MFEM 3rd party headers
 dnl the _ENV variant potentially has paths replaced by environment variables
 AC_MSG_CHECKING(for MFEM header paths)
-MFEM_EXT_INC=`$srcdir/m4/snarf_mfem.py --includes --noreplace`
-MFEM_EXT_INC_ENV=`$srcdir/m4/snarf_mfem.py --includes`
+MFEM_EXT_INC=`$srcdir/m4/snarf_mfem.py --includes --noreplace --dir $MFEM_PREFIX`
+MFEM_EXT_INC_ENV=`$srcdir/m4/snarf_mfem.py --includes --dir $MFEM_PREFIX`
 AC_MSG_RESULT($MFEM_EXT_INC)
 
 dnl if the user called the macro, check for package,
@@ -82,6 +82,19 @@ fi
 ac_MFEM_save_CXXFLAGS="$CXXFLAGS"
 ac_MFEM_save_LDFLAGS="$LDFLAGS"
 ac_MFEM_save_LIBS="$LIBS"
+
+
+dnl is this a GPU-enabled MFEM?
+if test "x${CUDA_CXXFLAGS}" != "x" ; then
+  CXXFLAGS="${CXXFLAGS} ${CUDA_CXXFLAGS}"
+fi
+
+if test "x${CUDA_LDFLAGS}" != "x" ; then
+  LDFLAGS="${LDFLAGS} ${CUDA_LDFLAGS}"
+  if test "x${OPENBLAS_LIBS}" != "x" ; then
+     MFEM_LIBS="$MFEM_LIBS ${OPENBLAS_LIBS}"
+  fi
+fi
 
 CXXFLAGS="${MFEM_CXXFLAGS} ${CXXFLAGS}"
 LDFLAGS="${MFEM_LIBS} ${LDFLAGS}"
