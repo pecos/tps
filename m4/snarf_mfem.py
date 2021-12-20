@@ -23,7 +23,7 @@ if not args.parseLibs and not args.parseIncs:
 
 if args.dir:
     mfem_dir = args.dir
-    print("dir = %s\n" % args.dir)
+    logging.debug("dir = %s\n" % args.dir)
 else:
     mfem_dir = os.getenv("MFEM_DIR")
     if not mfem_dir:
