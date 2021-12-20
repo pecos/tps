@@ -25,9 +25,10 @@ CXXFLAGS="-std=c++11 $CXXFLAGS"
 
 
 # 3rd party libraries
-AX_PATH_MFEM([4.2],  [yes])
+
 AX_PATH_GRVY([0.32], [yes])
 AX_PATH_HDF5([1.8.0],[yes])
+AX_PATH_OPENBLAS([no])
 
 AC_PROG_RANLIB
 
@@ -100,7 +101,8 @@ AH_TEMPLATE([_GPU_], [Build in GPU support])
 AH_TEMPLATE([_CUDA_],[CUDA backend])
 AH_TEMPLATE([_HIP_], [HIP backend])
 
-#-- GPU/Cuda build setup
+dnl ------------------------------
+dnl -- GPU/Cuda build setup
 
 AC_MSG_CHECKING([if requesting gpu-cuda build])
 AC_ARG_ENABLE([gpu-cuda],
@@ -126,6 +128,8 @@ echo " "
 AC_MSG_ERROR([Please rerun configure with a valid CUDA_ARCH setting.])
 else
 AC_MSG_RESULT([yes])
+dnl generally need blas as well so check for that
+AX_BLAS()
 fi
 
 AC_LANG_PUSH([C])
@@ -148,7 +152,8 @@ fi
 AM_CONDITIONAL(CUDA_ENABLED,test x$ENABLE_CUDA = xyes)
 AM_CONDITIONAL(GPU_ENABLED,test x$ENABLE_CUDA = xyes)
 
-#-- Check for GPU/HIP build setup
+dnl ------------------------------
+dnl Check for GPU/HIP build setup
 ENABLE_HIP=no
 if test x$ENABLE_GPU != xyes; then
    AX_HIP_CHECK()
@@ -156,11 +161,13 @@ if test x$ENABLE_GPU != xyes; then
 fi
 AM_CONDITIONAL(HIP_ENABLED,test x$ENABLE_HIP = xyes)
 
-#--
+AX_PATH_MFEM([4.2],  [yes])
+
+dnl --
 
 AC_OUTPUT([Makefile src/Makefile test/Makefile utils/Makefile])
 
-# create soft link to local bats binary in tests/
+dnl create soft link to local bats binary in tests/
 AC_MSG_NOTICE([Bootstrapping local bats test configuration])
 if test -d test ; then
   if test ! -e test/bats ; then
@@ -170,5 +177,5 @@ if test -d test ; then
   fi
 fi
 
-# Final summary
+dnl Final summary
 AX_SUMMARIZE_CONFIG
