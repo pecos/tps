@@ -52,16 +52,16 @@ echo Valgrind available.......... : $enable_valgrind
 echo GPU build enabled with CUDA. : $ENABLE_CUDA
 if test "$ENABLE_CUDA" = "yes"; then
 AS_ECHO("`$srcdir/m4/wrap_lines.py --maxWidth 110 --first 1 --remain 31 --prefix "   CUDA_CXXFLAGS............ :" \
-                                   --input "$CUDA_CXXFLAGS"`")
+                                   --input="$CUDA_CXXFLAGS"`")
 AS_ECHO("`$srcdir/m4/wrap_lines.py --maxWidth 110 --first 1 --remain 31 --prefix "   CUDA_LDFLAGS............. :" \
-                                   --input "$CUDA_LDFLAGS"`")
+                                   --input="$CUDA_LDFLAGS"`")
 fi
 echo GPU build enabled with HIP.. : $ENABLE_HIP
 if test "$ENABLE_HIP" = "yes"; then
 AS_ECHO("`$srcdir/m4/wrap_lines.py --maxWidth 110 --first 1 --remain 31 --prefix "   HIP_CXXFLAGS............. :" \
-                                   --input "$HIP_CXXFLAGS"`")
+                                   --input="$HIP_CXXFLAGS"`")
 AS_ECHO("`$srcdir/m4/wrap_lines.py --maxWidth 110 --first 1 --remain 31 --prefix "   HIP_LDFLAGS.............. :" \
-                                   --input "$HIP_LDFLAGS"`")
+                                   --input="$HIP_LDFLAGS"`")
 fi
 echo '-----------------------------------------------------------------------------------'
 
