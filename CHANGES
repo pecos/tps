@@ -1,3 +1,11 @@
+Version 1.1 (Dec 2021)
+
+  * addition of sponge zone boundary condition (#80)
+  * addition of passive scalars for Navier-Stokes CPU-based solver (#82)
+  * build system updated for MFEM, now provides a --with-mfem configure option
+    that can be used to supply the top-level path for MFEM; macro will query
+    required 3rd party libraries used with MFEM by scanning config.mk (#83)
+
 Version 1.0 (19 Oct 2021)
 
   * initial release with standalone compressible flow and EM solvers
