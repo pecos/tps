@@ -128,8 +128,6 @@ echo " "
 AC_MSG_ERROR([Please rerun configure with a valid CUDA_ARCH setting.])
 else
 AC_MSG_RESULT([yes])
-dnl generally need blas as well so check for that
-AX_BLAS()
 fi
 
 AC_LANG_PUSH([C])
