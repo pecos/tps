@@ -51,7 +51,7 @@ jobs:
        - name: Bootstrap
          run:  ./bootstrap
        - name: Configure
-         run:  ./configure CXXFLAGS="-fdiagnostics-color=always -I$PETSC_INC" LDFLAGS="-L$PETSC_LIB -lpetsc"
+         run:  ./configure CXXFLAGS="-fdiagnostics-color=always"
        - name: Make
          run:  make -j 2
        - name: Tests
@@ -59,7 +59,7 @@ jobs:
        - name: Distclean
          run:  make distclean
        - name: VPATH configure
-         run:  mkdir build; cd build; ../configure CXXFLAGS="-I$PETSC_INC" LDFLAGS="-L$PETSC_LIB -lpetsc"
+         run:  mkdir build; cd build; ../configure
        - name: VPATH make
          run:  cd build; make -j 2
        - name: VPATH tests
@@ -68,8 +68,7 @@ jobs:
     runs-on: [self-hosted, linux, x64, gpu, marvin-cuda]
     name: Build/GPU (Cuda)
     env:
-      MFEM_LIB: /home/karl/sw/mfem-gpu-4.2/lib
-      MFEM_INC: /home/karl/sw/mfem-gpu-4.2/include
+      MFEM_DIR: /home/karl/sw/mfem-gpu-4.2
     steps:
       - name: Cancel previous runs
         uses: styfle/cancel-workflow-action@0.9.0
@@ -95,8 +94,7 @@ jobs:
     runs-on: [self-hosted, linux, x64, gpu, hip]
     name: Build/GPU (AMD/HIP)
     env:
-      MFEM_LIB: /home/karl/sw/mfem-hip-4.3/lib
-      MFEM_INC: /home/karl/sw/mfem-hip-4.3/include
+      MFEM_DIR: /home/karl/sw/mfem-hip-4.3
     steps:
       - name: Cancel previous runs
         uses: styfle/cancel-workflow-action@0.9.0
