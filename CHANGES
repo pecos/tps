@@ -1,4 +1,4 @@
-Version 1.1 (Dec 2021)
+Version 1.1 (21 Dec 2021)
 
   * addition of sponge zone boundary condition (#80)
   * addition of passive scalars for Navier-Stokes CPU-based solver (#82)
