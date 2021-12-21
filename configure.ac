@@ -11,7 +11,7 @@ AM_INIT_AUTOMAKE([subdir-objects])
 AM_EXTRA_RECURSIVE_TARGETS([style enforcestyle])
 
 # Checks for programs.
-#AM_PATH_PYTHON([3.6.8])
+AM_PATH_PYTHON([3.6.8])
 
 AX_SUMMARIZE_ENV
 #AC_PROG_CXX
