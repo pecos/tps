@@ -1,5 +1,4 @@
-AM_CPPFLAGS          = -g -I$(MFEM_INC) -I$(MFEM_INC)/mfem
-AM_CPPFLAGS         += -I$(HYPRE_INC) $(HDF5_CFLAGS) $(GRVY_CFLAGS)
+AM_CPPFLAGS  = -g $(MFEM_CXXFLAGS) $(HDF5_CFLAGS) $(GRVY_CFLAGS)
 
 if CUDA_ENABLED
 AM_CPPFLAGS += $(CUDA_CXXFLAGS)
@@ -13,21 +12,15 @@ if GSLIB_ENABLED
 AM_CPPFLAGS += -I$(GSLIB_INC)
 endif
 
+tps_LDFLAGS=
+
 # C++ main solver binary
 bin_PROGRAMS         = tps
 tps_SOURCES          = main.cpp
-tps_LDADD            = libtps.a -lmfem
-
-tps_LDFLAGS          = -L$(MFEM_LIB)
-tps_LDFLAGS         += $(HDF5_LIBS)
-tps_LDFLAGS         += -L$(HYPRE_LIB) -lHYPRE
-tps_LDFLAGS         += -L$(OPENBLAS_LIB) -lopenblas
-tps_LDFLAGS         += -L$(METIS_LIB) -lmetis
-tps_LDFLAGS         += $(GRVY_LIBS)
-# hypre depends are complicated
-#tps_LDFLAGS         += -L$(PETSC_LIB) -lpetsc
-tps_LDFLAGS         += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
-tps_LDFLAGS         += -L$(NETCDF_LIB) -lnetcdf
+tps_LDADD            = libtps.a
+tps_LDADD           += $(HDF5_LIBS)
+tps_LDADD           += $(GRVY_LIBS)
+tps_LDADD           += $(MFEM_LIBS)
 
 if SLURM_ENABLED
 tps_LDFLAGS         += -lslurm
@@ -67,19 +60,6 @@ mfem_extra_headers   = ../utils/mfem_extras/pfem_extras.hpp
 
 noinst_LIBRARIES     = libtps.a
 libtps_a_SOURCES     = $(cxx_sources) $(mfem_extra_sources) $(headers) $(mfem_extra_headers)
-
-# disabling dynamic library, did not cooperate with nvcc
-#tps_LDADD            = -L$(top_builddir)/src -ltps
-#tps_DEPENDENCIES     = libtps.la
-#tps_DEPENDENCIES     = libtps.a
-
-## lib_LTLIBRARIES      = libtps.la
-## libtps_la_SOURCES    = $(cxx_sources) $(headers)
-## libtps_la_LDFLAGS    = -avoid-version
-## libtps_la_LDFLAGS   += -L/usr/local/lib -L$(MFEM_LIB) -lmfem
-## libtps_la_LDFLAGS   += -L$(HYPRE_LIB) -lHYPRE -L$(PETSC_LIB) -lpetsc -L$(SUPERLU_DIST_LIB) -lsuperlu_dist #-L$(HDF5_LIB) -lhdf5
-## libtps_la_LDFLAGS   += -L$(NETCDF_LIB) -lnetcdf
-## libtps_la_LDFLAGS   += -lgrvy
 
 # Python wrapper for C++ solver library
 ### pyexec_LTLIBRARIES   = pytps.la

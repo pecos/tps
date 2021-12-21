@@ -31,8 +31,6 @@
 // -----------------------------------------------------------------------------------el-
 #include "averaging_and_rms.hpp"
 
-#include <general/forall.hpp>
-
 Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollection *_fec, ParFiniteElementSpace *_fes,
                      ParFiniteElementSpace *_dfes, ParFiniteElementSpace *_vfes, Equations &_eqSys,
                      const int &_num_equation, const int &_dim, RunConfiguration &_config, MPI_Groups *_groupsMPI)

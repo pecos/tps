@@ -31,7 +31,6 @@
 // -----------------------------------------------------------------------------------el-
 #include "forcing_terms.hpp"
 #include <vector>
-#include <general/forall.hpp>
 
 ForcingTerms::ForcingTerms(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                            IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,

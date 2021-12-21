@@ -33,8 +33,7 @@
 #define DGNONLINEARFORM_HPP_
 
 #include <tps_config.h>
-
-#include <fem/nonlinearform.hpp>
+#include <mfem/fem/nonlinearform.hpp>
 #include <mfem.hpp>
 
 #include "BCintegrator.hpp"
