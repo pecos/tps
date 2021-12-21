@@ -54,7 +54,7 @@ class BCintegrator : public NonlinearFormIntegrator {
   RunConfiguration &config;
 
   RiemannSolver *rsolver;
-  EquationOfState *eqState;
+  GasMixture *mixture;
   Fluxes *fluxClass;
 
   double &max_char_speed;
@@ -87,7 +87,7 @@ class BCintegrator : public NonlinearFormIntegrator {
 
  public:
   BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules,
-               RiemannSolver *rsolver_, double &_dt, EquationOfState *_eqState, Fluxes *_fluxClass,
+               RiemannSolver *rsolver_, double &_dt, GasMixture *mixture, Fluxes *_fluxClass,
                ParGridFunction *_Up, ParGridFunction *_gradUp, Vector &_shapesBC, Vector &_normalsWBC,
                Array<int> &_intPointsElIDBC, const int _dim, const int _num_equation, double &_max_char_speed,
                RunConfiguration &_runFile, Array<int> &local_bdr_attr, const int &_maxIntPoints, const int &_maxDofs);

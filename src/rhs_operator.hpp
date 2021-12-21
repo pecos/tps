@@ -68,7 +68,7 @@ class RHSoperator : public TimeDependentOperator {
   const int intRuleType;
 
   Fluxes *fluxClass;
-  EquationOfState *eqState;
+  GasMixture *mixture;
 
   ParFiniteElementSpace *vfes;
 
@@ -128,7 +128,7 @@ class RHSoperator : public TimeDependentOperator {
  public:
   RHSoperator(int &_iter, const int _dim, const int &_num_equations, const int &_order, const Equations &_eqSystem,
               double &_max_char_speed, IntegrationRules *_intRules, int _intRuleType, Fluxes *_fluxClass,
-              EquationOfState *_eqState, ParFiniteElementSpace *_vfes, const volumeFaceIntegrationArrays &gpuArrays,
+              GasMixture *_mixture, ParFiniteElementSpace *_vfes, const volumeFaceIntegrationArrays &gpuArrays,
               const int &_maxIntPoints, const int &_maxDofs, DGNonLinearForm *_A, MixedBilinearForm *_Aflux,
               ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult, ParGridFunction *_Up, ParGridFunction *_gradUp,
               ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A, BCintegrator *_bcIntegrator,

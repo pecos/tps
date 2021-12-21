@@ -37,18 +37,13 @@
 #include <general/forall.hpp>
 #include <mfem.hpp>
 
+#include "dataStructures.hpp"
 #include "BoundaryCondition.hpp"
 #include "equation_of_state.hpp"
 #include "logger.hpp"
 #include "mpi_groups.hpp"
 
 using namespace mfem;
-
-enum InletType {
-  SUB_DENS_VEL,      // Subsonic inlet specified by the density and velocity components
-  SUB_DENS_VEL_NR,   // Non-reflecting subsonic inlet specified by the density and velocity components
-  SUB_VEL_CONST_ENT  // Subsonic non-reflecting. Specified vel, keeps entropy constant
-};
 
 class InletBC : public BoundaryCondition {
  private:
@@ -94,7 +89,7 @@ class InletBC : public BoundaryCondition {
   virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up);
 
  public:
-  InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *rsolver_, EquationOfState *_eqState,
+  InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *rsolver_, GasMixture *_mixture,
           ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
           const int _num_equation, int _patchNumber, double _refLength, InletType _bcType,
           const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs);

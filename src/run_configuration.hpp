@@ -41,11 +41,6 @@
 #include <vector>
 
 #include "dataStructures.hpp"
-#include "equation_of_state.hpp"
-#include "fluxes.hpp"
-#include "inletBC.hpp"
-#include "outletBC.hpp"
-#include "wallBC.hpp"
 
 using namespace mfem;
 using namespace std;

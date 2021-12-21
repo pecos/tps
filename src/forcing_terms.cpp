@@ -214,12 +214,12 @@ void ConstantPressureGradient::updateTerms_gpu(const int numElems, const int off
 #endif
 
 SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
-                       Fluxes *_fluxClass, EquationOfState *_eqState, IntegrationRules *_intRules,
+                       Fluxes *_fluxClass, GasMixture *_mixture, IntegrationRules *_intRules,
                        ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
                        const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays),
       fluxes(_fluxClass),
-      eqState(_eqState),
+      mixture(_mixture),
       szData(_config.GetSpongeZoneData()) {
   targetU.SetSize(num_equation);
   if (szData.szType == SpongeZoneSolution::USERDEF) {
@@ -227,7 +227,7 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
     Up[0] = szData.targetUp[0];
     for (int d = 0; d < dim; d++) Up[1 + d] = szData.targetUp[1 + d];
     Up[1 + dim] = szData.targetUp[4];
-    eqState->GetConservativesFromPrimitives(Up, targetU, dim, num_equation);
+    mixture->GetConservativesFromPrimitives(Up, targetU);
   }
 
   meanNormalFluxes.SetSize(num_equation + 1);
@@ -298,8 +298,8 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
   Vector Un(num_equation), Up(num_equation);
 
   // compute speed of sound
-  double gamma = eqState->GetSpecificHeatRatio();
-  eqState->GetPrimitivesFromConservatives(targetU, Up, dim, num_equation);
+  double gamma = mixture->GetSpecificHeatRatio();
+  mixture->GetPrimitivesFromConservatives(targetU, Up);
   double speedSound = sqrt(gamma * Up[1+dim] / Up[0]);
 
   // add forcing to RHS, i.e., @in
@@ -308,7 +308,7 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
     if (s > 0.) {
       s *= szData.multFactor;
       for (int eq = 0; eq < num_equation; eq++) Up[eq] = dataUp[n + eq * nnodes];
-      eqState->GetConservativesFromPrimitives(Up, Un, dim, num_equation);
+      mixture->GetConservativesFromPrimitives(Up, Un);
 
       for (int eq = 0; eq < num_equation; eq++) dataIn[n + eq * nnodes] -= speedSound * s * (Un[eq] - targetU[eq]);
     }
@@ -318,7 +318,7 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
 void SpongeZone::computeMixedOutValues() {
   int nnodes = vfes->GetNDofs();
   const double *dataUp = Up->HostRead();
-  double gamma = eqState->GetSpecificHeatRatio();
+  double gamma = mixture->GetSpecificHeatRatio();
 
   // compute mean normal fluxes
   meanNormalFluxes = 0.;
@@ -329,7 +329,7 @@ void SpongeZone::computeMixedOutValues() {
     int node = nodesInMixedOutPlane[n];
 
     for (int eq = 0; eq < num_equation; eq++) Up[eq] = dataUp[node + eq * nnodes];
-    eqState->GetConservativesFromPrimitives(Up, Un, dim, num_equation);
+    mixture->GetConservativesFromPrimitives(Up, Un);
     fluxes->ComputeConvectiveFluxes(Un, f);
 
     for (int eq = 0; eq < num_equation; eq++)
@@ -363,11 +363,11 @@ void SpongeZone::computeMixedOutValues() {
   double v2 = 0.;
   for (int d = 0; d < dim; d++) v2 += Up[1 + d] * Up[1 + d];
 
-  eqState->GetConservativesFromPrimitives(Up, targetU, dim, num_equation);
+  mixture->GetConservativesFromPrimitives(Up, targetU);
 }
 
 PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
-                             IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, EquationOfState *_eqState,
+                             IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, GasMixture *_mixture,
                              ParGridFunction *_Up, ParGridFunction *_gradUp,
                              const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays) {

@@ -58,7 +58,7 @@ class DGNonLinearForm : public ParNonlinearForm {
   IntegrationRules *intRules;
   const int dim;
   const int num_equation;
-  EquationOfState *eqState;
+  GasMixture *mixture;
 
   const volumeFaceIntegrationArrays &gpuArrays;
 
@@ -76,7 +76,7 @@ class DGNonLinearForm : public ParNonlinearForm {
  public:
   DGNonLinearForm(ParFiniteElementSpace *f, ParFiniteElementSpace *gradFes, ParGridFunction *_gradUp,
                   BCintegrator *_bcIntegrator, IntegrationRules *intRules, const int dim, const int num_equation,
-                  EquationOfState *eqState, const volumeFaceIntegrationArrays &_gpuArrays, const int &maxIntPoints,
+                  GasMixture *mixture, const volumeFaceIntegrationArrays &_gpuArrays, const int &maxIntPoints,
                   const int &maxDofs);
 
   void Mult(const Vector &x, Vector &y);

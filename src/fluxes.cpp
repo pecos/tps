@@ -31,13 +31,13 @@
 // -----------------------------------------------------------------------------------el-
 #include "fluxes.hpp"
 
-Fluxes::Fluxes(EquationOfState *_eqState, Equations &_eqSystem, const int &_num_equations, const int &_dim)
-    : eqState(_eqState), eqSystem(_eqSystem), dim(_dim), num_equations(_num_equations) {
+Fluxes::Fluxes(GasMixture *_mixture, Equations &_eqSystem, const int &_num_equations, const int &_dim)
+    : mixture(_mixture), eqSystem(_eqSystem), dim(_dim), num_equations(_num_equations) {
   gradT.SetSize(dim);
   vel.SetSize(dim);
   vtmp.SetSize(dim);
   stress.SetSize(dim, dim);
-  Rg = eqState->GetGasConstant();
+  Rg = mixture->GetGasConstant();
 }
 
 void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, DenseMatrix &flux) {
@@ -60,7 +60,7 @@ void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, D
 }
 
 void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
-  const double pres = eqState->ComputePressure(state, dim);
+  const double pres = mixture->ComputePressure(state);
 
   for (int d = 0; d < dim; d++) {
     flux(0, d) = state(d + 1);
@@ -84,11 +84,11 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   switch (eqSystem) {
     case NS:
     case NS_PASSIVE: {
-      const double p = eqState->ComputePressure(state, dim);
+      const double p = mixture->ComputePressure(state);
       const double temp = p / state[0] / Rg;
-      const double visc = eqState->GetViscosity(temp);
-      const double bulkViscMult = eqState->GetBulkViscMultiplyer();
-      const double k = eqState->GetThermalConductivity(visc);
+      const double visc = mixture->GetViscosity(state);
+      const double bulkViscMult = mixture->GetBulkViscMultiplyer();
+      const double k = mixture->GetThermalConductivity(state);
 
       // make sure density visc. flux is 0
       for (int d = 0; d < dim; d++) flux(0, d) = 0.;
@@ -118,7 +118,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
       }
 
       if (eqSystem == NS_PASSIVE) {
-        double Sc = eqState->GetSchmidtNum();
+        double Sc = mixture->GetSchmidtNum();
         for (int d = 0; d < dim; d++) flux(num_equations - 1, d) = visc / Sc * gradUp(num_equations - 1, d);
       }
     } break;

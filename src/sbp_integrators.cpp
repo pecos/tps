@@ -31,12 +31,12 @@
 // -----------------------------------------------------------------------------------el-
 #include "sbp_integrators.hpp"
 
-SBPintegrator::SBPintegrator(EquationOfState* _eqState, Fluxes* _fluxClass, IntegrationRules* _intRules, const int _dim,
+SBPintegrator::SBPintegrator(GasMixture* _mixture, Fluxes* _fluxClass, IntegrationRules* _intRules, const int _dim,
                              const int _num_equation, double& _alpha)
     : dim(_dim),
       num_equation(_num_equation),
       alpha(_alpha),
-      eqState(_eqState),
+      mixture(_mixture),
       fluxClass(_fluxClass),
       intRules(_intRules) {}
 

@@ -123,7 +123,7 @@ class M2ulPhyS {
   ODESolver *timeIntegrator;
 
   // Pointers to the different classes
-  EquationOfState *eqState;
+  GasMixture *mixture;
 
   ParGridFunction *spaceVaryViscMult;  // space varying viscosity multiplier
 

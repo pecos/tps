@@ -37,18 +37,12 @@
 #include <general/forall.hpp>
 #include <mfem.hpp>
 
+#include "dataStructures.hpp"
 #include "BoundaryCondition.hpp"
 #include "logger.hpp"
 #include "mpi_groups.hpp"
 
 using namespace mfem;
-
-enum OutletType {
-  SUB_P,        // subsonic outlet specified with pressure
-  SUB_P_NR,     // non-reflecting subsonic outlet specified with pressure
-  SUB_MF_NR,    // Mass-flow non-reflecting
-  SUB_MF_NR_PW  // point-based non-reflecting massflow BC
-};
 
 class OutletBC : public BoundaryCondition {
  private:
@@ -104,7 +98,7 @@ class OutletBC : public BoundaryCondition {
   void computeParallelArea();
 
  public:
-  OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *rsolver_, EquationOfState *_eqState,
+  OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *rsolver_, GasMixture *mixture,
            ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
            const int _num_equation, int _patchNumber, double _refLength, OutletType _bcType,
            const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs);

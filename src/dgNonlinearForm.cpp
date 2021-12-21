@@ -37,7 +37,7 @@
 
 DGNonLinearForm::DGNonLinearForm(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradFes,
                                  ParGridFunction *_gradUp, BCintegrator *_bcIntegrator, IntegrationRules *_intRules,
-                                 const int _dim, const int _num_equation, EquationOfState *_eqState,
+                                 const int _dim, const int _num_equation, GasMixture *_mixture,
                                  const volumeFaceIntegrationArrays &_gpuArrays, const int &_maxIntPoints,
                                  const int &_maxDofs)
     : ParNonlinearForm(_vfes),
@@ -48,7 +48,7 @@ DGNonLinearForm::DGNonLinearForm(ParFiniteElementSpace *_vfes, ParFiniteElementS
       intRules(_intRules),
       dim(_dim),
       num_equation(_num_equation),
-      eqState(_eqState),
+      mixture(_mixture),
       gpuArrays(_gpuArrays),
       maxIntPoints(_maxIntPoints),
       maxDofs(_maxDofs) {
@@ -125,8 +125,8 @@ void DGNonLinearForm::Mult_domain(const Vector &x, Vector &y) {
       faceIntegration_gpu(x,  // px,
                           y,  // py,
                           gradUp, vfes->GetNDofs(), mesh->GetNumFaces(), h_numElems[elType], elemOffset, dof_el, dim,
-                          num_equation, eqState->GetSpecificHeatRatio(), eqState->GetGasConstant(),
-                          eqState->GetViscMultiplyer(), eqState->GetBulkViscMultiplyer(), eqState->GetPrandtlNum(),
+                          num_equation, mixture->GetSpecificHeatRatio(), mixture->GetGasConstant(),
+                          mixture->GetViscMultiplyer(), mixture->GetBulkViscMultiplyer(), mixture->GetPrandtlNum(),
                           gpuArrays, maxIntPoints, maxDofs);
     }
   }
@@ -140,8 +140,8 @@ void DGNonLinearForm::Mult_bdr(const Vector &x, Vector &y) {
   const int Nshared = pmesh->GetNSharedFaces();
   if (Nshared > 0) {
     sharedFaceIntegration_gpu(x, transferU->face_nbr_data, gradUp, transferGradUp->face_nbr_data, y, vfes->GetNDofs(),
-                              dim, num_equation, eqState->GetSpecificHeatRatio(), eqState->GetGasConstant(),
-                              eqState->GetViscMultiplyer(), eqState->GetBulkViscMultiplyer(), eqState->GetPrandtlNum(),
+                              dim, num_equation, mixture->GetSpecificHeatRatio(), mixture->GetGasConstant(),
+                              mixture->GetViscMultiplyer(), mixture->GetBulkViscMultiplyer(), mixture->GetPrandtlNum(),
                               gpuArrays, parallelData, maxIntPoints, maxDofs);
   }
 }

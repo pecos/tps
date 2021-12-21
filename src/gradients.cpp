@@ -34,7 +34,7 @@
 #include "dgNonlinearForm.hpp"
 
 Gradients::Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradUpfes, int _dim, int _num_equation,
-                     ParGridFunction *_Up, ParGridFunction *_gradUp, EquationOfState *_eqState,
+                     ParGridFunction *_Up, ParGridFunction *_gradUp, GasMixture *_mixture,
                      GradNonLinearForm *_gradUp_A, IntegrationRules *_intRules, int _intRuleType,
                      const volumeFaceIntegrationArrays &_gpuArrays, Array<DenseMatrix *> &_Me_inv, Vector &_invMArray,
                      Array<int> &_posDofInvM, const int &_maxIntPoints, const int &_maxDofs)
@@ -45,7 +45,7 @@ Gradients::Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradU
       num_equation(_num_equation),
       Up(_Up),
       gradUp(_gradUp),
-      eqState(_eqState),
+      mixture(_mixture),
       gradUp_A(_gradUp_A),
       intRules(_intRules),
       intRuleType(_intRuleType),
@@ -217,9 +217,9 @@ void Gradients::computeGradients_bdr() {
   const int Nshared = pmesh->GetNSharedFaces();
   if (Nshared > 0) {
     integrationGradSharedFace_gpu(Up, transferUp->face_nbr_data, gradUp, vfes->GetNDofs(), dim, num_equation,
-                                  eqState->GetSpecificHeatRatio(), eqState->GetGasConstant(),
-                                  eqState->GetViscMultiplyer(), eqState->GetBulkViscMultiplyer(),
-                                  eqState->GetPrandtlNum(), gpuArrays, parallelData, maxIntPoints, maxDofs);
+                                  mixture->GetSpecificHeatRatio(), mixture->GetGasConstant(),
+                                  mixture->GetViscMultiplyer(), mixture->GetBulkViscMultiplyer(),
+                                  mixture->GetPrandtlNum(), gpuArrays, parallelData, maxIntPoints, maxDofs);
   }
 
   // Multiply by inverse mass matrix

@@ -34,11 +34,11 @@
 #include "dgNonlinearForm.hpp"
 #include "riemann_solver.hpp"
 
-InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rsolver, EquationOfState *_eqState,
+InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rsolver, GasMixture *_mixture,
                  ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
                  const int _num_equation, int _patchNumber, double _refLength, InletType _bcType,
                  const Array<double> &_inputData, const int &_maxIntPoints, const int &_maxDofs)
-    : BoundaryCondition(_rsolver, _eqState, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
+    : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
                         _refLength),
       groupsMPI(_groupsMPI),
       inletType(_bcType),
@@ -120,7 +120,7 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
     iState.SetSize(num_equation);
     for (int eq = 0; eq < num_equation; eq++) iState(eq) = hmeanUp[eq];
 
-    double gamma = eqState->GetSpecificHeatRatio();
+    double gamma = mixture->GetSpecificHeatRatio();
     double k = 0.;
     for (int d = 0; d < dim; d++) k += iState[1 + d] * iState[1 + d];
     double rE = iState[1 + dim] / (gamma - 1.) + 0.5 * iState[0] * k;
@@ -501,7 +501,7 @@ void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
     for (int i = 0; i < totNbdr; i++) {
       Vector iState(num_equation);
       for (int eq = 0; eq < num_equation; eq++) iState[eq] = boundaryU[eq + i * num_equation];
-      double gamma = eqState->GetSpecificHeatRatio();
+      double gamma = mixture->GetSpecificHeatRatio();
       double k = 0.;
       for (int d = 0; d < dim; d++) k += iState[1 + d] * iState[1 + d];
       double rE = iState[1 + dim] / (gamma - 1.) + 0.5 * iState[0] * k;
@@ -523,13 +523,13 @@ void InletBC::integrationBC(Vector &y,  // output
   integrateInlets_gpu(inletType, inputState, dt,
                       y,  // output
                       x, nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC, listElems,
-                      offsetsBoundaryU, maxIntPoints, maxDofs, dim, num_equation, eqState->GetSpecificHeatRatio(),
-                      eqState->GetGasConstant());
+                      offsetsBoundaryU, maxIntPoints, maxDofs, dim, num_equation, mixture->GetSpecificHeatRatio(),
+                      mixture->GetGasConstant());
 }
 
 void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
                                                    Vector &bdrFlux) {
-  const double gamma = eqState->GetSpecificHeatRatio();
+  const double gamma = mixture->GetSpecificHeatRatio();
   // const double p = eqState->ComputePressure(stateIn, dim);
 
   Vector unitNorm = normal;
@@ -677,8 +677,8 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
 }
 
 void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
-  const double gamma = eqState->GetSpecificHeatRatio();
-  const double p = eqState->ComputePressure(stateIn, dim);
+  const double gamma = mixture->GetSpecificHeatRatio();
+  const double p = mixture->ComputePressure(stateIn);
 
   Vector state2(num_equation);
   state2[0] = inputState[0];

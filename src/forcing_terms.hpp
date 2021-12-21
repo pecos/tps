@@ -106,7 +106,7 @@ class ConstantPressureGradient : public ForcingTerms {
 class SpongeZone : public ForcingTerms {
  private:
   Fluxes *fluxes;
-  EquationOfState *eqState;
+  GasMixture *mixture;
 
   SpongeZoneData &szData;
   Vector targetU;
@@ -122,7 +122,7 @@ class SpongeZone : public ForcingTerms {
 
  public:
   SpongeZone(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType, Fluxes *_fluxClass,
-             EquationOfState *_eqState, IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
+             GasMixture *_mixture, IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
              ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config);
   ~SpongeZone();
 
@@ -132,13 +132,13 @@ class SpongeZone : public ForcingTerms {
 // Forcing that adds a passive scalar
 class PassiveScalar : public ForcingTerms {
  private:
-  EquationOfState *eqState;
+  GasMixture *mixture;
 
   Array<passiveScalarData *> psData;
 
  public:
   PassiveScalar(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
-                IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, EquationOfState *_eqState,
+                IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, GasMixture *_mixture,
                 ParGridFunction *_Up, ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
                 RunConfiguration &_config);
 

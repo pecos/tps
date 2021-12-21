@@ -34,7 +34,7 @@
 // Implementation of class RHSoperator
 RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, const int &_order,
                          const Equations &_eqSystem, double &_max_char_speed, IntegrationRules *_intRules,
-                         int _intRuleType, Fluxes *_fluxClass, EquationOfState *_eqState, ParFiniteElementSpace *_vfes,
+                         int _intRuleType, Fluxes *_fluxClass, GasMixture *_mixture, ParFiniteElementSpace *_vfes,
                          const volumeFaceIntegrationArrays &_gpuArrays, const int &_maxIntPoints, const int &_maxDofs,
                          DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh,
                          ParGridFunction *_spaceVaryViscMult, ParGridFunction *_Up, ParGridFunction *_gradUp,
@@ -49,7 +49,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
       intRules(_intRules),
       intRuleType(_intRuleType),
       fluxClass(_fluxClass),
-      eqState(_eqState),
+      mixture(_mixture),
       vfes(_vfes),
       gpuArrays(_gpuArrays),
       maxIntPoints(_maxIntPoints),
@@ -89,10 +89,10 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
                                                 gpuArrays, _config));
   }
   if (_config.GetPassiveScalarData().Size() > 0)
-    forcing.Append(new PassiveScalar(dim, num_equation, _order, intRuleType, intRules, vfes, eqState, Up, gradUp,
+    forcing.Append(new PassiveScalar(dim, num_equation, _order, intRuleType, intRules, vfes, mixture, Up, gradUp,
                                      gpuArrays, _config));
   if (_config.GetSpongeZoneData().szType != SpongeZoneSolution::NONE) {
-    forcing.Append(new SpongeZone(dim, num_equation, _order, intRuleType, fluxClass, eqState, intRules, vfes, Up,
+    forcing.Append(new SpongeZone(dim, num_equation, _order, intRuleType, fluxClass, mixture, intRules, vfes, Up,
                                   gradUp, gpuArrays, _config));
   }
 #ifdef _MASA_
@@ -151,7 +151,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
 #endif
 
   // create gradients object
-  gradients = new Gradients(vfes, gradUpfes, dim, num_equation, Up, gradUp, eqState, gradUp_A, intRules, intRuleType,
+  gradients = new Gradients(vfes, gradUpfes, dim, num_equation, Up, gradUp, mixture, gradUp_A, intRules, intRuleType,
                             gpuArrays, Me_inv, invMArray, posDofInvM, maxIntPoints, maxDofs);
   gradients->setParallelData(&parallelData, &transferUp);
 
@@ -370,10 +370,10 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 #ifdef _GPU_
 
   // ComputeConvectiveFluxes
-  Fluxes::convectiveFluxes_gpu(x, flux, eqState->GetSpecificHeatRatio(), vfes->GetNDofs(), dim, num_equation);
+  Fluxes::convectiveFluxes_gpu(x, flux, mixture->GetSpecificHeatRatio(), vfes->GetNDofs(), dim, num_equation);
   if (eqSystem == NS) {
-    Fluxes::viscousFluxes_gpu(x, gradUp, flux, eqState->GetSpecificHeatRatio(), eqState->GetGasConstant(),
-                              eqState->GetPrandtlNum(), eqState->GetViscMultiplyer(), eqState->GetBulkViscMultiplyer(),
+    Fluxes::viscousFluxes_gpu(x, gradUp, flux, mixture->GetSpecificHeatRatio(), mixture->GetGasConstant(),
+                              mixture->GetPrandtlNum(), mixture->GetViscMultiplyer(), mixture->GetBulkViscMultiplyer(),
                               spaceVaryViscMult, linViscData, vfes->GetNDofs(), dim, num_equation);
   }
 #else
@@ -398,7 +398,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 
     if (isSBP) {
       f *= alpha;  // *= alpha
-      double p = eqState->ComputePressure(state, dim);
+      double p = mixture->ComputePressure(state);
       p *= 1. - alpha;
       for (int d = 0; d < dim; d++) {
         f(d + 1, d) += p;
@@ -425,7 +425,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
     }
 
     // Update max char speed
-    const double mcs = eqState->ComputeMaxCharSpeed(state, dim);
+    const double mcs = mixture->ComputeMaxCharSpeed(state);
     if (mcs > max_char_speed) {
       max_char_speed = mcs;
     }
@@ -439,13 +439,13 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 void RHSoperator::updatePrimitives(const Vector &x_in) const {
 #ifdef _GPU_
 
-  RHSoperator::updatePrimitives_gpu(Up, &x_in, eqState->GetSpecificHeatRatio(), vfes->GetNDofs(), dim, num_equation);
+  RHSoperator::updatePrimitives_gpu(Up, &x_in, mixture->GetSpecificHeatRatio(), vfes->GetNDofs(), dim, num_equation);
 #else
   double *dataUp = Up->GetData();
   for (int i = 0; i < vfes->GetNDofs(); i++) {
     Vector iState(num_equation);
     for (int eq = 0; eq < num_equation; eq++) iState[eq] = x_in[i + eq * vfes->GetNDofs()];
-    double p = eqState->ComputePressure(iState, dim);
+    double p = mixture->ComputePressure(iState);
     dataUp[i] = iState[0];
     dataUp[i + vfes->GetNDofs()] = iState[1] / iState[0];
     dataUp[i + 2 * vfes->GetNDofs()] = iState[2] / iState[0];

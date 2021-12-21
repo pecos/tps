@@ -37,16 +37,11 @@
 #include <general/forall.hpp>
 #include <mfem.hpp>
 
+#include "dataStructures.hpp"
 #include "BoundaryCondition.hpp"
 #include "fluxes.hpp"
 
 using namespace mfem;
-
-enum WallType {
-  INV,         // Inviscid wall
-  VISC_ADIAB,  // Viscous adiabatic wall
-  VISC_ISOTH   // Viscous isothermal wall
-};
 
 class WallBC : public BoundaryCondition {
  private:
@@ -68,7 +63,7 @@ class WallBC : public BoundaryCondition {
   void computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
 
  public:
-  WallBC(RiemannSolver *rsolver_, EquationOfState *_eqState, Equations _eqSystem, Fluxes *_fluxClass,
+  WallBC(RiemannSolver *rsolver_, GasMixture *_mixture, Equations _eqSystem, Fluxes *_fluxClass,
          ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
          const int _num_equation, int _patchNumber, WallType _bcType, const Array<double> _inputData,
          const Array<int> &intPointsElIDBC);

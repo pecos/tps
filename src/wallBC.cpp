@@ -33,11 +33,11 @@
 
 #include "riemann_solver.hpp"
 
-WallBC::WallBC(RiemannSolver *_rsolver, EquationOfState *_eqState, Equations _eqSystem, Fluxes *_fluxClass,
+WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSystem, Fluxes *_fluxClass,
                ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
                const int _num_equation, int _patchNumber, WallType _bcType, const Array<double> _inputData,
                const Array<int> &_intPointsElIDBC)
-    : BoundaryCondition(_rsolver, _eqState, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
+    : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
                         1),  // so far walls do not require ref. length. Left at 1
       wallType(_bcType),
       fluxClass(_fluxClass),
@@ -114,8 +114,8 @@ void WallBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesID
   integrateWalls_gpu(wallType, wallTemp,
                      y,  // output
                      x, nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC, wallElems, listElems,
-                     maxIntPoints, maxDofs, dim, num_equation, eqState->GetSpecificHeatRatio(),
-                     eqState->GetGasConstant());
+                     maxIntPoints, maxDofs, dim, num_equation, mixture->GetSpecificHeatRatio(),
+                     mixture->GetGasConstant());
 }
 
 void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
@@ -145,8 +145,8 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux
 }
 
 void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
-  double p = eqState->ComputePressure(stateIn, dim);
-  const double gamma = eqState->GetSpecificHeatRatio();
+  double p = mixture->ComputePressure(stateIn);
+  const double gamma = mixture->GetSpecificHeatRatio();
 
   Vector wallState = stateIn;
   for (int d = 0; d < dim; d++) wallState[1 + d] = 0.;
@@ -191,13 +191,13 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
 }
 
 void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
-  const double gamma = eqState->GetSpecificHeatRatio();
+  const double gamma = mixture->GetSpecificHeatRatio();
 
   Vector wallState(num_equation);
   wallState[0] = stateIn[0];
   for (int d = 0; d < dim; d++) wallState[1 + d] = 0.;
 
-  wallState[1 + dim] = eqState->GetGasConstant() / (gamma - 1.);  // Cv
+  wallState[1 + dim] = mixture->GetGasConstant() / (gamma - 1.);  // Cv
   wallState[1 + dim] *= stateIn[0] * wallTemp;
 
   if (eqSystem == NS_PASSIVE) wallState[num_equation - 1] = stateIn[num_equation - 1];

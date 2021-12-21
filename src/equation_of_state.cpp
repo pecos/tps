@@ -34,6 +34,45 @@
 
 EquationOfState::EquationOfState() {}
 
+DryAir::DryAir(RunConfiguration &_runfile, int _dim) : GasMixture(WorkingFluid::DRY_AIR,_dim)
+{
+  setNumEquations();
+  
+  gas_constant = 287.058;
+  // gas_constant = 1.; // for comparison against ex18
+  specific_heat_ratio = 1.4;
+  visc_mult = 1.;
+  Pr = 0.71;
+  cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
+  Sc = 0.71;
+  
+  // add extra equation for passive scalar
+  if( _runfile.GetEquationSystem()==Equations::NS_PASSIVE ){
+    Nconservative++;
+    Nprimitive++;
+  }
+}
+
+DryAir::DryAir()
+{
+  gas_constant = 287.058;
+  // gas_constant = 1.; // for comparison against ex18
+  specific_heat_ratio = 1.4;
+  visc_mult = 1.;
+  Pr = 0.71;
+  cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
+  Sc = 0.71;
+}
+
+
+void DryAir::setNumEquations()
+{
+  Nconservative = dim+2;
+  Nprimitive = Nconservative;
+}
+
+
+
 void EquationOfState::setFluid(WorkingFluid _fluid) {
   fluid = _fluid;
   switch (fluid) {
@@ -51,7 +90,7 @@ void EquationOfState::setFluid(WorkingFluid _fluid) {
   }
 }
 
-bool EquationOfState::StateIsPhysical(const mfem::Vector& state, const int dim) {
+bool DryAir::StateIsPhysical(const mfem::Vector& state) {
   const double den = state(0);
   const Vector den_vel(state.GetData() + 1, dim);
   const double den_energy = state(1 + dim);
@@ -93,7 +132,7 @@ bool EquationOfState::StateIsPhysical(const mfem::Vector& state, const int dim) 
 }
 
 // Compute the maximum characteristic speed.
-double EquationOfState::ComputeMaxCharSpeed(const Vector& state, const int dim) {
+double DryAir::ComputeMaxCharSpeed(const Vector& state) {
   const double den = state(0);
   const Vector den_vel(state.GetData() + 1, dim);
 
@@ -103,15 +142,15 @@ double EquationOfState::ComputeMaxCharSpeed(const Vector& state, const int dim) 
   }
   den_vel2 /= den;
 
-  const double pres = ComputePressure(state, dim);
+  const double pres = ComputePressure(state);
   const double sound = sqrt(specific_heat_ratio * pres / den);
   const double vel = sqrt(den_vel2 / den);
 
   return vel + sound;
 }
 
-void EquationOfState::GetConservativesFromPrimitives(const Vector& primit, Vector& conserv, const int& dim,
-                                                     const int& num_equations) {
+void DryAir::GetConservativesFromPrimitives(const Vector& primit, 
+                                                     Vector& conserv) {
   conserv = primit;
 
   double v2 = 0.;
@@ -122,9 +161,8 @@ void EquationOfState::GetConservativesFromPrimitives(const Vector& primit, Vecto
   conserv[num_equations - 1] = primit[num_equations - 1] / (specific_heat_ratio - 1.) + 0.5 * primit[0] * v2;
 }
 
-void EquationOfState::GetPrimitivesFromConservatives(const Vector& conserv, Vector& primit, const int& dim,
-                                                     const int& num_equations) {
-  double p = ComputePressure(conserv, dim);
+void DryAir::GetPrimitivesFromConservatives(const Vector& conserv, Vector& primit) {
+  double p = ComputePressure(conserv);
   primit = conserv;
 
   for (int d = 0; d < dim; d++) primit[1 + d] /= conserv[0];

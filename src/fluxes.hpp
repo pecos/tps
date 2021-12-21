@@ -48,7 +48,7 @@ using namespace mfem;
 
 class Fluxes {
  private:
-  EquationOfState *eqState;
+  GasMixture *mixture;
 
   Equations &eqSystem;
 
@@ -62,7 +62,7 @@ class Fluxes {
   DenseMatrix stress;
 
  public:
-  Fluxes(EquationOfState *_eqState, Equations &_eqSystem, const int &_num_equations, const int &_dim);
+  Fluxes(GasMixture *_mixture, Equations &_eqSystem, const int &_num_equations, const int &_dim);
 
   void ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &flux);
 

@@ -42,6 +42,27 @@ enum Equations {
   NS_PASSIVE  // NS with passive scalar equation
 };
 
+enum WorkingFluid { DRY_AIR, USER_DEFINED };
+
+enum InletType {
+  SUB_DENS_VEL,      // Subsonic inlet specified by the density and velocity components
+  SUB_DENS_VEL_NR,   // Non-reflecting subsonic inlet specified by the density and velocity components
+  SUB_VEL_CONST_ENT  // Subsonic non-reflecting. Specified vel, keeps entropy constant
+};
+
+enum OutletType {
+  SUB_P,        // subsonic outlet specified with pressure
+  SUB_P_NR,     // non-reflecting subsonic outlet specified with pressure
+  SUB_MF_NR,    // Mass-flow non-reflecting
+  SUB_MF_NR_PW  // point-based non-reflecting massflow BC
+};
+
+enum WallType {
+  INV,         // Inviscid wall
+  VISC_ADIAB,  // Viscous adiabatic wall
+  VISC_ISOTH   // Viscous isothermal wall
+};
+
 // The following four keywords define two planes in which
 // a linearly varying viscosity can be defined between these two.
 // The planes are defined by the normal and one point being the
