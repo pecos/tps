@@ -63,6 +63,7 @@
 #include "run_configuration.hpp"
 #include "sbp_integrators.hpp"
 #include "utils.hpp"
+#include "logger.hpp"
 
 #ifdef _MASA_
 #include "masa_handler.hpp"

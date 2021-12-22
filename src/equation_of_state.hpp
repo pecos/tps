@@ -63,7 +63,7 @@ protected:
   virtual void setNumEquations() = 0;
 public:
   GasMixture(WorkingFluid _fluid, int _dim){fluid = _fluid;dim = _dim;};
-  GasMixture();
+  GasMixture(){};
   
   ~GasMixture(){};
 
@@ -127,7 +127,7 @@ public:
   DryAir(RunConfiguration &_runfile, int _dim);
   DryAir(); //this will only be usefull to get air constants
   
-  ~DryAir();
+  ~DryAir(){};
   
   // implementation virtual methods
   virtual double ComputePressure(const Vector &state);
@@ -151,55 +151,9 @@ public:
   
   virtual double GetSchmidtNum(){return Sc;};
   virtual double GetPrandtlNum() { return Pr; }
-};
-
-
-class EquationOfState {
- private:
-  WorkingFluid fluid;
-  double specific_heat_ratio;
-  double gas_constant;
-  double visc_mult;
-  double thermalConductivity;
-
-  double bulk_visc_mult;
-
-  // Prandtl number
-  double Pr;         // Prandtl number
-  double cp_div_pr;  // cp divided by Pr (used in conductivity calculation)
-
-  // Fick's law
-  double Sc;  // Schmidt number
-
- public:
-  EquationOfState();
-
-  void setFluid(WorkingFluid _fluid);
-
-  void setViscMult(double _visc_mult) { visc_mult = _visc_mult; }
-  void setBulkViscMult(double _bulk_mult) { bulk_visc_mult = _bulk_mult; }
-
-  double ComputePressure(const Vector &state, int dim);
-
-  void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit, const int &dim, const int &num_equations);
-  void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv, const int &dim, const int &num_equations);
-
-  // Compute the maximum characteristic speed.
-  double ComputeMaxCharSpeed(const Vector &state, const int dim);
-
-  // Physicality check (at end)
-  bool StateIsPhysical(const Vector &state, const int dim);
-
-  double GetSpecificHeatRatio() { return specific_heat_ratio; }
-  double GetGasConstant() { return gas_constant; }
-  double GetViscosity(const double &temp);
-  double GetPrandtlNum() { return Pr; }
-  double GetSchmidtNum() { return Sc; }
-  double GetViscMultiplyer() { return visc_mult; }
-  double GetBulkViscMultiplyer() { return bulk_visc_mult; }
-  double GetThermalConductivity(const double &visc);
-
-  // GPU functions
+  
+  
+    // GPU functions
 #ifdef _GPU_
   static MFEM_HOST_DEVICE double pressure(const double *state, double *KE, const double &gamma, const int &dim,
                                           const int &num_equations) {
@@ -220,6 +174,55 @@ class EquationOfState {
   }
 #endif
 };
+
+
+// class EquationOfState {
+//  private:
+//   WorkingFluid fluid;
+//   double specific_heat_ratio;
+//   double gas_constant;
+//   double visc_mult;
+//   double thermalConductivity;
+// 
+//   double bulk_visc_mult;
+// 
+//   // Prandtl number
+//   double Pr;         // Prandtl number
+//   double cp_div_pr;  // cp divided by Pr (used in conductivity calculation)
+// 
+//   // Fick's law
+//   double Sc;  // Schmidt number
+// 
+//  public:
+//   EquationOfState();
+// 
+//   void setFluid(WorkingFluid _fluid);
+// 
+//   void setViscMult(double _visc_mult) { visc_mult = _visc_mult; }
+//   void setBulkViscMult(double _bulk_mult) { bulk_visc_mult = _bulk_mult; }
+// 
+//   double ComputePressure(const Vector &state, int dim);
+// 
+//   void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit, const int &dim, const int &num_equations);
+//   void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv, const int &dim, const int &num_equations);
+// 
+//   // Compute the maximum characteristic speed.
+//   double ComputeMaxCharSpeed(const Vector &state, const int dim);
+// 
+//   // Physicality check (at end)
+//   bool StateIsPhysical(const Vector &state, const int dim);
+// 
+//   double GetSpecificHeatRatio() { return specific_heat_ratio; }
+//   double GetGasConstant() { return gas_constant; }
+//   double GetViscosity(const double &temp);
+//   double GetPrandtlNum() { return Pr; }
+//   double GetSchmidtNum() { return Sc; }
+//   double GetViscMultiplyer() { return visc_mult; }
+//   double GetBulkViscMultiplyer() { return bulk_visc_mult; }
+//   double GetThermalConductivity(const double &visc);
+// 
+// 
+// };
 
 // additional functions inlined for speed...
 inline double DryAir::ComputePressure(const Vector &state) {

@@ -347,7 +347,7 @@ void M2ulPhyS::restart_files_hdf5(string mode) {
     for (int i = 0; i < vfes->GetNDofs(); i++) {
       Vector iState(num_equation);
       for (int eq = 0; eq < num_equation; eq++) iState[eq] = x[i + eq * vfes->GetNDofs()];
-      double p = eqState->ComputePressure(iState, dim);
+      double p = mixture->ComputePressure(iState);
       dataUp[i] = iState[0];
       dataUp[i + vfes->GetNDofs()] = iState[1] / iState[0];
       dataUp[i + 2 * vfes->GetNDofs()] = iState[2] / iState[0];

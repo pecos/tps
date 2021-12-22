@@ -32,7 +32,7 @@
 
 #include "equation_of_state.hpp"
 
-EquationOfState::EquationOfState() {}
+// EquationOfState::EquationOfState() {}
 
 DryAir::DryAir(RunConfiguration &_runfile, int _dim) : GasMixture(WorkingFluid::DRY_AIR,_dim)
 {
@@ -73,22 +73,22 @@ void DryAir::setNumEquations()
 
 
 
-void EquationOfState::setFluid(WorkingFluid _fluid) {
-  fluid = _fluid;
-  switch (fluid) {
-    case DRY_AIR:
-      gas_constant = 287.058;
-      // gas_constant = 1.; // for comparison against ex18
-      specific_heat_ratio = 1.4;
-      visc_mult = 1.;
-      Pr = 0.71;
-      cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
-      Sc = 0.71;
-      break;
-    default:
-      break;
-  }
-}
+// void EquationOfState::setFluid(WorkingFluid _fluid) {
+//   fluid = _fluid;
+//   switch (fluid) {
+//     case DRY_AIR:
+//       gas_constant = 287.058;
+//       // gas_constant = 1.; // for comparison against ex18
+//       specific_heat_ratio = 1.4;
+//       visc_mult = 1.;
+//       Pr = 0.71;
+//       cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
+//       Sc = 0.71;
+//       break;
+//     default:
+//       break;
+//   }
+// }
 
 bool DryAir::StateIsPhysical(const mfem::Vector& state) {
   const double den = state(0);
