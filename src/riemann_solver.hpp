@@ -101,8 +101,8 @@ class RiemannSolver {
     }
     MFEM_SYNC_THREAD;
 
-    if (thrd == 0) p1 = EquationOfState::pressure(U1, &KE1[0], gamma, dim, num_equation);
-    if (thrd == 1) p2 = EquationOfState::pressure(U2, &KE2[0], gamma, dim, num_equation);
+    if (thrd == 0) p1 = DryAir::pressure(U1, &KE1[0], gamma, dim, num_equation);
+    if (thrd == 1) p2 = DryAir::pressure(U2, &KE2[0], gamma, dim, num_equation);
     if (thrd == max_num_threads - 1) {
       vel1 = 0.;
       for (int d = 0; d < dim; d++) vel1 += 2. * KE1[d] / U1[0];

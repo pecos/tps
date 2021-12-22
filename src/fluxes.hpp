@@ -101,11 +101,11 @@ class Fluxes {
     }
     MFEM_SYNC_THREAD;
 
-    const double p = EquationOfState::pressure(&Un[0], &KE[0], gamma, dim, num_equation);
+    const double p = DryAir::pressure(&Un[0], &KE[0], gamma, dim, num_equation);
     const double temp = p / Un[0] / Rg;
-    double visc = EquationOfState::GetViscosity_gpu(temp);
+    double visc = DryAir::GetViscosity_gpu(temp);
     visc *= viscMult;
-    const double k = EquationOfState::GetThermalConductivity_gpu(visc, gamma, Rg, Pr);
+    const double k = DryAir::GetThermalConductivity_gpu(visc, gamma, Rg, Pr);
 
     for (int i = thrd; i < dim; i += maxThreads) {
       for (int j = 0; j < dim; j++) {

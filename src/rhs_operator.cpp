@@ -484,7 +484,7 @@ void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const dou
       if (eq == 3 && dim == 3) dataUp[n + 3 * ndofs] = state[3] / state[0];
       if (eq == num_equations - 1)
         dataUp[n + (num_equations - 1) * ndofs] =
-            EquationOfState::pressure(&state[0], &KE[0], gamma, dim, num_equations);
+            DryAir::pressure(&state[0], &KE[0], gamma, dim, num_equations);
     }
   });
 #endif
