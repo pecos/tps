@@ -130,7 +130,7 @@ class InletBC : public BoundaryCondition {
     if (dim != 3 && (thrd == num_equation - 1)) KE[2] = 0.;
     MFEM_SYNC_THREAD;
 
-    if (thrd == 0) p = EquationOfState::pressure(u1, &KE[0], gamma, dim, num_equation);
+    if (thrd == 0) p = DryAir::pressure(u1, &KE[0], gamma, dim, num_equation);
     MFEM_SYNC_THREAD;
 
     if (thrd == 0) u2[0] = inputState[0];

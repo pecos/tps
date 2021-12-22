@@ -172,7 +172,7 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const doub
       if (dim != 3 && eq == 1) KE[2] = 0.;
       MFEM_SYNC_THREAD;
 
-      if (eq == 0) p = EquationOfState::pressure(&Un[0], &KE[0], gamma, dim, num_equation);
+      if (eq == 0) p = DryAir::pressure(&Un[0], &KE[0], gamma, dim, num_equation);
       MFEM_SYNC_THREAD;
 
       double temp;
