@@ -62,7 +62,7 @@ protected:
   // force derived classes to set the number of equations
   virtual void setNumEquations() = 0;
 public:
-  GasMixture(WorkingFluid _fluid, int _dim){fluid = _fluid;dim = _dim;};
+  GasMixture(WorkingFluid _fluid, int _dim);
   GasMixture(){};
   
   ~GasMixture(){};
@@ -110,10 +110,7 @@ class DryAir : public GasMixture{
 private:
   double specific_heat_ratio;
   double gas_constant;
-  double visc_mult;
   double thermalConductivity;
-
-  double bulk_visc_mult;
 
   // Prandtl number
   double Pr;         // Prandtl number

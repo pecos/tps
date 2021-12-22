@@ -34,6 +34,14 @@
 
 // EquationOfState::EquationOfState() {}
 
+GasMixture::GasMixture(WorkingFluid _fluid, int _dim){
+  fluid = _fluid;
+  dim = _dim;
+  
+  bulk_visc_mult = 0.;
+  visc_mult = 1;
+};
+
 DryAir::DryAir(RunConfiguration &_runfile, int _dim) : GasMixture(WorkingFluid::DRY_AIR,_dim)
 {
   setNumEquations();
@@ -41,7 +49,7 @@ DryAir::DryAir(RunConfiguration &_runfile, int _dim) : GasMixture(WorkingFluid::
   gas_constant = 287.058;
   // gas_constant = 1.; // for comparison against ex18
   specific_heat_ratio = 1.4;
-  visc_mult = 1.;
+  
   Pr = 0.71;
   cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
   Sc = 0.71;
