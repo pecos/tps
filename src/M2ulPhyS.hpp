@@ -52,6 +52,7 @@
 #include "dgNonlinearForm.hpp"
 #include "domain_integrator.hpp"
 #include "equation_of_state.hpp"
+#include "transport_properties.hpp"
 #include "faceGradientIntegration.hpp"
 #include "face_integrator.hpp"
 #include "fluxes.hpp"
@@ -96,6 +97,18 @@ class M2ulPhyS {
   // Number of simensions
   int dim;
 
+  // Number of species
+  int numSpecies;
+
+  // Number of active species that are part of conserved variables.
+  int numActiveSpecies;
+
+  // Is it ambipolar?
+  bool ambipolar = false;
+
+  // Is it two-temperature?
+  bool twoTemperature = false;
+
   // Number of equations
   int num_equation;
 
@@ -125,6 +138,8 @@ class M2ulPhyS {
 
   // Pointers to the different classes
   GasMixture *mixture;
+
+  TransportProperties *transportPtr = NULL;
 
   ParGridFunction *spaceVaryViscMult;  // space varying viscosity multiplier
 
@@ -203,6 +218,11 @@ class M2ulPhyS {
 
   // Visualization functions (these are pointers to Up)
   ParGridFunction *press, *dens, *vel, *passiveScalar;
+  // Kevin: For now, only for species.
+  // But I would prefer to use array of pointers for all variables,
+  // rather than making pointer for each one.
+  // I used std::vector for now, but can change to Vector or Array if needed.
+  std::vector<ParGridFunction *> visualizationVariables;
 
   // gradient of primitive variables
   ParGridFunction *gradUp;

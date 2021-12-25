@@ -54,7 +54,7 @@ class Fluxes {
 
   const int &dim;
 
-  const int &num_equations;
+  const int &num_equation;
   double Rg;
   Vector gradT;
   Vector vel;
@@ -62,7 +62,7 @@ class Fluxes {
   DenseMatrix stress;
 
  public:
-  Fluxes(GasMixture *_mixture, Equations &_eqSystem, const int &_num_equations, const int &_dim);
+  Fluxes(GasMixture *_mixture, Equations &_eqSystem, const int &_num_equation, const int &_dim);
 
   void ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &flux);
 
