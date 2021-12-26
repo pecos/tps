@@ -33,10 +33,8 @@
 #define RHS_OPERATOR_HPP_
 
 #include <tps_config.h>
-
-#include <general/forall.hpp>
 #include <mfem.hpp>
-
+#include <mfem/general/forall.hpp>
 #include "BCintegrator.hpp"
 #include "dataStructures.hpp"
 #include "dgNonlinearForm.hpp"
