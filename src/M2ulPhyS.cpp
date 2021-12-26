@@ -234,8 +234,6 @@ void M2ulPhyS::initVariables() {
   switch( config.GetWorkingFluid() ){
     case WorkingFluid::DRY_AIR:
       mixture = new DryAir( config, dim);
-      mixture->SetViscMult(config.GetViscMult());
-      mixture->SetBulkViscMult(config.GetBulkViscMult());
       transportPtr = new DryAirTransport(mixture, config);
       break;
     case WorkingFluid::USER_DEFINED:
@@ -868,6 +866,8 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   } else {
     ioData.registerIOVar("/solution", "rho-E", 3);
   }
+  // TODO: for now, keep the number of primitive variables same as conserved variables.
+  // will need to add full list of species.
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     // Only for NS_PASSIVE.
     if ((eqSystem == NS_PASSIVE) && (sp==1)) break;
@@ -912,8 +912,10 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   paraviewColl->RegisterField("press", press);
   if (eqSystem == NS_PASSIVE) {
     paraviewColl->RegisterField("passiveScalar", passiveScalar);
-  } else {
-    for (int d = 0; d < numSpecies; d++) {
+  } else if (numSpecies > 1) {
+    // TODO: for now, keep the number of primitive variables same as conserved variables.
+    // will need to add full list of species.
+    for (int d = 0; d < numActiveSpecies; d++) {
       //TODO: May read species names from input file and add them as variable name.
       paraviewColl->RegisterField("rho-Y"+std::to_string(d + 1), visualizationVariables[d]);
     }
