@@ -370,7 +370,9 @@ PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const in
                              ParGridFunction *_Up, ParGridFunction *_gradUp,
                              const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays) {
+  std::cout << "worked out so far:" << _config.GetPassiveScalarData().Size() << std::endl;
   psData.SetSize(_config.GetPassiveScalarData().Size());
+
   for (int i = 0; i < psData.Size(); i++) {
     psData[i]->coords.SetSize(3);
     for (int d = 0; d < 3; d++) psData[i]->coords[d] = _config.GetPassiveScalarData(i)->coords[d];
@@ -378,14 +380,23 @@ PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const in
     psData[i]->value = _config.GetPassiveScalarData(i)->value;
   }
 
+  std::cout << "worked out so far. 2" << std::endl;
+
   // find nodes for each passive scalar location
   ParFiniteElementSpace dfes(vfes->GetParMesh(), vfes->FEColl(), dim, Ordering::byNODES);
+  std::cout << "worked out so far. 2-1" << std::endl;
   ParGridFunction coordinates(&dfes);
+  std::cout << "worked out so far. 2-2" << std::endl;
   vfes->GetParMesh()->GetNodes(coordinates);
+
+  std::cout << "worked out so far. 3" << std::endl;
 
   int nnodes = vfes->GetNDofs();
 
+  std::cout << "worked out so far. 4" << std::endl;
+
   for (int i = 0; i < psData.Size(); i++) {
+    std::cout << "worked out so far. 2" << i << std::endl;
     Vector x0(dim);
     for (int d = 0; d < dim; d++) x0[d] = psData[i]->coords[d];
 
