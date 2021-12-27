@@ -490,6 +490,34 @@ void RunConfiguration::readInputFile(std::string inpuFileName) {
         arrayPassiveScalar[arrSize]->radius = stod(word);
         ss >> word;
         arrayPassiveScalar[arrSize]->value = stod(word);
+      } else if (word.compare("NUM_SPECIES") == 0) {
+        ss >> word;
+        numSpecies = stoi(word);
+        gasParams.SetSize(numSpecies * GasParams::NUM_GASPARAMS);
+        for (int d = 0; d < numSpecies * GasParams::NUM_GASPARAMS; d++) {
+          ss >> word;
+          gasParams[d] = stod(word);
+        }
+      } else if (word.compare("AMBIPOLAR") == 0) {
+        ambipolar = false;
+        ss >> word;
+        if (word.compare("TRUE") == 0) ambipolar = true;
+      } else if (word.compare("TWO_TEMPERATURE") == 0) {
+        twoTemperature = false;
+        ss >> word;
+        if (word.compare("TRUE") == 0) twoTemperature = true;
+      } else if (word.compare("GAS_MODEL") == 0) {
+        ss >> word;
+        assert( (stoi(word) >= 0) && (stoi(word) < GasModel::NUM_GASMODEL) );
+        gasModel = (GasModel) stoi(word);
+      } else if (word.compare("TRANSPORT_MODEL") == 0) {
+        ss >> word;
+        assert( (stoi(word) >= 0) && (stoi(word) < TransportModel::NUM_TRANSPORTMODEL) );
+        transportModel = (TransportModel) stoi(word);
+      } else if (word.compare("CHEMISTRY_MODEL") == 0) {
+        ss >> word;
+        assert( (stoi(word) >= 0) && (stoi(word) < ChemistryModel::NUM_CHEMISTRYMODEL) );
+        chemistryModel = (ChemistryModel) stoi(word);
       }
     }
   }

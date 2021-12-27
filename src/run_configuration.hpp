@@ -184,12 +184,18 @@ class RunConfiguration {
 
   // number of species;
   int numSpecies;
+  Vector gasParams;
 
   // ambipolar flag
   bool ambipolar;
 
   // two temperature flag
   bool twoTemperature;
+
+  // For USER_DEFINED gas mixture, set models from input file.
+  GasModel gasModel;
+  TransportModel transportModel;
+  ChemistryModel chemistryModel;
 
  public:
   RunConfiguration();
@@ -266,6 +272,9 @@ class RunConfiguration {
   int GetNumSpecies() { return numSpecies; }
   bool IsAmbipolar() { return ambipolar; }
   bool IsTwoTemperature() { return twoTemperature; }
+  GasModel GetGasModel() { return gasModel; }
+  TransportModel GetTranportModel() { return transportModel; }
+  ChemistryModel GetChemistryModel() { return chemistryModel; }
 };
 
 #endif  // RUN_CONFIGURATION_HPP_

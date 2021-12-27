@@ -43,7 +43,15 @@ enum Equations {
   NS_PASSIVE  // NS with passive scalar equation
 };
 
+// These are presets of combination of EquationOfState, TranportProperties, and Chemistry.
 enum WorkingFluid { DRY_AIR, USER_DEFINED };
+
+// These are the type of EquationOfState.
+enum GasModel { /* PERFECT_SINGLE, */ PERFECT_MIXTURE, /* CANTERA, */ NUM_GASMODEL };
+
+enum TransportModel { TEST_BINARY_AIR, NUM_TRANSPORTMODEL };
+
+enum ChemistryModel { NUM_CHEMISTRYMODEL };
 
 enum GasParams { SPECIES_MW, SPECIES_CHARGES, SPECIES_HEAT_RATIO, NUM_GASPARAMS };
 

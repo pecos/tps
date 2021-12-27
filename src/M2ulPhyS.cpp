@@ -248,6 +248,18 @@ void M2ulPhyS::initVariables() {
       transportPtr = new DryAirTransport(mixture, config);
       break;
     case WorkingFluid::USER_DEFINED:
+      switch (config.GetGasModel()) {
+        case GasModel::PERFECT_MIXTURE:
+          break;
+      }
+      switch (config.GetTranportModel()) {
+        case TransportModel::TEST_BINARY_AIR:
+          break;
+      }
+      switch (config.GetChemistryModel()) {
+        default:
+          break;
+      }
       break;
   }
   assert(mixture != NULL);
