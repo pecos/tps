@@ -1253,7 +1253,7 @@ void M2ulPhyS::uniformInitialConditions() {
     dataUp[i + 2 * dof] = data[i + 2 * dof] / data[i];
     if (dim == 3) dataUp[i + 3 * dof] = data[i + 3 * dof] / data[i];
     dataUp[i + (1 + dim) * dof] = inputRhoRhoVp[4];
-    dataUp[i + (num_equation - 1) * dof] = 0.;
+    if (eqSystem == NS_PASSIVE) dataUp[i + (num_equation - 1) * dof] = 0.;
 
     for (int d = 0; d < dim; d++) {
       for (int eq = 0; eq < num_equation; eq++) {

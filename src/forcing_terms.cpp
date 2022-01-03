@@ -370,13 +370,18 @@ PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const in
                              IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, GasMixture *_mixture,
                              ParGridFunction *_Up, ParGridFunction *_gradUp,
                              const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays) {
-  psData.SetSize(_config.GetPassiveScalarData().Size());
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays),
+    mixture(_mixture){
+  
+  psData.DeleteAll();
+  for(int i=0;i<_config.GetPassiveScalarData().Size();i++) psData.Append( new passiveScalarData );
+  
   for (int i = 0; i < psData.Size(); i++) {
     psData[i]->coords.SetSize(3);
     for (int d = 0; d < 3; d++) psData[i]->coords[d] = _config.GetPassiveScalarData(i)->coords[d];
     psData[i]->radius = _config.GetPassiveScalarData(i)->radius;
     psData[i]->value = _config.GetPassiveScalarData(i)->value;
+    psData[i]->nodes.DeleteAll();
   }
 
   // find nodes for each passive scalar location
@@ -408,6 +413,13 @@ PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const in
   }
 }
 
+
+PassiveScalar::~PassiveScalar()
+{
+  for(int i=0; i<psData.Size();i++) delete psData[i];
+}
+
+
 void PassiveScalar::updateTerms(Vector &in) {
   auto dataUp = Up->HostRead();
   auto dataIn = in.HostReadWrite();
@@ -422,8 +434,8 @@ void PassiveScalar::updateTerms(Vector &in) {
       double vel = 0.;
       for (int d = 0; d < dim; d++) vel += dataUp[node + (1 + d) * nnode] * dataUp[node + (1 + d) * nnode];
       vel = sqrt(vel);
-      dataIn[node + (1+dim) * nnode] -=
-          vel * (dataUp[node + (1+dim) * nnode] - dataUp[node] * Z) / psData[i]->radius;
+      dataIn[node + (num_equation-1) * nnode] -=
+          vel * (dataUp[node + (num_equation-1) * nnode] - dataUp[node] * Z) / psData[i]->radius;
     }
   }
 }

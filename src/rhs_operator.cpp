@@ -83,6 +83,8 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
   Me_inv.SetSize(vfes->GetNE());
   posDofInvM.SetSize(2 * vfes->GetNE());
   auto hposDofInvM = posDofInvM.HostWrite();
+  
+  forcing.DeleteAll();
 
   if (_config.thereIsForcing()) {
     forcing.Append(new ConstantPressureGradient(dim, num_equation, _order, intRuleType, intRules, vfes, Up, gradUp,

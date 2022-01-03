@@ -58,6 +58,7 @@ DryAir::DryAir(RunConfiguration &_runfile, int _dim) : GasMixture(WorkingFluid::
   if( _runfile.GetEquationSystem()==Equations::NS_PASSIVE ){
     Nconservative++;
     Nprimitive++;
+    num_equations++;
   }
 }
 
@@ -77,6 +78,7 @@ void DryAir::setNumEquations()
 {
   Nconservative = dim+2;
   Nprimitive = Nconservative;
+  num_equations = Nconservative;
 }
 
 
