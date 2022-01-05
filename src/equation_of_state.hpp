@@ -50,37 +50,50 @@ using namespace std;
 class GasMixture{
 protected:
   WorkingFluid fluid;
-  int num_equations;
+  int num_equation;
   int dim;
-  
+
+  int numSpecies;
+  int numActiveSpecies;
+  bool ambipolar;
+  bool twoTemperature;
+
   // number of conservative and primitive/visualization variables
-  int Nconservative, Nprimitive; 
-  
+  int Nconservative, Nprimitive;
+
   double visc_mult;
   double bulk_visc_mult;
-  
-  // force derived classes to set the number of equations
-  virtual void setNumEquations() = 0;
+
+  // If not ambipolar, one species continuity equation is replaced by global continuity equation.
+  // If ambipolar, electron continuity equation is also replaced by an algebraic equation (determined by GasMixture).
+  void setNumActiveSpecies() { numActiveSpecies = ambipolar ? (numSpecies - 2) : (numSpecies - 1); }
+  // Add electron energy equation if two temperature.
+  void setNumEquations() { num_equation = twoTemperature ? (dim + 3 + numActiveSpecies) : (dim + 2 + numActiveSpecies); }
 public:
   GasMixture(WorkingFluid _fluid, int _dim);
   GasMixture(){};
-  
+
   ~GasMixture(){};
 
-  
   void setFluid(WorkingFluid _fluid);
-  
+
   void setViscMult(double _visc_mult) { visc_mult = _visc_mult; }
   void setBulkViscMult(double _bulk_mult) { bulk_visc_mult = _bulk_mult; }
-  
+
+  int GetNumSpecies() { return numSpecies; }
+  int GetNumActiveSpecies() { return numActiveSpecies; }
+  int GetNumEquations() { return num_equation; }
+  bool isAmbipolar() { return ambipolar; }
+  bool isTwoTemperature() { return twoTemperature; }
+
   int GetNumConservativeVariables(){return Nconservative;}
   int GetNumPrimitiveVariables(){return Nprimitive;}
 
   virtual double ComputePressure(const Vector &state) = 0;
 
-  virtual void GetPrimitivesFromConservatives(const Vector &conserv, 
+  virtual void GetPrimitivesFromConservatives(const Vector &conserv,
                                               Vector &primit) = 0;
-  virtual void GetConservativesFromPrimitives(const Vector &primit, 
+  virtual void GetConservativesFromPrimitives(const Vector &primit,
                                               Vector &conserv) = 0;
 
   // Compute the maximum characteristic speed.
@@ -91,16 +104,16 @@ public:
 
   virtual double GetSpecificHeatRatio() = 0;
   virtual double GetGasConstant() = 0;
-  
+
   virtual double GetViscosity(const Vector &state) = 0;
   virtual double GetThermalConductivity(const Vector &state) = 0;
-  
+
   virtual double GetSchmidtNum() = 0;
   virtual double GetPrandtlNum() = 0;
-  
+
 //   double GetPrandtlNum() { return Pr; }
 //   double GetSchmidtNum() { return Sc; }
-  
+
   double GetViscMultiplyer() { return visc_mult; }
   double GetBulkViscMultiplyer() { return bulk_visc_mult; }
 };
@@ -118,20 +131,20 @@ private:
 
   // Fick's law
   double Sc;  // Schmidt number
-  
-  virtual void setNumEquations();
+
+  // virtual void setNumEquations();
 public:
   DryAir(RunConfiguration &_runfile, int _dim);
   DryAir(); //this will only be usefull to get air constants
-  
+
   ~DryAir(){};
-  
+
   // implementation virtual methods
   virtual double ComputePressure(const Vector &state);
 
-  virtual void GetPrimitivesFromConservatives(const Vector &conserv, 
+  virtual void GetPrimitivesFromConservatives(const Vector &conserv,
                                               Vector &primit );
-  virtual void GetConservativesFromPrimitives(const Vector &primit, 
+  virtual void GetConservativesFromPrimitives(const Vector &primit,
                                               Vector &conserv);
 
   // Compute the maximum characteristic speed.
@@ -142,18 +155,18 @@ public:
 
   virtual double GetSpecificHeatRatio(){return specific_heat_ratio;};
   virtual double GetGasConstant(){return gas_constant;};
-  
+
   virtual double GetViscosity(const Vector &state);
   virtual double GetThermalConductivity(const Vector &state);
-  
+
   virtual double GetSchmidtNum(){return Sc;};
   virtual double GetPrandtlNum() { return Pr; }
-  
-  
+
+
     // GPU functions
 #ifdef _GPU_
   static MFEM_HOST_DEVICE double pressure(const double *state, double *KE, const double &gamma, const int &dim,
-                                          const int &num_equations) {
+                                          const int &num_equation) {
     double p = 0.;
     for (int k = 0; k < dim; k++) p += KE[k];
     return (gamma - 1.) * (state[1 + dim] - p);
@@ -180,35 +193,35 @@ public:
 //   double gas_constant;
 //   double visc_mult;
 //   double thermalConductivity;
-// 
+//
 //   double bulk_visc_mult;
-// 
+//
 //   // Prandtl number
 //   double Pr;         // Prandtl number
 //   double cp_div_pr;  // cp divided by Pr (used in conductivity calculation)
-// 
+//
 //   // Fick's law
 //   double Sc;  // Schmidt number
-// 
+//
 //  public:
 //   EquationOfState();
-// 
+//
 //   void setFluid(WorkingFluid _fluid);
-// 
+//
 //   void setViscMult(double _visc_mult) { visc_mult = _visc_mult; }
 //   void setBulkViscMult(double _bulk_mult) { bulk_visc_mult = _bulk_mult; }
-// 
+//
 //   double ComputePressure(const Vector &state, int dim);
-// 
-//   void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit, const int &dim, const int &num_equations);
-//   void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv, const int &dim, const int &num_equations);
-// 
+//
+//   void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit, const int &dim, const int &num_equation);
+//   void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv, const int &dim, const int &num_equation);
+//
 //   // Compute the maximum characteristic speed.
 //   double ComputeMaxCharSpeed(const Vector &state, const int dim);
-// 
+//
 //   // Physicality check (at end)
 //   bool StateIsPhysical(const Vector &state, const int dim);
-// 
+//
 //   double GetSpecificHeatRatio() { return specific_heat_ratio; }
 //   double GetGasConstant() { return gas_constant; }
 //   double GetViscosity(const double &temp);
@@ -217,8 +230,8 @@ public:
 //   double GetViscMultiplyer() { return visc_mult; }
 //   double GetBulkViscMultiplyer() { return bulk_visc_mult; }
 //   double GetThermalConductivity(const double &visc);
-// 
-// 
+//
+//
 // };
 
 // additional functions inlined for speed...
@@ -237,9 +250,9 @@ inline double DryAir::GetViscosity(const Vector &state) {
   return (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
 }
 
-inline double DryAir::GetThermalConductivity(const Vector &state) { 
+inline double DryAir::GetThermalConductivity(const Vector &state) {
   double visc = GetViscosity(state);
-  return (visc * cp_div_pr); 
+  return (visc * cp_div_pr);
 }
 
 #endif  // EQUATION_OF_STATE_HPP_

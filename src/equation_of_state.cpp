@@ -37,29 +37,37 @@
 GasMixture::GasMixture(WorkingFluid _fluid, int _dim){
   fluid = _fluid;
   dim = _dim;
-  
+
   bulk_visc_mult = 0.;
   visc_mult = 1;
 };
 
 DryAir::DryAir(RunConfiguration &_runfile, int _dim) : GasMixture(WorkingFluid::DRY_AIR,_dim)
 {
+  numSpecies = (_runfile.GetEquationSystem()==NS_PASSIVE) ? 2 : 1;
+  ambipolar = false;
+  twoTemperature = false;
+
+  setNumActiveSpecies();
   setNumEquations();
-  
+
   gas_constant = 287.058;
   // gas_constant = 1.; // for comparison against ex18
   specific_heat_ratio = 1.4;
-  
+
   Pr = 0.71;
   cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
   Sc = 0.71;
-  
+
+  // TODO: replace Nconservative/Nprimitive.
   // add extra equation for passive scalar
-  if( _runfile.GetEquationSystem()==Equations::NS_PASSIVE ){
-    Nconservative++;
-    Nprimitive++;
-    num_equations++;
-  }
+  Nconservative = num_equation;
+  Nprimitive = num_equation;
+  // if( _runfile.GetEquationSystem()==Equations::NS_PASSIVE ){
+  //   Nconservative++;
+  //   Nprimitive++;
+  //   num_equations++;
+  // }
 }
 
 DryAir::DryAir()
@@ -74,12 +82,12 @@ DryAir::DryAir()
 }
 
 
-void DryAir::setNumEquations()
-{
-  Nconservative = dim+2;
-  Nprimitive = Nconservative;
-  num_equations = Nconservative;
-}
+// void DryAir::setNumEquations()
+// {
+//   Nconservative = dim+2;
+//   Nprimitive = Nconservative;
+//   num_equations = Nconservative;
+// }
 
 
 
@@ -159,7 +167,7 @@ double DryAir::ComputeMaxCharSpeed(const Vector& state) {
   return vel + sound;
 }
 
-void DryAir::GetConservativesFromPrimitives(const Vector& primit, 
+void DryAir::GetConservativesFromPrimitives(const Vector& primit,
                                                      Vector& conserv) {
   conserv = primit;
 
@@ -168,7 +176,7 @@ void DryAir::GetConservativesFromPrimitives(const Vector& primit,
     v2 += primit[1 + d];
     conserv[1 + d] *= primit[0];
   }
-  conserv[num_equations - 1] = primit[num_equations - 1] / (specific_heat_ratio - 1.) + 0.5 * primit[0] * v2;
+  conserv[num_equation - 1] = primit[num_equation - 1] / (specific_heat_ratio - 1.) + 0.5 * primit[0] * v2;
 }
 
 void DryAir::GetPrimitivesFromConservatives(const Vector& conserv, Vector& primit) {
@@ -177,7 +185,7 @@ void DryAir::GetPrimitivesFromConservatives(const Vector& conserv, Vector& primi
 
   for (int d = 0; d < dim; d++) primit[1 + d] /= conserv[0];
 
-  primit[num_equations - 1] = p;
+  primit[num_equation - 1] = p;
 }
 
 // GPU FUNCTIONS
@@ -186,10 +194,10 @@ double EquationOfState::pressure( double *state,
                                   double *KE,
                                   const double gamma,
                                   const int dim,
-                                  const int num_equations)
+                                  const int num_equation)
 {
   double p = 0.;
   for(int k=0;k<dim;k++) p += KE[k];
-  return (gamma-1.)*(state[num_equations-1] - p);
+  return (gamma-1.)*(state[num_equation-1] - p);
 }
 #endif*/
