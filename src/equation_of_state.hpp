@@ -65,11 +65,10 @@ protected:
 
   Vector gasParams;
 
+  SpeciesPrimitiveType speciesPrimitiveType;
+
   // number of conservative and primitive/visualization variables
   int Nconservative, Nprimitive;
-
-  double visc_mult;
-  double bulk_visc_mult;
 
   // If not ambipolar, one species continuity equation is replaced by global continuity equation.
   // If ambipolar, electron continuity equation is also replaced by an algebraic equation (determined by GasMixture).
@@ -83,9 +82,6 @@ public:
   ~GasMixture(){};
 
   void SetFluid(WorkingFluid _fluid);
-
-  void SetViscMult(double _visc_mult) { visc_mult = _visc_mult; }
-  void SetBulkViscMult(double _bulk_mult) { bulk_visc_mult = _bulk_mult; }
 
   int GetNumSpecies() { return numSpecies; }
   int GetNumActiveSpecies() { return numActiveSpecies; }
@@ -115,17 +111,6 @@ public:
   virtual double GetSpecificHeatRatio() = 0;
   virtual double GetGasConstant() = 0;
 
-  virtual double GetViscosity(const Vector &state) = 0;
-  virtual double GetThermalConductivity(const Vector &state) = 0;
-
-  virtual double GetSchmidtNum() = 0;
-  virtual double GetPrandtlNum() = 0;
-
-//   double GetPrandtlNum() { return Pr; }
-//   double GetSchmidtNum() { return Sc; }
-
-  double GetViscMultiplyer() { return visc_mult; }
-  double GetBulkViscMultiplyer() { return bulk_visc_mult; }
 };
 
 
@@ -133,14 +118,6 @@ class DryAir : public GasMixture{
 private:
   double specific_heat_ratio;
   double gas_constant;
-  double thermalConductivity;
-
-  // Prandtl number
-  double Pr;         // Prandtl number
-  double cp_div_pr;  // cp divided by Pr (used in conductivity calculation)
-
-  // Fick's law
-  double Sc;  // Schmidt number
 
   // virtual void SetNumEquations();
 public:
@@ -166,11 +143,6 @@ public:
   virtual double GetSpecificHeatRatio(){return specific_heat_ratio;};
   virtual double GetGasConstant(){return gas_constant;};
 
-  virtual double GetViscosity(const Vector &state);
-  virtual double GetThermalConductivity(const Vector &state);
-
-  virtual double GetSchmidtNum(){return Sc;};
-  virtual double GetPrandtlNum() { return Pr; }
 
 
     // GPU functions
@@ -251,18 +223,6 @@ inline double DryAir::ComputePressure(const Vector &state) {
   den_vel2 /= state[0];
 
   return (specific_heat_ratio - 1.0) * (state[1 + dim] - 0.5 * den_vel2);
-}
-
-// Sutherland's law
-inline double DryAir::GetViscosity(const Vector &state) {
-  double p = ComputePressure(state);
-  double temp = p/gas_constant/state[0];
-  return (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
-}
-
-inline double DryAir::GetThermalConductivity(const Vector &state) {
-  double visc = GetViscosity(state);
-  return (visc * cp_div_pr);
 }
 
 #endif  // EQUATION_OF_STATE_HPP_
