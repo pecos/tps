@@ -39,7 +39,7 @@
 
 #include <tps_config.h>
 
-#include <general/forall.hpp>
+#include <mfem/general/forall.hpp>
 #include "dataStructures.hpp"
 #include "run_configuration.hpp"
 #include <mfem.hpp>

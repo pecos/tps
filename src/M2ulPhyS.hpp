@@ -43,7 +43,7 @@
 #include <tps_config.h>
 
 #include <fstream>
-#include <general/forall.hpp>
+#include <mfem/general/forall.hpp>
 #include <mfem.hpp>
 
 #include "BCintegrator.hpp"
