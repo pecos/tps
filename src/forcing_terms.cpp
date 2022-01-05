@@ -371,10 +371,10 @@ PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const in
                              const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays),
     mixture(_mixture){
-  
+
   psData.DeleteAll();
   for(int i=0;i<_config.GetPassiveScalarData().Size();i++) psData.Append( new passiveScalarData );
-  
+
   for (int i = 0; i < psData.Size(); i++) {
     psData[i]->coords.SetSize(3);
     for (int d = 0; d < 3; d++) psData[i]->coords[d] = _config.GetPassiveScalarData(i)->coords[d];

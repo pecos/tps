@@ -34,6 +34,7 @@
 #include "dgNonlinearForm.hpp"
 #include "riemann_solver.hpp"
 
+// TODO: write for multi-species and two temperature.
 OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rsolver, GasMixture *_mixture,
                    ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
                    const int _num_equation, int _patchNumber, double _refLength, OutletType _bcType,

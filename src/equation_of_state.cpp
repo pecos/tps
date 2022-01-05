@@ -48,12 +48,17 @@ DryAir::DryAir(RunConfiguration &_runfile, int _dim) : GasMixture(WorkingFluid::
   ambipolar = false;
   twoTemperature = false;
 
-  setNumActiveSpecies();
-  setNumEquations();
+  SetNumActiveSpecies();
+  SetNumEquations();
 
   gas_constant = 287.058;
   // gas_constant = 1.; // for comparison against ex18
   specific_heat_ratio = 1.4;
+
+  gasParams.SetSize(GasParams::NUM_GASPARAMS * numSpecies);
+  gasParams = 0.0;
+  gasParams[GasParams::SPECIES_MW * numSpecies + 0] = UNIVERSALGASCONSTANT / gas_constant;
+  gasParams[GasParams::SPECIES_HEAT_RATIO * numSpecies + 0] = specific_heat_ratio;
 
   Pr = 0.71;
   cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
@@ -82,7 +87,7 @@ DryAir::DryAir()
 }
 
 
-// void DryAir::setNumEquations()
+// void DryAir::SetNumEquations()
 // {
 //   Nconservative = dim+2;
 //   Nprimitive = Nconservative;
@@ -91,7 +96,7 @@ DryAir::DryAir()
 
 
 
-// void EquationOfState::setFluid(WorkingFluid _fluid) {
+// void EquationOfState::SetFluid(WorkingFluid _fluid) {
 //   fluid = _fluid;
 //   switch (fluid) {
 //     case DRY_AIR:
@@ -112,6 +117,7 @@ bool DryAir::StateIsPhysical(const mfem::Vector& state) {
   const double den = state(0);
   const Vector den_vel(state.GetData() + 1, dim);
   const double den_energy = state(1 + dim);
+  const double scalar = state(num_equation - 1);
 
   if (den < 0) {
     cout << "Negative density: ";
@@ -146,6 +152,16 @@ bool DryAir::StateIsPhysical(const mfem::Vector& state) {
     cout << endl;
     return false;
   }
+
+  if (scalar <= 0) {
+    cout << "Negative passive scalar: " << scalar << ", state: ";
+    for (int i = 0; i < state.Size(); i++) {
+      cout << state(i) << " ";
+    }
+    cout << endl;
+    return false;
+  }
+
   return true;
 }
 
