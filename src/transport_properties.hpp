@@ -95,6 +95,10 @@ class TransportProperties{
 
 };
 
+//////////////////////////////////////////////////////
+//////// Dry Air mixture
+//////////////////////////////////////////////////////
+
 class DryAirTransport : public TransportProperties {
 protected:
   double gas_constant;
@@ -112,6 +116,26 @@ public:
   DryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile);
 
   ~DryAirTransport(){};
+
+  virtual void ComputeFluxTransportProperties(const Vector &state,
+                                              const DenseMatrix &gradUp,
+                                              Vector &transportBuffer,
+                                              DenseMatrix &diffusionVelocity);
+};
+
+//////////////////////////////////////////////////////
+//////// Test Binary Air mixture
+//////////////////////////////////////////////////////
+// NOTE: this is mixture of two idential air species.
+// mixture variables (density, pressure, temperature) are treated as single species.
+// Only mass fractions are treated as binary mixture, essentially the same as PASSIVE_SCALAR.
+
+class TestBinaryAirTransport : public DryAirTransport {
+protected:
+public:
+  TestBinaryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile);
+
+  ~TestBinaryAirTransport(){};
 
   virtual void ComputeFluxTransportProperties(const Vector &state,
                                               const DenseMatrix &gradUp,

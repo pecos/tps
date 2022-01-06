@@ -17,6 +17,20 @@ endif
 # Possible there is nothing to do
 bin_PROGRAMS =
 
+bin_PROGRAMS += simmesh
+simmesh_SOURCES  = simple_periodic_mesh.cpp
+simmesh_LDADD    = ../src/libtps.a -lmfem
+
+simmesh_LDFLAGS  = -L$(MFEM_LIB)
+simmesh_LDFLAGS += $(HDF5_LIBS)
+simmesh_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
+simmesh_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
+simmesh_LDFLAGS += -L$(METIS_LIB) -lmetis
+simmesh_LDFLAGS += $(GRVY_LIBS)
+simmesh_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
+simmesh_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
+simmesh_LDFLAGS += -L$(GSLIB_LIB) -lgs
+
 if GSLIB_ENABLED
 bin_PROGRAMS   += interp
 interp_SOURCES  = pfield_interpolate.cpp
@@ -32,3 +46,17 @@ interp_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
 interp_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
 interp_LDFLAGS += -L$(GSLIB_LIB) -lgs
 endif
+
+bin_PROGRAMS += binaryic
+binaryic_SOURCES  = binary_mixture_ic.cpp
+binaryic_LDADD    = ../src/libtps.a -lmfem
+
+binaryic_LDFLAGS  = -L$(MFEM_LIB)
+binaryic_LDFLAGS += $(HDF5_LIBS)
+binaryic_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
+binaryic_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
+binaryic_LDFLAGS += -L$(METIS_LIB) -lmetis
+binaryic_LDFLAGS += $(GRVY_LIBS)
+binaryic_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
+binaryic_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
+binaryic_LDFLAGS += -L$(GSLIB_LIB) -lgs
