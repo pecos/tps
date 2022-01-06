@@ -151,6 +151,8 @@ bool DryAir::StateIsPhysical(const mfem::Vector& state) {
   return true;
 }
 
+// TODO: We need to move this routine to upper level, i.e. M2ulPhys.
+// Diffusion velocity contributes to the characteristic speed, which mixture cannot handle or know.
 // Compute the maximum characteristic speed.
 double DryAir::ComputeMaxCharSpeed(const Vector& state) {
   const double den = state(0);
