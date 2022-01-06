@@ -16,7 +16,7 @@ int main (int argc, char *argv[])
 
   // Parse command-line options.
   OptionsParser args(argc, argv);
-  args.AddOption(&input_file, "-r1", "--runFile1", "runFile");
+  args.AddOption(&input_file, "-r", "--runFile", "runFile");
 
   args.Parse();
   if (!args.Good())
@@ -74,9 +74,10 @@ int main (int argc, char *argv[])
   double T0 = 293.0;
   double p0 = 101300;
   double gas_constant = 287.058;
+  double u0 = 5.0;
 
   double rho = p0 / gas_constant / T0;
-  double rhoU = 0.0;
+  double rhoU = rho * u0;
   double rhoE = 101300. / (gamma - 1.) + 0.5 * rhoU * rhoU / rho;
   double pi = atan(1.0) * 4.0;
   for (int i = 0; i < NDof; i++) {
@@ -87,8 +88,9 @@ int main (int argc, char *argv[])
     // std::cout << std::endl;
 
     dataU[i] = rho;
-    for (int d = 0; d < dim; d++) {
-      dataU[i + (d+1) * NDof] = rhoU;
+    dataU[i + 1 * NDof] = rhoU;
+    for (int d = 1; d < dim; d++) {
+      dataU[i + (d+1) * NDof] = 0.0;
     }
     dataU[i + (dim+1) * NDof] = rhoE;
     dataU[i + (dim+2) * NDof] = rho * ( 0.5 + 0.5 * sin( 2.0 * pi * coordinates[i + 0 * NDof] / 10.0 ) );

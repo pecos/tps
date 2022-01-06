@@ -17,6 +17,20 @@ endif
 # Possible there is nothing to do
 bin_PROGRAMS =
 
+bin_PROGRAMS += beam_mesh
+beam_mesh_SOURCES  = beam_mesh.cpp
+beam_mesh_LDADD    = -lmfem
+
+beam_mesh_LDFLAGS  = -L$(MFEM_LIB)
+beam_mesh_LDFLAGS += $(HDF5_LIBS)
+beam_mesh_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
+beam_mesh_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
+beam_mesh_LDFLAGS += -L$(METIS_LIB) -lmetis
+beam_mesh_LDFLAGS += $(GRVY_LIBS)
+beam_mesh_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
+beam_mesh_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
+beam_mesh_LDFLAGS += -L$(GSLIB_LIB) -lgs
+
 bin_PROGRAMS += simmesh
 simmesh_SOURCES  = simple_periodic_mesh.cpp
 simmesh_LDADD    = ../src/libtps.a -lmfem
