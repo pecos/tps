@@ -38,6 +38,9 @@
 #include <mfem.hpp>
 #include <string>
 
+// application exit codes
+enum ExitCodes { NORMAL = 0, ERROR = 1, JOB_RESTART = 10, EARLY_EXIT = 11 };
+
 // Misc. utilities
 bool file_exists(const std::string &name);
 std::string systemCmd(const char *cmd);
