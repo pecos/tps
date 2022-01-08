@@ -39,6 +39,9 @@
  * variables and functions.
  */
 
+// forward declaration for parent Tps class
+class Tps;
+
 #include <hdf5.h>
 #include <tps_config.h>
 
@@ -69,15 +72,8 @@
 #include "masa_handler.hpp"
 #endif
 
-#ifdef HAVE_GRVY
-#include <grvy.h>
-#endif
-
 using namespace mfem;
 using namespace std;
-
-// application exit codes
-enum ExitCodes { NORMAL = 0, ERROR = 1, JOB_RESTART = 10, EARLY_EXIT = 11 };
 
 class M2ulPhyS {
  private:
@@ -86,6 +82,9 @@ class M2ulPhyS {
   int nprocs_;  // total number of MPI procs
   int rank_;    // local MPI rank
   bool rank0_;  // flag to indicate rank 0
+
+  // pointer to parent Tps class
+  Tps *tpsP;
 
   // Run options
   RunConfiguration config;
@@ -289,9 +288,10 @@ class M2ulPhyS {
   void Cache_Paraview_Timesteps();
 
  public:
-  M2ulPhyS(MPI_Session &_mpi, string &inputFileName);
+  M2ulPhyS(MPI_Session &_mpi, string &inputFileName,Tps *tps);
   ~M2ulPhyS();
 
+  void parseSolverOptions();
   void projectInitialSolution();
   void writeHDF5() { restart_files_hdf5("write"); }
   void writeParaview(int iter, double time) {

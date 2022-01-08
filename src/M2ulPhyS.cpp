@@ -37,7 +37,8 @@
 
 #include <sstream>
 
-M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, string &inputFileName) : mpi(_mpi) {
+M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, string &inputFileName, Tps *tps) : mpi(_mpi) {
+  tpsP = tps;
   nprocs_ = mpi.WorldSize();
   rank_ = mpi.WorldRank();
   if (rank_ == 0)
