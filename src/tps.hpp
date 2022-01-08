@@ -33,19 +33,53 @@
 #define TPS_HPP_
 
 #include <string>
+#include <grvy.h>
+#include <mfem.hpp>
 
+#include "tps_config.h"
+#include "logger.hpp"
+#include "utils.hpp"
 #include "M2ulPhyS.hpp"
 
+
 // Solver parent class shared by all implementations
-class tps {
+class Tps {
+ protected:
+
+ private:
+
   std::string tpsVersion_;  // code version
+  mfem::MPI_Session mpi_;   // top-level mpi context
   int rank_;                // local MPI rank
   int nprocs_;              // total number of MPI procs
   bool isRank0_;            // flag to indicate rank0
 
+  // runtime controls
+  std::string iFile_;       // name of runtime input file (new ini format)
+  std::string iFile_old_;   // name of runtime input file (old format)
+
+  // supported high-level physics configurations
+  bool isFlowOnlyMode_;
+  bool isEMOnlyMode_;
+  bool isFlowEMCoupledMode_;
+
+  // mesh
+  std::string meshFile_;  //
+
+  // koomie todo, replace with new base solver class
+  M2ulPhyS *solver;
+
  public:
-  tps(MPI_Session &mpi, int &argc, char **&argv);  // constructor
-  void PrintHeader();                              //  print header and versioning info
+  Tps(int argc, char *argv[]);    // constructor
+  GRVY::GRVY_Input_Class iparse_; // runtime input parser
+
+  void ChooseSolver();
+  void Iterate();
+  int  GetStatus(){return solver->GetStatus();}
+  void PrintHeader();                                  // print header and versioning info
+  void ParseCommandLineArgs(int argc,char *argv[]);    // parse command line arguments
+  void ParseInput();                                   // read and cache runtime inputs from file
+
 };
 
 #endif  // TPS_HPP_

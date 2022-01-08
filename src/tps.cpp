@@ -31,16 +31,27 @@
 // -----------------------------------------------------------------------------------el-
 #include "tps.hpp"
 
-tps::tps(MPI_Session &mpi, int &argc, char **&argv) {
-  nprocs_ = mpi.WorldSize();
-  rank_ = mpi.WorldRank();
+Tps::Tps(int argc, char *argv[]) {
+
+  nprocs_ = mpi_.WorldSize();
+  rank_   = mpi_.WorldRank();
   if (rank_ == 0)
     isRank0_ = true;
   else
     isRank0_ = false;
+
+  // default input file
+  iFile_ = "runfile.ini";
+  iFile_old_ = "unknown";
+
+  // default physics configuration
+  isFlowOnlyMode_      = true;
+  isEMOnlyMode_        = false;
+  isFlowEMCoupledMode_ = false;
+
 }
 
-void tps::PrintHeader() {
+void Tps::PrintHeader() {
   if (isRank0_) {
     grvy_printf(ginfo, "\n------------------------------------\n");
     grvy_printf(ginfo, "  _______ _____   _____\n");
@@ -54,4 +65,100 @@ void tps::PrintHeader() {
     grvy_printf(ginfo, "MFEM Version: %s\n", mfem::GetVersionStr());
     grvy_printf(ginfo, "------------------------------------\n\n");
   }
+}
+
+/// Register and parse supported command line arguments and runtime inputs
+void Tps::ParseCommandLineArgs(int argc, char *argv[]) {
+
+  mfem::OptionsParser args(argc,argv);
+  bool showVersion = false;
+  const char *astring = iFile_.c_str();
+
+  if(isRank0_)
+  {
+    grvy_printf(GRVY_INFO,"# of command-line arguments = %i\n",argc);
+    for(int i=0;i<argc;i++)
+      grvy_printf(GRVY_INFO,"--> %s\n",argv[i]);
+  }
+
+  // Register supported command-line arguments
+  args.AddOption(&isFlowOnlyMode_, "-flow", "--flow-only", "-nflow", "--not-flow-only", "Perform flow only simulation");
+  args.AddOption(&showVersion, "-v", "--version", "", "--no-version", "Print code version and exit");
+  args.AddOption(&astring, "-run", "--runFile", "Name of the input file with run options.");
+  args.Parse();
+
+  if (!args.Good()) {
+    if (isRank0_) args.PrintUsage(std::cout);
+    exit(ERROR);
+  }
+  args.PrintOptions(std::cout);
+
+  // koomie update here when input file conversion complete
+  //iFile_ = astring;
+  iFile_old_ = astring;
+
+  // Version info
+  PrintHeader();
+  if (showVersion)
+    exit(0);
+
+  return;
+}
+
+/// Choose desired solver class
+void Tps::ChooseSolver() {
+  // koomie update here when input file conversion complete
+  solver = new M2ulPhyS(mpi_,iFile_old_,this);
+
+  // load solver specific inputs
+  solver->parseSolverOptions();
+}
+
+void Tps::Iterate() {
+  solver->Iterate();
+}
+
+/// Read runtime input file on single MPI process and distribute so that
+/// runtime inputs are available for query on on all processors.
+void Tps::ParseInput() {
+
+  std::stringstream buffer;
+  std::string ss;
+
+  if(isRank0_)
+  {
+    grvy_printf(GRVY_INFO,"Caching input file -> %s\n",iFile_.c_str());
+    std::ifstream file(iFile_);
+    buffer << file.rdbuf();
+  }
+
+  // distribute buffer to remaining tasks
+  int bufferSize = buffer.str().size();
+  MPI_Bcast(&bufferSize,1,MPI_INT,0,MPI_COMM_WORLD);
+
+  if(isRank0_)
+    ss = buffer.str();
+  else
+    ss.resize(bufferSize);
+
+  MPI_Bcast(&ss[0],ss.capacity(),MPI_CHAR,0,MPI_COMM_WORLD);
+  buffer.str(ss);
+
+  // now, all procs can load the input file contents for subsequent parsing
+  if( !iparse_.Load(buffer) )
+    {
+      grvy_printf(GRVY_ERROR,"Unable to load runtime inputs from file -> %s\n",iFile_.c_str());
+      exit(ERROR);
+    }
+
+  int flag = 1;
+
+  // load common inputs needed for all solvers
+
+  // [mesh] options
+  flag *= iparse_.Read_Var("mesh/file",&meshFile_);
+
+  std::cout << "meshfile [new] = " << meshFile_ << std::endl;
+
+  return;
 }
