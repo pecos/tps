@@ -29,12 +29,8 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
-
-#include "quasimagnetostatic.hpp"
-
-#include <grvy.h>
 #include <hdf5.h>
-
+#include "quasimagnetostatic.hpp"
 #include "../utils/mfem_extras/pfem_extras.hpp"
 #include "logger.hpp"
 #include "utils.hpp"
@@ -44,11 +40,16 @@ using namespace mfem::common;
 
 void JFun(const Vector &x, Vector &f);
 
-QuasiMagnetostaticSolver::QuasiMagnetostaticSolver(MPI_Session &mpi, ElectromagneticOptions em_opts)
+QuasiMagnetostaticSolver::QuasiMagnetostaticSolver(MPI_Session &mpi, ElectromagneticOptions em_opts, TPS::Tps *tps)
     : _mpi(mpi), _em_opts(em_opts) {
-  // dump options to screen for user inspection
-  if (_mpi.Root()) {
-    _em_opts.print(std::cout);
+  tpsP = tps;
+
+  // verify running on cpu
+  if (tpsP->getDeviceConfig() != "cpu") {
+    if (mpi.Root()) {
+      grvy_printf(GRVY_ERROR, "[ERROR] EM simulation currently only supported on cpu.\n");
+    }
+    exit(1);
   }
 
   _pmesh = NULL;
@@ -79,7 +80,7 @@ QuasiMagnetostaticSolver::~QuasiMagnetostaticSolver() {
   delete _pmesh;
 }
 
-void QuasiMagnetostaticSolver::Initialize() {
+void QuasiMagnetostaticSolver::initialize() {
   bool verbose = _mpi.Root();
   if (verbose) grvy_printf(ginfo, "Initializing quasimagnetostatic solver.\n");
 
@@ -90,7 +91,7 @@ void QuasiMagnetostaticSolver::Initialize() {
   //-----------------------------------------------------
 
   // 1a) Read the serial mesh (on each mpi rank)
-  Mesh *mesh = new Mesh(_em_opts.mesh_file, 1, 1);
+  Mesh *mesh = new Mesh(_em_opts.mesh_file.c_str(), 1, 1);
   _dim = mesh->Dimension();
   if (_dim != 3) {
     if (verbose) {
@@ -143,6 +144,9 @@ void QuasiMagnetostaticSolver::Initialize() {
 
   // All done
   _operator_initialized = true;
+
+  // initialize current
+  InitializeCurrent();
 }
 
 void QuasiMagnetostaticSolver::InitializeCurrent() {
@@ -230,7 +234,30 @@ void QuasiMagnetostaticSolver::InitializeCurrent() {
   _current_initialized = true;
 }
 
-void QuasiMagnetostaticSolver::Solve() {
+// query solver-specific runtime controls
+void QuasiMagnetostaticSolver::parseSolverOptions() {
+
+  tpsP->getRequiredInput("em/mesh",_em_opts.mesh_file);
+
+  tpsP->getInput("em/order",       _em_opts.order,       1);
+  tpsP->getInput("em/ref_levels",  _em_opts.ref_levels,  0);
+  tpsP->getInput("em/max_iter",    _em_opts.max_iter,    100);
+  tpsP->getInput("em/rtol",        _em_opts.rtol,        1.0e-6);
+  tpsP->getInput("em/atol",        _em_opts.atol,        1.0e-10);
+  tpsP->getInput("em/nBy",         _em_opts.nBy,         0);
+  tpsP->getInput("em/yinterp_min", _em_opts.yinterp_min, 0.0);
+  tpsP->getInput("em/yinterp_max", _em_opts.yinterp_max, 1.0);
+  tpsP->getInput("em/By_file",     _em_opts.By_file,     std::string("By.h5"));
+  tpsP->getInput("em/top_only",    _em_opts.top_only,    false);
+  tpsP->getInput("em/bot_only",    _em_opts.bot_only,    false);
+
+  // dump options to screen for user inspection
+  if (_mpi.Root()) {
+    _em_opts.print(std::cout);
+  }
+}
+
+void QuasiMagnetostaticSolver::solve() {
   bool verbose = _mpi.Root();
   if (verbose) grvy_printf(ginfo, "Solving the quasi-magnetostatic system for A (magnetic vector potential).\n");
 
@@ -296,6 +323,10 @@ void QuasiMagnetostaticSolver::Solve() {
 
   // Compute and dump the magnetic field on the axis
   InterpolateToYAxis();
+
+  if (_mpi.Root()) {
+    std::cout << "EM simulation complete" << std::endl;
+  }
 }
 
 void QuasiMagnetostaticSolver::InterpolateToYAxis() const {
@@ -344,7 +375,7 @@ void QuasiMagnetostaticSolver::InterpolateToYAxis() const {
   hid_t dataspace = -1;
 
   if (root) {
-    file = H5Fcreate(_em_opts.By_file, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    file = H5Fcreate(_em_opts.By_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
     assert(file >= 0);
 
     h5_save_attribute(file, "nBy", _em_opts.nBy);
