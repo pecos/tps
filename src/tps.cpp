@@ -31,6 +31,8 @@
 // -----------------------------------------------------------------------------------el-
 #include "tps.hpp"
 
+namespace TPS {
+
 Tps::Tps(int argc, char *argv[]) {
 
   nprocs_ = mpi_.WorldSize();
@@ -49,9 +51,18 @@ Tps::Tps(int argc, char *argv[]) {
   isEMOnlyMode_        = false;
   isFlowEMCoupledMode_ = false;
 
+  // execution device inferred from build setup
+#ifdef _HIP_
+  deviceConfig_ = "hip";
+#elif _CUDA_
+  deviceConfig_ = "cuda";
+#else
+  deviceConfig_ = "cpu";
+#endif
+
 }
 
-void Tps::PrintHeader() {
+void Tps::printHeader() {
   if (isRank0_) {
     grvy_printf(ginfo, "\n------------------------------------\n");
     grvy_printf(ginfo, "  _______ _____   _____\n");
@@ -68,66 +79,102 @@ void Tps::PrintHeader() {
 }
 
 /// Register and parse supported command line arguments and runtime inputs
-void Tps::ParseCommandLineArgs(int argc, char *argv[]) {
+void Tps::parseCommandLineArgs(int argc, char *argv[]) {
 
   mfem::OptionsParser args(argc,argv);
   bool showVersion = false;
-  const char *astring = iFile_.c_str();
+  const char *astring  = iFile_.c_str();
+  const char *astring2 = iFile_.c_str();
 
   if(isRank0_)
   {
-    grvy_printf(GRVY_INFO,"# of command-line arguments = %i\n",argc);
+    grvy_printf(GRVY_DEBUG,"# of command-line arguments = %i\n",argc);
     for(int i=0;i<argc;i++)
-      grvy_printf(GRVY_INFO,"--> %s\n",argv[i]);
+      grvy_printf(GRVY_DEBUG,"--> %s\n",argv[i]);
   }
 
   // Register supported command-line arguments
-  args.AddOption(&isFlowOnlyMode_, "-flow", "--flow-only", "-nflow", "--not-flow-only", "Perform flow only simulation");
   args.AddOption(&showVersion, "-v", "--version", "", "--no-version", "Print code version and exit");
   args.AddOption(&astring, "-run", "--runFile", "Name of the input file with run options.");
+  args.AddOption(&astring2, "-input", "--inputFile", "Name of ini-style input file with run options.");
   args.Parse();
 
   if (!args.Good()) {
     if (isRank0_) args.PrintUsage(std::cout);
     exit(ERROR);
   }
-  args.PrintOptions(std::cout);
 
-  // koomie update here when input file conversion complete
-  //iFile_ = astring;
+  // koomie TODO: update here when input file conversion complete
   iFile_old_ = astring;
+  iFile_ = astring2;
 
   // Version info
-  PrintHeader();
+  printHeader();
   if (showVersion)
     exit(0);
+
+  args.PrintOptions(std::cout);
 
   return;
 }
 
-/// Choose desired solver class
-void Tps::ChooseSolver() {
-  // koomie update here when input file conversion complete
-  solver = new M2ulPhyS(mpi_,iFile_old_,this);
+/// Setup desired execution devices for MFEM
+void Tps::chooseDevices()
+{
+#ifdef _GPU_
+  device_.Configure(deviceConfig_,nprocs_ % numGpusPerRank_);
+#endif
 
-  // load solver specific inputs
-  solver->parseSolverOptions();
+  if(isRank0_)
+  {
+    printf("\n---------------------------------\n");
+    printf("MFEM Device configuration:\n");
+    device_.Print();
+    printf("---------------------------------\n\n");
+  }
+
+  return;
 }
 
-void Tps::Iterate() {
-  solver->Iterate();
+
+/// Choose desired solver class
+void Tps::chooseSolver() {
+
+  if(input_solver_type_ == "flow") {
+    isFlowOnlyMode_ = true;
+    // koomie TODO: update here when input file conversion complete - should not need iFile_old_)
+    solver_ = new M2ulPhyS(mpi_,iFile_old_,this);
+  }
+  else if (input_solver_type_ == "em") {
+    isEMOnlyMode_ = true;
+    iFile_ = iFile_old_;
+    ElectromagneticOptions em_opt;
+    solver_ = new QuasiMagnetostaticSolver(mpi_,em_opt,this);
+  }
+  else if (input_solver_type_ == "coupled") {
+   isFlowEMCoupledMode_ = true;
+   grvy_printf(GRVY_ERROR,"\nSlow your roll.  Solid high-five for whoever implements this coupled solver mode!\n");
+   exit(ERROR);
+  }
+  else {
+    grvy_printf(GRVY_ERROR,"\nUnsupported solver choice specified -> %s\n",input_solver_type_.c_str());
+    exit(ERROR);
+  }
+
+  // with a solver chosen, we can now parse remaining solver-specific inputs
+  solver_->parseSolverOptions();
 }
 
 /// Read runtime input file on single MPI process and distribute so that
 /// runtime inputs are available for query on on all processors.
-void Tps::ParseInput() {
+void Tps::parseInput() {
 
   std::stringstream buffer;
   std::string ss;
 
   if(isRank0_)
   {
-    grvy_printf(GRVY_INFO,"Caching input file -> %s\n",iFile_.c_str());
+    grvy_printf(GRVY_INFO,"\nCaching input file -> %s\n",iFile_.c_str());
     std::ifstream file(iFile_);
     buffer << file.rdbuf();
   }
@@ -151,14 +198,48 @@ void Tps::ParseInput() {
       exit(ERROR);
     }
 
-  int flag = 1;
-
-  // load common inputs needed for all solvers
-
-  // [mesh] options
-  flag *= iparse_.Read_Var("mesh/file",&meshFile_);
-
-  std::cout << "meshfile [new] = " << meshFile_ << std::endl;
+  // parse common inputs
+  getRequiredInput("solver/type",input_solver_type_);
+#ifdef _GPU_
+  getRequiredInput("gpu/numGpusPerRank",numGpusPerRank_);
+#endif
 
   return;
 }
+
+/// read an input value for keyword [name] and store in var - error if value
+/// is not supplied
+template <typename T> void Tps::getRequiredInput(const char *name, T &var)
+{
+  if(iparse_.Read_Var(name,&var) == 0)
+  {
+    std::cout << "ERROR: Unable to read required input variable -> " << name << std::endl;
+    exit(ERROR);
+  }
+  return;
+}
+
+/// read an input value for keyword [name] and store in var - use defaultValue if
+/// keyword not present
+template <typename T> void Tps::getInput(const char *name, T &var, T varDefault)
+{
+  if(iparse_.Read_Var(name,&var,varDefault) == 0)
+  {
+    std::cout << "ERROR: Unable to read input variable -> " << name << std::endl;
+    exit(ERROR);
+  }
+  return;
+}
+
+// supported templates for getInput()
+template void Tps::getInput <int>         (const char *name,    int &var, int    varDefault);
+template void Tps::getInput <double>      (const char *name, double &var, double varDefault);
+template void Tps::getInput <std::string> (const char *name, std::string &var, std::string varDefault);
+template void Tps::getInput <bool>        (const char *name, bool &var, bool varDefault);
+
+// supported templates for getRequiredInput()
+template void Tps::getRequiredInput <int>    (const char *name,    int &var);
+template void Tps::getRequiredInput <double> (const char *name, double &var);
+template void Tps::getRequiredInput <std::string> (const char *name, std::string &var);
+
+} // end namespace TPS
