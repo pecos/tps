@@ -39,8 +39,10 @@
  * variables and functions.
  */
 
-// forward declaration for parent Tps class
+// forward declaration for Tps support class
+namespace TPS {
 class Tps;
+}
 
 #include <hdf5.h>
 #include <tps_config.h>
@@ -66,6 +68,7 @@ class Tps;
 #include "riemann_solver.hpp"
 #include "run_configuration.hpp"
 #include "sbp_integrators.hpp"
+#include "tps.hpp"
 #include "utils.hpp"
 
 #ifdef _MASA_
@@ -75,7 +78,7 @@ class Tps;
 using namespace mfem;
 using namespace std;
 
-class M2ulPhyS {
+class M2ulPhyS : public TPS::Solver {
  private:
   MPI_Groups *groupsMPI;
   MPI_Session &mpi;
@@ -84,7 +87,7 @@ class M2ulPhyS {
   bool rank0_;  // flag to indicate rank 0
 
   // pointer to parent Tps class
-  Tps *tpsP;
+  TPS::Tps *tpsP;
 
   // Run options
   RunConfiguration config;
@@ -288,10 +291,10 @@ class M2ulPhyS {
   void Cache_Paraview_Timesteps();
 
  public:
-  M2ulPhyS(MPI_Session &_mpi, string &inputFileName,Tps *tps);
+  M2ulPhyS(MPI_Session &_mpi, string &inputFileName,TPS::Tps *tps);
   ~M2ulPhyS();
 
-  void parseSolverOptions();
+  void parseSolverOptions() override;
   void projectInitialSolution();
   void writeHDF5() { restart_files_hdf5("write"); }
   void writeParaview(int iter, double time) {
@@ -300,7 +303,7 @@ class M2ulPhyS {
     paraviewColl->Save();
   }
 
-  void Iterate();
+  void solve() override;
 
   // Accessors
   RHSoperator getRHSoperator() { return *rhsOperator; }
@@ -317,7 +320,7 @@ class M2ulPhyS {
     exit_status_ = code;
     return;
   }
-  int GetStatus() { return exit_status_; }
+  int getStatus() override { return exit_status_; }
 };
 
 #endif  // M2ULPHYS_HPP_

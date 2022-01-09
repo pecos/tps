@@ -37,7 +37,7 @@
 
 #include <sstream>
 
-M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, string &inputFileName, Tps *tps) : mpi(_mpi) {
+M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps) : mpi(_mpi) {
   tpsP = tps;
   nprocs_ = mpi.WorldSize();
   rank_ = mpi.WorldRank();
@@ -936,7 +936,7 @@ void M2ulPhyS::projectInitialSolution() {
   mixture->UpdatePressureGridFunction(press, Up);
 }
 
-void M2ulPhyS::Iterate() {
+void M2ulPhyS::solve() {
 #ifdef HAVE_GRVY
   const int iterQuery = 100;
   double tlast = grvy_timer_elapsed_global();
