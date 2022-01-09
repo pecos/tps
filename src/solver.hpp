@@ -29,36 +29,31 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
-#include "tps.hpp"
+#ifndef SOLVER_HPP_
+#define SOLVER_HPP_
 
-int main(int argc, char *argv[]) {
+#include "utils.hpp"
 
-  TPS::Tps tps(argc, argv);
+using namespace std;
 
-  tps.parseCommandLineArgs(argc, argv);
-  tps.parseInput();
-  tps.chooseDevices();
-  tps.chooseSolver();
-  tps.initialize();
+namespace TPS {
 
-  tps.solve();    // execute chosen solver
+// Base class shared by all solver implementations
+class Solver {
 
-  return (tps.getStatus());
+ private:
+  std::string name_;
+  std::string description_;
 
-}
+ public:
+  // methods to be (optionally) implemented by derived solver classes
+  virtual int  getStatus(){return NORMAL;}
+  virtual void initialize(){return;}
+  // methods *required* to be implemented by derived solver classes  
+  virtual void parseSolverOptions(){cout << "ERROR: " << __func__ << " remains unimplemented" << endl; exit(1);}  
+  virtual void solve(){cout << "ERROR: " << __func__ << " remains unimplemented" << endl; exit(1); }
+};
 
-// Q: is anybody using this?
+} // end namespace TPS
 
-// #ifdef DEBUG
-//   int threads = 0.;
-//   args.AddOption(&threads, "-thr", "--threads",
-//                  " Set -thr 1 so that the program stops at the beginning in debug mode for gdb attach.");
-// 
-//   if (threads != 0) {
-//     int gdb = 0;
-//     cout << "Process " << mpi.WorldRank() + 1 << "/" << mpi.WorldSize() << ", id: " << getpid() << endl;
-//     while (gdb == 0) sleep(5);
-//   }
-// #endif
-
-
+#endif  // SOLVER_HPP_
