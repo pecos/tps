@@ -57,7 +57,7 @@ jobs:
        - name: Expand
          run:  tar xfz tps-*.tar.gz; rm tps-*.tar.gz
        - name: Configure
-         run:  cd tps-*; ./configure CXXFLAGS="-I$PETSC_INC" LDFLAGS="-L$PETSC_LIB -lpetsc"
+         run:  cd tps-*; ./configure 
        - name: Make
          run:  cd tps-*; make -j 2
        - name: TPS version
@@ -67,7 +67,7 @@ jobs:
        - name: Distclean
          run:  cd tps-*; make distclean
        - name: VPATH configure
-         run:  cd tps-*; mkdir build; cd build; ../configure CXXFLAGS="-I$PETSC_INC" LDFLAGS="-L$PETSC_LIB -lpetsc"
+         run:  cd tps-*; mkdir build; cd build; ../configure
        - name: VPATH make
          run:  cd tps-*; cd build; make -j 2
        - name: VPATH tests
@@ -77,8 +77,7 @@ jobs:
      needs: distbuild
      name: GPU/Cuda release tarball tests
      env:
-       MFEM_LIB: /home/karl/sw/mfem-gpu-4.2/lib
-       MFEM_INC: /home/karl/sw/mfem-gpu-4.2/include
+       MFEM_DIR: /home/karl/sw/mfem-gpu-4.2
      steps:
        - name: Cancel previous runs
          uses: styfle/cancel-workflow-action@0.9.0

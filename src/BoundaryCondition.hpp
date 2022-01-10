@@ -33,10 +33,8 @@
 #define BOUNDARYCONDITION_HPP_
 
 #include <tps_config.h>
-
-#include <general/forall.hpp>
 #include <mfem.hpp>
-
+#include <mfem/general/forall.hpp>
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
 #include "riemann_solver.hpp"

@@ -33,7 +33,7 @@
 #define FORCING_TERMS_HPP_
 
 #include <tps_config.h>
-
+#include <mfem/general/forall.hpp>
 #include <mfem.hpp>
 
 #include "dataStructures.hpp"
