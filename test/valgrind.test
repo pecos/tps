@@ -2,7 +2,7 @@
 # -*- mode: sh -*-
 
 TEST="valgrind"
-RUNFILE="inputs/input.dtconst.2iters.cyl"
+RUNFILE="inputs/input.dtconst.2iters.cyl.ini"
 
 setup() {
     OPTS=""

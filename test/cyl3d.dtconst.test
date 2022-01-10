@@ -2,7 +2,7 @@
 # -*- mode: sh -*-
 
 TEST="cyl3d"
-RUNFILE="inputs/input.dtconst.cyl"
+RUNFILE="inputs/input.dtconst.cyl.ini"
 
 setup() {
     SOLN_FILE=restart_output.sol.h5
