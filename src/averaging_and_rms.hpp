@@ -34,6 +34,8 @@
 
 #include <tps_config.h>
 
+#include <mfem/general/forall.hpp>
+
 #include <mfem.hpp>
 #include <string>
 
