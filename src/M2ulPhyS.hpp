@@ -295,6 +295,7 @@ class M2ulPhyS : public TPS::Solver {
   ~M2ulPhyS();
 
   void parseSolverOptions() override;
+  void parseSolverOptions2();
   void projectInitialSolution();
   void writeHDF5() { restart_files_hdf5("write"); }
   void writeParaview(int iter, double time) {
