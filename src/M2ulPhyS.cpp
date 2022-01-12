@@ -332,7 +332,7 @@ void M2ulPhyS::initVariables() {
     } else {
       ioData.registerIOVar("/meanSolution", "mean-p", dim+1);
     }
-    for (int sp = 0; sp < numSpecies; sp++) {
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
       // Only for NS_PASSIVE.
       if ((eqSystem == NS_PASSIVE) && (sp==1)) break;
 
@@ -930,7 +930,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   paraviewColl->RegisterField("press", press);
   if (eqSystem == NS_PASSIVE) {
     paraviewColl->RegisterField("passiveScalar", passiveScalar);
-  } else if (numSpecies > 1) {
+  } else if (numActiveSpecies > 1) {
     // TODO: for now, keep the number of primitive variables same as conserved variables.
     // will need to add full list of species.
     for (int d = 0; d < numActiveSpecies; d++) {
