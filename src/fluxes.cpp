@@ -105,7 +105,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   // TODO: Ultimately, take Up as input variable.
   // TODO: pressure and temperature must be comptued by mixture only.
   const double p = mixture->ComputePressure(state);
-  const double temp = p / state[0] / mixture->GetGasParams(0,GasParams::SPECIES_HEAT_RATIO);
+  const double temp = p / state[0] / UNIVERSALGASCONSTANT * mixture->GetGasParams(0,GasParams::SPECIES_MW);
   // const double temp = p / state[0] / Rg;
   // const double visc = mixture->GetViscosity(state);
   // const double bulkViscMult = mixture->GetBulkViscMultiplyer();
