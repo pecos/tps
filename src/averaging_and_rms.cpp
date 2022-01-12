@@ -55,6 +55,8 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
   if (sampleInterval != 0) computeMean = true;
 
   if (computeMean) {
+    mixture = new DryAir(config,dim);
+    
     rmsFes = new ParFiniteElementSpace(mesh, fec, numRMS, Ordering::byNODES);
 
     meanUp = new ParGridFunction(vfes);
@@ -96,6 +98,7 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
 
 Averaging::~Averaging() {
   if (computeMean) {
+    delete mixture;
     delete paraviewMean;
 
     delete meanP;
@@ -130,11 +133,21 @@ void Averaging::addSample_cpu() {
   double *dataRMS = rms->GetData();
   int dof = fes->GetNDofs();
 
+  Vector iUp(num_equation);
+  
   for (int n = 0; n < dof; n++) {
+    for (int eq = 0; eq < num_equation; eq++) iUp[eq] = dataUp[n + eq * dof];
+    
     // mean
     for (int eq = 0; eq < num_equation; eq++) {
       double mVal = double(samplesMean) * dataMean[n + eq * dof];
-      dataMean[n + eq * dof] = (mVal + dataUp[n + eq * dof]) / double(samplesMean + 1);
+      dataMean[n + eq * dof] = (mVal + iUp[eq]) / double(samplesMean + 1);
+      
+      // presseure-temperature change
+      if(eq==dim+1){
+        double p = mixture->ComputePressureFromPrimitives(iUp);
+        dataMean[n + eq * dof] = (mVal + p) / double(samplesMean + 1);
+      }
     }
 
     // ----- RMS -----

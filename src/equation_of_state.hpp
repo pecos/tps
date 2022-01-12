@@ -75,15 +75,22 @@ public:
   int GetNumConservativeVariables(){return Nconservative;}
   int GetNumPrimitiveVariables(){return Nprimitive;}
 
-  virtual double ComputePressure(const Vector &state) = 0;
+  virtual double ComputePressure(const Vector &state) = 0; // pressure from conservatives
+  virtual double ComputePressureFromPrimitives(const Vector &Up) = 0; // pressure from primitive variables
+  virtual double ComputeTemperature(const Vector &state) = 0;
+  virtual double Temperature(double *rho, double *p, int nsp) = 0; // temperature given densities and pressures of all species
 
   virtual void GetPrimitivesFromConservatives(const Vector &conserv, 
                                               Vector &primit) = 0;
   virtual void GetConservativesFromPrimitives(const Vector &primit, 
                                               Vector &conserv) = 0;
+                                              
+  virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true) = 0;
 
   // Compute the maximum characteristic speed.
   virtual double ComputeMaxCharSpeed(const Vector &state) = 0;
+  
+  virtual double ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive = true) = 0;
 
   // Physicality check (at end)
   virtual bool StateIsPhysical(const Vector &state) = 0;
@@ -96,6 +103,8 @@ public:
   
   virtual double GetSchmidtNum() = 0;
   virtual double GetPrandtlNum() = 0;
+  
+  virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up) = 0;
   
 //   double GetPrandtlNum() { return Pr; }
 //   double GetSchmidtNum() { return Sc; }
@@ -122,19 +131,27 @@ private:
 public:
   DryAir(RunConfiguration &_runfile, int _dim);
   DryAir(); //this will only be usefull to get air constants
+  DryAir(int dim, int num_equation);
   
   ~DryAir(){};
   
   // implementation virtual methods
   virtual double ComputePressure(const Vector &state);
+  virtual double ComputePressureFromPrimitives(const Vector &Up);
+  virtual double ComputeTemperature(const Vector &state);
+  virtual double Temperature(double *rho, double *p, int nsp = 1){return p[0]/gas_constant/rho[0];};
 
   virtual void GetPrimitivesFromConservatives(const Vector &conserv, 
                                               Vector &primit );
   virtual void GetConservativesFromPrimitives(const Vector &primit, 
                                               Vector &conserv);
 
+  virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true);
+  
   // Compute the maximum characteristic speed.
   virtual double ComputeMaxCharSpeed(const Vector &state);
+  
+  virtual double ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive = true);
 
   // Physicality check (at end)
   virtual bool StateIsPhysical(const Vector &state);
@@ -148,6 +165,8 @@ public:
   virtual double GetSchmidtNum(){return Sc;};
   virtual double GetPrandtlNum() { return Pr; }
   
+  virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
+  
   
     // GPU functions
 #ifdef _GPU_
@@ -156,6 +175,14 @@ public:
     double p = 0.;
     for (int k = 0; k < dim; k++) p += KE[k];
     return (gamma - 1.) * (state[1 + dim] - p);
+  }
+  
+  static MFEM_HOST_DEVICE double temperature(const double *state, double *KE, const double &gamma, 
+                                          const double &Rgas, const int &dim, const int &num_equations) {
+    double temp = 0.;
+    for (int k = 0; k < dim; k++) temp += KE[k];
+    temp /= state[0];
+    return (gamma - 1.0)/Rgas * (state[1+dim]/state[0] - temp);
   }
 
   // Sutherland's law
@@ -227,6 +254,14 @@ inline double DryAir::ComputePressure(const Vector &state) {
   den_vel2 /= state[0];
 
   return (specific_heat_ratio - 1.0) * (state[1 + dim] - 0.5 * den_vel2);
+}
+
+inline double DryAir::ComputeTemperature(const Vector &state){
+  double den_vel2 = 0;
+  for (int d = 0; d < dim; d++) den_vel2 += state(d + 1) * state(d + 1);
+  den_vel2 /= state[0];
+  
+  return (specific_heat_ratio - 1.0)/gas_constant * (state[1+dim] - 0.5*den_vel2)/state[0];
 }
 
 // Sutherland's law

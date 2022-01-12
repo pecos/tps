@@ -86,6 +86,9 @@ ConstantPressureGradient::ConstantPressureGradient(const int &_dim, const int &_
                                                    const volumeFaceIntegrationArrays &_gpuArrays,
                                                    RunConfiguration &_config)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, _gpuArrays) {
+  
+  mixture = new DryAir(_config,dim);
+  
   pressGrad.UseDevice(true);
   pressGrad.SetSize(3);
   pressGrad = 0.;
@@ -95,9 +98,13 @@ ConstantPressureGradient::ConstantPressureGradient(const int &_dim, const int &_
     for (int jj = 0; jj < 3; jj++) h_pressGrad[jj] = data[jj];
   }
   pressGrad.ReadWrite();
-
-  //   updateTerms();
 }
+
+ConstantPressureGradient::~ConstantPressureGradient()
+{
+  delete mixture;
+}
+
 
 void ConstantPressureGradient::updateTerms(Vector &in) {
 #ifdef _GPU_
@@ -134,10 +141,11 @@ void ConstantPressureGradient::updateTerms(Vector &in) {
     Array<int> nodes;
     vfes->GetElementVDofs(el, nodes);
 
-    Vector vel(dim);
+    Vector vel(dim), primi(num_equation);
     for (int n = 0; n < dof_elem; n++) {
       int index = nodes[n];
-      double p = dataUp[index + (1 + dim) * dof];
+      for(int eq=0;eq<num_equation;eq++) primi[eq] = dataUp[index + eq * dof];
+      double p = mixture->ComputePressureFromPrimitives(primi);
       double grad_pV = 0.;
 
       for (int d = 0; d < dim; d++) {
@@ -225,7 +233,7 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
     Vector Up(num_equation);
     Up[0] = szData.targetUp[0];
     for (int d = 0; d < dim; d++) Up[1 + d] = szData.targetUp[1 + d];
-    Up[1 + dim] = szData.targetUp[4];
+    Up[1 + dim] =  mixture->Temperature(&Up[0],&szData.targetUp[4],1);
     mixture->GetConservativesFromPrimitives(Up, targetU);
   }
 
@@ -355,7 +363,8 @@ void SpongeZone::computeMixedOutValues() {
   double p = (-B - sqrt(B * B - 4. * A * C)) / (2. * A);  // real solution
 
   Up[0] = meanNormalFluxes[0] * meanNormalFluxes[0] / (temp - p);
-  Up[1+dim] = p;
+  Up[1+dim] = mixture->Temperature(&Up[0],&p,1);
+//   Up[1+dim] = p;
 
   for (int d = 0; d < dim; d++) Up[1 + d] = (meanNormalFluxes[1 + d] - p * szData.normal[d]) / meanNormalFluxes[0];
 

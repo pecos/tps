@@ -441,25 +441,29 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 void RHSoperator::updatePrimitives(const Vector &x_in) const {
 #ifdef _GPU_
 
-  RHSoperator::updatePrimitives_gpu(Up, &x_in, mixture->GetSpecificHeatRatio(), vfes->GetNDofs(), dim, num_equation);
+  RHSoperator::updatePrimitives_gpu(Up, &x_in, mixture->GetSpecificHeatRatio(), mixture->GetGasConstant(),
+                                    vfes->GetNDofs(), dim, num_equation);
 #else
   double *dataUp = Up->GetData();
   for (int i = 0; i < vfes->GetNDofs(); i++) {
     Vector iState(num_equation);
+    Vector iUp(num_equation);
     for (int eq = 0; eq < num_equation; eq++) iState[eq] = x_in[i + eq * vfes->GetNDofs()];
-    double p = mixture->ComputePressure(iState);
-    dataUp[i] = iState[0];
-    dataUp[i + vfes->GetNDofs()] = iState[1] / iState[0];
-    dataUp[i + 2 * vfes->GetNDofs()] = iState[2] / iState[0];
-    if (dim == 3) dataUp[i + 3 * vfes->GetNDofs()] = iState[3] / iState[0];
-    dataUp[i + (1 + dim) * vfes->GetNDofs()] = p;
-    if (eqSystem == NS_PASSIVE)
-      dataUp[i + (num_equation - 1) * vfes->GetNDofs()] = iState[num_equation - 1] / iState[0];
+    mixture->GetPrimitivesFromConservatives(iState,iUp);
+    for (int eq = 0; eq < num_equation; eq++) dataUp[i+eq*vfes->GetNDofs()] = iUp[eq];
+//     double temp = mixture->ComputeTemperature(iState);
+//     dataUp[i] = iState[0];
+//     dataUp[i + vfes->GetNDofs()] = iState[1] / iState[0];
+//     dataUp[i + 2 * vfes->GetNDofs()] = iState[2] / iState[0];
+//     if (dim == 3) dataUp[i + 3 * vfes->GetNDofs()] = iState[3] / iState[0];
+//     dataUp[i + (1 + dim) * vfes->GetNDofs()] = temp;
+//     if (eqSystem == NS_PASSIVE)
+//       dataUp[i + (num_equation - 1) * vfes->GetNDofs()] = iState[num_equation - 1] / iState[0];
   }
 #endif  // _GPU_
 }
 
-void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const double gamma, const int ndofs,
+void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const double gamma, const double Rgas,const int ndofs,
                                        const int dim, const int num_equations) {
 #ifdef _GPU_
   auto dataUp = Up->Write();   // make sure data is available in GPU
@@ -486,7 +490,7 @@ void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const dou
       if (eq == 3 && dim == 3) dataUp[n + 3 * ndofs] = state[3] / state[0];
       if (eq == num_equations - 1)
         dataUp[n + (num_equations - 1) * ndofs] =
-            DryAir::pressure(&state[0], &KE[0], gamma, dim, num_equations);
+            DryAir::temperature(&state[0], &KE[0], gamma, Rgas, dim, num_equations);
     }
   });
 #endif

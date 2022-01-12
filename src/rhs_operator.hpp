@@ -146,7 +146,7 @@ class RHSoperator : public TimeDependentOperator {
   static void copyZk2Z_gpu(Vector &z, Vector &zk, const int eq, const int dof);
   static void copyDataForFluxIntegration_gpu(const Vector &z, DenseTensor &flux, Vector &fk, Vector &zk, const int eq,
                                              const int dof, const int dim);
-  static void updatePrimitives_gpu(Vector *Up, const Vector *x_in, const double gamma, const int ndofs, const int dim,
+  static void updatePrimitives_gpu(Vector *Up, const Vector *x_in, const double gamma, const double Rgas,const int ndofs, const int dim,
                                    const int num_equations);
   static void multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceIntegrationArrays &gpuArrays,
                                  const Vector &invMArray, const Array<int> &posDofInvM, const int num_equation,

@@ -65,7 +65,7 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
   hmeanUp[1] = 60;
   hmeanUp[2] = 0;
   if (dim == 3) hmeanUp[3] = 0.;
-  hmeanUp[1 + dim] = 101300;
+  hmeanUp[1 + dim] = 300;
   if (eqSystem == NS_PASSIVE) hmeanUp[num_equation - 1] = 0.;
 
   area = 0.;
@@ -112,21 +112,26 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
   boundaryU.UseDevice(true);
   boundaryU.SetSize(bdrN * num_equation);
   boundaryU = 0.;
+  
+  Vector iState, iUp;
+  iState.UseDevice(false);
+  iUp.UseDevice(false);
+  iState.SetSize(num_equation);
+  iUp.SetSize(num_equation);
   auto hboundaryU = boundaryU.HostWrite();
   for (int i = 0; i < bdrN; i++) {
-    Vector iState;
-    iState.UseDevice(false);
-    iState.SetSize(num_equation);
-    for (int eq = 0; eq < num_equation; eq++) iState(eq) = hmeanUp[eq];
+    
+    for (int eq = 0; eq < num_equation; eq++) iUp(eq) = hmeanUp[eq];
+    mixture->GetConservativesFromPrimitives(iUp,iState);
 
-    double gamma = mixture->GetSpecificHeatRatio();
-    double k = 0.;
-    for (int d = 0; d < dim; d++) k += iState[1 + d] * iState[1 + d];
-    double rE = iState[1 + dim] / (gamma - 1.) + 0.5 * iState[0] * k;
-
-    for (int d = 0; d < dim; d++) iState[1 + d] *= iState[0];
-    iState[1 + dim] = rE;
-    if (eqSystem == NS_PASSIVE) iState(num_equation - 1) *= iState(0);
+//     double gamma = mixture->GetSpecificHeatRatio();
+//     double k = 0.;
+//     for (int d = 0; d < dim; d++) k += iState[1 + d] * iState[1 + d];
+//     double rE = iState[1 + dim] / (gamma - 1.) + 0.5 * iState[0] * k;
+// 
+//     for (int d = 0; d < dim; d++) iState[1 + d] *= iState[0];
+//     iState[1 + dim] = rE;
+//     if (eqSystem == NS_PASSIVE) iState(num_equation - 1) *= iState(0);
 
     for (int eq = 0; eq < num_equation; eq++) hboundaryU[eq + i * num_equation] = iState[eq];
   }
@@ -512,17 +517,19 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
 
   if (!bdrUInit) {
     auto hboundaryU = boundaryU.HostReadWrite();
+    Vector iState(num_equation), iUp(num_equation);
     for (int i = 0; i < totNbdr; i++) {
-      Vector iState(num_equation);
-      for (int eq = 0; eq < num_equation; eq++) iState[eq] = hboundaryU[eq + i * num_equation];
-      double gamma = mixture->GetSpecificHeatRatio();
-      double k = 0.;
-      for (int d = 0; d < dim; d++) k += iState[1 + d] * iState[1 + d];
-      double rE = iState[1 + dim] / (gamma - 1.) + 0.5 * iState[0] * k;
-
-      for (int d = 0; d < dim; d++) iState[1 + d] *= iState[0];
-      iState[1 + dim] = rE;
-      if (eqSystem == NS_PASSIVE) iState[num_equation - 1] *= iState[0];
+      
+      for (int eq = 0; eq < num_equation; eq++) iUp[eq] = hboundaryU[eq + i * num_equation];
+      mixture->GetConservativesFromPrimitives(iUp,iState);
+//       double gamma = mixture->GetSpecificHeatRatio();
+//       double k = 0.;
+//       for (int d = 0; d < dim; d++) k += iState[1 + d] * iState[1 + d];
+//       double rE = iState[1 + dim] / (gamma - 1.) + 0.5 * iState[0] * k;
+// 
+//       for (int d = 0; d < dim; d++) iState[1 + d] *= iState[0];
+//       iState[1 + dim] = rE;
+//       if (eqSystem == NS_PASSIVE) iState[num_equation - 1] *= iState[0];
 
       for (int eq = 0; eq < num_equation; eq++) hboundaryU[eq + i * num_equation] = iState[eq];
     }
@@ -564,20 +571,25 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
     for (int d = 0; d < dim; d++) meanVel[2] += tangent2[d] * meanUp[d + 1];
   }
 
+  double meanP = mixture->ComputePressureFromPrimitives(meanUp);
+  
   // normal gradients
   Vector normGrad(num_equation);
   normGrad = 0.;
   for (int eq = 0; eq < num_equation; eq++) {
     for (int d = 0; d < dim; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
   }
+  // gradient of pressure in normal direction
+  double dpdn = mixture->ComputePressureDerivative(normGrad,stateIn,false); 
 
-  const double speedSound = sqrt(gamma * meanUp[1 + dim] / meanUp[0]);
+  const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
+  
   double meanK = 0.;
   for (int d = 0; d < dim; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
   meanK *= 0.5;
 
   // compute outgoing characteristics
-  double L2 = speedSound * speedSound * normGrad[0] - normGrad[1 + dim];
+  double L2 = speedSound * speedSound * normGrad[0] - dpdn;
   L2 *= meanVel[0];
 
   double L3 = 0;
@@ -593,7 +605,7 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   double L5 = 0.;
   for (int d = 0; d < dim; d++) L5 += unitNorm[d] * normGrad[1 + d];
   //   L5 = normGrad[num_equation-1] +rho*speedSound*L5;
-  L5 = normGrad[1 + dim] + meanUp[0] * speedSound * L5;
+  L5 = dpdn + meanUp[0] * speedSound * L5;
   L5 *= meanVel[0] + speedSound;
 
   double L6 = 0.;
@@ -603,7 +615,8 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
 
   // estimate ingoing characteristic
   const double sigma = speedSound / refLength;
-  double L1 = sigma * (meanUp[1 + dim] - inputState[0]);
+//   double L1 = sigma * (meanUp[1 + dim] - inputState[0]);
+  double L1 = sigma * (meanP - inputState[0]);
 
   // calc vector d
   const double d1 = (L2 + 0.5 * (L5 + L1)) / speedSound / speedSound;
@@ -731,14 +744,18 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatr
   for (int eq = 0; eq < num_equation; eq++) {
     for (int d = 0; d < dim; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
   }
+  // gradient of pressure in normal direction
+  double dpdn = mixture->ComputePressureDerivative(normGrad,stateIn,false);
 
-  const double speedSound = sqrt(gamma * meanUp[1 + dim] / meanUp[0]);
+  const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
+  
   double meanK = 0.;
   for (int d = 0; d < dim; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
   meanK *= 0.5;
 
   // compute outgoing characteristics
-  double L2 = speedSound * speedSound * normGrad[0] - normGrad[1 + dim];
+//   double L2 = speedSound * speedSound * normGrad[0] - normGrad[1 + dim];
+  double L2 = speedSound * speedSound * normGrad[0] - dpdn;
   L2 *= meanVel[0];
 
   double L3 = 0;
@@ -753,14 +770,12 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatr
 
   double L5 = 0.;
   for (int d = 0; d < dim; d++) L5 += unitNorm[d] * normGrad[1 + d];
-  //   L5 = normGrad[num_equation-1] +rho*speedSound*L5;
-  L5 = normGrad[1 + dim] + meanUp[0] * speedSound * L5;
+//   L5 = normGrad[1 + dim] + meanUp[0] * speedSound * L5;
+  L5 = dpdn + meanUp[0] * speedSound * L5;
   L5 *= meanVel[0] + speedSound;
 
   double L6 = 0.;
   if (eqSystem == NS_PASSIVE) L6 = meanVel[0] * normGrad[num_equation - 1];
-
-  // const double p = eqState->ComputePressure(stateIn, dim);
 
   // estimate ingoing characteristic
   const double sigma = speedSound / refLength;
@@ -883,17 +898,22 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
   for (int eq = 0; eq < num_equation; eq++) {
     for (int d = 0; d < dim; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
   }
+  // gradient of pressure in normal direction
+  double dpdn = mixture->ComputePressureDerivative(normGrad,stateIn,false);
+
+  const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
+  
   double normVel = 0.;
   for (int d = 0; d < dim; d++) normVel += stateIn[1 + d] * unitNorm[d];
   normVel /= stateIn[0];
-
-  const double speedSound = sqrt(gamma * meanUp[1 + dim] / meanUp[0]);
+  
   double meanK = 0.;
   for (int d = 0; d < dim; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
   meanK *= 0.5;
 
   // compute outgoing characteristics
-  double L2 = speedSound * speedSound * normGrad[0] - normGrad[1 + dim];
+//   double L2 = speedSound * speedSound * normGrad[0] - normGrad[1 + dim];
+  double L2 = speedSound * speedSound * normGrad[0] - dpdn;
   L2 *= meanVel[0];
 
   double L3 = 0;
@@ -909,7 +929,7 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
   double L5 = 0.;
   for (int d = 0; d < dim; d++) L5 += unitNorm[d] * normGrad[1 + d];
   //   L5 = normGrad[num_equation-1] +rho*speedSound*L5;
-  L5 = normGrad[1 + dim] + meanUp[0] * speedSound * L5;
+  L5 = dpdn + meanUp[0] * speedSound * L5;
   L5 *= meanVel[0] + speedSound;
 
   double L6 = 0.;

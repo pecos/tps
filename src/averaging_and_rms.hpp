@@ -42,6 +42,7 @@
 #include "dataStructures.hpp"
 #include "mpi_groups.hpp"
 #include "run_configuration.hpp"
+#include "equation_of_state.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -60,6 +61,8 @@ class Averaging {
   const int &dim;
   RunConfiguration &config;
   MPI_Groups *groupsMPI;
+  
+  GasMixture *mixture;
 
   // FES for RMS
   ParFiniteElementSpace *rmsFes;

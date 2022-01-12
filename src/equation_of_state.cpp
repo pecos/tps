@@ -73,6 +73,21 @@ DryAir::DryAir()
   Sc = 0.71;
 }
 
+DryAir::DryAir(int _dim, int _num_equation)
+{
+  gas_constant = 287.058;
+  // gas_constant = 1.; // for comparison against ex18
+  specific_heat_ratio = 1.4;
+  visc_mult = 1.;
+  Pr = 0.71;
+  cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
+  Sc = 0.71;
+  
+  dim = _dim;
+  num_equations = _num_equation;
+}
+
+
 
 void DryAir::setNumEquations()
 {
@@ -165,20 +180,84 @@ void DryAir::GetConservativesFromPrimitives(const Vector& primit,
 
   double v2 = 0.;
   for (int d = 0; d < dim; d++) {
-    v2 += primit[1 + d];
+    v2 += primit[1 + d]*primit[1 + d];
     conserv[1 + d] *= primit[0];
   }
-  conserv[num_equations - 1] = primit[num_equations - 1] / (specific_heat_ratio - 1.) + 0.5 * primit[0] * v2;
+  // total energy
+  conserv[1+dim] = gas_constant*primit[0]*primit[1+dim] / (specific_heat_ratio - 1.) + 0.5 * primit[0] * v2;
+  
+  // case of passive scalar
+  if(num_equations>dim+2){
+    for(int n=0;n<num_equations-dim-2;n++){
+      conserv[dim+2+n] *= primit[0];
+    }
+  }
 }
 
 void DryAir::GetPrimitivesFromConservatives(const Vector& conserv, Vector& primit) {
-  double p = ComputePressure(conserv);
+  double T = ComputeTemperature(conserv);
   primit = conserv;
 
   for (int d = 0; d < dim; d++) primit[1 + d] /= conserv[0];
 
-  primit[num_equations - 1] = p;
+  primit[dim + 1] = T;
+  
+  // case of passive scalar
+  if(num_equations>dim+2){
+    for(int n=0;n<num_equations-dim-2;n++){
+      primit[dim+2+n] /= primit[0];
+    }
+  }
 }
+
+double DryAir::ComputeSpeedOfSound(const mfem::Vector& Uin, bool primitive)
+{
+  double T;
+  
+  if(primitive){
+    T = Uin[1+dim];
+  }else{
+    // conservatives passed in
+    T = ComputeTemperature(Uin);
+    
+  }
+  
+  return sqrt(specific_heat_ratio*gas_constant*T);
+}
+
+
+double DryAir::ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive)
+{
+  double T, p;
+  if(primitive){
+    T = Uin[1+dim];
+  }else{
+    T = ComputeTemperature(Uin);
+  }
+  
+  return gas_constant*(T*dUp_dx[0] + Uin[0]*dUp_dx[1+dim]);
+}
+
+double DryAir::ComputePressureFromPrimitives(const mfem::Vector& Up)
+{
+  return gas_constant*Up[0]*Up[1+dim];
+}
+
+
+void DryAir::UpdatePressureGridFunction(ParGridFunction* press, const ParGridFunction* Up)
+{
+  double *pGridFunc = press->HostWrite();
+  const double *UpData = Up->HostRead();
+  
+  const int nnode = press->FESpace()->GetNDofs();
+  
+  for(int n=0;n<nnode;n++){
+    double tmp = UpData[n + (1+dim)*nnode];
+    double rho = UpData[n];
+    pGridFunc[n] = rho*gas_constant*tmp;
+  }
+}
+
 
 // GPU FUNCTIONS
 /*#ifdef _GPU_

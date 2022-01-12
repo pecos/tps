@@ -827,7 +827,11 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   dens = new ParGridFunction(fes, Up->HostReadWrite());
   vel = new ParGridFunction(dfes, Up->HostReadWrite() + fes->GetNDofs());
-  press = new ParGridFunction(fes, Up->HostReadWrite() + (1 + dim) * fes->GetNDofs());
+  temperature = new ParGridFunction(fes, Up->HostReadWrite() + (1 + dim) * fes->GetNDofs());
+  
+  // this variable is purely for visualization
+  press = new ParGridFunction(fes);
+  
   passiveScalar = NULL;
   if (eqSystem == NS_PASSIVE)
     passiveScalar = new ParGridFunction(fes, Up->HostReadWrite() + (num_equation - 1) * fes->GetNDofs());
@@ -877,6 +881,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   paraviewColl->RegisterField("dens", dens);
   paraviewColl->RegisterField("vel", vel);
+  paraviewColl->RegisterField("temp",temperature);
   paraviewColl->RegisterField("press", press);
   if (eqSystem == NS_PASSIVE) paraviewColl->RegisterField("passiveScalar", passiveScalar);
 
@@ -925,6 +930,9 @@ void M2ulPhyS::projectInitialSolution() {
   }
 
   initGradUp();
+  
+  // update pressure grid function
+  mixture->UpdatePressureGridFunction(press,Up);
 }
 
 void M2ulPhyS::Iterate() {
@@ -1005,6 +1013,8 @@ void M2ulPhyS::Iterate() {
         restart_files_hdf5("write");
 
         auto hUp = Up->HostRead();
+        mixture->UpdatePressureGridFunction(press,Up);
+        
         paraviewColl->SetCycle(iter);
         paraviewColl->SetTime(time);
         paraviewColl->Save();
@@ -1231,7 +1241,7 @@ void M2ulPhyS::uniformInitialConditions() {
   int dof = vfes->GetNDofs();
   double *inputRhoRhoVp = config.GetConstantInitialCondition();
 
-  DryAir *eqState = new DryAir();
+  DryAir *eqState = new DryAir(dim,num_equation);
 
   const double gamma = eqState->GetSpecificHeatRatio();
   const double rhoE =
@@ -1240,6 +1250,13 @@ void M2ulPhyS::uniformInitialConditions() {
                                              inputRhoRhoVp[3] * inputRhoRhoVp[3]) /
                                             inputRhoRhoVp[0];
 
+  Vector state;
+  state.UseDevice(false);
+  state.SetSize(num_equation);
+  Vector Upi;
+  Upi.UseDevice(false);
+  Upi.SetSize(num_equation);
+  
   for (int i = 0; i < dof; i++) {
     data[i] = inputRhoRhoVp[0];
     data[i + dof] = inputRhoRhoVp[1];
@@ -1247,13 +1264,17 @@ void M2ulPhyS::uniformInitialConditions() {
     if (dim == 3) data[i + 3 * dof] = inputRhoRhoVp[3];
     data[i + (1 + dim) * dof] = rhoE;
     if (eqSystem == NS_PASSIVE) data[i + (num_equation - 1) * dof] = 0.;
+    
+    for(int eq=0;eq<num_equation;eq++) state(eq) = data[i + eq*dof];
+    eqState->GetPrimitivesFromConservatives(state,Upi);
+    for(int eq=0;eq<num_equation;eq++) dataUp[i+eq*dof] = Upi[eq];
 
-    dataUp[i] = data[i];
-    dataUp[i + dof] = data[i + dof] / data[i];
-    dataUp[i + 2 * dof] = data[i + 2 * dof] / data[i];
-    if (dim == 3) dataUp[i + 3 * dof] = data[i + 3 * dof] / data[i];
-    dataUp[i + (1 + dim) * dof] = inputRhoRhoVp[4];
-    if (eqSystem == NS_PASSIVE) dataUp[i + (num_equation - 1) * dof] = 0.;
+//     dataUp[i] = data[i];
+//     dataUp[i + dof] = data[i + dof] / data[i];
+//     dataUp[i + 2 * dof] = data[i + 2 * dof] / data[i];
+//     if (dim == 3) dataUp[i + 3 * dof] = data[i + 3 * dof] / data[i];
+//     dataUp[i + (1 + dim) * dof] = inputRhoRhoVp[4];
+//     if (eqSystem == NS_PASSIVE) dataUp[i + (num_equation - 1) * dof] = 0.;
 
     for (int d = 0; d < dim; d++) {
       for (int eq = 0; eq < num_equation; eq++) {

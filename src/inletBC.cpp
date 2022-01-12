@@ -113,20 +113,24 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
   boundaryU.UseDevice(true);
   boundaryU.SetSize(bdrN * num_equation);
   boundaryU = 0.;
+  Vector iState, iUp;
+  iState.UseDevice(false); 
+  iUp.UseDevice(false);
+  iState.SetSize(num_equation);
+  iUp.SetSize(num_equation);
   auto hboundaryU = boundaryU.HostWrite();
   for (int i = 0; i < bdrN; i++) {
-    Vector iState;
-    iState.UseDevice(false);
-    iState.SetSize(num_equation);
-    for (int eq = 0; eq < num_equation; eq++) iState(eq) = hmeanUp[eq];
+    
+    for (int eq = 0; eq < num_equation; eq++) iUp(eq) = hmeanUp[eq];
+    mixture->GetConservativesFromPrimitives(iUp,iState);
 
-    double gamma = mixture->GetSpecificHeatRatio();
-    double k = 0.;
-    for (int d = 0; d < dim; d++) k += iState[1 + d] * iState[1 + d];
-    double rE = iState[1 + dim] / (gamma - 1.) + 0.5 * iState[0] * k;
-
-    for (int d = 0; d < dim; d++) iState[1 + d] *= iState[0];
-    iState[1 + dim] = rE;
+//     double gamma = mixture->GetSpecificHeatRatio();
+//     double k = 0.;
+//     for (int d = 0; d < dim; d++) k += iState[1 + d] * iState[1 + d];
+//     double rE = iState[1 + dim] / (gamma - 1.) + 0.5 * iState[0] * k;
+// 
+//     for (int d = 0; d < dim; d++) iState[1 + d] *= iState[0];
+//     iState[1 + dim] = rE;
     for (int eq = 0; eq < num_equation; eq++) hboundaryU[eq + i * num_equation] = iState[eq];
   }
   bdrUInit = false;
@@ -498,17 +502,18 @@ void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
 
   if (!bdrUInit) {
     // for(int i=0;i<Nbdr;i++)
+    Vector iState(num_equation),iUp(num_equation);
     for (int i = 0; i < totNbdr; i++) {
-      Vector iState(num_equation);
-      for (int eq = 0; eq < num_equation; eq++) iState[eq] = boundaryU[eq + i * num_equation];
-      double gamma = mixture->GetSpecificHeatRatio();
-      double k = 0.;
-      for (int d = 0; d < dim; d++) k += iState[1 + d] * iState[1 + d];
-      double rE = iState[1 + dim] / (gamma - 1.) + 0.5 * iState[0] * k;
-
-      for (int d = 0; d < dim; d++) iState[1 + d] *= iState[0];
-      iState[1 + dim] = rE;
-      if (eqSystem == NS_PASSIVE) iState[num_equation - 1] *= iState[0];
+      for (int eq = 0; eq < num_equation; eq++) iUp[eq] = boundaryU[eq + i * num_equation];
+      mixture->GetConservativesFromPrimitives(iUp,iState);
+//       double gamma = mixture->GetSpecificHeatRatio();
+//       double k = 0.;
+//       for (int d = 0; d < dim; d++) k += iState[1 + d] * iState[1 + d];
+//       double rE = iState[1 + dim] / (gamma - 1.) + 0.5 * iState[0] * k;
+// 
+//       for (int d = 0; d < dim; d++) iState[1 + d] *= iState[0];
+//       iState[1 + dim] = rE;
+//       if (eqSystem == NS_PASSIVE) iState[num_equation - 1] *= iState[0];
 
       for (int eq = 0; eq < num_equation; eq++) boundaryU[eq + i * num_equation] = iState[eq];
     }
@@ -563,8 +568,11 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   for (int eq = 0; eq < num_equation; eq++) {
     for (int d = 0; d < dim; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
   }
+  // gradient of pressure in normal direction
+  double dpdn = mixture->ComputePressureDerivative(normGrad,stateIn,false);
 
-  const double speedSound = sqrt(gamma * meanUp[1 + dim] / meanUp[0]);
+  const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
+  
   double meanK = 0.;
   for (int d = 0; d < dim; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
   meanK *= 0.5;
@@ -572,7 +580,7 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   // compute outgoing characteristic
   double L1 = 0.;
   for (int d = 0; d < dim; d++) L1 += unitNorm[d] * normGrad[1 + d];  // dVn/dn
-  L1 = normGrad[1 + dim] - meanUp[0] * speedSound * L1;
+  L1 = dpdn - meanUp[0] * speedSound * L1;
   L1 *= meanVel[0] - speedSound;
 
   // estimate ingoing characteristic

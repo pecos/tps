@@ -84,8 +84,8 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   switch (eqSystem) {
     case NS:
     case NS_PASSIVE: {
-      const double p = mixture->ComputePressure(state);
-      const double temp = p / state[0] / Rg;
+//       const double p = mixture->ComputePressure(state);
+//       const double temp = p / state[0] / Rg;
       const double visc = mixture->GetViscosity(state);
       const double bulkViscMult = mixture->GetBulkViscMultiplyer();
       const double k = mixture->GetThermalConductivity(state);
@@ -106,15 +106,14 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
         for (int j = 0; j < dim; j++) flux(1 + i, j) = stress(i, j);
 
       // temperature gradient
-
-      for (int d = 0; d < dim; d++) gradT[d] = temp * (gradUp(1 + dim, d) / p - gradUp(0, d) / state[0]);
+//       for (int d = 0; d < dim; d++) gradT[d] = temp * (gradUp(1 + dim, d) / p - gradUp(0, d) / state[0]);
 
       for (int d = 0; d < dim; d++) vel(d) = state[1 + d] / state[0];
 
       stress.Mult(vel, vtmp);
       for (int d = 0; d < dim; d++) {
         flux(1 + dim, d) += vtmp[d];
-        flux(1 + dim, d) += k * gradT[d];
+        flux(1 + dim, d) += k * gradUp(1 + dim, d);
       }
 
       if (eqSystem == NS_PASSIVE) {
