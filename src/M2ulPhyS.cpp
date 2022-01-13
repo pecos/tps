@@ -1010,10 +1010,10 @@ void M2ulPhyS::Iterate() {
 #endif
 
       if (iter != MaxIters) {
-        restart_files_hdf5("write");
-
         auto hUp = Up->HostRead();
         mixture->UpdatePressureGridFunction(press,Up);
+        
+        restart_files_hdf5("write");
         
         paraviewColl->SetCycle(iter);
         paraviewColl->SetTime(time);
@@ -1051,10 +1051,12 @@ void M2ulPhyS::Iterate() {
   }  // <-- end main timestep iteration loop
 
   if (iter == MaxIters) {
+    auto hUp = Up->HostRead();
+    mixture->UpdatePressureGridFunction(press,Up);
+    
     // write_restart_files();
     restart_files_hdf5("write");
-
-    auto hUp = Up->HostRead();
+    
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
     paraviewColl->Save();
