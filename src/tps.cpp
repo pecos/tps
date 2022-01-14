@@ -30,6 +30,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 #include "tps.hpp"
+#include <sys/types.h>
+#include <unistd.h>
 
 namespace TPS {
 
@@ -82,6 +84,7 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
 
   mfem::OptionsParser args(argc,argv);
   bool showVersion = false;
+  bool debugMode   = false;
   const char *astring  = iFile_.c_str();
 
   if(isRank0_)
@@ -92,8 +95,10 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
   }
 
   // Register supported command-line arguments
-  args.AddOption(&showVersion, "-v", "--version", "", "--no-version", "Print code version and exit");
+  args.AddOption(&showVersion, "-v", "--version", "", "--no-version", "Print code version and exit,");
   args.AddOption(&astring, "-run", "--runFile", "Name of the input file with run options.");
+  args.AddOption(&debugMode,"-d","--debug", "","--no-debug","Launch in debug mode for gdb attach.");
+
   args.Parse();
 
   if (!args.Good()) {
@@ -108,7 +113,25 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
   if (showVersion)
     exit(0);
 
-  args.PrintOptions(std::cout);
+  if(isRank0_)
+    args.PrintOptions(std::cout);
+
+  // Debug mode: user's can attach gdb to the rank0 PID and set the gdb
+  // variable to be non-zero in order to exit the startup sleep process.
+  // gdb syntax is: set var gdb = 1 then you can type "continue" to run under
+  // the debugger
+  if (debugMode) {
+    volatile int gdb = 1;
+    MPI_Barrier(MPI_COMM_WORLD);
+    if(isRank0_) {
+      gdb = 0;
+      grvy_printf(GRVY_INFO,"\nDEBUG Mode enabled:\n");
+      grvy_printf(GRVY_INFO,"--> Rank 0 PID = %i\n",getpid());
+    }
+
+    while (gdb == 0) sleep(5);
+    MPI_Barrier(MPI_COMM_WORLD);
+  }
 
   return;
 }

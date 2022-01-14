@@ -41,24 +41,9 @@ int main(int argc, char *argv[]) {
   tps.chooseSolver();
   tps.initialize();
 
-  tps.solve();    // execute chosen solver
+  tps.solve();
 
   return (tps.getStatus());
-
 }
-
-// Q: is anybody using this?
-
-// #ifdef DEBUG
-//   int threads = 0.;
-//   args.AddOption(&threads, "-thr", "--threads",
-//                  " Set -thr 1 so that the program stops at the beginning in debug mode for gdb attach.");
-// 
-//   if (threads != 0) {
-//     int gdb = 0;
-//     cout << "Process " << mpi.WorldRank() + 1 << "/" << mpi.WorldSize() << ", id: " << getpid() << endl;
-//     while (gdb == 0) sleep(5);
-//   }
-// #endif
 
 
