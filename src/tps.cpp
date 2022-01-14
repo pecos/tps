@@ -217,7 +217,7 @@ void Tps::parseInput() {
   // parse common inputs
   getInput("solver/type",input_solver_type_,std::string("flow"));
 #ifdef _GPU_
-  getRequiredInput("gpu/numGpusPerRank",numGpusPerRank_);
+  getInput("gpu/numGpusPerRank",numGpusPerRank_,1);
 #endif
 
   return;
