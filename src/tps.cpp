@@ -44,7 +44,6 @@ Tps::Tps(int argc, char *argv[]) {
 
   // default input file
   iFile_ = "runfile.ini";
-  iFile_old_ = "unknown";
 
   // default physics configuration
   isFlowOnlyMode_      = true;
@@ -84,7 +83,6 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
   mfem::OptionsParser args(argc,argv);
   bool showVersion = false;
   const char *astring  = iFile_.c_str();
-  const char *astring2 = iFile_.c_str();
 
   if(isRank0_)
   {
@@ -96,7 +94,6 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
   // Register supported command-line arguments
   args.AddOption(&showVersion, "-v", "--version", "", "--no-version", "Print code version and exit");
   args.AddOption(&astring, "-run", "--runFile", "Name of the input file with run options.");
-  args.AddOption(&astring2, "-input", "--inputFile", "Name of ini-style input file with run options.");
   args.Parse();
 
   if (!args.Good()) {
@@ -104,9 +101,7 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
     exit(ERROR);
   }
 
-  // koomie TODO: update here when input file conversion complete
-  iFile_old_ = astring;
-  iFile_ = astring2;
+  iFile_ = astring;
 
   // Version info
   printHeader();
@@ -142,12 +137,10 @@ void Tps::chooseSolver() {
 
   if(input_solver_type_ == "flow") {
     isFlowOnlyMode_ = true;
-    // koomie TODO: update here when input file conversion complete - should not need iFile_old_)
-    solver_ = new M2ulPhyS(mpi_,iFile_old_,this);
+    solver_ = new M2ulPhyS(mpi_,iFile_,this);
   }
   else if (input_solver_type_ == "em") {
     isEMOnlyMode_ = true;
-    iFile_ = iFile_old_;
     ElectromagneticOptions em_opt;
     solver_ = new QuasiMagnetostaticSolver(mpi_,em_opt,this);
   }
@@ -199,7 +192,7 @@ void Tps::parseInput() {
     }
 
   // parse common inputs
-  getRequiredInput("solver/type",input_solver_type_);
+  getInput("solver/type",input_solver_type_,std::string("flow"));
 #ifdef _GPU_
   getRequiredInput("gpu/numGpusPerRank",numGpusPerRank_);
 #endif
@@ -207,11 +200,11 @@ void Tps::parseInput() {
   return;
 }
 
-/// read an input value for keyword [name] and store in var - error if value
+/// read an input value for keyword [name] and store in STL vector - error if value
 /// is not supplied
 template <typename T> void Tps::getRequiredInput(const char *name, T &var)
 {
-  if(iparse_.Read_Var(name,&var) == 0)
+  if( !iparse_.Read_Var(name,&var) )
   {
     std::cout << "ERROR: Unable to read required input variable -> " << name << std::endl;
     exit(ERROR);
@@ -219,11 +212,62 @@ template <typename T> void Tps::getRequiredInput(const char *name, T &var)
   return;
 }
 
+/// read an input vector for keyword [name] and store in MFEM vector. The size of the vector
+/// is numElems
+void Tps::getRequiredVec(const char *name, Vector &vec, size_t numElems)
+{
+  if(vec.Size() < numElems)
+    vec.SetSize(numElems);
+  if( !iparse_.Read_Var_Vec(name,vec.HostWrite(),numElems) )
+    {
+      std::cout << "ERROR: Unable to read input vector -> " << name << std::endl;
+      exit(ERROR);
+    }
+}
+
+/// read the ith entry from an input vector for keyword [name].
+void Tps::getRequiredVecElem(const char *name, double &value, int ithElem)
+{
+#if 1
+  if( !iparse_.Read_Var_iVec(name,&value,ithElem) )
+    {
+      grvy_printf(GRVY_ERROR,"Unable to read %ith element from input vector -> %s\n",ithElem,name);
+      exit(ERROR);
+    }
+#endif
+}
+
+/// read an input vector for keyword [name] and store in MFEM array. The size of the vector
+/// is numElems
+void Tps::getRequiredVec(const char *name, mfem::Array<double> &vec, size_t numElems)
+{
+  if(vec.Size() < numElems)
+    vec.SetSize(numElems);
+  if( !iparse_.Read_Var_Vec(name,vec.HostWrite(),numElems) )
+    {
+      std::cout << "ERROR: Unable to read input vector -> " << name << std::endl;
+      exit(ERROR);
+    }
+}
+
+/// read an input vector for keyword [name] and store in vec. The size of the vector
+/// is numElems
+void Tps::getRequiredVec(const char *name, std::vector<double> &vec, size_t numElems)
+{
+  if(vec.size() < numElems)
+    vec.reserve(numElems);
+  if( !iparse_.Read_Var_Vec(name,vec.data(),numElems) )
+    {
+      std::cout << "ERROR: Unable to read input vector -> " << name << std::endl;
+      exit(ERROR);
+    }
+}
+
 /// read an input value for keyword [name] and store in var - use defaultValue if
 /// keyword not present
 template <typename T> void Tps::getInput(const char *name, T &var, T varDefault)
 {
-  if(iparse_.Read_Var(name,&var,varDefault) == 0)
+  if( !iparse_.Read_Var(name,&var,varDefault) )
   {
     std::cout << "ERROR: Unable to read input variable -> " << name << std::endl;
     exit(ERROR);

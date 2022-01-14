@@ -57,7 +57,6 @@ class Tps {
 
   // runtime controls
   std::string iFile_;             // name of runtime input file (new ini format)
-  std::string iFile_old_;         // name of runtime input file (old format)
   std::string input_solver_type_; // choice of desired solver
   int numGpusPerRank_;            // number of GPUs to use per MPI rank
 
@@ -88,9 +87,13 @@ class Tps {
   // supported types are T={int,double,bool,std::string}
   template <typename T> void getInput (const char *name, T &var, T varDefault);
 
-  // input parsing support (variants value is required to be provided)
+  // input parsing support (variants where value is required to be provided)
   // supported types are T={int,double,std::string}
   template <typename T> void getRequiredInput(const char *name, T &var);
+  void getRequiredVec    (const char*name, std::vector<double> &var,size_t numElems);
+  void getRequiredVec    (const char*name,              Vector &var,size_t numElems);
+  void getRequiredVec    (const char*name,       Array<double> &var,size_t numElems);
+  void getRequiredVecElem(const char*name,              double &var,   int ithElem);
 
   int  getStatus(){return solver_->getStatus();}
   void initialize(){solver_->initialize(); return;}
