@@ -996,6 +996,8 @@ void M2ulPhyS::Iterate() {
     if (iter % vis_steps == 0) {
 #ifdef _MASA_
       rhsOperator->updatePrimitives(*U);
+      mixture->UpdatePressureGridFunction(press,Up);
+      
       DenMMS.SetTime(time);
       VelMMS.SetTime(time);
       PreMMS.SetTime(time);
@@ -1071,6 +1073,19 @@ void M2ulPhyS::Iterate() {
     VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
     const double error = U->ComputeLpError(2, u0);
     if (mpi.Root()) cout << "Solution error: " << error << endl;
+#else
+    rhsOperator->updatePrimitives(*U);
+    mixture->UpdatePressureGridFunction(press,Up);
+    
+    DenMMS.SetTime(time);
+    VelMMS.SetTime(time);
+    PreMMS.SetTime(time);
+    const double errorDen = dens->ComputeLpError(2, DenMMS);
+    const double errorVel = vel->ComputeLpError(2, VelMMS);
+    const double errorPre = press->ComputeLpError(2, PreMMS);
+    if (mpi.Root())
+      cout << "time step: " << iter << ", physical time " << time << "s"
+            << ", Dens. error: " << errorDen << " Vel. " << errorVel << " press. " << errorPre << endl;
 #endif
 
     if (mpi.Root()) cout << "Final timestep iteration = " << MaxIters << endl;
