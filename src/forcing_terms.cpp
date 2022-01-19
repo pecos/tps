@@ -306,8 +306,9 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
 
   // compute speed of sound
   double gamma = mixture->GetSpecificHeatRatio();
+  double Rg = mixture->GetGasConstant();
   mixture->GetPrimitivesFromConservatives(targetU, Up);
-  double speedSound = sqrt(gamma * Up[1+dim] / Up[0]);
+  double speedSound = sqrt(gamma * Rg * Up[1+dim]);
 
   // add forcing to RHS, i.e., @in
   for (int n = 0; n < nnodes; n++) {
