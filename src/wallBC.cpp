@@ -146,7 +146,10 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux
 
 void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
   double p = mixture->ComputePressure(stateIn);
+  double T = mixture->ComputeTemperature(stateIn);
+  
   const double gamma = mixture->GetSpecificHeatRatio();
+  const double Rg = mixture->GetGasConstant();
 
   Vector wallState = stateIn;
   for (int d = 0; d < dim; d++) wallState[1 + d] = 0.;
@@ -168,15 +171,29 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
     unitNorm *= 1. / sqrt(normN);
   }
 
-  // modify gradient density so dT/dn=0 at the wall
+  // modify gradient temperature so dT/dn=0 at the wall
   double DrhoDn = 0.;
   for (int d = 0; d < dim; d++) DrhoDn += gradState(0, d) * unitNorm[d];
+  double dpdn = Rg*T*DrhoDn; // this is the BC -> grad(T)*normal=0
 
-  double DrhoDnNew = 0.;
-  for (int d = 0; d < dim; d++) DrhoDnNew += gradState(1 + dim, d) * unitNorm[d];
-  DrhoDnNew *= stateIn[0] / p;
+  Vector gradP(dim);
+  double old_dpdn = 0.;
+  for (int d = 0; d < dim; d++){
+    Vector grads(gradState.GetColumn(d),num_equation);
+    double dpdx = mixture->ComputePressureDerivative(grads,stateIn,false);
+    gradP(d) = dpdx;
+    old_dpdn += dpdx*unitNorm(d);
+  }
+  
+  // force the new dp/dn
+  for (int d = 0; d < dim; d++) gradP(d) += (-old_dpdn + dpdn)*unitNorm(d);
 
-  for (int d = 0; d < dim; d++) gradState(0, d) += -DrhoDn * unitNorm[d] + DrhoDnNew * unitNorm[d];
+  // modify grad(T) with the corrected grad(p)
+  for (int d = 0; d < dim; d++){
+    // temperature gradient for ideal Dry Air
+    gradState(1+dim,d) = T*(gradP(d)/p - gradState(0, d)/stateIn[0] );
+  }
+  
   if (eqSystem == NS_PASSIVE) {
     for (int d = 0; d < dim; d++) gradState(num_equation - 1, d) = 0.;
   }

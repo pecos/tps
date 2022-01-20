@@ -83,7 +83,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   Me_inv.SetSize(vfes->GetNE());
   posDofInvM.SetSize(2 * vfes->GetNE());
   auto hposDofInvM = posDofInvM.HostWrite();
-  
+
   forcing.DeleteAll();
 
   if (_config.thereIsForcing()) {
@@ -442,21 +442,23 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 void RHSoperator::updatePrimitives(const Vector &x_in) const {
 #ifdef _GPU_
 
-  RHSoperator::updatePrimitives_gpu(Up, &x_in, mixture->GetSpecificHeatRatio(), vfes->GetNDofs(), dim, num_equation);
+  RHSoperator::updatePrimitives_gpu(Up, &x_in, mixture->GetSpecificHeatRatio(), mixture->GetGasConstant(),
+                                    vfes->GetNDofs(), dim, num_equation);
 #else
   double *dataUp = Up->GetData();
   for (int i = 0; i < vfes->GetNDofs(); i++) {
     Vector iState(num_equation);
-    Vector primitiveState(num_equation);
+    Vector iUp(num_equation);
     for (int eq = 0; eq < num_equation; eq++) iState[eq] = x_in[i + eq * vfes->GetNDofs()];
-    mixture->GetPrimitivesFromConservatives(iState,primitiveState);
-    for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * vfes->GetNDofs()] = primitiveState[eq];
+    mixture->GetPrimitivesFromConservatives(iState,iUp);
+    for (int eq = 0; eq < num_equation; eq++) dataUp[i+eq*vfes->GetNDofs()] = iUp[eq];
   }
 #endif  // _GPU_
 }
 
-void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const double gamma, const int ndofs,
-                                       const int dim, const int num_equation) {
+// Kevin: will need to consider how to feed Rgas for multi-species
+void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const double gamma, const double Rgas,const int ndofs,
+                                       const int dim, const int num_equations) {
 #ifdef _GPU_
   auto dataUp = Up->Write();   // make sure data is available in GPU
   auto dataIn = x_in->Read();  // make sure data is available in GPU
@@ -480,9 +482,9 @@ void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const dou
       if (eq == 1) dataUp[n + ndofs] = state[1] / state[0];
       if (eq == 2) dataUp[n + 2 * ndofs] = state[2] / state[0];
       if (eq == 3 && dim == 3) dataUp[n + 3 * ndofs] = state[3] / state[0];
-      if (eq == num_equation - 1)
-        dataUp[n + (num_equation - 1) * ndofs] =
-            DryAir::pressure(&state[0], &KE[0], gamma, dim, num_equation);
+      if (eq == num_equations - 1)
+        dataUp[n + (num_equations - 1) * ndofs] =
+            DryAir::temperature(&state[0], &KE[0], gamma, Rgas, dim, num_equations);
     }
   });
 #endif

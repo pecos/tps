@@ -81,6 +81,21 @@ DryAir::DryAir()
   specific_heat_ratio = 1.4;
 }
 
+DryAir::DryAir(int _dim, int _num_equation)
+{
+  gas_constant = 287.058;
+  // gas_constant = 1.; // for comparison against ex18
+  specific_heat_ratio = 1.4;
+  // visc_mult = 1.;
+  // Pr = 0.71;
+  // cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
+  // Sc = 0.71;
+
+  dim = _dim;
+  num_equation = _num_equation;
+}
+
+
 
 // void DryAir::SetNumEquations()
 // {
@@ -186,26 +201,84 @@ void DryAir::GetConservativesFromPrimitives(const Vector& primit,
 
   double v2 = 0.;
   for (int d = 0; d < dim; d++) {
-    v2 += primit[1 + d];
+    v2 += primit[1 + d]*primit[1 + d];
     conserv[1 + d] *= primit[0];
   }
-  conserv[dim + 1] = primit[dim + 1] / (specific_heat_ratio - 1.) + 0.5 * primit[0] * v2;
+  // total energy
+  conserv[1+dim] = gas_constant*primit[0]*primit[1+dim] / (specific_heat_ratio - 1.) + 0.5 * primit[0] * v2;
 
-  // Only for NS_PASSIVE. alwasys mass fraction.
-  for (int sp = 0; sp < numActiveSpecies; sp++) conserv[dim + 2 + sp] = primit[dim + 2 + sp] * primit[0];
+  // case of passive scalar
+  if(num_equation>dim+2){
+    for(int n=0;n<num_equation-dim-2;n++){
+      conserv[dim+2+n] *= primit[0];
+    }
+  }
 }
 
 void DryAir::GetPrimitivesFromConservatives(const Vector& conserv, Vector& primit) {
-  double p = ComputePressure(conserv);
+  double T = ComputeTemperature(conserv);
   primit = conserv;
 
   for (int d = 0; d < dim; d++) primit[1 + d] /= conserv[0];
 
-  primit[dim + 1] = p;
+  primit[dim + 1] = T;
 
-  // Only for NS_PASSIVE. alwasys mass fraction.
-  for (int sp = 0; sp < numActiveSpecies; sp++) primit[dim + 2 + sp] = conserv[dim + 2 + sp] / conserv[0];
+  // case of passive scalar
+  if(num_equation>dim+2){
+    for(int n=0;n<num_equation-dim-2;n++){
+      primit[dim+2+n] /= primit[0];
+    }
+  }
 }
+
+double DryAir::ComputeSpeedOfSound(const mfem::Vector& Uin, bool primitive)
+{
+  double T;
+
+  if(primitive){
+    T = Uin[1+dim];
+  }else{
+    // conservatives passed in
+    T = ComputeTemperature(Uin);
+
+  }
+
+  return sqrt(specific_heat_ratio*gas_constant*T);
+}
+
+
+double DryAir::ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive)
+{
+  double T, p;
+  if(primitive){
+    T = Uin[1+dim];
+  }else{
+    T = ComputeTemperature(Uin);
+  }
+
+  return gas_constant*(T*dUp_dx[0] + Uin[0]*dUp_dx[1+dim]);
+}
+
+double DryAir::ComputePressureFromPrimitives(const mfem::Vector& Up)
+{
+  return gas_constant*Up[0]*Up[1+dim];
+}
+
+
+void DryAir::UpdatePressureGridFunction(ParGridFunction* press, const ParGridFunction* Up)
+{
+  double *pGridFunc = press->HostWrite();
+  const double *UpData = Up->HostRead();
+
+  const int nnode = press->FESpace()->GetNDofs();
+
+  for(int n=0;n<nnode;n++){
+    double tmp = UpData[n + (1+dim)*nnode];
+    double rho = UpData[n];
+    pGridFunc[n] = rho*gas_constant*tmp;
+  }
+}
+
 
 // GPU FUNCTIONS
 /*#ifdef _GPU_
@@ -248,6 +321,7 @@ TestBinaryAir::TestBinaryAir(RunConfiguration &_runfile, int _dim) : GasMixture(
 void TestBinaryAir::GetConservativesFromPrimitives(const Vector& primit,
                                                      Vector& conserv) {
   const double specific_heat_ratio = gasParams(0, GasParams::SPECIES_HEAT_RATIO);
+  const double gas_constant = UNIVERSALGASCONSTANT / gasParams(0, GasParams::SPECIES_MW);
 
   conserv = primit;
 
@@ -256,7 +330,7 @@ void TestBinaryAir::GetConservativesFromPrimitives(const Vector& primit,
     v2 += primit[1 + d];
     conserv[1 + d] *= primit[0];
   }
-  conserv[dim + 1] = primit[dim + 1] / (specific_heat_ratio - 1.) + 0.5 * primit[0] * v2;
+  conserv[dim + 1] = primit[dim + 1] * gas_constant / (specific_heat_ratio - 1.) + 0.5 * primit[0] * v2;
 
   // NOTE: we unify to number density for species primitive.
   // This is beneficial for simple gradient computation, even for X or Y.
@@ -265,29 +339,53 @@ void TestBinaryAir::GetConservativesFromPrimitives(const Vector& primit,
 }
 
 void TestBinaryAir::GetPrimitivesFromConservatives(const Vector& conserv, Vector& primit) {
-  double p = ComputePressure(conserv);
+  double T = ComputeTemperature(conserv);
   primit = conserv;
 
   for (int d = 0; d < dim; d++) primit[1 + d] /= conserv[0];
 
-  primit[dim + 1] = p;
+  primit[dim + 1] = T;
 
   // NOTE: we unify to number density for species primitive.
   // This is beneficial for simple gradient computation, even for X or Y.
   for (int sp = 0; sp < numActiveSpecies; sp++)
-    primit[dim + 2 + sp] = conserv[dim + 2 + sp] / gasParams(sp, GasParams::SPECIES_MW * numSpecies);
+    primit[dim + 2 + sp] = conserv[dim + 2 + sp] / gasParams(sp, GasParams::SPECIES_MW);
+}
 
-  // std::cout << "conserved: " << conserv[0] << ", "
-  //                            << conserv[1] << ", "
-  //                            << conserv[2] << ", "
-  //                            << conserv[3] << ", "
-  //                            << conserv[4] << std::endl;
-  //
-  // std::cout << "primitive: " << primit[0] << ", "
-  //                            << primit[1] << ", "
-  //                            << primit[2] << ", "
-  //                            << primit[3] << ", "
-  //                            << primit[4] << std::endl;
+double TestBinaryAir::ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive)
+{
+  double T, p;
+  if(primitive){
+    T = Uin[1+dim];
+  }else{
+    T = ComputeTemperature(Uin);
+  }
+
+  double gas_constant = UNIVERSALGASCONSTANT / gasParams(0, GasParams::SPECIES_MW);
+
+  return gas_constant*(T*dUp_dx[0] + Uin[0]*dUp_dx[1+dim]);
+}
+
+double TestBinaryAir::ComputePressureFromPrimitives(const mfem::Vector& Up)
+{
+  double gas_constant = UNIVERSALGASCONSTANT / gasParams(0, GasParams::SPECIES_MW);
+  return gas_constant*Up[0]*Up[1+dim];
+}
+
+void TestBinaryAir::UpdatePressureGridFunction(ParGridFunction* press, const ParGridFunction* Up)
+{
+  double *pGridFunc = press->HostWrite();
+  const double *UpData = Up->HostRead();
+
+  const double gas_constant = UNIVERSALGASCONSTANT / gasParams(0, GasParams::SPECIES_MW);
+
+  const int nnode = press->FESpace()->GetNDofs();
+
+  for(int n=0;n<nnode;n++){
+    double tmp = UpData[n + (1+dim)*nnode];
+    double rho = UpData[n];
+    pGridFunc[n] = rho*gas_constant*tmp;
+  }
 }
 
 bool TestBinaryAir::StateIsPhysical(const mfem::Vector& state) {
@@ -314,7 +412,7 @@ bool TestBinaryAir::StateIsPhysical(const mfem::Vector& state) {
     }
   }
 
-  if(~physical) {
+  if(!physical) {
     cout << "state: ";
     for (int i = 0; i < state.Size(); i++) {
       cout << state(i) << " ";
@@ -341,6 +439,24 @@ double TestBinaryAir::ComputeMaxCharSpeed(const Vector& state) {
   const double vel = sqrt(den_vel2 / den);
 
   return vel + sound;
+}
+
+double TestBinaryAir::ComputeSpeedOfSound(const mfem::Vector& Uin, bool primitive)
+{
+  double T;
+
+  if(primitive){
+    T = Uin[1+dim];
+  }else{
+    // conservatives passed in
+    T = ComputeTemperature(Uin);
+
+  }
+
+  const double gas_constant = UNIVERSALGASCONSTANT / gasParams(0, GasParams::SPECIES_MW);
+  const double specific_heat_ratio = gasParams(0, GasParams::SPECIES_HEAT_RATIO);
+
+  return sqrt(specific_heat_ratio*gas_constant*T);
 }
 
 // NOTE: no ambipolar, no electron, no two temperature.
