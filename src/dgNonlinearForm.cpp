@@ -175,7 +175,7 @@ void DGNonLinearForm::setToZero_gpu(Vector &x, const int size) {
   MFEM_FORALL(i, size, { d_x[i] = 0.; });
 }
 
-void DGNonLinearForm::faceIntegration_gpu(const Vector &x, Vector &y, 
+void DGNonLinearForm::faceIntegration_gpu(Vector &y, 
                                           Vector &uk_el1,
                                           Vector &uk_el2,
                                           Vector &grad_uk_el1,
@@ -187,14 +187,12 @@ void DGNonLinearForm::faceIntegration_gpu(const Vector &x, Vector &y,
                                           const double &bulkViscMult, const double &Pr,
                                           const volumeFaceIntegrationArrays &gpuArrays, const int &maxIntPoints,
                                           const int &maxDofs) {
-  const double *d_x = x.Read();
   double *d_y = y.Write();
   const double *d_uk_el1 = uk_el1.Read();
   const double *d_uk_el2 = uk_el2.Read();
   const double *d_grad_uk_el1 = grad_uk_el1.Read();
   const double *d_grad_uk_el2 = grad_uk_el2.Read();
   
-  const double *d_gradUp = gradUp->Read();
   auto d_elemFaces = gpuArrays.elemFaces.Read();
   auto d_nodesIDs = gpuArrays.nodesIDs.Read();
   auto d_posDofIds = gpuArrays.posDofIds.Read();

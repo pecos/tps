@@ -90,7 +90,7 @@ class DGNonLinearForm : public ParNonlinearForm {
     transferGradUp = _transferGradUp;
   }
 
-  static void faceIntegration_gpu(const Vector &x, Vector &y, 
+  static void faceIntegration_gpu(Vector &y, 
                                   Vector &uk_el1,
                                   Vector &uk_el2,
                                   Vector &grad_uk_el1,
