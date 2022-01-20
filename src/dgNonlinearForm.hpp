@@ -71,6 +71,9 @@ class DGNonLinearForm : public ParNonlinearForm {
 
   const int &maxIntPoints;
   const int &maxDofs;
+  
+  Vector uk_el1, grad_upk_el1;
+  Vector uk_el2, grad_upk_el2;
 
  public:
   DGNonLinearForm(ParFiniteElementSpace *f, ParFiniteElementSpace *gradFes, ParGridFunction *_gradUp,
@@ -87,7 +90,12 @@ class DGNonLinearForm : public ParNonlinearForm {
     transferGradUp = _transferGradUp;
   }
 
-  static void faceIntegration_gpu(const Vector &x, Vector &y, const ParGridFunction *gradUp, const int &Ndofs,
+  static void faceIntegration_gpu(const Vector &x, Vector &y, 
+                                  Vector &uk_el1,
+                                  Vector &uk_el2,
+                                  Vector &grad_uk_el1,
+                                  Vector &grad_uk_el2,
+                                  const ParGridFunction *gradUp, const int &Ndofs,
                                   const int &Nf, const int &NumElemsType, const int &elemOffset, const int &elDof,
                                   const int &dim, const int &num_equation, const double &gamma, const double &Rg,
                                   const double &viscMult, const double &bulkViscMult, const double &Pr,
@@ -101,6 +109,28 @@ class DGNonLinearForm : public ParNonlinearForm {
                                         const volumeFaceIntegrationArrays &gpuArrays,
                                         const parallelFacesIntegrationArrays *parallelData, const int &maxIntPoints,
                                         const int &maxDofs);
+  
+  static void interpFaceData_gpu( const Vector &x, 
+                                          Vector &uk_el1,
+                                          Vector &uk_el2,
+                                          Vector &grad_uk_el1,
+                                          Vector &grad_uk_el2,
+                                          const ParGridFunction *gradUp, 
+                                          const int &Ndofs,
+                                          const int &Nf, 
+                                          const int &NumElemsType, 
+                                          const int &elemOffset, 
+                                          const int &elDof,
+                                          const int &dim, 
+                                          const int &num_equation, 
+                                          const double &gamma, 
+                                          const double &Rg,
+                                          const double &viscMult, 
+                                          const double &bulkViscMult, 
+                                          const double &Pr,
+                                          const volumeFaceIntegrationArrays &gpuArrays, 
+                                          const int &maxIntPoints,
+                                          const int &maxDofs);
 
 #ifdef _GPU_
   void Mult_domain(const Vector &x, Vector &y);
