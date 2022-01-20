@@ -84,12 +84,14 @@ class ConstantPressureGradient : public ForcingTerms {
  private:
   // RunConfiguration &config;
   Vector pressGrad;
+  GasMixture *mixture;
 
  public:
   ConstantPressureGradient(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                            IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
                            ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
                            RunConfiguration &_config);
+  ~ConstantPressureGradient();
 
   // Terms do not need updating
   virtual void updateTerms(Vector &in);

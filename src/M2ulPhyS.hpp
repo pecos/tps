@@ -217,11 +217,9 @@ class M2ulPhyS {
   ParGridFunction *Up;
 
   // Visualization functions (these are pointers to Up)
-  ParGridFunction *press, *dens, *vel, *passiveScalar;
-  // Kevin: For now, only for species.
-  // But I would prefer to use array of pointers for all variables,
-  // rather than making pointer for each one.
-  // I used std::vector for now, but can change to Vector or Array if needed.
+  ParGridFunction *temperature, *dens, *vel, *passiveScalar;
+  ParGridFunction *press;
+  // Kevin: For now, only for species. may move all visualizationVariables to this.
   std::vector<ParGridFunction *> visualizationVariables;
 
   // gradient of primitive variables

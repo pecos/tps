@@ -127,16 +127,16 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   for (int i = 0; i < dim; i++)
     for (int j = 0; j < dim; j++) flux(1 + i, j) = stress(i, j);
 
-  // temperature gradient
-  // TODO: reconsider this for multi species.
-  for (int d = 0; d < dim; d++) gradT[d] = temp * (gradUp(1 + dim, d) / p - gradUp(0, d) / state[0]);
+  // // temperature gradient
+  // // TODO: reconsider this for multi species.
+  // for (int d = 0; d < dim; d++) gradT[d] = temp * (gradUp(1 + dim, d) / p - gradUp(0, d) / state[0]);
 
   for (int d = 0; d < dim; d++) vel(d) = state[1 + d] / state[0];
 
   stress.Mult(vel, vtmp);
   for (int d = 0; d < dim; d++) {
     flux(1 + dim, d) += vtmp[d];
-    flux(1 + dim, d) += k * gradT[d];
+    flux(1 + dim, d) += k * gradUp(1 + dim, d);
   }
 
   // if (eqSystem == NS_PASSIVE) {
