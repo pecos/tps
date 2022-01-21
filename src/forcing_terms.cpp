@@ -262,7 +262,15 @@ void AxisymmetricSource::updateTerms(Vector &in) {
       const double pressure = dataUp[index + (1+dim)*dof];
 
       // Add to r-momentum eqn
-      data[index + 1*dof] += (pressure);
+
+      // NB: 1/r factor here is necessary b/c of way the source terms
+      // are handled in RHSoperator.  This term must be an
+      // approximation of Mr^{-1}*\int \phi * pressure, where Mr =
+      // \int r * \phi * \phi dr dz is the mass matrix in cylindrical
+      // coords
+
+      if (radius > 0)
+        data[index + 1*dof] += (pressure)/radius;
     }
   }
 }
