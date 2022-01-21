@@ -105,8 +105,7 @@ class DGNonLinearForm : public ParNonlinearForm {
 
   static void sharedFaceIntegration_gpu(const Vector &x, const Vector &faceU, const ParGridFunction *gradUp,
                                         const Vector &faceGradUp, Vector &y, const int &Ndofs, const int &dim,
-                                        const int &num_equation, const double &gamma, const double &Rg,
-                                        const double &viscMult, const double &bulkViscMult, const double &Pr,
+                                        const int &num_equation, GasMixture *mixture, Fluxes *flux,
                                         const volumeFaceIntegrationArrays &gpuArrays,
                                         const parallelFacesIntegrationArrays *parallelData, const int &maxIntPoints,
                                         const int &maxDofs);

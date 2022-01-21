@@ -192,7 +192,7 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const doub
 }
 
 void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTensor &flux, 
-                               Equations &eqSystem, GasMixture *mixture,
+                               const Equations &eqSystem, GasMixture *mixture,
                                const ParGridFunction *spaceVaryViscMult, const linearlyVaryingVisc &linViscData,
                                const int &dof, const int &dim, const int &num_equation) {
 #ifdef _GPU_

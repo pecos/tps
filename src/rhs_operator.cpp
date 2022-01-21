@@ -374,8 +374,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
   // ComputeConvectiveFluxes
   Fluxes::convectiveFluxes_gpu(x, flux, mixture->GetSpecificHeatRatio(), vfes->GetNDofs(), dim, num_equation);
   if (eqSystem == NS) {
-    Fluxes::viscousFluxes_gpu(x, gradUp, flux, mixture->GetSpecificHeatRatio(), mixture->GetGasConstant(),
-                              mixture->GetPrandtlNum(), mixture->GetViscMultiplyer(), mixture->GetBulkViscMultiplyer(),
+    Fluxes::viscousFluxes_gpu(x, gradUp, flux, eqSystem,mixture,
                               spaceVaryViscMult, linViscData, vfes->GetNDofs(), dim, num_equation);
   }
 #else

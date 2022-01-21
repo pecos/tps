@@ -145,8 +145,7 @@ void DGNonLinearForm::Mult_domain(const Vector &x, Vector &y) {
                           mixture->GetViscMultiplyer(), mixture->GetBulkViscMultiplyer(), mixture->GetPrandtlNum(),
                           gpuArrays, maxIntPoints, maxDofs);
       
-      faceIntegration_gpu(x,  // px,
-                          y,  // py,
+      faceIntegration_gpu(y,  // py,
                           uk_el1,uk_el2,grad_upk_el1,grad_upk_el2,
                           gradUp, fluxes, 
                           vfes->GetNDofs(), mesh->GetNumFaces(), h_numElems[elType], elemOffset, dof_el, dim,
@@ -163,8 +162,7 @@ void DGNonLinearForm::Mult_bdr(const Vector &x, Vector &y) {
   const int Nshared = pmesh->GetNSharedFaces();
   if (Nshared > 0) {
     sharedFaceIntegration_gpu(x, transferU->face_nbr_data, gradUp, transferGradUp->face_nbr_data, y, vfes->GetNDofs(),
-                              dim, num_equation, mixture->GetSpecificHeatRatio(), mixture->GetGasConstant(),
-                              mixture->GetViscMultiplyer(), mixture->GetBulkViscMultiplyer(), mixture->GetPrandtlNum(),
+                              dim, num_equation, mixture, fluxes,
                               gpuArrays, parallelData, maxIntPoints, maxDofs);
   }
 }
@@ -510,10 +508,8 @@ void DGNonLinearForm::interpFaceData_gpu( const Vector &x,
 
 void DGNonLinearForm::sharedFaceIntegration_gpu(
     const Vector &x, const Vector &faceU, const ParGridFunction *gradUp, const Vector &faceGradUp, Vector &y,
-    const int &Ndofs, const int &dim, const int &num_equation, const double &gamma, const double &Rg,
-    const double &viscMult, const double &bulkViscMult, const double &Pr, const volumeFaceIntegrationArrays &gpuArrays,
-    //                                                 const Array<int>& nodesIDs,
-    //                                                 const Array<int>& posDofIds,
+    const int &Ndofs, const int &dim, const int &num_equation, GasMixture *mixture, Fluxes *flux,
+    const volumeFaceIntegrationArrays &gpuArrays,
     const parallelFacesIntegrationArrays *parallelData, const int &maxIntPoints, const int &maxDofs) {
   const double *d_x = x.Read();
   const double *d_gradUp = gradUp->Read();
@@ -522,6 +518,14 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(
   double *d_y = y.ReadWrite();
   const int *d_nodesIDs = gpuArrays.nodesIDs.Read();
   const int *d_posDofIds = gpuArrays.posDofIds.Read();
+  
+  const double gamma = mixture->GetSpecificHeatRatio();
+  const double Rg    = mixture->GetGasConstant();
+  const double viscMult = mixture->GetViscMultiplyer();
+  const double bulkViscMult = mixture->GetBulkViscMultiplyer();
+  const double Pr = mixture->GetPrandtlNum();
+  const double Sc = mixture->GetSchmidtNum();
+  const Equations eqSystem = flux->GetEquationSystem();
 
   const double *d_sharedShapeWnor1 = parallelData->sharedShapeWnor1.Read();
   const double *d_sharedShape2 = parallelData->sharedShape2.Read();
@@ -612,10 +616,10 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(
           // compute Riemann flux
           RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg,
                                        dim, num_equation, i, maxDofs);
-          Fluxes::viscousFlux_gpu(&vFlux1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult,
-                                  bulkViscMult, Pr, i, maxDofs, dim, num_equation);
-          Fluxes::viscousFlux_gpu(&vFlux2[0], &u2[0], &gradUp2[0], gamma, Rg, viscMult, bulkViscMult,
-                                  Pr, i, maxDofs, dim, num_equation);
+          Fluxes::viscousFlux_gpu(&vFlux1[0], &u1[0], &gradUp1[0],eqSystem, gamma, Rg, viscMult,
+                                  bulkViscMult, Pr,Sc, i, maxDofs, dim, num_equation);
+          Fluxes::viscousFlux_gpu(&vFlux2[0], &u2[0], &gradUp2[0],eqSystem, gamma, Rg, viscMult, bulkViscMult,
+                                  Pr,Sc, i, maxDofs, dim, num_equation);
 
           MFEM_SYNC_THREAD;
           if (i < num_equation) {

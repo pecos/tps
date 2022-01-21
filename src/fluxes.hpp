@@ -78,7 +78,7 @@ class Fluxes {
   static void convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const double &gamma, const int &dof,
                                    const int &dim, const int &num_equation);
   static void viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTensor &flux, 
-                                Equations &eqSystem, GasMixture *mixture,
+                                const Equations &eqSystem, GasMixture *mixture,
                                 const ParGridFunction *spaceVaryViscMult, const linearlyVaryingVisc &linViscData,
                                 const int &dof, const int &dim, const int &num_equation);
 
