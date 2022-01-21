@@ -70,7 +70,11 @@ class Fluxes {
 
   void ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux);
 
+#ifdef AXISYM_DEV
+  void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &flux, double radius=0.0);
+#else
   void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &flux);
+#endif
 
   // Compute the split fersion of the flux for SBP operations
   // Output matrices a_mat, c_mat need not have the right size

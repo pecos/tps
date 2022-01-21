@@ -80,7 +80,11 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
   }
 }
 
+#ifdef AXISYM_DEV
+void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &flux, double radius) {
+#else
 void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &flux) {
+#endif
   switch (eqSystem) {
     case NS:
     case NS_PASSIVE: {
@@ -90,6 +94,10 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
       const double bulkViscMult = mixture->GetBulkViscMultiplyer();
       const double k = mixture->GetThermalConductivity(state);
 
+#ifdef AXISYM_DEV
+      const double ur = state[1]/state[0];
+#endif
+
       // make sure density visc. flux is 0
       for (int d = 0; d < dim; d++) flux(0, d) = 0.;
 
@@ -98,6 +106,10 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
         for (int j = 0; j < dim; j++) stress(i, j) = gradUp(1 + j, i) + gradUp(1 + i, j);
         divV += gradUp(1 + i, i);
       }
+#ifdef AXISYM_DEV
+      if (radius>0)
+        divV += ur/radius;
+#endif
 
       for (int i = 0; i < dim; i++) stress(i, i) += (bulkViscMult - 2. / 3.) * divV;
       stress *= visc;

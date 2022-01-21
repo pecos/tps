@@ -109,6 +109,11 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
   forcing.Append(new AxisymmetricSource(dim, num_equation, _order,
                                         intRuleType, intRules,
                                         vfes, Up, gradUp, gpuArrays, _config));
+
+  const FiniteElementCollection *fec = vfes->FEColl();
+  dfes = new ParFiniteElementSpace(mesh, fec, dim, Ordering::byNODES);
+  coordsDof = new ParGridFunction(dfes);
+  mesh->GetNodes(*coordsDof);
 #endif
 
   std::vector<double> temp;
@@ -250,6 +255,10 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
 }
 
 RHSoperator::~RHSoperator() {
+#if AXISYM_DEV
+  delete coordsDof;
+  delete dfes;
+#endif
   delete gradients;
   // delete[] Me_inv;
   for (int n = 0; n < Me_inv.Size(); n++) delete Me_inv[n];
@@ -393,6 +402,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
                               num_equation);
   }
 #else
+
   DenseMatrix xmat(x.GetData(), vfes->GetNDofs(), num_equation);
   DenseMatrix f(num_equation, dim);
 
@@ -410,6 +420,10 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
       for (int d = 0; d < dim; d++) gradUpi(eq, d) = dataGradUp[i + eq * dof + d * num_equation * dof];
     }
 
+#ifdef AXISYM_DEV
+    const double radius = (*coordsDof)[i + 0 * dof]; // radius is x coordinate
+#endif
+
     fluxClass->ComputeConvectiveFluxes(state, f);
 
     if (isSBP) {
@@ -424,7 +438,11 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 
     if (eqSystem == NS || NS_PASSIVE) {
       DenseMatrix fvisc(num_equation, dim);
+#ifdef AXISYM_DEV
+      fluxClass->ComputeViscousFluxes(state, gradUpi, fvisc, radius);
+#else
       fluxClass->ComputeViscousFluxes(state, gradUpi, fvisc);
+#endif
 
       if (spaceVaryViscMult != NULL) {
         auto *alpha = spaceVaryViscMult->GetData();

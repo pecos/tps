@@ -296,7 +296,11 @@ void OutletBC::initBCs() {
   }
 }
 
+#ifdef AXISYM_DEV
+void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius) {
+#else
 void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
+#endif
   switch (outletType) {
     case SUB_P:
       subsonicReflectingPressure(normal, stateIn, bdrFlux);

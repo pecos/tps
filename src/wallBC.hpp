@@ -59,7 +59,11 @@ class WallBC : public BoundaryCondition {
 
   void computeINVwallFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux);
 
+#ifdef AXISYM_DEV
+  void computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius=0);
+#else
   void computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
+#endif
   void computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
 
  public:
@@ -69,7 +73,11 @@ class WallBC : public BoundaryCondition {
          const Array<int> &intPointsElIDBC, const int &maxIntPoints);
   ~WallBC();
 
+#ifdef AXISYM_DEV
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius=0);
+#else
   void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
+#endif
 
   virtual void initBCs();
 

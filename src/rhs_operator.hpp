@@ -86,6 +86,9 @@ class RHSoperator : public TimeDependentOperator {
 
   ParMesh *mesh;
 
+  ParFiniteElementSpace *dfes;
+  ParGridFunction *coordsDof;
+
   ParGridFunction *spaceVaryViscMult;
   linearlyVaryingVisc &linViscData;
 

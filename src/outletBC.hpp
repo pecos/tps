@@ -103,8 +103,12 @@ class OutletBC : public BoundaryCondition {
            const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs);
   ~OutletBC();
 
-  // computes state that imposes the boundary
+#ifdef AXISYM_DEV
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius=0);
+#else
   void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
+#endif
+
   virtual void initBCs();
 
   virtual void integrationBC(Vector &y,  // output

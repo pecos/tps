@@ -102,13 +102,21 @@ void WallBC::buildWallElemsArray(const Array<int> &intPointsElIDBC) {
   auto dwallElems = wallElems.ReadWrite();
 }
 
+#ifdef AXISYM_DEV
+void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius) {
+#else
 void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
+#endif
   switch (wallType) {
     case INV:
       computeINVwallFlux(normal, stateIn, bdrFlux);
       break;
     case VISC_ADIAB:
+#ifdef AXISYM_DEV
+      computeAdiabaticWallFlux(normal, stateIn, gradState, bdrFlux, radius);
+#else
       computeAdiabaticWallFlux(normal, stateIn, gradState, bdrFlux);
+#endif
       break;
     case VISC_ISOTH:
       computeIsothermalWallFlux(normal, stateIn, gradState, bdrFlux);
@@ -154,7 +162,11 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux
   rsolver->Eval(stateIn, stateMirror, normal, bdrFlux);
 }
 
+#ifdef AXISYM_DEV
+void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius) {
+#else
 void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
+#endif
   double p = mixture->ComputePressure(stateIn);
   double T = mixture->ComputeTemperature(stateIn);
 
@@ -171,7 +183,11 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
 
   // incoming visc flux
   DenseMatrix viscF(num_equation, dim);
+#ifdef AXISYM_DEV
+  fluxClass->ComputeViscousFluxes(stateIn, gradState, viscF, radius);
+#else
   fluxClass->ComputeViscousFluxes(stateIn, gradState, viscF);
+#endif
 
   // modify gradients so that wall is adibatic
   Vector unitNorm = normal;
@@ -209,7 +225,11 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
   }
 
   DenseMatrix viscFw(num_equation, dim);
+#ifdef AXISYM_DEV
+  fluxClass->ComputeViscousFluxes(wallState, gradState, viscFw, radius);
+#else
   fluxClass->ComputeViscousFluxes(wallState, gradState, viscFw);
+#endif
 
   // Add visc fluxes (we skip density eq.)
   for (int eq = 1; eq < num_equation; eq++) {
