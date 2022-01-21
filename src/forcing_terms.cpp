@@ -420,16 +420,41 @@ PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const in
     psData[i]->nodes.SetSize(list.size());
     for (int n = 0; n < list.size(); n++) psData[i]->nodes[n] = list[n];
   }
+  
+#ifdef _GPU_
+  // create the gpu passive scalar data
+  psData_gpu = new passiveScalarData_gpu[ psData.Size() ];
+  for(int n=0;n<psData.Size();n++){
+    psData_gpu[n].coords = new double[ psData[n].coords.Size() ];
+    psData_gpu[n].nodes  = new int[ psData[n].nodes.Size() ];
+    psData_gpu[n].radius = psData[n].radius;
+    psData_gpu[n].value  = psData[n].value;
+    
+    for(int i=0;i<psData[n].coords.Size();i++) psData_gpu[n].coords[i] = psData[n].coords[i];
+    for(int i=0;i<psData[n].nodes.Size();i++)  psData_gpu[n].nodes[i] =  psData[n].nodes[i];
+  }
+#endif
 }
 
 
 PassiveScalar::~PassiveScalar()
 {
+#ifdef _GPU_
+  for(int n=0;n<psData.Size();n++){
+    delete[] psData_gpu[n].coords;
+    delete[] psData_gpu[n].nodes;
+  }
+  delete[] psData_gpu;
+#endif
+  
   for(int i=0; i<psData.Size();i++) delete psData[i];
 }
 
 
 void PassiveScalar::updateTerms(Vector &in) {
+#ifdef _GPU_
+  updateTerms_gpu(in,Up,psData,vfes->GetNDofs(),num_equation );
+#else
   auto dataUp = Up->HostRead();
   auto dataIn = in.HostReadWrite();
   int nnode = vfes->GetNDofs();
@@ -447,7 +472,37 @@ void PassiveScalar::updateTerms(Vector &in) {
           vel * (dataUp[node + (num_equation-1) * nnode] - dataUp[node] * Z) / psData[i]->radius;
     }
   }
+#endif
 }
+
+void PassiveScalar::updateTerms_gpu(Vector& in, ParGridFunction* Up, Array<passiveScalarData *> &psData,
+                                    const int nnode,const int num_equation )
+{
+#ifdef _GPU_
+  double *d_in = in.ReadWrite();
+  const double *d_Up = Up->Read();
+  
+  double Z = 0.;
+  double radius = 1.;
+  
+  for(int i=0;i<psData.Size();i++){
+    Z = psData[i]->value;
+    radius = psData[i]->radius;
+    const int *d_nodes = psData[i]->nodes.Read();
+    const int size = psData[i]->nodes.Size();
+    
+    MFEM_FORALL(n,size,{
+      int node = d_nodes[n];
+      double vel = 0.;
+      for (int d = 0; d < dim; d++) vel += d_Up[node + (1 + d) * nnode] * d_Up[node + (1 + d) * nnode];
+      vel = sqrt(vel);
+      d_in[node + (num_equation-1) * nnode] -=
+          vel * (d_Up[node + (num_equation-1) * nnode] - d_Up[node] * Z) / radius;
+    });
+  }
+#endif
+}
+
 
 #ifdef _MASA_
 MASA_forcings::MASA_forcings(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,

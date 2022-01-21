@@ -137,6 +137,10 @@ class PassiveScalar : public ForcingTerms {
   GasMixture *mixture;
 
   Array<passiveScalarData *> psData;
+  
+#ifdef _GPU_
+  passiveScalarData_gpu *psData_gpu;
+#endif
 
  public:
   PassiveScalar(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
@@ -146,6 +150,9 @@ class PassiveScalar : public ForcingTerms {
 
   // Terms do not need updating
   virtual void updateTerms(Vector &in);
+  
+  void updateTerms_gpu(Vector &in, ParGridFunction *Up, Array<passiveScalarData *> &psData,
+                       const int nnode,const int num_equation);
 
   ~PassiveScalar();
 };

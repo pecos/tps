@@ -94,7 +94,8 @@ class Averaging {
 
  public:
   Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollection *_fec, ParFiniteElementSpace *_fes,
-            ParFiniteElementSpace *_dfes, ParFiniteElementSpace *_vfes, Equations &_eqSys, const int &_num_equation,
+            ParFiniteElementSpace *_dfes, ParFiniteElementSpace *_vfes, Equations &_eqSys, GasMixture *mixture,
+            const int &_num_equation,
             const int &_dim, RunConfiguration &_config, MPI_Groups *_groupsMPI);
   ~Averaging();
 
@@ -116,7 +117,8 @@ class Averaging {
 
   // GPU functions
 #ifdef _GPU_
-  static void addSample_gpu(ParGridFunction *meanUp, ParGridFunction *rms, int &samplesMean, const ParGridFunction *Up,
+  static void addSample_gpu(ParGridFunction *meanUp, ParGridFunction *rms, int &samplesMean,
+                            GasMixture *mixture,const ParGridFunction *Up,
                             const int &Ndof, const int &dim, const int &num_equation);
   static void sumValues_gpu(const Vector &meanUp, const Vector &rms, Vector &local_sums, Vector &tmp_vector,
                             const int &num_equation, const int &dim);

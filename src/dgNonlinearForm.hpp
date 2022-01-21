@@ -47,6 +47,7 @@ using namespace std;
 // so that we can use GPU
 class DGNonLinearForm : public ParNonlinearForm {
  private:
+  Fluxes *fluxes;
   ParFiniteElementSpace *vfes;
   ParFiniteElementSpace *gradFes;
 
@@ -76,7 +77,7 @@ class DGNonLinearForm : public ParNonlinearForm {
   Vector uk_el2, grad_upk_el2;
 
  public:
-  DGNonLinearForm(ParFiniteElementSpace *f, ParFiniteElementSpace *gradFes, ParGridFunction *_gradUp,
+  DGNonLinearForm(Fluxes *_flux, ParFiniteElementSpace *f, ParFiniteElementSpace *gradFes, ParGridFunction *_gradUp,
                   BCintegrator *_bcIntegrator, IntegrationRules *intRules, const int dim, const int num_equation,
                   GasMixture *mixture, const volumeFaceIntegrationArrays &_gpuArrays, const int &maxIntPoints,
                   const int &maxDofs);
@@ -95,10 +96,10 @@ class DGNonLinearForm : public ParNonlinearForm {
                                   Vector &uk_el2,
                                   Vector &grad_uk_el1,
                                   Vector &grad_uk_el2,
-                                  const ParGridFunction *gradUp, const int &Ndofs,
+                                  const ParGridFunction *gradUp, Fluxes *flux,
+                                  const int &Ndofs,
                                   const int &Nf, const int &NumElemsType, const int &elemOffset, const int &elDof,
-                                  const int &dim, const int &num_equation, const double &gamma, const double &Rg,
-                                  const double &viscMult, const double &bulkViscMult, const double &Pr,
+                                  const int &dim, const int &num_equation, GasMixture *mixture,
                                   const volumeFaceIntegrationArrays &gpuArrays, const int &maxIntPoints,
                                   const int &maxDofs);
 

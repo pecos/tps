@@ -289,7 +289,7 @@ void M2ulPhyS::initVariables() {
   initIndirectionArrays();
   initSolutionAndVisualizationVectors();
 
-  average = new Averaging(Up, mesh, fec, fes, dfes, vfes, eqSystem, num_equation, dim, config, groupsMPI);
+  average = new Averaging(Up, mesh, fec, fes, dfes, vfes, eqSystem, mixture,num_equation, dim, config, groupsMPI);
   average->read_meanANDrms_restart_files();
 
   // NOTE: this should also be completed by the GasMixture class
@@ -343,7 +343,7 @@ void M2ulPhyS::initVariables() {
 
   // A->SetAssemblyLevel(AssemblyLevel::PARTIAL);
 
-  A = new DGNonLinearForm(vfes, gradUpfes, gradUp, bcIntegrator, intRules, dim, num_equation, mixture, gpuArrays,
+  A = new DGNonLinearForm(fluxClass,vfes, gradUpfes, gradUp, bcIntegrator, intRules, dim, num_equation, mixture, gpuArrays,
                           maxIntPoints, maxDofs);
   if (local_attr.Size() > 0) A->AddBdrFaceIntegrator(bcIntegrator);
 

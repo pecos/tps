@@ -61,6 +61,8 @@ class Fluxes {
 
  public:
   Fluxes(GasMixture *_mixture, Equations &_eqSystem, const int &_num_equations, const int &_dim);
+  
+  Equations GetEquationSystem(){return eqSystem;}
 
   void ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &flux);
 
@@ -75,17 +77,16 @@ class Fluxes {
   // GPU functions
   static void convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const double &gamma, const int &dof,
                                    const int &dim, const int &num_equation);
-  static void viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTensor &flux, const double &gamma,
-                                const double &Rg,  // gas constant
-                                const double &Pr,  // Prandtl number
-                                const double &viscMult, const double &bulkViscMult,
+  static void viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTensor &flux, 
+                                Equations &eqSystem, GasMixture *mixture,
                                 const ParGridFunction *spaceVaryViscMult, const linearlyVaryingVisc &linViscData,
                                 const int &dof, const int &dim, const int &num_equation);
 
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void viscousFlux_gpu(double *vFlux, const double *Un, const double *gradUpn,
-                                               const double &gamma, const double &Rg, const double &viscMult,
-                                               const double &bulkViscMult, const double &Pr, const int &thrd,
+                                               const Equations &eqSystem, const double &gamma, const double &Rg, const double &viscMult,
+                                               const double &bulkViscMult, const double &Pr, const double &Sc,
+                                               const int &thrd,
                                                const int &maxThreads, const int &dim, const int &num_equation) {
     MFEM_SHARED double KE[3], vel[3], divV;
     MFEM_SHARED double stress[3][3];
@@ -110,7 +111,8 @@ class Fluxes {
         stress[i][j] = gradUpn[1 + j + i * num_equation] + gradUpn[1 + i + j * num_equation];
       }
       // temperature gradient
-      gradT[i] = temp * (gradUpn[1 + dim + i * num_equation] / p - gradUpn[0 + i * num_equation] / Un[0]);
+//       gradT[i] = temp * (gradUpn[1 + dim + i * num_equation] / p - gradUpn[0 + i * num_equation] / Un[0]);
+      gradT[i] = gradUpn[1 + dim + i * num_equation];
 
       vel[i] = Un[1 + i] / Un[0];
     }
@@ -127,14 +129,19 @@ class Fluxes {
       for (int j = 0; j < dim; j++) {
         vFlux[1 + i + j * num_equation] = visc * stress[i][j];
         // energy equation
-        vFlux[num_equation - 1 + i * num_equation] += visc * vel[j] * stress[i][j];
+        vFlux[1+dim + i * num_equation] += visc * vel[j] * stress[i][j];
       }
     }
     MFEM_SYNC_THREAD;
     for (int i = thrd; i < dim; i += maxThreads) {
-      vFlux[num_equation - 1 + i * num_equation] += k * gradT[i];
+      vFlux[1+dim + i * num_equation] += k * gradT[i];
     }
     MFEM_SYNC_THREAD;
+    
+    if(eqSystem==NS_PASSIVE){
+      for (int d = thrd; d < dim; d += maxThreads) 
+        vFlux[ num_equation-1+ d * num_equation] += visc / Sc * gradUpn[num_equation-1 + d * num_equation];
+    }
   }
 #endif
 };

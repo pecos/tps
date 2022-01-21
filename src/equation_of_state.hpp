@@ -68,6 +68,7 @@ public:
 
   
   void setFluid(WorkingFluid _fluid);
+  WorkingFluid GetWorkingFluid(){return fluid;}
   
   void setViscMult(double _visc_mult) { visc_mult = _visc_mult; }
   void setBulkViscMult(double _bulk_mult) { bulk_visc_mult = _bulk_mult; }
@@ -175,6 +176,11 @@ public:
     double p = 0.;
     for (int k = 0; k < dim; k++) p += KE[k];
     return (gamma - 1.) * (state[1 + dim] - p);
+  }
+  
+  static MFEM_HOST_DEVICE double ComputePressureFromPrimitives_gpu(const double *Up, 
+                                                                   const double &Rg, const int &dim){
+    return Up[0]*Rg*Up[1+dim];
   }
   
   static MFEM_HOST_DEVICE double temperature(const double *state, double *KE, const double &gamma, 

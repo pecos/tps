@@ -191,10 +191,8 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const doub
 #endif
 }
 
-void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTensor &flux, const double &gamma,
-                               const double &Rg,  // gas constant
-                               const double &Pr,  // Prandtl number
-                               const double &viscMult, const double &bulkViscMult,
+void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTensor &flux, 
+                               Equations &eqSystem, GasMixture *mixture,
                                const ParGridFunction *spaceVaryViscMult, const linearlyVaryingVisc &linViscData,
                                const int &dof, const int &dim, const int &num_equation) {
 #ifdef _GPU_
@@ -208,6 +206,13 @@ void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTe
   } else {
     d_spaceVaryViscMult = NULL;
   }
+  
+  const double gamma = mixture->GetSpecificHeatRatio();
+  const double Rg = mixture->GetGasConstant();
+  const double viscMult = mixture->GetViscMultiplyer();
+  const double bulkViscMult = mixture->GetBulkViscMultiplyer();
+  const double Pr = mixture->GetPrandtlNum();
+  const double Sc = mixture->GetSchmidtNum();
 
   // clang-format off
   MFEM_FORALL_2D(n, dof, num_equation, 1, 1, {
@@ -225,8 +230,8 @@ void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTe
       }
       MFEM_SYNC_THREAD;
 
-      Fluxes::viscousFlux_gpu(&vFlux[0], &Un[0], &gradUpn[0], gamma, Rg, viscMult, bulkViscMult,
-                              Pr, eq, num_equation, dim, num_equation);
+      Fluxes::viscousFlux_gpu(&vFlux[0], &Un[0], &gradUpn[0],eqSystem, gamma, Rg, viscMult, bulkViscMult,
+                              Pr,Sc, eq, num_equation, dim, num_equation);
 
       MFEM_SYNC_THREAD;
 

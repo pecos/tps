@@ -478,7 +478,7 @@ void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const dou
       state[eq] = dataIn[n + eq * ndofs];  // loads data into shared memory
       MFEM_SYNC_THREAD;
 
-      // compute pressure
+      // compute temperature
       if (eq < dim) KE[eq] = 0.5 * state[1 + eq] * state[1 + eq] / state[0];
       if (eq == num_equations - 1 && dim == 2) KE[2] = 0;
       MFEM_SYNC_THREAD;

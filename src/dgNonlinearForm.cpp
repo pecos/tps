@@ -35,12 +35,13 @@
 
 #include "riemann_solver.hpp"
 
-DGNonLinearForm::DGNonLinearForm(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradFes,
+DGNonLinearForm::DGNonLinearForm(Fluxes *_flux,ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradFes,
                                  ParGridFunction *_gradUp, BCintegrator *_bcIntegrator, IntegrationRules *_intRules,
                                  const int _dim, const int _num_equation, GasMixture *_mixture,
                                  const volumeFaceIntegrationArrays &_gpuArrays, const int &_maxIntPoints,
                                  const int &_maxDofs)
     : ParNonlinearForm(_vfes),
+      fluxes(_flux),
       vfes(_vfes),
       gradFes(_gradFes),
       gradUp(_gradUp),
@@ -147,10 +148,9 @@ void DGNonLinearForm::Mult_domain(const Vector &x, Vector &y) {
       faceIntegration_gpu(x,  // px,
                           y,  // py,
                           uk_el1,uk_el2,grad_upk_el1,grad_upk_el2,
-                          gradUp, vfes->GetNDofs(), mesh->GetNumFaces(), h_numElems[elType], elemOffset, dof_el, dim,
-                          num_equation, mixture->GetSpecificHeatRatio(), mixture->GetGasConstant(),
-                          mixture->GetViscMultiplyer(), mixture->GetBulkViscMultiplyer(), mixture->GetPrandtlNum(),
-                          gpuArrays, maxIntPoints, maxDofs);
+                          gradUp, fluxes, 
+                          vfes->GetNDofs(), mesh->GetNumFaces(), h_numElems[elType], elemOffset, dof_el, dim,
+                          num_equation, mixture, gpuArrays, maxIntPoints, maxDofs);
     }
   }
 
@@ -180,11 +180,11 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y,
                                           Vector &uk_el2,
                                           Vector &grad_uk_el1,
                                           Vector &grad_uk_el2,
-                                          const ParGridFunction *gradUp, const int &Ndofs,
+                                          const ParGridFunction *gradUp, Fluxes *flux,
+                                          const int &Ndofs,
                                           const int &Nf, const int &NumElemType, const int &elemOffset,
                                           const int &elDof, const int &dim, const int &num_equation,
-                                          const double &gamma, const double &Rg, const double &viscMult,
-                                          const double &bulkViscMult, const double &Pr,
+                                          GasMixture *mixture,
                                           const volumeFaceIntegrationArrays &gpuArrays, const int &maxIntPoints,
                                           const int &maxDofs) {
   double *d_y = y.Write();
@@ -199,6 +199,15 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y,
   auto d_shapeWnor1 = gpuArrays.shapeWnor1.Read();
   const double *d_shape2 = gpuArrays.shape2.Read();
   auto d_elems12Q = gpuArrays.elems12Q.Read();
+  
+  const double gamma = mixture->GetSpecificHeatRatio();
+  const double Rg    = mixture->GetGasConstant();
+  const double viscMult = mixture->GetViscMultiplyer();
+  const double bulkViscMult = mixture->GetBulkViscMultiplyer();
+  const double Pr = mixture->GetPrandtlNum();
+  const double Sc = mixture->GetSchmidtNum();
+  const Equations eqSystem = flux->GetEquationSystem();
+  
 
   MFEM_FORALL_2D(el, NumElemType, elDof, 1, 1, {
     MFEM_FOREACH_THREAD(i, x, elDof) {
@@ -272,10 +281,10 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y,
 
       // compute Riemann flux
       RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation, i, elDof);
-      Fluxes::viscousFlux_gpu(&vFlux1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, i, elDof, dim,
-                              num_equation);
-      Fluxes::viscousFlux_gpu(&vFlux2[0], &u2[0], &gradUp2[0], gamma, Rg, viscMult, bulkViscMult, Pr, i, elDof, dim,
-                              num_equation);
+      Fluxes::viscousFlux_gpu(&vFlux1[0], &u1[0], &gradUp1[0],eqSystem, gamma, Rg, viscMult,
+                              bulkViscMult, Pr, Sc,i, elDof, dim, num_equation);
+      Fluxes::viscousFlux_gpu(&vFlux2[0], &u2[0], &gradUp2[0],eqSystem, gamma, Rg, viscMult, 
+                              bulkViscMult, Pr,Sc, i, elDof, dim,num_equation);
       MFEM_SYNC_THREAD;
       // if(i<num_equation)
       for (int eq = i; eq < num_equation; eq += elDof) {
