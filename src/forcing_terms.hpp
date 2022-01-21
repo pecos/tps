@@ -137,10 +137,6 @@ class PassiveScalar : public ForcingTerms {
   GasMixture *mixture;
 
   Array<passiveScalarData *> psData;
-  
-#ifdef _GPU_
-  passiveScalarData_gpu *psData_gpu;
-#endif
 
  public:
   PassiveScalar(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,

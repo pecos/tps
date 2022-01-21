@@ -420,33 +420,11 @@ PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const in
     psData[i]->nodes.SetSize(list.size());
     for (int n = 0; n < list.size(); n++) psData[i]->nodes[n] = list[n];
   }
-  
-#ifdef _GPU_
-  // create the gpu passive scalar data
-  psData_gpu = new passiveScalarData_gpu[ psData.Size() ];
-  for(int n=0;n<psData.Size();n++){
-    psData_gpu[n].coords = new double[ psData[n].coords.Size() ];
-    psData_gpu[n].nodes  = new int[ psData[n].nodes.Size() ];
-    psData_gpu[n].radius = psData[n].radius;
-    psData_gpu[n].value  = psData[n].value;
-    
-    for(int i=0;i<psData[n].coords.Size();i++) psData_gpu[n].coords[i] = psData[n].coords[i];
-    for(int i=0;i<psData[n].nodes.Size();i++)  psData_gpu[n].nodes[i] =  psData[n].nodes[i];
-  }
-#endif
 }
 
 
 PassiveScalar::~PassiveScalar()
 {
-#ifdef _GPU_
-  for(int n=0;n<psData.Size();n++){
-    delete[] psData_gpu[n].coords;
-    delete[] psData_gpu[n].nodes;
-  }
-  delete[] psData_gpu;
-#endif
-  
   for(int i=0; i<psData.Size();i++) delete psData[i];
 }
 
