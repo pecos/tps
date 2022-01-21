@@ -107,10 +107,12 @@ class ConstantPressureGradient : public ForcingTerms {
 
 class AxisymmetricSource : public ForcingTerms {
  private:
-
+  EquationOfState *eqState;
+  const Equations &eqSystem;
 
  public:
   AxisymmetricSource(const int &_dim, const int &_num_equation, const int &_order,
+                     EquationOfState *_eqState, const Equations &_eqSystem,
                      const int &_intRuleType, IntegrationRules *_intRules,
                      ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
                      const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config);

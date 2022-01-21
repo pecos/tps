@@ -217,10 +217,13 @@ void ConstantPressureGradient::updateTerms_gpu(const int numElems, const int off
 #endif
 
 AxisymmetricSource::AxisymmetricSource(const int &_dim, const int &_num_equation, const int &_order,
+                                       EquationOfState *_eqState, const Equations &_eqSystem,
                                        const int &_intRuleType, IntegrationRules *_intRules,
                                        ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
                                        const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays) {
+  : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays),
+    eqState(_eqState),
+    eqSystem(_eqSystem) {
   // no-op
 }
 
@@ -234,6 +237,7 @@ void AxisymmetricSource::updateTerms(Vector &in) {
 
   double *data = in.GetData();
   const double *dataUp = Up->GetData();
+  const double *dataGradUp = gradUp->GetData();
 
   // get coords
   const FiniteElementCollection *fec = vfes->FEColl();
@@ -261,6 +265,34 @@ void AxisymmetricSource::updateTerms(Vector &in) {
       // TODO: Indexing will have to change for swirl case
       const double pressure = dataUp[index + (1+dim)*dof];
 
+      double tau_tt;
+      if (eqSystem == EULER) {
+        tau_tt = 0.0;
+      } else {
+        //const double rho = data[index + 0*dof];
+        const double rho = dataUp[index + 0*dof];
+        const double ur = dataUp[index + 1*dof];
+        const double ur_r = dataGradUp[index + (1*dof) + (0*dof*num_equation)];
+        const double uz_z = dataGradUp[index + (2*dof) + (1*dof*num_equation)];
+
+        const double Rg = eqState->GetGasConstant();
+        const double temp = pressure / rho / Rg;
+        const double visc = eqState->GetViscosity(temp);
+
+        tau_tt = -ur_r - uz_z;
+        if (radius > 0)
+          tau_tt += 2*ur/radius;
+
+        if (std::isnan(tau_tt)) {
+          std::cout << "tau_tt is nan!" << std::endl;
+        }
+        tau_tt *= 2*visc/3.0;
+        if (std::isnan(visc)) {
+          std::cout << "visc is nan!" << std::endl;
+        }
+
+      }
+
       // Add to r-momentum eqn
 
       // NB: 1/r factor here is necessary b/c of way the source terms
@@ -270,7 +302,7 @@ void AxisymmetricSource::updateTerms(Vector &in) {
       // coords
 
       if (radius > 0)
-        data[index + 1*dof] += (pressure)/radius;
+        data[index + 1*dof] += (pressure - tau_tt)/radius;
     }
   }
 }
