@@ -31,6 +31,9 @@
 // -----------------------------------------------------------------------------------el-
 #include "rhs_operator.hpp"
 
+double getRadius(const Vector &pos) { return pos[0]; }
+FunctionCoefficient radius(getRadius);
+
 // Implementation of class RHSoperator
 RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, const int &_order,
                          const Equations &_eqSystem, double &_max_char_speed, IntegrationRules *_intRules,
@@ -101,6 +104,13 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
   forcing.Append(
       new MASA_forcings(dim, num_equation, _order, intRuleType, intRules, vfes, Up, gradUp, gpuArrays, _config));
 #endif
+
+#if AXISYM_DEV
+  forcing.Append(new AxisymmetricSource(dim, num_equation, _order,
+                                        intRuleType, intRules,
+                                        vfes, Up, gradUp, gpuArrays, _config));
+#endif
+
   std::vector<double> temp;
   temp.clear();
 
@@ -111,7 +121,12 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
     // DenseMatrixInverse inv(&Me);
     Me_inv[i] = new DenseMatrix(dof, dof);
 
+// TODO: Replace #if based logic with input options for axisymmetric
+#ifdef AXISYM_DEV
+    MassIntegrator mi(radius);
+#else
     MassIntegrator mi;
+#endif
 
     int integrationOrder = 2 * vfes->GetFE(i)->GetOrder();
     if (intRuleType == 1 && vfes->GetFE(i)->GetGeomType() == Geometry::SQUARE)

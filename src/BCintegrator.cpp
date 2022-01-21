@@ -284,6 +284,15 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
     computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, fluxN);
 
     fluxN *= ip.weight;
+
+#ifdef AXISYM_DEV
+    double x[3];
+    Vector transip(x, 3);
+    Tr.Transform(ip, transip);
+    const double radius = transip[0];
+    fluxN *= radius;
+#endif
+
     for (int eq = 0; eq < num_equation; eq++) {
       for (int s = 0; s < dof1; s++) {
         elvect(s + eq * dof1) -= fluxN(eq) * shape1(s);

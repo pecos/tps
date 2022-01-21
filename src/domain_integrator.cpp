@@ -76,6 +76,14 @@ void DomainIntegrator::AssembleElementMatrix2(const FiniteElement &trial_fe, con
     test_fe.CalcDShape(ip, dshapedr);
     Mult(dshapedr, Tr.AdjugateJacobian(), dshapedx);
 
+#ifdef AXISYM_DEV
+    double x[3];
+    Vector transip(x, 3);
+    Tr.Transform(ip, transip);
+    const double radius = transip[0];
+    shape *= radius;
+#endif
+
     for (int d = 0; d < dim; d++) {
       for (int j = 0; j < dof_test; j++) {
         for (int k = 0; k < dof_trial; k++) {

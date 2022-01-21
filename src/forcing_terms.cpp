@@ -216,6 +216,58 @@ void ConstantPressureGradient::updateTerms_gpu(const int numElems, const int off
 
 #endif
 
+AxisymmetricSource::AxisymmetricSource(const int &_dim, const int &_num_equation, const int &_order,
+                                       const int &_intRuleType, IntegrationRules *_intRules,
+                                       ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
+                                       const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays) {
+  // no-op
+}
+
+
+void AxisymmetricSource::updateTerms(Vector &in) {
+  // make sure we are in a 2D case (otherwise can't be axisymmetric)
+  assert(dim == 2);
+
+  int numElem = vfes->GetNE();
+  int dof = vfes->GetNDofs();
+
+  double *data = in.GetData();
+  const double *dataUp = Up->GetData();
+
+  // get coords
+  const FiniteElementCollection *fec = vfes->FEColl();
+  ParMesh *mesh = vfes->GetParMesh();
+  ParFiniteElementSpace dfes(mesh, fec, dim, Ordering::byNODES);
+  ParGridFunction coordsDof(&dfes);
+  mesh->GetNodes(coordsDof);
+
+  for (int el = 0; el < numElem; el++) {
+    const FiniteElement *elem = vfes->GetFE(el);
+    ElementTransformation *Tr = vfes->GetElementTransformation(el);
+    const int dof_elem = elem->GetDof();
+
+    // nodes of the element
+    Array<int> nodes;
+    vfes->GetElementVDofs(el, nodes);
+
+    Array<double> ip_forcing(num_equation);
+    Vector x(dim);
+    for (int n = 0; n < dof_elem; n++) {
+      int index = nodes[n];
+      for (int d = 0; d < dim; d++) x[d] = coordsDof[index + d * dof];
+      const double radius = x[0];
+      // TODO: Will have to change once PR #90 is merged
+      // TODO: Indexing will have to change for swirl case
+      const double pressure = dataUp[index + (1+dim)*dof];
+
+      // Add to r-momentum eqn
+      data[index + 1*dof] += (pressure);
+    }
+  }
+}
+
+
 SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                        Fluxes *_fluxClass, GasMixture *_mixture, IntegrationRules *_intRules,
                        ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,

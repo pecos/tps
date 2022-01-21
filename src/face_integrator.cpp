@@ -264,6 +264,14 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     viscF1.AddMult(nor, fluxN);
     fluxN *= ip.weight;
 
+#ifdef AXISYM_DEV
+    double x[3];
+    Vector transip(x, 3);
+    Tr.Transform(ip, transip);
+    const double radius = transip[0];
+    fluxN *= radius;
+#endif
+
     // add to element vectors
     AddMultVWt(shape2, fluxN, elvect2_mat);
     AddMult_a_VWt(-1.0, shape1, fluxN, elvect1_mat);

@@ -105,6 +105,21 @@ class ConstantPressureGradient : public ForcingTerms {
 #endif
 };
 
+class AxisymmetricSource : public ForcingTerms {
+ private:
+
+
+ public:
+  AxisymmetricSource(const int &_dim, const int &_num_equation, const int &_order,
+                     const int &_intRuleType, IntegrationRules *_intRules,
+                     ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
+                     const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config);
+  ~AxisymmetricSource();
+
+  virtual void updateTerms(Vector &in);
+};
+
+
 class SpongeZone : public ForcingTerms {
  private:
   Fluxes *fluxes;
