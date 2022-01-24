@@ -1619,25 +1619,24 @@ void M2ulPhyS::parseSolverOptions2() {
 
   // viscosity multiplier function
   {
-    tpsP->getInput("viscosityMultiplierFunction/isEnabled",config.linViscData.isEnabled, false);
-    if (config.linViscData.isEnabled)
-    {
+    tpsP->getInput("viscosityMultiplierFunction/isEnabled", config.linViscData.isEnabled, false);
+    if (config.linViscData.isEnabled) {
       auto normal = config.linViscData.normal.HostWrite();
-      tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm",normal[0],0);
-      tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm",normal[1],1);
-      tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm",normal[2],2);
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[0], 0);
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[1], 1);
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[2], 2);
 
       auto point0 = config.linViscData.point0.HostWrite();
-      tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0",point0[0],0);
-      tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0",point0[1],1);
-      tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0",point0[2],2);
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[0], 0);
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[1], 1);
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[2], 2);
 
       auto pointInit = config.linViscData.pointInit.HostWrite();
-      tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit",pointInit[0],0);
-      tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit",pointInit[1],1);
-      tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit",pointInit[2],2);
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[0], 0);
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[1], 1);
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[2], 2);
 
-      tpsP->getRequiredInput("viscosityMultiplierFunction/viscosityRatio",config.linViscData.viscRatio);
+      tpsP->getRequiredInput("viscosityMultiplierFunction/viscosityRatio", config.linViscData.viscRatio);
     }
   }
 
