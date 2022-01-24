@@ -24,7 +24,10 @@ setup() {
 @test "[$TEST] run tps with input -> $RUNFILE under valgrind" {
     test -s $RUNFILE
 
-    valgrind --error-exitcode=1 ../src/tps $OPTS --runFile $RUNFILE
+    # use following option to generate suppression list if needed
+    # for things not in TPS (I'm talking about you MPICH).
+    #valgrind--gen-suppressions=all
+    valgrind --suppressions=valgrind.suppressions --error-exitcode=1 ../src/tps $OPTS --runFile $RUNFILE
 
 }
 
