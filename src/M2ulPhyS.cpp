@@ -1735,21 +1735,17 @@ void M2ulPhyS::parseSolverOptions2() {
       break;
   }
 
-  int systemType;
-  tpsP->getInput("flow/equations", systemType, 0);
-
-  switch (systemType) {
-    case 0:
-      config.eqSystem = EULER;
-      break;
-    case 1:
-      config.eqSystem = NS;
-      break;
-    case 2:
-      config.eqSystem = NS_PASSIVE;
-      break;
-    default:
-      break;
+  std::string systemType;
+  tpsP->getInput("flow/equation_system", systemType, std::string("navier-stokes"));
+  if (systemType == "euler") {
+    config.eqSystem = EULER;
+  } else if (systemType == "navier-stokes") {
+    config.eqSystem = NS;
+  } else if (systemType == "navier-stokes-passive") {
+    config.eqSystem = NS_PASSIVE;
+  } else {
+    grvy_printf(GRVY_ERROR, "\nUnknown equation_system -> %s", systemType.c_str());
+    exit(ERROR);
   }
 
   return;

@@ -23,7 +23,7 @@ flow = [ ["MESH","mesh"],
          ["POL_ORDER","order"],
          ["INT_RULE","integrationRule"],
          ["BASIS_TYPE","basisType"],
-         ["EQ_SYSTEM","equations"],
+         ["EQ_SYSTEM","equation_system"],
          ["REF_LENGTH","refLength"],
          ["USE_ROE","useRoe"],
          ["ITERS_OUT","outputFreq"],
@@ -299,6 +299,17 @@ def parseEntry(entry):
                 newFile[section][newName] = integrators[value]
             else:
                 logging.error("Unknown value for TIME_INTEGRATOR conversion => %s " % value)
+                exit(1)
+        elif varName == "EQ_SYSTEM":
+            mapping = {}
+            mapping["0"] = "euler"
+            mapping["1"] = "navier-stokes"
+            mapping["2"] = "navier-stokes-passive"  # maybe trigger off of passiveScalars/numScalars instead?
+
+            if value in mapping:
+                newFile[section][newName] = mapping[value]
+            else:
+                logging.error("Unknown value for EQ_SYSTEM conversion => %s " % value)
                 exit(1)
         else:
             newFile[section][newName] = str(value)
