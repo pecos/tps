@@ -21,12 +21,22 @@ if [ ! -d ref_solns ];then
     ln -s $testDir/ref_solns .
 fi
 
-# necessary binaries/files
-binaries="bats die.sh soln_differ valgrind.suppressions"
+# necessary binaries
+binaries="bats die.sh soln_differ"
 for binary in $binaries; do
     if [ ! -x $binary ];then
         if [ -x $testDir/$binary ];then
            ln -s $testDir/$binary .
+        fi
+    fi
+done
+
+# necessary text files
+files="valgrind.suppressions"
+for file in $files; do
+    if [ ! -s $file ];then
+        if [ -s $testDir/$file ];then
+           ln -s $testDir/$file .
         fi
     fi
 done
