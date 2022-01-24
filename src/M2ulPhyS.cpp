@@ -858,7 +858,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   spaceVaryViscMult = NULL;
   ParGridFunction coordsDof(dfes);
   mesh->GetNodes(coordsDof);
-  if (config.GetLinearVaryingData().viscRatio > 0.) {
+  if (config.linViscData.isEnabled) {
     spaceVaryViscMult = new ParGridFunction(fes);
     double *viscMult = spaceVaryViscMult->HostWrite();
     for (int n = 0; n < fes->GetNDofs(); n++) {
@@ -1617,6 +1617,30 @@ void M2ulPhyS::parseSolverOptions2() {
     }
   }
 
+  // viscosity multiplier function
+  {
+    tpsP->getInput("viscosityMultiplierFunction/isEnabled",config.linViscData.isEnabled, false);
+    if (config.linViscData.isEnabled)
+    {
+      auto normal = config.linViscData.normal.HostWrite();
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm",normal[0],0);
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm",normal[1],1);
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm",normal[2],2);
+
+      auto point0 = config.linViscData.point0.HostWrite();
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0",point0[0],0);
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0",point0[1],1);
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0",point0[2],2);
+
+      auto pointInit = config.linViscData.pointInit.HostWrite();
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit",pointInit[0],0);
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit",pointInit[1],1);
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit",pointInit[2],2);
+
+      tpsP->getRequiredInput("viscosityMultiplierFunction/viscosityRatio",config.linViscData.viscRatio);
+    }
+  }
+
   // initial conditions
   {
     tpsP->getRequiredInput("initialConditions/rho", config.initRhoRhoVp[0]);
@@ -1670,7 +1694,7 @@ void M2ulPhyS::parseSolverOptions2() {
 
     for (int i = 1; i <= numInlets; i++) {
       int patch;
-      double density, u, v, w;
+      double density;
       std::string type;
       std::string basepath("boundaryConditions/inlet" + std::to_string(i));
 

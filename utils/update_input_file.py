@@ -85,7 +85,7 @@ sections["io"]  = io
 sections["averaging"] = averaging
 sections["spongezone"] = sponge
 sections["jobManagement"] = rms
-sections["viscousSource"] = viscSource
+sections["viscosityMultiplierFunction"] = viscSource
 sections["passiveScalars"] = passiveScalars
 
 newFile = configparser.ConfigParser()
@@ -200,19 +200,19 @@ def handleMultiValuedInputs(entry):
     elif varName == "LV_PLANE_NORM":
         section,name = getNewName(varName)
         addSection(section)
-        newFile[section]["enableViscousSource"] = str(True)
+        newFile[section]["isEnabled"] = str(True)
         values = str(entries[1]) + " " + str(entries[2]) + " " + str(entries[3])
         newFile[section][name] = "'" + values + "'"
     elif varName == "LV_PLANE_P0":
         section,name = getNewName(varName)
         addSection(section)
-        newFile[section]["enableViscousSource"] = str(True)
+        newFile[section]["isEnabled"] = str(True)
         values = str(entries[1]) + " " + str(entries[2]) + " " + str(entries[3])
         newFile[section][name] = "'" + values + "'"
     elif varName == "LV_PLANE_PINIT":
         section,name = getNewName(varName)
         addSection(section)
-        newFile[section]["enableViscousSource"] = str(True)
+        newFile[section]["isEnabled"] = str(True)
         values = str(entries[1]) + " " + str(entries[2]) + " " + str(entries[3])
         newFile[section][name] = "'" + values + "'"
     elif varName == "SZ_PLANE_NORM":
