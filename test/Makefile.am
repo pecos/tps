@@ -4,7 +4,7 @@ EXTRA_DIST      = tap-driver.sh soln_differ inputs meshes ref_solns/*.h5 \
 		  vpath.sh die.sh cyl3d.gpu.test cyl3d.mflow.gpu.test wedge.gpu.test \
 	          averages.gpu.test cyl3d.test cyl3d.mflow.test cyl3d.dtconst.test \
 		  die.test averages.test wedge.test cyl3d.interp.test qms.rings.test \
-       sponge_zone.test valgrind.test
+		  sponge_zone.test valgrind.test valgrind.suppressions
 
 TESTS = vpath.sh
 
