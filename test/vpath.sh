@@ -21,8 +21,8 @@ if [ ! -d ref_solns ];then
     ln -s $testDir/ref_solns .
 fi
 
-# necessary binaries
-binaries="bats die.sh soln_differ"
+# necessary binaries/files
+binaries="bats die.sh soln_differ valgrind.suppressions"
 for binary in $binaries; do
     if [ ! -x $binary ];then
         if [ -x $testDir/$binary ];then
@@ -30,4 +30,3 @@ for binary in $binaries; do
         fi
     fi
 done
-     
