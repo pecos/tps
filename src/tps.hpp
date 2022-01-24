@@ -41,7 +41,6 @@
 #include "logger.hpp"
 #include "quasimagnetostatic.hpp"
 #include "solver.hpp"
-
 #include "utils.hpp"
 
 namespace TPS {

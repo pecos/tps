@@ -1525,7 +1525,7 @@ void M2ulPhyS::parseSolverOptions2() {
     tpsP->getInput("flow/integrationRule", config.integrationRule, 1);
     tpsP->getInput("flow/basisType", config.basisType, 1);
     tpsP->getInput("flow/maxIters", config.numIters, 10);
-    tpsP->getInput("flow/iterFreq", config.itersOut, 50);
+    tpsP->getInput("flow/outputFreq", config.itersOut, 50);
     tpsP->getInput("flow/useRoe", config.useRoe, false);
     tpsP->getInput("flow/useSumByParts", config.SBP, false);
     tpsP->getInput("flow/refLength", config.refLength, 1.0);
