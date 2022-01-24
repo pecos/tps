@@ -32,7 +32,6 @@
 #include "tps.hpp"
 
 int main(int argc, char *argv[]) {
-
   TPS::Tps tps(argc, argv);
 
   tps.parseCommandLineArgs(argc, argv);
@@ -45,5 +44,3 @@ int main(int argc, char *argv[]) {
 
   return (tps.getStatus());
 }
-
-

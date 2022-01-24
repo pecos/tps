@@ -1513,71 +1513,66 @@ void M2ulPhyS::initialTimeStep() {
   }
 }
 
-void M2ulPhyS::parseSolverOptions()
-{
-  return;
-}
+void M2ulPhyS::parseSolverOptions() { return; }
 
 // koomie TODO: add parsing of all previously possible runtime inputs.
-void M2ulPhyS::parseSolverOptions2()
-{
-
-  tpsP->getRequiredInput("flow/mesh",config.meshFile);
+void M2ulPhyS::parseSolverOptions2() {
+  tpsP->getRequiredInput("flow/mesh", config.meshFile);
 
   // flow/numerics
   {
-    tpsP->getInput("flow/order",config.solOrder,4);
-    tpsP->getInput("flow/integrationRule",config.integrationRule,1);
-    tpsP->getInput("flow/basisType",config.basisType,1);
-    tpsP->getInput("flow/maxIters",config.numIters,10);
-    tpsP->getInput("flow/iterFreq",config.itersOut,50);
-    tpsP->getInput("flow/useRoe",config.useRoe,false);
-    tpsP->getInput("flow/useSumByParts",config.SBP,false);
-    tpsP->getInput("flow/refLength",config.refLength,1.0);
-    tpsP->getInput("flow/viscosityMultiplier",config.visc_mult,1.0);
-    tpsP->getInput("flow/bulkViscosityMultiplier",config.bulk_visc,0.0);
+    tpsP->getInput("flow/order", config.solOrder, 4);
+    tpsP->getInput("flow/integrationRule", config.integrationRule, 1);
+    tpsP->getInput("flow/basisType", config.basisType, 1);
+    tpsP->getInput("flow/maxIters", config.numIters, 10);
+    tpsP->getInput("flow/iterFreq", config.itersOut, 50);
+    tpsP->getInput("flow/useRoe", config.useRoe, false);
+    tpsP->getInput("flow/useSumByParts", config.SBP, false);
+    tpsP->getInput("flow/refLength", config.refLength, 1.0);
+    tpsP->getInput("flow/viscosityMultiplier", config.visc_mult, 1.0);
+    tpsP->getInput("flow/bulkViscosityMultiplier", config.bulk_visc, 0.0);
 
-    assert(config.solOrder  >  0);
-    assert(config.numIters  >= 0);
-    assert(config.itersOut  >  0);
-    assert(config.refLength >  0);
+    assert(config.solOrder > 0);
+    assert(config.numIters >= 0);
+    assert(config.itersOut > 0);
+    assert(config.refLength > 0);
   }
 
   // time integration controls
   {
-    std::map<std::string,int> integrators;
+    std::map<std::string, int> integrators;
     integrators["forwardEuler"] = 1;
-    integrators["rk2" ]         = 2;
-    integrators["rk3" ]         = 3;
-    integrators["rk4" ]         = 4;
-    integrators["rk6" ]         = 6;
+    integrators["rk2"] = 2;
+    integrators["rk3"] = 3;
+    integrators["rk4"] = 4;
+    integrators["rk6"] = 6;
     std::string type;
-    tpsP->getInput("time/cfl",config.cflNum,0.12);
-    tpsP->getInput("time/integrator",type,std::string("rk4"));
-    tpsP->getInput("time/enableConstantTimestep",config.constantTimeStep,false);
+    tpsP->getInput("time/cfl", config.cflNum, 0.12);
+    tpsP->getInput("time/integrator", type, std::string("rk4"));
+    tpsP->getInput("time/enableConstantTimestep", config.constantTimeStep, false);
     if (integrators.count(type) == 1) {
       config.timeIntegratorType = integrators[type];
     } else {
-      grvy_printf(GRVY_ERROR,"Unknown time integrator > %s\n",type.c_str());
+      grvy_printf(GRVY_ERROR, "Unknown time integrator > %s\n", type.c_str());
       exit(ERROR);
     }
   }
 
   // statistics
   {
-    tpsP->getInput("averaging/startIter",config.startIter,0);
-    tpsP->getInput("averaging/sampleFreq",config.sampleInterval,0);
-    tpsP->getInput("averaging/enableContinuation",config.restartMean,false);
+    tpsP->getInput("averaging/startIter", config.startIter, 0);
+    tpsP->getInput("averaging/sampleFreq", config.sampleInterval, 0);
+    tpsP->getInput("averaging/enableContinuation", config.restartMean, false);
   }
 
   // I/O settings
   {
-    tpsP->getInput("io/outdirBase",config.outputFile,std::string("output-default"));
-    tpsP->getInput("io/enableRestart",config.restart,false);
-    tpsP->getInput("io/exitCheckFreq",config.exit_checkFrequency_,500);
+    tpsP->getInput("io/outdirBase", config.outputFile, std::string("output-default"));
+    tpsP->getInput("io/enableRestart", config.restart, false);
+    tpsP->getInput("io/exitCheckFreq", config.exit_checkFrequency_, 500);
 
     std::string restartMode;
-    tpsP->getInput("io/restartMode",restartMode,std::string("standard"));
+    tpsP->getInput("io/restartMode", restartMode, std::string("standard"));
     if (restartMode == "variableP") {
       config.restartFromAux = true;
     } else if (restartMode == "singleFileWrite") {
@@ -1585,7 +1580,7 @@ void M2ulPhyS::parseSolverOptions2()
     } else if (restartMode == "singleFileRead") {
       config.restart_serial = "read";
     } else if (restartMode != "standard") {
-      grvy_printf(GRVY_ERROR,"\nUnknown restart mode -> %s\n",restartMode.c_str());
+      grvy_printf(GRVY_ERROR, "\nUnknown restart mode -> %s\n", restartMode.c_str());
       exit(ERROR);
     }
   }
@@ -1593,30 +1588,30 @@ void M2ulPhyS::parseSolverOptions2()
   // sponge zone
   {
     bool isSpongeZoneEnabled;
-    tpsP->getInput("spongezone/isEnabled",isSpongeZoneEnabled,false);
+    tpsP->getInput("spongezone/isEnabled", isSpongeZoneEnabled, false);
 
-    if(isSpongeZoneEnabled) {
-      tpsP->getRequiredVec("spongezone/normal", config.spongeData.normal,3);
-      tpsP->getRequiredVec("spongezone/p0",     config.spongeData.point0,3);
-      tpsP->getRequiredVec("spongezone/pInit",  config.spongeData.pointInit,3);
-      tpsP->getRequiredVec("spongezone/pInit",  config.spongeData.pointInit,3);
-      tpsP->getInput("spongezone/tolerance",    config.spongeData.tol,1e-5);
-      tpsP->getInput("spongezone/multiplier",   config.spongeData.multFactor,1.0);
+    if (isSpongeZoneEnabled) {
+      tpsP->getRequiredVec("spongezone/normal", config.spongeData.normal, 3);
+      tpsP->getRequiredVec("spongezone/p0", config.spongeData.point0, 3);
+      tpsP->getRequiredVec("spongezone/pInit", config.spongeData.pointInit, 3);
+      tpsP->getRequiredVec("spongezone/pInit", config.spongeData.pointInit, 3);
+      tpsP->getInput("spongezone/tolerance", config.spongeData.tol, 1e-5);
+      tpsP->getInput("spongezone/multiplier", config.spongeData.multFactor, 1.0);
 
       std::string type;
       tpsP->getRequiredInput("spongezone/type", type);
-      if( type == "userDef") {
+      if (type == "userDef") {
         config.spongeData.szType = SpongeZoneSolution::USERDEF;
         auto hup = config.spongeData.targetUp.HostWrite();
-        tpsP->getRequiredInput  ("spongezone/density",  hup[0]);    // rho
-        tpsP->getRequiredVecElem("spongezone/uvw",      hup[1],0);  // u
-        tpsP->getRequiredVecElem("spongezone/uvw",      hup[2],1);  // v
-        tpsP->getRequiredVecElem("spongezone/uvw",      hup[3],2);  // w
-        tpsP->getRequiredInput  ("spongezone/pressure", hup[4]);    // P
+        tpsP->getRequiredInput("spongezone/density", hup[0]);   // rho
+        tpsP->getRequiredVecElem("spongezone/uvw", hup[1], 0);  // u
+        tpsP->getRequiredVecElem("spongezone/uvw", hup[2], 1);  // v
+        tpsP->getRequiredVecElem("spongezone/uvw", hup[3], 2);  // w
+        tpsP->getRequiredInput("spongezone/pressure", hup[4]);  // P
       } else if (type == "mixedOut") {
         config.spongeData.szType = SpongeZoneSolution::MIXEDOUT;
       } else {
-        grvy_printf(GRVY_ERROR,"\nUnknown sponge zone type -> %s\n",type.c_str());
+        grvy_printf(GRVY_ERROR, "\nUnknown sponge zone type -> %s\n", type.c_str());
         exit(ERROR);
       }
     }
@@ -1624,11 +1619,11 @@ void M2ulPhyS::parseSolverOptions2()
 
   // initial conditions
   {
-    tpsP->getRequiredInput("initialConditions/rho",     config.initRhoRhoVp[0]);
-    tpsP->getRequiredInput("initialConditions/rhoU",    config.initRhoRhoVp[1]);
-    tpsP->getRequiredInput("initialConditions/rhoV",    config.initRhoRhoVp[2]);
-    tpsP->getRequiredInput("initialConditions/rhoW",    config.initRhoRhoVp[3]);
-    tpsP->getRequiredInput("initialConditions/pressure",config.initRhoRhoVp[4]);
+    tpsP->getRequiredInput("initialConditions/rho", config.initRhoRhoVp[0]);
+    tpsP->getRequiredInput("initialConditions/rhoU", config.initRhoRhoVp[1]);
+    tpsP->getRequiredInput("initialConditions/rhoV", config.initRhoRhoVp[2]);
+    tpsP->getRequiredInput("initialConditions/rhoW", config.initRhoRhoVp[3]);
+    tpsP->getRequiredInput("initialConditions/pressure", config.initRhoRhoVp[4]);
   }
 
   // boundary conditions. The number of boundaries of each supported type if
@@ -1636,99 +1631,93 @@ void M2ulPhyS::parseSolverOptions2()
   {
     // number of BC regions defined
     int numWalls, numInlets, numOutlets;
-    tpsP->getInput("boundaryConditions/numWalls",  numWalls,  0);
+    tpsP->getInput("boundaryConditions/numWalls", numWalls, 0);
     tpsP->getInput("boundaryConditions/numInlets", numInlets, 0);
-    tpsP->getInput("boundaryConditions/numOutlets",numOutlets,0);
+    tpsP->getInput("boundaryConditions/numOutlets", numOutlets, 0);
 
     // Wall Bcs
-    std::map<std::string,WallType> wallMapping;
+    std::map<std::string, WallType> wallMapping;
     wallMapping["inviscid"] = INV;
     wallMapping["viscous_adiabitc"] = VISC_ADIAB;
     wallMapping["viscous_isothermal"] = VISC_ISOTH;
 
-    for(int i=1;i<=numWalls;i++)
-    {
+    for (int i = 1; i <= numWalls; i++) {
       int patch;
       double temperature;
       std::string type;
       std::string basepath("boundaryConditions/wall" + std::to_string(i));
 
-      tpsP->getRequiredInput((basepath + "/patch").c_str(),patch);
-      tpsP->getRequiredInput((basepath + "/type").c_str(),type);
-      if (type == "viscous_isothermal")
-      {
-        tpsP->getRequiredInput((basepath + "/temperature").c_str(),temperature);
+      tpsP->getRequiredInput((basepath + "/patch").c_str(), patch);
+      tpsP->getRequiredInput((basepath + "/type").c_str(), type);
+      if (type == "viscous_isothermal") {
+        tpsP->getRequiredInput((basepath + "/temperature").c_str(), temperature);
         config.wallBC.Append(temperature);
       } else {
         config.wallBC.Append(0.);
       }
 
-      std::pair<int,WallType> patchType;
+      std::pair<int, WallType> patchType;
       patchType.first = patch;
       patchType.second = wallMapping[type];
       config.wallPatchType.push_back(patchType);
     }
 
     // Inlet Bcs
-    std::map<std::string,InletType> inletMapping;
-    inletMapping["subsonic"]                  = SUB_DENS_VEL;
-    inletMapping["nonreflecting"]             = SUB_DENS_VEL_NR;
+    std::map<std::string, InletType> inletMapping;
+    inletMapping["subsonic"] = SUB_DENS_VEL;
+    inletMapping["nonreflecting"] = SUB_DENS_VEL_NR;
     inletMapping["nonreflectingConstEntropy"] = SUB_VEL_CONST_ENT;
 
-    for(int i=1;i<=numInlets;i++)
-    {
+    for (int i = 1; i <= numInlets; i++) {
       int patch;
-      double density,u,v,w;
+      double density, u, v, w;
       std::string type;
       std::string basepath("boundaryConditions/inlet" + std::to_string(i));
 
-      tpsP->getRequiredInput((basepath + "/patch").c_str(),patch);
-      tpsP->getRequiredInput((basepath + "/type").c_str(),type);
+      tpsP->getRequiredInput((basepath + "/patch").c_str(), patch);
+      tpsP->getRequiredInput((basepath + "/type").c_str(), type);
       // all inlet BCs require 4 inputs (density + vel(3))
       {
         Array<double> uvw;
-        tpsP->getRequiredInput((basepath + "/density").c_str(),density);
-        tpsP->getRequiredVec((basepath + "/uvw").c_str(),uvw,3);
+        tpsP->getRequiredInput((basepath + "/density").c_str(), density);
+        tpsP->getRequiredVec((basepath + "/uvw").c_str(), uvw, 3);
         config.inletBC.Append(density);
-        config.inletBC.Append(uvw,3);
+        config.inletBC.Append(uvw, 3);
       }
-      std::pair<int,InletType> patchType;
+      std::pair<int, InletType> patchType;
       patchType.first = patch;
       patchType.second = inletMapping[type];
       config.inletPatchType.push_back(patchType);
     }
 
     // Outlet Bcs
-    std::map<std::string,OutletType> outletMapping;
-    outletMapping["subsonicPressure"]                = SUB_P;
-    outletMapping["nonReflectingPressure"]           = SUB_P_NR;
-    outletMapping["nonReflectingMassFlow"]           = SUB_MF_NR;
+    std::map<std::string, OutletType> outletMapping;
+    outletMapping["subsonicPressure"] = SUB_P;
+    outletMapping["nonReflectingPressure"] = SUB_P_NR;
+    outletMapping["nonReflectingMassFlow"] = SUB_MF_NR;
     outletMapping["nonReflectingPointBasedMassFlow"] = SUB_MF_NR_PW;
 
-    for(int i=1;i<=numOutlets;i++)
-    {
+    for (int i = 1; i <= numOutlets; i++) {
       int patch;
       double pressure, massFlow;
       std::string type;
       std::string basepath("boundaryConditions/outlet" + std::to_string(i));
 
-      tpsP->getRequiredInput((basepath + "/patch").c_str(),patch);
-      tpsP->getRequiredInput((basepath + "/type").c_str(),type);
+      tpsP->getRequiredInput((basepath + "/patch").c_str(), patch);
+      tpsP->getRequiredInput((basepath + "/type").c_str(), type);
 
-      if ( (type == "subsonicPressure") || (type == "nonReflectingPressure") )
-      {
-        tpsP->getRequiredInput((basepath + "/pressure").c_str(),pressure);
+      if ((type == "subsonicPressure") || (type == "nonReflectingPressure")) {
+        tpsP->getRequiredInput((basepath + "/pressure").c_str(), pressure);
         config.outletBC.Append(pressure);
-      } else if  ( (type == "nonReflectingMassFlow") || (type == "nonReflectingPointBasedMassFlow") )
-      {
-        tpsP->getRequiredInput((basepath + "/massFlow").c_str(),massFlow);
+      } else if ((type == "nonReflectingMassFlow") || (type == "nonReflectingPointBasedMassFlow")) {
+        tpsP->getRequiredInput((basepath + "/massFlow").c_str(), massFlow);
         config.outletBC.Append(massFlow);
-      } else{
-        grvy_printf(GRVY_ERROR,"\nUnknown outlet BC supplied at runtime -> %s",type.c_str());
+      } else {
+        grvy_printf(GRVY_ERROR, "\nUnknown outlet BC supplied at runtime -> %s", type.c_str());
         exit(ERROR);
       }
 
-      std::pair<int,OutletType> patchType;
+      std::pair<int, OutletType> patchType;
       patchType.first = patch;
       patchType.second = outletMapping[type];
       config.outletPatchType.push_back(patchType);
@@ -1736,7 +1725,7 @@ void M2ulPhyS::parseSolverOptions2()
   }
 
   int fluidType;
-  tpsP->getInput("flow/fluid",fluidType,0);
+  tpsP->getInput("flow/fluid", fluidType, 0);
 
   switch (fluidType) {
     case 0:
@@ -1747,7 +1736,7 @@ void M2ulPhyS::parseSolverOptions2()
   }
 
   int systemType;
-  tpsP->getInput("flow/equations",systemType,0);
+  tpsP->getInput("flow/equations", systemType, 0);
 
   switch (systemType) {
     case 0:

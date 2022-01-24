@@ -291,7 +291,7 @@ class M2ulPhyS : public TPS::Solver {
   void Cache_Paraview_Timesteps();
 
  public:
-  M2ulPhyS(MPI_Session &_mpi, string &inputFileName,TPS::Tps *tps);
+  M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps);
   ~M2ulPhyS();
 
   void parseSolverOptions() override;

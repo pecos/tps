@@ -29,8 +29,10 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
-#include <hdf5.h>
 #include "quasimagnetostatic.hpp"
+
+#include <hdf5.h>
+
 #include "../utils/mfem_extras/pfem_extras.hpp"
 #include "logger.hpp"
 #include "utils.hpp"
@@ -236,20 +238,19 @@ void QuasiMagnetostaticSolver::InitializeCurrent() {
 
 // query solver-specific runtime controls
 void QuasiMagnetostaticSolver::parseSolverOptions() {
+  tpsP->getRequiredInput("em/mesh", _em_opts.mesh_file);
 
-  tpsP->getRequiredInput("em/mesh",_em_opts.mesh_file);
-
-  tpsP->getInput("em/order",       _em_opts.order,       1);
-  tpsP->getInput("em/ref_levels",  _em_opts.ref_levels,  0);
-  tpsP->getInput("em/max_iter",    _em_opts.max_iter,    100);
-  tpsP->getInput("em/rtol",        _em_opts.rtol,        1.0e-6);
-  tpsP->getInput("em/atol",        _em_opts.atol,        1.0e-10);
-  tpsP->getInput("em/nBy",         _em_opts.nBy,         0);
+  tpsP->getInput("em/order", _em_opts.order, 1);
+  tpsP->getInput("em/ref_levels", _em_opts.ref_levels, 0);
+  tpsP->getInput("em/max_iter", _em_opts.max_iter, 100);
+  tpsP->getInput("em/rtol", _em_opts.rtol, 1.0e-6);
+  tpsP->getInput("em/atol", _em_opts.atol, 1.0e-10);
+  tpsP->getInput("em/nBy", _em_opts.nBy, 0);
   tpsP->getInput("em/yinterp_min", _em_opts.yinterp_min, 0.0);
   tpsP->getInput("em/yinterp_max", _em_opts.yinterp_max, 1.0);
-  tpsP->getInput("em/By_file",     _em_opts.By_file,     std::string("By.h5"));
-  tpsP->getInput("em/top_only",    _em_opts.top_only,    false);
-  tpsP->getInput("em/bot_only",    _em_opts.bot_only,    false);
+  tpsP->getInput("em/By_file", _em_opts.By_file, std::string("By.h5"));
+  tpsP->getInput("em/top_only", _em_opts.top_only, false);
+  tpsP->getInput("em/bot_only", _em_opts.bot_only, false);
 
   // dump options to screen for user inspection
   if (_mpi.Root()) {

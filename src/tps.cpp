@@ -30,15 +30,15 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 #include "tps.hpp"
+
 #include <sys/types.h>
 #include <unistd.h>
 
 namespace TPS {
 
 Tps::Tps(int argc, char *argv[]) {
-
   nprocs_ = mpi_.WorldSize();
-  rank_   = mpi_.WorldRank();
+  rank_ = mpi_.WorldRank();
   if (rank_ == 0)
     isRank0_ = true;
   else
@@ -48,8 +48,8 @@ Tps::Tps(int argc, char *argv[]) {
   iFile_ = "runfile.ini";
 
   // default physics configuration
-  isFlowOnlyMode_      = true;
-  isEMOnlyMode_        = false;
+  isFlowOnlyMode_ = true;
+  isEMOnlyMode_ = false;
   isFlowEMCoupledMode_ = false;
 
   // execution device inferred from build setup
@@ -60,7 +60,6 @@ Tps::Tps(int argc, char *argv[]) {
 #else
   deviceConfig_ = "cpu";
 #endif
-
 }
 
 void Tps::printHeader() {
@@ -81,23 +80,20 @@ void Tps::printHeader() {
 
 /// Register and parse supported command line arguments and runtime inputs
 void Tps::parseCommandLineArgs(int argc, char *argv[]) {
-
-  mfem::OptionsParser args(argc,argv);
+  mfem::OptionsParser args(argc, argv);
   bool showVersion = false;
-  bool debugMode   = false;
-  const char *astring  = iFile_.c_str();
+  bool debugMode = false;
+  const char *astring = iFile_.c_str();
 
-  if(isRank0_)
-  {
-    grvy_printf(GRVY_DEBUG,"# of command-line arguments = %i\n",argc);
-    for(int i=0;i<argc;i++)
-      grvy_printf(GRVY_DEBUG,"--> %s\n",argv[i]);
+  if (isRank0_) {
+    grvy_printf(GRVY_DEBUG, "# of command-line arguments = %i\n", argc);
+    for (int i = 0; i < argc; i++) grvy_printf(GRVY_DEBUG, "--> %s\n", argv[i]);
   }
 
   // Register supported command-line arguments
   args.AddOption(&showVersion, "-v", "--version", "", "--no-version", "Print code version and exit,");
   args.AddOption(&astring, "-run", "--runFile", "Name of the input file with run options.");
-  args.AddOption(&debugMode,"-d","--debug", "","--no-debug","Launch in debug mode for gdb attach.");
+  args.AddOption(&debugMode, "-d", "--debug", "", "--no-debug", "Launch in debug mode for gdb attach.");
 
   args.Parse();
 
@@ -110,11 +106,9 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
 
   // Version info
   printHeader();
-  if (showVersion)
-    exit(0);
+  if (showVersion) exit(0);
 
-  if(isRank0_)
-    args.PrintOptions(std::cout);
+  if (isRank0_) args.PrintOptions(std::cout);
 
   // Debug mode: user's can attach gdb to the rank0 PID and set the gdb
   // variable to be non-zero in order to exit the startup sleep process.
@@ -123,10 +117,10 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
   if (debugMode) {
     volatile int gdb = 1;
     MPI_Barrier(MPI_COMM_WORLD);
-    if(isRank0_) {
+    if (isRank0_) {
       gdb = 0;
-      grvy_printf(GRVY_INFO,"\nDEBUG Mode enabled:\n");
-      grvy_printf(GRVY_INFO,"--> Rank 0 PID = %i\n",getpid());
+      grvy_printf(GRVY_INFO, "\nDEBUG Mode enabled:\n");
+      grvy_printf(GRVY_INFO, "--> Rank 0 PID = %i\n", getpid());
     }
 
     while (gdb == 0) sleep(5);
@@ -137,14 +131,12 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
 }
 
 /// Setup desired execution devices for MFEM
-void Tps::chooseDevices()
-{
+void Tps::chooseDevices() {
 #ifdef _GPU_
-  device_.Configure(deviceConfig_,nprocs_ % numGpusPerRank_);
+  device_.Configure(deviceConfig_, nprocs_ % numGpusPerRank_);
 #endif
 
-  if(isRank0_)
-  {
+  if (isRank0_) {
     printf("\n---------------------------------\n");
     printf("MFEM Device configuration:\n");
     device_.Print();
@@ -154,26 +146,21 @@ void Tps::chooseDevices()
   return;
 }
 
-
 /// Choose desired solver class
 void Tps::chooseSolver() {
-
-  if(input_solver_type_ == "flow") {
+  if (input_solver_type_ == "flow") {
     isFlowOnlyMode_ = true;
-    solver_ = new M2ulPhyS(mpi_,iFile_,this);
-  }
-  else if (input_solver_type_ == "em") {
+    solver_ = new M2ulPhyS(mpi_, iFile_, this);
+  } else if (input_solver_type_ == "em") {
     isEMOnlyMode_ = true;
     ElectromagneticOptions em_opt;
-    solver_ = new QuasiMagnetostaticSolver(mpi_,em_opt,this);
-  }
-  else if (input_solver_type_ == "coupled") {
-   isFlowEMCoupledMode_ = true;
-   grvy_printf(GRVY_ERROR,"\nSlow your roll.  Solid high-five for whoever implements this coupled solver mode!\n");
-   exit(ERROR);
-  }
-  else {
-    grvy_printf(GRVY_ERROR,"\nUnsupported solver choice specified -> %s\n",input_solver_type_.c_str());
+    solver_ = new QuasiMagnetostaticSolver(mpi_, em_opt, this);
+  } else if (input_solver_type_ == "coupled") {
+    isFlowEMCoupledMode_ = true;
+    grvy_printf(GRVY_ERROR, "\nSlow your roll.  Solid high-five for whoever implements this coupled solver mode!\n");
+    exit(ERROR);
+  } else {
+    grvy_printf(GRVY_ERROR, "\nUnsupported solver choice specified -> %s\n", input_solver_type_.c_str());
     exit(ERROR);
   }
 
@@ -184,40 +171,37 @@ void Tps::chooseSolver() {
 /// Read runtime input file on single MPI process and distribute so that
 /// runtime inputs are available for query on on all processors.
 void Tps::parseInput() {
-
   std::stringstream buffer;
   std::string ss;
 
-  if(isRank0_)
-  {
-    grvy_printf(GRVY_INFO,"\nCaching input file -> %s\n",iFile_.c_str());
+  if (isRank0_) {
+    grvy_printf(GRVY_INFO, "\nCaching input file -> %s\n", iFile_.c_str());
     std::ifstream file(iFile_);
     buffer << file.rdbuf();
   }
 
   // distribute buffer to remaining tasks
   int bufferSize = buffer.str().size();
-  MPI_Bcast(&bufferSize,1,MPI_INT,0,MPI_COMM_WORLD);
+  MPI_Bcast(&bufferSize, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-  if(isRank0_)
+  if (isRank0_)
     ss = buffer.str();
   else
     ss.resize(bufferSize);
 
-  MPI_Bcast(&ss[0],ss.capacity(),MPI_CHAR,0,MPI_COMM_WORLD);
+  MPI_Bcast(&ss[0], ss.capacity(), MPI_CHAR, 0, MPI_COMM_WORLD);
   buffer.str(ss);
 
   // now, all procs can load the input file contents for subsequent parsing
-  if( !iparse_.Load(buffer) )
-    {
-      grvy_printf(GRVY_ERROR,"Unable to load runtime inputs from file -> %s\n",iFile_.c_str());
-      exit(ERROR);
-    }
+  if (!iparse_.Load(buffer)) {
+    grvy_printf(GRVY_ERROR, "Unable to load runtime inputs from file -> %s\n", iFile_.c_str());
+    exit(ERROR);
+  }
 
   // parse common inputs
-  getInput("solver/type",input_solver_type_,std::string("flow"));
+  getInput("solver/type", input_solver_type_, std::string("flow"));
 #ifdef _GPU_
-  getInput("gpu/numGpusPerRank",numGpusPerRank_,1);
+  getInput("gpu/numGpusPerRank", numGpusPerRank_, 1);
 #endif
 
   return;
@@ -225,10 +209,9 @@ void Tps::parseInput() {
 
 /// read an input value for keyword [name] and store in STL vector - error if value
 /// is not supplied
-template <typename T> void Tps::getRequiredInput(const char *name, T &var)
-{
-  if( !iparse_.Read_Var(name,&var) )
-  {
+template <typename T>
+void Tps::getRequiredInput(const char *name, T &var) {
+  if (!iparse_.Read_Var(name, &var)) {
     std::cout << "ERROR: Unable to read required input variable -> " << name << std::endl;
     exit(ERROR);
   }
@@ -237,61 +220,49 @@ template <typename T> void Tps::getRequiredInput(const char *name, T &var)
 
 /// read an input vector for keyword [name] and store in MFEM vector. The size of the vector
 /// is numElems
-void Tps::getRequiredVec(const char *name, Vector &vec, size_t numElems)
-{
-  if(vec.Size() < numElems)
-    vec.SetSize(numElems);
-  if( !iparse_.Read_Var_Vec(name,vec.HostWrite(),numElems) )
-    {
-      std::cout << "ERROR: Unable to read input vector -> " << name << std::endl;
-      exit(ERROR);
-    }
+void Tps::getRequiredVec(const char *name, Vector &vec, size_t numElems) {
+  if (vec.Size() < numElems) vec.SetSize(numElems);
+  if (!iparse_.Read_Var_Vec(name, vec.HostWrite(), numElems)) {
+    std::cout << "ERROR: Unable to read input vector -> " << name << std::endl;
+    exit(ERROR);
+  }
 }
 
 /// read the ith entry from an input vector for keyword [name].
-void Tps::getRequiredVecElem(const char *name, double &value, int ithElem)
-{
+void Tps::getRequiredVecElem(const char *name, double &value, int ithElem) {
 #if 1
-  if( !iparse_.Read_Var_iVec(name,&value,ithElem) )
-    {
-      grvy_printf(GRVY_ERROR,"Unable to read %ith element from input vector -> %s\n",ithElem,name);
-      exit(ERROR);
-    }
+  if (!iparse_.Read_Var_iVec(name, &value, ithElem)) {
+    grvy_printf(GRVY_ERROR, "Unable to read %ith element from input vector -> %s\n", ithElem, name);
+    exit(ERROR);
+  }
 #endif
 }
 
 /// read an input vector for keyword [name] and store in MFEM array. The size of the vector
 /// is numElems
-void Tps::getRequiredVec(const char *name, mfem::Array<double> &vec, size_t numElems)
-{
-  if(vec.Size() < numElems)
-    vec.SetSize(numElems);
-  if( !iparse_.Read_Var_Vec(name,vec.HostWrite(),numElems) )
-    {
-      std::cout << "ERROR: Unable to read input vector -> " << name << std::endl;
-      exit(ERROR);
-    }
+void Tps::getRequiredVec(const char *name, mfem::Array<double> &vec, size_t numElems) {
+  if (vec.Size() < numElems) vec.SetSize(numElems);
+  if (!iparse_.Read_Var_Vec(name, vec.HostWrite(), numElems)) {
+    std::cout << "ERROR: Unable to read input vector -> " << name << std::endl;
+    exit(ERROR);
+  }
 }
 
 /// read an input vector for keyword [name] and store in vec. The size of the vector
 /// is numElems
-void Tps::getRequiredVec(const char *name, std::vector<double> &vec, size_t numElems)
-{
-  if(vec.size() < numElems)
-    vec.reserve(numElems);
-  if( !iparse_.Read_Var_Vec(name,vec.data(),numElems) )
-    {
-      std::cout << "ERROR: Unable to read input vector -> " << name << std::endl;
-      exit(ERROR);
-    }
+void Tps::getRequiredVec(const char *name, std::vector<double> &vec, size_t numElems) {
+  if (vec.size() < numElems) vec.reserve(numElems);
+  if (!iparse_.Read_Var_Vec(name, vec.data(), numElems)) {
+    std::cout << "ERROR: Unable to read input vector -> " << name << std::endl;
+    exit(ERROR);
+  }
 }
 
 /// read an input value for keyword [name] and store in var - use defaultValue if
 /// keyword not present
-template <typename T> void Tps::getInput(const char *name, T &var, T varDefault)
-{
-  if( !iparse_.Read_Var(name,&var,varDefault) )
-  {
+template <typename T>
+void Tps::getInput(const char *name, T &var, T varDefault) {
+  if (!iparse_.Read_Var(name, &var, varDefault)) {
     std::cout << "ERROR: Unable to read input variable -> " << name << std::endl;
     exit(ERROR);
   }
@@ -299,14 +270,14 @@ template <typename T> void Tps::getInput(const char *name, T &var, T varDefault)
 }
 
 // supported templates for getInput()
-template void Tps::getInput <int>         (const char *name,    int &var, int    varDefault);
-template void Tps::getInput <double>      (const char *name, double &var, double varDefault);
-template void Tps::getInput <std::string> (const char *name, std::string &var, std::string varDefault);
-template void Tps::getInput <bool>        (const char *name, bool &var, bool varDefault);
+template void Tps::getInput<int>(const char *name, int &var, int varDefault);
+template void Tps::getInput<double>(const char *name, double &var, double varDefault);
+template void Tps::getInput<std::string>(const char *name, std::string &var, std::string varDefault);
+template void Tps::getInput<bool>(const char *name, bool &var, bool varDefault);
 
 // supported templates for getRequiredInput()
-template void Tps::getRequiredInput <int>    (const char *name,    int &var);
-template void Tps::getRequiredInput <double> (const char *name, double &var);
-template void Tps::getRequiredInput <std::string> (const char *name, std::string &var);
+template void Tps::getRequiredInput<int>(const char *name, int &var);
+template void Tps::getRequiredInput<double>(const char *name, double &var);
+template void Tps::getRequiredInput<std::string>(const char *name, std::string &var);
 
-} // end namespace TPS
+}  // end namespace TPS

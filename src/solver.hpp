@@ -40,20 +40,25 @@ namespace TPS {
 
 // Base class shared by all solver implementations
 class Solver {
-
  private:
   std::string name_;
   std::string description_;
 
  public:
   // methods to be (optionally) implemented by derived solver classes
-  virtual int  getStatus(){return NORMAL;}
-  virtual void initialize(){return;}
-  // methods *required* to be implemented by derived solver classes  
-  virtual void parseSolverOptions(){cout << "ERROR: " << __func__ << " remains unimplemented" << endl; exit(1);}  
-  virtual void solve(){cout << "ERROR: " << __func__ << " remains unimplemented" << endl; exit(1); }
+  virtual int getStatus() { return NORMAL; }
+  virtual void initialize() { return; }
+  // methods *required* to be implemented by derived solver classes
+  virtual void parseSolverOptions() {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+  }
+  virtual void solve() {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+  }
 };
 
-} // end namespace TPS
+}  // end namespace TPS
 
 #endif  // SOLVER_HPP_

@@ -58,10 +58,8 @@ class ElectromagneticOptions {
   double yinterp_min;  /**< Begin value for uniformly spaced points */
   double yinterp_max;  /**< End value for uniformly spaced points */
 
-  ElectromagneticOptions(){};
-  void AddElectromagneticOptions(mfem::OptionsParser &args) {
-
-  }
+  ElectromagneticOptions() {}
+  void AddElectromagneticOptions(mfem::OptionsParser &args) {}
 
   void print(std::ostream &out) {
     out << std::endl;
