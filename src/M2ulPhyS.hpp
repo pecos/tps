@@ -68,6 +68,7 @@ class Tps;
 #include "riemann_solver.hpp"
 #include "run_configuration.hpp"
 #include "sbp_integrators.hpp"
+#include "solver.hpp"
 #include "tps.hpp"
 #include "utils.hpp"
 
