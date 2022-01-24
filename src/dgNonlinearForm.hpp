@@ -75,6 +75,9 @@ class DGNonLinearForm : public ParNonlinearForm {
   
   Vector uk_el1, grad_upk_el1;
   Vector uk_el2, grad_upk_el2;
+  
+  Vector shared_uk_el1, shared_grad_upk_el1;
+  Vector shared_uk_el2, shared_grad_upk_el2;
 
  public:
   DGNonLinearForm(Fluxes *_flux, ParFiniteElementSpace *f, ParFiniteElementSpace *gradFes, ParGridFunction *_gradUp,
@@ -85,11 +88,7 @@ class DGNonLinearForm : public ParNonlinearForm {
   void Mult(const Vector &x, Vector &y);
 
   void setParallelData(parallelFacesIntegrationArrays *_parallelData, dataTransferArrays *_transferU,
-                       dataTransferArrays *_transferGradUp) {
-    parallelData = _parallelData;
-    transferU = _transferU;
-    transferGradUp = _transferGradUp;
-  }
+                       dataTransferArrays *_transferGradUp);
 
   static void faceIntegration_gpu(Vector &y, 
                                   Vector &uk_el1,
@@ -104,7 +103,12 @@ class DGNonLinearForm : public ParNonlinearForm {
                                   const int &maxDofs);
 
   static void sharedFaceIntegration_gpu(const Vector &x, const Vector &faceU, const ParGridFunction *gradUp,
-                                        const Vector &faceGradUp, Vector &y, const int &Ndofs, const int &dim,
+                                        const Vector &faceGradUp, Vector &y, 
+                                        Vector &shared_uk_el1,
+                                        Vector &shared_uk_el2,
+                                        Vector &shared_grad_upk_el1,
+                                        Vector &shared_grad_upk_el2,
+                                        const int &Ndofs, const int &dim,
                                         const int &num_equation, GasMixture *mixture, Fluxes *flux,
                                         const volumeFaceIntegrationArrays &gpuArrays,
                                         const parallelFacesIntegrationArrays *parallelData, const int &maxIntPoints,
@@ -131,6 +135,17 @@ class DGNonLinearForm : public ParNonlinearForm {
                                           const volumeFaceIntegrationArrays &gpuArrays, 
                                           const int &maxIntPoints,
                                           const int &maxDofs);
+  static void sharedFaceInterpolation_gpu(const Vector &x, const Vector &faceU, const ParGridFunction *gradUp,
+                                        const Vector &faceGradUp, 
+                                        Vector &shared_uk_el1,
+                                        Vector &shared_uk_el2,
+                                        Vector &shared_grad_upk_el1,
+                                        Vector &shared_grad_upk_el2,
+                                        const int &Ndofs, const int &dim,
+                                        const int &num_equation, GasMixture *mixture,
+                                        const volumeFaceIntegrationArrays &gpuArrays,
+                                        const parallelFacesIntegrationArrays *parallelData, const int &maxIntPoints,
+                                        const int &maxDofs);
 
 #ifdef _GPU_
   void Mult_domain(const Vector &x, Vector &y);
