@@ -152,14 +152,19 @@ void Fluxes::ComputeSplitFlux(const mfem::Vector &state, mfem::DenseMatrix &a_ma
   }
 }
 
-void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const double &gamma, const int &dof,
+void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, 
+                                  const Equations &eqSystem, GasMixture *mixture, 
+                                  const int &dof,
                                   const int &dim, const int &num_equation) {
 #ifdef _GPU_
   auto dataIn = x.Read();
   auto d_flux = flux.ReadWrite();
+  
+  double gamma = mixture->GetSpecificHeatRatio();
+  double Sc = mixture->GetSchmidtNum();
 
   MFEM_FORALL_2D(n, dof, num_equation, 1, 1, {
-    MFEM_SHARED double Un[5];
+    MFEM_SHARED double Un[20];
     MFEM_SHARED double KE[3];
     MFEM_SHARED double p;
 
@@ -173,7 +178,8 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const doub
 
       if (eq == 0) p = DryAir::pressure(&Un[0], &KE[0], gamma, dim, num_equation);
       MFEM_SYNC_THREAD;
-
+        
+        
       double temp;
       for (int d = 0; d < dim; d++) {
         if (eq == 0) d_flux[n + d * dof + eq * dof * dim] = Un[1 + d];
@@ -182,9 +188,12 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const doub
           if (eq - 1 == d) temp += p;
           d_flux[n + d * dof + eq * dof * dim] = temp;
         }
-        if (eq == num_equation - 1) {
-          d_flux[n + d * dof + eq * dof * dim] = Un[1 + d] * (Un[num_equation - 1] + p) / Un[0];
+        if (eq == 1+dim ) {
+          d_flux[n + d * dof + eq * dof * dim] = Un[1 + d] * (Un[1 + dim] + p) / Un[0];
         }
+        
+        if( eq == num_equation -1 )
+          d_flux[n + d * dof + eq * dof * dim] = Un[num_equation - 1] * Un[1 + d] / Un[0];
       }
     }  // end MFEM_FOREACH_THREAD
   });  // end MFEM_FORALL_WD

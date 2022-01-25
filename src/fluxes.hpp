@@ -75,7 +75,9 @@ class Fluxes {
   void ComputeSplitFlux(const Vector &state, DenseMatrix &a_mat, DenseMatrix &c_mat);
 
   // GPU functions
-  static void convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const double &gamma, const int &dof,
+  static void convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, 
+                                   const Equations &eqSystem, GasMixture *mixture,
+                                   const int &dof,
                                    const int &dim, const int &num_equation);
   static void viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTensor &flux, 
                                 const Equations &eqSystem, GasMixture *mixture,
