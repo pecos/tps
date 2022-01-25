@@ -52,6 +52,7 @@ class BoundaryCondition {
   IntegrationRules *intRules;
   double &dt;
   const int dim;
+  const int nvel;
   const int num_equation;
   const int patchNumber;
   const double refLength;

@@ -37,6 +37,11 @@ ForcingTerms::ForcingTerms(const int &_dim, const int &_num_equation, const int 
                            IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
                            ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &_gpuArrays)
     : dim(_dim),
+#ifdef AXISYM_DEV
+      nvel(3), // once ready for swirl, switch to nvel(3)
+#else
+      nvel(_dim),
+#endif
       num_equation(_num_equation),
       order(_order),
       intRuleType(_intRuleType),
@@ -137,13 +142,14 @@ void ConstantPressureGradient::updateTerms(Vector &in) {
     Array<int> nodes;
     vfes->GetElementVDofs(el, nodes);
 
-    Vector vel(dim), primi(num_equation);
+    Vector vel(nvel), primi(num_equation);
     for (int n = 0; n < dof_elem; n++) {
       int index = nodes[n];
       for (int eq = 0; eq < num_equation; eq++) primi[eq] = dataUp[index + eq * dof];
       double p = mixture->ComputePressureFromPrimitives(primi);
       double grad_pV = 0.;
 
+      // stays dim, not nvel, b/c no pressure gradient in theta direction
       for (int d = 0; d < dim; d++) {
         vel[d] = dataUp[index + (d + 1) * dof];
         data[index + (d + 1) * dof] -= pressGrad[d];
@@ -151,7 +157,7 @@ void ConstantPressureGradient::updateTerms(Vector &in) {
         grad_pV -= p * dataGradUp[index + (d + 1) * dof + d * dof * num_equation];
       }
 
-      data[index + (1 + dim) * dof] += grad_pV;
+      data[index + (1 + nvel) * dof] += grad_pV;
     }
   }
 #endif
@@ -231,6 +237,7 @@ AxisymmetricSource::AxisymmetricSource(const int &_dim, const int &_num_equation
 void AxisymmetricSource::updateTerms(Vector &in) {
   // make sure we are in a 2D case (otherwise can't be axisymmetric)
   assert(dim == 2);
+  assert(nvel == 3);
 
   int numElem = vfes->GetNE();
   int dof = vfes->GetNDofs();
@@ -311,7 +318,7 @@ void AxisymmetricSource::updateTerms(Vector &in) {
       const double radius = x[0];
       // TODO: Will have to change once PR #90 is merged
       // TODO: Indexing will have to change for swirl case
-      const double pressure = dataUp[index + (1+dim)*dof];
+      const double pressure = dataUp[index + (1+nvel)*dof];
 
       double tau_tt;
       if (eqSystem == EULER) {

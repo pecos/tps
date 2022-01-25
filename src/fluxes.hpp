@@ -53,6 +53,7 @@ class Fluxes {
   Equations &eqSystem;
 
   const int &dim;
+  int nvel;
 
   const int &num_equations;
   double Rg;

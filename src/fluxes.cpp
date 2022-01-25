@@ -33,6 +33,15 @@
 
 Fluxes::Fluxes(GasMixture *_mixture, Equations &_eqSystem, const int &_num_equations, const int &_dim)
     : mixture(_mixture), eqSystem(_eqSystem), dim(_dim), num_equations(_num_equations) {
+=======
+Fluxes::Fluxes(EquationOfState *_eqState, Equations &_eqSystem, const int &_num_equations, const int &_dim)
+    : mixture(_mixture), eqSystem(_eqSystem), dim(_dim),
+#ifdef AXISYM_DEV
+      nvel(3), // once ready for swirl, switch to nvel(3)
+#else
+      nvel(_dim),
+#endif
+      num_equations(_num_equations) {
   gradT.SetSize(dim);
   vel.SetSize(dim);
   vtmp.SetSize(dim);
@@ -64,17 +73,18 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
 
   for (int d = 0; d < dim; d++) {
     flux(0, d) = state(d + 1);
-    for (int i = 0; i < dim; i++) {
+    for (int i = 0; i < nvel; i++) {
       flux(1 + i, d) = state(i + 1) * state(d + 1) / state[0];
     }
     flux(1 + d, d) += pres;
   }
 
-  const double H = (state[1 + dim] + pres) / state[0];
+  const double H = (state[1 + nvel] + pres) / state[0];
   for (int d = 0; d < dim; d++) {
-    flux(1 + dim, d) = state(d + 1) * H;
+    flux(1 + nvel, d) = state(d + 1) * H;
   }
 
+  // TODO: Support scalars
   if (eqSystem == NS_PASSIVE) {
     for (int d = 0; d < dim; d++) flux(num_equations - 1, d) = state(num_equations - 1) * state(1 + d) / state(0);
   }
@@ -88,8 +98,6 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   switch (eqSystem) {
     case NS:
     case NS_PASSIVE: {
-      //       const double p = mixture->ComputePressure(state);
-      //       const double temp = p / state[0] / Rg;
       const double visc = mixture->GetViscosity(state);
       const double bulkViscMult = mixture->GetBulkViscMultiplyer();
       const double k = mixture->GetThermalConductivity(state);
@@ -117,15 +125,20 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
       for (int i = 0; i < dim; i++)
         for (int j = 0; j < dim; j++) flux(1 + i, j) = stress(i, j);
 
+      // TODO(AXI): Set flux(1+2,j) to \tau_{\theta, j} for axisymmetric
+
       // temperature gradient
       //       for (int d = 0; d < dim; d++) gradT[d] = temp * (gradUp(1 + dim, d) / p - gradUp(0, d) / state[0]);
 
       for (int d = 0; d < dim; d++) vel(d) = state[1 + d] / state[0];
 
       stress.Mult(vel, vtmp);
+
+      // TODO(AXI): Add u_{\theta}*\tau_{\theta,j} to vtmp[j] for axisymmetric
+
       for (int d = 0; d < dim; d++) {
-        flux(1 + dim, d) += vtmp[d];
-        flux(1 + dim, d) += k * gradUp(1 + dim, d);
+        flux(1 + nvel, d) += vtmp[d];
+        flux(1 + nvel, d) += k * gradUp(1 + nvel, d);
       }
 
       if (eqSystem == NS_PASSIVE) {

@@ -98,6 +98,7 @@ class M2ulPhyS : public TPS::Solver {
 
   // Number of simensions
   int dim;
+  int nvel;
 
   // Number of equations
   int num_equation;
@@ -205,7 +206,7 @@ class M2ulPhyS : public TPS::Solver {
   ParGridFunction *Up;
 
   // Visualization functions (these are pointers to Up)
-  ParGridFunction *temperature, *dens, *vel, *passiveScalar;
+  ParGridFunction *temperature, *dens, *vel, *vtheta, *passiveScalar;
   ParGridFunction *press;
 
   // gradient of primitive variables

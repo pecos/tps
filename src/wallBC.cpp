@@ -123,7 +123,11 @@ void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradSt
 #endif
       break;
     case VISC_ISOTH:
+#ifdef AXISYM_DEV
+      computeIsothermalWallFlux(normal, stateIn, gradState, bdrFlux, radius);
+#else
       computeIsothermalWallFlux(normal, stateIn, gradState, bdrFlux);
+#endif
       break;
   }
 }
@@ -145,8 +149,8 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn,  DenseMatrix &g
 #else
 void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
 #endif
-  Vector vel(dim);
-  for (int d = 0; d < dim; d++) vel[d] = stateIn[1 + d] / stateIn[0];
+  Vector vel(nvel);
+  for (int d = 0; d < nvel; d++) vel[d] = stateIn[1 + d] / stateIn[0];
 
   double norm = 0.;
   for (int d = 0; d < dim; d++) norm += normal[d] * normal[d];
@@ -164,7 +168,8 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux
   stateMirror[1] = stateIn[0] * (vel[0] - 2. * vn * unitN[0]);
   stateMirror[2] = stateIn[0] * (vel[1] - 2. * vn * unitN[1]);
   if (dim == 3) stateMirror[3] = stateIn[0] * (vel[2] - 2. * vn * unitN[2]);
-  stateMirror[1 + dim] = stateIn[1 + dim];
+  if ((nvel == 3) && (dim == 2)) stateMirror[3] = stateIn[0] * vel[2];
+  stateMirror[1 + nvel] = stateIn[1 + nvel];
   if (eqSystem == NS_PASSIVE) stateMirror[num_equation - 1] = stateIn[num_equation - 1];
 
   rsolver->Eval(stateIn, stateMirror, normal, bdrFlux);
@@ -216,15 +221,20 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
 #else
 void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
 #endif
+<<<<<<< HEAD
   double p = mixture->ComputePressure(stateIn);
   double T = mixture->ComputeTemperature(stateIn);
 
   const double gamma = mixture->GetSpecificHeatRatio();
   const double Rg = mixture->GetGasConstant();
+=======
+  double p = eqState->ComputePressure(stateIn, nvel);
+  const double gamma = eqState->GetSpecificHeatRatio();
+>>>>>>> Make room for swirl velocity component (#89)
 
   Vector wallState = stateIn;
-  for (int d = 0; d < dim; d++) wallState[1 + d] = 0.;
-  wallState[1 + dim] = p / (gamma - 1.);
+  for (int d = 0; d < nvel; d++) wallState[1 + d] = 0.;
+  wallState[1 + nvel] = p / (gamma - 1.);
 
   // Normal convective flux
   rsolver->Eval(stateIn, wallState, normal, bdrFlux, true);
@@ -295,10 +305,10 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
 
   Vector wallState(num_equation);
   wallState[0] = stateIn[0];
-  for (int d = 0; d < dim; d++) wallState[1 + d] = 0.;
+  for (int d = 0; d < nvel; d++) wallState[1 + d] = 0.;
 
-  wallState[1 + dim] = mixture->GetGasConstant() / (gamma - 1.);  // Cv
-  wallState[1 + dim] *= stateIn[0] * wallTemp;
+  wallState[1 + nvel] = mixture->GetGasConstant() / (gamma - 1.);  // Cv
+  wallState[1 + nvel] *= stateIn[0] * wallTemp;
 
   if (eqSystem == NS_PASSIVE) wallState[num_equation - 1] = stateIn[num_equation - 1];
 

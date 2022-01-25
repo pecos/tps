@@ -46,6 +46,11 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
     : TimeDependentOperator(_A->Height()),
       iter(_iter),
       dim(_dim),
+#ifdef AXISYM_DEV
+      nvel(3), // once ready for swirl, switch to nvel(3)
+#else
+      nvel(_dim),
+#endif
       eqSystem(_eqSystem),
       max_char_speed(_max_char_speed),
       num_equation(_num_equations),

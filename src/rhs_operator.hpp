@@ -58,6 +58,7 @@ class RHSoperator : public TimeDependentOperator {
   int &iter;
 
   const int dim;
+  const int nvel;
 
   const Equations &eqSystem;
 

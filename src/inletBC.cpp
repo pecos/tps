@@ -68,8 +68,8 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
   hmeanUp[0] = 1.2;
   hmeanUp[1] = 60;
   hmeanUp[2] = 0;
-  if (dim == 3) hmeanUp[3] = 0.;
-  hmeanUp[1 + dim] = 101300;
+  if (nvel == 3) hmeanUp[3] = 0.;
+  hmeanUp[1 + nvel] = 101300;
   if (eqSystem == NS_PASSIVE) hmeanUp[num_equation - 1] = 0.;
 
   Array<double> coords;
@@ -515,14 +515,6 @@ void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
     for (int i = 0; i < totNbdr; i++) {
       for (int eq = 0; eq < num_equation; eq++) iUp[eq] = boundaryU[eq + i * num_equation];
       mixture->GetConservativesFromPrimitives(iUp, iState);
-      //       double gamma = mixture->GetSpecificHeatRatio();
-      //       double k = 0.;
-      //       for (int d = 0; d < dim; d++) k += iState[1 + d] * iState[1 + d];
-      //       double rE = iState[1 + dim] / (gamma - 1.) + 0.5 * iState[0] * k;
-      //
-      //       for (int d = 0; d < dim; d++) iState[1 + d] *= iState[0];
-      //       iState[1 + dim] = rE;
-      //       if (eqSystem == NS_PASSIVE) iState[num_equation - 1] *= iState[0];
 
       for (int eq = 0; eq < num_equation; eq++) boundaryU[eq + i * num_equation] = iState[eq];
     }
@@ -556,7 +548,7 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   }
 
   // mean velocity in inlet normal and tangent directions
-  Vector meanVel(dim);
+  Vector meanVel(nvel);
   meanVel = 0.;
   for (int d = 0; d < dim; d++) {
     meanVel[0] += unitNorm[d] * meanUp[d + 1];
@@ -570,8 +562,8 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   }
 
   // velocity difference between actual and desired values
-  Vector meanDV(dim);
-  for (int d = 0; d < dim; d++) meanDV[d] = meanUp[1 + d] - inputState[1 + d];
+  Vector meanDV(nvel);
+  for (int d = 0; d < nvel; d++) meanDV[d] = meanUp[1 + d] - inputState[1 + d];
 
   // normal gradients
   Vector normGrad(num_equation);
@@ -584,14 +576,22 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
 
   const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
 
+<<<<<<< HEAD
+=======
+  const double speedSound = sqrt(gamma * meanUp[1 + nvel] / meanUp[0]);
+>>>>>>> Make room for swirl velocity component (#89)
   double meanK = 0.;
-  for (int d = 0; d < dim; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
+  for (int d = 0; d < nvel; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
   meanK *= 0.5;
 
   // compute outgoing characteristic
   double L1 = 0.;
   for (int d = 0; d < dim; d++) L1 += unitNorm[d] * normGrad[1 + d];  // dVn/dn
+<<<<<<< HEAD
   L1 = dpdn - meanUp[0] * speedSound * L1;
+=======
+  L1 = normGrad[1 + nvel] - meanUp[0] * speedSound * L1;
+>>>>>>> Make room for swirl velocity component (#89)
   L1 *= meanVel[0] - speedSound;
 
   // estimate ingoing characteristic
@@ -625,11 +625,11 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   bdrFlux[0] = d1;
   bdrFlux[1] = meanVel[0] * d1 + meanUp[0] * d2;
   bdrFlux[2] = meanVel[1] * d1 + meanUp[0] * d3;
-  if (dim == 3) bdrFlux[3] = meanVel[2] * d1 + meanUp[0] * d4;
-  bdrFlux[1 + dim] = meanUp[0] * meanVel[0] * d2;
-  bdrFlux[1 + dim] += meanUp[0] * meanVel[1] * d3;
-  if (dim == 3) bdrFlux[1 + dim] += meanUp[0] * meanVel[2] * d4;
-  bdrFlux[1 + dim] += meanK * d1 + d5 / (gamma - 1.);
+  if (nvel == 3) bdrFlux[3] = meanVel[2] * d1 + meanUp[0] * d4;
+  bdrFlux[1 + nvel] = meanUp[0] * meanVel[0] * d2;
+  bdrFlux[1 + nvel] += meanUp[0] * meanVel[1] * d3;
+  if (nvel == 3) bdrFlux[1 + dim] += meanUp[0] * meanVel[2] * d4;
+  bdrFlux[1 + nvel] += meanK * d1 + d5 / (gamma - 1.);
 
   // flux gradients in other directions
   //   Vector fluxY(num_equation);
@@ -661,7 +661,7 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   for (int eq = 0; eq < num_equation; eq++) state2[eq] = boundaryU[eq + bdrN * num_equation];
 
   Vector stateN = state2;
-  for (int d = 0; d < dim; d++) stateN[1 + d] = 0.;
+  for (int d = 0; d < nvel; d++) stateN[1 + d] = 0.;
   for (int d = 0; d < dim; d++) {
     stateN[1] += state2[1 + d] * unitNorm[d];
     stateN[2] += state2[1 + d] * tangent1[d];
@@ -696,17 +696,22 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
 }
 
 void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
+<<<<<<< HEAD
   const double gamma = mixture->GetSpecificHeatRatio();
   const double p = mixture->ComputePressure(stateIn);
+=======
+  const double gamma = eqState->GetSpecificHeatRatio();
+  const double p = eqState->ComputePressure(stateIn, nvel);
+>>>>>>> Make room for swirl velocity component (#89)
 
   Vector state2(num_equation);
   state2[0] = inputState[0];
   state2[1] = inputState[0] * inputState[1];
   state2[2] = inputState[0] * inputState[2];
-  if (dim == 3) state2[3] = inputState[0] * inputState[3];
+  if (nvel == 3) state2[3] = inputState[0] * inputState[3];
   double k = 0.;
-  for (int d = 0; d < dim; d++) k += state2[1 + d] * state2[1 + d];
-  state2[1 + dim] = p / (gamma - 1.) + 0.5 * k / state2[0];
+  for (int d = 0; d < nvel; d++) k += state2[1 + d] * state2[1 + d];
+  state2[1 + nvel] = p / (gamma - 1.) + 0.5 * k / state2[0];
 
   if (eqSystem == NS_PASSIVE) state2[num_equation - 1] = 0.;
 

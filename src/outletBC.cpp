@@ -64,8 +64,8 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
   hmeanUp[0] = 1.2;
   hmeanUp[1] = 60;
   hmeanUp[2] = 0;
-  if (dim == 3) hmeanUp[3] = 0.;
-  hmeanUp[1 + dim] = 300;
+  if (nvel == 3) hmeanUp[3] = 0.;
+  hmeanUp[1 + nvel] = 101300;
   if (eqSystem == NS_PASSIVE) hmeanUp[num_equation - 1] = 0.;
 
   area = 0.;
@@ -532,6 +532,7 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
     auto hboundaryU = boundaryU.HostReadWrite();
     Vector iState(num_equation), iUp(num_equation);
     for (int i = 0; i < totNbdr; i++) {
+<<<<<<< HEAD
       for (int eq = 0; eq < num_equation; eq++) iUp[eq] = hboundaryU[eq + i * num_equation];
       mixture->GetConservativesFromPrimitives(iUp, iState);
       //       double gamma = mixture->GetSpecificHeatRatio();
@@ -542,6 +543,18 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
       //       for (int d = 0; d < dim; d++) iState[1 + d] *= iState[0];
       //       iState[1 + dim] = rE;
       //       if (eqSystem == NS_PASSIVE) iState[num_equation - 1] *= iState[0];
+=======
+      Vector iState(num_equation);
+      for (int eq = 0; eq < num_equation; eq++) iState[eq] = hboundaryU[eq + i * num_equation];
+      double gamma = eqState->GetSpecificHeatRatio();
+      double k = 0.;
+      for (int d = 0; d < nvel; d++) k += iState[1 + d] * iState[1 + d];
+      double rE = iState[1 + nvel] / (gamma - 1.) + 0.5 * iState[0] * k;
+
+      for (int d = 0; d < nvel; d++) iState[1 + d] *= iState[0];
+      iState[1 + nvel] = rE;
+      if (eqSystem == NS_PASSIVE) iState[num_equation - 1] *= iState[0];
+>>>>>>> Make room for swirl velocity component (#89)
 
       for (int eq = 0; eq < num_equation; eq++) hboundaryU[eq + i * num_equation] = iState[eq];
     }
@@ -725,8 +738,8 @@ void OutletBC::subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vecto
   Vector state2(num_equation);
   state2 = stateIn;
   double k = 0.;
-  for (int d = 0; d < dim; d++) k += stateIn[1 + d] * stateIn[1 + d];
-  state2[1 + dim] = inputState[0] / (gamma - 1.) + 0.5 * k / stateIn[0];
+  for (int d = 0; d < nvel; d++) k += stateIn[1 + d] * stateIn[1 + d];
+  state2[1 + nvel] = inputState[0] / (gamma - 1.) + 0.5 * k / stateIn[0];
 
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }

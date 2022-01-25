@@ -54,6 +54,7 @@ class ForcingTerms {
   double time;
 
   const int &dim;
+  const int nvel;
   const int &num_equation;
   const int &order;
   const int &intRuleType;
