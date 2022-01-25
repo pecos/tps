@@ -585,6 +585,7 @@ void Gradients::multInverse_gpu(const int numElems, const int offsetElems, const
           }
           d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs] = temp;
         }
+        MFEM_SYNC_THREAD;
       }
 }
 });

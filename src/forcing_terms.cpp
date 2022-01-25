@@ -382,15 +382,15 @@ PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const in
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays),
     mixture(_mixture){
   
-  psData.DeleteAll();
-  for(int i=0;i<_config.GetPassiveScalarData().Size();i++) psData.Append( new passiveScalarData );
+  psData_.DeleteAll();
+  for(int i=0;i<_config.GetPassiveScalarData().Size();i++) psData_.Append( new passiveScalarData );
   
-  for (int i = 0; i < psData.Size(); i++) {
-    psData[i]->coords.SetSize(3);
-    for (int d = 0; d < 3; d++) psData[i]->coords[d] = _config.GetPassiveScalarData(i)->coords[d];
-    psData[i]->radius = _config.GetPassiveScalarData(i)->radius;
-    psData[i]->value = _config.GetPassiveScalarData(i)->value;
-    psData[i]->nodes.DeleteAll();
+  for (int i = 0; i < psData_.Size(); i++) {
+    psData_[i]->coords.SetSize(3);
+    for (int d = 0; d < 3; d++) psData_[i]->coords[d] = _config.GetPassiveScalarData(i)->coords[d];
+    psData_[i]->radius = _config.GetPassiveScalarData(i)->radius;
+    psData_[i]->value = _config.GetPassiveScalarData(i)->value;
+    psData_[i]->nodes.DeleteAll();
   }
 
   // find nodes for each passive scalar location
@@ -400,9 +400,9 @@ PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const in
 
   int nnodes = vfes->GetNDofs();
 
-  for (int i = 0; i < psData.Size(); i++) {
+  for (int i = 0; i < psData_.Size(); i++) {
     Vector x0(dim);
-    for (int d = 0; d < dim; d++) x0[d] = psData[i]->coords[d];
+    for (int d = 0; d < dim; d++) x0[d] = psData_[i]->coords[d];
 
     std::vector<int> list;
     list.clear();
@@ -414,24 +414,24 @@ PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const in
       double dist = 0.;
       for (int d = 0; d < dim; d++) dist += (y[d] - x0[d]) * (y[d] - x0[d]);
       dist = sqrt(dist);
-      if (dist < psData[i]->radius) list.push_back(n);
+      if (dist < psData_[i]->radius) list.push_back(n);
     }
 
-    psData[i]->nodes.SetSize(list.size());
-    for (int n = 0; n < list.size(); n++) psData[i]->nodes[n] = list[n];
+    psData_[i]->nodes.SetSize(list.size());
+    for (int n = 0; n < list.size(); n++) psData_[i]->nodes[n] = list[n];
   }
 }
 
 
 PassiveScalar::~PassiveScalar()
 {
-  for(int i=0; i<psData.Size();i++) delete psData[i];
+  for(int i=0; i<psData_.Size();i++) delete psData_[i];
 }
 
 
 void PassiveScalar::updateTerms(Vector &in) {
 #ifdef _GPU_
-  updateTerms_gpu(in,Up,psData,vfes->GetNDofs(),num_equation );
+  updateTerms_gpu(in,Up,psData_,vfes->GetNDofs(),num_equation );
 #else
   auto dataUp = Up->HostRead();
   auto dataIn = in.HostReadWrite();
@@ -439,15 +439,15 @@ void PassiveScalar::updateTerms(Vector &in) {
 
   double Z = 0.;
 
-  for (int i = 0; i < psData.Size(); i++) {
-    Z = psData[i]->value;
-    for (int n = 0; n < psData[i]->nodes.Size(); n++) {
-      int node = psData[i]->nodes[n];
+  for (int i = 0; i < psData_.Size(); i++) {
+    Z = psData_[i]->value;
+    for (int n = 0; n < psData_[i]->nodes.Size(); n++) {
+      int node = psData_[i]->nodes[n];
       double vel = 0.;
       for (int d = 0; d < dim; d++) vel += dataUp[node + (1 + d) * nnode] * dataUp[node + (1 + d) * nnode];
       vel = sqrt(vel);
       dataIn[node + (num_equation-1) * nnode] -=
-          vel * (dataUp[node + (num_equation-1) * nnode] - dataUp[node] * Z) / psData[i]->radius;
+          vel * (dataUp[node + (num_equation-1) * nnode] - dataUp[node] * Z) / psData_[i]->radius;
     }
   }
 #endif

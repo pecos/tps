@@ -136,7 +136,7 @@ class PassiveScalar : public ForcingTerms {
  private:
   GasMixture *mixture;
 
-  Array<passiveScalarData *> psData;
+  Array<passiveScalarData *> psData_;
 
  public:
   PassiveScalar(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
