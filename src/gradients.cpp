@@ -559,7 +559,7 @@ void Gradients::multInverse_gpu(const int numElems, const int offsetElems, const
   MFEM_FORALL_2D(el, numElems, elDof, 1, 1, { // NOLINT
     MFEM_FOREACH_THREAD(i, x, elDof) { // NOLINT
       //
-      MFEM_SHARED double gradUpi[216 * 5 * 3];
+      MFEM_SHARED double gradUpi[216 * 3];
 
       const int eli       = el + offsetElems;
       const int offsetIDs = d_posDofIds[2 * eli];
@@ -567,22 +567,20 @@ void Gradients::multInverse_gpu(const int numElems, const int offsetElems, const
       const int indexi    = d_nodesIDs[offsetIDs + i];
 
       for (int eq = 0; eq < num_equation; eq++) {
-    for (int d = 0; d < dim; d++) {
-      // tmpGrad[i +eq*elDof + d*num_equation*elDof] = 0.;
-      gradUpi[i + eq * elDof + d * num_equation * elDof] =
-          d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs];
-    }
-      }
-      MFEM_SYNC_THREAD;
+        for (int d = 0; d < dim; d++) {
+          gradUpi[i + d * elDof ] =
+              d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs];
+        }
+      
+        MFEM_SYNC_THREAD;
 
-      for (int eq = 0; eq < num_equation; eq++) {
-    for (int d = 0; d < dim; d++) {
-      double temp = 0;
-      for (int n = 0; n < elDof; n++) {
-        temp += gradUpi[n + eq * elDof + d * num_equation * elDof] * d_invMArray[offsetInv + i * elDof + n];
-      }
-      d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs] = temp;
-    }
+        for (int d = 0; d < dim; d++) {
+          double temp = 0;
+          for (int n = 0; n < elDof; n++) {
+            temp += gradUpi[n + d * elDof ] * d_invMArray[offsetInv + i * elDof + n];
+          }
+          d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs] = temp;
+        }
       }
 }
 });
