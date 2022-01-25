@@ -214,9 +214,9 @@ void Gradients::computeGradients_domain() {
                     *gradUp, 
                     num_equation, 
                     dim, 
-                    gpuArrays
+                    gpuArrays,
                     maxDofs, 
-                    maxIntPoints)
+                    maxIntPoints);
 
     computeGradients_gpu(h_numElems[elType], elemOffset, dof_el, vfes->GetNDofs(),
                          *Up,  // px,
@@ -259,7 +259,7 @@ void Gradients::computeGradients_gpu(const int numElems, const int offsetElems, 
 
   MFEM_FORALL_2D(el, numElems, elDof, 1, 1, {
     MFEM_FOREACH_THREAD(i, x, elDof) {
-      MFEM_SHARED double Ui[216 * 20], gradUpi[216 * 20 * 3];
+      MFEM_SHARED double Ui[216], gradUpi[216 * 3];
       MFEM_SHARED double l1[216], dl1[216];
 
       const int eli = el + offsetElems;
@@ -267,53 +267,40 @@ void Gradients::computeGradients_gpu(const int numElems, const int offsetElems, 
       const int offsetDShape = d_elemPosQ_shapeDshapeWJ[2 * eli   ];
       const int Q            = d_elemPosQ_shapeDshapeWJ[2 * eli + 1];
       const int indexi = d_nodesIDs[offsetIDs + i];
-
-      // fill out Ui and init gradUpi
-      for (int eq = 0; eq < num_equation; eq++) {
-        Ui[i + eq * elDof] = d_Up[indexi + eq * totalDofs];
+      
+      double gradUpk;
+      for(int eq=0;eq<num_equation;eq++){
+        Ui[i] = d_Up[indexi + eq * totalDofs];
         for (int d = 0; d < dim; d++) {
           // this loads face contribution
-          gradUpi[i + eq * elDof + d * num_equation * elDof] = 
+          gradUpi[i + d * elDof] = 
             d_gradUp[indexi+eq*totalDofs+d*num_equation*totalDofs];
         }
-      }
-      MFEM_SYNC_THREAD;
-
-      // volume integral contribution to gradient
-      double gradUpk[20];
-      for (int k = 0; k < Q; k++) {
-        for (int j = i; j < num_equation; j+=elDof) gradUpk[j] = 0.;
         MFEM_SYNC_THREAD;
-                 
-        const double weightDetJac = d_elemShapeDshapeWJ[offsetDShape + elDof + dim * elDof + k * ((dim + 1) * elDof + 1)];
-        l1[i] = d_elemShapeDshapeWJ[offsetDShape + i + k * ((dim + 1) * elDof + 1)];
         
-        for (int d = 0; d < dim; d++){
-          dl1[i] = d_elemShapeDshapeWJ[offsetDShape + elDof + i + d * elDof + k * ((dim + 1) * elDof + 1)];
-          MFEM_SYNC_THREAD;
+        for (int k = 0; k < Q; k++) {
+          const double weightDetJac = d_elemShapeDshapeWJ[offsetDShape + elDof + dim * elDof + k * ((dim + 1) * elDof + 1)];
+          l1[i] = d_elemShapeDshapeWJ[offsetDShape + i + k * ((dim + 1) * elDof + 1)];
           
-          for (int eq = 0; eq < num_equation; eq++) {
-            for (int j = 0; j < elDof; j++) gradUpk[eq] += dl1[j + d * elDof] * Ui[j + eq * elDof];
-          }
-          MFEM_SYNC_THREAD;
-          
-          // add integration point contribution
-          for (int eq = 0; eq < num_equation; eq++) {
-            gradUpi[i + eq * elDof + d * num_equation * elDof] += gradUpk[eq] * l1[i] * weightDetJac;
-          }
-          MFEM_SYNC_THREAD;
-          
-        } // end loop dimensions
-      } // end loop over integration points
+          for(int d=0;d<dim;d++){
+            gradUpk = 0.;
+            
+            dl1[i] = d_elemShapeDshapeWJ[offsetDShape + elDof + i + d * elDof + k * ((dim + 1) * elDof + 1)];
+            MFEM_SYNC_THREAD;
+            
+            for (int j = 0; j < elDof; j++) gradUpk += dl1[j] * Ui[j];
+            MFEM_SYNC_THREAD;
+            
+            gradUpi[i + d * elDof ] += gradUpk * l1[i] * weightDetJac;
+          } // end loop dimensions
+        } // end loop integration points
+        
+        // write to global memory
+        for(int d=0;d<dim;d++) 
+          d_gradUp[indexi+eq*totalDofs+d*num_equation*totalDofs] = gradUpi[i + d * elDof ];
+        MFEM_SYNC_THREAD;
+      } //end equation loop
 
-
-      // global memory
-      for (int eq = 0; eq < num_equation; eq++) {
-        for (int d = 0; d < dim; d++) {
-          d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs] +=
-              gradUpi[i + eq * elDof + d * num_equation * elDof];
-        }
-      }
 }
 });
 }
