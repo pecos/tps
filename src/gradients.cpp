@@ -482,15 +482,15 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up, const Vector &fa
       //
       MFEM_SHARED double Upi[216], Upj[216], Fcontrib[216 * 3];
       MFEM_SHARED double l1[216], l2[216];
-      MFEM_SHARED double meanUp[5], nor[3];
+      MFEM_SHARED double nor[3];
 
       const int el1      = d_sharedElemsFaces[0 + el * 7];
       const int numFaces = d_sharedElemsFaces[1 + el * 7];
       const int dof1     = d_sharedElem1Dof12Q[1 + d_sharedElemsFaces[2 + el * 7] * 4];
       const int offsetEl1 = d_posDofIds[2 * el1];
 
-      bool elemDataRecovered = false;
-      int indexi = d_nodesIDs[offsetEl1 + i];
+      int indexi;
+      if( i<dof1 ) indexi = d_nodesIDs[offsetEl1 + i];
       
       double up1, up2;
 
@@ -500,7 +500,7 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up, const Vector &fa
         const int Q = d_sharedElem1Dof12Q[3 + f * 4];
         
         for(int eq=0;eq<num_equation;eq++){
-          Upi[i] = d_up[indexi + eq * Ndofs];
+          if( i<dof1 ) Upi[i] = d_up[indexi + eq * Ndofs];
           if (i < dof2) {  // recover data from neighbor
             int index = d_sharedVdofs[i + eq * maxDofs + f * num_equation * maxDofs];
             Upj[i] = d_faceData[index];
