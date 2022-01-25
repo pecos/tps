@@ -527,6 +527,7 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up, const Vector &fa
               for (int n = 0; n < dof1; n++) up1 += Upi[n] * l1[n];
               for (int n = 0; n < dof2; n++) up2 += Upj[n] * l2[n];
             }
+            MFEM_SYNC_THREAD;
             
             // add contribution
             if (i < dof1) 
@@ -536,9 +537,12 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up, const Vector &fa
           } // end integration loop
           
           // save contribution to global memory
-          for(int d=0;d<dim;d++){
-            d_gradUp[indexi + eq * Ndofs + d * num_equation * Ndofs] += Fcontrib[i + d * dof1 ];
+          if( i<dof1 ){
+            for(int d=0;d<dim;d++){
+              d_gradUp[indexi + eq * Ndofs + d * num_equation * Ndofs] += Fcontrib[i + d * dof1 ];
+            }
           }
+          MFEM_SYNC_THREAD;
         } // end equation loop
       } // end face loop
 }
