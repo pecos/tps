@@ -83,6 +83,8 @@ class InletBC : public BoundaryCondition {
   void subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux);
 
   void subsonicNonReflectingDensityVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
+  
+  Vector interpolated_Ubdr;
 
   virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up);
 
@@ -111,16 +113,25 @@ class InletBC : public BoundaryCondition {
 
   static void integrateInlets_gpu(const InletType type, const Vector &inputState, const double &dt,
                                   Vector &y,  // output
-                                  const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+                                  const Vector &x, 
+                                  Vector &interpolated_Ubdr,
+                                  const Array<int> &nodesIDs, const Array<int> &posDofIds,
                                   ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                                   Array<int> &intPointsElIDBC, Array<int> &listElems, Array<int> &offsetsBoundaryU,
                                   const int &maxIntPoints, const int &maxDofs, const int &dim, const int &num_equation,
-                                  const double &gamma, const double &Rg);
+                                  GasMixture *mixture, Equations &eqSystem);
+  static void interpInlet_gpu(const InletType type, const Vector &inputState,
+                                  Vector &interpolated_Ubdr,
+                                  const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+                                  ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
+                                  Array<int> &intPointsElIDBC, Array<int> &listElems, Array<int> &offsetsBoundaryU,
+                                  const int &maxIntPoints, const int &maxDofs, const int &dim, const int &num_equation);
 
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void computeSubDenseVel(const int &thrd, const double *u1, double *u2, const double *nor,
                                                   const double *inputState, const double &gamma, const int &dim,
-                                                  const int &num_equation) {
+                                                  const int &num_equation, Equations &eqSystem) {
+    // assumes there at least as many threads as number of equations
     MFEM_SHARED double KE[3];
     MFEM_SHARED double p;
 
@@ -135,10 +146,13 @@ class InletBC : public BoundaryCondition {
     if (thrd == 1) u2[1] = inputState[0] * inputState[1];
     if (thrd == 2) u2[2] = inputState[0] * inputState[2];
     if (dim == 3 && thrd == 3) u2[3] = inputState[0] * inputState[3];
-    if (thrd == num_equation - 1) {
+    if (thrd == 1+dim) {
       double ke = 0.;
       for (int d = 0; d < dim; d++) ke += inputState[1 + d] * inputState[1 + d];
       u2[thrd] = p / (gamma - 1.) + 0.5 * inputState[0] * ke;
+    }
+    if(eqSystem==NS_PASSIVE && thrd==num_equation-1){
+      u2[thrd] = 0.;
     }
   }
 #endif
