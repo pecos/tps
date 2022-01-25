@@ -529,6 +529,13 @@ void InletBC::integrationBC(Vector &y,  // output
                             const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                             ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                             Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
+  interpInlet_gpu(inletType,inputState,
+                 interpolated_Ubdr,
+                 x, nodesIDs,posDofIds,
+                 Up, gradUp,shapesBC,normalsWBC,
+                 intPointsElIDBC, listElems, offsetsBoundaryU,
+                 maxIntPoints, maxDofs, dim, num_equation);
+  
   integrateInlets_gpu(inletType, inputState, dt,
                       y,  // output
                       x, 
