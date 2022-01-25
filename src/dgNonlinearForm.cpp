@@ -578,10 +578,10 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(
   const int *d_sharedElemsFaces = parallelData->sharedElemsFaces.Read();
   
   int maxNumElems = parallelData->sharedElemsFaces.Size()/7; // elements with shared faces
-  double *d_shared_uk1 = shared_uk_el1.Write();
-  double *d_shared_uk2 = shared_uk_el2.Write();
-  double *d_shared_gradUp1 = shared_grad_upk_el1.Write();
-  double *d_shared_gradUp2 = shared_grad_upk_el2.Write();
+  const double *d_shared_uk1 = shared_uk_el1.Read();
+  const double *d_shared_uk2 = shared_uk_el2.Read();
+  const double *d_shared_gradUp1 = shared_grad_upk_el1.Read();
+  const double *d_shared_gradUp2 = shared_grad_upk_el2.Read();
 
   MFEM_FORALL_2D(el, parallelData->sharedElemsFaces.Size() / 7, maxDofs, 1, 1, {
     MFEM_FOREACH_THREAD(i, x, maxDofs) {
