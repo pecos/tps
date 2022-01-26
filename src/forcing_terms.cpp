@@ -246,6 +246,54 @@ void AxisymmetricSource::updateTerms(Vector &in) {
   ParGridFunction coordsDof(&dfes);
   mesh->GetNodes(coordsDof);
 
+  // Commented out code below has the right structure if we want to
+  // add axisym source terms to rhs of weak form (as opposed to
+  // M^{-1}*rhs).  It is not entirely correct b/c the \tau_{\theta
+  // \theta} contribution is neglected, but this could be added if we
+  // switch to this formulation.  See comments at L348 of rhs_operator.cpp
+
+  // for (int el = 0; el < numElem; el++) {
+  //   const FiniteElement *elem = vfes->GetFE(el);
+  //   ElementTransformation *Tr = vfes->GetElementTransformation(el);
+  //   const int dof_elem = elem->GetDof();
+
+  //   // nodes of the element
+  //   Array<int> nodes;
+  //   vfes->GetElementVDofs(el, nodes);
+
+
+  //   const int order = elem->GetOrder();
+  //   //cout<<"order :"<<maxorder<<" dof: "<<dof_elem<<endl;
+  //   int intorder = 2*order;
+  //   //if(intRuleType==1 && trial_fe.GetGeomType()==Geometry::SQUARE) intorder--; // when Gauss-Lobatto
+  //   const IntegrationRule *ir = &intRules->Get(elem->GetGeomType(), intorder);
+  //   for (int k= 0; k< ir->GetNPoints(); k++)
+  //     {
+  //       const IntegrationPoint &ip = ir->IntPoint(k);
+
+  //       Vector shape(dof_elem);
+  //       elem->CalcShape(ip, shape);
+
+  //       double pressure = 0.0;
+  //       for (int k = 0; k < dof_elem; k++) pressure += dataUp[nodes[k] + (1+dim)*dof] * shape[k];
+
+  //       Tr->SetIntPoint(&ip);
+  //       shape *= Tr->Jacobian().Det()*ip.weight;
+
+  //       // get coordinates of integration point
+  //       double x[3];
+  //       Vector transip(x, 3);
+  //       Tr->Transform(ip,transip);
+
+  //       for (int j= 0;j<dof_elem;j++)
+  //         {
+  //           int i = nodes[j];
+  //           data[i + 1*dof] += pressure*shape[j];
+  //         }
+
+  //     }
+  // }
+
   for (int el = 0; el < numElem; el++) {
     const FiniteElement *elem = vfes->GetFE(el);
     ElementTransformation *Tr = vfes->GetElementTransformation(el);
@@ -301,10 +349,15 @@ void AxisymmetricSource::updateTerms(Vector &in) {
       // \int r * \phi * \phi dr dz is the mass matrix in cylindrical
       // coords
 
-      if (radius > 0)
+      if (radius > 0) {
         data[index + 1*dof] += (pressure - tau_tt)/radius;
+      } else {
+        double fake_radius = 1e-3;
+        data[index + 1*dof] += (pressure - tau_tt)/fake_radius;
+      }
     }
   }
+
 }
 
 

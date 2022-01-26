@@ -84,6 +84,9 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
 
   // Me_inv = new DenseMatrix[vfes->GetNE()];
   Me_inv.SetSize(vfes->GetNE());
+#ifdef AXISYM_DEV
+  Me_inv_norad.SetSize(vfes->GetNE());
+#endif
   posDofInvM.SetSize(2 * vfes->GetNE());
   auto hposDofInvM = posDofInvM.HostWrite();
 
@@ -105,7 +108,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
       new MASA_forcings(dim, num_equation, _order, intRuleType, intRules, vfes, Up, gradUp, gpuArrays, _config));
 #endif
 
-#if AXISYM_DEV
+#ifdef AXISYM_DEV
   forcing.Append(new AxisymmetricSource(dim, num_equation, _order,
                                         eqState, eqSystem,
                                         intRuleType, intRules,
@@ -129,12 +132,18 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
 
 // TODO: Replace #if based logic with input options for axisymmetric
 #ifdef AXISYM_DEV
+    DenseMatrix Me_norad(dof);
+    // DenseMatrixInverse inv(&Me);
+    Me_inv_norad[i] = new DenseMatrix(dof, dof);
+
     MassIntegrator mi(radius);
+    MassIntegrator mi_norad;
 #else
     MassIntegrator mi;
 #endif
 
     int integrationOrder = 2 * vfes->GetFE(i)->GetOrder();
+    //int integrationOrder = 2 * vfes->GetFE(i)->GetOrder() + 1;
     if (intRuleType == 1 && vfes->GetFE(i)->GetGeomType() == Geometry::SQUARE)
       integrationOrder--;  // when Gauss-Lobatto
     const IntegrationRule intRule = intRules->Get(vfes->GetFE(i)->GetGeomType(), integrationOrder);
@@ -148,6 +157,15 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
     Me.Invert();
     for (int n = 0; n < dof; n++)
       for (int j = 0; j < dof; j++) (*Me_inv[i])(n, j) = Me(n, j);
+
+#ifdef AXISYM_DEV
+    mi_norad.SetIntRule(&intRule);
+    mi_norad.AssembleElementMatrix(*(vfes->GetFE(i)), *(vfes->GetElementTransformation(i)), Me_norad);
+
+    Me_norad.Invert();
+    for (int n = 0; n < dof; n++)
+      for (int j = 0; j < dof; j++) (*Me_inv_norad[i])(n, j) = Me_norad(n, j);
+#endif
 
     hposDofInvM[2 * i] = temp.size();
     hposDofInvM[2 * i + 1] = dof;
@@ -174,8 +192,13 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
 #endif
 
   // create gradients object
+#ifdef AXISYM_DEV
+  gradients = new Gradients(vfes, gradUpfes, dim, num_equation, Up, gradUp, mixture, gradUp_A, intRules, intRuleType,
+                            gpuArrays, Me_inv_norad, invMArray, posDofInvM, maxIntPoints, maxDofs);
+#else
   gradients = new Gradients(vfes, gradUpfes, dim, num_equation, Up, gradUp, mixture, gradUp_A, intRules, intRuleType,
                             gpuArrays, Me_inv, invMArray, posDofInvM, maxIntPoints, maxDofs);
+#endif
   gradients->setParallelData(&parallelData, &transferUp);
 
   local_timeDerivatives.UseDevice(true);
@@ -256,7 +279,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
 }
 
 RHSoperator::~RHSoperator() {
-#if AXISYM_DEV
+#ifdef AXISYM_DEV
   delete coordsDof;
   delete dfes;
 #endif
@@ -322,6 +345,25 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
     RHSoperator::copyZk2Z_gpu(z, zk, eq, vfes->GetNDofs());
 #endif
   }
+
+#ifdef AXISYM_DEV
+  // It would be nice for the axisymmetric to add forcing here (i.e.,
+  // to add the contribution of the forcing to the rhs of the weak
+  // form and then mult by the inverse mass matrix below).  In
+  // particular, this avoids a 1/r in the calculation of the forcing,
+  // which eliminates any possibility of problems on the axis.  But,
+  // given the way all other forcing terms are evaluated currently, we
+  // don't do it that way.
+
+  // // add forcing terms
+  // for (int i = 0; i < forcing.Size(); i++) {
+  //   // NOTE: Do not use RHSoperator::time here b/c it is not correctly
+  //   // updated for each RK substep.  Instead, get time from parent
+  //   // class using TimeDependentOperator::GetTime().
+  //   forcing[i]->setTime(this->GetTime());
+  //   forcing[i]->updateTerms(z);
+  // }
+#endif
 
   // 3. Multiply element-wise by the inverse mass matrices.
 #ifdef _GPU_

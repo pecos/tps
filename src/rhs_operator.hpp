@@ -93,6 +93,9 @@ class RHSoperator : public TimeDependentOperator {
   linearlyVaryingVisc &linViscData;
 
   Array<DenseMatrix *> Me_inv;
+#ifdef AXISYM_DEV
+  Array<DenseMatrix *> Me_inv_norad;
+#endif
   Vector invMArray;
   Array<int> posDofInvM;
 

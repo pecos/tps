@@ -57,14 +57,24 @@ class WallBC : public BoundaryCondition {
   Array<int> wallElems;
   void buildWallElemsArray(const Array<int> &intPointsElIDBC);
 
+#ifdef AXISYM_DEV
+  void computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius=0);
+#else
   void computeINVwallFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux);
+#endif
+
 
 #ifdef AXISYM_DEV
   void computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius=0);
 #else
   void computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
 #endif
+
+#ifdef AXISYM_DEV
+  void computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius=0);
+#else
   void computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
+#endif
 
  public:
   WallBC(RiemannSolver *rsolver_, GasMixture *_mixture, Equations _eqSystem, Fluxes *_fluxClass,
