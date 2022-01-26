@@ -1074,8 +1074,10 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem,
         const int elOffset = d_posDofIds[2 * elID  ];
         const int elDof    = d_posDofIds[2 * elID + 1];
         int indexi;
-        if (i < elDof)
+        if (i < elDof){
           indexi = d_nodesIDs[elOffset + i];
+          for(int eq=0;eq<num_equation;eq++) Fcontrib[i+eq*elDof] = 0.;
+        }
 
         for (int q = 0; q < Q; q++) {  // loop over int. points
           if (i < elDof)

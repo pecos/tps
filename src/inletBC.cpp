@@ -759,8 +759,10 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
       const int elOffset = d_posDofIds[2 * elID  ];
       const int elDof    = d_posDofIds[2 * elID + 1];
       int indexi;
-      if (i < elDof)
+      if (i < elDof){
         indexi = d_nodesIDs[elOffset + i];
+        for(int eq=0;eq<num_equation;eq++) Fcontrib[i+eq*elDof] = 0.;
+      }
 
       for (int q = 0; q < Q; q++) {  // loop over int. points
         if (i < elDof) shape[i] = d_shapesBC[i + q * maxDofs + el * maxIntPoints * maxDofs];
