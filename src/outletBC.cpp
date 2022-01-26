@@ -108,6 +108,13 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
       }
     }
   }
+  
+  interpolated_Ubdr_.UseDevice(true);
+  interpolatedGradUpbdr_.UseDevice(true);;
+  interpolated_Ubdr_.SetSize(num_equation*maxIntPoints*listElems.Size());
+  interpolatedGradUpbdr_.SetSize(dim*num_equation*maxIntPoints*listElems.Size());
+  interpolated_Ubdr_ = 0.;
+  interpolatedGradUpbdr_ = 0.;
 
   boundaryU.UseDevice(true);
   boundaryU.SetSize(bdrN * num_equation);
@@ -342,7 +349,7 @@ void OutletBC::updateMean_gpu(ParGridFunction *Up, Vector &localMeanUp, const in
     //     double shape[maxDofs];
     // compiler does not allow to have maxDofs.
     // currently maxDofs = 64;
-    double elUp[5 * 216];
+    double elUp[20 * 216];
     double shape[216];
     double sum;
 
@@ -540,11 +547,18 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
 void OutletBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                              ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                              Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
-  integrateOutlets_gpu(outletType, inputState, dt,
+  interpOutlet_gpu(outletType,inputState,interpolated_Ubdr_,interpolatedGradUpbdr_,
+                   x,nodesIDs,posDofIds,Up, gradUp,shapesBC, normalsWBC,
+                   intPointsElIDBC, listElems, offsetsBoundaryU,
+                  maxIntPoints, maxDofs, dim, num_equation);
+  
+  integrateOutlets_gpu(outletType,eqSystem, inputState, dt,
                        y,  // output
-                       x, nodesIDs, posDofIds, Up, gradUp, meanUp, boundaryU, tangent1, tangent2, inverseNorm2cartesian,
+                       x, nodesIDs, posDofIds, Up, gradUp, meanUp, boundaryU, 
+                       interpolated_Ubdr_,interpolatedGradUpbdr_,
+                       tangent1, tangent2, inverseNorm2cartesian,
                        shapesBC, normalsWBC, intPointsElIDBC, listElems, offsetsBoundaryU, maxIntPoints, maxDofs, dim,
-                       num_equation, mixture->GetSpecificHeatRatio(), mixture->GetGasConstant(), refLength, area);
+                       num_equation, mixture, refLength, area);
 }
 
 void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
@@ -1002,13 +1016,16 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
-void OutletBC::integrateOutlets_gpu(const OutletType type, const Array<double> &inputState, const double &dt, Vector &y,
+void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem,
+                                    const Array<double> &inputState, const double &dt, Vector &y,
                                     const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                                     ParGridFunction *Up, ParGridFunction *gradUp, Vector &meanUp, Vector &boundaryU,
+                                    Vector &interpolated_Ubdr_,
+                                  Vector &interpolatedGradUpbdr_,
                                     Vector &tangent1, Vector &tangent2, Vector &inverseNorm2cartesian, Vector &shapesBC,
                                     Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
                                     Array<int> &offsetsBoundaryU, const int &maxIntPoints, const int &maxDofs,
-                                    const int &dim, const int &num_equation, const double &gamma, const double &Rg,
+                                    const int &dim, const int &num_equation, GasMixture *mixture,
                                     const double &refLength, const double &area) {
 #ifdef _GPU_
   const double *d_inputState = inputState.Read();
@@ -1031,13 +1048,19 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, const Array<double> &
 
   const int totDofs = x.Size() / num_equation;
   const int numBdrElem = listElems.Size();
+  
+  const double *d_interpUbdr = interpolated_Ubdr_.Read();
+  const double *d_interpGrads = interpolatedGradUpbdr_.Read();
+  
+  const double Rg = mixture->GetGasConstant();
+  const double gamma = mixture->GetSpecificHeatRatio();
 
   // clang-format off
   MFEM_FORALL_2D(n, numBdrElem, maxDofs, 1, 1, {
       MFEM_FOREACH_THREAD(i, x, maxDofs) {
-        MFEM_SHARED double Ui[216 * 5], Fcontrib[216 * 5], gradUpi[216 * 3 * 5];
+        MFEM_SHARED double Fcontrib[216 * 20];
         MFEM_SHARED double shape[216];
-        MFEM_SHARED double Rflux[5], u1[5], u2[5], gradUp[5 * 3], nor[3];
+        MFEM_SHARED double Rflux[20], u1[20], u2[20], gradUpi[20 * 3], nor[3];
         MFEM_SHARED double weight;
 
         const int el = d_listElems[n];
@@ -1052,18 +1075,6 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, const Array<double> &
         if (i < elDof)
           indexi = d_nodesIDs[elOffset + i];
 
-        // retreive data
-        for (int eq = 0; eq < num_equation; eq++) {
-          if (i < elDof) {
-            Ui[i + eq * elDof] = d_U[indexi + eq * totDofs];
-            for (int d = 0; d < dim; d++)
-              gradUpi[i + eq * elDof + d * num_equation * elDof] =
-                  d_gradUp[indexi + eq * totDofs + d * num_equation * totDofs];
-
-            Fcontrib[i + eq * elDof] = 0.;
-          }
-        }
-
         for (int q = 0; q < Q; q++) {  // loop over int. points
           if (i < elDof)
             shape[i] = d_shapesBC[i + q * maxDofs + el * maxIntPoints * maxDofs];
@@ -1075,16 +1086,12 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, const Array<double> &
             weight = d_normW[dim + q * (dim + 1) + el * maxIntPoints * (dim + 1)];
           MFEM_SYNC_THREAD;
 
-          // interpolate to int. point
+          // get interpolated data
           if (i < num_equation) {
-            u1[i] = 0.;
-            for (int d = 0; d < dim; d++) gradUp[i + d * num_equation] = 0.;
-
-            for (int k = 0; k < elDof; k++) {
-              u1[i] += Ui[k + i * elDof] * shape[k];
-              for (int d = 0; d < dim; d++)
-                gradUp[i + d * num_equation] += gradUpi[k + i * elDof + d * num_equation * elDof] * shape[k];
-            }
+            u1[i] = d_interpUbdr[i + q*num_equation +n*maxIntPoints*num_equation];
+            for(int d=0;d<dim;d++)
+              gradUpi[i +d*elDof] = 
+                d_interpGrads[i + d*num_equation +q*dim*num_equation + n*maxIntPoints*dim*num_equation];
           }
           MFEM_SYNC_THREAD;
 
@@ -1092,21 +1099,22 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, const Array<double> &
           switch (type) {
             case OutletType::SUB_P:
               if (i < num_equation)
-                computeSubPressure(i, &u1[0], &u2[0], &nor[0], d_inputState[0], gamma, dim, num_equation);
+                computeSubPressure(i, &u1[0], &u2[0], &nor[0], d_inputState[0], gamma, dim, num_equation,eqSystem);
               break;
             case OutletType::SUB_P_NR:
-              computeNRSubPress(i, offsetBdrU + q, &u1[0], &gradUp[0], d_meanUp, dt, &u2[0], d_boundaryU,
-                                &d_inputState[0], &nor[0], d_tang1, d_tang2, d_inv, refLength, gamma, elDof,
-                                dim, num_equation);
+              computeNRSubPress(i, offsetBdrU + q, &u1[0], &gradUpi[0], d_meanUp, dt, &u2[0], d_boundaryU,
+                                &d_inputState[0], &nor[0], d_tang1, d_tang2, d_inv, refLength, gamma,Rg, elDof,
+                                dim, num_equation,eqSystem);
               break;
             case OutletType::SUB_MF_NR:
-              computeNRSubMassFlow(i, offsetBdrU + q, &u1[0], &gradUp[0], d_meanUp, dt, &u2[0], d_boundaryU,
-                                   d_inputState, &nor[0], d_tang1, d_tang2, d_inv, refLength, area, gamma,
-                                   elDof, dim, num_equation);
+              computeNRSubMassFlow(i, offsetBdrU + q, &u1[0], &gradUpi[0], d_meanUp, dt, &u2[0], d_boundaryU,
+                                   d_inputState, &nor[0], d_tang1, d_tang2, d_inv, refLength, area, gamma,Rg,
+                                   elDof, dim, num_equation,eqSystem);
               break;
             case OutletType::SUB_MF_NR_PW:
-              computeNR_PW_SubMF(i, offsetBdrU + q, &u1[0], &gradUp[0], d_meanUp, dt, &u2[0], d_boundaryU, d_inputState,
-                                 &nor[0], d_tang1, d_tang2, d_inv, refLength, area, gamma, elDof, dim, num_equation);
+              computeNR_PW_SubMF(i, offsetBdrU + q, &u1[0], &gradUpi[0], d_meanUp, dt, &u2[0], d_boundaryU, d_inputState,
+                                 &nor[0], d_tang1, d_tang2, d_inv, refLength, area, gamma, Rg,
+                                 elDof, dim, num_equation,eqSystem);
               break;
           }
           MFEM_SYNC_THREAD;
@@ -1131,3 +1139,90 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, const Array<double> &
 #endif
 // clang-format on
 }
+
+void OutletBC::interpOutlet_gpu(const OutletType type, 
+                                const mfem::Array<double>& inputState, 
+                                mfem::Vector& interpolated_Ubdr_, 
+                                mfem::Vector& interpolatedGradUpbdr_, 
+                                const mfem::Vector& x, 
+                                const Array<int>& nodesIDs, 
+                                const Array<int>& posDofIds, 
+                                mfem::ParGridFunction* Up, 
+                                mfem::ParGridFunction* gradUp, 
+                                mfem::Vector& shapesBC, 
+                                mfem::Vector& normalsWBC, 
+                                Array<int>& intPointsElIDBC, 
+                                Array<int>& listElems, 
+                                Array<int>& offsetsBoundaryU, 
+                                const int& maxIntPoints, 
+                                const int& maxDofs, 
+                                const int& dim, 
+                                const int& num_equation)
+{
+#ifdef _GPU_
+  const double *d_U = x.Read();
+  const double *d_gradUp = gradUp->Read();
+  const int *d_nodesIDs = nodesIDs.Read();
+  const int *d_posDofIds = posDofIds.Read();
+  const double *d_shapesBC = shapesBC.Read();
+  const double *d_normW = normalsWBC.Read();
+  const int *d_intPointsElIDBC = intPointsElIDBC.Read();
+  const int *d_listElems = listElems.Read();
+  const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
+  
+  double *d_interpUbdr = interpolated_Ubdr_.Write();
+  double *d_interpGrads = interpolatedGradUpbdr_.Write();
+
+  const int totDofs = x.Size() / num_equation;
+  const int numBdrElem = listElems.Size();
+
+  MFEM_FORALL_2D(n, numBdrElem, maxDofs, 1, 1, {     // NOLINT
+    MFEM_FOREACH_THREAD(i, x, maxDofs) {             // NOLINT
+      //
+      MFEM_SHARED double Ui[216], gradUpi[216*3];
+      MFEM_SHARED double shape[216];
+      MFEM_SHARED double u1, gUp[3];
+
+      const int el = d_listElems[n];
+      const int Q    = d_intPointsElIDBC[2 * el  ];
+      const int elID = d_intPointsElIDBC[2 * el + 1];
+      const int elOffset = d_posDofIds[2 * elID  ];
+      const int elDof    = d_posDofIds[2 * elID + 1];
+      int indexi;
+      if (i < elDof)
+        indexi = d_nodesIDs[elOffset + i];
+
+      for(int eq=0;eq<num_equation;eq++){
+        // get data
+        if( i<elDof ) Ui[i] = d_U[indexi + eq * totDofs];
+        for(int d=0;d<dim;d++) gradUpi[i + d*elDof] = 
+          d_gradUp[indexi + eq * totDofs + d * num_equation * totDofs];
+        MFEM_SYNC_THREAD;
+        
+        for (int q = 0; q < Q; q++) {
+          if (i < elDof) shape[i] = d_shapesBC[i + q * maxDofs + el * maxIntPoints * maxDofs];
+          MFEM_SYNC_THREAD;
+          
+          // interpolation
+          // NOTE: make parallel!
+          if( i==0 ){
+            u1 = 0.;
+            for(int j=0;j<elDof;j++) u1 += shape[j]*Ui[j];
+          }
+          if( i<dim ){
+            gUp[i] = 0.;
+            for(int j=0;j<elDof;j++) gUp[i] += gradUpi[j +i*elDof]*shape[j];
+          }
+          MFEM_SYNC_THREAD;
+          
+          // save to global memory
+          if(i==0) d_interpUbdr[eq + q*num_equation +n*maxIntPoints*num_equation] = u1;
+          if(i<dim) d_interpGrads[eq + i*num_equation +q*dim*num_equation + n*maxIntPoints*dim*num_equation] = gUp[i];
+          MFEM_SYNC_THREAD;
+        } // end loop over intergration points
+      } // end loop over equations
+    }
+  });
+#endif
+}
+

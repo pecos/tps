@@ -158,7 +158,7 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux,
                                   const int &dim, const int &num_equation) {
 #ifdef _GPU_
   auto dataIn = x.Read();
-  auto d_flux = flux.ReadWrite();
+  auto d_flux = flux.Write();
   
   double gamma = mixture->GetSpecificHeatRatio();
   double Sc = mixture->GetSchmidtNum();
@@ -192,7 +192,7 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux,
           d_flux[n + d * dof + eq * dof * dim] = Un[1 + d] * (Un[1 + dim] + p) / Un[0];
         }
         
-        if( eq == num_equation -1 )
+        if( eq == num_equation -1 && eqSystem==NS_PASSIVE)
           d_flux[n + d * dof + eq * dof * dim] = Un[num_equation - 1] * Un[1 + d] / Un[0];
       }
     }  // end MFEM_FOREACH_THREAD

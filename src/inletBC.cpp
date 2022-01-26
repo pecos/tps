@@ -110,9 +110,9 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
     }
   }
   
-  interpolated_Ubdr.UseDevice(true);
-  interpolated_Ubdr.SetSize(num_equation*maxIntPoints*listElems.Size());
-  interpolated_Ubdr = 0.;
+  interpolated_Ubdr_.UseDevice(true);
+  interpolated_Ubdr_.SetSize(num_equation*maxIntPoints*listElems.Size());
+  interpolated_Ubdr_ = 0.;
 
   boundaryU.UseDevice(true);
   boundaryU.SetSize(bdrN * num_equation);
@@ -318,7 +318,7 @@ void InletBC::updateMean_gpu(ParGridFunction *Up, Vector &localMeanUp, const int
     const int Q = d_bdrElemQ[2 * el + 1];
     //     double elUp[5*maxDofs];
     //     double shape[maxDofs];
-    double elUp[20 * 64];
+    double elUp[20 * 216];
     double shape[216];
     double sum;
 
@@ -530,7 +530,7 @@ void InletBC::integrationBC(Vector &y,  // output
                             ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                             Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
   interpInlet_gpu(inletType,inputState,
-                 interpolated_Ubdr,
+                 interpolated_Ubdr_,
                  x, nodesIDs,posDofIds,
                  Up, gradUp,shapesBC,normalsWBC,
                  intPointsElIDBC, listElems, offsetsBoundaryU,
@@ -539,7 +539,7 @@ void InletBC::integrationBC(Vector &y,  // output
   integrateInlets_gpu(inletType, inputState, dt,
                       y,  // output
                       x, 
-                      interpolated_Ubdr,
+                      interpolated_Ubdr_,
                       nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC, listElems,
                       offsetsBoundaryU, maxIntPoints, maxDofs, dim, num_equation, mixture,eqSystem);
 }
@@ -716,7 +716,7 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
 
 void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState, const double &dt, Vector &y,
                                   const Vector &x, 
-                                  Vector &interpolated_Ubdr,
+                                  Vector &interpolated_Ubdr_,
                                   const Array<int> &nodesIDs, const Array<int> &posDofIds,
                                   ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                                   Array<int> &intPointsElIDBC, Array<int> &listElems, Array<int> &offsetsBoundaryU,
@@ -734,7 +734,7 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
   const int *d_listElems = listElems.Read();
   const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
   
-  const double *d_interpUbdr = interpolated_Ubdr.Read();
+  const double *d_interpUbdr = interpolated_Ubdr_.Read();
 
   const int totDofs = x.Size() / num_equation;
   const int numBdrElem = listElems.Size();
@@ -808,7 +808,7 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
 
 void InletBC::interpInlet_gpu(const InletType type, 
                               const mfem::Vector& inputState, 
-                              mfem::Vector& interpolated_Ubdr, 
+                              mfem::Vector& interpolated_Ubdr_, 
                               const mfem::Vector& x, 
                               const Array<int>& nodesIDs, 
                               const Array<int>& posDofIds, 
@@ -834,7 +834,7 @@ void InletBC::interpInlet_gpu(const InletType type,
   const int *d_listElems = listElems.Read();
   const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
   
-  double *d_interpUbdr = interpolated_Ubdr.Write();
+  double *d_interpUbdr = interpolated_Ubdr_.Write();
 
   const int totDofs = x.Size() / num_equation;
   const int numBdrElem = listElems.Size();

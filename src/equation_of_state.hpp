@@ -190,6 +190,14 @@ public:
     temp /= state[0];
     return (gamma - 1.0)/Rgas * (state[1+dim]/state[0] - temp);
   }
+  
+  static MFEM_HOST_DEVICE double temperatureFromConservative(const double *u, const double &gamma, const double &Rg,
+                                                             const int &dim, const int &num_equation){
+    double k = 0.;
+    for(int d=0;d<dim;d++) k += u[1+d]*u[1+d];
+    k /= u[0]*u[0];
+    return (gamma-1.)/Rg*(u[1+dim]/u[0]-0.5*k);
+  }
 
   // Sutherland's law
   static MFEM_HOST_DEVICE double GetViscosity_gpu(const double &temp) {

@@ -84,7 +84,7 @@ class InletBC : public BoundaryCondition {
 
   void subsonicNonReflectingDensityVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
   
-  Vector interpolated_Ubdr;
+  Vector interpolated_Ubdr_;
 
   virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up);
 
@@ -130,7 +130,7 @@ class InletBC : public BoundaryCondition {
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void computeSubDenseVel(const int &thrd, const double *u1, double *u2, const double *nor,
                                                   const double *inputState, const double &gamma, const int &dim,
-                                                  const int &num_equation, Equations &eqSystem) {
+                                                  const int &num_equation, const Equations &eqSystem) {
     // assumes there at least as many threads as number of equations
     MFEM_SHARED double KE[3];
     MFEM_SHARED double p;
