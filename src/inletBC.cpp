@@ -109,10 +109,6 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
       }
     }
   }
-  
-  interpolated_Ubdr_.UseDevice(true);
-  interpolated_Ubdr_.SetSize(num_equation*maxIntPoints*listElems.Size());
-  interpolated_Ubdr_ = 0.;
 
   boundaryU.UseDevice(true);
   boundaryU.SetSize(bdrN * num_equation);
@@ -294,7 +290,13 @@ void InletBC::initBCs() {
       grvy_printf(ginfo, "[INLET]: # of participating MPI partitions = %i\n", groupsMPI->groupSize(bcomm));
     }
   }
-
+  
+#ifdef _GPU_
+  interpolated_Ubdr_.UseDevice(true);
+  interpolated_Ubdr_.SetSize(num_equation*maxIntPoints*listElems.Size());
+  interpolated_Ubdr_ = 0.;
+#endif
+  
   BCinit = true;
 }
 

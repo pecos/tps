@@ -108,13 +108,6 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
       }
     }
   }
-  
-  interpolated_Ubdr_.UseDevice(true);
-  interpolatedGradUpbdr_.UseDevice(true);;
-  interpolated_Ubdr_.SetSize(num_equation*maxIntPoints*listElems.Size());
-  interpolatedGradUpbdr_.SetSize(dim*num_equation*maxIntPoints*listElems.Size());
-  interpolated_Ubdr_ = 0.;
-  interpolatedGradUpbdr_ = 0.;
 
   boundaryU.UseDevice(true);
   boundaryU.SetSize(bdrN * num_equation);
@@ -289,9 +282,18 @@ OutletBC::~OutletBC() {}
 void OutletBC::initBCs() {
   if (!BCinit) {
     computeParallelArea();
+    
+#ifdef _GPU_
+    interpolated_Ubdr_.UseDevice(true);
+    interpolatedGradUpbdr_.UseDevice(true);;
+    interpolated_Ubdr_.SetSize(num_equation*maxIntPoints*listElems.Size());
+    interpolatedGradUpbdr_.SetSize(dim*num_equation*maxIntPoints*listElems.Size());
+    interpolated_Ubdr_ = 0.;
+    interpolatedGradUpbdr_ = 0.;
+#endif
+    
+    BCinit = true;
   }
-
-  BCinit = true;
 }
 
 void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {

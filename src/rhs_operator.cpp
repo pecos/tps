@@ -441,7 +441,7 @@ void RHSoperator::updatePrimitives(const Vector &x_in) const {
 #ifdef _GPU_
 
   RHSoperator::updatePrimitives_gpu(Up, &x_in, mixture->GetSpecificHeatRatio(), mixture->GetGasConstant(),
-                                    vfes->GetNDofs(), dim, num_equation);
+                                    vfes->GetNDofs(), dim, num_equation, eqSystem);
 #else
   double *dataUp = Up->GetData();
   for (int i = 0; i < vfes->GetNDofs(); i++) {
@@ -463,7 +463,7 @@ void RHSoperator::updatePrimitives(const Vector &x_in) const {
 }
 
 void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const double gamma, const double Rgas,const int ndofs,
-                                       const int dim, const int num_equations) {
+                                       const int dim, const int num_equations, const Equations &eqSystem) {
 #ifdef _GPU_
   auto dataUp = Up->Write();   // make sure data is available in GPU
   auto dataIn = x_in->Read();  // make sure data is available in GPU
@@ -490,7 +490,8 @@ void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const dou
       if (eq == 1+dim)
         dataUp[n + (1+dim) * ndofs] =
             DryAir::temperature(&state[0], &KE[0], gamma, Rgas, dim, num_equations);
-      if (eq == num_equations-1) dataUp[n + (num_equations - 1) * ndofs] = state[num_equations-1]/state[0];
+      if (eq == num_equations-1 && eqSystem==NS_PASSIVE) 
+        dataUp[n + (num_equations - 1) * ndofs] = state[num_equations-1]/state[0];
     }
   });
 #endif
