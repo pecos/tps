@@ -89,7 +89,7 @@ class RiemannSolver {
     MFEM_SHARED double KE1[3], KE2[3];
     MFEM_SHARED double vel1, vel2, p1, p2;
     MFEM_SHARED double maxE1, maxE2, maxE;
-    MFEM_SHARED double flux1[5], flux2[5];
+    MFEM_SHARED double flux1[20], flux2[20];
     MFEM_SHARED double normag;
 
     for (int d = thrd; d < dim; d += max_num_threads) {
@@ -112,6 +112,7 @@ class RiemannSolver {
     }
     MFEM_SYNC_THREAD;
 
+    // vel + speedOfSound
     if (thrd == 0) maxE1 = vel1 + sqrt(gamma * p1 / U1[0]);
     if (thrd == 1) maxE2 = vel2 + sqrt(gamma * p2 / U2[0]);
     MFEM_SYNC_THREAD;

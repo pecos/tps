@@ -102,11 +102,9 @@ class WallBC : public BoundaryCondition {
       unitNor[d] = nor[d] / norm;
       momNormal += unitNor[d] * u1[d + 1];
     }
-    // if(dim==2) unitNor[2] = 0.;
+    u2[thrd] = u1[thrd];
 
-    if (thrd == 0 || thrd >= 1+dim) {
-      u2[thrd] = u1[thrd];
-    } else {
+    if (thrd > 0 || thrd < 1+dim) {
       u2[thrd] = u1[thrd] - 2. * momNormal * unitNor[thrd - 1];
     }
   }

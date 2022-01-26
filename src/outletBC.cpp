@@ -1092,7 +1092,7 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem,
           if (i < num_equation) {
             u1[i] = d_interpUbdr[i + q*num_equation +n*maxIntPoints*num_equation];
             for(int d=0;d<dim;d++)
-              gradUpi[i +d*elDof] = 
+              gradUpi[i +d*num_equation] = 
                 d_interpGrads[i + d*num_equation +q*dim*num_equation + n*maxIntPoints*dim*num_equation];
           }
           MFEM_SYNC_THREAD;
@@ -1196,9 +1196,11 @@ void OutletBC::interpOutlet_gpu(const OutletType type,
 
       for(int eq=0;eq<num_equation;eq++){
         // get data
-        if( i<elDof ) Ui[i] = d_U[indexi + eq * totDofs];
-        for(int d=0;d<dim;d++) gradUpi[i + d*elDof] = 
-          d_gradUp[indexi + eq * totDofs + d * num_equation * totDofs];
+        if( i<elDof ) {
+          Ui[i] = d_U[indexi + eq * totDofs];
+          for(int d=0;d<dim;d++) gradUpi[i + d*elDof] = 
+            d_gradUp[indexi + eq * totDofs + d * num_equation * totDofs];
+        }
         MFEM_SYNC_THREAD;
         
         for (int q = 0; q < Q; q++) {
