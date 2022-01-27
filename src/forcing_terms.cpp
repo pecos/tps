@@ -463,6 +463,8 @@ void PassiveScalar::updateTerms_gpu(Vector& in, ParGridFunction* Up, Array<passi
   double Z = 0.;
   double radius = 1.;
   
+  const int locDim = dim; // GPU code does no take class variables
+  
   for(int i=0;i<psData.Size();i++){
     Z = psData[i]->value;
     radius = psData[i]->radius;
@@ -472,7 +474,7 @@ void PassiveScalar::updateTerms_gpu(Vector& in, ParGridFunction* Up, Array<passi
     MFEM_FORALL(n,size,{
       int node = d_nodes[n];
       double vel = 0.;
-      for (int d = 0; d < dim; d++) vel += d_Up[node + (1 + d) * nnode] * d_Up[node + (1 + d) * nnode];
+      for (int d = 0; d < locDim; d++) vel += d_Up[node + (1 + d) * nnode] * d_Up[node + (1 + d) * nnode];
       vel = sqrt(vel);
       d_in[node + (num_equation-1) * nnode] -=
           vel * (d_Up[node + (num_equation-1) * nnode] - d_Up[node] * Z) / radius;
