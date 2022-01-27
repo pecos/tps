@@ -65,8 +65,8 @@ class RiemannSolver {
 
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void convFluxDotNorm_gpu(double *fluxN,const double *state, 
-                                                   const double pres, const double *nor,
-                                                   const int &num_equation, const int &dim, , const Equations &eqSystem,
+                                                   const double &pres, const double *nor,
+                                                   const int &num_equation, const int &dim, const Equations &eqSystem,
                                                    const int &thrd, const int &max_num_threads) {
     MFEM_SHARED double den_velN;
     

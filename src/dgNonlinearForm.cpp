@@ -316,7 +316,7 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y,
       MFEM_SYNC_THREAD;
 
       // compute Riemann flux
-      RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation, i, elDof);
+      RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim,eqSystem, num_equation, i, elDof);
       Fluxes::viscousFlux_gpu(&vFlux1[0], &u1[0], &gradUp1[0],eqSystem, gamma, Rg, viscMult,
                               bulkViscMult, Pr, Sc,i, elDof, dim, num_equation);
       Fluxes::viscousFlux_gpu(&vFlux2[0], &u2[0], &gradUp2[0],eqSystem, gamma, Rg, viscMult, 
@@ -662,7 +662,7 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(
 //           MFEM_SYNC_THREAD;
           // compute Riemann flux
           RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg,
-                                       dim, num_equation, i, maxDofs);
+                                       dim,eqSystem, num_equation, i, maxDofs);
           Fluxes::viscousFlux_gpu(&vFlux1[0], &u1[0], &gradUp1[0],eqSystem, gamma, Rg, viscMult,
                                   bulkViscMult, Pr,Sc, i, maxDofs, dim, num_equation);
           Fluxes::viscousFlux_gpu(&vFlux2[0], &u2[0], &gradUp2[0],eqSystem, gamma, Rg, viscMult, bulkViscMult,
