@@ -79,9 +79,6 @@ class OutletBC : public BoundaryCondition {
   Vector tangent1;
   Vector tangent2;
   Vector inverseNorm2cartesian;
-  
-  Vector interpolated_Ubdr_;
-  Vector interpolatedGradUpbdr_;
 
   void initBdrElemsShape();
   void initBoundaryU(ParGridFunction *Up);

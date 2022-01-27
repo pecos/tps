@@ -83,8 +83,6 @@ class InletBC : public BoundaryCondition {
   void subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux);
 
   void subsonicNonReflectingDensityVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
-  
-  Vector interpolated_Ubdr_;
 
   virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up);
 

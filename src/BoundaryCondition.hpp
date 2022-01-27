@@ -59,6 +59,9 @@ class BoundaryCondition {
   Array<int> listElems;  // list of boundary elements (position in the BC array)
 
   Array<int> offsetsBoundaryU;
+  
+  Vector interpolated_Ubdr_;
+  Vector interpolatedGradUpbdr_;
 
  public:
   BoundaryCondition(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSystem,

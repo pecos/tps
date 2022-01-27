@@ -51,6 +51,7 @@ class WallBC : public BoundaryCondition {
   double wallTemp;
 
   const Array<int> &intPointsElIDBC;
+  const int &maxIntPoints;
 
   Array<int> wallElems;
   void buildWallElemsArray(const Array<int> &intPointsElIDBC);
@@ -64,7 +65,7 @@ class WallBC : public BoundaryCondition {
   WallBC(RiemannSolver *rsolver_, GasMixture *_mixture, Equations _eqSystem, Fluxes *_fluxClass,
          ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
          const int _num_equation, int _patchNumber, WallType _bcType, const Array<double> _inputData,
-         const Array<int> &intPointsElIDBC);
+         const Array<int> &intPointsElIDBC, const int &maxIntPoints);
   ~WallBC();
 
   void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
@@ -82,11 +83,19 @@ class WallBC : public BoundaryCondition {
 
   static void integrateWalls_gpu(const WallType type, const double &wallTemp,
                                  Vector &y,  // output
-                                 const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+                                 const Vector &x, 
+                                 Vector &interpolated_Ubdr_,const Array<int> &nodesIDs, const Array<int> &posDofIds,
                                  ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                                  Array<int> &intPointsElIDBC, Array<int> &wallElems, Array<int> &listElems,
                                  const int &maxIntPoints, const int &maxDofs, const int &dim, const int &num_equation,
-                                 const double &gamma, const double &Rg);
+                                 GasMixture *mixture);
+  
+  static void integrpWalls_gpu(const WallType type, const double &wallTemp,
+                                 Vector &interpolated_Ubdr_,
+                                 const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+                                 ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
+                                 Array<int> &intPointsElIDBC, Array<int> &wallElems, Array<int> &listElems,
+                                 const int &maxIntPoints, const int &maxDofs, const int &dim, const int &num_equation);
 
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void computeInvWallState(const int &thrd, const double *u1, double *u2, const double *nor,
@@ -112,8 +121,10 @@ class WallBC : public BoundaryCondition {
   static MFEM_HOST_DEVICE void computeIsothermalState(const int &thrd, const double *u1, double *u2, const double *nor,
                                                       const double &wallTemp, const double &gamma, const double &Rg,
                                                       const int &dim, const int &num_equation) {
+    u2[thrd] = u1[thrd];
+    
+    // NOTE: assumes ideal gas
     if (thrd == 1+dim) u2[thrd] = Rg / (gamma - 1.) * u1[0] * wallTemp;
-    if (thrd == 0) u2[thrd] = u1[thrd];
     if (thrd > 0 && thrd < dim + 1) u2[thrd] = 0.;
   }
 #endif

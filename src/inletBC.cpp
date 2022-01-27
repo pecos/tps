@@ -289,15 +289,15 @@ void InletBC::initBCs() {
       grvy_printf(ginfo, "[INLET]: # of boundary faces               = %i\n", nfaces);
       grvy_printf(ginfo, "[INLET]: # of participating MPI partitions = %i\n", groupsMPI->groupSize(bcomm));
     }
-  }
   
 #ifdef _GPU_
-  interpolated_Ubdr_.UseDevice(true);
-  interpolated_Ubdr_.SetSize(num_equation*maxIntPoints*listElems.Size());
-  interpolated_Ubdr_ = 0.;
+    interpolated_Ubdr_.UseDevice(true);
+    interpolated_Ubdr_.SetSize(num_equation*maxIntPoints*listElems.Size());
+    interpolated_Ubdr_ = 0.;
 #endif
   
-  BCinit = true;
+    BCinit = true;
+  }
 }
 
 void InletBC::updateMean_gpu(ParGridFunction *Up, Vector &localMeanUp, const int num_equation, const int numBdrElems,
