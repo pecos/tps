@@ -119,11 +119,16 @@ void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradSt
 void WallBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                            ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                            Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
+  integrpWalls_gpu(wallType, wallTemp,interpolated_Ubdr_,
+                  x, nodesIDs,posDofIds,Up,gradUp,shapesBC, normalsWBC,
+                  intPointsElIDBC, wallElems,listElems,
+                  maxIntPoints,maxDofs,dim,num_equation);
+  
   integrateWalls_gpu(wallType, wallTemp,
                      y,  // output
-                     x, nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC, wallElems, listElems,
-                     maxIntPoints, maxDofs, dim, num_equation, mixture->GetSpecificHeatRatio(),
-                     mixture->GetGasConstant());
+                     x,interpolated_Ubdr_,
+                     nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC, wallElems, listElems,
+                     maxIntPoints, maxDofs, dim, num_equation, mixture);
 }
 
 void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
