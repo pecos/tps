@@ -128,7 +128,7 @@ void WallBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesID
                      y,  // output
                      x,interpolated_Ubdr_,
                      nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC, wallElems, listElems,
-                     maxIntPoints, maxDofs, dim, num_equation, mixture);
+                     eqSystem,maxIntPoints, maxDofs, dim, num_equation, mixture);
 }
 
 void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
@@ -241,6 +241,7 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
                                 const Array<int> &nodesIDs, const Array<int> &posDofIds, ParGridFunction *Up,
                                 ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                                 Array<int> &intPointsElIDBC, Array<int> &wallElems, Array<int> &listElems,
+                                const Equations &eqSystem,
                                 const int &maxIntPoints, const int &maxDofs, const int &dim, const int &num_equation,
                                 GasMixture *mixture) {
 #ifdef _GPU_
@@ -328,7 +329,7 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
           MFEM_SYNC_THREAD;
 
           // compute flux
-          RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation, i, maxDofs);
+          RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, eqSystem,num_equation, i, maxDofs);
           MFEM_SYNC_THREAD;
 
           // sum contributions to integral

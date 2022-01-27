@@ -792,7 +792,7 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
         MFEM_SYNC_THREAD;
 
         // compute flux
-        RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation, i, maxDofs);
+        RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim,eqSystem,num_equation, i, maxDofs);
         MFEM_SYNC_THREAD;
         // sum contributions to integral
         if (i < elDof) {

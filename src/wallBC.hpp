@@ -87,6 +87,7 @@ class WallBC : public BoundaryCondition {
                                  Vector &interpolated_Ubdr_,const Array<int> &nodesIDs, const Array<int> &posDofIds,
                                  ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                                  Array<int> &intPointsElIDBC, Array<int> &wallElems, Array<int> &listElems,
+                                 const Equations &eqSystem,
                                  const int &maxIntPoints, const int &maxDofs, const int &dim, const int &num_equation,
                                  GasMixture *mixture);
   
