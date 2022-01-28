@@ -86,9 +86,9 @@ ConstantPressureGradient::ConstantPressureGradient(const int &_dim, const int &_
                                                    const volumeFaceIntegrationArrays &_gpuArrays,
                                                    RunConfiguration &_config)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, _gpuArrays) {
-  
+
   mixture = new DryAir(_config,dim);
-  
+
   pressGrad.UseDevice(true);
   pressGrad.SetSize(3);
   pressGrad = 0.;
@@ -305,10 +305,11 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
   Vector Un(num_equation), Up(num_equation);
 
   // compute speed of sound
-  double gamma = mixture->GetSpecificHeatRatio();
-  double Rg = mixture->GetGasConstant();
+  // double gamma = mixture->GetSpecificHeatRatio();
+  // double Rg = mixture->GetGasConstant();
   mixture->GetPrimitivesFromConservatives(targetU, Up);
-  double speedSound = sqrt(gamma * Rg * Up[1+dim]);
+  // double speedSound = sqrt(gamma * Rg * Up[1+dim]);
+  double speedSound = mixture->ComputeSpeedOfSound(Up,true);
 
   // add forcing to RHS, i.e., @in
   for (int n = 0; n < nnodes; n++) {
