@@ -45,7 +45,7 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
       num_equation(_num_equation),
       dim(_dim),
 #ifdef AXISYM_DEV
-      nvel(3), // once ready for swirl, switch to nvel(3)
+      nvel(3),
 #else
       nvel(_dim),
 #endif
@@ -71,7 +71,6 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
 
     meanRho = new ParGridFunction(fes, meanUp->GetData());
     meanV = new ParGridFunction(dfes, meanUp->GetData() + fes->GetNDofs());
-    //meanP = new ParGridFunction(fes, meanUp->GetData() + (1 + dim) * fes->GetNDofs());
     meanP = new ParGridFunction(fes, meanUp->GetData() + (1 + nvel) * fes->GetNDofs());
 
     meanScalar = NULL;
@@ -163,7 +162,6 @@ void Averaging::addSample_cpu() {
     Vector meanVel(3), vel(3);
     meanVel = 0.;
     vel = 0.;
-    //for (int d = 0; d < dim; d++) {
     for (int d = 0; d < nvel; d++) {
       meanVel[d] = dataMean[n + dof * (d + 1)];
       vel[d] = dataUp[n + dof * (d + 1)];

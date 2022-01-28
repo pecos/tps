@@ -104,7 +104,7 @@ class OutletBC : public BoundaryCondition {
   ~OutletBC();
 
 #ifdef AXISYM_DEV
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius=0);
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius = 0);
 #else
   void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
 #endif

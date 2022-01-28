@@ -43,7 +43,7 @@ BoundaryCondition::BoundaryCondition(RiemannSolver *_rsolver, GasMixture *_mixtu
       dt(_dt),
       dim(_dim),
 #ifdef AXISYM_DEV
-      nvel(3), // once ready for swirl, switch to nvel(3)
+      nvel(3),
 #else
       nvel(_dim),
 #endif

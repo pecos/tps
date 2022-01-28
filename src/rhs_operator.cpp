@@ -47,7 +47,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
       iter(_iter),
       dim(_dim),
 #ifdef AXISYM_DEV
-      nvel(3), // once ready for swirl, switch to nvel(3)
+      nvel(3),
 #else
       nvel(_dim),
 #endif
@@ -135,10 +135,9 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
     // DenseMatrixInverse inv(&Me);
     Me_inv[i] = new DenseMatrix(dof, dof);
 
-// TODO: Replace #if based logic with input options for axisymmetric
+// TODO(trevilo): Replace #if based logic with input options for axisymmetric
 #ifdef AXISYM_DEV
     DenseMatrix Me_norad(dof);
-    // DenseMatrixInverse inv(&Me);
     Me_inv_norad[i] = new DenseMatrix(dof, dof);
 
     MassIntegrator mi(radius);
@@ -148,7 +147,6 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
 #endif
 
     int integrationOrder = 2 * vfes->GetFE(i)->GetOrder();
-    //int integrationOrder = 2 * vfes->GetFE(i)->GetOrder() + 1;
     if (intRuleType == 1 && vfes->GetFE(i)->GetGeomType() == Geometry::SQUARE)
       integrationOrder--;  // when Gauss-Lobatto
     const IntegrationRule intRule = intRules->Get(vfes->GetFE(i)->GetGeomType(), integrationOrder);
@@ -469,7 +467,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
     }
 
 #ifdef AXISYM_DEV
-    const double radius = (*coordsDof)[i + 0 * dof]; // radius is x coordinate
+    const double radius = (*coordsDof)[i + 0 * dof];
 #endif
 
     fluxClass->ComputeConvectiveFluxes(state, f);

@@ -84,7 +84,8 @@ class BCintegrator : public NonlinearFormIntegrator {
 
   // void calcMeanState();
 #ifdef AXISYM_DEV
-  void computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius=0);
+  void computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState,
+                      Vector &bdrFlux, double radius = 0);
 #else
   void computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
 #endif

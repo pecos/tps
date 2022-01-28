@@ -38,7 +38,7 @@ ForcingTerms::ForcingTerms(const int &_dim, const int &_num_equation, const int 
                            ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &_gpuArrays)
     : dim(_dim),
 #ifdef AXISYM_DEV
-      nvel(3), // once ready for swirl, switch to nvel(3)
+      nvel(3),
 #else
       nvel(_dim),
 #endif
@@ -316,7 +316,8 @@ void AxisymmetricSource::updateTerms(Vector &in) {
       int index = nodes[n];
       for (int d = 0; d < dim; d++) x[d] = coordsDof[index + d * dof];
       const double radius = x[0];
-      // TODO: Will have to change once PR #90 is merged
+
+      // TODO(trevilo): Will have to change once PR #90 is merged
       const double rho = dataUp[index + 0*dof];
       const double ur = dataUp[index + 1*dof];
       const double ut  = dataUp[index + 3*dof];
@@ -360,16 +361,15 @@ void AxisymmetricSource::updateTerms(Vector &in) {
 
       if (radius > 0) {
         data[index + 1*dof] += (pressure + rutut - tau_tt)/radius;
-        data[index + 3*dof] += (         - rurut + tau_tr)/radius;
+        data[index + 3*dof] +=          (- rurut + tau_tr)/radius;
       } else {
-        // TODO: How do we handle the axis in this approach?  Hackery?
+        // TODO(trevilo): Fix axis
         double fake_radius = 1e-3;
         data[index + 1*dof] += (pressure - tau_tt)/fake_radius;
-        data[index + 3*dof] += (           tau_tr)/fake_radius;
+        data[index + 3*dof] +=            (tau_tr)/fake_radius;
       }
     }
   }
-
 }
 
 

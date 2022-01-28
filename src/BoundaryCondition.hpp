@@ -73,7 +73,8 @@ class BoundaryCondition {
   virtual ~BoundaryCondition();
 
 #ifdef AXISYM_DEV
-  virtual void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius=0) = 0;
+  virtual void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
+                              Vector &bdrFlux, double radius = 0) = 0;
 #else
   virtual void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) = 0;
 #endif

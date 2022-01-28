@@ -47,7 +47,7 @@ void RiemannSolver::ComputeFluxDotN(const Vector &state, const Vector &nor, Vect
   // NOTE: nor in general is not a unit normal
   const int dim = nor.Size();
 #ifdef AXISYM_DEV
-  const int nvel = 3; // once ready for swirl, switch to nvel(3)
+  const int nvel = 3;
 #else
   const int nvel = dim;
 #endif
@@ -90,7 +90,7 @@ void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Ve
   // NOTE: nor in general is not a unit normal
   const int dim = nor.Size();
 #ifdef AXISYM_DEV
-  const int nvel = 3; // once ready for swirl, switch to nvel(3)
+  const int nvel = 3;
 #else
   const int nvel = dim;
 #endif
@@ -120,8 +120,9 @@ void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Ve
 void RiemannSolver::Eval_Roe(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux) {
   const int dim = nor.Size();
 #ifdef AXISYM_DEV
-  const int nvel = 3; // once ready for swirl, switch to nvel(3)
-  assert(nvel==2); // not ready to support Roe for axisym yet
+  const int nvel = 3;
+  assert(nvel == 2);  // Roe doesn't support axisym yet
+  // TODO(trevilo): Add axisymmetric support to Roe flux
 #endif
 
   int NS_eq = 2 + dim;  // number of NS equations (without species, passive scalars etc.)

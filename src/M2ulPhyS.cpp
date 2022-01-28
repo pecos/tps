@@ -230,8 +230,8 @@ void M2ulPhyS::initVariables() {
 
   dim = mesh->Dimension();
 #ifdef AXISYM_DEV
-  assert(dim==2);
-  nvel = 3; // once ready for swirl, switch to nvel(3)
+  assert(dim == 2);
+  nvel = 3;
 #else
   nvel = dim;
 #endif
@@ -293,8 +293,7 @@ void M2ulPhyS::initVariables() {
 
   // FE Spaces
   fes = new ParFiniteElementSpace(mesh, fec);
-  //dfes = new ParFiniteElementSpace(mesh, fec, nvel, Ordering::byNODES);
-  dfes = new ParFiniteElementSpace(mesh, fec, dim, Ordering::byNODES); // ??? how to handle this?
+  dfes = new ParFiniteElementSpace(mesh, fec, dim, Ordering::byNODES);
   vfes = new ParFiniteElementSpace(mesh, fec, num_equation, Ordering::byNODES);
   gradUpfes = new ParFiniteElementSpace(mesh, fec, num_equation * dim, Ordering::byNODES);
 
@@ -897,13 +896,10 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   paraviewColl->RegisterField("dens", dens);
   paraviewColl->RegisterField("vel", vel);
-<<<<<<< HEAD
-  paraviewColl->RegisterField("temp", temperature);
-=======
 #ifdef AXISYM_DEV
   paraviewColl->RegisterField("vtheta", vtheta);
 #endif
->>>>>>> Make room for swirl velocity component (#89)
+  paraviewColl->RegisterField("temp", temperature);
   paraviewColl->RegisterField("press", press);
   if (eqSystem == NS_PASSIVE) paraviewColl->RegisterField("passiveScalar", passiveScalar);
 
@@ -1304,7 +1300,6 @@ void M2ulPhyS::uniformInitialConditions() {
     data[i + (1 + nvel) * dof] = rhoE;
     if (eqSystem == NS_PASSIVE) data[i + (num_equation - 1) * dof] = 0.;
 
-<<<<<<< HEAD
     for (int eq = 0; eq < num_equation; eq++) state(eq) = data[i + eq * dof];
     eqState->GetPrimitivesFromConservatives(state, Upi);
     for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * dof] = Upi[eq];
@@ -1315,14 +1310,6 @@ void M2ulPhyS::uniformInitialConditions() {
     //     if (dim == 3) dataUp[i + 3 * dof] = data[i + 3 * dof] / data[i];
     //     dataUp[i + (1 + dim) * dof] = inputRhoRhoVp[4];
     //     if (eqSystem == NS_PASSIVE) dataUp[i + (num_equation - 1) * dof] = 0.;
-=======
-    dataUp[i] = data[i];
-    dataUp[i + dof] = data[i + dof] / data[i];
-    dataUp[i + 2 * dof] = data[i + 2 * dof] / data[i];
-    if (nvel == 3) dataUp[i + 3 * dof] = data[i + 3 * dof] / data[i];
-    dataUp[i + (1 + nvel) * dof] = inputRhoRhoVp[4];
-    dataUp[i + (num_equation - 1) * dof] = 0.;
->>>>>>> Make room for swirl velocity component (#89)
 
     for (int d = 0; d < dim; d++) {
       for (int eq = 0; eq < num_equation; eq++) {
@@ -1523,9 +1510,12 @@ void M2ulPhyS::initialTimeStep() {
     Vector state(num_equation);
     for (int eq = 0; eq < num_equation; eq++) state[eq] = dataU[n + eq * dof];
 <<<<<<< HEAD
+<<<<<<< HEAD
     double iC = mixture->ComputeMaxCharSpeed(state);
 =======
     //double iC = eqState->ComputeMaxCharSpeed(state, dim);
+=======
+>>>>>>> Minor styles fixes and clean up surrounding #89 work
     double iC = eqState->ComputeMaxCharSpeed(state, nvel);
 >>>>>>> Make room for swirl velocity component (#89)
     if (iC > max_char_speed) max_char_speed = iC;

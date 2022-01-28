@@ -145,7 +145,8 @@ void WallBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesID
 }
 
 #ifdef AXISYM_DEV
-void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn,  DenseMatrix &gradState, Vector &bdrFlux, double radius) {
+void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn,  DenseMatrix &gradState,
+                                Vector &bdrFlux, double radius) {
 #else
 void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
 #endif
@@ -213,11 +214,11 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux
     for (int d = 0; d < dim; d++) bdrFlux[eq] -= 0.5 * (viscFw(eq, d) + viscF(eq, d)) * normal[d];
   }
 #endif
-
 }
 
 #ifdef AXISYM_DEV
-void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius) {
+void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
+                                      Vector &bdrFlux, double radius) {
 #else
 void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
 #endif
@@ -297,7 +298,8 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
 }
 
 #ifdef AXISYM_DEV
-void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius) {
+void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
+                                       Vector &bdrFlux, double radius) {
 #else
 void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
 #endif

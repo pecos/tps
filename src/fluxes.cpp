@@ -37,7 +37,7 @@ Fluxes::Fluxes(GasMixture *_mixture, Equations &_eqSystem, const int &_num_equat
 Fluxes::Fluxes(EquationOfState *_eqState, Equations &_eqSystem, const int &_num_equations, const int &_dim)
     : mixture(_mixture), eqSystem(_eqSystem), dim(_dim),
 #ifdef AXISYM_DEV
-      nvel(3), // once ready for swirl, switch to nvel(3)
+      nvel(3),
 #else
       nvel(_dim),
 #endif
@@ -84,7 +84,6 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
     flux(1 + nvel, d) = state(d + 1) * H;
   }
 
-  // TODO: Support scalars
   if (eqSystem == NS_PASSIVE) {
     for (int d = 0; d < dim; d++) flux(num_equations - 1, d) = state(num_equations - 1) * state(1 + d) / state(0);
   }
@@ -116,7 +115,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
         divV += gradUp(1 + i, i);
       }
 #ifdef AXISYM_DEV
-      if (radius>0)
+      if (radius > 0)
         divV += ur/radius;
 #endif
 
@@ -127,8 +126,8 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
         for (int j = 0; j < dim; j++) flux(1 + i, j) = stress(i, j);
 
 #ifdef AXISYM
-      const double ut_r = gradUp(3,0);
-      const double ut_z = gradUp(3,1);
+      const double ut_r = gradUp(3, 0);
+      const double ut_z = gradUp(3, 1);
       double tau_tr = ut_r;
       if (radius > 0) tau_tr -= ut/radius;
       tau_tr *= visc;
@@ -145,8 +144,6 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
       for (int d = 0; d < dim; d++) vel(d) = state[1 + d] / state[0];
 
       stress.Mult(vel, vtmp);
-
-      // TODO(AXI): Add u_{\theta}*\tau_{\theta,j} to vtmp[j] for axisymmetric
 
       for (int d = 0; d < dim; d++) {
         flux(1 + nvel, d) = vtmp[d];

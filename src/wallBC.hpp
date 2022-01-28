@@ -58,21 +58,15 @@ class WallBC : public BoundaryCondition {
   void buildWallElemsArray(const Array<int> &intPointsElIDBC);
 
 #ifdef AXISYM_DEV
-  void computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius=0);
+  void computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
+                          Vector &bdrFlux, double radius = 0);
+  void computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
+                                Vector &bdrFlux, double radius = 0);
+  void computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
+                                 Vector &bdrFlux, double radius = 0);
 #else
   void computeINVwallFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux);
-#endif
-
-
-#ifdef AXISYM_DEV
-  void computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius=0);
-#else
   void computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
-#endif
-
-#ifdef AXISYM_DEV
-  void computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius=0);
-#else
   void computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
 #endif
 
@@ -84,7 +78,8 @@ class WallBC : public BoundaryCondition {
   ~WallBC();
 
 #ifdef AXISYM_DEV
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius=0);
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
+                      Vector &bdrFlux, double radius = 0);
 #else
   void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
 #endif
