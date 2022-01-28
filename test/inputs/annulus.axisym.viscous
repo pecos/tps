@@ -1,0 +1,44 @@
+# Runfile
+
+MESH meshes/axi-annulus.msh
+OUTPUT_NAME output-annulus
+RESTART_CYCLE
+RESTART_SERIAL write
+
+POL_ORDER 3
+INT_RULE 0
+BASIS_TYPE 0
+
+CFL 0.12
+
+NMAX 50100
+ITERS_OUT 100
+USE_ROE 0
+IS_SBP 0
+
+TIME_INTEGRATOR 3
+FLUID 0
+
+REF_LENGTH 1.
+
+# NS
+EQ_SYSTEM 1
+
+# Factor that multiplies fluid viscosity
+VISC_MULT 63000.
+
+# Constant initial conditions
+INIT_RHO 1.16
+INIT_RHOVX 0.0
+INIT_RHOVY 58.0
+INIT_RHOVZ 0.
+INIT_P 100000.
+
+WALL 2 2 300.
+INLET 3 0 1.27 0.0 50.0 0.0
+OUTLET 4 0 100000.
+WALL 5 2 300.
+
+
+
+
