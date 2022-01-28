@@ -104,6 +104,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
 
 #ifdef AXISYM_DEV
       const double ur = state[1]/state[0];
+      const double ut = state[2]/state[0];
 #endif
 
       // make sure density visc. flux is 0
@@ -125,7 +126,18 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
       for (int i = 0; i < dim; i++)
         for (int j = 0; j < dim; j++) flux(1 + i, j) = stress(i, j);
 
-      // TODO(AXI): Set flux(1+2,j) to \tau_{\theta, j} for axisymmetric
+#ifdef AXISYM
+      const double ut_r = gradUp(3,0);
+      const double ut_z = gradUp(3,1);
+      double tau_tr = ut_r;
+      if (radius > 0) tau_tr -= ut/radius;
+      tau_tr *= visc;
+
+      const double tau_tz = visc*ut_z;
+
+      flux(1+2, 0) = tau_tr;
+      flux(1+2, 1) = tau_tz;
+#endif
 
       // temperature gradient
       //       for (int d = 0; d < dim; d++) gradT[d] = temp * (gradUp(1 + dim, d) / p - gradUp(0, d) / state[0]);
@@ -137,9 +149,14 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
       // TODO(AXI): Add u_{\theta}*\tau_{\theta,j} to vtmp[j] for axisymmetric
 
       for (int d = 0; d < dim; d++) {
-        flux(1 + nvel, d) += vtmp[d];
+        flux(1 + nvel, d) = vtmp[d];
         flux(1 + nvel, d) += k * gradUp(1 + nvel, d);
       }
+
+#ifdef AXISYM
+        flux(1 + nvel, 0) += ut*tau_tr;
+        flux(1 + nvel, 1) += ut*tau_tz;
+#endif
 
       if (eqSystem == NS_PASSIVE) {
         double Sc = mixture->GetSchmidtNum();

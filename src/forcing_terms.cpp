@@ -317,18 +317,21 @@ void AxisymmetricSource::updateTerms(Vector &in) {
       for (int d = 0; d < dim; d++) x[d] = coordsDof[index + d * dof];
       const double radius = x[0];
       // TODO: Will have to change once PR #90 is merged
-      // TODO: Indexing will have to change for swirl case
+      const double rho = dataUp[index + 0*dof];
+      const double ur = dataUp[index + 1*dof];
+      const double ut  = dataUp[index + 3*dof];
       const double pressure = dataUp[index + (1+nvel)*dof];
 
-      double tau_tt;
+      const double rurut = rho*ur*ut;
+      const double rutut = rho*ut*ut;
+
+      double tau_tt, tau_tr;
       if (eqSystem == EULER) {
-        tau_tt = 0.0;
+        tau_tt = tau_tr = 0.0;
       } else {
-        //const double rho = data[index + 0*dof];
-        const double rho = dataUp[index + 0*dof];
-        const double ur = dataUp[index + 1*dof];
         const double ur_r = dataGradUp[index + (1*dof) + (0*dof*num_equation)];
         const double uz_z = dataGradUp[index + (2*dof) + (1*dof*num_equation)];
+        const double ut_r = dataGradUp[index + (3*dof) + (0*dof*num_equation)];
 
         const double Rg = eqState->GetGasConstant();
         const double temp = pressure / rho / Rg;
@@ -338,14 +341,13 @@ void AxisymmetricSource::updateTerms(Vector &in) {
         if (radius > 0)
           tau_tt += 2*ur/radius;
 
-        if (std::isnan(tau_tt)) {
-          std::cout << "tau_tt is nan!" << std::endl;
-        }
         tau_tt *= 2*visc/3.0;
-        if (std::isnan(visc)) {
-          std::cout << "visc is nan!" << std::endl;
-        }
 
+        tau_tr = ut_r;
+        if (radius > 0)
+          tau_tr -= ut/radius;
+
+        tau_tr *= visc;
       }
 
       // Add to r-momentum eqn
@@ -357,10 +359,13 @@ void AxisymmetricSource::updateTerms(Vector &in) {
       // coords
 
       if (radius > 0) {
-        data[index + 1*dof] += (pressure - tau_tt)/radius;
+        data[index + 1*dof] += (pressure + rutut - tau_tt)/radius;
+        data[index + 3*dof] += (         - rurut + tau_tr)/radius;
       } else {
+        // TODO: How do we handle the axis in this approach?  Hackery?
         double fake_radius = 1e-3;
         data[index + 1*dof] += (pressure - tau_tt)/fake_radius;
+        data[index + 3*dof] += (           tau_tr)/fake_radius;
       }
     }
   }
