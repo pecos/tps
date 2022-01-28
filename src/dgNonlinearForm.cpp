@@ -683,6 +683,7 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(
           for (int eq = 0; eq < num_equation; eq++) {
             if (i < dof1) Fcontrib[i + eq * dof1] -= weight * l1[i] * Rflux[eq];
           }
+          MFEM_SYNC_THREAD;
         }
         MFEM_SYNC_THREAD;
       }
@@ -749,7 +750,8 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector& x,
       const int dof1     = d_sharedElem1Dof12Q[1 + d_sharedElemsFaces[2 + el * 7] * 4];
       
       const int offsetEl1 = d_posDofIds[2 * el1];
-      int  indexi = d_nodesIDs[offsetEl1 + i];
+      int  indexi;
+      if( i<dof1 ) indexi = d_nodesIDs[offsetEl1 + i];
 
       for (int elFace = 0; elFace < numFaces; elFace++) {
         const int f = d_sharedElemsFaces[1 + elFace + 1 + el * 7];
@@ -773,7 +775,8 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector& x,
               gradUp2[eq +d*num_equation] = 0.;
             }
           }
-                 
+          MFEM_SYNC_THREAD;
+                
           // loop through the equations
           for(int eq=0;eq<num_equation;eq++){
             // load data for elem1

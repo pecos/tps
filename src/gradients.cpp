@@ -519,11 +519,11 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up, const Vector &fa
             if (i < dof2) l2[i] = d_sharedShape2[i + k * maxDofs + f * maxIntPoints * maxDofs];
             MFEM_SYNC_THREAD;
             
-            up1 = 0.;
-            up2 = 0.;
             // interpolation
             // NOTE: make parallel!
             if( i==0 ){
+              up1 = 0.;
+              up2 = 0.;
               for (int n = 0; n < dof1; n++) up1 += Upi[n] * l1[n];
               for (int n = 0; n < dof2; n++) up2 += Upj[n] * l2[n];
             }
