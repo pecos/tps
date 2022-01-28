@@ -195,9 +195,8 @@ class OutletBC : public BoundaryCondition {
     MFEM_SYNC_THREAD;
     if(thrd==0){
       // NOTE: assumes DryAir!
-      double p = inputState[0];
       double T = DryAir::temperatureFromConservative(u1, gamma,Rg,dim,num_equation);
-      dpdn = p/u1[0]*normGrad[0] + p/T*normGrad[1+dim];
+      dpdn = Rg*(T*normGrad[0]+u1[0]*normGrad[1+dim]);
     }
     MFEM_SYNC_THREAD;
 
@@ -343,9 +342,8 @@ class OutletBC : public BoundaryCondition {
     MFEM_SYNC_THREAD;
     if(thrd==0){
       // NOTE: assumes DryAir!
-      double p = inputState[0];
       double T = DryAir::temperatureFromConservative(u1, gamma,Rg,dim,num_equation);
-      dpdn = p/u1[0]*normGrad[0] + p/T*normGrad[1+dim];
+      dpdn = Rg*(T*normGrad[0] + u1[0]*normGrad[1+dim]);
     }
     MFEM_SYNC_THREAD;
 
@@ -491,9 +489,8 @@ class OutletBC : public BoundaryCondition {
     MFEM_SYNC_THREAD;
     if(thrd==0){
       // NOTE: assumes DryAir!
-      double p = inputState[0];
       double T = DryAir::temperatureFromConservative(u1, gamma,Rg,dim,num_equation);
-      dpdn = p/u1[0]*normGrad[0] + p/T*normGrad[1+dim];
+      dpdn = Rg*(T*normGrad[0] + u1[0]*normGrad[1+dim]);
     }
     MFEM_SYNC_THREAD;
 
