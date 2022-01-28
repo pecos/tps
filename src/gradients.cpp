@@ -492,7 +492,7 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up, const Vector &fa
       int indexi;
       if( i<dof1 ) indexi = d_nodesIDs[offsetEl1 + i];
       
-      double up1, up2;
+      MFEM_SHARED double up1, up2;
 
       for (int elFace = 0; elFace < numFaces; elFace++) {
         const int f = d_sharedElemsFaces[1 + elFace + 1 + el * 7];
