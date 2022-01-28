@@ -220,6 +220,7 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const doub
 #endif
 }
 
+//TODO: need to think how to take all transport coefficients for multi-species.
 void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTensor &flux, const double &gamma,
                                const double &Rg,  // gas constant
                                const double &Pr,  // Prandtl number

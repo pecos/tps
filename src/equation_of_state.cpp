@@ -60,7 +60,6 @@ DryAir::DryAir(RunConfiguration &_runfile, int _dim) : GasMixture(WorkingFluid::
   gasParams.SetSize(numSpecies,GasParams::NUM_GASPARAMS);
   gasParams = 0.0;
   gasParams(0,GasParams::SPECIES_MW) = UNIVERSALGASCONSTANT / gas_constant;
-  gasParams(0,GasParams::SPECIES_HEAT_RATIO) = specific_heat_ratio;
 
 
   // TODO: replace Nconservative/Nprimitive.
@@ -314,14 +313,11 @@ TestBinaryAir::TestBinaryAir(RunConfiguration &_runfile, int _dim) : GasMixture(
   gasParams = 0.0;
   for (int sp = 0; sp < numSpecies; sp++){
     gasParams(sp, GasParams::SPECIES_MW) = UNIVERSALGASCONSTANT / gas_constant;
-    gasParams(sp, GasParams::SPECIES_HEAT_RATIO) = specific_heat_ratio;
   }
 }
 
 void TestBinaryAir::GetConservativesFromPrimitives(const Vector& primit,
                                                      Vector& conserv) {
-  const double specific_heat_ratio = gasParams(0, GasParams::SPECIES_HEAT_RATIO);
-  const double gas_constant = UNIVERSALGASCONSTANT / gasParams(0, GasParams::SPECIES_MW);
 
   conserv = primit;
 
@@ -361,14 +357,11 @@ double TestBinaryAir::ComputePressureDerivative(const Vector &dUp_dx, const Vect
     T = ComputeTemperature(Uin);
   }
 
-  double gas_constant = UNIVERSALGASCONSTANT / gasParams(0, GasParams::SPECIES_MW);
-
   return gas_constant*(T*dUp_dx[0] + Uin[0]*dUp_dx[1+dim]);
 }
 
 double TestBinaryAir::ComputePressureFromPrimitives(const mfem::Vector& Up)
 {
-  double gas_constant = UNIVERSALGASCONSTANT / gasParams(0, GasParams::SPECIES_MW);
   return gas_constant*Up[0]*Up[1+dim];
 }
 
@@ -376,8 +369,6 @@ void TestBinaryAir::UpdatePressureGridFunction(ParGridFunction* press, const Par
 {
   double *pGridFunc = press->HostWrite();
   const double *UpData = Up->HostRead();
-
-  const double gas_constant = UNIVERSALGASCONSTANT / gasParams(0, GasParams::SPECIES_MW);
 
   const int nnode = press->FESpace()->GetNDofs();
 
@@ -435,7 +426,7 @@ double TestBinaryAir::ComputeMaxCharSpeed(const Vector& state) {
   den_vel2 /= den;
 
   const double pres = ComputePressure(state);
-  const double sound = sqrt(gasParams(0,GasParams::SPECIES_HEAT_RATIO) * pres / den);
+  const double sound = sqrt(specific_heat_ratio * pres / den);
   const double vel = sqrt(den_vel2 / den);
 
   return vel + sound;
@@ -452,9 +443,6 @@ double TestBinaryAir::ComputeSpeedOfSound(const mfem::Vector& Uin, bool primitiv
     T = ComputeTemperature(Uin);
 
   }
-
-  const double gas_constant = UNIVERSALGASCONSTANT / gasParams(0, GasParams::SPECIES_MW);
-  const double specific_heat_ratio = gasParams(0, GasParams::SPECIES_HEAT_RATIO);
 
   return sqrt(specific_heat_ratio*gas_constant*T);
 }

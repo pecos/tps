@@ -56,7 +56,7 @@ DryAirTransport::DryAirTransport(GasMixture *_mixture, RunConfiguration &_runfil
   Pr = 0.71;
   Sc = 0.71;
   gas_constant = UNIVERSALGASCONSTANT / mixture->GetGasParams(0,GasParams::SPECIES_MW);
-  const double specific_heat_ratio = mixture->GetGasParams(0,GasParams::SPECIES_HEAT_RATIO);
+  const double specific_heat_ratio = mixture->GetSpecificHeatRatio();
   cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
 
 }

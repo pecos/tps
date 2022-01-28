@@ -129,11 +129,11 @@ public:
   //                                      const DenseMatrix &gradUp,
   //                                      DenseMatrix &PressureGrad) {};
 
-  // TODO: Need to change these and fix wherever they are used.
-  // We cannot use these for multi species (heat ratio of which species?)
-  // These are used in forcingTerm, Fluxes ASSUMING that the fluid is single species.
-  virtual double GetSpecificHeatRatio() { return gasParams(0,GasParams::SPECIES_HEAT_RATIO); }
-  virtual double GetGasConstant() { return UNIVERSALGASCONSTANT / gasParams(0,GasParams::SPECIES_MW); }
+  // Kevin: These are defined by derived classes.
+  // TODO: need to discuss how they are used throughout the code.
+  // For now, these are used to get mixture speicific heat ratio and mixture gas constant.
+  virtual double GetSpecificHeatRatio() = 0;
+  virtual double GetGasConstant() = 0;
 
   // virtual double GetViscosity(const Vector &state) = 0;
   // virtual double GetThermalConductivity(const Vector &state) = 0;
@@ -312,8 +312,8 @@ inline double DryAir::ComputeTemperature(const Vector &state){
 
 class TestBinaryAir : public GasMixture{
 private:
-  // double specific_heat_ratio;
-  // double gas_constant;
+  double specific_heat_ratio;
+  double gas_constant;
 
   // virtual void SetNumEquations();
 public:
@@ -326,7 +326,7 @@ public:
   virtual double ComputePressure(const Vector &state);
   virtual double ComputePressureFromPrimitives(const Vector &Up);
   virtual double ComputeTemperature(const Vector &state);
-  virtual double Temperature(double *rho, double *p, int nsp = 1){return p[0] / rho[0] / UNIVERSALGASCONSTANT * gasParams(0, GasParams::SPECIES_MW);};
+  virtual double Temperature(double *rho, double *p, int nsp = 1){return p[0] / rho[0] / gas_constant;};
 
   virtual double ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive = true);
 
@@ -354,8 +354,9 @@ public:
   virtual void ComputeMoleFractionGradient(const Vector &state,
                                            const DenseMatrix &gradUp,
                                            DenseMatrix &moleFractionGrad);
-  // virtual double GetSpecificHeatRatio(){return specific_heat_ratio;};
-  // virtual double GetGasConstant(){return gas_constant;};
+
+  virtual double GetSpecificHeatRatio(){return specific_heat_ratio;};
+  virtual double GetGasConstant(){return gas_constant;};
 
     // GPU functions
 #ifdef _GPU_
@@ -369,7 +370,7 @@ inline double TestBinaryAir::ComputePressure(const Vector &state) {
   for (int d = 0; d < dim; d++) den_vel2 += state(d + 1) * state(d + 1);
   den_vel2 /= state[0];
 
-  return (gasParams(0,GasParams::SPECIES_HEAT_RATIO) - 1.0) * (state[1 + dim] - 0.5 * den_vel2);
+  return (specific_heat_ratio - 1.0) * (state[1 + dim] - 0.5 * den_vel2);
 }
 
 // additional functions inlined for speed...
@@ -379,7 +380,7 @@ inline double TestBinaryAir::ComputeTemperature(const Vector &state) {
   den_vel2 /= state[0];
 
   double rhoU = state[1 + dim] - 0.5 * den_vel2;
-  double cv = UNIVERSALGASCONSTANT / gasParams(0, GasParams::SPECIES_MW) / (gasParams(0,GasParams::SPECIES_HEAT_RATIO) - 1.0);
+  double cv = gas_constant / (specific_heat_ratio - 1.0);
 
   return rhoU / state[0] / cv;
 }
