@@ -33,8 +33,10 @@
 #define BOUNDARYCONDITION_HPP_
 
 #include <tps_config.h>
+
 #include <mfem.hpp>
 #include <mfem/general/forall.hpp>
+
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
 #include "riemann_solver.hpp"
@@ -59,14 +61,14 @@ class BoundaryCondition {
   Array<int> listElems;  // list of boundary elements (position in the BC array)
 
   Array<int> offsetsBoundaryU;
-  
+
   Vector interpolated_Ubdr_;
   Vector interpolatedGradUpbdr_;
 
  public:
-  BoundaryCondition(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSystem,
-                    ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &dt, const int _dim,
-                    const int _num_equation, const int _patchNumber, const double _refLength);
+  BoundaryCondition(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSystem, ParFiniteElementSpace *_vfes,
+                    IntegrationRules *_intRules, double &dt, const int _dim, const int _num_equation,
+                    const int _patchNumber, const double _refLength);
   virtual ~BoundaryCondition();
 
   virtual void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) = 0;

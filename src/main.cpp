@@ -37,9 +37,9 @@
 #include <sstream>
 
 #include "em_options.hpp"
+#include "logger.hpp"
 #include "quasimagnetostatic.hpp"
 #include "tps.hpp"
-#include "logger.hpp"
 
 int main(int argc, char *argv[]) {
   MPI_Session mpi(argc, argv);

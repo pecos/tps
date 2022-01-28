@@ -42,7 +42,7 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSyste
       wallType(_bcType),
       fluxClass(_fluxClass),
       intPointsElIDBC(_intPointsElIDBC),
-      maxIntPoints(_maxIntPoints){
+      maxIntPoints(_maxIntPoints) {
   if (wallType == VISC_ISOTH) {
     wallTemp = _inputData[0];
   }
@@ -53,13 +53,13 @@ WallBC::~WallBC() {}
 void WallBC::initBCs() {
   if (!BCinit) {
     buildWallElemsArray(intPointsElIDBC);
-  
+
 #ifdef _GPU_
     interpolated_Ubdr_.UseDevice(true);
-    interpolated_Ubdr_.SetSize(num_equation*maxIntPoints*listElems.Size());
+    interpolated_Ubdr_.SetSize(num_equation * maxIntPoints * listElems.Size());
     interpolated_Ubdr_ = 0.;
 #endif
-    
+
     BCinit = true;
   }
 }
@@ -119,16 +119,13 @@ void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradSt
 void WallBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                            ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                            Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
-  integrpWalls_gpu(wallType, wallTemp,interpolated_Ubdr_,
-                  x, nodesIDs,posDofIds,Up,gradUp,shapesBC, normalsWBC,
-                  intPointsElIDBC, wallElems,listElems,
-                  maxIntPoints,maxDofs,dim,num_equation);
-  
+  integrpWalls_gpu(wallType, wallTemp, interpolated_Ubdr_, x, nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC,
+                   intPointsElIDBC, wallElems, listElems, maxIntPoints, maxDofs, dim, num_equation);
+
   integrateWalls_gpu(wallType, wallTemp,
                      y,  // output
-                     x,interpolated_Ubdr_,
-                     nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC, wallElems, listElems,
-                     eqSystem,maxIntPoints, maxDofs, dim, num_equation, mixture);
+                     x, interpolated_Ubdr_, nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC,
+                     wallElems, listElems, eqSystem, maxIntPoints, maxDofs, dim, num_equation, mixture);
 }
 
 void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
@@ -160,7 +157,7 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux
 void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
   double p = mixture->ComputePressure(stateIn);
   double T = mixture->ComputeTemperature(stateIn);
-  
+
   const double gamma = mixture->GetSpecificHeatRatio();
   const double Rg = mixture->GetGasConstant();
 
@@ -187,26 +184,26 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
   // modify gradient temperature so dT/dn=0 at the wall
   double DrhoDn = 0.;
   for (int d = 0; d < dim; d++) DrhoDn += gradState(0, d) * unitNorm[d];
-  double dpdn = Rg*T*DrhoDn; // this is the BC -> grad(T)*normal=0
+  double dpdn = Rg * T * DrhoDn;  // this is the BC -> grad(T)*normal=0
 
   Vector gradP(dim);
   double old_dpdn = 0.;
-  for (int d = 0; d < dim; d++){
-    Vector grads(gradState.GetColumn(d),num_equation);
-    double dpdx = mixture->ComputePressureDerivative(grads,stateIn,false);
+  for (int d = 0; d < dim; d++) {
+    Vector grads(gradState.GetColumn(d), num_equation);
+    double dpdx = mixture->ComputePressureDerivative(grads, stateIn, false);
     gradP(d) = dpdx;
-    old_dpdn += dpdx*unitNorm(d);
+    old_dpdn += dpdx * unitNorm(d);
   }
-  
+
   // force the new dp/dn
-  for (int d = 0; d < dim; d++) gradP(d) += (-old_dpdn + dpdn)*unitNorm(d);
+  for (int d = 0; d < dim; d++) gradP(d) += (-old_dpdn + dpdn) * unitNorm(d);
 
   // modify grad(T) with the corrected grad(p)
-  for (int d = 0; d < dim; d++){
+  for (int d = 0; d < dim; d++) {
     // temperature gradient for ideal Dry Air
-    gradState(1+dim,d) = T*(gradP(d)/p - gradState(0, d)/stateIn[0] );
+    gradState(1 + dim, d) = T * (gradP(d) / p - gradState(0, d) / stateIn[0]);
   }
-  
+
   if (eqSystem == NS_PASSIVE) {
     for (int d = 0; d < dim; d++) gradState(num_equation - 1, d) = 0.;
   }
@@ -237,16 +234,14 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
 }
 
 void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vector &y, const Vector &x,
-                                Vector &interpolated_Ubdr_,
-                                const Array<int> &nodesIDs, const Array<int> &posDofIds, ParGridFunction *Up,
-                                ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
+                                Vector &interpolated_Ubdr_, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+                                ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                                 Array<int> &intPointsElIDBC, Array<int> &wallElems, Array<int> &listElems,
-                                const Equations &eqSystem,
-                                const int &maxIntPoints, const int &maxDofs, const int &dim, const int &num_equation,
-                                GasMixture *mixture) {
+                                const Equations &eqSystem, const int &maxIntPoints, const int &maxDofs, const int &dim,
+                                const int &num_equation, GasMixture *mixture) {
 #ifdef _GPU_
   double *d_y = y.Write();
-//   const double *d_U = x.Read();
+  //   const double *d_U = x.Read();
   const int *d_nodesIDs = nodesIDs.Read();
   const int *d_posDofIds = posDofIds.Read();
   const double *d_shapesBC = shapesBC.Read();
@@ -257,10 +252,10 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
 
   const int totDofs = x.Size() / num_equation;
   const int numBdrElem = listElems.Size();
-  
+
   const double Rg = mixture->GetGasConstant();
   const double gamma = mixture->GetSpecificHeatRatio();
-  
+
   const double *d_interpolU = interpolated_Ubdr_.Read();
 
   // clang-format off

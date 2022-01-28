@@ -34,15 +34,14 @@
 
 #include <tps_config.h>
 
-#include <mfem/general/forall.hpp>
-
 #include <mfem.hpp>
+#include <mfem/general/forall.hpp>
 #include <string>
 
 #include "dataStructures.hpp"
+#include "equation_of_state.hpp"
 #include "mpi_groups.hpp"
 #include "run_configuration.hpp"
-#include "equation_of_state.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -61,7 +60,7 @@ class Averaging {
   const int &dim;
   RunConfiguration &config;
   MPI_Groups *groupsMPI;
-  
+
   GasMixture *mixture;
 
   // FES for RMS
@@ -95,8 +94,7 @@ class Averaging {
  public:
   Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollection *_fec, ParFiniteElementSpace *_fes,
             ParFiniteElementSpace *_dfes, ParFiniteElementSpace *_vfes, Equations &_eqSys, GasMixture *mixture,
-            const int &_num_equation,
-            const int &_dim, RunConfiguration &_config, MPI_Groups *_groupsMPI);
+            const int &_num_equation, const int &_dim, RunConfiguration &_config, MPI_Groups *_groupsMPI);
   ~Averaging();
 
   void addSampleMean(const int &iter);
@@ -117,9 +115,8 @@ class Averaging {
 
   // GPU functions
 #ifdef _GPU_
-  static void addSample_gpu(ParGridFunction *meanUp, ParGridFunction *rms, int &samplesMean,
-                            GasMixture *mixture,const ParGridFunction *Up,
-                            const int &Ndof, const int &dim, const int &num_equation);
+  static void addSample_gpu(ParGridFunction *meanUp, ParGridFunction *rms, int &samplesMean, GasMixture *mixture,
+                            const ParGridFunction *Up, const int &Ndof, const int &dim, const int &num_equation);
   static void sumValues_gpu(const Vector &meanUp, const Vector &rms, Vector &local_sums, Vector &tmp_vector,
                             const int &num_equation, const int &dim);
 #endif  // _GPU_

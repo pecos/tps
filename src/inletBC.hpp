@@ -33,10 +33,11 @@
 #define INLETBC_HPP_
 
 #include <tps_config.h>
+
 #include <mfem.hpp>
 
-#include "dataStructures.hpp"
 #include "BoundaryCondition.hpp"
+#include "dataStructures.hpp"
 #include "equation_of_state.hpp"
 #include "logger.hpp"
 #include "mpi_groups.hpp"
@@ -111,19 +112,17 @@ class InletBC : public BoundaryCondition {
 
   static void integrateInlets_gpu(const InletType type, const Vector &inputState, const double &dt,
                                   Vector &y,  // output
-                                  const Vector &x, 
-                                  Vector &interpolated_Ubdr,
-                                  const Array<int> &nodesIDs, const Array<int> &posDofIds,
-                                  ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
-                                  Array<int> &intPointsElIDBC, Array<int> &listElems, Array<int> &offsetsBoundaryU,
-                                  const int &maxIntPoints, const int &maxDofs, const int &dim, const int &num_equation,
-                                  GasMixture *mixture, Equations &eqSystem);
-  static void interpInlet_gpu(const InletType type, const Vector &inputState,
-                                  Vector &interpolated_Ubdr,
-                                  const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
-                                  ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
-                                  Array<int> &intPointsElIDBC, Array<int> &listElems, Array<int> &offsetsBoundaryU,
-                                  const int &maxIntPoints, const int &maxDofs, const int &dim, const int &num_equation);
+                                  const Vector &x, Vector &interpolated_Ubdr, const Array<int> &nodesIDs,
+                                  const Array<int> &posDofIds, ParGridFunction *Up, ParGridFunction *gradUp,
+                                  Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
+                                  Array<int> &listElems, Array<int> &offsetsBoundaryU, const int &maxIntPoints,
+                                  const int &maxDofs, const int &dim, const int &num_equation, GasMixture *mixture,
+                                  Equations &eqSystem);
+  static void interpInlet_gpu(const InletType type, const Vector &inputState, Vector &interpolated_Ubdr,
+                              const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+                              ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
+                              Array<int> &intPointsElIDBC, Array<int> &listElems, Array<int> &offsetsBoundaryU,
+                              const int &maxIntPoints, const int &maxDofs, const int &dim, const int &num_equation);
 
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void computeSubDenseVel(const int &thrd, const double *u1, double *u2, const double *nor,
@@ -144,12 +143,12 @@ class InletBC : public BoundaryCondition {
     if (thrd == 1) u2[1] = inputState[0] * inputState[1];
     if (thrd == 2) u2[2] = inputState[0] * inputState[2];
     if (dim == 3 && thrd == 3) u2[3] = inputState[0] * inputState[3];
-    if (thrd == 1+dim) {
+    if (thrd == 1 + dim) {
       double ke = 0.;
       for (int d = 0; d < dim; d++) ke += inputState[1 + d] * inputState[1 + d];
       u2[thrd] = p / (gamma - 1.) + 0.5 * inputState[0] * ke;
     }
-    if(eqSystem==NS_PASSIVE && thrd==num_equation-1){
+    if (eqSystem == NS_PASSIVE && thrd == num_equation - 1) {
       u2[thrd] = 0.;
     }
   }

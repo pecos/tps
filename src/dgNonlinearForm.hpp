@@ -33,8 +33,9 @@
 #define DGNONLINEARFORM_HPP_
 
 #include <tps_config.h>
-#include <mfem/fem/nonlinearform.hpp>
+
 #include <mfem.hpp>
+#include <mfem/fem/nonlinearform.hpp>
 
 #include "BCintegrator.hpp"
 #include "dataStructures.hpp"
@@ -72,10 +73,10 @@ class DGNonLinearForm : public ParNonlinearForm {
 
   const int &maxIntPoints;
   const int &maxDofs;
-  
+
   Vector uk_el1, grad_upk_el1;
   Vector uk_el2, grad_upk_el2;
-  
+
   Vector shared_uk_el1, shared_grad_upk_el1;
   Vector shared_uk_el2, shared_grad_upk_el2;
 
@@ -90,62 +91,35 @@ class DGNonLinearForm : public ParNonlinearForm {
   void setParallelData(parallelFacesIntegrationArrays *_parallelData, dataTransferArrays *_transferU,
                        dataTransferArrays *_transferGradUp);
 
-  static void faceIntegration_gpu(Vector &y, 
-                                  Vector &uk_el1,
-                                  Vector &uk_el2,
-                                  Vector &grad_uk_el1,
-                                  Vector &grad_uk_el2,
-                                  const ParGridFunction *gradUp, Fluxes *flux,
-                                  const int &Ndofs,
-                                  const int &Nf, const int &NumElemsType, const int &elemOffset, const int &elDof,
-                                  const int &dim, const int &num_equation, GasMixture *mixture,
+  static void faceIntegration_gpu(Vector &y, Vector &uk_el1, Vector &uk_el2, Vector &grad_uk_el1, Vector &grad_uk_el2,
+                                  const ParGridFunction *gradUp, Fluxes *flux, const int &Ndofs, const int &Nf,
+                                  const int &NumElemsType, const int &elemOffset, const int &elDof, const int &dim,
+                                  const int &num_equation, GasMixture *mixture,
                                   const volumeFaceIntegrationArrays &gpuArrays, const int &maxIntPoints,
                                   const int &maxDofs);
 
   static void sharedFaceIntegration_gpu(const Vector &x, const Vector &faceU, const ParGridFunction *gradUp,
-                                        const Vector &faceGradUp, Vector &y, 
-                                        Vector &shared_uk_el1,
-                                        Vector &shared_uk_el2,
-                                        Vector &shared_grad_upk_el1,
-                                        Vector &shared_grad_upk_el2,
-                                        const int &Ndofs, const int &dim,
-                                        const int &num_equation, GasMixture *mixture, Fluxes *flux,
-                                        const volumeFaceIntegrationArrays &gpuArrays,
+                                        const Vector &faceGradUp, Vector &y, Vector &shared_uk_el1,
+                                        Vector &shared_uk_el2, Vector &shared_grad_upk_el1, Vector &shared_grad_upk_el2,
+                                        const int &Ndofs, const int &dim, const int &num_equation, GasMixture *mixture,
+                                        Fluxes *flux, const volumeFaceIntegrationArrays &gpuArrays,
                                         const parallelFacesIntegrationArrays *parallelData, const int &maxIntPoints,
                                         const int &maxDofs);
-  
-  static void interpFaceData_gpu( const Vector &x, 
-                                          Vector &uk_el1,
-                                          Vector &uk_el2,
-                                          Vector &grad_uk_el1,
-                                          Vector &grad_uk_el2,
-                                          const ParGridFunction *gradUp, 
-                                          const int &Ndofs,
-                                          const int &Nf, 
-                                          const int &NumElemsType, 
-                                          const int &elemOffset, 
-                                          const int &elDof,
-                                          const int &dim, 
-                                          const int &num_equation, 
-                                          const double &gamma, 
-                                          const double &Rg,
-                                          const double &viscMult, 
-                                          const double &bulkViscMult, 
-                                          const double &Pr,
-                                          const volumeFaceIntegrationArrays &gpuArrays, 
-                                          const int &maxIntPoints,
-                                          const int &maxDofs);
+
+  static void interpFaceData_gpu(const Vector &x, Vector &uk_el1, Vector &uk_el2, Vector &grad_uk_el1,
+                                 Vector &grad_uk_el2, const ParGridFunction *gradUp, const int &Ndofs, const int &Nf,
+                                 const int &NumElemsType, const int &elemOffset, const int &elDof, const int &dim,
+                                 const int &num_equation, const double &gamma, const double &Rg, const double &viscMult,
+                                 const double &bulkViscMult, const double &Pr,
+                                 const volumeFaceIntegrationArrays &gpuArrays, const int &maxIntPoints,
+                                 const int &maxDofs);
   static void sharedFaceInterpolation_gpu(const Vector &x, const Vector &faceU, const ParGridFunction *gradUp,
-                                        const Vector &faceGradUp, 
-                                        Vector &shared_uk_el1,
-                                        Vector &shared_uk_el2,
-                                        Vector &shared_grad_upk_el1,
-                                        Vector &shared_grad_upk_el2,
-                                        const int &Ndofs, const int &dim,
-                                        const int &num_equation, GasMixture *mixture,
-                                        const volumeFaceIntegrationArrays &gpuArrays,
-                                        const parallelFacesIntegrationArrays *parallelData, const int &maxIntPoints,
-                                        const int &maxDofs);
+                                          const Vector &faceGradUp, Vector &shared_uk_el1, Vector &shared_uk_el2,
+                                          Vector &shared_grad_upk_el1, Vector &shared_grad_upk_el2, const int &Ndofs,
+                                          const int &dim, const int &num_equation, GasMixture *mixture,
+                                          const volumeFaceIntegrationArrays &gpuArrays,
+                                          const parallelFacesIntegrationArrays *parallelData, const int &maxIntPoints,
+                                          const int &maxDofs);
 
 #ifdef _GPU_
   void Mult_domain(const Vector &x, Vector &y);

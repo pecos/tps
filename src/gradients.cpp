@@ -34,10 +34,10 @@
 #include "dgNonlinearForm.hpp"
 
 Gradients::Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradUpfes, int _dim, int _num_equation,
-                     ParGridFunction *_Up, ParGridFunction *_gradUp, GasMixture *_mixture,
-                     GradNonLinearForm *_gradUp_A, IntegrationRules *_intRules, int _intRuleType,
-                     const volumeFaceIntegrationArrays &_gpuArrays, Array<DenseMatrix *> &_Me_inv, Vector &_invMArray,
-                     Array<int> &_posDofInvM, const int &_maxIntPoints, const int &_maxDofs)
+                     ParGridFunction *_Up, ParGridFunction *_gradUp, GasMixture *_mixture, GradNonLinearForm *_gradUp_A,
+                     IntegrationRules *_intRules, int _intRuleType, const volumeFaceIntegrationArrays &_gpuArrays,
+                     Array<DenseMatrix *> &_Me_inv, Vector &_invMArray, Array<int> &_posDofInvM,
+                     const int &_maxIntPoints, const int &_maxDofs)
     : ParNonlinearForm(_vfes),
       vfes(_vfes),
       gradUpfes(_gradUpfes),
@@ -205,18 +205,9 @@ void Gradients::computeGradients_domain() {
       for (int i = 0; i < elType; i++) elemOffset += h_numElems[i];
     }
     int dof_el = h_posDofIds[2 * elemOffset + 1];
-    
-    faceContrib_gpu(h_numElems[elType], 
-                    elemOffset, 
-                    dof_el, 
-                    vfes->GetNDofs(),
-                    *Up, 
-                    *gradUp, 
-                    num_equation, 
-                    dim, 
-                    gpuArrays,
-                    maxDofs, 
-                    maxIntPoints);
+
+    faceContrib_gpu(h_numElems[elType], elemOffset, dof_el, vfes->GetNDofs(), *Up, *gradUp, num_equation, dim,
+                    gpuArrays, maxDofs, maxIntPoints);
 
     computeGradients_gpu(h_numElems[elType], elemOffset, dof_el, vfes->GetNDofs(),
                          *Up,  // px,
@@ -270,54 +261,43 @@ void Gradients::computeGradients_gpu(const int numElems, const int offsetElems, 
       
       double gradUpk;
       for(int eq=0;eq<num_equation;eq++){
-        Ui[i] = d_Up[indexi + eq * totalDofs];
-        for (int d = 0; d < dim; d++) {
-          // this loads face contribution
-          gradUpi[i + d * elDof] = 
-            d_gradUp[indexi+eq*totalDofs+d*num_equation*totalDofs];
-        }
-        MFEM_SYNC_THREAD;
-        
-        for (int k = 0; k < Q; k++) {
-          const double weightDetJac = d_elemShapeDshapeWJ[offsetDShape + elDof + dim * elDof + k * ((dim + 1) * elDof + 1)];
-          l1[i] = d_elemShapeDshapeWJ[offsetDShape + i + k * ((dim + 1) * elDof + 1)];
-          
-          for(int d=0;d<dim;d++){
-            gradUpk = 0.;
-            
-            dl1[i] = d_elemShapeDshapeWJ[offsetDShape + elDof + i + d * elDof + k * ((dim + 1) * elDof + 1)];
-            MFEM_SYNC_THREAD;
-            
-            for (int j = 0; j < elDof; j++) gradUpk += dl1[j] * Ui[j];
-            MFEM_SYNC_THREAD;
-            
-            gradUpi[i + d * elDof ] += gradUpk * l1[i] * weightDetJac;
-          } // end loop dimensions
-        } // end loop integration points
-        
-        // write to global memory
-        for(int d=0;d<dim;d++) 
-          d_gradUp[indexi+eq*totalDofs+d*num_equation*totalDofs] = gradUpi[i + d * elDof ];
-        MFEM_SYNC_THREAD;
-      } //end equation loop
+    Ui[i] = d_Up[indexi + eq * totalDofs];
+    for (int d = 0; d < dim; d++) {
+      // this loads face contribution
+      gradUpi[i + d * elDof] = d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs];
+    }
+    MFEM_SYNC_THREAD;
 
+    for (int k = 0; k < Q; k++) {
+      const double weightDetJac = d_elemShapeDshapeWJ[offsetDShape + elDof + dim * elDof + k * ((dim + 1) * elDof + 1)];
+      l1[i] = d_elemShapeDshapeWJ[offsetDShape + i + k * ((dim + 1) * elDof + 1)];
+
+      for (int d = 0; d < dim; d++) {
+        gradUpk = 0.;
+
+        dl1[i] = d_elemShapeDshapeWJ[offsetDShape + elDof + i + d * elDof + k * ((dim + 1) * elDof + 1)];
+        MFEM_SYNC_THREAD;
+
+        for (int j = 0; j < elDof; j++) gradUpk += dl1[j] * Ui[j];
+        MFEM_SYNC_THREAD;
+
+        gradUpi[i + d * elDof] += gradUpk * l1[i] * weightDetJac;
+      }  // end loop dimensions
+    }    // end loop integration points
+
+    // write to global memory
+    for (int d = 0; d < dim; d++)
+      d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs] = gradUpi[i + d * elDof];
+    MFEM_SYNC_THREAD;
+      } //end equation loop
 }
 });
 }
 
-
-void Gradients::faceContrib_gpu(const int numElems, 
-                                const int offsetElems, 
-                                const int elDof, 
-                                const int totalDofs, 
-                                const Vector& Up, 
-                                Vector& gradUp, 
-                                const int num_equation, 
-                                const int dim, 
-                                const volumeFaceIntegrationArrays& gpuArrays,
-                                const int& maxDofs, 
-                                const int& maxIntPoints)
-{
+void Gradients::faceContrib_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
+                                const Vector &Up, Vector &gradUp, const int num_equation, const int dim,
+                                const volumeFaceIntegrationArrays &gpuArrays, const int &maxDofs,
+                                const int &maxIntPoints) {
   const double *d_Up = Up.Read();
   double *d_gradUp = gradUp.Write();
   auto d_posDofIds = gpuArrays.posDofIds.Read();
@@ -342,120 +322,118 @@ void Gradients::faceContrib_gpu(const int numElems,
       
       // set to 0 the contribution to the gradients
       for(int eq=0;eq<num_equation;eq++){
-        for(int d=0;d<dim;d++){
-          gradUpi[i + eq * elDof + d * num_equation * elDof] = 0.;
-        }
+    for (int d = 0; d < dim; d++) {
+      gradUpi[i + eq * elDof + d * num_equation * elDof] = 0.;
+    }
       }
       MFEM_SYNC_THREAD;
 
       // ================  FACE CONTRIBUTION  ================
       const int elFaces = d_elemFaces[7 * eli];
       for (int face = 0; face < elFaces; face++) {
-        const int gFace = d_elemFaces[7 * eli + face + 1];
-        const int Q = d_elems12Q[3 * gFace + 2];
-        const int offsetShape1 = gFace * maxIntPoints * (maxDofs + 1 + dim);
-        const int offsetShape2 = gFace * maxIntPoints * maxDofs;
-        bool swapElems = false;
+    const int gFace = d_elemFaces[7 * eli + face + 1];
+    const int Q = d_elems12Q[3 * gFace + 2];
+    const int offsetShape1 = gFace * maxIntPoints * (maxDofs + 1 + dim);
+    const int offsetShape2 = gFace * maxIntPoints * maxDofs;
+    bool swapElems = false;
 
-        // get neighbor
-        int elj = d_elems12Q[3 * gFace];
-        if (elj == eli) {
-          elj = d_elems12Q[3 * gFace + 1];
-        } else {
-          swapElems = true;
-        }
+    // get neighbor
+    int elj = d_elems12Q[3 * gFace];
+    if (elj == eli) {
+      elj = d_elems12Q[3 * gFace + 1];
+    } else {
+      swapElems = true;
+    }
 
-        const int offsetElj = d_posDofIds[2 * elj];
-        int dofj = d_posDofIds[2 * elj + 1];
-        int dof1 = elDof;
-        int dof2 = dofj;
+    const int offsetElj = d_posDofIds[2 * elj];
+    int dofj = d_posDofIds[2 * elj + 1];
+    int dof1 = elDof;
+    int dof2 = dofj;
+    if (swapElems) {
+      dof1 = dofj;
+      dof2 = elDof;
+    }
+
+    for (int j = i; j < dofj; j += elDof) index_j[j] = d_nodesIDs[offsetElj + j];
+    MFEM_SYNC_THREAD;
+
+    for (int k = 0; k < Q; k++) {
+      const double weight = d_shapeWnor1[offsetShape1 + maxDofs + k * (maxDofs + 1 + dim)];
+      for (int d = i; d < dim; d += elDof)
+        nor[d] = d_shapeWnor1[offsetShape1 + maxDofs + 1 + d + k * (maxDofs + 1 + dim)];
+      // load interpolators
+      for (int j = i; j < dof1; j += elDof) l1[j] = d_shapeWnor1[offsetShape1 + j + k * (maxDofs + 1 + dim)];
+      for (int j = i; j < dof2; j += elDof) l2[j] = d_shape2[offsetShape2 + j + k * maxDofs];
+      MFEM_SYNC_THREAD;
+
+      // set to 0
+      for (int eq = i; eq < num_equation; eq += elDof) {
+        u1[eq] = 0.;
+        u2[eq] = 0.;
+      }
+      MFEM_SYNC_THREAD;
+
+      for (int eq = 0; eq < num_equation; eq++) {
         if (swapElems) {
-          dof1 = dofj;
-          dof2 = elDof;
+          // load el1
+          for (int j = i; j < dof1; j += elDof) {
+            int index = index_j[j];
+            U1[j] = d_Up[index + eq * totalDofs];
+          }
+          MFEM_SYNC_THREAD;
+
+          // load el2
+          for (int j = i; j < dof2; j += elDof) U2[j] = d_Up[indexi + eq * totalDofs];
+          MFEM_SYNC_THREAD;
+
+        } else {
+          // load data el1
+          for (int j = i; j < dof1; j += elDof) U1[j] = d_Up[indexi + eq * totalDofs];
+          MFEM_SYNC_THREAD;
+
+          // elem 2
+          for (int j = i; j < dof2; j += elDof) {
+            int index = index_j[j];
+            U2[j] = d_Up[index + eq * totalDofs];
+          }
+          MFEM_SYNC_THREAD;
         }
 
-        for (int j = i; j < dofj; j += elDof) index_j[j] = d_nodesIDs[offsetElj + j];
+        // interpolate el1
+        // NOTE: make parallel
+        if (i == 0)
+          for (int j = 0; j < dof1; j++) u1[eq] += l1[j] * U1[j];
         MFEM_SYNC_THREAD;
-        
-        
-        for (int k = 0; k < Q; k++) {
-          const double weight = d_shapeWnor1[offsetShape1 + maxDofs + k * (maxDofs + 1 + dim)];
-          for(int d=i; d<dim;d+=elDof) 
-            nor[d] = d_shapeWnor1[offsetShape1 + maxDofs + 1 + d + k * (maxDofs + 1 + dim)];
-          // load interpolators 
-          for (int j = i; j < dof1; j += elDof) l1[j] = d_shapeWnor1[offsetShape1 + j + k * (maxDofs + 1 + dim)];
-          for (int j = i; j < dof2; j += elDof) l2[j] = d_shape2[offsetShape2 + j + k * maxDofs];
-          MFEM_SYNC_THREAD;
-          
-          // set to 0
-          for(int eq=i;eq<num_equation;eq+=elDof){
-            u1[eq] = 0.;
-            u2[eq] = 0.;
-          }
-          MFEM_SYNC_THREAD;
-          
-          for(int eq=0;eq<num_equation;eq++){
-            if (swapElems ){
-              // load el1
-              for(int j=i;j<dof1;j+=elDof){
-                int index = index_j[j];
-                U1[j] = d_Up[index + eq * totalDofs];
-              }
-              MFEM_SYNC_THREAD;
-              
-              // load el2
-              for(int j=i;j<dof2;j+=elDof) U2[j] = d_Up[indexi + eq * totalDofs];
-              MFEM_SYNC_THREAD;
-              
-            }else{
-              //load data el1
-              for(int j=i;j<dof1;j+=elDof) U1[j] = d_Up[indexi + eq * totalDofs];
-              MFEM_SYNC_THREAD;
-              
-              // elem 2
-              for(int j=i;j<dof2;j+=elDof){
-                int index = index_j[j];
-                U2[j] = d_Up[index + eq * totalDofs];
-              }
-              MFEM_SYNC_THREAD;
-            }
-            
-            // interpolate el1
-            // NOTE: make parallel
-            if( i==0 )
-              for(int j=0;j<dof1;j++) u1[eq] += l1[j]*U1[j];
-            MFEM_SYNC_THREAD;
-              
-            // interpolate el2
-            // NOTE: make parallel
-            if(i==0)
-              for(int j=0;j<dof2;j++) u2[eq] += l2[j]*U2[j];
-            MFEM_SYNC_THREAD;
-            
-            for (int d = 0; d < dim; d++) {
-              double contrib = weight * 0.5*(u2[eq]-u1[eq]) * nor[d];
-              if( swapElems )
-                contrib *= l2[i];
-              else
-                contrib *= l1[i];
 
-              gradUpi[i + eq * elDof + d * num_equation * elDof] += contrib;
-            }
-          } // end equation loop
-        } // end loop over integration points
-        
-        // global memory
-        for (int eq = 0; eq < num_equation; eq++) {
-          for (int d = 0; d < dim; d++) {
-            d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs] =
-                gradUpi[i + eq * elDof + d * num_equation * elDof];
-          }
+        // interpolate el2
+        // NOTE: make parallel
+        if (i == 0)
+          for (int j = 0; j < dof2; j++) u2[eq] += l2[j] * U2[j];
+        MFEM_SYNC_THREAD;
+
+        for (int d = 0; d < dim; d++) {
+          double contrib = weight * 0.5 * (u2[eq] - u1[eq]) * nor[d];
+          if (swapElems)
+            contrib *= l2[i];
+          else
+            contrib *= l1[i];
+
+          gradUpi[i + eq * elDof + d * num_equation * elDof] += contrib;
         }
+      }  // end equation loop
+    }    // end loop over integration points
+
+    // global memory
+    for (int eq = 0; eq < num_equation; eq++) {
+      for (int d = 0; d < dim; d++) {
+        d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs] =
+            gradUpi[i + eq * elDof + d * num_equation * elDof];
       }
     }
-  });
+      }
 }
-
+});
+}
 
 void Gradients::integrationGradSharedFace_gpu(const Vector *Up, const Vector &faceUp, ParGridFunction *gradUp,
                                               const int &Ndofs, const int &dim, const int &num_equation,
@@ -495,55 +473,56 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up, const Vector &fa
       MFEM_SHARED double up1, up2;
 
       for (int elFace = 0; elFace < numFaces; elFace++) {
-        const int f = d_sharedElemsFaces[1 + elFace + 1 + el * 7];
-        const int dof2 = d_sharedElem1Dof12Q[2 + f * 4];
-        const int Q = d_sharedElem1Dof12Q[3 + f * 4];
-        
-        for(int eq=0;eq<num_equation;eq++){
-          if( i<dof1 ) Upi[i] = d_up[indexi + eq * Ndofs];
-          if (i < dof2) {  // recover data from neighbor
-            int index = d_sharedVdofs[i + eq * maxDofs + f * num_equation * maxDofs];
-            Upj[i] = d_faceData[index];
-          }
-          MFEM_SYNC_THREAD;
-          
-          for(int n=i;n<dof1*dim;n+=maxDofs) Fcontrib[n] = 0.;
-          
-          for (int k = 0; k < Q; k++) {
-            const double weight =
-              d_sharedShapeWnor1[maxDofs + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
-            if (i < dof1) l1[i] = d_sharedShapeWnor1[i + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
-            if (i < dim)
-              nor[i] = d_sharedShapeWnor1[maxDofs + 1 + i + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
-            if (dim == 2 && i == maxDofs - 1) nor[2] = 0.;
-            if (i < dof2) l2[i] = d_sharedShape2[i + k * maxDofs + f * maxIntPoints * maxDofs];
-            MFEM_SYNC_THREAD;
-            
-            // interpolation
-            // NOTE: make parallel!
-            if( i==0 ){
-              up1 = 0.;
-              up2 = 0.;
-              for (int n = 0; n < dof1; n++) up1 += Upi[n] * l1[n];
-              for (int n = 0; n < dof2; n++) up2 += Upj[n] * l2[n];
-            }
-            MFEM_SYNC_THREAD;
-            
-            // add contribution
-            if (i < dof1) 
-              for(int d=0;d<dim;d++) Fcontrib[i + d * dof1 ] += 0.5 * (up2 - up1) * weight * l1[i] * nor[d];
-            MFEM_SYNC_THREAD;
-            
-          } // end integration loop
-          
-          // save contribution to global memory
-          if( i<dof1 ){
-            for(int d=0;d<dim;d++){
-              d_gradUp[indexi + eq * Ndofs + d * num_equation * Ndofs] += Fcontrib[i + d * dof1 ];
-            }
-          }
-          MFEM_SYNC_THREAD;
-        } // end equation loop
+    const int f = d_sharedElemsFaces[1 + elFace + 1 + el * 7];
+    const int dof2 = d_sharedElem1Dof12Q[2 + f * 4];
+    const int Q = d_sharedElem1Dof12Q[3 + f * 4];
+
+    for (int eq = 0; eq < num_equation; eq++) {
+      if (i < dof1) Upi[i] = d_up[indexi + eq * Ndofs];
+      if (i < dof2) {  // recover data from neighbor
+        int index = d_sharedVdofs[i + eq * maxDofs + f * num_equation * maxDofs];
+        Upj[i] = d_faceData[index];
+      }
+      MFEM_SYNC_THREAD;
+
+      for (int n = i; n < dof1 * dim; n += maxDofs) Fcontrib[n] = 0.;
+
+      for (int k = 0; k < Q; k++) {
+        const double weight =
+            d_sharedShapeWnor1[maxDofs + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
+        if (i < dof1) l1[i] = d_sharedShapeWnor1[i + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
+        if (i < dim)
+          nor[i] =
+              d_sharedShapeWnor1[maxDofs + 1 + i + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
+        if (dim == 2 && i == maxDofs - 1) nor[2] = 0.;
+        if (i < dof2) l2[i] = d_sharedShape2[i + k * maxDofs + f * maxIntPoints * maxDofs];
+        MFEM_SYNC_THREAD;
+
+        // interpolation
+        // NOTE: make parallel!
+        if (i == 0) {
+          up1 = 0.;
+          up2 = 0.;
+          for (int n = 0; n < dof1; n++) up1 += Upi[n] * l1[n];
+          for (int n = 0; n < dof2; n++) up2 += Upj[n] * l2[n];
+        }
+        MFEM_SYNC_THREAD;
+
+        // add contribution
+        if (i < dof1)
+          for (int d = 0; d < dim; d++) Fcontrib[i + d * dof1] += 0.5 * (up2 - up1) * weight * l1[i] * nor[d];
+        MFEM_SYNC_THREAD;
+
+      }  // end integration loop
+
+      // save contribution to global memory
+      if (i < dof1) {
+        for (int d = 0; d < dim; d++) {
+          d_gradUp[indexi + eq * Ndofs + d * num_equation * Ndofs] += Fcontrib[i + d * dof1];
+        }
+      }
+      MFEM_SYNC_THREAD;
+    }   // end equation loop
       } // end face loop
 }
 });
@@ -571,21 +550,20 @@ void Gradients::multInverse_gpu(const int numElems, const int offsetElems, const
       const int indexi    = d_nodesIDs[offsetIDs + i];
 
       for (int eq = 0; eq < num_equation; eq++) {
-        for (int d = 0; d < dim; d++) {
-          gradUpi[i + d * elDof ] =
-              d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs];
-        }
-      
-        MFEM_SYNC_THREAD;
+    for (int d = 0; d < dim; d++) {
+      gradUpi[i + d * elDof] = d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs];
+    }
 
-        for (int d = 0; d < dim; d++) {
-          double temp = 0;
-          for (int n = 0; n < elDof; n++) {
-            temp += gradUpi[n + d * elDof ] * d_invMArray[offsetInv + i * elDof + n];
-          }
-          d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs] = temp;
-        }
-        MFEM_SYNC_THREAD;
+    MFEM_SYNC_THREAD;
+
+    for (int d = 0; d < dim; d++) {
+      double temp = 0;
+      for (int n = 0; n < elDof; n++) {
+        temp += gradUpi[n + d * elDof] * d_invMArray[offsetInv + i * elDof + n];
+      }
+      d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs] = temp;
+    }
+    MFEM_SYNC_THREAD;
       }
 }
 });

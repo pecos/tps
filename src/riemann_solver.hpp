@@ -33,7 +33,9 @@
 #define RIEMANN_SOLVER_HPP_
 
 #include <tps_config.h>
+
 #include <mfem.hpp>
+
 #include "dataStructures.hpp"
 #include "fluxes.hpp"
 
@@ -64,12 +66,12 @@ class RiemannSolver {
   void ComputeFluxDotN(const Vector &state, const Vector &nor, Vector &fluxN);
 
 #ifdef _GPU_
-  static MFEM_HOST_DEVICE void convFluxDotNorm_gpu(double *fluxN,const double *state, 
-                                                   const double &pres, const double *nor,
-                                                   const int &num_equation, const int &dim, const Equations &eqSystem,
-                                                   const int &thrd, const int &max_num_threads) {
+  static MFEM_HOST_DEVICE void convFluxDotNorm_gpu(double *fluxN, const double *state, const double &pres,
+                                                   const double *nor, const int &num_equation, const int &dim,
+                                                   const Equations &eqSystem, const int &thrd,
+                                                   const int &max_num_threads) {
     MFEM_SHARED double den_velN;
-    
+
     if (thrd == 0) {
       den_velN = 0.;
       for (int d = 0; d < dim; d++) den_velN += state[d + 1] * nor[d];
@@ -83,15 +85,16 @@ class RiemannSolver {
       const double H = (state[dim + 1] + pres) / state[0];
       fluxN[1 + dim] = den_velN * H;
     }
-    
-    if( eqSystem==NS_PASSIVE && thrd==max_num_threads-2){
-      fluxN[num_equation-1] = den_velN * state[num_equation-1]/state[0];
+
+    if (eqSystem == NS_PASSIVE && thrd == max_num_threads - 2) {
+      fluxN[num_equation - 1] = den_velN * state[num_equation - 1] / state[0];
     }
   }
 
   static MFEM_HOST_DEVICE void riemannLF_gpu(const double *U1, const double *U2, double *flux, const double *nor,
-                                             const double &gamma, const double &Rg, const int &dim,const Equations &eqSystem,
-                                             const int &num_equation, const int &thrd, const int &max_num_threads) {
+                                             const double &gamma, const double &Rg, const int &dim,
+                                             const Equations &eqSystem, const int &num_equation, const int &thrd,
+                                             const int &max_num_threads) {
     MFEM_SHARED double KE1[3], KE2[3];
     MFEM_SHARED double vel1, vel2, p1, p2;
     MFEM_SHARED double maxE1, maxE2, maxE;
@@ -125,9 +128,9 @@ class RiemannSolver {
 
     if (thrd == max_num_threads - 1) maxE = max(maxE1, maxE2);
 
-    RiemannSolver::convFluxDotNorm_gpu(flux1,U1, p1, nor,num_equation,dim,eqSystem, thrd, max_num_threads);
+    RiemannSolver::convFluxDotNorm_gpu(flux1, U1, p1, nor, num_equation, dim, eqSystem, thrd, max_num_threads);
     MFEM_SYNC_THREAD;
-    RiemannSolver::convFluxDotNorm_gpu(flux2,U2, p2, nor,num_equation,dim,eqSystem, thrd, max_num_threads);
+    RiemannSolver::convFluxDotNorm_gpu(flux2, U2, p2, nor, num_equation, dim, eqSystem, thrd, max_num_threads);
 
     if (thrd == 0) {
       normag = 0.;

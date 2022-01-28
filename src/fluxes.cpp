@@ -84,8 +84,8 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   switch (eqSystem) {
     case NS:
     case NS_PASSIVE: {
-//       const double p = mixture->ComputePressure(state);
-//       const double temp = p / state[0] / Rg;
+      //       const double p = mixture->ComputePressure(state);
+      //       const double temp = p / state[0] / Rg;
       const double visc = mixture->GetViscosity(state);
       const double bulkViscMult = mixture->GetBulkViscMultiplyer();
       const double k = mixture->GetThermalConductivity(state);
@@ -106,7 +106,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
         for (int j = 0; j < dim; j++) flux(1 + i, j) = stress(i, j);
 
       // temperature gradient
-//       for (int d = 0; d < dim; d++) gradT[d] = temp * (gradUp(1 + dim, d) / p - gradUp(0, d) / state[0]);
+      //       for (int d = 0; d < dim; d++) gradT[d] = temp * (gradUp(1 + dim, d) / p - gradUp(0, d) / state[0]);
 
       for (int d = 0; d < dim; d++) vel(d) = state[1 + d] / state[0];
 
@@ -152,14 +152,12 @@ void Fluxes::ComputeSplitFlux(const mfem::Vector &state, mfem::DenseMatrix &a_ma
   }
 }
 
-void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, 
-                                  const Equations &eqSystem, GasMixture *mixture, 
-                                  const int &dof,
-                                  const int &dim, const int &num_equation) {
+void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const Equations &eqSystem, GasMixture *mixture,
+                                  const int &dof, const int &dim, const int &num_equation) {
 #ifdef _GPU_
   auto dataIn = x.Read();
   auto d_flux = flux.Write();
-  
+
   double gamma = mixture->GetSpecificHeatRatio();
   double Sc = mixture->GetSchmidtNum();
 
@@ -178,8 +176,7 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux,
 
       if (eq == 0) p = DryAir::pressure(&Un[0], &KE[0], gamma, dim, num_equation);
       MFEM_SYNC_THREAD;
-        
-        
+
       double temp;
       for (int d = 0; d < dim; d++) {
         if (eq == 0) d_flux[n + d * dof + eq * dof * dim] = Un[1 + d];
@@ -188,11 +185,11 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux,
           if (eq - 1 == d) temp += p;
           d_flux[n + d * dof + eq * dof * dim] = temp;
         }
-        if (eq == 1+dim ) {
+        if (eq == 1 + dim) {
           d_flux[n + d * dof + eq * dof * dim] = Un[1 + d] * (Un[1 + dim] + p) / Un[0];
         }
-        
-        if( eq == num_equation -1 && eqSystem==NS_PASSIVE)
+
+        if (eq == num_equation - 1 && eqSystem == NS_PASSIVE)
           d_flux[n + d * dof + eq * dof * dim] = Un[num_equation - 1] * Un[1 + d] / Un[0];
       }
     }  // end MFEM_FOREACH_THREAD
@@ -200,10 +197,10 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux,
 #endif
 }
 
-void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTensor &flux, 
-                               const Equations &eqSystem, GasMixture *mixture,
-                               const ParGridFunction *spaceVaryViscMult, const linearlyVaryingVisc &linViscData,
-                               const int &dof, const int &dim, const int &num_equation) {
+void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTensor &flux, const Equations &eqSystem,
+                               GasMixture *mixture, const ParGridFunction *spaceVaryViscMult,
+                               const linearlyVaryingVisc &linViscData, const int &dof, const int &dim,
+                               const int &num_equation) {
 #ifdef _GPU_
   const double *dataIn = x.Read();
   double *d_flux = flux.ReadWrite();
@@ -215,7 +212,7 @@ void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTe
   } else {
     d_spaceVaryViscMult = NULL;
   }
-  
+
   const double gamma = mixture->GetSpecificHeatRatio();
   const double Rg = mixture->GetGasConstant();
   const double viscMult = mixture->GetViscMultiplyer();

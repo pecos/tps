@@ -35,7 +35,7 @@
 
 #include "riemann_solver.hpp"
 
-DGNonLinearForm::DGNonLinearForm(Fluxes *_flux,ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradFes,
+DGNonLinearForm::DGNonLinearForm(Fluxes *_flux, ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradFes,
                                  ParGridFunction *_gradUp, BCintegrator *_bcIntegrator, IntegrationRules *_intRules,
                                  const int _dim, const int _num_equation, GasMixture *_mixture,
                                  const volumeFaceIntegrationArrays &_gpuArrays, const int &_maxIntPoints,
@@ -55,43 +55,40 @@ DGNonLinearForm::DGNonLinearForm(Fluxes *_flux,ParFiniteElementSpace *_vfes, Par
       maxDofs(_maxDofs) {
   h_numElems = gpuArrays.numElems.HostRead();
   h_posDofIds = gpuArrays.posDofIds.HostRead();
-  
+
   uk_el1.UseDevice(true);
   uk_el2.UseDevice(true);
   grad_upk_el1.UseDevice(true);
   grad_upk_el2.UseDevice(true);
-  
+
   int nfaces = vfes->GetMesh()->GetNumFaces();
-  uk_el1.SetSize(nfaces*maxIntPoints*num_equation);
-  uk_el2.SetSize(nfaces*maxIntPoints*num_equation);
-  grad_upk_el1.SetSize(nfaces*maxIntPoints*num_equation*dim);
-  grad_upk_el2.SetSize(nfaces*maxIntPoints*num_equation*dim);
+  uk_el1.SetSize(nfaces * maxIntPoints * num_equation);
+  uk_el2.SetSize(nfaces * maxIntPoints * num_equation);
+  grad_upk_el1.SetSize(nfaces * maxIntPoints * num_equation * dim);
+  grad_upk_el2.SetSize(nfaces * maxIntPoints * num_equation * dim);
   uk_el1 = 0.;
   uk_el2 = 0.;
   grad_upk_el1 = 0.;
   grad_upk_el2 = 0.;
 }
 
-void DGNonLinearForm::setParallelData(parallelFacesIntegrationArrays* _parallelData, 
-                                      dataTransferArrays* _transferU, 
-                                      dataTransferArrays* _transferGradUp)
-{
+void DGNonLinearForm::setParallelData(parallelFacesIntegrationArrays *_parallelData, dataTransferArrays *_transferU,
+                                      dataTransferArrays *_transferGradUp) {
   parallelData = _parallelData;
   transferU = _transferU;
   transferGradUp = _transferGradUp;
-    
+
   shared_uk_el1.UseDevice(true);
   shared_uk_el2.UseDevice(true);
   shared_grad_upk_el1.UseDevice(true);
   shared_grad_upk_el2.UseDevice(true);
-  
-  int maxNumElems = parallelData->sharedElemsFaces.Size()/7; // elements with shared faces
-  shared_uk_el1.SetSize(maxNumElems*5*maxIntPoints*num_equation);
-  shared_uk_el2.SetSize(maxNumElems*5*maxIntPoints*num_equation);
-  shared_grad_upk_el1.SetSize(maxNumElems*5*maxIntPoints*num_equation*dim);
-  shared_grad_upk_el2.SetSize(maxNumElems*5*maxIntPoints*num_equation*dim);
-}
 
+  int maxNumElems = parallelData->sharedElemsFaces.Size() / 7;  // elements with shared faces
+  shared_uk_el1.SetSize(maxNumElems * 5 * maxIntPoints * num_equation);
+  shared_uk_el2.SetSize(maxNumElems * 5 * maxIntPoints * num_equation);
+  shared_grad_upk_el1.SetSize(maxNumElems * 5 * maxIntPoints * num_equation * dim);
+  shared_grad_upk_el2.SetSize(maxNumElems * 5 * maxIntPoints * num_equation * dim);
+}
 
 void DGNonLinearForm::Mult(const Vector &x, Vector &y) {
   ParNonlinearForm::Mult(x, y);
@@ -160,17 +157,15 @@ void DGNonLinearForm::Mult_domain(const Vector &x, Vector &y) {
       int dof_el = h_posDofIds[2 * elemOffset + 1];
 
       interpFaceData_gpu(x,  // px,
-                         uk_el1,uk_el2,grad_upk_el1,grad_upk_el2,
-                          gradUp, vfes->GetNDofs(), mesh->GetNumFaces(), h_numElems[elType], elemOffset, dof_el, dim,
-                          num_equation, mixture->GetSpecificHeatRatio(), mixture->GetGasConstant(),
-                          mixture->GetViscMultiplyer(), mixture->GetBulkViscMultiplyer(), mixture->GetPrandtlNum(),
-                          gpuArrays, maxIntPoints, maxDofs);
-      
+                         uk_el1, uk_el2, grad_upk_el1, grad_upk_el2, gradUp, vfes->GetNDofs(), mesh->GetNumFaces(),
+                         h_numElems[elType], elemOffset, dof_el, dim, num_equation, mixture->GetSpecificHeatRatio(),
+                         mixture->GetGasConstant(), mixture->GetViscMultiplyer(), mixture->GetBulkViscMultiplyer(),
+                         mixture->GetPrandtlNum(), gpuArrays, maxIntPoints, maxDofs);
+
       faceIntegration_gpu(y,  // py,
-                          uk_el1,uk_el2,grad_upk_el1,grad_upk_el2,
-                          gradUp, fluxes, 
-                          vfes->GetNDofs(), mesh->GetNumFaces(), h_numElems[elType], elemOffset, dof_el, dim,
-                          num_equation, mixture, gpuArrays, maxIntPoints, maxDofs);
+                          uk_el1, uk_el2, grad_upk_el1, grad_upk_el2, gradUp, fluxes, vfes->GetNDofs(),
+                          mesh->GetNumFaces(), h_numElems[elType], elemOffset, dof_el, dim, num_equation, mixture,
+                          gpuArrays, maxIntPoints, maxDofs);
     }
   }
 
@@ -182,30 +177,12 @@ void DGNonLinearForm::Mult_bdr(const Vector &x, Vector &y) {
   ParMesh *pmesh = vfes->GetParMesh();
   const int Nshared = pmesh->GetNSharedFaces();
   if (Nshared > 0) {
-    sharedFaceInterpolation_gpu(x,
-                                transferU->face_nbr_data, 
-                                gradUp, 
-                                transferGradUp->face_nbr_data, 
-                                shared_uk_el1,
-                                shared_uk_el2,
-                                shared_grad_upk_el1,
-                                shared_grad_upk_el2,
-                                vfes->GetNDofs(), 
-                                dim, 
-                                num_equation, 
-                                mixture,
-                                gpuArrays, 
-                                parallelData, 
-                                maxIntPoints, 
-                                maxDofs);
-    sharedFaceIntegration_gpu(x, transferU->face_nbr_data, gradUp, transferGradUp->face_nbr_data, y, 
-                              shared_uk_el1,
-                              shared_uk_el2,
-                              shared_grad_upk_el1,
-                              shared_grad_upk_el2,
-                              vfes->GetNDofs(),
-                              dim, num_equation, mixture, fluxes,
-                              gpuArrays, parallelData, maxIntPoints, maxDofs);
+    sharedFaceInterpolation_gpu(x, transferU->face_nbr_data, gradUp, transferGradUp->face_nbr_data, shared_uk_el1,
+                                shared_uk_el2, shared_grad_upk_el1, shared_grad_upk_el2, vfes->GetNDofs(), dim,
+                                num_equation, mixture, gpuArrays, parallelData, maxIntPoints, maxDofs);
+    sharedFaceIntegration_gpu(x, transferU->face_nbr_data, gradUp, transferGradUp->face_nbr_data, y, shared_uk_el1,
+                              shared_uk_el2, shared_grad_upk_el1, shared_grad_upk_el2, vfes->GetNDofs(), dim,
+                              num_equation, mixture, fluxes, gpuArrays, parallelData, maxIntPoints, maxDofs);
   }
 }
 
@@ -215,16 +192,12 @@ void DGNonLinearForm::setToZero_gpu(Vector &x, const int size) {
   MFEM_FORALL(i, size, { d_x[i] = 0.; });
 }
 
-void DGNonLinearForm::faceIntegration_gpu(Vector &y, 
-                                          Vector &uk_el1,
-                                          Vector &uk_el2,
-                                          Vector &grad_uk_el1,
-                                          Vector &grad_uk_el2,
-                                          const ParGridFunction *gradUp, Fluxes *flux,
-                                          const int &Ndofs,
-                                          const int &Nf, const int &NumElemType, const int &elemOffset,
-                                          const int &elDof, const int &dim, const int &num_equation,
-                                          GasMixture *mixture,
+// clang-format off
+void DGNonLinearForm::faceIntegration_gpu(Vector &y, Vector &uk_el1, Vector &uk_el2, Vector &grad_uk_el1,
+                                          Vector &grad_uk_el2, const ParGridFunction *gradUp, Fluxes *flux,
+                                          const int &Ndofs, const int &Nf, const int &NumElemType,
+                                          const int &elemOffset, const int &elDof, const int &dim,
+                                          const int &num_equation, GasMixture *mixture,
                                           const volumeFaceIntegrationArrays &gpuArrays, const int &maxIntPoints,
                                           const int &maxDofs) {
   double *d_y = y.Write();
@@ -232,22 +205,21 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y,
   const double *d_uk_el2 = uk_el2.Read();
   const double *d_grad_uk_el1 = grad_uk_el1.Read();
   const double *d_grad_uk_el2 = grad_uk_el2.Read();
-  
+
   auto d_elemFaces = gpuArrays.elemFaces.Read();
   auto d_nodesIDs = gpuArrays.nodesIDs.Read();
   auto d_posDofIds = gpuArrays.posDofIds.Read();
   auto d_shapeWnor1 = gpuArrays.shapeWnor1.Read();
   const double *d_shape2 = gpuArrays.shape2.Read();
   auto d_elems12Q = gpuArrays.elems12Q.Read();
-  
+
   const double gamma = mixture->GetSpecificHeatRatio();
-  const double Rg    = mixture->GetGasConstant();
+  const double Rg = mixture->GetGasConstant();
   const double viscMult = mixture->GetViscMultiplyer();
   const double bulkViscMult = mixture->GetBulkViscMultiplyer();
   const double Pr = mixture->GetPrandtlNum();
   const double Sc = mixture->GetSchmidtNum();
   const Equations eqSystem = flux->GetEquationSystem();
-  
 
   MFEM_FORALL_2D(el, NumElemType, elDof, 1, 1, {
     MFEM_FOREACH_THREAD(i, x, elDof) {
@@ -304,23 +276,24 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y,
       }
 
       for (int eq = i; eq < num_equation; eq += elDof) {
-        u1[eq] = d_uk_el1[eq + k*num_equation + gFace*maxIntPoints*num_equation ];
-        u2[eq] = d_uk_el2[eq + k*num_equation + gFace*maxIntPoints*num_equation ];
+        u1[eq] = d_uk_el1[eq + k * num_equation + gFace * maxIntPoints * num_equation];
+        u2[eq] = d_uk_el2[eq + k * num_equation + gFace * maxIntPoints * num_equation];
         for (int d = 0; d < dim; d++) {
-          gradUp1[eq + d * num_equation] = d_grad_uk_el1[eq + k*num_equation + d*maxIntPoints*num_equation+ 
-                            gFace*dim*maxIntPoints*num_equation ];
-          gradUp2[eq + d * num_equation] = d_grad_uk_el2[eq + k*num_equation + d*maxIntPoints*num_equation+ 
-                            gFace*dim*maxIntPoints*num_equation ];
+          gradUp1[eq + d * num_equation] = d_grad_uk_el1[eq + k * num_equation + d * maxIntPoints * num_equation +
+                                                         gFace * dim * maxIntPoints * num_equation];
+          gradUp2[eq + d * num_equation] = d_grad_uk_el2[eq + k * num_equation + d * maxIntPoints * num_equation +
+                                                         gFace * dim * maxIntPoints * num_equation];
         }
       }
       MFEM_SYNC_THREAD;
 
       // compute Riemann flux
-      RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim,eqSystem, num_equation, i, elDof);
-      Fluxes::viscousFlux_gpu(&vFlux1[0], &u1[0], &gradUp1[0],eqSystem, gamma, Rg, viscMult,
-                              bulkViscMult, Pr, Sc,i, elDof, dim, num_equation);
-      Fluxes::viscousFlux_gpu(&vFlux2[0], &u2[0], &gradUp2[0],eqSystem, gamma, Rg, viscMult, 
-                              bulkViscMult, Pr,Sc, i, elDof, dim,num_equation);
+      RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, eqSystem, num_equation, i,
+                                   elDof);
+      Fluxes::viscousFlux_gpu(&vFlux1[0], &u1[0], &gradUp1[0], eqSystem, gamma, Rg, viscMult, bulkViscMult, Pr, Sc, i,
+                              elDof, dim, num_equation);
+      Fluxes::viscousFlux_gpu(&vFlux2[0], &u2[0], &gradUp2[0], eqSystem, gamma, Rg, viscMult, bulkViscMult, Pr, Sc, i,
+                              elDof, dim, num_equation);
       MFEM_SYNC_THREAD;
       // if(i<num_equation)
       for (int eq = i; eq < num_equation; eq += elDof) {
@@ -353,35 +326,21 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y,
 });
 }
 
-void DGNonLinearForm::interpFaceData_gpu( const Vector &x, 
-                                          Vector &uk_el1,
-                                          Vector &uk_el2,
-                                          Vector &grad_uk_el1,
-                                          Vector &grad_uk_el2,
-                                          const ParGridFunction *gradUp, 
-                                          const int &Ndofs,
-                                          const int &Nf, 
-                                          const int &NumElemsType, 
-                                          const int &elemOffset, 
-                                          const int &elDof,
-                                          const int &dim, 
-                                          const int &num_equation, 
-                                          const double &gamma, 
-                                          const double &Rg,
-                                          const double &viscMult, 
-                                          const double &bulkViscMult, 
-                                          const double &Pr,
-                                          const volumeFaceIntegrationArrays &gpuArrays, 
-                                          const int &maxIntPoints,
-                                          const int &maxDofs)
-{
+// clang-format off
+void DGNonLinearForm::interpFaceData_gpu(const Vector &x, Vector &uk_el1, Vector &uk_el2, Vector &grad_uk_el1,
+                                         Vector &grad_uk_el2, const ParGridFunction *gradUp, const int &Ndofs,
+                                         const int &Nf, const int &NumElemsType, const int &elemOffset,
+                                         const int &elDof, const int &dim, const int &num_equation, const double &gamma,
+                                         const double &Rg, const double &viscMult, const double &bulkViscMult,
+                                         const double &Pr, const volumeFaceIntegrationArrays &gpuArrays,
+                                         const int &maxIntPoints, const int &maxDofs) {
 #ifdef _GPU_
   auto d_x = x.Read();
   double *d_uk_el1 = uk_el1.Write();
   double *d_uk_el2 = uk_el2.Write();
   double *d_grad_uk_el1 = grad_uk_el1.Write();
   double *d_grad_uk_el2 = grad_uk_el2.Write();
-  
+
   const double *d_gradUp = gradUp->Read();
   auto d_elemFaces = gpuArrays.elemFaces.Read();
   auto d_nodesIDs = gpuArrays.nodesIDs.Read();
@@ -389,7 +348,7 @@ void DGNonLinearForm::interpFaceData_gpu( const Vector &x,
   auto d_shapeWnor1 = gpuArrays.shapeWnor1.Read();
   const double *d_shape2 = gpuArrays.shape2.Read();
   auto d_elems12Q = gpuArrays.elems12Q.Read();
-  
+
   MFEM_FORALL_2D(el,NumElemsType,elDof,1,1,{
     MFEM_FOREACH_THREAD(i,x,elDof){
       // assuming max. num of equations = 20
@@ -406,143 +365,137 @@ void DGNonLinearForm::interpFaceData_gpu( const Vector &x,
 
       // loop over faces
       for (int face = 0; face < elFaces; face++) {
-        const int gFace = d_elemFaces[7 * eli + face + 1];
-        const int Q = d_elems12Q[3 * gFace + 2];
-        const int offsetShape1 = gFace * maxIntPoints * (maxDofs + 1 + dim);
-        const int offsetShape2 = gFace * maxIntPoints * maxDofs;
-        bool swapElems = false;
+    const int gFace = d_elemFaces[7 * eli + face + 1];
+    const int Q = d_elems12Q[3 * gFace + 2];
+    const int offsetShape1 = gFace * maxIntPoints * (maxDofs + 1 + dim);
+    const int offsetShape2 = gFace * maxIntPoints * maxDofs;
+    bool swapElems = false;
 
-        // get neighbor
-        int elj = d_elems12Q[3 * gFace];
-        if (elj == eli) {
-          elj = d_elems12Q[3 * gFace + 1];
-        } else {
-          swapElems = true;
-        }
-
-        const int offsetElj = d_posDofIds[2 * elj];
-        int dofj = d_posDofIds[2 * elj + 1];
-
-        int dof1 = elDof;
-        int dof2 = dofj;
-        if (swapElems) {
-          dof1 = dofj;
-          dof2 = elDof;
-        }
-
-        for (int j = i; j < dofj; j += elDof) indexes_j[j] = d_nodesIDs[offsetElj + j];
-        
-        for(int k=0;k<Q;k++){
-          
-          // set interpolation data to 0
-          for (int n = i; n < num_equation ; n += elDof) {
-            uk1[n] = 0.;
-            uk2[n] = 0.;
-            for (int d = 0; d < dim; d++) {
-              gradUpk1[n + d * num_equation] = 0.;
-              gradUpk2[n + d * num_equation] = 0.;
-            }
-          }
-          MFEM_SYNC_THREAD;
-            
-          // load shape functions for element 1
-          for (int j = i; j < dof1; j += elDof) shape[j] = d_shapeWnor1[offsetShape1 + j + k * (maxDofs + 1 + dim)];
-          MFEM_SYNC_THREAD;
-          
-          for(int eq=0;eq<num_equation;eq++){
-            
-            // load U1
-            int index = indexi;
-            for (int j = i; j < dof1; j += elDof) {
-              if (swapElems) index = indexes_j[j];
-              tempData[j] = d_x[index + eq * Ndofs];
-            }
-            MFEM_SYNC_THREAD;
-            
-            // interpolate U1
-            // NOTE: this is a serial sum. Update to parallel!
-            if(i==0)
-              for (int j = 0; j < dof1; j ++) uk1[eq] += shape[j]*tempData[j];
-            MFEM_SYNC_THREAD;
-                
-            // load gradUp1
-            for (int d = 0; d < dim; d++) {
-              index = indexi;
-              for (int j = i; j < dof1; j += elDof) {
-                if (swapElems) index = indexes_j[j];
-                tempData[j] = d_gradUp[index + eq * Ndofs + d * num_equation * Ndofs];
-              }
-              MFEM_SYNC_THREAD;
-              
-              // interpolate gradUp1
-            // NOTE: make this parallel!
-              if( i==0 ){
-                for (int j = 0; j < dof1; j++)
-                  gradUpk1[eq + d * num_equation] += tempData[j] * shape[j];
-              }
-              MFEM_SYNC_THREAD;
-            }
-          }
-          
-          // load shape functions for element 2
-          for (int j = i; j < dof2; j += elDof) shape[j] = d_shape2[offsetShape2 + j + k * maxDofs];
-          MFEM_SYNC_THREAD;
-          
-          for(int eq=0;eq<num_equation;eq++){
-            
-            //load U2
-            int index;
-            for (int j = i; j < dof2; j += elDof) {
-              index = indexes_j[j];
-              if (swapElems) index = indexi;
-              tempData[j] = d_x[index + eq * Ndofs];
-            }
-            MFEM_SYNC_THREAD;
-            
-            // interpolate U2
-            // NOTE: this is a serial sum. Update to parallel!
-            if(i==0)
-              for (int j = 0; j < dof2; j++) uk2[eq] += tempData[j] * shape[j];
-            MFEM_SYNC_THREAD;
-            
-            //load gradUp2
-            for (int d = 0; d < dim; d++) {
-              int index;
-              for (int j = i; j < dof2; j += elDof) {
-                index = indexes_j[j];
-                if (swapElems) index = indexi;
-                tempData[j] = d_gradUp[index + eq * Ndofs + d * num_equation * Ndofs];
-              }
-              MFEM_SYNC_THREAD;
-              
-              // interpolate gradUp2
-              // NOTE: make parallel!
-              if( i==0 ){
-                for (int j = 0; j < dof2; j++)
-                  gradUpk2[eq + d*num_equation] += tempData[j] * shape[j];
-              }
-              MFEM_SYNC_THREAD;
-            }
-          }
-          
-          // save el1 data to global memory
-          for(int eq=i;eq<num_equation;eq+=elDof){
-            d_uk_el1[eq + k*num_equation + gFace*maxIntPoints*num_equation ] = uk1[eq];
-            d_uk_el2[eq + k*num_equation + gFace*maxIntPoints*num_equation ] = uk2[eq];
-            for(int d=0;d<dim;d++) {
-              d_grad_uk_el1[eq + k*num_equation + d*maxIntPoints*num_equation+ 
-                            gFace*dim*maxIntPoints*num_equation ] = gradUpk1[eq+d*num_equation];
-              d_grad_uk_el2[eq + k*num_equation + d*maxIntPoints*num_equation+ 
-                            gFace*dim*maxIntPoints*num_equation ] = gradUpk2[eq+d*num_equation];
-            }
-          }
-        } // end loop over integrtion points
-      } // end loop over faces
+    // get neighbor
+    int elj = d_elems12Q[3 * gFace];
+    if (elj == eli) {
+      elj = d_elems12Q[3 * gFace + 1];
+    } else {
+      swapElems = true;
     }
-  });
+
+    const int offsetElj = d_posDofIds[2 * elj];
+    int dofj = d_posDofIds[2 * elj + 1];
+
+    int dof1 = elDof;
+    int dof2 = dofj;
+    if (swapElems) {
+      dof1 = dofj;
+      dof2 = elDof;
+    }
+
+    for (int j = i; j < dofj; j += elDof) indexes_j[j] = d_nodesIDs[offsetElj + j];
+
+    for (int k = 0; k < Q; k++) {
+      // set interpolation data to 0
+      for (int n = i; n < num_equation; n += elDof) {
+        uk1[n] = 0.;
+        uk2[n] = 0.;
+        for (int d = 0; d < dim; d++) {
+          gradUpk1[n + d * num_equation] = 0.;
+          gradUpk2[n + d * num_equation] = 0.;
+        }
+      }
+      MFEM_SYNC_THREAD;
+
+      // load shape functions for element 1
+      for (int j = i; j < dof1; j += elDof) shape[j] = d_shapeWnor1[offsetShape1 + j + k * (maxDofs + 1 + dim)];
+      MFEM_SYNC_THREAD;
+
+      for (int eq = 0; eq < num_equation; eq++) {
+        // load U1
+        int index = indexi;
+        for (int j = i; j < dof1; j += elDof) {
+          if (swapElems) index = indexes_j[j];
+          tempData[j] = d_x[index + eq * Ndofs];
+        }
+        MFEM_SYNC_THREAD;
+
+        // interpolate U1
+        // NOTE: this is a serial sum. Update to parallel!
+        if (i == 0)
+          for (int j = 0; j < dof1; j++) uk1[eq] += shape[j] * tempData[j];
+        MFEM_SYNC_THREAD;
+
+        // load gradUp1
+        for (int d = 0; d < dim; d++) {
+          index = indexi;
+          for (int j = i; j < dof1; j += elDof) {
+            if (swapElems) index = indexes_j[j];
+            tempData[j] = d_gradUp[index + eq * Ndofs + d * num_equation * Ndofs];
+          }
+          MFEM_SYNC_THREAD;
+
+          // interpolate gradUp1
+          // NOTE: make this parallel!
+          if (i == 0) {
+            for (int j = 0; j < dof1; j++) gradUpk1[eq + d * num_equation] += tempData[j] * shape[j];
+          }
+          MFEM_SYNC_THREAD;
+        }
+      }
+
+      // load shape functions for element 2
+      for (int j = i; j < dof2; j += elDof) shape[j] = d_shape2[offsetShape2 + j + k * maxDofs];
+      MFEM_SYNC_THREAD;
+
+      for (int eq = 0; eq < num_equation; eq++) {
+        // load U2
+        int index;
+        for (int j = i; j < dof2; j += elDof) {
+          index = indexes_j[j];
+          if (swapElems) index = indexi;
+          tempData[j] = d_x[index + eq * Ndofs];
+        }
+        MFEM_SYNC_THREAD;
+
+        // interpolate U2
+        // NOTE: this is a serial sum. Update to parallel!
+        if (i == 0)
+          for (int j = 0; j < dof2; j++) uk2[eq] += tempData[j] * shape[j];
+        MFEM_SYNC_THREAD;
+
+        // load gradUp2
+        for (int d = 0; d < dim; d++) {
+          int index;
+          for (int j = i; j < dof2; j += elDof) {
+            index = indexes_j[j];
+            if (swapElems) index = indexi;
+            tempData[j] = d_gradUp[index + eq * Ndofs + d * num_equation * Ndofs];
+          }
+          MFEM_SYNC_THREAD;
+
+          // interpolate gradUp2
+          // NOTE: make parallel!
+          if (i == 0) {
+            for (int j = 0; j < dof2; j++) gradUpk2[eq + d * num_equation] += tempData[j] * shape[j];
+          }
+          MFEM_SYNC_THREAD;
+        }
+      }
+
+      // save el1 data to global memory
+      for (int eq = i; eq < num_equation; eq += elDof) {
+        d_uk_el1[eq + k * num_equation + gFace * maxIntPoints * num_equation] = uk1[eq];
+        d_uk_el2[eq + k * num_equation + gFace * maxIntPoints * num_equation] = uk2[eq];
+        for (int d = 0; d < dim; d++) {
+          d_grad_uk_el1[eq + k * num_equation + d * maxIntPoints * num_equation +
+                        gFace * dim * maxIntPoints * num_equation] = gradUpk1[eq + d * num_equation];
+          d_grad_uk_el2[eq + k * num_equation + d * maxIntPoints * num_equation +
+                        gFace * dim * maxIntPoints * num_equation] = gradUpk2[eq + d * num_equation];
+        }
+      }
+    }   // end loop over integrtion points
+      } // end loop over faces
+}
+});
 #endif
 }
-
 
 // clang-format off
 void DGNonLinearForm::sharedFaceIntegration_gpu(

@@ -112,7 +112,7 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
   boundaryU.UseDevice(true);
   boundaryU.SetSize(bdrN * num_equation);
   boundaryU = 0.;
-  
+
   Vector iState, iUp;
   iState.UseDevice(false);
   iUp.UseDevice(false);
@@ -120,18 +120,17 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
   iUp.SetSize(num_equation);
   auto hboundaryU = boundaryU.HostWrite();
   for (int i = 0; i < bdrN; i++) {
-    
     for (int eq = 0; eq < num_equation; eq++) iUp(eq) = hmeanUp[eq];
-    mixture->GetConservativesFromPrimitives(iUp,iState);
+    mixture->GetConservativesFromPrimitives(iUp, iState);
 
-//     double gamma = mixture->GetSpecificHeatRatio();
-//     double k = 0.;
-//     for (int d = 0; d < dim; d++) k += iState[1 + d] * iState[1 + d];
-//     double rE = iState[1 + dim] / (gamma - 1.) + 0.5 * iState[0] * k;
-// 
-//     for (int d = 0; d < dim; d++) iState[1 + d] *= iState[0];
-//     iState[1 + dim] = rE;
-//     if (eqSystem == NS_PASSIVE) iState(num_equation - 1) *= iState(0);
+    //     double gamma = mixture->GetSpecificHeatRatio();
+    //     double k = 0.;
+    //     for (int d = 0; d < dim; d++) k += iState[1 + d] * iState[1 + d];
+    //     double rE = iState[1 + dim] / (gamma - 1.) + 0.5 * iState[0] * k;
+    //
+    //     for (int d = 0; d < dim; d++) iState[1 + d] *= iState[0];
+    //     iState[1 + dim] = rE;
+    //     if (eqSystem == NS_PASSIVE) iState(num_equation - 1) *= iState(0);
 
     for (int eq = 0; eq < num_equation; eq++) hboundaryU[eq + i * num_equation] = iState[eq];
   }
@@ -282,16 +281,17 @@ OutletBC::~OutletBC() {}
 void OutletBC::initBCs() {
   if (!BCinit) {
     computeParallelArea();
-    
+
 #ifdef _GPU_
     interpolated_Ubdr_.UseDevice(true);
-    interpolatedGradUpbdr_.UseDevice(true);;
-    interpolated_Ubdr_.SetSize(num_equation*maxIntPoints*listElems.Size());
-    interpolatedGradUpbdr_.SetSize(dim*num_equation*maxIntPoints*listElems.Size());
+    interpolatedGradUpbdr_.UseDevice(true);
+    ;
+    interpolated_Ubdr_.SetSize(num_equation * maxIntPoints * listElems.Size());
+    interpolatedGradUpbdr_.SetSize(dim * num_equation * maxIntPoints * listElems.Size());
     interpolated_Ubdr_ = 0.;
     interpolatedGradUpbdr_ = 0.;
 #endif
-    
+
     BCinit = true;
   }
 }
@@ -528,17 +528,16 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
     auto hboundaryU = boundaryU.HostReadWrite();
     Vector iState(num_equation), iUp(num_equation);
     for (int i = 0; i < totNbdr; i++) {
-      
       for (int eq = 0; eq < num_equation; eq++) iUp[eq] = hboundaryU[eq + i * num_equation];
-      mixture->GetConservativesFromPrimitives(iUp,iState);
-//       double gamma = mixture->GetSpecificHeatRatio();
-//       double k = 0.;
-//       for (int d = 0; d < dim; d++) k += iState[1 + d] * iState[1 + d];
-//       double rE = iState[1 + dim] / (gamma - 1.) + 0.5 * iState[0] * k;
-// 
-//       for (int d = 0; d < dim; d++) iState[1 + d] *= iState[0];
-//       iState[1 + dim] = rE;
-//       if (eqSystem == NS_PASSIVE) iState[num_equation - 1] *= iState[0];
+      mixture->GetConservativesFromPrimitives(iUp, iState);
+      //       double gamma = mixture->GetSpecificHeatRatio();
+      //       double k = 0.;
+      //       for (int d = 0; d < dim; d++) k += iState[1 + d] * iState[1 + d];
+      //       double rE = iState[1 + dim] / (gamma - 1.) + 0.5 * iState[0] * k;
+      //
+      //       for (int d = 0; d < dim; d++) iState[1 + d] *= iState[0];
+      //       iState[1 + dim] = rE;
+      //       if (eqSystem == NS_PASSIVE) iState[num_equation - 1] *= iState[0];
 
       for (int eq = 0; eq < num_equation; eq++) hboundaryU[eq + i * num_equation] = iState[eq];
     }
@@ -549,18 +548,16 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
 void OutletBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                              ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                              Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
-  interpOutlet_gpu(outletType,inputState,interpolated_Ubdr_,interpolatedGradUpbdr_,
-                   x,nodesIDs,posDofIds,Up, gradUp,shapesBC, normalsWBC,
-                   intPointsElIDBC, listElems, offsetsBoundaryU,
-                  maxIntPoints, maxDofs, dim, num_equation);
-  
-  integrateOutlets_gpu(outletType,eqSystem, inputState, dt,
+  interpOutlet_gpu(outletType, inputState, interpolated_Ubdr_, interpolatedGradUpbdr_, x, nodesIDs, posDofIds, Up,
+                   gradUp, shapesBC, normalsWBC, intPointsElIDBC, listElems, offsetsBoundaryU, maxIntPoints, maxDofs,
+                   dim, num_equation);
+
+  integrateOutlets_gpu(outletType, eqSystem, inputState, dt,
                        y,  // output
-                       x, nodesIDs, posDofIds, Up, gradUp, meanUp, boundaryU, 
-                       interpolated_Ubdr_,interpolatedGradUpbdr_,
-                       tangent1, tangent2, inverseNorm2cartesian,
-                       shapesBC, normalsWBC, intPointsElIDBC, listElems, offsetsBoundaryU, maxIntPoints, maxDofs, dim,
-                       num_equation, mixture, refLength, area);
+                       x, nodesIDs, posDofIds, Up, gradUp, meanUp, boundaryU, interpolated_Ubdr_,
+                       interpolatedGradUpbdr_, tangent1, tangent2, inverseNorm2cartesian, shapesBC, normalsWBC,
+                       intPointsElIDBC, listElems, offsetsBoundaryU, maxIntPoints, maxDofs, dim, num_equation, mixture,
+                       refLength, area);
 }
 
 void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
@@ -588,7 +585,7 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   }
 
   double meanP = mixture->ComputePressureFromPrimitives(meanUp);
-  
+
   // normal gradients
   Vector normGrad(num_equation);
   normGrad = 0.;
@@ -596,10 +593,10 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
     for (int d = 0; d < dim; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
   }
   // gradient of pressure in normal direction
-  double dpdn = mixture->ComputePressureDerivative(normGrad,stateIn,false); 
+  double dpdn = mixture->ComputePressureDerivative(normGrad, stateIn, false);
 
   const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
-  
+
   double meanK = 0.;
   for (int d = 0; d < dim; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
   meanK *= 0.5;
@@ -631,7 +628,7 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
 
   // estimate ingoing characteristic
   const double sigma = speedSound / refLength;
-//   double L1 = sigma * (meanUp[1 + dim] - inputState[0]);
+  //   double L1 = sigma * (meanUp[1 + dim] - inputState[0]);
   double L1 = sigma * (meanP - inputState[0]);
 
   // calc vector d
@@ -761,16 +758,16 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatr
     for (int d = 0; d < dim; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
   }
   // gradient of pressure in normal direction
-  double dpdn = mixture->ComputePressureDerivative(normGrad,stateIn,false);
+  double dpdn = mixture->ComputePressureDerivative(normGrad, stateIn, false);
 
   const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
-  
+
   double meanK = 0.;
   for (int d = 0; d < dim; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
   meanK *= 0.5;
 
   // compute outgoing characteristics
-//   double L2 = speedSound * speedSound * normGrad[0] - normGrad[1 + dim];
+  //   double L2 = speedSound * speedSound * normGrad[0] - normGrad[1 + dim];
   double L2 = speedSound * speedSound * normGrad[0] - dpdn;
   L2 *= meanVel[0];
 
@@ -786,7 +783,7 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatr
 
   double L5 = 0.;
   for (int d = 0; d < dim; d++) L5 += unitNorm[d] * normGrad[1 + d];
-//   L5 = normGrad[1 + dim] + meanUp[0] * speedSound * L5;
+  //   L5 = normGrad[1 + dim] + meanUp[0] * speedSound * L5;
   L5 = dpdn + meanUp[0] * speedSound * L5;
   L5 *= meanVel[0] + speedSound;
 
@@ -915,20 +912,20 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
     for (int d = 0; d < dim; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
   }
   // gradient of pressure in normal direction
-  double dpdn = mixture->ComputePressureDerivative(normGrad,stateIn,false);
+  double dpdn = mixture->ComputePressureDerivative(normGrad, stateIn, false);
 
   const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
-  
+
   double normVel = 0.;
   for (int d = 0; d < dim; d++) normVel += stateIn[1 + d] * unitNorm[d];
   normVel /= stateIn[0];
-  
+
   double meanK = 0.;
   for (int d = 0; d < dim; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
   meanK *= 0.5;
 
   // compute outgoing characteristics
-//   double L2 = speedSound * speedSound * normGrad[0] - normGrad[1 + dim];
+  //   double L2 = speedSound * speedSound * normGrad[0] - normGrad[1 + dim];
   double L2 = speedSound * speedSound * normGrad[0] - dpdn;
   L2 *= meanVel[0];
 
@@ -1018,17 +1015,16 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
-void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem,
-                                    const Array<double> &inputState, const double &dt, Vector &y,
-                                    const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
-                                    ParGridFunction *Up, ParGridFunction *gradUp, Vector &meanUp, Vector &boundaryU,
-                                    Vector &interpolated_Ubdr_,
-                                  Vector &interpolatedGradUpbdr_,
-                                    Vector &tangent1, Vector &tangent2, Vector &inverseNorm2cartesian, Vector &shapesBC,
-                                    Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
-                                    Array<int> &offsetsBoundaryU, const int &maxIntPoints, const int &maxDofs,
-                                    const int &dim, const int &num_equation, GasMixture *mixture,
-                                    const double &refLength, const double &area) {
+void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem, const Array<double> &inputState,
+                                    const double &dt, Vector &y, const Vector &x, const Array<int> &nodesIDs,
+                                    const Array<int> &posDofIds, ParGridFunction *Up, ParGridFunction *gradUp,
+                                    Vector &meanUp, Vector &boundaryU, Vector &interpolated_Ubdr_,
+                                    Vector &interpolatedGradUpbdr_, Vector &tangent1, Vector &tangent2,
+                                    Vector &inverseNorm2cartesian, Vector &shapesBC, Vector &normalsWBC,
+                                    Array<int> &intPointsElIDBC, Array<int> &listElems, Array<int> &offsetsBoundaryU,
+                                    const int &maxIntPoints, const int &maxDofs, const int &dim,
+                                    const int &num_equation, GasMixture *mixture, const double &refLength,
+                                    const double &area) {
 #ifdef _GPU_
   const double *d_inputState = inputState.Read();
   double *d_y = y.Write();
@@ -1050,10 +1046,10 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem,
 
   const int totDofs = x.Size() / num_equation;
   const int numBdrElem = listElems.Size();
-  
+
   const double *d_interpUbdr = interpolated_Ubdr_.Read();
   const double *d_interpGrads = interpolatedGradUpbdr_.Read();
-  
+
   const double Rg = mixture->GetGasConstant();
   const double gamma = mixture->GetSpecificHeatRatio();
 
@@ -1144,25 +1140,13 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem,
 // clang-format on
 }
 
-void OutletBC::interpOutlet_gpu(const OutletType type, 
-                                const mfem::Array<double>& inputState, 
-                                mfem::Vector& interpolated_Ubdr_, 
-                                mfem::Vector& interpolatedGradUpbdr_, 
-                                const mfem::Vector& x, 
-                                const Array<int>& nodesIDs, 
-                                const Array<int>& posDofIds, 
-                                mfem::ParGridFunction* Up, 
-                                mfem::ParGridFunction* gradUp, 
-                                mfem::Vector& shapesBC, 
-                                mfem::Vector& normalsWBC, 
-                                Array<int>& intPointsElIDBC, 
-                                Array<int>& listElems, 
-                                Array<int>& offsetsBoundaryU, 
-                                const int& maxIntPoints, 
-                                const int& maxDofs, 
-                                const int& dim, 
-                                const int& num_equation)
-{
+void OutletBC::interpOutlet_gpu(const OutletType type, const mfem::Array<double> &inputState,
+                                mfem::Vector &interpolated_Ubdr_, mfem::Vector &interpolatedGradUpbdr_,
+                                const mfem::Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+                                mfem::ParGridFunction *Up, mfem::ParGridFunction *gradUp, mfem::Vector &shapesBC,
+                                mfem::Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
+                                Array<int> &offsetsBoundaryU, const int &maxIntPoints, const int &maxDofs,
+                                const int &dim, const int &num_equation) {
 #ifdef _GPU_
   const double *d_U = x.Read();
   const double *d_gradUp = gradUp->Read();
@@ -1173,7 +1157,7 @@ void OutletBC::interpOutlet_gpu(const OutletType type,
   const int *d_intPointsElIDBC = intPointsElIDBC.Read();
   const int *d_listElems = listElems.Read();
   const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
-  
+
   double *d_interpUbdr = interpolated_Ubdr_.Write();
   double *d_interpGrads = interpolatedGradUpbdr_.Write();
 
@@ -1197,38 +1181,38 @@ void OutletBC::interpOutlet_gpu(const OutletType type,
         indexi = d_nodesIDs[elOffset + i];
 
       for(int eq=0;eq<num_equation;eq++){
-        // get data
-        if( i<elDof ) {
-          Ui[i] = d_U[indexi + eq * totDofs];
-          for(int d=0;d<dim;d++) gradUpi[i + d*elDof] = 
-            d_gradUp[indexi + eq * totDofs + d * num_equation * totDofs];
-        }
-        MFEM_SYNC_THREAD;
-        
-        for (int q = 0; q < Q; q++) {
-          if (i < elDof) shape[i] = d_shapesBC[i + q * maxDofs + el * maxIntPoints * maxDofs];
-          MFEM_SYNC_THREAD;
-          
-          // interpolation
-          // NOTE: make parallel!
-          if( i==0 ){
-            u1 = 0.;
-            for(int j=0;j<elDof;j++) u1 += shape[j]*Ui[j];
-          }
-          if( i<dim ){
-            gUp[i] = 0.;
-            for(int j=0;j<elDof;j++) gUp[i] += gradUpi[j +i*elDof]*shape[j];
-          }
-          MFEM_SYNC_THREAD;
-          
-          // save to global memory
-          if(i==0) d_interpUbdr[eq + q*num_equation +n*maxIntPoints*num_equation] = u1;
-          if(i<dim) d_interpGrads[eq + i*num_equation +q*dim*num_equation + n*maxIntPoints*dim*num_equation] = gUp[i];
-          MFEM_SYNC_THREAD;
-        } // end loop over intergration points
-      } // end loop over equations
+    // get data
+    if (i < elDof) {
+      Ui[i] = d_U[indexi + eq * totDofs];
+      for (int d = 0; d < dim; d++)
+        gradUpi[i + d * elDof] = d_gradUp[indexi + eq * totDofs + d * num_equation * totDofs];
     }
-  });
+    MFEM_SYNC_THREAD;
+
+    for (int q = 0; q < Q; q++) {
+      if (i < elDof) shape[i] = d_shapesBC[i + q * maxDofs + el * maxIntPoints * maxDofs];
+      MFEM_SYNC_THREAD;
+
+      // interpolation
+      // NOTE: make parallel!
+      if (i == 0) {
+        u1 = 0.;
+        for (int j = 0; j < elDof; j++) u1 += shape[j] * Ui[j];
+      }
+      if (i < dim) {
+        gUp[i] = 0.;
+        for (int j = 0; j < elDof; j++) gUp[i] += gradUpi[j + i * elDof] * shape[j];
+      }
+      MFEM_SYNC_THREAD;
+
+      // save to global memory
+      if (i == 0) d_interpUbdr[eq + q * num_equation + n * maxIntPoints * num_equation] = u1;
+      if (i < dim)
+        d_interpGrads[eq + i * num_equation + q * dim * num_equation + n * maxIntPoints * dim * num_equation] = gUp[i];
+      MFEM_SYNC_THREAD;
+    }   // end loop over intergration points
+      } // end loop over equations
+}
+});
 #endif
 }
-

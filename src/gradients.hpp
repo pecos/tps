@@ -35,6 +35,7 @@
 // Class to manage gradients of primitives
 
 #include <tps_config.h>
+
 #include <mfem.hpp>
 
 #include "dataStructures.hpp"
@@ -110,11 +111,11 @@ class Gradients : public ParNonlinearForm {
                                    //                                    const Vector &elemShapeDshapeWJ,
                                    //                                    const Array<int> &elemPosQ_shapeDshapeWJ,
                                    const int &maxDofs, const int &maxIntPoints);
-  
+
   static void faceContrib_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
-                                   const Vector &Up, Vector &gradUp, const int num_equation, const int dim,
-                                   const volumeFaceIntegrationArrays &gpuArrays,
-                                   const int &maxDofs, const int &maxIntPoints);
+                              const Vector &Up, Vector &gradUp, const int num_equation, const int dim,
+                              const volumeFaceIntegrationArrays &gpuArrays, const int &maxDofs,
+                              const int &maxIntPoints);
 
   static void integrationGradSharedFace_gpu(const Vector *Up, const Vector &faceUp, ParGridFunction *gradUp,
                                             const int &Ndofs, const int &dim, const int &num_equation,

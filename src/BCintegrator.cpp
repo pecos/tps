@@ -112,7 +112,7 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
 
       BCmap[patchType.first] =
           new WallBC(rsolver, mixture, _runFile.GetEquationSystem(), fluxClass, vfes, intRules, _dt, dim, num_equation,
-                     patchType.first, patchType.second, wallData, intPointsElIDBC,_maxIntPoints);
+                     patchType.first, patchType.second, wallData, intPointsElIDBC, _maxIntPoints);
     }
   }
 

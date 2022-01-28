@@ -33,8 +33,9 @@
 #define FORCING_TERMS_HPP_
 
 #include <tps_config.h>
-#include <mfem/general/forall.hpp>
+
 #include <mfem.hpp>
+#include <mfem/general/forall.hpp>
 
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
@@ -104,7 +105,6 @@ class ConstantPressureGradient : public ForcingTerms {
 #endif
 };
 
-
 class SpongeZone : public ForcingTerms {
  private:
   Fluxes *fluxes;
@@ -140,15 +140,14 @@ class PassiveScalar : public ForcingTerms {
 
  public:
   PassiveScalar(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
-                IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, GasMixture *_mixture,
-                ParGridFunction *_Up, ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
-                RunConfiguration &_config);
+                IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, GasMixture *_mixture, ParGridFunction *_Up,
+                ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config);
 
   // Terms do not need updating
   virtual void updateTerms(Vector &in);
-  
-  void updateTerms_gpu(Vector &in, ParGridFunction *Up, Array<passiveScalarData *> &psData,
-                       const int nnode,const int num_equation);
+
+  void updateTerms_gpu(Vector &in, ParGridFunction *Up, Array<passiveScalarData *> &psData, const int nnode,
+                       const int num_equation);
 
   ~PassiveScalar();
 };

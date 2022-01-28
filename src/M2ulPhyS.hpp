@@ -43,8 +43,8 @@
 #include <tps_config.h>
 
 #include <fstream>
-#include <mfem/general/forall.hpp>
 #include <mfem.hpp>
+#include <mfem/general/forall.hpp>
 
 #include "BCintegrator.hpp"
 #include "averaging_and_rms.hpp"
@@ -57,13 +57,13 @@
 #include "fluxes.hpp"
 #include "gradNonLinearForm.hpp"
 #include "io.hpp"
+#include "logger.hpp"
 #include "mpi_groups.hpp"
 #include "rhs_operator.hpp"
 #include "riemann_solver.hpp"
 #include "run_configuration.hpp"
 #include "sbp_integrators.hpp"
 #include "utils.hpp"
-#include "logger.hpp"
 
 #ifdef _MASA_
 #include "masa_handler.hpp"
