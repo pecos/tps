@@ -32,20 +32,84 @@
 #ifndef TPS_HPP_
 #define TPS_HPP_
 
+#include <tps_config.h>
+#include <grvy.h>
+#include <mfem.hpp>
 #include <string>
 
 #include "M2ulPhyS.hpp"
+#include "logger.hpp"
+#include "quasimagnetostatic.hpp"
+#include "solver.hpp"
+#include "utils.hpp"
 
-// Solver parent class shared by all implementations
-class tps {
+namespace TPS {
+
+// Top-level TPS class
+class Tps {
+ private:
   std::string tpsVersion_;  // code version
+  mfem::MPI_Session mpi_;   // top-level mpi context
   int rank_;                // local MPI rank
   int nprocs_;              // total number of MPI procs
   bool isRank0_;            // flag to indicate rank0
 
+  // runtime controls
+  std::string iFile_;              // name of runtime input file (new ini format)
+  std::string input_solver_type_;  // choice of desired solver
+  int numGpusPerRank_;             // number of GPUs to use per MPI rank
+
+  // execution device controls
+  std::string deviceConfig_;
+  mfem::Device device_;
+
+  // supported high-level physics configurations
+  bool isFlowOnlyMode_;
+  bool isEMOnlyMode_;
+  bool isFlowEMCoupledMode_;
+
+  // mesh
+  std::string meshFile_;
+
+  // pointer to solver implementation chosen at runtime
+  TPS::Solver *solver_;
+
  public:
-  tps(MPI_Session &mpi, int &argc, char **&argv);  // constructor
-  void PrintHeader();                              //  print header and versioning info
+  Tps(int argc, char *argv[]);     // constructor
+  GRVY::GRVY_Input_Class iparse_;  // runtime input parser
+
+  void chooseSolver();
+  void chooseDevices();
+  std::string getDeviceConfig() { return deviceConfig_; }
+
+  // input parsing support (variants with default value supplied)
+  // supported types are T={int,double,bool,std::string}
+  template <typename T>
+  void getInput(const char *name, T &var, T varDefault);
+
+  // input parsing support (variants where value is required to be provided)
+  // supported types are T={int,double,std::string}
+  template <typename T>
+  void getRequiredInput(const char *name, T &var);
+  void getRequiredVec(const char *name, std::vector<double> &var, size_t numElems);
+  void getRequiredVec(const char *name, Vector &var, size_t numElems);
+  void getRequiredVec(const char *name, Array<double> &var, size_t numElems);
+  void getRequiredVecElem(const char *name, double &var, int ithElem);
+
+  int getStatus() { return solver_->getStatus(); }
+  void initialize() {
+    solver_->initialize();
+    return;
+  }
+  void solve() {
+    solver_->solve();
+    return;
+  }
+  void printHeader();
+  void parseCommandLineArgs(int argc, char *argv[]);
+  void parseInput();
 };
+
+}  // end namespace TPS
 
 #endif  // TPS_HPP_

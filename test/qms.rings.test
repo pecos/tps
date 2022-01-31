@@ -7,7 +7,8 @@ setup() {
     MESH_FILE=meshes/rings.msh
     REF_FILE=ref_solns/rings.centerline.By.np1.h5
     OUT_FILE=ref_solns/By.h5
-    CMD_LINE="--em-only -m $MESH_FILE --rtol 1e-12 --atol 1e-15 --maxiter 30 -ny 129 -y0 -2.0 -y1 2.0 -by $OUT_FILE"
+    #CMD_LINE="--em-only -m $MESH_FILE --rtol 1e-12 --atol 1e-15 --maxiter 30 -ny 129 -y0 -2.0 -y1 2.0 -by $OUT_FILE"
+    CMD_LINE="--runFile inputs/rings.ini"
 }
 
 @test "[$TEST] verify tps quasimagnetostatic solver runs with np = 1" {

@@ -54,7 +54,7 @@ headers              = averaging_and_rms.hpp equation_of_state.hpp forcing_terms
 	               sbp_integrators.hpp BoundaryCondition.hpp face_integrator.hpp M2ulPhyS.hpp rhs_operator.hpp \
 	               wallBC.hpp domain_integrator.hpp fluxes.hpp masa_handler.hpp riemann_solver.hpp \
 		       dgNonlinearForm.hpp gradNonLinearForm.hpp dataStructures.hpp utils.hpp io.hpp em_options.hpp \
-		       quasimagnetostatic.hpp gradients.hpp logger.hpp tps.hpp
+		       quasimagnetostatic.hpp gradients.hpp logger.hpp solver.hpp tps.hpp
 
 mfem_extra_headers   = ../utils/mfem_extras/pfem_extras.hpp
 

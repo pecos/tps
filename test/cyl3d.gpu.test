@@ -2,8 +2,7 @@
 # -*- mode: sh -*-
 
 TEST="cyl3d.gpu"
-RUNFILE="inputs/input.dtconst.cyl"
-#OPTS="-d cuda"
+RUNFILE="inputs/input.dtconst.cyl.ini"
 OPTS=""
 
 setup() {
@@ -40,19 +39,10 @@ setup() {
     test -s $SOLN_FILE
     run h5dump  -a revision restart_output.sol.h5
     [[ "${status}" -eq 0 ]]
-
-    # disabling following bit since developer may be testing prior to commit
-##     hdf_dump=$output
-##
-##     run git log -1 --format="%h"
-##     if [ $? -eq 0 ];then
-## 	sha=${lines[0]}
-## 	[[ "${hdf_dump}" =~ "\"$sha\"" ]]
-##     fi
 }
 
 @test "[$TEST] verify exit code if restart files missing" {
-    RUNFILE=inputs/input.dtconst.restart.cyl
+    RUNFILE=inputs/input.dtconst.restart.cyl.ini
 
     rm -f $SOLN_FILE
 
@@ -63,7 +53,7 @@ setup() {
 }
 
 @test "[$TEST] verify consistent solution with restart from 2 iters" {
-    RUNFILE=inputs/input.dtconst.2iters.cyl
+    RUNFILE=inputs/input.dtconst.2iters.cyl.ini
 
     rm -f $SOLN_FILE
     test -s $RUNFILE
@@ -73,7 +63,7 @@ setup() {
     run h5dump  -a iteration  restart_output.sol.h5
     [ "${lines[5]}" = "   (0): 2" ]
 
-    RUNFILE=inputs/input.dtconst.restart.cyl
+    RUNFILE=inputs/input.dtconst.restart.cyl.ini
     ../src/tps --runFile $RUNFILE $OPTS
     ./soln_differ $SOLN_FILE $REF_FILE
 }
@@ -93,7 +83,7 @@ setup() {
 
      VARPLOG=varp.log
      rm -f $VARPLOG
-     RUNFILE=inputs/input.dtconst.8iters.newp.cyl
+     RUNFILE=inputs/input.dtconst.8iters.newp.cyl.ini
      ../src/tps --runFile $RUNFILE $OPTS >& $VARPLOG
 
      #intErr=$(cat $VARPLOG | grep "interpolation error" | awk '{print $6}')

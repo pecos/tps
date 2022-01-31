@@ -2,8 +2,8 @@
 # -*- mode: sh -*-
 
 TEST="cyl3d.mflow.outlet"
-RUNFILE="inputs/input.2iters.mflow.cyl"
-BULK_RUNFILE="inputs/input.2iters.mflow.bulkVisc.dtconst.cyl"
+RUNFILE="inputs/input.2iters.mflow.cyl.ini"
+BULK_RUNFILE="inputs/input.2iters.mflow.bulkVisc.dtconst.cyl.ini"
 
 setup() {
     SOLN_FILE=restart_output.sol.h5

@@ -29,82 +29,36 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
+#ifndef SOLVER_HPP_
+#define SOLVER_HPP_
 
-#ifndef QUASIMAGNETOSTATIC_HPP_
-#define QUASIMAGNETOSTATIC_HPP_
+#include "utils.hpp"
 
-// forward-declaration for Tps support class
+using namespace std;
+
 namespace TPS {
-class Tps;
-}
 
-#include <iostream>
-#include <mfem.hpp>
-
-#include "em_options.hpp"
-#include "tps.hpp"
-
-/** Solve quasi-magnetostatic approximation of Maxwell
- *
- *  Solves the quasi-magnetostatic approximation of Maxwell's
- *  equations for a user-specified source current.
- *
- */
-class QuasiMagnetostaticSolver : public TPS::Solver {
+// Base class shared by all solver implementations
+class Solver {
  private:
-  mfem::MPI_Session &_mpi;
-  ElectromagneticOptions _em_opts;
-
-  // pointer to parent Tps class
-  TPS::Tps *tpsP;
-
-  mfem::ParMesh *_pmesh;
-  int _dim;
-
-  mfem::FiniteElementCollection *_hcurl;
-  mfem::FiniteElementCollection *_h1;
-  mfem::FiniteElementCollection *_hdiv;
-
-  mfem::ParFiniteElementSpace *_Aspace;
-  mfem::ParFiniteElementSpace *_pspace;
-  mfem::ParFiniteElementSpace *_Bspace;
-
-  mfem::Array<int> _ess_bdr_tdofs;
-
-  mfem::ParBilinearForm *_K;
-  mfem::ParLinearForm *_r;
-
-  mfem::ParGridFunction *_A;
-  mfem::ParGridFunction *_B;
-
-  bool _operator_initialized;
-  bool _current_initialized;
-
-  void InterpolateToYAxis() const;
+  std::string name_;
+  std::string description_;
 
  public:
-  QuasiMagnetostaticSolver(mfem::MPI_Session &mpi, ElectromagneticOptions em_opts, TPS::Tps *tps);
-  ~QuasiMagnetostaticSolver();
-
-  /** Initialize quasi-magnetostatic problem
-   *
-   *  Sets up MFEM objects (e.g., ParMesh, ParFiniteElementSpace,
-   *  ParBilinearForm etc) required to form the linear system
-   *  corresponding to the quasi-magnetostatic problem.
-   */
-  void initialize() override;
-
-  /** Initialize current for quasi-magnetostatic problem
-   *
-   *  Build the source current function and do a divergence free
-   *  projection to form the RHS
-   */
-  void InitializeCurrent();
-
-  void parseSolverOptions() override;
-
-  /** Solve quasi-magnetostatic problem */
-  void solve() override;
+  // methods to be (optionally) implemented by derived solver classes
+  virtual int getStatus() { return NORMAL; }
+  virtual void initialize() { return; }
+  // methods *required* to be implemented by derived solver classes
+  virtual void parseSolverOptions() {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+  }
+  virtual void solve() {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+  }
 };
 
-#endif  // QUASIMAGNETOSTATIC_HPP_
+}  // end namespace TPS
+
+#endif  // SOLVER_HPP_

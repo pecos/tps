@@ -39,6 +39,11 @@
  * variables and functions.
  */
 
+// forward declaration for Tps support class
+namespace TPS {
+class Tps;
+}
+
 #include <hdf5.h>
 #include <tps_config.h>
 
@@ -63,29 +68,27 @@
 #include "riemann_solver.hpp"
 #include "run_configuration.hpp"
 #include "sbp_integrators.hpp"
+#include "solver.hpp"
+#include "tps.hpp"
 #include "utils.hpp"
 
 #ifdef _MASA_
 #include "masa_handler.hpp"
 #endif
 
-#ifdef HAVE_GRVY
-#include <grvy.h>
-#endif
-
 using namespace mfem;
 using namespace std;
 
-// application exit codes
-enum ExitCodes { NORMAL = 0, ERROR = 1, JOB_RESTART = 10, EARLY_EXIT = 11 };
-
-class M2ulPhyS {
+class M2ulPhyS : public TPS::Solver {
  private:
   MPI_Groups *groupsMPI;
   MPI_Session &mpi;
   int nprocs_;  // total number of MPI procs
   int rank_;    // local MPI rank
   bool rank0_;  // flag to indicate rank 0
+
+  // pointer to parent Tps class
+  TPS::Tps *tpsP;
 
   // Run options
   RunConfiguration config;
@@ -289,9 +292,11 @@ class M2ulPhyS {
   void Cache_Paraview_Timesteps();
 
  public:
-  M2ulPhyS(MPI_Session &_mpi, string &inputFileName);
+  M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps);
   ~M2ulPhyS();
 
+  void parseSolverOptions() override;
+  void parseSolverOptions2();
   void projectInitialSolution();
   void writeHDF5() { restart_files_hdf5("write"); }
   void writeParaview(int iter, double time) {
@@ -300,7 +305,7 @@ class M2ulPhyS {
     paraviewColl->Save();
   }
 
-  void Iterate();
+  void solve() override;
 
   // Accessors
   RHSoperator getRHSoperator() { return *rhsOperator; }
@@ -317,7 +322,7 @@ class M2ulPhyS {
     exit_status_ = code;
     return;
   }
-  int GetStatus() { return exit_status_; }
+  int getStatus() override { return exit_status_; }
 };
 
 #endif  // M2ULPHYS_HPP_

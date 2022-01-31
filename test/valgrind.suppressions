@@ -1,0 +1,10 @@
+{
+   <mpi-finalize-skip>
+   Memcheck:Cond
+   fun:MPIDI_OFI_mpi_finalize_hook
+   fun:MPID_Finalize
+   fun:PMPI_Finalize
+   fun:~MPI_Session
+   fun:_ZN3TPS3TpsD1Ev
+   fun:main
+}

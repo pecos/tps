@@ -30,4 +30,13 @@ for binary in $binaries; do
         fi
     fi
 done
-     
+
+# necessary text files
+files="valgrind.suppressions"
+for file in $files; do
+    if [ ! -s $file ];then
+        if [ -s $testDir/$file ];then
+           ln -s $testDir/$file .
+        fi
+    fi
+done
