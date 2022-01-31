@@ -34,7 +34,7 @@
 // Implementation of class RHSoperator
 RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, const int &_order,
                          const Equations &_eqSystem, double &_max_char_speed, IntegrationRules *_intRules,
-                         int _intRuleType, Fluxes *_fluxClass, EquationOfState *_eqState, ParFiniteElementSpace *_vfes,
+                         int _intRuleType, Fluxes *_fluxClass, GasMixture *_mixture, ParFiniteElementSpace *_vfes,
                          const volumeFaceIntegrationArrays &_gpuArrays, const int &_maxIntPoints, const int &_maxDofs,
                          DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh,
                          ParGridFunction *_spaceVaryViscMult, ParGridFunction *_Up, ParGridFunction *_gradUp,
@@ -49,7 +49,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
       intRules(_intRules),
       intRuleType(_intRuleType),
       fluxClass(_fluxClass),
-      eqState(_eqState),
+      mixture(_mixture),
       vfes(_vfes),
       gpuArrays(_gpuArrays),
       maxIntPoints(_maxIntPoints),
@@ -84,15 +84,17 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
   posDofInvM.SetSize(2 * vfes->GetNE());
   auto hposDofInvM = posDofInvM.HostWrite();
 
+  forcing.DeleteAll();
+
   if (_config.thereIsForcing()) {
     forcing.Append(new ConstantPressureGradient(dim, num_equation, _order, intRuleType, intRules, vfes, Up, gradUp,
                                                 gpuArrays, _config));
   }
   if (_config.GetPassiveScalarData().Size() > 0)
-    forcing.Append(new PassiveScalar(dim, num_equation, _order, intRuleType, intRules, vfes, eqState, Up, gradUp,
+    forcing.Append(new PassiveScalar(dim, num_equation, _order, intRuleType, intRules, vfes, mixture, Up, gradUp,
                                      gpuArrays, _config));
   if (_config.GetSpongeZoneData().szType != SpongeZoneSolution::NONE) {
-    forcing.Append(new SpongeZone(dim, num_equation, _order, intRuleType, fluxClass, eqState, intRules, vfes, Up,
+    forcing.Append(new SpongeZone(dim, num_equation, _order, intRuleType, fluxClass, mixture, intRules, vfes, Up,
                                   gradUp, gpuArrays, _config));
   }
 #ifdef _MASA_
@@ -151,7 +153,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
 #endif
 
   // create gradients object
-  gradients = new Gradients(vfes, gradUpfes, dim, num_equation, Up, gradUp, eqState, gradUp_A, intRules, intRuleType,
+  gradients = new Gradients(vfes, gradUpfes, dim, num_equation, Up, gradUp, mixture, gradUp_A, intRules, intRuleType,
                             gpuArrays, Me_inv, invMArray, posDofInvM, maxIntPoints, maxDofs);
   gradients->setParallelData(&parallelData, &transferUp);
 
@@ -370,11 +372,10 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 #ifdef _GPU_
 
   // ComputeConvectiveFluxes
-  Fluxes::convectiveFluxes_gpu(x, flux, eqState->GetSpecificHeatRatio(), vfes->GetNDofs(), dim, num_equation);
-  if (eqSystem == NS) {
-    Fluxes::viscousFluxes_gpu(x, gradUp, flux, eqState->GetSpecificHeatRatio(), eqState->GetGasConstant(),
-                              eqState->GetPrandtlNum(), eqState->GetViscMultiplyer(), eqState->GetBulkViscMultiplyer(),
-                              spaceVaryViscMult, linViscData, vfes->GetNDofs(), dim, num_equation);
+  Fluxes::convectiveFluxes_gpu(x, flux, eqSystem, mixture, vfes->GetNDofs(), dim, num_equation);
+  if (eqSystem != EULER) {
+    Fluxes::viscousFluxes_gpu(x, gradUp, flux, eqSystem, mixture, spaceVaryViscMult, linViscData, vfes->GetNDofs(), dim,
+                              num_equation);
   }
 #else
   DenseMatrix xmat(x.GetData(), vfes->GetNDofs(), num_equation);
@@ -398,7 +399,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 
     if (isSBP) {
       f *= alpha;  // *= alpha
-      double p = eqState->ComputePressure(state, dim);
+      double p = mixture->ComputePressure(state);
       p *= 1. - alpha;
       for (int d = 0; d < dim; d++) {
         f(d + 1, d) += p;
@@ -425,7 +426,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
     }
 
     // Update max char speed
-    const double mcs = eqState->ComputeMaxCharSpeed(state, dim);
+    const double mcs = mixture->ComputeMaxCharSpeed(state);
     if (mcs > max_char_speed) {
       max_char_speed = mcs;
     }
@@ -439,32 +440,37 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 void RHSoperator::updatePrimitives(const Vector &x_in) const {
 #ifdef _GPU_
 
-  RHSoperator::updatePrimitives_gpu(Up, &x_in, eqState->GetSpecificHeatRatio(), vfes->GetNDofs(), dim, num_equation);
+  RHSoperator::updatePrimitives_gpu(Up, &x_in, mixture->GetSpecificHeatRatio(), mixture->GetGasConstant(),
+                                    vfes->GetNDofs(), dim, num_equation, eqSystem);
 #else
   double *dataUp = Up->GetData();
   for (int i = 0; i < vfes->GetNDofs(); i++) {
     Vector iState(num_equation);
+    Vector iUp(num_equation);
     for (int eq = 0; eq < num_equation; eq++) iState[eq] = x_in[i + eq * vfes->GetNDofs()];
-    double p = eqState->ComputePressure(iState, dim);
-    dataUp[i] = iState[0];
-    dataUp[i + vfes->GetNDofs()] = iState[1] / iState[0];
-    dataUp[i + 2 * vfes->GetNDofs()] = iState[2] / iState[0];
-    if (dim == 3) dataUp[i + 3 * vfes->GetNDofs()] = iState[3] / iState[0];
-    dataUp[i + (1 + dim) * vfes->GetNDofs()] = p;
-    if (eqSystem == NS_PASSIVE)
-      dataUp[i + (num_equation - 1) * vfes->GetNDofs()] = iState[num_equation - 1] / iState[0];
+    mixture->GetPrimitivesFromConservatives(iState, iUp);
+    for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * vfes->GetNDofs()] = iUp[eq];
+    //     double temp = mixture->ComputeTemperature(iState);
+    //     dataUp[i] = iState[0];
+    //     dataUp[i + vfes->GetNDofs()] = iState[1] / iState[0];
+    //     dataUp[i + 2 * vfes->GetNDofs()] = iState[2] / iState[0];
+    //     if (dim == 3) dataUp[i + 3 * vfes->GetNDofs()] = iState[3] / iState[0];
+    //     dataUp[i + (1 + dim) * vfes->GetNDofs()] = temp;
+    //     if (eqSystem == NS_PASSIVE)
+    //       dataUp[i + (num_equation - 1) * vfes->GetNDofs()] = iState[num_equation - 1] / iState[0];
   }
 #endif  // _GPU_
 }
 
-void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const double gamma, const int ndofs,
-                                       const int dim, const int num_equations) {
+void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const double gamma, const double Rgas,
+                                       const int ndofs, const int dim, const int num_equations,
+                                       const Equations &eqSystem) {
 #ifdef _GPU_
   auto dataUp = Up->Write();   // make sure data is available in GPU
   auto dataIn = x_in->Read();  // make sure data is available in GPU
 
   MFEM_FORALL_2D(n, ndofs, num_equations, 1, 1, {
-    MFEM_SHARED double state[5];  // assuming 5 equations
+    MFEM_SHARED double state[20];  // assuming 20 equations
     // MFEM_SHARED double p;
     MFEM_SHARED double KE[3];
 
@@ -472,7 +478,7 @@ void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const dou
       state[eq] = dataIn[n + eq * ndofs];  // loads data into shared memory
       MFEM_SYNC_THREAD;
 
-      // compute pressure
+      // compute temperature
       if (eq < dim) KE[eq] = 0.5 * state[1 + eq] * state[1 + eq] / state[0];
       if (eq == num_equations - 1 && dim == 2) KE[2] = 0;
       MFEM_SYNC_THREAD;
@@ -482,9 +488,10 @@ void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const dou
       if (eq == 1) dataUp[n + ndofs] = state[1] / state[0];
       if (eq == 2) dataUp[n + 2 * ndofs] = state[2] / state[0];
       if (eq == 3 && dim == 3) dataUp[n + 3 * ndofs] = state[3] / state[0];
-      if (eq == num_equations - 1)
-        dataUp[n + (num_equations - 1) * ndofs] =
-            EquationOfState::pressure(&state[0], &KE[0], gamma, dim, num_equations);
+      if (eq == 1 + dim)
+        dataUp[n + (1 + dim) * ndofs] = DryAir::temperature(&state[0], &KE[0], gamma, Rgas, dim, num_equations);
+      if (eq == num_equations - 1 && eqSystem == NS_PASSIVE)
+        dataUp[n + (num_equations - 1) * ndofs] = state[num_equations - 1] / state[0];
     }
   });
 #endif
@@ -503,7 +510,7 @@ void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceInteg
 
   MFEM_FORALL_2D(el, NE, dof, 1, 1, {
     MFEM_FOREACH_THREAD(i, x, dof) {
-      MFEM_SHARED double data[216 * 5];
+      MFEM_SHARED double data[216 * 20];
 
       int eli = el + elemOffset;
       int offsetInv = d_posDofInvM[2 * eli];

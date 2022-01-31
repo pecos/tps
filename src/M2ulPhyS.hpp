@@ -43,8 +43,8 @@
 #include <tps_config.h>
 
 #include <fstream>
-#include <mfem/general/forall.hpp>
 #include <mfem.hpp>
+#include <mfem/general/forall.hpp>
 
 #include "BCintegrator.hpp"
 #include "averaging_and_rms.hpp"
@@ -57,6 +57,7 @@
 #include "fluxes.hpp"
 #include "gradNonLinearForm.hpp"
 #include "io.hpp"
+#include "logger.hpp"
 #include "mpi_groups.hpp"
 #include "rhs_operator.hpp"
 #include "riemann_solver.hpp"
@@ -123,7 +124,7 @@ class M2ulPhyS {
   ODESolver *timeIntegrator;
 
   // Pointers to the different classes
-  EquationOfState *eqState;
+  GasMixture *mixture;
 
   ParGridFunction *spaceVaryViscMult;  // space varying viscosity multiplier
 
@@ -201,7 +202,8 @@ class M2ulPhyS {
   ParGridFunction *Up;
 
   // Visualization functions (these are pointers to Up)
-  ParGridFunction *press, *dens, *vel, *passiveScalar;
+  ParGridFunction *temperature, *dens, *vel, *passiveScalar;
+  ParGridFunction *press;
 
   // gradient of primitive variables
   ParGridFunction *gradUp;

@@ -37,6 +37,7 @@
 #include <sstream>
 
 #include "em_options.hpp"
+#include "logger.hpp"
 #include "quasimagnetostatic.hpp"
 #include "tps.hpp"
 

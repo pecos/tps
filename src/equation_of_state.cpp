@@ -32,26 +32,82 @@
 
 #include "equation_of_state.hpp"
 
-EquationOfState::EquationOfState() {}
+// EquationOfState::EquationOfState() {}
 
-void EquationOfState::setFluid(WorkingFluid _fluid) {
+GasMixture::GasMixture(WorkingFluid _fluid, int _dim) {
   fluid = _fluid;
-  switch (fluid) {
-    case DRY_AIR:
-      gas_constant = 287.058;
-      // gas_constant = 1.; // for comparison against ex18
-      specific_heat_ratio = 1.4;
-      visc_mult = 1.;
-      Pr = 0.71;
-      cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
-      Sc = 0.71;
-      break;
-    default:
-      break;
+  dim = _dim;
+
+  bulk_visc_mult = 0.;
+  visc_mult = 1;
+}
+
+DryAir::DryAir(RunConfiguration& _runfile, int _dim) : GasMixture(WorkingFluid::DRY_AIR, _dim) {
+  setNumEquations();
+
+  gas_constant = 287.058;
+  // gas_constant = 1.; // for comparison against ex18
+  specific_heat_ratio = 1.4;
+
+  Pr = 0.71;
+  cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
+  Sc = 0.71;
+
+  // add extra equation for passive scalar
+  if (_runfile.GetEquationSystem() == Equations::NS_PASSIVE) {
+    Nconservative++;
+    Nprimitive++;
+    num_equations++;
   }
 }
 
-bool EquationOfState::StateIsPhysical(const mfem::Vector& state, const int dim) {
+DryAir::DryAir() {
+  gas_constant = 287.058;
+  // gas_constant = 1.; // for comparison against ex18
+  specific_heat_ratio = 1.4;
+  visc_mult = 1.;
+  Pr = 0.71;
+  cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
+  Sc = 0.71;
+}
+
+DryAir::DryAir(int _dim, int _num_equation) {
+  gas_constant = 287.058;
+  // gas_constant = 1.; // for comparison against ex18
+  specific_heat_ratio = 1.4;
+  visc_mult = 1.;
+  Pr = 0.71;
+  cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
+  Sc = 0.71;
+
+  dim = _dim;
+  num_equations = _num_equation;
+}
+
+void DryAir::setNumEquations() {
+  Nconservative = dim + 2;
+  Nprimitive = Nconservative;
+  num_equations = Nconservative;
+}
+
+// void EquationOfState::setFluid(WorkingFluid _fluid) {
+//   fluid = _fluid;
+//   switch (fluid) {
+//     case DRY_AIR:
+//       gas_constant = 287.058;
+//       // gas_constant = 1.; // for comparison against ex18
+//       specific_heat_ratio = 1.4;
+//       visc_mult = 1.;
+//       Pr = 0.71;
+//       cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
+//       Sc = 0.71;
+//       break;
+//     default:
+//       break;
+//   }
+// }
+
+bool DryAir::StateIsPhysical(const mfem::Vector& state) {
   const double den = state(0);
   const Vector den_vel(state.GetData() + 1, dim);
   const double den_energy = state(1 + dim);
@@ -93,7 +149,7 @@ bool EquationOfState::StateIsPhysical(const mfem::Vector& state, const int dim) 
 }
 
 // Compute the maximum characteristic speed.
-double EquationOfState::ComputeMaxCharSpeed(const Vector& state, const int dim) {
+double DryAir::ComputeMaxCharSpeed(const Vector& state) {
   const double den = state(0);
   const Vector den_vel(state.GetData() + 1, dim);
 
@@ -103,33 +159,85 @@ double EquationOfState::ComputeMaxCharSpeed(const Vector& state, const int dim) 
   }
   den_vel2 /= den;
 
-  const double pres = ComputePressure(state, dim);
+  const double pres = ComputePressure(state);
   const double sound = sqrt(specific_heat_ratio * pres / den);
   const double vel = sqrt(den_vel2 / den);
 
   return vel + sound;
 }
 
-void EquationOfState::GetConservativesFromPrimitives(const Vector& primit, Vector& conserv, const int& dim,
-                                                     const int& num_equations) {
+void DryAir::GetConservativesFromPrimitives(const Vector& primit, Vector& conserv) {
   conserv = primit;
 
   double v2 = 0.;
   for (int d = 0; d < dim; d++) {
-    v2 += primit[1 + d];
+    v2 += primit[1 + d] * primit[1 + d];
     conserv[1 + d] *= primit[0];
   }
-  conserv[num_equations - 1] = primit[num_equations - 1] / (specific_heat_ratio - 1.) + 0.5 * primit[0] * v2;
+  // total energy
+  conserv[1 + dim] = gas_constant * primit[0] * primit[1 + dim] / (specific_heat_ratio - 1.) + 0.5 * primit[0] * v2;
+
+  // case of passive scalar
+  if (num_equations > dim + 2) {
+    for (int n = 0; n < num_equations - dim - 2; n++) {
+      conserv[dim + 2 + n] *= primit[0];
+    }
+  }
 }
 
-void EquationOfState::GetPrimitivesFromConservatives(const Vector& conserv, Vector& primit, const int& dim,
-                                                     const int& num_equations) {
-  double p = ComputePressure(conserv, dim);
+void DryAir::GetPrimitivesFromConservatives(const Vector& conserv, Vector& primit) {
+  double T = ComputeTemperature(conserv);
   primit = conserv;
 
   for (int d = 0; d < dim; d++) primit[1 + d] /= conserv[0];
 
-  primit[num_equations - 1] = p;
+  primit[dim + 1] = T;
+
+  // case of passive scalar
+  if (num_equations > dim + 2) {
+    for (int n = 0; n < num_equations - dim - 2; n++) {
+      primit[dim + 2 + n] /= primit[0];
+    }
+  }
+}
+
+double DryAir::ComputeSpeedOfSound(const mfem::Vector& Uin, bool primitive) {
+  double T;
+
+  if (primitive) {
+    T = Uin[1 + dim];
+  } else {
+    // conservatives passed in
+    T = ComputeTemperature(Uin);
+  }
+
+  return sqrt(specific_heat_ratio * gas_constant * T);
+}
+
+double DryAir::ComputePressureDerivative(const Vector& dUp_dx, const Vector& Uin, bool primitive) {
+  double T, p;
+  if (primitive) {
+    T = Uin[1 + dim];
+  } else {
+    T = ComputeTemperature(Uin);
+  }
+
+  return gas_constant * (T * dUp_dx[0] + Uin[0] * dUp_dx[1 + dim]);
+}
+
+double DryAir::ComputePressureFromPrimitives(const mfem::Vector& Up) { return gas_constant * Up[0] * Up[1 + dim]; }
+
+void DryAir::UpdatePressureGridFunction(ParGridFunction* press, const ParGridFunction* Up) {
+  double* pGridFunc = press->HostWrite();
+  const double* UpData = Up->HostRead();
+
+  const int nnode = press->FESpace()->GetNDofs();
+
+  for (int n = 0; n < nnode; n++) {
+    double tmp = UpData[n + (1 + dim) * nnode];
+    double rho = UpData[n];
+    pGridFunc[n] = rho * gas_constant * tmp;
+  }
 }
 
 // GPU FUNCTIONS

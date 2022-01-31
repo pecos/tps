@@ -33,7 +33,9 @@
 #define RIEMANN_SOLVER_HPP_
 
 #include <tps_config.h>
+
 #include <mfem.hpp>
+
 #include "dataStructures.hpp"
 #include "fluxes.hpp"
 
@@ -47,7 +49,7 @@ class RiemannSolver {
   Vector flux1;
   Vector flux2;
 
-  EquationOfState *eqState;
+  GasMixture *mixture;
   Equations &eqSystem;
   Fluxes *fluxClass;
 
@@ -57,17 +59,19 @@ class RiemannSolver {
   void Eval_Roe(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux);
 
  public:
-  RiemannSolver(int &_num_equation, EquationOfState *_eqState, Equations &_eqSystem, Fluxes *_fluxClass, bool _useRoe);
+  RiemannSolver(int &_num_equation, GasMixture *mixture, Equations &_eqSystem, Fluxes *_fluxClass, bool _useRoe);
 
   void Eval(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux, bool LF = false);
 
   void ComputeFluxDotN(const Vector &state, const Vector &nor, Vector &fluxN);
 
 #ifdef _GPU_
-  static MFEM_HOST_DEVICE void convFluxDotNorm_gpu(const double *state, const double pres, const double *nor,
-                                                   const int &dim, double *fluxN, const int &thrd,
+  static MFEM_HOST_DEVICE void convFluxDotNorm_gpu(double *fluxN, const double *state, const double &pres,
+                                                   const double *nor, const int &num_equation, const int &dim,
+                                                   const Equations &eqSystem, const int &thrd,
                                                    const int &max_num_threads) {
     MFEM_SHARED double den_velN;
+
     if (thrd == 0) {
       den_velN = 0.;
       for (int d = 0; d < dim; d++) den_velN += state[d + 1] * nor[d];
@@ -81,15 +85,20 @@ class RiemannSolver {
       const double H = (state[dim + 1] + pres) / state[0];
       fluxN[1 + dim] = den_velN * H;
     }
+
+    if (eqSystem == NS_PASSIVE && thrd == max_num_threads - 2) {
+      fluxN[num_equation - 1] = den_velN * state[num_equation - 1] / state[0];
+    }
   }
 
   static MFEM_HOST_DEVICE void riemannLF_gpu(const double *U1, const double *U2, double *flux, const double *nor,
                                              const double &gamma, const double &Rg, const int &dim,
-                                             const int &num_equation, const int &thrd, const int &max_num_threads) {
+                                             const Equations &eqSystem, const int &num_equation, const int &thrd,
+                                             const int &max_num_threads) {
     MFEM_SHARED double KE1[3], KE2[3];
     MFEM_SHARED double vel1, vel2, p1, p2;
     MFEM_SHARED double maxE1, maxE2, maxE;
-    MFEM_SHARED double flux1[5], flux2[5];
+    MFEM_SHARED double flux1[20], flux2[20];
     MFEM_SHARED double normag;
 
     for (int d = thrd; d < dim; d += max_num_threads) {
@@ -98,8 +107,8 @@ class RiemannSolver {
     }
     MFEM_SYNC_THREAD;
 
-    if (thrd == 0) p1 = EquationOfState::pressure(U1, &KE1[0], gamma, dim, num_equation);
-    if (thrd == 1) p2 = EquationOfState::pressure(U2, &KE2[0], gamma, dim, num_equation);
+    if (thrd == 0) p1 = DryAir::pressure(U1, &KE1[0], gamma, dim, num_equation);
+    if (thrd == 1) p2 = DryAir::pressure(U2, &KE2[0], gamma, dim, num_equation);
     if (thrd == max_num_threads - 1) {
       vel1 = 0.;
       for (int d = 0; d < dim; d++) vel1 += 2. * KE1[d] / U1[0];
@@ -112,15 +121,16 @@ class RiemannSolver {
     }
     MFEM_SYNC_THREAD;
 
+    // vel + speedOfSound
     if (thrd == 0) maxE1 = vel1 + sqrt(gamma * p1 / U1[0]);
     if (thrd == 1) maxE2 = vel2 + sqrt(gamma * p2 / U2[0]);
     MFEM_SYNC_THREAD;
 
     if (thrd == max_num_threads - 1) maxE = max(maxE1, maxE2);
 
-    RiemannSolver::convFluxDotNorm_gpu(U1, p1, nor, dim, flux1, thrd, max_num_threads);
+    RiemannSolver::convFluxDotNorm_gpu(flux1, U1, p1, nor, num_equation, dim, eqSystem, thrd, max_num_threads);
     MFEM_SYNC_THREAD;
-    RiemannSolver::convFluxDotNorm_gpu(U2, p2, nor, dim, flux2, thrd, max_num_threads);
+    RiemannSolver::convFluxDotNorm_gpu(flux2, U2, p2, nor, num_equation, dim, eqSystem, thrd, max_num_threads);
 
     if (thrd == 0) {
       normag = 0.;

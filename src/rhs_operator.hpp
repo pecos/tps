@@ -33,8 +33,10 @@
 #define RHS_OPERATOR_HPP_
 
 #include <tps_config.h>
+
 #include <mfem.hpp>
 #include <mfem/general/forall.hpp>
+
 #include "BCintegrator.hpp"
 #include "dataStructures.hpp"
 #include "dgNonlinearForm.hpp"
@@ -66,7 +68,7 @@ class RHSoperator : public TimeDependentOperator {
   const int intRuleType;
 
   Fluxes *fluxClass;
-  EquationOfState *eqState;
+  GasMixture *mixture;
 
   ParFiniteElementSpace *vfes;
 
@@ -126,7 +128,7 @@ class RHSoperator : public TimeDependentOperator {
  public:
   RHSoperator(int &_iter, const int _dim, const int &_num_equations, const int &_order, const Equations &_eqSystem,
               double &_max_char_speed, IntegrationRules *_intRules, int _intRuleType, Fluxes *_fluxClass,
-              EquationOfState *_eqState, ParFiniteElementSpace *_vfes, const volumeFaceIntegrationArrays &gpuArrays,
+              GasMixture *_mixture, ParFiniteElementSpace *_vfes, const volumeFaceIntegrationArrays &gpuArrays,
               const int &_maxIntPoints, const int &_maxDofs, DGNonLinearForm *_A, MixedBilinearForm *_Aflux,
               ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult, ParGridFunction *_Up, ParGridFunction *_gradUp,
               ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A, BCintegrator *_bcIntegrator,
@@ -146,8 +148,8 @@ class RHSoperator : public TimeDependentOperator {
   static void copyZk2Z_gpu(Vector &z, Vector &zk, const int eq, const int dof);
   static void copyDataForFluxIntegration_gpu(const Vector &z, DenseTensor &flux, Vector &fk, Vector &zk, const int eq,
                                              const int dof, const int dim);
-  static void updatePrimitives_gpu(Vector *Up, const Vector *x_in, const double gamma, const int ndofs, const int dim,
-                                   const int num_equations);
+  static void updatePrimitives_gpu(Vector *Up, const Vector *x_in, const double gamma, const double Rgas,
+                                   const int ndofs, const int dim, const int num_equations, const Equations &eqSystem);
   static void multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceIntegrationArrays &gpuArrays,
                                  const Vector &invMArray, const Array<int> &posDofInvM, const int num_equation,
                                  const int totNumDof, const int NE, const int elemOffset, const int dof);

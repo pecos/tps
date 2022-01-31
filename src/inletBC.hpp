@@ -33,20 +33,16 @@
 #define INLETBC_HPP_
 
 #include <tps_config.h>
+
 #include <mfem.hpp>
 
 #include "BoundaryCondition.hpp"
+#include "dataStructures.hpp"
 #include "equation_of_state.hpp"
 #include "logger.hpp"
 #include "mpi_groups.hpp"
 
 using namespace mfem;
-
-enum InletType {
-  SUB_DENS_VEL,      // Subsonic inlet specified by the density and velocity components
-  SUB_DENS_VEL_NR,   // Non-reflecting subsonic inlet specified by the density and velocity components
-  SUB_VEL_CONST_ENT  // Subsonic non-reflecting. Specified vel, keeps entropy constant
-};
 
 class InletBC : public BoundaryCondition {
  private:
@@ -92,7 +88,7 @@ class InletBC : public BoundaryCondition {
   virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up);
 
  public:
-  InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *rsolver_, EquationOfState *_eqState,
+  InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *rsolver_, GasMixture *_mixture,
           ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
           const int _num_equation, int _patchNumber, double _refLength, InletType _bcType,
           const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs);
@@ -116,16 +112,23 @@ class InletBC : public BoundaryCondition {
 
   static void integrateInlets_gpu(const InletType type, const Vector &inputState, const double &dt,
                                   Vector &y,  // output
-                                  const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
-                                  ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
-                                  Array<int> &intPointsElIDBC, Array<int> &listElems, Array<int> &offsetsBoundaryU,
-                                  const int &maxIntPoints, const int &maxDofs, const int &dim, const int &num_equation,
-                                  const double &gamma, const double &Rg);
+                                  const Vector &x, Vector &interpolated_Ubdr, const Array<int> &nodesIDs,
+                                  const Array<int> &posDofIds, ParGridFunction *Up, ParGridFunction *gradUp,
+                                  Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
+                                  Array<int> &listElems, Array<int> &offsetsBoundaryU, const int &maxIntPoints,
+                                  const int &maxDofs, const int &dim, const int &num_equation, GasMixture *mixture,
+                                  Equations &eqSystem);
+  static void interpInlet_gpu(const InletType type, const Vector &inputState, Vector &interpolated_Ubdr,
+                              const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+                              ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
+                              Array<int> &intPointsElIDBC, Array<int> &listElems, Array<int> &offsetsBoundaryU,
+                              const int &maxIntPoints, const int &maxDofs, const int &dim, const int &num_equation);
 
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void computeSubDenseVel(const int &thrd, const double *u1, double *u2, const double *nor,
                                                   const double *inputState, const double &gamma, const int &dim,
-                                                  const int &num_equation) {
+                                                  const int &num_equation, const Equations &eqSystem) {
+    // assumes there at least as many threads as number of equations
     MFEM_SHARED double KE[3];
     MFEM_SHARED double p;
 
@@ -133,17 +136,20 @@ class InletBC : public BoundaryCondition {
     if (dim != 3 && (thrd == num_equation - 1)) KE[2] = 0.;
     MFEM_SYNC_THREAD;
 
-    if (thrd == 0) p = EquationOfState::pressure(u1, &KE[0], gamma, dim, num_equation);
+    if (thrd == 0) p = DryAir::pressure(u1, &KE[0], gamma, dim, num_equation);
     MFEM_SYNC_THREAD;
 
     if (thrd == 0) u2[0] = inputState[0];
     if (thrd == 1) u2[1] = inputState[0] * inputState[1];
     if (thrd == 2) u2[2] = inputState[0] * inputState[2];
     if (dim == 3 && thrd == 3) u2[3] = inputState[0] * inputState[3];
-    if (thrd == num_equation - 1) {
+    if (thrd == 1 + dim) {
       double ke = 0.;
       for (int d = 0; d < dim; d++) ke += inputState[1 + d] * inputState[1 + d];
       u2[thrd] = p / (gamma - 1.) + 0.5 * inputState[0] * ke;
+    }
+    if (eqSystem == NS_PASSIVE && thrd == num_equation - 1) {
+      u2[thrd] = 0.;
     }
   }
 #endif

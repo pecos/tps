@@ -33,8 +33,9 @@
 #define FORCING_TERMS_HPP_
 
 #include <tps_config.h>
-#include <mfem/general/forall.hpp>
+
 #include <mfem.hpp>
+#include <mfem/general/forall.hpp>
 
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
@@ -84,12 +85,14 @@ class ConstantPressureGradient : public ForcingTerms {
  private:
   // RunConfiguration &config;
   Vector pressGrad;
+  GasMixture *mixture;
 
  public:
   ConstantPressureGradient(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                            IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
                            ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
                            RunConfiguration &_config);
+  ~ConstantPressureGradient();
 
   // Terms do not need updating
   virtual void updateTerms(Vector &in);
@@ -102,11 +105,10 @@ class ConstantPressureGradient : public ForcingTerms {
 #endif
 };
 
-
 class SpongeZone : public ForcingTerms {
  private:
   Fluxes *fluxes;
-  EquationOfState *eqState;
+  GasMixture *mixture;
 
   SpongeZoneData &szData;
   Vector targetU;
@@ -122,7 +124,7 @@ class SpongeZone : public ForcingTerms {
 
  public:
   SpongeZone(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType, Fluxes *_fluxClass,
-             EquationOfState *_eqState, IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
+             GasMixture *_mixture, IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
              ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config);
   ~SpongeZone();
 
@@ -132,18 +134,20 @@ class SpongeZone : public ForcingTerms {
 // Forcing that adds a passive scalar
 class PassiveScalar : public ForcingTerms {
  private:
-  EquationOfState *eqState;
+  GasMixture *mixture;
 
-  Array<passiveScalarData *> psData;
+  Array<passiveScalarData *> psData_;
 
  public:
   PassiveScalar(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
-                IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, EquationOfState *_eqState,
-                ParGridFunction *_Up, ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
-                RunConfiguration &_config);
+                IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, GasMixture *_mixture, ParGridFunction *_Up,
+                ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config);
 
   // Terms do not need updating
   virtual void updateTerms(Vector &in);
+
+  void updateTerms_gpu(Vector &in, ParGridFunction *Up, Array<passiveScalarData *> &psData, const int nnode,
+                       const int num_equation);
 
   ~PassiveScalar();
 };

@@ -33,7 +33,8 @@
 
 Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollection *_fec, ParFiniteElementSpace *_fes,
                      ParFiniteElementSpace *_dfes, ParFiniteElementSpace *_vfes, Equations &_eqSys,
-                     const int &_num_equation, const int &_dim, RunConfiguration &_config, MPI_Groups *_groupsMPI)
+                     GasMixture *_mixture, const int &_num_equation, const int &_dim, RunConfiguration &_config,
+                     MPI_Groups *_groupsMPI)
     : Up(_Up),
       mesh(_mesh),
       fec(_fec),
@@ -44,7 +45,8 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
       num_equation(_num_equation),
       dim(_dim),
       config(_config),
-      groupsMPI(_groupsMPI) {
+      groupsMPI(_groupsMPI),
+      mixture(_mixture) {
   // Always assume 6 components of the Reynolds stress tensor
   numRMS = 6;
 
@@ -55,6 +57,8 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
   if (sampleInterval != 0) computeMean = true;
 
   if (computeMean) {
+    //     mixture = new DryAir(config,dim);
+
     rmsFes = new ParFiniteElementSpace(mesh, fec, numRMS, Ordering::byNODES);
 
     meanUp = new ParGridFunction(vfes);
@@ -96,6 +100,7 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
 
 Averaging::~Averaging() {
   if (computeMean) {
+    //     delete mixture;
     delete paraviewMean;
 
     delete meanP;
@@ -115,7 +120,7 @@ void Averaging::addSampleMean(const int &iter) {
     if (iter % sampleInterval == 0 && iter >= startMean) {
       if (iter == startMean && groupsMPI->getSession()->Root()) cout << "Starting mean calculation." << endl;
 #ifdef _GPU_
-      addSample_gpu(meanUp, rms, samplesMean, Up, fes->GetNDofs(), dim, num_equation);
+      addSample_gpu(meanUp, rms, samplesMean, mixture, Up, fes->GetNDofs(), dim, num_equation);
 #else
       addSample_cpu();
 #endif
@@ -130,11 +135,21 @@ void Averaging::addSample_cpu() {
   double *dataRMS = rms->GetData();
   int dof = fes->GetNDofs();
 
+  Vector iUp(num_equation);
+
   for (int n = 0; n < dof; n++) {
+    for (int eq = 0; eq < num_equation; eq++) iUp[eq] = dataUp[n + eq * dof];
+
     // mean
     for (int eq = 0; eq < num_equation; eq++) {
       double mVal = double(samplesMean) * dataMean[n + eq * dof];
-      dataMean[n + eq * dof] = (mVal + dataUp[n + eq * dof]) / double(samplesMean + 1);
+      dataMean[n + eq * dof] = (mVal + iUp[eq]) / double(samplesMean + 1);
+
+      // presseure-temperature change
+      if (eq == dim + 1) {
+        double p = mixture->ComputePressureFromPrimitives(iUp);
+        dataMean[n + eq * dof] = (mVal + p) / double(samplesMean + 1);
+      }
     }
 
     // ----- RMS -----
@@ -297,7 +312,7 @@ const double *Averaging::getLocalSums() {
 }
 
 #ifdef _GPU_
-void Averaging::addSample_gpu(ParGridFunction *meanUp, ParGridFunction *rms, int &samplesMean,
+void Averaging::addSample_gpu(ParGridFunction *meanUp, ParGridFunction *rms, int &samplesMean, GasMixture *mixture,
                               const ParGridFunction *Up, const int &Ndof, const int &dim, const int &num_equation) {
   double *d_meanUp = meanUp->ReadWrite();
   double *d_rms = rms->ReadWrite();
@@ -305,24 +320,42 @@ void Averaging::addSample_gpu(ParGridFunction *meanUp, ParGridFunction *rms, int
 
   double dSamplesMean = (double)samplesMean;
 
+  WorkingFluid fluid = mixture->GetWorkingFluid();
+  const double Rg = mixture->GetGasConstant();
+
   MFEM_FORALL_2D(n, Ndof, 6, 1, 1, {
     MFEM_FOREACH_THREAD(i, x, 6) {
       MFEM_SHARED double meanVel[3], vel[3];
+      MFEM_SHARED double nUp[20];  // NOTE: lets make sure we don't have more than 20 eq.
+
+      for (int eq = i; eq < num_equation; eq += 6) {
+    nUp[eq] = d_Up[n + eq * Ndof];
+      }
+      MFEM_SYNC_THREAD;
 
       // mean
       for (int eq = i; eq < num_equation; eq += 6) {
     double mUpi = d_meanUp[n + eq * Ndof];
-    double Upi = d_Up[n + eq * Ndof];
 
     double mVal = dSamplesMean * mUpi;
-    double newMeanUp = (mVal + Upi) / (dSamplesMean + 1);
+
+    double newMeanUp;
+    if (eq != 1 + dim) {
+      newMeanUp = (mVal + nUp[eq]) / (dSamplesMean + 1);
+    } else {  // eq == 1+dim
+      double p;
+      if (fluid == DRY_AIR) {
+        p = DryAir::ComputePressureFromPrimitives_gpu(&nUp[0], Rg, dim);
+      }
+      newMeanUp = (mVal + p) / (dSamplesMean + 1);
+    }
 
     d_meanUp[n + eq * Ndof] = newMeanUp;
 
     // fill out mean velocity array
     if (i > 0 && i <= 3) {
       meanVel[i - 1] = newMeanUp;
-      vel[i - 1] = Upi;
+      vel[i - 1] = nUp[i];
     }
     if (i == 3 && dim != 3) {
       meanVel[2] = 0.;

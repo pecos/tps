@@ -33,20 +33,15 @@
 #define OUTLETBC_HPP_
 
 #include <tps_config.h>
+
 #include <mfem.hpp>
 
 #include "BoundaryCondition.hpp"
+#include "dataStructures.hpp"
 #include "logger.hpp"
 #include "mpi_groups.hpp"
 
 using namespace mfem;
-
-enum OutletType {
-  SUB_P,        // subsonic outlet specified with pressure
-  SUB_P_NR,     // non-reflecting subsonic outlet specified with pressure
-  SUB_MF_NR,    // Mass-flow non-reflecting
-  SUB_MF_NR_PW  // point-based non-reflecting massflow BC
-};
 
 class OutletBC : public BoundaryCondition {
  private:
@@ -102,7 +97,7 @@ class OutletBC : public BoundaryCondition {
   void computeParallelArea();
 
  public:
-  OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *rsolver_, EquationOfState *_eqState,
+  OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *rsolver_, GasMixture *mixture,
            ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
            const int _num_equation, int _patchNumber, double _refLength, OutletType _bcType,
            const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs);
@@ -123,21 +118,31 @@ class OutletBC : public BoundaryCondition {
 
   // functions for BC integration on GPU
 
-  static void integrateOutlets_gpu(const OutletType type, const Array<double> &inputState, const double &dt,
+  static void integrateOutlets_gpu(const OutletType type, Equations &eqSystem, const Array<double> &inputState,
+                                   const double &dt,
                                    Vector &y,  // output
                                    const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                                    ParGridFunction *Up, ParGridFunction *gradUp, Vector &meanUp, Vector &boundaryU,
-                                   Vector &tangent1, Vector &tangent2, Vector &inverseNorm2cartesian, Vector &shapesBC,
+                                   Vector &interpolated_Ubdr, Vector &interpolatedGradUpbdr_, Vector &tangent1,
+                                   Vector &tangent2, Vector &inverseNorm2cartesian, Vector &shapesBC,
                                    Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
                                    Array<int> &offsetBoundaryU, const int &maxIntPoints, const int &maxDofs,
-                                   const int &dim, const int &num_equation, const double &gamma, const double &Rg,
+                                   const int &dim, const int &num_equation, GasMixture *mixture,
                                    const double &refLength, const double &area);
+
+  static void interpOutlet_gpu(const OutletType type, const Array<double> &inputState, Vector &interpolated_Ubdr,
+                               Vector &interpolatedGradUpbdr_, const Vector &x, const Array<int> &nodesIDs,
+                               const Array<int> &posDofIds, ParGridFunction *Up, ParGridFunction *gradUp,
+                               Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
+                               Array<int> &offsetsBoundaryU, const int &maxIntPoints, const int &maxDofs,
+                               const int &dim, const int &num_equation);
 
 #ifdef _GPU_  // GPU functions
   static MFEM_HOST_DEVICE void computeSubPressure(const int &thrd, const double *u1, double *u2, const double *nor,
                                                   const double &press, const double &gamma, const int &dim,
-                                                  const int &num_equation) {
-    if (thrd == num_equation - 1) {
+                                                  const int &num_equation, const Equations &eqSystem) {
+    if (thrd == 1 + dim) {
+      // NOTE: this still assumes ideal gas equation.
       double k = 0.;
       for (int d = 0; d < dim; d++) k += u1[1 + d] * u1[1 + d];
       u2[thrd] = press / (gamma - 1.) + 0.5 * k / u1[0];
@@ -150,14 +155,14 @@ class OutletBC : public BoundaryCondition {
                                                  const double *meanUp, const double &dt, double *u2, double *boundaryU,
                                                  const double *inputState, const double *nor, const double *d_tang1,
                                                  const double *d_tang2, const double *d_inv, const double &refLength,
-                                                 const double &gamma, const int &elDof, const int &dim,
-                                                 const int &num_equation) {
-    MFEM_SHARED double unitNorm[3], meanVel[3], normGrad[5];
+                                                 const double &gamma, const double &Rg, const int &elDof,
+                                                 const int &dim, const int &num_equation, const Equations &eqSystem) {
+    MFEM_SHARED double unitNorm[3], meanVel[3], normGrad[20];
     MFEM_SHARED double mod;
-    MFEM_SHARED double speedSound, meanK;
-    MFEM_SHARED double L1, L2, L3, L4, L5;
+    MFEM_SHARED double speedSound, meanK, dpdn;
+    MFEM_SHARED double L1, L2, L3, L4, L5, L6;
     MFEM_SHARED double d1, d2, d3, d4, d5;
-    MFEM_SHARED double bdrFlux[5], uN[5], newU[5];
+    MFEM_SHARED double bdrFlux[20], uN[20], newU[20];
 
     if (thrd < dim) unitNorm[thrd] = nor[thrd];
     if (thrd == num_equation - 1) {
@@ -188,8 +193,14 @@ class OutletBC : public BoundaryCondition {
       for (int d = 0; d < dim; d++) normGrad[thrd] += unitNorm[d] * gradUp[thrd + d * num_equation];
     }
     MFEM_SYNC_THREAD;
+    if (thrd == 0) {
+      // NOTE: assumes DryAir!
+      double T = DryAir::temperatureFromConservative(u1, gamma, Rg, dim, num_equation);
+      dpdn = Rg * (T * normGrad[0] + u1[0] * normGrad[1 + dim]);
+    }
+    MFEM_SYNC_THREAD;
 
-    if (thrd == 0) speedSound = sqrt(gamma * meanUp[num_equation - 1] / meanUp[0]);
+    if (thrd == 0) speedSound = sqrt(gamma * Rg * meanUp[1 + dim]);  // assumes perfect gas
     if (thrd == elDof - 1) {
       meanK = 0.;
       for (int d = 0; d < dim; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
@@ -199,7 +210,7 @@ class OutletBC : public BoundaryCondition {
 
     // compute outgoing characteristics
     if (thrd == 1) {
-      L2 = speedSound * speedSound * normGrad[0] - normGrad[num_equation - 1];
+      L2 = speedSound * speedSound * normGrad[0] - dpdn;
       L2 *= meanVel[0];
     }
 
@@ -220,14 +231,19 @@ class OutletBC : public BoundaryCondition {
     if (thrd == 0) {
       L5 = 0.;
       for (int d = 0; d < dim; d++) L5 += unitNorm[d] * normGrad[1 + d];
-      L5 = normGrad[num_equation - 1] + meanUp[0] * speedSound * L5;
+      L5 = dpdn + meanUp[0] * speedSound * L5;
       L5 *= meanVel[0] + speedSound;
+    }
+
+    if (thrd == num_equation - 1 && eqSystem == NS_PASSIVE) {
+      L6 = meanVel[0] * normGrad[num_equation - 1];
     }
 
     // estimate ingoing characteristic
     if (thrd == elDof - 1) {
       const double sigma = speedSound / refLength;
-      L1 = sigma * (meanUp[num_equation - 1] - inputState[0]);
+      double meanP = Rg * meanUp[0] * meanUp[1 + dim];  // NOTE: assumes DryAir
+      L1 = sigma * (meanP - inputState[0]);
     }
     MFEM_SYNC_THREAD;
 
@@ -242,11 +258,14 @@ class OutletBC : public BoundaryCondition {
     if (thrd == 1) bdrFlux[1] = meanVel[0] * d1 + meanUp[0] * d2;
     if (thrd == 2) bdrFlux[2] = meanVel[1] * d1 + meanUp[0] * d3;
     if (thrd == elDof - 1 && dim == 3) bdrFlux[3] = meanVel[2] * d1 + meanUp[0] * d4;
-    if (thrd == num_equation - 1) {
-      bdrFlux[num_equation - 1] = meanUp[0] * meanVel[0] * d2;
-      bdrFlux[num_equation - 1] += meanUp[0] * meanVel[1] * d3;
-      if (dim == 3) bdrFlux[num_equation - 1] += meanUp[0] * meanVel[2] * d4;
-      bdrFlux[num_equation - 1] += meanK * d1 + d5 / (gamma - 1.);
+    if (thrd == 1 + dim) {
+      bdrFlux[1 + dim] = meanUp[0] * meanVel[0] * d2;
+      bdrFlux[1 + dim] += meanUp[0] * meanVel[1] * d3;
+      if (dim == 3) bdrFlux[1 + dim] += meanUp[0] * meanVel[2] * d4;
+      bdrFlux[1 + dim] += meanK * d1 + d5 / (gamma - 1.);
+    }
+    if (thrd == num_equation - 1 && eqSystem == NS_PASSIVE) {
+      bdrFlux[num_equation - 1] = d1 * u1[num_equation - 1] / u1[0] + u1[0] * L6;
     }
     MFEM_SYNC_THREAD;
 
@@ -278,19 +297,17 @@ class OutletBC : public BoundaryCondition {
     if (thrd < num_equation) boundaryU[thrd + n * num_equation] = newU[thrd];
   }
 
-  static MFEM_HOST_DEVICE void computeNRSubMassFlow(const int &thrd, const int &n, const double *u1,
-                                                    const double *gradUp, const double *meanUp, const double &dt,
-                                                    double *u2, double *boundaryU, const double *inputState,
-                                                    const double *nor, const double *d_tang1, const double *d_tang2,
-                                                    const double *d_inv, const double &refLength, const double &area,
-                                                    const double &gamma, const int &elDof, const int &dim,
-                                                    const int &num_equation) {
-    MFEM_SHARED double unitNorm[3], meanVel[3], normGrad[5];
+  static MFEM_HOST_DEVICE void computeNRSubMassFlow(
+      const int &thrd, const int &n, const double *u1, const double *gradUp, const double *meanUp, const double &dt,
+      double *u2, double *boundaryU, const double *inputState, const double *nor, const double *d_tang1,
+      const double *d_tang2, const double *d_inv, const double &refLength, const double &area, const double &gamma,
+      const double &Rg, const int &elDof, const int &dim, const int &num_equation, const Equations &eqSystem) {
+    MFEM_SHARED double unitNorm[3], meanVel[3], normGrad[20];
     MFEM_SHARED double mod;
-    MFEM_SHARED double speedSound, meanK;
-    MFEM_SHARED double L1, L2, L3, L4, L5;
+    MFEM_SHARED double speedSound, meanK, dpdn;
+    MFEM_SHARED double L1, L2, L3, L4, L5, L6;
     MFEM_SHARED double d1, d2, d3, d4, d5;
-    MFEM_SHARED double bdrFlux[5], uN[5], newU[5];
+    MFEM_SHARED double bdrFlux[20], uN[20], newU[20];
 
     if (thrd < dim) unitNorm[thrd] = nor[thrd];
     if (thrd == num_equation - 1) {
@@ -321,8 +338,15 @@ class OutletBC : public BoundaryCondition {
       for (int d = 0; d < dim; d++) normGrad[thrd] += unitNorm[d] * gradUp[thrd + d * num_equation];
     }
     MFEM_SYNC_THREAD;
+    if (thrd == 0) {
+      // NOTE: assumes DryAir!
+      double T = DryAir::temperatureFromConservative(u1, gamma, Rg, dim, num_equation);
+      dpdn = Rg * (T * normGrad[0] + u1[0] * normGrad[1 + dim]);
+    }
+    MFEM_SYNC_THREAD;
 
-    if (thrd == 0) speedSound = sqrt(gamma * meanUp[num_equation - 1] / meanUp[0]);
+    // NOTE: assumes DryAir!
+    if (thrd == 0) speedSound = sqrt(gamma * Rg * meanUp[1 + dim]);
     if (thrd == elDof - 1) {
       meanK = 0.;
       for (int d = 0; d < dim; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
@@ -332,7 +356,7 @@ class OutletBC : public BoundaryCondition {
 
     // compute outgoing characteristics
     if (thrd == 1) {
-      L2 = speedSound * speedSound * normGrad[0] - normGrad[num_equation - 1];
+      L2 = speedSound * speedSound * normGrad[0] - dpdn;
       L2 *= meanVel[0];
     }
 
@@ -353,8 +377,12 @@ class OutletBC : public BoundaryCondition {
     if (thrd == 0) {
       L5 = 0.;
       for (int d = 0; d < dim; d++) L5 += unitNorm[d] * normGrad[1 + d];
-      L5 = normGrad[num_equation - 1] + meanUp[0] * speedSound * L5;
+      L5 = dpdn + meanUp[0] * speedSound * L5;
       L5 *= meanVel[0] + speedSound;
+    }
+
+    if (thrd == num_equation - 1 && eqSystem == NS_PASSIVE) {
+      L6 = meanVel[0] * normGrad[num_equation - 1];
     }
 
     // estimate ingoing characteristic
@@ -376,11 +404,14 @@ class OutletBC : public BoundaryCondition {
     if (thrd == 1) bdrFlux[1] = meanVel[0] * d1 + meanUp[0] * d2;
     if (thrd == 2) bdrFlux[2] = meanVel[1] * d1 + meanUp[0] * d3;
     if (thrd == elDof - 1 && dim == 3) bdrFlux[3] = meanVel[2] * d1 + meanUp[0] * d4;
-    if (thrd == num_equation - 1) {
-      bdrFlux[num_equation - 1] = meanUp[0] * meanVel[0] * d2;
-      bdrFlux[num_equation - 1] += meanUp[0] * meanVel[1] * d3;
-      if (dim == 3) bdrFlux[num_equation - 1] += meanUp[0] * meanVel[2] * d4;
-      bdrFlux[num_equation - 1] += meanK * d1 + d5 / (gamma - 1.);
+    if (thrd == 1 + dim) {
+      bdrFlux[1 + dim] = meanUp[0] * meanVel[0] * d2;
+      bdrFlux[1 + dim] += meanUp[0] * meanVel[1] * d3;
+      if (dim == 3) bdrFlux[1 + dim] += meanUp[0] * meanVel[2] * d4;
+      bdrFlux[1 + dim] += meanK * d1 + d5 / (gamma - 1.);
+    }
+    if (thrd == num_equation - 1 && eqSystem == NS_PASSIVE) {
+      bdrFlux[num_equation - 1] = d1 * u1[num_equation - 1] / u1[0] + u1[0] * L6;
     }
     MFEM_SYNC_THREAD;
 
@@ -416,14 +447,15 @@ class OutletBC : public BoundaryCondition {
                                                   const double *meanUp, const double &dt, double *u2, double *boundaryU,
                                                   const double *inputState, const double *nor, const double *d_tang1,
                                                   const double *d_tang2, const double *d_inv, const double &refLength,
-                                                  const double &area, const double &gamma, const int &elDof,
-                                                  const int &dim, const int &num_equation) {
-    MFEM_SHARED double unitNorm[3], meanVel[3], normGrad[5];
+                                                  const double &area, const double &gamma, const double &Rg,
+                                                  const int &elDof, const int &dim, const int &num_equation,
+                                                  const Equations &eqSystem) {
+    MFEM_SHARED double unitNorm[3], meanVel[3], normGrad[20];
     MFEM_SHARED double mod;
-    MFEM_SHARED double speedSound, meanK;
-    MFEM_SHARED double L1, L2, L3, L4, L5;
+    MFEM_SHARED double speedSound, meanK, dpdn;
+    MFEM_SHARED double L1, L2, L3, L4, L5, L6;
     MFEM_SHARED double d1, d2, d3, d4, d5;
-    MFEM_SHARED double bdrFlux[5], uN[5], newU[5];
+    MFEM_SHARED double bdrFlux[20], uN[20], newU[20];
 
     if (thrd < dim) unitNorm[thrd] = nor[thrd];
     if (thrd == num_equation - 1) {
@@ -454,8 +486,14 @@ class OutletBC : public BoundaryCondition {
       for (int d = 0; d < dim; d++) normGrad[thrd] += unitNorm[d] * gradUp[thrd + d * num_equation];
     }
     MFEM_SYNC_THREAD;
+    if (thrd == 0) {
+      // NOTE: assumes DryAir!
+      double T = DryAir::temperatureFromConservative(u1, gamma, Rg, dim, num_equation);
+      dpdn = Rg * (T * normGrad[0] + u1[0] * normGrad[1 + dim]);
+    }
+    MFEM_SYNC_THREAD;
 
-    if (thrd == 0) speedSound = sqrt(gamma * meanUp[num_equation - 1] / meanUp[0]);
+    if (thrd == 0) speedSound = sqrt(gamma * Rg * meanUp[1 + dim]);  // assumes perfect gas
     if (thrd == elDof - 1) {
       meanK = 0.;
       for (int d = 0; d < dim; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
@@ -465,7 +503,7 @@ class OutletBC : public BoundaryCondition {
 
     // compute outgoing characteristics
     if (thrd == 1) {
-      L2 = speedSound * speedSound * normGrad[0] - normGrad[num_equation - 1];
+      L2 = speedSound * speedSound * normGrad[0] - dpdn;
       L2 *= meanVel[0];
     }
 
@@ -486,8 +524,12 @@ class OutletBC : public BoundaryCondition {
     if (thrd == 0) {
       L5 = 0.;
       for (int d = 0; d < dim; d++) L5 += unitNorm[d] * normGrad[1 + d];
-      L5 = normGrad[num_equation - 1] + meanUp[0] * speedSound * L5;
+      L5 = dpdn + meanUp[0] * speedSound * L5;
       L5 *= meanVel[0] + speedSound;
+    }
+
+    if (thrd == num_equation - 1 && eqSystem == NS_PASSIVE) {
+      L6 = meanVel[0] * normGrad[num_equation - 1];
     }
 
     // estimate ingoing characteristic
@@ -512,11 +554,14 @@ class OutletBC : public BoundaryCondition {
     if (thrd == 1) bdrFlux[1] = meanVel[0] * d1 + meanUp[0] * d2;
     if (thrd == 2) bdrFlux[2] = meanVel[1] * d1 + meanUp[0] * d3;
     if (thrd == elDof - 1 && dim == 3) bdrFlux[3] = meanVel[2] * d1 + meanUp[0] * d4;
-    if (thrd == num_equation - 1) {
-      bdrFlux[num_equation - 1] = meanUp[0] * meanVel[0] * d2;
-      bdrFlux[num_equation - 1] += meanUp[0] * meanVel[1] * d3;
-      if (dim == 3) bdrFlux[num_equation - 1] += meanUp[0] * meanVel[2] * d4;
-      bdrFlux[num_equation - 1] += meanK * d1 + d5 / (gamma - 1.);
+    if (thrd == 1 + dim) {
+      bdrFlux[1 + dim] = meanUp[0] * meanVel[0] * d2;
+      bdrFlux[1 + dim] += meanUp[0] * meanVel[1] * d3;
+      if (dim == 3) bdrFlux[1 + dim] += meanUp[0] * meanVel[2] * d4;
+      bdrFlux[1 + dim] += meanK * d1 + d5 / (gamma - 1.);
+    }
+    if (thrd == num_equation - 1 && eqSystem == NS_PASSIVE) {
+      bdrFlux[num_equation - 1] = d1 * u1[num_equation - 1] / u1[0] + u1[0] * L6;
     }
     MFEM_SYNC_THREAD;
 

@@ -35,6 +35,7 @@
 // Class to manage gradients of primitives
 
 #include <tps_config.h>
+
 #include <mfem.hpp>
 
 #include "dataStructures.hpp"
@@ -54,7 +55,7 @@ class Gradients : public ParNonlinearForm {
   ParGridFunction *Up;
   ParGridFunction *gradUp;
 
-  EquationOfState *eqState;
+  GasMixture *mixture;
 
   // ParNonlinearForm *gradUp_A;
   GradNonLinearForm *gradUp_A;
@@ -86,7 +87,7 @@ class Gradients : public ParNonlinearForm {
 
  public:
   Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradUpfes, int _dim, int _num_equation,
-            ParGridFunction *_Up, ParGridFunction *_gradUp, EquationOfState *_eqState, GradNonLinearForm *_gradUp_A,
+            ParGridFunction *_Up, ParGridFunction *_gradUp, GasMixture *_mixture, GradNonLinearForm *_gradUp_A,
             IntegrationRules *_intRules, int _intRuleType, const volumeFaceIntegrationArrays &gpuArrays,
             Array<DenseMatrix *> &Me_inv, Vector &_invMArray, Array<int> &_posDofInvM, const int &_maxIntPoints,
             const int &_maxDofs);
@@ -110,6 +111,11 @@ class Gradients : public ParNonlinearForm {
                                    //                                    const Vector &elemShapeDshapeWJ,
                                    //                                    const Array<int> &elemPosQ_shapeDshapeWJ,
                                    const int &maxDofs, const int &maxIntPoints);
+
+  static void faceContrib_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
+                              const Vector &Up, Vector &gradUp, const int num_equation, const int dim,
+                              const volumeFaceIntegrationArrays &gpuArrays, const int &maxDofs,
+                              const int &maxIntPoints);
 
   static void integrationGradSharedFace_gpu(const Vector *Up, const Vector &faceUp, ParGridFunction *gradUp,
                                             const int &Ndofs, const int &dim, const int &num_equation,

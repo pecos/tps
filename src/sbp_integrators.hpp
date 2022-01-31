@@ -49,13 +49,13 @@ class SBPintegrator : public NonlinearFormIntegrator {
 
   const double &alpha;
 
-  EquationOfState *eqState;
+  GasMixture *mixture;
   Fluxes *fluxClass;
 
   IntegrationRules *intRules;
 
  public:
-  SBPintegrator(EquationOfState *_eqState, Fluxes *_fluxClass, IntegrationRules *_intRules, const int _dim,
+  SBPintegrator(GasMixture *mixture, Fluxes *_fluxClass, IntegrationRules *_intRules, const int _dim,
                 const int _num_equation, double &_alpha);
 
   virtual void AssembleElementVector(const FiniteElement &el, ElementTransformation &Tr, const Vector &elfun,

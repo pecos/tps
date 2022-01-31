@@ -229,10 +229,17 @@ void M2ulPhyS::initVariables() {
 
   eqSystem = config.GetEquationSystem();
 
-  eqState = new EquationOfState();
-  eqState->setFluid(config.GetWorkingFluid());
-  eqState->setViscMult(config.GetViscMult());
-  eqState->setBulkViscMult(config.GetBulkViscMult());
+  mixture = NULL;
+  switch (config.GetWorkingFluid()) {
+    case WorkingFluid::DRY_AIR:
+      mixture = new DryAir(config, dim);
+      mixture->setViscMult(config.GetViscMult());
+      mixture->setBulkViscMult(config.GetBulkViscMult());
+      break;
+    case WorkingFluid::USER_DEFINED:
+      break;
+  }
+  assert(mixture != NULL);
 
   order = config.GetSolutionOrder();
 
@@ -240,6 +247,7 @@ void M2ulPhyS::initVariables() {
 
   max_char_speed = 0.;
 
+  // NOTE: num_equations to be given by the gasMixture
   switch (eqSystem) {
     case EULER:
       num_equation = 2 + dim;
@@ -281,9 +289,10 @@ void M2ulPhyS::initVariables() {
   initIndirectionArrays();
   initSolutionAndVisualizationVectors();
 
-  average = new Averaging(Up, mesh, fec, fes, dfes, vfes, eqSystem, num_equation, dim, config, groupsMPI);
+  average = new Averaging(Up, mesh, fec, fes, dfes, vfes, eqSystem, mixture, num_equation, dim, config, groupsMPI);
   average->read_meanANDrms_restart_files();
 
+  // NOTE: this should also be completed by the GasMixture class
   // register rms and mean sol into ioData
   if (average->ComputeMean()) {
     // meanUp
@@ -313,13 +322,13 @@ void M2ulPhyS::initVariables() {
   ioData.initializeSerial(mpi.Root(), (config.RestartSerial() != "no"), serial_mesh);
   projectInitialSolution();
 
-  fluxClass = new Fluxes(eqState, eqSystem, num_equation, dim);
+  fluxClass = new Fluxes(mixture, eqSystem, num_equation, dim);
 
   alpha = 0.5;
   isSBP = config.isSBP();
 
   // Create Riemann Solver
-  rsolver = new RiemannSolver(num_equation, eqState, eqSystem, fluxClass, config.RoeRiemannSolver());
+  rsolver = new RiemannSolver(num_equation, mixture, eqSystem, fluxClass, config.RoeRiemannSolver());
 
   // Boundary attributes in present partition
   Array<int> local_attr;
@@ -327,15 +336,15 @@ void M2ulPhyS::initVariables() {
 
   bcIntegrator = NULL;
   if (local_attr.Size() > 0) {
-    bcIntegrator = new BCintegrator(groupsMPI, mesh, vfes, intRules, rsolver, dt, eqState, fluxClass, Up, gradUp,
+    bcIntegrator = new BCintegrator(groupsMPI, mesh, vfes, intRules, rsolver, dt, mixture, fluxClass, Up, gradUp,
                                     shapesBC, normalsWBC, intPointsElIDBC, dim, num_equation, max_char_speed, config,
                                     local_attr, maxIntPoints, maxDofs);
   }
 
   // A->SetAssemblyLevel(AssemblyLevel::PARTIAL);
 
-  A = new DGNonLinearForm(vfes, gradUpfes, gradUp, bcIntegrator, intRules, dim, num_equation, eqState, gpuArrays,
-                          maxIntPoints, maxDofs);
+  A = new DGNonLinearForm(fluxClass, vfes, gradUpfes, gradUp, bcIntegrator, intRules, dim, num_equation, mixture,
+                          gpuArrays, maxIntPoints, maxDofs);
   if (local_attr.Size() > 0) A->AddBdrFaceIntegrator(bcIntegrator);
 
   {
@@ -347,7 +356,7 @@ void M2ulPhyS::initVariables() {
   }
   A->AddInteriorFaceIntegrator(faceIntegrator);
   if (isSBP) {
-    SBPoperator = new SBPintegrator(eqState, fluxClass, intRules, dim, num_equation, alpha);
+    SBPoperator = new SBPintegrator(mixture, fluxClass, intRules, dim, num_equation, alpha);
     A->AddDomainIntegrator(SBPoperator);
   }
 
@@ -390,7 +399,7 @@ void M2ulPhyS::initVariables() {
   gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
 
   rhsOperator = new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType,
-                                fluxClass, eqState, vfes, gpuArrays, maxIntPoints, maxDofs, A, Aflux, mesh,
+                                fluxClass, mixture, vfes, gpuArrays, maxIntPoints, maxDofs, A, Aflux, mesh,
                                 spaceVaryViscMult, Up, gradUp, gradUpfes, gradUp_A, bcIntegrator, isSBP, alpha, config);
 
   CFL = config.GetCFLNumber();
@@ -757,7 +766,7 @@ M2ulPhyS::~M2ulPhyS() {
 
   delete rsolver;
   delete fluxClass;
-  delete eqState;
+  delete mixture;
   delete gradUpfes;
   delete vfes;
   delete dfes;
@@ -818,7 +827,11 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   dens = new ParGridFunction(fes, Up->HostReadWrite());
   vel = new ParGridFunction(dfes, Up->HostReadWrite() + fes->GetNDofs());
-  press = new ParGridFunction(fes, Up->HostReadWrite() + (1 + dim) * fes->GetNDofs());
+  temperature = new ParGridFunction(fes, Up->HostReadWrite() + (1 + dim) * fes->GetNDofs());
+
+  // this variable is purely for visualization
+  press = new ParGridFunction(fes);
+
   passiveScalar = NULL;
   if (eqSystem == NS_PASSIVE)
     passiveScalar = new ParGridFunction(fes, Up->HostReadWrite() + (num_equation - 1) * fes->GetNDofs());
@@ -868,6 +881,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   paraviewColl->RegisterField("dens", dens);
   paraviewColl->RegisterField("vel", vel);
+  paraviewColl->RegisterField("temp", temperature);
   paraviewColl->RegisterField("press", press);
   if (eqSystem == NS_PASSIVE) paraviewColl->RegisterField("passiveScalar", passiveScalar);
 
@@ -916,6 +930,9 @@ void M2ulPhyS::projectInitialSolution() {
   }
 
   initGradUp();
+
+  // update pressure grid function
+  mixture->UpdatePressureGridFunction(press, Up);
 }
 
 void M2ulPhyS::Iterate() {
@@ -979,6 +996,8 @@ void M2ulPhyS::Iterate() {
     if (iter % vis_steps == 0) {
 #ifdef _MASA_
       rhsOperator->updatePrimitives(*U);
+      mixture->UpdatePressureGridFunction(press, Up);
+
       DenMMS.SetTime(time);
       VelMMS.SetTime(time);
       PreMMS.SetTime(time);
@@ -993,9 +1012,11 @@ void M2ulPhyS::Iterate() {
 #endif
 
       if (iter != MaxIters) {
+        auto hUp = Up->HostRead();
+        mixture->UpdatePressureGridFunction(press, Up);
+
         restart_files_hdf5("write");
 
-        auto hUp = Up->HostRead();
         paraviewColl->SetCycle(iter);
         paraviewColl->SetTime(time);
         paraviewColl->Save();
@@ -1032,10 +1053,12 @@ void M2ulPhyS::Iterate() {
   }  // <-- end main timestep iteration loop
 
   if (iter == MaxIters) {
+    auto hUp = Up->HostRead();
+    mixture->UpdatePressureGridFunction(press, Up);
+
     // write_restart_files();
     restart_files_hdf5("write");
 
-    auto hUp = Up->HostRead();
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
     paraviewColl->Save();
@@ -1050,6 +1073,19 @@ void M2ulPhyS::Iterate() {
     VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
     const double error = U->ComputeLpError(2, u0);
     if (mpi.Root()) cout << "Solution error: " << error << endl;
+#else
+    rhsOperator->updatePrimitives(*U);
+    mixture->UpdatePressureGridFunction(press, Up);
+
+    DenMMS.SetTime(time);
+    VelMMS.SetTime(time);
+    PreMMS.SetTime(time);
+    const double errorDen = dens->ComputeLpError(2, DenMMS);
+    const double errorVel = vel->ComputeLpError(2, VelMMS);
+    const double errorPre = press->ComputeLpError(2, PreMMS);
+    if (mpi.Root())
+      cout << "time step: " << iter << ", physical time " << time << "s"
+           << ", Dens. error: " << errorDen << " Vel. " << errorVel << " press. " << errorPre << endl;
 #endif
 
     if (mpi.Root()) cout << "Final timestep iteration = " << MaxIters << endl;
@@ -1062,8 +1098,7 @@ void M2ulPhyS::Iterate() {
 void M2ulPhyS::MASA_exactSol(const Vector &x, double tin, Vector &y) {
   MFEM_ASSERT(x.Size() == 3, "");
 
-  EquationOfState eqState;
-  eqState.setFluid(DRY_AIR);
+  DryAir eqState;
   const double gamma = eqState.GetSpecificHeatRatio();
 
   y(0) = MASA::masa_eval_exact_rho<double>(x[0], x[1], x[2], tin);  // rho
@@ -1081,8 +1116,7 @@ void M2ulPhyS::MASA_exactSol(const Vector &x, double tin, Vector &y) {
 void M2ulPhyS::MASA_exactDen(const Vector &x, double tin, Vector &y) {
   MFEM_ASSERT(x.Size() == 3, "");
 
-  EquationOfState eqState;
-  eqState.setFluid(DRY_AIR);
+  DryAir eqState;
   const double gamma = eqState.GetSpecificHeatRatio();
 
   y(0) = MASA::masa_eval_exact_rho<double>(x[0], x[1], x[2], tin);  // rho
@@ -1091,8 +1125,7 @@ void M2ulPhyS::MASA_exactDen(const Vector &x, double tin, Vector &y) {
 void M2ulPhyS::MASA_exactVel(const Vector &x, double tin, Vector &y) {
   MFEM_ASSERT(x.Size() == 3, "");
 
-  EquationOfState eqState;
-  eqState.setFluid(DRY_AIR);
+  DryAir eqState;
   const double gamma = eqState.GetSpecificHeatRatio();
 
   y(0) = MASA::masa_eval_exact_u<double>(x[0], x[1], x[2], tin);
@@ -1103,8 +1136,7 @@ void M2ulPhyS::MASA_exactVel(const Vector &x, double tin, Vector &y) {
 void M2ulPhyS::MASA_exactPre(const Vector &x, double tin, Vector &y) {
   MFEM_ASSERT(x.Size() == 3, "");
 
-  EquationOfState eqState;
-  eqState.setFluid(DRY_AIR);
+  DryAir eqState;
   const double gamma = eqState.GetSpecificHeatRatio();
 
   y(0) = MASA::masa_eval_exact_p<double>(x[0], x[1], x[2], tin);
@@ -1118,8 +1150,7 @@ void M2ulPhyS::InitialConditionEulerVortex(const Vector &x, Vector &y) {
   if (x.Size() == 3) equations = 5;
 
   int problem = 1;
-  EquationOfState *eqState = new EquationOfState();
-  eqState->setFluid(DRY_AIR);
+  DryAir *eqState = new DryAir();
   const double gamma = eqState->GetSpecificHeatRatio();
   const double Rg = eqState->GetGasConstant();
 
@@ -1199,8 +1230,7 @@ void M2ulPhyS::InitialConditionEulerVortex(const Vector &x, Vector &y) {
 
 // Initial conditions for debug/test case
 void M2ulPhyS::testInitialCondition(const Vector &x, Vector &y) {
-  EquationOfState *eqState = new EquationOfState();
-  eqState->setFluid(DRY_AIR);
+  DryAir *eqState = new DryAir();
 
   // Nice units
   const double vel_inf = 1.;
@@ -1228,8 +1258,7 @@ void M2ulPhyS::uniformInitialConditions() {
   int dof = vfes->GetNDofs();
   double *inputRhoRhoVp = config.GetConstantInitialCondition();
 
-  EquationOfState *eqState = new EquationOfState();
-  eqState->setFluid(DRY_AIR);
+  DryAir *eqState = new DryAir(dim, num_equation);
 
   const double gamma = eqState->GetSpecificHeatRatio();
   const double rhoE =
@@ -1237,6 +1266,13 @@ void M2ulPhyS::uniformInitialConditions() {
                                             (inputRhoRhoVp[1] * inputRhoRhoVp[1] + inputRhoRhoVp[2] * inputRhoRhoVp[2] +
                                              inputRhoRhoVp[3] * inputRhoRhoVp[3]) /
                                             inputRhoRhoVp[0];
+
+  Vector state;
+  state.UseDevice(false);
+  state.SetSize(num_equation);
+  Vector Upi;
+  Upi.UseDevice(false);
+  Upi.SetSize(num_equation);
 
   for (int i = 0; i < dof; i++) {
     data[i] = inputRhoRhoVp[0];
@@ -1246,12 +1282,16 @@ void M2ulPhyS::uniformInitialConditions() {
     data[i + (1 + dim) * dof] = rhoE;
     if (eqSystem == NS_PASSIVE) data[i + (num_equation - 1) * dof] = 0.;
 
-    dataUp[i] = data[i];
-    dataUp[i + dof] = data[i + dof] / data[i];
-    dataUp[i + 2 * dof] = data[i + 2 * dof] / data[i];
-    if (dim == 3) dataUp[i + 3 * dof] = data[i + 3 * dof] / data[i];
-    dataUp[i + (1 + dim) * dof] = inputRhoRhoVp[4];
-    dataUp[i + (num_equation - 1) * dof] = 0.;
+    for (int eq = 0; eq < num_equation; eq++) state(eq) = data[i + eq * dof];
+    eqState->GetPrimitivesFromConservatives(state, Upi);
+    for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * dof] = Upi[eq];
+
+    //     dataUp[i] = data[i];
+    //     dataUp[i + dof] = data[i + dof] / data[i];
+    //     dataUp[i + 2 * dof] = data[i + 2 * dof] / data[i];
+    //     if (dim == 3) dataUp[i + 3 * dof] = data[i + 3 * dof] / data[i];
+    //     dataUp[i + (1 + dim) * dof] = inputRhoRhoVp[4];
+    //     if (eqSystem == NS_PASSIVE) dataUp[i + (num_equation - 1) * dof] = 0.;
 
     for (int d = 0; d < dim; d++) {
       for (int eq = 0; eq < num_equation; eq++) {
@@ -1369,7 +1409,7 @@ void M2ulPhyS::read_restart_files() {
 
     // fill out U
     double *dataU = U->GetData();
-    double gamma = eqState->GetSpecificHeatRatio();
+    double gamma = mixture->GetSpecificHeatRatio();
     int dof = vfes->GetNDofs();
     if (lines != dof * num_equation) {
       cout << "# of lines in files does not match domain size" << endl;
@@ -1451,7 +1491,7 @@ void M2ulPhyS::initialTimeStep() {
   for (int n = 0; n < dof; n++) {
     Vector state(num_equation);
     for (int eq = 0; eq < num_equation; eq++) state[eq] = dataU[n + eq * dof];
-    double iC = eqState->ComputeMaxCharSpeed(state, dim);
+    double iC = mixture->ComputeMaxCharSpeed(state);
     if (iC > max_char_speed) max_char_speed = iC;
   }
 

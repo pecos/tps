@@ -35,9 +35,9 @@
 using namespace mfem;
 
 // Implementation of class RiemannSolver
-RiemannSolver::RiemannSolver(int &_num_equation, EquationOfState *_eqState, Equations &_eqSystem, Fluxes *_fluxClass,
+RiemannSolver::RiemannSolver(int &_num_equation, GasMixture *_mixture, Equations &_eqSystem, Fluxes *_fluxClass,
                              bool _useRoe)
-    : num_equation(_num_equation), eqState(_eqState), eqSystem(_eqSystem), fluxClass(_fluxClass), useRoe(_useRoe) {
+    : num_equation(_num_equation), mixture(_mixture), eqSystem(_eqSystem), fluxClass(_fluxClass), useRoe(_useRoe) {
   flux1.SetSize(num_equation);
   flux2.SetSize(num_equation);
 }
@@ -52,7 +52,7 @@ void RiemannSolver::ComputeFluxDotN(const Vector &state, const Vector &nor, Vect
 
   // MFEM_ASSERT(eqState->StateIsPhysical(state, dim), "");
 
-  const double pres = eqState->ComputePressure(state, dim);
+  const double pres = mixture->ComputePressure(state);
 
   double den_velN = 0;
   for (int d = 0; d < dim; d++) {
@@ -85,8 +85,8 @@ void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Ve
   // MFEM_ASSERT(eqState->StateIsPhysical(state1, dim), "");
   // MFEM_ASSERT(eqState->StateIsPhysical(state2, dim), "");
 
-  const double maxE1 = eqState->ComputeMaxCharSpeed(state1, dim);
-  const double maxE2 = eqState->ComputeMaxCharSpeed(state2, dim);
+  const double maxE1 = mixture->ComputeMaxCharSpeed(state1);
+  const double maxE2 = mixture->ComputeMaxCharSpeed(state2);
 
   const double maxE = max(maxE1, maxE2);
 
@@ -134,8 +134,8 @@ void RiemannSolver::Eval_Roe(const Vector &state1, const Vector &state2, const V
   double qk = 0.;
   for (int d = 0; d < dim; d++) qk += vel[d] * unitN[d];
 
-  double p1 = eqState->ComputePressure(state1, dim);
-  double p2 = eqState->ComputePressure(state2, dim);
+  double p1 = mixture->ComputePressure(state1);
+  double p2 = mixture->ComputePressure(state2);
   double H = (state1[1 + dim] + p1) / sqrt(state1[0]) + (state2[1 + dim] + p2) / sqrt(state2[0]);
   H /= sqrt(state1[0]) + sqrt(state2[0]);
   double a2 = 0.4 * (H - 0.5 * (vel[0] * vel[0] + vel[1] * vel[1]));
