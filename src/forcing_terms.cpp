@@ -317,11 +317,23 @@ void AxisymmetricSource::updateTerms(Vector &in) {
       for (int d = 0; d < dim; d++) x[d] = coordsDof[index + d * dof];
       const double radius = x[0];
 
+      Vector prim(5);
+
       // TODO(trevilo): Will have to change once PR #90 is merged
       const double rho = dataUp[index + 0*dof];
-      const double ur = dataUp[index + 1*dof];
+      const double ur  = dataUp[index + 1*dof];
+      const double uz  = dataUp[index + 2*dof];
       const double ut  = dataUp[index + 3*dof];
-      const double pressure = dataUp[index + (1+nvel)*dof];
+      const double temperature = dataUp[index + (1+nvel)*dof];
+
+      prim[0] = rho;
+      prim[1] = ur;
+      prim[2] = uz;
+      prim[3] = ut;
+      prim[4] = temperature;
+
+      const double Rg = mixture->GetGasConstant();
+      const double pressure = rho*Rg*temperature;
 
       const double rurut = rho*ur*ut;
       const double rutut = rho*ut*ut;
@@ -334,13 +346,7 @@ void AxisymmetricSource::updateTerms(Vector &in) {
         const double uz_z = dataGradUp[index + (2*dof) + (1*dof*num_equation)];
         const double ut_r = dataGradUp[index + (3*dof) + (0*dof*num_equation)];
 
-        const double Rg = mixture->GetGasConstant();
-        const double temp = pressure / rho / Rg;
-        //const double visc = eqState->GetViscosity(temp);
-
-        // FIXME: Support for evaluating viscosity given temperature
-        // is gone... require CONSERVED state here
-        const double visc = 0.0;
+        const double visc = mixture->GetViscosityFromPrimitive(prim);
 
         tau_tt = -ur_r - uz_z;
         if (radius > 0)

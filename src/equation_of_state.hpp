@@ -100,6 +100,7 @@ class GasMixture {
   virtual double GetGasConstant() = 0;
 
   virtual double GetViscosity(const Vector &state) = 0;
+  virtual double GetViscosityFromPrimitive(const Vector &state) = 0;
   virtual double GetThermalConductivity(const Vector &state) = 0;
 
   virtual double GetSchmidtNum() = 0;
@@ -159,6 +160,7 @@ class DryAir : public GasMixture {
   virtual double GetGasConstant() { return gas_constant; }
 
   virtual double GetViscosity(const Vector &state);
+  virtual double GetViscosityFromPrimitive(const Vector &state);
   virtual double GetThermalConductivity(const Vector &state);
 
   virtual double GetSchmidtNum() { return Sc; }
@@ -278,6 +280,11 @@ inline double DryAir::ComputeTemperature(const Vector &state) {
 inline double DryAir::GetViscosity(const Vector &state) {
   double p = ComputePressure(state);
   double temp = p / gas_constant / state[0];
+  return (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
+}
+
+inline double DryAir::GetViscosityFromPrimitive(const Vector &state) {
+  double temp = state[1+dim];
   return (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
 }
 
