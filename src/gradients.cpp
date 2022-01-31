@@ -258,9 +258,9 @@ void Gradients::computeGradients_gpu(const int numElems, const int offsetElems, 
       const int offsetDShape = d_elemPosQ_shapeDshapeWJ[2 * eli   ];
       const int Q            = d_elemPosQ_shapeDshapeWJ[2 * eli + 1];
       const int indexi = d_nodesIDs[offsetIDs + i];
-      
+
       double gradUpk;
-      for(int eq=0;eq<num_equation;eq++){
+      for ( int eq = 0; eq < num_equation; eq++ ) {
     Ui[i] = d_Up[indexi + eq * totalDofs];
     for (int d = 0; d < dim; d++) {
       // this loads face contribution
@@ -289,11 +289,12 @@ void Gradients::computeGradients_gpu(const int numElems, const int offsetElems, 
     for (int d = 0; d < dim; d++)
       d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs] = gradUpi[i + d * elDof];
     MFEM_SYNC_THREAD;
-      } //end equation loop
+      }  // end equation loop
 }
 });
 }
 
+// clang-format on
 void Gradients::faceContrib_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
                                 const Vector &Up, Vector &gradUp, const int num_equation, const int dim,
                                 const volumeFaceIntegrationArrays &gpuArrays, const int &maxDofs,
@@ -311,17 +312,17 @@ void Gradients::faceContrib_gpu(const int numElems, const int offsetElems, const
 
   MFEM_FORALL_2D(el, numElems, elDof, 1, 1, {
     MFEM_FOREACH_THREAD(i, x, elDof) {
-      MFEM_SHARED double U1[216],U2[216], gradUpi[216 * 3];
-      MFEM_SHARED double l1[216] ,l2[216];
-      MFEM_SHARED double u1[20],u2[20], nor[3];
+      MFEM_SHARED double U1[216], U2[216], gradUpi[216 * 3];
+      MFEM_SHARED double l1[216], l2[216];
+      MFEM_SHARED double u1[20], u2[20], nor[3];
       MFEM_SHARED int index_j[216];
 
       const int eli = el + offsetElems;
       const int offsetIDs    = d_posDofIds[2 * eli];
       const int indexi = d_nodesIDs[offsetIDs + i];
-      
+
       // set to 0 the contribution to the gradients
-      for(int eq=0;eq<num_equation;eq++){
+      for ( int eq = 0; eq < num_equation; eq++ ) {
     for (int d = 0; d < dim; d++) {
       gradUpi[i + eq * elDof + d * num_equation * elDof] = 0.;
     }
@@ -401,14 +402,16 @@ void Gradients::faceContrib_gpu(const int numElems, const int offsetElems, const
 
         // interpolate el1
         // NOTE: make parallel
-        if (i == 0)
+        if (i == 0) {
           for (int j = 0; j < dof1; j++) u1[eq] += l1[j] * U1[j];
+        }
         MFEM_SYNC_THREAD;
 
         // interpolate el2
         // NOTE: make parallel
-        if (i == 0)
+        if (i == 0) {
           for (int j = 0; j < dof2; j++) u2[eq] += l2[j] * U2[j];
+        }
         MFEM_SYNC_THREAD;
 
         for (int d = 0; d < dim; d++) {
@@ -468,8 +471,8 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up, const Vector &fa
       const int offsetEl1 = d_posDofIds[2 * el1];
 
       int indexi;
-      if( i<dof1 ) indexi = d_nodesIDs[offsetEl1 + i];
-      
+      if ( i < dof1 ) indexi = d_nodesIDs[offsetEl1 + i];
+
       MFEM_SHARED double up1, up2;
 
       for (int elFace = 0; elFace < numFaces; elFace++) {
@@ -509,10 +512,10 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up, const Vector &fa
         MFEM_SYNC_THREAD;
 
         // add contribution
-        if (i < dof1)
+        if (i < dof1) {
           for (int d = 0; d < dim; d++) Fcontrib[i + d * dof1] += 0.5 * (up2 - up1) * weight * l1[i] * nor[d];
+        }
         MFEM_SYNC_THREAD;
-
       }  // end integration loop
 
       // save contribution to global memory
@@ -522,8 +525,8 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up, const Vector &fa
         }
       }
       MFEM_SYNC_THREAD;
-    }   // end equation loop
-      } // end face loop
+    }    // end equation loop
+      }  // end face loop
 }
 });
 }

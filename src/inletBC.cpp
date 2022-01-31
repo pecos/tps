@@ -751,7 +751,7 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
       const int elOffset = d_posDofIds[2 * elID  ];
       const int elDof    = d_posDofIds[2 * elID + 1];
       int indexi;
-      if (i < elDof){
+      if (i < elDof) {
     indexi = d_nodesIDs[elOffset + i];
     for (int eq = 0; eq < num_equation; eq++) Fcontrib[i + eq * elDof] = 0.;
       }
@@ -839,7 +839,7 @@ void InletBC::interpInlet_gpu(const InletType type, const mfem::Vector &inputSta
       if (i < elDof)
         indexi = d_nodesIDs[elOffset + i];
 
-      for(int eq=0;eq<num_equation;eq++){
+      for ( int eq = 0; eq < num_equation; eq++ ) {
     // get data
     if (i < elDof) Ui[i] = d_U[indexi + eq * totDofs];
     MFEM_SYNC_THREAD;
@@ -851,15 +851,16 @@ void InletBC::interpInlet_gpu(const InletType type, const mfem::Vector &inputSta
       u1 = 0.;
       // interpolation
       // NOTE: make parallel!
-      if (i == 0)
+      if (i == 0) {
         for (int j = 0; j < elDof; j++) u1 += shape[j] * Ui[j];
+      }
       MFEM_SYNC_THREAD;
 
       // save to global memory
       if (i == 0) d_interpUbdr[eq + q * num_equation + n * maxIntPoints * num_equation] = u1;
       MFEM_SYNC_THREAD;
-    }   // end loop over intergration points
-      } // end loop over equations
+    }    // end loop over intergration points
+      }  // end loop over equations
 }
 });
 #endif

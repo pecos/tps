@@ -326,13 +326,13 @@ void Averaging::addSample_gpu(ParGridFunction *meanUp, ParGridFunction *rms, int
   MFEM_FORALL_2D(n, Ndof, 6, 1, 1, {
     MFEM_FOREACH_THREAD(i, x, 6) {
       MFEM_SHARED double meanVel[3], vel[3];
-      MFEM_SHARED double nUp[20]; // NOTE: lets make sure we don't have more than 20 eq.
+      MFEM_SHARED double nUp[20];  // NOTE: lets make sure we don't have more than 20 eq.
 
       for (int eq = i; eq < num_equation; eq += 6) {
     nUp[eq] = d_Up[n + eq * Ndof];
       }
       MFEM_SYNC_THREAD;
-      
+
       // mean
       for (int eq = i; eq < num_equation; eq += 6) {
     double mUpi = d_meanUp[n + eq * Ndof];

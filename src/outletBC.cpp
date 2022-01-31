@@ -285,7 +285,7 @@ void OutletBC::initBCs() {
 #ifdef _GPU_
     interpolated_Ubdr_.UseDevice(true);
     interpolatedGradUpbdr_.UseDevice(true);
-    ;
+
     interpolated_Ubdr_.SetSize(num_equation * maxIntPoints * listElems.Size());
     interpolatedGradUpbdr_.SetSize(dim * num_equation * maxIntPoints * listElems.Size());
     interpolated_Ubdr_ = 0.;
@@ -1070,9 +1070,9 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem, 
         const int elOffset = d_posDofIds[2 * elID  ];
         const int elDof    = d_posDofIds[2 * elID + 1];
         int indexi;
-        if (i < elDof){
+        if (i < elDof) {
           indexi = d_nodesIDs[elOffset + i];
-          for(int eq=0;eq<num_equation;eq++) Fcontrib[i+eq*elDof] = 0.;
+          for ( int eq = 0; eq < num_equation; eq++ ) Fcontrib[i+eq*elDof] = 0.;
         }
 
         for (int q = 0; q < Q; q++) {  // loop over int. points
@@ -1089,8 +1089,8 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem, 
           // get interpolated data
           if (i < num_equation) {
             u1[i] = d_interpUbdr[i + q*num_equation +n*maxIntPoints*num_equation];
-            for(int d=0;d<dim;d++)
-              gradUpi[i +d*num_equation] = 
+            for ( int d = 0; d < dim; d++ )
+              gradUpi[i +d*num_equation] =
                 d_interpGrads[i + d*num_equation +q*dim*num_equation + n*maxIntPoints*dim*num_equation];
           }
           MFEM_SYNC_THREAD;
@@ -1099,28 +1099,29 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem, 
           switch (type) {
             case OutletType::SUB_P:
               if (i < num_equation)
-                computeSubPressure(i, &u1[0], &u2[0], &nor[0], d_inputState[0], gamma, dim, num_equation,eqSystem);
+                computeSubPressure(i, &u1[0], &u2[0], &nor[0], d_inputState[0], gamma, dim, num_equation, eqSystem);
               break;
             case OutletType::SUB_P_NR:
               computeNRSubPress(i, offsetBdrU + q, &u1[0], &gradUpi[0], d_meanUp, dt, &u2[0], d_boundaryU,
-                                &d_inputState[0], &nor[0], d_tang1, d_tang2, d_inv, refLength, gamma,Rg, elDof,
-                                dim, num_equation,eqSystem);
+                                &d_inputState[0], &nor[0], d_tang1, d_tang2, d_inv, refLength, gamma, Rg, elDof,
+                                dim, num_equation, eqSystem);
               break;
             case OutletType::SUB_MF_NR:
               computeNRSubMassFlow(i, offsetBdrU + q, &u1[0], &gradUpi[0], d_meanUp, dt, &u2[0], d_boundaryU,
-                                   d_inputState, &nor[0], d_tang1, d_tang2, d_inv, refLength, area, gamma,Rg,
-                                   elDof, dim, num_equation,eqSystem);
+                                   d_inputState, &nor[0], d_tang1, d_tang2, d_inv, refLength, area, gamma, Rg,
+                                   elDof, dim, num_equation, eqSystem);
               break;
             case OutletType::SUB_MF_NR_PW:
-              computeNR_PW_SubMF(i, offsetBdrU + q, &u1[0], &gradUpi[0], d_meanUp, dt, &u2[0], d_boundaryU, d_inputState,
-                                 &nor[0], d_tang1, d_tang2, d_inv, refLength, area, gamma, Rg,
-                                 elDof, dim, num_equation,eqSystem);
+              computeNR_PW_SubMF(i, offsetBdrU + q, &u1[0], &gradUpi[0], d_meanUp, dt, &u2[0], d_boundaryU,
+                                 d_inputState, &nor[0], d_tang1, d_tang2, d_inv, refLength, area, gamma, Rg,
+                                 elDof, dim, num_equation, eqSystem);
               break;
           }
           MFEM_SYNC_THREAD;
 
           // compute flux
-          RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim,eqSystem,num_equation, i, maxDofs);
+          RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg,
+                                       dim, eqSystem, num_equation, i, maxDofs);
           MFEM_SYNC_THREAD;
 
           // sum contributions to integral
@@ -1180,7 +1181,7 @@ void OutletBC::interpOutlet_gpu(const OutletType type, const mfem::Array<double>
       if (i < elDof)
         indexi = d_nodesIDs[elOffset + i];
 
-      for(int eq=0;eq<num_equation;eq++){
+      for ( int eq = 0; eq < num_equation; eq++ ) {
     // get data
     if (i < elDof) {
       Ui[i] = d_U[indexi + eq * totDofs];
@@ -1210,8 +1211,8 @@ void OutletBC::interpOutlet_gpu(const OutletType type, const mfem::Array<double>
       if (i < dim)
         d_interpGrads[eq + i * num_equation + q * dim * num_equation + n * maxIntPoints * dim * num_equation] = gUp[i];
       MFEM_SYNC_THREAD;
-    }   // end loop over intergration points
-      } // end loop over equations
+    }    // end loop over intergration points
+      }  // end loop over equations
 }
 });
 #endif

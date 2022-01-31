@@ -40,7 +40,7 @@ GasMixture::GasMixture(WorkingFluid _fluid, int _dim) {
 
   bulk_visc_mult = 0.;
   visc_mult = 1;
-};
+}
 
 DryAir::DryAir(RunConfiguration& _runfile, int _dim) : GasMixture(WorkingFluid::DRY_AIR, _dim) {
   setNumEquations();

@@ -64,9 +64,9 @@ class GasMixture {
 
  public:
   GasMixture(WorkingFluid _fluid, int _dim);
-  GasMixture(){};
+  GasMixture() {}
 
-  ~GasMixture(){};
+  ~GasMixture() {}
 
   void setFluid(WorkingFluid _fluid);
   WorkingFluid GetWorkingFluid() { return fluid; }
@@ -134,13 +134,13 @@ class DryAir : public GasMixture {
   DryAir();  // this will only be usefull to get air constants
   DryAir(int dim, int num_equation);
 
-  ~DryAir(){};
+  ~DryAir() {}
 
   // implementation virtual methods
   virtual double ComputePressure(const Vector &state);
   virtual double ComputePressureFromPrimitives(const Vector &Up);
   virtual double ComputeTemperature(const Vector &state);
-  virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / gas_constant / rho[0]; };
+  virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / gas_constant / rho[0]; }
 
   virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit);
   virtual void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv);
@@ -155,13 +155,13 @@ class DryAir : public GasMixture {
   // Physicality check (at end)
   virtual bool StateIsPhysical(const Vector &state);
 
-  virtual double GetSpecificHeatRatio() { return specific_heat_ratio; };
-  virtual double GetGasConstant() { return gas_constant; };
+  virtual double GetSpecificHeatRatio() { return specific_heat_ratio; }
+  virtual double GetGasConstant() { return gas_constant; }
 
   virtual double GetViscosity(const Vector &state);
   virtual double GetThermalConductivity(const Vector &state);
 
-  virtual double GetSchmidtNum() { return Sc; };
+  virtual double GetSchmidtNum() { return Sc; }
   virtual double GetPrandtlNum() { return Pr; }
 
   virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
