@@ -2,7 +2,7 @@
 # -*- mode: sh -*-
 
 TEST="axisymmetric/annulus"
-RUNFILE="inputs/annulus.axisym.viscous"
+RUNFILE="inputs/annulus.axisym.viscous.ini"
 
 setup() {
     SOLN_FILE=restart_output-annulus.sol.h5

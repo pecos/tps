@@ -183,7 +183,7 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux
   DenseMatrix viscF(num_equation, dim);
   fluxClass->ComputeViscousFluxes(stateIn, gradState, viscF, radius);
 
-  double p = eqState->ComputePressure(stateIn, dim);
+  double p = mixture->ComputePressure(stateIn);
 
   // modify gradients so that wall is adibatic
   Vector unitNorm = normal;
@@ -222,16 +222,11 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
 #else
 void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
 #endif
-<<<<<<< HEAD
   double p = mixture->ComputePressure(stateIn);
   double T = mixture->ComputeTemperature(stateIn);
 
   const double gamma = mixture->GetSpecificHeatRatio();
   const double Rg = mixture->GetGasConstant();
-=======
-  double p = eqState->ComputePressure(stateIn, nvel);
-  const double gamma = eqState->GetSpecificHeatRatio();
->>>>>>> Make room for swirl velocity component (#89)
 
   Vector wallState = stateIn;
   for (int d = 0; d < nvel; d++) wallState[1 + d] = 0.;

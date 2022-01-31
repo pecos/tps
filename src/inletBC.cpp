@@ -576,10 +576,6 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
 
   const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
 
-<<<<<<< HEAD
-=======
-  const double speedSound = sqrt(gamma * meanUp[1 + nvel] / meanUp[0]);
->>>>>>> Make room for swirl velocity component (#89)
   double meanK = 0.;
   for (int d = 0; d < nvel; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
   meanK *= 0.5;
@@ -587,11 +583,7 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   // compute outgoing characteristic
   double L1 = 0.;
   for (int d = 0; d < dim; d++) L1 += unitNorm[d] * normGrad[1 + d];  // dVn/dn
-<<<<<<< HEAD
   L1 = dpdn - meanUp[0] * speedSound * L1;
-=======
-  L1 = normGrad[1 + nvel] - meanUp[0] * speedSound * L1;
->>>>>>> Make room for swirl velocity component (#89)
   L1 *= meanVel[0] - speedSound;
 
   // estimate ingoing characteristic
@@ -696,13 +688,8 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
 }
 
 void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
-<<<<<<< HEAD
   const double gamma = mixture->GetSpecificHeatRatio();
   const double p = mixture->ComputePressure(stateIn);
-=======
-  const double gamma = eqState->GetSpecificHeatRatio();
-  const double p = eqState->ComputePressure(stateIn, nvel);
->>>>>>> Make room for swirl velocity component (#89)
 
   Vector state2(num_equation);
   state2[0] = inputState[0];

@@ -243,7 +243,7 @@ void M2ulPhyS::initVariables() {
   mixture = NULL;
   switch (config.GetWorkingFluid()) {
     case WorkingFluid::DRY_AIR:
-      mixture = new DryAir(config, dim);
+      mixture = new DryAir(config, nvel);
       mixture->setViscMult(config.GetViscMult());
       mixture->setBulkViscMult(config.GetBulkViscMult());
       break;
@@ -1509,15 +1509,7 @@ void M2ulPhyS::initialTimeStep() {
   for (int n = 0; n < dof; n++) {
     Vector state(num_equation);
     for (int eq = 0; eq < num_equation; eq++) state[eq] = dataU[n + eq * dof];
-<<<<<<< HEAD
-<<<<<<< HEAD
     double iC = mixture->ComputeMaxCharSpeed(state);
-=======
-    //double iC = eqState->ComputeMaxCharSpeed(state, dim);
-=======
->>>>>>> Minor styles fixes and clean up surrounding #89 work
-    double iC = eqState->ComputeMaxCharSpeed(state, nvel);
->>>>>>> Make room for swirl velocity component (#89)
     if (iC > max_char_speed) max_char_speed = iC;
   }
 

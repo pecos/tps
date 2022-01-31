@@ -532,7 +532,6 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
     auto hboundaryU = boundaryU.HostReadWrite();
     Vector iState(num_equation), iUp(num_equation);
     for (int i = 0; i < totNbdr; i++) {
-<<<<<<< HEAD
       for (int eq = 0; eq < num_equation; eq++) iUp[eq] = hboundaryU[eq + i * num_equation];
       mixture->GetConservativesFromPrimitives(iUp, iState);
       //       double gamma = mixture->GetSpecificHeatRatio();
@@ -543,18 +542,6 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
       //       for (int d = 0; d < dim; d++) iState[1 + d] *= iState[0];
       //       iState[1 + dim] = rE;
       //       if (eqSystem == NS_PASSIVE) iState[num_equation - 1] *= iState[0];
-=======
-      Vector iState(num_equation);
-      for (int eq = 0; eq < num_equation; eq++) iState[eq] = hboundaryU[eq + i * num_equation];
-      double gamma = eqState->GetSpecificHeatRatio();
-      double k = 0.;
-      for (int d = 0; d < nvel; d++) k += iState[1 + d] * iState[1 + d];
-      double rE = iState[1 + nvel] / (gamma - 1.) + 0.5 * iState[0] * k;
-
-      for (int d = 0; d < nvel; d++) iState[1 + d] *= iState[0];
-      iState[1 + nvel] = rE;
-      if (eqSystem == NS_PASSIVE) iState[num_equation - 1] *= iState[0];
->>>>>>> Make room for swirl velocity component (#89)
 
       for (int eq = 0; eq < num_equation; eq++) hboundaryU[eq + i * num_equation] = iState[eq];
     }

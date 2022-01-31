@@ -32,9 +32,6 @@
 #include "fluxes.hpp"
 
 Fluxes::Fluxes(GasMixture *_mixture, Equations &_eqSystem, const int &_num_equations, const int &_dim)
-    : mixture(_mixture), eqSystem(_eqSystem), dim(_dim), num_equations(_num_equations) {
-=======
-Fluxes::Fluxes(EquationOfState *_eqState, Equations &_eqSystem, const int &_num_equations, const int &_dim)
     : mixture(_mixture), eqSystem(_eqSystem), dim(_dim),
 #ifdef AXISYM_DEV
       nvel(3),

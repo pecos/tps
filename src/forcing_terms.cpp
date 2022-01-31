@@ -223,12 +223,12 @@ void ConstantPressureGradient::updateTerms_gpu(const int numElems, const int off
 #endif
 
 AxisymmetricSource::AxisymmetricSource(const int &_dim, const int &_num_equation, const int &_order,
-                                       EquationOfState *_eqState, const Equations &_eqSystem,
+                                       GasMixture *_mixture, const Equations &_eqSystem,
                                        const int &_intRuleType, IntegrationRules *_intRules,
                                        ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
                                        const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
   : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays),
-    eqState(_eqState),
+    mixture(_mixture),
     eqSystem(_eqSystem) {
   // no-op
 }
@@ -334,9 +334,13 @@ void AxisymmetricSource::updateTerms(Vector &in) {
         const double uz_z = dataGradUp[index + (2*dof) + (1*dof*num_equation)];
         const double ut_r = dataGradUp[index + (3*dof) + (0*dof*num_equation)];
 
-        const double Rg = eqState->GetGasConstant();
+        const double Rg = mixture->GetGasConstant();
         const double temp = pressure / rho / Rg;
-        const double visc = eqState->GetViscosity(temp);
+        //const double visc = eqState->GetViscosity(temp);
+
+        // FIXME: Support for evaluating viscosity given temperature
+        // is gone... require CONSERVED state here
+        const double visc = 0.0;
 
         tau_tt = -ur_r - uz_z;
         if (radius > 0)

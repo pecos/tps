@@ -115,7 +115,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
 
 #ifdef AXISYM_DEV
   forcing.Append(new AxisymmetricSource(dim, num_equation, _order,
-                                        eqState, eqSystem,
+                                        mixture, eqSystem,
                                         intRuleType, intRules,
                                         vfes, Up, gradUp, gpuArrays, _config));
 
