@@ -33,12 +33,16 @@
 #ifndef QUASIMAGNETOSTATIC_HPP_
 #define QUASIMAGNETOSTATIC_HPP_
 
-#include <tps_config.h>
+// forward-declaration for Tps support class
+namespace TPS {
+class Tps;
+}
 
 #include <iostream>
 #include <mfem.hpp>
 
 #include "em_options.hpp"
+#include "tps.hpp"
 
 /** Solve quasi-magnetostatic approximation of Maxwell
  *
@@ -46,10 +50,13 @@
  *  equations for a user-specified source current.
  *
  */
-class QuasiMagnetostaticSolver {
+class QuasiMagnetostaticSolver : public TPS::Solver {
  private:
   mfem::MPI_Session &_mpi;
   ElectromagneticOptions _em_opts;
+
+  // pointer to parent Tps class
+  TPS::Tps *tpsP;
 
   mfem::ParMesh *_pmesh;
   int _dim;
@@ -76,7 +83,7 @@ class QuasiMagnetostaticSolver {
   void InterpolateToYAxis() const;
 
  public:
-  QuasiMagnetostaticSolver(mfem::MPI_Session &mpi, ElectromagneticOptions em_opts);
+  QuasiMagnetostaticSolver(mfem::MPI_Session &mpi, ElectromagneticOptions em_opts, TPS::Tps *tps);
   ~QuasiMagnetostaticSolver();
 
   /** Initialize quasi-magnetostatic problem
@@ -85,7 +92,7 @@ class QuasiMagnetostaticSolver {
    *  ParBilinearForm etc) required to form the linear system
    *  corresponding to the quasi-magnetostatic problem.
    */
-  void Initialize();
+  void initialize() override;
 
   /** Initialize current for quasi-magnetostatic problem
    *
@@ -94,8 +101,10 @@ class QuasiMagnetostaticSolver {
    */
   void InitializeCurrent();
 
+  void parseSolverOptions() override;
+
   /** Solve quasi-magnetostatic problem */
-  void Solve();
+  void solve() override;
 };
 
 #endif  // QUASIMAGNETOSTATIC_HPP_

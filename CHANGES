@@ -1,3 +1,13 @@
+Version 1.2 (in progress)
+  * update primitive variable formulation to use pressure instead of
+    temperature and introduce a GasMixture class (#90)
+  * refactor of runtime input parsing to use libGRVY; file is now read only
+    once on rank0 and then distributed to remaining tasks for in-memory
+    parsing (#87)
+  * introduced a Solver base class and expanded top-level TpS class to
+    setup Solver based on runtime settings; significant cleanup of top-level
+    main() (#88)
+
 Version 1.1 (21 Dec 2021)
 
   * addition of sponge zone boundary condition (#80)

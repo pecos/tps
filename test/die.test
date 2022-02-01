@@ -4,15 +4,16 @@
 TEST="cyl3d"
 
 @test "[$TEST] verify solution terminates early with presence of DIE file" {
-    RUNFILE=inputs/input.2iters.cyl
+    RUNFILE=inputs/input.2iters.cyl.ini
     RUNFILE_MOD=input.2iters.cyl.mod
     SOLFILE_BASE=restart_output.sol
 
     rm -f  restart_output.sol*.h5
     rm -f  partition.*.h5
     rm -f  $RUNFILE_MOD
-    sed  's/NMAX 2/NMAX 30/' $RUNFILE > $RUNFILE_MOD
-    echo "EXIT_CHECK_FREQUENCY 10" >> $RUNFILE_MOD
+    sed  's/maxIters = 2/maxIters = 40/' $RUNFILE > $RUNFILE_MOD
+    echo "[io]" >> $RUNFILE_MOD
+    echo "exitCheckFreq = 15" >> $RUNFILE_MOD
 
     test -x die.sh
     run ./die.sh $RUNFILE_MOD
@@ -23,8 +24,8 @@ TEST="cyl3d"
     test -s restart_output.sol.1.h5
 
     run h5dump  -a iteration  ${SOLFILE_BASE}.0.h5
-    [ "${lines[5]}" = "   (0): 10" ]
+    [ "${lines[5]}" = "   (0): 15" ]
 
     run h5dump  -a iteration  ${SOLFILE_BASE}.1.h5
-    [ "${lines[5]}" = "   (0): 10" ]
+    [ "${lines[5]}" = "   (0): 15" ]
 }

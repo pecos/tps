@@ -181,14 +181,17 @@ void Fluxes::ComputeSplitFlux(const mfem::Vector &state, mfem::DenseMatrix &a_ma
   }
 }
 
-void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const double &gamma, const int &dof,
-                                  const int &dim, const int &num_equation) {
+void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const Equations &eqSystem, GasMixture *mixture,
+                                  const int &dof, const int &dim, const int &num_equation) {
 #ifdef _GPU_
   auto dataIn = x.Read();
-  auto d_flux = flux.ReadWrite();
+  auto d_flux = flux.Write();
+
+  double gamma = mixture->GetSpecificHeatRatio();
+  double Sc = mixture->GetSchmidtNum();
 
   MFEM_FORALL_2D(n, dof, num_equation, 1, 1, {
-    MFEM_SHARED double Un[5];
+    MFEM_SHARED double Un[20];
     MFEM_SHARED double KE[3];
     MFEM_SHARED double p;
 
@@ -211,22 +214,22 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const doub
           if (eq - 1 == d) temp += p;
           d_flux[n + d * dof + eq * dof * dim] = temp;
         }
-        if (eq == num_equation - 1) {
-          d_flux[n + d * dof + eq * dof * dim] = Un[1 + d] * (Un[num_equation - 1] + p) / Un[0];
+        if (eq == 1 + dim) {
+          d_flux[n + d * dof + eq * dof * dim] = Un[1 + d] * (Un[1 + dim] + p) / Un[0];
         }
+
+        if (eq == num_equation - 1 && eqSystem == NS_PASSIVE)
+          d_flux[n + d * dof + eq * dof * dim] = Un[num_equation - 1] * Un[1 + d] / Un[0];
       }
     }  // end MFEM_FOREACH_THREAD
   });  // end MFEM_FORALL_WD
 #endif
 }
 
-//TODO: need to think how to take all transport coefficients for multi-species.
-void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTensor &flux, const double &gamma,
-                               const double &Rg,  // gas constant
-                               const double &Pr,  // Prandtl number
-                               const double &viscMult, const double &bulkViscMult,
-                               const ParGridFunction *spaceVaryViscMult, const linearlyVaryingVisc &linViscData,
-                               const int &dof, const int &dim, const int &num_equation) {
+void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTensor &flux, const Equations &eqSystem,
+                               GasMixture *mixture, const ParGridFunction *spaceVaryViscMult,
+                               const linearlyVaryingVisc &linViscData, const int &dof, const int &dim,
+                               const int &num_equation) {
 #ifdef _GPU_
   const double *dataIn = x.Read();
   double *d_flux = flux.ReadWrite();
@@ -238,6 +241,13 @@ void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTe
   } else {
     d_spaceVaryViscMult = NULL;
   }
+
+  const double gamma = mixture->GetSpecificHeatRatio();
+  const double Rg = mixture->GetGasConstant();
+  const double viscMult = mixture->GetViscMultiplyer();
+  const double bulkViscMult = mixture->GetBulkViscMultiplyer();
+  const double Pr = mixture->GetPrandtlNum();
+  const double Sc = mixture->GetSchmidtNum();
 
   // clang-format off
   MFEM_FORALL_2D(n, dof, num_equation, 1, 1, {
@@ -255,8 +265,8 @@ void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTe
       }
       MFEM_SYNC_THREAD;
 
-      Fluxes::viscousFlux_gpu(&vFlux[0], &Un[0], &gradUpn[0], gamma, Rg, viscMult, bulkViscMult,
-                              Pr, eq, num_equation, dim, num_equation);
+      Fluxes::viscousFlux_gpu(&vFlux[0], &Un[0], &gradUpn[0], eqSystem, gamma, Rg, viscMult, bulkViscMult,
+                              Pr, Sc, eq, num_equation, dim, num_equation);
 
       MFEM_SYNC_THREAD;
 

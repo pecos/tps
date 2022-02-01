@@ -35,9 +35,8 @@
 
 #include "M2ulPhyS.hpp"
 
-#include <sstream>
-
-M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, string &inputFileName) : mpi(_mpi) {
+M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps) : mpi(_mpi) {
+  tpsP = tps;
   nprocs_ = mpi.WorldSize();
   rank_ = mpi.WorldRank();
   if (rank_ == 0)
@@ -47,7 +46,13 @@ M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, string &inputFileName) : mpi(_mpi) {
 
   groupsMPI = new MPI_Groups(&mpi);
 
+  // koomie TODO: refactor order so we can use standard parseSolverOptions call from Solver base class
+#define NEWPARSER
+#ifdef NEWPARSER
+  parseSolverOptions2();
+#else
   config.readInputFile(inputFileName);
+#endif
 
 #ifdef _GPU_
   if (!config.isTimeStepConstant()) {
@@ -231,10 +236,12 @@ void M2ulPhyS::initVariables() {
 
   // Kevin: This part is what I imagined "GasMixture" class would do. However, I'm fine with specifying explicitly here.
   mixture = NULL;
-  switch( config.GetWorkingFluid() ){
+  switch (config.GetWorkingFluid()) {
     case WorkingFluid::DRY_AIR:
       mixture = new DryAir( config, dim);
       transportPtr = new DryAirTransport(mixture, config);
+      // mixture->setViscMult(config.GetViscMult());
+      // mixture->setBulkViscMult(config.GetBulkViscMult());
       break;
     case WorkingFluid::TEST_BINARY_AIR: {
       mixture = new TestBinaryAir( config, dim);
@@ -314,7 +321,7 @@ void M2ulPhyS::initVariables() {
   initIndirectionArrays();
   initSolutionAndVisualizationVectors();
 
-  average = new Averaging(Up, mesh, fec, fes, dfes, vfes, eqSystem, num_equation, dim, config, groupsMPI);
+  average = new Averaging(Up, mesh, fec, fes, dfes, vfes, eqSystem, mixture, num_equation, dim, config, groupsMPI);
   average->read_meanANDrms_restart_files();
 
   // NOTE: this should also be completed by the GasMixture class
@@ -375,8 +382,8 @@ void M2ulPhyS::initVariables() {
 
   // A->SetAssemblyLevel(AssemblyLevel::PARTIAL);
 
-  A = new DGNonLinearForm(vfes, gradUpfes, gradUp, bcIntegrator, intRules, dim, num_equation, mixture, gpuArrays,
-                          maxIntPoints, maxDofs);
+  A = new DGNonLinearForm(fluxClass, vfes, gradUpfes, gradUp, bcIntegrator, intRules, dim, num_equation, mixture,
+                          gpuArrays, maxIntPoints, maxDofs);
   if (local_attr.Size() > 0) A->AddBdrFaceIntegrator(bcIntegrator);
 
   {
@@ -861,10 +868,10 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   dens = new ParGridFunction(fes, Up->HostReadWrite());
   vel = new ParGridFunction(dfes, Up->HostReadWrite() + fes->GetNDofs());
   temperature = new ParGridFunction(fes, Up->HostReadWrite() + (1 + dim) * fes->GetNDofs());
-  
+
   // this variable is purely for visualization
   press = new ParGridFunction(fes);
-  
+
   passiveScalar = NULL;
   if (eqSystem == NS_PASSIVE) {
     passiveScalar = new ParGridFunction(fes, Up->HostReadWrite() + (num_equation - 1) * fes->GetNDofs());
@@ -903,7 +910,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   spaceVaryViscMult = NULL;
   ParGridFunction coordsDof(dfes);
   mesh->GetNodes(coordsDof);
-  if (config.GetLinearVaryingData().viscRatio > 0.) {
+  if (config.linViscData.isEnabled) {
     spaceVaryViscMult = new ParGridFunction(fes);
     double *viscMult = spaceVaryViscMult->HostWrite();
     for (int n = 0; n < fes->GetNDofs(); n++) {
@@ -931,7 +938,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   paraviewColl->RegisterField("dens", dens);
   paraviewColl->RegisterField("vel", vel);
-  paraviewColl->RegisterField("temp",temperature);
+  paraviewColl->RegisterField("temp", temperature);
   paraviewColl->RegisterField("press", press);
   if (eqSystem == NS_PASSIVE) {
     paraviewColl->RegisterField("passiveScalar", passiveScalar);
@@ -989,12 +996,12 @@ std::cout << "restart: " << config.GetRestartCycle() << std::endl;
   }
 
   initGradUp();
-  
+
   // update pressure grid function
-  mixture->UpdatePressureGridFunction(press,Up);
+  mixture->UpdatePressureGridFunction(press, Up);
 }
 
-void M2ulPhyS::Iterate() {
+void M2ulPhyS::solve() {
 #ifdef HAVE_GRVY
   const int iterQuery = 100;
   double tlast = grvy_timer_elapsed_global();
@@ -1055,8 +1062,8 @@ void M2ulPhyS::Iterate() {
     if (iter % vis_steps == 0) {
 #ifdef _MASA_
       rhsOperator->updatePrimitives(*U);
-      mixture->UpdatePressureGridFunction(press,Up);
-      
+      mixture->UpdatePressureGridFunction(press, Up);
+
       DenMMS.SetTime(time);
       VelMMS.SetTime(time);
       PreMMS.SetTime(time);
@@ -1072,10 +1079,10 @@ void M2ulPhyS::Iterate() {
 
       if (iter != MaxIters) {
         auto hUp = Up->HostRead();
-        mixture->UpdatePressureGridFunction(press,Up);
-        
+        mixture->UpdatePressureGridFunction(press, Up);
+
         restart_files_hdf5("write");
-        
+
         paraviewColl->SetCycle(iter);
         paraviewColl->SetTime(time);
         paraviewColl->Save();
@@ -1113,11 +1120,11 @@ void M2ulPhyS::Iterate() {
 
   if (iter == MaxIters) {
     auto hUp = Up->HostRead();
-    mixture->UpdatePressureGridFunction(press,Up);
-    
+    mixture->UpdatePressureGridFunction(press, Up);
+
     // write_restart_files();
     restart_files_hdf5("write");
-    
+
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
     paraviewColl->Save();
@@ -1134,8 +1141,8 @@ void M2ulPhyS::Iterate() {
     if (mpi.Root()) cout << "Solution error: " << error << endl;
 #else
     rhsOperator->updatePrimitives(*U);
-    mixture->UpdatePressureGridFunction(press,Up);
-    
+    mixture->UpdatePressureGridFunction(press, Up);
+
     DenMMS.SetTime(time);
     VelMMS.SetTime(time);
     PreMMS.SetTime(time);
@@ -1144,7 +1151,7 @@ void M2ulPhyS::Iterate() {
     const double errorPre = press->ComputeLpError(2, PreMMS);
     if (mpi.Root())
       cout << "time step: " << iter << ", physical time " << time << "s"
-            << ", Dens. error: " << errorDen << " Vel. " << errorVel << " press. " << errorPre << endl;
+           << ", Dens. error: " << errorDen << " Vel. " << errorVel << " press. " << errorPre << endl;
 #endif
 
     if (mpi.Root()) cout << "Final timestep iteration = " << MaxIters << endl;
@@ -1318,7 +1325,7 @@ void M2ulPhyS::uniformInitialConditions() {
   int dof = vfes->GetNDofs();
   double *inputRhoRhoVp = config.GetConstantInitialCondition();
 
-  DryAir *eqState = new DryAir(dim,num_equation);
+  DryAir *eqState = new DryAir(dim, num_equation);
 
   const double gamma = eqState->GetSpecificHeatRatio();
   const double rhoE =
@@ -1333,7 +1340,7 @@ void M2ulPhyS::uniformInitialConditions() {
   Vector Upi;
   Upi.UseDevice(false);
   Upi.SetSize(num_equation);
-  
+
   for (int i = 0; i < dof; i++) {
     data[i] = inputRhoRhoVp[0];
     data[i + dof] = inputRhoRhoVp[1];
@@ -1341,17 +1348,17 @@ void M2ulPhyS::uniformInitialConditions() {
     if (dim == 3) data[i + 3 * dof] = inputRhoRhoVp[3];
     data[i + (1 + dim) * dof] = rhoE;
     if (eqSystem == NS_PASSIVE) data[i + (num_equation - 1) * dof] = 0.;
-    
-    for(int eq=0;eq<num_equation;eq++) state(eq) = data[i + eq*dof];
-    eqState->GetPrimitivesFromConservatives(state,Upi);
-    for(int eq=0;eq<num_equation;eq++) dataUp[i+eq*dof] = Upi[eq];
 
-//     dataUp[i] = data[i];
-//     dataUp[i + dof] = data[i + dof] / data[i];
-//     dataUp[i + 2 * dof] = data[i + 2 * dof] / data[i];
-//     if (dim == 3) dataUp[i + 3 * dof] = data[i + 3 * dof] / data[i];
-//     dataUp[i + (1 + dim) * dof] = inputRhoRhoVp[4];
-//     if (eqSystem == NS_PASSIVE) dataUp[i + (num_equation - 1) * dof] = 0.;
+    for (int eq = 0; eq < num_equation; eq++) state(eq) = data[i + eq * dof];
+    eqState->GetPrimitivesFromConservatives(state, Upi);
+    for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * dof] = Upi[eq];
+
+    //     dataUp[i] = data[i];
+    //     dataUp[i + dof] = data[i + dof] / data[i];
+    //     dataUp[i + 2 * dof] = data[i + 2 * dof] / data[i];
+    //     if (dim == 3) dataUp[i + 3 * dof] = data[i + 3 * dof] / data[i];
+    //     dataUp[i + (1 + dim) * dof] = inputRhoRhoVp[4];
+    //     if (eqSystem == NS_PASSIVE) dataUp[i + (num_equation - 1) * dof] = 0.;
 
     for (int d = 0; d < dim; d++) {
       for (int eq = 0; eq < num_equation; eq++) {
@@ -1566,4 +1573,265 @@ void M2ulPhyS::initialTimeStep() {
   if (dt_fixed > 0) {
     dt = dt_fixed;
   }
+}
+
+void M2ulPhyS::parseSolverOptions() { return; }
+
+// koomie TODO: add parsing of all previously possible runtime inputs.
+void M2ulPhyS::parseSolverOptions2() {
+  tpsP->getRequiredInput("flow/mesh", config.meshFile);
+
+  // flow/numerics
+  {
+    tpsP->getInput("flow/order", config.solOrder, 4);
+    tpsP->getInput("flow/integrationRule", config.integrationRule, 1);
+    tpsP->getInput("flow/basisType", config.basisType, 1);
+    tpsP->getInput("flow/maxIters", config.numIters, 10);
+    tpsP->getInput("flow/outputFreq", config.itersOut, 50);
+    tpsP->getInput("flow/useRoe", config.useRoe, false);
+    tpsP->getInput("flow/useSumByParts", config.SBP, false);
+    tpsP->getInput("flow/refLength", config.refLength, 1.0);
+    tpsP->getInput("flow/viscosityMultiplier", config.visc_mult, 1.0);
+    tpsP->getInput("flow/bulkViscosityMultiplier", config.bulk_visc, 0.0);
+
+    assert(config.solOrder > 0);
+    assert(config.numIters >= 0);
+    assert(config.itersOut > 0);
+    assert(config.refLength > 0);
+  }
+
+  // time integration controls
+  {
+    std::map<std::string, int> integrators;
+    integrators["forwardEuler"] = 1;
+    integrators["rk2"] = 2;
+    integrators["rk3"] = 3;
+    integrators["rk4"] = 4;
+    integrators["rk6"] = 6;
+    std::string type;
+    tpsP->getInput("time/cfl", config.cflNum, 0.12);
+    tpsP->getInput("time/integrator", type, std::string("rk4"));
+    tpsP->getInput("time/enableConstantTimestep", config.constantTimeStep, false);
+    if (integrators.count(type) == 1) {
+      config.timeIntegratorType = integrators[type];
+    } else {
+      grvy_printf(GRVY_ERROR, "Unknown time integrator > %s\n", type.c_str());
+      exit(ERROR);
+    }
+  }
+
+  // statistics
+  {
+    tpsP->getInput("averaging/startIter", config.startIter, 0);
+    tpsP->getInput("averaging/sampleFreq", config.sampleInterval, 0);
+    tpsP->getInput("averaging/enableContinuation", config.restartMean, false);
+  }
+
+  // I/O settings
+  {
+    tpsP->getInput("io/outdirBase", config.outputFile, std::string("output-default"));
+    tpsP->getInput("io/enableRestart", config.restart, false);
+    tpsP->getInput("io/exitCheckFreq", config.exit_checkFrequency_, 500);
+
+    std::string restartMode;
+    tpsP->getInput("io/restartMode", restartMode, std::string("standard"));
+    if (restartMode == "variableP") {
+      config.restartFromAux = true;
+    } else if (restartMode == "singleFileWrite") {
+      config.restart_serial = "write";
+    } else if (restartMode == "singleFileRead") {
+      config.restart_serial = "read";
+    } else if (restartMode != "standard") {
+      grvy_printf(GRVY_ERROR, "\nUnknown restart mode -> %s\n", restartMode.c_str());
+      exit(ERROR);
+    }
+  }
+
+  // sponge zone
+  {
+    bool isSpongeZoneEnabled;
+    tpsP->getInput("spongezone/isEnabled", isSpongeZoneEnabled, false);
+
+    if (isSpongeZoneEnabled) {
+      tpsP->getRequiredVec("spongezone/normal", config.spongeData.normal, 3);
+      tpsP->getRequiredVec("spongezone/p0", config.spongeData.point0, 3);
+      tpsP->getRequiredVec("spongezone/pInit", config.spongeData.pointInit, 3);
+      tpsP->getRequiredVec("spongezone/pInit", config.spongeData.pointInit, 3);
+      tpsP->getInput("spongezone/tolerance", config.spongeData.tol, 1e-5);
+      tpsP->getInput("spongezone/multiplier", config.spongeData.multFactor, 1.0);
+
+      std::string type;
+      tpsP->getRequiredInput("spongezone/type", type);
+      if (type == "userDef") {
+        config.spongeData.szType = SpongeZoneSolution::USERDEF;
+        auto hup = config.spongeData.targetUp.HostWrite();
+        tpsP->getRequiredInput("spongezone/density", hup[0]);   // rho
+        tpsP->getRequiredVecElem("spongezone/uvw", hup[1], 0);  // u
+        tpsP->getRequiredVecElem("spongezone/uvw", hup[2], 1);  // v
+        tpsP->getRequiredVecElem("spongezone/uvw", hup[3], 2);  // w
+        tpsP->getRequiredInput("spongezone/pressure", hup[4]);  // P
+      } else if (type == "mixedOut") {
+        config.spongeData.szType = SpongeZoneSolution::MIXEDOUT;
+      } else {
+        grvy_printf(GRVY_ERROR, "\nUnknown sponge zone type -> %s\n", type.c_str());
+        exit(ERROR);
+      }
+    }
+  }
+
+  // viscosity multiplier function
+  {
+    tpsP->getInput("viscosityMultiplierFunction/isEnabled", config.linViscData.isEnabled, false);
+    if (config.linViscData.isEnabled) {
+      auto normal = config.linViscData.normal.HostWrite();
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[0], 0);
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[1], 1);
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[2], 2);
+
+      auto point0 = config.linViscData.point0.HostWrite();
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[0], 0);
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[1], 1);
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[2], 2);
+
+      auto pointInit = config.linViscData.pointInit.HostWrite();
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[0], 0);
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[1], 1);
+      tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[2], 2);
+
+      tpsP->getRequiredInput("viscosityMultiplierFunction/viscosityRatio", config.linViscData.viscRatio);
+    }
+  }
+
+  // initial conditions
+  {
+    tpsP->getRequiredInput("initialConditions/rho", config.initRhoRhoVp[0]);
+    tpsP->getRequiredInput("initialConditions/rhoU", config.initRhoRhoVp[1]);
+    tpsP->getRequiredInput("initialConditions/rhoV", config.initRhoRhoVp[2]);
+    tpsP->getRequiredInput("initialConditions/rhoW", config.initRhoRhoVp[3]);
+    tpsP->getRequiredInput("initialConditions/pressure", config.initRhoRhoVp[4]);
+  }
+
+  // boundary conditions. The number of boundaries of each supported type if
+  // parsed first. Then, a section corresponding to each defined boundary is parsed afterwards
+  {
+    // number of BC regions defined
+    int numWalls, numInlets, numOutlets;
+    tpsP->getInput("boundaryConditions/numWalls", numWalls, 0);
+    tpsP->getInput("boundaryConditions/numInlets", numInlets, 0);
+    tpsP->getInput("boundaryConditions/numOutlets", numOutlets, 0);
+
+    // Wall Bcs
+    std::map<std::string, WallType> wallMapping;
+    wallMapping["inviscid"] = INV;
+    wallMapping["viscous_adiabitc"] = VISC_ADIAB;
+    wallMapping["viscous_isothermal"] = VISC_ISOTH;
+
+    for (int i = 1; i <= numWalls; i++) {
+      int patch;
+      double temperature;
+      std::string type;
+      std::string basepath("boundaryConditions/wall" + std::to_string(i));
+
+      tpsP->getRequiredInput((basepath + "/patch").c_str(), patch);
+      tpsP->getRequiredInput((basepath + "/type").c_str(), type);
+      if (type == "viscous_isothermal") {
+        tpsP->getRequiredInput((basepath + "/temperature").c_str(), temperature);
+        config.wallBC.Append(temperature);
+      } else {
+        config.wallBC.Append(0.);
+      }
+
+      std::pair<int, WallType> patchType;
+      patchType.first = patch;
+      patchType.second = wallMapping[type];
+      config.wallPatchType.push_back(patchType);
+    }
+
+    // Inlet Bcs
+    std::map<std::string, InletType> inletMapping;
+    inletMapping["subsonic"] = SUB_DENS_VEL;
+    inletMapping["nonreflecting"] = SUB_DENS_VEL_NR;
+    inletMapping["nonreflectingConstEntropy"] = SUB_VEL_CONST_ENT;
+
+    for (int i = 1; i <= numInlets; i++) {
+      int patch;
+      double density;
+      std::string type;
+      std::string basepath("boundaryConditions/inlet" + std::to_string(i));
+
+      tpsP->getRequiredInput((basepath + "/patch").c_str(), patch);
+      tpsP->getRequiredInput((basepath + "/type").c_str(), type);
+      // all inlet BCs require 4 inputs (density + vel(3))
+      {
+        Array<double> uvw;
+        tpsP->getRequiredInput((basepath + "/density").c_str(), density);
+        tpsP->getRequiredVec((basepath + "/uvw").c_str(), uvw, 3);
+        config.inletBC.Append(density);
+        config.inletBC.Append(uvw, 3);
+      }
+      std::pair<int, InletType> patchType;
+      patchType.first = patch;
+      patchType.second = inletMapping[type];
+      config.inletPatchType.push_back(patchType);
+    }
+
+    // Outlet Bcs
+    std::map<std::string, OutletType> outletMapping;
+    outletMapping["subsonicPressure"] = SUB_P;
+    outletMapping["nonReflectingPressure"] = SUB_P_NR;
+    outletMapping["nonReflectingMassFlow"] = SUB_MF_NR;
+    outletMapping["nonReflectingPointBasedMassFlow"] = SUB_MF_NR_PW;
+
+    for (int i = 1; i <= numOutlets; i++) {
+      int patch;
+      double pressure, massFlow;
+      std::string type;
+      std::string basepath("boundaryConditions/outlet" + std::to_string(i));
+
+      tpsP->getRequiredInput((basepath + "/patch").c_str(), patch);
+      tpsP->getRequiredInput((basepath + "/type").c_str(), type);
+
+      if ((type == "subsonicPressure") || (type == "nonReflectingPressure")) {
+        tpsP->getRequiredInput((basepath + "/pressure").c_str(), pressure);
+        config.outletBC.Append(pressure);
+      } else if ((type == "nonReflectingMassFlow") || (type == "nonReflectingPointBasedMassFlow")) {
+        tpsP->getRequiredInput((basepath + "/massFlow").c_str(), massFlow);
+        config.outletBC.Append(massFlow);
+      } else {
+        grvy_printf(GRVY_ERROR, "\nUnknown outlet BC supplied at runtime -> %s", type.c_str());
+        exit(ERROR);
+      }
+
+      std::pair<int, OutletType> patchType;
+      patchType.first = patch;
+      patchType.second = outletMapping[type];
+      config.outletPatchType.push_back(patchType);
+    }
+  }
+
+  int fluidType;
+  tpsP->getInput("flow/fluid", fluidType, 0);
+
+  switch (fluidType) {
+    case 0:
+      config.workFluid = DRY_AIR;
+      break;
+    default:
+      break;
+  }
+
+  std::string systemType;
+  tpsP->getInput("flow/equation_system", systemType, std::string("navier-stokes"));
+  if (systemType == "euler") {
+    config.eqSystem = EULER;
+  } else if (systemType == "navier-stokes") {
+    config.eqSystem = NS;
+  } else if (systemType == "navier-stokes-passive") {
+    config.eqSystem = NS_PASSIVE;
+  } else {
+    grvy_printf(GRVY_ERROR, "\nUnknown equation_system -> %s", systemType.c_str());
+    exit(ERROR);
+  }
+
+  return;
 }

@@ -61,6 +61,10 @@ HAVE_GRVY=0
 
 # if test "${with_grvy}" != no ; then
 
+    if test -d "${GRVY_PREFIX}/lib64" ; then
+       GRVY_LIBS="-L${GRVY_PREFIX}/lib64 -lgrvy"
+       GRVY_FCFLAGS="-I${GRVY_PREFIX}/lib64"
+    fi
     if test -d "${GRVY_PREFIX}/lib" ; then
        GRVY_LIBS="-L${GRVY_PREFIX}/lib -lgrvy"
        GRVY_FCFLAGS="-I${GRVY_PREFIX}/lib"

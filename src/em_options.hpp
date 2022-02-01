@@ -41,7 +41,7 @@
  */
 class ElectromagneticOptions {
  public:
-  const char *mesh_file; /**< Mesh filename */
+  std::string mesh_file; /**< Mesh filename */
 
   int order;      /**< Element order */
   int ref_levels; /**< Number of uniform mesh refinements */
@@ -53,39 +53,13 @@ class ElectromagneticOptions {
   bool top_only; /**< Flag to specify current in top rings only */
   bool bot_only; /**< Flag to specify current in bottom rings only */
 
-  const char *By_file; /**< Filename for vertical component of magnetic field on y-axis */
+  std::string By_file; /**< Filename for vertical component of magnetic field on y-axis */
   int nBy;             /**< Number of uniformly spaced points for By output */
   double yinterp_min;  /**< Begin value for uniformly spaced points */
   double yinterp_max;  /**< End value for uniformly spaced points */
 
-  ElectromagneticOptions()
-      : mesh_file("hello.msh"),
-        order(1),
-        ref_levels(0),
-        max_iter(100),
-        rtol(1e-6),
-        atol(1e-10),
-        top_only(false),
-        bot_only(false),
-        By_file("By.h5"),
-        nBy(0),
-        yinterp_min(0.0),
-        yinterp_max(1.0) {}
-
-  void AddElectromagneticOptions(mfem::OptionsParser &args) {
-    args.AddOption(&mesh_file, "-m", "--mesh", "Mesh file (for EM-only simulation)");
-    args.AddOption(&order, "-o", "--order", "Finite element order (polynomial degree) (for EM-only).");
-    args.AddOption(&ref_levels, "-r", "--ref", "Number of uniform refinements (for EM-only).");
-    args.AddOption(&max_iter, "-i", "--maxiter", "Maximum number of iterations (for EM-only).");
-    args.AddOption(&rtol, "-t", "--rtol", "Solver relative tolerance (for EM-only).");
-    args.AddOption(&atol, "-a", "--atol", "Solver absolute tolerance (for EM-only).");
-    args.AddOption(&top_only, "-top", "--top-only", "-ntop", "--no-top-only", "Run current through top branch only");
-    args.AddOption(&bot_only, "-bot", "--bot-only", "-nbot", "--no-bot-only", "Run current through bottom branch only");
-    args.AddOption(&By_file, "-by", "--byfile", "File for By interpolant output.");
-    args.AddOption(&nBy, "-ny", "--nyinterp", "Number of interpolation points.");
-    args.AddOption(&yinterp_min, "-y0", "--yinterpMin", "Minimum y interpolation value");
-    args.AddOption(&yinterp_max, "-y1", "--yinterpMax", "Maximum y interpolation value");
-  }
+  ElectromagneticOptions() {}
+  void AddElectromagneticOptions(mfem::OptionsParser &args) {}
 
   void print(std::ostream &out) {
     out << std::endl;
@@ -98,7 +72,7 @@ class ElectromagneticOptions {
     out << "  rtol        = " << rtol << std::endl;
     out << "  atol        = " << atol << std::endl;
     out << "  top_only    = " << top_only << std::endl;
-    out << "  bot_only    = " << top_only << std::endl;
+    out << "  bot_only    = " << bot_only << std::endl;
     out << "  By_file     = " << By_file << std::endl;
     out << "  nBy         = " << nBy << std::endl;
     out << "  yinterp_min = " << yinterp_min << std::endl;

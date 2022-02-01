@@ -39,10 +39,10 @@
 
 #include <tps_config.h>
 
-#include <mfem/general/forall.hpp>
+#include <mfem.hpp>
+
 #include "dataStructures.hpp"
 #include "run_configuration.hpp"
-#include <mfem.hpp>
 
 using namespace mfem;
 using namespace std;
@@ -52,7 +52,7 @@ static const int MAXSPECIES = 200;
 static const double UNIVERSALGASCONSTANT        = 8.3144598; // J * mol^(-1) * K^(-1)
 static const double AVOGADRONUMBER              = 6.0221409e+23; // mol^(-1)
 
-class GasMixture{
+class GasMixture {
 protected:
   WorkingFluid fluid;
   int num_equation;
@@ -95,18 +95,17 @@ public:
 
   double GetGasParams(int species, GasParams param) { return gasParams(species,param); }
 
-  int GetNumConservativeVariables(){return Nconservative;}
-  int GetNumPrimitiveVariables(){return Nprimitive;}
+  int GetNumConservativeVariables() { return Nconservative; }
+  int GetNumPrimitiveVariables() { return Nprimitive; }
 
-  virtual double ComputePressure(const Vector &state) = 0; // pressure from conservatives
-  virtual double ComputePressureFromPrimitives(const Vector &Up) = 0; // pressure from primitive variables
+  virtual double ComputePressure(const Vector &state) = 0;             // pressure from conservatives
+  virtual double ComputePressureFromPrimitives(const Vector &Up) = 0;  // pressure from primitive variables
   virtual double ComputeTemperature(const Vector &state) = 0;
-  virtual double Temperature(double *rho, double *p, int nsp) = 0; // temperature given densities and pressures of all species
+  virtual double Temperature(double *rho, double *p,
+                             int nsp) = 0;  // temperature given densities and pressures of all species
 
-  virtual void GetPrimitivesFromConservatives(const Vector &conserv,
-                                              Vector &primit) = 0;
-  virtual void GetConservativesFromPrimitives(const Vector &primit,
-                                              Vector &conserv) = 0;
+  virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit) = 0;
+  virtual void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv) = 0;
 
   virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true) = 0;
 
@@ -165,21 +164,19 @@ private:
   // virtual void SetNumEquations();
 public:
   DryAir(RunConfiguration &_runfile, int _dim);
-  DryAir(); //this will only be usefull to get air constants
+  DryAir();  // this will only be usefull to get air constants
   DryAir(int dim, int num_equation);
 
-  ~DryAir(){};
+  ~DryAir() {}
 
   // implementation virtual methods
   virtual double ComputePressure(const Vector &state);
   virtual double ComputePressureFromPrimitives(const Vector &Up);
   virtual double ComputeTemperature(const Vector &state);
-  virtual double Temperature(double *rho, double *p, int nsp = 1){return p[0]/gas_constant/rho[0];};
+  virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / gas_constant / rho[0]; }
 
-  virtual void GetPrimitivesFromConservatives(const Vector &conserv,
-                                              Vector &primit );
-  virtual void GetConservativesFromPrimitives(const Vector &primit,
-                                              Vector &conserv);
+  virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit);
+  virtual void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv);
 
   virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true);
 
@@ -212,12 +209,24 @@ public:
     return (gamma - 1.) * (state[1 + dim] - p);
   }
 
-  static MFEM_HOST_DEVICE double temperature(const double *state, double *KE, const double &gamma,
-                                          const double &Rgas, const int &dim, const int &num_equations) {
+  static MFEM_HOST_DEVICE double ComputePressureFromPrimitives_gpu(const double *Up, const double &Rg, const int &dim) {
+    return Up[0] * Rg * Up[1 + dim];
+  }
+
+  static MFEM_HOST_DEVICE double temperature(const double *state, double *KE, const double &gamma, const double &Rgas,
+                                             const int &dim, const int &num_equation) {
     double temp = 0.;
     for (int k = 0; k < dim; k++) temp += KE[k];
     temp /= state[0];
-    return (gamma - 1.0)/Rgas * (state[1+dim]/state[0] - temp);
+    return (gamma - 1.0) / Rgas * (state[1 + dim] / state[0] - temp);
+  }
+
+  static MFEM_HOST_DEVICE double temperatureFromConservative(const double *u, const double &gamma, const double &Rg,
+                                                             const int &dim, const int &num_equation) {
+    double k = 0.;
+    for (int d = 0; d < dim; d++) k += u[1 + d] * u[1 + d];
+    k /= u[0] * u[0];
+    return (gamma - 1.) / Rg * (u[1 + dim] / u[0] - 0.5 * k);
   }
 
   // Sutherland's law
@@ -232,7 +241,6 @@ public:
   }
 #endif
 };
-
 
 // class EquationOfState {
 //  private:
@@ -291,12 +299,12 @@ inline double DryAir::ComputePressure(const Vector &state) {
   return (specific_heat_ratio - 1.0) * (state[1 + dim] - 0.5 * den_vel2);
 }
 
-inline double DryAir::ComputeTemperature(const Vector &state){
+inline double DryAir::ComputeTemperature(const Vector &state) {
   double den_vel2 = 0;
   for (int d = 0; d < dim; d++) den_vel2 += state(d + 1) * state(d + 1);
   den_vel2 /= state[0];
 
-  return (specific_heat_ratio - 1.0)/gas_constant * (state[1+dim] - 0.5*den_vel2)/state[0];
+  return (specific_heat_ratio - 1.0) / gas_constant * (state[1+dim] - 0.5*den_vel2) / state[0];
 }
 
 // // Sutherland's law

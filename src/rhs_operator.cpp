@@ -372,11 +372,10 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 #ifdef _GPU_
 
   // ComputeConvectiveFluxes
-  Fluxes::convectiveFluxes_gpu(x, flux, mixture->GetSpecificHeatRatio(), vfes->GetNDofs(), dim, num_equation);
-  if (eqSystem == NS) {
-    Fluxes::viscousFluxes_gpu(x, gradUp, flux, mixture->GetSpecificHeatRatio(), mixture->GetGasConstant(),
-                              mixture->GetPrandtlNum(), mixture->GetViscMultiplyer(), mixture->GetBulkViscMultiplyer(),
-                              spaceVaryViscMult, linViscData, vfes->GetNDofs(), dim, num_equation);
+  Fluxes::convectiveFluxes_gpu(x, flux, eqSystem, mixture, vfes->GetNDofs(), dim, num_equation);
+  if (eqSystem != EULER) {
+    Fluxes::viscousFluxes_gpu(x, gradUp, flux, eqSystem, mixture, spaceVaryViscMult, linViscData, vfes->GetNDofs(), dim,
+                              num_equation);
   }
 #else
   DenseMatrix xmat(x.GetData(), vfes->GetNDofs(), num_equation);
@@ -443,28 +442,28 @@ void RHSoperator::updatePrimitives(const Vector &x_in) const {
 #ifdef _GPU_
 
   RHSoperator::updatePrimitives_gpu(Up, &x_in, mixture->GetSpecificHeatRatio(), mixture->GetGasConstant(),
-                                    vfes->GetNDofs(), dim, num_equation);
+                                    vfes->GetNDofs(), dim, num_equation, eqSystem);
 #else
   double *dataUp = Up->GetData();
   for (int i = 0; i < vfes->GetNDofs(); i++) {
     Vector iState(num_equation);
     Vector iUp(num_equation);
     for (int eq = 0; eq < num_equation; eq++) iState[eq] = x_in[i + eq * vfes->GetNDofs()];
-    mixture->GetPrimitivesFromConservatives(iState,iUp);
-    for (int eq = 0; eq < num_equation; eq++) dataUp[i+eq*vfes->GetNDofs()] = iUp[eq];
+    mixture->GetPrimitivesFromConservatives(iState, iUp);
+    for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * vfes->GetNDofs()] = iUp[eq];
   }
 #endif  // _GPU_
 }
 
-// Kevin: will need to consider how to feed Rgas for multi-species
-void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const double gamma, const double Rgas,const int ndofs,
-                                       const int dim, const int num_equations) {
+void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const double gamma, const double Rgas,
+                                       const int ndofs, const int dim, const int num_equation,
+                                       const Equations &eqSystem) {
 #ifdef _GPU_
   auto dataUp = Up->Write();   // make sure data is available in GPU
   auto dataIn = x_in->Read();  // make sure data is available in GPU
 
   MFEM_FORALL_2D(n, ndofs, num_equation, 1, 1, {
-    MFEM_SHARED double state[5];  // assuming 5 equations
+    MFEM_SHARED double state[20];  // assuming 20 equations
     // MFEM_SHARED double p;
     MFEM_SHARED double KE[3];
 
@@ -472,7 +471,7 @@ void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const dou
       state[eq] = dataIn[n + eq * ndofs];  // loads data into shared memory
       MFEM_SYNC_THREAD;
 
-      // compute pressure
+      // compute temperature
       if (eq < dim) KE[eq] = 0.5 * state[1 + eq] * state[1 + eq] / state[0];
       if (eq == num_equation - 1 && dim == 2) KE[2] = 0;
       MFEM_SYNC_THREAD;
@@ -482,9 +481,10 @@ void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const dou
       if (eq == 1) dataUp[n + ndofs] = state[1] / state[0];
       if (eq == 2) dataUp[n + 2 * ndofs] = state[2] / state[0];
       if (eq == 3 && dim == 3) dataUp[n + 3 * ndofs] = state[3] / state[0];
-      if (eq == num_equations - 1)
-        dataUp[n + (num_equations - 1) * ndofs] =
-            DryAir::temperature(&state[0], &KE[0], gamma, Rgas, dim, num_equations);
+      if (eq == 1 + dim)
+        dataUp[n + (1 + dim) * ndofs] = DryAir::temperature(&state[0], &KE[0], gamma, Rgas, dim, num_equation);
+      if (eq == num_equation - 1 && eqSystem == NS_PASSIVE)
+        dataUp[n + (num_equation - 1) * ndofs] = state[num_equation - 1] / state[0];
     }
   });
 #endif
@@ -503,7 +503,7 @@ void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceInteg
 
   MFEM_FORALL_2D(el, NE, dof, 1, 1, {
     MFEM_FOREACH_THREAD(i, x, dof) {
-      MFEM_SHARED double data[216 * 5];
+      MFEM_SHARED double data[216 * 20];
 
       int eli = el + elemOffset;
       int offsetInv = d_posDofInvM[2 * eli];

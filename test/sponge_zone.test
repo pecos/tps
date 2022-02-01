@@ -2,12 +2,9 @@
 # -*- mode: sh -*-
 
 TEST="sponge_zone.test"
-RUNFILE="inputs/input.sponge_zone.periodic"
+RUNFILE="inputs/input.sponge_zone.periodic.ini"
 SOLN_FILE=restart_sponge_zone.sol.h5
 REF_FILE=ref_solns/forcing-periodic-square.h5
-
-#setup() {
-#}
 
 @test "[$TEST] check for input file $RUNFILE" {
     test -s $RUNFILE

@@ -2,7 +2,7 @@
 # -*- mode: sh -*-
 
 TEST="2d/wedge"
-RUNFILE="inputs/input.dtconst.wedge"
+RUNFILE="inputs/input.dtconst.wedge.ini"
 OPTS=""
 
 @test "[$TEST] check for input file $RUNFILE" {

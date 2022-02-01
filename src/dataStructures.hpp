@@ -122,6 +122,7 @@ struct linearlyVaryingVisc {
   Vector point0;
   Vector pointInit;
   double viscRatio;
+  bool isEnabled;
 };
 
 enum SpongeZoneSolution {

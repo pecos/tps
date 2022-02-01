@@ -33,8 +33,10 @@
 #define FACE_INTEGRATOR_HPP_
 
 #include <tps_config.h>
+
 #include <mfem.hpp>
 #include <mfem/general/forall.hpp>
+
 #include "fluxes.hpp"
 #include "riemann_solver.hpp"
 

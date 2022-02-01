@@ -49,7 +49,7 @@ using namespace std;
 // specified in the input file
 // Lines begining with # are ignored
 class RunConfiguration {
- private:
+ public:
   // mesh file file
   string meshFile;
   int ref_levels;
@@ -189,7 +189,6 @@ class RunConfiguration {
   TransportModel transportModel;
   ChemistryModel chemistryModel;
 
- public:
   RunConfiguration();
   ~RunConfiguration();
 
