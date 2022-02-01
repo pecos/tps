@@ -48,7 +48,7 @@ void GasMixture::UpdatePressureGridFunction(ParGridFunction* press, const ParGri
   const int nnode = press->FESpace()->GetNDofs();
 
   for(int n=0;n<nnode;n++){
-    Vector UpAtNode;
+    Vector UpAtNode(num_equation);
     for (int eq = 0; eq < num_equation; eq++) {
       UpAtNode[eq] = UpData[n + eq * nnode];
     }
