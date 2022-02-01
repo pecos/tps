@@ -142,6 +142,7 @@ class RunConfiguration {
 
   // equations to be solved. Options thus far
   Equations eqSystem;
+  bool axisymmetric_;
 
   bool SBP;
 
@@ -207,6 +208,7 @@ class RunConfiguration {
   double GetBulkViscMult() { return bulk_visc; }
   double GetReferenceLength() { return refLength; }
   Equations GetEquationSystem() { return eqSystem; }
+  bool isAxisymmetric() const { return axisymmetric_; }
   bool isSBP() { return SBP; }
   double* GetConstantInitialCondition() { return &initRhoRhoVp[0]; }
 

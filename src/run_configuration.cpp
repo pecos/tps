@@ -66,6 +66,7 @@ RunConfiguration::RunConfiguration() {
   itersOut = 50;
   workFluid = DRY_AIR;
   eqSystem = EULER;
+  axisymmetric_ = false;
   visc_mult = 1.;
   bulk_visc = 0.;
   refLength = 1.;
