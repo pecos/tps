@@ -141,6 +141,9 @@ def handleMultiValuedInputs(entry):
         elif wallMapping[entries[2]] == 'inviscid':
             # no additional vars required
             noop=True
+        elif wallMapping[entries[2]] == 'viscous_adiabatic':
+            # no additional vars required
+            noop=True
         else:
             logging.error("Unsupported wall BC type -> %s" % wallMapping[entries[2]])
             exit(1)
@@ -162,6 +165,14 @@ def handleMultiValuedInputs(entry):
         newFile[section]["patch"] = patch        
         newFile[section]["type"]  = inletMapping[entries[2]]
         if inletMapping[entries[2]] == 'subsonic':
+            newFile[section]["density"] = entries[3]
+            uvw = "'" + str(entries[4]) + " " + str(entries[5]) + " " + str(entries[6]) + "'"
+            newFile[section]["uvw"] = uvw
+        elif inletMapping[entries[2]] == 'nonReflecting':
+            newFile[section]["density"] = entries[3]
+            uvw = "'" + str(entries[4]) + " " + str(entries[5]) + " " + str(entries[6]) + "'"
+            newFile[section]["uvw"] = uvw
+        elif inletMapping[entries[2]] == 'nonReflectingConstEntropy':
             newFile[section]["density"] = entries[3]
             uvw = "'" + str(entries[4]) + " " + str(entries[5]) + " " + str(entries[6]) + "'"
             newFile[section]["uvw"] = uvw
