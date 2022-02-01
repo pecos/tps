@@ -56,6 +56,7 @@ class ForcingTerms {
   const int &dim;
   const int nvel;
   const int &num_equation;
+  const bool axisymmetric_;
   const int &order;
   const int &intRuleType;
   IntegrationRules *intRules;
@@ -73,7 +74,7 @@ class ForcingTerms {
  public:
   ForcingTerms(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
-               ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays);
+               ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays, bool axisym);
   ~ForcingTerms();
 
   void setTime(double _time) { time = _time; }

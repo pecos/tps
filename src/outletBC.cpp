@@ -37,9 +37,9 @@
 OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rsolver, GasMixture *_mixture,
                    ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
                    const int _num_equation, int _patchNumber, double _refLength, OutletType _bcType,
-                   const Array<double> &_inputData, const int &_maxIntPoints, const int &_maxDofs)
+                   const Array<double> &_inputData, const int &_maxIntPoints, const int &_maxDofs, bool axisym)
     : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
-                        _refLength),
+                        _refLength, axisym),
       groupsMPI(_groupsMPI),
       outletType(_bcType),
       inputState(_inputData),
@@ -296,11 +296,7 @@ void OutletBC::initBCs() {
   }
 }
 
-#ifdef AXISYM_DEV
 void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius) {
-#else
-void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
-#endif
   switch (outletType) {
     case SUB_P:
       subsonicReflectingPressure(normal, stateIn, bdrFlux);

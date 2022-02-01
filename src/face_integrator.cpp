@@ -34,7 +34,8 @@
 // Implementation of class FaceIntegrator
 FaceIntegrator::FaceIntegrator(IntegrationRules *_intRules, RiemannSolver *rsolver_, Fluxes *_fluxClass,
                                ParFiniteElementSpace *_vfes, bool _useLinear, const int _dim, const int _num_equation,
-                               ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, double &_max_char_speed)
+                               ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, double &_max_char_speed,
+                               bool axisym)
     : rsolver(rsolver_),
       fluxClass(_fluxClass),
       vfes(_vfes),
@@ -44,7 +45,8 @@ FaceIntegrator::FaceIntegrator(IntegrationRules *_intRules, RiemannSolver *rsolv
       gradUp(_gradUp),
       gradUpfes(_gradUpfes),
       intRules(_intRules),
-      useLinear(_useLinear) {
+      useLinear(_useLinear),
+      axisymmetric_(axisym) {
   if (useLinear) {
     faceMassMatrix1 = new DenseMatrix[vfes->GetNF() - vfes->GetNBE()];
     faceMassMatrix2 = new DenseMatrix[vfes->GetNF() - vfes->GetNBE()];
@@ -163,11 +165,8 @@ void FaceIntegrator::getElementsGrads_gpu(const ParGridFunction *gradUp, ParFini
 
 void FaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2,
                                         FaceElementTransformations &Tr, const Vector &elfun, Vector &elvect) {
-#ifdef AXISYM_DEV
-  // the useLinear path isn't supported for axisymmetric
-  assert(!useLinear);
-#endif
   if (useLinear) {
+    assert(!axisymmetric_); // axisym not supported in useLinear path
     MassMatrixFaceIntegral(el1, el2, Tr, elfun, elvect);
   } else {
     NonLinearFaceIntegration(el1, el2, Tr, elfun, elvect);
@@ -254,23 +253,19 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     CalcOrtho(Tr.Jacobian(), nor);
     rsolver->Eval(funval1, funval2, nor, fluxN);
 
-#ifdef AXISYM_DEV
-    double x[3];
-    Vector transip(x, 3);
-    Tr.Transform(ip, transip);
-    const double radius = transip[0];
-#endif
+    double radius = 1;
+    if (axisymmetric_) {
+      double x[3];
+      Vector transip(x, 3);
+      Tr.Transform(ip, transip);
+      radius = transip[0];
+    }
 
     // compute viscous fluxes
     viscF1 = viscF2 = 0.;
 
-#ifdef AXISYM_DEV
     fluxClass->ComputeViscousFluxes(funval1, gradUp1i, viscF1, radius);
     fluxClass->ComputeViscousFluxes(funval2, gradUp2i, viscF2, radius);
-#else
-    fluxClass->ComputeViscousFluxes(funval1, gradUp1i, viscF1);
-    fluxClass->ComputeViscousFluxes(funval2, gradUp2i, viscF2);
-#endif
 
     // compute mean flux
     viscF1 += viscF2;
@@ -280,9 +275,9 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     viscF1.AddMult(nor, fluxN);
     fluxN *= ip.weight;
 
-#ifdef AXISYM_DEV
-    fluxN *= radius;
-#endif
+    if (axisymmetric_) {
+      fluxN *= radius;
+    }
 
     // add to element vectors
     AddMultVWt(shape2, fluxN, elvect2_mat);

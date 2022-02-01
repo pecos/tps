@@ -36,9 +36,9 @@
 WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSystem, Fluxes *_fluxClass,
                ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
                const int _num_equation, int _patchNumber, WallType _bcType, const Array<double> _inputData,
-               const Array<int> &_intPointsElIDBC, const int &_maxIntPoints)
+               const Array<int> &_intPointsElIDBC, const int &_maxIntPoints, bool axisym)
     : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
-                        1),  // so far walls do not require ref. length. Left at 1
+                        1, axisym),  // so far walls do not require ref. length. Left at 1
       wallType(_bcType),
       fluxClass(_fluxClass),
       intPointsElIDBC(_intPointsElIDBC),
@@ -102,32 +102,16 @@ void WallBC::buildWallElemsArray(const Array<int> &intPointsElIDBC) {
   auto dwallElems = wallElems.ReadWrite();
 }
 
-#ifdef AXISYM_DEV
 void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius) {
-#else
-void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
-#endif
   switch (wallType) {
     case INV:
-#ifdef AXISYM_DEV
       computeINVwallFlux(normal, stateIn, gradState, bdrFlux, radius);
-#else
-      computeINVwallFlux(normal, stateIn, bdrFlux);
-#endif
       break;
     case VISC_ADIAB:
-#ifdef AXISYM_DEV
       computeAdiabaticWallFlux(normal, stateIn, gradState, bdrFlux, radius);
-#else
-      computeAdiabaticWallFlux(normal, stateIn, gradState, bdrFlux);
-#endif
       break;
     case VISC_ISOTH:
-#ifdef AXISYM_DEV
       computeIsothermalWallFlux(normal, stateIn, gradState, bdrFlux, radius);
-#else
-      computeIsothermalWallFlux(normal, stateIn, gradState, bdrFlux);
-#endif
       break;
   }
 }
@@ -144,12 +128,9 @@ void WallBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesID
                      wallElems, listElems, eqSystem, maxIntPoints, maxDofs, dim, num_equation, mixture);
 }
 
-#ifdef AXISYM_DEV
+
 void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn,  DenseMatrix &gradState,
                                 Vector &bdrFlux, double radius) {
-#else
-void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
-#endif
   Vector vel(nvel);
   for (int d = 0; d < nvel; d++) vel[d] = stateIn[1 + d] / stateIn[0];
 
@@ -175,53 +156,49 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux
 
   rsolver->Eval(stateIn, stateMirror, normal, bdrFlux);
 
-#ifdef AXISYM_DEV
-  // here we have hijacked the inviscid wall condition to implement
-  // the axis... but... should implement this separately
+  if (axisymmetric_) {
+    // here we have hijacked the inviscid wall condition to implement
+    // the axis... but... should implement this separately
 
-  // incoming visc flux
-  DenseMatrix viscF(num_equation, dim);
-  fluxClass->ComputeViscousFluxes(stateIn, gradState, viscF, radius);
+    // incoming visc flux
+    DenseMatrix viscF(num_equation, dim);
+    fluxClass->ComputeViscousFluxes(stateIn, gradState, viscF, radius);
 
-  double p = mixture->ComputePressure(stateIn);
+    double p = mixture->ComputePressure(stateIn);
 
-  // modify gradients so that wall is adibatic
-  Vector unitNorm = normal;
-  {
-    double normN = 0.;
-    for (int d = 0; d < dim; d++) normN += normal[d] * normal[d];
-    unitNorm *= 1. / sqrt(normN);
+    // modify gradients so that wall is adibatic
+    Vector unitNorm = normal;
+    {
+      double normN = 0.;
+      for (int d = 0; d < dim; d++) normN += normal[d] * normal[d];
+      unitNorm *= 1. / sqrt(normN);
+    }
+
+    // modify gradient density so dT/dn=0 at the wall
+    double DrhoDn = 0.;
+    for (int d = 0; d < dim; d++) DrhoDn += gradState(0, d) * unitNorm[d];
+
+    double DrhoDnNew = 0.;
+    for (int d = 0; d < dim; d++) DrhoDnNew += gradState(1 + dim, d) * unitNorm[d];
+    DrhoDnNew *= stateIn[0] / p;
+
+    for (int d = 0; d < dim; d++) gradState(0, d) += -DrhoDn * unitNorm[d] + DrhoDnNew * unitNorm[d];
+    if (eqSystem == NS_PASSIVE) {
+      for (int d = 0; d < dim; d++) gradState(num_equation - 1, d) = 0.;
+    }
+
+    DenseMatrix viscFw(num_equation, dim);
+    fluxClass->ComputeViscousFluxes(stateMirror, gradState, viscFw, radius);
+
+    // Add visc fluxes (we skip density eq.)
+    for (int eq = 1; eq < num_equation; eq++) {
+      for (int d = 0; d < dim; d++) bdrFlux[eq] -= 0.5 * (viscFw(eq, d) + viscF(eq, d)) * normal[d];
+    }
   }
-
-  // modify gradient density so dT/dn=0 at the wall
-  double DrhoDn = 0.;
-  for (int d = 0; d < dim; d++) DrhoDn += gradState(0, d) * unitNorm[d];
-
-  double DrhoDnNew = 0.;
-  for (int d = 0; d < dim; d++) DrhoDnNew += gradState(1 + dim, d) * unitNorm[d];
-  DrhoDnNew *= stateIn[0] / p;
-
-  for (int d = 0; d < dim; d++) gradState(0, d) += -DrhoDn * unitNorm[d] + DrhoDnNew * unitNorm[d];
-  if (eqSystem == NS_PASSIVE) {
-    for (int d = 0; d < dim; d++) gradState(num_equation - 1, d) = 0.;
-  }
-
-  DenseMatrix viscFw(num_equation, dim);
-  fluxClass->ComputeViscousFluxes(stateMirror, gradState, viscFw, radius);
-
-  // Add visc fluxes (we skip density eq.)
-  for (int eq = 1; eq < num_equation; eq++) {
-    for (int d = 0; d < dim; d++) bdrFlux[eq] -= 0.5 * (viscFw(eq, d) + viscF(eq, d)) * normal[d];
-  }
-#endif
 }
 
-#ifdef AXISYM_DEV
 void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
                                       Vector &bdrFlux, double radius) {
-#else
-void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
-#endif
   double p = mixture->ComputePressure(stateIn);
   double T = mixture->ComputeTemperature(stateIn);
 
@@ -238,11 +215,7 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
 
   // incoming visc flux
   DenseMatrix viscF(num_equation, dim);
-#ifdef AXISYM_DEV
   fluxClass->ComputeViscousFluxes(stateIn, gradState, viscF, radius);
-#else
-  fluxClass->ComputeViscousFluxes(stateIn, gradState, viscF);
-#endif
 
   // modify gradients so that wall is adibatic
   Vector unitNorm = normal;
@@ -280,11 +253,7 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
   }
 
   DenseMatrix viscFw(num_equation, dim);
-#ifdef AXISYM_DEV
   fluxClass->ComputeViscousFluxes(wallState, gradState, viscFw, radius);
-#else
-  fluxClass->ComputeViscousFluxes(wallState, gradState, viscFw);
-#endif
 
   // Add visc fluxes (we skip density eq.)
   for (int eq = 1; eq < num_equation; eq++) {
@@ -292,12 +261,8 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
   }
 }
 
-#ifdef AXISYM_DEV
 void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
                                        Vector &bdrFlux, double radius) {
-#else
-void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
-#endif
   const double gamma = mixture->GetSpecificHeatRatio();
 
   Vector wallState(num_equation);
@@ -312,19 +277,19 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
   // Normal convective flux
   rsolver->Eval(stateIn, wallState, normal, bdrFlux, true);
 
-#ifdef AXISYM_DEV
-  // Shouldn't this be here?  Encapsulate in AXISYM_DEV for now b/c it breaks tests
+  if (axisymmetric_) {
+    // Shouldn't this always be here?  Encapsulate in axisymmetric for
+    // now b/c it breaks tests
 
-  // add it here!
-  DenseMatrix viscFw(num_equation, dim);
-  fluxClass->ComputeViscousFluxes(wallState, gradState, viscFw, radius);
+    DenseMatrix viscFw(num_equation, dim);
+    fluxClass->ComputeViscousFluxes(wallState, gradState, viscFw, radius);
 
 
-  // Add visc fluxes (we skip density eq.)
-  for (int eq = 1; eq < num_equation; eq++) {
-    for (int d = 0; d < dim; d++) bdrFlux[eq] -= (viscFw(eq, d)) * normal[d];
+    // Add visc fluxes (we skip density eq.)
+    for (int eq = 1; eq < num_equation; eq++) {
+      for (int d = 0; d < dim; d++) bdrFlux[eq] -= (viscFw(eq, d)) * normal[d];
+    }
   }
-#endif
 }
 
 void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vector &y, const Vector &x,

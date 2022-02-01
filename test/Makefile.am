@@ -26,8 +26,7 @@ TESTS += cyl3d.test \
 	 annulus.test \
 	 pipe.test
 
-XFAIL_TESTS += annulus.test \
-	       pipe.test
+XFAIL_TESTS += pipe.test
 endif
 
 if GSLIB_ENABLED

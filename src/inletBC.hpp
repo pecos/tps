@@ -91,14 +91,10 @@ class InletBC : public BoundaryCondition {
   InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *rsolver_, GasMixture *_mixture,
           ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
           const int _num_equation, int _patchNumber, double _refLength, InletType _bcType,
-          const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs);
+          const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs, bool axisym);
   ~InletBC();
 
-#ifdef AXISYM_DEV
   void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius = 0);
-#else
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
-#endif
 
   virtual void initBCs();
 

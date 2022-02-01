@@ -35,14 +35,11 @@
 
 ForcingTerms::ForcingTerms(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                            IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
-                           ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &_gpuArrays)
+                           ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &_gpuArrays, bool axisym)
     : dim(_dim),
-#ifdef AXISYM_DEV
-      nvel(3),
-#else
-      nvel(_dim),
-#endif
+      nvel(axisym ? 3 : _dim),
       num_equation(_num_equation),
+      axisymmetric_(axisym),
       order(_order),
       intRuleType(_intRuleType),
       intRules(_intRules),
@@ -91,7 +88,7 @@ ConstantPressureGradient::ConstantPressureGradient(const int &_dim, const int &_
                                                    ParGridFunction *_gradUp,
                                                    const volumeFaceIntegrationArrays &_gpuArrays,
                                                    RunConfiguration &_config)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, _gpuArrays) {
+: ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, _gpuArrays, _config.isAxisymmetric()) {
   mixture = new DryAir(_config, dim);
 
   pressGrad.UseDevice(true);
@@ -227,7 +224,7 @@ AxisymmetricSource::AxisymmetricSource(const int &_dim, const int &_num_equation
                                        const int &_intRuleType, IntegrationRules *_intRules,
                                        ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
                                        const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
-  : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays),
+  : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays, _config.isAxisymmetric()),
     mixture(_mixture),
     eqSystem(_eqSystem) {
   // no-op
@@ -387,7 +384,7 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
                        Fluxes *_fluxClass, GasMixture *_mixture, IntegrationRules *_intRules,
                        ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
                        const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays),
+  : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays, _config.isAxisymmetric()),
       fluxes(_fluxClass),
       mixture(_mixture),
       szData(_config.GetSpongeZoneData()) {
@@ -542,7 +539,7 @@ PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const in
                              IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, GasMixture *_mixture,
                              ParGridFunction *_Up, ParGridFunction *_gradUp,
                              const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays),
+  : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays, _config.isAxisymmetric()),
       mixture(_mixture) {
   psData_.DeleteAll();
   for (int i = 0; i < _config.GetPassiveScalarData().Size(); i++) psData_.Append(new passiveScalarData);
@@ -646,7 +643,7 @@ MASA_forcings::MASA_forcings(const int &_dim, const int &_num_equation, const in
                              IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
                              ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
                              RunConfiguration &_config)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays) {
+  : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays, _config.isAxisymmetric()) {
   initMasaHandler("forcing", dim, _config.GetEquationSystem(), _config.GetViscMult());
 }
 

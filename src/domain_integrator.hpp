@@ -57,10 +57,11 @@ class DomainIntegrator : public BilinearFormIntegrator {
   const int num_equation;
   IntegrationRules *intRules;
   const int intRuleType;
+  const bool axisymmetric_;
 
  public:
   DomainIntegrator(Fluxes *_fluxClass, IntegrationRules *_intRules, int _intRuleType, const int _dim,
-                   const int _num_equation);
+                   const int _num_equation, bool axisym);
 
   virtual void AssembleElementMatrix2(const FiniteElement &trial_fe, const FiniteElement &test_fe,
                                       ElementTransformation &Tr, DenseMatrix &elmat);

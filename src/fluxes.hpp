@@ -54,6 +54,7 @@ class Fluxes {
 
   const int &dim;
   int nvel;
+  const bool axisymmetric_;
 
   const int &num_equations;
   double Rg;
@@ -63,7 +64,7 @@ class Fluxes {
   DenseMatrix stress;
 
  public:
-  Fluxes(GasMixture *_mixture, Equations &_eqSystem, const int &_num_equations, const int &_dim);
+  Fluxes(GasMixture *_mixture, Equations &_eqSystem, const int &_num_equations, const int &_dim, bool axisym);
 
   Equations GetEquationSystem() { return eqSystem; }
 
@@ -71,11 +72,7 @@ class Fluxes {
 
   void ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux);
 
-#ifdef AXISYM_DEV
   void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &flux, double radius = 0);
-#else
-  void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &flux);
-#endif
 
   // Compute the split fersion of the flux for SBP operations
   // Output matrices a_mat, c_mat need not have the right size

@@ -34,7 +34,7 @@
 BoundaryCondition::BoundaryCondition(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSystem,
                                      ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt,
                                      const int _dim, const int _num_equation, const int _patchNumber,
-                                     const double _refLength)
+                                     const double _refLength, bool axisym)
     : rsolver(_rsolver),
       mixture(_mixture),
       eqSystem(_eqSystem),
@@ -42,14 +42,15 @@ BoundaryCondition::BoundaryCondition(RiemannSolver *_rsolver, GasMixture *_mixtu
       intRules(_intRules),
       dt(_dt),
       dim(_dim),
-#ifdef AXISYM_DEV
-      nvel(3),
-#else
-      nvel(_dim),
-#endif
       num_equation(_num_equation),
       patchNumber(_patchNumber),
-      refLength(_refLength) {
+      refLength(_refLength),
+      axisymmetric_(axisym) {
+  if (axisym) {
+    nvel = 3;
+  } else {
+    nvel = dim;
+  }
   BCinit = false;
 }
 

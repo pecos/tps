@@ -31,14 +31,11 @@
 // -----------------------------------------------------------------------------------el-
 #include "fluxes.hpp"
 
-Fluxes::Fluxes(GasMixture *_mixture, Equations &_eqSystem, const int &_num_equations, const int &_dim)
-    : mixture(_mixture), eqSystem(_eqSystem), dim(_dim),
-#ifdef AXISYM_DEV
-      nvel(3),
-#else
-      nvel(_dim),
-#endif
-      num_equations(_num_equations) {
+Fluxes::Fluxes(GasMixture *_mixture, Equations &_eqSystem, const int &_num_equations, const int &_dim, bool axisym)
+  : mixture(_mixture), eqSystem(_eqSystem), dim(_dim),
+    nvel(axisym ? 3 : _dim),
+    axisymmetric_(axisym),
+    num_equations(_num_equations) {
   gradT.SetSize(dim);
   vel.SetSize(dim);
   vtmp.SetSize(dim);
@@ -86,11 +83,7 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
   }
 }
 
-#ifdef AXISYM_DEV
 void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &flux, double radius) {
-#else
-void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &flux) {
-#endif
   switch (eqSystem) {
     case NS:
     case NS_PASSIVE: {
@@ -98,10 +91,8 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
       const double bulkViscMult = mixture->GetBulkViscMultiplyer();
       const double k = mixture->GetThermalConductivity(state);
 
-#ifdef AXISYM_DEV
-      const double ur = state[1]/state[0];
-      const double ut = state[2]/state[0];
-#endif
+      const double ur = (axisymmetric_ ? state[1]/state[0] : 0);
+      const double ut = (axisymmetric_ ? state[3]/state[0] : 0);
 
       // make sure density visc. flux is 0
       for (int d = 0; d < dim; d++) flux(0, d) = 0.;
@@ -111,10 +102,10 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
         for (int j = 0; j < dim; j++) stress(i, j) = gradUp(1 + j, i) + gradUp(1 + i, j);
         divV += gradUp(1 + i, i);
       }
-#ifdef AXISYM_DEV
-      if (radius > 0)
+
+      if (axisymmetric_ && radius > 0) {
         divV += ur/radius;
-#endif
+      }
 
       for (int i = 0; i < dim; i++) stress(i, i) += (bulkViscMult - 2. / 3.) * divV;
       stress *= visc;
@@ -122,18 +113,19 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
       for (int i = 0; i < dim; i++)
         for (int j = 0; j < dim; j++) flux(1 + i, j) = stress(i, j);
 
-#ifdef AXISYM
-      const double ut_r = gradUp(3, 0);
-      const double ut_z = gradUp(3, 1);
-      double tau_tr = ut_r;
-      if (radius > 0) tau_tr -= ut/radius;
-      tau_tr *= visc;
+      double tau_tr = 0, tau_tz = 0;
+      if (axisymmetric_) {
+        const double ut_r = gradUp(3, 0);
+        const double ut_z = gradUp(3, 1);
+        tau_tr = ut_r;
+        if (radius > 0) tau_tr -= ut/radius;
+        tau_tr *= visc;
 
-      const double tau_tz = visc*ut_z;
+        tau_tz = visc*ut_z;
 
-      flux(1+2, 0) = tau_tr;
-      flux(1+2, 1) = tau_tz;
-#endif
+        flux(1+2, 0) = tau_tr;
+        flux(1+2, 1) = tau_tz;
+      }
 
       // temperature gradient
       //       for (int d = 0; d < dim; d++) gradT[d] = temp * (gradUp(1 + dim, d) / p - gradUp(0, d) / state[0]);
@@ -147,10 +139,10 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
         flux(1 + nvel, d) += k * gradUp(1 + nvel, d);
       }
 
-#ifdef AXISYM
+      if (axisymmetric_) {
         flux(1 + nvel, 0) += ut*tau_tr;
         flux(1 + nvel, 1) += ut*tau_tz;
-#endif
+      }
 
       if (eqSystem == NS_PASSIVE) {
         double Sc = mixture->GetSchmidtNum();

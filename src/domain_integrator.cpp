@@ -34,8 +34,15 @@
 
 // Implementation of class DomainIntegrator
 DomainIntegrator::DomainIntegrator(Fluxes *_fluxClass, IntegrationRules *_intRules, int _intRuleType, const int _dim,
-                                   const int _num_equation)
-    : fluxClass(_fluxClass), dim(_dim), num_equation(_num_equation), intRules(_intRules), intRuleType(_intRuleType) {}
+                                   const int _num_equation, bool axisym)
+  : fluxClass(_fluxClass),
+    dim(_dim),
+    num_equation(_num_equation),
+    intRules(_intRules),
+    intRuleType(_intRuleType),
+    axisymmetric_(axisym)
+{
+}
 
 void DomainIntegrator::AssembleElementMatrix2(const FiniteElement &trial_fe, const FiniteElement &test_fe,
                                               ElementTransformation &Tr, DenseMatrix &elmat) {
@@ -76,13 +83,13 @@ void DomainIntegrator::AssembleElementMatrix2(const FiniteElement &trial_fe, con
     test_fe.CalcDShape(ip, dshapedr);
     Mult(dshapedr, Tr.AdjugateJacobian(), dshapedx);
 
-#ifdef AXISYM_DEV
-    double x[3];
-    Vector transip(x, 3);
-    Tr.Transform(ip, transip);
-    const double radius = transip[0];
-    shape *= radius;
-#endif
+    if (axisymmetric_) {
+      double x[3];
+      Vector transip(x, 3);
+      Tr.Transform(ip, transip);
+      const double radius = transip[0];
+      shape *= radius;
+    }
 
     for (int d = 0; d < dim; d++) {
       for (int j = 0; j < dof_test; j++) {

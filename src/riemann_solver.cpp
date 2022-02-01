@@ -36,8 +36,9 @@ using namespace mfem;
 
 // Implementation of class RiemannSolver
 RiemannSolver::RiemannSolver(int &_num_equation, GasMixture *_mixture, Equations &_eqSystem, Fluxes *_fluxClass,
-                             bool _useRoe)
-    : num_equation(_num_equation), mixture(_mixture), eqSystem(_eqSystem), fluxClass(_fluxClass), useRoe(_useRoe) {
+                             bool _useRoe, bool axisym)
+  : num_equation(_num_equation), mixture(_mixture), eqSystem(_eqSystem),
+    fluxClass(_fluxClass), useRoe(_useRoe), axisymmetric_(axisym) {
   flux1.SetSize(num_equation);
   flux2.SetSize(num_equation);
 }
@@ -46,11 +47,8 @@ RiemannSolver::RiemannSolver(int &_num_equation, GasMixture *_mixture, Equations
 void RiemannSolver::ComputeFluxDotN(const Vector &state, const Vector &nor, Vector &fluxN) {
   // NOTE: nor in general is not a unit normal
   const int dim = nor.Size();
-#ifdef AXISYM_DEV
-  const int nvel = 3;
-#else
-  const int nvel = dim;
-#endif
+  const int nvel = (axisymmetric_ ? 3 : dim);
+
   const double den = state(0);
   const Vector den_vel(state.GetData() + 1, nvel);
   const double den_energy = state(1 + nvel);
@@ -89,11 +87,7 @@ void RiemannSolver::Eval(const Vector &state1, const Vector &state2, const Vecto
 void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux) {
   // NOTE: nor in general is not a unit normal
   const int dim = nor.Size();
-#ifdef AXISYM_DEV
-  const int nvel = 3;
-#else
-  const int nvel = dim;
-#endif
+  const int nvel = (axisymmetric_ ? 3 : dim);
 
   // MFEM_ASSERT(eqState->StateIsPhysical(state1, dim), "");
   // MFEM_ASSERT(eqState->StateIsPhysical(state2, dim), "");
@@ -119,11 +113,7 @@ void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Ve
 
 void RiemannSolver::Eval_Roe(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux) {
   const int dim = nor.Size();
-#ifdef AXISYM_DEV
-  const int nvel = 3;
-  assert(nvel == 2);  // Roe doesn't support axisym yet
-  // TODO(trevilo): Add axisymmetric support to Roe flux
-#endif
+  assert(!axisymmetric_); // Roe doesn't support axisymmetric yet
 
   int NS_eq = 2 + dim;  // number of NS equations (without species, passive scalars etc.)
 

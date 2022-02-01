@@ -44,14 +44,16 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
       eqSystem(_eqSys),
       num_equation(_num_equation),
       dim(_dim),
-#ifdef AXISYM_DEV
-      nvel(3),
-#else
-      nvel(_dim),
-#endif
       config(_config),
       groupsMPI(_groupsMPI),
       mixture(_mixture) {
+  // Set number of velocity components
+  if (config.isAxisymmetric()) {
+    nvel = 3;
+  } else {
+    nvel = dim;
+  }
+
   // Always assume 6 components of the Reynolds stress tensor
   numRMS = 6;
 

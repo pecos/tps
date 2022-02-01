@@ -76,7 +76,7 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
       Array<double> data = config.GetInletData(in);
       BCmap[patchANDtype.first] = new InletBC(groupsMPI, _runFile.GetEquationSystem(), rsolver, mixture, vfes, intRules,
                                               _dt, dim, num_equation, patchANDtype.first, config.GetReferenceLength(),
-                                              patchANDtype.second, data, _maxIntPoints, _maxDofs);
+                                              patchANDtype.second, data, _maxIntPoints, _maxDofs, config.isAxisymmetric());
     }
   }
 
@@ -92,7 +92,8 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
       Array<double> data = config.GetOutletData(o);
       BCmap[patchANDtype.first] = new OutletBC(
           groupsMPI, _runFile.GetEquationSystem(), rsolver, mixture, vfes, intRules, _dt, dim, num_equation,
-          patchANDtype.first, config.GetReferenceLength(), patchANDtype.second, data, _maxIntPoints, _maxDofs);
+          patchANDtype.first, config.GetReferenceLength(), patchANDtype.second, data, _maxIntPoints, _maxDofs,
+          config.isAxisymmetric());
     }
   }
 
@@ -112,7 +113,7 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
 
       BCmap[patchType.first] =
           new WallBC(rsolver, mixture, _runFile.GetEquationSystem(), fluxClass, vfes, intRules, _dt, dim, num_equation,
-                     patchType.first, patchType.second, wallData, intPointsElIDBC, _maxIntPoints);
+                     patchType.first, patchType.second, wallData, intPointsElIDBC, _maxIntPoints, config.isAxisymmetric());
     }
   }
 
@@ -152,17 +153,10 @@ void BCintegrator::initBCs() {
   }
 }
 
-#ifdef AXISYM_DEV
 void BCintegrator::computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState,
                                   Vector &bdrFlux, double radius) {
   BCmap[attr]->computeBdrFlux(normal, stateIn, gradState, bdrFlux, radius);
 }
-#else
-void BCintegrator::computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState,
-                                  Vector &bdrFlux) {
-  BCmap[attr]->computeBdrFlux(normal, stateIn, gradState, bdrFlux);
-}
-#endif
 
 void BCintegrator::updateBCMean(ParGridFunction *Up) {
   for (auto bc = BCmap.begin(); bc != BCmap.end(); bc++) {
@@ -289,22 +283,20 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
     // Get the normal vector and the flux on the face
     CalcOrtho(Tr.Jacobian(), nor);
 
-#ifdef AXISYM_DEV
-    double x[3];
-    Vector transip(x, 3);
-    Tr.Transform(ip, transip);
-    const double radius = transip[0];
+    double radius = 1;
+    if (config.isAxisymmetric()) {
+      double x[3];
+      Vector transip(x, 3);
+      Tr.Transform(ip, transip);
+      radius = transip[0];
+    }
 
     computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, fluxN, radius);
-#else
-    computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, fluxN);
-#endif
-
     fluxN *= ip.weight;
 
-#ifdef AXISYM_DEV
-    fluxN *= radius;
-#endif
+    if (config.isAxisymmetric()) {
+      fluxN *= radius;
+    }
 
     for (int eq = 0; eq < num_equation; eq++) {
       for (int s = 0; s < dof1; s++) {

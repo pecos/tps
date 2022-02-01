@@ -37,9 +37,9 @@
 InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rsolver, GasMixture *_mixture,
                  ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
                  const int _num_equation, int _patchNumber, double _refLength, InletType _bcType,
-                 const Array<double> &_inputData, const int &_maxIntPoints, const int &_maxDofs)
+                 const Array<double> &_inputData, const int &_maxIntPoints, const int &_maxDofs, bool axisym)
     : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
-                        _refLength),
+                        _refLength, axisym),
       groupsMPI(_groupsMPI),
       inletType(_bcType),
       maxIntPoints(_maxIntPoints),
@@ -419,11 +419,7 @@ void InletBC::initBoundaryU(ParGridFunction *Up) {
   boundaryU.Read();
 }
 
-#ifdef AXISYM_DEV
 void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius) {
-#else
-void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
-#endif
   switch (inletType) {
     case SUB_DENS_VEL:
       subsonicReflectingDensityVelocity(normal, stateIn, bdrFlux);

@@ -229,12 +229,12 @@ void M2ulPhyS::initVariables() {
   cout << "Process " << mpi.WorldRank() << " # elems " << mesh->GetNE() << endl;
 
   dim = mesh->Dimension();
-#ifdef AXISYM_DEV
-  assert(dim == 2);
-  nvel = 3;
-#else
-  nvel = dim;
-#endif
+  if (config.isAxisymmetric()) {
+    assert(dim == 2);
+    nvel = 3;
+  } else {
+    nvel = dim;
+  }
 
   refLength = config.GetReferenceLength();
 
@@ -333,13 +333,14 @@ void M2ulPhyS::initVariables() {
   ioData.initializeSerial(mpi.Root(), (config.RestartSerial() != "no"), serial_mesh);
   projectInitialSolution();
 
-  fluxClass = new Fluxes(mixture, eqSystem, num_equation, dim);
+  fluxClass = new Fluxes(mixture, eqSystem, num_equation, dim, config.isAxisymmetric());
 
   alpha = 0.5;
   isSBP = config.isSBP();
 
   // Create Riemann Solver
-  rsolver = new RiemannSolver(num_equation, mixture, eqSystem, fluxClass, config.RoeRiemannSolver());
+  rsolver = new RiemannSolver(num_equation, mixture, eqSystem, fluxClass,
+                              config.RoeRiemannSolver(), config.isAxisymmetric());
 
   // Boundary attributes in present partition
   Array<int> local_attr;
@@ -363,7 +364,7 @@ void M2ulPhyS::initVariables() {
     //    if( basisType==1 && intRuleType==1 ) useLinearIntegration = true;
 
     faceIntegrator = new FaceIntegrator(intRules, rsolver, fluxClass, vfes, useLinearIntegration, dim, num_equation,
-                                        gradUp, gradUpfes, max_char_speed);
+                                        gradUp, gradUpfes, max_char_speed, config.isAxisymmetric());
   }
   A->AddInteriorFaceIntegrator(faceIntegrator);
   if (isSBP) {
@@ -372,7 +373,7 @@ void M2ulPhyS::initVariables() {
   }
 
   Aflux = new MixedBilinearForm(dfes, fes);
-  domainIntegrator = new DomainIntegrator(fluxClass, intRules, intRuleType, dim, num_equation);
+  domainIntegrator = new DomainIntegrator(fluxClass, intRules, intRuleType, dim, num_equation, config.isAxisymmetric());
   Aflux->AddDomainIntegrator(domainIntegrator);
   Aflux->Assemble();
   Aflux->Finalize();
@@ -838,9 +839,12 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   dens = new ParGridFunction(fes, Up->HostReadWrite());
   vel = new ParGridFunction(dfes, Up->HostReadWrite() + fes->GetNDofs());
-#ifdef AXISYM_DEV
-  vtheta = new ParGridFunction(fes, Up->HostReadWrite() + 3*fes->GetNDofs());
-#endif
+
+  if (config.isAxisymmetric()) {
+    vtheta = new ParGridFunction(fes, Up->HostReadWrite() + 3*fes->GetNDofs());
+  } else {
+    vtheta = NULL;
+  }
 
   temperature = new ParGridFunction(fes, Up->HostReadWrite() + (1 + nvel) * fes->GetNDofs());
 
@@ -896,9 +900,9 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   paraviewColl->RegisterField("dens", dens);
   paraviewColl->RegisterField("vel", vel);
-#ifdef AXISYM_DEV
-  paraviewColl->RegisterField("vtheta", vtheta);
-#endif
+  if (config.isAxisymmetric()) {
+    paraviewColl->RegisterField("vtheta", vtheta);
+  }
   paraviewColl->RegisterField("temp", temperature);
   paraviewColl->RegisterField("press", press);
   if (eqSystem == NS_PASSIVE) paraviewColl->RegisterField("passiveScalar", passiveScalar);
@@ -1544,6 +1548,7 @@ void M2ulPhyS::parseSolverOptions2() {
     tpsP->getInput("flow/refLength", config.refLength, 1.0);
     tpsP->getInput("flow/viscosityMultiplier", config.visc_mult, 1.0);
     tpsP->getInput("flow/bulkViscosityMultiplier", config.bulk_visc, 0.0);
+    tpsP->getInput("flow/axisymmetric", config.axisymmetric_, false);
 
     assert(config.solOrder > 0);
     assert(config.numIters >= 0);
