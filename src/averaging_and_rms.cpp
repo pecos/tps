@@ -44,16 +44,10 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
       eqSystem(_eqSys),
       num_equation(_num_equation),
       dim(_dim),
+      nvel(_config.isAxisymmetric() ? 3 : _dim),
       config(_config),
       groupsMPI(_groupsMPI),
       mixture(_mixture) {
-  // Set number of velocity components
-  if (config.isAxisymmetric()) {
-    nvel = 3;
-  } else {
-    nvel = dim;
-  }
-
   // Always assume 6 components of the Reynolds stress tensor
   numRMS = 6;
 
@@ -309,8 +303,7 @@ const double *Averaging::getLocalSums() {
     for (int eq = 0; eq < num_equation; eq++) local_sums(eq) += fabs(dataMean[n + eq * NDof]) / ddof;
     for (int i = 0; i < 6; i++) local_sums(5 + i) += fabs(dataRMS[n + i * NDof]) / ddof;
   }
-  // What is happening here??
-  if (dim == 2) {
+  if (nvel == 2) {
     local_sums(4) = local_sums(3);
     local_sums(3) = 0.;
   }

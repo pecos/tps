@@ -42,15 +42,11 @@ BoundaryCondition::BoundaryCondition(RiemannSolver *_rsolver, GasMixture *_mixtu
       intRules(_intRules),
       dt(_dt),
       dim(_dim),
+      nvel(axisym ? 3 : _dim),
       num_equation(_num_equation),
       patchNumber(_patchNumber),
       refLength(_refLength),
       axisymmetric_(axisym) {
-  if (axisym) {
-    nvel = 3;
-  } else {
-    nvel = dim;
-  }
   BCinit = false;
 }
 

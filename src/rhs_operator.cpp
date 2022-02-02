@@ -47,6 +47,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
       config_(_config),
       iter(_iter),
       dim(_dim),
+      nvel(_config.isAxisymmetric() ? 3 : _dim),
       eqSystem(_eqSystem),
       max_char_speed(_max_char_speed),
       num_equation(_num_equations),
@@ -70,13 +71,6 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
       gradUpfes(_gradUpfes),
       gradUp_A(_gradUp_A),
       bcIntegrator(_bcIntegrator) {
-  // set number of velocity components
-  if (config_.isAxisymmetric()) {
-    nvel = 3;
-  } else {
-    nvel = dim;
-  }
-
   flux.SetSize(vfes->GetNDofs(), dim, num_equation);
   z.UseDevice(true);
   z.SetSize(A->Height());

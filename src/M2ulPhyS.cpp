@@ -220,12 +220,8 @@ void M2ulPhyS::initVariables() {
   cout << "Process " << mpi.WorldRank() << " # elems " << mesh->GetNE() << endl;
 
   dim = mesh->Dimension();
-  if (config.isAxisymmetric()) {
-    assert(dim == 2);
-    nvel = 3;
-  } else {
-    nvel = dim;
-  }
+  nvel = (config.isAxisymmetric() ? 3 : dim);
+  if (config.isAxisymmetric()) assert(dim == 2 );
 
   refLength = config.GetReferenceLength();
 

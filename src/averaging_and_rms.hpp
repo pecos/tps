@@ -58,7 +58,7 @@ class Averaging {
   Equations &eqSystem;
   const int &num_equation;
   const int &dim;
-  int nvel;
+  const int nvel;
   RunConfiguration &config;
   MPI_Groups *groupsMPI;
 
