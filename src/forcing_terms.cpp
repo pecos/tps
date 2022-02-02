@@ -316,9 +316,9 @@ void AxisymmetricSource::updateTerms(Vector &in) {
       for (int d = 0; d < dim; d++) x[d] = coordsDof[index + d * dof];
       const double radius = x[0];
 
+      // TODO(trevilo): Generalize beyond flow only
       Vector prim(5);
 
-      // TODO(trevilo): Will have to change once PR #90 is merged
       const double rho = dataUp[index + 0*dof];
       const double ur  = dataUp[index + 1*dof];
       const double uz  = dataUp[index + 2*dof];
