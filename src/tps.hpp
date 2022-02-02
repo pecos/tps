@@ -76,6 +76,7 @@ class Tps {
 
  public:
   Tps(int argc, char *argv[]);     // constructor
+  ~Tps();                          // destructor
   GRVY::GRVY_Input_Class iparse_;  // runtime input parser
 
   void chooseSolver();
