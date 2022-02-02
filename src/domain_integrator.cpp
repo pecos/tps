@@ -40,8 +40,7 @@ DomainIntegrator::DomainIntegrator(Fluxes *_fluxClass, IntegrationRules *_intRul
     num_equation(_num_equation),
     intRules(_intRules),
     intRuleType(_intRuleType),
-    axisymmetric_(axisym)
-{
+    axisymmetric_(axisym) {
 }
 
 void DomainIntegrator::AssembleElementMatrix2(const FiniteElement &trial_fe, const FiniteElement &test_fe,

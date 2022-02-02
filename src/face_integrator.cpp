@@ -166,7 +166,7 @@ void FaceIntegrator::getElementsGrads_gpu(const ParGridFunction *gradUp, ParFini
 void FaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2,
                                         FaceElementTransformations &Tr, const Vector &elfun, Vector &elvect) {
   if (useLinear) {
-    assert(!axisymmetric_); // axisym not supported in useLinear path
+    assert(!axisymmetric_);  // axisym not supported in useLinear path
     MassMatrixFaceIntegral(el1, el2, Tr, elfun, elvect);
   } else {
     NonLinearFaceIntegration(el1, el2, Tr, elfun, elvect);

@@ -273,7 +273,6 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
 }
 
 RHSoperator::~RHSoperator() {
-
   delete coordsDof;
   delete dfes;
   delete gradients;

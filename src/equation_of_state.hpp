@@ -51,7 +51,7 @@ class GasMixture {
  protected:
   WorkingFluid fluid;
   int num_equations;
-  int dim; // NB: this is actually number of velocity components!
+  int dim;  // NB: this is actually number of velocity components!
 
   // number of conservative and primitive/visualization variables
   int Nconservative, Nprimitive;

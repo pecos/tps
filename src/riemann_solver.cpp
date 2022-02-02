@@ -113,7 +113,7 @@ void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Ve
 
 void RiemannSolver::Eval_Roe(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux) {
   const int dim = nor.Size();
-  assert(!axisymmetric_); // Roe doesn't support axisymmetric yet
+  assert(!axisymmetric_);  // Roe doesn't support axisymmetric yet
 
   int NS_eq = 2 + dim;  // number of NS equations (without species, passive scalars etc.)
 

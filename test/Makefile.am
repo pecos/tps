@@ -25,8 +25,6 @@ TESTS += cyl3d.test \
 	 sponge_zone.test \
 	 annulus.test \
 	 pipe.test
-
-XFAIL_TESTS += pipe.test
 endif
 
 if GSLIB_ENABLED

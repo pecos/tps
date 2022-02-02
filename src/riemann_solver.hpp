@@ -60,7 +60,8 @@ class RiemannSolver {
   void Eval_Roe(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux);
 
  public:
-  RiemannSolver(int &_num_equation, GasMixture *mixture, Equations &_eqSystem, Fluxes *_fluxClass, bool _useRoe, bool axisym);
+  RiemannSolver(int &_num_equation, GasMixture *mixture, Equations &_eqSystem,
+                Fluxes *_fluxClass, bool _useRoe, bool axisym);
 
   void Eval(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux, bool LF = false);
 
