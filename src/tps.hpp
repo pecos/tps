@@ -32,8 +32,9 @@
 #ifndef TPS_HPP_
 #define TPS_HPP_
 
-#include <tps_config.h>
 #include <grvy.h>
+#include <tps_config.h>
+
 #include <mfem.hpp>
 #include <string>
 

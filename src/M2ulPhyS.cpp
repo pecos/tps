@@ -1746,29 +1746,29 @@ void M2ulPhyS::parseSolverOptions2() {
       config.outletPatchType.push_back(patchType);
     }
   }
-  
+
   // add passive scalar forcings
   {
     int numForcings;
     tpsP->getInput("passiveScalars/numScalars", numForcings, 0);
-    for(int i=1;i<=numForcings;i++){
+    for (int i = 1; i <= numForcings; i++) {
       // add new entry in arrayPassiveScalar
       config.arrayPassiveScalar.Append(new passiveScalarData);
-      config.arrayPassiveScalar[i-1]->coords.SetSize(3);
-      
+      config.arrayPassiveScalar[i - 1]->coords.SetSize(3);
+
       std::string basepath("passiveScalar" + std::to_string(i));
-      
+
       Array<double> xyz;
       tpsP->getRequiredVec((basepath + "/xyz").c_str(), xyz, 3);
-      for(int d=0;d<3;d++) config.arrayPassiveScalar[i-1]->coords[d] = xyz[d];
-      
+      for (int d = 0; d < 3; d++) config.arrayPassiveScalar[i - 1]->coords[d] = xyz[d];
+
       double radius;
-      tpsP->getRequiredInput((basepath+"/radius").c_str(), radius);
-      config.arrayPassiveScalar[i-1]->radius = radius;
-      
+      tpsP->getRequiredInput((basepath + "/radius").c_str(), radius);
+      config.arrayPassiveScalar[i - 1]->radius = radius;
+
       double value;
-      tpsP->getRequiredInput((basepath+"/value").c_str(), value);
-      config.arrayPassiveScalar[i-1]->value = value;
+      tpsP->getRequiredInput((basepath + "/value").c_str(), value);
+      config.arrayPassiveScalar[i - 1]->value = value;
     }
   }
 
