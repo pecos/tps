@@ -54,16 +54,7 @@ M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps) : mp
   config.readInputFile(inputFileName);
 #endif
 
-#ifdef _GPU_
-  if (!config.isTimeStepConstant()) {
-    if (mpi.Root()) {
-      std::cerr << "[ERROR]: GPU runs must use a constant time step: Please set DT_CONSTANT in input file."
-                << std::endl;
-      std::cerr << std::endl;
-      exit(ERROR);
-    }
-  }
-#endif
+  checkSolverOptions();
 
   initVariables();
 
@@ -1787,6 +1778,67 @@ void M2ulPhyS::parseSolverOptions2() {
   } else {
     grvy_printf(GRVY_ERROR, "\nUnknown equation_system -> %s", systemType.c_str());
     exit(ERROR);
+  }
+
+  return;
+}
+
+void M2ulPhyS::checkSolverOptions() const {
+#ifdef _GPU_
+  if (!config.isTimeStepConstant()) {
+    if (mpi.Root()) {
+      std::cerr << "[ERROR]: GPU runs must use a constant time step: Please set DT_CONSTANT in input file."
+                << std::endl;
+      std::cerr << std::endl;
+      exit(ERROR);
+    }
+  }
+
+  if (config.isAxisymmetric()) {
+    if (mpi.Root()) {
+      std::cerr << "[ERROR]: Axisymmetric simulations not supported on GPU."
+                << std::endl;
+      std::cerr << std::endl;
+      exit(ERROR);
+    }
+  }
+#endif
+
+  // Axisymmetric solver does not yet support all options.  Check that
+  // we are running a supported combination.
+  if (config.isAxisymmetric()) {
+    // Don't support Roe flux yet
+    if (config.RoeRiemannSolver()) {
+      if (mpi.Root()) {
+        std::cerr << "[ERROR]: Roe flux not supported for axisymmetric simulations. Please use flow/useRoe = 0."
+                  << std::endl;
+        std::cerr << std::endl;
+        exit(ERROR);
+      }
+    }
+    // Don't support non-reflecting BCs yet
+    for (int i = 0; i < config.GetInletPatchType()->size(); i++) {
+      std::pair<int, InletType> patchANDtype = (*config.GetInletPatchType())[i];
+      if (patchANDtype.second != SUB_DENS_VEL) {
+        if (mpi.Root()) {
+          std::cerr << "[ERROR]: Only SUB_DENS_VEL inlet supported for axisymmetric simulations."
+                    << std::endl;
+          std::cerr << std::endl;
+          exit(ERROR);
+        }
+      }
+    }
+    for (int i = 0; i < config.GetOutletPatchType()->size(); i++) {
+      std::pair<int, OutletType> patchANDtype = (*config.GetOutletPatchType())[i];
+      if (patchANDtype.second != SUB_P) {
+        if (mpi.Root()) {
+          std::cerr << "[ERROR]: Only SUB_P outlet supported for axisymmetric simulations."
+                    << std::endl;
+          std::cerr << std::endl;
+          exit(ERROR);
+        }
+      }
+    }
   }
 
   return;
