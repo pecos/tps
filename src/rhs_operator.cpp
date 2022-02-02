@@ -476,7 +476,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 
     if (eqSystem == NS || NS_PASSIVE) {
       DenseMatrix fvisc(num_equation, dim);
-      fluxClass->ComputeViscousFluxes(state, gradUpi, fvisc, radius);
+      fluxClass->ComputeViscousFluxes(state, gradUpi, radius, fvisc);
 
       if (spaceVaryViscMult != NULL) {
         auto *alpha = spaceVaryViscMult->GetData();

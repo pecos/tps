@@ -94,7 +94,7 @@ class InletBC : public BoundaryCondition {
           const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs, bool axisym);
   ~InletBC();
 
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius = 0);
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux);
 
   virtual void initBCs();
 

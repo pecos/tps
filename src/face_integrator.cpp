@@ -264,8 +264,8 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     // compute viscous fluxes
     viscF1 = viscF2 = 0.;
 
-    fluxClass->ComputeViscousFluxes(funval1, gradUp1i, viscF1, radius);
-    fluxClass->ComputeViscousFluxes(funval2, gradUp2i, viscF2, radius);
+    fluxClass->ComputeViscousFluxes(funval1, gradUp1i, radius, viscF1);
+    fluxClass->ComputeViscousFluxes(funval2, gradUp2i, radius, viscF2);
 
     // compute mean flux
     viscF1 += viscF2;
@@ -400,8 +400,8 @@ void FaceIntegrator::MassMatrixFaceIntegral(const FiniteElement &el1, const Fini
       }
 
       DenseMatrix viscF1(num_equation, dim), viscF2(num_equation, dim);
-      fluxClass->ComputeViscousFluxes(state1, igradUp1, viscF1);
-      fluxClass->ComputeViscousFluxes(state2, igradUp2, viscF2);
+      fluxClass->ComputeViscousFluxes(state1, igradUp1, 1, viscF1);
+      fluxClass->ComputeViscousFluxes(state2, igradUp2, 1, viscF2);
       for (int eq = 0; eq < num_equation; eq++) {
         for (int d = 0; d < dim; d++) viscF1(eq, d) += viscF2(eq, d);
       }

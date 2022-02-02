@@ -156,8 +156,8 @@ void BCintegrator::initBCs() {
 }
 
 void BCintegrator::computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState,
-                                  Vector &bdrFlux, double radius) {
-  BCmap[attr]->computeBdrFlux(normal, stateIn, gradState, bdrFlux, radius);
+                                  double radius, Vector &bdrFlux) {
+  BCmap[attr]->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
 }
 
 void BCintegrator::updateBCMean(ParGridFunction *Up) {
@@ -293,7 +293,7 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
       radius = transip[0];
     }
 
-    computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, fluxN, radius);
+    computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, radius, fluxN);
     fluxN *= ip.weight;
 
     if (config.isAxisymmetric()) {

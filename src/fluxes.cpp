@@ -54,7 +54,7 @@ void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, D
       ComputeConvectiveFluxes(state, convF);
 
       DenseMatrix viscF(num_equations, dim);
-      ComputeViscousFluxes(state, gradUpi, viscF);
+      ComputeViscousFluxes(state, gradUpi, 1, viscF);
       for (int eq = 0; eq < num_equations; eq++) {
         for (int d = 0; d < dim; d++) flux(eq, d) = convF(eq, d) - viscF(eq, d);
       }
@@ -83,7 +83,7 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
   }
 }
 
-void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &flux, double radius) {
+void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, DenseMatrix &flux) {
   switch (eqSystem) {
     case NS:
     case NS_PASSIVE: {

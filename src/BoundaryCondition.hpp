@@ -74,7 +74,7 @@ class BoundaryCondition {
   virtual ~BoundaryCondition();
 
   virtual void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
-                              Vector &bdrFlux, double radius = 0) = 0;
+                              double radius, Vector &bdrFlux) = 0;
 
   // holding function for any miscellaneous items needed to initialize BCs
   // prior to use (and require MPI)

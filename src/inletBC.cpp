@@ -419,7 +419,7 @@ void InletBC::initBoundaryU(ParGridFunction *Up) {
   boundaryU.Read();
 }
 
-void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux, double radius) {
+void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux) {
   switch (inletType) {
     case SUB_DENS_VEL:
       subsonicReflectingDensityVelocity(normal, stateIn, bdrFlux);

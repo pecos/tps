@@ -84,7 +84,7 @@ class BCintegrator : public NonlinearFormIntegrator {
 
   // void calcMeanState();
   void computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState,
-                      Vector &bdrFlux, double radius = 0);
+                      double radius, Vector &bdrFlux);
 
  public:
   BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules,
