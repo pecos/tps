@@ -118,6 +118,9 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
     dfes = new ParFiniteElementSpace(mesh, fec, dim, Ordering::byNODES);
     coordsDof = new ParGridFunction(dfes);
     mesh->GetNodes(*coordsDof);
+  } else {
+    coordsDof = NULL;
+    dfes = NULL;
   }
 
   std::vector<double> temp;
@@ -158,6 +161,8 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
       Me_rad.Invert();
       for (int n = 0; n < dof; n++)
         for (int j = 0; j < dof; j++) (*Me_inv_rad[i])(n, j) = Me_rad(n, j);
+    } else {
+      Me_inv_rad[i] = NULL;
     }
 
     hposDofInvM[2 * i] = temp.size();
