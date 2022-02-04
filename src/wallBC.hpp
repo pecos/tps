@@ -112,7 +112,7 @@ class WallBC : public BoundaryCondition {
       unitNor[d] = nor[d] / norm;
       momNormal += unitNor[d] * u1[d + 1];
     }
-    u2[thrd] = u1[thrd];
+    if (thrd < num_equation) u2[thrd] = u1[thrd];
 
     if (thrd > 0 || thrd < 1 + dim) {
       u2[thrd] = u1[thrd] - 2. * momNormal * unitNor[thrd - 1];
@@ -122,7 +122,7 @@ class WallBC : public BoundaryCondition {
   static MFEM_HOST_DEVICE void computeIsothermalState(const int &thrd, const double *u1, double *u2, const double *nor,
                                                       const double &wallTemp, const double &gamma, const double &Rg,
                                                       const int &dim, const int &num_equation) {
-    u2[thrd] = u1[thrd];
+    if (thrd < num_equation) u2[thrd] = u1[thrd];
 
     // NOTE: assumes ideal gas
     if (thrd == 1 + dim) u2[thrd] = Rg / (gamma - 1.) * u1[0] * wallTemp;
