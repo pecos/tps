@@ -176,7 +176,12 @@ class RunConfiguration {
 
   // number of species;
   int numSpecies;
+  int backgroundIndex;
+  int electronIndex;
+  // std::vector<pair<int, int>> speciesNames;
   DenseMatrix gasParams;
+  Vector constantMolarCV;
+  Vector constantMolarCP;
 
   // ambipolar flag
   bool ambipolar;
@@ -266,6 +271,8 @@ class RunConfiguration {
   GasModel GetGasModel() { return gasModel; }
   TransportModel GetTranportModel() { return transportModel; }
   ChemistryModel GetChemistryModel() { return chemistryModel; }
+  double getConstantMolarCV(int species) { return constantMolarCV(species); }
+  double getConstantMolarCP(int species) { return constantMolarCP(species); }
 };
 
 #endif  // RUN_CONFIGURATION_HPP_

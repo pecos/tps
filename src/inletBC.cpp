@@ -692,6 +692,7 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
+// TODO: generalize for all fluid cases.
 void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
   const double gamma = mixture->GetSpecificHeatRatio();
   const double p = mixture->ComputePressure(stateIn);
@@ -706,6 +707,8 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
   state2[1 + dim] = p / (gamma - 1.) + 0.5 * k / state2[0];
 
   if (eqSystem == NS_PASSIVE) state2[num_equation - 1] = 0.;
+
+  // mixture->GetConservativesFromPrimitives()
 
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }

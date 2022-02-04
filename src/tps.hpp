@@ -82,6 +82,8 @@ class Tps {
   void chooseDevices();
   std::string getDeviceConfig() { return deviceConfig_; }
 
+  // TPS::Solver getSolver() { return solver_; }
+
   // input parsing support (variants with default value supplied)
   // supported types are T={int,double,bool,std::string}
   template <typename T>
@@ -108,6 +110,9 @@ class Tps {
   void printHeader();
   void parseCommandLineArgs(int argc, char *argv[]);
   void parseInput();
+
+  mfem::MPI_Session& getMPISession() { return mpi_; }
+  std::string& getInputFilename() { return iFile_; }
 };
 
 }  // end namespace TPS
