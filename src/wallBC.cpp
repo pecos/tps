@@ -231,20 +231,19 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
 
   // Normal convective flux
   rsolver->Eval(stateIn, wallState, normal, bdrFlux, true);
-  
+
   // evaluate viscous fluxes at the wall
   DenseMatrix viscFw(num_equation, dim);
   fluxClass->ComputeViscousFluxes(wallState, gradState, viscFw);
-  
+
   // evaluate internal viscous fluxes
   DenseMatrix viscF(num_equation, dim);
   fluxClass->ComputeViscousFluxes(stateIn, gradState, viscF);
-  
+
   // Add visc fluxes (we skip density eq.)
   for (int eq = 1; eq < num_equation; eq++) {
     for (int d = 0; d < dim; d++) bdrFlux[eq] -= 0.5 * (viscFw(eq, d) + viscF(eq, d)) * normal[d];
   }
-  
 }
 
 void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vector &y, const Vector &x,
