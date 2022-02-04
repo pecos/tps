@@ -159,7 +159,7 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
   if (eqSystem == NS_PASSIVE) stateMirror[num_equation - 1] = stateIn[num_equation - 1];
 
   rsolver->Eval(stateIn, stateMirror, normal, bdrFlux);
-  
+
   // evaluate viscous fluxes at the wall
   DenseMatrix viscFw(num_equation, dim);
   fluxClass->ComputeViscousFluxes(stateMirror, gradState, viscFw);
