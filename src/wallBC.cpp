@@ -56,8 +56,13 @@ void WallBC::initBCs() {
 
 #ifdef _GPU_
     interpolated_Ubdr_.UseDevice(true);
+    interpolatedGradUpbdr_.UseDevice(true);
+
     interpolated_Ubdr_.SetSize(num_equation * maxIntPoints * listElems.Size());
+    interpolatedGradUpbdr_.SetSize(dim * num_equation * maxIntPoints * listElems.Size());
+
     interpolated_Ubdr_ = 0.;
+    interpolatedGradUpbdr_ = 0.;
 #endif
 
     BCinit = true;
@@ -119,13 +124,15 @@ void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradSt
 void WallBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                            ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                            Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
-  integrpWalls_gpu(wallType, wallTemp, interpolated_Ubdr_, x, nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC,
-                   intPointsElIDBC, wallElems, listElems, maxIntPoints, maxDofs, dim, num_equation);
+  interpWalls_gpu(wallType, wallTemp, interpolated_Ubdr_, interpolatedGradUpbdr_, x, nodesIDs, posDofIds, Up, gradUp,
+                  shapesBC, normalsWBC, intPointsElIDBC, wallElems, listElems, maxIntPoints, maxDofs, dim,
+                  num_equation);
 
   integrateWalls_gpu(wallType, wallTemp,
                      y,  // output
-                     x, interpolated_Ubdr_, nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC,
-                     wallElems, listElems, eqSystem, maxIntPoints, maxDofs, dim, num_equation, mixture);
+                     x, interpolated_Ubdr_, interpolatedGradUpbdr_, nodesIDs, posDofIds, Up, gradUp, shapesBC,
+                     normalsWBC, intPointsElIDBC, wallElems, listElems, eqSystem, maxIntPoints, maxDofs, dim,
+                     num_equation, mixture);
 }
 
 void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
@@ -247,11 +254,12 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
 }
 
 void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vector &y, const Vector &x,
-                                Vector &interpolated_Ubdr_, const Array<int> &nodesIDs, const Array<int> &posDofIds,
-                                ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
-                                Array<int> &intPointsElIDBC, Array<int> &wallElems, Array<int> &listElems,
-                                const Equations &eqSystem, const int &maxIntPoints, const int &maxDofs, const int &dim,
-                                const int &num_equation, GasMixture *mixture) {
+                                Vector &interpolated_Ubdr_, Vector &interpolatedGradUpbdr_, const Array<int> &nodesIDs,
+                                const Array<int> &posDofIds, ParGridFunction *Up, ParGridFunction *gradUp,
+                                Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
+                                Array<int> &wallElems, Array<int> &listElems, const Equations &eqSystem,
+                                const int &maxIntPoints, const int &maxDofs, const int &dim, const int &num_equation,
+                                GasMixture *mixture) {
 #ifdef _GPU_
   double *d_y = y.Write();
   //   const double *d_U = x.Read();
@@ -268,15 +276,21 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
 
   const double Rg = mixture->GetGasConstant();
   const double gamma = mixture->GetSpecificHeatRatio();
+  const double viscMult = mixture->GetViscMultiplyer();
+  const double bulkViscMult = mixture->GetBulkViscMultiplyer();
+  const double Pr = mixture->GetPrandtlNum();
+  const double Sc = mixture->GetSchmidtNum();
 
   const double *d_interpolU = interpolated_Ubdr_.Read();
+  const double *d_interpGrads = interpolatedGradUpbdr_.Read();
 
   // clang-format on
   MFEM_FORALL_2D(el, wallElems.Size() / 7, maxDofs, 1, 1, {
     MFEM_FOREACH_THREAD(i, x, maxDofs) {
       MFEM_SHARED double Fcontrib[216 * 20];
       MFEM_SHARED double shape[216];
-      MFEM_SHARED double Rflux[20], u1[20], u2[20], nor[3];
+      MFEM_SHARED double Rflux[20], u1[20], u2[20], nor[3], gradUpi[20 * 3];
+      MFEM_SHARED double vF1[20 * 3], vF2[20 * 3];
       MFEM_SHARED double weight;
 
       const int numFaces = d_wallElems[0 + el * 7];
@@ -319,6 +333,9 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
       // recover interpolated data
       if (i < num_equation) {
         u1[i] = d_interpolU[i + q * num_equation + n * maxIntPoints * num_equation];
+        for (int d = 0; d < dim; d++)
+          gradUpi[i + d * num_equation] =
+              d_interpGrads[i + d * num_equation + q * dim * num_equation + n * maxIntPoints * dim * num_equation];
       }
       MFEM_SYNC_THREAD;
 
@@ -339,6 +356,18 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
       // compute flux
       RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, eqSystem, num_equation, i,
                                    maxDofs);
+
+      // compute viscous flux
+      Fluxes::viscousFlux_gpu(&vF1[0], &u1[0], &gradUpi[0], eqSystem, gamma, Rg, viscMult, bulkViscMult, Pr, Sc, i,
+                              maxDofs, dim, num_equation);
+      Fluxes::viscousFlux_gpu(&vF2[0], &u2[0], &gradUpi[0], eqSystem, gamma, Rg, viscMult, bulkViscMult, Pr, Sc, i,
+                              maxDofs, dim, num_equation);
+      MFEM_SYNC_THREAD;
+
+      // add visc flux contribution
+      for (int eq = i; eq < num_equation; eq += maxDofs)
+        for (int d = 0; d < dim; d++)
+          Rflux[eq] -= 0.5 * (vF2[eq + d * num_equation] + vF1[eq + d * num_equation]) * nor[d];
       MFEM_SYNC_THREAD;
 
       // sum contributions to integral
@@ -358,15 +387,18 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
 #endif
 }
 
-void WallBC::integrpWalls_gpu(const WallType type, const double &wallTemp, mfem::Vector &interpolated_Ubdr_,
-                              const mfem::Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
-                              mfem::ParGridFunction *Up, mfem::ParGridFunction *gradUp, mfem::Vector &shapesBC,
-                              mfem::Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &wallElems,
-                              Array<int> &listElems, const int &maxIntPoints, const int &maxDofs, const int &dim,
-                              const int &num_equation) {
+void WallBC::interpWalls_gpu(const WallType type, const double &wallTemp, mfem::Vector &interpolated_Ubdr_,
+                             Vector &interpolatedGradUpbdr_, const mfem::Vector &x, const Array<int> &nodesIDs,
+                             const Array<int> &posDofIds, mfem::ParGridFunction *Up, mfem::ParGridFunction *gradUp,
+                             mfem::Vector &shapesBC, mfem::Vector &normalsWBC, Array<int> &intPointsElIDBC,
+                             Array<int> &wallElems, Array<int> &listElems, const int &maxIntPoints, const int &maxDofs,
+                             const int &dim, const int &num_equation) {
 #ifdef _GPU_
   double *d_interpolU = interpolated_Ubdr_.Write();
+  double *d_interpGrads = interpolatedGradUpbdr_.Write();
+
   const double *d_U = x.Read();
+  const double *d_gradUp = gradUp->Read();
   const int *d_nodesIDs = nodesIDs.Read();
   const int *d_posDofIds = posDofIds.Read();
   const double *d_shapesBC = shapesBC.Read();
@@ -381,9 +413,9 @@ void WallBC::integrpWalls_gpu(const WallType type, const double &wallTemp, mfem:
   // clang-format on
   MFEM_FORALL_2D(el, wallElems.Size() / 7, maxDofs, 1, 1, {
     MFEM_FOREACH_THREAD(i, x, maxDofs) {
-      MFEM_SHARED double Ui[216];
+      MFEM_SHARED double Ui[216], gradUpi[216*3];;
       MFEM_SHARED double shape[216];
-      MFEM_SHARED double u1, nor[3];
+      MFEM_SHARED double u1, gUp[3];
       MFEM_SHARED double weight;
 
       const int numFaces = d_wallElems[0 + el * 7];
@@ -414,6 +446,8 @@ void WallBC::integrpWalls_gpu(const WallType type, const double &wallTemp, mfem:
       if (i < elDof) {
         indexi = d_nodesIDs[elOffset + i];
         Ui[i] = d_U[indexi + eq * totDofs];
+        for (int d = 0; d < dim; d++)
+          gradUpi[i + d * elDof] = d_gradUp[indexi + eq * totDofs + d * num_equation * totDofs];
       }
 
       for (int q = 0; q < Q; q++) {
@@ -426,10 +460,18 @@ void WallBC::integrpWalls_gpu(const WallType type, const double &wallTemp, mfem:
           u1 = 0.;
           for (int j = 0; j < elDof; j++) u1 += shape[j] * Ui[j];
         }
+        if (i < dim) {
+          gUp[i] = 0.;
+          for (int j = 0; j < elDof; j++) gUp[i] += gradUpi[j + i * elDof] * shape[j];
+        }
         MFEM_SYNC_THREAD;
 
         // save to global
         if (i == 0) d_interpolU[eq + q * num_equation + n * maxIntPoints * num_equation] = u1;
+        if (i < dim)
+          d_interpGrads[eq + i * num_equation + q * dim * num_equation + n * maxIntPoints * dim * num_equation] =
+              gUp[i];
+        MFEM_SYNC_THREAD;
       }  // end loop integration points
     }    // end loop equations
       }  // end loop faces
