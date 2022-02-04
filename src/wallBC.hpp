@@ -57,7 +57,7 @@ class WallBC : public BoundaryCondition {
   Array<int> wallElems;
   void buildWallElemsArray(const Array<int> &intPointsElIDBC);
 
-  void computeINVwallFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux);
+  void computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
 
   void computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
   void computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);

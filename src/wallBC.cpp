@@ -110,7 +110,7 @@ void WallBC::buildWallElemsArray(const Array<int> &intPointsElIDBC) {
 void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
   switch (wallType) {
     case INV:
-      computeINVwallFlux(normal, stateIn, bdrFlux);
+      computeINVwallFlux(normal, stateIn, gradState, bdrFlux);
       break;
     case VISC_ADIAB:
       computeAdiabaticWallFlux(normal, stateIn, gradState, bdrFlux);
@@ -135,7 +135,7 @@ void WallBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesID
                      num_equation, mixture);
 }
 
-void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
+void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
   Vector vel(dim);
   for (int d = 0; d < dim; d++) vel[d] = stateIn[1 + d] / stateIn[0];
 
@@ -159,6 +159,19 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux
   if (eqSystem == NS_PASSIVE) stateMirror[num_equation - 1] = stateIn[num_equation - 1];
 
   rsolver->Eval(stateIn, stateMirror, normal, bdrFlux);
+  
+  // evaluate viscous fluxes at the wall
+  DenseMatrix viscFw(num_equation, dim);
+  fluxClass->ComputeViscousFluxes(stateMirror, gradState, viscFw);
+
+  // evaluate internal viscous fluxes
+  DenseMatrix viscF(num_equation, dim);
+  fluxClass->ComputeViscousFluxes(stateIn, gradState, viscF);
+
+  // Add visc fluxes (we skip density eq.)
+  for (int eq = 1; eq < num_equation; eq++) {
+    for (int d = 0; d < dim; d++) bdrFlux[eq] -= 0.5 * (viscFw(eq, d) + viscF(eq, d)) * normal[d];
+  }
 }
 
 void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
