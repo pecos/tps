@@ -1882,10 +1882,6 @@ void M2ulPhyS::parseSolverOptions2() {
       grvy_printf(GRVY_ERROR, "\nUnknown gas_model -> %s", gasModelStr);
       exit(ERROR);
     }
-    if ( config.gasModel == PERFECT_MIXTURE ) {
-      config.constantMolarCV.SetSize(numSpecies);
-      config.constantMolarCP.SetSize(numSpecies);
-    }
 
     std::string transportModelStr;
     tpsP->getInput("plasma_models/transport_model", transportModelStr, std::string("") );
@@ -1901,6 +1897,11 @@ void M2ulPhyS::parseSolverOptions2() {
     if (config.eqSystem != NS_PASSIVE) {
       tpsP->getInput("species/numSpecies", config.numSpecies, 1);
       config.gasParams.SetSize(config.numSpecies,GasParams::NUM_GASPARAMS);
+
+      if ( config.gasModel == PERFECT_MIXTURE ) {
+        config.constantMolarCV.SetSize(config.numSpecies);
+        config.constantMolarCP.SetSize(config.numSpecies);
+      }
     }
 
     /*
@@ -1918,8 +1919,10 @@ void M2ulPhyS::parseSolverOptions2() {
         grvy_printf(GRVY_ERROR, "\n Electron species must be specified as the second to last species.");
         exit(ERROR);
       }
+    }
 
-      // Gas Params
+    // Gas Params
+    if (config.workFluid!=DRY_AIR) {
       for (int i = 1; i <= config.numSpecies; i++) {
         double mw, charge;
         std::string type;
@@ -1935,8 +1938,8 @@ void M2ulPhyS::parseSolverOptions2() {
           tpsP->getRequiredInput((basepath + "/constant_molar_cp").c_str(), config.constantMolarCP(i-1));
         }
       }
-
     }
+
   }
 
   return;

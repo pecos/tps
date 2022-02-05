@@ -7,6 +7,10 @@
 using namespace mfem;
 using namespace std;
 
+double uniformRandomNumber() {
+  return (double) rand() / (RAND_MAX);
+}
+
 int main (int argc, char *argv[])
 {
   TPS::Tps tps(argc, argv);
@@ -14,13 +18,1185 @@ int main (int argc, char *argv[])
   tps.parseInput();
   tps.chooseDevices();
 
+  srand (time(NULL));
+  double dummy = uniformRandomNumber();
+
   M2ulPhyS *srcField = new M2ulPhyS(tps.getMPISession(), &tps);
+
   RunConfiguration& srcConfig = srcField->GetConfig();
   assert(srcConfig.GetWorkingFluid()==WorkingFluid::USER_DEFINED);
   assert(srcConfig.GetGasModel()==PERFECT_MIXTURE);
 
   int dim = 3;
-  PerfectMixture *mixture = new PerfectMixture( srcConfig, dim);
+
+  double gradErrorThreshold = 5e-7;
+  int nTrials = 10;
+
+  /*
+    Test non-ambipolar, single-temperature fluid
+  */
+  for (int trial = 0; trial < nTrials; trial++)
+  {
+    srcConfig.ambipolar = false;
+    srcConfig.twoTemperature = false;
+    PerfectMixture *mixture = new PerfectMixture( srcConfig, dim);
+
+    grvy_printf(GRVY_INFO, "\n Setting a random primitive variable. \n");
+
+    Vector testPrimitives(mixture->GetNumEquations());
+    testPrimitives[0] = 1.784 * ( 0.9 + 0.2 * uniformRandomNumber() );
+    for (int d = 0; d < dim; d++) {
+      testPrimitives[d + 1] = -0.5 + 1.0 * uniformRandomNumber();
+    }
+    testPrimitives[dim + 1] = 300.0 * ( 0.9 + 0.2 * uniformRandomNumber() );
+
+    double Yb = uniformRandomNumber();
+    Vector Ysp(mixture->GetNumActiveSpecies());
+    double Ysum = 0.0;
+    for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
+      Ysp[sp] = uniformRandomNumber();
+      Ysum += Ysp[sp];
+    }
+    for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
+      double Y = Ysp[sp] / Ysum * (1.0 - Yb);
+      testPrimitives[dim + 2 + sp] = testPrimitives[0] * Y / mixture->GetGasParams(sp,GasParams::SPECIES_MW);
+    }
+    // for (int n = 0; n < mixture->GetNumEquations(); n++){
+    //   std::cout << testPrimitives[n] << ",";
+    // }
+    // std::cout << std::endl;
+
+    grvy_printf(GRVY_INFO, "\n Testing Conversion between conserved/primitive. \n");
+
+    Vector conservedState(mixture->GetNumEquations());
+    mixture->GetConservativesFromPrimitives(testPrimitives,conservedState);
+
+    // for (int n = 0; n < mixture->GetNumEquations(); n++){
+    //   std::cout << conservedState[n] << ",";
+    // }
+    // std::cout << std::endl;
+
+    Vector targetPrimitives(mixture->GetNumEquations());
+    mixture->GetPrimitivesFromConservatives(conservedState, targetPrimitives);
+
+    // for (int n = 0; n < mixture->GetNumEquations(); n++){
+    //   std::cout << targetPrimitives[n] << ",";
+    // }
+    // std::cout << std::endl;
+
+    double error = 0.0;
+    for (int n = 0; n < mixture->GetNumEquations(); n++){
+      error += abs( ( testPrimitives[n] - targetPrimitives[n] ) / testPrimitives[n] );
+    }
+
+    if (error > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n Conversions between conserved and primitive variables are not equivalent.");
+      grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
+      exit(ERROR);
+    }
+
+    grvy_printf(GRVY_INFO, "\n Testing ComputePressure. \n");
+
+    double pressureFromConserved = mixture->ComputePressure(conservedState);
+    double pressureFromPrimitive = mixture->ComputePressureFromPrimitives(testPrimitives);
+    error = abs( (pressureFromConserved - pressureFromPrimitive) / pressureFromConserved );
+    if (error > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n Pressure computations from conserved and primitive variables are not equivalent.");
+      grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
+      exit(ERROR);
+    }
+
+    grvy_printf(GRVY_INFO, "\n Testing ComputeTemperature. \n");
+
+    double temperature = mixture->ComputeTemperature(conservedState);
+    error = abs( (temperature - testPrimitives[dim + 1]) / testPrimitives[dim + 1] );
+    if (error > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n ComputeTemperature is not equivalent to the reference.");
+      grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
+      exit(ERROR);
+    }
+
+    grvy_printf(GRVY_INFO, "\n Testing computeSpeciesPrimitives. \n");
+
+    Vector X_sp, Y_sp, n_sp;
+    mixture->computeSpeciesPrimitives(conservedState, X_sp, Y_sp, n_sp);
+    double Xsum = 0.0;
+    for (int sp = 0; sp < mixture->GetNumSpecies(); sp++){
+      Xsum += X_sp[sp];
+    }
+    if (abs(Xsum - 1.0) > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives does not conserve mole fraction.");
+      exit(ERROR);
+    }
+    Ysum = 0.0;
+    for (int sp = 0; sp < mixture->GetNumSpecies(); sp++){
+      Ysum += Y_sp[sp];
+    }
+    if (abs(Ysum - 1.0) > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives does not conserve mass fraction.");
+      exit(ERROR);
+    }
+    if (abs(Yb - Y_sp[mixture->GetNumSpecies() - 1]) > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives does not compute background species properly.");
+      exit(ERROR);
+    }
+    for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
+      if (abs(n_sp[sp] - testPrimitives[dim + 2 + sp]) > 1.0e-15) {
+        grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives is not consistent in number density computation.");
+        exit(ERROR);
+      }
+    }
+
+    grvy_printf(GRVY_INFO, "\n Setting a random primitive gradient. \n");
+
+    int numSpecies = mixture->GetNumSpecies();
+    int numEquation = mixture->GetNumEquations();
+    DenseMatrix gradUp(numEquation,dim);
+    gradUp = 0.0;
+    for (int eq = 0; eq < numEquation; eq++) {
+      for (int d = 0; d < dim; d++) gradUp(eq, d) = -10.0 + 20.0 * uniformRandomNumber();
+    }
+    DenseMatrix massFractionGrad(numSpecies,dim);
+    DenseMatrix moleFractionGrad(numSpecies,dim);
+    mixture->computeMassFractionGradient(testPrimitives[0], n_sp, gradUp, massFractionGrad);
+    mixture->computeMoleFractionGradient(n_sp, gradUp, moleFractionGrad);
+    Vector dir(dim);
+    double norm = 0.0;
+    for (int d = 0; d < dim; d++) {
+      dir(d) = -1.0 + 2.0 * uniformRandomNumber();
+      norm += dir(d) * dir(d);
+    }
+    dir /= sqrt(norm);
+
+    Vector dUp_dx(numEquation), dY_dx(numSpecies), dX_dx(numSpecies);
+    gradUp.Mult(dir, dUp_dx);
+    massFractionGrad.Mult(dir, dY_dx);
+
+    moleFractionGrad.Mult(dir, dX_dx);
+    double dpdx_prim = mixture->ComputePressureDerivative(dUp_dx, testPrimitives, true);
+    double dpdx_cons = mixture->ComputePressureDerivative(dUp_dx, conservedState, false);
+    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > 1.0e-15 ) {
+      grvy_printf(GRVY_ERROR, "\n ComputePressureDerivative is not consistent between primitive and conservative.");
+      grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim), abs( (dpdx_prim - dpdx_cons) / dpdx_cons );
+      exit(ERROR);
+    }
+
+    { // FD verification of pressure gradient.
+      grvy_printf(GRVY_INFO, "\n Testing ComputePressureDerivative. \n");
+
+      double delta = 1.0e2 / dpdx_prim;
+      Vector perturbedPrimitive(numEquation);
+      for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+
+      double perturbedPressure = mixture->ComputePressureFromPrimitives(perturbedPrimitive);
+      double deltaPdeltax = (perturbedPressure - pressureFromPrimitive) / delta;
+
+      error = abs( (deltaPdeltax - dpdx_prim) / dpdx_prim );
+      double error1 = error;
+      for (int fd = 1; fd < 30; fd++) {
+        error1 = error;
+        double factor = pow(10.0, (- 0.25 * fd));
+        delta = 1.0e2 / dpdx_prim * factor;
+        for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+        perturbedPressure = mixture->ComputePressureFromPrimitives(perturbedPrimitive);
+        deltaPdeltax = (perturbedPressure - pressureFromPrimitive) / delta;
+        error = abs( (deltaPdeltax - dpdx_prim) / dpdx_prim );
+
+        grvy_printf(GRVY_INFO, "\n Delta : %.8E - FD-Error : %.8E", factor, error);
+
+        if (error > error1) break;
+      }
+      grvy_printf(GRVY_INFO, "\n");
+      if ( error1 > gradErrorThreshold ) {
+        grvy_printf(GRVY_ERROR, "\n ComputePressureDerivative is not computing the correct gradient.");
+        exit(ERROR);
+      }
+    }
+
+    { // FD verification of mass fraction gradient.
+      grvy_printf(GRVY_INFO, "\n Testing computeMassFractionGradient. \n");
+
+      double gradNorm = sqrt( dY_dx * dY_dx );
+      double delta = 1.0e-3 / gradNorm;
+      Vector perturbedPrimitive(numEquation);
+      for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+
+      Vector perturbedConserved(numEquation);
+      mixture->GetConservativesFromPrimitives(perturbedPrimitive, perturbedConserved);
+
+      Vector perturbedX(numSpecies), perturbedY(numSpecies), perturbedN(numSpecies);
+      mixture->computeSpeciesPrimitives(perturbedConserved, perturbedX, perturbedY, perturbedN);
+
+      Vector deltaYdeltax(numSpecies);
+      for (int sp = 0; sp < numSpecies; sp++) deltaYdeltax(sp) = (perturbedY(sp) - Y_sp(sp)) / delta;
+
+      error = 0.0;
+      for (int sp = 0; sp < numSpecies; sp++) error += pow(deltaYdeltax(sp) - dY_dx(sp), 2);
+      error = sqrt(error) / gradNorm;
+      double error1 = error;
+      for (int fd = 1; fd < 30; fd++) {
+        error1 = error;
+        double factor = pow(10.0, (- 0.25 * fd));
+        delta = 1.0e-3 / gradNorm * factor;
+        for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+
+        Vector perturbedConserved(numEquation);
+        mixture->GetConservativesFromPrimitives(perturbedPrimitive, perturbedConserved);
+
+        Vector perturbedX(numSpecies), perturbedY(numSpecies), perturbedN(numSpecies);
+        mixture->computeSpeciesPrimitives(perturbedConserved, perturbedX, perturbedY, perturbedN);
+
+        Vector deltaYdeltax(numSpecies);
+        for (int sp = 0; sp < numSpecies; sp++) deltaYdeltax(sp) = (perturbedY(sp) - Y_sp(sp)) / delta;
+
+        error = 0.0;
+        for (int sp = 0; sp < numSpecies; sp++) error += pow(deltaYdeltax(sp) - dY_dx(sp), 2);
+        error = sqrt(error) / gradNorm;
+
+        grvy_printf(GRVY_INFO, "\n Delta : %.8E - FD-Error : %.8E", factor, error);
+
+        if (error > error1) break;
+      }
+      grvy_printf(GRVY_INFO, "\n");
+      // std::cout << error1 << std::endl;
+      if ( error1 > gradErrorThreshold ) {
+        grvy_printf(GRVY_ERROR, "\n computeMassFractionGradient is not computing the correct gradient.");
+        exit(ERROR);
+      }
+    }
+
+    { // FD verification of mass fraction gradient.
+      grvy_printf(GRVY_INFO, "\n Testing computeMoleFractionGradient. \n");
+
+      double gradNorm = sqrt( dY_dx * dY_dx );
+      double delta = 1.0e-3 / gradNorm;
+      Vector perturbedPrimitive(numEquation);
+      for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+
+      Vector perturbedConserved(numEquation);
+      mixture->GetConservativesFromPrimitives(perturbedPrimitive, perturbedConserved);
+
+      Vector perturbedX(numSpecies), perturbedY(numSpecies), perturbedN(numSpecies);
+      mixture->computeSpeciesPrimitives(perturbedConserved, perturbedX, perturbedY, perturbedN);
+
+      Vector deltaXdeltax(numSpecies);
+      for (int sp = 0; sp < numSpecies; sp++) deltaXdeltax(sp) = (perturbedX(sp) - X_sp(sp)) / delta;
+
+      error = 0.0;
+      for (int sp = 0; sp < numSpecies; sp++) error += pow(deltaXdeltax(sp) - dX_dx(sp), 2);
+      error = sqrt(error) / gradNorm;
+      double error1 = error;
+      for (int fd = 1; fd < 30; fd++) {
+        error1 = error;
+        double factor = pow(10.0, (- 0.25 * fd));
+        delta = 1.0e-3 / gradNorm * factor;
+        for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+
+        Vector perturbedConserved(numEquation);
+        mixture->GetConservativesFromPrimitives(perturbedPrimitive, perturbedConserved);
+
+        Vector perturbedX(numSpecies), perturbedY(numSpecies), perturbedN(numSpecies);
+        mixture->computeSpeciesPrimitives(perturbedConserved, perturbedX, perturbedY, perturbedN);
+
+        Vector deltaXdeltax(numSpecies);
+        for (int sp = 0; sp < numSpecies; sp++) deltaXdeltax(sp) = (perturbedX(sp) - X_sp(sp)) / delta;
+
+        error = 0.0;
+        for (int sp = 0; sp < numSpecies; sp++) error += pow(deltaXdeltax(sp) - dX_dx(sp), 2);
+        error = sqrt(error) / gradNorm;
+
+        grvy_printf(GRVY_INFO, "\n Delta : %.8E - FD-Error : %.8E", factor, error);
+
+        if (error > error1) break;
+      }
+      grvy_printf(GRVY_INFO, "\n");
+      if ( error1 > gradErrorThreshold ) {
+        grvy_printf(GRVY_ERROR, "\n computeMoleFractionGradient is not computing the correct gradient.");
+        exit(ERROR);
+      }
+    }
+
+  }
+  grvy_printf(GRVY_INFO, "\nPASS: non-ambipolar, single temperature.\n");
+
+  /*
+    Test ambipolar, single-temperature fluid
+  */
+  for (int trial = 0; trial < nTrials; trial++)
+  {
+    srcConfig.ambipolar = true;
+    srcConfig.twoTemperature = false;
+    PerfectMixture *mixture = new PerfectMixture( srcConfig, dim);
+
+    grvy_printf(GRVY_INFO, "\n Setting a random primitive variable. \n");
+
+    Vector testPrimitives(mixture->GetNumEquations());
+    testPrimitives[0] = 1.784 * ( 0.9 + 0.2 * uniformRandomNumber() );
+    for (int d = 0; d < dim; d++) {
+      testPrimitives[d + 1] = -0.5 + 1.0 * uniformRandomNumber();
+    }
+    testPrimitives[dim + 1] = 300.0 * ( 0.9 + 0.2 * uniformRandomNumber() );
+
+    double Yb = 0.5 + 0.5 * uniformRandomNumber();
+    Vector Ysp(mixture->GetNumActiveSpecies());
+    Vector nsp(mixture->GetNumActiveSpecies());
+    double Ysum = 0.0;
+    for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
+      Ysp[sp] = uniformRandomNumber();
+      Ysum += Ysp[sp];
+    }
+    for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
+      double Y = Ysp[sp] / Ysum * (1.0 - Yb);
+      nsp[sp] = testPrimitives[0] * Y / mixture->GetGasParams(sp,GasParams::SPECIES_MW);
+      testPrimitives[dim + 2 + sp] = nsp[sp];
+    }
+    double ne = 0.0;
+    for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
+      ne += nsp[sp] * mixture->GetGasParams(sp,GasParams::SPECIES_CHARGES);
+    }
+    Yb -= ne * mixture->GetGasParams(mixture->GetNumSpecies() - 2, GasParams::SPECIES_MW) / testPrimitives[0];
+
+    grvy_printf(GRVY_INFO, "\n Testing Conversion between conserved/primitive. \n");
+
+    Vector conservedState(mixture->GetNumEquations());
+    mixture->GetConservativesFromPrimitives(testPrimitives,conservedState);
+
+    Vector targetPrimitives(mixture->GetNumEquations());
+    mixture->GetPrimitivesFromConservatives(conservedState, targetPrimitives);
+
+    double error = 0.0;
+    for (int n = 0; n < mixture->GetNumEquations(); n++){
+      error += abs( ( testPrimitives[n] - targetPrimitives[n] ) / testPrimitives[n] );
+    }
+
+    if (error > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n Conversions between conserved and primitive variables are not equivalent.");
+      grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
+      exit(ERROR);
+    }
+
+    grvy_printf(GRVY_INFO, "\n Testing ComputePressure. \n");
+
+    double pressureFromConserved = mixture->ComputePressure(conservedState);
+    double pressureFromPrimitive = mixture->ComputePressureFromPrimitives(testPrimitives);
+    error = abs( (pressureFromConserved - pressureFromPrimitive) / pressureFromConserved );
+    if (error > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n Pressure computations from conserved and primitive variables are not equivalent.");
+      grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
+      exit(ERROR);
+    }
+
+    grvy_printf(GRVY_INFO, "\n Testing ComputeTemperature. \n");
+
+    double temperature = mixture->ComputeTemperature(conservedState);
+    error = abs( (temperature - testPrimitives[dim + 1]) / testPrimitives[dim + 1] );
+    if (error > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n ComputeTemperature is not equivalent to the reference.");
+      grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
+      exit(ERROR);
+    }
+
+    grvy_printf(GRVY_INFO, "\n Testing computeSpeciesPrimitives. \n");
+
+    Vector X_sp, Y_sp, n_sp;
+    mixture->computeSpeciesPrimitives(conservedState, X_sp, Y_sp, n_sp);
+    double Xsum = 0.0;
+    for (int sp = 0; sp < mixture->GetNumSpecies(); sp++){
+      Xsum += X_sp[sp];
+    }
+    if (abs(Xsum - 1.0) > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives does not conserve mole fraction.");
+      exit(ERROR);
+    }
+    Ysum = 0.0;
+    for (int sp = 0; sp < mixture->GetNumSpecies(); sp++){
+      Ysum += Y_sp[sp];
+    }
+    if (abs(Ysum - 1.0) > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives does not conserve mass fraction.");
+      exit(ERROR);
+    }
+    if (abs(Yb - Y_sp[mixture->GetNumSpecies() - 1]) > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives does not compute background species properly.");
+      exit(ERROR);
+    }
+
+    double netCharge = 0.0;
+    for (int sp = 0; sp < mixture->GetNumSpecies(); sp++){
+      netCharge += n_sp[sp] * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+
+      if (sp < mixture->GetNumActiveSpecies()) {
+        if (abs(n_sp[sp] - testPrimitives[dim + 2 + sp]) > 1.0e-15) {
+          grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives is not consistent in number density computation.");
+          exit(ERROR);
+        }
+      }
+    }
+    if (abs(netCharge) > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives does not keep charge conservation.");
+      exit(ERROR);
+    }
+
+    grvy_printf(GRVY_INFO, "\n Setting a random primitive gradient. \n");
+
+    int numSpecies = mixture->GetNumSpecies();
+    int numEquation = mixture->GetNumEquations();
+    DenseMatrix gradUp(numEquation,dim);
+    gradUp = 0.0;
+    for (int eq = 0; eq < numEquation; eq++) {
+      for (int d = 0; d < dim; d++) gradUp(eq, d) = -10.0 + 20.0 * uniformRandomNumber();
+    }
+    DenseMatrix massFractionGrad(numSpecies,dim);
+    DenseMatrix moleFractionGrad(numSpecies,dim);
+    mixture->computeMassFractionGradient(testPrimitives[0], n_sp, gradUp, massFractionGrad);
+    mixture->computeMoleFractionGradient(n_sp, gradUp, moleFractionGrad);
+    Vector dir(dim);
+    double norm = 0.0;
+    for (int d = 0; d < dim; d++) {
+      dir(d) = -1.0 + 2.0 * uniformRandomNumber();
+      norm += dir(d) * dir(d);
+    }
+    dir /= sqrt(norm);
+
+    Vector dUp_dx(numEquation), dY_dx(numSpecies), dX_dx(numSpecies);
+    gradUp.Mult(dir, dUp_dx);
+    massFractionGrad.Mult(dir, dY_dx);
+    moleFractionGrad.Mult(dir, dX_dx);
+    double dpdx_prim = mixture->ComputePressureDerivative(dUp_dx, testPrimitives, true);
+    double dpdx_cons = mixture->ComputePressureDerivative(dUp_dx, conservedState, false);
+    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > 1.0e-15 ) {
+      grvy_printf(GRVY_ERROR, "\n ComputePressureDerivative is not consistent between primitive and conservative.");
+      grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim), abs( (dpdx_prim - dpdx_cons) / dpdx_cons );
+      exit(ERROR);
+    }
+
+    { // FD verification of pressure gradient.
+      grvy_printf(GRVY_INFO, "\n Testing ComputePressureDerivative. \n");
+
+      double delta = 1.0e2 / dpdx_prim;
+      Vector perturbedPrimitive(numEquation);
+      for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+
+      double perturbedPressure = mixture->ComputePressureFromPrimitives(perturbedPrimitive);
+      double deltaPdeltax = (perturbedPressure - pressureFromPrimitive) / delta;
+
+      error = abs( (deltaPdeltax - dpdx_prim) / dpdx_prim );
+      double error1 = error;
+      for (int fd = 1; fd < 30; fd++) {
+        error1 = error;
+        double factor = pow(10.0, (- 0.25 * fd));
+        delta = 1.0e2 / dpdx_prim * factor;
+        for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+        perturbedPressure = mixture->ComputePressureFromPrimitives(perturbedPrimitive);
+        deltaPdeltax = (perturbedPressure - pressureFromPrimitive) / delta;
+        error = abs( (deltaPdeltax - dpdx_prim) / dpdx_prim );
+
+        grvy_printf(GRVY_INFO, "\n Delta : %.8E - FD-Error : %.8E", factor, error);
+
+        if (error > error1) break;
+      }
+      grvy_printf(GRVY_INFO, "\n");
+      if ( error1 > gradErrorThreshold ) {
+        grvy_printf(GRVY_ERROR, "\n ComputePressureDerivative is not computing the correct gradient.");
+        exit(ERROR);
+      }
+    }
+
+    { // FD verification of mass fraction gradient.
+      grvy_printf(GRVY_INFO, "\n Testing computeMassFractionGradient. \n");
+
+      double gradNorm = sqrt( dY_dx * dY_dx );
+      double delta = 1.0e-3 / gradNorm;
+      Vector perturbedPrimitive(numEquation);
+      for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+
+      Vector perturbedConserved(numEquation);
+      mixture->GetConservativesFromPrimitives(perturbedPrimitive, perturbedConserved);
+
+      Vector perturbedX(numSpecies), perturbedY(numSpecies), perturbedN(numSpecies);
+      mixture->computeSpeciesPrimitives(perturbedConserved, perturbedX, perturbedY, perturbedN);
+
+      Vector deltaYdeltax(numSpecies);
+      for (int sp = 0; sp < numSpecies; sp++) deltaYdeltax(sp) = (perturbedY(sp) - Y_sp(sp)) / delta;
+
+      error = 0.0;
+      for (int sp = 0; sp < numSpecies; sp++) error += pow(deltaYdeltax(sp) - dY_dx(sp), 2);
+      error = sqrt(error) / gradNorm;
+      double error1 = error;
+      for (int fd = 1; fd < 30; fd++) {
+        error1 = error;
+        double factor = pow(10.0, (- 0.25 * fd));
+        delta = 1.0e-3 / gradNorm * factor;
+        for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+
+        Vector perturbedConserved(numEquation);
+        mixture->GetConservativesFromPrimitives(perturbedPrimitive, perturbedConserved);
+
+        Vector perturbedX(numSpecies), perturbedY(numSpecies), perturbedN(numSpecies);
+        mixture->computeSpeciesPrimitives(perturbedConserved, perturbedX, perturbedY, perturbedN);
+
+        Vector deltaYdeltax(numSpecies);
+        for (int sp = 0; sp < numSpecies; sp++) deltaYdeltax(sp) = (perturbedY(sp) - Y_sp(sp)) / delta;
+
+        error = 0.0;
+        for (int sp = 0; sp < numSpecies; sp++) error += pow(deltaYdeltax(sp) - dY_dx(sp), 2);
+        error = sqrt(error) / gradNorm;
+
+        grvy_printf(GRVY_INFO, "\n Delta : %.8E - FD-Error : %.8E", factor, error);
+
+        if (error > error1) break;
+      }
+      grvy_printf(GRVY_INFO, "\n");
+      // std::cout << error1 << std::endl;
+      if ( error1 > gradErrorThreshold ) {
+        grvy_printf(GRVY_ERROR, "\n computeMassFractionGradient is not computing the correct gradient.");
+        exit(ERROR);
+      }
+    }
+
+    { // FD verification of mass fraction gradient.
+      grvy_printf(GRVY_INFO, "\n Testing computeMoleFractionGradient. \n");
+
+      double gradNorm = sqrt( dY_dx * dY_dx );
+      double delta = 1.0e-3 / gradNorm;
+      Vector perturbedPrimitive(numEquation);
+      for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+
+      Vector perturbedConserved(numEquation);
+      mixture->GetConservativesFromPrimitives(perturbedPrimitive, perturbedConserved);
+
+      Vector perturbedX(numSpecies), perturbedY(numSpecies), perturbedN(numSpecies);
+      mixture->computeSpeciesPrimitives(perturbedConserved, perturbedX, perturbedY, perturbedN);
+
+      Vector deltaXdeltax(numSpecies);
+      for (int sp = 0; sp < numSpecies; sp++) deltaXdeltax(sp) = (perturbedX(sp) - X_sp(sp)) / delta;
+
+      error = 0.0;
+      for (int sp = 0; sp < numSpecies; sp++) error += pow(deltaXdeltax(sp) - dX_dx(sp), 2);
+      error = sqrt(error) / gradNorm;
+      double error1 = error;
+      for (int fd = 1; fd < 30; fd++) {
+        error1 = error;
+        double factor = pow(10.0, (- 0.25 * fd));
+        delta = 1.0e-3 / gradNorm * factor;
+        for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+
+        Vector perturbedConserved(numEquation);
+        mixture->GetConservativesFromPrimitives(perturbedPrimitive, perturbedConserved);
+
+        Vector perturbedX(numSpecies), perturbedY(numSpecies), perturbedN(numSpecies);
+        mixture->computeSpeciesPrimitives(perturbedConserved, perturbedX, perturbedY, perturbedN);
+
+        Vector deltaXdeltax(numSpecies);
+        for (int sp = 0; sp < numSpecies; sp++) deltaXdeltax(sp) = (perturbedX(sp) - X_sp(sp)) / delta;
+
+        error = 0.0;
+        for (int sp = 0; sp < numSpecies; sp++) error += pow(deltaXdeltax(sp) - dX_dx(sp), 2);
+        error = sqrt(error) / gradNorm;
+
+        grvy_printf(GRVY_INFO, "\n Delta : %.8E - FD-Error : %.8E", factor, error);
+
+        if (error > error1) break;
+      }
+      grvy_printf(GRVY_INFO, "\n");
+      if ( error1 > gradErrorThreshold ) {
+        grvy_printf(GRVY_ERROR, "\n computeMoleFractionGradient is not computing the correct gradient.");
+        exit(ERROR);
+      }
+    }
+  }
+  grvy_printf(GRVY_INFO, "\nPASS: ambipolar, single temperature.\n");
+
+
+  /*
+    Test non-ambipolar, two-temperature fluid
+  */
+  for (int trial = 0; trial < nTrials; trial++)
+  {
+    srcConfig.ambipolar = false;
+    srcConfig.twoTemperature = true;
+    PerfectMixture *mixture = new PerfectMixture( srcConfig, dim );
+
+    grvy_printf(GRVY_INFO, "\n Setting a random primitive variable. \n");
+
+    Vector testPrimitives(mixture->GetNumEquations());
+    testPrimitives[0] = 1.784 * ( 0.9 + 0.2 * uniformRandomNumber() );
+    for (int d = 0; d < dim; d++) {
+      testPrimitives[d + 1] = -0.5 + 1.0 * uniformRandomNumber();
+    }
+    testPrimitives[dim + 1] = 300.0 * ( 0.9 + 0.2 * uniformRandomNumber() );
+    testPrimitives[mixture->GetNumEquations() - 1] = 500.0 * ( 0.8 + 0.4 * uniformRandomNumber() );
+
+    double Yb = uniformRandomNumber();
+    Vector Ysp(mixture->GetNumActiveSpecies());
+    Vector nsp(mixture->GetNumActiveSpecies());
+    double Ysum = 0.0;
+    for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
+      Ysp[sp] = uniformRandomNumber();
+      Ysum += Ysp[sp];
+    }
+    for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
+      double Y = Ysp[sp] / Ysum * (1.0 - Yb);
+      nsp[sp] = testPrimitives[0] * Y / mixture->GetGasParams(sp,GasParams::SPECIES_MW);
+      testPrimitives[dim + 2 + sp] = nsp[sp];
+    }
+
+    grvy_printf(GRVY_INFO, "\n Testing Conversion between conserved/primitive. \n");
+
+    Vector conservedState(mixture->GetNumEquations());
+    mixture->GetConservativesFromPrimitives(testPrimitives,conservedState);
+
+    Vector targetPrimitives(mixture->GetNumEquations());
+    mixture->GetPrimitivesFromConservatives(conservedState, targetPrimitives);
+
+    double error = 0.0;
+    for (int n = 0; n < mixture->GetNumEquations(); n++){
+      error += abs( ( testPrimitives[n] - targetPrimitives[n] ) / testPrimitives[n] );
+    }
+
+    if (error > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n Conversions between conserved and primitive variables are not equivalent.");
+      grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
+      exit(ERROR);
+    }
+
+    grvy_printf(GRVY_INFO, "\n Testing ComputePressure. \n");
+
+    double pressureFromConserved = mixture->ComputePressure(conservedState);
+    double pressureFromPrimitive = mixture->ComputePressureFromPrimitives(testPrimitives);
+    error = abs( (pressureFromConserved - pressureFromPrimitive) / pressureFromConserved );
+    if (error > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n Pressure computations from conserved and primitive variables are not equivalent.");
+      grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
+      exit(ERROR);
+    }
+
+    grvy_printf(GRVY_INFO, "\n Testing ComputeTemperature. \n");
+
+    double temperature = mixture->ComputeTemperature(conservedState);
+    error = abs( (temperature - testPrimitives[dim + 1]) / testPrimitives[dim + 1] );
+    if (error > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n ComputeTemperature is not equivalent to the reference.");
+      grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
+      exit(ERROR);
+    }
+
+    grvy_printf(GRVY_INFO, "\n Testing computeSpeciesPrimitives. \n");
+
+    Vector X_sp, Y_sp, n_sp;
+    mixture->computeSpeciesPrimitives(conservedState, X_sp, Y_sp, n_sp);
+    double Xsum = 0.0;
+    for (int sp = 0; sp < mixture->GetNumSpecies(); sp++){
+      Xsum += X_sp[sp];
+    }
+    if (abs(Xsum - 1.0) > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives does not conserve mole fraction.");
+      exit(ERROR);
+    }
+    Ysum = 0.0;
+    for (int sp = 0; sp < mixture->GetNumSpecies(); sp++){
+      Ysum += Y_sp[sp];
+    }
+    if (abs(Ysum - 1.0) > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives does not conserve mass fraction.");
+      exit(ERROR);
+    }
+    if (abs(Yb - Y_sp[mixture->GetNumSpecies() - 1]) > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives does not compute background species properly.");
+      exit(ERROR);
+    }
+
+    for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
+      if (abs(n_sp[sp] - testPrimitives[dim + 2 + sp]) > 1.0e-15) {
+        grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives is not consistent in number density computation.");
+        exit(ERROR);
+      }
+    }
+
+    double T_h, T_e;
+    int numSpecies = mixture->GetNumSpecies();
+    int numEquation = mixture->GetNumEquations();
+    mixture->computeTemperaturesBase(conservedState, &n_sp[0], n_sp[numSpecies-2], n_sp[numSpecies-1], T_h, T_e);
+    if (abs( (T_h - testPrimitives[dim + 1]) / testPrimitives[dim + 1] ) > 1.0e-15) {
+      std::cout << T_h << " != " << testPrimitives[dim + 1] << std::endl;
+      grvy_printf(GRVY_ERROR, "\n computeTemperaturesBase does not compute heavy-species temperature properly.");
+      exit(ERROR);
+    }
+    if (abs( (T_e - testPrimitives[numEquation - 1]) / testPrimitives[numEquation - 1] ) > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n computeTemperaturesBase does not compute electron temperature properly.");
+      exit(ERROR);
+    }
+
+    grvy_printf(GRVY_INFO, "\n Setting a random primitive gradient. \n");
+
+    DenseMatrix gradUp(numEquation,dim);
+    gradUp = 0.0;
+    for (int eq = 0; eq < numEquation; eq++) {
+      for (int d = 0; d < dim; d++) gradUp(eq, d) = -10.0 + 20.0 * uniformRandomNumber();
+    }
+    DenseMatrix massFractionGrad(numSpecies,dim);
+    DenseMatrix moleFractionGrad(numSpecies,dim);
+    mixture->computeMassFractionGradient(testPrimitives[0], n_sp, gradUp, massFractionGrad);
+    mixture->computeMoleFractionGradient(n_sp, gradUp, moleFractionGrad);
+    Vector dir(dim);
+    double norm = 0.0;
+    for (int d = 0; d < dim; d++) {
+      dir(d) = -1.0 + 2.0 * uniformRandomNumber();
+      norm += dir(d) * dir(d);
+    }
+    dir /= sqrt(norm);
+
+    Vector dUp_dx(numEquation), dY_dx(numSpecies), dX_dx(numSpecies);
+    gradUp.Mult(dir, dUp_dx);
+    massFractionGrad.Mult(dir, dY_dx);
+    moleFractionGrad.Mult(dir, dX_dx);
+    double dpdx_prim = mixture->ComputePressureDerivative(dUp_dx, testPrimitives, true);
+    double dpdx_cons = mixture->ComputePressureDerivative(dUp_dx, conservedState, false);
+    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > 1.0e-15 ) {
+      grvy_printf(GRVY_ERROR, "\n ComputePressureDerivative is not consistent between primitive and conservative.");
+      grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim), abs( (dpdx_prim - dpdx_cons) / dpdx_cons );
+      exit(ERROR);
+    }
+
+    { // FD verification of pressure gradient.
+      grvy_printf(GRVY_INFO, "\n Testing ComputePressureDerivative. \n");
+
+      double delta = 1.0e2 / dpdx_prim;
+      Vector perturbedPrimitive(numEquation);
+      for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+
+      double perturbedPressure = mixture->ComputePressureFromPrimitives(perturbedPrimitive);
+      double deltaPdeltax = (perturbedPressure - pressureFromPrimitive) / delta;
+
+      error = abs( (deltaPdeltax - dpdx_prim) / dpdx_prim );
+      double error1 = error;
+      for (int fd = 1; fd < 30; fd++) {
+        error1 = error;
+        double factor = pow(10.0, (- 0.25 * fd));
+        delta = 1.0e2 / dpdx_prim * factor;
+        for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+        perturbedPressure = mixture->ComputePressureFromPrimitives(perturbedPrimitive);
+        deltaPdeltax = (perturbedPressure - pressureFromPrimitive) / delta;
+        error = abs( (deltaPdeltax - dpdx_prim) / dpdx_prim );
+
+        grvy_printf(GRVY_INFO, "\n Delta : %.8E - FD-Error : %.8E", factor, error);
+
+        if (error > error1) break;
+      }
+      grvy_printf(GRVY_INFO, "\n");
+      if ( error1 > gradErrorThreshold ) {
+        grvy_printf(GRVY_ERROR, "\n ComputePressureDerivative is not computing the correct gradient.");
+        exit(ERROR);
+      }
+    }
+
+    { // FD verification of mass fraction gradient.
+      grvy_printf(GRVY_INFO, "\n Testing computeMassFractionGradient. \n");
+
+      double gradNorm = sqrt( dY_dx * dY_dx );
+      double delta = 1.0e-3 / gradNorm;
+      Vector perturbedPrimitive(numEquation);
+      for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+
+      Vector perturbedConserved(numEquation);
+      mixture->GetConservativesFromPrimitives(perturbedPrimitive, perturbedConserved);
+
+      Vector perturbedX(numSpecies), perturbedY(numSpecies), perturbedN(numSpecies);
+      mixture->computeSpeciesPrimitives(perturbedConserved, perturbedX, perturbedY, perturbedN);
+
+      Vector deltaYdeltax(numSpecies);
+      for (int sp = 0; sp < numSpecies; sp++) deltaYdeltax(sp) = (perturbedY(sp) - Y_sp(sp)) / delta;
+
+      error = 0.0;
+      for (int sp = 0; sp < numSpecies; sp++) error += pow(deltaYdeltax(sp) - dY_dx(sp), 2);
+      error = sqrt(error) / gradNorm;
+      double error1 = error;
+      for (int fd = 1; fd < 30; fd++) {
+        error1 = error;
+        double factor = pow(10.0, (- 0.25 * fd));
+        delta = 1.0e-3 / gradNorm * factor;
+        for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+
+        Vector perturbedConserved(numEquation);
+        mixture->GetConservativesFromPrimitives(perturbedPrimitive, perturbedConserved);
+
+        Vector perturbedX(numSpecies), perturbedY(numSpecies), perturbedN(numSpecies);
+        mixture->computeSpeciesPrimitives(perturbedConserved, perturbedX, perturbedY, perturbedN);
+
+        Vector deltaYdeltax(numSpecies);
+        for (int sp = 0; sp < numSpecies; sp++) deltaYdeltax(sp) = (perturbedY(sp) - Y_sp(sp)) / delta;
+
+        error = 0.0;
+        for (int sp = 0; sp < numSpecies; sp++) error += pow(deltaYdeltax(sp) - dY_dx(sp), 2);
+        error = sqrt(error) / gradNorm;
+
+        grvy_printf(GRVY_INFO, "\n Delta : %.8E - FD-Error : %.8E", factor, error);
+
+        if (error > error1) break;
+      }
+      grvy_printf(GRVY_INFO, "\n");
+      // std::cout << error1 << std::endl;
+      if ( error1 > gradErrorThreshold ) {
+        grvy_printf(GRVY_ERROR, "\n computeMassFractionGradient is not computing the correct gradient.");
+        exit(ERROR);
+      }
+    }
+
+    { // FD verification of mass fraction gradient.
+      grvy_printf(GRVY_INFO, "\n Testing computeMoleFractionGradient. \n");
+
+      double gradNorm = sqrt( dY_dx * dY_dx );
+      double delta = 1.0e-3 / gradNorm;
+      Vector perturbedPrimitive(numEquation);
+      for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+
+      Vector perturbedConserved(numEquation);
+      mixture->GetConservativesFromPrimitives(perturbedPrimitive, perturbedConserved);
+
+      Vector perturbedX(numSpecies), perturbedY(numSpecies), perturbedN(numSpecies);
+      mixture->computeSpeciesPrimitives(perturbedConserved, perturbedX, perturbedY, perturbedN);
+
+      Vector deltaXdeltax(numSpecies);
+      for (int sp = 0; sp < numSpecies; sp++) deltaXdeltax(sp) = (perturbedX(sp) - X_sp(sp)) / delta;
+
+      error = 0.0;
+      for (int sp = 0; sp < numSpecies; sp++) error += pow(deltaXdeltax(sp) - dX_dx(sp), 2);
+      error = sqrt(error) / gradNorm;
+      double error1 = error;
+      for (int fd = 1; fd < 30; fd++) {
+        error1 = error;
+        double factor = pow(10.0, (- 0.25 * fd));
+        delta = 1.0e-3 / gradNorm * factor;
+        for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+
+        Vector perturbedConserved(numEquation);
+        mixture->GetConservativesFromPrimitives(perturbedPrimitive, perturbedConserved);
+
+        Vector perturbedX(numSpecies), perturbedY(numSpecies), perturbedN(numSpecies);
+        mixture->computeSpeciesPrimitives(perturbedConserved, perturbedX, perturbedY, perturbedN);
+
+        Vector deltaXdeltax(numSpecies);
+        for (int sp = 0; sp < numSpecies; sp++) deltaXdeltax(sp) = (perturbedX(sp) - X_sp(sp)) / delta;
+
+        error = 0.0;
+        for (int sp = 0; sp < numSpecies; sp++) error += pow(deltaXdeltax(sp) - dX_dx(sp), 2);
+        error = sqrt(error) / gradNorm;
+
+        grvy_printf(GRVY_INFO, "\n Delta : %.8E - FD-Error : %.8E", factor, error);
+
+        if (error > error1) break;
+      }
+      grvy_printf(GRVY_INFO, "\n");
+      if ( error1 > gradErrorThreshold ) {
+        grvy_printf(GRVY_ERROR, "\n computeMoleFractionGradient is not computing the correct gradient.");
+        exit(ERROR);
+      }
+    }
+
+  }
+  grvy_printf(GRVY_INFO, "\nPASS: non-ambipolar, two temperature.\n");
+
+  /*
+    Test ambipolar, two-temperature fluid
+  */
+  for (int trial = 0; trial < nTrials; trial++)
+  {
+    srcConfig.ambipolar = true;
+    srcConfig.twoTemperature = true;
+    PerfectMixture *mixture = new PerfectMixture( srcConfig, dim );
+
+    grvy_printf(GRVY_INFO, "\n Setting a random primitive variable. \n");
+
+    Vector testPrimitives(mixture->GetNumEquations());
+    testPrimitives[0] = 1.784 * ( 0.9 + 0.2 * uniformRandomNumber() );
+    for (int d = 0; d < dim; d++) {
+      testPrimitives[d + 1] = -0.5 + 1.0 * uniformRandomNumber();
+    }
+    testPrimitives[dim + 1] = 300.0 * ( 0.9 + 0.2 * uniformRandomNumber() );
+    testPrimitives[mixture->GetNumEquations() - 1] = 500.0 * ( 0.8 + 0.4 * uniformRandomNumber() );
+
+    double Yb = 0.5 + 0.5 * uniformRandomNumber();
+    Vector Ysp(mixture->GetNumActiveSpecies());
+    Vector nsp(mixture->GetNumActiveSpecies());
+    double Ysum = 0.0;
+    for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
+      Ysp[sp] = uniformRandomNumber();
+      Ysum += Ysp[sp];
+    }
+    for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
+      double Y = Ysp[sp] / Ysum * (1.0 - Yb);
+      nsp[sp] = testPrimitives[0] * Y / mixture->GetGasParams(sp,GasParams::SPECIES_MW);
+      testPrimitives[dim + 2 + sp] = nsp[sp];
+    }
+    double ne = 0.0;
+    for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
+      ne += nsp[sp] * mixture->GetGasParams(sp,GasParams::SPECIES_CHARGES);
+    }
+    Yb -= ne * mixture->GetGasParams(mixture->GetNumSpecies() - 2, GasParams::SPECIES_MW) / testPrimitives[0];
+
+    grvy_printf(GRVY_INFO, "\n Testing Conversion between conserved/primitive. \n");
+
+    Vector conservedState(mixture->GetNumEquations());
+    mixture->GetConservativesFromPrimitives(testPrimitives,conservedState);
+
+    Vector targetPrimitives(mixture->GetNumEquations());
+    mixture->GetPrimitivesFromConservatives(conservedState, targetPrimitives);
+
+    double error = 0.0;
+    for (int n = 0; n < mixture->GetNumEquations(); n++){
+      error += abs( ( testPrimitives[n] - targetPrimitives[n] ) / testPrimitives[n] );
+    }
+
+    if (error > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n Conversions between conserved and primitive variables are not equivalent.");
+      grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
+      exit(ERROR);
+    }
+
+    grvy_printf(GRVY_INFO, "\n Testing ComputePressure. \n");
+
+    double pressureFromConserved = mixture->ComputePressure(conservedState);
+    double pressureFromPrimitive = mixture->ComputePressureFromPrimitives(testPrimitives);
+    error = abs( (pressureFromConserved - pressureFromPrimitive) / pressureFromConserved );
+    if (error > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n Pressure computations from conserved and primitive variables are not equivalent.");
+      grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
+      exit(ERROR);
+    }
+
+    grvy_printf(GRVY_INFO, "\n Testing ComputeTemperature. \n");
+
+    double temperature = mixture->ComputeTemperature(conservedState);
+    error = abs( (temperature - testPrimitives[dim + 1]) / testPrimitives[dim + 1] );
+    if (error > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n ComputeTemperature is not equivalent to the reference.");
+      grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
+      exit(ERROR);
+    }
+
+    grvy_printf(GRVY_INFO, "\n Testing computeSpeciesPrimitives. \n");
+
+    Vector X_sp, Y_sp, n_sp;
+    mixture->computeSpeciesPrimitives(conservedState, X_sp, Y_sp, n_sp);
+    double Xsum = 0.0;
+    for (int sp = 0; sp < mixture->GetNumSpecies(); sp++){
+      Xsum += X_sp[sp];
+    }
+    if (abs(Xsum - 1.0) > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives does not conserve mole fraction.");
+      exit(ERROR);
+    }
+    Ysum = 0.0;
+    for (int sp = 0; sp < mixture->GetNumSpecies(); sp++){
+      Ysum += Y_sp[sp];
+    }
+    if (abs(Ysum - 1.0) > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives does not conserve mass fraction.");
+      exit(ERROR);
+    }
+    if (abs(Yb - Y_sp[mixture->GetNumSpecies() - 1]) > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives does not compute background species properly.");
+      exit(ERROR);
+    }
+
+    double netCharge = 0.0;
+    for (int sp = 0; sp < mixture->GetNumSpecies(); sp++){
+      netCharge += n_sp[sp] * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+
+      if (sp < mixture->GetNumActiveSpecies()) {
+        if (abs(n_sp[sp] - testPrimitives[dim + 2 + sp]) > 1.0e-15) {
+          grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives is not consistent in number density computation.");
+          exit(ERROR);
+        }
+      }
+    }
+    if (abs(netCharge) > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives does not keep charge conservation.");
+      exit(ERROR);
+    }
+
+    double T_h, T_e;
+    int numSpecies = mixture->GetNumSpecies();
+    int numEquation = mixture->GetNumEquations();
+    mixture->computeTemperaturesBase(conservedState, &n_sp[0], n_sp[numSpecies-2], n_sp[numSpecies-1], T_h, T_e);
+    if (abs( (T_h - testPrimitives[dim + 1]) / testPrimitives[dim + 1] ) > 1.0e-15) {
+      std::cout << T_h << " != " << testPrimitives[dim + 1] << std::endl;
+      grvy_printf(GRVY_ERROR, "\n computeTemperaturesBase does not compute heavy-species temperature properly.");
+      exit(ERROR);
+    }
+    if (abs( (T_e - testPrimitives[numEquation - 1]) / testPrimitives[numEquation - 1] ) > 1.0e-15) {
+      grvy_printf(GRVY_ERROR, "\n computeTemperaturesBase does not compute electron temperature properly.");
+      exit(ERROR);
+    }
+
+    grvy_printf(GRVY_INFO, "\n Setting a random primitive gradient. \n");
+
+    DenseMatrix gradUp(numEquation,dim);
+    gradUp = 0.0;
+    for (int eq = 0; eq < numEquation; eq++) {
+      for (int d = 0; d < dim; d++) gradUp(eq, d) = -10.0 + 20.0 * uniformRandomNumber();
+    }
+    DenseMatrix massFractionGrad(numSpecies,dim);
+    DenseMatrix moleFractionGrad(numSpecies,dim);
+    mixture->computeMassFractionGradient(testPrimitives[0], n_sp, gradUp, massFractionGrad);
+    mixture->computeMoleFractionGradient(n_sp, gradUp, moleFractionGrad);
+    Vector dir(dim);
+    double norm = 0.0;
+    for (int d = 0; d < dim; d++) {
+      dir(d) = -1.0 + 2.0 * uniformRandomNumber();
+      norm += dir(d) * dir(d);
+    }
+    dir /= sqrt(norm);
+
+    Vector dUp_dx(numEquation), dY_dx(numSpecies), dX_dx(numSpecies);
+    gradUp.Mult(dir, dUp_dx);
+    massFractionGrad.Mult(dir, dY_dx);
+    moleFractionGrad.Mult(dir, dX_dx);
+    double dpdx_prim = mixture->ComputePressureDerivative(dUp_dx, testPrimitives, true);
+    double dpdx_cons = mixture->ComputePressureDerivative(dUp_dx, conservedState, false);
+    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > 1.0e-15 ) {
+      grvy_printf(GRVY_ERROR, "\n ComputePressureDerivative is not consistent between primitive and conservative.");
+      grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim), abs( (dpdx_prim - dpdx_cons) / dpdx_cons );
+      exit(ERROR);
+    }
+
+    { // FD verification of pressure gradient.
+      grvy_printf(GRVY_INFO, "\n Testing ComputePressureDerivative. \n");
+
+      double delta = 1.0e2 / dpdx_prim;
+      Vector perturbedPrimitive(numEquation);
+      for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+
+      double perturbedPressure = mixture->ComputePressureFromPrimitives(perturbedPrimitive);
+      double deltaPdeltax = (perturbedPressure - pressureFromPrimitive) / delta;
+
+      error = abs( (deltaPdeltax - dpdx_prim) / dpdx_prim );
+      double error1 = error;
+      for (int fd = 1; fd < 30; fd++) {
+        error1 = error;
+        double factor = pow(10.0, (- 0.25 * fd));
+        delta = 1.0e2 / dpdx_prim * factor;
+        for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+        perturbedPressure = mixture->ComputePressureFromPrimitives(perturbedPrimitive);
+        deltaPdeltax = (perturbedPressure - pressureFromPrimitive) / delta;
+        error = abs( (deltaPdeltax - dpdx_prim) / dpdx_prim );
+
+        grvy_printf(GRVY_INFO, "\n Delta : %.8E - FD-Error : %.8E", factor, error);
+
+        if (error > error1) break;
+      }
+      grvy_printf(GRVY_INFO, "\n");
+      if ( error1 > gradErrorThreshold ) {
+        grvy_printf(GRVY_ERROR, "\n ComputePressureDerivative is not computing the correct gradient.");
+        exit(ERROR);
+      }
+    }
+
+    { // FD verification of mass fraction gradient.
+      grvy_printf(GRVY_INFO, "\n Testing computeMassFractionGradient. \n");
+
+      double gradNorm = sqrt( dY_dx * dY_dx );
+      double delta = 1.0e-3 / gradNorm;
+      Vector perturbedPrimitive(numEquation);
+      for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+
+      Vector perturbedConserved(numEquation);
+      mixture->GetConservativesFromPrimitives(perturbedPrimitive, perturbedConserved);
+
+      Vector perturbedX(numSpecies), perturbedY(numSpecies), perturbedN(numSpecies);
+      mixture->computeSpeciesPrimitives(perturbedConserved, perturbedX, perturbedY, perturbedN);
+
+      Vector deltaYdeltax(numSpecies);
+      for (int sp = 0; sp < numSpecies; sp++) deltaYdeltax(sp) = (perturbedY(sp) - Y_sp(sp)) / delta;
+
+      error = 0.0;
+      for (int sp = 0; sp < numSpecies; sp++) error += pow(deltaYdeltax(sp) - dY_dx(sp), 2);
+      error = sqrt(error) / gradNorm;
+      double error1 = error;
+      for (int fd = 1; fd < 30; fd++) {
+        error1 = error;
+        double factor = pow(10.0, (- 0.25 * fd));
+        delta = 1.0e-3 / gradNorm * factor;
+        for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+
+        Vector perturbedConserved(numEquation);
+        mixture->GetConservativesFromPrimitives(perturbedPrimitive, perturbedConserved);
+
+        Vector perturbedX(numSpecies), perturbedY(numSpecies), perturbedN(numSpecies);
+        mixture->computeSpeciesPrimitives(perturbedConserved, perturbedX, perturbedY, perturbedN);
+
+        Vector deltaYdeltax(numSpecies);
+        for (int sp = 0; sp < numSpecies; sp++) deltaYdeltax(sp) = (perturbedY(sp) - Y_sp(sp)) / delta;
+
+        error = 0.0;
+        for (int sp = 0; sp < numSpecies; sp++) error += pow(deltaYdeltax(sp) - dY_dx(sp), 2);
+        error = sqrt(error) / gradNorm;
+
+        grvy_printf(GRVY_INFO, "\n Delta : %.8E - FD-Error : %.8E", factor, error);
+
+        if (error > error1) break;
+      }
+      grvy_printf(GRVY_INFO, "\n");
+      // std::cout << error1 << std::endl;
+      if ( error1 > gradErrorThreshold ) {
+        grvy_printf(GRVY_ERROR, "\n computeMassFractionGradient is not computing the correct gradient.");
+        exit(ERROR);
+      }
+    }
+
+    { // FD verification of mass fraction gradient.
+      grvy_printf(GRVY_INFO, "\n Testing computeMoleFractionGradient. \n");
+
+      double gradNorm = sqrt( dY_dx * dY_dx );
+      double delta = 1.0e-3 / gradNorm;
+      Vector perturbedPrimitive(numEquation);
+      for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+
+      Vector perturbedConserved(numEquation);
+      mixture->GetConservativesFromPrimitives(perturbedPrimitive, perturbedConserved);
+
+      Vector perturbedX(numSpecies), perturbedY(numSpecies), perturbedN(numSpecies);
+      mixture->computeSpeciesPrimitives(perturbedConserved, perturbedX, perturbedY, perturbedN);
+
+      Vector deltaXdeltax(numSpecies);
+      for (int sp = 0; sp < numSpecies; sp++) deltaXdeltax(sp) = (perturbedX(sp) - X_sp(sp)) / delta;
+
+      error = 0.0;
+      for (int sp = 0; sp < numSpecies; sp++) error += pow(deltaXdeltax(sp) - dX_dx(sp), 2);
+      error = sqrt(error) / gradNorm;
+      double error1 = error;
+      for (int fd = 1; fd < 30; fd++) {
+        error1 = error;
+        double factor = pow(10.0, (- 0.25 * fd));
+        delta = 1.0e-3 / gradNorm * factor;
+        for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+
+        Vector perturbedConserved(numEquation);
+        mixture->GetConservativesFromPrimitives(perturbedPrimitive, perturbedConserved);
+
+        Vector perturbedX(numSpecies), perturbedY(numSpecies), perturbedN(numSpecies);
+        mixture->computeSpeciesPrimitives(perturbedConserved, perturbedX, perturbedY, perturbedN);
+
+        Vector deltaXdeltax(numSpecies);
+        for (int sp = 0; sp < numSpecies; sp++) deltaXdeltax(sp) = (perturbedX(sp) - X_sp(sp)) / delta;
+
+        error = 0.0;
+        for (int sp = 0; sp < numSpecies; sp++) error += pow(deltaXdeltax(sp) - dX_dx(sp), 2);
+        error = sqrt(error) / gradNorm;
+
+        grvy_printf(GRVY_INFO, "\n Delta : %.8E - FD-Error : %.8E", factor, error);
+
+        if (error > error1) break;
+      }
+      grvy_printf(GRVY_INFO, "\n");
+      if ( error1 > gradErrorThreshold ) {
+        grvy_printf(GRVY_ERROR, "\n computeMoleFractionGradient is not computing the correct gradient.");
+        exit(ERROR);
+      }
+    }
+
+  }
+  grvy_printf(GRVY_INFO, "\nPASS: ambipolar, two temperature.\n");
 
   return 0;
 }
