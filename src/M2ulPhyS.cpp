@@ -226,7 +226,20 @@ void M2ulPhyS::initVariables() {
     locToGlobElem = NULL;
   }
 
-  cout << "Process " << mpi.WorldRank() << " # elems " << mesh->GetNE() << endl;
+  // partitioning summary
+  {
+    int maxElems;
+    int minElems;
+    int localElems = mesh->GetNE();
+    MPI_Allreduce(&localElems, &minElems, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+    MPI_Allreduce(&localElems, &maxElems, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+
+    if (rank0_) {
+      grvy_printf(GRVY_INFO, "number of elements on rank 0 = %i\n", localElems);
+      grvy_printf(GRVY_INFO, "min elements/partition       = %i\n", minElems);
+      grvy_printf(GRVY_INFO, "max elements/partition       = %i\n", maxElems);
+    }
+  }
 
   dim = mesh->Dimension();
 
@@ -941,10 +954,7 @@ void M2ulPhyS::projectInitialSolution() {
 }
 
 void M2ulPhyS::solve() {
-#ifdef HAVE_GRVY
-  const int iterQuery = 100;
   double tlast = grvy_timer_elapsed_global();
-#endif
 
 #ifdef _MASA_
   // instantiate function for exact solution
@@ -974,17 +984,16 @@ void M2ulPhyS::solve() {
 
   // Integrate in time.
   while (iter < MaxIters) {
-#ifdef HAVE_GRVY
     grvy_timer_begin(__func__);
-    if ((iter % iterQuery) == 0) {
+
+    // periodically report on time/iteratino
+    if ((iter % config.timingFreq) == 0) {
       if (mpi.Root()) {
-        double timePerIter = (grvy_timer_elapsed_global() - tlast) / iterQuery;
+        double timePerIter = (grvy_timer_elapsed_global() - tlast) / config.timingFreq;
         grvy_printf(ginfo, "Iteration = %i: wall clock time/iter = %.3f (secs)\n", iter, timePerIter);
         tlast = grvy_timer_elapsed_global();
       }
-      writeHistoryFile();
     }
-#endif
 
     timeIntegrator->Step(*U, time, dt);
 
@@ -999,6 +1008,9 @@ void M2ulPhyS::solve() {
 
     const int vis_steps = config.GetNumItersOutput();
     if (iter % vis_steps == 0) {
+      // dump history
+      writeHistoryFile();
+
 #ifdef _MASA_
       rhsOperator->updatePrimitives(*U);
       mixture->UpdatePressureGridFunction(press, Up);
@@ -1052,9 +1064,7 @@ void M2ulPhyS::solve() {
       break;
     }
 
-#ifdef HAVE_GRVY
     grvy_timer_end(__func__);
-#endif
   }  // <-- end main timestep iteration loop
 
   if (iter == MaxIters) {
@@ -1526,6 +1536,7 @@ void M2ulPhyS::parseSolverOptions2() {
     tpsP->getInput("flow/basisType", config.basisType, 1);
     tpsP->getInput("flow/maxIters", config.numIters, 10);
     tpsP->getInput("flow/outputFreq", config.itersOut, 50);
+    tpsP->getInput("flow/timingFreq", config.timingFreq, 100);
     tpsP->getInput("flow/useRoe", config.useRoe, false);
     tpsP->getInput("flow/useSumByParts", config.SBP, false);
     tpsP->getInput("flow/refLength", config.refLength, 1.0);
@@ -1560,6 +1571,7 @@ void M2ulPhyS::parseSolverOptions2() {
 
   // statistics
   {
+    tpsP->getInput("averaging/saveMeanHist", config.meanHistEnable, false);
     tpsP->getInput("averaging/startIter", config.startIter, 0);
     tpsP->getInput("averaging/sampleFreq", config.sampleInterval, 0);
     tpsP->getInput("averaging/enableContinuation", config.restartMean, false);
