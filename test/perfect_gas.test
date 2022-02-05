@@ -11,10 +11,14 @@ setup() {
 }
 
 @test "[$TEST] test consistency of routines and gradient accuracy" {
-    ../utils/perfect_mixture_test -run $RUNFILE_ARGON
+    test -s $RUNFILE_ARGON
+    test -e ./perfect_mixture_test
+    ./perfect_mixture_test -run $RUNFILE_ARGON
 }
 
 @test "[$TEST] test speed of sound of dry-air composition at room temperature" {
-    ../utils/test_speed_of_sound -run $RUNFILE_AIR
+    test -s $RUNFILE_AIR
+    test -e ./test_speed_of_sound
+    ./test_speed_of_sound -run $RUNFILE_AIR
 }
 

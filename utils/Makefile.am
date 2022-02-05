@@ -77,30 +77,30 @@ binaryic_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
 binaryic_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
 binaryic_LDFLAGS += -L$(GSLIB_LIB) -lgs
 
-bin_PROGRAMS += perfect_mixture_test
-perfect_mixture_test_SOURCES  = test_perfect_mixture.cpp
-perfect_mixture_test_LDADD    = ../src/libtps.a -lmfem
-
-perfect_mixture_test_LDFLAGS  = -L$(MFEM_LIB)
-perfect_mixture_test_LDFLAGS += $(HDF5_LIBS)
-perfect_mixture_test_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
-perfect_mixture_test_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
-perfect_mixture_test_LDFLAGS += -L$(METIS_LIB) -lmetis
-perfect_mixture_test_LDFLAGS += $(GRVY_LIBS)
-perfect_mixture_test_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
-perfect_mixture_test_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
-perfect_mixture_test_LDFLAGS += -L$(GSLIB_LIB) -lgs
-
-bin_PROGRAMS += test_speed_of_sound
-test_speed_of_sound_SOURCES  = test_speed_of_sound.cpp
-test_speed_of_sound_LDADD    = ../src/libtps.a -lmfem
-
-test_speed_of_sound_LDFLAGS  = -L$(MFEM_LIB)
-test_speed_of_sound_LDFLAGS += $(HDF5_LIBS)
-test_speed_of_sound_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
-test_speed_of_sound_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
-test_speed_of_sound_LDFLAGS += -L$(METIS_LIB) -lmetis
-test_speed_of_sound_LDFLAGS += $(GRVY_LIBS)
-test_speed_of_sound_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
-test_speed_of_sound_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
-test_speed_of_sound_LDFLAGS += -L$(GSLIB_LIB) -lgs
+#bin_PROGRAMS += perfect_mixture_test
+#perfect_mixture_test_SOURCES  = test_perfect_mixture.cpp
+#perfect_mixture_test_LDADD    = ../src/libtps.a -lmfem
+#
+#perfect_mixture_test_LDFLAGS  = -L$(MFEM_LIB)
+#perfect_mixture_test_LDFLAGS += $(HDF5_LIBS)
+#perfect_mixture_test_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
+#perfect_mixture_test_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
+#perfect_mixture_test_LDFLAGS += -L$(METIS_LIB) -lmetis
+#perfect_mixture_test_LDFLAGS += $(GRVY_LIBS)
+#perfect_mixture_test_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
+#perfect_mixture_test_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
+#perfect_mixture_test_LDFLAGS += -L$(GSLIB_LIB) -lgs
+#
+#bin_PROGRAMS += test_speed_of_sound
+#test_speed_of_sound_SOURCES  = test_speed_of_sound.cpp
+#test_speed_of_sound_LDADD    = ../src/libtps.a -lmfem
+#
+#test_speed_of_sound_LDFLAGS  = -L$(MFEM_LIB)
+#test_speed_of_sound_LDFLAGS += $(HDF5_LIBS)
+#test_speed_of_sound_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
+#test_speed_of_sound_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
+#test_speed_of_sound_LDFLAGS += -L$(METIS_LIB) -lmetis
+#test_speed_of_sound_LDFLAGS += $(GRVY_LIBS)
+#test_speed_of_sound_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
+#test_speed_of_sound_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
+#test_speed_of_sound_LDFLAGS += -L$(GSLIB_LIB) -lgs
