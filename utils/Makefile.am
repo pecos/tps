@@ -1,6 +1,6 @@
 AM_CPPFLAGS          = -g -I../src -I$(MFEM_INC) -I$(MFEM_INC)/mfem
 AM_CPPFLAGS         += -I$(HYPRE_INC) $(HDF5_CFLAGS) $(GRVY_CFLAGS)
-#AM_CPPFLAGS         += -I$(PETSC_INC)
+AM_CPPFLAGS         += -I$(PETSC_INC)
 EXTRA_DIST           = bats cpplint
 
 if CUDA_ENABLED
@@ -23,7 +23,7 @@ beam_mesh_SOURCES  = beam_mesh.cpp
 beam_mesh_LDADD    = -lmfem
 
 beam_mesh_LDFLAGS  = -L$(MFEM_LIB)
-beam_mesh_LDFLAGS += -L$(PETSC_LIB) -lpetsc
+#beam_mesh_LDFLAGS += -L$(PETSC_LIB) -lpetsc
 beam_mesh_LDFLAGS += $(HDF5_LIBS)
 beam_mesh_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
 beam_mesh_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas

@@ -1869,6 +1869,9 @@ void M2ulPhyS::parseSolverOptions2() {
   // plasma conditions.
   if (config.workFluid != USER_DEFINED) {
     cout << "Fluid is set to the preset '" << fluidTypeStr << "'. Input options in [plasma_models] will not be used." << endl;
+    config.gasModel = NUM_GASMODEL;
+    config.transportModel = NUM_TRANSPORTMODEL;
+    config.chemistryModel = NUM_CHEMISTRYMODEL;
   } else {
 
     tpsP->getInput("plasma_models/ambipolar", config.ambipolar, false);
