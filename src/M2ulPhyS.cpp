@@ -1962,12 +1962,16 @@ void M2ulPhyS::parseSolverOptions2() {
   // fluid presets
   std::string fluidTypeStr;
   tpsP->getInput("flow/fluid", fluidTypeStr, std::string("dry_air") );
-
-  std::map<std::string, WorkingFluid> fluidMapping;
-  fluidMapping["dry_air"] = DRY_AIR;
-  fluidMapping["test_binary_air"] = TEST_BINARY_AIR;
-  fluidMapping["user_defined"] = USER_DEFINED;
-  config.workFluid = fluidMapping[fluidTypeStr];
+  if (fluidTypeStr == "dry_air") {
+    config.workFluid = DRY_AIR;
+  } else if (fluidTypeStr == "test_binary_air") {
+    config.workFluid = TEST_BINARY_AIR;
+  } else if (fluidTypeStr == "user_defined") {
+    config.workFluid = USER_DEFINED;
+  } else {
+    grvy_printf(GRVY_ERROR, "\nUnknown outlet BC supplied at runtime -> %s", fluidTypeStr);
+    exit(ERROR);
+  }
 
   // int fluidType;
   // switch (fluidType) {
