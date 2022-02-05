@@ -21,7 +21,8 @@ TESTS += cyl3d.test \
 	 averages.test \
 	 wedge.test \
 	 qms.rings.test \
-	 sponge_zone.test
+	 sponge_zone.test \
+	 perfect_gas.test
 endif
 
 if GSLIB_ENABLED
