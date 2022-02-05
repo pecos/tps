@@ -1661,7 +1661,7 @@ void M2ulPhyS::parseSolverOptions2() {
     // Wall Bcs
     std::map<std::string, WallType> wallMapping;
     wallMapping["inviscid"] = INV;
-    wallMapping["viscous_adiabitc"] = VISC_ADIAB;
+    wallMapping["viscous_adiabatic"] = VISC_ADIAB;
     wallMapping["viscous_isothermal"] = VISC_ISOTH;
 
     for (int i = 1; i <= numWalls; i++) {
