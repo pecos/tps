@@ -1,6 +1,6 @@
 /* A utility to transfer tps solutions from one mesh to another */
 
-#include "M2ulPhyS.hpp"
+#include "../src/M2ulPhyS.hpp"
 #include "mfem.hpp"
 #include <fstream>
 
