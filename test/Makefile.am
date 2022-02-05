@@ -1,3 +1,20 @@
+AM_CPPFLAGS          = -g -I../src -I$(MFEM_INC) -I$(MFEM_INC)/mfem
+AM_CPPFLAGS         += -I$(HYPRE_INC) $(HDF5_CFLAGS) $(GRVY_CFLAGS)
+AM_CPPFLAGS         += -I$(PETSC_INC)
+#EXTRA_DIST           = bats cpplint
+
+if CUDA_ENABLED
+AM_CPPFLAGS += $(CUDA_CXXFLAGS)
+endif
+
+if HIP_ENABLED
+AM_CPPFLAGS += $(HIP_CXXFLAGS)
+endif
+
+if GSLIB_ENABLED
+AM_CPPFLAGS += -I$(GSLIB_INC)
+endif
+
 TEST_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) $(top_srcdir)/test/tap-driver.sh
 
 EXTRA_DIST      = tap-driver.sh soln_differ inputs meshes ref_solns/*.h5 \
@@ -32,9 +49,38 @@ if GSLIB_ENABLED
 TESTS += cyl3d.interp.test
 endif
 
+check_PROGRAMS =
 if VALGRIND_ENABLED
-check_PROGRAMS = uninit
+check_PROGRAMS += uninit
 uninit_SOURCES = badloop.cpp
 
 TESTS  += valgrind.test
 endif
+
+check_PROGRAMS += perfect_mixture_test
+perfect_mixture_test_SOURCES  = test_perfect_mixture.cpp
+perfect_mixture_test_LDADD    = ../src/libtps.a -lmfem
+
+perfect_mixture_test_LDFLAGS  = -L$(MFEM_LIB)
+perfect_mixture_test_LDFLAGS += $(HDF5_LIBS)
+perfect_mixture_test_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
+perfect_mixture_test_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
+perfect_mixture_test_LDFLAGS += -L$(METIS_LIB) -lmetis
+perfect_mixture_test_LDFLAGS += $(GRVY_LIBS)
+perfect_mixture_test_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
+perfect_mixture_test_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
+perfect_mixture_test_LDFLAGS += -L$(GSLIB_LIB) -lgs
+
+check_PROGRAMS += test_speed_of_sound
+test_speed_of_sound_SOURCES  = test_speed_of_sound.cpp
+test_speed_of_sound_LDADD    = ../src/libtps.a -lmfem
+
+test_speed_of_sound_LDFLAGS  = -L$(MFEM_LIB)
+test_speed_of_sound_LDFLAGS += $(HDF5_LIBS)
+test_speed_of_sound_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
+test_speed_of_sound_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
+test_speed_of_sound_LDFLAGS += -L$(METIS_LIB) -lmetis
+test_speed_of_sound_LDFLAGS += $(GRVY_LIBS)
+test_speed_of_sound_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
+test_speed_of_sound_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
+test_speed_of_sound_LDFLAGS += -L$(GSLIB_LIB) -lgs

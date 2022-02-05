@@ -1969,7 +1969,7 @@ void M2ulPhyS::parseSolverOptions2() {
   } else if (fluidTypeStr == "user_defined") {
     config.workFluid = USER_DEFINED;
   } else {
-    grvy_printf(GRVY_ERROR, "\nUnknown outlet BC supplied at runtime -> %s", fluidTypeStr);
+    grvy_printf(GRVY_ERROR, "\nUnknown fluid preset supplied at runtime -> %s", fluidTypeStr);
     exit(ERROR);
   }
 
