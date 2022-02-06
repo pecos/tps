@@ -72,6 +72,7 @@ class Tps;
 #include "solver.hpp"
 #include "tps.hpp"
 #include "utils.hpp"
+#include "chemistry.hpp"
 
 #ifdef _MASA_
 #include "masa_handler.hpp"
