@@ -73,7 +73,7 @@ class Tps {
   std::string meshFile_;
 
   // pointer to solver implementation chosen at runtime
-  TPS::Solver *solver_;
+  TPS::Solver *solver_ = NULL;
 
  public:
   Tps(int argc, char *argv[]);     // constructor

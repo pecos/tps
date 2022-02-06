@@ -62,7 +62,7 @@ Tps::Tps(int argc, char *argv[]) {
 #endif
 }
 
-Tps::~Tps() { delete solver_; }
+Tps::~Tps() { if (solver_ != NULL) delete solver_; }
 
 void Tps::printHeader() {
   if (isRank0_) {
