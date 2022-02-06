@@ -48,6 +48,7 @@ class Solver {
   // methods to be (optionally) implemented by derived solver classes
   virtual int getStatus() { return NORMAL; }
   virtual void initialize() { return; }
+  virtual ~Solver() {}
   // methods *required* to be implemented by derived solver classes
   virtual void parseSolverOptions() {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;

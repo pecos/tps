@@ -90,6 +90,9 @@ class RunConfiguration {
   // num iterations. Defaults to 0
   int numIters;
 
+  // iteration frequency to provide iteration timing info
+  int timingFreq;
+
   // output interval in num. of iters.
   int itersOut;
 

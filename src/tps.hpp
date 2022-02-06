@@ -32,8 +32,9 @@
 #ifndef TPS_HPP_
 #define TPS_HPP_
 
-#include <tps_config.h>
 #include <grvy.h>
+#include <tps_config.h>
+
 #include <mfem.hpp>
 #include <string>
 
@@ -76,6 +77,7 @@ class Tps {
 
  public:
   Tps(int argc, char *argv[]);     // constructor
+  ~Tps();                          // destructor
   GRVY::GRVY_Input_Class iparse_;  // runtime input parser
 
   void chooseSolver();

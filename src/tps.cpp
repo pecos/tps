@@ -62,6 +62,8 @@ Tps::Tps(int argc, char *argv[]) {
 #endif
 }
 
+Tps::~Tps() { delete solver_; }
+
 void Tps::printHeader() {
   if (isRank0_) {
     grvy_printf(ginfo, "\n------------------------------------\n");
