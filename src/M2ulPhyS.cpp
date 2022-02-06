@@ -2075,8 +2075,8 @@ void M2ulPhyS::parseSolverOptions2() {
         config.gasParams(i-1, GasParams::SPECIES_CHARGES) = charge;
 
         if ( config.gasModel == PERFECT_MIXTURE ) {
-          tpsP->getRequiredInput((basepath + "/constant_molar_cv").c_str(), config.constantMolarCV(i-1));
-          tpsP->getRequiredInput((basepath + "/constant_molar_cp").c_str(), config.constantMolarCP(i-1));
+          tpsP->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(), config.constantMolarCV(i-1));
+          tpsP->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cp").c_str(), config.constantMolarCP(i-1));
         }
       }
     }
