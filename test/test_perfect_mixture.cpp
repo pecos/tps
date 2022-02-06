@@ -175,9 +175,9 @@ int main (int argc, char *argv[])
     moleFractionGrad.Mult(dir, dX_dx);
     double dpdx_prim = mixture->ComputePressureDerivative(dUp_dx, testPrimitives, true);
     double dpdx_cons = mixture->ComputePressureDerivative(dUp_dx, conservedState, false);
-    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > 1.0e-15 ) {
+    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > 1.0e-14 ) {
       grvy_printf(GRVY_ERROR, "\n ComputePressureDerivative is not consistent between primitive and conservative.");
-      grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim), abs( (dpdx_prim - dpdx_cons) / dpdx_cons );
+      grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim, abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) );
       exit(ERROR);
     }
 
@@ -464,9 +464,9 @@ int main (int argc, char *argv[])
     moleFractionGrad.Mult(dir, dX_dx);
     double dpdx_prim = mixture->ComputePressureDerivative(dUp_dx, testPrimitives, true);
     double dpdx_cons = mixture->ComputePressureDerivative(dUp_dx, conservedState, false);
-    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > 1.0e-15 ) {
+    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > 1.0e-14 ) {
       grvy_printf(GRVY_ERROR, "\n ComputePressureDerivative is not consistent between primitive and conservative.");
-      grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim), abs( (dpdx_prim - dpdx_cons) / dpdx_cons );
+      grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim, abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) );
       exit(ERROR);
     }
 
@@ -752,9 +752,9 @@ int main (int argc, char *argv[])
     moleFractionGrad.Mult(dir, dX_dx);
     double dpdx_prim = mixture->ComputePressureDerivative(dUp_dx, testPrimitives, true);
     double dpdx_cons = mixture->ComputePressureDerivative(dUp_dx, conservedState, false);
-    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > 1.0e-15 ) {
+    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > 1.0e-14 ) {
       grvy_printf(GRVY_ERROR, "\n ComputePressureDerivative is not consistent between primitive and conservative.");
-      grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim), abs( (dpdx_prim - dpdx_cons) / dpdx_cons );
+      grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim, abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) );
       exit(ERROR);
     }
 
@@ -1054,9 +1054,9 @@ int main (int argc, char *argv[])
     moleFractionGrad.Mult(dir, dX_dx);
     double dpdx_prim = mixture->ComputePressureDerivative(dUp_dx, testPrimitives, true);
     double dpdx_cons = mixture->ComputePressureDerivative(dUp_dx, conservedState, false);
-    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > 1.0e-15 ) {
+    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > 1.0e-14 ) {
       grvy_printf(GRVY_ERROR, "\n ComputePressureDerivative is not consistent between primitive and conservative.");
-      grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim), abs( (dpdx_prim - dpdx_cons) / dpdx_cons );
+      grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim, abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) );
       exit(ERROR);
     }
 
