@@ -91,12 +91,6 @@ RunConfiguration::RunConfiguration() {
   for (int ii = 0; ii < 3; ii++) gradPress[ii] = 0.;
 
   arrayPassiveScalar.DeleteAll();
-
-  // Resource manager monitoring
-  rm_enableMonitor_ = false;
-  rm_threshold_ = 15 * 60;     // 15 minutes
-  rm_checkFrequency_ = 25;     // 25 iterations
-  exit_checkFrequency_ = 500;  // 500 iterations
 }
 
 RunConfiguration::~RunConfiguration() {

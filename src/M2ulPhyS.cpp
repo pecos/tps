@@ -1597,6 +1597,13 @@ void M2ulPhyS::parseSolverOptions2() {
     }
   }
 
+  // RMS job management
+  {
+    tpsP->getInput("jobManagement/enableAutoRestart", config.rm_enableMonitor_, false);
+    tpsP->getInput("jobManagement/timeThreshold", config.rm_threshold_, 15*60);  // 15 minutes
+    tpsP->getInput("jobManagement/checkFreq", config.rm_checkFrequency_, 500);   // 500 iterations
+  }
+
   // sponge zone
   {
     bool isSpongeZoneEnabled;
