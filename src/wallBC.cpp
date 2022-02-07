@@ -203,11 +203,11 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn,  DenseMatrix &g
   } else {
     // evaluate viscous fluxes at the wall
     DenseMatrix viscFw(num_equation, dim);
-    fluxClass->ComputeViscousFluxes(stateMirror, gradState, viscFw);
+    fluxClass->ComputeViscousFluxes(stateMirror, gradState, radius, viscFw);
 
     // evaluate internal viscous fluxes
     DenseMatrix viscF(num_equation, dim);
-    fluxClass->ComputeViscousFluxes(stateIn, gradState, viscF);
+    fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, viscF);
 
     // Add visc fluxes (we skip density eq.)
     for (int eq = 1; eq < num_equation; eq++) {
