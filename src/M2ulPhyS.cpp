@@ -1847,6 +1847,15 @@ void M2ulPhyS::checkSolverOptions() const {
   // Axisymmetric solver does not yet support all options.  Check that
   // we are running a supported combination.
   if (config.isAxisymmetric()) {
+    // Don't support passive scalars yet
+    if (config.GetEquationSystem() == NS_PASSIVE) {
+      if (mpi.Root()) {
+        std::cerr << "[ERROR]: Passive scalars not supported for axisymmetric simulations."
+                  << std::endl;
+        std::cerr << std::endl;
+        exit(ERROR);
+      }
+    }
     // Don't support Roe flux yet
     if (config.RoeRiemannSolver()) {
       if (mpi.Root()) {

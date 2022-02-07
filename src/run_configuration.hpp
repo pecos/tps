@@ -210,7 +210,7 @@ class RunConfiguration {
   double GetViscMult() { return visc_mult; }
   double GetBulkViscMult() { return bulk_visc; }
   double GetReferenceLength() { return refLength; }
-  Equations GetEquationSystem() { return eqSystem; }
+  Equations GetEquationSystem() const { return eqSystem; }
   bool isAxisymmetric() const { return axisymmetric_; }
   bool isSBP() { return SBP; }
   double* GetConstantInitialCondition() { return &initRhoRhoVp[0]; }
