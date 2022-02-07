@@ -100,11 +100,11 @@ class OutletBC : public BoundaryCondition {
   OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *rsolver_, GasMixture *mixture,
            ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
            const int _num_equation, int _patchNumber, double _refLength, OutletType _bcType,
-           const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs);
+           const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs, bool axisym);
   ~OutletBC();
 
-  // computes state that imposes the boundary
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux);
+
   virtual void initBCs();
 
   virtual void integrationBC(Vector &y,  // output

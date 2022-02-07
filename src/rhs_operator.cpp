@@ -31,6 +31,9 @@
 // -----------------------------------------------------------------------------------el-
 #include "rhs_operator.hpp"
 
+double getRadius(const Vector &pos) { return pos[0]; }
+FunctionCoefficient radiusFcn(getRadius);
+
 // Implementation of class RHSoperator
 RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, const int &_order,
                          const Equations &_eqSystem, double &_max_char_speed, IntegrationRules *_intRules,
@@ -41,8 +44,10 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
                          ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A, BCintegrator *_bcIntegrator,
                          bool &_isSBP, double &_alpha, RunConfiguration &_config)
     : TimeDependentOperator(_A->Height()),
+      config_(_config),
       iter(_iter),
       dim(_dim),
+      nvel(_config.isAxisymmetric() ? 3 : _dim),
       eqSystem(_eqSystem),
       max_char_speed(_max_char_speed),
       num_equation(_num_equations),
@@ -79,8 +84,9 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
   h_numElems = gpuArrays.numElems.HostRead();
   h_posDofIds = gpuArrays.posDofIds.HostRead();
 
-  // Me_inv = new DenseMatrix[vfes->GetNE()];
   Me_inv.SetSize(vfes->GetNE());
+  Me_inv_rad.SetSize(vfes->GetNE());
+
   posDofInvM.SetSize(2 * vfes->GetNE());
   auto hposDofInvM = posDofInvM.HostWrite();
 
@@ -101,6 +107,22 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
   forcing.Append(
       new MASA_forcings(dim, num_equation, _order, intRuleType, intRules, vfes, Up, gradUp, gpuArrays, _config));
 #endif
+
+  if (config_.isAxisymmetric()) {
+    forcing.Append(new AxisymmetricSource(dim, num_equation, _order,
+                                          mixture, eqSystem,
+                                          intRuleType, intRules,
+                                          vfes, Up, gradUp, gpuArrays, _config));
+
+    const FiniteElementCollection *fec = vfes->FEColl();
+    dfes = new ParFiniteElementSpace(mesh, fec, dim, Ordering::byNODES);
+    coordsDof = new ParGridFunction(dfes);
+    mesh->GetNodes(*coordsDof);
+  } else {
+    coordsDof = NULL;
+    dfes = NULL;
+  }
+
   std::vector<double> temp;
   temp.clear();
 
@@ -108,7 +130,6 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
     // Standard local assembly and inversion for energy mass matrices.
     const int dof = vfes->GetFE(i)->GetDof();
     DenseMatrix Me(dof);
-    // DenseMatrixInverse inv(&Me);
     Me_inv[i] = new DenseMatrix(dof, dof);
 
     MassIntegrator mi;
@@ -120,13 +141,29 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
 
     mi.SetIntRule(&intRule);
     mi.AssembleElementMatrix(*(vfes->GetFE(i)), *(vfes->GetElementTransformation(i)), Me);
-    // inv.Factor();
-    // inv.GetInverseMatrix( (*Me_inv)(i));
-    // inv.GetInverseMatrix( Me_inv[i]);
 
     Me.Invert();
     for (int n = 0; n < dof; n++)
       for (int j = 0; j < dof; j++) (*Me_inv[i])(n, j) = Me(n, j);
+
+    if (config_.isAxisymmetric()) {
+      // For axisymmetric solves, we also require the inverse of
+      // M_{ij} = \int r \phi_i \phi_j dr dz,
+      // where r is the radius.  This is denoted Me_inv_rad here.
+      DenseMatrix Me_rad(dof);
+      Me_inv_rad[i] = new DenseMatrix(dof, dof);
+
+      MassIntegrator mi_rad(radiusFcn);
+
+      mi_rad.SetIntRule(&intRule);
+      mi_rad.AssembleElementMatrix(*(vfes->GetFE(i)), *(vfes->GetElementTransformation(i)), Me_rad);
+
+      Me_rad.Invert();
+      for (int n = 0; n < dof; n++)
+        for (int j = 0; j < dof; j++) (*Me_inv_rad[i])(n, j) = Me_rad(n, j);
+    } else {
+      Me_inv_rad[i] = NULL;
+    }
 
     hposDofInvM[2 * i] = temp.size();
     hposDofInvM[2 * i + 1] = dof;
@@ -235,9 +272,12 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
 }
 
 RHSoperator::~RHSoperator() {
+  delete coordsDof;
+  delete dfes;
   delete gradients;
   // delete[] Me_inv;
   for (int n = 0; n < Me_inv.Size(); n++) delete Me_inv[n];
+  for (int n = 0; n < Me_inv_rad.Size(); n++) delete Me_inv_rad[n];
   for (int i = 0; i < forcing.Size(); i++) delete forcing[i];
 
   if (transferU.requests != NULL) delete[] transferU.requests;
@@ -298,6 +338,23 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
 #endif
   }
 
+  // It would be nice for the axisymmetric to add forcing here (i.e.,
+  // to add the contribution of the forcing to the rhs of the weak
+  // form and then mult by the inverse mass matrix below).  In
+  // particular, this avoids a 1/r in the calculation of the forcing,
+  // which eliminates any possibility of problems on the axis.  But,
+  // given the way all other forcing terms are evaluated currently, we
+  // don't do it that way.
+
+  // // add forcing terms
+  // for (int i = 0; i < forcing.Size(); i++) {
+  //   // NOTE: Do not use RHSoperator::time here b/c it is not correctly
+  //   // updated for each RK substep.  Instead, get time from parent
+  //   // class using TimeDependentOperator::GetTime().
+  //   forcing[i]->setTime(this->GetTime());
+  //   forcing[i]->updateTerms(z);
+  // }
+
   // 3. Multiply element-wise by the inverse mass matrices.
 #ifdef _GPU_
   for (int eltype = 0; eltype < gpuArrays.numElems.Size(); eltype++) {
@@ -323,8 +380,11 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
     vfes->GetElementVDofs(el, vdofs);
     z.GetSubVector(vdofs, zval);
     zmat.UseExternalData(zval.GetData(), dof, num_equation);
-
-    mfem::Mult(*Me_inv[el], zmat, ymat);
+    if (config_.isAxisymmetric()) {
+      mfem::Mult(*Me_inv_rad[el], zmat, ymat);
+    } else {
+      mfem::Mult(*Me_inv[el], zmat, ymat);
+    }
     y.SetSubVector(vdofs, ymat.GetData());
   }
 #endif
@@ -378,6 +438,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
                               num_equation);
   }
 #else
+
   DenseMatrix xmat(x.GetData(), vfes->GetNDofs(), num_equation);
   DenseMatrix f(num_equation, dim);
 
@@ -395,6 +456,11 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
       for (int d = 0; d < dim; d++) gradUpi(eq, d) = dataGradUp[i + eq * dof + d * num_equation * dof];
     }
 
+    double radius = 1;
+    if (config_.isAxisymmetric()) {
+      radius = (*coordsDof)[i + 0 * dof];
+    }
+
     fluxClass->ComputeConvectiveFluxes(state, f);
 
     if (isSBP) {
@@ -409,7 +475,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 
     if (eqSystem == NS || NS_PASSIVE) {
       DenseMatrix fvisc(num_equation, dim);
-      fluxClass->ComputeViscousFluxes(state, gradUpi, fvisc);
+      fluxClass->ComputeViscousFluxes(state, gradUpi, radius, fvisc);
 
       if (spaceVaryViscMult != NULL) {
         auto *alpha = spaceVaryViscMult->GetData();

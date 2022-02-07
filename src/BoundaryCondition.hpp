@@ -52,10 +52,12 @@ class BoundaryCondition {
   IntegrationRules *intRules;
   double &dt;
   const int dim;
+  const int nvel;
   const int num_equation;
   const int patchNumber;
   const double refLength;
 
+  bool axisymmetric_;
   bool BCinit;
 
   Array<int> listElems;  // list of boundary elements (position in the BC array)
@@ -68,10 +70,11 @@ class BoundaryCondition {
  public:
   BoundaryCondition(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSystem, ParFiniteElementSpace *_vfes,
                     IntegrationRules *_intRules, double &dt, const int _dim, const int _num_equation,
-                    const int _patchNumber, const double _refLength);
+                    const int _patchNumber, const double _refLength, bool axisym);
   virtual ~BoundaryCondition();
 
-  virtual void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) = 0;
+  virtual void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
+                              double radius, Vector &bdrFlux) = 0;
 
   // holding function for any miscellaneous items needed to initialize BCs
   // prior to use (and require MPI)

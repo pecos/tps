@@ -53,11 +53,13 @@ using namespace mfem;
 // DG weak form.
 class RHSoperator : public TimeDependentOperator {
  private:
+  const RunConfiguration &config_;
   Gradients *gradients;
 
   int &iter;
 
   const int dim;
+  const int nvel;
 
   const Equations &eqSystem;
 
@@ -86,10 +88,15 @@ class RHSoperator : public TimeDependentOperator {
 
   ParMesh *mesh;
 
+  ParFiniteElementSpace *dfes;
+  ParGridFunction *coordsDof;
+
   ParGridFunction *spaceVaryViscMult;
   linearlyVaryingVisc &linViscData;
 
   Array<DenseMatrix *> Me_inv;
+  Array<DenseMatrix *> Me_inv_rad;
+
   Vector invMArray;
   Array<int> posDofInvM;
 

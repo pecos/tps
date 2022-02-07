@@ -35,9 +35,11 @@
 
 ForcingTerms::ForcingTerms(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                            IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
-                           ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &_gpuArrays)
+                           ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &_gpuArrays, bool axisym)
     : dim(_dim),
+      nvel(axisym ? 3 : _dim),
       num_equation(_num_equation),
+      axisymmetric_(axisym),
       order(_order),
       intRuleType(_intRuleType),
       intRules(_intRules),
@@ -86,7 +88,8 @@ ConstantPressureGradient::ConstantPressureGradient(const int &_dim, const int &_
                                                    ParGridFunction *_gradUp,
                                                    const volumeFaceIntegrationArrays &_gpuArrays,
                                                    RunConfiguration &_config)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, _gpuArrays) {
+: ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules,
+               _vfes, _Up, _gradUp, _gpuArrays, _config.isAxisymmetric()) {
   mixture = new DryAir(_config, dim);
 
   pressGrad.UseDevice(true);
@@ -137,13 +140,14 @@ void ConstantPressureGradient::updateTerms(Vector &in) {
     Array<int> nodes;
     vfes->GetElementVDofs(el, nodes);
 
-    Vector vel(dim), primi(num_equation);
+    Vector vel(nvel), primi(num_equation);
     for (int n = 0; n < dof_elem; n++) {
       int index = nodes[n];
       for (int eq = 0; eq < num_equation; eq++) primi[eq] = dataUp[index + eq * dof];
       double p = mixture->ComputePressureFromPrimitives(primi);
       double grad_pV = 0.;
 
+      // stays dim, not nvel, b/c no pressure gradient in theta direction
       for (int d = 0; d < dim; d++) {
         vel[d] = dataUp[index + (d + 1) * dof];
         data[index + (d + 1) * dof] -= pressGrad[d];
@@ -151,7 +155,7 @@ void ConstantPressureGradient::updateTerms(Vector &in) {
         grad_pV -= p * dataGradUp[index + (d + 1) * dof + d * dof * num_equation];
       }
 
-      data[index + (1 + dim) * dof] += grad_pV;
+      data[index + (1 + nvel) * dof] += grad_pV;
     }
   }
 #endif
@@ -216,11 +220,174 @@ void ConstantPressureGradient::updateTerms_gpu(const int numElems, const int off
 
 #endif
 
+AxisymmetricSource::AxisymmetricSource(const int &_dim, const int &_num_equation, const int &_order,
+                                       GasMixture *_mixture, const Equations &_eqSystem,
+                                       const int &_intRuleType, IntegrationRules *_intRules,
+                                       ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
+                                       const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
+  : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules,
+                 _vfes, _Up, _gradUp, gpuArrays, _config.isAxisymmetric()),
+    mixture(_mixture),
+    eqSystem(_eqSystem) {
+  // no-op
+}
+
+
+void AxisymmetricSource::updateTerms(Vector &in) {
+  // make sure we are in a 2D case (otherwise can't be axisymmetric)
+  assert(dim == 2);
+  assert(nvel == 3);
+
+  int numElem = vfes->GetNE();
+  int dof = vfes->GetNDofs();
+
+  double *data = in.GetData();
+  const double *dataUp = Up->GetData();
+  const double *dataGradUp = gradUp->GetData();
+
+  // get coords
+  const FiniteElementCollection *fec = vfes->FEColl();
+  ParMesh *mesh = vfes->GetParMesh();
+  ParFiniteElementSpace dfes(mesh, fec, dim, Ordering::byNODES);
+  ParGridFunction coordsDof(&dfes);
+  mesh->GetNodes(coordsDof);
+
+  // Commented out code below has the right structure if we want to
+  // add axisym source terms to rhs of weak form (as opposed to
+  // M^{-1}*rhs).  It is not entirely correct b/c the \tau_{\theta
+  // \theta} contribution is neglected, but this could be added if we
+  // switch to this formulation.  See comments at L348 of rhs_operator.cpp
+
+  // for (int el = 0; el < numElem; el++) {
+  //   const FiniteElement *elem = vfes->GetFE(el);
+  //   ElementTransformation *Tr = vfes->GetElementTransformation(el);
+  //   const int dof_elem = elem->GetDof();
+
+  //   // nodes of the element
+  //   Array<int> nodes;
+  //   vfes->GetElementVDofs(el, nodes);
+
+
+  //   const int order = elem->GetOrder();
+  //   //cout<<"order :"<<maxorder<<" dof: "<<dof_elem<<endl;
+  //   int intorder = 2*order;
+  //   //if(intRuleType==1 && trial_fe.GetGeomType()==Geometry::SQUARE) intorder--; // when Gauss-Lobatto
+  //   const IntegrationRule *ir = &intRules->Get(elem->GetGeomType(), intorder);
+  //   for (int k= 0; k< ir->GetNPoints(); k++)
+  //     {
+  //       const IntegrationPoint &ip = ir->IntPoint(k);
+
+  //       Vector shape(dof_elem);
+  //       elem->CalcShape(ip, shape);
+
+  //       double pressure = 0.0;
+  //       for (int k = 0; k < dof_elem; k++) pressure += dataUp[nodes[k] + (1+dim)*dof] * shape[k];
+
+  //       Tr->SetIntPoint(&ip);
+  //       shape *= Tr->Jacobian().Det()*ip.weight;
+
+  //       // get coordinates of integration point
+  //       double x[3];
+  //       Vector transip(x, 3);
+  //       Tr->Transform(ip,transip);
+
+  //       for (int j= 0;j<dof_elem;j++)
+  //         {
+  //           int i = nodes[j];
+  //           data[i + 1*dof] += pressure*shape[j];
+  //         }
+
+  //     }
+  // }
+
+  for (int el = 0; el < numElem; el++) {
+    const FiniteElement *elem = vfes->GetFE(el);
+    ElementTransformation *Tr = vfes->GetElementTransformation(el);
+    const int dof_elem = elem->GetDof();
+
+    // nodes of the element
+    Array<int> nodes;
+    vfes->GetElementVDofs(el, nodes);
+
+    Array<double> ip_forcing(num_equation);
+    Vector x(dim);
+    for (int n = 0; n < dof_elem; n++) {
+      int index = nodes[n];
+      for (int d = 0; d < dim; d++) x[d] = coordsDof[index + d * dof];
+      const double radius = x[0];
+
+      // TODO(trevilo): Generalize beyond flow only
+      Vector prim(5);
+
+      const double rho = dataUp[index + 0*dof];
+      const double ur  = dataUp[index + 1*dof];
+      const double uz  = dataUp[index + 2*dof];
+      const double ut  = dataUp[index + 3*dof];
+      const double temperature = dataUp[index + (1+nvel)*dof];
+
+      prim[0] = rho;
+      prim[1] = ur;
+      prim[2] = uz;
+      prim[3] = ut;
+      prim[4] = temperature;
+
+      const double Rg = mixture->GetGasConstant();
+      const double pressure = rho*Rg*temperature;
+
+      const double rurut = rho*ur*ut;
+      const double rutut = rho*ut*ut;
+
+      double tau_tt, tau_tr;
+      if (eqSystem == EULER) {
+        tau_tt = tau_tr = 0.0;
+      } else {
+        const double ur_r = dataGradUp[index + (1*dof) + (0*dof*num_equation)];
+        const double uz_z = dataGradUp[index + (2*dof) + (1*dof*num_equation)];
+        const double ut_r = dataGradUp[index + (3*dof) + (0*dof*num_equation)];
+
+        const double visc = mixture->GetViscosityFromPrimitive(prim);
+
+        tau_tt = -ur_r - uz_z;
+        if (radius > 0)
+          tau_tt += 2*ur/radius;
+
+        tau_tt *= 2*visc/3.0;
+
+        tau_tr = ut_r;
+        if (radius > 0)
+          tau_tr -= ut/radius;
+
+        tau_tr *= visc;
+      }
+
+      // Add to r-momentum eqn
+
+      // NB: 1/r factor here is necessary b/c of way the source terms
+      // are handled in RHSoperator.  This term must be an
+      // approximation of Mr^{-1}*\int \phi * pressure, where Mr =
+      // \int r * \phi * \phi dr dz is the mass matrix in cylindrical
+      // coords
+
+      if (radius > 0) {
+        data[index + 1*dof] += (pressure + rutut - tau_tt)/radius;
+        data[index + 3*dof] +=          (- rurut + tau_tr)/radius;
+      } else {
+        // TODO(trevilo): Fix axis
+        double fake_radius = 1e-3;
+        data[index + 1*dof] += (pressure - tau_tt)/fake_radius;
+        data[index + 3*dof] +=            (tau_tr)/fake_radius;
+      }
+    }
+  }
+}
+
+
 SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                        Fluxes *_fluxClass, GasMixture *_mixture, IntegrationRules *_intRules,
                        ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
                        const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays),
+  : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules,
+                 _vfes, _Up, _gradUp, gpuArrays, _config.isAxisymmetric()),
       fluxes(_fluxClass),
       mixture(_mixture),
       szData(_config.GetSpongeZoneData()) {
@@ -375,8 +542,9 @@ PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const in
                              IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, GasMixture *_mixture,
                              ParGridFunction *_Up, ParGridFunction *_gradUp,
                              const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays),
-      mixture(_mixture) {
+  : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules,
+                 _vfes, _Up, _gradUp, gpuArrays, _config.isAxisymmetric()),
+    mixture(_mixture) {
   psData_.DeleteAll();
   for (int i = 0; i < _config.GetPassiveScalarData().Size(); i++) psData_.Append(new passiveScalarData);
 
@@ -479,7 +647,8 @@ MASA_forcings::MASA_forcings(const int &_dim, const int &_num_equation, const in
                              IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
                              ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
                              RunConfiguration &_config)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays) {
+  : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules,
+                 _vfes, _Up, _gradUp, gpuArrays, _config.isAxisymmetric()) {
   initMasaHandler("forcing", dim, _config.GetEquationSystem(), _config.GetViscMult());
 }
 

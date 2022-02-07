@@ -37,9 +37,9 @@
 OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rsolver, GasMixture *_mixture,
                    ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
                    const int _num_equation, int _patchNumber, double _refLength, OutletType _bcType,
-                   const Array<double> &_inputData, const int &_maxIntPoints, const int &_maxDofs)
+                   const Array<double> &_inputData, const int &_maxIntPoints, const int &_maxDofs, bool axisym)
     : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
-                        _refLength),
+                        _refLength, axisym),
       groupsMPI(_groupsMPI),
       outletType(_bcType),
       inputState(_inputData),
@@ -64,8 +64,8 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
   hmeanUp[0] = 1.2;
   hmeanUp[1] = 60;
   hmeanUp[2] = 0;
-  if (dim == 3) hmeanUp[3] = 0.;
-  hmeanUp[1 + dim] = 300;
+  if (nvel == 3) hmeanUp[3] = 0.;
+  hmeanUp[1 + nvel] = 101300;
   if (eqSystem == NS_PASSIVE) hmeanUp[num_equation - 1] = 0.;
 
   area = 0.;
@@ -296,7 +296,7 @@ void OutletBC::initBCs() {
   }
 }
 
-void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
+void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux) {
   switch (outletType) {
     case SUB_P:
       subsonicReflectingPressure(normal, stateIn, bdrFlux);
@@ -721,8 +721,8 @@ void OutletBC::subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vecto
   Vector state2(num_equation);
   state2 = stateIn;
   double k = 0.;
-  for (int d = 0; d < dim; d++) k += stateIn[1 + d] * stateIn[1 + d];
-  state2[1 + dim] = inputState[0] / (gamma - 1.) + 0.5 * k / stateIn[0];
+  for (int d = 0; d < nvel; d++) k += stateIn[1 + d] * stateIn[1 + d];
+  state2[1 + nvel] = inputState[0] / (gamma - 1.) + 0.5 * k / stateIn[0];
 
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }

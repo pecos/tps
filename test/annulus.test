@@ -1,0 +1,35 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="axisymmetric/annulus"
+RUNFILE="inputs/annulus.axisym.viscous.ini"
+
+setup() {
+    SOLN_FILE=restart_output-annulus.sol.h5
+    RSTRT_FILE=ref_solns/annulus.restart.sol.h5
+    REF_FILE=ref_solns/annulus.50100.sol.h5
+}
+
+@test "[$TEST] verify axisymmetric exits with unsupported options" {
+    test -s $RUNFILE
+    test -s $RSTRT_FILE
+    cp $RSTRT_FILE $SOLN_FILE
+
+    RUNFILE_MOD="inputs/annulus.axisym.viscous.roe.ini"
+    sed  's/useRoe = 0/useRoe = 1/' $RUNFILE > $RUNFILE_MOD
+    run ../src/tps --runFile $RUNFILE_MOD
+    [[ "${output}" =~ "[ERROR]: Roe flux not supported for axisymmetric simulations. Please use flow/useRoe = 0." ]]
+    [[ "${status}" -eq 1 ]]
+}
+
+@test "[$TEST] verify axisymmetric tps output with input -> $RUNFILE" {
+    test -s $RUNFILE
+    test -s $RSTRT_FILE
+    cp $RSTRT_FILE $SOLN_FILE
+
+    ../src/tps --runFile $RUNFILE >& run.log
+
+    test -s $SOLN_FILE
+    test -s $REF_FILE
+    ./soln_differ -r $SOLN_FILE $REF_FILE
+}

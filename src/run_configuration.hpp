@@ -145,6 +145,7 @@ class RunConfiguration {
 
   // equations to be solved. Options thus far
   Equations eqSystem;
+  bool axisymmetric_;
 
   bool SBP;
 
@@ -194,11 +195,11 @@ class RunConfiguration {
   int GetBasisType() { return basisType; }
 
   double GetCFLNumber() { return cflNum; }
-  bool isTimeStepConstant() { return constantTimeStep; }
+  bool isTimeStepConstant() const { return constantTimeStep; }
   double GetFixedDT() { return dt_fixed; }
   int GetNumIters() { return numIters; }
   int GetNumItersOutput() { return itersOut; }
-  bool RoeRiemannSolver() { return useRoe; }
+  bool RoeRiemannSolver() const { return useRoe; }
 
   int GetMeanStartIter() { return startIter; }
   int GetMeanSampleInterval() { return sampleInterval; }
@@ -209,7 +210,8 @@ class RunConfiguration {
   double GetViscMult() { return visc_mult; }
   double GetBulkViscMult() { return bulk_visc; }
   double GetReferenceLength() { return refLength; }
-  Equations GetEquationSystem() { return eqSystem; }
+  Equations GetEquationSystem() const { return eqSystem; }
+  bool isAxisymmetric() const { return axisymmetric_; }
   bool isSBP() { return SBP; }
   double* GetConstantInitialCondition() { return &initRhoRhoVp[0]; }
 
@@ -235,10 +237,10 @@ class RunConfiguration {
   bool RestartHDFConversion() { return restart_hdf5_conversion; }
   std::string RestartSerial() { return restart_serial; }
 
-  std::vector<pair<int, InletType>>* GetInletPatchType() { return &inletPatchType; }
+  const std::vector<pair<int, InletType>>* GetInletPatchType() const { return &inletPatchType; }
   Array<double> GetInletData(int i);
 
-  std::vector<pair<int, OutletType>>* GetOutletPatchType() { return &outletPatchType; }
+  const std::vector<pair<int, OutletType>>* GetOutletPatchType() const { return &outletPatchType; }
   Array<double> GetOutletData(int out);
 
   std::vector<pair<int, WallType>>* GetWallPatchType() { return &wallPatchType; }

@@ -92,7 +92,8 @@ style:
 	@echo "Checking source code style using cpplint.py"
 	@echo "-------------------------------------------"
 	@echo ""
-	@$(top_srcdir)/utils/cpplint/cpplint.py $(headers) $(cxx_sources) main.cpp
+#	@$(top_srcdir)/utils/cpplint/cpplint.py $(headers) $(cxx_sources) main.cpp
+	@cd $(top_srcdir)/src && $(abs_top_srcdir)/utils/cpplint/cpplint.py $(headers) $(cxx_sources) main.cpp
 
 #---------------------------------
 # Embedded license header support

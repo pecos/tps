@@ -54,16 +54,7 @@ M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps) : mp
   config.readInputFile(inputFileName);
 #endif
 
-#ifdef _GPU_
-  if (!config.isTimeStepConstant()) {
-    if (mpi.Root()) {
-      std::cerr << "[ERROR]: GPU runs must use a constant time step: Please set DT_CONSTANT in input file."
-                << std::endl;
-      std::cerr << std::endl;
-      exit(ERROR);
-    }
-  }
-#endif
+  checkSolverOptions();
 
   initVariables();
 
@@ -242,6 +233,8 @@ void M2ulPhyS::initVariables() {
   }
 
   dim = mesh->Dimension();
+  nvel = (config.isAxisymmetric() ? 3 : dim);
+  if (config.isAxisymmetric()) assert(dim == 2 );
 
   refLength = config.GetReferenceLength();
 
@@ -250,7 +243,7 @@ void M2ulPhyS::initVariables() {
   mixture = NULL;
   switch (config.GetWorkingFluid()) {
     case WorkingFluid::DRY_AIR:
-      mixture = new DryAir(config, dim);
+      mixture = new DryAir(config, nvel);
       mixture->setViscMult(config.GetViscMult());
       mixture->setBulkViscMult(config.GetBulkViscMult());
       break;
@@ -268,13 +261,13 @@ void M2ulPhyS::initVariables() {
   // NOTE: num_equations to be given by the gasMixture
   switch (eqSystem) {
     case EULER:
-      num_equation = 2 + dim;
+      num_equation = 2 + nvel;
       break;
     case NS:
-      num_equation = 2 + dim;
+      num_equation = 2 + nvel;
       break;
     case NS_PASSIVE:
-      num_equation = 2 + dim + 1;
+      num_equation = 2 + nvel + 1;
       break;
     default:
       break;
@@ -319,7 +312,7 @@ void M2ulPhyS::initVariables() {
     ioData.registerIOVar("/meanSolution", "meanDens", 0);
     ioData.registerIOVar("/meanSolution", "mean-u", 1);
     ioData.registerIOVar("/meanSolution", "mean-v", 2);
-    if (dim == 3) {
+    if (nvel == 3) {
       ioData.registerIOVar("/meanSolution", "mean-w", 3);
       ioData.registerIOVar("/meanSolution", "mean-E", 4);
     } else {
@@ -340,13 +333,14 @@ void M2ulPhyS::initVariables() {
   ioData.initializeSerial(mpi.Root(), (config.RestartSerial() != "no"), serial_mesh);
   projectInitialSolution();
 
-  fluxClass = new Fluxes(mixture, eqSystem, num_equation, dim);
+  fluxClass = new Fluxes(mixture, eqSystem, num_equation, dim, config.isAxisymmetric());
 
   alpha = 0.5;
   isSBP = config.isSBP();
 
   // Create Riemann Solver
-  rsolver = new RiemannSolver(num_equation, mixture, eqSystem, fluxClass, config.RoeRiemannSolver());
+  rsolver = new RiemannSolver(num_equation, mixture, eqSystem, fluxClass,
+                              config.RoeRiemannSolver(), config.isAxisymmetric());
 
   // Boundary attributes in present partition
   Array<int> local_attr;
@@ -370,7 +364,7 @@ void M2ulPhyS::initVariables() {
     //    if( basisType==1 && intRuleType==1 ) useLinearIntegration = true;
 
     faceIntegrator = new FaceIntegrator(intRules, rsolver, fluxClass, vfes, useLinearIntegration, dim, num_equation,
-                                        gradUp, gradUpfes, max_char_speed);
+                                        gradUp, gradUpfes, max_char_speed, config.isAxisymmetric());
   }
   A->AddInteriorFaceIntegrator(faceIntegrator);
   if (isSBP) {
@@ -379,7 +373,7 @@ void M2ulPhyS::initVariables() {
   }
 
   Aflux = new MixedBilinearForm(dfes, fes);
-  domainIntegrator = new DomainIntegrator(fluxClass, intRules, intRuleType, dim, num_equation);
+  domainIntegrator = new DomainIntegrator(fluxClass, intRules, intRuleType, dim, num_equation, config.isAxisymmetric());
   Aflux->AddDomainIntegrator(domainIntegrator);
   Aflux->Assemble();
   Aflux->Finalize();
@@ -845,7 +839,14 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   dens = new ParGridFunction(fes, Up->HostReadWrite());
   vel = new ParGridFunction(dfes, Up->HostReadWrite() + fes->GetNDofs());
-  temperature = new ParGridFunction(fes, Up->HostReadWrite() + (1 + dim) * fes->GetNDofs());
+
+  if (config.isAxisymmetric()) {
+    vtheta = new ParGridFunction(fes, Up->HostReadWrite() + 3*fes->GetNDofs());
+  } else {
+    vtheta = NULL;
+  }
+
+  temperature = new ParGridFunction(fes, Up->HostReadWrite() + (1 + nvel) * fes->GetNDofs());
 
   // this variable is purely for visualization
   press = new ParGridFunction(fes);
@@ -859,7 +860,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   ioData.registerIOVar("/solution", "density", 0);
   ioData.registerIOVar("/solution", "rho-u", 1);
   ioData.registerIOVar("/solution", "rho-v", 2);
-  if (dim == 3) {
+  if (nvel == 3) {
     ioData.registerIOVar("/solution", "rho-w", 3);
     ioData.registerIOVar("/solution", "rho-E", 4);
   } else {
@@ -899,6 +900,9 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   paraviewColl->RegisterField("dens", dens);
   paraviewColl->RegisterField("vel", vel);
+  if (config.isAxisymmetric()) {
+    paraviewColl->RegisterField("vtheta", vtheta);
+  }
   paraviewColl->RegisterField("temp", temperature);
   paraviewColl->RegisterField("press", press);
   if (eqSystem == NS_PASSIVE) paraviewColl->RegisterField("passiveScalar", passiveScalar);
@@ -1293,8 +1297,8 @@ void M2ulPhyS::uniformInitialConditions() {
     data[i] = inputRhoRhoVp[0];
     data[i + dof] = inputRhoRhoVp[1];
     data[i + 2 * dof] = inputRhoRhoVp[2];
-    if (dim == 3) data[i + 3 * dof] = inputRhoRhoVp[3];
-    data[i + (1 + dim) * dof] = rhoE;
+    if (nvel == 3) data[i + 3 * dof] = inputRhoRhoVp[3];
+    data[i + (1 + nvel) * dof] = rhoE;
     if (eqSystem == NS_PASSIVE) data[i + (num_equation - 1) * dof] = 0.;
 
     for (int eq = 0; eq < num_equation; eq++) state(eq) = data[i + eq * dof];
@@ -1542,6 +1546,7 @@ void M2ulPhyS::parseSolverOptions2() {
     tpsP->getInput("flow/refLength", config.refLength, 1.0);
     tpsP->getInput("flow/viscosityMultiplier", config.visc_mult, 1.0);
     tpsP->getInput("flow/bulkViscosityMultiplier", config.bulk_visc, 0.0);
+    tpsP->getInput("flow/axisymmetric", config.axisymmetric_, false);
 
     assert(config.solOrder > 0);
     assert(config.numIters >= 0);
@@ -1813,6 +1818,76 @@ void M2ulPhyS::parseSolverOptions2() {
   } else {
     grvy_printf(GRVY_ERROR, "\nUnknown equation_system -> %s", systemType.c_str());
     exit(ERROR);
+  }
+
+  return;
+}
+
+void M2ulPhyS::checkSolverOptions() const {
+#ifdef _GPU_
+  if (!config.isTimeStepConstant()) {
+    if (mpi.Root()) {
+      std::cerr << "[ERROR]: GPU runs must use a constant time step: Please set DT_CONSTANT in input file."
+                << std::endl;
+      std::cerr << std::endl;
+      exit(ERROR);
+    }
+  }
+
+  if (config.isAxisymmetric()) {
+    if (mpi.Root()) {
+      std::cerr << "[ERROR]: Axisymmetric simulations not supported on GPU."
+                << std::endl;
+      std::cerr << std::endl;
+      exit(ERROR);
+    }
+  }
+#endif
+
+  // Axisymmetric solver does not yet support all options.  Check that
+  // we are running a supported combination.
+  if (config.isAxisymmetric()) {
+    // Don't support passive scalars yet
+    if (config.GetEquationSystem() == NS_PASSIVE) {
+      if (mpi.Root()) {
+        std::cerr << "[ERROR]: Passive scalars not supported for axisymmetric simulations."
+                  << std::endl;
+        std::cerr << std::endl;
+        exit(ERROR);
+      }
+    }
+    // Don't support Roe flux yet
+    if (config.RoeRiemannSolver()) {
+      if (mpi.Root()) {
+        std::cerr << "[ERROR]: Roe flux not supported for axisymmetric simulations. Please use flow/useRoe = 0."
+                  << std::endl;
+        std::cerr << std::endl;
+        exit(ERROR);
+      }
+    }
+    // Don't support non-reflecting BCs yet
+    for (int i = 0; i < config.GetInletPatchType()->size(); i++) {
+      std::pair<int, InletType> patchANDtype = (*config.GetInletPatchType())[i];
+      if (patchANDtype.second != SUB_DENS_VEL) {
+        if (mpi.Root()) {
+          std::cerr << "[ERROR]: Only SUB_DENS_VEL inlet supported for axisymmetric simulations."
+                    << std::endl;
+          std::cerr << std::endl;
+          exit(ERROR);
+        }
+      }
+    }
+    for (int i = 0; i < config.GetOutletPatchType()->size(); i++) {
+      std::pair<int, OutletType> patchANDtype = (*config.GetOutletPatchType())[i];
+      if (patchANDtype.second != SUB_P) {
+        if (mpi.Root()) {
+          std::cerr << "[ERROR]: Only SUB_P outlet supported for axisymmetric simulations."
+                    << std::endl;
+          std::cerr << std::endl;
+          exit(ERROR);
+        }
+      }
+    }
   }
 
   return;

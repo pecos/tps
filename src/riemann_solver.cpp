@@ -36,8 +36,9 @@ using namespace mfem;
 
 // Implementation of class RiemannSolver
 RiemannSolver::RiemannSolver(int &_num_equation, GasMixture *_mixture, Equations &_eqSystem, Fluxes *_fluxClass,
-                             bool _useRoe)
-    : num_equation(_num_equation), mixture(_mixture), eqSystem(_eqSystem), fluxClass(_fluxClass), useRoe(_useRoe) {
+                             bool _useRoe, bool axisym)
+  : num_equation(_num_equation), mixture(_mixture), eqSystem(_eqSystem),
+    fluxClass(_fluxClass), useRoe(_useRoe), axisymmetric_(axisym) {
   flux1.SetSize(num_equation);
   flux2.SetSize(num_equation);
 }
@@ -46,12 +47,13 @@ RiemannSolver::RiemannSolver(int &_num_equation, GasMixture *_mixture, Equations
 void RiemannSolver::ComputeFluxDotN(const Vector &state, const Vector &nor, Vector &fluxN) {
   // NOTE: nor in general is not a unit normal
   const int dim = nor.Size();
+  const int nvel = (axisymmetric_ ? 3 : dim);
+
   const double den = state(0);
-  const Vector den_vel(state.GetData() + 1, dim);
-  const double den_energy = state(1 + dim);
+  const Vector den_vel(state.GetData() + 1, nvel);
+  const double den_energy = state(1 + nvel);
 
   // MFEM_ASSERT(eqState->StateIsPhysical(state, dim), "");
-
   const double pres = mixture->ComputePressure(state);
 
   double den_velN = 0;
@@ -60,12 +62,16 @@ void RiemannSolver::ComputeFluxDotN(const Vector &state, const Vector &nor, Vect
   }
 
   fluxN(0) = den_velN;
+  for (int d = 0; d < nvel; d++) {
+    fluxN(1 + d) = den_velN * den_vel(d) / den;
+  }
   for (int d = 0; d < dim; d++) {
-    fluxN(1 + d) = den_velN * den_vel(d) / den + pres * nor(d);
+    fluxN(1 + d) += pres * nor(d);
   }
 
+
   const double H = (den_energy + pres) / den;
-  fluxN(1 + dim) = den_velN * H;
+  fluxN(1 + nvel) = den_velN * H;
 
   if (eqSystem == NS_PASSIVE) fluxN(num_equation - 1) = den_velN * state(num_equation - 1) / state(0);
 }
@@ -81,6 +87,7 @@ void RiemannSolver::Eval(const Vector &state1, const Vector &state2, const Vecto
 void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux) {
   // NOTE: nor in general is not a unit normal
   const int dim = nor.Size();
+  const int nvel = (axisymmetric_ ? 3 : dim);
 
   // MFEM_ASSERT(eqState->StateIsPhysical(state1, dim), "");
   // MFEM_ASSERT(eqState->StateIsPhysical(state2, dim), "");
@@ -106,6 +113,8 @@ void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Ve
 
 void RiemannSolver::Eval_Roe(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux) {
   const int dim = nor.Size();
+  assert(!axisymmetric_);  // Roe doesn't support axisymmetric yet
+
   int NS_eq = 2 + dim;  // number of NS equations (without species, passive scalars etc.)
 
   double normag = 0;

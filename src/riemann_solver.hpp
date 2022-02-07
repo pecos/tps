@@ -54,12 +54,14 @@ class RiemannSolver {
   Fluxes *fluxClass;
 
   bool useRoe;
+  const bool axisymmetric_;
 
   void Eval_LF(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux);
   void Eval_Roe(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux);
 
  public:
-  RiemannSolver(int &_num_equation, GasMixture *mixture, Equations &_eqSystem, Fluxes *_fluxClass, bool _useRoe);
+  RiemannSolver(int &_num_equation, GasMixture *mixture, Equations &_eqSystem,
+                Fluxes *_fluxClass, bool _useRoe, bool axisym);
 
   void Eval(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux, bool LF = false);
 

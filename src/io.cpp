@@ -352,8 +352,8 @@ void M2ulPhyS::restart_files_hdf5(string mode) {
       dataUp[i] = iState[0];
       dataUp[i + vfes->GetNDofs()] = iState[1] / iState[0];
       dataUp[i + 2 * vfes->GetNDofs()] = iState[2] / iState[0];
-      if (dim == 3) dataUp[i + 3 * vfes->GetNDofs()] = iState[3] / iState[0];
-      dataUp[i + (1 + dim) * vfes->GetNDofs()] = T;
+      if (nvel == 3) dataUp[i + 3 * vfes->GetNDofs()] = iState[3] / iState[0];
+      dataUp[i + (1 + nvel) * vfes->GetNDofs()] = T;
       if (eqSystem == NS_PASSIVE)
         dataUp[i + (num_equation - 1) * vfes->GetNDofs()] = iState[num_equation - 1] / iState[0];
     }

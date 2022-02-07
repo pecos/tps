@@ -31,8 +31,11 @@
 // -----------------------------------------------------------------------------------el-
 #include "fluxes.hpp"
 
-Fluxes::Fluxes(GasMixture *_mixture, Equations &_eqSystem, const int &_num_equations, const int &_dim)
-    : mixture(_mixture), eqSystem(_eqSystem), dim(_dim), num_equations(_num_equations) {
+Fluxes::Fluxes(GasMixture *_mixture, Equations &_eqSystem, const int &_num_equations, const int &_dim, bool axisym)
+  : mixture(_mixture), eqSystem(_eqSystem), dim(_dim),
+    nvel(axisym ? 3 : _dim),
+    axisymmetric_(axisym),
+    num_equations(_num_equations) {
   gradT.SetSize(dim);
   vel.SetSize(dim);
   vtmp.SetSize(dim);
@@ -51,7 +54,7 @@ void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, D
       ComputeConvectiveFluxes(state, convF);
 
       DenseMatrix viscF(num_equations, dim);
-      ComputeViscousFluxes(state, gradUpi, viscF);
+      ComputeViscousFluxes(state, gradUpi, 1, viscF);
       for (int eq = 0; eq < num_equations; eq++) {
         for (int d = 0; d < dim; d++) flux(eq, d) = convF(eq, d) - viscF(eq, d);
       }
@@ -64,15 +67,15 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
 
   for (int d = 0; d < dim; d++) {
     flux(0, d) = state(d + 1);
-    for (int i = 0; i < dim; i++) {
+    for (int i = 0; i < nvel; i++) {
       flux(1 + i, d) = state(i + 1) * state(d + 1) / state[0];
     }
     flux(1 + d, d) += pres;
   }
 
-  const double H = (state[1 + dim] + pres) / state[0];
+  const double H = (state[1 + nvel] + pres) / state[0];
   for (int d = 0; d < dim; d++) {
-    flux(1 + dim, d) = state(d + 1) * H;
+    flux(1 + nvel, d) = state(d + 1) * H;
   }
 
   if (eqSystem == NS_PASSIVE) {
@@ -80,15 +83,16 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
   }
 }
 
-void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &flux) {
+void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, DenseMatrix &flux) {
   switch (eqSystem) {
     case NS:
     case NS_PASSIVE: {
-      //       const double p = mixture->ComputePressure(state);
-      //       const double temp = p / state[0] / Rg;
       const double visc = mixture->GetViscosity(state);
       const double bulkViscMult = mixture->GetBulkViscMultiplyer();
       const double k = mixture->GetThermalConductivity(state);
+
+      const double ur = (axisymmetric_ ? state[1]/state[0] : 0);
+      const double ut = (axisymmetric_ ? state[3]/state[0] : 0);
 
       // make sure density visc. flux is 0
       for (int d = 0; d < dim; d++) flux(0, d) = 0.;
@@ -99,11 +103,29 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
         divV += gradUp(1 + i, i);
       }
 
+      if (axisymmetric_ && radius > 0) {
+        divV += ur/radius;
+      }
+
       for (int i = 0; i < dim; i++) stress(i, i) += (bulkViscMult - 2. / 3.) * divV;
       stress *= visc;
 
       for (int i = 0; i < dim; i++)
         for (int j = 0; j < dim; j++) flux(1 + i, j) = stress(i, j);
+
+      double tau_tr = 0, tau_tz = 0;
+      if (axisymmetric_) {
+        const double ut_r = gradUp(3, 0);
+        const double ut_z = gradUp(3, 1);
+        tau_tr = ut_r;
+        if (radius > 0) tau_tr -= ut/radius;
+        tau_tr *= visc;
+
+        tau_tz = visc*ut_z;
+
+        flux(1+2, 0) = tau_tr;
+        flux(1+2, 1) = tau_tz;
+      }
 
       // temperature gradient
       //       for (int d = 0; d < dim; d++) gradT[d] = temp * (gradUp(1 + dim, d) / p - gradUp(0, d) / state[0]);
@@ -111,9 +133,15 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
       for (int d = 0; d < dim; d++) vel(d) = state[1 + d] / state[0];
 
       stress.Mult(vel, vtmp);
+
       for (int d = 0; d < dim; d++) {
-        flux(1 + dim, d) += vtmp[d];
-        flux(1 + dim, d) += k * gradUp(1 + dim, d);
+        flux(1 + nvel, d) = vtmp[d];
+        flux(1 + nvel, d) += k * gradUp(1 + nvel, d);
+      }
+
+      if (axisymmetric_) {
+        flux(1 + nvel, 0) += ut*tau_tr;
+        flux(1 + nvel, 1) += ut*tau_tz;
       }
 
       if (eqSystem == NS_PASSIVE) {
