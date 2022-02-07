@@ -472,13 +472,15 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 
     fluxClass->ComputeConvectiveFluxes(state, f);
 
+    // TODO: Kevin - This needs to be incorporated in Fluxes::ComputeConvectiveFluxes.
+    // Kevin: we need to think through this.
     if (isSBP) {
       f *= alpha;  // *= alpha
       double p = mixture->ComputePressure(state);
       p *= 1. - alpha;
       for (int d = 0; d < dim; d++) {
         f(d + 1, d) += p;
-        f(num_equation - 1, d) += p * (state)(1 + d) / (state)(0);
+        f(dim + 1, d) += p * (state)(1 + d) / (state)(0);
       }
     }
 
