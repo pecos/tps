@@ -87,18 +87,19 @@ class WallBC : public BoundaryCondition {
 
   static void integrateWalls_gpu(const WallType type, const double &wallTemp,
                                  Vector &y,  // output
-                                 const Vector &x, Vector &interpolated_Ubdr_, const Array<int> &nodesIDs,
-                                 const Array<int> &posDofIds, ParGridFunction *Up, ParGridFunction *gradUp,
-                                 Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
-                                 Array<int> &wallElems, Array<int> &listElems, const Equations &eqSystem,
-                                 const int &maxIntPoints, const int &maxDofs, const int &dim, const int &num_equation,
-                                 GasMixture *mixture);
+                                 const Vector &x, Vector &interpolated_Ubdr_, Vector &interpolatedGradUpbdr_,
+                                 const Array<int> &nodesIDs, const Array<int> &posDofIds, ParGridFunction *Up,
+                                 ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
+                                 Array<int> &intPointsElIDBC, Array<int> &wallElems, Array<int> &listElems,
+                                 const Equations &eqSystem, const int &maxIntPoints, const int &maxDofs, const int &dim,
+                                 const int &num_equation, GasMixture *mixture);
 
-  static void integrpWalls_gpu(const WallType type, const double &wallTemp, Vector &interpolated_Ubdr_, const Vector &x,
-                               const Array<int> &nodesIDs, const Array<int> &posDofIds, ParGridFunction *Up,
-                               ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
-                               Array<int> &intPointsElIDBC, Array<int> &wallElems, Array<int> &listElems,
-                               const int &maxIntPoints, const int &maxDofs, const int &dim, const int &num_equation);
+  static void interpWalls_gpu(const WallType type, const double &wallTemp, Vector &interpolated_Ubdr_,
+                              Vector &interpolatedGradUpbdr_, const Vector &x, const Array<int> &nodesIDs,
+                              const Array<int> &posDofIds, ParGridFunction *Up, ParGridFunction *gradUp,
+                              Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &wallElems,
+                              Array<int> &listElems, const int &maxIntPoints, const int &maxDofs, const int &dim,
+                              const int &num_equation);
 
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void computeInvWallState(const int &thrd, const double *u1, double *u2, const double *nor,
@@ -114,7 +115,7 @@ class WallBC : public BoundaryCondition {
       unitNor[d] = nor[d] / norm;
       momNormal += unitNor[d] * u1[d + 1];
     }
-    u2[thrd] = u1[thrd];
+    if (thrd < num_equation) u2[thrd] = u1[thrd];
 
     if (thrd > 0 || thrd < 1 + dim) {
       u2[thrd] = u1[thrd] - 2. * momNormal * unitNor[thrd - 1];
@@ -124,7 +125,7 @@ class WallBC : public BoundaryCondition {
   static MFEM_HOST_DEVICE void computeIsothermalState(const int &thrd, const double *u1, double *u2, const double *nor,
                                                       const double &wallTemp, const double &gamma, const double &Rg,
                                                       const int &dim, const int &num_equation) {
-    u2[thrd] = u1[thrd];
+    if (thrd < num_equation) u2[thrd] = u1[thrd];
 
     // NOTE: assumes ideal gas
     if (thrd == 1 + dim) u2[thrd] = Rg / (gamma - 1.) * u1[0] * wallTemp;

@@ -1,4 +1,4 @@
-FROM centos:8
+FROM rockylinux:8
 MAINTAINER Karl W. Schulz <karl@oden.utexas.edu>
 
 # enable OpenHPC repository 
@@ -52,6 +52,10 @@ RUN yum -y install aspell
 RUN yum -y install diffutils
 RUN yum -y install cmake-ohpc
 RUN yum -y install bc
+<<<<<<< HEAD
+=======
+RUN yum -y install clang-tools-extra
+>>>>>>> c681c1b (switch to Rocky Linux, add clang-tools)
 
 # Register new libs installed into /usr/local/lib with linker
 RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/class.conf
