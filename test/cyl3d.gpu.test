@@ -3,11 +3,13 @@
 
 TEST="cyl3d.gpu"
 RUNFILE="inputs/input.dtconst.cyl.ini"
+RUNFILE_HEAT="inputs/input.dtconst.cyl.heatSource.ini"
 OPTS=""
 
 setup() {
     SOLN_FILE=restart_output.sol.h5
     REF_FILE=ref_solns/cyl3d.dtconst.cpu.h5
+    REF_FILE_HEAT=ref_solns/cyl3d.dtconst.heatSource.cpu.h5
 
     # various GPU card detections
     SKIP="ASPEED"
@@ -121,5 +123,15 @@ setup() {
     test -s $SOLN_FILE_1
     test -s $REF_FILE_1
     ./soln_differ $SOLN_FILE_1 $REF_FILE_1
+}
+
+@test "[$TEST] verify tps output with input heat source -> $RUNFILE" {
+
+    test -s 
+    ../src/tps -run $RUNFILE_HEAT
+    
+    test -s $SOLN_FILE
+    test -s $REF_FILE_HEAT
+    ./soln_differ $SOLN_FILE $REF_FILE_HEAT
 }
 
