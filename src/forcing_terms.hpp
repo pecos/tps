@@ -185,6 +185,8 @@ class HeatSource : public ForcingTerms {
   ~HeatSource();
 
   virtual void updateTerms(Vector &in);
+
+  void updateTerms_gpu(Vector &in);
 };
 
 #ifdef _MASA_

@@ -687,6 +687,9 @@ HeatSource::HeatSource(const int &_dim, const int &_num_equation, const int &_or
 }
 
 void HeatSource::updateTerms(mfem::Vector &in) {
+#ifdef _GPU_
+  updateTerms_gpu(in);
+#else
   const int nnode = vfes->GetNDofs();
   const double heatValue = heatSource_.value;
 
@@ -695,6 +698,25 @@ void HeatSource::updateTerms(mfem::Vector &in) {
     int index = node + (dim + 1) * nnode;
     in(index) += heatValue;
   }
+#endif
+}
+
+void HeatSource::updateTerms_gpu(mfem::Vector &in) {
+#ifdef _GPU_
+  double *d_in = in.ReadWrite();
+  const int *d_nodeList = nodeList_.Read();
+
+  const int dimGPU = dim;
+  const int nnode = vfes->GetNDofs();
+
+  const double heatVal = heatSource_.value;
+
+  MFEM_FORALL(n, nodeList_.Size(), {
+    const int node = d_nodeList[n];
+    const int index = node + (1 + dimGPU) * nnode;
+    d_in[index] += heatVal;
+  });
+#endif
 }
 
 #ifdef _MASA_
