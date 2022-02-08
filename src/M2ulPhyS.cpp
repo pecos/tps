@@ -234,7 +234,7 @@ void M2ulPhyS::initVariables() {
 
   dim = mesh->Dimension();
   nvel = (config.isAxisymmetric() ? 3 : dim);
-  if (config.isAxisymmetric()) assert(dim == 2 );
+  if (config.isAxisymmetric()) assert(dim == 2);
 
   refLength = config.GetReferenceLength();
 
@@ -339,8 +339,8 @@ void M2ulPhyS::initVariables() {
   isSBP = config.isSBP();
 
   // Create Riemann Solver
-  rsolver = new RiemannSolver(num_equation, mixture, eqSystem, fluxClass,
-                              config.RoeRiemannSolver(), config.isAxisymmetric());
+  rsolver =
+      new RiemannSolver(num_equation, mixture, eqSystem, fluxClass, config.RoeRiemannSolver(), config.isAxisymmetric());
 
   // Boundary attributes in present partition
   Array<int> local_attr;
@@ -841,7 +841,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   vel = new ParGridFunction(dfes, Up->HostReadWrite() + fes->GetNDofs());
 
   if (config.isAxisymmetric()) {
-    vtheta = new ParGridFunction(fes, Up->HostReadWrite() + 3*fes->GetNDofs());
+    vtheta = new ParGridFunction(fes, Up->HostReadWrite() + 3 * fes->GetNDofs());
   } else {
     vtheta = NULL;
   }
@@ -1605,8 +1605,8 @@ void M2ulPhyS::parseSolverOptions2() {
   // RMS job management
   {
     tpsP->getInput("jobManagement/enableAutoRestart", config.rm_enableMonitor_, false);
-    tpsP->getInput("jobManagement/timeThreshold", config.rm_threshold_, 15*60);  // 15 minutes
-    tpsP->getInput("jobManagement/checkFreq", config.rm_checkFrequency_, 500);   // 500 iterations
+    tpsP->getInput("jobManagement/timeThreshold", config.rm_threshold_, 15 * 60);  // 15 minutes
+    tpsP->getInput("jobManagement/checkFreq", config.rm_checkFrequency_, 500);     // 500 iterations
   }
 
   // sponge zone
@@ -1637,6 +1637,40 @@ void M2ulPhyS::parseSolverOptions2() {
       } else {
         grvy_printf(GRVY_ERROR, "\nUnknown sponge zone type -> %s\n", type.c_str());
         exit(ERROR);
+      }
+    }
+  }
+
+  // heat source
+  {
+    int numHeatSources;
+    tpsP->getInput("heatSource/numHeatSources", numHeatSources, 0);
+    config.numHeatSources = numHeatSources;
+
+    if (numHeatSources > 0) {
+      config.numHeatSources = numHeatSources;
+      config.heatSource = new heatSourceData[numHeatSources];
+
+      for (int s = 0; s < numHeatSources; s++) {
+        std::string base("heatSource" + std::to_string(s + 1));
+
+        tpsP->getRequiredInput((base + "/value").c_str(), config.heatSource[s].value);
+
+        std::string type;
+        tpsP->getRequiredInput((base + "/distribution").c_str(), type);
+        if (type == "cylinder") {
+          config.heatSource[s].type = type;
+        } else {
+          grvy_printf(GRVY_ERROR, "\nUnknown heat source distribution -> %s\n", type.c_str());
+          exit(ERROR);
+        }
+
+        tpsP->getRequiredInput((base + "/radius").c_str(), config.heatSource[s].radius);
+        config.heatSource[s].point1.SetSize(3);
+        config.heatSource[s].point2.SetSize(3);
+
+        tpsP->getRequiredVec((base + "/point1").c_str(), config.heatSource[s].point1, 3);
+        tpsP->getRequiredVec((base + "/point2").c_str(), config.heatSource[s].point2, 3);
       }
     }
   }
@@ -1836,8 +1870,7 @@ void M2ulPhyS::checkSolverOptions() const {
 
   if (config.isAxisymmetric()) {
     if (mpi.Root()) {
-      std::cerr << "[ERROR]: Axisymmetric simulations not supported on GPU."
-                << std::endl;
+      std::cerr << "[ERROR]: Axisymmetric simulations not supported on GPU." << std::endl;
       std::cerr << std::endl;
       exit(ERROR);
     }
@@ -1850,8 +1883,7 @@ void M2ulPhyS::checkSolverOptions() const {
     // Don't support passive scalars yet
     if (config.GetEquationSystem() == NS_PASSIVE) {
       if (mpi.Root()) {
-        std::cerr << "[ERROR]: Passive scalars not supported for axisymmetric simulations."
-                  << std::endl;
+        std::cerr << "[ERROR]: Passive scalars not supported for axisymmetric simulations." << std::endl;
         std::cerr << std::endl;
         exit(ERROR);
       }
@@ -1870,8 +1902,7 @@ void M2ulPhyS::checkSolverOptions() const {
       std::pair<int, InletType> patchANDtype = (*config.GetInletPatchType())[i];
       if (patchANDtype.second != SUB_DENS_VEL) {
         if (mpi.Root()) {
-          std::cerr << "[ERROR]: Only SUB_DENS_VEL inlet supported for axisymmetric simulations."
-                    << std::endl;
+          std::cerr << "[ERROR]: Only SUB_DENS_VEL inlet supported for axisymmetric simulations." << std::endl;
           std::cerr << std::endl;
           exit(ERROR);
         }
@@ -1881,8 +1912,7 @@ void M2ulPhyS::checkSolverOptions() const {
       std::pair<int, OutletType> patchANDtype = (*config.GetOutletPatchType())[i];
       if (patchANDtype.second != SUB_P) {
         if (mpi.Root()) {
-          std::cerr << "[ERROR]: Only SUB_P outlet supported for axisymmetric simulations."
-                    << std::endl;
+          std::cerr << "[ERROR]: Only SUB_P outlet supported for axisymmetric simulations." << std::endl;
           std::cerr << std::endl;
           exit(ERROR);
         }
