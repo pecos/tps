@@ -125,7 +125,7 @@ setup() {
     ./soln_differ $SOLN_FILE_1 $REF_FILE_1
 }
 
-@test "[$TEST] verify tps output with input heat source -> $RUNFILE" {
+@test "[$TEST] verify tps output with input heat source -> $RUNFILE_HEAT" {
 
     test -s 
     ../src/tps -run $RUNFILE_HEAT
