@@ -151,6 +151,11 @@ public:
 
   // double GetViscMultiplyer() { return visc_mult; }
   // double GetBulkViscMultiplyer() { return bulk_visc_mult; }
+  
+  // BC related functions
+  virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState) {};
+  virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp,
+                                            Vector &stateOut) {};
 };
 
 //////////////////////////////////////////////////////
@@ -199,6 +204,11 @@ public:
   // virtual double GetPrandtlNum() { return Pr; }
 
   // virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
+  
+  // BC related functions
+  virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState);
+  virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp,
+                                            Vector &stateOut);
 
 
     // GPU functions
@@ -479,6 +489,11 @@ public:
   virtual void computeMoleFractionGradient(const Vector &numberDensities,
                                            const DenseMatrix &gradUp,
                                            DenseMatrix &moleFractionGrad);
+  
+  // functions needed for BCs
+  virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState);
+  virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp,
+                                            Vector &stateOut);
 
 
     // GPU functions
