@@ -88,8 +88,8 @@ ConstantPressureGradient::ConstantPressureGradient(const int &_dim, const int &_
                                                    ParGridFunction *_gradUp,
                                                    const volumeFaceIntegrationArrays &_gpuArrays,
                                                    RunConfiguration &_config)
-: ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules,
-               _vfes, _Up, _gradUp, _gpuArrays, _config.isAxisymmetric()) {
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, _gpuArrays,
+                   _config.isAxisymmetric()) {
   mixture = new DryAir(_config, dim);
 
   pressGrad.UseDevice(true);
@@ -221,17 +221,16 @@ void ConstantPressureGradient::updateTerms_gpu(const int numElems, const int off
 #endif
 
 AxisymmetricSource::AxisymmetricSource(const int &_dim, const int &_num_equation, const int &_order,
-                                       GasMixture *_mixture, const Equations &_eqSystem,
-                                       const int &_intRuleType, IntegrationRules *_intRules,
-                                       ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
-                                       const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
-  : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules,
-                 _vfes, _Up, _gradUp, gpuArrays, _config.isAxisymmetric()),
-    mixture(_mixture),
-    eqSystem(_eqSystem) {
+                                       GasMixture *_mixture, const Equations &_eqSystem, const int &_intRuleType,
+                                       IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
+                                       ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
+                                       RunConfiguration &_config)
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays,
+                   _config.isAxisymmetric()),
+      mixture(_mixture),
+      eqSystem(_eqSystem) {
   // no-op
 }
-
 
 void AxisymmetricSource::updateTerms(Vector &in) {
   // make sure we are in a 2D case (otherwise can't be axisymmetric)
@@ -266,7 +265,6 @@ void AxisymmetricSource::updateTerms(Vector &in) {
   //   // nodes of the element
   //   Array<int> nodes;
   //   vfes->GetElementVDofs(el, nodes);
-
 
   //   const int order = elem->GetOrder();
   //   //cout<<"order :"<<maxorder<<" dof: "<<dof_elem<<endl;
@@ -319,11 +317,11 @@ void AxisymmetricSource::updateTerms(Vector &in) {
       // TODO(trevilo): Generalize beyond flow only
       Vector prim(5);
 
-      const double rho = dataUp[index + 0*dof];
-      const double ur  = dataUp[index + 1*dof];
-      const double uz  = dataUp[index + 2*dof];
-      const double ut  = dataUp[index + 3*dof];
-      const double temperature = dataUp[index + (1+nvel)*dof];
+      const double rho = dataUp[index + 0 * dof];
+      const double ur = dataUp[index + 1 * dof];
+      const double uz = dataUp[index + 2 * dof];
+      const double ut = dataUp[index + 3 * dof];
+      const double temperature = dataUp[index + (1 + nvel) * dof];
 
       prim[0] = rho;
       prim[1] = ur;
@@ -332,30 +330,28 @@ void AxisymmetricSource::updateTerms(Vector &in) {
       prim[4] = temperature;
 
       const double Rg = mixture->GetGasConstant();
-      const double pressure = rho*Rg*temperature;
+      const double pressure = rho * Rg * temperature;
 
-      const double rurut = rho*ur*ut;
-      const double rutut = rho*ut*ut;
+      const double rurut = rho * ur * ut;
+      const double rutut = rho * ut * ut;
 
       double tau_tt, tau_tr;
       if (eqSystem == EULER) {
         tau_tt = tau_tr = 0.0;
       } else {
-        const double ur_r = dataGradUp[index + (1*dof) + (0*dof*num_equation)];
-        const double uz_z = dataGradUp[index + (2*dof) + (1*dof*num_equation)];
-        const double ut_r = dataGradUp[index + (3*dof) + (0*dof*num_equation)];
+        const double ur_r = dataGradUp[index + (1 * dof) + (0 * dof * num_equation)];
+        const double uz_z = dataGradUp[index + (2 * dof) + (1 * dof * num_equation)];
+        const double ut_r = dataGradUp[index + (3 * dof) + (0 * dof * num_equation)];
 
         const double visc = mixture->GetViscosityFromPrimitive(prim);
 
         tau_tt = -ur_r - uz_z;
-        if (radius > 0)
-          tau_tt += 2*ur/radius;
+        if (radius > 0) tau_tt += 2 * ur / radius;
 
-        tau_tt *= 2*visc/3.0;
+        tau_tt *= 2 * visc / 3.0;
 
         tau_tr = ut_r;
-        if (radius > 0)
-          tau_tr -= ut/radius;
+        if (radius > 0) tau_tr -= ut / radius;
 
         tau_tr *= visc;
       }
@@ -369,25 +365,24 @@ void AxisymmetricSource::updateTerms(Vector &in) {
       // coords
 
       if (radius > 0) {
-        data[index + 1*dof] += (pressure + rutut - tau_tt)/radius;
-        data[index + 3*dof] +=          (- rurut + tau_tr)/radius;
+        data[index + 1 * dof] += (pressure + rutut - tau_tt) / radius;
+        data[index + 3 * dof] += (-rurut + tau_tr) / radius;
       } else {
         // TODO(trevilo): Fix axis
         double fake_radius = 1e-3;
-        data[index + 1*dof] += (pressure - tau_tt)/fake_radius;
-        data[index + 3*dof] +=            (tau_tr)/fake_radius;
+        data[index + 1 * dof] += (pressure - tau_tt) / fake_radius;
+        data[index + 3 * dof] += (tau_tr) / fake_radius;
       }
     }
   }
 }
 
-
 SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                        Fluxes *_fluxClass, GasMixture *_mixture, IntegrationRules *_intRules,
                        ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
                        const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
-  : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules,
-                 _vfes, _Up, _gradUp, gpuArrays, _config.isAxisymmetric()),
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays,
+                   _config.isAxisymmetric()),
       fluxes(_fluxClass),
       mixture(_mixture),
       szData(_config.GetSpongeZoneData()) {
@@ -542,9 +537,9 @@ PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const in
                              IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, GasMixture *_mixture,
                              ParGridFunction *_Up, ParGridFunction *_gradUp,
                              const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
-  : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules,
-                 _vfes, _Up, _gradUp, gpuArrays, _config.isAxisymmetric()),
-    mixture(_mixture) {
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays,
+                   _config.isAxisymmetric()),
+      mixture(_mixture) {
   psData_.DeleteAll();
   for (int i = 0; i < _config.GetPassiveScalarData().Size(); i++) psData_.Append(new passiveScalarData);
 
@@ -647,8 +642,8 @@ MASA_forcings::MASA_forcings(const int &_dim, const int &_num_equation, const in
                              IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
                              ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
                              RunConfiguration &_config)
-  : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules,
-                 _vfes, _Up, _gradUp, gpuArrays, _config.isAxisymmetric()) {
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays,
+                   _config.isAxisymmetric()) {
   initMasaHandler("forcing", dim, _config.GetEquationSystem(), _config.GetViscMult());
 }
 

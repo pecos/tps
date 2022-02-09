@@ -109,10 +109,8 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
 #endif
 
   if (config_.isAxisymmetric()) {
-    forcing.Append(new AxisymmetricSource(dim, num_equation, _order,
-                                          mixture, eqSystem,
-                                          intRuleType, intRules,
-                                          vfes, Up, gradUp, gpuArrays, _config));
+    forcing.Append(new AxisymmetricSource(dim, num_equation, _order, mixture, eqSystem, intRuleType, intRules, vfes, Up,
+                                          gradUp, gpuArrays, _config));
 
     const FiniteElementCollection *fec = vfes->FEColl();
     dfes = new ParFiniteElementSpace(mesh, fec, dim, Ordering::byNODES);

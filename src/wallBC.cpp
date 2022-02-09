@@ -37,8 +37,8 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSyste
                ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
                const int _num_equation, int _patchNumber, WallType _bcType, const Array<double> _inputData,
                const Array<int> &_intPointsElIDBC, const int &_maxIntPoints, bool axisym)
-    : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
-                        1, axisym),  // so far walls do not require ref. length. Left at 1
+    : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber, 1,
+                        axisym),  // so far walls do not require ref. length. Left at 1
       wallType(_bcType),
       fluxClass(_fluxClass),
       intPointsElIDBC(_intPointsElIDBC),
@@ -135,8 +135,8 @@ void WallBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesID
                      num_equation, mixture);
 }
 
-void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn,  DenseMatrix &gradState,
-                                double radius, Vector &bdrFlux) {
+void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                Vector &bdrFlux) {
   Vector vel(nvel);
   for (int d = 0; d < nvel; d++) vel[d] = stateIn[1 + d] / stateIn[0];
 
@@ -151,26 +151,25 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn,  DenseMatrix &g
   for (int d = 0; d < dim; d++) vn += vel[d] * unitN[d];
 
   Vector stateMirror(num_equation);
+  stateMirror = stateIn;
 
-  stateMirror[0] = stateIn[0];
+  // only momentum needs to be changed
   stateMirror[1] = stateIn[0] * (vel[0] - 2. * vn * unitN[0]);
   stateMirror[2] = stateIn[0] * (vel[1] - 2. * vn * unitN[1]);
   if (dim == 3) stateMirror[3] = stateIn[0] * (vel[2] - 2. * vn * unitN[2]);
   if ((nvel == 3) && (dim == 2)) stateMirror[3] = stateIn[0] * vel[2];
-  stateMirror[1 + nvel] = stateIn[1 + nvel];
-  if (eqSystem == NS_PASSIVE) stateMirror[num_equation - 1] = stateIn[num_equation - 1];
 
   rsolver->Eval(stateIn, stateMirror, normal, bdrFlux);
+
+  DenseMatrix viscFw(num_equation, dim);
+  DenseMatrix viscF(num_equation, dim);
 
   if (axisymmetric_) {
     // here we have hijacked the inviscid wall condition to implement
     // the axis... but... should implement this separately
 
     // incoming visc flux
-    DenseMatrix viscF(num_equation, dim);
     fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, viscF);
-
-    double p = mixture->ComputePressure(stateIn);
 
     // modify gradients so that wall is adibatic
     Vector unitNorm = normal;
@@ -180,20 +179,17 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn,  DenseMatrix &g
       unitNorm *= 1. / sqrt(normN);
     }
 
-    // modify gradient density so dT/dn=0 at the wall
-    double DrhoDn = 0.;
-    for (int d = 0; d < dim; d++) DrhoDn += gradState(0, d) * unitNorm[d];
+    double normGradT = 0.;
+    for (int d = 0; d < dim; d++) normGradT += unitNorm(d) * gradState(1 + dim, d);
+    for (int d = 0; d < dim; d++) gradState(1 + dim, d) -= normGradT * unitNorm(d);
 
-    double DrhoDnNew = 0.;
-    for (int d = 0; d < dim; d++) DrhoDnNew += gradState(1 + dim, d) * unitNorm[d];
-    DrhoDnNew *= stateIn[0] / p;
+    // TODO(marc): if we have a two-temperature plasma an additional
+    //       normal temperature gradient should also be removed.
 
-    for (int d = 0; d < dim; d++) gradState(0, d) += -DrhoDn * unitNorm[d] + DrhoDnNew * unitNorm[d];
     if (eqSystem == NS_PASSIVE) {
       for (int d = 0; d < dim; d++) gradState(num_equation - 1, d) = 0.;
     }
 
-    DenseMatrix viscFw(num_equation, dim);
     fluxClass->ComputeViscousFluxes(stateMirror, gradState, radius, viscFw);
 
     // Add visc fluxes (we skip density eq.)
@@ -202,31 +198,22 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn,  DenseMatrix &g
     }
   } else {
     // evaluate viscous fluxes at the wall
-    DenseMatrix viscFw(num_equation, dim);
     fluxClass->ComputeViscousFluxes(stateMirror, gradState, radius, viscFw);
 
     // evaluate internal viscous fluxes
-    DenseMatrix viscF(num_equation, dim);
     fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, viscF);
+  }
 
-    // Add visc fluxes (we skip density eq.)
-    for (int eq = 1; eq < num_equation; eq++) {
-      for (int d = 0; d < dim; d++) bdrFlux[eq] -= 0.5 * (viscFw(eq, d) + viscF(eq, d)) * normal[d];
-    }
+  // Add visc fluxes (we skip density eq.)
+  for (int eq = 1; eq < num_equation; eq++) {
+    for (int d = 0; d < dim; d++) bdrFlux[eq] -= 0.5 * (viscFw(eq, d) + viscF(eq, d)) * normal[d];
   }
 }
 
-void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
-                                      double radius, Vector &bdrFlux) {
-  double p = mixture->ComputePressure(stateIn);
-  double T = mixture->ComputeTemperature(stateIn);
-
-  const double gamma = mixture->GetSpecificHeatRatio();
-  const double Rg = mixture->GetGasConstant();
-
-  Vector wallState = stateIn;
-  for (int d = 0; d < nvel; d++) wallState[1 + d] = 0.;
-  wallState[1 + nvel] = p / (gamma - 1.);
+void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                      Vector &bdrFlux) {
+  Vector wallState(num_equation);
+  mixture->computeStagnationState(stateIn, wallState);
 
   // Normal convective flux
   rsolver->Eval(stateIn, wallState, normal, bdrFlux, true);
@@ -245,27 +232,12 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
   }
 
   // modify gradient temperature so dT/dn=0 at the wall
-  double DrhoDn = 0.;
-  for (int d = 0; d < dim; d++) DrhoDn += gradState(0, d) * unitNorm[d];
-  double dpdn = Rg * T * DrhoDn;  // this is the BC -> grad(T)*normal=0
+  double normGradT = 0.;
+  for (int d = 0; d < dim; d++) normGradT += unitNorm(d) * gradState(1 + dim, d);
+  for (int d = 0; d < dim; d++) gradState(1 + dim, d) -= normGradT * unitNorm(d);
 
-  Vector gradP(dim);
-  double old_dpdn = 0.;
-  for (int d = 0; d < dim; d++) {
-    Vector grads(gradState.GetColumn(d), num_equation);
-    double dpdx = mixture->ComputePressureDerivative(grads, stateIn, false);
-    gradP(d) = dpdx;
-    old_dpdn += dpdx * unitNorm(d);
-  }
-
-  // force the new dp/dn
-  for (int d = 0; d < dim; d++) gradP(d) += (-old_dpdn + dpdn) * unitNorm(d);
-
-  // modify grad(T) with the corrected grad(p)
-  for (int d = 0; d < dim; d++) {
-    // temperature gradient for ideal Dry Air
-    gradState(1 + dim, d) = T * (gradP(d) / p - gradState(0, d) / stateIn[0]);
-  }
+  // TODO(marc): if we have a two-temperature plasma an additional
+  //       normal temperature gradient should also be removed.
 
   if (eqSystem == NS_PASSIVE) {
     for (int d = 0; d < dim; d++) gradState(num_equation - 1, d) = 0.;
@@ -280,18 +252,10 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
   }
 }
 
-void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
-                                       double radius, Vector &bdrFlux) {
-  const double gamma = mixture->GetSpecificHeatRatio();
-
+void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                       Vector &bdrFlux) {
   Vector wallState(num_equation);
-  wallState[0] = stateIn[0];
-  for (int d = 0; d < nvel; d++) wallState[1 + d] = 0.;
-
-  wallState[1 + nvel] = mixture->GetGasConstant() / (gamma - 1.);  // Cv
-  wallState[1 + nvel] *= stateIn[0] * wallTemp;
-
-  if (eqSystem == NS_PASSIVE) wallState[num_equation - 1] = stateIn[num_equation - 1];
+  mixture->computeStagnantStateWithTemp(stateIn, wallTemp, wallState);
 
   // Normal convective flux
   rsolver->Eval(stateIn, wallState, normal, bdrFlux, true);

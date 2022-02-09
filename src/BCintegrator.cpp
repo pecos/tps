@@ -74,10 +74,10 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
 
     if (attrInMesh) {
       Array<double> data = config.GetInletData(in);
-      BCmap[patchANDtype.first] = new InletBC(groupsMPI, _runFile.GetEquationSystem(), rsolver, mixture, vfes, intRules,
-                                              _dt, dim, num_equation, patchANDtype.first, config.GetReferenceLength(),
-                                              patchANDtype.second, data, _maxIntPoints, _maxDofs,
-                                              config.isAxisymmetric());
+      BCmap[patchANDtype.first] =
+          new InletBC(groupsMPI, _runFile.GetEquationSystem(), rsolver, mixture, vfes, intRules, _dt, dim, num_equation,
+                      patchANDtype.first, config.GetReferenceLength(), patchANDtype.second, data, _maxIntPoints,
+                      _maxDofs, config.isAxisymmetric());
     }
   }
 
@@ -91,10 +91,10 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
 
     if (attrInMesh) {
       Array<double> data = config.GetOutletData(o);
-      BCmap[patchANDtype.first] = new OutletBC(
-          groupsMPI, _runFile.GetEquationSystem(), rsolver, mixture, vfes, intRules, _dt, dim, num_equation,
-          patchANDtype.first, config.GetReferenceLength(), patchANDtype.second, data, _maxIntPoints, _maxDofs,
-          config.isAxisymmetric());
+      BCmap[patchANDtype.first] =
+          new OutletBC(groupsMPI, _runFile.GetEquationSystem(), rsolver, mixture, vfes, intRules, _dt, dim,
+                       num_equation, patchANDtype.first, config.GetReferenceLength(), patchANDtype.second, data,
+                       _maxIntPoints, _maxDofs, config.isAxisymmetric());
     }
   }
 
@@ -112,10 +112,9 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
       Array<double> wallData;
       if (patchType.second == VISC_ISOTH) wallData = config.GetWallData(w);
 
-      BCmap[patchType.first] =
-          new WallBC(rsolver, mixture, _runFile.GetEquationSystem(), fluxClass, vfes, intRules, _dt, dim, num_equation,
-                     patchType.first, patchType.second, wallData, intPointsElIDBC, _maxIntPoints,
-                     config.isAxisymmetric());
+      BCmap[patchType.first] = new WallBC(rsolver, mixture, _runFile.GetEquationSystem(), fluxClass, vfes, intRules,
+                                          _dt, dim, num_equation, patchType.first, patchType.second, wallData,
+                                          intPointsElIDBC, _maxIntPoints, config.isAxisymmetric());
     }
   }
 

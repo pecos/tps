@@ -113,6 +113,10 @@ class GasMixture {
 
   double GetViscMultiplyer() { return visc_mult; }
   double GetBulkViscMultiplyer() { return bulk_visc_mult; }
+
+  // BC related functions
+  virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState) {}
+  virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut) {}
 };
 
 class DryAir : public GasMixture {
@@ -167,6 +171,10 @@ class DryAir : public GasMixture {
   virtual double GetPrandtlNum() { return Pr; }
 
   virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
+
+  // BC related functions
+  virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState);
+  virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut);
 
   // GPU functions
 #ifdef _GPU_
@@ -284,7 +292,7 @@ inline double DryAir::GetViscosity(const Vector &state) {
 }
 
 inline double DryAir::GetViscosityFromPrimitive(const Vector &state) {
-  double temp = state[1+dim];
+  double temp = state[1 + dim];
   return (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
 }
 

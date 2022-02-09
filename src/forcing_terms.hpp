@@ -113,16 +113,14 @@ class AxisymmetricSource : public ForcingTerms {
   const Equations &eqSystem;
 
  public:
-  AxisymmetricSource(const int &_dim, const int &_num_equation, const int &_order,
-                     GasMixture *_mixture, const Equations &_eqSystem,
-                     const int &_intRuleType, IntegrationRules *_intRules,
+  AxisymmetricSource(const int &_dim, const int &_num_equation, const int &_order, GasMixture *_mixture,
+                     const Equations &_eqSystem, const int &_intRuleType, IntegrationRules *_intRules,
                      ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
                      const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config);
   ~AxisymmetricSource();
 
   virtual void updateTerms(Vector &in);
 };
-
 
 class SpongeZone : public ForcingTerms {
  private:
