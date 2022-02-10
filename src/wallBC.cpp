@@ -304,7 +304,7 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
 
   const double *d_interpolU = interpolated_Ubdr_.Read();
   const double *d_interpGrads = interpolatedGradUpbdr_.Read();
-  
+
   const WorkingFluid fluid = mixture->GetWorkingFluid();
 
   // clang-format on
