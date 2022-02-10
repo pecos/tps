@@ -143,7 +143,7 @@ class OutletBC : public BoundaryCondition {
                                                   const int &num_equation, const WorkingFluid &fluid,
                                                   const Equations &eqSystem, const int &thrd, const int &maxThreads) {
     if (fluid == WorkingFluid::DRY_AIR) {
-      modifyEnergyForPressure_gpu(u1, u2, press, gamma, Rg, num_equation, dim, thrd, maxThreads);
+      DryAir::modifyEnergyForPressure_gpu(u1, u2, press, gamma, Rg, num_equation, dim, thrd, maxThreads);
     }
 
     //     if (thrd == 1 + dim) {
