@@ -102,21 +102,30 @@ class WallBC : public BoundaryCondition {
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void computeInvWallState(const double *u1, double *u2, const double *nor, const int &dim,
                                                    const int &num_equation, const int &thrd, const int &maxThreads) {
-    double momNormal = 0.;
-    double unitNor[3];
-    double norm;
-    norm = 0.;
-    for (int d = 0; d < dim; d++) norm += nor[d] * nor[d];
-    norm = sqrt(norm);
+    MFEM_SHARED double momNormal, norm;
+    MFEM_SHARED double unitNor[3];
 
-    for (int d = 0; d < dim; d++) {
-      unitNor[d] = nor[d] / norm;
-      momNormal += unitNor[d] * u1[d + 1];
+    if (thrd == maxThreads - 1) {
+      norm = 0.;
+      for (int d = 0; d < dim; d++) norm += nor[d] * nor[d];
+      norm = sqrt(norm);
     }
-    if (thrd < num_equation) u2[thrd] = u1[thrd];
+    MFEM_SYNC_THREAD;
 
-    if (thrd > 0 || thrd < 1 + dim) {
-      u2[thrd] = u1[thrd] - 2. * momNormal * unitNor[thrd - 1];
+    for (int d = thrd; d < dim; d += maxThreads) unitNor[d] = nor[d] / norm;
+    MFEM_SYNC_THREAD;
+
+    if (thrd == 0) {
+      momNormal = 0.;
+      for (int d = 0; d < dim; d++) momNormal += unitNor[d] * u1[d + 1];
+    }
+    MFEM_SYNC_THREAD;
+
+    if (thrd < num_equation) u2[thrd] = u1[thrd];
+    MFEM_SYNC_THREAD;
+
+    for (int d = thrd; d < dim; d += maxThreads) {
+      u2[d + 1] = u1[d + 1] - 2. * momNormal * unitNor[d];
     }
   }
 
