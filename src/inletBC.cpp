@@ -729,6 +729,8 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
 
   const double Rg = mixture->GetGasConstant();
   const double gamma = mixture->GetSpecificHeatRatio();
+  
+  const WorkingFluid fluid = mixture->GetWorkingFluid();
 
   MFEM_FORALL_2D(n, numBdrElem, maxDofs, 1, 1, {     // NOLINT
     MFEM_FOREACH_THREAD(i, x, maxDofs) {             // NOLINT
@@ -766,7 +768,8 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
     // compute mirror state
     switch (type) {
       case InletType::SUB_DENS_VEL:
-        computeSubDenseVel(i, &u1[0], &u2[0], &nor[0], d_inputState, gamma, dim, num_equation, eqSystem);
+        computeSubDenseVel(&u1[0], &u2[0], &nor[0], d_inputState, gamma, Rg, dim, num_equation, 
+                           fluid, eqSystem, i, maxDofs);
         break;
       case InletType::SUB_DENS_VEL_NR:
         printf("INLET BC NOT IMPLEMENTED");

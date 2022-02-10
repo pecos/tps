@@ -124,9 +124,11 @@ class InletBC : public BoundaryCondition {
                               const int &maxIntPoints, const int &maxDofs, const int &dim, const int &num_equation);
 
 #ifdef _GPU_
-  static MFEM_HOST_DEVICE void computeSubDenseVel(const int &thrd, const double *u1, double *u2, const double *nor,
-                                                  const double *inputState, const double &gamma, const int &dim,
-                                                  const int &num_equation, const Equations &eqSystem) {
+  static MFEM_HOST_DEVICE void computeSubDenseVel(const double *u1, double *u2, const double *nor,
+                                                  const double *inputState, const double &gamma, const double &Rg,
+                                                  const int &dim,
+                                                  const int &num_equation, const WorkingFluid &fluid, 
+                                                  const Equations &eqSystem, const int &thrd, const int &maxThread) {
     // assumes there at least as many threads as number of equations
     MFEM_SHARED double KE[3];
     MFEM_SHARED double p;
@@ -135,20 +137,25 @@ class InletBC : public BoundaryCondition {
     if (dim != 3 && (thrd == num_equation - 1)) KE[2] = 0.;
     MFEM_SYNC_THREAD;
 
-    if (thrd == 0) p = DryAir::pressure(u1, &KE[0], gamma, dim, num_equation);
-    MFEM_SYNC_THREAD;
+    if (fluid == WorkingFluid::DRY_AIR) {
+      if (thrd == 0) p = DryAir::pressure(u1, &KE[0], gamma, dim, num_equation);
+      MFEM_SYNC_THREAD;
 
-    if (thrd == 0) u2[0] = inputState[0];
-    if (thrd == 1) u2[1] = inputState[0] * inputState[1];
-    if (thrd == 2) u2[2] = inputState[0] * inputState[2];
-    if (dim == 3 && thrd == 3) u2[3] = inputState[0] * inputState[3];
-    if (thrd == 1 + dim) {
-      double ke = 0.;
-      for (int d = 0; d < dim; d++) ke += inputState[1 + d] * inputState[1 + d];
-      u2[thrd] = p / (gamma - 1.) + 0.5 * inputState[0] * ke;
-    }
-    if (eqSystem == NS_PASSIVE && thrd == num_equation - 1) {
-      u2[thrd] = 0.;
+      if (thrd == 0) u2[0] = inputState[0];
+      if (thrd == 1) u2[1] = inputState[0] * inputState[1];
+      if (thrd == 2) u2[2] = inputState[0] * inputState[2];
+      if (dim == 3 && thrd == 3) u2[3] = inputState[0] * inputState[3];
+//       if (thrd == 1 + dim) {
+//         double ke = 0.;
+//         for (int d = 0; d < dim; d++) ke += inputState[1 + d] * inputState[1 + d];
+//         u2[thrd] = p / (gamma - 1.) + 0.5 * inputState[0] * ke;
+//       }
+      if (eqSystem == NS_PASSIVE && thrd == num_equation - 1) {
+        u2[thrd] = 0.;
+      }
+      MFEM_SYNC_THREAD;
+      
+      DryAir::modifyEnergyForPressure_gpu(u2, u2, p, gamma, Rg, num_equation, dim, thrd, maxThreads);
     }
   }
 #endif
