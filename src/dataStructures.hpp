@@ -159,6 +159,7 @@ struct passiveScalarData {
 
 // heat source structure
 struct heatSourceData {
+  bool isEnabled;
   double value;
   std::string type;
   Vector point1;

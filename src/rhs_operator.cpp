@@ -105,8 +105,10 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
   }
   if (_config.numHeatSources > 0) {
     for (int s = 0; s < _config.numHeatSources; s++) {
-      forcing.Append(new HeatSource(dim, num_equation, _order, intRuleType, _config.heatSource[s], mixture, intRules,
-                                    vfes, Up, gradUp, gpuArrays, _config));
+      if (_config.heatSource[s].isEnabled) {
+        forcing.Append(new HeatSource(dim, num_equation, _order, intRuleType, _config.heatSource[s], mixture, intRules,
+                                      vfes, Up, gradUp, gpuArrays, _config));
+      }
     }
   }
 #ifdef _MASA_

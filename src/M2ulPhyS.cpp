@@ -1654,23 +1654,27 @@ void M2ulPhyS::parseSolverOptions2() {
       for (int s = 0; s < numHeatSources; s++) {
         std::string base("heatSource" + std::to_string(s + 1));
 
-        tpsP->getRequiredInput((base + "/value").c_str(), config.heatSource[s].value);
+        tpsP->getInput((base + "/isEnabled").c_str(), config.heatSource[s].isEnabled, false);
 
-        std::string type;
-        tpsP->getRequiredInput((base + "/distribution").c_str(), type);
-        if (type == "cylinder") {
-          config.heatSource[s].type = type;
-        } else {
-          grvy_printf(GRVY_ERROR, "\nUnknown heat source distribution -> %s\n", type.c_str());
-          exit(ERROR);
+        if (config.heatSource[s].isEnabled) {
+          tpsP->getRequiredInput((base + "/value").c_str(), config.heatSource[s].value);
+
+          std::string type;
+          tpsP->getRequiredInput((base + "/distribution").c_str(), type);
+          if (type == "cylinder") {
+            config.heatSource[s].type = type;
+          } else {
+            grvy_printf(GRVY_ERROR, "\nUnknown heat source distribution -> %s\n", type.c_str());
+            exit(ERROR);
+          }
+
+          tpsP->getRequiredInput((base + "/radius").c_str(), config.heatSource[s].radius);
+          config.heatSource[s].point1.SetSize(3);
+          config.heatSource[s].point2.SetSize(3);
+
+          tpsP->getRequiredVec((base + "/point1").c_str(), config.heatSource[s].point1, 3);
+          tpsP->getRequiredVec((base + "/point2").c_str(), config.heatSource[s].point2, 3);
         }
-
-        tpsP->getRequiredInput((base + "/radius").c_str(), config.heatSource[s].radius);
-        config.heatSource[s].point1.SetSize(3);
-        config.heatSource[s].point2.SetSize(3);
-
-        tpsP->getRequiredVec((base + "/point1").c_str(), config.heatSource[s].point1, 3);
-        tpsP->getRequiredVec((base + "/point2").c_str(), config.heatSource[s].point2, 3);
       }
     }
   }
