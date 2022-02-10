@@ -100,8 +100,8 @@ class WallBC : public BoundaryCondition {
                               const int &num_equation);
 
 #ifdef _GPU_
-  static MFEM_HOST_DEVICE void computeInvWallState(const int &thrd, const double *u1, double *u2, const double *nor,
-                                                   const int &dim, const int &num_equation) {
+  static MFEM_HOST_DEVICE void computeInvWallState(const double *u1, double *u2, const double *nor,
+                                                   const int &dim, const int &num_equation, const int &thrd, const int &maxThreads) {
     double momNormal = 0.;
     double unitNor[3];
     double norm;
@@ -120,14 +120,16 @@ class WallBC : public BoundaryCondition {
     }
   }
 
-  static MFEM_HOST_DEVICE void computeIsothermalState(const int &thrd, const double *u1, double *u2, const double *nor,
+  static MFEM_HOST_DEVICE void computeIsothermalState(const double *u1, double *u2, const double *nor,
                                                       const double &wallTemp, const double &gamma, const double &Rg,
-                                                      const int &dim, const int &num_equation) {
+                                                      const int &dim, const int &num_equation, 
+                                                      const WorkingFluid &fluid, const int &thrd, const int &maxThreads) {
     if (thrd < num_equation) u2[thrd] = u1[thrd];
+    MFEM_SYNC_THREAD;
 
-    // NOTE: assumes ideal gas
-    if (thrd == 1 + dim) u2[thrd] = Rg / (gamma - 1.) * u1[0] * wallTemp;
-    if (thrd > 0 && thrd < dim + 1) u2[thrd] = 0.;
+    if (fluid == WorkingFluid::DRY_AIR) {
+      DryAir::computeStagnantStateWithTemp_gpu(u1, u2, wallTemp, gamma, num_equation, dim, thrd, maxThreads);
+    }
   }
 #endif
 };
