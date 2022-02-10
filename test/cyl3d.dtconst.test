@@ -48,13 +48,24 @@ setup() {
     ./soln_differ $SOLN_FILE_1 $REF_FILE_1
 }
 
-@test "[$TEST] verify tps output with input heat source -> $RUNFILE_HEAT" {
+@test "[$TEST] verify tps output with one input heat source <enabled> -> $RUNFILE_HEAT" {
 
-    test -s 
+    test -s $RUNFILE_HEAT
     ../src/tps -run $RUNFILE_HEAT
     
     test -s $SOLN_FILE
     test -s $REF_FILE_HEAT
     ./soln_differ $SOLN_FILE $REF_FILE_HEAT
+}
+
+@test "[$TEST] verify tps output with one input heat source <disabled> -> $RUNFILE_HEAT" {
+
+    runFileDisabled="inputs/input.dtconst.cyl.heatSource.disabled.ini"
+    test -s $runFileDisabled
+    ../src/tps -run $runFileDisabled
+    
+    test -s $SOLN_FILE
+    test -s $REF_FILE
+    ./soln_differ $SOLN_FILE $REF_FILE
 }
 
