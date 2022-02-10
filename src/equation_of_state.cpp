@@ -262,6 +262,18 @@ void DryAir::computeStagnantStateWithTemp(const mfem::Vector& stateIn, const dou
   stateOut(1 + dim) = gas_constant / (specific_heat_ratio - 1.) * stateIn(0) * Temp;
 }
 
+void DryAir::modifyEnergyForPressure(const mfem::Vector& stateIn, mfem::Vector& stateOut, const double& p)
+{
+  stateOut.SetSize(num_equations);
+  stateOut = stateIn;
+  
+  double ke = 0.;
+  for (int d = 0; d < dim; d++) ke += stateIn(1 + d) * stateIn(1 + d);
+  ke *= 0.5 / stateIn(0);
+  
+  stateOut(1 + dim) = p / (specific_heat_ratio - 1.) + ke;
+}
+
 // GPU FUNCTIONS
 /*#ifdef _GPU_
 double EquationOfState::pressure( double *state,

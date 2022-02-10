@@ -118,6 +118,7 @@ class GasMixture {
   // BC related functions
   virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState) {}
   virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut) {}
+  virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p) {}
 };
 
 class DryAir : public GasMixture {
@@ -176,6 +177,7 @@ class DryAir : public GasMixture {
   // BC related functions
   virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState);
   virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut);
+  virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p);
 
   // GPU functions
 #ifdef _GPU_
@@ -225,6 +227,23 @@ class DryAir : public GasMixture {
     if (thrd > 0 && thrd <= dim) stagState[thrd] = 0.;
 
     if (thrd == 1 + dim) stagState[thrd] = Rg / (gamma - 1.) * stateIn[0] * Temp;
+  }
+  
+  static MFEM_HOST_DEVICE void modifyEnergyForPressure_gpu( const double *stateIn, double *stateOut,
+                                                            const double &p, const double &gamma,
+                                                            const double &Rg, const int &num_equation,
+                                                            const int &dim, const int &thrd,
+                                                            const int &maxThreads) {
+    MFEM_SHARED double ke;
+    if (thrd == maxThreads - 1) {
+      ke = 0.;
+      for (int d = 0; d < dim; d++) ke += stateIn[1 + d] * stateIn[1 + d];
+      ke *= 0.5 / stateIn[0];
+    }
+    for (int eq = 0; eq < num_equation; eq += maxThreads) stateOut[eq] = stateIn[eq];
+    MFEM_SYNC_THREAD;
+    
+    if (thrd == 0) stateOut[1 + dim] = p / (gamma - 1.) + ke;
   }
 #endif
 };
