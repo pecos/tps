@@ -373,6 +373,8 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
 
   const double *d_interpolU = interpolated_Ubdr_.Read();
   const double *d_interpGrads = interpolatedGradUpbdr_.Read();
+  
+  const WorkingFluid fluid = mixture->GetWorkingFluid();
 
   // clang-format on
   MFEM_FORALL_2D(el, wallElems.Size() / 7, maxDofs, 1, 1, {
@@ -432,11 +434,10 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
       // compute mirror state
       switch (type) {
         case WallType::INV:
-          if (i < num_equation) computeInvWallState(i, &u1[0], &u2[0], &nor[0], dim, num_equation);
+          computeInvWallState(&u1[0], &u2[0], &nor[0], dim, num_equation, i, maxDofs);
           break;
         case WallType::VISC_ISOTH:
-          if (i < num_equation)
-            computeIsothermalState(i, &u1[0], &u2[0], &nor[0], wallTemp, gamma, Rg, dim, num_equation);
+          computeIsothermalState(&u1[0], &u2[0], &nor[0], wallTemp, gamma, Rg, dim, num_equation, fluid, i, maxDofs);
           break;
         case WallType::VISC_ADIAB:
           break;

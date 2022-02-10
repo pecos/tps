@@ -283,6 +283,22 @@ class DryAir : public GasMixture {
     const double cp = gamma * Rg / (gamma - 1.);
     return visc * cp / Pr;
   }
+  
+  static MFEM_HOST_DEVICE void computeStagnantStateWithTemp_gpu(const double *stateIn, double *stagState, const double &Temp,
+                                                          const double &gamma, const int &num_equation, const int &dim,
+                                                          const int &thrd, const int &maxThreads) {
+    MFEM_SHARED double KE, p;
+    
+    if (thrd == 0) {
+      KE = 0.;
+      for (int d = 0; d < dim; d++) KE += 0.5 * stateIn[1+d] * stateIn[1+d] / stateIn[0];
+      p = (gamma - 1.) * (stateIn[1 + dim] - KE);
+    }
+    if (thrd >0 && thrd <= dim) stagState[thrd] = 0.;
+    MFEM_SYNC_THREAD;
+    
+    if (thrd == 1 + dim) stagState[thrd] = p / (gamma - 1.);
+  }
 #endif
 };
 
