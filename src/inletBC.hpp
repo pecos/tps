@@ -156,7 +156,7 @@ class InletBC : public BoundaryCondition {
       }
       MFEM_SYNC_THREAD;
       
-      DryAir::modifyEnergyForPressure_gpu(u2, u2, p, gamma, Rg, num_equation, dim, thrd, maxThreads);
+      DryAir::modifyEnergyForPressure_gpu(u2, u2, p, gamma, Rg, num_equation, dim, thrd, maxThread);
     }
   }
 #endif
