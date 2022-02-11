@@ -637,6 +637,88 @@ void PassiveScalar::updateTerms_gpu(Vector &in, ParGridFunction *Up, Array<passi
 #endif
 }
 
+HeatSource::HeatSource(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
+                       heatSourceData &_heatSource, GasMixture *_mixture, mfem::IntegrationRules *_intRules,
+                       mfem::ParFiniteElementSpace *_vfes, mfem::ParGridFunction *_Up, mfem::ParGridFunction *_gradUp,
+                       const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays,
+                   _config.isAxisymmetric()),
+      mixture_(_mixture),
+      heatSource_(_heatSource) {
+  // Initialize the nodes where the heat source will be applied
+  ParFiniteElementSpace dfes(vfes->GetParMesh(), vfes->FEColl(), dim, Ordering::byNODES);
+  ParGridFunction coordinates(&dfes);
+  vfes->GetParMesh()->GetNodes(coordinates);
+
+  int nnodes = vfes->GetNDofs();
+
+  std::vector<int> nodesVec;
+  nodesVec.clear();
+
+  if (heatSource_.type == "cylinder") {
+    // create unit vector from p1 to p2
+    Vector norm(dim);
+    for (int d = 0; d < dim; d++) norm(d) = heatSource_.point2(d) - heatSource_.point1(d);
+    double mod = 0.;
+    for (int d = 0; d < dim; d++) mod += norm(d) * norm(d);
+    mod = sqrt(mod);
+    norm /= mod;
+
+    for (int n = 0; n < nnodes; n++) {
+      Vector X(dim);
+      for (int d = 0; d < dim; d++) X(d) = coordinates(n + d * nnodes) - heatSource_.point1(d);
+
+      double proj = 0;
+      for (int d = 0; d < dim; d++) proj += X(d) * norm(d);
+
+      Vector r(dim);
+      for (int d = 0; d < dim; d++) r(d) = X(d) - proj * norm(d);
+
+      double normR = 0.;
+      for (int d = 0; d < dim; d++) normR += r(d) * r(d);
+      normR = sqrt(normR);
+
+      if (normR < heatSource_.radius && proj > 0 && proj < mod) nodesVec.push_back(n);
+    }
+  }
+
+  nodeList_.SetSize(nodesVec.size());
+  for (int n = 0; n < nodesVec.size(); n++) nodeList_[n] = nodesVec[n];
+}
+
+void HeatSource::updateTerms(mfem::Vector &in) {
+#ifdef _GPU_
+  updateTerms_gpu(in);
+#else
+  const int nnode = vfes->GetNDofs();
+  const double heatValue = heatSource_.value;
+
+  for (int n = 0; n < nodeList_.Size(); n++) {
+    int node = nodeList_[n];
+    int index = node + (dim + 1) * nnode;
+    in(index) += heatValue;
+  }
+#endif
+}
+
+void HeatSource::updateTerms_gpu(mfem::Vector &in) {
+#ifdef _GPU_
+  double *d_in = in.ReadWrite();
+  const int *d_nodeList = nodeList_.Read();
+
+  const int dimGPU = dim;
+  const int nnode = vfes->GetNDofs();
+
+  const double heatVal = heatSource_.value;
+
+  MFEM_FORALL(n, nodeList_.Size(), {
+    const int node = d_nodeList[n];
+    const int index = node + (1 + dimGPU) * nnode;
+    d_in[index] += heatVal;
+  });
+#endif
+}
+
 #ifdef _MASA_
 MASA_forcings::MASA_forcings(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                              IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,

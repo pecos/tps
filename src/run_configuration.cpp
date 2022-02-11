@@ -88,6 +88,8 @@ RunConfiguration::RunConfiguration() {
 
   initSpongeData();
 
+  heatSource = NULL;
+
   isForcing = false;
   for (int ii = 0; ii < 3; ii++) gradPress[ii] = 0.;
 
@@ -98,6 +100,8 @@ RunConfiguration::~RunConfiguration() {
   for (int i = 0; i < arrayPassiveScalar.Size(); i++) {
     delete arrayPassiveScalar[i];
   }
+
+  if (heatSource != NULL) delete[] heatSource;
 }
 
 void RunConfiguration::initSpongeData() {

@@ -140,6 +140,9 @@ class RunConfiguration {
   SpongeZoneData spongeData;
   void initSpongeData();
 
+  int numHeatSources;
+  heatSourceData* heatSource;
+
   // Reference length
   double refLength;
 

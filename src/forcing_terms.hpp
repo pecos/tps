@@ -169,6 +169,26 @@ class PassiveScalar : public ForcingTerms {
   ~PassiveScalar();
 };
 
+class HeatSource : public ForcingTerms {
+ private:
+  GasMixture *mixture_;
+
+  heatSourceData &heatSource_;
+
+  Array<int> nodeList_;
+
+ public:
+  HeatSource(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
+             heatSourceData &heatSource, GasMixture *_mixture, IntegrationRules *_intRules,
+             ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
+             const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config);
+  ~HeatSource();
+
+  virtual void updateTerms(Vector &in);
+
+  void updateTerms_gpu(Vector &in);
+};
+
 #ifdef _MASA_
 // Manufactured Solution using MASA
 class MASA_forcings : public ForcingTerms {
