@@ -272,26 +272,26 @@ double DryAir::ComputePressureFromPrimitives(const mfem::Vector& Up) { return ga
 void DryAir::computeStagnationState(const mfem::Vector& stateIn, mfem::Vector& stagnationState)
 {
   const double p = ComputePressure(stateIn);
-  
+
   stagnationState.SetSize(num_equation);
   stagnationState = stateIn;
-  
+
   // zero momentum
   for (int d=0;d<dim;d++) stagnationState(1+d) = 0.;
-  
+
   // total energy
   stagnationState(1+dim) = p/(specific_heat_ratio-1.);
 }
 
-void DryAir::computeStagnantStateWithTemp(const mfem::Vector& stateIn, 
-                                          const double Temp, 
+void DryAir::computeStagnantStateWithTemp(const mfem::Vector& stateIn,
+                                          const double Temp,
                                           mfem::Vector& stateOut)
 {
   stateOut.SetSize(num_equation);
   stateOut = stateIn;
-  
+
   for (int d=0;d<dim;d++) stateOut(1+d) = 0.;
-  
+
   stateOut(1+dim) = gas_constant/(specific_heat_ratio-1.) * stateIn(0) * Temp;
 }
 
@@ -299,11 +299,11 @@ void DryAir::modifyEnergyForPressure(const mfem::Vector& stateIn, mfem::Vector& 
 {
   stateOut.SetSize(num_equation);
   stateOut = stateIn;
-  
+
   double ke = 0.;
   for (int d = 0; d < dim; d++) ke += stateIn(1 + d) * stateIn(1 + d);
   ke *= 0.5 / stateIn(0);
-  
+
   stateOut(1 + dim) = p / (specific_heat_ratio - 1.) + ke;
 }
 
@@ -573,11 +573,11 @@ PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim)
     : GasMixture(WorkingFluid::USER_DEFINED, _dim)
 {
   numSpecies = _runfile.GetNumSpecies();
-  ambipolar = _runfile.IsAmbipolar();
-  twoTemperature = _runfile.IsTwoTemperature();
-
-  SetNumActiveSpecies();
-  SetNumEquations();
+  backgroundInputIndex_ = _runfile.backgroundIndex;
+  assert( (backgroundInputIndex_ > 0) && (backgroundInputIndex_ <= numSpecies) );
+  // If electron is not included, then ambipolar and two-temperature are false.
+  ambipolar = false;
+  twoTemperature = false;
 
   /*
     TODO: Currently, background species is assumed to be the last species, and electron the second to last.
@@ -590,17 +590,38 @@ PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim)
   specificHeatRatios_.SetSize(numSpecies);
 
   gasParams = 0.0;
+  int paramIdx = 0;
+  int targetIdx;
   for (int sp = 0; sp < numSpecies; sp++) {
-    for (int param = 0; param < GasParams::NUM_GASPARAMS; param++)
-      gasParams(sp, param) = _runfile.GetGasParams(sp,(GasParams) param);
+    if (sp == backgroundInputIndex_ - 1) {
+      targetIdx = numSpecies - 1;
+    } else if (_runfile.speciesNames[sp] == "E") {
+      targetIdx = numSpecies - 2;
+      // Set ambipolar and twoTemperature if electron is included.
+      ambipolar = _runfile.IsAmbipolar();
+      twoTemperature = _runfile.IsTwoTemperature();
+    } else {
+      targetIdx = paramIdx;
+      paramIdx++;
+    }
+    speciesMapping_[_runfile.speciesNames[sp]] = targetIdx;
+    mixtureToInputMap_[targetIdx] = sp;
+    std::cout << "name, input index, mixture index: " << _runfile.speciesNames[sp] << ", "
+                                                      << sp << ", " << targetIdx << std::endl;
 
-    specificGasConstants_(sp) = UNIVERSALGASCONSTANT / gasParams(sp, GasParams::SPECIES_MW);
+    for (int param = 0; param < GasParams::NUM_GASPARAMS; param++)
+      gasParams(targetIdx, param) = _runfile.GetGasParams(sp,(GasParams) param);
+
+    specificGasConstants_(targetIdx) = UNIVERSALGASCONSTANT / gasParams(targetIdx, GasParams::SPECIES_MW);
 
     // TODO: read these from input parser.
-    molarCV_(sp) = _runfile.getConstantMolarCV(sp) * UNIVERSALGASCONSTANT;
-    molarCP_(sp) = _runfile.getConstantMolarCP(sp) * UNIVERSALGASCONSTANT;
-    specificHeatRatios_(sp) = molarCP_(sp) / molarCV_(sp);
+    molarCV_(targetIdx) = _runfile.getConstantMolarCV(sp) * UNIVERSALGASCONSTANT;
+    molarCP_(targetIdx) = _runfile.getConstantMolarCP(sp) * UNIVERSALGASCONSTANT;
+    specificHeatRatios_(targetIdx) = molarCP_(targetIdx) / molarCV_(targetIdx);
   }
+
+  SetNumActiveSpecies();
+  SetNumEquations();
 
   // We assume the background species is neutral.
   assert( gasParams(numSpecies - 1, GasParams::SPECIES_CHARGES) == 0.0 );
@@ -1217,81 +1238,81 @@ void PerfectMixture::computeStagnationState(const mfem::Vector& stateIn, mfem::V
 {
   stagnationState.SetSize(num_equation);
   stagnationState = stateIn;
-  
+
   // momentum = 0.;
   for(int d=0;d<dim;d++) stagnationState(1+d) = 0.;
-  
+
   // compute total energy
   Vector n_s(numActiveSpecies);
-  for(int sp=0;sp<numActiveSpecies;sp++) n_s(sp) = 
+  for(int sp=0;sp<numActiveSpecies;sp++) n_s(sp) =
     stateIn(2+dim+sp)/gasParams(sp,GasParams::SPECIES_MW);
 
   double ne = 0.; // number density electrons
   if( ambipolar ) {
-    for(int sp=0;sp<numActiveSpecies;sp++) ne += 
+    for(int sp=0;sp<numActiveSpecies;sp++) ne +=
       gasParams(sp,GasParams::SPECIES_CHARGES)* n_s(sp);
   }else {
     ne = stateIn(2+dim+numSpecies-2)/gasParams(numSpecies-2,GasParams::SPECIES_MW);
   }
-  
+
   double nB = stateIn(0); // background species
   for(int sp=0;sp<numActiveSpecies;sp++) nB -= stateIn(2+dim+sp);
-  
+
   if (ambipolar) nB -= ne * gasParams(numSpecies-2,GasParams::SPECIES_MW);
-  
+
   nB /= gasParams(numSpecies-1,GasParams::SPECIES_MW);
-  
+
   double heatCapacity = 0.;
   for(int sp=0;sp<numActiveSpecies;sp++) heatCapacity += molarCV_(sp) * n_s(sp);
   heatCapacity += nB * molarCV_(numSpecies-1);
-  
+
   double Th, Te;
   Th = ComputeTemperature(stateIn);
-  
+
 //   if (twoTemperature) {
 //     Te = stateIn[num_equation - 1] / ne / molarCV_(numSpecies - 2);
 //   } else {
 //     Te = Th;
 //   }
-  
+
   stagnationState(1+dim) = heatCapacity * Th;
   if (twoTemperature) stagnationState(1+dim) += stateIn[num_equation - 1];
 }
 
-void PerfectMixture::computeStagnantStateWithTemp(const mfem::Vector& stateIn, 
-                                                  const double Temp, 
+void PerfectMixture::computeStagnantStateWithTemp(const mfem::Vector& stateIn,
+                                                  const double Temp,
                                                   mfem::Vector& stateOut)
 {
   stateOut.SetSize(num_equation);
   stateOut = stateIn;
-  
+
   // momentum = 0.;
   for(int d=0;d<dim;d++) stateOut(1+d) = 0.;
-  
+
   // compute total energy
   Vector n_s(numActiveSpecies);
-  for(int sp=0;sp<numActiveSpecies;sp++) n_s(sp) = 
+  for(int sp=0;sp<numActiveSpecies;sp++) n_s(sp) =
     stateIn(2+dim+sp)/gasParams(sp,GasParams::SPECIES_MW);
 
   double ne = 0.; // number density electrons
   if( ambipolar ) {
-    for(int sp=0;sp<numActiveSpecies;sp++) ne += 
+    for(int sp=0;sp<numActiveSpecies;sp++) ne +=
       gasParams(sp,GasParams::SPECIES_CHARGES)* n_s(sp);
   }else {
     ne = stateIn(2+dim+numSpecies-2)/gasParams(numSpecies-2,GasParams::SPECIES_MW);
   }
-  
+
   double nB = stateIn(0); // background species
   for(int sp=0;sp<numActiveSpecies;sp++) nB -= stateIn(2+dim+sp);
-  
+
   if (ambipolar) nB -= ne * gasParams(numSpecies-2,GasParams::SPECIES_MW);
-  
+
   nB /= gasParams(numSpecies-1,GasParams::SPECIES_MW);
-  
+
   double heatCapacity = 0.;
   for(int sp=0;sp<numActiveSpecies;sp++) heatCapacity += molarCV_(sp) * n_s(sp);
   heatCapacity += nB * molarCV_(numSpecies-1);
-  
+
   stateOut(1+dim) = heatCapacity * Temp;
   if (twoTemperature) {
     stateOut(1+dim) += ne * molarCV_(numSpecies-2) * Temp;
@@ -1304,26 +1325,26 @@ void PerfectMixture::modifyEnergyForPressure(const mfem::Vector& stateIn, mfem::
   // will change the partial pressure of background species to adjust to p
   stateOut.SetSize(num_equation);
   stateOut = stateIn;
-  
+
   // number densities
   Vector n_s(numActiveSpecies);
-  for(int sp=0;sp<numActiveSpecies;sp++) n_s(sp) = 
+  for(int sp=0;sp<numActiveSpecies;sp++) n_s(sp) =
     stateIn(2+dim+sp)/gasParams(sp,GasParams::SPECIES_MW);
-  
+
   double ne = 0.; // number density electrons
   if( ambipolar ) {
-    for(int sp=0;sp<numActiveSpecies;sp++) ne += 
+    for(int sp=0;sp<numActiveSpecies;sp++) ne +=
       gasParams(sp,GasParams::SPECIES_CHARGES)* n_s(sp);
   }else {
     ne = stateIn(2+dim+numSpecies-2)/gasParams(numSpecies-2,GasParams::SPECIES_MW);
   }
-  
+
   double Th = 0., Te = 0.;
   if (twoTemperature)
   {
     Te = stateIn(num_equation-1)/ne/molarCV_(numSpecies-2);
     double pe = stateIn(2+dim+numSpecies-2)/GetGasParams(numSpecies-2,GasParams::SPECIES_MW)*UNIVERSALGASCONSTANT*Te;
-    
+
     for(int sp=0;sp<numActiveSpecies;sp++) Th += n_s(sp);
     Th = (p - pe) / (Th * UNIVERSALGASCONSTANT);
   }else{
@@ -1331,7 +1352,7 @@ void PerfectMixture::modifyEnergyForPressure(const mfem::Vector& stateIn, mfem::
     if (ambipolar) Th += ne;
     Th = p/(Th*UNIVERSALGASCONSTANT);
   }
-  
+
   // compute total energy with the modified temperature of heavies
   double rE = 0.;
   for(int sp=0;sp<numActiveSpecies;sp++) rE += n_s(sp) * molarCV_(sp) * Th;
