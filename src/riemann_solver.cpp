@@ -37,8 +37,12 @@ using namespace mfem;
 // Implementation of class RiemannSolver
 RiemannSolver::RiemannSolver(int &_num_equation, GasMixture *_mixture, Equations &_eqSystem, Fluxes *_fluxClass,
                              bool _useRoe, bool axisym)
-  : num_equation(_num_equation), mixture(_mixture), eqSystem(_eqSystem),
-    fluxClass(_fluxClass), useRoe(_useRoe), axisymmetric_(axisym) {
+    : num_equation(_num_equation),
+      mixture(_mixture),
+      eqSystem(_eqSystem),
+      fluxClass(_fluxClass),
+      useRoe(_useRoe),
+      axisymmetric_(axisym) {
   flux1.SetSize(num_equation);
   flux2.SetSize(num_equation);
 }
@@ -68,7 +72,6 @@ void RiemannSolver::ComputeFluxDotN(const Vector &state, const Vector &nor, Vect
   for (int d = 0; d < dim; d++) {
     fluxN(1 + d) += pres * nor(d);
   }
-
 
   const double H = (den_energy + pres) / den;
   fluxN(1 + nvel) = den_velN * H;

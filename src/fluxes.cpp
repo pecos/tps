@@ -32,10 +32,12 @@
 #include "fluxes.hpp"
 
 Fluxes::Fluxes(GasMixture *_mixture, Equations &_eqSystem, const int &_num_equations, const int &_dim, bool axisym)
-  : mixture(_mixture), eqSystem(_eqSystem), dim(_dim),
-    nvel(axisym ? 3 : _dim),
-    axisymmetric_(axisym),
-    num_equations(_num_equations) {
+    : mixture(_mixture),
+      eqSystem(_eqSystem),
+      dim(_dim),
+      nvel(axisym ? 3 : _dim),
+      axisymmetric_(axisym),
+      num_equations(_num_equations) {
   gradT.SetSize(dim);
   vel.SetSize(dim);
   vtmp.SetSize(dim);
@@ -91,8 +93,8 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
       const double bulkViscMult = mixture->GetBulkViscMultiplyer();
       const double k = mixture->GetThermalConductivity(state);
 
-      const double ur = (axisymmetric_ ? state[1]/state[0] : 0);
-      const double ut = (axisymmetric_ ? state[3]/state[0] : 0);
+      const double ur = (axisymmetric_ ? state[1] / state[0] : 0);
+      const double ut = (axisymmetric_ ? state[3] / state[0] : 0);
 
       // make sure density visc. flux is 0
       for (int d = 0; d < dim; d++) flux(0, d) = 0.;
@@ -104,7 +106,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
       }
 
       if (axisymmetric_ && radius > 0) {
-        divV += ur/radius;
+        divV += ur / radius;
       }
 
       for (int i = 0; i < dim; i++) stress(i, i) += (bulkViscMult - 2. / 3.) * divV;
@@ -118,13 +120,13 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
         const double ut_r = gradUp(3, 0);
         const double ut_z = gradUp(3, 1);
         tau_tr = ut_r;
-        if (radius > 0) tau_tr -= ut/radius;
+        if (radius > 0) tau_tr -= ut / radius;
         tau_tr *= visc;
 
-        tau_tz = visc*ut_z;
+        tau_tz = visc * ut_z;
 
-        flux(1+2, 0) = tau_tr;
-        flux(1+2, 1) = tau_tz;
+        flux(1 + 2, 0) = tau_tr;
+        flux(1 + 2, 1) = tau_tz;
       }
 
       // temperature gradient
@@ -140,8 +142,8 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
       }
 
       if (axisymmetric_) {
-        flux(1 + nvel, 0) += ut*tau_tr;
-        flux(1 + nvel, 1) += ut*tau_tz;
+        flux(1 + nvel, 0) += ut * tau_tr;
+        flux(1 + nvel, 1) += ut * tau_tz;
       }
 
       if (eqSystem == NS_PASSIVE) {

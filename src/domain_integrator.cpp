@@ -35,13 +35,12 @@
 // Implementation of class DomainIntegrator
 DomainIntegrator::DomainIntegrator(Fluxes *_fluxClass, IntegrationRules *_intRules, int _intRuleType, const int _dim,
                                    const int _num_equation, bool axisym)
-  : fluxClass(_fluxClass),
-    dim(_dim),
-    num_equation(_num_equation),
-    intRules(_intRules),
-    intRuleType(_intRuleType),
-    axisymmetric_(axisym) {
-}
+    : fluxClass(_fluxClass),
+      dim(_dim),
+      num_equation(_num_equation),
+      intRules(_intRules),
+      intRuleType(_intRuleType),
+      axisymmetric_(axisym) {}
 
 void DomainIntegrator::AssembleElementMatrix2(const FiniteElement &trial_fe, const FiniteElement &test_fe,
                                               ElementTransformation &Tr, DenseMatrix &elmat) {

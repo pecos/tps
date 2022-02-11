@@ -33,6 +33,7 @@
 #define DATASTRUCTURES_HPP_
 
 #include <mfem.hpp>
+#include <string>
 
 using namespace mfem;
 
@@ -154,6 +155,16 @@ struct passiveScalarData {
   double radius;  // distance in which nodes will be looked for
   double value;   // value of the passive scalar at the location
   Array<int> nodes;
+};
+
+// heat source structure
+struct heatSourceData {
+  bool isEnabled;
+  double value;
+  std::string type;
+  Vector point1;
+  Vector point2;
+  double radius;
 };
 
 #endif  // DATASTRUCTURES_HPP_

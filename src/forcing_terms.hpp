@@ -113,16 +113,14 @@ class AxisymmetricSource : public ForcingTerms {
   const Equations &eqSystem;
 
  public:
-  AxisymmetricSource(const int &_dim, const int &_num_equation, const int &_order,
-                     GasMixture *_mixture, const Equations &_eqSystem,
-                     const int &_intRuleType, IntegrationRules *_intRules,
+  AxisymmetricSource(const int &_dim, const int &_num_equation, const int &_order, GasMixture *_mixture,
+                     const Equations &_eqSystem, const int &_intRuleType, IntegrationRules *_intRules,
                      ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
                      const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config);
   ~AxisymmetricSource();
 
   virtual void updateTerms(Vector &in);
 };
-
 
 class SpongeZone : public ForcingTerms {
  private:
@@ -169,6 +167,26 @@ class PassiveScalar : public ForcingTerms {
                        const int num_equation);
 
   ~PassiveScalar();
+};
+
+class HeatSource : public ForcingTerms {
+ private:
+  GasMixture *mixture_;
+
+  heatSourceData &heatSource_;
+
+  Array<int> nodeList_;
+
+ public:
+  HeatSource(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
+             heatSourceData &heatSource, GasMixture *_mixture, IntegrationRules *_intRules,
+             ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
+             const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config);
+  ~HeatSource();
+
+  virtual void updateTerms(Vector &in);
+
+  void updateTerms_gpu(Vector &in);
 };
 
 #ifdef _MASA_
