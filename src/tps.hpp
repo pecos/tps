@@ -113,8 +113,8 @@ class Tps {
   void parseCommandLineArgs(int argc, char *argv[]);
   void parseInput();
 
-  mfem::MPI_Session& getMPISession() { return mpi_; }
-  std::string& getInputFilename() { return iFile_; }
+  mfem::MPI_Session &getMPISession() { return mpi_; }
+  std::string &getInputFilename() { return iFile_; }
 };
 
 }  // end namespace TPS

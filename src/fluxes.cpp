@@ -31,7 +31,8 @@
 // -----------------------------------------------------------------------------------el-
 #include "fluxes.hpp"
 
-Fluxes::Fluxes(GasMixture *_mixture, Equations &_eqSystem, TransportProperties *_transport, const int &_num_equation, const int &_dim)
+Fluxes::Fluxes(GasMixture *_mixture, Equations &_eqSystem, TransportProperties *_transport, const int &_num_equation,
+               const int &_dim)
     : mixture(_mixture), eqSystem(_eqSystem), transport(_transport), dim(_dim), num_equation(_num_equation) {
   gradT.SetSize(dim);
   vel.SetSize(dim);
@@ -91,7 +92,7 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
 }
 
 void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &flux) {
-  if (eqSystem==EULER) {
+  if (eqSystem == EULER) {
     flux = 0.;
     return;
   }
@@ -145,13 +146,13 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   // }
   // NOTE: NS_PASSIVE will not be needed (automatically incorporated).
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
-  for (int sp = 0; sp < numActiveSpecies; sp++){
+  for (int sp = 0; sp < numActiveSpecies; sp++) {
     // TODO: need to check the sign.
     // NOTE: diffusionVelocity is set to be (numActiveSpecies,dim)-matrix.
     for (int d = 0; d < dim; d++) flux(dim + 2 + sp, d) = state[dim + 2 + sp] * diffusionVelocity(sp, d);
   }
 
-  if (mixture->IsTwoTemperature()){
+  if (mixture->IsTwoTemperature()) {
     // TODO: viscous flux for electron energy equation.
   }
 }

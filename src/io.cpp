@@ -349,7 +349,7 @@ void M2ulPhyS::restart_files_hdf5(string mode) {
       Vector iState(num_equation);
       Vector conservedState(num_equation);
       for (int eq = 0; eq < num_equation; eq++) iState[eq] = x[i + eq * vfes->GetNDofs()];
-      mixture->GetConservativesFromPrimitives(iState,conservedState);
+      mixture->GetConservativesFromPrimitives(iState, conservedState);
       for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * vfes->GetNDofs()] = conservedState[eq];
     }
 

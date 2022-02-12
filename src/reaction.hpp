@@ -39,56 +39,58 @@
 
 #include <tps_config.h>
 
-#include <mfem/general/forall.hpp>
-#include "dataStructures.hpp"
-#include "run_configuration.hpp"
-#include "equation_of_state.hpp"
 #include <mfem.hpp>
+#include <mfem/general/forall.hpp>
+
+#include "dataStructures.hpp"
+#include "equation_of_state.hpp"
+#include "run_configuration.hpp"
 
 using namespace mfem;
 using namespace std;
 
-class Reaction{
-  protected:
+class Reaction {
+ protected:
+ public:
+  Reaction(){};
 
-  public:
-    Reaction(){};
+  ~Reaction(){};
 
-    ~Reaction(){};
-
-    virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved=false) {};
-
+  virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved = false){};
 };
 
 class Arrhenius : public Reaction {
-  private:
-    // coefficients for modified Arrhenius model: k = A * T^b * exp( - E / R / T )
-    double A_;
-    double b_;
-    double E_;
-  public:
-    Arrhenius(const double A, const double b, const double E);
+ private:
+  // coefficients for modified Arrhenius model: k = A * T^b * exp( - E / R / T )
+  double A_;
+  double b_;
+  double E_;
 
-    ~Arrhenius() {};
+ public:
+  Arrhenius(const double A, const double b, const double E);
 
-    virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved=false);
+  ~Arrhenius(){};
+
+  virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved = false);
 };
 
 class HoffertLien : public Reaction {
   /*
-    referece: Hoffert, M. I., & Lien, H. (1967). Quasi-one-dimensional, nonequilibrium gas dynamics of partially ionized two-temperature argon. Physics of Fluids, 10(8), 1769–1777. https://doi.org/10.1063/1.1762356
+    referece: Hoffert, M. I., & Lien, H. (1967). Quasi-one-dimensional, nonequilibrium gas dynamics of partially ionized
+    two-temperature argon. Physics of Fluids, 10(8), 1769–1777. https://doi.org/10.1063/1.1762356
   */
-  private:
-    // coefficients for modified Arrhenius model: k = A * T^b * exp( - E / R / T )
-    double A_;
-    double b_;
-    double E_;
-  public:
-    HoffertLien(const double A, const double b, const double E);
+ private:
+  // coefficients for modified Arrhenius model: k = A * T^b * exp( - E / R / T )
+  double A_;
+  double b_;
+  double E_;
 
-    ~HoffertLien() {};
+ public:
+  HoffertLien(const double A, const double b, const double E);
 
-    virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved=false);
+  ~HoffertLien(){};
+
+  virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved = false);
 };
 
 #endif  // REACTION_HPP_

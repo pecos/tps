@@ -39,60 +39,55 @@
 
 #include <tps_config.h>
 
-#include <mfem/general/forall.hpp>
-#include "dataStructures.hpp"
-#include "run_configuration.hpp"
-#include "equation_of_state.hpp"
 #include <mfem.hpp>
+#include <mfem/general/forall.hpp>
+
+#include "dataStructures.hpp"
+#include "equation_of_state.hpp"
+#include "run_configuration.hpp"
 
 using namespace mfem;
 using namespace std;
 
-class TransportProperties{
-  protected:
-    int num_equation;
-    int dim;
-    int numSpecies;
-    int numActiveSpecies;
-    bool ambipolar;
-    bool twoTemperature;
+class TransportProperties {
+ protected:
+  int num_equation;
+  int dim;
+  int numSpecies;
+  int numActiveSpecies;
+  bool ambipolar;
+  bool twoTemperature;
 
-    GasMixture *mixture;
+  GasMixture *mixture;
 
-    // Array<bool> isComputed;
-    SpeciesPrimitiveType speciesPrimitiveType;
+  // Array<bool> isComputed;
+  SpeciesPrimitiveType speciesPrimitiveType;
 
-  public:
-    TransportProperties(GasMixture *_mixture);
+ public:
+  TransportProperties(GasMixture *_mixture);
 
-    ~TransportProperties(){};
+  ~TransportProperties(){};
 
-    // Currently, diffusion velocity is evaluated together with transport properties,
-    // though diffusion velocity can vary according to models we use.
-    // In some cases such variations may be independent of transport property models,
-    // but mostly changing diffusion velocity involves changes in tranport property models as well.
+  // Currently, diffusion velocity is evaluated together with transport properties,
+  // though diffusion velocity can vary according to models we use.
+  // In some cases such variations may be independent of transport property models,
+  // but mostly changing diffusion velocity involves changes in tranport property models as well.
 
-    // Currently, transport properties are evaluated in flux and source term separately.
-    // Flux does not take primitive variables as input, rather evaluate them whenever needed.
-    // ComputeFluxTransportProperties also evaluates required primitive variables,
-    // but do not return it as output.
-    // TODO: need to discuss whether to reuse computed primitive variables in flux evaluation,
-    // or in general evaluation of primitive variables.
-    virtual void ComputeFluxTransportProperties(const Vector &state,
-                                                const DenseMatrix &gradUp,
-                                                Vector &transportBuffer,
-                                                DenseMatrix &diffusionVelocity) {};
-                                                // Vector &outputUp);
+  // Currently, transport properties are evaluated in flux and source term separately.
+  // Flux does not take primitive variables as input, rather evaluate them whenever needed.
+  // ComputeFluxTransportProperties also evaluates required primitive variables,
+  // but do not return it as output.
+  // TODO: need to discuss whether to reuse computed primitive variables in flux evaluation,
+  // or in general evaluation of primitive variables.
+  virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
+                                              DenseMatrix &diffusionVelocity){};
+  // Vector &outputUp);
 
-    // Source term will be constructed using ForcingTerms, which have pointers to primitive variables.
-    // So we can use them in evaluating transport properties.
-    // If this routine evaluate additional primitive variables, can return them just as the routine above.
-    virtual void ComputeSourceTransportProperties(const Vector &state,
-                                                  const Vector &Up,
-                                                  const DenseMatrix &gradUp,
-                                                  Vector &transportBuffer,
-                                                  DenseMatrix &diffusionVelocity) {};
-
+  // Source term will be constructed using ForcingTerms, which have pointers to primitive variables.
+  // So we can use them in evaluating transport properties.
+  // If this routine evaluate additional primitive variables, can return them just as the routine above.
+  virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
+                                                Vector &transportBuffer, DenseMatrix &diffusionVelocity){};
 };
 
 //////////////////////////////////////////////////////
@@ -100,7 +95,7 @@ class TransportProperties{
 //////////////////////////////////////////////////////
 
 class DryAirTransport : public TransportProperties {
-protected:
+ protected:
   double gas_constant;
   double visc_mult;
   double bulk_visc_mult;
@@ -112,14 +107,12 @@ protected:
 
   // Fick's law
   double Sc;  // Schmidt number
-public:
+ public:
   DryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile);
 
   ~DryAirTransport(){};
 
-  virtual void ComputeFluxTransportProperties(const Vector &state,
-                                              const DenseMatrix &gradUp,
-                                              Vector &transportBuffer,
+  virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
                                               DenseMatrix &diffusionVelocity);
 };
 
@@ -131,15 +124,13 @@ public:
 // Only mass fractions are treated as binary mixture, essentially the same as PASSIVE_SCALAR.
 
 class TestBinaryAirTransport : public DryAirTransport {
-protected:
-public:
+ protected:
+ public:
   TestBinaryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile);
 
   ~TestBinaryAirTransport(){};
 
-  virtual void ComputeFluxTransportProperties(const Vector &state,
-                                              const DenseMatrix &gradUp,
-                                              Vector &transportBuffer,
+  virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
                                               DenseMatrix &diffusionVelocity);
 };
 

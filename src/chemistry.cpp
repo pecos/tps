@@ -36,15 +36,15 @@ using namespace mfem;
 using namespace std;
 
 Chemistry::Chemistry(GasMixture *mixture, RunConfiguration config) : mixture_(mixture) {
-  numEquations_     = mixture->GetNumEquations();
-  numSpecies_       = mixture->GetNumSpecies();
+  numEquations_ = mixture->GetNumEquations();
+  numSpecies_ = mixture->GetNumSpecies();
   numActiveSpecies_ = mixture->GetNumActiveSpecies();
-  ambipolar_        = mixture->IsAmbipolar();
-  twoTemperature_   = mixture->IsTwoTemperature();
+  ambipolar_ = mixture->IsAmbipolar();
+  twoTemperature_ = mixture->IsTwoTemperature();
 
   mixtureToInputMap_ = mixture->getMixtureToInputMap();
-  speciesMapping_    = mixture->getSpeciesMapping();
-  electronIndex_    = (speciesMapping_->count("E")) ? (*speciesMapping_)["E"] : -1;
+  speciesMapping_ = mixture->getSpeciesMapping();
+  electronIndex_ = (speciesMapping_->count("E")) ? (*speciesMapping_)["E"] : -1;
 
   // TODO: make tps input parser accessible to all classes.
   // TODO: reaction classes read input options directly in their initialization.
@@ -97,7 +97,7 @@ Chemistry::Chemistry(GasMixture *mixture, RunConfiguration config) : mixture_(mi
   }
 }
 
-Chemistry::~Chemistry(){
+Chemistry::~Chemistry() {
   if (mixture_ != NULL) delete mixture_;
   if (mixtureToInputMap_ != NULL) delete mixtureToInputMap_;
   if (speciesMapping_ != NULL) delete speciesMapping_;
@@ -125,9 +125,9 @@ void Chemistry::computeEquilibriumConstants(const double T_h, const double T_e, 
 
   for (int r = 0; r < numReactions_; r++) {
     double temp = (isElectronInvolvedAt(r)) ? T_e : T_h;
-    if (detailedBalance_[r]){
-      kC(r) = equilibriumConstantParams_(r,0) * pow(temp, equilibriumConstantParams_(r,1))
-                                              * exp( - equilibriumConstantParams_(r,2) / temp );
+    if (detailedBalance_[r]) {
+      kC(r) = equilibriumConstantParams_(r, 0) * pow(temp, equilibriumConstantParams_(r, 1)) *
+              exp(-equilibriumConstantParams_(r, 2) / temp);
     }
   }
 

@@ -71,7 +71,8 @@ class Fluxes {
   DenseMatrix stress;
 
  public:
-  Fluxes(GasMixture *_mixture, Equations &_eqSystem, TransportProperties *_transport, const int &_num_equation, const int &_dim);
+  Fluxes(GasMixture *_mixture, Equations &_eqSystem, TransportProperties *_transport, const int &_num_equation,
+         const int &_dim);
 
   Equations GetEquationSystem() { return eqSystem; }
 
