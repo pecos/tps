@@ -293,7 +293,7 @@ void M2ulPhyS::initVariables() {
       break;
   }
   assert(mixture!=NULL);
-  assert(chemistry_!=NULL);
+  //assert(chemistry_!=NULL);
 
   order = config.GetSolutionOrder();
 
