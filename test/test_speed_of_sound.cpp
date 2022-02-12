@@ -43,11 +43,10 @@ int main (int argc, char *argv[])
     X_sp(0) = 0.0407e-2;
     X_sp(1) = 0.934e-2;
     X_sp(2) = 20.946e-2;
-    X_sp(3) = 0.0;
-    X_sp(4) = 1.0;
-    for (int sp = 0; sp < numSpecies - 1; sp++) X_sp(4) -= X_sp(sp);
+    X_sp(3) = 1.0;
+    for (int sp = 0; sp < numSpecies - 1; sp++) X_sp(3) -= X_sp(sp);
     grvy_printf(GRVY_INFO, "\n Mole fraction of dry air.\n");
-    grvy_printf(GRVY_INFO, "\n %.8E, %.8E, %.8E, %.8E, %.8E\n", X_sp(0), X_sp(1), X_sp(2), X_sp(3), X_sp(4));
+    grvy_printf(GRVY_INFO, "\n %.8E, %.8E, %.8E, %.8E\n", X_sp(0), X_sp(1), X_sp(2), X_sp(3));
 
 
     double rho = 1.2041;
