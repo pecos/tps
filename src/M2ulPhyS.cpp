@@ -2094,6 +2094,7 @@ void M2ulPhyS::parseSolverOptions2() {
     tpsP->getInput("reactions/number_of_reactions", config.numReactions, 0);
     if (config.numReactions > 0) {
       assert((config.workFluid != DRY_AIR) && (config.numSpecies > 1));
+      config.reactionEnergies.SetSize(config.numReactions);
       config.reactionEquations.resize(config.numReactions);
       config.reactionModels.SetSize(config.numReactions);
       config.reactantStoich.SetSize(config.numSpecies, config.numReactions);
@@ -2113,6 +2114,10 @@ void M2ulPhyS::parseSolverOptions2() {
       tpsP->getRequiredInput((basepath + "/equation").c_str(), equation);
       config.reactionEquations[r - 1] = equation;
       tpsP->getRequiredInput((basepath + "/model").c_str(), model);
+
+      double energy;
+      tpsP->getRequiredInput((basepath + "/reaction_energy").c_str(), energy);
+      config.reactionEnergies[r - 1] = energy;
 
       if (model == "arrhenius") {
         config.reactionModels[r - 1] = ARRHENIUS;

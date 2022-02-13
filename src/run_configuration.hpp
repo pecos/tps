@@ -191,6 +191,7 @@ class RunConfiguration {
 
   // TODO: make tps input parser accessible to all classes.
   int numReactions;
+  Vector reactionEnergies;
   std::vector<std::string> reactionEquations;
   Array<ReactionModel> reactionModels;
   std::vector<std::vector<double>> reactionModelParams;

@@ -50,6 +50,9 @@ Chemistry::Chemistry(GasMixture *mixture, RunConfiguration config) : mixture_(mi
   // TODO: reaction classes read input options directly in their initialization.
   numReactions_ = config.numReactions;
   // std::cout << "number of reactions: " << numReactions_ << std::endl;
+  reactionEnergies_.SetSize(numReactions_);
+  reactionEnergies_ = config.reactionEnergies;
+
   detailedBalance_.SetSize(numReactions_);
   detailedBalance_ = config.detailedBalance;
 
