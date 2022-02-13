@@ -63,6 +63,7 @@ class Chemistry {
   DenseMatrix reactantStoich_, productStoich_;  // size of (numSpecies, numReactions)
 
   std::vector<Reaction *> reactions_;
+  Vector reactionEnergies_;
 
   std::map<int, int> *mixtureToInputMap_;
   std::map<std::string, int> *speciesMapping_;
