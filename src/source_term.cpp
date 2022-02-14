@@ -45,14 +45,6 @@ SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_or
       chemistry_(chemistry) {
   h_numElems = gpuArrays.numElems.HostRead();
   h_posDofIds = gpuArrays.posDofIds.HostRead();
-
-  //   b = new ParGridFunction(vfes);
-  //
-  //   // Initialize to zero
-  //   int dof = vfes->GetNDofs();
-  //   double *data = b->HostWrite();
-  //   for(int ii=0;ii<dof*num_equation;ii++) data[ii] = 0.;
-  //   auto d_b = b->ReadWrite();
 }
 
 SourceTerm::~SourceTerm() {
@@ -63,5 +55,38 @@ SourceTerm::~SourceTerm() {
 
 void SourceTerm::updateTerms(mfem::Vector& in)
 {
+  const double *h_Up = Up->HostRead();
+  double *h_in = in.HostReadWrite();
+  
+  const int nnodes = vfes->GetNDofs();
+  
+  for (int n = 0; n < nnodes; n++) {
+    Vector upn(num_equation);
+    for (int eq = 0; eq < num_equation; eq++) upn(eq) = h_Up[n + eq * nnodes];
+    
+    double Th = 0., Te = 0.;
+    Th = upn[1 + dim];
+    if (mixture_->IsTwoTemperature()) {
+      Te = upn[num_equation - 1];
+    }else {
+      Te = Th;
+    }
+    
+    Vector kfwd, kC;
+    chemistry_->computeForwardRateCoeffs(Th, Te, kfwd);
+    chemistry_->computeEquilibriumConstants(Th, Te, kC);
+    
+    Vector ns;
+    ns.SetDataAndSize(&upn[2+dim], numSpecies_);
+    
+    // get reaction rates
+    Vector creationRates;
+    chemistry_->computeCreationRate(ns, kfwd, kC, creationRates);
+    
+    // add terms to RHS
+    for (int sp = 0; sp < numActiveSpecies_; sp++) {
+      h_in[n + (2 + dim + sp) * nnodes] += creationRates(sp);
+    }
+  }
 }
 
