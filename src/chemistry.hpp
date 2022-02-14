@@ -53,7 +53,7 @@ using namespace std;
 class Chemistry {
  protected:
   int numEquations_;
-  // int dim_;
+  int dim_;
   int numSpecies_;
   int numActiveSpecies_;
   bool ambipolar_;
@@ -97,6 +97,8 @@ class Chemistry {
 
   const double *getReactantStoichiometry(const int reactionIndex) { return reactantStoich_.GetColumn(reactionIndex); }
   const double *getProductStoichiometry(const int reactionIndex) { return productStoich_.GetColumn(reactionIndex); }
+  
+  void computeRateProgression(const Vector &ns, const Vector &kfwd, const Vector &keq, Vector &rates);
 
   bool isElectronInvolvedAt(const int reactionIndex) {
     return (electronIndex_ < 0) ? false : (reactantStoich_(electronIndex_, reactionIndex) != 0);

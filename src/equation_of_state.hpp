@@ -152,6 +152,8 @@ class GasMixture {
   virtual double GetSpecificHeatRatio() = 0;
   virtual double GetGasConstant() = 0;
 
+  virtual void computeNumberDensities(const Vector &conservedState, Vector &n_sp) {};
+  
   // virtual double GetViscosity(const Vector &state) = 0;
   // virtual double GetThermalConductivity(const Vector &state) = 0;
   //
