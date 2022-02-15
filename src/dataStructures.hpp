@@ -50,7 +50,7 @@ enum GasModel { /* PERFECT_SINGLE, */ PERFECT_MIXTURE, /* CANTERA, */ NUM_GASMOD
 
 enum TransportModel { NUM_TRANSPORTMODEL };
 
-enum ChemistryModel { NUM_CHEMISTRYMODEL };
+enum ChemistryModel { MASS_ACTION_LAW, NUM_CHEMISTRYMODEL };
 
 enum ReactionModel { ARRHENIUS, HOFFERTLIEN, NUM_REACTIONMODEL };
 

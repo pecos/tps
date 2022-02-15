@@ -285,6 +285,9 @@ void M2ulPhyS::initVariables() {
           break;
       }
       switch (config.GetChemistryModel()) {
+        case ChemistryModel::MASS_ACTION_LAW:
+          chemistry_ = new MassActionLaw(mixture, config);
+          break;
         default:
           chemistry_ = new Chemistry(mixture, config);
           break;
@@ -1344,7 +1347,6 @@ void M2ulPhyS::testInitialCondition(const Vector &x, Vector &y) {
   delete eqState;
 }
 
-// NOTE: Use only for DRY_AIR.
 void M2ulPhyS::uniformInitialConditions() {
   double *data = U->HostWrite();
   double *dataUp = Up->HostWrite();
@@ -1352,15 +1354,52 @@ void M2ulPhyS::uniformInitialConditions() {
 
   int dof = vfes->GetNDofs();
   double *inputRhoRhoVp = config.GetConstantInitialCondition();
+  
+  // build initial state
+  Vector initState(num_equation);
+  
+  initState(0) = inputRhoRhoVp[0];
+  initState(1) = inputRhoRhoVp[1];
+  initState(2) = inputRhoRhoVp[2];
+  if (dim == 3) initState(3) = inputRhoRhoVp[3];
+  
+  if (mixture->GetWorkingFluid() == WorkingFluid::USER_DEFINED) {
+    const int numSpecies = mixture->GetNumSpecies();
+    const int numActiveSpecies = mixture->GetNumActiveSpecies();
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      int inputIndex = mixture->getInputIndexOf(sp);
+      initState(2+dim+sp) = inputRhoRhoVp[0] * config.initialMassFractions(inputIndex);
+    }
+    
+    // electron energy
+    if (mixture->IsTwoTemperature()) {
+      double ne = 0.;
+      if (mixture->IsAmbipolar()) {
+        for (int sp = 0; sp < numActiveSpecies; sp++) 
+          ne += mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) * 
+                initState(2+dim+sp)/mixture->GetGasParams(sp, GasParams::SPECIES_MW);
+      }else {
+        ne = initState(2 + dim + numSpecies - 2) / 
+          mixture->GetGasParams(numSpecies - 2, GasParams::SPECIES_MW);
+      }
+      
+      initState(num_equation-1) = config.initialElectronTemperature * ne * 
+                                  mixture->getMolarCV(numSpecies-2);
+    }
+  }
+  
+  // initial energy
+  mixture->modifyEnergyForPressure(initState, initState, inputRhoRhoVp[4]);
 
-  DryAir *eqState = new DryAir(dim, num_equation);
+  // TODO(marc): try to make this mixture independent
+//   DryAir *eqState = new DryAir(dim, num_equation);
 
-  const double gamma = eqState->GetSpecificHeatRatio();
-  const double rhoE =
-      inputRhoRhoVp[4] / (gamma - 1.) + 0.5 *
-                                            (inputRhoRhoVp[1] * inputRhoRhoVp[1] + inputRhoRhoVp[2] * inputRhoRhoVp[2] +
-                                             inputRhoRhoVp[3] * inputRhoRhoVp[3]) /
-                                            inputRhoRhoVp[0];
+//   const double gamma = eqState->GetSpecificHeatRatio();
+//   const double rhoE =
+//       inputRhoRhoVp[4] / (gamma - 1.) + 0.5 *
+//                                             (inputRhoRhoVp[1] * inputRhoRhoVp[1] + inputRhoRhoVp[2] * inputRhoRhoVp[2] +
+//                                              inputRhoRhoVp[3] * inputRhoRhoVp[3]) /
+//                                             inputRhoRhoVp[0];
 
   Vector state;
   state.UseDevice(false);
@@ -1370,15 +1409,21 @@ void M2ulPhyS::uniformInitialConditions() {
   Upi.SetSize(num_equation);
 
   for (int i = 0; i < dof; i++) {
-    data[i] = inputRhoRhoVp[0];
-    data[i + dof] = inputRhoRhoVp[1];
-    data[i + 2 * dof] = inputRhoRhoVp[2];
-    if (dim == 3) data[i + 3 * dof] = inputRhoRhoVp[3];
-    data[i + (1 + dim) * dof] = rhoE;
-    if (eqSystem == NS_PASSIVE) data[i + (num_equation - 1) * dof] = 0.;
+//     data[i] = inputRhoRhoVp[0];
+//     data[i + dof] = inputRhoRhoVp[1];
+//     data[i + 2 * dof] = inputRhoRhoVp[2];
+//     if (dim == 3) data[i + 3 * dof] = inputRhoRhoVp[3];
+//     data[i + (1 + dim) * dof] = rhoE;
+//     if (eqSystem == NS_PASSIVE) data[i + (num_equation - 1) * dof] = 0.;
+//     
+//     if (mixture->GetWorkingFluid() == WorkingFluid::USER_DEFINED) {
+//       const int numSpecies = mixture->GetNumActiveSpecies();
+//       for (int sp = 0; sp < numSpecies; sp++) 
+//         data[i + (2 + dim + sp) * dof] = inputRhoRhoVp[0] * config.initialMassFractions(sp);
+//     }
+    for (int eq = 0; eq < num_equation; eq++) data[i + eq * dof] = initState(eq);
 
-    for (int eq = 0; eq < num_equation; eq++) state(eq) = data[i + eq * dof];
-    eqState->GetPrimitivesFromConservatives(state, Upi);
+    mixture->GetPrimitivesFromConservatives(initState, Upi);
     for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * dof] = Upi[eq];
 
     //     dataUp[i] = data[i];
@@ -1395,7 +1440,7 @@ void M2ulPhyS::uniformInitialConditions() {
     }
   }
 
-  delete eqState;
+//   delete eqState;
 }
 
 void M2ulPhyS::initGradUp() {
@@ -1943,6 +1988,7 @@ void M2ulPhyS::parseSolverOptions2() {
       tpsP->getInput("species/numSpecies", config.numSpecies, 1);
       config.gasParams.SetSize(config.numSpecies, GasParams::NUM_GASPARAMS);
       // config.speciesNames.SetSize(config.numSpecies);
+      config.initialMassFractions.SetSize(numSpecies);
       config.speciesNames.resize(config.numSpecies);
 
       if (config.gasModel == PERFECT_MIXTURE) {
@@ -1982,6 +2028,14 @@ void M2ulPhyS::parseSolverOptions2() {
         tpsP->getRequiredInput((basepath + "/charge_number").c_str(), charge);
         config.gasParams(i - 1, GasParams::SPECIES_MW) = mw;
         config.gasParams(i - 1, GasParams::SPECIES_CHARGES) = charge;
+        
+        tpsP->getRequiredInput((basepath + "/initialMassFraction").c_str(),
+                               config.initialMassFractions(i));
+        
+        // require initial electron temperature
+        if (speciesName == "E")
+          tpsP->getRequiredInput((basepath + "/initialElectronTemperature").c_str(),
+                                 config.initialElectronTemperature);
 
         if (config.gasModel == PERFECT_MIXTURE) {
           tpsP->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(),
@@ -2064,6 +2118,9 @@ void M2ulPhyS::parseSolverOptions2() {
       for (int sp = 0; sp < config.numSpecies; sp++) config.productStoich(sp, r - 1) = stoich[sp];
     }
   }
+  
+  // chemistry
+  {}
 
   return;
 }

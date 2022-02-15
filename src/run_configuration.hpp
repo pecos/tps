@@ -181,6 +181,8 @@ class RunConfiguration {
   int numSpecies;
   int backgroundIndex;
   // int electronIndex;
+  Vector initialMassFractions;
+  double initialElectronTemperature;
 
   std::vector<std::string> speciesNames;
 
