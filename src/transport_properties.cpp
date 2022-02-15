@@ -67,8 +67,9 @@ void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const 
   transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY] =
       cp_div_pr * transportBuffer[GlobalTrnsCoeffs::VISCOSITY];
 
+  diffusionVelocity.SetSize(numSpecies, 3);
+  diffusionVelocity = 0.0;
   if (numActiveSpecies > 0) {
-    diffusionVelocity.SetSize(numActiveSpecies, 3);
     double diffusivity = transportBuffer[GlobalTrnsCoeffs::VISCOSITY] / Sc;
 
     // Kevin: forced passive scalar to be positive.
@@ -105,9 +106,9 @@ void TestBinaryAirTransport::ComputeFluxTransportProperties(const Vector &state,
   transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY] =
       cp_div_pr * transportBuffer[GlobalTrnsCoeffs::VISCOSITY];
 
+  diffusionVelocity.SetSize(numSpecies, 3);
+  diffusionVelocity = 0.0;
   if (numActiveSpecies > 0) {
-    diffusionVelocity.SetSize(numActiveSpecies, 3);
-    diffusionVelocity = 0.0;
 
     double diffusivity = transportBuffer[GlobalTrnsCoeffs::VISCOSITY] / Sc;
 
