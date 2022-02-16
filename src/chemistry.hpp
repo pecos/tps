@@ -84,7 +84,7 @@ class Chemistry {
   GasMixture *mixture_ = NULL;
 
  public:
-  Chemistry(GasMixture *mixture, RunConfiguration config);
+  Chemistry(GasMixture *mixture, RunConfiguration &config);
 
   ~Chemistry();
 
@@ -115,7 +115,7 @@ class Chemistry {
 class MassActionLaw : public Chemistry
 {
 public:
-  MassActionLaw(GasMixture *mixture, RunConfiguration config);
+  MassActionLaw(GasMixture *mixture, RunConfiguration &config);
   ~MassActionLaw() {};
   
   virtual void computeCreationRate(const Vector &ns, const Vector &kfwd, const Vector &keq, Vector &creationRate);

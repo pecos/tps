@@ -1284,6 +1284,12 @@ void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::
   } else {
     ne = stateIn(2 + dim + numSpecies - 2) / gasParams(numSpecies - 2, GasParams::SPECIES_MW);
   }
+  
+  double nB = stateIn(0);  // background species
+  for (int sp = 0; sp < numActiveSpecies; sp++) nB -= stateIn(2 + dim + sp);
+
+  if (ambipolar) nB -= ne * gasParams(numSpecies - 2, GasParams::SPECIES_MW);
+  nB /= gasParams(numSpecies - 1, GasParams::SPECIES_MW);
 
   double Th = 0., Te = 0.;
   if (twoTemperature) {
@@ -1292,10 +1298,12 @@ void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::
                 UNIVERSALGASCONSTANT * Te;
 
     for (int sp = 0; sp < numActiveSpecies; sp++) Th += n_s(sp);
+    Th += nB;
     Th = (p - pe) / (Th * UNIVERSALGASCONSTANT);
   } else {
     for (int sp = 0; sp < numActiveSpecies; sp++) Th += stateIn(2 + dim + sp) / gasParams(sp, GasParams::SPECIES_MW);
     if (ambipolar) Th += ne;
+    Th += nB;
     Th = p / (Th * UNIVERSALGASCONSTANT);
   }
 
@@ -1303,5 +1311,6 @@ void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::
   double rE = 0.;
   for (int sp = 0; sp < numActiveSpecies; sp++) rE += n_s(sp) * molarCV_(sp) * Th;
   if (twoTemperature) rE += ne * molarCV_(numSpecies - 2) * Te;
+  rE += nB * molarCV_(numSpecies - 1) * Th;
   stateOut(1 + dim) = rE;
 }

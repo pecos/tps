@@ -270,14 +270,16 @@ void M2ulPhyS::initVariables() {
       // mixture->setViscMult(config.GetViscMult());
       // mixture->setBulkViscMult(config.GetBulkViscMult());
       break;
-    case WorkingFluid::TEST_BINARY_AIR: {
+    case WorkingFluid::TEST_BINARY_AIR:
       mixture = new TestBinaryAir(config, dim);
       transportPtr = new TestBinaryAirTransport(mixture, config);
-    } break;
+      break;
     case WorkingFluid::USER_DEFINED:
       switch (config.GetGasModel()) {
         case GasModel::PERFECT_MIXTURE:
           mixture = new PerfectMixture(config, dim);
+          // WARNING: update this transport!
+          transportPtr = new DryAirTransport(mixture, config);
           break;
       }
       switch (config.GetTranportModel()) {
@@ -1357,6 +1359,7 @@ void M2ulPhyS::uniformInitialConditions() {
   
   // build initial state
   Vector initState(num_equation);
+  initState = 0.;
   
   initState(0) = inputRhoRhoVp[0];
   initState(1) = inputRhoRhoVp[1];
@@ -1960,7 +1963,7 @@ void M2ulPhyS::parseSolverOptions2() {
          << endl;
     config.gasModel = NUM_GASMODEL;
     config.transportModel = NUM_TRANSPORTMODEL;
-    config.chemistryModel = NUM_CHEMISTRYMODEL;
+    config.chemistryModel_ = NUM_CHEMISTRYMODEL;
   } else {
     tpsP->getInput("plasma_models/ambipolar", config.ambipolar, false);
     tpsP->getInput("plasma_models/two_temperature", config.twoTemperature, false);
@@ -1979,6 +1982,10 @@ void M2ulPhyS::parseSolverOptions2() {
 
     std::string chemistryModelStr;
     tpsP->getInput("plasma_models/chemistry_model", chemistryModelStr, std::string(""));
+    
+    if (chemistryModelStr == "mass_action_law") {
+      config.chemistryModel_ = ChemistryModel::MASS_ACTION_LAW;
+    }
   }
 
   // species list.
@@ -2118,9 +2125,6 @@ void M2ulPhyS::parseSolverOptions2() {
       for (int sp = 0; sp < config.numSpecies; sp++) config.productStoich(sp, r - 1) = stoich[sp];
     }
   }
-  
-  // chemistry
-  {}
 
   return;
 }
