@@ -50,7 +50,7 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
   for (int i = 0; i < inputState.Size(); i++) hinputState[i] = _inputData[i];
   auto dinputState = inputState.ReadWrite();
 
-  groupsMPI->setAsInlet(_patchNumber);
+  groupsMPI->setPatch(_patchNumber);
 
   localMeanUp.UseDevice(true);
   localMeanUp.SetSize(num_equation + 1);
@@ -278,7 +278,7 @@ void InletBC::initBCs() {
   if (!BCinit) {
     // placeholder to compute aggregate mass flow rate for inlets
 
-    MPI_Comm bcomm = groupsMPI->getInletComm();
+    MPI_Comm bcomm = groupsMPI->getComm(patchNumber);
     double area = aggregateArea(patchNumber, bcomm);
     int nfaces = aggregateBndryFaces(patchNumber, bcomm);
 
@@ -501,7 +501,7 @@ void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
   h_localMeanUp[num_equation] = static_cast<double>(totNbdr);
 
   double *h_sum = glob_sum.HostWrite();
-  MPI_Allreduce(h_localMeanUp, h_sum, num_equation + 1, MPI_DOUBLE, MPI_SUM, groupsMPI->getInletComm());
+  MPI_Allreduce(h_localMeanUp, h_sum, num_equation + 1, MPI_DOUBLE, MPI_SUM, groupsMPI->getComm(patchNumber));
 
   BoundaryCondition::copyValues(glob_sum, meanUp, 1. / h_sum[num_equation]);
 

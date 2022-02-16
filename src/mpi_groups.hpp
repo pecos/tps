@@ -43,12 +43,10 @@ using namespace mfem;
 class MPI_Groups {
  private:
   MPI_Session *mpi;
-
-  MPI_Comm inlet_comm;
-  MPI_Comm outlet_comm;
-
-  int isOutlet;
-  int isInlet;
+  
+  Array<int> patchList_; // list of patches visible to process
+  
+  std::unordered_map<int, MPI_Comm> patchGroupMap_; // maps of all group communicators by patch, i.e. <patch, communicator_patch>
 
  public:
   MPI_Groups(MPI_Session *mpi);
@@ -60,13 +58,11 @@ class MPI_Groups {
   // function that creates the groups
   void init();
 
-  void setAsInlet(int patchNum) { isInlet = patchNum + 1000; }
-  void setAsOutlet(int patchNum) { isOutlet = patchNum + 2000; }
+  void setPatch(int patchNum) { patchList_.Append(patchNum); }
 
   MPI_Session *getSession() { return mpi; }
 
-  MPI_Comm getInletComm() { return inlet_comm; }
-  MPI_Comm getOutletComm() { return outlet_comm; }
+  MPI_Comm getComm(int patch) { return patchGroupMap_[patch]; }
 
   std::string getParallelName(std::string name);
 };
