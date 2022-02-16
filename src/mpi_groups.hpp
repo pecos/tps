@@ -43,10 +43,11 @@ using namespace mfem;
 class MPI_Groups {
  private:
   MPI_Session *mpi;
-  
-  Array<int> patchList_; // list of patches visible to process
-  
-  std::unordered_map<int, MPI_Comm> patchGroupMap_; // maps of all group communicators by patch, i.e. <patch, communicator_patch>
+
+  Array<int> patchList_;  // list of patches visible to process
+
+  std::unordered_map<int, MPI_Comm>
+      patchGroupMap_;  // maps of all group communicators by patch, i.e. <patch, communicator_patch>
 
  public:
   MPI_Groups(MPI_Session *mpi);
