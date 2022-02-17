@@ -195,7 +195,11 @@ void Tps::chooseSolver() {
   } else if (input_solver_type_ == "em") {
     isEMOnlyMode_ = true;
     ElectromagneticOptions em_opt;
-    solver_ = new QuasiMagnetostaticSolver(mpi_, em_opt, this);
+    solver_ = new QuasiMagnetostaticSolver3D(mpi_, em_opt, this);
+  } else if (input_solver_type_ == "em-axi") {
+    isEMOnlyMode_ = true;
+    ElectromagneticOptions em_opt;
+    solver_ = new QuasiMagnetostaticSolverAxiSym(mpi_, em_opt, this);
   } else if (input_solver_type_ == "coupled") {
     isFlowEMCoupledMode_ = true;
     grvy_printf(GRVY_ERROR, "\nSlow your roll.  Solid high-five for whoever implements this coupled solver mode!\n");
