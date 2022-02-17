@@ -102,7 +102,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
   if (_config.numSpongeRegions_ > 0) {
     for (int sz = 0; sz < _config.numSpongeRegions_; sz++) {
       forcing.Append(new SpongeZone(dim, num_equation, _order, intRuleType, fluxClass, mixture, intRules, vfes, Up,
-                                  gradUp, gpuArrays, _config, sz));
+                                    gradUp, gpuArrays, _config, sz));
     }
   }
   if (_config.numHeatSources > 0) {

@@ -86,7 +86,7 @@ RunConfiguration::RunConfiguration() {
   linViscData.pointInit = 0.;
   linViscData.viscRatio = 0.;
 
-//   initSpongeData();
+  //   initSpongeData();
   numSpongeRegions_ = 0;
   spongeData_ = NULL;
 
@@ -104,30 +104,30 @@ RunConfiguration::~RunConfiguration() {
   }
 
   if (heatSource != NULL) delete[] heatSource;
-  
+
   if (spongeData_ != NULL) delete[] spongeData_;
 }
 
 void RunConfiguration::initSpongeData() {
-//   spongeData.multFactor = 1.;
-// 
-//   spongeData.normal.UseDevice(true);
-//   spongeData.point0.UseDevice(true);
-//   spongeData.pointInit.UseDevice(true);
-//   spongeData.targetUp.UseDevice(true);
-// 
-//   spongeData.normal.SetSize(3);
-//   spongeData.point0.SetSize(3);
-//   spongeData.pointInit.SetSize(3);
-//   spongeData.targetUp.SetSize(5);
-// 
-//   spongeData.normal = 0.;
-//   spongeData.point0 = 0.;
-//   spongeData.pointInit = 0.;
-//   spongeData.targetUp = 0.;
-// 
-//   spongeData.tol = 1e-5;
-//   spongeData.szType = SpongeZoneSolution::NONE;
+  //   spongeData.multFactor = 1.;
+  //
+  //   spongeData.normal.UseDevice(true);
+  //   spongeData.point0.UseDevice(true);
+  //   spongeData.pointInit.UseDevice(true);
+  //   spongeData.targetUp.UseDevice(true);
+  //
+  //   spongeData.normal.SetSize(3);
+  //   spongeData.point0.SetSize(3);
+  //   spongeData.pointInit.SetSize(3);
+  //   spongeData.targetUp.SetSize(5);
+  //
+  //   spongeData.normal = 0.;
+  //   spongeData.point0 = 0.;
+  //   spongeData.pointInit = 0.;
+  //   spongeData.targetUp = 0.;
+  //
+  //   spongeData.tol = 1e-5;
+  //   spongeData.szType = SpongeZoneSolution::NONE;
 }
 
 void RunConfiguration::readInputFile(std::string inpuFileName) {

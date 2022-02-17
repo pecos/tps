@@ -137,7 +137,7 @@ class RunConfiguration {
   // the plane defined by point0.
   linearlyVaryingVisc linViscData;
 
-  SpongeZoneData *spongeData_;
+  SpongeZoneData* spongeData_;
   int numSpongeRegions_;
   void initSpongeData();
 

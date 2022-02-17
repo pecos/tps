@@ -394,7 +394,7 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
     Up[1 + dim] = mixture->Temperature(&Up[0], &szData.targetUp[4], 1);
     mixture->GetConservativesFromPrimitives(Up, targetU);
   }
-  
+
   // make sure normal is unitary
   double mod = 0.;
   for (int d = 0; d < dim; d++) mod += szData.normal(d) * szData.normal(d);
@@ -421,7 +421,7 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
   for (int n = 0; n < ndofs; n++) {
     Vector Xn(dim);
     for (int d = 0; d < dim; d++) Xn[d] = coords[n + d * ndofs];
-    
+
     if (szData.szType == SpongeZoneType::PLANAR) {
       // distance to the mix-out plane
       double distInit = 0.;
@@ -437,10 +437,10 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
         double planeDistance = distF + distInit;
         hSigma[n] = distInit / planeDistance / planeDistance;
       }
-    }else if (szData.szType == SpongeZoneType::ANNULUS) {
+    } else if (szData.szType == SpongeZoneType::ANNULUS) {
       double distInit = 0.;
       for (int d = 0; d < dim; d++) distInit -= szData.normal[d] * (Xn[d] - szData.pointInit[d]);
-      
+
       // dadial distance to axis
       double R = 0.;
       {
@@ -449,14 +449,14 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
         for (int d = 0; d < dim; d++) R += tmp(d) * tmp(d);
         R = sqrt(R);
       }
-      
+
       // dist end plane
       double distF = 0.;
       for (int d = 0; d < dim; d++) distF += szData.normal[d] * (Xn[d] - szData.point0[d]);
-      
+
       // nodes for mixed out plane
       if (fabs(R - szData.r1) < szData.tol) nodesVec.push_back(n);
-      
+
       if (distInit > 0. && distF > 0. && R - szData.r1 > 0.) {
         double planeDistance = szData.r2 - szData.r1;
         hSigma[n] = (R - szData.r1) / planeDistance / planeDistance;
