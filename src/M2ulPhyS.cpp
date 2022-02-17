@@ -977,7 +977,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   paraviewColl->RegisterField("press", press);
   if (eqSystem == NS_PASSIVE) {
     paraviewColl->RegisterField("passiveScalar", passiveScalar);
-  } else if (numActiveSpecies > 1) {
+  } else if (numActiveSpecies > 0) {
     // TODO: for now, keep the number of primitive variables same as conserved variables.
     // will need to add full list of species.
     for (int sp = 0; sp < numActiveSpecies; sp++) {
@@ -1995,7 +1995,7 @@ void M2ulPhyS::parseSolverOptions2() {
       tpsP->getInput("species/numSpecies", config.numSpecies, 1);
       config.gasParams.SetSize(config.numSpecies, GasParams::NUM_GASPARAMS);
       // config.speciesNames.SetSize(config.numSpecies);
-      config.initialMassFractions.SetSize(numSpecies);
+      config.initialMassFractions.SetSize(config.numSpecies);
       config.speciesNames.resize(config.numSpecies);
 
       if (config.gasModel == PERFECT_MIXTURE) {
@@ -2037,7 +2037,7 @@ void M2ulPhyS::parseSolverOptions2() {
         config.gasParams(i - 1, GasParams::SPECIES_CHARGES) = charge;
         
         tpsP->getRequiredInput((basepath + "/initialMassFraction").c_str(),
-                               config.initialMassFractions(i));
+                               config.initialMassFractions(i - 1));
         
         // require initial electron temperature
         if (speciesName == "E")
