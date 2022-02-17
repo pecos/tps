@@ -98,11 +98,10 @@ enum SpongeZoneType {
 struct SpongeZoneData {
   Vector normal;  // These planes are defined in the same manner as
   Vector point0;  // in the linearlyVaryingVisc struct case.
-  Vector pointInit; // In the case of ANNULUS type, 'normal' is a
-                    // a vector in the direction of the axis; point0
-                    // is a point on that axis; and pointInit contains
-                    // the inner and outler radius of the annular 
-                    // region
+  Vector pointInit; 
+  
+  double r1; // inner radius in the case of annulus
+  double r2; // outer radius in the case of annulus
 
   SpongeZoneSolution szSolType;
   SpongeZoneType szType;

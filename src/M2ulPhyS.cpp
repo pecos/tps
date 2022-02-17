@@ -1622,7 +1622,6 @@ void M2ulPhyS::parseSolverOptions2() {
         std::string type;
         tpsP->getInput((base + "/type").c_str(), type, std::string("none"));
         
-        int sizePinit = 3;
         if (type == "none") {
           grvy_printf(GRVY_ERROR, "\nUnknown sponge zone type -> %s\n", type.c_str());
           exit(ERROR);
@@ -1630,17 +1629,19 @@ void M2ulPhyS::parseSolverOptions2() {
           config.spongeData_[sz].szType = SpongeZoneType::PLANAR;
         } else if (type == "annulus") {
           config.spongeData_[sz].szType = SpongeZoneType::ANNULUS;
-          sizePinit = 2;
+          
+          tpsP->getInput((base + "/r1").c_str(), config.spongeData_[sz].r1, 0.);
+          tpsP->getInput((base + "/r2").c_str(), config.spongeData_[sz].r2, 0.);
         }
         
         config.spongeData_[sz].normal.SetSize(3);
         config.spongeData_[sz].point0.SetSize(3);
-        config.spongeData_[sz].pointInit.SetSize(sizePinit);
+        config.spongeData_[sz].pointInit.SetSize(3);
         config.spongeData_[sz].targetUp.SetSize(5);
         
         tpsP->getRequiredVec((base + "/normal").c_str(), config.spongeData_[sz].normal, 3);
         tpsP->getRequiredVec((base + "/p0").c_str(), config.spongeData_[sz].point0, 3);
-        tpsP->getRequiredVec((base + "/pInit").c_str(), config.spongeData_[sz].pointInit, sizePinit);
+        tpsP->getRequiredVec((base + "/pInit").c_str(), config.spongeData_[sz].pointInit, 3);
         tpsP->getInput((base + "/tolerance").c_str(), config.spongeData_[sz].tol, 1e-5);
         tpsP->getInput((base + "/multiplier").c_str(), config.spongeData_[sz].multFactor, 1.0);
         
