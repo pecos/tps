@@ -28,8 +28,8 @@ EXTRA_DIST      = tap-driver.sh soln_differ inputs meshes ref_solns/*.h5 \
 		  mms.euler.test reaction.test perfect_gas.test collision_integrals.test \
 	 	  argon_minimal.test argon_minimal.binary.test diffusion_wall.test \
 	 	  inflow_outflow.test mms.ternary_2d.test mms.ternary_2d_wall.test \
-	 	  mms.ternary_2d_inout.test cuda-memcheck.test mms.general_wall.test
-
+	 	  mms.ternary_2d_inout.test cuda-memcheck.test mms.general_wall.test \
+		  independent_coupling.test
 
 TESTS = vpath.sh
 XFAIL_TESTS =
@@ -68,7 +68,8 @@ TESTS += cyl3d.test \
 	 argon_minimal.binary.test \
 	 diffusion_wall.test \
 	 reaction.test \
-	 inflow_outflow.test
+	 inflow_outflow.test \
+	 independent_coupling.test
 
 if PYTHON_ENABLED
 TESTS += cyl3d.python.test

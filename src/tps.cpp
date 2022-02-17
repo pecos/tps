@@ -42,6 +42,8 @@
 #include <pybind11/stl.h>
 #endif
 
+#include "independent_coupling.hpp"
+
 namespace TPS {
 
 Tps::Tps() {
@@ -200,6 +202,9 @@ void Tps::chooseSolver() {
     isEMOnlyMode_ = true;
     ElectromagneticOptions em_opt;
     solver_ = new QuasiMagnetostaticSolverAxiSym(mpi_, em_opt, this);
+  } else if (input_solver_type_ == "independent-coupled") {
+    isFlowEMCoupledMode_ = true;
+    solver_ = new IndependentCoupling(mpi_, iFile_, this);
   } else if (input_solver_type_ == "coupled") {
     isFlowEMCoupledMode_ = true;
     grvy_printf(GRVY_ERROR, "\nSlow your roll.  Solid high-five for whoever implements this coupled solver mode!\n");
