@@ -1,0 +1,21 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="qms"
+
+setup() {
+    MESH_FILE=meshes/axisym-rings.msh
+    #REF_FILE=ref_solns/rings.centerline.By.np1.h5
+    #OUT_FILE=ref_solns/By.h5
+    #CMD_LINE="--em-only -m $MESH_FILE --rtol 1e-12 --atol 1e-15 --maxiter 30 -ny 129 -y0 -2.0 -y1 2.0 -by $OUT_FILE"
+    CMD_LINE="--runFile inputs/axisym-rings.ini"
+}
+
+@test "[$TEST] verify tps axisymmetric quasimagnetostatic solver runs with np = 1" {
+    test -s $MESH_FILE
+    run mpirun -np 1 ../src/tps $CMD_LINE
+    [[ "${status}" -eq 0 ]]
+    [[ "${output}" =~ "EM simulation complete" ]]
+    #h5diff -v -p 1e-12 $REF_FILE $OUT_FILE
+}
+
