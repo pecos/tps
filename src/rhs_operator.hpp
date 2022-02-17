@@ -156,6 +156,7 @@ class RHSoperator : public TimeDependentOperator {
               ParGridFunction *jh);
 
   virtual void Mult(const Vector &x, Vector &y) const;
+  virtual void ImplicitSolve(const double dt, const Vector &x, Vector &k);
   void updatePrimitives(const Vector &x) const;
   void updateGradients(const Vector &x, const bool &primitiveUpdated) const;
 
