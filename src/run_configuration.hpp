@@ -209,6 +209,9 @@ class RunConfiguration {
   TransportModel transportModel;
   ChemistryModel chemistryModel;
 
+  // flag for using third-order electron thermal conductivity
+  bool thirdOrderkElectron;
+
   RunConfiguration();
   ~RunConfiguration();
 
