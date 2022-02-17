@@ -50,7 +50,7 @@ class Tps;
  *  equations for a user-specified source current.
  *
  */
-class QuasiMagnetostaticSolver : public TPS::Solver {
+class QuasiMagnetostaticSolver3D : public TPS::Solver {
  private:
   mfem::MPI_Session &mpi_;
   ElectromagneticOptions em_opts_;
@@ -83,8 +83,8 @@ class QuasiMagnetostaticSolver : public TPS::Solver {
   void InterpolateToYAxis() const;
 
  public:
-  QuasiMagnetostaticSolver(mfem::MPI_Session &mpi, ElectromagneticOptions em_opts, TPS::Tps *tps);
-  ~QuasiMagnetostaticSolver();
+  QuasiMagnetostaticSolver3D(mfem::MPI_Session &mpi, ElectromagneticOptions em_opts, TPS::Tps *tps);
+  ~QuasiMagnetostaticSolver3D();
 
   /** Initialize quasi-magnetostatic problem
    *
@@ -105,6 +105,72 @@ class QuasiMagnetostaticSolver : public TPS::Solver {
 
   /** Solve quasi-magnetostatic problem */
   void solve() override;
+};
+
+/** Solve quasi-magnetostatic approximation of Maxwell for 2-D axisymmetric
+ *
+ *  A separate class is used for axisymmetric b/c we use different finite
+ *  element spaces from the 3D solver.
+ *
+ */
+class QuasiMagnetostaticSolverAxiSym : public TPS::Solver {
+ private:
+  mfem::MPI_Session &mpi_;
+  ElectromagneticOptions em_opts_;
+
+  // pointer to parent Tps class
+  TPS::Tps *tpsP_;
+
+  mfem::ParMesh *pmesh_;
+  int dim_;
+  int true_size_;
+  Array<int> offsets_;
+
+  mfem::FiniteElementCollection *h1_;
+
+  mfem::ParFiniteElementSpace *Atheta_space_;
+
+  mfem::Array<int> ess_bdr_tdofs_;
+
+  mfem::ParBilinearForm *K_;
+  mfem::ParLinearForm *r_;
+
+  mfem::ParGridFunction *Atheta_real_;
+  mfem::ParGridFunction *Atheta_imag_;
+
+  mfem::ParGridFunction *plasma_conductivity_;
+  mfem::GridFunctionCoefficient *plasma_conductivity_coef_;
+
+  bool operator_initialized_;
+  bool current_initialized_;
+
+  void InterpolateToYAxis() const;
+
+ public:
+  QuasiMagnetostaticSolverAxiSym(mfem::MPI_Session &mpi, ElectromagneticOptions em_opts, TPS::Tps *tps);
+  ~QuasiMagnetostaticSolverAxiSym();
+
+  /** Initialize axisymmetric quasi-magnetostatic problem
+   *
+   *  Sets up MFEM objects (e.g., ParMesh, ParFiniteElementSpace,
+   *  ParBilinearForm etc) required to form the linear system
+   *  corresponding to the quasi-magnetostatic problem.
+   */
+  void initialize() override;
+
+  /** Initialize current for axisymmetric quasi-magnetostatic problem
+   *
+   *  Build the source current function
+   */
+  void InitializeCurrent();
+
+  void parseSolverOptions() override;
+
+  /** Solve quasi-magnetostatic problem */
+  void solve() override;
+
+  ParMesh *getMesh() const { return pmesh_; }
+  ParGridFunction *getPlasmaConductivityGF() { return plasma_conductivity_; }
 };
 
 #endif  // QUASIMAGNETOSTATIC_HPP_
