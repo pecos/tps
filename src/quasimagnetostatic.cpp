@@ -43,47 +43,49 @@ using namespace mfem::common;
 void JFun(const Vector &x, Vector &f);
 
 QuasiMagnetostaticSolver::QuasiMagnetostaticSolver(MPI_Session &mpi, ElectromagneticOptions em_opts, TPS::Tps *tps)
-    : _mpi(mpi), _em_opts(em_opts) {
-  tpsP = tps;
+    : mpi_(mpi), em_opts_(em_opts) {
+  tpsP_ = tps;
 
   // verify running on cpu
-  if (tpsP->getDeviceConfig() != "cpu") {
+  if (tpsP_->getDeviceConfig() != "cpu") {
     if (mpi.Root()) {
       grvy_printf(GRVY_ERROR, "[ERROR] EM simulation currently only supported on cpu.\n");
     }
     exit(1);
   }
 
-  _pmesh = NULL;
-  _hcurl = NULL;
-  _h1 = NULL;
-  _hdiv = NULL;
-  _Aspace = NULL;
-  _pspace = NULL;
-  _Bspace = NULL;
-  _K = NULL;
-  _A = NULL;
-  _B = NULL;
+  pmesh_ = NULL;
+  hcurl_ = NULL;
+  h1_ = NULL;
+  hdiv_ = NULL;
+  Aspace_ = NULL;
+  pspace_ = NULL;
+  Bspace_ = NULL;
+  K_ = NULL;
+  r_ = NULL;
+  A_ = NULL;
+  B_ = NULL;
 
-  _operator_initialized = false;
-  _current_initialized = false;
+  operator_initialized_ = false;
+  current_initialized_ = false;
 }
 
 QuasiMagnetostaticSolver::~QuasiMagnetostaticSolver() {
-  delete _B;
-  delete _A;
-  delete _K;
-  delete _Bspace;
-  delete _pspace;
-  delete _Aspace;
-  delete _hdiv;
-  delete _h1;
-  delete _hcurl;
-  delete _pmesh;
+  delete B_;
+  delete A_;
+  delete r_;
+  delete K_;
+  delete Bspace_;
+  delete pspace_;
+  delete Aspace_;
+  delete hdiv_;
+  delete h1_;
+  delete hcurl_;
+  delete pmesh_;
 }
 
 void QuasiMagnetostaticSolver::initialize() {
-  bool verbose = _mpi.Root();
+  bool verbose = mpi_.Root();
   if (verbose) grvy_printf(ginfo, "Initializing quasimagnetostatic solver.\n");
 
   // Prepare for the quasi-magnetostatic solve in four steps...
@@ -93,9 +95,9 @@ void QuasiMagnetostaticSolver::initialize() {
   //-----------------------------------------------------
 
   // 1a) Read the serial mesh (on each mpi rank)
-  Mesh *mesh = new Mesh(_em_opts.mesh_file.c_str(), 1, 1);
-  _dim = mesh->Dimension();
-  if (_dim != 3) {
+  Mesh *mesh = new Mesh(em_opts_.mesh_file.c_str(), 1, 1);
+  dim_ = mesh->Dimension();
+  if (dim_ != 3) {
     if (verbose) {
       grvy_printf(gerror, "[ERROR] Quasi-magnetostatic solver on supported for 3D.");
     }
@@ -103,64 +105,64 @@ void QuasiMagnetostaticSolver::initialize() {
   }
 
   // 1b) Refine the serial mesh, if requested
-  if (verbose && (_em_opts.ref_levels > 0)) {
-    grvy_printf(ginfo, "Refining mesh: ref_levels %d\n", _em_opts.ref_levels);
+  if (verbose && (em_opts_.ref_levels > 0)) {
+    grvy_printf(ginfo, "Refining mesh: ref_levels %d\n", em_opts_.ref_levels);
   }
-  for (int l = 0; l < _em_opts.ref_levels; l++) {
+  for (int l = 0; l < em_opts_.ref_levels; l++) {
     mesh->UniformRefinement();
   }
 
   // 1c) Partition the mesh
-  _pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);
+  pmesh_ = new ParMesh(MPI_COMM_WORLD, *mesh);
   delete mesh;  // no longer need the serial mesh
-  _pmesh->ReorientTetMesh();
+  pmesh_->ReorientTetMesh();
 
   //-----------------------------------------------------
   // 2) Prepare the required finite elements
   //-----------------------------------------------------
-  _hcurl = new ND_FECollection(_em_opts.order, _dim);
-  _h1 = new H1_FECollection(_em_opts.order, _dim);
-  _hdiv = new RT_FECollection(_em_opts.order - 1, _dim);
+  hcurl_ = new ND_FECollection(em_opts_.order, dim_);
+  h1_ = new H1_FECollection(em_opts_.order, dim_);
+  hdiv_ = new RT_FECollection(em_opts_.order - 1, dim_);
 
-  _Aspace = new ParFiniteElementSpace(_pmesh, _hcurl);
-  _pspace = new ParFiniteElementSpace(_pmesh, _h1);
-  _Bspace = new ParFiniteElementSpace(_pmesh, _hdiv);
+  Aspace_ = new ParFiniteElementSpace(pmesh_, hcurl_);
+  pspace_ = new ParFiniteElementSpace(pmesh_, h1_);
+  Bspace_ = new ParFiniteElementSpace(pmesh_, hdiv_);
 
   //-----------------------------------------------------
   // 3) Get BC dofs (everything is essential---i.e., PEC)
   //-----------------------------------------------------
-  Array<int> ess_bdr(_pmesh->bdr_attributes.Max());
-  if (_pmesh->bdr_attributes.Size()) {
+  Array<int> ess_bdr(pmesh_->bdr_attributes.Max());
+  if (pmesh_->bdr_attributes.Size()) {
     ess_bdr = 1;
   }
 
-  _Aspace->GetEssentialTrueDofs(ess_bdr, _ess_bdr_tdofs);
+  Aspace_->GetEssentialTrueDofs(ess_bdr, ess_bdr_tdofs_);
 
   //-----------------------------------------------------
   // 4) Form curl-curl bilinear form
   //-----------------------------------------------------
-  _K = new ParBilinearForm(_Aspace);
-  _K->AddDomainIntegrator(new CurlCurlIntegrator);
-  _K->Assemble();
-  _K->Finalize();
+  K_ = new ParBilinearForm(Aspace_);
+  K_->AddDomainIntegrator(new CurlCurlIntegrator);
+  K_->Assemble();
+  K_->Finalize();
 
   // All done
-  _operator_initialized = true;
+  operator_initialized_ = true;
 
   // initialize current
   InitializeCurrent();
 }
 
 void QuasiMagnetostaticSolver::InitializeCurrent() {
-  bool verbose = _mpi.Root();
+  bool verbose = mpi_.Root();
   if (verbose) grvy_printf(ginfo, "Initializing rhs using source current.\n");
 
   // ensure we've initialized the operators
   // b/c we need the mesh, spaces, etc here
-  assert(_operator_initialized);
+  assert(operator_initialized_);
 
   // ensure the mesh volume attributes conform to our expectations
-  assert(_pmesh->attributes.Max() == 5);
+  assert(pmesh_->attributes.Max() == 5);
 
   // Compute the right hand side in 3 steps...
 
@@ -168,13 +170,13 @@ void QuasiMagnetostaticSolver::InitializeCurrent() {
   //    uniformly distributed current density in rings defined by
   //    volume attributes in the mesh.  We assume 4 rings, plus a zero
   //    source current domain for 5 total attributes.
-  Vector J0(_pmesh->attributes.Max());
+  Vector J0(pmesh_->attributes.Max());
   J0 = 0.0;
-  if (_em_opts.bot_only) {
+  if (em_opts_.bot_only) {
     // only bottom rings
     J0(1) = J0(2) = 1.0;
     J0(3) = J0(4) = 0.0;
-  } else if (_em_opts.top_only) {
+  } else if (em_opts_.top_only) {
     // only top rings
     J0(1) = J0(2) = 0.0;
     J0(3) = J0(4) = 1.0;
@@ -185,22 +187,22 @@ void QuasiMagnetostaticSolver::InitializeCurrent() {
   }
 
   PWConstCoefficient J0coef(J0);
-  VectorFunctionCoefficient current(_dim, JFun, &J0coef);
+  VectorFunctionCoefficient current(dim_, JFun, &J0coef);
 
   // 2) Build a discretely divergence-free approximation of the source
   // current that lives in the Nedelec FE space defined in
   // Initialize()
-  ParGridFunction *Jorig = new ParGridFunction(_Aspace);
-  ParGridFunction *Jproj = new ParGridFunction(_Aspace);
+  ParGridFunction *Jorig = new ParGridFunction(Aspace_);
+  ParGridFunction *Jproj = new ParGridFunction(Aspace_);
 
-  _r = new ParLinearForm(_Aspace);
+  r_ = new ParLinearForm(Aspace_);
 
-  int irOrder = _pspace->GetElementTransformation(0)->OrderW() + 2 * _em_opts.order;
-  ParDiscreteGradOperator *grad = new ParDiscreteGradOperator(_pspace, _Aspace);
+  int irOrder = pspace_->GetElementTransformation(0)->OrderW() + 2 * em_opts_.order;
+  ParDiscreteGradOperator *grad = new ParDiscreteGradOperator(pspace_, Aspace_);
   grad->Assemble();
   grad->Finalize();
 
-  DivergenceFreeProjector *div_free = new DivergenceFreeProjector(*_pspace, *_Aspace, irOrder, NULL, NULL, grad);
+  DivergenceFreeProjector *div_free = new DivergenceFreeProjector(*pspace_, *Aspace_, irOrder, NULL, NULL, grad);
 
   // This call (i.e., GlobalProjectDiscCoefficient) replaces the
   // functionality of Jorig->ProjectCoefficient(current) in a way that
@@ -223,148 +225,148 @@ void QuasiMagnetostaticSolver::InitializeCurrent() {
   delete Jorig;
 
   // 3) Multiply by the mass matrix to get the RHS vector
-  ParBilinearForm *mass = new ParBilinearForm(_Aspace);
+  ParBilinearForm *mass = new ParBilinearForm(Aspace_);
   mass->AddDomainIntegrator(new VectorFEMassIntegrator);
   mass->Assemble();
   mass->Finalize();
 
-  mass->Mult(*Jproj, *_r);
+  mass->Mult(*Jproj, *r_);
 
   delete mass;
   delete Jproj;
 
-  _current_initialized = true;
+  current_initialized_ = true;
 }
 
 // query solver-specific runtime controls
 void QuasiMagnetostaticSolver::parseSolverOptions() {
-  tpsP->getRequiredInput("em/mesh", _em_opts.mesh_file);
+  tpsP_->getRequiredInput("em/mesh", em_opts_.mesh_file);
 
-  tpsP->getInput("em/order", _em_opts.order, 1);
-  tpsP->getInput("em/ref_levels", _em_opts.ref_levels, 0);
-  tpsP->getInput("em/max_iter", _em_opts.max_iter, 100);
-  tpsP->getInput("em/rtol", _em_opts.rtol, 1.0e-6);
-  tpsP->getInput("em/atol", _em_opts.atol, 1.0e-10);
-  tpsP->getInput("em/nBy", _em_opts.nBy, 0);
-  tpsP->getInput("em/yinterp_min", _em_opts.yinterp_min, 0.0);
-  tpsP->getInput("em/yinterp_max", _em_opts.yinterp_max, 1.0);
-  tpsP->getInput("em/By_file", _em_opts.By_file, std::string("By.h5"));
-  tpsP->getInput("em/top_only", _em_opts.top_only, false);
-  tpsP->getInput("em/bot_only", _em_opts.bot_only, false);
+  tpsP_->getInput("em/order", em_opts_.order, 1);
+  tpsP_->getInput("em/ref_levels", em_opts_.ref_levels, 0);
+  tpsP_->getInput("em/max_iter", em_opts_.max_iter, 100);
+  tpsP_->getInput("em/rtol", em_opts_.rtol, 1.0e-6);
+  tpsP_->getInput("em/atol", em_opts_.atol, 1.0e-10);
+  tpsP_->getInput("em/nBy", em_opts_.nBy, 0);
+  tpsP_->getInput("em/yinterp_min", em_opts_.yinterp_min, 0.0);
+  tpsP_->getInput("em/yinterp_max", em_opts_.yinterp_max, 1.0);
+  tpsP_->getInput("em/By_file", em_opts_.By_file, std::string("By.h5"));
+  tpsP_->getInput("em/top_only", em_opts_.top_only, false);
+  tpsP_->getInput("em/bot_only", em_opts_.bot_only, false);
 
   // dump options to screen for user inspection
-  if (_mpi.Root()) {
-    _em_opts.print(std::cout);
+  if (mpi_.Root()) {
+    em_opts_.print(std::cout);
   }
 }
 
 void QuasiMagnetostaticSolver::solve() {
-  bool verbose = _mpi.Root();
+  bool verbose = mpi_.Root();
   if (verbose) grvy_printf(ginfo, "Solving the quasi-magnetostatic system for A (magnetic vector potential).\n");
 
-  assert(_operator_initialized && _current_initialized);
+  assert(operator_initialized_ && current_initialized_);
 
   // Solve for the magnetic vector potential and magnetic field in 3 steps
 
   // 1) Solve the curl(curl(A)) = J for magnetic vector potential
   //    using operators set up by Initialize() and InitializeCurrent()
   //    fcns
-  _A = new ParGridFunction(_Aspace);
-  *_A = 0;
+  A_ = new ParGridFunction(Aspace_);
+  *A_ = 0;
 
   HypreParMatrix K;
-  HypreParVector x(_Aspace);
-  HypreParVector b(_Aspace);
+  HypreParVector x(Aspace_);
+  HypreParVector b(Aspace_);
 
-  _K->FormLinearSystem(_ess_bdr_tdofs, *_A, *_r, K, x, b);
+  K_->FormLinearSystem(ess_bdr_tdofs_, *A_, *r_, K, x, b);
 
   // Set up the preconditioner
   HypreAMS *iK;
-  iK = new HypreAMS(K, _Aspace);
+  iK = new HypreAMS(K, Aspace_);
   iK->SetSingularProblem();
   iK->iterative_mode = false;
 
   MINRESSolver solver(MPI_COMM_WORLD);
-  solver.SetAbsTol(_em_opts.atol);
-  solver.SetRelTol(_em_opts.rtol);
-  solver.SetMaxIter(_em_opts.max_iter);
+  solver.SetAbsTol(em_opts_.atol);
+  solver.SetRelTol(em_opts_.rtol);
+  solver.SetMaxIter(em_opts_.max_iter);
   solver.SetOperator(K);
   solver.SetPreconditioner(*iK);
   solver.SetPrintLevel(1);
   solver.Mult(b, x);
   delete iK;
 
-  _K->RecoverFEMSolution(x, *_r, *_A);
+  K_->RecoverFEMSolution(x, *r_, *A_);
 
   // 2) Determine B from A according to B = curl(A).  Here we use an
   //    interpolator rather than a projection.
   if (verbose) grvy_printf(ginfo, "Evaluating curl(A) to get the magnetic field.\n");
-  _B = new ParGridFunction(_Bspace);
-  *_B = 0;
+  B_ = new ParGridFunction(Bspace_);
+  *B_ = 0;
 
-  ParDiscreteLinearOperator *curl = new ParDiscreteLinearOperator(_Aspace, _Bspace);
+  ParDiscreteLinearOperator *curl = new ParDiscreteLinearOperator(Aspace_, Bspace_);
   curl->AddDomainInterpolator(new CurlInterpolator);
   curl->Assemble();
   curl->Finalize();
-  curl->Mult(*_A, *_B);
+  curl->Mult(*A_, *B_);
   delete curl;
 
   // 3) Output A and B fields for visualization using paraview
   if (verbose) grvy_printf(ginfo, "Writing solution to paraview output.\n");
-  ParaViewDataCollection paraview_dc("magnetostatic", _pmesh);
+  ParaViewDataCollection paraview_dc("magnetostatic", pmesh_);
   paraview_dc.SetPrefixPath("ParaView");
-  paraview_dc.SetLevelsOfDetail(_em_opts.order);
+  paraview_dc.SetLevelsOfDetail(em_opts_.order);
   paraview_dc.SetCycle(0);
   paraview_dc.SetDataFormat(VTKFormat::BINARY);
   paraview_dc.SetHighOrderOutput(true);
   paraview_dc.SetTime(0.0);
-  paraview_dc.RegisterField("magvecpot", _A);
-  paraview_dc.RegisterField("magnfield", _B);
+  paraview_dc.RegisterField("magvecpot", A_);
+  paraview_dc.RegisterField("magnfield", B_);
   paraview_dc.Save();
 
   // Compute and dump the magnetic field on the axis
   InterpolateToYAxis();
 
-  if (_mpi.Root()) {
+  if (mpi_.Root()) {
     std::cout << "EM simulation complete" << std::endl;
   }
 }
 
 void QuasiMagnetostaticSolver::InterpolateToYAxis() const {
-  const bool root = _mpi.Root();
+  const bool root = mpi_.Root();
 
   // quick return if there are no interpolation points
-  if (_em_opts.nBy < 1) return;
+  if (em_opts_.nBy < 1) return;
 
   // Set up array of points (on all ranks)
-  DenseMatrix phys_points(_dim, _em_opts.nBy);
+  DenseMatrix phys_points(dim_, em_opts_.nBy);
 
-  const double dy = (_em_opts.yinterp_max - _em_opts.yinterp_min) / (_em_opts.nBy - 1);
+  const double dy = (em_opts_.yinterp_max - em_opts_.yinterp_min) / (em_opts_.nBy - 1);
 
-  for (int ipt = 0; ipt < _em_opts.nBy; ipt++) {
+  for (int ipt = 0; ipt < em_opts_.nBy; ipt++) {
     phys_points(0, ipt) = 0.0;
-    phys_points(1, ipt) = _em_opts.yinterp_min + ipt * dy;
+    phys_points(1, ipt) = em_opts_.yinterp_min + ipt * dy;
     phys_points(2, ipt) = 0.0;
   }
 
   Array<int> eid;
   Array<IntegrationPoint> ips;
-  double *Byloc = new double[_em_opts.nBy];
-  double *By = new double[_em_opts.nBy];
-  Vector Bpoint(_dim);
+  double *Byloc = new double[em_opts_.nBy];
+  double *By = new double[em_opts_.nBy];
+  Vector Bpoint(dim_);
 
   // Get element numbers and integration points
-  _pmesh->FindPoints(phys_points, eid, ips);
+  pmesh_->FindPoints(phys_points, eid, ips);
 
   // And interpolate
-  for (int ipt = 0; ipt < _em_opts.nBy; ipt++) {
+  for (int ipt = 0; ipt < em_opts_.nBy; ipt++) {
     if (eid[ipt] >= 0) {
-      _B->GetVectorValue(eid[ipt], ips[ipt], Bpoint);
+      B_->GetVectorValue(eid[ipt], ips[ipt], Bpoint);
       Byloc[ipt] = Bpoint[1];
     } else {
       Byloc[ipt] = 0;
     }
-    MPI_Reduce(Byloc, By, _em_opts.nBy, MPI_DOUBLE, MPI_SUM, 0, _pmesh->GetComm());
+    MPI_Reduce(Byloc, By, em_opts_.nBy, MPI_DOUBLE, MPI_SUM, 0, pmesh_->GetComm());
   }
 
   // Finally, write the result to an hdf5 file
@@ -376,12 +378,12 @@ void QuasiMagnetostaticSolver::InterpolateToYAxis() const {
   hid_t dataspace = -1;
 
   if (root) {
-    file = H5Fcreate(_em_opts.By_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    file = H5Fcreate(em_opts_.By_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
     assert(file >= 0);
 
-    h5_save_attribute(file, "nBy", _em_opts.nBy);
+    h5_save_attribute(file, "nBy", em_opts_.nBy);
 
-    dims[0] = _em_opts.nBy;
+    dims[0] = em_opts_.nBy;
 
     // write y locations of points
     dataspace = H5Screate_simple(1, dims, NULL);

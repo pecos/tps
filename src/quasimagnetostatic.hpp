@@ -52,33 +52,33 @@ class Tps;
  */
 class QuasiMagnetostaticSolver : public TPS::Solver {
  private:
-  mfem::MPI_Session &_mpi;
-  ElectromagneticOptions _em_opts;
+  mfem::MPI_Session &mpi_;
+  ElectromagneticOptions em_opts_;
 
   // pointer to parent Tps class
-  TPS::Tps *tpsP;
+  TPS::Tps *tpsP_;
 
-  mfem::ParMesh *_pmesh;
-  int _dim;
+  mfem::ParMesh *pmesh_;
+  int dim_;
 
-  mfem::FiniteElementCollection *_hcurl;
-  mfem::FiniteElementCollection *_h1;
-  mfem::FiniteElementCollection *_hdiv;
+  mfem::FiniteElementCollection *hcurl_;
+  mfem::FiniteElementCollection *h1_;
+  mfem::FiniteElementCollection *hdiv_;
 
-  mfem::ParFiniteElementSpace *_Aspace;
-  mfem::ParFiniteElementSpace *_pspace;
-  mfem::ParFiniteElementSpace *_Bspace;
+  mfem::ParFiniteElementSpace *Aspace_;
+  mfem::ParFiniteElementSpace *pspace_;
+  mfem::ParFiniteElementSpace *Bspace_;
 
-  mfem::Array<int> _ess_bdr_tdofs;
+  mfem::Array<int> ess_bdr_tdofs_;
 
-  mfem::ParBilinearForm *_K;
-  mfem::ParLinearForm *_r;
+  mfem::ParBilinearForm *K_;
+  mfem::ParLinearForm *r_;
 
-  mfem::ParGridFunction *_A;
-  mfem::ParGridFunction *_B;
+  mfem::ParGridFunction *A_;
+  mfem::ParGridFunction *B_;
 
-  bool _operator_initialized;
-  bool _current_initialized;
+  bool operator_initialized_;
+  bool current_initialized_;
 
   void InterpolateToYAxis() const;
 

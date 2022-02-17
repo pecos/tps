@@ -81,7 +81,8 @@ enforcestyle:
 	@echo ""
 #	@$(top_srcdir)/utils/cpplint/cpplint.py --output=sed $(headers) $(cxx_sources) main.cpp | bash
 #	astyle --project $(headers) $(cxx_sources) main.cpp
-	clang-format -i $(headers) $(cxx_sources) main.cpp
+#	clang-format -i $(headers) $(cxx_sources) main.cpp
+	@cd $(top_srcdir)/src && clang-format -i $(headers) $(cxx_sources) main.cpp
 
 
 
