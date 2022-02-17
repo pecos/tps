@@ -411,6 +411,12 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
   computeMeanTimeDerivatives(y);
 }
 
+void RHSoperator::ImplicitSolve(const double dt, const Vector &x, Vector &k) {
+  // As a start, we simply call mult.  When invoked with "backward Euler",
+  // this should give the same result as forward Euler
+  this->Mult(x, k);
+}
+
 void RHSoperator::copyZk2Z_gpu(Vector &z, Vector &zk, const int eq, const int dof) {
 #ifdef _GPU_
   const double *d_zk = zk.Read();

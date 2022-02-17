@@ -394,6 +394,10 @@ void M2ulPhyS::initVariables() {
     case 6:
       timeIntegrator = new RK6Solver;
       break;
+    case 11:
+      if (mpi.Root()) cout << "Warning: Backward Euler is under development." << endl;
+      timeIntegrator = new BackwardEulerSolver;
+      break;
     default:
       cout << "Unknown ODE solver type: " << config.GetTimeIntegratorType() << '\n';
   }
@@ -1578,6 +1582,7 @@ void M2ulPhyS::parseSolverOptions2() {
     integrators["rk3"] = 3;
     integrators["rk4"] = 4;
     integrators["rk6"] = 6;
+    integrators["backwardEuler"] = 11;
     std::string type;
     tpsP->getInput("time/cfl", config.cflNum, 0.12);
     tpsP->getInput("time/integrator", type, std::string("rk4"));

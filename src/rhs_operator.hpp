@@ -142,6 +142,7 @@ class RHSoperator : public TimeDependentOperator {
               bool &_isSBP, double &_alpha, RunConfiguration &_config);
 
   virtual void Mult(const Vector &x, Vector &y) const;
+  virtual void ImplicitSolve(const double dt, const Vector &x, Vector &k);
   void updatePrimitives(const Vector &x) const;
 
   virtual ~RHSoperator();
