@@ -447,6 +447,7 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
         Vector tmp(dim);
         for (int d = 0; d < dim; d++) tmp(d) = Xn[d] - szData.pointInit[d] + distInit * szData.normal(d);
         for (int d = 0; d < dim; d++) R += tmp(d) * tmp(d);
+        R = sqrt(R);
       }
       
       // dist end plane
