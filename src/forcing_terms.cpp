@@ -380,14 +380,14 @@ void AxisymmetricSource::updateTerms(Vector &in) {
 SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                        Fluxes *_fluxClass, GasMixture *_mixture, IntegrationRules *_intRules,
                        ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
-                       const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
+                       const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config, const int sz)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()),
       fluxes(_fluxClass),
       mixture(_mixture),
-      szData(_config.GetSpongeZoneData()) {
+      szData(_config.spongeData_[sz]) {
   targetU.SetSize(num_equation);
-  if (szData.szType == SpongeZoneSolution::USERDEF) {
+  if (szData.szSolType == SpongeZoneSolution::USERDEF) {
     Vector Up(num_equation);
     Up[0] = szData.targetUp[0];
     for (int d = 0; d < dim; d++) Up[1 + d] = szData.targetUp[1 + d];
@@ -433,7 +433,7 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
   }
 
   // find plane nodes
-  if (szData.szType == SpongeZoneSolution::MIXEDOUT) {
+  if (szData.szSolType == SpongeZoneSolution::MIXEDOUT) {
     nodesInMixedOutPlane.SetSize(nodesVec.size());
     for (int n = 0; n < nodesInMixedOutPlane.Size(); n++) nodesInMixedOutPlane[n] = nodesVec[n];
 
@@ -448,7 +448,7 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
 SpongeZone::~SpongeZone() { delete sigma; }
 
 void SpongeZone::updateTerms(Vector &in) {
-  if (szData.szType == SpongeZoneSolution::MIXEDOUT) computeMixedOutValues();
+  if (szData.szSolType == SpongeZoneSolution::MIXEDOUT) computeMixedOutValues();
 
   addSpongeZoneForcing(in);
 }
