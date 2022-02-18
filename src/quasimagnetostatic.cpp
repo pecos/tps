@@ -443,17 +443,12 @@ void JFun(const Vector &x, Vector &J) {
   J = axx;
 }
 
+static double radius(const Vector &x) { return x[0]; }
 
-static double radius(const Vector &x) {
-  return x[0];
-}
+static double oneOverRadius(const Vector &x) { return 1.0 / x[0]; }
 
-static double oneOverRadius(const Vector &x) {
-  return 1.0/x[0];
-}
-
-QuasiMagnetostaticSolverAxiSym::QuasiMagnetostaticSolverAxiSym(MPI_Session &mpi,
-                                                               ElectromagneticOptions em_opts, TPS::Tps *tps)
+QuasiMagnetostaticSolverAxiSym::QuasiMagnetostaticSolverAxiSym(MPI_Session &mpi, ElectromagneticOptions em_opts,
+                                                               TPS::Tps *tps)
     : mpi_(mpi), em_opts_(em_opts) {
   tpsP_ = tps;
 
@@ -596,7 +591,6 @@ void QuasiMagnetostaticSolverAxiSym::InitializeCurrent() {
 
   current_initialized_ = true;
 }
-
 
 void QuasiMagnetostaticSolverAxiSym::parseSolverOptions() {
   tpsP_->getRequiredInput("em/mesh", em_opts_.mesh_file);

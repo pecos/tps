@@ -30,10 +30,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 #include "tps.hpp"
-#include "independent_coupling.hpp"
 
 #include <sys/types.h>
 #include <unistd.h>
+
+#include "independent_coupling.hpp"
 
 namespace TPS {
 

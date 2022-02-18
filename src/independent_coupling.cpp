@@ -31,12 +31,11 @@
 // -----------------------------------------------------------------------------------el-
 #include "independent_coupling.hpp"
 
+#include "M2ulPhyS.hpp"
 #include "em_options.hpp"
 #include "quasimagnetostatic.hpp"
-#include "M2ulPhyS.hpp"
 
-IndependentCoupling::IndependentCoupling(MPI_Session &mpi, string &inputFileName, TPS::Tps *tps)
-  : em_opt_() {
+IndependentCoupling::IndependentCoupling(MPI_Session &mpi, string &inputFileName, TPS::Tps *tps) : em_opt_() {
   qmsa_solver_ = new QuasiMagnetostaticSolverAxiSym(mpi, em_opt_, tps);
   flow_solver_ = new M2ulPhyS(mpi, inputFileName, tps);
 }
