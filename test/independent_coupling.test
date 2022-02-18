@@ -1,0 +1,25 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="coupling/independent"
+RUNFILE="inputs/independent-coupled.ini"
+
+setup() {
+    SOLN_FILE=restart_output-pipe.sol.h5
+    RSTRT_FILE=ref_solns/pipe.restart.sol.h5
+    REF_FILE=ref_solns/pipe.100100.sol.h5
+}
+
+@test "[$TEST] verify tps runs flow and EM in 'independent' coupling mode" {
+    test -s $RUNFILE
+    test -s $RSTRT_FILE
+    cp $RSTRT_FILE $SOLN_FILE
+
+    ../src/tps --runFile $RUNFILE >& run.log
+
+    test -s $SOLN_FILE
+    test -s $REF_FILE
+
+    # only the flow is currently diffed b/c EM doesn't write an h5 file
+    ./soln_differ -r $SOLN_FILE $REF_FILE
+}
