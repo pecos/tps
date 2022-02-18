@@ -30,7 +30,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 #include "tps.hpp"
-#include "independent_coupling.hpp"
 
 #ifdef HAVE_MPI_EXT
 #include <mpi-ext.h>
@@ -42,6 +41,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #endif
+
+#include "independent_coupling.hpp"
 
 namespace TPS {
 

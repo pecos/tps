@@ -40,9 +40,9 @@ class Tps;
 #include <iostream>
 #include <mfem.hpp>
 
+#include "M2ulPhyS.hpp"
 #include "em_options.hpp"
 #include "quasimagnetostatic.hpp"
-#include "M2ulPhyS.hpp"
 #include "solver.hpp"
 
 class IndependentCoupling : public TPS::Solver {
@@ -59,4 +59,4 @@ class IndependentCoupling : public TPS::Solver {
   void initialize() override;
   void solve() override;
 };
-#endif  // TOY_COUPLING_HPP_
+#endif  // INDEPENDENT_COUPLING_HPP_
