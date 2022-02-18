@@ -211,7 +211,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   gradients->setParallelData(&parallelData, &transferUp);
 
   local_timeDerivatives.UseDevice(true);
-  local_timeDerivatives.SetSize(5);
+  local_timeDerivatives.SetSize(num_equation);
   local_timeDerivatives = 0.;
 
 #ifdef DEBUG
