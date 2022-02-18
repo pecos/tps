@@ -1262,11 +1262,14 @@ void PerfectMixture::computeStagnantStateWithTemp(const mfem::Vector &stateIn, c
   double heatCapacity = 0.;
   for (int sp = 0; sp < numActiveSpecies; sp++) heatCapacity += molarCV_(sp) * n_s(sp);
   heatCapacity += nB * molarCV_(numSpecies - 1);
+  
+  // assuming electrons also have wall temperature
+  heatCapacity += ne * molarCV_(numSpecies - 1);
 
   stateOut(1 + dim) = heatCapacity * Temp;
-  if (twoTemperature) {
-    stateOut(1 + dim) += ne * molarCV_(numSpecies - 2) * Temp;
-  }
+
+  // make vel = 0
+  for (int d = 0; d < dim; d++) stateOut(1 + d) = 0.;
 }
 
 void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::Vector &stateOut, const double &p) {
