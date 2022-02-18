@@ -84,3 +84,17 @@ test_speed_of_sound_LDFLAGS += $(GRVY_LIBS)
 test_speed_of_sound_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
 test_speed_of_sound_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
 test_speed_of_sound_LDFLAGS += -L$(GSLIB_LIB) -lgs
+
+check_PROGRAMS += test_collision
+test_collision_SOURCES  = test_collision_integral.cpp
+test_collision_LDADD    = ../src/libtps.a -lmfem
+
+test_collision_LDFLAGS  = -L$(MFEM_LIB)
+test_collision_LDFLAGS += $(HDF5_LIBS)
+test_collision_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
+test_collision_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
+test_collision_LDFLAGS += -L$(METIS_LIB) -lmetis
+test_collision_LDFLAGS += $(GRVY_LIBS)
+test_collision_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
+test_collision_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
+test_collision_LDFLAGS += -L$(GSLIB_LIB) -lgs
