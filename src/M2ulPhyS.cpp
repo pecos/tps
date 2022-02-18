@@ -1356,16 +1356,16 @@ void M2ulPhyS::uniformInitialConditions() {
 
   int dof = vfes->GetNDofs();
   double *inputRhoRhoVp = config.GetConstantInitialCondition();
-  
+
   // build initial state
   Vector initState(num_equation);
   initState = 0.;
-  
+
   initState(0) = inputRhoRhoVp[0];
   initState(1) = inputRhoRhoVp[1];
   initState(2) = inputRhoRhoVp[2];
   if (dim == 3) initState(3) = inputRhoRhoVp[3];
-  
+
   if (mixture->GetWorkingFluid() == WorkingFluid::USER_DEFINED) {
     const int numSpecies = mixture->GetNumSpecies();
     const int numActiveSpecies = mixture->GetNumActiveSpecies();
@@ -1373,24 +1373,24 @@ void M2ulPhyS::uniformInitialConditions() {
       int inputIndex = mixture->getInputIndexOf(sp);
       initState(2+dim+sp) = inputRhoRhoVp[0] * config.initialMassFractions(inputIndex);
     }
-    
+
     // electron energy
     if (mixture->IsTwoTemperature()) {
       double ne = 0.;
       if (mixture->IsAmbipolar()) {
-        for (int sp = 0; sp < numActiveSpecies; sp++) 
-          ne += mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) * 
+        for (int sp = 0; sp < numActiveSpecies; sp++)
+          ne += mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) *
                 initState(2+dim+sp)/mixture->GetGasParams(sp, GasParams::SPECIES_MW);
       }else {
-        ne = initState(2 + dim + numSpecies - 2) / 
+        ne = initState(2 + dim + numSpecies - 2) /
           mixture->GetGasParams(numSpecies - 2, GasParams::SPECIES_MW);
       }
-      
-      initState(num_equation-1) = config.initialElectronTemperature * ne * 
+
+      initState(num_equation-1) = config.initialElectronTemperature * ne *
                                   mixture->getMolarCV(numSpecies-2);
     }
   }
-  
+
   // initial energy
   mixture->modifyEnergyForPressure(initState, initState, inputRhoRhoVp[4]);
 
@@ -1963,7 +1963,7 @@ void M2ulPhyS::parseSolverOptions2() {
 
     std::string chemistryModelStr;
     tpsP->getInput("plasma_models/chemistry_model", chemistryModelStr, std::string(""));
-    
+
     if (chemistryModelStr == "mass_action_law") {
       config.chemistryModel_ = ChemistryModel::MASS_ACTION_LAW;
     }
@@ -2005,7 +2005,7 @@ void M2ulPhyS::parseSolverOptions2() {
     // Gas Params
     if (config.workFluid != DRY_AIR) {
       for (int i = 1; i <= config.numSpecies; i++) {
-        double mw, charge;
+        double mw, charge, formEnergy;
         std::string type, speciesName;
         std::string basepath("species/species" + std::to_string(i));
 
@@ -2014,12 +2014,14 @@ void M2ulPhyS::parseSolverOptions2() {
 
         tpsP->getRequiredInput((basepath + "/molecular_weight").c_str(), mw);
         tpsP->getRequiredInput((basepath + "/charge_number").c_str(), charge);
+        tpsP->getRequiredInput((basepath + "/formation_energy").c_str(), formEnergy);
         config.gasParams(i - 1, GasParams::SPECIES_MW) = mw;
         config.gasParams(i - 1, GasParams::SPECIES_CHARGES) = charge;
-        
+        config.gasParams(i - 1, GasParams::FORMATION_ENERGY) = formEnergy;
+
         tpsP->getRequiredInput((basepath + "/initialMassFraction").c_str(),
                                config.initialMassFractions(i - 1));
-        
+
         // require initial electron temperature
         if (speciesName == "E")
           tpsP->getRequiredInput((basepath + "/initialElectronTemperature").c_str(),

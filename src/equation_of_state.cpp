@@ -600,6 +600,9 @@ PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim) : GasMixtur
   assert(gasParams(numSpecies - 1, GasParams::SPECIES_CHARGES) == 0.0);
   // TODO: release electron species enforcing.
   assert(isElectronIncluded);
+  // We assume the background species and electron have zero formation energy.
+  assert(gasParams(numSpecies - 2, GasParams::FORMATION_ENERGY) == 0.0);
+  assert(gasParams(numSpecies - 1, GasParams::FORMATION_ENERGY) == 0.0);
 }
 
 // compute heavy-species heat capacity from number densities.
@@ -707,6 +710,10 @@ void PerfectMixture::GetConservativesFromPrimitives(const Vector &primit, Vector
   totalEnergy += totalHeatCapacity * primit[dim + 1];
   if (twoTemperature) {
     totalEnergy += conserv[num_equation - 1];
+  }
+
+  for (int sp = 0; sp < numSpecies - 2; sp++) {
+    totalEnergy += primit[dim + 2 + sp] * gasParams(sp, GasParams::FORMATION_ENERGY);
   }
 
   conserv[dim + 1] = totalEnergy;
@@ -905,11 +912,16 @@ void PerfectMixture::computeTemperaturesBase(const Vector &conservedState, const
   double totalHeatCapacity = computeHeaviesHeatCapacity(&n_sp[0], n_B);
   if (~twoTemperature) totalHeatCapacity += n_e * molarCV_(numSpecies - 2);
 
+  double totalEnergy = conservedState[dim + 1];
+  for (int sp = 0; sp < numSpecies - 2; sp++) {
+    totalEnergy -= n_sp[sp] * gasParams(sp, GasParams::FORMATION_ENERGY);
+  }
+
   // Comptue heavy-species temperature. If not two temperature, then this works as the unique temperature.
   T_h = 0.0;
   for (int d = 0; d < dim; d++) T_h -= conservedState[d + 1] * conservedState[d + 1];
   T_h *= 0.5 / conservedState[0];
-  T_h += conservedState[dim + 1];
+  T_h += totalEnergy;
   if (twoTemperature) T_h -= conservedState[num_equation - 1];
   T_h /= totalHeatCapacity;
 
@@ -1262,11 +1274,15 @@ void PerfectMixture::computeStagnantStateWithTemp(const mfem::Vector &stateIn, c
   double heatCapacity = 0.;
   for (int sp = 0; sp < numActiveSpecies; sp++) heatCapacity += molarCV_(sp) * n_s(sp);
   heatCapacity += nB * molarCV_(numSpecies - 1);
-  
+
   // assuming electrons also have wall temperature
   heatCapacity += ne * molarCV_(numSpecies - 1);
 
+  // TODO: we should add electron energy here as well???
   stateOut(1 + dim) = heatCapacity * Temp;
+
+  // Kevin: added formation energies.
+  for (int sp = 0; sp < numSpecies - 2; sp++) stateOut(1 + dim) += n_s(sp) * gasParams(sp, GasParams::FORMATION_ENERGY);
 
   // make vel = 0
   for (int d = 0; d < dim; d++) stateOut(1 + d) = 0.;
@@ -1287,7 +1303,7 @@ void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::
   } else {
     ne = stateIn(2 + dim + numSpecies - 2) / gasParams(numSpecies - 2, GasParams::SPECIES_MW);
   }
-  
+
   double nB = stateIn(0);  // background species
   for (int sp = 0; sp < numActiveSpecies; sp++) nB -= stateIn(2 + dim + sp);
 
@@ -1315,5 +1331,9 @@ void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::
   for (int sp = 0; sp < numActiveSpecies; sp++) rE += n_s(sp) * molarCV_(sp) * Th;
   if (twoTemperature) rE += ne * molarCV_(numSpecies - 2) * Te;
   rE += nB * molarCV_(numSpecies - 1) * Th;
+
+  // Kevin: added formation energies.
+  for (int sp = 0; sp < numSpecies - 2; sp++) rE += n_s(sp) * gasParams(sp, GasParams::FORMATION_ENERGY);
+
   stateOut(1 + dim) = rE;
 }
