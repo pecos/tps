@@ -29,6 +29,7 @@ int main (int argc, char *argv[])
 
   int dim = 3;
 
+  double scalarErrorThreshold = 1e-13;
   double gradErrorThreshold = 5e-7;
   int nTrials = 10;
 
@@ -89,9 +90,21 @@ int main (int argc, char *argv[])
       error += abs( ( testPrimitives[n] - targetPrimitives[n] ) / testPrimitives[n] );
     }
 
-    if (error > 1.0e-15) {
+    if (error > scalarErrorThreshold) {
       grvy_printf(GRVY_ERROR, "\n Conversions between conserved and primitive variables are not equivalent.");
-      grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
+      grvy_printf(GRVY_ERROR, "\n Error: %.15E\n", error);
+     for (int n = 0; n < mixture->GetNumEquations(); n++){
+       std::cout << testPrimitives[n] << ",";
+     }
+     std::cout << std::endl;
+     for (int n = 0; n < mixture->GetNumEquations(); n++){
+       std::cout << targetPrimitives[n] << ",";
+     }
+     std::cout << std::endl;
+     for (int n = 0; n < mixture->GetNumEquations(); n++){
+       std::cout << targetPrimitives[n] - testPrimitives[n] << ",";
+     }
+     std::cout << std::endl;
       exit(ERROR);
     }
 
@@ -100,9 +113,10 @@ int main (int argc, char *argv[])
     double pressureFromConserved = mixture->ComputePressure(conservedState);
     double pressureFromPrimitive = mixture->ComputePressureFromPrimitives(testPrimitives);
     error = abs( (pressureFromConserved - pressureFromPrimitive) / pressureFromConserved );
-    if (error > 1.0e-15) {
+    if (error > scalarErrorThreshold) {
       grvy_printf(GRVY_ERROR, "\n Pressure computations from conserved and primitive variables are not equivalent.");
       grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
+      grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E \n", pressureFromConserved, pressureFromPrimitive );
       exit(ERROR);
     }
 
@@ -110,7 +124,7 @@ int main (int argc, char *argv[])
 
     double temperature = mixture->ComputeTemperature(conservedState);
     error = abs( (temperature - testPrimitives[dim + 1]) / testPrimitives[dim + 1] );
-    if (error > 1.0e-15) {
+    if (error > scalarErrorThreshold) {
       grvy_printf(GRVY_ERROR, "\n ComputeTemperature is not equivalent to the reference.");
       grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
       exit(ERROR);
@@ -175,7 +189,7 @@ int main (int argc, char *argv[])
     moleFractionGrad.Mult(dir, dX_dx);
     double dpdx_prim = mixture->ComputePressureDerivative(dUp_dx, testPrimitives, true);
     double dpdx_cons = mixture->ComputePressureDerivative(dUp_dx, conservedState, false);
-    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > 1.0e-14 ) {
+    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > scalarErrorThreshold ) {
       grvy_printf(GRVY_ERROR, "\n ComputePressureDerivative is not consistent between primitive and conservative.");
       grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim, abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) );
       exit(ERROR);
@@ -369,9 +383,21 @@ int main (int argc, char *argv[])
       error += abs( ( testPrimitives[n] - targetPrimitives[n] ) / testPrimitives[n] );
     }
 
-    if (error > 1.0e-15) {
+    if (error > scalarErrorThreshold) {
       grvy_printf(GRVY_ERROR, "\n Conversions between conserved and primitive variables are not equivalent.");
-      grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
+      grvy_printf(GRVY_ERROR, "\n Error: %.15E\n", error);
+     for (int n = 0; n < mixture->GetNumEquations(); n++){
+       std::cout << testPrimitives[n] << ",";
+     }
+     std::cout << std::endl;
+     for (int n = 0; n < mixture->GetNumEquations(); n++){
+       std::cout << targetPrimitives[n] << ",";
+     }
+     std::cout << std::endl;
+     for (int n = 0; n < mixture->GetNumEquations(); n++){
+       std::cout << targetPrimitives[n] - testPrimitives[n] << ",";
+     }
+     std::cout << std::endl;
       exit(ERROR);
     }
 
@@ -380,9 +406,10 @@ int main (int argc, char *argv[])
     double pressureFromConserved = mixture->ComputePressure(conservedState);
     double pressureFromPrimitive = mixture->ComputePressureFromPrimitives(testPrimitives);
     error = abs( (pressureFromConserved - pressureFromPrimitive) / pressureFromConserved );
-    if (error > 1.0e-15) {
+    if (error > scalarErrorThreshold) {
       grvy_printf(GRVY_ERROR, "\n Pressure computations from conserved and primitive variables are not equivalent.");
       grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
+      grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E \n", pressureFromConserved, pressureFromPrimitive );
       exit(ERROR);
     }
 
@@ -390,7 +417,7 @@ int main (int argc, char *argv[])
 
     double temperature = mixture->ComputeTemperature(conservedState);
     error = abs( (temperature - testPrimitives[dim + 1]) / testPrimitives[dim + 1] );
-    if (error > 1.0e-15) {
+    if (error > scalarErrorThreshold) {
       grvy_printf(GRVY_ERROR, "\n ComputeTemperature is not equivalent to the reference.");
       grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
       exit(ERROR);
@@ -464,7 +491,7 @@ int main (int argc, char *argv[])
     moleFractionGrad.Mult(dir, dX_dx);
     double dpdx_prim = mixture->ComputePressureDerivative(dUp_dx, testPrimitives, true);
     double dpdx_cons = mixture->ComputePressureDerivative(dUp_dx, conservedState, false);
-    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > 1.0e-14 ) {
+    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > scalarErrorThreshold ) {
       grvy_printf(GRVY_ERROR, "\n ComputePressureDerivative is not consistent between primitive and conservative.");
       grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim, abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) );
       exit(ERROR);
@@ -654,9 +681,21 @@ int main (int argc, char *argv[])
       error += abs( ( testPrimitives[n] - targetPrimitives[n] ) / testPrimitives[n] );
     }
 
-    if (error > 1.0e-15) {
+    if (error > scalarErrorThreshold) {
       grvy_printf(GRVY_ERROR, "\n Conversions between conserved and primitive variables are not equivalent.");
-      grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
+      grvy_printf(GRVY_ERROR, "\n Error: %.15E\n", error);
+     for (int n = 0; n < mixture->GetNumEquations(); n++){
+       std::cout << testPrimitives[n] << ",";
+     }
+     std::cout << std::endl;
+     for (int n = 0; n < mixture->GetNumEquations(); n++){
+       std::cout << targetPrimitives[n] << ",";
+     }
+     std::cout << std::endl;
+     for (int n = 0; n < mixture->GetNumEquations(); n++){
+       std::cout << targetPrimitives[n] - testPrimitives[n] << ",";
+     }
+     std::cout << std::endl;
       exit(ERROR);
     }
 
@@ -665,9 +704,10 @@ int main (int argc, char *argv[])
     double pressureFromConserved = mixture->ComputePressure(conservedState);
     double pressureFromPrimitive = mixture->ComputePressureFromPrimitives(testPrimitives);
     error = abs( (pressureFromConserved - pressureFromPrimitive) / pressureFromConserved );
-    if (error > 1.0e-15) {
+    if (error > scalarErrorThreshold) {
       grvy_printf(GRVY_ERROR, "\n Pressure computations from conserved and primitive variables are not equivalent.");
       grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
+      grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E \n", pressureFromConserved, pressureFromPrimitive );
       exit(ERROR);
     }
 
@@ -675,7 +715,7 @@ int main (int argc, char *argv[])
 
     double temperature = mixture->ComputeTemperature(conservedState);
     error = abs( (temperature - testPrimitives[dim + 1]) / testPrimitives[dim + 1] );
-    if (error > 1.0e-15) {
+    if (error > scalarErrorThreshold) {
       grvy_printf(GRVY_ERROR, "\n ComputeTemperature is not equivalent to the reference.");
       grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
       exit(ERROR);
@@ -717,7 +757,7 @@ int main (int argc, char *argv[])
     int numSpecies = mixture->GetNumSpecies();
     int numEquation = mixture->GetNumEquations();
     mixture->computeTemperaturesBase(conservedState, &n_sp[0], n_sp[numSpecies-2], n_sp[numSpecies-1], T_h, T_e);
-    if (abs( (T_h - testPrimitives[dim + 1]) / testPrimitives[dim + 1] ) > 1.0e-15) {
+    if (abs( (T_h - testPrimitives[dim + 1]) / testPrimitives[dim + 1] ) > scalarErrorThreshold) {
       std::cout << T_h << " != " << testPrimitives[dim + 1] << std::endl;
       grvy_printf(GRVY_ERROR, "\n computeTemperaturesBase does not compute heavy-species temperature properly.");
       exit(ERROR);
@@ -752,7 +792,7 @@ int main (int argc, char *argv[])
     moleFractionGrad.Mult(dir, dX_dx);
     double dpdx_prim = mixture->ComputePressureDerivative(dUp_dx, testPrimitives, true);
     double dpdx_cons = mixture->ComputePressureDerivative(dUp_dx, conservedState, false);
-    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > 1.0e-14 ) {
+    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > scalarErrorThreshold ) {
       grvy_printf(GRVY_ERROR, "\n ComputePressureDerivative is not consistent between primitive and conservative.");
       grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim, abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) );
       exit(ERROR);
@@ -947,9 +987,21 @@ int main (int argc, char *argv[])
       error += abs( ( testPrimitives[n] - targetPrimitives[n] ) / testPrimitives[n] );
     }
 
-    if (error > 1.0e-15) {
+    if (error > scalarErrorThreshold) {
       grvy_printf(GRVY_ERROR, "\n Conversions between conserved and primitive variables are not equivalent.");
-      grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
+      grvy_printf(GRVY_ERROR, "\n Error: %.15E\n", error);
+     for (int n = 0; n < mixture->GetNumEquations(); n++){
+       std::cout << testPrimitives[n] << ",";
+     }
+     std::cout << std::endl;
+     for (int n = 0; n < mixture->GetNumEquations(); n++){
+       std::cout << targetPrimitives[n] << ",";
+     }
+     std::cout << std::endl;
+     for (int n = 0; n < mixture->GetNumEquations(); n++){
+       std::cout << targetPrimitives[n] - testPrimitives[n] << ",";
+     }
+     std::cout << std::endl;
       exit(ERROR);
     }
 
@@ -958,9 +1010,10 @@ int main (int argc, char *argv[])
     double pressureFromConserved = mixture->ComputePressure(conservedState);
     double pressureFromPrimitive = mixture->ComputePressureFromPrimitives(testPrimitives);
     error = abs( (pressureFromConserved - pressureFromPrimitive) / pressureFromConserved );
-    if (error > 1.0e-15) {
+    if (error > scalarErrorThreshold) {
       grvy_printf(GRVY_ERROR, "\n Pressure computations from conserved and primitive variables are not equivalent.");
       grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
+      grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E \n", pressureFromConserved, pressureFromPrimitive );
       exit(ERROR);
     }
 
@@ -968,7 +1021,7 @@ int main (int argc, char *argv[])
 
     double temperature = mixture->ComputeTemperature(conservedState);
     error = abs( (temperature - testPrimitives[dim + 1]) / testPrimitives[dim + 1] );
-    if (error > 1.0e-15) {
+    if (error > scalarErrorThreshold) {
       grvy_printf(GRVY_ERROR, "\n ComputeTemperature is not equivalent to the reference.");
       grvy_printf(GRVY_ERROR, "\n Error: %.15E", error);
       exit(ERROR);
@@ -1019,7 +1072,7 @@ int main (int argc, char *argv[])
     int numSpecies = mixture->GetNumSpecies();
     int numEquation = mixture->GetNumEquations();
     mixture->computeTemperaturesBase(conservedState, &n_sp[0], n_sp[numSpecies-2], n_sp[numSpecies-1], T_h, T_e);
-    if (abs( (T_h - testPrimitives[dim + 1]) / testPrimitives[dim + 1] ) > 1.0e-15) {
+    if (abs( (T_h - testPrimitives[dim + 1]) / testPrimitives[dim + 1] ) > scalarErrorThreshold) {
       std::cout << T_h << " != " << testPrimitives[dim + 1] << std::endl;
       grvy_printf(GRVY_ERROR, "\n computeTemperaturesBase does not compute heavy-species temperature properly.");
       exit(ERROR);
@@ -1054,7 +1107,7 @@ int main (int argc, char *argv[])
     moleFractionGrad.Mult(dir, dX_dx);
     double dpdx_prim = mixture->ComputePressureDerivative(dUp_dx, testPrimitives, true);
     double dpdx_cons = mixture->ComputePressureDerivative(dUp_dx, conservedState, false);
-    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > 1.0e-14 ) {
+    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > scalarErrorThreshold ) {
       grvy_printf(GRVY_ERROR, "\n ComputePressureDerivative is not consistent between primitive and conservative.");
       grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim, abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) );
       exit(ERROR);
