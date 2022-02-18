@@ -86,7 +86,7 @@ double rep11(const double Tp) {
 }
 
 double rep12(const double Tp) {
-  return 0.1547 * pow(log(1.0 + 1.6597 * pow(Tp, 1.1725)), 1.9792) / Tp / Tp;
+  return 0.1547 * pow(log(1.0 + 1.6597 * pow(Tp, 1.1725)), 0.9792) / Tp / Tp;
 }
 
 double rep13(const double Tp) {
@@ -139,51 +139,51 @@ double ArAr1P11(const double T) {
 */
 double eAr11(const double T) {
   const double logT = log(T);
-  if (T > 1.2e4) {
-    return 5.8346e-22 * logT * logT * logT - 6.3417e-21 * logT * logT + 3.2083e-21 * logT + 9.0686e-20;
+  if (T < 1.2e4) {
+    return 5.8664e-22 * logT * logT * logT - 6.3417e-21 * logT * logT + 3.2083e-21 * logT + 9.0686e-20;
   } else {
     double tmp = logT - 10.9082;
-    return 12.1818e-20 * exp(- 0.4186 * tmp * tmp) + 0.0869e-20;
+    return 12.1818e-20 * exp(- 0.4186 * tmp * tmp) + 8.6949e-22;
   }
 }
 
 double eAr12(const double T) {
   const double logT = log(T);
-  if (T > 1.0e4) {
+  if (T < 1.0e4) {
     return 5.0435e-22 * logT * logT * logT - 4.0041e-21 * logT * logT - 1.3234e-20 * logT + 1.1966e-19;
   } else {
     double tmp = logT - 10.5348;
-    return 12.5836e-20 * exp(- 0.5116 * tmp * tmp) + 0.0873e-20;
+    return 12.5836e-20 * exp(- 0.5116 * tmp * tmp) + 8.7254e-22;
   }
 }
 
 double eAr13(const double T) {
   const double logT = log(T);
-  if (T > 8.2e3) {
+  if (T < 8.2e3) {
     return 4.3150e-22 * logT * logT * logT - 2.1312e-21 * logT * logT - 2.5311e-20 * logT + 1.3866e-19;
   } else {
     double tmp = logT - 10.2802;
-    return 12.9711e-20 * exp(- 0.5725 * tmp * tmp) + 0.1637e-20;
+    return 12.9711e-20 * exp(- 0.5725 * tmp * tmp) + 1.6371e-21;
   }
 }
 
 double eAr14(const double T) {
   const double logT = log(T);
-  if (T > 7.1e3) {
+  if (T < 7.1e3) {
     return 3.9545e-22 * logT * logT * logT - 1.1198e-21 * logT * logT - 3.1302e-20 * logT + 1.4507e-19;
   } else {
     double tmp = logT - 10.0853;
-    return 13.2903e-20 * exp(- 0.6150 * tmp * tmp) + 0.1785e-20;
+    return 13.2903e-20 * exp(- 0.6150 * tmp * tmp) + 1.7854e-21;
   }
 }
 
 double eAr15(const double T) {
   const double logT = log(T);
-  if (T > 6.0e3) {
+  if (T < 6.0e3) {
     return 2.8521e-22 * logT * logT * logT + 9.9567e-22 * logT * logT - 4.2614e-20 * logT + 1.6026e-19;
   } else {
     double tmp = logT - 9.9275;
-    return 13.4901e-20 * exp(- 0.6295 * tmp * tmp) + 0.0460e-20;
+    return 13.4901e-20 * exp(- 0.6295 * tmp * tmp) + 4.6041e-22;
   }
 }
 

@@ -1,0 +1,9 @@
+#!../utils/bats/bin/bats
+# -*- mode: sh -*-
+
+TEST="collision_integrals"
+
+@test "[$TEST] test accuracy of collision integrals" {
+    test -e ./test_collision
+    ./test_collision
+}
