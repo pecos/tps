@@ -8,10 +8,6 @@ if HIP_ENABLED
 AM_CPPFLAGS += $(HIP_CXXFLAGS)
 endif
 
-if GSLIB_ENABLED
-AM_CPPFLAGS += -I$(GSLIB_INC)
-endif
-
 tps_LDFLAGS=
 
 # C++ main solver binary
@@ -32,11 +28,6 @@ endif
 
 if HIP_ENABLED
 tps_LDFLAGS         += $(HIP_LDFLAGS)
-endif
-
-if GSLIB_ENABLED
-tps_LDADD   += -lgs
-tps_LDFLAGS += -L$(GSLIB_LIB)
 endif
 
 # C++ solver library sources
