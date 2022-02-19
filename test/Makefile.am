@@ -39,7 +39,8 @@ TESTS += cyl3d.test \
 	 wedge.test \
 	 qms.rings.test \
 	 sponge_zone.test \
-	 perfect_gas.test
+	 perfect_gas.test \
+	 collision_integrals.test
 endif
 
 if GSLIB_ENABLED
