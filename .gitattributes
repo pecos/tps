@@ -13,3 +13,5 @@ test/ref_solns/collisions/Chung.h5 filter=lfs diff=lfs merge=lfs -text
 test/ref_solns/collisions/Devoto.argon.IA.h5 filter=lfs diff=lfs merge=lfs -text
 test/ref_solns/collisions/Devoto.fitted.h5 filter=lfs diff=lfs merge=lfs -text
 test/ref_solns/collisions/Devoto.h5 filter=lfs diff=lfs merge=lfs -text
+test/ref_solns/transport/Chung.transport.h5 filter=lfs diff=lfs merge=lfs -text
+test/ref_solns/transport/Devoto1973.transport.h5 filter=lfs diff=lfs merge=lfs -text
