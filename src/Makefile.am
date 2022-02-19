@@ -21,7 +21,7 @@ tps_LDADD            = libtps.la
 tps_LDFLAGS         += $(PYTHON_LIBS) $(MFEM_LIBS)
 
 if HIP_ENABLED
-tps_LDFLAGS += -fgpu-rdc
+tps_LDFLAGS += -fgpu-rdc $(HIP_LDFLAGS)
 endif
 
 # C++ solver library sources
