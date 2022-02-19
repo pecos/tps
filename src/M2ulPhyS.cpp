@@ -2025,7 +2025,7 @@ void M2ulPhyS::parseSolverOptions2() {
     if (gasModelStr == "perfect_mixture") {
       config.gasModel = PERFECT_MIXTURE;
     } else {
-      grvy_printf(GRVY_ERROR, "\nUnknown gas_model -> %s", gasModelStr);
+      grvy_printf(GRVY_ERROR, "\nUnknown gas_model -> %s", gasModelStr.c_str());
       exit(ERROR);
     }
 
@@ -2033,10 +2033,11 @@ void M2ulPhyS::parseSolverOptions2() {
     tpsP->getRequiredInput("plasma_models/transport_model", transportModelStr);
     if (transportModelStr == "argon_ternary") {
       config.transportModel = ARGON_TERNARY;
-    } else {
-      grvy_printf(GRVY_ERROR, "\nUnknown gas_model -> %s", transportModelStr);
-      exit(ERROR);
     }
+    // } else {
+    //   grvy_printf(GRVY_ERROR, "\nUnknown transport_model -> %s", transportModelStr.c_str());
+    //   exit(ERROR);
+    // }
 
     std::string chemistryModelStr;
     tpsP->getInput("plasma_models/chemistry_model", chemistryModelStr, std::string(""));
