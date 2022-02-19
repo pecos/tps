@@ -29,9 +29,9 @@ TESTS += cyl3d.test \
 	 independent_coupling.test
 endif
 
-if GSLIB_ENABLED
-TESTS += cyl3d.interp.test
-endif
+#if GSLIB_ENABLED
+#TESTS += cyl3d.interp.test
+#endif
 
 if VALGRIND_ENABLED
 check_PROGRAMS = uninit
