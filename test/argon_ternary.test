@@ -1,0 +1,16 @@
+#!../utils/bats/bin/bats
+# -*- mode: sh -*-
+
+TEST="argon_ternary"
+
+setup() {
+
+    RUNFILE_ARGON="inputs/argonTernary.ini"
+
+}
+
+@test "[$TEST] test accuracy of routines with respect to reference" {
+    test -s $RUNFILE_ARGON
+    test -e ./test_argon_ternary
+    ./test_argon_ternary -run $RUNFILE_ARGON
+}
