@@ -33,10 +33,10 @@
 #include "argon_transport.hpp"
 
 ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture, RunConfiguration &_runfile) : TransportProperties(_mixture) {
-  if (!ambipolar) {
-    grvy_printf(GRVY_ERROR, "\nArgon ternary transport currently supports ambipolar condition only. Set plasma_models/ambipolar = true.\n");
-    exit(ERROR);
-  }
+  // if (!ambipolar) {
+  //   grvy_printf(GRVY_ERROR, "\nArgon ternary transport currently supports ambipolar condition only. Set plasma_models/ambipolar = true.\n");
+  //   exit(ERROR);
+  // }
   if (numSpecies != 3) {
     grvy_printf(GRVY_ERROR, "\nArgon ternary transport only supports ternary mixture of Ar, Ar.+1, and E !\n");
     exit(ERROR);
@@ -74,6 +74,7 @@ ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture, RunConfigurat
 
   muAE_ = mw_(electronIndex_) * mw_(neutralIndex_) / (mw_(electronIndex_) + mw_(neutralIndex_));
   muAI_ = mw_(ionIndex_) * mw_(neutralIndex_) / (mw_(ionIndex_) + mw_(neutralIndex_));
+  muEI_ = mw_(electronIndex_) * mw_(ionIndex_) / (mw_(electronIndex_) + mw_(ionIndex_));
 
   thirdOrderkElectron_ = _runfile.thirdOrderkElectron;
 
@@ -87,14 +88,22 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   Vector primitiveState(num_equation);
   mixture->GetPrimitivesFromConservatives(state, primitiveState);
 
-  Vector n_sp(3); //number densities
-  n_sp(ionIndex_) = primitiveState[dim + 2 + ionIndex_];
-  n_sp(electronIndex_) = mixture->computeAmbipolarElectronNumberDensity(&primitiveState[dim + 2]);
-  n_sp(neutralIndex_) = mixture->computeBackgroundMassDensity(state[0], &primitiveState[dim + 2], n_sp(electronIndex_), true);
-  n_sp(neutralIndex_) /= mixture->GetGasParams(neutralIndex_, GasParams::SPECIES_MW);
-  double nTotal = n_sp(0) + n_sp(1) + n_sp(2);
-  Vector X_sp(3);
-  for (int sp = 0; sp < numSpecies; sp++) X_sp(sp) = n_sp(sp) / nTotal;
+  // Vector n_sp(3); //number densities
+  // n_sp(ionIndex_) = primitiveState[dim + 2 + ionIndex_];
+  // n_sp(electronIndex_) = mixture->computeAmbipolarElectronNumberDensity(&primitiveState[dim + 2]);
+  // n_sp(neutralIndex_) = mixture->computeBackgroundMassDensity(state[0], &primitiveState[dim + 2], n_sp(electronIndex_), true);
+  // n_sp(neutralIndex_) /= mixture->GetGasParams(neutralIndex_, GasParams::SPECIES_MW);
+  // double nTotal = n_sp(0) + n_sp(1) + n_sp(2);
+  // Vector X_sp(3), Y_sp(3);
+  // for (int sp = 0; sp < numSpecies; sp++) {
+  //   X_sp(sp) = n_sp(sp) / nTotal;
+  //   Y_sp(sp) = n_sp(sp) / state(0) * mixture->GetGasParams(sp, GasParams::SPECIES_MW);
+  // }
+  Vector n_sp(3), X_sp(3), Y_sp(3);
+  mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
+  double nTotal = 0.0;
+  for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
+
   // std::cout << "N inside: ";
   // for (int sp = 0; sp < 3; sp++) {
   //   std::cout << n_sp(sp) << ",\t";
@@ -131,6 +140,32 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
                                                                                         / (collision::charged::rep22(nondimTe) * debyeCircle);
   }
 
+  double binaryDea = diffusivityFactor_ * sqrt(Te / muAE_) / nTotal / collision::argon::eAr11(Te);
+  double binaryDai = diffusivityFactor_ * sqrt(Th / muAI_) / nTotal / collision::argon::ArAr1P11(Th);
+  double binaryDie = diffusivityFactor_ * sqrt(Te / muEI_) / nTotal / collision::charged::att11(Te);
+
+  Vector diffusivity(3), mobility(3);
+  diffusivity(electronIndex_) = (1.0 - Y_sp(electronIndex_)) / (X_sp(ionIndex_) * binaryDie + X_sp(neutralIndex_) * binaryDea);
+  diffusivity(ionIndex_) = (1.0 - Y_sp(ionIndex_)) / (X_sp(neutralIndex_) * binaryDai + X_sp(electronIndex_) * binaryDie);
+  diffusivity(neutralIndex_) = (1.0 - Y_sp(neutralIndex_)) / (X_sp(electronIndex_) * binaryDea + X_sp(ionIndex_) * binaryDai);
+
+  double beta = 0.0;
+  for (int sp = 0; sp < numSpecies; sp++) {
+    double temp = (sp == electronIndex_) ? Te : Th;
+    mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity(sp);
+    beta += mobility(sp) * X_sp(sp) * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+  }
+
+
+  DenseMatrix gradX;
+  mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
+
+  // double denom = n_sp(ionIndex_) * binaryDea + n_sp(electronIndex_) * binaryDai + n_sp(neutralIndex_) * binaryDie;
+  // // Dai \approx Dia \approx binaryDai
+  // // Dei \approx Dea
+  // double Dea = binaryDea * (1.0 + n_sp(ionIndex_) * (mw_(ionIndex_) * binaryDie / mw_(neutralIndex_) - binaryDea) / denom);
+  // double Die = binaryDie * (1.0 + n_sp(neutralIndex_) * (mw_(neutralIndex_) * binaryDai / mw_(electronIndex_) - binaryDie) / denom);
+  // double Dae = binaryDea * (1.0 + n_sp(ionIndex_) * (mw_(ionIndex_) * binaryDai / mw_(electronIndex_) - binaryDea) / denom);
 
 }
 
