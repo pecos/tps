@@ -123,6 +123,7 @@ class GasMixture {
   virtual double Temperature(double *rho, double *p,
                              int nsp) = 0;  // temperature given densities and pressures of all species
 
+  virtual void computeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp) {};
   virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies) = 0;
 
   virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit) = 0;

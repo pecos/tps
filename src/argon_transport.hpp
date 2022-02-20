@@ -66,13 +66,17 @@ class ArgonMinimalTransport : public TransportProperties {
    const double R_ = UNIVERSALGASCONSTANT;
    const double debyeFactor_ = kB_ * eps0_ / qe_ / qe_;
    const double PI_ = 4.0 * atan(1.0);
+   const double qeOverkB_ = qe_ / kB_;
 
+   // standard Chapman-Enskog coefficients
    const double viscosityFactor_ = 5. / 16. * sqrt(PI_ * kB_);
    const double kOverEtaFactor_ = 15. / 4. * kB_;
+   const double diffusivityFactor_ = 3. / 16. * sqrt(2.0 * PI_ * kB_) / AVOGADRONUMBER;
 
    Vector mw_;
    double muAE_;
    double muAI_;
+   double muEI_;
 
    bool thirdOrderkElectron_;
 
