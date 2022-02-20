@@ -272,8 +272,8 @@ void M2ulPhyS::initVariables() {
           break;
       }
       switch (config.GetTranportModel()) {
-        case ARGON_TERNARY:
-          transportPtr = new ArgonTernaryTransport(mixture, config);
+        case ARGON_MINIMAL:
+          transportPtr = new ArgonMinimalTransport(mixture, config);
           break;
         default:
           break;
@@ -2031,8 +2031,8 @@ void M2ulPhyS::parseSolverOptions2() {
 
     std::string transportModelStr;
     tpsP->getRequiredInput("plasma_models/transport_model", transportModelStr);
-    if (transportModelStr == "argon_ternary") {
-      config.transportModel = ARGON_TERNARY;
+    if (transportModelStr == "argon_minimal") {
+      config.transportModel = ARGON_MINIMAL;
     }
     // } else {
     //   grvy_printf(GRVY_ERROR, "\nUnknown transport_model -> %s", transportModelStr.c_str());
@@ -2102,7 +2102,7 @@ void M2ulPhyS::parseSolverOptions2() {
 
   if (config.workFluid == USER_DEFINED) {  // Transport model
     switch (config.transportModel) {
-      case ARGON_TERNARY:
+      case ARGON_MINIMAL:
         // Check if unsupported species are included.
         for (int sp = 0; sp < config.numSpecies; sp++) {
           if ((config.speciesNames[sp] != "Ar") && (config.speciesNames[sp] != "Ar.+1") && (config.speciesNames[sp] != "E")) {
@@ -2110,7 +2110,7 @@ void M2ulPhyS::parseSolverOptions2() {
             exit(ERROR);
           }
         }
-        tpsP->getInput("plasma_models/transport_model/argon_ternary/third_order_thermal_conductivity", config.thirdOrderkElectron, true);
+        tpsP->getInput("plasma_models/transport_model/argon_minimal/third_order_thermal_conductivity", config.thirdOrderkElectron, true);
         break;
       default:
         break;

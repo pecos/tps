@@ -44,7 +44,7 @@ TESTS += cyl3d.test \
 	 pipe.test \
 	 perfect_gas.test \
 	 collision_integrals.test \
-	 argon_ternary.test
+	 argon_minimal.test
 endif
 
 if GSLIB_ENABLED
@@ -101,16 +101,16 @@ test_collision_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
 test_collision_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
 test_collision_LDFLAGS += -L$(GSLIB_LIB) -lgs
 
-check_PROGRAMS += test_argon_ternary
-test_argon_ternary_SOURCES  = test_argon_ternary.cpp
-test_argon_ternary_LDADD    = ../src/libtps.a -lmfem
+check_PROGRAMS += test_argon_minimal
+test_argon_minimal_SOURCES  = test_argon_minimal.cpp
+test_argon_minimal_LDADD    = ../src/libtps.a -lmfem
 
-test_argon_ternary_LDFLAGS  = -L$(MFEM_LIB)
-test_argon_ternary_LDFLAGS += $(HDF5_LIBS)
-test_argon_ternary_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
-test_argon_ternary_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
-test_argon_ternary_LDFLAGS += -L$(METIS_LIB) -lmetis
-test_argon_ternary_LDFLAGS += $(GRVY_LIBS)
-test_argon_ternary_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
-test_argon_ternary_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
-test_argon_ternary_LDFLAGS += -L$(GSLIB_LIB) -lgs
+test_argon_minimal_LDFLAGS  = -L$(MFEM_LIB)
+test_argon_minimal_LDFLAGS += $(HDF5_LIBS)
+test_argon_minimal_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
+test_argon_minimal_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
+test_argon_minimal_LDFLAGS += -L$(METIS_LIB) -lmetis
+test_argon_minimal_LDFLAGS += $(GRVY_LIBS)
+test_argon_minimal_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
+test_argon_minimal_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
+test_argon_minimal_LDFLAGS += -L$(GSLIB_LIB) -lgs

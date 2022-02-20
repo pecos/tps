@@ -54,7 +54,7 @@ using namespace std;
 // using namespace charged;
 // using namespace argon;
 
-class ArgonTernaryTransport : public TransportProperties {
+class ArgonMinimalTransport : public TransportProperties {
  protected:
    int electronIndex_ = -1;
    int ionIndex_ = -1;
@@ -77,9 +77,9 @@ class ArgonTernaryTransport : public TransportProperties {
    bool thirdOrderkElectron_;
 
  public:
-  ArgonTernaryTransport(GasMixture *_mixture, RunConfiguration &_runfile);
+  ArgonMinimalTransport(GasMixture *_mixture, RunConfiguration &_runfile);
 
-  ~ArgonTernaryTransport(){};
+  ~ArgonMinimalTransport(){};
 
   // Currently, transport properties are evaluated in flux and source term separately.
   // Flux does not take primitive variables as input, rather evaluate them whenever needed.

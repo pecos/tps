@@ -32,7 +32,7 @@
 
 #include "argon_transport.hpp"
 
-ArgonTernaryTransport::ArgonTernaryTransport(GasMixture *_mixture, RunConfiguration &_runfile) : TransportProperties(_mixture) {
+ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture, RunConfiguration &_runfile) : TransportProperties(_mixture) {
   if (!ambipolar) {
     grvy_printf(GRVY_ERROR, "\nArgon ternary transport currently supports ambipolar condition only. Set plasma_models/ambipolar = true.\n");
     exit(ERROR);
@@ -79,7 +79,7 @@ ArgonTernaryTransport::ArgonTernaryTransport(GasMixture *_mixture, RunConfigurat
 
 }
 
-void ArgonTernaryTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
+void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
                                                             Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
   transportBuffer.SetSize(GlobalTrnsCoeffs::NUM_GLOBAL_COEFFS);
   transportBuffer = 0.0;
@@ -134,7 +134,7 @@ void ArgonTernaryTransport::ComputeFluxTransportProperties(const Vector &state, 
 
 }
 
-double ArgonTernaryTransport::computeThirdOrderElectronThermalConductivity(const Vector &X_sp, const double debyeLength, const double Te, const double nondimTe) {
+double ArgonMinimalTransport::computeThirdOrderElectronThermalConductivity(const Vector &X_sp, const double debyeLength, const double Te, const double nondimTe) {
   double debyeCircle = PI_ * debyeLength * debyeLength;
   // std::cout << "LD: " << debyeLength << std::endl;
   Vector Q2(3);

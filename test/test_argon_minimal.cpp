@@ -55,7 +55,7 @@ int main (int argc, char *argv[])
   RunConfiguration& srcConfig = srcField->GetConfig();
   assert(srcConfig.GetWorkingFluid()==WorkingFluid::USER_DEFINED);
   assert(srcConfig.GetGasModel()==PERFECT_MIXTURE);
-  assert(srcConfig.GetTranportModel()==ARGON_TERNARY);
+  assert(srcConfig.GetTranportModel()==ARGON_MINIMAL);
 
   int dim = 3;
 
@@ -66,7 +66,7 @@ int main (int argc, char *argv[])
   double pressure = 101325.0;
 
   PerfectMixture *mixture = new PerfectMixture( srcConfig, dim);
-  ArgonTernaryTransport *transport = new ArgonTernaryTransport(mixture, srcConfig);
+  ArgonMinimalTransport *transport = new ArgonMinimalTransport(mixture, srcConfig);
   int numSpecies = mixture->GetNumSpecies();
   int numActiveSpecies = mixture->GetNumActiveSpecies();
   int num_equation = mixture->GetNumEquations();
