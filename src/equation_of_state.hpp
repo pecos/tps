@@ -204,6 +204,14 @@ class GasMixture {
     mfem_error("computeNumberDensities not implemented");
   }
 
+  // virtual double GetViscosity(const Vector &state) = 0;
+  // virtual double GetViscosityFromPrimitive(const Vector &state) = 0;
+  // virtual double GetThermalConductivity(const Vector &state) = 0;
+
+  virtual void UpdatePlasmaConductivityGridFunction(ParGridFunction *pc, const ParGridFunction *Up) {
+    mfem_error("UpdatePlasmaConductivityGridFunction not implemented");
+  }
+
   virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
 
 // TODO(kevin): GPU routines are not yet fully gas-agnostic. Need to be removed.
@@ -332,6 +340,8 @@ class DryAir : public GasMixture {
   virtual void computeSheathBdrFlux(const Vector &state, BoundaryViscousFluxData &bcFlux) {
     mfem_error("computeSheathBdrFlux not implemented");
   }
+
+  virtual void UpdatePlasmaConductivityGridFunction(ParGridFunction *pc, const ParGridFunction *Up);
 
   virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
                                                        Vector &conservedState);
