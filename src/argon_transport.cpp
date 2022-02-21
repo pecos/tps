@@ -153,12 +153,48 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   for (int sp = 0; sp < numSpecies; sp++) {
     double temp = (sp == electronIndex_) ? Te : Th;
     mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity(sp);
-    beta += mobility(sp) * X_sp(sp) * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+    if (ambipolar) beta += mobility(sp) * X_sp(sp) * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
   }
 
+  // ambipolar E-field
+  Vector ambE(3);
+  ambE = 0.0;
 
-  DenseMatrix gradX;
+  DenseMatrix gradX(numSpecies, dim);
   mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
+
+  diffusionVelocity.SetSize(numSpecies,dim);
+  for (int sp = 0; sp < numSpecies; sp++) {
+    for (int d = 0; d < dim; d++) {
+      double DgradX = diffusivity(sp) * gradX(sp, d);
+      // NOTE: we'll have to handle small X case.
+      diffusionVelocity(sp, d) = - DgradX / X_sp(sp);
+      if (ambipolar) ambE(d) += DgradX * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+    }
+  }
+
+  if (ambipolar) {
+    for (int d = 0; d < dim; d++) ambE(d) /= beta;
+
+    for (int sp = 0; sp < numSpecies; sp++) {
+      for (int d = 0; d < dim; d++)
+        diffusionVelocity(sp, d) += mobility(sp) * ambE(d);
+    }
+  }
+
+  // Correction Velocity
+  Vector Vc(3);
+  Vc = 0.0;
+  for (int sp = 0; sp < numSpecies; sp++) {
+    // NOTE: we'll have to handle small Y case.
+    for (int d = 0; d < dim; d++)
+      Vc(d) += state(0) * Y_sp(sp) * diffusionVelocity(sp, d);
+  }
+  for (int sp = 0; sp < numSpecies; sp++) {
+    for (int d = 0; d < dim; d++)
+      diffusionVelocity(sp, d) -= Vc(d);
+  }
+
 
   // double denom = n_sp(ionIndex_) * binaryDea + n_sp(electronIndex_) * binaryDai + n_sp(neutralIndex_) * binaryDie;
   // // Dai \approx Dia \approx binaryDai
