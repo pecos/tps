@@ -58,6 +58,10 @@ class ElectromagneticOptions {
   double yinterp_min;  /**< Begin value for uniformly spaced points */
   double yinterp_max;  /**< End value for uniformly spaced points */
 
+  double current_amplitude; /**< Amplitude of source current */
+  double current_frequency; /**< Frequency of source current */
+  double mu0;               /**< Permeability of free space */
+
   ElectromagneticOptions() {
     order = 1;
     ref_levels = 0;
@@ -69,6 +73,9 @@ class ElectromagneticOptions {
     yinterp_max = 1.0;
     top_only = false;
     bot_only = false;
+    current_amplitude = 1.0;
+    current_frequency = 1.0;
+    mu0 = 1.0;
   }
 
   void print(std::ostream &out) {
@@ -87,6 +94,9 @@ class ElectromagneticOptions {
     out << "  nBy         = " << nBy << std::endl;
     out << "  yinterp_min = " << yinterp_min << std::endl;
     out << "  yinterp_max = " << yinterp_max << std::endl;
+    out << "  current_amplitude = " << current_amplitude << std::endl;
+    out << "  current_frequency = " << current_frequency << std::endl;
+    out << "  mu0 = " << mu0 << std::endl;
     out << std::endl;
   }
 };

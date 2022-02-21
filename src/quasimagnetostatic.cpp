@@ -449,7 +449,7 @@ static double oneOverRadius(const Vector &x) { return 1.0 / x[0]; }
 
 QuasiMagnetostaticSolverAxiSym::QuasiMagnetostaticSolverAxiSym(MPI_Session &mpi, ElectromagneticOptions em_opts,
                                                                TPS::Tps *tps)
-    : mpi_(mpi), em_opts_(em_opts) {
+    : mpi_(mpi), em_opts_(em_opts), offsets_(3) {
   tpsP_ = tps;
 
   // verify running on cpu
@@ -465,14 +465,23 @@ QuasiMagnetostaticSolverAxiSym::QuasiMagnetostaticSolverAxiSym(MPI_Session &mpi,
   Atheta_space_ = NULL;
   K_ = NULL;
   r_ = NULL;
-  Atheta_ = NULL;
+  Atheta_real_ = NULL;
+  Atheta_imag_ = NULL;
+  plasma_conductivity_ = NULL;
+  plasma_conductivity_coef_ = NULL;
+
+  true_size_ = 0;
+  offsets_ = 0;
 
   operator_initialized_ = false;
   current_initialized_ = false;
 }
 
 QuasiMagnetostaticSolverAxiSym::~QuasiMagnetostaticSolverAxiSym() {
-  delete Atheta_;
+  delete plasma_conductivity_coef_;
+  delete plasma_conductivity_;
+  delete Atheta_imag_;
+  delete Atheta_real_;
   delete r_;
   delete K_;
   delete Atheta_space_;
@@ -514,11 +523,18 @@ void QuasiMagnetostaticSolverAxiSym::initialize() {
   pmesh_->ReorientTetMesh();
 
   //-----------------------------------------------------
-  // 2) Prepare the required finite elements
+  // 2) Prepare the required finite element and sizes
   //-----------------------------------------------------
   h1_ = new H1_FECollection(em_opts_.order, dim_);
 
   Atheta_space_ = new ParFiniteElementSpace(pmesh_, h1_);
+
+  true_size_ = Atheta_space_->TrueVSize();
+
+  offsets_[0] = 0;
+  offsets_[1] = true_size_;
+  offsets_[2] = true_size_;
+  offsets_.PartialSum();
 
   //-----------------------------------------------------
   // 3) Get BC dofs (everything is essential)
@@ -545,6 +561,12 @@ void QuasiMagnetostaticSolverAxiSym::initialize() {
 
   // initialize current
   InitializeCurrent();
+
+  // initialize conductivity
+  plasma_conductivity_ = new ParGridFunction(Atheta_space_);
+  *plasma_conductivity_ = 0.0;
+
+  plasma_conductivity_coef_ = new GridFunctionCoefficient(plasma_conductivity_);
 }
 
 void QuasiMagnetostaticSolverAxiSym::InitializeCurrent() {
@@ -566,18 +588,21 @@ void QuasiMagnetostaticSolverAxiSym::InitializeCurrent() {
   //    source current domain for 5 total attributes.
   Vector J0(pmesh_->attributes.Max());
   J0 = 0.0;
+
+  const double mu0J = em_opts_.mu0 * em_opts_.current_amplitude;
+
   if (em_opts_.bot_only) {
     // only bottom rings
-    J0(1) = J0(2) = 1.0;
+    J0(1) = J0(2) = mu0J;
     J0(3) = J0(4) = 0.0;
   } else if (em_opts_.top_only) {
     // only top rings
     J0(1) = J0(2) = 0.0;
-    J0(3) = J0(4) = 1.0;
+    J0(3) = J0(4) = mu0J;
   } else {
     // all rings
-    J0(1) = J0(2) = 1.0;
-    J0(3) = J0(4) = 1.0;
+    J0(1) = J0(2) = mu0J;
+    J0(3) = J0(4) = mu0J;
   }
 
   FunctionCoefficient radius_coeff(radius);
@@ -607,6 +632,10 @@ void QuasiMagnetostaticSolverAxiSym::parseSolverOptions() {
   tpsP_->getInput("em/top_only", em_opts_.top_only, false);
   tpsP_->getInput("em/bot_only", em_opts_.bot_only, false);
 
+  tpsP_->getInput("em/current_amplitude", em_opts_.current_amplitude, 1.0);
+  tpsP_->getInput("em/current_frequency", em_opts_.current_frequency, 1.0);
+  tpsP_->getInput("em/permeability", em_opts_.mu0, 1.0);
+
   // dump options to screen for user inspection
   if (mpi_.Root()) {
     em_opts_.print(std::cout);
@@ -619,28 +648,71 @@ void QuasiMagnetostaticSolverAxiSym::solve() {
 
   assert(operator_initialized_ && current_initialized_);
 
-  Atheta_ = new ParGridFunction(Atheta_space_);
-  *Atheta_ = 0.0;
+  // Set up block soln and rhs
+  BlockVector Atheta_vec(offsets_), rhs_vec(offsets_);
 
-  // 9d. system
-  OperatorPtr Kmat;
-  Vector b, x;
-  K_->FormLinearSystem(ess_bdr_tdofs_, *Atheta_, *r_, Kmat, x, b);
+  Atheta_real_ = new ParGridFunction(Atheta_space_);
+  *Atheta_real_ = 0.0;
 
-  HypreBoomerAMG *prec = new HypreBoomerAMG();
+  Atheta_imag_ = new ParGridFunction(Atheta_space_);
+  *Atheta_imag_ = 0.0;
 
-  CGSolver cg(MPI_COMM_WORLD);
-  cg.SetRelTol(em_opts_.rtol);
-  cg.SetAbsTol(em_opts_.atol);
-  cg.SetMaxIter(em_opts_.max_iter);
-  cg.SetPreconditioner(*prec);
-  cg.SetOperator(*Kmat);
-  cg.Mult(b, x);
+  Atheta_real_->ParallelAssemble(Atheta_vec.GetBlock(0));
+  Atheta_imag_->ParallelAssemble(Atheta_vec.GetBlock(1));
+
+  // NB: Have assumed that driving current has only REAL content
+  r_->ParallelAssemble(rhs_vec.GetBlock(0));
+  rhs_vec.GetBlock(1) = 0.0;
+
+  // Set up block operator
+  OperatorPtr Kdiag;
+  K_->FormSystemMatrix(ess_bdr_tdofs_, Kdiag);
+  K_->EliminateVDofsInRHS(ess_bdr_tdofs_, Atheta_vec.GetBlock(0), rhs_vec.GetBlock(0));
+  K_->EliminateVDofsInRHS(ess_bdr_tdofs_, Atheta_vec.GetBlock(1), rhs_vec.GetBlock(1));
+
+  const double mu0_omega = em_opts_.mu0 * em_opts_.current_frequency * 2 * M_PI;
+  ProductCoefficient mu_sigma_omega(mu0_omega, *plasma_conductivity_coef_);
+
+  ParBilinearForm *Kconductivity = new ParBilinearForm(Atheta_space_);
+  Kconductivity->AddDomainIntegrator(new MassIntegrator(mu_sigma_omega));
+  Kconductivity->Assemble();
+
+  OperatorPtr Koffd;
+  Kconductivity->FormSystemMatrix(ess_bdr_tdofs_, Koffd);
+
+  HypreParMatrix *Kdiag_mat = Kdiag.As<HypreParMatrix>();
+  HypreParMatrix *Koffd_mat = Koffd.As<HypreParMatrix>();
+
+  Koffd_mat->EliminateRows(ess_bdr_tdofs_);
+
+  BlockOperator *qms = new BlockOperator(offsets_);
+
+  qms->SetBlock(0, 0, Kdiag_mat);
+  qms->SetBlock(0, 1, Koffd_mat, -1);
+  qms->SetBlock(1, 0, Koffd_mat);
+  qms->SetBlock(1, 1, Kdiag_mat);
+
+  // Set up block preconditioner
+  HypreBoomerAMG *prec = new HypreBoomerAMG(*Kdiag_mat);
+  BlockDiagonalPreconditioner BDP(offsets_);
+  BDP.SetDiagonalBlock(0, prec);
+  BDP.SetDiagonalBlock(1, prec);
+
+  FGMRESSolver solver(MPI_COMM_WORLD);
+
+  solver.SetPreconditioner(BDP);
+  solver.SetOperator(*qms);
+
+  solver.SetRelTol(em_opts_.rtol);
+  solver.SetAbsTol(em_opts_.atol);
+  solver.SetMaxIter(em_opts_.max_iter);
+  solver.SetPreconditioner(*prec);
+
+  solver.Mult(rhs_vec, Atheta_vec);
   delete prec;
 
-  // 11. Recover the parallel grid function corresponding to X and
-  // save for visualization
-  K_->RecoverFEMSolution(x, *r_, *Atheta_);
+  Atheta_real_->Distribute(&(Atheta_vec.GetBlock(0)));
+  Atheta_imag_->Distribute(&(Atheta_vec.GetBlock(1)));
 
   // TODO(trevilo): Compute B field
 
@@ -653,12 +725,17 @@ void QuasiMagnetostaticSolverAxiSym::solve() {
   paraview_dc.SetDataFormat(VTKFormat::BINARY);
   paraview_dc.SetHighOrderOutput(true);
   paraview_dc.SetTime(0.0);
-  paraview_dc.RegisterField("magvecpot", Atheta_);
+  paraview_dc.RegisterField("magvecpot_real", Atheta_real_);
+  paraview_dc.RegisterField("magvecpot_imag", Atheta_imag_);
   // paraview_dc.RegisterField("magnfield", _B);
   paraview_dc.Save();
 
   // Compute and dump the magnetic field on the axis
   // InterpolateToYAxis();
+
+  // clean up
+  delete qms;
+  delete Kconductivity;
 
   if (mpi_.Root()) {
     std::cout << "EM simulation complete" << std::endl;

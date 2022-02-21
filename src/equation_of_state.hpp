@@ -107,6 +107,7 @@ class GasMixture {
   virtual double GetPrandtlNum() = 0;
 
   virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up) = 0;
+  virtual void UpdatePlasmaConductivityGridFunction(ParGridFunction *pc, const ParGridFunction *Up) = 0;
 
   //   double GetPrandtlNum() { return Pr; }
   //   double GetSchmidtNum() { return Sc; }
@@ -167,6 +168,7 @@ class DryAir : public GasMixture {
   virtual double GetPrandtlNum() { return Pr; }
 
   virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
+  virtual void UpdatePlasmaConductivityGridFunction(ParGridFunction *pc, const ParGridFunction *Up);
 
   // GPU functions
 #ifdef _GPU_

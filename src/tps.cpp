@@ -34,6 +34,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "cycle_avg_joule_coupling.hpp"
 #include "independent_coupling.hpp"
 
 namespace TPS {
@@ -166,6 +167,9 @@ void Tps::chooseSolver() {
   } else if (input_solver_type_ == "independent-coupled") {
     isFlowEMCoupledMode_ = true;
     solver_ = new IndependentCoupling(mpi_, iFile_, this);
+  } else if (input_solver_type_ == "cycle-avg-joule-coupled") {
+    isFlowEMCoupledMode_ = true;
+    solver_ = new CycleAvgJouleCoupling(mpi_, iFile_, this);
   } else if (input_solver_type_ == "coupled") {
     isFlowEMCoupledMode_ = true;
     grvy_printf(GRVY_ERROR, "\nSlow your roll.  Solid high-five for whoever implements this coupled solver mode!\n");

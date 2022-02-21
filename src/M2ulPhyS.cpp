@@ -855,6 +855,11 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   if (eqSystem == NS_PASSIVE)
     passiveScalar = new ParGridFunction(fes, Up->HostReadWrite() + (num_equation - 1) * fes->GetNDofs());
 
+  plasma_conductivity_ = NULL;
+  if (tpsP->isFlowEMCoupled()) {
+    plasma_conductivity_ = new ParGridFunction(fes);
+  }
+
   // define solution parameters for i/o
   ioData.registerIOFamily("Solution state variables", "/solution", U);
   ioData.registerIOVar("/solution", "density", 0);
@@ -955,6 +960,11 @@ void M2ulPhyS::projectInitialSolution() {
 
   // update pressure grid function
   mixture->UpdatePressureGridFunction(press, Up);
+
+  // update plasma electrical conductivity
+  if (tpsP->isFlowEMCoupled()) {
+    mixture->UpdatePlasmaConductivityGridFunction(plasma_conductivity_, Up);
+  }
 }
 
 void M2ulPhyS::solve() {

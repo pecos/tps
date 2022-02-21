@@ -110,6 +110,8 @@ class Tps {
   void printHeader();
   void parseCommandLineArgs(int argc, char *argv[]);
   void parseInput();
+
+  bool isFlowEMCoupled() const { return isFlowEMCoupledMode_; }
 };
 
 }  // end namespace TPS

@@ -123,6 +123,8 @@ class QuasiMagnetostaticSolverAxiSym : public TPS::Solver {
 
   mfem::ParMesh *pmesh_;
   int dim_;
+  int true_size_;
+  Array<int> offsets_;
 
   mfem::FiniteElementCollection *h1_;
 
@@ -133,7 +135,11 @@ class QuasiMagnetostaticSolverAxiSym : public TPS::Solver {
   mfem::ParBilinearForm *K_;
   mfem::ParLinearForm *r_;
 
-  mfem::ParGridFunction *Atheta_;
+  mfem::ParGridFunction *Atheta_real_;
+  mfem::ParGridFunction *Atheta_imag_;
+
+  mfem::ParGridFunction *plasma_conductivity_;
+  mfem::GridFunctionCoefficient *plasma_conductivity_coef_;
 
   bool operator_initialized_;
   bool current_initialized_;
@@ -162,6 +168,9 @@ class QuasiMagnetostaticSolverAxiSym : public TPS::Solver {
 
   /** Solve quasi-magnetostatic problem */
   void solve() override;
+
+  ParMesh *getMesh() const { return pmesh_; }
+  ParGridFunction *getPlasmaConductivityGF() { return plasma_conductivity_; }
 };
 
 #endif  // QUASIMAGNETOSTATIC_HPP_

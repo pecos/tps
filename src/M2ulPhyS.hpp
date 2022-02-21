@@ -208,6 +208,7 @@ class M2ulPhyS : public TPS::Solver {
   // Visualization functions (these are pointers to Up)
   ParGridFunction *temperature, *dens, *vel, *vtheta, *passiveScalar;
   ParGridFunction *press;
+  ParGridFunction *plasma_conductivity_;
 
   // gradient of primitive variables
   ParGridFunction *gradUp;
@@ -316,6 +317,10 @@ class M2ulPhyS : public TPS::Solver {
   ParFiniteElementSpace *GetFESpace() { return vfes; }
   ParGridFunction *GetSolutionGF() { return U; }
   RunConfiguration &GetConfig() { return config; }
+  const ParGridFunction *GetPlasmaConductivityGF() {
+    mixture->UpdatePlasmaConductivityGridFunction(plasma_conductivity_, Up);
+    return plasma_conductivity_;
+  }
 
   static int Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_print);
 
