@@ -314,6 +314,7 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
 
   // Update primite varibales
   updatePrimitives(x);
+
 #ifdef _GPU_
   // GPU version requires the exchange of data before gradient computation
   initNBlockDataTransfer(*Up, vfes, transferUp);

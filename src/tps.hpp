@@ -130,6 +130,7 @@ class Tps {
 
   mfem::MPI_Session &getMPISession() { return mpi_; }
   std::string &getInputFilename() { return iFile_; }
+  bool isFlowEMCoupled() const { return isFlowEMCoupledMode_; }
 };
 
 std::string ltrim(const std::string &s);
