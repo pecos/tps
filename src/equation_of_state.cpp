@@ -639,7 +639,16 @@ double PerfectMixture::computeBackgroundMassDensity(const double &rho, const dou
     rhoB -= n_e * gasParams(numSpecies - 2, GasParams::SPECIES_MW);
   }
 
+if (rhoB < 0.0) {
+  std::cout << "rho: " << rho << std::endl;
+  std::cout << "n_sp: ";
+  for (int sp = 0; sp < numActiveSpecies; sp++) std::cout << n_sp[sp] << ",\t";
+  std::cout << std::endl;
+  std::cout << "n_e: " << n_e << std::endl;
+  std::cout << "rhoB: " << rhoB << std::endl;
   assert(rhoB >= 0.0);
+}
+
 
   return rhoB;
 }
@@ -741,7 +750,15 @@ void PerfectMixture::computeSpeciesPrimitives(const Vector &conservedState, Vect
     Y_sp[numSpecies - 2] = n_e * gasParams(numSpecies - 2, GasParams::SPECIES_MW) / conservedState[0];
     Yb -= Y_sp[numSpecies - 2];
   }
-  assert(Yb >= 0.0);  // In case of negative mass fraction.
+  if (Yb < 0.0) {
+    std::cout << "rho: " << conservedState(0) << std::endl;
+    std::cout << "n_sp: ";
+    for (int sp = 0; sp < numActiveSpecies; sp++) std::cout << n_sp[sp] << ",\t";
+    std::cout << std::endl;
+    std::cout << "n_e: " << n_e << std::endl;
+    std::cout << "Yb: " << Yb << std::endl;
+    assert(Yb >= 0.0);  // In case of negative mass fraction.
+  }
   Y_sp[numSpecies - 1] = Yb;
 
   n_sp[numSpecies - 1] = Y_sp[numSpecies - 1] * conservedState[0] / gasParams(numSpecies - 1, GasParams::SPECIES_MW);
