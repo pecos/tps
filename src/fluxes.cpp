@@ -92,8 +92,8 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
 }
 
 void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &flux) {
+  flux = 0.;
   if (eqSystem == EULER) {
-    flux = 0.;
     return;
   }
 

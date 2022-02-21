@@ -104,17 +104,12 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   double nTotal = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
 
-  // std::cout << "N inside: ";
-  // for (int sp = 0; sp < 3; sp++) {
-  //   std::cout << n_sp(sp) << ",\t";
-  // }
-  // std::cout << std::endl;
-
   double Te = (twoTemperature) ? primitiveState[num_equation - 1] : primitiveState[dim + 1];
   double Th = primitiveState[dim + 1];
   // std::cout << "temp: " << Th << ",\t" << Te << std::endl;
 
-  double nOverT = n_sp(electronIndex_) / Te + n_sp(ionIndex_) / Th;
+  // Add Xeps to avoid zero number density case.
+  double nOverT = (n_sp(electronIndex_) + Xeps) / Te + (n_sp(ionIndex_) + Xeps) / Th;
   double debyeLength = sqrt(debyeFactor_ / AVOGADRONUMBER / nOverT);
   double debyeCircle = PI_ * debyeLength * debyeLength;
 
@@ -145,9 +140,9 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   double binaryDie = diffusivityFactor_ * sqrt(Te / muEI_) / nTotal / collision::charged::att11(Te);
 
   Vector diffusivity(3), mobility(3);
-  diffusivity(electronIndex_) = (1.0 - Y_sp(electronIndex_)) / (X_sp(ionIndex_) * binaryDie + X_sp(neutralIndex_) * binaryDea);
-  diffusivity(ionIndex_) = (1.0 - Y_sp(ionIndex_)) / (X_sp(neutralIndex_) * binaryDai + X_sp(electronIndex_) * binaryDie);
-  diffusivity(neutralIndex_) = (1.0 - Y_sp(neutralIndex_)) / (X_sp(electronIndex_) * binaryDea + X_sp(ionIndex_) * binaryDai);
+  diffusivity(electronIndex_) = (1.0 - Y_sp(electronIndex_)) / ((X_sp(ionIndex_) + Xeps) / binaryDie + (X_sp(neutralIndex_) + Xeps) / binaryDea);
+  diffusivity(ionIndex_) = (1.0 - Y_sp(ionIndex_)) / ((X_sp(neutralIndex_) + Xeps) / binaryDai + (X_sp(electronIndex_) + Xeps) / binaryDie);
+  diffusivity(neutralIndex_) = (1.0 - Y_sp(neutralIndex_)) / ((X_sp(electronIndex_) + Xeps) / binaryDea + (X_sp(ionIndex_) + Xeps) / binaryDai);
 
   double beta = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) {
@@ -168,7 +163,7 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
     for (int d = 0; d < dim; d++) {
       double DgradX = diffusivity(sp) * gradX(sp, d);
       // NOTE: we'll have to handle small X case.
-      diffusionVelocity(sp, d) = - DgradX / X_sp(sp);
+      diffusionVelocity(sp, d) = - DgradX / (X_sp(sp) + Xeps);
       if (ambipolar) ambE(d) += DgradX * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
     }
   }
@@ -195,6 +190,17 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
       diffusionVelocity(sp, d) -= Vc(d);
   }
 
+
+  double charSpeed = 0.0;
+  for (int sp = 0; sp < numActiveSpecies; sp++) {
+    double speciesSpeed = 0.0;
+    for (int d = 0; d < dim; d++)
+      speciesSpeed += diffusionVelocity(sp, d) * diffusionVelocity(sp, d);
+    speciesSpeed = sqrt(speciesSpeed);
+    if (speciesSpeed > charSpeed) charSpeed = speciesSpeed;
+    // charSpeed = max(charSpeed, speciesSpeed);
+  }
+  // std::cout << "max diff. vel: " << charSpeed << std::endl;
 
   // double denom = n_sp(ionIndex_) * binaryDea + n_sp(electronIndex_) * binaryDai + n_sp(neutralIndex_) * binaryDie;
   // // Dai \approx Dia \approx binaryDai

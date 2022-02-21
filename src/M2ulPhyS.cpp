@@ -837,9 +837,9 @@ M2ulPhyS::~M2ulPhyS() {
 
   delete rsolver;
   delete fluxClass;
-  delete mixture;
-  delete transportPtr;
-  delete chemistry_;
+  if (transportPtr != NULL) delete transportPtr;
+  if (chemistry_ != NULL) delete chemistry_;
+  if (mixture != NULL) delete mixture;
   delete gradUpfes;
   delete vfes;
   delete dfes;
@@ -1030,6 +1030,8 @@ void M2ulPhyS::projectInitialSolution() {
   }
 
   initGradUp();
+
+  updatePrimitives();
 
   // update pressure grid function
   mixture->UpdatePressureGridFunction(press, Up);
@@ -1439,6 +1441,7 @@ void M2ulPhyS::uniformInitialConditions() {
     for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * dof] = Upi[eq];
   }
 
+  return;
 }
 
 void M2ulPhyS::initGradUp() {
@@ -1684,6 +1687,10 @@ void M2ulPhyS::parseSolverOptions2() {
     tpsP->getInput("time/cfl", config.cflNum, 0.12);
     tpsP->getInput("time/integrator", type, std::string("rk4"));
     tpsP->getInput("time/enableConstantTimestep", config.constantTimeStep, false);
+    if (config.constantTimeStep) {
+      tpsP->getRequiredInput("time/timestep_size", config.dt_fixed);
+      assert(config.dt_fixed > 0.0);
+    }
     if (integrators.count(type) == 1) {
       config.timeIntegratorType = integrators[type];
     } else {
@@ -2133,4 +2140,23 @@ void M2ulPhyS::parseSolverOptions2() {
   }
 
   return;
+}
+
+void M2ulPhyS::updatePrimitives() {
+  double *data = U->HostWrite();
+  double *dataUp = Up->HostWrite();
+  int dof = vfes->GetNDofs();
+
+  Vector state;
+  state.UseDevice(false);
+  state.SetSize(num_equation);
+  Vector Upi;
+  Upi.UseDevice(false);
+  Upi.SetSize(num_equation);
+
+  for (int i = 0; i < dof; i++) {
+    for (int eq = 0; eq < num_equation; eq++) state(eq) = data[i + eq * dof];
+    mixture->GetPrimitivesFromConservatives(state, Upi);
+    for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * dof] = Upi[eq];
+  }
 }
