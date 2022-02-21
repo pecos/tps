@@ -114,7 +114,7 @@ void TestBinaryAirTransport::ComputeFluxTransportProperties(const Vector &state,
 
     // Compute mass fraction gradient from number density gradient.
     DenseMatrix massFractionGrad;
-    mixture->ComputeMassFractionGradient(state, gradUp, massFractionGrad);
+    mixture->computeMassFractionGradient(state, gradUp, massFractionGrad);
     for (int sp = 0; sp < numActiveSpecies; sp++) {
       if (state[dim + 2 + sp] == 0.0) continue;
 

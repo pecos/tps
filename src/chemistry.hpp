@@ -59,7 +59,7 @@ class Chemistry {
   bool ambipolar_;
   bool twoTemperature_;
 
-  int numReactions_;
+  int numReactions_ = 0;
   DenseMatrix reactantStoich_, productStoich_;  // size of (numSpecies, numReactions)
 
   std::vector<Reaction *> reactions_;

@@ -142,9 +142,9 @@ class GasMixture {
   // Compute X, Y gradients from number density gradient.
   // TODO: Fluxes class should take Up as input variable.
   // Currently cannot receive Up inside Fluxes class.
-  virtual void ComputeMassFractionGradient(const Vector &state, const DenseMatrix &gradUp,
+  virtual void computeMassFractionGradient(const Vector &state, const DenseMatrix &gradUp,
                                            DenseMatrix &massFractionGrad){};
-  virtual void ComputeMoleFractionGradient(const Vector &state, const DenseMatrix &gradUp,
+  virtual void computeMoleFractionGradient(const Vector &state, const DenseMatrix &gradUp,
                                            DenseMatrix &moleFractionGrad){};
   // // TODO: Compute pressure gradient from temperature gradient.
   // virtual void ComputePressureGradient(const Vector &state,

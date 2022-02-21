@@ -313,6 +313,8 @@ class M2ulPhyS : public TPS::Solver {
   bool Check_ExitEarly(int iter);
   void Cache_Paraview_Timesteps();
 
+  void updatePrimitives();
+
  public:
   M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps);
   M2ulPhyS(MPI_Session &_mpi, TPS::Tps *tps);
