@@ -40,7 +40,7 @@ using namespace mfem;
 static Element::Type el_type_ = Element::QUADRILATERAL;
 static int    order_ = 3;
 static int    nx_    = 5;
-static int    nt_    = 1;
+static int    nt_    = 3;
 static double a_     = 5.0;
 static double b_     = 1.0;
 // static double c_     = 3.0;
@@ -103,6 +103,10 @@ int main(int argc, char *argv[])
    }
    args.PrintOptions(cout);
 
+   if (nt_ < 3) {
+     cout << "nt: " << nt_ << " is too small for mesh generation. Use nt >= 3." << endl;
+   }
+
    // The output mesh could be tetrahedra, hexahedra, or prisms
    switch (el_type)
    {
@@ -123,9 +127,10 @@ int main(int argc, char *argv[])
    Mesh orig_mesh = Mesh::MakeCartesian2D(nt_*nx_, nt_, el_type_, false, a_, b_, false);
 
    std::vector<int> v2v(orig_mesh.GetNV());
-   std::vector<Vector> translations = {Vector({5.0,0.0}), Vector({0.0,1.0})};
+   std::vector<Vector> translations = {Vector({a_,0.0}), Vector({0.0,b_})};
    v2v = orig_mesh.CreatePeriodicVertexMapping(translations);
    Mesh mesh = Mesh::MakePeriodic(orig_mesh,v2v);
+   std::cout << "created periodic mesh." << std::endl;
   //  assert(mesh.GetNV() == nx_ * 1);
   // if (el_type_ == Element::QUADRILATERAL)
   // {

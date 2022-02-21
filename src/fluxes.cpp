@@ -108,6 +108,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
 
   const int numSpecies = mixture->GetNumSpecies();
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
+  const bool twoTemperature = mixture->IsTwoTemperature();
 
   Vector speciesEnthalpies;
   mixture->computeSpeciesEnthalpies(state, speciesEnthalpies);
@@ -117,7 +118,8 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   transport->ComputeFluxTransportProperties(state, gradUp, transportBuffer, diffusionVelocity);
   const double visc = transportBuffer[GlobalTrnsCoeffs::VISCOSITY];
   const double bulkViscMult = transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY];
-  const double k = transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY];
+  double k = transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY];
+  if (!twoTemperature) k += transportBuffer[GlobalTrnsCoeffs::ELECTRON_THERMAL_CONDUCTIVITY];
 
   // make sure density visc. flux is 0
   for (int d = 0; d < dim; d++) flux(0, d) = 0.;
@@ -158,10 +160,11 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     // TODO: need to check the sign.
     // NOTE: diffusionVelocity is set to be (numSpecies,dim)-matrix.
-    for (int d = 0; d < dim; d++) flux(dim + 2 + sp, d) = state[dim + 2 + sp] * diffusionVelocity(sp, d);
+    for (int d = 0; d < dim; d++) flux(dim + 2 + sp, d) = - state[dim + 2 + sp] * diffusionVelocity(sp, d);
   }
 
   if (mixture->IsTwoTemperature()) {
+    // TODO: add electron heat flux for total energy equation.
     // TODO: viscous flux for electron energy equation.
   }
 }
