@@ -88,6 +88,8 @@ class ArgonMinimalTransport : public TransportProperties {
 
   ~ArgonMinimalTransport(){};
 
+  int getIonIndex() { return ionIndex_; }
+
   // Currently, transport properties are evaluated in flux and source term separately.
   // Flux does not take primitive variables as input, rather evaluate them whenever needed.
   // ComputeFluxTransportProperties also evaluates required primitive variables,
@@ -105,6 +107,8 @@ class ArgonMinimalTransport : public TransportProperties {
                                                 Vector &transportBuffer, DenseMatrix &diffusionVelocity){};
 
   double computeThirdOrderElectronThermalConductivity(const Vector &X_sp, const double debyeLength, const double Te, const double nondimTe);
+
+  virtual void computeMixtureAverageDiffusivity(const Vector &state, Vector &diffusivity);
 
   // These are used to compute third-order electron thermal conductivity based on standard Chapman--Enskog method.
   double L11ee(const Vector &Q2) { return Q2(0); }
