@@ -46,6 +46,7 @@ viscSource = [ ["LV_PLANE_NORM","norm"],
 time = [ ["CFL","cfl"],
          ["TIME_INTEGRATOR","integrator"],
          ["DT_CONSTANT","enableConstantTimestep"],
+         ["DT_FIXED","fixed_timestep_size"]
        ]
 ics  = [ ["INIT_RHO","rho"],
          ["INIT_RHOVX","rhoU"],
