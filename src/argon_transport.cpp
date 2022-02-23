@@ -158,57 +158,6 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   DenseMatrix gradX(numSpecies, dim);
   mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
 
-  diffusionVelocity.SetSize(numSpecies,dim);
-  for (int sp = 0; sp < numSpecies; sp++) {
-    for (int d = 0; d < dim; d++) {
-      double DgradX = diffusivity(sp) * gradX(sp, d);
-      // NOTE: we'll have to handle small X case.
-      diffusionVelocity(sp, d) = - DgradX / (X_sp(sp) + Xeps);
-      if (ambipolar) ambE(d) += DgradX * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
-    }
-  }
-
-  if (ambipolar) {
-    for (int d = 0; d < dim; d++) ambE(d) /= (beta + Xeps); // NOTE: add Xeps for the case of no charged-species at the point.
-
-    for (int sp = 0; sp < numSpecies; sp++) {
-      for (int d = 0; d < dim; d++)
-        diffusionVelocity(sp, d) += mobility(sp) * ambE(d);
-    }
-  }
-
-  // Correction Velocity
-  Vector Vc(3);
-  Vc = 0.0;
-  for (int sp = 0; sp < numSpecies; sp++) {
-    // NOTE: we'll have to handle small Y case.
-    for (int d = 0; d < dim; d++)
-      Vc(d) += state(0) * Y_sp(sp) * diffusionVelocity(sp, d);
-  }
-  for (int sp = 0; sp < numSpecies; sp++) {
-    for (int d = 0; d < dim; d++)
-      diffusionVelocity(sp, d) -= Vc(d);
-  }
-
-
-  double charSpeed = 0.0;
-  for (int sp = 0; sp < numActiveSpecies; sp++) {
-    double speciesSpeed = 0.0;
-    for (int d = 0; d < dim; d++)
-      speciesSpeed += diffusionVelocity(sp, d) * diffusionVelocity(sp, d);
-    speciesSpeed = sqrt(speciesSpeed);
-    if (speciesSpeed > charSpeed) charSpeed = speciesSpeed;
-    // charSpeed = max(charSpeed, speciesSpeed);
-  }
-  // std::cout << "max diff. vel: " << charSpeed << std::endl;
-
-  // double denom = n_sp(ionIndex_) * binaryDea + n_sp(electronIndex_) * binaryDai + n_sp(neutralIndex_) * binaryDie;
-  // // Dai \approx Dia \approx binaryDai
-  // // Dei \approx Dea
-  // double Dea = binaryDea * (1.0 + n_sp(ionIndex_) * (mw_(ionIndex_) * binaryDie / mw_(neutralIndex_) - binaryDea) / denom);
-  // double Die = binaryDie * (1.0 + n_sp(neutralIndex_) * (mw_(neutralIndex_) * binaryDai / mw_(electronIndex_) - binaryDie) / denom);
-  // double Dae = binaryDea * (1.0 + n_sp(ionIndex_) * (mw_(ionIndex_) * binaryDai / mw_(electronIndex_) - binaryDea) / denom);
-
 }
 
 double ArgonMinimalTransport::computeThirdOrderElectronThermalConductivity(const Vector &X_sp, const double debyeLength, const double Te, const double nondimTe) {
