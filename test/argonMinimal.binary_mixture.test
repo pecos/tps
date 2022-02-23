@@ -1,0 +1,47 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="argonMinimal-binary mixture"
+RUNFILE="inputs/argonMinimal.binary_mixture.ini"
+
+setup() {
+    SOLN_FILE=restart_output.sol.h5
+    REF_FILE=argonMinimal.binary.ref.h5
+
+    TOL=2e-4
+}
+
+@test "[$TEST] check for input file $RUNFILE" {
+    test -s $RUNFILE
+}
+
+@test "[$TEST] create a mesh file" {
+    ../utils/beam_mesh -rs 0    # no refinement
+}
+
+@test "[$TEST] create a restart file with a prescribed initial condition" {
+    RUNFILE_MOD=${RUNFILE}.mod
+    sed  's/enableRestart = True/enableRestart = False/' $RUNFILE > $RUNFILE_MOD
+
+    # binaryic creates both initial condition and the analytic solution at a designiated time.
+    ../utils/binaryic -run $RUNFILE_MOD
+
+    test -s $SOLN_FILE
+    test -s $REF_FILE
+
+    rm $RUNFILE_MOD
+}
+
+@test "[$TEST] run tps with input -> $RUNFILE" {
+    ../src/tps -run $RUNFILE
+
+    test -s $SOLN_FILE
+    test ! -e DIE
+}
+
+@test "[$TEST] verify tps output with analytic solution -> $REF_FILE" {
+    test -s $SOLN_FILE
+    test -s $REF_FILE
+
+    h5diff --relative=$TOL $SOLN_FILE $REF_FILE /solution/rho-Y_Ar.+1
+}
