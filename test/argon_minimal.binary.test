@@ -3,11 +3,11 @@
 
 TEST="argonMinimal-binary mixture"
 RUNFILE="inputs/argonMinimal.binary_mixture.ini"
+REF_FILE=argonMinimal.binary.ref.h5
 
 setup() {
-    SOLN_FILE=restart_output.sol.h5
-    REF_FILE=argonMinimal.binary.ref.h5
-
+    SOLN_FILE=restart_argon_output.sol.h5
+    MESH_FILE=beam-quad-o3-s5-p.mesh
     TOL=2e-4
 }
 
@@ -17,6 +17,8 @@ setup() {
 
 @test "[$TEST] create a mesh file" {
     ../utils/beam_mesh -rs 0    # no refinement
+
+    test -s $MESH_FILE
 }
 
 @test "[$TEST] create a restart file with a prescribed initial condition" {
@@ -44,4 +46,8 @@ setup() {
     test -s $REF_FILE
 
     h5diff --relative=$TOL $SOLN_FILE $REF_FILE /solution/rho-Y_Ar.+1
+
+    rm $SOLN_FILE
+    rm $REF_FILE
+    rm $MESH_FILE
 }
