@@ -178,8 +178,8 @@ class QuasiMagnetostaticSolverAxiSym : public TPS::Solver {
   /** Solve quasi-magnetostatic problem */
   void solve() override;
 
-  ParMesh *getMesh() const { return pmesh_; }
-  ParGridFunction *getPlasmaConductivityGF() { return plasma_conductivity_; }
+  mfem::ParMesh *getMesh() const { return pmesh_; }
+  mfem::ParGridFunction *getPlasmaConductivityGF() { return plasma_conductivity_; }
 };
 
 #endif  // QUASIMAGNETOSTATIC_HPP_

@@ -758,6 +758,8 @@ void QuasiMagnetostaticSolverAxiSym::solve() {
   K_->EliminateVDofsInRHS(ess_bdr_tdofs_, Atheta_vec.GetBlock(0), rhs_vec.GetBlock(0));
   K_->EliminateVDofsInRHS(ess_bdr_tdofs_, Atheta_vec.GetBlock(1), rhs_vec.GetBlock(1));
 
+  plasma_conductivity_coef_->SetGridFunction(plasma_conductivity_);
+
   const double mu0_omega = em_opts_.mu0 * em_opts_.current_frequency * 2 * M_PI;
   ProductCoefficient mu_sigma_omega(mu0_omega, *plasma_conductivity_coef_);
 
@@ -781,7 +783,19 @@ void QuasiMagnetostaticSolverAxiSym::solve() {
   qms->SetBlock(1, 1, Kdiag_mat);
 
   // Set up block preconditioner
-  HypreBoomerAMG *prec = new HypreBoomerAMG(*Kdiag_mat);
+  FunctionCoefficient radius_coeff(radius);
+  FunctionCoefficient one_over_radius_coeff(oneOverRadius);
+
+  ParBilinearForm *Kpre = new ParBilinearForm(Atheta_space_);
+  Kpre->AddDomainIntegrator(new MassIntegrator(mu_sigma_omega));
+  Kpre->AddDomainIntegrator(new DiffusionIntegrator(radius_coeff));
+  Kpre->AddDomainIntegrator(new MassIntegrator(one_over_radius_coeff));
+  Kpre->Assemble();
+
+  OperatorPtr KpreOp;
+  Kpre->FormSystemMatrix(ess_bdr_tdofs_, KpreOp);
+
+  HypreBoomerAMG *prec = new HypreBoomerAMG(*KpreOp.As<HypreParMatrix>());
   BlockDiagonalPreconditioner BDP(offsets_);
   BDP.SetDiagonalBlock(0, prec);
   BDP.SetDiagonalBlock(1, prec);
@@ -794,7 +808,7 @@ void QuasiMagnetostaticSolverAxiSym::solve() {
   solver.SetRelTol(em_opts_.rtol);
   solver.SetAbsTol(em_opts_.atol);
   solver.SetMaxIter(em_opts_.max_iter);
-  solver.SetPreconditioner(*prec);
+  solver.SetPrintLevel(1);
 
   solver.Mult(rhs_vec, Atheta_vec);
   delete prec;
@@ -815,6 +829,7 @@ void QuasiMagnetostaticSolverAxiSym::solve() {
   paraview_dc.SetTime(0.0);
   paraview_dc.RegisterField("magvecpot_real", Atheta_real_);
   paraview_dc.RegisterField("magvecpot_imag", Atheta_imag_);
+  paraview_dc.RegisterField("plasma_conductivity", plasma_conductivity_);
   // paraview_dc.RegisterField("magnfield", _B);
   paraview_dc.Save();
 

@@ -47,6 +47,7 @@ class Tps;
 
 class CycleAvgJouleCoupling : public TPS::Solver {
  private:
+  MPI_Session &mpi_;
   ElectromagneticOptions em_opt_;
   QuasiMagnetostaticSolverAxiSym *qmsa_solver_;
   M2ulPhyS *flow_solver_;

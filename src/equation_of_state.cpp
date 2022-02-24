@@ -485,7 +485,7 @@ void DryAir::UpdatePlasmaConductivityGridFunction(ParGridFunction* pc, const Par
 
   for (int n = 0; n < nnode; n++) {
     // double temperature = UpData[n + (1 + dim) * nnode];
-    plasma_conductivity_gf[n] = 0.0;  // TODO(trevilo): replace with some function of temperature
+    plasma_conductivity_gf[n] = 500.0;  // 0.0;  // TODO(trevilo): replace with some function of temperature
   }
 }
 

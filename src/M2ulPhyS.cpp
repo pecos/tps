@@ -202,6 +202,15 @@ void M2ulPhyS::initVariables() {
     iter = 0;
   }
 
+  // This line is necessary to ensure that GetNodes does not return
+  // NULL, which is required when we set up interpolation between
+  // meshes.  We do it here b/c waiting until later (e.g., right
+  // before interpolation set up) leads to a seg fault when running in
+  // parallel, which is not yet understood.
+  if (mesh->GetNodes() == NULL) {
+    mesh->SetCurvature(1);
+  }
+
 #ifdef _GPU_
   loc_print.SetSize(1);
   loc_print = 0;

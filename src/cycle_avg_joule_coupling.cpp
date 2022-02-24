@@ -35,7 +35,8 @@
 #include "em_options.hpp"
 #include "quasimagnetostatic.hpp"
 
-CycleAvgJouleCoupling::CycleAvgJouleCoupling(MPI_Session &mpi, string &inputFileName, TPS::Tps *tps) : em_opt_() {
+CycleAvgJouleCoupling::CycleAvgJouleCoupling(MPI_Session &mpi, string &inputFileName, TPS::Tps *tps)
+    : mpi_(mpi), em_opt_() {
   qmsa_solver_ = new QuasiMagnetostaticSolverAxiSym(mpi, em_opt_, tps);
   flow_solver_ = new M2ulPhyS(mpi, inputFileName, tps);
   interp_flow_to_em_ = new FindPointsGSLIB(MPI_COMM_WORLD);
@@ -50,16 +51,40 @@ CycleAvgJouleCoupling::~CycleAvgJouleCoupling() {
 }
 
 void CycleAvgJouleCoupling::initializeInterpolationData() {
-  interp_flow_to_em_->Setup(*(flow_solver_->GetMesh()));
-  interp_flow_to_em_->SetDefaultInterpolationValue(0);
+  bool verbose = mpi_.Root();
+  if (verbose) grvy_printf(ginfo, "Initializing interpolation data.\n");
 
-  interp_em_to_flow_->Setup(*(qmsa_solver_->getMesh()));
-  interp_em_to_flow_->SetDefaultInterpolationValue(0);
+  ParMesh *flow_mesh = flow_solver_->GetMesh();
+  ParMesh *em_mesh = qmsa_solver_->getMesh();
+  assert(flow_mesh != NULL);
+  assert(em_mesh != NULL);
+
+  assert(flow_mesh->GetNodes() != NULL);
+  if (em_mesh->GetNodes() == NULL) {
+    em_mesh->SetCurvature(1, false, -1, 0);
+  }
+
+  interp_flow_to_em_->Setup(*flow_mesh);
+  interp_flow_to_em_->SetDefaultInterpolationValue(0.0);
+
+  // TODO(trevilo): Add em to flow interpolation
+  // interp_em_to_flow_->Setup(*(qmsa_solver_->getMesh()));
+  // interp_em_to_flow_->SetDefaultInterpolationValue(0);
 }
 
 void CycleAvgJouleCoupling::interpConductivityFromFlowToEM() {
-  const Vector vxyz_em = *(qmsa_solver_->getMesh()->GetNodes());
-  Vector conductivity_em(vxyz_em.Size());
+  const ParMesh *em_mesh = qmsa_solver_->getMesh();
+
+  // NB: Code below only valid if 1) conductivity treated as H1
+  // function, 2) order of conductivity field is same as the order of
+  // the mesh and 3) nodes for em mesh are ordered byNODES
+  //
+  // TODO(trevilo): Generalize beyond the constraints above
+  const Vector vxyz_em = *(em_mesh->GetNodes());
+  const int dim = em_mesh->Dimension();
+  const int n_mesh_nodes = vxyz_em.Size() / dim;
+
+  Vector conductivity_em(n_mesh_nodes);
   const ParGridFunction *conductivity_flow_gf = flow_solver_->GetPlasmaConductivityGF();
   interp_flow_to_em_->Interpolate(vxyz_em, *conductivity_flow_gf, conductivity_em);
 
@@ -68,7 +93,6 @@ void CycleAvgJouleCoupling::interpConductivityFromFlowToEM() {
 }
 
 void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
-  // Not implemented yet
   cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
   exit(1);
 }
@@ -86,5 +110,6 @@ void CycleAvgJouleCoupling::initialize() {
 
 void CycleAvgJouleCoupling::solve() {
   flow_solver_->solve();
+  interpConductivityFromFlowToEM();
   qmsa_solver_->solve();
 }
