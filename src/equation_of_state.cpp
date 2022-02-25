@@ -1248,8 +1248,6 @@ void PerfectMixture::computeStagnantStateWithTemp(const mfem::Vector &stateIn, c
   double ne = 0.;  // number density electrons
   if (ambipolar) {
     for (int sp = 0; sp < numActiveSpecies; sp++) ne += gasParams(sp, GasParams::SPECIES_CHARGES) * n_s(sp);
-  } else {
-    ne = stateIn(2 + dim + numSpecies - 2) / gasParams(numSpecies - 2, GasParams::SPECIES_MW);
   }
 
   double nB = stateIn(0);  // background species
