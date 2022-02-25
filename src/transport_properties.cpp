@@ -67,22 +67,26 @@ void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const 
   transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY] =
       cp_div_pr * transportBuffer[GlobalTrnsCoeffs::VISCOSITY];
 
-  if (numActiveSpecies > 0) {
-    diffusionVelocity.SetSize(numActiveSpecies, 3);
+  if (numActiveSpecies > 0) diffusionVelocity.SetSize(numActiveSpecies, dim);
+  
+  for (int sp = 0; sp < numActiveSpecies; sp++) {
     double diffusivity = transportBuffer[GlobalTrnsCoeffs::VISCOSITY] / Sc;
 
-    // Kevin: forced passive scalar to be positive.
-    // while original passive scalar can be both negative and positive,
-    // handling such case in flux requires additional if statement.
-    if (state[num_equation - 1] == 0.0) {
-      diffusionVelocity = 0.0;
-    } else {
-      for (int d = 0; d < dim; d++)
-        diffusionVelocity(0, d) = diffusivity * gradUp(num_equation - 1, d) / state[num_equation - 1];
+    for (int d = 0; d < dim; d++) {
+      if (fabs(state[2+dim+sp]) > 1e-10) {
+        diffusionVelocity(sp, d) = 0.0;
+      } else {
+        // compute mass fraction gradient
+        double dY = mixture->GetGasParams(sp, GasParams::SPECIES_MW) * gradUp(2+dim+sp, d);
+        dY -= state(2+dim+sp)/state(0) * gradUp(0, d);
+        dY /= state(0);
+        
+        diffusionVelocity(sp, d) = diffusivity * dY / state[2+dim+sp];
+      }
     }
 
     for (int d = 0; d < dim; d++) {
-      assert(~std::isnan(diffusionVelocity(0, d)));
+      assert(~std::isnan(diffusionVelocity(sp, d)));
     }
   }
 }
