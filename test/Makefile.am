@@ -45,7 +45,8 @@ TESTS += cyl3d.test \
 	 perfect_gas.test \
 	 collision_integrals.test \
 	 argon_minimal.test \
-	 argon_minimal.binary.test
+	 argon_minimal.binary.test \
+	 diffusion_wall.test
 endif
 
 if GSLIB_ENABLED
