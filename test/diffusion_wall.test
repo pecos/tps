@@ -3,12 +3,12 @@
 
 TEST="argonMinimal-diffusion at wall"
 RUNFILE="inputs/argonMinimal.diffusion_wall.ini"
-REF_FILE=argonMinimal.diffusion_wall.ref.h5
+REF_FILE=diffusion_wall.ref.h5
 
 setup() {
     SOLN_FILE=restart_diffusion_wall_output.sol.h5
     MESH_FILE=beam-quad-o3-s1-yp.mesh
-    TOL=8e-3
+    TOL=7e-3
 }
 
 @test "[$TEST] check for input file $RUNFILE" {
@@ -16,7 +16,7 @@ setup() {
 }
 
 @test "[$TEST] create a mesh file" {
-    ../utils/beam_mesh -rs 0 -nx 1 -nt 10 -a 5 -b 5   # no refinement
+    ../utils/beam_mesh -rs 0 -nx 1 -nt 10 -a 5 -b 5 -dir 1   # no refinement
 
     test -s $MESH_FILE
 }
