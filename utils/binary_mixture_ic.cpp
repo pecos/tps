@@ -60,19 +60,21 @@ int main (int argc, char *argv[])
   std::string basepath("utils/binary_initial_condition");
 
   double T0, p0, u0, Lx, Ly;
-  int k0;
+  double kx, ky;
   tps.getRequiredInput((basepath + "/temperature").c_str(), T0);
   tps.getRequiredInput((basepath + "/pressure").c_str(), p0);
   tps.getRequiredInput((basepath + "/velocity/u").c_str(), u0);
   tps.getRequiredInput((basepath + "/domain_length/x").c_str(), Lx);
   tps.getRequiredInput((basepath + "/domain_length/y").c_str(), Ly);
-  tps.getRequiredInput((basepath + "/wavenumber").c_str(), k0);
+  tps.getRequiredInput((basepath + "/wavenumber/x").c_str(), kx);
+  tps.getRequiredInput((basepath + "/wavenumber/y").c_str(), ky);
   grvy_printf(GRVY_INFO, "\n Temperature: %.8E\n", T0);
   grvy_printf(GRVY_INFO, "\n Pressure: %.8E\n", p0);
   grvy_printf(GRVY_INFO, "\n X velocity: %.8E\n", u0);
   grvy_printf(GRVY_INFO, "\n X domain length: %.8E\n", Lx);
   grvy_printf(GRVY_INFO, "\n Y domain length: %.8E\n", Ly);
-  grvy_printf(GRVY_INFO, "\n Wave number: %d\n", k0);
+  grvy_printf(GRVY_INFO, "\n Wave number - x: %.4E\n", kx);
+  grvy_printf(GRVY_INFO, "\n Wave number - y: %.4E\n", ky);
 
   double time;
   tps.getRequiredInput((basepath + "/reference_solution/time").c_str(), time);
@@ -91,7 +93,8 @@ int main (int argc, char *argv[])
   // double rhoE = 101300. / (gamma - 1.) + 0.5 * rhoU * rhoU / rho;
   double pi = atan(1.0) * 4.0;
   for (int i = 0; i < NDof; i++) {
-    double Y = 0.5 + 0.45 * sin( 2.0 * pi * k0 * coordinates[i + 0 * NDof] / Lx );
+    double Y = 0.5 + 0.45 * cos( 2.0 * pi * kx * coordinates[i + 0 * NDof] / Lx )
+                          * cos( 2.0 * pi * ky * coordinates[i + 1 * NDof] / Ly );
     // std::cout << "Grid point " << i << ": ";
     // for (int d = 0; d < dim; d++) {
     //   std::cout << coordinates[i + d * NDof] << ", ";
@@ -133,12 +136,13 @@ int main (int argc, char *argv[])
   grvy_printf(GRVY_INFO, "\n Ar-Ar+ binary diffusivity : %.8E\n", diffusivity(transport.getIonIndex()));
   double Dia = diffusivity(transport.getIonIndex());
 
-  double decay = exp(- (4.0 * pi * pi * k0 * k0 / Lx / Lx) * Dia * time);
+  double decay = exp(- (4.0 * pi * pi * (kx * kx / Lx / Lx + ky * ky / Ly / Ly)) * Dia * time);
   double distance = u0 * time;
 
-  // Set up reference solution
+  // Set up reference solution (only for doubly-periodic diffusion case)
   for (int i = 0; i < NDof; i++) {
-    double Y = 0.5 + 0.45 * decay * sin( 2.0 * pi * k0 * (coordinates[i + 0 * NDof] - distance) / Lx );
+    double Y = 0.5 + 0.45 * decay * cos( 2.0 * pi * kx * (coordinates[i + 0 * NDof] - distance) / Lx )
+                                  * cos( 2.0 * pi * ky * coordinates[i + 1 * NDof] / Ly );
     // std::cout << "Grid point " << i << ": ";
     // for (int d = 0; d < dim; d++) {
     //   std::cout << coordinates[i + d * NDof] << ", ";

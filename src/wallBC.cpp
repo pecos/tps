@@ -303,6 +303,22 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
   DenseMatrix viscFw(num_equation, dim);
   fluxClass->ComputeViscousFluxes(wallState, gradState, radius, viscFw);
 
+  // unit normal vector
+  Vector unitNorm = normal;
+  {
+    double normN = 0.;
+    for (int d = 0; d < dim; d++) normN += normal[d] * normal[d];
+    unitNorm *= 1. / sqrt(normN);
+  }
+
+  // zero out species normal diffusion fluxes.
+  const int numActiveSpecies = mixture->GetNumActiveSpecies();
+  for (int eq = dim + 2; eq < dim + 2 + numActiveSpecies; eq++) {
+    double normalDiffusionFlux = 0.0;
+    for (int d = 0; d < dim; d++) normalDiffusionFlux += unitNorm(d) * viscFw(eq, d);
+    for (int d = 0; d < dim; d++) viscFw(eq, d) -= unitNorm(d) * normalDiffusionFlux;
+  }
+
   // evaluate internal viscous fluxes
   DenseMatrix viscF(num_equation, dim);
   fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, viscF);
