@@ -174,11 +174,11 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
 }
 
 void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
-  double p = mixture->ComputePressure(stateIn);
-  double T = mixture->ComputeTemperature(stateIn);
+  //double p = mixture->ComputePressure(stateIn);
+  //double T = mixture->ComputeTemperature(stateIn);
 
-  const double gamma = mixture->GetSpecificHeatRatio();
-  const double Rg = mixture->GetGasConstant();
+  //const double gamma = mixture->GetSpecificHeatRatio();
+  //const double Rg = mixture->GetGasConstant();
 
   //   Vector wallState = stateIn;
   //   for (int d = 0; d < dim; d++) wallState[1 + d] = 0.;
@@ -224,12 +224,9 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
   //     // temperature gradient for ideal Dry Air
   //     gradState(1 + dim, d) = T * (gradP(d) / p - gradState(0, d) / stateIn[0]);
   //   }
-  double normGradT = 0.;
-  for (int d = 0; d < dim; d++) normGradT += unitNorm(d) * gradState(1 + dim, d);
-  for (int d = 0; d < dim; d++) gradState(1 + dim, d) -= normGradT * unitNorm(d);
-
-  // TODO: if we have a two-temperature plasma an additional
-  //       normal temperature gradient should also be removed.
+  //double normGradT = 0.;
+  //for (int d = 0; d < dim; d++) normGradT += unitNorm(d) * gradState(1 + dim, d);
+  //for (int d = 0; d < dim; d++) gradState(1 + dim, d) -= normGradT * unitNorm(d);
 
   if (eqSystem == NS_PASSIVE) {
     for (int d = 0; d < dim; d++) gradState(num_equation - 1, d) = 0.;
@@ -237,6 +234,27 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
 
   DenseMatrix viscFw(num_equation, dim);
   fluxClass->ComputeViscousFluxes(wallState, gradState, viscFw);
+
+  // zero out normal heat flux.
+  // NOTE: instead of zeroing the gradient, zeroed the resultant flux. Must be equivalent.
+  double normalHeatFlux = 0.0;
+  for (int d = 0; d < dim; d++) normalHeatFlux += unitNorm(d) * viscFw(1 + dim, d);
+  for (int d = 0; d < dim; d++) viscFw(1 + dim, d) -= unitNorm(d) * normalHeatFlux;
+
+  // zero out species normal diffusion fluxes.
+  const int numActiveSpecies = mixture->GetNumActiveSpecies();
+  for (int eq = dim + 2; eq < dim + 2 + numActiveSpecies; eq++) {
+    double normalDiffusionFlux = 0.0;
+    for (int d = 0; d < dim; d++) normalDiffusionFlux += unitNorm(d) * viscFw(eq, d);
+    for (int d = 0; d < dim; d++) viscFw(eq, d) -= unitNorm(d) * normalDiffusionFlux;
+  }
+
+  // adiabatic wall must also have zero heat flux from electron.
+  if (mixture->IsTwoTemperature()) {
+    double normalElectronHeatFlux = 0.0;
+    for (int d = 0; d < dim; d++) normalElectronHeatFlux += unitNorm(d) * viscFw(num_equation - 1, d);
+    for (int d = 0; d < dim; d++) viscFw(num_equation - 1, d) -= unitNorm(d) * normalElectronHeatFlux;
+  }
 
   // Add visc fluxes (we skip density eq.)
   for (int eq = 1; eq < num_equation; eq++) {
@@ -247,6 +265,7 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
 void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
   Vector wallState(num_equation);
   mixture->computeStagnantStateWithTemp(stateIn, wallTemp, wallState);
+  // TODO: set stangant state with two temperature.
 
   if (eqSystem == NS_PASSIVE) wallState[num_equation - 1] = stateIn[num_equation - 1];
 
