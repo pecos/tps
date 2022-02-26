@@ -54,6 +54,26 @@ void GasMixture::UpdatePressureGridFunction(ParGridFunction *press, const ParGri
   }
 }
 
+// total energy of stagnation state is essentially the same as
+// the total energy of input state subtracted by its bulk kinetic energy.
+// Do not necessarily need mixture-specific routines.
+void GasMixture::computeStagnationState(const mfem::Vector &stateIn, mfem::Vector &stagnationState) {
+  stagnationState.SetSize(num_equation);
+  stagnationState = stateIn;
+
+  // momentum = 0.;
+  for (int d = 0; d < dim; d++) stagnationState(1 + d) = 0.;
+
+  // compute total energy
+  double kineticEnergy = 0.0;
+  for (int d = 0; d < dim; d++) {
+    kineticEnergy += 0.5 * stateIn(1 + d) * stateIn(1 + d) / stateIn(0);
+  }
+  stagnationState(1 + dim) = stateIn(1 + dim) - kineticEnergy;
+
+  // NOTE: electron energy is purely internal energy, so no change.
+}
+
 //////////////////////////////////////////////////////
 //////// Dry Air mixture
 //////////////////////////////////////////////////////
@@ -1221,48 +1241,8 @@ void PerfectMixture::computeMoleFractionGradient(const Vector &numberDensities, 
   }
 }
 
-void PerfectMixture::computeStagnationState(const mfem::Vector &stateIn, mfem::Vector &stagnationState) {
-  stagnationState.SetSize(num_equation);
-  stagnationState = stateIn;
-
-  // momentum = 0.;
-  for (int d = 0; d < dim; d++) stagnationState(1 + d) = 0.;
-
-  // compute total energy
-  Vector n_s(numActiveSpecies);
-  for (int sp = 0; sp < numActiveSpecies; sp++) n_s(sp) = stateIn(2 + dim + sp) / gasParams(sp, GasParams::SPECIES_MW);
-
-  double ne = 0.;  // number density electrons
-  if (ambipolar) {
-    for (int sp = 0; sp < numActiveSpecies; sp++) ne += gasParams(sp, GasParams::SPECIES_CHARGES) * n_s(sp);
-  } else {
-    ne = stateIn(2 + dim + numSpecies - 2) / gasParams(numSpecies - 2, GasParams::SPECIES_MW);
-  }
-
-  double nB = stateIn(0);  // background species
-  for (int sp = 0; sp < numActiveSpecies; sp++) nB -= stateIn(2 + dim + sp);
-
-  if (ambipolar) nB -= ne * gasParams(numSpecies - 2, GasParams::SPECIES_MW);
-
-  nB /= gasParams(numSpecies - 1, GasParams::SPECIES_MW);
-
-  double heatCapacity = 0.;
-  for (int sp = 0; sp < numActiveSpecies; sp++) heatCapacity += molarCV_(sp) * n_s(sp);
-  heatCapacity += nB * molarCV_(numSpecies - 1);
-
-  double Th, Te;
-  Th = ComputeTemperature(stateIn);
-
-  //   if (twoTemperature) {
-  //     Te = stateIn[num_equation - 1] / ne / molarCV_(numSpecies - 2);
-  //   } else {
-  //     Te = Th;
-  //   }
-
-  stagnationState(1 + dim) = heatCapacity * Th;
-  if (twoTemperature) stagnationState(1 + dim) += stateIn[num_equation - 1];
-}
-
+// NOTE: this is used in isothermal wall, where gas temperature and electron temperature is assumed equal.
+// i.e. it assumes single temperature at the wall regardless of two temperature condition inside the domain.
 void PerfectMixture::computeStagnantStateWithTemp(const mfem::Vector &stateIn, const double Temp,
                                                   mfem::Vector &stateOut) {
   stateOut.SetSize(num_equation);
@@ -1272,31 +1252,34 @@ void PerfectMixture::computeStagnantStateWithTemp(const mfem::Vector &stateIn, c
   for (int d = 0; d < dim; d++) stateOut(1 + d) = 0.;
 
   // compute total energy
-  Vector n_s(numActiveSpecies);
-  for (int sp = 0; sp < numActiveSpecies; sp++) n_s(sp) = stateIn(2 + dim + sp) / gasParams(sp, GasParams::SPECIES_MW);
+  Vector n_sp(numSpecies);
+  computeNumberDensities(stateIn, n_sp);
 
-  double ne = 0.;  // number density electrons
-  if (ambipolar) {
-    for (int sp = 0; sp < numActiveSpecies; sp++) ne += gasParams(sp, GasParams::SPECIES_CHARGES) * n_s(sp);
-  } else {
-    ne = stateIn(2 + dim + numSpecies - 2) / gasParams(numSpecies - 2, GasParams::SPECIES_MW);
-  }
+  double totalHeatCapacity = computeHeaviesHeatCapacity(&n_sp[0], n_sp[numSpecies - 1]);
+  totalHeatCapacity += n_sp[numSpecies - 2] * molarCV_(numSpecies - 2);
 
-  double nB = stateIn(0);  // background species
-  for (int sp = 0; sp < numActiveSpecies; sp++) nB -= stateIn(2 + dim + sp);
+  // double ne = 0.;  // number density electrons
+  // if (ambipolar) {
+  //   for (int sp = 0; sp < numActiveSpecies; sp++) ne += gasParams(sp, GasParams::SPECIES_CHARGES) * n_s(sp);
+  // } else {
+  //   ne = stateIn(2 + dim + numSpecies - 2) / gasParams(numSpecies - 2, GasParams::SPECIES_MW);
+  // }
+  //
+  // double nB = stateIn(0);  // background species
+  // for (int sp = 0; sp < numActiveSpecies; sp++) nB -= stateIn(2 + dim + sp);
+  //
+  // if (ambipolar) nB -= ne * gasParams(numSpecies - 2, GasParams::SPECIES_MW);
+  //
+  // nB /= gasParams(numSpecies - 1, GasParams::SPECIES_MW);
+  //
+  // double heatCapacity = 0.;
+  // for (int sp = 0; sp < numActiveSpecies; sp++) heatCapacity += molarCV_(sp) * n_s(sp);
+  // heatCapacity += nB * molarCV_(numSpecies - 1);
 
-  if (ambipolar) nB -= ne * gasParams(numSpecies - 2, GasParams::SPECIES_MW);
-
-  nB /= gasParams(numSpecies - 1, GasParams::SPECIES_MW);
-
-  double heatCapacity = 0.;
-  for (int sp = 0; sp < numActiveSpecies; sp++) heatCapacity += molarCV_(sp) * n_s(sp);
-  heatCapacity += nB * molarCV_(numSpecies - 1);
-
-  stateOut(1 + dim) = heatCapacity * Temp;
-  if (twoTemperature) {
-    stateOut(1 + dim) += ne * molarCV_(numSpecies - 2) * Temp;
-  }
+  stateOut(1 + dim) = totalHeatCapacity * Temp;
+  // if (twoTemperature) {
+  //   stateOut(1 + dim) += ne * molarCV_(numSpecies - 2) * Temp;
+  // }
 }
 
 void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::Vector &stateOut, const double &p) {
