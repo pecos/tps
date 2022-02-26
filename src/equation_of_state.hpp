@@ -175,7 +175,7 @@ class GasMixture {
   virtual double getMolarCP(int species) {};
 
   // BC related functions
-  virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState){};
+  virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState);
   virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut){};
   virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p){};
 
@@ -508,7 +508,6 @@ class PerfectMixture : public GasMixture {
                                            DenseMatrix &moleFractionGrad);
 
   // functions needed for BCs
-  virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState);
   virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut);
   virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p);
 
