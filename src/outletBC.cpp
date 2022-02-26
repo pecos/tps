@@ -717,7 +717,7 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
-// TODO: figure out physics for 2T plasma. generalize
+// This is more or less right formulation even for two-temperature case.
 void OutletBC::subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
   Vector state2(num_equation);
 
