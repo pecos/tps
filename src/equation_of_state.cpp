@@ -1283,7 +1283,7 @@ void PerfectMixture::computeStagnantStateWithTemp(const mfem::Vector &stateIn, c
 }
 
 void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::Vector &stateOut, const double &p) {
-  // will change the partial pressure of background species to adjust to p
+  // will change the total energy to adjust to p
   stateOut.SetSize(num_equation);
   stateOut = stateIn;
 
