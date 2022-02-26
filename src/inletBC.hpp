@@ -52,6 +52,7 @@ class InletBC : public BoundaryCondition {
 
   // In/out conditions specified in the configuration file
   Vector inputState;
+  int numActiveSpecies_ = -1;
 
   // Mean boundary state
   Vector meanUp;
