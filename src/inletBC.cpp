@@ -732,11 +732,8 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
     }
   }
 
-  if (mixture->IsTwoTemperature()) {
-
-  } else {
-    mixture->modifyEnergyForPressure(state2, state2, p);
-  }
+  // NOTE: If two-temperature, BC for electron temperature is T_e = T_h, where the total pressure is p.
+  mixture->modifyEnergyForPressure(state2, state2, p, true);
 // {
 //   std::cout << "state2" << std::endl;
 //   for (int eq = 0; eq < num_equation; eq++) std::cout << state2[eq] << ",\t";

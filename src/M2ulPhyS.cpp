@@ -977,7 +977,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   paraviewColl->RegisterField("press", press);
   if (eqSystem == NS_PASSIVE) {
     paraviewColl->RegisterField("passiveScalar", passiveScalar);
-  } else if (numActiveSpecies > 1) {
+  } else if (numActiveSpecies > 0) {
     // TODO: for now, keep the number of primitive variables same as conserved variables.
     // will need to add full list of species.
     for (int sp = 0; sp < numActiveSpecies; sp++) {

@@ -173,7 +173,8 @@ class GasMixture {
   // BC related functions
   virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState);
   virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut){};
-  virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p){};
+  virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p,
+                                       bool modifyElectronEnergy = false){};
 
   virtual double computeAmbipolarElectronNumberDensity(const double *n_sp) {};
   virtual double computeBackgroundMassDensity(const double &rho, const double *n_sp, double &n_e,
@@ -228,7 +229,8 @@ class DryAir : public GasMixture {
   // BC related functions
   virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState);
   virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut);
-  virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p);
+  virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p,
+                                       bool modifyElectronEnergy = false);
 
   // GPU functions
 #ifdef _GPU_
@@ -493,7 +495,8 @@ class PerfectMixture : public GasMixture {
 
   // functions needed for BCs
   virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut);
-  virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p);
+  virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p,
+                                       bool modifyElectronEnergy = false);
 
   // GPU functions
 #ifdef _GPU_

@@ -292,7 +292,8 @@ void DryAir::computeStagnantStateWithTemp(const mfem::Vector &stateIn, const dou
   stateOut(1 + dim) = gas_constant / (specific_heat_ratio - 1.) * stateIn(0) * Temp;
 }
 
-void DryAir::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::Vector &stateOut, const double &p) {
+// NOTE: modifyElectronEnergy will not be used for DryAir.
+void DryAir::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::Vector &stateOut, const double &p, bool modifyElectronEnergy) {
   stateOut.SetSize(num_equation);
   stateOut = stateIn;
 
@@ -1278,7 +1279,8 @@ void PerfectMixture::computeStagnantStateWithTemp(const mfem::Vector &stateIn, c
   // }
 }
 
-void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::Vector &stateOut, const double &p) {
+// At Inlet BC, for two-temperature, electron temperature is set to be equal to gas temperature, where the total pressure is p.
+void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::Vector &stateOut, const double &p, bool modifyElectronEnergy) {
   // will change the total energy to adjust to p
   stateOut.SetSize(num_equation);
   stateOut = stateIn;
@@ -1287,24 +1289,33 @@ void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::
   Vector n_sp(numSpecies);
   computeNumberDensities(stateIn, n_sp);
 
-  double Th = 0., Te = 0., pe = 0.;
-  if (twoTemperature_) {
+  double Th = 0., pe = 0.0;
+  if (twoTemperature_ && (!modifyElectronEnergy)) {
     double Xeps = 1.0e-30; // To avoid dividing by zero.
-    Te = stateIn(num_equation - 1) / (n_sp(numSpecies - 2) + Xeps) / molarCV_(numSpecies - 2);
+    double Te = stateIn(num_equation - 1) / (n_sp(numSpecies - 2) + Xeps) / molarCV_(numSpecies - 2);
     pe = n_sp(numSpecies - 2) * UNIVERSALGASCONSTANT * Te;
   }
 
   for (int sp = 0; sp < numSpecies; sp++) {
-    if (twoTemperature_ && (sp == numSpecies - 2)) continue;
+    if (twoTemperature_ && (!modifyElectronEnergy) && (sp == numSpecies - 2)) continue;
     Th += n_sp(sp);
   }
   Th = (p - pe) / (Th * UNIVERSALGASCONSTANT);
 
   // compute total energy with the modified temperature of heavies
   double totalHeatCapacity = computeHeaviesHeatCapacity(&n_sp[0], n_sp[numSpecies - 1]);
-  if (!twoTemperature_) totalHeatCapacity += n_sp[numSpecies - 2] * molarCV_(numSpecies - 2);
+  // if (!twoTemperature_) totalHeatCapacity += n_sp[numSpecies - 2] * molarCV_(numSpecies - 2);
   double rE = totalHeatCapacity * Th;
-  if (twoTemperature_) rE += stateIn(num_equation - 1);
+  // if (twoTemperature_) rE += stateIn(num_equation - 1);
+
+  double electronEnergy = 0.0;
+  if (twoTemperature_) {
+    electronEnergy = (modifyElectronEnergy) ? n_sp[numSpecies - 2] * molarCV_(numSpecies - 2) * Th : stateIn(num_equation - 1);
+    stateOut(num_equation - 1) = electronEnergy;
+  } else {
+    electronEnergy = n_sp[numSpecies - 2] * molarCV_(numSpecies - 2) * Th;
+  }
+  rE += electronEnergy;
 
   for (int d = 0; d < dim; d++) rE += 0.5 * stateIn[d + 1] * stateIn[d + 1] / stateIn[0];
 
