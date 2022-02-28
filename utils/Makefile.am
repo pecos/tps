@@ -77,6 +77,20 @@ binaryic_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
 binaryic_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
 binaryic_LDFLAGS += -L$(GSLIB_LIB) -lgs
 
+bin_PROGRAMS += tanhic
+tanhic_SOURCES  = tanh_ic.cpp
+tanhic_LDADD    = ../src/libtps.a -lmfem
+
+tanhic_LDFLAGS  = -L$(MFEM_LIB)
+tanhic_LDFLAGS += $(HDF5_LIBS)
+tanhic_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
+tanhic_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
+tanhic_LDFLAGS += -L$(METIS_LIB) -lmetis
+tanhic_LDFLAGS += $(GRVY_LIBS)
+tanhic_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
+tanhic_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
+tanhic_LDFLAGS += -L$(GSLIB_LIB) -lgs
+
 #bin_PROGRAMS += perfect_mixture_test
 #perfect_mixture_test_SOURCES  = test_perfect_mixture.cpp
 #perfect_mixture_test_LDADD    = ../src/libtps.a -lmfem
