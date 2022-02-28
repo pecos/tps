@@ -37,7 +37,7 @@ TransportProperties::TransportProperties(GasMixture *_mixture) : mixture(_mixtur
   dim = mixture->GetDimension();
   numActiveSpecies = mixture->GetNumActiveSpecies();
   ambipolar = mixture->IsAmbipolar();
-  twoTemperature = mixture->IsTwoTemperature();
+  twoTemperature_ = mixture->IsTwoTemperature();
   num_equation = mixture->GetNumEquations();
 }
 

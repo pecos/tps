@@ -67,7 +67,7 @@ class GasMixture {
   int backgroundInputIndex_ = MAXSPECIES;
 
   bool ambipolar;
-  bool twoTemperature;
+  bool twoTemperature_;
 
   DenseMatrix gasParams;
 
@@ -90,7 +90,7 @@ class GasMixture {
   void SetNumActiveSpecies() { numActiveSpecies = ambipolar ? (numSpecies - 2) : (numSpecies - 1); }
   // Add electron energy equation if two temperature.
   void SetNumEquations() {
-    num_equation = twoTemperature ? (dim + 3 + numActiveSpecies) : (dim + 2 + numActiveSpecies);
+    num_equation = twoTemperature_ ? (dim + 3 + numActiveSpecies) : (dim + 2 + numActiveSpecies);
   }
 
  public:
@@ -106,7 +106,7 @@ class GasMixture {
   int GetNumEquations() { return num_equation; }
   int GetDimension() { return dim; }
   bool IsAmbipolar() { return ambipolar; }
-  bool IsTwoTemperature() { return twoTemperature; }
+  bool IsTwoTemperature() { return twoTemperature_; }
   int getInputIndexOf(int mixtureIndex) { return mixtureToInputMap_[mixtureIndex]; }
   // int getElectronMixtureIndex() { return (speciesMapping_.count("E")) ? speciesMapping_["E"] : -1; }
   std::map<int, int> *getMixtureToInputMap() { return &mixtureToInputMap_; }

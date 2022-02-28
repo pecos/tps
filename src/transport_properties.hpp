@@ -56,7 +56,7 @@ class TransportProperties {
   int numSpecies;
   int numActiveSpecies;
   bool ambipolar;
-  bool twoTemperature;
+  bool twoTemperature_;
 
   GasMixture *mixture;
 
