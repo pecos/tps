@@ -576,7 +576,8 @@ void M2ulPhyS::initVariables() {
   rhsOperator =
       new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType, fluxClass,
                       mixture, chemistry_, transportPtr, vfes, gpuArrays, maxIntPoints, maxDofs, A, Aflux, mesh,
-                      spaceVaryViscMult, U, Up, gradUp, gradUpfes, gradUp_A, bcIntegrator, isSBP, alpha, config);
+                      spaceVaryViscMult, U, Up, gradUp, gradUpfes, gradUp_A, bcIntegrator, isSBP, alpha, config,
+                      joule_heating_);
 
   CFL = config.GetCFLNumber();
   rhsOperator->SetTime(time);
@@ -1068,6 +1069,12 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   plasma_conductivity_ = NULL;
   if (tpsP->isFlowEMCoupled()) {
     plasma_conductivity_ = new ParGridFunction(fes);
+  }
+
+  joule_heating_ = NULL;
+  if (tpsP->isFlowEMCoupled()) {
+    joule_heating_ = new ParGridFunction(fes);
+    *joule_heating_ = 0.0;
   }
 
   // define solution parameters for i/o

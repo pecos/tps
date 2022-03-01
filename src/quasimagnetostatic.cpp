@@ -469,6 +469,7 @@ QuasiMagnetostaticSolverAxiSym::QuasiMagnetostaticSolverAxiSym(MPI_Session &mpi,
   Atheta_imag_ = NULL;
   plasma_conductivity_ = NULL;
   plasma_conductivity_coef_ = NULL;
+  joule_heating_ = NULL;
 
   true_size_ = 0;
   offsets_ = 0;
@@ -478,6 +479,7 @@ QuasiMagnetostaticSolverAxiSym::QuasiMagnetostaticSolverAxiSym(MPI_Session &mpi,
 }
 
 QuasiMagnetostaticSolverAxiSym::~QuasiMagnetostaticSolverAxiSym() {
+  delete joule_heating_;
   delete plasma_conductivity_coef_;
   delete plasma_conductivity_;
   delete Atheta_imag_;
@@ -567,6 +569,10 @@ void QuasiMagnetostaticSolverAxiSym::initialize() {
   *plasma_conductivity_ = 0.0;
 
   plasma_conductivity_coef_ = new GridFunctionCoefficient(plasma_conductivity_);
+
+  // initialize joule heating
+  joule_heating_ = new ParGridFunction(Atheta_space_);
+  *joule_heating_ = 0.0;
 }
 
 void QuasiMagnetostaticSolverAxiSym::InitializeCurrent() {
@@ -728,7 +734,22 @@ void QuasiMagnetostaticSolverAxiSym::solve() {
   Atheta_real_->Distribute(&(Atheta_vec.GetBlock(0)));
   Atheta_imag_->Distribute(&(Atheta_vec.GetBlock(1)));
 
-  // TODO(trevilo): Compute B field
+  // TODO(trevilo): Compute B field (maybe... we only need it for validation comparisons)
+
+  // Compute Joule heating (on em mesh obviously)
+  const double omega = (2 * M_PI * em_opts_.current_frequency);
+  const double omega2 = omega * omega;
+
+  Vector tmp1 = (*Atheta_real_);
+  tmp1 *= (*Atheta_real_);
+  Vector tmp2 = (*Atheta_imag_);
+  tmp2 *= (*Atheta_imag_);
+
+  tmp2 += tmp1;
+  tmp2 *= (*plasma_conductivity_);
+  tmp2 *= omega2;
+
+  *joule_heating_ = tmp2;
 
   // 3) Output A and B fields for visualization using paraview
   if (verbose) grvy_printf(ginfo, "Writing solution to paraview output.\n");
@@ -742,6 +763,7 @@ void QuasiMagnetostaticSolverAxiSym::solve() {
   paraview_dc.RegisterField("magvecpot_real", Atheta_real_);
   paraview_dc.RegisterField("magvecpot_imag", Atheta_imag_);
   paraview_dc.RegisterField("plasma_conductivity", plasma_conductivity_);
+  paraview_dc.RegisterField("joule_heating", joule_heating_);
   // paraview_dc.RegisterField("magnfield", _B);
   paraview_dc.Save();
 
