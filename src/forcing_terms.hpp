@@ -122,6 +122,21 @@ class AxisymmetricSource : public ForcingTerms {
   virtual void updateTerms(Vector &in);
 };
 
+class JouleHeating : public ForcingTerms {
+ private:
+  const Equations &eqSystem;
+  ParGridFunction *joule_heating_;
+
+ public:
+  JouleHeating(const int &_dim, const int &_num_equation, const int &_order, GasMixture *_mixture,
+               const Equations &_eqSystem, const int &_intRuleType, IntegrationRules *_intRules,
+               ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
+               const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config, ParGridFunction *jh_);
+  ~JouleHeating();
+
+  virtual void updateTerms(Vector &in);
+};
+
 class SpongeZone : public ForcingTerms {
  private:
   Fluxes *fluxes;

@@ -419,9 +419,10 @@ void M2ulPhyS::initVariables() {
       intRules, dim, num_equation, gpuArrays, maxIntPoints, maxDofs);
   gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
 
-  rhsOperator = new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType,
-                                fluxClass, mixture, vfes, gpuArrays, maxIntPoints, maxDofs, A, Aflux, mesh,
-                                spaceVaryViscMult, Up, gradUp, gradUpfes, gradUp_A, bcIntegrator, isSBP, alpha, config);
+  rhsOperator =
+      new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType, fluxClass,
+                      mixture, vfes, gpuArrays, maxIntPoints, maxDofs, A, Aflux, mesh, spaceVaryViscMult, Up, gradUp,
+                      gradUpfes, gradUp_A, bcIntegrator, isSBP, alpha, config, joule_heating_);
 
   CFL = config.GetCFLNumber();
   rhsOperator->SetTime(time);
@@ -867,6 +868,12 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   plasma_conductivity_ = NULL;
   if (tpsP->isFlowEMCoupled()) {
     plasma_conductivity_ = new ParGridFunction(fes);
+  }
+
+  joule_heating_ = NULL;
+  if (tpsP->isFlowEMCoupled()) {
+    joule_heating_ = new ParGridFunction(fes);
+    *joule_heating_ = 0.0;
   }
 
   // define solution parameters for i/o
