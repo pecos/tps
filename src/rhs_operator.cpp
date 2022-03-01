@@ -43,7 +43,8 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
                          DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh,
                          ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
                          ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A,
-                         BCintegrator *_bcIntegrator, bool &_isSBP, double &_alpha, RunConfiguration &_config)
+                         BCintegrator *_bcIntegrator, bool &_isSBP, double &_alpha, RunConfiguration &_config,
+                         ParGridFunction *jh)
     : TimeDependentOperator(_A->Height()),
       config_(_config),
       iter(_iter),
@@ -74,7 +75,8 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
       gradUp(_gradUp),
       gradUpfes(_gradUpfes),
       gradUp_A(_gradUp_A),
-      bcIntegrator(_bcIntegrator) {
+      bcIntegrator(_bcIntegrator),
+      joule_heating_(jh) {
   flux.SetSize(vfes->GetNDofs(), dim_, num_equation_);
   z.UseDevice(true);
   z.SetSize(A->Height());
@@ -141,6 +143,11 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   } else {
     coordsDof = NULL;
     dfes = NULL;
+  }
+
+  if (joule_heating_ != NULL) {
+    forcing.Append(new JouleHeating(dim_, num_equation_, _order, mixture, eqSystem, intRuleType, intRules, vfes, U_, Up,
+                                    gradUp, gpuArrays, _config, joule_heating_));
   }
 
   std::vector<double> temp;

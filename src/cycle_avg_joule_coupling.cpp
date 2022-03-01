@@ -68,11 +68,13 @@ void CycleAvgJouleCoupling::initializeInterpolationData() {
   interp_flow_to_em_->SetDefaultInterpolationValue(0.0);
 
   // TODO(trevilo): Add em to flow interpolation
-  // interp_em_to_flow_->Setup(*(qmsa_solver_->getMesh()));
-  // interp_em_to_flow_->SetDefaultInterpolationValue(0);
+  interp_em_to_flow_->Setup(*(qmsa_solver_->getMesh()));
+  interp_em_to_flow_->SetDefaultInterpolationValue(0);
 }
 
 void CycleAvgJouleCoupling::interpConductivityFromFlowToEM() {
+  bool verbose = mpi_.Root();
+  if (verbose) grvy_printf(ginfo, "Interpolating conductivity to EM mesh.\n");
   const ParMesh *em_mesh = qmsa_solver_->getMesh();
 
   // NB: Code below only valid if 1) conductivity treated as H1
@@ -93,8 +95,48 @@ void CycleAvgJouleCoupling::interpConductivityFromFlowToEM() {
 }
 
 void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
-  cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
-  exit(1);
+  bool verbose = mpi_.Root();
+  if (verbose) grvy_printf(ginfo, "Interpolating Joule heating to flow mesh.\n");
+  const ParMesh *flow_mesh = flow_solver_->GetMesh();
+  const ParFiniteElementSpace *flow_fespace = flow_solver_->GetFESpace();
+
+  const int NE = flow_mesh->GetNE();
+  const int nsp = flow_fespace->GetFE(0)->GetNodes().GetNPoints();
+  const int dim = flow_mesh->Dimension();
+
+  // Generate list of points where the grid function will be evaluated.
+  Vector vxyz;
+
+  vxyz.SetSize(nsp * NE * dim);
+  for (int i = 0; i < NE; i++) {
+    const FiniteElement *fe = flow_fespace->GetFE(i);
+    const IntegrationRule ir = fe->GetNodes();
+    ElementTransformation *et = flow_fespace->GetElementTransformation(i);
+
+    DenseMatrix pos;
+    et->Transform(ir, pos);
+    Vector rowx(vxyz.GetData() + i * nsp, nsp);
+    Vector rowy(vxyz.GetData() + i * nsp + NE * nsp, nsp);
+    Vector rowz;
+    if (dim == 3) {
+      rowz.SetDataAndSize(vxyz.GetData() + i * nsp + 2 * NE * nsp, nsp);
+    }
+    pos.GetRow(0, rowx);
+    pos.GetRow(1, rowy);
+    if (dim == 3) {
+      pos.GetRow(2, rowz);
+    }
+  }
+  const int nodes_cnt = vxyz.Size() / dim;
+
+  // Evaluate source grid function.
+  Vector interp_vals(nodes_cnt);
+
+  const ParGridFunction *joule_heating_gf = qmsa_solver_->getJouleHeatingGF();
+  interp_em_to_flow_->Interpolate(vxyz, *joule_heating_gf, interp_vals);
+
+  ParGridFunction *joule_heating_flow = flow_solver_->GetJouleHeatingGF();
+  joule_heating_flow->SetFromTrueDofs(interp_vals);
 }
 
 void CycleAvgJouleCoupling::parseSolverOptions() {
@@ -109,7 +151,8 @@ void CycleAvgJouleCoupling::initialize() {
 }
 
 void CycleAvgJouleCoupling::solve() {
-  flow_solver_->solve();
   interpConductivityFromFlowToEM();
   qmsa_solver_->solve();
+  interpJouleHeatingFromEMToFlow();
+  flow_solver_->solve();
 }

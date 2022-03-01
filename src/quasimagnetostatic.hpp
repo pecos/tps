@@ -150,6 +150,8 @@ class QuasiMagnetostaticSolverAxiSym : public TPS::Solver {
   mfem::ParGridFunction *plasma_conductivity_;
   mfem::GridFunctionCoefficient *plasma_conductivity_coef_;
 
+  mfem::ParGridFunction *joule_heating_;
+
   bool operator_initialized_;
   bool current_initialized_;
 
@@ -180,6 +182,7 @@ class QuasiMagnetostaticSolverAxiSym : public TPS::Solver {
 
   mfem::ParMesh *getMesh() const { return pmesh_; }
   mfem::ParGridFunction *getPlasmaConductivityGF() { return plasma_conductivity_; }
+  mfem::ParGridFunction *getJouleHeatingGF() { return joule_heating_; }
 };
 
 #endif  // QUASIMAGNETOSTATIC_HPP_
