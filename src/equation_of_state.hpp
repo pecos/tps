@@ -38,6 +38,7 @@
  */
 
 #include <tps_config.h>
+#include <grvy.h>
 
 #include <mfem.hpp>
 

@@ -644,7 +644,8 @@ double PerfectMixture::computeBackgroundMassDensity(const double &rho, const dou
     rhoB -= n_e * gasParams(numSpecies - 2, GasParams::SPECIES_MW);
   }
 
-  assert(rhoB >= 0.0);
+  //assert(rhoB >= 0.0);
+  if (rhoB < 0.) grvy_printf(GRVY_ERROR, "\nNegative background density -> %f\n", rhoB);
 
   return rhoB;
 }
@@ -1266,8 +1267,7 @@ void PerfectMixture::computeStagnantStateWithTemp(const mfem::Vector &stateIn, c
 
   stateOut(1 + dim) = heatCapacity * Temp;
 
-  // make vel = 0
-  for (int d = 0; d < dim; d++) stateOut(1 + d) = 0.;
+  // NOTE: add electron energy term for 2T model
 }
 
 void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::Vector &stateOut, const double &p) {
@@ -1282,8 +1282,6 @@ void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::
   double ne = 0.;  // number density electrons
   if (ambipolar) {
     for (int sp = 0; sp < numActiveSpecies; sp++) ne += gasParams(sp, GasParams::SPECIES_CHARGES) * n_s(sp);
-  } else {
-    ne = stateIn(2 + dim + numSpecies - 2) / gasParams(numSpecies - 2, GasParams::SPECIES_MW);
   }
   
   double nB = stateIn(0);  // background species
@@ -1302,7 +1300,7 @@ void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::
     Th += nB;
     Th = (p - pe) / (Th * UNIVERSALGASCONSTANT);
   } else {
-    for (int sp = 0; sp < numActiveSpecies; sp++) Th += stateIn(2 + dim + sp) / gasParams(sp, GasParams::SPECIES_MW);
+    for (int sp = 0; sp < numActiveSpecies; sp++) Th += n_s(sp);
     if (ambipolar) Th += ne;
     Th += nB;
     Th = p / (Th * UNIVERSALGASCONSTANT);
@@ -1310,6 +1308,8 @@ void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::
 
   // compute total energy with the modified temperature of heavies
   double rE = 0.;
+  for (int d = 0; d < dim; d++) rE += stateIn(1+d) * stateIn(1+d);
+  rE *= 0.5 / stateIn(0);
   for (int sp = 0; sp < numActiveSpecies; sp++) rE += n_s(sp) * molarCV_(sp) * Th;
   if (twoTemperature) rE += ne * molarCV_(numSpecies - 2) * Te;
   rE += nB * molarCV_(numSpecies - 1) * Th;

@@ -73,7 +73,7 @@ void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const 
     double diffusivity = transportBuffer[GlobalTrnsCoeffs::VISCOSITY] / Sc;
 
     for (int d = 0; d < dim; d++) {
-      if (fabs(state[2+dim+sp]) > 1e-10) {
+      if (fabs(state[2+dim+sp]/state(0)) < 1e-14) {
         diffusionVelocity(sp, d) = 0.0;
       } else {
         // compute mass fraction gradient
