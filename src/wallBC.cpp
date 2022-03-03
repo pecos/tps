@@ -256,7 +256,7 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
   // evaluate viscous fluxes at the wall
   DenseMatrix viscFw(num_equation, dim);
   fluxClass->ComputeViscousFluxes(wallState, gradState, viscFw);
-  
+
   // unit normal vector
   Vector unitNorm = normal;
   {

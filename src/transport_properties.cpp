@@ -68,20 +68,20 @@ void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const 
       cp_div_pr * transportBuffer[GlobalTrnsCoeffs::VISCOSITY];
 
   if (numActiveSpecies > 0) diffusionVelocity.SetSize(numActiveSpecies, dim);
-  
+
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     double diffusivity = transportBuffer[GlobalTrnsCoeffs::VISCOSITY] / Sc;
 
     for (int d = 0; d < dim; d++) {
-      if (fabs(state[2+dim+sp]/state(0)) < 1e-14) {
+      if (fabs(state[2 + dim + sp] / state(0)) < 1e-14) {
         diffusionVelocity(sp, d) = 0.0;
       } else {
         // compute mass fraction gradient
-        double dY = mixture->GetGasParams(sp, GasParams::SPECIES_MW) * gradUp(2+dim+sp, d);
-        dY -= state(2+dim+sp)/state(0) * gradUp(0, d);
+        double dY = mixture->GetGasParams(sp, GasParams::SPECIES_MW) * gradUp(2 + dim + sp, d);
+        dY -= state(2 + dim + sp) / state(0) * gradUp(0, d);
         dY /= state(0);
-        
-        diffusionVelocity(sp, d) = diffusivity * dY / state[2+dim+sp];
+
+        diffusionVelocity(sp, d) = diffusivity * dY / state[2 + dim + sp];
       }
     }
 

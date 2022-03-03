@@ -37,7 +37,7 @@
 GasMixture::GasMixture(WorkingFluid _fluid, int _dim) {
   fluid = _fluid;
   dim = _dim;
-};
+}
 
 void GasMixture::UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up) {
   double *pGridFunc = press->HostWrite();
@@ -647,7 +647,7 @@ double PerfectMixture::computeBackgroundMassDensity(const double &rho, const dou
     rhoB -= n_e * gasParams(numSpecies - 2, GasParams::SPECIES_MW);
   }
 
-  //assert(rhoB >= 0.0);
+  // assert(rhoB >= 0.0);
   if (rhoB < 0.) grvy_printf(GRVY_ERROR, "\nNegative background density -> %f\n", rhoB);
 
   return rhoB;
@@ -1261,8 +1261,8 @@ void PerfectMixture::computeStagnantStateWithTemp(const mfem::Vector &stateIn, c
   double ne = 0.;  // number density electrons
   if (ambipolar) {
     for (int sp = 0; sp < numActiveSpecies; sp++) ne += gasParams(sp, GasParams::SPECIES_CHARGES) * n_s(sp);
-  //} else {
-  //  ne = stateIn(2 + dim + numSpecies - 2) / gasParams(numSpecies - 2, GasParams::SPECIES_MW);
+    //} else {
+    //  ne = stateIn(2 + dim + numSpecies - 2) / gasParams(numSpecies - 2, GasParams::SPECIES_MW);
   }
 
   double nB = stateIn(0);  // background species
@@ -1301,8 +1301,8 @@ void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::
   double ne = 0.;  // number density electrons
   if (ambipolar) {
     for (int sp = 0; sp < numActiveSpecies; sp++) ne += gasParams(sp, GasParams::SPECIES_CHARGES) * n_s(sp);
-//  } else {
-//    ne = stateIn(2 + dim + numSpecies - 2) / gasParams(numSpecies - 2, GasParams::SPECIES_MW);
+    //  } else {
+    //    ne = stateIn(2 + dim + numSpecies - 2) / gasParams(numSpecies - 2, GasParams::SPECIES_MW);
   }
 
   double nB = stateIn(0);  // background species
