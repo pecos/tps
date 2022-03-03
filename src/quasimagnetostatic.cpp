@@ -766,8 +766,10 @@ void QuasiMagnetostaticSolverAxiSym::solve() {
 
   plasma_conductivity_coef_->SetGridFunction(plasma_conductivity_);
 
+  FunctionCoefficient radius_coeff(radius);
   const double mu0_omega = em_opts_.mu0 * em_opts_.current_frequency * 2 * M_PI;
-  ProductCoefficient mu_sigma_omega(mu0_omega, *plasma_conductivity_coef_);
+  ProductCoefficient temp_coef(mu0_omega, *plasma_conductivity_coef_);
+  ProductCoefficient mu_sigma_omega(temp_coef, radius_coeff);
 
   ParBilinearForm *Kconductivity = new ParBilinearForm(Atheta_space_);
   Kconductivity->AddDomainIntegrator(new MassIntegrator(mu_sigma_omega));
@@ -789,7 +791,6 @@ void QuasiMagnetostaticSolverAxiSym::solve() {
   qms->SetBlock(1, 1, Kdiag_mat);
 
   // Set up block preconditioner
-  FunctionCoefficient radius_coeff(radius);
   FunctionCoefficient one_over_radius_coeff(oneOverRadius);
 
   ParBilinearForm *Kpre = new ParBilinearForm(Atheta_space_);
