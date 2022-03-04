@@ -304,6 +304,28 @@ void DryAir::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::Vector &
   stateOut(1 + dim) = p / (specific_heat_ratio - 1.) + ke;
 }
 
+void DryAir::computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal, Vector &conservedState) {
+  const double gamma = specific_heat_ratio;
+
+  double temp = 0.;
+  for (int d = 0; d < dim; d++) temp += meanNormalFluxes[1 + d] * normal[d];
+  double A = 1. - 2. * gamma / (gamma - 1.);
+  double B = 2 * temp / (gamma - 1.);
+  double C = -2. * meanNormalFluxes[0] * meanNormalFluxes[1 + dim];
+  for (int d = 0; d < dim; d++) C += meanNormalFluxes[1 + d] * meanNormalFluxes[1 + d];
+  //   double p = (-B+sqrt(B*B-4.*A*C))/(2.*A);
+  double p = (-B - sqrt(B * B - 4. * A * C)) / (2. * A);  // real solution
+
+  Vector Up(num_equation);
+  Up[0] = meanNormalFluxes[0] * meanNormalFluxes[0] / (temp - p);
+  Up[1 + dim] = Temperature(&Up[0], &p, 1);
+  //   Up[1+dim] = p;
+
+  for (int d = 0; d < dim; d++) Up[1 + d] = (meanNormalFluxes[1 + d] - p * normal[d]) / meanNormalFluxes[0];
+
+  GetConservativesFromPrimitives(Up, conservedState);
+}
+
 // void DryAir::UpdatePressureGridFunction(ParGridFunction* press, const ParGridFunction* Up) {
 //   double* pGridFunc = press->HostWrite();
 //   const double* UpData = Up->HostRead();

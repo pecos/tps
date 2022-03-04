@@ -179,6 +179,8 @@ class GasMixture {
   virtual double computeAmbipolarElectronNumberDensity(const double *n_sp) {};
   virtual double computeBackgroundMassDensity(const double &rho, const double *n_sp, double &n_e,
                                               bool isElectronComputed = false) {};
+
+  virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal, Vector &conservedState) {};
 };
 
 //////////////////////////////////////////////////////
@@ -231,6 +233,8 @@ class DryAir : public GasMixture {
   virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut);
   virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p,
                                        bool modifyElectronEnergy = false);
+
+  virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal, Vector &conservedState);
 
   // GPU functions
 #ifdef _GPU_

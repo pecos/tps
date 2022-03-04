@@ -547,27 +547,29 @@ void SpongeZone::computeMixedOutValues() {
   // normalize
   for (int eq = 0; eq < num_equation; eq++) meanNormalFluxes[eq] /= double(meanNormalFluxes[num_equation]);
 
-  // Kevin: we need to find temperature value, rather than pressure.
-  // compute mixed-out variables considering the outlet pressure
-  double temp = 0.;
-  for (int d = 0; d < dim; d++) temp += meanNormalFluxes[1 + d] * szData.normal[d];
-  double A = 1. - 2. * gamma / (gamma - 1.);
-  double B = 2 * temp / (gamma - 1.);
-  double C = -2. * meanNormalFluxes[0] * meanNormalFluxes[1 + dim];
-  for (int d = 0; d < dim; d++) C += meanNormalFluxes[1 + d] * meanNormalFluxes[1 + d];
-  //   double p = (-B+sqrt(B*B-4.*A*C))/(2.*A);
-  double p = (-B - sqrt(B * B - 4. * A * C)) / (2. * A);  // real solution
+  mixture->computeConservedStateFromConvectiveFlux(meanNormalFluxes, szData.normal, targetU);
 
-  Up[0] = meanNormalFluxes[0] * meanNormalFluxes[0] / (temp - p);
-  Up[1 + dim] = mixture->Temperature(&Up[0], &p, 1);
-  //   Up[1+dim] = p;
-
-  for (int d = 0; d < dim; d++) Up[1 + d] = (meanNormalFluxes[1 + d] - p * szData.normal[d]) / meanNormalFluxes[0];
-
-  double v2 = 0.;
-  for (int d = 0; d < dim; d++) v2 += Up[1 + d] * Up[1 + d];
-
-  mixture->GetConservativesFromPrimitives(Up, targetU);
+  // // Kevin: we need to find temperature value, rather than pressure.
+  // // compute mixed-out variables considering the outlet pressure
+  // double temp = 0.;
+  // for (int d = 0; d < dim; d++) temp += meanNormalFluxes[1 + d] * szData.normal[d];
+  // double A = 1. - 2. * gamma / (gamma - 1.);
+  // double B = 2 * temp / (gamma - 1.);
+  // double C = -2. * meanNormalFluxes[0] * meanNormalFluxes[1 + dim];
+  // for (int d = 0; d < dim; d++) C += meanNormalFluxes[1 + d] * meanNormalFluxes[1 + d];
+  // //   double p = (-B+sqrt(B*B-4.*A*C))/(2.*A);
+  // double p = (-B - sqrt(B * B - 4. * A * C)) / (2. * A);  // real solution
+  //
+  // Up[0] = meanNormalFluxes[0] * meanNormalFluxes[0] / (temp - p);
+  // Up[1 + dim] = mixture->Temperature(&Up[0], &p, 1);
+  // //   Up[1+dim] = p;
+  //
+  // for (int d = 0; d < dim; d++) Up[1 + d] = (meanNormalFluxes[1 + d] - p * szData.normal[d]) / meanNormalFluxes[0];
+  //
+  // double v2 = 0.;
+  // for (int d = 0; d < dim; d++) v2 += Up[1 + d] * Up[1 + d];
+  //
+  // mixture->GetConservativesFromPrimitives(Up, targetU);
 }
 
 PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,

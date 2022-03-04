@@ -325,6 +325,7 @@ class M2ulPhyS : public TPS::Solver {
   void checkSolverOptions() const;
   void projectInitialSolution();
   void writeHDF5(string inputFileName = std::string()) { restart_files_hdf5("write", inputFileName); }
+  void readHDF5(string inputFileName = std::string()) { restart_files_hdf5("read", inputFileName); }
   void writeParaview(int iter, double time) {
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
