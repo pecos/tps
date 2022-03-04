@@ -502,6 +502,7 @@ class PerfectMixture : public GasMixture {
   virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p,
                                        bool modifyElectronEnergy = false);
 
+  virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal, Vector &conservedState);
   // GPU functions
 #ifdef _GPU_
 

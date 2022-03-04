@@ -1343,3 +1343,67 @@ void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::
 
   stateOut(1 + dim) = rE;
 }
+
+void PerfectMixture::computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal, Vector &conservedState) {
+  Vector Up(num_equation);
+
+  Vector numberDensityFluxes(numActiveSpecies);
+  double nBFlux = meanNormalFluxes(0); // background species number density flux.
+  for (int sp = 0; sp < numActiveSpecies; sp++) {
+    numberDensityFluxes(sp) = meanNormalFluxes(dim + 2 + sp) / gasParams(sp, GasParams::SPECIES_MW);
+    nBFlux -= meanNormalFluxes(dim + 2 + sp);
+  }
+  double neFlux = 0.0;
+  if (ambipolar) {
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      neFlux += gasParams(sp, GasParams::SPECIES_CHARGES);
+    }
+    nBFlux -= neFlux * gasParams(numSpecies - 2, GasParams::SPECIES_MW);
+  } else { // if not ambipolar, mass flux is already subtracted from nBFlux.
+    neFlux = numberDensityFluxes(numSpecies - 2);
+  }
+  nBFlux /= gasParams(numSpecies - 1, GasParams::SPECIES_MW);
+
+  double Te = 0.0;
+  if (twoTemperature_) {
+    Te = meanNormalFluxes(num_equation - 1) / molarCP_(numSpecies - 2) / neFlux;
+    Up(num_equation - 1) = Te;
+  }
+
+  double nMix = 0.0, cpMix = 0.0;
+  for (int sp = 0; sp < numSpecies - 2; sp++) {
+    nMix += numberDensityFluxes(sp);
+    cpMix += numberDensityFluxes(sp) * molarCP_(sp);
+  }
+  nMix += nBFlux;
+  cpMix += nBFlux * molarCP_(numSpecies - 1);
+  if (!twoTemperature_) {
+    nMix += neFlux;
+    cpMix += neFlux * molarCP_(numSpecies - 2);
+  }
+  cpMix /= nMix;
+
+  double temp = 0.;
+  for (int d = 0; d < dim; d++) temp += meanNormalFluxes[1 + d] * normal[d];
+  double A = 1. - 2. * cpMix / UNIVERSALGASCONSTANT;
+  double B = 2 * temp * (cpMix / UNIVERSALGASCONSTANT - 1.);
+  double C = -2. * meanNormalFluxes[0] * meanNormalFluxes[1 + dim];
+  for (int d = 0; d < dim; d++) C += meanNormalFluxes[1 + d] * meanNormalFluxes[1 + d];
+  if (twoTemperature_) C += 2.0 * meanNormalFluxes[0] * neFlux * (molarCP_(numSpecies - 2) - cpMix) * Te;
+  //   double p = (-B+sqrt(B*B-4.*A*C))/(2.*A);
+  double p = (-B - sqrt(B * B - 4. * A * C)) / (2. * A);  // real solution
+
+  double Th = (temp - p) / meanNormalFluxes[0] * p / UNIVERSALGASCONSTANT;
+  if (twoTemperature_) Th -= neFlux * Te;
+  Th /= nMix;
+
+  Up[0] = meanNormalFluxes[0] * meanNormalFluxes[0] / (temp - p);
+  for (int d = 0; d < dim; d++) Up[1 + d] = (meanNormalFluxes[1 + d] - p * normal[d]) / meanNormalFluxes[0];
+  Up[1 + dim] = Th;
+
+  for (int sp = 0; sp < numActiveSpecies; sp++) {
+    Up[2 + dim + sp] = numberDensityFluxes(sp) * meanNormalFluxes[0] / (temp - p);
+  }
+
+  GetConservativesFromPrimitives(Up, conservedState);
+}
