@@ -101,6 +101,8 @@ class GasMixture {
 
   void SetFluid(WorkingFluid _fluid);
 
+  WorkingFluid GetWorkingFluid() {return fluid;}
+
   int GetNumSpecies() { return numSpecies; }
   int GetNumActiveSpecies() { return numActiveSpecies; }
   int GetNumEquations() { return num_equation; }
@@ -156,6 +158,8 @@ class GasMixture {
   // For now, these are used to get mixture speicific heat ratio and mixture gas constant.
   virtual double GetSpecificHeatRatio() = 0;
   virtual double GetGasConstant() = 0;
+
+  virtual void computeNumberDensities(const Vector &conservedState, Vector &n_sp) {};
 
   // virtual double GetViscosity(const Vector &state) = 0;
   // virtual double GetThermalConductivity(const Vector &state) = 0;

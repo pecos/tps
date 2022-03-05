@@ -45,7 +45,7 @@ cxx_sources          = averaging_and_rms.cpp faceGradientIntegration.cpp M2ulPhy
                        masa_handler.cpp run_configuration.cpp domain_integrator.cpp forcing_terms.cpp mpi_groups.cpp \
 	               sbp_integrators.cpp equation_of_state.cpp transport_properties.cpp inletBC.cpp outletBC.cpp utils.cpp io.cpp \
 		       dgNonlinearForm.cpp  dgNonlinearForm.hpp gradients.cpp gradNonLinearForm.cpp \
-		       quasimagnetostatic.cpp tps.cpp chemistry.cpp reaction.cpp collision_integrals.cpp argon_transport.cpp
+		       quasimagnetostatic.cpp tps.cpp chemistry.cpp reaction.cpp collision_integrals.cpp argon_transport.cpp source_term.cpp
 
 mfem_extra_sources   = ../utils/mfem_extras/pfem_extras.cpp
 
@@ -55,7 +55,7 @@ headers              = averaging_and_rms.hpp equation_of_state.hpp transport_pro
 	               wallBC.hpp domain_integrator.hpp fluxes.hpp masa_handler.hpp riemann_solver.hpp \
 		       dgNonlinearForm.hpp gradNonLinearForm.hpp dataStructures.hpp utils.hpp io.hpp em_options.hpp \
 		       quasimagnetostatic.hpp gradients.hpp logger.hpp solver.hpp tps.hpp chemistry.hpp reaction.hpp \
-					 collision_integrals.hpp argon_transport.hpp
+					 collision_integrals.hpp argon_transport.hpp source_term.hpp
 
 mfem_extra_headers   = ../utils/mfem_extras/pfem_extras.hpp
 

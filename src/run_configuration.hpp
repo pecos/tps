@@ -181,6 +181,8 @@ class RunConfiguration {
   int numSpecies;
   int backgroundIndex;
   // int electronIndex;
+  Vector initialMassFractions;
+  double initialElectronTemperature;
 
   std::vector<std::string> speciesNames;
 
@@ -207,7 +209,7 @@ class RunConfiguration {
   // For USER_DEFINED gas mixture, set models from input file.
   GasModel gasModel;
   TransportModel transportModel;
-  ChemistryModel chemistryModel;
+  ChemistryModel chemistryModel_;
 
   // flag for using third-order electron thermal conductivity
   bool thirdOrderkElectron;
@@ -288,7 +290,7 @@ class RunConfiguration {
   bool IsTwoTemperature() { return twoTemperature; }
   GasModel GetGasModel() { return gasModel; }
   TransportModel GetTranportModel() { return transportModel; }
-  ChemistryModel GetChemistryModel() { return chemistryModel; }
+  ChemistryModel GetChemistryModel() { return chemistryModel_; }
   double getConstantMolarCV(int species) { return constantMolarCV(species); }
   double getConstantMolarCP(int species) { return constantMolarCP(species); }
 };

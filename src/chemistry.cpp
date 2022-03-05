@@ -35,12 +35,15 @@
 using namespace mfem;
 using namespace std;
 
-Chemistry::Chemistry(GasMixture *mixture, RunConfiguration config) : mixture_(mixture) {
+Chemistry::Chemistry(GasMixture *mixture, RunConfiguration &config) : mixture_(mixture) {
   numEquations_ = mixture->GetNumEquations();
   numSpecies_ = mixture->GetNumSpecies();
   numActiveSpecies_ = mixture->GetNumActiveSpecies();
   ambipolar_ = mixture->IsAmbipolar();
   twoTemperature_ = mixture->IsTwoTemperature();
+  dim_ = mixture->GetDimension();
+  
+  model = config.GetChemistryModel();
 
   mixtureToInputMap_ = mixture->getMixtureToInputMap();
   speciesMapping_ = mixture->getSpeciesMapping();
@@ -135,4 +138,38 @@ void Chemistry::computeEquilibriumConstants(const double T_h, const double T_e, 
   }
 
   return;
+}
+
+MassActionLaw::MassActionLaw(GasMixture* mixture, RunConfiguration &config):
+  Chemistry(mixture, config)
+{
+}
+
+
+void MassActionLaw::computeCreationRate(const mfem::Vector& ns, const mfem::Vector& kfwd, 
+                                       const mfem::Vector& keq, mfem::Vector& creationRate)
+{
+  Vector progressRate(numReactions_);
+  for (int r = 0; r < numReactions_; r++) {
+    // forward reaction rate
+    double rateFWD = 1., rateBWD = 1.;
+    for (int sp = 0; sp < numSpecies_; sp++) rateFWD *= pow(ns(sp), reactantStoich_(sp,r));
+    for (int sp = 0; sp < numSpecies_; sp++) rateBWD *= pow(ns(sp), productStoich_(sp,r));
+    progressRate(r) = kfwd(r) * (rateFWD - rateBWD / keq(r) );
+  }
+  
+  creationRate.SetSize(numSpecies_);
+  creationRate = 0.;
+  for (int sp = 0; sp < numSpecies_; sp++) {
+    for (int r = 0; r < numReactions_; r++) {
+      creationRate(sp) += progressRate(r) * (productStoich_(sp,r) - reactantStoich_(sp,r));
+    }
+    creationRate(sp) *= mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+  }
+  
+  // check total created mass is 0
+  double totMass = 0.;
+  for (int sp = 0; sp < numSpecies_; sp++) totMass += creationRate(sp);
+  // NOTE: this assertion below should be made non-dimensional with dt and density
+//   assert(fabs(totMass) < 1e-7);
 }

@@ -270,14 +270,16 @@ void M2ulPhyS::initVariables() {
       // mixture->setViscMult(config.GetViscMult());
       // mixture->setBulkViscMult(config.GetBulkViscMult());
       break;
-    case WorkingFluid::TEST_BINARY_AIR: {
+    case WorkingFluid::TEST_BINARY_AIR:
       mixture = new TestBinaryAir(config, dim);
       transportPtr = new TestBinaryAirTransport(mixture, config);
-    } break;
+      break;
     case WorkingFluid::USER_DEFINED:
       switch (config.GetGasModel()) {
         case GasModel::PERFECT_MIXTURE:
           mixture = new PerfectMixture(config, dim);
+          // WARNING: update this transport!
+          transportPtr = new DryAirTransport(mixture, config);
           break;
       }
       switch (config.GetTranportModel()) {
@@ -288,6 +290,9 @@ void M2ulPhyS::initVariables() {
           break;
       }
       switch (config.GetChemistryModel()) {
+        case ChemistryModel::MASS_ACTION_LAW:
+          chemistry_ = new MassActionLaw(mixture, config);
+          break;
         default:
           chemistry_ = new Chemistry(mixture, config);
           break;
@@ -470,7 +475,7 @@ void M2ulPhyS::initVariables() {
   gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
 
   rhsOperator = new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType,
-                                fluxClass, mixture, vfes, gpuArrays, maxIntPoints, maxDofs, A, Aflux, mesh,
+                                fluxClass, mixture, chemistry_, transportPtr, vfes, gpuArrays, maxIntPoints, maxDofs, A, Aflux, mesh,
                                 spaceVaryViscMult, Up, gradUp, gradUpfes, gradUp_A, bcIntegrator, isSBP, alpha, config);
 
   CFL = config.GetCFLNumber();
@@ -913,7 +918,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     // will need to add full list of species.
     visualizationVariables.resize(numActiveSpecies);
     for (int sp = 0; sp < numActiveSpecies; sp++) {
-      visualizationVariables[sp] = new ParGridFunction(fes, Up->HostReadWrite() + (sp + dim + 2) * fes->GetNDofs());
+      visualizationVariables[sp] = new ParGridFunction(fes, U->HostReadWrite() + (sp + dim + 2) * fes->GetNDofs());
     }
   }
 
@@ -981,7 +986,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     for (int sp = 0; sp < numActiveSpecies; sp++) {
       int inputSpeciesIndex = mixture->getInputIndexOf(sp);
       std::string speciesName = config.speciesNames[inputSpeciesIndex];
-      paraviewColl->RegisterField("number density_" + speciesName, visualizationVariables[sp]);
+      paraviewColl->RegisterField("partial_density_" + speciesName, visualizationVariables[sp]);
     }
   }
 
@@ -1349,8 +1354,9 @@ void M2ulPhyS::testInitialCondition(const Vector &x, Vector &y) {
   delete eqState;
 }
 
-// NOTE: Use only for DRY_AIR.
-void M2ulPhyS::dryAirUniformInitialConditions() {
+// // NOTE: Use only for DRY_AIR.
+// void M2ulPhyS::dryAirUniformInitialConditions() {
+void M2ulPhyS::uniformInitialConditions() {
   double *data = U->HostWrite();
   double *dataUp = Up->HostWrite();
   double *dataGradUp = gradUp->HostWrite();
@@ -1358,14 +1364,52 @@ void M2ulPhyS::dryAirUniformInitialConditions() {
   int dof = vfes->GetNDofs();
   double *inputRhoRhoVp = config.GetConstantInitialCondition();
 
-  DryAir *eqState = new DryAir(dim, num_equation);
+  // build initial state
+  Vector initState(num_equation);
+  initState = 0.;
 
-  const double gamma = eqState->GetSpecificHeatRatio();
-  const double rhoE =
-      inputRhoRhoVp[4] / (gamma - 1.) + 0.5 *
-                                            (inputRhoRhoVp[1] * inputRhoRhoVp[1] + inputRhoRhoVp[2] * inputRhoRhoVp[2] +
-                                             inputRhoRhoVp[3] * inputRhoRhoVp[3]) /
-                                            inputRhoRhoVp[0];
+  initState(0) = inputRhoRhoVp[0];
+  initState(1) = inputRhoRhoVp[1];
+  initState(2) = inputRhoRhoVp[2];
+  if (dim == 3) initState(3) = inputRhoRhoVp[3];
+
+  if (mixture->GetWorkingFluid() == WorkingFluid::USER_DEFINED) {
+    const int numSpecies = mixture->GetNumSpecies();
+    const int numActiveSpecies = mixture->GetNumActiveSpecies();
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      int inputIndex = mixture->getInputIndexOf(sp);
+      initState(2+dim+sp) = inputRhoRhoVp[0] * config.initialMassFractions(inputIndex);
+    }
+
+    // electron energy
+    if (mixture->IsTwoTemperature()) {
+      double ne = 0.;
+      if (mixture->IsAmbipolar()) {
+        for (int sp = 0; sp < numActiveSpecies; sp++)
+          ne += mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) *
+                initState(2+dim+sp)/mixture->GetGasParams(sp, GasParams::SPECIES_MW);
+      }else {
+        ne = initState(2 + dim + numSpecies - 2) /
+          mixture->GetGasParams(numSpecies - 2, GasParams::SPECIES_MW);
+      }
+
+      initState(num_equation-1) = config.initialElectronTemperature * ne *
+                                  mixture->getMolarCV(numSpecies-2);
+    }
+  }
+
+  // initial energy
+  mixture->modifyEnergyForPressure(initState, initState, inputRhoRhoVp[4]);
+
+  // TODO(marc): try to make this mixture independent
+//   DryAir *eqState = new DryAir(dim, num_equation);
+
+//   const double gamma = eqState->GetSpecificHeatRatio();
+//   const double rhoE =
+//       inputRhoRhoVp[4] / (gamma - 1.) + 0.5 *
+//                                             (inputRhoRhoVp[1] * inputRhoRhoVp[1] + inputRhoRhoVp[2] * inputRhoRhoVp[2] +
+//                                              inputRhoRhoVp[3] * inputRhoRhoVp[3]) /
+//                                             inputRhoRhoVp[0];
 
   Vector state;
   state.UseDevice(false);
@@ -1373,25 +1417,12 @@ void M2ulPhyS::dryAirUniformInitialConditions() {
   Vector Upi;
   Upi.UseDevice(false);
   Upi.SetSize(num_equation);
+  mixture->GetPrimitivesFromConservatives(initState, Upi);
 
   for (int i = 0; i < dof; i++) {
-    data[i] = inputRhoRhoVp[0];
-    data[i + dof] = inputRhoRhoVp[1];
-    data[i + 2 * dof] = inputRhoRhoVp[2];
-    if (dim == 3) data[i + 3 * dof] = inputRhoRhoVp[3];
-    data[i + (1 + dim) * dof] = rhoE;
-    if (eqSystem == NS_PASSIVE) data[i + (num_equation - 1) * dof] = 0.;
-
-    for (int eq = 0; eq < num_equation; eq++) state(eq) = data[i + eq * dof];
-    eqState->GetPrimitivesFromConservatives(state, Upi);
+//     }
+    for (int eq = 0; eq < num_equation; eq++) data[i + eq * dof] = initState(eq);
     for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * dof] = Upi[eq];
-
-    //     dataUp[i] = data[i];
-    //     dataUp[i + dof] = data[i + dof] / data[i];
-    //     dataUp[i + 2 * dof] = data[i + 2 * dof] / data[i];
-    //     if (dim == 3) dataUp[i + 3 * dof] = data[i + 3 * dof] / data[i];
-    //     dataUp[i + (1 + dim) * dof] = inputRhoRhoVp[4];
-    //     if (eqSystem == NS_PASSIVE) dataUp[i + (num_equation - 1) * dof] = 0.;
 
     for (int d = 0; d < dim; d++) {
       for (int eq = 0; eq < num_equation; eq++) {
@@ -1400,49 +1431,49 @@ void M2ulPhyS::dryAirUniformInitialConditions() {
     }
   }
 
-  delete eqState;
+//   delete eqState;
 }
 
-void M2ulPhyS::uniformInitialConditions() {
-  if (config.GetWorkingFluid() == DRY_AIR) {
-    dryAirUniformInitialConditions();
-    return;
-  }
-
-  std::string basepath("initialConditions");
-  Vector initCondition(num_equation);
-  for (int eq = 0; eq < num_equation; eq++) {
-    tpsP->getRequiredInput((basepath + "/Q" + std::to_string(eq+1)).c_str(), initCondition[eq]);
-  }
-
-  double *data = U->HostWrite();
-  double *dataUp = Up->HostWrite();
-  double *dataGradUp = gradUp->HostWrite();
-
-  int dof = vfes->GetNDofs();
-
-  Vector state;
-  state.UseDevice(false);
-  state.SetSize(num_equation);
-  Vector Upi;
-  Upi.UseDevice(false);
-  Upi.SetSize(num_equation);
-
-  for (int i = 0; i < dof; i++) {
-    for (int eq = 0; eq < num_equation; eq++) {
-      data[i + eq * dof] = initCondition(eq);
-      state(eq) = data[i + eq * dof];
-      for (int d = 0; d < dim; d++) {
-        dataGradUp[i + eq * dof + d * num_equation * dof] = 0.;
-      }
-    }
-
-    mixture->GetPrimitivesFromConservatives(state, Upi);
-    for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * dof] = Upi[eq];
-  }
-
-  return;
-}
+// void M2ulPhyS::uniformInitialConditions() {
+//   if (config.GetWorkingFluid() == DRY_AIR) {
+//     dryAirUniformInitialConditions();
+//     return;
+//   }
+//
+//   std::string basepath("initialConditions");
+//   Vector initCondition(num_equation);
+//   for (int eq = 0; eq < num_equation; eq++) {
+//     tpsP->getRequiredInput((basepath + "/Q" + std::to_string(eq+1)).c_str(), initCondition[eq]);
+//   }
+//
+//   double *data = U->HostWrite();
+//   double *dataUp = Up->HostWrite();
+//   double *dataGradUp = gradUp->HostWrite();
+//
+//   int dof = vfes->GetNDofs();
+//
+//   Vector state;
+//   state.UseDevice(false);
+//   state.SetSize(num_equation);
+//   Vector Upi;
+//   Upi.UseDevice(false);
+//   Upi.SetSize(num_equation);
+//
+//   for (int i = 0; i < dof; i++) {
+//     for (int eq = 0; eq < num_equation; eq++) {
+//       data[i + eq * dof] = initCondition(eq);
+//       state(eq) = data[i + eq * dof];
+//       for (int d = 0; d < dim; d++) {
+//         dataGradUp[i + eq * dof + d * num_equation * dof] = 0.;
+//       }
+//     }
+//
+//     mixture->GetPrimitivesFromConservatives(state, Upi);
+//     for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * dof] = Upi[eq];
+//   }
+//
+//   return;
+// }
 
 void M2ulPhyS::initGradUp() {
   double *dataGradUp = gradUp->HostWrite();
@@ -1867,7 +1898,7 @@ void M2ulPhyS::parseSolverOptions2() {
   // plasma conditions.
   config.gasModel = NUM_GASMODEL;
   config.transportModel = NUM_TRANSPORTMODEL;
-  config.chemistryModel = NUM_CHEMISTRYMODEL;
+  config.chemistryModel_ = NUM_CHEMISTRYMODEL;
   if (config.workFluid != USER_DEFINED) {
     cout << "Fluid is set to the preset '" << fluidTypeStr << "'. Input options in [plasma_models] will not be used."
          << endl;
@@ -1896,6 +1927,10 @@ void M2ulPhyS::parseSolverOptions2() {
 
     std::string chemistryModelStr;
     tpsP->getInput("plasma_models/chemistry_model", chemistryModelStr, std::string(""));
+
+    if (chemistryModelStr == "mass_action_law") {
+      config.chemistryModel_ = ChemistryModel::MASS_ACTION_LAW;
+    }
   }
 
   // species list.
@@ -1905,6 +1940,7 @@ void M2ulPhyS::parseSolverOptions2() {
       tpsP->getInput("species/numSpecies", config.numSpecies, 1);
       config.gasParams.SetSize(config.numSpecies, GasParams::NUM_GASPARAMS);
       // config.speciesNames.SetSize(config.numSpecies);
+      config.initialMassFractions.SetSize(config.numSpecies);
       config.speciesNames.resize(config.numSpecies);
 
       if (config.gasModel == PERFECT_MIXTURE) {
@@ -1933,7 +1969,7 @@ void M2ulPhyS::parseSolverOptions2() {
     // Gas Params
     if (config.workFluid != DRY_AIR) {
       for (int i = 1; i <= config.numSpecies; i++) {
-        double mw, charge;
+        double mw, charge, formEnergy;
         std::string type, speciesName;
         std::string basepath("species/species" + std::to_string(i));
 
@@ -1942,8 +1978,18 @@ void M2ulPhyS::parseSolverOptions2() {
 
         tpsP->getRequiredInput((basepath + "/molecular_weight").c_str(), mw);
         tpsP->getRequiredInput((basepath + "/charge_number").c_str(), charge);
+        tpsP->getRequiredInput((basepath + "/formation_energy").c_str(), formEnergy);
         config.gasParams(i - 1, GasParams::SPECIES_MW) = mw;
         config.gasParams(i - 1, GasParams::SPECIES_CHARGES) = charge;
+        config.gasParams(i - 1, GasParams::FORMATION_ENERGY) = formEnergy;
+
+        //tpsP->getRequiredInput((basepath + "/initialMassFraction").c_str(),
+        //                       config.initialMassFractions(i - 1));
+
+        //// require initial electron temperature
+        //if (speciesName == "E")
+        //  tpsP->getRequiredInput((basepath + "/initialElectronTemperature").c_str(),
+        //                         config.initialElectronTemperature);
 
         if (config.gasModel == PERFECT_MIXTURE) {
           tpsP->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(),
