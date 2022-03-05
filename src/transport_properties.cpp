@@ -58,7 +58,8 @@ DryAirTransport::DryAirTransport(GasMixture *_mixture, RunConfiguration &_runfil
 
 void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
                                                      Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
-  double p = mixture->ComputePressure(state);
+  double dummy; // electron pressure. won't compute anything.
+  double p = mixture->ComputePressure(state, dummy);
   double temp = p / gas_constant / state[0];
 
   transportBuffer.SetSize(GlobalTrnsCoeffs::NUM_GLOBAL_COEFFS);
@@ -84,7 +85,7 @@ void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const 
     }
 
     for (int d = 0; d < dim; d++) {
-      assert(~std::isnan(diffusionVelocity(0, d)));
+      assert(!std::isnan(diffusionVelocity(0, d)));
     }
   }
 }
@@ -98,7 +99,8 @@ TestBinaryAirTransport::TestBinaryAirTransport(GasMixture *_mixture, RunConfigur
 
 void TestBinaryAirTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
                                                             Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
-  double p = mixture->ComputePressure(state);
+  double dummy; // electron pressure. won't compute anything.
+  double p = mixture->ComputePressure(state, dummy);
   double temp = p / gas_constant / state[0];
 
   transportBuffer.SetSize(GlobalTrnsCoeffs::NUM_GLOBAL_COEFFS);

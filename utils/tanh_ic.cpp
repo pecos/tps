@@ -17,7 +17,7 @@ int main (int argc, char *argv[])
   M2ulPhyS *srcField = new M2ulPhyS(tps.getMPISession(), tps.getInputFilename(), &tps);
   RunConfiguration& srcConfig = srcField->GetConfig();
   assert(srcConfig.GetWorkingFluid()==USER_DEFINED);
-  assert(~srcConfig.GetRestartCycle());
+  assert(!srcConfig.GetRestartCycle());
 
   GasMixture *mixture = srcField->getMixture();
   int numSpecies = mixture->GetNumSpecies();
