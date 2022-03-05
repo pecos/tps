@@ -37,20 +37,19 @@
 #include <mfem.hpp>
 #include <mfem/general/forall.hpp>
 
+#include "chemistry.hpp"
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
 #include "fluxes.hpp"
-#include "run_configuration.hpp"
 #include "forcing_terms.hpp"
+#include "run_configuration.hpp"
 #include "transport_properties.hpp"
-#include "chemistry.hpp"
 
 using namespace mfem;
 using namespace std;
 
 class SourceTerm : public ForcingTerms {
  private:
-
   // These are protected variables in ForcingTerms base class.
   // double time;
   //
@@ -80,9 +79,9 @@ class SourceTerm : public ForcingTerms {
 
  public:
   SourceTerm(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
-             IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
-             ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
-             RunConfiguration &_config, GasMixture *mixture, TransportProperties *transport, Chemistry *chemistry);
+             IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
+             const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config, GasMixture *mixture,
+             TransportProperties *transport, Chemistry *chemistry);
   ~SourceTerm();
 
   // Terms do not need updating
@@ -93,6 +92,5 @@ class SourceTerm : public ForcingTerms {
 
 #endif
 };
-
 
 #endif  // SOURCE_TERM_HPP_

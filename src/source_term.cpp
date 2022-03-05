@@ -36,59 +36,60 @@
 SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                        IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
                        ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
-                       RunConfiguration &_config, GasMixture *mixture, TransportProperties *transport, Chemistry *chemistry)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType,
-                    _intRules, _vfes, _Up,
-                    _gradUp, gpuArrays),
+                       RunConfiguration &_config, GasMixture *mixture, TransportProperties *transport,
+                       Chemistry *chemistry)
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays),
       mixture_(mixture),
       transport_(transport),
       chemistry_(chemistry) {
-  h_numElems = gpuArrays.numElems.HostRead();
-  h_posDofIds = gpuArrays.posDofIds.HostRead();
+  numSpecies_ = mixture->GetNumSpecies();
+  numActiveSpecies_ = mixture->GetNumActiveSpecies();
+  //   int numReactions_ = chemistry_->
+
+  ambipolar_ = mixture->IsAmbipolar();
+  twoTemperature_ = mixture->IsTwoTemperature();
 }
 
 SourceTerm::~SourceTerm() {
-  if (mixture_ != NULL) delete mixture_;
-  if (transport_ != NULL) delete transport_;
-  if (chemistry_ != NULL) delete chemistry_;
+  //   if (mixture_ != NULL) delete mixture_;
+  //   if (transport_ != NULL) delete transport_;
+  //   if (chemistry_ != NULL) delete chemistry_;
 }
 
-void SourceTerm::updateTerms(mfem::Vector& in)
-{
+void SourceTerm::updateTerms(mfem::Vector &in) {
   const double *h_Up = Up->HostRead();
   double *h_in = in.HostReadWrite();
-  
+
   const int nnodes = vfes->GetNDofs();
-  
+
   Vector upn(num_equation);
   Vector Un(num_equation);
   for (int n = 0; n < nnodes; n++) {
     for (int eq = 0; eq < num_equation; eq++) upn(eq) = h_Up[n + eq * nnodes];
     mixture_->GetConservativesFromPrimitives(upn, Un);
-    
+
     double Th = 0., Te = 0.;
     Th = upn[1 + dim];
     if (mixture_->IsTwoTemperature()) {
       Te = upn[num_equation - 1];
-    }else {
+    } else {
       Te = Th;
     }
-    
+
     Vector kfwd, kC;
     chemistry_->computeForwardRateCoeffs(Th, Te, kfwd);
     chemistry_->computeEquilibriumConstants(Th, Te, kC);
-    
+
     Vector ns;
     mixture_->computeNumberDensities(Un, ns);
-    
+
     // get reaction rates
     Vector creationRates;
     chemistry_->computeCreationRate(ns, kfwd, kC, creationRates);
-    
-    // add terms to RHS
+
+    // add species creation rates
     for (int sp = 0; sp < numActiveSpecies_; sp++) {
       h_in[n + (2 + dim + sp) * nnodes] += creationRates(sp);
     }
   }
 }
-

@@ -37,7 +37,7 @@
 GasMixture::GasMixture(WorkingFluid _fluid, int _dim) {
   fluid = _fluid;
   dim = _dim;
-};
+}
 
 void GasMixture::UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up) {
   double *pGridFunc = press->HostWrite();
@@ -708,16 +708,8 @@ double PerfectMixture::computeBackgroundMassDensity(const double &rho, const dou
     rhoB -= n_e * gasParams(numSpecies - 2, GasParams::SPECIES_MW);
   }
 
-if (rhoB < 0.0) {
-  std::cout << "rho: " << rho << std::endl;
-  std::cout << "n_sp: ";
-  for (int sp = 0; sp < numActiveSpecies; sp++) std::cout << n_sp[sp] << ",\t";
-  std::cout << std::endl;
-  std::cout << "n_e: " << n_e << std::endl;
-  std::cout << "rhoB: " << rhoB << std::endl;
-  assert(rhoB >= 0.0);
-}
-
+  // assert(rhoB >= 0.0);
+  if (rhoB < 0.) grvy_printf(GRVY_ERROR, "\nNegative background density -> %f\n", rhoB);
 
   return rhoB;
 }
