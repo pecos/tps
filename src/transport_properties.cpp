@@ -168,6 +168,9 @@ void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, cons
   }
 
   for (int d = 0; d < dim; d++) {
-    assert(!std::isnan(diffusionVelocity(0, d)));
+    if (std::isnan(diffusionVelocity(0, d))) {
+      grvy_printf(GRVY_ERROR, "\nDiffusion velocity is NaN! -> %f\n", diffusionVelocity(0, d));
+      exit(-1);
+    }
   }
 }

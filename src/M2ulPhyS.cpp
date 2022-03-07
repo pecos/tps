@@ -277,6 +277,9 @@ void M2ulPhyS::initVariables() {
         case ARGON_MINIMAL:
           transportPtr = new ArgonMinimalTransport(mixture, config);
           break;
+        case CONSTANT:
+          transportPtr = new ConstantTransport(mixture, config);
+          break;
         default:
           break;
       }

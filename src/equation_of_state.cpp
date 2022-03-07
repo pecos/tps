@@ -691,7 +691,10 @@ double PerfectMixture::computeBackgroundMassDensity(const double &rho, const dou
   }
 
   // assert(rhoB >= 0.0);
-  if (rhoB < 0.) grvy_printf(GRVY_ERROR, "\nNegative background density -> %f\n", rhoB);
+  if (rhoB < 0.) {
+    grvy_printf(GRVY_ERROR, "\nNegative background density -> %f\n", rhoB);
+    exit(-1);
+  }
 
   return rhoB;
 }
