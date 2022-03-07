@@ -11,6 +11,69 @@ double uniformRandomNumber() {
   return (double) rand() / (RAND_MAX);
 }
 
+double getRandomPrimitiveState(GasMixture *mixture, Vector &primitiveState) {
+  const double numEquation = mixture->GetNumEquations();
+  const double numSpecies = mixture->GetNumSpecies();
+  const double numActiveSpecies = mixture->GetNumActiveSpecies();
+  const bool ambipolar = mixture->IsAmbipolar();
+  const bool twoTemperature = mixture->IsTwoTemperature();
+  const double dim = mixture->GetDimension();
+
+  primitiveState.SetSize(numEquation);
+  // testPrimitives[0] = 1.784 * ( 0.9 + 0.2 * uniformRandomNumber() );
+  for (int d = 0; d < dim; d++) {
+    primitiveState(d + 1) = -0.5 + 1.0 * uniformRandomNumber();
+  }
+  primitiveState(dim + 1) = 300.0 * ( 0.9 + 0.2 * uniformRandomNumber() );
+  if (twoTemperature) primitiveState(numEquation - 1) = 400.0 * ( 0.8 + 0.4 * uniformRandomNumber() );
+
+  Vector n_sp(numSpecies);
+  for (int sp = 0; sp < numSpecies; sp++){
+    if (ambipolar && (sp == numSpecies - 2)) continue;
+    n_sp(sp) = 1.0e0 * uniformRandomNumber();
+    if (sp == numSpecies - 1) n_sp(sp) += 1.0e0;
+  }
+  if (ambipolar) {
+    double ne = mixture->computeAmbipolarElectronNumberDensity(&n_sp[0]);
+    n_sp(numSpecies - 2) = ne;
+  }
+  grvy_printf(GRVY_INFO, "\n number densities.\n");
+  for (int sp = 0; sp < numSpecies; sp++){
+    grvy_printf(GRVY_INFO, "%.8E, ", n_sp(sp));
+  }
+  grvy_printf(GRVY_INFO, "\n");
+
+  double rho = 0.0;
+  for (int sp = 0; sp < numSpecies; sp++) rho += n_sp(sp) * mixture->GetGasParams(sp,GasParams::SPECIES_MW);
+  primitiveState(0) = rho;
+
+  for (int sp = 0; sp < numActiveSpecies; sp++) primitiveState(dim + 2 + sp) = n_sp(sp);
+
+  double Yb = n_sp(numSpecies - 1) * mixture->GetGasParams(numSpecies - 1,GasParams::SPECIES_MW) / rho;
+  return Yb;
+}
+
+void getRandomDirection(const Vector &velocity, Vector &direction) {
+  const double dim = velocity.Size();
+  Vector unitVel(dim);
+  double velNorm = 0.0;
+  for (int d = 0; d < dim; d++) velNorm += velocity(d) * velocity(d);
+  for (int d = 0; d < dim; d++) unitVel(d) = velocity(d) / sqrt(velNorm);
+
+  direction.SetSize(dim);
+  velNorm = 0.0;
+  for (int d = 0; d < dim; d++) {
+    direction(d) = unitVel(d) * (0.5 + uniformRandomNumber());
+    velNorm += direction(d) * direction(d);
+  }
+  for (int d = 0; d < dim; d++) direction(d) /= sqrt(velNorm);
+  grvy_printf(GRVY_INFO, "\n direction.\n");
+  for (int d = 0; d < dim; d++) {
+    grvy_printf(GRVY_INFO, "%.8E, ", direction(d));
+  }
+  grvy_printf(GRVY_INFO, "\n");
+}
+
 int main (int argc, char *argv[])
 {
   TPS::Tps tps(argc, argv);
@@ -45,23 +108,24 @@ int main (int argc, char *argv[])
     grvy_printf(GRVY_INFO, "\n Setting a random primitive variable. \n");
 
     Vector testPrimitives(mixture->GetNumEquations());
-    testPrimitives[0] = 1.784 * ( 0.9 + 0.2 * uniformRandomNumber() );
-    for (int d = 0; d < dim; d++) {
-      testPrimitives[d + 1] = -0.5 + 1.0 * uniformRandomNumber();
-    }
-    testPrimitives[dim + 1] = 300.0 * ( 0.9 + 0.2 * uniformRandomNumber() );
-
-    double Yb = uniformRandomNumber();
-    Vector Ysp(mixture->GetNumActiveSpecies());
-    double Ysum = 0.0;
-    for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
-      Ysp[sp] = uniformRandomNumber();
-      Ysum += Ysp[sp];
-    }
-    for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
-      double Y = Ysp[sp] / Ysum * (1.0 - Yb);
-      testPrimitives[dim + 2 + sp] = testPrimitives[0] * Y / mixture->GetGasParams(sp,GasParams::SPECIES_MW);
-    }
+    double Yb = getRandomPrimitiveState(mixture, testPrimitives);
+    // testPrimitives[0] = 1.784 * ( 0.9 + 0.2 * uniformRandomNumber() );
+    // for (int d = 0; d < dim; d++) {
+    //   testPrimitives[d + 1] = -0.5 + 1.0 * uniformRandomNumber();
+    // }
+    // testPrimitives[dim + 1] = 300.0 * ( 0.9 + 0.2 * uniformRandomNumber() );
+    //
+    // double Yb = uniformRandomNumber();
+    // Vector Ysp(mixture->GetNumActiveSpecies());
+    // double Ysum = 0.0;
+    // for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
+    //   Ysp[sp] = uniformRandomNumber();
+    //   Ysum += Ysp[sp];
+    // }
+    // for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
+    //   double Y = Ysp[sp] / Ysum * (1.0 - Yb);
+    //   testPrimitives[dim + 2 + sp] = testPrimitives[0] * Y / mixture->GetGasParams(sp,GasParams::SPECIES_MW);
+    // }
     // for (int n = 0; n < mixture->GetNumEquations(); n++){
     //   std::cout << testPrimitives[n] << ",";
     // }
@@ -133,7 +197,9 @@ int main (int argc, char *argv[])
 
     grvy_printf(GRVY_INFO, "\n Testing computeSpeciesPrimitives. \n");
 
-    Vector X_sp, Y_sp, n_sp;
+    int numSpecies = mixture->GetNumSpecies();
+    int numEquation = mixture->GetNumEquations();
+    Vector X_sp(numSpecies), Y_sp(numSpecies), n_sp(numSpecies);
     mixture->computeSpeciesPrimitives(conservedState, X_sp, Y_sp, n_sp);
     double Xsum = 0.0;
     for (int sp = 0; sp < mixture->GetNumSpecies(); sp++){
@@ -143,7 +209,7 @@ int main (int argc, char *argv[])
       grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives does not conserve mole fraction.");
       exit(ERROR);
     }
-    Ysum = 0.0;
+    double Ysum = 0.0;
     for (int sp = 0; sp < mixture->GetNumSpecies(); sp++){
       Ysum += Y_sp[sp];
     }
@@ -152,7 +218,10 @@ int main (int argc, char *argv[])
       exit(ERROR);
     }
     if (abs(Yb - Y_sp[mixture->GetNumSpecies() - 1]) > 1.0e-15) {
-      grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives does not compute background species properly.");
+      double error = abs(Yb - Y_sp[mixture->GetNumSpecies() - 1]);
+      grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives does not compute background species properly. Error: %.8E\n", error);
+      grvy_printf(GRVY_ERROR, "\n Yb: %.8E\n", Yb);
+      grvy_printf(GRVY_ERROR, "\n Ysp: %.8E\n", Y_sp[numSpecies - 1]);
       exit(ERROR);
     }
     for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
@@ -164,8 +233,6 @@ int main (int argc, char *argv[])
 
     grvy_printf(GRVY_INFO, "\n Setting a random primitive gradient. \n");
 
-    int numSpecies = mixture->GetNumSpecies();
-    int numEquation = mixture->GetNumEquations();
     DenseMatrix gradUp(numEquation,dim);
     gradUp = 0.0;
     for (int eq = 0; eq < numEquation; eq++) {
@@ -176,12 +243,15 @@ int main (int argc, char *argv[])
     mixture->computeMassFractionGradient(testPrimitives[0], n_sp, gradUp, massFractionGrad);
     mixture->computeMoleFractionGradient(n_sp, gradUp, moleFractionGrad);
     Vector dir(dim);
-    double norm = 0.0;
-    for (int d = 0; d < dim; d++) {
-      dir(d) = -1.0 + 2.0 * uniformRandomNumber();
-      norm += dir(d) * dir(d);
-    }
-    dir /= sqrt(norm);
+    Vector velocity(dim);
+    for (int d = 0; d < dim; d++) velocity(d) = testPrimitives(d + 1);
+    getRandomDirection(velocity, dir);
+    // double norm = 0.0;
+    // for (int d = 0; d < dim; d++) {
+    //   dir(d) = -1.0 + 2.0 * uniformRandomNumber();
+    //   norm += dir(d) * dir(d);
+    // }
+    // dir /= sqrt(norm);
 
     Vector dUp_dx(numEquation), dY_dx(numSpecies), dX_dx(numSpecies);
     gradUp.Mult(dir, dUp_dx);
@@ -359,9 +429,9 @@ int main (int argc, char *argv[])
       grvy_printf(GRVY_INFO, "Pressure: %.15E\n", pressureFromConserved);
 
       // grvy_printf(GRVY_INFO, "Deducing outside the routine, using known pressure. \n");
-      // double normalVelocity = 0.0;
-      // for (int d = 0; d < dim; d++) normalVelocity += testPrimitives(d + 1) * dir(d);
-      // grvy_printf(GRVY_INFO, "Normal velocity: %.8E \n", normalVelocity);
+      double normalVelocity = 0.0;
+      for (int d = 0; d < dim; d++) normalVelocity += testPrimitives(d + 1) * dir(d);
+      grvy_printf(GRVY_INFO, "Normal velocity: %.8E \n", normalVelocity);
       //
       // double bulkKinEnergy = 0.0;
       // for (int d = 0; d < dim; d++) bulkKinEnergy += testPrimitives(d + 1) * testPrimitives(d + 1);
@@ -450,30 +520,31 @@ int main (int argc, char *argv[])
     grvy_printf(GRVY_INFO, "\n Setting a random primitive variable. \n");
 
     Vector testPrimitives(mixture->GetNumEquations());
-    testPrimitives[0] = 1.784 * ( 0.9 + 0.2 * uniformRandomNumber() );
-    for (int d = 0; d < dim; d++) {
-      testPrimitives[d + 1] = -0.5 + 1.0 * uniformRandomNumber();
-    }
-    testPrimitives[dim + 1] = 300.0 * ( 0.9 + 0.2 * uniformRandomNumber() );
-
-    double Yb = 0.5 + 0.5 * uniformRandomNumber();
-    Vector Ysp(mixture->GetNumActiveSpecies());
-    Vector nsp(mixture->GetNumActiveSpecies());
-    double Ysum = 0.0;
-    for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
-      Ysp[sp] = uniformRandomNumber();
-      Ysum += Ysp[sp];
-    }
-    for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
-      double Y = Ysp[sp] / Ysum * (1.0 - Yb);
-      nsp[sp] = testPrimitives[0] * Y / mixture->GetGasParams(sp,GasParams::SPECIES_MW);
-      testPrimitives[dim + 2 + sp] = nsp[sp];
-    }
-    double ne = 0.0;
-    for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
-      ne += nsp[sp] * mixture->GetGasParams(sp,GasParams::SPECIES_CHARGES);
-    }
-    Yb -= ne * mixture->GetGasParams(mixture->GetNumSpecies() - 2, GasParams::SPECIES_MW) / testPrimitives[0];
+    double Yb = getRandomPrimitiveState(mixture, testPrimitives);
+    // testPrimitives[0] = 1.784 * ( 0.9 + 0.2 * uniformRandomNumber() );
+    // for (int d = 0; d < dim; d++) {
+    //   testPrimitives[d + 1] = -0.5 + 1.0 * uniformRandomNumber();
+    // }
+    // testPrimitives[dim + 1] = 300.0 * ( 0.9 + 0.2 * uniformRandomNumber() );
+    //
+    // double Yb = 0.5 + 0.5 * uniformRandomNumber();
+    // Vector Ysp(mixture->GetNumActiveSpecies());
+    // Vector nsp(mixture->GetNumActiveSpecies());
+    // double Ysum = 0.0;
+    // for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
+    //   Ysp[sp] = uniformRandomNumber();
+    //   Ysum += Ysp[sp];
+    // }
+    // for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
+    //   double Y = Ysp[sp] / Ysum * (1.0 - Yb);
+    //   nsp[sp] = testPrimitives[0] * Y / mixture->GetGasParams(sp,GasParams::SPECIES_MW);
+    //   testPrimitives[dim + 2 + sp] = nsp[sp];
+    // }
+    // double ne = 0.0;
+    // for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
+    //   ne += nsp[sp] * mixture->GetGasParams(sp,GasParams::SPECIES_CHARGES);
+    // }
+    // Yb -= ne * mixture->GetGasParams(mixture->GetNumSpecies() - 2, GasParams::SPECIES_MW) / testPrimitives[0];
 
     grvy_printf(GRVY_INFO, "\n Testing Conversion between conserved/primitive. \n");
 
@@ -531,7 +602,9 @@ int main (int argc, char *argv[])
 
     grvy_printf(GRVY_INFO, "\n Testing computeSpeciesPrimitives. \n");
 
-    Vector X_sp, Y_sp, n_sp;
+    int numSpecies = mixture->GetNumSpecies();
+    int numEquation = mixture->GetNumEquations();
+    Vector X_sp(numSpecies), Y_sp(numSpecies), n_sp(numSpecies);
     mixture->computeSpeciesPrimitives(conservedState, X_sp, Y_sp, n_sp);
     double Xsum = 0.0;
     for (int sp = 0; sp < mixture->GetNumSpecies(); sp++){
@@ -541,7 +614,7 @@ int main (int argc, char *argv[])
       grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives does not conserve mole fraction.");
       exit(ERROR);
     }
-    Ysum = 0.0;
+    double Ysum = 0.0;
     for (int sp = 0; sp < mixture->GetNumSpecies(); sp++){
       Ysum += Y_sp[sp];
     }
@@ -572,8 +645,6 @@ int main (int argc, char *argv[])
 
     grvy_printf(GRVY_INFO, "\n Setting a random primitive gradient. \n");
 
-    int numSpecies = mixture->GetNumSpecies();
-    int numEquation = mixture->GetNumEquations();
     DenseMatrix gradUp(numEquation,dim);
     gradUp = 0.0;
     for (int eq = 0; eq < numEquation; eq++) {
@@ -584,12 +655,15 @@ int main (int argc, char *argv[])
     mixture->computeMassFractionGradient(testPrimitives[0], n_sp, gradUp, massFractionGrad);
     mixture->computeMoleFractionGradient(n_sp, gradUp, moleFractionGrad);
     Vector dir(dim);
-    double norm = 0.0;
-    for (int d = 0; d < dim; d++) {
-      dir(d) = -1.0 + 2.0 * uniformRandomNumber();
-      norm += dir(d) * dir(d);
-    }
-    dir /= sqrt(norm);
+    Vector velocity(dim);
+    for (int d = 0; d < dim; d++) velocity(d) = testPrimitives(d + 1);
+    getRandomDirection(velocity, dir);
+    // double norm = 0.0;
+    // for (int d = 0; d < dim; d++) {
+    //   dir(d) = -1.0 + 2.0 * uniformRandomNumber();
+    //   norm += dir(d) * dir(d);
+    // }
+    // dir /= sqrt(norm);
 
     Vector dUp_dx(numEquation), dY_dx(numSpecies), dX_dx(numSpecies);
     gradUp.Mult(dir, dUp_dx);
@@ -764,6 +838,10 @@ int main (int argc, char *argv[])
       convectiveFlux.Mult(dir, normalFlux);
       grvy_printf(GRVY_INFO, "Computed normal convective flux. \n");
 
+      double normalVelocity = 0.0;
+      for (int d = 0; d < dim; d++) normalVelocity += testPrimitives(d + 1) * dir(d);
+      grvy_printf(GRVY_INFO, "Normal velocity: %.8E \n", normalVelocity);
+
       Vector deducedState(numEquation);
       mixture->computeConservedStateFromConvectiveFlux(normalFlux, dir, deducedState);
       grvy_printf(GRVY_INFO, "Computed conserved state back from normal convective flux. \n");
@@ -799,26 +877,27 @@ int main (int argc, char *argv[])
     grvy_printf(GRVY_INFO, "\n Setting a random primitive variable. \n");
 
     Vector testPrimitives(mixture->GetNumEquations());
-    testPrimitives[0] = 1.784 * ( 0.9 + 0.2 * uniformRandomNumber() );
-    for (int d = 0; d < dim; d++) {
-      testPrimitives[d + 1] = -0.5 + 1.0 * uniformRandomNumber();
-    }
-    testPrimitives[dim + 1] = 300.0 * ( 0.9 + 0.2 * uniformRandomNumber() );
-    testPrimitives[mixture->GetNumEquations() - 1] = 500.0 * ( 0.8 + 0.4 * uniformRandomNumber() );
-
-    double Yb = uniformRandomNumber();
-    Vector Ysp(mixture->GetNumActiveSpecies());
-    Vector nsp(mixture->GetNumActiveSpecies());
-    double Ysum = 0.0;
-    for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
-      Ysp[sp] = uniformRandomNumber();
-      Ysum += Ysp[sp];
-    }
-    for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
-      double Y = Ysp[sp] / Ysum * (1.0 - Yb);
-      nsp[sp] = testPrimitives[0] * Y / mixture->GetGasParams(sp,GasParams::SPECIES_MW);
-      testPrimitives[dim + 2 + sp] = nsp[sp];
-    }
+    double Yb = getRandomPrimitiveState(mixture, testPrimitives);
+    // testPrimitives[0] = 1.784 * ( 0.9 + 0.2 * uniformRandomNumber() );
+    // for (int d = 0; d < dim; d++) {
+    //   testPrimitives[d + 1] = -0.5 + 1.0 * uniformRandomNumber();
+    // }
+    // testPrimitives[dim + 1] = 300.0 * ( 0.9 + 0.2 * uniformRandomNumber() );
+    // testPrimitives[mixture->GetNumEquations() - 1] = 500.0 * ( 0.8 + 0.4 * uniformRandomNumber() );
+    //
+    // double Yb = uniformRandomNumber();
+    // Vector Ysp(mixture->GetNumActiveSpecies());
+    // Vector nsp(mixture->GetNumActiveSpecies());
+    // double Ysum = 0.0;
+    // for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
+    //   Ysp[sp] = uniformRandomNumber();
+    //   Ysum += Ysp[sp];
+    // }
+    // for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
+    //   double Y = Ysp[sp] / Ysum * (1.0 - Yb);
+    //   nsp[sp] = testPrimitives[0] * Y / mixture->GetGasParams(sp,GasParams::SPECIES_MW);
+    //   testPrimitives[dim + 2 + sp] = nsp[sp];
+    // }
 
     grvy_printf(GRVY_INFO, "\n Testing Conversion between conserved/primitive. \n");
 
@@ -876,7 +955,9 @@ int main (int argc, char *argv[])
 
     grvy_printf(GRVY_INFO, "\n Testing computeSpeciesPrimitives. \n");
 
-    Vector X_sp, Y_sp, n_sp;
+    int numSpecies = mixture->GetNumSpecies();
+    int numEquation = mixture->GetNumEquations();
+    Vector X_sp(numSpecies), Y_sp(numSpecies), n_sp(numSpecies);
     mixture->computeSpeciesPrimitives(conservedState, X_sp, Y_sp, n_sp);
     double Xsum = 0.0;
     for (int sp = 0; sp < mixture->GetNumSpecies(); sp++){
@@ -886,7 +967,7 @@ int main (int argc, char *argv[])
       grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives does not conserve mole fraction.");
       exit(ERROR);
     }
-    Ysum = 0.0;
+    double Ysum = 0.0;
     for (int sp = 0; sp < mixture->GetNumSpecies(); sp++){
       Ysum += Y_sp[sp];
     }
@@ -907,8 +988,6 @@ int main (int argc, char *argv[])
     }
 
     double T_h, T_e;
-    int numSpecies = mixture->GetNumSpecies();
-    int numEquation = mixture->GetNumEquations();
     mixture->computeTemperaturesBase(conservedState, &n_sp[0], n_sp[numSpecies-2], n_sp[numSpecies-1], T_h, T_e);
     if (abs( (T_h - testPrimitives[dim + 1]) / testPrimitives[dim + 1] ) > scalarErrorThreshold) {
       std::cout << T_h << " != " << testPrimitives[dim + 1] << std::endl;
@@ -932,12 +1011,15 @@ int main (int argc, char *argv[])
     mixture->computeMassFractionGradient(testPrimitives[0], n_sp, gradUp, massFractionGrad);
     mixture->computeMoleFractionGradient(n_sp, gradUp, moleFractionGrad);
     Vector dir(dim);
-    double norm = 0.0;
-    for (int d = 0; d < dim; d++) {
-      dir(d) = -1.0 + 2.0 * uniformRandomNumber();
-      norm += dir(d) * dir(d);
-    }
-    dir /= sqrt(norm);
+    Vector velocity(dim);
+    for (int d = 0; d < dim; d++) velocity(d) = testPrimitives(d + 1);
+    getRandomDirection(velocity, dir);
+    // double norm = 0.0;
+    // for (int d = 0; d < dim; d++) {
+    //   dir(d) = -1.0 + 2.0 * uniformRandomNumber();
+    //   norm += dir(d) * dir(d);
+    // }
+    // dir /= sqrt(norm);
 
     Vector dUp_dx(numEquation), dY_dx(numSpecies), dX_dx(numSpecies);
     gradUp.Mult(dir, dUp_dx);
@@ -1154,31 +1236,32 @@ int main (int argc, char *argv[])
     grvy_printf(GRVY_INFO, "\n Setting a random primitive variable. \n");
 
     Vector testPrimitives(mixture->GetNumEquations());
-    testPrimitives[0] = 1.784 * ( 0.9 + 0.2 * uniformRandomNumber() );
-    for (int d = 0; d < dim; d++) {
-      testPrimitives[d + 1] = -0.5 + 1.0 * uniformRandomNumber();
-    }
-    testPrimitives[dim + 1] = 300.0 * ( 0.9 + 0.2 * uniformRandomNumber() );
-    testPrimitives[mixture->GetNumEquations() - 1] = 500.0 * ( 0.8 + 0.4 * uniformRandomNumber() );
-
-    double Yb = 0.5 + 0.5 * uniformRandomNumber();
-    Vector Ysp(mixture->GetNumActiveSpecies());
-    Vector nsp(mixture->GetNumActiveSpecies());
-    double Ysum = 0.0;
-    for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
-      Ysp[sp] = uniformRandomNumber();
-      Ysum += Ysp[sp];
-    }
-    for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
-      double Y = Ysp[sp] / Ysum * (1.0 - Yb);
-      nsp[sp] = testPrimitives[0] * Y / mixture->GetGasParams(sp,GasParams::SPECIES_MW);
-      testPrimitives[dim + 2 + sp] = nsp[sp];
-    }
-    double ne = 0.0;
-    for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
-      ne += nsp[sp] * mixture->GetGasParams(sp,GasParams::SPECIES_CHARGES);
-    }
-    Yb -= ne * mixture->GetGasParams(mixture->GetNumSpecies() - 2, GasParams::SPECIES_MW) / testPrimitives[0];
+    double Yb = getRandomPrimitiveState(mixture, testPrimitives);
+    // testPrimitives[0] = 1.784 * ( 0.9 + 0.2 * uniformRandomNumber() );
+    // for (int d = 0; d < dim; d++) {
+    //   testPrimitives[d + 1] = -0.5 + 1.0 * uniformRandomNumber();
+    // }
+    // testPrimitives[dim + 1] = 300.0 * ( 0.9 + 0.2 * uniformRandomNumber() );
+    // testPrimitives[mixture->GetNumEquations() - 1] = 500.0 * ( 0.8 + 0.4 * uniformRandomNumber() );
+    //
+    // double Yb = 0.5 + 0.5 * uniformRandomNumber();
+    // Vector Ysp(mixture->GetNumActiveSpecies());
+    // Vector nsp(mixture->GetNumActiveSpecies());
+    // double Ysum = 0.0;
+    // for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
+    //   Ysp[sp] = uniformRandomNumber();
+    //   Ysum += Ysp[sp];
+    // }
+    // for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
+    //   double Y = Ysp[sp] / Ysum * (1.0 - Yb);
+    //   nsp[sp] = testPrimitives[0] * Y / mixture->GetGasParams(sp,GasParams::SPECIES_MW);
+    //   testPrimitives[dim + 2 + sp] = nsp[sp];
+    // }
+    // double ne = 0.0;
+    // for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++){
+    //   ne += nsp[sp] * mixture->GetGasParams(sp,GasParams::SPECIES_CHARGES);
+    // }
+    // Yb -= ne * mixture->GetGasParams(mixture->GetNumSpecies() - 2, GasParams::SPECIES_MW) / testPrimitives[0];
 
     grvy_printf(GRVY_INFO, "\n Testing Conversion between conserved/primitive. \n");
 
@@ -1236,7 +1319,9 @@ int main (int argc, char *argv[])
 
     grvy_printf(GRVY_INFO, "\n Testing computeSpeciesPrimitives. \n");
 
-    Vector X_sp, Y_sp, n_sp;
+    int numSpecies = mixture->GetNumSpecies();
+    int numEquation = mixture->GetNumEquations();
+    Vector X_sp(numSpecies), Y_sp(numSpecies), n_sp(numSpecies);
     mixture->computeSpeciesPrimitives(conservedState, X_sp, Y_sp, n_sp);
     double Xsum = 0.0;
     for (int sp = 0; sp < mixture->GetNumSpecies(); sp++){
@@ -1246,7 +1331,7 @@ int main (int argc, char *argv[])
       grvy_printf(GRVY_ERROR, "\n computeSpeciesPrimitives does not conserve mole fraction.");
       exit(ERROR);
     }
-    Ysum = 0.0;
+    double Ysum = 0.0;
     for (int sp = 0; sp < mixture->GetNumSpecies(); sp++){
       Ysum += Y_sp[sp];
     }
@@ -1276,8 +1361,6 @@ int main (int argc, char *argv[])
     }
 
     double T_h, T_e;
-    int numSpecies = mixture->GetNumSpecies();
-    int numEquation = mixture->GetNumEquations();
     mixture->computeTemperaturesBase(conservedState, &n_sp[0], n_sp[numSpecies-2], n_sp[numSpecies-1], T_h, T_e);
     if (abs( (T_h - testPrimitives[dim + 1]) / testPrimitives[dim + 1] ) > scalarErrorThreshold) {
       std::cout << T_h << " != " << testPrimitives[dim + 1] << std::endl;
@@ -1301,12 +1384,15 @@ int main (int argc, char *argv[])
     mixture->computeMassFractionGradient(testPrimitives[0], n_sp, gradUp, massFractionGrad);
     mixture->computeMoleFractionGradient(n_sp, gradUp, moleFractionGrad);
     Vector dir(dim);
-    double norm = 0.0;
-    for (int d = 0; d < dim; d++) {
-      dir(d) = -1.0 + 2.0 * uniformRandomNumber();
-      norm += dir(d) * dir(d);
-    }
-    dir /= sqrt(norm);
+    Vector velocity(dim);
+    for (int d = 0; d < dim; d++) velocity(d) = testPrimitives(d + 1);
+    getRandomDirection(velocity, dir);
+    // double norm = 0.0;
+    // for (int d = 0; d < dim; d++) {
+    //   dir(d) = -1.0 + 2.0 * uniformRandomNumber();
+    //   norm += dir(d) * dir(d);
+    // }
+    // dir /= sqrt(norm);
 
     Vector dUp_dx(numEquation), dY_dx(numSpecies), dX_dx(numSpecies);
     gradUp.Mult(dir, dUp_dx);
