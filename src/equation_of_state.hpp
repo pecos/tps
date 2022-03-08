@@ -299,6 +299,31 @@ class DryAir : public GasMixture {
       speciesEnthalpies[sp] = 0.;
     }
   }
+  
+  static MFEM_HOST_DEVICE void GetConservativesFromPrimitives_gpu(const double *state,
+                                                                  double *primit,
+                                                                  const Equations &eqSystem,
+                                                                  const double &gamma,
+                                                                  const double &Rgas,
+                                                                  const int &num_equation,
+                                                                  const int &dim,
+                                                                  const int &thrd,
+                                                                  const int &maxThreads ) {
+    MFEM_SHARED double KE[3];
+    // compute temperature
+    if (thrd < dim) KE[thrd] = 0.5 * state[1 + thrd] * state[1 + thrd] / state[0];
+    if (thrd == maxThreads - 1 && dim == 2) KE[2] = 0;
+    MFEM_SYNC_THREAD;
+
+    if (thrd == 0) primit[0] = state[0];
+    if (thrd == 1) primit[1] = state[1] / state[0];
+    if (thrd == 2) primit[2] = state[2] / state[0];
+    if (thrd == 3 && dim == 3) primit[3] = state[3] / state[0];
+    if (thrd == 1 + dim)
+      primit[1+dim] = DryAir::temperature(&state[0], &KE[0], gamma, Rgas, dim, num_equation);
+    if (thrd == num_equation - 1 && eqSystem == NS_PASSIVE)
+      primit[num_equation - 1] = state[num_equation - 1] / state[0];
+  }
 #endif
 };
 
@@ -556,7 +581,6 @@ class PerfectMixture : public GasMixture {
     PerfectMixture::computeNumberDensities_gpu(state, &n_sp[0], gasParams, dim, numSpecies, numActiveSpecies, 
                                                ambipolar, thrd, maxTheads);
     double T_h, T_e;
-    //temperature base
     PerfectMixture::computeTemperatureBase_gpu(state,
                                                &n_sp[0],
                                                molarCV,
@@ -704,6 +728,124 @@ class PerfectMixture : public GasMixture {
       rhoB -= gasParams[sp + numSpecies * int(GasParams::SPECIES_MW)] * n_sp[sp];
     
     return rhoB;
+  }
+  
+  static MFEM_HOST_DEVICE void GetPrimitivesFromConservatives_gpu(const double *state,
+                                                                  double *primitives,
+                                                                  const double *gasParams,
+                                                                  const double *molarCV,
+                                                                  const bool &ambipolar,
+                                                                  const bool &twoTemperature,
+                                                                  const int &num_equation,
+                                                                  const int &dim,
+                                                                  const int &numSpecies,
+                                                                  const int &numActiveSpecies,
+                                                                  const int &thrd,
+                                                                  const int &maxTheads ) {
+    MFEM_SHARED double n_sp[15]; // WARNING: assuming a maximum of 15 species
+    
+    PerfectMixture::computeNumberDensities_gpu(state, 
+                                               n_sp,
+                                               gasParams,
+                                               dim,
+                                               numSpecies,
+                                               numActiveSpecies,
+                                               ambipolar,
+                                               thrd,
+                                               maxTheads);
+    MFEM_SYNC_THREAD;
+    for (int sp = thrd; sp < numActiveSpecies; sp += maxTheads) 
+      primitives[dim + 2 + sp] = n_sp[sp];
+    
+    if (thrd == maxThreads-1) primitives[0] = state[0];
+    
+    for (int d = thrd; d < dim; d += maxTheads) primitives[d + 1] = state[d + 1] / state[0];
+    MFEM_SYNC_THREAD;
+    
+    double T_h, T_e;
+    PerfectMixture::computeTemperatureBase_gpu(state,
+                                               &n_sp[0],
+                                               molarCV,
+                                               gasParams,
+                                               num_equation,
+                                               dim,
+                                               numSpecies,
+                                               numActiveSpecies,
+                                               n_sp[numSpecies-1],
+                                               n_sp[numSpecies-2],
+                                               twoTemperature,
+                                               T_e,
+                                               T_h );
+    primitives[dim + 1] = T_h;
+
+    if (twoTemperature_)  // electron temperature as primitive variable.
+      primitives[num_equation - 1] = T_e;
+  }
+  
+  static MFEM_HOST_DEVICE void GetConservativesFromPrimitives_gpu(const double *primit,
+                                                              double *conserv,
+                                                              const double *gasParams,
+                                                              const double *molarCV,
+                                                              const double &ambipolar,
+                                                              const double &twoTemperature,
+                                                              const int &num_equation,
+                                                              const int &dim,
+                                                              const int &numSpecies,
+                                                              const int &numActiveSpecies,
+                                                              const int &thrd,
+                                                              const int &maxThreads ) {
+    if (thrd == maxThreads) conserv[0] = primit[0];
+    for (int d = thrd; d < dim; d += maxThreads) conserv[d + 1] = primit[d + 1] * primit[0];
+
+    // Convert species rhoY first.
+    for (int sp = thrd; sp < numActiveSpecies; sp += maxThreads) {
+      conserv[dim + 2 + sp] = primit[dim + 2 + sp] * gasParams[sp + numSpecies *(int)GasParams::SPECIES_MW];
+    }
+    MFEM_SYNC_THREAD;
+
+    double n_e = 0.0;
+    if (ambipolar) {
+      for (int sp = 0; sp < numActiveSpecies; sp++)
+        n_e += primit[2+dim+sp] * gasParams[sp + numSpecies * (int)GasParams::SPECIES_CHARGES];
+//       n_e = computeAmbipolarElectronNumberDensity(&primit[dim + 2]);
+    } else {
+      n_e = primit[dim + 2 + numSpecies - 2];
+    }
+    double rhoB =  PerfectMixture::computeBackgroundMassDensity_gpu(conserv,
+                                                                  &primit[2+dim],
+                                                                  gasParams,
+                                                                  dim,
+                                                                  numSpecies,
+                                                                  numActiveSpecies,
+                                                                  ambipolar,
+                                                                  true);
+    double nB = rhoB / gasParams[numSpecies - 1 + numSpecies * (int)GasParams::SPECIES_MW];
+
+    if (twoTemperature) conserv[num_equation - 1] = n_e * molarCV[numSpecies - 2] * primit[num_equation - 1];
+
+    // compute mixture heat capacity.
+    double totalHeatCapacity = 0.;
+    // heavies
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      if (sp == numSpecies - 2) continue;  // neglect electron.
+      totalHeatCapacity += primit[2+dim+sp] * molarCV[sp];
+    }
+    totalHeatCapacity += nB * molarCV[numSpecies - 1];
+    if (!twoTemperature_) totalHeatCapacity += n_e * molarCV[numSpecies - 2];
+
+    double totalEnergy = 0.0;
+    for (int d = 0; d < dim; d++) totalEnergy += primit[d + 1] * primit[d + 1];
+    totalEnergy *= 0.5 * primit[0];
+    totalEnergy += totalHeatCapacity * primit[dim + 1];
+    if (twoTemperature_) {
+      totalEnergy += conserv[num_equation - 1];
+    }
+
+    for (int sp = 0; sp < numSpecies - 2; sp++) {
+      totalEnergy += primit[dim + 2 + sp] * gasParams[sp + numSpecies * (int)GasParams::FORMATION_ENERGY];
+    }
+
+    conserv[dim + 1] = totalEnergy;
   }
 #endif
 };

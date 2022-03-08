@@ -470,30 +470,60 @@ void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const dou
 #ifdef _GPU_
   auto dataUp = Up->Write();   // make sure data is available in GPU
   auto dataIn = x_in->Read();  // make sure data is available in GPU
+  
+  const int numSpecies = mixture->GetNumSpecies();
+  const int numActiveSpecies = mixture->GetNumActiveSpecies();
+  const WorkingFluid fluid = mixture->GetWorkingFluid();
+  const double *gasParams = NULL;
+  const double *molarCV = NULL;
+  if (fluid == WorkingFluid::USER_DEFINED) {
+    gasParams = mixture->GetGasParam().Read();
+    molarCV = mixture->getMolarCVs().Read();
+  }
+  const bool ambipolar = mixture->IsAmbipolar();
+  const bool twoTemperature = mixture->IsTwoTemperature();
 
   MFEM_FORALL_2D(n, ndofs, num_equation, 1, 1, {
-    MFEM_SHARED double state[20];  // assuming 20 equations
-    // MFEM_SHARED double p;
-    MFEM_SHARED double KE[3];
-
+    MFEM_SHARED double state[20], primit[20];  // assuming 20 equations
+    
     MFEM_FOREACH_THREAD(eq, x, num_equation) {
       state[eq] = dataIn[n + eq * ndofs];  // loads data into shared memory
       MFEM_SYNC_THREAD;
-
-      // compute temperature
-      if (eq < dim) KE[eq] = 0.5 * state[1 + eq] * state[1 + eq] / state[0];
-      if (eq == num_equation - 1 && dim == 2) KE[2] = 0;
+      
+      switch (fluid) {
+        case WorkingFluid::DRY_AIR:
+          DryAir::GetConservativesFromPrimitives_gpu(&state[0],
+                                                     &primit[0],
+                                                     eqSystem,
+                                                     gamma,
+                                                     Rgas,
+                                                     num_equation,
+                                                     dim,
+                                                     eq,
+                                                     num_equation);
+          break;
+        case WorkingFluid::USER_DEFINED:
+          PerfectMixture::GetPrimitivesFromConservatives_gpu(&state[0],
+                                                             &primit[0],
+                                                             gasParams,
+                                                             molarCV,
+                                                             ambipolar,
+                                                             twoTemperature,
+                                                             num_equation,
+                                                             dim,
+                                                             numSpecies,
+                                                             numActiveSpecies,
+                                                             eq,
+                                                             num_equation);
+          break;
+        default:
+          if (eq == 0) printf("[ERROR] RHSoperator::updatePrimitives_gpu(): undefined working fluid.");
+          break;
+      }
+      
       MFEM_SYNC_THREAD;
-
-      // each thread writes to global memory
-      if (eq == 0) dataUp[n] = state[0];
-      if (eq == 1) dataUp[n + ndofs] = state[1] / state[0];
-      if (eq == 2) dataUp[n + 2 * ndofs] = state[2] / state[0];
-      if (eq == 3 && dim == 3) dataUp[n + 3 * ndofs] = state[3] / state[0];
-      if (eq == 1 + dim)
-        dataUp[n + (1 + dim) * ndofs] = DryAir::temperature(&state[0], &KE[0], gamma, Rgas, dim, num_equation);
-      if (eq == num_equation - 1 && eqSystem == NS_PASSIVE)
-        dataUp[n + (num_equation - 1) * ndofs] = state[num_equation - 1] / state[0];
+      dataUp[n + eq*ndofs] = primit[eq];
+      MFEM_SYNC_THREAD;
     }
   });
 #endif

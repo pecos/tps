@@ -227,12 +227,12 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const Equa
       Un[eq] = dataIn[n + eq * dof];
       MFEM_SYNC_THREAD;
 
-      if (eq < dim) KE[eq] = 0.5 * Un[1 + eq] * Un[1 + eq] / Un[0];
-      if (dim != 3 && eq == 1) KE[2] = 0.;
-      MFEM_SYNC_THREAD;
-
       switch (fluid) {
         case WorkingFluid::DRY_AIR:
+          if (eq < dim) KE[eq] = 0.5 * Un[1 + eq] * Un[1 + eq] / Un[0];
+          if (dim != 3 && eq == 1) KE[2] = 0.;
+          MFEM_SYNC_THREAD;
+          
           if (eq == 0) p = DryAir::pressure(&Un[0], &KE[0], gamma, dim, num_equation);
           break;
         case WorkingFluid::USER_DEFINED:
@@ -272,9 +272,6 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const Equa
           for (int d = 0; d < dim; d++) 
             d_flux[n + d * dof + eq * dof * dim] = Un[dim + 2 + sp] * Un[1 + d] / Un[0];
         }
-  
-//         if (eq == num_equation - 1 && eqSystem == NS_PASSIVE)
-//           d_flux[n + d * dof + eq * dof * dim] = Un[num_equation - 1] * Un[1 + d] / Un[0];
       }
     }  // end MFEM_FOREACH_THREAD
   });  // end MFEM_FORALL_WD
