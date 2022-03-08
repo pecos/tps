@@ -48,6 +48,8 @@ TransportProperties::TransportProperties(GasMixture *_mixture) : mixture(_mixtur
 DryAirTransport::DryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile) : TransportProperties(_mixture) {
   visc_mult = _runfile.GetViscMult();
   bulk_visc_mult = _runfile.GetBulkViscMult();
+  
+  trnspModel = TransportModel::DRY_AIR_TRNSP;
 
   Pr = 0.71;
   Sc = 0.71;

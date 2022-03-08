@@ -87,22 +87,28 @@ class Fluxes {
   void ComputeSplitFlux(const Vector &state, DenseMatrix &a_mat, DenseMatrix &c_mat);
 
   // GPU functions
-  static void convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const Equations &eqSystem, GasMixture *mixture,
+  void convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const Equations &eqSystem, GasMixture *mixture,
                                    const int &dof, const int &dim, const int &num_equation);
-  static void viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTensor &flux, const Equations &eqSystem,
+  void viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTensor &flux, const Equations &eqSystem,
                                 GasMixture *mixture, const ParGridFunction *spaceVaryViscMult,
                                 const linearlyVaryingVisc &linViscData, const int &dof, const int &dim,
                                 const int &num_equation);
 
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void viscousFlux_gpu(double *vFlux, const double *Un, const double *gradUpn,
-                                               const Equations &eqSystem, const double &gamma, const double &Rg,
+                                               const Equations &eqSystem, const TransportModel &transpModel, 
+                                               const double *gasParams,
+                                               const double &gamma, const double &Rg,
                                                const double &viscMult, const double &bulkViscMult, const double &Pr,
-                                               const double &Sc, const int &thrd, const int &maxThreads, const int &dim,
-                                               const int &num_equation) {
-    MFEM_SHARED double KE[3], vel[3], divV;
+                                               const double &Sc, const int &dim,
+                                               const int &num_equation, const int &numActiveSpecies, const int &numSpecies,
+                                               const int &thrd, const int &maxThreads) {
+    MFEM_SHARED double vel[3], divV;
     MFEM_SHARED double stress[3][3];
     MFEM_SHARED double gradT[3];
+    MFEM_SHARED double transportBuffer[10]; // WARNING: size set to 10. Check that it is enough!!
+    MFEM_SHARED double diffusionVelocity[15 * 3];
+    MFEM_SHARED double speciesEnthalpies[15];
 
     if (thrd < 3) KE[thrd] = 0.;
     if (thrd < dim) KE[thrd] = 0.5 * Un[1 + thrd] * Un[1 + thrd] / Un[0];
@@ -111,19 +117,46 @@ class Fluxes {
       for (int d = 0; d < dim; d++) vFlux[eq + d * num_equation] = 0.;
     }
     MFEM_SYNC_THREAD;
-
-    const double p = DryAir::pressure(&Un[0], &KE[0], gamma, dim, num_equation);
-    const double temp = p / Un[0] / Rg;
-    double visc = DryAir::GetViscosity_gpu(temp);
-    visc *= viscMult;
-    const double k = DryAir::GetThermalConductivity_gpu(visc, gamma, Rg, Pr);
+    
+    { // TODO: transform this to an if statement
+      DryAir::computeSpeciesEnthalpies_gpu(&speciesEnthalpies[0],numSpecies,thrd, maxThreads);
+    }
+    
+    switch (transpModel){
+      case TransportModel::DRY_AIR_TRNSP:
+        double cp_div_pr = Rg * gamma / (gamma - 1.);
+        cp_div_pr /= Pr;
+        DryAirTransport::ComputeFluxTransportProperties_gpu(Un,
+                                                            gradUpn,
+                                                            gasParams,
+                                                            transportBuffer,
+                                                            diffusionVelocity,
+                                                            dim,
+                                                            num_equation,
+                                                            numActiveSpecies,
+                                                            numSpecies,
+                                                            Rg,
+                                                            cp_div_pr,
+                                                            gamma,
+                                                            Sc,
+                                                            viscMult,
+                                                            bulkViscMult,
+                                                            thrd, maxThreads );
+        break;
+      default:
+        printf("[ERROR] Fluxes::viscousFlux_gpu() transport model not yet supported.");
+        break;
+    }
+    MFEM_SYNC_THREAD;
+    
+    const double visc = transportBuffer[GlobalTrnsCoeffs::VISCOSITY];
+    double k = transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY];
 
     for (int i = thrd; i < dim; i += maxThreads) {
       for (int j = 0; j < dim; j++) {
         stress[i][j] = gradUpn[1 + j + i * num_equation] + gradUpn[1 + i + j * num_equation];
       }
       // temperature gradient
-      //       gradT[i] = temp * (gradUpn[1 + dim + i * num_equation] / p - gradUpn[0 + i * num_equation] / Un[0]);
       gradT[i] = gradUpn[1 + dim + i * num_equation];
 
       vel[i] = Un[1 + i] / Un[0];
@@ -149,11 +182,19 @@ class Fluxes {
       vFlux[1 + dim + i * num_equation] += k * gradT[i];
     }
     MFEM_SYNC_THREAD;
-
-    if (eqSystem == NS_PASSIVE) {
-      for (int d = thrd; d < dim; d += maxThreads)
-        vFlux[num_equation - 1 + d * num_equation] += visc / Sc * gradUpn[num_equation - 1 + d * num_equation];
+    
+    // Transport terms
+    for (int sp = thrd; sp < numActiveSpecies; sp += maxThreads) {
+      for (int d = 0; d < dim; d++) {
+        vFlux[2 +dim + sp + d*num_equation] = - Un[dim + 2 + sp] * diffusionVelocity[sp+d*numActiveSpecies];
+        vFlux[1 + dim + d * num_equation] -=  speciesEnthalpies[sp] * diffusionVelocity[sp+d*numActiveSpecies];
+      }
     }
+
+//     if (eqSystem == NS_PASSIVE) {
+//       for (int d = thrd; d < dim; d += maxThreads)
+//         vFlux[num_equation - 1 + d * num_equation] += visc / Sc * gradUpn[num_equation - 1 + d * num_equation];
+//     }
   }
 #endif
 };

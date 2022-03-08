@@ -116,6 +116,8 @@ class GasMixture {
   std::map<std::string, int> *getSpeciesMapping() { return &speciesMapping_; }
 
   double GetGasParams(int species, GasParams param) { return gasParams(species, param); }
+  DenseMatrix GetGasParam() {return gasParams;}
+  
 
   int GetNumConservativeVariables() { return Nconservative; }
   int GetNumPrimitiveVariables() { return Nprimitive; }
@@ -287,6 +289,13 @@ class DryAir : public GasMixture {
                                                             const double &Pr) {
     const double cp = gamma * Rg / (gamma - 1.);
     return visc * cp / Pr;
+  }
+  
+  static MFEM_HOST_DEVICE void computeSpeciesEnthalpies_gpu(double *speciesEnthalpies, const int &numSpecies,
+                                                            const int &thrd, const int &maxThreads ) {
+    for (int sp = thr; sp < numSpecies; sp += maxThreads) {
+      speciesEnthalpies[sp] = 0.;
+    }
   }
 #endif
 };

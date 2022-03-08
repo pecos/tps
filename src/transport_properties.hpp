@@ -62,11 +62,15 @@ class TransportProperties {
 
   // Array<bool> isComputed;
   SpeciesPrimitiveType speciesPrimitiveType;
+  
+  TransportModel trnspModel;
 
  public:
   TransportProperties(GasMixture *_mixture);
 
   ~TransportProperties(){}
+  
+  TransportModel getTransportModel(){return trnspModel;}
 
   // Currently, diffusion velocity is evaluated together with transport properties,
   // though diffusion velocity can vary according to models we use.
@@ -114,6 +118,61 @@ class DryAirTransport : public TransportProperties {
 
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
                                               DenseMatrix &diffusionVelocity);
+  
+#ifdef _GPU_
+  static MFEM_HOST_DEVICE void ComputeFluxTransportProperties_gpu(const double *state,
+                                                             const double *gradUp,
+                                                             const double *gasParams,
+                                                             double *transportBuffer,
+                                                             double *diffusionVelocity,
+                                                             const int &dim,
+                                                             const int &num_equation,
+                                                             const int &numActiveSpecies,
+                                                             const int &numSpecies,
+                                                             const double &Rgas,
+                                                             const double &cp_div_pr,
+                                                             const double &gamma,
+                                                             const double &Sc,
+                                                             const double &visc_mult,
+                                                             const double &bulk_visc_mult,
+                                                             const int &thrd,
+                                                             const int &maxThreads ){
+    double dummy; // electron pressure. won't compute anything.
+    double KE[3];
+    for (int d = thrd; d < dim; d += maxThreads) KE[d] = 0.5 * state[1+d] * state[1+d] / state[0];
+    MFEM_SYNC_THREAD;
+    double p = DryAir::pressure(state, &KE[0], gamma, dim, num_equation);
+    double temp = p / Rgas / state[0];
+
+    if (thrd == 0) transportBuffer[GlobalTrnsCoeffs::VISCOSITY] = (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
+    if (thrd == 1) transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY] = bulk_visc_mult;
+    if (thrd == 2) transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY] =
+        cp_div_pr * transportBuffer[GlobalTrnsCoeffs::VISCOSITY];
+    MFEM_SYNC_THREAD;
+
+    for (int sp = thrd; sp < numActiveSpecies; sp += maxThreads) {
+      double diffusivity = transportBuffer[GlobalTrnsCoeffs::VISCOSITY] / Sc;
+
+      for (int d = 0; d < dim; d++) {
+        if (fabs(state[2 + dim + sp] / state[0]) < 1e-14) {
+          diffusionVelocity[sp + d*numActiveSpecies] = 0.0;
+        } else {
+          // compute mass fraction gradient
+          
+          double dY = gasParams[sp + numSpecies * int(GasParams::SPECIES_MW)] * gradUp[2 + dim + sp + d*num_equation];
+          dY -= state[2 + dim + sp] / state[0] * gradUp[0 + d*num_equation];
+          dY /= state[0];
+
+          diffusionVelocity[sp + d*numActiveSpecies] = diffusivity * dY / state[2 + dim + sp];
+        }
+      }
+
+//       for (int d = 0; d < dim; d++) {
+//         assert(!std::isnan(diffusionVelocity(0, d)));
+//       }
+    }
+  }
+#endif // _GPU_
 };
 
 //////////////////////////////////////////////////////
