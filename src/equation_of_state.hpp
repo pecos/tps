@@ -537,7 +537,171 @@ class PerfectMixture : public GasMixture {
   virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal, Vector &conservedState);
   // GPU functions
 #ifdef _GPU_
+  static MFEM_HOST_DEVICE double computePressure_gpu(const double *state, 
+                                                     double *electronPressure,
+                                                     const double *gasParams,
+                                                     const double *molarCV,
+                                                     const int &num_equation,
+                                                     const int &dim,
+                                                     const int &numSpecies,
+                                                     const int &numActiveSpecies,
+                                                     const bool &ambipolar,
+                                                     const bool &twoTemperature,
+                                                     const int &thrd,
+                                                     const int &maxTheads ){
+    MFEM_SHARED double n_sp[15]; // WARNING: assuming a maximum of 15 species
+    PerfectMixture::computeNumberDensities_gpu(state, &n_sp[0], gasParams, dim, numSpecies, numActiveSpecies, 
+                                               ambipolar, thrd, maxTheads);
+    double T_h, T_e;
+    //temperature base
+    PerfectMixture::computeTemperatureBase_gpu(state,
+                                               &n_sp[0],
+                                               molarCV,
+                                               gasParams,
+                                               num_equation,
+                                               dim,
+                                               numSpecies,
+                                               numActiveSpecies,
+                                               n_sp[numSpecies-1],
+                                               n_sp[numSpecies-2],
+                                               twoTemperature,
+                                               T_e,
+                                               T_h );
+    electronPressure[0] = n_sp[numSpecies - 2] * UNIVERSALGASCONSTANT * T_e;
+    
+    return PerfectMixture::computePressureBase_gpu(&n_sp[0],
+                                                       n_sp[numSpecies-2],
+                                                       n_sp[numSpecies-1],
+                                                       T_h,
+                                                       T_e,
+                                                       numSpecies,
+                                                       numActiveSpecies );
+  }
+  
+  static MFEM_HOST_DEVICE double computePressureBase_gpu(const double *n_sp,
+                                                         const double &n_e,
+                                                         const double &n_B,
+                                                         const double &T_h,
+                                                         const double &T_e,
+                                                         const int &numSpecies,
+                                                         const int &numActiveSpecies ) {
+    double n_h = 0.0;  // total number density of all heavy species.
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      if (sp == numSpecies - 2) continue;  // treat electron separately.
+      n_h += n_sp[sp];
+    }
+    n_h += n_B;
 
+    double p = n_h * T_h;
+    if (twoTemperature_) {
+      p += n_e * T_e;
+    } else {
+      p += n_e * T_h;
+    }
+    p *= UNIVERSALGASCONSTANT;
+
+    return p;
+  }
+  
+  static MFEM_HOST_DEVICE void computeTemperatureBase_gpu(const double *state,
+                                                          const double *n_sp,
+                                                          const double *molarCV,
+                                                          const double *gasParams,
+                                                          const int &num_equation,
+                                                          const int &dim,
+                                                          const int &numSpecies,
+                                                          const int &numActiveSpecies,
+                                                          const double &nb,
+                                                          const double &ne,
+                                                          const bool &twoTemperature,
+                                                          double &T_e,
+                                                          double &T_h ) {
+    double totalHeatCapacity = 0.;
+    // heavies
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      if (sp == numSpecies - 2) continue;  // neglect electron.
+      totalHeatCapacity += n_sp[sp] * molarCV[sp];
+    }
+    totalHeatCapacity += nb * molarCV[numSpecies - 1];
+    
+    double totalEnergy = state[dim + 1];
+    for (int sp = 0; sp < numSpecies - 2; sp++) {
+      totalEnergy -= n_sp[sp] * gasParams[sp + numSpecies* int(GasParams::FORMATION_ENERGY)];
+    }
+    
+    // Comptue heavy-species temperature. If not two temperature, then this works as the unique temperature.
+    T_h = 0.0;
+    for (int d = 0; d < dim; d++) T_h -= state[d + 1] * state[d + 1];
+    T_h *= 0.5 / state[0];
+    T_h += totalEnergy;
+    if (twoTemperature) T_h -= state[num_equation - 1];
+    T_h /= totalHeatCapacity;
+
+    // electron temperature as primitive variable.
+    if (twoTemperature_) {
+      T_e = state[num_equation - 1] / ne / molarCV[numSpecies - 2];
+    } else {
+      T_e = T_h;
+    }
+  }
+  
+  static MFEM_HOST_DEVICE void computeNumberDensities_gpu(const double *state, 
+                                                          double *n_sp,
+                                                          const double *gasParams,
+                                                          const int &dim,
+                                                          const int &numSpecies,
+                                                          const int &numActiveSpecies,
+                                                          const bool ambipolar,
+                                                          const int &thrd,
+                                                          const int &maxTheads ) {
+    for (int sp = thrd; sp < numActiveSpecies; sp += maxTheads) {
+      n_sp[sp] = state[dim+2+sp] / gasParams[sp + numSpecies * int(GasParams::SPECIES_MW)];
+    }
+    MFEM_SYNC_THREAD;
+    
+    // NOTE: all threads are computing n_e
+    if (ambipolar) {
+      double n_e = 0.;
+      for (int sp = 0; sp < numActiveSpecies; sp++) 
+        n_e += n_sp[sp] * gasParams[sp + numSpecies * int(GasParams::SPECIES_CHARGES)];
+      n_sp[numSpecies - 2] = n_e;
+    }
+    
+    double rhoB = PerfectMixture::computeBackgroundMassDensity_gpu(state,
+                                                                  n_sp,
+                                                                  gasParams,
+                                                                  dim,
+                                                                  numSpecies,
+                                                                  numActiveSpecies,
+                                                                  ambipolar,
+                                                                  true );
+    n_sp[numSpecies - 1] = rhoB / gasParams[numSpecies - 1 + numSpecies*int(GasParams::SPECIES_MW)];
+  }
+  
+  static MFEM_HOST_DEVICE double computeBackgroundMassDensity_gpu(const double *state,
+                                                                  const double *n_sp,
+                                                                  const double *gasParams,
+                                                                  const int &dim,
+                                                                  const int &numSpecies,
+                                                                  const int &numActiveSpecies,
+                                                                  const bool &ambipolar,
+                                                                  const bool isElectronComputed ){
+    double ne = 0.;
+    if (!isElectronComputed) {
+      if (ambipolar) {
+        for (int sp = 0; sp < numActiveSpecies; sp++) 
+          ne += n_sp[sp] * gasParams[sp + numSpecies * int(GasParams::SPECIES_CHARGES)];
+      }
+    }else {
+      ne = n_sp[numSpecies -1 ];
+    }
+    
+    double rhoB = state[0];
+    for (int sp = 0; sp < numActiveSpecies; sp++) 
+      rhoB -= gasParams[sp + numSpecies * int(GasParams::SPECIES_MW)] * n_sp[sp];
+    
+    return rhoB;
+  }
 #endif
 };
 
