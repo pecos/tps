@@ -91,20 +91,20 @@ tanhic_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
 tanhic_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
 tanhic_LDFLAGS += -L$(GSLIB_LIB) -lgs
 
-#bin_PROGRAMS += l2diff
-#l2diff_SOURCES  = L2_diff.cpp
-#l2diff_LDADD    = ../src/libtps.a -lmfem
-#
-#l2diff_LDFLAGS  = -L$(MFEM_LIB)
-#l2diff_LDFLAGS += $(HDF5_LIBS)
-#l2diff_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
-#l2diff_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
-#l2diff_LDFLAGS += -L$(METIS_LIB) -lmetis
-#l2diff_LDFLAGS += $(GRVY_LIBS)
-#l2diff_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
-#l2diff_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
-#l2diff_LDFLAGS += -L$(GSLIB_LIB) -lgs
-#
+bin_PROGRAMS += l2diff
+l2diff_SOURCES  = L2_diff.cpp
+l2diff_LDADD    = ../src/libtps.a -lmfem
+
+l2diff_LDFLAGS  = -L$(MFEM_LIB)
+l2diff_LDFLAGS += $(HDF5_LIBS)
+l2diff_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
+l2diff_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
+l2diff_LDFLAGS += -L$(METIS_LIB) -lmetis
+l2diff_LDFLAGS += $(GRVY_LIBS)
+l2diff_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
+l2diff_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
+l2diff_LDFLAGS += -L$(GSLIB_LIB) -lgs
+
 #bin_PROGRAMS += perfect_mixture_test
 #perfect_mixture_test_SOURCES  = test_perfect_mixture.cpp
 #perfect_mixture_test_LDADD    = ../src/libtps.a -lmfem

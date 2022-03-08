@@ -56,11 +56,20 @@ int main (int argc, char *argv[])
   int NDof = src_fes->GetNDofs();
 
   std::string basepath("utils/tanh_initial_condition");
-  Vector sol1(num_equation), sol2(num_equation);
+  bool constantPressure;
+  double p0;
+  tps.getInput((basepath + "/constant_pressure").c_str(), constantPressure, false);
+  if (constantPressure) tps.getRequiredInput((basepath + "/pressure").c_str(), p0);
 
+  Vector sol1(num_equation), sol2(num_equation);
   for (int eq = 0; eq < num_equation; eq++) {
     tps.getRequiredInput((basepath + "/solution1/Q" + std::to_string(eq+1)).c_str(), sol1[eq]);
     tps.getRequiredInput((basepath + "/solution2/Q" + std::to_string(eq+1)).c_str(), sol2[eq]);
+  }
+  if (constantPressure) {
+    grvy_printf(GRVY_INFO, "\n Setting total energy for the pressure: %.8E\n", p0);
+    mixture->modifyEnergyForPressure(sol1, sol1, p0, false);
+    mixture->modifyEnergyForPressure(sol2, sol2, p0, false);
   }
   for (int eq = 0; eq < num_equation; eq++) {
     grvy_printf(GRVY_INFO, "\n Solution 1 - Q%d: %.8E\n", (eq+1), sol1[eq]);

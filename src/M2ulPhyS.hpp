@@ -340,6 +340,7 @@ class M2ulPhyS : public TPS::Solver {
   FiniteElementCollection *GetFEC() { return fec; }
   ParFiniteElementSpace *GetFESpace() { return vfes; }
   ParGridFunction *GetSolutionGF() { return U; }
+  IntegrationRules *getIntegrationRules() { return intRules; }
   RunConfiguration &GetConfig() { return config; }
   GasMixture *getMixture() { return mixture; }
 
