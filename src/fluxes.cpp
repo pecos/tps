@@ -206,6 +206,17 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const Equa
 //   double Sc = mixture->GetSchmidtNum();
   
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
+  const int numSpecies = mixture->GetNumSpecies();
+  
+  const WorkingFluid fluid = mixture->GetWorkingFluid();
+  const DenseMatrix gasParams = mixture->GetGasParam();
+  const double *d_gasParams = gasParams.Read();
+  
+  const double *molarCV = NULL;
+  if (fluid == WorkingFluid::USER_DEFINED) molarCV = mixture->getMolarCVs().Read();
+  
+  const bool ambipolar = mixture->IsAmbipolar();
+  const bool twoTemperature = mixture->IsTwoTemperature();
 
   MFEM_FORALL_2D(n, dof, num_equation, 1, 1, {
     MFEM_SHARED double Un[20];
@@ -220,7 +231,29 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const Equa
       if (dim != 3 && eq == 1) KE[2] = 0.;
       MFEM_SYNC_THREAD;
 
-      if (eq == 0) p = DryAir::pressure(&Un[0], &KE[0], gamma, dim, num_equation);
+      switch (fluid) {
+        case WorkingFluid::DRY_AIR:
+          if (eq == 0) p = DryAir::pressure(&Un[0], &KE[0], gamma, dim, num_equation);
+          break;
+        case WorkingFluid::USER_DEFINED:
+          double electronPressure;
+          p = PerfectMixture::computePressure_gpu(&Un[0], 
+                                                  &electronPressure,
+                                                  d_gasParams,
+                                                  molarCV,
+                                                  num_equation,
+                                                  dim,
+                                                  numSpecies,
+                                                  numActiveSpecies,
+                                                  ambipolar,
+                                                  twoTemperature,
+                                                  eq,
+                                                  num_equation);
+          break;
+        default:
+          printf("[ERROR] Fluxes::convectiveFluxes_gpu(): WorkingFluid not supported");
+          break;
+      }
       MFEM_SYNC_THREAD;
 
       double temp;
