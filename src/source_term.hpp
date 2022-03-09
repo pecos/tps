@@ -76,6 +76,12 @@ class SourceTerm : public ForcingTerms {
   GasMixture *mixture_ = NULL;
   TransportProperties *transport_ = NULL;
   Chemistry *chemistry_ = NULL;
+  
+  // pointers to be stored in device memory
+#ifdef _GPU_
+  ReactionModel *d_reactionsModel;
+  reactionConstants * d_reactionConstants;
+#endif
 
  public:
   SourceTerm(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
@@ -89,7 +95,7 @@ class SourceTerm : public ForcingTerms {
 
   // GPU functions
 #ifdef _GPU_
-
+  void updateSourceTerms_gpu(Vector &in);
 #endif
 };
 

@@ -103,7 +103,7 @@ struct reactionConstants {
   double A_;
   double b_;
   double E_;
-}
+};
 
 // The following four keywords define two planes in which
 // a linearly varying viscosity can be defined between these two.

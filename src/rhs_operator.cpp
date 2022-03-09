@@ -492,7 +492,7 @@ void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const dou
       
       switch (fluid) {
         case WorkingFluid::DRY_AIR:
-          DryAir::GetConservativesFromPrimitives_gpu(&state[0],
+          DryAir::GetPrimitivesFromConservatives_gpu(&state[0],
                                                      &primit[0],
                                                      eqSystem,
                                                      gamma,

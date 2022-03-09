@@ -107,8 +107,19 @@ class Chemistry {
   bool isElectronInvolvedAt(const int reactionIndex) {
     return (electronIndex_ < 0) ? false : (reactantStoich_(electronIndex_, reactionIndex) != 0);
   }
+  
+  int GetElectronIndex(){return electronIndex_;}
+  
+  int GetNumReactions(){return numReactions_;}
 
   ChemistryModel getChemistryModel() { return model; }
+  
+  const DenseMatrix &GetReactantStoichiometryVector()const{return reactantStoich_;}
+  const DenseMatrix &getProductStoichiometryVector()const{return productStoich_;}
+  Reaction *GetReaction(int r){return reactions_[r];}
+  
+  Array<bool> GetDetailBalanceArray(){return detailedBalance_;}
+  DenseMatrix GetEquilibriumConstantsMatrix(){return equilibriumConstantParams_;}
   
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void computeForwardRateCoeffs_gpu(const double &T_h, 
@@ -117,7 +128,7 @@ class Chemistry {
                                                             const int &electronIndex,
                                                             const int &numSpecies,
                                                             const int &numReactions,
-                                                            const int *reactantStoich,
+                                                            const double *reactantStoich,
                                                             const ReactionModel *reactionsModel,
                                                             const reactionConstants *constants
                                                            ) {
@@ -159,7 +170,7 @@ class Chemistry {
                                                             const int &electronIndex,
                                                             const int &numSpecies,
                                                             const int &numReactions,
-                                                            const int *reactantStoich,
+                                                            const double *reactantStoich,
                                                             const double *equilibriumConstantParams ) {
     for (int r = 0; r < numReactions; r++) {
       bool isElectronInvolved;
@@ -185,6 +196,45 @@ class MassActionLaw : public Chemistry {
   ~MassActionLaw(){}
 
   virtual void computeCreationRate(const Vector &ns, const Vector &kfwd, const Vector &keq, Vector &creationRate);
+  
+#ifdef _GPU_
+  static MFEM_HOST_DEVICE void computeCreationRate_gpu(const double *ns,
+                                                       const double *kfwd,
+                                                       const double *keq,
+                                                       double *creationRate,
+                                                       const double *gasParams,
+                                                       const double *reactantStoich,
+                                                       const double *productsStoich,
+                                                       const int &numReactions,
+                                                       const int &numSpecies,
+                                                       const int &thrd,
+                                                       const int &maxThreads ) {
+    MFEM_SHARED double progressRate[20];
+    for (int r = thrd; r < numReactions; r += maxThreads) {
+      // forward reaction rate
+      double rateFWD = 1., rateBWD = 1.;
+      for (int sp = 0; sp < numSpecies; sp++) rateFWD *= pow(ns[sp], reactantStoich[sp + r * numSpecies]);
+      for (int sp = 0; sp < numSpecies; sp++) rateBWD *= pow(ns[sp], productsStoich[sp + r * numSpecies]);
+      progressRate[r] = kfwd[r] * (rateFWD - rateBWD / keq[r]);
+    }
+    
+    for (int sp = thrd; sp < numSpecies; sp += maxThreads ) creationRate[sp] = 0.;
+    MFEM_SYNC_THREAD;
+
+    for (int sp = thrd; sp < numSpecies; sp += maxThreads ) {
+      for (int r = 0; r < numReactions; r++) {
+        creationRate[sp] += progressRate[r] * (productsStoich[sp + r * numSpecies] - 
+                                               reactantStoich[sp + r * numSpecies]);
+      }
+      creationRate[sp] *= gasParams[sp + numSpecies * (int)GasParams::SPECIES_MW];
+    }
+    MFEM_SYNC_THREAD;
+
+    // check total created mass is 0
+//     double totMass = 0.;
+//     for (int sp = 0; sp < numSpecies_; sp++) totMass += creationRate(sp);
+  }
+#endif // _GPU_
 };
 
 #endif  // CHEMISTRY_HPP_

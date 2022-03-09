@@ -48,15 +48,35 @@ SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_or
 
   ambipolar_ = mixture->IsAmbipolar();
   twoTemperature_ = mixture->IsTwoTemperature();
+  
+  // allocate device vectors
+#ifdef _GPU_
+  d_reactionsModel = new ReactionModel[numReactions_];
+  for (int r = 0; r < numReactions_; r++) d_reactionsModel[r] = chemistry_->GetReaction(r)->GetReactionModel();
+  
+  d_reactionConstants = new reactionConstants[numReactions_];
+  for (int r = 0; r < numReactions_; r++) {
+    d_reactionConstants[r].A_ = chemistry->GetReaction(r)->GetReactionConstants().A_;
+    d_reactionConstants[r].b_ = chemistry->GetReaction(r)->GetReactionConstants().b_;
+    d_reactionConstants[r].E_ = chemistry->GetReaction(r)->GetReactionConstants().E_;
+  }
+#endif
 }
 
 SourceTerm::~SourceTerm() {
   //   if (mixture_ != NULL) delete mixture_;
   //   if (transport_ != NULL) delete transport_;
   //   if (chemistry_ != NULL) delete chemistry_;
+#ifdef _GPU_
+  delete[] d_reactionsModel;
+  delete[] d_reactionConstants;
+#endif
 }
 
 void SourceTerm::updateTerms(mfem::Vector &in) {
+#ifdef _GPU_
+  updateSourceTerms_gpu(in);
+#else
   const double *h_Up = Up->HostRead();
   double *h_in = in.HostReadWrite();
 
@@ -92,4 +112,125 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
       h_in[n + (2 + dim + sp) * nnodes] += creationRates(sp);
     }
   }
+#endif // _GPU_
 }
+
+#ifdef _GPU_
+void SourceTerm::updateSourceTerms_gpu(mfem::Vector& in)
+{
+  const double *d_Up = Up->Read();
+  double *d_in = in.ReadWrite();
+  
+  const int nnodes = vfes->GetNDofs();
+  const int d_num_equations = num_equation;
+  const int d_dim = dim;
+  
+  const WorkingFluid fluid = mixture_->GetWorkingFluid();
+  
+  const int numSpecies = mixture_->GetNumSpecies();
+  const int numActiveSpecies = mixture_->GetNumActiveSpecies();
+  const double *gasParams = NULL;
+  const double *molarCV = NULL;
+  if (fluid == WorkingFluid::USER_DEFINED) {
+    gasParams = mixture_->GetGasParam().Read();
+    molarCV = mixture_->getMolarCVs().Read();
+  }
+  const bool ambipolar = mixture_->IsAmbipolar();
+  const bool twoTemperature = mixture_->IsTwoTemperature();
+  const int electronIndex = chemistry_->GetElectronIndex();
+  const int numReactions = chemistry_->GetNumReactions();
+  const double *reactantStoich = chemistry_->GetReactantStoichiometryVector().Read();
+  const double *productsStoich = chemistry_->getProductStoichiometryVector().Read();
+  
+  const ReactionModel * reactionsModel = d_reactionsModel;
+  const reactionConstants *constants = d_reactionConstants;
+  
+  const bool *detailedBalance = chemistry_->GetDetailBalanceArray().Read();
+  const double *equilibriumConstantParams = chemistry_->GetEquilibriumConstantsMatrix().Read();
+  
+  
+  MFEM_FORALL_2D(n, nnodes, d_num_equations,1,1,{
+    MFEM_FOREACH_THREAD(eq, x, d_num_equations) {
+      MFEM_SHARED double up[20], state[20];
+      MFEM_SHARED double nsp[15], creationRates[15];
+      MFEM_SHARED double kfwd[20], kC[20]; // WARNING: 20 reactions considered
+      
+      up[eq] = d_Up[n + eq*nnodes];
+      MFEM_SYNC_THREAD;
+      
+      // Assuming this will always use a PefectMixture
+      PerfectMixture::GetPrimitivesFromConservatives_gpu(&state[0],
+                                                         &up[0],
+                                                          gasParams,
+                                                          molarCV,
+                                                          ambipolar,
+                                                          twoTemperature,
+                                                          d_num_equations,
+                                                          d_dim,
+                                                          numSpecies,
+                                                          numActiveSpecies,
+                                                          eq,
+                                                          d_num_equations);
+      MFEM_SYNC_THREAD;
+      
+      double Th = 0., Te = 0.;
+      Th = up[1 + dim];
+      if (twoTemperature) {
+        Te = up[num_equation - 1];
+      } else {
+        Te = Th;
+      }
+
+      Chemistry::computeForwardRateCoeffs_gpu(Th, 
+                                              Te, 
+                                              &kfwd[0],
+                                              electronIndex,
+                                              numSpecies,
+                                              numReactions,
+                                              reactantStoich,
+                                              reactionsModel,
+                                              constants);
+      Chemistry::computeEquilibriumConstants_gpu(Th, 
+                                                 Te, 
+                                                 &kC[0],
+                                                 detailedBalance,
+                                                 electronIndex,
+                                                 numSpecies,
+                                                 numReactions,
+                                                 reactantStoich,
+                                                 equilibriumConstantParams);
+
+      PerfectMixture::computeNumberDensities_gpu(&state[0], 
+                                                 &nsp[0],
+                                                 gasParams,
+                                                 d_dim,
+                                                 numSpecies,
+                                                 numActiveSpecies,
+                                                 ambipolar,
+                                                 eq,
+                                                 d_num_equations);
+      MFEM_SYNC_THREAD;
+
+      // get reaction rates
+      MassActionLaw::computeCreationRate_gpu(&nsp[0],
+                                             &kfwd[0],
+                                             &kC[0],
+                                             &creationRates[0],
+                                             gasParams,
+                                             reactantStoich,
+                                             productsStoich,
+                                             numReactions,
+                                             numSpecies,
+                                             eq,
+                                             d_num_equations);
+      MFEM_SYNC_THREAD;
+
+      // add species creation rates
+      for (int sp = eq; sp < numActiveSpecies_; sp += d_num_equations) {
+        d_in[n + (2 + dim + sp) * nnodes] += creationRates[sp];
+      }
+    }
+  });
+}
+
+#endif // _GPU_

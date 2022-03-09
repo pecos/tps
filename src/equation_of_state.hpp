@@ -300,7 +300,7 @@ class DryAir : public GasMixture {
     }
   }
   
-  static MFEM_HOST_DEVICE void GetConservativesFromPrimitives_gpu(const double *state,
+  static MFEM_HOST_DEVICE void GetPrimitivesFromConservatives_gpu(const double *state,
                                                                   double *primit,
                                                                   const Equations &eqSystem,
                                                                   const double &gamma,
