@@ -51,10 +51,15 @@ using namespace std;
 
 class Reaction {
  protected:
+   ReactionModel reactModel;
+   reactionConstants constants;
  public:
   Reaction(){}
 
   ~Reaction(){}
+  
+  ReactionModel GetReactionModel(){return reactModel;}
+  reactionConstants GetReactionConstants(){return constants;}
 
   virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved = false){}
 };
@@ -62,9 +67,9 @@ class Reaction {
 class Arrhenius : public Reaction {
  private:
   // coefficients for modified Arrhenius model: k = A * T^b * exp( - E / R / T )
-  double A_;
-  double b_;
-  double E_;
+//   double A_;
+//   double b_;
+//   double E_;
 
  public:
   Arrhenius(const double A, const double b, const double E);
@@ -72,6 +77,19 @@ class Arrhenius : public Reaction {
   ~Arrhenius(){}
 
   virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved = false);
+  
+#ifdef _GPU_
+  static MFEM_HOST_DEVICE double computeRateCoefficient_gpu(const double &T_h, 
+                                                            const double &T_e, 
+                                                            const bool &isElectronInvolved,
+                                                            const double &A,
+                                                            const double &b,
+                                                            const double &E ) {
+    double temp = (isElectronInvolved) ? T_e : T_h;
+
+    return A * pow(temp, b) * exp(-E / UNIVERSALGASCONSTANT / temp);
+  }
+#endif // _GPU_
 };
 
 class HoffertLien : public Reaction {
@@ -81,9 +99,9 @@ class HoffertLien : public Reaction {
   */
  private:
   // coefficients for modified Arrhenius model: k = A * T^b * exp( - E / R / T )
-  double A_;
-  double b_;
-  double E_;
+//   double A_;
+//   double b_;
+//   double E_;
 
  public:
   HoffertLien(const double A, const double b, const double E);
@@ -91,6 +109,20 @@ class HoffertLien : public Reaction {
   ~HoffertLien(){}
 
   virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved = false);
+  
+#ifdef _GPU_
+  static MFEM_HOST_DEVICE double computeRateCoefficient_gpu(const double &T_h, 
+                                                            const double &T_e, 
+                                                            const bool &isElectronInvolved,
+                                                            const double &A,
+                                                            const double &b,
+                                                            const double &E) {
+    double temp = (isElectronInvolved) ? T_e : T_h;
+    double tempFactor = E / BOLTZMANNCONSTANT / temp;
+
+    return A * pow(temp, b) * (tempFactor + 2.0) * exp(-tempFactor);
+  }
+#endif // _GPU_
 };
 
 #endif  // REACTION_HPP_

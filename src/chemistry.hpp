@@ -109,6 +109,73 @@ class Chemistry {
   }
 
   ChemistryModel getChemistryModel() { return model; }
+  
+#ifdef _GPU_
+  static MFEM_HOST_DEVICE void computeForwardRateCoeffs_gpu(const double &T_h, 
+                                                            const double &T_e, 
+                                                            double *kfwd,
+                                                            const int &electronIndex,
+                                                            const int &numSpecies,
+                                                            const int &numReactions,
+                                                            const int *reactantStoich,
+                                                            const ReactionModel *reactionsModel,
+                                                            const reactionConstants *constants
+                                                           ) {
+    for (int r = 0; r < numReactions; r++) {
+      bool isElectronInvolved;
+      if (electronIndex < 0) {
+        isElectronInvolved = false;
+      }else {
+        isElectronInvolved = reactantStoich[electronIndex + numSpecies* r] != 0
+      }
+      switch (reactionsModel[r]) {
+        case ReactionModel::ARRHENIUS:
+          kfwd[r] = Arrhenius::computeRateCoefficient_gpu(T_h, 
+                                                        T_e, 
+                                                        isElectronInvolved,
+                                                        constants[r].A_,
+                                                        constants[r].b_,
+                                                        constants[r].E_);
+          break;
+        case ReactionModel::HOFFERTLIEN:
+          kfwd[r] = HoffertLien::computeRateCoefficient_gpu(T_h, 
+                                                          T_e, 
+                                                          isElectronInvolved,
+                                                          constants[r].A_,
+                                                          constants[r].b_,
+                                                          constants[r].E_);
+          break;
+        default:
+          printf("[ERROR] Chemistry::computeForwardRateCoeffs_gpu(): bad ReactionModel");
+          break;
+      }
+    }
+  }
+  
+  static MFEM_HOST_DEVICE void computeEquilibriumConstants_gpu(const double &T_h, 
+                                                            const double &T_e, 
+                                                            double *kC,
+                                                            const bool *detailedBalance,
+                                                            const int &electronIndex,
+                                                            const int &numSpecies,
+                                                            const int &numReactions,
+                                                            const int *reactantStoich,
+                                                            const double *equilibriumConstantParams ) {
+    for (int r = 0; r < numReactions; r++) {
+      bool isElectronInvolved;
+      if (electronIndex < 0) {
+        isElectronInvolved = false;
+      }else {
+        isElectronInvolved = reactantStoich[electronIndex + numSpecies* r] != 0
+      }
+      double temp = isElectronInvolved ? T_e : T_h;
+      if (detailedBalance[r]) {
+        kC[r] = equilibriumConstantParams[r] * pow(temp, equilibriumConstantParams[r +numReactions]) *
+                exp(-equilibriumConstantParams[r + numReactions * 2] / temp);
+      }
+    }
+  }
+#endif // _GPU_
 };
 
 // Implementation of the Mass-action-law class

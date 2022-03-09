@@ -35,19 +35,31 @@
 using namespace mfem;
 using namespace std;
 
-Arrhenius::Arrhenius(const double A, const double b, const double E) : A_(A), b_(b), E_(E), Reaction() {}
+Arrhenius::Arrhenius(const double A, const double b, const double E) : Reaction() {
+  constants.A_ = A;
+  constants.b_ = b;
+  constants.E_ = E;
+  
+  reactModel = ReactionModel::ARRHENIUS;
+}
 
 double Arrhenius::computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved) {
   double temp = (isElectronInvolved) ? T_e : T_h;
 
-  return A_ * pow(temp, b_) * exp(-E_ / UNIVERSALGASCONSTANT / temp);
+  return constants.A_ * pow(temp, constants.b_) * exp(-constants.E_ / UNIVERSALGASCONSTANT / temp);
 }
 
-HoffertLien::HoffertLien(const double A, const double b, const double E) : A_(A), b_(b), E_(E), Reaction() {}
+HoffertLien::HoffertLien(const double A, const double b, const double E) : Reaction() {
+  constants.A_ = A;
+  constants.b_ = b;
+  constants.E_ = E;
+  
+  reactModel = ReactionModel::HOFFERTLIEN;
+}
 
 double HoffertLien::computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved) {
   double temp = (isElectronInvolved) ? T_e : T_h;
-  double tempFactor = E_ / BOLTZMANNCONSTANT / temp;
+  double tempFactor = constants.E_ / BOLTZMANNCONSTANT / temp;
 
-  return A_ * pow(temp, b_) * (tempFactor + 2.0) * exp(-tempFactor);
+  return constants.A_ * pow(temp, constants.b_) * (tempFactor + 2.0) * exp(-tempFactor);
 }

@@ -98,6 +98,13 @@ enum WallType {
   VISC_ISOTH   // Viscous isothermal wall
 };
 
+// Structure to keep reaction constants 
+struct reactionConstants {
+  double A_;
+  double b_;
+  double E_;
+}
+
 // The following four keywords define two planes in which
 // a linearly varying viscosity can be defined between these two.
 // The planes are defined by the normal and one point being the

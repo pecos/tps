@@ -118,7 +118,7 @@ void Chemistry::computeForwardRateCoeffs(const double T_h, const double T_e, Vec
 
   for (int r = 0; r < numReactions_; r++) {
     bool isElectronInvolved = isElectronInvolvedAt(r);
-    kfwd = reactions_[r]->computeRateCoefficient(T_h, T_e, isElectronInvolved);
+    kfwd(r) = reactions_[r]->computeRateCoefficient(T_h, T_e, isElectronInvolved);
   }
 
   return;
