@@ -153,8 +153,9 @@ class RHSoperator : public TimeDependentOperator {
   static void copyDataForFluxIntegration_gpu(const Vector &z, DenseTensor &flux, Vector &fk, Vector &zk, const int eq,
                                              const int dof, const int dim);
   // Kevin: will need to consider how to feed Rgas for multi-species
-  void updatePrimitives_gpu(Vector *Up, const Vector *x_in, const double gamma, const double Rgas,
-                                   const int ndofs, const int dim, const int num_equation, const Equations &eqSystem);
+  //void updatePrimitives_gpu(Vector *Up, const Vector *x_in, const double gamma, const double Rgas,
+  //                                 const int ndofs, const int dim, const int num_equation, const Equations &eqSystem) const;
+  void updatePrimitives_gpu(const Vector &in) const;
   static void multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceIntegrationArrays &gpuArrays,
                                  const Vector &invMArray, const Array<int> &posDofInvM, const int num_equation,
                                  const int totNumDof, const int NE, const int elemOffset, const int dof);

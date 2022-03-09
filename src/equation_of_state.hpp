@@ -295,7 +295,7 @@ class DryAir : public GasMixture {
   
   static MFEM_HOST_DEVICE void computeSpeciesEnthalpies_gpu(double *speciesEnthalpies, const int &numSpecies,
                                                             const int &thrd, const int &maxThreads ) {
-    for (int sp = thr; sp < numSpecies; sp += maxThreads) {
+    for (int sp = thrd; sp < numSpecies; sp += maxThreads) {
       speciesEnthalpies[sp] = 0.;
     }
   }
@@ -601,6 +601,7 @@ class PerfectMixture : public GasMixture {
                                                        n_sp[numSpecies-1],
                                                        T_h,
                                                        T_e,
+						       twoTemperature,
                                                        numSpecies,
                                                        numActiveSpecies );
   }
@@ -610,6 +611,7 @@ class PerfectMixture : public GasMixture {
                                                          const double &n_B,
                                                          const double &T_h,
                                                          const double &T_e,
+							 const bool &twoTemperature,
                                                          const int &numSpecies,
                                                          const int &numActiveSpecies ) {
     double n_h = 0.0;  // total number density of all heavy species.
@@ -620,7 +622,7 @@ class PerfectMixture : public GasMixture {
     n_h += n_B;
 
     double p = n_h * T_h;
-    if (twoTemperature_) {
+    if (twoTemperature) {
       p += n_e * T_e;
     } else {
       p += n_e * T_h;
@@ -665,7 +667,7 @@ class PerfectMixture : public GasMixture {
     T_h /= totalHeatCapacity;
 
     // electron temperature as primitive variable.
-    if (twoTemperature_) {
+    if (twoTemperature) {
       T_e = state[num_equation - 1] / ne / molarCV[numSpecies - 2];
     } else {
       T_e = T_h;
@@ -741,7 +743,7 @@ class PerfectMixture : public GasMixture {
                                                                   const int &numSpecies,
                                                                   const int &numActiveSpecies,
                                                                   const int &thrd,
-                                                                  const int &maxTheads ) {
+                                                                  const int &maxThreads ) {
     MFEM_SHARED double n_sp[15]; // WARNING: assuming a maximum of 15 species
     
     PerfectMixture::computeNumberDensities_gpu(state, 
@@ -752,14 +754,14 @@ class PerfectMixture : public GasMixture {
                                                numActiveSpecies,
                                                ambipolar,
                                                thrd,
-                                               maxTheads);
+                                               maxThreads);
     MFEM_SYNC_THREAD;
-    for (int sp = thrd; sp < numActiveSpecies; sp += maxTheads) 
+    for (int sp = thrd; sp < numActiveSpecies; sp += maxThreads) 
       primitives[dim + 2 + sp] = n_sp[sp];
     
     if (thrd == maxThreads-1) primitives[0] = state[0];
     
-    for (int d = thrd; d < dim; d += maxTheads) primitives[d + 1] = state[d + 1] / state[0];
+    for (int d = thrd; d < dim; d += maxThreads) primitives[d + 1] = state[d + 1] / state[0];
     MFEM_SYNC_THREAD;
     
     double T_h, T_e;
@@ -778,7 +780,7 @@ class PerfectMixture : public GasMixture {
                                                T_h );
     primitives[dim + 1] = T_h;
 
-    if (twoTemperature_)  // electron temperature as primitive variable.
+    if (twoTemperature)  // electron temperature as primitive variable.
       primitives[num_equation - 1] = T_e;
   }
   
@@ -831,13 +833,13 @@ class PerfectMixture : public GasMixture {
       totalHeatCapacity += primit[2+dim+sp] * molarCV[sp];
     }
     totalHeatCapacity += nB * molarCV[numSpecies - 1];
-    if (!twoTemperature_) totalHeatCapacity += n_e * molarCV[numSpecies - 2];
+    if (!twoTemperature) totalHeatCapacity += n_e * molarCV[numSpecies - 2];
 
     double totalEnergy = 0.0;
     for (int d = 0; d < dim; d++) totalEnergy += primit[d + 1] * primit[d + 1];
     totalEnergy *= 0.5 * primit[0];
     totalEnergy += totalHeatCapacity * primit[dim + 1];
-    if (twoTemperature_) {
+    if (twoTemperature) {
       totalEnergy += conserv[num_equation - 1];
     }
 

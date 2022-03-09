@@ -378,9 +378,9 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 #ifdef _GPU_
 
   // ComputeConvectiveFluxes
-  Fluxes::convectiveFluxes_gpu(x, flux, eqSystem, mixture, vfes->GetNDofs(), dim, num_equation);
+  fluxClass->convectiveFluxes_gpu(x, flux, eqSystem, mixture, vfes->GetNDofs(), dim, num_equation);
   if (eqSystem != EULER) {
-    Fluxes::viscousFluxes_gpu(x, gradUp, flux, eqSystem, mixture, spaceVaryViscMult, linViscData, vfes->GetNDofs(), dim,
+    fluxClass->viscousFluxes_gpu(x, gradUp, flux, eqSystem, mixture, spaceVaryViscMult, linViscData, vfes->GetNDofs(), dim,
                               num_equation);
   }
 #else
@@ -450,8 +450,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 void RHSoperator::updatePrimitives(const Vector &x_in) const {
 #ifdef _GPU_
 
-  RHSoperator::updatePrimitives_gpu(Up, &x_in, mixture->GetSpecificHeatRatio(), mixture->GetGasConstant(),
-                                    vfes->GetNDofs(), dim, num_equation, eqSystem);
+  updatePrimitives_gpu(x_in);
 #else
   double *dataUp = Up->GetData();
   for (int i = 0; i < vfes->GetNDofs(); i++) {
@@ -464,13 +463,15 @@ void RHSoperator::updatePrimitives(const Vector &x_in) const {
 #endif  // _GPU_
 }
 
-void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const double gamma, const double Rgas,
-                                       const int ndofs, const int dim, const int num_equation,
-                                       const Equations &eqSystem) {
+void RHSoperator::updatePrimitives_gpu(const Vector &x_in) const {
 #ifdef _GPU_
   auto dataUp = Up->Write();   // make sure data is available in GPU
-  auto dataIn = x_in->Read();  // make sure data is available in GPU
-  
+  auto dataIn = x_in.Read();  // make sure data is available in GPU
+ 
+  const double gamma = mixture->GetSpecificHeatRatio();
+  const double Rgas  = mixture->GetGasConstant();
+  const int ndofs = vfes->GetNDofs();
+
   const int numSpecies = mixture->GetNumSpecies();
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
   const WorkingFluid fluid = mixture->GetWorkingFluid();
@@ -483,6 +484,8 @@ void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const dou
   const bool ambipolar = mixture->IsAmbipolar();
   const bool twoTemperature = mixture->IsTwoTemperature();
 
+  const Equations d_eqSystem = eqSystem;
+
   MFEM_FORALL_2D(n, ndofs, num_equation, 1, 1, {
     MFEM_SHARED double state[20], primit[20];  // assuming 20 equations
     
@@ -494,7 +497,7 @@ void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const dou
         case WorkingFluid::DRY_AIR:
           DryAir::GetPrimitivesFromConservatives_gpu(&state[0],
                                                      &primit[0],
-                                                     eqSystem,
+                                                     d_eqSystem,
                                                      gamma,
                                                      Rgas,
                                                      num_equation,

@@ -137,7 +137,7 @@ class Chemistry {
       if (electronIndex < 0) {
         isElectronInvolved = false;
       }else {
-        isElectronInvolved = reactantStoich[electronIndex + numSpecies* r] != 0
+        isElectronInvolved = reactantStoich[electronIndex + numSpecies* r] != 0;
       }
       switch (reactionsModel[r]) {
         case ReactionModel::ARRHENIUS:
@@ -177,7 +177,7 @@ class Chemistry {
       if (electronIndex < 0) {
         isElectronInvolved = false;
       }else {
-        isElectronInvolved = reactantStoich[electronIndex + numSpecies* r] != 0
+        isElectronInvolved = reactantStoich[electronIndex + numSpecies* r] != 0;
       }
       double temp = isElectronInvolved ? T_e : T_h;
       if (detailedBalance[r]) {
