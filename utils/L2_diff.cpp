@@ -45,6 +45,9 @@ int main (int argc, char *argv[])
   srcField1->readHDF5(filename1);
   srcField2->readHDF5(filename2);
 
+  srcField1->updatePrimitives();
+  srcField2->updatePrimitives();
+
   // 2) Set up source field
   FiniteElementCollection *src_fec = NULL;
   ParFiniteElementSpace *src_fes = NULL;
@@ -88,6 +91,28 @@ int main (int argc, char *argv[])
   double norm = src_state1->ComputeLpError(2, zeroCoeff);
   grvy_printf(GRVY_INFO, "\n L2 norm of solution : %.8E\n", norm);
   grvy_printf(GRVY_INFO, "\n Relative error : %.8E\n", error / norm);
+
+  ParGridFunction *src_prim1 = srcField1->getPrimitiveGF();
+  ParGridFunction *src_prim2 = srcField2->getPrimitiveGF();
+
+  ParGridFunction *press1 = srcField1->getPressureGF();
+  ParGridFunction *press2 = srcField2->getPressureGF();
+  mixture->UpdatePressureGridFunction(press1, src_prim1);
+  mixture->UpdatePressureGridFunction(press2, src_prim2);
+
+  double *dataUp1 = src_prim1->GetData();
+  double *dataUp2 = src_prim2->GetData();
+  double *dataP1 = press1->GetData();
+  double *dataP2 = press2->GetData();
+  for (int i = 0; i < NDof; i++) {
+    for (int eq = 0; eq < num_equation; eq++) {
+      dataU1[i + eq * NDof] = dataDiff[i + eq * NDof];
+      dataUp1[i + eq * NDof] -= dataUp2[i + eq * NDof];
+      dataP1[i + eq * NDof] -= dataP2[i + eq * NDof];
+    }
+  }
+
+  srcField1->writeParaview(0, 0.0);
 
   // double norm = ComputeGlobalLpNorm(2, diffCoeff, *mesh_1, *intRules);
   // diff.ProjectCoefficient(diffCoeff);

@@ -313,8 +313,6 @@ class M2ulPhyS : public TPS::Solver {
   bool Check_ExitEarly(int iter);
   void Cache_Paraview_Timesteps();
 
-  void updatePrimitives();
-
  public:
   M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps);
   M2ulPhyS(MPI_Session &_mpi, TPS::Tps *tps);
@@ -340,9 +338,13 @@ class M2ulPhyS : public TPS::Solver {
   FiniteElementCollection *GetFEC() { return fec; }
   ParFiniteElementSpace *GetFESpace() { return vfes; }
   ParGridFunction *GetSolutionGF() { return U; }
+  ParGridFunction *getPrimitiveGF() { return Up; }
+  ParGridFunction *getPressureGF() { return press; }
   IntegrationRules *getIntegrationRules() { return intRules; }
   RunConfiguration &GetConfig() { return config; }
   GasMixture *getMixture() { return mixture; }
+
+  void updatePrimitives();
 
   static int Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_print);
 
