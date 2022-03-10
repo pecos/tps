@@ -160,9 +160,7 @@ void DGNonLinearForm::Mult_domain(const Vector &x, Vector &y) {
 
       interpFaceData_gpu(x,  // px,
                          uk_el1, uk_el2, grad_upk_el1, grad_upk_el2, gradUp, vfes->GetNDofs(), mesh->GetNumFaces(),
-                         h_numElems[elType], elemOffset, dof_el, dim, num_equation, mixture->GetSpecificHeatRatio(),
-                         mixture->GetGasConstant(), mixture->GetViscMultiplyer(), mixture->GetBulkViscMultiplyer(),
-                         mixture->GetPrandtlNum(), gpuArrays, maxIntPoints, maxDofs);
+                         h_numElems[elType], elemOffset, dof_el, dim, num_equation, gpuArrays, maxIntPoints, maxDofs);
 
       faceIntegration_gpu(y,  // py,
                           uk_el1, uk_el2, grad_upk_el1, grad_upk_el2, gradUp, fluxes, vfes->GetNDofs(),

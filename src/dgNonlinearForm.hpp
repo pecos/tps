@@ -40,6 +40,7 @@
 #include "BCintegrator.hpp"
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
+#include "transport_properties.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -110,8 +111,7 @@ class DGNonLinearForm : public ParNonlinearForm {
   void interpFaceData_gpu(const Vector &x, Vector &uk_el1, Vector &uk_el2, Vector &grad_uk_el1,
                                  Vector &grad_uk_el2, const ParGridFunction *gradUp, const int &Ndofs, const int &Nf,
                                  const int &NumElemsType, const int &elemOffset, const int &elDof, const int &dim,
-                                 const int &num_equation, const double &gamma, const double &Rg, const double &viscMult,
-                                 const double &bulkViscMult, const double &Pr,
+                                 const int &num_equation,
                                  const volumeFaceIntegrationArrays &gpuArrays, const int &maxIntPoints,
                                  const int &maxDofs);
   void sharedFaceInterpolation_gpu(const Vector &x, const Vector &faceU, const ParGridFunction *gradUp,
