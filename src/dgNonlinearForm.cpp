@@ -38,6 +38,7 @@
 DGNonLinearForm::DGNonLinearForm(Fluxes *_flux, ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradFes,
                                  ParGridFunction *_gradUp, BCintegrator *_bcIntegrator, IntegrationRules *_intRules,
                                  const int _dim, const int _num_equation, GasMixture *_mixture,
+                                 TrasnportProperties *_transport,
                                  const volumeFaceIntegrationArrays &_gpuArrays, const int &_maxIntPoints,
                                  const int &_maxDofs)
     : ParNonlinearForm(_vfes),
@@ -50,6 +51,7 @@ DGNonLinearForm::DGNonLinearForm(Fluxes *_flux, ParFiniteElementSpace *_vfes, Pa
       dim(_dim),
       num_equation(_num_equation),
       mixture(_mixture),
+      transport(_transport),
       gpuArrays(_gpuArrays),
       maxIntPoints(_maxIntPoints),
       maxDofs(_maxDofs) {
@@ -212,14 +214,23 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, Vector &uk_el1, Vector &uk_
   auto d_shapeWnor1 = gpuArrays.shapeWnor1.Read();
   const double *d_shape2 = gpuArrays.shape2.Read();
   auto d_elems12Q = gpuArrays.elems12Q.Read();
+  
+  const Equations eqSystem = flux->GetEquationSystem();
 
   const double gamma = mixture->GetSpecificHeatRatio();
   const double Rg = mixture->GetGasConstant();
-  const double viscMult = mixture->GetViscMultiplyer();
-  const double bulkViscMult = mixture->GetBulkViscMultiplyer();
-  const double Pr = mixture->GetPrandtlNum();
-  const double Sc = mixture->GetSchmidtNum();
-  const Equations eqSystem = flux->GetEquationSystem();
+  const double viscMult = transport->GetViscMultiplyer();
+  const double bulkViscMult = transport->GetBulkViscMultiplyer();
+  const double Pr = transport->GetPrandtlNum();
+  const double Sc = transport->GetSchmidtNum();
+  
+  const TransportModel transpModel = transport->getTransportModel();
+  
+  const DenseMatrix gasParameters = mixture->GetGasParam();
+  const double *d_gasParams = gasParameters.Read();
+  
+  const int d_numActiveSpecies = mixture->GetNumActiveSpecies();
+  const int d_numSpecies = mixture->GetNumSpecies();
 
   MFEM_FORALL_2D(el, NumElemType, elDof, 1, 1, {
     MFEM_FOREACH_THREAD(i, x, elDof) {
@@ -290,10 +301,12 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, Vector &uk_el1, Vector &uk_
       // compute Riemann flux
       RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, eqSystem, num_equation, i,
                                    elDof);
-      Fluxes::viscousFlux_gpu(&vFlux1[0], &u1[0], &gradUp1[0], eqSystem, gamma, Rg, viscMult, bulkViscMult, Pr, Sc, i,
-                              elDof, dim, num_equation);
-      Fluxes::viscousFlux_gpu(&vFlux2[0], &u2[0], &gradUp2[0], eqSystem, gamma, Rg, viscMult, bulkViscMult, Pr, Sc, i,
-                              elDof, dim, num_equation);
+      Fluxes::viscousFlux_gpu(&vFlux1[0], &u1[0], &gradUp1[0], eqSystem, transpModel, 
+                              d_gasParams, gamma, Rg, viscMult, bulkViscMult,
+                              Pr, Sc, dim, num_equation, d_numActiveSpecies, d_numSpecies, i, elDof);
+      Fluxes::viscousFlux_gpu(&vFlux2[0], &u2[0], &gradUp2[0], eqSystem, transpModel, 
+                              d_gasParams, gamma, Rg, viscMult, bulkViscMult,
+                              Pr, Sc, dim, num_equation, d_numActiveSpecies, d_numSpecies, i, elDof);
       MFEM_SYNC_THREAD;
       // if(i<num_equation)
       for (int eq = i; eq < num_equation; eq += elDof) {
@@ -517,13 +530,22 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(
   const int *d_nodesIDs = gpuArrays.nodesIDs.Read();
   const int *d_posDofIds = gpuArrays.posDofIds.Read();
 
-  const double gamma = mixture->GetSpecificHeatRatio();
-  const double Rg    = mixture->GetGasConstant();
-  const double viscMult = mixture->GetViscMultiplyer();
-  const double bulkViscMult = mixture->GetBulkViscMultiplyer();
-  const double Pr = mixture->GetPrandtlNum();
-  const double Sc = mixture->GetSchmidtNum();
   const Equations eqSystem = flux->GetEquationSystem();
+
+  const double gamma = mixture->GetSpecificHeatRatio();
+  const double Rg = mixture->GetGasConstant();
+  const double viscMult = transport->GetViscMultiplyer();
+  const double bulkViscMult = transport->GetBulkViscMultiplyer();
+  const double Pr = transport->GetPrandtlNum();
+  const double Sc = transport->GetSchmidtNum();
+  
+  const TransportModel transpModel = transport->getTransportModel();
+  
+  const DenseMatrix gasParameters = mixture->GetGasParam();
+  const double *d_gasParams = gasParameters.Read();
+  
+  const int d_numActiveSpecies = mixture->GetNumActiveSpecies();
+  const int d_numSpecies = mixture->GetNumSpecies();
 
   const double *d_sharedShapeWnor1 = parallelData->sharedShapeWnor1.Read();
   const double *d_sharedShape2 = parallelData->sharedShape2.Read();
@@ -618,10 +640,12 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(
           // compute Riemann flux
           RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg,
                                        dim, eqSystem, num_equation, i, maxDofs);
-          Fluxes::viscousFlux_gpu(&vFlux1[0], &u1[0], &gradUp1[0], eqSystem, gamma, Rg, viscMult,
-                                  bulkViscMult, Pr, Sc, i, maxDofs, dim, num_equation);
-          Fluxes::viscousFlux_gpu(&vFlux2[0], &u2[0], &gradUp2[0], eqSystem, gamma, Rg, viscMult, bulkViscMult,
-                                  Pr, Sc, i, maxDofs, dim, num_equation);
+          Fluxes::viscousFlux_gpu(&vFlux1[0], &u1[0], &gradUp1[0], eqSystem, transpModel, 
+                              d_gasParams, gamma, Rg, viscMult, bulkViscMult,
+                              Pr, Sc, dim, num_equation, d_numActiveSpecies, d_numSpecies, i, maxDofs);
+          Fluxes::viscousFlux_gpu(&vFlux2[0], &u2[0], &gradUp2[0], eqSystem, transpModel, 
+                              d_gasParams, gamma, Rg, viscMult, bulkViscMult,
+                              Pr, Sc, dim, num_equation, d_numActiveSpecies, d_numSpecies, i, maxDofs);
 
           MFEM_SYNC_THREAD;
           if (i < num_equation) {
