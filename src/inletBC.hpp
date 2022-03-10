@@ -127,9 +127,12 @@ class InletBC : public BoundaryCondition {
                               const int &maxIntPoints, const int &maxDofs, const int &dim, const int &num_equation);
 
 #ifdef _GPU_
-  static MFEM_HOST_DEVICE void computeSubDenseVel(const int &thrd, const double *u1, double *u2, const double *nor,
+  static MFEM_HOST_DEVICE void computeSubDenseVel(const double *u1, double *u2, const double *nor,
                                                   const double *inputState, const double &gamma, const int &dim,
-                                                  const int &num_equation, const Equations &eqSystem) {
+                                                  const int &num_equation, 
+                                                  const int &numActiveSpecies, const Equations &eqSystem,
+                                                  const int &thrd, const int &maxThreads
+                                                 ) {
     // assumes there at least as many threads as number of equations
     MFEM_SHARED double KE[3];
     MFEM_SHARED double p;
@@ -152,6 +155,10 @@ class InletBC : public BoundaryCondition {
     }
     if (eqSystem == NS_PASSIVE && thrd == num_equation - 1) {
       u2[thrd] = 0.;
+    }else if (numActiveSpecies > 0) {
+      for (int sp = thrd; sp < numActiveSpecies; sp+=maxThreads) {
+      u2[dim + 2 + sp] = inputState[4 + sp];
+    }
     }
   }
 #endif

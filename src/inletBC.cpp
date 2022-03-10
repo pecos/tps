@@ -782,6 +782,20 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
 
   const double Rg = mixture->GetGasConstant();
   const double gamma = mixture->GetSpecificHeatRatio();
+  
+  const WorkingFluid fluid = mixture->GetWorkingFluid();
+  
+  const double *molarCV = NULL;
+  const double *gasParams = NULL;
+  if (fluid == WorkingFluid::USER_DEFINED) {
+    molarCV = mixture->getMolarCVs().Read();
+    gasParams = mixture->GetGasParam().Read();
+  }
+  const bool ambipolar = mixture->IsAmbipolar();
+  const bool twoTemperature = mixture->IsTwoTemperature();
+  const int numSpecies = mixture->GetNumSpecies();
+  const int numActiveSpecies = mixture->GetNumActiveSpecies();
+
 
   MFEM_FORALL_2D(n, numBdrElem, maxDofs, 1, 1, {     // NOLINT
     MFEM_FOREACH_THREAD(i, x, maxDofs) {             // NOLINT
@@ -819,7 +833,17 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
     // compute mirror state
     switch (type) {
       case InletType::SUB_DENS_VEL:
-        computeSubDenseVel(i, &u1[0], &u2[0], &nor[0], d_inputState, gamma, dim, num_equation, eqSystem);
+        {
+          computeSubDenseVel(&u1[0], &u2[0], &nor[0], d_inputState, gamma, dim, num_equation, 
+                           numActiveSpecies, eqSystem,i,maxDofs);
+          PerfectMixture::modifyEnergyForPressure_gpu(u2,u2,d_inputState[0],
+                                                      true,molarCV,gasParams,
+                                                      ambipolar,twoTemperature,
+                                                      num_equation,dim,
+                                                      numSpecies,
+                                                      numActiveSpecies,
+                                                      i,maxDofs);
+        }
         break;
       case InletType::SUB_DENS_VEL_NR:
         printf("INLET BC NOT IMPLEMENTED");
