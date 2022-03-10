@@ -332,6 +332,7 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
   const double Sc = transport->GetSchmidtNum();
   
   const TransportModel transpModel = transport->getTransportModel();
+  const WorkingFluid fluid = mixture->GetWorkingFluid();
   
   const DenseMatrix gasParameters = mixture->GetGasParam();
   const double *d_gasParams = gasParameters.Read();
@@ -348,6 +349,7 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
       MFEM_SHARED double Fcontrib[216 * 20];
       MFEM_SHARED double shape[216];
       MFEM_SHARED double Rflux[20], u1[20], u2[20], nor[3], gradUpi[20 * 3];
+      MFEM_SHARED double unitN[3];
       MFEM_SHARED double vF1[20 * 3], vF2[20 * 3];
       MFEM_SHARED double weight;
 
@@ -422,10 +424,35 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
       Fluxes::viscousFlux_gpu(&vF2[0], &u2[0], &gradUpi[0], eqSystem, transpModel, 
                               d_gasParams, gamma, Rg, viscMult, bulkViscMult,
                               Pr, Sc, dim, num_equation, d_numActiveSpecies, d_numSpecies, i, maxDofs);
-//       Fluxes::viscousFlux_gpu(&vF1[0], &u1[0], &gradUpi[0], eqSystem, gamma, Rg, viscMult, bulkViscMult, Pr, Sc, i,
-//                               maxDofs, dim, num_equation);
-//       Fluxes::viscousFlux_gpu(&vF2[0], &u2[0], &gradUpi[0], eqSystem, gamma, Rg, viscMult, bulkViscMult, Pr, Sc, i,
-//                               maxDofs, dim, num_equation);
+      MFEM_SYNC_THREAD;
+      
+      switch (type) {
+        case WallType::VISC_ISOTH:
+          if (fluid == WorkingFluid::USER_DEFINED) {
+            // zero out species normal diffusion fluxes.
+            if (i < dim) unitN[i] = nor[i];
+            MFEM_SYNC_THREAD;
+            MFEM_SHARED double modNor;
+            if (i == 0) {
+              modNor = 0.;
+              for (int d = 0; d < dim; d++) modNor += nor[d] * nor[d];
+            }
+            MFEM_SYNC_THREAD;
+            if (i < dim) unitN[i] /= sqrt(modNor);
+            MFEM_SYNC_THREAD; 
+            
+            double normalDiffusionFlux;
+            for (int sp = i; sp < d_numActiveSpecies; sp += maxDofs) {
+              normalDiffusionFlux = 0.;
+              for (int d = 0; d < dim; d++) normalDiffusionFlux += unitN[d] * vF2[2 +dim + sp + d*num_equation];
+              for (int d = 0; d < dim; d++) vF2[2 +dim + sp + d*num_equation] -= unitN[d] * normalDiffusionFlux;
+            }
+          }
+          break;
+        case WallType::VISC_ADIAB:
+          if (i == 0) printf("Wall type not GPU supported");
+          break;
+      }
       MFEM_SYNC_THREAD;
 
       // add visc flux contribution

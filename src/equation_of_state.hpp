@@ -324,6 +324,25 @@ class DryAir : public GasMixture {
     if (thrd == num_equation - 1 && eqSystem == NS_PASSIVE)
       primit[num_equation - 1] = state[num_equation - 1] / state[0];
   }
+  
+  static MFEM_HOST_DEVICE void modifyEnergyForPressure_gpu(const double *stateIn,
+                                                           double *stateOut,
+                                                           const double &p,
+                                                           const double &gamma,
+                                                           const int &num_equation,
+                                                           const int &dim,
+                                                           const int &thrd,
+                                                           const int &maxThreads
+  ) {
+    if (thrd < num_equation) stateOut[thrd] = stateIn[thrd];
+    MFEM_SYNC_THREAD;
+    
+    double ke = 0.;
+    for (int d = 0; d < dim; d++) ke += stateIn[1 + d] * stateIn[1 + d];
+    ke *= 0.5 / stateIn[0];
+
+    stateOut[1 + dim] = p / (gamma - 1.) + ke;
+  }
 #endif
 };
 
@@ -848,6 +867,77 @@ class PerfectMixture : public GasMixture {
     }
 
     conserv[dim + 1] = totalEnergy;
+  }
+  
+  static MFEM_HOST_DEVICE void modifyEnergyForPressure_gpu(const double *stateIn,
+                                                           double *stateOut,
+                                                           const double &p,
+                                                           const bool &modifyElectronEnergy,
+                                                           const double *molarCV,
+                                                           const double *gasParams,
+                                                           const bool &ambipolar,
+                                                           const bool &twoTemperature,
+                                                           const int &num_equation,
+                                                           const int &dim,
+                                                           const int &numSpecies,
+                                                           const int &numActiveSpecies,
+                                                           const int &thrd,
+                                                           const int &maxThreads
+  ) {
+    MFEM_SHARED double n_sp[15];
+    PerfectMixture::computeNumberDensities_gpu(stateIn, 
+                                               n_sp,
+                                               gasParams,
+                                               dim,
+                                               numSpecies,
+                                               numActiveSpecies,
+                                               ambipolar,
+                                               thrd,
+                                               maxThreads);
+    MFEM_SYNC_THREAD;
+    
+    double Th = 0., pe = 0.0;
+    if (twoTemperature && (!modifyElectronEnergy)) {
+      double Xeps = 1.0e-30; // To avoid dividing by zero.
+      double Te = stateIn[num_equation - 1] / (n_sp[numSpecies - 2] + Xeps) / molarCV[numSpecies - 2];
+      pe = n_sp[numSpecies - 2] * UNIVERSALGASCONSTANT * Te;
+    }
+
+    for (int sp = 0; sp < numSpecies; sp++) {
+      if (twoTemperature && (!modifyElectronEnergy) && (sp == numSpecies - 2)) continue;
+      Th += n_sp[sp];
+    }
+    Th = (p - pe) / (Th * UNIVERSALGASCONSTANT);
+    
+    // compute total energy with the modified temperature of heavies
+    double totalHeatCapacity = 0.;
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      if (sp == numSpecies - 2) continue;  // neglect electron.
+      totalHeatCapacity += n_sp[sp] * molarCV[sp];
+    }
+    totalHeatCapacity += n_sp[numSpecies-1] * molarCV[numSpecies - 1];
+    if (!twoTemperature) totalHeatCapacity += n_sp[numSpecies-2] * molarCV[numSpecies - 2];
+    
+    // if (!twoTemperature_) totalHeatCapacity += n_sp[numSpecies - 2] * molarCV_(numSpecies - 2);
+    double rE = totalHeatCapacity * Th;
+    // if (twoTemperature_) rE += stateIn(num_equation - 1);
+
+    double electronEnergy = 0.0;
+    if (twoTemperature) {
+      electronEnergy = (modifyElectronEnergy) ? n_sp[numSpecies - 2] * molarCV[numSpecies - 2] * Th : stateIn[num_equation - 1];
+      stateOut[num_equation - 1] = electronEnergy;
+    } else {
+      electronEnergy = n_sp[numSpecies - 2] * molarCV[numSpecies - 2] * Th;
+    }
+    rE += electronEnergy;
+    
+    for (int d = 0; d < dim; d++) 
+      rE += 0.5 * stateIn[d + 1] * stateIn[d + 1] / stateIn[0];
+    
+    for (int sp = 0; sp < numSpecies - 2; sp++) 
+      rE += n_sp[sp] * gasParams[sp + numSpecies * (int)GasParams::FORMATION_ENERGY];
+
+    stateOut[1 + dim] = rE;
   }
 #endif
 };
