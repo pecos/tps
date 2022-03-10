@@ -41,6 +41,7 @@
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
 #include "gradNonLinearForm.hpp"
+#include "transport_properties.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -56,6 +57,7 @@ class Gradients : public ParNonlinearForm {
   ParGridFunction *gradUp;
 
   GasMixture *mixture;
+  TransportProperties *transport;
 
   // ParNonlinearForm *gradUp_A;
   GradNonLinearForm *gradUp_A;
@@ -87,7 +89,8 @@ class Gradients : public ParNonlinearForm {
 
  public:
   Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradUpfes, int _dim, int _num_equation,
-            ParGridFunction *_Up, ParGridFunction *_gradUp, GasMixture *_mixture, GradNonLinearForm *_gradUp_A,
+            ParGridFunction *_Up, ParGridFunction *_gradUp, GasMixture *_mixture, TransportProperties *_transport,
+            GradNonLinearForm *_gradUp_A,
             IntegrationRules *_intRules, int _intRuleType, const volumeFaceIntegrationArrays &gpuArrays,
             Array<DenseMatrix *> &Me_inv, Vector &_invMArray, Array<int> &_posDofInvM, const int &_maxIntPoints,
             const int &_maxDofs);
@@ -105,27 +108,25 @@ class Gradients : public ParNonlinearForm {
   void computeGradients_domain();
   void computeGradients_bdr();
 
-  static void computeGradients_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
+  void computeGradients_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
                                    const Vector &Up, Vector &gradUp, const int num_equation, const int dim,
                                    const volumeFaceIntegrationArrays &gpuArrays,
                                    //                                    const Vector &elemShapeDshapeWJ,
                                    //                                    const Array<int> &elemPosQ_shapeDshapeWJ,
                                    const int &maxDofs, const int &maxIntPoints);
 
-  static void faceContrib_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
+  void faceContrib_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
                               const Vector &Up, Vector &gradUp, const int num_equation, const int dim,
                               const volumeFaceIntegrationArrays &gpuArrays, const int &maxDofs,
                               const int &maxIntPoints);
 
-  static void integrationGradSharedFace_gpu(const Vector *Up, const Vector &faceUp, ParGridFunction *gradUp,
+  void integrationGradSharedFace_gpu(const Vector *Up, const Vector &faceUp, ParGridFunction *gradUp,
                                             const int &Ndofs, const int &dim, const int &num_equation,
-                                            const double &gamma, const double &Rg, const double &viscMult,
-                                            const double &bulkViscMult, const double &Pr,
                                             const volumeFaceIntegrationArrays &gpuArrays,
                                             const parallelFacesIntegrationArrays *parallelData, const int &maxIntPoints,
                                             const int &maxDofs);
 
-  static void multInverse_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
+  void multInverse_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
                               Vector &gradUp, const int num_equation, const int dim,
                               const volumeFaceIntegrationArrays &gpuArrays, const Vector &invMArray,
                               const Array<int> &posDofInvM);

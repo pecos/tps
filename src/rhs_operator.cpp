@@ -159,7 +159,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
 #endif
 
   // create gradients object
-  gradients = new Gradients(vfes, gradUpfes, dim, num_equation, Up, gradUp, mixture, gradUp_A, intRules, intRuleType,
+  gradients = new Gradients(vfes, gradUpfes, dim, num_equation, Up, gradUp, mixture, _transport, gradUp_A, intRules, intRuleType,
                             gpuArrays, Me_inv, invMArray, posDofInvM, maxIntPoints, maxDofs);
   gradients->setParallelData(&parallelData, &transferUp);
 

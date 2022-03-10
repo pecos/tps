@@ -34,7 +34,8 @@
 #include "dgNonlinearForm.hpp"
 
 Gradients::Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradUpfes, int _dim, int _num_equation,
-                     ParGridFunction *_Up, ParGridFunction *_gradUp, GasMixture *_mixture, GradNonLinearForm *_gradUp_A,
+                     ParGridFunction *_Up, ParGridFunction *_gradUp, GasMixture *_mixture, TransportProperties *_transport,
+                     GradNonLinearForm *_gradUp_A,
                      IntegrationRules *_intRules, int _intRuleType, const volumeFaceIntegrationArrays &_gpuArrays,
                      Array<DenseMatrix *> &_Me_inv, Vector &_invMArray, Array<int> &_posDofInvM,
                      const int &_maxIntPoints, const int &_maxDofs)
@@ -46,6 +47,7 @@ Gradients::Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradU
       Up(_Up),
       gradUp(_gradUp),
       mixture(_mixture),
+      transport(_transport),
       gradUp_A(_gradUp_A),
       intRules(_intRules),
       intRuleType(_intRuleType),
@@ -219,10 +221,8 @@ void Gradients::computeGradients_bdr() {
   ParMesh *pmesh = vfes->GetParMesh();
   const int Nshared = pmesh->GetNSharedFaces();
   if (Nshared > 0) {
-    integrationGradSharedFace_gpu(Up, transferUp->face_nbr_data, gradUp, vfes->GetNDofs(), dim, num_equation,
-                                  mixture->GetSpecificHeatRatio(), mixture->GetGasConstant(),
-                                  mixture->GetViscMultiplyer(), mixture->GetBulkViscMultiplyer(),
-                                  mixture->GetPrandtlNum(), gpuArrays, parallelData, maxIntPoints, maxDofs);
+    integrationGradSharedFace_gpu(Up, transferUp->face_nbr_data, gradUp, vfes->GetNDofs(), dim, num_equation, 
+                                  gpuArrays, parallelData, maxIntPoints, maxDofs);
   }
 
   // Multiply by inverse mass matrix
@@ -440,8 +440,6 @@ void Gradients::faceContrib_gpu(const int numElems, const int offsetElems, const
 
 void Gradients::integrationGradSharedFace_gpu(const Vector *Up, const Vector &faceUp, ParGridFunction *gradUp,
                                               const int &Ndofs, const int &dim, const int &num_equation,
-                                              const double &gamma, const double &Rg, const double &viscMult,
-                                              const double &bulkViscMult, const double &Pr,
                                               const volumeFaceIntegrationArrays &gpuArrays,
                                               const parallelFacesIntegrationArrays *parallelData,
                                               const int &maxIntPoints, const int &maxDofs) {
