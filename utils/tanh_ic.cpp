@@ -103,5 +103,33 @@ int main (int argc, char *argv[])
   // Write restart files
   srcField->writeHDF5();
 
+  // reference solution
+  double time;
+  tps.getRequiredInput((basepath + "/reference_solution/time").c_str(), time);
+  grvy_printf(GRVY_INFO, "\n Reference solution is at time = : %.8E\n", time);
+  std::string refFileName;
+  tps.getInput((basepath + "/reference_solution/filename").c_str(), refFileName, std::string("tanh_ic.ref.h5"));
+  grvy_printf(GRVY_INFO, "\n Reference solution filename : %s\n", refFileName.c_str());
+
+  double u0 = sol1[1] / sol1[0]; // assume sol2 has the same speed.
+  double distance = u0 * time;
+  for (int i = 0; i < NDof; i++) {
+    double tanhFactor = 0.5 + 0.5 * tanh((coordinates[i + 0 * NDof] - distance - offset) / scale);
+    // std::cout << "Grid point " << i << ": ";
+    // for (int d = 0; d < dim; d++) {
+    //   std::cout << coordinates[i + d * NDof] << ", ";
+    // }
+    // std::cout << std::endl;
+
+    for (int eq = 0; eq < num_equation; eq++) {
+      dataU[i + eq * NDof] = sol1[eq] * (1.0 - tanhFactor) + sol2[eq] * tanhFactor;
+    }
+  }
+
+  rhsOperator.updatePrimitives(*src_state);
+
+  // Write restart files
+  srcField->writeHDF5(refFileName);
+
   return 0;
 }
