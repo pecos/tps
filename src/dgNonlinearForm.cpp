@@ -38,7 +38,7 @@
 DGNonLinearForm::DGNonLinearForm(Fluxes *_flux, ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradFes,
                                  ParGridFunction *_gradUp, BCintegrator *_bcIntegrator, IntegrationRules *_intRules,
                                  const int _dim, const int _num_equation, GasMixture *_mixture,
-                                 TrasnportProperties *_transport,
+                                 TransportProperties *_transport,
                                  const volumeFaceIntegrationArrays &_gpuArrays, const int &_maxIntPoints,
                                  const int &_maxDofs)
     : ParNonlinearForm(_vfes),
