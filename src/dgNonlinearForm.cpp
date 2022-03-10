@@ -341,9 +341,7 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, Vector &uk_el1, Vector &uk_
 void DGNonLinearForm::interpFaceData_gpu(const Vector &x, Vector &uk_el1, Vector &uk_el2, Vector &grad_uk_el1,
                                          Vector &grad_uk_el2, const ParGridFunction *gradUp, const int &Ndofs,
                                          const int &Nf, const int &NumElemsType, const int &elemOffset,
-                                         const int &elDof, const int &dim, const int &num_equation, const double &gamma,
-                                         const double &Rg, const double &viscMult, const double &bulkViscMult,
-                                         const double &Pr, const volumeFaceIntegrationArrays &gpuArrays,
+                                         const int &elDof, const int &dim, const int &num_equation, const volumeFaceIntegrationArrays &gpuArrays,
                                          const int &maxIntPoints, const int &maxDofs) {
 #ifdef _GPU_
   auto d_x = x.Read();
