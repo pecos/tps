@@ -47,6 +47,7 @@ class BoundaryCondition {
  protected:
   RiemannSolver *rsolver;
   GasMixture *mixture;
+  TransportProperties *transport;
   Equations eqSystem;
   ParFiniteElementSpace *vfes;
   IntegrationRules *intRules;
@@ -66,7 +67,8 @@ class BoundaryCondition {
   Vector interpolatedGradUpbdr_;
 
  public:
-  BoundaryCondition(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSystem, ParFiniteElementSpace *_vfes,
+  BoundaryCondition(RiemannSolver *_rsolver, GasMixture *_mixture, TransportProperties *_transport,
+                    Equations _eqSystem, ParFiniteElementSpace *_vfes,
                     IntegrationRules *_intRules, double &dt, const int _dim, const int _num_equation,
                     const int _patchNumber, const double _refLength);
   virtual ~BoundaryCondition();

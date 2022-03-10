@@ -63,7 +63,8 @@ class WallBC : public BoundaryCondition {
   void computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
 
  public:
-  WallBC(RiemannSolver *rsolver_, GasMixture *_mixture, Equations _eqSystem, Fluxes *_fluxClass,
+  WallBC(RiemannSolver *rsolver_, GasMixture *_mixture, TransportProperties *_transport,
+         Equations _eqSystem, Fluxes *_fluxClass,
          ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
          const int _num_equation, int _patchNumber, WallType _bcType, const Array<double> _inputData,
          const Array<int> &intPointsElIDBC, const int &maxIntPoints);
@@ -82,7 +83,7 @@ class WallBC : public BoundaryCondition {
                              ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                              Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs);
 
-  static void integrateWalls_gpu(const WallType type, const double &wallTemp,
+  void integrateWalls_gpu(const WallType type, const double &wallTemp,
                                  Vector &y,  // output
                                  const Vector &x, Vector &interpolated_Ubdr_, Vector &interpolatedGradUpbdr_,
                                  const Array<int> &nodesIDs, const Array<int> &posDofIds, ParGridFunction *Up,

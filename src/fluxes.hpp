@@ -124,26 +124,26 @@ class Fluxes {
     
     switch (transpModel){
       case TransportModel::DRY_AIR_TRNSP:
-	{
-	  double cp_div_pr = Rg * gamma / (gamma - 1.);
-          cp_div_pr /= Pr;
-          DryAirTransport::ComputeFluxTransportProperties_gpu(Un,
-                                                              gradUpn,
-                                                              gasParams,
-                                                              transportBuffer,
-                                                              diffusionVelocity,
-                                                              dim,
-                                                              num_equation,
-                                                              numActiveSpecies,
-                                                              numSpecies,
-                                                              Rg,
-                                                              cp_div_pr,
-                                                              gamma,
-                                                              Sc,
-                                                              viscMult,
-                                                              bulkViscMult,
-                                                              thrd, maxThreads );
-	}
+        {
+          double cp_div_pr = Rg * gamma / (gamma - 1.);
+              cp_div_pr /= Pr;
+              DryAirTransport::ComputeFluxTransportProperties_gpu(Un,
+                                                                  gradUpn,
+                                                                  gasParams,
+                                                                  transportBuffer,
+                                                                  diffusionVelocity,
+                                                                  dim,
+                                                                  num_equation,
+                                                                  numActiveSpecies,
+                                                                  numSpecies,
+                                                                  Rg,
+                                                                  cp_div_pr,
+                                                                  gamma,
+                                                                  Sc,
+                                                                  viscMult,
+                                                                  bulkViscMult,
+                                                                  thrd, maxThreads );
+        }
         break;
       default:
         printf("[ERROR] Fluxes::viscousFlux_gpu() transport model not yet supported.");

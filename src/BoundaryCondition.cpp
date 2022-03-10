@@ -31,12 +31,14 @@
 // -----------------------------------------------------------------------------------el-
 #include "BoundaryCondition.hpp"
 
-BoundaryCondition::BoundaryCondition(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSystem,
+BoundaryCondition::BoundaryCondition(RiemannSolver *_rsolver, GasMixture *_mixture, TransportProperties *_transport,
+                                     Equations _eqSystem,
                                      ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt,
                                      const int _dim, const int _num_equation, const int _patchNumber,
                                      const double _refLength)
     : rsolver(_rsolver),
       mixture(_mixture),
+      transport(_transport),
       eqSystem(_eqSystem),
       vfes(_vfes),
       intRules(_intRules),

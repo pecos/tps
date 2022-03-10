@@ -92,6 +92,11 @@ class TransportProperties {
   // If this routine evaluate additional primitive variables, can return them just as the routine above.
   virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
                                                 Vector &transportBuffer, DenseMatrix &diffusionVelocity){}
+                                                
+  virtual double GetViscMultiplyer(){return 0.;}
+  virtual double GetBulkViscMultiplyer(){return 0.;}
+  virtual double GetPrandtlNum(){return 0.;}
+  virtual double GetSchmidtNum(){return 0.;}
 };
 
 //////////////////////////////////////////////////////
@@ -118,6 +123,11 @@ class DryAirTransport : public TransportProperties {
 
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
                                               DenseMatrix &diffusionVelocity);
+  
+  virtual double GetViscMultiplyer(){return visc_mult;}
+  virtual double GetBulkViscMultiplyer(){return bulk_visc_mult;}
+  virtual double GetPrandtlNum(){return Pr;}
+  virtual double GetSchmidtNum(){return Sc;}
   
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void ComputeFluxTransportProperties_gpu(const double *state,

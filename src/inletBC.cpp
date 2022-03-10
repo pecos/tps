@@ -36,10 +36,11 @@
 
 // TODO: need to write for multiple species and two temperature.
 InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rsolver, GasMixture *_mixture,
+                 TransportProperties *_transport,
                  ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
                  const int _num_equation, int _patchNumber, double _refLength, InletType _bcType,
                  const Array<double> &_inputData, const int &_maxIntPoints, const int &_maxDofs)
-    : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
+    : BoundaryCondition(_rsolver, _mixture, _transport, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
                         _refLength),
       groupsMPI(_groupsMPI),
       inletType(_bcType),

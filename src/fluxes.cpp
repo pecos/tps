@@ -296,10 +296,10 @@ void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTe
 
   const double gamma = mixture->GetSpecificHeatRatio();
   const double Rg = mixture->GetGasConstant();
-  const double viscMult = mixture->GetViscMultiplyer();
-  const double bulkViscMult = mixture->GetBulkViscMultiplyer();
-  const double Pr = mixture->GetPrandtlNum();
-  const double Sc = mixture->GetSchmidtNum();
+  const double viscMult = transport->GetViscMultiplyer();
+  const double bulkViscMult = transport->GetBulkViscMultiplyer();
+  const double Pr = transport->GetPrandtlNum();
+  const double Sc = transport->GetSchmidtNum();
   
   const TransportModel transpModel = transport->getTransportModel();
   

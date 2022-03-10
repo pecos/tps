@@ -33,11 +33,12 @@
 
 #include "riemann_solver.hpp"
 
-WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSystem, Fluxes *_fluxClass,
+WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, TransportProperties *_transport,
+               Equations _eqSystem, Fluxes *_fluxClass,
                ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
                const int _num_equation, int _patchNumber, WallType _bcType, const Array<double> _inputData,
                const Array<int> &_intPointsElIDBC, const int &_maxIntPoints)
-    : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
+    : BoundaryCondition(_rsolver, _mixture, _transport, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
                         1),  // so far walls do not require ref. length. Left at 1
       wallType(_bcType),
       fluxClass(_fluxClass),
@@ -325,10 +326,18 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
 
   const double Rg = mixture->GetGasConstant();
   const double gamma = mixture->GetSpecificHeatRatio();
-  const double viscMult = mixture->GetViscMultiplyer();
-  const double bulkViscMult = mixture->GetBulkViscMultiplyer();
-  const double Pr = mixture->GetPrandtlNum();
-  const double Sc = mixture->GetSchmidtNum();
+  const double viscMult = transport->GetViscMultiplyer();
+  const double bulkViscMult = transport->GetBulkViscMultiplyer();
+  const double Pr = transport->GetPrandtlNum();
+  const double Sc = transport->GetSchmidtNum();
+  
+  const TransportModel transpModel = transport->getTransportModel();
+  
+  const DenseMatrix gasParameters = mixture->GetGasParam();
+  const double *d_gasParams = gasParameters.Read();
+  
+  const int d_numActiveSpecies = mixture->GetNumActiveSpecies();
+  const int d_numSpecies = mixture->GetNumSpecies();
 
   const double *d_interpolU = interpolated_Ubdr_.Read();
   const double *d_interpGrads = interpolatedGradUpbdr_.Read();
@@ -407,10 +416,16 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
                                    maxDofs);
 
       // compute viscous flux
-      Fluxes::viscousFlux_gpu(&vF1[0], &u1[0], &gradUpi[0], eqSystem, gamma, Rg, viscMult, bulkViscMult, Pr, Sc, i,
-                              maxDofs, dim, num_equation);
-      Fluxes::viscousFlux_gpu(&vF2[0], &u2[0], &gradUpi[0], eqSystem, gamma, Rg, viscMult, bulkViscMult, Pr, Sc, i,
-                              maxDofs, dim, num_equation);
+      Fluxes::viscousFlux_gpu(&vF1[0], &u1[0], &gradUpi[0], eqSystem, transpModel, 
+                              d_gasParams, gamma, Rg, viscMult, bulkViscMult,
+                              Pr, Sc, dim, num_equation, d_numActiveSpecies, d_numSpecies, i, maxDofs);
+      Fluxes::viscousFlux_gpu(&vF2[0], &u2[0], &gradUpi[0], eqSystem, transpModel, 
+                              d_gasParams, gamma, Rg, viscMult, bulkViscMult,
+                              Pr, Sc, dim, num_equation, d_numActiveSpecies, d_numSpecies, i, maxDofs);
+//       Fluxes::viscousFlux_gpu(&vF1[0], &u1[0], &gradUpi[0], eqSystem, gamma, Rg, viscMult, bulkViscMult, Pr, Sc, i,
+//                               maxDofs, dim, num_equation);
+//       Fluxes::viscousFlux_gpu(&vF2[0], &u2[0], &gradUpi[0], eqSystem, gamma, Rg, viscMult, bulkViscMult, Pr, Sc, i,
+//                               maxDofs, dim, num_equation);
       MFEM_SYNC_THREAD;
 
       // add visc flux contribution
