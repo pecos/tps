@@ -188,7 +188,7 @@ class Fluxes {
     // Transport terms
     for (int sp = thrd; sp < numActiveSpecies; sp += maxThreads) {
       for (int d = 0; d < dim; d++) {
-        vFlux[2 +dim + sp + d*num_equation] = - Un[dim + 2 + sp] * diffusionVelocity[sp+d*numActiveSpecies];
+        vFlux[2 +dim + sp + d*num_equation] = Un[dim + 2 + sp] * diffusionVelocity[sp+d*numActiveSpecies];
         vFlux[1 + dim + d * num_equation] -=  speciesEnthalpies[sp] * diffusionVelocity[sp+d*numActiveSpecies];
       }
     }
