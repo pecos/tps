@@ -2023,8 +2023,9 @@ void M2ulPhyS::parseSolverOptions2() {
         if (config.gasModel == PERFECT_MIXTURE) {
           tpsP->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(),
                                  config.constantMolarCV(i - 1));
-          tpsP->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cp").c_str(),
-                                 config.constantMolarCP(i - 1));
+          // NOTE: For perfect gas, CP will be automatically set from CV.
+          // tpsP->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cp").c_str(),
+          //                        config.constantMolarCP(i - 1));
         }
       }
     }

@@ -632,7 +632,9 @@ PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim) : GasMixtur
 
     // TODO: read these from input parser.
     molarCV_(targetIdx) = _runfile.getConstantMolarCV(sp) * UNIVERSALGASCONSTANT;
-    molarCP_(targetIdx) = _runfile.getConstantMolarCP(sp) * UNIVERSALGASCONSTANT;
+    // NOTE: for perfect gas, CP = CV + R
+    molarCP_(targetIdx) = molarCV_(targetIdx) + UNIVERSALGASCONSTANT;
+    // molarCP_(targetIdx) = _runfile.getConstantMolarCP(sp) * UNIVERSALGASCONSTANT;
     specificHeatRatios_(targetIdx) = molarCP_(targetIdx) / molarCV_(targetIdx);
   }
 
