@@ -56,7 +56,7 @@ SourceTerm::~SourceTerm() {
 }
 
 void SourceTerm::updateTerms(mfem::Vector &in) {
-  const double *h_Up = Up->HostRead();
+  const double *h_Up = Up_->HostRead();
   double *h_in = in.HostReadWrite();
 
   const int nnodes = vfes->GetNDofs();

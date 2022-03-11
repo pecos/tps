@@ -44,8 +44,8 @@ ForcingTerms::ForcingTerms(const int &_dim, const int &_num_equation, const int 
       intRuleType(_intRuleType),
       intRules(_intRules),
       vfes(_vfes),
-      Up(_Up),
-      gradUp(_gradUp),
+      Up_(_Up),
+      gradUp_(_gradUp),
       gpuArrays(_gpuArrays) {
   h_numElems = gpuArrays.numElems.HostRead();
   h_posDofIds = gpuArrays.posDofIds.HostRead();
@@ -114,7 +114,7 @@ void ConstantPressureGradient::updateTerms(Vector &in) {
     }
     int dof_el = h_posDofIds[2 * elemOffset + 1];
 
-    updateTerms_gpu(h_numElems[elType], elemOffset, dof_el, vfes->GetNDofs(), pressGrad, in, *Up, *gradUp, num_equation,
+    updateTerms_gpu(h_numElems[elType], elemOffset, dof_el, vfes->GetNDofs(), pressGrad, in, *Up_, *gradUp_, num_equation,
                     dim, gpuArrays);
   }
 #else
@@ -122,8 +122,8 @@ void ConstantPressureGradient::updateTerms(Vector &in) {
   int dof = vfes->GetNDofs();
 
   double *data = in.GetData();
-  const double *dataUp = Up->GetData();
-  const double *dataGradUp = gradUp->GetData();
+  const double *dataUp = Up_->GetData();
+  const double *dataGradUp = gradUp_->GetData();
 
   Vector gradUpk;  // interpolated gradient
   gradUpk.SetSize(num_equation * dim);
@@ -513,7 +513,7 @@ void SpongeZone::updateTerms(Vector &in) {
 void SpongeZone::addSpongeZoneForcing(Vector &in) {
   const double *ds = sigma->HostRead();
   double *dataIn = in.HostReadWrite();
-  const double *dataUp = Up->HostRead();
+  const double *dataUp = Up_->HostRead();
 
   int nnodes = vfes->GetNDofs();
 
@@ -542,7 +542,7 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
 // TODO: change to conserved variables.
 void SpongeZone::computeMixedOutValues() {
   int nnodes = vfes->GetNDofs();
-  const double *dataUp = Up->HostRead();
+  const double *dataUp = Up_->HostRead();
   double gamma = mixture->GetSpecificHeatRatio();
 
   // compute mean normal fluxes
@@ -654,9 +654,9 @@ PassiveScalar::~PassiveScalar() {
 
 void PassiveScalar::updateTerms(Vector &in) {
 #ifdef _GPU_
-  updateTerms_gpu(in, Up, psData_, vfes->GetNDofs(), num_equation);
+  updateTerms_gpu(in, Up_, psData_, vfes->GetNDofs(), num_equation);
 #else
-  auto dataUp = Up->HostRead();
+  auto dataUp = Up_->HostRead();
   auto dataIn = in.HostReadWrite();
   int nnode = vfes->GetNDofs();
 

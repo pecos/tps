@@ -62,8 +62,8 @@ class ForcingTerms {
   const int &intRuleType;
   IntegrationRules *intRules;
   ParFiniteElementSpace *vfes;
-  ParGridFunction *Up;
-  ParGridFunction *gradUp;
+  ParGridFunction *Up_;
+  ParGridFunction *gradUp_;
 
   const volumeFaceIntegrationArrays &gpuArrays;
   const int *h_numElems;
