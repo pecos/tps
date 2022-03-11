@@ -91,6 +91,20 @@ tanhic_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
 tanhic_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
 tanhic_LDFLAGS += -L$(GSLIB_LIB) -lgs
 
+bin_PROGRAMS += sineic
+sineic_SOURCES  = sine_ic.cpp
+sineic_LDADD    = ../src/libtps.a -lmfem
+
+sineic_LDFLAGS  = -L$(MFEM_LIB)
+sineic_LDFLAGS += $(HDF5_LIBS)
+sineic_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
+sineic_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
+sineic_LDFLAGS += -L$(METIS_LIB) -lmetis
+sineic_LDFLAGS += $(GRVY_LIBS)
+sineic_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
+sineic_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
+sineic_LDFLAGS += -L$(GSLIB_LIB) -lgs
+
 bin_PROGRAMS += l2diff
 l2diff_SOURCES  = L2_diff.cpp
 l2diff_LDADD    = ../src/libtps.a -lmfem

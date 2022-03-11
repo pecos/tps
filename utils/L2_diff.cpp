@@ -66,10 +66,10 @@ int main (int argc, char *argv[])
   ParGridFunction coordinates(&dfes);
   src_fes->GetParMesh()->GetNodes(coordinates);
 
-  double *dataU1 = src_state1->GetData();
+  double *dataU1 = src_state1->HostReadWrite();
   double *dataU2 = src_state2->GetData();
-  double *dataDiff = diff.GetData();
-  double *dataZeros = zeros.GetData();
+  double *dataDiff = diff.HostReadWrite();
+  double *dataZeros = zeros.HostReadWrite();
   int NDof = src_fes->GetNDofs();
 
   for (int i = 0; i < NDof; i++) {
@@ -100,10 +100,10 @@ int main (int argc, char *argv[])
   mixture->UpdatePressureGridFunction(press1, src_prim1);
   mixture->UpdatePressureGridFunction(press2, src_prim2);
 
-  double *dataUp1 = src_prim1->GetData();
-  double *dataUp2 = src_prim2->GetData();
-  double *dataP1 = press1->GetData();
-  double *dataP2 = press2->GetData();
+  double *dataUp1 = src_prim1->HostReadWrite();
+  double *dataUp2 = src_prim2->HostReadWrite();
+  double *dataP1 = press1->HostReadWrite();
+  double *dataP2 = press2->HostReadWrite();
   for (int i = 0; i < NDof; i++) {
     for (int eq = 0; eq < num_equation; eq++) {
       dataU1[i + eq * NDof] = dataDiff[i + eq * NDof];
