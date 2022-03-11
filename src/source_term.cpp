@@ -44,7 +44,7 @@ SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_or
       chemistry_(chemistry) {
   numSpecies_ = mixture->GetNumSpecies();
   numActiveSpecies_ = mixture->GetNumActiveSpecies();
-  //   int numReactions_ = chemistry_->
+  numReactions_ = chemistry_->GetNumReactions();
 
   ambipolar_ = mixture->IsAmbipolar();
   twoTemperature_ = mixture->IsTwoTemperature();

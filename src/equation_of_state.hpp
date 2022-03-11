@@ -117,13 +117,13 @@ class GasMixture {
   std::map<std::string, int> *getSpeciesMapping() { return &speciesMapping_; }
 
   double GetGasParams(int species, GasParams param) { return gasParams(species, param); }
-  DenseMatrix GetGasParam() {return gasParams;}
+  DenseMatrix &GetGasParam() {return gasParams;}
   
 
   int GetNumConservativeVariables() { return Nconservative; }
   int GetNumPrimitiveVariables() { return Nprimitive; }
   
-  virtual const Vector getMolarCVs(){}
+  virtual const Vector &getMolarCVs(){}
 
   virtual double ComputePressure(const Vector &state, double &electronPressure) = 0;             // pressure from conservatives
   virtual double ComputePressureFromPrimitives(const Vector &Up) = 0;  // pressure from primitive variables
@@ -520,7 +520,7 @@ class PerfectMixture : public GasMixture {
   ~PerfectMixture(){}
 
   virtual double getMolarCV(int species) { return molarCV_(species); }
-  virtual const Vector getMolarCVs(){return molarCV_;}
+  virtual const Vector &getMolarCVs(){return molarCV_;}
   virtual double getMolarCP(int species) { return molarCP_(species); }
   virtual double getSpecificHeatRatio(int species) { return specificHeatRatios_(species); }
   virtual double getSpecificGasConstant(int species) { return specificGasConstants_(species); }

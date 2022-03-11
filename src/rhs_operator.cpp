@@ -492,7 +492,7 @@ void RHSoperator::updatePrimitives_gpu(const Vector &x_in) const {
     MFEM_FOREACH_THREAD(eq, x, num_equation) {
       state[eq] = dataIn[n + eq * ndofs];  // loads data into shared memory
       MFEM_SYNC_THREAD;
-      
+
       switch (fluid) {
         case WorkingFluid::DRY_AIR:
           DryAir::GetPrimitivesFromConservatives_gpu(&state[0],
@@ -522,9 +522,9 @@ void RHSoperator::updatePrimitives_gpu(const Vector &x_in) const {
         default:
           if (eq == 0) printf("[ERROR] RHSoperator::updatePrimitives_gpu(): undefined working fluid.");
           break;
-      }
-      
+      } 
       MFEM_SYNC_THREAD;
+
       dataUp[n + eq*ndofs] = primit[eq];
       MFEM_SYNC_THREAD;
     }

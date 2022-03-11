@@ -209,8 +209,7 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const Equa
   const int numSpecies = mixture->GetNumSpecies();
   
   const WorkingFluid fluid = mixture->GetWorkingFluid();
-  const DenseMatrix gasParams = mixture->GetGasParam();
-  const double *d_gasParams = gasParams.Read();
+  const double *d_gasParams = mixture->GetGasParam().Read();
   
   const double *molarCV = NULL;
   if (fluid == WorkingFluid::USER_DEFINED) molarCV = mixture->getMolarCVs().Read();
@@ -303,8 +302,7 @@ void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTe
   
   const TransportModel transpModel = transport->getTransportModel();
   
-  const DenseMatrix gasParameters = mixture->GetGasParam();
-  const double *d_gasParams = gasParameters.Read();
+  const double *d_gasParams = mixture->GetGasParam().Read();
   
   const int d_numActiveSpecies = mixture->GetNumActiveSpecies();
   const int d_numSpecies = mixture->GetNumSpecies();

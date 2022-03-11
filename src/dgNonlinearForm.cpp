@@ -224,8 +224,8 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, Vector &uk_el1, Vector &uk_
   
   const TransportModel transpModel = transport->getTransportModel();
   
-  const DenseMatrix gasParameters = mixture->GetGasParam();
-  const double *d_gasParams = gasParameters.Read();
+//  const DenseMatrix gasParameters = mixture->GetGasParam();
+  const double *d_gasParams = mixture->GetGasParam().Read();
   
   const int d_numActiveSpecies = mixture->GetNumActiveSpecies();
   const int d_numSpecies = mixture->GetNumSpecies();
