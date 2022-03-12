@@ -57,6 +57,7 @@ SourceTerm::~SourceTerm() {
 
 void SourceTerm::updateTerms(mfem::Vector &in) {
   const double *h_Up = Up_->HostRead();
+  const double *h_U = U_->HostRead();
   double *h_in = in.HostReadWrite();
 
   const int nnodes = vfes->GetNDofs();
@@ -64,8 +65,11 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
   Vector upn(num_equation);
   Vector Un(num_equation);
   for (int n = 0; n < nnodes; n++) {
-    for (int eq = 0; eq < num_equation; eq++) upn(eq) = h_Up[n + eq * nnodes];
-    mixture_->GetConservativesFromPrimitives(upn, Un);
+    for (int eq = 0; eq < num_equation; eq++) {
+      upn(eq) = h_Up[n + eq * nnodes];
+      Un(eq) = h_U[n + eq * nnodes];
+    }
+    // mixture_->GetConservativesFromPrimitives(upn, Un);
 
     double Th = 0., Te = 0.;
     Th = upn[1 + dim];
@@ -80,6 +84,8 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     chemistry_->computeEquilibriumConstants(Th, Te, kC);
 
     Vector ns;
+    // TODO: either expand Up to include dependent variables,
+    // or only compute dependent number densities.
     mixture_->computeNumberDensities(Un, ns);
 
     // get reaction rates
