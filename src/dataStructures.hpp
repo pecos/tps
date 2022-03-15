@@ -112,6 +112,9 @@ struct SpongeZoneData {
 
   Vector targetUp;  // Target user-defined solution defined with primitive
                     // variables: rho, V, p. Required if szType==USERDEF
+                    // When the Annular zone is selected, velocity components are
+                    // given as V = {radial, azimuthal, axial} (axial in the
+                    // direction of the normal)
 
   double multFactor;  // Factor multiplying the product of sigma*(U-U*) where
                       // U* is the target solution. Currently sigam=a/l where
