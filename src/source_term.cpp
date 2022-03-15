@@ -148,7 +148,7 @@ void SourceTerm::updateSourceTerms_gpu(mfem::Vector& in)
   const bool *detailedBalance = chemistry_->GetDetailBalanceArray().Read();
   const double *equilibriumConstantParams = chemistry_->GetEquilibriumConstantsMatrix().Read();
   
-  
+
   MFEM_FORALL_2D(n, nnodes, d_num_equations,1,1,{
     MFEM_FOREACH_THREAD(eq, x, d_num_equations) {
       MFEM_SHARED double up[20], state[20];
@@ -174,9 +174,9 @@ void SourceTerm::updateSourceTerms_gpu(mfem::Vector& in)
       MFEM_SYNC_THREAD;
       
       double Th = 0., Te = 0.;
-      Th = up[1 + dim];
+      Th = up[1 + d_dim];
       if (twoTemperature) {
-        Te = up[num_equation - 1];
+        Te = up[d_num_equations - 1];
       } else {
         Te = Th;
       }
@@ -226,8 +226,8 @@ void SourceTerm::updateSourceTerms_gpu(mfem::Vector& in)
       MFEM_SYNC_THREAD;
 
       // add species creation rates
-      for (int sp = eq; sp < numActiveSpecies_; sp += d_num_equations) {
-        d_in[n + (2 + dim + sp) * nnodes] += creationRates[sp];
+      for (int sp = eq; sp < numActiveSpecies; sp += d_num_equations) {
+        d_in[n + (2 + d_dim + sp) * nnodes] += creationRates[sp];
       }
     }
   });

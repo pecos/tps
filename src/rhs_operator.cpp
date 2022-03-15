@@ -449,7 +449,6 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 
 void RHSoperator::updatePrimitives(const Vector &x_in) const {
 #ifdef _GPU_
-
   updatePrimitives_gpu(x_in);
 #else
   double *dataUp = Up->GetData();
@@ -484,12 +483,15 @@ void RHSoperator::updatePrimitives_gpu(const Vector &x_in) const {
   const bool ambipolar = mixture->IsAmbipolar();
   const bool twoTemperature = mixture->IsTwoTemperature();
 
+  const int d_num_equation = num_equation;
+  const int d_dim = dim;
+
   const Equations d_eqSystem = eqSystem;
 
-  MFEM_FORALL_2D(n, ndofs, num_equation, 1, 1, {
+  MFEM_FORALL_2D(n, ndofs, d_num_equation, 1, 1, {
     MFEM_SHARED double state[20], primit[20];  // assuming 20 equations
     
-    MFEM_FOREACH_THREAD(eq, x, num_equation) {
+    MFEM_FOREACH_THREAD(eq, x, d_num_equation) {
       state[eq] = dataIn[n + eq * ndofs];  // loads data into shared memory
       MFEM_SYNC_THREAD;
 
@@ -500,10 +502,10 @@ void RHSoperator::updatePrimitives_gpu(const Vector &x_in) const {
                                                      d_eqSystem,
                                                      gamma,
                                                      Rgas,
-                                                     num_equation,
-                                                     dim,
+                                                     d_num_equation,
+                                                     d_dim,
                                                      eq,
-                                                     num_equation);
+                                                     d_num_equation);
           break;
         case WorkingFluid::USER_DEFINED:
           PerfectMixture::GetPrimitivesFromConservatives_gpu(&state[0],
@@ -512,12 +514,12 @@ void RHSoperator::updatePrimitives_gpu(const Vector &x_in) const {
                                                              molarCV,
                                                              ambipolar,
                                                              twoTemperature,
-                                                             num_equation,
-                                                             dim,
+                                                             d_num_equation,
+                                                             d_dim,
                                                              numSpecies,
                                                              numActiveSpecies,
                                                              eq,
-                                                             num_equation);
+                                                             d_num_equation);
           break;
         default:
           if (eq == 0) printf("[ERROR] RHSoperator::updatePrimitives_gpu(): undefined working fluid.");
