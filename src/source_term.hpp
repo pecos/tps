@@ -79,8 +79,8 @@ class SourceTerm : public ForcingTerms {
   
   // pointers to be stored in device memory
 #ifdef _GPU_
-  ReactionModel *d_reactionsModel;
-  reactionConstants * d_reactionConstants;
+  Array<ReactionModel> reactionsModel_;
+  Array<reactionConstants> reactionConstants_;
 #endif
 
  public:

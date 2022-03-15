@@ -51,14 +51,14 @@ SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_or
   
   // allocate device vectors
 #ifdef _GPU_
-  d_reactionsModel = new ReactionModel[numReactions_];
-  for (int r = 0; r < numReactions_; r++) d_reactionsModel[r] = chemistry_->GetReaction(r)->GetReactionModel();
+  reactionsModel_.SetSize(numReactions_);
+  for (int r = 0; r < numReactions_; r++) reactionsModel_[r] = chemistry_->GetReaction(r)->GetReactionModel();
   
-  d_reactionConstants = new reactionConstants[numReactions_];
+  reactionConstants_.SetSize(numReactions_);
   for (int r = 0; r < numReactions_; r++) {
-    d_reactionConstants[r].A_ = chemistry->GetReaction(r)->GetReactionConstants().A_;
-    d_reactionConstants[r].b_ = chemistry->GetReaction(r)->GetReactionConstants().b_;
-    d_reactionConstants[r].E_ = chemistry->GetReaction(r)->GetReactionConstants().E_;
+    reactionConstants_[r].A_ = chemistry->GetReaction(r)->GetReactionConstants().A_;
+    reactionConstants_[r].b_ = chemistry->GetReaction(r)->GetReactionConstants().b_;
+    reactionConstants_[r].E_ = chemistry->GetReaction(r)->GetReactionConstants().E_;
   }
 #endif
 }
@@ -67,10 +67,6 @@ SourceTerm::~SourceTerm() {
   //   if (mixture_ != NULL) delete mixture_;
   //   if (transport_ != NULL) delete transport_;
   //   if (chemistry_ != NULL) delete chemistry_;
-#ifdef _GPU_
-  delete[] d_reactionsModel;
-  delete[] d_reactionConstants;
-#endif
 }
 
 void SourceTerm::updateTerms(mfem::Vector &in) {
@@ -142,8 +138,8 @@ void SourceTerm::updateSourceTerms_gpu(mfem::Vector& in)
   const double *reactantStoich = chemistry_->GetReactantStoichiometryVector().Read();
   const double *productsStoich = chemistry_->getProductStoichiometryVector().Read();
   
-  const ReactionModel * reactionsModel = d_reactionsModel;
-  const reactionConstants *constants = d_reactionConstants;
+  const ReactionModel * reactionsModel = reactionsModel_.Read();
+  const reactionConstants *constants = reactionConstants_.Read();
   
   const bool *detailedBalance = chemistry_->GetDetailBalanceArray().Read();
   const double *equilibriumConstantParams = chemistry_->GetEquilibriumConstantsMatrix().Read();
