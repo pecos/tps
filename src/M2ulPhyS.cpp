@@ -1065,6 +1065,9 @@ void M2ulPhyS::solve() {
   VectorFunctionCoefficient PreMMS(1, exactSolnFunctionPre);
 
   if (config.use_mms_) {
+    rhsOperator->updatePrimitives(*U);
+    mixture->UpdatePressureGridFunction(press, Up);
+
     // and dump error before we take any steps
     DenMMS.SetTime(time);
     VelMMS.SetTime(time);
@@ -2326,7 +2329,6 @@ void M2ulPhyS::parseSolverOptions2() {
     }
   }
 
-
   return;
 }
 
@@ -2404,13 +2406,12 @@ void M2ulPhyS::checkSolverOptions() const {
 #endif
 
   // Warn user if they requested fixed dt without setting enableConstantTimestep
-  if ( (config.GetFixedDT() > 0) && (!config.isTimeStepConstant()) ) {
+  if ((config.GetFixedDT() > 0) && (!config.isTimeStepConstant())) {
     if (mpi.Root()) {
       std::cerr << "[WARNING]: Setting dt_fixed overrides enableConstantTimestep." << std::endl;
       std::cerr << std::endl;
     }
   }
-
 
   return;
 }
