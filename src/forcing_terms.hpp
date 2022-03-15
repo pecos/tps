@@ -142,7 +142,8 @@ class SpongeZone : public ForcingTerms {
  public:
   SpongeZone(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType, Fluxes *_fluxClass,
              GasMixture *_mixture, IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
-             ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config);
+             ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config,
+             const int sz);
   ~SpongeZone();
 
   virtual void updateTerms(Vector &in);

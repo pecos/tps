@@ -89,12 +89,22 @@ enum SpongeZoneSolution {
   NONE = -1  // Invalid value
 };
 
+enum SpongeZoneType {
+  PLANAR,  // The sponge solution is imposed between two planes
+  ANNULUS  // The sponge solution is applied to an annular region
+           // defined by an axis and inner and outer radius
+};
+
 struct SpongeZoneData {
   Vector normal;  // These planes are defined in the same manner as
   Vector point0;  // in the linearlyVaryingVisc struct case.
   Vector pointInit;
 
-  SpongeZoneSolution szType;
+  double r1;  // inner radius in the case of annulus
+  double r2;  // outer radius in the case of annulus
+
+  SpongeZoneSolution szSolType;
+  SpongeZoneType szType;
 
   double tol;  // Tolerance for finding nodes at pInit plane
                // These points are used to compute mixed-out values.

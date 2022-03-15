@@ -137,7 +137,8 @@ class RunConfiguration {
   // the plane defined by point0.
   linearlyVaryingVisc linViscData;
 
-  SpongeZoneData spongeData;
+  SpongeZoneData* spongeData_;
+  int numSpongeRegions_;
   void initSpongeData();
 
   int numHeatSources;
@@ -219,7 +220,7 @@ class RunConfiguration {
   double* GetConstantInitialCondition() { return &initRhoRhoVp[0]; }
 
   linearlyVaryingVisc& GetLinearVaryingData() { return linViscData; }
-  SpongeZoneData& GetSpongeZoneData() { return spongeData; }
+  SpongeZoneData& GetSpongeZoneData(int sz) { return spongeData_[sz]; }
 
   // resource manager controls
   bool isAutoRestart() { return rm_enableMonitor_; }

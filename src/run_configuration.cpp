@@ -86,7 +86,9 @@ RunConfiguration::RunConfiguration() {
   linViscData.pointInit = 0.;
   linViscData.viscRatio = 0.;
 
-  initSpongeData();
+  //   initSpongeData();
+  numSpongeRegions_ = 0;
+  spongeData_ = NULL;
 
   heatSource = NULL;
 
@@ -102,28 +104,30 @@ RunConfiguration::~RunConfiguration() {
   }
 
   if (heatSource != NULL) delete[] heatSource;
+
+  if (spongeData_ != NULL) delete[] spongeData_;
 }
 
 void RunConfiguration::initSpongeData() {
-  spongeData.multFactor = 1.;
-
-  spongeData.normal.UseDevice(true);
-  spongeData.point0.UseDevice(true);
-  spongeData.pointInit.UseDevice(true);
-  spongeData.targetUp.UseDevice(true);
-
-  spongeData.normal.SetSize(3);
-  spongeData.point0.SetSize(3);
-  spongeData.pointInit.SetSize(3);
-  spongeData.targetUp.SetSize(5);
-
-  spongeData.normal = 0.;
-  spongeData.point0 = 0.;
-  spongeData.pointInit = 0.;
-  spongeData.targetUp = 0.;
-
-  spongeData.tol = 1e-5;
-  spongeData.szType = SpongeZoneSolution::NONE;
+  //   spongeData.multFactor = 1.;
+  //
+  //   spongeData.normal.UseDevice(true);
+  //   spongeData.point0.UseDevice(true);
+  //   spongeData.pointInit.UseDevice(true);
+  //   spongeData.targetUp.UseDevice(true);
+  //
+  //   spongeData.normal.SetSize(3);
+  //   spongeData.point0.SetSize(3);
+  //   spongeData.pointInit.SetSize(3);
+  //   spongeData.targetUp.SetSize(5);
+  //
+  //   spongeData.normal = 0.;
+  //   spongeData.point0 = 0.;
+  //   spongeData.pointInit = 0.;
+  //   spongeData.targetUp = 0.;
+  //
+  //   spongeData.tol = 1e-5;
+  //   spongeData.szType = SpongeZoneSolution::NONE;
 }
 
 void RunConfiguration::readInputFile(std::string inpuFileName) {
@@ -394,63 +398,6 @@ void RunConfiguration::readInputFile(std::string inpuFileName) {
       } else if (word.compare("LV_VISC_RATIO") == 0) {
         ss >> word;
         linViscData.viscRatio = stod(word);
-
-      } else if (word.compare("SZ_PLANE_NORM") == 0) {
-        auto hnorm = spongeData.normal.HostWrite();
-        ss >> word;
-        hnorm[0] = stod(word);
-        ss >> word;
-        hnorm[1] = stod(word);
-        ss >> word;
-        hnorm[2] = stod(word);
-
-      } else if (word.compare("SZ_PLANE_P0") == 0) {
-        auto hp0 = spongeData.point0.HostWrite();
-        ss >> word;
-        hp0[0] = stod(word);
-        ss >> word;
-        hp0[1] = stod(word);
-        ss >> word;
-        hp0[2] = stod(word);
-
-      } else if (word.compare("SZ_PLANE_PINIT") == 0) {
-        auto hpi = spongeData.pointInit.HostWrite();
-        ss >> word;
-        hpi[0] = stod(word);
-        ss >> word;
-        hpi[1] = stod(word);
-        ss >> word;
-        hpi[2] = stod(word);
-
-      } else if (word.compare("SZ_TYPE") == 0) {
-        ss >> word;
-
-        auto hup = spongeData.targetUp.HostWrite();
-
-        int szTypeInt = stoi(word);
-        switch (szTypeInt) {
-          case 0:
-            spongeData.szType = SpongeZoneSolution::USERDEF;
-            ss >> word;
-            hup[0] = stod(word);  // rho
-            ss >> word;
-            hup[1] = stod(word);  // u
-            ss >> word;
-            hup[2] = stod(word);  // v
-            ss >> word;
-            hup[3] = stod(word);  // w
-            ss >> word;
-            hup[4] = stod(word);  // p
-            break;
-          case 1:
-            spongeData.szType = SpongeZoneSolution::MIXEDOUT;
-            ss >> word;
-            spongeData.tol = stod(word);
-            break;
-        }
-      } else if (word.compare("SZ_MULT") == 0) {
-        ss >> word;
-        spongeData.multFactor = stod(word);
 
       } else if (word.compare("INLET") == 0) {
         ss >> word;
