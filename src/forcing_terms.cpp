@@ -751,14 +751,14 @@ void HeatSource::updateTerms_gpu(mfem::Vector &in) {
 #endif
 }
 
-#ifdef _MASA_
+#ifdef HAVE_MASA
 MASA_forcings::MASA_forcings(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                              IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
                              ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
                              RunConfiguration &_config)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()) {
-  initMasaHandler("forcing", dim, _config.GetEquationSystem(), _config.GetViscMult());
+  initMasaHandler("forcing", dim, _config.GetEquationSystem(), _config.GetViscMult(), _config.mms_name_);
 }
 
 void MASA_forcings::updateTerms(Vector &in) {
@@ -855,4 +855,4 @@ void MASA_forcings::updateTerms(Vector &in) {
     //     }
   }
 }
-#endif  //  _MASA_
+#endif  //  HAVE_MASA

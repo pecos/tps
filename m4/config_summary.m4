@@ -49,6 +49,14 @@ echo [Additional Options]:
 echo
 echo SLURM support enabled....... : $ENABLE_SLURM
 echo Valgrind available.......... : $enable_valgrind
+
+echo MASA support enabled........ : $ENABLE_MASA
+if test "x$ENABLE_MASA" = "xyes"; then
+echo '  ' CXX flags................ : $MASA_CXXFLAGS
+echo '  ' LIBS..................... : $MASA_LIBS
+fi
+
+
 echo GPU build enabled with CUDA. : $ENABLE_CUDA
 if test "$ENABLE_CUDA" = "yes"; then
 AS_ECHO("`$srcdir/m4/wrap_lines.py --maxWidth 110 --first 1 --remain 31 --prefix "   CUDA_CXXFLAGS............ :" \

@@ -42,7 +42,7 @@
 #include "fluxes.hpp"
 #include "run_configuration.hpp"
 
-#ifdef _MASA_
+#ifdef HAVE_MASA
 #include "masa_handler.hpp"
 #endif
 
@@ -190,7 +190,7 @@ class HeatSource : public ForcingTerms {
   void updateTerms_gpu(Vector &in);
 };
 
-#ifdef _MASA_
+#ifdef HAVE_MASA
 // Manufactured Solution using MASA
 class MASA_forcings : public ForcingTerms {
  private:
@@ -201,6 +201,6 @@ class MASA_forcings : public ForcingTerms {
 
   virtual void updateTerms(Vector &in);
 };
-#endif  // _MASA_
+#endif  // HAVE_MASA
 
 #endif  // FORCING_TERMS_HPP_

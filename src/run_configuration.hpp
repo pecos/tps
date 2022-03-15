@@ -182,6 +182,10 @@ class RunConfiguration {
 
   int exit_checkFrequency_;  // iteration frequency to check for early exit
 
+  // Use MMS
+  bool use_mms_;
+  std::string mms_name_;
+
   RunConfiguration();
   ~RunConfiguration();
 
