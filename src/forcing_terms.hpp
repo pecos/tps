@@ -133,6 +133,8 @@ class SpongeZone : public ForcingTerms {
   Array<int> nodesInMixedOutPlane;
 
   ParGridFunction *sigma;  // linearly varying factor
+  Vector radialNormal;
+  Array<int> nodesInAnnulus;
 
   Vector meanNormalFluxes;
 

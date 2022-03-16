@@ -416,8 +416,15 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
   mesh->GetNodes(coords);
   int ndofs = vfes->GetNDofs();
 
+  if (szData.szType == SpongeZoneType::ANNULUS) {
+    nodesInAnnulus.SetSize(ndofs);
+    nodesInAnnulus = -1;
+  }
+
   vector<int> nodesVec;
+  vector<double> radialNormalsVec;
   nodesVec.clear();
+  radialNormalsVec.clear();
   for (int n = 0; n < ndofs; n++) {
     Vector Xn(dim);
     for (int d = 0; d < dim; d++) Xn[d] = coords[n + d * ndofs];
@@ -443,8 +450,8 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
 
       // dadial distance to axis
       double R = 0.;
+      Vector tmp(dim);
       {
-        Vector tmp(dim);
         for (int d = 0; d < dim; d++) tmp(d) = Xn[d] - szData.pointInit[d] + distInit * szData.normal(d);
         for (int d = 0; d < dim; d++) R += tmp(d) * tmp(d);
         R = sqrt(R);
@@ -460,9 +467,14 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
       if (distInit > 0. && distF > 0. && R - szData.r1 > 0.) {
         double planeDistance = szData.r2 - szData.r1;
         hSigma[n] = (R - szData.r1) / planeDistance / planeDistance;
+        for (int d = 0; d < dim; d++) radialNormalsVec.push_back(tmp(d) / R);
+        nodesInAnnulus[n] = radialNormalsVec.size() / dim - 1;
       }
     }
   }
+
+  radialNormal.SetSize(radialNormalsVec.size());
+  for (int n = 0; n < radialNormal.Size(); n++) radialNormal(n) = radialNormalsVec[n];
 
   // find plane nodes
   if (szData.szSolType == SpongeZoneSolution::MIXEDOUT) {
@@ -493,6 +505,11 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
   int nnodes = vfes->GetNDofs();
 
   Vector Un(num_equation), Up(num_equation);
+  Vector ur(dim), uth(dim), uz(dim);
+  Vector targetCyl(num_equation);
+  DenseMatrix MM(dim);
+
+  targetCyl = targetU;
 
   // compute speed of sound
   double gamma = mixture->GetSpecificHeatRatio();
@@ -508,7 +525,29 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
       for (int eq = 0; eq < num_equation; eq++) Up[eq] = dataUp[n + eq * nnodes];
       mixture->GetConservativesFromPrimitives(Up, Un);
 
-      for (int eq = 0; eq < num_equation; eq++) dataIn[n + eq * nnodes] -= speedSound * s * (Un[eq] - targetU[eq]);
+      // transform to cylindrical in annular
+      if (szData.szType == SpongeZoneType::ANNULUS) {
+        const int node = nodesInAnnulus[n];
+        if (node > -1) {
+          for (int d = 0; d < dim; d++) {
+            ur(d) = radialNormal(3 * node + d);
+            uz(d) = szData.normal(d);
+          }
+          uth(0) = uz(1) * ur(2) - ur(1) * uz(2);
+          uth(1) = uz(2) * ur(0) - uz(0) * ur(2);
+          uth(2) = uz(0) * ur(1) - ur(0) * uz(1);
+
+          for (int d = 0; d < dim; d++) {
+            MM(0, d) = ur(d);
+            MM(1, d) = uth(d);
+            MM(2, d) = uz(d);
+          }
+          MM.Invert();
+          MM.Mult(targetU.HostRead() + 1, targetCyl.HostReadWrite() + 1);
+        }
+      }
+
+      for (int eq = 0; eq < num_equation; eq++) dataIn[n + eq * nnodes] -= speedSound * s * (Un[eq] - targetCyl[eq]);
     }
   }
 }
