@@ -118,8 +118,8 @@ class Chemistry {
   const DenseMatrix &getProductStoichiometryVector()const{return productStoich_;}
   Reaction *GetReaction(int r){return reactions_[r];}
   
-  Array<bool> GetDetailBalanceArray(){return detailedBalance_;}
-  DenseMatrix GetEquilibriumConstantsMatrix(){return equilibriumConstantParams_;}
+  Array<bool> &GetDetailBalanceArray(){return detailedBalance_;}
+  DenseMatrix &GetEquilibriumConstantsMatrix(){return equilibriumConstantParams_;}
   
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void computeForwardRateCoeffs_gpu(const double &T_h, 
@@ -139,6 +139,7 @@ class Chemistry {
       }else {
         isElectronInvolved = reactantStoich[electronIndex + numSpecies* r] != 0;
       }
+
       switch (reactionsModel[r]) {
         case ReactionModel::ARRHENIUS:
           kfwd[r] = Arrhenius::computeRateCoefficient_gpu(T_h, 
@@ -147,6 +148,7 @@ class Chemistry {
                                                         constants[r].A_,
                                                         constants[r].b_,
                                                         constants[r].E_);
+
           break;
         case ReactionModel::HOFFERTLIEN:
           kfwd[r] = HoffertLien::computeRateCoefficient_gpu(T_h, 
@@ -183,6 +185,9 @@ class Chemistry {
       if (detailedBalance[r]) {
         kC[r] = equilibriumConstantParams[r] * pow(temp, equilibriumConstantParams[r +numReactions]) *
                 exp(-equilibriumConstantParams[r + numReactions * 2] / temp);
+      }else {
+        kC[r] = 0.;
+	printf("***\n");
       }
     }
   }

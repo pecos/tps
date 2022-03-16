@@ -153,20 +153,19 @@ void SourceTerm::updateSourceTerms_gpu(mfem::Vector& in)
       
       up[eq] = d_Up[n + eq*nnodes];
       MFEM_SYNC_THREAD;
-      
+
       // Assuming this will always use a PefectMixture
-      PerfectMixture::GetPrimitivesFromConservatives_gpu(&state[0],
-                                                         &up[0],
-                                                          gasParams,
-                                                          molarCV,
-                                                          ambipolar,
-                                                          twoTemperature,
-                                                          d_num_equations,
-                                                          d_dim,
-                                                          numSpecies,
-                                                          numActiveSpecies,
-                                                          eq,
-                                                          d_num_equations);
+      PerfectMixture::GetConservativesFromPrimitives_gpu(up,
+                                                         state,
+                                                         gasParams,
+                                                         molarCV,
+                                                         ambipolar,
+                                                         twoTemperature,
+                                                         d_num_equations,
+                                                         d_dim,
+                                                         numSpecies,
+                                                         numActiveSpecies,
+                                                         eq, d_num_equations );
       MFEM_SYNC_THREAD;
       
       double Th = 0., Te = 0.;
@@ -186,6 +185,7 @@ void SourceTerm::updateSourceTerms_gpu(mfem::Vector& in)
                                               reactantStoich,
                                               reactionsModel,
                                               constants);
+
       Chemistry::computeEquilibriumConstants_gpu(Th, 
                                                  Te, 
                                                  &kC[0],
