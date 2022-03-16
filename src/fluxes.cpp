@@ -267,9 +267,9 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const Equa
           d_flux[n + d * dof + eq * dof * dim] = Un[1 + d] * (Un[1 + dim] + p) / Un[0];
         }
 
-        for (int sp = eq; sp < numActiveSpecies && eq >1+dim; sp += num_equation) {
+        for (int sp = eq; sp < numActiveSpecies; sp += num_equation) {
           for (int d = 0; d < dim; d++) 
-            d_flux[n + d * dof + eq * dof * dim] = Un[dim + 2 + sp] * Un[1 + d] / Un[0];
+            d_flux[n + d * dof + (2+dim+sp) * dof * dim] = Un[dim + 2 + sp] * Un[1 + d] / Un[0];
         }
       }
     }  // end MFEM_FOREACH_THREAD

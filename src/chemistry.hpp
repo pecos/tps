@@ -187,7 +187,6 @@ class Chemistry {
                 exp(-equilibriumConstantParams[r + numReactions * 2] / temp);
       }else {
         kC[r] = 0.;
-	printf("***\n");
       }
     }
   }
