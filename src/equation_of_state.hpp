@@ -816,7 +816,7 @@ class PerfectMixture : public GasMixture {
                                                               const int &numActiveSpecies,
                                                               const int &thrd,
                                                               const int &maxThreads ) {
-    if (thrd == maxThreads) conserv[0] = primit[0];
+    if (thrd == maxThreads-1) conserv[0] = primit[0];
     for (int d = thrd; d < dim; d += maxThreads) conserv[d + 1] = primit[d + 1] * primit[0];
 
     // Convert species rhoY first.

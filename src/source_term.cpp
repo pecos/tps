@@ -155,8 +155,8 @@ void SourceTerm::updateSourceTerms_gpu(mfem::Vector& in)
       MFEM_SYNC_THREAD;
 
       // Assuming this will always use a PefectMixture
-      PerfectMixture::GetConservativesFromPrimitives_gpu(up,
-                                                         state,
+      PerfectMixture::GetConservativesFromPrimitives_gpu(&up[0],
+                                                         &state[0],
                                                          gasParams,
                                                          molarCV,
                                                          ambipolar,
@@ -167,7 +167,7 @@ void SourceTerm::updateSourceTerms_gpu(mfem::Vector& in)
                                                          numActiveSpecies,
                                                          eq, d_num_equations );
       MFEM_SYNC_THREAD;
-      
+
       double Th = 0., Te = 0.;
       Th = up[1 + d_dim];
       if (twoTemperature) {
@@ -227,6 +227,8 @@ void SourceTerm::updateSourceTerms_gpu(mfem::Vector& in)
       }
     }
   });
+//  for(int n=0;n<100000000000; n++)double kk = pow(3.,(double)n);
+//  exit(1);
 }
 
 #endif // _GPU_
