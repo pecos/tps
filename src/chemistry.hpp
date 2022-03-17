@@ -71,6 +71,8 @@ class Chemistry {
 
   Array<bool> detailedBalance_;
   DenseMatrix equilibriumConstantParams_;
+  
+  ChemistryModel model;
 
   // /*
   //   From input file, reaction/reaction%d/equation will specify this mapping.
@@ -87,9 +89,11 @@ class Chemistry {
   ~Chemistry();
 
   // return Vector of reaction rate coefficients, with the size of numReaction_.
-  virtual void computeForwardRateCoeffs(const double T_h, const double T_e, Vector &kfwd);
+  // WARNING(marc) I have removed "virtual" qualifier here assuming these functions will not
+  // change for child classes. Correct if wrong
+  void computeForwardRateCoeffs(const double T_h, const double T_e, Vector &kfwd);
 
-  virtual void computeEquilibriumConstants(const double T_h, const double T_e, Vector &kC);
+  void computeEquilibriumConstants(const double T_h, const double T_e, Vector &kC);
 
   // return rate coefficients of (reactionIndex)-th reaction. (start from 0)
   // reactionIndex is taken from reactionMapping.right.
@@ -98,11 +102,24 @@ class Chemistry {
   const double *getReactantStoichiometry(const int reactionIndex) { return reactantStoich_.GetColumn(reactionIndex); }
   const double *getProductStoichiometry(const int reactionIndex) { return productStoich_.GetColumn(reactionIndex); }
   
-  void computeCreationRate(const Vector &ns, const Vector &kfwd, const Vector &keq, Vector &creationRate);
+  virtual void computeCreationRate(const Vector &ns, const Vector &kfwd, const Vector &keq, Vector &creationRate) {};
 
   bool isElectronInvolvedAt(const int reactionIndex) {
     return (electronIndex_ < 0) ? false : (reactantStoich_(electronIndex_, reactionIndex) != 0);
   }
+  
+  ChemistryModel getChemistryModel() {return model;}
 };
+
+// Implementation of the Mass-action-law class
+class MassActionLaw : public Chemistry
+{
+public:
+  MassActionLaw(GasMixture *mixture, RunConfiguration config);
+  ~MassActionLaw() {};
+  
+  virtual void computeCreationRate(const Vector &ns, const Vector &kfwd, const Vector &keq, Vector &creationRate);
+};
+
 
 #endif  // CHEMISTRY_HPP_

@@ -39,7 +39,7 @@ SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_or
                        RunConfiguration &_config, GasMixture *mixture, TransportProperties *transport, Chemistry *chemistry)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType,
                     _intRules, _vfes, _Up,
-                    _gradUp, gpuArrays),
+                    _gradUp, gpuArrays, _config.isAxisymmetric()),
       mixture_(mixture),
       transport_(transport),
       chemistry_(chemistry) {
@@ -57,13 +57,13 @@ void SourceTerm::updateTerms(mfem::Vector& in)
 {
   const double *h_Up = Up->HostRead();
   double *h_in = in.HostReadWrite();
-  
+
   const int nnodes = vfes->GetNDofs();
-  
+
   for (int n = 0; n < nnodes; n++) {
     Vector upn(num_equation);
     for (int eq = 0; eq < num_equation; eq++) upn(eq) = h_Up[n + eq * nnodes];
-    
+
     double Th = 0., Te = 0.;
     Th = upn[1 + dim];
     if (mixture_->IsTwoTemperature()) {
@@ -71,22 +71,21 @@ void SourceTerm::updateTerms(mfem::Vector& in)
     }else {
       Te = Th;
     }
-    
+
     Vector kfwd, kC;
     chemistry_->computeForwardRateCoeffs(Th, Te, kfwd);
     chemistry_->computeEquilibriumConstants(Th, Te, kC);
-    
+
     Vector ns;
     ns.SetDataAndSize(&upn[2+dim], numSpecies_);
-    
+
     // get reaction rates
     Vector creationRates;
     chemistry_->computeCreationRate(ns, kfwd, kC, creationRates);
-    
+
     // add terms to RHS
     for (int sp = 0; sp < numActiveSpecies_; sp++) {
       h_in[n + (2 + dim + sp) * nnodes] += creationRates(sp);
     }
   }
 }
-

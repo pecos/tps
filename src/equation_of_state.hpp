@@ -101,6 +101,8 @@ class GasMixture {
 
   void SetFluid(WorkingFluid _fluid);
 
+  WorkingFluid GetWorkingFluid() {return fluid;}
+
   int GetNumSpecies() { return numSpecies; }
   int GetNumActiveSpecies() { return numActiveSpecies; }
   int GetNumEquations() { return num_equation; }
