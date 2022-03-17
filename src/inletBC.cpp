@@ -48,7 +48,19 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
   inputState.UseDevice(true);
   inputState.SetSize(_inputData.Size());
   auto hinputState = inputState.HostWrite();
-  for (int i = 0; i < inputState.Size(); i++) hinputState[i] = _inputData[i];
+  for (int i = 0; i < nvel + 1; i++) hinputState[i] = _inputData[i];
+
+  numActiveSpecies_ = mixture->GetNumActiveSpecies();
+  if (numActiveSpecies_ > 0) { // read species input state for multi-component flow.
+    std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
+    // NOTE: Inlet BC do not specify total energy, therefore skips one index.
+    for (int sp = 0; sp < numActiveSpecies_; sp++) {
+      int inputIndex = (*mixtureToInputMap)[sp];
+      // store species density into inputState in the order of mixture-sorted index.
+      hinputState[dim + 1 + sp] = _inputData[0] * _inputData[dim + 1 + inputIndex];
+    }
+  }
+
   auto dinputState = inputState.ReadWrite();
 
   groupsMPI->setAsInlet(_patchNumber);
@@ -71,7 +83,13 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
   hmeanUp[2] = 0;
   if (nvel == 3) hmeanUp[3] = 0.;
   hmeanUp[1 + nvel] = 101300;
-  if (eqSystem == NS_PASSIVE) hmeanUp[num_equation - 1] = 0.;
+  if (eqSystem == NS_PASSIVE) {
+    hmeanUp[num_equation - 1] = 0.;
+  } else if (numActiveSpecies_ > 0) {
+    for (int sp = 0; sp < numActiveSpecies_; sp++) {
+      hmeanUp[dim + 2 + sp] = 0.0;
+    }
+  }
 
   Array<double> coords;
 
@@ -684,8 +702,10 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
-// TODO: generalize for all fluid cases.
+// TODO: extension to two-temperature case.
 void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
+  // NOTE: it is likely that for two-temperature case inlet will also specify electron temperature,
+  // whether it is equal to the gas temperature or not.
   const double p = mixture->ComputePressure(stateIn);
 
   Vector state2(num_equation);
@@ -694,9 +714,20 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
   state2[2] = inputState[0] * inputState[2];
   if (nvel == 3) state2[3] = inputState[0] * inputState[3];
 
-  if (eqSystem == NS_PASSIVE) state2[num_equation - 1] = 0.;
+  if (eqSystem == NS_PASSIVE) {
+    state2[num_equation - 1] = 0.;
+  } else if (numActiveSpecies_ > 0) {
+    for (int sp = 0; sp < numActiveSpecies_; sp++) {
+      // NOTE: inlet BC does not specify total energy. therefore skips one index.
+      state2[nvel + 2 + sp] = inputState[nvel + 1 + sp];
+    }
+  }
 
-  mixture->modifyEnergyForPressure(state2, state2, p);
+  if (mixture->IsTwoTemperature()) {
+
+  } else {
+    mixture->modifyEnergyForPressure(state2, state2, p);
+  }
 
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }

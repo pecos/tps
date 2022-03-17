@@ -1890,104 +1890,6 @@ void M2ulPhyS::parseSolverOptions2() {
     tpsP->getRequiredInput("initialConditions/pressure", config.initRhoRhoVp[4]);
   }
 
-  // boundary conditions. The number of boundaries of each supported type if
-  // parsed first. Then, a section corresponding to each defined boundary is parsed afterwards
-  {
-    // number of BC regions defined
-    int numWalls, numInlets, numOutlets;
-    tpsP->getInput("boundaryConditions/numWalls", numWalls, 0);
-    tpsP->getInput("boundaryConditions/numInlets", numInlets, 0);
-    tpsP->getInput("boundaryConditions/numOutlets", numOutlets, 0);
-
-    // Wall Bcs
-    std::map<std::string, WallType> wallMapping;
-    wallMapping["inviscid"] = INV;
-    wallMapping["viscous_adiabatic"] = VISC_ADIAB;
-    wallMapping["viscous_isothermal"] = VISC_ISOTH;
-
-    for (int i = 1; i <= numWalls; i++) {
-      int patch;
-      double temperature;
-      std::string type;
-      std::string basepath("boundaryConditions/wall" + std::to_string(i));
-
-      tpsP->getRequiredInput((basepath + "/patch").c_str(), patch);
-      tpsP->getRequiredInput((basepath + "/type").c_str(), type);
-      if (type == "viscous_isothermal") {
-        tpsP->getRequiredInput((basepath + "/temperature").c_str(), temperature);
-        config.wallBC.Append(temperature);
-      } else {
-        config.wallBC.Append(0.);
-      }
-
-      std::pair<int, WallType> patchType;
-      patchType.first = patch;
-      patchType.second = wallMapping[type];
-      config.wallPatchType.push_back(patchType);
-    }
-
-    // Inlet Bcs
-    std::map<std::string, InletType> inletMapping;
-    inletMapping["subsonic"] = SUB_DENS_VEL;
-    inletMapping["nonreflecting"] = SUB_DENS_VEL_NR;
-    inletMapping["nonreflectingConstEntropy"] = SUB_VEL_CONST_ENT;
-
-    for (int i = 1; i <= numInlets; i++) {
-      int patch;
-      double density;
-      std::string type;
-      std::string basepath("boundaryConditions/inlet" + std::to_string(i));
-
-      tpsP->getRequiredInput((basepath + "/patch").c_str(), patch);
-      tpsP->getRequiredInput((basepath + "/type").c_str(), type);
-      // all inlet BCs require 4 inputs (density + vel(3))
-      {
-        Array<double> uvw;
-        tpsP->getRequiredInput((basepath + "/density").c_str(), density);
-        tpsP->getRequiredVec((basepath + "/uvw").c_str(), uvw, 3);
-        config.inletBC.Append(density);
-        config.inletBC.Append(uvw, 3);
-      }
-      std::pair<int, InletType> patchType;
-      patchType.first = patch;
-      patchType.second = inletMapping[type];
-      config.inletPatchType.push_back(patchType);
-    }
-
-    // Outlet Bcs
-    std::map<std::string, OutletType> outletMapping;
-    outletMapping["subsonicPressure"] = SUB_P;
-    outletMapping["nonReflectingPressure"] = SUB_P_NR;
-    outletMapping["nonReflectingMassFlow"] = SUB_MF_NR;
-    outletMapping["nonReflectingPointBasedMassFlow"] = SUB_MF_NR_PW;
-
-    for (int i = 1; i <= numOutlets; i++) {
-      int patch;
-      double pressure, massFlow;
-      std::string type;
-      std::string basepath("boundaryConditions/outlet" + std::to_string(i));
-
-      tpsP->getRequiredInput((basepath + "/patch").c_str(), patch);
-      tpsP->getRequiredInput((basepath + "/type").c_str(), type);
-
-      if ((type == "subsonicPressure") || (type == "nonReflectingPressure")) {
-        tpsP->getRequiredInput((basepath + "/pressure").c_str(), pressure);
-        config.outletBC.Append(pressure);
-      } else if ((type == "nonReflectingMassFlow") || (type == "nonReflectingPointBasedMassFlow")) {
-        tpsP->getRequiredInput((basepath + "/massFlow").c_str(), massFlow);
-        config.outletBC.Append(massFlow);
-      } else {
-        grvy_printf(GRVY_ERROR, "\nUnknown outlet BC supplied at runtime -> %s", type.c_str());
-        exit(ERROR);
-      }
-
-      std::pair<int, OutletType> patchType;
-      patchType.first = patch;
-      patchType.second = outletMapping[type];
-      config.outletPatchType.push_back(patchType);
-    }
-  }
-
   // add passive scalar forcings
   {
     int numForcings;
@@ -2235,6 +2137,118 @@ void M2ulPhyS::parseSolverOptions2() {
       for (int sp = 0; sp < config.numSpecies; sp++) config.reactantStoich(sp, r - 1) = stoich[sp];
       tpsP->getRequiredVec((basepath + "/product_stoichiometry").c_str(), stoich, config.numSpecies);
       for (int sp = 0; sp < config.numSpecies; sp++) config.productStoich(sp, r - 1) = stoich[sp];
+    }
+  }
+
+  // changed the order of parsing in order to use species list.
+  // boundary conditions. The number of boundaries of each supported type if
+  // parsed first. Then, a section corresponding to each defined boundary is parsed afterwards
+  {
+    // number of BC regions defined
+    int numWalls, numInlets, numOutlets;
+    tpsP->getInput("boundaryConditions/numWalls", numWalls, 0);
+    tpsP->getInput("boundaryConditions/numInlets", numInlets, 0);
+    tpsP->getInput("boundaryConditions/numOutlets", numOutlets, 0);
+
+    // Wall Bcs
+    std::map<std::string, WallType> wallMapping;
+    wallMapping["inviscid"] = INV;
+    wallMapping["viscous_adiabatic"] = VISC_ADIAB;
+    wallMapping["viscous_isothermal"] = VISC_ISOTH;
+
+    for (int i = 1; i <= numWalls; i++) {
+      int patch;
+      double temperature;
+      std::string type;
+      std::string basepath("boundaryConditions/wall" + std::to_string(i));
+
+      tpsP->getRequiredInput((basepath + "/patch").c_str(), patch);
+      tpsP->getRequiredInput((basepath + "/type").c_str(), type);
+      if (type == "viscous_isothermal") {
+        tpsP->getRequiredInput((basepath + "/temperature").c_str(), temperature);
+        config.wallBC.Append(temperature);
+      } else {
+        config.wallBC.Append(0.);
+      }
+
+      std::pair<int, WallType> patchType;
+      patchType.first = patch;
+      patchType.second = wallMapping[type];
+      config.wallPatchType.push_back(patchType);
+    }
+
+    // Inlet Bcs
+    std::map<std::string, InletType> inletMapping;
+    inletMapping["subsonic"] = SUB_DENS_VEL;
+    inletMapping["nonreflecting"] = SUB_DENS_VEL_NR;
+    inletMapping["nonreflectingConstEntropy"] = SUB_VEL_CONST_ENT;
+
+    for (int i = 1; i <= numInlets; i++) {
+      int patch;
+      double density;
+      std::string type;
+      std::string basepath("boundaryConditions/inlet" + std::to_string(i));
+
+      tpsP->getRequiredInput((basepath + "/patch").c_str(), patch);
+      tpsP->getRequiredInput((basepath + "/type").c_str(), type);
+      // all inlet BCs require 4 inputs (density + vel(3))
+      {
+        Array<double> uvw;
+        tpsP->getRequiredInput((basepath + "/density").c_str(), density);
+        tpsP->getRequiredVec((basepath + "/uvw").c_str(), uvw, 3);
+        config.inletBC.Append(density);
+        config.inletBC.Append(uvw, 3);
+      }
+      // For multi-component gas, require (numActiveSpecies)-more inputs.
+      if ((config.workFluid != DRY_AIR) && (config.numSpecies > 1)) {
+        grvy_printf(GRVY_INFO, "\nInlet mass fraction of background species will not be used. \n");
+        if (config.ambipolar) grvy_printf(GRVY_INFO, "\nInlet mass fraction of electron will not be used. \n");
+
+        for (int sp = 1; sp <= config.numSpecies; sp++) {
+          double Ysp;
+          // read mass fraction of species as listed in the input file.
+          std::string speciesBasePath(basepath + "/mass_fraction/species" + std::to_string(sp));
+          tpsP->getRequiredInput(speciesBasePath.c_str(), Ysp);
+          config.inletBC.Append(Ysp);
+        }
+      }
+      std::pair<int, InletType> patchType;
+      patchType.first = patch;
+      patchType.second = inletMapping[type];
+      config.inletPatchType.push_back(patchType);
+    }
+
+    // Outlet Bcs
+    std::map<std::string, OutletType> outletMapping;
+    outletMapping["subsonicPressure"] = SUB_P;
+    outletMapping["nonReflectingPressure"] = SUB_P_NR;
+    outletMapping["nonReflectingMassFlow"] = SUB_MF_NR;
+    outletMapping["nonReflectingPointBasedMassFlow"] = SUB_MF_NR_PW;
+
+    for (int i = 1; i <= numOutlets; i++) {
+      int patch;
+      double pressure, massFlow;
+      std::string type;
+      std::string basepath("boundaryConditions/outlet" + std::to_string(i));
+
+      tpsP->getRequiredInput((basepath + "/patch").c_str(), patch);
+      tpsP->getRequiredInput((basepath + "/type").c_str(), type);
+
+      if ((type == "subsonicPressure") || (type == "nonReflectingPressure")) {
+        tpsP->getRequiredInput((basepath + "/pressure").c_str(), pressure);
+        config.outletBC.Append(pressure);
+      } else if ((type == "nonReflectingMassFlow") || (type == "nonReflectingPointBasedMassFlow")) {
+        tpsP->getRequiredInput((basepath + "/massFlow").c_str(), massFlow);
+        config.outletBC.Append(massFlow);
+      } else {
+        grvy_printf(GRVY_ERROR, "\nUnknown outlet BC supplied at runtime -> %s", type.c_str());
+        exit(ERROR);
+      }
+
+      std::pair<int, OutletType> patchType;
+      patchType.first = patch;
+      patchType.second = outletMapping[type];
+      config.outletPatchType.push_back(patchType);
     }
   }
 
