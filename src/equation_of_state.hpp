@@ -157,7 +157,9 @@ class GasMixture {
   // We cannot use these for multi species (heat ratio of which species?)
   // These are used in forcingTerm, Fluxes ASSUMING that the fluid is single species.
   virtual double GetSpecificHeatRatio() = 0;
-  virtual double GetGasConstant() { return UNIVERSALGASCONSTANT / gasParams(0,GasParams::SPECIES_MW); }
+  virtual double GetGasConstant() = 0;
+
+  virtual void computeNumberDensities(const Vector &conservedState, Vector &n_sp) {};
 
   virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
 

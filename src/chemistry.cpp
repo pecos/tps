@@ -41,6 +41,7 @@ Chemistry::Chemistry(GasMixture *mixture, RunConfiguration config) : mixture_(mi
   numActiveSpecies_ = mixture->GetNumActiveSpecies();
   ambipolar_ = mixture->IsAmbipolar();
   twoTemperature_ = mixture->IsTwoTemperature();
+  dim_ = mixture->GetDimension();
 
   mixtureToInputMap_ = mixture->getMixtureToInputMap();
   speciesMapping_ = mixture->getSpeciesMapping();
@@ -135,4 +136,17 @@ void Chemistry::computeEquilibriumConstants(const double T_h, const double T_e, 
   }
 
   return;
+}
+
+void Chemistry::computeRateProgression(const mfem::Vector& ns, const mfem::Vector& kfwd, 
+                                       const mfem::Vector& keq, mfem::Vector& rates)
+{
+  rates.SetSize(numReactions_);
+  for (int r = 0; r < numReactions_; r++) {
+    // forward reaction rate
+    double rateFWD = 1., rateBWD = 1.;
+    for (int sp = 0; sp < numActiveSpecies_; sp++) rateFWD *= pow(ns(sp), reactantStoich_(sp,r));
+    for (int sp = 0; sp < numActiveSpecies_; sp++) rateBWD *= pow(ns(sp), productStoich_(sp,r));
+    rates(r) = kfwd(r) * (rateFWD - rateBWD / keq(r) );
+  }
 }
