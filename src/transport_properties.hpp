@@ -96,6 +96,10 @@ class TransportProperties{
     virtual double GetViscosityFromPrimitive(const Vector &state) = 0;
 };
 
+//////////////////////////////////////////////////////
+//////// Dry Air mixture
+//////////////////////////////////////////////////////
+
 class DryAirTransport : public TransportProperties {
 protected:
   double gas_constant;
@@ -126,5 +130,25 @@ inline double DryAirTransport::GetViscosityFromPrimitive(const Vector &state) {
   double temp = state[1 + dim];
   return (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
 }
+
+//////////////////////////////////////////////////////
+//////// Test Binary Air mixture
+//////////////////////////////////////////////////////
+// NOTE: this is mixture of two idential air species.
+// mixture variables (density, pressure, temperature) are treated as single species.
+// Only mass fractions are treated as binary mixture, essentially the same as PASSIVE_SCALAR.
+
+class TestBinaryAirTransport : public DryAirTransport {
+protected:
+public:
+  TestBinaryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile);
+
+  ~TestBinaryAirTransport(){};
+
+  virtual void ComputeFluxTransportProperties(const Vector &state,
+                                              const DenseMatrix &gradUp,
+                                              Vector &transportBuffer,
+                                              DenseMatrix &diffusionVelocity);
+};
 
 #endif  // TRANSPORT_PROPERTIES_HPP_

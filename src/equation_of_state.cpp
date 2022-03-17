@@ -40,7 +40,11 @@ GasMixture::GasMixture(WorkingFluid _fluid, int _dim) {
 
 };
 
-DryAir::DryAir(RunConfiguration &_runfile, int _dim) : GasMixture(WorkingFluid::DRY_AIR, _dim)
+//////////////////////////////////////////////////////
+//////// Dry Air mixture
+//////////////////////////////////////////////////////
+
+DryAir::DryAir(RunConfiguration &_runfile, int _dim) : GasMixture(WorkingFluid::DRY_AIR,_dim)
 {
   numSpecies = (_runfile.GetEquationSystem()==NS_PASSIVE) ? 2 : 1;
   ambipolar = false;
@@ -53,10 +57,10 @@ DryAir::DryAir(RunConfiguration &_runfile, int _dim) : GasMixture(WorkingFluid::
   // gas_constant = 1.; // for comparison against ex18
   specific_heat_ratio = 1.4;
 
-  gasParams.SetSize(GasParams::NUM_GASPARAMS * numSpecies);
+  gasParams.SetSize(numSpecies,GasParams::NUM_GASPARAMS);
   gasParams = 0.0;
-  gasParams[GasParams::SPECIES_MW * numSpecies + 0] = UNIVERSALGASCONSTANT / gas_constant;
-  gasParams[GasParams::SPECIES_HEAT_RATIO * numSpecies + 0] = specific_heat_ratio;
+  gasParams(0,GasParams::SPECIES_MW) = UNIVERSALGASCONSTANT / gas_constant;
+  gasParams(0,GasParams::SPECIES_HEAT_RATIO) = specific_heat_ratio;
 
 
   // TODO: replace Nconservative/Nprimitive.
@@ -252,3 +256,200 @@ double EquationOfState::pressure( double *state,
   return (gamma-1.)*(state[num_equation-1] - p);
 }
 #endif*/
+
+//////////////////////////////////////////////////////
+//////// Test Binary Air mixture
+//////////////////////////////////////////////////////
+TestBinaryAir::TestBinaryAir(RunConfiguration &_runfile, int _dim) : GasMixture(WorkingFluid::TEST_BINARY_AIR,_dim)
+{
+  numSpecies = 2;
+  ambipolar = false;
+  twoTemperature = false;
+
+  SetNumActiveSpecies();
+  SetNumEquations();
+
+  const double gas_constant = 287.058;;
+  // gas_constant = 1.; // for comparison against ex18
+  const double specific_heat_ratio = 1.4;
+
+  gasParams.SetSize(numSpecies, GasParams::NUM_GASPARAMS);
+  gasParams = 0.0;
+  for (int sp = 0; sp < numSpecies; sp++){
+    gasParams(sp, GasParams::SPECIES_MW) = UNIVERSALGASCONSTANT / gas_constant;
+    gasParams(sp, GasParams::SPECIES_HEAT_RATIO) = specific_heat_ratio;
+  }
+}
+
+void TestBinaryAir::GetConservativesFromPrimitives(const Vector& primit,
+                                                     Vector& conserv) {
+  const double specific_heat_ratio = gasParams(0, GasParams::SPECIES_HEAT_RATIO);
+
+  conserv = primit;
+
+  double v2 = 0.;
+  for (int d = 0; d < dim; d++) {
+    v2 += primit[1 + d];
+    conserv[1 + d] *= primit[0];
+  }
+  conserv[dim + 1] = primit[dim + 1] / (specific_heat_ratio - 1.) + 0.5 * primit[0] * v2;
+
+  // NOTE: we unify to number density for species primitive.
+  // This is beneficial for simple gradient computation, even for X or Y.
+  for (int sp = 0; sp < numActiveSpecies; sp++)
+    conserv[dim + 2 + sp] = primit[dim + 2 + sp] * gasParams(sp, GasParams::SPECIES_MW);
+}
+
+void TestBinaryAir::GetPrimitivesFromConservatives(const Vector& conserv, Vector& primit) {
+  double p = ComputePressure(conserv);
+  primit = conserv;
+
+  for (int d = 0; d < dim; d++) primit[1 + d] /= conserv[0];
+
+  primit[dim + 1] = p;
+
+  // NOTE: we unify to number density for species primitive.
+  // This is beneficial for simple gradient computation, even for X or Y.
+  for (int sp = 0; sp < numActiveSpecies; sp++)
+    primit[dim + 2 + sp] = conserv[dim + 2 + sp] / gasParams(sp, GasParams::SPECIES_MW * numSpecies);
+
+  // std::cout << "conserved: " << conserv[0] << ", "
+  //                            << conserv[1] << ", "
+  //                            << conserv[2] << ", "
+  //                            << conserv[3] << ", "
+  //                            << conserv[4] << std::endl;
+  //
+  // std::cout << "primitive: " << primit[0] << ", "
+  //                            << primit[1] << ", "
+  //                            << primit[2] << ", "
+  //                            << primit[3] << ", "
+  //                            << primit[4] << std::endl;
+}
+
+bool TestBinaryAir::StateIsPhysical(const mfem::Vector& state) {
+  bool physical = true;
+
+  const double pres = ComputePressure(state);
+
+  if (state(0) < 0) {
+    cout << "Negative density: " << state(0) << endl;
+    physical = false;
+  } else if (state(dim+1) <= 0) {
+    cout << "Negative energy: " << state(dim+1) << endl;
+    physical = false;
+  } else if (pres <= 0.) {
+    cout << "Negative pressure: " << pres << endl;
+    physical = false;
+  } else {
+    // we do not re-compute species primitives here. only check conserved variables.
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      if (state(dim + 2 + sp) < 0.0) {
+        cout << "Negative species: " << state(dim + 2 + sp) << endl;
+        physical = false;
+      }
+    }
+  }
+
+  if(~physical) {
+    cout << "state: ";
+    for (int i = 0; i < state.Size(); i++) {
+      cout << state(i) << " ";
+    }
+    cout << endl;
+  }
+
+  return physical;
+}
+
+// Compute the maximum characteristic speed.
+double TestBinaryAir::ComputeMaxCharSpeed(const Vector& state) {
+  const double den = state(0);
+  const Vector den_vel(state.GetData() + 1, dim);
+
+  double den_vel2 = 0;
+  for (int d = 0; d < dim; d++) {
+    den_vel2 += den_vel(d) * den_vel(d);
+  }
+  den_vel2 /= den;
+
+  const double pres = ComputePressure(state);
+  const double sound = sqrt(gasParams(0,GasParams::SPECIES_HEAT_RATIO) * pres / den);
+  const double vel = sqrt(den_vel2 / den);
+
+  return vel + sound;
+}
+
+// NOTE: no ambipolar, no electron, no two temperature.
+void TestBinaryAir::ComputeSpeciesPrimitives(const Vector &conservedState,
+                                              Vector &X_sp, Vector &Y_sp, Vector &n_sp){
+  X_sp.SetSize(numSpecies);
+  Y_sp.SetSize(numSpecies);
+  n_sp.SetSize(numSpecies);
+  X_sp = 0.0;
+  Y_sp = 0.0;
+  n_sp = 0.0;
+
+  double Yb = conservedState[0];
+  double n = 0.0;
+
+  for (int sp = 0; sp < numActiveSpecies; sp++) {
+    n_sp[sp] = conservedState[dim + 2 + sp] / gasParams(sp, GasParams::SPECIES_MW);
+    Y_sp[sp] = conservedState[dim + 2 + sp] / conservedState[0];
+    Yb -= conservedState[dim + 2 + sp]; // will be divided by density later.
+    n += n_sp[sp];
+  }
+
+  n_sp[numSpecies - 1] = Yb / gasParams(numSpecies - 1,GasParams::SPECIES_MW);
+  Y_sp[numSpecies - 1] = Yb / conservedState[0];
+  n += n_sp[numSpecies - 1];
+
+  for (int sp = 0; sp < numSpecies; sp++) X_sp[sp] = n_sp[sp] / n;
+
+  // check for physicality.
+  for (int sp = 0; sp < numSpecies; sp++) {
+    assert( n_sp[sp] >= 0.0 );
+    assert( (X_sp[sp] >= 0.0) && (X_sp[sp] <= 1.0) );
+    assert( (Y_sp[sp] >= 0.0) && (Y_sp[sp] <= 1.0) );
+  }
+}
+
+void TestBinaryAir::ComputeMassFractionGradient(const Vector &state,
+                                                const DenseMatrix &gradUp,
+                                                DenseMatrix &massFractionGrad) {
+  // Only need active species.
+  massFractionGrad.SetSize(numActiveSpecies,dim);
+  for (int sp = 0; sp < numActiveSpecies; sp++) {
+    for (int d = 0; d < dim; d++)
+      massFractionGrad(sp,d) = gasParams(sp,GasParams::SPECIES_MW) * gradUp(dim + 2 + sp, d) / state(0)
+                                - state(dim + 2 + sp) / state(0) / state(0) * gradUp(0, d);
+  }
+}
+
+void TestBinaryAir::ComputeMoleFractionGradient(const Vector &state,
+                                                const DenseMatrix &gradUp,
+                                                DenseMatrix &moleFractionGrad) {
+  // TODO: Fluxes need to take Up as input, so that we won't recompute primitives again.
+  Vector X_sp;
+  Vector Y_sp;
+  Vector n_sp;
+  ComputeSpeciesPrimitives(state,X_sp,Y_sp,n_sp);
+
+  double n = 0.0;
+  for (int sp = 0; sp < numSpecies; sp++) n += n_sp[sp];
+
+  Vector nGrad(dim);
+  nGrad = 0.0;
+  for (int sp = 0; sp < numActiveSpecies; sp++) {
+    for (int d = 0; d < dim; d++) nGrad(d) += gradUp(dim + 2 + sp, d)
+                                              * (1.0 - gasParams(sp,GasParams::SPECIES_MW) / gasParams(numSpecies-1,GasParams::SPECIES_MW));
+  }
+  for (int d = 0; d < dim; d++) nGrad(d) += gradUp(0, d) / gasParams(numSpecies-1,GasParams::SPECIES_MW);
+
+  // Only need active species.
+  moleFractionGrad.SetSize(numActiveSpecies,dim);
+  for (int sp = 0; sp < numActiveSpecies; sp++) {
+    for (int d = 0; d < dim; d++)
+      moleFractionGrad(sp,d) = gradUp(dim + 2 + sp, d) / n
+                                - X_sp[sp] / n * nGrad(d);
+  }
+}

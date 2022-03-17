@@ -247,13 +247,17 @@ void M2ulPhyS::initVariables() {
       mixture = new DryAir( config, nvel);
       transportPtr = new DryAirTransport(mixture, config);
       break;
+    case WorkingFluid::TEST_BINARY_AIR: {
+      mixture = new TestBinaryAir( config, nvel);
+      transportPtr = new TestBinaryAirTransport(mixture, config);
+    } break;
     case WorkingFluid::USER_DEFINED:
       switch (config.GetGasModel()) {
         case GasModel::PERFECT_MIXTURE:
           break;
       }
       switch (config.GetTranportModel()) {
-        case TransportModel::TEST_BINARY_AIR:
+        default:
           break;
       }
       switch (config.GetChemistryModel()) {
@@ -958,7 +962,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     // will need to add full list of species.
     for (int d = 0; d < numActiveSpecies; d++) {
       //TODO: May read species names from input file and add them as variable name.
-      paraviewColl->RegisterField("rho-Y"+std::to_string(d + 1), visualizationVariables[d]);
+      paraviewColl->RegisterField("number density-"+std::to_string(d + 1), visualizationVariables[d]);
     }
   }
 
@@ -981,7 +985,7 @@ void M2ulPhyS::projectInitialSolution() {
   //     VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
   //     U->ProjectCoefficient(u0);
   //   }
-
+std::cout << "restart: " << config.GetRestartCycle() << std::endl;
   if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
     uniformInitialConditions();
 #ifdef _MASA_
@@ -1518,6 +1522,7 @@ void M2ulPhyS::Check_NAN() {
   // bool thereIsNan = false;
 
   for (int i = 0; i < dof; i++) {
+    Vector iState(num_equation);
     for (int eq = 0; eq < num_equation; eq++) {
       if (std::isnan(dataU[i + eq * dof])) {
         // thereIsNan = true;
@@ -1525,7 +1530,12 @@ void M2ulPhyS::Check_NAN() {
         local_print++;
         // MPI_Abort(MPI_COMM_WORLD,1);
       }
+      iState[eq] = dataU[i + eq * dof];
     }
+    // if (~mixture->StateIsPhysical(iState)) {
+    //   cout << "Unphysical at node: " << i << " partition: " << mpi.WorldRank() << endl;
+    //   local_print++;
+    // }
   }
 #endif
   int print;

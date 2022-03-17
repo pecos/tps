@@ -43,6 +43,9 @@ Fluxes::Fluxes(GasMixture *_mixture, Equations &_eqSystem, TransportProperties *
   vel.SetSize(dim);
   vtmp.SetSize(dim);
   stress.SetSize(dim, dim);
+  // TODO: Ultimately, take Up as input variable.
+  // Multi-species cannot use this, since it is not clear which species gas constant is needed.
+  // Also we should not repeat primitive computations here.
   Rg = mixture->GetGasConstant();
 }
 
@@ -99,8 +102,11 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
     return;
   }
 
+  // TODO: Ultimately, take Up as input variable.
+  // TODO: pressure and temperature must be comptued by mixture only.
   const double p = mixture->ComputePressure(state);
-  const double temp = p / state[0] / Rg;
+  const double temp = p / state[0] / mixture->GetGasParams(0,GasParams::SPECIES_HEAT_RATIO);
+  // const double temp = p / state[0] / Rg;
   // const double visc = mixture->GetViscosity(state);
   // const double bulkViscMult = mixture->GetBulkViscMultiplyer();
   // const double k = mixture->GetThermalConductivity(state);

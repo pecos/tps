@@ -289,7 +289,11 @@ void RunConfiguration::readInputFile(std::string inpuFileName) {
           case 0:
             workFluid = DRY_AIR;
             break;
+          case 1:
+            workFluid = TEST_BINARY_AIR;
+            break;
           default:
+            workFluid = USER_DEFINED;
             break;
         }
       } else if (word.compare("EQ_SYSTEM") == 0) {
