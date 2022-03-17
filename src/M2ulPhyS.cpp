@@ -1671,6 +1671,11 @@ void M2ulPhyS::parseSolverOptions2() {
     tpsP->getInput("flow/viscosityMultiplier", config.visc_mult, 1.0);
     tpsP->getInput("flow/bulkViscosityMultiplier", config.bulk_visc, 0.0);
     tpsP->getInput("flow/axisymmetric", config.axisymmetric_, false);
+    tpsP->getInput("flow/enablePressureForcing", config.isForcing, false);
+    if (config.isForcing) {
+      for (int d = 0; d < 3; d++)
+        tpsP->getRequiredVecElem("flow/pressureGrad", config.gradPress[d], d);
+    }
 
     assert(config.solOrder > 0);
     assert(config.numIters >= 0);

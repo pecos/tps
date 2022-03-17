@@ -137,7 +137,7 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
         }
       }
 
-      BCmap[attr]->setElementList(list);
+      if (BCmap.count(attr)) BCmap[attr]->setElementList(list);
     }
   }
 }
