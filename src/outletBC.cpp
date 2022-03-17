@@ -719,12 +719,9 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
 
 // TODO: figure out physics for 2T plasma. generalize
 void OutletBC::subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
-  const double gamma = mixture->GetSpecificHeatRatio();
   Vector state2(num_equation);
-  state2 = stateIn;
-  double k = 0.;
-  for (int d = 0; d < nvel; d++) k += stateIn[1 + d] * stateIn[1 + d];
-  state2[1 + nvel] = inputState[0] / (gamma - 1.) + 0.5 * k / stateIn[0];
+
+  mixture->modifyEnergyForPressure(stateIn, state2, inputState[0]);
 
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }

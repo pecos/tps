@@ -150,6 +150,7 @@ public:
   virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState) {};
   virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp,
                                             Vector &stateOut) {};
+  virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p) {};
 };
 
 //////////////////////////////////////////////////////
@@ -199,6 +200,7 @@ private:
   virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState);
   virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp,
                                             Vector &stateOut);
+  virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p);
 
   // GPU functions
 #ifdef _GPU_
@@ -477,6 +479,7 @@ public:
   virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState);
   virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp,
                                             Vector &stateOut);
+  virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p);
 
 
     // GPU functions

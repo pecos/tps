@@ -273,6 +273,19 @@ void DryAir::computeStagnantStateWithTemp(const mfem::Vector& stateIn,
   stateOut(1+dim) = gas_constant/(specific_heat_ratio-1.) * stateIn(0) * Temp;
 }
 
+void DryAir::modifyEnergyForPressure(const mfem::Vector& stateIn, mfem::Vector& stateOut, const double& p)
+{
+  stateOut.SetSize(num_equation);
+  stateOut = stateIn;
+
+  double ke = 0.;
+  for (int d = 0; d < dim; d++) ke += stateIn(1 + d) * stateIn(1 + d);
+  ke *= 0.5 / stateIn(0);
+
+  stateOut(1 + dim) = p / (specific_heat_ratio - 1.) + ke;
+}
+
+
 
 // void DryAir::UpdatePressureGridFunction(ParGridFunction* press, const ParGridFunction* Up) {
 //   double* pGridFunc = press->HostWrite();
@@ -1261,4 +1274,45 @@ void PerfectMixture::computeStagnantStateWithTemp(const mfem::Vector& stateIn,
   if (twoTemperature) {
     stateOut(1+dim) += ne * molarCV_(numSpecies-2) * Temp;
   }
+}
+
+
+void PerfectMixture::modifyEnergyForPressure(const mfem::Vector& stateIn, mfem::Vector& stateOut, const double& p)
+{
+  // will change the partial pressure of background species to adjust to p
+  stateOut.SetSize(num_equation);
+  stateOut = stateIn;
+
+  // number densities
+  Vector n_s(numActiveSpecies);
+  for(int sp=0;sp<numActiveSpecies;sp++) n_s(sp) =
+    stateIn(2+dim+sp)/gasParams(sp,GasParams::SPECIES_MW);
+
+  double ne = 0.; // number density electrons
+  if( ambipolar ) {
+    for(int sp=0;sp<numActiveSpecies;sp++) ne +=
+      gasParams(sp,GasParams::SPECIES_CHARGES)* n_s(sp);
+  }else {
+    ne = stateIn(2+dim+numSpecies-2)/gasParams(numSpecies-2,GasParams::SPECIES_MW);
+  }
+
+  double Th = 0., Te = 0.;
+  if (twoTemperature)
+  {
+    Te = stateIn(num_equation-1)/ne/molarCV_(numSpecies-2);
+    double pe = stateIn(2+dim+numSpecies-2)/GetGasParams(numSpecies-2,GasParams::SPECIES_MW)*UNIVERSALGASCONSTANT*Te;
+
+    for(int sp=0;sp<numActiveSpecies;sp++) Th += n_s(sp);
+    Th = (p - pe) / (Th * UNIVERSALGASCONSTANT);
+  }else{
+    for(int sp=0;sp<numActiveSpecies;sp++) Th += stateIn(2+dim+sp)/gasParams(sp,GasParams::SPECIES_MW);
+    if (ambipolar) Th += ne;
+    Th = p/(Th*UNIVERSALGASCONSTANT);
+  }
+
+  // compute total energy with the modified temperature of heavies
+  double rE = 0.;
+  for(int sp=0;sp<numActiveSpecies;sp++) rE += n_s(sp) * molarCV_(sp) * Th;
+  if (twoTemperature) rE += ne * molarCV_(numSpecies-2) * Te;
+  stateOut(1+dim) = rE;
 }
