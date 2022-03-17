@@ -53,7 +53,7 @@ enum TransportModel { NUM_TRANSPORTMODEL };
 
 enum ChemistryModel { NUM_CHEMISTRYMODEL };
 
-enum GasParams { SPECIES_MW, SPECIES_CHARGES, SPECIES_HEAT_RATIO, NUM_GASPARAMS };
+enum GasParams { SPECIES_MW, SPECIES_CHARGES, /* SPECIES_HEAT_RATIO, */ NUM_GASPARAMS };
 
 enum GlobalTrnsCoeffs {
   VISCOSITY,

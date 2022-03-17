@@ -131,7 +131,7 @@ public:
   // TODO: Need to remove these and fix wherever they are used.
   // We cannot use these for multi species (heat ratio of which species?)
   // These are used in forcingTerm, Fluxes ASSUMING that the fluid is single species.
-  virtual double GetSpecificHeatRatio() { return gasParams(0,GasParams::SPECIES_HEAT_RATIO); }
+  virtual double GetSpecificHeatRatio() = 0;
   virtual double GetGasConstant() { return UNIVERSALGASCONSTANT / gasParams(0,GasParams::SPECIES_MW); }
 
   virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up) = 0;
@@ -297,8 +297,8 @@ inline double DryAir::ComputeTemperature(const Vector &state) {
 
 class TestBinaryAir : public GasMixture{
 private:
-  // double specific_heat_ratio;
-  // double gas_constant;
+  double specific_heat_ratio;
+  double gas_constant;
 
   // virtual void SetNumEquations();
 public:
@@ -309,13 +309,13 @@ public:
 
   // implementation virtual methods
   virtual double ComputePressure(const Vector &state);
-  virtual double ComputePressureFromPrimitives(const Vector &Up) {};  // pressure from primitive variables
-  virtual double ComputeTemperature(const Vector &state) {};
-  virtual double Temperature(double *rho, double *p, int nsp) {};  // temperature given densities and pressures of all species
+  virtual double ComputePressureFromPrimitives(const Vector &Up);
+  virtual double ComputeTemperature(const Vector &state);
+  virtual double Temperature(double *rho, double *p, int nsp = 1){return p[0] / rho[0] / gas_constant;};
 
-  virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true) {};
+  virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true);
 
-  virtual double ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive = true) {};
+  virtual double ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive = true);
 
   virtual void GetPrimitivesFromConservatives(const Vector &conserv,
                                               Vector &primit );
@@ -337,10 +337,11 @@ public:
   virtual void ComputeMoleFractionGradient(const Vector &state,
                                            const DenseMatrix &gradUp,
                                            DenseMatrix &moleFractionGrad);
-  // virtual double GetSpecificHeatRatio(){return specific_heat_ratio;};
-  // virtual double GetGasConstant(){return gas_constant;};
 
-  virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up) {};
+  virtual double GetSpecificHeatRatio(){return specific_heat_ratio;};
+  virtual double GetGasConstant(){return gas_constant;};
+
+  virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
 
     // GPU functions
 #ifdef _GPU_
@@ -354,7 +355,19 @@ inline double TestBinaryAir::ComputePressure(const Vector &state) {
   for (int d = 0; d < dim; d++) den_vel2 += state(d + 1) * state(d + 1);
   den_vel2 /= state[0];
 
-  return (gasParams(0,GasParams::SPECIES_HEAT_RATIO) - 1.0) * (state[1 + dim] - 0.5 * den_vel2);
+  return (specific_heat_ratio - 1.0) * (state[1 + dim] - 0.5 * den_vel2);
+}
+
+// additional functions inlined for speed...
+inline double TestBinaryAir::ComputeTemperature(const Vector &state) {
+  double den_vel2 = 0;
+  for (int d = 0; d < dim; d++) den_vel2 += state(d + 1) * state(d + 1);
+  den_vel2 /= state[0];
+
+  double rhoU = state[1 + dim] - 0.5 * den_vel2;
+  double cv = gas_constant / (specific_heat_ratio - 1.0);
+
+  return rhoU / state[0] / cv;
 }
 
 #endif  // EQUATION_OF_STATE_HPP_
