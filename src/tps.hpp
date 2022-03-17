@@ -76,7 +76,7 @@ class Tps {
   TPS::Solver *solver_ = NULL;
 
  public:
-  Tps(int argc, char *argv[]);     // constructor
+  Tps();                           // constructor
   ~Tps();                          // destructor
   GRVY::GRVY_Input_Class iparse_;  // runtime input parser
 
@@ -113,6 +113,7 @@ class Tps {
   }
   void printHeader();
   void parseCommandLineArgs(int argc, char *argv[]);
+  void parseArgs(std::vector<std::string> argv);
   void parseInput();
 
   mfem::MPI_Session &getMPISession() { return mpi_; }
