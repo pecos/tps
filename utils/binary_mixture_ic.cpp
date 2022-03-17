@@ -81,7 +81,7 @@ int main (int argc, char *argv[])
   // double rhoE = 101300. / (gamma - 1.) + 0.5 * rhoU * rhoU / rho;
   double pi = atan(1.0) * 4.0;
   for (int i = 0; i < NDof; i++) {
-    double Y = ( 0.5 + 0.45 * sin( 2.0 * pi * coordinates[i + 0 * NDof] / Lx / (k0 * 1.0) ) );
+    double Y = ( 0.5 + 0.45 * sin( 2.0 * pi * k0 * coordinates[i + 0 * NDof] / Lx ) );
     // std::cout << "Grid point " << i << ": ";
     // for (int d = 0; d < dim; d++) {
     //   std::cout << coordinates[i + d * NDof] << ", ";

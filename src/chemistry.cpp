@@ -101,9 +101,9 @@ Chemistry::Chemistry(GasMixture *mixture, RunConfiguration config) : mixture_(mi
 }
 
 Chemistry::~Chemistry() {
-  if (mixture_ != NULL) delete mixture_;
-  if (mixtureToInputMap_ != NULL) delete mixtureToInputMap_;
-  if (speciesMapping_ != NULL) delete speciesMapping_;
+  // if (mixture_ != NULL) delete mixture_;
+  // if (mixtureToInputMap_ != NULL) delete mixtureToInputMap_;
+  // if (speciesMapping_ != NULL) delete speciesMapping_;
   for (int r = 0; r < numReactions_; r++) {
     if (reactions_[r] != NULL) delete reactions_[r];
   }
