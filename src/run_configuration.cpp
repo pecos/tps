@@ -96,6 +96,14 @@ RunConfiguration::RunConfiguration() {
   for (int ii = 0; ii < 3; ii++) gradPress[ii] = 0.;
 
   arrayPassiveScalar.DeleteAll();
+
+  // Resource manager monitoring
+  rm_enableMonitor_ = false;
+  rm_threshold_ = 15 * 60;     // 15 minutes
+  rm_checkFrequency_ = 25;     // 25 iterations
+  exit_checkFrequency_ = 500;  // 500 iterations
+
+  initialElectronTemperature = 0.;
 }
 
 RunConfiguration::~RunConfiguration() {
@@ -525,7 +533,7 @@ void RunConfiguration::readInputFile(std::string inpuFileName) {
       } else if (word.compare("CHEMISTRY_MODEL") == 0) {
         ss >> word;
         assert((stoi(word) >= 0) && (stoi(word) < ChemistryModel::NUM_CHEMISTRYMODEL));
-        chemistryModel = (ChemistryModel)stoi(word);
+        chemistryModel_ = (ChemistryModel)stoi(word);
       }
     }
   }

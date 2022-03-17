@@ -261,14 +261,16 @@ void M2ulPhyS::initVariables() {
       mixture = new DryAir( config, nvel);
       transportPtr = new DryAirTransport(mixture, config);
       break;
-    case WorkingFluid::TEST_BINARY_AIR: {
+    case WorkingFluid::TEST_BINARY_AIR:
       mixture = new TestBinaryAir( config, nvel);
       transportPtr = new TestBinaryAirTransport(mixture, config);
-    } break;
+      break;
     case WorkingFluid::USER_DEFINED:
       switch (config.GetGasModel()) {
         case GasModel::PERFECT_MIXTURE:
           mixture = new PerfectMixture(config, dim);
+          // WARNING: update this transport!
+          transportPtr = new DryAirTransport(mixture, config);
           break;
       }
       switch (config.GetTranportModel()) {
@@ -1365,6 +1367,7 @@ void M2ulPhyS::dryAirUniformInitialConditions() {
 
   // build initial state
   Vector initState(num_equation);
+  initState = 0.;
 
   initState(0) = inputRhoRhoVp[0];
   initState(1) = inputRhoRhoVp[1];
@@ -2009,7 +2012,7 @@ void M2ulPhyS::parseSolverOptions2() {
   // plasma conditions.
   config.gasModel = NUM_GASMODEL;
   config.transportModel = NUM_TRANSPORTMODEL;
-  config.chemistryModel = NUM_CHEMISTRYMODEL;
+  config.chemistryModel_ = NUM_CHEMISTRYMODEL;
   if (config.workFluid != USER_DEFINED) {
     cout << "Fluid is set to the preset '" << fluidTypeStr << "'. Input options in [plasma_models] will not be used."
          << endl;
@@ -2038,6 +2041,10 @@ void M2ulPhyS::parseSolverOptions2() {
 
     std::string chemistryModelStr;
     tpsP->getInput("plasma_models/chemistry_model", chemistryModelStr, std::string(""));
+
+    if (chemistryModelStr == "mass_action_law") {
+      config.chemistryModel_ = ChemistryModel::MASS_ACTION_LAW;
+    }
   }
 
   // species list.
@@ -2194,9 +2201,6 @@ void M2ulPhyS::parseSolverOptions2() {
       for (int sp = 0; sp < config.numSpecies; sp++) config.productStoich(sp, r - 1) = stoich[sp];
     }
   }
-
-  // chemistry
-  {}
 
   // changed the order of parsing in order to use species list.
   // boundary conditions. The number of boundaries of each supported type if

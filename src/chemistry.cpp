@@ -35,7 +35,7 @@
 using namespace mfem;
 using namespace std;
 
-Chemistry::Chemistry(GasMixture *mixture, RunConfiguration config) : mixture_(mixture) {
+Chemistry::Chemistry(GasMixture *mixture, RunConfiguration &config) : mixture_(mixture) {
   numEquations_ = mixture->GetNumEquations();
   numSpecies_ = mixture->GetNumSpecies();
   numActiveSpecies_ = mixture->GetNumActiveSpecies();
@@ -140,7 +140,7 @@ void Chemistry::computeEquilibriumConstants(const double T_h, const double T_e, 
   return;
 }
 
-MassActionLaw::MassActionLaw(GasMixture* mixture, RunConfiguration config):
+MassActionLaw::MassActionLaw(GasMixture* mixture, RunConfiguration &config):
   Chemistry(mixture, config)
 {
 }
@@ -153,8 +153,8 @@ void MassActionLaw::computeCreationRate(const mfem::Vector& ns, const mfem::Vect
   for (int r = 0; r < numReactions_; r++) {
     // forward reaction rate
     double rateFWD = 1., rateBWD = 1.;
-    for (int sp = 0; sp < numActiveSpecies_; sp++) rateFWD *= pow(ns(sp), reactantStoich_(sp,r));
-    for (int sp = 0; sp < numActiveSpecies_; sp++) rateBWD *= pow(ns(sp), productStoich_(sp,r));
+    for (int sp = 0; sp < numSpecies_; sp++) rateFWD *= pow(ns(sp), reactantStoich_(sp,r));
+    for (int sp = 0; sp < numSpecies_; sp++) rateBWD *= pow(ns(sp), productStoich_(sp,r));
     progressRate(r) = kfwd(r) * (rateFWD - rateBWD / keq(r) );
   }
   

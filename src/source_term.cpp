@@ -60,9 +60,11 @@ void SourceTerm::updateTerms(mfem::Vector& in)
 
   const int nnodes = vfes->GetNDofs();
 
+  Vector upn(num_equation);
+  Vector Un(num_equation);
   for (int n = 0; n < nnodes; n++) {
-    Vector upn(num_equation);
     for (int eq = 0; eq < num_equation; eq++) upn(eq) = h_Up[n + eq * nnodes];
+    mixture_->GetConservativesFromPrimitives(upn, Un);
 
     double Th = 0., Te = 0.;
     Th = upn[1 + dim];
@@ -77,7 +79,7 @@ void SourceTerm::updateTerms(mfem::Vector& in)
     chemistry_->computeEquilibriumConstants(Th, Te, kC);
 
     Vector ns;
-    ns.SetDataAndSize(&upn[2+dim], numSpecies_);
+    mixture_->computeNumberDensities(Un, ns);
 
     // get reaction rates
     Vector creationRates;
