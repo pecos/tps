@@ -21,27 +21,10 @@ tps_LDFLAGS=
 # C++ main solver binary
 bin_PROGRAMS         = tps
 tps_SOURCES          = main.cpp
-tps_LDADD            = libtps.a
-tps_LDADD           += $(HDF5_LIBS)
-tps_LDADD           += $(GRVY_LIBS)
-tps_LDADD           += $(MFEM_LIBS)
+tps_LDADD            = libtps.la
+tps_LDFLAGS         += $(PYTHON_LIBS)
 
-if SLURM_ENABLED
-tps_LDFLAGS         += -lslurm
-endif
 
-if CUDA_ENABLED
-tps_LDFLAGS         += $(CUDA_LDFLAGS) -lcuda -lcusparse
-endif
-
-if HIP_ENABLED
-tps_LDFLAGS         += $(HIP_LDFLAGS)
-endif
-
-if GSLIB_ENABLED
-tps_LDADD   += -lgs
-tps_LDFLAGS += -L$(GSLIB_LIB)
-endif
 
 if MASA_ENABLED
 tps_LDFLAGS += $(MASA_LIBS)
@@ -68,8 +51,30 @@ headers              = averaging_and_rms.hpp equation_of_state.hpp transport_pro
 
 mfem_extra_headers   = ../utils/mfem_extras/pfem_extras.hpp
 
-noinst_LIBRARIES     = libtps.a
-libtps_a_SOURCES     = $(cxx_sources) $(mfem_extra_sources) $(headers) $(mfem_extra_headers)
+## noinst_LIBRARIES     = libtps.a
+## libtps_a_SOURCES     = $(cxx_sources) $(mfem_extra_sources) $(headers) $(mfem_extra_headers)
+
+lib_LTLIBRARIES      = libtps.la
+libtps_la_SOURCES    = $(cxx_sources) $(mfem_extra_sources) $(headers) $(mfem_extra_headers)
+libtps_la_LIBADD     = $(MFEM_LIBS)
+libtps_la_LIBADD    += $(HDF5_LIBS)
+libtps_la_LIBADD    += $(GRVY_LIBS)
+
+if SLURM_ENABLED
+libtps_la_LIBADD    += -lslurm
+endif
+
+if CUDA_ENABLED
+libtps_la_LIBADD    += $(CUDA_LDFLAGS) -lcuda -lcusparse
+endif
+
+if HIP_ENABLED
+libtps_la_LIBADD    += $(HIP_LDFLAGS)
+endif
+
+if GSLIB_ENABLED
+libtps_la_LIBADD    += -L$(GSLIB_LIB) -lgs
+endif
 
 # Python wrapper for C++ solver library
 ### pyexec_LTLIBRARIES   = pytps.la
