@@ -783,7 +783,7 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
   const double Rg = mixture->GetGasConstant();
   const double gamma = mixture->GetSpecificHeatRatio();
   
-  const TransportModel transpModel = transport->getTransportModel();
+//   const TransportModel transpModel = transport->getTransportModel();
   const WorkingFluid fluid = mixture->GetWorkingFluid();
   
   const int d_numSpecies = mixture->GetNumSpecies();

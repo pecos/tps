@@ -550,11 +550,22 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(
   
   const TransportModel transpModel = transport->getTransportModel();
   
-  const DenseMatrix gasParameters = mixture->GetGasParam();
-  const double *d_gasParams = gasParameters.Read();
+ const double *d_gasParams = mixture->GetGasParam().Read();
   
   const int d_numActiveSpecies = mixture->GetNumActiveSpecies();
   const int d_numSpecies = mixture->GetNumSpecies();
+  
+  const WorkingFluid fluid = mixture->GetWorkingFluid();
+  
+  const double *molarCV = NULL;
+  const double *gasParams = NULL;
+  if (fluid == WorkingFluid::USER_DEFINED) {
+    molarCV = mixture->getMolarCVs().Read();
+    gasParams = mixture->GetGasParam().Read();
+  }
+  
+  const bool ambipolar = mixture->IsAmbipolar();
+  const bool twoTemperature = mixture->IsTwoTemperature();
 
   const double *d_sharedShapeWnor1 = parallelData->sharedShapeWnor1.Read();
   const double *d_sharedShape2 = parallelData->sharedShape2.Read();
@@ -625,30 +636,9 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(
           }
           MFEM_SYNC_THREAD;
 
-          // interpolate
-//           if (i < num_equation) {
-//             for (int n = 0; n < dof1; n++) {
-//               u1[i] += Ui[n + i * dof1] * l1[n];
-//               for (int d = 0; d < dim; d++)
-//                 gradUp1[i + d * num_equation] += gradUpi[n + i * dof1 + d * num_equation * dof1] * l1[n];
-//             }
-//             for (int n = 0; n < dof2; n++) {
-//               //             u2[i] += Uj[n+i*dof2]*l2[n];
-//               //             for(int d=0;d<dim;d++) gradUp2[i+d*num_equation] +=
-//               //                           gradUpj[n+i*dof2+d*num_equation*dof2]*l2[n];
-//               int index = d_sharedVdofs[n + i * maxDofs + f * num_equation * maxDofs];
-//               u2[i] += l2[n] * d_faceData[index];
-//               for (int d = 0; d < dim; d++) {
-//                 index = d_sharedVdofsGrads[n + i * maxDofs + d * num_equation * maxDofs +
-//                                              f * dim * num_equation * maxDofs];
-//                 gradUp2[i + d * num_equation] += l2[n] * d_faceGradUp[index];
-//               }
-//             }
-//           }
-//           MFEM_SYNC_THREAD;
           // compute Riemann flux
-          RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg,
-                                       dim, eqSystem, num_equation, i, maxDofs);
+          RiemannSolver::riemannLF_gpu(u1, u2, Rflux, nor,gamma, Rg, gasParams, molarCV, dim, eqSystem, fluid, ambipolar, twoTemperature,
+                                             num_equation, d_numSpecies, d_numActiveSpecies, i, maxDofs);
           Fluxes::viscousFlux_gpu(&vFlux1[0], &u1[0], &gradUp1[0], eqSystem, transpModel, 
                               d_gasParams, gamma, Rg, viscMult, bulkViscMult,
                               Pr, Sc, dim, num_equation, d_numActiveSpecies, d_numSpecies, i, maxDofs);
