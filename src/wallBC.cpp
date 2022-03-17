@@ -334,11 +334,16 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
   const TransportModel transpModel = transport->getTransportModel();
   const WorkingFluid fluid = mixture->GetWorkingFluid();
   
-  const DenseMatrix gasParameters = mixture->GetGasParam();
-  const double *d_gasParams = gasParameters.Read();
-  
-  const int d_numActiveSpecies = mixture->GetNumActiveSpecies();
   const int d_numSpecies = mixture->GetNumSpecies();
+  const int d_numActiveSpecies = mixture->GetNumActiveSpecies();
+  const double *gasParams = NULL;
+  const double *molarCV = NULL;
+  if (fluid == WorkingFluid::USER_DEFINED) {
+    gasParams = mixture->GetGasParam().Read();
+    molarCV = mixture->getMolarCVs().Read();
+  }
+  const bool ambipolar = mixture->IsAmbipolar();
+  const bool twoTemperature = mixture->IsTwoTemperature();
 
   const double *d_interpolU = interpolated_Ubdr_.Read();
   const double *d_interpGrads = interpolatedGradUpbdr_.Read();
@@ -414,15 +419,15 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
       MFEM_SYNC_THREAD;
 
       // compute flux
-      RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, eqSystem, num_equation, i,
-                                   maxDofs);
+      RiemannSolver::riemannLF_gpu(u1, u2, Rflux, nor,gamma, Rg, gasParams, molarCV, dim, eqSystem, fluid, ambipolar, twoTemperature,
+                                             num_equation, d_numSpecies, d_numActiveSpecies, i, maxDofs);
 
       // compute viscous flux
       Fluxes::viscousFlux_gpu(&vF1[0], &u1[0], &gradUpi[0], eqSystem, transpModel, 
-                              d_gasParams, gamma, Rg, viscMult, bulkViscMult,
+                              gasParams, gamma, Rg, viscMult, bulkViscMult,
                               Pr, Sc, dim, num_equation, d_numActiveSpecies, d_numSpecies, i, maxDofs);
       Fluxes::viscousFlux_gpu(&vF2[0], &u2[0], &gradUpi[0], eqSystem, transpModel, 
-                              d_gasParams, gamma, Rg, viscMult, bulkViscMult,
+                              gasParams, gamma, Rg, viscMult, bulkViscMult,
                               Pr, Sc, dim, num_equation, d_numActiveSpecies, d_numSpecies, i, maxDofs);
       MFEM_SYNC_THREAD;
       

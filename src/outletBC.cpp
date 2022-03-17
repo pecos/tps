@@ -1055,16 +1055,16 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem, 
   
   const WorkingFluid fluid = mixture->GetWorkingFluid();
   
-  const double *molarCV = NULL;
+  const int d_numSpecies = mixture->GetNumSpecies();
+  const int d_numActiveSpecies = mixture->GetNumActiveSpecies();
   const double *gasParams = NULL;
+  const double *molarCV = NULL;
   if (fluid == WorkingFluid::USER_DEFINED) {
-    molarCV = mixture->getMolarCVs().Read();
     gasParams = mixture->GetGasParam().Read();
+    molarCV = mixture->getMolarCVs().Read();
   }
   const bool ambipolar = mixture->IsAmbipolar();
   const bool twoTemperature = mixture->IsTwoTemperature();
-  const int numSpecies = mixture->GetNumSpecies();
-  const int numActiveSpecies = mixture->GetNumActiveSpecies();
 
   // clang-format off
   MFEM_FORALL_2D(n, numBdrElem, maxDofs, 1, 1, {
@@ -1120,8 +1120,8 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem, 
                                                            false,molarCV,gasParams,
                                                            ambipolar,twoTemperature,
                                                            num_equation,dim,
-                                                           numSpecies,
-                                                           numActiveSpecies,
+                                                           d_numSpecies,
+                                                           d_numActiveSpecies,
                                                            i,maxDofs);
                   break;
                 default:
@@ -1150,8 +1150,8 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem, 
           MFEM_SYNC_THREAD;
 
           // compute flux
-          RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg,
-                                       dim, eqSystem, num_equation, i, maxDofs);
+          RiemannSolver::riemannLF_gpu(u1, u2, Rflux, nor,gamma, Rg, gasParams, molarCV, dim, eqSystem, fluid, ambipolar, twoTemperature,
+                                             num_equation, d_numSpecies, d_numActiveSpecies, i, maxDofs);
           MFEM_SYNC_THREAD;
 
           // sum contributions to integral
