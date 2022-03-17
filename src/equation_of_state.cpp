@@ -247,11 +247,36 @@ double DryAir::ComputePressureDerivative(const Vector& dUp_dx, const Vector& Uin
 
 double DryAir::ComputePressureFromPrimitives(const mfem::Vector& Up) { return gas_constant * Up[0] * Up[1 + dim]; }
 
+void DryAir::computeStagnationState(const mfem::Vector& stateIn, mfem::Vector& stagnationState)
+{
+  const double p = ComputePressure(stateIn);
 
-// void DryAir::UpdatePressureGridFunction(ParGridFunction* press, const ParGridFunction* Up)
-// {
-//   double *pGridFunc = press->HostWrite();
-//   const double *UpData = Up->HostRead();
+  stagnationState.SetSize(num_equation);
+  stagnationState = stateIn;
+
+  // zero momentum
+  for (int d=0;d<dim;d++) stagnationState(1+d) = 0.;
+
+  // total energy
+  stagnationState(1+dim) = p/(specific_heat_ratio-1.);
+}
+
+void DryAir::computeStagnantStateWithTemp(const mfem::Vector& stateIn,
+                                          const double Temp,
+                                          mfem::Vector& stateOut)
+{
+  stateOut.SetSize(num_equation);
+  stateOut = stateIn;
+
+  for (int d=0;d<dim;d++) stateOut(1+d) = 0.;
+
+  stateOut(1+dim) = gas_constant/(specific_heat_ratio-1.) * stateIn(0) * Temp;
+}
+
+
+// void DryAir::UpdatePressureGridFunction(ParGridFunction* press, const ParGridFunction* Up) {
+//   double* pGridFunc = press->HostWrite();
+//   const double* UpData = Up->HostRead();
 //
 //   const int nnode = press->FESpace()->GetNDofs();
 //
@@ -1151,4 +1176,89 @@ void PerfectMixture::computeMoleFractionGradient(const Vector &numberDensities,
     moleFractionGrad(sp,d) = nBGrad(d) / totalN - numberDensities(sp) / totalN / totalN * totalNGrad(d);
   }
 
+}
+
+void PerfectMixture::computeStagnationState(const mfem::Vector& stateIn, mfem::Vector& stagnationState)
+{
+  stagnationState.SetSize(num_equation);
+  stagnationState = stateIn;
+
+  // momentum = 0.;
+  for(int d=0;d<dim;d++) stagnationState(1+d) = 0.;
+
+  // compute total energy
+  Vector n_s(numActiveSpecies);
+  for(int sp=0;sp<numActiveSpecies;sp++) n_s(sp) =
+    stateIn(2+dim+sp)/gasParams(sp,GasParams::SPECIES_MW);
+
+  double ne = 0.; // number density electrons
+  if( ambipolar ) {
+    for(int sp=0;sp<numActiveSpecies;sp++) ne +=
+      gasParams(sp,GasParams::SPECIES_CHARGES)* n_s(sp);
+  }else {
+    ne = stateIn(2+dim+numSpecies-2)/gasParams(numSpecies-2,GasParams::SPECIES_MW);
+  }
+
+  double nB = stateIn(0); // background species
+  for(int sp=0;sp<numActiveSpecies;sp++) nB -= stateIn(2+dim+sp);
+
+  if (ambipolar) nB -= ne * gasParams(numSpecies-2,GasParams::SPECIES_MW);
+
+  nB /= gasParams(numSpecies-1,GasParams::SPECIES_MW);
+
+  double heatCapacity = 0.;
+  for(int sp=0;sp<numActiveSpecies;sp++) heatCapacity += molarCV_(sp) * n_s(sp);
+  heatCapacity += nB * molarCV_(numSpecies-1);
+
+  double Th, Te;
+  Th = ComputeTemperature(stateIn);
+
+//   if (twoTemperature) {
+//     Te = stateIn[num_equation - 1] / ne / molarCV_(numSpecies - 2);
+//   } else {
+//     Te = Th;
+//   }
+
+  stagnationState(1+dim) = heatCapacity * Th;
+  if (twoTemperature) stagnationState(1+dim) += stateIn[num_equation - 1];
+}
+
+void PerfectMixture::computeStagnantStateWithTemp(const mfem::Vector& stateIn,
+                                                  const double Temp,
+                                                  mfem::Vector& stateOut)
+{
+  stateOut.SetSize(num_equation);
+  stateOut = stateIn;
+
+  // momentum = 0.;
+  for(int d=0;d<dim;d++) stateOut(1+d) = 0.;
+
+  // compute total energy
+  Vector n_s(numActiveSpecies);
+  for(int sp=0;sp<numActiveSpecies;sp++) n_s(sp) =
+    stateIn(2+dim+sp)/gasParams(sp,GasParams::SPECIES_MW);
+
+  double ne = 0.; // number density electrons
+  if( ambipolar ) {
+    for(int sp=0;sp<numActiveSpecies;sp++) ne +=
+      gasParams(sp,GasParams::SPECIES_CHARGES)* n_s(sp);
+  }else {
+    ne = stateIn(2+dim+numSpecies-2)/gasParams(numSpecies-2,GasParams::SPECIES_MW);
+  }
+
+  double nB = stateIn(0); // background species
+  for(int sp=0;sp<numActiveSpecies;sp++) nB -= stateIn(2+dim+sp);
+
+  if (ambipolar) nB -= ne * gasParams(numSpecies-2,GasParams::SPECIES_MW);
+
+  nB /= gasParams(numSpecies-1,GasParams::SPECIES_MW);
+
+  double heatCapacity = 0.;
+  for(int sp=0;sp<numActiveSpecies;sp++) heatCapacity += molarCV_(sp) * n_s(sp);
+  heatCapacity += nB * molarCV_(numSpecies-1);
+
+  stateOut(1+dim) = heatCapacity * Temp;
+  if (twoTemperature) {
+    stateOut(1+dim) += ne * molarCV_(numSpecies-2) * Temp;
+  }
 }

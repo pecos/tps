@@ -151,8 +151,9 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
   for (int d = 0; d < dim; d++) vn += vel[d] * unitN[d];
 
   Vector stateMirror(num_equation);
+  stateMirror = stateIn;
 
-  stateMirror[0] = stateIn[0];
+  // only momentum needs to be changed
   stateMirror[1] = stateIn[0] * (vel[0] - 2. * vn * unitN[0]);
   stateMirror[2] = stateIn[0] * (vel[1] - 2. * vn * unitN[1]);
   if (dim == 3) stateMirror[3] = stateIn[0] * (vel[2] - 2. * vn * unitN[2]);
@@ -224,9 +225,11 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
   const double gamma = mixture->GetSpecificHeatRatio();
   const double Rg = mixture->GetGasConstant();
 
-  Vector wallState = stateIn;
-  for (int d = 0; d < nvel; d++) wallState[1 + d] = 0.;
-  wallState[1 + nvel] = p / (gamma - 1.);
+//   Vector wallState = stateIn;
+//   for (int d = 0; d < dim; d++) wallState[1 + d] = 0.;
+//   wallState[1 + dim] = p / (gamma - 1.);
+  Vector wallState(num_equation);
+  mixture->computeStagnationState(stateIn,wallState);
 
   // Normal convective flux
   rsolver->Eval(stateIn, wallState, normal, bdrFlux, true);
@@ -245,27 +248,33 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
   }
 
   // modify gradient temperature so dT/dn=0 at the wall
-  double DrhoDn = 0.;
-  for (int d = 0; d < dim; d++) DrhoDn += gradState(0, d) * unitNorm[d];
-  double dpdn = Rg * T * DrhoDn;  // this is the BC -> grad(T)*normal=0
+//   double DrhoDn = 0.;
+//   for (int d = 0; d < dim; d++) DrhoDn += gradState(0, d) * unitNorm[d];
+//   double dpdn = Rg * T * DrhoDn;  // this is the BC -> grad(T)*normal=0
+//
+//   Vector gradP(dim);
+//   double old_dpdn = 0.;
+//   for (int d = 0; d < dim; d++) {
+//     Vector grads(gradState.GetColumn(d), num_equation);
+//     double dpdx = mixture->ComputePressureDerivative(grads, stateIn, false);
+//     gradP(d) = dpdx;
+//     old_dpdn += dpdx * unitNorm(d);
+//   }
+//
+//   // force the new dp/dn
+//   for (int d = 0; d < dim; d++) gradP(d) += (-old_dpdn + dpdn) * unitNorm(d);
+//
+//   // modify grad(T) with the corrected grad(p)
+//   for (int d = 0; d < dim; d++) {
+//     // temperature gradient for ideal Dry Air
+//     gradState(1 + dim, d) = T * (gradP(d) / p - gradState(0, d) / stateIn[0]);
+//   }
+  double normGradT = 0.;
+  for (int d=0;d<dim;d++) normGradT += unitNorm(d) * gradState(1+dim,d);
+  for (int d=0;d<dim;d++) gradState(1+dim,d) -= normGradT * unitNorm(d);
 
-  Vector gradP(dim);
-  double old_dpdn = 0.;
-  for (int d = 0; d < dim; d++) {
-    Vector grads(gradState.GetColumn(d), num_equation);
-    double dpdx = mixture->ComputePressureDerivative(grads, stateIn, false);
-    gradP(d) = dpdx;
-    old_dpdn += dpdx * unitNorm(d);
-  }
-
-  // force the new dp/dn
-  for (int d = 0; d < dim; d++) gradP(d) += (-old_dpdn + dpdn) * unitNorm(d);
-
-  // modify grad(T) with the corrected grad(p)
-  for (int d = 0; d < dim; d++) {
-    // temperature gradient for ideal Dry Air
-    gradState(1 + dim, d) = T * (gradP(d) / p - gradState(0, d) / stateIn[0]);
-  }
+  // TODO: if we have a two-temperature plasma an additional
+  //       normal temperature gradient should also be removed.
 
   if (eqSystem == NS_PASSIVE) {
     for (int d = 0; d < dim; d++) gradState(num_equation - 1, d) = 0.;
@@ -280,16 +289,10 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
   }
 }
 
-void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
-                                       Vector &bdrFlux) {
-  const double gamma = mixture->GetSpecificHeatRatio();
+void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux) {
 
   Vector wallState(num_equation);
-  wallState[0] = stateIn[0];
-  for (int d = 0; d < nvel; d++) wallState[1 + d] = 0.;
-
-  wallState[1 + nvel] = mixture->GetGasConstant() / (gamma - 1.);  // Cv
-  wallState[1 + nvel] *= stateIn[0] * wallTemp;
+  mixture->computeStagnantStateWithTemp(stateIn, wallTemp, wallState);
 
   if (eqSystem == NS_PASSIVE) wallState[num_equation - 1] = stateIn[num_equation - 1];
 
