@@ -182,6 +182,16 @@ class RunConfiguration {
 
   int exit_checkFrequency_;  // iteration frequency to check for early exit
 
+  // number of species;
+  int numSpecies;
+
+  // ambipolar flag
+  bool ambipolar;
+
+  // two temperature flag
+  bool twoTemperature;
+
+ public:
   RunConfiguration();
   ~RunConfiguration();
 
@@ -252,6 +262,10 @@ class RunConfiguration {
 
   Array<passiveScalarData*>& GetPassiveScalarData() { return arrayPassiveScalar; }
   passiveScalarData* GetPassiveScalarData(int i) { return arrayPassiveScalar[i]; }
+
+  int GetNumSpecies() { return numSpecies; }
+  bool isAmbipolar() { return ambipolar; }
+  bool isTwoTemperature() { return twoTemperature; }
 };
 
 #endif  // RUN_CONFIGURATION_HPP_

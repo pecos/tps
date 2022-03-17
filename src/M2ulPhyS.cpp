@@ -240,12 +240,14 @@ void M2ulPhyS::initVariables() {
 
   eqSystem = config.GetEquationSystem();
 
+  // Kevin: This part is what I imagined "GasMixture" class would do. However, I'm fine with specifying explicitly here.
   mixture = NULL;
   switch (config.GetWorkingFluid()) {
     case WorkingFluid::DRY_AIR:
       mixture = new DryAir(config, nvel);
       mixture->setViscMult(config.GetViscMult());
       mixture->setBulkViscMult(config.GetBulkViscMult());
+      transportPtr = new TransportProperties();
       break;
     case WorkingFluid::USER_DEFINED:
       break;
@@ -258,20 +260,28 @@ void M2ulPhyS::initVariables() {
 
   max_char_speed = 0.;
 
-  // NOTE: num_equations to be given by the gasMixture
-  switch (eqSystem) {
-    case EULER:
-      num_equation = 2 + nvel;
-      break;
-    case NS:
-      num_equation = 2 + nvel;
-      break;
-    case NS_PASSIVE:
-      num_equation = 2 + nvel + 1;
-      break;
-    default:
-      break;
-  }
+  // Kevin: if mixture is set to a preset such as DRY_AIR,
+  // it will not read the input options for following variables,
+  // instead applies preset values.
+  numSpecies = mixture->GetNumSpecies();
+  numActiveSpecies = mixture->GetNumActiveSpecies();
+  ambipolar = mixture->isAmbipolar();
+  twoTemperature = mixture->isTwoTemperature();
+  num_equation = mixture->GetNumEquations();
+  // // Kevin: the code above replaces this num_equation determination.
+  // switch (eqSystem) {
+  //   case EULER:
+  //     num_equation = 2 + dim;
+  //     break;
+  //   case NS:
+  //     num_equation = 2 + dim;
+  //     break;
+  //   case NS_PASSIVE:
+  //     num_equation = 2 + dim + 1;
+  //     break;
+  //   default:
+  //     break;
+  // }
 
   // initialize basis type and integration rule
   intRuleType = config.GetIntegrationRule();
@@ -304,6 +314,7 @@ void M2ulPhyS::initVariables() {
   average->read_meanANDrms_restart_files();
 
   // NOTE: this should also be completed by the GasMixture class
+  // Kevin: Do we need GasMixture class for this?
   // register rms and mean sol into ioData
   if (average->ComputeMean()) {
     // meanUp
@@ -316,9 +327,16 @@ void M2ulPhyS::initVariables() {
       ioData.registerIOVar("/meanSolution", "mean-w", 3);
       ioData.registerIOVar("/meanSolution", "mean-E", 4);
     } else {
-      ioData.registerIOVar("/meanSolution", "mean-p", 3);
+      ioData.registerIOVar("/meanSolution", "mean-p", dim+1);
     }
-    if (eqSystem == NS_PASSIVE) ioData.registerIOVar("/meanSolution", "mean-Z", num_equation - 1);
+    for (int sp = 0; sp < numSpecies; sp++) {
+      // Only for NS_PASSIVE.
+      if ((eqSystem == NS_PASSIVE) && (sp==1)) break;
+
+      //TODO: May read species names from input file and add them as variable name.
+      //TODO: May change depending on visualization variable. (X, Y, n)
+      ioData.registerIOVar("/meanSolution", "mean-Y"+std::to_string(sp + 1), sp + dim + 2);
+    }
 
     // rms
     ioData.registerIOFamily("RMS velocity fluctuation", "/rmsData", average->GetRMS(), false, config.GetRestartMean());
@@ -779,6 +797,7 @@ M2ulPhyS::~M2ulPhyS() {
   delete rsolver;
   delete fluxClass;
   delete mixture;
+  delete transportPtr;
   delete gradUpfes;
   delete vfes;
   delete dfes;
@@ -852,8 +871,15 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   press = new ParGridFunction(fes);
 
   passiveScalar = NULL;
-  if (eqSystem == NS_PASSIVE)
+  if (eqSystem == NS_PASSIVE) {
     passiveScalar = new ParGridFunction(fes, Up->HostReadWrite() + (num_equation - 1) * fes->GetNDofs());
+  } else {
+    //Kevin: for now, only contain species mass fraction. but I would contain all visualization variables here.
+    visualizationVariables.resize(numSpecies);
+    for (int sp = 0; sp < numSpecies; sp++) {
+      visualizationVariables[sp] = new ParGridFunction(fes, Up->HostReadWrite() + (sp + dim + 2) * fes->GetNDofs());
+    }
+  }
 
   // define solution parameters for i/o
   ioData.registerIOFamily("Solution state variables", "/solution", U);
@@ -866,7 +892,14 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   } else {
     ioData.registerIOVar("/solution", "rho-E", 3);
   }
-  if (eqSystem == NS_PASSIVE) ioData.registerIOVar("/solution", "rho-Z", num_equation - 1);
+  for (int sp = 0; sp < numSpecies; sp++) {
+    // Only for NS_PASSIVE.
+    if ((eqSystem == NS_PASSIVE) && (sp==1)) break;
+
+    //TODO: May read species names from input file and add them as variable name.
+    //TODO: May change depending on visualization variable. (X, Y, n)
+    ioData.registerIOVar("/solution", "rho-Y"+std::to_string(sp + 1), sp + dim + 2);
+  }
 
   // compute factor to multiply viscosity when this option is active
   spaceVaryViscMult = NULL;
@@ -905,7 +938,14 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   }
   paraviewColl->RegisterField("temp", temperature);
   paraviewColl->RegisterField("press", press);
-  if (eqSystem == NS_PASSIVE) paraviewColl->RegisterField("passiveScalar", passiveScalar);
+  if (eqSystem == NS_PASSIVE) {
+    paraviewColl->RegisterField("passiveScalar", passiveScalar);
+  } else {
+    for (int d = 0; d < numSpecies; d++) {
+      //TODO: May read species names from input file and add them as variable name.
+      paraviewColl->RegisterField("rho-Y"+std::to_string(d + 1), visualizationVariables[d]);
+    }
+  }
 
   if (spaceVaryViscMult != NULL) paraviewColl->RegisterField("viscMult", spaceVaryViscMult);
 
@@ -1269,6 +1309,7 @@ void M2ulPhyS::testInitialCondition(const Vector &x, Vector &y) {
   delete eqState;
 }
 
+// NOTE: Use only for DRY_AIR.
 void M2ulPhyS::uniformInitialConditions() {
   double *data = U->HostWrite();
   double *dataUp = Up->HostWrite();
@@ -1434,6 +1475,7 @@ void M2ulPhyS::read_restart_files() {
       cout << "# of lines in files does not match domain size" << endl;
     } else {
       dof = vfes->GetNDofs();
+      // TODO: replace with mixture conversion of primitive variable.
       for (int i = 0; i < dof; i++) {
         double p = dataUp[i + (1 + dim) * dof];
         double r = dataUp[i];

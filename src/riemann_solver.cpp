@@ -50,6 +50,7 @@ RiemannSolver::RiemannSolver(int &_num_equation, GasMixture *_mixture, Equations
 // Compute the scalar F(u).n
 void RiemannSolver::ComputeFluxDotN(const Vector &state, const Vector &nor, Vector &fluxN) {
   // NOTE: nor in general is not a unit normal
+  // Kevin: Are we supposed to keep the magnitude of nor, or should we normalize it?
   const int dim = nor.Size();
   const int nvel = (axisymmetric_ ? 3 : dim);
 
@@ -58,25 +59,31 @@ void RiemannSolver::ComputeFluxDotN(const Vector &state, const Vector &nor, Vect
   const double den_energy = state(1 + nvel);
 
   // MFEM_ASSERT(eqState->StateIsPhysical(state, dim), "");
-  const double pres = mixture->ComputePressure(state);
 
-  double den_velN = 0;
-  for (int d = 0; d < dim; d++) {
-    den_velN += den_vel(d) * nor(d);
+  // const double pres = mixture->ComputePressure(state);
+  //
+  // double den_velN = 0;
+  // for (int d = 0; d < dim; d++) {
+  //   den_velN += den_vel(d) * nor(d);
+  // }
+  //
+  // fluxN(0) = den_velN;
+  // for (int d = 0; d < dim; d++) {
+  //   fluxN(1 + d) = den_velN * den_vel(d) / den + pres * nor(d);
+  // }
+  //
+  // const double H = (den_energy + pres) / den;
+  // fluxN(1 + dim) = den_velN * H;
+  //
+  // if (eqSystem == NS_PASSIVE) fluxN(num_equation - 1) = den_velN * state(num_equation - 1) / state(0);
+
+  // Kevin: used fluxClass to prevent rewriting in future.
+  DenseMatrix fluxes(num_equation, dim);
+  fluxClass->ComputeConvectiveFluxes(state, fluxes);
+  fluxN = 0.;
+  for (int eq = 0; eq < num_equation; eq++) {
+    for (int d = 0; d < dim; d++) fluxN[eq] += fluxes(eq, d) * nor[d];
   }
-
-  fluxN(0) = den_velN;
-  for (int d = 0; d < nvel; d++) {
-    fluxN(1 + d) = den_velN * den_vel(d) / den;
-  }
-  for (int d = 0; d < dim; d++) {
-    fluxN(1 + d) += pres * nor(d);
-  }
-
-  const double H = (den_energy + pres) / den;
-  fluxN(1 + nvel) = den_velN * H;
-
-  if (eqSystem == NS_PASSIVE) fluxN(num_equation - 1) = den_velN * state(num_equation - 1) / state(0);
 }
 
 void RiemannSolver::Eval(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux, bool LF) {
@@ -114,6 +121,7 @@ void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Ve
   }
 }
 
+// TODO: need to write for multiple species and two temperature.
 void RiemannSolver::Eval_Roe(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux) {
   const int dim = nor.Size();
   assert(!axisymmetric_);  // Roe doesn't support axisymmetric yet

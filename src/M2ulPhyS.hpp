@@ -57,6 +57,7 @@ class Tps;
 #include "dgNonlinearForm.hpp"
 #include "domain_integrator.hpp"
 #include "equation_of_state.hpp"
+#include "transport_properties.hpp"
 #include "faceGradientIntegration.hpp"
 #include "face_integrator.hpp"
 #include "fluxes.hpp"
@@ -100,6 +101,18 @@ class M2ulPhyS : public TPS::Solver {
   int dim;
   int nvel;
 
+  // Number of species
+  int numSpecies;
+
+  // Number of active species that are part of conserved variables.
+  int numActiveSpecies;
+
+  // Is it ambipolar?
+  bool ambipolar = false;
+
+  // Is it two-temperature?
+  bool twoTemperature = false;
+
   // Number of equations
   int num_equation;
 
@@ -129,6 +142,8 @@ class M2ulPhyS : public TPS::Solver {
 
   // Pointers to the different classes
   GasMixture *mixture;
+
+  TransportProperties *transportPtr = NULL;
 
   ParGridFunction *spaceVaryViscMult;  // space varying viscosity multiplier
 
@@ -208,6 +223,7 @@ class M2ulPhyS : public TPS::Solver {
   // Visualization functions (these are pointers to Up)
   ParGridFunction *temperature, *dens, *vel, *vtheta, *passiveScalar;
   ParGridFunction *press;
+  std::vector<ParGridFunction *> visualizationVariables;
 
   // gradient of primitive variables
   ParGridFunction *gradUp;

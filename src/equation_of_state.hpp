@@ -50,8 +50,13 @@ using namespace std;
 class GasMixture {
  protected:
   WorkingFluid fluid;
-  int num_equations;
-  int dim;  // NB: this is actually number of velocity components!
+  int num_equation;
+  int dim;
+
+  int numSpecies;
+  int numActiveSpecies;
+  bool ambipolar;
+  bool twoTemperature;
 
   // number of conservative and primitive/visualization variables
   int Nconservative, Nprimitive;
@@ -59,20 +64,27 @@ class GasMixture {
   double visc_mult;
   double bulk_visc_mult;
 
-  // force derived classes to set the number of equations
-  virtual void setNumEquations() = 0;
-
- public:
+  // If not ambipolar, one species continuity equation is replaced by global continuity equation.
+  // If ambipolar, electron continuity equation is also replaced by an algebraic equation (determined by GasMixture).
+  void setNumActiveSpecies() { numActiveSpecies = ambipolar ? (numSpecies - 2) : (numSpecies - 1); }
+  // Add electron energy equation if two temperature.
+  void setNumEquations() { num_equation = twoTemperature ? (dim + 3 + numActiveSpecies) : (dim + 2 + numActiveSpecies); }
+public:
   GasMixture(WorkingFluid _fluid, int _dim);
-  GasMixture() {}
+  GasMixture(){};
 
-  ~GasMixture() {}
+  ~GasMixture(){};
 
   void setFluid(WorkingFluid _fluid);
-  WorkingFluid GetWorkingFluid() { return fluid; }
 
   void setViscMult(double _visc_mult) { visc_mult = _visc_mult; }
   void setBulkViscMult(double _bulk_mult) { bulk_visc_mult = _bulk_mult; }
+
+  int GetNumSpecies() { return numSpecies; }
+  int GetNumActiveSpecies() { return numActiveSpecies; }
+  int GetNumEquations() { return num_equation; }
+  bool isAmbipolar() { return ambipolar; }
+  bool isTwoTemperature() { return twoTemperature; }
 
   int GetNumConservativeVariables() { return Nconservative; }
   int GetNumPrimitiveVariables() { return Nprimitive; }
@@ -171,7 +183,7 @@ class DryAir : public GasMixture {
   // GPU functions
 #ifdef _GPU_
   static MFEM_HOST_DEVICE double pressure(const double *state, double *KE, const double &gamma, const int &dim,
-                                          const int &num_equations) {
+                                          const int &num_equation) {
     double p = 0.;
     for (int k = 0; k < dim; k++) p += KE[k];
     return (gamma - 1.) * (state[1 + dim] - p);
@@ -182,7 +194,7 @@ class DryAir : public GasMixture {
   }
 
   static MFEM_HOST_DEVICE double temperature(const double *state, double *KE, const double &gamma, const double &Rgas,
-                                             const int &dim, const int &num_equations) {
+                                             const int &dim, const int &num_equation) {
     double temp = 0.;
     for (int k = 0; k < dim; k++) temp += KE[k];
     temp /= state[0];

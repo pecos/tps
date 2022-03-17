@@ -42,7 +42,13 @@ GasMixture::GasMixture(WorkingFluid _fluid, int _dim) {
   visc_mult = 1;
 }
 
-DryAir::DryAir(RunConfiguration& _runfile, int _dim) : GasMixture(WorkingFluid::DRY_AIR, _dim) {
+DryAir::DryAir(RunConfiguration &_runfile, int _dim) : GasMixture(WorkingFluid::DRY_AIR, _dim)
+{
+  numSpecies = (_runfile.GetEquationSystem()==NS_PASSIVE) ? 2 : 1;
+  ambipolar = false;
+  twoTemperature = false;
+
+  setNumActiveSpecies();
   setNumEquations();
 
   gas_constant = 287.058;
@@ -53,11 +59,12 @@ DryAir::DryAir(RunConfiguration& _runfile, int _dim) : GasMixture(WorkingFluid::
   cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
   Sc = 0.71;
 
+  // TODO: replace Nconservative/Nprimitive.
   // add extra equation for passive scalar
   if (_runfile.GetEquationSystem() == Equations::NS_PASSIVE) {
     Nconservative++;
     Nprimitive++;
-    num_equations++;
+    num_equation++;
   }
 }
 
@@ -81,13 +88,13 @@ DryAir::DryAir(int _dim, int _num_equation) {
   Sc = 0.71;
 
   dim = _dim;
-  num_equations = _num_equation;
+  num_equation = _num_equation;
 }
 
 void DryAir::setNumEquations() {
   Nconservative = dim + 2;
   Nprimitive = Nconservative;
-  num_equations = Nconservative;
+  num_equation = Nconservative;
 }
 
 // void EquationOfState::setFluid(WorkingFluid _fluid) {
@@ -178,8 +185,8 @@ void DryAir::GetConservativesFromPrimitives(const Vector& primit, Vector& conser
   conserv[1 + dim] = gas_constant * primit[0] * primit[1 + dim] / (specific_heat_ratio - 1.) + 0.5 * primit[0] * v2;
 
   // case of passive scalar
-  if (num_equations > dim + 2) {
-    for (int n = 0; n < num_equations - dim - 2; n++) {
+  if (num_equation > dim + 2) {
+    for (int n = 0; n < num_equation - dim - 2; n++) {
       conserv[dim + 2 + n] *= primit[0];
     }
   }
@@ -194,8 +201,8 @@ void DryAir::GetPrimitivesFromConservatives(const Vector& conserv, Vector& primi
   primit[dim + 1] = T;
 
   // case of passive scalar
-  if (num_equations > dim + 2) {
-    for (int n = 0; n < num_equations - dim - 2; n++) {
+  if (num_equation > dim + 2) {
+    for (int n = 0; n < num_equation - dim - 2; n++) {
       primit[dim + 2 + n] /= primit[0];
     }
   }
@@ -246,10 +253,10 @@ double EquationOfState::pressure( double *state,
                                   double *KE,
                                   const double gamma,
                                   const int dim,
-                                  const int num_equations)
+                                  const int num_equation)
 {
   double p = 0.;
   for(int k=0;k<dim;k++) p += KE[k];
-  return (gamma-1.)*(state[num_equations-1] - p);
+  return (gamma-1.)*(state[num_equation-1] - p);
 }
 #endif*/
