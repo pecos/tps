@@ -212,7 +212,11 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const Equa
   const double *d_gasParams = mixture->GetGasParam().Read();
   
   const double *molarCV = NULL;
-  if (fluid == WorkingFluid::USER_DEFINED) molarCV = mixture->getMolarCVs().Read();
+  const double *molarCP = NULL;
+  if (fluid == WorkingFluid::USER_DEFINED) {
+    molarCV = mixture->getMolarCVs().Read();
+    molarCP = mixture->getMolarCPs().Read();
+  }
   
   const bool ambipolar = mixture->IsAmbipolar();
   const bool twoTemperature = mixture->IsTwoTemperature();
@@ -288,6 +292,16 @@ void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTe
   const double Sc = transport->GetSchmidtNum();
   
   const TransportModel transpModel = transport->getTransportModel();
+  const WorkingFluid fluid = mixture->GetWorkingFluid();
+  
+  const double *molarCV = NULL;
+  const double *molarCP = NULL;
+  if (fluid == WorkingFluid::USER_DEFINED) {
+    molarCV = mixture->getMolarCVs().Read();
+    molarCP = mixture->getMolarCPs().Read();
+  }
+  const bool ambipolar = mixture->IsAmbipolar();
+  const bool twoTemperature = mixture->IsTwoTemperature();
   
   const double *d_gasParams = mixture->GetGasParam().Read();
   
@@ -310,9 +324,9 @@ void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTe
       }
       MFEM_SYNC_THREAD;
 
-      Fluxes::viscousFlux_gpu(&vFlux[0], &Un[0], &gradUpn[0], eqSystem, transpModel, 
-                              d_gasParams, gamma, Rg, viscMult, bulkViscMult,
-                              Pr, Sc, dim, num_equation, d_numActiveSpecies, d_numSpecies, eq, num_equation);
+      Fluxes::viscousFlux_gpu(vFlux, Un, gradUpn, fluid, eqSystem, transpModel, d_gasParams, gamma, 
+                              Rg, viscMult, bulkViscMult, Pr, Sc, molarCV, molarCP, ambipolar, twoTemperature,
+                              dim, num_equation, d_numActiveSpecies, d_numSpecies, eq, num_equation);
 
       MFEM_SYNC_THREAD;
 

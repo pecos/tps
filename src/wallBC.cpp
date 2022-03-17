@@ -338,9 +338,11 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
   const int d_numActiveSpecies = mixture->GetNumActiveSpecies();
   const double *gasParams = NULL;
   const double *molarCV = NULL;
+  const double *molarCP = NULL;
   if (fluid == WorkingFluid::USER_DEFINED) {
     gasParams = mixture->GetGasParam().Read();
     molarCV = mixture->getMolarCVs().Read();
+    molarCP = mixture->getMolarCPs().Read();
   }
   const bool ambipolar = mixture->IsAmbipolar();
   const bool twoTemperature = mixture->IsTwoTemperature();
@@ -423,12 +425,12 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
                                              num_equation, d_numSpecies, d_numActiveSpecies, i, maxDofs);
 
       // compute viscous flux
-      Fluxes::viscousFlux_gpu(&vF1[0], &u1[0], &gradUpi[0], eqSystem, transpModel, 
-                              gasParams, gamma, Rg, viscMult, bulkViscMult,
-                              Pr, Sc, dim, num_equation, d_numActiveSpecies, d_numSpecies, i, maxDofs);
-      Fluxes::viscousFlux_gpu(&vF2[0], &u2[0], &gradUpi[0], eqSystem, transpModel, 
-                              gasParams, gamma, Rg, viscMult, bulkViscMult,
-                              Pr, Sc, dim, num_equation, d_numActiveSpecies, d_numSpecies, i, maxDofs);
+      Fluxes::viscousFlux_gpu(vF1, u1, gradUpi, fluid, eqSystem, transpModel, gasParams, gamma, 
+                              Rg, viscMult, bulkViscMult, Pr, Sc, molarCV, molarCP, ambipolar, twoTemperature,
+                              dim, num_equation, d_numActiveSpecies, d_numSpecies, i, maxDofs);
+      Fluxes::viscousFlux_gpu(vF2, u2, gradUpi, fluid, eqSystem, transpModel, gasParams, gamma, 
+                              Rg, viscMult, bulkViscMult, Pr, Sc, molarCV, molarCP, ambipolar, twoTemperature,
+                              dim, num_equation, d_numActiveSpecies, d_numSpecies, i, maxDofs);
       MFEM_SYNC_THREAD;
       
       switch (type) {

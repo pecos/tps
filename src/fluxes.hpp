@@ -122,11 +122,14 @@ class Fluxes {
       }
   }
   static MFEM_HOST_DEVICE void viscousFlux_gpu(double *vFlux, const double *Un, const double *gradUpn,
+                                               const WorkingFluid &fluid,
                                                const Equations &eqSystem, const TransportModel &transpModel, 
                                                const double *gasParams,
                                                const double &gamma, const double &Rg,
                                                const double &viscMult, const double &bulkViscMult, const double &Pr,
-                                               const double &Sc, const int &dim,
+                                               const double &Sc, const double *molarCV, const double *molarCP,
+                                               const bool &ambipolar, const bool &twoTemperature,
+                                               const int &dim,
                                                const int &num_equation, const int &numActiveSpecies, const int &numSpecies,
                                                const int &thrd, const int &maxThreads) {
     MFEM_SHARED double vel[3], divV, KE[3];
@@ -144,8 +147,28 @@ class Fluxes {
     }
     MFEM_SYNC_THREAD;
     
-    { // TODO: transform this to an if statement
-      DryAir::computeSpeciesEnthalpies_gpu(&speciesEnthalpies[0],numSpecies,thrd, maxThreads);
+    switch (fluid) {
+      case WorkingFluid::DRY_AIR:
+        DryAir::computeSpeciesEnthalpies_gpu(&speciesEnthalpies[0],numSpecies,thrd, maxThreads);
+        break;
+      case WorkingFluid::USER_DEFINED:
+        PerfectMixture::computeSpeciesEnthalpies_gpu(speciesEnthalpies,
+                                                     Un,
+                                                     gasParams,
+                                                     molarCV,
+                                                     molarCP,
+                                                     num_equation,
+                                                     dim,
+                                                     numSpecies,
+                                                     numActiveSpecies,
+                                                     ambipolar,
+                                                     twoTemperature,
+                                                     thrd,
+                                                     maxThreads);
+        break;
+      default:
+        printf("Fluxes::viscousFlux_gpu(): Fluid not specified");
+        break;
     }
     
     switch (transpModel){

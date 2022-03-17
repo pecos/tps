@@ -124,6 +124,7 @@ class GasMixture {
   int GetNumPrimitiveVariables() { return Nprimitive; }
   
   virtual const Vector &getMolarCVs(){}
+  virtual const Vector &getMolarCPs(){}
 
   virtual double ComputePressure(const Vector &state, double &electronPressure) = 0;             // pressure from conservatives
   virtual double ComputePressureFromPrimitives(const Vector &Up) = 0;  // pressure from primitive variables
@@ -521,6 +522,7 @@ class PerfectMixture : public GasMixture {
 
   virtual double getMolarCV(int species) { return molarCV_(species); }
   virtual const Vector &getMolarCVs(){return molarCV_;}
+  virtual const Vector &getMolarCPs(){return molarCP_;}
   virtual double getMolarCP(int species) { return molarCP_(species); }
   virtual double getSpecificHeatRatio(int species) { return specificHeatRatios_(species); }
   virtual double getSpecificGasConstant(int species) { return specificGasConstants_(species); }
@@ -939,6 +941,54 @@ class PerfectMixture : public GasMixture {
       rE += n_sp[sp] * gasParams[sp + numSpecies * (int)GasParams::FORMATION_ENERGY];
 
     stateOut[1 + dim] = rE;
+  }
+  
+  static MFEM_HOST_DEVICE void computeSpeciesEnthalpies_gpu(double *speciesEnthalpies,
+                                                            const double *stateIn,
+                                                            const double *gasParams,
+                                                            const double *molarCV,
+                                                            const double *molarCP,
+                                                            const int &num_equation,
+                                                            const int &dim,
+                                                            const int &numSpecies,
+                                                            const int &numActiveSpecies,
+                                                            const bool &ambipolar,
+                                                            const bool &twoTemperature,
+                                                            const int &thrd,
+                                                            const int &maxThreads ) {
+
+    MFEM_SHARED double n_sp[15];
+    PerfectMixture::computeNumberDensities_gpu(stateIn, 
+                                               n_sp,
+                                               gasParams,
+                                               dim,
+                                               numSpecies,
+                                               numActiveSpecies,
+                                               ambipolar,
+                                               thrd,
+                                               maxThreads);
+    MFEM_SYNC_THREAD;
+
+    double T_h, T_e;
+    PerfectMixture::computeTemperatureBase_gpu(stateIn,
+                                               &n_sp[0],
+                                               molarCV,
+                                               gasParams,
+                                               num_equation,
+                                               dim,
+                                               numSpecies,
+                                               numActiveSpecies,
+                                               n_sp[numSpecies-1],
+                                               n_sp[numSpecies-2],
+                                               twoTemperature,
+                                               T_e,
+                                               T_h );
+
+    for (int sp = thrd; sp < numSpecies - 2; sp += maxThreads) {
+      speciesEnthalpies[sp] = n_sp[sp] * molarCP[sp] * T_h;
+    }
+    if (thrd == maxThreads-1) speciesEnthalpies[numSpecies - 1] = n_sp[numSpecies - 1] * molarCP[numSpecies - 1] * T_h;
+    if (thrd == maxThreads-2) speciesEnthalpies[numSpecies - 2] = n_sp[numSpecies - 2] * molarCP[numSpecies - 2] * T_e;
   }
 #endif
 };
