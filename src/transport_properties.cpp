@@ -113,7 +113,7 @@ void TestBinaryAirTransport::ComputeFluxTransportProperties(const Vector &state,
     }
 
     for (int d = 0; d < dim; d++) {
-      assert(~std::isnan(diffusionVelocity(0, d)));
+      assert(!std::isnan(diffusionVelocity(0, d)));
     }
   }
 }
