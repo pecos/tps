@@ -18,6 +18,9 @@
 /* Git revision */
 #undef BUILD_VERSION
 
+/* Define to 1 if you have the <dlfcn.h> header file. */
+#undef HAVE_DLFCN_H
+
 /* Define if GRVY is available */
 #undef HAVE_GRVY
 
@@ -51,6 +54,9 @@
 /* Define if OPENBLAS is available */
 #undef HAVE_OPENBLAS
 
+/* If available, contains the Python version number currently in use. */
+#undef HAVE_PYTHON
+
 /* Enable SLURM resource manager support */
 #undef HAVE_SLURM
 
@@ -74,6 +80,9 @@
 
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
+
+/* Define to the sub-directory where libtool stores uninstalled libraries. */
+#undef LT_OBJDIR
 
 /* Path to nvcc binary */
 #undef NVCC_PATH

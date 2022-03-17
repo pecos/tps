@@ -37,10 +37,14 @@
 
 #include <sys/types.h>
 #include <unistd.h>
+#ifdef HAVE_PYTHON
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#endif
 
 namespace TPS {
 
-Tps::Tps(int argc, char *argv[]) {
+Tps::Tps() {
   nprocs_ = mpi_.WorldSize();
   rank_ = mpi_.WorldRank();
   if (rank_ == 0)
@@ -141,6 +145,16 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
 
   return;
 }
+
+/// Wrapper function for parseCommandLineArgs that takes command-line args as
+/// a vector of strings (intended for use with Python interface)
+void Tps::parseArgs(std::vector<std::string> argv) {
+  std::vector<char *> argv_char;
+  for (auto& s : argv)
+    argv_char.push_back(&s.front());
+  parseCommandLineArgs(argv_char.size(), argv_char.data());
+}
+
 
 /// Setup desired execution devices for MFEM
 void Tps::chooseDevices() {
@@ -356,3 +370,25 @@ template void Tps::getRequiredInput<double>(const char *name, double &var);
 template void Tps::getRequiredInput<std::string>(const char *name, std::string &var);
 
 }  // end namespace TPS
+
+// --------------------------------
+// Python interface using pybind11
+// --------------------------------
+
+#ifdef HAVE_PYTHON
+
+namespace py = pybind11;
+
+PYBIND11_MODULE(libtps, m) {
+  m.doc() = "TPS Python Interface";
+  py::class_<TPS::Tps>(m, "Tps")
+      .def(py::init())
+      .def("chooseDevices", &TPS::Tps::chooseDevices)
+      .def("chooseSolver", &TPS::Tps::chooseSolver)
+      .def("getStatus", &TPS::Tps::getStatus)
+      .def("initialize", &TPS::Tps::initialize)
+      .def("parseCommandLineArgs", &TPS::Tps::parseArgs)
+      .def("parseInput", &TPS::Tps::parseInput)
+      .def("solve", &TPS::Tps::solve);
+}
+#endif
