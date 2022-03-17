@@ -233,9 +233,11 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, Vector &uk_el1, Vector &uk_
   const WorkingFluid fluid = mixture->GetWorkingFluid();
   
   const double *molarCV = NULL;
+  const double *molarCP = NULL;
   const double *gasParams = NULL;
   if (fluid == WorkingFluid::USER_DEFINED) {
     molarCV = mixture->getMolarCVs().Read();
+    molarCP = mixture->getMolarCPs().Read();
     gasParams = mixture->GetGasParam().Read();
   }
   
@@ -312,12 +314,18 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, Vector &uk_el1, Vector &uk_
       RiemannSolver::riemannLF_gpu(u1, u2, Rflux, nor,gamma, Rg, gasParams, molarCV, dim, eqSystem, fluid, ambipolar, twoTemperature,
                                              num_equation, d_numSpecies, d_numActiveSpecies, i, elDof);
       
-      Fluxes::viscousFlux_gpu(&vFlux1[0], &u1[0], &gradUp1[0], eqSystem, transpModel, 
-                              d_gasParams, gamma, Rg, viscMult, bulkViscMult,
-                              Pr, Sc, dim, num_equation, d_numActiveSpecies, d_numSpecies, i, elDof);
-      Fluxes::viscousFlux_gpu(&vFlux2[0], &u2[0], &gradUp2[0], eqSystem, transpModel, 
-                              d_gasParams, gamma, Rg, viscMult, bulkViscMult,
-                              Pr, Sc, dim, num_equation, d_numActiveSpecies, d_numSpecies, i, elDof);
+      Fluxes::viscousFlux_gpu(vFlux1, u1, gradUp1, fluid, eqSystem, transpModel, d_gasParams, gamma, 
+                              Rg, viscMult, bulkViscMult, Pr, Sc, molarCV, molarCP, ambipolar, twoTemperature,
+                              dim, num_equation, d_numActiveSpecies, d_numSpecies, i, maxDofs);
+      Fluxes::viscousFlux_gpu(vFlux2, u2, gradUp2, fluid, eqSystem, transpModel, d_gasParams, gamma, 
+                              Rg, viscMult, bulkViscMult, Pr, Sc, molarCV, molarCP, ambipolar, twoTemperature,
+                              dim, num_equation, d_numActiveSpecies, d_numSpecies, i, maxDofs);
+//       Fluxes::viscousFlux_gpu(&vFlux1[0], &u1[0], &gradUp1[0], eqSystem, transpModel, 
+//                               d_gasParams, gamma, Rg, viscMult, bulkViscMult,
+//                               Pr, Sc, dim, num_equation, d_numActiveSpecies, d_numSpecies, i, elDof);
+//       Fluxes::viscousFlux_gpu(&vFlux2[0], &u2[0], &gradUp2[0], eqSystem, transpModel, 
+//                               d_gasParams, gamma, Rg, viscMult, bulkViscMult,
+//                               Pr, Sc, dim, num_equation, d_numActiveSpecies, d_numSpecies, i, elDof);
       MFEM_SYNC_THREAD;
       // if(i<num_equation)
       for (int eq = i; eq < num_equation; eq += elDof) {
