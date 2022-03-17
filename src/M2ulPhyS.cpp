@@ -2075,7 +2075,7 @@ void M2ulPhyS::parseSolverOptions2() {
     // Gas Params
     if (config.workFluid != DRY_AIR) {
       for (int i = 1; i <= config.numSpecies; i++) {
-        double mw, charge;
+        double mw, charge, formEnergy;
         std::string type, speciesName;
         std::string basepath("species/species" + std::to_string(i));
 
@@ -2084,8 +2084,10 @@ void M2ulPhyS::parseSolverOptions2() {
 
         tpsP->getRequiredInput((basepath + "/molecular_weight").c_str(), mw);
         tpsP->getRequiredInput((basepath + "/charge_number").c_str(), charge);
+        tpsP->getRequiredInput((basepath + "/formation_energy").c_str(), formEnergy);
         config.gasParams(i - 1, GasParams::SPECIES_MW) = mw;
         config.gasParams(i - 1, GasParams::SPECIES_CHARGES) = charge;
+        config.gasParams(i - 1, GasParams::FORMATION_ENERGY) = formEnergy;
 
         tpsP->getRequiredInput((basepath + "/initialMassFraction").c_str(),
                                config.initialMassFractions(i - 1));
