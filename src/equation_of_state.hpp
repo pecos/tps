@@ -52,6 +52,8 @@ static const int MAXSPECIES = 200;
 static const double UNIVERSALGASCONSTANT = 8.3144598;  // J * mol^(-1) * K^(-1)
 static const double AVOGADRONUMBER = 6.0221409e+23;    // mol^(-1)
 static const double BOLTZMANNCONSTANT = UNIVERSALGASCONSTANT / AVOGADRONUMBER;
+static const double VACUUMPERMITTIVITY = 8.8541878128e-12;
+static const double ELECTRONCHARGE = 1.60218e-19;
 
 class GasMixture {
  protected:
@@ -168,6 +170,10 @@ class GasMixture {
   virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState){};
   virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut){};
   virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p){};
+
+  virtual double computeAmbipolarElectronNumberDensity(const double *n_sp) {};
+  virtual double computeBackgroundMassDensity(const double &rho, const double *n_sp, double &n_e,
+                                              bool isElectronComputed = false) {};
 };
 
 //////////////////////////////////////////////////////

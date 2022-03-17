@@ -72,6 +72,7 @@ class Tps;
 #include "solver.hpp"
 #include "tps.hpp"
 #include "transport_properties.hpp"
+#include "argon_transport.hpp"
 #include "utils.hpp"
 
 #ifdef _MASA_

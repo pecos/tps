@@ -272,6 +272,9 @@ void M2ulPhyS::initVariables() {
           break;
       }
       switch (config.GetTranportModel()) {
+        case ARGON_TERNARY:
+          transportPtr = new ArgonTernaryTransport(mixture, config);
+          break;
         default:
           break;
       }
@@ -2027,7 +2030,13 @@ void M2ulPhyS::parseSolverOptions2() {
     }
 
     std::string transportModelStr;
-    tpsP->getInput("plasma_models/transport_model", transportModelStr, std::string(""));
+    tpsP->getRequiredInput("plasma_models/transport_model", transportModelStr);
+    if (transportModelStr == "argon_ternary") {
+      config.transportModel = ARGON_TERNARY;
+    } else {
+      grvy_printf(GRVY_ERROR, "\nUnknown gas_model -> %s", transportModelStr);
+      exit(ERROR);
+    }
 
     std::string chemistryModelStr;
     tpsP->getInput("plasma_models/chemistry_model", chemistryModelStr, std::string(""));
@@ -2087,6 +2096,23 @@ void M2ulPhyS::parseSolverOptions2() {
                                  config.constantMolarCP(i - 1));
         }
       }
+    }
+  }
+
+  if (config.workFluid == USER_DEFINED) {  // Transport model
+    switch (config.transportModel) {
+      case ARGON_TERNARY:
+        // Check if unsupported species are included.
+        for (int sp = 0; sp < config.numSpecies; sp++) {
+          if ((config.speciesNames[sp] != "Ar") && (config.speciesNames[sp] != "Ar.+1") && (config.speciesNames[sp] != "E")) {
+            grvy_printf(GRVY_ERROR, "\nArgon ternary mixture transport does not support the species: %s !", config.speciesNames[sp]);
+            exit(ERROR);
+          }
+        }
+        tpsP->getInput("plasma_models/transport_model/argon_ternary/third_order_thermal_conductivity", config.thirdOrderkElectron, true);
+        break;
+      default:
+        break;
     }
   }
 
