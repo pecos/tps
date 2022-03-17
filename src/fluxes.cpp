@@ -102,10 +102,10 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
     return;
   }
 
-  // TODO: Ultimately, take Up as input variable.
-  // TODO: pressure and temperature must be comptued by mixture only.
-  const double p = mixture->ComputePressure(state);
-  const double temp = p / state[0] / UNIVERSALGASCONSTANT * mixture->GetGasParams(0,GasParams::SPECIES_MW);
+  // // TODO: Ultimately, take Up as input variable.
+  // // TODO: pressure and temperature must be comptued by mixture only.
+  // const double p = mixture->ComputePressure(state);
+  // const double temp = p / state[0] / UNIVERSALGASCONSTANT * mixture->GetGasParams(0,GasParams::SPECIES_MW);
   // const double temp = p / state[0] / Rg;
   // const double visc = mixture->GetViscosity(state);
   // const double bulkViscMult = mixture->GetBulkViscMultiplyer();
@@ -175,7 +175,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   //   double Sc = mixture->GetSchmidtNum();
   //   for (int d = 0; d < dim; d++) flux(num_equation - 1, d) = visc / Sc * gradUp(num_equation - 1, d);
   // }
-  // TODO: NS_PASSIVE will not be needed (automatically incorporated).
+  // NOTE: NS_PASSIVE will not be needed (automatically incorporated).
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
   for (int sp = 0; sp < numActiveSpecies; sp++){
     // TODO: need to check the sign.

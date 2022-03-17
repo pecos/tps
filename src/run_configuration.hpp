@@ -184,7 +184,7 @@ class RunConfiguration {
 
   // number of species;
   int numSpecies;
-  Vector gasParams;
+  DenseMatrix gasParams;
 
   // ambipolar flag
   bool ambipolar;
@@ -270,6 +270,7 @@ class RunConfiguration {
   passiveScalarData* GetPassiveScalarData(int i) { return arrayPassiveScalar[i]; }
 
   int GetNumSpecies() { return numSpecies; }
+  double GetGasParams(int species, GasParams param) { return gasParams(species,param); }
   bool IsAmbipolar() { return ambipolar; }
   bool IsTwoTemperature() { return twoTemperature; }
   GasModel GetGasModel() { return gasModel; }

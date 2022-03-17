@@ -497,11 +497,15 @@ void RunConfiguration::readInputFile(std::string inpuFileName) {
       } else if (word.compare("NUM_SPECIES") == 0) {
         ss >> word;
         numSpecies = stoi(word);
-        gasParams.SetSize(numSpecies * GasParams::NUM_GASPARAMS);
-        for (int d = 0; d < numSpecies * GasParams::NUM_GASPARAMS; d++) {
-          ss >> word;
-          gasParams[d] = stod(word);
-        }
+        gasParams.SetSize(numSpecies, GasParams::NUM_GASPARAMS);
+        // TODO: Currently, background species is assumed to be the last species, and electron the second to last.
+        // This, however, cannot be enforced in input file parser right now.
+        // The improved input parser must be able to reorder the species depending on their name (or additional flag).
+        for (int sp = 0; sp < numSpecies; sp++)
+          for (int param = 0; param < GasParams::NUM_GASPARAMS; param++) {
+            ss >> word;
+            gasParams(sp,param) = stod(word);
+          }
       } else if (word.compare("AMBIPOLAR") == 0) {
         ambipolar = false;
         ss >> word;
