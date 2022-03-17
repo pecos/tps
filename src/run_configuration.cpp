@@ -534,8 +534,10 @@ void RunConfiguration::readInputFile(std::string inpuFileName) {
 }
 
 Array<double> RunConfiguration::GetInletData(int i) {
-  Array<double> data(4);
-  for (int j = 0; j < 4; j++) data[j] = inletBC[j + 4 * i];
+  int length = 4;
+  if ((workFluid != DRY_AIR) && (numSpecies > 1)) length += numSpecies;
+  Array<double> data(length);
+  for (int j = 0; j < length; j++) data[j] = inletBC[j + length * i];
 
   return data;
 }

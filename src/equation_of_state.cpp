@@ -833,10 +833,6 @@ double PerfectMixture::ComputePressure(const Vector &state) {
   Vector n_sp;
   computeNumberDensities(state, n_sp);
 
-  // compute mixture heat capacity.
-  double totalHeatCapacity = computeHeaviesHeatCapacity(&n_sp[0], n_sp[numSpecies - 1]);
-  if (~twoTemperature) totalHeatCapacity += n_sp[numSpecies - 2] * molarCV_(numSpecies - 2);
-
   double T_h, T_e;
   computeTemperaturesBase(state, &n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
 
@@ -1309,5 +1305,8 @@ void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::
   if (!twoTemperature) totalHeatCapacity += n_sp[numSpecies - 2] * molarCV_(numSpecies - 2);
   double rE = totalHeatCapacity * Th;
   if (twoTemperature) rE += stateIn(num_equation - 1);
+
+  for (int d = 0; d < dim; d++) rE += 0.5 * stateIn[d + 1] * stateIn[d + 1] / stateIn[0];
+
   stateOut(1 + dim) = rE;
 }

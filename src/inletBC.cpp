@@ -48,7 +48,8 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
   inputState.UseDevice(true);
   inputState.SetSize(_inputData.Size());
   auto hinputState = inputState.HostWrite();
-  for (int i = 0; i < nvel + 1; i++) hinputState[i] = _inputData[i];
+  // NOTE: regardless of dimension, inletBC saves first 4 elements for density and velocity.
+  for (int i = 0; i < 4; i++) hinputState[i] = _inputData[i];
 
   numActiveSpecies_ = mixture->GetNumActiveSpecies();
   if (numActiveSpecies_ > 0) { // read species input state for multi-component flow.
@@ -57,7 +58,7 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
     for (int sp = 0; sp < numActiveSpecies_; sp++) {
       int inputIndex = (*mixtureToInputMap)[sp];
       // store species density into inputState in the order of mixture-sorted index.
-      hinputState[dim + 1 + sp] = _inputData[0] * _inputData[dim + 1 + inputIndex];
+      hinputState[4 + sp] = _inputData[0] * _inputData[4 + inputIndex];
     }
   }
 
@@ -706,8 +707,15 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
 void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
   // NOTE: it is likely that for two-temperature case inlet will also specify electron temperature,
   // whether it is equal to the gas temperature or not.
-  const double p = mixture->ComputePressure(stateIn);
+  // std::cout << "stateIn" << std::endl;
+  // for (int eq = 0; eq < num_equation; eq++) std::cout << stateIn[eq] << ",\t";
+  // std::cout << std::endl;
 
+  const double p = mixture->ComputePressure(stateIn);
+// {
+//
+//   std::cout << "stateIn pressure: " << p << std::endl;
+// }
   Vector state2(num_equation);
   state2[0] = inputState[0];
   state2[1] = inputState[0] * inputState[1];
@@ -719,7 +727,8 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
   } else if (numActiveSpecies_ > 0) {
     for (int sp = 0; sp < numActiveSpecies_; sp++) {
       // NOTE: inlet BC does not specify total energy. therefore skips one index.
-      state2[nvel + 2 + sp] = inputState[nvel + 1 + sp];
+      // NOTE: regardless of dimension, inletBC save the first 4 elements for density and velocity.
+      state2[nvel + 2 + sp] = inputState[4 + sp];
     }
   }
 
@@ -728,7 +737,15 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
   } else {
     mixture->modifyEnergyForPressure(state2, state2, p);
   }
-
+// {
+//   std::cout << "state2" << std::endl;
+//   for (int eq = 0; eq < num_equation; eq++) std::cout << state2[eq] << ",\t";
+//   std::cout << std::endl;
+//
+//   const double p1 = mixture->ComputePressure(state2);
+//   std::cout << "state2 pressure: " << p1 << std::endl;
+//   exit(-1);
+// }
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
