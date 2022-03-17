@@ -462,7 +462,7 @@ void M2ulPhyS::initVariables() {
   gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
 
   rhsOperator = new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType,
-                                fluxClass, mixture, transportPtr, vfes, gpuArrays, maxIntPoints, maxDofs, A, Aflux, mesh,
+                                fluxClass, mixture, chemistry_, transportPtr, vfes, gpuArrays, maxIntPoints, maxDofs, A, Aflux, mesh,
                                 spaceVaryViscMult, Up, gradUp, gradUpfes, gradUp_A, bcIntegrator, isSBP, alpha, config);
 
   CFL = config.GetCFLNumber();

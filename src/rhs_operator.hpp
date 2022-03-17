@@ -47,6 +47,9 @@
 #include "gradNonLinearForm.hpp"
 #include "gradients.hpp"
 #include "run_configuration.hpp"
+#include "chemistry.hpp"
+#include "transport_properties.hpp"
+#include "source_term.hpp"
 
 using namespace mfem;
 
@@ -137,7 +140,8 @@ class RHSoperator : public TimeDependentOperator {
  public:
   RHSoperator(int &_iter, const int _dim, const int &_num_equation, const int &_order, const Equations &_eqSystem,
               double &_max_char_speed, IntegrationRules *_intRules, int _intRuleType, Fluxes *_fluxClass,
-              GasMixture *_mixture, TransportProperties *_transport, ParFiniteElementSpace *_vfes, const volumeFaceIntegrationArrays &gpuArrays,
+              GasMixture *_mixture, Chemistry *chemistry, TransportProperties *transport,
+              ParFiniteElementSpace *_vfes, const volumeFaceIntegrationArrays &gpuArrays,
               const int &_maxIntPoints, const int &_maxDofs, DGNonLinearForm *_A, MixedBilinearForm *_Aflux,
               ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult, ParGridFunction *_Up, ParGridFunction *_gradUp,
               ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A, BCintegrator *_bcIntegrator,
