@@ -113,7 +113,7 @@ class M2ulPhyS : public TPS::Solver {
   bool ambipolar = false;
 
   // Is it two-temperature?
-  bool twoTemperature = false;
+  bool twoTemperature_ = false;
 
   // Number of equations
   int num_equation;

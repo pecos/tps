@@ -299,7 +299,7 @@ void M2ulPhyS::initVariables() {
   numSpecies = mixture->GetNumSpecies();
   numActiveSpecies = mixture->GetNumActiveSpecies();
   ambipolar = mixture->IsAmbipolar();
-  twoTemperature = mixture->IsTwoTemperature();
+  twoTemperature_ = mixture->IsTwoTemperature();
   num_equation = mixture->GetNumEquations();
   // // Kevin: the code above replaces this num_equation determination.
   // switch (eqSystem) {

@@ -81,7 +81,7 @@ void GasMixture::computeStagnationState(const mfem::Vector &stateIn, mfem::Vecto
 DryAir::DryAir(RunConfiguration &_runfile, int _dim) : GasMixture(WorkingFluid::DRY_AIR, _dim) {
   numSpecies = (_runfile.GetEquationSystem() == NS_PASSIVE) ? 2 : 1;
   ambipolar = false;
-  twoTemperature = false;
+  twoTemperature_ = false;
 
   SetNumActiveSpecies();
   SetNumEquations();
@@ -336,7 +336,7 @@ double EquationOfState::pressure( double *state,
 TestBinaryAir::TestBinaryAir(RunConfiguration &_runfile, int _dim) : GasMixture(WorkingFluid::TEST_BINARY_AIR, _dim) {
   numSpecies = 2;
   ambipolar = false;
-  twoTemperature = false;
+  twoTemperature_ = false;
 
   SetNumActiveSpecies();
   SetNumEquations();
@@ -565,7 +565,7 @@ PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim) : GasMixtur
   assert((backgroundInputIndex_ > 0) && (backgroundInputIndex_ <= numSpecies));
   // If electron is not included, then ambipolar and two-temperature are false.
   ambipolar = false;
-  twoTemperature = false;
+  twoTemperature_ = false;
 
   // TODO: electron species is enforced to be included in the input file.
   bool isElectronIncluded = false;
@@ -587,7 +587,7 @@ PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim) : GasMixtur
       isElectronIncluded = true;
       // Set ambipolar and twoTemperature if electron is included.
       ambipolar = _runfile.IsAmbipolar();
-      twoTemperature = _runfile.IsTwoTemperature();
+      twoTemperature_ = _runfile.IsTwoTemperature();
     } else {
       targetIdx = paramIdx;
       paramIdx++;
@@ -695,7 +695,7 @@ void PerfectMixture::GetPrimitivesFromConservatives(const Vector &conserv, Vecto
 
   primit[dim + 1] = T_h;
 
-  if (twoTemperature)  // electron temperature as primitive variable.
+  if (twoTemperature_)  // electron temperature as primitive variable.
     primit[num_equation - 1] = T_e;
 }
 
@@ -719,17 +719,17 @@ void PerfectMixture::GetConservativesFromPrimitives(const Vector &primit, Vector
   double rhoB = computeBackgroundMassDensity(primit[0], &primit[dim + 2], n_e, true);
   double nB = rhoB / gasParams(numSpecies - 1, GasParams::SPECIES_MW);
 
-  if (twoTemperature) conserv[num_equation - 1] = n_e * molarCV_(numSpecies - 2) * primit[num_equation - 1];
+  if (twoTemperature_) conserv[num_equation - 1] = n_e * molarCV_(numSpecies - 2) * primit[num_equation - 1];
 
   // compute mixture heat capacity.
   double totalHeatCapacity = computeHeaviesHeatCapacity(&primit[dim + 2], nB);
-  if (~twoTemperature) totalHeatCapacity += n_e * molarCV_(numSpecies - 2);
+  if (~twoTemperature_) totalHeatCapacity += n_e * molarCV_(numSpecies - 2);
 
   double totalEnergy = 0.0;
   for (int d = 0; d < dim; d++) totalEnergy += primit[d + 1] * primit[d + 1];
   totalEnergy *= 0.5 * primit[0];
   totalEnergy += totalHeatCapacity * primit[dim + 1];
-  if (twoTemperature) {
+  if (twoTemperature_) {
     totalEnergy += conserv[num_equation - 1];
   }
 
@@ -818,7 +818,7 @@ double PerfectMixture::ComputePressureFromPrimitives(const mfem::Vector &Up) {
 
   double T_h = Up[dim + 1];
   double T_e;
-  if (twoTemperature) {
+  if (twoTemperature_) {
     T_e = Up[num_equation - 1];
   } else {
     T_e = Up[dim + 1];
@@ -853,7 +853,7 @@ double PerfectMixture::computePressureBase(const double *n_sp, const double n_e,
   n_h += n_B;
 
   double p = n_h * T_h;
-  if (twoTemperature) {
+  if (twoTemperature_) {
     p += n_e * T_e;
   } else {
     p += n_e * T_h;
@@ -931,18 +931,18 @@ void PerfectMixture::computeTemperaturesBase(const Vector &conservedState, const
                                              const double n_B, double &T_h, double &T_e) {
   // compute mixture heat capacity.
   double totalHeatCapacity = computeHeaviesHeatCapacity(&n_sp[0], n_B);
-  if (~twoTemperature) totalHeatCapacity += n_e * molarCV_(numSpecies - 2);
+  if (~twoTemperature_) totalHeatCapacity += n_e * molarCV_(numSpecies - 2);
 
   // Comptue heavy-species temperature. If not two temperature, then this works as the unique temperature.
   T_h = 0.0;
   for (int d = 0; d < dim; d++) T_h -= conservedState[d + 1] * conservedState[d + 1];
   T_h *= 0.5 / conservedState[0];
   T_h += conservedState[dim + 1];
-  if (twoTemperature) T_h -= conservedState[num_equation - 1];
+  if (twoTemperature_) T_h -= conservedState[num_equation - 1];
   T_h /= totalHeatCapacity;
 
   // electron temperature as primitive variable.
-  if (twoTemperature) {
+  if (twoTemperature_) {
     T_e = conservedState[num_equation - 1] / n_e / molarCV_(numSpecies - 2);
   } else {
     T_e = T_h;
@@ -1014,7 +1014,7 @@ double PerfectMixture::computePressureDerivativeFromPrimitives(const Vector &dUp
       dne_dx * gasParams(numSpecies - 2, GasParams::SPECIES_MW) / gasParams(numSpecies - 1, GasParams::SPECIES_MW);
   pressureGradient += numDenGrad * Uin[dim + 1];
 
-  if (twoTemperature) {
+  if (twoTemperature_) {
     pressureGradient += n_e * dUp_dx[num_equation - 1] + dne_dx * Uin[num_equation - 1];
   } else {
     pressureGradient += n_e * dUp_dx[dim + 1] + dne_dx * Uin[dim + 1];
@@ -1059,7 +1059,7 @@ double PerfectMixture::computePressureDerivativeFromConservatives(const Vector &
       dne_dx * gasParams(numSpecies - 2, GasParams::SPECIES_MW) / gasParams(numSpecies - 1, GasParams::SPECIES_MW);
   pressureGradient += numDenGrad * T_h;
 
-  if (twoTemperature) {
+  if (twoTemperature_) {
     pressureGradient += n_sp[numSpecies - 2] * dUp_dx[num_equation - 1] + dne_dx * T_e;
   } else {
     pressureGradient += n_sp[numSpecies - 2] * dUp_dx[dim + 1] + dne_dx * T_h;
@@ -1126,7 +1126,7 @@ double PerfectMixture::ComputeSpeedOfSound(const mfem::Vector &Uin, bool primiti
     double rhoB = computeBackgroundMassDensity(Uin[0], &Uin[dim + 2], n_e, true);
     double nB = rhoB / gasParams(numSpecies - 1, GasParams::SPECIES_MW);
 
-    double T_e = (twoTemperature) ? Uin[num_equation - 1] : Uin[dim + 1];
+    double T_e = (twoTemperature_) ? Uin[num_equation - 1] : Uin[dim + 1];
     double p = computePressureBase(&Uin[dim + 2], n_e, nB, Uin[dim + 1], T_e);
 
     return computeSpeedOfSoundBase(&Uin[dim + 2], nB, Uin[0], p);
@@ -1273,7 +1273,7 @@ void PerfectMixture::computeStagnantStateWithTemp(const mfem::Vector &stateIn, c
   // heatCapacity += nB * molarCV_(numSpecies - 1);
 
   stateOut(1 + dim) = totalHeatCapacity * Temp;
-  // if (twoTemperature) {
+  // if (twoTemperature_) {
   //   stateOut(1 + dim) += ne * molarCV_(numSpecies - 2) * Temp;
   // }
 }
@@ -1288,23 +1288,23 @@ void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::
   computeNumberDensities(stateIn, n_sp);
 
   double Th = 0., Te = 0., pe = 0.;
-  if (twoTemperature) {
+  if (twoTemperature_) {
     double Xeps = 1.0e-30; // To avoid dividing by zero.
     Te = stateIn(num_equation - 1) / (n_sp(numSpecies - 2) + Xeps) / molarCV_(numSpecies - 2);
     pe = n_sp(numSpecies - 2) * UNIVERSALGASCONSTANT * Te;
   }
 
   for (int sp = 0; sp < numSpecies; sp++) {
-    if (twoTemperature && (sp == numSpecies - 2)) continue;
+    if (twoTemperature_ && (sp == numSpecies - 2)) continue;
     Th += n_sp(sp);
   }
   Th = (p - pe) / (Th * UNIVERSALGASCONSTANT);
 
   // compute total energy with the modified temperature of heavies
   double totalHeatCapacity = computeHeaviesHeatCapacity(&n_sp[0], n_sp[numSpecies - 1]);
-  if (!twoTemperature) totalHeatCapacity += n_sp[numSpecies - 2] * molarCV_(numSpecies - 2);
+  if (!twoTemperature_) totalHeatCapacity += n_sp[numSpecies - 2] * molarCV_(numSpecies - 2);
   double rE = totalHeatCapacity * Th;
-  if (twoTemperature) rE += stateIn(num_equation - 1);
+  if (twoTemperature_) rE += stateIn(num_equation - 1);
 
   for (int d = 0; d < dim; d++) rE += 0.5 * stateIn[d + 1] * stateIn[d + 1] / stateIn[0];
 

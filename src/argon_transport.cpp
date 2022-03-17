@@ -104,7 +104,7 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   double nTotal = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
 
-  double Te = (twoTemperature) ? primitiveState[num_equation - 1] : primitiveState[dim + 1];
+  double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : primitiveState[dim + 1];
   double Th = primitiveState[dim + 1];
   // std::cout << "temp: " << Th << ",\t" << Te << std::endl;
 
@@ -214,7 +214,7 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
   double nTotal = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
 
-  double Te = (twoTemperature) ? primitiveState[num_equation - 1] : primitiveState[dim + 1];
+  double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : primitiveState[dim + 1];
   double Th = primitiveState[dim + 1];
 
   // Add Xeps to avoid zero number density case.
