@@ -95,6 +95,33 @@ class Fluxes {
                                 const int &num_equation);
 
 #ifdef _GPU_
+  static MFEM_HOST_DEVICE void convectiveFlux_gpu(double *flux,
+                                                  const double *Un,
+                                                  const double &p,
+                                                  const int &dim,
+                                                  const int &num_equation,
+                                                  const int &numActiveSpecies,
+                                                  const int &thrd,
+                                                  const int &maxThreads
+  ) {
+    double temp;
+      for (int d = 0; d < dim; d++) {
+        if (thrd == 0) flux[thrd + d * num_equation] = Un[1 + d];
+        if (thrd > 0 && thrd <= dim) {
+          temp = Un[thrd] * Un[1 + d] / Un[0];
+          if (thrd - 1 == d) temp += p;
+          flux[thrd + d * num_equation] = temp;
+        }
+        if (thrd == 1 + dim) {
+          flux[thrd + d * num_equation] = Un[1 + d] * (Un[1 + dim] + p) / Un[0];
+        }
+
+        for (int sp = thrd; sp < numActiveSpecies; sp += maxThreads) {
+          for (int d = 0; d < dim; d++) 
+            flux[(2+dim+sp) + d * num_equation] = Un[dim + 2 + sp] * Un[1 + d] / Un[0];
+        }
+      }
+  }
   static MFEM_HOST_DEVICE void viscousFlux_gpu(double *vFlux, const double *Un, const double *gradUpn,
                                                const Equations &eqSystem, const TransportModel &transpModel, 
                                                const double *gasParams,

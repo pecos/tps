@@ -229,6 +229,18 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, Vector &uk_el1, Vector &uk_
   
   const int d_numActiveSpecies = mixture->GetNumActiveSpecies();
   const int d_numSpecies = mixture->GetNumSpecies();
+  
+  const WorkingFluid fluid = mixture->GetWorkingFluid();
+  
+  const double *molarCV = NULL;
+  const double *gasParams = NULL;
+  if (fluid == WorkingFluid::USER_DEFINED) {
+    molarCV = mixture->getMolarCVs().Read();
+    gasParams = mixture->GetGasParam().Read();
+  }
+  
+  const bool ambipolar = mixture->IsAmbipolar();
+  const bool twoTemperature = mixture->IsTwoTemperature();
 
   MFEM_FORALL_2D(el, NumElemType, elDof, 1, 1, {
     MFEM_FOREACH_THREAD(i, x, elDof) {
@@ -297,8 +309,9 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, Vector &uk_el1, Vector &uk_
       MFEM_SYNC_THREAD;
 
       // compute Riemann flux
-      RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, eqSystem, num_equation, i,
-                                   elDof);
+      RiemannSolver::riemannLF_gpu(u1, u2, Rflux, nor,gamma, Rg, gasParams, molarCV, dim, eqSystem, fluid, ambipolar, twoTemperature,
+                                             num_equation, d_numSpecies, d_numActiveSpecies, i, elDof);
+      
       Fluxes::viscousFlux_gpu(&vFlux1[0], &u1[0], &gradUp1[0], eqSystem, transpModel, 
                               d_gasParams, gamma, Rg, viscMult, bulkViscMult,
                               Pr, Sc, dim, num_equation, d_numActiveSpecies, d_numSpecies, i, elDof);

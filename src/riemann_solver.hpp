@@ -75,32 +75,32 @@ class RiemannSolver {
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void convFluxDotNorm_gpu(double *fluxN, const double *state, const double &pres,
                                                    const double *nor, const int &num_equation, const int &dim,
-                                                   const Equations &eqSystem, const int &thrd,
+                                                   const int &numActiveSpecies,
+                                                   const int &thrd,
                                                    const int &max_num_threads) {
-    MFEM_SHARED double den_velN;
-
-    if (thrd == 0) {
-      den_velN = 0.;
-      for (int d = 0; d < dim; d++) den_velN += state[d + 1] * nor[d];
+    MFEM_SHARED double localFluxes[20*3], KE[3];
+    
+    Fluxes::convectiveFlux_gpu(localFluxes,state, pres, dim, num_equation, numActiveSpecies, thrd, max_num_threads);
+    MFEM_SYNC_THREAD;
+    
+    for (int eq = thrd; eq < num_equation; eq += max_num_threads) fluxN[eq] = 0.;
+    MFEM_SYNC_THREAD;
+    
+    for (int eq = thrd; eq < num_equation; eq += max_num_threads) {
+      for (int d = 0; d < dim; d++) fluxN[eq] += localFluxes[eq + d*num_equation] * nor[d];
     }
     MFEM_SYNC_THREAD;
-
-    if (thrd == max_num_threads - 1) fluxN[0] = den_velN;
-    for (int d = thrd; d < dim; d += max_num_threads) fluxN[1 + d] = den_velN * state[d + 1] / state[0] + pres * nor[d];
-
-    if (thrd == max_num_threads - 1) {
-      const double H = (state[dim + 1] + pres) / state[0];
-      fluxN[1 + dim] = den_velN * H;
-    }
-
-    if (eqSystem == NS_PASSIVE && thrd == max_num_threads - 2) {
-      fluxN[num_equation - 1] = den_velN * state[num_equation - 1] / state[0];
-    }
   }
 
   static MFEM_HOST_DEVICE void riemannLF_gpu(const double *U1, const double *U2, double *flux, const double *nor,
-                                             const double &gamma, const double &Rg, const int &dim,
-                                             const Equations &eqSystem, const int &num_equation, const int &thrd,
+                                             const double &gamma, const double &Rg, 
+                                             const double *gasParams, const double *molarCV,
+                                             const int &dim,
+                                             const Equations &eqSystem, const WorkingFluid &fluid,
+                                             const bool &ambipolar, const bool &twoTemperature,
+                                             const int &num_equation, 
+                                             const int &numSpecies, const int &numActiveSpecies,
+                                             const int &thrd,
                                              const int &max_num_threads) {
     MFEM_SHARED double KE1[3], KE2[3];
     MFEM_SHARED double vel1, vel2, p1, p2;
@@ -113,9 +113,45 @@ class RiemannSolver {
       KE2[d] = 0.5 * U2[1 + d] * U2[1 + d] / U2[0];
     }
     MFEM_SYNC_THREAD;
-
-    if (thrd == 0) p1 = DryAir::pressure(U1, &KE1[0], gamma, dim, num_equation);
-    if (thrd == 1) p2 = DryAir::pressure(U2, &KE2[0], gamma, dim, num_equation);
+        
+    switch (fluid) {
+      case WorkingFluid::DRY_AIR:
+        if (thrd == 0) p1 = DryAir::pressure(U1, &KE1[0], gamma, dim, num_equation);
+        if (thrd == 1) p2 = DryAir::pressure(U2, &KE2[0], gamma, dim, num_equation);
+        break;
+      case WorkingFluid::USER_DEFINED:
+        double electronPressure;
+        p1 = PerfectMixture::computePressure_gpu(U1, 
+                                                &electronPressure,
+                                                gasParams,
+                                                molarCV,
+                                                num_equation,
+                                                dim,
+                                                numSpecies,
+                                                numActiveSpecies,
+                                                ambipolar,
+                                                twoTemperature,
+                                                thrd,
+                                                max_num_threads);
+        p2 = PerfectMixture::computePressure_gpu(U2, 
+                                                &electronPressure,
+                                                gasParams,
+                                                molarCV,
+                                                num_equation,
+                                                dim,
+                                                numSpecies,
+                                                numActiveSpecies,
+                                                ambipolar,
+                                                twoTemperature,
+                                                thrd,
+                                                max_num_threads);
+        break;
+      default:
+        printf("[ERROR] Fluxes::convectiveFluxes_gpu(): WorkingFluid not supported");
+        break;
+    }
+    MFEM_SYNC_THREAD;
+  
     if (thrd == max_num_threads - 1) {
       vel1 = 0.;
       for (int d = 0; d < dim; d++) vel1 += 2. * KE1[d] / U1[0];
@@ -135,9 +171,9 @@ class RiemannSolver {
 
     if (thrd == max_num_threads - 1) maxE = max(maxE1, maxE2);
 
-    RiemannSolver::convFluxDotNorm_gpu(flux1, U1, p1, nor, num_equation, dim, eqSystem, thrd, max_num_threads);
+    RiemannSolver::convFluxDotNorm_gpu(flux1, U1, p1, nor, num_equation, dim, numActiveSpecies, thrd, max_num_threads);
+    RiemannSolver::convFluxDotNorm_gpu(flux2, U2, p2, nor, num_equation, dim, numActiveSpecies, thrd, max_num_threads);
     MFEM_SYNC_THREAD;
-    RiemannSolver::convFluxDotNorm_gpu(flux2, U2, p2, nor, num_equation, dim, eqSystem, thrd, max_num_threads);
 
     if (thrd == 0) {
       normag = 0.;

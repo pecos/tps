@@ -218,7 +218,7 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const Equa
   const bool twoTemperature = mixture->IsTwoTemperature();
 
   MFEM_FORALL_2D(n, dof, num_equation, 1, 1, {
-    MFEM_SHARED double Un[20];
+    MFEM_SHARED double Un[20], localFlux[20*3];
     MFEM_SHARED double KE[3];
     MFEM_SHARED double p;
 
@@ -254,24 +254,27 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const Equa
           break;
       }
       MFEM_SYNC_THREAD;
+      
+      Fluxes::convectiveFlux_gpu(localFlux, Un, p, dim, num_equation, numActiveSpecies, eq, num_equation);
+      MFEM_SYNC_THREAD;
 
-      double temp;
-      for (int d = 0; d < dim; d++) {
-        if (eq == 0) d_flux[n + d * dof + eq * dof * dim] = Un[1 + d];
-        if (eq > 0 && eq <= dim) {
-          temp = Un[eq] * Un[1 + d] / Un[0];
-          if (eq - 1 == d) temp += p;
-          d_flux[n + d * dof + eq * dof * dim] = temp;
-        }
-        if (eq == 1 + dim) {
-          d_flux[n + d * dof + eq * dof * dim] = Un[1 + d] * (Un[1 + dim] + p) / Un[0];
-        }
-
-        for (int sp = eq; sp < numActiveSpecies; sp += num_equation) {
-          for (int d = 0; d < dim; d++) 
-            d_flux[n + d * dof + (2+dim+sp) * dof * dim] = Un[dim + 2 + sp] * Un[1 + d] / Un[0];
-        }
-      }
+//       double temp;
+//       for (int d = 0; d < dim; d++) {
+//         if (eq == 0) d_flux[n + d * dof + eq * dof * dim] = Un[1 + d];
+//         if (eq > 0 && eq <= dim) {
+//           temp = Un[eq] * Un[1 + d] / Un[0];
+//           if (eq - 1 == d) temp += p;
+//           d_flux[n + d * dof + eq * dof * dim] = temp;
+//         }
+//         if (eq == 1 + dim) {
+//           d_flux[n + d * dof + eq * dof * dim] = Un[1 + d] * (Un[1 + dim] + p) / Un[0];
+//         }
+// 
+//         for (int sp = eq; sp < numActiveSpecies; sp += num_equation) {
+//           for (int d = 0; d < dim; d++) 
+//             d_flux[n + d * dof + (2+dim+sp) * dof * dim] = Un[dim + 2 + sp] * Un[1 + d] / Un[0];
+//         }
+//       }
     }  // end MFEM_FOREACH_THREAD
   });  // end MFEM_FORALL_WD
 #endif
