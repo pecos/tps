@@ -102,8 +102,7 @@ class Fluxes {
                                                   const int &num_equation,
                                                   const int &numActiveSpecies,
                                                   const int &thrd,
-                                                  const int &maxThreads
-  ) {
+                                                  const int &maxThreads ) {
     double temp;
       for (int d = 0; d < dim; d++) {
         if (thrd == 0) flux[thrd + d * num_equation] = Un[1 + d];

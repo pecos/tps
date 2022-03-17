@@ -257,24 +257,8 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const Equa
       
       Fluxes::convectiveFlux_gpu(localFlux, Un, p, dim, num_equation, numActiveSpecies, eq, num_equation);
       MFEM_SYNC_THREAD;
-
-//       double temp;
-//       for (int d = 0; d < dim; d++) {
-//         if (eq == 0) d_flux[n + d * dof + eq * dof * dim] = Un[1 + d];
-//         if (eq > 0 && eq <= dim) {
-//           temp = Un[eq] * Un[1 + d] / Un[0];
-//           if (eq - 1 == d) temp += p;
-//           d_flux[n + d * dof + eq * dof * dim] = temp;
-//         }
-//         if (eq == 1 + dim) {
-//           d_flux[n + d * dof + eq * dof * dim] = Un[1 + d] * (Un[1 + dim] + p) / Un[0];
-//         }
-// 
-//         for (int sp = eq; sp < numActiveSpecies; sp += num_equation) {
-//           for (int d = 0; d < dim; d++) 
-//             d_flux[n + d * dof + (2+dim+sp) * dof * dim] = Un[dim + 2 + sp] * Un[1 + d] / Un[0];
-//         }
-//       }
+      
+      for (int d = 0; d < dim; d++) d_flux[n + d * dof + eq * dof * dim] = localFlux[eq + d*num_equation];
     }  // end MFEM_FOREACH_THREAD
   });  // end MFEM_FORALL_WD
 #endif
@@ -342,6 +326,7 @@ void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTe
           vFlux[eq + d * num_equation] *= linVisc;
         }
       }
+      MFEM_SYNC_THREAD;
 
       // write to global memory
       for (int d = 0; d < dim; d++) {
