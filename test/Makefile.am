@@ -42,7 +42,8 @@ TESTS += cyl3d.test \
 	 sponge_zone.test \
 	 annulus.test \
 	 pipe.test \
-	 perfect_gas.test
+	 perfect_gas.test \
+	 collision_integrals.test
 endif
 
 if GSLIB_ENABLED
