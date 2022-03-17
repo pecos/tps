@@ -36,13 +36,15 @@
 using namespace std;
 
 MPI_Groups::MPI_Groups(MPI_Session* _mpi) : mpi(_mpi) {
-  isInlet = 0;
-  isOutlet = 0;
+  patchList_.SetSize(0);
+
+  patchGroupMap_.clear();
 }
 
 MPI_Groups::~MPI_Groups() {
-  MPI_Comm_free(&inlet_comm);
-  MPI_Comm_free(&outlet_comm);
+  for (auto pg = patchGroupMap_.begin(); pg != patchGroupMap_.end(); pg++) {
+    MPI_Comm_free(&(pg->second));
+  }
 }
 
 bool MPI_Groups::isGroupRoot(MPI_Comm group_comm) {
@@ -61,11 +63,19 @@ int MPI_Groups::groupSize(MPI_Comm group_comm) {
 }
 
 void MPI_Groups::init() {
-  // create inlet communicator
-  MPI_Comm_split(MPI_COMM_WORLD, isInlet, mpi->WorldRank(), &inlet_comm);
+  int localMaxPatch = 0;
+  if (patchList_.Size() > 0) localMaxPatch = patchList_.Max();
+  int globalMax = 0.;
+  MPI_Allreduce(&localMaxPatch, &globalMax, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
 
-  // create outlet communicator
-  MPI_Comm_split(MPI_COMM_WORLD, isOutlet, mpi->WorldRank(), &outlet_comm);
+  for (int p = 0; p <= globalMax; p++) {
+    int processContainsPatch = 0;
+    for (int n = 0; n < patchList_.Size(); n++) {
+      if (patchList_[n] == p) processContainsPatch = p;
+    }
+
+    MPI_Comm_split(MPI_COMM_WORLD, processContainsPatch, mpi->WorldRank(), &patchGroupMap_[p]);
+  }
 }
 
 string MPI_Groups::getParallelName(string serialName) {
