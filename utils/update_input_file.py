@@ -33,6 +33,7 @@ flow = [ ["MESH","mesh"],
          ["BULK_VISC_MULT","bulkViscosityMultiplier"],
          ["VISC_MULT","viscosityMultiplier"],
          ["GRAD_PRESSURE","additionalGradPressure"],
+         ["REF_LEVELS","refinement_levels"],
        ]
 
 passiveScalars = [ ["PASIVE_SCALAR",""] ]
@@ -46,6 +47,7 @@ viscSource = [ ["LV_PLANE_NORM","norm"],
 time = [ ["CFL","cfl"],
          ["TIME_INTEGRATOR","integrator"],
          ["DT_CONSTANT","enableConstantTimestep"],
+         ["DT_FIXED","dt_fixed"],
        ]
 ics  = [ ["INIT_RHO","rho"],
          ["INIT_RHOVX","rhoU"],

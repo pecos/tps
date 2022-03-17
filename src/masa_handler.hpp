@@ -41,6 +41,6 @@
 using namespace mfem;
 using namespace std;
 
-void initMasaHandler(string name, int dim, const Equations& eqn, const double& viscMult);
+void initMasaHandler(string name, int dim, const Equations& eqn, const double& viscMult, const std::string mms_name);
 
 #endif  // MASA_HANDLER_HPP_

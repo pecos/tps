@@ -182,6 +182,10 @@ class RunConfiguration {
 
   int exit_checkFrequency_;  // iteration frequency to check for early exit
 
+  // Use MMS
+  bool use_mms_;
+  std::string mms_name_;
+
   RunConfiguration();
   ~RunConfiguration();
 
@@ -200,7 +204,7 @@ class RunConfiguration {
 
   double GetCFLNumber() { return cflNum; }
   bool isTimeStepConstant() const { return constantTimeStep; }
-  double GetFixedDT() { return dt_fixed; }
+  double GetFixedDT() const { return dt_fixed; }
   int GetNumIters() { return numIters; }
   int GetNumItersOutput() { return itersOut; }
   bool RoeRiemannSolver() const { return useRoe; }
