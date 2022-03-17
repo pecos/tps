@@ -24,7 +24,8 @@ TESTS += cyl3d.test \
 	 qms.rings.test \
 	 sponge_zone.test \
 	 annulus.test \
-	 pipe.test
+	 pipe.test \
+	 perfect_gas.test
 endif
 
 if GSLIB_ENABLED
