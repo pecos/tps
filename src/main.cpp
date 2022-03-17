@@ -32,7 +32,7 @@
 #include "tps.hpp"
 
 int main(int argc, char *argv[]) {
-  TPS::Tps tps(argc, argv);
+  TPS::Tps tps;
 
   tps.parseCommandLineArgs(argc, argv);
   tps.parseInput();
