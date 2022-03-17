@@ -9,37 +9,18 @@ using namespace std;
 
 int main (int argc, char *argv[])
 {
-  MPI_Session mpi(argc, argv);
+  TPS::Tps tps(argc, argv);
+  tps.parseCommandLineArgs(argc, argv);
+  tps.parseInput();
+  tps.chooseDevices();
 
-  // Set the method's default parameters.
-  const char *input_file = "coarse.run";
-
-  // Parse command-line options.
-  OptionsParser args(argc, argv);
-  args.AddOption(&input_file, "-r", "--runFile", "runFile");
-
-  args.Parse();
-  if (!args.Good())
-    {
-      args.PrintUsage(cout);
-      return 1;
-    }
-  args.PrintOptions(cout);
-
-  // Instantiate M2ulPhyS classes for *both* the coarse and fine
-
-  // NB: the M2ulPhyS ctor calls M2ulPhyS::initVariables, which reads
-  // the restart files, assuming that RESTART_CYCLE is set in the
-  // input file.  So, we require that RESTART_CYCLE is set in the
-  // *source* run file....
-  string inputFileName(input_file);
-  M2ulPhyS srcField( mpi, inputFileName );
-  RunConfiguration& srcConfig = srcField.GetConfig();
+  M2ulPhyS *srcField = new M2ulPhyS(tps.getMPISession(), tps.getInputFilename(), &tps);
+  RunConfiguration& srcConfig = srcField->GetConfig();
   assert(srcConfig.GetWorkingFluid()==WorkingFluid::TEST_BINARY_AIR);
   assert(~srcConfig.GetRestartCycle());
 
   // Get meshes
-  ParMesh* mesh_1 = srcField.GetMesh();
+  ParMesh* mesh_1 = srcField->GetMesh();
 
   const int dim = mesh_1->Dimension();
 
@@ -57,9 +38,9 @@ int main (int argc, char *argv[])
   ParFiniteElementSpace *src_fes = NULL;
   ParGridFunction *src_state = NULL;
 
-  src_fec = srcField.GetFEC();
-  src_fes = srcField.GetFESpace();
-  src_state = srcField.GetSolutionGF();
+  src_fec = srcField->GetFEC();
+  src_fes = srcField->GetFESpace();
+  src_state = srcField->GetSolutionGF();
 
   std::cout << "Source FE collection: " << src_fec->Name() << std::endl;
 
@@ -104,11 +85,11 @@ int main (int argc, char *argv[])
     // }
   }
 
-  RHSoperator rhsOperator = srcField.getRHSoperator();
+  RHSoperator rhsOperator = srcField->getRHSoperator();
   rhsOperator.updatePrimitives(*src_state);
 
   // Write restart files
-  srcField.writeHDF5();
+  srcField->writeHDF5();
 
   return 0;
 }

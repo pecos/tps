@@ -54,6 +54,7 @@ static const double AVOGADRONUMBER              = 6.0221409e+23; // mol^(-1)
 
 class GasMixture{
 protected:
+
   WorkingFluid fluid;
   int num_equation;
   int dim;

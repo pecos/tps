@@ -35,6 +35,21 @@
 
 #include "M2ulPhyS.hpp"
 
+M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, TPS::Tps *tps) : mpi(_mpi) {
+  tpsP = tps;
+  nprocs_ = mpi.WorldSize();
+  rank_ = mpi.WorldRank();
+  if (rank_ == 0)
+    rank0_ = true;
+  else
+    rank0_ = false;
+
+  groupsMPI = new MPI_Groups(&mpi);
+
+  parseSolverOptions2();
+
+}
+
 M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps) : mpi(_mpi) {
   tpsP = tps;
   nprocs_ = mpi.WorldSize();
@@ -254,6 +269,7 @@ void M2ulPhyS::initVariables() {
     case WorkingFluid::USER_DEFINED:
       switch (config.GetGasModel()) {
         case GasModel::PERFECT_MIXTURE:
+          mixture = new PerfectMixture( config, dim);
           break;
       }
       switch (config.GetTranportModel()) {
@@ -1943,16 +1959,33 @@ void M2ulPhyS::parseSolverOptions2() {
     }
   }
 
-  int fluidType;
-  tpsP->getInput("flow/fluid", fluidType, 0);
+  // fluid presets
+  std::string fluidTypeStr;
+  tpsP->getInput("flow/fluid", fluidTypeStr, std::string("dry_air") );
 
-  switch (fluidType) {
-    case 0:
-      config.workFluid = DRY_AIR;
-      break;
-    default:
-      break;
-  }
+  std::map<std::string, WorkingFluid> fluidMapping;
+  fluidMapping["dry_air"] = DRY_AIR;
+  fluidMapping["test_binary_air"] = TEST_BINARY_AIR;
+  fluidMapping["user_defined"] = USER_DEFINED;
+  config.workFluid = fluidMapping[fluidTypeStr];
+
+  // int fluidType;
+  // switch (fluidType) {
+  //   case WorkingFluid::DRY_AIR:
+  //     config.workFluid = DRY_AIR;
+  //     fluidTypeStr = "DRY_AIR";
+  //     break;
+  //   case WorkingFluid::TEST_BINARY_AIR:
+  //     config.workFluid = TEST_BINARY_AIR;
+  //     fluidTypeStr = "TEST_BINARY_AIR";
+  //     break;
+  //   case WorkingFluid::USER_DEFINED:
+  //     config.workFluid = USER_DEFINED;
+  //     fluidTypeStr = "USER_DEFINED";
+  //     break;
+  //   default:
+  //     break;
+  // }
 
   std::string systemType;
   tpsP->getInput("flow/equation_system", systemType, std::string("navier-stokes"));
@@ -1965,6 +1998,79 @@ void M2ulPhyS::parseSolverOptions2() {
   } else {
     grvy_printf(GRVY_ERROR, "\nUnknown equation_system -> %s", systemType.c_str());
     exit(ERROR);
+  }
+
+  // plasma conditions.
+  if (config.workFluid != USER_DEFINED) {
+    cout << "Fluid is set to the preset '" << fluidTypeStr << "'. Input options in [plasma_models] will not be used." << endl;
+  } else {
+
+    tpsP->getInput("plasma_models/ambipolar", config.ambipolar, false);
+    tpsP->getInput("plasma_models/two_temperature", config.twoTemperature, false);
+
+    std::string gasModelStr;
+    tpsP->getInput("plasma_models/gas_model", gasModelStr, std::string("perfect_mixture") );
+    if (gasModelStr == "perfect_mixture") {
+      config.gasModel = PERFECT_MIXTURE;
+    } else {
+      grvy_printf(GRVY_ERROR, "\nUnknown gas_model -> %s", gasModelStr);
+      exit(ERROR);
+    }
+    if ( config.gasModel == PERFECT_MIXTURE ) {
+      config.constantMolarCV.SetSize(numSpecies);
+      config.constantMolarCP.SetSize(numSpecies);
+    }
+
+    std::string transportModelStr;
+    tpsP->getInput("plasma_models/transport_model", transportModelStr, std::string("") );
+
+    std::string chemistryModelStr;
+    tpsP->getInput("plasma_models/chemistry_model", chemistryModelStr, std::string("") );
+
+  }
+
+  // species list.
+  {
+    // number of species defined
+    if (config.eqSystem != NS_PASSIVE) {
+      tpsP->getInput("species/numSpecies", config.numSpecies, 1);
+      config.gasParams.SetSize(config.numSpecies,GasParams::NUM_GASPARAMS);
+    }
+
+    /*
+      TODO: for now, we force the user to set the background species as the last,
+      and the electron species as the second to last.
+    */
+    if ( (config.numSpecies > 1) && (config.eqSystem != NS_PASSIVE) ) {
+      tpsP->getRequiredInput("species/background_index", config.backgroundIndex);
+      tpsP->getRequiredInput("species/electron_index", config.electronIndex);
+      if ( config.backgroundIndex != config.numSpecies ) {
+        grvy_printf(GRVY_ERROR, "\n Background species must be specified as the last species.");
+        exit(ERROR);
+      }
+      if ( config.electronIndex != config.numSpecies - 1 ) {
+        grvy_printf(GRVY_ERROR, "\n Electron species must be specified as the second to last species.");
+        exit(ERROR);
+      }
+
+      // Gas Params
+      for (int i = 1; i <= config.numSpecies; i++) {
+        double mw, charge;
+        std::string type;
+        std::string basepath("species/species" + std::to_string(i));
+
+        tpsP->getRequiredInput((basepath + "/molecular_weight").c_str(), mw);
+        tpsP->getRequiredInput((basepath + "/charge_number").c_str(), charge);
+        config.gasParams(i-1, GasParams::SPECIES_MW) = mw;
+        config.gasParams(i-1, GasParams::SPECIES_CHARGES) = charge;
+
+        if ( config.gasModel == PERFECT_MIXTURE ) {
+          tpsP->getRequiredInput((basepath + "/constant_molar_cv").c_str(), config.constantMolarCV(i-1));
+          tpsP->getRequiredInput((basepath + "/constant_molar_cp").c_str(), config.constantMolarCP(i-1));
+        }
+      }
+
+    }
   }
 
   return;

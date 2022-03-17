@@ -310,6 +310,7 @@ class M2ulPhyS : public TPS::Solver {
 
  public:
   M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps);
+  M2ulPhyS(MPI_Session &_mpi, TPS::Tps *tps);
   ~M2ulPhyS();
 
   void parseSolverOptions() override;

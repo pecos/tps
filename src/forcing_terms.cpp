@@ -516,6 +516,7 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
   }
 }
 
+// TODO: change to conserved variables.
 void SpongeZone::computeMixedOutValues() {
   int nnodes = vfes->GetNDofs();
   const double *dataUp = Up->HostRead();

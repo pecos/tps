@@ -18,20 +18,20 @@ endif
 # Possible there is nothing to do
 bin_PROGRAMS =
 
-#bin_PROGRAMS += beam_mesh
-#beam_mesh_SOURCES  = beam_mesh.cpp
-#beam_mesh_LDADD    = -lmfem
-#
-#beam_mesh_LDFLAGS  = -L$(MFEM_LIB)
-#beam_mesh_LDFLAGS += -L$(PETSC_LIB) -lpetsc
-#beam_mesh_LDFLAGS += $(HDF5_LIBS)
-#beam_mesh_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
-#beam_mesh_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
-#beam_mesh_LDFLAGS += -L$(METIS_LIB) -lmetis
-#beam_mesh_LDFLAGS += $(GRVY_LIBS)
-#beam_mesh_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
-#beam_mesh_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
-#beam_mesh_LDFLAGS += -L$(GSLIB_LIB) -lgs
+bin_PROGRAMS += beam_mesh
+beam_mesh_SOURCES  = beam_mesh.cpp
+beam_mesh_LDADD    = -lmfem
+
+beam_mesh_LDFLAGS  = -L$(MFEM_LIB)
+beam_mesh_LDFLAGS += -L$(PETSC_LIB) -lpetsc
+beam_mesh_LDFLAGS += $(HDF5_LIBS)
+beam_mesh_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
+beam_mesh_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
+beam_mesh_LDFLAGS += -L$(METIS_LIB) -lmetis
+beam_mesh_LDFLAGS += $(GRVY_LIBS)
+beam_mesh_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
+beam_mesh_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
+beam_mesh_LDFLAGS += -L$(GSLIB_LIB) -lgs
 
 #bin_PROGRAMS += simmesh
 #simmesh_SOURCES  = simple_periodic_mesh.cpp
@@ -63,16 +63,30 @@ interp_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
 interp_LDFLAGS += -L$(GSLIB_LIB) -lgs
 endif
 
-#bin_PROGRAMS += binaryic
-#binaryic_SOURCES  = binary_mixture_ic.cpp
-#binaryic_LDADD    = ../src/libtps.a -lmfem
-#
-#binaryic_LDFLAGS  = -L$(MFEM_LIB)
-#binaryic_LDFLAGS += $(HDF5_LIBS)
-#binaryic_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
-#binaryic_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
-#binaryic_LDFLAGS += -L$(METIS_LIB) -lmetis
-#binaryic_LDFLAGS += $(GRVY_LIBS)
-#binaryic_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
-#binaryic_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
-#binaryic_LDFLAGS += -L$(GSLIB_LIB) -lgs
+bin_PROGRAMS += binaryic
+binaryic_SOURCES  = binary_mixture_ic.cpp
+binaryic_LDADD    = ../src/libtps.a -lmfem
+
+binaryic_LDFLAGS  = -L$(MFEM_LIB)
+binaryic_LDFLAGS += $(HDF5_LIBS)
+binaryic_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
+binaryic_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
+binaryic_LDFLAGS += -L$(METIS_LIB) -lmetis
+binaryic_LDFLAGS += $(GRVY_LIBS)
+binaryic_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
+binaryic_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
+binaryic_LDFLAGS += -L$(GSLIB_LIB) -lgs
+
+bin_PROGRAMS += perfect_mixture_test
+perfect_mixture_test_SOURCES  = test_perfect_mixture.cpp
+perfect_mixture_test_LDADD    = ../src/libtps.a -lmfem
+
+perfect_mixture_test_LDFLAGS  = -L$(MFEM_LIB)
+perfect_mixture_test_LDFLAGS += $(HDF5_LIBS)
+perfect_mixture_test_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
+perfect_mixture_test_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
+perfect_mixture_test_LDFLAGS += -L$(METIS_LIB) -lmetis
+perfect_mixture_test_LDFLAGS += $(GRVY_LIBS)
+perfect_mixture_test_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
+perfect_mixture_test_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
+perfect_mixture_test_LDFLAGS += -L$(GSLIB_LIB) -lgs

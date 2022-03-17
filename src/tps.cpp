@@ -200,6 +200,8 @@ void Tps::parseInput() {
     exit(ERROR);
   }
 
+  // if (isRank0_)
+  //   iparse_.Fdump();
   // parse common inputs
   getInput("solver/type", input_solver_type_, std::string("flow"));
 #ifdef _GPU_

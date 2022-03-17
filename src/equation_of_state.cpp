@@ -516,26 +516,31 @@ PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim)
   ambipolar = _runfile.IsAmbipolar();
   twoTemperature = _runfile.IsTwoTemperature();
 
-  // TODO: Currently, background species is assumed to be the last species, and electron the second to last.
-  // TODO: set up new routine with the new input parser.
+  /*
+    TODO: Currently, background species is assumed to be the last species, and electron the second to last.
+    These are enforced at input parsing.
+  */
   gasParams.SetSize(numSpecies, GasParams::NUM_GASPARAMS);
+  molarCV_.SetSize(numSpecies);
+  molarCP_.SetSize(numSpecies);
+  specificGasConstants_.SetSize(numSpecies);
+  specificHeatRatios_.SetSize(numSpecies);
+
   gasParams = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) {
     for (int param = 0; param < GasParams::NUM_GASPARAMS; param++)
-      gasParams(sp, param) = 0.0;
-      // gasParams(sp, param) = _runfile.GetGasParams(sp,(GasParams) param);
+      gasParams(sp, param) = _runfile.GetGasParams(sp,(GasParams) param);
 
     specificGasConstants_(sp) = UNIVERSALGASCONSTANT / gasParams(sp, GasParams::SPECIES_MW);
 
     // TODO: read these from input parser.
-    molarCV_(sp) = 1.5 * UNIVERSALGASCONSTANT;
-    molarCP_(sp) = 2.5 * UNIVERSALGASCONSTANT;
-    specificHeatRatios_(sp) = 2.5 / 1.5;
+    molarCV_(sp) = _runfile.getConstantMolarCV(sp) * UNIVERSALGASCONSTANT;
+    molarCP_(sp) = _runfile.getConstantMolarCP(sp) * UNIVERSALGASCONSTANT;
+    specificHeatRatios_(sp) = molarCP_(sp) / molarCV_(sp);
   }
 
   // We assume the background species is neutral.
   assert( gasParams(numSpecies - 1, GasParams::SPECIES_CHARGES) == 0.0 );
-  // TODO: Need to assure that the second to last species is electron.
 }
 
 // compute heavy-species heat capacity from number densities.
