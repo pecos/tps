@@ -124,9 +124,21 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   DenseMatrix diffusionVelocity(numSpecies, dim);
   transport->ComputeFluxTransportProperties(state, gradUp, transportBuffer, diffusionVelocity);
   const double visc = transportBuffer[GlobalTrnsCoeffs::VISCOSITY];
-  const double bulkViscosity = transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY];
+  double bulkViscosity = transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY];
+  bulkViscosity -= 2. / 3. * visc;
   double k = transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY];
-  if (!twoTemperature) k += transportBuffer[GlobalTrnsCoeffs::ELECTRON_THERMAL_CONDUCTIVITY];
+  double ke = transportBuffer[GlobalTrnsCoeffs::ELECTRON_THERMAL_CONDUCTIVITY];
+  if (twoTemperature) {
+    for (int d = 0; d < dim; d++) {
+      double qeFlux = ke * gradUp(num_equation - 1, d);
+      flux(1 + dim, d) += qeFlux;
+      flux(num_equation - 1, d) += qeFlux;
+      flux(num_equation - 1, d) -= speciesEnthalpies(numSpecies - 2)
+                                    * diffusionVelocity(numSpecies - 2, d);
+    }
+  } else {
+    k += ke;
+  }
 
   const double ur = (axisymmetric_ ? state[1] / state[0] : 0);
   const double ut = (axisymmetric_ ? state[3] / state[0] : 0);
@@ -145,7 +157,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
     divV += ur / radius;
   }
 
-  for (int i = 0; i < dim; i++) stress(i, i) += (bulkViscosity - 2. / 3. * visc) * divV;
+  for (int i = 0; i < dim; i++) stress(i, i) += bulkViscosity * divV;
 
   for (int i = 0; i < dim; i++)
     for (int j = 0; j < dim; j++) flux(1 + i, j) = stress(i, j);
@@ -194,11 +206,6 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
     // TODO: need to check the sign.
     // NOTE: diffusionVelocity is set to be (numSpecies,dim)-matrix.
     for (int d = 0; d < dim; d++) flux(nvel + 2 + sp, d) = - state[nvel + 2 + sp] * diffusionVelocity(sp, d);
-  }
-
-  if (mixture->IsTwoTemperature()) {
-    // TODO: add electron heat flux for total energy equation.
-    // TODO: viscous flux for electron energy equation.
   }
 }
 
