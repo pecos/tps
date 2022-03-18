@@ -316,10 +316,10 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, Vector &uk_el1, Vector &uk_
       
       Fluxes::viscousFlux_gpu(vFlux1, u1, gradUp1, fluid, eqSystem, transpModel, d_gasParams, gamma, 
                               Rg, viscMult, bulkViscMult, Pr, Sc, molarCV, molarCP, ambipolar, twoTemperature,
-                              dim, num_equation, d_numActiveSpecies, d_numSpecies, i, maxDofs);
+                              dim, num_equation, d_numActiveSpecies, d_numSpecies, i, elDof);
       Fluxes::viscousFlux_gpu(vFlux2, u2, gradUp2, fluid, eqSystem, transpModel, d_gasParams, gamma, 
                               Rg, viscMult, bulkViscMult, Pr, Sc, molarCV, molarCP, ambipolar, twoTemperature,
-                              dim, num_equation, d_numActiveSpecies, d_numSpecies, i, maxDofs);
+                              dim, num_equation, d_numActiveSpecies, d_numSpecies, i, elDof);
 //       Fluxes::viscousFlux_gpu(&vFlux1[0], &u1[0], &gradUp1[0], eqSystem, transpModel, 
 //                               d_gasParams, gamma, Rg, viscMult, bulkViscMult,
 //                               Pr, Sc, dim, num_equation, d_numActiveSpecies, d_numSpecies, i, elDof);
