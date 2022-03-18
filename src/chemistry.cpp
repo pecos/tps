@@ -42,7 +42,7 @@ Chemistry::Chemistry(GasMixture *mixture, RunConfiguration &config) : mixture_(m
   ambipolar_ = mixture->IsAmbipolar();
   twoTemperature_ = mixture->IsTwoTemperature();
   dim_ = mixture->GetDimension();
-  
+
   model = config.GetChemistryModel();
 
   mixtureToInputMap_ = mixture->getMixtureToInputMap();
@@ -104,9 +104,9 @@ Chemistry::Chemistry(GasMixture *mixture, RunConfiguration &config) : mixture_(m
 }
 
 Chemistry::~Chemistry() {
-  // if (mixture_ != NULL) delete mixture_;
-  // if (mixtureToInputMap_ != NULL) delete mixtureToInputMap_;
-  // if (speciesMapping_ != NULL) delete speciesMapping_;
+//   if (mixture_ != NULL) delete mixture_;
+//   if (mixtureToInputMap_ != NULL) delete mixtureToInputMap_;
+//   if (speciesMapping_ != NULL) delete speciesMapping_;
   for (int r = 0; r < numReactions_; r++) {
     if (reactions_[r] != NULL) delete reactions_[r];
   }
@@ -146,7 +146,7 @@ MassActionLaw::MassActionLaw(GasMixture* mixture, RunConfiguration &config):
 }
 
 
-void MassActionLaw::computeCreationRate(const mfem::Vector& ns, const mfem::Vector& kfwd, 
+void MassActionLaw::computeCreationRate(const mfem::Vector& ns, const mfem::Vector& kfwd,
                                        const mfem::Vector& keq, mfem::Vector& creationRate)
 {
   Vector progressRate(numReactions_);
@@ -157,7 +157,7 @@ void MassActionLaw::computeCreationRate(const mfem::Vector& ns, const mfem::Vect
     for (int sp = 0; sp < numSpecies_; sp++) rateBWD *= pow(ns(sp), productStoich_(sp,r));
     progressRate(r) = kfwd(r) * (rateFWD - rateBWD / keq(r) );
   }
-  
+
   creationRate.SetSize(numSpecies_);
   creationRate = 0.;
   for (int sp = 0; sp < numSpecies_; sp++) {
@@ -166,7 +166,7 @@ void MassActionLaw::computeCreationRate(const mfem::Vector& ns, const mfem::Vect
     }
     creationRate(sp) *= mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
   }
-  
+
   // check total created mass is 0
   double totMass = 0.;
   for (int sp = 0; sp < numSpecies_; sp++) totMass += creationRate(sp);
