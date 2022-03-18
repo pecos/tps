@@ -221,13 +221,14 @@ void ConstantPressureGradient::updateTerms_gpu(const int numElems, const int off
 #endif
 
 AxisymmetricSource::AxisymmetricSource(const int &_dim, const int &_num_equation, const int &_order,
-                                       GasMixture *_mixture, const Equations &_eqSystem, const int &_intRuleType,
+                                       GasMixture *_mixture, TransportProperties *_transport, const Equations &_eqSystem, const int &_intRuleType,
                                        IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
                                        ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
                                        RunConfiguration &_config)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()),
       mixture(_mixture),
+      transport_(_transport),
       eqSystem(_eqSystem) {
   // no-op
 }
@@ -343,7 +344,7 @@ void AxisymmetricSource::updateTerms(Vector &in) {
         const double uz_z = dataGradUp[index + (2 * dof) + (1 * dof * num_equation)];
         const double ut_r = dataGradUp[index + (3 * dof) + (0 * dof * num_equation)];
 
-        const double visc = mixture->GetViscosityFromPrimitive(prim);
+        const double visc = transport_->GetViscosityFromPrimitive(prim);
 
         tau_tt = -ur_r - uz_z;
         if (radius > 0) tau_tt += 2 * ur / radius;

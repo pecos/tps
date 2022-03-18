@@ -92,7 +92,8 @@ class TransportProperties{
                                                   const DenseMatrix &gradUp,
                                                   Vector &transportBuffer,
                                                   DenseMatrix &diffusionVelocity) {};
-
+    // NOTE: only for AxisymmetricSource
+    virtual double GetViscosityFromPrimitive(const Vector &state) = 0;
 };
 
 class DryAirTransport : public TransportProperties {
@@ -117,6 +118,13 @@ public:
                                               const DenseMatrix &gradUp,
                                               Vector &transportBuffer,
                                               DenseMatrix &diffusionVelocity);
+
+  virtual double GetViscosityFromPrimitive(const Vector &state);
 };
+
+inline double DryAirTransport::GetViscosityFromPrimitive(const Vector &state) {
+  double temp = state[1 + dim];
+  return (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
+}
 
 #endif  // TRANSPORT_PROPERTIES_HPP_

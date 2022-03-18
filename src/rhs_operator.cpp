@@ -37,7 +37,7 @@ FunctionCoefficient radiusFcn(getRadius);
 // Implementation of class RHSoperator
 RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, const int &_order,
                          const Equations &_eqSystem, double &_max_char_speed, IntegrationRules *_intRules,
-                         int _intRuleType, Fluxes *_fluxClass, GasMixture *_mixture, ParFiniteElementSpace *_vfes,
+                         int _intRuleType, Fluxes *_fluxClass, GasMixture *_mixture, TransportProperties *_transport, ParFiniteElementSpace *_vfes,
                          const volumeFaceIntegrationArrays &_gpuArrays, const int &_maxIntPoints, const int &_maxDofs,
                          DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh,
                          ParGridFunction *_spaceVaryViscMult, ParGridFunction *_Up, ParGridFunction *_gradUp,
@@ -55,6 +55,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
       intRuleType(_intRuleType),
       fluxClass(_fluxClass),
       mixture(_mixture),
+      transport_(_transport),
       vfes(_vfes),
       gpuArrays(_gpuArrays),
       maxIntPoints(_maxIntPoints),
@@ -119,7 +120,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
 #endif
 
   if (config_.isAxisymmetric()) {
-    forcing.Append(new AxisymmetricSource(dim, num_equation, _order, mixture, eqSystem, intRuleType, intRules, vfes, Up,
+    forcing.Append(new AxisymmetricSource(dim, num_equation, _order, mixture, transport_, eqSystem, intRuleType, intRules, vfes, Up,
                                           gradUp, gpuArrays, _config));
 
     const FiniteElementCollection *fec = vfes->FEColl();

@@ -39,6 +39,7 @@
 
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
+#include "transport_properties.hpp"
 #include "fluxes.hpp"
 #include "run_configuration.hpp"
 
@@ -110,10 +111,11 @@ class ConstantPressureGradient : public ForcingTerms {
 class AxisymmetricSource : public ForcingTerms {
  private:
   GasMixture *mixture;
+  TransportProperties *transport_;
   const Equations &eqSystem;
 
  public:
-  AxisymmetricSource(const int &_dim, const int &_num_equation, const int &_order, GasMixture *_mixture,
+  AxisymmetricSource(const int &_dim, const int &_num_equation, const int &_order, GasMixture *_mixture, TransportProperties *_transport,
                      const Equations &_eqSystem, const int &_intRuleType, IntegrationRules *_intRules,
                      ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
                      const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config);

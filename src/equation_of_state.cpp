@@ -38,9 +38,7 @@ GasMixture::GasMixture(WorkingFluid _fluid, int _dim) {
   fluid = _fluid;
   dim = _dim;
 
-  bulk_visc_mult = 0.;
-  visc_mult = 1;
-}
+};
 
 DryAir::DryAir(RunConfiguration &_runfile, int _dim) : GasMixture(WorkingFluid::DRY_AIR, _dim)
 {
@@ -60,9 +58,6 @@ DryAir::DryAir(RunConfiguration &_runfile, int _dim) : GasMixture(WorkingFluid::
   gasParams[GasParams::SPECIES_MW * numSpecies + 0] = UNIVERSALGASCONSTANT / gas_constant;
   gasParams[GasParams::SPECIES_HEAT_RATIO * numSpecies + 0] = specific_heat_ratio;
 
-  Pr = 0.71;
-  cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
-  Sc = 0.71;
 
   // TODO: replace Nconservative/Nprimitive.
   // add extra equation for passive scalar
@@ -77,20 +72,12 @@ DryAir::DryAir() {
   gas_constant = 287.058;
   // gas_constant = 1.; // for comparison against ex18
   specific_heat_ratio = 1.4;
-  visc_mult = 1.;
-  Pr = 0.71;
-  cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
-  Sc = 0.71;
 }
 
 DryAir::DryAir(int _dim, int _num_equation) {
   gas_constant = 287.058;
   // gas_constant = 1.; // for comparison against ex18
   specific_heat_ratio = 1.4;
-  visc_mult = 1.;
-  Pr = 0.71;
-  cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
-  Sc = 0.71;
 
   dim = _dim;
   num_equation = _num_equation;
