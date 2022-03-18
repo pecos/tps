@@ -146,7 +146,6 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   }
 
   for (int i = 0; i < dim; i++) stress(i, i) += (bulkViscosity - 2. / 3. * visc) * divV;
-  // stress *= visc;
 
   for (int i = 0; i < dim; i++)
     for (int j = 0; j < dim; j++) flux(1 + i, j) = stress(i, j);
