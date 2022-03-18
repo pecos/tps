@@ -366,9 +366,9 @@ void M2ulPhyS::initVariables() {
       // Only for NS_PASSIVE.
       if ((eqSystem == NS_PASSIVE) && (sp == 1)) break;
 
-      // TODO: May read species names from input file and add them as variable name.
-      // TODO: May change depending on visualization variable. (X, Y, n)
-      ioData.registerIOVar("/meanSolution", "mean-Y" + std::to_string(sp + 1), sp + nvel + 2);
+      int inputSpeciesIndex = mixture->getInputIndexOf(sp);
+      std::string speciesName = config.speciesNames[inputSpeciesIndex];
+      ioData.registerIOVar("/meanSolution", "mean-Y" + speciesName, sp + nvel + 2);
     }
 
     // rms
@@ -1350,7 +1350,7 @@ void M2ulPhyS::testInitialCondition(const Vector &x, Vector &y) {
 }
 
 // NOTE: Use only for DRY_AIR.
-void M2ulPhyS::uniformInitialConditions() {
+void M2ulPhyS::dryAirUniformInitialConditions() {
   double *data = U->HostWrite();
   double *dataUp = Up->HostWrite();
   double *dataGradUp = gradUp->HostWrite();
@@ -1401,6 +1401,46 @@ void M2ulPhyS::uniformInitialConditions() {
   }
 
   delete eqState;
+}
+
+void M2ulPhyS::uniformInitialConditions() {
+  if (config.GetWorkingFluid() == DRY_AIR) {
+    dryAirUniformInitialConditions();
+    return;
+  }
+
+  std::string basepath("initialConditions");
+  Vector initCondition(num_equation);
+  for (int eq = 0; eq < num_equation; eq++) {
+    tpsP->getRequiredInput((basepath + "/Q" + std::to_string(eq+1)).c_str(), initCondition[eq]);
+  }
+
+  double *data = U->HostWrite();
+  double *dataUp = Up->HostWrite();
+  double *dataGradUp = gradUp->HostWrite();
+
+  int dof = vfes->GetNDofs();
+
+  Vector state;
+  state.UseDevice(false);
+  state.SetSize(num_equation);
+  Vector Upi;
+  Upi.UseDevice(false);
+  Upi.SetSize(num_equation);
+
+  for (int i = 0; i < dof; i++) {
+    for (int eq = 0; eq < num_equation; eq++) {
+      data[i + eq * dof] = initCondition(eq);
+      state(eq) = data[i + eq * dof];
+      for (int d = 0; d < dim; d++) {
+        dataGradUp[i + eq * dof + d * num_equation * dof] = 0.;
+      }
+    }
+
+    mixture->GetPrimitivesFromConservatives(state, Upi);
+    for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * dof] = Upi[eq];
+  }
+
 }
 
 void M2ulPhyS::initGradUp() {

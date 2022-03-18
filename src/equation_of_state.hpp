@@ -167,6 +167,9 @@ class GasMixture {
   // double GetViscMultiplyer() { return visc_mult; }
   // double GetBulkViscMultiplyer() { return bulk_visc_mult; }
 
+  virtual double getMolarCV(int species) {};
+  virtual double getMolarCP(int species) {};
+
   // BC related functions
   virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState){};
   virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut){};

@@ -62,6 +62,7 @@ void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const 
   double temp = p / gas_constant / state[0];
 
   transportBuffer.SetSize(GlobalTrnsCoeffs::NUM_GLOBAL_COEFFS);
+  transportBuffer = 0.0;
   transportBuffer[GlobalTrnsCoeffs::VISCOSITY] = (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
   transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY] = bulk_visc_mult;
   transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY] =

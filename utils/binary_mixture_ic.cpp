@@ -16,8 +16,11 @@ int main (int argc, char *argv[])
 
   M2ulPhyS *srcField = new M2ulPhyS(tps.getMPISession(), tps.getInputFilename(), &tps);
   RunConfiguration& srcConfig = srcField->GetConfig();
-  assert(srcConfig.GetWorkingFluid()==WorkingFluid::TEST_BINARY_AIR);
+  assert(srcConfig.GetWorkingFluid()==USER_DEFINED);
   assert(~srcConfig.GetRestartCycle());
+
+  GasMixture *mixture = srcField->getMixture();
+  int numSpecies = mixture->GetNumSpecies();
 
   // Get meshes
   ParMesh* mesh_1 = srcField->GetMesh();
@@ -51,17 +54,34 @@ int main (int argc, char *argv[])
   double *dataU = src_state->GetData();
   int NDof = src_fes->GetNDofs();
 
-  double gamma = 1.4;
-  double T0 = 293.0;
-  double p0 = 101300;
-  double gas_constant = 287.058;
-  double u0 = 5.0;
+  std::string basepath("utils/binary_initial_condition");
 
-  double rho = p0 / gas_constant / T0;
+  double T0, p0, u0, Lx, Ly;
+  int k0;
+  tps.getRequiredInput((basepath + "/temperature").c_str(), T0);
+  tps.getRequiredInput((basepath + "/pressure").c_str(), p0);
+  tps.getRequiredInput((basepath + "/velocity/u").c_str(), u0);
+  tps.getRequiredInput((basepath + "/domain_length/x").c_str(), Lx);
+  tps.getRequiredInput((basepath + "/domain_length/y").c_str(), Ly);
+  tps.getRequiredInput((basepath + "/wavenumber").c_str(), k0);
+  grvy_printf(GRVY_INFO, "\n Temperature: %.8E\n", T0);
+  grvy_printf(GRVY_INFO, "\n Pressure: %.8E\n", p0);
+  grvy_printf(GRVY_INFO, "\n X velocity: %.8E\n", u0);
+  grvy_printf(GRVY_INFO, "\n X domain length: %.8E\n", Lx);
+  grvy_printf(GRVY_INFO, "\n Y domain length: %.8E\n", Ly);
+  grvy_printf(GRVY_INFO, "\n Wave number: %d\n", k0);
+
+  double nTotal = p0 / UNIVERSALGASCONSTANT / T0;
+  double rho = nTotal * mixture->GetGasParams(numSpecies - 1, GasParams::SPECIES_MW);
   double rhoU = rho * u0;
-  double rhoE = 101300. / (gamma - 1.) + 0.5 * rhoU * rhoU / rho;
+  double rhoE = nTotal * mixture->getMolarCV(numSpecies - 1) * T0 + 0.5 * rhoU * rhoU / rho;
+
+  // double rho = p0 / gas_constant / T0;
+  // double rhoU = rho * u0;
+  // double rhoE = 101300. / (gamma - 1.) + 0.5 * rhoU * rhoU / rho;
   double pi = atan(1.0) * 4.0;
   for (int i = 0; i < NDof; i++) {
+    double Y = ( 0.5 + 0.45 * sin( 2.0 * pi * coordinates[i + 0 * NDof] / Lx / (k0 * 1.0) ) );
     // std::cout << "Grid point " << i << ": ";
     // for (int d = 0; d < dim; d++) {
     //   std::cout << coordinates[i + d * NDof] << ", ";
@@ -71,10 +91,11 @@ int main (int argc, char *argv[])
     dataU[i] = rho;
     dataU[i + 1 * NDof] = rhoU;
     for (int d = 1; d < dim; d++) {
-      dataU[i + (d+1) * NDof] = 0.0;
+      dataU[i + (d + 1) * NDof] = 0.0;
     }
-    dataU[i + (dim+1) * NDof] = rhoE;
-    dataU[i + (dim+2) * NDof] = rho * ( 0.5 + 0.5 * sin( 2.0 * pi * coordinates[i + 0 * NDof] / 10.0 ) );
+    dataU[i + (dim + 1) * NDof] = rhoE;
+    dataU[i + (dim + 2) * NDof] = rho * Y;
+    dataU[i + (dim + 2 + numSpecies - 2) * NDof] = 0.0;
     // dataU[i + (dim+3) * NDof] = 0.5 - 0.5 * sin( 2.0 * pi * coordinates[i + 0 * NDof] / 10.0 );
     // if (coordinates[i + 0 * NDof]>0) {
     //   dataU[i + (dim+2) * NDof] = 0.0;

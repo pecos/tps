@@ -293,6 +293,7 @@ class M2ulPhyS : public TPS::Solver {
 #endif
   static void InitialConditionEulerVortex(const Vector &x, Vector &y);
   static void testInitialCondition(const Vector &x, Vector &y);
+  void dryAirUniformInitialConditions();
   void uniformInitialConditions();
   void initGradUp();
 
@@ -337,6 +338,7 @@ class M2ulPhyS : public TPS::Solver {
   ParFiniteElementSpace *GetFESpace() { return vfes; }
   ParGridFunction *GetSolutionGF() { return U; }
   RunConfiguration &GetConfig() { return config; }
+  GasMixture *getMixture() { return mixture; }
 
   static int Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_print);
 

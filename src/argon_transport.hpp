@@ -103,6 +103,9 @@ class ArgonMinimalTransport : public TransportProperties {
 
   double computeThirdOrderElectronThermalConductivity(const Vector &X_sp, const double debyeLength, const double Te, const double nondimTe);
 
+  // TODO: only for AxisymmetricSource
+  virtual double GetViscosityFromPrimitive(const Vector &state) {};
+
   // These are used to compute third-order electron thermal conductivity based on standard Chapman--Enskog method.
   double L11ee(const Vector &Q2) { return Q2(0); }
   double L11ea(const Vector &Q1) { return 6.25 * Q1(0) - 15. * Q1(1) + 12. * Q1(2); }

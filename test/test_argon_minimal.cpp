@@ -86,10 +86,10 @@ int main (int argc, char *argv[])
     }
     std::cout << std::endl;
   }
-
   fileName = "./ref_solns/transport/Devoto1973.transport.h5";
   DenseMatrix Devoto;
   Array<int> dims2 = readTable(fileName, datasetName, Devoto);
+
   Array<int> idxs(dims1[0]);
   idxs[0] = 2;
   idxs[1] = 3;
@@ -146,7 +146,8 @@ int main (int argc, char *argv[])
     gradUp = 0.0;
 
     Vector transportBuffer;
-    DenseMatrix diffusionVelocity;
+    transportBuffer.SetSize(GlobalTrnsCoeffs::NUM_GLOBAL_COEFFS);
+    DenseMatrix diffusionVelocity(numSpecies, dim);
     transport->ComputeFluxTransportProperties(conservedState, gradUp, transportBuffer, diffusionVelocity);
 
     // error = max(error, abs(refValues(i,1) - transportBuffer[GlobalTrnsCoeffs::VISCOSITY]) / refValues(i,1));
