@@ -83,7 +83,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     mixture_->computeNumberDensities(Un, ns);
 
     // get reaction rates
-    Vector creationRates;
+    Vector creationRates(numSpecies_);
     chemistry_->computeCreationRate(ns, kfwd, kC, creationRates);
 
     // add species creation rates
