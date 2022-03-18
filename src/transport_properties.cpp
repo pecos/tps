@@ -64,8 +64,9 @@ void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const 
 
   transportBuffer.SetSize(GlobalTrnsCoeffs::NUM_GLOBAL_COEFFS);
   transportBuffer = 0.0;
-  transportBuffer[GlobalTrnsCoeffs::VISCOSITY] = (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
-  transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY] = bulk_visc_mult;
+  double viscosity = (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
+  transportBuffer[GlobalTrnsCoeffs::VISCOSITY] = viscosity;
+  transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY] = bulk_visc_mult * viscosity;
   transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY] =
       cp_div_pr * transportBuffer[GlobalTrnsCoeffs::VISCOSITY];
 
@@ -109,8 +110,9 @@ void TestBinaryAirTransport::ComputeFluxTransportProperties(const Vector &state,
   double temp = p / gas_constant / state[0];
 
   transportBuffer.SetSize(GlobalTrnsCoeffs::NUM_GLOBAL_COEFFS);
-  transportBuffer[GlobalTrnsCoeffs::VISCOSITY] = (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
-  transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY] = bulk_visc_mult;
+  double viscosity = (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
+  transportBuffer[GlobalTrnsCoeffs::VISCOSITY] = viscosity;
+  transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY] = bulk_visc_mult * viscosity;
   transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY] =
       cp_div_pr * transportBuffer[GlobalTrnsCoeffs::VISCOSITY];
 

@@ -124,7 +124,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   DenseMatrix diffusionVelocity(numSpecies, dim);
   transport->ComputeFluxTransportProperties(state, gradUp, transportBuffer, diffusionVelocity);
   const double visc = transportBuffer[GlobalTrnsCoeffs::VISCOSITY];
-  const double bulkViscMult = transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY];
+  const double bulkViscosity = transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY];
   double k = transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY];
   if (!twoTemperature) k += transportBuffer[GlobalTrnsCoeffs::ELECTRON_THERMAL_CONDUCTIVITY];
 
@@ -139,13 +139,14 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
     for (int j = 0; j < dim; j++) stress(i, j) = gradUp(1 + j, i) + gradUp(1 + i, j);
     divV += gradUp(1 + i, i);
   }
+  stress *= visc;
 
   if (axisymmetric_ && radius > 0) {
     divV += ur / radius;
   }
 
-  for (int i = 0; i < dim; i++) stress(i, i) += (bulkViscMult - 2. / 3.) * divV;
-  stress *= visc;
+  for (int i = 0; i < dim; i++) stress(i, i) += (bulkViscosity - 2. / 3. * visc) * divV;
+  // stress *= visc;
 
   for (int i = 0; i < dim; i++)
     for (int j = 0; j < dim; j++) flux(1 + i, j) = stress(i, j);
