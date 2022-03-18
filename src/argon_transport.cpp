@@ -137,7 +137,7 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
 
   double binaryDea = diffusivityFactor_ * sqrt(Te / muAE_) / nTotal / collision::argon::eAr11(Te);
   double binaryDai = diffusivityFactor_ * sqrt(Th / muAI_) / nTotal / collision::argon::ArAr1P11(Th);
-  double binaryDie = diffusivityFactor_ * sqrt(Te / muEI_) / nTotal / collision::charged::att11(Te);
+  double binaryDie = diffusivityFactor_ * sqrt(Te / muEI_) / nTotal / collision::charged::att11(nondimTe);
 
   Vector diffusivity(3), mobility(3);
   diffusivity(electronIndex_) = (1.0 - Y_sp(electronIndex_)) / ((X_sp(ionIndex_) + Xeps) / binaryDie + (X_sp(neutralIndex_) + Xeps) / binaryDea);
@@ -169,7 +169,7 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   }
 
   if (ambipolar) {
-    for (int d = 0; d < dim; d++) ambE(d) /= beta;
+    for (int d = 0; d < dim; d++) ambE(d) /= (beta + Xeps); // NOTE: add Xeps for the case of no charged-species at the point.
 
     for (int sp = 0; sp < numSpecies; sp++) {
       for (int d = 0; d < dim; d++)
@@ -254,4 +254,34 @@ double ArgonMinimalTransport::computeThirdOrderElectronThermalConductivity(const
   // std::cout << "L22: " << L22 << std::endl;
 
   return viscosityFactor_ * kOverEtaFactor_ * sqrt(2.0 * Te / mw_(electronIndex_)) * X_sp(electronIndex_) / (L11 - L12 * L12 / L22);
+}
+
+void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state, Vector &diffusivity) {
+  Vector primitiveState(num_equation);
+  mixture->GetPrimitivesFromConservatives(state, primitiveState);
+
+  Vector n_sp(3), X_sp(3), Y_sp(3);
+  mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
+  double nTotal = 0.0;
+  for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
+
+  double Te = (twoTemperature) ? primitiveState[num_equation - 1] : primitiveState[dim + 1];
+  double Th = primitiveState[dim + 1];
+
+  // Add Xeps to avoid zero number density case.
+  double nOverT = (n_sp(electronIndex_) + Xeps) / Te + (n_sp(ionIndex_) + Xeps) / Th;
+  double debyeLength = sqrt(debyeFactor_ / AVOGADRONUMBER / nOverT);
+  double debyeCircle = PI_ * debyeLength * debyeLength;
+
+  double nondimTe = debyeLength * 4.0 * PI_ * debyeFactor_ * Te;
+  double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
+
+  double binaryDea = diffusivityFactor_ * sqrt(Te / muAE_) / nTotal / collision::argon::eAr11(Te);
+  double binaryDai = diffusivityFactor_ * sqrt(Th / muAI_) / nTotal / collision::argon::ArAr1P11(Th);
+  double binaryDie = diffusivityFactor_ * sqrt(Te / muEI_) / nTotal / collision::charged::att11(nondimTe);
+
+  diffusivity.SetSize(3);
+  diffusivity(electronIndex_) = (1.0 - Y_sp(electronIndex_)) / ((X_sp(ionIndex_) + Xeps) / binaryDie + (X_sp(neutralIndex_) + Xeps) / binaryDea);
+  diffusivity(ionIndex_) = (1.0 - Y_sp(ionIndex_)) / ((X_sp(neutralIndex_) + Xeps) / binaryDai + (X_sp(electronIndex_) + Xeps) / binaryDie);
+  diffusivity(neutralIndex_) = (1.0 - Y_sp(neutralIndex_)) / ((X_sp(electronIndex_) + Xeps) / binaryDea + (X_sp(ionIndex_) + Xeps) / binaryDai);
 }

@@ -1690,10 +1690,7 @@ void M2ulPhyS::parseSolverOptions2() {
     tpsP->getInput("time/cfl", config.cflNum, 0.12);
     tpsP->getInput("time/integrator", type, std::string("rk4"));
     tpsP->getInput("time/enableConstantTimestep", config.constantTimeStep, false);
-    if (config.constantTimeStep) {
-      tpsP->getRequiredInput("time/timestep_size", config.dt_fixed);
-      assert(config.dt_fixed > 0.0);
-    }
+    if (config.constantTimeStep) tpsP->getInput("time/dt_fixed", config.dt_fixed, -1.);
     if (integrators.count(type) == 1) {
       config.timeIntegratorType = integrators[type];
     } else {

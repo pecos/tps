@@ -36,7 +36,7 @@
 #include "M2ulPhyS.hpp"
 #include "utils.hpp"
 
-void M2ulPhyS::restart_files_hdf5(string mode) {
+void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
 #ifdef HAVE_GRVY
   grvy_timer_begin(__func__);
 #endif
@@ -46,9 +46,19 @@ void M2ulPhyS::restart_files_hdf5(string mode) {
   herr_t status;
   Vector dataSerial;
 
-  string serialName = "restart_";
-  serialName.append(config.GetOutputName());
-  serialName.append(".sol.h5");
+  string serialName;
+  if (inputFileName.length() > 0) {
+    if (inputFileName.substr(inputFileName.length() - 3) != ".h5") {
+      grvy_printf(gerror, "[ERROR]: M2ulPhyS::restart_files_hdf5 - input file name has a wrong format -> %s\n", inputFileName.c_str());
+      grvy_printf(GRVY_INFO, "format: %s\n", (inputFileName.substr(inputFileName.length() - 3)).c_str());
+      exit(ERROR);
+    }
+    serialName = inputFileName;
+  } else {
+    serialName = "restart_";
+    serialName.append(config.GetOutputName());
+    serialName.append(".sol.h5");
+  }
   string fileName;
 
   if (((config.RestartSerial() == "read") && (mode == "read")) ||

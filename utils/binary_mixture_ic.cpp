@@ -21,6 +21,9 @@ int main (int argc, char *argv[])
 
   GasMixture *mixture = srcField->getMixture();
   int numSpecies = mixture->GetNumSpecies();
+  int num_equation = mixture->GetNumEquations();
+
+  ArgonMinimalTransport transport = ArgonMinimalTransport(mixture, srcConfig);
 
   // Get meshes
   ParMesh* mesh_1 = srcField->GetMesh();
@@ -71,6 +74,13 @@ int main (int argc, char *argv[])
   grvy_printf(GRVY_INFO, "\n Y domain length: %.8E\n", Ly);
   grvy_printf(GRVY_INFO, "\n Wave number: %d\n", k0);
 
+  double time;
+  tps.getRequiredInput((basepath + "/reference_solution/time").c_str(), time);
+  grvy_printf(GRVY_INFO, "\n Reference solution is at time = : %.8E\n", time);
+  std::string refFileName;
+  tps.getInput((basepath + "/reference_solution/filename").c_str(), refFileName, std::string("argonMinimal.binary.ref.h5"));
+  grvy_printf(GRVY_INFO, "\n Reference solution filename : %s\n", refFileName.c_str());
+
   double nTotal = p0 / UNIVERSALGASCONSTANT / T0;
   double rho = nTotal * mixture->GetGasParams(numSpecies - 1, GasParams::SPECIES_MW);
   double rhoU = rho * u0;
@@ -81,7 +91,7 @@ int main (int argc, char *argv[])
   // double rhoE = 101300. / (gamma - 1.) + 0.5 * rhoU * rhoU / rho;
   double pi = atan(1.0) * 4.0;
   for (int i = 0; i < NDof; i++) {
-    double Y = ( 0.5 + 0.45 * sin( 2.0 * pi * k0 * coordinates[i + 0 * NDof] / Lx ) );
+    double Y = 0.5 + 0.45 * sin( 2.0 * pi * k0 * coordinates[i + 0 * NDof] / Lx );
     // std::cout << "Grid point " << i << ": ";
     // for (int d = 0; d < dim; d++) {
     //   std::cout << coordinates[i + d * NDof] << ", ";
@@ -111,6 +121,44 @@ int main (int argc, char *argv[])
 
   // Write restart files
   srcField->writeHDF5();
+
+  Vector conservedState(num_equation);
+  int idx = 0;
+  for (int eq = 0; eq < num_equation; eq++) {
+    conservedState(eq) = dataU[idx + eq * NDof];
+  }
+
+  Vector diffusivity;
+  transport.computeMixtureAverageDiffusivity(conservedState, diffusivity);
+  grvy_printf(GRVY_INFO, "\n Ar-Ar+ binary diffusivity : %.8E\n", diffusivity(transport.getIonIndex()));
+  double Dia = diffusivity(transport.getIonIndex());
+
+  double decay = exp(- (4.0 * pi * pi * k0 * k0 / Lx / Lx) * Dia * time);
+  double distance = u0 * time;
+
+  // Set up reference solution
+  for (int i = 0; i < NDof; i++) {
+    double Y = 0.5 + 0.45 * decay * sin( 2.0 * pi * k0 * (coordinates[i + 0 * NDof] - distance) / Lx );
+    // std::cout << "Grid point " << i << ": ";
+    // for (int d = 0; d < dim; d++) {
+    //   std::cout << coordinates[i + d * NDof] << ", ";
+    // }
+    // std::cout << std::endl;
+
+    dataU[i] = rho;
+    dataU[i + 1 * NDof] = rhoU;
+    for (int d = 1; d < dim; d++) {
+      dataU[i + (d + 1) * NDof] = 0.0;
+    }
+    dataU[i + (dim + 1) * NDof] = rhoE;
+    dataU[i + (dim + 2) * NDof] = rho * Y;
+    dataU[i + (dim + 2 + numSpecies - 2) * NDof] = 0.0;
+  }
+
+  rhsOperator.updatePrimitives(*src_state);
+
+  // Write restart files
+  srcField->writeHDF5(refFileName);
 
   return 0;
 }

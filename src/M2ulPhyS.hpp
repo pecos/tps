@@ -303,7 +303,7 @@ class M2ulPhyS : public TPS::Solver {
   void read_restart_files();
   void read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data);
   void read_serialized_soln_data(hid_t file, string varName, int numDof, int varOffset, double *data, IOFamily &fam);
-  void restart_files_hdf5(string mode);
+  void restart_files_hdf5(string mode, string inputFileName = std::string());
   void partitioning_file_hdf5(string mode);
   void serialize_soln_for_write(IOFamily &fam);
   void write_soln_data(hid_t group, string varName, hid_t dataspace, double *data);
@@ -324,7 +324,7 @@ class M2ulPhyS : public TPS::Solver {
   void parseSolverOptions2();
   void checkSolverOptions() const;
   void projectInitialSolution();
-  void writeHDF5() { restart_files_hdf5("write"); }
+  void writeHDF5(string inputFileName = std::string()) { restart_files_hdf5("write", inputFileName); }
   void writeParaview(int iter, double time) {
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
