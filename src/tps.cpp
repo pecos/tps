@@ -79,6 +79,10 @@ void Tps::printHeader() {
     grvy_printf(ginfo, "Git Version:  %s\n", BUILD_VERSION);
     grvy_printf(ginfo, "MFEM Version: %s\n", mfem::GetVersionStr());
     grvy_printf(ginfo, "------------------------------------\n\n");
+
+#ifdef _MASA_
+    grvy_printf(ginfo, "MASA is enabled. \n\n");
+#endif
   }
 }
 

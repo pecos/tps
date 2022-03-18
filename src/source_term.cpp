@@ -97,5 +97,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     for (int sp = 0; sp < numActiveSpecies_; sp++) {
       h_in[n + (2 + dim + sp) * nnodes] += creationRates(sp);
     }
+
+    // TODO: energy sink for radiative reaction.
   }
 }
