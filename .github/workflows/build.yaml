@@ -85,7 +85,7 @@ jobs:
       - name: Bootstrap
         run:  module restore tps-gpu; ./bootstrap
       - name: Configure
-        run: module restore tps-gpu; ./configure --enable-gpu-cuda CUDA_ARCH=sm_75
+        run: module restore tps-gpu; ./configure --enable-pybind11 --enable-gpu-cuda CUDA_ARCH=sm_75
       - name: Make
         run: module restore tps-gpu; make -j 2
       - name: Tests
@@ -113,7 +113,7 @@ jobs:
       - name: Bootstrap
         run:  module restore tps-gpu; ./bootstrap
       - name: Configure
-        run: module restore tps-gpu; ./configure --enable-gpu-hip HIP_ARCH=gfx803
+        run: module restore tps-gpu; ./configure -enable-pybind11 --enable-gpu-hip HIP_ARCH=gfx803
       - name: Make
         run: module restore tps-gpu; make -j 2
       - name: Tests
