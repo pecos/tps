@@ -327,7 +327,6 @@ void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTe
       Fluxes::viscousFlux_gpu(vFlux, Un, gradUpn, fluid, eqSystem, transpModel, d_gasParams, gamma, 
                               Rg, viscMult, bulkViscMult, Pr, Sc, molarCV, molarCP, ambipolar, twoTemperature,
                               dim, num_equation, d_numActiveSpecies, d_numSpecies, eq, num_equation);
-
       MFEM_SYNC_THREAD;
 
       if (d_spaceVaryViscMult != NULL) {

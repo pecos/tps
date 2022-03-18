@@ -170,6 +170,7 @@ class Fluxes {
         printf("Fluxes::viscousFlux_gpu(): Fluid not specified");
         break;
     }
+    MFEM_SYNC_THREAD;
     
     switch (transpModel){
       case TransportModel::DRY_AIR_TRNSP:
@@ -234,13 +235,18 @@ class Fluxes {
     }
     MFEM_SYNC_THREAD;
     
+    for (int d = thrd; d < dim; d += maxThreads) {
+      for (int sp = 0; sp < numActiveSpecies; sp++)
+        vFlux[1 + dim + d * num_equation] -= speciesEnthalpies[sp] * diffusionVelocity[sp+d*numActiveSpecies];
+    }
+    
     // Transport terms
     for (int sp = thrd; sp < numActiveSpecies; sp += maxThreads) {
       for (int d = 0; d < dim; d++) {
         vFlux[2 +dim + sp + d*num_equation] = Un[dim + 2 + sp] * diffusionVelocity[sp+d*numActiveSpecies];
-        vFlux[1 + dim + d * num_equation] -=  speciesEnthalpies[sp] * diffusionVelocity[sp+d*numActiveSpecies];
       }
     }
+    MFEM_SYNC_THREAD;
 
 //     if (eqSystem == NS_PASSIVE) {
 //       for (int d = thrd; d < dim; d += maxThreads)
