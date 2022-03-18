@@ -1,0 +1,149 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="cyl3d.gpu"
+RUNFILE="inputs/input.dtconst.cyl.ini"
+RUNFILE_HEAT="inputs/input.dtconst.cyl.heatSource.ini"
+OPTS=""
+EXE="../src/tps.py"
+
+setup() {
+    SOLN_FILE=restart_output.sol.h5
+    REF_FILE=ref_solns/cyl3d.dtconst.cpu.h5
+    REF_FILE_HEAT=ref_solns/cyl3d.dtconst.heatSource.cpu.h5
+
+    # various GPU card detections
+    SKIP="ASPEED"
+    NUM_GPUS=`/sbin/lspci | grep "VGA compatible controller" | grep -v $SKIP | wc -l`
+    if [ $NUM_GPUS -eq 0 ];then
+	NUM_GPUS=`/sbin/lspci | grep "controller: NVIDIA" | wc -l`
+    fi
+}
+
+@test "[$TEST] check for input file $RUNFILE" {
+    test -s $RUNFILE
+}
+
+@test "[$TEST] run tps with input -> $RUNFILE" {
+    rm -f $SOLN_FILE
+    $EXE --runFile $RUNFILE
+
+    test -s $SOLN_FILE
+}
+
+@test "[$TEST] verify tps output with input -> $RUNFILE" {
+    test -s $SOLN_FILE
+    test -s $REF_FILE
+    ./soln_differ $SOLN_FILE $REF_FILE
+}
+
+@test "[$TEST] verify git sha in HDF5 file" {
+
+    test -s $SOLN_FILE
+    run h5dump  -a revision restart_output.sol.h5
+    [[ "${status}" -eq 0 ]]
+}
+
+@test "[$TEST] verify exit code if restart files missing" {
+    RUNFILE=inputs/input.dtconst.restart.cyl.ini
+
+    rm -f $SOLN_FILE
+
+    # following should exit with error
+    run $EXE --runFile $RUNFILE $OPTS
+    [[ "${status}" -eq 1 ]]
+    [[ "${output}" =~ "Unable to access desired restart file" ]]
+}
+
+@test "[$TEST] verify consistent solution with restart from 2 iters" {
+    RUNFILE=inputs/input.dtconst.2iters.cyl.ini
+
+    rm -f $SOLN_FILE
+    test -s $RUNFILE
+    $EXE --runFile $RUNFILE $OPTS
+    test -s $SOLN_FILE
+
+    run h5dump  -a iteration  restart_output.sol.h5
+    [ "${lines[5]}" = "   (0): 2" ]
+
+    RUNFILE=inputs/input.dtconst.restart.cyl.ini
+    $EXE --runFile $RUNFILE $OPTS
+    ./soln_differ $SOLN_FILE $REF_FILE
+}
+
+@test "[$TEST] verify tps output after variable p restart" {
+
+    rm -f $SOLN_FILE
+    test -s $RUNFILE
+    $EXE --runFile $RUNFILE $OPTS
+    test -s $SOLN_FILE
+
+    run h5dump  -a iteration  restart_output.sol.h5
+    [ "${lines[5]}" = "   (0): 4" ]
+
+    run h5dump  -a order  restart_output.sol.h5
+    [ "${lines[5]}" = "   (0): 1" ]
+
+     VARPLOG=varp.log
+     rm -f $VARPLOG
+     RUNFILE=inputs/input.dtconst.8iters.newp.cyl.ini
+     $EXE --runFile $RUNFILE $OPTS >& $VARPLOG
+
+     #intErr=$(cat $VARPLOG | grep "interpolation error" | awk '{print $6}')
+     # Line grabs the printed interpolation error norm, which I'd like
+     # to compare against a tolerance.  But bc isn't available in
+     # current container it seems, so I'm not doing this now.
+     
+     run h5dump  -a iteration  restart_output.sol.h5
+     [ "${lines[5]}" = "   (0): 8" ]
+     
+     run h5dump  -a order  restart_output.sol.h5
+     [ "${lines[5]}" = "   (0): 2" ]
+     
+     REF_FILE=ref_solns/cyl3d.dtconst.gpu.varp.h5
+     test -s $REF_FILE
+     ./soln_differ $SOLN_FILE $REF_FILE
+}
+
+@test "[$TEST] verify tps output from 2 mpi tasks with input -> $RUNFILE" {
+
+    [ $NUM_GPUS -ge 2 ] || skip "Two GPUs not available"
+
+    SOLN_FILE_0=restart_output.sol.0.h5
+    SOLN_FILE_1=restart_output.sol.1.h5
+
+    REF_FILE_0=ref_solns/cyl.r0.p2.iter4.h5
+    REF_FILE_1=ref_solns/cyl.r1.p2.iter4.h5
+
+    mpirun -np 2 $EXE --runFile $RUNFILE $OPTS
+
+    test -s $SOLN_FILE_0
+    test -s $REF_FILE_0
+    ./soln_differ $SOLN_FILE_0 $REF_FILE_0
+
+    test -s $SOLN_FILE_1
+    test -s $REF_FILE_1
+    ./soln_differ $SOLN_FILE_1 $REF_FILE_1
+}
+
+@test "[$TEST] verify tps output with input heat source <enabled> -> $RUNFILE_HEAT" {
+
+    test -s $RUNFILE_HEAT
+    $EXE -run $RUNFILE_HEAT
+    
+    test -s $SOLN_FILE
+    test -s $REF_FILE_HEAT
+    ./soln_differ $SOLN_FILE $REF_FILE_HEAT
+}
+
+@test "[$TEST] verify tps output with one input heat source <disabled> -> $RUNFILE_HEAT" {
+
+    runFileDisabled="inputs/input.dtconst.cyl.heatSource.disabled.ini"
+    test -s $runFileDisabled
+    $EXE -run $runFileDisabled
+    
+    test -s $SOLN_FILE
+    test -s $REF_FILE
+    ./soln_differ $SOLN_FILE $REF_FILE
+}
+

@@ -39,8 +39,13 @@ TESTS += cyl3d.gpu.test \
 	 cyl3d.mflow.gpu.test \
 	 wedge.gpu.test \
 	 averages.gpu.test
+
+if PYTHON_ENABLED
+TESTS += cyl3d.python.gpu.test
+endif
+
 else
-TESTS += cyl3d.test \
+TESTS += cyl3d.test
 	 cyl3d.mflow.test \
 	 cyl3d.dtconst.test \
 	 averages.test \
@@ -56,6 +61,11 @@ TESTS += cyl3d.test \
 	 diffusion_wall.test \
 	 reaction.test \
 	 inflow_outflow.test
+
+if PYTHON_ENABLED
+TESTS += cyl3d.python.test
+endif
+
 endif
 
 if GSLIB_ENABLED
