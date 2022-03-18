@@ -803,7 +803,7 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
       //
       MFEM_SHARED double Fcontrib[216 * 20];
       MFEM_SHARED double shape[216];
-      MFEM_SHARED double Rflux[20], u1[20], u2[20], nor[3];
+      MFEM_SHARED double Rflux[20], u1[20], u2[20], nor[3], KE[3] ,p;
       MFEM_SHARED double weight;
 
       const int el = d_listElems[n];
@@ -837,13 +837,28 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
         {
           computeSubDenseVel(&u1[0], &u2[0], &nor[0], d_inputState, gamma, dim, num_equation, 
                            d_numActiveSpecies, eqSystem,i,maxDofs);
-          PerfectMixture::modifyEnergyForPressure_gpu(u2,u2,d_inputState[0],
+          
+          switch (fluid) {
+            case WorkingFluid::DRY_AIR:
+              {
+                if (i < dim) KE[i] = 0.5 * u1[1 + i] * u1[1 + i] / u1[0];
+                if (dim != 3 && i == 1) KE[2] = 0.;
+                MFEM_SYNC_THREAD;
+                
+                if (i == 0) p = DryAir::pressure(&u1[0], &KE[0], gamma, dim, num_equation);
+                DryAir::modifyEnergyForPressure_gpu(u2,u2,p,gamma, num_equation, dim,i,maxDofs);
+              }
+              break;
+            case WorkingFluid::USER_DEFINED:
+              PerfectMixture::modifyEnergyForPressure_gpu(u2,u2,d_inputState[0],
                                                       true,molarCV,gasParams,
                                                       ambipolar,twoTemperature,
                                                       num_equation,dim,
                                                       d_numSpecies,
                                                       d_numActiveSpecies,
                                                       i,maxDofs);
+              break;
+          }
         }
         break;
       case InletType::SUB_DENS_VEL_NR:
