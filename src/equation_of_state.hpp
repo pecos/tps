@@ -61,10 +61,19 @@ protected:
 
   int numSpecies;
   int numActiveSpecies;
+
+  int backgroundInputIndex_ = MAXSPECIES;
+
   bool ambipolar;
   bool twoTemperature;
 
   DenseMatrix gasParams;
+
+  std::map<int, int> mixtureToInputMap_;
+
+  // NOTE: the indexes here starts from 0, 1, ...
+  // Mapping between name and species index in gas parameter arrays.
+  std::map<std::string, int> speciesMapping_;
 
   // We fix species primitive to be number density and compute its gradient only.
   // Conversion to X- and Y-gradient are easy, compared to the other way around.
@@ -93,6 +102,7 @@ public:
   int GetDimension() { return dim; }
   bool IsAmbipolar() { return ambipolar; }
   bool IsTwoTemperature() { return twoTemperature; }
+  int getInputIndexOf(int mixtureIndex) { return mixtureToInputMap_[mixtureIndex]; }
 
   double GetGasParams(int species, GasParams param) { return gasParams(species,param); }
 
@@ -145,7 +155,7 @@ public:
 
   // double GetViscMultiplyer() { return visc_mult; }
   // double GetBulkViscMultiplyer() { return bulk_visc_mult; }
-  
+
   // BC related functions
   virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState) {};
   virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp,
@@ -195,7 +205,7 @@ private:
 
 
   // virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
-  
+
   // BC related functions
   virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState);
   virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp,
@@ -474,7 +484,7 @@ public:
   virtual void computeMoleFractionGradient(const Vector &numberDensities,
                                            const DenseMatrix &gradUp,
                                            DenseMatrix &moleFractionGrad);
-  
+
   // functions needed for BCs
   virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState);
   virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp,

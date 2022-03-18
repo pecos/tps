@@ -186,7 +186,9 @@ class RunConfiguration {
   int numSpecies;
   int backgroundIndex;
   int electronIndex;
-  // std::vector<pair<int, int>> speciesNames;
+
+  std::vector<std::string> speciesNames;
+
   DenseMatrix gasParams;
   Vector constantMolarCV;
   Vector constantMolarCP;

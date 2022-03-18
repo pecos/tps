@@ -929,9 +929,9 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     // Only for NS_PASSIVE.
     if ((eqSystem == NS_PASSIVE) && (sp==1)) break;
 
-    //TODO: May read species names from input file and add them as variable name.
-    //TODO: May change depending on visualization variable. (X, Y, n)
-    ioData.registerIOVar("/solution", "rho-Y"+std::to_string(sp + 1), sp + nvel + 2);
+    int inputSpeciesIndex = mixture->getInputIndexOf(sp);
+    std::string speciesName = config.speciesNames[inputSpeciesIndex];
+    ioData.registerIOVar("/solution", "rho-Y_" + speciesName, sp + nvel + 2);
   }
 
   // compute factor to multiply viscosity when this option is active
@@ -976,9 +976,10 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   } else if (numActiveSpecies > 1) {
     // TODO: for now, keep the number of primitive variables same as conserved variables.
     // will need to add full list of species.
-    for (int d = 0; d < numActiveSpecies; d++) {
-      //TODO: May read species names from input file and add them as variable name.
-      paraviewColl->RegisterField("number density-"+std::to_string(d + 1), visualizationVariables[d]);
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      int inputSpeciesIndex = mixture->getInputIndexOf(sp);
+      std::string speciesName = config.speciesNames[inputSpeciesIndex];
+      paraviewColl->RegisterField("number density_" + speciesName, visualizationVariables[sp]);
     }
   }
 
@@ -2037,7 +2038,9 @@ void M2ulPhyS::parseSolverOptions2() {
     // number of species defined
     if (config.eqSystem != NS_PASSIVE) {
       tpsP->getInput("species/numSpecies", config.numSpecies, 1);
-      config.gasParams.SetSize(config.numSpecies,GasParams::NUM_GASPARAMS);
+      config.gasParams.SetSize(config.numSpecies, GasParams::NUM_GASPARAMS);
+      // config.speciesNames.SetSize(config.numSpecies);
+      config.speciesNames.resize(config.numSpecies);
 
       if ( config.gasModel == PERFECT_MIXTURE ) {
         config.constantMolarCV.SetSize(config.numSpecies);
@@ -2051,23 +2054,26 @@ void M2ulPhyS::parseSolverOptions2() {
     */
     if ( (config.numSpecies > 1) && (config.eqSystem != NS_PASSIVE) ) {
       tpsP->getRequiredInput("species/background_index", config.backgroundIndex);
-      tpsP->getRequiredInput("species/electron_index", config.electronIndex);
-      if ( config.backgroundIndex != config.numSpecies ) {
-        grvy_printf(GRVY_ERROR, "\n Background species must be specified as the last species.");
-        exit(ERROR);
-      }
-      if ( config.electronIndex != config.numSpecies - 1 ) {
-        grvy_printf(GRVY_ERROR, "\n Electron species must be specified as the second to last species.");
-        exit(ERROR);
-      }
+      // tpsP->getRequiredInput("species/electron_index", config.electronIndex);
+      // if ( config.backgroundIndex != config.numSpecies ) {
+      //   grvy_printf(GRVY_ERROR, "\n Background species must be specified as the last species.");
+      //   exit(ERROR);
+      // }
+      // if ( config.electronIndex != config.numSpecies - 1 ) {
+      //   grvy_printf(GRVY_ERROR, "\n Electron species must be specified as the second to last species.");
+      //   exit(ERROR);
+      // }
     }
 
     // Gas Params
     if (config.workFluid!=DRY_AIR) {
       for (int i = 1; i <= config.numSpecies; i++) {
         double mw, charge;
-        std::string type;
+        std::string type, speciesName;
         std::string basepath("species/species" + std::to_string(i));
+
+        tpsP->getRequiredInput((basepath + "/name").c_str(), speciesName);
+        config.speciesNames[i-1] = speciesName;
 
         tpsP->getRequiredInput((basepath + "/molecular_weight").c_str(), mw);
         tpsP->getRequiredInput((basepath + "/charge_number").c_str(), charge);

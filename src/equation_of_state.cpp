@@ -551,11 +551,11 @@ PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim)
     : GasMixture(WorkingFluid::USER_DEFINED, _dim)
 {
   numSpecies = _runfile.GetNumSpecies();
-  ambipolar = _runfile.IsAmbipolar();
-  twoTemperature = _runfile.IsTwoTemperature();
-
-  SetNumActiveSpecies();
-  SetNumEquations();
+  backgroundInputIndex_ = _runfile.backgroundIndex;
+  assert( (backgroundInputIndex_ > 0) && (backgroundInputIndex_ <= numSpecies) );
+  // If electron is not included, then ambipolar and two-temperature are false.
+  ambipolar = false;
+  twoTemperature = false;
 
   /*
     TODO: Currently, background species is assumed to be the last species, and electron the second to last.
@@ -568,17 +568,38 @@ PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim)
   specificHeatRatios_.SetSize(numSpecies);
 
   gasParams = 0.0;
+  int paramIdx = 0;
+  int targetIdx;
   for (int sp = 0; sp < numSpecies; sp++) {
-    for (int param = 0; param < GasParams::NUM_GASPARAMS; param++)
-      gasParams(sp, param) = _runfile.GetGasParams(sp,(GasParams) param);
+    if (sp == backgroundInputIndex_ - 1) {
+      targetIdx = numSpecies - 1;
+    } else if (_runfile.speciesNames[sp] == "E") {
+      targetIdx = numSpecies - 2;
+      // Set ambipolar and twoTemperature if electron is included.
+      ambipolar = _runfile.IsAmbipolar();
+      twoTemperature = _runfile.IsTwoTemperature();
+    } else {
+      targetIdx = paramIdx;
+      paramIdx++;
+    }
+    speciesMapping_[_runfile.speciesNames[sp]] = targetIdx;
+    mixtureToInputMap_[targetIdx] = sp;
+    std::cout << "name, input index, mixture index: " << _runfile.speciesNames[sp] << ", "
+                                                      << sp << ", " << targetIdx << std::endl;
 
-    specificGasConstants_(sp) = UNIVERSALGASCONSTANT / gasParams(sp, GasParams::SPECIES_MW);
+    for (int param = 0; param < GasParams::NUM_GASPARAMS; param++)
+      gasParams(targetIdx, param) = _runfile.GetGasParams(sp,(GasParams) param);
+
+    specificGasConstants_(targetIdx) = UNIVERSALGASCONSTANT / gasParams(targetIdx, GasParams::SPECIES_MW);
 
     // TODO: read these from input parser.
-    molarCV_(sp) = _runfile.getConstantMolarCV(sp) * UNIVERSALGASCONSTANT;
-    molarCP_(sp) = _runfile.getConstantMolarCP(sp) * UNIVERSALGASCONSTANT;
-    specificHeatRatios_(sp) = molarCP_(sp) / molarCV_(sp);
+    molarCV_(targetIdx) = _runfile.getConstantMolarCV(sp) * UNIVERSALGASCONSTANT;
+    molarCP_(targetIdx) = _runfile.getConstantMolarCP(sp) * UNIVERSALGASCONSTANT;
+    specificHeatRatios_(targetIdx) = molarCP_(targetIdx) / molarCV_(targetIdx);
   }
+
+  SetNumActiveSpecies();
+  SetNumEquations();
 
   // We assume the background species is neutral.
   assert( gasParams(numSpecies - 1, GasParams::SPECIES_CHARGES) == 0.0 );
