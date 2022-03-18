@@ -29,8 +29,10 @@ if test ${enable_pybind11} == "yes" ; then
       AC_MSG_ERROR([pybind11 header not found. Please verify pybind11 is installed locally.])
    fi
    AC_LANG_POP([C++])
-   AM_CONDITIONAL(PYTHON_ENABLED,test x$enable_pybind11 = xyes)
+
 fi
+AM_CONDITIONAL(PYTHON_ENABLED,test x$enable_pybind11 = xyes)
+
 # enable c++11 standard
 CXXFLAGS="-std=c++11 $CXXFLAGS"
 # libtool
