@@ -72,7 +72,7 @@ dnl if the user called the macro, check for package,
 dnl decide what to do based on whether the package is required or not.
 
 if test -d "${MFEM_PREFIX}/lib" ; then
-   MFEM_LIBS="-L${MFEM_PREFIX}/lib -lmfem  $MFEM_EXT_LIBS"
+   MFEM_LIBS="-L${MFEM_PREFIX}/lib -lmfem -Wl,-rpath,${MFEM_PREFIX}/lib $MFEM_EXT_LIBS"
 fi
 
 if test -d "${MFEM_PREFIX}/include" ; then
