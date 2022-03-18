@@ -117,7 +117,7 @@ class GasMixture {
   int GetNumConservativeVariables() { return Nconservative; }
   int GetNumPrimitiveVariables() { return Nprimitive; }
 
-  virtual double ComputePressure(const Vector &state) = 0;             // pressure from conservatives
+  virtual double ComputePressure(const Vector &state, double &electronPressure) = 0;             // pressure from conservatives
   virtual double ComputePressureFromPrimitives(const Vector &Up) = 0;  // pressure from primitive variables
   virtual double ComputeTemperature(const Vector &state) = 0;
   virtual double Temperature(double *rho, double *p,
@@ -202,7 +202,7 @@ class DryAir : public GasMixture {
   ~DryAir() {}
 
   // implementation virtual methods
-  virtual double ComputePressure(const Vector &state);
+  virtual double ComputePressure(const Vector &state, double &electronPressure);
   virtual double ComputePressureFromPrimitives(const Vector &Up);
   virtual double ComputeTemperature(const Vector &state);
   virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / gas_constant / rho[0]; }
@@ -328,7 +328,8 @@ class DryAir : public GasMixture {
 // };
 
 // additional functions inlined for speed...
-inline double DryAir::ComputePressure(const Vector &state) {
+inline double DryAir::ComputePressure(const Vector &state, double &electronPressure) {
+  electronPressure = 0.0;
   double den_vel2 = 0;
   for (int d = 0; d < dim; d++) den_vel2 += state(d + 1) * state(d + 1);
   den_vel2 /= state[0];
@@ -364,7 +365,7 @@ class TestBinaryAir : public GasMixture {
   ~TestBinaryAir(){};
 
   // implementation virtual methods
-  virtual double ComputePressure(const Vector &state);
+  virtual double ComputePressure(const Vector &state, double &electronPressure);
   virtual double ComputePressureFromPrimitives(const Vector &Up);
   virtual double ComputeTemperature(const Vector &state);
   virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / rho[0] / gas_constant; };
@@ -402,7 +403,8 @@ class TestBinaryAir : public GasMixture {
 };
 
 // additional functions inlined for speed...
-inline double TestBinaryAir::ComputePressure(const Vector &state) {
+inline double TestBinaryAir::ComputePressure(const Vector &state, double &electronPressure) {
+  electronPressure = 0.0;
   double den_vel2 = 0;
   for (int d = 0; d < dim; d++) den_vel2 += state(d + 1) * state(d + 1);
   den_vel2 /= state[0];
@@ -460,7 +462,7 @@ class PerfectMixture : public GasMixture {
   virtual void computeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp);
   virtual void computeNumberDensities(const Vector &conservedState, Vector &n_sp);
 
-  virtual double ComputePressure(const Vector &state);
+  virtual double ComputePressure(const Vector &state, double &electronPressure);
   virtual double ComputePressureFromPrimitives(const Vector &Up);
   virtual double computePressureBase(const double *n_sp, const double n_e, const double n_B, const double T_h,
                                      const double T_e);

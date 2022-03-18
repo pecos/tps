@@ -58,7 +58,8 @@ DryAirTransport::DryAirTransport(GasMixture *_mixture, RunConfiguration &_runfil
 
 void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
                                                      Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
-  double p = mixture->ComputePressure(state);
+  double dummy; // electron pressure. won't compute anything.
+  double p = mixture->ComputePressure(state, dummy);
   double temp = p / gas_constant / state[0];
 
   transportBuffer.SetSize(GlobalTrnsCoeffs::NUM_GLOBAL_COEFFS);
@@ -73,8 +74,19 @@ void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const 
   if (numActiveSpecies > 0) {
     double diffusivity = transportBuffer[GlobalTrnsCoeffs::VISCOSITY] / Sc;
 
-    for (int d = 0; d < dim; d++) diffusionVelocity(0,d) = diffusivity * gradUp(num_equation - 1, d)
-                                                                       / state[num_equation - 1] * state[0];
+    // Kevin: forced passive scalar to be positive.
+    // while original passive scalar can be both negative and positive,
+    // handling such case in flux requires additional if statement.
+    if (state[num_equation - 1] == 0.0) {
+      diffusionVelocity = 0.0;
+    } else {
+      for (int d = 0; d < dim; d++)
+        diffusionVelocity(0, d) = diffusivity * gradUp(num_equation - 1, d) / state[num_equation - 1];
+    }
+
+    for (int d = 0; d < dim; d++) {
+      assert(!std::isnan(diffusionVelocity(0, d)));
+    }
   }
 }
 
@@ -87,7 +99,8 @@ TestBinaryAirTransport::TestBinaryAirTransport(GasMixture *_mixture, RunConfigur
 
 void TestBinaryAirTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
                                                             Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
-  double p = mixture->ComputePressure(state);
+  double dummy; // electron pressure. won't compute anything.
+  double p = mixture->ComputePressure(state, dummy);
   double temp = p / gas_constant / state[0];
 
   transportBuffer.SetSize(GlobalTrnsCoeffs::NUM_GLOBAL_COEFFS);

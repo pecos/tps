@@ -710,8 +710,8 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
   // std::cout << "stateIn" << std::endl;
   // for (int eq = 0; eq < num_equation; eq++) std::cout << stateIn[eq] << ",\t";
   // std::cout << std::endl;
-
-  const double p = mixture->ComputePressure(stateIn);
+  double dummy; // electron pressure. by-product of total pressure computation. won't be used
+  const double p = mixture->ComputePressure(stateIn, dummy);
 // {
 //
 //   std::cout << "stateIn pressure: " << p << std::endl;

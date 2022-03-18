@@ -476,7 +476,8 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
     // Kevin: we need to think through this.
     if (isSBP) {
       f *= alpha;  // *= alpha
-      double p = mixture->ComputePressure(state);
+      double electronPressure;
+      double p = mixture->ComputePressure(state, electronPressure);
       p *= 1. - alpha;
       for (int d = 0; d < dim; d++) {
         f(d + 1, d) += p;

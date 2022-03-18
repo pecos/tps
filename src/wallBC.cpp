@@ -171,7 +171,8 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
     DenseMatrix viscF(num_equation, dim);
     fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, viscF);
 
-    double p = mixture->ComputePressure(stateIn);
+    double dummy; // electron pressure. by-product of total pressure computation. won't be used
+    double p = mixture->ComputePressure(stateIn, dummy);
 
     // modify gradients so that wall is adibatic
     Vector unitNorm = normal;

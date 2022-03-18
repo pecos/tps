@@ -1961,12 +1961,12 @@ void M2ulPhyS::parseSolverOptions2() {
   }
 
   // plasma conditions.
+  config.gasModel = NUM_GASMODEL;
+  config.transportModel = NUM_TRANSPORTMODEL;
+  config.chemistryModel = NUM_CHEMISTRYMODEL;
   if (config.workFluid != USER_DEFINED) {
     cout << "Fluid is set to the preset '" << fluidTypeStr << "'. Input options in [plasma_models] will not be used."
          << endl;
-    config.gasModel = NUM_GASMODEL;
-    config.transportModel = NUM_TRANSPORTMODEL;
-    config.chemistryModel = NUM_CHEMISTRYMODEL;
   } else {
     tpsP->getInput("plasma_models/ambipolar", config.ambipolar, false);
     tpsP->getInput("plasma_models/two_temperature", config.twoTemperature, false);
@@ -2057,7 +2057,7 @@ void M2ulPhyS::parseSolverOptions2() {
         // Check if unsupported species are included.
         for (int sp = 0; sp < config.numSpecies; sp++) {
           if ((config.speciesNames[sp] != "Ar") && (config.speciesNames[sp] != "Ar.+1") && (config.speciesNames[sp] != "E")) {
-            grvy_printf(GRVY_ERROR, "\nArgon ternary mixture transport does not support the species: %s !", config.speciesNames[sp]);
+            grvy_printf(GRVY_ERROR, "\nArgon ternary mixture transport does not support the species: %s !", config.speciesNames[sp].c_str());
             exit(ERROR);
           }
         }

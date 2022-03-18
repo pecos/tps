@@ -97,7 +97,8 @@ int main (int argc, char *argv[])
 
     grvy_printf(GRVY_INFO, "\n Testing ComputePressure. \n");
 
-    double pressureFromConserved = mixture->ComputePressure(conservedState);
+    double dummy;
+    double pressureFromConserved = mixture->ComputePressure(conservedState, dummy);
     double pressureFromPrimitive = mixture->ComputePressureFromPrimitives(testPrimitives);
     error = abs( (pressureFromConserved - pressureFromPrimitive) / pressureFromConserved );
     if (error > 1.0e-15) {
@@ -316,6 +317,110 @@ int main (int argc, char *argv[])
       }
     }
 
+    {
+      grvy_printf(GRVY_INFO, "Conserved state \n");
+      for (int eq = 0; eq < numEquation; eq++) {
+        grvy_printf(GRVY_INFO, "%.8E, ", conservedState(eq));
+      }
+      grvy_printf(GRVY_INFO, "\n");
+
+      Equations eqSystem = NS;
+      TransportProperties *transportPtr = NULL;
+      Fluxes *flux = new Fluxes(mixture, eqSystem, transportPtr, numEquation, dim, false);
+      grvy_printf(GRVY_INFO, "Initialized flux class. \n");
+
+      DenseMatrix convectiveFlux(numEquation, dim);
+      flux->ComputeConvectiveFluxes(conservedState, convectiveFlux);
+      grvy_printf(GRVY_INFO, "Computed convective flux. \n");
+
+      Vector normalFlux(numEquation);
+      convectiveFlux.Mult(dir, normalFlux);
+      grvy_printf(GRVY_INFO, "Computed normal convective flux. \n");
+
+      Vector deducedState(numEquation);
+      mixture->computeConservedStateFromConvectiveFlux(normalFlux, dir, deducedState);
+      grvy_printf(GRVY_INFO, "Computed conserved state back from normal convective flux. \n");
+
+
+      grvy_printf(GRVY_INFO, "Pressure: %.15E\n", pressureFromConserved);
+
+      // grvy_printf(GRVY_INFO, "Deducing outside the routine, using known pressure. \n");
+      // double normalVelocity = 0.0;
+      // for (int d = 0; d < dim; d++) normalVelocity += testPrimitives(d + 1) * dir(d);
+      // grvy_printf(GRVY_INFO, "Normal velocity: %.8E \n", normalVelocity);
+      //
+      // double bulkKinEnergy = 0.0;
+      // for (int d = 0; d < dim; d++) bulkKinEnergy += testPrimitives(d + 1) * testPrimitives(d + 1);
+      // bulkKinEnergy *= 0.5 * testPrimitives(0);
+      //
+      // double temp = 0.;
+      // for (int d = 0; d < dim; d++) temp += normalFlux[1 + d] * dir[d];
+      //
+      // double A = 1.0;
+      // double B = -2.0 * temp;
+      // double C = -2.0 * normalFlux[0] * bulkKinEnergy * normalVelocity;
+      // for (int d = 0; d < dim; d++) C += normalFlux[d + 1] * normalFlux[d + 1];
+      // double p = (-B + sqrt(B * B - 4. * A * C)) / (2. * A);
+      // grvy_printf(GRVY_INFO, "pressured computed with bulk kin energy: %.15E \n", p);
+      // p = (-B - sqrt(B * B - 4. * A * C)) / (2. * A);
+      // grvy_printf(GRVY_INFO, "pressured computed with bulk kin energy: %.15E \n", p);
+      // grvy_printf(GRVY_INFO, "Normal velocity: %.8E \n", (temp - p) / normalFlux[0]);
+      //
+      // Vector numberDensityFluxes(mixture->GetNumActiveSpecies());
+      // double nBFlux = normalFlux(0); // background species number density flux.
+      // for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++) {
+      //   numberDensityFluxes(sp) = normalFlux(dim + 2 + sp) / mixture->GetGasParams(sp, GasParams::SPECIES_MW);
+      //   nBFlux -= normalFlux(dim + 2 + sp);
+      // }
+      // nBFlux /= mixture->GetGasParams(numSpecies - 1, GasParams::SPECIES_MW);
+      // double nMix = 0.0, cpMix = 0.0;
+      // for (int sp = 0; sp < numSpecies - 1; sp++) {
+      //   nMix += numberDensityFluxes(sp);
+      //   cpMix += numberDensityFluxes(sp) * mixture->getMolarCP(sp);
+      // }
+      // nMix += nBFlux;
+      // cpMix += nBFlux * mixture->getMolarCP(numSpecies - 1);
+      // cpMix /= nMix;
+      //
+      // A = 1.0;
+      // B = -2.0 * temp;
+      // C = -2.0 * normalFlux[0] * normalFlux[dim + 1];
+      // for (int d = 0; d < dim; d++) C += normalFlux[d + 1] * normalFlux[d + 1];
+      // C += 2.0 * normalFlux[0] * (nMix * cpMix * testPrimitives(dim + 1));
+      // p = (-B + sqrt(B * B - 4. * A * C)) / (2. * A);
+      // grvy_printf(GRVY_INFO, "pressured computed with temps: %.15E \n", p);
+      // p = (-B - sqrt(B * B - 4. * A * C)) / (2. * A);
+      // grvy_printf(GRVY_INFO, "pressured computed with temps: %.15E \n", p);
+      // grvy_printf(GRVY_INFO, "Normal velocity: %.8E \n", (temp - p) / normalFlux[0]);
+      //
+      // A = 1.0 - 2.0 * cpMix / UNIVERSALGASCONSTANT;
+      // B = 2.0 * temp * (cpMix / UNIVERSALGASCONSTANT - 1.0);
+      // C = -2.0 * normalFlux[0] * normalFlux[dim + 1];
+      // for (int d = 0; d < dim; d++) C += normalFlux[d + 1] * normalFlux[d + 1];
+      // p = (-B + sqrt(B * B - 4. * A * C)) / (2. * A);
+      // grvy_printf(GRVY_INFO, "pressured computed: %.15E \n", p);
+      // p = (-B - sqrt(B * B - 4. * A * C)) / (2. * A);
+      // grvy_printf(GRVY_INFO, "pressured computed: %.15E \n", p);
+      // grvy_printf(GRVY_INFO, "Normal velocity: %.8E \n", (temp - p) / normalFlux[0]);
+
+
+      grvy_printf(GRVY_INFO, "Deduced state \n");
+      for (int eq = 0; eq < numEquation; eq++) {
+        grvy_printf(GRVY_INFO, "%.8E, ", deducedState(eq));
+      }
+      grvy_printf(GRVY_INFO, "\n");
+
+      double error = 0.0;
+      for (int n = 0; n < numEquation; n++){
+        error = max(error, abs(( conservedState[n] - deducedState[n] ) / conservedState[n]));
+      }
+      grvy_printf(GRVY_INFO, "Relative error: %.8E\n", error);
+      if ( error > gradErrorThreshold ) {
+        grvy_printf(GRVY_ERROR, "\n computeConservedStateFromConvectiveFlux is not computing the correct state.");
+        exit(ERROR);
+      }
+    }
+
   }
   grvy_printf(GRVY_INFO, "\nPASS: non-ambipolar, single temperature.\n");
 
@@ -377,7 +482,8 @@ int main (int argc, char *argv[])
 
     grvy_printf(GRVY_INFO, "\n Testing ComputePressure. \n");
 
-    double pressureFromConserved = mixture->ComputePressure(conservedState);
+    double dummy;
+    double pressureFromConserved = mixture->ComputePressure(conservedState, dummy);
     double pressureFromPrimitive = mixture->ComputePressureFromPrimitives(testPrimitives);
     error = abs( (pressureFromConserved - pressureFromPrimitive) / pressureFromConserved );
     if (error > 1.0e-15) {
@@ -604,9 +710,55 @@ int main (int argc, char *argv[])
         exit(ERROR);
       }
     }
+
+    {
+      grvy_printf(GRVY_INFO, "Primitive state \n");
+      for (int eq = 0; eq < numEquation; eq++) {
+        grvy_printf(GRVY_INFO, "%.8E, ", testPrimitives(eq));
+      }
+      grvy_printf(GRVY_INFO, "\n");
+
+      grvy_printf(GRVY_INFO, "Conserved state \n");
+      for (int eq = 0; eq < numEquation; eq++) {
+        grvy_printf(GRVY_INFO, "%.8E, ", conservedState(eq));
+      }
+      grvy_printf(GRVY_INFO, "\n");
+
+      Equations eqSystem = NS;
+      TransportProperties *transportPtr = NULL;
+      Fluxes *flux = new Fluxes(mixture, eqSystem, transportPtr, numEquation, dim, false);
+      grvy_printf(GRVY_INFO, "Initialized flux class. \n");
+
+      DenseMatrix convectiveFlux(numEquation, dim);
+      flux->ComputeConvectiveFluxes(conservedState, convectiveFlux);
+      grvy_printf(GRVY_INFO, "Computed convective flux. \n");
+
+      Vector normalFlux(numEquation);
+      convectiveFlux.Mult(dir, normalFlux);
+      grvy_printf(GRVY_INFO, "Computed normal convective flux. \n");
+
+      Vector deducedState(numEquation);
+      mixture->computeConservedStateFromConvectiveFlux(normalFlux, dir, deducedState);
+      grvy_printf(GRVY_INFO, "Computed conserved state back from normal convective flux. \n");
+
+      grvy_printf(GRVY_INFO, "Deduced state \n");
+      for (int eq = 0; eq < numEquation; eq++) {
+        grvy_printf(GRVY_INFO, "%.8E, ", deducedState(eq));
+      }
+      grvy_printf(GRVY_INFO, "\n");
+
+      double error = 0.0;
+      for (int n = 0; n < numEquation; n++){
+        error = max(error, abs(( conservedState[n] - deducedState[n] ) / conservedState[n]));
+      }
+      grvy_printf(GRVY_INFO, "Relative error: %.8E\n", error);
+      if ( error > gradErrorThreshold ) {
+        grvy_printf(GRVY_ERROR, "\n computeConservedStateFromConvectiveFlux is not computing the correct state.");
+        exit(ERROR);
+      }
+    }
   }
   grvy_printf(GRVY_INFO, "\nPASS: ambipolar, single temperature.\n");
-
 
   /*
     Test non-ambipolar, two-temperature fluid
@@ -662,7 +814,8 @@ int main (int argc, char *argv[])
 
     grvy_printf(GRVY_INFO, "\n Testing ComputePressure. \n");
 
-    double pressureFromConserved = mixture->ComputePressure(conservedState);
+    double dummy;
+    double pressureFromConserved = mixture->ComputePressure(conservedState, dummy);
     double pressureFromPrimitive = mixture->ComputePressureFromPrimitives(testPrimitives);
     error = abs( (pressureFromConserved - pressureFromPrimitive) / pressureFromConserved );
     if (error > 1.0e-15) {
@@ -889,6 +1042,59 @@ int main (int argc, char *argv[])
       grvy_printf(GRVY_INFO, "\n");
       if ( error1 > gradErrorThreshold ) {
         grvy_printf(GRVY_ERROR, "\n computeMoleFractionGradient is not computing the correct gradient.");
+        exit(ERROR);
+      }
+    }
+
+    {
+      std::cout << "two temperature?: " << mixture->IsTwoTemperature() << std::endl;
+      grvy_printf(GRVY_INFO, "Primitive state \n");
+      for (int eq = 0; eq < numEquation; eq++) {
+        grvy_printf(GRVY_INFO, "%.8E, ", testPrimitives(eq));
+      }
+      grvy_printf(GRVY_INFO, "\n");
+
+      grvy_printf(GRVY_INFO, "Conserved state \n");
+      for (int eq = 0; eq < numEquation; eq++) {
+        grvy_printf(GRVY_INFO, "%.8E, ", conservedState(eq));
+      }
+      grvy_printf(GRVY_INFO, "\n");
+
+      grvy_printf(GRVY_INFO, "Pressure: %.15E \n", pressureFromConserved);
+
+      double normalVelocity = 0.0;
+      for (int d = 0; d < dim; d++) normalVelocity += testPrimitives(d + 1) * dir(d);
+      grvy_printf(GRVY_INFO, "Normal velocity: %.8E \n", normalVelocity);
+
+      Equations eqSystem = NS;
+      TransportProperties *transportPtr = NULL;
+      Fluxes *flux = new Fluxes(mixture, eqSystem, transportPtr, numEquation, dim, false);
+      grvy_printf(GRVY_INFO, "Initialized flux class. \n");
+
+      DenseMatrix convectiveFlux(numEquation, dim);
+      flux->ComputeConvectiveFluxes(conservedState, convectiveFlux);
+      grvy_printf(GRVY_INFO, "Computed convective flux. \n");
+
+      Vector normalFlux(numEquation);
+      convectiveFlux.Mult(dir, normalFlux);
+      grvy_printf(GRVY_INFO, "Computed normal convective flux. \n");
+
+      Vector deducedState(numEquation);
+      mixture->computeConservedStateFromConvectiveFlux(normalFlux, dir, deducedState);
+      grvy_printf(GRVY_INFO, "Computed conserved state back from normal convective flux. \n");
+      grvy_printf(GRVY_INFO, "Deduced state \n");
+      for (int eq = 0; eq < numEquation; eq++) {
+        grvy_printf(GRVY_INFO, "%.8E, ", deducedState(eq));
+      }
+      grvy_printf(GRVY_INFO, "\n");
+
+      double error = 0.0;
+      for (int n = 0; n < numEquation; n++){
+        error = max(error, abs(( conservedState[n] - deducedState[n] ) / conservedState[n]));
+      }
+      grvy_printf(GRVY_INFO, "Relative error: %.8E\n", error);
+      if ( error > gradErrorThreshold ) {
+        grvy_printf(GRVY_ERROR, "\n computeConservedStateFromConvectiveFlux is not computing the correct state.");
         exit(ERROR);
       }
     }
@@ -955,7 +1161,8 @@ int main (int argc, char *argv[])
 
     grvy_printf(GRVY_INFO, "\n Testing ComputePressure. \n");
 
-    double pressureFromConserved = mixture->ComputePressure(conservedState);
+    double dummy;
+    double pressureFromConserved = mixture->ComputePressure(conservedState, dummy);
     double pressureFromPrimitive = mixture->ComputePressureFromPrimitives(testPrimitives);
     error = abs( (pressureFromConserved - pressureFromPrimitive) / pressureFromConserved );
     if (error > 1.0e-15) {
@@ -1191,6 +1398,59 @@ int main (int argc, char *argv[])
       grvy_printf(GRVY_INFO, "\n");
       if ( error1 > gradErrorThreshold ) {
         grvy_printf(GRVY_ERROR, "\n computeMoleFractionGradient is not computing the correct gradient.");
+        exit(ERROR);
+      }
+    }
+
+    {
+      std::cout << "two temperature?: " << mixture->IsTwoTemperature() << std::endl;
+      grvy_printf(GRVY_INFO, "Primitive state \n");
+      for (int eq = 0; eq < numEquation; eq++) {
+        grvy_printf(GRVY_INFO, "%.8E, ", testPrimitives(eq));
+      }
+      grvy_printf(GRVY_INFO, "\n");
+
+      grvy_printf(GRVY_INFO, "Conserved state \n");
+      for (int eq = 0; eq < numEquation; eq++) {
+        grvy_printf(GRVY_INFO, "%.8E, ", conservedState(eq));
+      }
+      grvy_printf(GRVY_INFO, "\n");
+
+      grvy_printf(GRVY_INFO, "Pressure: %.15E \n", pressureFromConserved);
+
+      double normalVelocity = 0.0;
+      for (int d = 0; d < dim; d++) normalVelocity += testPrimitives(d + 1) * dir(d);
+      grvy_printf(GRVY_INFO, "Normal velocity: %.8E \n", normalVelocity);
+
+      Equations eqSystem = NS;
+      TransportProperties *transportPtr = NULL;
+      Fluxes *flux = new Fluxes(mixture, eqSystem, transportPtr, numEquation, dim, false);
+      grvy_printf(GRVY_INFO, "Initialized flux class. \n");
+
+      DenseMatrix convectiveFlux(numEquation, dim);
+      flux->ComputeConvectiveFluxes(conservedState, convectiveFlux);
+      grvy_printf(GRVY_INFO, "Computed convective flux. \n");
+
+      Vector normalFlux(numEquation);
+      convectiveFlux.Mult(dir, normalFlux);
+      grvy_printf(GRVY_INFO, "Computed normal convective flux. \n");
+
+      Vector deducedState(numEquation);
+      mixture->computeConservedStateFromConvectiveFlux(normalFlux, dir, deducedState);
+      grvy_printf(GRVY_INFO, "Computed conserved state back from normal convective flux. \n");
+      grvy_printf(GRVY_INFO, "Deduced state \n");
+      for (int eq = 0; eq < numEquation; eq++) {
+        grvy_printf(GRVY_INFO, "%.8E, ", deducedState(eq));
+      }
+      grvy_printf(GRVY_INFO, "\n");
+
+      double error = 0.0;
+      for (int n = 0; n < numEquation; n++){
+        error = max(error, abs(( conservedState[n] - deducedState[n] ) / conservedState[n]));
+      }
+      grvy_printf(GRVY_INFO, "Relative error: %.8E\n", error);
+      if ( error > gradErrorThreshold ) {
+        grvy_printf(GRVY_ERROR, "\n computeConservedStateFromConvectiveFlux is not computing the correct state.");
         exit(ERROR);
       }
     }

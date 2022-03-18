@@ -202,7 +202,8 @@ double DryAir::ComputeMaxCharSpeed(const Vector &state) {
   }
   den_vel2 /= den;
 
-  const double pres = ComputePressure(state);
+  double dummy; // electron pressure. won't compute anything.
+  const double pres = ComputePressure(state, dummy);
   const double sound = sqrt(specific_heat_ratio * pres / den);
   const double vel = sqrt(den_vel2 / den);
 
@@ -271,7 +272,8 @@ double DryAir::ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin
 double DryAir::ComputePressureFromPrimitives(const mfem::Vector &Up) { return gas_constant * Up[0] * Up[1 + dim]; }
 
 void DryAir::computeStagnationState(const mfem::Vector &stateIn, mfem::Vector &stagnationState) {
-  const double p = ComputePressure(stateIn);
+  double dummy; // electron pressure. won't compute anything.
+  const double p = ComputePressure(stateIn, dummy);
 
   stagnationState.SetSize(num_equation);
   stagnationState = stateIn;
@@ -392,7 +394,8 @@ void TestBinaryAir::GetConservativesFromPrimitives(const Vector &primit, Vector 
 }
 
 void TestBinaryAir::GetPrimitivesFromConservatives(const Vector& conserv, Vector& primit) {
-  double p = ComputePressure(conserv);
+  double dummy; // electron pressure. by-product of total pressure computation. won't be used
+  double p = ComputePressure(conserv, dummy);
   primit = conserv;
 
   for (int d = 0; d < dim; d++) primit[1 + d] /= conserv[0];
@@ -444,7 +447,8 @@ void TestBinaryAir::computeSpeciesEnthalpies(const Vector &state, Vector &specie
 bool TestBinaryAir::StateIsPhysical(const mfem::Vector &state) {
   bool physical = true;
 
-  const double pres = ComputePressure(state);
+  double dummy; // electron pressure. won't compute anything.
+  const double pres = ComputePressure(state, dummy);
 
   if (state(0) < 0) {
     cout << "Negative density: " << state(0) << endl;
@@ -487,7 +491,8 @@ double TestBinaryAir::ComputeMaxCharSpeed(const Vector &state) {
   }
   den_vel2 /= den;
 
-  const double pres = ComputePressure(state);
+  double dummy; // electron pressure. won't compute anything.
+  const double pres = ComputePressure(state, dummy);
   const double sound = sqrt(specific_heat_ratio * pres / den);
   const double vel = sqrt(den_vel2 / den);
 
@@ -666,7 +671,7 @@ double PerfectMixture::computeAmbipolarElectronNumberDensity(const double *n_sp)
 
 double PerfectMixture::computeBackgroundMassDensity(const double &rho, const double *n_sp, double &n_e,
                                                     bool isElectronComputed) {
-  if ((~isElectronComputed) && (ambipolar)) {
+  if ((!isElectronComputed) && (ambipolar)) {
     n_e = computeAmbipolarElectronNumberDensity(n_sp);
   }
 
@@ -746,7 +751,7 @@ void PerfectMixture::GetConservativesFromPrimitives(const Vector &primit, Vector
 
   // compute mixture heat capacity.
   double totalHeatCapacity = computeHeaviesHeatCapacity(&primit[dim + 2], nB);
-  if (~twoTemperature_) totalHeatCapacity += n_e * molarCV_(numSpecies - 2);
+  if (!twoTemperature_) totalHeatCapacity += n_e * molarCV_(numSpecies - 2);
 
   double totalEnergy = 0.0;
   for (int d = 0; d < dim; d++) totalEnergy += primit[d + 1] * primit[d + 1];
@@ -852,12 +857,14 @@ double PerfectMixture::ComputePressureFromPrimitives(const mfem::Vector &Up) {
 }
 
 // NOTE: This is almost the same as GetPrimitivesFromConservatives except storing other primitive variables.
-double PerfectMixture::ComputePressure(const Vector &state) {
+double PerfectMixture::ComputePressure(const Vector &state, double &electronPressure) {
   Vector n_sp;
   computeNumberDensities(state, n_sp);
 
   double T_h, T_e;
   computeTemperaturesBase(state, &n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
+
+  electronPressure = n_sp(numSpecies - 2) * UNIVERSALGASCONSTANT * T_e;
 
   // NOTE: compute pressure.
   double p = computePressureBase(&n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
@@ -954,7 +961,7 @@ void PerfectMixture::computeTemperaturesBase(const Vector &conservedState, const
                                              const double n_B, double &T_h, double &T_e) {
   // compute mixture heat capacity.
   double totalHeatCapacity = computeHeaviesHeatCapacity(&n_sp[0], n_B);
-  if (~twoTemperature_) totalHeatCapacity += n_e * molarCV_(numSpecies - 2);
+  if (!twoTemperature_) totalHeatCapacity += n_e * molarCV_(numSpecies - 2);
 
   // Comptue heavy-species temperature. If not two temperature, then this works as the unique temperature.
   T_h = 0.0;
@@ -1356,7 +1363,7 @@ void PerfectMixture::computeConservedStateFromConvectiveFlux(const Vector &meanN
   double neFlux = 0.0;
   if (ambipolar) {
     for (int sp = 0; sp < numActiveSpecies; sp++) {
-      neFlux += gasParams(sp, GasParams::SPECIES_CHARGES);
+      neFlux += numberDensityFluxes(sp) * gasParams(sp, GasParams::SPECIES_CHARGES);
     }
     nBFlux -= neFlux * gasParams(numSpecies - 2, GasParams::SPECIES_MW);
   } else { // if not ambipolar, mass flux is already subtracted from nBFlux.
@@ -1386,7 +1393,7 @@ void PerfectMixture::computeConservedStateFromConvectiveFlux(const Vector &meanN
   double temp = 0.;
   for (int d = 0; d < dim; d++) temp += meanNormalFluxes[1 + d] * normal[d];
   double A = 1. - 2. * cpMix / UNIVERSALGASCONSTANT;
-  double B = 2 * temp * (cpMix / UNIVERSALGASCONSTANT - 1.);
+  double B = 2. * temp * (cpMix / UNIVERSALGASCONSTANT - 1.);
   double C = -2. * meanNormalFluxes[0] * meanNormalFluxes[1 + dim];
   for (int d = 0; d < dim; d++) C += meanNormalFluxes[1 + d] * meanNormalFluxes[1 + d];
   if (twoTemperature_) C += 2.0 * meanNormalFluxes[0] * neFlux * (molarCP_(numSpecies - 2) - cpMix) * Te;
