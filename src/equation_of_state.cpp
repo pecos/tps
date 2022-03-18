@@ -121,6 +121,13 @@ void DryAir::setNumEquations() {
 //   }
 // }
 
+void DryAir::computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies) {
+  speciesEnthalpies.SetSize(numSpecies);
+  speciesEnthalpies = 0.0;
+
+  return;
+}
+
 bool DryAir::StateIsPhysical(const mfem::Vector &state) {
   const double den = state(0);
   const Vector den_vel(state.GetData() + 1, dim);
@@ -383,6 +390,13 @@ double TestBinaryAir::ComputePressureFromPrimitives(const mfem::Vector &Up) {
 //     pGridFunc[n] = rho*gas_constant*tmp;
 //   }
 // }
+
+void TestBinaryAir::computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies) {
+  speciesEnthalpies.SetSize(numSpecies);
+  speciesEnthalpies = 0.0;
+
+  return;
+}
 
 bool TestBinaryAir::StateIsPhysical(const mfem::Vector &state) {
   bool physical = true;
@@ -900,6 +914,24 @@ void PerfectMixture::computeTemperaturesBase(const Vector &conservedState, const
   } else {
     T_e = T_h;
   }
+
+  return;
+}
+
+void PerfectMixture::computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies) {
+  speciesEnthalpies.SetSize(numSpecies);
+
+  Vector n_sp;
+  computeNumberDensities(state, n_sp);
+
+  double T_h, T_e;
+  computeTemperaturesBase(state, &n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
+
+  for (int sp = 0; sp < numSpecies - 2; sp++) {
+    speciesEnthalpies(sp) = n_sp[sp] * molarCP_(sp) * T_h;
+  }
+  speciesEnthalpies(numSpecies - 1) = n_sp[numSpecies - 1] * molarCP_(numSpecies - 1) * T_h;
+  speciesEnthalpies(numSpecies - 2) = n_sp[numSpecies - 2] * molarCP_(numSpecies - 2) * T_e;
 
   return;
 }

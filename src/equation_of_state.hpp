@@ -121,6 +121,8 @@ class GasMixture {
   virtual double Temperature(double *rho, double *p,
                              int nsp) = 0;  // temperature given densities and pressures of all species
 
+  virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies) = 0;
+
   virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit) = 0;
   virtual void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv) = 0;
 
@@ -191,6 +193,8 @@ class DryAir : public GasMixture {
   virtual double ComputePressureFromPrimitives(const Vector &Up);
   virtual double ComputeTemperature(const Vector &state);
   virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / gas_constant / rho[0]; }
+
+  virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies);
 
   virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit);
   virtual void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv);
@@ -350,6 +354,7 @@ class TestBinaryAir : public GasMixture {
   virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / rho[0] / gas_constant; };
 
   virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true);
+  virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies);
 
   virtual double ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive = true);
 
@@ -450,6 +455,8 @@ class PerfectMixture : public GasMixture {
   virtual double ComputeTemperature(const Vector &state);
   virtual void computeTemperaturesBase(const Vector &conservedState, const double *n_sp, const double n_e,
                                        const double n_B, double &T_h, double &T_e);
+
+  virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies);
 
   // TODO: Kevin - I don't think we should use this for boundary condition.
   virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / rho[0] / GetGasConstant(); };

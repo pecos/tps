@@ -111,6 +111,12 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   // const double bulkViscMult = mixture->GetBulkViscMultiplyer();
   // const double k = mixture->GetThermalConductivity(state);
 
+  const int numSpecies = mixture->GetNumSpecies();
+  const int numActiveSpecies = mixture->GetNumActiveSpecies();
+
+  Vector speciesEnthalpies;
+  mixture->computeSpeciesEnthalpies(state, speciesEnthalpies);
+
   Vector transportBuffer;
   DenseMatrix diffusionVelocity;
   transport->ComputeFluxTransportProperties(state, gradUp, transportBuffer, diffusionVelocity);
@@ -164,6 +170,10 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   for (int d = 0; d < dim; d++) {
     flux(1 + nvel, d) = vtmp[d];
     flux(1 + nvel, d) += k * gradUp(1 + nvel, d);
+    // compute diffusive enthalpy flux.
+    for (int sp = 0; sp < numSpecies; sp++) {
+      flux(1 + nvel, d) -= speciesEnthalpies(sp) * diffusionVelocity(sp, d);
+    }
   }
 
   if (axisymmetric_) {
@@ -176,10 +186,10 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   //   for (int d = 0; d < dim; d++) flux(num_equation - 1, d) = visc / Sc * gradUp(num_equation - 1, d);
   // }
   // NOTE: NS_PASSIVE will not be needed (automatically incorporated).
-  const int numActiveSpecies = mixture->GetNumActiveSpecies();
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     // TODO: need to check the sign.
-    for (int d = 0; d < dim; d++) flux(nvel + 2 + sp, d) = state[nvel + 2 + sp] * diffusionVelocity(nvel + 2 + sp, d);
+    // NOTE: diffusionVelocity is set to be (numSpecies,dim)-matrix.
+    for (int d = 0; d < dim; d++) flux(nvel + 2 + sp, d) = state[nvel + 2 + sp] * diffusionVelocity(sp, d);
   }
 
   if (mixture->IsTwoTemperature()) {
