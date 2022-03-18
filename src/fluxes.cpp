@@ -115,11 +115,11 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
   const bool twoTemperature = mixture->IsTwoTemperature();
 
-  Vector speciesEnthalpies;
+  Vector speciesEnthalpies(numSpecies);
   mixture->computeSpeciesEnthalpies(state, speciesEnthalpies);
 
   Vector transportBuffer;
-  DenseMatrix diffusionVelocity;
+  DenseMatrix diffusionVelocity(numSpecies, dim);
   transport->ComputeFluxTransportProperties(state, gradUp, transportBuffer, diffusionVelocity);
   const double visc = transportBuffer[GlobalTrnsCoeffs::VISCOSITY];
   const double bulkViscMult = transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY];
