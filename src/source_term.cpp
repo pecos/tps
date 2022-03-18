@@ -84,6 +84,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
 
     // get reaction rates
     Vector creationRates(numSpecies_);
+    creationRates = 0.0;
     chemistry_->computeCreationRate(ns, kfwd, kC, creationRates);
 
     // add species creation rates

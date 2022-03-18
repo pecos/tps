@@ -284,9 +284,6 @@ void M2ulPhyS::initVariables() {
           break;
       }
       switch (config.GetChemistryModel()) {
-        case ChemistryModel::MASS_ACTION_LAW:
-          chemistry_ = new MassActionLaw(mixture, config);
-          break;
         default:
           chemistry_ = new Chemistry(mixture, config);
           break;
@@ -1960,9 +1957,10 @@ void M2ulPhyS::parseSolverOptions2() {
     std::string chemistryModelStr;
     tpsP->getInput("plasma_models/chemistry_model", chemistryModelStr, std::string(""));
 
-    if (chemistryModelStr == "mass_action_law") {
-      config.chemistryModel_ = ChemistryModel::MASS_ACTION_LAW;
-    }
+    // TODO: cantera wrapper
+    // if (chemistryModelStr == "cantera") {
+    //   config.chemistryModel_ = ChemistryModel::CANTERA;
+    // }
   }
 
   // species list.

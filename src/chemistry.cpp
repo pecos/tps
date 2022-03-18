@@ -43,7 +43,7 @@ Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : mixture_(m
   twoTemperature_ = mixture->IsTwoTemperature();
   dim_ = mixture->GetDimension();
 
-  model = config.GetChemistryModel();
+  model_ = config.GetChemistryModel();
 
   mixtureToInputMap_ = mixture->getMixtureToInputMap();
   speciesMapping_ = mixture->getSpeciesMapping();
@@ -140,11 +140,9 @@ void Chemistry::computeEquilibriumConstants(const double T_h, const double T_e, 
   return;
 }
 
-MassActionLaw::MassActionLaw(GasMixture* mixture, RunConfiguration& config) : Chemistry(mixture, config) {}
-
-void MassActionLaw::computeCreationRate(const mfem::Vector& ns, const mfem::Vector& kfwd,
-                                       const mfem::Vector& keq, mfem::Vector& creationRate)
-{
+// compute creation rate based on mass-action law.
+void Chemistry::computeCreationRate(const mfem::Vector& ns, const mfem::Vector& kfwd, const mfem::Vector& keq,
+                                        mfem::Vector& creationRate) {
   Vector progressRate(numReactions_);
   for (int r = 0; r < numReactions_; r++) {
     // forward reaction rate
