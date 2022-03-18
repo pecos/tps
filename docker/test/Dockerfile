@@ -75,6 +75,8 @@ RUN yum -y install aspell
 RUN yum -y install cmake-ohpc
 RUN yum -y install bc
 RUN yum -y install clang-tools-extra
+RUN yum -y install zlib-devel
+RUN yum -y install libcurl-devel
 
 # Register new libs installed into /usr/local/lib with linker
 RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/class.conf
