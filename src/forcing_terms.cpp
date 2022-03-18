@@ -583,10 +583,16 @@ PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const in
     psData_[i]->nodes.DeleteAll();
   }
 
+  std::cout << "worked out so far. 2" << std::endl;
+
   // find nodes for each passive scalar location
   ParFiniteElementSpace dfes(vfes->GetParMesh(), vfes->FEColl(), dim, Ordering::byNODES);
+  std::cout << "worked out so far. 2-1" << std::endl;
   ParGridFunction coordinates(&dfes);
+  std::cout << "worked out so far. 2-2" << std::endl;
   vfes->GetParMesh()->GetNodes(coordinates);
+
+  std::cout << "worked out so far. 3" << std::endl;
 
   int nnodes = vfes->GetNDofs();
 

@@ -43,12 +43,21 @@
 
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
+#include "transport_properties.hpp"
 
 using namespace mfem;
 
+// TODO: In order to avoid repeated primitive variable evaluation,
+// Fluxes and RiemannSolver should take Vector Up (on the evaulation point) as input argument,
+// and FaceIntegrator should have a pointer to ParGridFunction *Up.
+// Also should be able to have Up more than number of equations,
+// while gradUp is evaluated only for the first num_equation variables.
+// Need to discuss further.
 class Fluxes {
  private:
   GasMixture *mixture;
+
+  TransportProperties *transport;
 
   Equations &eqSystem;
 
@@ -64,7 +73,7 @@ class Fluxes {
   DenseMatrix stress;
 
  public:
-  Fluxes(GasMixture *_mixture, Equations &_eqSystem, const int &_num_equation, const int &_dim, bool axisym);
+  Fluxes(GasMixture *_mixture, Equations &_eqSystem, TransportProperties *_transport, const int &_num_equation, const int &_dim, bool axisym);
 
   Equations GetEquationSystem() { return eqSystem; }
 

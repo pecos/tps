@@ -244,10 +244,10 @@ void M2ulPhyS::initVariables() {
   mixture = NULL;
   switch (config.GetWorkingFluid()) {
     case WorkingFluid::DRY_AIR:
-      mixture = new DryAir(config, nvel);
-      mixture->setViscMult(config.GetViscMult());
-      mixture->setBulkViscMult(config.GetBulkViscMult());
-      transportPtr = new TransportProperties();
+      mixture = new DryAir( config, nvel);
+      mixture->SetViscMult(config.GetViscMult());
+      mixture->SetBulkViscMult(config.GetBulkViscMult());
+      transportPtr = new DryAirTransport(mixture, config);
       break;
     case WorkingFluid::USER_DEFINED:
       break;
@@ -265,8 +265,8 @@ void M2ulPhyS::initVariables() {
   // instead applies preset values.
   numSpecies = mixture->GetNumSpecies();
   numActiveSpecies = mixture->GetNumActiveSpecies();
-  ambipolar = mixture->isAmbipolar();
-  twoTemperature = mixture->isTwoTemperature();
+  ambipolar = mixture->IsAmbipolar();
+  twoTemperature = mixture->IsTwoTemperature();
   num_equation = mixture->GetNumEquations();
   // // Kevin: the code above replaces this num_equation determination.
   // switch (eqSystem) {
@@ -351,7 +351,7 @@ void M2ulPhyS::initVariables() {
   ioData.initializeSerial(mpi.Root(), (config.RestartSerial() != "no"), serial_mesh);
   projectInitialSolution();
 
-  fluxClass = new Fluxes(mixture, eqSystem, num_equation, dim, config.isAxisymmetric());
+  fluxClass = new Fluxes(mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric());
 
   alpha = 0.5;
   isSBP = config.isSBP();

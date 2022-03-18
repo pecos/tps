@@ -264,8 +264,8 @@ class RunConfiguration {
   passiveScalarData* GetPassiveScalarData(int i) { return arrayPassiveScalar[i]; }
 
   int GetNumSpecies() { return numSpecies; }
-  bool isAmbipolar() { return ambipolar; }
-  bool isTwoTemperature() { return twoTemperature; }
+  bool IsAmbipolar() { return ambipolar; }
+  bool IsTwoTemperature() { return twoTemperature; }
 };
 
 #endif  // RUN_CONFIGURATION_HPP_

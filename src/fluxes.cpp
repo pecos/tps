@@ -31,9 +31,10 @@
 // -----------------------------------------------------------------------------------el-
 #include "fluxes.hpp"
 
-Fluxes::Fluxes(GasMixture *_mixture, Equations &_eqSystem, const int &_num_equation, const int &_dim, bool axisym)
+Fluxes::Fluxes(GasMixture *_mixture, Equations &_eqSystem, TransportProperties *_transport, const int &_num_equation, const int &_dim, bool axisym)
     : mixture(_mixture),
       eqSystem(_eqSystem),
+      transport(_transport),
       dim(_dim),
       nvel(axisym ? 3 : _dim),
       axisymmetric_(axisym),
@@ -67,7 +68,7 @@ void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, D
 void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
   const double pres = mixture->ComputePressure(state);
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
-  const bool twoTemperature = mixture->isTwoTemperature();
+  const bool twoTemperature = mixture->IsTwoTemperature();
 
   for (int d = 0; d < dim; d++) {
     flux(0, d) = state(d + 1);
@@ -97,9 +98,19 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
     flux = 0.;
     return;
   }
-  const double visc = mixture->GetViscosity(state);
-  const double bulkViscMult = mixture->GetBulkViscMultiplyer();
-  const double k = mixture->GetThermalConductivity(state);
+
+  const double p = mixture->ComputePressure(state);
+  const double temp = p / state[0] / Rg;
+  // const double visc = mixture->GetViscosity(state);
+  // const double bulkViscMult = mixture->GetBulkViscMultiplyer();
+  // const double k = mixture->GetThermalConductivity(state);
+
+  Vector transportBuffer;
+  DenseMatrix diffusionVelocity;
+  transport->ComputeFluxTransportProperties(state, gradUp, transportBuffer, diffusionVelocity);
+  const double visc = transportBuffer[GlobalTrnsCoeffs::VISCOSITY];
+  const double bulkViscMult = transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY];
+  const double k = transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY];
 
   const double ur = (axisymmetric_ ? state[1] / state[0] : 0);
   const double ut = (axisymmetric_ ? state[3] / state[0] : 0);
@@ -154,10 +165,19 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
     flux(1 + nvel, 1) += ut * tau_tz;
   }
 
-  // TODO: rewrite this with transport properties. NS_PASSIVE will not be needed.
-  if (eqSystem == NS_PASSIVE) {
-    double Sc = mixture->GetSchmidtNum();
-    for (int d = 0; d < dim; d++) flux(num_equation - 1, d) = visc / Sc * gradUp(num_equation - 1, d);
+  // if (eqSystem == NS_PASSIVE) {
+  //   double Sc = mixture->GetSchmidtNum();
+  //   for (int d = 0; d < dim; d++) flux(num_equation - 1, d) = visc / Sc * gradUp(num_equation - 1, d);
+  // }
+  // TODO: NS_PASSIVE will not be needed (automatically incorporated).
+  const int numActiveSpecies = mixture->GetNumActiveSpecies();
+  for (int sp = 0; sp < numActiveSpecies; sp++){
+    // TODO: need to check the sign.
+    for (int d = 0; d < dim; d++) flux(nvel + 2 + sp, d) = state[nvel + 2 + sp] * diffusionVelocity(nvel + 2 + sp, d);
+  }
+
+  if (mixture->IsTwoTemperature()){
+    // TODO: viscous flux for electron energy equation.
   }
 }
 

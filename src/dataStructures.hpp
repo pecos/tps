@@ -45,6 +45,42 @@ enum Equations {
 
 enum WorkingFluid { DRY_AIR, USER_DEFINED };
 
+enum GasParams { SPECIES_MW, SPECIES_CHARGES, SPECIES_HEAT_RATIO, NUM_GASPARAMS };
+
+enum GlobalTrnsCoeffs {
+  VISCOSITY,
+  BULK_VISCOSITY,
+  HEAVY_THERMAL_CONDUCTIVITY,
+  ELECTRON_THERMAL_CONDUCTIVITY,
+  NUM_GLOBAL_COEFFS
+};
+
+enum SpeciesTrnsCoeffs {
+  DIFFUSIVITY,
+  MOBILITY,
+  MF_FREQUENCY,
+  NUM_SPECIES_COEFFS
+};
+
+enum TransportOutputPrimitives {
+  TOTAL_PRESSURE,
+  HEAVY_TEMPERATURE,
+  ELECTRON_PRESSURE,
+  ELECTRON_TEMPERATURE,
+  TOTAL_NUMBER_DENSITY,
+  NUM_OUTPUT_PRIMITIVES
+};
+
+// Type of primitive variable which requires gradient evaulation for diffusion velocity.
+// Also used for species output primitive variables.
+enum SpeciesPrimitiveType {
+  MASS_FRACTION,
+  MOLE_FRACTION,
+  NUMBER_DENSITY,
+  NUM_SPECIES_PRIMITIVES
+};
+
+
 enum InletType {
   SUB_DENS_VEL,      // Subsonic inlet specified by the density and velocity components
   SUB_DENS_VEL_NR,   // Non-reflecting subsonic inlet specified by the density and velocity components

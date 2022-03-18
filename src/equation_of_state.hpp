@@ -47,8 +47,13 @@
 using namespace mfem;
 using namespace std;
 
-class GasMixture {
- protected:
+// Kevin: maybe use namespace?
+static const int MAXSPECIES = 200;
+static const double UNIVERSALGASCONSTANT        = 8.3144598;
+static const double AVOGADRONUMBER              = 6.0221409e+23;
+
+class GasMixture{
+protected:
   WorkingFluid fluid;
   int num_equation;
   int dim;
@@ -58,6 +63,8 @@ class GasMixture {
   bool ambipolar;
   bool twoTemperature;
 
+  Vector gasParams;
+
   // number of conservative and primitive/visualization variables
   int Nconservative, Nprimitive;
 
@@ -66,25 +73,28 @@ class GasMixture {
 
   // If not ambipolar, one species continuity equation is replaced by global continuity equation.
   // If ambipolar, electron continuity equation is also replaced by an algebraic equation (determined by GasMixture).
-  void setNumActiveSpecies() { numActiveSpecies = ambipolar ? (numSpecies - 2) : (numSpecies - 1); }
+  void SetNumActiveSpecies() { numActiveSpecies = ambipolar ? (numSpecies - 2) : (numSpecies - 1); }
   // Add electron energy equation if two temperature.
-  void setNumEquations() { num_equation = twoTemperature ? (dim + 3 + numActiveSpecies) : (dim + 2 + numActiveSpecies); }
+  void SetNumEquations() { num_equation = twoTemperature ? (dim + 3 + numActiveSpecies) : (dim + 2 + numActiveSpecies); }
 public:
   GasMixture(WorkingFluid _fluid, int _dim);
   GasMixture(){};
 
   ~GasMixture(){};
 
-  void setFluid(WorkingFluid _fluid);
+  void SetFluid(WorkingFluid _fluid);
 
-  void setViscMult(double _visc_mult) { visc_mult = _visc_mult; }
-  void setBulkViscMult(double _bulk_mult) { bulk_visc_mult = _bulk_mult; }
+  void SetViscMult(double _visc_mult) { visc_mult = _visc_mult; }
+  void SetBulkViscMult(double _bulk_mult) { bulk_visc_mult = _bulk_mult; }
 
   int GetNumSpecies() { return numSpecies; }
   int GetNumActiveSpecies() { return numActiveSpecies; }
   int GetNumEquations() { return num_equation; }
-  bool isAmbipolar() { return ambipolar; }
-  bool isTwoTemperature() { return twoTemperature; }
+  int GetDimension() { return dim; }
+  bool IsAmbipolar() { return ambipolar; }
+  bool IsTwoTemperature() { return twoTemperature; }
+
+  double GetGasParams(int species, GasParams param) { return gasParams[param*numSpecies + species]; }
 
   int GetNumConservativeVariables() { return Nconservative; }
   int GetNumPrimitiveVariables() { return Nprimitive; }
@@ -242,10 +252,10 @@ class DryAir : public GasMixture {
 //  public:
 //   EquationOfState();
 //
-//   void setFluid(WorkingFluid _fluid);
+//   void SetFluid(WorkingFluid _fluid);
 //
-//   void setViscMult(double _visc_mult) { visc_mult = _visc_mult; }
-//   void setBulkViscMult(double _bulk_mult) { bulk_visc_mult = _bulk_mult; }
+//   void SetViscMult(double _visc_mult) { visc_mult = _visc_mult; }
+//   void SetBulkViscMult(double _bulk_mult) { bulk_visc_mult = _bulk_mult; }
 //
 //   double ComputePressure(const Vector &state, int dim);
 //

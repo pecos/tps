@@ -48,12 +48,17 @@ DryAir::DryAir(RunConfiguration &_runfile, int _dim) : GasMixture(WorkingFluid::
   ambipolar = false;
   twoTemperature = false;
 
-  setNumActiveSpecies();
-  setNumEquations();
+  SetNumActiveSpecies();
+  SetNumEquations();
 
   gas_constant = 287.058;
   // gas_constant = 1.; // for comparison against ex18
   specific_heat_ratio = 1.4;
+
+  gasParams.SetSize(GasParams::NUM_GASPARAMS * numSpecies);
+  gasParams = 0.0;
+  gasParams[GasParams::SPECIES_MW * numSpecies + 0] = UNIVERSALGASCONSTANT / gas_constant;
+  gasParams[GasParams::SPECIES_HEAT_RATIO * numSpecies + 0] = specific_heat_ratio;
 
   Pr = 0.71;
   cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
@@ -97,7 +102,7 @@ void DryAir::setNumEquations() {
   num_equation = Nconservative;
 }
 
-// void EquationOfState::setFluid(WorkingFluid _fluid) {
+// void EquationOfState::SetFluid(WorkingFluid _fluid) {
 //   fluid = _fluid;
 //   switch (fluid) {
 //     case DRY_AIR:
