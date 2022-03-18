@@ -278,6 +278,7 @@ void M2ulPhyS::initVariables() {
       }
       switch (config.GetChemistryModel()) {
         default:
+          chemistry_ = new Chemistry( mixture, config);
           break;
       }
       break;
@@ -828,6 +829,7 @@ M2ulPhyS::~M2ulPhyS() {
   delete fluxClass;
   delete mixture;
   delete transportPtr;
+  delete chemistry_;
   delete gradUpfes;
   delete vfes;
   delete dfes;
@@ -2087,6 +2089,73 @@ void M2ulPhyS::parseSolverOptions2() {
       }
     }
 
+  }
+
+  {// Reaction list
+    tpsP->getInput("reactions/number_of_reactions", config.numReactions, 0);
+    if (config.numReactions > 0) {
+      assert((config.workFluid != DRY_AIR) && (config.numSpecies > 1));
+      config.reactionEquations.resize(config.numReactions);
+      config.reactionModels.SetSize(config.numReactions);
+      config.reactantStoich.SetSize(config.numSpecies, config.numReactions);
+      config.productStoich.SetSize(config.numSpecies, config.numReactions);
+
+      config.reactionModelParams.resize(config.numReactions);
+      config.detailedBalance.SetSize(config.numReactions);
+      config.equilibriumConstantParams.resize(config.numReactions);
+    }
+
+    for (int r = 1; r <= config.numReactions; r++) {
+      std::string basepath("reactions/reaction" + std::to_string(r));
+
+      // TODO: make tps input parser accessible to all classes.
+      // TODO: reaction classes read input options directly in their initialization.
+      std::string equation, model;
+      tpsP->getRequiredInput((basepath + "/equation").c_str(), equation);
+      config.reactionEquations[r-1] = equation;
+      tpsP->getRequiredInput((basepath + "/model").c_str(), model);
+
+      if (model=="arrhenius") {
+        config.reactionModels[r-1] = ARRHENIUS;
+        config.reactionModelParams[r-1].resize(3);
+        double A, b, E;
+        tpsP->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
+        tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
+        tpsP->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
+        config.reactionModelParams[r-1] = {A, b, E};
+
+      } else if (model=="hoffert_lien") {
+        config.reactionModels[r-1] = HOFFERTLIEN;
+        config.reactionModelParams[r-1].resize(3);
+        double A, b, E;
+        tpsP->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
+        tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
+        tpsP->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
+        config.reactionModelParams[r-1] = {A, b, E};
+
+      } else {
+        grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model);
+        exit(ERROR);
+      }
+
+      bool detailedBalance;
+      tpsP->getInput((basepath + "/detailed_balance").c_str(), detailedBalance, false);
+      config.detailedBalance[r-1] = detailedBalance;
+      if (detailedBalance) {
+        config.equilibriumConstantParams[r-1].resize(3);
+        double A, b, E;
+        tpsP->getRequiredInput((basepath + "/equilibrium_constant/A").c_str(), A);
+        tpsP->getRequiredInput((basepath + "/equilibrium_constant/b").c_str(), b);
+        tpsP->getRequiredInput((basepath + "/equilibrium_constant/E").c_str(), E);
+        config.equilibriumConstantParams[r-1] = {A, b, E};
+      }
+
+      Array<double> stoich(config.numSpecies);
+      tpsP->getRequiredVec((basepath + "/reactant_stoichiometry").c_str(), stoich, config.numSpecies);
+      for (int sp = 0; sp < config.numSpecies; sp++) config.reactantStoich(sp, r-1) = stoich[sp];
+      tpsP->getRequiredVec((basepath + "/product_stoichiometry").c_str(), stoich, config.numSpecies);
+      for (int sp = 0; sp < config.numSpecies; sp++) config.productStoich(sp, r-1) = stoich[sp];
+    }
   }
 
   return;

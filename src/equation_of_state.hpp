@@ -51,6 +51,7 @@ using namespace std;
 static const int MAXSPECIES = 200;
 static const double UNIVERSALGASCONSTANT        = 8.3144598; // J * mol^(-1) * K^(-1)
 static const double AVOGADRONUMBER              = 6.0221409e+23; // mol^(-1)
+static const double BOLTZMANNCONSTANT = UNIVERSALGASCONSTANT / AVOGADRONUMBER;
 
 class GasMixture{
 protected:
@@ -103,6 +104,9 @@ public:
   bool IsAmbipolar() { return ambipolar; }
   bool IsTwoTemperature() { return twoTemperature; }
   int getInputIndexOf(int mixtureIndex) { return mixtureToInputMap_[mixtureIndex]; }
+  // int getElectronMixtureIndex() { return (speciesMapping_.count("E")) ? speciesMapping_["E"] : -1; }
+  std::map<int, int>* getMixtureToInputMap() { return &mixtureToInputMap_; }
+  std::map<std::string, int>* getSpeciesMapping() { return &speciesMapping_; }
 
   double GetGasParams(int species, GasParams param) { return gasParams(species,param); }
 

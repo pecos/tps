@@ -29,13 +29,13 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
-#ifndef CHEMISTRY_HPP_
-#define CHEMISTRY_HPP_
+#ifndef REACTION_HPP_
+#define REACTION_HPP_
 
 /*
- * Implementation of the equation of state and some
- * handy functions to deal with operations.
- */
+  Reaction class determines reaction rate coefficient of a single reaction.
+  The set of reaction classes is handled by Chemistry class.
+*/
 
 #include <tps_config.h>
 
@@ -43,61 +43,52 @@
 #include "dataStructures.hpp"
 #include "run_configuration.hpp"
 #include "equation_of_state.hpp"
-#include "reaction.hpp"
 #include <mfem.hpp>
 
 using namespace mfem;
 using namespace std;
 
-class Chemistry{
+class Reaction{
   protected:
-    int numEquations_;
-    // int dim_;
-    int numSpecies_;
-    int numActiveSpecies_;
-    bool ambipolar_;
-    bool twoTemperature_;
-
-    int numReactions_;
-    DenseMatrix reactantStoich_, productStoich_; // size of (numSpecies, numReactions)
-
-    std::vector<Reaction *> reactions_;
-
-    std::map<int, int> *mixtureToInputMap_;
-    std::map<std::string, int> *speciesMapping_;
-    int electronIndex_ = -1;
-
-    Array<bool> detailedBalance_;
-    DenseMatrix equilibriumConstantParams_;
-
-    // /*
-    //   From input file, reaction/reaction%d/equation will specify this mapping.
-    // */
-    // std::vector<std::pair<int, int>> reactionMapping; // size of numReactions_
-    // // Kevin: should we use a vector of function pointers?
-
-    // Kevin: currently, I doubt we need mixture class here. but left it just in case.
-    GasMixture *mixture_ = NULL;
 
   public:
-    Chemistry(GasMixture *mixture, RunConfiguration config);
+    Reaction(){};
 
-    ~Chemistry();
+    ~Reaction(){};
 
-    // return Vector of reaction rate coefficients, with the size of numReaction_.
-    virtual void computeForwardRateCoeffs(const double T_h, const double T_e, Vector &kfwd);
-
-    virtual void computeEquilibriumConstants(const double T_h, const double T_e, Vector &kC);
-
-    // return rate coefficients of (reactionIndex)-th reaction. (start from 0)
-    // reactionIndex is taken from reactionMapping.right.
-    // virtual Vector computeRateCoeffOf(const int reactionIndex, const double T_h, const double T_e) {};
-
-    const double* getReactantStoichiometry(const int reactionIndex) { return reactantStoich_.GetColumn(reactionIndex); }
-    const double* getProductStoichiometry(const int reactionIndex) { return productStoich_.GetColumn(reactionIndex); }
-
-    bool isElectronInvolvedAt(const int reactionIndex) { return (electronIndex_ < 0) ? false : (reactantStoich_(electronIndex_,reactionIndex)!=0); }
+    virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved=false) {};
 
 };
 
-#endif  // CHEMISTRY_HPP_
+class Arrhenius : public Reaction {
+  private:
+    // coefficients for modified Arrhenius model: k = A * T^b * exp( - E / R / T )
+    double A_;
+    double b_;
+    double E_;
+  public:
+    Arrhenius(const double A, const double b, const double E);
+
+    ~Arrhenius() {};
+
+    virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved=false);
+};
+
+class HoffertLien : public Reaction {
+  /*
+    referece: Hoffert, M. I., & Lien, H. (1967). Quasi-one-dimensional, nonequilibrium gas dynamics of partially ionized two-temperature argon. Physics of Fluids, 10(8), 1769–1777. https://doi.org/10.1063/1.1762356
+  */
+  private:
+    // coefficients for modified Arrhenius model: k = A * T^b * exp( - E / R / T )
+    double A_;
+    double b_;
+    double E_;
+  public:
+    HoffertLien(const double A, const double b, const double E);
+
+    ~HoffertLien() {};
+
+    virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved=false);
+};
+
+#endif  // REACTION_HPP_

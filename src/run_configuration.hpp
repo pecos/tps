@@ -185,9 +185,18 @@ class RunConfiguration {
   // number of species;
   int numSpecies;
   int backgroundIndex;
-  int electronIndex;
+  // int electronIndex;
 
   std::vector<std::string> speciesNames;
+
+  // TODO: make tps input parser accessible to all classes.
+  int numReactions;
+  std::vector<std::string> reactionEquations;
+  Array<ReactionModel> reactionModels;
+  std::vector<std::vector<double>> reactionModelParams;
+  DenseMatrix reactantStoich, productStoich;
+  Array<bool> detailedBalance;
+  std::vector<std::vector<double>> equilibriumConstantParams;
 
   DenseMatrix gasParams;
   Vector constantMolarCV;

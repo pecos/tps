@@ -146,6 +146,8 @@ class M2ulPhyS : public TPS::Solver {
 
   TransportProperties *transportPtr = NULL;
 
+  Chemistry *chemistry_ = NULL;
+
   ParGridFunction *spaceVaryViscMult;  // space varying viscosity multiplier
 
   Fluxes *fluxClass;
