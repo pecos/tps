@@ -522,18 +522,10 @@ void RHSoperator::updatePrimitives(const Vector &x_in) const {
   double *dataUp = Up->GetData();
   for (int i = 0; i < vfes->GetNDofs(); i++) {
     Vector iState(num_equation);
-    Vector iUp(num_equation);
+    Vector primitiveState(num_equation);
     for (int eq = 0; eq < num_equation; eq++) iState[eq] = x_in[i + eq * vfes->GetNDofs()];
-    mixture->GetPrimitivesFromConservatives(iState, iUp);
-    for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * vfes->GetNDofs()] = iUp[eq];
-    //     double temp = mixture->ComputeTemperature(iState);
-    //     dataUp[i] = iState[0];
-    //     dataUp[i + vfes->GetNDofs()] = iState[1] / iState[0];
-    //     dataUp[i + 2 * vfes->GetNDofs()] = iState[2] / iState[0];
-    //     if (dim == 3) dataUp[i + 3 * vfes->GetNDofs()] = iState[3] / iState[0];
-    //     dataUp[i + (1 + dim) * vfes->GetNDofs()] = temp;
-    //     if (eqSystem == NS_PASSIVE)
-    //       dataUp[i + (num_equation - 1) * vfes->GetNDofs()] = iState[num_equation - 1] / iState[0];
+    mixture->GetPrimitivesFromConservatives(iState,primitiveState);
+    for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * vfes->GetNDofs()] = primitiveState[eq];
   }
 #endif  // _GPU_
 }

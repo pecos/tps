@@ -872,7 +872,8 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   if (eqSystem == NS_PASSIVE) {
     passiveScalar = new ParGridFunction(fes, Up->HostReadWrite() + (num_equation - 1) * fes->GetNDofs());
   } else {
-    //Kevin: for now, only contain species mass fraction. but I would contain all visualization variables here.
+    // TODO: for now, keep the number of primitive variables same as conserved variables.
+    // will need to add full list of species.
     visualizationVariables.resize(numActiveSpecies);
     for (int sp = 0; sp < numActiveSpecies; sp++) {
       visualizationVariables[sp] = new ParGridFunction(fes, Up->HostReadWrite() + (sp + nvel + 2) * fes->GetNDofs());
@@ -1477,19 +1478,12 @@ void M2ulPhyS::read_restart_files() {
       cout << "# of lines in files does not match domain size" << endl;
     } else {
       dof = vfes->GetNDofs();
-      // TODO: replace with mixture conversion of primitive variable.
       for (int i = 0; i < dof; i++) {
-        double p = dataUp[i + (1 + dim) * dof];
-        double r = dataUp[i];
-        Array<double> vel(dim);
-        for (int d = 0; d < dim; d++) vel[d] = dataUp[i + (d + 1) * dof];
-        double k = 0.;
-        for (int d = 0; d < dim; d++) k += vel[d] * vel[d];
-        double rE = p / (gamma - 1.) + 0.5 * r * k;
-        dataU[i] = r;
-        for (int d = 0; d < dim; d++) dataU[i + (d + 1) * dof] = r * vel[d];
-        dataU[i + (1 + dim) * dof] = rE;
-        if (eqSystem == NS_PASSIVE) dataU[i + (num_equation - 1) * dof] = r * dataUp[i + (num_equation - 1) * dof];
+        Vector primitiveState(num_equation);
+        Vector conservedState(num_equation);
+        for (int eq = 0; eq < num_equation; eq++) primitiveState[eq] = dataUp[i + eq * dof];
+        mixture->GetConservativesFromPrimitives(primitiveState,conservedState);
+        for (int eq = 0; eq < num_equation; eq++) dataU[i + eq * dof] = conservedState[eq];
       }
     }
   }
