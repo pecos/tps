@@ -41,7 +41,7 @@ TESTS += cyl3d.gpu.test \
 	 averages.gpu.test
 
 if PYTHON_ENABLED
-TESTS += cyl3d.python.gpu.test
+TESTS += cyl3d.gpu.python.test
 endif
 
 else
