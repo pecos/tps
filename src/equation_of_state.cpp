@@ -1403,9 +1403,11 @@ void PerfectMixture::computeConservedStateFromConvectiveFlux(const Vector &meanN
   Vector Up(num_equation);
 
   Vector numberDensityFluxes(numActiveSpecies);
+  double formEnergyFlux = 0.0;
   double nBFlux = meanNormalFluxes(0); // background species number density flux.
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     numberDensityFluxes(sp) = meanNormalFluxes(dim + 2 + sp) / gasParams(sp, GasParams::SPECIES_MW);
+    formEnergyFlux += numberDensityFluxes(sp) * gasParams(sp, GasParams::FORMATION_ENERGY);
     nBFlux -= meanNormalFluxes(dim + 2 + sp);
   }
   double neFlux = 0.0;
@@ -1413,11 +1415,13 @@ void PerfectMixture::computeConservedStateFromConvectiveFlux(const Vector &meanN
     for (int sp = 0; sp < numActiveSpecies; sp++) {
       neFlux += numberDensityFluxes(sp) * gasParams(sp, GasParams::SPECIES_CHARGES);
     }
+    formEnergyFlux += neFlux * gasParams(numSpecies - 2, GasParams::FORMATION_ENERGY);
     nBFlux -= neFlux * gasParams(numSpecies - 2, GasParams::SPECIES_MW);
   } else { // if not ambipolar, mass flux is already subtracted from nBFlux.
     neFlux = numberDensityFluxes(numSpecies - 2);
   }
   nBFlux /= gasParams(numSpecies - 1, GasParams::SPECIES_MW);
+  formEnergyFlux += nBFlux * gasParams(numSpecies - 1, GasParams::FORMATION_ENERGY);
 
   double Te = 0.0;
   if (twoTemperature_) {
@@ -1445,6 +1449,7 @@ void PerfectMixture::computeConservedStateFromConvectiveFlux(const Vector &meanN
   double C = -2. * meanNormalFluxes[0] * meanNormalFluxes[1 + dim];
   for (int d = 0; d < dim; d++) C += meanNormalFluxes[1 + d] * meanNormalFluxes[1 + d];
   if (twoTemperature_) C += 2.0 * meanNormalFluxes[0] * neFlux * (molarCP_(numSpecies - 2) - cpMix) * Te;
+  C += 2.0 * meanNormalFluxes[0] * formEnergyFlux;
   //   double p = (-B+sqrt(B*B-4.*A*C))/(2.*A);
   double p = (-B - sqrt(B * B - 4. * A * C)) / (2. * A);  // real solution
 

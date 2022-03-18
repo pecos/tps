@@ -2089,13 +2089,13 @@ void M2ulPhyS::parseSolverOptions2() {
         config.gasParams(i - 1, GasParams::SPECIES_CHARGES) = charge;
         config.gasParams(i - 1, GasParams::FORMATION_ENERGY) = formEnergy;
 
-        tpsP->getRequiredInput((basepath + "/initialMassFraction").c_str(),
-                               config.initialMassFractions(i - 1));
+        //tpsP->getRequiredInput((basepath + "/initialMassFraction").c_str(),
+        //                       config.initialMassFractions(i - 1));
 
-        // require initial electron temperature
-        if (speciesName == "E")
-          tpsP->getRequiredInput((basepath + "/initialElectronTemperature").c_str(),
-                                 config.initialElectronTemperature);
+        //// require initial electron temperature
+        //if (speciesName == "E")
+        //  tpsP->getRequiredInput((basepath + "/initialElectronTemperature").c_str(),
+        //                         config.initialElectronTemperature);
 
         if (config.gasModel == PERFECT_MIXTURE) {
           tpsP->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(),
