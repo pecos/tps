@@ -335,7 +335,7 @@ void M2ulPhyS::initVariables() {
 
       //TODO: May read species names from input file and add them as variable name.
       //TODO: May change depending on visualization variable. (X, Y, n)
-      ioData.registerIOVar("/meanSolution", "mean-Y"+std::to_string(sp + 1), sp + dim + 2);
+      ioData.registerIOVar("/meanSolution", "mean-Y"+std::to_string(sp + 1), sp + nvel + 2);
     }
 
     // rms
@@ -875,9 +875,9 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     passiveScalar = new ParGridFunction(fes, Up->HostReadWrite() + (num_equation - 1) * fes->GetNDofs());
   } else {
     //Kevin: for now, only contain species mass fraction. but I would contain all visualization variables here.
-    visualizationVariables.resize(numSpecies);
-    for (int sp = 0; sp < numSpecies; sp++) {
-      visualizationVariables[sp] = new ParGridFunction(fes, Up->HostReadWrite() + (sp + dim + 2) * fes->GetNDofs());
+    visualizationVariables.resize(numActiveSpecies);
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      visualizationVariables[sp] = new ParGridFunction(fes, Up->HostReadWrite() + (sp + nvel + 2) * fes->GetNDofs());
     }
   }
 
@@ -892,13 +892,13 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   } else {
     ioData.registerIOVar("/solution", "rho-E", 3);
   }
-  for (int sp = 0; sp < numSpecies; sp++) {
+  for (int sp = 0; sp < numActiveSpecies; sp++) {
     // Only for NS_PASSIVE.
     if ((eqSystem == NS_PASSIVE) && (sp==1)) break;
 
     //TODO: May read species names from input file and add them as variable name.
     //TODO: May change depending on visualization variable. (X, Y, n)
-    ioData.registerIOVar("/solution", "rho-Y"+std::to_string(sp + 1), sp + dim + 2);
+    ioData.registerIOVar("/solution", "rho-Y"+std::to_string(sp + 1), sp + nvel + 2);
   }
 
   // compute factor to multiply viscosity when this option is active
@@ -941,7 +941,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   if (eqSystem == NS_PASSIVE) {
     paraviewColl->RegisterField("passiveScalar", passiveScalar);
   } else {
-    for (int d = 0; d < numSpecies; d++) {
+    for (int d = 0; d < numActiveSpecies; d++) {
       //TODO: May read species names from input file and add them as variable name.
       paraviewColl->RegisterField("rho-Y"+std::to_string(d + 1), visualizationVariables[d]);
     }

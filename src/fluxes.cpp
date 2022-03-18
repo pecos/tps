@@ -84,7 +84,7 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
 
   // Kevin: even NS_PASSIVE will be controlled by this. no need of if statement.
   for (int sp = 0; sp < numActiveSpecies; sp++) {
-    for (int d = 0; d < dim; d++) flux(dim + 2 + sp, d) = state(dim + 2 + sp) * state(1 + d) / state(0);
+    for (int d = 0; d < dim; d++) flux(nvel + 2 + sp, d) = state(nvel + 2 + sp) * state(1 + d) / state(0);
   }
 
   if (twoTemperature) {
@@ -120,8 +120,8 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   for (int i = 0; i < dim; i++) stress(i, i) += (bulkViscMult - 2. / 3.) * divV;
   stress *= visc;
 
-  // make sure density visc. flux is 0
-  for (int d = 0; d < dim; d++) flux(0, d) = 0.;
+  for (int i = 0; i < dim; i++)
+    for (int j = 0; j < dim; j++) flux(1 + i, j) = stress(i, j);
 
   double tau_tr = 0, tau_tz = 0;
   if (axisymmetric_) {
@@ -140,8 +140,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   // temperature gradient
   //       for (int d = 0; d < dim; d++) gradT[d] = temp * (gradUp(1 + dim, d) / p - gradUp(0, d) / state[0]);
 
-  for (int i = 0; i < dim; i++)
-    for (int j = 0; j < dim; j++) flux(1 + i, j) = stress(i, j);
+  for (int d = 0; d < dim; d++) vel(d) = state[1 + d] / state[0];
 
   stress.Mult(vel, vtmp);
 
@@ -153,14 +152,6 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   if (axisymmetric_) {
     flux(1 + nvel, 0) += ut * tau_tr;
     flux(1 + nvel, 1) += ut * tau_tz;
-  }
-
-  for (int d = 0; d < dim; d++) vel(d) = state[1 + d] / state[0];
-
-  stress.Mult(vel, vtmp);
-  for (int d = 0; d < dim; d++) {
-    flux(1 + dim, d) += vtmp[d];
-    flux(1 + dim, d) += k * gradT[d];
   }
 
   // TODO: rewrite this with transport properties. NS_PASSIVE will not be needed.
