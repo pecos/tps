@@ -43,8 +43,12 @@ SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_or
       mixture_(mixture),
       transport_(transport),
       chemistry_(chemistry) {
-  h_numElems = gpuArrays.numElems.HostRead();
-  h_posDofIds = gpuArrays.posDofIds.HostRead();
+  numSpecies_ = mixture->GetNumSpecies();
+  numActiveSpecies_ = mixture->GetNumActiveSpecies();
+//   int numReactions_ = chemistry_->
+
+  ambipolar_ = mixture->IsAmbipolar();
+  twoTemperature_ = mixture->IsTwoTemperature();
 }
 
 SourceTerm::~SourceTerm() {
