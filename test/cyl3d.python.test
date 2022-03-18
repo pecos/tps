@@ -1,0 +1,330 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="cyl3d"
+RUNFILE="inputs/input.4iters.cyl"
+RUNFILE="inputs/input.4iters.cyl.ini"
+EXE="../src/tps.py"
+
+setup() {
+    SOLN_FILE=restart_output.sol.h5
+    REF_FILE=ref_solns/cyl3d_coarse.4iters.h5
+}
+
+@test "[$TEST] check for input file $RUNFILE" {
+    test -s $RUNFILE
+}
+
+@test "[$TEST] run tps with input -> $RUNFILE" {
+    rm -f $SOLN_FILE
+    touch DIE
+    $EXE --runFile $RUNFILE
+
+    test -s $SOLN_FILE
+    test ! -e DIE
+}
+
+@test "[$TEST] verify tps output with input -> $RUNFILE" {
+
+    test -s $SOLN_FILE
+    test -s $REF_FILE
+    ./soln_differ $SOLN_FILE $REF_FILE
+}
+
+@test "[$TEST] verify git sha in HDF5 file" {
+
+    test -s $SOLN_FILE
+    run h5dump  -a revision restart_output.sol.h5
+    [[ "${status}" -eq 0 ]]
+
+    # disabling following bit since developer may be testing prior to commit
+#     hdf_dump=$output
+#
+#     run git log -1 --format="%h"
+#     if [ $? -eq 0 ];then
+# 	sha=${lines[0]}
+# 	[[ "${hdf_dump}" =~ "\"$sha\"" ]]
+#     fi
+}
+
+@test "[$TEST] verify exit code if restart files missing" {
+    RUNFILE=inputs/input.4iters.restart.cyl.ini
+
+    rm -f $SOLN_FILE
+
+    # following should exit with error
+    run $EXE --runFile $RUNFILE
+    [[ "${status}" -eq 1 ]]
+    [[ "${output}" =~ "Unable to access desired restart file" ]]
+}
+
+@test "[$TEST] verify consistent solution with restart from 2 iters" {
+    RUNFILE=inputs/input.2iters.cyl.ini
+
+    rm -f $SOLN_FILE
+    test -s $RUNFILE
+    $EXE --runFile $RUNFILE
+    test -s $SOLN_FILE
+
+    run h5dump  -a iteration  restart_output.sol.h5
+    [ "${lines[5]}" = "   (0): 2" ]
+
+    RUNFILE=inputs/input.4iters.restart.cyl.ini
+    $EXE --runFile $RUNFILE
+    ./soln_differ $SOLN_FILE $REF_FILE
+}
+
+@test "[$TEST] verify tps output after variable p restart" {
+    RUNFILE=inputs/input.4iters.cyl.ini
+
+    rm -f $SOLN_FILE
+    test -s $RUNFILE
+    $EXE --runFile $RUNFILE
+    test -s $SOLN_FILE
+
+    run h5dump  -a iteration  restart_output.sol.h5
+    [ "${lines[5]}" = "   (0): 4" ]
+
+    run h5dump  -a order  restart_output.sol.h5
+    [ "${lines[5]}" = "   (0): 1" ]
+
+    VARPLOG=varp.log
+    rm -f $VARPLOG
+    RUNFILE=inputs/input.8iters.restart.newp.cyl.ini
+    $EXE --runFile $RUNFILE >& $VARPLOG
+
+    #intErr=$(cat $VARPLOG | grep "interpolation error" | awk '{print $6}')
+    # Line grabs the printed interpolation error norm, which I'd like
+    # to compare against a tolerance.  But bc isn't available in
+    # current container it seems, so I'm not doing this now.
+
+    run h5dump  -a iteration  restart_output.sol.h5
+    [ "${lines[5]}" = "   (0): 8" ]
+
+    run h5dump  -a order  restart_output.sol.h5
+    [ "${lines[5]}" = "   (0): 2" ]
+
+    REF_FILE=ref_solns/cyl3d_coarse.8iters.varp.h5
+    test -s $REF_FILE
+    ./soln_differ $SOLN_FILE $REF_FILE
+}
+
+@test "[$TEST] verify serial restart consistency using 2 mpi tasks" {
+    RUNFILE=inputs/input.4iters.cyl.ini
+    RUNFILE_PART=${RUNFILE}.part
+    SOLN_FILE=restart_output.sol.h5
+
+    rm -f $RUNFILE_PART
+    rm -f $SOLN_FILE
+
+    # copy the run file, b/c I want to edit it
+    test -s $RUNFILE
+    cp $RUNFILE $RUNFILE_PART
+
+    # request single file restart
+    echo "[io]" >> $RUNFILE_PART
+    echo "restartMode = singleFileWrite" >> $RUNFILE_PART
+
+    # run 2 tasks
+    mpirun -np 2 $EXE --runFile $RUNFILE_PART
+    test -s $SOLN_FILE_SERIAL
+
+    ./soln_differ $SOLN_FILE $REF_FILE
+
+    # clean up if we got this far
+    rm -f $RUNFILE_PART
+    rm -f restart_output.sol.*.h5
+}
+
+@test "[$TEST] verify serial restart consistency using 4 mpi tasks" {
+    RUNFILE=inputs/input.4iters.cyl.ini
+    RUNFILE_PART=${RUNFILE}.part
+    SOLN_FILE=restart_output.sol.h5
+
+    rm -f $RUNFILE_PART
+    rm -f $SOLN_FILE
+
+    # copy the run file, b/c I want to edit it
+    test -s $RUNFILE
+    cp $RUNFILE $RUNFILE_PART
+
+    # add partition info to the runfile
+    echo "[io]" >> $RUNFILE_PART
+    echo "restartMode = singleFileWrite" >> $RUNFILE_PART
+
+    # run 4 tasks
+    mpirun -np 4 $EXE --runFile $RUNFILE_PART
+    test -s $SOLN_FILE_SERIAL
+
+    ./soln_differ $SOLN_FILE $REF_FILE
+
+    # clean up if we got this far
+    rm -f $RUNFILE_PART
+    rm -f restart_output.sol.*.h5
+}
+
+@test "[$TEST] verify serialized restart switching processors from 2 -> 4 mpi tasks" {
+    RUNFILE=inputs/input.2iters.cyl.ini
+    SOLFILE_BASE=restart_output.sol
+
+    RUNFILE_MOD=input.serialized.mod
+    TMPDIR=tmp_serialized_restart
+
+    rm -f  restart_output.sol*.h5
+    rm -f  partition.*.h5
+    rm -f  $RUNFILE_MOD
+    rm -rf $TMPDIR
+
+    # run 2 iterations using 2 tasks and save serialized restart file
+
+    test -s $RUNFILE
+    cp $RUNFILE $RUNFILE_MOD
+    echo "[io]" >> $RUNFILE_MOD
+    echo "restartMode = singleFileWrite" >> $RUNFILE_MOD
+    
+    mpirun -np 2 $EXE --runFile $RUNFILE_MOD
+    test -s ${SOLFILE_BASE}.h5
+    test -s partition.2p.h5
+
+    run h5dump  -a iteration  ${SOLFILE_BASE}.h5
+    [ "${lines[5]}" = "   (0): 2" ]
+
+    # now, restart from serialized restart at 2 iters, and run with 4 procs till 4 iterations
+    RUNFILE=inputs/input.4iters.cyl.ini
+    cp $RUNFILE $RUNFILE_MOD
+    echo "[io]" >> $RUNFILE_MOD
+    echo "restartMode   = singleFileRead" >> $RUNFILE_MOD
+    echo "enableRestart = true" >> $RUNFILE_MOD
+
+    mpirun -np 4 $EXE --runFile $RUNFILE_MOD
+    test -s partition.4p.h5
+
+    mkdir $TMPDIR
+
+    for i in `seq 0 3`; do
+	test -s ${SOLFILE_BASE}.$i.h5
+	run h5dump  -a iteration  ${SOLFILE_BASE}.$i.h5
+	[ "${lines[5]}" = "   (0): 4" ]
+	mv ${SOLFILE_BASE}.$i.h5 $TMPDIR
+    done
+
+    # finally, run a normal 4 proc case for 4 iterations and compare against above solution
+    rm -f  restart_output.sol*.h5
+    mpirun -np 4 $EXE --runFile $RUNFILE
+
+    for i in `seq 0 3`; do
+	test -s ${SOLFILE_BASE}.$i.h5
+	run h5dump  -a iteration  ${SOLFILE_BASE}.$i.h5
+	[ "${lines[5]}" = "   (0): 4" ]
+	./soln_differ ${SOLFILE_BASE}.$i.h5 ${TMPDIR}/${SOLFILE_BASE}.$i.h5 
+    done
+
+    rm -rf $TMPDIR
+}
+
+@test "[$TEST] verify restart from partitioned files to generate a serialized output (2 mpi tasks)" {
+    RUNFILE=inputs/input.2iters.cyl.ini
+    SOLFILE_BASE=restart_output.sol
+
+    RUNFILE_MOD=input.serialized.mod
+
+    rm -f  restart_output.sol*.h5
+    rm -f  partition.*.h5
+    rm -f  $RUNFILE_MOD
+    rm -rf $TMPDIR
+
+    # run 2 iterations using 2 tasks and save partitioned restart files
+    test -s $RUNFILE
+    mpirun -np 2 $EXE --runFile $RUNFILE
+    test -s ${SOLFILE_BASE}.0.h5
+    test -s ${SOLFILE_BASE}.1.h5
+    test -s partition.2p.h5
+
+    run h5dump  -a iteration  ${SOLFILE_BASE}.0.h5
+    [ "${lines[5]}" = "   (0): 2" ]
+    run h5dump  -a iteration  ${SOLFILE_BASE}.1.h5
+    [ "${lines[5]}" = "   (0): 2" ]
+
+    # verify we have global number of dofs correctly included
+    run h5dump  -a dofs_global  ${SOLFILE_BASE}.0.h5
+    [ "${lines[5]}" = "   (0): 24612" ]
+    run h5dump  -a dofs_global  ${SOLFILE_BASE}.1.h5
+    [ "${lines[5]}" = "   (0): 24612" ]
+
+    # now, start from partitioned restart files at 2 iters, and save serialized output at 4 iters
+    RUNFILE=inputs/input.4iters.cyl.ini
+    cp $RUNFILE $RUNFILE_MOD
+    echo "[io]" >> $RUNFILE_MOD
+    echo "restartMode   = singleFileWrite" >> $RUNFILE_MOD
+    echo "enableRestart = true" >> $RUNFILE_MOD
+
+    mpirun -np 2 $EXE --runFile $RUNFILE_MOD
+    test -s partition.2p.h5
+    test -s ${SOLFILE_BASE}.h5
+    run h5dump  -a iteration  ${SOLFILE_BASE}.h5
+    [ "${lines[5]}" = "   (0): 4" ]
+
+    ./soln_differ ${SOLFILE_BASE}.h5 $REF_FILE
+}
+
+@test "[$TEST] verify two back to back (partitioned) restarts using 2 tasks" {
+    RUNFILE=inputs/input.4iters.cyl.ini
+    SOLFILE_BASE=restart_output.sol
+
+    RUNFILE_MOD=${RUNFILE}.mod
+    TMPDIR=tmp_multi_restarts
+
+    rm -f  restart_output.sol*.h5
+    rm -f  partition.*.h5
+    rm -f  $RUNFILE_MOD
+    rm -rf $TMPDIR
+
+    # run 2 iterations using 2 tasks
+    sed  's/maxIters = 4/maxIters = 2/' $RUNFILE > $RUNFILE_MOD
+
+    test -s $RUNFILE
+    mpirun -np 2 $EXE --runFile $RUNFILE_MOD
+    test -s ${SOLFILE_BASE}.0.h5
+    test -s ${SOLFILE_BASE}.1.h5
+    test -s partition.2p.h5
+
+    run h5dump  -a iteration  ${SOLFILE_BASE}.0.h5
+    [ "${lines[5]}" = "   (0): 2" ]
+    run h5dump  -a iteration  ${SOLFILE_BASE}.1.h5
+    [ "${lines[5]}" = "   (0): 2" ]
+
+    # now, restart and run 1 additional iteration
+    sed  's/maxIters = 4/maxIters = 3/' $RUNFILE > $RUNFILE_MOD
+    run mpirun -np 2 $EXE --runFile $RUNFILE_MOD
+
+    run h5dump  -a iteration  ${SOLFILE_BASE}.0.h5
+    [ "${lines[5]}" = "   (0): 3" ]
+
+    run h5dump  -a iteration  ${SOLFILE_BASE}.1.h5
+    [ "${lines[5]}" = "   (0): 3" ]
+
+    # now, repeat and run 1 additional iteration
+    run mpirun -np 2 $EXE --runFile $RUNFILE
+
+    mkdir $TMPDIR
+
+    for i in `seq 0 1`; do
+	test -s ${SOLFILE_BASE}.$i.h5
+	run h5dump  -a iteration  ${SOLFILE_BASE}.$i.h5
+	[ "${lines[5]}" = "   (0): 4" ]
+	mv ${SOLFILE_BASE}.$i.h5 $TMPDIR
+    done
+
+    # finally, run a normal 2 proc case for 4 iterations and compare against above solution
+   rm -f  restart_output.sol*.h5
+   mpirun -np 2 $EXE --runFile $RUNFILE
+
+   for i in `seq 0 1`; do
+	test -s ${SOLFILE_BASE}.$i.h5
+	run h5dump  -a iteration  ${SOLFILE_BASE}.$i.h5
+	[ "${lines[5]}" = "   (0): 4" ]
+	./soln_differ ${SOLFILE_BASE}.$i.h5 ${TMPDIR}/${SOLFILE_BASE}.$i.h5
+   done
+
+   rm -rf $TMPDIR
+}
