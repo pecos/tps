@@ -1042,7 +1042,7 @@ void M2ulPhyS::projectInitialSolution() {
 
   // update pressure grid function
   mixture->UpdatePressureGridFunction(press, Up);
-  
+
   paraviewColl->Save();
 }
 
