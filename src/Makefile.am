@@ -22,7 +22,7 @@ tps_LDFLAGS=
 bin_PROGRAMS         = tps
 tps_SOURCES          = main.cpp
 tps_LDADD            = libtps.la
-tps_LDFLAGS         += $(PYTHON_LIBS)
+tps_LDFLAGS         += $(PYTHON_LIBS) $(MFEM_LIBS)
 
 
 
