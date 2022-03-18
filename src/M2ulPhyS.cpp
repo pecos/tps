@@ -2027,6 +2027,8 @@ void M2ulPhyS::parseSolverOptions2() {
     tpsP->getRequiredInput("plasma_models/transport_model", transportModelStr);
     if (transportModelStr == "argon_minimal") {
       config.transportModel = ARGON_MINIMAL;
+    } else if (transportModelStr == "constant") {
+      config.transportModel = CONSTANT;
     }
     // } else {
     //   grvy_printf(GRVY_ERROR, "\nUnknown transport_model -> %s", transportModelStr.c_str());
@@ -2119,6 +2121,12 @@ void M2ulPhyS::parseSolverOptions2() {
           }
         }
         tpsP->getInput("plasma_models/transport_model/argon_minimal/third_order_thermal_conductivity", config.thirdOrderkElectron, true);
+        break;
+      case CONSTANT:
+        tpsP->getRequiredInput("plasma_models/transport_model/constant/viscosity", config.constantTransport.viscosity);
+        tpsP->getRequiredInput("plasma_models/transport_model/constant/bulk_viscosity", config.constantTransport.bulkViscosity);
+        tpsP->getRequiredInput("plasma_models/transport_model/constant/diffusivity", config.constantTransport.diffusivity);
+        tpsP->getRequiredInput("plasma_models/transport_model/constant/thermal_conductivity", config.constantTransport.thermalConductivity);
         break;
       default:
         break;

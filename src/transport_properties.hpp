@@ -59,7 +59,10 @@ class TransportProperties {
   GasMixture *mixture;
 
   // Array<bool> isComputed;
-  SpeciesPrimitiveType speciesPrimitiveType;
+  // SpeciesPrimitiveType speciesPrimitiveType;
+
+  // NOTE: when species primitives (X, Y, n) are in a denominator, this noise is added to avoid dividing-by-zero.
+  const double Xeps_ = 1.0e-30;
 
  public:
   TransportProperties(GasMixture *_mixture);
@@ -136,6 +139,25 @@ class TestBinaryAirTransport : public DryAirTransport {
   TestBinaryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile);
 
   ~TestBinaryAirTransport(){}
+
+  virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
+                                              DenseMatrix &diffusionVelocity);
+};
+
+//////////////////////////////////////////////////////
+//////// Constant Transport
+//////////////////////////////////////////////////////
+
+class ConstantTransport : public TransportProperties {
+ protected:
+   double viscosity_;
+   double bulkViscosity_;
+   double diffusivity_;
+   double thermalConductivity_;
+ public:
+  ConstantTransport(GasMixture *_mixture, RunConfiguration &_runfile);
+
+  ~ConstantTransport(){}
 
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
                                               DenseMatrix &diffusionVelocity);

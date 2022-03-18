@@ -68,9 +68,6 @@ class ArgonMinimalTransport : public TransportProperties {
    const double PI_ = 4.0 * atan(1.0);
    const double qeOverkB_ = qe_ / kB_;
 
-   // NOTE: when species primitives (X, Y, n) are in a denominator, this noise is added to avoid dividing-by-zero.
-   const double Xeps = 1.0e-30;
-
    // standard Chapman-Enskog coefficients
    const double viscosityFactor_ = 5. / 16. * sqrt(PI_ * kB_);
    const double kOverEtaFactor_ = 15. / 4. * kB_;

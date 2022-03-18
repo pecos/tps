@@ -135,3 +135,39 @@ void TestBinaryAirTransport::ComputeFluxTransportProperties(const Vector &state,
     }
   }
 }
+
+//////////////////////////////////////////////////////
+//////// Constant transport
+//////////////////////////////////////////////////////
+
+ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_runfile) : TransportProperties(_mixture) {
+  viscosity_ = _runfile.constantTransport.viscosity;
+  bulkViscosity_ = _runfile.constantTransport.bulkViscosity;
+  diffusivity_ = _runfile.constantTransport.diffusivity;
+  thermalConductivity_ = _runfile.constantTransport.thermalConductivity;
+}
+
+void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
+                                                       Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
+
+  transportBuffer.SetSize(GlobalTrnsCoeffs::NUM_GLOBAL_COEFFS);
+  transportBuffer[GlobalTrnsCoeffs::VISCOSITY] = viscosity_;
+  transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY] = bulkViscosity_;
+  transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY] = thermalConductivity_;
+  transportBuffer[GlobalTrnsCoeffs::ELECTRON_THERMAL_CONDUCTIVITY] = thermalConductivity_;
+
+  diffusionVelocity.SetSize(numSpecies, dim);
+  diffusionVelocity = 0.0;
+
+  // Compute mass fraction gradient from number density gradient.
+  DenseMatrix massFractionGrad(numSpecies, dim);
+  mixture->ComputeMassFractionGradient(state, gradUp, massFractionGrad);
+  for (int sp = 0; sp < numSpecies; sp++) {
+    for (int d = 0; d < dim; d++)
+      diffusionVelocity(sp, d) = diffusivity_ * massFractionGrad(sp, d) / (state[dim + 2 + sp] + Xeps_) * state[0];
+  }
+
+  for (int d = 0; d < dim; d++) {
+    assert(!std::isnan(diffusionVelocity(0, d)));
+  }
+}

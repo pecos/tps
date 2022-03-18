@@ -49,7 +49,7 @@ enum WorkingFluid { DRY_AIR, TEST_BINARY_AIR, USER_DEFINED };
 // These are the type of EquationOfState.
 enum GasModel { /* PERFECT_SINGLE, */ PERFECT_MIXTURE, /* CANTERA, */ NUM_GASMODEL };
 
-enum TransportModel { ARGON_MINIMAL, NUM_TRANSPORTMODEL };
+enum TransportModel { ARGON_MINIMAL, CONSTANT, NUM_TRANSPORTMODEL };
 
 enum ChemistryModel { MASS_ACTION_LAW, NUM_CHEMISTRYMODEL };
 
@@ -210,6 +210,13 @@ struct heatSourceData {
   Vector point1;
   Vector point2;
   double radius;
+};
+
+struct constantTransportData {
+  double viscosity;
+  double bulkViscosity;
+  double diffusivity;
+  double thermalConductivity;
 };
 
 #endif  // DATASTRUCTURES_HPP_

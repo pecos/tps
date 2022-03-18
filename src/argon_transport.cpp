@@ -109,7 +109,7 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   // std::cout << "temp: " << Th << ",\t" << Te << std::endl;
 
   // Add Xeps to avoid zero number density case.
-  double nOverT = (n_sp(electronIndex_) + Xeps) / Te + (n_sp(ionIndex_) + Xeps) / Th;
+  double nOverT = (n_sp(electronIndex_) + Xeps_) / Te + (n_sp(ionIndex_) + Xeps_) / Th;
   double debyeLength = sqrt(debyeFactor_ / AVOGADRONUMBER / nOverT);
   double debyeCircle = PI_ * debyeLength * debyeLength;
 
@@ -140,9 +140,9 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   double binaryDie = diffusivityFactor_ * sqrt(Te / muEI_) / nTotal / collision::charged::att11(nondimTe);
 
   Vector diffusivity(3), mobility(3);
-  diffusivity(electronIndex_) = (1.0 - Y_sp(electronIndex_)) / ((X_sp(ionIndex_) + Xeps) / binaryDie + (X_sp(neutralIndex_) + Xeps) / binaryDea);
-  diffusivity(ionIndex_) = (1.0 - Y_sp(ionIndex_)) / ((X_sp(neutralIndex_) + Xeps) / binaryDai + (X_sp(electronIndex_) + Xeps) / binaryDie);
-  diffusivity(neutralIndex_) = (1.0 - Y_sp(neutralIndex_)) / ((X_sp(electronIndex_) + Xeps) / binaryDea + (X_sp(ionIndex_) + Xeps) / binaryDai);
+  diffusivity(electronIndex_) = (1.0 - Y_sp(electronIndex_)) / ((X_sp(ionIndex_) + Xeps_) / binaryDie + (X_sp(neutralIndex_) + Xeps_) / binaryDea);
+  diffusivity(ionIndex_) = (1.0 - Y_sp(ionIndex_)) / ((X_sp(neutralIndex_) + Xeps_) / binaryDai + (X_sp(electronIndex_) + Xeps_) / binaryDie);
+  diffusivity(neutralIndex_) = (1.0 - Y_sp(neutralIndex_)) / ((X_sp(electronIndex_) + Xeps_) / binaryDea + (X_sp(ionIndex_) + Xeps_) / binaryDai);
 
   double beta = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) {
@@ -155,7 +155,7 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   Vector ambE(3);
   ambE = 0.0;
 
-  DenseMatrix gradX(numSpecies, dim);
+  DenseMatrix gradX(numSpecies,dim);
   mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
 
   diffusionVelocity.SetSize(numSpecies,dim);
@@ -163,13 +163,13 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
     for (int d = 0; d < dim; d++) {
       double DgradX = diffusivity(sp) * gradX(sp, d);
       // NOTE: we'll have to handle small X case.
-      diffusionVelocity(sp, d) = - DgradX / (X_sp(sp) + Xeps);
+      diffusionVelocity(sp, d) = - DgradX / (X_sp(sp) + Xeps_);
       if (ambipolar) ambE(d) += DgradX * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
     }
   }
 
   if (ambipolar) {
-    for (int d = 0; d < dim; d++) ambE(d) /= (beta + Xeps); // NOTE: add Xeps for the case of no charged-species at the point.
+    for (int d = 0; d < dim; d++) ambE(d) /= (beta + Xeps_); // NOTE: add Xeps for the case of no charged-species at the point.
 
     for (int sp = 0; sp < numSpecies; sp++) {
       for (int d = 0; d < dim; d++)
@@ -262,7 +262,7 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
   double Th = primitiveState[dim + 1];
 
   // Add Xeps to avoid zero number density case.
-  double nOverT = (n_sp(electronIndex_) + Xeps) / Te + (n_sp(ionIndex_) + Xeps) / Th;
+  double nOverT = (n_sp(electronIndex_) + Xeps_) / Te + (n_sp(ionIndex_) + Xeps_) / Th;
   double debyeLength = sqrt(debyeFactor_ / AVOGADRONUMBER / nOverT);
   double debyeCircle = PI_ * debyeLength * debyeLength;
 
@@ -274,7 +274,7 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
   double binaryDie = diffusivityFactor_ * sqrt(Te / muEI_) / nTotal / collision::charged::att11(nondimTe);
 
   diffusivity.SetSize(3);
-  diffusivity(electronIndex_) = (1.0 - Y_sp(electronIndex_)) / ((X_sp(ionIndex_) + Xeps) / binaryDie + (X_sp(neutralIndex_) + Xeps) / binaryDea);
-  diffusivity(ionIndex_) = (1.0 - Y_sp(ionIndex_)) / ((X_sp(neutralIndex_) + Xeps) / binaryDai + (X_sp(electronIndex_) + Xeps) / binaryDie);
-  diffusivity(neutralIndex_) = (1.0 - Y_sp(neutralIndex_)) / ((X_sp(electronIndex_) + Xeps) / binaryDea + (X_sp(ionIndex_) + Xeps) / binaryDai);
+  diffusivity(electronIndex_) = (1.0 - Y_sp(electronIndex_)) / ((X_sp(ionIndex_) + Xeps_) / binaryDie + (X_sp(neutralIndex_) + Xeps_) / binaryDea);
+  diffusivity(ionIndex_) = (1.0 - Y_sp(ionIndex_)) / ((X_sp(neutralIndex_) + Xeps_) / binaryDai + (X_sp(electronIndex_) + Xeps_) / binaryDie);
+  diffusivity(neutralIndex_) = (1.0 - Y_sp(neutralIndex_)) / ((X_sp(electronIndex_) + Xeps_) / binaryDea + (X_sp(ionIndex_) + Xeps_) / binaryDai);
 }

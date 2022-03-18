@@ -219,6 +219,9 @@ class RunConfiguration {
   // flag for using third-order electron thermal conductivity
   bool thirdOrderkElectron;
 
+  // data structure for constant transport property class
+  constantTransportData constantTransport;
+
   RunConfiguration();
   ~RunConfiguration();
 
