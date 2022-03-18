@@ -466,9 +466,10 @@ void M2ulPhyS::initVariables() {
       intRules, dim, num_equation, gpuArrays, maxIntPoints, maxDofs);
   gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
 
-  rhsOperator = new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType,
-                                fluxClass, mixture, chemistry_, transportPtr, vfes, gpuArrays, maxIntPoints, maxDofs, A, Aflux, mesh,
-                                spaceVaryViscMult, Up, gradUp, gradUpfes, gradUp_A, bcIntegrator, isSBP, alpha, config);
+  rhsOperator =
+      new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType, fluxClass,
+                      mixture, chemistry_, transportPtr, vfes, gpuArrays, maxIntPoints, maxDofs, A, Aflux, mesh,
+                      spaceVaryViscMult, Up, gradUp, gradUpfes, gradUp_A, bcIntegrator, isSBP, alpha, config);
 
   CFL = config.GetCFLNumber();
   rhsOperator->SetTime(time);
@@ -1381,7 +1382,7 @@ void M2ulPhyS::dryAirUniformInitialConditions() {
     const int numActiveSpecies = mixture->GetNumActiveSpecies();
     for (int sp = 0; sp < numActiveSpecies; sp++) {
       int inputIndex = mixture->getInputIndexOf(sp);
-      initState(2+nvel+sp) = inputRhoRhoVp[0] * config.initialMassFractions(inputIndex);
+      initState(2 + nvel + sp) = inputRhoRhoVp[0] * config.initialMassFractions(inputIndex);
     }
 
     // electron energy
@@ -1389,15 +1390,13 @@ void M2ulPhyS::dryAirUniformInitialConditions() {
       double ne = 0.;
       if (mixture->IsAmbipolar()) {
         for (int sp = 0; sp < numActiveSpecies; sp++)
-          ne += mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) *
-                initState(2+nvel+sp)/mixture->GetGasParams(sp, GasParams::SPECIES_MW);
-      }else {
-        ne = initState(2 + nvel + numSpecies - 2) /
-          mixture->GetGasParams(numSpecies - 2, GasParams::SPECIES_MW);
+          ne += mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) * initState(2 + nvel + sp) /
+                mixture->GetGasParams(sp, GasParams::SPECIES_MW);
+      } else {
+        ne = initState(2 + nvel + numSpecies - 2) / mixture->GetGasParams(numSpecies - 2, GasParams::SPECIES_MW);
       }
 
-      initState(num_equation-1) = config.initialElectronTemperature * ne *
-                                  mixture->getMolarCV(numSpecies-2);
+      initState(num_equation - 1) = config.initialElectronTemperature * ne * mixture->getMolarCV(numSpecies - 2);
     }
   }
 
@@ -1405,14 +1404,15 @@ void M2ulPhyS::dryAirUniformInitialConditions() {
   mixture->modifyEnergyForPressure(initState, initState, inputRhoRhoVp[4]);
 
   // TODO(marc): try to make this mixture independent
-//   DryAir *eqState = new DryAir(dim, num_equation);
+  //   DryAir *eqState = new DryAir(dim, num_equation);
 
-//   const double gamma = eqState->GetSpecificHeatRatio();
-//   const double rhoE =
-//       inputRhoRhoVp[4] / (gamma - 1.) + 0.5 *
-//                                             (inputRhoRhoVp[1] * inputRhoRhoVp[1] + inputRhoRhoVp[2] * inputRhoRhoVp[2] +
-//                                              inputRhoRhoVp[3] * inputRhoRhoVp[3]) /
-//                                             inputRhoRhoVp[0];
+  //   const double gamma = eqState->GetSpecificHeatRatio();
+  //   const double rhoE =
+  //       inputRhoRhoVp[4] / (gamma - 1.) + 0.5 *
+  //                                             (inputRhoRhoVp[1] * inputRhoRhoVp[1] + inputRhoRhoVp[2] *
+  //                                             inputRhoRhoVp[2] +
+  //                                              inputRhoRhoVp[3] * inputRhoRhoVp[3]) /
+  //                                             inputRhoRhoVp[0];
 
   Vector state;
   state.UseDevice(false);
@@ -1445,7 +1445,7 @@ void M2ulPhyS::dryAirUniformInitialConditions() {
     }
   }
 
-//   delete eqState;
+  //   delete eqState;
 }
 
 void M2ulPhyS::uniformInitialConditions() {
@@ -2091,11 +2091,10 @@ void M2ulPhyS::parseSolverOptions2() {
         config.gasParams(i - 1, GasParams::SPECIES_CHARGES) = charge;
         config.gasParams(i - 1, GasParams::FORMATION_ENERGY) = formEnergy;
 
-        //tpsP->getRequiredInput((basepath + "/initialMassFraction").c_str(),
-        //                       config.initialMassFractions(i - 1));
+        tpsP->getRequiredInput((basepath + "/initialMassFraction").c_str(), config.initialMassFractions(i - 1));
 
         //// require initial electron temperature
-        //if (speciesName == "E")
+        // if (speciesName == "E")
         //  tpsP->getRequiredInput((basepath + "/initialElectronTemperature").c_str(),
         //                         config.initialElectronTemperature);
 

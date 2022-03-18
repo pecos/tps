@@ -37,8 +37,8 @@ FunctionCoefficient radiusFcn(getRadius);
 // Implementation of class RHSoperator
 RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, const int &_order,
                          const Equations &_eqSystem, double &_max_char_speed, IntegrationRules *_intRules,
-                         int _intRuleType, Fluxes *_fluxClass, GasMixture *_mixture,
-                         Chemistry *_chemistry, TransportProperties *_transport, ParFiniteElementSpace *_vfes,
+                         int _intRuleType, Fluxes *_fluxClass, GasMixture *_mixture, Chemistry *_chemistry,
+                         TransportProperties *_transport, ParFiniteElementSpace *_vfes,
                          const volumeFaceIntegrationArrays &_gpuArrays, const int &_maxIntPoints, const int &_maxDofs,
                          DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh,
                          ParGridFunction *_spaceVaryViscMult, ParGridFunction *_Up, ParGridFunction *_gradUp,
@@ -117,8 +117,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   }
   // NOTE: check if this logic is sound
   if (_config.GetWorkingFluid() == WorkingFluid::USER_DEFINED) {
-    forcing.Append(new SourceTerm(dim, num_equation, _order, intRuleType,
-                                  intRules, vfes, Up, gradUp, gpuArrays,
+    forcing.Append(new SourceTerm(dim, num_equation, _order, intRuleType, intRules, vfes, Up, gradUp, gpuArrays,
                                   _config, mixture, _transport, _chemistry));
   }
 #ifdef _MASA_

@@ -37,8 +37,8 @@
  * handy functions to deal with operations.
  */
 
-#include <tps_config.h>
 #include <grvy.h>
+#include <tps_config.h>
 
 #include <mfem.hpp>
 
@@ -96,13 +96,13 @@ class GasMixture {
 
  public:
   GasMixture(WorkingFluid _fluid, int _dim);
-  GasMixture(){};
+  GasMixture(){}
 
-  ~GasMixture(){};
+  ~GasMixture(){}
 
   void SetFluid(WorkingFluid _fluid);
 
-  WorkingFluid GetWorkingFluid() {return fluid;}
+  WorkingFluid GetWorkingFluid() { return fluid; }
 
   int GetNumSpecies() { return numSpecies; }
   int GetNumActiveSpecies() { return numActiveSpecies; }
@@ -367,13 +367,13 @@ class TestBinaryAir : public GasMixture {
   TestBinaryAir(RunConfiguration &_runfile, int _dim);
   // TestBinaryAir(); //this will only be usefull to get air constants
 
-  ~TestBinaryAir(){};
+  ~TestBinaryAir(){}
 
   // implementation virtual methods
   virtual double ComputePressure(const Vector &state, double &electronPressure);
   virtual double ComputePressureFromPrimitives(const Vector &Up);
   virtual double ComputeTemperature(const Vector &state);
-  virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / rho[0] / gas_constant; };
+  virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / rho[0] / gas_constant; }
 
   virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true);
   virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies);
@@ -396,8 +396,8 @@ class TestBinaryAir : public GasMixture {
   virtual void ComputeMoleFractionGradient(const Vector &state, const DenseMatrix &gradUp,
                                            DenseMatrix &moleFractionGrad);
 
-  virtual double GetSpecificHeatRatio() { return specific_heat_ratio; };
-  virtual double GetGasConstant() { return gas_constant; };
+  virtual double GetSpecificHeatRatio() { return specific_heat_ratio; }
+  virtual double GetGasConstant() { return gas_constant; }
 
   // virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
 
@@ -445,16 +445,16 @@ class PerfectMixture : public GasMixture {
   PerfectMixture(RunConfiguration &_runfile, int _dim);
   // TestBinaryAir(); //this will only be usefull to get air constants
 
-  ~PerfectMixture(){};
+  ~PerfectMixture(){}
 
-  virtual double getMolarCV(int species) { return molarCV_(species); };
-  virtual double getMolarCP(int species) { return molarCP_(species); };
-  virtual double getSpecificHeatRatio(int species) { return specificHeatRatios_(species); };
-  virtual double getSpecificGasConstant(int species) { return specificGasConstants_(species); };
+  virtual double getMolarCV(int species) { return molarCV_(species); }
+  virtual double getMolarCP(int species) { return molarCP_(species); }
+  virtual double getSpecificHeatRatio(int species) { return specificHeatRatios_(species); }
+  virtual double getSpecificGasConstant(int species) { return specificGasConstants_(species); }
 
   // Kevin: these are mixture heat ratio and gas constant. need to change argument.
-  virtual double GetSpecificHeatRatio() { return molarCP_(numSpecies - 1) / molarCV_(numSpecies - 1); };
-  virtual double GetGasConstant() { return specificGasConstants_(numSpecies - 1); };
+  virtual double GetSpecificHeatRatio() { return molarCP_(numSpecies - 1) / molarCV_(numSpecies - 1); }
+  virtual double GetGasConstant() { return specificGasConstants_(numSpecies - 1); }
 
   virtual double computeHeaviesHeatCapacity(const double *n_sp, const double &nB);
   virtual double computeAmbipolarElectronNumberDensity(const double *n_sp);

@@ -37,28 +37,25 @@ SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_or
                        IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
                        ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
                        RunConfiguration &_config, GasMixture *mixture, TransportProperties *transport, Chemistry *chemistry)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType,
-                    _intRules, _vfes, _Up,
-                    _gradUp, gpuArrays, _config.isAxisymmetric()),
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays, _config.isAxisymmetric()),
       mixture_(mixture),
       transport_(transport),
       chemistry_(chemistry) {
   numSpecies_ = mixture->GetNumSpecies();
   numActiveSpecies_ = mixture->GetNumActiveSpecies();
-//   int numReactions_ = chemistry_->
+  //   int numReactions_ = chemistry_->
 
   ambipolar_ = mixture->IsAmbipolar();
   twoTemperature_ = mixture->IsTwoTemperature();
 }
 
 SourceTerm::~SourceTerm() {
-//   if (mixture_ != NULL) delete mixture_;
-//   if (transport_ != NULL) delete transport_;
-//   if (chemistry_ != NULL) delete chemistry_;
+  //   if (mixture_ != NULL) delete mixture_;
+  //   if (transport_ != NULL) delete transport_;
+  //   if (chemistry_ != NULL) delete chemistry_;
 }
 
-void SourceTerm::updateTerms(mfem::Vector& in)
-{
+void SourceTerm::updateTerms(mfem::Vector &in) {
   const double *h_Up = Up->HostRead();
   double *h_in = in.HostReadWrite();
 
@@ -74,7 +71,7 @@ void SourceTerm::updateTerms(mfem::Vector& in)
     Th = upn[1 + dim];
     if (mixture_->IsTwoTemperature()) {
       Te = upn[num_equation - 1];
-    }else {
+    } else {
       Te = Th;
     }
 

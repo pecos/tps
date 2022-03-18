@@ -71,7 +71,7 @@ class Chemistry {
 
   Array<bool> detailedBalance_;
   DenseMatrix equilibriumConstantParams_;
-  
+
   ChemistryModel model;
 
   // /*
@@ -101,25 +101,23 @@ class Chemistry {
 
   const double *getReactantStoichiometry(const int reactionIndex) { return reactantStoich_.GetColumn(reactionIndex); }
   const double *getProductStoichiometry(const int reactionIndex) { return productStoich_.GetColumn(reactionIndex); }
-  
-  virtual void computeCreationRate(const Vector &ns, const Vector &kfwd, const Vector &keq, Vector &creationRate) {};
+
+  virtual void computeCreationRate(const Vector &ns, const Vector &kfwd, const Vector &keq, Vector &creationRate){}
 
   bool isElectronInvolvedAt(const int reactionIndex) {
     return (electronIndex_ < 0) ? false : (reactantStoich_(electronIndex_, reactionIndex) != 0);
   }
-  
-  ChemistryModel getChemistryModel() {return model;}
+
+  ChemistryModel getChemistryModel() { return model; }
 };
 
 // Implementation of the Mass-action-law class
-class MassActionLaw : public Chemistry
-{
-public:
+class MassActionLaw : public Chemistry {
+ public:
   MassActionLaw(GasMixture *mixture, RunConfiguration &config);
-  ~MassActionLaw() {};
-  
+  ~MassActionLaw(){}
+
   virtual void computeCreationRate(const Vector &ns, const Vector &kfwd, const Vector &keq, Vector &creationRate);
 };
-
 
 #endif  // CHEMISTRY_HPP_
