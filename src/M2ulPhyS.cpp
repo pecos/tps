@@ -1785,87 +1785,6 @@ void M2ulPhyS::parseSolverOptions2() {
     tpsP->getInput("jobManagement/checkFreq", config.rm_checkFrequency_, 500);     // 500 iterations
   }
 
-  // sponge zone
-  {
-    tpsP->getInput("spongezone/numSpongeZones", config.numSpongeRegions_, 0);
-
-    if (config.numSpongeRegions_ > 0) {
-      config.spongeData_ = new SpongeZoneData[config.numSpongeRegions_];
-
-      for (int sz = 0; sz < config.numSpongeRegions_; sz++) {
-        std::string base("spongezone" + std::to_string(sz + 1));
-
-        std::string type;
-        tpsP->getInput((base + "/type").c_str(), type, std::string("none"));
-
-        if (type == "none") {
-          grvy_printf(GRVY_ERROR, "\nUnknown sponge zone type -> %s\n", type.c_str());
-          exit(ERROR);
-        } else if (type == "planar") {
-          config.spongeData_[sz].szType = SpongeZoneType::PLANAR;
-        } else if (type == "annulus") {
-          config.spongeData_[sz].szType = SpongeZoneType::ANNULUS;
-
-          tpsP->getInput((base + "/r1").c_str(), config.spongeData_[sz].r1, 0.);
-          tpsP->getInput((base + "/r2").c_str(), config.spongeData_[sz].r2, 0.);
-        }
-
-        config.spongeData_[sz].normal.SetSize(3);
-        config.spongeData_[sz].point0.SetSize(3);
-        config.spongeData_[sz].pointInit.SetSize(3);
-        config.spongeData_[sz].targetUp.SetSize(5);
-
-        tpsP->getRequiredVec((base + "/normal").c_str(), config.spongeData_[sz].normal, 3);
-        tpsP->getRequiredVec((base + "/p0").c_str(), config.spongeData_[sz].point0, 3);
-        tpsP->getRequiredVec((base + "/pInit").c_str(), config.spongeData_[sz].pointInit, 3);
-        tpsP->getInput((base + "/tolerance").c_str(), config.spongeData_[sz].tol, 1e-5);
-        tpsP->getInput((base + "/multiplier").c_str(), config.spongeData_[sz].multFactor, 1.0);
-
-        tpsP->getRequiredInput((base + "/targetSolType").c_str(), type);
-        if (type == "userDef") {
-          config.spongeData_[sz].szSolType = SpongeZoneSolution::USERDEF;
-          auto hup = config.spongeData_[sz].targetUp.HostWrite();
-          tpsP->getRequiredInput((base + "/density").c_str(), hup[0]);   // rho
-          tpsP->getRequiredVecElem((base + "/uvw").c_str(), hup[1], 0);  // u
-          tpsP->getRequiredVecElem((base + "/uvw").c_str(), hup[2], 1);  // v
-          tpsP->getRequiredVecElem((base + "/uvw").c_str(), hup[3], 2);  // w
-          tpsP->getRequiredInput((base + "/pressure").c_str(), hup[4]);  // P
-        } else if (type == "mixedOut") {
-          config.spongeData_[sz].szSolType = SpongeZoneSolution::MIXEDOUT;
-        } else {
-          grvy_printf(GRVY_ERROR, "\nUnknown sponge zone type -> %s\n", type.c_str());
-          exit(ERROR);
-        }
-      }
-    }
-
-    //     if (isSpongeZoneEnabled) {
-    //       tpsP->getRequiredVec("spongezone/normal", config.spongeData.normal, 3);
-    //       tpsP->getRequiredVec("spongezone/p0", config.spongeData.point0, 3);
-    //       tpsP->getRequiredVec("spongezone/pInit", config.spongeData.pointInit, 3);
-    //       tpsP->getRequiredVec("spongezone/pInit", config.spongeData.pointInit, 3);
-    //       tpsP->getInput("spongezone/tolerance", config.spongeData.tol, 1e-5);
-    //       tpsP->getInput("spongezone/multiplier", config.spongeData.multFactor, 1.0);
-    //
-    //       std::string type;
-    //       tpsP->getRequiredInput("spongezone/type", type);
-    //       if (type == "userDef") {
-    //         config.spongeData.szType = SpongeZoneSolution::USERDEF;
-    //         auto hup = config.spongeData.targetUp.HostWrite();
-    //         tpsP->getRequiredInput("spongezone/density", hup[0]);   // rho
-    //         tpsP->getRequiredVecElem("spongezone/uvw", hup[1], 0);  // u
-    //         tpsP->getRequiredVecElem("spongezone/uvw", hup[2], 1);  // v
-    //         tpsP->getRequiredVecElem("spongezone/uvw", hup[3], 2);  // w
-    //         tpsP->getRequiredInput("spongezone/pressure", hup[4]);  // P
-    //       } else if (type == "mixedOut") {
-    //         config.spongeData.szType = SpongeZoneSolution::MIXEDOUT;
-    //       } else {
-    //         grvy_printf(GRVY_ERROR, "\nUnknown sponge zone type -> %s\n", type.c_str());
-    //         exit(ERROR);
-    //       }
-    //     }
-  }
-
   // heat source
   {
     int numHeatSources;
@@ -2317,6 +2236,82 @@ void M2ulPhyS::parseSolverOptions2() {
       patchType.first = patch;
       patchType.second = outletMapping[type];
       config.outletPatchType.push_back(patchType);
+    }
+  }
+
+  // changed the order of parsing in order to use species list.
+  // sponge zone
+  {
+    tpsP->getInput("spongezone/numSpongeZones", config.numSpongeRegions_, 0);
+
+    if (config.numSpongeRegions_ > 0) {
+      config.spongeData_ = new SpongeZoneData[config.numSpongeRegions_];
+
+      for (int sz = 0; sz < config.numSpongeRegions_; sz++) {
+        std::string base("spongezone" + std::to_string(sz + 1));
+
+        std::string type;
+        tpsP->getInput((base + "/type").c_str(), type, std::string("none"));
+
+        if (type == "none") {
+          grvy_printf(GRVY_ERROR, "\nUnknown sponge zone type -> %s\n", type.c_str());
+          exit(ERROR);
+        } else if (type == "planar") {
+          config.spongeData_[sz].szType = SpongeZoneType::PLANAR;
+        } else if (type == "annulus") {
+          config.spongeData_[sz].szType = SpongeZoneType::ANNULUS;
+
+          tpsP->getInput((base + "/r1").c_str(), config.spongeData_[sz].r1, 0.);
+          tpsP->getInput((base + "/r2").c_str(), config.spongeData_[sz].r2, 0.);
+        }
+
+        config.spongeData_[sz].normal.SetSize(3);
+        config.spongeData_[sz].point0.SetSize(3);
+        config.spongeData_[sz].pointInit.SetSize(3);
+        config.spongeData_[sz].targetUp.SetSize(5);
+
+        tpsP->getRequiredVec((base + "/normal").c_str(), config.spongeData_[sz].normal, 3);
+        tpsP->getRequiredVec((base + "/p0").c_str(), config.spongeData_[sz].point0, 3);
+        tpsP->getRequiredVec((base + "/pInit").c_str(), config.spongeData_[sz].pointInit, 3);
+        tpsP->getInput((base + "/tolerance").c_str(), config.spongeData_[sz].tol, 1e-5);
+        tpsP->getInput((base + "/multiplier").c_str(), config.spongeData_[sz].multFactor, 1.0);
+
+        tpsP->getRequiredInput((base + "/targetSolType").c_str(), type);
+        if (type == "userDef") {
+          config.spongeData_[sz].szSolType = SpongeZoneSolution::USERDEF;
+          auto hup = config.spongeData_[sz].targetUp.HostWrite();
+          tpsP->getRequiredInput((base + "/density").c_str(), hup[0]);   // rho
+          tpsP->getRequiredVecElem((base + "/uvw").c_str(), hup[1], 0);  // u
+          tpsP->getRequiredVecElem((base + "/uvw").c_str(), hup[2], 1);  // v
+          tpsP->getRequiredVecElem((base + "/uvw").c_str(), hup[3], 2);  // w
+          tpsP->getRequiredInput((base + "/pressure").c_str(), hup[4]);  // P
+
+          // For multi-component gas, require (numActiveSpecies)-more inputs.
+          if ((config.workFluid != DRY_AIR) && (config.numSpecies > 1)) {
+            grvy_printf(GRVY_INFO, "\nInlet mass fraction of background species will not be used. \n");
+            if (config.ambipolar) grvy_printf(GRVY_INFO, "\nInlet mass fraction of electron will not be used. \n");
+
+            for (int sp = 1; sp <= config.numSpecies; sp++) {
+              // read mass fraction of species as listed in the input file.
+              std::string speciesBasePath(base + "/mass_fraction/species" + std::to_string(sp));
+              tpsP->getRequiredInput(speciesBasePath.c_str(), hup[4 + sp]);
+            }
+          }
+
+          if (config.twoTemperature) {
+            tpsP->getInput((base + "/single_temperature").c_str(), config.spongeData_[sz].singleTemperature, false);
+            if (!config.spongeData_[sz].singleTemperature) {
+              tpsP->getRequiredInput((base + "/electron_temperature").c_str(), hup[5 + config.numSpecies]);  // P
+            }
+          }
+
+        } else if (type == "mixedOut") {
+          config.spongeData_[sz].szSolType = SpongeZoneSolution::MIXEDOUT;
+        } else {
+          grvy_printf(GRVY_ERROR, "\nUnknown sponge zone type -> %s\n", type.c_str());
+          exit(ERROR);
+        }
+      }
     }
   }
 

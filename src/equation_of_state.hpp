@@ -186,6 +186,8 @@ class GasMixture {
                                               bool isElectronComputed = false) {};
 
   virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal, Vector &conservedState) {};
+
+  virtual double computeElectronEnergy(const double n_e, const double T_e) {};
 };
 
 //////////////////////////////////////////////////////
@@ -510,6 +512,8 @@ class PerfectMixture : public GasMixture {
                                        bool modifyElectronEnergy = false);
 
   virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal, Vector &conservedState);
+
+  virtual double computeElectronEnergy(const double n_e, const double T_e) { return n_e * molarCV_(numSpecies - 2) * T_e; };
   // GPU functions
 #ifdef _GPU_
 

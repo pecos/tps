@@ -138,6 +138,8 @@ class SpongeZone : public ForcingTerms {
 
   Vector meanNormalFluxes;
 
+  bool singleTemperature_;
+
   void computeMixedOutValues();
   void addSpongeZoneForcing(Vector &in);
 

@@ -389,12 +389,35 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
       szData(_config.spongeData_[sz]) {
   targetU.SetSize(num_equation);
   if (szData.szSolType == SpongeZoneSolution::USERDEF) {
-    Vector Up(num_equation);
-    Up[0] = szData.targetUp[0];
-    for (int d = 0; d < dim; d++) Up[1 + d] = szData.targetUp[1 + d];
+    Vector conserved(num_equation);
+    conserved[0] = szData.targetUp[0];
+    for (int d = 0; d < dim; d++) conserved[1 + d] = szData.targetUp[0] * szData.targetUp[1 + d];
     // Kevin: I don't think we can do this.. we should set target temperature.
-    Up[1 + dim] =  mixture->Temperature(&Up[0],&szData.targetUp[4],1);
-    mixture->GetConservativesFromPrimitives(Up, targetU);
+    // Up[1 + dim] = mixture->Temperature(&Up[0], &szData.targetUp[4], 1);
+    // mixture->GetConservativesFromPrimitives(Up, targetU);
+
+    int numActiveSpecies_ = mixture->GetNumActiveSpecies();
+    if (numActiveSpecies_ > 0) { // read species input state for multi-component flow.
+      std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
+      // NOTE: input Up will always contain 3 velocity components.
+      for (int sp = 0; sp < numActiveSpecies_; sp++) {
+        int inputIndex = (*mixtureToInputMap)[sp];
+        // store species density into inputState in the order of mixture-sorted index.
+        conserved[dim + 2 + sp] = szData.targetUp[0] * szData.targetUp[5 + inputIndex];
+      }
+    }
+
+    singleTemperature_ = false;
+    if (mixture->IsTwoTemperature()) {
+      singleTemperature_ = szData.singleTemperature;
+      if (!singleTemperature_) {
+        double numSpecies = mixture->GetNumSpecies();
+        Vector n_sp(numSpecies);
+        mixture->computeNumberDensities(conserved, n_sp);
+        conserved[num_equation - 1] = mixture->computeElectronEnergy(n_sp(numSpecies - 2), szData.targetUp(5 + numSpecies));
+      }
+    }
+    mixture->modifyEnergyForPressure(conserved, targetU, szData.targetUp[4], singleTemperature_);
   }
 
   // make sure normal is unitary

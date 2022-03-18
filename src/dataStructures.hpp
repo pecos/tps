@@ -152,6 +152,8 @@ struct SpongeZoneData {
                       // U* is the target solution. Currently sigam=a/l where
                       // a is the mixed-out speed of sound and l is the lenght
                       // of the spnge zone. [OPTIONAL]
+
+  bool singleTemperature;
 };
 
 struct volumeFaceIntegrationArrays {

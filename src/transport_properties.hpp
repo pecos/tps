@@ -161,6 +161,8 @@ class ConstantTransport : public TransportProperties {
 
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
                                               DenseMatrix &diffusionVelocity);
+
+  virtual double GetViscosityFromPrimitive(const Vector &state) {};
 };
 
 #endif  // TRANSPORT_PROPERTIES_HPP_
