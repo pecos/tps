@@ -557,10 +557,9 @@ PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim)
   ambipolar = false;
   twoTemperature = false;
 
-  /*
-    TODO: Currently, background species is assumed to be the last species, and electron the second to last.
-    These are enforced at input parsing.
-  */
+  // TODO: electron species is enforced to be included in the input file.
+  bool isElectronIncluded = false;
+
   gasParams.SetSize(numSpecies, GasParams::NUM_GASPARAMS);
   molarCV_.SetSize(numSpecies);
   molarCP_.SetSize(numSpecies);
@@ -575,6 +574,7 @@ PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim)
       targetIdx = numSpecies - 1;
     } else if (_runfile.speciesNames[sp] == "E") {
       targetIdx = numSpecies - 2;
+      isElectronIncluded = true;
       // Set ambipolar and twoTemperature if electron is included.
       ambipolar = _runfile.IsAmbipolar();
       twoTemperature = _runfile.IsTwoTemperature();
@@ -603,6 +603,8 @@ PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim)
 
   // We assume the background species is neutral.
   assert( gasParams(numSpecies - 1, GasParams::SPECIES_CHARGES) == 0.0 );
+  // TODO: release electron species enforcing.
+  assert( isElectronIncluded );
 }
 
 // compute heavy-species heat capacity from number densities.
