@@ -34,7 +34,7 @@
 #include <vector>
 
 ForcingTerms::ForcingTerms(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
-                           IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
+                           IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up,
                            ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &_gpuArrays, bool axisym)
     : dim(_dim),
       nvel(axisym ? 3 : _dim),
@@ -44,6 +44,7 @@ ForcingTerms::ForcingTerms(const int &_dim, const int &_num_equation, const int 
       intRuleType(_intRuleType),
       intRules(_intRules),
       vfes(_vfes),
+      U_(U),
       Up_(_Up),
       gradUp_(_gradUp),
       gpuArrays(_gpuArrays) {
@@ -84,11 +85,11 @@ ForcingTerms::~ForcingTerms() {
 
 ConstantPressureGradient::ConstantPressureGradient(const int &_dim, const int &_num_equation, const int &_order,
                                                    const int &_intRuleType, IntegrationRules *_intRules,
-                                                   ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
-                                                   ParGridFunction *_gradUp,
+                                                   ParFiniteElementSpace *_vfes, ParGridFunction *U,
+                                                   ParGridFunction *_Up, ParGridFunction *_gradUp,
                                                    const volumeFaceIntegrationArrays &_gpuArrays,
                                                    RunConfiguration &_config)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, _gpuArrays,
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, _gpuArrays,
                    _config.isAxisymmetric()) {
   mixture = new DryAir(_config, dim);
 
@@ -222,10 +223,10 @@ void ConstantPressureGradient::updateTerms_gpu(const int numElems, const int off
 
 AxisymmetricSource::AxisymmetricSource(const int &_dim, const int &_num_equation, const int &_order,
                                        GasMixture *_mixture, TransportProperties *_transport, const Equations &_eqSystem, const int &_intRuleType,
-                                       IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
+                                       IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up,
                                        ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
                                        RunConfiguration &_config)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays,
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()),
       mixture(_mixture),
       transport_(_transport),
@@ -242,8 +243,8 @@ void AxisymmetricSource::updateTerms(Vector &in) {
   int dof = vfes->GetNDofs();
 
   double *data = in.GetData();
-  const double *dataUp = Up->GetData();
-  const double *dataGradUp = gradUp->GetData();
+  const double *dataUp = Up_->GetData();
+  const double *dataGradUp = gradUp_->GetData();
 
   // get coords
   const FiniteElementCollection *fec = vfes->FEColl();
@@ -380,9 +381,9 @@ void AxisymmetricSource::updateTerms(Vector &in) {
 
 SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                        Fluxes *_fluxClass, GasMixture *_mixture, IntegrationRules *_intRules,
-                       ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
+                       ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp,
                        const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config, const int sz)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays,
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()),
       fluxes(_fluxClass),
       mixture(_mixture),
@@ -597,9 +598,9 @@ void SpongeZone::computeMixedOutValues() {
 
 PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                              IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, GasMixture *_mixture,
-                             ParGridFunction *_Up, ParGridFunction *_gradUp,
+                             ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp,
                              const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays,
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()),
       mixture(_mixture) {
   psData_.DeleteAll();
@@ -680,7 +681,7 @@ void PassiveScalar::updateTerms_gpu(Vector &in, ParGridFunction *Up, Array<passi
                                     const int nnode, const int num_equation) {
 #ifdef _GPU_
   double *d_in = in.ReadWrite();
-  const double *d_Up = Up->Read();
+  const double *d_Up = Up_->Read();
 
   double Z = 0.;
   double radius = 1.;
@@ -707,9 +708,9 @@ void PassiveScalar::updateTerms_gpu(Vector &in, ParGridFunction *Up, Array<passi
 
 HeatSource::HeatSource(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                        heatSourceData &_heatSource, GasMixture *_mixture, mfem::IntegrationRules *_intRules,
-                       mfem::ParFiniteElementSpace *_vfes, mfem::ParGridFunction *_Up, mfem::ParGridFunction *_gradUp,
+                       mfem::ParFiniteElementSpace *_vfes, ParGridFunction *U, mfem::ParGridFunction *_Up, mfem::ParGridFunction *_gradUp,
                        const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays,
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()),
       mixture_(_mixture),
       heatSource_(_heatSource) {

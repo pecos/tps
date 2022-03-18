@@ -41,7 +41,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
                          TransportProperties *_transport, ParFiniteElementSpace *_vfes,
                          const volumeFaceIntegrationArrays &_gpuArrays, const int &_maxIntPoints, const int &_maxDofs,
                          DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh,
-                         ParGridFunction *_spaceVaryViscMult, ParGridFunction *_Up, ParGridFunction *_gradUp,
+                         ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp,
                          ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A, BCintegrator *_bcIntegrator,
                          bool &_isSBP, double &_alpha, RunConfiguration &_config)
     : TimeDependentOperator(_A->Height()),
@@ -68,6 +68,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
       linViscData(_config.GetLinearVaryingData()),
       isSBP(_isSBP),
       alpha(_alpha),
+      U_(U),
       Up(_Up),
       gradUp(_gradUp),
       gradUpfes(_gradUpfes),
@@ -95,15 +96,15 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   forcing.DeleteAll();
 
   if (_config.thereIsForcing()) {
-    forcing.Append(new ConstantPressureGradient(dim, num_equation, _order, intRuleType, intRules, vfes, Up, gradUp,
+    forcing.Append(new ConstantPressureGradient(dim, num_equation, _order, intRuleType, intRules, vfes, U_, Up, gradUp,
                                                 gpuArrays, _config));
   }
   if (_config.GetPassiveScalarData().Size() > 0)
-    forcing.Append(new PassiveScalar(dim, num_equation, _order, intRuleType, intRules, vfes, mixture, Up, gradUp,
+    forcing.Append(new PassiveScalar(dim, num_equation, _order, intRuleType, intRules, vfes, mixture, U_, Up, gradUp,
                                      gpuArrays, _config));
   if (_config.numSpongeRegions_ > 0) {
     for (int sz = 0; sz < _config.numSpongeRegions_; sz++) {
-      forcing.Append(new SpongeZone(dim, num_equation, _order, intRuleType, fluxClass, mixture, intRules, vfes, Up,
+      forcing.Append(new SpongeZone(dim, num_equation, _order, intRuleType, fluxClass, mixture, intRules, vfes, U_, Up,
                                     gradUp, gpuArrays, _config, sz));
     }
   }
@@ -111,22 +112,22 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
     for (int s = 0; s < _config.numHeatSources; s++) {
       if (_config.heatSource[s].isEnabled) {
         forcing.Append(new HeatSource(dim, num_equation, _order, intRuleType, _config.heatSource[s], mixture, intRules,
-                                      vfes, Up, gradUp, gpuArrays, _config));
+                                      vfes, U_, Up, gradUp, gpuArrays, _config));
       }
     }
   }
   // NOTE: check if this logic is sound
-  if (_config.GetWorkingFluid() == WorkingFluid::USER_DEFINED) {
-    forcing.Append(new SourceTerm(dim, num_equation, _order, intRuleType, intRules, vfes, Up, gradUp, gpuArrays,
+  if (_config.GetWorkingFluid() != WorkingFluid::DRY_AIR) {
+    forcing.Append(new SourceTerm(dim, num_equation, _order, intRuleType, intRules, vfes, U_, Up, gradUp, gpuArrays,
                                   _config, mixture, _transport, _chemistry));
   }
 #ifdef _MASA_
   forcing.Append(
-      new MASA_forcings(dim, num_equation, _order, intRuleType, intRules, vfes, Up, gradUp, gpuArrays, _config));
+      new MASA_forcings(dim, num_equation, _order, intRuleType, intRules, vfes, U_, Up, gradUp, gpuArrays, _config));
 #endif
 
   if (config_.isAxisymmetric()) {
-    forcing.Append(new AxisymmetricSource(dim, num_equation, _order, mixture, transport_, eqSystem, intRuleType, intRules, vfes, Up,
+    forcing.Append(new AxisymmetricSource(dim, num_equation, _order, mixture, transport_, eqSystem, intRuleType, intRules, vfes, U_, Up,
                                           gradUp, gpuArrays, _config));
 
     const FiniteElementCollection *fec = vfes->FEColl();

@@ -108,6 +108,9 @@ class RHSoperator : public TimeDependentOperator {
   const bool &isSBP;
   const double &alpha;
 
+  // reference to conserved varibales
+  ParGridFunction *U_;
+
   // reference to primitive varibales
   ParGridFunction *Up;
 
@@ -143,7 +146,7 @@ class RHSoperator : public TimeDependentOperator {
               GasMixture *_mixture, Chemistry *chemistry, TransportProperties *transport, ParFiniteElementSpace *_vfes,
               const volumeFaceIntegrationArrays &gpuArrays, const int &_maxIntPoints, const int &_maxDofs,
               DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult,
-              ParGridFunction *_Up, ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes,
+              ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes,
               GradNonLinearForm *_gradUp_A, BCintegrator *_bcIntegrator, bool &_isSBP, double &_alpha,
               RunConfiguration &_config);
 
