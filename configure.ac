@@ -10,18 +10,31 @@ AC_CONFIG_MACRO_DIRS([m4])
 AM_INIT_AUTOMAKE([subdir-objects])
 AM_EXTRA_RECURSIVE_TARGETS([style enforcestyle])
 
-# Checks for programs.
-AM_PATH_PYTHON([3.6.8])
-
 AX_SUMMARIZE_ENV
-#AC_PROG_CXX
+# MPI
 AX_PROG_CC_MPI
 AX_PROG_CXX_MPI
-
-# C++ 17 standard, just setting by hand
-#AX_CXX_COMPILE_STDCXX_17
-#CXXFLAGS="-std=c++17 $CXXFLAGS"
+# python binary
+AM_PATH_PYTHON([3.6.8])
+# python interface
+AC_ARG_ENABLE([pybind11],
+         [AS_HELP_STRING([--enable-pybind11],[enable python interface [default=no]])],
+	 [],[enable_pybind11=no])
+if test ${enable_pybind11} == "yes" ; then
+   AX_PYTHON_DEVEL
+   CPPFLAGS="$PYTHON_CPPFLAGS $CPPFLAGS"
+   AC_LANG_PUSH([C++])
+   AC_CHECK_HEADER([pybind11/pybind11.h],[],[found_pybind11_header=no])
+   if test "x${found_pybind11_header}" = "xno" ; then
+      AC_MSG_ERROR([pybind11 header not found. Please verify pybind11 is installed locally.])
+   fi
+   AC_LANG_POP([C++])
+   AM_CONDITIONAL(PYTHON_ENABLED,test x$enable_pybind11 = xyes)
+fi
+# enable c++11 standard
 CXXFLAGS="-std=c++11 $CXXFLAGS"
+# libtool
+AC_PROG_LIBTOOL
 
 # check for mpi-ext.h
 AH_TEMPLATE([HAVE_MPI_EXT],[Enable MPI extensions declared in mpi-ext.h])
@@ -30,19 +43,18 @@ if test "x${found_mpi_ext}" = "xyes" ; then
    AC_DEFINE([HAVE_MPI_EXT])
 fi
 
+#--------------------
 # 3rd party libraries
-
+#--------------------
 AX_PATH_GRVY([0.36], [yes])
 AX_PATH_HDF5([1.8.0],[yes])
 AX_PATH_OPENBLAS([no])
-
 ENABLE_MASA=no
 AX_PATH_MASA([0.50], [no])
 if test x$HAVE_MASA = x1 ; then
    ENABLE_MASA=yes
 fi
-
-AC_PROG_RANLIB
+dnl AC_PROG_RANLIB
 
 # Valgrind?
 AX_VALGRIND_CHECK()
@@ -72,6 +84,7 @@ if test "x$enable_slurm" != "xno" ; then
    fi
 fi
 AM_CONDITIONAL(SLURM_ENABLED,test x$ENABLE_SLURM = xyes)
+
 
 
 #-- GSLIB support in MFEM?
@@ -206,3 +219,4 @@ fi
 
 dnl Final summary
 AX_SUMMARIZE_CONFIG
+
