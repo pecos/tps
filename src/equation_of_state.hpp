@@ -49,13 +49,12 @@ using namespace std;
 
 // Kevin: maybe use namespace?
 static const int MAXSPECIES = 200;
-static const double UNIVERSALGASCONSTANT        = 8.3144598; // J * mol^(-1) * K^(-1)
-static const double AVOGADRONUMBER              = 6.0221409e+23; // mol^(-1)
+static const double UNIVERSALGASCONSTANT = 8.3144598;  // J * mol^(-1) * K^(-1)
+static const double AVOGADRONUMBER = 6.0221409e+23;    // mol^(-1)
 static const double BOLTZMANNCONSTANT = UNIVERSALGASCONSTANT / AVOGADRONUMBER;
 
-class GasMixture{
-protected:
-
+class GasMixture {
+ protected:
   WorkingFluid fluid;
   int num_equation;
   int dim;
@@ -88,8 +87,11 @@ protected:
   // If ambipolar, electron continuity equation is also replaced by an algebraic equation (determined by GasMixture).
   void SetNumActiveSpecies() { numActiveSpecies = ambipolar ? (numSpecies - 2) : (numSpecies - 1); }
   // Add electron energy equation if two temperature.
-  void SetNumEquations() { num_equation = twoTemperature ? (dim + 3 + numActiveSpecies) : (dim + 2 + numActiveSpecies); }
-public:
+  void SetNumEquations() {
+    num_equation = twoTemperature ? (dim + 3 + numActiveSpecies) : (dim + 2 + numActiveSpecies);
+  }
+
+ public:
   GasMixture(WorkingFluid _fluid, int _dim);
   GasMixture(){};
 
@@ -105,10 +107,10 @@ public:
   bool IsTwoTemperature() { return twoTemperature; }
   int getInputIndexOf(int mixtureIndex) { return mixtureToInputMap_[mixtureIndex]; }
   // int getElectronMixtureIndex() { return (speciesMapping_.count("E")) ? speciesMapping_["E"] : -1; }
-  std::map<int, int>* getMixtureToInputMap() { return &mixtureToInputMap_; }
-  std::map<std::string, int>* getSpeciesMapping() { return &speciesMapping_; }
+  std::map<int, int> *getMixtureToInputMap() { return &mixtureToInputMap_; }
+  std::map<std::string, int> *getSpeciesMapping() { return &speciesMapping_; }
 
-  double GetGasParams(int species, GasParams param) { return gasParams(species,param); }
+  double GetGasParams(int species, GasParams param) { return gasParams(species, param); }
 
   int GetNumConservativeVariables() { return Nconservative; }
   int GetNumPrimitiveVariables() { return Nprimitive; }
@@ -154,25 +156,24 @@ public:
 
   virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
 
-//   double GetPrandtlNum() { return Pr; }
-//   double GetSchmidtNum() { return Sc; }
+  //   double GetPrandtlNum() { return Pr; }
+  //   double GetSchmidtNum() { return Sc; }
 
   // double GetViscMultiplyer() { return visc_mult; }
   // double GetBulkViscMultiplyer() { return bulk_visc_mult; }
 
   // BC related functions
-  virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState) {};
-  virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp,
-                                            Vector &stateOut) {};
-  virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p) {};
+  virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState){};
+  virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut){};
+  virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p){};
 };
 
 //////////////////////////////////////////////////////
 //////// Dry Air mixture
 //////////////////////////////////////////////////////
 
-class DryAir : public GasMixture{
-private:
+class DryAir : public GasMixture {
+ private:
   double specific_heat_ratio;
   double gas_constant;
 
@@ -212,8 +213,7 @@ private:
 
   // BC related functions
   virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState);
-  virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp,
-                                            Vector &stateOut);
+  virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut);
   virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p);
 
   // GPU functions
@@ -331,13 +331,13 @@ inline double DryAir::ComputeTemperature(const Vector &state) {
 // mixture variables (density, pressure, temperature) are treated as single species.
 // Only mass fractions are treated as binary mixture, essentially the same as PASSIVE_SCALAR.
 
-class TestBinaryAir : public GasMixture{
-private:
+class TestBinaryAir : public GasMixture {
+ private:
   double specific_heat_ratio;
   double gas_constant;
 
   // virtual void SetNumEquations();
-public:
+ public:
   TestBinaryAir(RunConfiguration &_runfile, int _dim);
   // TestBinaryAir(); //this will only be usefull to get air constants
 
@@ -347,16 +347,14 @@ public:
   virtual double ComputePressure(const Vector &state);
   virtual double ComputePressureFromPrimitives(const Vector &Up);
   virtual double ComputeTemperature(const Vector &state);
-  virtual double Temperature(double *rho, double *p, int nsp = 1){return p[0] / rho[0] / gas_constant;};
+  virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / rho[0] / gas_constant; };
 
   virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true);
 
   virtual double ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive = true);
 
-  virtual void GetPrimitivesFromConservatives(const Vector &conserv,
-                                              Vector &primit );
-  virtual void GetConservativesFromPrimitives(const Vector &primit,
-                                              Vector &conserv);
+  virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit);
+  virtual void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv);
 
   // Compute the maximum characteristic speed.
   virtual double ComputeMaxCharSpeed(const Vector &state);
@@ -364,18 +362,15 @@ public:
   // Physicality check (at end)
   virtual bool StateIsPhysical(const Vector &state);
 
-  virtual void ComputeSpeciesPrimitives(const Vector &conservedState,
-                                        Vector &X_sp, Vector &Y_sp, Vector &n_sp);
+  virtual void ComputeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp);
 
-  virtual void ComputeMassFractionGradient(const Vector &state,
-                                           const DenseMatrix &gradUp,
+  virtual void ComputeMassFractionGradient(const Vector &state, const DenseMatrix &gradUp,
                                            DenseMatrix &massFractionGrad);
-  virtual void ComputeMoleFractionGradient(const Vector &state,
-                                           const DenseMatrix &gradUp,
+  virtual void ComputeMoleFractionGradient(const Vector &state, const DenseMatrix &gradUp,
                                            DenseMatrix &moleFractionGrad);
 
-  virtual double GetSpecificHeatRatio(){return specific_heat_ratio;};
-  virtual double GetGasConstant(){return gas_constant;};
+  virtual double GetSpecificHeatRatio() { return specific_heat_ratio; };
+  virtual double GetGasConstant() { return gas_constant; };
 
   // virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
 
@@ -406,21 +401,19 @@ inline double TestBinaryAir::ComputeTemperature(const Vector &state) {
   return rhoU / state[0] / cv;
 }
 
-
 //////////////////////////////////////////////////////////////////////////
 ////// Perfect Mixture GasMixture                     ////////////////////
 //////////////////////////////////////////////////////////////////////////
 
-class PerfectMixture : public GasMixture{
-private:
-
+class PerfectMixture : public GasMixture {
+ private:
   Vector specificHeatRatios_;
   Vector specificGasConstants_;
   Vector molarCV_;
   Vector molarCP_;
 
   // virtual void SetNumEquations();
-public:
+ public:
   PerfectMixture(RunConfiguration &_runfile, int _dim);
   // TestBinaryAir(); //this will only be usefull to get air constants
 
@@ -432,46 +425,40 @@ public:
   virtual double getSpecificGasConstant(int species) { return specificGasConstants_(species); };
 
   // Kevin: these are mixture heat ratio and gas constant. need to change argument.
-  virtual double GetSpecificHeatRatio() { return molarCP_(numSpecies-1) / molarCV_(numSpecies-1); };
-  virtual double GetGasConstant() { return specificGasConstants_(numSpecies-1); };
+  virtual double GetSpecificHeatRatio() { return molarCP_(numSpecies - 1) / molarCV_(numSpecies - 1); };
+  virtual double GetGasConstant() { return specificGasConstants_(numSpecies - 1); };
 
   virtual double computeHeaviesHeatCapacity(const double *n_sp, const double &nB);
   virtual double computeAmbipolarElectronNumberDensity(const double *n_sp);
-  virtual double computeBackgroundMassDensity(const double &rho, const double *n_sp,
-                                              double &n_e, bool isElectronComputed = false);
+  virtual double computeBackgroundMassDensity(const double &rho, const double *n_sp, double &n_e,
+                                              bool isElectronComputed = false);
 
-  virtual void GetPrimitivesFromConservatives(const Vector &conserv,
-                                              Vector &primit );
-  virtual void GetConservativesFromPrimitives(const Vector &primit,
-                                              Vector &conserv);
+  virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit);
+  virtual void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv);
 
-  virtual void computeSpeciesPrimitives(const Vector &conservedState,
-                                        Vector &X_sp, Vector &Y_sp, Vector &n_sp);
+  virtual void computeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp);
   virtual void computeNumberDensities(const Vector &conservedState, Vector &n_sp);
 
   virtual double ComputePressure(const Vector &state);
   virtual double ComputePressureFromPrimitives(const Vector &Up);
-  virtual double computePressureBase(const double *n_sp, const double n_e, const double n_B,
-                                     const double T_h, const double T_e);
+  virtual double computePressureBase(const double *n_sp, const double n_e, const double n_B, const double T_h,
+                                     const double T_e);
 
   // Physicality check (at end)
   virtual bool StateIsPhysical(const Vector &state);
 
   virtual double ComputeTemperature(const Vector &state);
-  virtual void computeTemperaturesBase(const Vector &conservedState,
-                                       const double *n_sp, const double n_e, const double n_B,
-                                       double &T_h, double &T_e);
+  virtual void computeTemperaturesBase(const Vector &conservedState, const double *n_sp, const double n_e,
+                                       const double n_B, double &T_h, double &T_e);
 
   // TODO: Kevin - I don't think we should use this for boundary condition.
-  virtual double Temperature(double *rho, double *p, int nsp = 1){return p[0] / rho[0] / GetGasConstant();};
+  virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / rho[0] / GetGasConstant(); };
 
   virtual double ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive = true);
   virtual double computePressureDerivativeFromPrimitives(const Vector &dUp_dx, const Vector &Uin);
   virtual double computePressureDerivativeFromConservatives(const Vector &dUp_dx, const Vector &Uin);
 
   // virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
-
-
 
   // Compute the maximum characteristic speed.
   virtual double ComputeMaxCharSpeed(const Vector &state);
@@ -482,21 +469,17 @@ public:
   virtual double computeHeaviesMixtureCV(const double *n_sp, const double n_B);
   virtual double computeHeaviesMixtureHeatRatio(const double *n_sp, const double n_B);
 
-  virtual void computeMassFractionGradient(const double rho, const Vector &numberDensities,
-                                           const DenseMatrix &gradUp,
+  virtual void computeMassFractionGradient(const double rho, const Vector &numberDensities, const DenseMatrix &gradUp,
                                            DenseMatrix &massFractionGrad);
-  virtual void computeMoleFractionGradient(const Vector &numberDensities,
-                                           const DenseMatrix &gradUp,
+  virtual void computeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
                                            DenseMatrix &moleFractionGrad);
 
   // functions needed for BCs
   virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState);
-  virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp,
-                                            Vector &stateOut);
+  virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut);
   virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p);
 
-
-    // GPU functions
+  // GPU functions
 #ifdef _GPU_
 
 #endif

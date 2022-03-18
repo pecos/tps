@@ -39,65 +39,67 @@
 
 #include <tps_config.h>
 
+#include <mfem.hpp>
 #include <mfem/general/forall.hpp>
+
 #include "dataStructures.hpp"
-#include "run_configuration.hpp"
 #include "equation_of_state.hpp"
 #include "reaction.hpp"
-#include <mfem.hpp>
+#include "run_configuration.hpp"
 
 using namespace mfem;
 using namespace std;
 
-class Chemistry{
-  protected:
-    int numEquations_;
-    // int dim_;
-    int numSpecies_;
-    int numActiveSpecies_;
-    bool ambipolar_;
-    bool twoTemperature_;
+class Chemistry {
+ protected:
+  int numEquations_;
+  // int dim_;
+  int numSpecies_;
+  int numActiveSpecies_;
+  bool ambipolar_;
+  bool twoTemperature_;
 
-    int numReactions_;
-    DenseMatrix reactantStoich_, productStoich_; // size of (numSpecies, numReactions)
+  int numReactions_;
+  DenseMatrix reactantStoich_, productStoich_;  // size of (numSpecies, numReactions)
 
-    std::vector<Reaction *> reactions_;
+  std::vector<Reaction *> reactions_;
 
-    std::map<int, int> *mixtureToInputMap_;
-    std::map<std::string, int> *speciesMapping_;
-    int electronIndex_ = -1;
+  std::map<int, int> *mixtureToInputMap_;
+  std::map<std::string, int> *speciesMapping_;
+  int electronIndex_ = -1;
 
-    Array<bool> detailedBalance_;
-    DenseMatrix equilibriumConstantParams_;
+  Array<bool> detailedBalance_;
+  DenseMatrix equilibriumConstantParams_;
 
-    // /*
-    //   From input file, reaction/reaction%d/equation will specify this mapping.
-    // */
-    // std::vector<std::pair<int, int>> reactionMapping; // size of numReactions_
-    // // Kevin: should we use a vector of function pointers?
+  // /*
+  //   From input file, reaction/reaction%d/equation will specify this mapping.
+  // */
+  // std::vector<std::pair<int, int>> reactionMapping; // size of numReactions_
+  // // Kevin: should we use a vector of function pointers?
 
-    // Kevin: currently, I doubt we need mixture class here. but left it just in case.
-    GasMixture *mixture_ = NULL;
+  // Kevin: currently, I doubt we need mixture class here. but left it just in case.
+  GasMixture *mixture_ = NULL;
 
-  public:
-    Chemistry(GasMixture *mixture, RunConfiguration config);
+ public:
+  Chemistry(GasMixture *mixture, RunConfiguration config);
 
-    ~Chemistry();
+  ~Chemistry();
 
-    // return Vector of reaction rate coefficients, with the size of numReaction_.
-    virtual void computeForwardRateCoeffs(const double T_h, const double T_e, Vector &kfwd);
+  // return Vector of reaction rate coefficients, with the size of numReaction_.
+  virtual void computeForwardRateCoeffs(const double T_h, const double T_e, Vector &kfwd);
 
-    virtual void computeEquilibriumConstants(const double T_h, const double T_e, Vector &kC);
+  virtual void computeEquilibriumConstants(const double T_h, const double T_e, Vector &kC);
 
-    // return rate coefficients of (reactionIndex)-th reaction. (start from 0)
-    // reactionIndex is taken from reactionMapping.right.
-    // virtual Vector computeRateCoeffOf(const int reactionIndex, const double T_h, const double T_e) {};
+  // return rate coefficients of (reactionIndex)-th reaction. (start from 0)
+  // reactionIndex is taken from reactionMapping.right.
+  // virtual Vector computeRateCoeffOf(const int reactionIndex, const double T_h, const double T_e) {};
 
-    const double* getReactantStoichiometry(const int reactionIndex) { return reactantStoich_.GetColumn(reactionIndex); }
-    const double* getProductStoichiometry(const int reactionIndex) { return productStoich_.GetColumn(reactionIndex); }
+  const double *getReactantStoichiometry(const int reactionIndex) { return reactantStoich_.GetColumn(reactionIndex); }
+  const double *getProductStoichiometry(const int reactionIndex) { return productStoich_.GetColumn(reactionIndex); }
 
-    bool isElectronInvolvedAt(const int reactionIndex) { return (electronIndex_ < 0) ? false : (reactantStoich_(electronIndex_,reactionIndex)!=0); }
-
+  bool isElectronInvolvedAt(const int reactionIndex) {
+    return (electronIndex_ < 0) ? false : (reactantStoich_(electronIndex_, reactionIndex) != 0);
+  }
 };
 
 #endif  // CHEMISTRY_HPP_

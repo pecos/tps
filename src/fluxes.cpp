@@ -177,12 +177,12 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   // }
   // NOTE: NS_PASSIVE will not be needed (automatically incorporated).
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
-  for (int sp = 0; sp < numActiveSpecies; sp++){
+  for (int sp = 0; sp < numActiveSpecies; sp++) {
     // TODO: need to check the sign.
     for (int d = 0; d < dim; d++) flux(nvel + 2 + sp, d) = state[nvel + 2 + sp] * diffusionVelocity(nvel + 2 + sp, d);
   }
 
-  if (mixture->IsTwoTemperature()){
+  if (mixture->IsTwoTemperature()) {
     // TODO: viscous flux for electron energy equation.
   }
 }

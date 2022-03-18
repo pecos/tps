@@ -41,9 +41,8 @@
 
 // #include <general/forall.hpp>
 #include "dataStructures.hpp"
-#include "run_configuration.hpp"
 #include "equation_of_state.hpp"
-#include <mfem.hpp>
+#include "run_configuration.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -101,7 +100,7 @@ class TransportProperties{
 //////////////////////////////////////////////////////
 
 class DryAirTransport : public TransportProperties {
-protected:
+ protected:
   double gas_constant;
   double visc_mult;
   double bulk_visc_mult;
@@ -113,14 +112,12 @@ protected:
 
   // Fick's law
   double Sc;  // Schmidt number
-public:
+ public:
   DryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile);
 
   ~DryAirTransport(){};
 
-  virtual void ComputeFluxTransportProperties(const Vector &state,
-                                              const DenseMatrix &gradUp,
-                                              Vector &transportBuffer,
+  virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
                                               DenseMatrix &diffusionVelocity);
 
   virtual double GetViscosityFromPrimitive(const Vector &state);
@@ -139,15 +136,13 @@ inline double DryAirTransport::GetViscosityFromPrimitive(const Vector &state) {
 // Only mass fractions are treated as binary mixture, essentially the same as PASSIVE_SCALAR.
 
 class TestBinaryAirTransport : public DryAirTransport {
-protected:
-public:
+ protected:
+ public:
   TestBinaryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile);
 
   ~TestBinaryAirTransport(){};
 
-  virtual void ComputeFluxTransportProperties(const Vector &state,
-                                              const DenseMatrix &gradUp,
-                                              Vector &transportBuffer,
+  virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
                                               DenseMatrix &diffusionVelocity);
 };
 

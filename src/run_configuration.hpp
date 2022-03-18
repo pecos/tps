@@ -286,7 +286,7 @@ class RunConfiguration {
   passiveScalarData* GetPassiveScalarData(int i) { return arrayPassiveScalar[i]; }
 
   int GetNumSpecies() { return numSpecies; }
-  double GetGasParams(int species, GasParams param) { return gasParams(species,param); }
+  double GetGasParams(int species, GasParams param) { return gasParams(species, param); }
   bool IsAmbipolar() { return ambipolar; }
   bool IsTwoTemperature() { return twoTemperature; }
   GasModel GetGasModel() { return gasModel; }

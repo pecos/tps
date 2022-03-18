@@ -504,7 +504,7 @@ void RunConfiguration::readInputFile(std::string inpuFileName) {
         for (int sp = 0; sp < numSpecies; sp++)
           for (int param = 0; param < GasParams::NUM_GASPARAMS; param++) {
             ss >> word;
-            gasParams(sp,param) = stod(word);
+            gasParams(sp, param) = stod(word);
           }
       } else if (word.compare("AMBIPOLAR") == 0) {
         ambipolar = false;
@@ -516,16 +516,16 @@ void RunConfiguration::readInputFile(std::string inpuFileName) {
         if (word.compare("TRUE") == 0) twoTemperature = true;
       } else if (word.compare("GAS_MODEL") == 0) {
         ss >> word;
-        assert( (stoi(word) >= 0) && (stoi(word) < GasModel::NUM_GASMODEL) );
-        gasModel = (GasModel) stoi(word);
+        assert((stoi(word) >= 0) && (stoi(word) < GasModel::NUM_GASMODEL));
+        gasModel = (GasModel)stoi(word);
       } else if (word.compare("TRANSPORT_MODEL") == 0) {
         ss >> word;
-        assert( (stoi(word) >= 0) && (stoi(word) < TransportModel::NUM_TRANSPORTMODEL) );
-        transportModel = (TransportModel) stoi(word);
+        assert((stoi(word) >= 0) && (stoi(word) < TransportModel::NUM_TRANSPORTMODEL));
+        transportModel = (TransportModel)stoi(word);
       } else if (word.compare("CHEMISTRY_MODEL") == 0) {
         ss >> word;
-        assert( (stoi(word) >= 0) && (stoi(word) < ChemistryModel::NUM_CHEMISTRYMODEL) );
-        chemistryModel = (ChemistryModel) stoi(word);
+        assert((stoi(word) >= 0) && (stoi(word) < ChemistryModel::NUM_CHEMISTRYMODEL));
+        chemistryModel = (ChemistryModel)stoi(word);
       }
     }
   }

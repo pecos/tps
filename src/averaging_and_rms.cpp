@@ -33,7 +33,7 @@
 
 #include <mfem/general/forall.hpp>
 
-//TODO: add multi species and two temperature case.
+// TODO: add multi species and two temperature case.
 Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollection *_fec, ParFiniteElementSpace *_fes,
                      ParFiniteElementSpace *_dfes, ParFiniteElementSpace *_vfes, Equations &_eqSys,
                      GasMixture *_mixture, const int &_num_equation, const int &_dim, RunConfiguration &_config,

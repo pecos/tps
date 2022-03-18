@@ -53,11 +53,11 @@ class Tps;
 
 #include "BCintegrator.hpp"
 #include "averaging_and_rms.hpp"
+#include "chemistry.hpp"
 #include "dataStructures.hpp"
 #include "dgNonlinearForm.hpp"
 #include "domain_integrator.hpp"
 #include "equation_of_state.hpp"
-#include "transport_properties.hpp"
 #include "faceGradientIntegration.hpp"
 #include "face_integrator.hpp"
 #include "fluxes.hpp"
@@ -71,8 +71,8 @@ class Tps;
 #include "sbp_integrators.hpp"
 #include "solver.hpp"
 #include "tps.hpp"
+#include "transport_properties.hpp"
 #include "utils.hpp"
-#include "chemistry.hpp"
 
 #ifdef _MASA_
 #include "masa_handler.hpp"

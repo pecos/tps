@@ -225,11 +225,11 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
   const double gamma = mixture->GetSpecificHeatRatio();
   const double Rg = mixture->GetGasConstant();
 
-//   Vector wallState = stateIn;
-//   for (int d = 0; d < dim; d++) wallState[1 + d] = 0.;
-//   wallState[1 + dim] = p / (gamma - 1.);
+  //   Vector wallState = stateIn;
+  //   for (int d = 0; d < dim; d++) wallState[1 + d] = 0.;
+  //   wallState[1 + dim] = p / (gamma - 1.);
   Vector wallState(num_equation);
-  mixture->computeStagnationState(stateIn,wallState);
+  mixture->computeStagnationState(stateIn, wallState);
 
   // Normal convective flux
   rsolver->Eval(stateIn, wallState, normal, bdrFlux, true);

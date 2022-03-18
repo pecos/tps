@@ -65,12 +65,7 @@ enum GlobalTrnsCoeffs {
   NUM_GLOBAL_COEFFS
 };
 
-enum SpeciesTrnsCoeffs {
-  DIFFUSIVITY,
-  MOBILITY,
-  MF_FREQUENCY,
-  NUM_SPECIES_COEFFS
-};
+enum SpeciesTrnsCoeffs { DIFFUSIVITY, MOBILITY, MF_FREQUENCY, NUM_SPECIES_COEFFS };
 
 enum TransportOutputPrimitives {
   TOTAL_PRESSURE,
@@ -83,13 +78,7 @@ enum TransportOutputPrimitives {
 
 // Type of primitive variable which requires gradient evaulation for diffusion velocity.
 // Also used for species output primitive variables.
-enum SpeciesPrimitiveType {
-  MASS_FRACTION,
-  MOLE_FRACTION,
-  NUMBER_DENSITY,
-  NUM_SPECIES_PRIMITIVES
-};
-
+enum SpeciesPrimitiveType { MASS_FRACTION, MOLE_FRACTION, NUMBER_DENSITY, NUM_SPECIES_PRIMITIVES };
 
 enum InletType {
   SUB_DENS_VEL,      // Subsonic inlet specified by the density and velocity components

@@ -47,7 +47,6 @@ M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, TPS::Tps *tps) : mpi(_mpi) {
   groupsMPI = new MPI_Groups(&mpi);
 
   parseSolverOptions2();
-
 }
 
 M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps) : mpi(_mpi) {
@@ -269,7 +268,7 @@ void M2ulPhyS::initVariables() {
     case WorkingFluid::USER_DEFINED:
       switch (config.GetGasModel()) {
         case GasModel::PERFECT_MIXTURE:
-          mixture = new PerfectMixture( config, dim);
+          mixture = new PerfectMixture(config, dim);
           break;
       }
       switch (config.GetTranportModel()) {
@@ -278,7 +277,7 @@ void M2ulPhyS::initVariables() {
       }
       switch (config.GetChemistryModel()) {
         default:
-          chemistry_ = new Chemistry( mixture, config);
+          chemistry_ = new Chemistry(mixture, config);
           break;
       }
       break;
@@ -358,15 +357,15 @@ void M2ulPhyS::initVariables() {
       ioData.registerIOVar("/meanSolution", "mean-w", 3);
       ioData.registerIOVar("/meanSolution", "mean-E", 4);
     } else {
-      ioData.registerIOVar("/meanSolution", "mean-p", dim+1);
+      ioData.registerIOVar("/meanSolution", "mean-p", dim + 1);
     }
     for (int sp = 0; sp < numActiveSpecies; sp++) {
       // Only for NS_PASSIVE.
-      if ((eqSystem == NS_PASSIVE) && (sp==1)) break;
+      if ((eqSystem == NS_PASSIVE) && (sp == 1)) break;
 
-      //TODO: May read species names from input file and add them as variable name.
-      //TODO: May change depending on visualization variable. (X, Y, n)
-      ioData.registerIOVar("/meanSolution", "mean-Y"+std::to_string(sp + 1), sp + nvel + 2);
+      // TODO: May read species names from input file and add them as variable name.
+      // TODO: May change depending on visualization variable. (X, Y, n)
+      ioData.registerIOVar("/meanSolution", "mean-Y" + std::to_string(sp + 1), sp + nvel + 2);
     }
 
     // rms
@@ -929,7 +928,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   // will need to add full list of species.
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     // Only for NS_PASSIVE.
-    if ((eqSystem == NS_PASSIVE) && (sp==1)) break;
+    if ((eqSystem == NS_PASSIVE) && (sp == 1)) break;
 
     int inputSpeciesIndex = mixture->getInputIndexOf(sp);
     std::string speciesName = config.speciesNames[inputSpeciesIndex];
@@ -1004,7 +1003,7 @@ void M2ulPhyS::projectInitialSolution() {
   //     VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
   //     U->ProjectCoefficient(u0);
   //   }
-std::cout << "restart: " << config.GetRestartCycle() << std::endl;
+  std::cout << "restart: " << config.GetRestartCycle() << std::endl;
   if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
     uniformInitialConditions();
 #ifdef _MASA_
@@ -1517,7 +1516,7 @@ void M2ulPhyS::read_restart_files() {
         Vector primitiveState(num_equation);
         Vector conservedState(num_equation);
         for (int eq = 0; eq < num_equation; eq++) primitiveState[eq] = dataUp[i + eq * dof];
-        mixture->GetConservativesFromPrimitives(primitiveState,conservedState);
+        mixture->GetConservativesFromPrimitives(primitiveState, conservedState);
         for (int eq = 0; eq < num_equation; eq++) dataU[i + eq * dof] = conservedState[eq];
       }
     }
@@ -1964,7 +1963,7 @@ void M2ulPhyS::parseSolverOptions2() {
 
   // fluid presets
   std::string fluidTypeStr;
-  tpsP->getInput("flow/fluid", fluidTypeStr, std::string("dry_air") );
+  tpsP->getInput("flow/fluid", fluidTypeStr, std::string("dry_air"));
   if (fluidTypeStr == "dry_air") {
     config.workFluid = DRY_AIR;
   } else if (fluidTypeStr == "test_binary_air") {
@@ -2009,17 +2008,17 @@ void M2ulPhyS::parseSolverOptions2() {
 
   // plasma conditions.
   if (config.workFluid != USER_DEFINED) {
-    cout << "Fluid is set to the preset '" << fluidTypeStr << "'. Input options in [plasma_models] will not be used." << endl;
+    cout << "Fluid is set to the preset '" << fluidTypeStr << "'. Input options in [plasma_models] will not be used."
+         << endl;
     config.gasModel = NUM_GASMODEL;
     config.transportModel = NUM_TRANSPORTMODEL;
     config.chemistryModel = NUM_CHEMISTRYMODEL;
   } else {
-
     tpsP->getInput("plasma_models/ambipolar", config.ambipolar, false);
     tpsP->getInput("plasma_models/two_temperature", config.twoTemperature, false);
 
     std::string gasModelStr;
-    tpsP->getInput("plasma_models/gas_model", gasModelStr, std::string("perfect_mixture") );
+    tpsP->getInput("plasma_models/gas_model", gasModelStr, std::string("perfect_mixture"));
     if (gasModelStr == "perfect_mixture") {
       config.gasModel = PERFECT_MIXTURE;
     } else {
@@ -2028,11 +2027,10 @@ void M2ulPhyS::parseSolverOptions2() {
     }
 
     std::string transportModelStr;
-    tpsP->getInput("plasma_models/transport_model", transportModelStr, std::string("") );
+    tpsP->getInput("plasma_models/transport_model", transportModelStr, std::string(""));
 
     std::string chemistryModelStr;
-    tpsP->getInput("plasma_models/chemistry_model", chemistryModelStr, std::string("") );
-
+    tpsP->getInput("plasma_models/chemistry_model", chemistryModelStr, std::string(""));
   }
 
   // species list.
@@ -2044,7 +2042,7 @@ void M2ulPhyS::parseSolverOptions2() {
       // config.speciesNames.SetSize(config.numSpecies);
       config.speciesNames.resize(config.numSpecies);
 
-      if ( config.gasModel == PERFECT_MIXTURE ) {
+      if (config.gasModel == PERFECT_MIXTURE) {
         config.constantMolarCV.SetSize(config.numSpecies);
         config.constantMolarCP.SetSize(config.numSpecies);
       }
@@ -2054,7 +2052,7 @@ void M2ulPhyS::parseSolverOptions2() {
       TODO: for now, we force the user to set the background species as the last,
       and the electron species as the second to last.
     */
-    if ( (config.numSpecies > 1) && (config.eqSystem != NS_PASSIVE) ) {
+    if ((config.numSpecies > 1) && (config.eqSystem != NS_PASSIVE)) {
       tpsP->getRequiredInput("species/background_index", config.backgroundIndex);
       // tpsP->getRequiredInput("species/electron_index", config.electronIndex);
       // if ( config.backgroundIndex != config.numSpecies ) {
@@ -2068,30 +2066,31 @@ void M2ulPhyS::parseSolverOptions2() {
     }
 
     // Gas Params
-    if (config.workFluid!=DRY_AIR) {
+    if (config.workFluid != DRY_AIR) {
       for (int i = 1; i <= config.numSpecies; i++) {
         double mw, charge;
         std::string type, speciesName;
         std::string basepath("species/species" + std::to_string(i));
 
         tpsP->getRequiredInput((basepath + "/name").c_str(), speciesName);
-        config.speciesNames[i-1] = speciesName;
+        config.speciesNames[i - 1] = speciesName;
 
         tpsP->getRequiredInput((basepath + "/molecular_weight").c_str(), mw);
         tpsP->getRequiredInput((basepath + "/charge_number").c_str(), charge);
-        config.gasParams(i-1, GasParams::SPECIES_MW) = mw;
-        config.gasParams(i-1, GasParams::SPECIES_CHARGES) = charge;
+        config.gasParams(i - 1, GasParams::SPECIES_MW) = mw;
+        config.gasParams(i - 1, GasParams::SPECIES_CHARGES) = charge;
 
-        if ( config.gasModel == PERFECT_MIXTURE ) {
-          tpsP->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(), config.constantMolarCV(i-1));
-          tpsP->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cp").c_str(), config.constantMolarCP(i-1));
+        if (config.gasModel == PERFECT_MIXTURE) {
+          tpsP->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(),
+                                 config.constantMolarCV(i - 1));
+          tpsP->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cp").c_str(),
+                                 config.constantMolarCP(i - 1));
         }
       }
     }
-
   }
 
-  {// Reaction list
+  {  // Reaction list
     tpsP->getInput("reactions/number_of_reactions", config.numReactions, 0);
     if (config.numReactions > 0) {
       assert((config.workFluid != DRY_AIR) && (config.numSpecies > 1));
@@ -2112,26 +2111,26 @@ void M2ulPhyS::parseSolverOptions2() {
       // TODO: reaction classes read input options directly in their initialization.
       std::string equation, model;
       tpsP->getRequiredInput((basepath + "/equation").c_str(), equation);
-      config.reactionEquations[r-1] = equation;
+      config.reactionEquations[r - 1] = equation;
       tpsP->getRequiredInput((basepath + "/model").c_str(), model);
 
-      if (model=="arrhenius") {
-        config.reactionModels[r-1] = ARRHENIUS;
-        config.reactionModelParams[r-1].resize(3);
+      if (model == "arrhenius") {
+        config.reactionModels[r - 1] = ARRHENIUS;
+        config.reactionModelParams[r - 1].resize(3);
         double A, b, E;
         tpsP->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
         tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
         tpsP->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
-        config.reactionModelParams[r-1] = {A, b, E};
+        config.reactionModelParams[r - 1] = {A, b, E};
 
-      } else if (model=="hoffert_lien") {
-        config.reactionModels[r-1] = HOFFERTLIEN;
-        config.reactionModelParams[r-1].resize(3);
+      } else if (model == "hoffert_lien") {
+        config.reactionModels[r - 1] = HOFFERTLIEN;
+        config.reactionModelParams[r - 1].resize(3);
         double A, b, E;
         tpsP->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
         tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
         tpsP->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
-        config.reactionModelParams[r-1] = {A, b, E};
+        config.reactionModelParams[r - 1] = {A, b, E};
 
       } else {
         grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model);
@@ -2140,21 +2139,21 @@ void M2ulPhyS::parseSolverOptions2() {
 
       bool detailedBalance;
       tpsP->getInput((basepath + "/detailed_balance").c_str(), detailedBalance, false);
-      config.detailedBalance[r-1] = detailedBalance;
+      config.detailedBalance[r - 1] = detailedBalance;
       if (detailedBalance) {
-        config.equilibriumConstantParams[r-1].resize(3);
+        config.equilibriumConstantParams[r - 1].resize(3);
         double A, b, E;
         tpsP->getRequiredInput((basepath + "/equilibrium_constant/A").c_str(), A);
         tpsP->getRequiredInput((basepath + "/equilibrium_constant/b").c_str(), b);
         tpsP->getRequiredInput((basepath + "/equilibrium_constant/E").c_str(), E);
-        config.equilibriumConstantParams[r-1] = {A, b, E};
+        config.equilibriumConstantParams[r - 1] = {A, b, E};
       }
 
       Array<double> stoich(config.numSpecies);
       tpsP->getRequiredVec((basepath + "/reactant_stoichiometry").c_str(), stoich, config.numSpecies);
-      for (int sp = 0; sp < config.numSpecies; sp++) config.reactantStoich(sp, r-1) = stoich[sp];
+      for (int sp = 0; sp < config.numSpecies; sp++) config.reactantStoich(sp, r - 1) = stoich[sp];
       tpsP->getRequiredVec((basepath + "/product_stoichiometry").c_str(), stoich, config.numSpecies);
-      for (int sp = 0; sp < config.numSpecies; sp++) config.productStoich(sp, r-1) = stoich[sp];
+      for (int sp = 0; sp < config.numSpecies; sp++) config.productStoich(sp, r - 1) = stoich[sp];
     }
   }
 
