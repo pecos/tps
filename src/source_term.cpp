@@ -52,9 +52,9 @@ SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_or
 }
 
 SourceTerm::~SourceTerm() {
-  if (mixture_ != NULL) delete mixture_;
-  if (transport_ != NULL) delete transport_;
-  if (chemistry_ != NULL) delete chemistry_;
+//   if (mixture_ != NULL) delete mixture_;
+//   if (transport_ != NULL) delete transport_;
+//   if (chemistry_ != NULL) delete chemistry_;
 }
 
 void SourceTerm::updateTerms(mfem::Vector& in)
@@ -89,7 +89,7 @@ void SourceTerm::updateTerms(mfem::Vector& in)
     Vector creationRates;
     chemistry_->computeCreationRate(ns, kfwd, kC, creationRates);
 
-    // add terms to RHS
+    // add species creation rates
     for (int sp = 0; sp < numActiveSpecies_; sp++) {
       h_in[n + (2 + dim + sp) * nnodes] += creationRates(sp);
     }
