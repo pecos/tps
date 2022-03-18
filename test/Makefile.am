@@ -45,7 +45,7 @@ TESTS += cyl3d.gpu.python.test
 endif
 
 else
-TESTS += cyl3d.test
+TESTS += cyl3d.test \
 	 cyl3d.mflow.test \
 	 cyl3d.dtconst.test \
 	 averages.test \
