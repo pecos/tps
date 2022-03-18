@@ -917,7 +917,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     // will need to add full list of species.
     visualizationVariables.resize(numActiveSpecies);
     for (int sp = 0; sp < numActiveSpecies; sp++) {
-      visualizationVariables[sp] = new ParGridFunction(fes, Up->HostReadWrite() + (sp + nvel + 2) * fes->GetNDofs());
+      visualizationVariables[sp] = new ParGridFunction(fes, U->HostReadWrite() + (sp + nvel + 2) * fes->GetNDofs());
     }
   }
 
@@ -988,7 +988,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     for (int sp = 0; sp < numActiveSpecies; sp++) {
       int inputSpeciesIndex = mixture->getInputIndexOf(sp);
       std::string speciesName = config.speciesNames[inputSpeciesIndex];
-      paraviewColl->RegisterField("number density_" + speciesName, visualizationVariables[sp]);
+      paraviewColl->RegisterField("partial_density_" + speciesName, visualizationVariables[sp]);
     }
   }
 
@@ -1418,6 +1418,7 @@ void M2ulPhyS::dryAirUniformInitialConditions() {
   Vector Upi;
   Upi.UseDevice(false);
   Upi.SetSize(num_equation);
+  mixture->GetPrimitivesFromConservatives(initState, Upi);
 
   for (int i = 0; i < dof; i++) {
 //     data[i] = inputRhoRhoVp[0];
@@ -1433,16 +1434,7 @@ void M2ulPhyS::dryAirUniformInitialConditions() {
 //         data[i + (2 + dim + sp) * dof] = inputRhoRhoVp[0] * config.initialMassFractions(sp);
 //     }
     for (int eq = 0; eq < num_equation; eq++) data[i + eq * dof] = initState(eq);
-
-    mixture->GetPrimitivesFromConservatives(initState, Upi);
     for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * dof] = Upi[eq];
-
-    //     dataUp[i] = data[i];
-    //     dataUp[i + dof] = data[i + dof] / data[i];
-    //     dataUp[i + 2 * dof] = data[i + 2 * dof] / data[i];
-    //     if (dim == 3) dataUp[i + 3 * dof] = data[i + 3 * dof] / data[i];
-    //     dataUp[i + (1 + dim) * dof] = inputRhoRhoVp[4];
-    //     if (eqSystem == NS_PASSIVE) dataUp[i + (num_equation - 1) * dof] = 0.;
 
     for (int d = 0; d < dim; d++) {
       for (int eq = 0; eq < num_equation; eq++) {

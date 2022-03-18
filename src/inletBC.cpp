@@ -717,6 +717,7 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
 //   std::cout << "stateIn pressure: " << p << std::endl;
 // }
   Vector state2(num_equation);
+  state2 = 0.;
   state2[0] = inputState[0];
   state2[1] = inputState[0] * inputState[1];
   state2[2] = inputState[0] * inputState[2];
