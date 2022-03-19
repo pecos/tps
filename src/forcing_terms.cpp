@@ -223,12 +223,13 @@ void ConstantPressureGradient::updateTerms_gpu(const int numElems, const int off
 AxisymmetricSource::AxisymmetricSource(const int &_dim, const int &_num_equation, const int &_order,
                                        GasMixture *_mixture, const Equations &_eqSystem, const int &_intRuleType,
                                        IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
-                                       ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
-                                       RunConfiguration &_config)
+                                       ParGridFunction *_gradUp, ParGridFunction *spaceVaryViscMult,
+                                       const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()),
       mixture(_mixture),
-      eqSystem(_eqSystem) {
+      eqSystem(_eqSystem),
+      space_vary_viscosity_mult_(spaceVaryViscMult) {
   // no-op
 }
 
@@ -343,7 +344,12 @@ void AxisymmetricSource::updateTerms(Vector &in) {
         const double uz_z = dataGradUp[index + (2 * dof) + (1 * dof * num_equation)];
         const double ut_r = dataGradUp[index + (3 * dof) + (0 * dof * num_equation)];
 
-        const double visc = mixture->GetViscosityFromPrimitive(prim);
+        double visc = mixture->GetViscosityFromPrimitive(prim);
+
+        if (space_vary_viscosity_mult_ != NULL) {
+          auto *alpha = space_vary_viscosity_mult_->GetData();
+          visc *= alpha[index];
+        }
 
         tau_tt = -ur_r - uz_z;
         if (radius > 0) tau_tt += 2 * ur / radius;
@@ -442,7 +448,8 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
     Vector Up(num_equation);
     Up[0] = szData.targetUp[0];
     for (int d = 0; d < dim; d++) Up[1 + d] = szData.targetUp[1 + d];
-    Up[1 + dim] = mixture->Temperature(&Up[0], &szData.targetUp[4], 1);
+    //Up[1 + dim] = mixture->Temperature(&Up[0], &szData.targetUp[4], 1);
+    Up[1 + nvel] = mixture->Temperature(&Up[0], &szData.targetUp[4], 1);
     mixture->GetConservativesFromPrimitives(Up, targetU);
   }
 
@@ -517,7 +524,7 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
   double gamma = mixture->GetSpecificHeatRatio();
   double Rg = mixture->GetGasConstant();
   mixture->GetPrimitivesFromConservatives(targetU, Up);
-  double speedSound = sqrt(gamma * Rg * Up[1 + dim]);
+  double speedSound = sqrt(gamma * Rg * Up[1 + nvel]);
 
   // add forcing to RHS, i.e., @in
   for (int n = 0; n < nnodes; n++) {

@@ -111,11 +111,13 @@ class AxisymmetricSource : public ForcingTerms {
  private:
   GasMixture *mixture;
   const Equations &eqSystem;
+  ParGridFunction *space_vary_viscosity_mult_;
 
  public:
   AxisymmetricSource(const int &_dim, const int &_num_equation, const int &_order, GasMixture *_mixture,
                      const Equations &_eqSystem, const int &_intRuleType, IntegrationRules *_intRules,
                      ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
+                     ParGridFunction *spaceVaryViscMult,
                      const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config);
   ~AxisymmetricSource();
 
