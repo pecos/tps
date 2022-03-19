@@ -15,6 +15,10 @@ if GSLIB_ENABLED
 AM_CPPFLAGS += -I$(GSLIB_INC)
 endif
 
+if MASA_ENABLED
+AM_CPPFLAGS += $(MASA_CXXFLAGS)
+endif
+
 # Possible there is nothing to do
 bin_PROGRAMS =
 
@@ -32,6 +36,9 @@ beam_mesh_LDFLAGS += $(GRVY_LIBS)
 beam_mesh_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
 beam_mesh_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
 beam_mesh_LDFLAGS += -L$(GSLIB_LIB) -lgs
+if MASA_ENABLED
+beam_mesh_LDFLAGS += $(MASA_LIBS)
+endif
 
 #bin_PROGRAMS += simmesh
 #simmesh_SOURCES  = simple_periodic_mesh.cpp
@@ -61,6 +68,9 @@ interp_LDFLAGS += $(GRVY_LIBS)
 interp_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
 interp_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
 interp_LDFLAGS += -L$(GSLIB_LIB) -lgs
+if MASA_ENABLED
+interp_LDFLAGS += $(MASA_LIBS)
+endif
 endif
 
 bin_PROGRAMS += binaryic
@@ -76,6 +86,9 @@ binaryic_LDFLAGS += $(GRVY_LIBS)
 binaryic_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
 binaryic_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
 binaryic_LDFLAGS += -L$(GSLIB_LIB) -lgs
+if MASA_ENABLED
+binaryic_LDFLAGS += $(MASA_LIBS)
+endif
 
 bin_PROGRAMS += tanhic
 tanhic_SOURCES  = tanh_ic.cpp
@@ -90,6 +103,9 @@ tanhic_LDFLAGS += $(GRVY_LIBS)
 tanhic_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
 tanhic_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
 tanhic_LDFLAGS += -L$(GSLIB_LIB) -lgs
+if MASA_ENABLED
+tanhic_LDFLAGS += $(MASA_LIBS)
+endif
 
 bin_PROGRAMS += sineic
 sineic_SOURCES  = sine_ic.cpp
@@ -104,6 +120,9 @@ sineic_LDFLAGS += $(GRVY_LIBS)
 sineic_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
 sineic_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
 sineic_LDFLAGS += -L$(GSLIB_LIB) -lgs
+if MASA_ENABLED
+sineic_LDFLAGS += $(MASA_LIBS)
+endif
 
 bin_PROGRAMS += l2diff
 l2diff_SOURCES  = L2_diff.cpp
@@ -118,6 +137,9 @@ l2diff_LDFLAGS += $(GRVY_LIBS)
 l2diff_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
 l2diff_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
 l2diff_LDFLAGS += -L$(GSLIB_LIB) -lgs
+if MASA_ENABLED
+l2diff_LDFLAGS += $(MASA_LIBS)
+endif
 
 #bin_PROGRAMS += perfect_mixture_test
 #perfect_mixture_test_SOURCES  = test_perfect_mixture.cpp

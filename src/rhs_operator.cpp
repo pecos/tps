@@ -121,9 +121,11 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
     forcing.Append(new SourceTerm(dim, num_equation, _order, intRuleType, intRules, vfes, U_, Up, gradUp, gpuArrays,
                                   _config, mixture, _transport, _chemistry));
   }
-#ifdef _MASA_
-  forcing.Append(
-      new MASA_forcings(dim, num_equation, _order, intRuleType, intRules, vfes, U_, Up, gradUp, gpuArrays, _config));
+#ifdef HAVE_MASA
+  if (config_.use_mms_) {
+    forcing.Append(
+        new MASA_forcings(dim, num_equation, _order, intRuleType, intRules, vfes, U_, Up, gradUp, gpuArrays, _config));
+  }
 #endif
 
   if (config_.isAxisymmetric()) {

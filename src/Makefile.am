@@ -12,6 +12,10 @@ if GSLIB_ENABLED
 AM_CPPFLAGS += -I$(GSLIB_INC)
 endif
 
+if MASA_ENABLED
+AM_CPPFLAGS += $(MASA_CXXFLAGS)
+endif
+
 tps_LDFLAGS=
 
 # C++ main solver binary
@@ -38,6 +42,11 @@ if GSLIB_ENABLED
 tps_LDADD   += -lgs
 tps_LDFLAGS += -L$(GSLIB_LIB)
 endif
+
+if MASA_ENABLED
+tps_LDFLAGS += $(MASA_LIBS)
+endif
+
 
 # C++ solver library sources
 cxx_sources          = averaging_and_rms.cpp faceGradientIntegration.cpp M2ulPhyS.cpp rhs_operator.cpp wallBC.cpp \

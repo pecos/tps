@@ -222,6 +222,10 @@ class RunConfiguration {
   // data structure for constant transport property class
   constantTransportData constantTransport;
 
+  // Use MMS
+  bool use_mms_;
+  std::string mms_name_;
+
   RunConfiguration();
   ~RunConfiguration();
 
