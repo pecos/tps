@@ -61,7 +61,9 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
       num_equation(_num_equation),
       maxIntPoints(_maxIntPoints),
       maxDofs(_maxDofs) {
-  BCmap.clear();
+  inletBCmap.clear();
+  outletBCmap.clear();
+  wallBCmap.clear();
 
   // Init inlet BCs
   for (int in = 0; in < config.GetInletPatchType()->size(); in++) {
@@ -74,7 +76,7 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
 
     if (attrInMesh) {
       Array<double> data = config.GetInletData(in);
-      BCmap[patchANDtype.first] =
+      inletBCmap[patchANDtype.first] =
           new InletBC(groupsMPI, _runFile.GetEquationSystem(), rsolver, mixture, vfes, intRules, _dt, dim, num_equation,
                       patchANDtype.first, config.GetReferenceLength(), patchANDtype.second, data, _maxIntPoints,
                       _maxDofs, config.isAxisymmetric());
@@ -91,7 +93,7 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
 
     if (attrInMesh) {
       Array<double> data = config.GetOutletData(o);
-      BCmap[patchANDtype.first] =
+      outletBCmap[patchANDtype.first] =
           new OutletBC(groupsMPI, _runFile.GetEquationSystem(), rsolver, mixture, vfes, intRules, _dt, dim,
                        num_equation, patchANDtype.first, config.GetReferenceLength(), patchANDtype.second, data,
                        _maxIntPoints, _maxDofs, config.isAxisymmetric());
@@ -112,7 +114,7 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
       Array<double> wallData;
       if (patchType.second == VISC_ISOTH) wallData = config.GetWallData(w);
 
-      BCmap[patchType.first] = new WallBC(rsolver, mixture, _runFile.GetEquationSystem(), fluxClass, vfes, intRules,
+      wallBCmap[patchType.first] = new WallBC(rsolver, mixture, _runFile.GetEquationSystem(), fluxClass, vfes, intRules,
                                           _dt, dim, num_equation, patchType.first, patchType.second, wallData,
                                           intPointsElIDBC, _maxIntPoints, config.isAxisymmetric());
     }
@@ -120,7 +122,33 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
 
   // assign list of elements to each BC
   const int NumBCelems = vfes->GetNBE();
-  if (NumBCelems > 0 && BCmap.size() > 0) {
+  
+  // Inlets
+  if (NumBCelems > 0 && inletBCmap.size() > 0) {
+    Mesh *mesh_bc = vfes->GetMesh();
+    FaceElementTransformations *tr;
+
+    for (int i = 0; i < local_attr.Size(); i++) {
+      int attr = local_attr[i];
+      Array<int> list;
+      list.LoseData();
+
+      for (int el = 0; el < NumBCelems; el++) {
+        tr = mesh_bc->GetBdrFaceTransformations(el);
+        if (tr != NULL) {
+          // if( tr->Attribute==attr ) list.Append( tr->Elem1No );
+          if (tr->Attribute == attr) list.Append(el);
+        }
+      }
+      
+      std::unordered_map<int, BoundaryCondition *>::const_iterator ibc = inletBCmap.find(attr);
+      if (ibc != inletBCmap.end()) ibc->second->setElementList(list);
+    }
+  }
+  
+  
+  // Outlets
+  if (NumBCelems > 0 && outletBCmap.size() > 0) {
     Mesh *mesh_bc = vfes->GetMesh();
     FaceElementTransformations *tr;
 
@@ -137,36 +165,106 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
         }
       }
 
-      if (BCmap.count(attr)) BCmap[attr]->setElementList(list);
+      //if (BCmap.count(attr)) BCmap[attr]->setElementList(list);
+      std::unordered_map<int, BoundaryCondition *>::const_iterator obc = outletBCmap.find(attr);
+      if (obc != outletBCmap.end()) obc->second->setElementList(list);
     }
   }
+  
+  // Walls
+  if (NumBCelems > 0 && wallBCmap.size() > 0) {
+    Mesh *mesh_bc = vfes->GetMesh();
+    FaceElementTransformations *tr;
+
+    for (int i = 0; i < local_attr.Size(); i++) {
+      int attr = local_attr[i];
+      Array<int> list;
+      list.LoseData();
+
+      for (int el = 0; el < NumBCelems; el++) {
+        tr = mesh_bc->GetBdrFaceTransformations(el);
+        if (tr != NULL) {
+          // if( tr->Attribute==attr ) list.Append( tr->Elem1No );
+          if (tr->Attribute == attr) list.Append(el);
+        }
+      }
+
+      std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = wallBCmap.find(attr);
+      if (wbc != wallBCmap.end()) wbc->second->setElementList(list);
+    }
+  }
+  
 }
 
 BCintegrator::~BCintegrator() {
-  for (auto bc = BCmap.begin(); bc != BCmap.end(); bc++) {
+  for (auto bc = inletBCmap.begin(); bc != inletBCmap.end(); bc++) {
+    delete bc->second;
+  }
+  
+  for (auto bc = outletBCmap.begin(); bc != outletBCmap.end(); bc++) {
+    delete bc->second;
+  }
+  
+  for (auto bc = wallBCmap.begin(); bc != wallBCmap.end(); bc++) {
     delete bc->second;
   }
 }
 
 void BCintegrator::initBCs() {
-  for (auto bc = BCmap.begin(); bc != BCmap.end(); bc++) {
+  for (auto bc = inletBCmap.begin(); bc != inletBCmap.end(); bc++) {
+    bc->second->initBCs();
+  }
+  
+  for (auto bc = outletBCmap.begin(); bc != outletBCmap.end(); bc++) {
+    bc->second->initBCs();
+  }
+  
+  for (auto bc = wallBCmap.begin(); bc != wallBCmap.end(); bc++) {
     bc->second->initBCs();
   }
 }
 
 void BCintegrator::computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState,
                                   double radius, Vector &bdrFlux) {
-  BCmap[attr]->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
+  std::unordered_map<int, BoundaryCondition *>::const_iterator ibc = inletBCmap.find(attr);
+  std::unordered_map<int, BoundaryCondition *>::const_iterator obc = outletBCmap.find(attr);
+  std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = wallBCmap.find(attr);
+  
+  if (ibc != inletBCmap.end()) ibc->second->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
+  if (obc != outletBCmap.end()) obc->second->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
+  if (wbc != wallBCmap.end()) wbc->second->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
+  
+//   BCmap[attr]->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
 }
 
 void BCintegrator::updateBCMean(ParGridFunction *Up) {
-  for (auto bc = BCmap.begin(); bc != BCmap.end(); bc++) {
+  for (auto bc = inletBCmap.begin(); bc != inletBCmap.end(); bc++) {
+    bc->second->updateMean(intRules, Up);
+  }
+  
+  for (auto bc = outletBCmap.begin(); bc != outletBCmap.end(); bc++) {
+    bc->second->updateMean(intRules, Up);
+  }
+  
+  for (auto bc = wallBCmap.begin(); bc != wallBCmap.end(); bc++) {
     bc->second->updateMean(intRules, Up);
   }
 }
 
 void BCintegrator::integrateBCs(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds) {
-  for (auto bc = BCmap.begin(); bc != BCmap.end(); bc++) {
+  for (auto bc = inletBCmap.begin(); bc != inletBCmap.end(); bc++) {
+    bc->second->integrationBC(y,  // output
+                              x, nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC, maxIntPoints,
+                              maxDofs);
+  }
+  
+  for (auto bc = outletBCmap.begin(); bc != outletBCmap.end(); bc++) {
+    bc->second->integrationBC(y,  // output
+                              x, nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC, maxIntPoints,
+                              maxDofs);
+  }
+  
+  for (auto bc = wallBCmap.begin(); bc != wallBCmap.end(); bc++) {
     bc->second->integrationBC(y,  // output
                               x, nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC, maxIntPoints,
                               maxDofs);

@@ -80,7 +80,9 @@ class BCintegrator : public NonlinearFormIntegrator {
   const int &maxIntPoints;
   const int &maxDofs;
 
-  std::unordered_map<int, BoundaryCondition *> BCmap;
+  std::unordered_map<int, BoundaryCondition *> inletBCmap;
+  std::unordered_map<int, BoundaryCondition *> outletBCmap;
+  std::unordered_map<int, BoundaryCondition *> wallBCmap;
 
   // void calcMeanState();
   void computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
