@@ -1721,6 +1721,7 @@ void M2ulPhyS::parseSolverOptions2() {
       for (int d = 0; d < 3; d++)
         tpsP->getRequiredVecElem("flow/pressureGrad", config.gradPress[d], d);
     }
+    tpsP->getInput("flow/refinement_levels", config.ref_levels, 0);
 
     assert(config.solOrder > 0);
     assert(config.numIters >= 0);
@@ -1740,7 +1741,7 @@ void M2ulPhyS::parseSolverOptions2() {
     tpsP->getInput("time/cfl", config.cflNum, 0.12);
     tpsP->getInput("time/integrator", type, std::string("rk4"));
     tpsP->getInput("time/enableConstantTimestep", config.constantTimeStep, false);
-    if (config.constantTimeStep) tpsP->getInput("time/dt_fixed", config.dt_fixed, -1.);
+    tpsP->getInput("time/dt_fixed", config.dt_fixed, -1.);
     if (integrators.count(type) == 1) {
       config.timeIntegratorType = integrators[type];
     } else {
@@ -1845,8 +1846,17 @@ void M2ulPhyS::parseSolverOptions2() {
     }
   }
 
-  // initial conditions
+  // MMS (check before IC b/c if MMS, IC not required)
   {
+    tpsP->getInput("mms/isEnabled", config.use_mms_, false);
+
+    if (config.use_mms_) {
+      tpsP->getRequiredInput("mms/name", config.mms_name_);
+    }
+  }
+
+  // initial conditions
+  if (!config.use_mms_) {
     tpsP->getRequiredInput("initialConditions/rho", config.initRhoRhoVp[0]);
     tpsP->getRequiredInput("initialConditions/rhoU", config.initRhoRhoVp[1]);
     tpsP->getRequiredInput("initialConditions/rhoV", config.initRhoRhoVp[2]);
@@ -2316,14 +2326,6 @@ void M2ulPhyS::parseSolverOptions2() {
     }
   }
 
-  // MMS
-  {
-    tpsP->getInput("mms/isEnabled", config.use_mms_, false);
-
-    if (config.use_mms_) {
-      tpsP->getRequiredInput("mms/name", config.mms_name_);
-    }
-  }
 
   return;
 }
@@ -2400,6 +2402,15 @@ void M2ulPhyS::checkSolverOptions() const {
     }
   }
 #endif
+
+  // Warn user if they requested fixed dt without setting enableConstantTimestep
+  if ( (config.GetFixedDT() > 0) && (!config.isTimeStepConstant()) ) {
+    if (mpi.Root()) {
+      std::cerr << "[WARNING]: Setting dt_fixed overrides enableConstantTimestep." << std::endl;
+      std::cerr << std::endl;
+    }
+  }
+
 
   return;
 }
