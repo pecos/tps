@@ -133,11 +133,13 @@ int main (int argc, char *argv[])
 
   Vector diffusivity;
   transport.computeMixtureAverageDiffusivity(conservedState, diffusivity);
-  grvy_printf(GRVY_INFO, "\n Ar-Ar+ binary diffusivity : %.8E\n", diffusivity(transport.getIonIndex()));
   double Dia = diffusivity(transport.getIonIndex());
+  grvy_printf(GRVY_INFO, "\n Ar-Ar+ binary diffusivity : %.8E\n", Dia);
 
   double decay = exp(- (4.0 * pi * pi * (kx * kx / Lx / Lx + ky * ky / Ly / Ly)) * Dia * time);
   double distance = u0 * time;
+  grvy_printf(GRVY_INFO, "\n Decay : %.8E\n", decay);
+  grvy_printf(GRVY_INFO, "\n Convection distance : %.8E\n", distance);
 
   // Set up reference solution (only for doubly-periodic diffusion case)
   for (int i = 0; i < NDof; i++) {

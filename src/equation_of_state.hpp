@@ -501,9 +501,9 @@ class PerfectMixture : public GasMixture {
   virtual double computeHeaviesMixtureCV(const double *n_sp, const double n_B);
   virtual double computeHeaviesMixtureHeatRatio(const double *n_sp, const double n_B);
 
-  virtual void computeMassFractionGradient(const double rho, const Vector &numberDensities, const DenseMatrix &gradUp,
+  virtual void ComputeMassFractionGradient(const double rho, const Vector &numberDensities, const DenseMatrix &gradUp,
                                            DenseMatrix &massFractionGrad);
-  virtual void computeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
+  virtual void ComputeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
                                            DenseMatrix &moleFractionGrad);
 
   // functions needed for BCs

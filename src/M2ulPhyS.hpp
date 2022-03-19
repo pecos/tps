@@ -293,7 +293,7 @@ class M2ulPhyS : public TPS::Solver {
 #endif
   static void InitialConditionEulerVortex(const Vector &x, Vector &y);
   static void testInitialCondition(const Vector &x, Vector &y);
-  void dryAirUniformInitialConditions();
+  // void dryAirUniformInitialConditions();
   void uniformInitialConditions();
   void initGradUp();
 

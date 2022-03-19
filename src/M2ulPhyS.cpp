@@ -1359,8 +1359,9 @@ void M2ulPhyS::testInitialCondition(const Vector &x, Vector &y) {
   delete eqState;
 }
 
-// NOTE: Use only for DRY_AIR.
-void M2ulPhyS::dryAirUniformInitialConditions() {
+// // NOTE: Use only for DRY_AIR.
+// void M2ulPhyS::dryAirUniformInitialConditions() {
+void M2ulPhyS::uniformInitialConditions() {
   double *data = U->HostWrite();
   double *dataUp = Up->HostWrite();
   double *dataGradUp = gradUp->HostWrite();
@@ -1375,14 +1376,14 @@ void M2ulPhyS::dryAirUniformInitialConditions() {
   initState(0) = inputRhoRhoVp[0];
   initState(1) = inputRhoRhoVp[1];
   initState(2) = inputRhoRhoVp[2];
-  if (nvel == 3) initState(3) = inputRhoRhoVp[3];
+  if (dim == 3) initState(3) = inputRhoRhoVp[3];
 
   if (mixture->GetWorkingFluid() == WorkingFluid::USER_DEFINED) {
     const int numSpecies = mixture->GetNumSpecies();
     const int numActiveSpecies = mixture->GetNumActiveSpecies();
     for (int sp = 0; sp < numActiveSpecies; sp++) {
       int inputIndex = mixture->getInputIndexOf(sp);
-      initState(2 + nvel + sp) = inputRhoRhoVp[0] * config.initialMassFractions(inputIndex);
+      initState(2 + dim + sp) = inputRhoRhoVp[0] * config.initialMassFractions(inputIndex);
     }
 
     // electron energy
@@ -1390,10 +1391,10 @@ void M2ulPhyS::dryAirUniformInitialConditions() {
       double ne = 0.;
       if (mixture->IsAmbipolar()) {
         for (int sp = 0; sp < numActiveSpecies; sp++)
-          ne += mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) * initState(2 + nvel + sp) /
+          ne += mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) * initState(2 + dim + sp) /
                 mixture->GetGasParams(sp, GasParams::SPECIES_MW);
       } else {
-        ne = initState(2 + nvel + numSpecies - 2) / mixture->GetGasParams(numSpecies - 2, GasParams::SPECIES_MW);
+        ne = initState(2 + dim + numSpecies - 2) / mixture->GetGasParams(numSpecies - 2, GasParams::SPECIES_MW);
       }
 
       initState(num_equation - 1) = config.initialElectronTemperature * ne * mixture->getMolarCV(numSpecies - 2);
@@ -1423,18 +1424,7 @@ void M2ulPhyS::dryAirUniformInitialConditions() {
   mixture->GetPrimitivesFromConservatives(initState, Upi);
 
   for (int i = 0; i < dof; i++) {
-//     data[i] = inputRhoRhoVp[0];
-//     data[i + dof] = inputRhoRhoVp[1];
-//     data[i + 2 * dof] = inputRhoRhoVp[2];
-//     if (dim == 3) data[i + 3 * dof] = inputRhoRhoVp[3];
-//     data[i + (1 + dim) * dof] = rhoE;
-//     if (eqSystem == NS_PASSIVE) data[i + (num_equation - 1) * dof] = 0.;
-//
-//     if (mixture->GetWorkingFluid() == WorkingFluid::USER_DEFINED) {
-//       const int numSpecies = mixture->GetNumActiveSpecies();
-//       for (int sp = 0; sp < numSpecies; sp++)
-//         data[i + (2 + dim + sp) * dof] = inputRhoRhoVp[0] * config.initialMassFractions(sp);
-//     }
+    //     }
     for (int eq = 0; eq < num_equation; eq++) data[i + eq * dof] = initState(eq);
     for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * dof] = Upi[eq];
 
@@ -1448,46 +1438,46 @@ void M2ulPhyS::dryAirUniformInitialConditions() {
   //   delete eqState;
 }
 
-void M2ulPhyS::uniformInitialConditions() {
-  if (config.GetWorkingFluid() == DRY_AIR) {
-    dryAirUniformInitialConditions();
-    return;
-  }
-
-  std::string basepath("initialConditions");
-  Vector initCondition(num_equation);
-  for (int eq = 0; eq < num_equation; eq++) {
-    tpsP->getRequiredInput((basepath + "/Q" + std::to_string(eq+1)).c_str(), initCondition[eq]);
-  }
-
-  double *data = U->HostWrite();
-  double *dataUp = Up->HostWrite();
-  double *dataGradUp = gradUp->HostWrite();
-
-  int dof = vfes->GetNDofs();
-
-  Vector state;
-  state.UseDevice(false);
-  state.SetSize(num_equation);
-  Vector Upi;
-  Upi.UseDevice(false);
-  Upi.SetSize(num_equation);
-
-  for (int i = 0; i < dof; i++) {
-    for (int eq = 0; eq < num_equation; eq++) {
-      data[i + eq * dof] = initCondition(eq);
-      state(eq) = data[i + eq * dof];
-      for (int d = 0; d < dim; d++) {
-        dataGradUp[i + eq * dof + d * num_equation * dof] = 0.;
-      }
-    }
-
-    mixture->GetPrimitivesFromConservatives(state, Upi);
-    for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * dof] = Upi[eq];
-  }
-
-  return;
-}
+// void M2ulPhyS::uniformInitialConditions() {
+//   if (config.GetWorkingFluid() == DRY_AIR) {
+//     dryAirUniformInitialConditions();
+//     return;
+//   }
+//
+//   std::string basepath("initialConditions");
+//   Vector initCondition(num_equation);
+//   for (int eq = 0; eq < num_equation; eq++) {
+//     tpsP->getRequiredInput((basepath + "/Q" + std::to_string(eq+1)).c_str(), initCondition[eq]);
+//   }
+//
+//   double *data = U->HostWrite();
+//   double *dataUp = Up->HostWrite();
+//   double *dataGradUp = gradUp->HostWrite();
+//
+//   int dof = vfes->GetNDofs();
+//
+//   Vector state;
+//   state.UseDevice(false);
+//   state.SetSize(num_equation);
+//   Vector Upi;
+//   Upi.UseDevice(false);
+//   Upi.SetSize(num_equation);
+//
+//   for (int i = 0; i < dof; i++) {
+//     for (int eq = 0; eq < num_equation; eq++) {
+//       data[i + eq * dof] = initCondition(eq);
+//       state(eq) = data[i + eq * dof];
+//       for (int d = 0; d < dim; d++) {
+//         dataGradUp[i + eq * dof + d * num_equation * dof] = 0.;
+//       }
+//     }
+//
+//     mixture->GetPrimitivesFromConservatives(state, Upi);
+//     for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * dof] = Upi[eq];
+//   }
+//
+//   return;
+// }
 
 void M2ulPhyS::initGradUp() {
   double *dataGradUp = gradUp->HostWrite();

@@ -1184,7 +1184,7 @@ double PerfectMixture::ComputeSpeedOfSound(const mfem::Vector &Uin, bool primiti
 }
 
 // NOTE: numberDensities have all species number density.
-void PerfectMixture::computeMassFractionGradient(const double rho, const Vector &numberDensities,
+void PerfectMixture::ComputeMassFractionGradient(const double rho, const Vector &numberDensities,
                                                  const DenseMatrix &gradUp, DenseMatrix &massFractionGrad) {
   massFractionGrad.SetSize(numSpecies, dim);
   massFractionGrad = 0.0;
@@ -1222,7 +1222,7 @@ void PerfectMixture::computeMassFractionGradient(const double rho, const Vector 
   }
 }
 
-void PerfectMixture::computeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
+void PerfectMixture::ComputeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
                                                  DenseMatrix &moleFractionGrad) {
   moleFractionGrad.SetSize(numSpecies, dim);
   double totalN = 0.0;

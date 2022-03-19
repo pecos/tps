@@ -240,8 +240,8 @@ int main (int argc, char *argv[])
     }
     DenseMatrix massFractionGrad(numSpecies,dim);
     DenseMatrix moleFractionGrad(numSpecies,dim);
-    mixture->computeMassFractionGradient(testPrimitives[0], n_sp, gradUp, massFractionGrad);
-    mixture->computeMoleFractionGradient(n_sp, gradUp, moleFractionGrad);
+    mixture->ComputeMassFractionGradient(testPrimitives[0], n_sp, gradUp, massFractionGrad);
+    mixture->ComputeMoleFractionGradient(n_sp, gradUp, moleFractionGrad);
     Vector dir(dim);
     Vector velocity(dim);
     for (int d = 0; d < dim; d++) velocity(d) = testPrimitives(d + 1);
@@ -652,8 +652,8 @@ int main (int argc, char *argv[])
     }
     DenseMatrix massFractionGrad(numSpecies,dim);
     DenseMatrix moleFractionGrad(numSpecies,dim);
-    mixture->computeMassFractionGradient(testPrimitives[0], n_sp, gradUp, massFractionGrad);
-    mixture->computeMoleFractionGradient(n_sp, gradUp, moleFractionGrad);
+    mixture->ComputeMassFractionGradient(testPrimitives[0], n_sp, gradUp, massFractionGrad);
+    mixture->ComputeMoleFractionGradient(n_sp, gradUp, moleFractionGrad);
     Vector dir(dim);
     Vector velocity(dim);
     for (int d = 0; d < dim; d++) velocity(d) = testPrimitives(d + 1);
@@ -1008,8 +1008,8 @@ int main (int argc, char *argv[])
     }
     DenseMatrix massFractionGrad(numSpecies,dim);
     DenseMatrix moleFractionGrad(numSpecies,dim);
-    mixture->computeMassFractionGradient(testPrimitives[0], n_sp, gradUp, massFractionGrad);
-    mixture->computeMoleFractionGradient(n_sp, gradUp, moleFractionGrad);
+    mixture->ComputeMassFractionGradient(testPrimitives[0], n_sp, gradUp, massFractionGrad);
+    mixture->ComputeMoleFractionGradient(n_sp, gradUp, moleFractionGrad);
     Vector dir(dim);
     Vector velocity(dim);
     for (int d = 0; d < dim; d++) velocity(d) = testPrimitives(d + 1);
@@ -1381,8 +1381,8 @@ int main (int argc, char *argv[])
     }
     DenseMatrix massFractionGrad(numSpecies,dim);
     DenseMatrix moleFractionGrad(numSpecies,dim);
-    mixture->computeMassFractionGradient(testPrimitives[0], n_sp, gradUp, massFractionGrad);
-    mixture->computeMoleFractionGradient(n_sp, gradUp, moleFractionGrad);
+    mixture->ComputeMassFractionGradient(testPrimitives[0], n_sp, gradUp, massFractionGrad);
+    mixture->ComputeMoleFractionGradient(n_sp, gradUp, moleFractionGrad);
     Vector dir(dim);
     Vector velocity(dim);
     for (int d = 0; d < dim; d++) velocity(d) = testPrimitives(d + 1);
