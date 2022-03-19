@@ -133,8 +133,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
 
   if (config_.isAxisymmetric()) {
     forcing.Append(new AxisymmetricSource(dim, num_equation, _order, mixture, transport_, eqSystem, intRuleType,
-                                          intRules, vfes, U_, Up, gradUp, gpuArrays, _config));
-
+                                          intRules, vfes, U_, Up, gradUp, spaceVaryViscMult, gpuArrays, _config));
     const FiniteElementCollection *fec = vfes->FEColl();
     dfes = new ParFiniteElementSpace(mesh, fec, dim, Ordering::byNODES);
     coordsDof = new ParGridFunction(dfes);
