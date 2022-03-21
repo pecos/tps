@@ -43,7 +43,7 @@ MPI_Groups::MPI_Groups(MPI_Session* _mpi) : mpi(_mpi) {
 
 MPI_Groups::~MPI_Groups() {
   for (auto pg = patchGroupMap_.begin(); pg != patchGroupMap_.end(); pg++) {
-    MPI_Comm_free(&(pg->second));
+    MPI_Comm_free( &(pg->second) );
   }
 }
 
@@ -63,12 +63,13 @@ int MPI_Groups::groupSize(MPI_Comm group_comm) {
 }
 
 void MPI_Groups::init() {
+
   int localMaxPatch = 0;
   if (patchList_.Size() > 0) localMaxPatch = patchList_.Max();
   int globalMax = 0.;
   MPI_Allreduce(&localMaxPatch, &globalMax, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
-
-  for (int p = 0; p <= globalMax; p++) {
+  
+  for (int p = 0; p < globalMax+1; p++) {
     int processContainsPatch = 0;
     for (int n = 0; n < patchList_.Size(); n++) {
       if (patchList_[n] == p) processContainsPatch = p;
