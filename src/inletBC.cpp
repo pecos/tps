@@ -703,21 +703,15 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
-// TODO: extension to two-temperature case.
 void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
   // NOTE: it is likely that for two-temperature case inlet will also specify electron temperature,
   // whether it is equal to the gas temperature or not.
-  // std::cout << "stateIn" << std::endl;
-  // for (int eq = 0; eq < num_equation; eq++) std::cout << stateIn[eq] << ",\t";
-  // std::cout << std::endl;
   double dummy; // electron pressure. by-product of total pressure computation. won't be used
   const double p = mixture->ComputePressure(stateIn, dummy);
-// {
-//
-//   std::cout << "stateIn pressure: " << p << std::endl;
-// }
+
   Vector state2(num_equation);
-  state2 = 0.;
+  state2 = stateIn;
+
   state2[0] = inputState[0];
   state2[1] = inputState[0] * inputState[1];
   state2[2] = inputState[0] * inputState[2];
@@ -735,15 +729,6 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
 
   // NOTE: If two-temperature, BC for electron temperature is T_e = T_h, where the total pressure is p.
   mixture->modifyEnergyForPressure(state2, state2, p, true);
-// {
-//   std::cout << "state2" << std::endl;
-//   for (int eq = 0; eq < num_equation; eq++) std::cout << state2[eq] << ",\t";
-//   std::cout << std::endl;
-//
-//   const double p1 = mixture->ComputePressure(state2);
-//   std::cout << "state2 pressure: " << p1 << std::endl;
-//   exit(-1);
-// }
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
