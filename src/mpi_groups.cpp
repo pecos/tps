@@ -69,7 +69,7 @@ void MPI_Groups::init() {
   int globalMax = 0.;
   MPI_Allreduce(&localMaxPatch, &globalMax, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
   
-  for (int p = 0; p < globalMax+1; p++) {
+  for (int p = 0; p <= globalMax; p++) {
     int processContainsPatch = 0;
     for (int n = 0; n < patchList_.Size(); n++) {
       if (patchList_[n] == p) processContainsPatch = p;

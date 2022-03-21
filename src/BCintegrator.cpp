@@ -122,7 +122,7 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
 
   // assign list of elements to each BC
   const int NumBCelems = vfes->GetNBE();
-
+  
   // Inlets
   if (NumBCelems > 0 && inletBCmap.size() > 0) {
     Mesh *mesh_bc = vfes->GetMesh();
@@ -140,12 +140,13 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
           if (tr->Attribute == attr) list.Append(el);
         }
       }
-
+      
       std::unordered_map<int, BoundaryCondition *>::const_iterator ibc = inletBCmap.find(attr);
       if (ibc != inletBCmap.end()) ibc->second->setElementList(list);
     }
   }
-
+  
+  
   // Outlets
   if (NumBCelems > 0 && outletBCmap.size() > 0) {
     Mesh *mesh_bc = vfes->GetMesh();
@@ -164,12 +165,11 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
         }
       }
 
-      //if (BCmap.count(attr)) BCmap[attr]->setElementList(list);
       std::unordered_map<int, BoundaryCondition *>::const_iterator obc = outletBCmap.find(attr);
       if (obc != outletBCmap.end()) obc->second->setElementList(list);
     }
   }
-
+  
   // Walls
   if (NumBCelems > 0 && wallBCmap.size() > 0) {
     Mesh *mesh_bc = vfes->GetMesh();
@@ -192,17 +192,18 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
       if (wbc != wallBCmap.end()) wbc->second->setElementList(list);
     }
   }
+  
 }
 
 BCintegrator::~BCintegrator() {
   for (auto bc = inletBCmap.begin(); bc != inletBCmap.end(); bc++) {
     delete bc->second;
   }
-
+  
   for (auto bc = outletBCmap.begin(); bc != outletBCmap.end(); bc++) {
     delete bc->second;
   }
-
+  
   for (auto bc = wallBCmap.begin(); bc != wallBCmap.end(); bc++) {
     delete bc->second;
   }
@@ -212,11 +213,11 @@ void BCintegrator::initBCs() {
   for (auto bc = inletBCmap.begin(); bc != inletBCmap.end(); bc++) {
     bc->second->initBCs();
   }
-
+  
   for (auto bc = outletBCmap.begin(); bc != outletBCmap.end(); bc++) {
     bc->second->initBCs();
   }
-
+  
   for (auto bc = wallBCmap.begin(); bc != wallBCmap.end(); bc++) {
     bc->second->initBCs();
   }
@@ -239,11 +240,11 @@ void BCintegrator::updateBCMean(ParGridFunction *Up) {
   for (auto bc = inletBCmap.begin(); bc != inletBCmap.end(); bc++) {
     bc->second->updateMean(intRules, Up);
   }
-
+  
   for (auto bc = outletBCmap.begin(); bc != outletBCmap.end(); bc++) {
     bc->second->updateMean(intRules, Up);
   }
-
+  
   for (auto bc = wallBCmap.begin(); bc != wallBCmap.end(); bc++) {
     bc->second->updateMean(intRules, Up);
   }
