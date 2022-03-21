@@ -34,8 +34,11 @@
 #ifdef HAVE_MASA
 #include "masa_handler.hpp"
 
-void initMasaHandler(std::string name, int dim, const Equations& eqn, const double& viscMult,
-                     const std::string mms_name) {
+void initMasaHandler(std::string name, int dim, const RunConfiguration& config) {
+  const Equations eqn = config.GetEquationSystem();
+  const double viscMult = config.visc_mult;
+  const std::string mms_name = config.mms_name_;
+
   // Initialize MASA
   if (dim == 2) {
     assert(mms_name == "navierstokes_2d_compressible");
