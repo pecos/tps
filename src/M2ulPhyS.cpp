@@ -931,7 +931,8 @@ void M2ulPhyS::projectInitialSolution() {
     uniformInitialConditions();
 #ifdef HAVE_MASA
     if (config.use_mms_) {
-      initMasaHandler("exact", dim, config.GetEquationSystem(), config.GetViscMult(), config.mms_name_);
+      // initMasaHandler("exact", dim, config.GetEquationSystem(), config.GetViscMult(), config.mms_name_);
+      masaHandler_ = new MasaHandler(dim, config);
       void (*initialConditionFunction)(const Vector &, double, Vector &);
       initialConditionFunction = &(this->MASA_exactSol);
       VectorFunctionCoefficient u0(num_equation, initialConditionFunction);

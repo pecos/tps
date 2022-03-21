@@ -253,6 +253,10 @@ class M2ulPhyS : public TPS::Solver {
   // I/O organizer
   IODataOrganizer ioData;
 
+#ifdef HAVE_MASA
+  MasaHandler *masaHandler_;
+#endif
+
 #ifdef _GPU_
   Array<int> loc_print;
 #endif
