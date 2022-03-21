@@ -498,6 +498,10 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
       }
     }
   }
+  
+  
+  radialNormal.SetSize( radialNormalsVec.size() );
+  for (int n = 0; n < radialNormal.Size(); n++) radialNormal(n) = radialNormalsVec[n];
 
   radialNormal.SetSize(radialNormalsVec.size());
   for (int n = 0; n < radialNormal.Size(); n++) radialNormal(n) = radialNormalsVec[n];
@@ -534,7 +538,6 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
   Vector ur(dim), uth(dim), uz(dim);
   Vector targetCyl(num_equation);
   DenseMatrix MM(dim);
-
   targetCyl = targetU;
 
   // compute speed of sound
@@ -551,6 +554,24 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
       s *= szData.multFactor;
       for (int eq = 0; eq < num_equation; eq++) Up[eq] = dataUp[n + eq * nnodes];
       mixture->GetConservativesFromPrimitives(Up, Un);
+      
+      // transform to cylindrical in annular
+      if ( szData.szType == SpongeZoneType::ANNULUS ) {
+        const int node = nodesInAnnulus[n];
+        for(int d = 0; d < dim; d++) ur(d) = radialNormal(3*node +d);
+        double Vr = 0., Vt = 0., Vx = 0.;
+        Vector Vtv(dim);
+        for(int d = 0; d < dim; d++) {
+          Vx += targetU(1+d) * szData.normal(d);
+          Vr += targetU(1+d) * ur(d);
+          Vtv(d) = targetU(1+d) - Vx*szData.normal(d) - Vr*ur(d);
+          Vt += Vtv(d) * Vtv(d);
+        }
+        Vt = sqrt( Vt );
+        targetCyl(1) = Vr;
+        targetCyl(2) = Vt;
+        if (dim == 3) targetCyl(3) = Vx;
+      }
 
       // transform to cylindrical in annular
       if (szData.szType == SpongeZoneType::ANNULUS) {
