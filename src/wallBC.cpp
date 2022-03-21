@@ -158,17 +158,17 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
   stateMirror[2] = stateIn[0] * (vel[1] - 2. * vn * unitN[1]);
   if (dim == 3) stateMirror[3] = stateIn[0] * (vel[2] - 2. * vn * unitN[2]);
   if ((nvel == 3) && (dim == 2)) stateMirror[3] = stateIn[0] * vel[2];
-  stateMirror[1 + nvel] = stateIn[1 + nvel];
-  if (eqSystem == NS_PASSIVE) stateMirror[num_equation - 1] = stateIn[num_equation - 1];
 
   rsolver->Eval(stateIn, stateMirror, normal, bdrFlux);
+
+  DenseMatrix viscFw(num_equation, dim);
+  DenseMatrix viscF(num_equation, dim);
 
   if (axisymmetric_) {
     // here we have hijacked the inviscid wall condition to implement
     // the axis... but... should implement this separately
 
     // incoming visc flux
-    DenseMatrix viscF(num_equation, dim);
     fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, viscF);
 
     double dummy; // electron pressure. by-product of total pressure computation. won't be used
@@ -182,20 +182,17 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
       unitNorm *= 1. / sqrt(normN);
     }
 
-    // modify gradient density so dT/dn=0 at the wall
-    double DrhoDn = 0.;
-    for (int d = 0; d < dim; d++) DrhoDn += gradState(0, d) * unitNorm[d];
+    double normGradT = 0.;
+    for (int d = 0; d < dim; d++) normGradT += unitNorm(d) * gradState(1 + dim, d);
+    for (int d = 0; d < dim; d++) gradState(1 + dim, d) -= normGradT * unitNorm(d);
 
-    double DrhoDnNew = 0.;
-    for (int d = 0; d < dim; d++) DrhoDnNew += gradState(1 + dim, d) * unitNorm[d];
-    DrhoDnNew *= stateIn[0] / p;
+    // TODO(marc): if we have a two-temperature plasma an additional
+    //       normal temperature gradient should also be removed.
 
-    for (int d = 0; d < dim; d++) gradState(0, d) += -DrhoDn * unitNorm[d] + DrhoDnNew * unitNorm[d];
     if (eqSystem == NS_PASSIVE) {
       for (int d = 0; d < dim; d++) gradState(num_equation - 1, d) = 0.;
     }
 
-    DenseMatrix viscFw(num_equation, dim);
     fluxClass->ComputeViscousFluxes(stateMirror, gradState, radius, viscFw);
 
     // Add visc fluxes (we skip density eq.)
@@ -204,17 +201,15 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
     }
   } else {
     // evaluate viscous fluxes at the wall
-    DenseMatrix viscFw(num_equation, dim);
     fluxClass->ComputeViscousFluxes(stateMirror, gradState, radius, viscFw);
 
     // evaluate internal viscous fluxes
-    DenseMatrix viscF(num_equation, dim);
     fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, viscF);
+  }
 
-    // Add visc fluxes (we skip density eq.)
-    for (int eq = 1; eq < num_equation; eq++) {
-      for (int d = 0; d < dim; d++) bdrFlux[eq] -= 0.5 * (viscFw(eq, d) + viscF(eq, d)) * normal[d];
-    }
+  // Add visc fluxes (we skip density eq.)
+  for (int eq = 1; eq < num_equation; eq++) {
+    for (int d = 0; d < dim; d++) bdrFlux[eq] -= 0.5 * (viscFw(eq, d) + viscF(eq, d)) * normal[d];
   }
 }
 

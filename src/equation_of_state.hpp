@@ -188,6 +188,7 @@ class GasMixture {
   virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal, Vector &conservedState) {};
 
   virtual double computeElectronEnergy(const double n_e, const double T_e) {};
+
 };
 
 //////////////////////////////////////////////////////
