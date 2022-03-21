@@ -1053,6 +1053,8 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem, 
   const double Rg = mixture->GetGasConstant();
   const double gamma = mixture->GetSpecificHeatRatio();
 
+  const WorkingFluid fluid = mixture->GetWorkingFluid();
+
   // clang-format off
   MFEM_FORALL_2D(n, numBdrElem, maxDofs, 1, 1, {
       MFEM_FOREACH_THREAD(i, x, maxDofs) {
@@ -1098,8 +1100,8 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem, 
           // compute mirror state
           switch (type) {
             case OutletType::SUB_P:
-              if (i < num_equation)
-                computeSubPressure(i, &u1[0], &u2[0], &nor[0], d_inputState[0], gamma, dim, num_equation, eqSystem);
+              computeSubPressure(&u1[0], &u2[0], &nor[0], d_inputState[0], gamma, Rg, dim, num_equation,
+                                 fluid, eqSystem, i, maxDofs);
               break;
             case OutletType::SUB_P_NR:
               computeNRSubPress(i, offsetBdrU + q, &u1[0], &gradUpi[0], d_meanUp, dt, &u2[0], d_boundaryU,
