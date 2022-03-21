@@ -194,11 +194,6 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
     }
 
     fluxClass->ComputeViscousFluxes(stateMirror, gradState, radius, viscFw);
-
-    // Add visc fluxes (we skip density eq.)
-    for (int eq = 1; eq < num_equation; eq++) {
-      for (int d = 0; d < dim; d++) bdrFlux[eq] -= 0.5 * (viscFw(eq, d) + viscF(eq, d)) * normal[d];
-    }
   } else {
     // evaluate viscous fluxes at the wall
     fluxClass->ComputeViscousFluxes(stateMirror, gradState, radius, viscFw);
