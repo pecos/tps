@@ -840,17 +840,19 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
           
           switch (fluid) {
             case WorkingFluid::DRY_AIR:
-              {
+	      { 
                 if (i < dim) KE[i] = 0.5 * u1[1 + i] * u1[1 + i] / u1[0];
                 if (dim != 3 && i == 1) KE[2] = 0.;
                 MFEM_SYNC_THREAD;
                 
                 if (i == 0) p = DryAir::pressure(&u1[0], &KE[0], gamma, dim, num_equation);
+		MFEM_SYNC_THREAD;
                 DryAir::modifyEnergyForPressure_gpu(u2,u2,p,gamma, num_equation, dim,i,maxDofs);
               }
               break;
             case WorkingFluid::USER_DEFINED:
-              PerfectMixture::modifyEnergyForPressure_gpu(u2,u2,d_inputState[0],
+	      // WARNING: compute pressure
+              PerfectMixture::modifyEnergyForPressure_gpu(u2,u2,p,
                                                       true,molarCV,gasParams,
                                                       ambipolar,twoTemperature,
                                                       num_equation,dim,
@@ -874,6 +876,7 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
     RiemannSolver::riemannLF_gpu(u1, u2, Rflux, nor,gamma, Rg, gasParams, molarCV, dim, eqSystem, fluid, ambipolar, twoTemperature,
                                              num_equation, d_numSpecies, d_numActiveSpecies, i, maxDofs);
     MFEM_SYNC_THREAD;
+
     // sum contributions to integral
     if (i < elDof) {
       for (int eq = 0; eq < num_equation; eq++) Fcontrib[i + eq * elDof] -= Rflux[eq] * shape[i] * weight;
