@@ -295,7 +295,7 @@ void DryAir::computeStagnantStateWithTemp(const mfem::Vector &stateIn, const dou
 }
 
 // NOTE: modifyElectronEnergy will not be used for DryAir.
-void DryAir::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::Vector &stateOut, const double &p, bool modifyElectronEnergy) {
+void DryAir::modifyEnergyForPressure(const mfem::Vector& stateIn, mfem::Vector& stateOut, const double& p, bool modifyElectronEnergy) {
   stateOut.SetSize(num_equation);
   stateOut = stateIn;
 
