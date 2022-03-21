@@ -2329,6 +2329,15 @@ void M2ulPhyS::parseSolverOptions2() {
     }
   }
 
+  // MMS
+  {
+    tpsP->getInput("mms/isEnabled", config.use_mms_, false);
+
+    if (config.use_mms_) {
+      tpsP->getRequiredInput("mms/name", config.mms_name_);
+    }
+  }
+
   return;
 }
 
