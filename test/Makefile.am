@@ -70,6 +70,8 @@ if MASA_ENABLED
 TESTS += mms.euler.test
 endif
 
+if !GPU_ENABLED
+
 check_PROGRAMS += perfect_mixture_test
 perfect_mixture_test_SOURCES  = test_perfect_mixture.cpp
 perfect_mixture_test_LDADD    = ../src/libtps.a
@@ -149,3 +151,5 @@ test_argon_minimal_LDFLAGS  =
 if MASA_ENABLED
 test_argon_minimal_LDFLAGS += $(MASA_LIBS)
 endif
+
+endif # if !GPU_ENABLED

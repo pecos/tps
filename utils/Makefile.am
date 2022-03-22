@@ -23,6 +23,8 @@ endif
 # Possible there is nothing to do
 bin_PROGRAMS =
 
+if !GPU_ENABLED
+
 bin_PROGRAMS += beam_mesh
 beam_mesh_SOURCES  = beam_mesh.cpp
 beam_mesh_LDADD    =
@@ -159,6 +161,8 @@ l2diff_LDFLAGS  =
 if MASA_ENABLED
 l2diff_LDFLAGS += $(MASA_LIBS)
 endif
+
+endif # if !GPU_ENABLED
 
 #bin_PROGRAMS += perfect_mixture_test
 #perfect_mixture_test_SOURCES  = test_perfect_mixture.cpp
