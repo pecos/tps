@@ -24,7 +24,9 @@ EXTRA_DIST      = tap-driver.sh soln_differ inputs meshes ref_solns/*.h5 \
 	          averages.gpu.test cyl3d.test cyl3d.mflow.test cyl3d.dtconst.test \
 		  die.test averages.test wedge.test cyl3d.interp.test qms.rings.test \
 		  sponge_zone.test annulus.test pipe.test valgrind.test valgrind.suppressions \
-		  mms.euler.test reaction.test
+		  mms.euler.test reaction.test perfect_gas.test collision_integrals.test \
+	 	  argon_minimal.test argon_minimal.binary.test diffusion_wall.test \
+	 	  inflow_outflow.test
 
 TESTS = vpath.sh
 XFAIL_TESTS =
