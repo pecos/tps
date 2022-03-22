@@ -87,6 +87,19 @@ class GasMixture {
   // number of conservative and primitive/visualization variables
   int Nconservative, Nprimitive;
 
+// TODO: GPU routines are not yet fully gas-agnostic. Need to be removed.
+#ifdef _GPU_
+  double specific_heat_ratio;
+  double gas_constant;
+  double visc_mult;
+  double bulk_visc_mult;
+  // Prandtl number
+  double Pr;         // Prandtl number
+  double cp_div_pr;  // cp divided by Pr (used in conductivity calculation)
+  // Fick's law
+  double Sc;  // Schmidt number
+#endif
+
   // If not ambipolar, one species continuity equation is replaced by global continuity equation.
   // If ambipolar, electron continuity equation is also replaced by an algebraic equation (determined by GasMixture).
   void SetNumActiveSpecies() { numActiveSpecies = ambipolar ? (numSpecies - 2) : (numSpecies - 1); }
@@ -157,21 +170,29 @@ class GasMixture {
                                        const DenseMatrix &gradUp,
                                        DenseMatrix &PressureGrad) {};
 
-  // TODO: Need to remove these and fix wherever they are used.
-  // We cannot use these for multi species (heat ratio of which species?)
-  // These are used in forcingTerm, Fluxes ASSUMING that the fluid is single species.
-  virtual double GetSpecificHeatRatio() = 0;
-  virtual double GetGasConstant() = 0;
+ // TODO: GPU routines are not yet fully gas-agnostic. Need to be removed.
+ #ifdef _GPU_
+   // TODO: Need to remove these and fix wherever they are used.
+   // We cannot use these for multi species (heat ratio of which species?)
+   // These are used in forcingTerm, Fluxes ASSUMING that the fluid is single species.
+   virtual double GetSpecificHeatRatio() { return specific_heat_ratio; }
+   virtual double GetGasConstant() { return gas_constant; }
+ #else
+   virtual double GetSpecificHeatRatio() = 0;
+   virtual double GetGasConstant() = 0;
+ #endif
 
   virtual void computeNumberDensities(const Vector &conservedState, Vector &n_sp) {};
 
   virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
 
-  //   double GetPrandtlNum() { return Pr; }
-  //   double GetSchmidtNum() { return Sc; }
-
-  // double GetViscMultiplyer() { return visc_mult; }
-  // double GetBulkViscMultiplyer() { return bulk_visc_mult; }
+// TODO: GPU routines are not yet fully gas-agnostic. Need to be removed.
+#ifdef _GPU_
+  double GetPrandtlNum() { return Pr; }
+  double GetSchmidtNum() { return Sc; }
+  double GetViscMultiplyer() { return visc_mult; }
+  double GetBulkViscMultiplyer() { return bulk_visc_mult; }
+#endif
 
   virtual double getMolarCV(int species) {};
   virtual double getMolarCP(int species) {};
