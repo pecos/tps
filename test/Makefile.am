@@ -139,4 +139,3 @@ test_argon_minimal_LDFLAGS += -L$(GSLIB_LIB) -lgs
 if MASA_ENABLED
 test_argon_minimal_LDFLAGS += $(MASA_LIBS)
 endif
-

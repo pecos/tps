@@ -199,11 +199,11 @@ BCintegrator::~BCintegrator() {
   for (auto bc = inletBCmap.begin(); bc != inletBCmap.end(); bc++) {
     delete bc->second;
   }
-  
+
   for (auto bc = outletBCmap.begin(); bc != outletBCmap.end(); bc++) {
     delete bc->second;
   }
-  
+
   for (auto bc = wallBCmap.begin(); bc != wallBCmap.end(); bc++) {
     delete bc->second;
   }
@@ -213,11 +213,11 @@ void BCintegrator::initBCs() {
   for (auto bc = inletBCmap.begin(); bc != inletBCmap.end(); bc++) {
     bc->second->initBCs();
   }
-  
+
   for (auto bc = outletBCmap.begin(); bc != outletBCmap.end(); bc++) {
     bc->second->initBCs();
   }
-  
+
   for (auto bc = wallBCmap.begin(); bc != wallBCmap.end(); bc++) {
     bc->second->initBCs();
   }
@@ -240,11 +240,11 @@ void BCintegrator::updateBCMean(ParGridFunction *Up) {
   for (auto bc = inletBCmap.begin(); bc != inletBCmap.end(); bc++) {
     bc->second->updateMean(intRules, Up);
   }
-  
+
   for (auto bc = outletBCmap.begin(); bc != outletBCmap.end(); bc++) {
     bc->second->updateMean(intRules, Up);
   }
-  
+
   for (auto bc = wallBCmap.begin(); bc != wallBCmap.end(); bc++) {
     bc->second->updateMean(intRules, Up);
   }

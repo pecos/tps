@@ -135,8 +135,8 @@ void WallBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesID
                      num_equation, mixture);
 }
 
-void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
-                                Vector &bdrFlux) {
+void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn,  DenseMatrix &gradState,
+                                double radius, Vector &bdrFlux) {
   Vector vel(nvel);
   for (int d = 0; d < nvel; d++) vel[d] = stateIn[1 + d] / stateIn[0];
 
@@ -170,9 +170,6 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
 
     // incoming visc flux
     fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, viscF);
-
-    double dummy; // electron pressure. by-product of total pressure computation. won't be used
-    double p = mixture->ComputePressure(stateIn, dummy);
 
     // modify gradients so that wall is adibatic
     Vector unitNorm = normal;
@@ -208,16 +205,8 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
   }
 }
 
-void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux) {
-  //double p = mixture->ComputePressure(stateIn);
-  //double T = mixture->ComputeTemperature(stateIn);
-
-  //const double gamma = mixture->GetSpecificHeatRatio();
-  //const double Rg = mixture->GetGasConstant();
-
-  //   Vector wallState = stateIn;
-  //   for (int d = 0; d < dim; d++) wallState[1 + d] = 0.;
-  //   wallState[1 + dim] = p / (gamma - 1.);
+void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                      Vector &bdrFlux) {
   Vector wallState(num_equation);
   mixture->computeStagnationState(stateIn, wallState);
 
@@ -238,27 +227,6 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
   }
 
   // modify gradient temperature so dT/dn=0 at the wall
-  //   double DrhoDn = 0.;
-  //   for (int d = 0; d < dim; d++) DrhoDn += gradState(0, d) * unitNorm[d];
-  //   double dpdn = Rg * T * DrhoDn;  // this is the BC -> grad(T)*normal=0
-  //
-  //   Vector gradP(dim);
-  //   double old_dpdn = 0.;
-  //   for (int d = 0; d < dim; d++) {
-  //     Vector grads(gradState.GetColumn(d), num_equation);
-  //     double dpdx = mixture->ComputePressureDerivative(grads, stateIn, false);
-  //     gradP(d) = dpdx;
-  //     old_dpdn += dpdx * unitNorm(d);
-  //   }
-  //
-  //   // force the new dp/dn
-  //   for (int d = 0; d < dim; d++) gradP(d) += (-old_dpdn + dpdn) * unitNorm(d);
-  //
-  //   // modify grad(T) with the corrected grad(p)
-  //   for (int d = 0; d < dim; d++) {
-  //     // temperature gradient for ideal Dry Air
-  //     gradState(1 + dim, d) = T * (gradP(d) / p - gradState(0, d) / stateIn[0]);
-  //   }
   //double normGradT = 0.;
   //for (int d = 0; d < dim; d++) normGradT += unitNorm(d) * gradState(1 + dim, d);
   //for (int d = 0; d < dim; d++) gradState(1 + dim, d) -= normGradT * unitNorm(d);
@@ -297,7 +265,8 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
   }
 }
 
-void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux) {
+void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                       Vector &bdrFlux) {
 
   Vector wallState(num_equation);
   mixture->computeStagnantStateWithTemp(stateIn, wallTemp, wallState);

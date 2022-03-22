@@ -506,6 +506,9 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
   radialNormal.SetSize(radialNormalsVec.size());
   for (int n = 0; n < radialNormal.Size(); n++) radialNormal(n) = radialNormalsVec[n];
 
+  radialNormal.SetSize(radialNormalsVec.size());
+  for (int n = 0; n < radialNormal.Size(); n++) radialNormal(n) = radialNormalsVec[n];
+
   // find plane nodes
   if (szData.szSolType == SpongeZoneSolution::MIXEDOUT) {
     nodesInMixedOutPlane.SetSize(nodesVec.size());
@@ -538,6 +541,7 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
   Vector ur(dim), uth(dim), uz(dim);
   Vector targetCyl(num_equation);
   DenseMatrix MM(dim);
+
   targetCyl = targetU;
 
   // compute speed of sound
