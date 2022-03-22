@@ -1902,7 +1902,7 @@ void M2ulPhyS::parseSolverOptions2() {
   } else if (fluidTypeStr == "user_defined") {
     config.workFluid = USER_DEFINED;
   } else {
-    grvy_printf(GRVY_ERROR, "\nUnknown fluid preset supplied at runtime -> %s", fluidTypeStr);
+    grvy_printf(GRVY_ERROR, "\nUnknown fluid preset supplied at runtime -> %s", fluidTypeStr.c_str());
     exit(ERROR);
   }
 
@@ -2117,7 +2117,7 @@ void M2ulPhyS::parseSolverOptions2() {
         config.reactionModelParams[r - 1] = {A, b, E};
 
       } else {
-        grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model);
+        grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
         exit(ERROR);
       }
 
