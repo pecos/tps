@@ -1,5 +1,6 @@
-AM_CPPFLAGS          = -g -I../src -I$(MFEM_INC) -I$(MFEM_INC)/mfem
-AM_CPPFLAGS         += -I$(HYPRE_INC) $(HDF5_CFLAGS) $(GRVY_CFLAGS)
+# AM_CPPFLAGS          = -g -I../src -I$(MFEM_INC) -I$(MFEM_INC)/mfem
+AM_CPPFLAGS          = -g -I../src $(MFEM_CXXFLAGS) $(HDF5_CFLAGS) $(GRVY_CFLAGS)
+# AM_CPPFLAGS         += -I$(HYPRE_INC) $(HDF5_CFLAGS) $(GRVY_CFLAGS)
 # AM_CPPFLAGS         += -I$(PETSC_INC)
 EXTRA_DIST           = bats cpplint
 
@@ -24,18 +25,21 @@ bin_PROGRAMS =
 
 bin_PROGRAMS += beam_mesh
 beam_mesh_SOURCES  = beam_mesh.cpp
-beam_mesh_LDADD    = -lmfem
+beam_mesh_LDADD    =
+beam_mesh_LDADD    += $(HDF5_LIBS)
+beam_mesh_LDADD    += $(GRVY_LIBS)
+beam_mesh_LDADD    += $(MFEM_LIBS)
 
-beam_mesh_LDFLAGS  = -L$(MFEM_LIB)
-#beam_mesh_LDFLAGS += -L$(PETSC_LIB) -lpetsc
-beam_mesh_LDFLAGS += $(HDF5_LIBS)
-beam_mesh_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
-beam_mesh_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
-beam_mesh_LDFLAGS += -L$(METIS_LIB) -lmetis
-beam_mesh_LDFLAGS += $(GRVY_LIBS)
-beam_mesh_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
-beam_mesh_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
-beam_mesh_LDFLAGS += -L$(GSLIB_LIB) -lgs
+beam_mesh_LDFLAGS  =
+# #beam_mesh_LDFLAGS += -L$(PETSC_LIB) -lpetsc
+# beam_mesh_LDFLAGS += $(HDF5_LIBS)
+# beam_mesh_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
+# beam_mesh_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
+# beam_mesh_LDFLAGS += -L$(METIS_LIB) -lmetis
+# beam_mesh_LDFLAGS += $(GRVY_LIBS)
+# beam_mesh_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
+# beam_mesh_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
+# beam_mesh_LDFLAGS += -L$(GSLIB_LIB) -lgs
 if MASA_ENABLED
 beam_mesh_LDFLAGS += $(MASA_LIBS)
 endif
@@ -57,17 +61,20 @@ endif
 if GSLIB_ENABLED
 bin_PROGRAMS   += interp
 interp_SOURCES  = pfield_interpolate.cpp
-interp_LDADD    = ../src/libtps.a -lmfem
+interp_LDADD    = ../src/libtps.a
+interp_LDADD    += $(HDF5_LIBS)
+interp_LDADD    += $(GRVY_LIBS)
+interp_LDADD    += $(MFEM_LIBS)
 
-interp_LDFLAGS  = -L$(MFEM_LIB)
-interp_LDFLAGS += $(HDF5_LIBS)
-interp_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
-interp_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
-interp_LDFLAGS += -L$(METIS_LIB) -lmetis
-interp_LDFLAGS += $(GRVY_LIBS)
-interp_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
-interp_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
-interp_LDFLAGS += -L$(GSLIB_LIB) -lgs
+interp_LDFLAGS  =
+# interp_LDFLAGS += $(HDF5_LIBS)
+# interp_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
+# interp_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
+# interp_LDFLAGS += -L$(METIS_LIB) -lmetis
+# interp_LDFLAGS += $(GRVY_LIBS)
+# interp_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
+# interp_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
+# interp_LDFLAGS += -L$(GSLIB_LIB) -lgs
 if MASA_ENABLED
 interp_LDFLAGS += $(MASA_LIBS)
 endif
@@ -75,17 +82,20 @@ endif
 
 bin_PROGRAMS += binaryic
 binaryic_SOURCES  = binary_mixture_ic.cpp
-binaryic_LDADD    = ../src/libtps.a -lmfem
+binaryic_LDADD    = ../src/libtps.a
+binaryic_LDADD    += $(HDF5_LIBS)
+binaryic_LDADD    += $(GRVY_LIBS)
+binaryic_LDADD    += $(MFEM_LIBS)
 
-binaryic_LDFLAGS  = -L$(MFEM_LIB)
-binaryic_LDFLAGS += $(HDF5_LIBS)
-binaryic_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
-binaryic_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
-binaryic_LDFLAGS += -L$(METIS_LIB) -lmetis
-binaryic_LDFLAGS += $(GRVY_LIBS)
-binaryic_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
-binaryic_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
-binaryic_LDFLAGS += -L$(GSLIB_LIB) -lgs
+binaryic_LDFLAGS  =
+# binaryic_LDFLAGS += $(HDF5_LIBS)
+# binaryic_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
+# binaryic_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
+# binaryic_LDFLAGS += -L$(METIS_LIB) -lmetis
+# binaryic_LDFLAGS += $(GRVY_LIBS)
+# binaryic_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
+# binaryic_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
+# binaryic_LDFLAGS += -L$(GSLIB_LIB) -lgs
 if MASA_ENABLED
 binaryic_LDFLAGS += $(MASA_LIBS)
 endif
@@ -93,16 +103,19 @@ endif
 bin_PROGRAMS += tanhic
 tanhic_SOURCES  = tanh_ic.cpp
 tanhic_LDADD    = ../src/libtps.a -lmfem
+tanhic_LDADD    += $(HDF5_LIBS)
+tanhic_LDADD    += $(GRVY_LIBS)
+tanhic_LDADD    += $(MFEM_LIBS)
 
-tanhic_LDFLAGS  = -L$(MFEM_LIB)
-tanhic_LDFLAGS += $(HDF5_LIBS)
-tanhic_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
-tanhic_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
-tanhic_LDFLAGS += -L$(METIS_LIB) -lmetis
-tanhic_LDFLAGS += $(GRVY_LIBS)
-tanhic_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
-tanhic_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
-tanhic_LDFLAGS += -L$(GSLIB_LIB) -lgs
+tanhic_LDFLAGS  =
+# tanhic_LDFLAGS += $(HDF5_LIBS)
+# tanhic_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
+# tanhic_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
+# tanhic_LDFLAGS += -L$(METIS_LIB) -lmetis
+# tanhic_LDFLAGS += $(GRVY_LIBS)
+# tanhic_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
+# tanhic_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
+# tanhic_LDFLAGS += -L$(GSLIB_LIB) -lgs
 if MASA_ENABLED
 tanhic_LDFLAGS += $(MASA_LIBS)
 endif
@@ -110,16 +123,19 @@ endif
 bin_PROGRAMS += sineic
 sineic_SOURCES  = sine_ic.cpp
 sineic_LDADD    = ../src/libtps.a -lmfem
+sineic_LDADD    += $(HDF5_LIBS)
+sineic_LDADD    += $(GRVY_LIBS)
+sineic_LDADD    += $(MFEM_LIBS)
 
-sineic_LDFLAGS  = -L$(MFEM_LIB)
-sineic_LDFLAGS += $(HDF5_LIBS)
-sineic_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
-sineic_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
-sineic_LDFLAGS += -L$(METIS_LIB) -lmetis
-sineic_LDFLAGS += $(GRVY_LIBS)
-sineic_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
-sineic_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
-sineic_LDFLAGS += -L$(GSLIB_LIB) -lgs
+sineic_LDFLAGS  =
+# sineic_LDFLAGS += $(HDF5_LIBS)
+# sineic_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
+# sineic_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
+# sineic_LDFLAGS += -L$(METIS_LIB) -lmetis
+# sineic_LDFLAGS += $(GRVY_LIBS)
+# sineic_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
+# sineic_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
+# sineic_LDFLAGS += -L$(GSLIB_LIB) -lgs
 if MASA_ENABLED
 sineic_LDFLAGS += $(MASA_LIBS)
 endif
@@ -127,16 +143,19 @@ endif
 bin_PROGRAMS += l2diff
 l2diff_SOURCES  = L2_diff.cpp
 l2diff_LDADD    = ../src/libtps.a -lmfem
+l2diff_LDADD    += $(HDF5_LIBS)
+l2diff_LDADD    += $(GRVY_LIBS)
+l2diff_LDADD    += $(MFEM_LIBS)
 
-l2diff_LDFLAGS  = -L$(MFEM_LIB)
-l2diff_LDFLAGS += $(HDF5_LIBS)
-l2diff_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
-l2diff_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
-l2diff_LDFLAGS += -L$(METIS_LIB) -lmetis
-l2diff_LDFLAGS += $(GRVY_LIBS)
-l2diff_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
-l2diff_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
-l2diff_LDFLAGS += -L$(GSLIB_LIB) -lgs
+l2diff_LDFLAGS  =
+# l2diff_LDFLAGS += $(HDF5_LIBS)
+# l2diff_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
+# l2diff_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
+# l2diff_LDFLAGS += -L$(METIS_LIB) -lmetis
+# l2diff_LDFLAGS += $(GRVY_LIBS)
+# l2diff_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
+# l2diff_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
+# l2diff_LDFLAGS += -L$(GSLIB_LIB) -lgs
 if MASA_ENABLED
 l2diff_LDFLAGS += $(MASA_LIBS)
 endif
