@@ -67,7 +67,7 @@ M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps) : mp
   }
 
   // set default solver state
-  exit_status_ =  NORMAL;
+  exit_status_ = NORMAL;
 
   // This example depends on this ordering of the space.
   // MFEM_ASSERT(fes.GetOrdering() == Ordering::byNODES, "");
@@ -750,9 +750,6 @@ void M2ulPhyS::initIndirectionArrays() {
 M2ulPhyS::~M2ulPhyS() {
   if (mpi.Root()) histFile.close();
 
-
-M2ulPhyS::~M2ulPhyS()
-{
   delete gradUp;
 
   delete gradUp_A;
@@ -962,7 +959,6 @@ void M2ulPhyS::projectInitialSolution() {
 
 void M2ulPhyS::solve() {
   double tlast = grvy_timer_elapsed_global();
-#endif
 
 #ifdef _MASA_
   // instantiate function for exact solution
