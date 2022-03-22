@@ -1,8 +1,9 @@
-#!/usr/bin/env bats
+#!./bats
 # -*- mode: sh -*-
 
 TEST="cyl3d"
-RUNFILE="input.4iters.cyl"
+RUNFILE="inputs/input.4iters.cyl"
+RUNFILE="inputs/input.4iters.cyl.ini"
 
 setup() {
     SOLN_FILE=restart_output.sol.h5
@@ -46,7 +47,7 @@ setup() {
 }
 
 @test "[$TEST] verify exit code if restart files missing" {
-    RUNFILE=input.4iters.restart.cyl
+    RUNFILE=inputs/input.4iters.restart.cyl.ini
 
     rm -f $SOLN_FILE
 
@@ -57,7 +58,7 @@ setup() {
 }
 
 @test "[$TEST] verify consistent solution with restart from 2 iters" {
-    RUNFILE=input.2iters.cyl
+    RUNFILE=inputs/input.2iters.cyl.ini
 
     rm -f $SOLN_FILE
     test -s $RUNFILE
@@ -67,13 +68,13 @@ setup() {
     run h5dump  -a iteration  restart_output.sol.h5
     [ "${lines[5]}" = "   (0): 2" ]
 
-    RUNFILE=input.4iters.restart.cyl
+    RUNFILE=inputs/input.4iters.restart.cyl.ini
     ../src/tps --runFile $RUNFILE
     ./soln_differ $SOLN_FILE $REF_FILE
 }
 
 @test "[$TEST] verify tps output after variable p restart" {
-    RUNFILE=input.4iters.cyl
+    RUNFILE=inputs/input.4iters.cyl.ini
 
     rm -f $SOLN_FILE
     test -s $RUNFILE
@@ -88,7 +89,7 @@ setup() {
 
     VARPLOG=varp.log
     rm -f $VARPLOG
-    RUNFILE=input.8iters.restart.newp.cyl
+    RUNFILE=inputs/input.8iters.restart.newp.cyl.ini
     ../src/tps --runFile $RUNFILE >& $VARPLOG
 
     #intErr=$(cat $VARPLOG | grep "interpolation error" | awk '{print $6}')
@@ -108,7 +109,7 @@ setup() {
 }
 
 @test "[$TEST] verify serial restart consistency using 2 mpi tasks" {
-    RUNFILE=input.4iters.cyl
+    RUNFILE=inputs/input.4iters.cyl.ini
     RUNFILE_PART=${RUNFILE}.part
     SOLN_FILE=restart_output.sol.h5
 
@@ -119,8 +120,9 @@ setup() {
     test -s $RUNFILE
     cp $RUNFILE $RUNFILE_PART
 
-    # add partition info to the runfile
-    echo "RESTART_SERIAL write" >> $RUNFILE_PART
+    # request single file restart
+    echo "[io]" >> $RUNFILE_PART
+    echo "restartMode = singleFileWrite" >> $RUNFILE_PART
 
     # run 2 tasks
     mpirun -np 2 ../src/tps --runFile $RUNFILE_PART
@@ -134,7 +136,7 @@ setup() {
 }
 
 @test "[$TEST] verify serial restart consistency using 4 mpi tasks" {
-    RUNFILE=input.4iters.cyl
+    RUNFILE=inputs/input.4iters.cyl.ini
     RUNFILE_PART=${RUNFILE}.part
     SOLN_FILE=restart_output.sol.h5
 
@@ -146,7 +148,8 @@ setup() {
     cp $RUNFILE $RUNFILE_PART
 
     # add partition info to the runfile
-    echo "RESTART_SERIAL write" >> $RUNFILE_PART
+    echo "[io]" >> $RUNFILE_PART
+    echo "restartMode = singleFileWrite" >> $RUNFILE_PART
 
     # run 4 tasks
     mpirun -np 4 ../src/tps --runFile $RUNFILE_PART
@@ -160,10 +163,10 @@ setup() {
 }
 
 @test "[$TEST] verify serialized restart switching processors from 2 -> 4 mpi tasks" {
-    RUNFILE=input.2iters.cyl
+    RUNFILE=inputs/input.2iters.cyl.ini
     SOLFILE_BASE=restart_output.sol
 
-    RUNFILE_MOD=${RUNFILE}.serialized
+    RUNFILE_MOD=input.serialized.mod
     TMPDIR=tmp_serialized_restart
 
     rm -f  restart_output.sol*.h5
@@ -175,7 +178,8 @@ setup() {
 
     test -s $RUNFILE
     cp $RUNFILE $RUNFILE_MOD
-    echo "RESTART_SERIAL write" >> $RUNFILE_MOD
+    echo "[io]" >> $RUNFILE_MOD
+    echo "restartMode = singleFileWrite" >> $RUNFILE_MOD
     
     mpirun -np 2 ../src/tps --runFile $RUNFILE_MOD
     test -s ${SOLFILE_BASE}.h5
@@ -185,11 +189,11 @@ setup() {
     [ "${lines[5]}" = "   (0): 2" ]
 
     # now, restart from serialized restart at 2 iters, and run with 4 procs till 4 iterations
-
-    RUNFILE=input.4iters.cyl
+    RUNFILE=inputs/input.4iters.cyl.ini
     cp $RUNFILE $RUNFILE_MOD
-    echo "RESTART_SERIAL read" >> $RUNFILE_MOD
-    echo "RESTART_CYCLE" >> $RUNFILE_MOD
+    echo "[io]" >> $RUNFILE_MOD
+    echo "restartMode   = singleFileRead" >> $RUNFILE_MOD
+    echo "enableRestart = true" >> $RUNFILE_MOD
 
     mpirun -np 4 ../src/tps --runFile $RUNFILE_MOD
     test -s partition.4p.h5
@@ -218,17 +222,17 @@ setup() {
 }
 
 @test "[$TEST] verify restart from partitioned files to generate a serialized output (2 mpi tasks)" {
-    RUNFILE=input.2iters.cyl
+    RUNFILE=inputs/input.2iters.cyl.ini
     SOLFILE_BASE=restart_output.sol
 
-    RUNFILE_MOD=${RUNFILE}.serialized
+    RUNFILE_MOD=input.serialized.mod
 
     rm -f  restart_output.sol*.h5
     rm -f  partition.*.h5
     rm -f  $RUNFILE_MOD
     rm -rf $TMPDIR
 
-    # run 2 iterations using 2 tasks and save serialized restart file
+    # run 2 iterations using 2 tasks and save partitioned restart files
     test -s $RUNFILE
     mpirun -np 2 ../src/tps --runFile $RUNFILE
     test -s ${SOLFILE_BASE}.0.h5
@@ -247,10 +251,11 @@ setup() {
     [ "${lines[5]}" = "   (0): 24612" ]
 
     # now, start from partitioned restart files at 2 iters, and save serialized output at 4 iters
-    RUNFILE=input.4iters.cyl
+    RUNFILE=inputs/input.4iters.cyl.ini
     cp $RUNFILE $RUNFILE_MOD
-    echo "RESTART_SERIAL write" >> $RUNFILE_MOD
-    echo "RESTART_CYCLE" >> $RUNFILE_MOD
+    echo "[io]" >> $RUNFILE_MOD
+    echo "restartMode   = singleFileWrite" >> $RUNFILE_MOD
+    echo "enableRestart = true" >> $RUNFILE_MOD
 
     mpirun -np 2 ../src/tps --runFile $RUNFILE_MOD
     test -s partition.2p.h5
@@ -262,7 +267,7 @@ setup() {
 }
 
 @test "[$TEST] verify two back to back (partitioned) restarts using 2 tasks" {
-    RUNFILE=input.4iters.cyl
+    RUNFILE=inputs/input.4iters.cyl.ini
     SOLFILE_BASE=restart_output.sol
 
     RUNFILE_MOD=${RUNFILE}.mod
@@ -274,7 +279,7 @@ setup() {
     rm -rf $TMPDIR
 
     # run 2 iterations using 2 tasks
-    sed  's/NMAX 4/NMAX 2/' $RUNFILE > $RUNFILE_MOD
+    sed  's/maxIters = 4/maxIters = 2/' $RUNFILE > $RUNFILE_MOD
 
     test -s $RUNFILE
     mpirun -np 2 ../src/tps --runFile $RUNFILE_MOD
@@ -288,7 +293,7 @@ setup() {
     [ "${lines[5]}" = "   (0): 2" ]
 
     # now, restart and run 1 additional iteration
-    sed  's/NMAX 4/NMAX 3/' $RUNFILE > $RUNFILE_MOD
+    sed  's/maxIters = 4/maxIters = 3/' $RUNFILE > $RUNFILE_MOD
     run mpirun -np 2 ../src/tps --runFile $RUNFILE_MOD
 
     run h5dump  -a iteration  ${SOLFILE_BASE}.0.h5

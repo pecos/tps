@@ -1,0 +1,25 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="sponge_zone.test"
+RUNFILE="inputs/input.sponge_zone.periodic.ini"
+SOLN_FILE=restart_sponge_zone.sol.h5
+REF_FILE=ref_solns/forcing-periodic-square.h5
+
+@test "[$TEST] check for input file $RUNFILE" {
+    test -s $RUNFILE
+}
+
+@test "[$TEST] check for reference solution -> $REF_FILE" {
+    test -s $REF_FILE
+}
+
+
+@test "[$TEST] verify sponge-zone output -> $SOLN_FILE" {
+    rm -f $SOLN_FILE
+    
+    run ../src/tps --runFile $RUNFILE
+    
+    test -s $SOLN_FILE
+    ./soln_differ -d 2 $SOLN_FILE $REF_FILE
+}

@@ -1,0 +1,63 @@
+#!../utils/bats/bin/bats
+# -*- mode: sh -*-
+
+TEST="cyl3d.interp"
+
+setup() {
+    SOLN_FILE=restart_output.sol.h5
+    INTERP_FILE=restart_output_ref0.sol.h5
+
+    SOLN_FILE_P0=restart_output.sol.0.h5
+    SOLN_FILE_P1=restart_output.sol.1.h5
+    INTERP_FILE_P0=restart_output_ref0.sol.0.h5
+    INTERP_FILE_P1=restart_output_ref0.sol.1.h5
+
+    RUNFILE_FRESH="inputs/input.dtconst.cyl"
+    RUNFILE_RESTART="inputs/input.dtconst.restart.cyl"
+    RUNFILE_INTERP0="inputs/input.refine0.cyl"
+    RUNFILE_INTERP1="inputs/input.refine1.cyl"
+}
+
+@test "[$TEST] run serial interp with same input and output grids" {
+    # generate restart file
+    ../src/tps --runFile $RUNFILE_FRESH
+    test -s $SOLN_FILE
+
+    # interpolation
+    ../utils/interp -r1 $RUNFILE_RESTART -r2 $RUNFILE_INTERP0
+    test -s $INTERP_FILE
+
+    # verify soln didn't change
+    # not using ./soln_differ so I can have tigher tols
+    h5diff --relative=1e-15 $SOLN_FILE $INTERP_FILE /solution/density
+    h5diff --delta=1e-12    $SOLN_FILE $INTERP_FILE /solution/rho-u
+    h5diff --delta=1e-12    $SOLN_FILE $INTERP_FILE /solution/rho-v
+    h5diff --delta=1e-12    $SOLN_FILE $INTERP_FILE /solution/rho-w
+    h5diff --relative=1e-15 $SOLN_FILE $INTERP_FILE /solution/rho-E
+}
+
+@test "[$TEST] run parallel (np=2) interp with same input and output grids" {
+    # generate restart file
+    mpirun -np 2 ../src/tps --runFile $RUNFILE_FRESH
+    test -s $SOLN_FILE_P0
+    test -s $SOLN_FILE_P1
+
+    # interpolation
+    mpirun -np 2 ../utils/interp -r1 $RUNFILE_RESTART -r2 $RUNFILE_INTERP0
+    test -s $INTERP_FILE_P0
+    test -s $INTERP_FILE_P1
+
+    # verify soln didn't change
+    # not using ./soln_differ so I can have tigher tols
+    h5diff --relative=1e-15 $SOLN_FILE_P0 $INTERP_FILE_P0 /solution/density
+    h5diff --delta=1e-12    $SOLN_FILE_P0 $INTERP_FILE_P0 /solution/rho-u
+    h5diff --delta=1e-12    $SOLN_FILE_P0 $INTERP_FILE_P0 /solution/rho-v
+    h5diff --delta=1e-12    $SOLN_FILE_P0 $INTERP_FILE_P0 /solution/rho-w
+    h5diff --relative=1e-15 $SOLN_FILE_P0 $INTERP_FILE_P0 /solution/rho-E
+
+    h5diff --relative=1e-15 $SOLN_FILE_P1 $INTERP_FILE_P1 /solution/density
+    h5diff --delta=1e-12    $SOLN_FILE_P1 $INTERP_FILE_P1 /solution/rho-u
+    h5diff --delta=1e-12    $SOLN_FILE_P1 $INTERP_FILE_P1 /solution/rho-v
+    h5diff --delta=1e-12    $SOLN_FILE_P1 $INTERP_FILE_P1 /solution/rho-w
+    h5diff --relative=1e-15 $SOLN_FILE_P1 $INTERP_FILE_P1 /solution/rho-E
+}

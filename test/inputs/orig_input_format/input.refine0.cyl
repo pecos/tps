@@ -1,7 +1,7 @@
 # Runfile
 
 MESH meshes/cyl-tet-coarse.msh
-OUTPUT_NAME output
+OUTPUT_NAME output_ref0
 
 POL_ORDER 1
 INT_RULE 0

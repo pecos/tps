@@ -1,14 +1,14 @@
-#!/usr/bin/env bats
+#!./bats
 # -*- mode: sh -*-
 
 TEST="averages"
-RUNFILE_A="inputs/input.cyl-2d.caseA"
-RUNFILE_B="inputs/input.cyl-2d.caseB"
-RUNFILE_C1="inputs/input.cyl-2d.caseC1"
-RUNFILE_C2="inputs/input.cyl-2d.caseC2"
-RUNFILE_D1="inputs/input.cyl-2d.caseD1"
-RUNFILE_D2="inputs/input.cyl-2d.caseD2"
-OPT="-d cuda"
+RUNFILE_A="inputs/input.cyl-2d.caseA.ini"
+RUNFILE_B="inputs/input.cyl-2d.caseB.ini"
+RUNFILE_C1="inputs/input.cyl-2d.caseC1.ini"
+RUNFILE_C2="inputs/input.cyl-2d.caseC2.ini"
+RUNFILE_D1="inputs/input.cyl-2d.caseD1.ini"
+RUNFILE_D2="inputs/input.cyl-2d.caseD2.ini"
+OPT=""
 
 setup() {
     SOLN_FILE=restart_output.sol.h5

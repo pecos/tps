@@ -1,0 +1,10 @@
+--indent=spaces=2
+--style=google
+--indent-switches
+--keep-one-line-statements
+--keep-one-line-blocks
+--max-code-length=120
+--max-instatement-indent=80
+--pad-oper
+--pad-header
+

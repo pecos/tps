@@ -1,3 +1,4 @@
+# -*- mode: sh -*-
 # Example Runfile
 
 # Mesh file
@@ -33,18 +34,18 @@ RM_CHECK_FREQUENCY 500
 # and adds a new value every sampleInterval iterations
 CALC_MEAN_RMS 12400 20
 
+# whether to dump mean values every ITERS_OUT for paraview; if not set,
+# only the current value will be preserved.
+SAVE_MEAN_HIST
+
 # if simulation is to restart computing mean
 CONTINUE_MEAN_CALC
 
 # Polynomial order
 POL_ORDER 3
 
-# Auxiliary order. A solution would be interpolated
-# from order POL_ORDER to AUX_ORDER and dumped
-AUX_ORDER 1
-
 # Restart from solution of AUX_ORDER
-# If set, AUX_ORDER must be set too
+# Auxiliary order retreived from HD5 files
 RESTART_FROM_AUX
 
 # Integration rule (quadrature)
@@ -102,9 +103,9 @@ BULK_VISC_MULT 5.
 REF_LENGTH 1.
 
 # equations to be solved. Options thus far
-# EULER -> 0
-# NS    -> 1
-# MHD   -> 2
+# EULER        -> 0
+# NS           -> 1
+# NS_PASSIVE   -> 2
 EQ_SYSTEM 0
 
 # Constant initial conditions
@@ -126,10 +127,27 @@ GRAD_PRESSURE 8 0 0
 # from 0 to VISC_RATIO from the plane defined by PLANE_PINIT and 
 # the plane defined by PLANE_P0. This is intended to help in 
 # problematic boundary conditions.
-PLANE_NORM n1 n2 n3
-PLANE_P0 x0 y0 z0
-PLANE_PINIT xi yi zi
-VISC_RATIO 50.
+#  |-----------------------------------|
+#  |------------------------------<====|
+#  |-----------------------------------|
+#  p_init                     normal  p0
+LV_PLANE_NORM n1 n2 n3
+LV_PLANE_P0 x0 y0 z0
+LV_PLANE_PINIT xi yi zi
+LV_VISC_RATIO 50.
+
+# Sponge zone input. See dataStructures.hpp for more info
+SZ_PLANE_NORM n1 n2 n3
+SZ_PLANE_P0 x0 y0 z0
+SZ_PLANE_PINIT xi yi zi
+SZ_TYPE 0 rho u v w p
+#SZ_TYPE 1 tol
+#SZ_MULT 0.5
+
+# Passive scalar
+# more than one entry can be created
+#PASSIVE_SCALAR x y z radius value
+PASSIVE_SCALAR 0. 0. 0. 0.1 1
 
 # Inlet Boundary Conditions
 # types:

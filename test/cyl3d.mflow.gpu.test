@@ -1,10 +1,10 @@
-#!/usr/bin/env bats
+#!./bats
 # -*- mode: sh -*-
 
 TEST="cyl3d.gpu.mflow.outlet"
-RUNFILE="inputs/input.2iters.mflow.dtconst.cyl"
-BULK_RUNFILE="inputs/input.2iters.mflow.bulkVisc.dtconst.cyl"
-OPTS="-d cuda"
+RUNFILE="inputs/input.2iters.mflow.dtconst.cyl.ini"
+BULK_RUNFILE="inputs/input.2iters.mflow.bulkVisc.dtconst.cyl.ini"
+OPTS=""
 
 setup() {
     SOLN_FILE=restart_output.sol.h5
