@@ -91,7 +91,8 @@ DryAir::DryAir(RunConfiguration &_runfile, int _dim) : GasMixture(WorkingFluid::
   specific_heat_ratio = 1.4;
 // TODO: GPU routines are not yet fully gas-agnostic. Need to be removed.
 #ifdef _GPU_
-  visc_mult = 1.;
+  visc_mult = _runfile.visc_mult;
+  bulk_visc_mult = _runfile.bulk_visc;
   Pr = 0.71;
   cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
   Sc = 0.71;
