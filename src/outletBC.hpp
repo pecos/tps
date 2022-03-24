@@ -138,17 +138,22 @@ class OutletBC : public BoundaryCondition {
                                const int &dim, const int &num_equation);
 
 #ifdef _GPU_  // GPU functions
-  static MFEM_HOST_DEVICE void computeSubPressure(const int &thrd, const double *u1, double *u2, const double *nor,
-                                                  const double &press, const double &gamma, const int &dim,
-                                                  const int &num_equation, const Equations &eqSystem) {
-    if (thrd == 1 + dim) {
-      // NOTE: this still assumes ideal gas equation.
-      double k = 0.;
-      for (int d = 0; d < dim; d++) k += u1[1 + d] * u1[1 + d];
-      u2[thrd] = press / (gamma - 1.) + 0.5 * k / u1[0];
-    } else {
-      u2[thrd] = u1[thrd];
+  static MFEM_HOST_DEVICE void computeSubPressure(const double *u1, double *u2, const double *nor, const double &press,
+                                                  const double &gamma, const double &Rg, const int &dim,
+                                                  const int &num_equation, const WorkingFluid &fluid,
+                                                  const Equations &eqSystem, const int &thrd, const int &maxThreads) {
+    if (fluid == WorkingFluid::DRY_AIR) {
+      DryAir::modifyEnergyForPressure_gpu(u1, u2, press, gamma, Rg, num_equation, dim, thrd, maxThreads);
     }
+
+    //     if (thrd == 1 + dim) {
+    //       // NOTE: this still assumes ideal gas equation.
+    //       double k = 0.;
+    //       for (int d = 0; d < dim; d++) k += u1[1 + d] * u1[1 + d];
+    //       u2[thrd] = press / (gamma - 1.) + 0.5 * k / u1[0];
+    //     } else {
+    //       u2[thrd] = u1[thrd];
+    //     }
   }
 
   static MFEM_HOST_DEVICE void computeNRSubPress(const int &thrd, const int &n, const double *u1, const double *gradUp,

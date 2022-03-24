@@ -1,0 +1,73 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="mms/euler"
+RUNFILE_1="inputs/mms.euler.3d.r1.ini"
+RUNFILE_2="inputs/mms.euler.3d.r2.ini"
+
+@test "[$TEST] run tps with input -> $RUNFILE_1" {
+    mpirun -np 2 ../src/tps --runFile $RUNFILE_1 >& euler_mms_r1.log
+}
+
+@test "[$TEST] run tps with input -> $RUNFILE_2" {
+    rm -f $SOLN_FILE
+    touch DIE
+    mpirun -np 2 ../src/tps --runFile $RUNFILE_2 >& euler_mms_r2.log
+}
+
+@test "[$TEST] verify tps density convergence rate for Euler MMS with linear elems" {
+    rho_err_r1=$(cat euler_mms_r1.log | grep "time step: 300" | head -1 | awk '{print $9}')
+    rho_err_r2=$(cat euler_mms_r2.log | grep "time step: 600" | head -1 | awk '{print $9}')
+
+    # evaluate the convergence rate
+    rho_rate=$(echo "l ($rho_err_r2 / $rho_err_r1) / l (0.5)" | bc -l)
+
+    # empirically observed rate 2.1676
+    rate_p1_lo=2.16
+    rate_p1_hi=2.17
+
+    # make sure rate isn't too low or too high
+    rate_check_lo=$( echo "$rho_rate > $rate_p1_lo" | bc -l )
+    rate_check_hi=$( echo "$rho_rate < $rate_p1_hi" | bc -l )
+
+    test $rate_check_lo -eq 1
+    test $rate_check_hi -eq 1
+}
+
+@test "[$TEST] verify tps velocity convergence rate for Euler MMS with linear elems" {
+    vel_err_r1=$(cat euler_mms_r1.log | grep "time step: 300" | head -1 | awk '{print $11}')
+    vel_err_r2=$(cat euler_mms_r2.log | grep "time step: 600" | head -1 | awk '{print $11}')
+
+    # evaluate the convergence rate
+    vel_rate=$(echo "l ($vel_err_r2 / $vel_err_r1) / l (0.5)" | bc -l)
+
+    # empirically observed rate 2.0344
+    rate_p1_lo=2.03
+    rate_p1_hi=2.04
+
+    # make sure rate isn't too low or too high
+    rate_check_lo=$( echo "$vel_rate > $rate_p1_lo" | bc -l )
+    rate_check_hi=$( echo "$vel_rate < $rate_p1_hi" | bc -l )
+
+    test $rate_check_lo -eq 1
+    test $rate_check_hi -eq 1
+}
+
+@test "[$TEST] verify tps pressure convergence rate for Euler MMS with linear elems" {
+    pre_err_r1=$(cat euler_mms_r1.log | grep "time step: 300" | head -1 | awk '{print $13}')
+    pre_err_r2=$(cat euler_mms_r2.log | grep "time step: 600" | head -1 | awk '{print $13}')
+
+    # evaluate the convergence rate
+    pre_rate=$(echo "l ($pre_err_r2 / $pre_err_r1) / l (0.5)" | bc -l)
+
+    # empirically observed rate 2.0698
+    rate_p1_lo=2.06
+    rate_p1_hi=2.08
+
+    # make sure rate isn't too low or too high
+    rate_check_lo=$( echo "$pre_rate > $rate_p1_lo" | bc -l )
+    rate_check_hi=$( echo "$pre_rate < $rate_p1_hi" | bc -l )
+
+    test $rate_check_lo -eq 1
+    test $rate_check_hi -eq 1
+}

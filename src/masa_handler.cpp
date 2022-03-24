@@ -29,17 +29,22 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
-#ifdef _MASA_
+#include <tps_config.h>
+
+#ifdef HAVE_MASA
 #include "masa_handler.hpp"
 
-void initMasaHandler(std::string name, int dim, const Equations& eqn, const double& viscMult) {
+void initMasaHandler(std::string name, int dim, const Equations& eqn, const double& viscMult,
+                     const std::string mms_name) {
   // Initialize MASA
   if (dim == 2) {
+    assert(mms_name == "navierstokes_2d_compressible");
     MASA::masa_init<double>(name, "navierstokes_2d_compressible");
   } else if (dim == 3) {
     switch (eqn) {
       // 3-D euler equations
       case EULER:
+        assert(mms_name == "euler_transient_3d");
         MASA::masa_init<double>("forcing handler", "euler_transient_3d");
 
         // fluid parameters
@@ -107,6 +112,7 @@ void initMasaHandler(std::string name, int dim, const Equations& eqn, const doub
 
       // 3-D navier-stokes equations
       case NS:
+        assert(mms_name == "navierstokes_3d_transient_sutherland");
         MASA::masa_init<double>("forcing handler", "navierstokes_3d_transient_sutherland");
 
         // fluid parameters

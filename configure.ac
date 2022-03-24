@@ -30,6 +30,12 @@ AX_PATH_GRVY([0.36], [yes])
 AX_PATH_HDF5([1.8.0],[yes])
 AX_PATH_OPENBLAS([no])
 
+ENABLE_MASA=no
+AX_PATH_MASA([0.50], [no])
+if test x$HAVE_MASA = x1 ; then
+   ENABLE_MASA=yes
+fi
+
 AC_PROG_RANLIB
 
 # Valgrind?

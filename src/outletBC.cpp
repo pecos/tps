@@ -45,7 +45,7 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
       inputState(_inputData),
       maxIntPoints(_maxIntPoints),
       maxDofs(_maxDofs) {
-  groupsMPI->setAsOutlet(_patchNumber);
+  groupsMPI->setPatch(_patchNumber);
 
   meanUp.UseDevice(true);
   meanUp.SetSize(num_equation);
@@ -316,7 +316,7 @@ void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &grad
 void OutletBC::computeParallelArea() {
   if (parallelAreaComputed) return;
 
-  MPI_Comm bcomm = groupsMPI->getOutletComm();
+  MPI_Comm bcomm = groupsMPI->getComm(patchNumber);
   area = aggregateArea(patchNumber, bcomm);
   int nfaces = aggregateBndryFaces(patchNumber, bcomm);
   parallelAreaComputed = true;
@@ -520,7 +520,7 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
   h_localMeanUp[num_equation] = static_cast<double>(totNbdr);
 
   double *h_sum = glob_sum.HostWrite();
-  MPI_Allreduce(h_localMeanUp, h_sum, num_equation + 1, MPI_DOUBLE, MPI_SUM, groupsMPI->getOutletComm());
+  MPI_Allreduce(h_localMeanUp, h_sum, num_equation + 1, MPI_DOUBLE, MPI_SUM, groupsMPI->getComm(patchNumber));
 
   BoundaryCondition::copyValues(glob_sum, meanUp, 1. / h_sum[num_equation]);
 
@@ -1053,6 +1053,8 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem, 
   const double Rg = mixture->GetGasConstant();
   const double gamma = mixture->GetSpecificHeatRatio();
 
+  const WorkingFluid fluid = mixture->GetWorkingFluid();
+
   // clang-format off
   MFEM_FORALL_2D(n, numBdrElem, maxDofs, 1, 1, {
       MFEM_FOREACH_THREAD(i, x, maxDofs) {
@@ -1098,8 +1100,8 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem, 
           // compute mirror state
           switch (type) {
             case OutletType::SUB_P:
-              if (i < num_equation)
-                computeSubPressure(i, &u1[0], &u2[0], &nor[0], d_inputState[0], gamma, dim, num_equation, eqSystem);
+              computeSubPressure(&u1[0], &u2[0], &nor[0], d_inputState[0], gamma, Rg, dim, num_equation,
+                                 fluid, eqSystem, i, maxDofs);
               break;
             case OutletType::SUB_P_NR:
               computeNRSubPress(i, offsetBdrU + q, &u1[0], &gradUpi[0], d_meanUp, dt, &u2[0], d_boundaryU,

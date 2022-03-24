@@ -72,7 +72,7 @@ class Tps;
 #include "tps.hpp"
 #include "utils.hpp"
 
-#ifdef _MASA_
+#ifdef HAVE_MASA
 #include "masa_handler.hpp"
 #endif
 
@@ -265,7 +265,7 @@ class M2ulPhyS : public TPS::Solver {
   void initSolutionAndVisualizationVectors();
   void initialTimeStep();
 
-#ifdef _MASA_
+#ifdef HAVE_MASA
   static void MASA_exactSol(const Vector &x, double tin, Vector &y);
   static void MASA_exactDen(const Vector &x, double tin, Vector &y);
   static void MASA_exactVel(const Vector &x, double tin, Vector &y);
