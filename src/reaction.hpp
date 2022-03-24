@@ -52,11 +52,11 @@ using namespace std;
 class Reaction {
  protected:
  public:
-  Reaction(){}
+  Reaction() {}
 
-  ~Reaction(){}
+  ~Reaction() {}
 
-  virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved = false){}
+  virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved = false) {}
 };
 
 class Arrhenius : public Reaction {
@@ -69,7 +69,7 @@ class Arrhenius : public Reaction {
  public:
   Arrhenius(const double A, const double b, const double E);
 
-  ~Arrhenius(){}
+  ~Arrhenius() {}
 
   virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved = false);
 };
@@ -88,7 +88,7 @@ class HoffertLien : public Reaction {
  public:
   HoffertLien(const double A, const double b, const double E);
 
-  ~HoffertLien(){}
+  ~HoffertLien() {}
 
   virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved = false);
 };

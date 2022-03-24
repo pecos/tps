@@ -154,7 +154,7 @@ void RiemannSolver::Eval_Roe(const Vector &state1, const Vector &state2, const V
   double qk = 0.;
   for (int d = 0; d < dim; d++) qk += vel[d] * unitN[d];
 
-  double dummy; // electron pressure. by-product of total pressure computation. won't be used
+  double dummy;  // electron pressure. by-product of total pressure computation. won't be used
   double p1 = mixture->ComputePressure(state1, dummy);
   double p2 = mixture->ComputePressure(state2, dummy);
   double H = (state1[1 + dim] + p1) / sqrt(state1[0]) + (state2[1 + dim] + p2) / sqrt(state2[0]);

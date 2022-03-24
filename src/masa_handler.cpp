@@ -190,15 +190,15 @@ void initMasaHandler(std::string name, int dim, const RunConfiguration& config) 
 
           // other equations: we don't support anything else right now!
           default:
-            std::cout << "*** WARNING: No MASA solution for equation set number " << eqn << "!  MASA is uninitialized. ***"
-                      << std::endl;
+            std::cout << "*** WARNING: No MASA solution for equation set number " << eqn
+                      << "!  MASA is uninitialized. ***" << std::endl;
             break;
         }  // end dry_air 3d switch
       }
       break;
     case USER_DEFINED:
       break;
-  } // end WorkingFluid switch
+  }  // end WorkingFluid switch
 
   // check that masa at least thinks things are okie-dokie
   int ierr = MASA::masa_sanity_check<double>();

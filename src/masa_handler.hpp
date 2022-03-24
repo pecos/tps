@@ -36,8 +36,8 @@
 
 #include <mfem.hpp>
 
-#include "run_configuration.hpp"
 #include "fluxes.hpp"  // for enum Equations
+#include "run_configuration.hpp"
 
 using namespace mfem;
 using namespace std;

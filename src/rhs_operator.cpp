@@ -41,9 +41,9 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
                          TransportProperties *_transport, ParFiniteElementSpace *_vfes,
                          const volumeFaceIntegrationArrays &_gpuArrays, const int &_maxIntPoints, const int &_maxDofs,
                          DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh,
-                         ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp,
-                         ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A, BCintegrator *_bcIntegrator,
-                         bool &_isSBP, double &_alpha, RunConfiguration &_config)
+                         ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
+                         ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A,
+                         BCintegrator *_bcIntegrator, bool &_isSBP, double &_alpha, RunConfiguration &_config)
     : TimeDependentOperator(_A->Height()),
       config_(_config),
       iter(_iter),
@@ -129,8 +129,8 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
 #endif
 
   if (config_.isAxisymmetric()) {
-    forcing.Append(new AxisymmetricSource(dim, num_equation, _order, mixture, transport_, eqSystem, intRuleType, intRules, vfes, U_, Up,
-                                          gradUp, gpuArrays, _config));
+    forcing.Append(new AxisymmetricSource(dim, num_equation, _order, mixture, transport_, eqSystem, intRuleType,
+                                          intRules, vfes, U_, Up, gradUp, gpuArrays, _config));
 
     const FiniteElementCollection *fec = vfes->FEColl();
     dfes = new ParFiniteElementSpace(mesh, fec, dim, Ordering::byNODES);
@@ -536,7 +536,7 @@ void RHSoperator::updatePrimitives(const Vector &x_in) const {
     Vector iState(num_equation);
     Vector primitiveState(num_equation);
     for (int eq = 0; eq < num_equation; eq++) iState[eq] = x_in[i + eq * vfes->GetNDofs()];
-    mixture->GetPrimitivesFromConservatives(iState,primitiveState);
+    mixture->GetPrimitivesFromConservatives(iState, primitiveState);
     for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * vfes->GetNDofs()] = primitiveState[eq];
   }
 #endif  // _GPU_

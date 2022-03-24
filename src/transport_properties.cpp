@@ -58,7 +58,7 @@ DryAirTransport::DryAirTransport(GasMixture *_mixture, RunConfiguration &_runfil
 
 void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
                                                      Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
-  double dummy; // electron pressure. won't compute anything.
+  double dummy;  // electron pressure. won't compute anything.
   double p = mixture->ComputePressure(state, dummy);
   double temp = p / gas_constant / state[0];
 
@@ -77,15 +77,15 @@ void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const 
       double diffusivity = transportBuffer[GlobalTrnsCoeffs::VISCOSITY] / Sc;
 
       for (int d = 0; d < dim; d++) {
-        if (fabs(state[2+dim+sp]) > 1e-10) {
+        if (fabs(state[2 + dim + sp]) > 1e-10) {
           diffusionVelocity(sp, d) = 0.0;
         } else {
           // compute mass fraction gradient
-          double dY = mixture->GetGasParams(sp, GasParams::SPECIES_MW) * gradUp(2+dim+sp, d);
-          dY -= state(2+dim+sp)/state(0) * gradUp(0, d);
+          double dY = mixture->GetGasParams(sp, GasParams::SPECIES_MW) * gradUp(2 + dim + sp, d);
+          dY -= state(2 + dim + sp) / state(0) * gradUp(0, d);
           dY /= state(0);
 
-          diffusionVelocity(sp, d) = diffusivity * dY / state[2+dim+sp];
+          diffusionVelocity(sp, d) = diffusivity * dY / state[2 + dim + sp];
         }
       }
 
@@ -105,7 +105,7 @@ TestBinaryAirTransport::TestBinaryAirTransport(GasMixture *_mixture, RunConfigur
 
 void TestBinaryAirTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
                                                             Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
-  double dummy; // electron pressure. won't compute anything.
+  double dummy;  // electron pressure. won't compute anything.
   double p = mixture->ComputePressure(state, dummy);
   double temp = p / gas_constant / state[0];
 
@@ -119,7 +119,6 @@ void TestBinaryAirTransport::ComputeFluxTransportProperties(const Vector &state,
   diffusionVelocity.SetSize(numSpecies, 3);
   diffusionVelocity = 0.0;
   if (numActiveSpecies > 0) {
-
     double diffusivity = transportBuffer[GlobalTrnsCoeffs::VISCOSITY] / Sc;
 
     // Compute mass fraction gradient from number density gradient.
@@ -151,7 +150,6 @@ ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_ru
 
 void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
                                                        Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
-
   transportBuffer.SetSize(GlobalTrnsCoeffs::NUM_GLOBAL_COEFFS);
   transportBuffer[GlobalTrnsCoeffs::VISCOSITY] = viscosity_;
   transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY] = bulkViscosity_;

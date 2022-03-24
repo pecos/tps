@@ -52,7 +52,7 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
   for (int i = 0; i < 4; i++) hinputState[i] = _inputData[i];
 
   numActiveSpecies_ = mixture->GetNumActiveSpecies();
-  if (numActiveSpecies_ > 0) { // read species input state for multi-component flow.
+  if (numActiveSpecies_ > 0) {  // read species input state for multi-component flow.
     std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
     // NOTE: Inlet BC do not specify total energy, therefore skips one index.
     for (int sp = 0; sp < numActiveSpecies_; sp++) {
@@ -706,7 +706,7 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
 void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
   // NOTE: it is likely that for two-temperature case inlet will also specify electron temperature,
   // whether it is equal to the gas temperature or not.
-  double dummy; // electron pressure. by-product of total pressure computation. won't be used
+  double dummy;  // electron pressure. by-product of total pressure computation. won't be used
   const double p = mixture->ComputePressure(stateIn, dummy);
 
   Vector state2(num_equation);

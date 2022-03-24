@@ -67,7 +67,7 @@ class TransportProperties {
  public:
   TransportProperties(GasMixture *_mixture);
 
-  ~TransportProperties(){}
+  ~TransportProperties() {}
 
   // Currently, diffusion velocity is evaluated together with transport properties,
   // though diffusion velocity can vary according to models we use.
@@ -81,7 +81,7 @@ class TransportProperties {
   // TODO: need to discuss whether to reuse computed primitive variables in flux evaluation,
   // or in general evaluation of primitive variables.
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
-                                              DenseMatrix &diffusionVelocity){}
+                                              DenseMatrix &diffusionVelocity) {}
   // Vector &outputUp);
 
   // Source term will be constructed using ForcingTerms, which have pointers to primitive variables.
@@ -113,7 +113,7 @@ class DryAirTransport : public TransportProperties {
  public:
   DryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile);
 
-  ~DryAirTransport(){}
+  ~DryAirTransport() {}
 
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
                                               DenseMatrix &diffusionVelocity);
@@ -138,7 +138,7 @@ class TestBinaryAirTransport : public DryAirTransport {
  public:
   TestBinaryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile);
 
-  ~TestBinaryAirTransport(){}
+  ~TestBinaryAirTransport() {}
 
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
                                               DenseMatrix &diffusionVelocity);
@@ -150,19 +150,20 @@ class TestBinaryAirTransport : public DryAirTransport {
 
 class ConstantTransport : public TransportProperties {
  protected:
-   double viscosity_;
-   double bulkViscosity_;
-   double diffusivity_;
-   double thermalConductivity_;
+  double viscosity_;
+  double bulkViscosity_;
+  double diffusivity_;
+  double thermalConductivity_;
+
  public:
   ConstantTransport(GasMixture *_mixture, RunConfiguration &_runfile);
 
-  ~ConstantTransport(){}
+  ~ConstantTransport() {}
 
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
                                               DenseMatrix &diffusionVelocity);
 
-  virtual double GetViscosityFromPrimitive(const Vector &state) {};
+  virtual double GetViscosityFromPrimitive(const Vector &state){};
 };
 
 #endif  // TRANSPORT_PROPERTIES_HPP_

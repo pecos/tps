@@ -258,11 +258,11 @@ void M2ulPhyS::initVariables() {
   mixture = NULL;
   switch (config.GetWorkingFluid()) {
     case WorkingFluid::DRY_AIR:
-      mixture = new DryAir( config, nvel);
+      mixture = new DryAir(config, nvel);
       transportPtr = new DryAirTransport(mixture, config);
       break;
     case WorkingFluid::TEST_BINARY_AIR:
-      mixture = new TestBinaryAir( config, nvel);
+      mixture = new TestBinaryAir(config, nvel);
       transportPtr = new TestBinaryAirTransport(mixture, config);
       break;
     case WorkingFluid::USER_DEFINED:
@@ -1721,8 +1721,7 @@ void M2ulPhyS::parseSolverOptions2() {
     tpsP->getInput("flow/axisymmetric", config.axisymmetric_, false);
     tpsP->getInput("flow/enablePressureForcing", config.isForcing, false);
     if (config.isForcing) {
-      for (int d = 0; d < 3; d++)
-        tpsP->getRequiredVecElem("flow/pressureGrad", config.gradPress[d], d);
+      for (int d = 0; d < 3; d++) tpsP->getRequiredVecElem("flow/pressureGrad", config.gradPress[d], d);
     }
     tpsP->getInput("flow/refinement_levels", config.ref_levels, 0);
 
@@ -2051,18 +2050,24 @@ void M2ulPhyS::parseSolverOptions2() {
       case ARGON_MINIMAL:
         // Check if unsupported species are included.
         for (int sp = 0; sp < config.numSpecies; sp++) {
-          if ((config.speciesNames[sp] != "Ar") && (config.speciesNames[sp] != "Ar.+1") && (config.speciesNames[sp] != "E")) {
-            grvy_printf(GRVY_ERROR, "\nArgon ternary mixture transport does not support the species: %s !", config.speciesNames[sp].c_str());
+          if ((config.speciesNames[sp] != "Ar") && (config.speciesNames[sp] != "Ar.+1") &&
+              (config.speciesNames[sp] != "E")) {
+            grvy_printf(GRVY_ERROR, "\nArgon ternary mixture transport does not support the species: %s !",
+                        config.speciesNames[sp].c_str());
             exit(ERROR);
           }
         }
-        tpsP->getInput("plasma_models/transport_model/argon_minimal/third_order_thermal_conductivity", config.thirdOrderkElectron, true);
+        tpsP->getInput("plasma_models/transport_model/argon_minimal/third_order_thermal_conductivity",
+                       config.thirdOrderkElectron, true);
         break;
       case CONSTANT:
         tpsP->getRequiredInput("plasma_models/transport_model/constant/viscosity", config.constantTransport.viscosity);
-        tpsP->getRequiredInput("plasma_models/transport_model/constant/bulk_viscosity", config.constantTransport.bulkViscosity);
-        tpsP->getRequiredInput("plasma_models/transport_model/constant/diffusivity", config.constantTransport.diffusivity);
-        tpsP->getRequiredInput("plasma_models/transport_model/constant/thermal_conductivity", config.constantTransport.thermalConductivity);
+        tpsP->getRequiredInput("plasma_models/transport_model/constant/bulk_viscosity",
+                               config.constantTransport.bulkViscosity);
+        tpsP->getRequiredInput("plasma_models/transport_model/constant/diffusivity",
+                               config.constantTransport.diffusivity);
+        tpsP->getRequiredInput("plasma_models/transport_model/constant/thermal_conductivity",
+                               config.constantTransport.thermalConductivity);
         break;
       default:
         break;

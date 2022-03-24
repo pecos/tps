@@ -36,21 +36,22 @@
 
 using namespace std;
 
-namespace collision
-{
+namespace collision {
 
-namespace charged
-{
+namespace charged {
 /*
   collision integrals Q^(l,r) for charged species, based on screened Coulomb potential (attractive/repulsive).
   Functions are fitted from the tabulated data of:
-  1. Mason, E. A., Munn, R. J., & Smith, F. J. (1967). Transport coefficients of ionized gases. Physics of Fluids, 10(8), 1827–1832. https://doi.org/10.1063/1.1762365
-  2. Devoto, R. S. (1973). Transport coefficients of ionized argon. Physics of Fluids, 16(5), 616–623. https://doi.org/10.1063/1.1694396
+  1. Mason, E. A., Munn, R. J., & Smith, F. J. (1967). Transport coefficients of ionized gases. Physics of Fluids,
+  10(8), 1827–1832. https://doi.org/10.1063/1.1762365
+  2. Devoto, R. S. (1973). Transport coefficients of ionized argon. Physics of Fluids, 16(5), 616–623.
+  https://doi.org/10.1063/1.1694396
 
   Functions take a non-dimensionalized temperature based on Debye length,
   and return collision integrals in unit of pi * (Debye length)^2.
   For the exact formulation, see equations (A.3) and (A.4) in the following reference:
-  Munafò, A., Alberti, A., Pantano, C., Freund, J. B., & Panesi, M. (2020). A computational model for nanosecond pulse laser-plasma interactions. Journal of Computational Physics, 406, 109190. https://doi.org/10.1016/j.jcp.2019.109190
+  Munafò, A., Alberti, A., Pantano, C., Freund, J. B., & Panesi, M. (2020). A computational model for nanosecond pulse
+  laser-plasma interactions. Journal of Computational Physics, 406, 109190. https://doi.org/10.1016/j.jcp.2019.109190
 */
 
 double att11(const double Tp);
@@ -73,13 +74,12 @@ double rep22(const double Tp);
 double rep23(const double Tp);
 double rep24(const double Tp);
 
-} // charged
+}  // namespace charged
 
 // Argon collision integrals
 // Q_(species, species)^(l,r)
 // Takes T in Kelvin, returns in unit of m^2.
-namespace argon
-{
+namespace argon {
 
 double ArAr22(const double T);
 
@@ -97,8 +97,7 @@ double eAr13(const double T);
 double eAr14(const double T);
 double eAr15(const double T);
 
-} // argon
+}  // namespace argon
 
-
-} // collision
+}  // namespace collision
 #endif  // COLLISION_INTEGRALS_HPP_

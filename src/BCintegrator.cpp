@@ -122,7 +122,7 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
 
   // assign list of elements to each BC
   const int NumBCelems = vfes->GetNBE();
-  
+
   // Inlets
   if (NumBCelems > 0 && inletBCmap.size() > 0) {
     Mesh *mesh_bc = vfes->GetMesh();
@@ -140,13 +140,12 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
           if (tr->Attribute == attr) list.Append(el);
         }
       }
-      
+
       std::unordered_map<int, BoundaryCondition *>::const_iterator ibc = inletBCmap.find(attr);
       if (ibc != inletBCmap.end()) ibc->second->setElementList(list);
     }
   }
-  
-  
+
   // Outlets
   if (NumBCelems > 0 && outletBCmap.size() > 0) {
     Mesh *mesh_bc = vfes->GetMesh();
@@ -169,7 +168,7 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
       if (obc != outletBCmap.end()) obc->second->setElementList(list);
     }
   }
-  
+
   // Walls
   if (NumBCelems > 0 && wallBCmap.size() > 0) {
     Mesh *mesh_bc = vfes->GetMesh();
@@ -192,7 +191,6 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
       if (wbc != wallBCmap.end()) wbc->second->setElementList(list);
     }
   }
-  
 }
 
 BCintegrator::~BCintegrator() {

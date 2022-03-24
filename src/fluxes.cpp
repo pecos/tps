@@ -31,7 +31,8 @@
 // -----------------------------------------------------------------------------------el-
 #include "fluxes.hpp"
 
-Fluxes::Fluxes(GasMixture *_mixture, Equations &_eqSystem, TransportProperties *_transport, const int &_num_equation, const int &_dim, bool axisym)
+Fluxes::Fluxes(GasMixture *_mixture, Equations &_eqSystem, TransportProperties *_transport, const int &_num_equation,
+               const int &_dim, bool axisym)
     : mixture(_mixture),
       eqSystem(_eqSystem),
       transport(_transport),
@@ -133,8 +134,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
       double qeFlux = ke * gradUp(num_equation - 1, d);
       flux(1 + dim, d) += qeFlux;
       flux(num_equation - 1, d) += qeFlux;
-      flux(num_equation - 1, d) -= speciesEnthalpies(numSpecies - 2)
-                                    * diffusionVelocity(numSpecies - 2, d);
+      flux(num_equation - 1, d) -= speciesEnthalpies(numSpecies - 2) * diffusionVelocity(numSpecies - 2, d);
     }
   } else {
     k += ke;
@@ -205,7 +205,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     // TODO: need to check the sign.
     // NOTE: diffusionVelocity is set to be (numSpecies,dim)-matrix.
-    for (int d = 0; d < dim; d++) flux(nvel + 2 + sp, d) = - state[nvel + 2 + sp] * diffusionVelocity(sp, d);
+    for (int d = 0; d < dim; d++) flux(nvel + 2 + sp, d) = -state[nvel + 2 + sp] * diffusionVelocity(sp, d);
   }
 }
 

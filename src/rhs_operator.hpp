@@ -42,7 +42,6 @@
 #include "dataStructures.hpp"
 #include "dgNonlinearForm.hpp"
 #include "equation_of_state.hpp"
-#include "transport_properties.hpp"
 #include "fluxes.hpp"
 #include "forcing_terms.hpp"
 #include "gradNonLinearForm.hpp"

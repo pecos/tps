@@ -52,6 +52,7 @@ class Tps;
 #include <mfem/general/forall.hpp>
 
 #include "BCintegrator.hpp"
+#include "argon_transport.hpp"
 #include "averaging_and_rms.hpp"
 #include "chemistry.hpp"
 #include "dataStructures.hpp"
@@ -72,7 +73,6 @@ class Tps;
 #include "solver.hpp"
 #include "tps.hpp"
 #include "transport_properties.hpp"
-#include "argon_transport.hpp"
 #include "utils.hpp"
 
 #ifdef HAVE_MASA

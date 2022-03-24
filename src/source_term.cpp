@@ -34,10 +34,12 @@
 #include <vector>
 
 SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
-                       IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up,
-                       ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
-                       RunConfiguration &_config, GasMixture *mixture, TransportProperties *transport, Chemistry *chemistry)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays, _config.isAxisymmetric()),
+                       IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
+                       ParGridFunction *_Up, ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
+                       RunConfiguration &_config, GasMixture *mixture, TransportProperties *transport,
+                       Chemistry *chemistry)
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
+                   _config.isAxisymmetric()),
       mixture_(mixture),
       transport_(transport),
       chemistry_(chemistry) {

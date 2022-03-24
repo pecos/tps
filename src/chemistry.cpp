@@ -142,7 +142,7 @@ void Chemistry::computeEquilibriumConstants(const double T_h, const double T_e, 
 
 // compute creation rate based on mass-action law.
 void Chemistry::computeCreationRate(const mfem::Vector& ns, const mfem::Vector& kfwd, const mfem::Vector& keq,
-                                        mfem::Vector& creationRate) {
+                                    mfem::Vector& creationRate) {
   Vector progressRate(numReactions_);
   for (int r = 0; r < numReactions_; r++) {
     // forward reaction rate

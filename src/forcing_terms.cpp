@@ -34,8 +34,9 @@
 #include <vector>
 
 ForcingTerms::ForcingTerms(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
-                           IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up,
-                           ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &_gpuArrays, bool axisym)
+                           IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
+                           ParGridFunction *_Up, ParGridFunction *_gradUp,
+                           const volumeFaceIntegrationArrays &_gpuArrays, bool axisym)
     : dim(_dim),
       nvel(axisym ? 3 : _dim),
       num_equation(_num_equation),
@@ -115,8 +116,8 @@ void ConstantPressureGradient::updateTerms(Vector &in) {
     }
     int dof_el = h_posDofIds[2 * elemOffset + 1];
 
-    updateTerms_gpu(h_numElems[elType], elemOffset, dof_el, vfes->GetNDofs(), pressGrad, in, *Up_, *gradUp_, num_equation,
-                    dim, gpuArrays);
+    updateTerms_gpu(h_numElems[elType], elemOffset, dof_el, vfes->GetNDofs(), pressGrad, in, *Up_, *gradUp_,
+                    num_equation, dim, gpuArrays);
   }
 #else
   int numElem = vfes->GetNE();
@@ -222,8 +223,9 @@ void ConstantPressureGradient::updateTerms_gpu(const int numElems, const int off
 #endif
 
 AxisymmetricSource::AxisymmetricSource(const int &_dim, const int &_num_equation, const int &_order,
-                                       GasMixture *_mixture, TransportProperties *_transport, const Equations &_eqSystem, const int &_intRuleType,
-                                       IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up,
+                                       GasMixture *_mixture, TransportProperties *_transport,
+                                       const Equations &_eqSystem, const int &_intRuleType, IntegrationRules *_intRules,
+                                       ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up,
                                        ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
                                        RunConfiguration &_config)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
@@ -398,7 +400,7 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
     // mixture->GetConservativesFromPrimitives(Up, targetU);
 
     int numActiveSpecies_ = mixture->GetNumActiveSpecies();
-    if (numActiveSpecies_ > 0) { // read species input state for multi-component flow.
+    if (numActiveSpecies_ > 0) {  // read species input state for multi-component flow.
       std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
       // NOTE: input Up will always contain 3 velocity components.
       for (int sp = 0; sp < numActiveSpecies_; sp++) {
@@ -415,7 +417,8 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
         double numSpecies = mixture->GetNumSpecies();
         Vector n_sp(numSpecies);
         mixture->computeNumberDensities(conserved, n_sp);
-        conserved[num_equation - 1] = mixture->computeElectronEnergy(n_sp(numSpecies - 2), szData.targetUp(5 + numSpecies));
+        conserved[num_equation - 1] =
+            mixture->computeElectronEnergy(n_sp(numSpecies - 2), szData.targetUp(5 + numSpecies));
       }
     }
     mixture->modifyEnergyForPressure(conserved, targetU, szData.targetUp[4], singleTemperature_);
@@ -498,9 +501,8 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
       }
     }
   }
-  
-  
-  radialNormal.SetSize( radialNormalsVec.size() );
+
+  radialNormal.SetSize(radialNormalsVec.size());
   for (int n = 0; n < radialNormal.Size(); n++) radialNormal(n) = radialNormalsVec[n];
 
   radialNormal.SetSize(radialNormalsVec.size());
@@ -549,7 +551,7 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
   // double Rg = mixture->GetGasConstant();
   mixture->GetPrimitivesFromConservatives(targetU, Up);
   // double speedSound = sqrt(gamma * Rg * Up[1+dim]);
-  double speedSound = mixture->ComputeSpeedOfSound(Up,true);
+  double speedSound = mixture->ComputeSpeedOfSound(Up, true);
 
   // add forcing to RHS, i.e., @in
   for (int n = 0; n < nnodes; n++) {
@@ -558,20 +560,20 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
       s *= szData.multFactor;
       for (int eq = 0; eq < num_equation; eq++) Up[eq] = dataUp[n + eq * nnodes];
       mixture->GetConservativesFromPrimitives(Up, Un);
-      
+
       // transform to cylindrical in annular
-      if ( szData.szType == SpongeZoneType::ANNULUS ) {
+      if (szData.szType == SpongeZoneType::ANNULUS) {
         const int node = nodesInAnnulus[n];
-        for(int d = 0; d < dim; d++) ur(d) = radialNormal(3*node +d);
+        for (int d = 0; d < dim; d++) ur(d) = radialNormal(3 * node + d);
         double Vr = 0., Vt = 0., Vx = 0.;
         Vector Vtv(dim);
-        for(int d = 0; d < dim; d++) {
-          Vx += targetU(1+d) * szData.normal(d);
-          Vr += targetU(1+d) * ur(d);
-          Vtv(d) = targetU(1+d) - Vx*szData.normal(d) - Vr*ur(d);
+        for (int d = 0; d < dim; d++) {
+          Vx += targetU(1 + d) * szData.normal(d);
+          Vr += targetU(1 + d) * ur(d);
+          Vtv(d) = targetU(1 + d) - Vx * szData.normal(d) - Vr * ur(d);
           Vt += Vtv(d) * Vtv(d);
         }
-        Vt = sqrt( Vt );
+        Vt = sqrt(Vt);
         targetCyl(1) = Vr;
         targetCyl(2) = Vt;
         if (dim == 3) targetCyl(3) = Vx;
@@ -681,7 +683,8 @@ PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const in
   std::cout << "worked out so far. 2" << std::endl;
 
   // find nodes for each passive scalar location
-  ParFiniteElementSpace dfes(vfes->GetParMesh(), vfes->FEColl(), dim, Ordering::byNODES); // Kevin: Had a seg fault from this line.
+  ParFiniteElementSpace dfes(vfes->GetParMesh(), vfes->FEColl(), dim,
+                             Ordering::byNODES);  // Kevin: Had a seg fault from this line.
   std::cout << "worked out so far. 2-1" << std::endl;
   ParGridFunction coordinates(&dfes);
   std::cout << "worked out so far. 2-2" << std::endl;
@@ -772,8 +775,9 @@ void PassiveScalar::updateTerms_gpu(Vector &in, ParGridFunction *Up, Array<passi
 
 HeatSource::HeatSource(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                        heatSourceData &_heatSource, GasMixture *_mixture, mfem::IntegrationRules *_intRules,
-                       mfem::ParFiniteElementSpace *_vfes, ParGridFunction *U, mfem::ParGridFunction *_Up, mfem::ParGridFunction *_gradUp,
-                       const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
+                       mfem::ParFiniteElementSpace *_vfes, ParGridFunction *U, mfem::ParGridFunction *_Up,
+                       mfem::ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
+                       RunConfiguration &_config)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()),
       mixture_(_mixture),
@@ -854,9 +858,9 @@ void HeatSource::updateTerms_gpu(mfem::Vector &in) {
 
 #ifdef HAVE_MASA
 MASA_forcings::MASA_forcings(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
-                             IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up,
-                             ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
-                             RunConfiguration &_config)
+                             IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
+                             ParGridFunction *_Up, ParGridFunction *_gradUp,
+                             const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()) {
   initMasaHandler("forcing", dim, _config);

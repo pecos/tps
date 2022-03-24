@@ -49,7 +49,8 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
   string serialName;
   if (inputFileName.length() > 0) {
     if (inputFileName.substr(inputFileName.length() - 3) != ".h5") {
-      grvy_printf(gerror, "[ERROR]: M2ulPhyS::restart_files_hdf5 - input file name has a wrong format -> %s\n", inputFileName.c_str());
+      grvy_printf(gerror, "[ERROR]: M2ulPhyS::restart_files_hdf5 - input file name has a wrong format -> %s\n",
+                  inputFileName.c_str());
       grvy_printf(GRVY_INFO, "format: %s\n", (inputFileName.substr(inputFileName.length() - 3)).c_str());
       exit(ERROR);
     }

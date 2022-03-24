@@ -135,8 +135,8 @@ void WallBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesID
                      num_equation, mixture);
 }
 
-void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn,  DenseMatrix &gradState,
-                                double radius, Vector &bdrFlux) {
+void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                Vector &bdrFlux) {
   Vector vel(nvel);
   for (int d = 0; d < nvel; d++) vel[d] = stateIn[1 + d] / stateIn[0];
 
@@ -227,9 +227,9 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
   }
 
   // modify gradient temperature so dT/dn=0 at the wall
-  //double normGradT = 0.;
-  //for (int d = 0; d < dim; d++) normGradT += unitNorm(d) * gradState(1 + dim, d);
-  //for (int d = 0; d < dim; d++) gradState(1 + dim, d) -= normGradT * unitNorm(d);
+  // double normGradT = 0.;
+  // for (int d = 0; d < dim; d++) normGradT += unitNorm(d) * gradState(1 + dim, d);
+  // for (int d = 0; d < dim; d++) gradState(1 + dim, d) -= normGradT * unitNorm(d);
 
   if (eqSystem == NS_PASSIVE) {
     for (int d = 0; d < dim; d++) gradState(num_equation - 1, d) = 0.;
@@ -267,7 +267,6 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
 
 void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
                                        Vector &bdrFlux) {
-
   Vector wallState(num_equation);
   mixture->computeStagnantStateWithTemp(stateIn, wallTemp, wallState);
   // TODO: set stangant state with two temperature.
