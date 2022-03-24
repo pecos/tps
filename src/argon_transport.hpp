@@ -84,7 +84,7 @@ class ArgonMinimalTransport : public TransportProperties {
  public:
   ArgonMinimalTransport(GasMixture *_mixture, RunConfiguration &_runfile);
 
-  ~ArgonMinimalTransport(){}
+  ~ArgonMinimalTransport() {}
 
   int getIonIndex() { return ionIndex_; }
 
@@ -102,10 +102,10 @@ class ArgonMinimalTransport : public TransportProperties {
   // So we can use them in evaluating transport properties.
   // If this routine evaluate additional primitive variables, can return them just as the routine above.
   virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
-                                                Vector &transportBuffer, DenseMatrix &diffusionVelocity){}
+                                                Vector &transportBuffer, DenseMatrix &diffusionVelocity) {}
 
   // TODO(kevin): only for AxisymmetricSource
-  virtual double GetViscosityFromPrimitive(const Vector &state){}
+  virtual double GetViscosityFromPrimitive(const Vector &state) {}
 
   double computeThirdOrderElectronThermalConductivity(const Vector &X_sp, const double debyeLength, const double Te,
                                                       const double nondimTe);
