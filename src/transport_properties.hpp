@@ -78,7 +78,7 @@ class TransportProperties {
   // Flux does not take primitive variables as input, rather evaluate them whenever needed.
   // ComputeFluxTransportProperties also evaluates required primitive variables,
   // but do not return it as output.
-  // TODO: need to discuss whether to reuse computed primitive variables in flux evaluation,
+  // TODO(kevin): need to discuss whether to reuse computed primitive variables in flux evaluation,
   // or in general evaluation of primitive variables.
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
                                               DenseMatrix &diffusionVelocity) {}
@@ -88,7 +88,7 @@ class TransportProperties {
   // So we can use them in evaluating transport properties.
   // If this routine evaluate additional primitive variables, can return them just as the routine above.
   virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
-                                                Vector &transportBuffer, DenseMatrix &diffusionVelocity){};
+                                                Vector &transportBuffer, DenseMatrix &diffusionVelocity){}
   // NOTE: only for AxisymmetricSource
   virtual double GetViscosityFromPrimitive(const Vector &state) = 0;
 };
@@ -163,7 +163,7 @@ class ConstantTransport : public TransportProperties {
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
                                               DenseMatrix &diffusionVelocity);
 
-  virtual double GetViscosityFromPrimitive(const Vector &state){};
+  virtual double GetViscosityFromPrimitive(const Vector &state){}
 };
 
 #endif  // TRANSPORT_PROPERTIES_HPP_

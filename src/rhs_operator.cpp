@@ -481,7 +481,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 
     fluxClass->ComputeConvectiveFluxes(state, f);
 
-    // TODO: Kevin - This needs to be incorporated in Fluxes::ComputeConvectiveFluxes.
+    // TODO(Kevin): - This needs to be incorporated in Fluxes::ComputeConvectiveFluxes.
     // Kevin: we need to think through this.
     if (isSBP) {
       f *= alpha;  // *= alpha
@@ -498,7 +498,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
       DenseMatrix fvisc(num_equation, dim);
       fluxClass->ComputeViscousFluxes(state, gradUpi, radius, fvisc);
 
-      // TODO: This needs to be incorporated in Fluxes::ComputeViscousFluxes.
+      // TODO(kevin): This needs to be incorporated in Fluxes::ComputeViscousFluxes.
       if (spaceVaryViscMult != NULL) {
         auto *alpha = spaceVaryViscMult->GetData();
         for (int eq = 0; eq < num_equation; eq++)

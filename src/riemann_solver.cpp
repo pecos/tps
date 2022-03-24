@@ -121,7 +121,7 @@ void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Ve
   }
 }
 
-// TODO: need to write for multiple species and two temperature.
+// TODO(kevin): need to write for multiple species and two temperature.
 void RiemannSolver::Eval_Roe(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux) {
   const int dim = nor.Size();
   assert(!axisymmetric_);  // Roe doesn't support axisymmetric yet

@@ -86,7 +86,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     chemistry_->computeEquilibriumConstants(Th, Te, kC);
 
     Vector ns;
-    // TODO: either expand Up to include dependent variables,
+    // TODO(kevin): either expand Up to include dependent variables,
     // or only compute dependent number densities.
     mixture_->computeNumberDensities(Un, ns);
 
@@ -100,6 +100,6 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
       h_in[n + (2 + dim + sp) * nnodes] += creationRates(sp);
     }
 
-    // TODO: energy sink for radiative reaction.
+    // TODO(kevin): energy sink for radiative reaction.
   }
 }

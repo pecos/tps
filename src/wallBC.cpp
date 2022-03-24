@@ -269,7 +269,7 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
                                        Vector &bdrFlux) {
   Vector wallState(num_equation);
   mixture->computeStagnantStateWithTemp(stateIn, wallTemp, wallState);
-  // TODO: set stangant state with two temperature.
+  // TODO(kevin): set stangant state with two separate temperature.
 
   if (eqSystem == NS_PASSIVE) wallState[num_equation - 1] = stateIn[num_equation - 1];
 

@@ -49,8 +49,8 @@ Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : mixture_(m
   speciesMapping_ = mixture->getSpeciesMapping();
   electronIndex_ = (speciesMapping_->count("E")) ? (*speciesMapping_)["E"] : -1;
 
-  // TODO: make tps input parser accessible to all classes.
-  // TODO: reaction classes read input options directly in their initialization.
+  // TODO(kevin): make tps input parser accessible to all classes.
+  // TODO(kevin): reaction classes read input options directly in their initialization.
   numReactions_ = config.numReactions;
   // std::cout << "number of reactions: " << numReactions_ << std::endl;
   reactionEnergies_.SetSize(numReactions_);

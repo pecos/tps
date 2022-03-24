@@ -914,7 +914,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   if (eqSystem == NS_PASSIVE) {
     passiveScalar = new ParGridFunction(fes, Up->HostReadWrite() + (num_equation - 1) * fes->GetNDofs());
   } else {
-    // TODO: for now, keep the number of primitive variables same as conserved variables.
+    // TODO(kevin): for now, keep the number of primitive variables same as conserved variables.
     // will need to add full list of species.
     visualizationVariables.resize(numActiveSpecies);
     for (int sp = 0; sp < numActiveSpecies; sp++) {
@@ -933,7 +933,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   } else {
     ioData.registerIOVar("/solution", "rho-E", 3);
   }
-  // TODO: for now, keep the number of primitive variables same as conserved variables.
+  // TODO(kevin): for now, keep the number of primitive variables same as conserved variables.
   // will need to add full list of species.
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     // Only for NS_PASSIVE.
@@ -984,7 +984,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   if (eqSystem == NS_PASSIVE) {
     paraviewColl->RegisterField("passiveScalar", passiveScalar);
   } else if (numActiveSpecies > 0) {
-    // TODO: for now, keep the number of primitive variables same as conserved variables.
+    // TODO(kevin): for now, keep the number of primitive variables same as conserved variables.
     // will need to add full list of species.
     for (int sp = 0; sp < numActiveSpecies; sp++) {
       int inputSpeciesIndex = mixture->getInputIndexOf(sp);
@@ -1971,7 +1971,7 @@ void M2ulPhyS::parseSolverOptions2() {
     std::string chemistryModelStr;
     tpsP->getInput("plasma_models/chemistry_model", chemistryModelStr, std::string(""));
 
-    // TODO: cantera wrapper
+    // TODO(kevin): cantera wrapper
     // if (chemistryModelStr == "cantera") {
     //   config.chemistryModel_ = ChemistryModel::CANTERA;
     // }
@@ -2092,8 +2092,8 @@ void M2ulPhyS::parseSolverOptions2() {
     for (int r = 1; r <= config.numReactions; r++) {
       std::string basepath("reactions/reaction" + std::to_string(r));
 
-      // TODO: make tps input parser accessible to all classes.
-      // TODO: reaction classes read input options directly in their initialization.
+      // TODO(kevin): make tps input parser accessible to all classes.
+      // TODO(kevin): reaction classes read input options directly in their initialization.
       std::string equation, model;
       tpsP->getRequiredInput((basepath + "/equation").c_str(), equation);
       config.reactionEquations[r - 1] = equation;

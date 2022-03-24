@@ -41,7 +41,7 @@
 
 using namespace mfem;
 
-// TODO: In order to avoid repeated primitive variable evaluation,
+// TODO(kevin): In order to avoid repeated primitive variable evaluation,
 // Fluxes and RiemannSolver should take Vector Up (on the evaulation point) as input argument,
 // and FaceIntegrator should have a pointer to ParGridFunction *Up.
 // Also should be able to have Up more than number of equations,

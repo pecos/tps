@@ -34,7 +34,7 @@
 #include "dgNonlinearForm.hpp"
 #include "riemann_solver.hpp"
 
-// TODO: need to write for multiple species and two temperature.
+// TODO(kevin): non-reflecting bc for plasam.
 InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rsolver, GasMixture *_mixture,
                  ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
                  const int _num_equation, int _patchNumber, double _refLength, InletType _bcType,

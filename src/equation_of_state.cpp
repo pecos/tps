@@ -89,7 +89,7 @@ DryAir::DryAir(RunConfiguration &_runfile, int _dim) : GasMixture(WorkingFluid::
   gas_constant = 287.058;
   // gas_constant = 1.; // for comparison against ex18
   specific_heat_ratio = 1.4;
-// TODO: GPU routines are not yet fully gas-agnostic. Need to be removed.
+// TODO(kevin): GPU routines are not yet fully gas-agnostic. Need to be removed.
 #ifdef _GPU_
   visc_mult = _runfile.visc_mult;
   bulk_visc_mult = _runfile.bulk_visc;
@@ -102,7 +102,7 @@ DryAir::DryAir(RunConfiguration &_runfile, int _dim) : GasMixture(WorkingFluid::
   gasParams = 0.0;
   gasParams(0, GasParams::SPECIES_MW) = UNIVERSALGASCONSTANT / gas_constant;
 
-  // TODO: replace Nconservative/Nprimitive.
+  // TODO(kevin): replace Nconservative/Nprimitive.
   // add extra equation for passive scalar
   if (_runfile.GetEquationSystem() == Equations::NS_PASSIVE) {
     Nconservative++;
@@ -115,7 +115,7 @@ DryAir::DryAir() {
   gas_constant = 287.058;
   // gas_constant = 1.; // for comparison against ex18
   specific_heat_ratio = 1.4;
-// TODO: GPU routines are not yet fully gas-agnostic. Need to be removed.
+// TODO(kevin): GPU routines are not yet fully gas-agnostic. Need to be removed.
 #ifdef _GPU_
   visc_mult = 1.;
   Pr = 0.71;
@@ -128,7 +128,7 @@ DryAir::DryAir(int _dim, int _num_equation) {
   gas_constant = 287.058;
   // gas_constant = 1.; // for comparison against ex18
   specific_heat_ratio = 1.4;
-// TODO: GPU routines are not yet fully gas-agnostic. Need to be removed.
+// TODO(kevin): GPU routines are not yet fully gas-agnostic. Need to be removed.
 #ifdef _GPU_
   visc_mult = 1.;
   Pr = 0.71;
@@ -211,7 +211,7 @@ bool DryAir::StateIsPhysical(const mfem::Vector &state) {
   return true;
 }
 
-// TODO: We need to move this routine to upper level, i.e. M2ulPhys.
+// TODO(kevin): We need to move this routine to upper level, i.e. M2ulPhys.
 // Diffusion velocity contributes to the characteristic speed, which mixture cannot handle or know.
 // Compute the maximum characteristic speed.
 double DryAir::ComputeMaxCharSpeed(const Vector &state) {
@@ -391,7 +391,7 @@ TestBinaryAir::TestBinaryAir(RunConfiguration &_runfile, int _dim) : GasMixture(
   SetNumEquations();
 
   gas_constant = 287.058;
-  ;
+
   // gas_constant = 1.; // for comparison against ex18
   specific_heat_ratio = 1.4;
 
@@ -583,7 +583,7 @@ void TestBinaryAir::ComputeMassFractionGradient(const Vector &state, const Dense
 
 void TestBinaryAir::ComputeMoleFractionGradient(const Vector &state, const DenseMatrix &gradUp,
                                                 DenseMatrix &moleFractionGrad) {
-  // TODO: Fluxes need to take Up as input, so that we won't recompute primitives again.
+  // TODO(kevin): Fluxes need to take Up as input, so that we won't recompute primitives again.
   Vector X_sp;
   Vector Y_sp;
   Vector n_sp;
@@ -620,7 +620,7 @@ PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim) : GasMixtur
   ambipolar = false;
   twoTemperature_ = false;
 
-  // TODO: electron species is enforced to be included in the input file.
+  // TODO(kevin): electron species is enforced to be included in the input file.
   bool isElectronIncluded = false;
 
   gasParams.SetSize(numSpecies, GasParams::NUM_GASPARAMS);
@@ -655,7 +655,7 @@ PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim) : GasMixtur
 
     specificGasConstants_(targetIdx) = UNIVERSALGASCONSTANT / gasParams(targetIdx, GasParams::SPECIES_MW);
 
-    // TODO: read these from input parser.
+    // TODO(kevin): read these from input parser.
     molarCV_(targetIdx) = _runfile.getConstantMolarCV(sp) * UNIVERSALGASCONSTANT;
     // NOTE: for perfect gas, CP = CV + R
     molarCP_(targetIdx) = molarCV_(targetIdx) + UNIVERSALGASCONSTANT;
@@ -668,7 +668,7 @@ PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim) : GasMixtur
 
   // We assume the background species is neutral.
   assert(gasParams(numSpecies - 1, GasParams::SPECIES_CHARGES) == 0.0);
-  // TODO: release electron species enforcing.
+  // TODO(kevin): release electron species enforcing.
   assert(isElectronIncluded);
   // We assume the background species and electron have zero formation energy.
   assert(gasParams(numSpecies - 2, GasParams::FORMATION_ENERGY) == 0.0);
@@ -726,7 +726,7 @@ double PerfectMixture::computeBackgroundMassDensity(const double &rho, const dou
   return rhoB;
 }
 
-// TODO: Need to expand the number of primitive variables and store all of them.
+// TODO(kevin): Need to expand the number of primitive variables and store all of them.
 // Right now, it's alwasy the same as conserved variables, to minimize gradient computation.
 // Additional primitive variables (such as temperature currently) needs to be evaluated every time it is needed.
 // Gradient computation can still keep the same number, while expanding the primitive variables.
@@ -795,7 +795,7 @@ void PerfectMixture::GetConservativesFromPrimitives(const Vector &primit, Vector
 
 // NOTE: Almost for sure ambipolar will remain true, then we have to always compute at least both Y and n.
 // Mole fraction X will be needed almost everywhere, though it requires Y and n to be evaluated first.
-// TODO: It is better to include all X, Y, n into primitive variable Up,
+// TODO(kevin): It is better to include all X, Y, n into primitive variable Up,
 // in order to reduce repeated evaluation.
 void PerfectMixture::computeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp) {
   X_sp.SetSize(numSpecies);
@@ -934,7 +934,7 @@ bool PerfectMixture::StateIsPhysical(const Vector &state) {
     physical = false;
   }
 
-  /* TODO: take primitive variables as input for physicality check. */
+  /* TODO(kevin): take primitive variables as input for physicality check. */
   // Vector primitiveState(num_equation);
   // GetPrimitivesFromConservatives(state, primitiveState);
   // if (primitiveState(dim+1) < 0) {

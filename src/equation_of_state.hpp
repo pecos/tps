@@ -87,7 +87,7 @@ class GasMixture {
   // number of conservative and primitive/visualization variables
   int Nconservative, Nprimitive;
 
-// TODO: GPU routines are not yet fully gas-agnostic. Need to be removed.
+// TODO(kevin): GPU routines are not yet fully gas-agnostic. Need to be removed.
 #ifdef _GPU_
   double specific_heat_ratio;
   double gas_constant;
@@ -140,7 +140,7 @@ class GasMixture {
   virtual double Temperature(double *rho, double *p,
                              int nsp) = 0;  // temperature given densities and pressures of all species
 
-  virtual void computeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp){};
+  virtual void computeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp){}
   virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies) = 0;
 
   virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit) = 0;
@@ -157,18 +157,18 @@ class GasMixture {
   virtual bool StateIsPhysical(const Vector &state) = 0;
 
   // Compute X, Y gradients from number density gradient.
-  // TODO: Fluxes class should take Up as input variable.
+  // TODO(kevin): Fluxes class should take Up as input variable.
   // Currently cannot receive Up inside Fluxes class.
   virtual void ComputeMassFractionGradient(const Vector &state, const DenseMatrix &gradUp,
-                                           DenseMatrix &massFractionGrad){};
+                                           DenseMatrix &massFractionGrad){}
   virtual void ComputeMoleFractionGradient(const Vector &state, const DenseMatrix &gradUp,
-                                           DenseMatrix &moleFractionGrad){};
-  // TODO: Compute pressure gradient from temperature gradient.
-  virtual void ComputePressureGradient(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &PressureGrad){};
+                                           DenseMatrix &moleFractionGrad){}
+  // TODO(kevin): Compute pressure gradient from temperature gradient.
+  virtual void ComputePressureGradient(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &PressureGrad){}
 
-// TODO: GPU routines are not yet fully gas-agnostic. Need to be removed.
+// TODO(kevin): GPU routines are not yet fully gas-agnostic. Need to be removed.
 #ifdef _GPU_
-  // TODO: Need to remove these and fix wherever they are used.
+  // TODO(kevin): Need to remove these and fix wherever they are used.
   // We cannot use these for multi species (heat ratio of which species?)
   // These are used in forcingTerm, Fluxes ASSUMING that the fluid is single species.
   virtual double GetSpecificHeatRatio() { return specific_heat_ratio; }
@@ -178,11 +178,11 @@ class GasMixture {
   virtual double GetGasConstant() = 0;
 #endif
 
-  virtual void computeNumberDensities(const Vector &conservedState, Vector &n_sp){};
+  virtual void computeNumberDensities(const Vector &conservedState, Vector &n_sp){}
 
   virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
 
-// TODO: GPU routines are not yet fully gas-agnostic. Need to be removed.
+// TODO(kevin): GPU routines are not yet fully gas-agnostic. Need to be removed.
 #ifdef _GPU_
   double GetPrandtlNum() { return Pr; }
   double GetSchmidtNum() { return Sc; }
@@ -190,23 +190,23 @@ class GasMixture {
   double GetBulkViscMultiplyer() { return bulk_visc_mult; }
 #endif
 
-  virtual double getMolarCV(int species){};
-  virtual double getMolarCP(int species){};
+  virtual double getMolarCV(int species){}
+  virtual double getMolarCP(int species){}
 
   // BC related functions
   virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState);
-  virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut){};
+  virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut){}
   virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p,
-                                       bool modifyElectronEnergy = false){};
+                                       bool modifyElectronEnergy = false){}
 
-  virtual double computeAmbipolarElectronNumberDensity(const double *n_sp){};
+  virtual double computeAmbipolarElectronNumberDensity(const double *n_sp){}
   virtual double computeBackgroundMassDensity(const double &rho, const double *n_sp, double &n_e,
-                                              bool isElectronComputed = false){};
+                                              bool isElectronComputed = false){}
 
   virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
-                                                       Vector &conservedState){};
+                                                       Vector &conservedState){}
 
-  virtual double computeElectronEnergy(const double n_e, const double T_e){};
+  virtual double computeElectronEnergy(const double n_e, const double T_e){}
 };
 
 //////////////////////////////////////////////////////
@@ -528,8 +528,8 @@ class PerfectMixture : public GasMixture {
 
   virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies);
 
-  // TODO: Kevin - I don't think we should use this for boundary condition.
-  virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / rho[0] / GetGasConstant(); };
+  // TODO(kevin): Kevin - I don't think we should use this for boundary condition.
+  virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / rho[0] / GetGasConstant(); }
 
   virtual double ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive = true);
   virtual double computePressureDerivativeFromPrimitives(const Vector &dUp_dx, const Vector &Uin);
@@ -561,7 +561,7 @@ class PerfectMixture : public GasMixture {
 
   virtual double computeElectronEnergy(const double n_e, const double T_e) {
     return n_e * molarCV_(numSpecies - 2) * T_e;
-  };
+  }
     // GPU functions
 #ifdef _GPU_
 

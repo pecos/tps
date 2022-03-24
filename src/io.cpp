@@ -353,7 +353,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
     // We would like to just call rhsOperator::updatePrimitives, but
     // rhsOperator has not been constructed yet.  As a workaround,
     // that code is duplicated here.
-    // TODO: use mixture comptue primitive.
+    // TODO(kevin): use mixture comptue primitive.
     double *dataUp = Up->HostReadWrite();
     double *x = U->HostReadWrite();
     for (int i = 0; i < vfes->GetNDofs(); i++) {
