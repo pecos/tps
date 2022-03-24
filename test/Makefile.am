@@ -76,7 +76,7 @@ if !GPU_ENABLED
 
 check_PROGRAMS += perfect_mixture_test
 perfect_mixture_test_SOURCES  = test_perfect_mixture.cpp
-perfect_mixture_test_LDADD    = $(top_srcdir)/src/libtps.a
+perfect_mixture_test_LDADD    = ../src/libtps.a
 perfect_mixture_test_LDADD    += $(HDF5_LIBS)
 perfect_mixture_test_LDADD    += $(GRVY_LIBS)
 perfect_mixture_test_LDADD    += $(MFEM_LIBS)
@@ -96,7 +96,7 @@ endif
 
 check_PROGRAMS += test_speed_of_sound
 test_speed_of_sound_SOURCES  = test_speed_of_sound.cpp
-test_speed_of_sound_LDADD    = $(top_srcdir)/src/libtps.a
+test_speed_of_sound_LDADD    = ../src/libtps.a
 test_speed_of_sound_LDADD    += $(HDF5_LIBS)
 test_speed_of_sound_LDADD    += $(GRVY_LIBS)
 test_speed_of_sound_LDADD    += $(MFEM_LIBS)
@@ -116,7 +116,7 @@ endif
 
 check_PROGRAMS += test_collision
 test_collision_SOURCES  = test_collision_integral.cpp
-test_collision_LDADD    = $(top_srcdir)/src/libtps.a
+test_collision_LDADD    = ../src/libtps.a
 test_collision_LDADD    += $(HDF5_LIBS)
 test_collision_LDADD    += $(GRVY_LIBS)
 test_collision_LDADD    += $(MFEM_LIBS)
@@ -136,7 +136,7 @@ endif
 
 check_PROGRAMS += test_argon_minimal
 test_argon_minimal_SOURCES  = test_argon_minimal.cpp
-test_argon_minimal_LDADD    = $(top_srcdir)/src/libtps.a
+test_argon_minimal_LDADD    = ../src/libtps.a
 test_argon_minimal_LDADD    += $(HDF5_LIBS)
 test_argon_minimal_LDADD    += $(GRVY_LIBS)
 test_argon_minimal_LDADD    += $(MFEM_LIBS)
