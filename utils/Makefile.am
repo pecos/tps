@@ -1,5 +1,5 @@
 # AM_CPPFLAGS          = -g -I../src -I$(MFEM_INC) -I$(MFEM_INC)/mfem
-AM_CPPFLAGS          = -g -I../src $(MFEM_CXXFLAGS) $(HDF5_CFLAGS) $(GRVY_CFLAGS)
+AM_CPPFLAGS          = -g -I$(top_srcdir)/src $(MFEM_CXXFLAGS) $(HDF5_CFLAGS) $(GRVY_CFLAGS)
 # AM_CPPFLAGS         += -I$(HYPRE_INC) $(HDF5_CFLAGS) $(GRVY_CFLAGS)
 # AM_CPPFLAGS         += -I$(PETSC_INC)
 EXTRA_DIST           = bats cpplint
@@ -63,7 +63,7 @@ endif
 if GSLIB_ENABLED
 bin_PROGRAMS   += interp
 interp_SOURCES  = pfield_interpolate.cpp
-interp_LDADD    = ../src/libtps.a
+interp_LDADD    = $(top_srcdir)/src/libtps.a
 interp_LDADD    += $(HDF5_LIBS)
 interp_LDADD    += $(GRVY_LIBS)
 interp_LDADD    += $(MFEM_LIBS)
@@ -84,7 +84,7 @@ endif
 
 bin_PROGRAMS += binaryic
 binaryic_SOURCES  = binary_mixture_ic.cpp
-binaryic_LDADD    = ../src/libtps.a
+binaryic_LDADD    = $(top_srcdir)/src/libtps.a
 binaryic_LDADD    += $(HDF5_LIBS)
 binaryic_LDADD    += $(GRVY_LIBS)
 binaryic_LDADD    += $(MFEM_LIBS)
@@ -104,7 +104,7 @@ endif
 
 bin_PROGRAMS += tanhic
 tanhic_SOURCES  = tanh_ic.cpp
-tanhic_LDADD    = ../src/libtps.a -lmfem
+tanhic_LDADD    = $(top_srcdir)/src/libtps.a -lmfem
 tanhic_LDADD    += $(HDF5_LIBS)
 tanhic_LDADD    += $(GRVY_LIBS)
 tanhic_LDADD    += $(MFEM_LIBS)
@@ -124,7 +124,7 @@ endif
 
 bin_PROGRAMS += sineic
 sineic_SOURCES  = sine_ic.cpp
-sineic_LDADD    = ../src/libtps.a -lmfem
+sineic_LDADD    = $(top_srcdir)/src/libtps.a -lmfem
 sineic_LDADD    += $(HDF5_LIBS)
 sineic_LDADD    += $(GRVY_LIBS)
 sineic_LDADD    += $(MFEM_LIBS)
@@ -144,7 +144,7 @@ endif
 
 bin_PROGRAMS += l2diff
 l2diff_SOURCES  = L2_diff.cpp
-l2diff_LDADD    = ../src/libtps.a -lmfem
+l2diff_LDADD    = $(top_srcdir)/src/libtps.a -lmfem
 l2diff_LDADD    += $(HDF5_LIBS)
 l2diff_LDADD    += $(GRVY_LIBS)
 l2diff_LDADD    += $(MFEM_LIBS)
