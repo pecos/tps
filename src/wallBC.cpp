@@ -412,8 +412,7 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
           if (i < num_equation) computeInvWallState(i, &u1[0], &u2[0], &nor[0], dim, num_equation);
           break;
         case WallType::VISC_ISOTH:
-          if (i < num_equation)
-            computeIsothermalState(i, &u1[0], &u2[0], &nor[0], wallTemp, gamma, Rg, dim, num_equation);
+          computeIsothermalState(i, &u1[0], &u2[0], &nor[0], wallTemp, gamma, Rg, dim, num_equation);
           break;
         case WallType::VISC_ADIAB:
           break;

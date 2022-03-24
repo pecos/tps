@@ -1336,23 +1336,44 @@ void M2ulPhyS::InitialConditionEulerVortex(const Vector &x, Vector &y) {
 }
 
 // Initial conditions for debug/test case
-void M2ulPhyS::testInitialCondition(const Vector &x, Vector &y) {
+void M2ulPhyS::testInitialCondition(const Vector &xi, Vector &yi) {
   DryAir *eqState = new DryAir();
 
   // Nice units
-  const double vel_inf = 1.;
-  const double den_inf = 1.3;
-  const double Minf = 0.5;
+  const double vel_inf = 30.;
+  const double p_inf = 101300.;
+  const double T_inf = 300.;
+
+  const double L = 2.;
+  const double x0 = 0.;
+  const double y0 = 0.;
+  const double z0 = 0.;
 
   const double gamma = eqState->GetSpecificHeatRatio();
-  // const double Rgas = eqState->GetGasConstant();
+  const double Rgas = eqState->GetGasConstant();
 
-  const double pres_inf = (den_inf / gamma) * (vel_inf / Minf) * (vel_inf / Minf);
+  const double rho_inf = p_inf/Rgas/T_inf;
 
-  y(0) = den_inf + 0.5 * (x(0) + 3) + 0.25 * (x(1) + 3);
-  y(1) = y(0);
-  y(2) = 0;
-  y(3) = (pres_inf + x(0) + 0.2 * x(1)) / (gamma - 1.) + 0.5 * y(1) * y(1) / y(0);
+  double x = 2.*M_PI*(xi(0)-x0)/L;
+  double y = 2.*M_PI*(xi(1)-y0)/L;
+  double z = 2.*M_PI*(xi(2)-z0)/L;
+
+  double u =  sin(x)*cos(y)*cos(z);
+  double v = -cos(x)*sin(y)*cos(z);
+  double w = 0.;
+  double p = ( cos(2.*x)+cos(2.*y) )*( cos(2.*z)+2. )/16.;
+  u *= vel_inf;
+  v *= vel_inf;
+  w *= vel_inf;
+  p = p_inf + rho_inf*vel_inf*vel_inf*p;
+
+  double rE = p/(gamma-1.)+0.5*rho_inf*(u*u+v*v+w*w);
+
+  yi(0) = p/Rgas/T_inf;
+  yi(1) = yi(0)*u;
+  yi(2) = yi(0)*v;
+  yi(3) = yi(0)*w;
+  yi(4) = rE;
 
   delete eqState;
 }

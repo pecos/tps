@@ -323,7 +323,7 @@ class DryAir : public GasMixture {
     if (thrd == 3 && dim == 3) primit[3] = state[3] / state[0];
     if (thrd == 1 + dim)
       primit[1+dim] = DryAir::temperature(&state[0], &KE[0], gamma, Rgas, dim, num_equation);
-    if (thrd == num_equation - 1 && eqSystem == NS_PASSIVE)
+    if (thrd == maxThreads - 1 && eqSystem == NS_PASSIVE)
       primit[num_equation - 1] = state[num_equation - 1] / state[0];
   }
   
@@ -336,7 +336,7 @@ class DryAir : public GasMixture {
                                                            const int &thrd,
                                                            const int &maxThreads
   ) {
-    if (thrd < num_equation) stateOut[thrd] = stateIn[thrd];
+    for (int eq = thrd; eq < num_equation; eq += maxThreads) stateOut[eq] = stateIn[eq];
     MFEM_SYNC_THREAD;
     
     double ke = 0.;

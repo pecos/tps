@@ -148,7 +148,7 @@ class DryAirTransport : public TransportProperties {
                                                              const int &thrd,
                                                              const int &maxThreads ){
     double dummy; // electron pressure. won't compute anything.
-    double KE[3];
+    MFEM_SHARED double KE[3];
     for (int d = thrd; d < dim; d += maxThreads) KE[d] = 0.5 * state[1+d] * state[1+d] / state[0];
     MFEM_SYNC_THREAD;
     double p = DryAir::pressure(state, &KE[0], gamma, dim, num_equation);
