@@ -35,7 +35,7 @@
 #include "masa_handler.hpp"
 #include "M2ulPhyS.hpp"
 
-void M2ulPhyS::initMasaHandler(const int dim, RunConfiguration& config) {
+void M2ulPhyS::initMasaHandler() {
   assert(config.use_mms_);
 
   // Initialize MASA
@@ -50,6 +50,9 @@ void M2ulPhyS::initMasaHandler(const int dim, RunConfiguration& config) {
     exit(-1);
   }
 
+  // Initialize mms vector function coefficients
+  initMMSCoefficients();
+
   // check that masa at least thinks things are okie-dokie
   int ierr = MASA::masa_sanity_check<double>();
   if (ierr != 0) {
@@ -59,7 +62,7 @@ void M2ulPhyS::initMasaHandler(const int dim, RunConfiguration& config) {
   }
 }
 
-void M2ulPhyS::projectExactSolution() {
+void M2ulPhyS::projectExactSolution(const double _time) {
   void (*exactSolnFunction)(const Vector &, double, Vector &);
 
   if (config.workFluid == DRY_AIR) {
@@ -71,20 +74,36 @@ void M2ulPhyS::projectExactSolution() {
   }
 
   VectorFunctionCoefficient u0(num_equation, exactSolnFunction);
-  u0.SetTime(0.0);
+  u0.SetTime(_time);
   U->ProjectCoefficient(u0);
 }
 
 void M2ulPhyS::initMMSCoefficients() {
 
-  // Initialize mms vector function coefficients
   if (config.workFluid == DRY_AIR) {
     DenMMS_ = new VectorFunctionCoefficient(1, &(dryair3d::exactDenFunction));
     VelMMS_ = new VectorFunctionCoefficient(dim, &(dryair3d::exactVelFunction));
     PreMMS_ = new VectorFunctionCoefficient(1, &(dryair3d::exactPreFunction));
-    grvy_printf(GRVY_INFO, "initMMSCoefficients done.\n");
   }
 
+}
+
+void M2ulPhyS::checkSolutionError(const double _time) {
+  rhsOperator->updatePrimitives(*U);
+  mixture->UpdatePressureGridFunction(press, Up);
+
+  // and dump error before we take any steps
+  if (config.workFluid == DRY_AIR) {
+    DenMMS_->SetTime(_time);
+    VelMMS_->SetTime(_time);
+    PreMMS_->SetTime(_time);
+    const double errorDen = dens->ComputeLpError(2, *DenMMS_);
+    const double errorVel = vel->ComputeLpError(2, *VelMMS_);
+    const double errorPre = press->ComputeLpError(2, *PreMMS_);
+    if (mpi.Root())
+      cout << "time step: " << iter << ", physical time " << _time << "s"
+           << ", Dens. error: " << errorDen << " Vel. " << errorVel << " press. " << errorPre << endl;
+  }
 }
 
 namespace dryair3d {

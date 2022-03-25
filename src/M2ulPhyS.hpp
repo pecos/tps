@@ -312,19 +312,13 @@ class M2ulPhyS : public TPS::Solver {
   void Cache_Paraview_Timesteps();
 
 #ifdef HAVE_MASA
-  void initMasaHandler(int dim, RunConfiguration& config);
-  void projectExactSolution();
+  void initMasaHandler();
+  void projectExactSolution(const double _time);
   void initMMSCoefficients();
+  void checkSolutionError(const double _time);
 #endif
 
  public:
-#ifdef HAVE_MASA
- static void MASA_exactSol(const Vector &x, double tin, Vector &y);
- static void MASA_exactDen(const Vector &x, double tin, Vector &y);
- static void MASA_exactVel(const Vector &x, double tin, Vector &y);
- static void MASA_exactPre(const Vector &x, double tin, Vector &y);
-#endif
-
   M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps);
   M2ulPhyS(MPI_Session &_mpi, TPS::Tps *tps);
   ~M2ulPhyS();

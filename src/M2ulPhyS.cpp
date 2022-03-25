@@ -1017,14 +1017,9 @@ void M2ulPhyS::projectInitialSolution() {
     uniformInitialConditions();
 #ifdef HAVE_MASA
     if (config.use_mms_) {
-      initMasaHandler(dim, config);
+      initMasaHandler();
 
-      projectExactSolution();
-      // void (*initialConditionFunction)(const Vector &, double, Vector &);
-      // initialConditionFunction = &(this->MASA_exactSol);
-      // VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
-      // u0.SetTime(0.0);
-      // U->ProjectCoefficient(u0);
+      projectExactSolution(0.0);
     }
 #endif
   } else {
@@ -1056,25 +1051,11 @@ void M2ulPhyS::solve() {
 
 #ifdef HAVE_MASA
   // instantiate function for exact solution
-  initMMSCoefficients();
+  // NOTE: this has been taken care of at M2ulPhyS::initMasaHandler.
+  // initMMSCoefficients();
 
   if (config.use_mms_) {
-    rhsOperator->updatePrimitives(*U);
-    mixture->UpdatePressureGridFunction(press, Up);
-
-    grvy_printf(GRVY_INFO, "Right before using MMS pointers.\n");
-
-    // and dump error before we take any steps
-    DenMMS_->SetTime(time);
-    VelMMS_->SetTime(time);
-    PreMMS_->SetTime(time);
-    grvy_printf(GRVY_INFO, "Right before compute Lp errors.\n");
-    const double errorDen = dens->ComputeLpError(2, *DenMMS_);
-    const double errorVel = vel->ComputeLpError(2, *VelMMS_);
-    const double errorPre = press->ComputeLpError(2, *PreMMS_);
-    if (mpi.Root())
-      cout << "time step: " << iter << ", physical time " << time << "s"
-           << ", Dens. error: " << errorDen << " Vel. " << errorVel << " press. " << errorPre << endl;
+    checkSolutionError(time);
   }
 #endif
 
@@ -1111,18 +1092,7 @@ void M2ulPhyS::solve() {
 
 #ifdef HAVE_MASA
       if (config.use_mms_) {
-        rhsOperator->updatePrimitives(*U);
-        mixture->UpdatePressureGridFunction(press, Up);
-
-        DenMMS_->SetTime(time);
-        VelMMS_->SetTime(time);
-        PreMMS_->SetTime(time);
-        const double errorDen = dens->ComputeLpError(2, *DenMMS_);
-        const double errorVel = vel->ComputeLpError(2, *VelMMS_);
-        const double errorPre = press->ComputeLpError(2, *PreMMS_);
-        if (mpi.Root())
-          cout << "time step: " << iter << ", physical time " << time << "s"
-               << ", Dens. error: " << errorDen << " Vel. " << errorVel << " press. " << errorPre << endl;
+        checkSolutionError(time);
       } else {
         if (mpi.Root()) cout << "time step: " << iter << ", physical time " << time << "s" << endl;
       }
@@ -1192,18 +1162,7 @@ void M2ulPhyS::solve() {
     // if (mpi.Root()) cout << "Solution error: " << error << endl;
 #else
     if (config.use_mms_) {
-      rhsOperator->updatePrimitives(*U);
-      mixture->UpdatePressureGridFunction(press, Up);
-
-      DenMMS_->SetTime(time);
-      VelMMS_->SetTime(time);
-      PreMMS_->SetTime(time);
-      const double errorDen = dens->ComputeLpError(2, *DenMMS_);
-      const double errorVel = vel->ComputeLpError(2, *VelMMS_);
-      const double errorPre = press->ComputeLpError(2, *PreMMS_);
-      if (mpi.Root())
-        cout << "time step: " << iter << ", physical time " << time << "s"
-             << ", Dens. error: " << errorDen << " Vel. " << errorVel << " press. " << errorPre << endl;
+      checkSolutionError(time);
     } else {
       if (mpi.Root()) cout << "Final timestep iteration = " << MaxIters << endl;
     }
@@ -1214,55 +1173,6 @@ void M2ulPhyS::solve() {
 
   return;
 }
-
-#ifdef HAVE_MASA
-void M2ulPhyS::MASA_exactSol(const Vector &x, double tin, Vector &y) {
-  MFEM_ASSERT(x.Size() == 3, "");
-
-  DryAir eqState;
-  const double gamma = eqState.GetSpecificHeatRatio();
-
-  y(0) = MASA::masa_eval_exact_rho<double>(x[0], x[1], x[2], tin);  // rho
-  y(1) = y[0] * MASA::masa_eval_exact_u<double>(x[0], x[1], x[2], tin);
-  y(2) = y[0] * MASA::masa_eval_exact_v<double>(x[0], x[1], x[2], tin);
-  y(3) = y[0] * MASA::masa_eval_exact_w<double>(x[0], x[1], x[2], tin);
-  y(4) = MASA::masa_eval_exact_p<double>(x[0], x[1], x[2], tin) / (gamma - 1.);
-
-  double k = 0.;
-  for (int d = 0; d < x.Size(); d++) k += y[1 + d] * y[1 + d];
-  k *= 0.5 / y[0];
-  y[4] += k;
-}
-
-void M2ulPhyS::MASA_exactDen(const Vector &x, double tin, Vector &y) {
-  MFEM_ASSERT(x.Size() == 3, "");
-
-  DryAir eqState;
-  const double gamma = eqState.GetSpecificHeatRatio();
-
-  y(0) = MASA::masa_eval_exact_rho<double>(x[0], x[1], x[2], tin);  // rho
-}
-
-void M2ulPhyS::MASA_exactVel(const Vector &x, double tin, Vector &y) {
-  MFEM_ASSERT(x.Size() == 3, "");
-
-  DryAir eqState;
-  const double gamma = eqState.GetSpecificHeatRatio();
-
-  y(0) = MASA::masa_eval_exact_u<double>(x[0], x[1], x[2], tin);
-  y(1) = MASA::masa_eval_exact_v<double>(x[0], x[1], x[2], tin);
-  y(2) = MASA::masa_eval_exact_w<double>(x[0], x[1], x[2], tin);
-}
-
-void M2ulPhyS::MASA_exactPre(const Vector &x, double tin, Vector &y) {
-  MFEM_ASSERT(x.Size() == 3, "");
-
-  DryAir eqState;
-  const double gamma = eqState.GetSpecificHeatRatio();
-
-  y(0) = MASA::masa_eval_exact_p<double>(x[0], x[1], x[2], tin);
-}
-#endif
 
 // Initial conditions for debug/test case
 void M2ulPhyS::InitialConditionEulerVortex(const Vector &x, Vector &y) {
