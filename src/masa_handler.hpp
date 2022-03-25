@@ -38,6 +38,7 @@
 
 #include "fluxes.hpp"  // for enum Equations
 #include "run_configuration.hpp"
+#include "equation_of_state.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -46,35 +47,50 @@ using namespace std;
 
 class MasaHandler {
  protected:
+  int dim_, numEquation_;
   RunConfiguration* config_;
 
   // TODO: hope to incorporate den, vel, press to Up.
   ParGridFunction *U_, *Up_, *dens_, *vel_, *press_;
  public:
-  MasaHandler(const int dim, RunConfiguration& config, ParGridFunction *U, ParGridFunction *Up,
+  MasaHandler(const int dim, const int numEquation, RunConfiguration& config, ParGridFunction *U, ParGridFunction *Up,
               ParGridFunction *dens, ParGridFunction *vel, ParGridFunction *press);
-  ~MasaHandler() {};
+  ~MasaHandler() {}
+
+  virtual void exactSolnFunction(const Vector &x, double tin, Vector &y) = 0;
 
   void checkSanity();
+  void projectExactSolution();
 };
 
-class NS2DCompressible : public MasaHandler {
+class DryAirMMS : public MasaHandler {
+ private:
+  DryAir *dryAir_;
  public:
-  NS2DCompressible(const int dim, RunConfiguration& config, ParGridFunction *U, ParGridFunction *Up,
+  DryAirMMS(const int dim, const int numEquation, RunConfiguration& config, ParGridFunction *U, ParGridFunction *Up,
+                   ParGridFunction *dens, ParGridFunction *vel, ParGridFunction *press);
+  ~DryAirMMS();
+
+  virtual void exactSolnFunction(const Vector &x, double tin, Vector &y);
+};
+
+class NS2DCompressible : public DryAirMMS {
+ public:
+  NS2DCompressible(const int dim, const int numEquation, RunConfiguration& config, ParGridFunction *U, ParGridFunction *Up,
                    ParGridFunction *dens, ParGridFunction *vel, ParGridFunction *press);
   ~NS2DCompressible() {};
 };
 
-class Euler3DTransient : public MasaHandler {
+class Euler3DTransient : public DryAirMMS {
  public:
-  Euler3DTransient(const int dim, RunConfiguration& config, ParGridFunction *U, ParGridFunction *Up,
+  Euler3DTransient(const int dim, const int numEquation, RunConfiguration& config, ParGridFunction *U, ParGridFunction *Up,
                    ParGridFunction *dens, ParGridFunction *vel, ParGridFunction *press);
   ~Euler3DTransient() {};
 };
 
-class NS3DTransient : public MasaHandler {
+class NS3DTransient : public DryAirMMS {
  public:
-  NS3DTransient(const int dim, RunConfiguration& config, ParGridFunction *U, ParGridFunction *Up,
+  NS3DTransient(const int dim, const int numEquation, RunConfiguration& config, ParGridFunction *U, ParGridFunction *Up,
                 ParGridFunction *dens, ParGridFunction *vel, ParGridFunction *press);
   ~NS3DTransient() {};
 };

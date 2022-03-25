@@ -191,9 +191,11 @@
 //     }  // end switch
 //   }
 
-MasaHandler::MasaHandler(const int dim, RunConfiguration& config, ParGridFunction *U, ParGridFunction *Up,
+MasaHandler::MasaHandler(const int dim, const int numEquation, RunConfiguration& config, ParGridFunction *U, ParGridFunction *Up,
                          ParGridFunction *dens, ParGridFunction *vel, ParGridFunction *press)
-    : config_(&config),
+    : dim_(dim),
+      numEquation_(numEquation),
+      config_(&config),
       U_(U),
       Up_(Up_),
       dens_(dens),
@@ -210,9 +212,45 @@ void MasaHandler::checkSanity() {
   }
 }
 
-NS2DCompressible::NS2DCompressible(const int dim, RunConfiguration& config, ParGridFunction *U, ParGridFunction *Up,
+void MasaHandler::projectExactSolution() {
+  void (*exactSolnFunction)(const Vector &, double, Vector &);
+  exactSolnFunction = &(this->exactSolnFunction);
+  VectorFunctionCoefficient u0(numEquation_, exactSolnFunction);
+  u0.SetTime(0.0);
+  U_->ProjectCoefficient(u0);
+}
+
+DryAirMMS::DryAirMMS(const int dim, const int numEquation, RunConfiguration& config, ParGridFunction *U, ParGridFunction *Up,
+                     ParGridFunction *dens, ParGridFunction *vel, ParGridFunction *press)
+    : MasaHandler(dim, numEquation, config, U, Up, dens, vel, press) {
+  dryAir_ = new DryAir(); // NOTE: only for getting gas constant and heat specific ratio.
+}
+
+DryAirMMS::~DryAirMMS() {
+  delete dryAir_;
+}
+
+void DryAirMMS::exactSolnFunction(const Vector &x, double tin, Vector &y) {
+  // TODO(kevin): make one for NS2DCompressible.
+  MFEM_ASSERT(x.Size() == 3, "");
+
+  const double gamma = dryAir_->GetSpecificHeatRatio();
+
+  y(0) = MASA::masa_eval_exact_rho<double>(x[0], x[1], x[2], tin);  // rho
+  y(1) = y[0] * MASA::masa_eval_exact_u<double>(x[0], x[1], x[2], tin);
+  y(2) = y[0] * MASA::masa_eval_exact_v<double>(x[0], x[1], x[2], tin);
+  y(3) = y[0] * MASA::masa_eval_exact_w<double>(x[0], x[1], x[2], tin);
+  y(4) = MASA::masa_eval_exact_p<double>(x[0], x[1], x[2], tin) / (gamma - 1.);
+
+  double k = 0.;
+  for (int d = 0; d < x.Size(); d++) k += y[1 + d] * y[1 + d];
+  k *= 0.5 / y[0];
+  y[4] += k;
+}
+
+NS2DCompressible::NS2DCompressible(const int dim, const int numEquation, RunConfiguration& config, ParGridFunction *U, ParGridFunction *Up,
                                    ParGridFunction *dens, ParGridFunction *vel, ParGridFunction *press)
-    : MasaHandler(dim, config, U, Up, dens, vel, press) {
+    : DryAirMMS(dim, numEquation, config, U, Up, dens, vel, press) {
   assert(dim == 2);
   assert(config.workFluid == DRY_AIR);
   assert(config.mms_name_ == "navierstokes_2d_compressible");
@@ -224,9 +262,9 @@ NS2DCompressible::NS2DCompressible(const int dim, RunConfiguration& config, ParG
   checkSanity();
 }
 
-Euler3DTransient::Euler3DTransient(const int dim, RunConfiguration& config, ParGridFunction *U, ParGridFunction *Up,
+Euler3DTransient::Euler3DTransient(const int dim, const int numEquation, RunConfiguration& config, ParGridFunction *U, ParGridFunction *Up,
                                    ParGridFunction *dens, ParGridFunction *vel, ParGridFunction *press)
-    : MasaHandler(dim, config, U, Up, dens, vel, press) {
+    : DryAirMMS(dim, numEquation, config, U, Up, dens, vel, press) {
   assert(dim == 3);
   assert(config.workFluid == DRY_AIR);
   assert(config.GetEquationSystem() == EULER);
@@ -299,9 +337,9 @@ Euler3DTransient::Euler3DTransient(const int dim, RunConfiguration& config, ParG
   checkSanity();
 }
 
-NS3DTransient::NS3DTransient(const int dim, RunConfiguration& config, ParGridFunction *U, ParGridFunction *Up,
+NS3DTransient::NS3DTransient(const int dim, const int numEquation, RunConfiguration& config, ParGridFunction *U, ParGridFunction *Up,
                              ParGridFunction *dens, ParGridFunction *vel, ParGridFunction *press)
-    : MasaHandler(dim, config, U, Up, dens, vel, press) {
+    : DryAirMMS(dim, numEquation, config, U, Up, dens, vel, press) {
   assert(dim == 3);
   assert(config.workFluid == DRY_AIR);
   assert(config.GetEquationSystem() == NS);
