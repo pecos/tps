@@ -45,11 +45,38 @@ using namespace std;
 // void initMasaHandler(string name, int dim, const Equations& eqn, const double& viscMult, const std::string mms_name);
 
 class MasaHandler {
- private:
+ protected:
   RunConfiguration* config_;
+
+  // TODO: hope to incorporate den, vel, press to Up.
+  ParGridFunction *U_, *Up_, *dens_, *vel_, *press_;
  public:
-  MasaHandler(const int dim, RunConfiguration& config);
+  MasaHandler(const int dim, RunConfiguration& config, ParGridFunction *U, ParGridFunction *Up,
+              ParGridFunction *dens, ParGridFunction *vel, ParGridFunction *press);
   ~MasaHandler() {};
+
+  void checkSanity();
+};
+
+class NS2DCompressible : public MasaHandler {
+ public:
+  NS2DCompressible(const int dim, RunConfiguration& config, ParGridFunction *U, ParGridFunction *Up,
+                   ParGridFunction *dens, ParGridFunction *vel, ParGridFunction *press);
+  ~NS2DCompressible() {};
+};
+
+class Euler3DTransient : public MasaHandler {
+ public:
+  Euler3DTransient(const int dim, RunConfiguration& config, ParGridFunction *U, ParGridFunction *Up,
+                   ParGridFunction *dens, ParGridFunction *vel, ParGridFunction *press);
+  ~Euler3DTransient() {};
+};
+
+class NS3DTransient : public MasaHandler {
+ public:
+  NS3DTransient(const int dim, RunConfiguration& config, ParGridFunction *U, ParGridFunction *Up,
+                ParGridFunction *dens, ParGridFunction *vel, ParGridFunction *press);
+  ~NS3DTransient() {};
 };
 
 #endif  // MASA_HANDLER_HPP_

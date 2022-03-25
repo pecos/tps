@@ -1018,7 +1018,16 @@ void M2ulPhyS::projectInitialSolution() {
 #ifdef HAVE_MASA
     if (config.use_mms_) {
       // initMasaHandler("exact", dim, config.GetEquationSystem(), config.GetViscMult(), config.mms_name_);
-      masaHandler_ = new MasaHandler(dim, config);
+      if (config.mms_name_ == "navierstokes_2d_compressible") {
+        masaHandler_ = new NS2DCompressible(dim, config, U, Up, dens, vel, press);
+      } else if (config.mms_name_ == "euler_transient_3d") {
+        masaHandler_ = new Euler3DTransient(dim, config, U, Up, dens, vel, press);
+      } else if (config.mms_name_ == "navierstokes_3d_transient_sutherland") {
+        masaHandler_ = new NS3DTransient(dim, config, U, Up, dens, vel, press);
+      } else {
+        grvy_printf(GRVY_ERROR, "Unknown manufactured solution > %s\n", config.mms_name_.c_str());
+      }
+
       void (*initialConditionFunction)(const Vector &, double, Vector &);
       initialConditionFunction = &(this->MASA_exactSol);
       VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
