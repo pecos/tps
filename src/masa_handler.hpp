@@ -42,6 +42,14 @@
 using namespace mfem;
 using namespace std;
 
-void initMasaHandler(string name, int dim, const RunConfiguration& config);
+// void initMasaHandler(string name, int dim, const Equations& eqn, const double& viscMult, const std::string mms_name);
+
+class MasaHandler {
+ private:
+  RunConfiguration* config_;
+ public:
+  MasaHandler(const int dim, RunConfiguration& config);
+  ~MasaHandler() {};
+};
 
 #endif  // MASA_HANDLER_HPP_

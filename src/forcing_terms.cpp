@@ -863,7 +863,8 @@ MASA_forcings::MASA_forcings(const int &_dim, const int &_num_equation, const in
                              const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()) {
-  initMasaHandler("forcing", dim, _config);
+  // NOTE: This has been taken care of by M2ulPhyS.masaHandler_.
+  // initMasaHandler("forcing", dim, _config.GetEquationSystem(), _config.GetViscMult(), _config.mms_name_);
 }
 
 void MASA_forcings::updateTerms(Vector &in) {
