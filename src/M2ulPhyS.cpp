@@ -1017,18 +1017,9 @@ void M2ulPhyS::projectInitialSolution() {
     uniformInitialConditions();
 #ifdef HAVE_MASA
     if (config.use_mms_) {
-      // initMasaHandler("exact", dim, config.GetEquationSystem(), config.GetViscMult(), config.mms_name_);
-      if (config.mms_name_ == "navierstokes_2d_compressible") {
-        masaHandler_ = new NS2DCompressible(dim, num_equation, config, U, Up, dens, vel, press);
-      } else if (config.mms_name_ == "euler_transient_3d") {
-        masaHandler_ = new Euler3DTransient(dim, num_equation, config, U, Up, dens, vel, press);
-      } else if (config.mms_name_ == "navierstokes_3d_transient_sutherland") {
-        masaHandler_ = new NS3DTransient(dim, num_equation, config, U, Up, dens, vel, press);
-      } else {
-        grvy_printf(GRVY_ERROR, "Unknown manufactured solution > %s\n", config.mms_name_.c_str());
-      }
+      initMasaHandler(dim, config);
 
-      masaHandler_->projectExactSolution();
+      projectExactSolution();
       // void (*initialConditionFunction)(const Vector &, double, Vector &);
       // initialConditionFunction = &(this->MASA_exactSol);
       // VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
@@ -1065,27 +1056,22 @@ void M2ulPhyS::solve() {
 
 #ifdef HAVE_MASA
   // instantiate function for exact solution
-  void (*exactSolnFunctionDen)(const Vector &, double, Vector &);
-  void (*exactSolnFunctionVel)(const Vector &, double, Vector &);
-  void (*exactSolnFunctionPre)(const Vector &, double, Vector &);
-  exactSolnFunctionDen = &(this->MASA_exactDen);
-  exactSolnFunctionVel = &(this->MASA_exactVel);
-  exactSolnFunctionPre = &(this->MASA_exactPre);
-  VectorFunctionCoefficient DenMMS(1, exactSolnFunctionDen);
-  VectorFunctionCoefficient VelMMS(dim, exactSolnFunctionVel);
-  VectorFunctionCoefficient PreMMS(1, exactSolnFunctionPre);
+  initMMSCoefficients();
 
   if (config.use_mms_) {
     rhsOperator->updatePrimitives(*U);
     mixture->UpdatePressureGridFunction(press, Up);
 
+    grvy_printf(GRVY_INFO, "Right before using MMS pointers.\n");
+
     // and dump error before we take any steps
-    DenMMS.SetTime(time);
-    VelMMS.SetTime(time);
-    PreMMS.SetTime(time);
-    const double errorDen = dens->ComputeLpError(2, DenMMS);
-    const double errorVel = vel->ComputeLpError(2, VelMMS);
-    const double errorPre = press->ComputeLpError(2, PreMMS);
+    DenMMS_->SetTime(time);
+    VelMMS_->SetTime(time);
+    PreMMS_->SetTime(time);
+    grvy_printf(GRVY_INFO, "Right before compute Lp errors.\n");
+    const double errorDen = dens->ComputeLpError(2, *DenMMS_);
+    const double errorVel = vel->ComputeLpError(2, *VelMMS_);
+    const double errorPre = press->ComputeLpError(2, *PreMMS_);
     if (mpi.Root())
       cout << "time step: " << iter << ", physical time " << time << "s"
            << ", Dens. error: " << errorDen << " Vel. " << errorVel << " press. " << errorPre << endl;
@@ -1128,12 +1114,12 @@ void M2ulPhyS::solve() {
         rhsOperator->updatePrimitives(*U);
         mixture->UpdatePressureGridFunction(press, Up);
 
-        DenMMS.SetTime(time);
-        VelMMS.SetTime(time);
-        PreMMS.SetTime(time);
-        const double errorDen = dens->ComputeLpError(2, DenMMS);
-        const double errorVel = vel->ComputeLpError(2, VelMMS);
-        const double errorPre = press->ComputeLpError(2, PreMMS);
+        DenMMS_->SetTime(time);
+        VelMMS_->SetTime(time);
+        PreMMS_->SetTime(time);
+        const double errorDen = dens->ComputeLpError(2, *DenMMS_);
+        const double errorVel = vel->ComputeLpError(2, *VelMMS_);
+        const double errorPre = press->ComputeLpError(2, *PreMMS_);
         if (mpi.Root())
           cout << "time step: " << iter << ", physical time " << time << "s"
                << ", Dens. error: " << errorDen << " Vel. " << errorVel << " press. " << errorPre << endl;
@@ -1209,12 +1195,12 @@ void M2ulPhyS::solve() {
       rhsOperator->updatePrimitives(*U);
       mixture->UpdatePressureGridFunction(press, Up);
 
-      DenMMS.SetTime(time);
-      VelMMS.SetTime(time);
-      PreMMS.SetTime(time);
-      const double errorDen = dens->ComputeLpError(2, DenMMS);
-      const double errorVel = vel->ComputeLpError(2, VelMMS);
-      const double errorPre = press->ComputeLpError(2, PreMMS);
+      DenMMS_->SetTime(time);
+      VelMMS_->SetTime(time);
+      PreMMS_->SetTime(time);
+      const double errorDen = dens->ComputeLpError(2, *DenMMS_);
+      const double errorVel = vel->ComputeLpError(2, *VelMMS_);
+      const double errorPre = press->ComputeLpError(2, *PreMMS_);
       if (mpi.Root())
         cout << "time step: " << iter << ", physical time " << time << "s"
              << ", Dens. error: " << errorDen << " Vel. " << errorVel << " press. " << errorPre << endl;
