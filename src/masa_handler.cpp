@@ -32,8 +32,8 @@
 #include <tps_config.h>
 
 #ifdef HAVE_MASA
-#include "masa_handler.hpp"
 #include "M2ulPhyS.hpp"
+#include "masa_handler.hpp"
 
 void M2ulPhyS::initMasaHandler() {
   assert(config.use_mms_);
@@ -79,13 +79,11 @@ void M2ulPhyS::projectExactSolution(const double _time) {
 }
 
 void M2ulPhyS::initMMSCoefficients() {
-
   if (config.workFluid == DRY_AIR) {
     DenMMS_ = new VectorFunctionCoefficient(1, &(dryair3d::exactDenFunction));
     VelMMS_ = new VectorFunctionCoefficient(dim, &(dryair3d::exactVelFunction));
     PreMMS_ = new VectorFunctionCoefficient(1, &(dryair3d::exactPreFunction));
   }
-
 }
 
 void M2ulPhyS::checkSolutionError(const double _time) {
@@ -156,7 +154,7 @@ void exactPreFunction(const Vector &x, double tin, Vector &y) {
   y(0) = MASA::masa_eval_exact_p<double>(x[0], x[1], x[2], tin);
 }
 
-void initNS2DCompressible(const int dim, RunConfiguration& config) {
+void initNS2DCompressible(const int dim, RunConfiguration &config) {
   assert(dim == 2);
   assert(config.workFluid == DRY_AIR);
   assert(config.mms_name_ == "navierstokes_2d_compressible");
@@ -165,7 +163,7 @@ void initNS2DCompressible(const int dim, RunConfiguration& config) {
   MASA::masa_init<double>("forcing", "navierstokes_2d_compressible");
 }
 
-void initEuler3DTransient(const int dim, RunConfiguration& config) {
+void initEuler3DTransient(const int dim, RunConfiguration &config) {
   assert(dim == 3);
   assert(config.workFluid == DRY_AIR);
   assert(config.GetEquationSystem() == EULER);
@@ -235,7 +233,7 @@ void initEuler3DTransient(const int dim, RunConfiguration& config) {
   MASA::masa_set_param<double>("a_pt", 400.);
 }
 
-void initNS3DTransient(const int dim, RunConfiguration& config) {
+void initNS3DTransient(const int dim, RunConfiguration &config) {
   assert(dim == 3);
   assert(config.workFluid == DRY_AIR);
   assert(config.GetEquationSystem() == NS);
@@ -312,5 +310,5 @@ void initNS3DTransient(const int dim, RunConfiguration& config) {
   MASA::masa_set_param<double>("a_pt", 400.);
 }
 
-} // namespace dryair3d
+}  // namespace dryair3d
 #endif
