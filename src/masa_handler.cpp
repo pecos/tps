@@ -45,13 +45,12 @@ void M2ulPhyS::initMasaHandler() {
     dryair3d::initEuler3DTransient(dim, config);
   } else if (config.mms_name_ == "navierstokes_3d_transient_sutherland") {
     dryair3d::initNS3DTransient(dim, config);
+  } else if (config.mms_name_ == "test_plasma_2d") {
+    argon2d::initTestPlasma2D(config);
   } else {
     grvy_printf(GRVY_ERROR, "Unknown manufactured solution > %s\n", config.mms_name_.c_str());
     exit(-1);
   }
-
-  // Initialize mms vector function coefficients
-  initMMSCoefficients();
 
   // check that masa at least thinks things are okie-dokie
   int ierr = MASA::masa_sanity_check<double>();
@@ -59,7 +58,16 @@ void M2ulPhyS::initMasaHandler() {
     std::cout << "*** WARNING: MASA sanity check returned error = " << ierr << " ***" << std::endl;
     std::cout << "Current parameters are as follows" << std::endl;
     MASA::masa_display_param<double>();
+    exit(-1);
   }
+
+  if (config.mms_name_ == "test_plasma_2d") {
+    grvy_printf(GRVY_INFO, "test plasma 2d solution is implemented up to this point.\n");
+    exit(0);
+  }
+
+  // Initialize mms vector function coefficients
+  initMMSCoefficients();
 }
 
 void M2ulPhyS::projectExactSolution(const double _time) {
@@ -311,4 +319,20 @@ void initNS3DTransient(const int dim, RunConfiguration &config) {
 }
 
 }  // namespace dryair3d
+
+namespace argon2d {
+
+void initTestPlasma2D(RunConfiguration &config) {
+  // assert(dim == 2);
+  // assert(config.workFluid == DRY_AIR);
+  assert(config.mms_name_ == "test_plasma_2d");
+
+  MASA::masa_init<double>("forcing handler", "test_plasma_2d");
+
+  double state = MASA::masa_eval_exact_state<double>(0.0, 0.0, 0);
+  double src = MASA::masa_eval_source_state<double>(0.0, 0.0, 0);
+  grvy_printf(GRVY_INFO,"state: %f, src: %f\n", state, src);
+}
+
+}  // namespace argon2d
 #endif

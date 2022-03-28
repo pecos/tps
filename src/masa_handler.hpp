@@ -59,4 +59,10 @@ void initNS3DTransient(const int dim, RunConfiguration &config);
 
 }  // namespace dryair3d
 
+namespace argon2d {
+
+void initTestPlasma2D(RunConfiguration &config);
+
+}  // namespace argon2d
+
 #endif  // MASA_HANDLER_HPP_
