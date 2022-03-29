@@ -91,6 +91,14 @@ class TransportProperties {
                                                 Vector &transportBuffer, DenseMatrix &diffusionVelocity) {}
   // NOTE: only for AxisymmetricSource
   virtual double GetViscosityFromPrimitive(const Vector &state) = 0;
+
+  // For mixture-averaged diffusion, correct for mass conservation.
+  void correctMassDiffusionFlux(const double &rho, const Vector &Y_sp, DenseMatrix &diffusionVelocity);
+
+  // compute electric conductivity for mixture-averaged diffusions.
+  double computeMixtureElectricConductivity(const Vector &mobility, const Vector &n_sp);
+
+  void addAmbipolarEfield(const Vector &mobility, const Vector &n_sp, DenseMatrix &diffusionVelocity);
 };
 
 //////////////////////////////////////////////////////

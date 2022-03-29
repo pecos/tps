@@ -152,16 +152,10 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   diffusivity(neutralIndex_) = (1.0 - Y_sp(neutralIndex_)) /
                                ((X_sp(electronIndex_) + Xeps_) / binaryDea + (X_sp(ionIndex_) + Xeps_) / binaryDai);
 
-  double beta = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) {
     double temp = (sp == electronIndex_) ? Te : Th;
     mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity(sp);
-    if (ambipolar) beta += mobility(sp) * X_sp(sp) * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
   }
-
-  // ambipolar E-field
-  Vector ambE(3);
-  ambE = 0.0;
 
   DenseMatrix gradX(numSpecies, dim);
   mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
@@ -172,29 +166,12 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
       double DgradX = diffusivity(sp) * gradX(sp, d);
       // NOTE: we'll have to handle small X case.
       diffusionVelocity(sp, d) = -DgradX / (X_sp(sp) + Xeps_);
-      if (ambipolar) ambE(d) += DgradX * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
     }
   }
 
-  if (ambipolar) {
-    for (int d = 0; d < dim; d++)
-      ambE(d) /= (beta + Xeps_);  // NOTE: add Xeps for the case of no charged-species at the point.
+  if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
 
-    for (int sp = 0; sp < numSpecies; sp++) {
-      for (int d = 0; d < dim; d++) diffusionVelocity(sp, d) += mobility(sp) * ambE(d);
-    }
-  }
-
-  // Correction Velocity
-  Vector Vc(3);
-  Vc = 0.0;
-  for (int sp = 0; sp < numSpecies; sp++) {
-    // NOTE: we'll have to handle small Y case.
-    for (int d = 0; d < dim; d++) Vc(d) += state(0) * Y_sp(sp) * diffusionVelocity(sp, d);
-  }
-  for (int sp = 0; sp < numSpecies; sp++) {
-    for (int d = 0; d < dim; d++) diffusionVelocity(sp, d) -= Vc(d);
-  }
+  correctMassDiffusionFlux(state(0), Y_sp, diffusionVelocity);
 
   double charSpeed = 0.0;
   for (int sp = 0; sp < numActiveSpecies; sp++) {

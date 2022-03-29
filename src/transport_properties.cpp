@@ -41,6 +41,48 @@ TransportProperties::TransportProperties(GasMixture *_mixture) : mixture(_mixtur
   num_equation = mixture->GetNumEquations();
 }
 
+void TransportProperties::correctMassDiffusionFlux(const double &rho, const Vector &Y_sp, DenseMatrix &diffusionVelocity) {
+  // Correction Velocity
+  Vector Vc(3);
+  Vc = 0.0;
+  for (int sp = 0; sp < numSpecies; sp++) {
+    // NOTE: we'll have to handle small Y case.
+    for (int d = 0; d < dim; d++) Vc(d) += rho * Y_sp(sp) * diffusionVelocity(sp, d);
+  }
+  for (int sp = 0; sp < numSpecies; sp++) {
+    for (int d = 0; d < dim; d++) diffusionVelocity(sp, d) -= Vc(d);
+  }
+}
+
+double TransportProperties::computeMixtureElectricConductivity(const Vector &mobility, const Vector &n_sp) {
+  double mho = 0.0; // electric conductivity.
+
+  for (int sp = 0; sp < numSpecies; sp++) {
+    mho += mobility(sp) * n_sp(sp) * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+  }
+
+  return mho;
+}
+
+void TransportProperties::addAmbipolarEfield(const Vector &mobility, const Vector &n_sp, DenseMatrix &diffusionVelocity) {
+  double mho = computeMixtureElectricConductivity(mobility, n_sp);
+
+  Vector ambE(dim);
+  ambE = 0.0;
+  for (int sp = 0; sp < numSpecies; sp++) {
+    for (int d = 0; d < dim; d++) {
+      ambE(d) -= diffusionVelocity(sp, d) * n_sp(sp) * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+    }
+  }
+
+  for (int d = 0; d < dim; d++)
+    ambE(d) /= (mho + Xeps_);  // NOTE: add Xeps for the case of no charged-species at the point.
+
+  for (int sp = 0; sp < numSpecies; sp++) {
+    for (int d = 0; d < dim; d++) diffusionVelocity(sp, d) += mobility(sp) * ambE(d);
+  }
+}
+
 //////////////////////////////////////////////////////
 //////// Dry Air mixture
 //////////////////////////////////////////////////////
