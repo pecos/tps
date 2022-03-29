@@ -37,12 +37,14 @@
  * handy functions to deal with operations.
  */
 
+#include <grvy.h>
 #include <tps_config.h>
 
 // #include <general/forall.hpp>
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
 #include "run_configuration.hpp"
+#include "utils.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -162,6 +164,9 @@ class ConstantTransport : public TransportProperties {
   double bulkViscosity_;
   double diffusivity_;
   double thermalConductivity_;
+
+  int electronIndex_ = -1;
+  const double qeOverkB_ = ELECTRONCHARGE / BOLTZMANNCONSTANT;
 
  public:
   ConstantTransport(GasMixture *_mixture, RunConfiguration &_runfile);

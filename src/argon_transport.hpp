@@ -37,7 +37,6 @@
  * handy functions to deal with operations.
  */
 
-#include <grvy.h>
 #include <tps_config.h>
 
 #include <mfem.hpp>
@@ -48,7 +47,6 @@
 #include "equation_of_state.hpp"
 #include "run_configuration.hpp"
 #include "transport_properties.hpp"
-#include "utils.hpp"
 
 using namespace mfem;
 using namespace std;

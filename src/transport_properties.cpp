@@ -188,6 +188,16 @@ ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_ru
   bulkViscosity_ = _runfile.constantTransport.bulkViscosity;
   diffusivity_ = _runfile.constantTransport.diffusivity;
   thermalConductivity_ = _runfile.constantTransport.thermalConductivity;
+
+  if (mixture->IsTwoTemperature()) {
+    std::map<std::string, int> *speciesMapping = mixture->getSpeciesMapping();
+    if (speciesMapping->count("E")) {
+      electronIndex_ = (*speciesMapping)["E"];
+    } else {
+      grvy_printf(GRVY_ERROR, "\nConstant transport: two-temperature plasma requires the species 'E' !\n");
+      exit(ERROR);
+    }
+  }
 }
 
 void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
@@ -197,6 +207,14 @@ void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, cons
   transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY] = bulkViscosity_;
   transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY] = thermalConductivity_;
   transportBuffer[GlobalTrnsCoeffs::ELECTRON_THERMAL_CONDUCTIVITY] = thermalConductivity_;
+
+  Vector primitiveState(num_equation);
+  mixture->GetPrimitivesFromConservatives(state, primitiveState);
+  double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : primitiveState[dim + 1];
+  double Th = primitiveState[dim + 1];
+
+  Vector n_sp(numSpecies), X_sp(numSpecies), Y_sp(numSpecies);
+  mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
 
   diffusionVelocity.SetSize(numSpecies, dim);
   diffusionVelocity = 0.0;
@@ -208,6 +226,16 @@ void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, cons
     for (int d = 0; d < dim; d++)
       diffusionVelocity(sp, d) = diffusivity_ * massFractionGrad(sp, d) / (state[dim + 2 + sp] + Xeps_) * state[0];
   }
+
+  Vector mobility(numSpecies);
+  for (int sp = 0; sp < numSpecies; sp++) {
+    double temp = (sp == electronIndex_) ? Te : Th;
+    mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity_;
+  }
+
+  if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
+
+  correctMassDiffusionFlux(state(0), Y_sp, diffusionVelocity);
 
   for (int d = 0; d < dim; d++) {
     if (std::isnan(diffusionVelocity(0, d))) {
