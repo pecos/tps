@@ -61,7 +61,8 @@ void initNS3DTransient(const int dim, RunConfiguration &config);
 
 namespace argon2d {
 
-void initTestPlasma2D(RunConfiguration &config);
+void initPeriodicArgonTernary2D(GasMixture *mixture, RunConfiguration &config,
+                                const double Lx, const double Ly);
 
 }  // namespace argon2d
 

@@ -46,7 +46,12 @@ void M2ulPhyS::initMasaHandler() {
   } else if (config.mms_name_ == "navierstokes_3d_transient_sutherland") {
     dryair3d::initNS3DTransient(dim, config);
   } else if (config.mms_name_ == "test_plasma_2d") {
-    argon2d::initTestPlasma2D(config);
+    double Lx, Ly;
+    std::string basepath("mms/periodic_argon_ternary_2d");
+    tpsP->getRequiredInput((basepath + "/Lx").c_str(), Lx);
+    tpsP->getRequiredInput((basepath + "/Ly").c_str(), Ly);
+
+    argon2d::initPeriodicArgonTernary2D(mixture, config, Lx, Ly);
   } else {
     grvy_printf(GRVY_ERROR, "Unknown manufactured solution > %s\n", config.mms_name_.c_str());
     exit(-1);
@@ -322,16 +327,55 @@ void initNS3DTransient(const int dim, RunConfiguration &config) {
 
 namespace argon2d {
 
-void initTestPlasma2D(RunConfiguration &config) {
+void initPeriodicArgonTernary2D(GasMixture *mixture, RunConfiguration &config,
+                                const double Lx, const double Ly) {
   // assert(dim == 2);
   // assert(config.workFluid == DRY_AIR);
-  assert(config.mms_name_ == "test_plasma_2d");
+  assert(config.mms_name_ == "periodic_argon_ternary_2d");
 
-  MASA::masa_init<double>("forcing handler", "test_plasma_2d");
+  MASA::masa_init<double>("forcing handler", "periodic_argon_ternary_2d");
 
-  double state = MASA::masa_eval_exact_state<double>(0.0, 0.0, 0);
-  double src = MASA::masa_eval_source_state<double>(0.0, 0.0, 0);
-  grvy_printf(GRVY_INFO,"state: %f, src: %f\n", state, src);
+  MASA::masa_set_param<double>("u0", 1.5);
+  MASA::masa_set_param<double>("dux", 0.1);
+  MASA::masa_set_param<double>("duy", 0.2);
+
+  MASA::masa_set_param<double>("kux", 1.0);
+  MASA::masa_set_param<double>("kuy", 2.0);
+  MASA::masa_set_param<double>("offset_ux", - 0.33);
+  MASA::masa_set_param<double>("offset_uy", 0.47);
+
+  MASA::masa_set_param<double>("v0", 0.91);
+  MASA::masa_set_param<double>("dvx", 0.13);
+  MASA::masa_set_param<double>("dvy", 0.11);
+
+  MASA::masa_set_param<double>("kvx", 2.0);
+  MASA::masa_set_param<double>("kvy", 1.0);
+  MASA::masa_set_param<double>("offset_vx", 0.11);
+  MASA::masa_set_param<double>("offset_vy", 0.92);
+
+  MASA::masa_set_param<double>("n0", 40.0);
+  MASA::masa_set_param<double>("X0", 0.2);
+  MASA::masa_set_param<double>("dX", 0.014);
+  MASA::masa_set_param<double>("T0", 500.0);
+  MASA::masa_set_param<double>("dT", 37.0);
+
+  const int numSpecies = mixture->GetNumSpecies();
+  MASA::masa_set_param<double>("mA", mixture->GetGasParams(numSpecies - 1, GasParams::SPECIES_MW));
+  MASA::masa_set_param<double>("mI", mixture->GetGasParams(0, GasParams::SPECIES_MW));
+  MASA::masa_set_param<double>("mE", mixture->GetGasParams(numSpecies - 2, GasParams::SPECIES_MW));
+
+  MASA::masa_set_param<double>("CV_A", mixture->getMolarCV(numSpecies - 1) * UNIVERSALGASCONSTANT);
+  MASA::masa_set_param<double>("CV_I", mixture->getMolarCV(numSpecies - 1) * UNIVERSALGASCONSTANT);
+  MASA::masa_set_param<double>("CV_E", mixture->getMolarCV(numSpecies - 1) * UNIVERSALGASCONSTANT);
+
+  MASA::masa_set_param<double>("formEnergy_I", mixture->GetGasParams(0, GasParams::FORMATION_ENERGY));
+
+  MASA::masa_set_param<double>("Lx", Lx);
+  MASA::masa_set_param<double>("Ly", Ly);
+  MASA::masa_set_param<double>("kx", 3.0);
+  MASA::masa_set_param<double>("ky", 1.0);
+  MASA::masa_set_param<double>("offset_x", 0.17);
+  MASA::masa_set_param<double>("offset_y", 0.58);
 }
 
 }  // namespace argon2d
