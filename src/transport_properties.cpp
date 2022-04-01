@@ -189,6 +189,13 @@ ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_ru
   diffusivity_ = _runfile.constantTransport.diffusivity;
   thermalConductivity_ = _runfile.constantTransport.thermalConductivity;
 
+  diffusivity_.SetSize(numSpecies);
+  std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
+  for (int mixSp = 0; mixSp < numSpecies; mixSp++) {
+    int inputSp = (*mixtureToInputMap)[mixSp];
+    diffusivity_(mixSp) = _runfile.constantTransport.diffusivity(inputSp);
+  }
+
   if (mixture->IsTwoTemperature()) {
     std::map<std::string, int> *speciesMapping = mixture->getSpeciesMapping();
     if (speciesMapping->count("E")) {
@@ -224,13 +231,13 @@ void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, cons
   mixture->ComputeMassFractionGradient(state, gradUp, massFractionGrad);
   for (int sp = 0; sp < numSpecies; sp++) {
     for (int d = 0; d < dim; d++)
-      diffusionVelocity(sp, d) = diffusivity_ * massFractionGrad(sp, d) / (state[dim + 2 + sp] + Xeps_) * state[0];
+      diffusionVelocity(sp, d) = diffusivity_(sp) * massFractionGrad(sp, d) / (state[dim + 2 + sp] + Xeps_) * state[0];
   }
 
   Vector mobility(numSpecies);
   for (int sp = 0; sp < numSpecies; sp++) {
     double temp = (sp == electronIndex_) ? Te : Th;
-    mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity_;
+    mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity_(sp);
   }
 
   if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);

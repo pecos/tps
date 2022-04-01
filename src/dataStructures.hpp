@@ -220,7 +220,7 @@ struct heatSourceData {
 struct constantTransportData {
   double viscosity;
   double bulkViscosity;
-  double diffusivity;
+  Vector diffusivity;
   double thermalConductivity;
 };
 

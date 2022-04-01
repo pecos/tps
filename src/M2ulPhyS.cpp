@@ -1967,14 +1967,19 @@ void M2ulPhyS::parseSolverOptions2() {
         tpsP->getInput("plasma_models/transport_model/argon_minimal/third_order_thermal_conductivity",
                        config.thirdOrderkElectron, true);
         break;
-      case CONSTANT:
-        tpsP->getRequiredInput("plasma_models/transport_model/constant/viscosity", config.constantTransport.viscosity);
-        tpsP->getRequiredInput("plasma_models/transport_model/constant/bulk_viscosity",
-                               config.constantTransport.bulkViscosity);
-        tpsP->getRequiredInput("plasma_models/transport_model/constant/diffusivity",
-                               config.constantTransport.diffusivity);
-        tpsP->getRequiredInput("plasma_models/transport_model/constant/thermal_conductivity",
-                               config.constantTransport.thermalConductivity);
+      case CONSTANT: {
+          tpsP->getRequiredInput("plasma_models/transport_model/constant/viscosity", config.constantTransport.viscosity);
+          tpsP->getRequiredInput("plasma_models/transport_model/constant/bulk_viscosity",
+                                 config.constantTransport.bulkViscosity);
+          tpsP->getRequiredInput("plasma_models/transport_model/constant/thermal_conductivity",
+                                 config.constantTransport.thermalConductivity);
+          std::string basepath("plasma_models/transport_model/constant/diffusivity");
+          config.constantTransport.diffusivity.SetSize(config.numSpecies);
+          for (int sp = 1; sp <= config.numSpecies; sp++) {
+            tpsP->getRequiredInput((basepath + "/species" + std::to_string(sp)).c_str(),
+                                   config.constantTransport.diffusivity(sp - 1));
+          }
+        }
         break;
       default:
         break;

@@ -162,7 +162,7 @@ class ConstantTransport : public TransportProperties {
  protected:
   double viscosity_;
   double bulkViscosity_;
-  double diffusivity_;
+  Vector diffusivity_;
   double thermalConductivity_;
 
   int electronIndex_ = -1;
