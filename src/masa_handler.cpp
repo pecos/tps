@@ -103,6 +103,17 @@ void M2ulPhyS::initMMSCoefficients() {
       componentWindow(eq) = 1.0;
       componentWindow_[eq] = new VectorConstantCoefficient(componentWindow);
     }
+
+    // set up origin vector to compute L2 norm via ComputeLpError.
+    zeroUBlock_ = new BlockVector(*offsets);
+    zeroU_ = new ParGridFunction(vfes, zeroUBlock_->HostReadWrite());
+    double *dataZeros = zeroU_->HostReadWrite();
+    int NDof = vfes->GetNDofs();
+    for (int i = 0; i < NDof; i++) {
+      for (int eq = 0; eq < num_equation; eq++) {
+        dataZeros[i + eq * NDof] = 0.0;
+      }
+    }
   }
 }
 
@@ -125,13 +136,18 @@ void M2ulPhyS::checkSolutionError(const double _time) {
     Coefficient *nullPtr = NULL;
 
     stateMMS_->SetTime(_time);
-    Vector componentErrors(num_equation);
+    Vector componentErrors(num_equation), componentRelErrors(num_equation);
     componentErrors = 0.0;
+    componentRelErrors = 0.0;
     for (int eq = 0; eq < num_equation; eq++) {
       componentErrors(eq) = U->ComputeLpError(2, *stateMMS_, nullPtr, componentWindow_[eq]);
+      componentRelErrors(eq) = componentErrors(eq) / zeroU_->ComputeLpError(2, *stateMMS_, nullPtr, componentWindow_[eq]);
     }
-    grvy_printf(GRVY_INFO, "\ntime step: %d, physical time: %.5E, component L2-error: (%.8E, %.8E, %.8E, %.8E, %.8E) \n",
-                iter, _time, componentErrors(0), componentErrors(1), componentErrors(2), componentErrors(3), componentErrors(4));
+    grvy_printf(GRVY_INFO, "\ntime step: %d, physical time: %.5E\n", iter, _time);
+    grvy_printf(GRVY_INFO, "component L2-error: (%.8E, %.8E, %.8E, %.8E, %.8E) \n",
+                           componentErrors(0), componentErrors(1), componentErrors(2), componentErrors(3), componentErrors(4));
+    grvy_printf(GRVY_INFO, "component relative-error: (%.4E, %.4E, %.4E, %.4E, %.4E) \n",
+                           componentRelErrors(0), componentRelErrors(1), componentRelErrors(2), componentRelErrors(3), componentRelErrors(4));
   }
 }
 
@@ -350,6 +366,7 @@ void initPeriodicArgonTernary2D(GasMixture *mixture, RunConfiguration &config,
   // assert(dim == 2);
   // assert(config.workFluid == DRY_AIR);
   assert(config.mms_name_ == "periodic_argon_ternary_2d");
+  assert(config.numSpecies == 3);
 
   MASA::masa_init<double>("forcing handler", "periodic_argon_ternary_2d");
 
