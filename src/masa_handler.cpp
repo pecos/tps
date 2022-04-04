@@ -153,6 +153,14 @@ void M2ulPhyS::checkSolutionError(const double _time) {
 
 namespace dryair3d {
 
+void evaluateForcing(const Vector &x, double time, Array<double> &y) {
+  y[0] = MASA::masa_eval_source_rho<double>(x[0], x[1], x[2], time);  // rho
+  y[1] = MASA::masa_eval_source_u<double>(x[0], x[1], x[2], time);    // rho*u
+  y[2] = MASA::masa_eval_source_v<double>(x[0], x[1], x[2], time);    // rho*v
+  y[3] = MASA::masa_eval_source_w<double>(x[0], x[1], x[2], time);    // rho*w
+  y[4] = MASA::masa_eval_source_e<double>(x[0], x[1], x[2], time);    // rhp*e
+}
+
 void exactSolnFunction(const Vector &x, double tin, Vector &y) {
   // TODO(kevin): make one for NS2DCompressible.
   MFEM_ASSERT(x.Size() == 3, "");
@@ -399,9 +407,15 @@ void initPeriodicArgonTernary2D(GasMixture *mixture, RunConfiguration &config,
   MASA::masa_set_param<double>("mI", mixture->GetGasParams(0, GasParams::SPECIES_MW));
   MASA::masa_set_param<double>("mE", mixture->GetGasParams(numSpecies - 2, GasParams::SPECIES_MW));
 
+  MASA::masa_set_param<double>("R", UNIVERSALGASCONSTANT);
+
   MASA::masa_set_param<double>("CV_A", mixture->getMolarCV(numSpecies - 1));
   MASA::masa_set_param<double>("CV_I", mixture->getMolarCV(0));
   MASA::masa_set_param<double>("CV_E", mixture->getMolarCV(numSpecies - 2));
+
+  MASA::masa_set_param<double>("CP_A", mixture->getMolarCP(numSpecies - 1));
+  MASA::masa_set_param<double>("CP_I", mixture->getMolarCP(0));
+  MASA::masa_set_param<double>("CP_E", mixture->getMolarCP(numSpecies - 2));
 
   MASA::masa_set_param<double>("formEnergy_I", mixture->GetGasParams(0, GasParams::FORMATION_ENERGY));
 
@@ -416,6 +430,20 @@ void initPeriodicArgonTernary2D(GasMixture *mixture, RunConfiguration &config,
   MASA::masa_set_param<double>("kTy", 1.0);
   MASA::masa_set_param<double>("offset_Tx", 0.71);
   MASA::masa_set_param<double>("offset_Ty", 0.29);
+
+  MASA::masa_set_param<double>("mu", config.constantTransport.viscosity);
+  MASA::masa_set_param<double>("muB", config.constantTransport.bulkViscosity);
+  MASA::masa_set_param<double>("k_heat", config.constantTransport.thermalConductivity
+                                          + config.constantTransport.electronThermalConductivity);
+  MASA::masa_set_param<double>("D_A", config.constantTransport.diffusivity(numSpecies - 1));
+  MASA::masa_set_param<double>("D_I", config.constantTransport.diffusivity(0));
+  MASA::masa_set_param<double>("D_E", config.constantTransport.diffusivity(numSpecies - 2));
+
+  MASA::masa_set_param<double>("qe", ELECTRONCHARGE);
+  MASA::masa_set_param<double>("kB", BOLTZMANNCONSTANT);
+
+  MASA::masa_set_param<double>("ZI", mixture->GetGasParams(0, GasParams::SPECIES_CHARGES));
+  MASA::masa_set_param<double>("ZE", mixture->GetGasParams(numSpecies - 2, GasParams::SPECIES_CHARGES));
 }
 
 // TODO(kevin): make it numSpecies-insensitive.
@@ -423,6 +451,13 @@ void exactSolnFunction(const Vector &x, double tin, Vector &y) {
   const int num_equation = 5;
   for (int eq = 0; eq < num_equation; eq++) {
     y(eq) = MASA::masa_eval_exact_state<double>(x[0], x[1], eq);
+  }
+}
+
+void evaluateForcing(const Vector &x, double time, Array<double> &y) {
+  const int num_equation = 5;
+  for (int eq = 0; eq < num_equation; eq++) {
+    y[eq] = MASA::masa_eval_source_state<double>(x[0], x[1], eq);
   }
 }
 

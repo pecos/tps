@@ -47,6 +47,8 @@ using namespace std;
 
 namespace dryair3d {
 
+void evaluateForcing(const Vector &x, double time, Array<double> &y);
+
 void exactSolnFunction(const Vector &x, double tin, Vector &y);
 void exactDenFunction(const Vector &x, double tin, Vector &y);
 void exactVelFunction(const Vector &x, double tin, Vector &y);
@@ -65,6 +67,8 @@ void initPeriodicArgonTernary2D(GasMixture *mixture, RunConfiguration &config,
                                 const double Lx, const double Ly);
 
 void exactSolnFunction(const Vector &x, double tin, Vector &y);
+
+void evaluateForcing(const Vector &x, double time, Array<double> &y);
 
 }  // namespace argon2d
 
