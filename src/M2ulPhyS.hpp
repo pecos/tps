@@ -275,6 +275,8 @@ class M2ulPhyS : public TPS::Solver {
 
 #ifdef HAVE_MASA
   VectorFunctionCoefficient *DenMMS_, *VelMMS_, *PreMMS_;
+  VectorFunctionCoefficient *stateMMS_;
+  std::vector<VectorConstantCoefficient *> componentWindow_;
 #endif
 
 #ifdef _GPU_

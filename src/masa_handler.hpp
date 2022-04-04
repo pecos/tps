@@ -64,6 +64,8 @@ namespace argon2d {
 void initPeriodicArgonTernary2D(GasMixture *mixture, RunConfiguration &config,
                                 const double Lx, const double Ly);
 
+void exactSolnFunction(const Vector &x, double tin, Vector &y);
+
 }  // namespace argon2d
 
 #endif  // MASA_HANDLER_HPP_

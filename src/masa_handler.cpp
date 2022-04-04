@@ -45,7 +45,7 @@ void M2ulPhyS::initMasaHandler() {
     dryair3d::initEuler3DTransient(dim, config);
   } else if (config.mms_name_ == "navierstokes_3d_transient_sutherland") {
     dryair3d::initNS3DTransient(dim, config);
-  } else if (config.mms_name_ == "test_plasma_2d") {
+  } else if (config.mms_name_ == "periodic_argon_ternary_2d") {
     double Lx, Ly;
     std::string basepath("mms/periodic_argon_ternary_2d");
     tpsP->getRequiredInput((basepath + "/Lx").c_str(), Lx);
@@ -66,11 +66,6 @@ void M2ulPhyS::initMasaHandler() {
     exit(-1);
   }
 
-  if (config.mms_name_ == "test_plasma_2d") {
-    grvy_printf(GRVY_INFO, "test plasma 2d solution is implemented up to this point.\n");
-    exit(0);
-  }
-
   // Initialize mms vector function coefficients
   initMMSCoefficients();
 }
@@ -84,6 +79,8 @@ void M2ulPhyS::projectExactSolution(const double _time) {
       exit(-1);
     }
     exactSolnFunction = &(dryair3d::exactSolnFunction);
+  } else if (config.mms_name_ == "periodic_argon_ternary_2d") {
+    exactSolnFunction = &(argon2d::exactSolnFunction);
   }
 
   VectorFunctionCoefficient u0(num_equation, exactSolnFunction);
@@ -96,6 +93,16 @@ void M2ulPhyS::initMMSCoefficients() {
     DenMMS_ = new VectorFunctionCoefficient(1, &(dryair3d::exactDenFunction));
     VelMMS_ = new VectorFunctionCoefficient(dim, &(dryair3d::exactVelFunction));
     PreMMS_ = new VectorFunctionCoefficient(1, &(dryair3d::exactPreFunction));
+  } else if (config.mms_name_ == "periodic_argon_ternary_2d") {
+    stateMMS_ = new VectorFunctionCoefficient(num_equation, &(argon2d::exactSolnFunction));
+
+    Vector componentWindow(num_equation);
+    componentWindow_.resize(num_equation);
+    for (int eq = 0; eq < num_equation; eq++) {
+      componentWindow = 0.0;
+      componentWindow(eq) = 1.0;
+      componentWindow_[eq] = new VectorConstantCoefficient(componentWindow);
+    }
   }
 }
 
@@ -114,6 +121,17 @@ void M2ulPhyS::checkSolutionError(const double _time) {
     if (mpi.Root())
       cout << "time step: " << iter << ", physical time " << _time << "s"
            << ", Dens. error: " << errorDen << " Vel. " << errorVel << " press. " << errorPre << endl;
+  } else if (config.mms_name_ == "periodic_argon_ternary_2d") {
+    Coefficient *nullPtr = NULL;
+
+    stateMMS_->SetTime(_time);
+    Vector componentErrors(num_equation);
+    componentErrors = 0.0;
+    for (int eq = 0; eq < num_equation; eq++) {
+      componentErrors(eq) = U->ComputeLpError(2, *stateMMS_, nullPtr, componentWindow_[eq]);
+    }
+    grvy_printf(GRVY_INFO, "\ntime step: %d, physical time: %.5E, component L2-error: (%.8E, %.8E, %.8E, %.8E, %.8E) \n",
+                iter, _time, componentErrors(0), componentErrors(1), componentErrors(2), componentErrors(3), componentErrors(4));
   }
 }
 
@@ -354,8 +372,8 @@ void initPeriodicArgonTernary2D(GasMixture *mixture, RunConfiguration &config,
   MASA::masa_set_param<double>("offset_vy", 0.92);
 
   MASA::masa_set_param<double>("n0", 40.0);
-  MASA::masa_set_param<double>("X0", 0.2);
-  MASA::masa_set_param<double>("dX", 0.014);
+  MASA::masa_set_param<double>("X0", 0.3);
+  MASA::masa_set_param<double>("dX", 0.11);
   MASA::masa_set_param<double>("T0", 500.0);
   MASA::masa_set_param<double>("dT", 37.0);
 
@@ -364,18 +382,31 @@ void initPeriodicArgonTernary2D(GasMixture *mixture, RunConfiguration &config,
   MASA::masa_set_param<double>("mI", mixture->GetGasParams(0, GasParams::SPECIES_MW));
   MASA::masa_set_param<double>("mE", mixture->GetGasParams(numSpecies - 2, GasParams::SPECIES_MW));
 
-  MASA::masa_set_param<double>("CV_A", mixture->getMolarCV(numSpecies - 1) * UNIVERSALGASCONSTANT);
-  MASA::masa_set_param<double>("CV_I", mixture->getMolarCV(numSpecies - 1) * UNIVERSALGASCONSTANT);
-  MASA::masa_set_param<double>("CV_E", mixture->getMolarCV(numSpecies - 1) * UNIVERSALGASCONSTANT);
+  MASA::masa_set_param<double>("CV_A", mixture->getMolarCV(numSpecies - 1));
+  MASA::masa_set_param<double>("CV_I", mixture->getMolarCV(0));
+  MASA::masa_set_param<double>("CV_E", mixture->getMolarCV(numSpecies - 2));
 
   MASA::masa_set_param<double>("formEnergy_I", mixture->GetGasParams(0, GasParams::FORMATION_ENERGY));
 
   MASA::masa_set_param<double>("Lx", Lx);
   MASA::masa_set_param<double>("Ly", Ly);
-  MASA::masa_set_param<double>("kx", 3.0);
+  MASA::masa_set_param<double>("kx", 2.0);
   MASA::masa_set_param<double>("ky", 1.0);
   MASA::masa_set_param<double>("offset_x", 0.17);
   MASA::masa_set_param<double>("offset_y", 0.58);
+
+  MASA::masa_set_param<double>("kTx", 1.0);
+  MASA::masa_set_param<double>("kTy", 1.0);
+  MASA::masa_set_param<double>("offset_Tx", 0.71);
+  MASA::masa_set_param<double>("offset_Ty", 0.29);
+}
+
+// TODO(kevin): make it numSpecies-insensitive.
+void exactSolnFunction(const Vector &x, double tin, Vector &y) {
+  const int num_equation = 5;
+  for (int eq = 0; eq < num_equation; eq++) {
+    y(eq) = MASA::masa_eval_exact_state<double>(x[0], x[1], eq);
+  }
 }
 
 }  // namespace argon2d
