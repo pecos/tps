@@ -188,6 +188,7 @@ ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_ru
   bulkViscosity_ = _runfile.constantTransport.bulkViscosity;
   diffusivity_ = _runfile.constantTransport.diffusivity;
   thermalConductivity_ = _runfile.constantTransport.thermalConductivity;
+  electronThermalConductivity_ = _runfile.constantTransport.electronThermalConductivity;
 
   diffusivity_.SetSize(numSpecies);
   std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
@@ -213,7 +214,7 @@ void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, cons
   transportBuffer[GlobalTrnsCoeffs::VISCOSITY] = viscosity_;
   transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY] = bulkViscosity_;
   transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY] = thermalConductivity_;
-  transportBuffer[GlobalTrnsCoeffs::ELECTRON_THERMAL_CONDUCTIVITY] = thermalConductivity_;
+  transportBuffer[GlobalTrnsCoeffs::ELECTRON_THERMAL_CONDUCTIVITY] = electronThermalConductivity_;
 
   Vector primitiveState(num_equation);
   mixture->GetPrimitivesFromConservatives(state, primitiveState);

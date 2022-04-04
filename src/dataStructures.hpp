@@ -222,6 +222,7 @@ struct constantTransportData {
   double bulkViscosity;
   Vector diffusivity;
   double thermalConductivity;
+  double electronThermalConductivity;
 };
 
 #endif  // DATASTRUCTURES_HPP_

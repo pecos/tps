@@ -164,6 +164,7 @@ class ConstantTransport : public TransportProperties {
   double bulkViscosity_;
   Vector diffusivity_;
   double thermalConductivity_;
+  double electronThermalConductivity_;
 
   int electronIndex_ = -1;
   const double qeOverkB_ = ELECTRONCHARGE / BOLTZMANNCONSTANT;

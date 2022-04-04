@@ -1973,6 +1973,8 @@ void M2ulPhyS::parseSolverOptions2() {
                                  config.constantTransport.bulkViscosity);
           tpsP->getRequiredInput("plasma_models/transport_model/constant/thermal_conductivity",
                                  config.constantTransport.thermalConductivity);
+          tpsP->getRequiredInput("plasma_models/transport_model/constant/electron_thermal_conductivity",
+                                 config.constantTransport.electronThermalConductivity);
           std::string basepath("plasma_models/transport_model/constant/diffusivity");
           config.constantTransport.diffusivity.SetSize(config.numSpecies);
           for (int sp = 1; sp <= config.numSpecies; sp++) {
