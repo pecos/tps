@@ -143,11 +143,13 @@ void M2ulPhyS::checkSolutionError(const double _time) {
       componentErrors(eq) = U->ComputeLpError(2, *stateMMS_, nullPtr, componentWindow_[eq]);
       componentRelErrors(eq) = componentErrors(eq) / zeroU_->ComputeLpError(2, *stateMMS_, nullPtr, componentWindow_[eq]);
     }
-    grvy_printf(GRVY_INFO, "\ntime step: %d, physical time: %.5E\n", iter, _time);
-    grvy_printf(GRVY_INFO, "component L2-error: (%.8E, %.8E, %.8E, %.8E, %.8E) \n",
-                           componentErrors(0), componentErrors(1), componentErrors(2), componentErrors(3), componentErrors(4));
-    grvy_printf(GRVY_INFO, "component relative-error: (%.4E, %.4E, %.4E, %.4E, %.4E) \n",
-                           componentRelErrors(0), componentRelErrors(1), componentRelErrors(2), componentRelErrors(3), componentRelErrors(4));
+    if (mpi.Root()) {
+      grvy_printf(GRVY_INFO, "\ntime step: %d, physical time: %.5E\n", iter, _time);
+      grvy_printf(GRVY_INFO, "component L2-error: (%.8E, %.8E, %.8E, %.8E, %.8E) \n",
+                             componentErrors(0), componentErrors(1), componentErrors(2), componentErrors(3), componentErrors(4));
+      grvy_printf(GRVY_INFO, "component relative-error: (%.4E, %.4E, %.4E, %.4E, %.4E) \n",
+                             componentRelErrors(0), componentRelErrors(1), componentRelErrors(2), componentRelErrors(3), componentRelErrors(4));
+    }
   }
 }
 
@@ -375,21 +377,28 @@ void initPeriodicArgonTernary2D(GasMixture *mixture, RunConfiguration &config,
   // assert(config.workFluid == DRY_AIR);
   assert(config.mms_name_ == "periodic_argon_ternary_2d");
   assert(config.numSpecies == 3);
+  assert(config.transportModel == CONSTANT);
 
   MASA::masa_init<double>("forcing handler", "periodic_argon_ternary_2d");
 
-  MASA::masa_set_param<double>("u0", 1.5);
-  MASA::masa_set_param<double>("dux", 0.1);
-  MASA::masa_set_param<double>("duy", 0.2);
+  // MASA::masa_set_param<double>("u0", 1.5);
+  // MASA::masa_set_param<double>("dux", 0.1);
+  // MASA::masa_set_param<double>("duy", 0.2);
+  MASA::masa_set_param<double>("u0", 1.0);
+  MASA::masa_set_param<double>("dux", 0.0);
+  MASA::masa_set_param<double>("duy", 0.0);
 
   MASA::masa_set_param<double>("kux", 1.0);
   MASA::masa_set_param<double>("kuy", 2.0);
   MASA::masa_set_param<double>("offset_ux", - 0.33);
   MASA::masa_set_param<double>("offset_uy", 0.47);
 
-  MASA::masa_set_param<double>("v0", 0.91);
-  MASA::masa_set_param<double>("dvx", 0.13);
-  MASA::masa_set_param<double>("dvy", 0.11);
+  // MASA::masa_set_param<double>("v0", 0.91);
+  // MASA::masa_set_param<double>("dvx", 0.13);
+  // MASA::masa_set_param<double>("dvy", 0.11);
+  MASA::masa_set_param<double>("v0", 1.0);
+  MASA::masa_set_param<double>("dvx", 0.0);
+  MASA::masa_set_param<double>("dvy", 0.0);
 
   MASA::masa_set_param<double>("kvx", 2.0);
   MASA::masa_set_param<double>("kvy", 1.0);
@@ -399,8 +408,10 @@ void initPeriodicArgonTernary2D(GasMixture *mixture, RunConfiguration &config,
   MASA::masa_set_param<double>("n0", 40.0);
   MASA::masa_set_param<double>("X0", 0.3);
   MASA::masa_set_param<double>("dX", 0.11);
+  // MASA::masa_set_param<double>("dX", 0.0);
   MASA::masa_set_param<double>("T0", 500.0);
-  MASA::masa_set_param<double>("dT", 37.0);
+  // MASA::masa_set_param<double>("dT", 37.0);
+  MASA::masa_set_param<double>("dT", 0.0);
 
   const int numSpecies = mixture->GetNumSpecies();
   MASA::masa_set_param<double>("mA", mixture->GetGasParams(numSpecies - 1, GasParams::SPECIES_MW));

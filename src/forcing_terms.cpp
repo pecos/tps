@@ -866,6 +866,8 @@ MASA_forcings::MASA_forcings(const int &_dim, const int &_num_equation, const in
   // NOTE: This has been taken care of by M2ulPhyS.masaHandler_.
   // initMasaHandler("forcing", dim, _config.GetEquationSystem(), _config.GetViscMult(), _config.mms_name_);
   if (_config.workFluid == DRY_AIR) {
+    // make sure we are in a 3D case
+    assert(dim == 3);
     evaluateForcing_ = &(dryair3d::evaluateForcing);
   } else if (_config.mms_name_ == "periodic_argon_ternary_2d") {
     evaluateForcing_ = &(argon2d::evaluateForcing);
@@ -873,9 +875,6 @@ MASA_forcings::MASA_forcings(const int &_dim, const int &_num_equation, const in
 }
 
 void MASA_forcings::updateTerms(Vector &in) {
-  // make sure we are in a 3D case
-  assert(dim == 3);
-
   int numElem = vfes->GetNE();
   int dof = vfes->GetNDofs();
 

@@ -32,6 +32,7 @@
 #ifndef RHS_OPERATOR_HPP_
 #define RHS_OPERATOR_HPP_
 
+#include <grvy.h>
 #include <tps_config.h>
 
 #include <mfem.hpp>
