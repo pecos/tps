@@ -570,27 +570,25 @@ void TestBinaryAir::ComputeSpeciesPrimitives(const Vector &conservedState, Vecto
   }
 }
 
-void TestBinaryAir::ComputeMassFractionGradient(const Vector &state, const DenseMatrix &gradUp,
+void TestBinaryAir::ComputeMassFractionGradient(const double rho, const Vector &numberDensities, const DenseMatrix &gradUp,
                                                 DenseMatrix &massFractionGrad) {
   // Only need active species.
   massFractionGrad.SetSize(numActiveSpecies, dim);
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     for (int d = 0; d < dim; d++)
-      massFractionGrad(sp, d) = gasParams(sp, GasParams::SPECIES_MW) * gradUp(dim + 2 + sp, d) / state(0) -
-                                state(dim + 2 + sp) / state(0) / state(0) * gradUp(0, d);
+      massFractionGrad(sp, d) = gasParams(sp, GasParams::SPECIES_MW) * gradUp(dim + 2 + sp, d) / rho -
+                                gasParams(sp, GasParams::SPECIES_MW) * numberDensities(sp) / rho / rho * gradUp(0, d);
   }
 }
 
-void TestBinaryAir::ComputeMoleFractionGradient(const Vector &state, const DenseMatrix &gradUp,
+void TestBinaryAir::ComputeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
                                                 DenseMatrix &moleFractionGrad) {
   // TODO(kevin): Fluxes need to take Up as input, so that we won't recompute primitives again.
-  Vector X_sp;
-  Vector Y_sp;
-  Vector n_sp;
-  ComputeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
+  Vector X_sp(numSpecies);
 
   double n = 0.0;
-  for (int sp = 0; sp < numSpecies; sp++) n += n_sp[sp];
+  for (int sp = 0; sp < numSpecies; sp++) n += numberDensities(sp);
+  for (int sp = 0; sp < numSpecies; sp++) X_sp(sp) = numberDensities(sp) / n;
 
   Vector nGrad(dim);
   nGrad = 0.0;

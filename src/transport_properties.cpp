@@ -151,6 +151,9 @@ void TestBinaryAirTransport::ComputeFluxTransportProperties(const Vector &state,
   double p = mixture->ComputePressure(state, dummy);
   double temp = p / gas_constant / state[0];
 
+  Vector n_sp(numSpecies), X_sp(numSpecies), Y_sp(numSpecies);
+  mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
+
   transportBuffer.SetSize(GlobalTrnsCoeffs::NUM_GLOBAL_COEFFS);
   double viscosity = (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
   transportBuffer[GlobalTrnsCoeffs::VISCOSITY] = viscosity;
@@ -165,7 +168,7 @@ void TestBinaryAirTransport::ComputeFluxTransportProperties(const Vector &state,
 
     // Compute mass fraction gradient from number density gradient.
     DenseMatrix massFractionGrad;
-    mixture->ComputeMassFractionGradient(state, gradUp, massFractionGrad);
+    mixture->ComputeMassFractionGradient(state(0), n_sp, gradUp, massFractionGrad);
     for (int sp = 0; sp < numActiveSpecies; sp++) {
       if (state[dim + 2 + sp] == 0.0) continue;
 
@@ -186,7 +189,6 @@ void TestBinaryAirTransport::ComputeFluxTransportProperties(const Vector &state,
 ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_runfile) : TransportProperties(_mixture) {
   viscosity_ = _runfile.constantTransport.viscosity;
   bulkViscosity_ = _runfile.constantTransport.bulkViscosity;
-  diffusivity_ = _runfile.constantTransport.diffusivity;
   thermalConductivity_ = _runfile.constantTransport.thermalConductivity;
   electronThermalConductivity_ = _runfile.constantTransport.electronThermalConductivity;
 
@@ -229,10 +231,10 @@ void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, cons
 
   // Compute mass fraction gradient from number density gradient.
   DenseMatrix massFractionGrad(numSpecies, dim);
-  mixture->ComputeMassFractionGradient(state, gradUp, massFractionGrad);
+  mixture->ComputeMassFractionGradient(state(0), n_sp, gradUp, massFractionGrad);
   for (int sp = 0; sp < numSpecies; sp++) {
     for (int d = 0; d < dim; d++)
-      diffusionVelocity(sp, d) = diffusivity_(sp) * massFractionGrad(sp, d) / (state[dim + 2 + sp] + Xeps_) * state[0];
+      diffusionVelocity(sp, d) = - diffusivity_(sp) * massFractionGrad(sp, d) / (Y_sp(sp) + Xeps_);
   }
 
   Vector mobility(numSpecies);
@@ -245,10 +247,12 @@ void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, cons
 
   correctMassDiffusionFlux(state(0), Y_sp, diffusionVelocity);
 
-  for (int d = 0; d < dim; d++) {
-    if (std::isnan(diffusionVelocity(0, d))) {
-      grvy_printf(GRVY_ERROR, "\nDiffusion velocity is NaN! -> %f\n", diffusionVelocity(0, d));
-      exit(-1);
+  for (int sp = 0; sp < numSpecies; sp++) {
+    for (int d = 0; d < dim; d++) {
+      if (std::isnan(diffusionVelocity(sp, d))) {
+        grvy_printf(GRVY_ERROR, "\nDiffusion velocity of species %d is NaN! -> %f\n", sp, diffusionVelocity(sp, d));
+        exit(-1);
+      }
     }
   }
 }

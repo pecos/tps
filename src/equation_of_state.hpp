@@ -159,10 +159,10 @@ class GasMixture {
   // Compute X, Y gradients from number density gradient.
   // TODO(kevin): Fluxes class should take Up as input variable.
   // Currently cannot receive Up inside Fluxes class.
-  virtual void ComputeMassFractionGradient(const Vector &state, const DenseMatrix &gradUp,
-                                           DenseMatrix &massFractionGrad) {}
-  virtual void ComputeMoleFractionGradient(const Vector &state, const DenseMatrix &gradUp,
-                                           DenseMatrix &moleFractionGrad) {}
+  virtual void ComputeMassFractionGradient(const double rho, const Vector &numberDensities, const DenseMatrix &gradUp,
+                                           DenseMatrix &massFractionGrad) = 0;
+  virtual void ComputeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
+                                           DenseMatrix &moleFractionGrad) = 0;
   // TODO(kevin): Compute pressure gradient from temperature gradient.
   virtual void ComputePressureGradient(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &PressureGrad) {}
 
@@ -250,6 +250,11 @@ class DryAir : public GasMixture {
 
   virtual double GetSpecificHeatRatio() { return specific_heat_ratio; }
   virtual double GetGasConstant() { return gas_constant; }
+
+  virtual void ComputeMassFractionGradient(const double rho, const Vector &numberDensities, const DenseMatrix &gradUp,
+                                           DenseMatrix &massFractionGrad) {}
+  virtual void ComputeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
+                                           DenseMatrix &moleFractionGrad) {}
 
   // virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
 
@@ -438,9 +443,9 @@ class TestBinaryAir : public GasMixture {
 
   virtual void ComputeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp);
 
-  virtual void ComputeMassFractionGradient(const Vector &state, const DenseMatrix &gradUp,
+  virtual void ComputeMassFractionGradient(const double rho, const Vector &numberDensities, const DenseMatrix &gradUp,
                                            DenseMatrix &massFractionGrad);
-  virtual void ComputeMoleFractionGradient(const Vector &state, const DenseMatrix &gradUp,
+  virtual void ComputeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
                                            DenseMatrix &moleFractionGrad);
 
   virtual double GetSpecificHeatRatio() { return specific_heat_ratio; }
