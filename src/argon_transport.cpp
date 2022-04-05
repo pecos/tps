@@ -63,6 +63,8 @@ ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture, RunConfigurat
     exit(ERROR);
   }
 
+  // TODO(kevin): need to factor out avogadro numbers throughout all transport property.
+  // multiplying/dividing big numbers are risky of losing precision.
   mw_.SetSize(3);
   mw_(electronIndex_) = mixture->GetGasParams(electronIndex_, GasParams::SPECIES_MW);
   mw_(neutralIndex_) = mixture->GetGasParams(neutralIndex_, GasParams::SPECIES_MW);
@@ -142,7 +144,7 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
 
   double binaryDea = diffusivityFactor_ * sqrt(Te / muAE_) / nTotal / collision::argon::eAr11(Te);
   double binaryDai = diffusivityFactor_ * sqrt(Th / muAI_) / nTotal / collision::argon::ArAr1P11(Th);
-  double binaryDie = diffusivityFactor_ * sqrt(Te / muEI_) / nTotal / collision::charged::att11(nondimTe);
+  double binaryDie = diffusivityFactor_ * sqrt(Te / muEI_) / nTotal / (collision::charged::att11(nondimTe) * debyeCircle);
 
   Vector diffusivity(3), mobility(3);
   diffusivity(electronIndex_) = (1.0 - Y_sp(electronIndex_)) /
@@ -253,7 +255,7 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
 
   double binaryDea = diffusivityFactor_ * sqrt(Te / muAE_) / nTotal / collision::argon::eAr11(Te);
   double binaryDai = diffusivityFactor_ * sqrt(Th / muAI_) / nTotal / collision::argon::ArAr1P11(Th);
-  double binaryDie = diffusivityFactor_ * sqrt(Te / muEI_) / nTotal / collision::charged::att11(nondimTe);
+  double binaryDie = diffusivityFactor_ * sqrt(Te / muEI_) / nTotal / (collision::charged::att11(nondimTe) * debyeCircle);
 
   diffusivity.SetSize(3);
   diffusivity(electronIndex_) = (1.0 - Y_sp(electronIndex_)) /
@@ -262,4 +264,84 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
                            ((X_sp(neutralIndex_) + Xeps_) / binaryDai + (X_sp(electronIndex_) + Xeps_) / binaryDie);
   diffusivity(neutralIndex_) = (1.0 - Y_sp(neutralIndex_)) /
                                ((X_sp(electronIndex_) + Xeps_) / binaryDea + (X_sp(ionIndex_) + Xeps_) / binaryDai);
+}
+
+void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up,
+                                                             const DenseMatrix &gradUp, DenseMatrix &speciesTransport,
+                                                             DenseMatrix &diffusionVelocity, Vector &n_sp) {
+  speciesTransport.SetSize(numSpecies, SpeciesTrnsCoeffs::NUM_SPECIES_COEFFS);
+  speciesTransport = 0.0;
+
+  n_sp.SetSize(3);
+  Vector X_sp(3), Y_sp(3);
+  mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
+  double nTotal = 0.0;
+  for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
+
+  double Te = (twoTemperature_) ? Up[num_equation - 1] : Up[dim + 1];
+  double Th = Up[dim + 1];
+
+  // Add Xeps to avoid zero number density case.
+  double nOverT = (n_sp(electronIndex_) + Xeps_) / Te + (n_sp(ionIndex_) + Xeps_) / Th;
+  double debyeLength = sqrt(debyeFactor_ / AVOGADRONUMBER / nOverT);
+  double debyeCircle = PI_ * debyeLength * debyeLength;
+
+  double nondimTe = debyeLength * 4.0 * PI_ * debyeFactor_ * Te;
+  double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
+
+  double Qea = collision::argon::eAr11(Te);
+  double Qai = collision::argon::ArAr1P11(Th);
+  double Qie = collision::charged::att11(nondimTe) * debyeCircle;
+  double binaryDea = diffusivityFactor_ * sqrt(Te / muAE_) / nTotal / Qea;
+  double binaryDai = diffusivityFactor_ * sqrt(Th / muAI_) / nTotal / Qai;
+  double binaryDie = diffusivityFactor_ * sqrt(Te / muEI_) / nTotal / Qie;
+
+  Vector diffusivity(3), mobility(3);
+  diffusivity(electronIndex_) = (1.0 - Y_sp(electronIndex_)) /
+                                ((X_sp(ionIndex_) + Xeps_) / binaryDie + (X_sp(neutralIndex_) + Xeps_) / binaryDea);
+  diffusivity(ionIndex_) = (1.0 - Y_sp(ionIndex_)) /
+                           ((X_sp(neutralIndex_) + Xeps_) / binaryDai + (X_sp(electronIndex_) + Xeps_) / binaryDie);
+  diffusivity(neutralIndex_) = (1.0 - Y_sp(neutralIndex_)) /
+                               ((X_sp(electronIndex_) + Xeps_) / binaryDea + (X_sp(ionIndex_) + Xeps_) / binaryDai);
+
+  for (int sp = 0; sp < numSpecies; sp++) {
+    double temp = (sp == electronIndex_) ? Te : Th;
+    mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity(sp);
+
+    speciesTransport(sp, SpeciesTrnsCoeffs::MOBILITY) = mobility(sp);
+  }
+
+  DenseMatrix gradX(numSpecies, dim);
+  mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
+
+  diffusionVelocity.SetSize(numSpecies, dim);
+  for (int sp = 0; sp < numSpecies; sp++) {
+    for (int d = 0; d < dim; d++) {
+      double DgradX = diffusivity(sp) * gradX(sp, d);
+      // NOTE: we'll have to handle small X case.
+      diffusionVelocity(sp, d) = - DgradX / (X_sp(sp) + Xeps_);
+    }
+  }
+
+  if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
+
+  correctMassDiffusionFlux(state(0), Y_sp, diffusionVelocity);
+
+  speciesTransport(ionIndex_, SpeciesTrnsCoeffs::MF_FREQUENCY) = mfFreqFactor_ * sqrt(Te / mw_(electronIndex_))
+                                                                  * n_sp(ionIndex_) * Qie;
+  speciesTransport(neutralIndex_, SpeciesTrnsCoeffs::MF_FREQUENCY) = mfFreqFactor_ * sqrt(Te / mw_(electronIndex_))
+                                                                      * n_sp(neutralIndex_) * Qea;
+  // // relative electron collision speed
+  // double ge = sqrt(8.0 * kB_ * Te / PI_ / mw_(electronIndex_));
+  // speciesTransport(ionIndex_, SpeciesTrnsCoeffs::MF_FREQUENCY) = 4.0 / 3.0 * AVOGADRONUMBER * n_sp(ionIndex_) * ge * Qie;
+
+  double charSpeed = 0.0;
+  for (int sp = 0; sp < numActiveSpecies; sp++) {
+    double speciesSpeed = 0.0;
+    for (int d = 0; d < dim; d++) speciesSpeed += diffusionVelocity(sp, d) * diffusionVelocity(sp, d);
+    speciesSpeed = sqrt(speciesSpeed);
+    if (speciesSpeed > charSpeed) charSpeed = speciesSpeed;
+    // charSpeed = max(charSpeed, speciesSpeed);
+  }
+  // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }

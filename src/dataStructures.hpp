@@ -65,7 +65,7 @@ enum GlobalTrnsCoeffs {
   NUM_GLOBAL_COEFFS
 };
 
-enum SpeciesTrnsCoeffs { DIFFUSIVITY, MOBILITY, MF_FREQUENCY, NUM_SPECIES_COEFFS };
+enum SpeciesTrnsCoeffs { /* DIFFUSIVITY, */ MOBILITY, MF_FREQUENCY, NUM_SPECIES_COEFFS };
 
 enum TransportOutputPrimitives {
   TOTAL_PRESSURE,

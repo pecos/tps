@@ -83,14 +83,14 @@ class TransportProperties {
   // TODO(kevin): need to discuss whether to reuse computed primitive variables in flux evaluation,
   // or in general evaluation of primitive variables.
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
-                                              DenseMatrix &diffusionVelocity) {}
+                                              DenseMatrix &diffusionVelocity) = 0;
   // Vector &outputUp);
 
   // Source term will be constructed using ForcingTerms, which have pointers to primitive variables.
   // So we can use them in evaluating transport properties.
   // If this routine evaluate additional primitive variables, can return them just as the routine above.
   virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
-                                                Vector &transportBuffer, DenseMatrix &diffusionVelocity) {}
+                                                DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity, Vector &n_sp) = 0;
   // NOTE: only for AxisymmetricSource
   virtual double GetViscosityFromPrimitive(const Vector &state) = 0;
 
@@ -127,6 +127,8 @@ class DryAirTransport : public TransportProperties {
 
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
                                               DenseMatrix &diffusionVelocity);
+  virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
+                                                DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity, Vector &n_sp) {}
 
   virtual double GetViscosityFromPrimitive(const Vector &state);
 };
@@ -152,6 +154,8 @@ class TestBinaryAirTransport : public DryAirTransport {
 
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
                                               DenseMatrix &diffusionVelocity);
+  virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
+                                                DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity, Vector &n_sp) {}
 };
 
 //////////////////////////////////////////////////////
@@ -176,6 +180,8 @@ class ConstantTransport : public TransportProperties {
 
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
                                               DenseMatrix &diffusionVelocity);
+  virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
+                                                DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity, Vector &n_sp) {}
 
   virtual double GetViscosityFromPrimitive(const Vector &state) {}
 };
