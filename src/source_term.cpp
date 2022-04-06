@@ -76,11 +76,15 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
       for (int d = 0; d < dim; d++)
         gradUpn(eq, d) = h_gradUp[n + eq * nnodes + d * num_equation * nnodes];
     }
+    // TODO(kevin): update E-field with EM coupling.
+    Vector Efield(dim);
+    Efield = 0.0;
+
     Vector globalTransport(numSpecies_);
     DenseMatrix speciesTransport(numSpecies_, SpeciesTrns::NUM_SPECIES_COEFFS);
     DenseMatrix diffusionVelocity(numSpecies_, dim);
     Vector ns(numSpecies_);
-    transport_->ComputeSourceTransportProperties(Un, upn, gradUpn, globalTransport,
+    transport_->ComputeSourceTransportProperties(Un, upn, gradUpn, globalTransport, Efield,
                                                  speciesTransport, diffusionVelocity, ns);
 
     srcTerm = 0.0;

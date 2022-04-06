@@ -49,13 +49,14 @@
 using namespace mfem;
 using namespace std;
 
-// Kevin: maybe use namespace?
+// TODO(kevin): move these constants to dataStructures.hpp
 static const int MAXSPECIES = 200;
 static const double UNIVERSALGASCONSTANT = 8.3144598;  // J * mol^(-1) * K^(-1)
 static const double AVOGADRONUMBER = 6.0221409e+23;    // mol^(-1)
 static const double BOLTZMANNCONSTANT = UNIVERSALGASCONSTANT / AVOGADRONUMBER;
 static const double VACUUMPERMITTIVITY = 8.8541878128e-12;
 static const double ELECTRONCHARGE = 1.60218e-19;
+static const double MOLARELECTRONCHARGE = ELECTRONCHARGE * AVOGADRONUMBER;
 
 class GasMixture {
  protected:

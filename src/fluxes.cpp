@@ -114,6 +114,10 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   // const double bulkViscMult = mixture->GetBulkViscMultiplyer();
   // const double k = mixture->GetThermalConductivity(state);
 
+  // TODO(kevin): update E-field with EM coupling.
+  Vector Efield(dim);
+  Efield = 0.0;
+
   const int numSpecies = mixture->GetNumSpecies();
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
   const bool twoTemperature = mixture->IsTwoTemperature();
@@ -123,7 +127,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
 
   Vector transportBuffer;
   DenseMatrix diffusionVelocity(numSpecies, dim);
-  transport->ComputeFluxTransportProperties(state, gradUp, transportBuffer, diffusionVelocity);
+  transport->ComputeFluxTransportProperties(state, gradUp, Efield, transportBuffer, diffusionVelocity);
   const double visc = transportBuffer[FluxTrns::VISCOSITY];
   double bulkViscosity = transportBuffer[FluxTrns::BULK_VISCOSITY];
   bulkViscosity -= 2. / 3. * visc;

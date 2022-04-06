@@ -82,7 +82,7 @@ ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture, RunConfigurat
   thirdOrderkElectron_ = _runfile.thirdOrderkElectron;
 }
 
-void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
+void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
                                                            Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
   transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   transportBuffer = 0.0;
@@ -172,6 +172,8 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   }
 
   if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
+
+  addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
 
   correctMassDiffusionFlux(state(0), Y_sp, diffusionVelocity);
 
@@ -266,7 +268,7 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
                                ((X_sp(electronIndex_) + Xeps_) / binaryDea + (X_sp(ionIndex_) + Xeps_) / binaryDai);
 }
 
-void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
+void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp, const Vector &Efield,
                                                              Vector &globalTransport, DenseMatrix &speciesTransport,
                                                              DenseMatrix &diffusionVelocity, Vector &n_sp) {
   globalTransport.SetSize(SrcTrns::NUM_SRC_TRANS);
@@ -326,6 +328,8 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
   }
 
   if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
+
+  addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
 
   correctMassDiffusionFlux(state(0), Y_sp, diffusionVelocity);
 

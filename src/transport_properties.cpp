@@ -83,6 +83,16 @@ void TransportProperties::addAmbipolarEfield(const Vector &mobility, const Vecto
   }
 }
 
+void TransportProperties::addMixtureDrift(const Vector &mobility, const Vector &n_sp, const Vector &Efield, DenseMatrix &diffusionVelocity) {
+  for (int sp = 0; sp < numSpecies; sp++) {
+    if (mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) == 0.0) continue;
+
+    double charge = MOLARELECTRONCHARGE * n_sp(sp) * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+    for (int d = 0; d < dim; d++)
+      diffusionVelocity(sp, d) += charge * Efield(d);
+  }
+}
+
 //////////////////////////////////////////////////////
 //////// Dry Air mixture
 //////////////////////////////////////////////////////
@@ -98,7 +108,7 @@ DryAirTransport::DryAirTransport(GasMixture *_mixture, RunConfiguration &_runfil
   cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
 }
 
-void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
+void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
                                                      Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
   double dummy;  // electron pressure. won't compute anything.
   double p = mixture->ComputePressure(state, dummy);
@@ -145,7 +155,7 @@ void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const 
 TestBinaryAirTransport::TestBinaryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile)
     : DryAirTransport(_mixture, _runfile) {}
 
-void TestBinaryAirTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
+void TestBinaryAirTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
                                                             Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
   double dummy;  // electron pressure. won't compute anything.
   double p = mixture->ComputePressure(state, dummy);
@@ -210,7 +220,7 @@ ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_ru
   }
 }
 
-void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
+void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
                                                        Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
   transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   transportBuffer[FluxTrns::VISCOSITY] = viscosity_;
@@ -244,6 +254,8 @@ void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, cons
   }
 
   if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
+
+  addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
 
   correctMassDiffusionFlux(state(0), Y_sp, diffusionVelocity);
 

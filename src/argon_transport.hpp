@@ -93,14 +93,14 @@ class ArgonMinimalTransport : public TransportProperties {
   // but do not return it as output.
   // TODO(kevin): need to discuss whether to reuse computed primitive variables in flux evaluation,
   // or in general evaluation of primitive variables.
-  virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
-                                              DenseMatrix &diffusionVelocity);
+  virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
+                                              Vector &transportBuffer, DenseMatrix &diffusionVelocity);
   // Vector &outputUp);
 
   // Source term will be constructed using ForcingTerms, which have pointers to primitive variables.
   // So we can use them in evaluating transport properties.
   // If this routine evaluate additional primitive variables, can return them just as the routine above.
-  virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
+  virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp, const Vector &Efield,
                                                 Vector &globalTransport, DenseMatrix &speciesTransport,
                                                 DenseMatrix &diffusionVelocity, Vector &n_sp);
 
