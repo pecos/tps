@@ -77,7 +77,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
         gradUpn(eq, d) = h_gradUp[n + eq * nnodes + d * num_equation * nnodes];
     }
     Vector globalTransport(numSpecies_);
-    DenseMatrix speciesTransport(numSpecies_, SpeciesTrnsCoeffs::NUM_SPECIES_COEFFS);
+    DenseMatrix speciesTransport(numSpecies_, SpeciesTrns::NUM_SPECIES_COEFFS);
     DenseMatrix diffusionVelocity(numSpecies_, dim);
     Vector ns(numSpecies_);
     transport_->ComputeSourceTransportProperties(Un, upn, gradUpn, globalTransport,
@@ -117,7 +117,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     Jd = 0.0;
     const double qe = AVOGADRONUMBER * ELECTRONCHARGE;
     if (ambipolar_) { // diffusion current using electric conductivity.
-      const double mho = globalTransport(GlobalTrnsCoeffs::ELECTRIC_CONDUCTIVITY);
+      const double mho = globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY);
       // Jd = mho * ???
 
     } else { // diffusion current by definition.
@@ -142,7 +142,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
         for (int d = 0; d < dim; d++) {
           energy += 0.5 * (m_sp - me) * diffusionVelocity(sp, d) * diffusionVelocity(numSpecies_, d);
         }
-        energy *= 2.0 * me * m_sp / (m_sp + me) / (m_sp + me) * ne * speciesTransport(sp, SpeciesTrnsCoeffs::MF_FREQUENCY);
+        energy *= 2.0 * me * m_sp / (m_sp + me) / (m_sp + me) * ne * speciesTransport(sp, SpeciesTrns::MF_FREQUENCY);
 
         srcTerm(num_equation - 1) -= energy;
       }

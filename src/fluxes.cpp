@@ -124,11 +124,11 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   Vector transportBuffer;
   DenseMatrix diffusionVelocity(numSpecies, dim);
   transport->ComputeFluxTransportProperties(state, gradUp, transportBuffer, diffusionVelocity);
-  const double visc = transportBuffer[GlobalTrnsCoeffs::VISCOSITY];
-  double bulkViscosity = transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY];
+  const double visc = transportBuffer[FluxTrns::VISCOSITY];
+  double bulkViscosity = transportBuffer[FluxTrns::BULK_VISCOSITY];
   bulkViscosity -= 2. / 3. * visc;
-  double k = transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY];
-  double ke = transportBuffer[GlobalTrnsCoeffs::ELECTRON_THERMAL_CONDUCTIVITY];
+  double k = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY];
+  double ke = transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY];
   if (twoTemperature) {
     for (int d = 0; d < dim; d++) {
       double qeFlux = ke * gradUp(num_equation - 1, d);

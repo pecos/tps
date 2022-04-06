@@ -104,19 +104,19 @@ void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const 
   double p = mixture->ComputePressure(state, dummy);
   double temp = p / gas_constant / state[0];
 
-  transportBuffer.SetSize(GlobalTrnsCoeffs::NUM_GLOBAL_COEFFS);
+  transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   transportBuffer = 0.0;
   double viscosity = (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
-  transportBuffer[GlobalTrnsCoeffs::VISCOSITY] = viscosity;
-  transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY] = bulk_visc_mult * viscosity;
-  transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY] =
-      cp_div_pr * transportBuffer[GlobalTrnsCoeffs::VISCOSITY];
+  transportBuffer[FluxTrns::VISCOSITY] = viscosity;
+  transportBuffer[FluxTrns::BULK_VISCOSITY] = bulk_visc_mult * viscosity;
+  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] =
+      cp_div_pr * transportBuffer[FluxTrns::VISCOSITY];
 
   diffusionVelocity.SetSize(numSpecies, 3);
   diffusionVelocity = 0.0;
   if (numActiveSpecies > 0) {
     for (int sp = 0; sp < numActiveSpecies; sp++) {
-      double diffusivity = transportBuffer[GlobalTrnsCoeffs::VISCOSITY] / Sc;
+      double diffusivity = transportBuffer[FluxTrns::VISCOSITY] / Sc;
 
       for (int d = 0; d < dim; d++) {
         if (fabs(state[2 + dim + sp]) > 1e-10) {
@@ -154,17 +154,17 @@ void TestBinaryAirTransport::ComputeFluxTransportProperties(const Vector &state,
   Vector n_sp(numSpecies), X_sp(numSpecies), Y_sp(numSpecies);
   mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
 
-  transportBuffer.SetSize(GlobalTrnsCoeffs::NUM_GLOBAL_COEFFS);
+  transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   double viscosity = (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
-  transportBuffer[GlobalTrnsCoeffs::VISCOSITY] = viscosity;
-  transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY] = bulk_visc_mult * viscosity;
-  transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY] =
-      cp_div_pr * transportBuffer[GlobalTrnsCoeffs::VISCOSITY];
+  transportBuffer[FluxTrns::VISCOSITY] = viscosity;
+  transportBuffer[FluxTrns::BULK_VISCOSITY] = bulk_visc_mult * viscosity;
+  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] =
+      cp_div_pr * transportBuffer[FluxTrns::VISCOSITY];
 
   diffusionVelocity.SetSize(numSpecies, 3);
   diffusionVelocity = 0.0;
   if (numActiveSpecies > 0) {
-    double diffusivity = transportBuffer[GlobalTrnsCoeffs::VISCOSITY] / Sc;
+    double diffusivity = transportBuffer[FluxTrns::VISCOSITY] / Sc;
 
     // Compute mass fraction gradient from number density gradient.
     DenseMatrix massFractionGrad;
@@ -212,11 +212,11 @@ ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_ru
 
 void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
                                                        Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
-  transportBuffer.SetSize(GlobalTrnsCoeffs::NUM_GLOBAL_COEFFS);
-  transportBuffer[GlobalTrnsCoeffs::VISCOSITY] = viscosity_;
-  transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY] = bulkViscosity_;
-  transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY] = thermalConductivity_;
-  transportBuffer[GlobalTrnsCoeffs::ELECTRON_THERMAL_CONDUCTIVITY] = electronThermalConductivity_;
+  transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
+  transportBuffer[FluxTrns::VISCOSITY] = viscosity_;
+  transportBuffer[FluxTrns::BULK_VISCOSITY] = bulkViscosity_;
+  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = thermalConductivity_;
+  transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] = electronThermalConductivity_;
 
   Vector primitiveState(num_equation);
   mixture->GetPrimitivesFromConservatives(state, primitiveState);

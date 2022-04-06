@@ -84,7 +84,7 @@ ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture, RunConfigurat
 
 void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
                                                            Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
-  transportBuffer.SetSize(GlobalTrnsCoeffs::NUM_GLOBAL_COEFFS);
+  transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   transportBuffer = 0.0;
 
   Vector primitiveState(num_equation);
@@ -127,17 +127,17 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   // speciesViscosity(0) = 5. / 16. * sqrt(PI_ * mI_ * kB_ * Th) / (collision::charged::rep22(nondimTe) * PI_ *
   // debyeLength * debyeLength);
   for (int sp = 0; sp < numSpecies; sp++) {
-    transportBuffer[GlobalTrnsCoeffs::VISCOSITY] += X_sp(sp) * speciesViscosity(sp);
-    transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY] +=
+    transportBuffer[FluxTrns::VISCOSITY] += X_sp(sp) * speciesViscosity(sp);
+    transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] +=
         X_sp(sp) * speciesViscosity(sp) * kOverEtaFactor_ / mw_(sp);
   }
-  transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY] = 0.0;
+  transportBuffer[FluxTrns::BULK_VISCOSITY] = 0.0;
 
   if (thirdOrderkElectron_) {
-    transportBuffer[GlobalTrnsCoeffs::ELECTRON_THERMAL_CONDUCTIVITY] =
+    transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
         computeThirdOrderElectronThermalConductivity(X_sp, debyeLength, Te, nondimTe);
   } else {
-    transportBuffer[GlobalTrnsCoeffs::ELECTRON_THERMAL_CONDUCTIVITY] =
+    transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
         viscosityFactor_ * kOverEtaFactor_ * sqrt(Te / mw_(electronIndex_)) * X_sp(electronIndex_) /
         (collision::charged::rep22(nondimTe) * debyeCircle);
   }
@@ -269,9 +269,9 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
 void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
                                                              Vector &globalTransport, DenseMatrix &speciesTransport,
                                                              DenseMatrix &diffusionVelocity, Vector &n_sp) {
-  globalTransport.SetSize(GlobalTrnsCoeffs::NUM_GLOBAL_COEFFS);
+  globalTransport.SetSize(SrcTrns::NUM_SRC_TRANS);
   globalTransport = 0.0;
-  speciesTransport.SetSize(numSpecies, SpeciesTrnsCoeffs::NUM_SPECIES_COEFFS);
+  speciesTransport.SetSize(numSpecies, SpeciesTrns::NUM_SPECIES_COEFFS);
   speciesTransport = 0.0;
 
   n_sp.SetSize(3);
@@ -310,7 +310,7 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
     double temp = (sp == electronIndex_) ? Te : Th;
     mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity(sp);
   }
-  globalTransport(GlobalTrnsCoeffs::ELECTRIC_CONDUCTIVITY) = computeMixtureElectricConductivity(mobility, n_sp)
+  globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY) = computeMixtureElectricConductivity(mobility, n_sp)
                                                               * ELECTRONCHARGE * AVOGADRONUMBER;
 
   DenseMatrix gradX(numSpecies, dim);
@@ -329,13 +329,13 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
 
   correctMassDiffusionFlux(state(0), Y_sp, diffusionVelocity);
 
-  speciesTransport(ionIndex_, SpeciesTrnsCoeffs::MF_FREQUENCY) = mfFreqFactor_ * sqrt(Te / mw_(electronIndex_))
+  speciesTransport(ionIndex_, SpeciesTrns::MF_FREQUENCY) = mfFreqFactor_ * sqrt(Te / mw_(electronIndex_))
                                                                   * n_sp(ionIndex_) * Qie;
-  speciesTransport(neutralIndex_, SpeciesTrnsCoeffs::MF_FREQUENCY) = mfFreqFactor_ * sqrt(Te / mw_(electronIndex_))
+  speciesTransport(neutralIndex_, SpeciesTrns::MF_FREQUENCY) = mfFreqFactor_ * sqrt(Te / mw_(electronIndex_))
                                                                       * n_sp(neutralIndex_) * Qea;
   // // relative electron collision speed
   // double ge = sqrt(8.0 * kB_ * Te / PI_ / mw_(electronIndex_));
-  // speciesTransport(ionIndex_, SpeciesTrnsCoeffs::MF_FREQUENCY) = 4.0 / 3.0 * AVOGADRONUMBER * n_sp(ionIndex_) * ge * Qie;
+  // speciesTransport(ionIndex_, SpeciesTrns::MF_FREQUENCY) = 4.0 / 3.0 * AVOGADRONUMBER * n_sp(ionIndex_) * ge * Qie;
 
   double charSpeed = 0.0;
   for (int sp = 0; sp < numActiveSpecies; sp++) {
