@@ -60,18 +60,30 @@ SourceTerm::~SourceTerm() {
 void SourceTerm::updateTerms(mfem::Vector &in) {
   const double *h_Up = Up_->HostRead();
   const double *h_U = U_->HostRead();
+  const double *h_gradUp = gradUp_->HostRead();
   double *h_in = in.HostReadWrite();
 
   const int nnodes = vfes->GetNDofs();
 
   Vector upn(num_equation);
   Vector Un(num_equation);
+  DenseMatrix gradUpn(num_equation, dim);
+  Vector srcTerm(num_equation);
   for (int n = 0; n < nnodes; n++) {
     for (int eq = 0; eq < num_equation; eq++) {
       upn(eq) = h_Up[n + eq * nnodes];
       Un(eq) = h_U[n + eq * nnodes];
+      for (int d = 0; d < dim; d++)
+        gradUpn(eq, d) = h_gradUp[n + eq * nnodes + d * num_equation * nnodes];
     }
-    // mixture_->GetConservativesFromPrimitives(upn, Un);
+    Vector globalTransport(numSpecies_);
+    DenseMatrix speciesTransport(numSpecies_, SpeciesTrnsCoeffs::NUM_SPECIES_COEFFS);
+    DenseMatrix diffusionVelocity(numSpecies_, dim);
+    Vector ns(numSpecies_);
+    transport_->ComputeSourceTransportProperties(Un, upn, gradUpn, globalTransport,
+                                                 speciesTransport, diffusionVelocity, ns);
+
+    srcTerm = 0.0;
 
     double Th = 0., Te = 0.;
     Th = upn[1 + dim];
@@ -85,10 +97,10 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     chemistry_->computeForwardRateCoeffs(Th, Te, kfwd);
     chemistry_->computeEquilibriumConstants(Th, Te, kC);
 
-    Vector ns;
-    // TODO(kevin): either expand Up to include dependent variables,
-    // or only compute dependent number densities.
-    mixture_->computeNumberDensities(Un, ns);
+    // Vector ns;
+    // // TODO(kevin): either expand Up to include dependent variables,
+    // // or only compute dependent number densities.
+    // mixture_->computeNumberDensities(Un, ns);
 
     // get reaction rates
     Vector creationRates(numSpecies_);
@@ -97,9 +109,48 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
 
     // add species creation rates
     for (int sp = 0; sp < numActiveSpecies_; sp++) {
-      h_in[n + (2 + dim + sp) * nnodes] += creationRates(sp);
+      srcTerm(2 + dim + sp) += creationRates(sp);
+    }
+
+    // Terms required for EM-coupling.
+    Vector Jd(dim); // diffusion current.
+    Jd = 0.0;
+    const double qe = AVOGADRONUMBER * ELECTRONCHARGE;
+    if (ambipolar_) { // diffusion current using electric conductivity.
+      const double mho = globalTransport(GlobalTrnsCoeffs::ELECTRIC_CONDUCTIVITY);
+      // Jd = mho * ???
+
+    } else { // diffusion current by definition.
+      for (int sp = 0; sp < numSpecies_; sp++) {
+        for (int d = 0; d < dim; d++) Jd(d) += diffusionVelocity(sp, d) * ns(sp) * qe
+                                                * mixture_->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+      }
     }
 
     // TODO(kevin): energy sink for radiative reaction.
+
+    // energy transfer by elastic momentum transfer
+    if (twoTemperature_) {
+      const double me = mixture_->GetGasParams(numSpecies_ - 2, GasParams::SPECIES_MW);
+      const double ne = ns(numSpecies_ - 2);
+      for (int sp = 0; sp < numSpecies_; sp++) {
+        if (sp == numSpecies_ - 2) continue;
+
+        double m_sp = mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+        // kB is converted to R, as number densities are provided in mol.
+        double energy = 1.5 * UNIVERSALGASCONSTANT * (Te - Th);
+        for (int d = 0; d < dim; d++) {
+          energy += 0.5 * (m_sp - me) * diffusionVelocity(sp, d) * diffusionVelocity(numSpecies_, d);
+        }
+        energy *= 2.0 * me * m_sp / (m_sp + me) / (m_sp + me) * ne * speciesTransport(sp, SpeciesTrnsCoeffs::MF_FREQUENCY);
+
+        srcTerm(num_equation - 1) -= energy;
+      }
+    }
+
+    // add source term to buffer
+    for (int eq = 0; eq < num_equation; eq++) {
+      h_in[n + eq * nnodes] += srcTerm(eq);
+    }
   }
 }

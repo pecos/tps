@@ -266,9 +266,11 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
                                ((X_sp(electronIndex_) + Xeps_) / binaryDea + (X_sp(ionIndex_) + Xeps_) / binaryDai);
 }
 
-void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up,
-                                                             const DenseMatrix &gradUp, DenseMatrix &speciesTransport,
+void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
+                                                             Vector &globalTransport, DenseMatrix &speciesTransport,
                                                              DenseMatrix &diffusionVelocity, Vector &n_sp) {
+  globalTransport.SetSize(GlobalTrnsCoeffs::NUM_GLOBAL_COEFFS);
+  globalTransport = 0.0;
   speciesTransport.SetSize(numSpecies, SpeciesTrnsCoeffs::NUM_SPECIES_COEFFS);
   speciesTransport = 0.0;
 
@@ -307,9 +309,9 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
   for (int sp = 0; sp < numSpecies; sp++) {
     double temp = (sp == electronIndex_) ? Te : Th;
     mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity(sp);
-
-    speciesTransport(sp, SpeciesTrnsCoeffs::MOBILITY) = mobility(sp);
   }
+  globalTransport(GlobalTrnsCoeffs::ELECTRIC_CONDUCTIVITY) = computeMixtureElectricConductivity(mobility, n_sp)
+                                                              * ELECTRONCHARGE * AVOGADRONUMBER;
 
   DenseMatrix gradX(numSpecies, dim);
   mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);

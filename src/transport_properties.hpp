@@ -90,7 +90,8 @@ class TransportProperties {
   // So we can use them in evaluating transport properties.
   // If this routine evaluate additional primitive variables, can return them just as the routine above.
   virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
-                                                DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity, Vector &n_sp) = 0;
+                                                Vector &globalTransport, DenseMatrix &speciesTransport,
+                                                DenseMatrix &diffusionVelocity, Vector &n_sp) = 0;
   // NOTE: only for AxisymmetricSource
   virtual double GetViscosityFromPrimitive(const Vector &state) = 0;
 
@@ -98,6 +99,7 @@ class TransportProperties {
   void correctMassDiffusionFlux(const double &rho, const Vector &Y_sp, DenseMatrix &diffusionVelocity);
 
   // compute electric conductivity for mixture-averaged diffusions.
+  // NOTE: in unit of ELECTRONCHARGE * AVOGADRONUMBER.
   double computeMixtureElectricConductivity(const Vector &mobility, const Vector &n_sp);
 
   void addAmbipolarEfield(const Vector &mobility, const Vector &n_sp, DenseMatrix &diffusionVelocity);
@@ -128,7 +130,8 @@ class DryAirTransport : public TransportProperties {
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
                                               DenseMatrix &diffusionVelocity);
   virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
-                                                DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity, Vector &n_sp) {}
+                                                Vector &globalTransport, DenseMatrix &speciesTransport,
+                                                DenseMatrix &diffusionVelocity, Vector &n_sp) {}
 
   virtual double GetViscosityFromPrimitive(const Vector &state);
 };
@@ -155,7 +158,8 @@ class TestBinaryAirTransport : public DryAirTransport {
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
                                               DenseMatrix &diffusionVelocity);
   virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
-                                                DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity, Vector &n_sp) {}
+                                                Vector &globalTransport, DenseMatrix &speciesTransport,
+                                                DenseMatrix &diffusionVelocity, Vector &n_sp) {}
 };
 
 //////////////////////////////////////////////////////
@@ -181,7 +185,8 @@ class ConstantTransport : public TransportProperties {
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
                                               DenseMatrix &diffusionVelocity);
   virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
-                                                DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity, Vector &n_sp) {}
+                                                Vector &globalTransport, DenseMatrix &speciesTransport,
+                                                DenseMatrix &diffusionVelocity, Vector &n_sp) {}
 
   virtual double GetViscosityFromPrimitive(const Vector &state) {}
 };
