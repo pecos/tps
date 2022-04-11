@@ -1761,6 +1761,7 @@ void M2ulPhyS::parseSolverOptions2() {
 
     if (config.use_mms_) {
       tpsP->getRequiredInput("mms/name", config.mms_name_);
+      tpsP->getInput("mms/compare_rhs", config.compareRhs_, false);
     }
   }
 

@@ -347,6 +347,9 @@ class M2ulPhyS : public TPS::Solver {
   ParMesh *GetMesh() { return mesh; }
   FiniteElementCollection *GetFEC() { return fec; }
   ParFiniteElementSpace *GetFESpace() { return vfes; }
+  ParFiniteElementSpace *GetScalarFES() { return fes; }
+  ParFiniteElementSpace *GetVectorFES() { return dfes; }
+  ParaViewDataCollection *GetParaviewColl() { return paraviewColl; }
   ParGridFunction *GetSolutionGF() { return U; }
   ParGridFunction *getPrimitiveGF() { return Up; }
   ParGridFunction *getPressureGF() { return press; }

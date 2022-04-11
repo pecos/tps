@@ -162,6 +162,18 @@ if MASA_ENABLED
 l2diff_LDFLAGS += $(MASA_LIBS)
 endif
 
+bin_PROGRAMS += compute_rhs
+compute_rhs_SOURCES  = compute_rhs.cpp
+compute_rhs_LDADD    = ../src/libtps.a -lmfem
+compute_rhs_LDADD    += $(HDF5_LIBS)
+compute_rhs_LDADD    += $(GRVY_LIBS)
+compute_rhs_LDADD    += $(MFEM_LIBS)
+
+compute_rhs_LDFLAGS  =
+if MASA_ENABLED
+compute_rhs_LDFLAGS += $(MASA_LIBS)
+endif
+
 endif # if !GPU_ENABLED
 
 #bin_PROGRAMS += perfect_mixture_test
