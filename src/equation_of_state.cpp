@@ -1450,7 +1450,8 @@ void PerfectMixture::computeConservedStateFromConvectiveFlux(const Vector &meanN
 
   double Te = 0.0;
   if (twoTemperature_) {
-    Te = meanNormalFluxes(num_equation - 1) / molarCP_(numSpecies - 2) / neFlux;
+    // Te = meanNormalFluxes(num_equation - 1) / molarCP_(numSpecies - 2) / neFlux;
+    Te = meanNormalFluxes(num_equation - 1) / molarCV_(numSpecies - 2) / neFlux;
     Up(num_equation - 1) = Te;
   }
 

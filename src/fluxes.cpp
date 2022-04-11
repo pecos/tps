@@ -94,8 +94,9 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
   }
 
   if (twoTemperature) {
-    double electronEnthalpy = (state(num_equation - 1) + electronPressure) / state(0);
-    for (int d = 0; d < dim; d++) flux(num_equation - 1, d) = electronEnthalpy * state(1 + d);
+    // double electronEnthalpy = (state(num_equation - 1) + electronPressure) / state(0);
+    // for (int d = 0; d < dim; d++) flux(num_equation - 1, d) = electronEnthalpy * state(1 + d);
+    for (int d = 0; d < dim; d++) flux(num_equation - 1, d) = state(num_equation - 1) * state(1 + d) / state(0);
   }
 }
 
