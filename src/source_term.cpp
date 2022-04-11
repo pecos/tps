@@ -101,11 +101,6 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     chemistry_->computeForwardRateCoeffs(Th, Te, kfwd);
     chemistry_->computeEquilibriumConstants(Th, Te, kC);
 
-    // Vector ns;
-    // // TODO(kevin): either expand Up to include dependent variables,
-    // // or only compute dependent number densities.
-    // mixture_->computeNumberDensities(Un, ns);
-
     // get reaction rates
     Vector creationRates(numSpecies_);
     creationRates = 0.0;
@@ -146,13 +141,17 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
         double m_sp = mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
         // kB is converted to R, as number densities are provided in mol.
         double energy = 1.5 * UNIVERSALGASCONSTANT * (Te - Th);
-        for (int d = 0; d < dim; d++) {
-          energy += 0.5 * (m_sp - me) * diffusionVelocity(sp, d) * diffusionVelocity(numSpecies_, d);
-        }
+        // TODO(kevin): diffusion-driven term is often neglected.
+        // Let's neglect this now and add it later if more refined physics is needed.
+        // for (int d = 0; d < dim; d++) {
+        //   energy += 0.5 * (m_sp - me) * diffusionVelocity(sp, d) * diffusionVelocity(numSpecies_, d);
+        // }
         energy *= 2.0 * me * m_sp / (m_sp + me) / (m_sp + me) * ne * speciesTransport(sp, SpeciesTrns::MF_FREQUENCY);
 
         srcTerm(num_equation - 1) -= energy;
       }
+
+      // TODO(kevin): work by electron diffusion - rho_e V_e * Du/Dt
     }
 
     // add source term to buffer
