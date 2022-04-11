@@ -145,10 +145,13 @@ int main (int argc, char *argv[])
     DenseMatrix gradUp(num_equation,3);
     gradUp = 0.0;
 
+    Vector Efield(3);
+    Efield = 0.0;
+
     Vector transportBuffer;
     transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
     DenseMatrix diffusionVelocity(numSpecies, dim);
-    transport->ComputeFluxTransportProperties(conservedState, gradUp, transportBuffer, diffusionVelocity);
+    transport->ComputeFluxTransportProperties(conservedState, gradUp, Efield, transportBuffer, diffusionVelocity);
 
     // error = max(error, abs(refValues(i,1) - transportBuffer[FluxTrns::VISCOSITY]) / refValues(i,1));
     error(0) = abs(refValues(i,1) - transportBuffer[FluxTrns::VISCOSITY]) / refValues(i,1);
