@@ -207,7 +207,8 @@ class GasMixture {
   virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
                                                        Vector &conservedState) {}
 
-  virtual double computeElectronEnergy(const double n_e, const double T_e) {}
+  virtual double computeElectronEnergy(const double n_e, const double T_e) = 0;
+  virtual double computeElectronPressure(const double n_e, const double T_e) = 0;
 };
 
 //////////////////////////////////////////////////////
@@ -268,6 +269,8 @@ class DryAir : public GasMixture {
   virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
                                                        Vector &conservedState);
 
+  virtual double computeElectronEnergy(const double n_e, const double T_e) {}
+  virtual double computeElectronPressure(const double n_e, const double T_e) {}
   // GPU functions
 #ifdef _GPU_
   static MFEM_HOST_DEVICE double pressure(const double *state, double *KE, const double &gamma, const int &dim,
@@ -454,6 +457,9 @@ class TestBinaryAir : public GasMixture {
 
   // virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
 
+  virtual double computeElectronEnergy(const double n_e, const double T_e) {}
+  virtual double computeElectronPressure(const double n_e, const double T_e) {}
+
   // GPU functions
 #ifdef _GPU_
 
@@ -567,6 +573,9 @@ class PerfectMixture : public GasMixture {
 
   virtual double computeElectronEnergy(const double n_e, const double T_e) {
     return n_e * molarCV_(numSpecies - 2) * T_e;
+  }
+  virtual double computeElectronPressure(const double n_e, const double T_e) {
+    return n_e * UNIVERSALGASCONSTANT * T_e;
   }
   // GPU functions
 #ifdef _GPU_

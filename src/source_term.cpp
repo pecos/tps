@@ -119,22 +119,25 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     // Terms required for EM-coupling.
     Vector Jd(dim); // diffusion current.
     Jd = 0.0;
-    const double qe = AVOGADRONUMBER * ELECTRONCHARGE;
     if (ambipolar_) { // diffusion current using electric conductivity.
       const double mho = globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY);
-      // Jd = mho * ???
+      // Jd = mho * Efield
 
     } else { // diffusion current by definition.
       for (int sp = 0; sp < numSpecies_; sp++) {
-        for (int d = 0; d < dim; d++) Jd(d) += diffusionVelocity(sp, d) * ns(sp) * qe
+        for (int d = 0; d < dim; d++) Jd(d) += diffusionVelocity(sp, d) * ns(sp) * MOLARELECTRONCHARGE
                                                 * mixture_->GetGasParams(sp, GasParams::SPECIES_CHARGES);
       }
     }
 
     // TODO(kevin): energy sink for radiative reaction.
 
-    // energy transfer by elastic momentum transfer
     if (twoTemperature_) {
+      // work by electron pressure
+      const double pe = mixture_->computeElectronPressure(ns(numSpecies_ - 2), Te);
+      for (int d = 0; d < dim; d++) srcTerm(num_equation - 1) -= pe * gradUpn(d + 1, d);
+
+      // energy transfer by elastic momentum transfer
       const double me = mixture_->GetGasParams(numSpecies_ - 2, GasParams::SPECIES_MW);
       const double ne = ns(numSpecies_ - 2);
       for (int sp = 0; sp < numSpecies_; sp++) {
