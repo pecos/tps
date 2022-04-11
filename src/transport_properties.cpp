@@ -110,8 +110,7 @@ DryAirTransport::DryAirTransport(GasMixture *_mixture, RunConfiguration &_runfil
 
 void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
                                                      Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
-  double dummy;  // electron pressure. won't compute anything.
-  double p = mixture->ComputePressure(state, dummy);
+  double p = mixture->ComputePressure(state);
   double temp = p / gas_constant / state[0];
 
   transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
@@ -157,8 +156,7 @@ TestBinaryAirTransport::TestBinaryAirTransport(GasMixture *_mixture, RunConfigur
 
 void TestBinaryAirTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
                                                             Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
-  double dummy;  // electron pressure. won't compute anything.
-  double p = mixture->ComputePressure(state, dummy);
+  double p = mixture->ComputePressure(state);
   double temp = p / gas_constant / state[0];
 
   Vector n_sp(numSpecies), X_sp(numSpecies), Y_sp(numSpecies);

@@ -224,8 +224,7 @@ double DryAir::ComputeMaxCharSpeed(const Vector &state) {
   }
   den_vel2 /= den;
 
-  double dummy;  // electron pressure. won't compute anything.
-  const double pres = ComputePressure(state, dummy);
+  const double pres = ComputePressure(state);
   const double sound = sqrt(specific_heat_ratio * pres / den);
   const double vel = sqrt(den_vel2 / den);
 
@@ -294,8 +293,7 @@ double DryAir::ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin
 double DryAir::ComputePressureFromPrimitives(const mfem::Vector &Up) { return gas_constant * Up[0] * Up[1 + dim]; }
 
 void DryAir::computeStagnationState(const mfem::Vector &stateIn, mfem::Vector &stagnationState) {
-  double dummy;  // electron pressure. won't compute anything.
-  const double p = ComputePressure(stateIn, dummy);
+  const double p = ComputePressure(stateIn);
 
   stagnationState.SetSize(num_equation);
   stagnationState = stateIn;
@@ -419,8 +417,7 @@ void TestBinaryAir::GetConservativesFromPrimitives(const Vector &primit, Vector 
 }
 
 void TestBinaryAir::GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit) {
-  double dummy;  // electron pressure. by-product of total pressure computation. won't be used
-  double p = ComputePressure(conserv, dummy);
+  double p = ComputePressure(conserv);
   primit = conserv;
 
   for (int d = 0; d < dim; d++) primit[1 + d] /= conserv[0];
@@ -472,8 +469,7 @@ void TestBinaryAir::computeSpeciesEnthalpies(const Vector &state, Vector &specie
 bool TestBinaryAir::StateIsPhysical(const mfem::Vector &state) {
   bool physical = true;
 
-  double dummy;  // electron pressure. won't compute anything.
-  const double pres = ComputePressure(state, dummy);
+  const double pres = ComputePressure(state);
 
   if (state(0) < 0) {
     cout << "Negative density: " << state(0) << endl;
@@ -516,8 +512,7 @@ double TestBinaryAir::ComputeMaxCharSpeed(const Vector &state) {
   }
   den_vel2 /= den;
 
-  double dummy;  // electron pressure. won't compute anything.
-  const double pres = ComputePressure(state, dummy);
+  const double pres = ComputePressure(state);
   const double sound = sqrt(specific_heat_ratio * pres / den);
   const double vel = sqrt(den_vel2 / den);
 
@@ -884,14 +879,14 @@ double PerfectMixture::ComputePressureFromPrimitives(const mfem::Vector &Up) {
 }
 
 // NOTE: This is almost the same as GetPrimitivesFromConservatives except storing other primitive variables.
-double PerfectMixture::ComputePressure(const Vector &state, double &electronPressure) {
+double PerfectMixture::ComputePressure(const Vector &state, double *electronPressure) {
   Vector n_sp;
   computeNumberDensities(state, n_sp);
 
   double T_h, T_e;
   computeTemperaturesBase(state, &n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
 
-  electronPressure = n_sp(numSpecies - 2) * UNIVERSALGASCONSTANT * T_e;
+  if (electronPressure != NULL) *electronPressure = n_sp(numSpecies - 2) * UNIVERSALGASCONSTANT * T_e;
 
   // NOTE: compute pressure.
   double p = computePressureBase(&n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);

@@ -70,8 +70,7 @@ void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, D
 }
 
 void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
-  double electronPressure = 0.0;
-  const double pres = mixture->ComputePressure(state, electronPressure);
+  const double pres = mixture->ComputePressure(state);
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
   const bool twoTemperature = mixture->IsTwoTemperature();
 
