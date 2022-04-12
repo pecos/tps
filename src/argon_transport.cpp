@@ -175,7 +175,7 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
 
   addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
 
-  correctMassDiffusionFlux(state(0), Y_sp, diffusionVelocity);
+  correctMassDiffusionFlux(Y_sp, diffusionVelocity);
 
   double charSpeed = 0.0;
   for (int sp = 0; sp < numActiveSpecies; sp++) {
@@ -331,7 +331,7 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
 
   addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
 
-  correctMassDiffusionFlux(state(0), Y_sp, diffusionVelocity);
+  correctMassDiffusionFlux(Y_sp, diffusionVelocity);
 
   speciesTransport(ionIndex_, SpeciesTrns::MF_FREQUENCY) = mfFreqFactor_ * sqrt(Te / mw_(electronIndex_))
                                                                   * n_sp(ionIndex_) * Qie;

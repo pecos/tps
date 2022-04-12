@@ -41,13 +41,13 @@ TransportProperties::TransportProperties(GasMixture *_mixture) : mixture(_mixtur
   num_equation = mixture->GetNumEquations();
 }
 
-void TransportProperties::correctMassDiffusionFlux(const double &rho, const Vector &Y_sp, DenseMatrix &diffusionVelocity) {
+void TransportProperties::correctMassDiffusionFlux(const Vector &Y_sp, DenseMatrix &diffusionVelocity) {
   // Correction Velocity
   Vector Vc(3);
   Vc = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) {
     // NOTE: we'll have to handle small Y case.
-    for (int d = 0; d < dim; d++) Vc(d) += rho * Y_sp(sp) * diffusionVelocity(sp, d);
+    for (int d = 0; d < dim; d++) Vc(d) += Y_sp(sp) * diffusionVelocity(sp, d);
   }
   for (int sp = 0; sp < numSpecies; sp++) {
     for (int d = 0; d < dim; d++) diffusionVelocity(sp, d) -= Vc(d);
@@ -255,7 +255,7 @@ void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, cons
 
   addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
 
-  correctMassDiffusionFlux(state(0), Y_sp, diffusionVelocity);
+  correctMassDiffusionFlux(Y_sp, diffusionVelocity);
 
   for (int sp = 0; sp < numSpecies; sp++) {
     for (int d = 0; d < dim; d++) {

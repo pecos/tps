@@ -96,7 +96,7 @@ class TransportProperties {
   virtual double GetViscosityFromPrimitive(const Vector &state) = 0;
 
   // For mixture-averaged diffusion, correct for mass conservation.
-  void correctMassDiffusionFlux(const double &rho, const Vector &Y_sp, DenseMatrix &diffusionVelocity);
+  void correctMassDiffusionFlux(const Vector &Y_sp, DenseMatrix &diffusionVelocity);
 
   // compute electric conductivity for mixture-averaged diffusions.
   // NOTE: in unit of ELECTRONCHARGE * AVOGADRONUMBER.
