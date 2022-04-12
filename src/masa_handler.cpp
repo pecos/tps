@@ -470,15 +470,15 @@ void initPeriodicArgonTernary2D(GasMixture *mixture, RunConfiguration &config,
 }
 
 void exactSolnFunction(const Vector &x, double tin, Vector &y) {
-  for (int eq = 0; eq < y.Size(); eq++) {
-    y(eq) = MASA::masa_eval_exact_state<double>(x[0], x[1], eq);
-  }
+  std::vector<double> y1(y.Size());
+  MASA::masa_eval_exact_state<double>(x[0], x[1], y1);
+  for (int eq = 0; eq < y.Size(); eq++) y[eq] = y1[eq];
 }
 
 void evaluateForcing(const Vector &x, double time, Array<double> &y) {
-  for (int eq = 0; eq < y.Size(); eq++) {
-    y[eq] = MASA::masa_eval_source_state<double>(x[0], x[1], eq);
-  }
+  std::vector<double> y1(y.Size());
+  MASA::masa_eval_source_state<double>(x[0], x[1], y1);
+  for (int eq = 0; eq < y.Size(); eq++) y[eq] = y1[eq];
 }
 
 }  // namespace argon2d
