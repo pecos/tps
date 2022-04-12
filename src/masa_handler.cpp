@@ -382,24 +382,18 @@ void initPeriodicArgonTernary2D(GasMixture *mixture, RunConfiguration &config,
 
   MASA::masa_init<double>("forcing handler", "periodic_ternary_2d");
 
-  // MASA::masa_set_param<double>("u0", 1.5);
-  // MASA::masa_set_param<double>("dux", 0.1);
-  // MASA::masa_set_param<double>("duy", 0.2);
-  MASA::masa_set_param<double>("u0", 0.0);
-  MASA::masa_set_param<double>("dux", 0.0);
-  MASA::masa_set_param<double>("duy", 0.0);
+  MASA::masa_set_param<double>("u0", 1.5);
+  MASA::masa_set_param<double>("dux", 0.1);
+  MASA::masa_set_param<double>("duy", 0.2);
 
   MASA::masa_set_param<double>("kux", 1.0);
   MASA::masa_set_param<double>("kuy", 2.0);
   MASA::masa_set_param<double>("offset_ux", - 0.33);
   MASA::masa_set_param<double>("offset_uy", 0.47);
 
-  // MASA::masa_set_param<double>("v0", 0.91);
-  // MASA::masa_set_param<double>("dvx", 0.13);
-  // MASA::masa_set_param<double>("dvy", 0.11);
-  MASA::masa_set_param<double>("v0", 0.0);
-  MASA::masa_set_param<double>("dvx", 0.0);
-  MASA::masa_set_param<double>("dvy", 0.0);
+  MASA::masa_set_param<double>("v0", 0.91);
+  MASA::masa_set_param<double>("dvx", 0.13);
+  MASA::masa_set_param<double>("dvy", 0.11);
 
   MASA::masa_set_param<double>("kvx", 2.0);
   MASA::masa_set_param<double>("kvy", 1.0);
@@ -408,25 +402,25 @@ void initPeriodicArgonTernary2D(GasMixture *mixture, RunConfiguration &config,
 
   MASA::masa_set_param<double>("n0", 40.0);
 
-  MASA::masa_set_param<double>("X0", 0.3);
-  MASA::masa_set_param<double>("dX0", 0.11);
-  // MASA::masa_set_param<double>("dX0", 0.0);
+  MASA::masa_set_param<double>("X0", 0.17);
+  MASA::masa_set_param<double>("dX0x", 0.05);
+  MASA::masa_set_param<double>("dX0y", 0.06);
   MASA::masa_set_param<double>("kx0", 2.0);
-  MASA::masa_set_param<double>("ky0", 0.0);
+  MASA::masa_set_param<double>("ky0", 1.0);
   MASA::masa_set_param<double>("offset_x0", 0.17);
   MASA::masa_set_param<double>("offset_y0", 0.58);
 
-  MASA::masa_set_param<double>("X1", 1e-16);
-  // MASA::masa_set_param<double>("dX1", 0.11);
-  MASA::masa_set_param<double>("dX1", 0.0);
-  MASA::masa_set_param<double>("kx1", 2.0);
-  MASA::masa_set_param<double>("ky1", 1.0);
-  MASA::masa_set_param<double>("offset_x1", 0.17);
-  MASA::masa_set_param<double>("offset_y1", 0.58);
+  MASA::masa_set_param<double>("X1", 0.24);
+  MASA::masa_set_param<double>("dX1x", 0.13);
+  MASA::masa_set_param<double>("dX1y", 0.07);
+  MASA::masa_set_param<double>("kx1", 1.0);
+  MASA::masa_set_param<double>("ky1", 2.0);
+  MASA::masa_set_param<double>("offset_x1", 0.94);
+  MASA::masa_set_param<double>("offset_y1", 0.29);
 
   MASA::masa_set_param<double>("T0", 500.0);
-  // MASA::masa_set_param<double>("dT", 37.0);
-  MASA::masa_set_param<double>("dT", 0.0);
+  MASA::masa_set_param<double>("dTx", 37.0);
+  MASA::masa_set_param<double>("dTx", 29.0);
   MASA::masa_set_param<double>("kTx", 1.0);
   MASA::masa_set_param<double>("kTy", 1.0);
   MASA::masa_set_param<double>("offset_Tx", 0.71);
