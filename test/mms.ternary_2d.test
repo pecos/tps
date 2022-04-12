@@ -1,0 +1,62 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="mms/ternary_plasma_2d"
+RUNFILE="inputs/mms.ternary_plasma.2d.ini"
+
+setup() {
+    SOLN_FILE=restart_argon_output.sol.h5
+    MESH_FILE=beam-quad-o3-s1-r1-p.mesh
+    TOL=2e-4
+}
+
+@test "[$TEST] check for input file $RUNFILE" {
+    test -s $RUNFILE
+}
+
+@test "[$TEST] create a mesh file" {
+    ../utils/beam_mesh -nx 1 -nt 5 -b 5 -rs 1    # no refinement
+
+    test -s $MESH_FILE
+}
+
+@test "[$TEST] run tps with input -> $RUNFILE" {
+    mpirun -np 2 ../src/tps --runFile $RUNFILE >& plasma_ternary_mms.log
+}
+
+@test "[$TEST] check if the relative error is similar to the reported value" {
+    while IFS=$'\t' read -r nx e0 e1 e2 e3 e4 e5;
+    do
+      test $nx -eq 100
+      # empirically observed error 5.59e-4
+      check_lo=$(awk 'BEGIN{print ('$e0'>5.5e-4)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e0'<5.7e-4)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 0.00151
+      check_lo=$(awk 'BEGIN{print ('$e1'>1.5e-3)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e1'<1.6e-3)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 0.001204
+      check_lo=$(awk 'BEGIN{print ('$e2'>1.2e-3)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e2'<1.3e-3)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 5.82e-5
+      check_lo=$(awk 'BEGIN{print ('$e3'>5.8e-5)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e3'<5.9e-5)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 0.00223
+      check_lo=$(awk 'BEGIN{print ('$e4'>2.2e-3)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e4'<2.3e-3)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 0.00216
+      check_lo=$(awk 'BEGIN{print ('$e5'>2.1e-3)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e5'<2.2e-3)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+    done < periodic_ternary_2d.rel_error.txt
+}

@@ -320,7 +320,7 @@ class M2ulPhyS : public TPS::Solver {
   void initMasaHandler();
   void projectExactSolution(const double _time);
   void initMMSCoefficients();
-  void checkSolutionError(const double _time);
+  void checkSolutionError(const double _time, const bool final = false);
 #endif
 
  public:

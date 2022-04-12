@@ -117,7 +117,7 @@ void M2ulPhyS::initMMSCoefficients() {
   }
 }
 
-void M2ulPhyS::checkSolutionError(const double _time) {
+void M2ulPhyS::checkSolutionError(const double _time, const bool final) {
   rhsOperator->updatePrimitives(*U);
   mixture->UpdatePressureGridFunction(press, Up);
 
@@ -132,7 +132,7 @@ void M2ulPhyS::checkSolutionError(const double _time) {
     if (mpi.Root())
       cout << "time step: " << iter << ", physical time " << _time << "s"
            << ", Dens. error: " << errorDen << " Vel. " << errorVel << " press. " << errorPre << endl;
-  } else if (config.mms_name_ == "periodic_ternary_2d") {
+  } else {
     Coefficient *nullPtr = NULL;
 
     stateMMS_->SetTime(_time);
@@ -143,12 +143,35 @@ void M2ulPhyS::checkSolutionError(const double _time) {
       componentErrors(eq) = U->ComputeLpError(2, *stateMMS_, nullPtr, componentWindow_[eq]);
       componentRelErrors(eq) = componentErrors(eq) / zeroU_->ComputeLpError(2, *stateMMS_, nullPtr, componentWindow_[eq]);
     }
+
+    int numElems;
+    if (final) {
+      int localElems = mesh->GetNE();
+      MPI_Allreduce(&localElems, &numElems, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    }
+
     if (mpi.Root()) {
       grvy_printf(GRVY_INFO, "\ntime step: %d, physical time: %.5E\n", iter, _time);
-      grvy_printf(GRVY_INFO, "component L2-error: (%.8E, %.8E, %.8E, %.8E, %.8E) \n",
-                             componentErrors(0), componentErrors(1), componentErrors(2), componentErrors(3), componentErrors(4));
-      grvy_printf(GRVY_INFO, "component relative-error: (%.4E, %.4E, %.4E, %.4E, %.4E) \n",
-                             componentRelErrors(0), componentRelErrors(1), componentRelErrors(2), componentRelErrors(3), componentRelErrors(4));
+      grvy_printf(GRVY_INFO, "component L2-error: (");
+      for (int eq = 0; eq < num_equation; eq++) {
+        std::string format = (eq == num_equation - 1) ? "%.8E) \n" : "%.8E, ";
+        grvy_printf(GRVY_INFO, format.c_str(), componentErrors(eq));
+      }
+      grvy_printf(GRVY_INFO, "component relative-error: (");
+      for (int eq = 0; eq < num_equation; eq++) {
+        std::string format = (eq == num_equation - 1) ? "%.8E) \n" : "%.8E, ";
+        grvy_printf(GRVY_INFO, format.c_str(), componentRelErrors(eq));
+      }
+
+      if (final) {
+        ofstream fID;
+        std::string filename = config.mms_name_ + ".rel_error.txt";
+        fID.open(filename, std::ios_base::out);
+        fID << numElems << "\t";
+        for (int eq = 0; eq < num_equation; eq++) fID << componentRelErrors(eq) << "\t";
+        fID << "\n";
+        fID.close();
+      }
     }
   }
 }

@@ -1162,7 +1162,7 @@ void M2ulPhyS::solve() {
     // if (mpi.Root()) cout << "Solution error: " << error << endl;
 #else
     if (config.use_mms_) {
-      checkSolutionError(time);
+      checkSolutionError(time, true);
     } else {
       if (mpi.Root()) cout << "Final timestep iteration = " << MaxIters << endl;
     }
