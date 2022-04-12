@@ -45,9 +45,9 @@ void M2ulPhyS::initMasaHandler() {
     dryair3d::initEuler3DTransient(dim, config);
   } else if (config.mms_name_ == "navierstokes_3d_transient_sutherland") {
     dryair3d::initNS3DTransient(dim, config);
-  } else if (config.mms_name_ == "periodic_argon_ternary_2d") {
+  } else if (config.mms_name_ == "periodic_ternary_2d") {
     double Lx, Ly;
-    std::string basepath("mms/periodic_argon_ternary_2d");
+    std::string basepath("mms/periodic_ternary_2d");
     tpsP->getRequiredInput((basepath + "/Lx").c_str(), Lx);
     tpsP->getRequiredInput((basepath + "/Ly").c_str(), Ly);
 
@@ -79,7 +79,7 @@ void M2ulPhyS::projectExactSolution(const double _time) {
       exit(-1);
     }
     exactSolnFunction = &(dryair3d::exactSolnFunction);
-  } else if (config.mms_name_ == "periodic_argon_ternary_2d") {
+  } else if (config.mms_name_ == "periodic_ternary_2d") {
     exactSolnFunction = &(argon2d::exactSolnFunction);
   }
 
@@ -93,7 +93,7 @@ void M2ulPhyS::initMMSCoefficients() {
     DenMMS_ = new VectorFunctionCoefficient(1, &(dryair3d::exactDenFunction));
     VelMMS_ = new VectorFunctionCoefficient(dim, &(dryair3d::exactVelFunction));
     PreMMS_ = new VectorFunctionCoefficient(1, &(dryair3d::exactPreFunction));
-  } else if (config.mms_name_ == "periodic_argon_ternary_2d") {
+  } else if (config.mms_name_ == "periodic_ternary_2d") {
     stateMMS_ = new VectorFunctionCoefficient(num_equation, &(argon2d::exactSolnFunction));
 
     Vector componentWindow(num_equation);
@@ -132,7 +132,7 @@ void M2ulPhyS::checkSolutionError(const double _time) {
     if (mpi.Root())
       cout << "time step: " << iter << ", physical time " << _time << "s"
            << ", Dens. error: " << errorDen << " Vel. " << errorVel << " press. " << errorPre << endl;
-  } else if (config.mms_name_ == "periodic_argon_ternary_2d") {
+  } else if (config.mms_name_ == "periodic_ternary_2d") {
     Coefficient *nullPtr = NULL;
 
     stateMMS_->SetTime(_time);
@@ -375,16 +375,17 @@ void initPeriodicArgonTernary2D(GasMixture *mixture, RunConfiguration &config,
                                 const double Lx, const double Ly) {
   // assert(dim == 2);
   // assert(config.workFluid == DRY_AIR);
-  assert(config.mms_name_ == "periodic_argon_ternary_2d");
+  assert(config.mms_name_ == "periodic_ternary_2d");
   assert(config.numSpecies == 3);
+  assert(!config.ambipolar);
   assert(config.transportModel == CONSTANT);
 
-  MASA::masa_init<double>("forcing handler", "periodic_argon_ternary_2d");
+  MASA::masa_init<double>("forcing handler", "periodic_ternary_2d");
 
   // MASA::masa_set_param<double>("u0", 1.5);
   // MASA::masa_set_param<double>("dux", 0.1);
   // MASA::masa_set_param<double>("duy", 0.2);
-  MASA::masa_set_param<double>("u0", 1.0);
+  MASA::masa_set_param<double>("u0", 0.0);
   MASA::masa_set_param<double>("dux", 0.0);
   MASA::masa_set_param<double>("duy", 0.0);
 
@@ -396,7 +397,7 @@ void initPeriodicArgonTernary2D(GasMixture *mixture, RunConfiguration &config,
   // MASA::masa_set_param<double>("v0", 0.91);
   // MASA::masa_set_param<double>("dvx", 0.13);
   // MASA::masa_set_param<double>("dvy", 0.11);
-  MASA::masa_set_param<double>("v0", 1.0);
+  MASA::masa_set_param<double>("v0", 0.0);
   MASA::masa_set_param<double>("dvx", 0.0);
   MASA::masa_set_param<double>("dvy", 0.0);
 
@@ -406,12 +407,30 @@ void initPeriodicArgonTernary2D(GasMixture *mixture, RunConfiguration &config,
   MASA::masa_set_param<double>("offset_vy", 0.92);
 
   MASA::masa_set_param<double>("n0", 40.0);
+
   MASA::masa_set_param<double>("X0", 0.3);
-  MASA::masa_set_param<double>("dX", 0.11);
-  // MASA::masa_set_param<double>("dX", 0.0);
+  MASA::masa_set_param<double>("dX0", 0.11);
+  // MASA::masa_set_param<double>("dX0", 0.0);
+  MASA::masa_set_param<double>("kx0", 2.0);
+  MASA::masa_set_param<double>("ky0", 0.0);
+  MASA::masa_set_param<double>("offset_x0", 0.17);
+  MASA::masa_set_param<double>("offset_y0", 0.58);
+
+  MASA::masa_set_param<double>("X1", 1e-16);
+  // MASA::masa_set_param<double>("dX1", 0.11);
+  MASA::masa_set_param<double>("dX1", 0.0);
+  MASA::masa_set_param<double>("kx1", 2.0);
+  MASA::masa_set_param<double>("ky1", 1.0);
+  MASA::masa_set_param<double>("offset_x1", 0.17);
+  MASA::masa_set_param<double>("offset_y1", 0.58);
+
   MASA::masa_set_param<double>("T0", 500.0);
   // MASA::masa_set_param<double>("dT", 37.0);
   MASA::masa_set_param<double>("dT", 0.0);
+  MASA::masa_set_param<double>("kTx", 1.0);
+  MASA::masa_set_param<double>("kTy", 1.0);
+  MASA::masa_set_param<double>("offset_Tx", 0.71);
+  MASA::masa_set_param<double>("offset_Ty", 0.29);
 
   const int numSpecies = mixture->GetNumSpecies();
   MASA::masa_set_param<double>("mA", mixture->GetGasParams(numSpecies - 1, GasParams::SPECIES_MW));
@@ -432,23 +451,16 @@ void initPeriodicArgonTernary2D(GasMixture *mixture, RunConfiguration &config,
 
   MASA::masa_set_param<double>("Lx", Lx);
   MASA::masa_set_param<double>("Ly", Ly);
-  MASA::masa_set_param<double>("kx", 2.0);
-  MASA::masa_set_param<double>("ky", 1.0);
-  MASA::masa_set_param<double>("offset_x", 0.17);
-  MASA::masa_set_param<double>("offset_y", 0.58);
-
-  MASA::masa_set_param<double>("kTx", 1.0);
-  MASA::masa_set_param<double>("kTy", 1.0);
-  MASA::masa_set_param<double>("offset_Tx", 0.71);
-  MASA::masa_set_param<double>("offset_Ty", 0.29);
 
   MASA::masa_set_param<double>("mu", config.constantTransport.viscosity);
   MASA::masa_set_param<double>("muB", config.constantTransport.bulkViscosity);
   MASA::masa_set_param<double>("k_heat", config.constantTransport.thermalConductivity
                                           + config.constantTransport.electronThermalConductivity);
-  MASA::masa_set_param<double>("D_A", config.constantTransport.diffusivity(numSpecies - 1));
-  MASA::masa_set_param<double>("D_I", config.constantTransport.diffusivity(0));
-  MASA::masa_set_param<double>("D_E", config.constantTransport.diffusivity(numSpecies - 2));
+
+  std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
+  MASA::masa_set_param<double>("D_A", config.constantTransport.diffusivity((*mixtureToInputMap)[numSpecies - 1]));
+  MASA::masa_set_param<double>("D_I", config.constantTransport.diffusivity((*mixtureToInputMap)[0]));
+  MASA::masa_set_param<double>("D_E", config.constantTransport.diffusivity((*mixtureToInputMap)[numSpecies - 2]));
 
   MASA::masa_set_param<double>("qe", ELECTRONCHARGE);
   MASA::masa_set_param<double>("kB", BOLTZMANNCONSTANT);
@@ -457,17 +469,14 @@ void initPeriodicArgonTernary2D(GasMixture *mixture, RunConfiguration &config,
   MASA::masa_set_param<double>("ZE", mixture->GetGasParams(numSpecies - 2, GasParams::SPECIES_CHARGES));
 }
 
-// TODO(kevin): make it numSpecies-insensitive.
 void exactSolnFunction(const Vector &x, double tin, Vector &y) {
-  const int num_equation = 5;
-  for (int eq = 0; eq < num_equation; eq++) {
+  for (int eq = 0; eq < y.Size(); eq++) {
     y(eq) = MASA::masa_eval_exact_state<double>(x[0], x[1], eq);
   }
 }
 
 void evaluateForcing(const Vector &x, double time, Array<double> &y) {
-  const int num_equation = 5;
-  for (int eq = 0; eq < num_equation; eq++) {
+  for (int eq = 0; eq < y.Size(); eq++) {
     y[eq] = MASA::masa_eval_source_state<double>(x[0], x[1], eq);
   }
 }

@@ -869,7 +869,7 @@ MASA_forcings::MASA_forcings(const int &_dim, const int &_num_equation, const in
     // make sure we are in a 3D case
     assert(dim == 3);
     evaluateForcing_ = &(dryair3d::evaluateForcing);
-  } else if (_config.mms_name_ == "periodic_argon_ternary_2d") {
+  } else if (_config.mms_name_ == "periodic_ternary_2d") {
     evaluateForcing_ = &(argon2d::evaluateForcing);
   }
 }
