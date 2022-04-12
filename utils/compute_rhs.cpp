@@ -14,6 +14,12 @@ int main (int argc, char *argv[])
   tps.parseInput();
   tps.chooseDevices();
 
+#ifdef HAVE_MASA
+  std::string basepath("utils/compute_rhs");
+  std::string filename;
+  tps.getRequiredInput((basepath + "/filename").c_str(), filename);
+#endif
+
   M2ulPhyS *srcField = new M2ulPhyS(tps.getMPISession(), tps.getInputFilename(), &tps);
   RunConfiguration& srcConfig = srcField->GetConfig();
 
@@ -113,6 +119,62 @@ int main (int argc, char *argv[])
 
     paraviewColl->RegisterField("MASA-Rhs" + std::to_string(var),
                                 visualizationVariables[var + 3 * numVariables]);
+  }
+
+  // compute component relative error of rhs.
+  Vector error(numVariables);
+  ParGridFunction scalarZero(*visualizationVariables[0]), vectorZero(*visualizationVariables[1]);
+  double *dataScalar = scalarZero.HostReadWrite();
+  double *dataVector = vectorZero.HostReadWrite();
+  for (int i = 0; i < nDofs; i++) {
+    dataScalar[i] = 0.0;
+    for (int d = 0; d < dim; d++) dataVector[i + d * nDofs] = 0.0;
+  }
+  VectorGridFunctionCoefficient scalarZeroCoeff(&scalarZero), vectorZeroCoeff(&vectorZero);
+  if (srcConfig.compareRhs_) {
+    double norm;
+    for (int var = 0; var < numVariables; var++) {
+      VectorGridFunctionCoefficient masaCoeff(visualizationVariables[var + 3 * numVariables]);
+      error(var) = visualizationVariables[var + 2 * numVariables]->ComputeLpError(2, masaCoeff);
+      if (var == 1) {
+        norm = visualizationVariables[var + 3 * numVariables]->ComputeLpError(2, vectorZeroCoeff);
+      } else {
+        norm = visualizationVariables[var + 3 * numVariables]->ComputeLpError(2, scalarZeroCoeff);
+      }
+      error(var) /= norm;
+    }
+  } else {
+    for (int var = 0; var < numVariables; var++) {
+      double norm;
+      if (var == 1) {
+        error(var) = visualizationVariables[var + 2 * numVariables]->ComputeLpError(2, vectorZeroCoeff);
+        norm = visualizationVariables[var + 3 * numVariables]->ComputeLpError(2, vectorZeroCoeff);
+      } else {
+        error(var) = visualizationVariables[var + 2 * numVariables]->ComputeLpError(2, scalarZeroCoeff);
+        norm = visualizationVariables[var + 3 * numVariables]->ComputeLpError(2, scalarZeroCoeff);
+      }
+      error(var) /= norm;
+    }
+  }
+
+  int numElems;
+  int localElems = mesh->GetNE();
+  MPI_Allreduce(&localElems, &numElems, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+
+  mfem::MPI_Session *mpi = &(tps.getMPISession());
+  if (mpi->Root()) {
+    std::cout << numElems << ",\t";
+    for (int var = 0; var < numVariables; var++) {
+      std::cout << error(var) << ",\t";
+    }
+    std::cout << std::endl;
+
+    ofstream fID;
+    fID.open(filename, std::ios_base::app | std::ios_base::out);
+    fID << numElems << "\t";
+    for (int var = 0; var < numVariables; var++) fID << error(var) << "\t";
+    fID << "\n";
+    fID.close();
   }
 #endif
 
