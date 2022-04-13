@@ -447,7 +447,7 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
   if (szData.szType == SpongeZoneSolution::USERDEF) {
     Vector Up(num_equation);
     Up[0] = szData.targetUp[0];
-    for (int d = 0; d < dim; d++) Up[1 + d] = szData.targetUp[1 + d];
+    for (int d = 0; d < nvel; d++) Up[1 + d] = szData.targetUp[1 + d];
     //Up[1 + dim] = mixture->Temperature(&Up[0], &szData.targetUp[4], 1);
     Up[1 + nvel] = mixture->Temperature(&Up[0], &szData.targetUp[4], 1);
     mixture->GetConservativesFromPrimitives(Up, targetU);
