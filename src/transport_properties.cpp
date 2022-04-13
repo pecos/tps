@@ -237,12 +237,12 @@ void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, cons
   diffusionVelocity.SetSize(numSpecies, dim);
   diffusionVelocity = 0.0;
 
-  // Compute mass fraction gradient from number density gradient.
-  DenseMatrix massFractionGrad(numSpecies, dim);
-  mixture->ComputeMassFractionGradient(state(0), n_sp, gradUp, massFractionGrad);
+  // Compute mole fraction gradient from number density gradient.
+  DenseMatrix gradX(numSpecies, dim);
+  mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
   for (int sp = 0; sp < numSpecies; sp++) {
     for (int d = 0; d < dim; d++)
-      diffusionVelocity(sp, d) = - diffusivity_(sp) * massFractionGrad(sp, d) / (Y_sp(sp) + Xeps_);
+      diffusionVelocity(sp, d) = - diffusivity_(sp) * gradX(sp, d) / (X_sp(sp) + Xeps_);
   }
 
   Vector mobility(numSpecies);
