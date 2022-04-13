@@ -55,6 +55,11 @@ void M2ulPhyS::initMasaHandler() {
       ternary2d::initTernary2DPeriodic(mixture, config, Lx, Ly);
     } else if (config.mms_name_ == "ternary_2d_periodic_ambipolar") {
       ternary2d::initTernary2DPeriodicAmbipolar(mixture, config, Lx, Ly);
+    } else if (config.mms_name_ == "ternary_2d_2t_periodic_ambipolar") {
+      ternary2d::initTernary2D2TPeriodicAmbipolar(mixture, config, Lx, Ly);
+    } else {
+      grvy_printf(GRVY_ERROR, "Unknown ternary 2d solution > %s\n", config.mms_name_.c_str());
+      exit(-1);
     }
   } else {
     grvy_printf(GRVY_ERROR, "Unknown manufactured solution > %s\n", config.mms_name_.c_str());
@@ -503,6 +508,7 @@ void initTernary2DPeriodic(GasMixture *mixture, RunConfiguration &config,
                            const double Lx, const double Ly) {
   assert(config.mms_name_ == "ternary_2d_periodic");
   assert(!config.ambipolar);
+  assert(!config.twoTemperature);
 
   MASA::masa_init<double>("forcing handler", "ternary_2d_periodic");
   ternary2d::initTernary2DBase(mixture, config, Lx, Ly);
@@ -520,9 +526,36 @@ void initTernary2DPeriodicAmbipolar(GasMixture *mixture, RunConfiguration &confi
                                     const double Lx, const double Ly) {
   assert(config.mms_name_ == "ternary_2d_periodic_ambipolar");
   assert(config.ambipolar);
+  assert(!config.twoTemperature);
 
   MASA::masa_init<double>("forcing handler", "ternary_2d_periodic_ambipolar");
   ternary2d::initTernary2DBase(mixture, config, Lx, Ly);
+}
+
+void initTernary2D2TPeriodicAmbipolar(GasMixture *mixture, RunConfiguration &config,
+                                      const double Lx, const double Ly) {
+  assert(config.mms_name_ == "ternary_2d_2t_periodic_ambipolar");
+  assert(config.ambipolar);
+  assert(config.twoTemperature);
+
+  MASA::masa_init<double>("forcing handler", "ternary_2d_2t_periodic_ambipolar");
+  ternary2d::initTernary2DBase(mixture, config, Lx, Ly);
+
+  MASA::masa_set_param<double>("TE0", 700.0);
+  MASA::masa_set_param<double>("dTEx", 49.3);
+  MASA::masa_set_param<double>("dTEy", 23.1);
+  MASA::masa_set_param<double>("kTEx", 2.0);
+  MASA::masa_set_param<double>("kTEy", 1.0);
+  MASA::masa_set_param<double>("offset_TEx", 0.31);
+  MASA::masa_set_param<double>("offset_TEy", 0.91);
+
+  MASA::masa_set_param<double>("k_heat", config.constantTransport.thermalConductivity);
+  MASA::masa_set_param<double>("k_E", config.constantTransport.electronThermalConductivity);
+
+  const int numSpecies = mixture->GetNumSpecies();
+  std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
+  MASA::masa_set_param<double>("nu_I", config.constantTransport.mtFreq((*mixtureToInputMap)[0]));
+  MASA::masa_set_param<double>("nu_A", config.constantTransport.mtFreq((*mixtureToInputMap)[numSpecies - 1]));
 }
 
 }  // namespace ternary2d

@@ -79,6 +79,9 @@ void initTernary2DPeriodic(GasMixture *mixture, RunConfiguration &config,
 void initTernary2DPeriodicAmbipolar(GasMixture *mixture, RunConfiguration &config,
                                     const double Lx, const double Ly);
 
+void initTernary2D2TPeriodicAmbipolar(GasMixture *mixture, RunConfiguration &config,
+                                      const double Lx, const double Ly);
+
 }  // namespace ternary2d
 
 #endif  // MASA_HANDLER_HPP_
