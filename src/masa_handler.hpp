@@ -45,6 +45,13 @@ using namespace std;
 
 // void initMasaHandler(string name, int dim, const Equations& eqn, const double& viscMult, const std::string mms_name);
 
+namespace mms {
+
+void exactSolnFunction(const Vector &x, double tin, Vector &y);
+void evaluateForcing(const Vector &x, double time, Array<double> &y);
+
+}  // namespace mms
+
 namespace dryair3d {
 
 void evaluateForcing(const Vector &x, double time, Array<double> &y);
@@ -61,15 +68,17 @@ void initNS3DTransient(const int dim, RunConfiguration &config);
 
 }  // namespace dryair3d
 
-namespace argon2d {
+namespace ternary2d {
 
-void initPeriodicArgonTernary2D(GasMixture *mixture, RunConfiguration &config,
-                                const double Lx, const double Ly);
+void initTernary2DBase(GasMixture *mixture, RunConfiguration &config,
+                       const double Lx, const double Ly);
 
-void exactSolnFunction(const Vector &x, double tin, Vector &y);
+void initTernary2DPeriodic(GasMixture *mixture, RunConfiguration &config,
+                           const double Lx, const double Ly);
 
-void evaluateForcing(const Vector &x, double time, Array<double> &y);
+void initTernary2DPeriodicAmbipolar(GasMixture *mixture, RunConfiguration &config,
+                                    const double Lx, const double Ly);
 
-}  // namespace argon2d
+}  // namespace ternary2d
 
 #endif  // MASA_HANDLER_HPP_
