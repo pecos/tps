@@ -1976,11 +1976,15 @@ void M2ulPhyS::parseSolverOptions2() {
                                  config.constantTransport.thermalConductivity);
           tpsP->getRequiredInput("plasma_models/transport_model/constant/electron_thermal_conductivity",
                                  config.constantTransport.electronThermalConductivity);
-          std::string basepath("plasma_models/transport_model/constant/diffusivity");
+          std::string diffpath("plasma_models/transport_model/constant/diffusivity");
           config.constantTransport.diffusivity.SetSize(config.numSpecies);
+          std::string mtpath("plasma_models/transport_model/constant/momentum_transfer_frequency");
+          config.constantTransport.mtFreq.SetSize(config.numSpecies);
           for (int sp = 1; sp <= config.numSpecies; sp++) {
-            tpsP->getRequiredInput((basepath + "/species" + std::to_string(sp)).c_str(),
+            tpsP->getRequiredInput((diffpath + "/species" + std::to_string(sp)).c_str(),
                                    config.constantTransport.diffusivity(sp - 1));
+            tpsP->getRequiredInput((mtpath + "/species" + std::to_string(sp)).c_str(),
+                                   config.constantTransport.mtFreq(sp - 1));
           }
         }
         break;

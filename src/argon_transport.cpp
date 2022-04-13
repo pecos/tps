@@ -312,8 +312,8 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
     double temp = (sp == electronIndex_) ? Te : Th;
     mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity(sp);
   }
-  globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY) = computeMixtureElectricConductivity(mobility, n_sp)
-                                                              * ELECTRONCHARGE * AVOGADRONUMBER;
+  globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY)
+    = computeMixtureElectricConductivity(mobility, n_sp) * MOLARELECTRONCHARGE;
 
   DenseMatrix gradX(numSpecies, dim);
   mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);

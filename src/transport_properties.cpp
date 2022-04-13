@@ -201,10 +201,12 @@ ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_ru
   electronThermalConductivity_ = _runfile.constantTransport.electronThermalConductivity;
 
   diffusivity_.SetSize(numSpecies);
+  mtFreq_.SetSize(numSpecies);
   std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
   for (int mixSp = 0; mixSp < numSpecies; mixSp++) {
     int inputSp = (*mixtureToInputMap)[mixSp];
     diffusivity_(mixSp) = _runfile.constantTransport.diffusivity(inputSp);
+    mtFreq_(mixSp) = _runfile.constantTransport.mtFreq(inputSp);
   }
 
   if (mixture->IsTwoTemperature()) {
@@ -256,6 +258,60 @@ void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, cons
   addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
 
   correctMassDiffusionFlux(Y_sp, diffusionVelocity);
+
+  for (int sp = 0; sp < numSpecies; sp++) {
+    for (int d = 0; d < dim; d++) {
+      if (std::isnan(diffusionVelocity(sp, d))) {
+        grvy_printf(GRVY_ERROR, "\nDiffusion velocity of species %d is NaN! -> %f\n", sp, diffusionVelocity(sp, d));
+        exit(-1);
+      }
+    }
+  }
+}
+
+void ConstantTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp, const Vector &Efield,
+                                                         Vector &globalTransport, DenseMatrix &speciesTransport,
+                                                         DenseMatrix &diffusionVelocity, Vector &n_sp) {
+  globalTransport.SetSize(SrcTrns::NUM_SRC_TRANS);
+  globalTransport = 0.0;
+  speciesTransport.SetSize(numSpecies, SpeciesTrns::NUM_SPECIES_COEFFS);
+  speciesTransport = 0.0;
+  n_sp.SetSize(numSpecies);
+  diffusionVelocity.SetSize(numSpecies, dim);
+  diffusionVelocity = 0.0;
+
+  Vector primitiveState(num_equation);
+  mixture->GetPrimitivesFromConservatives(state, primitiveState);
+  double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : primitiveState[dim + 1];
+  double Th = primitiveState[dim + 1];
+
+  Vector X_sp(numSpecies), Y_sp(numSpecies);
+  mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
+
+  // Compute mole fraction gradient from number density gradient.
+  DenseMatrix gradX(numSpecies, dim);
+  mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
+  for (int sp = 0; sp < numSpecies; sp++) {
+    for (int d = 0; d < dim; d++)
+      diffusionVelocity(sp, d) = - diffusivity_(sp) * gradX(sp, d) / (X_sp(sp) + Xeps_);
+  }
+
+  Vector mobility(numSpecies);
+  for (int sp = 0; sp < numSpecies; sp++) {
+    double temp = (sp == electronIndex_) ? Te : Th;
+    mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity_(sp);
+  }
+  globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY)
+    = computeMixtureElectricConductivity(mobility, n_sp) * MOLARELECTRONCHARGE;
+
+  if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
+
+  addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
+
+  correctMassDiffusionFlux(Y_sp, diffusionVelocity);
+
+  for (int sp = 0; sp < numSpecies; sp++)
+    speciesTransport(sp, SpeciesTrns::MF_FREQUENCY) = mtFreq_(sp);
 
   for (int sp = 0; sp < numSpecies; sp++) {
     for (int d = 0; d < dim; d++) {

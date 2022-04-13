@@ -228,6 +228,7 @@ struct constantTransportData {
   Vector diffusivity;
   double thermalConductivity;
   double electronThermalConductivity;
+  Vector mtFreq; // momentum transfer frequency
 };
 
 #endif  // DATASTRUCTURES_HPP_

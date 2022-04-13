@@ -175,6 +175,7 @@ class ConstantTransport : public TransportProperties {
   Vector diffusivity_;
   double thermalConductivity_;
   double electronThermalConductivity_;
+  Vector mtFreq_;
 
   int electronIndex_ = -1;
   const double qeOverkB_ = ELECTRONCHARGE / BOLTZMANNCONSTANT;
@@ -188,7 +189,7 @@ class ConstantTransport : public TransportProperties {
                                               Vector &transportBuffer, DenseMatrix &diffusionVelocity);
   virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp, const Vector &Efield,
                                                 Vector &globalTransport, DenseMatrix &speciesTransport,
-                                                DenseMatrix &diffusionVelocity, Vector &n_sp) {}
+                                                DenseMatrix &diffusionVelocity, Vector &n_sp);
 
   virtual double GetViscosityFromPrimitive(const Vector &state) {}
 };
