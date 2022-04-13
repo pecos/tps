@@ -1199,12 +1199,13 @@ void M2ulPhyS::projectInitialSolution() {
     else
       restart_files_hdf5("read");
 
-    if (mpi.Root()) Cache_Paraview_Timesteps();
+    //if (mpi.Root()) Cache_Paraview_Timesteps();
 
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
     // to be used with future MFEM version...
     // paraviewColl->SetRestartMode(true);
+    paraviewColl->UseRestartMode(true);
   }
 
   initGradUp();
