@@ -423,19 +423,25 @@ void initPeriodicArgonTernary2D(GasMixture *mixture, RunConfiguration &config,
   MASA::masa_set_param<double>("offset_vx", 0.11);
   MASA::masa_set_param<double>("offset_vy", 0.92);
 
-  MASA::masa_set_param<double>("n0", 40.0);
+  MASA::masa_set_param<double>("rho0", 1.2);
+  MASA::masa_set_param<double>("drhox", 0.17);
+  MASA::masa_set_param<double>("drhoy", 0.09);
+  MASA::masa_set_param<double>("krhox", 1.0);
+  MASA::masa_set_param<double>("krhoy", 1.0);
+  MASA::masa_set_param<double>("offset_rhox", 0.74);
+  MASA::masa_set_param<double>("offset_rhoy", 0.19);
 
-  MASA::masa_set_param<double>("X0", 0.17);
-  MASA::masa_set_param<double>("dX0x", 0.05);
-  MASA::masa_set_param<double>("dX0y", 0.06);
+  MASA::masa_set_param<double>("Y0", 0.34);
+  MASA::masa_set_param<double>("dY0x", 0.13);
+  MASA::masa_set_param<double>("dY0y", 0.07);
   MASA::masa_set_param<double>("kx0", 2.0);
   MASA::masa_set_param<double>("ky0", 1.0);
   MASA::masa_set_param<double>("offset_x0", 0.17);
   MASA::masa_set_param<double>("offset_y0", 0.58);
 
-  MASA::masa_set_param<double>("X1", 0.24);
-  MASA::masa_set_param<double>("dX1x", 0.13);
-  MASA::masa_set_param<double>("dX1y", 0.07);
+  MASA::masa_set_param<double>("Y1", 0.13);
+  MASA::masa_set_param<double>("dY1x", 0.03);
+  MASA::masa_set_param<double>("dY1y", 0.04);
   MASA::masa_set_param<double>("kx1", 1.0);
   MASA::masa_set_param<double>("ky1", 2.0);
   MASA::masa_set_param<double>("offset_x1", 0.94);
