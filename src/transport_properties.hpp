@@ -126,6 +126,7 @@ class DryAirTransport : public TransportProperties {
 
   // Fick's law
   double Sc;  // Schmidt number
+  
  public:
   DryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile);
 
