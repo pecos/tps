@@ -129,8 +129,11 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
 
     if (twoTemperature_) {
       // work by electron pressure
-      const double pe = mixture_->computeElectronPressure(ns(numSpecies_ - 2), Te);
-      for (int d = 0; d < dim; d++) srcTerm(num_equation - 1) -= pe * gradUpn(d + 1, d);
+      // const double pe = mixture_->computeElectronPressure(ns(numSpecies_ - 2), Te);
+      // for (int d = 0; d < dim; d++) srcTerm(num_equation - 1) -= pe * gradUpn(d + 1, d);
+      Vector gradPe(dim);
+      mixture_->computeElectronPressureGrad(ns(numSpecies_ - 2), Te, gradUpn, gradPe);
+      for (int d = 0; d < dim; d++) srcTerm(num_equation - 1) += gradPe(d) * upn(d + 1);
 
       // energy transfer by elastic momentum transfer
       const double me = mixture_->GetGasParams(numSpecies_ - 2, GasParams::SPECIES_MW);

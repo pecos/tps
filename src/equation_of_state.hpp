@@ -209,6 +209,8 @@ class GasMixture {
 
   virtual double computeElectronEnergy(const double n_e, const double T_e) = 0;
   virtual double computeElectronPressure(const double n_e, const double T_e) = 0;
+  virtual void computeElectronPressureGrad(const double n_e, const double T_e,
+                                           const DenseMatrix &gradUp, Vector &gradPe) = 0;
 };
 
 //////////////////////////////////////////////////////
@@ -271,6 +273,8 @@ class DryAir : public GasMixture {
 
   virtual double computeElectronEnergy(const double n_e, const double T_e) {}
   virtual double computeElectronPressure(const double n_e, const double T_e) {}
+  virtual void computeElectronPressureGrad(const double n_e, const double T_e,
+                                           const DenseMatrix &gradUp, Vector &gradPe) {}
   // GPU functions
 #ifdef _GPU_
   static MFEM_HOST_DEVICE double pressure(const double *state, double *KE, const double &gamma, const int &dim,
@@ -459,6 +463,8 @@ class TestBinaryAir : public GasMixture {
 
   virtual double computeElectronEnergy(const double n_e, const double T_e) {}
   virtual double computeElectronPressure(const double n_e, const double T_e) {}
+  virtual void computeElectronPressureGrad(const double n_e, const double T_e,
+                                           const DenseMatrix &gradUp, Vector &gradPe) {}
 
   // GPU functions
 #ifdef _GPU_
@@ -577,6 +583,8 @@ class PerfectMixture : public GasMixture {
   virtual double computeElectronPressure(const double n_e, const double T_e) {
     return n_e * UNIVERSALGASCONSTANT * T_e;
   }
+  virtual void computeElectronPressureGrad(const double n_e, const double T_e,
+                                           const DenseMatrix &gradUp, Vector &gradPe);
   // GPU functions
 #ifdef _GPU_
 

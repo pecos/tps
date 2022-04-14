@@ -1017,11 +1017,10 @@ void PerfectMixture::computeSpeciesEnthalpies(const Vector &state, Vector &speci
   double T_h, T_e;
   computeTemperaturesBase(state, &n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
 
-  for (int sp = 0; sp < numSpecies - 2; sp++) {
-    speciesEnthalpies(sp) = n_sp[sp] * molarCP_(sp) * T_h;
+  for (int sp = 0; sp < numSpecies; sp++) {
+    double temp = (sp == numSpecies - 2) ? T_e : T_h;
+    speciesEnthalpies(sp) = n_sp[sp] * (molarCP_(sp) * temp + gasParams(sp, GasParams::FORMATION_ENERGY));
   }
-  speciesEnthalpies(numSpecies - 1) = n_sp[numSpecies - 1] * molarCP_(numSpecies - 1) * T_h;
-  speciesEnthalpies(numSpecies - 2) = n_sp[numSpecies - 2] * molarCP_(numSpecies - 2) * T_e;
 
   return;
 }
@@ -1487,4 +1486,24 @@ void PerfectMixture::computeConservedStateFromConvectiveFlux(const Vector &meanN
   }
 
   GetConservativesFromPrimitives(Up, conservedState);
+}
+
+void PerfectMixture::computeElectronPressureGrad(const double n_e, const double T_e,
+                                                 const DenseMatrix &gradUp, Vector &gradPe){
+  gradPe.SetSize(dim);
+
+  Vector neGrad;
+  neGrad.SetSize(dim);
+  neGrad = 0.0;
+  if (ambipolar) {
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      for (int d = 0; d < dim; d++) neGrad(d) += gradUp(dim + 2 + sp, d) * gasParams(sp, GasParams::SPECIES_CHARGES);
+    }
+  } else {
+    for (int d = 0; d < dim; d++) neGrad(d) = gradUp(dim + numSpecies, d); // dim + 2 + (numSpecies - 2)
+  }
+
+  for (int d = 0; d < dim; d++) gradPe(d) = (neGrad(d) * T_e + n_e * gradUp(num_equation - 1, d)) * UNIVERSALGASCONSTANT;
+
+  return;
 }
