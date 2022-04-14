@@ -98,6 +98,10 @@ class BCintegrator : public NonlinearFormIntegrator {
 
   virtual void AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,
                                   const Vector &elfun, Vector &elvect);
+
+  virtual void AssembleFaceGrad(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,
+                                const Vector &elfun, DenseMatrix &elmat);
+
   void initBCs();
 
   void updateBCMean(ParGridFunction *Up);

@@ -79,11 +79,114 @@ void RiemannSolver::ComputeFluxDotN(const Vector &state, const Vector &nor, Vect
   if (eqSystem == NS_PASSIVE) fluxN(num_equation - 1) = den_velN * state(num_equation - 1) / state(0);
 }
 
+// Compute the Jacobian of F(u).n
+void RiemannSolver::ComputeFluxDotNJacobian(const Vector &state, const Vector &nor, DenseMatrix &fluxN_state) {
+  fluxN_state.SetSize(num_equation, num_equation);
+
+  // NOTE: nor in general is not a unit normal
+  const int dim = nor.Size();
+  const int nvel = (axisymmetric_ ? 3 : dim);
+
+  const double den = state(0);
+  const Vector den_vel(state.GetData() + 1, nvel);
+  const double den_energy = state(1 + nvel);
+
+  // MFEM_ASSERT(eqState->StateIsPhysical(state, dim), "");
+  const double pres = mixture->ComputePressure(state);
+
+  // First, evaluate the derivative of the pressure with respect to the conserved state.
+  // NB: this code is only valid for a perfect gas, and really doesn't belong here anyway.
+  // TODO(trevilo): Generalize beyond perfect gas and move to mixture class.
+  const double gam = mixture->GetSpecificHeatRatio();
+  const double gm1 = gam - 1;
+  Vector p_U(num_equation);
+  p_U[0] = 0;
+  for (int d = 0; d < nvel; d++) {
+    p_U[0] += (den_vel(d)/den)*(den_vel(d)/den);
+  }
+  p_U[0] *= 0.5*gm1;
+
+  for (int d = 0; d < nvel; d++) {
+    p_U[d+1] = -gm1*den_vel(d)/den;
+  }
+
+  p_U[nvel+1] = gm1;
+
+  // Second compute derivative of rho*u_n (normal velocity) wrt conserved state
+  Vector den_velN_U(num_equation);
+  den_velN_U = 0.0;
+  for (int d = 0; d < dim; d++) {
+    den_velN_U[d+1] = nor(d);
+  }
+
+  // Third, Jacobian of total enthalpy
+  const double H = (den_energy + pres) / den;
+  Vector H_U(num_equation);
+  H_U[0] = -H/den + p_U[0]/den;
+  for (int d = 0; d < nvel; d++) {
+    H_U[1 + d] = p_U[1 + d] / den;
+  }
+  H_U[1 + nvel] = (1. + p_U[1 + nvel])/den;
+
+
+  // Fourth, compute Jacobian, using results from above
+  double den_velN = 0;
+  for (int d = 0; d < dim; d++) {
+    den_velN += den_vel(d) * nor(d);
+  }
+
+
+  // Cons of mass equation
+  for (int jeqn = 0; jeqn < num_equation; jeqn++) {
+    fluxN_state(0,jeqn) = den_velN_U[jeqn];
+  }
+
+  // Cons of momentum eqns
+
+  // velocity part
+  for (int d = 0; d < nvel; d++) {
+    fluxN_state(1 + d, 0) = -(den_vel(d)/den)*(den_velN/den);
+
+    for (int k = 0; k < nvel; k++) {
+      fluxN_state(1 + d, 1 + k) = (den_vel(d)/den)*den_velN_U[1+k];
+    }
+    fluxN_state(1 + d, 1 + d) += den_velN/den;
+    fluxN_state(1 + d, 1 + nvel) = 0;
+  }
+
+  // pressure part
+  for (int d = 0; d < dim; d++) {
+    fluxN_state(1 + d, 0) += p_U[0]*nor(d);
+
+    for (int k = 0; k < nvel; k++) {
+      fluxN_state(1 + d, 1 + k) += p_U[1+k]*nor(d);
+    }
+
+    fluxN_state(1 + d, 1 + nvel) += p_U[1 + nvel]*nor(d);
+  }
+
+  // cons of energy
+  for (int k = 0; k < num_equation; k++) {
+    fluxN_state(1 + nvel, k) = den_velN_U[k] * H + den_velN * H_U[k];
+  }
+
+  assert(eqSystem != NS_PASSIVE);
+}
+
 void RiemannSolver::Eval(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux, bool LF) {
   if (useRoe && !LF) {
     Eval_Roe(state1, state2, nor, flux);
   } else {
     Eval_LF(state1, state2, nor, flux);
+  }
+}
+
+void RiemannSolver::Jacobian(const Vector &state1, const Vector &state2, const Vector &nor,
+                             DenseMatrix &flux_state1, DenseMatrix &flux_state2, bool LF) {
+  if (useRoe && !LF) {
+    assert(false);
+  } else {
+    Jacobian_LF(state1, state2, nor, flux_state1, flux_state2);
   }
 }
 
@@ -111,6 +214,40 @@ void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Ve
 
   for (int i = 0; i < num_equation; i++) {
     flux(i) = 0.5 * (flux1(i) + flux2(i)) - 0.5 * maxE * (state2(i) - state1(i)) * normag;
+  }
+}
+
+void RiemannSolver::Jacobian_LF(const Vector &state1, const Vector &state2, const Vector &nor,
+                                DenseMatrix &flux_state1, DenseMatrix &flux_state2) {
+  flux_state1.SetSize(num_equation, num_equation);
+  flux_state2.SetSize(num_equation, num_equation);
+
+  // NOTE: nor in general is not a unit normal
+  const int dim = nor.Size();
+  const int nvel = (axisymmetric_ ? 3 : dim);
+
+  const double maxE1 = mixture->ComputeMaxCharSpeed(state1);
+  const double maxE2 = mixture->ComputeMaxCharSpeed(state2);
+
+  const double maxE = max(maxE1, maxE2);
+
+  ComputeFluxDotNJacobian(state1, nor, flux1_state1);
+  ComputeFluxDotNJacobian(state2, nor, flux2_state2);
+
+  double normag = 0;
+  for (int i = 0; i < dim; i++) {
+    normag += nor(i) * nor(i);
+  }
+  normag = sqrt(normag);
+
+  flux_state1.Set(0.5, flux1_state1);
+  flux_state2.Set(0.5, flux2_state2);
+
+  // NB: The following neglects the derivative of maxE wrt the state
+  for (int i = 0; i < num_equation; i++) {
+    //flux(i) = 0.5 * (flux1(i) + flux2(i)) - 0.5 * maxE * (state2(i) - state1(i)) * normag;
+    flux_state1(i, i) += 0.5 * maxE * normag;
+    flux_state2(i, i) -= 0.5 * maxE * normag;
   }
 }
 

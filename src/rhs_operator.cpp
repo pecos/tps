@@ -412,6 +412,10 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
 }
 
 void RHSoperator::ImplicitSolve(const double dt, const Vector &x, Vector &k) {
+
+  // See if we can even successfully call the Jacobian code I just wrote
+  Operator &J = A->GetGradient(x);
+
   // As a start, we simply call mult.  When invoked with "backward Euler",
   // this should give the same result as forward Euler
   this->Mult(x, k);
