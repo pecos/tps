@@ -294,7 +294,6 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     //     elvect[ieqn*dof1 + idof] -= shape1[idof]*fluxN[ieqn];
     //   }
     // }
-
   }
 }
 
@@ -305,7 +304,7 @@ void FaceIntegrator::AssembleFaceGrad(const FiniteElement &el1, const FiniteElem
   funval1.SetSize(num_equation);
   funval2.SetSize(num_equation);
   nor.SetSize(dim);
-  //fluxN.SetSize(num_equation);
+  // fluxN.SetSize(num_equation);
   fluxN_U1.SetSize(num_equation, num_equation);
   fluxN_U2.SetSize(num_equation, num_equation);
 
@@ -349,7 +348,7 @@ void FaceIntegrator::AssembleFaceGrad(const FiniteElement &el1, const FiniteElem
 
     // Get the normal vector and the convective flux on the face
     CalcOrtho(Tr.Jacobian(), nor);
-    //rsolver->Eval(funval1, funval2, nor, fluxN);
+    // rsolver->Eval(funval1, funval2, nor, fluxN);
     // TODO(trevilo): Replace with rsolver->Jacobian(funval1, funval2, nor, fluxN_U1, fluxN_U2);
 
     double radius = 1;
@@ -368,48 +367,45 @@ void FaceIntegrator::AssembleFaceGrad(const FiniteElement &el1, const FiniteElem
       fluxN_U2 *= radius;
     }
 
-    for (unsigned int ieqn=0; ieqn<num_equation; ieqn++) {
-      for (unsigned int idof=0; idof < dof2; idof++) {
-        const int res_ind = num_equation*dof1 + ieqn*dof2 + idof;
-        //elvect[res_ind] += shape2[idof]*fluxN[ieqn];
+    for (unsigned int ieqn = 0; ieqn < num_equation; ieqn++) {
+      for (unsigned int idof = 0; idof < dof2; idof++) {
+        const int res_ind = num_equation * dof1 + ieqn * dof2 + idof;
+        // elvect[res_ind] += shape2[idof]*fluxN[ieqn];
 
-        for (unsigned int jeqn=0; jeqn<num_equation; jeqn++) {
-          for (unsigned int jdof=0; jdof < dof1; jdof++) {
-            const int state_ind = jeqn*dof1 + jdof;
-            elmat(res_ind, state_ind) += shape2[idof]*fluxN_U1(ieqn, jeqn)*shape1[jdof];
+        for (unsigned int jeqn = 0; jeqn < num_equation; jeqn++) {
+          for (unsigned int jdof = 0; jdof < dof1; jdof++) {
+            const int state_ind = jeqn * dof1 + jdof;
+            elmat(res_ind, state_ind) += shape2[idof] * fluxN_U1(ieqn, jeqn) * shape1[jdof];
           }
         }
-        for (unsigned int jeqn=0; jeqn<num_equation; jeqn++) {
-          for (unsigned int jdof=0; jdof < dof2; jdof++) {
-            const int state_ind = num_equation*dof1 + jeqn*dof1 + jdof;
-            elmat(res_ind, state_ind) += shape2[idof]*fluxN_U2(ieqn, jeqn)*shape2[jdof];
+        for (unsigned int jeqn = 0; jeqn < num_equation; jeqn++) {
+          for (unsigned int jdof = 0; jdof < dof2; jdof++) {
+            const int state_ind = num_equation * dof1 + jeqn * dof1 + jdof;
+            elmat(res_ind, state_ind) += shape2[idof] * fluxN_U2(ieqn, jeqn) * shape2[jdof];
           }
         }
-
       }
     }
 
-    for (unsigned int ieqn=0; ieqn<num_equation; ieqn++) {
-      for (unsigned int idof=0; idof < dof1; idof++) {
-        const int res_ind = ieqn*dof1 + idof;
-        //elvect[res_ind] -= shape1[idof]*fluxN[ieqn];
+    for (unsigned int ieqn = 0; ieqn < num_equation; ieqn++) {
+      for (unsigned int idof = 0; idof < dof1; idof++) {
+        const int res_ind = ieqn * dof1 + idof;
+        // elvect[res_ind] -= shape1[idof]*fluxN[ieqn];
 
-        for (unsigned int jeqn=0; jeqn<num_equation; jeqn++) {
-          for (unsigned int jdof=0; jdof < dof1; jdof++) {
-            const int state_ind = jeqn*dof1 + jdof;
-            elmat(res_ind, state_ind) -= shape1[idof]*fluxN_U1(ieqn, jeqn)*shape1[jdof];
+        for (unsigned int jeqn = 0; jeqn < num_equation; jeqn++) {
+          for (unsigned int jdof = 0; jdof < dof1; jdof++) {
+            const int state_ind = jeqn * dof1 + jdof;
+            elmat(res_ind, state_ind) -= shape1[idof] * fluxN_U1(ieqn, jeqn) * shape1[jdof];
           }
         }
-        for (unsigned int jeqn=0; jeqn<num_equation; jeqn++) {
-          for (unsigned int jdof=0; jdof < dof2; jdof++) {
-            const int state_ind = num_equation*dof1 + jeqn*dof1 + jdof;
-            elmat(res_ind, state_ind) -= shape1[idof]*fluxN_U2(ieqn, jeqn)*shape2[jdof];
+        for (unsigned int jeqn = 0; jeqn < num_equation; jeqn++) {
+          for (unsigned int jdof = 0; jdof < dof2; jdof++) {
+            const int state_ind = num_equation * dof1 + jeqn * dof1 + jdof;
+            elmat(res_ind, state_ind) -= shape1[idof] * fluxN_U2(ieqn, jeqn) * shape2[jdof];
           }
         }
-
       }
     }
-
   }
 }
 

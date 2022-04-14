@@ -135,8 +135,8 @@ void WallBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesID
                      num_equation, mixture);
 }
 
-void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn,  DenseMatrix &gradState,
-                                double radius, Vector &bdrFlux) {
+void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                Vector &bdrFlux) {
   Vector vel(nvel);
   for (int d = 0; d < nvel; d++) vel[d] = stateIn[1 + d] / stateIn[0];
 
