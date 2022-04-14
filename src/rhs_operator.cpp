@@ -430,7 +430,6 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
 }
 
 void RHSoperator::ImplicitSolve(const double dt, const Vector &x, Vector &k) {
-
   // See if we can even successfully call the Jacobian code I just wrote
   Operator &J = A->GetGradient(x);
 

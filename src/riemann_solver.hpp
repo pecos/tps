@@ -64,19 +64,20 @@ class RiemannSolver {
 
   void Eval_Roe(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux);
 
-  void Jacobian_LF(const Vector &state1, const Vector &state2, const Vector &nor,
-                   DenseMatrix &flux_state1, DenseMatrix &flux_state2);
+  void Jacobian_LF(const Vector &state1, const Vector &state2, const Vector &nor, DenseMatrix &flux_state1,
+                   DenseMatrix &flux_state2);
 
  public:
   MFEM_HOST_DEVICE RiemannSolver(int _num_equation, GasMixture *mixture, Equations _eqSystem, Fluxes *_fluxClass,
                                  bool _useRoe, bool axisym);
 
   void Eval(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux, bool LF = false);
+
   MFEM_HOST_DEVICE void Eval(const double *state1, const double *state2, const double *nor, double *flux,
                              bool LF = false);
 
-  void Jacobian(const Vector &state1, const Vector &state2, const Vector &nor,
-                DenseMatrix &flux_state1, DenseMatrix &flux_state2, bool LF = false);
+  void Jacobian(const Vector &state1, const Vector &state2, const Vector &nor, DenseMatrix &flux_state1,
+                DenseMatrix &flux_state2, bool LF = false);
 
   void ComputeFluxDotN(const Vector &state, const Vector &nor, Vector &fluxN);
   void ComputeFluxDotNJacobian(const Vector &state, const Vector &nor, DenseMatrix &fluxN_state);

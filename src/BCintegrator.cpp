@@ -405,7 +405,6 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
   }  // end loop over integration points
 }
 
-
 void BCintegrator::AssembleFaceGrad(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,
                                     const Vector &elfun, DenseMatrix &elmat) {
   const int dof1 = el1.GetDof();
