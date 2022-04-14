@@ -82,8 +82,9 @@ ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture, RunConfigurat
   thirdOrderkElectron_ = _runfile.thirdOrderkElectron;
 }
 
-void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
-                                                           Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
+void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
+                                                           const Vector &Efield, Vector &transportBuffer,
+                                                           DenseMatrix &diffusionVelocity) {
   transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   transportBuffer = 0.0;
 
@@ -137,14 +138,15 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
     transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
         computeThirdOrderElectronThermalConductivity(X_sp, debyeLength, Te, nondimTe);
   } else {
-    transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
-        viscosityFactor_ * kOverEtaFactor_ * sqrt(Te / mw_(electronIndex_)) * X_sp(electronIndex_) /
-        (collision::charged::rep22(nondimTe) * debyeCircle);
+    transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] = viscosityFactor_ * kOverEtaFactor_ *
+                                                               sqrt(Te / mw_(electronIndex_)) * X_sp(electronIndex_) /
+                                                               (collision::charged::rep22(nondimTe) * debyeCircle);
   }
 
   double binaryDea = diffusivityFactor_ * sqrt(Te / muAE_) / nTotal / collision::argon::eAr11(Te);
   double binaryDai = diffusivityFactor_ * sqrt(Th / muAI_) / nTotal / collision::argon::ArAr1P11(Th);
-  double binaryDie = diffusivityFactor_ * sqrt(Te / muEI_) / nTotal / (collision::charged::att11(nondimTe) * debyeCircle);
+  double binaryDie =
+      diffusivityFactor_ * sqrt(Te / muEI_) / nTotal / (collision::charged::att11(nondimTe) * debyeCircle);
 
   Vector diffusivity(3), mobility(3);
   diffusivity(electronIndex_) = (1.0 - Y_sp(electronIndex_)) /
@@ -257,7 +259,8 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
 
   double binaryDea = diffusivityFactor_ * sqrt(Te / muAE_) / nTotal / collision::argon::eAr11(Te);
   double binaryDai = diffusivityFactor_ * sqrt(Th / muAI_) / nTotal / collision::argon::ArAr1P11(Th);
-  double binaryDie = diffusivityFactor_ * sqrt(Te / muEI_) / nTotal / (collision::charged::att11(nondimTe) * debyeCircle);
+  double binaryDie =
+      diffusivityFactor_ * sqrt(Te / muEI_) / nTotal / (collision::charged::att11(nondimTe) * debyeCircle);
 
   diffusivity.SetSize(3);
   diffusivity(electronIndex_) = (1.0 - Y_sp(electronIndex_)) /
@@ -268,7 +271,8 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
                                ((X_sp(electronIndex_) + Xeps_) / binaryDea + (X_sp(ionIndex_) + Xeps_) / binaryDai);
 }
 
-void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp, const Vector &Efield,
+void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up,
+                                                             const DenseMatrix &gradUp, const Vector &Efield,
                                                              Vector &globalTransport, DenseMatrix &speciesTransport,
                                                              DenseMatrix &diffusionVelocity, Vector &n_sp) {
   globalTransport.SetSize(SrcTrns::NUM_SRC_TRANS);
@@ -312,8 +316,8 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
     double temp = (sp == electronIndex_) ? Te : Th;
     mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity(sp);
   }
-  globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY)
-    = computeMixtureElectricConductivity(mobility, n_sp) * MOLARELECTRONCHARGE;
+  globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY) =
+      computeMixtureElectricConductivity(mobility, n_sp) * MOLARELECTRONCHARGE;
 
   DenseMatrix gradX(numSpecies, dim);
   mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
@@ -323,7 +327,7 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
     for (int d = 0; d < dim; d++) {
       double DgradX = diffusivity(sp) * gradX(sp, d);
       // NOTE: we'll have to handle small X case.
-      diffusionVelocity(sp, d) = - DgradX / (X_sp(sp) + Xeps_);
+      diffusionVelocity(sp, d) = -DgradX / (X_sp(sp) + Xeps_);
     }
   }
 
@@ -333,10 +337,10 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
 
   correctMassDiffusionFlux(Y_sp, diffusionVelocity);
 
-  speciesTransport(ionIndex_, SpeciesTrns::MF_FREQUENCY) = mfFreqFactor_ * sqrt(Te / mw_(electronIndex_))
-                                                                  * n_sp(ionIndex_) * Qie;
-  speciesTransport(neutralIndex_, SpeciesTrns::MF_FREQUENCY) = mfFreqFactor_ * sqrt(Te / mw_(electronIndex_))
-                                                                      * n_sp(neutralIndex_) * Qea;
+  speciesTransport(ionIndex_, SpeciesTrns::MF_FREQUENCY) =
+      mfFreqFactor_ * sqrt(Te / mw_(electronIndex_)) * n_sp(ionIndex_) * Qie;
+  speciesTransport(neutralIndex_, SpeciesTrns::MF_FREQUENCY) =
+      mfFreqFactor_ * sqrt(Te / mw_(electronIndex_)) * n_sp(neutralIndex_) * Qea;
   // // relative electron collision speed
   // double ge = sqrt(8.0 * kB_ * Te / PI_ / mw_(electronIndex_));
   // speciesTransport(ionIndex_, SpeciesTrns::MF_FREQUENCY) = 4.0 / 3.0 * AVOGADRONUMBER * n_sp(ionIndex_) * ge * Qie;

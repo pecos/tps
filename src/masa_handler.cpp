@@ -45,7 +45,7 @@ void M2ulPhyS::initMasaHandler() {
     dryair3d::initEuler3DTransient(dim, config);
   } else if (config.mms_name_ == "navierstokes_3d_transient_sutherland") {
     dryair3d::initNS3DTransient(dim, config);
-  } else if (config.mms_name_.substr(0,10) == "ternary_2d") {
+  } else if (config.mms_name_.substr(0, 10) == "ternary_2d") {
     double Lx, Ly;
     std::string basepath("mms/ternary_2d");
     tpsP->getRequiredInput((basepath + "/Lx").c_str(), Lx);
@@ -150,7 +150,8 @@ void M2ulPhyS::checkSolutionError(const double _time, const bool final) {
     componentRelErrors = 0.0;
     for (int eq = 0; eq < num_equation; eq++) {
       componentErrors(eq) = U->ComputeLpError(2, *stateMMS_, nullPtr, componentWindow_[eq]);
-      componentRelErrors(eq) = componentErrors(eq) / zeroU_->ComputeLpError(2, *stateMMS_, nullPtr, componentWindow_[eq]);
+      componentRelErrors(eq) =
+          componentErrors(eq) / zeroU_->ComputeLpError(2, *stateMMS_, nullPtr, componentWindow_[eq]);
     }
 
     int numElems;
@@ -419,8 +420,7 @@ void initNS3DTransient(const int dim, RunConfiguration &config) {
 
 namespace ternary2d {
 
-void initTernary2DBase(GasMixture *mixture, RunConfiguration &config,
-                       const double Lx, const double Ly) {
+void initTernary2DBase(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly) {
   assert(config.numSpecies == 3);
   assert(config.transportModel == CONSTANT);
   assert(config.gasModel == PERFECT_MIXTURE);
@@ -431,7 +431,7 @@ void initTernary2DBase(GasMixture *mixture, RunConfiguration &config,
 
   MASA::masa_set_param<double>("kux", 1.0);
   MASA::masa_set_param<double>("kuy", 2.0);
-  MASA::masa_set_param<double>("offset_ux", - 0.33);
+  MASA::masa_set_param<double>("offset_ux", -0.33);
   MASA::masa_set_param<double>("offset_uy", 0.47);
 
   MASA::masa_set_param<double>("v0", 0.91);
@@ -489,8 +489,8 @@ void initTernary2DBase(GasMixture *mixture, RunConfiguration &config,
 
   MASA::masa_set_param<double>("mu", config.constantTransport.viscosity);
   MASA::masa_set_param<double>("muB", config.constantTransport.bulkViscosity);
-  MASA::masa_set_param<double>("k_heat", config.constantTransport.thermalConductivity
-                                          + config.constantTransport.electronThermalConductivity);
+  MASA::masa_set_param<double>(
+      "k_heat", config.constantTransport.thermalConductivity + config.constantTransport.electronThermalConductivity);
 
   std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
   MASA::masa_set_param<double>("D_A", config.constantTransport.diffusivity((*mixtureToInputMap)[numSpecies - 1]));
@@ -504,8 +504,7 @@ void initTernary2DBase(GasMixture *mixture, RunConfiguration &config,
   MASA::masa_set_param<double>("ZE", mixture->GetGasParams(numSpecies - 2, GasParams::SPECIES_CHARGES));
 }
 
-void initTernary2DPeriodic(GasMixture *mixture, RunConfiguration &config,
-                           const double Lx, const double Ly) {
+void initTernary2DPeriodic(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly) {
   assert(config.mms_name_ == "ternary_2d_periodic");
   assert(!config.ambipolar);
   assert(!config.twoTemperature);
@@ -522,8 +521,7 @@ void initTernary2DPeriodic(GasMixture *mixture, RunConfiguration &config,
   MASA::masa_set_param<double>("offset_y1", 0.29);
 }
 
-void initTernary2DPeriodicAmbipolar(GasMixture *mixture, RunConfiguration &config,
-                                    const double Lx, const double Ly) {
+void initTernary2DPeriodicAmbipolar(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly) {
   assert(config.mms_name_ == "ternary_2d_periodic_ambipolar");
   assert(config.ambipolar);
   assert(!config.twoTemperature);
@@ -532,8 +530,7 @@ void initTernary2DPeriodicAmbipolar(GasMixture *mixture, RunConfiguration &confi
   ternary2d::initTernary2DBase(mixture, config, Lx, Ly);
 }
 
-void initTernary2D2TPeriodicAmbipolar(GasMixture *mixture, RunConfiguration &config,
-                                      const double Lx, const double Ly) {
+void initTernary2D2TPeriodicAmbipolar(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly) {
   assert(config.mms_name_ == "ternary_2d_2t_periodic_ambipolar");
   assert(config.ambipolar);
   assert(config.twoTemperature);

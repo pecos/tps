@@ -73,8 +73,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     for (int eq = 0; eq < num_equation; eq++) {
       upn(eq) = h_Up[n + eq * nnodes];
       Un(eq) = h_U[n + eq * nnodes];
-      for (int d = 0; d < dim; d++)
-        gradUpn(eq, d) = h_gradUp[n + eq * nnodes + d * num_equation * nnodes];
+      for (int d = 0; d < dim; d++) gradUpn(eq, d) = h_gradUp[n + eq * nnodes + d * num_equation * nnodes];
     }
     // TODO(kevin): update E-field with EM coupling.
     Vector Efield(dim);
@@ -84,8 +83,8 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     DenseMatrix speciesTransport(numSpecies_, SpeciesTrns::NUM_SPECIES_COEFFS);
     DenseMatrix diffusionVelocity(numSpecies_, dim);
     Vector ns(numSpecies_);
-    transport_->ComputeSourceTransportProperties(Un, upn, gradUpn, globalTransport, Efield,
-                                                 speciesTransport, diffusionVelocity, ns);
+    transport_->ComputeSourceTransportProperties(Un, upn, gradUpn, globalTransport, Efield, speciesTransport,
+                                                 diffusionVelocity, ns);
 
     srcTerm = 0.0;
 
@@ -112,16 +111,17 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     }
 
     // Terms required for EM-coupling.
-    Vector Jd(dim); // diffusion current.
+    Vector Jd(dim);  // diffusion current.
     Jd = 0.0;
-    if (ambipolar_) { // diffusion current using electric conductivity.
+    if (ambipolar_) {  // diffusion current using electric conductivity.
       const double mho = globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY);
       // Jd = mho * Efield
 
-    } else { // diffusion current by definition.
+    } else {  // diffusion current by definition.
       for (int sp = 0; sp < numSpecies_; sp++) {
-        for (int d = 0; d < dim; d++) Jd(d) += diffusionVelocity(sp, d) * ns(sp) * MOLARELECTRONCHARGE
-                                                * mixture_->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+        for (int d = 0; d < dim; d++)
+          Jd(d) += diffusionVelocity(sp, d) * ns(sp) * MOLARELECTRONCHARGE *
+                   mixture_->GetGasParams(sp, GasParams::SPECIES_CHARGES);
       }
     }
 

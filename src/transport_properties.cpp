@@ -55,7 +55,7 @@ void TransportProperties::correctMassDiffusionFlux(const Vector &Y_sp, DenseMatr
 }
 
 double TransportProperties::computeMixtureElectricConductivity(const Vector &mobility, const Vector &n_sp) {
-  double mho = 0.0; // electric conductivity.
+  double mho = 0.0;  // electric conductivity.
 
   for (int sp = 0; sp < numSpecies; sp++) {
     mho += mobility(sp) * n_sp(sp) * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
@@ -64,7 +64,8 @@ double TransportProperties::computeMixtureElectricConductivity(const Vector &mob
   return mho;
 }
 
-void TransportProperties::addAmbipolarEfield(const Vector &mobility, const Vector &n_sp, DenseMatrix &diffusionVelocity) {
+void TransportProperties::addAmbipolarEfield(const Vector &mobility, const Vector &n_sp,
+                                             DenseMatrix &diffusionVelocity) {
   double mho = computeMixtureElectricConductivity(mobility, n_sp);
 
   Vector ambE(dim);
@@ -83,13 +84,13 @@ void TransportProperties::addAmbipolarEfield(const Vector &mobility, const Vecto
   }
 }
 
-void TransportProperties::addMixtureDrift(const Vector &mobility, const Vector &n_sp, const Vector &Efield, DenseMatrix &diffusionVelocity) {
+void TransportProperties::addMixtureDrift(const Vector &mobility, const Vector &n_sp, const Vector &Efield,
+                                          DenseMatrix &diffusionVelocity) {
   for (int sp = 0; sp < numSpecies; sp++) {
     if (mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) == 0.0) continue;
 
     double charge = MOLARELECTRONCHARGE * n_sp(sp) * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
-    for (int d = 0; d < dim; d++)
-      diffusionVelocity(sp, d) += charge * Efield(d);
+    for (int d = 0; d < dim; d++) diffusionVelocity(sp, d) += charge * Efield(d);
   }
 }
 
@@ -108,8 +109,9 @@ DryAirTransport::DryAirTransport(GasMixture *_mixture, RunConfiguration &_runfil
   cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
 }
 
-void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
-                                                     Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
+void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
+                                                     const Vector &Efield, Vector &transportBuffer,
+                                                     DenseMatrix &diffusionVelocity) {
   double p = mixture->ComputePressure(state);
   double temp = p / gas_constant / state[0];
 
@@ -118,8 +120,7 @@ void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const 
   double viscosity = (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
   transportBuffer[FluxTrns::VISCOSITY] = viscosity;
   transportBuffer[FluxTrns::BULK_VISCOSITY] = bulk_visc_mult * viscosity;
-  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] =
-      cp_div_pr * transportBuffer[FluxTrns::VISCOSITY];
+  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = cp_div_pr * transportBuffer[FluxTrns::VISCOSITY];
 
   diffusionVelocity.SetSize(numSpecies, 3);
   diffusionVelocity = 0.0;
@@ -154,8 +155,9 @@ void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const 
 TestBinaryAirTransport::TestBinaryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile)
     : DryAirTransport(_mixture, _runfile) {}
 
-void TestBinaryAirTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
-                                                            Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
+void TestBinaryAirTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
+                                                            const Vector &Efield, Vector &transportBuffer,
+                                                            DenseMatrix &diffusionVelocity) {
   double p = mixture->ComputePressure(state);
   double temp = p / gas_constant / state[0];
 
@@ -166,8 +168,7 @@ void TestBinaryAirTransport::ComputeFluxTransportProperties(const Vector &state,
   double viscosity = (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
   transportBuffer[FluxTrns::VISCOSITY] = viscosity;
   transportBuffer[FluxTrns::BULK_VISCOSITY] = bulk_visc_mult * viscosity;
-  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] =
-      cp_div_pr * transportBuffer[FluxTrns::VISCOSITY];
+  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = cp_div_pr * transportBuffer[FluxTrns::VISCOSITY];
 
   diffusionVelocity.SetSize(numSpecies, 3);
   diffusionVelocity = 0.0;
@@ -220,8 +221,9 @@ ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_ru
   }
 }
 
-void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
-                                                       Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
+void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
+                                                       const Vector &Efield, Vector &transportBuffer,
+                                                       DenseMatrix &diffusionVelocity) {
   transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   transportBuffer[FluxTrns::VISCOSITY] = viscosity_;
   transportBuffer[FluxTrns::BULK_VISCOSITY] = bulkViscosity_;
@@ -243,8 +245,7 @@ void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, cons
   DenseMatrix gradX(numSpecies, dim);
   mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
   for (int sp = 0; sp < numSpecies; sp++) {
-    for (int d = 0; d < dim; d++)
-      diffusionVelocity(sp, d) = - diffusivity_(sp) * gradX(sp, d) / (X_sp(sp) + Xeps_);
+    for (int d = 0; d < dim; d++) diffusionVelocity(sp, d) = -diffusivity_(sp) * gradX(sp, d) / (X_sp(sp) + Xeps_);
   }
 
   Vector mobility(numSpecies);
@@ -269,7 +270,8 @@ void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, cons
   }
 }
 
-void ConstantTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp, const Vector &Efield,
+void ConstantTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up,
+                                                         const DenseMatrix &gradUp, const Vector &Efield,
                                                          Vector &globalTransport, DenseMatrix &speciesTransport,
                                                          DenseMatrix &diffusionVelocity, Vector &n_sp) {
   globalTransport.SetSize(SrcTrns::NUM_SRC_TRANS);
@@ -292,8 +294,7 @@ void ConstantTransport::ComputeSourceTransportProperties(const Vector &state, co
   DenseMatrix gradX(numSpecies, dim);
   mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
   for (int sp = 0; sp < numSpecies; sp++) {
-    for (int d = 0; d < dim; d++)
-      diffusionVelocity(sp, d) = - diffusivity_(sp) * gradX(sp, d) / (X_sp(sp) + Xeps_);
+    for (int d = 0; d < dim; d++) diffusionVelocity(sp, d) = -diffusivity_(sp) * gradX(sp, d) / (X_sp(sp) + Xeps_);
   }
 
   Vector mobility(numSpecies);
@@ -301,8 +302,8 @@ void ConstantTransport::ComputeSourceTransportProperties(const Vector &state, co
     double temp = (sp == electronIndex_) ? Te : Th;
     mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity_(sp);
   }
-  globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY)
-    = computeMixtureElectricConductivity(mobility, n_sp) * MOLARELECTRONCHARGE;
+  globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY) =
+      computeMixtureElectricConductivity(mobility, n_sp) * MOLARELECTRONCHARGE;
 
   if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
 
@@ -310,8 +311,7 @@ void ConstantTransport::ComputeSourceTransportProperties(const Vector &state, co
 
   correctMassDiffusionFlux(Y_sp, diffusionVelocity);
 
-  for (int sp = 0; sp < numSpecies; sp++)
-    speciesTransport(sp, SpeciesTrns::MF_FREQUENCY) = mtFreq_(sp);
+  for (int sp = 0; sp < numSpecies; sp++) speciesTransport(sp, SpeciesTrns::MF_FREQUENCY) = mtFreq_(sp);
 
   for (int sp = 0; sp < numSpecies; sp++) {
     for (int d = 0; d < dim; d++) {

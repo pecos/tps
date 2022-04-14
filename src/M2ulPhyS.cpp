@@ -1969,25 +1969,24 @@ void M2ulPhyS::parseSolverOptions2() {
                        config.thirdOrderkElectron, true);
         break;
       case CONSTANT: {
-          tpsP->getRequiredInput("plasma_models/transport_model/constant/viscosity", config.constantTransport.viscosity);
-          tpsP->getRequiredInput("plasma_models/transport_model/constant/bulk_viscosity",
-                                 config.constantTransport.bulkViscosity);
-          tpsP->getRequiredInput("plasma_models/transport_model/constant/thermal_conductivity",
-                                 config.constantTransport.thermalConductivity);
-          tpsP->getRequiredInput("plasma_models/transport_model/constant/electron_thermal_conductivity",
-                                 config.constantTransport.electronThermalConductivity);
-          std::string diffpath("plasma_models/transport_model/constant/diffusivity");
-          config.constantTransport.diffusivity.SetSize(config.numSpecies);
-          std::string mtpath("plasma_models/transport_model/constant/momentum_transfer_frequency");
-          config.constantTransport.mtFreq.SetSize(config.numSpecies);
-          for (int sp = 1; sp <= config.numSpecies; sp++) {
-            tpsP->getRequiredInput((diffpath + "/species" + std::to_string(sp)).c_str(),
-                                   config.constantTransport.diffusivity(sp - 1));
-            tpsP->getRequiredInput((mtpath + "/species" + std::to_string(sp)).c_str(),
-                                   config.constantTransport.mtFreq(sp - 1));
-          }
+        tpsP->getRequiredInput("plasma_models/transport_model/constant/viscosity", config.constantTransport.viscosity);
+        tpsP->getRequiredInput("plasma_models/transport_model/constant/bulk_viscosity",
+                               config.constantTransport.bulkViscosity);
+        tpsP->getRequiredInput("plasma_models/transport_model/constant/thermal_conductivity",
+                               config.constantTransport.thermalConductivity);
+        tpsP->getRequiredInput("plasma_models/transport_model/constant/electron_thermal_conductivity",
+                               config.constantTransport.electronThermalConductivity);
+        std::string diffpath("plasma_models/transport_model/constant/diffusivity");
+        config.constantTransport.diffusivity.SetSize(config.numSpecies);
+        std::string mtpath("plasma_models/transport_model/constant/momentum_transfer_frequency");
+        config.constantTransport.mtFreq.SetSize(config.numSpecies);
+        for (int sp = 1; sp <= config.numSpecies; sp++) {
+          tpsP->getRequiredInput((diffpath + "/species" + std::to_string(sp)).c_str(),
+                                 config.constantTransport.diffusivity(sp - 1));
+          tpsP->getRequiredInput((mtpath + "/species" + std::to_string(sp)).c_str(),
+                                 config.constantTransport.mtFreq(sp - 1));
         }
-        break;
+      } break;
       default:
         break;
     }

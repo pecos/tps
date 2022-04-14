@@ -565,8 +565,8 @@ void TestBinaryAir::ComputeSpeciesPrimitives(const Vector &conservedState, Vecto
   }
 }
 
-void TestBinaryAir::ComputeMassFractionGradient(const double rho, const Vector &numberDensities, const DenseMatrix &gradUp,
-                                                DenseMatrix &massFractionGrad) {
+void TestBinaryAir::ComputeMassFractionGradient(const double rho, const Vector &numberDensities,
+                                                const DenseMatrix &gradUp, DenseMatrix &massFractionGrad) {
   // Only need active species.
   massFractionGrad.SetSize(numActiveSpecies, dim);
   for (int sp = 0; sp < numActiveSpecies; sp++) {
@@ -1488,8 +1488,8 @@ void PerfectMixture::computeConservedStateFromConvectiveFlux(const Vector &meanN
   GetConservativesFromPrimitives(Up, conservedState);
 }
 
-void PerfectMixture::computeElectronPressureGrad(const double n_e, const double T_e,
-                                                 const DenseMatrix &gradUp, Vector &gradPe){
+void PerfectMixture::computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix &gradUp,
+                                                 Vector &gradPe) {
   gradPe.SetSize(dim);
 
   Vector neGrad;
@@ -1500,10 +1500,11 @@ void PerfectMixture::computeElectronPressureGrad(const double n_e, const double 
       for (int d = 0; d < dim; d++) neGrad(d) += gradUp(dim + 2 + sp, d) * gasParams(sp, GasParams::SPECIES_CHARGES);
     }
   } else {
-    for (int d = 0; d < dim; d++) neGrad(d) = gradUp(dim + numSpecies, d); // dim + 2 + (numSpecies - 2)
+    for (int d = 0; d < dim; d++) neGrad(d) = gradUp(dim + numSpecies, d);  // dim + 2 + (numSpecies - 2)
   }
 
-  for (int d = 0; d < dim; d++) gradPe(d) = (neGrad(d) * T_e + n_e * gradUp(num_equation - 1, d)) * UNIVERSALGASCONSTANT;
+  for (int d = 0; d < dim; d++)
+    gradPe(d) = (neGrad(d) * T_e + n_e * gradUp(num_equation - 1, d)) * UNIVERSALGASCONSTANT;
 
   return;
 }

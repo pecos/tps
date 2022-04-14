@@ -203,7 +203,8 @@ class HeatSource : public ForcingTerms {
 // Manufactured Solution using MASA
 class MASA_forcings : public ForcingTerms {
  private:
-   void (*evaluateForcing_)(const Vector &, const double, Array<double> &) = 0;
+  void (*evaluateForcing_)(const Vector &, const double, Array<double> &) = 0;
+
  public:
   MASA_forcings(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                 IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up,

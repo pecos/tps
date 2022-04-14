@@ -100,9 +100,10 @@ class ArgonMinimalTransport : public TransportProperties {
   // Source term will be constructed using ForcingTerms, which have pointers to primitive variables.
   // So we can use them in evaluating transport properties.
   // If this routine evaluate additional primitive variables, can return them just as the routine above.
-  virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp, const Vector &Efield,
-                                                Vector &globalTransport, DenseMatrix &speciesTransport,
-                                                DenseMatrix &diffusionVelocity, Vector &n_sp);
+  virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
+                                                const Vector &Efield, Vector &globalTransport,
+                                                DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
+                                                Vector &n_sp);
 
   // TODO(kevin): only for AxisymmetricSource
   virtual double GetViscosityFromPrimitive(const Vector &state) {}
