@@ -32,7 +32,7 @@ EXTRA_DIST      = tap-driver.sh soln_differ inputs meshes ref_solns/*.h5 \
 	 	  inflow_outflow.test mms.ternary_2d.test mms.ternary_2d_wall.test \
 	 	  mms.ternary_2d_inout.test cuda-memcheck.test mms.general_wall.test \
 		  independent_coupling.test interp_em.test mms.euler_2d.test mms.cns_2d.test \
-		  gradient.test coupled-3d.test tabulated.test lte_mixture.test
+		  gradient.test coupled-3d.test tabulated.test lte_mixture.test ping_jacobian.test
 
 TESTS = vpath.sh
 XFAIL_TESTS =
@@ -74,7 +74,8 @@ TESTS += cyl3d.test \
 	 gradient.test \
 	 coupled-3d.test \
 	 tabulated.test \
-	 lte_mixture.test
+	 lte_mixture.test \
+	 ping_jacobian.test
 
 if PYTHON_ENABLED
 TESTS += cyl3d.python.test
@@ -171,3 +172,51 @@ test_lte_mixture_LDADD       += $(HDF5_LIBS)
 test_lte_mixture_LDADD       += $(GRVY_LIBS)
 
 endif # if !GPU_ENABLED
+
+# extra cpu test programs
+
+# local Jacobian tests
+check_PROGRAMS += ping_jacobian_local
+ping_jacobian_local_SOURCES = ping_jacobian_local.cpp
+ping_jacobian_local_LDADD   = ../src/libtps.a
+ping_jacobian_local_LDADD  += $(HDF5_LIBS)
+ping_jacobian_local_LDADD  += $(GRVY_LIBS)
+ping_jacobian_local_LDADD  += $(MFEM_LIBS)
+
+ping_jacobian_local_LDFLAGS =
+if SLURM_ENABLED
+ping_jacobian_local_LDFLAGS += -lslurm
+endif
+
+if GSLIB_ENABLED
+ping_jacobian_local_LDADD   += -lgs
+ping_jacobian_local_LDFLAGS += -L$(GSLIB_LIB)
+endif
+
+if MASA_ENABLED
+ping_jacobian_local_LDFLAGS += $(MASA_LIBS)
+endif
+
+# global Jacobian tests
+check_PROGRAMS += ping_jacobian_global
+ping_jacobian_global_SOURCES = ping_jacobian_global.cpp
+ping_jacobian_global_LDADD   = ../src/libtps.a
+ping_jacobian_global_LDADD  += $(HDF5_LIBS)
+ping_jacobian_global_LDADD  += $(GRVY_LIBS)
+ping_jacobian_global_LDADD  += $(MFEM_LIBS)
+
+ping_jacobian_global_LDFLAGS =
+if SLURM_ENABLED
+ping_jacobian_global_LDFLAGS += -lslurm
+endif
+
+if GSLIB_ENABLED
+ping_jacobian_global_LDADD   += -lgs
+ping_jacobian_global_LDFLAGS += -L$(GSLIB_LIB)
+endif
+
+if MASA_ENABLED
+ping_jacobian_global_LDFLAGS += $(MASA_LIBS)
+endif
+
+endif

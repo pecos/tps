@@ -158,6 +158,7 @@ class Tps {
   void parseArgs(std::vector<std::string> argv);      // variant used in python interface
 
   void parseInput();
+
   void parseInputFile(std::string iFile);
   void closeInputFile() { iparse_.Close(); }
 
