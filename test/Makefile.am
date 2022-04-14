@@ -29,7 +29,7 @@ TESTS += cyl3d.test \
 endif
 
 if GSLIB_ENABLED
-TESTS += cyl3d.interp.test
+#TESTS += cyl3d.interp.test
 endif
 
 if VALGRIND_ENABLED
