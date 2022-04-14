@@ -316,6 +316,7 @@ class M2ulPhyS : public TPS::Solver {
   ParFiniteElementSpace *GetFESpace() { return vfes; }
   ParGridFunction *GetSolutionGF() { return U; }
   RunConfiguration &GetConfig() { return config; }
+  DGNonLinearForm *GetFaceIntegrator() { return A; }
 
   static int Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_print);
 

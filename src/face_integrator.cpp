@@ -346,10 +346,9 @@ void FaceIntegrator::AssembleFaceGrad(const FiniteElement &el1, const FiniteElem
     elfun1_mat.MultTranspose(shape1, funval1);
     elfun2_mat.MultTranspose(shape2, funval2);
 
-    // Get the normal vector and the convective flux on the face
+    // Get the normal vector and the convective flux Jacobian on the face
     CalcOrtho(Tr.Jacobian(), nor);
-    // rsolver->Eval(funval1, funval2, nor, fluxN);
-    // TODO(trevilo): Replace with rsolver->Jacobian(funval1, funval2, nor, fluxN_U1, fluxN_U2);
+    rsolver->Jacobian(funval1, funval2, nor, fluxN_U1, fluxN_U2);
 
     double radius = 1;
     if (axisymmetric_) {

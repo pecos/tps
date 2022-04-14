@@ -60,6 +60,8 @@ Tps::Tps(int argc, char *argv[]) {
 #else
   deviceConfig_ = "cpu";
 #endif
+
+  solver_ = NULL;
 }
 
 Tps::~Tps() { delete solver_; }
