@@ -15,7 +15,7 @@ setup() {
 }
 
 @test "[$TEST] create a mesh file" {
-    ../utils/beam_mesh -nx 1 -nt 5 -b 5 -rs 1    # no refinement
+    ../utils/beam_mesh -nx 1 -nt 5 -b 5 -rs 2
 
     test -s $MESH_FILE
 }
@@ -28,34 +28,34 @@ setup() {
     while IFS=$'\t' read -r nx e0 e1 e2 e3 e4 e5;
     do
       test $nx -eq 100
-      # empirically observed error 1.172e-3
-      check_lo=$(awk 'BEGIN{print ('$e0'>1.17e-3)?1:0}')
-      check_hi=$(awk 'BEGIN{print ('$e0'<1.18e-3)?1:0}')
+      # empirically observed error 3.7306e-4
+      check_lo=$(awk 'BEGIN{print ('$e0'>3.72e-4)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e0'<3.74e-4)?1:0}')
       test $check_lo -eq 1
       test $check_hi -eq 1
-      # empirically observed error 0.361
-      check_lo=$(awk 'BEGIN{print ('$e1'>0.36)?1:0}')
-      check_hi=$(awk 'BEGIN{print ('$e1'<0.37)?1:0}')
+      # empirically observed error 0.1467
+      check_lo=$(awk 'BEGIN{print ('$e1'>0.146)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e1'<0.147)?1:0}')
       test $check_lo -eq 1
       test $check_hi -eq 1
-      # empirically observed error 0.659
-      check_lo=$(awk 'BEGIN{print ('$e2'>0.655)?1:0}')
-      check_hi=$(awk 'BEGIN{print ('$e2'<0.665)?1:0}')
+      # empirically observed error 0.2269
+      check_lo=$(awk 'BEGIN{print ('$e2'>0.22)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e2'<0.23)?1:0}')
       test $check_lo -eq 1
       test $check_hi -eq 1
-      # empirically observed error 1.508e-3
-      check_lo=$(awk 'BEGIN{print ('$e3'>1.45e-3)?1:0}')
-      check_hi=$(awk 'BEGIN{print ('$e3'<1.55e-3)?1:0}')
+      # empirically observed error 3.9929e-4
+      check_lo=$(awk 'BEGIN{print ('$e3'>3.99e-4)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e3'<4.0e-4)?1:0}')
       test $check_lo -eq 1
       test $check_hi -eq 1
-      # empirically observed error 3.140e-3
-      check_lo=$(awk 'BEGIN{print ('$e4'>3.135e-3)?1:0}')
-      check_hi=$(awk 'BEGIN{print ('$e4'<3.145e-3)?1:0}')
+      # empirically observed error 3.9968e-4
+      check_lo=$(awk 'BEGIN{print ('$e4'>3.99e-4)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e4'<4.0e-4)?1:0}')
       test $check_lo -eq 1
       test $check_hi -eq 1
-      # empirically observed error 2.177e-3
-      check_lo=$(awk 'BEGIN{print ('$e5'>2.17e-3)?1:0}')
-      check_hi=$(awk 'BEGIN{print ('$e5'<2.18e-3)?1:0}')
+      # empirically observed error 7.0126e-4
+      check_lo=$(awk 'BEGIN{print ('$e5'>7.0e-4)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e5'<7.1e-4)?1:0}')
       test $check_lo -eq 1
       test $check_hi -eq 1
     done < periodic_ternary_2d.rel_error.txt
