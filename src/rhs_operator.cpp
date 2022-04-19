@@ -314,7 +314,7 @@ RHSoperator::~RHSoperator() {
   if (transferGradUp.statuses != NULL) delete[] transferGradUp.statuses;
 }
 
-void RHSoperator::Mult(const Vector &x, Vector &y) const {
+void RHSoperator::formResidual(const Vector &x) const {
   max_char_speed = 0.;
 
 #ifdef _GPU_
@@ -381,8 +381,13 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
   //   forcing[i]->setTime(this->GetTime());
   //   forcing[i]->updateTerms(z);
   // }
+}
 
-  // 3. Multiply element-wise by the inverse mass matrices.
+void RHSoperator::Mult(const Vector &x, Vector &y) const {
+  // Evaluate the spatial part of the residual
+  formResidual(x);
+
+  // Multiply element-wise by the inverse mass matrices.
 #ifdef _GPU_
   for (int eltype = 0; eltype < gpuArrays.numElems.Size(); eltype++) {
     int elemOffset = 0;
@@ -429,6 +434,9 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
 }
 
 void RHSoperator::ImplicitSolve(const double dt, const Vector &x, Vector &k) {
+  // Evaluate the spatial part of the Residual
+  formResidual(x);
+
   // Evaluate spatial part of Jacobian
   OperatorHandle Jh(&(A->GetGradient(x)), false);
   HypreParMatrix &Jmat = *Jh.As<HypreParMatrix>();
