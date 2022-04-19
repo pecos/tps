@@ -6,7 +6,7 @@ RUNFILE="inputs/mms.ternary_plasma.2d.ini"
 
 setup() {
     SOLN_FILE=restart_argon_output.sol.h5
-    MESH_FILE=beam-quad-o3-s1-r1-p.mesh
+    MESH_FILE=beam-quad-o3-s1-r2-p.mesh
     TOL=2e-4
 }
 
@@ -58,5 +58,5 @@ setup() {
       check_hi=$(awk 'BEGIN{print ('$e5'<7.1e-4)?1:0}')
       test $check_lo -eq 1
       test $check_hi -eq 1
-    done < periodic_ternary_2d.rel_error.txt
+    done < ternary_2d_periodic.rel_error.txt
 }
