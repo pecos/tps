@@ -293,9 +293,24 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
     }
   }
 #endif
+
+  if (Aflux == NULL) {
+    VectorMassIntegrator *vmi = new VectorMassIntegrator();
+    vmi->SetVDim(num_equation);
+
+    global_mass_bf_ = new ParBilinearForm(vfes);
+    global_mass_bf_->AddDomainIntegrator(vmi);
+    global_mass_bf_->Assemble(0);
+    global_mass_bf_->Finalize(0);
+
+    global_mass_matrix_.Reset(global_mass_bf_->ParallelAssemble(), true);
+  } else {
+    global_mass_bf_ = NULL;
+  }
 }
 
 RHSoperator::~RHSoperator() {
+  delete global_mass_bf_;
   delete coordsDof;
   delete dfes;
   delete gradients;
@@ -432,8 +447,25 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
 }
 
 void RHSoperator::ImplicitSolve(const double dt, const Vector &x, Vector &k) {
-  // See if we can even successfully call the Jacobian code I just wrote
-  Operator &J = A->GetGradient(x);
+  // Evaluate spatial part of Jacobian
+  OperatorHandle Jh(&(A->GetGradient(x)), false);
+  HypreParMatrix &Jmat = *Jh.As<HypreParMatrix>();
+
+  // Form A = M - dt * J
+  // NB: The code below works b/c A->GetDiag gets the
+  // diagonal *block* rather than just the diagonal.
+  // See mfem/linalg/hypre.{hpp, cpp} for more details and
+  // mfem/examples/ex9p.cpp for an analogous usage.
+  HypreParMatrix *A;
+  A = Add(-dt, Jmat, 0, Jmat);
+  SparseMatrix A_diag;
+  A->GetDiag(A_diag);
+
+  HypreParMatrix &M = *global_mass_matrix_.As<HypreParMatrix>();
+  SparseMatrix M_diag;
+  M.GetDiag(M_diag);
+
+  A_diag.Add(1.0, M_diag);
 
   // As a start, we simply call mult.  When invoked with "backward Euler",
   // this should give the same result as forward Euler
