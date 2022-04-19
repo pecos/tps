@@ -48,7 +48,7 @@ headers              = averaging_and_rms.hpp equation_of_state.hpp transport_pro
 		       quasimagnetostatic.hpp gradients.hpp logger.hpp solver.hpp tps.hpp chemistry.hpp reaction.hpp \
 	               collision_integrals.hpp argon_transport.hpp source_term.hpp tps_mfem_wrap.hpp gpu_constructor.hpp \
                        independent_coupling.hpp cycle_avg_joule_coupling.hpp table.hpp radiation.hpp lte_mixture.hpp \
-                       lte_transport_properties.hpp element_integrator.hpp
+                       lte_transport_properties.hpp element_integrator.hpp flow_linear_solver.hpp
 
 mfem_extra_headers   = ../utils/mfem_extras/pfem_extras.hpp
 

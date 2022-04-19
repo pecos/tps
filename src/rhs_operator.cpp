@@ -304,8 +304,11 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
     global_mass_bf_->Finalize(0);
 
     global_mass_matrix_.Reset(global_mass_bf_->ParallelAssemble(), true);
+
+    flow_linear_solver_ = new flowLinearSolver(vfes);
   } else {
     global_mass_bf_ = NULL;
+    flow_linear_solver_ = NULL;
   }
 }
 
@@ -452,6 +455,8 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
 }
 
 void RHSoperator::ImplicitSolve(const double dt, const Vector &x, Vector &k) {
+  assert(flow_linear_solver_ != NULL);
+
   // Evaluate the spatial part of the Residual
   formResidual(x);
 
@@ -475,9 +480,9 @@ void RHSoperator::ImplicitSolve(const double dt, const Vector &x, Vector &k) {
 
   A_diag.Add(1.0, M_diag);
 
-  // As a start, we simply call mult.  When invoked with "backward Euler",
-  // this should give the same result as forward Euler
-  this->Mult(x, k);
+  // Solve (M - dt*J) k = R(x)
+  flow_linear_solver_->SetOperator(*A);
+  flow_linear_solver_->Mult(z, k);
 }
 
 void RHSoperator::copyZk2Z_gpu(Vector &z, Vector &zk, const int eq, const int dof) {
