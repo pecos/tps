@@ -41,6 +41,7 @@
 #include "dataStructures.hpp"
 #include "dgNonlinearForm.hpp"
 #include "equation_of_state.hpp"
+#include "flow_linear_solver.hpp"
 #include "fluxes.hpp"
 #include "forcing_terms.hpp"
 #include "gradNonLinearForm.hpp"
@@ -96,8 +97,10 @@ class RHSoperator : public TimeDependentOperator {
 
   Array<DenseMatrix *> Me_inv;
   Array<DenseMatrix *> Me_inv_rad;
+
   ParBilinearForm *global_mass_bf_;
   OperatorHandle global_mass_matrix_;
+  flowLinearSolver *flow_linear_solver_;
 
   Vector invMArray;
   Array<int> posDofInvM;
