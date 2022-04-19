@@ -96,6 +96,8 @@ class RHSoperator : public TimeDependentOperator {
 
   Array<DenseMatrix *> Me_inv;
   Array<DenseMatrix *> Me_inv_rad;
+  ParBilinearForm *global_mass_bf_;
+  OperatorHandle global_mass_matrix_;
 
   Vector invMArray;
   Array<int> posDofInvM;
