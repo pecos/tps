@@ -1307,37 +1307,19 @@ void PerfectMixture::computeStagnantStateWithTemp(const mfem::Vector &stateIn, c
   Vector n_sp(numSpecies);
   computeNumberDensities(stateIn, n_sp);
 
-  double totalHeatCapacity = computeHeaviesHeatCapacity(&n_sp[0], n_sp[numSpecies - 1]);
+  double Ch = computeHeaviesHeatCapacity(&n_sp[0], n_sp[numSpecies - 1]);
   // assuming electrons also have wall temperature
-  totalHeatCapacity += n_sp[numSpecies - 2] * molarCV_(numSpecies - 2);
+  double Ue = n_sp[numSpecies - 2] * molarCV_(numSpecies - 2) * Temp;
 
-  stateOut(1 + dim) = totalHeatCapacity * Temp;
+  stateOut(1 + dim) = Ch * Temp + Ue;
+
+  if (twoTemperature_) {
+    stateOut(num_equation - 1) = Ue;
+  }
 
   // Kevin: added formation energies.
   for (int sp = 0; sp < numSpecies - 2; sp++)
     stateOut(1 + dim) += n_sp(sp) * gasParams(sp, GasParams::FORMATION_ENERGY);
-
-  // double ne = 0.;  // number density electrons
-  // if (ambipolar) {
-  //   for (int sp = 0; sp < numActiveSpecies; sp++) ne += gasParams(sp, GasParams::SPECIES_CHARGES) * n_s(sp);
-  // } else {
-  //   ne = stateIn(2 + dim + numSpecies - 2) / gasParams(numSpecies - 2, GasParams::SPECIES_MW);
-  // }
-  //
-  // double nB = stateIn(0);  // background species
-  // for (int sp = 0; sp < numActiveSpecies; sp++) nB -= stateIn(2 + dim + sp);
-  //
-  // if (ambipolar) nB -= ne * gasParams(numSpecies - 2, GasParams::SPECIES_MW);
-  //
-  // nB /= gasParams(numSpecies - 1, GasParams::SPECIES_MW);
-  //
-  // double heatCapacity = 0.;
-  // for (int sp = 0; sp < numActiveSpecies; sp++) heatCapacity += molarCV_(sp) * n_s(sp);
-  // heatCapacity += nB * molarCV_(numSpecies - 1);
-
-  // if (twoTemperature_) {
-  //   stateOut(1 + dim) += ne * molarCV_(numSpecies - 2) * Temp;
-  // }
 }
 
 // At Inlet BC, for two-temperature, electron temperature is set to be equal to gas temperature, where the total
