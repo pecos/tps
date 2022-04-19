@@ -77,7 +77,10 @@ class Fluxes {
 #endif
 
   void ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux);
+
   MFEM_HOST_DEVICE void ComputeConvectiveFluxes(const double *state, double *flux) const;
+
+  void ComputeConvectiveFluxJacobian(const Vector &state, DenseTensor &jacobian);
 
   void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, DenseMatrix &flux);
 

@@ -194,7 +194,7 @@ ping_jacobian_local_LDFLAGS += -L$(GSLIB_LIB)
 endif
 
 if MASA_ENABLED
-ping_jacobian_local_LDFLAGS += $(MASA_LIBS)
+ping_jacobian_local_LDADD += $(MASA_LIBS)
 endif
 
 # global Jacobian tests
@@ -216,7 +216,7 @@ ping_jacobian_global_LDFLAGS += -L$(GSLIB_LIB)
 endif
 
 if MASA_ENABLED
-ping_jacobian_global_LDFLAGS += $(MASA_LIBS)
+ping_jacobian_global_LDADD += $(MASA_LIBS)
 endif
 
 endif
