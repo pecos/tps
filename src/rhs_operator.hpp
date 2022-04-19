@@ -146,6 +146,9 @@ class RHSoperator : public TimeDependentOperator {
   mutable Vector local_timeDerivatives;
   void computeMeanTimeDerivatives(Vector &y) const;
 
+  // evaluates spatial residual and puts into vector z
+  void formResidual(const Vector &x) const;
+
  public:
   RHSoperator(int &_iter, const int _dim, const int &_num_equation, const int &_order, const Equations &_eqSystem,
               double &_max_char_speed, IntegrationRules *_intRules, int _intRuleType, Fluxes *_fluxClass,
