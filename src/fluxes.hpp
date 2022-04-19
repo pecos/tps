@@ -71,6 +71,7 @@ class Fluxes {
   void ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &flux);
 
   void ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux);
+  void ComputeConvectiveFluxJacobian(const Vector &state, DenseTensor &jacobian);
 
   void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, DenseMatrix &flux);
 

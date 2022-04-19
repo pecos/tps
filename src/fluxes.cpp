@@ -85,6 +85,72 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
   }
 }
 
+void Fluxes::ComputeConvectiveFluxJacobian(const Vector &state, DenseTensor &jacobian) {
+  const double pres = mixture->ComputePressure(state);
+
+  const double den = state(0);
+  const Vector den_vel(state.GetData() + 1, nvel);
+  const double den_energy = state(1 + nvel);
+
+  // First, evaluate the derivative of the pressure with respect to the conserved state.
+  // NB: this code is only valid for a perfect gas, and really doesn't belong here anyway.
+  // TODO(trevilo): Generalize beyond perfect gas and move to mixture class.
+  const double gam = mixture->GetSpecificHeatRatio();
+  const double gm1 = gam - 1;
+  Vector p_U(num_equations);
+  p_U[0] = 0;
+  for (int d = 0; d < nvel; d++) {
+    p_U[0] += (den_vel(d) / den) * (den_vel(d) / den);
+  }
+  p_U[0] *= 0.5 * gm1;
+
+  for (int d = 0; d < nvel; d++) {
+    p_U[d + 1] = -gm1 * den_vel(d) / den;
+  }
+
+  p_U[nvel + 1] = gm1;
+
+  // Third, Jacobian of total enthalpy
+  const double H = (den_energy + pres) / den;
+  Vector H_U(num_equations);
+  H_U[0] = -H / den + p_U[0] / den;
+  for (int d = 0; d < nvel; d++) {
+    H_U[1 + d] = p_U[1 + d] / den;
+  }
+  H_U[1 + nvel] = (1. + p_U[1 + nvel]) / den;
+
+  jacobian.SetSize(num_equations, dim, num_equations);
+  jacobian = 0.;
+
+  for (int d = 0; d < dim; d++) {
+    // flux(0, d) = state(d + 1);
+    jacobian(0, d, d + 1) += 1.;
+
+    for (int i = 0; i < nvel; i++) {
+      // flux(1 + i, d) = state(i + 1) * state(d + 1) / state[0];
+      jacobian(1 + i, d, 0) += -state(i + 1) * state(d + 1) / state[0] / state[0];
+      jacobian(1 + i, d, 1 + i) += state(d + 1) / state[0];
+      jacobian(1 + i, d, 1 + d) += state(i + 1) / state[0];
+    }
+    // flux(1 + d, d) += pres;
+    for (int k = 0; k < num_equations; k++) {
+      jacobian(1 + d, d, k) += p_U[k];
+    }
+  }
+
+  for (int d = 0; d < dim; d++) {
+    // flux(1 + nvel, d) = state(d + 1) * H;
+    jacobian(1 + nvel, d, d + 1) += H;
+    for (int k = 0; k < num_equations; k++) {
+      jacobian(1 + nvel, d, k) += state(d + 1) * H_U[k];
+    }
+  }
+
+  // if (eqSystem == NS_PASSIVE) {
+  //   for (int d = 0; d < dim; d++) flux(num_equations - 1, d) = state(num_equations - 1) * state(1 + d) / state(0);
+  // }
+}
+
 void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, DenseMatrix &flux) {
   switch (eqSystem) {
     case NS:

@@ -342,7 +342,9 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
     Vector zk(z.HostReadWrite() + eq * vfes->GetNDofs(), vfes->GetNDofs());
 #endif
 
-    Aflux->AddMult(fk, zk);
+    if (Aflux != NULL) {
+      Aflux->AddMult(fk, zk);
+    }
 #ifdef _GPU_
     RHSoperator::copyZk2Z_gpu(z, zk, eq, vfes->GetNDofs());
 #endif

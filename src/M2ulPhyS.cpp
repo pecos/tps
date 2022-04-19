@@ -35,6 +35,8 @@
 
 #include "M2ulPhyS.hpp"
 
+#include "element_integrator.hpp"
+
 M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps) : mpi(_mpi) {
   tpsP = tps;
   nprocs_ = mpi.WorldSize();
@@ -372,11 +374,22 @@ void M2ulPhyS::initVariables() {
     A->AddDomainIntegrator(SBPoperator);
   }
 
-  Aflux = new MixedBilinearForm(dfes, fes);
-  domainIntegrator = new DomainIntegrator(fluxClass, intRules, intRuleType, dim, num_equation, config.isAxisymmetric());
-  Aflux->AddDomainIntegrator(domainIntegrator);
-  Aflux->Assemble();
-  Aflux->Finalize();
+  if (!config.isNodalInterior()) {
+    // Formulate interior contribution using 'standard' method
+    // (quadrature applied to each element)
+    Aflux = NULL;
+    A->AddDomainIntegrator(
+        new ElementIntegrator(dim, num_equation, config.isAxisymmetric(), fluxClass, intRules, vfes, gradUp));
+  } else {
+    // Formulation interior contributionas B * F, where B is operator
+    // from MixedBilinearForm and F is flux evaluated at nodes
+    Aflux = new MixedBilinearForm(dfes, fes);
+    domainIntegrator =
+        new DomainIntegrator(fluxClass, intRules, intRuleType, dim, num_equation, config.isAxisymmetric());
+    Aflux->AddDomainIntegrator(domainIntegrator);
+    Aflux->Assemble();
+    Aflux->Finalize();
+  }
 
   switch (config.GetTimeIntegratorType()) {
     case 1:
@@ -1561,6 +1574,7 @@ void M2ulPhyS::parseSolverOptions2() {
     tpsP->getInput("flow/outputFreq", config.itersOut, 50);
     tpsP->getInput("flow/timingFreq", config.timingFreq, 100);
     tpsP->getInput("flow/useRoe", config.useRoe, false);
+    tpsP->getInput("flow/useNodalInterior", config.use_nodal_for_interior_, true);
     tpsP->getInput("flow/useSumByParts", config.SBP, false);
     tpsP->getInput("flow/refLength", config.refLength, 1.0);
     tpsP->getInput("flow/viscosityMultiplier", config.visc_mult, 1.0);
