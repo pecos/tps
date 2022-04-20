@@ -314,7 +314,13 @@ class M2ulPhyS : public TPS::Solver {
   void initSolutionAndVisualizationVectors();
   void initialTimeStep();
 
-  static void InitialConditionEulerVortex(const Vector &x, Vector &y);
+#ifdef HAVE_MASA
+  static void MASA_exactSol(const Vector &x, double tin, Vector &y);
+  static void MASA_exactDen(const Vector &x, double tin, Vector &y);
+  static void MASA_exactVel(const Vector &x, double tin, Vector &y);
+  static void MASA_exactPre(const Vector &x, double tin, Vector &y);
+#endif
+
   static void testInitialCondition(const Vector &x, Vector &y);
   // void dryAirUniformInitialConditions();
   void uniformInitialConditions();

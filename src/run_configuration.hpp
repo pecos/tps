@@ -258,6 +258,9 @@ class RunConfiguration {
 
   PostProcessInput postprocessInput;
 
+  // String to select an IC function
+  std::string ic_fcn_;
+
   RunConfiguration();
   ~RunConfiguration();
 

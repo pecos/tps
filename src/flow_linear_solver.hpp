@@ -50,7 +50,7 @@ class flowLinearSolver : public mfem::Solver {
     gmres_solver_.SetRelTol(1e-9);
     gmres_solver_.SetAbsTol(1e-14);
     gmres_solver_.SetMaxIter(100);
-    gmres_solver_.SetPrintLevel(1);
+    gmres_solver_.SetPrintLevel(0);
     gmres_solver_.SetPreconditioner(*prec_);
   }
 
