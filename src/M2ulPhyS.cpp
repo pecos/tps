@@ -36,6 +36,7 @@
 #include "M2ulPhyS.hpp"
 
 #include "element_integrator.hpp"
+#include "flow_initial_conditions.hpp"
 
 M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps) : mpi(_mpi) {
   tpsP = tps;
@@ -945,7 +946,15 @@ void M2ulPhyS::projectInitialSolution() {
   //   }
 
   if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
-    uniformInitialConditions();
+    if (config.ic_fcn_ == std::string("none")) {
+      uniformInitialConditions();
+    } else if (config.ic_fcn_ == std::string("euler-vortex")) {
+      VectorFunctionCoefficient u0(num_equation, initializeEulerVortex);
+      U->ProjectCoefficient(u0);
+    } else {
+      assert(config.use_mms_);
+    }
+
 #ifdef HAVE_MASA
     if (config.use_mms_) {
       initMasaHandler("exact", dim, config.GetEquationSystem(), config.GetViscMult(), config.mms_name_);
@@ -1193,91 +1202,6 @@ void M2ulPhyS::MASA_exactPre(const Vector &x, double tin, Vector &y) {
   y(0) = MASA::masa_eval_exact_p<double>(x[0], x[1], x[2], tin);
 }
 #endif
-
-// Initial conditions for debug/test case
-void M2ulPhyS::InitialConditionEulerVortex(const Vector &x, Vector &y) {
-  MFEM_ASSERT(x.Size() == 2, "");
-  int equations = 4;
-  if (x.Size() == 3) equations = 5;
-
-  int problem = 1;
-  DryAir *eqState = new DryAir();
-  const double gamma = eqState->GetSpecificHeatRatio();
-  const double Rg = eqState->GetGasConstant();
-
-  double radius = 0, Minf = 0, beta = 0;
-  if (problem == 1) {
-    // "Fast vortex"
-    radius = 0.2;
-    Minf = 0.5;
-    beta = 1. / 5.;
-
-    radius = 0.5;
-    Minf = 0.1;
-  } else if (problem == 2) {
-    // "Slow vortex"
-    radius = 0.2;
-    Minf = 0.05;
-    beta = 1. / 50.;
-  } else {
-    mfem_error(
-        "Cannot recognize problem."
-        "Options are: 1 - fast vortex, 2 - slow vortex");
-  }
-
-  int numVortices = 3;
-  Vector xc(numVortices), yc(numVortices);
-  yc = 0.;
-  for (int i = 0; i < numVortices; i++) {
-    xc[i] = 2. * M_PI / static_cast<double>(numVortices + 1);
-    xc[i] += static_cast<double>(i) * 2. * M_PI / static_cast<double>(numVortices);
-  }
-
-  const double Tt = 300.;
-  const double Pt = 102200;
-
-  const double funcGamma = 1. + 0.5 * (gamma - 1.) * Minf * Minf;
-
-  const double temp_inf = Tt / funcGamma;
-  const double pres_inf = Pt * pow(funcGamma, gamma / (gamma - 1.));
-  const double vel_inf = Minf * sqrt(gamma * Rg * temp_inf);
-  const double den_inf = pres_inf / (Rg * temp_inf);
-
-  double r2rad = 0.0;
-
-  const double shrinv1 = 1.0 / (gamma - 1.);
-
-  double velX = 0.;
-  double velY = 0.;
-  double temp = 0.;
-  for (int i = 0; i < numVortices; i++) {
-    r2rad = (x(0) - xc[i]) * (x(0) - xc[i]);
-    r2rad += (x(1) - yc[i]) * (x(1) - yc[i]);
-    r2rad /= radius * radius;
-    velX -= beta * (x(1) - yc[i]) / radius * exp(-0.5 * r2rad);
-    velY += beta * (x(0) - xc[i]) / radius * exp(-0.5 * r2rad);
-    temp += exp(-r2rad);
-  }
-
-  velX = vel_inf * (1 - velX);
-  velY = vel_inf * velY;
-  const double vel2 = velX * velX + velY * velY;
-
-  const double specific_heat = Rg * gamma * shrinv1;
-  temp = temp_inf - 0.5 * (vel_inf * beta) * (vel_inf * beta) / specific_heat * temp;
-
-  const double den = den_inf * pow(temp / temp_inf, shrinv1);
-  const double pres = den * Rg * temp;
-  const double energy = shrinv1 * pres / den + 0.5 * vel2;
-
-  y(0) = den;
-  y(1) = den * velX;
-  y(2) = den * velY;
-  if (x.Size() == 3) y(3) = 0.;
-  y(equations - 1) = den * energy;
-
-  delete eqState;
-}
 
 // Initial conditions for debug/test case
 void M2ulPhyS::testInitialCondition(const Vector &x, Vector &y) {
@@ -1796,8 +1720,10 @@ void M2ulPhyS::parseSolverOptions2() {
     }
   }
 
+  tpsP->getInput("initialConditions/function", config.ic_fcn_, std::string("none"));
+
   // initial conditions
-  if (!config.use_mms_) {
+  if (!config.use_mms_ && (config.ic_fcn_ == std::string("none"))) {
     tpsP->getRequiredInput("initialConditions/rho", config.initRhoRhoVp[0]);
     tpsP->getRequiredInput("initialConditions/rhoU", config.initRhoRhoVp[1]);
     tpsP->getRequiredInput("initialConditions/rhoV", config.initRhoRhoVp[2]);

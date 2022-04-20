@@ -189,6 +189,9 @@ class RunConfiguration {
   bool use_mms_;
   std::string mms_name_;
 
+  // String to select an IC function
+  std::string ic_fcn_;
+
   RunConfiguration();
   ~RunConfiguration();
 
