@@ -76,6 +76,9 @@ class BoundaryCondition {
   virtual void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
                               Vector &bdrFlux) = 0;
 
+  virtual void computeBdrFluxJacobian(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                      DenseMatrix &bdrFluxJacobian) = 0;
+
   // holding function for any miscellaneous items needed to initialize BCs
   // prior to use (and require MPI)
   virtual void initBCs() = 0;

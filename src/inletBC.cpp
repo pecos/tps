@@ -433,6 +433,11 @@ void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradS
   }
 }
 
+void InletBC::computeBdrFluxJacobian(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                     DenseMatrix &bdrFluxJacobian) {
+  MFEM_ASSERT(false, "InletBC Jacobians are not yet supported.");
+}
+
 void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
   if (inletType == SUB_DENS_VEL) return;
   bdrN = 0;
