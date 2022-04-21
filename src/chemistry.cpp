@@ -140,18 +140,26 @@ void Chemistry::computeEquilibriumConstants(const double T_h, const double T_e, 
   return;
 }
 
-// compute creation rate based on mass-action law.
-void Chemistry::computeCreationRate(const mfem::Vector& ns, const mfem::Vector& kfwd, const mfem::Vector& keq,
-                                    mfem::Vector& creationRate) {
-  Vector progressRate(numReactions_);
+// compute progress rate based on mass-action law.
+void Chemistry::computeProgressRate(const mfem::Vector& ns, const mfem::Vector& kfwd, const mfem::Vector& keq,
+                                    mfem::Vector& progressRate) {
+  progressRate.SetSize(numReactions_);
   for (int r = 0; r < numReactions_; r++) {
     // forward reaction rate
-    double rateFWD = 1., rateBWD = 1.;
-    for (int sp = 0; sp < numSpecies_; sp++) rateFWD *= pow(ns(sp), reactantStoich_(sp, r));
-    for (int sp = 0; sp < numSpecies_; sp++) rateBWD *= pow(ns(sp), productStoich_(sp, r));
-    progressRate(r) = kfwd(r) * (rateFWD - rateBWD / keq(r));
-  }
+    double rate = 1.;
+    for (int sp = 0; sp < numSpecies_; sp++) rate *= pow(ns(sp), reactantStoich_(sp, r));
+    if (detailedBalance_[r]) {
+      double rateBWD = 1.;
+      for (int sp = 0; sp < numSpecies_; sp++) rateBWD *= pow(ns(sp), productStoich_(sp, r));
+      rate -= rateBWD / keq(r);
+    }
 
+    progressRate(r) = kfwd(r) * rate;
+  }
+}
+
+// compute creation rate based on progress rates.
+void Chemistry::computeCreationRate(const mfem::Vector& progressRate, mfem::Vector& creationRate) {
   creationRate.SetSize(numSpecies_);
   creationRate = 0.;
   for (int sp = 0; sp < numSpecies_; sp++) {

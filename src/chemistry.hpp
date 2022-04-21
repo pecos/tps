@@ -102,7 +102,12 @@ class Chemistry {
   const double *getReactantStoichiometry(const int reactionIndex) { return reactantStoich_.GetColumn(reactionIndex); }
   const double *getProductStoichiometry(const int reactionIndex) { return productStoich_.GetColumn(reactionIndex); }
 
-  virtual void computeCreationRate(const Vector &ns, const Vector &kfwd, const Vector &keq, Vector &creationRate);
+  // compute progress rate by mass-action law.
+  void computeProgressRate(const Vector &ns, const Vector &kfwd, const Vector &keq, Vector &progressRate);
+  void computeCreationRate(const Vector &progressRate, Vector &creationRate);
+
+  double getReactionEnergy(const int reactionIndex) { return reactionEnergies_(reactionIndex); }
+  int getNumReactions() { return numReactions_; }
 
   bool isElectronInvolvedAt(const int reactionIndex) {
     return (electronIndex_ < 0) ? false : (reactantStoich_(electronIndex_, reactionIndex) != 0);

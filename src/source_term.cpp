@@ -45,7 +45,7 @@ SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_or
       chemistry_(chemistry) {
   numSpecies_ = mixture->GetNumSpecies();
   numActiveSpecies_ = mixture->GetNumActiveSpecies();
-  //   int numReactions_ = chemistry_->
+  numReactions_ = chemistry_->getNumReactions();
 
   ambipolar_ = mixture->IsAmbipolar();
   twoTemperature_ = mixture->IsTwoTemperature();
@@ -101,9 +101,11 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     chemistry_->computeEquilibriumConstants(Th, Te, kC);
 
     // get reaction rates
-    Vector creationRates(numSpecies_);
+    Vector progressRates(numReactions_), creationRates(numSpecies_);
+    progressRates = 0.0;
     creationRates = 0.0;
-    chemistry_->computeCreationRate(ns, kfwd, kC, creationRates);
+    chemistry_->computeProgressRate(ns, kfwd, kC, progressRates);
+    chemistry_->computeCreationRate(progressRates, creationRates);
 
     // add species creation rates
     for (int sp = 0; sp < numActiveSpecies_; sp++) {
@@ -128,6 +130,12 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     // TODO(kevin): energy sink for radiative reaction.
 
     if (twoTemperature_) {
+      // energy sink from electron-impact reactions.
+      for (int r = 0; r < numReactions_; r++) {
+        if (chemistry_->isElectronInvolvedAt(r))
+          srcTerm(num_equation - 1) -= chemistry_->getReactionEnergy(r) * progressRates(r);
+      }
+
       // work by electron pressure
       // const double pe = mixture_->computeElectronPressure(ns(numSpecies_ - 2), Te);
       // for (int d = 0; d < dim; d++) srcTerm(num_equation - 1) -= pe * gradUpn(d + 1, d);
