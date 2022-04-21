@@ -407,7 +407,73 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
 
 void BCintegrator::AssembleFaceGrad(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,
                                     const Vector &elfun, DenseMatrix &elmat) {
+  Vector shape1;
+  Vector funval1(num_equation);
+  Vector nor(dim);
+  DenseMatrix fluxN_U(num_equation, num_equation);
+
   const int dof1 = el1.GetDof();
+  shape1.SetSize(dof1);
+
   elmat.SetSize(dof1 * num_equation, dof1 * num_equation);
   elmat = 0.0;
+
+  DenseMatrix elfun1_mat(elfun.GetData(), dof1, num_equation);
+
+  // Integration order calculation from DGTraceIntegrator
+  int intorder;
+  if (Tr.Elem2No >= 0) {
+    intorder = (min(Tr.Elem1->OrderW(), Tr.Elem2->OrderW()) + 2 * max(el1.GetOrder(), el2.GetOrder()));
+  } else {
+    intorder = Tr.Elem1->OrderW() + 2 * el1.GetOrder();
+  }
+  if (el1.Space() == FunctionSpace::Pk) {
+    intorder++;
+  }
+
+  const IntegrationRule *ir = &intRules->Get(Tr.GetGeometryType(), intorder);
+
+  for (int i = 0; i < ir->GetNPoints(); i++) {
+    const IntegrationPoint &ip = ir->IntPoint(i);
+
+    Tr.SetAllIntPoints(&ip);  // set face and element int. points
+
+    // Calculate basis functions on both elements at the face
+    el1.CalcShape(Tr.GetElement1IntPoint(), shape1);
+
+    // Interpolate elfun at the point
+    elfun1_mat.MultTranspose(shape1, funval1);
+
+    // Get the normal vector and the flux on the face
+    CalcOrtho(Tr.Jacobian(), nor);
+
+    double radius = 1;
+    if (config.isAxisymmetric()) {
+      double x[3];
+      Vector transip(x, 3);
+      Tr.Transform(ip, transip);
+      radius = transip[0];
+    }
+
+    // computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, radius, fluxN);
+    // computeBdrFluxJacobian(Tr.Attribute, nor, funval1, iGradUp, radius, fluxN);
+    fluxN_U *= ip.weight;
+
+    if (config.isAxisymmetric()) {
+      fluxN_U *= radius;
+    }
+
+    for (int ieqn = 0; ieqn < num_equation; ieqn++) {
+      for (int idof = 0; idof < dof1; idof++) {
+        int res_ind = ieqn * dof1 + idof;
+        // elvect(s + eq * dof1) -= fluxN(eq) * shape1(s);
+        for (int jeqn = 0; jeqn < num_equation; jeqn++) {
+          for (int jdof = 0; jdof < dof1; jdof++) {
+            int state_ind = jeqn * dof1 + jdof;
+            elmat(res_ind, state_ind) -= shape1[idof] * fluxN_U(ieqn, jeqn) * shape1[jdof];
+          }
+        }
+      }
+    }
+  }  // end loop over integration points
 }

@@ -104,6 +104,8 @@ class OutletBC : public BoundaryCondition {
   ~OutletBC();
 
   void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux);
+  void computeBdrFluxJacobian(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                              DenseMatrix &bdrFluxJacobian);
 
   virtual void initBCs();
 

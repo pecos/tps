@@ -208,6 +208,20 @@ void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradSt
   }
 }
 
+void WallBC::computeBdrFluxJacobian(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                    DenseMatrix &bdrFluxJacobian) {
+  switch (wallType) {
+    case INV:
+      computeINVwallFluxJacobian(normal, stateIn, gradState, radius, bdrFluxJacobian);
+      break;
+    case VISC_ADIAB:
+    case VISC_ISOTH:
+    default:
+      MFEM_ASSERT(false, "Only inviscid wall Jacobians are supported.");
+      break;
+  }
+}
+
 void WallBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                            ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                            Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
@@ -278,6 +292,42 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
     bdrFlux[eq] -= 0.5 * wallViscF(eq);
     for (int d = 0; d < dim_; d++) bdrFlux[eq] -= 0.5 * viscF(eq, d) * normal[d];
   }
+}
+
+void WallBC::computeINVwallFluxJacobian(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                        DenseMatrix &bdrFluxJacobian) {
+  double norm = 0.;
+  for (int d = 0; d < dim; d++) norm += normal[d] * normal[d];
+  norm = sqrt(norm);
+
+  Vector unitN(dim);
+  for (int d = 0; d < dim; d++) unitN[d] = normal[d] / norm;
+
+  double rvn = 0;
+  for (int d = 0; d < dim; d++) rvn += stateIn[1 + d] * unitN[d];
+
+  Vector stateMirror(num_equation);
+  stateMirror = stateIn;
+
+  // only momentum needs to be changed
+  stateMirror[1] = stateIn[1] - 2. * rvn * unitN[0];
+  stateMirror[2] = stateIn[2] - 2. * rvn * unitN[1];
+  if (dim == 3) stateMirror[3] = stateIn[3] - 2. * rvn * unitN[2];
+  // if ((nvel == 3) && (dim == 2)) stateMirror[3] = stateIn[0] * vel[2];
+
+  DenseMatrix mirror_wrt_in;  // Jacobian of mirror state wrt interior state
+  mirror_wrt_in.Diag(1., num_equation);
+  for (int i = 0; i < dim; i++) {
+    for (int j = 0; j < dim; j++) {
+      mirror_wrt_in(1 + i, 1 + j) -= 2. * unitN[i] * unitN[j];
+    }
+  }
+
+  DenseMatrix JL(num_equation, num_equation), JR(num_equation, num_equation);
+  rsolver->Jacobian(stateIn, stateMirror, normal, JL, JR);
+
+  bdrFluxJacobian = JL;
+  AddMult(JR, mirror_wrt_in, bdrFluxJacobian);
 }
 
 void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,

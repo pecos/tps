@@ -70,6 +70,9 @@ class WallBC : public BoundaryCondition {
                                  Vector &bdrFlux);
   void computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux);
 
+  void computeINVwallFluxJacobian(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                  DenseMatrix &bdrFluxJacobian);
+
  public:
   WallBC(RiemannSolver *rsolver_, GasMixture *_mixture, GasMixture *d_mixture, Equations _eqSystem, Fluxes *_fluxClass,
          ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
@@ -78,6 +81,9 @@ class WallBC : public BoundaryCondition {
   ~WallBC();
 
   void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux);
+
+  void computeBdrFluxJacobian(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                              DenseMatrix &bdrFluxJacobian);
 
   virtual void initBCs();
 

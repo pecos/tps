@@ -315,6 +315,11 @@ void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &grad
   }
 }
 
+void OutletBC::computeBdrFluxJacobian(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                      DenseMatrix &bdrFluxJacobian) {
+  MFEM_ASSERT(false, "OutletBC Jacobians are not yet supported.");
+}
+
 void OutletBC::computeParallelArea() {
   if (parallelAreaComputed) return;
 
