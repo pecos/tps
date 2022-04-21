@@ -27,7 +27,9 @@ EXTRA_DIST      = tap-driver.sh soln_differ inputs meshes ref_solns/*.h5 \
 		  sponge_zone.test annulus.test pipe.test valgrind.test valgrind.suppressions \
 		  mms.euler.test reaction.test perfect_gas.test collision_integrals.test \
 	 	  argon_minimal.test argon_minimal.binary.test diffusion_wall.test \
-	 	  inflow_outflow.test mms.ternary_2d.test mms.ternary_2d_wall.test
+	 	  inflow_outflow.test mms.ternary_2d.test mms.ternary_2d_wall.test \
+	 	  mms.ternary_2d_inout.test
+
 
 TESTS = vpath.sh
 XFAIL_TESTS =
@@ -72,7 +74,8 @@ endif
 if MASA_ENABLED
 TESTS += mms.euler.test \
 	 mms.ternary_2d.test \
-	 mms.ternary_2d_wall.test
+	 mms.ternary_2d_wall.test \
+	 mms.ternary_2d_inout.test
 endif
 
 if !GPU_ENABLED
