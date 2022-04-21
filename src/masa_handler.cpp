@@ -59,6 +59,8 @@ void M2ulPhyS::initMasaHandler() {
       ternary2d::initTernary2D2TPeriodicAmbipolar(mixture, config, Lx, Ly);
     } else if (config.mms_name_ == "ternary_2d_2t_ambipolar_wall") {
       ternary2d::initTernary2D2TAmbipolarWall(mixture, config, Lx, Ly);
+    } else if (config.mms_name_ == "ternary_2d_2t_ambipolar_inoutlet") {
+      ternary2d::initTernary2D2TAmbipolarInoutlet(mixture, config, Lx, Ly);
     } else {
       grvy_printf(GRVY_ERROR, "Unknown ternary 2d solution > %s\n", config.mms_name_.c_str());
       exit(-1);
@@ -603,6 +605,75 @@ void initTernary2D2TAmbipolarWall(GasMixture *mixture, RunConfiguration &config,
   MASA::masa_set_param<double>("X0", 0.21);
   MASA::masa_set_param<double>("dX0x", 0.08);
   MASA::masa_set_param<double>("dX0y", 0.045);
+}
+
+void initTernary2D2TAmbipolarInoutlet(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly) {
+  assert(config.mms_name_ == "ternary_2d_2t_ambipolar_inoutlet");
+  assert(config.ambipolar);
+  assert(config.twoTemperature);
+  const int dim = 2;
+
+  MASA::masa_init<double>("forcing handler", "ternary_2d_2t_ambipolar_inoutlet");
+  ternary2d::initTernary2DBase(mixture, config, Lx, Ly);
+
+  MASA::masa_set_param<double>("dTEx", 49.3);
+  MASA::masa_set_param<double>("dTEy", 23.1);
+  MASA::masa_set_param<double>("kTEx", 2.0);
+  MASA::masa_set_param<double>("kTEy", 1.0);
+  MASA::masa_set_param<double>("offset_TEx", 0.31);
+  MASA::masa_set_param<double>("offset_TEy", 0.91);
+
+  MASA::masa_set_param<double>("k_heat", config.constantTransport.thermalConductivity);
+  MASA::masa_set_param<double>("k_E", config.constantTransport.electronThermalConductivity);
+
+  const int numSpecies = mixture->GetNumSpecies();
+  std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
+  MASA::masa_set_param<double>("nu_I", config.constantTransport.mtFreq((*mixtureToInputMap)[0]));
+  MASA::masa_set_param<double>("nu_A", config.constantTransport.mtFreq((*mixtureToInputMap)[numSpecies - 1]));
+
+  assert(config.GetOutletPatchType()->size() == 1);
+  Array<double> p0 = config.GetOutletData(0);
+  assert(config.GetInletPatchType()->size() == 1);
+  Array<double> inlet0 = config.GetInletData(0);
+  double rho0 = inlet0[0];
+  double u0 = inlet0[1];
+  double v0 = inlet0[2];
+  int ionIndex = (*mixtureToInputMap)[0];
+  double YI = inlet0[4 + ionIndex];
+  assert(p0[0] > 0.0);
+  assert(rho0 > 0.0);
+  assert(YI > 0.0);
+
+  Vector conservedState(mixture->GetNumEquations());
+  conservedState = 0.0;
+  // NOTE: fill only necessary information for computing X, Y, n.
+  conservedState(0) = rho0;
+  conservedState(dim + 2) = rho0 * YI;
+  Vector X_sp(3), Y_sp(3), n_sp(3);
+  mixture->computeSpeciesPrimitives(conservedState, X_sp, Y_sp, n_sp);
+  double nTotal = 0.0;
+  for (int sp = 0; sp < 3; sp++) nTotal += n_sp(sp);
+
+  MASA::masa_set_param<double>("u0", u0);
+  MASA::masa_set_param<double>("v0", v0);
+
+  MASA::masa_set_param<double>("n0", nTotal);
+  MASA::masa_set_param<double>("dnx", 5.7);
+  MASA::masa_set_param<double>("dny", 8.9);
+  MASA::masa_set_param<double>("knx", 2.0);
+  MASA::masa_set_param<double>("kny", 2.0);
+  MASA::masa_set_param<double>("offset_ny", 0.87);
+
+  MASA::masa_set_param<double>("X0", X_sp(0));
+  MASA::masa_set_param<double>("dX0x", 0.24 * X_sp(0));
+  MASA::masa_set_param<double>("dX0y", 0.37 * X_sp(0));
+
+  MASA::masa_set_param<double>("pLx", p0[0]);
+  MASA::masa_set_param<double>("dpx", 0.11 * p0[0]);
+  MASA::masa_set_param<double>("dpy", 0.07 * p0[0]);
+  MASA::masa_set_param<double>("kpx", 2.0);
+  MASA::masa_set_param<double>("kpy", 1.0);
+  MASA::masa_set_param<double>("offset_py", 0.87);
 }
 
 }  // namespace ternary2d
