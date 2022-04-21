@@ -437,7 +437,7 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
 }
 
 void RHSoperator::ImplicitSolve(const double dt, const Vector &x, Vector &k) {
-  assert(flow_linear_solver_ != NULL);
+  MFEM_ASSERT(flow_linear_solver_ != NULL, "Flow linear solver object is not initialized");
 
   // Evaluate the spatial part of the Residual
   formResidual(x);
@@ -465,6 +465,7 @@ void RHSoperator::ImplicitSolve(const double dt, const Vector &x, Vector &k) {
   // Solve (M - dt*J) k = R(x)
   flow_linear_solver_->SetOperator(*A);
   flow_linear_solver_->Mult(z, k);
+  delete A;
 }
 
 void RHSoperator::copyZk2Z_gpu(Vector &z, Vector &zk, const int eq, const int dof) {

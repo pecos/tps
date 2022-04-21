@@ -32,6 +32,8 @@
 #ifndef FLOW_LINEAR_SOLVER_HPP_
 #define FLOW_LINEAR_SOLVER_HPP_
 
+#include <mpi.h>
+
 #include <mfem.hpp>
 
 class flowLinearSolver : public mfem::Solver {
@@ -41,15 +43,30 @@ class flowLinearSolver : public mfem::Solver {
 
  public:
   flowLinearSolver(const mfem::ParFiniteElementSpace *vfes) : gmres_solver_(vfes->GetComm()) {
-    // NB: does not work on hybrid meshes
-    int block_size = vfes->GetFE(0)->GetDof();
-    prec_ = new mfem::BlockILU(block_size, mfem::BlockILU::Reordering::MINIMUM_DISCARDED_FILL);
+    ParMesh *pmesh = vfes->GetParMesh();
+    int dim = pmesh->Dimension();
+    int ngeom = pmesh->GetNumGeometries(dim);
+    int max_ngeom;
+    MPI_Allreduce(&ngeom, &max_ngeom, 1, MPI_INT, MPI_MAX, vfes->GetComm());
+
+    if (max_ngeom == 1) {
+      // Block ILU preconditioner
+      // NB: does not work on hybrid meshes
+      int block_size = vfes->GetFE(0)->GetDof();
+      prec_ = new mfem::BlockILU(block_size, mfem::BlockILU::Reordering::MINIMUM_DISCARDED_FILL);
+    } else {
+      // Regular ILU preconditioner
+      mfem::HypreILU *ilu = new mfem::HypreILU();
+      ilu->SetLevelOfFill(0);
+      prec_ = ilu;
+    }
 
     // TODO(trevilo): Allow user to set thse
     gmres_solver_.iterative_mode = false;
     gmres_solver_.SetRelTol(1e-9);
     gmres_solver_.SetAbsTol(1e-14);
-    gmres_solver_.SetMaxIter(100);
+    gmres_solver_.SetMaxIter(1000);
+    // gmres_solver_.SetPrintLevel(1);
     gmres_solver_.SetPrintLevel(0);
     gmres_solver_.SetPreconditioner(*prec_);
   }
