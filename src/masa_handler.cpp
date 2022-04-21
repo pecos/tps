@@ -506,6 +506,38 @@ void initTernary2DBase(GasMixture *mixture, RunConfiguration &config, const doub
 
   MASA::masa_set_param<double>("ZI", mixture->GetGasParams(0, GasParams::SPECIES_CHARGES));
   MASA::masa_set_param<double>("ZE", mixture->GetGasParams(numSpecies - 2, GasParams::SPECIES_CHARGES));
+
+  double Af = 0., bf = 0., Ef = 1., Ab = 1., bb = 0., Eb = 1., rE = 0.;
+  if (config.numReactions > 0) {
+    assert(config.numReactions == 1);
+    assert(config.reactionModels[0] == ARRHENIUS);
+    assert(config.detailedBalance[0]);
+    assert(config.reactantStoich((*mixtureToInputMap)[0], 0) == 0);
+    assert(config.reactantStoich((*mixtureToInputMap)[1], 0) == 1);
+    assert(config.reactantStoich((*mixtureToInputMap)[2], 0) == 1);
+    assert(config.productStoich((*mixtureToInputMap)[0], 0) == 1);
+    assert(config.productStoich((*mixtureToInputMap)[1], 0) == 2);
+    assert(config.productStoich((*mixtureToInputMap)[2], 0) == 0);
+
+    Af = (config.reactionModelParams[0])[0];
+    bf = (config.reactionModelParams[0])[1];
+    Ef = (config.reactionModelParams[0])[2];
+
+    Ab = (config.equilibriumConstantParams[0])[0];
+    bb = (config.equilibriumConstantParams[0])[1];
+    Eb = (config.equilibriumConstantParams[0])[2];
+
+    rE = config.reactionEnergies[0];
+  }
+  MASA::masa_set_param<double>("Af", Af);
+  MASA::masa_set_param<double>("bf", bf);
+  MASA::masa_set_param<double>("Ef", Ef);
+
+  MASA::masa_set_param<double>("Ab", Ab);
+  MASA::masa_set_param<double>("bb", bb);
+  MASA::masa_set_param<double>("Eb", Eb);
+
+  MASA::masa_set_param<double>("rE", rE);
 }
 
 void initTernary2DPeriodic(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly) {
