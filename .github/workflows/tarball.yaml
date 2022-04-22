@@ -15,7 +15,7 @@ jobs:
    distbuild:
      runs-on: ubuntu-20.04
      container:
-       image: koomietx/mfem:4.3.tps
+       image: koomietx/mfem:4.3.tps.masa_mod
        options: --user 1001 --privileged
      name: Create dist tarball
      steps:
@@ -42,7 +42,7 @@ jobs:
      runs-on: ubuntu-20.04
      needs: distbuild
      container:
-       image: koomietx/mfem:4.3.tps
+       image: koomietx/mfem:4.3.tps.masa_mod
        options: --user 1001 --privileged
      name: CPU release tarball tests
      steps:
