@@ -15,7 +15,7 @@ jobs:
    style:
      runs-on: ubuntu-20.04
      container:
-       image: koomietx/mfem:4.3.tps
+       image: koomietx/mfem:4.3.tps.masa_mod
        options: --user 1001 --privileged
      name: Code style
      steps:
@@ -34,7 +34,7 @@ jobs:
    build:
      runs-on: ubuntu-20.04
      container:
-       image: koomietx/mfem:4.3.tps
+       image: koomietx/mfem:4.3.tps.masa_mod
        options: --user 1001 --privileged
      name: Build/CPU
      steps:
