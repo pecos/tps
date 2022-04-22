@@ -27,7 +27,7 @@ setup() {
 @test "[$TEST] check if the relative error is similar to the reported value" {
     while IFS=$'\t' read -r nx e0 e1 e2 e3 e4 e5;
     do
-      test $nx -eq 100
+      test $nx -eq 400
       # empirically observed error 3.8993e-4
       check_lo=$(awk 'BEGIN{print ('$e0'>3.8e-4)?1:0}')
       check_hi=$(awk 'BEGIN{print ('$e0'<3.94e-4)?1:0}')
@@ -58,5 +58,5 @@ setup() {
       check_hi=$(awk 'BEGIN{print ('$e5'<6.4e-4)?1:0}')
       test $check_lo -eq 1
       test $check_hi -eq 1
-    done < ternary_2d_periodic.rel_error.txt
+    done < ternary_2d_2t_periodic_ambipolar.rel_error.txt
 }
