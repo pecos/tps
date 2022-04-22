@@ -18,7 +18,7 @@ REF_FILE=ref_solns/forcing-periodic-square.h5
 @test "[$TEST] verify sponge-zone output -> $SOLN_FILE" {
     rm -f $SOLN_FILE
     
-    run ../src/tps --runFile $RUNFILE
+    ../src/tps --runFile $RUNFILE &> sponge_zone.log
     
     test -s $SOLN_FILE
     ./soln_differ -d 2 $SOLN_FILE $REF_FILE
