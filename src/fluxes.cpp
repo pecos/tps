@@ -100,6 +100,7 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
   }
 }
 
+// TODO(kevin): check/complete axisymmetric setting for multi-component flow.
 void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, DenseMatrix &flux) {
   flux = 0.;
   if (eqSystem == EULER) {
@@ -137,7 +138,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   if (twoTemperature) {
     for (int d = 0; d < dim; d++) {
       double qeFlux = ke * gradUp(num_equation - 1, d);
-      flux(1 + dim, d) += qeFlux;
+      flux(1 + nvel, d) += qeFlux;
       flux(num_equation - 1, d) += qeFlux;
       flux(num_equation - 1, d) -= speciesEnthalpies(numSpecies - 2) * diffusionVelocity(numSpecies - 2, d);
     }

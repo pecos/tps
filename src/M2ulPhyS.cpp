@@ -257,6 +257,7 @@ void M2ulPhyS::initVariables() {
   // Kevin: This part is what I imagined "GasMixture" class would do. However, I'm fine with specifying explicitly here.
   mixture = NULL;
   switch (config.GetWorkingFluid()) {
+    // TODO(kevin): GasMixture should take both dim and nvel, to avoid confusion in future.
     case WorkingFluid::DRY_AIR:
       mixture = new DryAir(config, nvel);
       transportPtr = new DryAirTransport(mixture, config);
@@ -268,9 +269,7 @@ void M2ulPhyS::initVariables() {
     case WorkingFluid::USER_DEFINED:
       switch (config.GetGasModel()) {
         case GasModel::PERFECT_MIXTURE:
-          mixture = new PerfectMixture(config, dim);
-          // WARNING: update this transport!
-          transportPtr = new DryAirTransport(mixture, config);
+          mixture = new PerfectMixture(config, nvel);
           break;
       }
       switch (config.GetTranportModel()) {
@@ -835,9 +834,9 @@ M2ulPhyS::~M2ulPhyS() {
 
   delete rsolver;
   delete fluxClass;
-  if (transportPtr != NULL) delete transportPtr;
-  if (chemistry_ != NULL) delete chemistry_;
-  if (mixture != NULL) delete mixture;
+  delete transportPtr;
+  delete chemistry_;
+  delete mixture;
   delete gradUpfes;
   delete vfes;
   delete dfes;

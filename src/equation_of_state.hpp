@@ -205,11 +205,13 @@ class GasMixture {
   virtual double computeBackgroundMassDensity(const double &rho, const double *n_sp, double &n_e,
                                               bool isElectronComputed = false) {}
 
+  // TODO(kevin): check if this works for axisymmetric case.
   virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
                                                        Vector &conservedState) {}
 
   virtual double computeElectronEnergy(const double n_e, const double T_e) = 0;
   virtual double computeElectronPressure(const double n_e, const double T_e) = 0;
+  // TODO(kevin): check if this works for axisymmetric case.
   virtual void computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix &gradUp,
                                            Vector &gradPe) = 0;
 };
