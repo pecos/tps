@@ -1979,11 +1979,14 @@ void M2ulPhyS::parseSolverOptions2() {
         config.constantTransport.diffusivity.SetSize(config.numSpecies);
         std::string mtpath("plasma_models/transport_model/constant/momentum_transfer_frequency");
         config.constantTransport.mtFreq.SetSize(config.numSpecies);
+        config.constantTransport.diffusivity = 0.0;
+        config.constantTransport.mtFreq = 0.0;
         for (int sp = 1; sp <= config.numSpecies; sp++) {
           tpsP->getRequiredInput((diffpath + "/species" + std::to_string(sp)).c_str(),
                                  config.constantTransport.diffusivity(sp - 1));
-          tpsP->getRequiredInput((mtpath + "/species" + std::to_string(sp)).c_str(),
-                                 config.constantTransport.mtFreq(sp - 1));
+          if (config.twoTemperature)
+            tpsP->getRequiredInput((mtpath + "/species" + std::to_string(sp)).c_str(),
+                                   config.constantTransport.mtFreq(sp - 1));
         }
       } break;
       default:
