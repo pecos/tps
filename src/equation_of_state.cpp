@@ -327,6 +327,7 @@ void DryAir::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::Vector &
   stateOut(1 + dim) = p / (specific_heat_ratio - 1.) + ke;
 }
 
+// TODO(kevin): check if this works for axisymmetric case.
 void DryAir::computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
                                                      Vector &conservedState) {
   const double gamma = specific_heat_ratio;
@@ -1399,6 +1400,7 @@ void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::
   stateOut(1 + dim) = rE;
 }
 
+// TODO(kevin): check if this works for axisymmetric case.
 void PerfectMixture::computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
                                                              Vector &conservedState) {
   Vector Up(num_equation);
@@ -1470,6 +1472,7 @@ void PerfectMixture::computeConservedStateFromConvectiveFlux(const Vector &meanN
   GetConservativesFromPrimitives(Up, conservedState);
 }
 
+// TODO(kevin): check if this works for axisymmetric case.
 void PerfectMixture::computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix &gradUp,
                                                  Vector &gradPe) {
   gradPe.SetSize(dim);
