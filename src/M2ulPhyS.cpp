@@ -2226,21 +2226,23 @@ void M2ulPhyS::parseSolverOptions2() {
           tpsP->getRequiredInput((base + "/pressure").c_str(), hup[4]);  // P
 
           // For multi-component gas, require (numActiveSpecies)-more inputs.
-          if ((config.workFluid != DRY_AIR) && (config.numSpecies > 1)) {
-            grvy_printf(GRVY_INFO, "\nInlet mass fraction of background species will not be used. \n");
-            if (config.ambipolar) grvy_printf(GRVY_INFO, "\nInlet mass fraction of electron will not be used. \n");
+          if (config.workFluid != DRY_AIR) {
+            if (config.numSpecies > 1) {
+              grvy_printf(GRVY_INFO, "\nInlet mass fraction of background species will not be used. \n");
+              if (config.ambipolar) grvy_printf(GRVY_INFO, "\nInlet mass fraction of electron will not be used. \n");
 
-            for (int sp = 1; sp <= config.numSpecies; sp++) {
-              // read mass fraction of species as listed in the input file.
-              std::string speciesBasePath(base + "/mass_fraction/species" + std::to_string(sp));
-              tpsP->getRequiredInput(speciesBasePath.c_str(), hup[4 + sp]);
+              for (int sp = 1; sp <= config.numSpecies; sp++) {
+                // read mass fraction of species as listed in the input file.
+                std::string speciesBasePath(base + "/mass_fraction/species" + std::to_string(sp));
+                tpsP->getRequiredInput(speciesBasePath.c_str(), hup[4 + sp]);
+              }
             }
-          }
 
-          if (config.twoTemperature) {
-            tpsP->getInput((base + "/single_temperature").c_str(), config.spongeData_[sz].singleTemperature, false);
-            if (!config.spongeData_[sz].singleTemperature) {
-              tpsP->getRequiredInput((base + "/electron_temperature").c_str(), hup[5 + config.numSpecies]);  // P
+            if (config.twoTemperature) {
+              tpsP->getInput((base + "/single_temperature").c_str(), config.spongeData_[sz].singleTemperature, false);
+              if (!config.spongeData_[sz].singleTemperature) {
+                tpsP->getRequiredInput((base + "/electron_temperature").c_str(), hup[5 + config.numSpecies]);  // P
+              }
             }
           }
 
