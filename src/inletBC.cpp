@@ -459,7 +459,17 @@ void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradS
 
 void InletBC::computeBdrFluxJacobian(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
                                      DenseMatrix &bdrFluxJacobian) {
-  MFEM_ASSERT(false, "InletBC Jacobians are not yet supported.");
+  switch (inletType) {
+    case SUB_DENS_VEL:
+      subsonicReflectingDensityVelocityJacobian(normal, stateIn, bdrFluxJacobian);
+      break;
+    case SUB_DENS_VEL_NR:
+    case SUB_VEL_CONST_ENT:
+    default:
+      MFEM_ASSERT(false, "InletBC Jacobians are not yet supported for this inlet type.");
+      break;
+  }
+
 }
 
 void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
@@ -737,6 +747,53 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
   mixture->modifyEnergyForPressure(state2, state2, p, true);
 
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
+}
+
+void InletBC::subsonicReflectingDensityVelocityJacobian(Vector &normal, Vector &stateIn, DenseMatrix &bdrFluxJacobian) {
+  const double p = mixture->ComputePressure(stateIn);
+
+  // TODO(trevilo): only valid for single species ideal gas
+  const double gam = mixture->GetSpecificHeatRatio();
+  const double gm1 = gam - 1;
+
+  Vector p_U(num_equation);
+  p_U[0] = 0;
+  for (int d = 0; d < nvel; d++) {
+    p_U[0] += (stateIn[d + 1] / stateIn[0]) * (stateIn[d + 1] / stateIn[0]);
+  }
+  p_U[0] *= 0.5 * gm1;
+
+  for (int d = 0; d < nvel; d++) {
+    p_U[d + 1] = -gm1 * stateIn[d + 1] / stateIn[0];
+  }
+
+  p_U[nvel + 1] = gm1;
+
+  Vector state2(num_equation);
+  state2 = stateIn;
+
+  // NOTE: In the case of active species some more work needs to be done here.
+  //       Inlet BC for plasma yet to be agreed upon.
+  state2[0] = inputState[0];
+  state2[1] = inputState[0] * inputState[1];
+  state2[2] = inputState[0] * inputState[2];
+  if (nvel == 3) state2[3] = inputState[0] * inputState[3];
+
+  if (eqSystem == NS_PASSIVE) state2[num_equation - 1] = 0.;
+
+  mixture->modifyEnergyForPressure(state2, state2, p);
+
+  DenseMatrix UR_UL(num_equation, num_equation);
+  UR_UL = 0.;
+  for (int i=0; i<num_equation; i++) {
+    UR_UL(nvel + 1, i) = p_U[i] / gm1;
+  }
+
+  DenseMatrix F_UL, F_UR;
+  rsolver->Jacobian(stateIn, state2, normal, F_UL, F_UR, true);
+
+  bdrFluxJacobian = F_UL;
+  AddMult(F_UR, UR_UL, bdrFluxJacobian);
 }
 
 void InletBC::integrateInlets_gpu(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
