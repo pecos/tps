@@ -124,6 +124,7 @@ class GasMixture {
   int GetNumActiveSpecies() { return numActiveSpecies; }
   int GetNumEquations() { return num_equation; }
   int GetDimension() { return dim; }
+  int GetNumVels() { return nvel_; }
   bool IsAmbipolar() { return ambipolar; }
   bool IsTwoTemperature() { return twoTemperature_; }
   int getInputIndexOf(int mixtureIndex) { return mixtureToInputMap_[mixtureIndex]; }
@@ -279,6 +280,7 @@ class DryAir : public GasMixture {
   virtual void computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix &gradUp,
                                            Vector &gradPe) {}
   // GPU functions
+  // TODO(kevin): GPU part is not refactored for axisymmetric case.
 #ifdef _GPU_
   static MFEM_HOST_DEVICE double pressure(const double *state, double *KE, const double &gamma, const int &dim,
                                           const int &num_equation) {
@@ -399,18 +401,18 @@ class DryAir : public GasMixture {
 inline double DryAir::ComputePressure(const Vector &state, double *electronPressure) {
   if (electronPressure != NULL) *electronPressure = 0.0;
   double den_vel2 = 0;
-  for (int d = 0; d < dim; d++) den_vel2 += state(d + 1) * state(d + 1);
+  for (int d = 0; d < nvel_; d++) den_vel2 += state(d + 1) * state(d + 1);
   den_vel2 /= state[0];
 
-  return (specific_heat_ratio - 1.0) * (state[1 + dim] - 0.5 * den_vel2);
+  return (specific_heat_ratio - 1.0) * (state[1 + nvel_] - 0.5 * den_vel2);
 }
 
 inline double DryAir::ComputeTemperature(const Vector &state) {
   double den_vel2 = 0;
-  for (int d = 0; d < dim; d++) den_vel2 += state(d + 1) * state(d + 1);
+  for (int d = 0; d < nvel_; d++) den_vel2 += state(d + 1) * state(d + 1);
   den_vel2 /= state[0];
 
-  return (specific_heat_ratio - 1.0) / gas_constant * (state[1 + dim] - 0.5 * den_vel2) / state[0];
+  return (specific_heat_ratio - 1.0) / gas_constant * (state[1 + nvel_] - 0.5 * den_vel2) / state[0];
 }
 
 //////////////////////////////////////////////////////
@@ -479,19 +481,19 @@ class TestBinaryAir : public GasMixture {
 inline double TestBinaryAir::ComputePressure(const Vector &state, double *electronPressure) {
   if (electronPressure != NULL) *electronPressure = 0.0;
   double den_vel2 = 0;
-  for (int d = 0; d < dim; d++) den_vel2 += state(d + 1) * state(d + 1);
+  for (int d = 0; d < nvel_; d++) den_vel2 += state(d + 1) * state(d + 1);
   den_vel2 /= state[0];
 
-  return (specific_heat_ratio - 1.0) * (state[1 + dim] - 0.5 * den_vel2);
+  return (specific_heat_ratio - 1.0) * (state[1 + nvel_] - 0.5 * den_vel2);
 }
 
 // additional functions inlined for speed...
 inline double TestBinaryAir::ComputeTemperature(const Vector &state) {
   double den_vel2 = 0;
-  for (int d = 0; d < dim; d++) den_vel2 += state(d + 1) * state(d + 1);
+  for (int d = 0; d < nvel_; d++) den_vel2 += state(d + 1) * state(d + 1);
   den_vel2 /= state[0];
 
-  double rhoU = state[1 + dim] - 0.5 * den_vel2;
+  double rhoU = state[1 + nvel_] - 0.5 * den_vel2;
   double cv = gas_constant / (specific_heat_ratio - 1.0);
 
   return rhoU / state[0] / cv;
