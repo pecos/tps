@@ -145,33 +145,36 @@ int main (int argc, char *argv[])
     DenseMatrix gradUp(num_equation,3);
     gradUp = 0.0;
 
-    Vector transportBuffer;
-    transportBuffer.SetSize(GlobalTrnsCoeffs::NUM_GLOBAL_COEFFS);
-    DenseMatrix diffusionVelocity(numSpecies, dim);
-    transport->ComputeFluxTransportProperties(conservedState, gradUp, transportBuffer, diffusionVelocity);
+    Vector Efield(3);
+    Efield = 0.0;
 
-    // error = max(error, abs(refValues(i,1) - transportBuffer[GlobalTrnsCoeffs::VISCOSITY]) / refValues(i,1));
-    error(0) = abs(refValues(i,1) - transportBuffer[GlobalTrnsCoeffs::VISCOSITY]) / refValues(i,1);
+    Vector transportBuffer;
+    transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
+    DenseMatrix diffusionVelocity(numSpecies, dim);
+    transport->ComputeFluxTransportProperties(conservedState, gradUp, Efield, transportBuffer, diffusionVelocity);
+
+    // error = max(error, abs(refValues(i,1) - transportBuffer[FluxTrns::VISCOSITY]) / refValues(i,1));
+    error(0) = abs(refValues(i,1) - transportBuffer[FluxTrns::VISCOSITY]) / refValues(i,1);
     if (error(0) > relErrorThreshold(0)) {
       grvy_printf(GRVY_ERROR, "\n Viscosity deviates from the reference value.");
       grvy_printf(GRVY_ERROR, "\n Relative Error: %.15E", error(0));
       exit(ERROR);
     }
-    error(1) = abs(refValues(i,2) - transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY]) / refValues(i,2);
+    error(1) = abs(refValues(i,2) - transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY]) / refValues(i,2);
     if (error(1) > relErrorThreshold(1)) {
       grvy_printf(GRVY_ERROR, "\n Heavy-species thermal conductivity deviates from the reference value.");
       grvy_printf(GRVY_ERROR, "\n Relative Error: %.15E", error(1));
       exit(ERROR);
     }
     if (i < 4) {
-      error(2) = abs(refValues(i,3) - transportBuffer[GlobalTrnsCoeffs::ELECTRON_THERMAL_CONDUCTIVITY]);
+      error(2) = abs(refValues(i,3) - transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY]);
       if (error(2) > absErrorThreshold(2)) {
         grvy_printf(GRVY_ERROR, "\n Heavy-species thermal conductivity deviates from the reference value.");
         grvy_printf(GRVY_ERROR, "\n Absolute Error: %.15E", error(1));
         exit(ERROR);
       }
     } else {
-      error(2) = abs(refValues(i,3) - transportBuffer[GlobalTrnsCoeffs::ELECTRON_THERMAL_CONDUCTIVITY]) / refValues(i,3);
+      error(2) = abs(refValues(i,3) - transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY]) / refValues(i,3);
       if (error(2) > relErrorThreshold(2)) {
         grvy_printf(GRVY_ERROR, "\n Heavy-species thermal conductivity deviates from the reference value.");
         grvy_printf(GRVY_ERROR, "\n Relative Error: %.15E", error(1));

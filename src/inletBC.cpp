@@ -706,8 +706,7 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
 void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
   // NOTE: it is likely that for two-temperature case inlet will also specify electron temperature,
   // whether it is equal to the gas temperature or not.
-  double dummy;  // electron pressure. by-product of total pressure computation. won't be used
-  const double p = mixture->ComputePressure(stateIn, dummy);
+  const double p = mixture->ComputePressure(stateIn);
 
   Vector state2(num_equation);
   state2 = stateIn;

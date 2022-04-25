@@ -257,6 +257,7 @@ void M2ulPhyS::initVariables() {
   // Kevin: This part is what I imagined "GasMixture" class would do. However, I'm fine with specifying explicitly here.
   mixture = NULL;
   switch (config.GetWorkingFluid()) {
+    // TODO(kevin): GasMixture should take both dim and nvel, to avoid confusion in future.
     case WorkingFluid::DRY_AIR:
       mixture = new DryAir(config, nvel);
       transportPtr = new DryAirTransport(mixture, config);
@@ -268,9 +269,7 @@ void M2ulPhyS::initVariables() {
     case WorkingFluid::USER_DEFINED:
       switch (config.GetGasModel()) {
         case GasModel::PERFECT_MIXTURE:
-          mixture = new PerfectMixture(config, dim);
-          // WARNING: update this transport!
-          transportPtr = new DryAirTransport(mixture, config);
+          mixture = new PerfectMixture(config, nvel);
           break;
       }
       switch (config.GetTranportModel()) {
@@ -835,9 +834,9 @@ M2ulPhyS::~M2ulPhyS() {
 
   delete rsolver;
   delete fluxClass;
-  if (transportPtr != NULL) delete transportPtr;
-  if (chemistry_ != NULL) delete chemistry_;
-  if (mixture != NULL) delete mixture;
+  delete transportPtr;
+  delete chemistry_;
+  delete mixture;
   delete gradUpfes;
   delete vfes;
   delete dfes;
@@ -1162,7 +1161,7 @@ void M2ulPhyS::solve() {
     // if (mpi.Root()) cout << "Solution error: " << error << endl;
 #else
     if (config.use_mms_) {
-      checkSolutionError(time);
+      checkSolutionError(time, true);
     } else {
       if (mpi.Root()) cout << "Final timestep iteration = " << MaxIters << endl;
     }
@@ -1761,6 +1760,7 @@ void M2ulPhyS::parseSolverOptions2() {
 
     if (config.use_mms_) {
       tpsP->getRequiredInput("mms/name", config.mms_name_);
+      tpsP->getInput("mms/compare_rhs", config.compareRhs_, false);
     }
   }
 
@@ -1967,15 +1967,28 @@ void M2ulPhyS::parseSolverOptions2() {
         tpsP->getInput("plasma_models/transport_model/argon_minimal/third_order_thermal_conductivity",
                        config.thirdOrderkElectron, true);
         break;
-      case CONSTANT:
+      case CONSTANT: {
         tpsP->getRequiredInput("plasma_models/transport_model/constant/viscosity", config.constantTransport.viscosity);
         tpsP->getRequiredInput("plasma_models/transport_model/constant/bulk_viscosity",
                                config.constantTransport.bulkViscosity);
-        tpsP->getRequiredInput("plasma_models/transport_model/constant/diffusivity",
-                               config.constantTransport.diffusivity);
         tpsP->getRequiredInput("plasma_models/transport_model/constant/thermal_conductivity",
                                config.constantTransport.thermalConductivity);
-        break;
+        tpsP->getRequiredInput("plasma_models/transport_model/constant/electron_thermal_conductivity",
+                               config.constantTransport.electronThermalConductivity);
+        std::string diffpath("plasma_models/transport_model/constant/diffusivity");
+        config.constantTransport.diffusivity.SetSize(config.numSpecies);
+        std::string mtpath("plasma_models/transport_model/constant/momentum_transfer_frequency");
+        config.constantTransport.mtFreq.SetSize(config.numSpecies);
+        config.constantTransport.diffusivity = 0.0;
+        config.constantTransport.mtFreq = 0.0;
+        for (int sp = 1; sp <= config.numSpecies; sp++) {
+          tpsP->getRequiredInput((diffpath + "/species" + std::to_string(sp)).c_str(),
+                                 config.constantTransport.diffusivity(sp - 1));
+          if (config.twoTemperature)
+            tpsP->getRequiredInput((mtpath + "/species" + std::to_string(sp)).c_str(),
+                                   config.constantTransport.mtFreq(sp - 1));
+        }
+      } break;
       default:
         break;
     }
@@ -2213,21 +2226,23 @@ void M2ulPhyS::parseSolverOptions2() {
           tpsP->getRequiredInput((base + "/pressure").c_str(), hup[4]);  // P
 
           // For multi-component gas, require (numActiveSpecies)-more inputs.
-          if ((config.workFluid != DRY_AIR) && (config.numSpecies > 1)) {
-            grvy_printf(GRVY_INFO, "\nInlet mass fraction of background species will not be used. \n");
-            if (config.ambipolar) grvy_printf(GRVY_INFO, "\nInlet mass fraction of electron will not be used. \n");
+          if (config.workFluid != DRY_AIR) {
+            if (config.numSpecies > 1) {
+              grvy_printf(GRVY_INFO, "\nInlet mass fraction of background species will not be used. \n");
+              if (config.ambipolar) grvy_printf(GRVY_INFO, "\nInlet mass fraction of electron will not be used. \n");
 
-            for (int sp = 1; sp <= config.numSpecies; sp++) {
-              // read mass fraction of species as listed in the input file.
-              std::string speciesBasePath(base + "/mass_fraction/species" + std::to_string(sp));
-              tpsP->getRequiredInput(speciesBasePath.c_str(), hup[4 + sp]);
+              for (int sp = 1; sp <= config.numSpecies; sp++) {
+                // read mass fraction of species as listed in the input file.
+                std::string speciesBasePath(base + "/mass_fraction/species" + std::to_string(sp));
+                tpsP->getRequiredInput(speciesBasePath.c_str(), hup[4 + sp]);
+              }
             }
-          }
 
-          if (config.twoTemperature) {
-            tpsP->getInput((base + "/single_temperature").c_str(), config.spongeData_[sz].singleTemperature, false);
-            if (!config.spongeData_[sz].singleTemperature) {
-              tpsP->getRequiredInput((base + "/electron_temperature").c_str(), hup[5 + config.numSpecies]);  // P
+            if (config.twoTemperature) {
+              tpsP->getInput((base + "/single_temperature").c_str(), config.spongeData_[sz].singleTemperature, false);
+              if (!config.spongeData_[sz].singleTemperature) {
+                tpsP->getRequiredInput((base + "/electron_temperature").c_str(), hup[5 + config.numSpecies]);  // P
+              }
             }
           }
 

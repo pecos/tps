@@ -865,12 +865,16 @@ MASA_forcings::MASA_forcings(const int &_dim, const int &_num_equation, const in
                    _config.isAxisymmetric()) {
   // NOTE: This has been taken care of by M2ulPhyS.masaHandler_.
   // initMasaHandler("forcing", dim, _config.GetEquationSystem(), _config.GetViscMult(), _config.mms_name_);
+  if (_config.workFluid == DRY_AIR) {
+    // make sure we are in a 3D case
+    assert(dim == 3);
+    evaluateForcing_ = &(dryair3d::evaluateForcing);
+  } else {
+    evaluateForcing_ = &(mms::evaluateForcing);
+  }
 }
 
 void MASA_forcings::updateTerms(Vector &in) {
-  // make sure we are in a 3D case
-  assert(dim == 3);
-
   int numElem = vfes->GetNE();
   int dof = vfes->GetNDofs();
 
@@ -899,11 +903,7 @@ void MASA_forcings::updateTerms(Vector &in) {
       int index = nodes[n];
       for (int d = 0; d < dim; d++) x[d] = coordsDof[index + d * dof];
 
-      ip_forcing[0] = MASA::masa_eval_source_rho<double>(x[0], x[1], x[2], time);  // rho
-      ip_forcing[1] = MASA::masa_eval_source_u<double>(x[0], x[1], x[2], time);    // rho*u
-      ip_forcing[2] = MASA::masa_eval_source_v<double>(x[0], x[1], x[2], time);    // rho*v
-      ip_forcing[3] = MASA::masa_eval_source_w<double>(x[0], x[1], x[2], time);    // rho*w
-      ip_forcing[4] = MASA::masa_eval_source_e<double>(x[0], x[1], x[2], time);    // rhp*e
+      (*evaluateForcing_)(x, time, ip_forcing);
 
       for (int eq = 0; eq < num_equation; eq++) data[index + eq * dof] += ip_forcing[eq];
     }

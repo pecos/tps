@@ -57,15 +57,11 @@ enum ReactionModel { ARRHENIUS, HOFFERTLIEN, NUM_REACTIONMODEL };
 
 enum GasParams { SPECIES_MW, SPECIES_CHARGES, FORMATION_ENERGY, /* SPECIES_HEAT_RATIO, */ NUM_GASPARAMS };
 
-enum GlobalTrnsCoeffs {
-  VISCOSITY,
-  BULK_VISCOSITY,
-  HEAVY_THERMAL_CONDUCTIVITY,
-  ELECTRON_THERMAL_CONDUCTIVITY,
-  NUM_GLOBAL_COEFFS
-};
+enum FluxTrns { VISCOSITY, BULK_VISCOSITY, HEAVY_THERMAL_CONDUCTIVITY, ELECTRON_THERMAL_CONDUCTIVITY, NUM_FLUX_TRANS };
 
-enum SpeciesTrnsCoeffs { DIFFUSIVITY, MOBILITY, MF_FREQUENCY, NUM_SPECIES_COEFFS };
+enum SrcTrns { ELECTRIC_CONDUCTIVITY, NUM_SRC_TRANS };
+
+enum SpeciesTrns { /* DIFFUSIVITY, MOBILITY, */ MF_FREQUENCY, NUM_SPECIES_COEFFS };
 
 enum TransportOutputPrimitives {
   TOTAL_PRESSURE,
@@ -220,8 +216,10 @@ struct heatSourceData {
 struct constantTransportData {
   double viscosity;
   double bulkViscosity;
-  double diffusivity;
+  Vector diffusivity;
   double thermalConductivity;
+  double electronThermalConductivity;
+  Vector mtFreq;  // momentum transfer frequency
 };
 
 #endif  // DATASTRUCTURES_HPP_

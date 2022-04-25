@@ -1,0 +1,62 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="mms/ternary_plasma_2d"
+RUNFILE="inputs/mms.ternary_plasma.2d.ini"
+
+setup() {
+    SOLN_FILE=restart_argon_output.sol.h5
+    MESH_FILE=beam-quad-o3-s1-r2-p.mesh
+    TOL=2e-4
+}
+
+@test "[$TEST] check for input file $RUNFILE" {
+    test -s $RUNFILE
+}
+
+@test "[$TEST] create a mesh file" {
+    ../utils/beam_mesh -nx 1 -nt 5 -b 5 -rs 2
+
+    test -s $MESH_FILE
+}
+
+@test "[$TEST] run tps with input -> $RUNFILE" {
+    mpirun -np 2 ../src/tps --runFile $RUNFILE >& plasma_ternary_mms.log
+}
+
+@test "[$TEST] check if the relative error is similar to the reported value" {
+    while IFS=$'\t' read -r nx e0 e1 e2 e3 e4 e5;
+    do
+      test $nx -eq 400
+      # empirically observed error 3.8993e-4
+      check_lo=$(awk 'BEGIN{print ('$e0'>3.8e-4)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e0'<3.94e-4)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 0.1479
+      check_lo=$(awk 'BEGIN{print ('$e1'>0.147)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e1'<0.148)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 0.2293
+      check_lo=$(awk 'BEGIN{print ('$e2'>0.22)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e2'<0.23)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 4.6527e-4
+      check_lo=$(awk 'BEGIN{print ('$e3'>4.6e-4)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e3'<4.7e-4)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 4.2047e-4
+      check_lo=$(awk 'BEGIN{print ('$e4'>4.1e-4)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e4'<4.3e-4)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 6.3578e-4
+      check_lo=$(awk 'BEGIN{print ('$e5'>6.3e-4)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e5'<6.4e-4)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+    done < ternary_2d_2t_periodic_ambipolar.rel_error.txt
+}

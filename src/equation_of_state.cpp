@@ -224,8 +224,7 @@ double DryAir::ComputeMaxCharSpeed(const Vector &state) {
   }
   den_vel2 /= den;
 
-  double dummy;  // electron pressure. won't compute anything.
-  const double pres = ComputePressure(state, dummy);
+  const double pres = ComputePressure(state);
   const double sound = sqrt(specific_heat_ratio * pres / den);
   const double vel = sqrt(den_vel2 / den);
 
@@ -294,8 +293,7 @@ double DryAir::ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin
 double DryAir::ComputePressureFromPrimitives(const mfem::Vector &Up) { return gas_constant * Up[0] * Up[1 + dim]; }
 
 void DryAir::computeStagnationState(const mfem::Vector &stateIn, mfem::Vector &stagnationState) {
-  double dummy;  // electron pressure. won't compute anything.
-  const double p = ComputePressure(stateIn, dummy);
+  const double p = ComputePressure(stateIn);
 
   stagnationState.SetSize(num_equation);
   stagnationState = stateIn;
@@ -329,6 +327,7 @@ void DryAir::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::Vector &
   stateOut(1 + dim) = p / (specific_heat_ratio - 1.) + ke;
 }
 
+// TODO(kevin): check if this works for axisymmetric case.
 void DryAir::computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
                                                      Vector &conservedState) {
   const double gamma = specific_heat_ratio;
@@ -419,8 +418,7 @@ void TestBinaryAir::GetConservativesFromPrimitives(const Vector &primit, Vector 
 }
 
 void TestBinaryAir::GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit) {
-  double dummy;  // electron pressure. by-product of total pressure computation. won't be used
-  double p = ComputePressure(conserv, dummy);
+  double p = ComputePressure(conserv);
   primit = conserv;
 
   for (int d = 0; d < dim; d++) primit[1 + d] /= conserv[0];
@@ -472,8 +470,7 @@ void TestBinaryAir::computeSpeciesEnthalpies(const Vector &state, Vector &specie
 bool TestBinaryAir::StateIsPhysical(const mfem::Vector &state) {
   bool physical = true;
 
-  double dummy;  // electron pressure. won't compute anything.
-  const double pres = ComputePressure(state, dummy);
+  const double pres = ComputePressure(state);
 
   if (state(0) < 0) {
     cout << "Negative density: " << state(0) << endl;
@@ -516,8 +513,7 @@ double TestBinaryAir::ComputeMaxCharSpeed(const Vector &state) {
   }
   den_vel2 /= den;
 
-  double dummy;  // electron pressure. won't compute anything.
-  const double pres = ComputePressure(state, dummy);
+  const double pres = ComputePressure(state);
   const double sound = sqrt(specific_heat_ratio * pres / den);
   const double vel = sqrt(den_vel2 / den);
 
@@ -570,27 +566,25 @@ void TestBinaryAir::ComputeSpeciesPrimitives(const Vector &conservedState, Vecto
   }
 }
 
-void TestBinaryAir::ComputeMassFractionGradient(const Vector &state, const DenseMatrix &gradUp,
-                                                DenseMatrix &massFractionGrad) {
+void TestBinaryAir::ComputeMassFractionGradient(const double rho, const Vector &numberDensities,
+                                                const DenseMatrix &gradUp, DenseMatrix &massFractionGrad) {
   // Only need active species.
   massFractionGrad.SetSize(numActiveSpecies, dim);
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     for (int d = 0; d < dim; d++)
-      massFractionGrad(sp, d) = gasParams(sp, GasParams::SPECIES_MW) * gradUp(dim + 2 + sp, d) / state(0) -
-                                state(dim + 2 + sp) / state(0) / state(0) * gradUp(0, d);
+      massFractionGrad(sp, d) = gasParams(sp, GasParams::SPECIES_MW) * gradUp(dim + 2 + sp, d) / rho -
+                                gasParams(sp, GasParams::SPECIES_MW) * numberDensities(sp) / rho / rho * gradUp(0, d);
   }
 }
 
-void TestBinaryAir::ComputeMoleFractionGradient(const Vector &state, const DenseMatrix &gradUp,
+void TestBinaryAir::ComputeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
                                                 DenseMatrix &moleFractionGrad) {
   // TODO(kevin): Fluxes need to take Up as input, so that we won't recompute primitives again.
-  Vector X_sp;
-  Vector Y_sp;
-  Vector n_sp;
-  ComputeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
+  Vector X_sp(numSpecies);
 
   double n = 0.0;
-  for (int sp = 0; sp < numSpecies; sp++) n += n_sp[sp];
+  for (int sp = 0; sp < numSpecies; sp++) n += numberDensities(sp);
+  for (int sp = 0; sp < numSpecies; sp++) X_sp(sp) = numberDensities(sp) / n;
 
   Vector nGrad(dim);
   nGrad = 0.0;
@@ -886,14 +880,14 @@ double PerfectMixture::ComputePressureFromPrimitives(const mfem::Vector &Up) {
 }
 
 // NOTE: This is almost the same as GetPrimitivesFromConservatives except storing other primitive variables.
-double PerfectMixture::ComputePressure(const Vector &state, double &electronPressure) {
+double PerfectMixture::ComputePressure(const Vector &state, double *electronPressure) {
   Vector n_sp;
   computeNumberDensities(state, n_sp);
 
   double T_h, T_e;
   computeTemperaturesBase(state, &n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
 
-  electronPressure = n_sp(numSpecies - 2) * UNIVERSALGASCONSTANT * T_e;
+  if (electronPressure != NULL) *electronPressure = n_sp(numSpecies - 2) * UNIVERSALGASCONSTANT * T_e;
 
   // NOTE: compute pressure.
   double p = computePressureBase(&n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
@@ -1024,11 +1018,10 @@ void PerfectMixture::computeSpeciesEnthalpies(const Vector &state, Vector &speci
   double T_h, T_e;
   computeTemperaturesBase(state, &n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
 
-  for (int sp = 0; sp < numSpecies - 2; sp++) {
-    speciesEnthalpies(sp) = n_sp[sp] * molarCP_(sp) * T_h;
+  for (int sp = 0; sp < numSpecies; sp++) {
+    double temp = (sp == numSpecies - 2) ? T_e : T_h;
+    speciesEnthalpies(sp) = n_sp[sp] * (molarCP_(sp) * temp + gasParams(sp, GasParams::FORMATION_ENERGY));
   }
-  speciesEnthalpies(numSpecies - 1) = n_sp[numSpecies - 1] * molarCP_(numSpecies - 1) * T_h;
-  speciesEnthalpies(numSpecies - 2) = n_sp[numSpecies - 2] * molarCP_(numSpecies - 2) * T_e;
 
   return;
 }
@@ -1315,37 +1308,19 @@ void PerfectMixture::computeStagnantStateWithTemp(const mfem::Vector &stateIn, c
   Vector n_sp(numSpecies);
   computeNumberDensities(stateIn, n_sp);
 
-  double totalHeatCapacity = computeHeaviesHeatCapacity(&n_sp[0], n_sp[numSpecies - 1]);
+  double Ch = computeHeaviesHeatCapacity(&n_sp[0], n_sp[numSpecies - 1]);
   // assuming electrons also have wall temperature
-  totalHeatCapacity += n_sp[numSpecies - 2] * molarCV_(numSpecies - 2);
+  double Ue = n_sp[numSpecies - 2] * molarCV_(numSpecies - 2) * Temp;
 
-  stateOut(1 + dim) = totalHeatCapacity * Temp;
+  stateOut(1 + dim) = Ch * Temp + Ue;
+
+  if (twoTemperature_) {
+    stateOut(num_equation - 1) = Ue;
+  }
 
   // Kevin: added formation energies.
   for (int sp = 0; sp < numSpecies - 2; sp++)
     stateOut(1 + dim) += n_sp(sp) * gasParams(sp, GasParams::FORMATION_ENERGY);
-
-  // double ne = 0.;  // number density electrons
-  // if (ambipolar) {
-  //   for (int sp = 0; sp < numActiveSpecies; sp++) ne += gasParams(sp, GasParams::SPECIES_CHARGES) * n_s(sp);
-  // } else {
-  //   ne = stateIn(2 + dim + numSpecies - 2) / gasParams(numSpecies - 2, GasParams::SPECIES_MW);
-  // }
-  //
-  // double nB = stateIn(0);  // background species
-  // for (int sp = 0; sp < numActiveSpecies; sp++) nB -= stateIn(2 + dim + sp);
-  //
-  // if (ambipolar) nB -= ne * gasParams(numSpecies - 2, GasParams::SPECIES_MW);
-  //
-  // nB /= gasParams(numSpecies - 1, GasParams::SPECIES_MW);
-  //
-  // double heatCapacity = 0.;
-  // for (int sp = 0; sp < numActiveSpecies; sp++) heatCapacity += molarCV_(sp) * n_s(sp);
-  // heatCapacity += nB * molarCV_(numSpecies - 1);
-
-  // if (twoTemperature_) {
-  //   stateOut(1 + dim) += ne * molarCV_(numSpecies - 2) * Temp;
-  // }
 }
 
 // At Inlet BC, for two-temperature, electron temperature is set to be equal to gas temperature, where the total
@@ -1425,6 +1400,7 @@ void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::
   stateOut(1 + dim) = rE;
 }
 
+// TODO(kevin): check if this works for axisymmetric case.
 void PerfectMixture::computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
                                                              Vector &conservedState) {
   Vector Up(num_equation);
@@ -1453,6 +1429,7 @@ void PerfectMixture::computeConservedStateFromConvectiveFlux(const Vector &meanN
   double Te = 0.0;
   if (twoTemperature_) {
     Te = meanNormalFluxes(num_equation - 1) / molarCP_(numSpecies - 2) / neFlux;
+    // Te = meanNormalFluxes(num_equation - 1) / molarCV_(numSpecies - 2) / neFlux;
     Up(num_equation - 1) = Te;
   }
 
@@ -1493,4 +1470,26 @@ void PerfectMixture::computeConservedStateFromConvectiveFlux(const Vector &meanN
   }
 
   GetConservativesFromPrimitives(Up, conservedState);
+}
+
+// TODO(kevin): check if this works for axisymmetric case.
+void PerfectMixture::computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix &gradUp,
+                                                 Vector &gradPe) {
+  gradPe.SetSize(dim);
+
+  Vector neGrad;
+  neGrad.SetSize(dim);
+  neGrad = 0.0;
+  if (ambipolar) {
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      for (int d = 0; d < dim; d++) neGrad(d) += gradUp(dim + 2 + sp, d) * gasParams(sp, GasParams::SPECIES_CHARGES);
+    }
+  } else {
+    for (int d = 0; d < dim; d++) neGrad(d) = gradUp(dim + numSpecies, d);  // dim + 2 + (numSpecies - 2)
+  }
+
+  for (int d = 0; d < dim; d++)
+    gradPe(d) = (neGrad(d) * T_e + n_e * gradUp(num_equation - 1, d)) * UNIVERSALGASCONSTANT;
+
+  return;
 }

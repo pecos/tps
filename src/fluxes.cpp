@@ -70,8 +70,8 @@ void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, D
 }
 
 void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
-  double electronPressure = 0.0;
-  const double pres = mixture->ComputePressure(state, electronPressure);
+  double Pe = 0.0;
+  const double pres = mixture->ComputePressure(state, &Pe);
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
   const bool twoTemperature = mixture->IsTwoTemperature();
 
@@ -94,11 +94,13 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
   }
 
   if (twoTemperature) {
-    double electronEnthalpy = (state(num_equation - 1) + electronPressure) / state(0);
+    double electronEnthalpy = (state(num_equation - 1) + Pe) / state(0);
     for (int d = 0; d < dim; d++) flux(num_equation - 1, d) = electronEnthalpy * state(1 + d);
+    // for (int d = 0; d < dim; d++) flux(num_equation - 1, d) = state(num_equation - 1) * state(1 + d) / state(0);
   }
 }
 
+// TODO(kevin): check/complete axisymmetric setting for multi-component flow.
 void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, DenseMatrix &flux) {
   flux = 0.;
   if (eqSystem == EULER) {
@@ -114,6 +116,10 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   // const double bulkViscMult = mixture->GetBulkViscMultiplyer();
   // const double k = mixture->GetThermalConductivity(state);
 
+  // TODO(kevin): update E-field with EM coupling.
+  Vector Efield(dim);
+  Efield = 0.0;
+
   const int numSpecies = mixture->GetNumSpecies();
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
   const bool twoTemperature = mixture->IsTwoTemperature();
@@ -123,16 +129,16 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
 
   Vector transportBuffer;
   DenseMatrix diffusionVelocity(numSpecies, dim);
-  transport->ComputeFluxTransportProperties(state, gradUp, transportBuffer, diffusionVelocity);
-  const double visc = transportBuffer[GlobalTrnsCoeffs::VISCOSITY];
-  double bulkViscosity = transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY];
+  transport->ComputeFluxTransportProperties(state, gradUp, Efield, transportBuffer, diffusionVelocity);
+  const double visc = transportBuffer[FluxTrns::VISCOSITY];
+  double bulkViscosity = transportBuffer[FluxTrns::BULK_VISCOSITY];
   bulkViscosity -= 2. / 3. * visc;
-  double k = transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY];
-  double ke = transportBuffer[GlobalTrnsCoeffs::ELECTRON_THERMAL_CONDUCTIVITY];
+  double k = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY];
+  double ke = transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY];
   if (twoTemperature) {
     for (int d = 0; d < dim; d++) {
       double qeFlux = ke * gradUp(num_equation - 1, d);
-      flux(1 + dim, d) += qeFlux;
+      flux(1 + nvel, d) += qeFlux;
       flux(num_equation - 1, d) += qeFlux;
       flux(num_equation - 1, d) -= speciesEnthalpies(numSpecies - 2) * diffusionVelocity(numSpecies - 2, d);
     }

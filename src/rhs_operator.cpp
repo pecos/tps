@@ -123,6 +123,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   }
 #ifdef HAVE_MASA
   if (config_.use_mms_) {
+    masaForcingIndex_ = forcing.Size();
     forcing.Append(
         new MASA_forcings(dim, num_equation, _order, intRuleType, intRules, vfes, U_, Up, gradUp, gpuArrays, _config));
   }
@@ -409,6 +410,9 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
 
   // add forcing terms
   for (int i = 0; i < forcing.Size(); i++) {
+#ifdef HAVE_MASA
+    if ((i == masaForcingIndex_) && (config_.compareRhs_)) continue;
+#endif
     // NOTE: Do not use RHSoperator::time here b/c it is not correctly
     // updated for each RK substep.  Instead, get time from parent
     // class using TimeDependentOperator::GetTime().
@@ -485,8 +489,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
     // Kevin: we need to think through this.
     if (isSBP) {
       f *= alpha;  // *= alpha
-      double electronPressure;
-      double p = mixture->ComputePressure(state, electronPressure);
+      double p = mixture->ComputePressure(state);
       p *= 1. - alpha;
       for (int d = 0; d < dim; d++) {
         f(d + 1, d) += p;

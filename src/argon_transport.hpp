@@ -37,7 +37,6 @@
  * handy functions to deal with operations.
  */
 
-#include <grvy.h>
 #include <tps_config.h>
 
 #include <mfem.hpp>
@@ -48,7 +47,6 @@
 #include "equation_of_state.hpp"
 #include "run_configuration.hpp"
 #include "transport_properties.hpp"
-#include "utils.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -73,6 +71,7 @@ class ArgonMinimalTransport : public TransportProperties {
   const double viscosityFactor_ = 5. / 16. * sqrt(PI_ * kB_);
   const double kOverEtaFactor_ = 15. / 4. * kB_;
   const double diffusivityFactor_ = 3. / 16. * sqrt(2.0 * PI_ * kB_) / AVOGADRONUMBER;
+  const double mfFreqFactor_ = 4. / 3. * AVOGADRONUMBER * sqrt(8. * kB_ / PI_);
 
   Vector mw_;
   double muAE_;
@@ -94,15 +93,17 @@ class ArgonMinimalTransport : public TransportProperties {
   // but do not return it as output.
   // TODO(kevin): need to discuss whether to reuse computed primitive variables in flux evaluation,
   // or in general evaluation of primitive variables.
-  virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, Vector &transportBuffer,
-                                              DenseMatrix &diffusionVelocity);
+  virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
+                                              Vector &transportBuffer, DenseMatrix &diffusionVelocity);
   // Vector &outputUp);
 
   // Source term will be constructed using ForcingTerms, which have pointers to primitive variables.
   // So we can use them in evaluating transport properties.
   // If this routine evaluate additional primitive variables, can return them just as the routine above.
   virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
-                                                Vector &transportBuffer, DenseMatrix &diffusionVelocity) {}
+                                                const Vector &Efield, Vector &globalTransport,
+                                                DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
+                                                Vector &n_sp);
 
   // TODO(kevin): only for AxisymmetricSource
   virtual double GetViscosityFromPrimitive(const Vector &state) {}

@@ -1,0 +1,61 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="mms/ternary_plasma_2d_wall"
+RUNFILE="inputs/mms.ternary_plasma.2d.wall.ini"
+
+setup() {
+    SOLN_FILE=restart_argon_output.sol.h5
+    MESH_FILE=beam-quad-o3-s1-r2-xp.mesh
+}
+
+@test "[$TEST] check for input file $RUNFILE" {
+    test -s $RUNFILE
+}
+
+@test "[$TEST] create a mesh file" {
+    ../utils/beam_mesh -nx 1 -nt 5 -b 5 -rs 2 -dir 0
+
+    test -s $MESH_FILE
+}
+
+@test "[$TEST] run tps with input -> $RUNFILE" {
+    mpirun -np 2 ../src/tps --runFile $RUNFILE >& plasma_ternary_mms.wall.log
+}
+
+@test "[$TEST] check if the relative error is similar to the reported value" {
+    while IFS=$'\t' read -r nx e0 e1 e2 e3 e4 e5;
+    do
+      test $nx -eq 400
+      # empirically observed error 3.9019e-4
+      check_lo=$(awk 'BEGIN{print ('$e0'>3.90e-4)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e0'<3.91e-4)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 0.1620
+      check_lo=$(awk 'BEGIN{print ('$e1'>0.16)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e1'<0.17)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 0.2274
+      check_lo=$(awk 'BEGIN{print ('$e2'>0.22)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e2'<0.23)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 4.7081e-4
+      check_lo=$(awk 'BEGIN{print ('$e3'>4.70e-4)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e3'<4.71e-4)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 4.7059e-4
+      check_lo=$(awk 'BEGIN{print ('$e4'>4.70e-4)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e4'<4.71e-4)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 7.8473e-4
+      check_lo=$(awk 'BEGIN{print ('$e5'>7.84e-4)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e5'<7.85e-4)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+    done < ternary_2d_2t_ambipolar_wall.rel_error.txt
+}

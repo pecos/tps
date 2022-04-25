@@ -174,8 +174,7 @@ int main (int argc, char *argv[])
 
     grvy_printf(GRVY_INFO, "\n Testing ComputePressure. \n");
 
-    double dummy;
-    double pressureFromConserved = mixture->ComputePressure(conservedState, dummy);
+    double pressureFromConserved = mixture->ComputePressure(conservedState);
     double pressureFromPrimitive = mixture->ComputePressureFromPrimitives(testPrimitives);
     error = abs( (pressureFromConserved - pressureFromPrimitive) / pressureFromConserved );
     if (error > scalarErrorThreshold) {
@@ -579,8 +578,7 @@ int main (int argc, char *argv[])
 
     grvy_printf(GRVY_INFO, "\n Testing ComputePressure. \n");
 
-    double dummy;
-    double pressureFromConserved = mixture->ComputePressure(conservedState, dummy);
+    double pressureFromConserved = mixture->ComputePressure(conservedState);
     double pressureFromPrimitive = mixture->ComputePressureFromPrimitives(testPrimitives);
     error = abs( (pressureFromConserved - pressureFromPrimitive) / pressureFromConserved );
     if (error > scalarErrorThreshold) {
@@ -932,8 +930,7 @@ int main (int argc, char *argv[])
 
     grvy_printf(GRVY_INFO, "\n Testing ComputePressure. \n");
 
-    double dummy;
-    double pressureFromConserved = mixture->ComputePressure(conservedState, dummy);
+    double pressureFromConserved = mixture->ComputePressure(conservedState);
     double pressureFromPrimitive = mixture->ComputePressureFromPrimitives(testPrimitives);
     error = abs( (pressureFromConserved - pressureFromPrimitive) / pressureFromConserved );
     if (error > scalarErrorThreshold) {
@@ -1296,8 +1293,7 @@ int main (int argc, char *argv[])
 
     grvy_printf(GRVY_INFO, "\n Testing ComputePressure. \n");
 
-    double dummy;
-    double pressureFromConserved = mixture->ComputePressure(conservedState, dummy);
+    double pressureFromConserved = mixture->ComputePressure(conservedState);
     double pressureFromPrimitive = mixture->ComputePressureFromPrimitives(testPrimitives);
     error = abs( (pressureFromConserved - pressureFromPrimitive) / pressureFromConserved );
     if (error > scalarErrorThreshold) {

@@ -49,13 +49,14 @@
 using namespace mfem;
 using namespace std;
 
-// Kevin: maybe use namespace?
+// TODO(kevin): move these constants to dataStructures.hpp
 static const int MAXSPECIES = 200;
 static const double UNIVERSALGASCONSTANT = 8.3144598;  // J * mol^(-1) * K^(-1)
 static const double AVOGADRONUMBER = 6.0221409e+23;    // mol^(-1)
 static const double BOLTZMANNCONSTANT = UNIVERSALGASCONSTANT / AVOGADRONUMBER;
 static const double VACUUMPERMITTIVITY = 8.8541878128e-12;
 static const double ELECTRONCHARGE = 1.60218e-19;
+static const double MOLARELECTRONCHARGE = ELECTRONCHARGE * AVOGADRONUMBER;
 
 class GasMixture {
  protected:
@@ -134,8 +135,9 @@ class GasMixture {
   int GetNumConservativeVariables() { return Nconservative; }
   int GetNumPrimitiveVariables() { return Nprimitive; }
 
-  virtual double ComputePressure(const Vector &state, double &electronPressure) = 0;  // pressure from conservatives
-  virtual double ComputePressureFromPrimitives(const Vector &Up) = 0;  // pressure from primitive variables
+  virtual double ComputePressure(const Vector &state,
+                                 double *electronPressure = NULL) = 0;  // pressure from conservatives
+  virtual double ComputePressureFromPrimitives(const Vector &Up) = 0;   // pressure from primitive variables
   virtual double ComputeTemperature(const Vector &state) = 0;
   virtual double Temperature(double *rho, double *p,
                              int nsp) = 0;  // temperature given densities and pressures of all species
@@ -159,10 +161,10 @@ class GasMixture {
   // Compute X, Y gradients from number density gradient.
   // TODO(kevin): Fluxes class should take Up as input variable.
   // Currently cannot receive Up inside Fluxes class.
-  virtual void ComputeMassFractionGradient(const Vector &state, const DenseMatrix &gradUp,
-                                           DenseMatrix &massFractionGrad) {}
-  virtual void ComputeMoleFractionGradient(const Vector &state, const DenseMatrix &gradUp,
-                                           DenseMatrix &moleFractionGrad) {}
+  virtual void ComputeMassFractionGradient(const double rho, const Vector &numberDensities, const DenseMatrix &gradUp,
+                                           DenseMatrix &massFractionGrad) = 0;
+  virtual void ComputeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
+                                           DenseMatrix &moleFractionGrad) = 0;
   // TODO(kevin): Compute pressure gradient from temperature gradient.
   virtual void ComputePressureGradient(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &PressureGrad) {}
 
@@ -203,10 +205,15 @@ class GasMixture {
   virtual double computeBackgroundMassDensity(const double &rho, const double *n_sp, double &n_e,
                                               bool isElectronComputed = false) {}
 
+  // TODO(kevin): check if this works for axisymmetric case.
   virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
                                                        Vector &conservedState) {}
 
-  virtual double computeElectronEnergy(const double n_e, const double T_e) {}
+  virtual double computeElectronEnergy(const double n_e, const double T_e) = 0;
+  virtual double computeElectronPressure(const double n_e, const double T_e) = 0;
+  // TODO(kevin): check if this works for axisymmetric case.
+  virtual void computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix &gradUp,
+                                           Vector &gradPe) = 0;
 };
 
 //////////////////////////////////////////////////////
@@ -228,7 +235,7 @@ class DryAir : public GasMixture {
   ~DryAir() {}
 
   // implementation virtual methods
-  virtual double ComputePressure(const Vector &state, double &electronPressure);
+  virtual double ComputePressure(const Vector &state, double *electronPressure = NULL);
   virtual double ComputePressureFromPrimitives(const Vector &Up);
   virtual double ComputeTemperature(const Vector &state);
   virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / gas_constant / rho[0]; }
@@ -251,6 +258,11 @@ class DryAir : public GasMixture {
   virtual double GetSpecificHeatRatio() { return specific_heat_ratio; }
   virtual double GetGasConstant() { return gas_constant; }
 
+  virtual void ComputeMassFractionGradient(const double rho, const Vector &numberDensities, const DenseMatrix &gradUp,
+                                           DenseMatrix &massFractionGrad) {}
+  virtual void ComputeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
+                                           DenseMatrix &moleFractionGrad) {}
+
   // virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
 
   // BC related functions
@@ -262,6 +274,10 @@ class DryAir : public GasMixture {
   virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
                                                        Vector &conservedState);
 
+  virtual double computeElectronEnergy(const double n_e, const double T_e) {}
+  virtual double computeElectronPressure(const double n_e, const double T_e) {}
+  virtual void computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix &gradUp,
+                                           Vector &gradPe) {}
   // GPU functions
 #ifdef _GPU_
   static MFEM_HOST_DEVICE double pressure(const double *state, double *KE, const double &gamma, const int &dim,
@@ -380,8 +396,8 @@ class DryAir : public GasMixture {
 // };
 
 // additional functions inlined for speed...
-inline double DryAir::ComputePressure(const Vector &state, double &electronPressure) {
-  electronPressure = 0.0;
+inline double DryAir::ComputePressure(const Vector &state, double *electronPressure) {
+  if (electronPressure != NULL) *electronPressure = 0.0;
   double den_vel2 = 0;
   for (int d = 0; d < dim; d++) den_vel2 += state(d + 1) * state(d + 1);
   den_vel2 /= state[0];
@@ -417,7 +433,7 @@ class TestBinaryAir : public GasMixture {
   ~TestBinaryAir() {}
 
   // implementation virtual methods
-  virtual double ComputePressure(const Vector &state, double &electronPressure);
+  virtual double ComputePressure(const Vector &state, double *electronPressure = NULL);
   virtual double ComputePressureFromPrimitives(const Vector &Up);
   virtual double ComputeTemperature(const Vector &state);
   virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / rho[0] / gas_constant; }
@@ -438,15 +454,20 @@ class TestBinaryAir : public GasMixture {
 
   virtual void ComputeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp);
 
-  virtual void ComputeMassFractionGradient(const Vector &state, const DenseMatrix &gradUp,
+  virtual void ComputeMassFractionGradient(const double rho, const Vector &numberDensities, const DenseMatrix &gradUp,
                                            DenseMatrix &massFractionGrad);
-  virtual void ComputeMoleFractionGradient(const Vector &state, const DenseMatrix &gradUp,
+  virtual void ComputeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
                                            DenseMatrix &moleFractionGrad);
 
   virtual double GetSpecificHeatRatio() { return specific_heat_ratio; }
   virtual double GetGasConstant() { return gas_constant; }
 
   // virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
+
+  virtual double computeElectronEnergy(const double n_e, const double T_e) {}
+  virtual double computeElectronPressure(const double n_e, const double T_e) {}
+  virtual void computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix &gradUp,
+                                           Vector &gradPe) {}
 
   // GPU functions
 #ifdef _GPU_
@@ -455,8 +476,8 @@ class TestBinaryAir : public GasMixture {
 };
 
 // additional functions inlined for speed...
-inline double TestBinaryAir::ComputePressure(const Vector &state, double &electronPressure) {
-  electronPressure = 0.0;
+inline double TestBinaryAir::ComputePressure(const Vector &state, double *electronPressure) {
+  if (electronPressure != NULL) *electronPressure = 0.0;
   double den_vel2 = 0;
   for (int d = 0; d < dim; d++) den_vel2 += state(d + 1) * state(d + 1);
   den_vel2 /= state[0];
@@ -514,7 +535,7 @@ class PerfectMixture : public GasMixture {
   virtual void computeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp);
   virtual void computeNumberDensities(const Vector &conservedState, Vector &n_sp);
 
-  virtual double ComputePressure(const Vector &state, double &electronPressure);
+  virtual double ComputePressure(const Vector &state, double *electronPressure = NULL);
   virtual double ComputePressureFromPrimitives(const Vector &Up);
   virtual double computePressureBase(const double *n_sp, const double n_e, const double n_B, const double T_h,
                                      const double T_e);
@@ -562,6 +583,11 @@ class PerfectMixture : public GasMixture {
   virtual double computeElectronEnergy(const double n_e, const double T_e) {
     return n_e * molarCV_(numSpecies - 2) * T_e;
   }
+  virtual double computeElectronPressure(const double n_e, const double T_e) {
+    return n_e * UNIVERSALGASCONSTANT * T_e;
+  }
+  virtual void computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix &gradUp,
+                                           Vector &gradPe);
   // GPU functions
 #ifdef _GPU_
 

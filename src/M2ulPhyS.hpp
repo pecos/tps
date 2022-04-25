@@ -275,6 +275,11 @@ class M2ulPhyS : public TPS::Solver {
 
 #ifdef HAVE_MASA
   VectorFunctionCoefficient *DenMMS_, *VelMMS_, *PreMMS_;
+  VectorFunctionCoefficient *stateMMS_;
+  std::vector<VectorConstantCoefficient *> componentWindow_;
+
+  ParGridFunction *zeroU_;  // to compute L2 norm of exact solution via ComputeLpError.
+  BlockVector *zeroUBlock_;
 #endif
 
 #ifdef _GPU_
@@ -315,7 +320,7 @@ class M2ulPhyS : public TPS::Solver {
   void initMasaHandler();
   void projectExactSolution(const double _time);
   void initMMSCoefficients();
-  void checkSolutionError(const double _time);
+  void checkSolutionError(const double _time, const bool final = false);
 #endif
 
  public:
@@ -342,6 +347,9 @@ class M2ulPhyS : public TPS::Solver {
   ParMesh *GetMesh() { return mesh; }
   FiniteElementCollection *GetFEC() { return fec; }
   ParFiniteElementSpace *GetFESpace() { return vfes; }
+  ParFiniteElementSpace *GetScalarFES() { return fes; }
+  ParFiniteElementSpace *GetVectorFES() { return dfes; }
+  ParaViewDataCollection *GetParaviewColl() { return paraviewColl; }
   ParGridFunction *GetSolutionGF() { return U; }
   ParGridFunction *getPrimitiveGF() { return Up; }
   ParGridFunction *getPressureGF() { return press; }

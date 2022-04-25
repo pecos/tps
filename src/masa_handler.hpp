@@ -45,7 +45,16 @@ using namespace std;
 
 // void initMasaHandler(string name, int dim, const Equations& eqn, const double& viscMult, const std::string mms_name);
 
+namespace mms {
+
+void exactSolnFunction(const Vector &x, double tin, Vector &y);
+void evaluateForcing(const Vector &x, double time, Array<double> &y);
+
+}  // namespace mms
+
 namespace dryair3d {
+
+void evaluateForcing(const Vector &x, double time, Array<double> &y);
 
 void exactSolnFunction(const Vector &x, double tin, Vector &y);
 void exactDenFunction(const Vector &x, double tin, Vector &y);
@@ -58,5 +67,21 @@ void initEuler3DTransient(const int dim, RunConfiguration &config);
 void initNS3DTransient(const int dim, RunConfiguration &config);
 
 }  // namespace dryair3d
+
+namespace ternary2d {
+
+void initTernary2DBase(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly);
+
+void initTernary2DPeriodic(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly);
+
+void initTernary2DPeriodicAmbipolar(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly);
+
+void initTernary2D2TPeriodicAmbipolar(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly);
+
+void initTernary2D2TAmbipolarWall(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly);
+
+void initTernary2D2TAmbipolarInoutlet(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly);
+
+}  // namespace ternary2d
 
 #endif  // MASA_HANDLER_HPP_

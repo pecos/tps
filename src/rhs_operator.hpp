@@ -32,6 +32,7 @@
 #ifndef RHS_OPERATOR_HPP_
 #define RHS_OPERATOR_HPP_
 
+#include <grvy.h>
 #include <tps_config.h>
 
 #include <mfem.hpp>
@@ -122,6 +123,7 @@ class RHSoperator : public TimeDependentOperator {
   BCintegrator *bcIntegrator;
 
   Array<ForcingTerms *> forcing;
+  int masaForcingIndex_ = -1;
 
   mutable DenseTensor flux;
   mutable Vector z;
@@ -155,6 +157,8 @@ class RHSoperator : public TimeDependentOperator {
   virtual ~RHSoperator();
 
   const double *getLocalTimeDerivatives() { return local_timeDerivatives.HostRead(); }
+  ForcingTerms *getForcingTerm(const int index) { return forcing[index]; }
+  int getMasaForcingIndex() { return masaForcingIndex_; }
 
   static void initNBlockDataTransfer(const Vector &x, ParFiniteElementSpace *pfes, dataTransferArrays &dataTransfer);
   static void waitAllDataTransfer(ParFiniteElementSpace *pfes, dataTransferArrays &dataTransfer);
