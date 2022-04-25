@@ -59,14 +59,14 @@ sponge = [ ["SZ_PLANE_NORM",""],
            ["SZ_PLANE_P0",""],
            ["SZ_PLANE_PINIT",""],
            ["SZ_TYPE","type"],
-           ["SZ_MULT","multiplier"]           
+           ["SZ_MULT","multiplier"]
 ]
 
 rms = [ ["ENABLE_AUTORESTART","enableAutoRestart"],
         ["RM_THRESHOLD","timeThreshold"],
         ["RM_CHECK_FREQUENCY","checkFreq"],
 ]
-           
+
 
 io   = [ ["OUTPUT_NAME","outdirBase"],
          ["RESTART_CYCLE","enableRestart"],
@@ -94,7 +94,7 @@ newFile = configparser.ConfigParser()
 newFile.optionxform = str
 newFile.add_section("solver")
 newFile["solver"]["type"] = "flow"
-    
+
 numInlets     = 0
 numOutlets    = 0
 numWalls      = 0
@@ -123,7 +123,7 @@ def addSection(section):
     if not newFile.has_section(section):
         newFile.add_section(section)
 
-# deal with special inputs that are multi-valued on a case-by-case basis        
+# deal with special inputs that are multi-valued on a case-by-case basis
 def handleMultiValuedInputs(entry):
 
     global numInlets, numOutlets, numWalls, numScalars
@@ -133,7 +133,7 @@ def handleMultiValuedInputs(entry):
 
         patch = entries[1]
         numWalls += 1
-        section = "boundaryConditions/wall" + str(numWalls)        
+        section = "boundaryConditions/wall" + str(numWalls)
 
         addSection(section)
         newFile[section]["patch"] = patch
@@ -161,10 +161,10 @@ def handleMultiValuedInputs(entry):
 
         patch = entries[1]
         numInlets += 1
-        section = "boundaryConditions/inlet" + str(numInlets)        
+        section = "boundaryConditions/inlet" + str(numInlets)
 
         addSection(section)
-        newFile[section]["patch"] = patch        
+        newFile[section]["patch"] = patch
         newFile[section]["type"]  = inletMapping[entries[2]]
         if inletMapping[entries[2]] == 'subsonic':
             newFile[section]["density"] = entries[3]
@@ -187,15 +187,15 @@ def handleMultiValuedInputs(entry):
         numOutlets += 1
         section = "boundaryConditions/outlet" + str(numOutlets)
 
-        addSection(section)        
-        newFile[section]["patch"] = patch                
+        addSection(section)
+        newFile[section]["patch"] = patch
         newFile[section]["type"]  = outletMapping[entries[2]]
         if outletMapping[entries[2]] == 'subsonicPressure':
             newFile[section]["pressure"] = entries[3]
         elif outletMapping[entries[2]] == 'nonReflectingMassFlow':
             newFile[section]["massFlow"] = entries[3]
         elif outletMapping[entries[2]] == 'nonReflectingPressure':
-            newFile[section]["pressure"] = entries[3]            
+            newFile[section]["pressure"] = entries[3]
         else:
             logging.error("Unsupported outlet BC type -> %s" % outletMapping[entries[2]])
             exit(1)
@@ -231,7 +231,7 @@ def handleMultiValuedInputs(entry):
     elif varName == "SZ_PLANE_NORM":
         section,name = getNewName(varName)
         addSection(section)
-        values = str(entries[1]) + " " + str(entries[2]) + " " + str(entries[3])        
+        values = str(entries[1]) + " " + str(entries[2]) + " " + str(entries[3])
         newFile[section]["normal"] = "'" + values + "'"
     elif varName == "SZ_PLANE_P0":
         section,name = getNewName(varName)
@@ -245,14 +245,14 @@ def handleMultiValuedInputs(entry):
         newFile[section]["pInit"] = "'" + values + "'"
     elif varName == "SZ_TYPE":
         section,name = getNewName(varName)
-        addSection(section)        
+        addSection(section)
         if entries[1] == "0":
             newFile[section]["isEnabled"] = str(True)
             newFile[section]["type"]     = "userDef"
             newFile[section]["density"]  = entries[2]
             uvw = "'" + str(entries[3]) + " " + str(entries[4]) + " " + str(entries[5]) + "'"
             newFile[section]["uvw"] = uvw
-            newFile[section]["pressure"] = entries[6]              
+            newFile[section]["pressure"] = entries[6]
         elif entries[1] == "1":
             newFile[section]["isEnabled"] = str(True)
             newFile[section]["type"] = "mixedOut"
@@ -262,11 +262,11 @@ def handleMultiValuedInputs(entry):
     else:
         logging.error("Unknown special input not yet supported -> %s" % varName)
         exit(1)
-    
+
 
 def parseEntry(entry):
     # skip empty lines
-    if entry == '': 
+    if entry == '':
         return
     # skip comment lines
     elif entry.startswith("#"):
@@ -324,6 +324,15 @@ def parseEntry(entry):
             else:
                 logging.error("Unknown value for EQ_SYSTEM conversion => %s " % value)
                 exit(1)
+        elif varName == "FLUID":
+            mapping = {}
+            mapping["0"] = "dry_air"
+
+            if value in mapping:
+                newFile[section][newName] = mapping[value]
+            else:
+                logging.error("FLUID values other then 0 may change in the future. Stop conversion for %s " % value)
+                exit(1)
         else:
             newFile[section][newName] = str(value)
     else:
@@ -342,6 +351,5 @@ newFile["boundaryConditions"]["numOutlets"] = str(numOutlets)
 if numScalars > 0:
     newFile.add_section("passiveScalars")
     newFile["passiveScalars"]["numScalars"] = str(numScalars)
-    
-newFile.write(sys.stdout)
 
+newFile.write(sys.stdout)

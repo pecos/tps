@@ -35,14 +35,15 @@ double getRadius(const Vector &pos) { return pos[0]; }
 FunctionCoefficient radiusFcn(getRadius);
 
 // Implementation of class RHSoperator
-RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, const int &_order,
+RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, const int &_order,
                          const Equations &_eqSystem, double &_max_char_speed, IntegrationRules *_intRules,
-                         int _intRuleType, Fluxes *_fluxClass, GasMixture *_mixture, ParFiniteElementSpace *_vfes,
+                         int _intRuleType, Fluxes *_fluxClass, GasMixture *_mixture, Chemistry *_chemistry,
+                         TransportProperties *_transport, ParFiniteElementSpace *_vfes,
                          const volumeFaceIntegrationArrays &_gpuArrays, const int &_maxIntPoints, const int &_maxDofs,
                          DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh,
-                         ParGridFunction *_spaceVaryViscMult, ParGridFunction *_Up, ParGridFunction *_gradUp,
-                         ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A, BCintegrator *_bcIntegrator,
-                         bool &_isSBP, double &_alpha, RunConfiguration &_config)
+                         ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
+                         ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A,
+                         BCintegrator *_bcIntegrator, bool &_isSBP, double &_alpha, RunConfiguration &_config)
     : TimeDependentOperator(_A->Height()),
       config_(_config),
       iter(_iter),
@@ -50,11 +51,12 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
       nvel(_config.isAxisymmetric() ? 3 : _dim),
       eqSystem(_eqSystem),
       max_char_speed(_max_char_speed),
-      num_equation(_num_equations),
+      num_equation(_num_equation),
       intRules(_intRules),
       intRuleType(_intRuleType),
       fluxClass(_fluxClass),
       mixture(_mixture),
+      transport_(_transport),
       vfes(_vfes),
       gpuArrays(_gpuArrays),
       maxIntPoints(_maxIntPoints),
@@ -66,6 +68,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
       linViscData(_config.GetLinearVaryingData()),
       isSBP(_isSBP),
       alpha(_alpha),
+      U_(U),
       Up(_Up),
       gradUp(_gradUp),
       gradUpfes(_gradUpfes),
@@ -93,15 +96,15 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
   forcing.DeleteAll();
 
   if (_config.thereIsForcing()) {
-    forcing.Append(new ConstantPressureGradient(dim, num_equation, _order, intRuleType, intRules, vfes, Up, gradUp,
+    forcing.Append(new ConstantPressureGradient(dim, num_equation, _order, intRuleType, intRules, vfes, U_, Up, gradUp,
                                                 gpuArrays, _config));
   }
   if (_config.GetPassiveScalarData().Size() > 0)
-    forcing.Append(new PassiveScalar(dim, num_equation, _order, intRuleType, intRules, vfes, mixture, Up, gradUp,
+    forcing.Append(new PassiveScalar(dim, num_equation, _order, intRuleType, intRules, vfes, mixture, U_, Up, gradUp,
                                      gpuArrays, _config));
   if (_config.numSpongeRegions_ > 0) {
     for (int sz = 0; sz < _config.numSpongeRegions_; sz++) {
-      forcing.Append(new SpongeZone(dim, num_equation, _order, intRuleType, fluxClass, mixture, intRules, vfes, Up,
+      forcing.Append(new SpongeZone(dim, num_equation, _order, intRuleType, fluxClass, mixture, intRules, vfes, U_, Up,
                                     gradUp, gpuArrays, _config, sz));
     }
   }
@@ -109,20 +112,25 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
     for (int s = 0; s < _config.numHeatSources; s++) {
       if (_config.heatSource[s].isEnabled) {
         forcing.Append(new HeatSource(dim, num_equation, _order, intRuleType, _config.heatSource[s], mixture, intRules,
-                                      vfes, Up, gradUp, gpuArrays, _config));
+                                      vfes, U_, Up, gradUp, gpuArrays, _config));
       }
     }
+  }
+  // NOTE: check if this logic is sound
+  if (_config.GetWorkingFluid() != WorkingFluid::DRY_AIR) {
+    forcing.Append(new SourceTerm(dim, num_equation, _order, intRuleType, intRules, vfes, U_, Up, gradUp, gpuArrays,
+                                  _config, mixture, _transport, _chemistry));
   }
 #ifdef HAVE_MASA
   if (config_.use_mms_) {
     forcing.Append(
-        new MASA_forcings(dim, num_equation, _order, intRuleType, intRules, vfes, Up, gradUp, gpuArrays, _config));
+        new MASA_forcings(dim, num_equation, _order, intRuleType, intRules, vfes, U_, Up, gradUp, gpuArrays, _config));
   }
 #endif
 
   if (config_.isAxisymmetric()) {
-    forcing.Append(new AxisymmetricSource(dim, num_equation, _order, mixture, eqSystem, intRuleType, intRules, vfes, Up,
-                                          gradUp, gpuArrays, _config));
+    forcing.Append(new AxisymmetricSource(dim, num_equation, _order, mixture, transport_, eqSystem, intRuleType,
+                                          intRules, vfes, U_, Up, gradUp, gpuArrays, _config));
 
     const FiniteElementCollection *fec = vfes->FEColl();
     dfes = new ParFiniteElementSpace(mesh, fec, dim, Ordering::byNODES);
@@ -205,7 +213,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equations, 
   gradients->setParallelData(&parallelData, &transferUp);
 
   local_timeDerivatives.UseDevice(true);
-  local_timeDerivatives.SetSize(5);
+  local_timeDerivatives.SetSize(num_equation);
   local_timeDerivatives = 0.;
 
 #ifdef DEBUG
@@ -473,20 +481,24 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 
     fluxClass->ComputeConvectiveFluxes(state, f);
 
+    // TODO(Kevin): - This needs to be incorporated in Fluxes::ComputeConvectiveFluxes.
+    // Kevin: we need to think through this.
     if (isSBP) {
       f *= alpha;  // *= alpha
-      double p = mixture->ComputePressure(state);
+      double electronPressure;
+      double p = mixture->ComputePressure(state, electronPressure);
       p *= 1. - alpha;
       for (int d = 0; d < dim; d++) {
         f(d + 1, d) += p;
-        f(num_equation - 1, d) += p * (state)(1 + d) / (state)(0);
+        f(dim + 1, d) += p * (state)(1 + d) / (state)(0);
       }
     }
 
-    if (eqSystem == NS || NS_PASSIVE) {
+    if (eqSystem != EULER) {
       DenseMatrix fvisc(num_equation, dim);
       fluxClass->ComputeViscousFluxes(state, gradUpi, radius, fvisc);
 
+      // TODO(kevin): This needs to be incorporated in Fluxes::ComputeViscousFluxes.
       if (spaceVaryViscMult != NULL) {
         auto *alpha = spaceVaryViscMult->GetData();
         for (int eq = 0; eq < num_equation; eq++)
@@ -522,41 +534,33 @@ void RHSoperator::updatePrimitives(const Vector &x_in) const {
   double *dataUp = Up->GetData();
   for (int i = 0; i < vfes->GetNDofs(); i++) {
     Vector iState(num_equation);
-    Vector iUp(num_equation);
+    Vector primitiveState(num_equation);
     for (int eq = 0; eq < num_equation; eq++) iState[eq] = x_in[i + eq * vfes->GetNDofs()];
-    mixture->GetPrimitivesFromConservatives(iState, iUp);
-    for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * vfes->GetNDofs()] = iUp[eq];
-    //     double temp = mixture->ComputeTemperature(iState);
-    //     dataUp[i] = iState[0];
-    //     dataUp[i + vfes->GetNDofs()] = iState[1] / iState[0];
-    //     dataUp[i + 2 * vfes->GetNDofs()] = iState[2] / iState[0];
-    //     if (dim == 3) dataUp[i + 3 * vfes->GetNDofs()] = iState[3] / iState[0];
-    //     dataUp[i + (1 + dim) * vfes->GetNDofs()] = temp;
-    //     if (eqSystem == NS_PASSIVE)
-    //       dataUp[i + (num_equation - 1) * vfes->GetNDofs()] = iState[num_equation - 1] / iState[0];
+    mixture->GetPrimitivesFromConservatives(iState, primitiveState);
+    for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * vfes->GetNDofs()] = primitiveState[eq];
   }
 #endif  // _GPU_
 }
 
 void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const double gamma, const double Rgas,
-                                       const int ndofs, const int dim, const int num_equations,
+                                       const int ndofs, const int dim, const int num_equation,
                                        const Equations &eqSystem) {
 #ifdef _GPU_
   auto dataUp = Up->Write();   // make sure data is available in GPU
   auto dataIn = x_in->Read();  // make sure data is available in GPU
 
-  MFEM_FORALL_2D(n, ndofs, num_equations, 1, 1, {
+  MFEM_FORALL_2D(n, ndofs, num_equation, 1, 1, {
     MFEM_SHARED double state[20];  // assuming 20 equations
     // MFEM_SHARED double p;
     MFEM_SHARED double KE[3];
 
-    MFEM_FOREACH_THREAD(eq, x, num_equations) {
+    MFEM_FOREACH_THREAD(eq, x, num_equation) {
       state[eq] = dataIn[n + eq * ndofs];  // loads data into shared memory
       MFEM_SYNC_THREAD;
 
       // compute temperature
       if (eq < dim) KE[eq] = 0.5 * state[1 + eq] * state[1 + eq] / state[0];
-      if (eq == num_equations - 1 && dim == 2) KE[2] = 0;
+      if (eq == num_equation - 1 && dim == 2) KE[2] = 0;
       MFEM_SYNC_THREAD;
 
       // each thread writes to global memory
@@ -565,9 +569,9 @@ void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const dou
       if (eq == 2) dataUp[n + 2 * ndofs] = state[2] / state[0];
       if (eq == 3 && dim == 3) dataUp[n + 3 * ndofs] = state[3] / state[0];
       if (eq == 1 + dim)
-        dataUp[n + (1 + dim) * ndofs] = DryAir::temperature(&state[0], &KE[0], gamma, Rgas, dim, num_equations);
-      if (eq == num_equations - 1 && eqSystem == NS_PASSIVE)
-        dataUp[n + (num_equations - 1) * ndofs] = state[num_equations - 1] / state[0];
+        dataUp[n + (1 + dim) * ndofs] = DryAir::temperature(&state[0], &KE[0], gamma, Rgas, dim, num_equation);
+      if (eq == num_equation - 1 && eqSystem == NS_PASSIVE)
+        dataUp[n + (num_equation - 1) * ndofs] = state[num_equation - 1] / state[0];
     }
   });
 #endif

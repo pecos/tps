@@ -34,6 +34,7 @@
 #include "dgNonlinearForm.hpp"
 #include "riemann_solver.hpp"
 
+// TODO(kevin): non-reflecting bc for plasam.
 InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rsolver, GasMixture *_mixture,
                  ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
                  const int _num_equation, int _patchNumber, double _refLength, InletType _bcType,
@@ -47,7 +48,20 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
   inputState.UseDevice(true);
   inputState.SetSize(_inputData.Size());
   auto hinputState = inputState.HostWrite();
-  for (int i = 0; i < inputState.Size(); i++) hinputState[i] = _inputData[i];
+  // NOTE: regardless of dimension, inletBC saves first 4 elements for density and velocity.
+  for (int i = 0; i < 4; i++) hinputState[i] = _inputData[i];
+
+  numActiveSpecies_ = mixture->GetNumActiveSpecies();
+  if (numActiveSpecies_ > 0) {  // read species input state for multi-component flow.
+    std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
+    // NOTE: Inlet BC do not specify total energy, therefore skips one index.
+    for (int sp = 0; sp < numActiveSpecies_; sp++) {
+      int inputIndex = (*mixtureToInputMap)[sp];
+      // store species density into inputState in the order of mixture-sorted index.
+      hinputState[4 + sp] = _inputData[0] * _inputData[4 + inputIndex];
+    }
+  }
+
   auto dinputState = inputState.ReadWrite();
 
   groupsMPI->setPatch(_patchNumber);
@@ -70,7 +84,13 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
   hmeanUp[2] = 0;
   if (nvel == 3) hmeanUp[3] = 0.;
   hmeanUp[1 + nvel] = 101300;
-  if (eqSystem == NS_PASSIVE) hmeanUp[num_equation - 1] = 0.;
+  if (eqSystem == NS_PASSIVE) {
+    hmeanUp[num_equation - 1] = 0.;
+  } else if (numActiveSpecies_ > 0) {
+    for (int sp = 0; sp < numActiveSpecies_; sp++) {
+      hmeanUp[dim + 2 + sp] = 0.0;
+    }
+  }
 
   Array<double> coords;
 
@@ -684,21 +704,31 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
 }
 
 void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
-  const double p = mixture->ComputePressure(stateIn);
+  // NOTE: it is likely that for two-temperature case inlet will also specify electron temperature,
+  // whether it is equal to the gas temperature or not.
+  double dummy;  // electron pressure. by-product of total pressure computation. won't be used
+  const double p = mixture->ComputePressure(stateIn, dummy);
 
   Vector state2(num_equation);
   state2 = stateIn;
 
-  // NOTE: In the case of active species some more work needs to be done here.
-  //       Inlet BC for plasma yet to be agreed upon.
   state2[0] = inputState[0];
   state2[1] = inputState[0] * inputState[1];
   state2[2] = inputState[0] * inputState[2];
   if (nvel == 3) state2[3] = inputState[0] * inputState[3];
 
-  if (eqSystem == NS_PASSIVE) state2[num_equation - 1] = 0.;
+  if (eqSystem == NS_PASSIVE) {
+    state2[num_equation - 1] = 0.;
+  } else if (numActiveSpecies_ > 0) {
+    for (int sp = 0; sp < numActiveSpecies_; sp++) {
+      // NOTE: inlet BC does not specify total energy. therefore skips one index.
+      // NOTE: regardless of dimension, inletBC save the first 4 elements for density and velocity.
+      state2[nvel + 2 + sp] = inputState[4 + sp];
+    }
+  }
 
-  mixture->modifyEnergyForPressure(state2, state2, p);
+  // NOTE: If two-temperature, BC for electron temperature is T_e = T_h, where the total pressure is p.
+  mixture->modifyEnergyForPressure(state2, state2, p, true);
 
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }

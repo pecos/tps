@@ -182,6 +182,46 @@ class RunConfiguration {
 
   int exit_checkFrequency_;  // iteration frequency to check for early exit
 
+  // number of species;
+  int numSpecies;
+  int backgroundIndex;
+  // int electronIndex;
+  Vector initialMassFractions;
+  double initialElectronTemperature;
+
+  std::vector<std::string> speciesNames;
+
+  // TODO(kevin): make tps input parser accessible to all classes.
+  int numReactions;
+  Vector reactionEnergies;
+  std::vector<std::string> reactionEquations;
+  Array<ReactionModel> reactionModels;
+  std::vector<std::vector<double>> reactionModelParams;
+  DenseMatrix reactantStoich, productStoich;
+  Array<bool> detailedBalance;
+  std::vector<std::vector<double>> equilibriumConstantParams;
+
+  DenseMatrix gasParams;
+  Vector constantMolarCV;
+  Vector constantMolarCP;
+
+  // ambipolar flag
+  bool ambipolar;
+
+  // two temperature flag
+  bool twoTemperature;
+
+  // For USER_DEFINED gas mixture, set models from input file.
+  GasModel gasModel;
+  TransportModel transportModel;
+  ChemistryModel chemistryModel_;
+
+  // flag for using third-order electron thermal conductivity
+  bool thirdOrderkElectron;
+
+  // data structure for constant transport property class
+  constantTransportData constantTransport;
+
   // Use MMS
   bool use_mms_;
   std::string mms_name_;
@@ -256,6 +296,16 @@ class RunConfiguration {
 
   Array<passiveScalarData*>& GetPassiveScalarData() { return arrayPassiveScalar; }
   passiveScalarData* GetPassiveScalarData(int i) { return arrayPassiveScalar[i]; }
+
+  int GetNumSpecies() { return numSpecies; }
+  double GetGasParams(int species, GasParams param) { return gasParams(species, param); }
+  bool IsAmbipolar() { return ambipolar; }
+  bool IsTwoTemperature() { return twoTemperature; }
+  GasModel GetGasModel() { return gasModel; }
+  TransportModel GetTranportModel() { return transportModel; }
+  ChemistryModel GetChemistryModel() { return chemistryModel_; }
+  double getConstantMolarCV(int species) { return constantMolarCV(species); }
+  double getConstantMolarCP(int species) { return constantMolarCP(species); }
 };
 
 #endif  // RUN_CONFIGURATION_HPP_

@@ -1,0 +1,22 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="averages"
+RUNFILE="inputs/input.reaction.ini"
+
+setup() {
+    SOLN_FILE=restart_output.sol.h5
+    REF_FILE=ref_solns/reaction.test.h5
+}
+
+@test "[$TEST] Test correct equilibrium is achieved" {
+    test -s $RUNFILE
+    rm -f $SOLN_FILE
+    ../src/tps -run $RUNFILE
+    test -s $SOLN_FILE
+    test -s $REF_FILE
+    ./soln_differ -d 2 $SOLN_FILE $REF_FILE
+
+    rm -f $SOLN_FILE
+}
+

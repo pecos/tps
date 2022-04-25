@@ -62,7 +62,9 @@ Tps::Tps(int argc, char *argv[]) {
 #endif
 }
 
-Tps::~Tps() { delete solver_; }
+Tps::~Tps() {
+  if (solver_ != NULL) delete solver_;
+}
 
 void Tps::printHeader() {
   if (isRank0_) {
@@ -77,6 +79,10 @@ void Tps::printHeader() {
     grvy_printf(ginfo, "Git Version:  %s\n", BUILD_VERSION);
     grvy_printf(ginfo, "MFEM Version: %s\n", mfem::GetVersionStr());
     grvy_printf(ginfo, "------------------------------------\n\n");
+
+#ifdef _MASA_
+    grvy_printf(ginfo, "MASA is enabled. \n\n");
+#endif
   }
 }
 
@@ -200,6 +206,7 @@ void Tps::parseInput() {
     exit(ERROR);
   }
 
+  // if (isRank0_) iparse_.Fdump();
   // parse common inputs
   getInput("solver/type", input_solver_type_, std::string("flow"));
 #ifdef _GPU_

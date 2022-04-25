@@ -1,0 +1,16 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="argon_minimal"
+
+setup() {
+
+    RUNFILE_ARGON="inputs/argonMinimal.ini"
+
+}
+
+@test "[$TEST] test accuracy of routines with respect to reference" {
+    test -s $RUNFILE_ARGON
+    test -e ./test_argon_minimal
+    ./test_argon_minimal -run $RUNFILE_ARGON
+}

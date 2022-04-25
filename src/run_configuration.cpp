@@ -96,6 +96,14 @@ RunConfiguration::RunConfiguration() {
   for (int ii = 0; ii < 3; ii++) gradPress[ii] = 0.;
 
   arrayPassiveScalar.DeleteAll();
+
+  // Resource manager monitoring
+  rm_enableMonitor_ = false;
+  rm_threshold_ = 15 * 60;     // 15 minutes
+  rm_checkFrequency_ = 25;     // 25 iterations
+  exit_checkFrequency_ = 500;  // 500 iterations
+
+  initialElectronTemperature = 0.;
 }
 
 RunConfiguration::~RunConfiguration() {
@@ -289,7 +297,11 @@ void RunConfiguration::readInputFile(std::string inpuFileName) {
           case 0:
             workFluid = DRY_AIR;
             break;
+          case 1:
+            workFluid = TEST_BINARY_AIR;
+            break;
           default:
+            workFluid = USER_DEFINED;
             break;
         }
       } else if (word.compare("EQ_SYSTEM") == 0) {
@@ -490,6 +502,35 @@ void RunConfiguration::readInputFile(std::string inpuFileName) {
         arrayPassiveScalar[arrSize]->radius = stod(word);
         ss >> word;
         arrayPassiveScalar[arrSize]->value = stod(word);
+      } else if (word.compare("NUM_SPECIES") == 0) {
+        ss >> word;
+        numSpecies = stoi(word);
+        gasParams.SetSize(numSpecies, GasParams::NUM_GASPARAMS);
+        for (int sp = 0; sp < numSpecies; sp++)
+          for (int param = 0; param < GasParams::NUM_GASPARAMS; param++) {
+            ss >> word;
+            gasParams(sp, param) = stod(word);
+          }
+      } else if (word.compare("AMBIPOLAR") == 0) {
+        ambipolar = false;
+        ss >> word;
+        if (word.compare("TRUE") == 0) ambipolar = true;
+      } else if (word.compare("TWO_TEMPERATURE") == 0) {
+        twoTemperature = false;
+        ss >> word;
+        if (word.compare("TRUE") == 0) twoTemperature = true;
+      } else if (word.compare("GAS_MODEL") == 0) {
+        ss >> word;
+        assert((stoi(word) >= 0) && (stoi(word) < GasModel::NUM_GASMODEL));
+        gasModel = (GasModel)stoi(word);
+      } else if (word.compare("TRANSPORT_MODEL") == 0) {
+        ss >> word;
+        assert((stoi(word) >= 0) && (stoi(word) < TransportModel::NUM_TRANSPORTMODEL));
+        transportModel = (TransportModel)stoi(word);
+      } else if (word.compare("CHEMISTRY_MODEL") == 0) {
+        ss >> word;
+        assert((stoi(word) >= 0) && (stoi(word) < ChemistryModel::NUM_CHEMISTRYMODEL));
+        chemistryModel_ = (ChemistryModel)stoi(word);
       }
     }
   }
@@ -498,8 +539,10 @@ void RunConfiguration::readInputFile(std::string inpuFileName) {
 }
 
 Array<double> RunConfiguration::GetInletData(int i) {
-  Array<double> data(4);
-  for (int j = 0; j < 4; j++) data[j] = inletBC[j + 4 * i];
+  int length = 4;
+  if ((workFluid != DRY_AIR) && (numSpecies > 1)) length += numSpecies;
+  Array<double> data(length);
+  for (int j = 0; j < length; j++) data[j] = inletBC[j + length * i];
 
   return data;
 }

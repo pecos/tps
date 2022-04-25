@@ -34,8 +34,9 @@
 #include <vector>
 
 ForcingTerms::ForcingTerms(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
-                           IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
-                           ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &_gpuArrays, bool axisym)
+                           IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
+                           ParGridFunction *_Up, ParGridFunction *_gradUp,
+                           const volumeFaceIntegrationArrays &_gpuArrays, bool axisym)
     : dim(_dim),
       nvel(axisym ? 3 : _dim),
       num_equation(_num_equation),
@@ -44,8 +45,9 @@ ForcingTerms::ForcingTerms(const int &_dim, const int &_num_equation, const int 
       intRuleType(_intRuleType),
       intRules(_intRules),
       vfes(_vfes),
-      Up(_Up),
-      gradUp(_gradUp),
+      U_(U),
+      Up_(_Up),
+      gradUp_(_gradUp),
       gpuArrays(_gpuArrays) {
   h_numElems = gpuArrays.numElems.HostRead();
   h_posDofIds = gpuArrays.posDofIds.HostRead();
@@ -84,11 +86,11 @@ ForcingTerms::~ForcingTerms() {
 
 ConstantPressureGradient::ConstantPressureGradient(const int &_dim, const int &_num_equation, const int &_order,
                                                    const int &_intRuleType, IntegrationRules *_intRules,
-                                                   ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
-                                                   ParGridFunction *_gradUp,
+                                                   ParFiniteElementSpace *_vfes, ParGridFunction *U,
+                                                   ParGridFunction *_Up, ParGridFunction *_gradUp,
                                                    const volumeFaceIntegrationArrays &_gpuArrays,
                                                    RunConfiguration &_config)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, _gpuArrays,
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, _gpuArrays,
                    _config.isAxisymmetric()) {
   mixture = new DryAir(_config, dim);
 
@@ -114,16 +116,16 @@ void ConstantPressureGradient::updateTerms(Vector &in) {
     }
     int dof_el = h_posDofIds[2 * elemOffset + 1];
 
-    updateTerms_gpu(h_numElems[elType], elemOffset, dof_el, vfes->GetNDofs(), pressGrad, in, *Up, *gradUp, num_equation,
-                    dim, gpuArrays);
+    updateTerms_gpu(h_numElems[elType], elemOffset, dof_el, vfes->GetNDofs(), pressGrad, in, *Up_, *gradUp_,
+                    num_equation, dim, gpuArrays);
   }
 #else
   int numElem = vfes->GetNE();
   int dof = vfes->GetNDofs();
 
   double *data = in.GetData();
-  const double *dataUp = Up->GetData();
-  const double *dataGradUp = gradUp->GetData();
+  const double *dataUp = Up_->GetData();
+  const double *dataGradUp = gradUp_->GetData();
 
   Vector gradUpk;  // interpolated gradient
   gradUpk.SetSize(num_equation * dim);
@@ -221,13 +223,15 @@ void ConstantPressureGradient::updateTerms_gpu(const int numElems, const int off
 #endif
 
 AxisymmetricSource::AxisymmetricSource(const int &_dim, const int &_num_equation, const int &_order,
-                                       GasMixture *_mixture, const Equations &_eqSystem, const int &_intRuleType,
-                                       IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
+                                       GasMixture *_mixture, TransportProperties *_transport,
+                                       const Equations &_eqSystem, const int &_intRuleType, IntegrationRules *_intRules,
+                                       ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up,
                                        ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
                                        RunConfiguration &_config)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays,
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()),
       mixture(_mixture),
+      transport_(_transport),
       eqSystem(_eqSystem) {
   // no-op
 }
@@ -241,8 +245,8 @@ void AxisymmetricSource::updateTerms(Vector &in) {
   int dof = vfes->GetNDofs();
 
   double *data = in.GetData();
-  const double *dataUp = Up->GetData();
-  const double *dataGradUp = gradUp->GetData();
+  const double *dataUp = Up_->GetData();
+  const double *dataGradUp = gradUp_->GetData();
 
   // get coords
   const FiniteElementCollection *fec = vfes->FEColl();
@@ -343,7 +347,7 @@ void AxisymmetricSource::updateTerms(Vector &in) {
         const double uz_z = dataGradUp[index + (2 * dof) + (1 * dof * num_equation)];
         const double ut_r = dataGradUp[index + (3 * dof) + (0 * dof * num_equation)];
 
-        const double visc = mixture->GetViscosityFromPrimitive(prim);
+        const double visc = transport_->GetViscosityFromPrimitive(prim);
 
         tau_tt = -ur_r - uz_z;
         if (radius > 0) tau_tt += 2 * ur / radius;
@@ -379,20 +383,45 @@ void AxisymmetricSource::updateTerms(Vector &in) {
 
 SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                        Fluxes *_fluxClass, GasMixture *_mixture, IntegrationRules *_intRules,
-                       ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
+                       ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp,
                        const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config, const int sz)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays,
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()),
       fluxes(_fluxClass),
       mixture(_mixture),
       szData(_config.spongeData_[sz]) {
   targetU.SetSize(num_equation);
   if (szData.szSolType == SpongeZoneSolution::USERDEF) {
-    Vector Up(num_equation);
-    Up[0] = szData.targetUp[0];
-    for (int d = 0; d < dim; d++) Up[1 + d] = szData.targetUp[1 + d];
-    Up[1 + dim] = mixture->Temperature(&Up[0], &szData.targetUp[4], 1);
-    mixture->GetConservativesFromPrimitives(Up, targetU);
+    Vector conserved(num_equation);
+    conserved[0] = szData.targetUp[0];
+    for (int d = 0; d < dim; d++) conserved[1 + d] = szData.targetUp[0] * szData.targetUp[1 + d];
+    // Kevin: I don't think we can do this.. we should set target temperature.
+    // Up[1 + dim] = mixture->Temperature(&Up[0], &szData.targetUp[4], 1);
+    // mixture->GetConservativesFromPrimitives(Up, targetU);
+
+    int numActiveSpecies_ = mixture->GetNumActiveSpecies();
+    if (numActiveSpecies_ > 0) {  // read species input state for multi-component flow.
+      std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
+      // NOTE: input Up will always contain 3 velocity components.
+      for (int sp = 0; sp < numActiveSpecies_; sp++) {
+        int inputIndex = (*mixtureToInputMap)[sp];
+        // store species density into inputState in the order of mixture-sorted index.
+        conserved[dim + 2 + sp] = szData.targetUp[0] * szData.targetUp[5 + inputIndex];
+      }
+    }
+
+    singleTemperature_ = false;
+    if (mixture->IsTwoTemperature()) {
+      singleTemperature_ = szData.singleTemperature;
+      if (!singleTemperature_) {
+        double numSpecies = mixture->GetNumSpecies();
+        Vector n_sp(numSpecies);
+        mixture->computeNumberDensities(conserved, n_sp);
+        conserved[num_equation - 1] =
+            mixture->computeElectronEnergy(n_sp(numSpecies - 2), szData.targetUp(5 + numSpecies));
+      }
+    }
+    mixture->modifyEnergyForPressure(conserved, targetU, szData.targetUp[4], singleTemperature_);
   }
 
   // make sure normal is unitary
@@ -476,6 +505,12 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
   radialNormal.SetSize(radialNormalsVec.size());
   for (int n = 0; n < radialNormal.Size(); n++) radialNormal(n) = radialNormalsVec[n];
 
+  radialNormal.SetSize(radialNormalsVec.size());
+  for (int n = 0; n < radialNormal.Size(); n++) radialNormal(n) = radialNormalsVec[n];
+
+  radialNormal.SetSize(radialNormalsVec.size());
+  for (int n = 0; n < radialNormal.Size(); n++) radialNormal(n) = radialNormalsVec[n];
+
   // find plane nodes
   if (szData.szSolType == SpongeZoneSolution::MIXEDOUT) {
     nodesInMixedOutPlane.SetSize(nodesVec.size());
@@ -500,7 +535,7 @@ void SpongeZone::updateTerms(Vector &in) {
 void SpongeZone::addSpongeZoneForcing(Vector &in) {
   const double *ds = sigma->HostRead();
   double *dataIn = in.HostReadWrite();
-  const double *dataUp = Up->HostRead();
+  const double *dataUp = Up_->HostRead();
 
   int nnodes = vfes->GetNDofs();
 
@@ -512,10 +547,11 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
   targetCyl = targetU;
 
   // compute speed of sound
-  double gamma = mixture->GetSpecificHeatRatio();
-  double Rg = mixture->GetGasConstant();
+  // double gamma = mixture->GetSpecificHeatRatio();
+  // double Rg = mixture->GetGasConstant();
   mixture->GetPrimitivesFromConservatives(targetU, Up);
-  double speedSound = sqrt(gamma * Rg * Up[1 + dim]);
+  // double speedSound = sqrt(gamma * Rg * Up[1+dim]);
+  double speedSound = mixture->ComputeSpeedOfSound(Up, true);
 
   // add forcing to RHS, i.e., @in
   for (int n = 0; n < nnodes; n++) {
@@ -524,6 +560,24 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
       s *= szData.multFactor;
       for (int eq = 0; eq < num_equation; eq++) Up[eq] = dataUp[n + eq * nnodes];
       mixture->GetConservativesFromPrimitives(Up, Un);
+
+      // transform to cylindrical in annular
+      if (szData.szType == SpongeZoneType::ANNULUS) {
+        const int node = nodesInAnnulus[n];
+        for (int d = 0; d < dim; d++) ur(d) = radialNormal(3 * node + d);
+        double Vr = 0., Vt = 0., Vx = 0.;
+        Vector Vtv(dim);
+        for (int d = 0; d < dim; d++) {
+          Vx += targetU(1 + d) * szData.normal(d);
+          Vr += targetU(1 + d) * ur(d);
+          Vtv(d) = targetU(1 + d) - Vx * szData.normal(d) - Vr * ur(d);
+          Vt += Vtv(d) * Vtv(d);
+        }
+        Vt = sqrt(Vt);
+        targetCyl(1) = Vr;
+        targetCyl(2) = Vt;
+        if (dim == 3) targetCyl(3) = Vx;
+      }
 
       // transform to cylindrical in annular
       if (szData.szType == SpongeZoneType::ANNULUS) {
@@ -552,9 +606,10 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
   }
 }
 
+// TODO(kevin): change to conserved variables.
 void SpongeZone::computeMixedOutValues() {
   int nnodes = vfes->GetNDofs();
-  const double *dataUp = Up->HostRead();
+  const double *dataUp = Up_->HostRead();
   double gamma = mixture->GetSpecificHeatRatio();
 
   // compute mean normal fluxes
@@ -582,33 +637,36 @@ void SpongeZone::computeMixedOutValues() {
   // normalize
   for (int eq = 0; eq < num_equation; eq++) meanNormalFluxes[eq] /= double(meanNormalFluxes[num_equation]);
 
-  // compute mixed-out variables considering the outlet pressure
-  double temp = 0.;
-  for (int d = 0; d < dim; d++) temp += meanNormalFluxes[1 + d] * szData.normal[d];
-  double A = 1. - 2. * gamma / (gamma - 1.);
-  double B = 2 * temp / (gamma - 1.);
-  double C = -2. * meanNormalFluxes[0] * meanNormalFluxes[1 + dim];
-  for (int d = 0; d < dim; d++) C += meanNormalFluxes[1 + d] * meanNormalFluxes[1 + d];
-  //   double p = (-B+sqrt(B*B-4.*A*C))/(2.*A);
-  double p = (-B - sqrt(B * B - 4. * A * C)) / (2. * A);  // real solution
+  mixture->computeConservedStateFromConvectiveFlux(meanNormalFluxes, szData.normal, targetU);
 
-  Up[0] = meanNormalFluxes[0] * meanNormalFluxes[0] / (temp - p);
-  Up[1 + dim] = mixture->Temperature(&Up[0], &p, 1);
-  //   Up[1+dim] = p;
-
-  for (int d = 0; d < dim; d++) Up[1 + d] = (meanNormalFluxes[1 + d] - p * szData.normal[d]) / meanNormalFluxes[0];
-
-  double v2 = 0.;
-  for (int d = 0; d < dim; d++) v2 += Up[1 + d] * Up[1 + d];
-
-  mixture->GetConservativesFromPrimitives(Up, targetU);
+  // // Kevin: we need to find temperature value, rather than pressure.
+  // // compute mixed-out variables considering the outlet pressure
+  // double temp = 0.;
+  // for (int d = 0; d < dim; d++) temp += meanNormalFluxes[1 + d] * szData.normal[d];
+  // double A = 1. - 2. * gamma / (gamma - 1.);
+  // double B = 2 * temp / (gamma - 1.);
+  // double C = -2. * meanNormalFluxes[0] * meanNormalFluxes[1 + dim];
+  // for (int d = 0; d < dim; d++) C += meanNormalFluxes[1 + d] * meanNormalFluxes[1 + d];
+  // //   double p = (-B+sqrt(B*B-4.*A*C))/(2.*A);
+  // double p = (-B - sqrt(B * B - 4. * A * C)) / (2. * A);  // real solution
+  //
+  // Up[0] = meanNormalFluxes[0] * meanNormalFluxes[0] / (temp - p);
+  // Up[1 + dim] = mixture->Temperature(&Up[0], &p, 1);
+  // //   Up[1+dim] = p;
+  //
+  // for (int d = 0; d < dim; d++) Up[1 + d] = (meanNormalFluxes[1 + d] - p * szData.normal[d]) / meanNormalFluxes[0];
+  //
+  // double v2 = 0.;
+  // for (int d = 0; d < dim; d++) v2 += Up[1 + d] * Up[1 + d];
+  //
+  // mixture->GetConservativesFromPrimitives(Up, targetU);
 }
 
 PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                              IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, GasMixture *_mixture,
-                             ParGridFunction *_Up, ParGridFunction *_gradUp,
+                             ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp,
                              const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays,
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()),
       mixture(_mixture) {
   psData_.DeleteAll();
@@ -622,10 +680,17 @@ PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const in
     psData_[i]->nodes.DeleteAll();
   }
 
+  std::cout << "worked out so far. 2" << std::endl;
+
   // find nodes for each passive scalar location
-  ParFiniteElementSpace dfes(vfes->GetParMesh(), vfes->FEColl(), dim, Ordering::byNODES);
+  ParFiniteElementSpace dfes(vfes->GetParMesh(), vfes->FEColl(), dim,
+                             Ordering::byNODES);  // Kevin: Had a seg fault from this line.
+  std::cout << "worked out so far. 2-1" << std::endl;
   ParGridFunction coordinates(&dfes);
+  std::cout << "worked out so far. 2-2" << std::endl;
   vfes->GetParMesh()->GetNodes(coordinates);
+
+  std::cout << "worked out so far. 3" << std::endl;
 
   int nnodes = vfes->GetNDofs();
 
@@ -657,9 +722,9 @@ PassiveScalar::~PassiveScalar() {
 
 void PassiveScalar::updateTerms(Vector &in) {
 #ifdef _GPU_
-  updateTerms_gpu(in, Up, psData_, vfes->GetNDofs(), num_equation);
+  updateTerms_gpu(in, Up_, psData_, vfes->GetNDofs(), num_equation);
 #else
-  auto dataUp = Up->HostRead();
+  auto dataUp = Up_->HostRead();
   auto dataIn = in.HostReadWrite();
   int nnode = vfes->GetNDofs();
 
@@ -683,7 +748,7 @@ void PassiveScalar::updateTerms_gpu(Vector &in, ParGridFunction *Up, Array<passi
                                     const int nnode, const int num_equation) {
 #ifdef _GPU_
   double *d_in = in.ReadWrite();
-  const double *d_Up = Up->Read();
+  const double *d_Up = Up_->Read();
 
   double Z = 0.;
   double radius = 1.;
@@ -710,9 +775,10 @@ void PassiveScalar::updateTerms_gpu(Vector &in, ParGridFunction *Up, Array<passi
 
 HeatSource::HeatSource(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                        heatSourceData &_heatSource, GasMixture *_mixture, mfem::IntegrationRules *_intRules,
-                       mfem::ParFiniteElementSpace *_vfes, mfem::ParGridFunction *_Up, mfem::ParGridFunction *_gradUp,
-                       const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays,
+                       mfem::ParFiniteElementSpace *_vfes, ParGridFunction *U, mfem::ParGridFunction *_Up,
+                       mfem::ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
+                       RunConfiguration &_config)
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()),
       mixture_(_mixture),
       heatSource_(_heatSource) {
@@ -792,12 +858,12 @@ void HeatSource::updateTerms_gpu(mfem::Vector &in) {
 
 #ifdef HAVE_MASA
 MASA_forcings::MASA_forcings(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
-                             IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
-                             ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
-                             RunConfiguration &_config)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays,
+                             IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
+                             ParGridFunction *_Up, ParGridFunction *_gradUp,
+                             const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()) {
-  initMasaHandler("forcing", dim, _config.GetEquationSystem(), _config.GetViscMult(), _config.mms_name_);
+  initMasaHandler("forcing", dim, _config);
 }
 
 void MASA_forcings::updateTerms(Vector &in) {

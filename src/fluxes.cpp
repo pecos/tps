@@ -31,17 +31,22 @@
 // -----------------------------------------------------------------------------------el-
 #include "fluxes.hpp"
 
-Fluxes::Fluxes(GasMixture *_mixture, Equations &_eqSystem, const int &_num_equations, const int &_dim, bool axisym)
+Fluxes::Fluxes(GasMixture *_mixture, Equations &_eqSystem, TransportProperties *_transport, const int &_num_equation,
+               const int &_dim, bool axisym)
     : mixture(_mixture),
       eqSystem(_eqSystem),
+      transport(_transport),
       dim(_dim),
       nvel(axisym ? 3 : _dim),
       axisymmetric_(axisym),
-      num_equations(_num_equations) {
+      num_equation(_num_equation) {
   gradT.SetSize(dim);
   vel.SetSize(dim);
   vtmp.SetSize(dim);
   stress.SetSize(dim, dim);
+  // TODO(kevin): Ultimately, take Up as input variable.
+  // Multi-species cannot use this, since it is not clear which species gas constant is needed.
+  // Also we should not repeat primitive computations here.
   Rg = mixture->GetGasConstant();
 }
 
@@ -52,12 +57,12 @@ void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, D
       break;
     case NS:
     case NS_PASSIVE: {
-      DenseMatrix convF(num_equations, dim);
+      DenseMatrix convF(num_equation, dim);
       ComputeConvectiveFluxes(state, convF);
 
-      DenseMatrix viscF(num_equations, dim);
+      DenseMatrix viscF(num_equation, dim);
       ComputeViscousFluxes(state, gradUpi, 1, viscF);
-      for (int eq = 0; eq < num_equations; eq++) {
+      for (int eq = 0; eq < num_equation; eq++) {
         for (int d = 0; d < dim; d++) flux(eq, d) = convF(eq, d) - viscF(eq, d);
       }
     } break;
@@ -65,7 +70,10 @@ void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, D
 }
 
 void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
-  const double pres = mixture->ComputePressure(state);
+  double electronPressure = 0.0;
+  const double pres = mixture->ComputePressure(state, electronPressure);
+  const int numActiveSpecies = mixture->GetNumActiveSpecies();
+  const bool twoTemperature = mixture->IsTwoTemperature();
 
   for (int d = 0; d < dim; d++) {
     flux(0, d) = state(d + 1);
@@ -80,105 +88,148 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
     flux(1 + nvel, d) = state(d + 1) * H;
   }
 
-  if (eqSystem == NS_PASSIVE) {
-    for (int d = 0; d < dim; d++) flux(num_equations - 1, d) = state(num_equations - 1) * state(1 + d) / state(0);
+  // Kevin: even NS_PASSIVE will be controlled by this. no need of if statement.
+  for (int sp = 0; sp < numActiveSpecies; sp++) {
+    for (int d = 0; d < dim; d++) flux(nvel + 2 + sp, d) = state(nvel + 2 + sp) * state(1 + d) / state(0);
+  }
+
+  if (twoTemperature) {
+    double electronEnthalpy = (state(num_equation - 1) + electronPressure) / state(0);
+    for (int d = 0; d < dim; d++) flux(num_equation - 1, d) = electronEnthalpy * state(1 + d);
   }
 }
 
 void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, DenseMatrix &flux) {
-  switch (eqSystem) {
-    case NS:
-    case NS_PASSIVE: {
-      const double visc = mixture->GetViscosity(state);
-      const double bulkViscMult = mixture->GetBulkViscMultiplyer();
-      const double k = mixture->GetThermalConductivity(state);
+  flux = 0.;
+  if (eqSystem == EULER) {
+    return;
+  }
 
-      const double ur = (axisymmetric_ ? state[1] / state[0] : 0);
-      const double ut = (axisymmetric_ ? state[3] / state[0] : 0);
+  // // TODO(kevin): Ultimately, take Up as input variable.
+  // // TODO(kevin): pressure and temperature must be comptued by mixture only.
+  // const double p = mixture->ComputePressure(state);
+  // const double temp = p / state[0] / UNIVERSALGASCONSTANT * mixture->GetGasParams(0,GasParams::SPECIES_MW);
+  // const double temp = p / state[0] / Rg;
+  // const double visc = mixture->GetViscosity(state);
+  // const double bulkViscMult = mixture->GetBulkViscMultiplyer();
+  // const double k = mixture->GetThermalConductivity(state);
 
-      // make sure density visc. flux is 0
-      for (int d = 0; d < dim; d++) flux(0, d) = 0.;
+  const int numSpecies = mixture->GetNumSpecies();
+  const int numActiveSpecies = mixture->GetNumActiveSpecies();
+  const bool twoTemperature = mixture->IsTwoTemperature();
 
-      double divV = 0.;
-      for (int i = 0; i < dim; i++) {
-        for (int j = 0; j < dim; j++) stress(i, j) = gradUp(1 + j, i) + gradUp(1 + i, j);
-        divV += gradUp(1 + i, i);
-      }
+  Vector speciesEnthalpies(numSpecies);
+  mixture->computeSpeciesEnthalpies(state, speciesEnthalpies);
 
-      if (axisymmetric_ && radius > 0) {
-        divV += ur / radius;
-      }
+  Vector transportBuffer;
+  DenseMatrix diffusionVelocity(numSpecies, dim);
+  transport->ComputeFluxTransportProperties(state, gradUp, transportBuffer, diffusionVelocity);
+  const double visc = transportBuffer[GlobalTrnsCoeffs::VISCOSITY];
+  double bulkViscosity = transportBuffer[GlobalTrnsCoeffs::BULK_VISCOSITY];
+  bulkViscosity -= 2. / 3. * visc;
+  double k = transportBuffer[GlobalTrnsCoeffs::HEAVY_THERMAL_CONDUCTIVITY];
+  double ke = transportBuffer[GlobalTrnsCoeffs::ELECTRON_THERMAL_CONDUCTIVITY];
+  if (twoTemperature) {
+    for (int d = 0; d < dim; d++) {
+      double qeFlux = ke * gradUp(num_equation - 1, d);
+      flux(1 + dim, d) += qeFlux;
+      flux(num_equation - 1, d) += qeFlux;
+      flux(num_equation - 1, d) -= speciesEnthalpies(numSpecies - 2) * diffusionVelocity(numSpecies - 2, d);
+    }
+  } else {
+    k += ke;
+  }
 
-      for (int i = 0; i < dim; i++) stress(i, i) += (bulkViscMult - 2. / 3.) * divV;
-      stress *= visc;
+  const double ur = (axisymmetric_ ? state[1] / state[0] : 0);
+  const double ut = (axisymmetric_ ? state[3] / state[0] : 0);
 
-      for (int i = 0; i < dim; i++)
-        for (int j = 0; j < dim; j++) flux(1 + i, j) = stress(i, j);
+  // make sure density visc. flux is 0
+  for (int d = 0; d < dim; d++) flux(0, d) = 0.;
 
-      double tau_tr = 0, tau_tz = 0;
-      if (axisymmetric_) {
-        const double ut_r = gradUp(3, 0);
-        const double ut_z = gradUp(3, 1);
-        tau_tr = ut_r;
-        if (radius > 0) tau_tr -= ut / radius;
-        tau_tr *= visc;
+  double divV = 0.;
+  for (int i = 0; i < dim; i++) {
+    for (int j = 0; j < dim; j++) stress(i, j) = gradUp(1 + j, i) + gradUp(1 + i, j);
+    divV += gradUp(1 + i, i);
+  }
+  stress *= visc;
 
-        tau_tz = visc * ut_z;
+  if (axisymmetric_ && radius > 0) {
+    divV += ur / radius;
+  }
 
-        flux(1 + 2, 0) = tau_tr;
-        flux(1 + 2, 1) = tau_tz;
-      }
+  for (int i = 0; i < dim; i++) stress(i, i) += bulkViscosity * divV;
 
-      // temperature gradient
-      //       for (int d = 0; d < dim; d++) gradT[d] = temp * (gradUp(1 + dim, d) / p - gradUp(0, d) / state[0]);
+  for (int i = 0; i < dim; i++)
+    for (int j = 0; j < dim; j++) flux(1 + i, j) = stress(i, j);
 
-      for (int d = 0; d < dim; d++) vel(d) = state[1 + d] / state[0];
+  double tau_tr = 0, tau_tz = 0;
+  if (axisymmetric_) {
+    const double ut_r = gradUp(3, 0);
+    const double ut_z = gradUp(3, 1);
+    tau_tr = ut_r;
+    if (radius > 0) tau_tr -= ut / radius;
+    tau_tr *= visc;
 
-      stress.Mult(vel, vtmp);
+    tau_tz = visc * ut_z;
 
-      for (int d = 0; d < dim; d++) {
-        flux(1 + nvel, d) = vtmp[d];
-        flux(1 + nvel, d) += k * gradUp(1 + nvel, d);
-      }
+    flux(1 + 2, 0) = tau_tr;
+    flux(1 + 2, 1) = tau_tz;
+  }
 
-      if (axisymmetric_) {
-        flux(1 + nvel, 0) += ut * tau_tr;
-        flux(1 + nvel, 1) += ut * tau_tz;
-      }
+  // temperature gradient
+  //       for (int d = 0; d < dim; d++) gradT[d] = temp * (gradUp(1 + dim, d) / p - gradUp(0, d) / state[0]);
 
-      if (eqSystem == NS_PASSIVE) {
-        double Sc = mixture->GetSchmidtNum();
-        for (int d = 0; d < dim; d++) flux(num_equations - 1, d) = visc / Sc * gradUp(num_equations - 1, d);
-      }
-    } break;
-    default:
-      flux = 0.;
-      break;
+  for (int d = 0; d < dim; d++) vel(d) = state[1 + d] / state[0];
+
+  stress.Mult(vel, vtmp);
+
+  for (int d = 0; d < dim; d++) {
+    flux(1 + nvel, d) = vtmp[d];
+    flux(1 + nvel, d) += k * gradUp(1 + nvel, d);
+    // compute diffusive enthalpy flux.
+    for (int sp = 0; sp < numSpecies; sp++) {
+      flux(1 + nvel, d) -= speciesEnthalpies(sp) * diffusionVelocity(sp, d);
+    }
+  }
+
+  if (axisymmetric_) {
+    flux(1 + nvel, 0) += ut * tau_tr;
+    flux(1 + nvel, 1) += ut * tau_tz;
+  }
+
+  // if (eqSystem == NS_PASSIVE) {
+  //   double Sc = mixture->GetSchmidtNum();
+  //   for (int d = 0; d < dim; d++) flux(num_equation - 1, d) = visc / Sc * gradUp(num_equation - 1, d);
+  // }
+  // NOTE: NS_PASSIVE will not be needed (automatically incorporated).
+  for (int sp = 0; sp < numActiveSpecies; sp++) {
+    // NOTE: diffusionVelocity is set to be (numSpecies,dim)-matrix.
+    for (int d = 0; d < dim; d++) flux(nvel + 2 + sp, d) = -state[nvel + 2 + sp] * diffusionVelocity(sp, d);
   }
 }
 
 void Fluxes::ComputeSplitFlux(const mfem::Vector &state, mfem::DenseMatrix &a_mat, mfem::DenseMatrix &c_mat) {
-  const int num_equations = state.Size();
-  const int dim = num_equations - 2;
+  const int num_equation = state.Size();
+  const int dim = num_equation - 2;
 
-  a_mat.SetSize(num_equations, dim);
-  c_mat.SetSize(num_equations, dim);
+  a_mat.SetSize(num_equation, dim);
+  c_mat.SetSize(num_equation, dim);
 
   const double rho = state(0);
   const Vector rhoV(state.GetData() + 1, dim);
-  const double rhoE = state(num_equations - 1);
+  const double rhoE = state(num_equation - 1);
   // const double p = eqState->ComputePressure(state, dim);
   // cout<<"*"<<p<<" "<<rho<<" "<<rhoE<<endl;
 
   for (int d = 0; d < dim; d++) {
-    for (int i = 0; i < num_equations - 1; i++) a_mat(i, d) = rhoV(d);
-    a_mat(num_equations - 1, d) = rhoV(d) / rho;
+    for (int i = 0; i < num_equation - 1; i++) a_mat(i, d) = rhoV(d);
+    a_mat(num_equation - 1, d) = rhoV(d) / rho;
 
     c_mat(0, d) = 1.;
     for (int i = 0; i < dim; i++) {
       c_mat(i + 1, d) = rhoV(i) / rho;
     }
-    c_mat(num_equations - 1, d) = rhoE /*+p*/;
+    c_mat(num_equation - 1, d) = rhoE /*+p*/;
   }
 }
 

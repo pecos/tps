@@ -73,7 +73,7 @@ class Tps {
   std::string meshFile_;
 
   // pointer to solver implementation chosen at runtime
-  TPS::Solver *solver_;
+  TPS::Solver *solver_ = NULL;
 
  public:
   Tps(int argc, char *argv[]);     // constructor
@@ -83,6 +83,8 @@ class Tps {
   void chooseSolver();
   void chooseDevices();
   std::string getDeviceConfig() { return deviceConfig_; }
+
+  // TPS::Solver getSolver() { return solver_; }
 
   // input parsing support (variants with default value supplied)
   // supported types are T={int,double,bool,std::string}
@@ -110,6 +112,9 @@ class Tps {
   void printHeader();
   void parseCommandLineArgs(int argc, char *argv[]);
   void parseInput();
+
+  mfem::MPI_Session &getMPISession() { return mpi_; }
+  std::string &getInputFilename() { return iFile_; }
 };
 
 }  // end namespace TPS

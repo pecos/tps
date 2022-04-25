@@ -52,7 +52,9 @@ class Tps;
 #include <mfem/general/forall.hpp>
 
 #include "BCintegrator.hpp"
+#include "argon_transport.hpp"
 #include "averaging_and_rms.hpp"
+#include "chemistry.hpp"
 #include "dataStructures.hpp"
 #include "dgNonlinearForm.hpp"
 #include "domain_integrator.hpp"
@@ -70,6 +72,7 @@ class Tps;
 #include "sbp_integrators.hpp"
 #include "solver.hpp"
 #include "tps.hpp"
+#include "transport_properties.hpp"
 #include "utils.hpp"
 
 #ifdef HAVE_MASA
@@ -100,6 +103,18 @@ class M2ulPhyS : public TPS::Solver {
   int dim;
   int nvel;
 
+  // Number of species
+  int numSpecies;
+
+  // Number of active species that are part of conserved variables.
+  int numActiveSpecies;
+
+  // Is it ambipolar?
+  bool ambipolar = false;
+
+  // Is it two-temperature?
+  bool twoTemperature_ = false;
+
   // Number of equations
   int num_equation;
 
@@ -129,6 +144,10 @@ class M2ulPhyS : public TPS::Solver {
 
   // Pointers to the different classes
   GasMixture *mixture;
+
+  TransportProperties *transportPtr = NULL;
+
+  Chemistry *chemistry_ = NULL;
 
   ParGridFunction *spaceVaryViscMult;  // space varying viscosity multiplier
 
@@ -208,6 +227,7 @@ class M2ulPhyS : public TPS::Solver {
   // Visualization functions (these are pointers to Up)
   ParGridFunction *temperature, *dens, *vel, *vtheta, *passiveScalar;
   ParGridFunction *press;
+  std::vector<ParGridFunction *> visualizationVariables;
 
   // gradient of primitive variables
   ParGridFunction *gradUp;
@@ -273,6 +293,7 @@ class M2ulPhyS : public TPS::Solver {
 #endif
   static void InitialConditionEulerVortex(const Vector &x, Vector &y);
   static void testInitialCondition(const Vector &x, Vector &y);
+  // void dryAirUniformInitialConditions();
   void uniformInitialConditions();
   void initGradUp();
 
@@ -282,7 +303,7 @@ class M2ulPhyS : public TPS::Solver {
   void read_restart_files();
   void read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data);
   void read_serialized_soln_data(hid_t file, string varName, int numDof, int varOffset, double *data, IOFamily &fam);
-  void restart_files_hdf5(string mode);
+  void restart_files_hdf5(string mode, string inputFileName = std::string());
   void partitioning_file_hdf5(string mode);
   void serialize_soln_for_write(IOFamily &fam);
   void write_soln_data(hid_t group, string varName, hid_t dataspace, double *data);
@@ -294,13 +315,15 @@ class M2ulPhyS : public TPS::Solver {
 
  public:
   M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps);
+  M2ulPhyS(MPI_Session &_mpi, TPS::Tps *tps);
   ~M2ulPhyS();
 
   void parseSolverOptions() override;
   void parseSolverOptions2();
   void checkSolverOptions() const;
   void projectInitialSolution();
-  void writeHDF5() { restart_files_hdf5("write"); }
+  void writeHDF5(string inputFileName = std::string()) { restart_files_hdf5("write", inputFileName); }
+  void readHDF5(string inputFileName = std::string()) { restart_files_hdf5("read", inputFileName); }
   void writeParaview(int iter, double time) {
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
@@ -315,7 +338,13 @@ class M2ulPhyS : public TPS::Solver {
   FiniteElementCollection *GetFEC() { return fec; }
   ParFiniteElementSpace *GetFESpace() { return vfes; }
   ParGridFunction *GetSolutionGF() { return U; }
+  ParGridFunction *getPrimitiveGF() { return Up; }
+  ParGridFunction *getPressureGF() { return press; }
+  IntegrationRules *getIntegrationRules() { return intRules; }
   RunConfiguration &GetConfig() { return config; }
+  GasMixture *getMixture() { return mixture; }
+
+  void updatePrimitives();
 
   static int Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_print);
 

@@ -36,7 +36,7 @@
 #include "M2ulPhyS.hpp"
 #include "utils.hpp"
 
-void M2ulPhyS::restart_files_hdf5(string mode) {
+void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
 #ifdef HAVE_GRVY
   grvy_timer_begin(__func__);
 #endif
@@ -46,9 +46,20 @@ void M2ulPhyS::restart_files_hdf5(string mode) {
   herr_t status;
   Vector dataSerial;
 
-  string serialName = "restart_";
-  serialName.append(config.GetOutputName());
-  serialName.append(".sol.h5");
+  string serialName;
+  if (inputFileName.length() > 0) {
+    if (inputFileName.substr(inputFileName.length() - 3) != ".h5") {
+      grvy_printf(gerror, "[ERROR]: M2ulPhyS::restart_files_hdf5 - input file name has a wrong format -> %s\n",
+                  inputFileName.c_str());
+      grvy_printf(GRVY_INFO, "format: %s\n", (inputFileName.substr(inputFileName.length() - 3)).c_str());
+      exit(ERROR);
+    }
+    serialName = inputFileName;
+  } else {
+    serialName = "restart_";
+    serialName.append(config.GetOutputName());
+    serialName.append(".sol.h5");
+  }
   string fileName;
 
   if (((config.RestartSerial() == "read") && (mode == "read")) ||
@@ -342,20 +353,15 @@ void M2ulPhyS::restart_files_hdf5(string mode) {
     // We would like to just call rhsOperator::updatePrimitives, but
     // rhsOperator has not been constructed yet.  As a workaround,
     // that code is duplicated here.
+    // TODO(kevin): use mixture comptue primitive.
     double *dataUp = Up->HostReadWrite();
     double *x = U->HostReadWrite();
     for (int i = 0; i < vfes->GetNDofs(); i++) {
       Vector iState(num_equation);
+      Vector conservedState(num_equation);
       for (int eq = 0; eq < num_equation; eq++) iState[eq] = x[i + eq * vfes->GetNDofs()];
-      double p = mixture->ComputePressure(iState);
-      double T = mixture->ComputeTemperature(iState);
-      dataUp[i] = iState[0];
-      dataUp[i + vfes->GetNDofs()] = iState[1] / iState[0];
-      dataUp[i + 2 * vfes->GetNDofs()] = iState[2] / iState[0];
-      if (nvel == 3) dataUp[i + 3 * vfes->GetNDofs()] = iState[3] / iState[0];
-      dataUp[i + (1 + nvel) * vfes->GetNDofs()] = T;
-      if (eqSystem == NS_PASSIVE)
-        dataUp[i + (num_equation - 1) * vfes->GetNDofs()] = iState[num_equation - 1] / iState[0];
+      mixture->GetConservativesFromPrimitives(iState, conservedState);
+      for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * vfes->GetNDofs()] = conservedState[eq];
     }
 
     // clean up aux data

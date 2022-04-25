@@ -43,7 +43,42 @@ enum Equations {
   NS_PASSIVE  // NS with passive scalar equation
 };
 
-enum WorkingFluid { DRY_AIR, USER_DEFINED };
+// These are presets of combination of EquationOfState, TranportProperties, and Chemistry.
+enum WorkingFluid { DRY_AIR, TEST_BINARY_AIR, USER_DEFINED };
+
+// These are the type of EquationOfState.
+enum GasModel { /* PERFECT_SINGLE, */ PERFECT_MIXTURE, /* CANTERA, */ NUM_GASMODEL };
+
+enum TransportModel { ARGON_MINIMAL, CONSTANT, NUM_TRANSPORTMODEL };
+
+enum ChemistryModel { /* CANTERA, */ NUM_CHEMISTRYMODEL };
+
+enum ReactionModel { ARRHENIUS, HOFFERTLIEN, NUM_REACTIONMODEL };
+
+enum GasParams { SPECIES_MW, SPECIES_CHARGES, FORMATION_ENERGY, /* SPECIES_HEAT_RATIO, */ NUM_GASPARAMS };
+
+enum GlobalTrnsCoeffs {
+  VISCOSITY,
+  BULK_VISCOSITY,
+  HEAVY_THERMAL_CONDUCTIVITY,
+  ELECTRON_THERMAL_CONDUCTIVITY,
+  NUM_GLOBAL_COEFFS
+};
+
+enum SpeciesTrnsCoeffs { DIFFUSIVITY, MOBILITY, MF_FREQUENCY, NUM_SPECIES_COEFFS };
+
+enum TransportOutputPrimitives {
+  TOTAL_PRESSURE,
+  HEAVY_TEMPERATURE,
+  ELECTRON_PRESSURE,
+  ELECTRON_TEMPERATURE,
+  TOTAL_NUMBER_DENSITY,
+  NUM_OUTPUT_PRIMITIVES
+};
+
+// Type of primitive variable which requires gradient evaulation for diffusion velocity.
+// Also used for species output primitive variables.
+enum SpeciesPrimitiveType { MASS_FRACTION, MOLE_FRACTION, NUMBER_DENSITY, NUM_SPECIES_PRIMITIVES };
 
 enum InletType {
   SUB_DENS_VEL,      // Subsonic inlet specified by the density and velocity components
@@ -120,6 +155,8 @@ struct SpongeZoneData {
                       // U* is the target solution. Currently sigam=a/l where
                       // a is the mixed-out speed of sound and l is the lenght
                       // of the spnge zone. [OPTIONAL]
+
+  bool singleTemperature;
 };
 
 struct volumeFaceIntegrationArrays {
@@ -178,6 +215,13 @@ struct heatSourceData {
   Vector point1;
   Vector point2;
   double radius;
+};
+
+struct constantTransportData {
+  double viscosity;
+  double bulkViscosity;
+  double diffusivity;
+  double thermalConductivity;
 };
 
 #endif  // DATASTRUCTURES_HPP_

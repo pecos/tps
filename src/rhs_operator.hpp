@@ -38,6 +38,7 @@
 #include <mfem/general/forall.hpp>
 
 #include "BCintegrator.hpp"
+#include "chemistry.hpp"
 #include "dataStructures.hpp"
 #include "dgNonlinearForm.hpp"
 #include "equation_of_state.hpp"
@@ -46,6 +47,8 @@
 #include "gradNonLinearForm.hpp"
 #include "gradients.hpp"
 #include "run_configuration.hpp"
+#include "source_term.hpp"
+#include "transport_properties.hpp"
 
 using namespace mfem;
 
@@ -71,6 +74,7 @@ class RHSoperator : public TimeDependentOperator {
 
   Fluxes *fluxClass;
   GasMixture *mixture;
+  TransportProperties *transport_;
 
   ParFiniteElementSpace *vfes;
 
@@ -103,6 +107,9 @@ class RHSoperator : public TimeDependentOperator {
   const bool &isSBP;
   const double &alpha;
 
+  // reference to conserved varibales
+  ParGridFunction *U_;
+
   // reference to primitive varibales
   ParGridFunction *Up;
 
@@ -133,13 +140,14 @@ class RHSoperator : public TimeDependentOperator {
   void computeMeanTimeDerivatives(Vector &y) const;
 
  public:
-  RHSoperator(int &_iter, const int _dim, const int &_num_equations, const int &_order, const Equations &_eqSystem,
+  RHSoperator(int &_iter, const int _dim, const int &_num_equation, const int &_order, const Equations &_eqSystem,
               double &_max_char_speed, IntegrationRules *_intRules, int _intRuleType, Fluxes *_fluxClass,
-              GasMixture *_mixture, ParFiniteElementSpace *_vfes, const volumeFaceIntegrationArrays &gpuArrays,
-              const int &_maxIntPoints, const int &_maxDofs, DGNonLinearForm *_A, MixedBilinearForm *_Aflux,
-              ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult, ParGridFunction *_Up, ParGridFunction *_gradUp,
-              ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A, BCintegrator *_bcIntegrator,
-              bool &_isSBP, double &_alpha, RunConfiguration &_config);
+              GasMixture *_mixture, Chemistry *chemistry, TransportProperties *transport, ParFiniteElementSpace *_vfes,
+              const volumeFaceIntegrationArrays &gpuArrays, const int &_maxIntPoints, const int &_maxDofs,
+              DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult,
+              ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes,
+              GradNonLinearForm *_gradUp_A, BCintegrator *_bcIntegrator, bool &_isSBP, double &_alpha,
+              RunConfiguration &_config);
 
   virtual void Mult(const Vector &x, Vector &y) const;
   void updatePrimitives(const Vector &x) const;
@@ -156,7 +164,7 @@ class RHSoperator : public TimeDependentOperator {
   static void copyDataForFluxIntegration_gpu(const Vector &z, DenseTensor &flux, Vector &fk, Vector &zk, const int eq,
                                              const int dof, const int dim);
   static void updatePrimitives_gpu(Vector *Up, const Vector *x_in, const double gamma, const double Rgas,
-                                   const int ndofs, const int dim, const int num_equations, const Equations &eqSystem);
+                                   const int ndofs, const int dim, const int num_equation, const Equations &eqSystem);
   static void multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceIntegrationArrays &gpuArrays,
                                  const Vector &invMArray, const Array<int> &posDofInvM, const int num_equation,
                                  const int totNumDof, const int NE, const int elemOffset, const int dof);

@@ -1,0 +1,24 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="perfect_gas"
+
+setup() {
+
+    RUNFILE_AIR="inputs/perfectGas.air.ini"
+    RUNFILE_ARGON="inputs/perfectGas.argon.ini"
+
+}
+
+@test "[$TEST] test consistency of routines and gradient accuracy" {
+    test -s $RUNFILE_ARGON
+    test -e ./perfect_mixture_test
+    ./perfect_mixture_test -run $RUNFILE_ARGON
+}
+
+@test "[$TEST] test speed of sound of dry-air composition at room temperature" {
+    test -s $RUNFILE_AIR
+    test -e ./test_speed_of_sound
+    ./test_speed_of_sound -run $RUNFILE_AIR
+}
+

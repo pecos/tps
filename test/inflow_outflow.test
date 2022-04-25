@@ -1,0 +1,53 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="inlet-outlet with argon minimal"
+RUNFILE="inputs/argonMinimal.inflow_outflow.ini"
+REF_FILE=inflow_outflow_output.ref.h5
+
+setup() {
+    SOLN_FILE=restart_inflow_outflow_output.sol.h5
+    MESH_FILE=beam-quad-o3-s10-yp.mesh
+    TOL=3e-3
+}
+
+@test "[$TEST] check for input file $RUNFILE" {
+    test -s $RUNFILE
+}
+
+@test "[$TEST] create a mesh file" {
+    ../utils/beam_mesh -rs 0 -nx 10 -a 10 -dir 1   # no refinement
+
+    test -s $MESH_FILE
+}
+
+@test "[$TEST] create a restart file with a prescribed initial condition" {
+    RUNFILE_MOD=${RUNFILE}.mod
+    sed  's/enableRestart = True/enableRestart = False/' $RUNFILE > $RUNFILE_MOD
+
+    # binaryic creates both initial condition and the analytic solution at a designiated time.
+    ../utils/tanhic -run $RUNFILE_MOD
+
+    test -s $SOLN_FILE
+    test -s $REF_FILE
+
+    rm $RUNFILE_MOD
+}
+
+@test "[$TEST] run tps with input -> $RUNFILE" {
+    ../src/tps -run $RUNFILE
+
+    test -s $SOLN_FILE
+    test ! -e DIE
+}
+
+@test "[$TEST] verify tps output with analytic solution -> $REF_FILE" {
+    test -s $SOLN_FILE
+    test -s $REF_FILE
+
+    h5diff --relative=$TOL $SOLN_FILE $REF_FILE /solution/rho-Y_Ar.+1
+
+    rm $SOLN_FILE
+    rm $REF_FILE
+    rm $MESH_FILE
+}

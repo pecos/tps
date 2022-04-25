@@ -41,6 +41,7 @@
 #include "equation_of_state.hpp"
 #include "fluxes.hpp"
 #include "run_configuration.hpp"
+#include "transport_properties.hpp"
 
 #ifdef HAVE_MASA
 #include "masa_handler.hpp"
@@ -61,8 +62,9 @@ class ForcingTerms {
   const int &intRuleType;
   IntegrationRules *intRules;
   ParFiniteElementSpace *vfes;
-  ParGridFunction *Up;
-  ParGridFunction *gradUp;
+  ParGridFunction *U_;
+  ParGridFunction *Up_;
+  ParGridFunction *gradUp_;
 
   const volumeFaceIntegrationArrays &gpuArrays;
   const int *h_numElems;
@@ -73,7 +75,7 @@ class ForcingTerms {
 
  public:
   ForcingTerms(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
-               IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
+               IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up,
                ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays, bool axisym);
   ~ForcingTerms();
 
@@ -91,8 +93,8 @@ class ConstantPressureGradient : public ForcingTerms {
 
  public:
   ConstantPressureGradient(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
-                           IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
-                           ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
+                           IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
+                           ParGridFunction *_Up, ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
                            RunConfiguration &_config);
   ~ConstantPressureGradient();
 
@@ -110,13 +112,15 @@ class ConstantPressureGradient : public ForcingTerms {
 class AxisymmetricSource : public ForcingTerms {
  private:
   GasMixture *mixture;
+  TransportProperties *transport_;
   const Equations &eqSystem;
 
  public:
   AxisymmetricSource(const int &_dim, const int &_num_equation, const int &_order, GasMixture *_mixture,
-                     const Equations &_eqSystem, const int &_intRuleType, IntegrationRules *_intRules,
-                     ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
-                     const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config);
+                     TransportProperties *_transport, const Equations &_eqSystem, const int &_intRuleType,
+                     IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
+                     ParGridFunction *_Up, ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
+                     RunConfiguration &_config);
   ~AxisymmetricSource();
 
   virtual void updateTerms(Vector &in);
@@ -138,14 +142,16 @@ class SpongeZone : public ForcingTerms {
 
   Vector meanNormalFluxes;
 
+  bool singleTemperature_;
+
   void computeMixedOutValues();
   void addSpongeZoneForcing(Vector &in);
 
  public:
   SpongeZone(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType, Fluxes *_fluxClass,
-             GasMixture *_mixture, IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
-             ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config,
-             const int sz);
+             GasMixture *_mixture, IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
+             ParGridFunction *_Up, ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
+             RunConfiguration &_config, const int sz);
   ~SpongeZone();
 
   virtual void updateTerms(Vector &in);
@@ -160,8 +166,9 @@ class PassiveScalar : public ForcingTerms {
 
  public:
   PassiveScalar(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
-                IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, GasMixture *_mixture, ParGridFunction *_Up,
-                ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config);
+                IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, GasMixture *_mixture, ParGridFunction *U,
+                ParGridFunction *_Up, ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
+                RunConfiguration &_config);
 
   // Terms do not need updating
   virtual void updateTerms(Vector &in);
@@ -183,7 +190,7 @@ class HeatSource : public ForcingTerms {
  public:
   HeatSource(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
              heatSourceData &heatSource, GasMixture *_mixture, IntegrationRules *_intRules,
-             ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
+             ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp,
              const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config);
   ~HeatSource();
 
@@ -198,7 +205,7 @@ class MASA_forcings : public ForcingTerms {
  private:
  public:
   MASA_forcings(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
-                IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *_Up,
+                IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up,
                 ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config);
 
   virtual void updateTerms(Vector &in);

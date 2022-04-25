@@ -34,6 +34,7 @@
 #include "dgNonlinearForm.hpp"
 #include "riemann_solver.hpp"
 
+// TODO(kevin): non-reflecting BC for plasma.
 OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rsolver, GasMixture *_mixture,
                    ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
                    const int _num_equation, int _patchNumber, double _refLength, OutletType _bcType,
@@ -716,13 +717,11 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
+// This is more or less right formulation even for two-temperature case.
 void OutletBC::subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
-  const double gamma = mixture->GetSpecificHeatRatio();
   Vector state2(num_equation);
-  state2 = stateIn;
-  double k = 0.;
-  for (int d = 0; d < nvel; d++) k += stateIn[1 + d] * stateIn[1 + d];
-  state2[1 + nvel] = inputState[0] / (gamma - 1.) + 0.5 * k / stateIn[0];
+
+  mixture->modifyEnergyForPressure(stateIn, state2, inputState[0]);
 
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }

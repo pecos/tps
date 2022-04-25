@@ -4,3 +4,13 @@ test/ref_solns/cyl.r1.p2.iter4.h5 filter=lfs diff=lfs merge=lfs -text
 test/ref_solns/forcing-periodic-square.h5 filter=lfs diff=lfs merge=lfs -text
 test/meshes/periodic-square.mesh filter=lfs diff=lfs merge=lfs -text
 test/ref_solns/cyl3d.dtconst.heatSource.cpu.h5 filter=lfs diff=lfs merge=lfs -text
+test/ref_solns/collisions/Mason.fitted.h5 filter=lfs diff=lfs merge=lfs -text
+test/ref_solns/collisions/Mason.h5 filter=lfs diff=lfs merge=lfs -text
+test/ref_solns/collisions/Chung.fitted.h5 filter=lfs diff=lfs merge=lfs -text
+test/ref_solns/collisions/Chung.h5 filter=lfs diff=lfs merge=lfs -text
+test/ref_solns/collisions/Devoto.argon.IA.h5 filter=lfs diff=lfs merge=lfs -text
+test/ref_solns/collisions/Devoto.fitted.h5 filter=lfs diff=lfs merge=lfs -text
+test/ref_solns/collisions/Devoto.h5 filter=lfs diff=lfs merge=lfs -text
+test/ref_solns/transport/Chung.transport.h5 filter=lfs diff=lfs merge=lfs -text
+test/ref_solns/transport/Devoto1973.transport.h5 filter=lfs diff=lfs merge=lfs -text
+test/ref_solns/reaction.test.h5 filter=lfs diff=lfs merge=lfs -text
