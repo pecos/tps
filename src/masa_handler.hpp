@@ -36,12 +36,27 @@
 
 #include <mfem.hpp>
 
+#include "equation_of_state.hpp"
 #include "fluxes.hpp"  // for enum Equations
 #include "run_configuration.hpp"
 
 using namespace mfem;
 using namespace std;
 
-void initMasaHandler(string name, int dim, const RunConfiguration& config);
+// void initMasaHandler(string name, int dim, const Equations& eqn, const double& viscMult, const std::string mms_name);
+
+namespace dryair3d {
+
+void exactSolnFunction(const Vector &x, double tin, Vector &y);
+void exactDenFunction(const Vector &x, double tin, Vector &y);
+void exactVelFunction(const Vector &x, double tin, Vector &y);
+void exactPreFunction(const Vector &x, double tin, Vector &y);
+
+// TODO(kevin): move NS2D to separate namespace.
+void initNS2DCompressible(const int dim, RunConfiguration &config);
+void initEuler3DTransient(const int dim, RunConfiguration &config);
+void initNS3DTransient(const int dim, RunConfiguration &config);
+
+}  // namespace dryair3d
 
 #endif  // MASA_HANDLER_HPP_

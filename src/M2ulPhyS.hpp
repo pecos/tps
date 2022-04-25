@@ -273,6 +273,10 @@ class M2ulPhyS : public TPS::Solver {
   // I/O organizer
   IODataOrganizer ioData;
 
+#ifdef HAVE_MASA
+  VectorFunctionCoefficient *DenMMS_, *VelMMS_, *PreMMS_;
+#endif
+
 #ifdef _GPU_
   Array<int> loc_print;
 #endif
@@ -285,12 +289,6 @@ class M2ulPhyS : public TPS::Solver {
   void initSolutionAndVisualizationVectors();
   void initialTimeStep();
 
-#ifdef HAVE_MASA
-  static void MASA_exactSol(const Vector &x, double tin, Vector &y);
-  static void MASA_exactDen(const Vector &x, double tin, Vector &y);
-  static void MASA_exactVel(const Vector &x, double tin, Vector &y);
-  static void MASA_exactPre(const Vector &x, double tin, Vector &y);
-#endif
   static void InitialConditionEulerVortex(const Vector &x, Vector &y);
   static void testInitialCondition(const Vector &x, Vector &y);
   // void dryAirUniformInitialConditions();
@@ -312,6 +310,13 @@ class M2ulPhyS : public TPS::Solver {
   bool Check_JobResubmit();
   bool Check_ExitEarly(int iter);
   void Cache_Paraview_Timesteps();
+
+#ifdef HAVE_MASA
+  void initMasaHandler();
+  void projectExactSolution(const double _time);
+  void initMMSCoefficients();
+  void checkSolutionError(const double _time);
+#endif
 
  public:
   M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps);
