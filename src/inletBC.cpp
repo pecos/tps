@@ -585,6 +585,7 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   Vector normGrad(num_equation);
   normGrad = 0.;
   for (int eq = 0; eq < num_equation; eq++) {
+    // NOTE(kevin): for axisymmetric case, azimuthal normal component will be always zero.
     for (int d = 0; d < dim; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
   }
   // gradient of pressure in normal direction

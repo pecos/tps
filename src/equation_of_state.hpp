@@ -63,6 +63,7 @@ class GasMixture {
   WorkingFluid fluid;
   int num_equation;
   int dim;
+  int nvel_; // number of velocity, which differs from dim for axisymmetric case.
 
   int numSpecies;
   int numActiveSpecies;
@@ -106,11 +107,11 @@ class GasMixture {
   void SetNumActiveSpecies() { numActiveSpecies = ambipolar ? (numSpecies - 2) : (numSpecies - 1); }
   // Add electron energy equation if two temperature.
   void SetNumEquations() {
-    num_equation = twoTemperature_ ? (dim + 3 + numActiveSpecies) : (dim + 2 + numActiveSpecies);
+    num_equation = twoTemperature_ ? (nvel_ + 3 + numActiveSpecies) : (nvel_ + 2 + numActiveSpecies);
   }
 
  public:
-  GasMixture(WorkingFluid _fluid, int _dim);
+  GasMixture(WorkingFluid _fluid, int _dim, int nvel);
   GasMixture() {}
 
   ~GasMixture() {}
@@ -159,8 +160,7 @@ class GasMixture {
   virtual bool StateIsPhysical(const Vector &state) = 0;
 
   // Compute X, Y gradients from number density gradient.
-  // TODO(kevin): Fluxes class should take Up as input variable.
-  // Currently cannot receive Up inside Fluxes class.
+  // NOTE(kevin): for axisymmetric case, these handle only r- and z-direction.
   virtual void ComputeMassFractionGradient(const double rho, const Vector &numberDensities, const DenseMatrix &gradUp,
                                            DenseMatrix &massFractionGrad) = 0;
   virtual void ComputeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
@@ -211,7 +211,7 @@ class GasMixture {
 
   virtual double computeElectronEnergy(const double n_e, const double T_e) = 0;
   virtual double computeElectronPressure(const double n_e, const double T_e) = 0;
-  // TODO(kevin): check if this works for axisymmetric case.
+  // NOTE(kevin): for axisymmetric case, this handles only r- and z-direction.
   virtual void computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix &gradUp,
                                            Vector &gradPe) = 0;
 };
@@ -228,9 +228,9 @@ class DryAir : public GasMixture {
   virtual void setNumEquations();
 
  public:
-  DryAir(RunConfiguration &_runfile, int _dim);
+  DryAir(RunConfiguration &_runfile, int _dim, int nvel);
   DryAir();  // this will only be usefull to get air constants
-  DryAir(int dim, int num_equation);
+  // DryAir(int dim, int num_equation);
 
   ~DryAir() {}
 
@@ -427,7 +427,7 @@ class TestBinaryAir : public GasMixture {
 
   // virtual void SetNumEquations();
  public:
-  TestBinaryAir(RunConfiguration &_runfile, int _dim);
+  TestBinaryAir(RunConfiguration &_runfile, int _dim, int nvel);
   // TestBinaryAir(); //this will only be usefull to get air constants
 
   ~TestBinaryAir() {}
@@ -510,7 +510,7 @@ class PerfectMixture : public GasMixture {
 
   // virtual void SetNumEquations();
  public:
-  PerfectMixture(RunConfiguration &_runfile, int _dim);
+  PerfectMixture(RunConfiguration &_runfile, int _dim, int nvel);
   // TestBinaryAir(); //this will only be usefull to get air constants
 
   ~PerfectMixture() {}

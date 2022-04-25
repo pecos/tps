@@ -607,6 +607,7 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   Vector normGrad(num_equation);
   normGrad = 0.;
   for (int eq = 0; eq < num_equation; eq++) {
+    // NOTE(kevin): for axisymmetric case, azimuthal normal component will be always zero.
     for (int d = 0; d < dim; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
   }
   // gradient of pressure in normal direction
@@ -770,6 +771,7 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatr
   Vector normGrad(num_equation);
   normGrad = 0.;
   for (int eq = 0; eq < num_equation; eq++) {
+    // NOTE(kevin): for axisymmetric case, azimuthal normal component will be always zero.
     for (int d = 0; d < dim; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
   }
   // gradient of pressure in normal direction
@@ -924,6 +926,7 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
   Vector normGrad(num_equation);
   normGrad = 0.;
   for (int eq = 0; eq < num_equation; eq++) {
+    // NOTE(kevin): for axisymmetric case, azimuthal normal component will be always zero.
     for (int d = 0; d < dim; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
   }
   // gradient of pressure in normal direction

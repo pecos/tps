@@ -127,6 +127,8 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
       }
     }
 
+    // TODO(kevin): may move axisymmetric source terms to here.
+
     // TODO(kevin): energy sink for radiative reaction.
 
     if (twoTemperature_) {
