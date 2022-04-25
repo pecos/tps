@@ -97,7 +97,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
 
   if (_config.thereIsForcing()) {
     forcing.Append(new ConstantPressureGradient(dim, num_equation, _order, intRuleType, intRules, vfes, U_, Up, gradUp,
-                                                gpuArrays, _config));
+                                                gpuArrays, _config, mixture));
   }
   if (_config.GetPassiveScalarData().Size() > 0)
     forcing.Append(new PassiveScalar(dim, num_equation, _order, intRuleType, intRules, vfes, mixture, U_, Up, gradUp,

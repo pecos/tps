@@ -89,10 +89,14 @@ ConstantPressureGradient::ConstantPressureGradient(const int &_dim, const int &_
                                                    ParFiniteElementSpace *_vfes, ParGridFunction *U,
                                                    ParGridFunction *_Up, ParGridFunction *_gradUp,
                                                    const volumeFaceIntegrationArrays &_gpuArrays,
-                                                   RunConfiguration &_config)
+                                                   RunConfiguration &_config, GasMixture *mixture)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, _gpuArrays,
-                   _config.isAxisymmetric()) {
-  mixture = new DryAir(_config, dim);
+                   _config.isAxisymmetric()),
+      mixture_(mixture) {
+#ifdef _GPU_
+  grvy_printf(GRVY_ERROR, "ConstantPressureGradient with GPU computing is out-dated and not supported yet.");
+  exit(-1);
+#endif
 
   pressGrad.UseDevice(true);
   pressGrad.SetSize(3);
@@ -105,7 +109,7 @@ ConstantPressureGradient::ConstantPressureGradient(const int &_dim, const int &_
   pressGrad.ReadWrite();
 }
 
-ConstantPressureGradient::~ConstantPressureGradient() { delete mixture; }
+// ConstantPressureGradient::~ConstantPressureGradient() { delete mixture; }
 
 void ConstantPressureGradient::updateTerms(Vector &in) {
 #ifdef _GPU_
@@ -146,7 +150,7 @@ void ConstantPressureGradient::updateTerms(Vector &in) {
     for (int n = 0; n < dof_elem; n++) {
       int index = nodes[n];
       for (int eq = 0; eq < num_equation; eq++) primi[eq] = dataUp[index + eq * dof];
-      double p = mixture->ComputePressureFromPrimitives(primi);
+      double p = mixture_->ComputePressureFromPrimitives(primi);
       double grad_pV = 0.;
 
       // stays dim, not nvel, b/c no pressure gradient in theta direction

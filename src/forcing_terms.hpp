@@ -32,6 +32,7 @@
 #ifndef FORCING_TERMS_HPP_
 #define FORCING_TERMS_HPP_
 
+#include <grvy.h>
 #include <tps_config.h>
 
 #include <mfem.hpp>
@@ -89,14 +90,14 @@ class ConstantPressureGradient : public ForcingTerms {
  private:
   // RunConfiguration &config;
   Vector pressGrad;
-  GasMixture *mixture;
+  GasMixture *mixture_;
 
  public:
   ConstantPressureGradient(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                            IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
                            ParGridFunction *_Up, ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
-                           RunConfiguration &_config);
-  ~ConstantPressureGradient();
+                           RunConfiguration &_config, GasMixture *mixture);
+  ~ConstantPressureGradient() {}
 
   // Terms do not need updating
   virtual void updateTerms(Vector &in);
