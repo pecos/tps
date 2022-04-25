@@ -82,6 +82,7 @@ class InletBC : public BoundaryCondition {
   void initBoundaryU(ParGridFunction *Up);
 
   void subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux);
+  void subsonicReflectingDensityVelocityJacobian(Vector &normal, Vector &stateIn, DenseMatrix &bdrFluxJacobian);
 
   void subsonicNonReflectingDensityVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
 
