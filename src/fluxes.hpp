@@ -157,6 +157,56 @@ class Fluxes {
         vFlux[num_equation - 1 + d * num_equation] += visc / Sc * gradUpn[num_equation - 1 + d * num_equation];
     }
   }
+
+  static MFEM_HOST_DEVICE void viscousFlux_serial_gpu(double *vFlux, const double *Un, const double *gradUpn,
+                                                      const double &gamma, const double &Rg, const double &viscMult,
+                                                      const double &bulkViscMult, const double &Pr, const int &dim,
+                                                      const int &num_equation) {
+    double KE[3], vel[3], divV;
+    double stress[3][3];
+    double gradT[3];
+
+    for (int d = 0; d < dim; d++) KE[d] = 0.;
+    for (int d = 0; d < dim; d++) KE[d] = 0.5 * Un[1 + d] * Un[1 + d] / Un[0];
+
+    for (int eq = 0; eq < num_equation; eq++) {
+      for (int d = 0; d < dim; d++) vFlux[eq + d * num_equation] = 0.;
+    }
+
+    const double p = DryAir::pressure(&Un[0], &KE[0], gamma, dim, num_equation);
+    const double temp = p / Un[0] / Rg;
+    double visc = DryAir::GetViscosity_gpu(temp);
+    visc *= viscMult;
+    const double k = DryAir::GetThermalConductivity_gpu(visc, gamma, Rg, Pr);
+
+    for (int i = 0; i < dim; i++) {
+      for (int j = 0; j < dim; j++) {
+        stress[i][j] = gradUpn[1 + j + i * num_equation] + gradUpn[1 + i + j * num_equation];
+      }
+      // temperature gradient
+      //gradT[i] = temp * (gradUpn[1 + dim + i * num_equation] / p - gradUpn[0 + i * num_equation] / Un[0]);
+      gradT[i] = gradUpn[1 + dim + i * num_equation];
+
+      vel[i] = Un[1 + i] / Un[0];
+    }
+
+    divV = 0.;
+    for (int i = 0; i < dim; i++) divV += gradUpn[1 + i + i * num_equation];
+
+    for (int i = 0; i < dim; i++) stress[i][i] += (bulkViscMult - 2. / 3.) * divV;
+
+    for (int i = 0; i < dim; i++) {
+      for (int j = 0; j < dim; j++) {
+        vFlux[1 + i + j * num_equation] = visc * stress[i][j];
+        // energy equation
+        vFlux[num_equation - 1 + i * num_equation] += visc * vel[j] * stress[i][j];
+      }
+    }
+
+    for (int i = 0; i < dim; i++) {
+      vFlux[num_equation - 1 + i * num_equation] += k * gradT[i];
+    }
+  }
 #endif
 };
 
