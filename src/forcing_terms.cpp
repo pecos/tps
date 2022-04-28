@@ -249,6 +249,7 @@ void AxisymmetricSource::updateTerms(Vector &in) {
   int dof = vfes->GetNDofs();
 
   double *data = in.GetData();
+  const double *dataU = U_->GetData();
   const double *dataUp = Up_->GetData();
   const double *dataGradUp = gradUp_->GetData();
 
@@ -322,23 +323,19 @@ void AxisymmetricSource::updateTerms(Vector &in) {
       for (int d = 0; d < dim; d++) x[d] = coordsDof[index + d * dof];
       const double radius = x[0];
 
-      // TODO(trevilo): Generalize beyond flow only
-      Vector prim(5);
+      Vector prim(num_equation), conserv(num_equation);
+      for (int eq = 0; eq < num_equation; eq++) {
+        prim(eq) = dataUp[index + eq * dof];
+        conserv(eq) = dataU[index + eq * dof];
+      }
 
-      const double rho = dataUp[index + 0 * dof];
-      const double ur = dataUp[index + 1 * dof];
-      const double uz = dataUp[index + 2 * dof];
-      const double ut = dataUp[index + 3 * dof];
-      const double temperature = dataUp[index + (1 + nvel) * dof];
+      const double rho = prim(0);
+      const double ur = prim(1);
+      const double uz = prim(2);
+      const double ut = prim(3);
+      const double temperature = prim(1 + nvel);
 
-      prim[0] = rho;
-      prim[1] = ur;
-      prim[2] = uz;
-      prim[3] = ut;
-      prim[4] = temperature;
-
-      const double Rg = mixture->GetGasConstant();
-      const double pressure = rho * Rg * temperature;
+      const double pressure = mixture->ComputePressureFromPrimitives(prim);
 
       const double rurut = rho * ur * ut;
       const double rutut = rho * ut * ut;
@@ -351,12 +348,15 @@ void AxisymmetricSource::updateTerms(Vector &in) {
         const double uz_z = dataGradUp[index + (2 * dof) + (1 * dof * num_equation)];
         const double ut_r = dataGradUp[index + (3 * dof) + (0 * dof * num_equation)];
 
-        const double visc = transport_->GetViscosityFromPrimitive(prim);
+        double visc, bulkVisc;
+        transport_->GetViscosities(conserv, prim, visc, bulkVisc);
+        bulkVisc -= 2. / 3. * visc;
 
-        tau_tt = -ur_r - uz_z;
-        if (radius > 0) tau_tt += 2 * ur / radius;
+        double divV = ur_r + uz_z;
+        if (radius > 0) divV += ur / radius;
 
-        tau_tt *= 2 * visc / 3.0;
+        tau_tt = (radius > 0) ? 2.0 * ur / radius * visc : 0.0;
+        tau_tt += bulkVisc * divV;
 
         tau_tr = ut_r;
         if (radius > 0) tau_tr -= ut / radius;

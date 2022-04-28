@@ -95,7 +95,7 @@ class TransportProperties {
                                                 DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
                                                 Vector &n_sp) = 0;
   // NOTE: only for AxisymmetricSource
-  virtual double GetViscosityFromPrimitive(const Vector &state) = 0;
+  virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc) = 0;
 
   // For mixture-averaged diffusion, correct for mass conservation.
   void correctMassDiffusionFlux(const Vector &Y_sp, DenseMatrix &diffusionVelocity);
@@ -140,12 +140,14 @@ class DryAirTransport : public TransportProperties {
                                                 DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
                                                 Vector &n_sp) {}
 
-  virtual double GetViscosityFromPrimitive(const Vector &state);
+  virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc);
 };
 
-inline double DryAirTransport::GetViscosityFromPrimitive(const Vector &state) {
-  double temp = state[1 + nvel_];
-  return (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
+inline void DryAirTransport::GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc) {
+  double temp = primitive[1 + nvel_];
+  visc = (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
+  bulkVisc = bulk_visc_mult * visc;
+  return;
 }
 
 //////////////////////////////////////////////////////
@@ -198,7 +200,15 @@ class ConstantTransport : public TransportProperties {
                                                 DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
                                                 Vector &n_sp);
 
-  virtual double GetViscosityFromPrimitive(const Vector &state) {}
+  virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc);
 };
+
+
+inline void ConstantTransport::GetViscosities(const Vector &conserved, const Vector &primitive,
+                                              double &visc, double &bulkVisc) {
+  visc = viscosity_;
+  bulkVisc = bulkViscosity_;
+  return;
+}
 
 #endif  // TRANSPORT_PROPERTIES_HPP_
