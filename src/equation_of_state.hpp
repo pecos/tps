@@ -63,7 +63,7 @@ class GasMixture {
   WorkingFluid fluid;
   int num_equation;
   int dim;
-  int nvel_; // number of velocity, which differs from dim for axisymmetric case.
+  int nvel_;  // number of velocity, which differs from dim for axisymmetric case.
 
   int numSpecies;
   int numActiveSpecies;

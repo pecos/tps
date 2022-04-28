@@ -143,7 +143,8 @@ class DryAirTransport : public TransportProperties {
   virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc);
 };
 
-inline void DryAirTransport::GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc) {
+inline void DryAirTransport::GetViscosities(const Vector &conserved, const Vector &primitive, double &visc,
+                                            double &bulkVisc) {
   double temp = primitive[1 + nvel_];
   visc = (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
   bulkVisc = bulk_visc_mult * visc;
@@ -203,9 +204,8 @@ class ConstantTransport : public TransportProperties {
   virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc);
 };
 
-
-inline void ConstantTransport::GetViscosities(const Vector &conserved, const Vector &primitive,
-                                              double &visc, double &bulkVisc) {
+inline void ConstantTransport::GetViscosities(const Vector &conserved, const Vector &primitive, double &visc,
+                                              double &bulkVisc) {
   visc = viscosity_;
   bulkVisc = bulkViscosity_;
   return;

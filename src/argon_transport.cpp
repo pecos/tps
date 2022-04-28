@@ -364,8 +364,8 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
   // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
-void ArgonMinimalTransport::GetViscosities(const Vector &conserved, const Vector &primitive,
-                                           double &visc, double &bulkVisc) {
+void ArgonMinimalTransport::GetViscosities(const Vector &conserved, const Vector &primitive, double &visc,
+                                           double &bulkVisc) {
   Vector n_sp(3), X_sp(3), Y_sp(3);
   mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
   double nTotal = 0.0;

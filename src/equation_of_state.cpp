@@ -351,7 +351,7 @@ void DryAir::computeConservedStateFromConvectiveFlux(const Vector &meanNormalFlu
   for (int d = 0; d < nvel_; d++) {
     if (d < dim) {
       Up[1 + d] = (meanNormalFluxes[1 + d] - p * normal[d]) / meanNormalFluxes[0];
-    } else { // azimuthal direction for axisymmetric case.
+    } else {  // azimuthal direction for axisymmetric case.
       Up[1 + d] = meanNormalFluxes[1 + d] / meanNormalFluxes[0];
     }
   }
@@ -389,7 +389,8 @@ double EquationOfState::pressure( double *state,
 //////////////////////////////////////////////////////
 //////// Test Binary Air mixture
 //////////////////////////////////////////////////////
-TestBinaryAir::TestBinaryAir(RunConfiguration &_runfile, int _dim, int nvel) : GasMixture(WorkingFluid::TEST_BINARY_AIR, _dim, nvel) {
+TestBinaryAir::TestBinaryAir(RunConfiguration &_runfile, int _dim, int nvel)
+    : GasMixture(WorkingFluid::TEST_BINARY_AIR, _dim, nvel) {
   numSpecies = 2;
   ambipolar = false;
   twoTemperature_ = false;
@@ -614,7 +615,8 @@ void TestBinaryAir::ComputeMoleFractionGradient(const Vector &numberDensities, c
 ////// Perfect Mixture GasMixture                     ////////////////////
 //////////////////////////////////////////////////////////////////////////
 
-PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim, int nvel) : GasMixture(WorkingFluid::USER_DEFINED, _dim, nvel) {
+PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim, int nvel)
+    : GasMixture(WorkingFluid::USER_DEFINED, _dim, nvel) {
   numSpecies = _runfile.GetNumSpecies();
   backgroundInputIndex_ = _runfile.backgroundIndex;
   assert((backgroundInputIndex_ > 0) && (backgroundInputIndex_ <= numSpecies));
@@ -1394,10 +1396,8 @@ void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::
   //   Th += nB;
   //   Th = (p - pe) / (Th * UNIVERSALGASCONSTANT);
   // } else {
-  //   for (int sp = 0; sp < numActiveSpecies; sp++) Th += stateIn(2 + nvel_ + sp) / gasParams(sp, GasParams::SPECIES_MW);
-  //   if (ambipolar) Th += ne;
-  //   Th += nB;
-  //   Th = p / (Th * UNIVERSALGASCONSTANT);
+  //   for (int sp = 0; sp < numActiveSpecies; sp++) Th += stateIn(2 + nvel_ + sp) / gasParams(sp,
+  //   GasParams::SPECIES_MW); if (ambipolar) Th += ne; Th += nB; Th = p / (Th * UNIVERSALGASCONSTANT);
   // }
   //
   // // compute total energy with the modified temperature of heavies
@@ -1478,7 +1478,7 @@ void PerfectMixture::computeConservedStateFromConvectiveFlux(const Vector &meanN
   for (int d = 0; d < nvel_; d++) {
     if (d < dim) {
       Up[1 + d] = (meanNormalFluxes[1 + d] - p * normal[d]) / meanNormalFluxes[0];
-    } else { // For axisymmetric case.
+    } else {  // For axisymmetric case.
       Up[1 + d] = meanNormalFluxes[1 + d] / meanNormalFluxes[0];
     }
   }
