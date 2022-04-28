@@ -53,6 +53,7 @@ class TransportProperties {
  protected:
   int num_equation;
   int dim;
+  int nvel_;
   int numSpecies;
   int numActiveSpecies;
   bool ambipolar;
@@ -143,7 +144,7 @@ class DryAirTransport : public TransportProperties {
 };
 
 inline double DryAirTransport::GetViscosityFromPrimitive(const Vector &state) {
-  double temp = state[1 + dim];
+  double temp = state[1 + nvel_];
   return (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
 }
 
