@@ -107,8 +107,8 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   double nTotal = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
 
-  double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : primitiveState[dim + 1];
-  double Th = primitiveState[dim + 1];
+  double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : primitiveState[nvel_ + 1];
+  double Th = primitiveState[nvel_ + 1];
   // std::cout << "temp: " << Th << ",\t" << Te << std::endl;
 
   // Add Xeps to avoid zero number density case.
@@ -164,8 +164,11 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   DenseMatrix gradX(numSpecies, dim);
   mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
 
-  diffusionVelocity.SetSize(numSpecies, dim);
+  // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
+  diffusionVelocity.SetSize(numSpecies, nvel_);
+  diffusionVelocity = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) {
+    // concentration-driven diffusion only determines the first dim-components.
     for (int d = 0; d < dim; d++) {
       double DgradX = diffusivity(sp) * gradX(sp, d);
       // NOTE: we'll have to handle small X case.
@@ -182,6 +185,7 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   double charSpeed = 0.0;
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     double speciesSpeed = 0.0;
+    // azimuthal component does not participate in flux.
     for (int d = 0; d < dim; d++) speciesSpeed += diffusionVelocity(sp, d) * diffusionVelocity(sp, d);
     speciesSpeed = sqrt(speciesSpeed);
     if (speciesSpeed > charSpeed) charSpeed = speciesSpeed;
@@ -246,8 +250,8 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
   double nTotal = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
 
-  double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : primitiveState[dim + 1];
-  double Th = primitiveState[dim + 1];
+  double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : primitiveState[nvel_ + 1];
+  double Th = primitiveState[nvel_ + 1];
 
   // Add Xeps to avoid zero number density case.
   double nOverT = (n_sp(electronIndex_) + Xeps_) / Te + (n_sp(ionIndex_) + Xeps_) / Th;
@@ -286,8 +290,8 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
   double nTotal = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
 
-  double Te = (twoTemperature_) ? Up[num_equation - 1] : Up[dim + 1];
-  double Th = Up[dim + 1];
+  double Te = (twoTemperature_) ? Up[num_equation - 1] : Up[nvel_ + 1];
+  double Th = Up[nvel_ + 1];
 
   // Add Xeps to avoid zero number density case.
   double nOverT = (n_sp(electronIndex_) + Xeps_) / Te + (n_sp(ionIndex_) + Xeps_) / Th;
@@ -322,8 +326,11 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
   DenseMatrix gradX(numSpecies, dim);
   mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
 
-  diffusionVelocity.SetSize(numSpecies, dim);
+  // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
+  diffusionVelocity.SetSize(numSpecies, nvel_);
+  diffusionVelocity = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) {
+    // concentration-driven diffusion only determines the first dim-components.
     for (int d = 0; d < dim; d++) {
       double DgradX = diffusivity(sp) * gradX(sp, d);
       // NOTE: we'll have to handle small X case.
@@ -348,6 +355,7 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
   double charSpeed = 0.0;
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     double speciesSpeed = 0.0;
+    // azimuthal component does not participate in flux.
     for (int d = 0; d < dim; d++) speciesSpeed += diffusionVelocity(sp, d) * diffusionVelocity(sp, d);
     speciesSpeed = sqrt(speciesSpeed);
     if (speciesSpeed > charSpeed) charSpeed = speciesSpeed;
