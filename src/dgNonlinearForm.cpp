@@ -44,7 +44,7 @@ DGNonLinearForm::DGNonLinearForm(Fluxes *_flux, ParFiniteElementSpace *_vfes, Pa
       fluxes(_flux),
       vfes(_vfes),
       gradFes(_gradFes),
-      gradUp(_gradUp),
+      gradUp_(_gradUp),
       bcIntegrator(_bcIntegrator),
       intRules(_intRules),
       dim_(_dim),
@@ -160,12 +160,7 @@ void DGNonLinearForm::Mult_domain(const Vector &x, Vector &y) {
         for (int i = 0; i < elType; i++) elemOffset += h_numElems[i];
       }
       int dof_el = h_posDofIds[2 * elemOffset + 1];
-
-      interpFaceData_gpu(x,  // px,
-                         uk_el1, uk_el2, grad_upk_el1, grad_upk_el2, gradUp, vfes->GetNDofs(), mesh->GetNumFaces(),
-                         h_numElems[elType], elemOffset, dof_el, dim_, num_equation_, mixture->GetSpecificHeatRatio(),
-                         mixture->GetGasConstant(), mixture->GetViscMultiplyer(), mixture->GetBulkViscMultiplyer(),
-                         mixture->GetPrandtlNum(), gpuArrays, maxIntPoints_, maxDofs_);
+      interpFaceData_gpu(x, elType, elemOffset, dof_el);
     }
     MFEM_DEVICE_SYNC;
 
@@ -185,7 +180,7 @@ void DGNonLinearForm::Mult_domain(const Vector &x, Vector &y) {
       int dof_el = h_posDofIds[2 * elemOffset + 1];
 
       faceIntegration_gpu(y,  face_flux_,
-                          uk_el1, uk_el2, grad_upk_el1, grad_upk_el2, gradUp, fluxes, vfes->GetNDofs(),
+                          uk_el1, uk_el2, grad_upk_el1, grad_upk_el2, gradUp_, fluxes, vfes->GetNDofs(),
                           mesh->GetNumFaces(), h_numElems[elType], elemOffset, dof_el, dim_, num_equation_, mixture,
                           gpuArrays, maxIntPoints_, maxDofs_);
     }
@@ -200,10 +195,10 @@ void DGNonLinearForm::Mult_bdr(const Vector &x, Vector &y) {
   ParMesh *pmesh = vfes->GetParMesh();
   const int Nshared = pmesh->GetNSharedFaces();
   if (Nshared > 0) {
-    sharedFaceInterpolation_gpu(x, transferU->face_nbr_data, gradUp, transferGradUp->face_nbr_data, shared_uk_el1,
+    sharedFaceInterpolation_gpu(x, transferU->face_nbr_data, gradUp_, transferGradUp->face_nbr_data, shared_uk_el1,
                                 shared_uk_el2, shared_grad_upk_el1, shared_grad_upk_el2, vfes->GetNDofs(), dim_,
                                 num_equation_, mixture, gpuArrays, parallelData, maxIntPoints_, maxDofs_);
-    sharedFaceIntegration_gpu(x, transferU->face_nbr_data, gradUp, transferGradUp->face_nbr_data, y, shared_uk_el1,
+    sharedFaceIntegration_gpu(x, transferU->face_nbr_data, gradUp_, transferGradUp->face_nbr_data, y, shared_uk_el1,
                               shared_uk_el2, shared_grad_upk_el1, shared_grad_upk_el2, vfes->GetNDofs(), dim_,
                               num_equation_, mixture, fluxes, gpuArrays, parallelData, maxIntPoints_, maxDofs_);
   }
@@ -457,19 +452,15 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
 }
 
 // clang-format off
-void DGNonLinearForm::interpFaceData_gpu(const Vector &x, Vector &uk_el1, Vector &uk_el2, Vector &grad_uk_el1,
-                                         Vector &grad_uk_el2, const ParGridFunction *gradUp, const int &Ndofs,
-                                         const int &Nf, const int &NumElemsType, const int &elemOffset,
-                                         const int &elDof, const int &dim, const int &num_equation, const double &gamma,
-                                         const double &Rg, const double &viscMult, const double &bulkViscMult,
-                                         const double &Pr, const volumeFaceIntegrationArrays &gpuArrays,
-                                         const int &maxIntPoints, const int &maxDofs) {
+void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOffset, int elDof) {
 #ifdef _GPU_
   auto d_x = x.Read();
   double *d_uk_el1 = uk_el1.Write();
   double *d_uk_el2 = uk_el2.Write();
-  double *d_grad_uk_el1 = grad_uk_el1.Write();
-  double *d_grad_uk_el2 = grad_uk_el2.Write();
+  double *d_grad_uk_el1 = grad_upk_el1.Write();
+  double *d_grad_uk_el2 = grad_upk_el2.Write();
+
+  const ParGridFunction *gradUp = gradUp_;
 
   const double *d_gradUp = gradUp->Read();
   auto d_elemFaces = gpuArrays.elemFaces.Read();
@@ -478,6 +469,13 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, Vector &uk_el1, Vector
   auto d_shapeWnor1 = gpuArrays.shapeWnor1.Read();
   const double *d_shape2 = gpuArrays.shape2.Read();
   auto d_elems12Q = gpuArrays.elems12Q.Read();
+
+  const int Ndofs = vfes->GetNDofs();
+  const int NumElemsType = h_numElems[elType];
+  const int dim = dim_;
+  const int num_equation = num_equation_;
+  const int maxIntPoints = maxIntPoints_;
+  const int maxDofs = maxDofs_;
 
   //MFEM_FORALL(el, NumElemsType, {
   MFEM_FORALL_2D(el, NumElemsType, maxIntPoints, 1, 1, {

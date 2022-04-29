@@ -52,7 +52,7 @@ class DGNonLinearForm : public ParNonlinearForm {
   ParFiniteElementSpace *vfes;
   ParFiniteElementSpace *gradFes;
 
-  ParGridFunction *gradUp;
+  ParGridFunction *gradUp_;
 
   BCintegrator *bcIntegrator;
 
@@ -108,13 +108,8 @@ class DGNonLinearForm : public ParNonlinearForm {
                                         const parallelFacesIntegrationArrays *parallelData, const int &maxIntPoints,
                                         const int &maxDofs);
 
-  static void interpFaceData_gpu(const Vector &x, Vector &uk_el1, Vector &uk_el2, Vector &grad_uk_el1,
-                                 Vector &grad_uk_el2, const ParGridFunction *gradUp, const int &Ndofs, const int &Nf,
-                                 const int &NumElemsType, const int &elemOffset, const int &elDof, const int &dim,
-                                 const int &num_equation, const double &gamma, const double &Rg, const double &viscMult,
-                                 const double &bulkViscMult, const double &Pr,
-                                 const volumeFaceIntegrationArrays &gpuArrays, const int &maxIntPoints,
-                                 const int &maxDofs);
+  void interpFaceData_gpu(const Vector &x, int elType, int elemOffset, int elDof);
+
   static void sharedFaceInterpolation_gpu(const Vector &x, const Vector &faceU, const ParGridFunction *gradUp,
                                           const Vector &faceGradUp, Vector &shared_uk_el1, Vector &shared_uk_el2,
                                           Vector &shared_grad_upk_el1, Vector &shared_grad_upk_el2, const int &Ndofs,
