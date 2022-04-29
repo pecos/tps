@@ -100,6 +100,8 @@ class Tps {
   void getRequiredVec(const char *name, Array<double> &var, size_t numElems);
   void getRequiredVecElem(const char *name, double &var, int ithElem);
 
+  void getRequiredPairs(const char *name, std::vector<pair<std::string, std::string>> &var);
+
   int getStatus() { return solver_->getStatus(); }
   void initialize() {
     solver_->initialize();
@@ -116,6 +118,10 @@ class Tps {
   mfem::MPI_Session &getMPISession() { return mpi_; }
   std::string &getInputFilename() { return iFile_; }
 };
+
+std::string ltrim(const std::string &s);
+std::string rtrim(const std::string &s);
+std::string trim(const std::string &s);
 
 }  // end namespace TPS
 

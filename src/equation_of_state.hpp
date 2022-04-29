@@ -74,6 +74,8 @@ class GasMixture {
   bool twoTemperature_;
 
   DenseMatrix gasParams;
+  DenseMatrix composition_;
+  Vector atomMW_;
 
   std::map<int, int> mixtureToInputMap_;
 

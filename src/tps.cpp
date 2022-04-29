@@ -278,6 +278,55 @@ void Tps::getInput(const char *name, T &var, T varDefault) {
   return;
 }
 
+/// read string-string pairs for keyword [name] and store in var.
+void Tps::getRequiredPairs(const char *name, std::vector<pair<std::string, std::string>> &var) {
+  std::string inputString;
+  if (!iparse_.Read_Var(name, &inputString)) {
+    std::cout << "ERROR: Unable to read required input variable -> " << name << std::endl;
+    exit(ERROR);
+  }
+  const int len = inputString.length();
+  if ((inputString[0] != '{') || (inputString[len - 1] != '}')) {
+    std::cout << "ERROR: " << name << " does not have a map format {...}" << std::endl;
+    exit(ERROR);
+  }
+  std::string content = inputString.substr(1, len - 2);
+
+  var.clear();
+  std::stringstream s_stream(content);
+  while(s_stream.good()) {
+    std::string substr;
+    std::getline(s_stream, substr, ','); //get first string delimited by comma
+
+    std::stringstream sub_stream(substr);
+    std::string left, right;
+    std::pair<std::string, std::string> subvar;
+    std::getline(sub_stream, left, ':');
+    std::getline(sub_stream, right, ':');
+    subvar.first = trim(left);
+    subvar.second = trim(right);
+
+    var.push_back(subvar);
+  }
+  return;
+}
+
+std::string ltrim(const std::string &s)
+{
+    size_t start = s.find_first_not_of(" \n\r\t\f\v");
+    return (start == std::string::npos) ? "" : s.substr(start);
+}
+
+std::string rtrim(const std::string &s)
+{
+    size_t end = s.find_last_not_of(" \n\r\t\f\v");
+    return (end == std::string::npos) ? "" : s.substr(0, end + 1);
+}
+
+std::string trim(const std::string &s) {
+    return rtrim(ltrim(s));
+}
+
 // supported templates for getInput()
 template void Tps::getInput<int>(const char *name, int &var, int varDefault);
 template void Tps::getInput<double>(const char *name, double &var, double varDefault);
