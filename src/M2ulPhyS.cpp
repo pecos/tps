@@ -1901,37 +1901,51 @@ void M2ulPhyS::parseSolverOptions2() {
     }
 
     /*
-      TODO: for now, we force the user to set the background species as the last,
+      NOTE: for now, we force the user to set the background species as the last,
       and the electron species as the second to last.
     */
+    config.numAtoms = 0;
     if ((config.numSpecies > 1) && (config.eqSystem != NS_PASSIVE)) {
       tpsP->getRequiredInput("species/background_index", config.backgroundIndex);
-      // tpsP->getRequiredInput("species/electron_index", config.electronIndex);
-      // if ( config.backgroundIndex != config.numSpecies ) {
-      //   grvy_printf(GRVY_ERROR, "\n Background species must be specified as the last species.");
-      //   exit(ERROR);
-      // }
-      // if ( config.electronIndex != config.numSpecies - 1 ) {
-      //   grvy_printf(GRVY_ERROR, "\n Electron species must be specified as the second to last species.");
-      //   exit(ERROR);
-      // }
+
+      tpsP->getRequiredInput("atoms/numAtoms", config.numAtoms);
+      config.atomMW.SetSize(config.numAtoms);
+      for (int a = 1; a <= config.numAtoms; a++) {
+        std::string basepath("atoms/atom" + std::to_string(a));
+
+        std::string atomName;
+        tpsP->getRequiredInput((basepath + "/name").c_str(), atomName);
+        tpsP->getRequiredInput((basepath + "/mass").c_str(), config.atomMW(a - 1));
+        config.atomMap[atomName] = a - 1;
+      }
     }
 
     // Gas Params
     if (config.workFluid != DRY_AIR) {
+      assert(config.numAtoms > 0);
+      config.speciesComposition.SetSize(config.numSpecies, config.numAtoms);
+      config.speciesComposition = 0.0;
       for (int i = 1; i <= config.numSpecies; i++) {
         double mw, charge, formEnergy;
         std::string type, speciesName;
+        std::vector<std::pair<std::string, std::string>> composition;
         std::string basepath("species/species" + std::to_string(i));
 
         tpsP->getRequiredInput((basepath + "/name").c_str(), speciesName);
         config.speciesNames[i - 1] = speciesName;
 
-        tpsP->getRequiredInput((basepath + "/molecular_weight").c_str(), mw);
-        tpsP->getRequiredInput((basepath + "/charge_number").c_str(), charge);
+        tpsP->getRequiredPairs((basepath + "/composition").c_str(), composition);
+        for (int c = 0; c < composition.size(); c++) {
+          if (config.atomMap.count(composition[c].first)) {
+            int atomIdx = config.atomMap[composition[c].first];
+            config.speciesComposition(i - 1, atomIdx) = stoi(composition[c].second);
+          } else {
+            grvy_printf(GRVY_ERROR, "Requested atom %s for species %s is not available!\n",
+                        composition[c].first.c_str(), speciesName.c_str());
+          }
+        }
+
         tpsP->getRequiredInput((basepath + "/formation_energy").c_str(), formEnergy);
-        config.gasParams(i - 1, GasParams::SPECIES_MW) = mw;
-        config.gasParams(i - 1, GasParams::SPECIES_CHARGES) = charge;
         config.gasParams(i - 1, GasParams::FORMATION_ENERGY) = formEnergy;
 
         tpsP->getRequiredInput((basepath + "/initialMassFraction").c_str(), config.initialMassFractions(i - 1));
@@ -1945,10 +1959,15 @@ void M2ulPhyS::parseSolverOptions2() {
           tpsP->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(),
                                  config.constantMolarCV(i - 1));
           // NOTE: For perfect gas, CP will be automatically set from CV.
-          // tpsP->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cp").c_str(),
-          //                        config.constantMolarCP(i - 1));
         }
       }
+
+      Vector speciesMass(config.numSpecies), speciesCharge(config.numSpecies);
+      config.speciesComposition.Mult(config.atomMW, speciesMass);
+      config.speciesComposition.GetColumn(config.atomMap["E"], speciesCharge);
+      speciesCharge *= -1.0;
+      config.gasParams.SetCol(GasParams::SPECIES_MW, speciesMass);
+      config.gasParams.SetCol(GasParams::SPECIES_CHARGES, speciesCharge);
     }
   }
 
