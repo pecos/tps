@@ -208,7 +208,6 @@ class RiemannSolver {
     }
   }
 
-
 #endif
 };
 

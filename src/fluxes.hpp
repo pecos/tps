@@ -184,7 +184,7 @@ class Fluxes {
         stress[i][j] = gradUpn[1 + j + i * num_equation] + gradUpn[1 + i + j * num_equation];
       }
       // temperature gradient
-      //gradT[i] = temp * (gradUpn[1 + dim + i * num_equation] / p - gradUpn[0 + i * num_equation] / Un[0]);
+      // gradT[i] = temp * (gradUpn[1 + dim + i * num_equation] / p - gradUpn[0 + i * num_equation] / Un[0]);
       gradT[i] = gradUpn[1 + dim + i * num_equation];
 
       vel[i] = Un[1 + i] / Un[0];
