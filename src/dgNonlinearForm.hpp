@@ -57,8 +57,8 @@ class DGNonLinearForm : public ParNonlinearForm {
   BCintegrator *bcIntegrator;
 
   IntegrationRules *intRules;
-  const int dim;
-  const int num_equation;
+  const int dim_;
+  const int num_equation_;
   GasMixture *mixture;
 
   const volumeFaceIntegrationArrays &gpuArrays;
@@ -71,8 +71,8 @@ class DGNonLinearForm : public ParNonlinearForm {
   mutable dataTransferArrays *transferU;
   mutable dataTransferArrays *transferGradUp;
 
-  const int &maxIntPoints;
-  const int &maxDofs;
+  const int &maxIntPoints_;
+  const int &maxDofs_;
 
   Vector uk_el1, grad_upk_el1;
   Vector uk_el2, grad_upk_el2;
@@ -122,13 +122,7 @@ class DGNonLinearForm : public ParNonlinearForm {
                                           const volumeFaceIntegrationArrays &gpuArrays,
                                           const parallelFacesIntegrationArrays *parallelData, const int &maxIntPoints,
                                           const int &maxDofs);
-  void evalFaceFlux_gpu(Vector &uk_el1, Vector &uk_el2, Vector &grad_uk_el1, Vector &grad_uk_el2,
-                        Fluxes *flux,
-                        const int &Ndofs, const int &Nf, const int &NumElemType,
-                        const int &elemOffset, const int &elDof, const int &dim,
-                        const int &num_equation, GasMixture *mixture,
-                        const volumeFaceIntegrationArrays &gpuArrays, const int &maxIntPoints,
-                        const int &maxDofs);
+  void evalFaceFlux_gpu();
 
 
 #ifdef _GPU_

@@ -47,12 +47,12 @@ DGNonLinearForm::DGNonLinearForm(Fluxes *_flux, ParFiniteElementSpace *_vfes, Pa
       gradUp(_gradUp),
       bcIntegrator(_bcIntegrator),
       intRules(_intRules),
-      dim(_dim),
-      num_equation(_num_equation),
+      dim_(_dim),
+      num_equation_(_num_equation),
       mixture(_mixture),
       gpuArrays(_gpuArrays),
-      maxIntPoints(_maxIntPoints),
-      maxDofs(_maxDofs) {
+      maxIntPoints_(_maxIntPoints),
+      maxDofs_(_maxDofs) {
   h_numElems = gpuArrays.numElems.HostRead();
   h_posDofIds = gpuArrays.posDofIds.HostRead();
 
@@ -63,16 +63,16 @@ DGNonLinearForm::DGNonLinearForm(Fluxes *_flux, ParFiniteElementSpace *_vfes, Pa
   face_flux_.UseDevice(true);
 
   int nfaces = vfes->GetMesh()->GetNumFaces();
-  uk_el1.SetSize(nfaces * maxIntPoints * num_equation);
-  uk_el2.SetSize(nfaces * maxIntPoints * num_equation);
-  grad_upk_el1.SetSize(nfaces * maxIntPoints * num_equation * dim);
-  grad_upk_el2.SetSize(nfaces * maxIntPoints * num_equation * dim);
+  uk_el1.SetSize(nfaces * maxIntPoints_ * num_equation_);
+  uk_el2.SetSize(nfaces * maxIntPoints_ * num_equation_);
+  grad_upk_el1.SetSize(nfaces * maxIntPoints_ * num_equation_ * dim_);
+  grad_upk_el2.SetSize(nfaces * maxIntPoints_ * num_equation_ * dim_);
   uk_el1 = 0.;
   uk_el2 = 0.;
   grad_upk_el1 = 0.;
   grad_upk_el2 = 0.;
 
-  face_flux_.SetSize(nfaces * maxIntPoints * num_equation);
+  face_flux_.SetSize(nfaces * maxIntPoints_ * num_equation_);
   face_flux_ = 0.;
 }
 
@@ -88,10 +88,10 @@ void DGNonLinearForm::setParallelData(parallelFacesIntegrationArrays *_parallelD
   shared_grad_upk_el2.UseDevice(true);
 
   int maxNumElems = parallelData->sharedElemsFaces.Size() / 7;  // elements with shared faces
-  shared_uk_el1.SetSize(maxNumElems * 5 * maxIntPoints * num_equation);
-  shared_uk_el2.SetSize(maxNumElems * 5 * maxIntPoints * num_equation);
-  shared_grad_upk_el1.SetSize(maxNumElems * 5 * maxIntPoints * num_equation * dim);
-  shared_grad_upk_el2.SetSize(maxNumElems * 5 * maxIntPoints * num_equation * dim);
+  shared_uk_el1.SetSize(maxNumElems * 5 * maxIntPoints_ * num_equation_);
+  shared_uk_el2.SetSize(maxNumElems * 5 * maxIntPoints_ * num_equation_);
+  shared_grad_upk_el1.SetSize(maxNumElems * 5 * maxIntPoints_ * num_equation_ * dim_);
+  shared_grad_upk_el2.SetSize(maxNumElems * 5 * maxIntPoints_ * num_equation_ * dim_);
 }
 
 void DGNonLinearForm::Mult(const Vector &x, Vector &y) {
@@ -163,24 +163,14 @@ void DGNonLinearForm::Mult_domain(const Vector &x, Vector &y) {
 
       interpFaceData_gpu(x,  // px,
                          uk_el1, uk_el2, grad_upk_el1, grad_upk_el2, gradUp, vfes->GetNDofs(), mesh->GetNumFaces(),
-                         h_numElems[elType], elemOffset, dof_el, dim, num_equation, mixture->GetSpecificHeatRatio(),
+                         h_numElems[elType], elemOffset, dof_el, dim_, num_equation_, mixture->GetSpecificHeatRatio(),
                          mixture->GetGasConstant(), mixture->GetViscMultiplyer(), mixture->GetBulkViscMultiplyer(),
-                         mixture->GetPrandtlNum(), gpuArrays, maxIntPoints, maxDofs);
+                         mixture->GetPrandtlNum(), gpuArrays, maxIntPoints_, maxDofs_);
     }
     MFEM_DEVICE_SYNC;
 
     // Evaluate fluxes at quadrature points
-    for (int elType = 0; elType < gpuArrays.numElems.Size(); elType++) {
-      int elemOffset = 0;
-      if (elType != 0) {
-        for (int i = 0; i < elType; i++) elemOffset += h_numElems[i];
-      }
-      int dof_el = h_posDofIds[2 * elemOffset + 1];
-
-      evalFaceFlux_gpu(uk_el1, uk_el2, grad_upk_el1, grad_upk_el2, fluxes,
-                       vfes->GetNDofs(), mesh->GetNumFaces(), h_numElems[elType], elemOffset, dof_el, dim, num_equation, mixture,
-                       gpuArrays, maxIntPoints, maxDofs);
-    }
+    evalFaceFlux_gpu();
     MFEM_DEVICE_SYNC;
 
     // Compute flux contributions to residual
@@ -196,8 +186,8 @@ void DGNonLinearForm::Mult_domain(const Vector &x, Vector &y) {
 
       faceIntegration_gpu(y,  face_flux_,
                           uk_el1, uk_el2, grad_upk_el1, grad_upk_el2, gradUp, fluxes, vfes->GetNDofs(),
-                          mesh->GetNumFaces(), h_numElems[elType], elemOffset, dof_el, dim, num_equation, mixture,
-                          gpuArrays, maxIntPoints, maxDofs);
+                          mesh->GetNumFaces(), h_numElems[elType], elemOffset, dof_el, dim_, num_equation_, mixture,
+                          gpuArrays, maxIntPoints_, maxDofs_);
     }
 
 }
@@ -211,11 +201,11 @@ void DGNonLinearForm::Mult_bdr(const Vector &x, Vector &y) {
   const int Nshared = pmesh->GetNSharedFaces();
   if (Nshared > 0) {
     sharedFaceInterpolation_gpu(x, transferU->face_nbr_data, gradUp, transferGradUp->face_nbr_data, shared_uk_el1,
-                                shared_uk_el2, shared_grad_upk_el1, shared_grad_upk_el2, vfes->GetNDofs(), dim,
-                                num_equation, mixture, gpuArrays, parallelData, maxIntPoints, maxDofs);
+                                shared_uk_el2, shared_grad_upk_el1, shared_grad_upk_el2, vfes->GetNDofs(), dim_,
+                                num_equation_, mixture, gpuArrays, parallelData, maxIntPoints_, maxDofs_);
     sharedFaceIntegration_gpu(x, transferU->face_nbr_data, gradUp, transferGradUp->face_nbr_data, y, shared_uk_el1,
-                              shared_uk_el2, shared_grad_upk_el1, shared_grad_upk_el2, vfes->GetNDofs(), dim,
-                              num_equation, mixture, fluxes, gpuArrays, parallelData, maxIntPoints, maxDofs);
+                              shared_uk_el2, shared_grad_upk_el1, shared_grad_upk_el2, vfes->GetNDofs(), dim_,
+                              num_equation_, mixture, fluxes, gpuArrays, parallelData, maxIntPoints_, maxDofs_);
   }
 }
 
@@ -380,18 +370,12 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, Vector &face_flux, Vector &
 }
 
 // clang-format off
-void DGNonLinearForm::evalFaceFlux_gpu(Vector &uk_el1, Vector &uk_el2, Vector &grad_uk_el1, Vector &grad_uk_el2,
-                                       Fluxes *flux,
-                                       const int &Ndofs, const int &Nf, const int &NumElemType,
-                                       const int &elemOffset, const int &elDof, const int &dim,
-                                       const int &num_equation, GasMixture *mixture,
-                                       const volumeFaceIntegrationArrays &gpuArrays, const int &maxIntPoints,
-                                       const int &maxDofs) {
+void DGNonLinearForm::evalFaceFlux_gpu() {
   double *d_f = face_flux_.Write();
   const double *d_uk_el1 = uk_el1.Read();
   const double *d_uk_el2 = uk_el2.Read();
-  const double *d_grad_uk_el1 = grad_uk_el1.Read();
-  const double *d_grad_uk_el2 = grad_uk_el2.Read();
+  const double *d_grad_uk_el1 = grad_upk_el1.Read();
+  const double *d_grad_uk_el2 = grad_upk_el2.Read();
 
   auto d_elemFaces = gpuArrays.elemFaces.Read();
   auto d_nodesIDs = gpuArrays.nodesIDs.Read();
@@ -406,7 +390,14 @@ void DGNonLinearForm::evalFaceFlux_gpu(Vector &uk_el1, Vector &uk_el2, Vector &g
   const double bulkViscMult = mixture->GetBulkViscMultiplyer();
   const double Pr = mixture->GetPrandtlNum();
   const double Sc = mixture->GetSchmidtNum();
-  const Equations eqSystem = flux->GetEquationSystem();
+
+  Mesh *mesh = fes->GetMesh();
+  const int Nf = mesh->GetNumFaces();
+
+  const int dim = dim_;
+  const int num_equation = num_equation_;
+  const int maxIntPoints = maxIntPoints_;
+  const int maxDofs = maxDofs_;
 
   // clang-format off
   MFEM_FORALL(iface, Nf,
