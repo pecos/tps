@@ -119,19 +119,18 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   double nondimTe = debyeLength * 4.0 * PI_ * debyeFactor_ * Te;
   double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
 
-  Vector speciesViscosity(3);
+  Vector speciesViscosity(3), speciesHvyThrmCnd(3);
   speciesViscosity(ionIndex_) =
       viscosityFactor_ * sqrt(mw_(ionIndex_) * Th) / (collision::charged::rep22(nondimTh) * debyeCircle);
   speciesViscosity(neutralIndex_) = viscosityFactor_ * sqrt(mw_(neutralIndex_) * Th) / collision::argon::ArAr22(Th);
-  // std::cout << "viscosity: " << speciesViscosity(neutralIndex_) << ",\t" << speciesViscosity(ionIndex_) << std::endl;
   speciesViscosity(electronIndex_) = 0.0;
   // speciesViscosity(0) = 5. / 16. * sqrt(PI_ * mI_ * kB_ * Th) / (collision::charged::rep22(nondimTe) * PI_ *
   // debyeLength * debyeLength);
   for (int sp = 0; sp < numSpecies; sp++) {
-    transportBuffer[FluxTrns::VISCOSITY] += X_sp(sp) * speciesViscosity(sp);
-    transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] +=
-        X_sp(sp) * speciesViscosity(sp) * kOverEtaFactor_ / mw_(sp);
+    speciesHvyThrmCnd(sp) = speciesViscosity(sp) * kOverEtaFactor_ / mw_(sp);
   }
+  transportBuffer[FluxTrns::VISCOSITY] = linearAverage(X_sp, speciesViscosity);
+  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = linearAverage(X_sp, speciesHvyThrmCnd);
   transportBuffer[FluxTrns::BULK_VISCOSITY] = 0.0;
 
   if (thirdOrderkElectron_) {
@@ -143,18 +142,14 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
                                                                (collision::charged::rep22(nondimTe) * debyeCircle);
   }
 
-  double binaryDea = diffusivityFactor_ * sqrt(Te / muAE_) / nTotal / collision::argon::eAr11(Te);
-  double binaryDai = diffusivityFactor_ * sqrt(Th / muAI_) / nTotal / collision::argon::ArAr1P11(Th);
-  double binaryDie =
+  DenseSymmetricMatrix binaryDiff(3);
+  binaryDiff(electronIndex_, neutralIndex_) = diffusivityFactor_ * sqrt(Te / muAE_) / nTotal / collision::argon::eAr11(Te);
+  binaryDiff(neutralIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Th / muAI_) / nTotal / collision::argon::ArAr1P11(Th);
+  binaryDiff(ionIndex_, electronIndex_) =
       diffusivityFactor_ * sqrt(Te / muEI_) / nTotal / (collision::charged::att11(nondimTe) * debyeCircle);
 
   Vector diffusivity(3), mobility(3);
-  diffusivity(electronIndex_) = (1.0 - Y_sp(electronIndex_)) /
-                                ((X_sp(ionIndex_) + Xeps_) / binaryDie + (X_sp(neutralIndex_) + Xeps_) / binaryDea);
-  diffusivity(ionIndex_) = (1.0 - Y_sp(ionIndex_)) /
-                           ((X_sp(neutralIndex_) + Xeps_) / binaryDai + (X_sp(electronIndex_) + Xeps_) / binaryDie);
-  diffusivity(neutralIndex_) = (1.0 - Y_sp(neutralIndex_)) /
-                               ((X_sp(electronIndex_) + Xeps_) / binaryDea + (X_sp(ionIndex_) + Xeps_) / binaryDai);
+  CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
 
   for (int sp = 0; sp < numSpecies; sp++) {
     double temp = (sp == electronIndex_) ? Te : Th;
