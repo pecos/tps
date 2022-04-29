@@ -108,6 +108,9 @@ class TransportProperties {
   void addAmbipolarEfield(const Vector &mobility, const Vector &n_sp, DenseMatrix &diffusionVelocity);
   void addMixtureDrift(const Vector &mobility, const Vector &n_sp, const Vector &Efield,
                        DenseMatrix &diffusionVelocity);
+  double linearAverage(const Vector &X_sp, const Vector &speciesTransport);
+  // Curtiss-Hirschfelder approximation of diffusivity.
+  void CurtissHirschfelder(const Vector &X_sp, const Vector &Y_sp, const DenseSymmetricMatrix &binaryDiff, Vector &avgDiff);
 };
 
 //////////////////////////////////////////////////////
