@@ -95,6 +95,28 @@ void TransportProperties::addMixtureDrift(const Vector &mobility, const Vector &
   }
 }
 
+double TransportProperties::linearAverage(const Vector &X_sp, const Vector &speciesTransport) {
+  double average = 0.0;
+
+  for (int sp = 0; sp < numSpecies; sp++)
+    average += X_sp(sp) * speciesTransport(sp);
+
+  return average;
+}
+
+void TransportProperties::CurtissHirschfelder(const Vector &X_sp, const Vector &Y_sp, const DenseSymmetricMatrix &binaryDiff, Vector &avgDiff) {
+  avgDiff.SetSize(numSpecies);
+  avgDiff = 0.0;
+
+  for (int spI = 0; spI < numSpecies; spI++) {
+    for (int spJ = 0; spJ < numSpecies; spJ++) {
+      if (spI == spJ) continue;
+      avgDiff(spI) += (X_sp(spJ) + Xeps_) / binaryDiff(spI, spJ);
+    }
+    avgDiff(spI) = (1.0 - Y_sp(spI)) / avgDiff(spI);
+  }
+}
+
 //////////////////////////////////////////////////////
 //////// Dry Air mixture
 //////////////////////////////////////////////////////
