@@ -74,9 +74,7 @@ class ArgonMinimalTransport : public TransportProperties {
   const double mfFreqFactor_ = 4. / 3. * AVOGADRONUMBER * sqrt(8. * kB_ / PI_);
 
   Vector mw_;
-  double muAE_;
-  double muAI_;
-  double muEI_;
+  DenseSymmetricMatrix muw_;  // effective mass
 
   bool thirdOrderkElectron_;
 
@@ -122,6 +120,8 @@ class ArgonMinimalTransport : public TransportProperties {
   double L22ea(const Vector &Q1) {
     return 19.140625 * Q1(0) - 91.875 * Q1(1) + 199.5 * Q1(2) - 210. * Q1(3) + 90. * Q1(4);
   }
+
+  void computeEffectiveMass(const Vector &mw, DenseSymmetricMatrix &muw);
 };
 
 #endif  // ARGON_TRANSPORT_HPP_
