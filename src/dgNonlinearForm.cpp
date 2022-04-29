@@ -178,14 +178,10 @@ void DGNonLinearForm::Mult_domain(const Vector &x, Vector &y) {
         for (int i = 0; i < elType; i++) elemOffset += h_numElems[i];
       }
       int dof_el = h_posDofIds[2 * elemOffset + 1];
-
-      faceIntegration_gpu(y,  face_flux_,
-                          uk_el1, uk_el2, grad_upk_el1, grad_upk_el2, gradUp_, fluxes, vfes->GetNDofs(),
-                          mesh->GetNumFaces(), h_numElems[elType], elemOffset, dof_el, dim_, num_equation_, mixture,
-                          gpuArrays, maxIntPoints_, maxDofs_);
+      faceIntegration_gpu(y, elType, elemOffset, dof_el);
     }
 
-}
+  }
 
   // INTEGRATION BOUNDARIES
   if (bfnfi.Size()) bcIntegrator->integrateBCs(y, x, gpuArrays.nodesIDs, gpuArrays.posDofIds);
@@ -211,19 +207,13 @@ void DGNonLinearForm::setToZero_gpu(Vector &x, const int size) {
 }
 
 // clang-format off
-void DGNonLinearForm::faceIntegration_gpu(Vector &y, Vector &face_flux, Vector &uk_el1, Vector &uk_el2, Vector &grad_uk_el1,
-                                          Vector &grad_uk_el2, const ParGridFunction *gradUp, Fluxes *flux,
-                                          const int &Ndofs, const int &Nf, const int &NumElemType,
-                                          const int &elemOffset, const int &elDof, const int &dim,
-                                          const int &num_equation, GasMixture *mixture,
-                                          const volumeFaceIntegrationArrays &gpuArrays, const int &maxIntPoints,
-                                          const int &maxDofs) {
+void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset, int elDof) {
   double *d_y = y.Write();
-  const double *d_f = face_flux.Read();
+  const double *d_f = face_flux_.Read();
   const double *d_uk_el1 = uk_el1.Read();
   const double *d_uk_el2 = uk_el2.Read();
-  const double *d_grad_uk_el1 = grad_uk_el1.Read();
-  const double *d_grad_uk_el2 = grad_uk_el2.Read();
+  const double *d_grad_uk_el1 = grad_upk_el1.Read();
+  const double *d_grad_uk_el2 = grad_upk_el2.Read();
 
   auto d_elemFaces = gpuArrays.elemFaces.Read();
   auto d_nodesIDs = gpuArrays.nodesIDs.Read();
@@ -232,13 +222,12 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, Vector &face_flux, Vector &
   const double *d_shape2 = gpuArrays.shape2.Read();
   auto d_elems12Q = gpuArrays.elems12Q.Read();
 
-  const double gamma = mixture->GetSpecificHeatRatio();
-  const double Rg = mixture->GetGasConstant();
-  const double viscMult = mixture->GetViscMultiplyer();
-  const double bulkViscMult = mixture->GetBulkViscMultiplyer();
-  const double Pr = mixture->GetPrandtlNum();
-  const double Sc = mixture->GetSchmidtNum();
-  const Equations eqSystem = flux->GetEquationSystem();
+  const int Ndofs = vfes->GetNDofs();
+  const int NumElemType = h_numElems[elType];
+  const int dim = dim_;
+  const int num_equation = num_equation_;
+  const int maxIntPoints = maxIntPoints_;
+  const int maxDofs = maxDofs_;
 
   // clang-format off
   MFEM_FORALL(el, NumElemType,
