@@ -75,11 +75,19 @@ ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture, RunConfigurat
   // mA_ /= AVOGADRONUMBER;
   // mI_ /= AVOGADRONUMBER;
 
-  muAE_ = mw_(electronIndex_) * mw_(neutralIndex_) / (mw_(electronIndex_) + mw_(neutralIndex_));
-  muAI_ = mw_(ionIndex_) * mw_(neutralIndex_) / (mw_(ionIndex_) + mw_(neutralIndex_));
-  muEI_ = mw_(electronIndex_) * mw_(ionIndex_) / (mw_(electronIndex_) + mw_(ionIndex_));
+  muw_.SetSize(3);
+  computeEffectiveMass(mw_, muw_);
 
   thirdOrderkElectron_ = _runfile.thirdOrderkElectron;
+}
+
+void ArgonMinimalTransport::computeEffectiveMass(const Vector &mw, DenseSymmetricMatrix &muw) {
+  muw.SetSize(numSpecies);
+  muw = 0.0;
+
+  for (int spI = 0; spI < numSpecies; spI++)
+    for (int spJ = spI + 1; spJ < numSpecies; spJ++)
+      muw(spI, spJ) = mw(spI) * mw(spJ) / (mw(spI) + mw(spJ));
 }
 
 void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
@@ -143,10 +151,14 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   }
 
   DenseSymmetricMatrix binaryDiff(3);
-  binaryDiff(electronIndex_, neutralIndex_) = diffusivityFactor_ * sqrt(Te / muAE_) / nTotal / collision::argon::eAr11(Te);
-  binaryDiff(neutralIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Th / muAI_) / nTotal / collision::argon::ArAr1P11(Th);
+  binaryDiff = 0.0;
+  binaryDiff(electronIndex_, neutralIndex_) = diffusivityFactor_ * sqrt(Te / muw_(electronIndex_, neutralIndex_)) /
+                                              nTotal / collision::argon::eAr11(Te);
+  binaryDiff(neutralIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Th / muw_(neutralIndex_, ionIndex_)) / nTotal /
+                                         collision::argon::ArAr1P11(Th);
   binaryDiff(ionIndex_, electronIndex_) =
-      diffusivityFactor_ * sqrt(Te / muEI_) / nTotal / (collision::charged::att11(nondimTe) * debyeCircle);
+      diffusivityFactor_ * sqrt(Te / muw_(ionIndex_, electronIndex_)) / nTotal /
+      (collision::charged::att11(nondimTe) * debyeCircle);
 
   Vector diffusivity(3), mobility(3);
   CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
@@ -256,18 +268,19 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
   double nondimTe = debyeLength * 4.0 * PI_ * debyeFactor_ * Te;
   double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
 
-  double binaryDea = diffusivityFactor_ * sqrt(Te / muAE_) / nTotal / collision::argon::eAr11(Te);
-  double binaryDai = diffusivityFactor_ * sqrt(Th / muAI_) / nTotal / collision::argon::ArAr1P11(Th);
-  double binaryDie =
-      diffusivityFactor_ * sqrt(Te / muEI_) / nTotal / (collision::charged::att11(nondimTe) * debyeCircle);
+  DenseSymmetricMatrix binaryDiff(3);
+  binaryDiff = 0.0;
+  binaryDiff(electronIndex_, neutralIndex_) = diffusivityFactor_ * sqrt(Te / muw_(electronIndex_, neutralIndex_)) /
+                                              nTotal / collision::argon::eAr11(Te);
+  binaryDiff(neutralIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Th / muw_(neutralIndex_, ionIndex_)) / nTotal /
+                                         collision::argon::ArAr1P11(Th);
+  binaryDiff(ionIndex_, electronIndex_) =
+      diffusivityFactor_ * sqrt(Te / muw_(ionIndex_, electronIndex_)) / nTotal /
+      (collision::charged::att11(nondimTe) * debyeCircle);
 
   diffusivity.SetSize(3);
-  diffusivity(electronIndex_) = (1.0 - Y_sp(electronIndex_)) /
-                                ((X_sp(ionIndex_) + Xeps_) / binaryDie + (X_sp(neutralIndex_) + Xeps_) / binaryDea);
-  diffusivity(ionIndex_) = (1.0 - Y_sp(ionIndex_)) /
-                           ((X_sp(neutralIndex_) + Xeps_) / binaryDai + (X_sp(electronIndex_) + Xeps_) / binaryDie);
-  diffusivity(neutralIndex_) = (1.0 - Y_sp(neutralIndex_)) /
-                               ((X_sp(electronIndex_) + Xeps_) / binaryDea + (X_sp(ionIndex_) + Xeps_) / binaryDai);
+  diffusivity = 0.0;
+  CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
 }
 
 void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up,
@@ -299,17 +312,16 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
   double Qea = collision::argon::eAr11(Te);
   double Qai = collision::argon::ArAr1P11(Th);
   double Qie = collision::charged::att11(nondimTe) * debyeCircle;
-  double binaryDea = diffusivityFactor_ * sqrt(Te / muAE_) / nTotal / Qea;
-  double binaryDai = diffusivityFactor_ * sqrt(Th / muAI_) / nTotal / Qai;
-  double binaryDie = diffusivityFactor_ * sqrt(Te / muEI_) / nTotal / Qie;
+
+  DenseSymmetricMatrix binaryDiff(3);
+  binaryDiff = 0.0;
+  binaryDiff(electronIndex_, neutralIndex_) = diffusivityFactor_ * sqrt(Te / muw_(electronIndex_, neutralIndex_)) / nTotal / Qea;
+  binaryDiff(neutralIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Th / muw_(neutralIndex_, ionIndex_)) / nTotal / Qai;
+  binaryDiff(ionIndex_, electronIndex_) =
+      diffusivityFactor_ * sqrt(Te / muw_(ionIndex_, electronIndex_)) / nTotal / Qie;
 
   Vector diffusivity(3), mobility(3);
-  diffusivity(electronIndex_) = (1.0 - Y_sp(electronIndex_)) /
-                                ((X_sp(ionIndex_) + Xeps_) / binaryDie + (X_sp(neutralIndex_) + Xeps_) / binaryDea);
-  diffusivity(ionIndex_) = (1.0 - Y_sp(ionIndex_)) /
-                           ((X_sp(neutralIndex_) + Xeps_) / binaryDai + (X_sp(electronIndex_) + Xeps_) / binaryDie);
-  diffusivity(neutralIndex_) = (1.0 - Y_sp(neutralIndex_)) /
-                               ((X_sp(electronIndex_) + Xeps_) / binaryDea + (X_sp(ionIndex_) + Xeps_) / binaryDai);
+  CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
 
   for (int sp = 0; sp < numSpecies; sp++) {
     double temp = (sp == electronIndex_) ? Te : Th;
@@ -383,10 +395,7 @@ void ArgonMinimalTransport::GetViscosities(const Vector &conserved, const Vector
   speciesViscosity(neutralIndex_) = viscosityFactor_ * sqrt(mw_(neutralIndex_) * Th) / collision::argon::ArAr22(Th);
   speciesViscosity(electronIndex_) = 0.0;
 
-  visc = 0.0;
-  for (int sp = 0; sp < numSpecies; sp++) {
-    visc += X_sp(sp) * speciesViscosity(sp);
-  }
+  visc = linearAverage(X_sp, speciesViscosity);
   bulkVisc = 0.0;
 
   return;
