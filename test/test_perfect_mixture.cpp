@@ -31,7 +31,7 @@ double getRandomPrimitiveState(GasMixture *mixture, Vector &primitiveState) {
   for (int sp = 0; sp < numSpecies; sp++){
     if (ambipolar && (sp == numSpecies - 2)) continue;
     n_sp(sp) = 1.0e0 * uniformRandomNumber();
-    if (sp == numSpecies - 1) n_sp(sp) += 1.0e0;
+    if (sp == numSpecies - 1) n_sp(sp) += 2.0e0;
   }
   if (ambipolar) {
     double ne = mixture->computeAmbipolarElectronNumberDensity(&n_sp[0]);

@@ -205,6 +205,11 @@ class RunConfiguration {
   Vector constantMolarCV;
   Vector constantMolarCP;
 
+  int numAtoms;
+  DenseMatrix speciesComposition;
+  Vector atomMW;  // used 'atom' instead of 'element', to avoid confusion with finite 'element'.
+  std::map<std::string, int> atomMap;
+
   // ambipolar flag
   bool ambipolar;
 
