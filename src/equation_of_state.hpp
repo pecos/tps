@@ -74,8 +74,9 @@ class GasMixture {
   bool twoTemperature_;
 
   DenseMatrix gasParams;
-  DenseMatrix composition_;
-  Vector atomMW_;
+  // TODO(kevin): not initialized at this point.
+  // DenseMatrix composition_;
+  // Vector atomMW_;
 
   std::map<int, int> mixtureToInputMap_;
 
@@ -133,6 +134,7 @@ class GasMixture {
   // int getElectronMixtureIndex() { return (speciesMapping_.count("E")) ? speciesMapping_["E"] : -1; }
   std::map<int, int> *getMixtureToInputMap() { return &mixtureToInputMap_; }
   std::map<std::string, int> *getSpeciesMapping() { return &speciesMapping_; }
+  // DenseMatrix *getCompositions() { return &composition_; }
 
   double GetGasParams(int species, GasParams param) { return gasParams(species, param); }
 

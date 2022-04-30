@@ -49,10 +49,7 @@ Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : mixture_(m
   speciesMapping_ = mixture->getSpeciesMapping();
   electronIndex_ = (speciesMapping_->count("E")) ? (*speciesMapping_)["E"] : -1;
 
-  // TODO(kevin): make tps input parser accessible to all classes.
-  // TODO(kevin): reaction classes read input options directly in their initialization.
   numReactions_ = config.numReactions;
-  // std::cout << "number of reactions: " << numReactions_ << std::endl;
   reactionEnergies_.SetSize(numReactions_);
   reactionEnergies_ = config.reactionEnergies;
 
@@ -66,37 +63,79 @@ Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : mixture_(m
   equilibriumConstantParams_ = 0.0;
 
   for (int r = 0; r < numReactions_; r++) {
-    // std::cout << "reactions-" << r  << std::endl;
     for (int mixSp = 0; mixSp < numSpecies_; mixSp++) {
       int inputSp = (*mixtureToInputMap_)[mixSp];
-      // std::cout << mixSp << " : " << inputSp << std::endl;
       reactantStoich_(mixSp, r) = config.reactantStoich(inputSp, r);
       productStoich_(mixSp, r) = config.productStoich(inputSp, r);
-      // std::cout << reactantStoich_(mixSp, r) << " - " << productStoich_(mixSp, r) << std::endl;
     }
+
+    // check conservations.
+    {
+      Vector react(numSpecies_), product(numSpecies_);
+      config.reactantStoich.GetColumn(r, react);
+      config.productStoich.GetColumn(r, product);
+
+      // atom conservation.
+      DenseMatrix composition;
+      composition.Transpose(config.speciesComposition);
+      Vector reactAtom(config.numAtoms), prodAtom(config.numAtoms);
+      composition.Mult(react, reactAtom);
+      composition.Mult(product, prodAtom);
+      for (int a = 0; a < config.numAtoms; a++) {
+        if (reactAtom(a) != prodAtom(a)) {
+          grvy_printf(GRVY_ERROR, "Reaction %d does not conserve atom %d.\n", r, a);
+          exit(-1);
+        }
+      }
+
+      // mass conservation. (already ensured with atom but checking again.)
+      double reactMass = 0.0, prodMass = 0.0;
+      for (int sp = 0; sp < numSpecies_; sp++) {
+        int inputSp = (*mixtureToInputMap_)[sp];
+        reactMass += react(inputSp) * mixture->GetGasParams(sp, SPECIES_MW);
+        prodMass += product(inputSp) * mixture->GetGasParams(sp, SPECIES_MW);
+      }
+      // This may be too strict..
+      if (reactMass != prodMass) {
+        grvy_printf(GRVY_ERROR, "Reaction %d does not conserve mass.\n", r);
+        grvy_printf(GRVY_ERROR, "%.8E =/= %.8E\n", reactMass, prodMass);
+        exit(-1);
+      }
+
+      // energy conservation.
+      // TODO(kevin): this will need an adjustion when radiation comes into play.
+      double reactEnergy = 0.0, prodEnergy = 0.0;
+      for (int sp = 0; sp < numSpecies_; sp++) {
+        int inputSp = (*mixtureToInputMap_)[sp];
+        reactEnergy += react(inputSp) * mixture->GetGasParams(sp, FORMATION_ENERGY);
+        prodEnergy += product(inputSp) * mixture->GetGasParams(sp, FORMATION_ENERGY);
+      }
+      // This may be too strict..
+      if (reactEnergy + reactionEnergies_(r) != prodEnergy) {
+        grvy_printf(GRVY_ERROR, "Reaction %d does not conserve energy.\n", r);
+        grvy_printf(GRVY_ERROR, "%.8E + %.8E = %.8E =/= %.8E\n",
+                    reactEnergy, reactionEnergies_(r), reactEnergy + reactionEnergies_(r), prodEnergy);
+        exit(-1);
+      }
+    }
+
     switch (config.reactionModels[r]) {
       case ARRHENIUS: {
-        // std::cout << "reactions-" << r << ": Arrhenius" << std::endl;
         double A = (config.reactionModelParams[r])[0];
         double b = (config.reactionModelParams[r])[1];
         double E = (config.reactionModelParams[r])[2];
         reactions_[r] = new Arrhenius(A, b, E);
-        // std::cout << A << ", " << b << ", " << E << std::endl;
       } break;
       case HOFFERTLIEN: {
-        // std::cout << "reactions-" << r << ": HoffertLien" << std::endl;
         double A = (config.reactionModelParams[r])[0];
         double b = (config.reactionModelParams[r])[1];
         double E = (config.reactionModelParams[r])[2];
         reactions_[r] = new HoffertLien(A, b, E);
-        // std::cout << A << ", " << b << ", " << E << std::endl;
       } break;
     }
     if (detailedBalance_[r]) {
-      // std::cout << "detail balanced: ";
       for (int d = 0; d < 3; d++) {
         equilibriumConstantParams_(r, d) = (config.equilibriumConstantParams[r])[d];
-        // std::cout << equilibriumConstantParams_(r, d);
       }
       std::cout << std::endl;
     }

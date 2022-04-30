@@ -51,11 +51,12 @@ GasMixture::GasMixture(RunConfiguration &_runfile, int _dim, int nvel) {
     bool isElectronIncluded = false;
 
     gasParams.SetSize(numSpecies, GasParams::NUM_GASPARAMS);
+    // composition_.SetSize(numSpecies, _runfile.numAtoms);
 
     gasParams = 0.0;
     int paramIdx = 0;  // new species index.
     int targetIdx;
-    for (int sp = 0; sp < numSpecies; sp++) {
+    for (int sp = 0; sp < numSpecies; sp++) {  // input file species index.
       if (sp == backgroundInputIndex_ - 1) {
         targetIdx = numSpecies - 1;
       } else if (_runfile.speciesNames[sp] == "E") {
@@ -75,6 +76,11 @@ GasMixture::GasMixture(RunConfiguration &_runfile, int _dim, int nvel) {
 
       for (int param = 0; param < GasParams::NUM_GASPARAMS; param++)
         gasParams(targetIdx, param) = _runfile.GetGasParams(sp, (GasParams)param);
+
+      /* TODO(kevin): not sure we need atomMW and composition in GasMixture.
+                      not initialized at thit point. */
+      // for (int a = 0; a < _runfile.numAtoms; a++)
+      //   composition_(targetIdx, a) = _runfile.speciesComposition(sp, a);
     }
 
     SetNumActiveSpecies();

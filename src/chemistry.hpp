@@ -37,6 +37,7 @@
  * handy functions to deal with operations.
  */
 
+#include <grvy.h>
 #include <tps_config.h>
 
 #include <mfem.hpp>
