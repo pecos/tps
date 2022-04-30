@@ -113,7 +113,7 @@ class GasMixture {
   }
 
  public:
-  GasMixture(WorkingFluid _fluid, int _dim, int nvel);
+  GasMixture(RunConfiguration &_runfile, int _dim, int nvel);
   GasMixture() {}
 
   ~GasMixture() {}
