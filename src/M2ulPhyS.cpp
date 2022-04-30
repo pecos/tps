@@ -254,10 +254,8 @@ void M2ulPhyS::initVariables() {
 
   eqSystem = config.GetEquationSystem();
 
-  // Kevin: This part is what I imagined "GasMixture" class would do. However, I'm fine with specifying explicitly here.
   mixture = NULL;
   switch (config.GetWorkingFluid()) {
-    // TODO(kevin): GasMixture should take both dim and nvel, to avoid confusion in future.
     case WorkingFluid::DRY_AIR:
       mixture = new DryAir(config, dim, nvel);
       transportPtr = new DryAirTransport(mixture, config);
