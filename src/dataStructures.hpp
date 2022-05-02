@@ -72,6 +72,23 @@ enum TransportOutputPrimitives {
   NUM_OUTPUT_PRIMITIVES
 };
 
+enum ArgonColl {
+  CLMB_ATT,           // Attractive Coulomb potential
+  CLMB_REP,           // Repulsive Coulomb potential
+  AR_AR1P,            // Ar - Ar.1+ (include excited states)
+  AR_E,               // Ar - E (include excited states)
+  AR_AR,              // Ar - Ar (include excited states)
+/*DMR_ION, */         // Ar2 - Ar.1+ (include excited states)
+  NONE_ARGCOLL
+};
+
+enum ArgonSpcs {
+  AR,                 // Monomer Argon neutral, including excited states
+  AR1P,               // Ar.1+, including excited states
+  ELECTRON,           // Electron
+  NONE_ARGSPCS
+};
+
 // Type of primitive variable which requires gradient evaulation for diffusion velocity.
 // Also used for species output primitive variables.
 enum SpeciesPrimitiveType { MASS_FRACTION, MOLE_FRACTION, NUMBER_DENSITY, NUM_SPECIES_PRIMITIVES };
@@ -220,6 +237,14 @@ struct constantTransportData {
   double thermalConductivity;
   double electronThermalConductivity;
   Vector mtFreq;  // momentum transfer frequency
+};
+
+struct collisionInputs {
+  double debyeCircle;
+  double Th;
+  double Te;
+  double ndimTh;
+  double ndimTe;
 };
 
 #endif  // DATASTRUCTURES_HPP_
