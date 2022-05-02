@@ -37,6 +37,7 @@
  * handy functions to deal with operations.
  */
 
+#include <grvy.h>
 #include <tps_config.h>
 
 #include <mfem.hpp>
@@ -52,6 +53,10 @@ using namespace mfem;
 using namespace std;
 // using namespace charged;
 // using namespace argon;
+
+//////////////////////////////////////////////////////
+//////// Argon Minimal Transport (ternary mixture)
+//////////////////////////////////////////////////////
 
 class ArgonMinimalTransport : public TransportProperties {
  protected:
@@ -80,10 +85,13 @@ class ArgonMinimalTransport : public TransportProperties {
 
  public:
   ArgonMinimalTransport(GasMixture *_mixture, RunConfiguration &_runfile);
+  ArgonMinimalTransport(GasMixture *_mixture);
 
   ~ArgonMinimalTransport() {}
 
   int getIonIndex() { return ionIndex_; }
+
+  virtual collisionInputs computeCollisionInputs(const Vector &primitive, const Vector &n_sp);
 
   // Currently, transport properties are evaluated in flux and source term separately.
   // Flux does not take primitive variables as input, rather evaluate them whenever needed.
@@ -106,8 +114,8 @@ class ArgonMinimalTransport : public TransportProperties {
   // NOTE(kevin): only for AxisymmetricSource
   virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc);
 
-  double computeThirdOrderElectronThermalConductivity(const Vector &X_sp, const double debyeLength, const double Te,
-                                                      const double nondimTe);
+  virtual double computeThirdOrderElectronThermalConductivity(const Vector &X_sp, const double debyeLength, const double Te,
+                                                              const double nondimTe);
 
   virtual void computeMixtureAverageDiffusivity(const Vector &state, Vector &diffusivity);
 
@@ -122,6 +130,59 @@ class ArgonMinimalTransport : public TransportProperties {
   }
 
   void computeEffectiveMass(const Vector &mw, DenseSymmetricMatrix &muw);
+};
+
+//////////////////////////////////////////////////////
+//////// Argon Mixture Transport
+//////////////////////////////////////////////////////
+
+class ArgonMixtureTransport : public ArgonMinimalTransport {
+ private:
+  int numAtoms_;
+  DenseMatrix composition_;
+  std::map<std::string, int> atomMap_;
+  Array<ArgonSpcs> speciesType_;
+  std::vector<std::string> speciesNames_;
+  std::map<int, int> *mixtureToInputMap_;
+
+  // integer matrix. only upper triangular part will be used.
+  std::vector<std::vector<ArgonColl>> collisionIndex_;
+
+  void identifySpeciesType();
+  void identifyCollisionType();
+ public:
+  ArgonMixtureTransport(GasMixture *_mixture, RunConfiguration &_runfile);
+
+  ~ArgonMixtureTransport() {}
+
+  double collisionIntegral(const int _spI, const int _spJ, const int l,
+                           const int r, const collisionInputs collInputs);
+
+  // // Currently, transport properties are evaluated in flux and source term separately.
+  // // Flux does not take primitive variables as input, rather evaluate them whenever needed.
+  // // ComputeFluxTransportProperties also evaluates required primitive variables,
+  // // but do not return it as output.
+  // // TODO(kevin): need to discuss whether to reuse computed primitive variables in flux evaluation,
+  // // or in general evaluation of primitive variables.
+  // virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
+  //                                             Vector &transportBuffer, DenseMatrix &diffusionVelocity);
+  // // Vector &outputUp);
+  //
+  // // Source term will be constructed using ForcingTerms, which have pointers to primitive variables.
+  // // So we can use them in evaluating transport properties.
+  // // If this routine evaluate additional primitive variables, can return them just as the routine above.
+  // virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
+  //                                               const Vector &Efield, Vector &globalTransport,
+  //                                               DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
+  //                                               Vector &n_sp);
+  //
+  // // NOTE(kevin): only for AxisymmetricSource
+  // virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc);
+  //
+  // virtual double computeThirdOrderElectronThermalConductivity(const Vector &X_sp, const double debyeLength, const double Te,
+  //                                                             const double nondimTe);
+  //
+  // virtual void computeMixtureAverageDiffusivity(const Vector &state, Vector &diffusivity);
 };
 
 #endif  // ARGON_TRANSPORT_HPP_
