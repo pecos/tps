@@ -258,38 +258,37 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset,
       }
 
       for (int k = 0; k < Q; k++) {
-
-	// get shapes and normal
+        // get shapes and normal
         const double weight = d_shapeWnor1[offsetShape1 + maxDofs + k * (maxDofs + 1 + dim)];
 
 
-	for (int j = 0; j < dof1; j++) shape1[j] = d_shapeWnor1[offsetShape1 + j + k * (maxDofs + 1 + dim)];
+        for (int j = 0; j < dof1; j++) shape1[j] = d_shapeWnor1[offsetShape1 + j + k * (maxDofs + 1 + dim)];
         for (int j = 0; j < dof2; j++) shape2[j] = d_shape2[offsetShape2 + j + k * maxDofs];
 
         for (int eq = 0; eq < num_equation; eq++) {
           Rflux[eq] = d_f[eq + k * num_equation + gFace * maxIntPoints * num_equation];
         }
 
-	if (swapElems) {
-	  for (int eq = 0; eq < num_equation; eq++) {
-	    for (int i = 0; i < elDof; i++) {
+        if (swapElems) {
+          for (int eq = 0; eq < num_equation; eq++) {
+            for (int i = 0; i < elDof; i++) {
               Fcontrib[i + eq * elDof] += weight * shape2[i] * Rflux[eq];
-	    }
-	  }
-	} else {
-	  for (int eq = 0; eq < num_equation; eq++) {
-	    for (int i = 0; i < elDof; i++) {
-	      Fcontrib[i + eq * elDof] -= weight * shape1[i] * Rflux[eq];
-	    }
-	  }
-	}
-      } // end loop over quad pts
-    } // end loop over faces
+            }
+          }
+        } else {
+          for (int eq = 0; eq < num_equation; eq++) {
+            for (int i = 0; i < elDof; i++) {
+              Fcontrib[i + eq * elDof] -= weight * shape1[i] * Rflux[eq];
+            }
+          }
+        }
+      }  // end loop over quad pts
+    }  // end loop over faces
 
-    for (int eq = 0; eq < num_equation; eq++ ) {
+    for (int eq = 0; eq < num_equation; eq++) {
       for (int i = 0; i < elDof; i++) {
-	int index = indexes_i[i];
-	d_y[index + eq * Ndofs] += Fcontrib[i + eq * elDof];
+        int index = indexes_i[i];
+        d_y[index + eq * Ndofs] += Fcontrib[i + eq * elDof];
       }
     }
   });
@@ -338,7 +337,6 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
 
     // loop over quad points on this face
     for (int k = 0; k < Q; k++) {
-
       // get normal vector
       for (int d = 0; d < dim; d++)
         nor[d] = d_shapeWnor1[offsetShape1 + maxDofs + 1 + d + k * (maxDofs + 1 + dim)];
@@ -378,7 +376,7 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
       for (int eq = 0; eq < num_equation; eq++) {
         d_f[eq + k * num_equation + iface * maxIntPoints * num_equation] = Rflux[eq];
       }
-    } // end loop over quad pts
+    }  // end loop over quad pts
   });
   // clang-format on
 }
@@ -442,7 +440,6 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
 
       // loop over quadrature points on this face
       MFEM_FOREACH_THREAD(k, x, Q) {
-
         // set interpolation data to 0
         for (int n = 0; n < num_equation; n++) {
           uk1[n] = 0.;
@@ -494,7 +491,6 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
             }
           }
         }
-
       }   // end loop over integration points (MFEM_FOREACH_THREAD)
     }  // end loop over faces
   });
