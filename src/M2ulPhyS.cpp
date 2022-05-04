@@ -274,6 +274,9 @@ void M2ulPhyS::initVariables() {
         case ARGON_MINIMAL:
           transportPtr = new ArgonMinimalTransport(mixture, config);
           break;
+        case ARGON_MIXTURE:
+          transportPtr = new ArgonMixtureTransport(mixture, config);
+          break;
         case CONSTANT:
           transportPtr = new ConstantTransport(mixture, config);
           break;
@@ -1865,6 +1868,8 @@ void M2ulPhyS::parseSolverOptions2() {
     tpsP->getRequiredInput("plasma_models/transport_model", transportModelStr);
     if (transportModelStr == "argon_minimal") {
       config.transportModel = ARGON_MINIMAL;
+    } else if (transportModelStr == "argon_mixture") {
+      config.transportModel = ARGON_MIXTURE;
     } else if (transportModelStr == "constant") {
       config.transportModel = CONSTANT;
     }
@@ -1982,6 +1987,10 @@ void M2ulPhyS::parseSolverOptions2() {
           }
         }
         tpsP->getInput("plasma_models/transport_model/argon_minimal/third_order_thermal_conductivity",
+                       config.thirdOrderkElectron, true);
+        break;
+      case ARGON_MIXTURE:
+        tpsP->getInput("plasma_models/transport_model/argon_mixture/third_order_thermal_conductivity",
                        config.thirdOrderkElectron, true);
         break;
       case CONSTANT: {
