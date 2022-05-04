@@ -92,8 +92,7 @@ void ArgonMinimalTransport::computeEffectiveMass(const Vector &mw, DenseSymmetri
   muw = 0.0;
 
   for (int spI = 0; spI < numSpecies; spI++)
-    for (int spJ = spI + 1; spJ < numSpecies; spJ++)
-      muw(spI, spJ) = mw(spI) * mw(spJ) / (mw(spI) + mw(spJ));
+    for (int spJ = spI + 1; spJ < numSpecies; spJ++) muw(spI, spJ) = mw(spI) * mw(spJ) / (mw(spI) + mw(spJ));
 }
 
 collisionInputs ArgonMinimalTransport::computeCollisionInputs(const Vector &primitive, const Vector &n_sp) {
@@ -104,8 +103,7 @@ collisionInputs ArgonMinimalTransport::computeCollisionInputs(const Vector &prim
   // Add Xeps to avoid zero number density case.
   double nOverT = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) {
-    nOverT += (n_sp(sp) + Xeps_) / collInputs.Te *
-              mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) *
+    nOverT += (n_sp(sp) + Xeps_) / collInputs.Te * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) *
               mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
   }
   double debyeLength = sqrt(debyeFactor_ / AVOGADRONUMBER / nOverT);
@@ -179,13 +177,12 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
 
   DenseSymmetricMatrix binaryDiff(3);
   binaryDiff = 0.0;
-  binaryDiff(electronIndex_, neutralIndex_) = diffusivityFactor_ * sqrt(Te / muw_(electronIndex_, neutralIndex_)) /
-                                              nTotal / collision::argon::eAr11(Te);
-  binaryDiff(neutralIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Th / muw_(neutralIndex_, ionIndex_)) / nTotal /
-                                         collision::argon::ArAr1P11(Th);
-  binaryDiff(ionIndex_, electronIndex_) =
-      diffusivityFactor_ * sqrt(Te / muw_(ionIndex_, electronIndex_)) / nTotal /
-      (collision::charged::att11(nondimTe) * debyeCircle);
+  binaryDiff(electronIndex_, neutralIndex_) =
+      diffusivityFactor_ * sqrt(Te / muw_(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
+  binaryDiff(neutralIndex_, ionIndex_) =
+      diffusivityFactor_ * sqrt(Th / muw_(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
+  binaryDiff(ionIndex_, electronIndex_) = diffusivityFactor_ * sqrt(Te / muw_(ionIndex_, electronIndex_)) / nTotal /
+                                          (collision::charged::att11(nondimTe) * debyeCircle);
 
   Vector diffusivity(3), mobility(3);
   CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
@@ -297,13 +294,12 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
 
   DenseSymmetricMatrix binaryDiff(3);
   binaryDiff = 0.0;
-  binaryDiff(electronIndex_, neutralIndex_) = diffusivityFactor_ * sqrt(Te / muw_(electronIndex_, neutralIndex_)) /
-                                              nTotal / collision::argon::eAr11(Te);
-  binaryDiff(neutralIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Th / muw_(neutralIndex_, ionIndex_)) / nTotal /
-                                         collision::argon::ArAr1P11(Th);
-  binaryDiff(ionIndex_, electronIndex_) =
-      diffusivityFactor_ * sqrt(Te / muw_(ionIndex_, electronIndex_)) / nTotal /
-      (collision::charged::att11(nondimTe) * debyeCircle);
+  binaryDiff(electronIndex_, neutralIndex_) =
+      diffusivityFactor_ * sqrt(Te / muw_(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
+  binaryDiff(neutralIndex_, ionIndex_) =
+      diffusivityFactor_ * sqrt(Th / muw_(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
+  binaryDiff(ionIndex_, electronIndex_) = diffusivityFactor_ * sqrt(Te / muw_(ionIndex_, electronIndex_)) / nTotal /
+                                          (collision::charged::att11(nondimTe) * debyeCircle);
 
   diffusivity.SetSize(3);
   diffusivity = 0.0;
@@ -342,7 +338,8 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
 
   DenseSymmetricMatrix binaryDiff(3);
   binaryDiff = 0.0;
-  binaryDiff(electronIndex_, neutralIndex_) = diffusivityFactor_ * sqrt(Te / muw_(electronIndex_, neutralIndex_)) / nTotal / Qea;
+  binaryDiff(electronIndex_, neutralIndex_) =
+      diffusivityFactor_ * sqrt(Te / muw_(electronIndex_, neutralIndex_)) / nTotal / Qea;
   binaryDiff(neutralIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Th / muw_(neutralIndex_, ionIndex_)) / nTotal / Qai;
   binaryDiff(ionIndex_, electronIndex_) =
       diffusivityFactor_ * sqrt(Te / muw_(ionIndex_, electronIndex_)) / nTotal / Qie;
@@ -457,8 +454,7 @@ ArgonMixtureTransport::ArgonMixtureTransport(GasMixture *_mixture, RunConfigurat
   // TODO(kevin): need to factor out avogadro numbers throughout all transport property.
   // multiplying/dividing big numbers are risky of losing precision.
   mw_.SetSize(numSpecies);
-  for (int sp = 0; sp < numSpecies; sp++)
-    mw_(sp) = mixture->GetGasParams(sp, GasParams::SPECIES_MW);
+  for (int sp = 0; sp < numSpecies; sp++) mw_(sp) = mixture->GetGasParams(sp, GasParams::SPECIES_MW);
   mw_ /= AVOGADRONUMBER;
 
   muw_.SetSize(numSpecies);
@@ -498,7 +494,8 @@ void ArgonMixtureTransport::identifySpeciesType() {
           speciesType_[sp] = AR;
         } else {
           std::string name = speciesNames_[(*mixtureToInputMap_)[sp]];
-          grvy_printf(GRVY_ERROR, "The atom composition of species %s is not supported by ArgonMixtureTransport! \n", name.c_str());
+          grvy_printf(GRVY_ERROR, "The atom composition of species %s is not supported by ArgonMixtureTransport! \n",
+                      name.c_str());
           exit(-1);
         }
       }
@@ -515,12 +512,14 @@ void ArgonMixtureTransport::identifySpeciesType() {
         speciesType_[sp] = ELECTRON;
       } else {
         std::string name = speciesNames_[(*mixtureToInputMap_)[sp]];
-        grvy_printf(GRVY_ERROR, "The atom composition of species %s is not supported by ArgonMixtureTransport! \n", name.c_str());
+        grvy_printf(GRVY_ERROR, "The atom composition of species %s is not supported by ArgonMixtureTransport! \n",
+                    name.c_str());
         exit(-1);
       }
     } else {
       std::string name = speciesNames_[(*mixtureToInputMap_)[sp]];
-      grvy_printf(GRVY_ERROR, "The atom composition of species %s is not supported by ArgonMixtureTransport! \n", name.c_str());
+      grvy_printf(GRVY_ERROR, "The atom composition of species %s is not supported by ArgonMixtureTransport! \n",
+                  name.c_str());
       exit(-1);
     }
   }
@@ -561,8 +560,7 @@ void ArgonMixtureTransport::identifyCollisionType() {
         } else {
           std::string name1 = speciesNames_[(*mixtureToInputMap_)[spI]];
           std::string name2 = speciesNames_[(*mixtureToInputMap_)[spJ]];
-          grvy_printf(GRVY_ERROR, "%s-%s is not supported in ArgonMixtureTransport! \n",
-                      name1.c_str(), name2.c_str());
+          grvy_printf(GRVY_ERROR, "%s-%s is not supported in ArgonMixtureTransport! \n", name1.c_str(), name2.c_str());
           exit(-1);
         }
       }
@@ -575,8 +573,7 @@ void ArgonMixtureTransport::identifyCollisionType() {
       if (collisionIndex_[spI][spJ] == NONE_ARGCOLL) {
         std::string name1 = speciesNames_[(*mixtureToInputMap_)[spI]];
         std::string name2 = speciesNames_[(*mixtureToInputMap_)[spJ]];
-        grvy_printf(GRVY_ERROR, "%s-%s is not initialized in ArgonMixtureTransport! \n",
-                    name1.c_str(), name2.c_str());
+        grvy_printf(GRVY_ERROR, "%s-%s is not initialized in ArgonMixtureTransport! \n", name1.c_str(), name2.c_str());
         exit(-1);
       }
     }
@@ -596,8 +593,7 @@ double ArgonMixtureTransport::collisionIntegral(const int _spI, const int _spJ, 
   }
 
   switch (collisionIndex_[spI][spJ]) {
-    case CLMB_ATT:
-    {
+    case CLMB_ATT: {
       if (l == 1) {
         switch (r) {
           case 1:
@@ -616,7 +612,9 @@ double ArgonMixtureTransport::collisionIntegral(const int _spI, const int _spJ, 
             return collInputs.debyeCircle * collision::charged::att15(temp);
             break;
           default:
-            grvy_printf(GRVY_ERROR, "(%d, %d)-collision integral for attractive Coulomb potential is not supported in ArgonMixtureTransport! \n",
+            grvy_printf(GRVY_ERROR,
+                        "(%d, %d)-collision integral for attractive Coulomb potential is not supported in "
+                        "ArgonMixtureTransport! \n",
                         l, r);
             exit(-1);
             break;
@@ -633,15 +631,16 @@ double ArgonMixtureTransport::collisionIntegral(const int _spI, const int _spJ, 
             return collInputs.debyeCircle * collision::charged::att24(temp);
             break;
           default:
-            grvy_printf(GRVY_ERROR, "(%d, %d)-collision integral for attractive Coulomb potential is not supported in ArgonMixtureTransport! \n",
+            grvy_printf(GRVY_ERROR,
+                        "(%d, %d)-collision integral for attractive Coulomb potential is not supported in "
+                        "ArgonMixtureTransport! \n",
                         l, r);
             exit(-1);
             break;
         }
       }
     } break;
-    case CLMB_REP:
-    {
+    case CLMB_REP: {
       if (l == 1) {
         switch (r) {
           case 1:
@@ -660,7 +659,9 @@ double ArgonMixtureTransport::collisionIntegral(const int _spI, const int _spJ, 
             return collInputs.debyeCircle * collision::charged::rep15(temp);
             break;
           default:
-            grvy_printf(GRVY_ERROR, "(%d, %d)-collision integral for repulsive Coulomb potential is not supported in ArgonMixtureTransport! \n",
+            grvy_printf(GRVY_ERROR,
+                        "(%d, %d)-collision integral for repulsive Coulomb potential is not supported in "
+                        "ArgonMixtureTransport! \n",
                         l, r);
             exit(-1);
             break;
@@ -677,25 +678,26 @@ double ArgonMixtureTransport::collisionIntegral(const int _spI, const int _spJ, 
             return collInputs.debyeCircle * collision::charged::rep24(temp);
             break;
           default:
-            grvy_printf(GRVY_ERROR, "(%d, %d)-collision integral for repulsive Coulomb potential is not supported in ArgonMixtureTransport! \n",
+            grvy_printf(GRVY_ERROR,
+                        "(%d, %d)-collision integral for repulsive Coulomb potential is not supported in "
+                        "ArgonMixtureTransport! \n",
                         l, r);
             exit(-1);
             break;
         }
       }
     } break;
-    case AR_AR1P:
-    {
+    case AR_AR1P: {
       if ((l == 1) && (r == 1)) {
         return collision::argon::ArAr1P11(temp);
       } else {
-        grvy_printf(GRVY_ERROR, "(%d, %d)-collision integral for Ar-Ar.1+ pair is not supported in ArgonMixtureTransport! \n",
-                    l, r);
+        grvy_printf(GRVY_ERROR,
+                    "(%d, %d)-collision integral for Ar-Ar.1+ pair is not supported in ArgonMixtureTransport! \n", l,
+                    r);
         exit(-1);
       }
     } break;
-    case AR_E:
-    {
+    case AR_E: {
       if (l == 1) {
         switch (r) {
           case 1:
@@ -714,29 +716,30 @@ double ArgonMixtureTransport::collisionIntegral(const int _spI, const int _spJ, 
             return collision::argon::eAr15(temp);
             break;
           default:
-            grvy_printf(GRVY_ERROR, "(%d, %d)-collision integral for repulsive Coulomb potential is not supported in ArgonMixtureTransport! \n",
+            grvy_printf(GRVY_ERROR,
+                        "(%d, %d)-collision integral for repulsive Coulomb potential is not supported in "
+                        "ArgonMixtureTransport! \n",
                         l, r);
             exit(-1);
             break;
         }
       } else {
-        grvy_printf(GRVY_ERROR, "(%d, %d)-collision integral for Ar-E pair is not supported in ArgonMixtureTransport! \n",
-                    l, r);
+        grvy_printf(GRVY_ERROR,
+                    "(%d, %d)-collision integral for Ar-E pair is not supported in ArgonMixtureTransport! \n", l, r);
         exit(-1);
       }
     } break;
-    case AR_AR:
-    {
+    case AR_AR: {
       if ((l == 2) && (r == 2)) {
         return collision::argon::ArAr22(temp);
       } else {
-        grvy_printf(GRVY_ERROR, "(%d, %d)-collision integral for Ar-Ar pair is not supported in ArgonMixtureTransport! \n",
-                    l, r);
+        grvy_printf(GRVY_ERROR,
+                    "(%d, %d)-collision integral for Ar-Ar pair is not supported in ArgonMixtureTransport! \n", l, r);
         exit(-1);
       }
     } break;
     default:
-    break;
+      break;
   }
 }
 
@@ -763,7 +766,8 @@ void ArgonMixtureTransport::ComputeFluxTransportProperties(const Vector &state, 
       speciesHvyThrmCnd(sp) = 0.0;
       continue;
     }
-    speciesViscosity(sp) = viscosityFactor_ * sqrt(mw_(sp) * collInputs.Th) / collisionIntegral(sp, sp, 2, 2, collInputs);
+    speciesViscosity(sp) =
+        viscosityFactor_ * sqrt(mw_(sp) * collInputs.Th) / collisionIntegral(sp, sp, 2, 2, collInputs);
     speciesHvyThrmCnd(sp) = speciesViscosity(sp) * kOverEtaFactor_ / mw_(sp);
   }
   transportBuffer[FluxTrns::VISCOSITY] = linearAverage(X_sp, speciesViscosity);
@@ -774,9 +778,9 @@ void ArgonMixtureTransport::ComputeFluxTransportProperties(const Vector &state, 
     transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
         computeThirdOrderElectronThermalConductivity(X_sp, collInputs);
   } else {
-    transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] = viscosityFactor_ * kOverEtaFactor_ *
-                                                               sqrt(collInputs.Te / mw_(electronIndex_)) * X_sp(electronIndex_) /
-                                                               collisionIntegral(electronIndex_, electronIndex_, 2, 2, collInputs);
+    transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
+        viscosityFactor_ * kOverEtaFactor_ * sqrt(collInputs.Te / mw_(electronIndex_)) * X_sp(electronIndex_) /
+        collisionIntegral(electronIndex_, electronIndex_, 2, 2, collInputs);
   }
 
   DenseSymmetricMatrix binaryDiff(numSpecies);
@@ -784,8 +788,8 @@ void ArgonMixtureTransport::ComputeFluxTransportProperties(const Vector &state, 
   for (int spI = 0; spI < numSpecies - 1; spI++) {
     for (int spJ = spI + 1; spJ < numSpecies; spJ++) {
       double temp = ((spI == electronIndex_) || (spJ == electronIndex_)) ? collInputs.Te : collInputs.Th;
-      binaryDiff(spI, spJ) = diffusivityFactor_ * sqrt(temp / muw_(spI, spJ)) /
-                             nTotal / collisionIntegral(spI, spJ, 1, 1, collInputs);
+      binaryDiff(spI, spJ) =
+          diffusivityFactor_ * sqrt(temp / muw_(spI, spJ)) / nTotal / collisionIntegral(spI, spJ, 1, 1, collInputs);
     }
   }
 
@@ -830,10 +834,10 @@ void ArgonMixtureTransport::ComputeFluxTransportProperties(const Vector &state, 
   // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
-double ArgonMixtureTransport::computeThirdOrderElectronThermalConductivity(const Vector &X_sp, const collisionInputs &collInputs) {
+double ArgonMixtureTransport::computeThirdOrderElectronThermalConductivity(const Vector &X_sp,
+                                                                           const collisionInputs &collInputs) {
   Vector Q2(3);
-  for (int r = 0; r < 3; r++)
-    Q2(r) = collisionIntegral(electronIndex_, electronIndex_, 2, r + 2, collInputs);
+  for (int r = 0; r < 3; r++) Q2(r) = collisionIntegral(electronIndex_, electronIndex_, 2, r + 2, collInputs);
 
   double L11 = sqrt(2.0) * X_sp(electronIndex_) * L11ee(Q2);
   double L12 = sqrt(2.0) * X_sp(electronIndex_) * L12ee(Q2);
@@ -841,8 +845,7 @@ double ArgonMixtureTransport::computeThirdOrderElectronThermalConductivity(const
   for (int sp = 0; sp < numSpecies; sp++) {
     if (sp == electronIndex_) continue;
     Vector Q1(5);
-    for (int r = 0; r < 5; r++)
-      Q1(r) = collisionIntegral(sp, electronIndex_, 1, r + 1, collInputs);
+    for (int r = 0; r < 5; r++) Q1(r) = collisionIntegral(sp, electronIndex_, 1, r + 1, collInputs);
     L11 += X_sp(sp) * L11ea(Q1);
     L12 += X_sp(sp) * L12ea(Q1);
     L22 += X_sp(sp) * L22ea(Q1);
@@ -875,8 +878,8 @@ void ArgonMixtureTransport::ComputeSourceTransportProperties(const Vector &state
     for (int spJ = spI + 1; spJ < numSpecies; spJ++) {
       double temp = ((spI == electronIndex_) || (spJ == electronIndex_)) ? collInputs.Te : collInputs.Th;
 
-      binaryDiff(spI, spJ) = diffusivityFactor_ * sqrt(temp / muw_(spI, spJ)) /
-                             nTotal / collisionIntegral(spI, spJ, 1, 1, collInputs);
+      binaryDiff(spI, spJ) =
+          diffusivityFactor_ * sqrt(temp / muw_(spI, spJ)) / nTotal / collisionIntegral(spI, spJ, 1, 1, collInputs);
     }
   }
 
@@ -914,7 +917,8 @@ void ArgonMixtureTransport::ComputeSourceTransportProperties(const Vector &state
   // NOTE(kevin): collision integrals could be reused from diffusivities.. but not done that way at this point.
   for (int sp = 0; sp < numSpecies; sp++) {
     if (sp == electronIndex_) continue;
-    speciesTransport(sp, SpeciesTrns::MF_FREQUENCY) = mfFreqFactor_ * sqrt(collInputs.Te / mw_(electronIndex_)) * n_sp(sp) *
+    speciesTransport(sp, SpeciesTrns::MF_FREQUENCY) = mfFreqFactor_ * sqrt(collInputs.Te / mw_(electronIndex_)) *
+                                                      n_sp(sp) *
                                                       collisionIntegral(sp, electronIndex_, 1, 1, collInputs);
   }
 

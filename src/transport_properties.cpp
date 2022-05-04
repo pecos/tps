@@ -98,13 +98,13 @@ void TransportProperties::addMixtureDrift(const Vector &mobility, const Vector &
 double TransportProperties::linearAverage(const Vector &X_sp, const Vector &speciesTransport) {
   double average = 0.0;
 
-  for (int sp = 0; sp < numSpecies; sp++)
-    average += X_sp(sp) * speciesTransport(sp);
+  for (int sp = 0; sp < numSpecies; sp++) average += X_sp(sp) * speciesTransport(sp);
 
   return average;
 }
 
-void TransportProperties::CurtissHirschfelder(const Vector &X_sp, const Vector &Y_sp, const DenseSymmetricMatrix &binaryDiff, Vector &avgDiff) {
+void TransportProperties::CurtissHirschfelder(const Vector &X_sp, const Vector &Y_sp,
+                                              const DenseSymmetricMatrix &binaryDiff, Vector &avgDiff) {
   avgDiff.SetSize(numSpecies);
   avgDiff = 0.0;
 
