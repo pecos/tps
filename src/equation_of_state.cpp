@@ -445,8 +445,7 @@ double EquationOfState::pressure( double *state,
 //////////////////////////////////////////////////////
 //////// Test Binary Air mixture
 //////////////////////////////////////////////////////
-TestBinaryAir::TestBinaryAir(RunConfiguration &_runfile, int _dim, int nvel)
-    : GasMixture(_runfile, _dim, nvel) {
+TestBinaryAir::TestBinaryAir(RunConfiguration &_runfile, int _dim, int nvel) : GasMixture(_runfile, _dim, nvel) {
   numSpecies = 2;
   ambipolar = false;
   twoTemperature_ = false;
@@ -671,8 +670,7 @@ void TestBinaryAir::ComputeMoleFractionGradient(const Vector &numberDensities, c
 ////// Perfect Mixture GasMixture                     ////////////////////
 //////////////////////////////////////////////////////////////////////////
 
-PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim, int nvel)
-    : GasMixture(_runfile, _dim, nvel) {
+PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim, int nvel) : GasMixture(_runfile, _dim, nvel) {
   molarCV_.SetSize(numSpecies);
   molarCP_.SetSize(numSpecies);
   specificGasConstants_.SetSize(numSpecies);

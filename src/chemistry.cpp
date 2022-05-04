@@ -113,8 +113,8 @@ Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : mixture_(m
       // This may be too strict..
       if (reactEnergy + reactionEnergies_(r) != prodEnergy) {
         grvy_printf(GRVY_ERROR, "Reaction %d does not conserve energy.\n", r);
-        grvy_printf(GRVY_ERROR, "%.8E + %.8E = %.8E =/= %.8E\n",
-                    reactEnergy, reactionEnergies_(r), reactEnergy + reactionEnergies_(r), prodEnergy);
+        grvy_printf(GRVY_ERROR, "%.8E + %.8E = %.8E =/= %.8E\n", reactEnergy, reactionEnergies_(r),
+                    reactEnergy + reactionEnergies_(r), prodEnergy);
         exit(-1);
       }
     }

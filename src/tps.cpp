@@ -315,9 +315,9 @@ void Tps::getRequiredPairs(const char *name, std::vector<pair<std::string, std::
 
   var.clear();
   std::stringstream s_stream(content);
-  while(s_stream.good()) {
+  while (s_stream.good()) {
     std::string substr;
-    std::getline(s_stream, substr, ','); //get first string delimited by comma
+    std::getline(s_stream, substr, ',');  // get first string delimited by comma
 
     std::stringstream sub_stream(substr);
     std::string left, right;
@@ -332,21 +332,17 @@ void Tps::getRequiredPairs(const char *name, std::vector<pair<std::string, std::
   return;
 }
 
-std::string ltrim(const std::string &s)
-{
-    size_t start = s.find_first_not_of(" \n\r\t\f\v");
-    return (start == std::string::npos) ? "" : s.substr(start);
+std::string ltrim(const std::string &s) {
+  size_t start = s.find_first_not_of(" \n\r\t\f\v");
+  return (start == std::string::npos) ? "" : s.substr(start);
 }
 
-std::string rtrim(const std::string &s)
-{
-    size_t end = s.find_last_not_of(" \n\r\t\f\v");
-    return (end == std::string::npos) ? "" : s.substr(0, end + 1);
+std::string rtrim(const std::string &s) {
+  size_t end = s.find_last_not_of(" \n\r\t\f\v");
+  return (end == std::string::npos) ? "" : s.substr(0, end + 1);
 }
 
-std::string trim(const std::string &s) {
-    return rtrim(ltrim(s));
-}
+std::string trim(const std::string &s) { return rtrim(ltrim(s)); }
 
 // supported templates for getInput()
 template void Tps::getInput<int>(const char *name, int &var, int varDefault);
