@@ -49,8 +49,8 @@ class Gradients : public ParNonlinearForm {
  private:
   ParFiniteElementSpace *vfes;
   ParFiniteElementSpace *gradUpfes;
-  const int dim;
-  const int num_equation;
+  const int dim_;
+  const int num_equation_;
 
   ParGridFunction *Up;
   ParGridFunction *gradUp;
@@ -64,6 +64,9 @@ class Gradients : public ParNonlinearForm {
   const int intRuleType;
 
   const volumeFaceIntegrationArrays &gpuArrays;
+  Vector uk_el1;
+  Vector uk_el2;
+  Vector dun_face;
 
   const int *h_numElems;
   const int *h_posDofIds;
@@ -74,8 +77,8 @@ class Gradients : public ParNonlinearForm {
   Vector &invMArray;
   Array<int> &posDofInvM;
 
-  const int &maxIntPoints;
-  const int &maxDofs;
+  const int &maxIntPoints_;
+  const int &maxDofs_;
 
   // gradients of shape functions for all nodes and weight multiplied by det(Jac)
   // at each integration point
@@ -112,10 +115,10 @@ class Gradients : public ParNonlinearForm {
                                    //                                    const Array<int> &elemPosQ_shapeDshapeWJ,
                                    const int &maxDofs, const int &maxIntPoints);
 
-  static void faceContrib_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
-                              const Vector &Up, Vector &gradUp, const int num_equation, const int dim,
-                              const volumeFaceIntegrationArrays &gpuArrays, const int &maxDofs,
-                              const int &maxIntPoints);
+  void faceContrib_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
+                       const Vector &Up, Vector &gradUp, const int num_equation, const int dim,
+                       const volumeFaceIntegrationArrays &gpuArrays, const int &maxDofs,
+                       const int &maxIntPoints);
 
   static void integrationGradSharedFace_gpu(const Vector *Up, const Vector &faceUp, ParGridFunction *gradUp,
                                             const int &Ndofs, const int &dim, const int &num_equation,
@@ -129,6 +132,9 @@ class Gradients : public ParNonlinearForm {
                               Vector &gradUp, const int num_equation, const int dim,
                               const volumeFaceIntegrationArrays &gpuArrays, const Vector &invMArray,
                               const Array<int> &posDofInvM);
+
+  void interpFaceData_gpu(const Vector &x, int elType, int elemOffset, int elDof);
+  void evalFaceIntegrand_gpu();
 #endif
 };
 
