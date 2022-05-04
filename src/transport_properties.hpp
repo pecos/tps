@@ -110,7 +110,8 @@ class TransportProperties {
                        DenseMatrix &diffusionVelocity);
   double linearAverage(const Vector &X_sp, const Vector &speciesTransport);
   // Curtiss-Hirschfelder approximation of diffusivity.
-  void CurtissHirschfelder(const Vector &X_sp, const Vector &Y_sp, const DenseSymmetricMatrix &binaryDiff, Vector &avgDiff);
+  void CurtissHirschfelder(const Vector &X_sp, const Vector &Y_sp, const DenseSymmetricMatrix &binaryDiff,
+                           Vector &avgDiff);
 };
 
 //////////////////////////////////////////////////////
