@@ -158,29 +158,27 @@ class ArgonMixtureTransport : public ArgonMinimalTransport {
   double collisionIntegral(const int _spI, const int _spJ, const int l,
                            const int r, const collisionInputs collInputs);
 
-  // // Currently, transport properties are evaluated in flux and source term separately.
-  // // Flux does not take primitive variables as input, rather evaluate them whenever needed.
-  // // ComputeFluxTransportProperties also evaluates required primitive variables,
-  // // but do not return it as output.
-  // // TODO(kevin): need to discuss whether to reuse computed primitive variables in flux evaluation,
-  // // or in general evaluation of primitive variables.
-  // virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
-  //                                             Vector &transportBuffer, DenseMatrix &diffusionVelocity);
-  // // Vector &outputUp);
-  //
-  // // Source term will be constructed using ForcingTerms, which have pointers to primitive variables.
-  // // So we can use them in evaluating transport properties.
-  // // If this routine evaluate additional primitive variables, can return them just as the routine above.
-  // virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
-  //                                               const Vector &Efield, Vector &globalTransport,
-  //                                               DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
-  //                                               Vector &n_sp);
+  // Currently, transport properties are evaluated in flux and source term separately.
+  // Flux does not take primitive variables as input, rather evaluate them whenever needed.
+  // ComputeFluxTransportProperties also evaluates required primitive variables,
+  // but do not return it as output.
+  // TODO(kevin): need to discuss whether to reuse computed primitive variables in flux evaluation,
+  // or in general evaluation of primitive variables.
+  virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
+                                              Vector &transportBuffer, DenseMatrix &diffusionVelocity);
+
+  // Source term will be constructed using ForcingTerms, which have pointers to primitive variables.
+  // So we can use them in evaluating transport properties.
+  // If this routine evaluate additional primitive variables, can return them just as the routine above.
+  virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
+                                                const Vector &Efield, Vector &globalTransport,
+                                                DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
+                                                Vector &n_sp);
   //
   // // NOTE(kevin): only for AxisymmetricSource
   // virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc);
   //
-  // virtual double computeThirdOrderElectronThermalConductivity(const Vector &X_sp, const double debyeLength, const double Te,
-  //                                                             const double nondimTe);
+  virtual double computeThirdOrderElectronThermalConductivity(const Vector &X_sp, const collisionInputs &collInputs);
   //
   // virtual void computeMixtureAverageDiffusivity(const Vector &state, Vector &diffusivity);
 };
