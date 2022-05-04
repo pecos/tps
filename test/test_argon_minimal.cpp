@@ -55,7 +55,7 @@ int main (int argc, char *argv[])
   RunConfiguration& srcConfig = srcField->GetConfig();
   assert(srcConfig.GetWorkingFluid()==WorkingFluid::USER_DEFINED);
   assert(srcConfig.GetGasModel()==PERFECT_MIXTURE);
-  assert(srcConfig.GetTranportModel()==ARGON_MINIMAL);
+  assert((srcConfig.GetTranportModel()==ARGON_MINIMAL) || (srcConfig.GetTranportModel()==ARGON_MIXTURE));
 
   int dim = 3;
 

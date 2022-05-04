@@ -1,7 +1,7 @@
 #!./bats
 # -*- mode: sh -*-
 
-TEST="argon_minimal"
+TEST="argon_transport"
 
 setup() {
 
@@ -9,8 +9,17 @@ setup() {
 
 }
 
-@test "[$TEST] test accuracy of routines with respect to reference" {
+@test "[$TEST] argon minimal transport : test accuracy of routines with respect to reference" {
     test -s $RUNFILE_ARGON
     test -e ./test_argon_minimal
     ./test_argon_minimal -run $RUNFILE_ARGON
+}
+
+@test "[$TEST] argon mixture transport : test accuracy of routines with respect to reference" {
+    test -s $RUNFILE_ARGON
+    test -e ./test_argon_minimal
+
+    RUNFILE_MOD=${RUNFILE_ARGON}.mod
+    sed  's/transport_model = argon_minimal/transport_model = argon_mixture/' $RUNFILE_ARGON > $RUNFILE_MOD
+    ./test_argon_minimal -run $RUNFILE_MOD
 }
