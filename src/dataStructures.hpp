@@ -73,19 +73,19 @@ enum TransportOutputPrimitives {
 };
 
 enum ArgonColl {
-  CLMB_ATT,           // Attractive Coulomb potential
-  CLMB_REP,           // Repulsive Coulomb potential
-  AR_AR1P,            // Ar - Ar.1+ (include excited states)
-  AR_E,               // Ar - E (include excited states)
-  AR_AR,              // Ar - Ar (include excited states)
-/*DMR_ION, */         // Ar2 - Ar.1+ (include excited states)
+  CLMB_ATT,      // Attractive Coulomb potential
+  CLMB_REP,      // Repulsive Coulomb potential
+  AR_AR1P,       // Ar - Ar.1+ (include excited states)
+  AR_E,          // Ar - E (include excited states)
+  AR_AR,         // Ar - Ar (include excited states)
+  /*DMR_ION, */  // Ar2 - Ar.1+ (include excited states)
   NONE_ARGCOLL
 };
 
 enum ArgonSpcs {
-  AR,                 // Monomer Argon neutral, including excited states
-  AR1P,               // Ar.1+, including excited states
-  ELECTRON,           // Electron
+  AR,        // Monomer Argon neutral, including excited states
+  AR1P,      // Ar.1+, including excited states
+  ELECTRON,  // Electron
   NONE_ARGSPCS
 };
 
