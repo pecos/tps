@@ -298,22 +298,22 @@ void OutletBC::initBCs() {
 }
 
 void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux) {
-// {
-//   std::cout << "stateIn." << std::endl;
-//   for (int eq = 0; eq < num_equation; eq++) {
-//     std::cout << stateIn(eq) << ",\t";
-//   }
-//   std::cout << std::endl;
-//
-//   std::cout << "gradState." << std::endl;
-//   for (int eq = 0; eq < num_equation; eq++) {
-//     for (int d = 0; d < dim; d++) {
-//       std::cout << gradState(eq, d) << ",\t";
-//     }
-//     std::cout << std::endl;
-//   }
-//   exit(-1);
-// }
+  // {
+  //   std::cout << "stateIn." << std::endl;
+  //   for (int eq = 0; eq < num_equation; eq++) {
+  //     std::cout << stateIn(eq) << ",\t";
+  //   }
+  //   std::cout << std::endl;
+  //
+  //   std::cout << "gradState." << std::endl;
+  //   for (int eq = 0; eq < num_equation; eq++) {
+  //     for (int d = 0; d < dim; d++) {
+  //       std::cout << gradState(eq, d) << ",\t";
+  //     }
+  //     std::cout << std::endl;
+  //   }
+  //   exit(-1);
+  // }
   switch (outletType) {
     case SUB_P:
       subsonicReflectingPressure(normal, stateIn, bdrFlux);

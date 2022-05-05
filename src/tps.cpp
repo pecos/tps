@@ -141,7 +141,7 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
 /// Setup desired execution devices for MFEM
 void Tps::chooseDevices() {
 #ifdef _GPU_
-  device_.Configure(deviceConfig_, nprocs_ % numGpusPerRank_);
+  device_.Configure(deviceConfig_, rank_ % numGpusPerRank_);
 #endif
 
   if (isRank0_) {
