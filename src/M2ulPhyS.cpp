@@ -1613,193 +1613,252 @@ void M2ulPhyS::parseSolverOptions2() {
   tpsP->getRequiredInput("flow/mesh", config.meshFile);
 
   // flow/numerics
-  {
-    tpsP->getInput("flow/order", config.solOrder, 4);
-    tpsP->getInput("flow/integrationRule", config.integrationRule, 1);
-    tpsP->getInput("flow/basisType", config.basisType, 1);
-    tpsP->getInput("flow/maxIters", config.numIters, 10);
-    tpsP->getInput("flow/outputFreq", config.itersOut, 50);
-    tpsP->getInput("flow/timingFreq", config.timingFreq, 100);
-    tpsP->getInput("flow/useRoe", config.useRoe, false);
-    tpsP->getInput("flow/useSumByParts", config.SBP, false);
-    tpsP->getInput("flow/refLength", config.refLength, 1.0);
-    tpsP->getInput("flow/viscosityMultiplier", config.visc_mult, 1.0);
-    tpsP->getInput("flow/bulkViscosityMultiplier", config.bulk_visc, 0.0);
-    tpsP->getInput("flow/axisymmetric", config.axisymmetric_, false);
-    tpsP->getInput("flow/enablePressureForcing", config.isForcing, false);
-    if (config.isForcing) {
-      for (int d = 0; d < 3; d++) tpsP->getRequiredVecElem("flow/pressureGrad", config.gradPress[d], d);
-    }
-    tpsP->getInput("flow/refinement_levels", config.ref_levels, 0);
-
-    assert(config.solOrder > 0);
-    assert(config.numIters >= 0);
-    assert(config.itersOut > 0);
-    assert(config.refLength > 0);
-  }
+  parseFlowOptions();
 
   // time integration controls
-  {
-    std::map<std::string, int> integrators;
-    integrators["forwardEuler"] = 1;
-    integrators["rk2"] = 2;
-    integrators["rk3"] = 3;
-    integrators["rk4"] = 4;
-    integrators["rk6"] = 6;
-    std::string type;
-    tpsP->getInput("time/cfl", config.cflNum, 0.12);
-    tpsP->getInput("time/integrator", type, std::string("rk4"));
-    tpsP->getInput("time/enableConstantTimestep", config.constantTimeStep, false);
-    tpsP->getInput("time/dt_fixed", config.dt_fixed, -1.);
-    if (integrators.count(type) == 1) {
-      config.timeIntegratorType = integrators[type];
-    } else {
-      grvy_printf(GRVY_ERROR, "Unknown time integrator > %s\n", type.c_str());
-      exit(ERROR);
-    }
-  }
+  parseTimeIntegrationOptions();
 
   // statistics
-  {
-    tpsP->getInput("averaging/saveMeanHist", config.meanHistEnable, false);
-    tpsP->getInput("averaging/startIter", config.startIter, 0);
-    tpsP->getInput("averaging/sampleFreq", config.sampleInterval, 0);
-    tpsP->getInput("averaging/enableContinuation", config.restartMean, false);
-  }
+  parseStatOptions();
 
   // I/O settings
-  {
-    tpsP->getInput("io/outdirBase", config.outputFile, std::string("output-default"));
-    tpsP->getInput("io/enableRestart", config.restart, false);
-    tpsP->getInput("io/exitCheckFreq", config.exit_checkFrequency_, 500);
-
-    std::string restartMode;
-    tpsP->getInput("io/restartMode", restartMode, std::string("standard"));
-    if (restartMode == "variableP") {
-      config.restartFromAux = true;
-    } else if (restartMode == "singleFileWrite") {
-      config.restart_serial = "write";
-    } else if (restartMode == "singleFileRead") {
-      config.restart_serial = "read";
-    } else if (restartMode != "standard") {
-      grvy_printf(GRVY_ERROR, "\nUnknown restart mode -> %s\n", restartMode.c_str());
-      exit(ERROR);
-    }
-  }
+  parseIOSettings();
 
   // RMS job management
-  {
-    tpsP->getInput("jobManagement/enableAutoRestart", config.rm_enableMonitor_, false);
-    tpsP->getInput("jobManagement/timeThreshold", config.rm_threshold_, 15 * 60);  // 15 minutes
-    tpsP->getInput("jobManagement/checkFreq", config.rm_checkFrequency_, 500);     // 500 iterations
-  }
+  parseRMSJobOptions();
 
   // heat source
-  {
-    int numHeatSources;
-    tpsP->getInput("heatSource/numHeatSources", numHeatSources, 0);
-    config.numHeatSources = numHeatSources;
-
-    if (numHeatSources > 0) {
-      config.numHeatSources = numHeatSources;
-      config.heatSource = new heatSourceData[numHeatSources];
-
-      for (int s = 0; s < numHeatSources; s++) {
-        std::string base("heatSource" + std::to_string(s + 1));
-
-        tpsP->getInput((base + "/isEnabled").c_str(), config.heatSource[s].isEnabled, false);
-
-        if (config.heatSource[s].isEnabled) {
-          tpsP->getRequiredInput((base + "/value").c_str(), config.heatSource[s].value);
-
-          std::string type;
-          tpsP->getRequiredInput((base + "/distribution").c_str(), type);
-          if (type == "cylinder") {
-            config.heatSource[s].type = type;
-          } else {
-            grvy_printf(GRVY_ERROR, "\nUnknown heat source distribution -> %s\n", type.c_str());
-            exit(ERROR);
-          }
-
-          tpsP->getRequiredInput((base + "/radius").c_str(), config.heatSource[s].radius);
-          config.heatSource[s].point1.SetSize(3);
-          config.heatSource[s].point2.SetSize(3);
-
-          tpsP->getRequiredVec((base + "/point1").c_str(), config.heatSource[s].point1, 3);
-          tpsP->getRequiredVec((base + "/point2").c_str(), config.heatSource[s].point2, 3);
-        }
-      }
-    }
-  }
+  parseHeatSrcOptions();
 
   // viscosity multiplier function
-  {
-    tpsP->getInput("viscosityMultiplierFunction/isEnabled", config.linViscData.isEnabled, false);
-    if (config.linViscData.isEnabled) {
-      auto normal = config.linViscData.normal.HostWrite();
-      tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[0], 0);
-      tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[1], 1);
-      tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[2], 2);
-
-      auto point0 = config.linViscData.point0.HostWrite();
-      tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[0], 0);
-      tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[1], 1);
-      tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[2], 2);
-
-      auto pointInit = config.linViscData.pointInit.HostWrite();
-      tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[0], 0);
-      tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[1], 1);
-      tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[2], 2);
-
-      tpsP->getRequiredInput("viscosityMultiplierFunction/viscosityRatio", config.linViscData.viscRatio);
-    }
-  }
+  parseViscosityOptions();
 
   // MMS (check before IC b/c if MMS, IC not required)
-  {
-    tpsP->getInput("mms/isEnabled", config.use_mms_, false);
-
-    if (config.use_mms_) {
-      tpsP->getRequiredInput("mms/name", config.mms_name_);
-      tpsP->getInput("mms/compare_rhs", config.compareRhs_, false);
-    }
-  }
+  parseMMSOptions();
 
   // initial conditions
   if (!config.use_mms_) {
-    tpsP->getRequiredInput("initialConditions/rho", config.initRhoRhoVp[0]);
-    tpsP->getRequiredInput("initialConditions/rhoU", config.initRhoRhoVp[1]);
-    tpsP->getRequiredInput("initialConditions/rhoV", config.initRhoRhoVp[2]);
-    tpsP->getRequiredInput("initialConditions/rhoW", config.initRhoRhoVp[3]);
-    tpsP->getRequiredInput("initialConditions/pressure", config.initRhoRhoVp[4]);
+    parseICOptions();
   }
 
   // add passive scalar forcings
-  {
-    int numForcings;
-    tpsP->getInput("passiveScalars/numScalars", numForcings, 0);
-    for (int i = 1; i <= numForcings; i++) {
-      // add new entry in arrayPassiveScalar
-      config.arrayPassiveScalar.Append(new passiveScalarData);
-      config.arrayPassiveScalar[i - 1]->coords.SetSize(3);
-
-      std::string basepath("passiveScalar" + std::to_string(i));
-
-      Array<double> xyz;
-      tpsP->getRequiredVec((basepath + "/xyz").c_str(), xyz, 3);
-      for (int d = 0; d < 3; d++) config.arrayPassiveScalar[i - 1]->coords[d] = xyz[d];
-
-      double radius;
-      tpsP->getRequiredInput((basepath + "/radius").c_str(), radius);
-      config.arrayPassiveScalar[i - 1]->radius = radius;
-
-      double value;
-      tpsP->getRequiredInput((basepath + "/value").c_str(), value);
-      config.arrayPassiveScalar[i - 1]->value = value;
-    }
-  }
+  parsePassiveScalarOptions();
 
   // fluid presets
+  parseFluidPreset();
+
+  parseSystemType();
+
+  // plasma conditions.
+  config.gasModel = NUM_GASMODEL;
+  config.transportModel = NUM_TRANSPORTMODEL;
+  config.chemistryModel_ = NUM_CHEMISTRYMODEL;
+  if (config.workFluid == USER_DEFINED) {
+    parsePlasmaModels();
+  } else {
+    // parse options for other plasma presets.
+  }
+
+  // species list.
+  parseSpeciesInputs();
+
+  if (config.workFluid == USER_DEFINED) {  // Transport model
+    parseTransportInputs();
+  }
+
+  // Reaction list
+  parseReactionInputs();
+
+  // changed the order of parsing in order to use species list.
+  // boundary conditions. The number of boundaries of each supported type if
+  // parsed first. Then, a section corresponding to each defined boundary is parsed afterwards
+  parseBCInputs();
+
+  // changed the order of parsing in order to use species list.
+  // sponge zone
+  parseSpongeZoneInputs();
+
+  return;
+}
+
+void M2ulPhyS::parseFlowOptions() {
+  tpsP->getInput("flow/order", config.solOrder, 4);
+  tpsP->getInput("flow/integrationRule", config.integrationRule, 1);
+  tpsP->getInput("flow/basisType", config.basisType, 1);
+  tpsP->getInput("flow/maxIters", config.numIters, 10);
+  tpsP->getInput("flow/outputFreq", config.itersOut, 50);
+  tpsP->getInput("flow/timingFreq", config.timingFreq, 100);
+  tpsP->getInput("flow/useRoe", config.useRoe, false);
+  tpsP->getInput("flow/useSumByParts", config.SBP, false);
+  tpsP->getInput("flow/refLength", config.refLength, 1.0);
+  tpsP->getInput("flow/viscosityMultiplier", config.visc_mult, 1.0);
+  tpsP->getInput("flow/bulkViscosityMultiplier", config.bulk_visc, 0.0);
+  tpsP->getInput("flow/axisymmetric", config.axisymmetric_, false);
+  tpsP->getInput("flow/enablePressureForcing", config.isForcing, false);
+  if (config.isForcing) {
+    for (int d = 0; d < 3; d++) tpsP->getRequiredVecElem("flow/pressureGrad", config.gradPress[d], d);
+  }
+  tpsP->getInput("flow/refinement_levels", config.ref_levels, 0);
+
+  assert(config.solOrder > 0);
+  assert(config.numIters >= 0);
+  assert(config.itersOut > 0);
+  assert(config.refLength > 0);
+}
+
+void M2ulPhyS::parseTimeIntegrationOptions() {
+  std::map<std::string, int> integrators;
+  integrators["forwardEuler"] = 1;
+  integrators["rk2"] = 2;
+  integrators["rk3"] = 3;
+  integrators["rk4"] = 4;
+  integrators["rk6"] = 6;
+  std::string type;
+  tpsP->getInput("time/cfl", config.cflNum, 0.12);
+  tpsP->getInput("time/integrator", type, std::string("rk4"));
+  tpsP->getInput("time/enableConstantTimestep", config.constantTimeStep, false);
+  tpsP->getInput("time/dt_fixed", config.dt_fixed, -1.);
+  if (integrators.count(type) == 1) {
+    config.timeIntegratorType = integrators[type];
+  } else {
+    grvy_printf(GRVY_ERROR, "Unknown time integrator > %s\n", type.c_str());
+    exit(ERROR);
+  }
+}
+
+void M2ulPhyS::parseStatOptions() {
+  tpsP->getInput("averaging/saveMeanHist", config.meanHistEnable, false);
+  tpsP->getInput("averaging/startIter", config.startIter, 0);
+  tpsP->getInput("averaging/sampleFreq", config.sampleInterval, 0);
+  tpsP->getInput("averaging/enableContinuation", config.restartMean, false);
+}
+
+void M2ulPhyS::parseIOSettings() {
+  tpsP->getInput("io/outdirBase", config.outputFile, std::string("output-default"));
+  tpsP->getInput("io/enableRestart", config.restart, false);
+  tpsP->getInput("io/exitCheckFreq", config.exit_checkFrequency_, 500);
+
+  std::string restartMode;
+  tpsP->getInput("io/restartMode", restartMode, std::string("standard"));
+  if (restartMode == "variableP") {
+    config.restartFromAux = true;
+  } else if (restartMode == "singleFileWrite") {
+    config.restart_serial = "write";
+  } else if (restartMode == "singleFileRead") {
+    config.restart_serial = "read";
+  } else if (restartMode != "standard") {
+    grvy_printf(GRVY_ERROR, "\nUnknown restart mode -> %s\n", restartMode.c_str());
+    exit(ERROR);
+  }
+}
+
+void M2ulPhyS::parseRMSJobOptions() {
+  tpsP->getInput("jobManagement/enableAutoRestart", config.rm_enableMonitor_, false);
+  tpsP->getInput("jobManagement/timeThreshold", config.rm_threshold_, 15 * 60);  // 15 minutes
+  tpsP->getInput("jobManagement/checkFreq", config.rm_checkFrequency_, 500);     // 500 iterations
+}
+
+void M2ulPhyS::parseHeatSrcOptions() {
+  int numHeatSources;
+  tpsP->getInput("heatSource/numHeatSources", numHeatSources, 0);
+  config.numHeatSources = numHeatSources;
+
+  if (numHeatSources > 0) {
+    config.numHeatSources = numHeatSources;
+    config.heatSource = new heatSourceData[numHeatSources];
+
+    for (int s = 0; s < numHeatSources; s++) {
+      std::string base("heatSource" + std::to_string(s + 1));
+
+      tpsP->getInput((base + "/isEnabled").c_str(), config.heatSource[s].isEnabled, false);
+
+      if (config.heatSource[s].isEnabled) {
+        tpsP->getRequiredInput((base + "/value").c_str(), config.heatSource[s].value);
+
+        std::string type;
+        tpsP->getRequiredInput((base + "/distribution").c_str(), type);
+        if (type == "cylinder") {
+          config.heatSource[s].type = type;
+        } else {
+          grvy_printf(GRVY_ERROR, "\nUnknown heat source distribution -> %s\n", type.c_str());
+          exit(ERROR);
+        }
+
+        tpsP->getRequiredInput((base + "/radius").c_str(), config.heatSource[s].radius);
+        config.heatSource[s].point1.SetSize(3);
+        config.heatSource[s].point2.SetSize(3);
+
+        tpsP->getRequiredVec((base + "/point1").c_str(), config.heatSource[s].point1, 3);
+        tpsP->getRequiredVec((base + "/point2").c_str(), config.heatSource[s].point2, 3);
+      }
+    }
+  }
+}
+
+void M2ulPhyS::parseViscosityOptions() {
+  tpsP->getInput("viscosityMultiplierFunction/isEnabled", config.linViscData.isEnabled, false);
+  if (config.linViscData.isEnabled) {
+    auto normal = config.linViscData.normal.HostWrite();
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[0], 0);
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[1], 1);
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[2], 2);
+
+    auto point0 = config.linViscData.point0.HostWrite();
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[0], 0);
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[1], 1);
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[2], 2);
+
+    auto pointInit = config.linViscData.pointInit.HostWrite();
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[0], 0);
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[1], 1);
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[2], 2);
+
+    tpsP->getRequiredInput("viscosityMultiplierFunction/viscosityRatio", config.linViscData.viscRatio);
+  }
+}
+
+void M2ulPhyS::parseMMSOptions() {
+  tpsP->getInput("mms/isEnabled", config.use_mms_, false);
+
+  if (config.use_mms_) {
+    tpsP->getRequiredInput("mms/name", config.mms_name_);
+    tpsP->getInput("mms/compare_rhs", config.compareRhs_, false);
+  }
+}
+
+void M2ulPhyS::parseICOptions() {
+  tpsP->getRequiredInput("initialConditions/rho", config.initRhoRhoVp[0]);
+  tpsP->getRequiredInput("initialConditions/rhoU", config.initRhoRhoVp[1]);
+  tpsP->getRequiredInput("initialConditions/rhoV", config.initRhoRhoVp[2]);
+  tpsP->getRequiredInput("initialConditions/rhoW", config.initRhoRhoVp[3]);
+  tpsP->getRequiredInput("initialConditions/pressure", config.initRhoRhoVp[4]);
+}
+
+void M2ulPhyS::parsePassiveScalarOptions() {
+  int numForcings;
+  tpsP->getInput("passiveScalars/numScalars", numForcings, 0);
+  for (int i = 1; i <= numForcings; i++) {
+    // add new entry in arrayPassiveScalar
+    config.arrayPassiveScalar.Append(new passiveScalarData);
+    config.arrayPassiveScalar[i - 1]->coords.SetSize(3);
+
+    std::string basepath("passiveScalar" + std::to_string(i));
+
+    Array<double> xyz;
+    tpsP->getRequiredVec((basepath + "/xyz").c_str(), xyz, 3);
+    for (int d = 0; d < 3; d++) config.arrayPassiveScalar[i - 1]->coords[d] = xyz[d];
+
+    double radius;
+    tpsP->getRequiredInput((basepath + "/radius").c_str(), radius);
+    config.arrayPassiveScalar[i - 1]->radius = radius;
+
+    double value;
+    tpsP->getRequiredInput((basepath + "/value").c_str(), value);
+    config.arrayPassiveScalar[i - 1]->value = value;
+  }
+}
+
+void M2ulPhyS::parseFluidPreset() {
   std::string fluidTypeStr;
   tpsP->getInput("flow/fluid", fluidTypeStr, std::string("dry_air"));
   if (fluidTypeStr == "dry_air") {
@@ -1813,24 +1872,12 @@ void M2ulPhyS::parseSolverOptions2() {
     exit(ERROR);
   }
 
-  // int fluidType;
-  // switch (fluidType) {
-  //   case WorkingFluid::DRY_AIR:
-  //     config.workFluid = DRY_AIR;
-  //     fluidTypeStr = "DRY_AIR";
-  //     break;
-  //   case WorkingFluid::TEST_BINARY_AIR:
-  //     config.workFluid = TEST_BINARY_AIR;
-  //     fluidTypeStr = "TEST_BINARY_AIR";
-  //     break;
-  //   case WorkingFluid::USER_DEFINED:
-  //     config.workFluid = USER_DEFINED;
-  //     fluidTypeStr = "USER_DEFINED";
-  //     break;
-  //   default:
-  //     break;
-  // }
+  if (config.workFluid != USER_DEFINED)
+    cout << "Fluid is set to the preset '" << fluidTypeStr << "'. Input options in [plasma_models] will not be used."
+         << endl;
+}
 
+void M2ulPhyS::parseSystemType() {
   std::string systemType;
   tpsP->getInput("flow/equation_system", systemType, std::string("navier-stokes"));
   if (systemType == "euler") {
@@ -1843,446 +1890,431 @@ void M2ulPhyS::parseSolverOptions2() {
     grvy_printf(GRVY_ERROR, "\nUnknown equation_system -> %s", systemType.c_str());
     exit(ERROR);
   }
+}
 
-  // plasma conditions.
-  config.gasModel = NUM_GASMODEL;
-  config.transportModel = NUM_TRANSPORTMODEL;
-  config.chemistryModel_ = NUM_CHEMISTRYMODEL;
-  if (config.workFluid != USER_DEFINED) {
-    cout << "Fluid is set to the preset '" << fluidTypeStr << "'. Input options in [plasma_models] will not be used."
-         << endl;
+void M2ulPhyS::parsePlasmaModels() {
+  tpsP->getInput("plasma_models/ambipolar", config.ambipolar, false);
+  tpsP->getInput("plasma_models/two_temperature", config.twoTemperature, false);
+
+  std::string gasModelStr;
+  tpsP->getInput("plasma_models/gas_model", gasModelStr, std::string("perfect_mixture"));
+  if (gasModelStr == "perfect_mixture") {
+    config.gasModel = PERFECT_MIXTURE;
   } else {
-    tpsP->getInput("plasma_models/ambipolar", config.ambipolar, false);
-    tpsP->getInput("plasma_models/two_temperature", config.twoTemperature, false);
+    grvy_printf(GRVY_ERROR, "\nUnknown gas_model -> %s", gasModelStr.c_str());
+    exit(ERROR);
+  }
 
-    std::string gasModelStr;
-    tpsP->getInput("plasma_models/gas_model", gasModelStr, std::string("perfect_mixture"));
-    if (gasModelStr == "perfect_mixture") {
-      config.gasModel = PERFECT_MIXTURE;
+  std::string transportModelStr;
+  tpsP->getRequiredInput("plasma_models/transport_model", transportModelStr);
+  if (transportModelStr == "argon_minimal") {
+    config.transportModel = ARGON_MINIMAL;
+  } else if (transportModelStr == "argon_mixture") {
+    config.transportModel = ARGON_MIXTURE;
+  } else if (transportModelStr == "constant") {
+    config.transportModel = CONSTANT;
+  }
+  // } else {
+  //   grvy_printf(GRVY_ERROR, "\nUnknown transport_model -> %s", transportModelStr.c_str());
+  //   exit(ERROR);
+  // }
+
+  std::string chemistryModelStr;
+  tpsP->getInput("plasma_models/chemistry_model", chemistryModelStr, std::string(""));
+
+  // TODO(kevin): cantera wrapper
+  // if (chemistryModelStr == "cantera") {
+  //   config.chemistryModel_ = ChemistryModel::CANTERA;
+  // }
+}
+
+void M2ulPhyS::parseSpeciesInputs() {
+  // number of species defined
+  if (config.eqSystem != NS_PASSIVE) {
+    tpsP->getInput("species/numSpecies", config.numSpecies, 1);
+    config.gasParams.SetSize(config.numSpecies, GasParams::NUM_GASPARAMS);
+    // config.speciesNames.SetSize(config.numSpecies);
+    config.initialMassFractions.SetSize(config.numSpecies);
+    config.speciesNames.resize(config.numSpecies);
+
+    if (config.gasModel == PERFECT_MIXTURE) {
+      config.constantMolarCV.SetSize(config.numSpecies);
+      config.constantMolarCP.SetSize(config.numSpecies);
+    }
+  }
+
+  /*
+    NOTE: for now, we force the user to set the background species as the last,
+    and the electron species as the second to last.
+  */
+  config.numAtoms = 0;
+  if ((config.numSpecies > 1) && (config.eqSystem != NS_PASSIVE)) {
+    tpsP->getRequiredInput("species/background_index", config.backgroundIndex);
+
+    tpsP->getRequiredInput("atoms/numAtoms", config.numAtoms);
+    config.atomMW.SetSize(config.numAtoms);
+    for (int a = 1; a <= config.numAtoms; a++) {
+      std::string basepath("atoms/atom" + std::to_string(a));
+
+      std::string atomName;
+      tpsP->getRequiredInput((basepath + "/name").c_str(), atomName);
+      tpsP->getRequiredInput((basepath + "/mass").c_str(), config.atomMW(a - 1));
+      config.atomMap[atomName] = a - 1;
+    }
+  }
+
+  // Gas Params
+  if (config.workFluid != DRY_AIR) {
+    assert(config.numAtoms > 0);
+    config.speciesComposition.SetSize(config.numSpecies, config.numAtoms);
+    config.speciesComposition = 0.0;
+    for (int i = 1; i <= config.numSpecies; i++) {
+      double mw, charge, formEnergy;
+      std::string type, speciesName;
+      std::vector<std::pair<std::string, std::string>> composition;
+      std::string basepath("species/species" + std::to_string(i));
+
+      tpsP->getRequiredInput((basepath + "/name").c_str(), speciesName);
+      config.speciesNames[i - 1] = speciesName;
+
+      tpsP->getRequiredPairs((basepath + "/composition").c_str(), composition);
+      for (int c = 0; c < composition.size(); c++) {
+        if (config.atomMap.count(composition[c].first)) {
+          int atomIdx = config.atomMap[composition[c].first];
+          config.speciesComposition(i - 1, atomIdx) = stoi(composition[c].second);
+        } else {
+          grvy_printf(GRVY_ERROR, "Requested atom %s for species %s is not available!\n",
+                      composition[c].first.c_str(), speciesName.c_str());
+        }
+      }
+
+      tpsP->getRequiredInput((basepath + "/formation_energy").c_str(), formEnergy);
+      config.gasParams(i - 1, GasParams::FORMATION_ENERGY) = formEnergy;
+
+      tpsP->getRequiredInput((basepath + "/initialMassFraction").c_str(), config.initialMassFractions(i - 1));
+
+      //// require initial electron temperature
+      // if (speciesName == "E")
+      //  tpsP->getRequiredInput((basepath + "/initialElectronTemperature").c_str(),
+      //                         config.initialElectronTemperature);
+
+      if (config.gasModel == PERFECT_MIXTURE) {
+        tpsP->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(),
+                               config.constantMolarCV(i - 1));
+        // NOTE: For perfect gas, CP will be automatically set from CV.
+      }
+    }
+
+    Vector speciesMass(config.numSpecies), speciesCharge(config.numSpecies);
+    config.speciesComposition.Mult(config.atomMW, speciesMass);
+    config.speciesComposition.GetColumn(config.atomMap["E"], speciesCharge);
+    speciesCharge *= -1.0;
+    config.gasParams.SetCol(GasParams::SPECIES_MW, speciesMass);
+    config.gasParams.SetCol(GasParams::SPECIES_CHARGES, speciesCharge);
+  }
+}
+
+void M2ulPhyS::parseTransportInputs() {
+  switch (config.transportModel) {
+    case ARGON_MINIMAL:
+      // Check if unsupported species are included.
+      for (int sp = 0; sp < config.numSpecies; sp++) {
+        if ((config.speciesNames[sp] != "Ar") && (config.speciesNames[sp] != "Ar.+1") &&
+            (config.speciesNames[sp] != "E")) {
+          grvy_printf(GRVY_ERROR, "\nArgon ternary mixture transport does not support the species: %s !",
+                      config.speciesNames[sp].c_str());
+          exit(ERROR);
+        }
+      }
+      tpsP->getInput("plasma_models/transport_model/argon_minimal/third_order_thermal_conductivity",
+                     config.thirdOrderkElectron, true);
+      break;
+    case ARGON_MIXTURE:
+      tpsP->getInput("plasma_models/transport_model/argon_mixture/third_order_thermal_conductivity",
+                     config.thirdOrderkElectron, true);
+      break;
+    case CONSTANT: {
+      tpsP->getRequiredInput("plasma_models/transport_model/constant/viscosity", config.constantTransport.viscosity);
+      tpsP->getRequiredInput("plasma_models/transport_model/constant/bulk_viscosity",
+                             config.constantTransport.bulkViscosity);
+      tpsP->getRequiredInput("plasma_models/transport_model/constant/thermal_conductivity",
+                             config.constantTransport.thermalConductivity);
+      tpsP->getRequiredInput("plasma_models/transport_model/constant/electron_thermal_conductivity",
+                             config.constantTransport.electronThermalConductivity);
+      std::string diffpath("plasma_models/transport_model/constant/diffusivity");
+      config.constantTransport.diffusivity.SetSize(config.numSpecies);
+      std::string mtpath("plasma_models/transport_model/constant/momentum_transfer_frequency");
+      config.constantTransport.mtFreq.SetSize(config.numSpecies);
+      config.constantTransport.diffusivity = 0.0;
+      config.constantTransport.mtFreq = 0.0;
+      for (int sp = 1; sp <= config.numSpecies; sp++) {
+        tpsP->getRequiredInput((diffpath + "/species" + std::to_string(sp)).c_str(),
+                               config.constantTransport.diffusivity(sp - 1));
+        if (config.twoTemperature)
+          tpsP->getRequiredInput((mtpath + "/species" + std::to_string(sp)).c_str(),
+                                 config.constantTransport.mtFreq(sp - 1));
+      }
+    } break;
+    default:
+      break;
+  }
+}
+
+void M2ulPhyS::parseReactionInputs() {
+  tpsP->getInput("reactions/number_of_reactions", config.numReactions, 0);
+  if (config.numReactions > 0) {
+    assert((config.workFluid != DRY_AIR) && (config.numSpecies > 1));
+    config.reactionEnergies.SetSize(config.numReactions);
+    config.reactionEquations.resize(config.numReactions);
+    config.reactionModels.SetSize(config.numReactions);
+    config.reactantStoich.SetSize(config.numSpecies, config.numReactions);
+    config.productStoich.SetSize(config.numSpecies, config.numReactions);
+
+    config.reactionModelParams.resize(config.numReactions);
+    config.detailedBalance.SetSize(config.numReactions);
+    config.equilibriumConstantParams.resize(config.numReactions);
+  }
+
+  for (int r = 1; r <= config.numReactions; r++) {
+    std::string basepath("reactions/reaction" + std::to_string(r));
+
+    // TODO(kevin): make tps input parser accessible to all classes.
+    // TODO(kevin): reaction classes read input options directly in their initialization.
+    std::string equation, model;
+    tpsP->getRequiredInput((basepath + "/equation").c_str(), equation);
+    config.reactionEquations[r - 1] = equation;
+    tpsP->getRequiredInput((basepath + "/model").c_str(), model);
+
+    double energy;
+    tpsP->getRequiredInput((basepath + "/reaction_energy").c_str(), energy);
+    config.reactionEnergies[r - 1] = energy;
+
+    if (model == "arrhenius") {
+      config.reactionModels[r - 1] = ARRHENIUS;
+      config.reactionModelParams[r - 1].resize(3);
+      double A, b, E;
+      tpsP->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
+      tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
+      tpsP->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
+      config.reactionModelParams[r - 1] = {A, b, E};
+
+    } else if (model == "hoffert_lien") {
+      config.reactionModels[r - 1] = HOFFERTLIEN;
+      config.reactionModelParams[r - 1].resize(3);
+      double A, b, E;
+      tpsP->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
+      tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
+      tpsP->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
+      config.reactionModelParams[r - 1] = {A, b, E};
+
     } else {
-      grvy_printf(GRVY_ERROR, "\nUnknown gas_model -> %s", gasModelStr.c_str());
+      grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
       exit(ERROR);
     }
 
-    std::string transportModelStr;
-    tpsP->getRequiredInput("plasma_models/transport_model", transportModelStr);
-    if (transportModelStr == "argon_minimal") {
-      config.transportModel = ARGON_MINIMAL;
-    } else if (transportModelStr == "argon_mixture") {
-      config.transportModel = ARGON_MIXTURE;
-    } else if (transportModelStr == "constant") {
-      config.transportModel = CONSTANT;
+    bool detailedBalance;
+    tpsP->getInput((basepath + "/detailed_balance").c_str(), detailedBalance, false);
+    config.detailedBalance[r - 1] = detailedBalance;
+    if (detailedBalance) {
+      config.equilibriumConstantParams[r - 1].resize(3);
+      double A, b, E;
+      tpsP->getRequiredInput((basepath + "/equilibrium_constant/A").c_str(), A);
+      tpsP->getRequiredInput((basepath + "/equilibrium_constant/b").c_str(), b);
+      tpsP->getRequiredInput((basepath + "/equilibrium_constant/E").c_str(), E);
+      config.equilibriumConstantParams[r - 1] = {A, b, E};
     }
-    // } else {
-    //   grvy_printf(GRVY_ERROR, "\nUnknown transport_model -> %s", transportModelStr.c_str());
-    //   exit(ERROR);
-    // }
 
-    std::string chemistryModelStr;
-    tpsP->getInput("plasma_models/chemistry_model", chemistryModelStr, std::string(""));
+    Array<double> stoich(config.numSpecies);
+    tpsP->getRequiredVec((basepath + "/reactant_stoichiometry").c_str(), stoich, config.numSpecies);
+    for (int sp = 0; sp < config.numSpecies; sp++) config.reactantStoich(sp, r - 1) = stoich[sp];
+    tpsP->getRequiredVec((basepath + "/product_stoichiometry").c_str(), stoich, config.numSpecies);
+    for (int sp = 0; sp < config.numSpecies; sp++) config.productStoich(sp, r - 1) = stoich[sp];
+  }
+}
 
-    // TODO(kevin): cantera wrapper
-    // if (chemistryModelStr == "cantera") {
-    //   config.chemistryModel_ = ChemistryModel::CANTERA;
-    // }
+void M2ulPhyS::parseBCInputs() {
+  // number of BC regions defined
+  int numWalls, numInlets, numOutlets;
+  tpsP->getInput("boundaryConditions/numWalls", numWalls, 0);
+  tpsP->getInput("boundaryConditions/numInlets", numInlets, 0);
+  tpsP->getInput("boundaryConditions/numOutlets", numOutlets, 0);
+
+  // Wall Bcs
+  std::map<std::string, WallType> wallMapping;
+  wallMapping["inviscid"] = INV;
+  wallMapping["viscous_adiabatic"] = VISC_ADIAB;
+  wallMapping["viscous_isothermal"] = VISC_ISOTH;
+
+  for (int i = 1; i <= numWalls; i++) {
+    int patch;
+    double temperature;
+    std::string type;
+    std::string basepath("boundaryConditions/wall" + std::to_string(i));
+
+    tpsP->getRequiredInput((basepath + "/patch").c_str(), patch);
+    tpsP->getRequiredInput((basepath + "/type").c_str(), type);
+    if (type == "viscous_isothermal") {
+      tpsP->getRequiredInput((basepath + "/temperature").c_str(), temperature);
+      config.wallBC.Append(temperature);
+    } else {
+      config.wallBC.Append(0.);
+    }
+
+    std::pair<int, WallType> patchType;
+    patchType.first = patch;
+    patchType.second = wallMapping[type];
+    config.wallPatchType.push_back(patchType);
   }
 
-  // species list.
-  {
-    // number of species defined
-    if (config.eqSystem != NS_PASSIVE) {
-      tpsP->getInput("species/numSpecies", config.numSpecies, 1);
-      config.gasParams.SetSize(config.numSpecies, GasParams::NUM_GASPARAMS);
-      // config.speciesNames.SetSize(config.numSpecies);
-      config.initialMassFractions.SetSize(config.numSpecies);
-      config.speciesNames.resize(config.numSpecies);
+  // Inlet Bcs
+  std::map<std::string, InletType> inletMapping;
+  inletMapping["subsonic"] = SUB_DENS_VEL;
+  inletMapping["nonreflecting"] = SUB_DENS_VEL_NR;
+  inletMapping["nonreflectingConstEntropy"] = SUB_VEL_CONST_ENT;
 
-      if (config.gasModel == PERFECT_MIXTURE) {
-        config.constantMolarCV.SetSize(config.numSpecies);
-        config.constantMolarCP.SetSize(config.numSpecies);
+  for (int i = 1; i <= numInlets; i++) {
+    int patch;
+    double density;
+    std::string type;
+    std::string basepath("boundaryConditions/inlet" + std::to_string(i));
+
+    tpsP->getRequiredInput((basepath + "/patch").c_str(), patch);
+    tpsP->getRequiredInput((basepath + "/type").c_str(), type);
+    // all inlet BCs require 4 inputs (density + vel(3))
+    {
+      Array<double> uvw;
+      tpsP->getRequiredInput((basepath + "/density").c_str(), density);
+      tpsP->getRequiredVec((basepath + "/uvw").c_str(), uvw, 3);
+      config.inletBC.Append(density);
+      config.inletBC.Append(uvw, 3);
+    }
+    // For multi-component gas, require (numActiveSpecies)-more inputs.
+    if ((config.workFluid != DRY_AIR) && (config.numSpecies > 1)) {
+      grvy_printf(GRVY_INFO, "\nInlet mass fraction of background species will not be used. \n");
+      if (config.ambipolar) grvy_printf(GRVY_INFO, "\nInlet mass fraction of electron will not be used. \n");
+
+      for (int sp = 1; sp <= config.numSpecies; sp++) {
+        double Ysp;
+        // read mass fraction of species as listed in the input file.
+        std::string speciesBasePath(basepath + "/mass_fraction/species" + std::to_string(sp));
+        tpsP->getRequiredInput(speciesBasePath.c_str(), Ysp);
+        config.inletBC.Append(Ysp);
       }
     }
-
-    /*
-      NOTE: for now, we force the user to set the background species as the last,
-      and the electron species as the second to last.
-    */
-    config.numAtoms = 0;
-    if ((config.numSpecies > 1) && (config.eqSystem != NS_PASSIVE)) {
-      tpsP->getRequiredInput("species/background_index", config.backgroundIndex);
-
-      tpsP->getRequiredInput("atoms/numAtoms", config.numAtoms);
-      config.atomMW.SetSize(config.numAtoms);
-      for (int a = 1; a <= config.numAtoms; a++) {
-        std::string basepath("atoms/atom" + std::to_string(a));
-
-        std::string atomName;
-        tpsP->getRequiredInput((basepath + "/name").c_str(), atomName);
-        tpsP->getRequiredInput((basepath + "/mass").c_str(), config.atomMW(a - 1));
-        config.atomMap[atomName] = a - 1;
-      }
-    }
-
-    // Gas Params
-    if (config.workFluid != DRY_AIR) {
-      assert(config.numAtoms > 0);
-      config.speciesComposition.SetSize(config.numSpecies, config.numAtoms);
-      config.speciesComposition = 0.0;
-      for (int i = 1; i <= config.numSpecies; i++) {
-        double mw, charge, formEnergy;
-        std::string type, speciesName;
-        std::vector<std::pair<std::string, std::string>> composition;
-        std::string basepath("species/species" + std::to_string(i));
-
-        tpsP->getRequiredInput((basepath + "/name").c_str(), speciesName);
-        config.speciesNames[i - 1] = speciesName;
-
-        tpsP->getRequiredPairs((basepath + "/composition").c_str(), composition);
-        for (int c = 0; c < composition.size(); c++) {
-          if (config.atomMap.count(composition[c].first)) {
-            int atomIdx = config.atomMap[composition[c].first];
-            config.speciesComposition(i - 1, atomIdx) = stoi(composition[c].second);
-          } else {
-            grvy_printf(GRVY_ERROR, "Requested atom %s for species %s is not available!\n",
-                        composition[c].first.c_str(), speciesName.c_str());
-          }
-        }
-
-        tpsP->getRequiredInput((basepath + "/formation_energy").c_str(), formEnergy);
-        config.gasParams(i - 1, GasParams::FORMATION_ENERGY) = formEnergy;
-
-        tpsP->getRequiredInput((basepath + "/initialMassFraction").c_str(), config.initialMassFractions(i - 1));
-
-        //// require initial electron temperature
-        // if (speciesName == "E")
-        //  tpsP->getRequiredInput((basepath + "/initialElectronTemperature").c_str(),
-        //                         config.initialElectronTemperature);
-
-        if (config.gasModel == PERFECT_MIXTURE) {
-          tpsP->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(),
-                                 config.constantMolarCV(i - 1));
-          // NOTE: For perfect gas, CP will be automatically set from CV.
-        }
-      }
-
-      Vector speciesMass(config.numSpecies), speciesCharge(config.numSpecies);
-      config.speciesComposition.Mult(config.atomMW, speciesMass);
-      config.speciesComposition.GetColumn(config.atomMap["E"], speciesCharge);
-      speciesCharge *= -1.0;
-      config.gasParams.SetCol(GasParams::SPECIES_MW, speciesMass);
-      config.gasParams.SetCol(GasParams::SPECIES_CHARGES, speciesCharge);
-    }
+    std::pair<int, InletType> patchType;
+    patchType.first = patch;
+    patchType.second = inletMapping[type];
+    config.inletPatchType.push_back(patchType);
   }
 
-  if (config.workFluid == USER_DEFINED) {  // Transport model
-    switch (config.transportModel) {
-      case ARGON_MINIMAL:
-        // Check if unsupported species are included.
-        for (int sp = 0; sp < config.numSpecies; sp++) {
-          if ((config.speciesNames[sp] != "Ar") && (config.speciesNames[sp] != "Ar.+1") &&
-              (config.speciesNames[sp] != "E")) {
-            grvy_printf(GRVY_ERROR, "\nArgon ternary mixture transport does not support the species: %s !",
-                        config.speciesNames[sp].c_str());
-            exit(ERROR);
-          }
-        }
-        tpsP->getInput("plasma_models/transport_model/argon_minimal/third_order_thermal_conductivity",
-                       config.thirdOrderkElectron, true);
-        break;
-      case ARGON_MIXTURE:
-        tpsP->getInput("plasma_models/transport_model/argon_mixture/third_order_thermal_conductivity",
-                       config.thirdOrderkElectron, true);
-        break;
-      case CONSTANT: {
-        tpsP->getRequiredInput("plasma_models/transport_model/constant/viscosity", config.constantTransport.viscosity);
-        tpsP->getRequiredInput("plasma_models/transport_model/constant/bulk_viscosity",
-                               config.constantTransport.bulkViscosity);
-        tpsP->getRequiredInput("plasma_models/transport_model/constant/thermal_conductivity",
-                               config.constantTransport.thermalConductivity);
-        tpsP->getRequiredInput("plasma_models/transport_model/constant/electron_thermal_conductivity",
-                               config.constantTransport.electronThermalConductivity);
-        std::string diffpath("plasma_models/transport_model/constant/diffusivity");
-        config.constantTransport.diffusivity.SetSize(config.numSpecies);
-        std::string mtpath("plasma_models/transport_model/constant/momentum_transfer_frequency");
-        config.constantTransport.mtFreq.SetSize(config.numSpecies);
-        config.constantTransport.diffusivity = 0.0;
-        config.constantTransport.mtFreq = 0.0;
-        for (int sp = 1; sp <= config.numSpecies; sp++) {
-          tpsP->getRequiredInput((diffpath + "/species" + std::to_string(sp)).c_str(),
-                                 config.constantTransport.diffusivity(sp - 1));
-          if (config.twoTemperature)
-            tpsP->getRequiredInput((mtpath + "/species" + std::to_string(sp)).c_str(),
-                                   config.constantTransport.mtFreq(sp - 1));
-        }
-      } break;
-      default:
-        break;
+  // Outlet Bcs
+  std::map<std::string, OutletType> outletMapping;
+  outletMapping["subsonicPressure"] = SUB_P;
+  outletMapping["nonReflectingPressure"] = SUB_P_NR;
+  outletMapping["nonReflectingMassFlow"] = SUB_MF_NR;
+  outletMapping["nonReflectingPointBasedMassFlow"] = SUB_MF_NR_PW;
+
+  for (int i = 1; i <= numOutlets; i++) {
+    int patch;
+    double pressure, massFlow;
+    std::string type;
+    std::string basepath("boundaryConditions/outlet" + std::to_string(i));
+
+    tpsP->getRequiredInput((basepath + "/patch").c_str(), patch);
+    tpsP->getRequiredInput((basepath + "/type").c_str(), type);
+
+    if ((type == "subsonicPressure") || (type == "nonReflectingPressure")) {
+      tpsP->getRequiredInput((basepath + "/pressure").c_str(), pressure);
+      config.outletBC.Append(pressure);
+    } else if ((type == "nonReflectingMassFlow") || (type == "nonReflectingPointBasedMassFlow")) {
+      tpsP->getRequiredInput((basepath + "/massFlow").c_str(), massFlow);
+      config.outletBC.Append(massFlow);
+    } else {
+      grvy_printf(GRVY_ERROR, "\nUnknown outlet BC supplied at runtime -> %s", type.c_str());
+      exit(ERROR);
     }
+
+    std::pair<int, OutletType> patchType;
+    patchType.first = patch;
+    patchType.second = outletMapping[type];
+    config.outletPatchType.push_back(patchType);
   }
+}
 
-  {  // Reaction list
-    tpsP->getInput("reactions/number_of_reactions", config.numReactions, 0);
-    if (config.numReactions > 0) {
-      assert((config.workFluid != DRY_AIR) && (config.numSpecies > 1));
-      config.reactionEnergies.SetSize(config.numReactions);
-      config.reactionEquations.resize(config.numReactions);
-      config.reactionModels.SetSize(config.numReactions);
-      config.reactantStoich.SetSize(config.numSpecies, config.numReactions);
-      config.productStoich.SetSize(config.numSpecies, config.numReactions);
+void M2ulPhyS::parseSpongeZoneInputs() {
+  tpsP->getInput("spongezone/numSpongeZones", config.numSpongeRegions_, 0);
 
-      config.reactionModelParams.resize(config.numReactions);
-      config.detailedBalance.SetSize(config.numReactions);
-      config.equilibriumConstantParams.resize(config.numReactions);
-    }
+  if (config.numSpongeRegions_ > 0) {
+    config.spongeData_ = new SpongeZoneData[config.numSpongeRegions_];
 
-    for (int r = 1; r <= config.numReactions; r++) {
-      std::string basepath("reactions/reaction" + std::to_string(r));
+    for (int sz = 0; sz < config.numSpongeRegions_; sz++) {
+      std::string base("spongezone" + std::to_string(sz + 1));
 
-      // TODO(kevin): make tps input parser accessible to all classes.
-      // TODO(kevin): reaction classes read input options directly in their initialization.
-      std::string equation, model;
-      tpsP->getRequiredInput((basepath + "/equation").c_str(), equation);
-      config.reactionEquations[r - 1] = equation;
-      tpsP->getRequiredInput((basepath + "/model").c_str(), model);
+      std::string type;
+      tpsP->getInput((base + "/type").c_str(), type, std::string("none"));
 
-      double energy;
-      tpsP->getRequiredInput((basepath + "/reaction_energy").c_str(), energy);
-      config.reactionEnergies[r - 1] = energy;
-
-      if (model == "arrhenius") {
-        config.reactionModels[r - 1] = ARRHENIUS;
-        config.reactionModelParams[r - 1].resize(3);
-        double A, b, E;
-        tpsP->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
-        tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
-        tpsP->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
-        config.reactionModelParams[r - 1] = {A, b, E};
-
-      } else if (model == "hoffert_lien") {
-        config.reactionModels[r - 1] = HOFFERTLIEN;
-        config.reactionModelParams[r - 1].resize(3);
-        double A, b, E;
-        tpsP->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
-        tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
-        tpsP->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
-        config.reactionModelParams[r - 1] = {A, b, E};
-
-      } else {
-        grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
+      if (type == "none") {
+        grvy_printf(GRVY_ERROR, "\nUnknown sponge zone type -> %s\n", type.c_str());
         exit(ERROR);
+      } else if (type == "planar") {
+        config.spongeData_[sz].szType = SpongeZoneType::PLANAR;
+      } else if (type == "annulus") {
+        config.spongeData_[sz].szType = SpongeZoneType::ANNULUS;
+
+        tpsP->getInput((base + "/r1").c_str(), config.spongeData_[sz].r1, 0.);
+        tpsP->getInput((base + "/r2").c_str(), config.spongeData_[sz].r2, 0.);
       }
 
-      bool detailedBalance;
-      tpsP->getInput((basepath + "/detailed_balance").c_str(), detailedBalance, false);
-      config.detailedBalance[r - 1] = detailedBalance;
-      if (detailedBalance) {
-        config.equilibriumConstantParams[r - 1].resize(3);
-        double A, b, E;
-        tpsP->getRequiredInput((basepath + "/equilibrium_constant/A").c_str(), A);
-        tpsP->getRequiredInput((basepath + "/equilibrium_constant/b").c_str(), b);
-        tpsP->getRequiredInput((basepath + "/equilibrium_constant/E").c_str(), E);
-        config.equilibriumConstantParams[r - 1] = {A, b, E};
-      }
+      config.spongeData_[sz].normal.SetSize(3);
+      config.spongeData_[sz].point0.SetSize(3);
+      config.spongeData_[sz].pointInit.SetSize(3);
+      config.spongeData_[sz].targetUp.SetSize(5);
 
-      Array<double> stoich(config.numSpecies);
-      tpsP->getRequiredVec((basepath + "/reactant_stoichiometry").c_str(), stoich, config.numSpecies);
-      for (int sp = 0; sp < config.numSpecies; sp++) config.reactantStoich(sp, r - 1) = stoich[sp];
-      tpsP->getRequiredVec((basepath + "/product_stoichiometry").c_str(), stoich, config.numSpecies);
-      for (int sp = 0; sp < config.numSpecies; sp++) config.productStoich(sp, r - 1) = stoich[sp];
-    }
-  }
+      tpsP->getRequiredVec((base + "/normal").c_str(), config.spongeData_[sz].normal, 3);
+      tpsP->getRequiredVec((base + "/p0").c_str(), config.spongeData_[sz].point0, 3);
+      tpsP->getRequiredVec((base + "/pInit").c_str(), config.spongeData_[sz].pointInit, 3);
+      tpsP->getInput((base + "/tolerance").c_str(), config.spongeData_[sz].tol, 1e-5);
+      tpsP->getInput((base + "/multiplier").c_str(), config.spongeData_[sz].multFactor, 1.0);
 
-  // changed the order of parsing in order to use species list.
-  // boundary conditions. The number of boundaries of each supported type if
-  // parsed first. Then, a section corresponding to each defined boundary is parsed afterwards
-  {
-    // number of BC regions defined
-    int numWalls, numInlets, numOutlets;
-    tpsP->getInput("boundaryConditions/numWalls", numWalls, 0);
-    tpsP->getInput("boundaryConditions/numInlets", numInlets, 0);
-    tpsP->getInput("boundaryConditions/numOutlets", numOutlets, 0);
+      tpsP->getRequiredInput((base + "/targetSolType").c_str(), type);
+      if (type == "userDef") {
+        config.spongeData_[sz].szSolType = SpongeZoneSolution::USERDEF;
+        auto hup = config.spongeData_[sz].targetUp.HostWrite();
+        tpsP->getRequiredInput((base + "/density").c_str(), hup[0]);   // rho
+        tpsP->getRequiredVecElem((base + "/uvw").c_str(), hup[1], 0);  // u
+        tpsP->getRequiredVecElem((base + "/uvw").c_str(), hup[2], 1);  // v
+        tpsP->getRequiredVecElem((base + "/uvw").c_str(), hup[3], 2);  // w
+        tpsP->getRequiredInput((base + "/pressure").c_str(), hup[4]);  // P
 
-    // Wall Bcs
-    std::map<std::string, WallType> wallMapping;
-    wallMapping["inviscid"] = INV;
-    wallMapping["viscous_adiabatic"] = VISC_ADIAB;
-    wallMapping["viscous_isothermal"] = VISC_ISOTH;
+        // For multi-component gas, require (numActiveSpecies)-more inputs.
+        if (config.workFluid != DRY_AIR) {
+          if (config.numSpecies > 1) {
+            grvy_printf(GRVY_INFO, "\nInlet mass fraction of background species will not be used. \n");
+            if (config.ambipolar) grvy_printf(GRVY_INFO, "\nInlet mass fraction of electron will not be used. \n");
 
-    for (int i = 1; i <= numWalls; i++) {
-      int patch;
-      double temperature;
-      std::string type;
-      std::string basepath("boundaryConditions/wall" + std::to_string(i));
-
-      tpsP->getRequiredInput((basepath + "/patch").c_str(), patch);
-      tpsP->getRequiredInput((basepath + "/type").c_str(), type);
-      if (type == "viscous_isothermal") {
-        tpsP->getRequiredInput((basepath + "/temperature").c_str(), temperature);
-        config.wallBC.Append(temperature);
-      } else {
-        config.wallBC.Append(0.);
-      }
-
-      std::pair<int, WallType> patchType;
-      patchType.first = patch;
-      patchType.second = wallMapping[type];
-      config.wallPatchType.push_back(patchType);
-    }
-
-    // Inlet Bcs
-    std::map<std::string, InletType> inletMapping;
-    inletMapping["subsonic"] = SUB_DENS_VEL;
-    inletMapping["nonreflecting"] = SUB_DENS_VEL_NR;
-    inletMapping["nonreflectingConstEntropy"] = SUB_VEL_CONST_ENT;
-
-    for (int i = 1; i <= numInlets; i++) {
-      int patch;
-      double density;
-      std::string type;
-      std::string basepath("boundaryConditions/inlet" + std::to_string(i));
-
-      tpsP->getRequiredInput((basepath + "/patch").c_str(), patch);
-      tpsP->getRequiredInput((basepath + "/type").c_str(), type);
-      // all inlet BCs require 4 inputs (density + vel(3))
-      {
-        Array<double> uvw;
-        tpsP->getRequiredInput((basepath + "/density").c_str(), density);
-        tpsP->getRequiredVec((basepath + "/uvw").c_str(), uvw, 3);
-        config.inletBC.Append(density);
-        config.inletBC.Append(uvw, 3);
-      }
-      // For multi-component gas, require (numActiveSpecies)-more inputs.
-      if ((config.workFluid != DRY_AIR) && (config.numSpecies > 1)) {
-        grvy_printf(GRVY_INFO, "\nInlet mass fraction of background species will not be used. \n");
-        if (config.ambipolar) grvy_printf(GRVY_INFO, "\nInlet mass fraction of electron will not be used. \n");
-
-        for (int sp = 1; sp <= config.numSpecies; sp++) {
-          double Ysp;
-          // read mass fraction of species as listed in the input file.
-          std::string speciesBasePath(basepath + "/mass_fraction/species" + std::to_string(sp));
-          tpsP->getRequiredInput(speciesBasePath.c_str(), Ysp);
-          config.inletBC.Append(Ysp);
-        }
-      }
-      std::pair<int, InletType> patchType;
-      patchType.first = patch;
-      patchType.second = inletMapping[type];
-      config.inletPatchType.push_back(patchType);
-    }
-
-    // Outlet Bcs
-    std::map<std::string, OutletType> outletMapping;
-    outletMapping["subsonicPressure"] = SUB_P;
-    outletMapping["nonReflectingPressure"] = SUB_P_NR;
-    outletMapping["nonReflectingMassFlow"] = SUB_MF_NR;
-    outletMapping["nonReflectingPointBasedMassFlow"] = SUB_MF_NR_PW;
-
-    for (int i = 1; i <= numOutlets; i++) {
-      int patch;
-      double pressure, massFlow;
-      std::string type;
-      std::string basepath("boundaryConditions/outlet" + std::to_string(i));
-
-      tpsP->getRequiredInput((basepath + "/patch").c_str(), patch);
-      tpsP->getRequiredInput((basepath + "/type").c_str(), type);
-
-      if ((type == "subsonicPressure") || (type == "nonReflectingPressure")) {
-        tpsP->getRequiredInput((basepath + "/pressure").c_str(), pressure);
-        config.outletBC.Append(pressure);
-      } else if ((type == "nonReflectingMassFlow") || (type == "nonReflectingPointBasedMassFlow")) {
-        tpsP->getRequiredInput((basepath + "/massFlow").c_str(), massFlow);
-        config.outletBC.Append(massFlow);
-      } else {
-        grvy_printf(GRVY_ERROR, "\nUnknown outlet BC supplied at runtime -> %s", type.c_str());
-        exit(ERROR);
-      }
-
-      std::pair<int, OutletType> patchType;
-      patchType.first = patch;
-      patchType.second = outletMapping[type];
-      config.outletPatchType.push_back(patchType);
-    }
-  }
-
-  // changed the order of parsing in order to use species list.
-  // sponge zone
-  {
-    tpsP->getInput("spongezone/numSpongeZones", config.numSpongeRegions_, 0);
-
-    if (config.numSpongeRegions_ > 0) {
-      config.spongeData_ = new SpongeZoneData[config.numSpongeRegions_];
-
-      for (int sz = 0; sz < config.numSpongeRegions_; sz++) {
-        std::string base("spongezone" + std::to_string(sz + 1));
-
-        std::string type;
-        tpsP->getInput((base + "/type").c_str(), type, std::string("none"));
-
-        if (type == "none") {
-          grvy_printf(GRVY_ERROR, "\nUnknown sponge zone type -> %s\n", type.c_str());
-          exit(ERROR);
-        } else if (type == "planar") {
-          config.spongeData_[sz].szType = SpongeZoneType::PLANAR;
-        } else if (type == "annulus") {
-          config.spongeData_[sz].szType = SpongeZoneType::ANNULUS;
-
-          tpsP->getInput((base + "/r1").c_str(), config.spongeData_[sz].r1, 0.);
-          tpsP->getInput((base + "/r2").c_str(), config.spongeData_[sz].r2, 0.);
-        }
-
-        config.spongeData_[sz].normal.SetSize(3);
-        config.spongeData_[sz].point0.SetSize(3);
-        config.spongeData_[sz].pointInit.SetSize(3);
-        config.spongeData_[sz].targetUp.SetSize(5);
-
-        tpsP->getRequiredVec((base + "/normal").c_str(), config.spongeData_[sz].normal, 3);
-        tpsP->getRequiredVec((base + "/p0").c_str(), config.spongeData_[sz].point0, 3);
-        tpsP->getRequiredVec((base + "/pInit").c_str(), config.spongeData_[sz].pointInit, 3);
-        tpsP->getInput((base + "/tolerance").c_str(), config.spongeData_[sz].tol, 1e-5);
-        tpsP->getInput((base + "/multiplier").c_str(), config.spongeData_[sz].multFactor, 1.0);
-
-        tpsP->getRequiredInput((base + "/targetSolType").c_str(), type);
-        if (type == "userDef") {
-          config.spongeData_[sz].szSolType = SpongeZoneSolution::USERDEF;
-          auto hup = config.spongeData_[sz].targetUp.HostWrite();
-          tpsP->getRequiredInput((base + "/density").c_str(), hup[0]);   // rho
-          tpsP->getRequiredVecElem((base + "/uvw").c_str(), hup[1], 0);  // u
-          tpsP->getRequiredVecElem((base + "/uvw").c_str(), hup[2], 1);  // v
-          tpsP->getRequiredVecElem((base + "/uvw").c_str(), hup[3], 2);  // w
-          tpsP->getRequiredInput((base + "/pressure").c_str(), hup[4]);  // P
-
-          // For multi-component gas, require (numActiveSpecies)-more inputs.
-          if (config.workFluid != DRY_AIR) {
-            if (config.numSpecies > 1) {
-              grvy_printf(GRVY_INFO, "\nInlet mass fraction of background species will not be used. \n");
-              if (config.ambipolar) grvy_printf(GRVY_INFO, "\nInlet mass fraction of electron will not be used. \n");
-
-              for (int sp = 1; sp <= config.numSpecies; sp++) {
-                // read mass fraction of species as listed in the input file.
-                std::string speciesBasePath(base + "/mass_fraction/species" + std::to_string(sp));
-                tpsP->getRequiredInput(speciesBasePath.c_str(), hup[4 + sp]);
-              }
-            }
-
-            if (config.twoTemperature) {
-              tpsP->getInput((base + "/single_temperature").c_str(), config.spongeData_[sz].singleTemperature, false);
-              if (!config.spongeData_[sz].singleTemperature) {
-                tpsP->getRequiredInput((base + "/electron_temperature").c_str(), hup[5 + config.numSpecies]);  // P
-              }
+            for (int sp = 1; sp <= config.numSpecies; sp++) {
+              // read mass fraction of species as listed in the input file.
+              std::string speciesBasePath(base + "/mass_fraction/species" + std::to_string(sp));
+              tpsP->getRequiredInput(speciesBasePath.c_str(), hup[4 + sp]);
             }
           }
 
-        } else if (type == "mixedOut") {
-          config.spongeData_[sz].szSolType = SpongeZoneSolution::MIXEDOUT;
-        } else {
-          grvy_printf(GRVY_ERROR, "\nUnknown sponge zone type -> %s\n", type.c_str());
-          exit(ERROR);
+          if (config.twoTemperature) {
+            tpsP->getInput((base + "/single_temperature").c_str(), config.spongeData_[sz].singleTemperature, false);
+            if (!config.spongeData_[sz].singleTemperature) {
+              tpsP->getRequiredInput((base + "/electron_temperature").c_str(), hup[5 + config.numSpecies]);  // P
+            }
+          }
         }
+
+      } else if (type == "mixedOut") {
+        config.spongeData_[sz].szSolType = SpongeZoneSolution::MIXEDOUT;
+      } else {
+        grvy_printf(GRVY_ERROR, "\nUnknown sponge zone type -> %s\n", type.c_str());
+        exit(ERROR);
       }
     }
   }
-
-  return;
 }
 
 void M2ulPhyS::checkSolverOptions() const {
