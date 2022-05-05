@@ -330,6 +330,26 @@ class M2ulPhyS : public TPS::Solver {
 
   void parseSolverOptions() override;
   void parseSolverOptions2();
+  // NOTE(kevin): had to split parseSolverOptions2 to enforce style..
+  void parseFlowOptions();
+  void parseTimeIntegrationOptions();
+  void parseStatOptions();
+  void parseIOSettings();
+  void parseRMSJobOptions();
+  void parseHeatSrcOptions();
+  void parseViscosityOptions();
+  void parseMMSOptions();
+  void parseICOptions();
+  void parsePassiveScalarOptions();
+  void parseFluidPreset();
+  void parseSystemType();
+  void parsePlasmaModels();
+  void parseSpeciesInputs();
+  void parseTransportInputs();
+  void parseReactionInputs();
+  void parseBCInputs();
+  void parseSpongeZoneInputs();
+
   void checkSolverOptions() const;
   void projectInitialSolution();
   void writeHDF5(string inputFileName = std::string()) { restart_files_hdf5("write", inputFileName); }
