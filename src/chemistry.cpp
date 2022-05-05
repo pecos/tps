@@ -96,7 +96,7 @@ Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : mixture_(m
         prodMass += product(inputSp) * mixture->GetGasParams(sp, SPECIES_MW);
       }
       // This may be too strict..
-      if (reactMass != prodMass) {
+      if (abs(reactMass - prodMass) > 1.0e-15) {
         grvy_printf(GRVY_ERROR, "Reaction %d does not conserve mass.\n", r);
         grvy_printf(GRVY_ERROR, "%.8E =/= %.8E\n", reactMass, prodMass);
         exit(-1);
