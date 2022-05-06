@@ -46,6 +46,7 @@ class WallBC : public BoundaryCondition {
  private:
   // The type of wall
   const WallType wallType_;
+  const wallData wallData_;
 
   Fluxes *fluxClass;
 
@@ -68,7 +69,7 @@ class WallBC : public BoundaryCondition {
  public:
   WallBC(RiemannSolver *rsolver_, GasMixture *_mixture, Equations _eqSystem, Fluxes *_fluxClass,
          ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
-         const int _num_equation, int _patchNumber, WallType _bcType, const Array<double> _inputData,
+         const int _num_equation, int _patchNumber, WallType _bcType, const wallData _inputData,
          const Array<int> &intPointsElIDBC, const int &maxIntPoints, bool axisym);
   ~WallBC();
 

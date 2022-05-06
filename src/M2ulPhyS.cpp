@@ -2144,7 +2144,9 @@ void M2ulPhyS::parseBCInputs() {
   wallMapping["inviscid"] = INV;
   wallMapping["viscous_adiabatic"] = VISC_ADIAB;
   wallMapping["viscous_isothermal"] = VISC_ISOTH;
+  wallMapping["viscous_general"] = VISC_GNRL;
 
+  config.wallBC.resize(numWalls);
   for (int i = 1; i <= numWalls; i++) {
     int patch;
     double temperature;
@@ -2155,11 +2157,61 @@ void M2ulPhyS::parseBCInputs() {
     tpsP->getRequiredInput((basepath + "/type").c_str(), type);
     if (type == "viscous_isothermal") {
       tpsP->getRequiredInput((basepath + "/temperature").c_str(), temperature);
-      config.wallBC.Append(temperature);
-    } else {
-      config.wallBC.Append(0.);
+      config.wallBC[i - 1].hvyThermalCond = ISOTH;
+      config.wallBC[i - 1].elecThermalCond = ISOTH;
+      config.wallBC[i - 1].Th = temperature;
+      config.wallBC[i - 1].Te = temperature;
+    } else if (type == "viscous_adiabatic") {
+      config.wallBC[i - 1].hvyThermalCond = ADIAB;
+      config.wallBC[i - 1].elecThermalCond = ADIAB;
+      config.wallBC[i - 1].Th = -1.0;
+      config.wallBC[i - 1].Te = -1.0;
+    } else if (type == "viscous_general") {
+      std::map<std::string, ThermalCondition> thmCondMap;
+      thmCondMap["adiabatic"] = ADIAB;
+      thmCondMap["isothermal"] = ISOTH;
+      thmCondMap["sheath"] = SHTH;
+
+      std::string hvyType, elecType;
+      tpsP->getRequiredInput((basepath + "/heavy_thermal_condition").c_str(), hvyType);
+      config.wallBC[i - 1].hvyThermalCond = thmCondMap[hvyType];
+
+      config.wallBC[i - 1].Th = -1.0;
+      switch (config.wallBC[i - 1].hvyThermalCond) {
+        case ISOTH: {
+          double Th;
+          tpsP->getRequiredInput((basepath + "/temperature").c_str(), Th);
+          config.wallBC[i - 1].Th = Th;
+        } break;
+        case SHTH: {
+          grvy_printf(GRVY_ERROR, "Wall%d: sheath condition is only supported for electron!\n", i);
+          exit(-1);
+        } break;
+        default:
+        break;
+      }
+
+      if (config.twoTemperature) {
+        tpsP->getRequiredInput((basepath + "/electron_thermal_condition").c_str(), elecType);
+        config.wallBC[i - 1].elecThermalCond = thmCondMap[elecType];
+        config.wallBC[i - 1].Te = -1.0;
+        switch (config.wallBC[i - 1].elecThermalCond) {
+          case ISOTH: {
+            // TODO(kevin): separate isothermal condition for electron.
+          } break;
+          case SHTH: {
+            if (!config.ambipolar) {
+              grvy_printf(GRVY_ERROR, "Wall%d: plasma must be ambipolar for sheath condition!\n", i);
+              exit(-1);
+            }
+          }
+          default:
+          break;
+        }
+      }
     }
 
+    // NOTE(kevin): maybe redundant at this point. Kept this just in case.
     std::pair<int, WallType> patchType;
     patchType.first = patch;
     patchType.second = wallMapping[type];

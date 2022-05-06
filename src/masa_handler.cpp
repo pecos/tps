@@ -614,11 +614,11 @@ void initTernary2D2TAmbipolarWall(GasMixture *mixture, RunConfiguration &config,
   MASA::masa_set_param<double>("nu_I", config.constantTransport.mtFreq((*mixtureToInputMap)[0]));
   MASA::masa_set_param<double>("nu_A", config.constantTransport.mtFreq((*mixtureToInputMap)[numSpecies - 1]));
 
-  assert(config.wallBC.Size() == 2);
+  assert(config.wallBC.size() == 2);
   double T0 = -1.0;
   for (int w = 0; w < 2; w++) {
-    if (config.wallBC[w] > 0.0) {
-      T0 = config.wallBC[w];
+    if (config.wallBC[w].Th > 0.0) {
+      T0 = config.wallBC[w].Th;
       break;
     }
   }
