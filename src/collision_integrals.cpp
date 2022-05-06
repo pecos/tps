@@ -89,6 +89,12 @@ double rep24(const double Tp) { return 0.1323 * pow(log(1.0 + 2.7248 * pow(Tp, 1
 // Takes T in Kelvin, returns in unit of m^2.
 namespace argon {
 
+double ArAr11(const double T) {
+  // Reference : fitted from tabulated data of Amdur, I., & Mason, E. A. (1958). Properties of gases at very high
+  // temperatures. Physics of Fluids, 1(5), 370–383. https://doi.org/10.1063/1.1724353
+  return 2.2910e-18 * pow(T, -0.3032);
+}
+
 double ArAr22(const double T) {
   // Reference : Liu, W. S., Whitten, B. T., & Glass, I. I. (1978). Ionizing argon boundary layers. Part 1. Quasi-steady
   // flat-plate laminar boundary-layer flows. Journal of Fluid Mechanics, 87(4), 609–640.

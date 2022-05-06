@@ -730,7 +730,9 @@ double ArgonMixtureTransport::collisionIntegral(const int _spI, const int _spJ, 
       }
     } break;
     case AR_AR: {
-      if ((l == 2) && (r == 2)) {
+      if ((l == 1) && (r == 1)) {
+        return collision::argon::ArAr11(temp);
+      } else if ((l == 2) && (r == 2)) {
         return collision::argon::ArAr22(temp);
       } else {
         grvy_printf(GRVY_ERROR,
