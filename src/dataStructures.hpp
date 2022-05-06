@@ -109,7 +109,14 @@ enum OutletType {
 enum WallType {
   INV,         // Inviscid wall
   VISC_ADIAB,  // Viscous adiabatic wall
-  VISC_ISOTH   // Viscous isothermal wall
+  VISC_ISOTH,  // Viscous isothermal wall
+  VISC_GNRL    // Viscous general wall
+};
+
+enum ThermalCondition {
+  ADIAB,  // Adiabatic
+  ISOTH,  // Isothermal
+  SHTH    // Sheath (only for electron temperature)
 };
 
 // The following four keywords define two planes in which
@@ -245,6 +252,14 @@ struct collisionInputs {
   double Te;
   double ndimTh;
   double ndimTe;
+};
+
+struct wallData {
+  ThermalCondition hvyThermalCond;
+  ThermalCondition elecThermalCond;
+
+  double Th;
+  double Te;
 };
 
 struct boundaryViscousFluxData {
