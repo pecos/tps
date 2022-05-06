@@ -306,5 +306,39 @@ int main (int argc, char *argv[])
     grvy_printf(GRVY_INFO, "\nPASS: Ar-Ar1+ (1,1) collision integral.\n");
   }
 
+  {
+    std::string fileName = "./ref_solns/collisions/Amdur_Mason.estimated.h5";
+    std::string datasetName = "Amdur_est";
+
+    DenseMatrix Amdur;
+    Array<int> dims = readTable(fileName, datasetName, Amdur);
+
+    Vector Tm(dims[0]);
+    Amdur.GetColumn(0, Tm);
+
+    double errorThreshold = 1.0e-2;
+
+    Vector O(dims[0]);
+    double relError = 0.0, relError1 = 0.0;
+    for (int m = 0; m < dims[0]; m++) {
+      O(m) = collision::argon::ArAr11(Tm(m));
+      int index = 3;
+
+      relError += abs((Amdur(m,index) - O(m)) / Amdur(m,index));
+      std::cout << O(m) << " =?= " << Amdur(m,index) << std::endl;
+      // std::cout << O(m) * Tm(m) * Tm(m) << " =?= " << Mason(m,1) << std::endl;
+    }
+    relError /= dims[0];
+    grvy_printf(GRVY_INFO, "\n Q11 with respect to Amdur & Mason (1958): %.8E\n", relError);
+    if (relError > errorThreshold) {
+      grvy_printf(GRVY_ERROR, "\n Collision integral error beyond threshold: %.8E\n", errorThreshold);
+      exit(ERROR);
+    }
+    // std::cout << relError << std::endl;
+    // std::cout << relError1 << std::endl;
+
+    grvy_printf(GRVY_INFO, "\nPASS: Ar-Ar (1,1) collision integral.\n");
+  }
+
   return 0;
 }

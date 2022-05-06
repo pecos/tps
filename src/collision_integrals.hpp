@@ -81,6 +81,8 @@ double rep24(const double Tp);
 // Takes T in Kelvin, returns in unit of m^2.
 namespace argon {
 
+double ArAr11(const double T);
+
 double ArAr22(const double T);
 
 // argon neutral (Ar) - argon positive ion (Ar1P)
