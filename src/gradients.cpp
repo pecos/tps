@@ -71,7 +71,13 @@ Gradients::Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradU
   uk_el2 = 0.;
   dun_face = 0.;
 
-#ifndef _GPU_
+  Ke_positions_.SetSize(vfes->GetNE());
+  auto h_Ke_positions = Ke_positions_.HostWrite();
+
+  std::vector<double> temp;
+  temp.clear();
+
+  //#ifndef _GPU_
   // element derivative stiffness matrix
   Ke.SetSize(vfes->GetNE());
   for (int el = 0; el < vfes->GetNE(); el++) {
@@ -108,14 +114,30 @@ Gradients::Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradU
         }
       }
     }
+
+    h_Ke_positions[el] = temp.size();
+    for (int j = 0; j < eldDof; j++) {
+      for (int k = 0; k < dim_ * eldDof; k++) {
+        temp.push_back((*Ke[el])(j, k));
+      }
+    }
   }
-#endif
+
+  Ke_array_.UseDevice(true);
+  Ke_array_.SetSize(temp.size());
+  auto h_Ke_array = Ke_array_.HostWrite();
+  for (int i = 0; i < static_cast<int>(temp.size()); i++) h_Ke_array[i] = temp[i];
+
+  auto d_Ke_array = Ke_array_.ReadWrite();
+  auto d_Ke_positions = Ke_positions_.ReadWrite();
+
+  //#endif
 }
 
 Gradients::~Gradients() {
-#ifndef _GPU_
+  //#ifndef _GPU_
   for (int n = 0; n < Ke.Size(); n++) delete Ke[n];
-#endif
+  //#endif
 }
 
 void Gradients::computeGradients() {
@@ -374,6 +396,22 @@ void Gradients::computeGradients_gpu(const int numElems, const int offsetElems, 
   const double *d_elemShapeDshapeWJ = gpuArrays.elemShapeDshapeWJ.Read();
   auto d_elemPosQ_shapeDshapeWJ = gpuArrays.elemPosQ_shapeDshapeWJ.Read();
 
+  auto d_Ke = Ke_array_.Read();
+  auto d_Ke_pos = Ke_positions_.Read();
+
+  //elGradUp(j, eq + d * num_equation_) += (*Ke[el])(j, k + d * eldDof) * elUp(k, eq);
+
+  // for (int eq = 0; eq < num_equation_; eq++) {
+  //   for (int d = 0; d < dim_; d++) {
+  //     for (int j = 0; j < eldDof; j++) {
+  //       for (int k = 0; k < eldDof; k++) {
+  //         elGradUp(j, eq + d * num_equation_) += (*Ke[el])(j, k + d * eldDof) * elUp(k, eq);
+  //       }
+  //     }
+  //   }
+  // }
+
+
   // MFEM_FORALL_2D(el, numElems, elDof, 1, 1,
   // {
   //   MFEM_FOREACH_THREAD(i, x, elDof) {
@@ -383,10 +421,13 @@ void Gradients::computeGradients_gpu(const int numElems, const int offsetElems, 
     const int offsetIDs    = d_posDofIds[2 * eli];
     const int offsetDShape = d_elemPosQ_shapeDshapeWJ[2 * eli   ];
     const int Q            = d_elemPosQ_shapeDshapeWJ[2 * eli + 1];
+
+    const int keoffset = d_Ke_pos[eli];
+
     int index_i[216];
     double Ui[216], gradUpi[216 * 3];
-    double l1[216], dl1[216];
-    double gradUpk;
+    //double l1[216], dl1[216];
+    //double gradUpk;
 
 
     for (int i = 0; i < elDof; i++) {
@@ -402,26 +443,35 @@ void Gradients::computeGradients_gpu(const int numElems, const int offsetElems, 
         }
       }
 
-      for (int k = 0; k < Q; k++) {
-        for (int i = 0; i < elDof; i++) {
-          l1[i] = d_elemShapeDshapeWJ[offsetDShape + i + k * ((dim + 1) * elDof + 1)];
-        }
-
-        for (int d = 0; d < dim; d++) {
-          // interpolate gradient in dth direction to kth quad point
-          gradUpk = 0.;
-          for (int j = 0; j < elDof; j++) {
-            dl1[j] = d_elemShapeDshapeWJ[offsetDShape + elDof + j + d * elDof + k * ((dim + 1) * elDof + 1)];
-            gradUpk += dl1[j] * Ui[j];
-          }
-
-
-          for (int i = 0; i < elDof; i++) {
-            const double weightDetJac = d_elemShapeDshapeWJ[offsetDShape + elDof + dim * elDof + k * ((dim + 1) * elDof + 1)];
-            gradUpi[i + d * elDof] += gradUpk * l1[i] * weightDetJac;
+      for (int d = 0; d < dim; d++) {
+        for (int j = 0; j < elDof; j++) {
+          for (int k = 0; k < elDof; k++) {
+            //gradUpi[j + d * elDof] += d_Ke[el][dim * elDof * j + d * elDof + k] * Ui[k];
+            gradUpi[j + d * elDof] += d_Ke[keoffset + dim * elDof * j + d * elDof + k] * Ui[k];
           }
         }
       }
+
+      // for (int k = 0; k < Q; k++) {
+      //   for (int i = 0; i < elDof; i++) {
+      //     l1[i] = d_elemShapeDshapeWJ[offsetDShape + i + k * ((dim + 1) * elDof + 1)];
+      //   }
+
+      //   for (int d = 0; d < dim; d++) {
+      //     // interpolate gradient in dth direction to kth quad point
+      //     gradUpk = 0.;
+      //     for (int j = 0; j < elDof; j++) {
+      //       dl1[j] = d_elemShapeDshapeWJ[offsetDShape + elDof + j + d * elDof + k * ((dim + 1) * elDof + 1)];
+      //       gradUpk += dl1[j] * Ui[j];
+      //     }
+
+
+      //     for (int i = 0; i < elDof; i++) {
+      //       const double weightDetJac = d_elemShapeDshapeWJ[offsetDShape + elDof + dim * elDof + k * ((dim + 1) * elDof + 1)];
+      //       gradUpi[i + d * elDof] += gradUpk * l1[i] * weightDetJac;
+      //     }
+      //   }
+      // }
 
         // write to global memory
       for (int i = 0; i < elDof; i++) {

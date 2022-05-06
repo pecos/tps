@@ -74,6 +74,9 @@ class Gradients : public ParNonlinearForm {
   // DenseMatrix *Me_inv;
   Array<DenseMatrix *> &Me_inv;
   Array<DenseMatrix *> Ke;
+  Vector Ke_array_;
+  Array<int> Ke_positions_;
+
   Vector &invMArray;
   Array<int> &posDofInvM;
 
@@ -108,12 +111,12 @@ class Gradients : public ParNonlinearForm {
   void computeGradients_domain();
   void computeGradients_bdr();
 
-  static void computeGradients_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
-                                   const Vector &Up, Vector &gradUp, const int num_equation, const int dim,
-                                   const volumeFaceIntegrationArrays &gpuArrays,
-                                   //                                    const Vector &elemShapeDshapeWJ,
-                                   //                                    const Array<int> &elemPosQ_shapeDshapeWJ,
-                                   const int &maxDofs, const int &maxIntPoints);
+  void computeGradients_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
+                            const Vector &Up, Vector &gradUp, const int num_equation, const int dim,
+                            const volumeFaceIntegrationArrays &gpuArrays,
+                            //                                    const Vector &elemShapeDshapeWJ,
+                            //                                    const Array<int> &elemPosQ_shapeDshapeWJ,
+                            const int &maxDofs, const int &maxIntPoints);
 
   void faceContrib_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
                        const Vector &Up, Vector &gradUp, const int num_equation, const int dim,
