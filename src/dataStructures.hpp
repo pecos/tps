@@ -247,4 +247,16 @@ struct collisionInputs {
   double ndimTe;
 };
 
+struct boundaryViscousFluxData {
+  Vector normal;
+  /* Primitive viscous flux index order:
+   diffusion velocity - numSpecies,
+   stress             - nvel,
+   heavy_heat         - 1,
+   electron_heat      - 1
+  */
+  Vector primFlux;
+  Array<bool> primFluxIdxs;
+};
+
 #endif  // DATASTRUCTURES_HPP_
