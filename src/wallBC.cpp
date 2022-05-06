@@ -43,6 +43,21 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSyste
       fluxClass(_fluxClass),
       intPointsElIDBC(_intPointsElIDBC),
       maxIntPoints_(_maxIntPoints) {
+  const int numSpecies = mixture->GetNumSpecies();
+  const int primFluxSize = (mixture->IsTwoTemperature()) ? numSpecies + nvel_ + 2 : numSpecies + nvel_ + 1;
+  bcFlux_.primFlux.SetSize(primFluxSize);
+  bcFlux_.primFluxIdxs.SetSize(primFluxSize);
+  bcFlux_.primFlux = 0.0;
+  for (int i = 0; i < primFluxSize; i++) bcFlux_.primFluxIdxs[i] = false;
+  for (int i = 0; i < numSpecies; i++) bcFlux_.primFluxIdxs[i] = true;
+  if ((wallType_ == VISC_ADIAB) || ((wallType_ == INV) && axisymmetric_)) {
+    bcFlux_.primFlux(numSpecies + 1) = 0.0;
+    bcFlux_.primFluxIdxs[numSpecies + nvel_] = true;
+    if (mixture->IsTwoTemperature()) {
+      bcFlux_.primFlux(numSpecies + 2) = 0.0;
+      bcFlux_.primFluxIdxs[numSpecies + nvel_ + 1] = true;
+    }
+  }
   if (wallType_ == VISC_ISOTH) {
     wallTemp_ = _inputData[0];
   }
@@ -151,7 +166,7 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
 
   rsolver->Eval(stateIn, stateMirror, normal, bdrFlux);
 
-  DenseMatrix viscFw(num_equation_, dim_);
+  Vector wallViscF(num_equation_);
   DenseMatrix viscF(num_equation_, dim_);
 
   if (axisymmetric_) {
@@ -163,37 +178,19 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
 
     // modify gradients so that wall is adibatic
     Vector unitNorm = normal;
-    {
-      double normN = 0.;
-      for (int d = 0; d < dim_; d++) normN += normal[d] * normal[d];
-      unitNorm *= 1. / sqrt(normN);
-    }
+    double normN = 0.;
+    for (int d = 0; d < dim_; d++) normN += normal[d] * normal[d];
+    unitNorm *= 1. / sqrt(normN);
 
-    fluxClass->ComputeViscousFluxes(stateMirror, gradState, radius, viscFw);
-
-    // zero out normal heat flux.
-    // NOTE: instead of zeroing the gradient, zeroed the resultant flux.
-    double normalHeatFlux = 0.0;
-    for (int d = 0; d < dim_; d++) normalHeatFlux += unitNorm(d) * viscFw(1 + dim_, d);
-    for (int d = 0; d < dim_; d++) viscFw(1 + dim_, d) -= unitNorm(d) * normalHeatFlux;
-
-    // zero out species normal diffusion fluxes.
-    const int numActiveSpecies = mixture->GetNumActiveSpecies();
-    for (int eq = nvel_ + 2; eq < nvel_ + 2 + numActiveSpecies; eq++) {
-      double normalDiffusionFlux = 0.0;
-      for (int d = 0; d < dim_; d++) normalDiffusionFlux += unitNorm(d) * viscFw(eq, d);
-      for (int d = 0; d < dim_; d++) viscFw(eq, d) -= unitNorm(d) * normalDiffusionFlux;
-    }
-
-    // adiabatic wall must also have zero heat flux from electron.
-    if (mixture->IsTwoTemperature()) {
-      double normalElectronHeatFlux = 0.0;
-      for (int d = 0; d < dim_; d++) normalElectronHeatFlux += unitNorm(d) * viscFw(num_equation_ - 1, d);
-      for (int d = 0; d < dim_; d++) viscFw(num_equation_ - 1, d) -= unitNorm(d) * normalElectronHeatFlux;
-    }
+    bcFlux_.normal = unitNorm;
+    fluxClass->ComputeBdrViscousFluxes(stateMirror, gradState, radius, bcFlux_, wallViscF);
+    wallViscF *= sqrt(normN);  // in case normal is not a unit vector..
   } else {
+    DenseMatrix viscFw(num_equation_, dim_);
+
     // evaluate viscous fluxes at the wall
     fluxClass->ComputeViscousFluxes(stateMirror, gradState, radius, viscFw);
+    viscFw.Mult(normal, wallViscF);
 
     // evaluate internal viscous fluxes
     fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, viscF);
@@ -201,7 +198,8 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
 
   // Add visc fluxes (we skip density eq.)
   for (int eq = 1; eq < num_equation_; eq++) {
-    for (int d = 0; d < dim_; d++) bdrFlux[eq] -= 0.5 * (viscFw(eq, d) + viscF(eq, d)) * normal[d];
+    bdrFlux[eq] -= 0.5 * wallViscF(eq);
+    for (int d = 0; d < dim_; d++) bdrFlux[eq] -= 0.5 * viscF(eq, d) * normal[d];
   }
 }
 
@@ -220,48 +218,29 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
 
   // modify gradients so that wall is adibatic
   Vector unitNorm = normal;
-  {
-    double normN = 0.;
-    for (int d = 0; d < dim_; d++) normN += normal[d] * normal[d];
-    unitNorm *= 1. / sqrt(normN);
-  }
-
-  // modify gradient temperature so dT/dn=0 at the wall
-  // double normGradT = 0.;
-  // for (int d = 0; d < dim_; d++) normGradT += unitNorm(d) * gradState(1 + dim_, d);
-  // for (int d = 0; d < dim_; d++) gradState(1 + dim_, d) -= normGradT * unitNorm(d);
+  double normN = 0.;
+  for (int d = 0; d < dim_; d++) normN += normal[d] * normal[d];
+  unitNorm *= 1. / sqrt(normN);
+  bcFlux_.normal = unitNorm;
 
   if (eqSystem == NS_PASSIVE) {
     for (int d = 0; d < dim_; d++) gradState(num_equation_ - 1, d) = 0.;
   }
 
-  DenseMatrix viscFw(num_equation_, dim_);
-  fluxClass->ComputeViscousFluxes(wallState, gradState, radius, viscFw);
-
-  // zero out normal heat flux.
-  // NOTE: instead of zeroing the gradient, zeroed the resultant flux. Must be equivalent.
-  double normalHeatFlux = 0.0;
-  for (int d = 0; d < dim_; d++) normalHeatFlux += unitNorm(d) * viscFw(1 + dim_, d);
-  for (int d = 0; d < dim_; d++) viscFw(1 + dim_, d) -= unitNorm(d) * normalHeatFlux;
-
   // zero out species normal diffusion fluxes.
-  const int numActiveSpecies = mixture->GetNumActiveSpecies();
-  for (int eq = nvel_ + 2; eq < nvel_ + 2 + numActiveSpecies; eq++) {
-    double normalDiffusionFlux = 0.0;
-    for (int d = 0; d < dim_; d++) normalDiffusionFlux += unitNorm(d) * viscFw(eq, d);
-    for (int d = 0; d < dim_; d++) viscFw(eq, d) -= unitNorm(d) * normalDiffusionFlux;
-  }
+  const int numSpecies = mixture->GetNumSpecies();
+  Vector normDiffVel(numSpecies);
+  normDiffVel = 0.0;
 
-  // adiabatic wall must also have zero heat flux from electron.
-  if (mixture->IsTwoTemperature()) {
-    double normalElectronHeatFlux = 0.0;
-    for (int d = 0; d < dim_; d++) normalElectronHeatFlux += unitNorm(d) * viscFw(num_equation_ - 1, d);
-    for (int d = 0; d < dim_; d++) viscFw(num_equation_ - 1, d) -= unitNorm(d) * normalElectronHeatFlux;
-  }
+  // evaluate viscous fluxes at the wall
+  Vector wallViscF(num_equation_);
+  fluxClass->ComputeBdrViscousFluxes(wallState, gradState, radius, bcFlux_, wallViscF);
+  wallViscF *= sqrt(normN);  // in case normal is not a unit vector..
 
   // Add visc fluxes (we skip density eq.)
   for (int eq = 1; eq < num_equation_; eq++) {
-    for (int d = 0; d < dim_; d++) bdrFlux[eq] -= 0.5 * (viscFw(eq, d) + viscF(eq, d)) * normal[d];
+    bdrFlux[eq] -= 0.5 * wallViscF(eq);
+    for (int d = 0; d < dim_; d++) bdrFlux[eq] -= 0.5 * viscF(eq, d) * normal[d];
   }
 }
 
@@ -276,25 +255,17 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
   // Normal convective flux
   rsolver->Eval(stateIn, wallState, normal, bdrFlux, true);
 
-  // evaluate viscous fluxes at the wall
-  DenseMatrix viscFw(num_equation_, dim_);
-  fluxClass->ComputeViscousFluxes(wallState, gradState, radius, viscFw);
-
   // unit normal vector
   Vector unitNorm = normal;
-  {
-    double normN = 0.;
-    for (int d = 0; d < dim_; d++) normN += normal[d] * normal[d];
-    unitNorm *= 1. / sqrt(normN);
-  }
+  double normN = 0.;
+  for (int d = 0; d < dim_; d++) normN += normal[d] * normal[d];
+  unitNorm *= 1. / sqrt(normN);
+  bcFlux_.normal = unitNorm;
 
-  // zero out species normal diffusion fluxes.
-  const int numActiveSpecies = mixture->GetNumActiveSpecies();
-  for (int eq = nvel_ + 2; eq < nvel_ + 2 + numActiveSpecies; eq++) {
-    double normalDiffusionFlux = 0.0;
-    for (int d = 0; d < dim_; d++) normalDiffusionFlux += unitNorm(d) * viscFw(eq, d);
-    for (int d = 0; d < dim_; d++) viscFw(eq, d) -= unitNorm(d) * normalDiffusionFlux;
-  }
+  // evaluate viscous fluxes at the wall
+  Vector wallViscF(num_equation_);
+  fluxClass->ComputeBdrViscousFluxes(wallState, gradState, radius, bcFlux_, wallViscF);
+  wallViscF *= sqrt(normN);  // in case normal is not a unit vector..
 
   // evaluate internal viscous fluxes
   DenseMatrix viscF(num_equation_, dim_);
@@ -302,7 +273,8 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
 
   // Add visc fluxes (we skip density eq.)
   for (int eq = 1; eq < num_equation_; eq++) {
-    for (int d = 0; d < dim_; d++) bdrFlux[eq] -= 0.5 * (viscFw(eq, d) + viscF(eq, d)) * normal[d];
+    bdrFlux[eq] -= 0.5 * wallViscF(eq);
+    for (int d = 0; d < dim_; d++) bdrFlux[eq] -= 0.5 * viscF(eq, d) * normal[d];
   }
 }
 
