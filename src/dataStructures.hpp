@@ -247,4 +247,13 @@ struct collisionInputs {
   double ndimTe;
 };
 
+struct boundaryViscousFluxData {
+  Vector normal;
+  // Array<bool> fluxTypes;
+  Vector *stress;
+  double *qH;
+  double *qE;
+  Vector *diffVel;
+};
+
 #endif  // DATASTRUCTURES_HPP_

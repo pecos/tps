@@ -136,6 +136,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   bulkViscosity -= 2. / 3. * visc;
   double k = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY];
   double ke = transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY];
+
   if (twoTemperature) {
     for (int d = 0; d < dim; d++) {
       double qeFlux = ke * gradUp(num_equation - 1, d);
@@ -213,6 +214,129 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
     // NOTE: diffusionVelocity is set to be (numSpecies,nvel)-matrix.
     // however only dim-components are used for flux.
     for (int d = 0; d < dim; d++) flux(nvel + 2 + sp, d) = -state[nvel + 2 + sp] * diffusionVelocity(sp, d);
+  }
+}
+
+void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius,
+                                     const boundaryViscousFluxData &bcFlux, Vector &normalFlux) {
+  normalFlux.SetSize(num_equation);
+  normalFlux = 0.;
+  if (eqSystem == EULER) {
+    return;
+  }
+
+  // TODO(kevin): update E-field with EM coupling.
+  Vector Efield(nvel);
+  Efield = 0.0;
+
+  const int numSpecies = mixture->GetNumSpecies();
+  const int numActiveSpecies = mixture->GetNumActiveSpecies();
+  const bool twoTemperature = mixture->IsTwoTemperature();
+
+  Vector speciesEnthalpies(numSpecies);
+  mixture->computeSpeciesEnthalpies(state, speciesEnthalpies);
+
+  Vector transportBuffer;
+  // NOTE(kevin): in flux, only dim-components of diffusionVelocity will be used.
+  DenseMatrix diffusionVelocity(numSpecies, nvel);
+  transport->ComputeFluxTransportProperties(state, gradUp, Efield, transportBuffer, diffusionVelocity);
+  const double visc = transportBuffer[FluxTrns::VISCOSITY];
+  double bulkViscosity = transportBuffer[FluxTrns::BULK_VISCOSITY];
+  bulkViscosity -= 2. / 3. * visc;
+  double k = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY];
+  double ke = transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY];
+
+  // Either take the prescribed diffusion velocities or compute them.
+  Vector normDiffVel(numSpecies);
+  if (bcFlux.diffVel != NULL) {
+    normDiffVel = *(bcFlux.diffVel);
+  } else {
+    normDiffVel = 0.0;
+    for (int sp = 0; sp < numSpecies; sp++) {
+      // NOTE: diffusionVelocity is set to be (numSpecies,nvel)-matrix.
+      // however only dim-components are used for flux.
+      for (int d = 0; d < dim; d++) normDiffVel(sp) += diffusionVelocity(sp, d) * bcFlux.normal(d);
+    }
+  }
+
+  // Either take the prescribed stress or compute them.
+  Vector normStress(nvel);
+  if (bcFlux.stress != NULL) {
+    normStress = *(bcFlux.stress);
+  } else {
+    normStress = 0.0;
+
+    const double ur = (axisymmetric_ ? state[1] / state[0] : 0);
+    const double ut = (axisymmetric_ ? state[3] / state[0] : 0);
+
+    double divV = 0.;
+    for (int i = 0; i < dim; i++) {
+      for (int j = 0; j < dim; j++) stress(i, j) = gradUp(1 + j, i) + gradUp(1 + i, j);
+      divV += gradUp(1 + i, i);
+    }
+    stress *= visc;
+
+    if (axisymmetric_ && radius > 0) {
+      divV += ur / radius;
+    }
+
+    for (int i = 0; i < dim; i++) stress(i, i) += bulkViscosity * divV;
+
+    for (int i = 0; i < dim; i++) {
+      for (int j = 0; j < dim; j++) normStress(i) += stress(i, j) * bcFlux.normal(j);
+    }
+
+    double tau_tr = 0, tau_tz = 0;
+    if (axisymmetric_) {
+      const double ut_r = gradUp(3, 0);
+      const double ut_z = gradUp(3, 1);
+      tau_tr = ut_r;
+      if (radius > 0) tau_tr -= ut / radius;
+      tau_tr *= visc;
+
+      tau_tz = visc * ut_z;
+
+      normStress(nvel - 1) += tau_tr * bcFlux.normal(0);
+      normStress(nvel - 1) += tau_tz * bcFlux.normal(1);
+    }
+  }
+
+  double qH = 0.0, qE = 0.0;
+  // Either take the prescribed electron heat flux or compute them.
+  if (twoTemperature) {
+    if (bcFlux.qE != NULL) {
+      qE = *(bcFlux.qE);
+    } else {
+      for (int d = 0; d < dim; d++) qE += ke * gradUp(num_equation - 1, d) * bcFlux.normal(d);
+      qE -= speciesEnthalpies(numSpecies - 2) * normDiffVel(numSpecies - 2);
+    }
+  } else {
+    k += ke;
+  }
+  // Either take the prescribed heavies heat flux or compute them.
+  if (bcFlux.qH != NULL) {
+    qH = *(bcFlux.qH);
+  } else {
+    for (int d = 0; d < dim; d++) qH += k * gradUp(1 + nvel, d) * bcFlux.normal(d);
+    for (int sp = 0; sp < numSpecies; sp++) {
+      if (twoTemperature && (sp == numSpecies - 2)) continue;
+      qH -= speciesEnthalpies(sp) * normDiffVel(sp);
+    }
+  }
+
+  Vector vel0(nvel);
+  for (int d = 0; d < nvel; d++) vel0(d) = state[1 + d] / state[0];
+
+  // make sure density visc. flux is 0
+  // normalFlux(0) = 0.0;
+  for (int sp = 0; sp < numActiveSpecies; sp++) {
+    normalFlux(nvel + 2 + sp) = -state[nvel + 2 + sp] * normDiffVel(sp);
+  }
+  for (int d = 0; d < nvel; d++) normalFlux(d + 1) = normStress(d);
+  normalFlux(nvel + 1) = normStress * vel0 + qH;
+  if (twoTemperature) {
+    normalFlux(nvel + 1) += qE;
+    normalFlux(num_equation - 1) = qE;
   }
 }
 
