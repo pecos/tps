@@ -27,34 +27,34 @@ setup() {
     while IFS=$'\t' read -r nx e0 e1 e2 e3 e4 e5;
     do
       test $nx -eq 100
-      # empirically observed error 1.922e-3
-      check_lo=$(awk 'BEGIN{print ('$e0'>1.92e-3)?1:0}')
-      check_hi=$(awk 'BEGIN{print ('$e0'<1.93e-3)?1:0}')
+      # empirically observed error 1.792e-3
+      check_lo=$(awk 'BEGIN{print ('$e0'>1.785e-3)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e0'<1.795e-3)?1:0}')
       test $check_lo -eq 1
       test $check_hi -eq 1
-      # empirically observed error 0.7603
-      check_lo=$(awk 'BEGIN{print ('$e1'>0.755)?1:0}')
-      check_hi=$(awk 'BEGIN{print ('$e1'<0.765)?1:0}')
+      # empirically observed error 0.7511
+      check_lo=$(awk 'BEGIN{print ('$e1'>0.745)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e1'<0.755)?1:0}')
       test $check_lo -eq 1
       test $check_hi -eq 1
-      # empirically observed error 0.9183
-      check_lo=$(awk 'BEGIN{print ('$e2'>0.91)?1:0}')
-      check_hi=$(awk 'BEGIN{print ('$e2'<0.92)?1:0}')
+      # empirically observed error 0.8917
+      check_lo=$(awk 'BEGIN{print ('$e2'>0.885)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e2'<0.895)?1:0}')
       test $check_lo -eq 1
       test $check_hi -eq 1
-      # empirically observed error 3.065e-3
-      check_lo=$(awk 'BEGIN{print ('$e3'>3.06e-3)?1:0}')
-      check_hi=$(awk 'BEGIN{print ('$e3'<3.07e-3)?1:0}')
+      # empirically observed error 2.9574e-3
+      check_lo=$(awk 'BEGIN{print ('$e3'>2.95e-3)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e3'<2.96e-3)?1:0}')
       test $check_lo -eq 1
       test $check_hi -eq 1
-      # empirically observed error 3.0837e-3
-      check_lo=$(awk 'BEGIN{print ('$e4'>3.08e-3)?1:0}')
-      check_hi=$(awk 'BEGIN{print ('$e4'<3.09e-3)?1:0}')
+      # empirically observed error 2.9744e-3
+      check_lo=$(awk 'BEGIN{print ('$e4'>2.97e-3)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e4'<2.98e-3)?1:0}')
       test $check_lo -eq 1
       test $check_hi -eq 1
-      # empirically observed error 5.0761e-3
-      check_lo=$(awk 'BEGIN{print ('$e5'>5.07e-3)?1:0}')
-      check_hi=$(awk 'BEGIN{print ('$e5'<5.08e-3)?1:0}')
+      # empirically observed error 4.9651e-3
+      check_lo=$(awk 'BEGIN{print ('$e5'>4.96e-3)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e5'<4.97e-3)?1:0}')
       test $check_lo -eq 1
       test $check_hi -eq 1
     done < ternary_2d_2t_ambipolar_wall.rel_error.txt
