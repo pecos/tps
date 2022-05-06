@@ -51,6 +51,8 @@ class WallBC : public BoundaryCondition {
 
   double wallTemp_;
 
+  boundaryViscousFluxData bcFlux_;
+
   const Array<int> &intPointsElIDBC;
   const int &maxIntPoints_;
 
