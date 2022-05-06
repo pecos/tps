@@ -479,12 +479,14 @@ void RunConfiguration::readInputFile(std::string inpuFileName) {
             break;
         }
         wallPatchType.push_back(patchType);
+        wallData wData;
         if (patchType.second == VISC_ISOTH) {
           ss >> word;
-          wallBC.Append(stod(word));
+          wData.Th = stod(word);
         } else {
-          wallBC.Append(0.);
+          wData.Th = -1.0;
         }
+        wallBC.push_back(wData);
       } else if (word.compare("PASSIVE_SCALAR") == 0) {
         int arrSize = arrayPassiveScalar.Size();
         arrayPassiveScalar.Append(new passiveScalarData);
@@ -554,9 +556,4 @@ Array<double> RunConfiguration::GetOutletData(int out) {
   return data;
 }
 
-Array<double> RunConfiguration::GetWallData(int w) {
-  Array<double> data(1);
-  data[0] = wallBC[w];
-
-  return data;
-}
+wallData RunConfiguration::GetWallData(int w) { return wallBC[w]; }

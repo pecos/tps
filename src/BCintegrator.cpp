@@ -111,8 +111,7 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
     }
 
     if (patchInMesh) {
-      Array<double> wallData;
-      if (patchType.second == VISC_ISOTH) wallData = config.GetWallData(w);
+      wallData wallData = config.GetWallData(w);
 
       wallBCmap[patchType.first] = new WallBC(rsolver, mixture, _runFile.GetEquationSystem(), fluxClass, vfes, intRules,
                                               _dt, dim, num_equation, patchType.first, patchType.second, wallData,

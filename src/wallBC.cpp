@@ -35,11 +35,12 @@
 
 WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSystem, Fluxes *_fluxClass,
                ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
-               const int _num_equation, int _patchNumber, WallType _bcType, const Array<double> _inputData,
+               const int _num_equation, int _patchNumber, WallType _bcType, const wallData _inputData,
                const Array<int> &_intPointsElIDBC, const int &_maxIntPoints, bool axisym)
     : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber, 1,
                         axisym),  // so far walls do not require ref. length. Left at 1
       wallType_(_bcType),
+      wallData_(_inputData),
       fluxClass(_fluxClass),
       intPointsElIDBC(_intPointsElIDBC),
       maxIntPoints_(_maxIntPoints) {
@@ -59,7 +60,7 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSyste
     }
   }
   if (wallType_ == VISC_ISOTH) {
-    wallTemp_ = _inputData[0];
+    wallTemp_ = _inputData.Th;
   }
 }
 
