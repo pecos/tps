@@ -131,6 +131,17 @@ void GasMixture::computeStagnationState(const mfem::Vector &stateIn, mfem::Vecto
   // NOTE: electron energy is purely internal energy, so no change.
 }
 
+void GasMixture::modifyStateFromPrimitive(const Vector &state, const Vector &inputPrimitive, const Array<int> &inputIdxs, Vector &outputState) {
+  outputState.SetSize(num_equation);
+  assert(inputPrimitive.Size() == inputIdxs.Size());
+
+  Vector prim(num_equation);
+  GetPrimitivesFromConservatives(state, prim);
+  for (int i = 0; i < inputIdxs.Size(); i++) prim(inputIdxs[i]) = inputPrimitive(inputIdxs[i]);
+
+  GetConservativesFromPrimitives(prim, outputState);
+}
+
 //////////////////////////////////////////////////////
 //////// Dry Air mixture
 //////////////////////////////////////////////////////
