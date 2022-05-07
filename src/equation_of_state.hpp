@@ -205,6 +205,9 @@ class GasMixture {
   virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut) {}
   virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p,
                                        bool modifyElectronEnergy = false) {}
+  // Modify state with a prescribed condition at boundary.
+  // TODO(kevin): it is possible to use this routine for all BCs, so no need of making so many functions as above.
+  void modifyStateFromPrimitive(const Vector &state, const Vector &inputPrimitive, const Array<int> &inputIdxs, Vector &outputState);
 
   virtual double computeAmbipolarElectronNumberDensity(const double *n_sp) {}
   virtual double computeBackgroundMassDensity(const double &rho, const double *n_sp, double &n_e,
