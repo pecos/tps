@@ -274,4 +274,9 @@ struct boundaryViscousFluxData {
   Array<bool> primFluxIdxs;
 };
 
+struct boundaryPrimitiveData {
+  Vector prim;
+  Array<bool> primIdxs;
+};
+
 #endif  // DATASTRUCTURES_HPP_
