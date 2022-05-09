@@ -50,9 +50,12 @@ class WallBC : public BoundaryCondition {
 
   Fluxes *fluxClass;
 
+  // TODO(kevin): eventually replace this with wallPrim.
   double wallTemp_;
 
+  // TODO(kevin): can be moved to BoundaryCondition.
   boundaryViscousFluxData bcFlux_;
+  boundaryPrimitiveData bcState_;
 
   const Array<int> &intPointsElIDBC;
   const int &maxIntPoints_;
@@ -65,6 +68,8 @@ class WallBC : public BoundaryCondition {
                                 Vector &bdrFlux);
   void computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
                                  Vector &bdrFlux);
+  void computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                              Vector &bdrFlux);
 
  public:
   WallBC(RiemannSolver *rsolver_, GasMixture *_mixture, Equations _eqSystem, Fluxes *_fluxClass,
