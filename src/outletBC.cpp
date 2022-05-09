@@ -298,7 +298,6 @@ void OutletBC::initBCs() {
 }
 
 void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux) {
-
   switch (outletType) {
     case SUB_P:
       subsonicReflectingPressure(normal, stateIn, bdrFlux);
