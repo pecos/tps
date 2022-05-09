@@ -21,19 +21,42 @@ RUN yum -y install boost-gnu9-mpich-ohpc
 
 RUN yum -y install python38-pip
 RUN pip3 install matplotlib
+RUN yum -y install procps-ng
+RUN yum -y install diffutils
+
+#----------------------------------
+# Add local install of MetaPhysicl
+#----------------------------------
+
+RUN wget https://github.com/roystgnr/MetaPhysicL/archive/refs/tags/v0.6.0.tar.gz -P /tmp
+RUN cd /tmp; tar xfz v0.6.0.tar.gz
+RUN cd /tmp; rm v0.6.0.tar.gz
+RUN . /etc/profile.d/lmod.sh \
+    && cd /tmp/MetaPhysicL-0.6.0 \
+    && ./bootstrap \
+    && ./configure \
+    && make \
+    && make install
+RUN rm -rf /tmp/MetaPhysicL-0.6.0
 
 #---------------------------
 # Add local install of MASA
 #---------------------------
-ARG version=0.50.0
-RUN wget https://github.com/manufactured-solutions/MASA/releases/download/$version/masa-$version.tar.gz -P /tmp
-RUN cd /tmp; tar xfz /tmp/masa-$version.tar.gz
+## ARG version=0.50.0
+## RUN wget https://github.com/manufactured-solutions/MASA/releases/download/$version/masa-$version.tar.gz -P /tmp
+## RUN cd /tmp; tar xfz /tmp/masa-$version.tar.gz
+
+# Pull from Kevin's fork for new solutions..
+RUN cd /tmp; git clone https://github.com/dreamer2368/MASA.git masa
+RUN cd /tmp/masa; git checkout 99b12dab2056553ae00804c76bb32c911ec06349
 RUN . /etc/profile.d/lmod.sh \
-    && cd /tmp/masa-$version \
-    && ./configure --enable-fortran-interfaces \
+    && cd /tmp/masa \
+    && ./bootstrap \
+    && ./configure \
     && make \
     && make install
-RUN rm /tmp/masa-$version.tar.gz
+# RUN rm /tmp/masa-$version.tar.gz
+RUN rm -rf /tmp/masa
 
 ENV grvy_ver="0.37.0"
 RUN wget https://github.com/hpcsi/grvy/releases/download/$grvy_ver/grvy-$grvy_ver.tar.gz -P /tmp
@@ -49,7 +72,6 @@ RUN rm /tmp/grvy-$grvy_ver.tar.gz
 # additional packages
 RUN yum -y install git-lfs
 RUN yum -y install aspell
-RUN yum -y install diffutils
 RUN yum -y install cmake-ohpc
 RUN yum -y install bc
 RUN yum -y install clang-tools-extra

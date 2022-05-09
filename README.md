@@ -1,4 +1,4 @@
-[![CI](https://github.com/pecos/tps/actions/workflows/build.yaml/badge.svg)](https://github.com/pecos/tps/actions/workflows/build.yaml)
+[![CI](https://github.com/pecos/tps/actions/workflows/build.yaml/badge.svg?branch=main)](https://github.com/pecos/tps/actions/workflows/build.yaml)
 [![Docs](https://github.com/pecos/tps-docs/actions/workflows/docs.yaml/badge.svg)](https://pecos.github.io/tps-docs)
 
 
