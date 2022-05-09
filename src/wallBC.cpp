@@ -352,10 +352,14 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
   // clang-format on
   MFEM_FORALL(el_wall, wallElems.Size() / 7,
   {
-    double Fcontrib[216 * 20];
+    // double Fcontrib[216 * 20];
+    // double shape[216];
+    // double Rflux[20], u1[20], u2[20], nor[3], gradUpi[20 * 3];
+    // double vF1[20 * 3], vF2[20 * 3];
+    double Fcontrib[216 * 5];
     double shape[216];
-    double Rflux[20], u1[20], u2[20], nor[3], gradUpi[20 * 3];
-    double vF1[20 * 3], vF2[20 * 3];
+    double Rflux[5], u1[5], u2[5], nor[3], gradUpi[5 * 3];
+    double vF1[5 * 3], vF2[5 * 3];
     double weight;
 
     const int numFaces = d_wallElems[0 + el_wall * 7];

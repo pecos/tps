@@ -764,9 +764,9 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
 
   MFEM_FORALL(n, numBdrElem,
   {
-    double Fcontrib[216 * 20];
+    double Fcontrib[216 * 5];
     double shape[216];
-    double Rflux[20], u1[20], u2[20], nor[3];
+    double Rflux[5], u1[5], u2[5], nor[3];
     double weight;
 
     const int el = d_listElems[n];
@@ -795,8 +795,6 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
       switch (type) {
       case InletType::SUB_DENS_VEL:
         computeSubDenseVel_gpu_serial(&u1[0], &u2[0], &nor[0], d_inputState, gamma, Rg, dim, num_equation, fluid);
-        // computeSubDenseVel(&u1[0], &u2[0], &nor[0], d_inputState, gamma, Rg, dim, num_equation, fluid, eqSystem, i,
-        //                    maxDofs);
         break;
       case InletType::SUB_DENS_VEL_NR:
         printf("INLET BC NOT IMPLEMENTED");
