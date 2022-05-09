@@ -541,34 +541,64 @@ void Gradients::multInverse_gpu(const int numElems, const int offsetElems, const
   const double *d_invMArray = invMArray.Read();
   auto d_posDofInvM = posDofInvM.Read();
 
-  // NOTE: I'm sure this can be done more efficiently. Have a think
-  MFEM_FORALL_2D(el, numElems, elDof, 1, 1, { // NOLINT
-    MFEM_FOREACH_THREAD(i, x, elDof) { // NOLINT
-      //
-      MFEM_SHARED double gradUpi[216 * 3];
+  MFEM_FORALL(el, numElems,
+  {
+    double gradUpi[216 * 3];
 
-      const int eli       = el + offsetElems;
-      const int offsetIDs = d_posDofIds[2 * eli];
-      const int offsetInv = d_posDofInvM[2 * eli];
-      const int indexi    = d_nodesIDs[offsetIDs + i];
+    const int eli       = el + offsetElems;
+    const int offsetIDs = d_posDofIds[2 * eli];
+    const int offsetInv = d_posDofInvM[2 * eli];
 
-      for (int eq = 0; eq < num_equation; eq++) {
-    for (int d = 0; d < dim; d++) {
-      gradUpi[i + d * elDof] = d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs];
-    }
+    for (int eq = 0; eq < num_equation; eq++) {
+      for (int d = 0; d < dim; d++) {
 
-    MFEM_SYNC_THREAD;
+        for (int i = 0; i < elDof; i++) {
+          const int indexi    = d_nodesIDs[offsetIDs + i];
+          gradUpi[i + d * elDof] = d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs];
+        }
 
-    for (int d = 0; d < dim; d++) {
-      double temp = 0;
-      for (int n = 0; n < elDof; n++) {
-        temp += gradUpi[n + d * elDof] * d_invMArray[offsetInv + i * elDof + n];
+
+        for (int i = 0; i < elDof; i++) {
+          const int indexi    = d_nodesIDs[offsetIDs + i];
+          double temp = 0;
+          for (int n = 0; n < elDof; n++) {
+            temp += gradUpi[n + d * elDof] * d_invMArray[offsetInv + i * elDof + n];
+          }
+          d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs] = temp;
+        }
       }
-      d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs] = temp;
     }
-    MFEM_SYNC_THREAD;
-      }
-}
-});
+  });
+
+
+//   // NOTE: I'm sure this can be done more efficiently. Have a think
+//   MFEM_FORALL_2D(el, numElems, elDof, 1, 1, { // NOLINT
+//     MFEM_FOREACH_THREAD(i, x, elDof) { // NOLINT
+//       //
+//       MFEM_SHARED double gradUpi[216 * 3];
+
+//       const int eli       = el + offsetElems;
+//       const int offsetIDs = d_posDofIds[2 * eli];
+//       const int offsetInv = d_posDofInvM[2 * eli];
+//       const int indexi    = d_nodesIDs[offsetIDs + i];
+
+//       for (int eq = 0; eq < num_equation; eq++) {
+//     for (int d = 0; d < dim; d++) {
+//       gradUpi[i + d * elDof] = d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs];
+//     }
+
+//     MFEM_SYNC_THREAD;
+
+//     for (int d = 0; d < dim; d++) {
+//       double temp = 0;
+//       for (int n = 0; n < elDof; n++) {
+//         temp += gradUpi[n + d * elDof] * d_invMArray[offsetInv + i * elDof + n];
+//       }
+//       d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs] = temp;
+//     }
+//     MFEM_SYNC_THREAD;
+//       }
+// }
+// });
 }
 #endif
