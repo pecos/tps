@@ -154,6 +154,28 @@ class InletBC : public BoundaryCondition {
       DryAir::modifyEnergyForPressure_gpu(u2, u2, p, gamma, Rg, num_equation, dim, thrd, maxThread);
     }
   }
+
+  static MFEM_HOST_DEVICE void computeSubDenseVel_gpu_serial(const double *u1, double *u2, const double *nor,
+                                                             const double *inputState, const double &gamma, const double &Rg,
+                                                             const int &dim, const int &num_equation, const WorkingFluid &fluid) {
+    // assumes there at least as many threads as number of equations
+    double KE[3];
+    double p;
+
+    for (int d = 0; d < dim; d++) KE[d] = 0.5 * u1[1 + d] * u1[1 + d] / u1[0];
+    if (dim != 3) KE[2] = 0.;
+
+    if (fluid == WorkingFluid::DRY_AIR) {
+      p = DryAir::pressure(u1, &KE[0], gamma, dim, num_equation);
+
+      u2[0] = inputState[0];
+
+      for (int d = 0; d < dim; d++) u2[1 + d] = inputState[0] * inputState[1 + d];
+
+      DryAir::modifyEnergyForPressure_gpu_serial(u2, u2, p, gamma, Rg, num_equation, dim);
+    }
+  }
+
 #endif
 };
 
