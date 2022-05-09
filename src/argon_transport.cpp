@@ -933,3 +933,27 @@ void ArgonMixtureTransport::ComputeSourceTransportProperties(const Vector &state
   }
   // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
+
+void ArgonMixtureTransport::GetViscosities(const Vector &conserved, const Vector &primitive, double &visc,
+                                           double &bulkVisc) {
+  Vector n_sp(numSpecies), X_sp(numSpecies), Y_sp(numSpecies);
+  mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
+  double nTotal = 0.0;
+  for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
+
+  collisionInputs collInputs = computeCollisionInputs(primitive, n_sp);
+
+  Vector speciesViscosity(numSpecies);
+  for (int sp = 0; sp < numSpecies; sp++) {
+    if (sp == electronIndex_) {
+      speciesViscosity(sp) = 0.0;
+      continue;
+    }
+    speciesViscosity(sp) =
+        viscosityFactor_ * sqrt(mw_(sp) * collInputs.Th) / collisionIntegral(sp, sp, 2, 2, collInputs);
+  }
+  visc = linearAverage(X_sp, speciesViscosity);
+  bulkVisc = 0.0;
+
+  return;
+}
