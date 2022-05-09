@@ -371,6 +371,9 @@ void WallBC::computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix
   unitNorm *= 1. / sqrt(normN);
   bcFlux_.normal = unitNorm;
 
+  if (wallData_.elecThermalCond == SHTH)
+    mixture->computeSheathBdrFlux(wallState, bcFlux_);
+
   // evaluate viscous fluxes at the wall
   Vector wallViscF(num_equation);
   fluxClass->ComputeBdrViscousFluxes(wallState, gradState, radius, bcFlux_, wallViscF);
