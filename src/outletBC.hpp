@@ -156,6 +156,23 @@ class OutletBC : public BoundaryCondition {
     //     }
   }
 
+  static MFEM_HOST_DEVICE void computeSubPressure_gpu_serial(const double *u1, double *u2, const double *nor, const double &press,
+                                                             const double &gamma, const double &Rg, const int &dim,
+                                                             const int &num_equation, const WorkingFluid &fluid) {
+    if (fluid == WorkingFluid::DRY_AIR) {
+      DryAir::modifyEnergyForPressure_gpu_serial(u1, u2, press, gamma, Rg, num_equation, dim);
+    }
+
+    //     if (thrd == 1 + dim) {
+    //       // NOTE: this still assumes ideal gas equation.
+    //       double k = 0.;
+    //       for (int d = 0; d < dim; d++) k += u1[1 + d] * u1[1 + d];
+    //       u2[thrd] = press / (gamma - 1.) + 0.5 * k / u1[0];
+    //     } else {
+    //       u2[thrd] = u1[thrd];
+    //     }
+  }
+
   static MFEM_HOST_DEVICE void computeNRSubPress(const int &thrd, const int &n, const double *u1, const double *gradUp,
                                                  const double *meanUp, const double &dt, double *u2, double *boundaryU,
                                                  const double *inputState, const double *nor, const double *d_tang1,
@@ -302,6 +319,130 @@ class OutletBC : public BoundaryCondition {
     if (thrd < num_equation) boundaryU[thrd + n * num_equation] = newU[thrd];
   }
 
+  static MFEM_HOST_DEVICE void computeNRSubPress_serial(const int &n, const double *u1, const double *gradUp,
+                                                        const double *meanUp, const double &dt, double *u2, double *boundaryU,
+                                                        const double *inputState, const double *nor, const double *d_tang1,
+                                                        const double *d_tang2, const double *d_inv, const double &refLength,
+                                                        const double &gamma, const double &Rg, const int &elDof,
+                                                        const int &dim, const int &num_equation, const Equations &eqSystem) {
+    double unitNorm[3], meanVel[3], normGrad[20];
+    double mod;
+    double speedSound, meanK, dpdn;
+    double L1, L2, L3, L4, L5, L6;
+    double d1, d2, d3, d4, d5;
+    double bdrFlux[20], uN[20], newU[20];
+
+    for (int d = 0; d < dim; d++) unitNorm[d] = nor[d];
+
+    mod = 0.;
+    for (int d = 0; d < dim; d++) mod += nor[d] * nor[d];
+    mod = sqrt(mod);
+
+    for (int d = 0; d < dim; d++) unitNorm[d] /= mod;
+
+    // mean vel. outlet tangent and normal
+    for (int d = 0; d < dim; d++) meanVel[d] = 0.;
+    for (int d = 0; d < dim; d++) {
+      meanVel[0] += unitNorm[d] * meanUp[d + 1];
+      meanVel[1] += d_tang1[d] * meanUp[d + 1];
+      if (dim == 3)
+        meanVel[2] += d_tang2[d] * meanUp[d + 1];
+    }
+
+    for (int eq = 0; eq < num_equation; eq++) {
+      normGrad[eq] = 0.;
+      for (int d = 0; d < dim; d++) normGrad[eq] += unitNorm[d] * gradUp[eq + d * num_equation];
+    }
+
+    // NOTE: assumes DryAir!
+    double T = DryAir::temperatureFromConservative(u1, gamma, Rg, dim, num_equation);
+    dpdn = Rg * (T * normGrad[0] + u1[0] * normGrad[1 + dim]);
+
+    speedSound = sqrt(gamma * Rg * meanUp[1 + dim]);  // assumes perfect gas
+
+    meanK = 0.;
+    for (int d = 0; d < dim; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
+    meanK *= 0.5;
+
+    // compute outgoing characteristics
+    L2 = speedSound * speedSound * normGrad[0] - dpdn;
+    L2 *= meanVel[0];
+
+    L3 = 0;
+    for (int d = 0; d < dim; d++) L3 += d_tang1[d] * normGrad[1 + d];
+    L3 *= meanVel[0];
+
+    L4 = 0.;
+    if (dim == 3) {
+      for (int d = 0; d < dim; d++) L4 += d_tang2[d] * normGrad[1 + d];
+      L4 *= meanVel[0];
+    }
+
+    L5 = 0.;
+    for (int d = 0; d < dim; d++) L5 += unitNorm[d] * normGrad[1 + d];
+    L5 = dpdn + meanUp[0] * speedSound * L5;
+    L5 *= meanVel[0] + speedSound;
+
+    if (eqSystem == NS_PASSIVE) {
+      L6 = meanVel[0] * normGrad[num_equation - 1];
+    }
+
+    // estimate ingoing characteristic
+    const double sigma = speedSound / refLength;
+    double meanP = Rg * meanUp[0] * meanUp[1 + dim];  // NOTE: assumes DryAir
+    L1 = sigma * (meanP - inputState[0]);
+
+    d1 = (L2 + 0.5 * (L5 + L1)) / speedSound / speedSound;
+    d2 = 0.5 * (L5 - L1) / meanUp[0] / speedSound;
+    d3 = L3;
+    d4 = L4;
+    d5 = 0.5 * (L5 + L1);
+
+    bdrFlux[0] = d1;
+    bdrFlux[1] = meanVel[0] * d1 + meanUp[0] * d2;
+    bdrFlux[2] = meanVel[1] * d1 + meanUp[0] * d3;
+    if (dim == 3) bdrFlux[3] = meanVel[2] * d1 + meanUp[0] * d4;
+
+    bdrFlux[1 + dim] = meanUp[0] * meanVel[0] * d2;
+    bdrFlux[1 + dim] += meanUp[0] * meanVel[1] * d3;
+    if (dim == 3) bdrFlux[1 + dim] += meanUp[0] * meanVel[2] * d4;
+    bdrFlux[1 + dim] += meanK * d1 + d5 / (gamma - 1.);
+
+    if (eqSystem == NS_PASSIVE) {
+      bdrFlux[num_equation - 1] = d1 * u1[num_equation - 1] / u1[0] + u1[0] * L6;
+    }
+
+    for (int eq = 0; eq < num_equation; eq++) {
+      u2[eq] = boundaryU[eq + n * num_equation];
+      uN[eq] = u2[eq];
+    }
+
+    for (int eq = 1; eq < dim + 1; eq++) uN[eq] = 0.;
+    for (int d = 0; d < dim; d++) {
+      uN[1] += u2[1 + d] * unitNorm[d];
+      uN[2] += u2[1 + d] * d_tang1[d];
+      if (dim == 3) uN[3] += u2[1 + d] * d_tang2[d];
+    }
+
+    for (int eq = 0; eq < num_equation; eq++) {
+      newU[eq] = uN[eq] - dt * bdrFlux[eq];
+    }
+
+    double sum[3];
+    for (int i = 0; i < dim; i++) {
+      sum[i] = 0.;
+      for (int j = 0; j < dim; j++) {
+        sum[i] += d_inv[i + j * dim] * newU[1 + j];
+      }
+    }
+
+    for (int d = 0; d < dim; d++) newU[d + 1] = sum[d];
+
+    for (int eq = 0; eq < num_equation; eq++) {
+      boundaryU[eq + n * num_equation] = newU[eq];
+    }
+  }
+
   static MFEM_HOST_DEVICE void computeNRSubMassFlow(
       const int &thrd, const int &n, const double *u1, const double *gradUp, const double *meanUp, const double &dt,
       double *u2, double *boundaryU, const double *inputState, const double *nor, const double *d_tang1,
@@ -446,6 +587,136 @@ class OutletBC : public BoundaryCondition {
     MFEM_SYNC_THREAD;
 
     if (thrd < num_equation) boundaryU[thrd + n * num_equation] = newU[thrd];
+  }
+
+  static MFEM_HOST_DEVICE void computeNRSubMassFlow_serial(
+     const int &n, const double *u1, const double *gradUp, const double *meanUp, const double &dt,
+      double *u2, double *boundaryU, const double *inputState, const double *nor, const double *d_tang1,
+      const double *d_tang2, const double *d_inv, const double &refLength, const double &area, const double &gamma,
+      const double &Rg, const int &elDof, const int &dim, const int &num_equation, const Equations &eqSystem) {
+
+    double unitNorm[3], meanVel[3], normGrad[20];
+    double mod;
+    double speedSound, meanK, dpdn;
+    double L1, L2, L3, L4, L5, L6;
+    double d1, d2, d3, d4, d5;
+    double bdrFlux[20], uN[20], newU[20];
+
+    for (int d = 0; d < dim; d++) unitNorm[d] = nor[d];
+
+    mod = 0.;
+    for (int d = 0; d < dim; d++) mod += nor[d] * nor[d];
+    mod = sqrt(mod);
+
+    for (int d = 0; d < dim; d++) unitNorm[d] /= mod;
+
+    // mean vel. outlet tangent and normal
+    for (int d = 0; d < dim; d++) meanVel[d] = 0.;
+    for (int d = 0; d < dim; d++) {
+      meanVel[0] += unitNorm[d] * meanUp[d + 1];
+      meanVel[1] += d_tang1[d] * meanUp[d + 1];
+      if (dim == 3) meanVel[2] += d_tang2[d] * meanUp[d + 1];
+    }
+
+    for (int eq = 0; eq < num_equation; eq++) {
+      normGrad[eq] = 0.;
+      for (int d = 0; d < dim; d++) normGrad[eq] += unitNorm[d] * gradUp[eq + d * num_equation];
+    }
+
+    // NOTE: assumes DryAir!
+    double T = DryAir::temperatureFromConservative(u1, gamma, Rg, dim, num_equation);
+    dpdn = Rg * (T * normGrad[0] + u1[0] * normGrad[1 + dim]);
+
+    // NOTE: assumes DryAir!
+    speedSound = sqrt(gamma * Rg * meanUp[1 + dim]);
+    meanK = 0.;
+    for (int d = 0; d < dim; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
+    meanK *= 0.5;
+
+    // compute outgoing characteristics
+    L2 = speedSound * speedSound * normGrad[0] - dpdn;
+    L2 *= meanVel[0];
+
+    L3 = 0;
+    for (int d = 0; d < dim; d++) L3 += d_tang1[d] * normGrad[1 + d];
+    L3 *= meanVel[0];
+
+    L4 = 0.;
+    if (dim == 3) {
+      for (int d = 0; d < dim; d++) L4 += d_tang2[d] * normGrad[1 + d];
+      L4 *= meanVel[0];
+    }
+
+
+    L5 = 0.;
+    for (int d = 0; d < dim; d++) L5 += unitNorm[d] * normGrad[1 + d];
+    L5 = dpdn + meanUp[0] * speedSound * L5;
+    L5 *= meanVel[0] + speedSound;
+
+    if (eqSystem == NS_PASSIVE) {
+      L6 = meanVel[0] * normGrad[num_equation - 1];
+    }
+
+    // estimate ingoing characteristic
+    const double sigma = speedSound / refLength;
+    L1 = -sigma * (meanVel[0] - inputState[0] / meanUp[0] / area);
+    L1 *= meanUp[0] * speedSound;
+
+
+    d1 = (L2 + 0.5 * (L5 + L1)) / speedSound / speedSound;
+    d2 = 0.5 * (L5 - L1) / meanUp[0] / speedSound;
+    d3 = L3;
+    d4 = L4;
+    d5 = 0.5 * (L5 + L1);
+
+    bdrFlux[0] = d1;
+    bdrFlux[1] = meanVel[0] * d1 + meanUp[0] * d2;
+    bdrFlux[2] = meanVel[1] * d1 + meanUp[0] * d3;
+    if (dim == 3) bdrFlux[3] = meanVel[2] * d1 + meanUp[0] * d4;
+
+    bdrFlux[1 + dim] = meanUp[0] * meanVel[0] * d2;
+    bdrFlux[1 + dim] += meanUp[0] * meanVel[1] * d3;
+    if (dim == 3) bdrFlux[1 + dim] += meanUp[0] * meanVel[2] * d4;
+    bdrFlux[1 + dim] += meanK * d1 + d5 / (gamma - 1.);
+
+    if (eqSystem == NS_PASSIVE) {
+      bdrFlux[num_equation - 1] = d1 * u1[num_equation - 1] / u1[0] + u1[0] * L6;
+    }
+
+    for (int eq = 0; eq < num_equation; eq++) {
+      u2[eq] = boundaryU[eq + n * num_equation];
+      uN[eq] = u2[eq];
+    }
+
+    for (int eq = 1; eq < dim + 1; eq++) {
+      uN[eq] = 0.;
+    }
+    for (int d = 0; d < dim; d++) {
+      uN[1] += u2[1 + d] * unitNorm[d];
+      uN[2] += u2[1 + d] * d_tang1[d];
+      if (dim == 3) uN[3] += u2[1 + d] * d_tang2[d];
+    }
+
+    for (int eq = 0; eq < num_equation; eq++) {
+      newU[eq] = uN[eq] - dt * bdrFlux[eq];
+    }
+
+    double sum[3];
+    for (int i = 0; i < dim; i++) {
+      sum[i] = 0;
+      for (int j = 0; j < dim; j++) {
+        sum[i] += d_inv[i + j * dim] * newU[1 + j];
+      }
+    }
+
+
+    for (int d = 0; d < dim; d++) {
+      newU[d + 1] = sum[d];
+    }
+
+    for (int eq = 0; eq < num_equation; eq++) {
+      boundaryU[eq + n * num_equation] = newU[eq];
+    }
   }
 
   static MFEM_HOST_DEVICE void computeNR_PW_SubMF(const int &thrd, const int &n, const double *u1, const double *gradUp,
