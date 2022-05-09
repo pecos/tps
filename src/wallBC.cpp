@@ -90,6 +90,7 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSyste
         case ISOTH: {
           bcState_.prim(nvel + 2) = wallData_.Te;
           bcState_.primIdxs[nvel + 2] = num_equation - 1;
+          bcFlux_.qE = NULL;
         } break;
         case ADIAB: {
           bcFlux_.qE = new double {0.0};
@@ -100,6 +101,9 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSyste
           } else {  // If single temperature, no need to specify heat flux.
             bcFlux_.qE = NULL;
           }
+        } break;
+        case NONE_THMCND: {
+          bcFlux_.qE = NULL;
         } break;
       }
     } break;
@@ -348,6 +352,9 @@ void WallBC::computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix
   for (int d = 0; d < dim; d++) normN += normal[d] * normal[d];
   unitNorm *= 1. / sqrt(normN);
   bcFlux_.normal = unitNorm;
+
+  if (wallData_.elecThermalCond == SHTH)
+    mixture->computeSheathBdrFlux(wallState, bcFlux_);
 
   // evaluate viscous fluxes at the wall
   Vector wallViscF(num_equation);

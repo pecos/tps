@@ -1532,3 +1532,40 @@ void PerfectMixture::computeElectronPressureGrad(const double n_e, const double 
 
   return;
 }
+
+void PerfectMixture::computeSheathBdrFlux(const Vector &state, boundaryViscousFluxData &bcFlux) {
+  Vector n_sp(numSpecies);
+  computeNumberDensities(state, n_sp);
+
+  double T_h, T_e;
+  computeTemperaturesBase(state, &n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
+
+  Vector diffVel(numSpecies);
+  diffVel = 0.0;
+  diffVel = 0.0;
+  // Compute Bohm velocity for positive ions.
+  for (int sp = 0; sp < numSpecies; sp++) {
+    double Zsp = gasParams(sp, GasParams::SPECIES_CHARGES);
+    if (Zsp > 0.0) {
+      double msp = gasParams(sp, GasParams::SPECIES_MW);
+      double VB = sqrt((T_h + Zsp * T_e) * UNIVERSALGASCONSTANT / msp);
+      // TODO(kevin): need to check the sign (out of wall or into the wall)
+      diffVel(sp) = VB;
+      diffVel(numSpecies - 2) += Zsp * n_sp(sp) * VB;
+      diffVel(numSpecies - 1) -= msp * n_sp(sp) * VB;  // fully catalytic wall.
+    }
+  }
+  diffVel(numSpecies - 2) /= n_sp(numSpecies - 2);
+  diffVel(numSpecies - 1) -= gasParams(numSpecies - 2, GasParams::SPECIES_MW) * n_sp(numSpecies - 2) *
+                             diffVel(numSpecies - 2);
+  diffVel(numSpecies - 1) /= gasParams(numSpecies - 1, GasParams::SPECIES_MW) * n_sp(numSpecies - 1);
+  *(bcFlux.diffVel) = diffVel;
+
+  if (twoTemperature_) {
+    double vTe = sqrt(8.0 * UNIVERSALGASCONSTANT * T_e / PI / gasParams(numSpecies - 2, GasParams::SPECIES_MW));
+    double gamma = - log(4.0 / vTe * diffVel(numSpecies - 2));
+
+    *(bcFlux.qH) = diffVel(numSpecies - 2) * (gamma + 2.0) *
+                   n_sp(numSpecies - 2) * UNIVERSALGASCONSTANT * T_e;
+  }
+}
