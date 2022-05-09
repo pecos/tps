@@ -57,6 +57,7 @@ static const double BOLTZMANNCONSTANT = UNIVERSALGASCONSTANT / AVOGADRONUMBER;
 static const double VACUUMPERMITTIVITY = 8.8541878128e-12;
 static const double ELECTRONCHARGE = 1.60218e-19;
 static const double MOLARELECTRONCHARGE = ELECTRONCHARGE * AVOGADRONUMBER;
+static const double PI = 4.0 * atan(1.0);
 
 class GasMixture {
  protected:
@@ -208,6 +209,7 @@ class GasMixture {
   // Modify state with a prescribed condition at boundary.
   // TODO(kevin): it is possible to use this routine for all BCs, so no need of making so many functions as above.
   void modifyStateFromPrimitive(const Vector &state, const boundaryPrimitiveData &bcState, Vector &outputState);
+  virtual void computeSheathBdrFlux(const Vector &state, boundaryViscousFluxData &bcFlux) = 0;
 
   virtual double computeAmbipolarElectronNumberDensity(const double *n_sp) {}
   virtual double computeBackgroundMassDensity(const double &rho, const double *n_sp, double &n_e,
@@ -278,6 +280,8 @@ class DryAir : public GasMixture {
   virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut);
   virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p,
                                        bool modifyElectronEnergy = false);
+
+  virtual void computeSheathBdrFlux(const Vector &state, boundaryViscousFluxData &bcFlux) {}
 
   virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
                                                        Vector &conservedState);
@@ -494,6 +498,7 @@ class TestBinaryAir : public GasMixture {
   virtual double GetGasConstant() { return gas_constant; }
 
   // virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
+  virtual void computeSheathBdrFlux(const Vector &state, boundaryViscousFluxData &bcFlux) {}
 
   virtual double computeElectronEnergy(const double n_e, const double T_e) {}
   virtual double computeElectronPressure(const double n_e, const double T_e) {}
@@ -607,6 +612,7 @@ class PerfectMixture : public GasMixture {
   virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut);
   virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p,
                                        bool modifyElectronEnergy = false);
+  virtual void computeSheathBdrFlux(const Vector &state, boundaryViscousFluxData &bcFlux);
 
   virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
                                                        Vector &conservedState);

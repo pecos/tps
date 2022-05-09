@@ -116,7 +116,8 @@ enum WallType {
 enum ThermalCondition {
   ADIAB,  // Adiabatic
   ISOTH,  // Isothermal
-  SHTH    // Sheath (only for electron temperature)
+  SHTH,   // Sheath (only for electron temperature)
+  NONE_THMCND
 };
 
 // The following four keywords define two planes in which
