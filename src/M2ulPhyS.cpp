@@ -2171,6 +2171,7 @@ void M2ulPhyS::parseBCInputs() {
       thmCondMap["adiabatic"] = ADIAB;
       thmCondMap["isothermal"] = ISOTH;
       thmCondMap["sheath"] = SHTH;
+      thmCondMap["none"] = NONE_THMCND;
 
       std::string hvyType, elecType;
       tpsP->getRequiredInput((basepath + "/heavy_thermal_condition").c_str(), hvyType);
@@ -2187,37 +2188,49 @@ void M2ulPhyS::parseBCInputs() {
           grvy_printf(GRVY_ERROR, "Wall%d: sheath condition is only supported for electron!\n", i);
           exit(-1);
         } break;
+        case NONE_THMCND: {
+          grvy_printf(GRVY_ERROR, "Wall%d: must specify heavies' thermal condition!\n", i);
+          exit(-1);
+        }
         default:
         break;
       }
 
+      // NOTE(kevin): sheath can exist even for single temperature.
       if (config.twoTemperature) {
         tpsP->getRequiredInput((basepath + "/electron_thermal_condition").c_str(), elecType);
-        config.wallBC[i - 1].elecThermalCond = thmCondMap[elecType];
-        config.wallBC[i - 1].Te = -1.0;
-        switch (config.wallBC[i - 1].elecThermalCond) {
-          case ISOTH: {
-            double Te;
-            tpsP->getInput((basepath + "/electron_temperature").c_str(), Te, -1.0);
-            if (Te < 0.0) {
-              grvy_printf(GRVY_INFO, "Wall%d: no input for electron_temperature. Using temperature instead.\n", i);
-              tpsP->getRequiredInput((basepath + "/temperature").c_str(), Te);
-            }
-            if (Te < 0.0) {
-              grvy_printf(GRVY_ERROR, "Wall%d: invalid electron temperature: %.8E!\n", i, Te);
-              exit(-1);
-            }
-            config.wallBC[i - 1].Te = Te;
-          } break;
-          case SHTH: {
-            if (!config.ambipolar) {
-              grvy_printf(GRVY_ERROR, "Wall%d: plasma must be ambipolar for sheath condition!\n", i);
-              exit(-1);
-            }
-          }
-          default:
-          break;
+        if (thmCondMap[elecType] == NONE_THMCND) {
+          grvy_printf(GRVY_ERROR, "Wall%d: electron thermal condition must be specified for two-temperature plasma!\n", i);
+          exit(-1);
         }
+        config.wallBC[i - 1].elecThermalCond = thmCondMap[elecType];
+      } else {
+        tpsP->getInput((basepath + "/electron_thermal_condition").c_str(), elecType, std::string("none"));
+        config.wallBC[i - 1].elecThermalCond = (thmCondMap[elecType] == SHTH) ? SHTH : NONE_THMCND;
+      }
+      config.wallBC[i - 1].Te = -1.0;
+      switch (config.wallBC[i - 1].elecThermalCond) {
+        case ISOTH: {
+          double Te;
+          tpsP->getInput((basepath + "/electron_temperature").c_str(), Te, -1.0);
+          if (Te < 0.0) {
+            grvy_printf(GRVY_INFO, "Wall%d: no input for electron_temperature. Using temperature instead.\n", i);
+            tpsP->getRequiredInput((basepath + "/temperature").c_str(), Te);
+          }
+          if (Te < 0.0) {
+            grvy_printf(GRVY_ERROR, "Wall%d: invalid electron temperature: %.8E!\n", i, Te);
+            exit(-1);
+          }
+          config.wallBC[i - 1].Te = Te;
+        } break;
+        case SHTH: {
+          if (!config.ambipolar) {
+            grvy_printf(GRVY_ERROR, "Wall%d: plasma must be ambipolar for sheath condition!\n", i);
+            exit(-1);
+          }
+        }
+        default:
+        break;
       }
     }
 
