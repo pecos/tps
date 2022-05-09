@@ -271,4 +271,9 @@ struct boundaryViscousFluxData {
   Vector *diffVel;
 };
 
+struct boundaryPrimitiveData {
+  Vector prim;
+  Array<int> primIdxs;
+};
+
 #endif  // DATASTRUCTURES_HPP_

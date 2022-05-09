@@ -2197,7 +2197,17 @@ void M2ulPhyS::parseBCInputs() {
         config.wallBC[i - 1].Te = -1.0;
         switch (config.wallBC[i - 1].elecThermalCond) {
           case ISOTH: {
-            // TODO(kevin): separate isothermal condition for electron.
+            double Te;
+            tpsP->getInput((basepath + "/electron_temperature").c_str(), Te, -1.0);
+            if (Te < 0.0) {
+              grvy_printf(GRVY_INFO, "Wall%d: no input for electron_temperature. Using temperature instead.\n", i);
+              tpsP->getRequiredInput((basepath + "/temperature").c_str(), Te);
+            }
+            if (Te < 0.0) {
+              grvy_printf(GRVY_ERROR, "Wall%d: invalid electron temperature: %.8E!\n", i, Te);
+              exit(-1);
+            }
+            config.wallBC[i - 1].Te = Te;
           } break;
           case SHTH: {
             if (!config.ambipolar) {

@@ -63,6 +63,46 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSyste
       bcFlux_.qH = new double {0.0};
       bcFlux_.qE = new double {0.0};
     } break;
+    case VISC_GNRL: {
+      int idxSize = nvel;
+      if (wallData_.hvyThermalCond == ISOTH) idxSize += 1;
+      if (wallData_.elecThermalCond == ISOTH) idxSize += 1;
+      bcState_.prim.SetSize(idxSize);
+      bcState_.primIdxs.SetSize(idxSize);
+      // No slip boundary condition.
+      for (int d = 0; d < nvel; d++) {
+        bcState_.prim(d) = 0.0;
+        bcState_.primIdxs[d] = d + 1;
+      }
+      // Heavy-species isothermal condition.
+      switch (wallData_.hvyThermalCond) {
+        case ISOTH: {
+          bcState_.prim(nvel + 1) = wallData_.Th;
+          bcState_.primIdxs[nvel + 1] = nvel + 2;
+          bcFlux_.qH = NULL;
+        } break;
+        case ADIAB: {
+          bcFlux_.qH = new double {0.0};
+        } break;
+      }
+      // Electron isothermal condition.
+      switch (wallData_.elecThermalCond) {
+        case ISOTH: {
+          bcState_.prim(nvel + 2) = wallData_.Te;
+          bcState_.primIdxs[nvel + 2] = num_equation - 1;
+        } break;
+        case ADIAB: {
+          bcFlux_.qE = new double {0.0};
+        } break;
+        case SHTH: {
+          if (mixture->IsTwoTemperature()) {
+            bcFlux_.qE = new double {0.0};
+          } else {  // If single temperature, no need to specify heat flux.
+            bcFlux_.qE = NULL;
+          }
+        } break;
+      }
+    } break;
   }
 }
 
@@ -135,6 +175,9 @@ void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradSt
       break;
     case VISC_ISOTH:
       computeIsothermalWallFlux(normal, stateIn, gradState, radius, bdrFlux);
+      break;
+    case VISC_GNRL:
+      computeGeneralWallFlux(normal, stateIn, gradState, radius, bdrFlux);
       break;
   }
 }
@@ -264,6 +307,37 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
   // TODO(kevin): set stangant state with two separate temperature.
 
   if (eqSystem == NS_PASSIVE) wallState[num_equation - 1] = stateIn[num_equation - 1];
+
+  // Normal convective flux
+  rsolver->Eval(stateIn, wallState, normal, bdrFlux, true);
+
+  // unit normal vector
+  Vector unitNorm = normal;
+  double normN = 0.;
+  for (int d = 0; d < dim; d++) normN += normal[d] * normal[d];
+  unitNorm *= 1. / sqrt(normN);
+  bcFlux_.normal = unitNorm;
+
+  // evaluate viscous fluxes at the wall
+  Vector wallViscF(num_equation);
+  fluxClass->ComputeBdrViscousFluxes(wallState, gradState, radius, bcFlux_, wallViscF);
+  wallViscF *= sqrt(normN);  // in case normal is not a unit vector..
+
+  // evaluate internal viscous fluxes
+  DenseMatrix viscF(num_equation, dim);
+  fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, viscF);
+
+  // Add visc fluxes (we skip density eq.)
+  for (int eq = 1; eq < num_equation; eq++) {
+    bdrFlux[eq] -= 0.5 * wallViscF(eq);
+    for (int d = 0; d < dim; d++) bdrFlux[eq] -= 0.5 * viscF(eq, d) * normal[d];
+  }
+}
+
+void WallBC::computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                    Vector &bdrFlux) {
+  Vector wallState(num_equation);
+  mixture->modifyStateFromPrimitive(stateIn, bcState_, wallState);
 
   // Normal convective flux
   rsolver->Eval(stateIn, wallState, normal, bdrFlux, true);

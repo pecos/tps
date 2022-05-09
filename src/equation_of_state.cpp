@@ -131,13 +131,13 @@ void GasMixture::computeStagnationState(const mfem::Vector &stateIn, mfem::Vecto
   // NOTE: electron energy is purely internal energy, so no change.
 }
 
-void GasMixture::modifyStateFromPrimitive(const Vector &state, const Vector &inputPrimitive, const Array<int> &inputIdxs, Vector &outputState) {
+void GasMixture::modifyStateFromPrimitive(const Vector &state, const boundaryPrimitiveData &bcState, Vector &outputState) {
   outputState.SetSize(num_equation);
-  assert(inputPrimitive.Size() == inputIdxs.Size());
+  assert(bcState.prim.Size() == bcState.primIdxs.Size());
 
   Vector prim(num_equation);
   GetPrimitivesFromConservatives(state, prim);
-  for (int i = 0; i < inputIdxs.Size(); i++) prim(inputIdxs[i]) = inputPrimitive(inputIdxs[i]);
+  for (int i = 0; i < bcState.primIdxs.Size(); i++) prim(bcState.primIdxs[i]) = bcState.prim(i);
 
   GetConservativesFromPrimitives(prim, outputState);
 }
