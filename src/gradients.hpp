@@ -111,17 +111,9 @@ class Gradients : public ParNonlinearForm {
   void computeGradients_domain();
   void computeGradients_bdr();
 
-  void computeGradients_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
-                            const Vector &Up, Vector &gradUp, const int num_equation, const int dim,
-                            const volumeFaceIntegrationArrays &gpuArrays,
-                            //                                    const Vector &elemShapeDshapeWJ,
-                            //                                    const Array<int> &elemPosQ_shapeDshapeWJ,
-                            const int &maxDofs, const int &maxIntPoints);
+  void computeGradients_gpu(const int elType, const int offsetElems, const int elDof);
 
-  void faceContrib_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
-                       const Vector &Up, Vector &gradUp, const int num_equation, const int dim,
-                       const volumeFaceIntegrationArrays &gpuArrays, const int &maxDofs,
-                       const int &maxIntPoints);
+  void faceContrib_gpu(const int elType, const int offsetElems, const int elDof);
 
   static void integrationGradSharedFace_gpu(const Vector *Up, const Vector &faceUp, ParGridFunction *gradUp,
                                             const int &Ndofs, const int &dim, const int &num_equation,

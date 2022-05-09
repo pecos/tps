@@ -241,25 +241,16 @@ void Gradients::computeGradients_domain() {
 
   for (int elType = 0; elType < gpuArrays.numElems.Size(); elType++) {
     int elemOffset = 0;
-    if (elType != 0) {
-      for (int i = 0; i < elType; i++) elemOffset += h_numElems[i];
-    }
+    for (int i = 0; i < elType; i++) elemOffset += h_numElems[i];
     int dof_el = h_posDofIds[2 * elemOffset + 1];
-
-    faceContrib_gpu(h_numElems[elType], elemOffset, dof_el, vfes->GetNDofs(), *Up, *gradUp, num_equation_, dim_,
-                    gpuArrays, maxDofs_, maxIntPoints_);
+    faceContrib_gpu(elType, elemOffset, dof_el);
   }
 
   for (int elType = 0; elType < gpuArrays.numElems.Size(); elType++) {
     int elemOffset = 0;
-    if (elType != 0) {
-      for (int i = 0; i < elType; i++) elemOffset += h_numElems[i];
-    }
+    for (int i = 0; i < elType; i++) elemOffset += h_numElems[i];
     int dof_el = h_posDofIds[2 * elemOffset + 1];
-
-    computeGradients_gpu(h_numElems[elType], elemOffset, dof_el, vfes->GetNDofs(),
-                         *Up,  // px,
-                         *gradUp, num_equation_, dim_, gpuArrays, maxDofs_, maxIntPoints_);
+    computeGradients_gpu(elType, elemOffset, dof_el);
   }
 }
 
@@ -378,12 +369,9 @@ void Gradients::interpFaceData_gpu(const Vector &Up, int elType, int elemOffset,
 }
 
 
-void Gradients::computeGradients_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
-                                     const Vector &Up, Vector &gradUp, const int num_equation, const int dim,
-                                     const volumeFaceIntegrationArrays &gpuArrays, const int &maxDofs,
-                                     const int &maxIntPoints) {
-  const double *d_Up = Up.Read();
-  double *d_gradUp = gradUp.ReadWrite();
+void Gradients::computeGradients_gpu(const int elType, const int offsetElems, const int elDof) {
+  const double *d_Up = Up->Read();
+  double *d_gradUp = gradUp->ReadWrite();
   auto d_posDofIds = gpuArrays.posDofIds.Read();
   auto d_nodesIDs = gpuArrays.nodesIDs.Read();
   const double *d_elemShapeDshapeWJ = gpuArrays.elemShapeDshapeWJ.Read();
@@ -391,6 +379,14 @@ void Gradients::computeGradients_gpu(const int numElems, const int offsetElems, 
 
   auto d_Ke = Ke_array_.Read();
   auto d_Ke_pos = Ke_positions_.Read();
+
+  const int numElems = h_numElems[elType];
+  const int totalDofs = vfes->GetNDofs();
+
+  const int num_equation = num_equation_;
+  const int dim = dim_;
+  const int maxIntPoints = maxIntPoints_;
+  const int maxDofs = maxDofs_;
 
   MFEM_FORALL(el, numElems,
   {
@@ -485,16 +481,13 @@ void Gradients::evalFaceIntegrand_gpu() {
 
 
 // clang-format on
-void Gradients::faceContrib_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
-                                const Vector &Up, Vector &gradUp, const int num_equation, const int dim,
-                                const volumeFaceIntegrationArrays &gpuArrays, const int &maxDofs,
-                                const int &maxIntPoints) {
-  const double *d_Up = Up.Read();
+void Gradients::faceContrib_gpu(const int elType, const int offsetElems, const int elDof) {
+  const double *d_Up = Up->Read();
   const double *d_uk_el1 = uk_el1.Read();
   const double *d_uk_el2 = uk_el2.Read();
   const double *d_dun = dun_face.Read();
 
-  double *d_gradUp = gradUp.Write();  // NB: I assume this comes in set to zero!
+  double *d_gradUp = gradUp->Write();  // NB: I assume this comes in set to zero!
   auto d_posDofIds = gpuArrays.posDofIds.Read();
   auto d_nodesIDs = gpuArrays.nodesIDs.Read();
 
@@ -503,6 +496,15 @@ void Gradients::faceContrib_gpu(const int numElems, const int offsetElems, const
   auto d_shapeWnor1 = gpuArrays.shapeWnor1.Read();
   const double *d_shape2 = gpuArrays.shape2.Read();
   auto d_elems12Q = gpuArrays.elems12Q.Read();
+
+  const int numElems = h_numElems[elType];
+  const int totalDofs = vfes->GetNDofs();
+
+  const int dim = dim_;
+  const int num_equation = num_equation_;
+  const int maxIntPoints = maxIntPoints_;
+  const int maxDofs = maxDofs_;
+
 
   MFEM_FORALL_2D(el, numElems, elDof, 1, 1,
   {
