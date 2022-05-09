@@ -23,6 +23,7 @@ int main (int argc, char *argv[])
   RunConfiguration& srcConfig = srcField->GetConfig();
   assert(srcConfig.GetWorkingFluid()==WorkingFluid::USER_DEFINED);
   assert(srcConfig.GetGasModel()==PERFECT_MIXTURE);
+  assert(!srcConfig.axisymmetric_);
 
   int dim = 3;
 
@@ -32,7 +33,7 @@ int main (int argc, char *argv[])
   {
     srcConfig.ambipolar = false;
     srcConfig.twoTemperature = false;
-    PerfectMixture *mixture = new PerfectMixture( srcConfig, dim);
+    PerfectMixture *mixture = new PerfectMixture(srcConfig, dim, dim);
 
     double airMW = 28.964e-3;
 

@@ -107,8 +107,8 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   double nTotal = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
 
-  double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : primitiveState[dim + 1];
-  double Th = primitiveState[dim + 1];
+  double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : primitiveState[nvel_ + 1];
+  double Th = primitiveState[nvel_ + 1];
   // std::cout << "temp: " << Th << ",\t" << Te << std::endl;
 
   // Add Xeps to avoid zero number density case.
@@ -164,8 +164,11 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   DenseMatrix gradX(numSpecies, dim);
   mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
 
-  diffusionVelocity.SetSize(numSpecies, dim);
+  // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
+  diffusionVelocity.SetSize(numSpecies, nvel_);
+  diffusionVelocity = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) {
+    // concentration-driven diffusion only determines the first dim-components.
     for (int d = 0; d < dim; d++) {
       double DgradX = diffusivity(sp) * gradX(sp, d);
       // NOTE: we'll have to handle small X case.
@@ -182,6 +185,7 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   double charSpeed = 0.0;
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     double speciesSpeed = 0.0;
+    // azimuthal component does not participate in flux.
     for (int d = 0; d < dim; d++) speciesSpeed += diffusionVelocity(sp, d) * diffusionVelocity(sp, d);
     speciesSpeed = sqrt(speciesSpeed);
     if (speciesSpeed > charSpeed) charSpeed = speciesSpeed;
@@ -246,8 +250,8 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
   double nTotal = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
 
-  double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : primitiveState[dim + 1];
-  double Th = primitiveState[dim + 1];
+  double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : primitiveState[nvel_ + 1];
+  double Th = primitiveState[nvel_ + 1];
 
   // Add Xeps to avoid zero number density case.
   double nOverT = (n_sp(electronIndex_) + Xeps_) / Te + (n_sp(ionIndex_) + Xeps_) / Th;
@@ -286,8 +290,8 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
   double nTotal = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
 
-  double Te = (twoTemperature_) ? Up[num_equation - 1] : Up[dim + 1];
-  double Th = Up[dim + 1];
+  double Te = (twoTemperature_) ? Up[num_equation - 1] : Up[nvel_ + 1];
+  double Th = Up[nvel_ + 1];
 
   // Add Xeps to avoid zero number density case.
   double nOverT = (n_sp(electronIndex_) + Xeps_) / Te + (n_sp(ionIndex_) + Xeps_) / Th;
@@ -322,8 +326,11 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
   DenseMatrix gradX(numSpecies, dim);
   mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
 
-  diffusionVelocity.SetSize(numSpecies, dim);
+  // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
+  diffusionVelocity.SetSize(numSpecies, nvel_);
+  diffusionVelocity = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) {
+    // concentration-driven diffusion only determines the first dim-components.
     for (int d = 0; d < dim; d++) {
       double DgradX = diffusivity(sp) * gradX(sp, d);
       // NOTE: we'll have to handle small X case.
@@ -348,10 +355,44 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
   double charSpeed = 0.0;
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     double speciesSpeed = 0.0;
+    // azimuthal component does not participate in flux.
     for (int d = 0; d < dim; d++) speciesSpeed += diffusionVelocity(sp, d) * diffusionVelocity(sp, d);
     speciesSpeed = sqrt(speciesSpeed);
     if (speciesSpeed > charSpeed) charSpeed = speciesSpeed;
     // charSpeed = max(charSpeed, speciesSpeed);
   }
   // std::cout << "max diff. vel: " << charSpeed << std::endl;
+}
+
+void ArgonMinimalTransport::GetViscosities(const Vector &conserved, const Vector &primitive, double &visc,
+                                           double &bulkVisc) {
+  Vector n_sp(3), X_sp(3), Y_sp(3);
+  mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
+  double nTotal = 0.0;
+  for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
+
+  double Te = (twoTemperature_) ? primitive[num_equation - 1] : primitive[nvel_ + 1];
+  double Th = primitive[nvel_ + 1];
+
+  // Add Xeps to avoid zero number density case.
+  double nOverT = (n_sp(electronIndex_) + Xeps_) / Te + (n_sp(ionIndex_) + Xeps_) / Th;
+  double debyeLength = sqrt(debyeFactor_ / AVOGADRONUMBER / nOverT);
+  double debyeCircle = PI_ * debyeLength * debyeLength;
+
+  double nondimTe = debyeLength * 4.0 * PI_ * debyeFactor_ * Te;
+  double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
+
+  Vector speciesViscosity(3);
+  speciesViscosity(ionIndex_) =
+      viscosityFactor_ * sqrt(mw_(ionIndex_) * Th) / (collision::charged::rep22(nondimTh) * debyeCircle);
+  speciesViscosity(neutralIndex_) = viscosityFactor_ * sqrt(mw_(neutralIndex_) * Th) / collision::argon::ArAr22(Th);
+  speciesViscosity(electronIndex_) = 0.0;
+
+  visc = 0.0;
+  for (int sp = 0; sp < numSpecies; sp++) {
+    visc += X_sp(sp) * speciesViscosity(sp);
+  }
+  bulkVisc = 0.0;
+
+  return;
 }

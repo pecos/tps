@@ -89,10 +89,14 @@ ConstantPressureGradient::ConstantPressureGradient(const int &_dim, const int &_
                                                    ParFiniteElementSpace *_vfes, ParGridFunction *U,
                                                    ParGridFunction *_Up, ParGridFunction *_gradUp,
                                                    const volumeFaceIntegrationArrays &_gpuArrays,
-                                                   RunConfiguration &_config)
+                                                   RunConfiguration &_config, GasMixture *mixture)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, _gpuArrays,
-                   _config.isAxisymmetric()) {
-  mixture = new DryAir(_config, dim);
+                   _config.isAxisymmetric()),
+      mixture_(mixture) {
+#ifdef _GPU_
+  grvy_printf(GRVY_ERROR, "ConstantPressureGradient with GPU computing is out-dated and not supported yet.");
+  exit(-1);
+#endif
 
   pressGrad.UseDevice(true);
   pressGrad.SetSize(3);
@@ -105,7 +109,7 @@ ConstantPressureGradient::ConstantPressureGradient(const int &_dim, const int &_
   pressGrad.ReadWrite();
 }
 
-ConstantPressureGradient::~ConstantPressureGradient() { delete mixture; }
+// ConstantPressureGradient::~ConstantPressureGradient() { delete mixture; }
 
 void ConstantPressureGradient::updateTerms(Vector &in) {
 #ifdef _GPU_
@@ -146,7 +150,7 @@ void ConstantPressureGradient::updateTerms(Vector &in) {
     for (int n = 0; n < dof_elem; n++) {
       int index = nodes[n];
       for (int eq = 0; eq < num_equation; eq++) primi[eq] = dataUp[index + eq * dof];
-      double p = mixture->ComputePressureFromPrimitives(primi);
+      double p = mixture_->ComputePressureFromPrimitives(primi);
       double grad_pV = 0.;
 
       // stays dim, not nvel, b/c no pressure gradient in theta direction
@@ -245,6 +249,7 @@ void AxisymmetricSource::updateTerms(Vector &in) {
   int dof = vfes->GetNDofs();
 
   double *data = in.GetData();
+  const double *dataU = U_->GetData();
   const double *dataUp = Up_->GetData();
   const double *dataGradUp = gradUp_->GetData();
 
@@ -318,23 +323,19 @@ void AxisymmetricSource::updateTerms(Vector &in) {
       for (int d = 0; d < dim; d++) x[d] = coordsDof[index + d * dof];
       const double radius = x[0];
 
-      // TODO(trevilo): Generalize beyond flow only
-      Vector prim(5);
+      Vector prim(num_equation), conserv(num_equation);
+      for (int eq = 0; eq < num_equation; eq++) {
+        prim(eq) = dataUp[index + eq * dof];
+        conserv(eq) = dataU[index + eq * dof];
+      }
 
-      const double rho = dataUp[index + 0 * dof];
-      const double ur = dataUp[index + 1 * dof];
-      const double uz = dataUp[index + 2 * dof];
-      const double ut = dataUp[index + 3 * dof];
-      const double temperature = dataUp[index + (1 + nvel) * dof];
+      const double rho = prim(0);
+      const double ur = prim(1);
+      const double uz = prim(2);
+      const double ut = prim(3);
+      const double temperature = prim(1 + nvel);
 
-      prim[0] = rho;
-      prim[1] = ur;
-      prim[2] = uz;
-      prim[3] = ut;
-      prim[4] = temperature;
-
-      const double Rg = mixture->GetGasConstant();
-      const double pressure = rho * Rg * temperature;
+      const double pressure = mixture->ComputePressureFromPrimitives(prim);
 
       const double rurut = rho * ur * ut;
       const double rutut = rho * ut * ut;
@@ -347,12 +348,15 @@ void AxisymmetricSource::updateTerms(Vector &in) {
         const double uz_z = dataGradUp[index + (2 * dof) + (1 * dof * num_equation)];
         const double ut_r = dataGradUp[index + (3 * dof) + (0 * dof * num_equation)];
 
-        const double visc = transport_->GetViscosityFromPrimitive(prim);
+        double visc, bulkVisc;
+        transport_->GetViscosities(conserv, prim, visc, bulkVisc);
+        bulkVisc -= 2. / 3. * visc;
 
-        tau_tt = -ur_r - uz_z;
-        if (radius > 0) tau_tt += 2 * ur / radius;
+        double divV = ur_r + uz_z;
+        if (radius > 0) divV += ur / radius;
 
-        tau_tt *= 2 * visc / 3.0;
+        tau_tt = (radius > 0) ? 2.0 * ur / radius * visc : 0.0;
+        tau_tt += bulkVisc * divV;
 
         tau_tr = ut_r;
         if (radius > 0) tau_tr -= ut / radius;

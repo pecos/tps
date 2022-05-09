@@ -65,7 +65,7 @@ int main (int argc, char *argv[])
 
   double pressure = 101325.0;
 
-  PerfectMixture *mixture = new PerfectMixture( srcConfig, dim);
+  PerfectMixture *mixture = new PerfectMixture(srcConfig, dim, dim);
   ArgonMinimalTransport *transport = new ArgonMinimalTransport(mixture, srcConfig);
   int numSpecies = mixture->GetNumSpecies();
   int numActiveSpecies = mixture->GetNumActiveSpecies();

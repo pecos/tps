@@ -259,17 +259,17 @@ void M2ulPhyS::initVariables() {
   switch (config.GetWorkingFluid()) {
     // TODO(kevin): GasMixture should take both dim and nvel, to avoid confusion in future.
     case WorkingFluid::DRY_AIR:
-      mixture = new DryAir(config, nvel);
+      mixture = new DryAir(config, dim, nvel);
       transportPtr = new DryAirTransport(mixture, config);
       break;
     case WorkingFluid::TEST_BINARY_AIR:
-      mixture = new TestBinaryAir(config, nvel);
+      mixture = new TestBinaryAir(config, dim, nvel);
       transportPtr = new TestBinaryAirTransport(mixture, config);
       break;
     case WorkingFluid::USER_DEFINED:
       switch (config.GetGasModel()) {
         case GasModel::PERFECT_MIXTURE:
-          mixture = new PerfectMixture(config, nvel);
+          mixture = new PerfectMixture(config, dim, nvel);
           break;
       }
       switch (config.GetTranportModel()) {

@@ -63,6 +63,7 @@ class GasMixture {
   WorkingFluid fluid;
   int num_equation;
   int dim;
+  int nvel_;  // number of velocity, which differs from dim for axisymmetric case.
 
   int numSpecies;
   int numActiveSpecies;
@@ -106,11 +107,11 @@ class GasMixture {
   void SetNumActiveSpecies() { numActiveSpecies = ambipolar ? (numSpecies - 2) : (numSpecies - 1); }
   // Add electron energy equation if two temperature.
   void SetNumEquations() {
-    num_equation = twoTemperature_ ? (dim + 3 + numActiveSpecies) : (dim + 2 + numActiveSpecies);
+    num_equation = twoTemperature_ ? (nvel_ + 3 + numActiveSpecies) : (nvel_ + 2 + numActiveSpecies);
   }
 
  public:
-  GasMixture(WorkingFluid _fluid, int _dim);
+  GasMixture(WorkingFluid _fluid, int _dim, int nvel);
   GasMixture() {}
 
   ~GasMixture() {}
@@ -123,6 +124,7 @@ class GasMixture {
   int GetNumActiveSpecies() { return numActiveSpecies; }
   int GetNumEquations() { return num_equation; }
   int GetDimension() { return dim; }
+  int GetNumVels() { return nvel_; }
   bool IsAmbipolar() { return ambipolar; }
   bool IsTwoTemperature() { return twoTemperature_; }
   int getInputIndexOf(int mixtureIndex) { return mixtureToInputMap_[mixtureIndex]; }
@@ -159,8 +161,7 @@ class GasMixture {
   virtual bool StateIsPhysical(const Vector &state) = 0;
 
   // Compute X, Y gradients from number density gradient.
-  // TODO(kevin): Fluxes class should take Up as input variable.
-  // Currently cannot receive Up inside Fluxes class.
+  // NOTE(kevin): for axisymmetric case, these handle only r- and z-direction.
   virtual void ComputeMassFractionGradient(const double rho, const Vector &numberDensities, const DenseMatrix &gradUp,
                                            DenseMatrix &massFractionGrad) = 0;
   virtual void ComputeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
@@ -211,7 +212,7 @@ class GasMixture {
 
   virtual double computeElectronEnergy(const double n_e, const double T_e) = 0;
   virtual double computeElectronPressure(const double n_e, const double T_e) = 0;
-  // TODO(kevin): check if this works for axisymmetric case.
+  // NOTE(kevin): for axisymmetric case, this handles only r- and z-direction.
   virtual void computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix &gradUp,
                                            Vector &gradPe) = 0;
 };
@@ -228,9 +229,9 @@ class DryAir : public GasMixture {
   virtual void setNumEquations();
 
  public:
-  DryAir(RunConfiguration &_runfile, int _dim);
+  DryAir(RunConfiguration &_runfile, int _dim, int nvel);
   DryAir();  // this will only be usefull to get air constants
-  DryAir(int dim, int num_equation);
+  // DryAir(int dim, int num_equation);
 
   ~DryAir() {}
 
@@ -279,6 +280,7 @@ class DryAir : public GasMixture {
   virtual void computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix &gradUp,
                                            Vector &gradPe) {}
   // GPU functions
+  // TODO(kevin): GPU part is not refactored for axisymmetric case.
 #ifdef _GPU_
   static MFEM_HOST_DEVICE double pressure(const double *state, double *KE, const double &gamma, const int &dim,
                                           const int &num_equation) {
@@ -399,18 +401,18 @@ class DryAir : public GasMixture {
 inline double DryAir::ComputePressure(const Vector &state, double *electronPressure) {
   if (electronPressure != NULL) *electronPressure = 0.0;
   double den_vel2 = 0;
-  for (int d = 0; d < dim; d++) den_vel2 += state(d + 1) * state(d + 1);
+  for (int d = 0; d < nvel_; d++) den_vel2 += state(d + 1) * state(d + 1);
   den_vel2 /= state[0];
 
-  return (specific_heat_ratio - 1.0) * (state[1 + dim] - 0.5 * den_vel2);
+  return (specific_heat_ratio - 1.0) * (state[1 + nvel_] - 0.5 * den_vel2);
 }
 
 inline double DryAir::ComputeTemperature(const Vector &state) {
   double den_vel2 = 0;
-  for (int d = 0; d < dim; d++) den_vel2 += state(d + 1) * state(d + 1);
+  for (int d = 0; d < nvel_; d++) den_vel2 += state(d + 1) * state(d + 1);
   den_vel2 /= state[0];
 
-  return (specific_heat_ratio - 1.0) / gas_constant * (state[1 + dim] - 0.5 * den_vel2) / state[0];
+  return (specific_heat_ratio - 1.0) / gas_constant * (state[1 + nvel_] - 0.5 * den_vel2) / state[0];
 }
 
 //////////////////////////////////////////////////////
@@ -427,7 +429,7 @@ class TestBinaryAir : public GasMixture {
 
   // virtual void SetNumEquations();
  public:
-  TestBinaryAir(RunConfiguration &_runfile, int _dim);
+  TestBinaryAir(RunConfiguration &_runfile, int _dim, int nvel);
   // TestBinaryAir(); //this will only be usefull to get air constants
 
   ~TestBinaryAir() {}
@@ -479,19 +481,19 @@ class TestBinaryAir : public GasMixture {
 inline double TestBinaryAir::ComputePressure(const Vector &state, double *electronPressure) {
   if (electronPressure != NULL) *electronPressure = 0.0;
   double den_vel2 = 0;
-  for (int d = 0; d < dim; d++) den_vel2 += state(d + 1) * state(d + 1);
+  for (int d = 0; d < nvel_; d++) den_vel2 += state(d + 1) * state(d + 1);
   den_vel2 /= state[0];
 
-  return (specific_heat_ratio - 1.0) * (state[1 + dim] - 0.5 * den_vel2);
+  return (specific_heat_ratio - 1.0) * (state[1 + nvel_] - 0.5 * den_vel2);
 }
 
 // additional functions inlined for speed...
 inline double TestBinaryAir::ComputeTemperature(const Vector &state) {
   double den_vel2 = 0;
-  for (int d = 0; d < dim; d++) den_vel2 += state(d + 1) * state(d + 1);
+  for (int d = 0; d < nvel_; d++) den_vel2 += state(d + 1) * state(d + 1);
   den_vel2 /= state[0];
 
-  double rhoU = state[1 + dim] - 0.5 * den_vel2;
+  double rhoU = state[1 + nvel_] - 0.5 * den_vel2;
   double cv = gas_constant / (specific_heat_ratio - 1.0);
 
   return rhoU / state[0] / cv;
@@ -510,7 +512,7 @@ class PerfectMixture : public GasMixture {
 
   // virtual void SetNumEquations();
  public:
-  PerfectMixture(RunConfiguration &_runfile, int _dim);
+  PerfectMixture(RunConfiguration &_runfile, int _dim, int nvel);
   // TestBinaryAir(); //this will only be usefull to get air constants
 
   ~PerfectMixture() {}

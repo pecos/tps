@@ -105,8 +105,8 @@ class ArgonMinimalTransport : public TransportProperties {
                                                 DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
                                                 Vector &n_sp);
 
-  // TODO(kevin): only for AxisymmetricSource
-  virtual double GetViscosityFromPrimitive(const Vector &state) {}
+  // NOTE(kevin): only for AxisymmetricSource
+  virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc);
 
   double computeThirdOrderElectronThermalConductivity(const Vector &X_sp, const double debyeLength, const double Te,
                                                       const double nondimTe);

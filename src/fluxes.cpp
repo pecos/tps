@@ -117,7 +117,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   // const double k = mixture->GetThermalConductivity(state);
 
   // TODO(kevin): update E-field with EM coupling.
-  Vector Efield(dim);
+  Vector Efield(nvel);
   Efield = 0.0;
 
   const int numSpecies = mixture->GetNumSpecies();
@@ -128,7 +128,8 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   mixture->computeSpeciesEnthalpies(state, speciesEnthalpies);
 
   Vector transportBuffer;
-  DenseMatrix diffusionVelocity(numSpecies, dim);
+  // NOTE(kevin): in flux, only dim-components of diffusionVelocity will be used.
+  DenseMatrix diffusionVelocity(numSpecies, nvel);
   transport->ComputeFluxTransportProperties(state, gradUp, Efield, transportBuffer, diffusionVelocity);
   const double visc = transportBuffer[FluxTrns::VISCOSITY];
   double bulkViscosity = transportBuffer[FluxTrns::BULK_VISCOSITY];
@@ -209,7 +210,8 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   // }
   // NOTE: NS_PASSIVE will not be needed (automatically incorporated).
   for (int sp = 0; sp < numActiveSpecies; sp++) {
-    // NOTE: diffusionVelocity is set to be (numSpecies,dim)-matrix.
+    // NOTE: diffusionVelocity is set to be (numSpecies,nvel)-matrix.
+    // however only dim-components are used for flux.
     for (int d = 0; d < dim; d++) flux(nvel + 2 + sp, d) = -state[nvel + 2 + sp] * diffusionVelocity(sp, d);
   }
 }

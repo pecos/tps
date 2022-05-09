@@ -6,7 +6,7 @@ RUNFILE="inputs/mms.ternary_plasma.2d.wall.ini"
 
 setup() {
     SOLN_FILE=restart_argon_output.sol.h5
-    MESH_FILE=beam-quad-o3-s1-r2-xp.mesh
+    MESH_FILE=beam-quad-o3-s1-r1-xp.mesh
 }
 
 @test "[$TEST] check for input file $RUNFILE" {
@@ -14,7 +14,7 @@ setup() {
 }
 
 @test "[$TEST] create a mesh file" {
-    ../utils/beam_mesh -nx 1 -nt 5 -b 5 -rs 2 -dir 0
+    ../utils/beam_mesh -nx 1 -nt 5 -b 5 -rs 1 -dir 0
 
     test -s $MESH_FILE
 }
@@ -26,35 +26,35 @@ setup() {
 @test "[$TEST] check if the relative error is similar to the reported value" {
     while IFS=$'\t' read -r nx e0 e1 e2 e3 e4 e5;
     do
-      test $nx -eq 400
-      # empirically observed error 3.9019e-4
-      check_lo=$(awk 'BEGIN{print ('$e0'>3.90e-4)?1:0}')
-      check_hi=$(awk 'BEGIN{print ('$e0'<3.91e-4)?1:0}')
+      test $nx -eq 100
+      # empirically observed error 1.922e-3
+      check_lo=$(awk 'BEGIN{print ('$e0'>1.92e-3)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e0'<1.93e-3)?1:0}')
       test $check_lo -eq 1
       test $check_hi -eq 1
-      # empirically observed error 0.1620
-      check_lo=$(awk 'BEGIN{print ('$e1'>0.16)?1:0}')
-      check_hi=$(awk 'BEGIN{print ('$e1'<0.17)?1:0}')
+      # empirically observed error 0.7603
+      check_lo=$(awk 'BEGIN{print ('$e1'>0.755)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e1'<0.765)?1:0}')
       test $check_lo -eq 1
       test $check_hi -eq 1
-      # empirically observed error 0.2274
-      check_lo=$(awk 'BEGIN{print ('$e2'>0.22)?1:0}')
-      check_hi=$(awk 'BEGIN{print ('$e2'<0.23)?1:0}')
+      # empirically observed error 0.9183
+      check_lo=$(awk 'BEGIN{print ('$e2'>0.91)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e2'<0.92)?1:0}')
       test $check_lo -eq 1
       test $check_hi -eq 1
-      # empirically observed error 4.7081e-4
-      check_lo=$(awk 'BEGIN{print ('$e3'>4.70e-4)?1:0}')
-      check_hi=$(awk 'BEGIN{print ('$e3'<4.71e-4)?1:0}')
+      # empirically observed error 3.065e-3
+      check_lo=$(awk 'BEGIN{print ('$e3'>3.06e-3)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e3'<3.07e-3)?1:0}')
       test $check_lo -eq 1
       test $check_hi -eq 1
-      # empirically observed error 4.7059e-4
-      check_lo=$(awk 'BEGIN{print ('$e4'>4.70e-4)?1:0}')
-      check_hi=$(awk 'BEGIN{print ('$e4'<4.71e-4)?1:0}')
+      # empirically observed error 3.0837e-3
+      check_lo=$(awk 'BEGIN{print ('$e4'>3.08e-3)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e4'<3.09e-3)?1:0}')
       test $check_lo -eq 1
       test $check_hi -eq 1
-      # empirically observed error 7.8473e-4
-      check_lo=$(awk 'BEGIN{print ('$e5'>7.84e-4)?1:0}')
-      check_hi=$(awk 'BEGIN{print ('$e5'<7.85e-4)?1:0}')
+      # empirically observed error 5.0761e-3
+      check_lo=$(awk 'BEGIN{print ('$e5'>5.07e-3)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e5'<5.08e-3)?1:0}')
       test $check_lo -eq 1
       test $check_hi -eq 1
     done < ternary_2d_2t_ambipolar_wall.rel_error.txt

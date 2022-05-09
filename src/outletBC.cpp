@@ -298,22 +298,6 @@ void OutletBC::initBCs() {
 }
 
 void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux) {
-  // {
-  //   std::cout << "stateIn." << std::endl;
-  //   for (int eq = 0; eq < num_equation; eq++) {
-  //     std::cout << stateIn(eq) << ",\t";
-  //   }
-  //   std::cout << std::endl;
-  //
-  //   std::cout << "gradState." << std::endl;
-  //   for (int eq = 0; eq < num_equation; eq++) {
-  //     for (int d = 0; d < dim; d++) {
-  //       std::cout << gradState(eq, d) << ",\t";
-  //     }
-  //     std::cout << std::endl;
-  //   }
-  //   exit(-1);
-  // }
   switch (outletType) {
     case SUB_P:
       subsonicReflectingPressure(normal, stateIn, bdrFlux);
@@ -607,6 +591,7 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   Vector normGrad(num_equation);
   normGrad = 0.;
   for (int eq = 0; eq < num_equation; eq++) {
+    // NOTE(kevin): for axisymmetric case, azimuthal normal component will be always zero.
     for (int d = 0; d < dim; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
   }
   // gradient of pressure in normal direction
@@ -770,6 +755,7 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatr
   Vector normGrad(num_equation);
   normGrad = 0.;
   for (int eq = 0; eq < num_equation; eq++) {
+    // NOTE(kevin): for axisymmetric case, azimuthal normal component will be always zero.
     for (int d = 0; d < dim; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
   }
   // gradient of pressure in normal direction
@@ -924,6 +910,7 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
   Vector normGrad(num_equation);
   normGrad = 0.;
   for (int eq = 0; eq < num_equation; eq++) {
+    // NOTE(kevin): for axisymmetric case, azimuthal normal component will be always zero.
     for (int d = 0; d < dim; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
   }
   // gradient of pressure in normal direction

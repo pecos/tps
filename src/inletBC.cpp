@@ -88,7 +88,7 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
     hmeanUp[num_equation - 1] = 0.;
   } else if (numActiveSpecies_ > 0) {
     for (int sp = 0; sp < numActiveSpecies_; sp++) {
-      hmeanUp[dim + 2 + sp] = 0.0;
+      hmeanUp[nvel + 2 + sp] = 0.0;
     }
   }
 
@@ -585,6 +585,7 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   Vector normGrad(num_equation);
   normGrad = 0.;
   for (int eq = 0; eq < num_equation; eq++) {
+    // NOTE(kevin): for axisymmetric case, azimuthal normal component will be always zero.
     for (int d = 0; d < dim; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
   }
   // gradient of pressure in normal direction
@@ -636,7 +637,7 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   if (nvel == 3) bdrFlux[3] = meanVel[2] * d1 + meanUp[0] * d4;
   bdrFlux[1 + nvel] = meanUp[0] * meanVel[0] * d2;
   bdrFlux[1 + nvel] += meanUp[0] * meanVel[1] * d3;
-  if (nvel == 3) bdrFlux[1 + dim] += meanUp[0] * meanVel[2] * d4;
+  if (nvel == 3) bdrFlux[1 + nvel] += meanUp[0] * meanVel[2] * d4;
   bdrFlux[1 + nvel] += meanK * d1 + d5 / (gamma - 1.);
 
   // flux gradients in other directions

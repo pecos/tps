@@ -89,6 +89,7 @@ int main (int argc, char *argv[])
   RunConfiguration& srcConfig = srcField->GetConfig();
   assert(srcConfig.GetWorkingFluid()==WorkingFluid::USER_DEFINED);
   assert(srcConfig.GetGasModel()==PERFECT_MIXTURE);
+  assert(!srcConfig.axisymmetric_);
 
   int dim = 3;
 
@@ -103,7 +104,7 @@ int main (int argc, char *argv[])
   {
     srcConfig.ambipolar = false;
     srcConfig.twoTemperature = false;
-    PerfectMixture *mixture = new PerfectMixture( srcConfig, dim);
+    PerfectMixture *mixture = new PerfectMixture(srcConfig, dim, dim);
 
     grvy_printf(GRVY_INFO, "\n Setting a random primitive variable. \n");
 
@@ -514,7 +515,7 @@ int main (int argc, char *argv[])
   {
     srcConfig.ambipolar = true;
     srcConfig.twoTemperature = false;
-    PerfectMixture *mixture = new PerfectMixture( srcConfig, dim);
+    PerfectMixture *mixture = new PerfectMixture(srcConfig, dim, dim);
 
     grvy_printf(GRVY_INFO, "\n Setting a random primitive variable. \n");
 
@@ -870,7 +871,7 @@ int main (int argc, char *argv[])
   {
     srcConfig.ambipolar = false;
     srcConfig.twoTemperature = true;
-    PerfectMixture *mixture = new PerfectMixture( srcConfig, dim );
+    PerfectMixture *mixture = new PerfectMixture(srcConfig, dim, dim);
 
     grvy_printf(GRVY_INFO, "\n Setting a random primitive variable. \n");
 
@@ -1228,7 +1229,7 @@ int main (int argc, char *argv[])
   {
     srcConfig.ambipolar = true;
     srcConfig.twoTemperature = true;
-    PerfectMixture *mixture = new PerfectMixture( srcConfig, dim );
+    PerfectMixture *mixture = new PerfectMixture(srcConfig, dim, dim);
 
     grvy_printf(GRVY_INFO, "\n Setting a random primitive variable. \n");
 
