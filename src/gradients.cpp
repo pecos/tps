@@ -656,9 +656,10 @@ void Gradients::multInverse_gpu(const int numElems, const int offsetElems, const
   const double *d_invMArray = invMArray.Read();
   auto d_posDofInvM = posDofInvM.Read();
 
-  MFEM_FORALL(el, numElems,
+  //MFEM_FORALL(el, numElems,
+  MFEM_FORALL_2D(el, numElems, elDof, 1, 1,
   {
-    double gradUpi[216 * 3];
+    MFEM_SHARED double gradUpi[216 * 3];
 
     const int eli       = el + offsetElems;
     const int offsetIDs = d_posDofIds[2 * eli];
@@ -667,13 +668,13 @@ void Gradients::multInverse_gpu(const int numElems, const int offsetElems, const
     for (int eq = 0; eq < num_equation; eq++) {
       for (int d = 0; d < dim; d++) {
 
-        for (int i = 0; i < elDof; i++) {
+        MFEM_FOREACH_THREAD(i, x, elDof) {
           const int indexi    = d_nodesIDs[offsetIDs + i];
           gradUpi[i + d * elDof] = d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs];
         }
+        MFEM_SYNC_THREAD;
 
-
-        for (int i = 0; i < elDof; i++) {
+        MFEM_FOREACH_THREAD(i, x, elDof) {
           const int indexi    = d_nodesIDs[offsetIDs + i];
           double temp = 0;
           for (int n = 0; n < elDof; n++) {
@@ -681,6 +682,7 @@ void Gradients::multInverse_gpu(const int numElems, const int offsetElems, const
           }
           d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs] = temp;
         }
+        MFEM_SYNC_THREAD;
       }
     }
   });

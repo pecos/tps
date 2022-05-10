@@ -616,23 +616,23 @@ void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceInteg
   auto d_posDofInvM = posDofInvM.Read();
   const double *d_invM = invMArray.Read();
 
-  //MFEM_FORALL_2D(el, NE, dof, 1, 1,
-  MFEM_FORALL(el, NE,
+  MFEM_FORALL_2D(el, NE, dof, 1, 1,
   {
-    double data[216 * 20];
+    MFEM_SHARED double data[216 * 20];
 
     int eli = el + elemOffset;
     int offsetInv = d_posDofInvM[2 * eli];
     int offsetIds = d_posDofIds[2 * eli];
 
-    for (int i = 0; i < dof; i++) {
+    MFEM_FOREACH_THREAD(i, x, dof) {
       int index = d_nodesIDs[offsetIds + i];
       for (int eq = 0; eq < num_equation; eq++) {
         data[i + eq * dof] = d_z[index + eq * totNumDof];
       }
     }
+    MFEM_SYNC_THREAD;
 
-    for (int i = 0; i < dof; i++) {
+    MFEM_FOREACH_THREAD(i, x, dof) {
       int index = d_nodesIDs[offsetIds + i];
       for (int eq = 0; eq < num_equation; eq++) {
         double tmp = 0.;
@@ -640,6 +640,7 @@ void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceInteg
         d_y[index + eq * totNumDof] = tmp;
       }
     }
+    MFEM_SYNC_THREAD;
   });
 
   //   MFEM_FORALL_2D(el, NE, dof, 1, 1,
