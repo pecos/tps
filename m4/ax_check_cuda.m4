@@ -67,7 +67,15 @@ AC_SUBST([CUDA_LDFLAGS])
 
 CUDA_CXXFLAGS="-I$cuda_prefix/include"
 CXXFLAGS="$CUDA_CXXFLAGS $CXXFLAGS"
-CUDA_LDFLAGS="-L$cuda_prefix/lib"
+
+# Check for lib directory
+CUDA_LDFLAGS=""
+if test -x "$cuda_prefix/lib"; then
+   CUDA_LDFLAGS="-L$cuda_prefix/lib"
+fi
+if test -x "$cuda_prefix/lib64"; then
+   CUDA_LDFLAGS="-L$cuda_prefix/lib64"
+fi
 LDFLAGS="$CUDA_LDFLAGS $LDFLAGS"
 
 # And the header and the lib
