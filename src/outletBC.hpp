@@ -156,9 +156,10 @@ class OutletBC : public BoundaryCondition {
     //     }
   }
 
-  static MFEM_HOST_DEVICE void computeSubPressure_gpu_serial(const double *u1, double *u2, const double *nor, const double &press,
-                                                             const double &gamma, const double &Rg, const int &dim,
-                                                             const int &num_equation, const WorkingFluid &fluid) {
+  static MFEM_HOST_DEVICE void computeSubPressure_gpu_serial(const double *u1, double *u2, const double *nor,
+                                                             const double &press, const double &gamma, const double &Rg,
+                                                             const int &dim, const int &num_equation,
+                                                             const WorkingFluid &fluid) {
     if (fluid == WorkingFluid::DRY_AIR) {
       DryAir::modifyEnergyForPressure_gpu_serial(u1, u2, press, gamma, Rg, num_equation, dim);
     }
@@ -319,12 +320,11 @@ class OutletBC : public BoundaryCondition {
     if (thrd < num_equation) boundaryU[thrd + n * num_equation] = newU[thrd];
   }
 
-  static MFEM_HOST_DEVICE void computeNRSubPress_serial(const int &n, const double *u1, const double *gradUp,
-                                                        const double *meanUp, const double &dt, double *u2, double *boundaryU,
-                                                        const double *inputState, const double *nor, const double *d_tang1,
-                                                        const double *d_tang2, const double *d_inv, const double &refLength,
-                                                        const double &gamma, const double &Rg, const int &elDof,
-                                                        const int &dim, const int &num_equation, const Equations &eqSystem) {
+  static MFEM_HOST_DEVICE void computeNRSubPress_serial(
+      const int &n, const double *u1, const double *gradUp, const double *meanUp, const double &dt, double *u2,
+      double *boundaryU, const double *inputState, const double *nor, const double *d_tang1, const double *d_tang2,
+      const double *d_inv, const double &refLength, const double &gamma, const double &Rg, const int &elDof,
+      const int &dim, const int &num_equation, const Equations &eqSystem) {
     double unitNorm[3], meanVel[3], normGrad[20];
     double mod;
     double speedSound, meanK, dpdn;
@@ -345,8 +345,7 @@ class OutletBC : public BoundaryCondition {
     for (int d = 0; d < dim; d++) {
       meanVel[0] += unitNorm[d] * meanUp[d + 1];
       meanVel[1] += d_tang1[d] * meanUp[d + 1];
-      if (dim == 3)
-        meanVel[2] += d_tang2[d] * meanUp[d + 1];
+      if (dim == 3) meanVel[2] += d_tang2[d] * meanUp[d + 1];
     }
 
     for (int eq = 0; eq < num_equation; eq++) {
@@ -590,11 +589,10 @@ class OutletBC : public BoundaryCondition {
   }
 
   static MFEM_HOST_DEVICE void computeNRSubMassFlow_serial(
-     const int &n, const double *u1, const double *gradUp, const double *meanUp, const double &dt,
-      double *u2, double *boundaryU, const double *inputState, const double *nor, const double *d_tang1,
-      const double *d_tang2, const double *d_inv, const double &refLength, const double &area, const double &gamma,
-      const double &Rg, const int &elDof, const int &dim, const int &num_equation, const Equations &eqSystem) {
-
+      const int &n, const double *u1, const double *gradUp, const double *meanUp, const double &dt, double *u2,
+      double *boundaryU, const double *inputState, const double *nor, const double *d_tang1, const double *d_tang2,
+      const double *d_inv, const double &refLength, const double &area, const double &gamma, const double &Rg,
+      const int &elDof, const int &dim, const int &num_equation, const Equations &eqSystem) {
     double unitNorm[3], meanVel[3], normGrad[20];
     double mod;
     double speedSound, meanK, dpdn;
@@ -647,7 +645,6 @@ class OutletBC : public BoundaryCondition {
       L4 *= meanVel[0];
     }
 
-
     L5 = 0.;
     for (int d = 0; d < dim; d++) L5 += unitNorm[d] * normGrad[1 + d];
     L5 = dpdn + meanUp[0] * speedSound * L5;
@@ -661,7 +658,6 @@ class OutletBC : public BoundaryCondition {
     const double sigma = speedSound / refLength;
     L1 = -sigma * (meanVel[0] - inputState[0] / meanUp[0] / area);
     L1 *= meanUp[0] * speedSound;
-
 
     d1 = (L2 + 0.5 * (L5 + L1)) / speedSound / speedSound;
     d2 = 0.5 * (L5 - L1) / meanUp[0] / speedSound;
@@ -708,7 +704,6 @@ class OutletBC : public BoundaryCondition {
         sum[i] += d_inv[i + j * dim] * newU[1 + j];
       }
     }
-
 
     for (int d = 0; d < dim; d++) {
       newU[d + 1] = sum[d];

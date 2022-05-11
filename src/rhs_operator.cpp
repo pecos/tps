@@ -552,8 +552,7 @@ void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const dou
   auto dataUp = Up->Write();   // make sure data is available in GPU
   auto dataIn = x_in->Read();  // make sure data is available in GPU
 
-  MFEM_FORALL(n, ndofs,
-  {
+  MFEM_FORALL(n, ndofs, {
     double state[20];  // assuming 20 equations
     // MFEM_SHARED double p;
     double KE[3];
@@ -572,8 +571,7 @@ void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const dou
     dataUp[n + 2 * ndofs] = state[2] / state[0];
     if (dim == 3) dataUp[n + 3 * ndofs] = state[3] / state[0];
     dataUp[n + (1 + dim) * ndofs] = DryAir::temperature(&state[0], &KE[0], gamma, Rgas, dim, num_equation);
-    if (eqSystem == NS_PASSIVE)
-      dataUp[n + (num_equation - 1) * ndofs] = state[num_equation - 1] / state[0];
+    if (eqSystem == NS_PASSIVE) dataUp[n + (num_equation - 1) * ndofs] = state[num_equation - 1] / state[0];
   });
 
   // MFEM_FORALL_2D(n, ndofs, num_equation, 1, 1, {
@@ -616,8 +614,7 @@ void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceInteg
   auto d_posDofInvM = posDofInvM.Read();
   const double *d_invM = invMArray.Read();
 
-  MFEM_FORALL_2D(el, NE, dof, 1, 1,
-  {
+  MFEM_FORALL_2D(el, NE, dof, 1, 1, {
     MFEM_SHARED double data[216 * 20];
 
     int eli = el + elemOffset;

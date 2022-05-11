@@ -156,8 +156,9 @@ class InletBC : public BoundaryCondition {
   }
 
   static MFEM_HOST_DEVICE void computeSubDenseVel_gpu_serial(const double *u1, double *u2, const double *nor,
-                                                             const double *inputState, const double &gamma, const double &Rg,
-                                                             const int &dim, const int &num_equation, const WorkingFluid &fluid) {
+                                                             const double *inputState, const double &gamma,
+                                                             const double &Rg, const int &dim, const int &num_equation,
+                                                             const WorkingFluid &fluid) {
     // assumes there at least as many threads as number of equations
     double KE[3];
     double p;

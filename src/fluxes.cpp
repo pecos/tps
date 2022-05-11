@@ -250,8 +250,7 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const Equa
   double gamma = mixture->GetSpecificHeatRatio();
   double Sc = mixture->GetSchmidtNum();
 
-  MFEM_FORALL(n, dof,
-  {
+  MFEM_FORALL(n, dof, {
     double Un[20];
     double KE[3];
     double p;
@@ -280,8 +279,8 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const Equa
         if (eq == num_equation - 1 && eqSystem == NS_PASSIVE)
           d_flux[n + d * dof + eq * dof * dim] = Un[num_equation - 1] * Un[1 + d] / Un[0];
       }
-    }  // end MFEM_FOREACH_THREAD
-  });  // end MFEM_FORALL_WD
+    }
+  });
 
 #endif
 }
@@ -326,7 +325,6 @@ void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTe
       }
     }
 
-    // TODO: Update viscous flux routine!
     // Fluxes::viscousFlux_gpu(&vFlux[0], &Un[0], &gradUpn[0], eqSystem, gamma, Rg, viscMult, bulkViscMult,
     //                         Pr, Sc, eq, num_equation, dim, num_equation);
     Fluxes::viscousFlux_serial_gpu(&vFlux[0], &Un[0], &gradUpn[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,

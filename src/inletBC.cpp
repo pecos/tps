@@ -762,8 +762,7 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
 
   const WorkingFluid fluid = mixture->GetWorkingFluid();
 
-  MFEM_FORALL(n, numBdrElem,
-  {
+  MFEM_FORALL(n, numBdrElem, {
     double Fcontrib[216 * 5];
     double shape[216];
     double Rflux[5], u1[5], u2[5], nor[3];
@@ -771,17 +770,16 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
 
     const int el = d_listElems[n];
     const int offsetBdrU = d_offsetBoundaryU[n];
-    const int Q    = d_intPointsElIDBC[2 * el  ];
+    const int Q = d_intPointsElIDBC[2 * el];
     const int elID = d_intPointsElIDBC[2 * el + 1];
-    const int elOffset = d_posDofIds[2 * elID  ];
-    const int elDof    = d_posDofIds[2 * elID + 1];
+    const int elOffset = d_posDofIds[2 * elID];
+    const int elDof = d_posDofIds[2 * elID + 1];
 
     for (int i = 0; i < elDof; i++) {
       for (int eq = 0; eq < num_equation; eq++) Fcontrib[i + eq * elDof] = 0.;
     }
 
     for (int q = 0; q < Q; q++) {  // loop over int. points
-
       for (int i = 0; i < elDof; i++) shape[i] = d_shapesBC[i + q * maxDofs + el * maxIntPoints * maxDofs];
       for (int d = 0; d < dim; d++) nor[d] = d_normW[d + q * (dim + 1) + el * maxIntPoints * (dim + 1)];
       weight = d_normW[dim + q * (dim + 1) + el * maxIntPoints * (dim + 1)];
@@ -793,15 +791,15 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
 
       // compute mirror state
       switch (type) {
-      case InletType::SUB_DENS_VEL:
-        computeSubDenseVel_gpu_serial(&u1[0], &u2[0], &nor[0], d_inputState, gamma, Rg, dim, num_equation, fluid);
-        break;
-      case InletType::SUB_DENS_VEL_NR:
-        printf("INLET BC NOT IMPLEMENTED");
-        break;
-      case InletType::SUB_VEL_CONST_ENT:
-        printf("INLET BC NOT IMPLEMENTED");
-        break;
+        case InletType::SUB_DENS_VEL:
+          computeSubDenseVel_gpu_serial(&u1[0], &u2[0], &nor[0], d_inputState, gamma, Rg, dim, num_equation, fluid);
+          break;
+        case InletType::SUB_DENS_VEL_NR:
+          printf("INLET BC NOT IMPLEMENTED");
+          break;
+        case InletType::SUB_VEL_CONST_ENT:
+          printf("INLET BC NOT IMPLEMENTED");
+          break;
       }
 
       // compute flux
@@ -843,19 +841,18 @@ void InletBC::interpInlet_gpu(const InletType type, const mfem::Vector &inputSta
   const int totDofs = x.Size() / num_equation;
   const int numBdrElem = listElems.Size();
 
-  MFEM_FORALL(n, numBdrElem,
-  {
+  MFEM_FORALL(n, numBdrElem, {
     double Ui[216];
     double shape[216];
     double u1;
 
     const int el = d_listElems[n];
-    const int Q    = d_intPointsElIDBC[2 * el  ];
+    const int Q = d_intPointsElIDBC[2 * el];
     const int elID = d_intPointsElIDBC[2 * el + 1];
-    const int elOffset = d_posDofIds[2 * elID  ];
-    const int elDof    = d_posDofIds[2 * elID + 1];
+    const int elOffset = d_posDofIds[2 * elID];
+    const int elDof = d_posDofIds[2 * elID + 1];
 
-    for ( int eq = 0; eq < num_equation; eq++ ) {
+    for (int eq = 0; eq < num_equation; eq++) {
       // get data
       for (int i = 0; i < elDof; i++) {
         const int indexi = d_nodesIDs[elOffset + i];
@@ -872,8 +869,8 @@ void InletBC::interpInlet_gpu(const InletType type, const mfem::Vector &inputSta
 
         // save to global memory
         d_interpUbdr[eq + q * num_equation + n * maxIntPoints * num_equation] = u1;
-      }    // end loop over intergration points
-    }  // end loop over equations
+      }  // end loop over intergration points
+    }    // end loop over equations
   });
 #endif
 }

@@ -327,10 +327,7 @@ void Averaging::addSample_gpu(ParGridFunction *meanUp, ParGridFunction *rms, int
   WorkingFluid fluid = mixture->GetWorkingFluid();
   const double Rg = mixture->GetGasConstant();
 
-  // MFEM_FORALL_2D(n, Ndof, 6, 1, 1, {
-  //   MFEM_FOREACH_THREAD(i, x, 6) {
-  MFEM_FORALL(n, Ndof,
-  {
+  MFEM_FORALL(n, Ndof, {
     double meanVel[3], vel[3];
     double nUp[20];  // NOTE: lets make sure we don't have more than 20 eq.
 

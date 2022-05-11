@@ -350,8 +350,7 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
   const WorkingFluid fluid = mixture->GetWorkingFluid();
 
   // clang-format on
-  MFEM_FORALL(el_wall, wallElems.Size() / 7,
-  {
+  MFEM_FORALL(el_wall, wallElems.Size() / 7, {
     // double Fcontrib[216 * 20];
     // double shape[216];
     // double Rflux[20], u1[20], u2[20], nor[3], gradUpi[20 * 3];
@@ -393,23 +392,23 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
         for (int d = 0; d < dim; d++) nor[d] = d_normW[d + q * (dim + 1) + el_bdry * maxIntPoints * (dim + 1)];
         weight = d_normW[dim + q * (dim + 1) + el_bdry * maxIntPoints * (dim + 1)];
 
-        for (int eq = 0; eq < num_equation; eq++) {// recover interpolated data
+        for (int eq = 0; eq < num_equation; eq++) {  // recover interpolated data
           u1[eq] = d_interpolU[eq + q * num_equation + n * maxIntPoints * num_equation];
           for (int d = 0; d < dim; d++)
             gradUpi[eq + d * num_equation] =
-              d_interpGrads[eq + d * num_equation + q * dim * num_equation + n * maxIntPoints * dim * num_equation];
+                d_interpGrads[eq + d * num_equation + q * dim * num_equation + n * maxIntPoints * dim * num_equation];
         }
 
         // compute mirror state
         switch (type) {
-        case WallType::INV:
-          computeInvWallState_gpu_serial(&u1[0], &u2[0], &nor[0], dim, num_equation);
-          break;
-        case WallType::VISC_ISOTH:
-          computeIsothermalState_gpu_serial(&u1[0], &u2[0], &nor[0], wallTemp, gamma, Rg, dim, num_equation, fluid);
-          break;
-        case WallType::VISC_ADIAB:
-          break;
+          case WallType::INV:
+            computeInvWallState_gpu_serial(&u1[0], &u2[0], &nor[0], dim, num_equation);
+            break;
+          case WallType::VISC_ISOTH:
+            computeIsothermalState_gpu_serial(&u1[0], &u2[0], &nor[0], wallTemp, gamma, Rg, dim, num_equation, fluid);
+            break;
+          case WallType::VISC_ADIAB:
+            break;
         }
 
         // evaluate flux
@@ -420,7 +419,7 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
                                        num_equation);
 
         // add visc flux contribution
-        for (int eq = 0; eq < num_equation; eq++ )
+        for (int eq = 0; eq < num_equation; eq++)
           for (int d = 0; d < dim; d++)
             Rflux[eq] -= 0.5 * (vF2[eq + d * num_equation] + vF1[eq + d * num_equation]) * nor[d];
 
@@ -464,56 +463,55 @@ void WallBC::interpWalls_gpu(const WallType type, const double &wallTemp, mfem::
   const int numBdrElem = listElems.Size();
 
   // clang-format on
-  MFEM_FORALL(el_wall, wallElems.Size() / 7, // el_wall is index within wall boundary elements?
-  {
-    double Ui[216], gradUpi[216*3];
-    double shape[216];
+  MFEM_FORALL(
+      el_wall, wallElems.Size() / 7,  // el_wall is index within wall boundary elements?
+      {
+        double Ui[216], gradUpi[216 * 3];
+        double shape[216];
 
-    const int numFaces = d_wallElems[0 + el_wall * 7];
+        const int numFaces = d_wallElems[0 + el_wall * 7];
 
-    for (int f = 0; f < numFaces; f++) {
+        for (int f = 0; f < numFaces; f++) {
+          const int n = d_wallElems[1 + f + el_wall * 7];
+          const int el_bdry = d_listElems[n];  // element number within all boundary elements?
+          const int Q = d_intPointsElIDBC[2 * el_bdry];
+          const int el = d_intPointsElIDBC[2 * el_bdry + 1];  // global element number (on this mpi rank) ?
 
-      const int n = d_wallElems[1 + f + el_wall * 7];
-      const int el_bdry = d_listElems[n];  // element number within all boundary elements?
-      const int Q = d_intPointsElIDBC[2 * el_bdry];
-      const int el = d_intPointsElIDBC[2 * el_bdry + 1];  // global element number (on this mpi rank) ?
+          const int elOffset = d_posDofIds[2 * el];
+          const int elDof = d_posDofIds[2 * el + 1];
 
-      const int elOffset = d_posDofIds[2 * el];
-      const int elDof = d_posDofIds[2 * el + 1];
+          for (int eq = 0; eq < num_equation; eq++) {
+            for (int i = 0; i < elDof; i++) {
+              // load data
+              const int indexi = d_nodesIDs[elOffset + i];
+              Ui[i] = d_U[indexi + eq * totDofs];
+              for (int d = 0; d < dim; d++)
+                gradUpi[i + d * elDof] = d_gradUp[indexi + eq * totDofs + d * num_equation * totDofs];
+            }
 
-      for (int eq = 0; eq < num_equation; eq++) {
-        for (int i = 0; i < elDof; i++) {
-          // load data
-          const int indexi = d_nodesIDs[elOffset + i];
-          Ui[i] = d_U[indexi + eq * totDofs];
-          for (int d = 0; d < dim; d++)
-            gradUpi[i + d * elDof] = d_gradUp[indexi + eq * totDofs + d * num_equation * totDofs];
+            for (int q = 0; q < Q; q++) {
+              for (int j = 0; j < elDof; j++) shape[j] = d_shapesBC[j + q * maxDofs + el_bdry * maxIntPoints * maxDofs];
 
-        }
+              double u1 = 0.;
+              for (int j = 0; j < elDof; j++) u1 += shape[j] * Ui[j];
 
-        for (int q = 0; q < Q; q++) {
-          for (int j = 0; j < elDof; j++) shape[j] = d_shapesBC[j + q * maxDofs + el_bdry * maxIntPoints * maxDofs];
+              double gUp[3];
+              for (int d = 0; d < dim; d++) {
+                gUp[d] = 0.;
+                for (int j = 0; j < elDof; j++) gUp[d] += gradUpi[j + d * elDof] * shape[j];
+              }
 
-          double u1 = 0.;
-          for (int j = 0; j < elDof; j++) u1 += shape[j] * Ui[j];
+              // save to global
+              d_interpolU[eq + q * num_equation + n * maxIntPoints * num_equation] = u1;
 
-          double gUp[3];
-          for (int d = 0; d < dim; d++) {
-            gUp[d] = 0.;
-            for (int j = 0; j < elDof; j++) gUp[d] += gradUpi[j + d * elDof] * shape[j];
-          }
-
-          // save to global
-          d_interpolU[eq + q * num_equation + n * maxIntPoints * num_equation] = u1;
-
-          for (int d = 0; d < dim; d++) {
-            d_interpGrads[eq + d * num_equation + q * dim * num_equation + n * maxIntPoints * dim * num_equation] =
-              gUp[d];
-          }
-        }  // end quadrature point loop
-      }  // end equation loop
-    }  // end face loop
-  });  // end element loop
+              for (int d = 0; d < dim; d++) {
+                d_interpGrads[eq + d * num_equation + q * dim * num_equation + n * maxIntPoints * dim * num_equation] =
+                    gUp[d];
+              }
+            }  // end quadrature point loop
+          }    // end equation loop
+        }      // end face loop
+      });      // end element loop
 #endif
 }
 

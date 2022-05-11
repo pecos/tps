@@ -368,7 +368,6 @@ void Gradients::interpFaceData_gpu(const Vector &Up, int elType, int elemOffset,
   // clang-format on
 }
 
-
 void Gradients::computeGradients_gpu(const int elType, const int offsetElems, const int elDof) {
   const double *d_Up = Up->Read();
   double *d_gradUp = gradUp->ReadWrite();
@@ -388,12 +387,11 @@ void Gradients::computeGradients_gpu(const int elType, const int offsetElems, co
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;
 
-  MFEM_FORALL(el, numElems,
-  {
+  MFEM_FORALL(el, numElems, {
     const int eli = el + offsetElems;
-    const int offsetIDs    = d_posDofIds[2 * eli];
-    const int offsetDShape = d_elemPosQ_shapeDshapeWJ[2 * eli   ];
-    const int Q            = d_elemPosQ_shapeDshapeWJ[2 * eli + 1];
+    const int offsetIDs = d_posDofIds[2 * eli];
+    const int offsetDShape = d_elemPosQ_shapeDshapeWJ[2 * eli];
+    const int Q = d_elemPosQ_shapeDshapeWJ[2 * eli + 1];
 
     const int keoffset = d_Ke_pos[eli];
 
@@ -404,7 +402,7 @@ void Gradients::computeGradients_gpu(const int elType, const int offsetElems, co
       index_i[i] = d_nodesIDs[offsetIDs + i];
     }
 
-    for ( int eq = 0; eq < num_equation; eq++ ) {
+    for (int eq = 0; eq < num_equation; eq++) {
       for (int i = 0; i < elDof; i++) {
         Ui[i] = d_Up[index_i[i] + eq * totalDofs];
         for (int d = 0; d < dim; d++) {
@@ -449,8 +447,7 @@ void Gradients::evalFaceIntegrand_gpu() {
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;
 
-  MFEM_FORALL(iface, Nf,
-  {
+  MFEM_FORALL(iface, Nf, {
     double u1[20], u2[20], nor[3];
 
     const int Q = d_elems12Q[3 * iface + 2];
@@ -479,7 +476,6 @@ void Gradients::evalFaceIntegrand_gpu() {
   });  // end loop over faces
 }
 
-
 // clang-format on
 void Gradients::faceContrib_gpu(const int elType, const int offsetElems, const int elDof) {
   const double *d_Up = Up->Read();
@@ -505,15 +501,13 @@ void Gradients::faceContrib_gpu(const int elType, const int offsetElems, const i
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;
 
-
-  MFEM_FORALL_2D(el, numElems, elDof, 1, 1,
-  {
+  MFEM_FORALL_2D(el, numElems, elDof, 1, 1, {
     const int eli = el + offsetElems;
-    const int offsetIDs    = d_posDofIds[2 * eli];
+    const int offsetIDs = d_posDofIds[2 * eli];
 
     MFEM_FOREACH_THREAD(i, x, elDof) {
       const int idx = d_nodesIDs[offsetIDs + i];
-      double const* shape;
+      double const *shape;
 
       // ================  FACE CONTRIBUTION  ================
       const int elFaces = d_elemFaces[7 * eli];
@@ -656,26 +650,23 @@ void Gradients::multInverse_gpu(const int numElems, const int offsetElems, const
   const double *d_invMArray = invMArray.Read();
   auto d_posDofInvM = posDofInvM.Read();
 
-  //MFEM_FORALL(el, numElems,
-  MFEM_FORALL_2D(el, numElems, elDof, 1, 1,
-  {
+  MFEM_FORALL_2D(el, numElems, elDof, 1, 1, {
     MFEM_SHARED double gradUpi[216 * 3];
 
-    const int eli       = el + offsetElems;
+    const int eli = el + offsetElems;
     const int offsetIDs = d_posDofIds[2 * eli];
     const int offsetInv = d_posDofInvM[2 * eli];
 
     for (int eq = 0; eq < num_equation; eq++) {
       for (int d = 0; d < dim; d++) {
-
         MFEM_FOREACH_THREAD(i, x, elDof) {
-          const int indexi    = d_nodesIDs[offsetIDs + i];
+          const int indexi = d_nodesIDs[offsetIDs + i];
           gradUpi[i + d * elDof] = d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs];
         }
         MFEM_SYNC_THREAD;
 
         MFEM_FOREACH_THREAD(i, x, elDof) {
-          const int indexi    = d_nodesIDs[offsetIDs + i];
+          const int indexi = d_nodesIDs[offsetIDs + i];
           double temp = 0;
           for (int n = 0; n < elDof; n++) {
             temp += gradUpi[n + d * elDof] * d_invMArray[offsetInv + i * elDof + n];
@@ -686,36 +677,5 @@ void Gradients::multInverse_gpu(const int numElems, const int offsetElems, const
       }
     }
   });
-
-
-//   // NOTE: I'm sure this can be done more efficiently. Have a think
-//   MFEM_FORALL_2D(el, numElems, elDof, 1, 1, { // NOLINT
-//     MFEM_FOREACH_THREAD(i, x, elDof) { // NOLINT
-//       //
-//       MFEM_SHARED double gradUpi[216 * 3];
-
-//       const int eli       = el + offsetElems;
-//       const int offsetIDs = d_posDofIds[2 * eli];
-//       const int offsetInv = d_posDofInvM[2 * eli];
-//       const int indexi    = d_nodesIDs[offsetIDs + i];
-
-//       for (int eq = 0; eq < num_equation; eq++) {
-//     for (int d = 0; d < dim; d++) {
-//       gradUpi[i + d * elDof] = d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs];
-//     }
-
-//     MFEM_SYNC_THREAD;
-
-//     for (int d = 0; d < dim; d++) {
-//       double temp = 0;
-//       for (int n = 0; n < elDof; n++) {
-//         temp += gradUpi[n + d * elDof] * d_invMArray[offsetInv + i * elDof + n];
-//       }
-//       d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs] = temp;
-//     }
-//     MFEM_SYNC_THREAD;
-//       }
-// }
-// });
 }
 #endif

@@ -129,8 +129,8 @@ class WallBC : public BoundaryCondition {
     }
   }
 
-  static MFEM_HOST_DEVICE void computeInvWallState_gpu_serial(const double *u1, double *u2, const double *nor, const int &dim,
-                                                              const int &num_equation) {
+  static MFEM_HOST_DEVICE void computeInvWallState_gpu_serial(const double *u1, double *u2, const double *nor,
+                                                              const int &dim, const int &num_equation) {
     double momNormal, norm;
     double unitNor[3];
 
@@ -164,9 +164,9 @@ class WallBC : public BoundaryCondition {
   }
 
   static MFEM_HOST_DEVICE void computeIsothermalState_gpu_serial(const double *u1, double *u2, const double *nor,
-                                                                 const double &wallTemp, const double &gamma, const double &Rg,
-                                                                 const int &dim, const int &num_equation,
-                                                                 const WorkingFluid &fluid) {
+                                                                 const double &wallTemp, const double &gamma,
+                                                                 const double &Rg, const int &dim,
+                                                                 const int &num_equation, const WorkingFluid &fluid) {
     for (int eq = 0; eq < num_equation; eq++) {
       u2[eq] = u1[eq];
     }

@@ -398,8 +398,7 @@ void OutletBC::updateMean_gpu(ParGridFunction *Up, Vector &localMeanUp, const in
     // }
   });
 
-  MFEM_FORALL(eq, num_equation,
-  {
+  MFEM_FORALL(eq, num_equation, {
     // serial sum (for each eq)
     for (int el = 1; el < numBdrElems; el++) {
       d_bdrUp[eq] += d_bdrUp[eq + el * num_equation * maxIntPoints];
@@ -1145,7 +1144,7 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem, 
     }
   });  // end MFEM_FORALL_2D
 #endif
-// clang-format on
+  // clang-format on
 }
 
 void OutletBC::interpOutlet_gpu(const OutletType type, const mfem::Array<double> &inputState,
@@ -1172,21 +1171,19 @@ void OutletBC::interpOutlet_gpu(const OutletType type, const mfem::Array<double>
   const int totDofs = x.Size() / num_equation;
   const int numBdrElem = listElems.Size();
 
-  MFEM_FORALL(n, numBdrElem,
-  {
+  MFEM_FORALL(n, numBdrElem, {
     //
-    double Ui[216], gradUpi[216*3];
+    double Ui[216], gradUpi[216 * 3];
     double shape[216];
     double u1, gUp[3];
 
     const int el = d_listElems[n];
-    const int Q    = d_intPointsElIDBC[2 * el  ];
+    const int Q = d_intPointsElIDBC[2 * el];
     const int elID = d_intPointsElIDBC[2 * el + 1];
-    const int elOffset = d_posDofIds[2 * elID  ];
-    const int elDof    = d_posDofIds[2 * elID + 1];
+    const int elOffset = d_posDofIds[2 * elID];
+    const int elDof = d_posDofIds[2 * elID + 1];
 
-    for ( int eq = 0; eq < num_equation; eq++ ) {
-
+    for (int eq = 0; eq < num_equation; eq++) {
       // get data
       for (int i = 0; i < elDof; i++) {
         const int indexi = d_nodesIDs[elOffset + i];
@@ -1211,10 +1208,11 @@ void OutletBC::interpOutlet_gpu(const OutletType type, const mfem::Array<double>
         d_interpUbdr[eq + q * num_equation + n * maxIntPoints * num_equation] = u1;
 
         for (int d = 0; d < dim; d++) {
-          d_interpGrads[eq + d * num_equation + q * dim * num_equation + n * maxIntPoints * dim * num_equation] = gUp[d];
+          d_interpGrads[eq + d * num_equation + q * dim * num_equation + n * maxIntPoints * dim * num_equation] =
+              gUp[d];
         }
-      }    // end loop over intergration points
-    }  // end loop over equations
+      }  // end loop over intergration points
+    }    // end loop over equations
   });
 #endif
 }
