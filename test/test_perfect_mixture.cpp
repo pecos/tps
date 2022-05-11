@@ -95,6 +95,7 @@ int main (int argc, char *argv[])
 
   double scalarErrorThreshold = 1e-13;
   double gradErrorThreshold = 5e-7;
+  double pressGradAbsThreshold = 1e-8;
   int nTrials = 10;
 
   /*
@@ -260,28 +261,31 @@ int main (int argc, char *argv[])
     moleFractionGrad.Mult(dir, dX_dx);
     double dpdx_prim = mixture->ComputePressureDerivative(dUp_dx, testPrimitives, true);
     double dpdx_cons = mixture->ComputePressureDerivative(dUp_dx, conservedState, false);
-    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > scalarErrorThreshold ) {
+    double rel_error = abs( (dpdx_prim - dpdx_cons) / dpdx_cons );
+    double abs_error = abs( (dpdx_prim - dpdx_cons) );
+    grvy_printf(GRVY_INFO, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim, rel_error );
+    if ((rel_error > scalarErrorThreshold) && (abs_error > pressGradAbsThreshold)) {
       grvy_printf(GRVY_ERROR, "\n ComputePressureDerivative is not consistent between primitive and conservative.");
-      grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim, abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) );
       exit(ERROR);
     }
 
     { // FD verification of pressure gradient.
       grvy_printf(GRVY_INFO, "\n Testing ComputePressureDerivative. \n");
 
-      double delta = 1.0e2 / dpdx_prim;
+      double delta0 = 1e-3 * testPrimitives(0) / abs(dUp_dx(0));
+      for (int eq = 1; eq < numEquation; eq++) delta0 = min(delta0, 0.1 * testPrimitives(0) / abs(dUp_dx(0)));
       Vector perturbedPrimitive(numEquation);
-      for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+      for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta0 * dUp_dx(eq);
 
       double perturbedPressure = mixture->ComputePressureFromPrimitives(perturbedPrimitive);
-      double deltaPdeltax = (perturbedPressure - pressureFromPrimitive) / delta;
+      double deltaPdeltax = (perturbedPressure - pressureFromPrimitive) / delta0;
 
       error = abs( (deltaPdeltax - dpdx_prim) / dpdx_prim );
       double error1 = error;
       for (int fd = 1; fd < 30; fd++) {
         error1 = error;
         double factor = pow(10.0, (- 0.25 * fd));
-        delta = 1.0e2 / dpdx_prim * factor;
+        double delta = delta0 * factor;
         for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
         perturbedPressure = mixture->ComputePressureFromPrimitives(perturbedPrimitive);
         deltaPdeltax = (perturbedPressure - pressureFromPrimitive) / delta;
@@ -670,28 +674,31 @@ int main (int argc, char *argv[])
     moleFractionGrad.Mult(dir, dX_dx);
     double dpdx_prim = mixture->ComputePressureDerivative(dUp_dx, testPrimitives, true);
     double dpdx_cons = mixture->ComputePressureDerivative(dUp_dx, conservedState, false);
-    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > scalarErrorThreshold ) {
+    double rel_error = abs( (dpdx_prim - dpdx_cons) / dpdx_cons );
+    double abs_error = abs( (dpdx_prim - dpdx_cons) );
+    grvy_printf(GRVY_INFO, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim, rel_error );
+    if ((rel_error > scalarErrorThreshold) && (abs_error > pressGradAbsThreshold)) {
       grvy_printf(GRVY_ERROR, "\n ComputePressureDerivative is not consistent between primitive and conservative.");
-      grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim, abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) );
       exit(ERROR);
     }
 
     { // FD verification of pressure gradient.
       grvy_printf(GRVY_INFO, "\n Testing ComputePressureDerivative. \n");
 
-      double delta = 1.0e2 / dpdx_prim;
+      double delta0 = 1e-3 * testPrimitives(0) / abs(dUp_dx(0));
+      for (int eq = 1; eq < numEquation; eq++) delta0 = min(delta0, 0.1 * testPrimitives(0) / abs(dUp_dx(0)));
       Vector perturbedPrimitive(numEquation);
-      for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+      for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta0 * dUp_dx(eq);
 
       double perturbedPressure = mixture->ComputePressureFromPrimitives(perturbedPrimitive);
-      double deltaPdeltax = (perturbedPressure - pressureFromPrimitive) / delta;
+      double deltaPdeltax = (perturbedPressure - pressureFromPrimitive) / delta0;
 
       error = abs( (deltaPdeltax - dpdx_prim) / dpdx_prim );
       double error1 = error;
       for (int fd = 1; fd < 30; fd++) {
         error1 = error;
         double factor = pow(10.0, (- 0.25 * fd));
-        delta = 1.0e2 / dpdx_prim * factor;
+        double delta = delta0 * factor;
         for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
         perturbedPressure = mixture->ComputePressureFromPrimitives(perturbedPrimitive);
         deltaPdeltax = (perturbedPressure - pressureFromPrimitive) / delta;
@@ -1025,28 +1032,31 @@ int main (int argc, char *argv[])
     moleFractionGrad.Mult(dir, dX_dx);
     double dpdx_prim = mixture->ComputePressureDerivative(dUp_dx, testPrimitives, true);
     double dpdx_cons = mixture->ComputePressureDerivative(dUp_dx, conservedState, false);
-    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > scalarErrorThreshold ) {
+    double rel_error = abs( (dpdx_prim - dpdx_cons) / dpdx_cons );
+    double abs_error = abs( (dpdx_prim - dpdx_cons) );
+    grvy_printf(GRVY_INFO, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim, rel_error );
+    if ((rel_error > scalarErrorThreshold) && (abs_error > pressGradAbsThreshold)) {
       grvy_printf(GRVY_ERROR, "\n ComputePressureDerivative is not consistent between primitive and conservative.");
-      grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim, abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) );
       exit(ERROR);
     }
 
     { // FD verification of pressure gradient.
       grvy_printf(GRVY_INFO, "\n Testing ComputePressureDerivative. \n");
 
-      double delta = 1.0e2 / dpdx_prim;
+      double delta0 = 1e-3 * testPrimitives(0) / abs(dUp_dx(0));
+      for (int eq = 1; eq < numEquation; eq++) delta0 = min(delta0, 0.1 * testPrimitives(0) / abs(dUp_dx(0)));
       Vector perturbedPrimitive(numEquation);
-      for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+      for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta0 * dUp_dx(eq);
 
       double perturbedPressure = mixture->ComputePressureFromPrimitives(perturbedPrimitive);
-      double deltaPdeltax = (perturbedPressure - pressureFromPrimitive) / delta;
+      double deltaPdeltax = (perturbedPressure - pressureFromPrimitive) / delta0;
 
       error = abs( (deltaPdeltax - dpdx_prim) / dpdx_prim );
       double error1 = error;
       for (int fd = 1; fd < 30; fd++) {
         error1 = error;
         double factor = pow(10.0, (- 0.25 * fd));
-        delta = 1.0e2 / dpdx_prim * factor;
+        double delta = delta0 * factor;
         for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
         perturbedPressure = mixture->ComputePressureFromPrimitives(perturbedPrimitive);
         deltaPdeltax = (perturbedPressure - pressureFromPrimitive) / delta;
@@ -1397,28 +1407,31 @@ int main (int argc, char *argv[])
     moleFractionGrad.Mult(dir, dX_dx);
     double dpdx_prim = mixture->ComputePressureDerivative(dUp_dx, testPrimitives, true);
     double dpdx_cons = mixture->ComputePressureDerivative(dUp_dx, conservedState, false);
-    if ( abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) > scalarErrorThreshold ) {
+    double rel_error = abs( (dpdx_prim - dpdx_cons) / dpdx_cons );
+    double abs_error = abs( (dpdx_prim - dpdx_cons) );
+    grvy_printf(GRVY_INFO, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim, rel_error );
+    if ((rel_error > scalarErrorThreshold) && (abs_error > pressGradAbsThreshold)) {
       grvy_printf(GRVY_ERROR, "\n ComputePressureDerivative is not consistent between primitive and conservative.");
-      grvy_printf(GRVY_ERROR, "\n %.15E =/= %.15E, error: %.8E \n", dpdx_cons, dpdx_prim, abs( (dpdx_prim - dpdx_cons) / dpdx_cons ) );
       exit(ERROR);
     }
 
     { // FD verification of pressure gradient.
       grvy_printf(GRVY_INFO, "\n Testing ComputePressureDerivative. \n");
 
-      double delta = 1.0e2 / dpdx_prim;
+      double delta0 = 1e-3 * testPrimitives(0) / abs(dUp_dx(0));
+      for (int eq = 1; eq < numEquation; eq++) delta0 = min(delta0, 0.1 * testPrimitives(0) / abs(dUp_dx(0)));
       Vector perturbedPrimitive(numEquation);
-      for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
+      for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta0 * dUp_dx(eq);
 
       double perturbedPressure = mixture->ComputePressureFromPrimitives(perturbedPrimitive);
-      double deltaPdeltax = (perturbedPressure - pressureFromPrimitive) / delta;
+      double deltaPdeltax = (perturbedPressure - pressureFromPrimitive) / delta0;
 
       error = abs( (deltaPdeltax - dpdx_prim) / dpdx_prim );
       double error1 = error;
       for (int fd = 1; fd < 30; fd++) {
         error1 = error;
         double factor = pow(10.0, (- 0.25 * fd));
-        delta = 1.0e2 / dpdx_prim * factor;
+        double delta = delta0 * factor;
         for (int eq = 0; eq < numEquation; eq++) perturbedPrimitive(eq) = testPrimitives(eq) + delta * dUp_dx(eq);
         perturbedPressure = mixture->ComputePressureFromPrimitives(perturbedPrimitive);
         deltaPdeltax = (perturbedPressure - pressureFromPrimitive) / delta;
