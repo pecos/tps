@@ -43,7 +43,6 @@ else
 TESTS += cyl3d.test \
 	 cyl3d.mflow.test \
 	 cyl3d.dtconst.test \
-	 die.test \
 	 averages.test \
 	 wedge.test \
 	 qms.rings.test \
