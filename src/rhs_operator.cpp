@@ -552,31 +552,54 @@ void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const dou
   auto dataUp = Up->Write();   // make sure data is available in GPU
   auto dataIn = x_in->Read();  // make sure data is available in GPU
 
-  MFEM_FORALL_2D(n, ndofs, num_equation, 1, 1, {
-    MFEM_SHARED double state[20];  // assuming 20 equations
+  MFEM_FORALL(n, ndofs, {
+    double state[20];  // assuming 20 equations
     // MFEM_SHARED double p;
-    MFEM_SHARED double KE[3];
+    double KE[3];
 
-    MFEM_FOREACH_THREAD(eq, x, num_equation) {
+    for (int eq = 0; eq < num_equation; eq++) {
       state[eq] = dataIn[n + eq * ndofs];  // loads data into shared memory
-      MFEM_SYNC_THREAD;
-
-      // compute temperature
-      if (eq < dim) KE[eq] = 0.5 * state[1 + eq] * state[1 + eq] / state[0];
-      if (eq == num_equation - 1 && dim == 2) KE[2] = 0;
-      MFEM_SYNC_THREAD;
-
-      // each thread writes to global memory
-      if (eq == 0) dataUp[n] = state[0];
-      if (eq == 1) dataUp[n + ndofs] = state[1] / state[0];
-      if (eq == 2) dataUp[n + 2 * ndofs] = state[2] / state[0];
-      if (eq == 3 && dim == 3) dataUp[n + 3 * ndofs] = state[3] / state[0];
-      if (eq == 1 + dim)
-        dataUp[n + (1 + dim) * ndofs] = DryAir::temperature(&state[0], &KE[0], gamma, Rgas, dim, num_equation);
-      if (eq == num_equation - 1 && eqSystem == NS_PASSIVE)
-        dataUp[n + (num_equation - 1) * ndofs] = state[num_equation - 1] / state[0];
     }
+
+    for (int d = 0; d < dim; d++) {
+      KE[d] = 0.5 * state[1 + d] * state[1 + d] / state[0];
+    }
+    if (dim == 2) KE[2] = 0;
+
+    dataUp[n] = state[0];
+    dataUp[n + ndofs] = state[1] / state[0];
+    dataUp[n + 2 * ndofs] = state[2] / state[0];
+    if (dim == 3) dataUp[n + 3 * ndofs] = state[3] / state[0];
+    dataUp[n + (1 + dim) * ndofs] = DryAir::temperature(&state[0], &KE[0], gamma, Rgas, dim, num_equation);
+    if (eqSystem == NS_PASSIVE) dataUp[n + (num_equation - 1) * ndofs] = state[num_equation - 1] / state[0];
   });
+
+  // MFEM_FORALL_2D(n, ndofs, num_equation, 1, 1, {
+  //   MFEM_SHARED double state[20];  // assuming 20 equations
+  //   // MFEM_SHARED double p;
+  //   MFEM_SHARED double KE[3];
+
+  //   MFEM_FOREACH_THREAD(eq, x, num_equation) {
+  //     state[eq] = dataIn[n + eq * ndofs];  // loads data into shared memory
+  //     MFEM_SYNC_THREAD;
+
+  //     // compute temperature
+  //     if (eq < dim) KE[eq] = 0.5 * state[1 + eq] * state[1 + eq] / state[0];
+  //     if (eq == num_equation - 1 && dim == 2) KE[2] = 0;
+  //     MFEM_SYNC_THREAD;
+
+  //     // each thread writes to global memory
+  //     if (eq == 0) dataUp[n] = state[0];
+  //     if (eq == 1) dataUp[n + ndofs] = state[1] / state[0];
+  //     if (eq == 2) dataUp[n + 2 * ndofs] = state[2] / state[0];
+  //     if (eq == 3 && dim == 3) dataUp[n + 3 * ndofs] = state[3] / state[0];
+  //     if (eq == 1 + dim)
+  //       dataUp[n + (1 + dim) * ndofs] = DryAir::temperature(&state[0], &KE[0], gamma, Rgas, dim, num_equation);
+  //     if (eq == num_equation - 1 && eqSystem == NS_PASSIVE)
+  //       dataUp[n + (num_equation - 1) * ndofs] = state[num_equation - 1] / state[0];
+  //   }
+  // });
+
 #endif
 }
 
@@ -592,27 +615,54 @@ void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceInteg
   const double *d_invM = invMArray.Read();
 
   MFEM_FORALL_2D(el, NE, dof, 1, 1, {
+    MFEM_SHARED double data[216 * 20];
+
+    int eli = el + elemOffset;
+    int offsetInv = d_posDofInvM[2 * eli];
+    int offsetIds = d_posDofIds[2 * eli];
+
     MFEM_FOREACH_THREAD(i, x, dof) {
-      MFEM_SHARED double data[216 * 20];
-
-      int eli = el + elemOffset;
-      int offsetInv = d_posDofInvM[2 * eli];
-      int offsetIds = d_posDofIds[2 * eli];
-
       int index = d_nodesIDs[offsetIds + i];
-
       for (int eq = 0; eq < num_equation; eq++) {
-    data[i + eq * dof] = d_z[index + eq * totNumDof];
+        data[i + eq * dof] = d_z[index + eq * totNumDof];
       }
-      MFEM_SYNC_THREAD;
+    }
+    MFEM_SYNC_THREAD;
 
+    MFEM_FOREACH_THREAD(i, x, dof) {
+      int index = d_nodesIDs[offsetIds + i];
       for (int eq = 0; eq < num_equation; eq++) {
-    double tmp = 0.;
-    for (int k = 0; k < dof; k++) tmp += d_invM[offsetInv + i * dof + k] * data[k + eq * dof];
-    d_y[index + eq * totNumDof] = tmp;
+        double tmp = 0.;
+        for (int k = 0; k < dof; k++) tmp += d_invM[offsetInv + i * dof + k] * data[k + eq * dof];
+        d_y[index + eq * totNumDof] = tmp;
       }
-}
-});
+    }
+    MFEM_SYNC_THREAD;
+  });
+
+  //   MFEM_FORALL_2D(el, NE, dof, 1, 1,
+  // {
+  //   MFEM_FOREACH_THREAD(i, x, dof) {
+  //     MFEM_SHARED double data[216 * 20];
+
+  //     int eli = el + elemOffset;
+  //     int offsetInv = d_posDofInvM[2 * eli];
+  //     int offsetIds = d_posDofIds[2 * eli];
+
+  //     int index = d_nodesIDs[offsetIds + i];
+
+  //     for (int eq = 0; eq < num_equation; eq++) {
+  //       data[i + eq * dof] = d_z[index + eq * totNumDof];
+  //     }
+  //     MFEM_SYNC_THREAD;
+
+  //     for (int eq = 0; eq < num_equation; eq++) {
+  //       double tmp = 0.;
+  //       for (int k = 0; k < dof; k++) tmp += d_invM[offsetInv + i * dof + k] * data[k + eq * dof];
+  //       d_y[index + eq * totNumDof] = tmp;
+  //     }
+  //   }
+  // });
 
 //   MFEM_FORALL_2D(el,NE,dof,1,1,
 //   {

@@ -327,85 +327,69 @@ void Averaging::addSample_gpu(ParGridFunction *meanUp, ParGridFunction *rms, int
   WorkingFluid fluid = mixture->GetWorkingFluid();
   const double Rg = mixture->GetGasConstant();
 
-  MFEM_FORALL_2D(n, Ndof, 6, 1, 1, {
-    MFEM_FOREACH_THREAD(i, x, 6) {
-      MFEM_SHARED double meanVel[3], vel[3];
-      MFEM_SHARED double nUp[20];  // NOTE: lets make sure we don't have more than 20 eq.
+  MFEM_FORALL(n, Ndof, {
+    double meanVel[3], vel[3];
+    double nUp[20];  // NOTE: lets make sure we don't have more than 20 eq.
 
-      for (int eq = i; eq < num_equation; eq += 6) {
-    nUp[eq] = d_Up[n + eq * Ndof];
-      }
-      MFEM_SYNC_THREAD;
-
-      // mean
-      for (int eq = i; eq < num_equation; eq += 6) {
-    double mUpi = d_meanUp[n + eq * Ndof];
-
-    double mVal = dSamplesMean * mUpi;
-
-    double newMeanUp;
-    if (eq != 1 + dim) {
-      newMeanUp = (mVal + nUp[eq]) / (dSamplesMean + 1);
-    } else {  // eq == 1+dim
-      double p;
-      if (fluid == DRY_AIR) {
-        p = DryAir::ComputePressureFromPrimitives_gpu(&nUp[0], Rg, dim);
-      }
-      newMeanUp = (mVal + p) / (dSamplesMean + 1);
+    for (int eq = 0; eq < num_equation; eq++) {
+      nUp[eq] = d_Up[n + eq * Ndof];
     }
 
-    d_meanUp[n + eq * Ndof] = newMeanUp;
+    // mean
+    for (int eq = 0; eq < num_equation; eq++) {
+      double mUpi = d_meanUp[n + eq * Ndof];
+      double mVal = dSamplesMean * mUpi;
+
+      double newMeanUp;
+      if (eq != 1 + dim) {
+        newMeanUp = (mVal + nUp[eq]) / (dSamplesMean + 1);
+      } else {  // eq == 1+dim
+        double p;
+        if (fluid == DRY_AIR) {
+          p = DryAir::ComputePressureFromPrimitives_gpu(&nUp[0], Rg, dim);
+        }
+        newMeanUp = (mVal + p) / (dSamplesMean + 1);
+      }
+
+      d_meanUp[n + eq * Ndof] = newMeanUp;
+    }
 
     // fill out mean velocity array
-    if (i > 0 && i <= 3) {
-      meanVel[i - 1] = newMeanUp;
-      vel[i - 1] = nUp[i];
+    for (int d = 0; d < dim; d++) {
+      meanVel[d] = d_meanUp[n + (d + 1) * Ndof];
+      vel[d] = nUp[d + 1];
     }
-    if (i == 3 && dim != 3) {
+    if (dim != 3) {
       meanVel[2] = 0.;
       vel[2] = 0.;
     }
-      }
-      MFEM_SYNC_THREAD;
 
-      // ----- RMS -----
-      // xx
-      if (i == 0) {
-    double val = d_rms[n];
+    // ----- RMS -----
+    double val = 0.;
+    // xx
+    val = d_rms[n];
     d_rms[n] = (val * dSamplesMean + (vel[0] - meanVel[0]) * (vel[0] - meanVel[0])) / (dSamplesMean + 1);
-      }
 
-      // yy
-      if (i == 1) {
-    double val = d_rms[n + Ndof];
+    // yy
+    val = d_rms[n + Ndof];
     d_rms[n + Ndof] = (val * dSamplesMean + (vel[1] - meanVel[1]) * (vel[1] - meanVel[1])) / (dSamplesMean + 1);
-      }
 
-      // zz
-      if (i == 2) {
-    double val = d_rms[n + 2 * Ndof];
+    // zz
+    val = d_rms[n + 2 * Ndof];
     d_rms[n + 2 * Ndof] = (val * dSamplesMean + (vel[2] - meanVel[2]) * (vel[2] - meanVel[2])) / (dSamplesMean + 1);
-      }
 
-      // xy
-      if (i == 3) {
-    double val = d_rms[n + 3 * Ndof];
+    // xy
+    val = d_rms[n + 3 * Ndof];
     d_rms[n + 3 * Ndof] = (val * dSamplesMean + (vel[0] - meanVel[0]) * (vel[1] - meanVel[1])) / (dSamplesMean + 1);
-      }
 
-      // xz
-      if (i == 4) {
-    double val = d_rms[n + 4 * Ndof];
+    // xz
+    val = d_rms[n + 4 * Ndof];
     d_rms[n + 4 * Ndof] = (val * dSamplesMean + (vel[0] - meanVel[0]) * (vel[2] - meanVel[2])) / (dSamplesMean + 1);
-      }
 
-      // yz
-      if (i == 5) {
-    double val = d_rms[n + 5 * Ndof];
+    // yz
+    val = d_rms[n + 5 * Ndof];
     d_rms[n + 5 * Ndof] = (val * dSamplesMean + (vel[1] - meanVel[1]) * (vel[2] - meanVel[2])) / (dSamplesMean + 1);
-      }
-}
-});
+  });
 }
 
 void Averaging::sumValues_gpu(const Vector &meanUp, const Vector &rms, Vector &local_sums, Vector &tmp_vector,

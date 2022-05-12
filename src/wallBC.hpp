@@ -129,6 +129,27 @@ class WallBC : public BoundaryCondition {
     }
   }
 
+  static MFEM_HOST_DEVICE void computeInvWallState_gpu_serial(const double *u1, double *u2, const double *nor,
+                                                              const int &dim, const int &num_equation) {
+    double momNormal, norm;
+    double unitNor[3];
+
+    norm = 0.;
+    for (int d = 0; d < dim; d++) norm += nor[d] * nor[d];
+    norm = sqrt(norm);
+
+    for (int d = 0; d < dim; d++) unitNor[d] = nor[d] / norm;
+
+    momNormal = 0.;
+    for (int d = 0; d < dim; d++) momNormal += unitNor[d] * u1[d + 1];
+
+    for (int eq = 0; eq < num_equation; eq++) u2[eq] = u1[eq];
+
+    for (int d = 0; d < dim; d++) {
+      u2[d + 1] = u1[d + 1] - 2. * momNormal * unitNor[d];
+    }
+  }
+
   static MFEM_HOST_DEVICE void computeIsothermalState(const double *u1, double *u2, const double *nor,
                                                       const double &wallTemp, const double &gamma, const double &Rg,
                                                       const int &dim, const int &num_equation,
@@ -141,6 +162,20 @@ class WallBC : public BoundaryCondition {
       DryAir::computeStagnantStateWithTemp_gpu(u1, u2, wallTemp, gamma, Rg, num_equation, dim, thrd, maxThreads);
     }
   }
+
+  static MFEM_HOST_DEVICE void computeIsothermalState_gpu_serial(const double *u1, double *u2, const double *nor,
+                                                                 const double &wallTemp, const double &gamma,
+                                                                 const double &Rg, const int &dim,
+                                                                 const int &num_equation, const WorkingFluid &fluid) {
+    for (int eq = 0; eq < num_equation; eq++) {
+      u2[eq] = u1[eq];
+    }
+
+    if (fluid == WorkingFluid::DRY_AIR) {
+      DryAir::computeStagnantStateWithTemp_gpu_serial(u1, u2, wallTemp, gamma, Rg, num_equation, dim);
+    }
+  }
+
 #endif
 };
 

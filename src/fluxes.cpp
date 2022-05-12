@@ -250,22 +250,20 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const Equa
   double gamma = mixture->GetSpecificHeatRatio();
   double Sc = mixture->GetSchmidtNum();
 
-  MFEM_FORALL_2D(n, dof, num_equation, 1, 1, {
-    MFEM_SHARED double Un[20];
-    MFEM_SHARED double KE[3];
-    MFEM_SHARED double p;
+  MFEM_FORALL(n, dof, {
+    double Un[20];
+    double KE[3];
+    double p;
 
-    MFEM_FOREACH_THREAD(eq, x, num_equation) {
+    for (int eq = 0; eq < num_equation; eq++) {
       Un[eq] = dataIn[n + eq * dof];
-      MFEM_SYNC_THREAD;
+    }
+    for (int d = 0; d < dim; d++) KE[d] = 0.5 * Un[1 + d] * Un[1 + d] / Un[0];
+    if (dim != 3) KE[2] = 0.;
 
-      if (eq < dim) KE[eq] = 0.5 * Un[1 + eq] * Un[1 + eq] / Un[0];
-      if (dim != 3 && eq == 1) KE[2] = 0.;
-      MFEM_SYNC_THREAD;
+    p = DryAir::pressure(&Un[0], &KE[0], gamma, dim, num_equation);
 
-      if (eq == 0) p = DryAir::pressure(&Un[0], &KE[0], gamma, dim, num_equation);
-      MFEM_SYNC_THREAD;
-
+    for (int eq = 0; eq < num_equation; eq++) {
       double temp;
       for (int d = 0; d < dim; d++) {
         if (eq == 0) d_flux[n + d * dof + eq * dof * dim] = Un[1 + d];
@@ -281,8 +279,9 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const Equa
         if (eq == num_equation - 1 && eqSystem == NS_PASSIVE)
           d_flux[n + d * dof + eq * dof * dim] = Un[num_equation - 1] * Un[1 + d] / Un[0];
       }
-    }  // end MFEM_FOREACH_THREAD
-  });  // end MFEM_FORALL_WD
+    }
+  });
+
 #endif
 }
 
@@ -310,43 +309,47 @@ void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTe
   const double Sc = mixture->GetSchmidtNum();
 
   // clang-format off
-  MFEM_FORALL_2D(n, dof, num_equation, 1, 1, {
-    MFEM_FOREACH_THREAD(eq, x, num_equation) {
-      MFEM_SHARED double Un[5];
-      MFEM_SHARED double gradUpn[5 * 3];
-      MFEM_SHARED double vFlux[5 * 3];
-      MFEM_SHARED double linVisc;
+  MFEM_FORALL(n, dof,
+  {
+    double Un[5];
+    double gradUpn[5 * 3];
+    double vFlux[5 * 3];
+    double linVisc;
 
-      // init. State
+    // init. State
+    for (int eq = 0; eq < num_equation; eq++) {
       Un[eq] = dataIn[n + eq * dof];
 
       for (int d = 0; d < dim; d++) {
         gradUpn[eq + d * num_equation] = d_gradUp[n + eq * dof + d * dof * num_equation];
       }
-      MFEM_SYNC_THREAD;
+    }
 
-      Fluxes::viscousFlux_gpu(&vFlux[0], &Un[0], &gradUpn[0], eqSystem, gamma, Rg, viscMult, bulkViscMult,
-                              Pr, Sc, eq, num_equation, dim, num_equation);
+    // Fluxes::viscousFlux_gpu(&vFlux[0], &Un[0], &gradUpn[0], eqSystem, gamma, Rg, viscMult, bulkViscMult,
+    //                         Pr, Sc, eq, num_equation, dim, num_equation);
+    Fluxes::viscousFlux_serial_gpu(&vFlux[0], &Un[0], &gradUpn[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
+                                   num_equation);
 
-      MFEM_SYNC_THREAD;
 
-      if (d_spaceVaryViscMult != NULL) {
-        if (eq == 0) {
-          linVisc = d_spaceVaryViscMult[n];
-        }
-        MFEM_SYNC_THREAD;
+    MFEM_SYNC_THREAD;
 
-        for (int d = 0; d < dim; d++) {
+    if (d_spaceVaryViscMult != NULL) {
+      linVisc = d_spaceVaryViscMult[n];
+
+      for (int d = 0; d < dim; d++) {
+        for (int eq = 0; eq < num_equation; eq++) {
           vFlux[eq + d * num_equation] *= linVisc;
         }
       }
+    }
 
-      // write to global memory
+    // write to global memory
+    for (int eq = 0; eq < num_equation; eq++) {
       for (int d = 0; d < dim; d++) {
         d_flux[n + d * dof + eq * dof * dim] -= vFlux[eq + d * num_equation];
       }
-    }  // end MFEM_FOREACH_THREAD
-  });  // end MFEM_FORALL_2D
+    }
+  });  // end MFEM_FORALL
 #endif
 }
 // clang-format on

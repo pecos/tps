@@ -330,6 +330,14 @@ class DryAir : public GasMixture {
     if (thrd == 1 + dim) stagState[thrd] = Rg / (gamma - 1.) * stateIn[0] * Temp;
   }
 
+  static MFEM_HOST_DEVICE void computeStagnantStateWithTemp_gpu_serial(const double *stateIn, double *stagState,
+                                                                       const double &Temp, const double &gamma,
+                                                                       const double &Rg, const int &num_equation,
+                                                                       const int &dim) {
+    for (int d = 0; d < dim; d++) stagState[1 + d] = 0.;
+    stagState[1 + dim] = Rg / (gamma - 1.) * stateIn[0] * Temp;
+  }
+
   static MFEM_HOST_DEVICE void modifyEnergyForPressure_gpu(const double *stateIn, double *stateOut, const double &p,
                                                            const double &gamma, const double &Rg,
                                                            const int &num_equation, const int &dim, const int &thrd,
@@ -344,6 +352,20 @@ class DryAir : public GasMixture {
     MFEM_SYNC_THREAD;
 
     if (thrd == 0) stateOut[1 + dim] = p / (gamma - 1.) + ke;
+  }
+
+  static MFEM_HOST_DEVICE void modifyEnergyForPressure_gpu_serial(const double *stateIn, double *stateOut,
+                                                                  const double &p, const double &gamma,
+                                                                  const double &Rg, const int &num_equation,
+                                                                  const int &dim) {
+    double ke;
+    ke = 0.;
+    for (int d = 0; d < dim; d++) ke += stateIn[1 + d] * stateIn[1 + d];
+    ke *= 0.5 / stateIn[0];
+
+    for (int eq = 0; eq < num_equation; eq++) stateOut[eq] = stateIn[eq];
+
+    stateOut[1 + dim] = p / (gamma - 1.) + ke;
   }
 #endif
 };

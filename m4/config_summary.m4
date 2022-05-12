@@ -71,6 +71,8 @@ AS_ECHO("`$srcdir/m4/wrap_lines.py --maxWidth 110 --first 1 --remain 31 --prefix
 AS_ECHO("`$srcdir/m4/wrap_lines.py --maxWidth 110 --first 1 --remain 31 --prefix "   HIP_LDFLAGS.............. :" \
                                    --input="$HIP_LDFLAGS"`")
 fi
+
+echo GPU build enabled for cpu... : $enable_gpu_cpu
 echo '-----------------------------------------------------------------------------------'
 
 ])

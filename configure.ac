@@ -165,6 +165,22 @@ if test x$ENABLE_GPU != xyes; then
 fi
 AM_CONDITIONAL(HIP_ENABLED,test x$ENABLE_HIP = xyes)
 
+
+dnl ------------------------------
+dnl Check for GPU build without hip or cuda
+AC_ARG_ENABLE([gpu-cpu],
+         [AS_HELP_STRING([--enable-gpu-cpu],[Enable GPU code path on CPU (WARNING: Experimental option).])],
+	 [],[enable_gpu_cpu=no])
+
+if test x$enable_gpu_cpu = xyes; then
+   AC_MSG_NOTICE([Configuring for GPU code path build on CPU system])
+   AC_MSG_NOTICE([WARNING: This is an experimental feature.])
+   AC_DEFINE([_GPU_])
+   AM_CONDITIONAL(GPU_ENABLED,test x$enable_gpu_cpu = xyes)
+fi
+
+
+
 AX_PATH_MFEM([4.2],  [yes])
 
 dnl --
