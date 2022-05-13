@@ -65,6 +65,7 @@ libtps_la_LIBADD    += -lslurm
 endif
 
 if CUDA_ENABLED
+tps_LDFLAGS         += $(CUDA_LDFLAGS)
 libtps_la_LIBADD    += $(CUDA_LDFLAGS) -lcuda -lcusparse
 endif
 
