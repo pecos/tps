@@ -536,115 +536,91 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(
   const double *d_shared_gradUp1 = shared_grad_upk_el1.Read();
   const double *d_shared_gradUp2 = shared_grad_upk_el2.Read();
 
-  MFEM_FORALL_2D(el, parallelData->sharedElemsFaces.Size() / 7, maxDofs, 1, 1, {
-    MFEM_FOREACH_THREAD(i, x, maxDofs) {
-      //
-      MFEM_SHARED double Fcontrib[216 * 20];
-      MFEM_SHARED double l1[216], l2[216];
-      MFEM_SHARED double Rflux[20], u1[20], u2[20], nor[3];
-      MFEM_SHARED double gradUp1[20 * 3], gradUp2[20 * 3];
-      MFEM_SHARED double vFlux1[20 * 3], vFlux2[20 * 3];
 
-      const int el1      = d_sharedElemsFaces[0 + el * 7];
-      const int numFaces = d_sharedElemsFaces[1 + el * 7];
-      const int dof1     = d_sharedElem1Dof12Q[1 + d_sharedElemsFaces[2 + el * 7] * 4];
+  MFEM_FORALL(el, parallelData->sharedElemsFaces.Size() / 7, {
+    //
+    double Fcontrib[216 * 5];
+    double l1[216];
+    double Rflux[5], u1[5], u2[5], nor[3];
+    double gradUp1[5 * 3], gradUp2[5 * 3];
+    double vFlux1[5 * 3], vFlux2[5 * 3];
+    int index_i[216];
 
-      bool elemDataRecovered = false;
-      int indexi;
+    const int el1      = d_sharedElemsFaces[0 + el * 7];
+    const int offsetEl1 = d_posDofIds[2 * el1];
+    const int numFaces = d_sharedElemsFaces[1 + el * 7];
+    const int dof1     = d_sharedElem1Dof12Q[1 + d_sharedElemsFaces[2 + el * 7] * 4];
 
-      for (int elFace = 0; elFace < numFaces; elFace++) {
-        const int f = d_sharedElemsFaces[1 + elFace + 1 + el * 7];
-        const int dof2 = d_sharedElem1Dof12Q[2 + f * 4];
-        const int Q = d_sharedElem1Dof12Q[3 + f * 4];
-        const int offsetEl1 = d_posDofIds[2 * el1];
-
-        if (i < dof1 && !elemDataRecovered) {
-          indexi = d_nodesIDs[offsetEl1 + i];
-          for (int eq = 0; eq < num_equation; eq++) {
-            Fcontrib[i + eq * dof1] = 0.;
-          }
-          elemDataRecovered = true;
-        }
-        MFEM_SYNC_THREAD;
-
-        for (int k = 0; k < Q; k++) {
-          const double weight =
-            d_sharedShapeWnor1[maxDofs + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
-          if (i < dof1)
-            l1[i] = d_sharedShapeWnor1[i + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
-          if (i < dim)
-            nor[i] = d_sharedShapeWnor1[maxDofs + 1 + i + k * (maxDofs + 1 + dim) +
-                                        f * maxIntPoints * (maxDofs + 1 + dim)];
-          if (dim == 2 && i == maxDofs - 1) nor[2] = 0.;
-          if (i < dof2) l2[i] = d_sharedShape2[i + k * maxDofs + f * maxIntPoints * maxDofs];
-          if (i < num_equation) {
-            u1[i] = d_shared_uk1[i + k*num_equation + elFace*maxIntPoints*num_equation +
-                                  el*5*maxIntPoints*num_equation];
-            u2[i] = d_shared_uk2[i + k*num_equation + elFace*maxIntPoints*num_equation +
-                                  el*5*maxIntPoints*num_equation];
-            Rflux[i] = 0.;
-            for (int d = 0; d < dim; d++) {
-              gradUp1[i + d * num_equation] = d_shared_gradUp1[i + k*num_equation + elFace*maxIntPoints*num_equation +
-                el*5*maxIntPoints*num_equation + d*maxNumElems*5*maxIntPoints*num_equation];
-              gradUp2[i + d * num_equation] = d_shared_gradUp2[i + k*num_equation + elFace*maxIntPoints*num_equation +
-                el*5*maxIntPoints*num_equation + d*maxNumElems*5*maxIntPoints*num_equation];
-            }
-          }
-          MFEM_SYNC_THREAD;
-
-          // interpolate
-//           if (i < num_equation) {
-//             for (int n = 0; n < dof1; n++) {
-//               u1[i] += Ui[n + i * dof1] * l1[n];
-//               for (int d = 0; d < dim; d++)
-//                 gradUp1[i + d * num_equation] += gradUpi[n + i * dof1 + d * num_equation * dof1] * l1[n];
-//             }
-//             for (int n = 0; n < dof2; n++) {
-//               //             u2[i] += Uj[n+i*dof2]*l2[n];
-//               //             for(int d=0;d<dim;d++) gradUp2[i+d*num_equation] +=
-//               //                           gradUpj[n+i*dof2+d*num_equation*dof2]*l2[n];
-//               int index = d_sharedVdofs[n + i * maxDofs + f * num_equation * maxDofs];
-//               u2[i] += l2[n] * d_faceData[index];
-//               for (int d = 0; d < dim; d++) {
-//                 index = d_sharedVdofsGrads[n + i * maxDofs + d * num_equation * maxDofs +
-//                                              f * dim * num_equation * maxDofs];
-//                 gradUp2[i + d * num_equation] += l2[n] * d_faceGradUp[index];
-//               }
-//             }
-//           }
-//           MFEM_SYNC_THREAD;
-          // compute Riemann flux
-          RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg,
-                                       dim, eqSystem, num_equation, i, maxDofs);
-          Fluxes::viscousFlux_gpu(&vFlux1[0], &u1[0], &gradUp1[0], eqSystem, gamma, Rg, viscMult,
-                                  bulkViscMult, Pr, Sc, i, maxDofs, dim, num_equation);
-          Fluxes::viscousFlux_gpu(&vFlux2[0], &u2[0], &gradUp2[0], eqSystem, gamma, Rg, viscMult, bulkViscMult,
-                                  Pr, Sc, i, maxDofs, dim, num_equation);
-
-          MFEM_SYNC_THREAD;
-          if (i < num_equation) {
-            for (int d = 0; d < dim; d++)
-              vFlux1[i + d * num_equation] = 0.5 * (vFlux1[i + d * num_equation] + vFlux2[i + d * num_equation]);
-          }
-          MFEM_SYNC_THREAD;
-          if (i < num_equation) {
-            for (int d = 0; d < dim; d++) Rflux[i] -= vFlux1[i + d * num_equation] * nor[d];
-          }
-          MFEM_SYNC_THREAD;
-
-          // add integration point contribution
-          for (int eq = 0; eq < num_equation; eq++) {
-            if (i < dof1) Fcontrib[i + eq * dof1] -= weight * l1[i] * Rflux[eq];
-          }
-          MFEM_SYNC_THREAD;
-        }
-        MFEM_SYNC_THREAD;
-      }
-
-      // write to global memory
+    for (int i = 0; i <  dof1; i++) {
+      index_i[i] = d_nodesIDs[offsetEl1 + i];
       for (int eq = 0; eq < num_equation; eq++) {
-        if (i < dof1)
-          d_y[indexi + eq * Ndofs] += Fcontrib[i + eq * dof1];
+        Fcontrib[i + eq * dof1] = 0.;
+      }
+    }
+
+    for (int elFace = 0; elFace < numFaces; elFace++) {
+      const int f = d_sharedElemsFaces[1 + elFace + 1 + el * 7];
+      const int dof2 = d_sharedElem1Dof12Q[2 + f * 4];
+      const int Q = d_sharedElem1Dof12Q[3 + f * 4];
+
+      for (int k = 0; k < Q; k++) {
+        const double weight =
+          d_sharedShapeWnor1[maxDofs + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
+        for (int i = 0; i < dof1; i++) {
+          l1[i] = d_sharedShapeWnor1[i + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
+        }
+        for (int d = 0; d < dim; d++) {
+          nor[d] = d_sharedShapeWnor1[maxDofs + 1 + d + k * (maxDofs + 1 + dim) +
+                                      f * maxIntPoints * (maxDofs + 1 + dim)];
+        }
+
+        for (int eq = 0; eq < num_equation; eq++) {
+          u1[eq] = d_shared_uk1[eq + k*num_equation + elFace*maxIntPoints*num_equation +
+                                el*5*maxIntPoints*num_equation];
+          u2[eq] = d_shared_uk2[eq + k*num_equation + elFace*maxIntPoints*num_equation +
+                                el*5*maxIntPoints*num_equation];
+          Rflux[eq] = 0.;
+          for (int d = 0; d < dim; d++) {
+            gradUp1[eq + d * num_equation] = d_shared_gradUp1[eq + k*num_equation + elFace*maxIntPoints*num_equation +
+                                                              el*5*maxIntPoints*num_equation + d*maxNumElems*5*maxIntPoints*num_equation];
+            gradUp2[eq + d * num_equation] = d_shared_gradUp2[eq + k*num_equation + elFace*maxIntPoints*num_equation +
+                                                              el*5*maxIntPoints*num_equation + d*maxNumElems*5*maxIntPoints*num_equation];
+          }
+        }
+
+        // // compute Riemann flux
+        // RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg,
+        //                              dim, eqSystem, num_equation, i, maxDofs);
+        // Fluxes::viscousFlux_gpu(&vFlux1[0], &u1[0], &gradUp1[0], eqSystem, gamma, Rg, viscMult,
+        //                         bulkViscMult, Pr, Sc, i, maxDofs, dim, num_equation);
+        // Fluxes::viscousFlux_gpu(&vFlux2[0], &u2[0], &gradUp2[0], eqSystem, gamma, Rg, viscMult, bulkViscMult,
+        //                         Pr, Sc, i, maxDofs, dim, num_equation);
+        // evaluate flux
+        RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
+        Fluxes::viscousFlux_serial_gpu(&vFlux1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
+                                       num_equation);
+        Fluxes::viscousFlux_serial_gpu(&vFlux2[0], &u2[0], &gradUp2[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
+                                       num_equation);
+
+
+        for (int eq = 0; eq < num_equation; eq++) {
+          for (int d = 0; d < dim; d++)
+            vFlux1[eq + d * num_equation] = 0.5 * (vFlux1[eq + d * num_equation] + vFlux2[eq + d * num_equation]);
+        }
+        for (int eq = 0; eq < num_equation; eq++) {
+          for (int d = 0; d < dim; d++) Rflux[eq] -= vFlux1[eq + d * num_equation] * nor[d];
+        }
+
+        // add integration point contribution
+        for (int eq = 0; eq < num_equation; eq++) {
+          for (int i = 0; i < dof1; i++) Fcontrib[i + eq * dof1] -= weight * l1[i] * Rflux[eq];
+        }
+      }
+    }
+    // write to global memory
+    for (int eq = 0; eq < num_equation; eq++) {
+      for (int i = 0; i < dof1; i++) {
+        d_y[index_i[i] + eq * Ndofs] += Fcontrib[i + eq * dof1];
       }
     }
   });
