@@ -75,7 +75,7 @@ if test "${with_hdf5}" != no ; then
     CFLAGS="${HDF5_CFLAGS} ${CFLAGS}"
     CPPFLAGS="${HDF5_CFLAGS} ${CPPFLAGS}"
     LDFLAGS="${HDF5_LIBS} ${LDFLAGS}"
-    AC_LANG_PUSH([C])
+    AC_LANG_PUSH([C++])
     AC_CHECK_HEADER([hdf5.h],[found_header=yes],[found_header=no])
 
     #-----------------------
@@ -106,7 +106,7 @@ if test "${with_hdf5}" != no ; then
     # begin additional test(s) if header if available
 
     succeeded=no
-    AC_LANG_PUSH([C])
+    AC_LANG_PUSH([C++])
 
     if test "x${found_header}" = "xyes" ; then
         version_succeeded=no
@@ -128,7 +128,7 @@ if test "${with_hdf5}" != no ; then
             AC_MSG_RESULT(no)
         ])
 
-    	AC_LANG_POP([C])
+        AC_LANG_POP([C++])
 
     	if test "$version_succeeded" != "yes";then
        	   if test "$is_package_required" = yes; then	
@@ -145,7 +145,7 @@ if test "${with_hdf5}" != no ; then
     # Library availability
 
     AC_CHECK_LIB([hdf5],[H5Fopen],[found_library=yes],[found_library=no])
-    AC_LANG_POP([C])
+    AC_LANG_POP([C++])
 
     succeeded=no
     if test "$found_header" = yes; then
