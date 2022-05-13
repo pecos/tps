@@ -12,8 +12,9 @@ AM_EXTRA_RECURSIVE_TARGETS([style enforcestyle])
 
 AX_SUMMARIZE_ENV
 # MPI
-AX_PROG_CC_MPI
 AX_PROG_CXX_MPI
+# libtool/dynamic library support
+AC_PROG_LIBTOOL
 # python binary
 AM_PATH_PYTHON([3.6.8])
 # python interface
@@ -35,8 +36,6 @@ AM_CONDITIONAL(PYTHON_ENABLED,test x$enable_pybind11 = xyes)
 
 # enable c++11 standard
 CXXFLAGS="-std=c++11 $CXXFLAGS"
-# libtool
-AC_PROG_LIBTOOL
 
 # check for mpi-ext.h
 AH_TEMPLATE([HAVE_MPI_EXT],[Enable MPI extensions declared in mpi-ext.h])
@@ -162,8 +161,14 @@ AX_CHECK_CUDA
 AC_LANG_POP([C])
 
 CXX=$NVCC_PATH/nvcc
-CUDA_CXXFLAGS="-x=cu --expt-extended-lambda -arch=$CUDA_ARCH -ccbin mpicxx $CUDA_CXXFLAGS"
-CUDA_LDFLAGS="--expt-extended-lambda -arch=$CUDA_ARCH -ccbin mpicxx $CUDA_LDFLAGS"
+CUDA_CXXFLAGS="-Xcompiler=-fPIC -x=cu --expt-extended-lambda -arch=$CUDA_ARCH -ccbin mpicxx $CUDA_CXXFLAGS"
+CUDA_LDFLAGS="--expt-extended-lambda -arch=$CUDA_ARCH -ccbin mpicxx $CUDA_LDFLAGS -lcuda -lcudart"
+
+dnl CUDA does not support -fPIC, disable in libtool in favor of -Xcompiler option above
+_LT_TAGVAR(lt_prog_compiler_pic,)=''
+_LT_TAGVAR(lt_prog_compiler_pic,CXX)=''
+dnl CUDA aldo does not support -Wl linker option, replace with -Xlinker
+_LT_TAGVAR(lt_prog_compiler_wl,CXX)='-Xlinker '
 
 ENABLE_GPU=yes
 ENABLE_CUDA=yes
