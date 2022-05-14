@@ -91,6 +91,9 @@ class Gradients : public ParNonlinearForm {
   parallelFacesIntegrationArrays *parallelData;
   dataTransferArrays *transferUp;
 
+  Vector shared_uk_el1;
+  Vector shared_uk_el2;
+
  public:
   Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradUpfes, int _dim, int _num_equation,
             ParGridFunction *_Up, ParGridFunction *_gradUp, GasMixture *_mixture, GradNonLinearForm *_gradUp_A,
@@ -103,6 +106,13 @@ class Gradients : public ParNonlinearForm {
   void setParallelData(parallelFacesIntegrationArrays *_parData, dataTransferArrays *_transferUp) {
     parallelData = _parData;
     transferUp = _transferUp;
+
+    shared_uk_el1.UseDevice(true);
+    shared_uk_el2.UseDevice(true);
+
+    int maxNumElems = parallelData->sharedElemsFaces.Size() / 7;  // elements with shared faces
+    shared_uk_el1.SetSize(maxNumElems * 5 * maxIntPoints_ * num_equation_);
+    shared_uk_el2.SetSize(maxNumElems * 5 * maxIntPoints_ * num_equation_);
   }
 
   void computeGradients();
@@ -115,13 +125,20 @@ class Gradients : public ParNonlinearForm {
 
   void faceContrib_gpu(const int elType, const int offsetElems, const int elDof);
 
-  static void integrationGradSharedFace_gpu(const Vector *Up, const Vector &faceUp, ParGridFunction *gradUp,
-                                            const int &Ndofs, const int &dim, const int &num_equation,
-                                            const double &gamma, const double &Rg, const double &viscMult,
-                                            const double &bulkViscMult, const double &Pr,
-                                            const volumeFaceIntegrationArrays &gpuArrays,
-                                            const parallelFacesIntegrationArrays *parallelData, const int &maxIntPoints,
-                                            const int &maxDofs);
+  void interpGradSharedFace_gpu(const Vector &faceU, Vector &shared_uk_el1, Vector &shared_uk_el2,
+                                const int &Ndofs, const int &dim,
+                                const int &num_equation, GasMixture *mixture,
+                                const volumeFaceIntegrationArrays &gpuArrays,
+                                const parallelFacesIntegrationArrays *parallelData,
+                                const int &maxIntPoints, const int &maxDofs);
+
+  void integrationGradSharedFace_gpu(const Vector *Up, const Vector &faceUp, ParGridFunction *gradUp,
+                                     const int &Ndofs, const int &dim, const int &num_equation,
+                                     const double &gamma, const double &Rg, const double &viscMult,
+                                     const double &bulkViscMult, const double &Pr,
+                                     const volumeFaceIntegrationArrays &gpuArrays,
+                                     const parallelFacesIntegrationArrays *parallelData, const int &maxIntPoints,
+                                     const int &maxDofs);
 
   static void multInverse_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
                               Vector &gradUp, const int num_equation, const int dim,

@@ -258,6 +258,10 @@ void Gradients::computeGradients_bdr() {
   ParMesh *pmesh = vfes->GetParMesh();
   const int Nshared = pmesh->GetNSharedFaces();
   if (Nshared > 0) {
+    interpGradSharedFace_gpu(transferUp->face_nbr_data, shared_uk_el1, shared_uk_el2,
+                             vfes->GetNDofs(), dim_, num_equation_, mixture, gpuArrays,
+                             parallelData, maxIntPoints_, maxDofs_);
+
     integrationGradSharedFace_gpu(Up, transferUp->face_nbr_data, gradUp, vfes->GetNDofs(), dim_, num_equation_,
                                   mixture->GetSpecificHeatRatio(), mixture->GetGasConstant(),
                                   mixture->GetViscMultiplyer(), mixture->GetBulkViscMultiplyer(),
@@ -547,6 +551,85 @@ void Gradients::faceContrib_gpu(const int elType, const int offsetElems, const i
   });
 }
 
+void Gradients::interpGradSharedFace_gpu(const Vector &faceU, Vector &shared_uk_el1, Vector &shared_uk_el2,
+                                         const int &Ndofs, const int &dim,
+                                         const int &num_equation, GasMixture *mixture,
+                                         const volumeFaceIntegrationArrays &gpuArrays,
+                                         const parallelFacesIntegrationArrays *parallelData,
+                                         const int &maxIntPoints, const int &maxDofs) {
+  const double *d_up = Up->Read();
+  const double *d_faceData = faceU.Read();
+  const int *d_nodesIDs = gpuArrays.nodesIDs.Read();
+  const int *d_posDofIds = gpuArrays.posDofIds.Read();
+
+  const double *d_sharedShapeWnor1 = parallelData->sharedShapeWnor1.Read();
+  const double *d_sharedShape2 = parallelData->sharedShape2.Read();
+  const int *d_sharedElem1Dof12Q = parallelData->sharedElem1Dof12Q.Read();
+  const int *d_sharedVdofs = parallelData->sharedVdofs.Read();
+  const int *d_sharedElemsFaces = parallelData->sharedElemsFaces.Read();
+
+  int maxNumElems = parallelData->sharedElemsFaces.Size() / 7;  // elements with shared faces
+
+  double *d_shared_uk1 = shared_uk_el1.Write();
+  double *d_shared_uk2 = shared_uk_el2.Write();
+
+  MFEM_FORALL_2D(el, parallelData->sharedElemsFaces.Size() / 7, maxIntPoints, 1, 1, {
+    double Ui[216];
+    double l1[216], l2[216];
+    double u1, u2;
+    int index_i[216];
+
+    const int el1      = d_sharedElemsFaces[0 + el * 7];
+    const int numFaces = d_sharedElemsFaces[1 + el * 7];
+    const int dof1     = d_sharedElem1Dof12Q[1 + d_sharedElemsFaces[2 + el * 7] * 4];
+
+    const int offsetEl1 = d_posDofIds[2 * el1];
+
+    for (int i = 0; i < dof1; i++) {
+      index_i[i] = d_nodesIDs[offsetEl1 + i];
+    }
+
+    for (int elFace = 0; elFace < numFaces; elFace++) {
+      const int f = d_sharedElemsFaces[1 + elFace + 1 + el * 7];
+      const int dof2 = d_sharedElem1Dof12Q[2 + f * 4];
+      const int Q = d_sharedElem1Dof12Q[3 + f * 4];
+
+      // begin loop through integration points
+      //for (int k = 0; k < Q; k++) {
+      MFEM_FOREACH_THREAD(k, x, Q) {
+        // load interpolating functions
+        for (int i = 0; i < dof1; i++) {
+          l1[i] = d_sharedShapeWnor1[i + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
+        }
+        for (int i = 0; i < dof2; i++) {
+          l2[i] = d_sharedShape2[i + k * maxDofs + f * maxIntPoints * maxDofs];
+        }
+
+        // set array for interpolated data to 0
+        for (int eq = 0; eq < num_equation; eq++) {
+          u1 = u2 = 0.;
+
+          // load data for elem1
+          for (int j = 0; j < dof1; j++) {
+            u1 += d_up[index_i[j] + eq * Ndofs] * l1[j];
+          }
+
+          // load data elem2
+          for (int j = 0; j < dof2; j++) {
+            int index = d_sharedVdofs[j + eq * maxDofs + f * num_equation * maxDofs];
+            u2 += d_faceData[index] * l2[j];
+          }
+
+
+          const int idx = eq + k * num_equation + elFace * maxIntPoints * num_equation + el * 5 * maxIntPoints * num_equation;
+          d_shared_uk1[idx] = u1;
+          d_shared_uk2[idx] = u2;
+        }
+      }    // end loop through integration points
+    }
+  });
+}
+
 void Gradients::integrationGradSharedFace_gpu(const Vector *Up, const Vector &faceUp, ParGridFunction *gradUp,
                                               const int &Ndofs, const int &dim, const int &num_equation,
                                               const double &gamma, const double &Rg, const double &viscMult,
@@ -567,77 +650,67 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up, const Vector &fa
   const int *d_sharedVdofs = parallelData->sharedVdofs.Read();
   const int *d_sharedElemsFaces = parallelData->sharedElemsFaces.Read();
 
-  MFEM_FORALL_2D(el, parallelData->sharedElemsFaces.Size() / 7, maxDofs, 1, 1, { // NOLINT
-    MFEM_FOREACH_THREAD(i, x, maxDofs) { // NOLINT
-      //
-      MFEM_SHARED double Upi[216], Upj[216], Fcontrib[216 * 3];
-      MFEM_SHARED double l1[216], l2[216];
-      MFEM_SHARED double nor[3];
+  const double *d_shared_uk1 = shared_uk_el1.Read();
+  const double *d_shared_uk2 = shared_uk_el2.Read();
 
-      const int el1      = d_sharedElemsFaces[0 + el * 7];
-      const int numFaces = d_sharedElemsFaces[1 + el * 7];
-      const int dof1     = d_sharedElem1Dof12Q[1 + d_sharedElemsFaces[2 + el * 7] * 4];
-      const int offsetEl1 = d_posDofIds[2 * el1];
+  MFEM_FORALL(el, parallelData->sharedElemsFaces.Size() / 7, { // NOLINT
+    double Upi[216], Upj[216], Fcontrib[216 * 3];
+    double l1[216], l2[216];
+    double nor[3];
+    int index_i[216];
 
-      int indexi;
-      if ( i < dof1 ) indexi = d_nodesIDs[offsetEl1 + i];
+    const int el1      = d_sharedElemsFaces[0 + el * 7];
+    const int numFaces = d_sharedElemsFaces[1 + el * 7];
+    const int dof1     = d_sharedElem1Dof12Q[1 + d_sharedElemsFaces[2 + el * 7] * 4];
+    const int offsetEl1 = d_posDofIds[2 * el1];
 
-      MFEM_SHARED double up1, up2;
+    for (int i = 0; i < dof1; i++) {
+      index_i[i] = d_nodesIDs[offsetEl1 + i];
+    }
 
-      for (int elFace = 0; elFace < numFaces; elFace++) {
-    const int f = d_sharedElemsFaces[1 + elFace + 1 + el * 7];
-    const int dof2 = d_sharedElem1Dof12Q[2 + f * 4];
-    const int Q = d_sharedElem1Dof12Q[3 + f * 4];
+    double up1, up2;
 
-    for (int eq = 0; eq < num_equation; eq++) {
-      if (i < dof1) Upi[i] = d_up[indexi + eq * Ndofs];
-      if (i < dof2) {  // recover data from neighbor
-        int index = d_sharedVdofs[i + eq * maxDofs + f * num_equation * maxDofs];
-        Upj[i] = d_faceData[index];
-      }
-      MFEM_SYNC_THREAD;
+    for (int elFace = 0; elFace < numFaces; elFace++) {
+      const int f = d_sharedElemsFaces[1 + elFace + 1 + el * 7];
+      const int dof2 = d_sharedElem1Dof12Q[2 + f * 4];
+      const int Q = d_sharedElem1Dof12Q[3 + f * 4];
 
-      for (int n = i; n < dof1 * dim; n += maxDofs) Fcontrib[n] = 0.;
+      for (int eq = 0; eq < num_equation; eq++) {
+        for (int n = 0; n < dof1 * dim; n++) Fcontrib[n] = 0.;
 
-      for (int k = 0; k < Q; k++) {
-        const double weight =
+        for (int k = 0; k < Q; k++) {
+          const double weight =
             d_sharedShapeWnor1[maxDofs + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
-        if (i < dof1) l1[i] = d_sharedShapeWnor1[i + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
-        if (i < dim)
-          nor[i] =
-              d_sharedShapeWnor1[maxDofs + 1 + i + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
-        if (dim == 2 && i == maxDofs - 1) nor[2] = 0.;
-        if (i < dof2) l2[i] = d_sharedShape2[i + k * maxDofs + f * maxIntPoints * maxDofs];
-        MFEM_SYNC_THREAD;
+          for (int i = 0; i < dof1; i++) {
+            l1[i] = d_sharedShapeWnor1[i + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
+          }
+          for (int d = 0; d < dim; d++) {
+            nor[d] = d_sharedShapeWnor1[maxDofs + 1 + d + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
+          }
 
-        // interpolation
-        // NOTE: make parallel!
-        if (i == 0) {
-          up1 = 0.;
-          up2 = 0.;
-          for (int n = 0; n < dof1; n++) up1 += Upi[n] * l1[n];
-          for (int n = 0; n < dof2; n++) up2 += Upj[n] * l2[n];
-        }
-        MFEM_SYNC_THREAD;
+          up1 = d_shared_uk1[eq + k*num_equation + elFace*maxIntPoints*num_equation +
+                             el*5*maxIntPoints*num_equation];
+          up2 = d_shared_uk2[eq + k*num_equation + elFace*maxIntPoints*num_equation +
+                             el*5*maxIntPoints*num_equation];
 
-        // add contribution
-        if (i < dof1) {
-          for (int d = 0; d < dim; d++) Fcontrib[i + d * dof1] += 0.5 * (up2 - up1) * weight * l1[i] * nor[d];
-        }
-        MFEM_SYNC_THREAD;
-      }  // end integration loop
 
-      // save contribution to global memory
-      if (i < dof1) {
-        for (int d = 0; d < dim; d++) {
-          d_gradUp[indexi + eq * Ndofs + d * num_equation * Ndofs] += Fcontrib[i + d * dof1];
+          // add contribution
+          for (int i = 0; i < dof1; i++) {
+            for (int d = 0; d < dim; d++) Fcontrib[i + d * dof1] += 0.5 * (up2 - up1) * weight * l1[i] * nor[d];
+          }
+        }  // end integration loop
+
+        // save contribution to global memory
+        for (int i = 0; i < dof1; i++) {
+          const int indexi = index_i[i];
+          for (int d = 0; d < dim; d++) {
+            d_gradUp[indexi + eq * Ndofs + d * num_equation * Ndofs] += Fcontrib[i + d * dof1];
+          }
         }
-      }
-      MFEM_SYNC_THREAD;
-    }    // end equation loop
-      }  // end face loop
-}
-});
+      }    // end equation loop
+    }  // end face loop
+  });
+
 }
 
 void Gradients::multInverse_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
