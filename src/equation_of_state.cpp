@@ -1535,12 +1535,18 @@ void PerfectMixture::computeElectronPressureGrad(const double n_e, const double 
   return;
 }
 
+// TODO(kevin): this assumes all positive ions, whatever they are,
+// are recombined with electron into the background species.
+// For air plasma, we will need specific reaction inputs.
+// We may need to move this to rather chemistry class.
 void PerfectMixture::computeSheathBdrFlux(const Vector &state, boundaryViscousFluxData &bcFlux) {
   Vector n_sp(numSpecies);
   computeNumberDensities(state, n_sp);
 
   double T_h, T_e;
   computeTemperaturesBase(state, &n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
+
+  for (int sp = 0; sp < numSpecies; sp++) bcFlux.primFlux(sp) = 0.0;
 
   // Compute Bohm velocity for positive ions.
   for (int sp = 0; sp < numSpecies; sp++) {
