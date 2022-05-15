@@ -32,6 +32,7 @@
 #ifndef BOUNDARYCONDITION_HPP_
 #define BOUNDARYCONDITION_HPP_
 
+#include <grvy.h>
 #include <tps_config.h>
 
 #include <mfem.hpp>
