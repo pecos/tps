@@ -141,4 +141,16 @@ if MASA_ENABLED
 test_argon_minimal_LDFLAGS += $(MASA_LIBS)
 endif
 
+check_PROGRAMS += test_bdr_flux
+test_bdr_flux_SOURCES  = test_boundary_flux.cpp
+test_bdr_flux_LDADD    = ../src/libtps.a
+test_bdr_flux_LDADD    += $(HDF5_LIBS)
+test_bdr_flux_LDADD    += $(GRVY_LIBS)
+test_bdr_flux_LDADD    += $(MFEM_LIBS)
+
+test_bdr_flux_LDFLAGS  =
+if MASA_ENABLED
+test_bdr_flux_LDFLAGS += $(MASA_LIBS)
+endif
+
 endif # if !GPU_ENABLED

@@ -47,6 +47,7 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSyste
   // Initialize bc state.
   bcState_.prim.SetSize(num_equation_);
   bcState_.primIdxs.SetSize(num_equation_);
+  bcState_.prim = 0.0;
   for (int eq = 0; eq < num_equation_; eq++) bcState_.primIdxs[eq] = false;
 
   // Initialize bc flux.
@@ -126,6 +127,19 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSyste
       }
     } break;
   }
+
+  // {  // print out prescribed boundary conditions.
+  //   grvy_printf(GRVY_INFO, "boundary state.\n");
+  //   for (int eq = 0; eq < num_equation; eq++) grvy_printf(GRVY_INFO, "%.8E,\t", bcState_.prim(eq));
+  //   grvy_printf(GRVY_INFO, "\n");
+  //   for (int eq = 0; eq < num_equation; eq++) grvy_printf(GRVY_INFO, "%s,\t", std::string(bcState_.primIdxs[eq] ? "T" : "F").c_str());
+  //   grvy_printf(GRVY_INFO, "\n");
+  //   grvy_printf(GRVY_INFO, "boundary flux.\n");
+  //   for (int eq = 0; eq < primFluxSize; eq++) grvy_printf(GRVY_INFO, "%.8E,\t", bcFlux_.primFlux(eq));
+  //   grvy_printf(GRVY_INFO, "\n");
+  //   for (int eq = 0; eq < primFluxSize; eq++) grvy_printf(GRVY_INFO, "%s,\t", std::string(bcFlux_.primFluxIdxs[eq] ? "T" : "F").c_str());
+  //   grvy_printf(GRVY_INFO, "\n");
+  // }
 }
 
 WallBC::~WallBC() {}
@@ -368,11 +382,51 @@ void WallBC::computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix
   Vector wallViscF(num_equation_);
   fluxClass->ComputeBdrViscousFluxes(wallState, gradState, radius, bcFlux_, wallViscF);
   wallViscF *= sqrt(normN);  // in case normal is not a unit vector..
-
+// {
+//   grvy_printf(GRVY_INFO, "unit norm: (%.8E, %.8E)\n", unitNorm(0), unitNorm(1));
+//   grvy_printf(GRVY_INFO, "wallViscF\n");
+//   for (int eq = 0; eq < num_equation_; eq++) grvy_printf(GRVY_INFO, "%.8E\t", wallViscF(eq));
+//   grvy_printf(GRVY_INFO, "\n");
+//
+//   boundaryViscousFluxData tempBC;
+//   tempBC.normal = unitNorm;
+//   tempBC.primFlux.SetSize(mixture->GetNumSpecies() + nvel + 2);
+//   tempBC.primFluxIdxs.SetSize(mixture->GetNumSpecies() + nvel + 2);
+//   tempBC.primFlux = 0.0;
+//   for (int eq = 0; eq < tempBC.primFlux.Size(); eq++) tempBC.primFluxIdxs[eq] = false;
+//   Vector tempBCF(num_equation_);
+//   fluxClass->ComputeBdrViscousFluxes(wallState, gradState, radius, tempBC, tempBCF);
+//   tempBCF *= sqrt(normN);  // in case normal is not a unit vector..
+//   grvy_printf(GRVY_INFO, "wallBCF\n");
+//   for (int eq = 0; eq < num_equation_; eq++) grvy_printf(GRVY_INFO, "%.8E\t", tempBCF(eq));
+//   grvy_printf(GRVY_INFO, "\n");
+//
+//   grvy_printf(GRVY_INFO, "wallTempF\n");
+//   DenseMatrix tempF(num_equation_, dim_);
+//   fluxClass->ComputeViscousFluxes(wallState, gradState, radius, tempF);
+//   Vector wallTempF(num_equation_);
+//   for (int eq = 0; eq < num_equation_; eq++) {
+//     wallTempF(eq) = 0.0;
+//     for (int d = 0; d < dim_; d++) wallTempF(eq) += tempF(eq, d) * normal[d];
+//     grvy_printf(GRVY_INFO, "%.8E\t", wallTempF(eq));
+//   }
+//   grvy_printf(GRVY_INFO, "\n");
+// }
   // evaluate internal viscous fluxes
   DenseMatrix viscF(num_equation_, dim_);
   fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, viscF);
-
+// {
+//   grvy_printf(GRVY_INFO, "viscF\n");
+//   Vector wallTempF(num_equation_);
+//   for (int eq = 0; eq < num_equation_; eq++) {
+//     wallTempF(eq) = 0.0;
+//     for (int d = 0; d < dim_; d++) wallTempF(eq) += viscF(eq, d) * normal[d];
+//     grvy_printf(GRVY_INFO, "%.8E\t", wallTempF(eq));
+//   }
+//   grvy_printf(GRVY_INFO, "\n");
+//
+//   if (unitNorm(1) < 0.0) exit(-1);
+// }
   // Add visc fluxes (we skip density eq.)
   for (int eq = 1; eq < num_equation_; eq++) {
     bdrFlux[eq] -= 0.5 * wallViscF(eq);
