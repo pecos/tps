@@ -1032,6 +1032,9 @@ void PerfectMixture::computeTemperaturesBase(const Vector &conservedState, const
   T_h /= totalHeatCapacity;
 
   // electron temperature as primitive variable.
+  // TODO(kevin): this will have a singularity when there is no electron.
+  // It is highly unlikely to have zero electron in the simulation,
+  // but it's better to have a capability to avoid this.
   if (twoTemperature_) {
     T_e = conservedState[num_equation - 1] / n_e / molarCV_(numSpecies - 2);
   } else {
