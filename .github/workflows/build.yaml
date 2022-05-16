@@ -79,7 +79,7 @@ jobs:
         with:
           lfs: true
       - name: MFEM Tree
-        run: echo "MFEM_INC=$MFEM_INC, MFEM_LIB=$MFEM_LIB"
+        run: echo "MFEM_DIR=$MFEM_DIR"
       - name: Query modules loaded
         run:  module restore tps-gpu; module list
       - name: Bootstrap
