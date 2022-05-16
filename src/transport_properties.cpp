@@ -90,8 +90,7 @@ void TransportProperties::addMixtureDrift(const Vector &mobility, const Vector &
   for (int sp = 0; sp < numSpecies; sp++) {
     if (mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) == 0.0) continue;
 
-    double charge = MOLARELECTRONCHARGE * n_sp(sp) * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
-    for (int d = 0; d < nvel_; d++) diffusionVelocity(sp, d) += charge * Efield(d);
+    for (int d = 0; d < nvel_; d++) diffusionVelocity(sp, d) += mobility(sp) * Efield(d);
   }
 }
 
