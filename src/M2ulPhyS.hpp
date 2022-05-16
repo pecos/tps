@@ -279,7 +279,8 @@ class M2ulPhyS : public TPS::Solver {
   std::vector<VectorConstantCoefficient *> componentWindow_;
 
   ParGridFunction *zeroU_;  // to compute L2 norm of exact solution via ComputeLpError.
-  BlockVector *zeroUBlock_;
+  ParGridFunction *masaU_;  // for visualization of the exact solution.
+  BlockVector *zeroUBlock_, *masaUBlock_;
 #endif
 
 #ifdef _GPU_
@@ -318,7 +319,7 @@ class M2ulPhyS : public TPS::Solver {
 
 #ifdef HAVE_MASA
   void initMasaHandler();
-  void projectExactSolution(const double _time);
+  void projectExactSolution(const double _time, ParGridFunction *prjU);
   void initMMSCoefficients();
   void checkSolutionError(const double _time, const bool final = false);
 #endif

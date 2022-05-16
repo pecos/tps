@@ -922,6 +922,20 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     }
   }
 
+  // If mms, add conserved and exact solution.
+#ifdef HAVE_MASA
+  if (config.use_mms_) {
+    // for visualization.
+    masaUBlock_ = new BlockVector(*offsets);
+    masaU_ = new ParGridFunction(vfes, masaUBlock_->HostReadWrite());
+
+    for (int eq = 0; eq < num_equation; eq++)
+      visualizationVariables.push_back(new ParGridFunction(fes, U->HostReadWrite() + eq * fes->GetNDofs()));
+    for (int eq = 0; eq < num_equation; eq++)
+      visualizationVariables.push_back(new ParGridFunction(fes, masaU_->HostReadWrite() + eq * fes->GetNDofs()));
+  }
+#endif
+
   // define solution parameters for i/o
   ioData.registerIOFamily("Solution state variables", "/solution", U);
   ioData.registerIOVar("/solution", "density", 0);
@@ -993,6 +1007,16 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     }
   }
 
+  // If mms, add exact solution.
+  #ifdef HAVE_MASA
+  if (config.use_mms_) {
+    for (int eq = 0; eq < num_equation; eq++)
+      paraviewColl->RegisterField("U" + std::to_string(eq), visualizationVariables[numActiveSpecies + eq]);
+    for (int eq = 0; eq < num_equation; eq++)
+      paraviewColl->RegisterField("mms_U" + std::to_string(eq), visualizationVariables[numActiveSpecies + num_equation + eq]);
+  }
+  #endif
+
   if (spaceVaryViscMult != NULL) paraviewColl->RegisterField("viscMult", spaceVaryViscMult);
 
   paraviewColl->SetOwnData(true);
@@ -1019,7 +1043,8 @@ void M2ulPhyS::projectInitialSolution() {
     if (config.use_mms_) {
       initMasaHandler();
 
-      projectExactSolution(0.0);
+      projectExactSolution(0.0, U);
+      projectExactSolution(0.0, masaU_);
     }
 #endif
   } else {
@@ -1092,6 +1117,7 @@ void M2ulPhyS::solve() {
 
 #ifdef HAVE_MASA
       if (config.use_mms_) {
+        projectExactSolution(time, masaU_);
         checkSolutionError(time);
       } else {
         if (mpi.Root()) cout << "time step: " << iter << ", physical time " << time << "s" << endl;
