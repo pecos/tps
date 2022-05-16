@@ -258,25 +258,18 @@ void Gradients::computeGradients_bdr() {
   ParMesh *pmesh = vfes->GetParMesh();
   const int Nshared = pmesh->GetNSharedFaces();
   if (Nshared > 0) {
-    interpGradSharedFace_gpu(transferUp->face_nbr_data, shared_uk_el1, shared_uk_el2,
-                             vfes->GetNDofs(), dim_, num_equation_, mixture, gpuArrays,
-                             parallelData, maxIntPoints_, maxDofs_);
-
-    integrationGradSharedFace_gpu(Up, transferUp->face_nbr_data, gradUp, vfes->GetNDofs(), dim_, num_equation_,
-                                  mixture->GetSpecificHeatRatio(), mixture->GetGasConstant(),
-                                  mixture->GetViscMultiplyer(), mixture->GetBulkViscMultiplyer(),
-                                  mixture->GetPrandtlNum(), gpuArrays, parallelData, maxIntPoints_, maxDofs_);
+    interpGradSharedFace_gpu();
+    integrationGradSharedFace_gpu();
   }
 
   // Multiply by inverse mass matrix
   for (int elType = 0; elType < gpuArrays.numElems.Size(); elType++) {
     int elemOffset = 0;
-    if (elType != 0) {
-      for (int i = 0; i < elType; i++) elemOffset += h_numElems[i];
-    }
+    for (int i = 0; i < elType; i++) elemOffset += h_numElems[i];
     int dof_el = h_posDofIds[2 * elemOffset + 1];
-    multInverse_gpu(h_numElems[elType], elemOffset, dof_el, vfes->GetNDofs(), *gradUp, num_equation_, dim_, gpuArrays,
-                    invMArray, posDofInvM);
+    multInverse_gpu(h_numElems[elType], elemOffset, dof_el);
+    // multInverse_gpu(h_numElems[elType], elemOffset, dof_el, vfes->GetNDofs(), *gradUp, num_equation_, dim_, gpuArrays,
+    //                 invMArray, posDofInvM);
   }
 }
 
@@ -551,14 +544,9 @@ void Gradients::faceContrib_gpu(const int elType, const int offsetElems, const i
   });
 }
 
-void Gradients::interpGradSharedFace_gpu(const Vector &faceU, Vector &shared_uk_el1, Vector &shared_uk_el2,
-                                         const int &Ndofs, const int &dim,
-                                         const int &num_equation, GasMixture *mixture,
-                                         const volumeFaceIntegrationArrays &gpuArrays,
-                                         const parallelFacesIntegrationArrays *parallelData,
-                                         const int &maxIntPoints, const int &maxDofs) {
+void Gradients::interpGradSharedFace_gpu() {
   const double *d_up = Up->Read();
-  const double *d_faceData = faceU.Read();
+  const double *d_faceData = transferUp->face_nbr_data.Read();
   const int *d_nodesIDs = gpuArrays.nodesIDs.Read();
   const int *d_posDofIds = gpuArrays.posDofIds.Read();
 
@@ -568,10 +556,16 @@ void Gradients::interpGradSharedFace_gpu(const Vector &faceU, Vector &shared_uk_
   const int *d_sharedVdofs = parallelData->sharedVdofs.Read();
   const int *d_sharedElemsFaces = parallelData->sharedElemsFaces.Read();
 
-  int maxNumElems = parallelData->sharedElemsFaces.Size() / 7;  // elements with shared faces
-
   double *d_shared_uk1 = shared_uk_el1.Write();
   double *d_shared_uk2 = shared_uk_el2.Write();
+
+  const int maxNumElems = parallelData->sharedElemsFaces.Size() / 7;  // elements with shared faces
+  const int dim = dim_;
+  const int num_equation = num_equation_;
+  const int maxIntPoints = maxIntPoints_;
+  const int maxDofs = maxDofs_;
+  const int Ndofs = vfes->GetNDofs();
+
 
   MFEM_FORALL_2D(el, parallelData->sharedElemsFaces.Size() / 7, maxIntPoints, 1, 1, {
     double Ui[216];
@@ -630,16 +624,10 @@ void Gradients::interpGradSharedFace_gpu(const Vector &faceU, Vector &shared_uk_
   });
 }
 
-void Gradients::integrationGradSharedFace_gpu(const Vector *Up, const Vector &faceUp, ParGridFunction *gradUp,
-                                              const int &Ndofs, const int &dim, const int &num_equation,
-                                              const double &gamma, const double &Rg, const double &viscMult,
-                                              const double &bulkViscMult, const double &Pr,
-                                              const volumeFaceIntegrationArrays &gpuArrays,
-                                              const parallelFacesIntegrationArrays *parallelData,
-                                              const int &maxIntPoints, const int &maxDofs) {
+void Gradients::integrationGradSharedFace_gpu() {
   const double *d_up = Up->Read();
   double *d_gradUp = gradUp->ReadWrite();
-  const double *d_faceData = faceUp.Read();
+  const double *d_faceData = transferUp->face_nbr_data.Read();
 
   const int *d_nodesIDs = gpuArrays.nodesIDs.Read();
   const int *d_posDofIds = gpuArrays.posDofIds.Read();
@@ -652,6 +640,12 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up, const Vector &fa
 
   const double *d_shared_uk1 = shared_uk_el1.Read();
   const double *d_shared_uk2 = shared_uk_el2.Read();
+
+  const int dim = dim_;
+  const int num_equation = num_equation_;
+  const int maxIntPoints = maxIntPoints_;
+  const int maxDofs = maxDofs_;
+  const int Ndofs = vfes->GetNDofs();
 
   MFEM_FORALL(el, parallelData->sharedElemsFaces.Size() / 7, { // NOLINT
     double Upi[216], Upj[216], Fcontrib[216 * 3];
@@ -713,15 +707,16 @@ void Gradients::integrationGradSharedFace_gpu(const Vector *Up, const Vector &fa
 
 }
 
-void Gradients::multInverse_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
-                                Vector &gradUp, const int num_equation, const int dim,
-                                const volumeFaceIntegrationArrays &gpuArrays, const Vector &invMArray,
-                                const Array<int> &posDofInvM) {
-  double *d_gradUp = gradUp.ReadWrite();
+void Gradients::multInverse_gpu(const int numElems, const int offsetElems, const int elDof) {
+  double *d_gradUp = gradUp->ReadWrite();
   auto d_posDofIds = gpuArrays.posDofIds.Read();
   auto d_nodesIDs = gpuArrays.nodesIDs.Read();
   const double *d_invMArray = invMArray.Read();
   auto d_posDofInvM = posDofInvM.Read();
+
+  const int totalDofs = vfes->GetNDofs();
+  const int dim = dim_;
+  const int num_equation = num_equation_;
 
   MFEM_FORALL_2D(el, numElems, elDof, 1, 1, {
     MFEM_SHARED double gradUpi[216 * 3];

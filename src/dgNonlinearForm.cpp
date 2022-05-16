@@ -178,12 +178,8 @@ void DGNonLinearForm::Mult_bdr(const Vector &x, Vector &y) {
   ParMesh *pmesh = vfes->GetParMesh();
   const int Nshared = pmesh->GetNSharedFaces();
   if (Nshared > 0) {
-    sharedFaceInterpolation_gpu(x, transferU->face_nbr_data, gradUp_, transferGradUp->face_nbr_data, shared_uk_el1,
-                                shared_uk_el2, shared_grad_upk_el1, shared_grad_upk_el2, vfes->GetNDofs(), dim_,
-                                num_equation_, mixture, gpuArrays, parallelData, maxIntPoints_, maxDofs_);
-    sharedFaceIntegration_gpu(x, transferU->face_nbr_data, gradUp_, transferGradUp->face_nbr_data, y, shared_uk_el1,
-                              shared_uk_el2, shared_grad_upk_el1, shared_grad_upk_el2, vfes->GetNDofs(), dim_,
-                              num_equation_, mixture, fluxes, gpuArrays, parallelData, maxIntPoints_, maxDofs_);
+    sharedFaceInterpolation_gpu(x);
+    sharedFaceIntegration_gpu(y);
   }
 }
 
@@ -498,19 +494,7 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
 }
 
 // clang-format off
-void DGNonLinearForm::sharedFaceIntegration_gpu(
-    const Vector &x, const Vector &faceU, const ParGridFunction *gradUp, const Vector &faceGradUp, Vector &y,
-    Vector &shared_uk_el1,
-    Vector &shared_uk_el2,
-    Vector &shared_grad_upk_el1,
-    Vector &shared_grad_upk_el2,
-    const int &Ndofs, const int &dim, const int &num_equation, GasMixture *mixture, Fluxes *flux,
-    const volumeFaceIntegrationArrays &gpuArrays,
-    const parallelFacesIntegrationArrays *parallelData, const int &maxIntPoints, const int &maxDofs) {
-  const double *d_x = x.Read();
-  const double *d_gradUp = gradUp->Read();
-  const double *d_faceGradUp = faceGradUp.Read();
-  const double *d_faceData = faceU.Read();
+void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
   double *d_y = y.ReadWrite();
   const int *d_nodesIDs = gpuArrays.nodesIDs.Read();
   const int *d_posDofIds = gpuArrays.posDofIds.Read();
@@ -521,7 +505,6 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(
   const double bulkViscMult = mixture->GetBulkViscMultiplyer();
   const double Pr = mixture->GetPrandtlNum();
   const double Sc = mixture->GetSchmidtNum();
-  const Equations eqSystem = flux->GetEquationSystem();
 
   const double *d_sharedShapeWnor1 = parallelData->sharedShapeWnor1.Read();
   const double *d_sharedShape2 = parallelData->sharedShape2.Read();
@@ -530,11 +513,17 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(
   const int *d_sharedVdofsGrads = parallelData->sharedVdofsGradUp.Read();
   const int *d_sharedElemsFaces = parallelData->sharedElemsFaces.Read();
 
-  int maxNumElems = parallelData->sharedElemsFaces.Size()/7;  // elements with shared faces
   const double *d_shared_uk1 = shared_uk_el1.Read();
   const double *d_shared_uk2 = shared_uk_el2.Read();
   const double *d_shared_gradUp1 = shared_grad_upk_el1.Read();
   const double *d_shared_gradUp2 = shared_grad_upk_el2.Read();
+
+  const int maxNumElems = parallelData->sharedElemsFaces.Size()/7;  // elements with shared faces
+  const int Ndofs = vfes->GetNDofs();
+  const int dim = dim_;
+  const int num_equation = num_equation_;
+  const int maxIntPoints = maxIntPoints_;
+  const int maxDofs = maxDofs_;
 
 
   MFEM_FORALL(el, parallelData->sharedElemsFaces.Size() / 7, {
@@ -627,18 +616,11 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(
 }
 // clang-format on
 
-void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x, const Vector &faceU, const ParGridFunction *gradUp,
-                                                  const Vector &faceGradUp, Vector &shared_uk_el1,
-                                                  Vector &shared_uk_el2, Vector &shared_grad_upk_el1,
-                                                  Vector &shared_grad_upk_el2, const int &Ndofs, const int &dim,
-                                                  const int &num_equation, GasMixture *mixture,
-                                                  const volumeFaceIntegrationArrays &gpuArrays,
-                                                  const parallelFacesIntegrationArrays *parallelData,
-                                                  const int &maxIntPoints, const int &maxDofs) {
+void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
   const double *d_x = x.Read();
-  const double *d_gradUp = gradUp->Read();
-  const double *d_faceGradUp = faceGradUp.Read();
-  const double *d_faceData = faceU.Read();
+  const double *d_gradUp = gradUp_->Read();
+  const double *d_faceGradUp = transferGradUp->face_nbr_data.Read();
+  const double *d_faceData = transferU->face_nbr_data.Read();
   const int *d_nodesIDs = gpuArrays.nodesIDs.Read();
   const int *d_posDofIds = gpuArrays.posDofIds.Read();
 
@@ -649,7 +631,12 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x, const Vector 
   const int *d_sharedVdofsGrads = parallelData->sharedVdofsGradUp.Read();
   const int *d_sharedElemsFaces = parallelData->sharedElemsFaces.Read();
 
-  int maxNumElems = parallelData->sharedElemsFaces.Size() / 7;  // elements with shared faces
+  const int maxNumElems = parallelData->sharedElemsFaces.Size() / 7;  // elements with shared faces
+  const int Ndofs = vfes->GetNDofs();
+  const int dim = dim_;
+  const int num_equation = num_equation_;
+  const int maxIntPoints = maxIntPoints_;
+  const int maxDofs = maxDofs_;
 
   double *d_shared_uk1 = shared_uk_el1.Write();
   double *d_shared_uk2 = shared_uk_el2.Write();
