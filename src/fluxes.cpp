@@ -192,7 +192,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   stress.Mult(vel, vtmp);
 
   for (int d = 0; d < dim; d++) {
-    flux(1 + nvel, d) = vtmp[d];
+    flux(1 + nvel, d) += vtmp[d];
     flux(1 + nvel, d) += k * gradUp(1 + nvel, d);
     // compute diffusive enthalpy flux.
     for (int sp = 0; sp < numSpecies; sp++) {
@@ -225,19 +225,6 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
     return;
   }
 
-// {
-//   grvy_printf(GRVY_INFO, "state\n");
-//   for (int eq = 0; eq < num_equation; eq++) grvy_printf(GRVY_INFO, "%.8E\t", state(eq));
-//   grvy_printf(GRVY_INFO, "\n");
-//
-//   grvy_printf(GRVY_INFO, "gradUp\n");
-//   for (int eq = 0; eq < num_equation; eq++) {
-//     for (int d = 0; d < dim; d++) grvy_printf(GRVY_INFO, "%.8E\t", gradUp(eq,d));
-//     grvy_printf(GRVY_INFO, "\n");
-//   }
-//
-//   grvy_printf(GRVY_INFO, "bcFlux.normal: (%.8E, %.8E)\n", bcFlux.normal[0], bcFlux.normal[1]);
-// }
   // TODO(kevin): update E-field with EM coupling.
   Vector Efield(nvel);
   Efield = 0.0;
@@ -270,16 +257,7 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
     // however only dim-components are used for flux.
     for (int d = 0; d < dim; d++) normalPrimFlux(sp) += diffusionVelocity(sp, d) * bcFlux.normal(d);
   }
-{
-  grvy_printf(GRVY_INFO, "diff vel\n");
-  for (int eq = 0; eq < numSpecies; eq++) {
-    for (int d = 0; d < nvel; d++) grvy_printf(GRVY_INFO, "%.8E\t", diffusionVelocity(eq,d));
-    grvy_printf(GRVY_INFO, "\n");
-  }
 
-  std::cout << "computed bdr flux: " << primFluxSize << " " << numSpecies << std::endl;
-  for (int i = 0; i < numSpecies; i++) grvy_printf(GRVY_INFO, "%.8E\t", normalPrimFlux(i));
-}
   // Replace with the prescribed boundary fluxes.
   for (int i = 0; i < numSpecies; i++) {
     if (bcFlux.primFluxIdxs[i]) normalPrimFlux(i) = bcFlux.primFlux(i);
@@ -338,21 +316,10 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
     normalPrimFlux(numSpecies + nvel) += speciesEnthalpies(sp) * normalPrimFlux(sp);
   }
 
-{
-  for (int i = numSpecies; i < primFluxSize; i++) grvy_printf(GRVY_INFO, "%.8E\t", normalPrimFlux(i));
-  grvy_printf(GRVY_INFO, "\n");
-}
   // Replace with the prescribed boundary fluxes.
   for (int i = numSpecies; i < primFluxSize; i++) {
     if (bcFlux.primFluxIdxs[i]) normalPrimFlux(i) = bcFlux.primFlux(i);
   }
-{
-  grvy_printf(GRVY_INFO, "boundary flux.\n");
-  for (int i = 0; i < primFluxSize; i++) grvy_printf(GRVY_INFO, "%.8E\t", bcFlux.primFlux(i));
-  grvy_printf(GRVY_INFO, "\n");
-  for (int i = 0; i < primFluxSize; i++) grvy_printf(GRVY_INFO, "%s\t", std::string(bcFlux.primFluxIdxs[i] ? "T" : "F").c_str());
-  grvy_printf(GRVY_INFO, "\n");
-}
 
   Vector vel0(nvel);
   for (int d = 0; d < nvel; d++) vel0(d) = state[1 + d] / state[0];
