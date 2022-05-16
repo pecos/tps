@@ -85,7 +85,7 @@ void M2ulPhyS::initMasaHandler() {
   initMMSCoefficients();
 }
 
-void M2ulPhyS::projectExactSolution(const double _time) {
+void M2ulPhyS::projectExactSolution(const double _time, ParGridFunction *prjU) {
   void (*exactSolnFunction)(const Vector &, double, Vector &);
 
   if (config.workFluid == DRY_AIR) {
@@ -100,7 +100,7 @@ void M2ulPhyS::projectExactSolution(const double _time) {
 
   VectorFunctionCoefficient u0(num_equation, exactSolnFunction);
   u0.SetTime(_time);
-  U->ProjectCoefficient(u0);
+  prjU->ProjectCoefficient(u0);
 }
 
 void M2ulPhyS::initMMSCoefficients() {
@@ -726,11 +726,11 @@ void initTernary2DSheath(GasMixture *mixture, RunConfiguration &config, const do
   MASA::masa_set_param<double>("nu_I", config.constantTransport.mtFreq((*mixtureToInputMap)[0]));
   MASA::masa_set_param<double>("nu_A", config.constantTransport.mtFreq((*mixtureToInputMap)[numSpecies - 1]));
 
-  MASA::masa_set_param<double>("Te0", 500.0);
-  MASA::masa_set_param<double>("Th0", 1000.0);
+  MASA::masa_set_param<double>("Te0", 5.0e-1);
+  MASA::masa_set_param<double>("Th0", 10.0e-1);
   MASA::masa_set_param<double>("XI0", 0.11);
 
-  MASA::masa_set_param<double>("TeL", 300.0);
+  MASA::masa_set_param<double>("TeL", 3.0e-1);
   MASA::masa_set_param<double>("XIL", 0.13);
 
   assert(config.wallBC.size() == 2);
@@ -743,10 +743,11 @@ void initTernary2DSheath(GasMixture *mixture, RunConfiguration &config, const do
   }
   assert(T0 > 0.0);
   MASA::masa_set_param<double>("ThL", T0);
+  MASA::masa_set_param<double>("dTx", 3.7e-2);
 
-  MASA::masa_set_param<double>("n0", 40.0);
-  MASA::masa_set_param<double>("dnx", 5.7);
-  MASA::masa_set_param<double>("dny", 8.9);
+  MASA::masa_set_param<double>("n0", 40.0e-5);
+  MASA::masa_set_param<double>("dnx", 5.7e-5);
+  MASA::masa_set_param<double>("dny", 8.9e-5);
   MASA::masa_set_param<double>("knx", 2.0);
   MASA::masa_set_param<double>("kny", 1.0);
   MASA::masa_set_param<double>("offset_nx", 0.29);
