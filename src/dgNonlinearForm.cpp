@@ -192,10 +192,6 @@ void DGNonLinearForm::setToZero_gpu(Vector &x, const int size) {
 void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset, int elDof) {
   double *d_y = y.Write();
   const double *d_f = face_flux_.Read();
-  const double *d_uk_el1 = uk_el1.Read();
-  const double *d_uk_el2 = uk_el2.Read();
-  const double *d_grad_uk_el1 = grad_upk_el1.Read();
-  const double *d_grad_uk_el2 = grad_upk_el2.Read();
 
   auto d_elemFaces = gpuArrays.elemFaces.Read();
   auto d_nodesIDs = gpuArrays.nodesIDs.Read();
@@ -298,11 +294,7 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
   const double *d_grad_uk_el1 = grad_upk_el1.Read();
   const double *d_grad_uk_el2 = grad_upk_el2.Read();
 
-  auto d_elemFaces = gpuArrays.elemFaces.Read();
-  auto d_nodesIDs = gpuArrays.nodesIDs.Read();
-  auto d_posDofIds = gpuArrays.posDofIds.Read();
   auto d_shapeWnor1 = gpuArrays.shapeWnor1.Read();
-  const double *d_shape2 = gpuArrays.shape2.Read();
   auto d_elems12Q = gpuArrays.elems12Q.Read();
 
   const double gamma = mixture->GetSpecificHeatRatio();
@@ -310,7 +302,7 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
   const double viscMult = mixture->GetViscMultiplyer();
   const double bulkViscMult = mixture->GetBulkViscMultiplyer();
   const double Pr = mixture->GetPrandtlNum();
-  const double Sc = mixture->GetSchmidtNum();
+  //const double Sc = mixture->GetSchmidtNum();
 
   Mesh *mesh = fes->GetMesh();
   const int Nf = mesh->GetNumFaces();
@@ -504,13 +496,10 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
   const double viscMult = mixture->GetViscMultiplyer();
   const double bulkViscMult = mixture->GetBulkViscMultiplyer();
   const double Pr = mixture->GetPrandtlNum();
-  const double Sc = mixture->GetSchmidtNum();
+  // const double Sc = mixture->GetSchmidtNum();
 
   const double *d_sharedShapeWnor1 = parallelData->sharedShapeWnor1.Read();
-  const double *d_sharedShape2 = parallelData->sharedShape2.Read();
   const int *d_sharedElem1Dof12Q = parallelData->sharedElem1Dof12Q.Read();
-  const int *d_sharedVdofs = parallelData->sharedVdofs.Read();
-  const int *d_sharedVdofsGrads = parallelData->sharedVdofsGradUp.Read();
   const int *d_sharedElemsFaces = parallelData->sharedElemsFaces.Read();
 
   const double *d_shared_uk1 = shared_uk_el1.Read();
@@ -549,7 +538,6 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
 
     for (int elFace = 0; elFace < numFaces; elFace++) {
       const int f = d_sharedElemsFaces[1 + elFace + 1 + el * 7];
-      const int dof2 = d_sharedElem1Dof12Q[2 + f * 4];
       const int Q = d_sharedElem1Dof12Q[3 + f * 4];
 
       for (int k = 0; k < Q; k++) {
@@ -644,7 +632,6 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
   double *d_shared_gradUp2 = shared_grad_upk_el2.Write();
 
   MFEM_FORALL_2D(el, parallelData->sharedElemsFaces.Size() / 7, maxIntPoints, 1, 1, {
-    double Ui[216];
     double l1[216], l2[216];
     double u1, u2;
     double gradUp1[3], gradUp2[3];
