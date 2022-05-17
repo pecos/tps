@@ -463,8 +463,8 @@ void WallBC::interpWalls_gpu(const WallType type, const double &wallTemp, mfem::
   const int numBdrElem = listElems.Size();
 
   // clang-format on
-  MFEM_FORALL(
-      el_wall, wallElems.Size() / 7,  // el_wall is index within wall boundary elements?
+  // el_wall is index within wall boundary elements?
+  MFEM_FORALL_2D(el_wall, wallElems.Size() / 7, maxIntPoints, 1, 1,
       {
         double Ui[216], gradUpi[216 * 3];
         double shape[216];
@@ -489,7 +489,7 @@ void WallBC::interpWalls_gpu(const WallType type, const double &wallTemp, mfem::
                 gradUpi[i + d * elDof] = d_gradUp[indexi + eq * totDofs + d * num_equation * totDofs];
             }
 
-            for (int q = 0; q < Q; q++) {
+            MFEM_FOREACH_THREAD(q, x, Q) {
               for (int j = 0; j < elDof; j++) shape[j] = d_shapesBC[j + q * maxDofs + el_bdry * maxIntPoints * maxDofs];
 
               double u1 = 0.;
