@@ -208,10 +208,11 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset,
   const int maxDofs = maxDofs_;
 
   // clang-format off
-  MFEM_FORALL(el, NumElemType,
+  MFEM_FORALL_2D(el, NumElemType, elDof, 1, 1,
   {
-    double shape1[216], shape2[216];
-    double Rflux[5], Fcontrib[216 * 5];
+    MFEM_SHARED double shape[216];
+    MFEM_SHARED double Fcontrib[216 * 5];
+    double Rflux[5];
     int indexes_i[216];
 
     const int eli = elemOffset + el;
@@ -253,36 +254,35 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset,
         // get shapes and normal
         const double weight = d_shapeWnor1[offsetShape1 + maxDofs + k * (maxDofs + 1 + dim)];
 
-
-        for (int j = 0; j < dof1; j++) shape1[j] = d_shapeWnor1[offsetShape1 + j + k * (maxDofs + 1 + dim)];
-        for (int j = 0; j < dof2; j++) shape2[j] = d_shape2[offsetShape2 + j + k * maxDofs];
+        if (swapElems) {
+          MFEM_FOREACH_THREAD(j, x, elDof){ shape[j] = d_shape2[offsetShape2 + j + k * maxDofs]; }
+        } else {
+          // NB: Negaive sign correct b/c we *add* to flux below regardless of swapElems
+          MFEM_FOREACH_THREAD(j, x, elDof){ shape[j] = -d_shapeWnor1[offsetShape1 + j + k * (maxDofs + 1 + dim)]; }
+        }
+        MFEM_SYNC_THREAD;
 
         for (int eq = 0; eq < num_equation; eq++) {
           Rflux[eq] = d_f[eq + k * num_equation + gFace * maxIntPoints * num_equation];
         }
 
-        if (swapElems) {
+        MFEM_FOREACH_THREAD(i, x, elDof) {
           for (int eq = 0; eq < num_equation; eq++) {
-            for (int i = 0; i < elDof; i++) {
-              Fcontrib[i + eq * elDof] += weight * shape2[i] * Rflux[eq];
-            }
-          }
-        } else {
-          for (int eq = 0; eq < num_equation; eq++) {
-            for (int i = 0; i < elDof; i++) {
-              Fcontrib[i + eq * elDof] -= weight * shape1[i] * Rflux[eq];
-            }
+            Fcontrib[i + eq * elDof] += weight * shape[i] * Rflux[eq];
           }
         }
+        MFEM_SYNC_THREAD;
+
       }  // end loop over quad pts
     }  // end loop over faces
 
-    for (int eq = 0; eq < num_equation; eq++) {
-      for (int i = 0; i < elDof; i++) {
-        int index = indexes_i[i];
+    MFEM_FOREACH_THREAD(i, x, elDof) {
+      const int index = indexes_i[i];
+      for (int eq = 0; eq < num_equation; eq++) {
         d_y[index + eq * Ndofs] += Fcontrib[i + eq * elDof];
       }
     }
+    MFEM_SYNC_THREAD;
   });
   // clang-format on
 }
