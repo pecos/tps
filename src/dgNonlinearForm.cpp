@@ -505,11 +505,9 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;
 
-
-  MFEM_FORALL(el, parallelData->sharedElemsFaces.Size() / 7, {
+  MFEM_FORALL_2D(el, parallelData->sharedElemsFaces.Size() / 7, maxDofs, 1, 1, {
     //
     double Fcontrib[216 * 5];
-    double l1[216];
     double Rflux[5];
     int index_i[216];
 
@@ -532,9 +530,6 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
       for (int k = 0; k < Q; k++) {
         const double weight =
           d_sharedShapeWnor1[maxDofs + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
-        for (int i = 0; i < dof1; i++) {
-          l1[i] = d_sharedShapeWnor1[i + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
-        }
 
         for (int eq = 0; eq < num_equation; eq++) {
           const int idxu = eq + k*num_equation + elFace*maxIntPoints*num_equation + el*5*maxIntPoints*num_equation;
@@ -542,17 +537,22 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
         }
 
         // add integration point contribution
-        for (int eq = 0; eq < num_equation; eq++) {
-          for (int i = 0; i < dof1; i++) Fcontrib[i + eq * dof1] -= weight * l1[i] * Rflux[eq];
+        MFEM_FOREACH_THREAD(i, x, dof1) {
+          const double shape = d_sharedShapeWnor1[i + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
+          for (int eq = 0; eq < num_equation; eq++) {
+            Fcontrib[i + eq * dof1] -= weight * shape * Rflux[eq];
+          }
         }
+        MFEM_SYNC_THREAD;
       }
     }
     // write to global memory
-    for (int eq = 0; eq < num_equation; eq++) {
-      for (int i = 0; i < dof1; i++) {
+    MFEM_FOREACH_THREAD(i, x, dof1) {
+      for (int eq = 0; eq < num_equation; eq++) {
         d_y[index_i[i] + eq * Ndofs] += Fcontrib[i + eq * dof1];
       }
     }
+    MFEM_SYNC_THREAD;
   });
 }
 // clang-format on
