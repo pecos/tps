@@ -302,7 +302,7 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
   const double viscMult = mixture->GetViscMultiplyer();
   const double bulkViscMult = mixture->GetBulkViscMultiplyer();
   const double Pr = mixture->GetPrandtlNum();
-  //const double Sc = mixture->GetSchmidtNum();
+  // const double Sc = mixture->GetSchmidtNum();
 
   Mesh *mesh = fes->GetMesh();
   const int Nf = mesh->GetNumFaces();
@@ -552,26 +552,17 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
         }
 
         for (int eq = 0; eq < num_equation; eq++) {
-          u1[eq] = d_shared_uk1[eq + k*num_equation + elFace*maxIntPoints*num_equation +
-                                el*5*maxIntPoints*num_equation];
-          u2[eq] = d_shared_uk2[eq + k*num_equation + elFace*maxIntPoints*num_equation +
-                                el*5*maxIntPoints*num_equation];
+          const int idxu = eq + k*num_equation + elFace*maxIntPoints*num_equation + el*5*maxIntPoints*num_equation;
+          u1[eq] = d_shared_uk1[idxu];
+          u2[eq] = d_shared_uk2[idxu];
           Rflux[eq] = 0.;
           for (int d = 0; d < dim; d++) {
-            gradUp1[eq + d * num_equation] = d_shared_gradUp1[eq + k*num_equation + elFace*maxIntPoints*num_equation +
-                                                              el*5*maxIntPoints*num_equation + d*maxNumElems*5*maxIntPoints*num_equation];
-            gradUp2[eq + d * num_equation] = d_shared_gradUp2[eq + k*num_equation + elFace*maxIntPoints*num_equation +
-                                                              el*5*maxIntPoints*num_equation + d*maxNumElems*5*maxIntPoints*num_equation];
+            const int idxg = idxu + d*maxNumElems*5*maxIntPoints*num_equation;
+            gradUp1[eq + d * num_equation] = d_shared_gradUp1[idxg];
+            gradUp2[eq + d * num_equation] = d_shared_gradUp2[idxg];
           }
         }
 
-        // // compute Riemann flux
-        // RiemannSolver::riemannLF_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg,
-        //                              dim, eqSystem, num_equation, i, maxDofs);
-        // Fluxes::viscousFlux_gpu(&vFlux1[0], &u1[0], &gradUp1[0], eqSystem, gamma, Rg, viscMult,
-        //                         bulkViscMult, Pr, Sc, i, maxDofs, dim, num_equation);
-        // Fluxes::viscousFlux_gpu(&vFlux2[0], &u2[0], &gradUp2[0], eqSystem, gamma, Rg, viscMult, bulkViscMult,
-        //                         Pr, Sc, i, maxDofs, dim, num_equation);
         // evaluate flux
         RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
         Fluxes::viscousFlux_serial_gpu(&vFlux1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
@@ -637,9 +628,9 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
     double gradUp1[3], gradUp2[3];
     int index_i[216];
 
-    const int el1      = d_sharedElemsFaces[0 + el * 7];
+    const int el1 = d_sharedElemsFaces[0 + el * 7];
     const int numFaces = d_sharedElemsFaces[1 + el * 7];
-    const int dof1     = d_sharedElem1Dof12Q[1 + d_sharedElemsFaces[2 + el * 7] * 4];
+    const int dof1 = d_sharedElem1Dof12Q[1 + d_sharedElemsFaces[2 + el * 7] * 4];
 
     const int offsetEl1 = d_posDofIds[2 * el1];
 
@@ -653,7 +644,7 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
       const int Q = d_sharedElem1Dof12Q[3 + f * 4];
 
       // begin loop through integration points
-      //for (int k = 0; k < Q; k++) {
+      // for (int k = 0; k < Q; k++) {
       MFEM_FOREACH_THREAD(k, x, Q) {
         // load interpolating functions
         for (int i = 0; i < dof1; i++) {
@@ -681,7 +672,6 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
             u2 += d_faceData[index] * l2[j];
           }
 
-
           // interpolate gradients
           for (int d = 0; d < dim; d++) {
             // el1
@@ -693,14 +683,14 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
             // el2
             for (int j = 0; j < dof2; j++) {
               int index =
-                d_sharedVdofsGrads[j + eq * maxDofs + d * num_equation * maxDofs + f * dim * num_equation * maxDofs];
+                  d_sharedVdofsGrads[j + eq * maxDofs + d * num_equation * maxDofs + f * dim * num_equation * maxDofs];
               const double G = d_faceGradUp[index];
               gradUp2[d] += l2[j] * G;
             }
-
           }
 
-          const int idx = eq + k * num_equation + elFace * maxIntPoints * num_equation + el * 5 * maxIntPoints * num_equation;
+          const int idx =
+              eq + k * num_equation + elFace * maxIntPoints * num_equation + el * 5 * maxIntPoints * num_equation;
           d_shared_uk1[idx] = u1;
           d_shared_uk2[idx] = u2;
           for (int d = 0; d < dim; d++) {
@@ -708,7 +698,7 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
             d_shared_gradUp2[idx + d * maxNumElems * 5 * maxIntPoints * num_equation] = gradUp2[d];
           }
         }
-      }    // end loop through integration points
+      }  // end loop through integration points
     }
   });
 }
