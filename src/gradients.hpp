@@ -91,8 +91,7 @@ class Gradients : public ParNonlinearForm {
   parallelFacesIntegrationArrays *parallelData;
   dataTransferArrays *transferUp;
 
-  Vector shared_uk_el1;
-  Vector shared_uk_el2;
+  Vector dun_shared_face;
 
  public:
   Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradUpfes, int _dim, int _num_equation,
@@ -107,12 +106,10 @@ class Gradients : public ParNonlinearForm {
     parallelData = _parData;
     transferUp = _transferUp;
 
-    shared_uk_el1.UseDevice(true);
-    shared_uk_el2.UseDevice(true);
+    dun_shared_face.UseDevice(true);
 
     int maxNumElems = parallelData->sharedElemsFaces.Size() / 7;  // elements with shared faces
-    shared_uk_el1.SetSize(maxNumElems * 5 * maxIntPoints_ * num_equation_);
-    shared_uk_el2.SetSize(maxNumElems * 5 * maxIntPoints_ * num_equation_);
+    dun_shared_face.SetSize(dim_ * maxNumElems * 5 * maxIntPoints_ * num_equation_);
   }
 
   void computeGradients();
