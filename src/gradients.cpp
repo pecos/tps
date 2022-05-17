@@ -381,43 +381,47 @@ void Gradients::computeGradients_gpu(const int elType, const int offsetElems, co
   const int num_equation = num_equation_;
   const int dim = dim_;
 
-  MFEM_FORALL(el, numElems, {
+  //MFEM_FORALL(el, numElems, {
+  MFEM_FORALL_2D(el, numElems, elDof, 1, 1, {
     const int eli = el + offsetElems;
     const int offsetIDs = d_posDofIds[2 * eli];
 
     const int keoffset = d_Ke_pos[eli];
 
     int index_i[216];
-    double Ui[216], gradUpi[216 * 3];
+    MFEM_SHARED double Ui[216], gradUpi[216 * 3];
 
     for (int i = 0; i < elDof; i++) {
       index_i[i] = d_nodesIDs[offsetIDs + i];
     }
 
     for (int eq = 0; eq < num_equation; eq++) {
-      for (int i = 0; i < elDof; i++) {
+      MFEM_FOREACH_THREAD(i, x, elDof) {
         Ui[i] = d_Up[index_i[i] + eq * totalDofs];
         for (int d = 0; d < dim; d++) {
           // this loads face contribution
           gradUpi[i + d * elDof] = d_gradUp[index_i[i] + eq * totalDofs + d * num_equation * totalDofs];
         }
       }
+      MFEM_SYNC_THREAD;
 
       // add the element interior contribution
-      for (int d = 0; d < dim; d++) {
-        for (int j = 0; j < elDof; j++) {
+      MFEM_FOREACH_THREAD(j, x, elDof) {
+        for (int d = 0; d < dim; d++) {
           for (int k = 0; k < elDof; k++) {
             gradUpi[j + d * elDof] += d_Ke[keoffset + dim * elDof * j + d * elDof + k] * Ui[k];
           }
         }
       }
+      MFEM_SYNC_THREAD;
 
       // write to global memory
-      for (int i = 0; i < elDof; i++) {
+      MFEM_FOREACH_THREAD(i, x, elDof) {
         for (int d = 0; d < dim; d++) {
           d_gradUp[index_i[i] + eq * totalDofs + d * num_equation * totalDofs] = gradUpi[i + d * elDof];
         }
       }
+      MFEM_SYNC_THREAD;
     }  // end equation loop
   });
 }
