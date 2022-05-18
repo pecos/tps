@@ -131,7 +131,7 @@ int main (int argc, char *argv[])
     for (int d = 0; d < dim; d++) dataVector[i + d * nDofs] = 0.0;
   }
   VectorGridFunctionCoefficient scalarZeroCoeff(&scalarZero), vectorZeroCoeff(&vectorZero);
-  if (srcConfig.compareRhs_) {
+  if (srcConfig.mmsCompareRhs_) {
     double norm;
     for (int var = 0; var < numVariables; var++) {
       VectorGridFunctionCoefficient masaCoeff(visualizationVariables[var + 3 * numVariables]);

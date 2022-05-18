@@ -730,7 +730,7 @@ void initTernary2DSheath(GasMixture *mixture, RunConfiguration &config, const do
   MASA::masa_set_param<double>("Th0", 10.0e-1);
   MASA::masa_set_param<double>("XI0", 0.11);
 
-  MASA::masa_set_param<double>("TeL", 3.0e-1);
+  MASA::masa_set_param<double>("TeL", 4.0e-1);
   MASA::masa_set_param<double>("XIL", 0.13);
 
   assert(config.wallBC.size() == 2);
@@ -744,14 +744,25 @@ void initTernary2DSheath(GasMixture *mixture, RunConfiguration &config, const do
   assert(T0 > 0.0);
   MASA::masa_set_param<double>("ThL", T0);
   MASA::masa_set_param<double>("dTx", 3.7e-2);
+  // MASA::masa_set_param<double>("dTx", 0.0);
 
-  MASA::masa_set_param<double>("n0", 40.0e-5);
-  MASA::masa_set_param<double>("dnx", 5.7e-5);
-  MASA::masa_set_param<double>("dny", 8.9e-5);
+  MASA::masa_set_param<double>("n0", 40.0e-1);
+  MASA::masa_set_param<double>("dnx", 5.7e-1);
+  MASA::masa_set_param<double>("dny", 8.9e-1);
+  // MASA::masa_set_param<double>("dnx", 0.0);
+  // MASA::masa_set_param<double>("dny", 0.0);
   MASA::masa_set_param<double>("knx", 2.0);
   MASA::masa_set_param<double>("kny", 1.0);
   MASA::masa_set_param<double>("offset_nx", 0.29);
   MASA::masa_set_param<double>("offset_ny", 0.87);
+
+  // MASA::masa_set_param<double>("u0", 0.0);
+  // MASA::masa_set_param<double>("dux", 0.0);
+  // MASA::masa_set_param<double>("duy", 0.0);
+  //
+  // MASA::masa_set_param<double>("v0", 0.0);
+  // MASA::masa_set_param<double>("dvx", 0.0);
+  // MASA::masa_set_param<double>("dvy", 0.0);
 }
 
 }  // namespace ternary2d
