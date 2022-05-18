@@ -928,11 +928,14 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     // for visualization.
     masaUBlock_ = new BlockVector(*offsets);
     masaU_ = new ParGridFunction(vfes, masaUBlock_->HostReadWrite());
+    masaRhs_ = new ParGridFunction(*U);
 
     for (int eq = 0; eq < num_equation; eq++)
       visualizationVariables.push_back(new ParGridFunction(fes, U->HostReadWrite() + eq * fes->GetNDofs()));
     for (int eq = 0; eq < num_equation; eq++)
       visualizationVariables.push_back(new ParGridFunction(fes, masaU_->HostReadWrite() + eq * fes->GetNDofs()));
+    for (int eq = 0; eq < num_equation; eq++)
+      visualizationVariables.push_back(new ParGridFunction(fes, masaRhs_->HostReadWrite() + eq * fes->GetNDofs()));
   }
 #endif
 
@@ -1014,6 +1017,8 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
       paraviewColl->RegisterField("U" + std::to_string(eq), visualizationVariables[numActiveSpecies + eq]);
     for (int eq = 0; eq < num_equation; eq++)
       paraviewColl->RegisterField("mms_U" + std::to_string(eq), visualizationVariables[numActiveSpecies + num_equation + eq]);
+    for (int eq = 0; eq < num_equation; eq++)
+      paraviewColl->RegisterField("RHS" + std::to_string(eq), visualizationVariables[numActiveSpecies + 2 * num_equation + eq]);
   }
   #endif
 
@@ -1117,6 +1122,7 @@ void M2ulPhyS::solve() {
 
 #ifdef HAVE_MASA
       if (config.use_mms_) {
+        rhsOperator->Mult(*U, *masaRhs_);
         projectExactSolution(time, masaU_);
         checkSolutionError(time);
       } else {
