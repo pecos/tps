@@ -411,7 +411,7 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
   // add forcing terms
   for (int i = 0; i < forcing.Size(); i++) {
 #ifdef HAVE_MASA
-    if ((i == masaForcingIndex_) && (config_.compareRhs_)) continue;
+    if ((i == masaForcingIndex_) && (config_.mmsCompareRhs_)) continue;
 #endif
     // NOTE: Do not use RHSoperator::time here b/c it is not correctly
     // updated for each RK substep.  Instead, get time from parent
