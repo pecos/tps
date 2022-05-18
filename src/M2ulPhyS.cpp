@@ -924,15 +924,18 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   // If mms, add conserved and exact solution.
 #ifdef HAVE_MASA
-  if (config.use_mms_) {
+  if (config.use_mms_ && config.mmsSaveDetails_) {
     // for visualization.
     masaUBlock_ = new BlockVector(*offsets);
     masaU_ = new ParGridFunction(vfes, masaUBlock_->HostReadWrite());
+    masaRhs_ = new ParGridFunction(*U);
 
     for (int eq = 0; eq < num_equation; eq++)
       visualizationVariables.push_back(new ParGridFunction(fes, U->HostReadWrite() + eq * fes->GetNDofs()));
     for (int eq = 0; eq < num_equation; eq++)
       visualizationVariables.push_back(new ParGridFunction(fes, masaU_->HostReadWrite() + eq * fes->GetNDofs()));
+    for (int eq = 0; eq < num_equation; eq++)
+      visualizationVariables.push_back(new ParGridFunction(fes, masaRhs_->HostReadWrite() + eq * fes->GetNDofs()));
   }
 #endif
 
@@ -1007,15 +1010,17 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     }
   }
 
-  // If mms, add exact solution.
-  #ifdef HAVE_MASA
-  if (config.use_mms_) {
+// If mms, add exact solution.
+#ifdef HAVE_MASA
+  if (config.use_mms_ && config.mmsSaveDetails_) {
     for (int eq = 0; eq < num_equation; eq++)
       paraviewColl->RegisterField("U" + std::to_string(eq), visualizationVariables[numActiveSpecies + eq]);
     for (int eq = 0; eq < num_equation; eq++)
       paraviewColl->RegisterField("mms_U" + std::to_string(eq), visualizationVariables[numActiveSpecies + num_equation + eq]);
+    for (int eq = 0; eq < num_equation; eq++)
+      paraviewColl->RegisterField("RHS" + std::to_string(eq), visualizationVariables[numActiveSpecies + 2 * num_equation + eq]);
   }
-  #endif
+#endif
 
   if (spaceVaryViscMult != NULL) paraviewColl->RegisterField("viscMult", spaceVaryViscMult);
 
@@ -1044,7 +1049,7 @@ void M2ulPhyS::projectInitialSolution() {
       initMasaHandler();
 
       projectExactSolution(0.0, U);
-      projectExactSolution(0.0, masaU_);
+      if (config.mmsSaveDetails_) projectExactSolution(0.0, masaU_);
     }
 #endif
   } else {
@@ -1117,7 +1122,10 @@ void M2ulPhyS::solve() {
 
 #ifdef HAVE_MASA
       if (config.use_mms_) {
-        projectExactSolution(time, masaU_);
+        if (config.mmsSaveDetails_) {
+          rhsOperator->Mult(*U, *masaRhs_);
+          projectExactSolution(time, masaU_);
+        }
         checkSolutionError(time);
       } else {
         if (mpi.Root()) cout << "time step: " << iter << ", physical time " << time << "s" << endl;
@@ -1848,7 +1856,8 @@ void M2ulPhyS::parseMMSOptions() {
 
   if (config.use_mms_) {
     tpsP->getRequiredInput("mms/name", config.mms_name_);
-    tpsP->getInput("mms/compare_rhs", config.compareRhs_, false);
+    tpsP->getInput("mms/compare_rhs", config.mmsCompareRhs_, false);
+    tpsP->getInput("mms/save_details", config.mmsSaveDetails_, false);
   }
 }
 
