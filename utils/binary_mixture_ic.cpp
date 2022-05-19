@@ -119,8 +119,8 @@ int main (int argc, char *argv[])
     // }
   }
 
-  RHSoperator rhsOperator = srcField->getRHSoperator();
-  rhsOperator.updatePrimitives(*src_state);
+  RHSoperator *rhsOperator = srcField->getRHSoperator();
+  rhsOperator->updatePrimitives(*src_state);
 
   // Write restart files
   srcField->writeHDF5();
@@ -161,7 +161,7 @@ int main (int argc, char *argv[])
     dataU[i + (dim + 2 + numSpecies - 2) * NDof] = 0.0;
   }
 
-  rhsOperator.updatePrimitives(*src_state);
+  rhsOperator->updatePrimitives(*src_state);
 
   // Write restart files
   srcField->writeHDF5(refFileName);

@@ -51,6 +51,14 @@ void evaluateForcing(const Vector &x, double time, Array<double> &y);
 
 }  // namespace mms
 
+namespace dryair2d {
+
+void evaluateForcing(const Vector &x, double time, Array<double> &y);
+void exactSolnFunction(const Vector &x, double tin, Vector &y);
+void initEuler2D(const int dim, RunConfiguration &config);
+
+}
+
 namespace dryair3d {
 
 void evaluateForcing(const Vector &x, double time, Array<double> &y);

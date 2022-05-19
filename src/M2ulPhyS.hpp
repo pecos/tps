@@ -379,7 +379,7 @@ class M2ulPhyS : public TPS::Solver {
   void solve() override;
 
   // Accessors
-  RHSoperator getRHSoperator() { return *rhsOperator; }
+  RHSoperator *getRHSoperator() { return rhsOperator; }
   ParMesh *GetMesh() { return mesh; }
   FiniteElementCollection *GetFEC() { return fec; }
   ParFiniteElementSpace *GetFESpace() { return vfes; }

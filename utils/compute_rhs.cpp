@@ -56,7 +56,7 @@ int main (int argc, char *argv[])
   ParGridFunction *src_state = srcField->GetSolutionGF();
   ParGridFunction *src_prim = srcField->getPrimitiveGF();
 
-  RHSoperator rhsOperator = srcField->getRHSoperator();
+  RHSoperator *rhsOperator = srcField->getRHSoperator();
   ParGridFunction *rhs = new ParGridFunction(*src_state);
 
   ParaViewDataCollection *paraviewColl = srcField->GetParaviewColl();
@@ -98,10 +98,10 @@ int main (int argc, char *argv[])
   ParGridFunction coordinates(&dfes);
   src_fes->GetParMesh()->GetNodes(coordinates);
 
-  rhsOperator.Mult(*src_state, *rhs);
+  rhsOperator->Mult(*src_state, *rhs);
 
 #ifdef HAVE_MASA
-  ForcingTerms *masaForcing = rhsOperator.getForcingTerm(rhsOperator.getMasaForcingIndex());
+  ForcingTerms *masaForcing = rhsOperator->getForcingTerm(rhsOperator->getMasaForcingIndex());
   ParGridFunction *masaRhs = new ParGridFunction(*src_state);
   double *dataMF = masaRhs->HostReadWrite();
   for (int i = 0; i < nDofs; i++)
