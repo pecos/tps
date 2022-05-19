@@ -92,12 +92,12 @@ class WallBC : public BoundaryCondition {
                                  const Equations &eqSystem, const int &maxIntPoints, const int &maxDofs, const int &dim,
                                  const int &num_equation, GasMixture *mixture);
 
-  static void interpWalls_gpu(const WallType type, const double &wallTemp, Vector &interpolated_Ubdr_,
-                              Vector &interpolatedGradUpbdr_, const Vector &x, const Array<int> &nodesIDs,
-                              const Array<int> &posDofIds, ParGridFunction *Up, ParGridFunction *gradUp,
-                              Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &wallElems,
-                              Array<int> &listElems, const int &maxIntPoints, const int &maxDofs, const int &dim,
-                              const int &num_equation);
+  void interpWalls_gpu(const WallType type, const double &wallTemp, Vector &interpolated_Ubdr_,
+                       Vector &interpolatedGradUpbdr_, const Vector &x, const Array<int> &nodesIDs,
+                       const Array<int> &posDofIds, ParGridFunction *Up, ParGridFunction *gradUp,
+                       Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &wallElems,
+                       Array<int> &listElems, const int &maxIntPoints, const int &maxDofs, const int &dim,
+                       const int &num_equation);
 
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void computeInvWallState(const double *u1, double *u2, const double *nor, const int &dim,
