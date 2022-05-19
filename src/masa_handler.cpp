@@ -41,6 +41,8 @@ void M2ulPhyS::initMasaHandler() {
   // Initialize MASA
   if (config.mms_name_ == "navierstokes_2d_compressible") {
     dryair3d::initNS2DCompressible(dim, config);
+  } else if (config.mms_name_ == "euler_2d") {
+    dryair2d::initEuler2D(dim, config);
   } else if (config.mms_name_ == "euler_transient_3d") {
     dryair3d::initEuler3DTransient(dim, config);
   } else if (config.mms_name_ == "navierstokes_3d_transient_sutherland") {
@@ -90,10 +92,15 @@ void M2ulPhyS::projectExactSolution(const double _time, ParGridFunction *prjU) {
 
   if (config.workFluid == DRY_AIR) {
     if (dim == 2) {
-      grvy_printf(GRVY_ERROR, "Currently does not support MASA solution for dry air, 2d ns equation.\n");
-      exit(-1);
+      if (config.eqSystem == EULER) {
+        exactSolnFunction = &(dryair2d::exactSolnFunction);
+      } else {
+        grvy_printf(GRVY_ERROR, "Currently does not support MASA solution for dry air, 2d ns equation.\n");
+        exit(-1);
+      }
+    } else {
+      exactSolnFunction = &(dryair3d::exactSolnFunction);
     }
-    exactSolnFunction = &(dryair3d::exactSolnFunction);
   } else {
     exactSolnFunction = &(mms::exactSolnFunction);
   }
@@ -207,6 +214,56 @@ void evaluateForcing(const Vector &x, double time, Array<double> &y) {
 }
 
 }  // namespace mms
+
+namespace dryair2d {
+
+void evaluateForcing(const Vector &x, double time, Array<double> &y) {
+  y[0] = MASA::masa_eval_source_rho<double>(x[0], x[1]);  // rho
+  y[1] = MASA::masa_eval_source_rho_u<double>(x[0], x[1]);    // rho*u
+  y[2] = MASA::masa_eval_source_rho_v<double>(x[0], x[1]);    // rho*v
+  y[3] = MASA::masa_eval_source_rho_e<double>(x[0], x[1]);    // rhp*e
+}
+
+void exactSolnFunction(const Vector &x, double tin, Vector &y) {
+  // TODO(kevin): make one for NS2DCompressible.
+  MFEM_ASSERT(x.Size() == 2, "");
+
+  DryAir eqState;
+  const double gamma = eqState.GetSpecificHeatRatio();
+
+  y(0) = MASA::masa_eval_exact_rho<double>(x[0], x[1]);  // rho
+  y(1) = y[0] * MASA::masa_eval_exact_u<double>(x[0], x[1]);
+  y(2) = y[0] * MASA::masa_eval_exact_v<double>(x[0], x[1]);
+  y(3) = MASA::masa_eval_exact_p<double>(x[0], x[1]) / (gamma - 1.);
+
+  double k = 0.;
+  for (int d = 0; d < x.Size(); d++) k += y[1 + d] * y[1 + d];
+  k *= 0.5 / y[0];
+  y[3] += k;
+}
+
+void initEuler2D(const int dim, RunConfiguration &config) {
+  assert(dim == 2);
+  assert(config.workFluid == DRY_AIR);
+  assert(config.GetEquationSystem() == EULER);
+  assert(config.mms_name_ == "euler_2d");
+
+  MASA::masa_init<double>("forcing handler", "euler_2d");
+
+  MASA::masa_set_param<double>("a_rhox", 2.);
+  MASA::masa_set_param<double>("a_rhoy", 2.);
+
+  MASA::masa_set_param<double>("a_ux", 2.);
+  MASA::masa_set_param<double>("a_uy", 2.);
+
+  MASA::masa_set_param<double>("a_vx", 2.);
+  MASA::masa_set_param<double>("a_vy", 2.);
+
+  MASA::masa_set_param<double>("a_px", 2.);
+  MASA::masa_set_param<double>("a_py", 2.);
+}
+
+}
 
 namespace dryair3d {
 
