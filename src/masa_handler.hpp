@@ -56,6 +56,7 @@ namespace dryair2d {
 void evaluateForcing(const Vector &x, double time, Array<double> &y);
 void exactSolnFunction(const Vector &x, double tin, Vector &y);
 void initEuler2D(const int dim, RunConfiguration &config);
+void initCNS2DSutherlands(const int dim, RunConfiguration &config);
 
 }
 
@@ -68,8 +69,6 @@ void exactDenFunction(const Vector &x, double tin, Vector &y);
 void exactVelFunction(const Vector &x, double tin, Vector &y);
 void exactPreFunction(const Vector &x, double tin, Vector &y);
 
-// TODO(kevin): move NS2D to separate namespace.
-void initNS2DCompressible(const int dim, RunConfiguration &config);
 void initEuler3DTransient(const int dim, RunConfiguration &config);
 void initNS3DTransient(const int dim, RunConfiguration &config);
 

@@ -951,7 +951,6 @@ MASA_forcings::MASA_forcings(const int &_dim, const int &_num_equation, const in
   if (_config.workFluid == DRY_AIR) {
     switch (dim) {
       case 2: {
-        assert(_config.eqSystem == EULER);
         evaluateForcing_ = &(dryair2d::evaluateForcing);
       } break;
       case 3: {

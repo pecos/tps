@@ -39,8 +39,8 @@ void M2ulPhyS::initMasaHandler() {
   assert(config.use_mms_);
 
   // Initialize MASA
-  if (config.mms_name_ == "navierstokes_2d_compressible") {
-    dryair3d::initNS2DCompressible(dim, config);
+  if (config.mms_name_ == "ad_cns_2d_sutherlands") {
+    dryair2d::initCNS2DSutherlands(dim, config);
   } else if (config.mms_name_ == "euler_2d") {
     dryair2d::initEuler2D(dim, config);
   } else if (config.mms_name_ == "euler_transient_3d") {
@@ -92,12 +92,7 @@ void M2ulPhyS::projectExactSolution(const double _time, ParGridFunction *prjU) {
 
   if (config.workFluid == DRY_AIR) {
     if (dim == 2) {
-      if (config.eqSystem == EULER) {
-        exactSolnFunction = &(dryair2d::exactSolnFunction);
-      } else {
-        grvy_printf(GRVY_ERROR, "Currently does not support MASA solution for dry air, 2d ns equation.\n");
-        exit(-1);
-      }
+      exactSolnFunction = &(dryair2d::exactSolnFunction);
     } else {
       exactSolnFunction = &(dryair3d::exactSolnFunction);
     }
@@ -263,6 +258,41 @@ void initEuler2D(const int dim, RunConfiguration &config) {
   MASA::masa_set_param<double>("a_py", 2.);
 }
 
+void initCNS2DSutherlands(const int dim, RunConfiguration &config) {
+  assert(dim == 2);
+  assert(config.workFluid == DRY_AIR);
+  assert(config.mms_name_ == "ad_cns_2d_sutherlands");
+
+  const double viscMult = config.visc_mult;
+  const double bulkVisc = config.bulk_visc;
+
+  MASA::masa_init<double>("forcing handler", "ad_cns_2d_sutherlands");
+
+  // fluid parameters
+  MASA::masa_set_param<double>("Gamma", 1.4);
+  MASA::masa_set_param<double>("R", 287.058);
+  MASA::masa_set_param<double>("Pr", 0.71);
+  MASA::masa_set_param<double>("Amu", viscMult * 1.458e-6);
+  MASA::masa_set_param<double>("Bmu", 1.5);
+  MASA::masa_set_param<double>("Cmu", 110.4);
+  MASA::masa_set_param<double>("bulkViscMult", bulkVisc);
+
+  MASA::masa_set_param<double>("rho_0",1.02);
+  MASA::masa_set_param<double>("rho_x",0.11);
+  MASA::masa_set_param<double>("rho_y",0.13);
+  MASA::masa_set_param<double>("a_rhox", 2.);
+  MASA::masa_set_param<double>("a_rhoy", 2.);
+
+  MASA::masa_set_param<double>("a_ux", 2.);
+  MASA::masa_set_param<double>("a_uy", 2.);
+
+  MASA::masa_set_param<double>("a_vx", 2.);
+  MASA::masa_set_param<double>("a_vy", 2.);
+
+  MASA::masa_set_param<double>("a_px", 2.);
+  MASA::masa_set_param<double>("a_py", 2.);
+}
+
 }
 
 namespace dryair3d {
@@ -309,15 +339,6 @@ void exactVelFunction(const Vector &x, double tin, Vector &y) {
 void exactPreFunction(const Vector &x, double tin, Vector &y) {
   MFEM_ASSERT(x.Size() == 3, "");
   y(0) = MASA::masa_eval_exact_p<double>(x[0], x[1], x[2], tin);
-}
-
-void initNS2DCompressible(const int dim, RunConfiguration &config) {
-  assert(dim == 2);
-  assert(config.workFluid == DRY_AIR);
-  assert(config.mms_name_ == "navierstokes_2d_compressible");
-
-  MASA::masa_init<double>("exact", "navierstokes_2d_compressible");
-  MASA::masa_init<double>("forcing", "navierstokes_2d_compressible");
 }
 
 void initEuler3DTransient(const int dim, RunConfiguration &config) {
