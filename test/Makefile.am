@@ -28,7 +28,7 @@ EXTRA_DIST      = tap-driver.sh soln_differ inputs meshes ref_solns/*.h5 \
 		  mms.euler.test reaction.test perfect_gas.test collision_integrals.test \
 	 	  argon_minimal.test argon_minimal.binary.test diffusion_wall.test \
 	 	  inflow_outflow.test mms.ternary_2d.test mms.ternary_2d_wall.test \
-                  mms.ternary_2d_inout.test cuda-memcheck.test
+	 	  mms.ternary_2d_inout.test cuda-memcheck.test mms.general_wall.test
 
 
 TESTS = vpath.sh
@@ -92,7 +92,8 @@ if MASA_ENABLED
 TESTS += mms.euler.test \
 	 mms.ternary_2d.test \
 	 mms.ternary_2d_wall.test \
-	 mms.ternary_2d_inout.test
+	 mms.ternary_2d_inout.test \
+	 mms.general_wall.test
 endif
 
 if !GPU_ENABLED
@@ -138,19 +139,18 @@ test_argon_minimal_LDADD     += $(GRVY_LIBS)
 test_argon_minimal_LDFLAGS    = $(PYTHON_LIBS) $(MFEM_LIBS)
 
 if MASA_ENABLED
-test_argon_minimal_LDFLAGS += $(MASA_LIBS)
+test_argon_minimal_LDFLAGS 	 += $(MASA_LIBS)
 endif
 
-check_PROGRAMS += test_bdr_flux
-test_bdr_flux_SOURCES  = test_boundary_flux.cpp
-test_bdr_flux_LDADD    = ../src/libtps.a
-test_bdr_flux_LDADD    += $(HDF5_LIBS)
-test_bdr_flux_LDADD    += $(GRVY_LIBS)
-test_bdr_flux_LDADD    += $(MFEM_LIBS)
+check_PROGRAMS 							 += test_bdr_flux
+test_bdr_flux_SOURCES  				= test_boundary_flux.cpp
+test_bdr_flux_LDADD    				= ../src/libtps.la
+test_bdr_flux_LDADD    			 += $(HDF5_LIBS)
+test_bdr_flux_LDADD    			 += $(GRVY_LIBS)
+test_bdr_flux_LDFLAGS  				= $(PYTHON_LIBS) $(MFEM_LIBS)
 
-test_bdr_flux_LDFLAGS  =
 if MASA_ENABLED
-test_bdr_flux_LDFLAGS += $(MASA_LIBS)
+test_bdr_flux_LDFLAGS 			 += $(MASA_LIBS)
 endif
 
 endif # if !GPU_ENABLED
