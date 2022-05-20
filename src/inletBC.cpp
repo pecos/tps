@@ -762,11 +762,10 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
 
   const WorkingFluid fluid = mixture->GetWorkingFluid();
 
-  MFEM_FORALL(n, numBdrElem, {
-    double Fcontrib[216 * 5];
-    double shape[216];
+  //MFEM_FORALL(n, numBdrElem, {
+  MFEM_FORALL_2D(n, numBdrElem, maxDofs, 1, 1, {
+    MFEM_SHARED double Fcontrib[216 * 5];
     double Rflux[5], u1[5], u2[5], nor[3];
-    double weight;
 
     const int el = d_listElems[n];
     const int offsetBdrU = d_offsetBoundaryU[n];
@@ -775,47 +774,34 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
     const int elOffset = d_posDofIds[2 * elID];
     const int elDof = d_posDofIds[2 * elID + 1];
 
-    for (int i = 0; i < elDof; i++) {
+    MFEM_FOREACH_THREAD(i, x, elDof) {//for (int i = 0; i < elDof; i++) {
       for (int eq = 0; eq < num_equation; eq++) Fcontrib[i + eq * elDof] = 0.;
     }
+    MFEM_SYNC_THREAD;
 
     for (int q = 0; q < Q; q++) {  // loop over int. points
-      for (int i = 0; i < elDof; i++) shape[i] = d_shapesBC[i + q * maxDofs + el * maxIntPoints * maxDofs];
-      for (int d = 0; d < dim; d++) nor[d] = d_normW[d + q * (dim + 1) + el * maxIntPoints * (dim + 1)];
-      weight = d_normW[dim + q * (dim + 1) + el * maxIntPoints * (dim + 1)];
+
+      const double weight = d_normW[dim + q * (dim + 1) + el * maxIntPoints * (dim + 1)];
 
       // get interpolated data
       for (int eq = 0; eq < num_equation; eq++) {
-        u1[eq] = d_interpUbdr[eq + q * num_equation + n * maxIntPoints * num_equation];
+        Rflux[eq] = weight * d_interpUbdr[eq + q * num_equation + n * maxIntPoints * num_equation];
       }
-
-      // compute mirror state
-      switch (type) {
-        case InletType::SUB_DENS_VEL:
-          computeSubDenseVel_gpu_serial(&u1[0], &u2[0], &nor[0], d_inputState, gamma, Rg, dim, num_equation, fluid);
-          break;
-        case InletType::SUB_DENS_VEL_NR:
-          printf("INLET BC NOT IMPLEMENTED");
-          break;
-        case InletType::SUB_VEL_CONST_ENT:
-          printf("INLET BC NOT IMPLEMENTED");
-          break;
-      }
-
-      // compute flux
-      RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
 
       // sum contributions to integral
-      for (int i = 0; i < elDof; i++) {
-        for (int eq = 0; eq < num_equation; eq++) Fcontrib[i + eq * elDof] -= Rflux[eq] * shape[i] * weight;
+      MFEM_FOREACH_THREAD(i, x, elDof) {//for (int i = 0; i < elDof; i++) {
+        const double shape = d_shapesBC[i + q * maxDofs + el * maxIntPoints * maxDofs];
+        for (int eq = 0; eq < num_equation; eq++) Fcontrib[i + eq * elDof] -= Rflux[eq] * shape;
       }
+      MFEM_SYNC_THREAD;
     }
 
     // add to global data
-    for (int i = 0; i < elDof; i++) {
+    MFEM_FOREACH_THREAD(i, x, elDof) { //for (int i = 0; i < elDof; i++) {
       const int indexi = d_nodesIDs[elOffset + i];
       for (int eq = 0; eq < num_equation; eq++) d_y[indexi + eq * totDofs] += Fcontrib[i + eq * elDof];
     }
+    MFEM_SYNC_THREAD;
   });
 #endif
 }
@@ -827,6 +813,7 @@ void InletBC::interpInlet_gpu(const InletType type, const mfem::Vector &inputSta
                               Array<int> &offsetsBoundaryU, const int &maxIntPoints, const int &maxDofs, const int &dim,
                               const int &num_equation) {
 #ifdef _GPU_
+  const double *d_inputState = inputState.Read();
   const double *d_U = x.Read();
   const int *d_nodesIDs = nodesIDs.Read();
   const int *d_posDofIds = posDofIds.Read();
@@ -841,10 +828,16 @@ void InletBC::interpInlet_gpu(const InletType type, const mfem::Vector &inputSta
   const int totDofs = x.Size() / num_equation;
   const int numBdrElem = listElems.Size();
 
-  MFEM_FORALL(n, numBdrElem, {
-    double Ui[216];
+  const double Rg = mixture->GetGasConstant();
+  const double gamma = mixture->GetSpecificHeatRatio();
+
+  const WorkingFluid fluid = mixture->GetWorkingFluid();
+
+
+  //MFEM_FORALL(n, numBdrElem, {
+  MFEM_FORALL_2D(n, numBdrElem, maxIntPoints, 1, 1, {
     double shape[216];
-    double u1;
+    double u1[5], u2[5], Rflux[5], nor[3];
 
     const int el = d_listElems[n];
     const int Q = d_intPointsElIDBC[2 * el];
@@ -852,25 +845,43 @@ void InletBC::interpInlet_gpu(const InletType type, const mfem::Vector &inputSta
     const int elOffset = d_posDofIds[2 * elID];
     const int elDof = d_posDofIds[2 * elID + 1];
 
-    for (int eq = 0; eq < num_equation; eq++) {
-      // get data
+    //for (int q = 0; q < Q; q++) {
+    MFEM_FOREACH_THREAD(q, x, Q) {
+      for (int d = 0; d < dim; d++) nor[d] = d_normW[d + q * (dim + 1) + el * maxIntPoints * (dim + 1)];
+
       for (int i = 0; i < elDof; i++) {
-        const int indexi = d_nodesIDs[elOffset + i];
-        Ui[i] = d_U[indexi + eq * totDofs];
+        shape[i] = d_shapesBC[i + q * maxDofs + el * maxIntPoints * maxDofs];
       }
 
-      for (int q = 0; q < Q; q++) {
+      for (int eq = 0; eq < num_equation; eq++) {
+        u1[eq] = 0.;
         for (int i = 0; i < elDof; i++) {
-          shape[i] = d_shapesBC[i + q * maxDofs + el * maxIntPoints * maxDofs];
+          const int indexi = d_nodesIDs[elOffset + i];
+          u1[eq] += d_U[indexi + eq * totDofs] * shape[i];
         }
+      }
 
-        u1 = 0.;
-        for (int j = 0; j < elDof; j++) u1 += shape[j] * Ui[j];
+      // compute mirror state
+      switch (type) {
+      case InletType::SUB_DENS_VEL:
+        computeSubDenseVel_gpu_serial(&u1[0], &u2[0], &nor[0], d_inputState, gamma, Rg, dim, num_equation, fluid);
+        break;
+      case InletType::SUB_DENS_VEL_NR:
+        printf("INLET BC NOT IMPLEMENTED");
+        break;
+      case InletType::SUB_VEL_CONST_ENT:
+        printf("INLET BC NOT IMPLEMENTED");
+        break;
+      }
 
-        // save to global memory
-        d_interpUbdr[eq + q * num_equation + n * maxIntPoints * num_equation] = u1;
-      }  // end loop over intergration points
-    }    // end loop over equations
+      // compute flux
+      RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
+
+      // save to global memory
+      for (int eq = 0; eq < num_equation; eq++) {
+        d_interpUbdr[eq + q * num_equation + n * maxIntPoints * num_equation] = Rflux[eq];
+      }
+    } // end loop over intergration points
   });
 #endif
 }
