@@ -118,11 +118,11 @@ class InletBC : public BoundaryCondition {
                                   Array<int> &listElems, Array<int> &offsetsBoundaryU, const int &maxIntPoints,
                                   const int &maxDofs, const int &dim, const int &num_equation, GasMixture *mixture,
                                   Equations &eqSystem);
-  void interpInlet_gpu(const InletType type, const Vector &inputState, Vector &interpolated_Ubdr,
-                       const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
-                       ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
-                       Array<int> &intPointsElIDBC, Array<int> &listElems, Array<int> &offsetsBoundaryU,
-                       const int &maxIntPoints, const int &maxDofs, const int &dim, const int &num_equation);
+  void interpInlet_gpu(const InletType type, const Vector &inputState, Vector &interpolated_Ubdr, const Vector &x,
+                       const Array<int> &nodesIDs, const Array<int> &posDofIds, ParGridFunction *Up,
+                       ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
+                       Array<int> &listElems, Array<int> &offsetsBoundaryU, const int &maxIntPoints, const int &maxDofs,
+                       const int &dim, const int &num_equation);
 
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void computeSubDenseVel(const double *u1, double *u2, const double *nor,

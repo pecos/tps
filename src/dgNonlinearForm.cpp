@@ -140,7 +140,7 @@ void DGNonLinearForm::Mult(const Vector &x, Vector &y) {
 
 #ifdef _GPU_
 void DGNonLinearForm::Mult_domain(const Vector &x, Vector &y) {
-  //setToZero_gpu(y, y.Size());  // assume y comes in set to zero (or that we are updating)
+  // setToZero_gpu(y, y.Size());  // assume y comes in set to zero (or that we are updating)
 
   // Internal face integration
   if (fnfi.Size()) {
@@ -184,7 +184,7 @@ void DGNonLinearForm::setToZero_gpu(Vector &x, const int size) {
 }
 
 void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset, int elDof) {
-  //double *d_y = y.Write();
+  // double *d_y = y.Write();
   double *d_y = y.ReadWrite();
   const double *d_f = face_flux_.Read();
 
@@ -250,10 +250,10 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset,
         const double weight = d_shapeWnor1[offsetShape1 + maxDofs + k * (maxDofs + 1 + dim)];
 
         if (swapElems) {
-          MFEM_FOREACH_THREAD(j, x, elDof){ shape[j] = d_shape2[offsetShape2 + j + k * maxDofs]; }
+          MFEM_FOREACH_THREAD(j, x, elDof) { shape[j] = d_shape2[offsetShape2 + j + k * maxDofs]; }
         } else {
           // NB: Negaive sign correct b/c we *add* to flux below regardless of swapElems
-          MFEM_FOREACH_THREAD(j, x, elDof){ shape[j] = -d_shapeWnor1[offsetShape1 + j + k * (maxDofs + 1 + dim)]; }
+          MFEM_FOREACH_THREAD(j, x, elDof) { shape[j] = -d_shapeWnor1[offsetShape1 + j + k * (maxDofs + 1 + dim)]; }
         }
         MFEM_SYNC_THREAD;
 
@@ -267,7 +267,6 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset,
           }
         }
         MFEM_SYNC_THREAD;
-
       }  // end loop over quad pts
     }  // end loop over faces
 
@@ -581,7 +580,7 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
   const int maxDofs = maxDofs_;
 
   const double gamma = mixture->GetSpecificHeatRatio();
-  const double Rg    = mixture->GetGasConstant();
+  const double Rg = mixture->GetGasConstant();
   const double viscMult = mixture->GetViscMultiplyer();
   const double bulkViscMult = mixture->GetBulkViscMultiplyer();
   const double Pr = mixture->GetPrandtlNum();
@@ -621,8 +620,8 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
         }
 
         for (int d = 0; d < dim; d++) {
-          nor[d] = d_sharedShapeWnor1[maxDofs + 1 + d + k * (maxDofs + 1 + dim) +
-                                      f * maxIntPoints * (maxDofs + 1 + dim)];
+          nor[d] =
+              d_sharedShapeWnor1[maxDofs + 1 + d + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
         }
 
         // set array for interpolated data to 0
@@ -668,7 +667,6 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
         Fluxes::viscousFlux_serial_gpu(&vFlux2[0], &u2[0], &gradUp2[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
                                        num_equation);
 
-
         for (int eq = 0; eq < num_equation; eq++) {
           for (int d = 0; d < dim; d++)
             vFlux1[eq + d * num_equation] = 0.5 * (vFlux1[eq + d * num_equation] + vFlux2[eq + d * num_equation]);
@@ -679,7 +677,7 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
 
         for (int eq = 0; eq < num_equation; eq++) {
           const int idx =
-            eq + k * num_equation + elFace * maxIntPoints * num_equation + el * 5 * maxIntPoints * num_equation;
+              eq + k * num_equation + elFace * maxIntPoints * num_equation + el * 5 * maxIntPoints * num_equation;
           d_shared_flux[idx] = Rflux[eq];
         }
       }  // end loop through integration points

@@ -1065,7 +1065,6 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem, 
   const WorkingFluid fluid = mixture->GetWorkingFluid();
 
   // clang-format off
-  //MFEM_FORALL(n, numBdrElem,
   MFEM_FORALL_2D(n, numBdrElem, maxDofs, 1, 1,
   {
     MFEM_SHARED double Fcontrib[216 * 20];
@@ -1080,8 +1079,7 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem, 
     const int elOffset = d_posDofIds[2 * elID  ];
     const int elDof    = d_posDofIds[2 * elID + 1];
 
-    //for (int i = 0; i < elDof; i++) {
-    MFEM_FOREACH_THREAD(i, x, elDof) { //for (int i = 0; i < elDof; i++) {
+    MFEM_FOREACH_THREAD(i, x, elDof) {
       for ( int eq = 0; eq < num_equation; eq++ ) Fcontrib[i+eq*elDof] = 0.;
     }
     MFEM_SYNC_THREAD;
@@ -1094,7 +1092,7 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem, 
         Rflux[eq] = weight * d_interpUbdr[eq + q*num_equation +n*maxIntPoints*num_equation];
       }
 
-      MFEM_FOREACH_THREAD(i, x, elDof) { //for (int i = 0; i < elDof; i++) {
+      MFEM_FOREACH_THREAD(i, x, elDof) {
         const double shape = d_shapesBC[i + q * maxDofs + el * maxIntPoints * maxDofs];
         for (int eq = 0; eq < num_equation; eq++) Fcontrib[i + eq * elDof] -= Rflux[eq] * shape;
       }
@@ -1102,7 +1100,7 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem, 
     }
 
     // add to global data
-    MFEM_FOREACH_THREAD(i, x, elDof) { //for (int i = 0; i < elDof; i++) {
+    MFEM_FOREACH_THREAD(i, x, elDof) {
       const int indexi = d_nodesIDs[elOffset + i];
       for (int eq = 0; eq < num_equation; eq++) d_y[indexi + eq * totDofs] += Fcontrib[i + eq * elDof];
     }
@@ -1147,7 +1145,7 @@ void OutletBC::interpOutlet_gpu(const OutletType type, const mfem::Array<double>
 
   const WorkingFluid fluid = mixture->GetWorkingFluid();
 
-  //MFEM_FORALL(n, numBdrElem, {
+  // MFEM_FORALL(n, numBdrElem, {
   MFEM_FORALL_2D(n, numBdrElem, maxIntPoints, 1, 1, {
     //
     double shape[216];
@@ -1166,9 +1164,8 @@ void OutletBC::interpOutlet_gpu(const OutletType type, const mfem::Array<double>
       index_i[i] = d_nodesIDs[elOffset + i];
     }
 
-    //for (int q = 0; q < Q; q++) {
+    // for (int q = 0; q < Q; q++) {
     MFEM_FOREACH_THREAD(q, x, Q) {
-
       // zero state and gradient at this quad point
       for (int eq = 0; eq < num_equation; eq++) {
         u1[eq] = 0.;
@@ -1200,18 +1197,17 @@ void OutletBC::interpOutlet_gpu(const OutletType type, const mfem::Array<double>
       // compute mirror state
       switch (type) {
         case OutletType::SUB_P:
-          computeSubPressure_gpu_serial(&u1[0], &u2[0], &nor[0], d_inputState[0], gamma, Rg, dim, num_equation,
-                                        fluid);
+          computeSubPressure_gpu_serial(&u1[0], &u2[0], &nor[0], d_inputState[0], gamma, Rg, dim, num_equation, fluid);
           break;
         case OutletType::SUB_P_NR:
           computeNRSubPress_serial(offsetBdrU + q, &u1[0], &gradUp1[0], d_meanUp, dt, &u2[0], d_boundaryU,
-                                   &d_inputState[0], &nor[0], d_tang1, d_tang2, d_inv, refLength, gamma, Rg, elDof,
-                                   dim, num_equation, eqSystem);
+                                   &d_inputState[0], &nor[0], d_tang1, d_tang2, d_inv, refLength, gamma, Rg, elDof, dim,
+                                   num_equation, eqSystem);
           break;
         case OutletType::SUB_MF_NR:
           computeNRSubMassFlow_serial(offsetBdrU + q, &u1[0], &gradUp1[0], d_meanUp, dt, &u2[0], d_boundaryU,
-                                      d_inputState, &nor[0], d_tang1, d_tang2, d_inv, refLength, area, gamma, Rg,
-                                      elDof, dim, num_equation, eqSystem);
+                                      d_inputState, &nor[0], d_tang1, d_tang2, d_inv, refLength, area, gamma, Rg, elDof,
+                                      dim, num_equation, eqSystem);
           break;
         case OutletType::SUB_MF_NR_PW:
           printf("OUTLET SUB_MF_NR_PW BC NOT IMPLEMENTED");

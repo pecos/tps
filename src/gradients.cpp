@@ -381,7 +381,7 @@ void Gradients::computeGradients_gpu(const int elType, const int offsetElems, co
   const int num_equation = num_equation_;
   const int dim = dim_;
 
-  //MFEM_FORALL(el, numElems, {
+  // MFEM_FORALL(el, numElems, {
   MFEM_FORALL_2D(el, numElems, elDof, 1, 1, {
     const int eli = el + offsetElems;
     const int offsetIDs = d_posDofIds[2 * eli];
