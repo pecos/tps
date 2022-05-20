@@ -245,6 +245,8 @@ void initEuler2D(const int dim, RunConfiguration &config) {
 
   MASA::masa_init<double>("forcing handler", "euler_2d");
 
+  MASA::masa_set_param<double>("Gamma", 1.4);
+
   MASA::masa_set_param<double>("a_rhox", 2.);
   MASA::masa_set_param<double>("a_rhoy", 2.);
 
