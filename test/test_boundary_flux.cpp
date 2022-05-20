@@ -7,7 +7,7 @@
 using namespace mfem;
 using namespace std;
 
-const double scalarErrorThreshold = 1e-13;
+const double scalarErrorThreshold = 5e-13;
 const int nTrials = 10;
 
 double uniformRandomNumber() {
@@ -109,7 +109,11 @@ bool testComputeBdrViscousFlux(RunConfiguration &srcConfig, const int dim) {
   DenseMatrix gradUp(num_equation,dim);
   gradUp = 0.0;
   for (int eq = 0; eq < num_equation; eq++) {
-    for (int d = 0; d < dim; d++) gradUp(eq, d) = -10.0 + 20.0 * uniformRandomNumber();
+    for (int d = 0; d < dim; d++) {
+      gradUp(eq, d) = -10.0 + 20.0 * uniformRandomNumber();
+      grvy_printf(GRVY_INFO, "%.8E\t", gradUp(eq, d));
+    }
+    grvy_printf(GRVY_INFO, "\n");
   }
   Vector dir(dim);
   Vector velocity(dim);  // only care dim components if axisymmetric.
@@ -123,7 +127,6 @@ bool testComputeBdrViscousFlux(RunConfiguration &srcConfig, const int dim) {
   viscF.Mult(dir, viscFdotNorm);
   for (int eq = 0; eq < num_equation; eq++) {
     grvy_printf(GRVY_INFO, "%.8E\t", viscFdotNorm(eq));
-    // for (int d = 0; d < dim; d++) grvy_printf(GRVY_INFO, "%.8E\t", viscF(eq, d));
   }
   grvy_printf(GRVY_INFO, "\n");
 
@@ -161,7 +164,7 @@ bool testComputeBdrViscousFlux(RunConfiguration &srcConfig, const int dim) {
 
 int main (int argc, char *argv[])
 {
-  TPS::Tps tps(argc, argv);
+  TPS::Tps tps;
   tps.parseCommandLineArgs(argc, argv);
   tps.parseInput();
   tps.chooseDevices();
