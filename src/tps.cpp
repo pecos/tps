@@ -31,6 +31,10 @@
 // -----------------------------------------------------------------------------------el-
 #include "tps.hpp"
 
+#ifdef HAVE_MPI_EXT
+#include <mpi-ext.h>
+#endif
+
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -142,7 +146,14 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
 void Tps::chooseDevices() {
 #ifdef _GPU_
   device_.Configure(deviceConfig_, rank_ % numGpusPerRank_);
-  device_.SetGPUAwareMPI(true); // TODO: determine based on config???
+
+  int mpi_gpu_aware = 0; //false;
+#if _CUDA_ && defined(MPIX_CUDA_AWARE_SUPPORT)
+  // check for cuda-aware mpi (if possible)
+  mpi_gpu_aware = MPIX_Query_cuda_support();
+#endif
+
+  device_.SetGPUAwareMPI(mpi_gpu_aware);
 #endif
 
   if (isRank0_) {
@@ -152,6 +163,15 @@ void Tps::chooseDevices() {
     printf("---------------------------------\n\n");
   }
 
+#ifdef _GPU_
+  if (isRank0_) {
+    if (mpi_gpu_aware) {
+      grvy_printf(GRVY_INFO, "\nTPS is using GPU-aware MPI.\n");
+    } else {
+      grvy_printf(GRVY_INFO, "\nTPS is using non-GPU-aware MPI.\n");
+    }
+  }
+#endif
   return;
 }
 

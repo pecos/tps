@@ -23,6 +23,12 @@ AX_PROG_CXX_MPI
 #CXXFLAGS="-std=c++17 $CXXFLAGS"
 CXXFLAGS="-std=c++11 $CXXFLAGS"
 
+# check for mpi-ext.h
+AH_TEMPLATE([HAVE_MPI_EXT],[Enable MPI extensions declared in mpi-ext.h])
+AC_CHECK_HEADER([mpi-ext.h],[found_mpi_ext=yes],[found_mpi_ext=no],[#include <mpi.h>])
+if test "x${found_mpi_ext}" = "xyes" ; then
+   AC_DEFINE([HAVE_MPI_EXT])
+fi
 
 # 3rd party libraries
 
@@ -182,6 +188,7 @@ fi
 
 
 AX_PATH_MFEM([4.2],  [yes])
+
 
 dnl --
 
