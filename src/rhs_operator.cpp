@@ -889,9 +889,6 @@ void RHSoperator::initNBlockDataTransfer(const Vector &x, ParFiniteElementSpace 
   if (pfes->GetFaceNbrVSize() <= 0) {
     return;
   }
-#ifdef HAVE_GRVY
-  grvy_timer_begin(__func__);
-#endif
 
   ParMesh *pmesh = pfes->GetParMesh();
 
@@ -917,12 +914,12 @@ void RHSoperator::initNBlockDataTransfer(const Vector &x, ParFiniteElementSpace 
     d_send_data[i] = d_data[ldof >= 0 ? ldof : -1 - ldof];
   });
 
-  bool mpi_gpu_aware = Device::GetGPUAwareMPI();
-  //std::cout << "mpi_gpu_aware = " << mpi_gpu_aware << std::endl;
+  const bool mpi_gpu_aware = Device::GetGPUAwareMPI();
+
+  if (mpi_gpu_aware) MFEM_STREAM_SYNC;
+
   auto send_data_ptr = mpi_gpu_aware ? dataTransfer.send_data.Read() : dataTransfer.send_data.HostRead();
   auto face_nbr_data_ptr = mpi_gpu_aware ? dataTransfer.face_nbr_data.Write() : dataTransfer.face_nbr_data.HostWrite();
-  // auto send_data_ptr = dataTransfer.send_data.HostRead();
-  // auto face_nbr_data_ptr = dataTransfer.face_nbr_data.HostWrite();
 
   for (int fn = 0; fn < dataTransfer.num_face_nbrs; fn++) {
     int nbr_rank = pmesh->GetFaceNbrRank(fn);
@@ -934,27 +931,15 @@ void RHSoperator::initNBlockDataTransfer(const Vector &x, ParFiniteElementSpace 
     MPI_Irecv(&face_nbr_data_ptr[recv_offset[fn]], recv_offset[fn + 1] - recv_offset[fn], MPI_DOUBLE, nbr_rank, tag,
               MyComm, &dataTransfer.requests[fn + dataTransfer.num_face_nbrs]);
   }
-
-
-#ifdef HAVE_GRVY
-  grvy_timer_end(__func__);
-#endif
 }
 
 void RHSoperator::waitAllDataTransfer(ParFiniteElementSpace *pfes, dataTransferArrays &dataTransfer) {
   if (pfes->GetFaceNbrVSize() <= 0) {
     return;
   }
-#ifdef HAVE_GRVY
-  grvy_timer_begin(__func__);
-#endif
 
   MPI_Waitall(dataTransfer.num_face_nbrs, dataTransfer.requests, dataTransfer.statuses);
   MPI_Waitall(dataTransfer.num_face_nbrs, dataTransfer.requests + dataTransfer.num_face_nbrs, dataTransfer.statuses);
-#ifdef HAVE_GRVY
-  grvy_timer_end(__func__);
-#endif
-
 }
 
 void RHSoperator::computeMeanTimeDerivatives(Vector &y) const {
