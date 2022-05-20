@@ -140,7 +140,7 @@ void DGNonLinearForm::Mult(const Vector &x, Vector &y) {
 
 #ifdef _GPU_
 void DGNonLinearForm::Mult_domain(const Vector &x, Vector &y) {
-  setToZero_gpu(y, y.Size());
+  //setToZero_gpu(y, y.Size());  // assume y comes in set to zero (or that we are updating)
 
   // Internal face integration
   if (fnfi.Size()) {
@@ -184,7 +184,8 @@ void DGNonLinearForm::setToZero_gpu(Vector &x, const int size) {
 }
 
 void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset, int elDof) {
-  double *d_y = y.Write();
+  //double *d_y = y.Write();
+  double *d_y = y.ReadWrite();
   const double *d_f = face_flux_.Read();
 
   auto d_elemFaces = gpuArrays.elemFaces.Read();

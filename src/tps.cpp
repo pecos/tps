@@ -142,6 +142,7 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
 void Tps::chooseDevices() {
 #ifdef _GPU_
   device_.Configure(deviceConfig_, rank_ % numGpusPerRank_);
+  device_.SetGPUAwareMPI(true); // TODO: determine based on config???
 #endif
 
   if (isRank0_) {
