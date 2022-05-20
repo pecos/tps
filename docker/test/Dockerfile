@@ -48,7 +48,7 @@ RUN rm -rf /tmp/MetaPhysicL-0.6.0
 
 # Pull from Kevin's fork for new solutions..
 RUN cd /tmp; git clone https://github.com/dreamer2368/MASA.git masa
-RUN cd /tmp/masa; git checkout 99b12dab2056553ae00804c76bb32c911ec06349
+RUN cd /tmp/masa; git checkout 887d5e26e3865bd6415503d62f9a557bbd3da4dc
 RUN . /etc/profile.d/lmod.sh \
     && cd /tmp/masa \
     && ./bootstrap \

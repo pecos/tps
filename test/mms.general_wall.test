@@ -1,0 +1,108 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="mms/general_wall"
+RUNFILE_WALL="inputs/mms.ternary_plasma.2d.general_wall.ini"
+RUNFILE_SHEATH="inputs/mms.ternary_plasma.2d.sheath.ini"
+
+setup() {
+    REPORT_WALL="ternary_2d_2t_ambipolar_general_wall.rhs_error.p2.txt"
+    REPORT_SHEATH="ternary_2d_sheath.rhs_error.p2.txt"
+    MESH_FILE=beam-quad-o3-s1-xp.mesh
+}
+
+@test "[$TEST] check for input file $RUNFILE" {
+    test -s $RUNFILE_WALL
+    test -s $RUNFILE_SHEATH
+}
+
+@test "[$TEST] create a mesh file" {
+    ../utils/beam_mesh -nx 1 -nt 5 -b 5 -rs 0 -dir 0
+
+    test -s $MESH_FILE
+}
+
+@test "[$TEST] test consistency of Fluxes::ComputeBdrViscousFluxes" {
+    test -s $RUNFILE_WALL
+    test -e ./test_bdr_flux
+    ./test_bdr_flux -run $RUNFILE_WALL
+}
+
+@test "[$TEST] compare rhs for a manufactured solution with input -> $RUNFILE_WALL" {
+    test -e ../utils/compute_rhs
+    mpirun -np 2 ../utils/compute_rhs --runFile $RUNFILE_WALL >& plasma_ternary_mms.wall.log
+
+    test -s $REPORT_WALL
+
+    while IFS=$'\t' read -r nx e0 e1 e2 e3 e4;
+    do
+      test $nx -eq 1600
+      # empirically observed error 0.5448
+      check_lo=$(awk 'BEGIN{print ('$e0'>0.54)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e0'<0.55)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 3.3280e-4
+      check_lo=$(awk 'BEGIN{print ('$e1'>3.32e-4)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e1'<3.33e-4)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 0.1937
+      check_lo=$(awk 'BEGIN{print ('$e2'>0.19)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e2'<0.20)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 0.1940
+      check_lo=$(awk 'BEGIN{print ('$e3'>0.19)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e3'<0.20)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 0.1581
+      check_lo=$(awk 'BEGIN{print ('$e4'>0.15)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e4'<0.16)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+    done < $REPORT_WALL
+
+    rm $REPORT_WALL
+}
+
+@test "[$TEST] compare rhs for a manufactured solution with input -> $RUNFILE_SHEATH" {
+    test -e ../utils/compute_rhs
+    mpirun -np 2 ../utils/compute_rhs --runFile $RUNFILE_SHEATH >& plasma_ternary_mms.wall.log
+
+    test -s $REPORT_SHEATH
+
+    while IFS=$'\t' read -r nx e0 e1 e2 e3 e4;
+    do
+      test $nx -eq 1600
+      # empirically observed error 2.1553e-3
+      check_lo=$(awk 'BEGIN{print ('$e0'>2.15e-3)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e0'<2.16e-3)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 2.2959e-3
+      check_lo=$(awk 'BEGIN{print ('$e1'>2.29e-3)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e1'<2.30e-3)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 2.2553e-3
+      check_lo=$(awk 'BEGIN{print ('$e2'>2.25e-3)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e2'<2.26e-3)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 2.5418e-3
+      check_lo=$(awk 'BEGIN{print ('$e3'>2.535e-3)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e3'<2.545e-3)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 8.6992e-3
+      check_lo=$(awk 'BEGIN{print ('$e4'>8.695e-3)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e4'<8.705e-3)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+    done < $REPORT_SHEATH
+
+    rm $REPORT_SHEATH
+    rm $MESH_FILE
+}
