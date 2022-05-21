@@ -1145,6 +1145,11 @@ void OutletBC::interpOutlet_gpu(const OutletType type, const mfem::Array<double>
 
   const WorkingFluid fluid = mixture->GetWorkingFluid();
 
+  const double rL = this->refLength;
+  const double A = this->area;
+  const double dtloc = this->dt;
+  const Equations es = this->eqSystem;
+
   // MFEM_FORALL(n, numBdrElem, {
   MFEM_FORALL_2D(n, numBdrElem, maxIntPoints, 1, 1, {
     //
@@ -1200,14 +1205,14 @@ void OutletBC::interpOutlet_gpu(const OutletType type, const mfem::Array<double>
           computeSubPressure_gpu_serial(&u1[0], &u2[0], &nor[0], d_inputState[0], gamma, Rg, dim, num_equation, fluid);
           break;
         case OutletType::SUB_P_NR:
-          computeNRSubPress_serial(offsetBdrU + q, &u1[0], &gradUp1[0], d_meanUp, dt, &u2[0], d_boundaryU,
-                                   &d_inputState[0], &nor[0], d_tang1, d_tang2, d_inv, refLength, gamma, Rg, elDof, dim,
-                                   num_equation, eqSystem);
+          computeNRSubPress_serial(offsetBdrU + q, &u1[0], &gradUp1[0], d_meanUp, dtloc, &u2[0], d_boundaryU,
+                                   &d_inputState[0], &nor[0], d_tang1, d_tang2, d_inv, rL, gamma, Rg, elDof, dim,
+                                   num_equation, es);
           break;
         case OutletType::SUB_MF_NR:
-          computeNRSubMassFlow_serial(offsetBdrU + q, &u1[0], &gradUp1[0], d_meanUp, dt, &u2[0], d_boundaryU,
-                                      d_inputState, &nor[0], d_tang1, d_tang2, d_inv, refLength, area, gamma, Rg, elDof,
-                                      dim, num_equation, eqSystem);
+          computeNRSubMassFlow_serial(offsetBdrU + q, &u1[0], &gradUp1[0], d_meanUp, dtloc, &u2[0], d_boundaryU,
+                                      d_inputState, &nor[0], d_tang1, d_tang2, d_inv, rL, A, gamma, Rg, elDof,
+                                      dim, num_equation, es);
           break;
         case OutletType::SUB_MF_NR_PW:
           printf("OUTLET SUB_MF_NR_PW BC NOT IMPLEMENTED");
