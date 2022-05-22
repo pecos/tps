@@ -371,17 +371,18 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
       const int el_bdry = d_listElems[n];
       const int Q = d_intPointsElIDBC[2 * el_bdry];
 
+      el = d_intPointsElIDBC[2 * el_bdry + 1];
+
+      elOffset = d_posDofIds[2 * el];
+      elDof = d_posDofIds[2 * el + 1];
+
       if (!elemDataRecovered) {
-        el = d_intPointsElIDBC[2 * el_bdry + 1];
-
-        elOffset = d_posDofIds[2 * el];
-        elDof = d_posDofIds[2 * el + 1];
-
-        for (int i = 0; i < elDof; i++) {
+        MFEM_FOREACH_THREAD(i, x, elDof) {
           for (int eq = 0; eq < num_equation; eq++) {
             Fcontrib[i + eq * elDof] = 0.;
           }
         }
+        MFEM_SYNC_THREAD;
         elemDataRecovered = true;
       }
 
