@@ -1016,9 +1016,11 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     for (int eq = 0; eq < num_equation; eq++)
       paraviewColl->RegisterField("U" + std::to_string(eq), visualizationVariables[numActiveSpecies + eq]);
     for (int eq = 0; eq < num_equation; eq++)
-      paraviewColl->RegisterField("mms_U" + std::to_string(eq), visualizationVariables[numActiveSpecies + num_equation + eq]);
+      paraviewColl->RegisterField("mms_U" + std::to_string(eq),
+                                  visualizationVariables[numActiveSpecies + num_equation + eq]);
     for (int eq = 0; eq < num_equation; eq++)
-      paraviewColl->RegisterField("RHS" + std::to_string(eq), visualizationVariables[numActiveSpecies + 2 * num_equation + eq]);
+      paraviewColl->RegisterField("RHS" + std::to_string(eq),
+                                  visualizationVariables[numActiveSpecies + 2 * num_equation + eq]);
   }
 #endif
 
@@ -2018,8 +2020,8 @@ void M2ulPhyS::parseSpeciesInputs() {
           int atomIdx = config.atomMap[composition[c].first];
           config.speciesComposition(i - 1, atomIdx) = stoi(composition[c].second);
         } else {
-          grvy_printf(GRVY_ERROR, "Requested atom %s for species %s is not available!\n",
-                      composition[c].first.c_str(), speciesName.c_str());
+          grvy_printf(GRVY_ERROR, "Requested atom %s for species %s is not available!\n", composition[c].first.c_str(),
+                      speciesName.c_str());
         }
       }
 
@@ -2228,14 +2230,15 @@ void M2ulPhyS::parseBCInputs() {
           exit(-1);
         }
         default:
-        break;
+          break;
       }
 
       // NOTE(kevin): sheath can exist even for single temperature.
       if (config.twoTemperature) {
         tpsP->getRequiredInput((basepath + "/electron_thermal_condition").c_str(), elecType);
         if (thmCondMap[elecType] == NONE_THMCND) {
-          grvy_printf(GRVY_ERROR, "Wall%d: electron thermal condition must be specified for two-temperature plasma!\n", i);
+          grvy_printf(GRVY_ERROR, "Wall%d: electron thermal condition must be specified for two-temperature plasma!\n",
+                      i);
           exit(-1);
         }
         config.wallBC[i - 1].elecThermalCond = thmCondMap[elecType];
@@ -2265,7 +2268,7 @@ void M2ulPhyS::parseBCInputs() {
           }
         }
         default:
-        break;
+          break;
       }
     }
 

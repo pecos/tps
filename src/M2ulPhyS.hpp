@@ -278,8 +278,8 @@ class M2ulPhyS : public TPS::Solver {
   VectorFunctionCoefficient *stateMMS_;
   std::vector<VectorConstantCoefficient *> componentWindow_;
 
-  ParGridFunction *zeroU_;  // to compute L2 norm of exact solution via ComputeLpError.
-  ParGridFunction *masaU_;  // for visualization of the exact solution.
+  ParGridFunction *zeroU_;    // to compute L2 norm of exact solution via ComputeLpError.
+  ParGridFunction *masaU_;    // for visualization of the exact solution.
   ParGridFunction *masaRhs_;  // for visualization of the right-hand side.
   BlockVector *zeroUBlock_, *masaUBlock_;
 #endif
