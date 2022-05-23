@@ -552,12 +552,11 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
 void OutletBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                              ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                              Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
-  interpOutlet_gpu(x, nodesIDs, posDofIds, Up,
-                   gradUp, shapesBC, normalsWBC, intPointsElIDBC, listElems, offsetsBoundaryU);
+  interpOutlet_gpu(x, nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC, listElems,
+                   offsetsBoundaryU);
 
   integrateOutlets_gpu(y,  // output
-                       x, nodesIDs, posDofIds, shapesBC, normalsWBC,
-                       intPointsElIDBC, listElems, offsetsBoundaryU);
+                       x, nodesIDs, posDofIds, shapesBC, normalsWBC, intPointsElIDBC, listElems, offsetsBoundaryU);
 }
 
 void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
@@ -1016,10 +1015,9 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
-void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const Array<int> &nodesIDs,
-                                    const Array<int> &posDofIds,
-                                    Vector &shapesBC, Vector &normalsWBC,
-                                    Array<int> &intPointsElIDBC, Array<int> &listElems, Array<int> &offsetsBoundaryU) {
+void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+                                    Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
+                                    Array<int> &listElems, Array<int> &offsetsBoundaryU) {
 #ifdef _GPU_
   double *d_y = y.Write();
   const double *d_U = x.Read();
@@ -1191,8 +1189,8 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const Array<int> &nodesID
           break;
         case OutletType::SUB_MF_NR:
           computeNRSubMassFlow_serial(offsetBdrU + q, &u1[0], &gradUp1[0], d_meanUp, dtloc, &u2[0], d_boundaryU,
-                                      d_inputState, &nor[0], d_tang1, d_tang2, d_inv, rL, area, gamma, Rg, elDof,
-                                      dim, num_equation, es);
+                                      d_inputState, &nor[0], d_tang1, d_tang2, d_inv, rL, area, gamma, Rg, elDof, dim,
+                                      num_equation, es);
           break;
         case OutletType::SUB_MF_NR_PW:
           printf("OUTLET SUB_MF_NR_PW BC NOT IMPLEMENTED");

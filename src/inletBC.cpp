@@ -542,12 +542,10 @@ void InletBC::integrationBC(Vector &y,  // output
                             const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                             ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                             Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
-  interpInlet_gpu(x, nodesIDs, posDofIds, shapesBC, normalsWBC,
-                  intPointsElIDBC, listElems, offsetsBoundaryU);
+  interpInlet_gpu(x, nodesIDs, posDofIds, shapesBC, normalsWBC, intPointsElIDBC, listElems, offsetsBoundaryU);
 
   integrateInlets_gpu(y,  // output
-                      x, nodesIDs, posDofIds, shapesBC, normalsWBC, intPointsElIDBC,
-                      listElems, offsetsBoundaryU);
+                      x, nodesIDs, posDofIds, shapesBC, normalsWBC, intPointsElIDBC, listElems, offsetsBoundaryU);
 }
 
 void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
@@ -732,9 +730,7 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
-void InletBC::integrateInlets_gpu(Vector &y,
-                                  const Vector &x, const Array<int> &nodesIDs,
-                                  const Array<int> &posDofIds,
+void InletBC::integrateInlets_gpu(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                                   Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
                                   Array<int> &listElems, Array<int> &offsetsBoundaryU) {
 #ifdef _GPU_
@@ -799,9 +795,8 @@ void InletBC::integrateInlets_gpu(Vector &y,
 }
 
 void InletBC::interpInlet_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
-                              mfem::Vector &shapesBC,
-                              mfem::Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
-                              Array<int> &offsetsBoundaryU) {
+                              mfem::Vector &shapesBC, mfem::Vector &normalsWBC, Array<int> &intPointsElIDBC,
+                              Array<int> &listElems, Array<int> &offsetsBoundaryU) {
 #ifdef _GPU_
   const double *d_inputState = inputState.Read();
   const double *d_U = x.Read();
@@ -829,7 +824,6 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const Array<int> &nodesIDs,
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;
-
 
   // MFEM_FORALL(n, numBdrElem, {
   MFEM_FORALL_2D(n, numBdrElem, maxIntPoints, 1, 1, {

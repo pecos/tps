@@ -111,14 +111,12 @@ class InletBC : public BoundaryCondition {
   // functions for BC integration on GPU
 
   void integrateInlets_gpu(Vector &y,  // output
-                           const Vector &x, const Array<int> &nodesIDs,
-                           const Array<int> &posDofIds,
-                           Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
-                           Array<int> &listElems, Array<int> &offsetsBoundaryU);
-  void interpInlet_gpu(const Vector &x,
-                       const Array<int> &nodesIDs, const Array<int> &posDofIds,
-                       Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
-                       Array<int> &listElems, Array<int> &offsetsBoundaryU);
+                           const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds, Vector &shapesBC,
+                           Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
+                           Array<int> &offsetsBoundaryU);
+  void interpInlet_gpu(const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds, Vector &shapesBC,
+                       Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
+                       Array<int> &offsetsBoundaryU);
 
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void computeSubDenseVel(const double *u1, double *u2, const double *nor,

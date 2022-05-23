@@ -119,12 +119,10 @@ void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradSt
 void WallBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                            ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                            Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
-  interpWalls_gpu(x, nodesIDs, posDofIds, Up, gradUp,
-                  shapesBC, normalsWBC, intPointsElIDBC, maxDofs);
+  interpWalls_gpu(x, nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC, maxDofs);
 
   integrateWalls_gpu(y,  // output
-                     x, nodesIDs, posDofIds, shapesBC,
-                     normalsWBC, intPointsElIDBC, maxDofs);
+                     x, nodesIDs, posDofIds, shapesBC, normalsWBC, intPointsElIDBC, maxDofs);
 }
 
 void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
@@ -308,11 +306,8 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
   }
 }
 
-void WallBC::integrateWalls_gpu(Vector &y, const Vector &x,
-                                const Array<int> &nodesIDs,
-                                const Array<int> &posDofIds,
-                                Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
-                                const int &maxDofs) {
+void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+                                Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC, const int &maxDofs) {
 #ifdef _GPU_
   double *d_y = y.Write();
   //   const double *d_U = x.Read();
@@ -406,10 +401,9 @@ void WallBC::integrateWalls_gpu(Vector &y, const Vector &x,
 #endif
 }
 
-void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs,
-                             const Array<int> &posDofIds, mfem::ParGridFunction *Up, mfem::ParGridFunction *gradUp,
-                             mfem::Vector &shapesBC, mfem::Vector &normalsWBC, Array<int> &intPointsElIDBC,
-                             const int &maxDofs) {
+void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+                             mfem::ParGridFunction *Up, mfem::ParGridFunction *gradUp, mfem::Vector &shapesBC,
+                             mfem::Vector &normalsWBC, Array<int> &intPointsElIDBC, const int &maxDofs) {
 #ifdef _GPU_
   double *d_flux = face_flux_.Write();
 
