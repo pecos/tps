@@ -48,7 +48,7 @@ class InletBC : public BoundaryCondition {
  private:
   MPI_Groups *groupsMPI;
 
-  const InletType inletType;
+  const InletType inletType_;
 
   // In/out conditions specified in the configuration file
   Vector inputState;
@@ -110,17 +110,15 @@ class InletBC : public BoundaryCondition {
 
   // functions for BC integration on GPU
 
-  static void integrateInlets_gpu(const InletType type, const Vector &inputState, const double &dt,
-                                  Vector &y,  // output
-                                  const Vector &x, Vector &interpolated_Ubdr, const Array<int> &nodesIDs,
-                                  const Array<int> &posDofIds, ParGridFunction *Up, ParGridFunction *gradUp,
-                                  Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
-                                  Array<int> &listElems, Array<int> &offsetsBoundaryU, const int &maxIntPoints,
-                                  const int &maxDofs, const int &dim, const int &num_equation, GasMixture *mixture,
-                                  Equations &eqSystem);
-  void interpInlet_gpu(const InletType type, const Vector &inputState, Vector &interpolated_Ubdr, const Vector &x,
-                       const Array<int> &nodesIDs, const Array<int> &posDofIds, ParGridFunction *Up,
-                       ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
+  void integrateInlets_gpu(Vector &y,  // output
+                           const Vector &x, const Array<int> &nodesIDs,
+                           const Array<int> &posDofIds,
+                           Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
+                           Array<int> &listElems, Array<int> &offsetsBoundaryU, const int &maxIntPoints,
+                           const int &maxDofs, const int &dim, const int &num_equation);
+  void interpInlet_gpu(const Vector &x,
+                       const Array<int> &nodesIDs, const Array<int> &posDofIds,
+                       Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
                        Array<int> &listElems, Array<int> &offsetsBoundaryU, const int &maxIntPoints, const int &maxDofs,
                        const int &dim, const int &num_equation);
 

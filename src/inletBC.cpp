@@ -42,7 +42,7 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
     : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
                         _refLength, axisym),
       groupsMPI(_groupsMPI),
-      inletType(_bcType),
+      inletType_(_bcType),
       maxIntPoints(_maxIntPoints),
       maxDofs(_maxDofs) {
   inputState.UseDevice(true);
@@ -440,7 +440,7 @@ void InletBC::initBoundaryU(ParGridFunction *Up) {
 }
 
 void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux) {
-  switch (inletType) {
+  switch (inletType_) {
     case SUB_DENS_VEL:
       subsonicReflectingDensityVelocity(normal, stateIn, bdrFlux);
       break;
@@ -454,7 +454,7 @@ void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradS
 }
 
 void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
-  if (inletType == SUB_DENS_VEL) return;
+  if (inletType_ == SUB_DENS_VEL) return;
   bdrN = 0;
 
   int Nbdr = 0;
@@ -542,13 +542,12 @@ void InletBC::integrationBC(Vector &y,  // output
                             const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                             ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                             Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
-  interpInlet_gpu(inletType, inputState, interpolated_Ubdr_, x, nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC,
+  interpInlet_gpu(x, nodesIDs, posDofIds, shapesBC, normalsWBC,
                   intPointsElIDBC, listElems, offsetsBoundaryU, maxIntPoints, maxDofs, dim, num_equation);
 
-  integrateInlets_gpu(inletType, inputState, dt,
-                      y,  // output
-                      x, interpolated_Ubdr_, nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC,
-                      listElems, offsetsBoundaryU, maxIntPoints, maxDofs, dim, num_equation, mixture, eqSystem);
+  integrateInlets_gpu(y,  // output
+                      x, nodesIDs, posDofIds, shapesBC, normalsWBC, intPointsElIDBC,
+                      listElems, offsetsBoundaryU, maxIntPoints, maxDofs, dim, num_equation);
 }
 
 void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
@@ -620,7 +619,7 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   }
 
   double L2 = sigma * speedSound * speedSound * (meanUp[0] - inputState[0]) - 0.5 * L5;
-  if (inletType == SUB_VEL_CONST_ENT) L2 = 0.;
+  if (inletType_ == SUB_VEL_CONST_ENT) L2 = 0.;
 
   // calc vector d
   const double d1 = (L2 + 0.5 * (L5 + L1)) / speedSound / speedSound;
@@ -733,17 +732,14 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
-void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState, const double &dt, Vector &y,
-                                  const Vector &x, Vector &interpolated_Ubdr_, const Array<int> &nodesIDs,
-                                  const Array<int> &posDofIds, ParGridFunction *Up, ParGridFunction *gradUp,
+void InletBC::integrateInlets_gpu(Vector &y,
+                                  const Vector &x, const Array<int> &nodesIDs,
+                                  const Array<int> &posDofIds,
                                   Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
                                   Array<int> &listElems, Array<int> &offsetsBoundaryU, const int &maxIntPoints,
-                                  const int &maxDofs, const int &dim, const int &num_equation, GasMixture *mixture,
-                                  Equations &eqSystem) {
+                                  const int &maxDofs, const int &dim, const int &num_equation) {
 #ifdef _GPU_
-  const double *d_inputState = inputState.Read();
   double *d_y = y.Write();
-  const double *d_U = x.Read();
   const int *d_nodesIDs = nodesIDs.Read();
   const int *d_posDofIds = posDofIds.Read();
   const double *d_shapesBC = shapesBC.Read();
@@ -757,10 +753,7 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
   const int totDofs = x.Size() / num_equation;
   const int numBdrElem = listElems.Size();
 
-  const double Rg = mixture->GetGasConstant();
-  const double gamma = mixture->GetSpecificHeatRatio();
-
-  const WorkingFluid fluid = mixture->GetWorkingFluid();
+  const InletType type = inletType_;
 
   MFEM_FORALL_2D(n, numBdrElem, maxDofs, 1, 1, {
     MFEM_SHARED double Fcontrib[216 * 5];
@@ -804,9 +797,8 @@ void InletBC::integrateInlets_gpu(const InletType type, const Vector &inputState
 #endif
 }
 
-void InletBC::interpInlet_gpu(const InletType type, const mfem::Vector &inputState, mfem::Vector &interpolated_Ubdr_,
-                              const mfem::Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
-                              mfem::ParGridFunction *Up, mfem::ParGridFunction *gradUp, mfem::Vector &shapesBC,
+void InletBC::interpInlet_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+                              mfem::Vector &shapesBC,
                               mfem::Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
                               Array<int> &offsetsBoundaryU, const int &maxIntPoints, const int &maxDofs, const int &dim,
                               const int &num_equation) {
@@ -830,6 +822,8 @@ void InletBC::interpInlet_gpu(const InletType type, const mfem::Vector &inputSta
   const double gamma = mixture->GetSpecificHeatRatio();
 
   const WorkingFluid fluid = mixture->GetWorkingFluid();
+
+  const InletType type = inletType_;
 
   // MFEM_FORALL(n, numBdrElem, {
   MFEM_FORALL_2D(n, numBdrElem, maxIntPoints, 1, 1, {
