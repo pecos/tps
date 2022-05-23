@@ -44,8 +44,8 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
       groupsMPI(_groupsMPI),
       outletType_(_bcType),
       inputState(_inputData),
-      maxIntPoints(_maxIntPoints),
-      maxDofs(_maxDofs) {
+      maxIntPoints_(_maxIntPoints),
+      maxDofs_(_maxDofs) {
   groupsMPI->setPatch(_patchNumber);
 
   meanUp.UseDevice(true);
@@ -202,7 +202,7 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
 void OutletBC::initBdrElemsShape() {
   bdrShape.UseDevice(true);
   int Nbdr = boundaryU.Size() / num_equation_;
-  bdrShape.SetSize(maxIntPoints * maxDofs * Nbdr);
+  bdrShape.SetSize(maxIntPoints_ * maxDofs_ * Nbdr);
   bdrShape = 0.;
   auto hbdrShape = bdrShape.HostWrite();
   int elCount = 0;
@@ -214,7 +214,7 @@ void OutletBC::initBdrElemsShape() {
   }
 
   bdrElemsQ.SetSize(2 * elCount);
-  bdrDofs.SetSize(maxDofs * elCount);
+  bdrDofs.SetSize(maxDofs_ * elCount);
   bdrElemsQ = 0;
   bdrDofs = 0;
   auto hbdrElemsQ = bdrElemsQ.HostWrite();
@@ -238,7 +238,7 @@ void OutletBC::initBdrElemsShape() {
       Array<int> dofs;
       vfes->GetElementVDofs(Tr->Elem1No, dofs);
 
-      for (int i = 0; i < elDofs; i++) hbdrDofs[i + elCount * maxDofs] = dofs[i];
+      for (int i = 0; i < elDofs; i++) hbdrDofs[i + elCount * maxDofs_] = dofs[i];
 
       int intorder = Tr->Elem1->OrderW() + 2 * vfes->GetFE(Tr->Elem1No)->GetOrder();
       if (vfes->GetFE(Tr->Elem1No)->Space() == FunctionSpace::Pk) {
@@ -256,7 +256,7 @@ void OutletBC::initBdrElemsShape() {
         shape.SetSize(elDofs);
         vfes->GetFE(Tr->Elem1No)->CalcShape(Tr->GetElement1IntPoint(), shape);
 
-        for (int n = 0; n < elDofs; n++) hbdrShape[n + i * maxDofs + elCount * maxIntPoints * maxDofs] = shape(n);
+        for (int n = 0; n < elDofs; n++) hbdrShape[n + i * maxDofs_ + elCount * maxIntPoints_ * maxDofs_] = shape(n);
         offsetCount++;
       }
       elCount++;
@@ -269,7 +269,7 @@ void OutletBC::initBdrElemsShape() {
 
   bdrUp.UseDevice(true);
   int size_bdrUp = bdrElemsQ.Size() / 2;
-  bdrUp.SetSize(size_bdrUp * num_equation_ * maxIntPoints);
+  bdrUp.SetSize(size_bdrUp * num_equation_ * maxIntPoints_);
   bdrUp = 0.;
   bdrUp.Read();
 
@@ -285,7 +285,7 @@ void OutletBC::initBCs() {
 
 #ifdef _GPU_
     face_flux_.UseDevice(true);
-    face_flux_.SetSize(num_equation_ * maxIntPoints * listElems.Size());
+    face_flux_.SetSize(num_equation_ * maxIntPoints_ * listElems.Size());
     face_flux_ = 0.;
 #endif
 
@@ -468,7 +468,7 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
   const int dofs = vfes->GetNDofs();
 
   updateMean_gpu(Up, localMeanUp, num_equation_, bdrElemsQ.Size() / 2, dofs, bdrUp, bdrElemsQ, bdrDofs, bdrShape,
-                 maxIntPoints, maxDofs);
+                 maxIntPoints_, maxDofs_);
 
   if (!bdrUInit) initBoundaryU(Up);
 
@@ -553,11 +553,11 @@ void OutletBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodes
                              ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                              Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
   interpOutlet_gpu(x, nodesIDs, posDofIds, Up,
-                   gradUp, shapesBC, normalsWBC, intPointsElIDBC, listElems, offsetsBoundaryU, maxIntPoints, maxDofs);
+                   gradUp, shapesBC, normalsWBC, intPointsElIDBC, listElems, offsetsBoundaryU);
 
   integrateOutlets_gpu(y,  // output
                        x, nodesIDs, posDofIds, shapesBC, normalsWBC,
-                       intPointsElIDBC, listElems, offsetsBoundaryU, maxIntPoints, maxDofs);
+                       intPointsElIDBC, listElems, offsetsBoundaryU);
 }
 
 void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
@@ -1019,8 +1019,7 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
 void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const Array<int> &nodesIDs,
                                     const Array<int> &posDofIds,
                                     Vector &shapesBC, Vector &normalsWBC,
-                                    Array<int> &intPointsElIDBC, Array<int> &listElems, Array<int> &offsetsBoundaryU,
-                                    const int &maxIntPoints, const int &maxDofs) {
+                                    Array<int> &intPointsElIDBC, Array<int> &listElems, Array<int> &offsetsBoundaryU) {
 #ifdef _GPU_
   double *d_y = y.Write();
   const double *d_U = x.Read();
@@ -1038,6 +1037,8 @@ void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const Array<int>
 
   const int dim = dim_;
   const int num_equation = num_equation_;
+  const int maxIntPoints = maxIntPoints_;
+  const int maxDofs = maxDofs_;
 
   const double *d_flux = face_flux_.Read();
 
@@ -1090,7 +1091,7 @@ void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const Array<int>
 void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                                 mfem::ParGridFunction *Up, mfem::ParGridFunction *gradUp, mfem::Vector &shapesBC,
                                 mfem::Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
-                                Array<int> &offsetsBoundaryU, const int &maxIntPoints, const int &maxDofs) {
+                                Array<int> &offsetsBoundaryU) {
 #ifdef _GPU_
   const double *d_inputState = inputState.Read();
   const double *d_U = x.Read();
@@ -1127,6 +1128,8 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const Array<int> &nodesID
 
   const int dim = dim_;
   const int num_equation = num_equation_;
+  const int maxIntPoints = maxIntPoints_;
+  const int maxDofs = maxDofs_;
 
   // MFEM_FORALL(n, numBdrElem, {
   MFEM_FORALL_2D(n, numBdrElem, maxIntPoints, 1, 1, {

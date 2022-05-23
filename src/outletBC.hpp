@@ -64,8 +64,8 @@ class OutletBC : public BoundaryCondition {
   Array<int> bdrElemsQ;  // element dofs and face num. of integration points
   Array<int> bdrDofs;    // indexes of the D
   Vector bdrShape;       // shape functions evaluated at the integration points
-  const int &maxIntPoints;
-  const int &maxDofs;
+  const int &maxIntPoints_;
+  const int &maxDofs_;
 
   // local vector for mean calculation
   Vector localMeanUp;
@@ -122,12 +122,12 @@ class OutletBC : public BoundaryCondition {
                             const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                             Vector &shapesBC,
                             Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
-                            Array<int> &offsetBoundaryU, const int &maxIntPoints, const int &maxDofs);
+                            Array<int> &offsetBoundaryU);
 
   void interpOutlet_gpu(const Vector &x, const Array<int> &nodesIDs,
                         const Array<int> &posDofIds, ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC,
                         Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
-                        Array<int> &offsetsBoundaryU, const int &maxIntPoints, const int &maxDofs);
+                        Array<int> &offsetsBoundaryU);
 
 #ifdef _GPU_  // GPU functions
   static MFEM_HOST_DEVICE void computeSubPressure(const double *u1, double *u2, const double *nor, const double &press,

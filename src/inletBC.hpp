@@ -66,8 +66,8 @@ class InletBC : public BoundaryCondition {
   Array<int> bdrElemsQ;  // element dofs and face num. of integration points
   Array<int> bdrDofs;    // indexes of the D
   Vector bdrShape;       // shape functions evaluated at the integration points
-  const int &maxIntPoints;
-  const int &maxDofs;
+  const int &maxIntPoints_;
+  const int &maxDofs_;
 
   // local vector for mean calculation
   Vector localMeanUp;
@@ -114,12 +114,11 @@ class InletBC : public BoundaryCondition {
                            const Vector &x, const Array<int> &nodesIDs,
                            const Array<int> &posDofIds,
                            Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
-                           Array<int> &listElems, Array<int> &offsetsBoundaryU, const int &maxIntPoints,
-                           const int &maxDofs);
+                           Array<int> &listElems, Array<int> &offsetsBoundaryU);
   void interpInlet_gpu(const Vector &x,
                        const Array<int> &nodesIDs, const Array<int> &posDofIds,
                        Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
-                       Array<int> &listElems, Array<int> &offsetsBoundaryU, const int &maxIntPoints, const int &maxDofs);
+                       Array<int> &listElems, Array<int> &offsetsBoundaryU);
 
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void computeSubDenseVel(const double *u1, double *u2, const double *nor,
