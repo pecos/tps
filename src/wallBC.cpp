@@ -445,8 +445,7 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs,
   // el_wall is index within wall boundary elements?
   MFEM_FORALL_2D(el_wall, wallElems.Size() / 7, maxIntPoints, 1, 1, {
     double u1[5], u2[5], nor[3], Rflux[5], vF1[5 * 3], vF2[5 * 3];
-    double gradUp1[5 * 3], gradUp2[5 * 3];
-    double Ui[216], gradUpi[216 * 3];
+    double gradUp1[5 * 3];
     double shape[216];
     int index_i[216];
 

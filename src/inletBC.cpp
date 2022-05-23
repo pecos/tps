@@ -752,8 +752,6 @@ void InletBC::integrateInlets_gpu(Vector &y,
   const int totDofs = x.Size() / num_equation_;
   const int numBdrElem = listElems.Size();
 
-  const InletType type = inletType_;
-
   const int dim = dim_;
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
@@ -761,10 +759,9 @@ void InletBC::integrateInlets_gpu(Vector &y,
 
   MFEM_FORALL_2D(n, numBdrElem, maxDofs, 1, 1, {
     MFEM_SHARED double Fcontrib[216 * 5];
-    double Rflux[5], u1[5], u2[5], nor[3];
+    double Rflux[5];
 
     const int el = d_listElems[n];
-    const int offsetBdrU = d_offsetBoundaryU[n];
     const int Q = d_intPointsElIDBC[2 * el];
     const int elID = d_intPointsElIDBC[2 * el + 1];
     const int elOffset = d_posDofIds[2 * elID];

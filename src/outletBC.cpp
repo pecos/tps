@@ -1049,7 +1049,6 @@ void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const Array<int>
     double Rflux[20];
 
     const int el = d_listElems[n];
-    const int offsetBdrU = d_offsetBoundaryU[n];
 
     const int Q    = d_intPointsElIDBC[2 * el  ];
     const int elID = d_intPointsElIDBC[2 * el + 1];
