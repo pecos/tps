@@ -41,9 +41,9 @@ BoundaryCondition::BoundaryCondition(RiemannSolver *_rsolver, GasMixture *_mixtu
       vfes(_vfes),
       intRules(_intRules),
       dt(_dt),
-      dim(_dim),
-      nvel(axisym ? 3 : _dim),
-      num_equation(_num_equation),
+      dim_(_dim),
+      nvel_(axisym ? 3 : _dim),
+      num_equation_(_num_equation),
       patchNumber(_patchNumber),
       refLength(_refLength),
       axisymmetric_(axisym) {

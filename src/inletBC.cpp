@@ -67,28 +67,28 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
   groupsMPI->setPatch(_patchNumber);
 
   localMeanUp.UseDevice(true);
-  localMeanUp.SetSize(num_equation + 1);
+  localMeanUp.SetSize(num_equation_ + 1);
   localMeanUp = 0.;
 
   glob_sum.UseDevice(true);
-  glob_sum.SetSize(num_equation + 1);
+  glob_sum.SetSize(num_equation_ + 1);
   glob_sum = 0.;
 
   meanUp.UseDevice(true);
-  meanUp.SetSize(num_equation);
+  meanUp.SetSize(num_equation_);
   meanUp = 0.;
   auto hmeanUp = meanUp.HostWrite();
 
   hmeanUp[0] = 1.2;
   hmeanUp[1] = 60;
   hmeanUp[2] = 0;
-  if (nvel == 3) hmeanUp[3] = 0.;
-  hmeanUp[1 + nvel] = 101300;
+  if (nvel_ == 3) hmeanUp[3] = 0.;
+  hmeanUp[1 + nvel_] = 101300;
   if (eqSystem == NS_PASSIVE) {
-    hmeanUp[num_equation - 1] = 0.;
+    hmeanUp[num_equation_ - 1] = 0.;
   } else if (numActiveSpecies_ > 0) {
     for (int sp = 0; sp < numActiveSpecies_; sp++) {
-      hmeanUp[nvel + 2 + sp] = 0.0;
+      hmeanUp[nvel_ + 2 + sp] = 0.0;
     }
   }
 
@@ -97,7 +97,7 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
   // assuming planar outlets (for GPU only)
   Vector normal;
   normal.UseDevice(false);
-  normal.SetSize(dim);
+  normal.SetSize(dim_);
   bool normalFull = false;
 
   // init boundary U
@@ -131,16 +131,16 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
   }
 
   boundaryU.UseDevice(true);
-  boundaryU.SetSize(bdrN * num_equation);
+  boundaryU.SetSize(bdrN * num_equation_);
   boundaryU = 0.;
   Vector iState, iUp;
   iState.UseDevice(false);
   iUp.UseDevice(false);
-  iState.SetSize(num_equation);
-  iUp.SetSize(num_equation);
+  iState.SetSize(num_equation_);
+  iUp.SetSize(num_equation_);
   auto hboundaryU = boundaryU.HostWrite();
   for (int i = 0; i < bdrN; i++) {
-    for (int eq = 0; eq < num_equation; eq++) iUp(eq) = hmeanUp[eq];
+    for (int eq = 0; eq < num_equation_; eq++) iUp(eq) = hmeanUp[eq];
     mixture->GetConservativesFromPrimitives(iUp, iState);
 
     //     double gamma = mixture->GetSpecificHeatRatio();
@@ -150,7 +150,7 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
     //
     //     for (int d = 0; d < dim; d++) iState[1 + d] *= iState[0];
     //     iState[1 + dim] = rE;
-    for (int eq = 0; eq < num_equation; eq++) hboundaryU[eq + i * num_equation] = iState[eq];
+    for (int eq = 0; eq < num_equation_; eq++) hboundaryU[eq + i * num_equation_] = iState[eq];
   }
   bdrUInit = false;
   bdrN = 0;
@@ -158,55 +158,55 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
   // init. unit tangent vector tangent1
   tangent1.UseDevice(true);
   tangent2.UseDevice(true);
-  tangent1.SetSize(dim);
-  tangent2.SetSize(dim);
+  tangent1.SetSize(dim_);
+  tangent2.SetSize(dim_);
   tangent1 = 0.;
   tangent2 = 0.;
   auto htan1 = tangent1.HostWrite();
   auto htan2 = tangent2.HostWrite();
   Array<double> coords1, coords2;
-  for (int d = 0; d < dim; d++) {
+  for (int d = 0; d < dim_; d++) {
     coords1.Append(coords[d]);
     coords2.Append(coords[d + 3]);
   }
 
   double modVec = 0.;
-  for (int d = 0; d < dim; d++) {
+  for (int d = 0; d < dim_; d++) {
     modVec += (coords2[d] - coords1[d]) * (coords2[d] - coords1[d]);
     htan1[d] = coords2[d] - coords1[d];
   }
-  for (int d = 0; d < dim; d++) htan1[d] *= 1. / sqrt(modVec);
+  for (int d = 0; d < dim_; d++) htan1[d] *= 1. / sqrt(modVec);
 
   Vector unitNorm;
   unitNorm.UseDevice(false);
-  unitNorm.SetSize(dim);
+  unitNorm.SetSize(dim_);
   unitNorm = normal;
   {
     double mod = 0.;
-    for (int d = 0; d < dim; d++) mod += normal[d] * normal[d];
+    for (int d = 0; d < dim_; d++) mod += normal[d] * normal[d];
     unitNorm *= 1. / sqrt(mod);
   }
-  if (dim == 3) {
+  if (dim_ == 3) {
     htan2[0] = unitNorm[1] * htan1[2] - unitNorm[2] * htan1[1];
     htan2[1] = unitNorm[2] * htan1[0] - unitNorm[0] * htan1[2];
     htan2[2] = unitNorm[0] * htan1[1] - unitNorm[1] * htan1[0];
   }
 
-  DenseMatrix M(dim, dim);
-  for (int d = 0; d < dim; d++) {
+  DenseMatrix M(dim_, dim_);
+  for (int d = 0; d < dim_; d++) {
     M(0, d) = unitNorm[d];
     M(1, d) = htan1[d];
-    if (dim == 3) M(2, d) = htan2[d];
+    if (dim_ == 3) M(2, d) = htan2[d];
   }
 
-  DenseMatrix invM(dim, dim);
+  DenseMatrix invM(dim_, dim_);
   mfem::CalcInverse(M, invM);
 
   inverseNorm2cartesian.UseDevice(true);
-  inverseNorm2cartesian.SetSize(dim * dim);
+  inverseNorm2cartesian.SetSize(dim_ * dim_);
   auto hinv = inverseNorm2cartesian.HostWrite();
-  for (int i = 0; i < dim; i++)
-    for (int j = 0; j < dim; j++) hinv[i + j * dim] = invM(i, j);
+  for (int i = 0; i < dim_; i++)
+    for (int j = 0; j < dim_; j++) hinv[i + j * dim_] = invM(i, j);
 
   initBdrElemsShape();
 
@@ -218,7 +218,7 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
 
 void InletBC::initBdrElemsShape() {
   bdrShape.UseDevice(true);
-  int Nbdr = boundaryU.Size() / num_equation;
+  int Nbdr = boundaryU.Size() / num_equation_;
   bdrShape.SetSize(maxIntPoints * maxDofs * Nbdr);
   bdrShape = 0.;
   auto hbdrShape = bdrShape.HostWrite();
@@ -286,7 +286,7 @@ void InletBC::initBdrElemsShape() {
 
   bdrUp.UseDevice(true);
   int size_bdrUp = bdrElemsQ.Size() / 2;
-  bdrUp.SetSize(size_bdrUp * num_equation * maxIntPoints);
+  bdrUp.SetSize(size_bdrUp * num_equation_ * maxIntPoints);
   bdrUp = 0.;
   bdrUp.Read();
 #endif
@@ -310,9 +310,9 @@ void InletBC::initBCs() {
     }
 
 #ifdef _GPU_
-    interpolated_Ubdr_.UseDevice(true);
-    interpolated_Ubdr_.SetSize(num_equation * maxIntPoints * listElems.Size());
-    interpolated_Ubdr_ = 0.;
+    face_flux_.UseDevice(true);
+    face_flux_.SetSize(num_equation_ * maxIntPoints * listElems.Size());
+    face_flux_ = 0.;
 #endif
 
     BCinit = true;
@@ -409,7 +409,7 @@ void InletBC::initBoundaryU(ParGridFunction *Up) {
       vfes->GetElementVDofs(Tr->Elem1No, dofs);
 
       // retreive data
-      elUp.SetSize(elDofs * num_equation);
+      elUp.SetSize(elDofs * num_equation_);
       Up->GetSubVector(dofs, elUp);
 
       int intorder = Tr->Elem1->OrderW() + 2 * vfes->GetFE(Tr->Elem1No)->GetOrder();
@@ -422,14 +422,14 @@ void InletBC::initBoundaryU(ParGridFunction *Up) {
         Tr->SetAllIntPoints(&ip);
         shape.SetSize(elDofs);
         vfes->GetFE(Tr->Elem1No)->CalcShape(Tr->GetElement1IntPoint(), shape);
-        Vector iUp(num_equation);
+        Vector iUp(num_equation_);
 
-        for (int eq = 0; eq < num_equation; eq++) {
+        for (int eq = 0; eq < num_equation_; eq++) {
           double sum = 0.;
           for (int d = 0; d < elDofs; d++) {
             sum += shape[d] * elUp(d + eq * elDofs);
           }
-          hboundaryU[eq + Nbdr * num_equation] = sum;
+          hboundaryU[eq + Nbdr * num_equation_] = sum;
         }
         Nbdr++;
       }
@@ -464,7 +464,7 @@ void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
 
   const int dofs = vfes->GetNDofs();
 
-  updateMean_gpu(Up, localMeanUp, num_equation, bdrElemsQ.Size() / 2, dofs, bdrUp, bdrElemsQ, bdrDofs, bdrShape,
+  updateMean_gpu(Up, localMeanUp, num_equation_, bdrElemsQ.Size() / 2, dofs, bdrUp, bdrElemsQ, bdrDofs, bdrShape,
                  maxIntPoints, maxDofs);
 
   if (!bdrUInit) initBoundaryU(Up);
@@ -487,7 +487,7 @@ void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
       vfes->GetElementVDofs(Tr->Elem1No, dofs);
 
       // retreive data
-      elUp.SetSize(elDofs * num_equation);
+      elUp.SetSize(elDofs * num_equation_);
       Up->GetSubVector(dofs, elUp);
 
       int intorder = Tr->Elem1->OrderW() + 2 * vfes->GetFE(Tr->Elem1No)->GetOrder();
@@ -500,15 +500,15 @@ void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
         Tr->SetAllIntPoints(&ip);
         shape.SetSize(elDofs);
         vfes->GetFE(Tr->Elem1No)->CalcShape(Tr->GetElement1IntPoint(), shape);
-        Vector iUp(num_equation);
+        Vector iUp(num_equation_);
 
-        for (int eq = 0; eq < num_equation; eq++) {
+        for (int eq = 0; eq < num_equation_; eq++) {
           double sum = 0.;
           for (int d = 0; d < elDofs; d++) {
             sum += shape[d] * elUp(d + eq * elDofs);
           }
           localMeanUp[eq] += sum;
-          if (!bdrUInit) boundaryU[eq + Nbdr * num_equation] = sum;
+          if (!bdrUInit) boundaryU[eq + Nbdr * num_equation_] = sum;
         }
         Nbdr++;
       }
@@ -517,22 +517,22 @@ void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
 #endif
 
   double *h_localMeanUp = localMeanUp.HostReadWrite();
-  int totNbdr = boundaryU.Size() / num_equation;
-  h_localMeanUp[num_equation] = static_cast<double>(totNbdr);
+  int totNbdr = boundaryU.Size() / num_equation_;
+  h_localMeanUp[num_equation_] = static_cast<double>(totNbdr);
 
   double *h_sum = glob_sum.HostWrite();
-  MPI_Allreduce(h_localMeanUp, h_sum, num_equation + 1, MPI_DOUBLE, MPI_SUM, groupsMPI->getComm(patchNumber));
+  MPI_Allreduce(h_localMeanUp, h_sum, num_equation_ + 1, MPI_DOUBLE, MPI_SUM, groupsMPI->getComm(patchNumber));
 
-  BoundaryCondition::copyValues(glob_sum, meanUp, 1. / h_sum[num_equation]);
+  BoundaryCondition::copyValues(glob_sum, meanUp, 1. / h_sum[num_equation_]);
 
   if (!bdrUInit) {
     // for(int i=0;i<Nbdr;i++)
-    Vector iState(num_equation), iUp(num_equation);
+    Vector iState(num_equation_), iUp(num_equation_);
     for (int i = 0; i < totNbdr; i++) {
-      for (int eq = 0; eq < num_equation; eq++) iUp[eq] = boundaryU[eq + i * num_equation];
+      for (int eq = 0; eq < num_equation_; eq++) iUp[eq] = boundaryU[eq + i * num_equation_];
       mixture->GetConservativesFromPrimitives(iUp, iState);
 
-      for (int eq = 0; eq < num_equation; eq++) boundaryU[eq + i * num_equation] = iState[eq];
+      for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + i * num_equation_] = iState[eq];
     }
     bdrUInit = true;
   }
@@ -543,11 +543,11 @@ void InletBC::integrationBC(Vector &y,  // output
                             ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                             Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
   interpInlet_gpu(x, nodesIDs, posDofIds, shapesBC, normalsWBC,
-                  intPointsElIDBC, listElems, offsetsBoundaryU, maxIntPoints, maxDofs, dim, num_equation);
+                  intPointsElIDBC, listElems, offsetsBoundaryU, maxIntPoints, maxDofs);
 
   integrateInlets_gpu(y,  // output
                       x, nodesIDs, posDofIds, shapesBC, normalsWBC, intPointsElIDBC,
-                      listElems, offsetsBoundaryU, maxIntPoints, maxDofs, dim, num_equation);
+                      listElems, offsetsBoundaryU, maxIntPoints, maxDofs);
 }
 
 void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
@@ -558,34 +558,34 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   Vector unitNorm = normal;
   {
     double mod = 0.;
-    for (int d = 0; d < dim; d++) mod += normal[d] * normal[d];
+    for (int d = 0; d < dim_; d++) mod += normal[d] * normal[d];
     unitNorm *= -1. / sqrt(mod);  // point into domain!!
   }
 
   // mean velocity in inlet normal and tangent directions
-  Vector meanVel(nvel);
+  Vector meanVel(nvel_);
   meanVel = 0.;
-  for (int d = 0; d < dim; d++) {
+  for (int d = 0; d < dim_; d++) {
     meanVel[0] += unitNorm[d] * meanUp[d + 1];
     meanVel[1] += tangent1[d] * meanUp[d + 1];
   }
-  if (dim == 3) {
+  if (dim_ == 3) {
     tangent2[0] = unitNorm[1] * tangent1[2] - unitNorm[2] * tangent1[1];
     tangent2[1] = unitNorm[2] * tangent1[0] - unitNorm[0] * tangent1[2];
     tangent2[2] = unitNorm[0] * tangent1[1] - unitNorm[1] * tangent1[0];
-    for (int d = 0; d < dim; d++) meanVel[2] += tangent2[d] * meanUp[d + 1];
+    for (int d = 0; d < dim_; d++) meanVel[2] += tangent2[d] * meanUp[d + 1];
   }
 
   // velocity difference between actual and desired values
-  Vector meanDV(nvel);
-  for (int d = 0; d < nvel; d++) meanDV[d] = meanUp[1 + d] - inputState[1 + d];
+  Vector meanDV(nvel_);
+  for (int d = 0; d < nvel_; d++) meanDV[d] = meanUp[1 + d] - inputState[1 + d];
 
   // normal gradients
-  Vector normGrad(num_equation);
+  Vector normGrad(num_equation_);
   normGrad = 0.;
-  for (int eq = 0; eq < num_equation; eq++) {
+  for (int eq = 0; eq < num_equation_; eq++) {
     // NOTE(kevin): for axisymmetric case, azimuthal normal component will be always zero.
-    for (int d = 0; d < dim; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
+    for (int d = 0; d < dim_; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
   }
   // gradient of pressure in normal direction
   double dpdn = mixture->ComputePressureDerivative(normGrad, stateIn, false);
@@ -593,28 +593,28 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
 
   double meanK = 0.;
-  for (int d = 0; d < nvel; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
+  for (int d = 0; d < nvel_; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
   meanK *= 0.5;
 
   // compute outgoing characteristic
   double L1 = 0.;
-  for (int d = 0; d < dim; d++) L1 += unitNorm[d] * normGrad[1 + d];  // dVn/dn
+  for (int d = 0; d < dim_; d++) L1 += unitNorm[d] * normGrad[1 + d];  // dVn/dn
   L1 = dpdn - meanUp[0] * speedSound * L1;
   L1 *= meanVel[0] - speedSound;
 
   // estimate ingoing characteristic
   const double sigma = speedSound / refLength;
   double L5 = 0.;
-  for (int d = 0; d < dim; d++) L5 += meanDV[d] * unitNorm[d];
+  for (int d = 0; d < dim_; d++) L5 += meanDV[d] * unitNorm[d];
   L5 *= sigma * 2. * meanUp[0] * speedSound;
 
   double L3 = 0.;
-  for (int d = 0; d < dim; d++) L3 += meanDV[d] * tangent1[d];
+  for (int d = 0; d < dim_; d++) L3 += meanDV[d] * tangent1[d];
   L3 *= sigma;
 
   double L4 = 0.;
-  if (dim == 3) {
-    for (int d = 0; d < dim; d++) L4 += meanDV[d] * tangent2[d];
+  if (dim_ == 3) {
+    for (int d = 0; d < dim_; d++) L4 += meanDV[d] * tangent2[d];
     L4 *= sigma;
   }
 
@@ -633,11 +633,11 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   bdrFlux[0] = d1;
   bdrFlux[1] = meanVel[0] * d1 + meanUp[0] * d2;
   bdrFlux[2] = meanVel[1] * d1 + meanUp[0] * d3;
-  if (nvel == 3) bdrFlux[3] = meanVel[2] * d1 + meanUp[0] * d4;
-  bdrFlux[1 + nvel] = meanUp[0] * meanVel[0] * d2;
-  bdrFlux[1 + nvel] += meanUp[0] * meanVel[1] * d3;
-  if (nvel == 3) bdrFlux[1 + nvel] += meanUp[0] * meanVel[2] * d4;
-  bdrFlux[1 + nvel] += meanK * d1 + d5 / (gamma - 1.);
+  if (nvel_ == 3) bdrFlux[3] = meanVel[2] * d1 + meanUp[0] * d4;
+  bdrFlux[1 + nvel_] = meanUp[0] * meanVel[0] * d2;
+  bdrFlux[1 + nvel_] += meanUp[0] * meanVel[1] * d3;
+  if (nvel_ == 3) bdrFlux[1 + nvel_] += meanUp[0] * meanVel[2] * d4;
+  bdrFlux[1 + nvel_] += meanK * d1 + d5 / (gamma - 1.);
 
   // flux gradients in other directions
   //   Vector fluxY(num_equation);
@@ -665,39 +665,39 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   //     fluxY[3] = stateIn(3)/rho*dy_rv + rho*meanVt1*dy_E + dy_vp;
   //   }
 
-  Vector state2(num_equation);
-  for (int eq = 0; eq < num_equation; eq++) state2[eq] = boundaryU[eq + bdrN * num_equation];
+  Vector state2(num_equation_);
+  for (int eq = 0; eq < num_equation_; eq++) state2[eq] = boundaryU[eq + bdrN * num_equation_];
 
   Vector stateN = state2;
-  for (int d = 0; d < nvel; d++) stateN[1 + d] = 0.;
-  for (int d = 0; d < dim; d++) {
+  for (int d = 0; d < nvel_; d++) stateN[1 + d] = 0.;
+  for (int d = 0; d < dim_; d++) {
     stateN[1] += state2[1 + d] * unitNorm[d];
     stateN[2] += state2[1 + d] * tangent1[d];
-    if (dim == 3) stateN[3] += state2[1 + d] * tangent2[d];
+    if (dim_ == 3) stateN[3] += state2[1 + d] * tangent2[d];
   }
 
-  Vector newU(num_equation);
+  Vector newU(num_equation_);
   // for(int i=0; i<num_equation;i++) newU[i] = state2[i]- dt*(bdrFlux[i] /*+ fluxY[i]*/);
-  for (int i = 0; i < num_equation; i++) newU[i] = stateN[i] - dt * bdrFlux[i];
-  if (eqSystem == NS_PASSIVE) newU[num_equation - 1] = 0.;
+  for (int i = 0; i < num_equation_; i++) newU[i] = stateN[i] - dt * bdrFlux[i];
+  if (eqSystem == NS_PASSIVE) newU[num_equation_ - 1] = 0.;
 
   // transform back into x-y coords
   {
-    DenseMatrix M(dim, dim);
-    for (int d = 0; d < dim; d++) {
+    DenseMatrix M(dim_, dim_);
+    for (int d = 0; d < dim_; d++) {
       M(0, d) = unitNorm[d];
       M(1, d) = tangent1[d];
-      if (dim == 3) M(2, d) = tangent2[d];
+      if (dim_ == 3) M(2, d) = tangent2[d];
     }
 
-    DenseMatrix invM(dim, dim);
+    DenseMatrix invM(dim_, dim_);
     mfem::CalcInverse(M, invM);
-    Vector momN(dim), momX(dim);
-    for (int d = 0; d < dim; d++) momN[d] = newU[1 + d];
+    Vector momN(dim_), momX(dim_);
+    for (int d = 0; d < dim_; d++) momN[d] = newU[1 + d];
     invM.Mult(momN, momX);
-    for (int d = 0; d < dim; d++) newU[1 + d] = momX[d];
+    for (int d = 0; d < dim_; d++) newU[1 + d] = momX[d];
   }
-  for (int eq = 0; eq < num_equation; eq++) boundaryU[eq + bdrN * num_equation] = newU[eq];
+  for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + bdrN * num_equation_] = newU[eq];
   bdrN++;
 
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
@@ -708,21 +708,21 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
   // whether it is equal to the gas temperature or not.
   const double p = mixture->ComputePressure(stateIn);
 
-  Vector state2(num_equation);
+  Vector state2(num_equation_);
   state2 = stateIn;
 
   state2[0] = inputState[0];
   state2[1] = inputState[0] * inputState[1];
   state2[2] = inputState[0] * inputState[2];
-  if (nvel == 3) state2[3] = inputState[0] * inputState[3];
+  if (nvel_ == 3) state2[3] = inputState[0] * inputState[3];
 
   if (eqSystem == NS_PASSIVE) {
-    state2[num_equation - 1] = 0.;
+    state2[num_equation_ - 1] = 0.;
   } else if (numActiveSpecies_ > 0) {
     for (int sp = 0; sp < numActiveSpecies_; sp++) {
       // NOTE: inlet BC does not specify total energy. therefore skips one index.
-      // NOTE: regardless of dimension, inletBC save the first 4 elements for density and velocity.
-      state2[nvel + 2 + sp] = inputState[4 + sp];
+      // NOTE: regardless of dim_ension, inletBC save the first 4 elements for density and velocity.
+      state2[nvel_ + 2 + sp] = inputState[4 + sp];
     }
   }
 
@@ -737,7 +737,7 @@ void InletBC::integrateInlets_gpu(Vector &y,
                                   const Array<int> &posDofIds,
                                   Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
                                   Array<int> &listElems, Array<int> &offsetsBoundaryU, const int &maxIntPoints,
-                                  const int &maxDofs, const int &dim, const int &num_equation) {
+                                  const int &maxDofs) {
 #ifdef _GPU_
   double *d_y = y.Write();
   const int *d_nodesIDs = nodesIDs.Read();
@@ -748,12 +748,15 @@ void InletBC::integrateInlets_gpu(Vector &y,
   const int *d_listElems = listElems.Read();
   const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
 
-  const double *d_interpUbdr = interpolated_Ubdr_.Read();
+  const double *d_flux = face_flux_.Read();
 
-  const int totDofs = x.Size() / num_equation;
+  const int totDofs = x.Size() / num_equation_;
   const int numBdrElem = listElems.Size();
 
   const InletType type = inletType_;
+
+  const int dim = dim_;
+  const int num_equation = num_equation_;
 
   MFEM_FORALL_2D(n, numBdrElem, maxDofs, 1, 1, {
     MFEM_SHARED double Fcontrib[216 * 5];
@@ -776,7 +779,7 @@ void InletBC::integrateInlets_gpu(Vector &y,
 
       // get interpolated data
       for (int eq = 0; eq < num_equation; eq++) {
-        Rflux[eq] = weight * d_interpUbdr[eq + q * num_equation + n * maxIntPoints * num_equation];
+        Rflux[eq] = weight * d_flux[eq + q * num_equation + n * maxIntPoints * num_equation];
       }
 
       // sum contributions to integral
@@ -800,8 +803,7 @@ void InletBC::integrateInlets_gpu(Vector &y,
 void InletBC::interpInlet_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                               mfem::Vector &shapesBC,
                               mfem::Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
-                              Array<int> &offsetsBoundaryU, const int &maxIntPoints, const int &maxDofs, const int &dim,
-                              const int &num_equation) {
+                              Array<int> &offsetsBoundaryU, const int &maxIntPoints, const int &maxDofs) {
 #ifdef _GPU_
   const double *d_inputState = inputState.Read();
   const double *d_U = x.Read();
@@ -813,9 +815,9 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const Array<int> &nodesIDs,
   const int *d_listElems = listElems.Read();
   const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
 
-  double *d_interpUbdr = interpolated_Ubdr_.Write();
+  double *d_flux = face_flux_.Write();
 
-  const int totDofs = x.Size() / num_equation;
+  const int totDofs = x.Size() / num_equation_;
   const int numBdrElem = listElems.Size();
 
   const double Rg = mixture->GetGasConstant();
@@ -824,6 +826,9 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const Array<int> &nodesIDs,
   const WorkingFluid fluid = mixture->GetWorkingFluid();
 
   const InletType type = inletType_;
+
+  const int dim = dim_;
+  const int num_equation = num_equation_;
 
   // MFEM_FORALL(n, numBdrElem, {
   MFEM_FORALL_2D(n, numBdrElem, maxIntPoints, 1, 1, {
@@ -870,7 +875,7 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const Array<int> &nodesIDs,
 
       // save to global memory
       for (int eq = 0; eq < num_equation; eq++) {
-        d_interpUbdr[eq + q * num_equation + n * maxIntPoints * num_equation] = Rflux[eq];
+        d_flux[eq + q * num_equation + n * maxIntPoints * num_equation] = Rflux[eq];
       }
     }  // end loop over intergration points
   });

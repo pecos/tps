@@ -122,14 +122,12 @@ class OutletBC : public BoundaryCondition {
                             const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                             Vector &shapesBC,
                             Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
-                            Array<int> &offsetBoundaryU, const int &maxIntPoints, const int &maxDofs,
-                            const int &dim, const int &num_equation);
+                            Array<int> &offsetBoundaryU, const int &maxIntPoints, const int &maxDofs);
 
   void interpOutlet_gpu(const Vector &x, const Array<int> &nodesIDs,
                         const Array<int> &posDofIds, ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC,
                         Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
-                        Array<int> &offsetsBoundaryU, const int &maxIntPoints, const int &maxDofs, const int &dim,
-                        const int &num_equation);
+                        Array<int> &offsetsBoundaryU, const int &maxIntPoints, const int &maxDofs);
 
 #ifdef _GPU_  // GPU functions
   static MFEM_HOST_DEVICE void computeSubPressure(const double *u1, double *u2, const double *nor, const double &press,
