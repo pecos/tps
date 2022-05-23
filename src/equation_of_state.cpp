@@ -131,7 +131,8 @@ void GasMixture::computeStagnationState(const mfem::Vector &stateIn, mfem::Vecto
   // NOTE: electron energy is purely internal energy, so no change.
 }
 
-void GasMixture::modifyStateFromPrimitive(const Vector &state, const boundaryPrimitiveData &bcState, Vector &outputState) {
+void GasMixture::modifyStateFromPrimitive(const Vector &state, const boundaryPrimitiveData &bcState,
+                                          Vector &outputState) {
   outputState.SetSize(num_equation);
   assert(bcState.prim.Size() == num_equation);
 
@@ -1564,15 +1565,15 @@ void PerfectMixture::computeSheathBdrFlux(const Vector &state, boundaryViscousFl
     }
   }
   bcFlux.primFlux(numSpecies - 2) /= n_sp(numSpecies - 2);
-  bcFlux.primFlux(numSpecies - 1) -= gasParams(numSpecies - 2, GasParams::SPECIES_MW) * n_sp(numSpecies - 2) *
-                                     bcFlux.primFlux(numSpecies - 2);
+  bcFlux.primFlux(numSpecies - 1) -=
+      gasParams(numSpecies - 2, GasParams::SPECIES_MW) * n_sp(numSpecies - 2) * bcFlux.primFlux(numSpecies - 2);
   bcFlux.primFlux(numSpecies - 1) /= gasParams(numSpecies - 1, GasParams::SPECIES_MW) * n_sp(numSpecies - 1);
 
   if (twoTemperature_) {
     double vTe = sqrt(8.0 * UNIVERSALGASCONSTANT * T_e / PI / gasParams(numSpecies - 2, GasParams::SPECIES_MW));
-    double gamma = - log(4.0 / vTe * bcFlux.primFlux(numSpecies - 2));
+    double gamma = -log(4.0 / vTe * bcFlux.primFlux(numSpecies - 2));
 
-    bcFlux.primFlux(numSpecies + nvel_ + 1) = bcFlux.primFlux(numSpecies - 2) * (gamma + 2.0) *
-                                              n_sp(numSpecies - 2) * UNIVERSALGASCONSTANT * T_e;
+    bcFlux.primFlux(numSpecies + nvel_ + 1) =
+        bcFlux.primFlux(numSpecies - 2) * (gamma + 2.0) * n_sp(numSpecies - 2) * UNIVERSALGASCONSTANT * T_e;
   }
 }
