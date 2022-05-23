@@ -42,7 +42,7 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
     : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
                         _refLength, axisym),
       groupsMPI(_groupsMPI),
-      outletType(_bcType),
+      outletType_(_bcType),
       inputState(_inputData),
       maxIntPoints(_maxIntPoints),
       maxDofs(_maxDofs) {
@@ -69,7 +69,7 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
   hmeanUp[1 + nvel] = 101300;
   if (eqSystem == NS_PASSIVE) hmeanUp[num_equation - 1] = 0.;
 
-  area = 0.;
+  area_ = 0.;
   parallelAreaComputed = false;
 
   Array<double> coords;
@@ -298,7 +298,7 @@ void OutletBC::initBCs() {
 }
 
 void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux) {
-  switch (outletType) {
+  switch (outletType_) {
     case SUB_P:
       subsonicReflectingPressure(normal, stateIn, bdrFlux);
       break;
@@ -318,13 +318,13 @@ void OutletBC::computeParallelArea() {
   if (parallelAreaComputed) return;
 
   MPI_Comm bcomm = groupsMPI->getComm(patchNumber);
-  area = aggregateArea(patchNumber, bcomm);
+  area_ = aggregateArea(patchNumber, bcomm);
   int nfaces = aggregateBndryFaces(patchNumber, bcomm);
   parallelAreaComputed = true;
 
   if (groupsMPI->isGroupRoot(bcomm)) {
     grvy_printf(ginfo, "\n[OUTLET]: Patch number                      = %i\n", patchNumber);
-    grvy_printf(ginfo, "[OUTLET]: Total Surface Area                = %.5f\n", area);
+    grvy_printf(ginfo, "[OUTLET]: Total Surface Area                = %.5f\n", area_);
     grvy_printf(ginfo, "[OUTLET]: # of boundary faces               = %i\n", nfaces);
     grvy_printf(ginfo, "[OUTLET]: # of participating MPI partitions = %i\n", groupsMPI->groupSize(bcomm));
   }
@@ -460,7 +460,7 @@ void OutletBC::initBoundaryU(ParGridFunction *Up) {
 }
 
 void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
-  if (outletType == SUB_P) return;
+  if (outletType_ == SUB_P) return;
 
   bdrN = 0;
 
@@ -556,16 +556,13 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
 void OutletBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                              ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                              Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
-  interpOutlet_gpu(outletType, inputState, interpolated_Ubdr_, interpolatedGradUpbdr_, x, nodesIDs, posDofIds, Up,
+  interpOutlet_gpu(x, nodesIDs, posDofIds, Up,
                    gradUp, shapesBC, normalsWBC, intPointsElIDBC, listElems, offsetsBoundaryU, maxIntPoints, maxDofs,
                    dim, num_equation);
 
-  integrateOutlets_gpu(outletType, eqSystem, inputState, dt,
-                       y,  // output
-                       x, nodesIDs, posDofIds, Up, gradUp, meanUp, boundaryU, interpolated_Ubdr_,
-                       interpolatedGradUpbdr_, tangent1, tangent2, inverseNorm2cartesian, shapesBC, normalsWBC,
-                       intPointsElIDBC, listElems, offsetsBoundaryU, maxIntPoints, maxDofs, dim, num_equation, mixture,
-                       refLength, area);
+  integrateOutlets_gpu(y,  // output
+                       x, nodesIDs, posDofIds, shapesBC, normalsWBC,
+                       intPointsElIDBC, listElems, offsetsBoundaryU, maxIntPoints, maxDofs, dim, num_equation);
 }
 
 void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
@@ -800,7 +797,7 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatr
 
   // estimate ingoing characteristic
   const double sigma = speedSound / refLength;
-  double L1 = -sigma * (meanVel[0] - inputState[0] / meanUp[0] / area);
+  double L1 = -sigma * (meanVel[0] - inputState[0] / meanUp[0] / area_);
   // cout<<inputState[0]<<" "<<meanUp[0]<<" "<<area<<endl;
   L1 *= meanUp[0] * speedSound;
 
@@ -961,7 +958,7 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
 
   // estimate ingoing characteristic
   const double sigma = speedSound / refLength;
-  double L1 = -sigma * (normVel - inputState[0] / meanUp[0] / area);
+  double L1 = -sigma * (normVel - inputState[0] / meanUp[0] / area_);
   // cout<<inputState[0]<<" "<<meanUp[0]<<" "<<area<<endl;
   L1 *= meanUp[0] * speedSound;
 
@@ -1024,29 +1021,18 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
-void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem, const Array<double> &inputState,
-                                    const double &dt, Vector &y, const Vector &x, const Array<int> &nodesIDs,
-                                    const Array<int> &posDofIds, ParGridFunction *Up, ParGridFunction *gradUp,
-                                    Vector &meanUp, Vector &boundaryU, Vector &interpolated_Ubdr_,
-                                    Vector &interpolatedGradUpbdr_, Vector &tangent1, Vector &tangent2,
-                                    Vector &inverseNorm2cartesian, Vector &shapesBC, Vector &normalsWBC,
+void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const Array<int> &nodesIDs,
+                                    const Array<int> &posDofIds,
+                                    Vector &shapesBC, Vector &normalsWBC,
                                     Array<int> &intPointsElIDBC, Array<int> &listElems, Array<int> &offsetsBoundaryU,
                                     const int &maxIntPoints, const int &maxDofs, const int &dim,
-                                    const int &num_equation, GasMixture *mixture, const double &refLength,
-                                    const double &area) {
+                                    const int &num_equation) {
 #ifdef _GPU_
-  const double *d_inputState = inputState.Read();
   double *d_y = y.Write();
   const double *d_U = x.Read();
   const int *d_nodesIDs = nodesIDs.Read();
   const int *d_posDofIds = posDofIds.Read();
-  //   const double *d_Up = Up->Read();
-  const double *d_gradUp = gradUp->Read();
-  const double *d_meanUp = meanUp.Read();
-  double *d_boundaryU = boundaryU.ReadWrite();
-  const double *d_tang1 = tangent1.Read();
-  const double *d_tang2 = tangent2.Read();
-  const double *d_inv = inverseNorm2cartesian.Read();
+
   const double *d_shapesBC = shapesBC.Read();
   const double *d_normW = normalsWBC.Read();
   const int *d_intPointsElIDBC = intPointsElIDBC.Read();
@@ -1057,12 +1043,6 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem, 
   const int numBdrElem = listElems.Size();
 
   const double *d_interpUbdr = interpolated_Ubdr_.Read();
-  const double *d_interpGrads = interpolatedGradUpbdr_.Read();
-
-  const double Rg = mixture->GetGasConstant();
-  const double gamma = mixture->GetSpecificHeatRatio();
-
-  const WorkingFluid fluid = mixture->GetWorkingFluid();
 
   // clang-format off
   MFEM_FORALL_2D(n, numBdrElem, maxDofs, 1, 1,
@@ -1110,9 +1090,7 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem, 
   // clang-format on
 }
 
-void OutletBC::interpOutlet_gpu(const OutletType type, const mfem::Array<double> &inputState,
-                                mfem::Vector &interpolated_Ubdr_, mfem::Vector &interpolatedGradUpbdr_,
-                                const mfem::Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                                 mfem::ParGridFunction *Up, mfem::ParGridFunction *gradUp, mfem::Vector &shapesBC,
                                 mfem::Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
                                 Array<int> &offsetsBoundaryU, const int &maxIntPoints, const int &maxDofs,
@@ -1135,7 +1113,6 @@ void OutletBC::interpOutlet_gpu(const OutletType type, const mfem::Array<double>
   const double *d_inv = inverseNorm2cartesian.Read();
 
   double *d_interpUbdr = interpolated_Ubdr_.Write();
-  double *d_interpGrads = interpolatedGradUpbdr_.Write();
 
   const int totDofs = x.Size() / num_equation;
   const int numBdrElem = listElems.Size();
@@ -1146,9 +1123,11 @@ void OutletBC::interpOutlet_gpu(const OutletType type, const mfem::Array<double>
   const WorkingFluid fluid = mixture->GetWorkingFluid();
 
   const double rL = this->refLength;
-  const double A = this->area;
+  const double area = this->area_;
   const double dtloc = this->dt;
   const Equations es = this->eqSystem;
+
+  const OutletType type = outletType_;
 
   // MFEM_FORALL(n, numBdrElem, {
   MFEM_FORALL_2D(n, numBdrElem, maxIntPoints, 1, 1, {
@@ -1211,7 +1190,7 @@ void OutletBC::interpOutlet_gpu(const OutletType type, const mfem::Array<double>
           break;
         case OutletType::SUB_MF_NR:
           computeNRSubMassFlow_serial(offsetBdrU + q, &u1[0], &gradUp1[0], d_meanUp, dtloc, &u2[0], d_boundaryU,
-                                      d_inputState, &nor[0], d_tang1, d_tang2, d_inv, rL, A, gamma, Rg, elDof,
+                                      d_inputState, &nor[0], d_tang1, d_tang2, d_inv, rL, area, gamma, Rg, elDof,
                                       dim, num_equation, es);
           break;
         case OutletType::SUB_MF_NR_PW:
