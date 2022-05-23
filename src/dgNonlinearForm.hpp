@@ -94,23 +94,11 @@ class DGNonLinearForm : public ParNonlinearForm {
 
   void faceIntegration_gpu(Vector &y, int elType, int elemOffset, int elDof);
 
-  static void sharedFaceIntegration_gpu(const Vector &x, const Vector &faceU, const ParGridFunction *gradUp,
-                                        const Vector &faceGradUp, Vector &y, Vector &shared_uk_el1,
-                                        Vector &shared_uk_el2, Vector &shared_grad_upk_el1, Vector &shared_grad_upk_el2,
-                                        const int &Ndofs, const int &dim, const int &num_equation, GasMixture *mixture,
-                                        Fluxes *flux, const volumeFaceIntegrationArrays &gpuArrays,
-                                        const parallelFacesIntegrationArrays *parallelData, const int &maxIntPoints,
-                                        const int &maxDofs);
+  void sharedFaceIntegration_gpu(Vector &y);
 
   void interpFaceData_gpu(const Vector &x, int elType, int elemOffset, int elDof);
 
-  static void sharedFaceInterpolation_gpu(const Vector &x, const Vector &faceU, const ParGridFunction *gradUp,
-                                          const Vector &faceGradUp, Vector &shared_uk_el1, Vector &shared_uk_el2,
-                                          Vector &shared_grad_upk_el1, Vector &shared_grad_upk_el2, const int &Ndofs,
-                                          const int &dim, const int &num_equation, GasMixture *mixture,
-                                          const volumeFaceIntegrationArrays &gpuArrays,
-                                          const parallelFacesIntegrationArrays *parallelData, const int &maxIntPoints,
-                                          const int &maxDofs);
+  void sharedFaceInterpolation_gpu(const Vector &x);
   void evalFaceFlux_gpu();
 
 #ifdef _GPU_

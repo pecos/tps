@@ -91,6 +91,8 @@ class Gradients : public ParNonlinearForm {
   parallelFacesIntegrationArrays *parallelData;
   dataTransferArrays *transferUp;
 
+  Vector dun_shared_face;
+
  public:
   Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradUpfes, int _dim, int _num_equation,
             ParGridFunction *_Up, ParGridFunction *_gradUp, GasMixture *_mixture, GradNonLinearForm *_gradUp_A,
@@ -103,6 +105,11 @@ class Gradients : public ParNonlinearForm {
   void setParallelData(parallelFacesIntegrationArrays *_parData, dataTransferArrays *_transferUp) {
     parallelData = _parData;
     transferUp = _transferUp;
+
+    dun_shared_face.UseDevice(true);
+
+    int maxNumElems = parallelData->sharedElemsFaces.Size() / 7;  // elements with shared faces
+    dun_shared_face.SetSize(dim_ * maxNumElems * 5 * maxIntPoints_ * num_equation_);
   }
 
   void computeGradients();
@@ -115,18 +122,11 @@ class Gradients : public ParNonlinearForm {
 
   void faceContrib_gpu(const int elType, const int offsetElems, const int elDof);
 
-  static void integrationGradSharedFace_gpu(const Vector *Up, const Vector &faceUp, ParGridFunction *gradUp,
-                                            const int &Ndofs, const int &dim, const int &num_equation,
-                                            const double &gamma, const double &Rg, const double &viscMult,
-                                            const double &bulkViscMult, const double &Pr,
-                                            const volumeFaceIntegrationArrays &gpuArrays,
-                                            const parallelFacesIntegrationArrays *parallelData, const int &maxIntPoints,
-                                            const int &maxDofs);
+  void interpGradSharedFace_gpu();
 
-  static void multInverse_gpu(const int numElems, const int offsetElems, const int elDof, const int totalDofs,
-                              Vector &gradUp, const int num_equation, const int dim,
-                              const volumeFaceIntegrationArrays &gpuArrays, const Vector &invMArray,
-                              const Array<int> &posDofInvM);
+  void integrationGradSharedFace_gpu();
+
+  void multInverse_gpu(const int numElems, const int offsetElems, const int elDof);
 
   void interpFaceData_gpu(const Vector &x, int elType, int elemOffset, int elDof);
   void evalFaceIntegrand_gpu();
