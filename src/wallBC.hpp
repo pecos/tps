@@ -45,14 +45,14 @@ using namespace mfem;
 class WallBC : public BoundaryCondition {
  private:
   // The type of wall
-  const WallType wallType;
+  const WallType wallType_;
 
   Fluxes *fluxClass;
 
-  double wallTemp;
+  double wallTemp_;
 
   const Array<int> &intPointsElIDBC;
-  const int &maxIntPoints;
+  const int &maxIntPoints_;
 
   Array<int> wallElems;
   void buildWallElemsArray(const Array<int> &intPointsElIDBC);
@@ -83,21 +83,13 @@ class WallBC : public BoundaryCondition {
                              ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                              Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs);
 
-  static void integrateWalls_gpu(const WallType type, const double &wallTemp,
-                                 Vector &y,  // output
-                                 const Vector &x, Vector &interpolated_Ubdr_, Vector &interpolatedGradUpbdr_,
-                                 const Array<int> &nodesIDs, const Array<int> &posDofIds, ParGridFunction *Up,
-                                 ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
-                                 Array<int> &intPointsElIDBC, Array<int> &wallElems, Array<int> &listElems,
-                                 const Equations &eqSystem, const int &maxIntPoints, const int &maxDofs, const int &dim,
-                                 const int &num_equation, GasMixture *mixture);
+  void integrateWalls_gpu(Vector &y,  // output
+                          const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds, Vector &shapesBC,
+                          Vector &normalsWBC, Array<int> &intPointsElIDBC, const int &maxDofs);
 
-  static void interpWalls_gpu(const WallType type, const double &wallTemp, Vector &interpolated_Ubdr_,
-                              Vector &interpolatedGradUpbdr_, const Vector &x, const Array<int> &nodesIDs,
-                              const Array<int> &posDofIds, ParGridFunction *Up, ParGridFunction *gradUp,
-                              Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &wallElems,
-                              Array<int> &listElems, const int &maxIntPoints, const int &maxDofs, const int &dim,
-                              const int &num_equation);
+  void interpWalls_gpu(const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds, ParGridFunction *Up,
+                       ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
+                       const int &maxDofs);
 
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void computeInvWallState(const double *u1, double *u2, const double *nor, const int &dim,

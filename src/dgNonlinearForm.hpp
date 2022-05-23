@@ -78,8 +78,7 @@ class DGNonLinearForm : public ParNonlinearForm {
   Vector uk_el2, grad_upk_el2;
   Vector face_flux_;
 
-  Vector shared_uk_el1, shared_grad_upk_el1;
-  Vector shared_uk_el2, shared_grad_upk_el2;
+  Vector shared_flux;
 
  public:
   DGNonLinearForm(Fluxes *_flux, ParFiniteElementSpace *f, ParFiniteElementSpace *gradFes, ParGridFunction *_gradUp,

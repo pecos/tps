@@ -51,9 +51,9 @@ class BoundaryCondition {
   ParFiniteElementSpace *vfes;
   IntegrationRules *intRules;
   double &dt;
-  const int dim;
-  const int nvel;
-  const int num_equation;
+  const int dim_;
+  const int nvel_;
+  const int num_equation_;
   const int patchNumber;
   const double refLength;
 
@@ -64,8 +64,7 @@ class BoundaryCondition {
 
   Array<int> offsetsBoundaryU;
 
-  Vector interpolated_Ubdr_;
-  Vector interpolatedGradUpbdr_;
+  Vector face_flux_;
 
  public:
   BoundaryCondition(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSystem, ParFiniteElementSpace *_vfes,

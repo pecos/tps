@@ -47,7 +47,7 @@ class OutletBC : public BoundaryCondition {
  private:
   MPI_Groups *groupsMPI;
 
-  const OutletType outletType;
+  const OutletType outletType_;
 
   // In/out conditions specified in the configuration file
   const Array<double> inputState;
@@ -64,8 +64,8 @@ class OutletBC : public BoundaryCondition {
   Array<int> bdrElemsQ;  // element dofs and face num. of integration points
   Array<int> bdrDofs;    // indexes of the D
   Vector bdrShape;       // shape functions evaluated at the integration points
-  const int &maxIntPoints;
-  const int &maxDofs;
+  const int &maxIntPoints_;
+  const int &maxDofs_;
 
   // local vector for mean calculation
   Vector localMeanUp;
@@ -73,7 +73,7 @@ class OutletBC : public BoundaryCondition {
   Vector glob_sum;
 
   // area of the outlet
-  double area;
+  double area_;
   bool parallelAreaComputed;
 
   // Unit trangent vector 1 & 2
@@ -118,24 +118,14 @@ class OutletBC : public BoundaryCondition {
 
   // functions for BC integration on GPU
 
-  static void integrateOutlets_gpu(const OutletType type, Equations &eqSystem, const Array<double> &inputState,
-                                   const double &dt,
-                                   Vector &y,  // output
-                                   const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
-                                   ParGridFunction *Up, ParGridFunction *gradUp, Vector &meanUp, Vector &boundaryU,
-                                   Vector &interpolated_Ubdr, Vector &interpolatedGradUpbdr_, Vector &tangent1,
-                                   Vector &tangent2, Vector &inverseNorm2cartesian, Vector &shapesBC,
-                                   Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
-                                   Array<int> &offsetBoundaryU, const int &maxIntPoints, const int &maxDofs,
-                                   const int &dim, const int &num_equation, GasMixture *mixture,
-                                   const double &refLength, const double &area);
+  void integrateOutlets_gpu(Vector &y,  // output
+                            const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds, Vector &shapesBC,
+                            Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
+                            Array<int> &offsetBoundaryU);
 
-  static void interpOutlet_gpu(const OutletType type, const Array<double> &inputState, Vector &interpolated_Ubdr,
-                               Vector &interpolatedGradUpbdr_, const Vector &x, const Array<int> &nodesIDs,
-                               const Array<int> &posDofIds, ParGridFunction *Up, ParGridFunction *gradUp,
-                               Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
-                               Array<int> &offsetsBoundaryU, const int &maxIntPoints, const int &maxDofs,
-                               const int &dim, const int &num_equation);
+  void interpOutlet_gpu(const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds, ParGridFunction *Up,
+                        ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
+                        Array<int> &listElems, Array<int> &offsetsBoundaryU);
 
 #ifdef _GPU_  // GPU functions
   static MFEM_HOST_DEVICE void computeSubPressure(const double *u1, double *u2, const double *nor, const double &press,

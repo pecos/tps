@@ -48,7 +48,7 @@ class InletBC : public BoundaryCondition {
  private:
   MPI_Groups *groupsMPI;
 
-  const InletType inletType;
+  const InletType inletType_;
 
   // In/out conditions specified in the configuration file
   Vector inputState;
@@ -66,8 +66,8 @@ class InletBC : public BoundaryCondition {
   Array<int> bdrElemsQ;  // element dofs and face num. of integration points
   Array<int> bdrDofs;    // indexes of the D
   Vector bdrShape;       // shape functions evaluated at the integration points
-  const int &maxIntPoints;
-  const int &maxDofs;
+  const int &maxIntPoints_;
+  const int &maxDofs_;
 
   // local vector for mean calculation
   Vector localMeanUp;
@@ -110,19 +110,13 @@ class InletBC : public BoundaryCondition {
 
   // functions for BC integration on GPU
 
-  static void integrateInlets_gpu(const InletType type, const Vector &inputState, const double &dt,
-                                  Vector &y,  // output
-                                  const Vector &x, Vector &interpolated_Ubdr, const Array<int> &nodesIDs,
-                                  const Array<int> &posDofIds, ParGridFunction *Up, ParGridFunction *gradUp,
-                                  Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
-                                  Array<int> &listElems, Array<int> &offsetsBoundaryU, const int &maxIntPoints,
-                                  const int &maxDofs, const int &dim, const int &num_equation, GasMixture *mixture,
-                                  Equations &eqSystem);
-  static void interpInlet_gpu(const InletType type, const Vector &inputState, Vector &interpolated_Ubdr,
-                              const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
-                              ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
-                              Array<int> &intPointsElIDBC, Array<int> &listElems, Array<int> &offsetsBoundaryU,
-                              const int &maxIntPoints, const int &maxDofs, const int &dim, const int &num_equation);
+  void integrateInlets_gpu(Vector &y,  // output
+                           const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds, Vector &shapesBC,
+                           Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
+                           Array<int> &offsetsBoundaryU);
+  void interpInlet_gpu(const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds, Vector &shapesBC,
+                       Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
+                       Array<int> &offsetsBoundaryU);
 
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void computeSubDenseVel(const double *u1, double *u2, const double *nor,

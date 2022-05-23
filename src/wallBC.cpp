@@ -39,12 +39,12 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSyste
                const Array<int> &_intPointsElIDBC, const int &_maxIntPoints, bool axisym)
     : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber, 1,
                         axisym),  // so far walls do not require ref. length. Left at 1
-      wallType(_bcType),
+      wallType_(_bcType),
       fluxClass(_fluxClass),
       intPointsElIDBC(_intPointsElIDBC),
-      maxIntPoints(_maxIntPoints) {
-  if (wallType == VISC_ISOTH) {
-    wallTemp = _inputData[0];
+      maxIntPoints_(_maxIntPoints) {
+  if (wallType_ == VISC_ISOTH) {
+    wallTemp_ = _inputData[0];
   }
 }
 
@@ -55,14 +55,9 @@ void WallBC::initBCs() {
     buildWallElemsArray(intPointsElIDBC);
 
 #ifdef _GPU_
-    interpolated_Ubdr_.UseDevice(true);
-    interpolatedGradUpbdr_.UseDevice(true);
-
-    interpolated_Ubdr_.SetSize(num_equation * maxIntPoints * listElems.Size());
-    interpolatedGradUpbdr_.SetSize(dim * num_equation * maxIntPoints * listElems.Size());
-
-    interpolated_Ubdr_ = 0.;
-    interpolatedGradUpbdr_ = 0.;
+    face_flux_.UseDevice(true);
+    face_flux_.SetSize(num_equation_ * maxIntPoints_ * listElems.Size());
+    face_flux_ = 0.;
 #endif
 
     BCinit = true;
@@ -108,7 +103,7 @@ void WallBC::buildWallElemsArray(const Array<int> &intPointsElIDBC) {
 }
 
 void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux) {
-  switch (wallType) {
+  switch (wallType_) {
     case INV:
       computeINVwallFlux(normal, stateIn, gradState, radius, bdrFlux);
       break;
@@ -124,45 +119,40 @@ void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradSt
 void WallBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                            ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                            Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
-  interpWalls_gpu(wallType, wallTemp, interpolated_Ubdr_, interpolatedGradUpbdr_, x, nodesIDs, posDofIds, Up, gradUp,
-                  shapesBC, normalsWBC, intPointsElIDBC, wallElems, listElems, maxIntPoints, maxDofs, dim,
-                  num_equation);
+  interpWalls_gpu(x, nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC, maxDofs);
 
-  integrateWalls_gpu(wallType, wallTemp,
-                     y,  // output
-                     x, interpolated_Ubdr_, interpolatedGradUpbdr_, nodesIDs, posDofIds, Up, gradUp, shapesBC,
-                     normalsWBC, intPointsElIDBC, wallElems, listElems, eqSystem, maxIntPoints, maxDofs, dim,
-                     num_equation, mixture);
+  integrateWalls_gpu(y,  // output
+                     x, nodesIDs, posDofIds, shapesBC, normalsWBC, intPointsElIDBC, maxDofs);
 }
 
 void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
                                 Vector &bdrFlux) {
-  Vector vel(nvel);
-  for (int d = 0; d < nvel; d++) vel[d] = stateIn[1 + d] / stateIn[0];
+  Vector vel(nvel_);
+  for (int d = 0; d < nvel_; d++) vel[d] = stateIn[1 + d] / stateIn[0];
 
   double norm = 0.;
-  for (int d = 0; d < dim; d++) norm += normal[d] * normal[d];
+  for (int d = 0; d < dim_; d++) norm += normal[d] * normal[d];
   norm = sqrt(norm);
 
-  Vector unitN(dim);
-  for (int d = 0; d < dim; d++) unitN[d] = normal[d] / norm;
+  Vector unitN(dim_);
+  for (int d = 0; d < dim_; d++) unitN[d] = normal[d] / norm;
 
   double vn = 0;
-  for (int d = 0; d < dim; d++) vn += vel[d] * unitN[d];
+  for (int d = 0; d < dim_; d++) vn += vel[d] * unitN[d];
 
-  Vector stateMirror(num_equation);
+  Vector stateMirror(num_equation_);
   stateMirror = stateIn;
 
   // only momentum needs to be changed
   stateMirror[1] = stateIn[0] * (vel[0] - 2. * vn * unitN[0]);
   stateMirror[2] = stateIn[0] * (vel[1] - 2. * vn * unitN[1]);
-  if (dim == 3) stateMirror[3] = stateIn[0] * (vel[2] - 2. * vn * unitN[2]);
-  if ((nvel == 3) && (dim == 2)) stateMirror[3] = stateIn[0] * vel[2];
+  if (dim_ == 3) stateMirror[3] = stateIn[0] * (vel[2] - 2. * vn * unitN[2]);
+  if ((nvel_ == 3) && (dim_ == 2)) stateMirror[3] = stateIn[0] * vel[2];
 
   rsolver->Eval(stateIn, stateMirror, normal, bdrFlux);
 
-  DenseMatrix viscFw(num_equation, dim);
-  DenseMatrix viscF(num_equation, dim);
+  DenseMatrix viscFw(num_equation_, dim_);
+  DenseMatrix viscF(num_equation_, dim_);
 
   if (axisymmetric_) {
     // here we have hijacked the inviscid wall condition to implement
@@ -175,7 +165,7 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
     Vector unitNorm = normal;
     {
       double normN = 0.;
-      for (int d = 0; d < dim; d++) normN += normal[d] * normal[d];
+      for (int d = 0; d < dim_; d++) normN += normal[d] * normal[d];
       unitNorm *= 1. / sqrt(normN);
     }
 
@@ -184,22 +174,22 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
     // zero out normal heat flux.
     // NOTE: instead of zeroing the gradient, zeroed the resultant flux.
     double normalHeatFlux = 0.0;
-    for (int d = 0; d < dim; d++) normalHeatFlux += unitNorm(d) * viscFw(1 + dim, d);
-    for (int d = 0; d < dim; d++) viscFw(1 + dim, d) -= unitNorm(d) * normalHeatFlux;
+    for (int d = 0; d < dim_; d++) normalHeatFlux += unitNorm(d) * viscFw(1 + dim_, d);
+    for (int d = 0; d < dim_; d++) viscFw(1 + dim_, d) -= unitNorm(d) * normalHeatFlux;
 
     // zero out species normal diffusion fluxes.
     const int numActiveSpecies = mixture->GetNumActiveSpecies();
-    for (int eq = nvel + 2; eq < nvel + 2 + numActiveSpecies; eq++) {
+    for (int eq = nvel_ + 2; eq < nvel_ + 2 + numActiveSpecies; eq++) {
       double normalDiffusionFlux = 0.0;
-      for (int d = 0; d < dim; d++) normalDiffusionFlux += unitNorm(d) * viscFw(eq, d);
-      for (int d = 0; d < dim; d++) viscFw(eq, d) -= unitNorm(d) * normalDiffusionFlux;
+      for (int d = 0; d < dim_; d++) normalDiffusionFlux += unitNorm(d) * viscFw(eq, d);
+      for (int d = 0; d < dim_; d++) viscFw(eq, d) -= unitNorm(d) * normalDiffusionFlux;
     }
 
     // adiabatic wall must also have zero heat flux from electron.
     if (mixture->IsTwoTemperature()) {
       double normalElectronHeatFlux = 0.0;
-      for (int d = 0; d < dim; d++) normalElectronHeatFlux += unitNorm(d) * viscFw(num_equation - 1, d);
-      for (int d = 0; d < dim; d++) viscFw(num_equation - 1, d) -= unitNorm(d) * normalElectronHeatFlux;
+      for (int d = 0; d < dim_; d++) normalElectronHeatFlux += unitNorm(d) * viscFw(num_equation_ - 1, d);
+      for (int d = 0; d < dim_; d++) viscFw(num_equation_ - 1, d) -= unitNorm(d) * normalElectronHeatFlux;
     }
   } else {
     // evaluate viscous fluxes at the wall
@@ -210,119 +200,114 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
   }
 
   // Add visc fluxes (we skip density eq.)
-  for (int eq = 1; eq < num_equation; eq++) {
-    for (int d = 0; d < dim; d++) bdrFlux[eq] -= 0.5 * (viscFw(eq, d) + viscF(eq, d)) * normal[d];
+  for (int eq = 1; eq < num_equation_; eq++) {
+    for (int d = 0; d < dim_; d++) bdrFlux[eq] -= 0.5 * (viscFw(eq, d) + viscF(eq, d)) * normal[d];
   }
 }
 
 void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
                                       Vector &bdrFlux) {
-  Vector wallState(num_equation);
+  Vector wallState(num_equation_);
   mixture->computeStagnationState(stateIn, wallState);
 
   // Normal convective flux
   rsolver->Eval(stateIn, wallState, normal, bdrFlux, true);
-  if (eqSystem == NS_PASSIVE) bdrFlux[num_equation - 1] = 0.;
+  if (eqSystem == NS_PASSIVE) bdrFlux[num_equation_ - 1] = 0.;
 
   // incoming visc flux
-  DenseMatrix viscF(num_equation, dim);
+  DenseMatrix viscF(num_equation_, dim_);
   fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, viscF);
 
   // modify gradients so that wall is adibatic
   Vector unitNorm = normal;
   {
     double normN = 0.;
-    for (int d = 0; d < dim; d++) normN += normal[d] * normal[d];
+    for (int d = 0; d < dim_; d++) normN += normal[d] * normal[d];
     unitNorm *= 1. / sqrt(normN);
   }
 
   // modify gradient temperature so dT/dn=0 at the wall
   // double normGradT = 0.;
-  // for (int d = 0; d < dim; d++) normGradT += unitNorm(d) * gradState(1 + dim, d);
-  // for (int d = 0; d < dim; d++) gradState(1 + dim, d) -= normGradT * unitNorm(d);
+  // for (int d = 0; d < dim_; d++) normGradT += unitNorm(d) * gradState(1 + dim_, d);
+  // for (int d = 0; d < dim_; d++) gradState(1 + dim_, d) -= normGradT * unitNorm(d);
 
   if (eqSystem == NS_PASSIVE) {
-    for (int d = 0; d < dim; d++) gradState(num_equation - 1, d) = 0.;
+    for (int d = 0; d < dim_; d++) gradState(num_equation_ - 1, d) = 0.;
   }
 
-  DenseMatrix viscFw(num_equation, dim);
+  DenseMatrix viscFw(num_equation_, dim_);
   fluxClass->ComputeViscousFluxes(wallState, gradState, radius, viscFw);
 
   // zero out normal heat flux.
   // NOTE: instead of zeroing the gradient, zeroed the resultant flux. Must be equivalent.
   double normalHeatFlux = 0.0;
-  for (int d = 0; d < dim; d++) normalHeatFlux += unitNorm(d) * viscFw(1 + dim, d);
-  for (int d = 0; d < dim; d++) viscFw(1 + dim, d) -= unitNorm(d) * normalHeatFlux;
+  for (int d = 0; d < dim_; d++) normalHeatFlux += unitNorm(d) * viscFw(1 + dim_, d);
+  for (int d = 0; d < dim_; d++) viscFw(1 + dim_, d) -= unitNorm(d) * normalHeatFlux;
 
   // zero out species normal diffusion fluxes.
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
-  for (int eq = nvel + 2; eq < nvel + 2 + numActiveSpecies; eq++) {
+  for (int eq = nvel_ + 2; eq < nvel_ + 2 + numActiveSpecies; eq++) {
     double normalDiffusionFlux = 0.0;
-    for (int d = 0; d < dim; d++) normalDiffusionFlux += unitNorm(d) * viscFw(eq, d);
-    for (int d = 0; d < dim; d++) viscFw(eq, d) -= unitNorm(d) * normalDiffusionFlux;
+    for (int d = 0; d < dim_; d++) normalDiffusionFlux += unitNorm(d) * viscFw(eq, d);
+    for (int d = 0; d < dim_; d++) viscFw(eq, d) -= unitNorm(d) * normalDiffusionFlux;
   }
 
   // adiabatic wall must also have zero heat flux from electron.
   if (mixture->IsTwoTemperature()) {
     double normalElectronHeatFlux = 0.0;
-    for (int d = 0; d < dim; d++) normalElectronHeatFlux += unitNorm(d) * viscFw(num_equation - 1, d);
-    for (int d = 0; d < dim; d++) viscFw(num_equation - 1, d) -= unitNorm(d) * normalElectronHeatFlux;
+    for (int d = 0; d < dim_; d++) normalElectronHeatFlux += unitNorm(d) * viscFw(num_equation_ - 1, d);
+    for (int d = 0; d < dim_; d++) viscFw(num_equation_ - 1, d) -= unitNorm(d) * normalElectronHeatFlux;
   }
 
   // Add visc fluxes (we skip density eq.)
-  for (int eq = 1; eq < num_equation; eq++) {
-    for (int d = 0; d < dim; d++) bdrFlux[eq] -= 0.5 * (viscFw(eq, d) + viscF(eq, d)) * normal[d];
+  for (int eq = 1; eq < num_equation_; eq++) {
+    for (int d = 0; d < dim_; d++) bdrFlux[eq] -= 0.5 * (viscFw(eq, d) + viscF(eq, d)) * normal[d];
   }
 }
 
 void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
                                        Vector &bdrFlux) {
-  Vector wallState(num_equation);
-  mixture->computeStagnantStateWithTemp(stateIn, wallTemp, wallState);
+  Vector wallState(num_equation_);
+  mixture->computeStagnantStateWithTemp(stateIn, wallTemp_, wallState);
   // TODO(kevin): set stangant state with two separate temperature.
 
-  if (eqSystem == NS_PASSIVE) wallState[num_equation - 1] = stateIn[num_equation - 1];
+  if (eqSystem == NS_PASSIVE) wallState[num_equation_ - 1] = stateIn[num_equation_ - 1];
 
   // Normal convective flux
   rsolver->Eval(stateIn, wallState, normal, bdrFlux, true);
 
   // evaluate viscous fluxes at the wall
-  DenseMatrix viscFw(num_equation, dim);
+  DenseMatrix viscFw(num_equation_, dim_);
   fluxClass->ComputeViscousFluxes(wallState, gradState, radius, viscFw);
 
   // unit normal vector
   Vector unitNorm = normal;
   {
     double normN = 0.;
-    for (int d = 0; d < dim; d++) normN += normal[d] * normal[d];
+    for (int d = 0; d < dim_; d++) normN += normal[d] * normal[d];
     unitNorm *= 1. / sqrt(normN);
   }
 
   // zero out species normal diffusion fluxes.
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
-  for (int eq = nvel + 2; eq < nvel + 2 + numActiveSpecies; eq++) {
+  for (int eq = nvel_ + 2; eq < nvel_ + 2 + numActiveSpecies; eq++) {
     double normalDiffusionFlux = 0.0;
-    for (int d = 0; d < dim; d++) normalDiffusionFlux += unitNorm(d) * viscFw(eq, d);
-    for (int d = 0; d < dim; d++) viscFw(eq, d) -= unitNorm(d) * normalDiffusionFlux;
+    for (int d = 0; d < dim_; d++) normalDiffusionFlux += unitNorm(d) * viscFw(eq, d);
+    for (int d = 0; d < dim_; d++) viscFw(eq, d) -= unitNorm(d) * normalDiffusionFlux;
   }
 
   // evaluate internal viscous fluxes
-  DenseMatrix viscF(num_equation, dim);
+  DenseMatrix viscF(num_equation_, dim_);
   fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, viscF);
 
   // Add visc fluxes (we skip density eq.)
-  for (int eq = 1; eq < num_equation; eq++) {
-    for (int d = 0; d < dim; d++) bdrFlux[eq] -= 0.5 * (viscFw(eq, d) + viscF(eq, d)) * normal[d];
+  for (int eq = 1; eq < num_equation_; eq++) {
+    for (int d = 0; d < dim_; d++) bdrFlux[eq] -= 0.5 * (viscFw(eq, d) + viscF(eq, d)) * normal[d];
   }
 }
 
-void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vector &y, const Vector &x,
-                                Vector &interpolated_Ubdr_, Vector &interpolatedGradUpbdr_, const Array<int> &nodesIDs,
-                                const Array<int> &posDofIds, ParGridFunction *Up, ParGridFunction *gradUp,
-                                Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
-                                Array<int> &wallElems, Array<int> &listElems, const Equations &eqSystem,
-                                const int &maxIntPoints, const int &maxDofs, const int &dim, const int &num_equation,
-                                GasMixture *mixture) {
+void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+                                Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC, const int &maxDofs) {
 #ifdef _GPU_
   double *d_y = y.Write();
   //   const double *d_U = x.Read();
@@ -334,7 +319,7 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
   const int *d_wallElems = wallElems.Read();
   const int *d_listElems = listElems.Read();
 
-  const int totDofs = x.Size() / num_equation;
+  const int totDofs = x.Size() / num_equation_;
   const int numBdrElem = listElems.Size();
 
   const double Rg = mixture->GetGasConstant();
@@ -344,22 +329,21 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
   const double Pr = mixture->GetPrandtlNum();
   const double Sc = mixture->GetSchmidtNum();
 
-  const double *d_interpolU = interpolated_Ubdr_.Read();
-  const double *d_interpGrads = interpolatedGradUpbdr_.Read();
+  const int dim = dim_;
+  const int num_equation = num_equation_;
+  const int maxIntPoints = maxIntPoints_;
 
-  const WorkingFluid fluid = mixture->GetWorkingFluid();
+  const double *d_flux = face_flux_.Read();
 
   // clang-format on
-  MFEM_FORALL(el_wall, wallElems.Size() / 7, {
+  // MFEM_FORALL(el_wall, wallElems.Size() / 7, {
+  MFEM_FORALL_2D(el_wall, wallElems.Size() / 7, maxDofs, 1, 1, {
     // double Fcontrib[216 * 20];
     // double shape[216];
     // double Rflux[20], u1[20], u2[20], nor[3], gradUpi[20 * 3];
     // double vF1[20 * 3], vF2[20 * 3];
-    double Fcontrib[216 * 5];
-    double shape[216];
-    double Rflux[5], u1[5], u2[5], nor[3], gradUpi[5 * 3];
-    double vF1[5 * 3], vF2[5 * 3];
-    double weight;
+    MFEM_SHARED double Fcontrib[216 * 5];
+    double Rflux[5];
 
     const int numFaces = d_wallElems[0 + el_wall * 7];
     bool elemDataRecovered = false;
@@ -373,30 +357,134 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
       const int el_bdry = d_listElems[n];
       const int Q = d_intPointsElIDBC[2 * el_bdry];
 
+      el = d_intPointsElIDBC[2 * el_bdry + 1];
+
+      elOffset = d_posDofIds[2 * el];
+      elDof = d_posDofIds[2 * el + 1];
+
       if (!elemDataRecovered) {
-        el = d_intPointsElIDBC[2 * el_bdry + 1];
-
-        elOffset = d_posDofIds[2 * el];
-        elDof = d_posDofIds[2 * el + 1];
-
-        for (int i = 0; i < elDof; i++) {
+        MFEM_FOREACH_THREAD(i, x, elDof) {
           for (int eq = 0; eq < num_equation; eq++) {
             Fcontrib[i + eq * elDof] = 0.;
           }
         }
+        MFEM_SYNC_THREAD;
         elemDataRecovered = true;
       }
 
       for (int q = 0; q < Q; q++) {  // loop over int. points
-        for (int i = 0; i < elDof; i++) shape[i] = d_shapesBC[i + q * maxDofs + el_bdry * maxIntPoints * maxDofs];
-        for (int d = 0; d < dim; d++) nor[d] = d_normW[d + q * (dim + 1) + el_bdry * maxIntPoints * (dim + 1)];
-        weight = d_normW[dim + q * (dim + 1) + el_bdry * maxIntPoints * (dim + 1)];
+        const double weight = d_normW[dim + q * (dim + 1) + el_bdry * maxIntPoints * (dim + 1)];
 
-        for (int eq = 0; eq < num_equation; eq++) {  // recover interpolated data
-          u1[eq] = d_interpolU[eq + q * num_equation + n * maxIntPoints * num_equation];
-          for (int d = 0; d < dim; d++)
-            gradUpi[eq + d * num_equation] =
-                d_interpGrads[eq + d * num_equation + q * dim * num_equation + n * maxIntPoints * dim * num_equation];
+        for (int eq = 0; eq < num_equation; eq++)
+          Rflux[eq] = weight * d_flux[eq + q * num_equation + n * maxIntPoints * num_equation];
+
+        // sum contributions to integral
+        // for (int i = 0; i < elDof; i++) {
+        MFEM_FOREACH_THREAD(i, x, elDof) {
+          const double shape = d_shapesBC[i + q * maxDofs + el_bdry * maxIntPoints * maxDofs];
+          for (int eq = 0; eq < num_equation; eq++) {
+            Fcontrib[i + eq * elDof] -= Rflux[eq] * shape;
+          }
+        }
+        MFEM_SYNC_THREAD;
+      }
+    }
+
+    // add to global data
+    // for (int i = 0; i < elDof; i++) {
+    MFEM_FOREACH_THREAD(i, x, elDof) {
+      const int indexi = d_nodesIDs[elOffset + i];
+      for (int eq = 0; eq < num_equation; eq++) d_y[indexi + eq * totDofs] += Fcontrib[i + eq * elDof];
+    }
+    MFEM_SYNC_THREAD;
+  });
+#endif
+}
+
+void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+                             mfem::ParGridFunction *Up, mfem::ParGridFunction *gradUp, mfem::Vector &shapesBC,
+                             mfem::Vector &normalsWBC, Array<int> &intPointsElIDBC, const int &maxDofs) {
+#ifdef _GPU_
+  double *d_flux = face_flux_.Write();
+
+  const double *d_U = x.Read();
+  const double *d_gradUp = gradUp->Read();
+  const int *d_nodesIDs = nodesIDs.Read();
+  const int *d_posDofIds = posDofIds.Read();
+  const double *d_shapesBC = shapesBC.Read();
+  const double *d_normW = normalsWBC.Read();
+  const int *d_intPointsElIDBC = intPointsElIDBC.Read();
+  const int *d_wallElems = wallElems.Read();
+  const int *d_listElems = listElems.Read();
+
+  const int totDofs = x.Size() / num_equation_;
+  const int numBdrElem = listElems.Size();
+
+  const double Rg = mixture->GetGasConstant();
+  const double gamma = mixture->GetSpecificHeatRatio();
+  const double viscMult = mixture->GetViscMultiplyer();
+  const double bulkViscMult = mixture->GetBulkViscMultiplyer();
+  const double Pr = mixture->GetPrandtlNum();
+  const double Sc = mixture->GetSchmidtNum();
+
+  const WorkingFluid fluid = mixture->GetWorkingFluid();
+  const WallType type = wallType_;
+  const double wallTemp = wallTemp_;
+
+  const int dim = dim_;
+  const int num_equation = num_equation_;
+  const int maxIntPoints = maxIntPoints_;
+
+  // clang-format on
+  // el_wall is index within wall boundary elements?
+  MFEM_FORALL_2D(el_wall, wallElems.Size() / 7, maxIntPoints, 1, 1, {
+    double u1[5], u2[5], nor[3], Rflux[5], vF1[5 * 3], vF2[5 * 3];
+    double gradUp1[5 * 3];
+    double shape[216];
+    int index_i[216];
+
+    const int numFaces = d_wallElems[0 + el_wall * 7];
+
+    for (int f = 0; f < numFaces; f++) {
+      const int n = d_wallElems[1 + f + el_wall * 7];
+      const int el_bdry = d_listElems[n];  // element number within all boundary elements?
+      const int Q = d_intPointsElIDBC[2 * el_bdry];
+      const int el = d_intPointsElIDBC[2 * el_bdry + 1];  // global element number (on this mpi rank) ?
+
+      const int elOffset = d_posDofIds[2 * el];
+      const int elDof = d_posDofIds[2 * el + 1];
+
+      for (int i = 0; i < elDof; i++) {
+        index_i[i] = d_nodesIDs[elOffset + i];
+      }
+
+      MFEM_FOREACH_THREAD(q, x, Q) {
+        // zero state and gradient at this quad point
+        for (int eq = 0; eq < num_equation; eq++) {
+          u1[eq] = 0.;
+          for (int d = 0; d < dim; d++) {
+            gradUp1[eq + d * num_equation] = 0.;
+          }
+        }
+
+        // extract shape functions at this quad point
+        for (int j = 0; j < elDof; j++) {
+          shape[j] = d_shapesBC[j + q * maxDofs + el_bdry * maxIntPoints * maxDofs];
+        }
+
+        // extract normal vector at this quad point
+        for (int d = 0; d < dim; d++) {
+          nor[d] = d_normW[d + q * (dim + 1) + el_bdry * maxIntPoints * (dim + 1)];
+        }
+
+        // interpolate to this quad point
+        for (int eq = 0; eq < num_equation; eq++) {
+          for (int i = 0; i < elDof; i++) {
+            const int indexi = index_i[i];
+            u1[eq] += d_U[indexi + eq * totDofs] * shape[i];
+            for (int d = 0; d < dim; d++)
+              gradUp1[eq + d * num_equation] += d_gradUp[indexi + eq * totDofs + d * num_equation * totDofs] * shape[i];
+          }
         }
 
         // compute mirror state
@@ -413,9 +501,9 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
 
         // evaluate flux
         RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
-        Fluxes::viscousFlux_serial_gpu(&vF1[0], &u1[0], &gradUpi[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
+        Fluxes::viscousFlux_serial_gpu(&vF1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
                                        num_equation);
-        Fluxes::viscousFlux_serial_gpu(&vF2[0], &u2[0], &gradUpi[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
+        Fluxes::viscousFlux_serial_gpu(&vF2[0], &u2[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
                                        num_equation);
 
         // add visc flux contribution
@@ -423,95 +511,13 @@ void WallBC::integrateWalls_gpu(const WallType type, const double &wallTemp, Vec
           for (int d = 0; d < dim; d++)
             Rflux[eq] -= 0.5 * (vF2[eq + d * num_equation] + vF1[eq + d * num_equation]) * nor[d];
 
-        // sum contributions to integral
-        for (int i = 0; i < elDof; i++) {
-          for (int eq = 0; eq < num_equation; eq++) Fcontrib[i + eq * elDof] -= Rflux[eq] * shape[i] * weight;
+        // store flux (TODO: change variable name)
+        for (int eq = 0; eq < num_equation; eq++) {
+          d_flux[eq + q * num_equation + n * maxIntPoints * num_equation] = Rflux[eq];
         }
-      }
-    }
-
-    // add to global data
-    for (int i = 0; i < elDof; i++) {
-      const int indexi = d_nodesIDs[elOffset + i];
-      for (int eq = 0; eq < num_equation; eq++) d_y[indexi + eq * totDofs] += Fcontrib[i + eq * elDof];
-    }
-  });
-#endif
-}
-
-void WallBC::interpWalls_gpu(const WallType type, const double &wallTemp, mfem::Vector &interpolated_Ubdr_,
-                             Vector &interpolatedGradUpbdr_, const mfem::Vector &x, const Array<int> &nodesIDs,
-                             const Array<int> &posDofIds, mfem::ParGridFunction *Up, mfem::ParGridFunction *gradUp,
-                             mfem::Vector &shapesBC, mfem::Vector &normalsWBC, Array<int> &intPointsElIDBC,
-                             Array<int> &wallElems, Array<int> &listElems, const int &maxIntPoints, const int &maxDofs,
-                             const int &dim, const int &num_equation) {
-#ifdef _GPU_
-  double *d_interpolU = interpolated_Ubdr_.Write();
-  double *d_interpGrads = interpolatedGradUpbdr_.Write();
-
-  const double *d_U = x.Read();
-  const double *d_gradUp = gradUp->Read();
-  const int *d_nodesIDs = nodesIDs.Read();
-  const int *d_posDofIds = posDofIds.Read();
-  const double *d_shapesBC = shapesBC.Read();
-  const double *d_normW = normalsWBC.Read();
-  const int *d_intPointsElIDBC = intPointsElIDBC.Read();
-  const int *d_wallElems = wallElems.Read();
-  const int *d_listElems = listElems.Read();
-
-  const int totDofs = x.Size() / num_equation;
-  const int numBdrElem = listElems.Size();
-
-  // clang-format on
-  MFEM_FORALL(
-      el_wall, wallElems.Size() / 7,  // el_wall is index within wall boundary elements?
-      {
-        double Ui[216], gradUpi[216 * 3];
-        double shape[216];
-
-        const int numFaces = d_wallElems[0 + el_wall * 7];
-
-        for (int f = 0; f < numFaces; f++) {
-          const int n = d_wallElems[1 + f + el_wall * 7];
-          const int el_bdry = d_listElems[n];  // element number within all boundary elements?
-          const int Q = d_intPointsElIDBC[2 * el_bdry];
-          const int el = d_intPointsElIDBC[2 * el_bdry + 1];  // global element number (on this mpi rank) ?
-
-          const int elOffset = d_posDofIds[2 * el];
-          const int elDof = d_posDofIds[2 * el + 1];
-
-          for (int eq = 0; eq < num_equation; eq++) {
-            for (int i = 0; i < elDof; i++) {
-              // load data
-              const int indexi = d_nodesIDs[elOffset + i];
-              Ui[i] = d_U[indexi + eq * totDofs];
-              for (int d = 0; d < dim; d++)
-                gradUpi[i + d * elDof] = d_gradUp[indexi + eq * totDofs + d * num_equation * totDofs];
-            }
-
-            for (int q = 0; q < Q; q++) {
-              for (int j = 0; j < elDof; j++) shape[j] = d_shapesBC[j + q * maxDofs + el_bdry * maxIntPoints * maxDofs];
-
-              double u1 = 0.;
-              for (int j = 0; j < elDof; j++) u1 += shape[j] * Ui[j];
-
-              double gUp[3];
-              for (int d = 0; d < dim; d++) {
-                gUp[d] = 0.;
-                for (int j = 0; j < elDof; j++) gUp[d] += gradUpi[j + d * elDof] * shape[j];
-              }
-
-              // save to global
-              d_interpolU[eq + q * num_equation + n * maxIntPoints * num_equation] = u1;
-
-              for (int d = 0; d < dim; d++) {
-                d_interpGrads[eq + d * num_equation + q * dim * num_equation + n * maxIntPoints * dim * num_equation] =
-                    gUp[d];
-              }
-            }  // end quadrature point loop
-          }    // end equation loop
-        }      // end face loop
-      });      // end element loop
+      }  // end quadrature point loop
+    }    // end face loop
+  });    // end element loop
 #endif
 }
 

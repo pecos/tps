@@ -45,6 +45,9 @@
 /* Define if you have the MPI library. */
 #undef HAVE_MPI
 
+/* Enable MPI extensions declared in mpi-ext.h */
+#undef HAVE_MPI_EXT
+
 /* Define if OPENBLAS is available */
 #undef HAVE_OPENBLAS
 

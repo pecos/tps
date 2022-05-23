@@ -42,22 +42,22 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
     : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
                         _refLength, axisym),
       groupsMPI(_groupsMPI),
-      outletType(_bcType),
+      outletType_(_bcType),
       inputState(_inputData),
-      maxIntPoints(_maxIntPoints),
-      maxDofs(_maxDofs) {
+      maxIntPoints_(_maxIntPoints),
+      maxDofs_(_maxDofs) {
   groupsMPI->setPatch(_patchNumber);
 
   meanUp.UseDevice(true);
-  meanUp.SetSize(num_equation);
+  meanUp.SetSize(num_equation_);
   meanUp = 0.;
 
   localMeanUp.UseDevice(true);
-  localMeanUp.SetSize(num_equation + 1);
+  localMeanUp.SetSize(num_equation_ + 1);
   localMeanUp = 0.;
 
   glob_sum.UseDevice(true);
-  glob_sum.SetSize(num_equation + 1);
+  glob_sum.SetSize(num_equation_ + 1);
   glob_sum = 0.;
 
   auto hmeanUp = meanUp.HostWrite();
@@ -65,11 +65,11 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
   hmeanUp[0] = 1.2;
   hmeanUp[1] = 60;
   hmeanUp[2] = 0;
-  if (nvel == 3) hmeanUp[3] = 0.;
-  hmeanUp[1 + nvel] = 101300;
-  if (eqSystem == NS_PASSIVE) hmeanUp[num_equation - 1] = 0.;
+  if (nvel_ == 3) hmeanUp[3] = 0.;
+  hmeanUp[1 + nvel_] = 101300;
+  if (eqSystem == NS_PASSIVE) hmeanUp[num_equation_ - 1] = 0.;
 
-  area = 0.;
+  area_ = 0.;
   parallelAreaComputed = false;
 
   Array<double> coords;
@@ -77,7 +77,7 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
   // assuming planar outlets (for GPU only)
   Vector normal;
   normal.UseDevice(false);
-  normal.SetSize(dim);
+  normal.SetSize(dim_);
   bool normalFull = false;
 
   // init boundary U
@@ -111,17 +111,17 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
   }
 
   boundaryU.UseDevice(true);
-  boundaryU.SetSize(bdrN * num_equation);
+  boundaryU.SetSize(bdrN * num_equation_);
   boundaryU = 0.;
 
   Vector iState, iUp;
   iState.UseDevice(false);
   iUp.UseDevice(false);
-  iState.SetSize(num_equation);
-  iUp.SetSize(num_equation);
+  iState.SetSize(num_equation_);
+  iUp.SetSize(num_equation_);
   auto hboundaryU = boundaryU.HostWrite();
   for (int i = 0; i < bdrN; i++) {
-    for (int eq = 0; eq < num_equation; eq++) iUp(eq) = hmeanUp[eq];
+    for (int eq = 0; eq < num_equation_; eq++) iUp(eq) = hmeanUp[eq];
     mixture->GetConservativesFromPrimitives(iUp, iState);
 
     //     double gamma = mixture->GetSpecificHeatRatio();
@@ -133,7 +133,7 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
     //     iState[1 + dim] = rE;
     //     if (eqSystem == NS_PASSIVE) iState(num_equation - 1) *= iState(0);
 
-    for (int eq = 0; eq < num_equation; eq++) hboundaryU[eq + i * num_equation] = iState[eq];
+    for (int eq = 0; eq < num_equation_; eq++) hboundaryU[eq + i * num_equation_] = iState[eq];
   }
   bdrUInit = false;
   bdrN = 0;
@@ -141,55 +141,55 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
   // init. unit tangent vector tangent1
   tangent1.UseDevice(true);
   tangent2.UseDevice(true);
-  tangent1.SetSize(dim);
-  tangent2.SetSize(dim);
+  tangent1.SetSize(dim_);
+  tangent2.SetSize(dim_);
   tangent1 = 0.;
   tangent2 = 0.;
   auto htan1 = tangent1.HostWrite();
   auto htan2 = tangent2.HostWrite();
   Array<double> coords1, coords2;
-  for (int d = 0; d < dim; d++) {
+  for (int d = 0; d < dim_; d++) {
     coords1.Append(coords[d]);
     coords2.Append(coords[d + 3]);
   }
 
   double modVec = 0.;
-  for (int d = 0; d < dim; d++) {
+  for (int d = 0; d < dim_; d++) {
     modVec += (coords2[d] - coords1[d]) * (coords2[d] - coords1[d]);
     htan1[d] = coords2[d] - coords1[d];
   }
-  for (int d = 0; d < dim; d++) htan1[d] *= 1. / sqrt(modVec);
+  for (int d = 0; d < dim_; d++) htan1[d] *= 1. / sqrt(modVec);
 
   Vector unitNorm;
   unitNorm.UseDevice(false);
-  unitNorm.SetSize(dim);
+  unitNorm.SetSize(dim_);
   unitNorm = normal;
   {
     double mod = 0.;
-    for (int d = 0; d < dim; d++) mod += normal[d] * normal[d];
+    for (int d = 0; d < dim_; d++) mod += normal[d] * normal[d];
     unitNorm *= 1. / sqrt(mod);
   }
-  if (dim == 3) {
+  if (dim_ == 3) {
     htan2[0] = unitNorm[1] * htan1[2] - unitNorm[2] * htan1[1];
     htan2[1] = unitNorm[2] * htan1[0] - unitNorm[0] * htan1[2];
     htan2[2] = unitNorm[0] * htan1[1] - unitNorm[1] * htan1[0];
   }
 
-  DenseMatrix M(dim, dim);
-  for (int d = 0; d < dim; d++) {
+  DenseMatrix M(dim_, dim_);
+  for (int d = 0; d < dim_; d++) {
     M(0, d) = unitNorm[d];
     M(1, d) = htan1[d];
-    if (dim == 3) M(2, d) = htan2[d];
+    if (dim_ == 3) M(2, d) = htan2[d];
   }
 
-  DenseMatrix invM(dim, dim);
+  DenseMatrix invM(dim_, dim_);
   mfem::CalcInverse(M, invM);
 
   inverseNorm2cartesian.UseDevice(true);
-  inverseNorm2cartesian.SetSize(dim * dim);
+  inverseNorm2cartesian.SetSize(dim_ * dim_);
   auto hinv = inverseNorm2cartesian.HostWrite();
-  for (int i = 0; i < dim; i++)
-    for (int j = 0; j < dim; j++) hinv[i + j * dim] = invM(i, j);
+  for (int i = 0; i < dim_; i++)
+    for (int j = 0; j < dim_; j++) hinv[i + j * dim_] = invM(i, j);
 
   initBdrElemsShape();
 
@@ -201,8 +201,8 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
 
 void OutletBC::initBdrElemsShape() {
   bdrShape.UseDevice(true);
-  int Nbdr = boundaryU.Size() / num_equation;
-  bdrShape.SetSize(maxIntPoints * maxDofs * Nbdr);
+  int Nbdr = boundaryU.Size() / num_equation_;
+  bdrShape.SetSize(maxIntPoints_ * maxDofs_ * Nbdr);
   bdrShape = 0.;
   auto hbdrShape = bdrShape.HostWrite();
   int elCount = 0;
@@ -214,7 +214,7 @@ void OutletBC::initBdrElemsShape() {
   }
 
   bdrElemsQ.SetSize(2 * elCount);
-  bdrDofs.SetSize(maxDofs * elCount);
+  bdrDofs.SetSize(maxDofs_ * elCount);
   bdrElemsQ = 0;
   bdrDofs = 0;
   auto hbdrElemsQ = bdrElemsQ.HostWrite();
@@ -238,7 +238,7 @@ void OutletBC::initBdrElemsShape() {
       Array<int> dofs;
       vfes->GetElementVDofs(Tr->Elem1No, dofs);
 
-      for (int i = 0; i < elDofs; i++) hbdrDofs[i + elCount * maxDofs] = dofs[i];
+      for (int i = 0; i < elDofs; i++) hbdrDofs[i + elCount * maxDofs_] = dofs[i];
 
       int intorder = Tr->Elem1->OrderW() + 2 * vfes->GetFE(Tr->Elem1No)->GetOrder();
       if (vfes->GetFE(Tr->Elem1No)->Space() == FunctionSpace::Pk) {
@@ -256,7 +256,7 @@ void OutletBC::initBdrElemsShape() {
         shape.SetSize(elDofs);
         vfes->GetFE(Tr->Elem1No)->CalcShape(Tr->GetElement1IntPoint(), shape);
 
-        for (int n = 0; n < elDofs; n++) hbdrShape[n + i * maxDofs + elCount * maxIntPoints * maxDofs] = shape(n);
+        for (int n = 0; n < elDofs; n++) hbdrShape[n + i * maxDofs_ + elCount * maxIntPoints_ * maxDofs_] = shape(n);
         offsetCount++;
       }
       elCount++;
@@ -269,7 +269,7 @@ void OutletBC::initBdrElemsShape() {
 
   bdrUp.UseDevice(true);
   int size_bdrUp = bdrElemsQ.Size() / 2;
-  bdrUp.SetSize(size_bdrUp * num_equation * maxIntPoints);
+  bdrUp.SetSize(size_bdrUp * num_equation_ * maxIntPoints_);
   bdrUp = 0.;
   bdrUp.Read();
 
@@ -284,13 +284,9 @@ void OutletBC::initBCs() {
     computeParallelArea();
 
 #ifdef _GPU_
-    interpolated_Ubdr_.UseDevice(true);
-    interpolatedGradUpbdr_.UseDevice(true);
-
-    interpolated_Ubdr_.SetSize(num_equation * maxIntPoints * listElems.Size());
-    interpolatedGradUpbdr_.SetSize(dim * num_equation * maxIntPoints * listElems.Size());
-    interpolated_Ubdr_ = 0.;
-    interpolatedGradUpbdr_ = 0.;
+    face_flux_.UseDevice(true);
+    face_flux_.SetSize(num_equation_ * maxIntPoints_ * listElems.Size());
+    face_flux_ = 0.;
 #endif
 
     BCinit = true;
@@ -298,7 +294,7 @@ void OutletBC::initBCs() {
 }
 
 void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux) {
-  switch (outletType) {
+  switch (outletType_) {
     case SUB_P:
       subsonicReflectingPressure(normal, stateIn, bdrFlux);
       break;
@@ -318,13 +314,13 @@ void OutletBC::computeParallelArea() {
   if (parallelAreaComputed) return;
 
   MPI_Comm bcomm = groupsMPI->getComm(patchNumber);
-  area = aggregateArea(patchNumber, bcomm);
+  area_ = aggregateArea(patchNumber, bcomm);
   int nfaces = aggregateBndryFaces(patchNumber, bcomm);
   parallelAreaComputed = true;
 
   if (groupsMPI->isGroupRoot(bcomm)) {
     grvy_printf(ginfo, "\n[OUTLET]: Patch number                      = %i\n", patchNumber);
-    grvy_printf(ginfo, "[OUTLET]: Total Surface Area                = %.5f\n", area);
+    grvy_printf(ginfo, "[OUTLET]: Total Surface Area                = %.5f\n", area_);
     grvy_printf(ginfo, "[OUTLET]: # of boundary faces               = %i\n", nfaces);
     grvy_printf(ginfo, "[OUTLET]: # of participating MPI partitions = %i\n", groupsMPI->groupSize(bcomm));
   }
@@ -429,7 +425,7 @@ void OutletBC::initBoundaryU(ParGridFunction *Up) {
       vfes->GetElementVDofs(Tr->Elem1No, dofs);
 
       // retreive data
-      elUp.SetSize(elDofs * num_equation);
+      elUp.SetSize(elDofs * num_equation_);
       Up->GetSubVector(dofs, elUp);
 
       int intorder = Tr->Elem1->OrderW() + 2 * vfes->GetFE(Tr->Elem1No)->GetOrder();
@@ -442,14 +438,14 @@ void OutletBC::initBoundaryU(ParGridFunction *Up) {
         Tr->SetAllIntPoints(&ip);
         shape.SetSize(elDofs);
         vfes->GetFE(Tr->Elem1No)->CalcShape(Tr->GetElement1IntPoint(), shape);
-        Vector iUp(num_equation);
+        Vector iUp(num_equation_);
 
-        for (int eq = 0; eq < num_equation; eq++) {
+        for (int eq = 0; eq < num_equation_; eq++) {
           double sum = 0.;
           for (int d = 0; d < elDofs; d++) {
             sum += shape[d] * elUp(d + eq * elDofs);
           }
-          hboundaryU[eq + Nbdr * num_equation] = sum;
+          hboundaryU[eq + Nbdr * num_equation_] = sum;
         }
         Nbdr++;
       }
@@ -460,7 +456,7 @@ void OutletBC::initBoundaryU(ParGridFunction *Up) {
 }
 
 void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
-  if (outletType == SUB_P) return;
+  if (outletType_ == SUB_P) return;
 
   bdrN = 0;
 
@@ -471,8 +467,8 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
 
   const int dofs = vfes->GetNDofs();
 
-  updateMean_gpu(Up, localMeanUp, num_equation, bdrElemsQ.Size() / 2, dofs, bdrUp, bdrElemsQ, bdrDofs, bdrShape,
-                 maxIntPoints, maxDofs);
+  updateMean_gpu(Up, localMeanUp, num_equation_, bdrElemsQ.Size() / 2, dofs, bdrUp, bdrElemsQ, bdrDofs, bdrShape,
+                 maxIntPoints_, maxDofs_);
 
   if (!bdrUInit) initBoundaryU(Up);
 
@@ -494,7 +490,7 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
       vfes->GetElementVDofs(Tr->Elem1No, dofs);
 
       // retreive data
-      elUp.SetSize(elDofs * num_equation);
+      elUp.SetSize(elDofs * num_equation_);
       Up->GetSubVector(dofs, elUp);
 
       int intorder = Tr->Elem1->OrderW() + 2 * vfes->GetFE(Tr->Elem1No)->GetOrder();
@@ -507,15 +503,15 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
         Tr->SetAllIntPoints(&ip);
         shape.SetSize(elDofs);
         vfes->GetFE(Tr->Elem1No)->CalcShape(Tr->GetElement1IntPoint(), shape);
-        Vector iUp(num_equation);
+        Vector iUp(num_equation_);
 
-        for (int eq = 0; eq < num_equation; eq++) {
+        for (int eq = 0; eq < num_equation_; eq++) {
           double sum = 0.;
           for (int d = 0; d < elDofs; d++) {
             sum += shape[d] * elUp(d + eq * elDofs);
           }
           localMeanUp[eq] += sum;
-          if (!bdrUInit) boundaryU[eq + Nbdr * num_equation] = sum;
+          if (!bdrUInit) boundaryU[eq + Nbdr * num_equation_] = sum;
         }
         Nbdr++;
       }
@@ -524,19 +520,19 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
 #endif
 
   double *h_localMeanUp = localMeanUp.HostReadWrite();
-  int totNbdr = boundaryU.Size() / num_equation;
-  h_localMeanUp[num_equation] = static_cast<double>(totNbdr);
+  int totNbdr = boundaryU.Size() / num_equation_;
+  h_localMeanUp[num_equation_] = static_cast<double>(totNbdr);
 
   double *h_sum = glob_sum.HostWrite();
-  MPI_Allreduce(h_localMeanUp, h_sum, num_equation + 1, MPI_DOUBLE, MPI_SUM, groupsMPI->getComm(patchNumber));
+  MPI_Allreduce(h_localMeanUp, h_sum, num_equation_ + 1, MPI_DOUBLE, MPI_SUM, groupsMPI->getComm(patchNumber));
 
-  BoundaryCondition::copyValues(glob_sum, meanUp, 1. / h_sum[num_equation]);
+  BoundaryCondition::copyValues(glob_sum, meanUp, 1. / h_sum[num_equation_]);
 
   if (!bdrUInit) {
     auto hboundaryU = boundaryU.HostReadWrite();
-    Vector iState(num_equation), iUp(num_equation);
+    Vector iState(num_equation_), iUp(num_equation_);
     for (int i = 0; i < totNbdr; i++) {
-      for (int eq = 0; eq < num_equation; eq++) iUp[eq] = hboundaryU[eq + i * num_equation];
+      for (int eq = 0; eq < num_equation_; eq++) iUp[eq] = hboundaryU[eq + i * num_equation_];
       mixture->GetConservativesFromPrimitives(iUp, iState);
       //       double gamma = mixture->GetSpecificHeatRatio();
       //       double k = 0.;
@@ -547,7 +543,7 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
       //       iState[1 + dim] = rE;
       //       if (eqSystem == NS_PASSIVE) iState[num_equation - 1] *= iState[0];
 
-      for (int eq = 0; eq < num_equation; eq++) hboundaryU[eq + i * num_equation] = iState[eq];
+      for (int eq = 0; eq < num_equation_; eq++) hboundaryU[eq + i * num_equation_] = iState[eq];
     }
     bdrUInit = true;
   }
@@ -556,16 +552,11 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
 void OutletBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                              ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                              Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
-  interpOutlet_gpu(outletType, inputState, interpolated_Ubdr_, interpolatedGradUpbdr_, x, nodesIDs, posDofIds, Up,
-                   gradUp, shapesBC, normalsWBC, intPointsElIDBC, listElems, offsetsBoundaryU, maxIntPoints, maxDofs,
-                   dim, num_equation);
+  interpOutlet_gpu(x, nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC, listElems,
+                   offsetsBoundaryU);
 
-  integrateOutlets_gpu(outletType, eqSystem, inputState, dt,
-                       y,  // output
-                       x, nodesIDs, posDofIds, Up, gradUp, meanUp, boundaryU, interpolated_Ubdr_,
-                       interpolatedGradUpbdr_, tangent1, tangent2, inverseNorm2cartesian, shapesBC, normalsWBC,
-                       intPointsElIDBC, listElems, offsetsBoundaryU, maxIntPoints, maxDofs, dim, num_equation, mixture,
-                       refLength, area);
+  integrateOutlets_gpu(y,  // output
+                       x, nodesIDs, posDofIds, shapesBC, normalsWBC, intPointsElIDBC, listElems, offsetsBoundaryU);
 }
 
 void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
@@ -574,32 +565,32 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   Vector unitNorm = normal;
   {
     double mod = 0.;
-    for (int d = 0; d < dim; d++) mod += normal[d] * normal[d];
+    for (int d = 0; d < dim_; d++) mod += normal[d] * normal[d];
     unitNorm *= 1. / sqrt(mod);
   }
 
   // mean velocity in inlet normal and tangent directions
-  Vector meanVel(dim);
+  Vector meanVel(dim_);
   meanVel = 0.;
-  for (int d = 0; d < dim; d++) {
+  for (int d = 0; d < dim_; d++) {
     meanVel[0] += unitNorm[d] * meanUp[d + 1];
     meanVel[1] += tangent1[d] * meanUp[d + 1];
   }
-  if (dim == 3) {
+  if (dim_ == 3) {
     tangent2[0] = unitNorm[1] * tangent1[2] - unitNorm[2] * tangent1[1];
     tangent2[1] = unitNorm[2] * tangent1[0] - unitNorm[0] * tangent1[2];
     tangent2[2] = unitNorm[0] * tangent1[1] - unitNorm[1] * tangent1[0];
-    for (int d = 0; d < dim; d++) meanVel[2] += tangent2[d] * meanUp[d + 1];
+    for (int d = 0; d < dim_; d++) meanVel[2] += tangent2[d] * meanUp[d + 1];
   }
 
   double meanP = mixture->ComputePressureFromPrimitives(meanUp);
 
   // normal gradients
-  Vector normGrad(num_equation);
+  Vector normGrad(num_equation_);
   normGrad = 0.;
-  for (int eq = 0; eq < num_equation; eq++) {
+  for (int eq = 0; eq < num_equation_; eq++) {
     // NOTE(kevin): for axisymmetric case, azimuthal normal component will be always zero.
-    for (int d = 0; d < dim; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
+    for (int d = 0; d < dim_; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
   }
   // gradient of pressure in normal direction
   double dpdn = mixture->ComputePressureDerivative(normGrad, stateIn, false);
@@ -607,7 +598,7 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
 
   double meanK = 0.;
-  for (int d = 0; d < dim; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
+  for (int d = 0; d < dim_; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
   meanK *= 0.5;
 
   // compute outgoing characteristics
@@ -615,29 +606,29 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   L2 *= meanVel[0];
 
   double L3 = 0;
-  for (int d = 0; d < dim; d++) L3 += tangent1[d] * normGrad[1 + d];
+  for (int d = 0; d < dim_; d++) L3 += tangent1[d] * normGrad[1 + d];
   L3 *= meanVel[0];
 
   double L4 = 0.;
-  if (dim == 3) {
-    for (int d = 0; d < dim; d++) L4 += tangent2[d] * normGrad[1 + d];
+  if (dim_ == 3) {
+    for (int d = 0; d < dim_; d++) L4 += tangent2[d] * normGrad[1 + d];
     L4 *= meanVel[0];
   }
 
   double L5 = 0.;
-  for (int d = 0; d < dim; d++) L5 += unitNorm[d] * normGrad[1 + d];
+  for (int d = 0; d < dim_; d++) L5 += unitNorm[d] * normGrad[1 + d];
   //   L5 = normGrad[num_equation-1] +rho*speedSound*L5;
   L5 = dpdn + meanUp[0] * speedSound * L5;
   L5 *= meanVel[0] + speedSound;
 
   double L6 = 0.;
-  if (eqSystem == NS_PASSIVE) L6 = meanVel[0] * normGrad[num_equation - 1];
+  if (eqSystem == NS_PASSIVE) L6 = meanVel[0] * normGrad[num_equation_ - 1];
 
-  // const double p = eqState->ComputePressure(stateIn, dim);
+  // const double p = eqState->ComputePressure(stateIn, dim_);
 
   // estimate ingoing characteristic
   const double sigma = speedSound / refLength;
-  //   double L1 = sigma * (meanUp[1 + dim] - inputState[0]);
+  //   double L1 = sigma * (meanUp[1 + dim_] - inputState[0]);
   double L1 = sigma * (meanP - inputState[0]);
 
   // calc vector d
@@ -654,13 +645,13 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   bdrFlux[0] = d1;
   bdrFlux[1] = meanVel[0] * d1 + meanUp[0] * d2;
   bdrFlux[2] = meanVel[1] * d1 + meanUp[0] * d3;
-  if (dim == 3) bdrFlux[3] = meanVel[2] * d1 + meanUp[0] * d4;
-  bdrFlux[1 + dim] = meanUp[0] * meanVel[0] * d2;
-  bdrFlux[1 + dim] += meanUp[0] * meanVel[1] * d3;
-  if (dim == 3) bdrFlux[1 + dim] += meanUp[0] * meanVel[2] * d4;
-  bdrFlux[1 + dim] += meanK * d1 + d5 / (gamma - 1.);
+  if (dim_ == 3) bdrFlux[3] = meanVel[2] * d1 + meanUp[0] * d4;
+  bdrFlux[1 + dim_] = meanUp[0] * meanVel[0] * d2;
+  bdrFlux[1 + dim_] += meanUp[0] * meanVel[1] * d3;
+  if (dim_ == 3) bdrFlux[1 + dim_] += meanUp[0] * meanVel[2] * d4;
+  bdrFlux[1 + dim_] += meanK * d1 + d5 / (gamma - 1.);
 
-  if (eqSystem == NS_PASSIVE) bdrFlux[num_equation - 1] = d1 * meanUp[num_equation - 1] + meanUp[0] * d6;
+  if (eqSystem == NS_PASSIVE) bdrFlux[num_equation_ - 1] = d1 * meanUp[num_equation_ - 1] + meanUp[0] * d6;
 
   // flux gradients in other directions
   //   Vector fluxY(num_equation);
@@ -688,38 +679,38 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   //     fluxY[3] = stateIn(3)/rho*dy_rv + rho*meanVt1*dy_E + dy_vp;
   //   }
 
-  Vector state2(num_equation);
-  for (int eq = 0; eq < num_equation; eq++) state2[eq] = boundaryU[eq + bdrN * num_equation];
+  Vector state2(num_equation_);
+  for (int eq = 0; eq < num_equation_; eq++) state2[eq] = boundaryU[eq + bdrN * num_equation_];
 
   Vector stateN = state2;
-  for (int d = 0; d < dim; d++) stateN[1 + d] = 0.;
-  for (int d = 0; d < dim; d++) {
+  for (int d = 0; d < dim_; d++) stateN[1 + d] = 0.;
+  for (int d = 0; d < dim_; d++) {
     stateN[1] += state2[1 + d] * unitNorm[d];
     stateN[2] += state2[1 + d] * tangent1[d];
-    if (dim == 3) stateN[3] += state2[1 + d] * tangent2[d];
+    if (dim_ == 3) stateN[3] += state2[1 + d] * tangent2[d];
   }
 
-  Vector newU(num_equation);
+  Vector newU(num_equation_);
   // for(int i=0; i<num_equation;i++) newU[i] = state2[i]- dt*(bdrFlux[i] /*+ fluxY[i]*/);
-  for (int i = 0; i < num_equation; i++) newU[i] = stateN[i] - dt * bdrFlux[i];
+  for (int i = 0; i < num_equation_; i++) newU[i] = stateN[i] - dt * bdrFlux[i];
 
   // transform back into x-y coords
   {
-    DenseMatrix M(dim, dim);
-    for (int d = 0; d < dim; d++) {
+    DenseMatrix M(dim_, dim_);
+    for (int d = 0; d < dim_; d++) {
       M(0, d) = unitNorm[d];
       M(1, d) = tangent1[d];
-      if (dim == 3) M(2, d) = tangent2[d];
+      if (dim_ == 3) M(2, d) = tangent2[d];
     }
 
-    DenseMatrix invM(dim, dim);
+    DenseMatrix invM(dim_, dim_);
     mfem::CalcInverse(M, invM);
-    Vector momN(dim), momX(dim);
-    for (int d = 0; d < dim; d++) momN[d] = newU[1 + d];
+    Vector momN(dim_), momX(dim_);
+    for (int d = 0; d < dim_; d++) momN[d] = newU[1 + d];
     invM.Mult(momN, momX);
-    for (int d = 0; d < dim; d++) newU[1 + d] = momX[d];
+    for (int d = 0; d < dim_; d++) newU[1 + d] = momX[d];
   }
-  for (int eq = 0; eq < num_equation; eq++) boundaryU[eq + bdrN * num_equation] = newU[eq];
+  for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + bdrN * num_equation_] = newU[eq];
   bdrN++;
 
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
@@ -727,7 +718,7 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
 
 // This is more or less right formulation even for two-temperature case.
 void OutletBC::subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
-  Vector state2(num_equation);
+  Vector state2(num_equation_);
 
   mixture->modifyEnergyForPressure(stateIn, state2, inputState[0]);
 
@@ -740,30 +731,30 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatr
   Vector unitNorm = normal;
   {
     double mod = 0.;
-    for (int d = 0; d < dim; d++) mod += normal[d] * normal[d];
+    for (int d = 0; d < dim_; d++) mod += normal[d] * normal[d];
     unitNorm *= 1. / sqrt(mod);
   }
 
   // mean velocity in inlet normal and tangent directions
-  Vector meanVel(dim);
+  Vector meanVel(dim_);
   meanVel = 0.;
-  for (int d = 0; d < dim; d++) {
+  for (int d = 0; d < dim_; d++) {
     meanVel[0] += unitNorm[d] * meanUp[d + 1];
     meanVel[1] += tangent1[d] * meanUp[d + 1];
   }
-  if (dim == 3) {
+  if (dim_ == 3) {
     tangent2[0] = unitNorm[1] * tangent1[2] - unitNorm[2] * tangent1[1];
     tangent2[1] = unitNorm[2] * tangent1[0] - unitNorm[0] * tangent1[2];
     tangent2[2] = unitNorm[0] * tangent1[1] - unitNorm[1] * tangent1[0];
-    for (int d = 0; d < dim; d++) meanVel[2] += tangent2[d] * meanUp[d + 1];
+    for (int d = 0; d < dim_; d++) meanVel[2] += tangent2[d] * meanUp[d + 1];
   }
 
   // normal gradients
-  Vector normGrad(num_equation);
+  Vector normGrad(num_equation_);
   normGrad = 0.;
-  for (int eq = 0; eq < num_equation; eq++) {
+  for (int eq = 0; eq < num_equation_; eq++) {
     // NOTE(kevin): for axisymmetric case, azimuthal normal component will be always zero.
-    for (int d = 0; d < dim; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
+    for (int d = 0; d < dim_; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
   }
   // gradient of pressure in normal direction
   double dpdn = mixture->ComputePressureDerivative(normGrad, stateIn, false);
@@ -771,36 +762,36 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatr
   const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
 
   double meanK = 0.;
-  for (int d = 0; d < dim; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
+  for (int d = 0; d < dim_; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
   meanK *= 0.5;
 
   // compute outgoing characteristics
-  //   double L2 = speedSound * speedSound * normGrad[0] - normGrad[1 + dim];
+  //   double L2 = speedSound * speedSound * normGrad[0] - normGrad[1 + dim_];
   double L2 = speedSound * speedSound * normGrad[0] - dpdn;
   L2 *= meanVel[0];
 
   double L3 = 0;
-  for (int d = 0; d < dim; d++) L3 += tangent1[d] * normGrad[1 + d];
+  for (int d = 0; d < dim_; d++) L3 += tangent1[d] * normGrad[1 + d];
   L3 *= meanVel[0];
 
   double L4 = 0.;
-  if (dim == 3) {
-    for (int d = 0; d < dim; d++) L4 += tangent2[d] * normGrad[1 + d];
+  if (dim_ == 3) {
+    for (int d = 0; d < dim_; d++) L4 += tangent2[d] * normGrad[1 + d];
     L4 *= meanVel[0];
   }
 
   double L5 = 0.;
-  for (int d = 0; d < dim; d++) L5 += unitNorm[d] * normGrad[1 + d];
-  //   L5 = normGrad[1 + dim] + meanUp[0] * speedSound * L5;
+  for (int d = 0; d < dim_; d++) L5 += unitNorm[d] * normGrad[1 + d];
+  //   L5 = normGrad[1 + dim_] + meanUp[0] * speedSound * L5;
   L5 = dpdn + meanUp[0] * speedSound * L5;
   L5 *= meanVel[0] + speedSound;
 
   double L6 = 0.;
-  if (eqSystem == NS_PASSIVE) L6 = meanVel[0] * normGrad[num_equation - 1];
+  if (eqSystem == NS_PASSIVE) L6 = meanVel[0] * normGrad[num_equation_ - 1];
 
   // estimate ingoing characteristic
   const double sigma = speedSound / refLength;
-  double L1 = -sigma * (meanVel[0] - inputState[0] / meanUp[0] / area);
+  double L1 = -sigma * (meanVel[0] - inputState[0] / meanUp[0] / area_);
   // cout<<inputState[0]<<" "<<meanUp[0]<<" "<<area<<endl;
   L1 *= meanUp[0] * speedSound;
 
@@ -818,13 +809,13 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatr
   bdrFlux[0] = d1;
   bdrFlux[1] = meanVel[0] * d1 + meanUp[0] * d2;
   bdrFlux[2] = meanVel[1] * d1 + meanUp[0] * d3;
-  if (dim == 3) bdrFlux[3] = meanVel[2] * d1 + meanUp[0] * d4;
-  bdrFlux[1 + dim] = meanUp[0] * meanVel[0] * d2;
-  bdrFlux[1 + dim] += meanUp[0] * meanVel[1] * d3;
-  if (dim == 3) bdrFlux[num_equation - 1] += meanUp[0] * meanVel[2] * d4;
-  bdrFlux[1 + dim] += meanK * d1 + d5 / (gamma - 1.);
+  if (dim_ == 3) bdrFlux[3] = meanVel[2] * d1 + meanUp[0] * d4;
+  bdrFlux[1 + dim_] = meanUp[0] * meanVel[0] * d2;
+  bdrFlux[1 + dim_] += meanUp[0] * meanVel[1] * d3;
+  if (dim_ == 3) bdrFlux[num_equation_ - 1] += meanUp[0] * meanVel[2] * d4;
+  bdrFlux[1 + dim_] += meanK * d1 + d5 / (gamma - 1.);
 
-  if (eqSystem == NS_PASSIVE) bdrFlux[num_equation - 1] = d1 * meanUp[num_equation - 1] + meanUp[0] * d6;
+  if (eqSystem == NS_PASSIVE) bdrFlux[num_equation_ - 1] = d1 * meanUp[num_equation_ - 1] + meanUp[0] * d6;
 
   // flux gradients in other directions
   //   Vector fluxY(num_equation);
@@ -852,38 +843,38 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatr
   //     fluxY[3] = stateIn(3)/rho*dy_rv + rho*meanVt1*dy_E + dy_vp;
   //   }
 
-  Vector state2(num_equation);
-  for (int eq = 0; eq < num_equation; eq++) state2[eq] = boundaryU[eq + bdrN * num_equation];
+  Vector state2(num_equation_);
+  for (int eq = 0; eq < num_equation_; eq++) state2[eq] = boundaryU[eq + bdrN * num_equation_];
 
   Vector stateN = state2;
-  for (int d = 0; d < dim; d++) stateN[1 + d] = 0.;
-  for (int d = 0; d < dim; d++) {
+  for (int d = 0; d < dim_; d++) stateN[1 + d] = 0.;
+  for (int d = 0; d < dim_; d++) {
     stateN[1] += state2[1 + d] * unitNorm[d];
     stateN[2] += state2[1 + d] * tangent1[d];
-    if (dim == 3) stateN[3] += state2[1 + d] * tangent2[d];
+    if (dim_ == 3) stateN[3] += state2[1 + d] * tangent2[d];
   }
 
-  Vector newU(num_equation);
+  Vector newU(num_equation_);
   // for(int i=0; i<num_equation;i++) newU[i] = state2[i]- dt*(bdrFlux[i] /*+ fluxY[i]*/);
-  for (int i = 0; i < num_equation; i++) newU[i] = stateN[i] - dt * bdrFlux[i];
+  for (int i = 0; i < num_equation_; i++) newU[i] = stateN[i] - dt * bdrFlux[i];
 
   // transform back into x-y coords
   {
-    DenseMatrix M(dim, dim);
-    for (int d = 0; d < dim; d++) {
+    DenseMatrix M(dim_, dim_);
+    for (int d = 0; d < dim_; d++) {
       M(0, d) = unitNorm[d];
       M(1, d) = tangent1[d];
-      if (dim == 3) M(2, d) = tangent2[d];
+      if (dim_ == 3) M(2, d) = tangent2[d];
     }
 
-    DenseMatrix invM(dim, dim);
+    DenseMatrix invM(dim_, dim_);
     mfem::CalcInverse(M, invM);
-    Vector momN(dim), momX(dim);
-    for (int d = 0; d < dim; d++) momN[d] = newU[1 + d];
+    Vector momN(dim_), momX(dim_);
+    for (int d = 0; d < dim_; d++) momN[d] = newU[1 + d];
     invM.Mult(momN, momX);
-    for (int d = 0; d < dim; d++) newU[1 + d] = momX[d];
+    for (int d = 0; d < dim_; d++) newU[1 + d] = momX[d];
   }
-  for (int eq = 0; eq < num_equation; eq++) boundaryU[eq + bdrN * num_equation] = newU[eq];
+  for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + bdrN * num_equation_] = newU[eq];
   bdrN++;
 
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
@@ -895,30 +886,30 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
   Vector unitNorm = normal;
   {
     double mod = 0.;
-    for (int d = 0; d < dim; d++) mod += normal[d] * normal[d];
+    for (int d = 0; d < dim_; d++) mod += normal[d] * normal[d];
     unitNorm *= 1. / sqrt(mod);
   }
 
   // mean velocity in inlet normal and tangent directions
-  Vector meanVel(dim);
+  Vector meanVel(dim_);
   meanVel = 0.;
-  for (int d = 0; d < dim; d++) {
+  for (int d = 0; d < dim_; d++) {
     meanVel[0] += unitNorm[d] * meanUp[d + 1];
     meanVel[1] += tangent1[d] * meanUp[d + 1];
   }
-  if (dim == 3) {
+  if (dim_ == 3) {
     tangent2[0] = unitNorm[1] * tangent1[2] - unitNorm[2] * tangent1[1];
     tangent2[1] = unitNorm[2] * tangent1[0] - unitNorm[0] * tangent1[2];
     tangent2[2] = unitNorm[0] * tangent1[1] - unitNorm[1] * tangent1[0];
-    for (int d = 0; d < dim; d++) meanVel[2] += tangent2[d] * meanUp[d + 1];
+    for (int d = 0; d < dim_; d++) meanVel[2] += tangent2[d] * meanUp[d + 1];
   }
 
   // normal gradients
-  Vector normGrad(num_equation);
+  Vector normGrad(num_equation_);
   normGrad = 0.;
-  for (int eq = 0; eq < num_equation; eq++) {
+  for (int eq = 0; eq < num_equation_; eq++) {
     // NOTE(kevin): for axisymmetric case, azimuthal normal component will be always zero.
-    for (int d = 0; d < dim; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
+    for (int d = 0; d < dim_; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
   }
   // gradient of pressure in normal direction
   double dpdn = mixture->ComputePressureDerivative(normGrad, stateIn, false);
@@ -926,11 +917,11 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
   const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
 
   double normVel = 0.;
-  for (int d = 0; d < dim; d++) normVel += stateIn[1 + d] * unitNorm[d];
+  for (int d = 0; d < dim_; d++) normVel += stateIn[1 + d] * unitNorm[d];
   normVel /= stateIn[0];
 
   double meanK = 0.;
-  for (int d = 0; d < dim; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
+  for (int d = 0; d < dim_; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
   meanK *= 0.5;
 
   // compute outgoing characteristics
@@ -939,29 +930,29 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
   L2 *= meanVel[0];
 
   double L3 = 0;
-  for (int d = 0; d < dim; d++) L3 += tangent1[d] * normGrad[1 + d];
+  for (int d = 0; d < dim_; d++) L3 += tangent1[d] * normGrad[1 + d];
   L3 *= meanVel[0];
 
   double L4 = 0.;
-  if (dim == 3) {
-    for (int d = 0; d < dim; d++) L4 += tangent2[d] * normGrad[1 + d];
+  if (dim_ == 3) {
+    for (int d = 0; d < dim_; d++) L4 += tangent2[d] * normGrad[1 + d];
     L4 *= meanVel[0];
   }
 
   double L5 = 0.;
-  for (int d = 0; d < dim; d++) L5 += unitNorm[d] * normGrad[1 + d];
+  for (int d = 0; d < dim_; d++) L5 += unitNorm[d] * normGrad[1 + d];
   //   L5 = normGrad[num_equation-1] +rho*speedSound*L5;
   L5 = dpdn + meanUp[0] * speedSound * L5;
   L5 *= meanVel[0] + speedSound;
 
   double L6 = 0.;
-  if (eqSystem == NS_PASSIVE) L6 = meanVel[0] * normGrad[num_equation - 1];
+  if (eqSystem == NS_PASSIVE) L6 = meanVel[0] * normGrad[num_equation_ - 1];
 
-  // const double p = eqState->ComputePressure(stateIn, dim);
+  // const double p = eqState->ComputePressure(stateIn, dim_);
 
   // estimate ingoing characteristic
   const double sigma = speedSound / refLength;
-  double L1 = -sigma * (normVel - inputState[0] / meanUp[0] / area);
+  double L1 = -sigma * (normVel - inputState[0] / meanUp[0] / area_);
   // cout<<inputState[0]<<" "<<meanUp[0]<<" "<<area<<endl;
   L1 *= meanUp[0] * speedSound;
 
@@ -979,101 +970,83 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
   bdrFlux[0] = d1;
   bdrFlux[1] = meanVel[0] * d1 + meanUp[0] * d2;
   bdrFlux[2] = meanVel[1] * d1 + meanUp[0] * d3;
-  if (dim == 3) bdrFlux[3] = meanVel[2] * d1 + meanUp[0] * d4;
-  bdrFlux[1 + dim] = meanUp[0] * meanVel[0] * d2;
-  bdrFlux[1 + dim] += meanUp[0] * meanVel[1] * d3;
-  if (dim == 3) bdrFlux[num_equation - 1] += meanUp[0] * meanVel[2] * d4;
-  bdrFlux[1 + dim] += meanK * d1 + d5 / (gamma - 1.);
+  if (dim_ == 3) bdrFlux[3] = meanVel[2] * d1 + meanUp[0] * d4;
+  bdrFlux[1 + dim_] = meanUp[0] * meanVel[0] * d2;
+  bdrFlux[1 + dim_] += meanUp[0] * meanVel[1] * d3;
+  if (dim_ == 3) bdrFlux[num_equation_ - 1] += meanUp[0] * meanVel[2] * d4;
+  bdrFlux[1 + dim_] += meanK * d1 + d5 / (gamma - 1.);
 
-  if (eqSystem == NS_PASSIVE) bdrFlux[num_equation - 1] = d1 * meanUp[num_equation - 1] + meanUp[0] * d6;
+  if (eqSystem == NS_PASSIVE) bdrFlux[num_equation_ - 1] = d1 * meanUp[num_equation_ - 1] + meanUp[0] * d6;
 
-  Vector state2(num_equation);
-  for (int eq = 0; eq < num_equation; eq++) state2[eq] = boundaryU[eq + bdrN * num_equation];
+  Vector state2(num_equation_);
+  for (int eq = 0; eq < num_equation_; eq++) state2[eq] = boundaryU[eq + bdrN * num_equation_];
 
   Vector stateN = state2;
-  for (int d = 0; d < dim; d++) stateN[1 + d] = 0.;
-  for (int d = 0; d < dim; d++) {
+  for (int d = 0; d < dim_; d++) stateN[1 + d] = 0.;
+  for (int d = 0; d < dim_; d++) {
     stateN[1] += state2[1 + d] * unitNorm[d];
     stateN[2] += state2[1 + d] * tangent1[d];
-    if (dim == 3) stateN[3] += state2[1 + d] * tangent2[d];
+    if (dim_ == 3) stateN[3] += state2[1 + d] * tangent2[d];
   }
 
-  Vector newU(num_equation);
+  Vector newU(num_equation_);
   // for(int i=0; i<num_equation;i++) newU[i] = state2[i]- dt*(bdrFlux[i] /*+ fluxY[i]*/);
-  for (int i = 0; i < num_equation; i++) newU[i] = stateN[i] - dt * bdrFlux[i];
+  for (int i = 0; i < num_equation_; i++) newU[i] = stateN[i] - dt * bdrFlux[i];
 
   // transform back into x-y coords
   {
-    DenseMatrix M(dim, dim);
-    for (int d = 0; d < dim; d++) {
+    DenseMatrix M(dim_, dim_);
+    for (int d = 0; d < dim_; d++) {
       M(0, d) = unitNorm[d];
       M(1, d) = tangent1[d];
-      if (dim == 3) M(2, d) = tangent2[d];
+      if (dim_ == 3) M(2, d) = tangent2[d];
     }
 
-    DenseMatrix invM(dim, dim);
+    DenseMatrix invM(dim_, dim_);
     mfem::CalcInverse(M, invM);
-    Vector momN(dim), momX(dim);
-    for (int d = 0; d < dim; d++) momN[d] = newU[1 + d];
+    Vector momN(dim_), momX(dim_);
+    for (int d = 0; d < dim_; d++) momN[d] = newU[1 + d];
     invM.Mult(momN, momX);
-    for (int d = 0; d < dim; d++) newU[1 + d] = momX[d];
+    for (int d = 0; d < dim_; d++) newU[1 + d] = momX[d];
   }
-  for (int eq = 0; eq < num_equation; eq++) boundaryU[eq + bdrN * num_equation] = newU[eq];
+  for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + bdrN * num_equation_] = newU[eq];
   bdrN++;
 
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
-void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem, const Array<double> &inputState,
-                                    const double &dt, Vector &y, const Vector &x, const Array<int> &nodesIDs,
-                                    const Array<int> &posDofIds, ParGridFunction *Up, ParGridFunction *gradUp,
-                                    Vector &meanUp, Vector &boundaryU, Vector &interpolated_Ubdr_,
-                                    Vector &interpolatedGradUpbdr_, Vector &tangent1, Vector &tangent2,
-                                    Vector &inverseNorm2cartesian, Vector &shapesBC, Vector &normalsWBC,
-                                    Array<int> &intPointsElIDBC, Array<int> &listElems, Array<int> &offsetsBoundaryU,
-                                    const int &maxIntPoints, const int &maxDofs, const int &dim,
-                                    const int &num_equation, GasMixture *mixture, const double &refLength,
-                                    const double &area) {
+void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+                                    Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
+                                    Array<int> &listElems, Array<int> &offsetsBoundaryU) {
 #ifdef _GPU_
-  const double *d_inputState = inputState.Read();
   double *d_y = y.Write();
   const double *d_U = x.Read();
   const int *d_nodesIDs = nodesIDs.Read();
   const int *d_posDofIds = posDofIds.Read();
-  //   const double *d_Up = Up->Read();
-  const double *d_gradUp = gradUp->Read();
-  const double *d_meanUp = meanUp.Read();
-  double *d_boundaryU = boundaryU.ReadWrite();
-  const double *d_tang1 = tangent1.Read();
-  const double *d_tang2 = tangent2.Read();
-  const double *d_inv = inverseNorm2cartesian.Read();
+
   const double *d_shapesBC = shapesBC.Read();
   const double *d_normW = normalsWBC.Read();
   const int *d_intPointsElIDBC = intPointsElIDBC.Read();
   const int *d_listElems = listElems.Read();
   const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
 
-  const int totDofs = x.Size() / num_equation;
+  const int totDofs = x.Size() / num_equation_;
   const int numBdrElem = listElems.Size();
 
-  const double *d_interpUbdr = interpolated_Ubdr_.Read();
-  const double *d_interpGrads = interpolatedGradUpbdr_.Read();
+  const int dim = dim_;
+  const int num_equation = num_equation_;
+  const int maxIntPoints = maxIntPoints_;
+  const int maxDofs = maxDofs_;
 
-  const double Rg = mixture->GetGasConstant();
-  const double gamma = mixture->GetSpecificHeatRatio();
-
-  const WorkingFluid fluid = mixture->GetWorkingFluid();
+  const double *d_flux = face_flux_.Read();
 
   // clang-format off
-  MFEM_FORALL(n, numBdrElem,
+  MFEM_FORALL_2D(n, numBdrElem, maxDofs, 1, 1,
   {
-    double Fcontrib[216 * 20];
-    double shape[216];
-    double Rflux[20], u1[20], u2[20], gradUpi[20 * 3], nor[3];
-    double weight;
+    MFEM_SHARED double Fcontrib[216 * 20];
+    double Rflux[20];
 
     const int el = d_listElems[n];
-    const int offsetBdrU = d_offsetBoundaryU[n];
 
     const int Q    = d_intPointsElIDBC[2 * el  ];
     const int elID = d_intPointsElIDBC[2 * el + 1];
@@ -1081,80 +1054,43 @@ void OutletBC::integrateOutlets_gpu(const OutletType type, Equations &eqSystem, 
     const int elOffset = d_posDofIds[2 * elID  ];
     const int elDof    = d_posDofIds[2 * elID + 1];
 
-    for (int i = 0; i < elDof; i++) {
+    MFEM_FOREACH_THREAD(i, x, elDof) {
       for ( int eq = 0; eq < num_equation; eq++ ) Fcontrib[i+eq*elDof] = 0.;
     }
+    MFEM_SYNC_THREAD;
 
     for (int q = 0; q < Q; q++) {  // loop over int. points
-      for (int i = 0; i < elDof; i++) shape[i] = d_shapesBC[i + q * maxDofs + el * maxIntPoints * maxDofs];
-      for (int d = 0; d < dim; d++) nor[d] = d_normW[d + q * (dim + 1) + el * maxIntPoints * (dim + 1)];
-      weight = d_normW[dim + q * (dim + 1) + el * maxIntPoints * (dim + 1)];
+      const double weight = d_normW[dim + q * (dim + 1) + el * maxIntPoints * (dim + 1)];
 
       // get interpolated data
       for (int eq = 0; eq < num_equation; eq++) {
-        u1[eq] = d_interpUbdr[eq + q*num_equation +n*maxIntPoints*num_equation];
-        for ( int d = 0; d < dim; d++ )
-          gradUpi[eq +d*num_equation] =
-            d_interpGrads[eq + d*num_equation +q*dim*num_equation + n*maxIntPoints*dim*num_equation];
+        Rflux[eq] = weight * d_flux[eq + q*num_equation +n*maxIntPoints*num_equation];
       }
 
-      // compute mirror state
-      switch (type) {
-      case OutletType::SUB_P:
-        computeSubPressure_gpu_serial(&u1[0], &u2[0], &nor[0], d_inputState[0], gamma, Rg, dim, num_equation,
-                                      fluid);
-        break;
-      case OutletType::SUB_P_NR:
-        computeNRSubPress_serial(offsetBdrU + q, &u1[0], &gradUpi[0], d_meanUp, dt, &u2[0], d_boundaryU,
-                                 &d_inputState[0], &nor[0], d_tang1, d_tang2, d_inv, refLength, gamma, Rg, elDof,
-                                 dim, num_equation, eqSystem);
-        // computeNRSubPress(i, offsetBdrU + q, &u1[0], &gradUpi[0], d_meanUp, dt, &u2[0], d_boundaryU,
-        //                   &d_inputState[0], &nor[0], d_tang1, d_tang2, d_inv, refLength, gamma, Rg, elDof,
-        //                   dim, num_equation, eqSystem);
-        break;
-      case OutletType::SUB_MF_NR:
-        computeNRSubMassFlow_serial(offsetBdrU + q, &u1[0], &gradUpi[0], d_meanUp, dt, &u2[0], d_boundaryU,
-                                    d_inputState, &nor[0], d_tang1, d_tang2, d_inv, refLength, area, gamma, Rg,
-                                    elDof, dim, num_equation, eqSystem);
-        // computeNRSubMassFlow(i, offsetBdrU + q, &u1[0], &gradUpi[0], d_meanUp, dt, &u2[0], d_boundaryU,
-        //                      d_inputState, &nor[0], d_tang1, d_tang2, d_inv, refLength, area, gamma, Rg,
-        //                      elDof, dim, num_equation, eqSystem);
-        break;
-      case OutletType::SUB_MF_NR_PW:
-        printf("OUTLET SUB_MF_NR_PW BC NOT IMPLEMENTED");
-        // computeNR_PW_SubMF(i, offsetBdrU + q, &u1[0], &gradUpi[0], d_meanUp, dt, &u2[0], d_boundaryU,
-        //                    d_inputState, &nor[0], d_tang1, d_tang2, d_inv, refLength, area, gamma, Rg,
-        //                    elDof, dim, num_equation, eqSystem);
-        break;
+      MFEM_FOREACH_THREAD(i, x, elDof) {
+        const double shape = d_shapesBC[i + q * maxDofs + el * maxIntPoints * maxDofs];
+        for (int eq = 0; eq < num_equation; eq++) Fcontrib[i + eq * elDof] -= Rflux[eq] * shape;
       }
-
-      // compute flux
-      RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
-
-      // sum contributions to integral
-      for (int i = 0; i < elDof; i++) {
-        for (int eq = 0; eq < num_equation; eq++) Fcontrib[i + eq * elDof] -= Rflux[eq] * shape[i] * weight;
-      }
+      MFEM_SYNC_THREAD;
     }
 
     // add to global data
-    for (int i = 0; i < elDof; i++) {
+    MFEM_FOREACH_THREAD(i, x, elDof) {
       const int indexi = d_nodesIDs[elOffset + i];
       for (int eq = 0; eq < num_equation; eq++) d_y[indexi + eq * totDofs] += Fcontrib[i + eq * elDof];
     }
+    MFEM_SYNC_THREAD;
   });  // end MFEM_FORALL_2D
 #endif
   // clang-format on
 }
 
-void OutletBC::interpOutlet_gpu(const OutletType type, const mfem::Array<double> &inputState,
-                                mfem::Vector &interpolated_Ubdr_, mfem::Vector &interpolatedGradUpbdr_,
-                                const mfem::Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                                 mfem::ParGridFunction *Up, mfem::ParGridFunction *gradUp, mfem::Vector &shapesBC,
                                 mfem::Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
-                                Array<int> &offsetsBoundaryU, const int &maxIntPoints, const int &maxDofs,
-                                const int &dim, const int &num_equation) {
+                                Array<int> &offsetsBoundaryU) {
 #ifdef _GPU_
+  const double *d_inputState = inputState.Read();
   const double *d_U = x.Read();
   const double *d_gradUp = gradUp->Read();
   const int *d_nodesIDs = nodesIDs.Read();
@@ -1164,55 +1100,110 @@ void OutletBC::interpOutlet_gpu(const OutletType type, const mfem::Array<double>
   const int *d_intPointsElIDBC = intPointsElIDBC.Read();
   const int *d_listElems = listElems.Read();
   const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
+  const double *d_meanUp = meanUp.Read();
+  double *d_boundaryU = boundaryU.ReadWrite();
+  const double *d_tang1 = tangent1.Read();
+  const double *d_tang2 = tangent2.Read();
+  const double *d_inv = inverseNorm2cartesian.Read();
 
-  double *d_interpUbdr = interpolated_Ubdr_.Write();
-  double *d_interpGrads = interpolatedGradUpbdr_.Write();
+  double *d_flux = face_flux_.Write();
 
-  const int totDofs = x.Size() / num_equation;
+  const int totDofs = x.Size() / num_equation_;
   const int numBdrElem = listElems.Size();
 
-  MFEM_FORALL(n, numBdrElem, {
+  const double Rg = mixture->GetGasConstant();
+  const double gamma = mixture->GetSpecificHeatRatio();
+
+  const WorkingFluid fluid = mixture->GetWorkingFluid();
+
+  const double rL = this->refLength;
+  const double area = this->area_;
+  const double dtloc = this->dt;
+  const Equations es = this->eqSystem;
+
+  const OutletType type = outletType_;
+
+  const int dim = dim_;
+  const int num_equation = num_equation_;
+  const int maxIntPoints = maxIntPoints_;
+  const int maxDofs = maxDofs_;
+
+  // MFEM_FORALL(n, numBdrElem, {
+  MFEM_FORALL_2D(n, numBdrElem, maxIntPoints, 1, 1, {
     //
-    double Ui[216], gradUpi[216 * 3];
     double shape[216];
-    double u1, gUp[3];
+    double u1[5], u2[5], gradUp1[5 * 3], Rflux[5], nor[3];
+    int index_i[216];
 
     const int el = d_listElems[n];
+    const int offsetBdrU = d_offsetBoundaryU[n];
     const int Q = d_intPointsElIDBC[2 * el];
     const int elID = d_intPointsElIDBC[2 * el + 1];
     const int elOffset = d_posDofIds[2 * elID];
     const int elDof = d_posDofIds[2 * elID + 1];
 
-    for (int eq = 0; eq < num_equation; eq++) {
-      // get data
-      for (int i = 0; i < elDof; i++) {
-        const int indexi = d_nodesIDs[elOffset + i];
-        Ui[i] = d_U[indexi + eq * totDofs];
-        for (int d = 0; d < dim; d++)
-          gradUpi[i + d * elDof] = d_gradUp[indexi + eq * totDofs + d * num_equation * totDofs];
+    // get data
+    for (int i = 0; i < elDof; i++) {
+      index_i[i] = d_nodesIDs[elOffset + i];
+    }
+
+    // for (int q = 0; q < Q; q++) {
+    MFEM_FOREACH_THREAD(q, x, Q) {
+      // zero state and gradient at this quad point
+      for (int eq = 0; eq < num_equation; eq++) {
+        u1[eq] = 0.;
+        for (int d = 0; d < dim; d++) {
+          gradUp1[eq + d * num_equation] = 0.;
+        }
       }
 
-      for (int q = 0; q < Q; q++) {
+      // extract shape functions at this quad point
+      for (int j = 0; j < elDof; j++) {
+        shape[j] = d_shapesBC[j + q * maxDofs + el * maxIntPoints * maxDofs];
+      }
+
+      // extract normal vector at this quad point
+      for (int d = 0; d < dim; d++) {
+        nor[d] = d_normW[d + q * (dim + 1) + el * maxIntPoints * (dim + 1)];
+      }
+
+      // interpolate to this quad point
+      for (int eq = 0; eq < num_equation; eq++) {
         for (int i = 0; i < elDof; i++) {
-          shape[i] = d_shapesBC[i + q * maxDofs + el * maxIntPoints * maxDofs];
+          const int indexi = index_i[i];
+          u1[eq] += d_U[indexi + eq * totDofs] * shape[i];
+          for (int d = 0; d < dim; d++)
+            gradUp1[eq + d * num_equation] += d_gradUp[indexi + eq * totDofs + d * num_equation * totDofs] * shape[i];
         }
+      }
 
-        u1 = 0.;
-        for (int j = 0; j < elDof; j++) u1 += shape[j] * Ui[j];
+      // compute mirror state
+      switch (type) {
+        case OutletType::SUB_P:
+          computeSubPressure_gpu_serial(&u1[0], &u2[0], &nor[0], d_inputState[0], gamma, Rg, dim, num_equation, fluid);
+          break;
+        case OutletType::SUB_P_NR:
+          computeNRSubPress_serial(offsetBdrU + q, &u1[0], &gradUp1[0], d_meanUp, dtloc, &u2[0], d_boundaryU,
+                                   &d_inputState[0], &nor[0], d_tang1, d_tang2, d_inv, rL, gamma, Rg, elDof, dim,
+                                   num_equation, es);
+          break;
+        case OutletType::SUB_MF_NR:
+          computeNRSubMassFlow_serial(offsetBdrU + q, &u1[0], &gradUp1[0], d_meanUp, dtloc, &u2[0], d_boundaryU,
+                                      d_inputState, &nor[0], d_tang1, d_tang2, d_inv, rL, area, gamma, Rg, elDof, dim,
+                                      num_equation, es);
+          break;
+        case OutletType::SUB_MF_NR_PW:
+          printf("OUTLET SUB_MF_NR_PW BC NOT IMPLEMENTED");
+          break;
+      }
 
-        for (int d = 0; d < dim; d++) {
-          gUp[d] = 0.;
-          for (int j = 0; j < elDof; j++) gUp[d] += gradUpi[j + d * elDof] * shape[j];
-        }
+      // compute flux
+      RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
 
-        d_interpUbdr[eq + q * num_equation + n * maxIntPoints * num_equation] = u1;
-
-        for (int d = 0; d < dim; d++) {
-          d_interpGrads[eq + d * num_equation + q * dim * num_equation + n * maxIntPoints * dim * num_equation] =
-              gUp[d];
-        }
-      }  // end loop over intergration points
-    }    // end loop over equations
+      for (int eq = 0; eq < num_equation; eq++) {
+        d_flux[eq + q * num_equation + n * maxIntPoints * num_equation] = Rflux[eq];
+      }
+    }
   });
 #endif
 }
