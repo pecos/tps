@@ -231,7 +231,7 @@ class RunConfiguration {
   // Use MMS
   bool use_mms_;
   std::string mms_name_;
-  bool mmsCompareRhs_ = false;  // used for utils/compare_rhs
+  bool mmsCompareRhs_ = false;   // used for utils/compare_rhs
   bool mmsSaveDetails_ = false;  // used for utils/compare_rhs
 
   RunConfiguration();

@@ -309,8 +309,7 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
   }
   // Compute the heavies heat flux.
   // NOTE(kevin): followed the standard sign of heat flux.
-  for (int d = 0; d < dim; d++)
-    normalPrimFlux(numSpecies + nvel) -= k * gradUp(1 + nvel, d) * bcFlux.normal(d);
+  for (int d = 0; d < dim; d++) normalPrimFlux(numSpecies + nvel) -= k * gradUp(1 + nvel, d) * bcFlux.normal(d);
   for (int sp = 0; sp < numSpecies; sp++) {
     if (twoTemperature && (sp == numSpecies - 2)) continue;
     normalPrimFlux(numSpecies + nvel) += speciesEnthalpies(sp) * normalPrimFlux(sp);

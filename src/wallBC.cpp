@@ -74,8 +74,7 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSyste
       // no diffusion and heat flux.
       for (int i = 0; i < numSpecies; i++) bcFlux_.primFluxIdxs[i] = true;
       bcFlux_.primFluxIdxs[numSpecies + nvel_] = true;
-      if (mixture->IsTwoTemperature())
-        bcFlux_.primFluxIdxs[numSpecies + nvel_ + 1] = true;
+      if (mixture->IsTwoTemperature()) bcFlux_.primFluxIdxs[numSpecies + nvel_ + 1] = true;
 
       // NOTE(kevin): for VISC_ADIAB, we do not use bcState_ at this point. (but could use)
       // no slip condition.
@@ -92,7 +91,8 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSyste
       bcState_.prim(nvel_ + 1) = _inputData.Th;
       bcState_.primIdxs[nvel_ + 1] = true;
       if (mixture->IsTwoTemperature()) {
-        bcState_.prim(num_equation_ - 1) = _inputData.Te;  // NOTE(kevin): for VISC_ISOTH, _inputData.Th == _inputData.Te
+        // NOTE(kevin): for VISC_ISOTH, _inputData.Th == _inputData.Te
+        bcState_.prim(num_equation_ - 1) = _inputData.Te;
         bcState_.primIdxs[num_equation_ - 1] = true;
       }
     } break;
@@ -127,19 +127,6 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSyste
       }
     } break;
   }
-
-  // {  // print out prescribed boundary conditions.
-  //   grvy_printf(GRVY_INFO, "boundary state.\n");
-  //   for (int eq = 0; eq < num_equation; eq++) grvy_printf(GRVY_INFO, "%.8E,\t", bcState_.prim(eq));
-  //   grvy_printf(GRVY_INFO, "\n");
-  //   for (int eq = 0; eq < num_equation; eq++) grvy_printf(GRVY_INFO, "%s,\t", std::string(bcState_.primIdxs[eq] ? "T" : "F").c_str());
-  //   grvy_printf(GRVY_INFO, "\n");
-  //   grvy_printf(GRVY_INFO, "boundary flux.\n");
-  //   for (int eq = 0; eq < primFluxSize; eq++) grvy_printf(GRVY_INFO, "%.8E,\t", bcFlux_.primFlux(eq));
-  //   grvy_printf(GRVY_INFO, "\n");
-  //   for (int eq = 0; eq < primFluxSize; eq++) grvy_printf(GRVY_INFO, "%s,\t", std::string(bcFlux_.primFluxIdxs[eq] ? "T" : "F").c_str());
-  //   grvy_printf(GRVY_INFO, "\n");
-  // }
 }
 
 WallBC::~WallBC() {}
@@ -375,8 +362,7 @@ void WallBC::computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix
   unitNorm *= 1. / sqrt(normN);
   bcFlux_.normal = unitNorm;
 
-  if (wallData_.elecThermalCond == SHTH)
-    mixture->computeSheathBdrFlux(wallState, bcFlux_);
+  if (wallData_.elecThermalCond == SHTH) mixture->computeSheathBdrFlux(wallState, bcFlux_);
 
   // evaluate viscous fluxes at the wall
   Vector wallViscF(num_equation_);
