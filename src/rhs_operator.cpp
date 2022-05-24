@@ -1058,10 +1058,12 @@ void RHSoperator::computeMeanTimeDerivatives(Vector &y) const {
       }
     }
 
-    if (dim_ == 2) {
-      local_timeDerivatives[4] = local_timeDerivatives[3];
-      local_timeDerivatives[3] = 0.;
-    }
+    // NOTE(kevin): This unnecessary part spares one space for third component of velocity even for 2d solution.
+    //              This is commented out as it causes seg-fault error.
+    // if (dim == 2) {
+    //   local_timeDerivatives[4] = local_timeDerivatives[3];
+    //   local_timeDerivatives[3] = 0.;
+    // }
 #endif
   }
 }
