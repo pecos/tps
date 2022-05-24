@@ -30,6 +30,9 @@ fi
 
 file1=$1
 file2=$2
+if [ $# -gt 2 ];then
+    avg=$3
+fi
 
 absTolrho=2e-13      # absolute tolerance to use for density
 absTolrhovel=2e-11   # absolute tolerance to use for rhou,rhov,rhow
