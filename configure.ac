@@ -187,7 +187,7 @@ fi
 
 
 
-AX_PATH_MFEM([4.2],  [yes])
+AX_PATH_MFEM([4.3],  [yes])
 
 
 dnl --

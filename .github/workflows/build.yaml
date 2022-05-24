@@ -68,7 +68,7 @@ jobs:
     runs-on: [self-hosted, linux, x64, gpu, marvin-cuda]
     name: Build/GPU (Cuda)
     env:
-      MFEM_DIR: /home/karl/sw/mfem-gpu-4.2
+      MFEM_DIR: /home/karl/sw/mfem-gpu-4.4
     steps:
       - name: Cancel previous runs
         uses: styfle/cancel-workflow-action@0.9.0
@@ -79,7 +79,7 @@ jobs:
         with:
           lfs: true
       - name: MFEM Tree
-        run: echo "MFEM_INC=$MFEM_INC, MFEM_LIB=$MFEM_LIB"
+        run: echo "MFEM_DIR=$MFEM_DIR"
       - name: Query modules loaded
         run:  module restore tps-gpu; module list
       - name: Bootstrap

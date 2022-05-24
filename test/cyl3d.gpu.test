@@ -43,14 +43,14 @@ setup() {
     [[ "${status}" -eq 0 ]]
 }
 
-@test "[$TEST] verify exit code if restart files missing" {
+@test "[$TEST] verify non-zero exit code if restart files missing" {
     RUNFILE=inputs/input.dtconst.restart.cyl.ini
 
     rm -f $SOLN_FILE
 
     # following should exit with error
     run ../src/tps --runFile $RUNFILE $OPTS
-    [[ "${status}" -eq 1 ]]
+    [[ "${status}" -ne 0 ]]
     [[ "${output}" =~ "Unable to access desired restart file" ]]
 }
 
