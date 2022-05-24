@@ -88,7 +88,7 @@ Gradients::Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradU
 
     // element volume integral
     int intorder = 2 * elem->GetOrder();
-    if (intRuleType == 1 && elem->GetGeomType() == Geometry::SQUARE) intorder--;  // when Gauss-Lobatto
+    // if (intRuleType == 1 && elem->GetGeomType() == Geometry::SQUARE) intorder--;  // when Gauss-Lobatto
     const IntegrationRule *ir = &intRules->Get(elem->GetGeomType(), intorder);
 
     Vector shape(eldDof);

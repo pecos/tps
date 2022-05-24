@@ -67,7 +67,7 @@ void DomainIntegrator::AssembleElementMatrix2(const FiniteElement &trial_fe, con
 
   const int maxorder = max(trial_fe.GetOrder(), test_fe.GetOrder());
   int intorder = 2 * maxorder;
-  if (intRuleType == 1 && trial_fe.GetGeomType() == Geometry::SQUARE) intorder--;  // when Gauss-Lobatto
+  // if (intRuleType == 1 && trial_fe.GetGeomType() == Geometry::SQUARE) intorder--;  // when Gauss-Lobatto
   const IntegrationRule *ir = &intRules->Get(trial_fe.GetGeomType(), intorder);
   for (int i = 0; i < ir->GetNPoints(); i++) {
     const IntegrationPoint &ip = ir->IntPoint(i);

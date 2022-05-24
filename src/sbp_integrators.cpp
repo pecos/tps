@@ -84,7 +84,7 @@ void SBPintegrator::AssembleElementVector(const FiniteElement& el, ElementTransf
 
   // Integration order calculation from DGTraceIntegrator
   int intorder = 2 * el.GetOrder();
-  if (el.GetGeomType() == Geometry::SQUARE) intorder--;  // when Gauss-Lobatto
+  // if (el.GetGeomType() == Geometry::SQUARE) intorder--;  // when Gauss-Lobatto
 
   const IntegrationRule* ir = &intRules->Get(Tr.GetGeometryType(), intorder);
 
