@@ -2,6 +2,7 @@
 
 dim=3
 report="-q"
+avg="none"
 
 while getopts ":d:r" args; do
     case "${args}" in
@@ -26,6 +27,9 @@ fi
 
 file1=$1
 file2=$2
+if [ $# -gt 2 ];then
+    avg=$3
+fi
 
 absTolrho=2e-13      # absolute tolerance to use for density
 absTolrhovel=2e-11   # absolute tolerance to use for rhou,rhov,rhow
@@ -42,7 +46,7 @@ if [ $dim -eq 3 ];then
     h5diff ${report} --delta=${absTolrhovel}  $file1 $file2 /solution/rho-w   || exit 1
 fi
 
-if [ $3 = '-averages' ]; then
+if [ $avg =  '-averages' ]; then
    echo "averages"
    h5diff ${report} --delta=${absTolrhovel}  $file1 $file2 /meanSolution/meanDens   || exit 1
    h5diff ${report} --delta=${absTolrhovel}  $file1 $file2 /meanSolution/mean-u   || exit 1
