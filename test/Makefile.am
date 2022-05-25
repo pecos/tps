@@ -63,11 +63,19 @@ TESTS += cyl3d.interp.test
 endif
 
 check_PROGRAMS =
+
 if VALGRIND_ENABLED
 check_PROGRAMS += uninit
 uninit_SOURCES = badloop.cpp
-
+if !CUDA_ENABLED
 TESTS  += valgrind.test
+endif
+endif
+
+if CUDA_ENABLED
+check_PROGRAMS  += badcuda
+badcuda_SOURCES  = badcuda.cpp
+TESTS           += cuda-memcheck.test
 endif
 
 if MASA_ENABLED

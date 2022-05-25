@@ -1,0 +1,19 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="cuda-memcheck"
+RUNFILE="inputs/input.dtconst.2iters.cyl.ini"
+
+@test "[$TEST] verify cuda-memcheck detects known error" {
+    test -e ./badcuda
+    run /usr/local/cuda/bin/cuda-memcheck --error-exitcode 1 ./badcuda
+    [[ "${status}" -eq 1 ]]
+}
+
+@test "[$TEST] run tps with input -> $RUNFILE under cuda-memcheck" {
+    test -s $RUNFILE
+
+    /usr/local/cuda/bin/cuda-memcheck --error-exitcode 1 ../src/tps $OPTS --runFile $RUNFILE
+
+}
+
