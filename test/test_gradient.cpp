@@ -58,7 +58,7 @@ void setRandomPrimitiveState(GasMixture *mixture) {
     for (int d = 0; d < dim; d++) dUp_(eq, d) = 0.1 * Up0_(eq) / dim * uniformRandomNumber();
 }
 
-void exactPrimFunction(const Vector &x, double tin, Vector &y) {
+void exactPrimFunction(const Vector &x, Vector &y) {
   for (int eq = 0; eq < y.Size(); eq++) {
     y(eq) = Up0_(eq);
     for (int d = 0; d < x.Size(); d++)
@@ -66,21 +66,21 @@ void exactPrimFunction(const Vector &x, double tin, Vector &y) {
   }
 }
 
-void exactGradXFunction(const Vector &x, double tin, Vector &y) {
+void exactGradXFunction(const Vector &x, Vector &y) {
   y = 0.0;
   const int d = 0;
   for (int eq = 0; eq < y.Size(); eq++)
     y(eq) += dUp_(eq, d) * 2.0 * pi_ * kx_[d] / L_(d) * cos(2.0 * pi_ * kx_[d] * (x(d) / L_(d) - offset_(eq, d)));
 }
 
-void exactGradYFunction(const Vector &x, double tin, Vector &y) {
+void exactGradYFunction(const Vector &x, Vector &y) {
   y = 0.0;
   const int d = 1;
   for (int eq = 0; eq < y.Size(); eq++)
     y(eq) += dUp_(eq, d) * 2.0 * pi_ * kx_[d] / L_(d) * cos(2.0 * pi_ * kx_[d] * (x(d) / L_(d) - offset_(eq, d)));
 }
 
-void exactGradZFunction(const Vector &x, double tin, Vector &y) {
+void exactGradZFunction(const Vector &x, Vector &y) {
   y = 0.0;
   const int d = 2;
   for (int eq = 0; eq < y.Size(); eq++)
@@ -155,7 +155,6 @@ int main (int argc, char *argv[])
   ParGridFunction *src_grad = srcField->getGradientGF();
 
   VectorFunctionCoefficient prim0(num_equation, &(exactPrimFunction));
-  prim0.SetTime(0.0);
   src_prim->ProjectCoefficient(prim0);
 
   RHSoperator *rhsOperator = srcField->getRHSoperator();
@@ -196,90 +195,73 @@ int main (int argc, char *argv[])
                                   visualizationVariables[eq + func * num_equation]);
     }
   }
-//
-//
-//   rhsOperator->Mult(*src_state, *rhs);
-//
-// #ifdef HAVE_MASA
-//   ForcingTerms *masaForcing = rhsOperator->getForcingTerm(rhsOperator->getMasaForcingIndex());
-//   ParGridFunction *masaRhs = new ParGridFunction(*src_state);
-//   double *dataMF = masaRhs->HostReadWrite();
-//   for (int i = 0; i < nDofs; i++)
-//     for (int eq = 0; eq < num_equation; eq++) dataMF[i + eq * nDofs] = 0.0;
-//   masaForcing->updateTerms(*masaRhs);
-//   for (int i = 0; i < nDofs; i++)
-//     for (int eq = 0; eq < num_equation; eq++) dataMF[i + eq * nDofs] *= -1.0;
-//
-//   for (int var = 0; var < numVariables; var++) {
-//     int offset = (var < 2) ? var : var - 1 + dim;
-//     if (var == 1) {
-//       visualizationVariables[var + 3 * numVariables] =
-//         new ParGridFunction(vector_fes, masaRhs->HostReadWrite() + offset * nDofs);
-//     } else {
-//       visualizationVariables[var + 3 * numVariables] =
-//         new ParGridFunction(scalar_fes, masaRhs->HostReadWrite() + offset * nDofs);
-//     }
-//
-//     paraviewColl->RegisterField("MASA-Rhs" + std::to_string(var),
-//                                 visualizationVariables[var + 3 * numVariables]);
-//   }
-//
-//   // compute component relative error of rhs.
-//   Vector error(numVariables);
-//   ParGridFunction scalarZero(*visualizationVariables[0]), vectorZero(*visualizationVariables[1]);
-//   double *dataScalar = scalarZero.HostReadWrite();
-//   double *dataVector = vectorZero.HostReadWrite();
-//   for (int i = 0; i < nDofs; i++) {
-//     dataScalar[i] = 0.0;
-//     for (int d = 0; d < dim; d++) dataVector[i + d * nDofs] = 0.0;
-//   }
-//   VectorGridFunctionCoefficient scalarZeroCoeff(&scalarZero), vectorZeroCoeff(&vectorZero);
-//   if (srcConfig.mmsCompareRhs_) {
-//     double norm;
-//     for (int var = 0; var < numVariables; var++) {
-//       VectorGridFunctionCoefficient masaCoeff(visualizationVariables[var + 3 * numVariables]);
-//       error(var) = visualizationVariables[var + 2 * numVariables]->ComputeLpError(2, masaCoeff);
-//       if (var == 1) {
-//         norm = visualizationVariables[var + 3 * numVariables]->ComputeLpError(2, vectorZeroCoeff);
-//       } else {
-//         norm = visualizationVariables[var + 3 * numVariables]->ComputeLpError(2, scalarZeroCoeff);
-//       }
-//       error(var) /= norm;
-//     }
-//   } else {
-//     for (int var = 0; var < numVariables; var++) {
-//       double norm;
-//       if (var == 1) {
-//         error(var) = visualizationVariables[var + 2 * numVariables]->ComputeLpError(2, vectorZeroCoeff);
-//         norm = visualizationVariables[var + 3 * numVariables]->ComputeLpError(2, vectorZeroCoeff);
-//       } else {
-//         error(var) = visualizationVariables[var + 2 * numVariables]->ComputeLpError(2, scalarZeroCoeff);
-//         norm = visualizationVariables[var + 3 * numVariables]->ComputeLpError(2, scalarZeroCoeff);
-//       }
-//       error(var) /= norm;
-//     }
-//   }
-//
-//   int numElems;
-//   int localElems = mesh->GetNE();
-//   MPI_Allreduce(&localElems, &numElems, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-//
-//   mfem::MPI_Session *mpi = &(tps.getMPISession());
-//   if (mpi->Root()) {
-//     std::cout << numElems << ",\t";
-//     for (int var = 0; var < numVariables; var++) {
-//       std::cout << error(var) << ",\t";
-//     }
-//     std::cout << std::endl;
-//
-//     ofstream fID;
-//     fID.open(filename, std::ios_base::app | std::ios_base::out);
-//     fID << numElems << "\t";
-//     for (int var = 0; var < numVariables; var++) fID << error(var) << "\t";
-//     fID << "\n";
-//     fID.close();
-//   }
-// #endif
+
+  ParGridFunction exact_gradX(*src_prim), exact_gradY(*src_prim), exact_gradZ(*src_prim);
+  VectorFunctionCoefficient gradX(num_equation, &(exactGradXFunction));
+  exact_gradX.ProjectCoefficient(gradX);
+  VectorFunctionCoefficient gradY(num_equation, &(exactGradYFunction));
+  exact_gradY.ProjectCoefficient(gradY);
+  VectorFunctionCoefficient gradZ(num_equation, &(exactGradZFunction));
+  exact_gradZ.ProjectCoefficient(gradZ);
+  for (int func = 0; func < dim; func++) {
+    std::string varName;
+    ParGridFunction *targetVar;
+    switch (func) {
+      case 0:
+        varName = "exact_grad_x";
+        targetVar = &exact_gradX;
+        break;
+      case 1:
+        varName = "exact_grad_y";
+        targetVar = &exact_gradY;
+        break;
+      case 2:
+        varName = "exact_grad_z";
+        targetVar = &exact_gradZ;
+        break;
+    }
+    for (int eq = 0; eq < num_equation; eq++) {
+      visualizationVariables.push_back(new ParGridFunction(scalar_fes, targetVar->HostReadWrite() + eq * nDofs));
+
+      paraviewColl->RegisterField(varName + std::to_string(eq), visualizationVariables.back());
+    }
+  }
+  
+  // compute component relative error of rhs.
+  Vector error(dim * num_equation);
+  ParGridFunction scalarZero(*visualizationVariables[0]);
+  double *dataScalar = scalarZero.HostReadWrite();
+  for (int i = 0; i < nDofs; i++) dataScalar[i] = 0.0;
+  VectorGridFunctionCoefficient scalarZeroCoeff(&scalarZero);
+
+  for (int d = 0; d < dim; d++) {
+    for (int eq = 0; eq < num_equation; eq++) {
+      VectorGridFunctionCoefficient exactCoeff(visualizationVariables[eq + (d + 1 + dim) * num_equation]);
+      error(eq + d * num_equation) = visualizationVariables[eq + (d + 1) * num_equation]->ComputeLpError(2, exactCoeff);
+      double norm = visualizationVariables[eq + (d + 1) * num_equation]->ComputeLpError(2, scalarZeroCoeff);
+      error(eq + d * num_equation) /= norm;
+    }
+  }
+
+  int numElems;
+  int localElems = mesh->GetNE();
+  MPI_Allreduce(&localElems, &numElems, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+
+  mfem::MPI_Session *mpi = &(tps.getMPISession());
+  if (mpi->Root()) {
+    std::cout << numElems << ",\t";
+    for (int i = 0; i < error.Size(); i++) {
+      std::cout << error(i) << ",\t";
+    }
+    std::cout << std::endl;
+
+    ofstream fID;
+    fID.open(filename, std::ios_base::app | std::ios_base::out);
+    fID << numElems << "\t";
+    for (int i = 0; i < error.Size(); i++) fID << error(i) << "\t";
+    fID << "\n";
+    fID.close();
+  }
 
   srcField->writeParaview(0, 0.0);
 
