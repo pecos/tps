@@ -205,29 +205,29 @@ int main (int argc, char *argv[])
     }
   }
 
-  // bool saveFlux;
-  // tps.getInput((basepath + "/save_flux").c_str(), saveFlux, false);
-  // if (saveFlux) {
-  //   ParGridFunction *src_flux = srcField->getGradientGF();
-  //   for (int d = 0; d < dim; d++) {
-  //     std::string varName;
-  //     switch (d) {
-  //       case 0:
-  //         varName = "gradUp_x";
-  //         break;
-  //       case 1:
-  //         varName = "gradUp_y";
-  //         break;
-  //       case 2:
-  //         varName = "gradUp_z";
-  //         break;
-  //     }
-  //     for (int eq = 0; eq < num_equation; eq++) {
-  //       visualizationVariables.push_back(new ParGridFunction(scalar_fes, src_gradUp->HostReadWrite() + eq * nDofs + d * num_equation * nDofs));
-  //       paraviewColl->RegisterField(varName + std::to_string(eq), visualizationVariables.back());
-  //     }
-  //   }
-  // }
+  bool saveFlux;
+  tps.getInput((basepath + "/save_flux").c_str(), saveFlux, false);
+  if (saveFlux) {
+    DenseTensor *src_flux = rhsOperator->getFlux();
+    for (int d = 0; d < dim; d++) {
+      std::string varName;
+      switch (d) {
+        case 0:
+          varName = "flux_x";
+          break;
+        case 1:
+          varName = "flux_y";
+          break;
+        case 2:
+          varName = "flux_z";
+          break;
+      }
+      for (int eq = 0; eq < num_equation; eq++) {
+        visualizationVariables.push_back(new ParGridFunction(scalar_fes, src_flux->HostReadWrite() + d * nDofs + eq * dim * nDofs));
+        paraviewColl->RegisterField(varName + std::to_string(eq), visualizationVariables.back());
+      }
+    }
+  }
 
   srcField->writeParaview(0, 0.0);
 
