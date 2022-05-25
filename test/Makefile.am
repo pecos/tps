@@ -20,7 +20,7 @@ endif
 TEST_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) $(top_srcdir)/test/tap-driver.sh
 
 EXTRA_DIST      = tap-driver.sh soln_differ inputs meshes ref_solns/*.h5 \
-			ref_solns/collisions/*.h5 ref_solns/transport/*.h5 \
+		  ref_solns/collisions/*.h5 ref_solns/transport/*.h5 \
 		  vpath.sh die.sh cyl3d.gpu.test cyl3d.mflow.gpu.test wedge.gpu.test \
 	          averages.gpu.test cyl3d.test cyl3d.mflow.test cyl3d.dtconst.test \
 		  die.test averages.test wedge.test cyl3d.interp.test qms.rings.test \
@@ -28,7 +28,7 @@ EXTRA_DIST      = tap-driver.sh soln_differ inputs meshes ref_solns/*.h5 \
 		  mms.euler.test reaction.test perfect_gas.test collision_integrals.test \
 	 	  argon_minimal.test argon_minimal.binary.test diffusion_wall.test \
 	 	  inflow_outflow.test mms.ternary_2d.test mms.ternary_2d_wall.test \
-	 	  mms.ternary_2d_inout.test
+                  mms.ternary_2d_inout.test cuda-memcheck.test
 
 
 TESTS = vpath.sh
