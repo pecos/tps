@@ -61,7 +61,7 @@ void setRandomPrimitiveState(GasMixture *mixture) {
 void exactPrimFunction(const Vector &x, double tin, Vector &y) {
   for (int eq = 0; eq < y.Size(); eq++) {
     y(eq) = Up0_(eq);
-    for (int d = 0; x.Size(); d++)
+    for (int d = 0; d < x.Size(); d++)
       y(eq) += dUp_(eq, d) * sin(2.0 * pi_ * kx_[d] * (x(d) / L_(d) - offset_(eq, d)));
   }
 }
@@ -154,7 +154,7 @@ int main (int argc, char *argv[])
   ParGridFunction *src_prim = srcField->getPrimitiveGF();
   ParGridFunction *src_grad = srcField->getGradientGF();
 
-  VectorFunctionCoefficient prim0(num_equation, exactPrimFunction);
+  VectorFunctionCoefficient prim0(num_equation, &(exactPrimFunction));
   prim0.SetTime(0.0);
   src_prim->ProjectCoefficient(prim0);
 
