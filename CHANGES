@@ -11,6 +11,7 @@ Version 1.2 (in progress)
   * introduction of new axisymmetric flow solver-mode, CPU only (#98)
   * added a cylindrical source artificial heating term for energy equation (#105)
   * bug fix to include viscous terms in isothermal wall boundary condition (#100)
+  * update minimum version requirement for MFEM to be v4.3 (#132)
 
 Version 1.1 (21 Dec 2021)
 
