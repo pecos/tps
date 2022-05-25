@@ -14,8 +14,8 @@ int main (int argc, char *argv[])
   tps.parseInput();
   tps.chooseDevices();
 
-#ifdef HAVE_MASA
   std::string basepath("utils/compute_rhs");
+#ifdef HAVE_MASA
   std::string filename;
   tps.getRequiredInput((basepath + "/filename").c_str(), filename);
 #endif
@@ -180,6 +180,54 @@ int main (int argc, char *argv[])
     fID.close();
   }
 #endif
+
+  bool saveGrad;
+  tps.getInput((basepath + "/save_grad").c_str(), saveGrad, false);
+  if (saveGrad) {
+    ParGridFunction *src_gradUp = srcField->getGradientGF();
+    for (int d = 0; d < dim; d++) {
+      std::string varName;
+      switch (d) {
+        case 0:
+          varName = "gradUp_x";
+          break;
+        case 1:
+          varName = "gradUp_y";
+          break;
+        case 2:
+          varName = "gradUp_z";
+          break;
+      }
+      for (int eq = 0; eq < num_equation; eq++) {
+        visualizationVariables.push_back(new ParGridFunction(scalar_fes, src_gradUp->HostReadWrite() + eq * nDofs + d * num_equation * nDofs));
+        paraviewColl->RegisterField(varName + std::to_string(eq), visualizationVariables.back());
+      }
+    }
+  }
+
+  // bool saveFlux;
+  // tps.getInput((basepath + "/save_flux").c_str(), saveFlux, false);
+  // if (saveFlux) {
+  //   ParGridFunction *src_flux = srcField->getGradientGF();
+  //   for (int d = 0; d < dim; d++) {
+  //     std::string varName;
+  //     switch (d) {
+  //       case 0:
+  //         varName = "gradUp_x";
+  //         break;
+  //       case 1:
+  //         varName = "gradUp_y";
+  //         break;
+  //       case 2:
+  //         varName = "gradUp_z";
+  //         break;
+  //     }
+  //     for (int eq = 0; eq < num_equation; eq++) {
+  //       visualizationVariables.push_back(new ParGridFunction(scalar_fes, src_gradUp->HostReadWrite() + eq * nDofs + d * num_equation * nDofs));
+  //       paraviewColl->RegisterField(varName + std::to_string(eq), visualizationVariables.back());
+  //     }
+  //   }
+  // }
 
   srcField->writeParaview(0, 0.0);
 
