@@ -156,6 +156,8 @@ class RHSoperator : public TimeDependentOperator {
 
   virtual ~RHSoperator();
 
+  Gradients* getGradients() { return gradients; }
+
   const double *getLocalTimeDerivatives() { return local_timeDerivatives.HostRead(); }
   ForcingTerms *getForcingTerm(const int index) { return forcing[index]; }
   int getMasaForcingIndex() { return masaForcingIndex_; }
