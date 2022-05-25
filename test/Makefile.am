@@ -176,4 +176,16 @@ if MASA_ENABLED
 test_interp_em_LDFLAGS 	 += $(MASA_LIBS)
 endif
 
+check_PROGRAMS += test_grad
+test_grad_SOURCES  = test_gradient.cpp
+test_grad_LDADD    = ../src/libtps.a
+test_grad_LDADD    += $(HDF5_LIBS)
+test_grad_LDADD    += $(GRVY_LIBS)
+test_grad_LDADD    += $(MFEM_LIBS)
+
+test_grad_LDFLAGS  =
+if MASA_ENABLED
+test_grad_LDFLAGS += $(MASA_LIBS)
+endif
+
 endif # if !GPU_ENABLED

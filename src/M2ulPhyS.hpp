@@ -388,6 +388,7 @@ class M2ulPhyS : public TPS::Solver {
   ParaViewDataCollection *GetParaviewColl() { return paraviewColl; }
   ParGridFunction *GetSolutionGF() { return U; }
   ParGridFunction *getPrimitiveGF() { return Up; }
+  ParGridFunction *getGradientGF() { return gradUp; }
   ParGridFunction *getPressureGF() { return press; }
   IntegrationRules *getIntegrationRules() { return intRules; }
   RunConfiguration &GetConfig() { return config; }
