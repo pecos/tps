@@ -112,8 +112,8 @@ class Tps {
     return;
   }
   void printHeader();
-  void parseCommandLineArgs(int argc, char *argv[]);
-  void parseArgs(std::vector<std::string> argv); // used in python interface
+  void parseCommandLineArgs(int argc, char *argv[]);  // variant used in C++ interface
+  void parseArgs(std::vector<std::string> argv);      // variant used in python interface
   void parseInput();
 
   mfem::MPI_Session &getMPISession() { return mpi_; }
