@@ -42,7 +42,7 @@ Array<int> readTable(const string fileName, const string datasetName, DenseMatri
 
 int main (int argc, char *argv[])
 {
-  TPS::Tps tps(argc, argv);
+  TPS::Tps tps;
   tps.parseCommandLineArgs(argc, argv);
   tps.parseInput();
   tps.chooseDevices();
