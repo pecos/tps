@@ -1,7 +1,7 @@
 SUBDIRS          = src test utils
 AUTOMAKE_OPTIONS = foreign
 ACLOCAL_AMFLAGS  = -I m4
-EXTRA_DIST       = CHANGES LICENSE dist_version m4/snarf_mfem.py m4/wrap_lines.py
+EXTRA_DIST       = CHANGES LICENSE dist_version m4/snarf_mfem.py m4/wrap_lines.py src/tps.py
 
 # --------------------------------------------------
 # Revision control support for external distribution
