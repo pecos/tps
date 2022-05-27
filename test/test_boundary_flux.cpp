@@ -131,7 +131,7 @@ bool testComputeBdrViscousFlux(RunConfiguration &srcConfig, const int dim) {
   grvy_printf(GRVY_INFO, "\n");
 
   grvy_printf(GRVY_INFO, "\n ComputeBdrViscousFluxes. \n");
-  boundaryViscousFluxData bcFlux;
+  BoundaryViscousFluxData bcFlux;
   bcFlux.normal = dir;
   bcFlux.primFlux.SetSize(primFluxSize);
   bcFlux.primFluxIdxs.SetSize(primFluxSize);

@@ -46,7 +46,7 @@ class WallBC : public BoundaryCondition {
  private:
   // The type of wall
   const WallType wallType_;
-  const wallData wallData_;
+  const WallData wallData_;
 
   Fluxes *fluxClass;
 
@@ -54,8 +54,8 @@ class WallBC : public BoundaryCondition {
   double wallTemp_;
 
   // TODO(kevin): can be moved to BoundaryCondition.
-  boundaryViscousFluxData bcFlux_;
-  boundaryPrimitiveData bcState_;
+  BoundaryViscousFluxData bcFlux_;
+  BoundaryPrimitiveData bcState_;
 
   const Array<int> &intPointsElIDBC;
   const int &maxIntPoints_;
@@ -73,7 +73,7 @@ class WallBC : public BoundaryCondition {
  public:
   WallBC(RiemannSolver *rsolver_, GasMixture *_mixture, Equations _eqSystem, Fluxes *_fluxClass,
          ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
-         const int _num_equation, int _patchNumber, WallType _bcType, const wallData _inputData,
+         const int _num_equation, int _patchNumber, WallType _bcType, const WallData _inputData,
          const Array<int> &intPointsElIDBC, const int &maxIntPoints, bool axisym);
   ~WallBC();
 

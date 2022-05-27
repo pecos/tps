@@ -131,7 +131,7 @@ void GasMixture::computeStagnationState(const mfem::Vector &stateIn, mfem::Vecto
   // NOTE: electron energy is purely internal energy, so no change.
 }
 
-void GasMixture::modifyStateFromPrimitive(const Vector &state, const boundaryPrimitiveData &bcState,
+void GasMixture::modifyStateFromPrimitive(const Vector &state, const BoundaryPrimitiveData &bcState,
                                           Vector &outputState) {
   outputState.SetSize(num_equation);
   assert(bcState.prim.Size() == num_equation);
@@ -1543,7 +1543,7 @@ void PerfectMixture::computeElectronPressureGrad(const double n_e, const double 
 // are recombined with electron into the background species.
 // For air plasma, we will need specific reaction inputs.
 // We may need to move this to rather chemistry class.
-void PerfectMixture::computeSheathBdrFlux(const Vector &state, boundaryViscousFluxData &bcFlux) {
+void PerfectMixture::computeSheathBdrFlux(const Vector &state, BoundaryViscousFluxData &bcFlux) {
   Vector n_sp(numSpecies);
   computeNumberDensities(state, n_sp);
 

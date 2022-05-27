@@ -218,7 +218,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
 }
 
 void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius,
-                                     const boundaryViscousFluxData &bcFlux, Vector &normalFlux) {
+                                     const BoundaryViscousFluxData &bcFlux, Vector &normalFlux) {
   normalFlux.SetSize(num_equation);
   normalFlux = 0.;
   if (eqSystem == EULER) {

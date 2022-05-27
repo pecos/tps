@@ -479,7 +479,7 @@ void RunConfiguration::readInputFile(std::string inpuFileName) {
             break;
         }
         wallPatchType.push_back(patchType);
-        wallData wData;
+        WallData wData;
         if (patchType.second == VISC_ISOTH) {
           ss >> word;
           wData.Th = stod(word);
@@ -556,4 +556,4 @@ Array<double> RunConfiguration::GetOutletData(int out) {
   return data;
 }
 
-wallData RunConfiguration::GetWallData(int w) { return wallBC[w]; }
+WallData RunConfiguration::GetWallData(int w) { return wallBC[w]; }
