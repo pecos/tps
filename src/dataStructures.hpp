@@ -255,7 +255,7 @@ struct collisionInputs {
   double ndimTe;
 };
 
-struct wallData {
+struct WallData {
   ThermalCondition hvyThermalCond;
   ThermalCondition elecThermalCond;
 
@@ -263,7 +263,7 @@ struct wallData {
   double Te;
 };
 
-struct boundaryViscousFluxData {
+struct BoundaryViscousFluxData {
   Vector normal;
   /* Primitive viscous flux index order:
    diffusion velocity - numSpecies,
@@ -275,7 +275,7 @@ struct boundaryViscousFluxData {
   Array<bool> primFluxIdxs;
 };
 
-struct boundaryPrimitiveData {
+struct BoundaryPrimitiveData {
   Vector prim;
   Array<bool> primIdxs;
 };

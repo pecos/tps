@@ -35,7 +35,7 @@
 
 WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSystem, Fluxes *_fluxClass,
                ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
-               const int _num_equation, int _patchNumber, WallType _bcType, const wallData _inputData,
+               const int _num_equation, int _patchNumber, WallType _bcType, const WallData _inputData,
                const Array<int> &_intPointsElIDBC, const int &_maxIntPoints, bool axisym)
     : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber, 1,
                         axisym),  // so far walls do not require ref. length. Left at 1
