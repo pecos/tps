@@ -10,7 +10,12 @@ Version 1.2 (in progress)
     temperature and introduce a GasMixture class (#90)
   * introduction of new axisymmetric flow solver-mode, CPU only (#98)
   * added a cylindrical source artificial heating term for energy equation (#105)
-  * bug fix to include viscous terms in isothermal wall boundary condition (#100)
+  * bug fix to include viscous terms in isothermal wall boundary condition
+    (#100)
+  * provide Python interface to top-level TPS:Tps class; build system updated
+    to build a dynamic libtps.so support library; python bindings are generated
+    using pybind11 and can be enabled via a new `--enable-pybind` configure
+    option (#117)
   * update minimum version requirement for MFEM to be v4.3 (#132)
 
 Version 1.1 (21 Dec 2021)
