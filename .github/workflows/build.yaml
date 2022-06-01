@@ -74,7 +74,7 @@ jobs:
      runs-on: ubuntu-20.04
      needs: docker-ci     
      container:
-       image: koomietx/mfem:4.3.tps.masa_mod
+       image: pecosut/tps_env:latest
        options: --user 1001 --privileged
      name: Build/CPU
      steps:
