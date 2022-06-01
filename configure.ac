@@ -161,7 +161,7 @@ AX_CHECK_CUDA
 AC_LANG_POP([C])
 
 CXX=$NVCC_PATH/nvcc
-CUDA_CXXFLAGS="-Xcompiler=-fPIC -x=cu --expt-extended-lambda -arch=$CUDA_ARCH -ccbin mpicxx $CUDA_CXXFLAGS"
+CUDA_CXXFLAGS="-Xcompiler=-fPIC -x=cu -dc --expt-extended-lambda -arch=$CUDA_ARCH -ccbin mpicxx $CUDA_CXXFLAGS"
 CUDA_LDFLAGS="--expt-extended-lambda -arch=$CUDA_ARCH -ccbin mpicxx $CUDA_LDFLAGS -lcuda -lcudart"
 
 dnl CUDA does not support -fPIC, disable in libtool in favor of -Xcompiler option above
