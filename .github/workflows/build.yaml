@@ -30,7 +30,7 @@ jobs:
          run: |
            echo "CI container needs rebuilding..."
            echo "CI_NEEDS_REBUILD=true" >> $GITHUB_ENV
-      - name: Docker Image - Set up QEMU
+       - name: Docker Image - Set up QEMU
          if: env.CI_NEEDS_REBUILD
          uses: docker/setup-qemu-action@v2
        - name: Docker Image - Setup Buildx
