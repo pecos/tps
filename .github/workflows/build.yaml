@@ -14,7 +14,7 @@ defaults:
 jobs:
    docker-ci:
      runs-on: ubuntu-latest
-     name: "Manage CI docker image (CPU)"
+     name: "CI docker image (CPU)"
      env:
        DOCKERFILE: docker/test/Dockerfile
      steps:
@@ -23,6 +23,7 @@ jobs:
            fetch-depth: 0
        - uses: jitterbit/get-changed-files@v1
          id: files
+         continue-on-error: true
        - name: Dockerfile configuration
          run: echo "DOCKERFILE=$DOCKERFILE"
        - name: Docker Image - check if CI Dockerfile changed
