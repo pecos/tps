@@ -184,7 +184,7 @@ if test "x${found_header}" = "xyes" ; then
    AC_MSG_CHECKING([for -lmfem linkage])
    
    #AX_CXX_CHECK_LIB([mfem], [mfem::GetVersionMinor()])
-   #AX_CXX_CHECK_LIB([mfem], [mfem::GetVersionMinor()],[found_library=yes],AC_MSG_ERROR([uh oh]))
+   AX_CXX_CHECK_LIB([mfem], [mfem::GetVersionMinor()],[found_library=yes],AC_MSG_ERROR([uh oh]))
 
 fi   dnl end test if header if available
 
