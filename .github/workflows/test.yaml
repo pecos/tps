@@ -1,0 +1,234 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+# make sure steps are run in a login shell to support Lmod modules
+defaults:
+  run:
+    shell: bash -l {0}
+
+jobs:
+   cpuimage:
+     uses: ./.github/workflows/docker-cpu.yaml
+     secrets:
+       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+   style:
+     runs-on: ubuntu-20.04
+     needs: [cpuimage]
+     container:
+       image: pecosut/tps_env:latest
+       options: --user 1001 --privileged
+     name: Code style
+     steps:
+       - name: Cancel previous runs
+         uses: styfle/cancel-workflow-action@0.9.0
+         with:
+           access_token: ${{ github.token }}
+       - name: Checkout code
+         uses: actions/checkout@v2
+       - name: Bootstrap
+         run:  ./bootstrap
+       - name: Configure
+         run:  ./configure
+       - name: Style check
+         run:  make style
+   build:
+     runs-on: ubuntu-20.04
+     needs: [cpuimage]
+     container:
+       image: pecosut/tps_env:latest
+       options: --user 1001 --privileged
+     name: Build/CPU
+     steps:
+       - name: Cancel previous runs
+         uses: styfle/cancel-workflow-action@0.9.0
+         with:
+           access_token: ${{ github.token }}     
+       - name: Checkout code
+         uses: actions/checkout@v2
+         with:
+           lfs: true
+       - name: Query modules loaded
+         run:  module list
+       - name: Bootstrap
+         run:  ./bootstrap
+       - name: Configure
+         run:  ./configure CXXFLAGS="-fdiagnostics-color=always"
+       - name: Make
+         run:  make -j 2
+       - name: Tests
+         run:  make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
+       - name: Distclean
+         run:  make distclean
+       - name: VPATH configure
+         run:  mkdir build; cd build; ../configure
+       - name: VPATH make
+         run:  cd build; make -j 2
+       - name: VPATH tests
+         run:  cd build; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
+   build-gpu:
+    runs-on: [self-hosted, linux, x64, gpu, marvin-cuda]
+    name: Build/GPU (Cuda)
+    env:
+      MFEM_DIR: /home/karl/sw/mfem-gpu-4.4
+    steps:
+      - name: Cancel previous runs
+        uses: styfle/cancel-workflow-action@0.9.0
+        with:
+          access_token: ${{ github.token }}    
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          lfs: true
+      - name: MFEM Tree
+        run: echo "MFEM_DIR=$MFEM_DIR"
+      - name: Query modules loaded
+        run:  module restore tps-gpu; module list
+      - name: Bootstrap
+        run:  module restore tps-gpu; ./bootstrap
+      - name: Configure
+        run: module restore tps-gpu; ./configure --enable-pybind11 --enable-gpu-cuda CUDA_ARCH=sm_75
+      - name: Make
+        run: module restore tps-gpu; make -j 2
+      - name: Tests
+        run: module restore tps-gpu; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
+   build-hip:
+    runs-on: [self-hosted, linux, x64, gpu, hip]
+    name: Build/GPU (AMD/HIP)
+    env:
+      MFEM_DIR: /home/karl/sw/mfem-hip-4.3
+    steps:
+      - name: Cancel previous runs
+        uses: styfle/cancel-workflow-action@0.9.0
+        with:
+          access_token: ${{ github.token }}    
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          lfs: true
+      - name: Set ROCm path
+        run: echo '/opt/rocm/bin' >>"${GITHUB_PATH}"
+      - name: MFEM Tree
+        run: echo "MFEM_DIR=$MFEM_DIR"
+      - name: Query modules loaded
+        run:  module restore tps-gpu; module list
+      - name: Bootstrap
+        run:  module restore tps-gpu; ./bootstrap
+      - name: Configure
+        run: module restore tps-gpu; ./configure -enable-pybind11 --enable-gpu-hip HIP_ARCH=gfx803
+      - name: Make
+        run: module restore tps-gpu; make -j 2
+      - name: Tests
+        run: module restore tps-gpu; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
+      - name: Distclean
+        run:  make distclean
+      - name: VPATH configure
+        run:  mkdir build; cd build; module restore tps-gpu; ../configure --enable-gpu-hip HIP_ARCH=gfx803
+      - name: VPATH make
+        run:  cd build; module restore tps-gpu; make -j 2
+      - name: VPATH tests
+        run:  cd build; module restore tps-gpu; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
+   distbuild:
+     runs-on: ubuntu-20.04
+     needs: [cpuimage]
+     container:
+       image: pecosut/tps_env:latest
+       options: --user 1001 --privileged
+     name: Create dist tarball
+     steps:
+       - name: Cancel previous runs
+         uses: styfle/cancel-workflow-action@0.9.0
+         with:
+           access_token: ${{ github.token }}     
+       - name: Checkout code
+         uses: actions/checkout@v2
+         with:
+           lfs: true         
+       - name: Bootstrap
+         run:  ./bootstrap
+       - name: Configure
+         run:  ./configure
+       - name: Dist
+         run:  make dist
+       - name: Archive tarball
+         uses: actions/upload-artifact@v2
+         with:
+           name: tarball-${{ github.event.pull_request.head.sha }}
+           path: tps-*.tar.gz
+   disttest-cpu:
+     runs-on: ubuntu-20.04
+     needs: [cpuimage,distbuild]
+     container:
+       image: pecosut/tps_env:latest
+       options: --user 1001 --privileged
+     name: CPU release tarball tests
+     steps:
+       - name: Cancel previous runs
+         uses: styfle/cancel-workflow-action@0.9.0
+         with:
+           access_token: ${{ github.token }}     
+       - name: Access tarball
+         uses: actions/download-artifact@v2
+         with:
+           name: tarball-${{ github.event.pull_request.head.sha }}
+       - name: Expand
+         run:  tar xfz tps-*.tar.gz; rm tps-*.tar.gz
+       - name: Configure
+         run:  cd tps-*; ./configure 
+       - name: Make
+         run:  cd tps-*; make -j 2
+       - name: TPS version
+         run:  cd tps-*; ./src/tps --version
+       - name: Tests
+         run:  cd tps-*; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
+       - name: Distclean
+         run:  cd tps-*; make distclean
+       - name: VPATH configure
+         run:  cd tps-*; mkdir build; cd build; ../configure
+       - name: VPATH make
+         run:  cd tps-*; cd build; make -j 2
+       - name: VPATH tests
+         run:  cd tps-*; cd build; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
+   disttest-gpu:
+     runs-on: [self-hosted, linux, x64, gpu, marvin-cuda]
+     needs: distbuild
+     name: GPU/Cuda release tarball tests
+     env:
+       MFEM_DIR: /home/karl/sw/mfem-gpu-4.4
+     steps:
+       - name: Cancel previous runs
+         uses: styfle/cancel-workflow-action@0.9.0
+         with:
+           access_token: ${{ github.token }}    
+       - name: Access tarball
+         uses: actions/download-artifact@v2
+         with:
+           name: tarball-${{ github.event.pull_request.head.sha }}
+       - name: Expand
+         run:  tar xfz tps-*.tar.gz; rm tps-*.tar.gz
+       - name: MFEM Tree
+         run:  echo "MFEM_INC=$MFEM_INC, MFEM_LIB=$MFEM_LIB"
+       - name: Query modules loaded
+         run:  module restore tps-gpu; module list         
+       - name: Configure
+         run:  cd tps-*; module restore tps-gpu; ./configure --enable-gpu-cuda CUDA_ARCH=sm_75
+       - name: Make
+         run:  cd tps-*; module restore tps-gpu; make -j 2
+       - name: TPS version
+         run:  cd tps-*; module restore tps-gpu; ./src/tps --version         
+       - name: Tests
+         run:  cd tps-*; module restore tps-gpu; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
+       - name: Distclean
+         run:  cd tps-*; make distclean
+       - name: VPATH configure
+         run:  cd tps-*; mkdir build; cd build; module restore tps-gpu; ../configure --enable-gpu-cuda CUDA_ARCH=sm_75
+       - name: VPATH Make
+         run:  cd tps-*; cd build; module restore tps-gpu; make -j 2
+       - name: VPATH Tests
+         run:  cd tps-*; cd build; module restore tps-gpu; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
+ 
