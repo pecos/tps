@@ -13,7 +13,7 @@ defaults:
 
 jobs:
    image:
-     uses: ./.github/workflows/docker-cpu.yml
+     uses: ./.github/workflows/docker-cpu.yaml
    distbuild:
      runs-on: ubuntu-20.04
      needs: [cpuimage]
