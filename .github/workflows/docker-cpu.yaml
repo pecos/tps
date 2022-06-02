@@ -16,9 +16,10 @@ jobs:
        - uses: actions/checkout@v2
          with:
            fetch-depth: 0
-       - uses: jitterbit/get-changed-files@v1
+#       - uses: jitterbit/get-changed-files@v1
+       - uses: Ana06/get-changed-files@v2.1.0       
          id: files
-         continue-on-error: true
+#         continue-on-error: true
        - name: Dockerfile configuration
          run: echo "DOCKERFILE=$DOCKERFILE"
        - name: Docker Image - check if CI Dockerfile changed
