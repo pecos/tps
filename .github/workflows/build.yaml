@@ -12,28 +12,28 @@ defaults:
     shell: bash -l {0}
 
 jobs:
-   image:
-     uses: ./.github/workflows/docker-cpu.yml
-###    style:
-###      runs-on: ubuntu-20.04
-###      needs: [cpuimage]
-###      container:
-###        image: pecosut/tps_env:latest
-###        options: --user 1001 --privileged
-###      name: Code style
-###      steps:
-###        - name: Cancel previous runs
-###          uses: styfle/cancel-workflow-action@0.9.0
-###          with:
-###            access_token: ${{ github.token }}
-###        - name: Checkout code
-###          uses: actions/checkout@v2
-###        - name: Bootstrap
-###          run:  ./bootstrap
-###        - name: Configure
-###          run:  ./configure
-###        - name: Style check
-###          run:  make style
+   cpuimage:
+     uses: ./.github/workflows/docker-cpu.yaml
+   style:
+     runs-on: ubuntu-20.04
+     needs: [cpuimage]
+     container:
+       image: pecosut/tps_env:latest
+       options: --user 1001 --privileged
+     name: Code style
+     steps:
+       - name: Cancel previous runs
+         uses: styfle/cancel-workflow-action@0.9.0
+         with:
+           access_token: ${{ github.token }}
+       - name: Checkout code
+         uses: actions/checkout@v2
+       - name: Bootstrap
+         run:  ./bootstrap
+       - name: Configure
+         run:  ./configure
+       - name: Style check
+         run:  make style
 ###    build:
 ###      runs-on: ubuntu-20.04
 ###      needs: [cpuimage]
