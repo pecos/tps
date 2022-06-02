@@ -12,10 +12,13 @@ defaults:
     shell: bash -l {0}
 
 jobs:
+   image:
+     uses: ./.github/workflows/docker-cpu.yml
    distbuild:
      runs-on: ubuntu-20.04
+     needs: [cpuimage]
      container:
-       image: koomietx/mfem:4.3.tps.masa_mod
+       image: pecosut/tps_env:latest
        options: --user 1001 --privileged
      name: Create dist tarball
      steps:
@@ -40,9 +43,9 @@ jobs:
            path: tps-*.tar.gz
    disttest-cpu:
      runs-on: ubuntu-20.04
-     needs: distbuild
+     needs: [cpuimage,distbuild]
      container:
-       image: koomietx/mfem:4.3.tps.masa_mod
+       image: pecosut/tps_env:latest
        options: --user 1001 --privileged
      name: CPU release tarball tests
      steps:
