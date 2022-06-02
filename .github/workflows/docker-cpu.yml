@@ -4,7 +4,7 @@ on: [workflow_call]
 jobs:
    docker-ci:
      runs-on: ubuntu-latest
-     name: "CI docker image (CPU)"
+     name: "CI docker image (CPU) - test"
      env:
        DOCKERFILE: docker/test/Dockerfile
      steps:
