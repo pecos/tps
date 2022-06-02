@@ -9,7 +9,7 @@ on:
 jobs:
    docker-ci:
      runs-on: ubuntu-latest
-     name: "CI docker image (CPU)"
+     name: "docker env"
      env:
        DOCKERFILE: docker/test/Dockerfile
      steps:
