@@ -22,11 +22,11 @@ if [ ! -d ref_solns ];then
 fi
 
 # necessary binaries
-binaries="bats die.sh soln_differ"
+binaries="bats die.sh soln_differ ../src/tps.py"
 for binary in $binaries; do
     if [ ! -x $binary ];then
         if [ -x $testDir/$binary ];then
-           ln -s $testDir/$binary .
+           ln -s $testDir/$binary $binary
         fi
     fi
 done
