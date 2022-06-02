@@ -12,7 +12,7 @@ defaults:
     shell: bash -l {0}
 
 jobs:
-   image:
+   cpuimage:
      uses: ./.github/workflows/docker-cpu.yaml
    distbuild:
      runs-on: ubuntu-20.04
