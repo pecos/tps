@@ -21,6 +21,7 @@ RUN yum -y install boost-gnu9-mpich-ohpc
 
 RUN yum -y install python38-pip
 RUN pip3 install matplotlib
+RUN pip3 install pybind11
 RUN yum -y install procps-ng
 RUN yum -y install diffutils
 

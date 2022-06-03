@@ -58,7 +58,7 @@ jobs:
        - name: Bootstrap
          run:  ./bootstrap
        - name: Configure
-         run:  ./configure CXXFLAGS="-fdiagnostics-color=always"
+         run:  ./configure CXXFLAGS="-fdiagnostics-color=always" --enable-pybind11
        - name: Make
          run:  make -j 2
        - name: Tests
