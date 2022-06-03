@@ -27,7 +27,7 @@ RUN yum -y install python3-pip
 RUN yum -y install python3-devel
 RUN yum -y install valgrind-ohpc
 RUN yum -y install clang-tools-extra
-
+RUN yum -y install diffutils
 
 #---------------------------
 # Add local install of GRVY
