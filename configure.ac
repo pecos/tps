@@ -38,11 +38,13 @@ AM_CONDITIONAL(PYTHON_ENABLED,test x$enable_pybind11 = xyes)
 CXXFLAGS="-std=c++11 $CXXFLAGS"
 
 # check for mpi-ext.h
+AC_LANG_PUSH([C++])
 AH_TEMPLATE([HAVE_MPI_EXT],[Enable MPI extensions declared in mpi-ext.h])
 AC_CHECK_HEADER([mpi-ext.h],[found_mpi_ext=yes],[found_mpi_ext=no],[#include <mpi.h>])
 if test "x${found_mpi_ext}" = "xyes" ; then
    AC_DEFINE([HAVE_MPI_EXT])
 fi
+AC_LANG_POP([C++])
 
 #--------------------
 # 3rd party libraries
