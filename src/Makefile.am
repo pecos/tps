@@ -24,13 +24,6 @@ tps_SOURCES          = main.cpp
 tps_LDADD            = libtps.la
 tps_LDFLAGS         += $(PYTHON_LIBS) $(MFEM_LIBS)
 
-
-
-if MASA_ENABLED
-tps_LDFLAGS += $(MASA_LIBS)
-endif
-
-
 # C++ solver library sources
 cxx_sources          = averaging_and_rms.cpp faceGradientIntegration.cpp M2ulPhyS.cpp rhs_operator.cpp wallBC.cpp \
 		       BCintegrator.cpp face_integrator.cpp riemann_solver.cpp BoundaryCondition.cpp fluxes.cpp \
@@ -76,6 +69,11 @@ endif
 if GSLIB_ENABLED
 libtps_la_LIBADD    += -L$(GSLIB_LIB) -lgs
 endif
+
+if MASA_ENABLED
+libtps_la_LIBADD += $(MASA_LIBS)
+endif
+
 
 # Python wrapper for C++ solver library
 ### pyexec_LTLIBRARIES   = pytps.la

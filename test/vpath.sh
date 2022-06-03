@@ -40,3 +40,13 @@ for file in $files; do
         fi
     fi
 done
+
+# necessary libs
+libs="libtps.la"
+for lib in $libs; do
+    if [ ! -s $lib ];then
+        if [ -s $testDir/$lib ];then
+           ln -s $testDir/$lib .
+        fi
+    fi
+done
