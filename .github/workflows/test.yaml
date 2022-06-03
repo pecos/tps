@@ -128,7 +128,7 @@ jobs:
       - name: Distclean
         run:  make distclean
       - name: VPATH configure
-        run:  mkdir build; cd build; module restore tps-gpu; ../configure --enable-gpu-hip HIP_ARCH=gfx803
+        run:  mkdir build; cd build; module restore tps-gpu; ../configure --enable-pybind11 --enable-gpu-hip HIP_ARCH=gfx803
       - name: VPATH make
         run:  cd build; module restore tps-gpu; make -j 2
       - name: VPATH tests
