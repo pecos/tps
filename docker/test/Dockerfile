@@ -21,7 +21,7 @@ RUN yum -y install boost-gnu9-mpich-ohpc
 
 RUN yum -y install python38-pip
 RUN pip3 install matplotlib
-RUN pip3 install pybind11
+
 RUN yum -y install procps-ng
 RUN yum -y install diffutils
 
@@ -78,7 +78,9 @@ RUN yum -y install bc
 RUN yum -y install clang-tools-extra
 RUN yum -y install zlib-devel
 RUN yum -y install libcurl-devel
+RUN yum -y install pybind11-devel
 RUN yum -y install python3-pybind11
+
 
 # Register new libs installed into /usr/local/lib with linker
 RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/class.conf
