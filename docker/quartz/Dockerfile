@@ -27,7 +27,7 @@ RUN yum -y install python3-pip
 RUN yum -y install python3-devel
 RUN yum -y install valgrind-ohpc
 RUN yum -y install clang-tools-extra
-
+RUN yum -y install diffutils
 
 #---------------------------
 # Add local install of GRVY
@@ -49,6 +49,7 @@ RUN ldconfig
 
 # additional packages
 RUN pip3 install numpy
+RUN yum -y install pybind11-devel
 
 # load mfem by default
 RUN echo "module try-add mfem" >> /etc/profile.d/lmod.sh
