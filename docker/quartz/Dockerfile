@@ -49,6 +49,7 @@ RUN ldconfig
 
 # additional packages
 RUN pip3 install numpy
+RUN yum -y install pybind11-devel
 
 # load mfem by default
 RUN echo "module try-add mfem" >> /etc/profile.d/lmod.sh
