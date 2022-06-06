@@ -60,7 +60,7 @@ jobs:
          with:
            push: true
            context: ${{ env.DOCKERPATH }}	   
-           tags: ${{ steps.meta.outputs.tags }
+           tags: ${{ steps.meta.outputs.tags }}
        - name: Docker Image - modules avail
          if: env.CI_NEEDS_REBUILD
          run: docker ps
