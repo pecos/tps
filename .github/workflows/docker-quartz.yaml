@@ -6,7 +6,6 @@ jobs:
      runs-on: ubuntu-latest
      name: "docker quartz env"
      env:
-#       DOCKERFILE: docker/quartz/Dockerfile
        DOCKERPATH: docker/quartz
      steps:
        - name: Cancel previous runs
@@ -18,8 +17,8 @@ jobs:
            fetch-depth: 0
        - uses: Ana06/get-changed-files@v2.1.0       
          id: files
-       - name: Dockerfile configuration
-         run: echo "DOCKERFILE=$DOCKERFILE"
+       - name: Dockerpath configuration
+         run: echo "DOCKERPATH=$DOCKERPATH"
        - name: Dockerpath - check if files in docker path changed
          if: contains(steps.files.outputs.all,env.DOCKERPATH)
          run: |
