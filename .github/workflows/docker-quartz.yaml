@@ -41,7 +41,7 @@ jobs:
          if: env.CI_NEEDS_REBUILD
          uses: docker/metadata-action@v4
          with:
-           images: pecosut/app
+           images: pecosut/tps_quartz
            tags: type=sha
            flavor: latest=true
        - name: Build Container motd
@@ -60,7 +60,7 @@ jobs:
          with:
            push: true
            context: ${{ env.DOCKERPATH }}	   
-           tags: pecosut/tps_quartz_env:latest
+           tags: ${{ steps.meta.outputs.tags }
        - name: Docker Image - modules avail
          if: env.CI_NEEDS_REBUILD
          run: docker ps
