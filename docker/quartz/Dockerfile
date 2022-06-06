@@ -62,3 +62,4 @@ COPY motd.sh /etc/profile.d/motd.sh
 RUN useradd -u 1000 -m test
 WORKDIR /home/test
 USER test
+
