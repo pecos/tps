@@ -92,6 +92,9 @@ RUN echo "module try-add mfem" >> /etc/profile.d/lmod.sh
 RUN echo "module try-add boost" >> /etc/profile.d/lmod.sh
 RUN echo "module try-add valgrind" >> /etc/profile.d/lmod.sh
 
+# include git sha in motd
+COPY motd.sh /etc/profile.d/motd.sh
+
 ## Define a user
 RUN useradd -u 1000 -m test
 WORKDIR /home/test
