@@ -11,7 +11,7 @@ jobs:
      runs-on: ubuntu-latest
      name: "docker env"
      env:
-       DOCKERFILE: docker/test/Dockerfile
+       DOCKERPATH: docker/test
      steps:
        - name: Cancel previous runs
          uses: styfle/cancel-workflow-action@0.9.0
@@ -24,10 +24,10 @@ jobs:
        - uses: Ana06/get-changed-files@v2.1.0       
          id: files
 #         continue-on-error: true
-       - name: Dockerfile configuration
-         run: echo "DOCKERFILE=$DOCKERFILE"
-       - name: Docker Image - check if CI Dockerfile changed
-         if: contains(steps.files.outputs.all,env.DOCKERFILE)
+       - name: DockerPATH configuration
+         run: echo "DOCKERPATH=$DOCKERPATH"
+       - name: DockerPATH - check if files in docker path changed
+         if: contains(steps.files.outputs.all,env.DOCKERPATH)
          run: |
            echo "CI container needs rebuilding..."
            echo "CI_NEEDS_REBUILD=true" >> $GITHUB_ENV
@@ -43,10 +43,29 @@ jobs:
          with:
            username: ${{ secrets.DOCKERHUB_USERNAME }}
            password: ${{ secrets.DOCKERHUB_TOKEN }}
+       - name: Extract metadata (tags, labels) for Docker
+         id: meta
+         if: env.CI_NEEDS_REBUILD
+         uses: docker/metadata-action@v4
+         with:
+           images: pecosut/tps_env
+           tags: type=sha
+           flavor: latest=true
+       - name: Build Container motd
+         if: env.CI_NEEDS_REBUILD
+         run: |
+           echo "#!/bin/bash" > ${{env.DOCKERPATH}}/motd.sh
+           echo "echo --------------------------" >> ${{env.DOCKERPATH}}/motd.sh
+           echo "echo TPS/CI Development Container"  >> ${{env.DOCKERPATH}}/motd.sh
+           echo "Revision: `echo ${GITHUB_SHA} | cut -c1-8`" >> ${{env.DOCKERPATH}}/motd.sh
+           echo "echo --------------------------" >> ${{env.DOCKERPATH}}/motd.sh
+           chmod 755 ${{env.DOCKERPATH}}/motd.sh
+           cat ${{env.DOCKERPATH}}/motd.sh
        - name: Docker Image - Build and push
          if: env.CI_NEEDS_REBUILD
          uses: docker/build-push-action@v3
          with:
            push: true
-           file: ${{ env.DOCKERFILE }}
-           tags: pecosut/tps_env:latest
+           context: ${{ env.DOCKERPATH }}
+           tags: ${{ steps.meta.outputs.tags }
+
