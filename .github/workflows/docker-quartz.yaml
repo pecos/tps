@@ -44,16 +44,16 @@ jobs:
            images: pecosut/app
            tags: type=sha
            flavor: latest=true
-      - name: Build Container motd
-        if: env.CI_NEEDS_REBUILD
-        run: |
-          echo "#!/bin/bash" > ${{env.DOCKERPATH}}/motd.sh
-          echo "echo --------------------------" >> ${{env.DOCKERPATH}}/motd.sh
-          echo "echo TPS Development Container"  >> ${{env.DOCKERPATH}}/motd.sh
-          echo "Revision: `echo ${GITHUB_SHA} | cut -c1-8`" >> ${{env.DOCKERPATH}}/motd.sh
-          echo "echo --------------------------" >> ${{env.DOCKERPATH}}/motd.sh
-          chmod 755 ${{env.DOCKERPATH}}/motd.sh
-          cat ${{env.DOCKERPATH}}/motd.sh
+       - name: Build Container motd
+         if: env.CI_NEEDS_REBUILD
+         run: |
+           echo "#!/bin/bash" > ${{env.DOCKERPATH}}/motd.sh
+           echo "echo --------------------------" >> ${{env.DOCKERPATH}}/motd.sh
+           echo "echo TPS Development Container"  >> ${{env.DOCKERPATH}}/motd.sh
+           echo "Revision: `echo ${GITHUB_SHA} | cut -c1-8`" >> ${{env.DOCKERPATH}}/motd.sh
+           echo "echo --------------------------" >> ${{env.DOCKERPATH}}/motd.sh
+           chmod 755 ${{env.DOCKERPATH}}/motd.sh
+           cat ${{env.DOCKERPATH}}/motd.sh
        - name: Docker Image - Build and push
          if: env.CI_NEEDS_REBUILD
          uses: docker/build-push-action@v3
