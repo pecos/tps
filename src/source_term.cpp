@@ -119,7 +119,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     Vector Jd(nvel);  // diffusion current.
     Jd = 0.0;
     if (ambipolar_) {  // diffusion current using electric conductivity.
-      const double mho = globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY);
+      //const double mho = globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY);
       // Jd = mho * Efield
 
     } else {  // diffusion current by definition.
