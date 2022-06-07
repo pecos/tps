@@ -14,7 +14,7 @@ AX_SUMMARIZE_ENV
 # MPI
 AX_PROG_CXX_MPI
 # libtool/dynamic library support
-AC_PROG_LIBTOOL
+AC_PROG_LIBTOOL([disable-static])
 # python binary
 AM_PATH_PYTHON([3.6.8])
 # python interface
