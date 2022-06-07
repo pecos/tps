@@ -21,10 +21,13 @@ int main (int argc, char *argv[])
 #endif
 
   M2ulPhyS *srcField = new M2ulPhyS(tps.getMPISession(), tps.getInputFilename(), &tps);
+
+#ifdef HAVE_MASA
   RunConfiguration& srcConfig = srcField->GetConfig();
+#endif
 
   GasMixture *mixture = srcField->getMixture();
-  int numSpecies = mixture->GetNumSpecies();
+  // int numSpecies = mixture->GetNumSpecies();
   int num_equation = mixture->GetNumEquations();
 
   // Get meshes
@@ -34,8 +37,8 @@ int main (int argc, char *argv[])
   int numVariables = num_equation - dim + 1;
 
   if (mesh->GetNodes() == NULL) { mesh->SetCurvature(1); }
-  const int mesh_poly_deg =
-    mesh->GetNodes()->FESpace()->GetElementOrder(0);
+  // const int mesh_poly_deg =
+  //   mesh->GetNodes()->FESpace()->GetElementOrder(0);
   cout << "Source mesh curvature: "
        << mesh->GetNodes()->OwnFEC()->Name() << endl;
 
