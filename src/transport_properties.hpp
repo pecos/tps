@@ -70,7 +70,7 @@ class TransportProperties {
  public:
   TransportProperties(GasMixture *_mixture);
 
-  ~TransportProperties() {}
+  virtual ~TransportProperties() {}
 
   // Currently, diffusion velocity is evaluated together with transport properties,
   // though diffusion velocity can vary according to models we use.
@@ -135,7 +135,7 @@ class DryAirTransport : public TransportProperties {
  public:
   DryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile);
 
-  ~DryAirTransport() {}
+  virtual ~DryAirTransport() {}
 
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
                                               Vector &transportBuffer, DenseMatrix &diffusionVelocity);
@@ -167,7 +167,7 @@ class TestBinaryAirTransport : public DryAirTransport {
  public:
   TestBinaryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile);
 
-  ~TestBinaryAirTransport() {}
+  virtual ~TestBinaryAirTransport() {}
 
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
                                               Vector &transportBuffer, DenseMatrix &diffusionVelocity);
@@ -196,7 +196,7 @@ class ConstantTransport : public TransportProperties {
  public:
   ConstantTransport(GasMixture *_mixture, RunConfiguration &_runfile);
 
-  ~ConstantTransport() {}
+  virtual ~ConstantTransport() {}
 
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
                                               Vector &transportBuffer, DenseMatrix &diffusionVelocity);

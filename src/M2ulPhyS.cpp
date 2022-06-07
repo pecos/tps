@@ -221,7 +221,7 @@ void M2ulPhyS::initVariables() {
 
     locToGlobElem = new int[mesh->GetNE()];
     int lelem = 0;
-    for (unsigned int gelem = 0; gelem < nelemGlobal_; gelem++) {
+    for (int gelem = 0; gelem < nelemGlobal_; gelem++) {
       if (mpi.WorldRank() == partitioning_[gelem]) {
         locToGlobElem[lelem] = gelem;
         lelem += 1;
@@ -269,6 +269,9 @@ void M2ulPhyS::initVariables() {
         case GasModel::PERFECT_MIXTURE:
           mixture = new PerfectMixture(config, dim, nvel);
           break;
+        default:
+          mfem_error("GasModel not recognized.");
+          break;
       }
       switch (config.GetTranportModel()) {
         case ARGON_MINIMAL:
@@ -281,6 +284,7 @@ void M2ulPhyS::initVariables() {
           transportPtr = new ConstantTransport(mixture, config);
           break;
         default:
+          mfem_error("TransportModel not recognized.");
           break;
       }
       switch (config.GetChemistryModel()) {
@@ -288,6 +292,9 @@ void M2ulPhyS::initVariables() {
           chemistry_ = new Chemistry(mixture, config);
           break;
       }
+      break;
+    default:
+      mfem_error("WorkingFluid not recognized.");
       break;
   }
   assert(mixture != NULL);
@@ -1091,7 +1098,9 @@ void M2ulPhyS::solve() {
   }
 #endif
 
+#ifdef HAVE_SLURM
   bool readyForRestart = false;
+#endif
 
   // Integrate in time.
   while (iter < MaxIters) {
@@ -1137,7 +1146,8 @@ void M2ulPhyS::solve() {
 #endif
 
       if (iter != MaxIters) {
-        auto hUp = Up->HostRead();
+        //auto hUp = Up->HostRead();
+        Up->HostRead();
         mixture->UpdatePressureGridFunction(press, Up);
 
         restart_files_hdf5("write");
@@ -1145,7 +1155,8 @@ void M2ulPhyS::solve() {
         paraviewColl->SetCycle(iter);
         paraviewColl->SetTime(time);
         paraviewColl->Save();
-        auto dUp = Up->ReadWrite();  // sets memory to GPU
+        //auto dUp = Up->ReadWrite();  // sets memory to GPU
+        Up->ReadWrite();  // sets memory to GPU
 
         average->write_meanANDrms_restart_files(iter, time);
       }
@@ -1176,7 +1187,8 @@ void M2ulPhyS::solve() {
   }  // <-- end main timestep iteration loop
 
   if (iter == MaxIters) {
-    auto hUp = Up->HostRead();
+    //auto hUp = Up->HostRead();
+    Up->HostRead();
     mixture->UpdatePressureGridFunction(press, Up);
 
     // write_restart_files();
@@ -1543,7 +1555,7 @@ void M2ulPhyS::read_restart_files() {
 
     // fill out U
     double *dataU = U->GetData();
-    double gamma = mixture->GetSpecificHeatRatio();
+    //double gamma = mixture->GetSpecificHeatRatio();
     int dof = vfes->GetNDofs();
     if (lines != dof * num_equation) {
       cout << "# of lines in files does not match domain size" << endl;
@@ -1560,8 +1572,10 @@ void M2ulPhyS::read_restart_files() {
   }
 
   // load data to GPU
-  auto dUp = Up->ReadWrite();
-  auto dU = U->ReadWrite();
+  // auto dUp = Up->ReadWrite();
+  // auto dU = U->ReadWrite();
+  Up->ReadWrite();
+  U->ReadWrite();
   //  if( loadFromAuxSol ) auto dausUp = aux_Up->ReadWrite();
 }
 
@@ -1596,7 +1610,8 @@ void M2ulPhyS::Check_NAN() {
   int print;
   MPI_Allreduce(&local_print, &print, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
   if (print > 0) {
-    auto hUp = Up->HostRead();  // get GPU data
+    //auto hUp = Up->HostRead();  // get GPU data
+    Up->HostRead();  // get GPU data
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
     paraviewColl->Save();
@@ -2006,7 +2021,8 @@ void M2ulPhyS::parseSpeciesInputs() {
     config.speciesComposition.SetSize(config.numSpecies, config.numAtoms);
     config.speciesComposition = 0.0;
     for (int i = 1; i <= config.numSpecies; i++) {
-      double mw, charge, formEnergy;
+      //double mw, charge;
+      double formEnergy;
       std::string type, speciesName;
       std::vector<std::pair<std::string, std::string>> composition;
       std::string basepath("species/species" + std::to_string(i));
@@ -2015,7 +2031,7 @@ void M2ulPhyS::parseSpeciesInputs() {
       config.speciesNames[i - 1] = speciesName;
 
       tpsP->getRequiredPairs((basepath + "/composition").c_str(), composition);
-      for (int c = 0; c < composition.size(); c++) {
+      for (size_t c = 0; c < composition.size(); c++) {
         if (config.atomMap.count(composition[c].first)) {
           int atomIdx = config.atomMap[composition[c].first];
           config.speciesComposition(i - 1, atomIdx) = stoi(composition[c].second);
@@ -2471,7 +2487,7 @@ void M2ulPhyS::checkSolverOptions() const {
       }
     }
     // Don't support non-reflecting BCs yet
-    for (int i = 0; i < config.GetInletPatchType()->size(); i++) {
+    for (size_t i = 0; i < config.GetInletPatchType()->size(); i++) {
       std::pair<int, InletType> patchANDtype = (*config.GetInletPatchType())[i];
       if (patchANDtype.second != SUB_DENS_VEL) {
         if (mpi.Root()) {
@@ -2481,7 +2497,7 @@ void M2ulPhyS::checkSolverOptions() const {
         }
       }
     }
-    for (int i = 0; i < config.GetOutletPatchType()->size(); i++) {
+    for (size_t i = 0; i < config.GetOutletPatchType()->size(); i++) {
       std::pair<int, OutletType> patchANDtype = (*config.GetOutletPatchType())[i];
       if (patchANDtype.second != SUB_P) {
         if (mpi.Root()) {

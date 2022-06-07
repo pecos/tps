@@ -87,7 +87,7 @@ class ArgonMinimalTransport : public TransportProperties {
   ArgonMinimalTransport(GasMixture *_mixture, RunConfiguration &_runfile);
   ArgonMinimalTransport(GasMixture *_mixture);
 
-  ~ArgonMinimalTransport() {}
+  virtual ~ArgonMinimalTransport() {}
 
   int getIonIndex() { return ionIndex_; }
 
@@ -154,7 +154,7 @@ class ArgonMixtureTransport : public ArgonMinimalTransport {
  public:
   ArgonMixtureTransport(GasMixture *_mixture, RunConfiguration &_runfile);
 
-  ~ArgonMixtureTransport() {}
+  virtual ~ArgonMixtureTransport() {}
 
   double collisionIntegral(const int _spI, const int _spJ, const int l, const int r, const collisionInputs collInputs);
 
