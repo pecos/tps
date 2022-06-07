@@ -135,11 +135,10 @@ void ConstantPressureGradient::updateTerms(Vector &in) {
   gradUpk.SetSize(num_equation * dim);
   Vector upk;  // interpolated Up
   upk.SetSize(num_equation);
-  double grad_pV;
 
   for (int el = 0; el < numElem; el++) {
     const FiniteElement *elem = vfes->GetFE(el);
-    ElementTransformation *Tr = vfes->GetElementTransformation(el);
+    //ElementTransformation *Tr = vfes->GetElementTransformation(el);
     const int dof_elem = elem->GetDof();
 
     // nodes of the element
@@ -309,7 +308,7 @@ void AxisymmetricSource::updateTerms(Vector &in) {
 
   for (int el = 0; el < numElem; el++) {
     const FiniteElement *elem = vfes->GetFE(el);
-    ElementTransformation *Tr = vfes->GetElementTransformation(el);
+    //ElementTransformation *Tr = vfes->GetElementTransformation(el);
     const int dof_elem = elem->GetDof();
 
     // nodes of the element
@@ -331,9 +330,9 @@ void AxisymmetricSource::updateTerms(Vector &in) {
 
       const double rho = prim(0);
       const double ur = prim(1);
-      const double uz = prim(2);
+      //const double uz = prim(2);
       const double ut = prim(3);
-      const double temperature = prim(1 + nvel);
+      //const double temperature = prim(1 + nvel);
 
       const double pressure = mixture->ComputePressureFromPrimitives(prim);
 
@@ -614,7 +613,7 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
 void SpongeZone::computeMixedOutValues() {
   int nnodes = vfes->GetNDofs();
   const double *dataUp = Up_->HostRead();
-  double gamma = mixture->GetSpecificHeatRatio();
+  //double gamma = mixture->GetSpecificHeatRatio();
 
   // compute mean normal fluxes
   meanNormalFluxes = 0.;
@@ -716,7 +715,7 @@ PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const in
     }
 
     psData_[i]->nodes.SetSize(list.size());
-    for (int n = 0; n < list.size(); n++) psData_[i]->nodes[n] = list[n];
+    for (size_t n = 0; n < list.size(); n++) psData_[i]->nodes[n] = list[n];
   }
 }
 
@@ -824,7 +823,7 @@ HeatSource::HeatSource(const int &_dim, const int &_num_equation, const int &_or
   }
 
   nodeList_.SetSize(nodesVec.size());
-  for (int n = 0; n < nodesVec.size(); n++) nodeList_[n] = nodesVec[n];
+  for (size_t n = 0; n < nodesVec.size(); n++) nodeList_[n] = nodesVec[n];
 }
 
 void HeatSource::updateTerms(mfem::Vector &in) {
