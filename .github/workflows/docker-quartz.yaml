@@ -50,7 +50,7 @@ jobs:
            echo "#!/bin/bash" > ${{env.DOCKERPATH}}/motd.sh
            echo "echo --------------------------" >> ${{env.DOCKERPATH}}/motd.sh
            echo "echo TPS/Quartz Development Container"  >> ${{env.DOCKERPATH}}/motd.sh
-           echo "Revision: `echo ${GITHUB_SHA} | cut -c1-8`" >> ${{env.DOCKERPATH}}/motd.sh
+           echo "echo \"Revision: `echo ${GITHUB_SHA} | cut -c1-8`\"" >> ${{env.DOCKERPATH}}/motd.sh
            echo "echo --------------------------" >> ${{env.DOCKERPATH}}/motd.sh
            chmod 755 ${{env.DOCKERPATH}}/motd.sh
            cat ${{env.DOCKERPATH}}/motd.sh
