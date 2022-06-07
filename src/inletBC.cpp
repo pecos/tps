@@ -62,7 +62,8 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
     }
   }
 
-  auto dinputState = inputState.ReadWrite();
+  //auto dinputState = inputState.ReadWrite();
+  inputState.ReadWrite();
 
   groupsMPI->setPatch(_patchNumber);
 
