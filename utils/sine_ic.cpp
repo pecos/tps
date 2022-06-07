@@ -20,7 +20,7 @@ int main (int argc, char *argv[])
   assert(!srcConfig.GetRestartCycle());
 
   GasMixture *mixture = srcField->getMixture();
-  int numSpecies = mixture->GetNumSpecies();
+  //int numSpecies = mixture->GetNumSpecies();
   int num_equation = mixture->GetNumEquations();
 
   // Get meshes
@@ -32,8 +32,8 @@ int main (int argc, char *argv[])
   assert(dim>1);
 
   if (mesh_1->GetNodes() == NULL) { mesh_1->SetCurvature(1); }
-  const int mesh_poly_deg =
-    mesh_1->GetNodes()->FESpace()->GetElementOrder(0);
+  // const int mesh_poly_deg =
+  //   mesh_1->GetNodes()->FESpace()->GetElementOrder(0);
   cout << "Source mesh curvature: "
        << mesh_1->GetNodes()->OwnFEC()->Name() << endl;
 

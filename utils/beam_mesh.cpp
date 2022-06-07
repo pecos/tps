@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
    int el_type = 4;
    bool per_mesh = true;
    bool dg_mesh  = true;
-   bool visualization = false;
+   //bool visualization = false;
 
    OptionsParser args(argc, argv);
    args.AddOption(&nx_, "-nx", "--num-elements-x",
