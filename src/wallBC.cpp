@@ -110,6 +110,9 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSyste
         case ADIAB: {  // Heat flux is already set to zero.
           bcFlux_.primFluxIdxs[numSpecies + nvel_] = true;
         } break;
+        default:
+          mfem_error("Thermal condition not understood.");
+          break;
       }
       // Electron isothermal condition.
       switch (wallData_.elecThermalCond) {
@@ -124,6 +127,9 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSyste
           if (mixture->IsTwoTemperature())  // If two-temperature, heat flux will be computed on the fly.
             bcFlux_.primFluxIdxs[numSpecies + nvel_ + 1] = true;
         } break;
+        default:
+          mfem_error("Electron thermal condition not understood.");
+          break;
       }
     } break;
   }
@@ -157,7 +163,7 @@ void WallBC::buildWallElemsArray(const Array<int> &intPointsElIDBC) {
     int elID = hintPointsElIDBC[2 * bcFace + 1];
 
     bool elInList = false;
-    for (int i = 0; i < unicElems.size(); i++) {
+    for (size_t i = 0; i < unicElems.size(); i++) {
       if (unicElems[i] == elID) elInList = true;
     }
     if (!elInList) unicElems.push_back(elID);
@@ -180,7 +186,8 @@ void WallBC::buildWallElemsArray(const Array<int> &intPointsElIDBC) {
       }
     }
   }
-  auto dwallElems = wallElems.ReadWrite();
+  //auto dwallElems = wallElems.ReadWrite();
+  wallElems.ReadWrite();
 }
 
 void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux) {
