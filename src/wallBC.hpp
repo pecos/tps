@@ -34,11 +34,10 @@
 
 #include <tps_config.h>
 
-#include "tps_mfem_wrap.hpp"
-
 #include "BoundaryCondition.hpp"
 #include "dataStructures.hpp"
 #include "fluxes.hpp"
+#include "tps_mfem_wrap.hpp"
 
 using namespace mfem;
 

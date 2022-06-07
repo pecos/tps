@@ -1146,7 +1146,7 @@ void M2ulPhyS::solve() {
 #endif
 
       if (iter != MaxIters) {
-        //auto hUp = Up->HostRead();
+        // auto hUp = Up->HostRead();
         Up->HostRead();
         mixture->UpdatePressureGridFunction(press, Up);
 
@@ -1155,7 +1155,7 @@ void M2ulPhyS::solve() {
         paraviewColl->SetCycle(iter);
         paraviewColl->SetTime(time);
         paraviewColl->Save();
-        //auto dUp = Up->ReadWrite();  // sets memory to GPU
+        // auto dUp = Up->ReadWrite();  // sets memory to GPU
         Up->ReadWrite();  // sets memory to GPU
 
         average->write_meanANDrms_restart_files(iter, time);
@@ -1187,7 +1187,7 @@ void M2ulPhyS::solve() {
   }  // <-- end main timestep iteration loop
 
   if (iter == MaxIters) {
-    //auto hUp = Up->HostRead();
+    // auto hUp = Up->HostRead();
     Up->HostRead();
     mixture->UpdatePressureGridFunction(press, Up);
 
@@ -1555,7 +1555,7 @@ void M2ulPhyS::read_restart_files() {
 
     // fill out U
     double *dataU = U->GetData();
-    //double gamma = mixture->GetSpecificHeatRatio();
+    // double gamma = mixture->GetSpecificHeatRatio();
     int dof = vfes->GetNDofs();
     if (lines != dof * num_equation) {
       cout << "# of lines in files does not match domain size" << endl;
@@ -1610,7 +1610,7 @@ void M2ulPhyS::Check_NAN() {
   int print;
   MPI_Allreduce(&local_print, &print, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
   if (print > 0) {
-    //auto hUp = Up->HostRead();  // get GPU data
+    // auto hUp = Up->HostRead();  // get GPU data
     Up->HostRead();  // get GPU data
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
@@ -2021,7 +2021,7 @@ void M2ulPhyS::parseSpeciesInputs() {
     config.speciesComposition.SetSize(config.numSpecies, config.numAtoms);
     config.speciesComposition = 0.0;
     for (int i = 1; i <= config.numSpecies; i++) {
-      //double mw, charge;
+      // double mw, charge;
       double formEnergy;
       std::string type, speciesName;
       std::vector<std::pair<std::string, std::string>> composition;

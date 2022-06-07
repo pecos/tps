@@ -39,11 +39,11 @@
 #include <cstdlib>
 #include <iostream>
 #include <memory>
-#include "tps_mfem_wrap.hpp"
 #include <stdexcept>
 #include <string>
 
 #include "M2ulPhyS.hpp"
+#include "tps_mfem_wrap.hpp"
 
 #ifdef HAVE_SLURM
 #include <slurm/slurm.h>

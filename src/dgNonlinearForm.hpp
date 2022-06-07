@@ -34,12 +34,12 @@
 
 #include <tps_config.h>
 
-#include "tps_mfem_wrap.hpp"
 #include <mfem/fem/nonlinearform.hpp>
 
 #include "BCintegrator.hpp"
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
+#include "tps_mfem_wrap.hpp"
 
 using namespace mfem;
 using namespace std;

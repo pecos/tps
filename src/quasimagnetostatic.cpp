@@ -115,7 +115,7 @@ void QuasiMagnetostaticSolver::initialize() {
   // 1c) Partition the mesh
   pmesh_ = new ParMesh(MPI_COMM_WORLD, *mesh);
   delete mesh;  // no longer need the serial mesh
-  //pmesh_->ReorientTetMesh();
+  // pmesh_->ReorientTetMesh();
 
   //-----------------------------------------------------
   // 2) Prepare the required finite elements

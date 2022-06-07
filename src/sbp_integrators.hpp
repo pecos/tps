@@ -34,10 +34,9 @@
 
 #include <tps_config.h>
 
-#include "tps_mfem_wrap.hpp"
-
 #include "equation_of_state.hpp"
 #include "fluxes.hpp"
+#include "tps_mfem_wrap.hpp"
 
 using namespace mfem;
 

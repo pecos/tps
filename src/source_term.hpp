@@ -34,7 +34,6 @@
 
 #include <tps_config.h>
 
-#include "tps_mfem_wrap.hpp"
 #include <mfem/general/forall.hpp>
 
 #include "chemistry.hpp"
@@ -43,6 +42,7 @@
 #include "fluxes.hpp"
 #include "forcing_terms.hpp"
 #include "run_configuration.hpp"
+#include "tps_mfem_wrap.hpp"
 #include "transport_properties.hpp"
 
 using namespace mfem;

@@ -34,6 +34,7 @@
 #define EM_OPTIONS_HPP_
 
 #include <iostream>
+
 #include "tps_mfem_wrap.hpp"
 
 /** Electromagnetics options

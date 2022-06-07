@@ -186,7 +186,7 @@ void WallBC::buildWallElemsArray(const Array<int> &intPointsElIDBC) {
       }
     }
   }
-  //auto dwallElems = wallElems.ReadWrite();
+  // auto dwallElems = wallElems.ReadWrite();
   wallElems.ReadWrite();
 }
 

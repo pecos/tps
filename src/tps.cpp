@@ -150,11 +150,9 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
 /// a vector of strings (intended for use with Python interface)
 void Tps::parseArgs(std::vector<std::string> argv) {
   std::vector<char *> argv_char;
-  for (auto& s : argv)
-    argv_char.push_back(&s.front());
+  for (auto &s : argv) argv_char.push_back(&s.front());
   parseCommandLineArgs(argv_char.size(), argv_char.data());
 }
-
 
 /// Setup desired execution devices for MFEM
 void Tps::chooseDevices() {
