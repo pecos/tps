@@ -265,7 +265,7 @@ void Tps::getRequiredInput(const char *name, T &var) {
 /// read an input vector for keyword [name] and store in MFEM vector. The size of the vector
 /// is numElems
 void Tps::getRequiredVec(const char *name, Vector &vec, size_t numElems) {
-  if (vec.Size() < numElems) vec.SetSize(numElems);
+  if ((size_t)vec.Size() < numElems) vec.SetSize(numElems);
   if (!iparse_.Read_Var_Vec(name, vec.HostWrite(), numElems)) {
     std::cout << "ERROR: Unable to read input vector -> " << name << std::endl;
     exit(ERROR);
@@ -285,7 +285,7 @@ void Tps::getRequiredVecElem(const char *name, double &value, int ithElem) {
 /// read an input vector for keyword [name] and store in MFEM array. The size of the vector
 /// is numElems
 void Tps::getRequiredVec(const char *name, mfem::Array<double> &vec, size_t numElems) {
-  if (vec.Size() < numElems) vec.SetSize(numElems);
+  if ((size_t)vec.Size() < numElems) vec.SetSize(numElems);
   if (!iparse_.Read_Var_Vec(name, vec.HostWrite(), numElems)) {
     std::cout << "ERROR: Unable to read input vector -> " << name << std::endl;
     exit(ERROR);
