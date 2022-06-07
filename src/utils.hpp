@@ -35,7 +35,7 @@
 #include <assert.h>
 #include <hdf5.h>
 
-#include <mfem.hpp>
+#include "tps_mfem_wrap.hpp"
 #include <string>
 
 // application exit codes

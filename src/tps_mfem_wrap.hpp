@@ -29,27 +29,25 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
-#ifndef FACEGRADIENTINTEGRATION_HPP_
-#define FACEGRADIENTINTEGRATION_HPP_
+#ifndef TPS_MFEM_WRAP_HPP_
+#define TPS_MFEM_WRAP_HPP_
 
-#include <tps_config.h>
+// To avoid compilation warnings due to redefining preprocessor
+// macros, explicitly undefine those that clash here.  These are
+// introduced b/c mfem #includes HYPRE_config.h.
 
-#include "tps_mfem_wrap.hpp"
+#undef PACKAGE_NAME
+#undef PACKAGE_VERSION
+#undef PACKAGE_TARNAME
+#undef PACKAGE_BUGREPORT
+#undef PACKAGE_STRING
 
-using namespace mfem;
+#include <mfem.hpp>
 
-// Interior face term: <F.n(u),[w]>
-class GradFaceIntegrator : public NonlinearFormIntegrator {
- private:
-  const int dim;
-  const int num_equation;
-  IntegrationRules *intRules;
+#undef PACKAGE_NAME
+#undef PACKAGE_VERSION
+#undef PACKAGE_TARNAME
+#undef PACKAGE_BUGREPORT
+#undef PACKAGE_STRING
 
- public:
-  GradFaceIntegrator(IntegrationRules *_intRules, const int _dim, const int _num_equation);
-
-  virtual void AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,
-                                  const Vector &elfun, Vector &elvect);
-};
-
-#endif  // FACEGRADIENTINTEGRATION_HPP_
+#endif  // TPS_MFEM_WRAP_HPP_

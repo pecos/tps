@@ -38,7 +38,7 @@
 
 #include <tps_config.h>
 
-#include <mfem.hpp>
+#include "tps_mfem_wrap.hpp"
 #include <mfem/general/forall.hpp>
 
 #include "dataStructures.hpp"

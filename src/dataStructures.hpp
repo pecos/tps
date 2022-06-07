@@ -32,7 +32,7 @@
 #ifndef DATASTRUCTURES_HPP_
 #define DATASTRUCTURES_HPP_
 
-#include <mfem.hpp>
+#include "tps_mfem_wrap.hpp"
 #include <string>
 
 using namespace mfem;

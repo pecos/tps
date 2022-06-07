@@ -39,7 +39,7 @@ class Tps;
 }
 
 #include <iostream>
-#include <mfem.hpp>
+#include "tps_mfem_wrap.hpp"
 
 #include "em_options.hpp"
 #include "tps.hpp"

@@ -32,7 +32,7 @@
 #ifndef IO_HPP_
 #define IO_HPP_
 
-#include <mfem.hpp>
+#include "tps_mfem_wrap.hpp"
 #include <vector>
 
 class IOFamily {
