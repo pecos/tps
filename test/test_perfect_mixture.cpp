@@ -82,7 +82,7 @@ int main (int argc, char *argv[])
   tps.chooseDevices();
 
   srand (time(NULL));
-  double dummy = uniformRandomNumber();
+  //double dummy = uniformRandomNumber();
 
   M2ulPhyS *srcField = new M2ulPhyS(tps.getMPISession(), &tps);
 

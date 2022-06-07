@@ -27,7 +27,7 @@ Array<int> readTable(const string fileName, const string datasetName, DenseMatri
   dataspace = H5Dget_space(datasetID);
   const int ndims = H5Sget_simple_extent_ndims(dataspace);
   hsize_t dims[ndims];
-  int dummy = H5Sget_simple_extent_dims(dataspace,dims,NULL);
+  H5Sget_simple_extent_dims(dataspace,dims,NULL);
 
   output.SetSize(dims[0], dims[1]);
 
@@ -285,7 +285,7 @@ int main (int argc, char *argv[])
     double errorThreshold = 3.0e-3;
 
     Vector O(dims[0]);
-    double relError = 0.0, relError1 = 0.0;
+    double relError = 0.0; // , relError1 = 0.0;
     for (int m = 0; m < dims[0]; m++) {
       O(m) = collision::argon::ArAr1P11(Tm(m));
       int index = 1;
@@ -319,7 +319,7 @@ int main (int argc, char *argv[])
     double errorThreshold = 1.0e-2;
 
     Vector O(dims[0]);
-    double relError = 0.0, relError1 = 0.0;
+    double relError = 0.0; // , relError1 = 0.0;
     for (int m = 0; m < dims[0]; m++) {
       O(m) = collision::argon::ArAr11(Tm(m));
       int index = 3;

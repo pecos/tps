@@ -23,7 +23,8 @@ Array<int> readTable(const string fileName, const string datasetName, DenseMatri
   dataspace = H5Dget_space(datasetID);
   const int ndims = H5Sget_simple_extent_ndims(dataspace);
   hsize_t dims[ndims];
-  int dummy = H5Sget_simple_extent_dims(dataspace,dims,NULL);
+  // int dummy = H5Sget_simple_extent_dims(dataspace,dims,NULL);
+  H5Sget_simple_extent_dims(dataspace,dims,NULL);
 
   output.SetSize(dims[0], dims[1]);
 
@@ -61,7 +62,7 @@ int main (int argc, char *argv[])
 
   Vector relErrorThreshold = Vector({2e-4, 2e-4, 3e-4});
   Vector absErrorThreshold = Vector({5e-8, 4e-5, 1.5e-4});
-  int nTrials = 10;
+  // int nTrials = 10;
 
   double pressure = 101325.0;
 
