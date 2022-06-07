@@ -56,7 +56,10 @@ class Reaction {
 
   ~Reaction() {}
 
-  virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved = false) {}
+  virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved = false) {
+    mfem_error("computeRateCoefficient not implemented");
+    return 0;
+  }
 };
 
 class Arrhenius : public Reaction {
