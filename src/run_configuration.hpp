@@ -35,7 +35,7 @@
 
 #include <tps_config.h>
 
-#include <mfem.hpp>
+#include "tps_mfem_wrap.hpp"
 #include <string>
 #include <utility>
 #include <vector>

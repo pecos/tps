@@ -39,7 +39,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <memory>
-#include <mfem.hpp>
+#include "tps_mfem_wrap.hpp"
 #include <stdexcept>
 #include <string>
 

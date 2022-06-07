@@ -34,7 +34,7 @@
 #define EM_OPTIONS_HPP_
 
 #include <iostream>
-#include <mfem.hpp>
+#include "tps_mfem_wrap.hpp"
 
 /** Electromagnetics options
  *  A class for storing/passing options to EM solvers.

@@ -35,7 +35,19 @@
 #include <grvy.h>
 #include <tps_config.h>
 
-#include <mfem.hpp>
+#undef PACKAGE_NAME
+#undef PACKAGE_VERSION
+#undef PACKAGE_TARNAME
+#undef PACKAGE_BUGREPORT
+#undef PACKAGE_STRING
+
+#include "tps_mfem_wrap.hpp"
+#undef PACKAGE_NAME
+#undef PACKAGE_VERSION
+#undef PACKAGE_TARNAME
+#undef PACKAGE_BUGREPORT
+#undef PACKAGE_STRING
+
 #include <string>
 
 #include "M2ulPhyS.hpp"
