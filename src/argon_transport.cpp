@@ -290,7 +290,7 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
   double debyeCircle = PI_ * debyeLength * debyeLength;
 
   double nondimTe = debyeLength * 4.0 * PI_ * debyeFactor_ * Te;
-  double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
+  //double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
 
   DenseSymmetricMatrix binaryDiff(3);
   binaryDiff = 0.0;
@@ -330,7 +330,7 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
   double debyeCircle = PI_ * debyeLength * debyeLength;
 
   double nondimTe = debyeLength * 4.0 * PI_ * debyeFactor_ * Te;
-  double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
+  //double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
 
   double Qea = collision::argon::eAr11(Te);
   double Qai = collision::argon::ArAr1P11(Th);
@@ -410,7 +410,7 @@ void ArgonMinimalTransport::GetViscosities(const Vector &conserved, const Vector
   double debyeLength = sqrt(debyeFactor_ / AVOGADRONUMBER / nOverT);
   double debyeCircle = PI_ * debyeLength * debyeLength;
 
-  double nondimTe = debyeLength * 4.0 * PI_ * debyeFactor_ * Te;
+  //double nondimTe = debyeLength * 4.0 * PI_ * debyeFactor_ * Te;
   double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
 
   Vector speciesViscosity(3);
@@ -743,6 +743,7 @@ double ArgonMixtureTransport::collisionIntegral(const int _spI, const int _spJ, 
     default:
       break;
   }
+  return -1;
 }
 
 void ArgonMixtureTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
