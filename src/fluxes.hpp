@@ -56,10 +56,9 @@ using namespace mfem;
 class Fluxes {
  private:
   GasMixture *mixture;
+  Equations &eqSystem;
 
   TransportProperties *transport;
-
-  Equations &eqSystem;
 
   const int &dim;
   int nvel;
