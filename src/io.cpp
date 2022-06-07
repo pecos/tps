@@ -111,7 +111,8 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
   // Attributes - relevant solution metadata saved as attributes
   // -------------------------------------------------------------------
 
-  hid_t aid, attr;
+  //hid_t aid, attr;
+  hid_t attr;
   if (mode == "write") {
     // note: all tasks save unless we are writing a serial restart file
     if (mpi.Root() || (config.RestartSerial() != "write")) {
@@ -224,13 +225,13 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
   // -------------------------------------------------------------------
 
   hsize_t dims[1];
-  hsize_t maxdims[1];
-  hsize_t numInSoln;
+  //hsize_t maxdims[1];
+  hsize_t numInSoln = 0;
 
   //-------------------------------------------------------
   // Loop over defined IO families to save desired output
   //-------------------------------------------------------
-  for (int n = 0; n < ioData.families_.size(); n++) {
+  for (size_t n = 0; n < ioData.families_.size(); n++) {
     IOFamily &fam = ioData.families_[n];
 
     if (mode == "write") {
@@ -306,7 +307,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
 
       if (loadFromAuxSol && fam.allowsAuxRestart) dof = aux_vfes->GetNDofs();
 
-      if (rank0_ || (config.RestartSerial() != "read")) assert(numInSoln == dof);
+      if (rank0_ || (config.RestartSerial() != "read")) assert((int)numInSoln == dof);
 
       // get pointer to raw data
       double *data = fam.pfunc_->HostReadWrite();
@@ -383,7 +384,8 @@ void M2ulPhyS::partitioning_file_hdf5(std::string mode) {
   // only rank 0 writes partitioning file
   if (!rank0_ && (mode == "write")) return;
 
-  hid_t file, dataspace, data_soln;
+  //hid_t file, dataspace, data_soln;
+  hid_t file=-1, dataspace;
   herr_t status;
   std::string fileName = config.GetPartitionBaseName();
   fileName += "." + std::to_string(nprocs_) + "p.h5";
@@ -397,6 +399,7 @@ void M2ulPhyS::partitioning_file_hdf5(std::string mode) {
       grvy_printf(gwarn, "Removing existing partition file: %s\n", fileName.c_str());
       string command = "rm " + fileName;
       int err = system(command.c_str());
+      if (err != 0) grvy_printf(gwarn, "%s returned error code %d", command.c_str(), err);
     } else {
       grvy_printf(ginfo, "Saving original domain decomposition partition file: %s\n", fileName.c_str());
     }
@@ -455,7 +458,7 @@ void M2ulPhyS::partitioning_file_hdf5(std::string mode) {
       dataspace = H5Dget_space(data);
       numInFile = H5Sget_simple_extent_npoints(dataspace);
 
-      assert(numInFile == nelemGlobal_);
+      assert((int)numInFile == nelemGlobal_);
 
       status = H5Dread(data, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, partitioning_.GetData());
       assert(status >= 0);
@@ -594,7 +597,7 @@ void M2ulPhyS::read_serialized_soln_data(hid_t file, string varName, int numDof,
     Array<int> lvdofs, gvdofs;
     Vector lnodes;
     int counter = 0;
-    int ndof_per_elem;
+    //int ndof_per_elem;
 
     for (int gelem = 0; gelem < nelemGlobal_; gelem++) {
       if (partitioning_[gelem] == 0) {
@@ -638,7 +641,7 @@ void M2ulPhyS::read_serialized_soln_data(hid_t file, string varName, int numDof,
     MPI_Recv(packedData.data(), numlDofs, MPI_DOUBLE, 0, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
     // update local state vector
-    for (size_t i = 0; i < numlDofs; i++) data[i + varOffset * numlDofs] = packedData[i];
+    for (int i = 0; i < numlDofs; i++) data[i + varOffset * numlDofs] = packedData[i];
   }
 }
 
@@ -712,7 +715,7 @@ void IODataOrganizer::registerIOVar(std::string group, std::string varName, int 
 
 // return the index to IO family given a group name
 int IODataOrganizer::getIOFamilyIndex(std::string group) {
-  for (int i = 0; i < families_.size(); i++)
+  for (size_t i = 0; i < families_.size(); i++)
     if (families_[i].group_ == group) return (i);
 
   return (-1);
@@ -720,7 +723,7 @@ int IODataOrganizer::getIOFamilyIndex(std::string group) {
 
 void IODataOrganizer::initializeSerial(bool root, bool serial, Mesh *serial_mesh) {
   // loop through families
-  for (int n = 0; n < families_.size(); n++) {
+  for (size_t n = 0; n < families_.size(); n++) {
     IOFamily &fam = families_[n];
     fam.serial_fes = NULL;
     fam.serial_sol = NULL;
@@ -736,7 +739,7 @@ void IODataOrganizer::initializeSerial(bool root, bool serial, Mesh *serial_mesh
 }
 
 IODataOrganizer::~IODataOrganizer() {
-  for (int n = 0; n < families_.size(); n++) {
+  for (size_t n = 0; n < families_.size(); n++) {
     IOFamily fam = families_[n];
     if (fam.serial_fes != NULL) delete fam.serial_fes;
     if (fam.serial_sol != NULL) delete fam.serial_sol;
