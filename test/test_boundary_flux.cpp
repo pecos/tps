@@ -20,7 +20,7 @@ double getRandomPrimitiveState(GasMixture *mixture, Vector &primitiveState) {
   const double numActiveSpecies = mixture->GetNumActiveSpecies();
   const bool ambipolar = mixture->IsAmbipolar();
   const bool twoTemperature = mixture->IsTwoTemperature();
-  const double dim = mixture->GetDimension();
+  // const double dim = mixture->GetDimension();
   const double nvel = mixture->GetNumVels();
 
   primitiveState.SetSize(numEquation);
@@ -101,7 +101,8 @@ bool testComputeBdrViscousFlux(RunConfiguration &srcConfig, const int dim) {
   grvy_printf(GRVY_INFO, "\n Setting a random primitive variable. \n");
 
   Vector testPrimitives(num_equation), testConserved(num_equation);
-  double Yb = getRandomPrimitiveState(mixture, testPrimitives);
+  //double Yb = getRandomPrimitiveState(mixture, testPrimitives);
+  getRandomPrimitiveState(mixture, testPrimitives);
   mixture->GetConservativesFromPrimitives(testPrimitives, testConserved);
 
   grvy_printf(GRVY_INFO, "\n Setting a random primitive gradient. \n");
@@ -170,7 +171,7 @@ int main (int argc, char *argv[])
   tps.chooseDevices();
 
   srand (time(NULL));
-  double dummy = uniformRandomNumber();
+  // double dummy = uniformRandomNumber();
 
   M2ulPhyS *srcField = new M2ulPhyS(tps.getMPISession(), &tps);
 
