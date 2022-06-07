@@ -81,6 +81,7 @@ RUN yum -y install libcurl-devel
 RUN yum -y install python38-devel
 RUN yum -y install pybind11-devel
 RUN yum -y install python3-pybind11
+RUN yum -y perl-Data-Dumper
 
 # Register new libs installed into /usr/local/lib with linker
 RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/class.conf

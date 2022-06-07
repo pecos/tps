@@ -50,6 +50,8 @@ RUN ldconfig
 # additional packages
 RUN pip3 install numpy
 RUN yum -y install pybind11-devel
+RUN yum -y install python38-devel
+RUN yum -y perl-Data-Dumper
 
 # load mfem by default
 RUN echo "module try-add mfem" >> /etc/profile.d/lmod.sh
