@@ -118,7 +118,7 @@ class GasMixture {
   GasMixture(RunConfiguration &_runfile, int _dim, int nvel);
   GasMixture() {}
 
-  ~GasMixture() {}
+  virtual ~GasMixture() {}
 
   void SetFluid(WorkingFluid _fluid);
 
@@ -266,7 +266,7 @@ class DryAir : public GasMixture {
   DryAir();  // this will only be usefull to get air constants
   // DryAir(int dim, int num_equation);
 
-  ~DryAir() {}
+  virtual ~DryAir() {}
 
   // implementation virtual methods
   virtual double ComputePressure(const Vector &state, double *electronPressure = NULL);
@@ -503,7 +503,7 @@ class TestBinaryAir : public GasMixture {
   TestBinaryAir(RunConfiguration &_runfile, int _dim, int nvel);
   // TestBinaryAir(); //this will only be usefull to get air constants
 
-  ~TestBinaryAir() {}
+  virtual ~TestBinaryAir() {}
 
   // implementation virtual methods
   virtual double ComputePressure(const Vector &state, double *electronPressure = NULL);
@@ -597,7 +597,7 @@ class PerfectMixture : public GasMixture {
   PerfectMixture(RunConfiguration &_runfile, int _dim, int nvel);
   // TestBinaryAir(); //this will only be usefull to get air constants
 
-  ~PerfectMixture() {}
+  virtual ~PerfectMixture() {}
 
   virtual double getMolarCV(int species) { return molarCV_(species); }
   virtual double getMolarCP(int species) { return molarCP_(species); }
