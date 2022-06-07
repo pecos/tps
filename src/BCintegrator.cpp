@@ -66,7 +66,7 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
   wallBCmap.clear();
 
   // Init inlet BCs
-  for (int in = 0; in < config.GetInletPatchType()->size(); in++) {
+  for (size_t in = 0; in < config.GetInletPatchType()->size(); in++) {
     std::pair<int, InletType> patchANDtype = (*config.GetInletPatchType())[in];
     // check if attribute is in mesh
     bool attrInMesh = false;
@@ -84,7 +84,7 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
   }
 
   // Init outlet BCs
-  for (int o = 0; o < config.GetOutletPatchType()->size(); o++) {
+  for (size_t o = 0; o < config.GetOutletPatchType()->size(); o++) {
     std::pair<int, OutletType> patchANDtype = (*config.GetOutletPatchType())[o];
     // check if attribute is in mesh
     bool attrInMesh = false;
@@ -101,7 +101,7 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
   }
 
   // Wall BCs
-  for (int w = 0; w < config.GetWallPatchType()->size(); w++) {
+  for (size_t w = 0; w < config.GetWallPatchType()->size(); w++) {
     std::pair<int, WallType> patchType = (*config.GetWallPatchType())[w];
 
     // check that patch is in mesh
