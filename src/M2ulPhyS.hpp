@@ -48,7 +48,6 @@ class Tps;
 #include <tps_config.h>
 
 #include <fstream>
-#include "tps_mfem_wrap.hpp"
 #include <mfem/general/forall.hpp>
 
 #include "BCintegrator.hpp"
@@ -72,6 +71,7 @@ class Tps;
 #include "sbp_integrators.hpp"
 #include "solver.hpp"
 #include "tps.hpp"
+#include "tps_mfem_wrap.hpp"
 #include "transport_properties.hpp"
 #include "utils.hpp"
 

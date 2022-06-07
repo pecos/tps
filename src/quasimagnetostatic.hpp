@@ -39,10 +39,10 @@ class Tps;
 }
 
 #include <iostream>
-#include "tps_mfem_wrap.hpp"
 
 #include "em_options.hpp"
 #include "tps.hpp"
+#include "tps_mfem_wrap.hpp"
 
 /** Solve quasi-magnetostatic approximation of Maxwell
  *

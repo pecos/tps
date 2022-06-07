@@ -52,11 +52,11 @@ void RiemannSolver::ComputeFluxDotN(const Vector &state, const Vector &nor, Vect
   // NOTE: nor in general is not a unit normal
   // Kevin: Are we supposed to keep the magnitude of nor, or should we normalize it?
   const int dim = nor.Size();
-  //const int nvel = (axisymmetric_ ? 3 : dim);
+  // const int nvel = (axisymmetric_ ? 3 : dim);
 
-  //const double den = state(0);
-  //const Vector den_vel(state.GetData() + 1, nvel);
-  //const double den_energy = state(1 + nvel);
+  // const double den = state(0);
+  // const Vector den_vel(state.GetData() + 1, nvel);
+  // const double den_energy = state(1 + nvel);
 
   // MFEM_ASSERT(eqState->StateIsPhysical(state, dim), "");
 
@@ -97,7 +97,7 @@ void RiemannSolver::Eval(const Vector &state1, const Vector &state2, const Vecto
 void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux) {
   // NOTE: nor in general is not a unit normal
   const int dim = nor.Size();
-  //const int nvel = (axisymmetric_ ? 3 : dim);
+  // const int nvel = (axisymmetric_ ? 3 : dim);
 
   // MFEM_ASSERT(eqState->StateIsPhysical(state1, dim), "");
   // MFEM_ASSERT(eqState->StateIsPhysical(state2, dim), "");

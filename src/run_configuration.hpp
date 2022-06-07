@@ -35,12 +35,12 @@
 
 #include <tps_config.h>
 
-#include "tps_mfem_wrap.hpp"
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "dataStructures.hpp"
+#include "tps_mfem_wrap.hpp"
 
 using namespace mfem;
 using namespace std;

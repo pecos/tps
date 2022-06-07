@@ -34,14 +34,13 @@
 
 #include <tps_config.h>
 
-#include "tps_mfem_wrap.hpp"
-
 #include "BoundaryCondition.hpp"
 #include "equation_of_state.hpp"
 #include "fluxes.hpp"
 #include "mpi_groups.hpp"
 #include "riemann_solver.hpp"
 #include "run_configuration.hpp"
+#include "tps_mfem_wrap.hpp"
 #include "unordered_map"
 
 using namespace mfem;

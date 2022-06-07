@@ -35,7 +35,6 @@
 #include <grvy.h>
 #include <tps_config.h>
 
-#include "tps_mfem_wrap.hpp"
 #include <mfem/general/forall.hpp>
 
 #include "BCintegrator.hpp"
@@ -49,6 +48,7 @@
 #include "gradients.hpp"
 #include "run_configuration.hpp"
 #include "source_term.hpp"
+#include "tps_mfem_wrap.hpp"
 #include "transport_properties.hpp"
 
 using namespace mfem;

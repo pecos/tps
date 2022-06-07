@@ -32,8 +32,9 @@
 #ifndef DATASTRUCTURES_HPP_
 #define DATASTRUCTURES_HPP_
 
-#include "tps_mfem_wrap.hpp"
 #include <string>
+
+#include "tps_mfem_wrap.hpp"
 
 using namespace mfem;
 

@@ -32,8 +32,9 @@
 #ifndef IO_HPP_
 #define IO_HPP_
 
-#include "tps_mfem_wrap.hpp"
 #include <vector>
+
+#include "tps_mfem_wrap.hpp"
 
 class IOFamily {
  public:

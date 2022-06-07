@@ -35,8 +35,9 @@
 #include <assert.h>
 #include <hdf5.h>
 
-#include "tps_mfem_wrap.hpp"
 #include <string>
+
+#include "tps_mfem_wrap.hpp"
 
 // application exit codes
 enum ExitCodes { NORMAL = 0, ERROR = 1, JOB_RESTART = 10, EARLY_EXIT = 11 };

@@ -111,7 +111,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
   // Attributes - relevant solution metadata saved as attributes
   // -------------------------------------------------------------------
 
-  //hid_t aid, attr;
+  // hid_t aid, attr;
   hid_t attr;
   if (mode == "write") {
     // note: all tasks save unless we are writing a serial restart file
@@ -225,7 +225,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
   // -------------------------------------------------------------------
 
   hsize_t dims[1];
-  //hsize_t maxdims[1];
+  // hsize_t maxdims[1];
   hsize_t numInSoln = 0;
 
   //-------------------------------------------------------
@@ -384,8 +384,8 @@ void M2ulPhyS::partitioning_file_hdf5(std::string mode) {
   // only rank 0 writes partitioning file
   if (!rank0_ && (mode == "write")) return;
 
-  //hid_t file, dataspace, data_soln;
-  hid_t file=-1, dataspace;
+  // hid_t file, dataspace, data_soln;
+  hid_t file = -1, dataspace;
   herr_t status;
   std::string fileName = config.GetPartitionBaseName();
   fileName += "." + std::to_string(nprocs_) + "p.h5";
@@ -597,7 +597,7 @@ void M2ulPhyS::read_serialized_soln_data(hid_t file, string varName, int numDof,
     Array<int> lvdofs, gvdofs;
     Vector lnodes;
     int counter = 0;
-    //int ndof_per_elem;
+    // int ndof_per_elem;
 
     for (int gelem = 0; gelem < nelemGlobal_; gelem++) {
       if (partitioning_[gelem] == 0) {

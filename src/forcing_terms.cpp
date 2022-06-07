@@ -138,7 +138,7 @@ void ConstantPressureGradient::updateTerms(Vector &in) {
 
   for (int el = 0; el < numElem; el++) {
     const FiniteElement *elem = vfes->GetFE(el);
-    //ElementTransformation *Tr = vfes->GetElementTransformation(el);
+    // ElementTransformation *Tr = vfes->GetElementTransformation(el);
     const int dof_elem = elem->GetDof();
 
     // nodes of the element
@@ -308,7 +308,7 @@ void AxisymmetricSource::updateTerms(Vector &in) {
 
   for (int el = 0; el < numElem; el++) {
     const FiniteElement *elem = vfes->GetFE(el);
-    //ElementTransformation *Tr = vfes->GetElementTransformation(el);
+    // ElementTransformation *Tr = vfes->GetElementTransformation(el);
     const int dof_elem = elem->GetDof();
 
     // nodes of the element
@@ -330,9 +330,9 @@ void AxisymmetricSource::updateTerms(Vector &in) {
 
       const double rho = prim(0);
       const double ur = prim(1);
-      //const double uz = prim(2);
+      // const double uz = prim(2);
       const double ut = prim(3);
-      //const double temperature = prim(1 + nvel);
+      // const double temperature = prim(1 + nvel);
 
       const double pressure = mixture->ComputePressureFromPrimitives(prim);
 
@@ -613,7 +613,7 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
 void SpongeZone::computeMixedOutValues() {
   int nnodes = vfes->GetNDofs();
   const double *dataUp = Up_->HostRead();
-  //double gamma = mixture->GetSpecificHeatRatio();
+  // double gamma = mixture->GetSpecificHeatRatio();
 
   // compute mean normal fluxes
   meanNormalFluxes = 0.;

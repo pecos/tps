@@ -40,13 +40,13 @@
 #include <grvy.h>
 #include <tps_config.h>
 
-#include "tps_mfem_wrap.hpp"
 #include <mfem/general/forall.hpp>
 
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
 #include "reaction.hpp"
 #include "run_configuration.hpp"
+#include "tps_mfem_wrap.hpp"
 
 using namespace mfem;
 using namespace std;
