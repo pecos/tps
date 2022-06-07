@@ -149,7 +149,9 @@ class GasMixture {
   virtual double Temperature(double *rho, double *p,
                              int nsp) = 0;  // temperature given densities and pressures of all species
 
-  virtual void computeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp) {}
+  virtual void computeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp) {
+    mfem_error("computeSpeciesPrimitives not implemented");
+  }
   virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies) = 0;
 
   virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit) = 0;
@@ -172,7 +174,9 @@ class GasMixture {
   virtual void ComputeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
                                            DenseMatrix &moleFractionGrad) = 0;
   // TODO(kevin): Compute pressure gradient from temperature gradient.
-  virtual void ComputePressureGradient(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &PressureGrad) {}
+  virtual void ComputePressureGradient(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &PressureGrad) {
+    mfem_error("ComputePressureGradient not implemented");
+  }
 
 // TODO(kevin): GPU routines are not yet fully gas-agnostic. Need to be removed.
 #ifdef _GPU_
@@ -186,7 +190,9 @@ class GasMixture {
   virtual double GetGasConstant() = 0;
 #endif
 
-  virtual void computeNumberDensities(const Vector &conservedState, Vector &n_sp) {}
+  virtual void computeNumberDensities(const Vector &conservedState, Vector &n_sp) {
+    mfem_error("computeNumberDensities not implemented");
+  }
 
   virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
 
@@ -198,26 +204,44 @@ class GasMixture {
   double GetBulkViscMultiplyer() { return bulk_visc_mult; }
 #endif
 
-  virtual double getMolarCV(int species) {}
-  virtual double getMolarCP(int species) {}
+  virtual double getMolarCV(int species) {
+    mfem_error("getMolarCV not implemented");
+    return 0;
+  }
+  virtual double getMolarCP(int species) {
+    mfem_error("getMolarCV not implemented");
+    return 0;
+  }
 
   // BC related functions
   virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState);
-  virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut) {}
+  virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut) {
+    mfem_error("computeStagnantStateWithTemp not implemented");
+  }
   virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p,
-                                       bool modifyElectronEnergy = false) {}
+                                       bool modifyElectronEnergy = false) {
+    mfem_error("modifyEnergyForPressure not implemented");
+  }
   // Modify state with a prescribed condition at boundary.
   // TODO(kevin): it is possible to use this routine for all BCs, so no need of making so many functions as above.
   void modifyStateFromPrimitive(const Vector &state, const BoundaryPrimitiveData &bcState, Vector &outputState);
   virtual void computeSheathBdrFlux(const Vector &state, BoundaryViscousFluxData &bcFlux) = 0;
 
-  virtual double computeAmbipolarElectronNumberDensity(const double *n_sp) {}
+  virtual double computeAmbipolarElectronNumberDensity(const double *n_sp) {
+    mfem_error("computeAmbipolarElectronNumberDensity not implemented");
+    return 0;
+  }
   virtual double computeBackgroundMassDensity(const double &rho, const double *n_sp, double &n_e,
-                                              bool isElectronComputed = false) {}
+                                              bool isElectronComputed = false) {
+    mfem_error("computeBackgroundMassDensity not implemented");
+    return 0;
+  }
 
   // TODO(kevin): check if this works for axisymmetric case.
   virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
-                                                       Vector &conservedState) {}
+                                                       Vector &conservedState) {
+    mfem_error("computeConservedStateFromConvectiveFlux not implemented");
+  }
 
   virtual double computeElectronEnergy(const double n_e, const double T_e) = 0;
   virtual double computeElectronPressure(const double n_e, const double T_e) = 0;
@@ -269,9 +293,13 @@ class DryAir : public GasMixture {
   virtual double GetGasConstant() { return gas_constant; }
 
   virtual void ComputeMassFractionGradient(const double rho, const Vector &numberDensities, const DenseMatrix &gradUp,
-                                           DenseMatrix &massFractionGrad) {}
+                                           DenseMatrix &massFractionGrad) {
+    mfem_error("computeMassFractionGradient not implemented");
+  }
   virtual void ComputeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
-                                           DenseMatrix &moleFractionGrad) {}
+                                           DenseMatrix &moleFractionGrad) {
+    mfem_error("computeMoleFractionGradient not implemented");
+  }
 
   // virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
 
@@ -281,15 +309,25 @@ class DryAir : public GasMixture {
   virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p,
                                        bool modifyElectronEnergy = false);
 
-  virtual void computeSheathBdrFlux(const Vector &state, BoundaryViscousFluxData &bcFlux) {}
+  virtual void computeSheathBdrFlux(const Vector &state, BoundaryViscousFluxData &bcFlux) {
+    mfem_error("computeSheathBdrFlux not implemented");
+  }
 
   virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
                                                        Vector &conservedState);
 
-  virtual double computeElectronEnergy(const double n_e, const double T_e) {}
-  virtual double computeElectronPressure(const double n_e, const double T_e) {}
+  virtual double computeElectronEnergy(const double n_e, const double T_e) {
+    mfem_error("computeElectronEnergy not implemented");
+    return 0;
+  }
+  virtual double computeElectronPressure(const double n_e, const double T_e) {
+    mfem_error("computeElectronPressure not implemented");
+    return 0;
+  }
   virtual void computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix &gradUp,
-                                           Vector &gradPe) {}
+                                           Vector &gradPe) {
+    mfem_error("computeElectronPressureGrad not implemented");
+  }
   // GPU functions
   // TODO(kevin): GPU part is not refactored for axisymmetric case.
 #ifdef _GPU_
@@ -498,12 +536,22 @@ class TestBinaryAir : public GasMixture {
   virtual double GetGasConstant() { return gas_constant; }
 
   // virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
-  virtual void computeSheathBdrFlux(const Vector &state, BoundaryViscousFluxData &bcFlux) {}
+  virtual void computeSheathBdrFlux(const Vector &state, BoundaryViscousFluxData &bcFlux) {
+    mfem_error("computeSheathBdrFlux not implemented");
+  }
 
-  virtual double computeElectronEnergy(const double n_e, const double T_e) {}
-  virtual double computeElectronPressure(const double n_e, const double T_e) {}
+  virtual double computeElectronEnergy(const double n_e, const double T_e) {
+    mfem_error("computeElectronEnergy not implemented");
+    return 0;
+  }
+  virtual double computeElectronPressure(const double n_e, const double T_e) {
+    mfem_error("computeElectronPressure not implemented");
+    return 0;
+  }
   virtual void computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix &gradUp,
-                                           Vector &gradPe) {}
+                                           Vector &gradPe) {
+    mfem_error("computeElectronPressureGrad not implemented");
+  }
 
   // GPU functions
 #ifdef _GPU_
