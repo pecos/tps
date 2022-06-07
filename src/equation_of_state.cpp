@@ -351,7 +351,7 @@ double DryAir::ComputeSpeedOfSound(const mfem::Vector &Uin, bool primitive) {
 }
 
 double DryAir::ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive) {
-  double T, p;
+  double T;
   if (primitive) {
     T = Uin[1 + nvel_];
   } else {
@@ -510,7 +510,7 @@ void TestBinaryAir::GetPrimitivesFromConservatives(const Vector &conserv, Vector
 }
 
 double TestBinaryAir::ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive) {
-  double T, p;
+  double T;
   if (primitive) {
     T = Uin[1 + dim];
   } else {
