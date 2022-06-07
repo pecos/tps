@@ -156,28 +156,6 @@ inline void DryAirTransport::GetViscosities(const Vector &conserved, const Vecto
 }
 
 //////////////////////////////////////////////////////
-//////// Test Binary Air mixture
-//////////////////////////////////////////////////////
-// NOTE: this is mixture of two idential air species.
-// mixture variables (density, pressure, temperature) are treated as single species.
-// Only mass fractions are treated as binary mixture, essentially the same as PASSIVE_SCALAR.
-
-class TestBinaryAirTransport : public DryAirTransport {
- protected:
- public:
-  TestBinaryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile);
-
-  virtual ~TestBinaryAirTransport() {}
-
-  virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
-                                              Vector &transportBuffer, DenseMatrix &diffusionVelocity);
-  virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
-                                                const Vector &Efield, Vector &globalTransport,
-                                                DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
-                                                Vector &n_sp) {}
-};
-
-//////////////////////////////////////////////////////
 //////// Constant Transport
 //////////////////////////////////////////////////////
 

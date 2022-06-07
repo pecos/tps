@@ -45,7 +45,7 @@ enum Equations {
 };
 
 // These are presets of combination of EquationOfState, TranportProperties, and Chemistry.
-enum WorkingFluid { DRY_AIR, TEST_BINARY_AIR, USER_DEFINED };
+enum WorkingFluid { DRY_AIR, USER_DEFINED };
 
 // These are the type of EquationOfState.
 enum GasModel { /* PERFECT_SINGLE, */ PERFECT_MIXTURE, /* CANTERA, */ NUM_GASMODEL };

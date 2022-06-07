@@ -260,10 +260,6 @@ void M2ulPhyS::initVariables() {
       mixture = new DryAir(config, dim, nvel);
       transportPtr = new DryAirTransport(mixture, config);
       break;
-    case WorkingFluid::TEST_BINARY_AIR:
-      mixture = new TestBinaryAir(config, dim, nvel);
-      transportPtr = new TestBinaryAirTransport(mixture, config);
-      break;
     case WorkingFluid::USER_DEFINED:
       switch (config.GetGasModel()) {
         case GasModel::PERFECT_MIXTURE:
@@ -1919,8 +1915,6 @@ void M2ulPhyS::parseFluidPreset() {
   tpsP->getInput("flow/fluid", fluidTypeStr, std::string("dry_air"));
   if (fluidTypeStr == "dry_air") {
     config.workFluid = DRY_AIR;
-  } else if (fluidTypeStr == "test_binary_air") {
-    config.workFluid = TEST_BINARY_AIR;
   } else if (fluidTypeStr == "user_defined") {
     config.workFluid = USER_DEFINED;
   } else {

@@ -170,49 +170,6 @@ void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const 
 }
 
 //////////////////////////////////////////////////////
-//////// Test Binary Air mixture
-//////////////////////////////////////////////////////
-
-TestBinaryAirTransport::TestBinaryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile)
-    : DryAirTransport(_mixture, _runfile) {}
-
-void TestBinaryAirTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
-                                                            const Vector &Efield, Vector &transportBuffer,
-                                                            DenseMatrix &diffusionVelocity) {
-  double p = mixture->ComputePressure(state);
-  double temp = p / gas_constant / state[0];
-
-  Vector n_sp(numSpecies), X_sp(numSpecies), Y_sp(numSpecies);
-  mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
-
-  transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
-  double viscosity = (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
-  transportBuffer[FluxTrns::VISCOSITY] = viscosity;
-  transportBuffer[FluxTrns::BULK_VISCOSITY] = bulk_visc_mult * viscosity;
-  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = cp_div_pr * transportBuffer[FluxTrns::VISCOSITY];
-
-  diffusionVelocity.SetSize(numSpecies, 3);
-  diffusionVelocity = 0.0;
-  if (numActiveSpecies > 0) {
-    double diffusivity = transportBuffer[FluxTrns::VISCOSITY] / Sc;
-
-    // Compute mass fraction gradient from number density gradient.
-    DenseMatrix massFractionGrad;
-    mixture->ComputeMassFractionGradient(state(0), n_sp, gradUp, massFractionGrad);
-    for (int sp = 0; sp < numActiveSpecies; sp++) {
-      if (state[nvel_ + 2 + sp] == 0.0) continue;
-
-      for (int d = 0; d < dim; d++)
-        diffusionVelocity(sp, d) = diffusivity * massFractionGrad(sp, d) / state[nvel_ + 2 + sp] * state[0];
-    }
-
-    for (int d = 0; d < nvel_; d++) {
-      assert(!std::isnan(diffusionVelocity(0, d)));
-    }
-  }
-}
-
-//////////////////////////////////////////////////////
 //////// Constant transport
 //////////////////////////////////////////////////////
 
