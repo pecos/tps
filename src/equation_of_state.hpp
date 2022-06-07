@@ -116,6 +116,7 @@ class GasMixture {
 
  public:
   GasMixture(RunConfiguration &_runfile, int _dim, int nvel);
+  GasMixture(WorkingFluid f, int _dim, int nvel);
   GasMixture() {}
 
   virtual ~GasMixture() {}
@@ -263,6 +264,8 @@ class DryAir : public GasMixture {
 
  public:
   DryAir(RunConfiguration &_runfile, int _dim, int nvel);
+  DryAir(const WorkingFluid f, const Equations eq_sys, const double viscosity_multiplier, const double bulk_viscosity,
+         int _dim, int nvel);
   DryAir();  // this will only be usefull to get air constants
   // DryAir(int dim, int num_equation);
 

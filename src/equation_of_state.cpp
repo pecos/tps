@@ -34,66 +34,12 @@
 
 // EquationOfState::EquationOfState() {}
 
-GasMixture::GasMixture(RunConfiguration &_runfile, int _dim, int nvel) {
-  fluid = _runfile.workFluid;
+GasMixture::GasMixture(RunConfiguration &_runfile, int _dim, int nvel) : GasMixture(_runfile.workFluid, _dim, nvel) {}
+
+GasMixture::GasMixture(WorkingFluid f, int _dim, int nvel) {
+  fluid = f;
   dim = _dim;
   nvel_ = nvel;
-
-  if (fluid != DRY_AIR) {
-    numSpecies = _runfile.GetNumSpecies();
-    backgroundInputIndex_ = _runfile.backgroundIndex;
-    assert((backgroundInputIndex_ > 0) && (backgroundInputIndex_ <= numSpecies));
-    // If electron is not included, then ambipolar and two-temperature are false.
-    ambipolar = false;
-    twoTemperature_ = false;
-
-    // TODO(kevin): electron species is enforced to be included in the input file.
-    bool isElectronIncluded = false;
-
-    gasParams.SetSize(numSpecies, GasParams::NUM_GASPARAMS);
-    // composition_.SetSize(numSpecies, _runfile.numAtoms);
-
-    gasParams = 0.0;
-    int paramIdx = 0;  // new species index.
-    int targetIdx;
-    for (int sp = 0; sp < numSpecies; sp++) {  // input file species index.
-      if (sp == backgroundInputIndex_ - 1) {
-        targetIdx = numSpecies - 1;
-      } else if (_runfile.speciesNames[sp] == "E") {
-        targetIdx = numSpecies - 2;
-        isElectronIncluded = true;
-        // Set ambipolar and twoTemperature if electron is included.
-        ambipolar = _runfile.IsAmbipolar();
-        twoTemperature_ = _runfile.IsTwoTemperature();
-      } else {
-        targetIdx = paramIdx;
-        paramIdx++;
-      }
-      speciesMapping_[_runfile.speciesNames[sp]] = targetIdx;
-      mixtureToInputMap_[targetIdx] = sp;
-      std::cout << "name, input index, mixture index: " << _runfile.speciesNames[sp] << ", " << sp << ", " << targetIdx
-                << std::endl;
-
-      for (int param = 0; param < GasParams::NUM_GASPARAMS; param++)
-        gasParams(targetIdx, param) = _runfile.GetGasParams(sp, (GasParams)param);
-
-      /* TODO(kevin): not sure we need atomMW and composition in GasMixture.
-                      not initialized at thit point. */
-      // for (int a = 0; a < _runfile.numAtoms; a++)
-      //   composition_(targetIdx, a) = _runfile.speciesComposition(sp, a);
-    }
-
-    SetNumActiveSpecies();
-    SetNumEquations();
-
-    // We assume the background species is neutral.
-    assert(gasParams(numSpecies - 1, GasParams::SPECIES_CHARGES) == 0.0);
-    // TODO(kevin): release electron species enforcing.
-    assert(isElectronIncluded);
-    // We assume the background species and electron have zero formation energy.
-    assert(gasParams(numSpecies - 2, GasParams::FORMATION_ENERGY) == 0.0);
-    assert(gasParams(numSpecies - 1, GasParams::FORMATION_ENERGY) == 0.0);
-  }
 }
 
 void GasMixture::UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up) {
@@ -149,8 +95,13 @@ void GasMixture::modifyStateFromPrimitive(const Vector &state, const BoundaryPri
 //////// Dry Air mixture
 //////////////////////////////////////////////////////
 
-DryAir::DryAir(RunConfiguration &_runfile, int _dim, int nvel) : GasMixture(_runfile, _dim, nvel) {
-  numSpecies = (_runfile.GetEquationSystem() == NS_PASSIVE) ? 2 : 1;
+DryAir::DryAir(RunConfiguration &_runfile, int _dim, int nvel)
+    : DryAir(_runfile.workFluid, _runfile.GetEquationSystem(), _runfile.visc_mult, _runfile.bulk_visc, _dim, nvel) {}
+
+DryAir::DryAir(const WorkingFluid f, const Equations eq_sys, const double viscosity_multiplier,
+               const double bulk_viscosity, int _dim, int nvel)
+    : GasMixture(f, _dim, nvel) {
+  numSpecies = (eq_sys == NS_PASSIVE) ? 2 : 1;
   ambipolar = false;
   twoTemperature_ = false;
 
@@ -158,12 +109,12 @@ DryAir::DryAir(RunConfiguration &_runfile, int _dim, int nvel) : GasMixture(_run
   SetNumEquations();
 
   gas_constant = 287.058;
-  // gas_constant = 1.; // for comparison against ex18
+
   specific_heat_ratio = 1.4;
 // TODO(kevin): GPU routines are not yet fully gas-agnostic. Need to be removed.
 #ifdef _GPU_
-  visc_mult = _runfile.visc_mult;
-  bulk_visc_mult = _runfile.bulk_visc;
+  visc_mult = viscosity_multiplier;
+  bulk_visc_mult = bulk_viscosity;
   Pr = 0.71;
   cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
   Sc = 0.71;
@@ -175,7 +126,7 @@ DryAir::DryAir(RunConfiguration &_runfile, int _dim, int nvel) : GasMixture(_run
 
   // TODO(kevin): replace Nconservative/Nprimitive.
   // add extra equation for passive scalar
-  if (_runfile.GetEquationSystem() == Equations::NS_PASSIVE) {
+  if (eq_sys == Equations::NS_PASSIVE) {
     Nconservative++;
     Nprimitive++;
     num_equation++;
@@ -461,6 +412,60 @@ double EquationOfState::pressure( double *state,
 //////////////////////////////////////////////////////////////////////////
 
 PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim, int nvel) : GasMixture(_runfile, _dim, nvel) {
+  numSpecies = _runfile.GetNumSpecies();
+  backgroundInputIndex_ = _runfile.backgroundIndex;
+  assert((backgroundInputIndex_ > 0) && (backgroundInputIndex_ <= numSpecies));
+  // If electron is not included, then ambipolar and two-temperature are false.
+  ambipolar = false;
+  twoTemperature_ = false;
+
+  // TODO(kevin): electron species is enforced to be included in the input file.
+  bool isElectronIncluded = false;
+
+  gasParams.SetSize(numSpecies, GasParams::NUM_GASPARAMS);
+  // composition_.SetSize(numSpecies, _runfile.numAtoms);
+
+  gasParams = 0.0;
+  int paramIdx = 0;  // new species index.
+  int targetIdx;
+  for (int sp = 0; sp < numSpecies; sp++) {  // input file species index.
+    if (sp == backgroundInputIndex_ - 1) {
+      targetIdx = numSpecies - 1;
+    } else if (_runfile.speciesNames[sp] == "E") {
+      targetIdx = numSpecies - 2;
+      isElectronIncluded = true;
+      // Set ambipolar and twoTemperature if electron is included.
+      ambipolar = _runfile.IsAmbipolar();
+      twoTemperature_ = _runfile.IsTwoTemperature();
+    } else {
+      targetIdx = paramIdx;
+      paramIdx++;
+    }
+    speciesMapping_[_runfile.speciesNames[sp]] = targetIdx;
+    mixtureToInputMap_[targetIdx] = sp;
+    std::cout << "name, input index, mixture index: " << _runfile.speciesNames[sp] << ", " << sp << ", " << targetIdx
+              << std::endl;
+
+    for (int param = 0; param < GasParams::NUM_GASPARAMS; param++)
+      gasParams(targetIdx, param) = _runfile.GetGasParams(sp, (GasParams)param);
+
+    /* TODO(kevin): not sure we need atomMW and composition in GasMixture.
+       not initialized at thit point. */
+    // for (int a = 0; a < _runfile.numAtoms; a++)
+    //   composition_(targetIdx, a) = _runfile.speciesComposition(sp, a);
+  }
+
+  SetNumActiveSpecies();
+  SetNumEquations();
+
+  // We assume the background species is neutral.
+  assert(gasParams(numSpecies - 1, GasParams::SPECIES_CHARGES) == 0.0);
+  // TODO(kevin): release electron species enforcing.
+  assert(isElectronIncluded);
+  // We assume the background species and electron have zero formation energy.
+  assert(gasParams(numSpecies - 2, GasParams::FORMATION_ENERGY) == 0.0);
+  assert(gasParams(numSpecies - 1, GasParams::FORMATION_ENERGY) == 0.0);
+
   molarCV_.SetSize(numSpecies);
   molarCP_.SetSize(numSpecies);
   specificGasConstants_.SetSize(numSpecies);
