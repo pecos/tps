@@ -374,7 +374,7 @@ void FaceIntegrator::MassMatrixFaceIntegral(const FiniteElement &el1, const Fini
       Tr.SetAllIntPoints(&ip);
       CalcOrtho(Tr.Jacobian(), nor);
 
-      int index1, index2;
+      int index1 = 0, index2 = 0;
       el1.CalcShape(Tr.GetElement1IntPoint(), shape1);
       el2.CalcShape(Tr.GetElement2IntPoint(), shape2);
       for (int j = 0; j < dof1; j++)
