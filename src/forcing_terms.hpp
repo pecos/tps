@@ -78,7 +78,7 @@ class ForcingTerms {
   ForcingTerms(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up,
                ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays, bool axisym);
-  ~ForcingTerms();
+  virtual ~ForcingTerms();
 
   void setTime(double _time) { time = _time; }
   virtual void updateTerms(Vector &in) = 0;
@@ -97,7 +97,7 @@ class ConstantPressureGradient : public ForcingTerms {
                            IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
                            ParGridFunction *_Up, ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
                            RunConfiguration &_config, GasMixture *mixture);
-  ~ConstantPressureGradient() {}
+  virtual ~ConstantPressureGradient() {}
 
   // Terms do not need updating
   virtual void updateTerms(Vector &in);
@@ -122,7 +122,7 @@ class AxisymmetricSource : public ForcingTerms {
                      IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
                      ParGridFunction *_Up, ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
                      RunConfiguration &_config);
-  ~AxisymmetricSource();
+  virtual ~AxisymmetricSource() {}
 
   virtual void updateTerms(Vector &in);
 };
@@ -153,7 +153,7 @@ class SpongeZone : public ForcingTerms {
              GasMixture *_mixture, IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
              ParGridFunction *_Up, ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
              RunConfiguration &_config, const int sz);
-  ~SpongeZone();
+  virtual ~SpongeZone();
 
   virtual void updateTerms(Vector &in);
 };
@@ -177,7 +177,7 @@ class PassiveScalar : public ForcingTerms {
   void updateTerms_gpu(Vector &in, ParGridFunction *Up, Array<passiveScalarData *> &psData, const int nnode,
                        const int num_equation);
 
-  ~PassiveScalar();
+  virtual ~PassiveScalar();
 };
 
 class HeatSource : public ForcingTerms {
@@ -193,7 +193,7 @@ class HeatSource : public ForcingTerms {
              heatSourceData &heatSource, GasMixture *_mixture, IntegrationRules *_intRules,
              ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp,
              const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config);
-  ~HeatSource();
+  virtual ~HeatSource() {}
 
   virtual void updateTerms(Vector &in);
 
