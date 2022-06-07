@@ -767,7 +767,7 @@ void RHSoperator::fillSharedData() {
       hsharedElem1Dof12Q[3 + i * 4] = ir->GetNPoints();
 
       bool inList = false;
-      for (int n = 0; n < unicElems.size(); n++) {
+      for (size_t n = 0; n < unicElems.size(); n++) {
         if (unicElems[n] == tr->Elem1No) inList = true;
       }
       if (!inList) unicElems.push_back(tr->Elem1No);
@@ -805,7 +805,7 @@ void RHSoperator::fillSharedData() {
     parallelData.sharedElemsFaces.SetSize(7 * unicElems.size());
     parallelData.sharedElemsFaces = -1;
     auto hsharedElemsFaces = parallelData.sharedElemsFaces.HostWrite();
-    for (int el = 0; el < unicElems.size(); el++) {
+    for (size_t el = 0; el < unicElems.size(); el++) {
       const int eli = unicElems[el];
       for (int f = 0; f < parallelData.sharedElem1Dof12Q.Size() / 4; f++) {
         if (eli == hsharedElem1Dof12Q[0 + f * 4]) {
