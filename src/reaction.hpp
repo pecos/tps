@@ -54,7 +54,7 @@ class Reaction {
  public:
   Reaction() {}
 
-  ~Reaction() {}
+  virtual ~Reaction() {}
 
   virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved = false) {
     mfem_error("computeRateCoefficient not implemented");
@@ -72,7 +72,7 @@ class Arrhenius : public Reaction {
  public:
   Arrhenius(const double A, const double b, const double E);
 
-  ~Arrhenius() {}
+  virtual ~Arrhenius() {}
 
   virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved = false);
 };
@@ -91,7 +91,7 @@ class HoffertLien : public Reaction {
  public:
   HoffertLien(const double A, const double b, const double E);
 
-  ~HoffertLien() {}
+  virtual ~HoffertLien() {}
 
   virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved = false);
 };

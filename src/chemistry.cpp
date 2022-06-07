@@ -132,6 +132,9 @@ Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : mixture_(m
         double E = (config.reactionModelParams[r])[2];
         reactions_[r] = new HoffertLien(A, b, E);
       } break;
+      default:
+        mfem_error("Unknown reactionModel.");
+        break;
     }
     if (detailedBalance_[r]) {
       for (int d = 0; d < 3; d++) {
