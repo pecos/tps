@@ -62,11 +62,15 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
   }
   string fileName;
 
-  if (((config.RestartSerial() == "read") && (mode == "read")) ||
-      ((config.RestartSerial() == "write") && (mode == "write")))
+  assert((mode == "read") || (mode == "write"));
+
+  // determine restart file name (either serial or partitioned)
+
+  if (config.isRestartSerialized(mode)) {
     fileName = serialName;
-  else
+  } else {
     fileName = groupsMPI->getParallelName(serialName);
+  }
 
   // Variables used if (and only if) restarting from different order
   FiniteElementCollection *aux_fec = NULL;
@@ -77,16 +81,14 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
 
   if (mpi.Root()) cout << "HDF5 restart files mode: " << mode << endl;
 
-  assert((mode == "read") || (mode == "write"));
-
-  // open restart files (currently per MPI process variants)
+  // open restart files
   if (mode == "write") {
-    if (mpi.Root() || (config.RestartSerial() != "write")) {
+    if (mpi.Root() || config.isRestartPartitioned(mode)) {
       file = H5Fcreate(fileName.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
       assert(file >= 0);
     }
   } else if (mode == "read") {
-    if (config.RestartSerial() == "read") {
+    if (config.isRestartSerialized(mode)) {
       if (rank0_) {
         file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
         assert(file >= 0);
@@ -115,7 +117,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
   hid_t attr;
   if (mode == "write") {
     // note: all tasks save unless we are writing a serial restart file
-    if (mpi.Root() || (config.RestartSerial() != "write")) {
+    if (mpi.Root() || config.isRestartPartitioned(mode)) {
       // current iteration count
       h5_save_attribute(file, "iteration", iter);
       // total time
@@ -153,7 +155,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
 #endif
 
     // included total dofs for partitioned files
-    if (config.RestartSerial() != "write") {
+    if (!config.isRestartSerialized(mode)) {
       int ldofs = vfes->GetNDofs();
       int gdofs;
       MPI_Allreduce(&ldofs, &gdofs, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
@@ -162,11 +164,11 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
   } else {  // read
     int read_order;
 
-    // normal restarts have each process read there own portion of the
+    // normal restarts have each process read their own portion of the
     // solution; a serial restart only reads on rank 0 and distributes to
     // the remaining processes
 
-    if (rank0_ || (config.RestartSerial() != "read")) {
+    if (rank0_ || config.isRestartPartitioned(mode)) {
       h5_read_attribute(file, "iteration", iter);
       h5_read_attribute(file, "time", time);
       h5_read_attribute(file, "dt", dt);
@@ -180,7 +182,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
       }
     }
 
-    if (config.RestartSerial() == "read") {
+    if (config.isRestartSerialized(mode)) {
       MPI_Bcast(&iter, 1, MPI_INT, 0, MPI_COMM_WORLD);
       MPI_Bcast(&time, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
       MPI_Bcast(&dt, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
@@ -194,7 +196,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
     }
 
     if (loadFromAuxSol) {
-      assert(config.RestartSerial() == "no");
+      assert(config.RestartSerial() == "no");  // koomie, check cis
       auxOrder = read_order;
 
       if (basisType == 0)
@@ -235,15 +237,13 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
     IOFamily &fam = ioData.families_[n];
 
     if (mode == "write") {
-      if ((config.RestartSerial() == "write") && (nprocs_ > 1) && (mpi.Root())) {
+      if ((config.isRestartSerialized(mode)) && (nprocs_ > 1) && (mpi.Root())) {
         assert((locToGlobElem != NULL) && (partitioning_ != NULL));
         assert(fam.serial_fes != NULL);
         dims[0] = fam.serial_fes->GetNDofs();
       } else {
         dims[0] = fam.pfunc_->ParFESpace()->GetNDofs();
       }
-      //       for(auto fam : ioData.families_)
-      //       {
       // define groups based on defined IO families
       if (rank0_) {
         grvy_printf(ginfo, "\nCreating HDF5 group for defined IO families\n");
@@ -253,7 +253,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
       hid_t group = -1;
       hid_t dataspace = -1;
 
-      if (rank0_ || (config.RestartSerial() != "write")) {
+      if (rank0_ || !config.isRestartSerialized(mode)) {
         dataspace = H5Screate_simple(1, dims, NULL);
         assert(dataspace >= 0);
         group = H5Gcreate(file, fam.group_.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
@@ -263,7 +263,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
       // get pointer to raw data
       double *data = fam.pfunc_->HostReadWrite();
       // special case if writing a serial restart
-      if ((config.RestartSerial() == "write") && (nprocs_ > 1)) {
+      if ((config.isRestartSerialized(mode)) && (nprocs_ > 1)) {
         serialize_soln_for_write(fam);
         if (rank0_) data = fam.serial_sol->HostReadWrite();
       }
@@ -272,7 +272,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
       vector<IOVar> vars = ioData.vars_[fam.group_];
 
       // save raw data
-      if (mpi.Root() || (config.RestartSerial() != "write")) {
+      if (mpi.Root() || config.isRestartPartitioned(mode)) {
         for (auto var : vars) write_soln_data(group, var.varName_, dataspace, data + var.index_ * dims[0]);
       }
 
@@ -283,7 +283,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
       if (rank0_) cout << "Reading in solutiond data from restart..." << endl;
 
       // verify Dofs match expectations with current mesh
-      if (mpi.Root() || (config.RestartSerial() != "read")) {
+      if (mpi.Root() || config.isRestartPartitioned(mode)) {
         hid_t dataspace;
 
         vector<IOVar> vars = ioData.vars_[fam.group_];
@@ -299,7 +299,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
       }
 
       int dof = fam.pfunc_->ParFESpace()->GetNDofs();
-      if (config.RestartSerial() == "read") {
+      if (config.isRestartSerialized(mode)) {
         int dof_global;
         MPI_Reduce(&dof, &dof_global, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
         dof = dof_global;
@@ -307,7 +307,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
 
       if (loadFromAuxSol && fam.allowsAuxRestart) dof = aux_vfes->GetNDofs();
 
-      if (rank0_ || (config.RestartSerial() != "read")) assert((int)numInSoln == dof);
+      if (rank0_ || config.isRestartPartitioned(mode)) assert((int)numInSoln == dof);
 
       // get pointer to raw data
       double *data = fam.pfunc_->HostReadWrite();
@@ -324,7 +324,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
       for (auto var : vars) {
         std::string h5Path = fam.group_ + "/" + var.varName_;
         if (rank0_) grvy_printf(ginfo, "--> Reading h5 path = %s\n", h5Path.c_str());
-        if (config.RestartSerial() != "read")
+        if (config.isRestartPartitioned(mode))
           read_partitioned_soln_data(file, h5Path.c_str(), var.index_ * numInSoln, data);
         else
           read_serialized_soln_data(file, h5Path.c_str(), dof, var.index_, data, fam);
@@ -506,7 +506,7 @@ void M2ulPhyS::serialize_soln_for_write(IOFamily &fam) {
   assert((locToGlobElem != NULL) && (partitioning_ != NULL));
 
   if (rank0_) {
-    grvy_printf(ginfo, "Generating serialized restart file (group %s...\n", fam.group_.c_str());
+    grvy_printf(ginfo, "Generating serialized restart file (group %s...)\n", fam.group_.c_str());
     // copy my own data
     Array<int> lvdofs, gvdofs;
     Vector lsoln;
@@ -549,7 +549,7 @@ void M2ulPhyS::serialize_soln_for_write(IOFamily &fam) {
 
 // convenience function to read solution data for parallel restarts
 void M2ulPhyS::read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data) {
-  assert(config.RestartSerial() != "read");
+  assert(config.isRestartPartitioned("read"));
 
   hid_t data_soln;
   herr_t status;
@@ -564,7 +564,7 @@ void M2ulPhyS::read_partitioned_soln_data(hid_t file, string varName, size_t ind
 // convenience function to read and distribute solution data for serialized restarts
 void M2ulPhyS::read_serialized_soln_data(hid_t file, string varName, int numDof, int varOffset, double *data,
                                          IOFamily &fam) {
-  assert(config.RestartSerial() == "read");
+  assert(config.isRestartSerialized("read"));
 
   hid_t data_soln;
   herr_t status;

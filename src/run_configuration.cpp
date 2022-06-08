@@ -116,6 +116,24 @@ RunConfiguration::~RunConfiguration() {
   if (spongeData_ != NULL) delete[] spongeData_;
 }
 
+// convenience function to determine whether a restart is serialized (using a
+// single HDF5 file)
+bool RunConfiguration::isRestartSerialized(string mode) {
+  if (restart_serial == "readwrite") {
+    return true;
+  } else if (mode == "read") {
+    if (restart_serial == "read") return true;
+  } else if (mode == "write") {
+    if (restart_serial == "write") return true;
+  }
+
+  return false;
+}
+
+// convenience function to determine whether a restart is partitioned
+// (ie. parallel).
+bool RunConfiguration::isRestartPartitioned(string mode) { return (!isRestartSerialized(mode)); }
+
 void RunConfiguration::initSpongeData() {
   //   spongeData.multFactor = 1.;
   //
@@ -138,6 +156,8 @@ void RunConfiguration::initSpongeData() {
   //   spongeData.szType = SpongeZoneSolution::NONE;
 }
 
+// Note from ks: this method to be deprecated. Superceded by
+// M2ulPhyS::parseSolverOptions2()
 void RunConfiguration::readInputFile(std::string inpuFileName) {
   // runfile
   ifstream runFile(inpuFileName);

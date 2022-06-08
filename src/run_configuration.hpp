@@ -292,6 +292,8 @@ class RunConfiguration {
   bool RestartFromAux() { return restartFromAux; }
   bool RestartHDFConversion() { return restart_hdf5_conversion; }
   std::string RestartSerial() { return restart_serial; }
+  bool isRestartSerialized(string mode);
+  bool isRestartPartitioned(string mode);
 
   const std::vector<pair<int, InletType>>* GetInletPatchType() const { return &inletPatchType; }
   Array<double> GetInletData(int i);
