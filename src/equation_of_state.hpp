@@ -74,16 +74,16 @@ class GasMixture {
   bool ambipolar;
   bool twoTemperature_;
 
-  DenseMatrix gasParams;
-  // TODO(kevin): not initialized at this point.
-  // DenseMatrix composition_;
-  // Vector atomMW_;
+  // DenseMatrix gasParams;
+  // // TODO(kevin): not initialized at this point.
+  // // DenseMatrix composition_;
+  // // Vector atomMW_;
 
-  std::map<int, int> mixtureToInputMap_;
+  // std::map<int, int> mixtureToInputMap_;
 
-  // NOTE: the indexes here starts from 0, 1, ...
-  // Mapping between name and species index in gas parameter arrays.
-  std::map<std::string, int> speciesMapping_;
+  // // NOTE: the indexes here starts from 0, 1, ...
+  // // Mapping between name and species index in gas parameter arrays.
+  // std::map<std::string, int> speciesMapping_;
 
   // We fix species primitive to be number density and compute its gradient only.
   // Conversion to X- and Y-gradient are easy, compared to the other way around.
@@ -108,18 +108,18 @@ class GasMixture {
 
   // If not ambipolar, one species continuity equation is replaced by global continuity equation.
   // If ambipolar, electron continuity equation is also replaced by an algebraic equation (determined by GasMixture).
-  void SetNumActiveSpecies() { numActiveSpecies = ambipolar ? (numSpecies - 2) : (numSpecies - 1); }
+  MFEM_HOST_DEVICE void SetNumActiveSpecies() { numActiveSpecies = ambipolar ? (numSpecies - 2) : (numSpecies - 1); }
   // Add electron energy equation if two temperature.
-  void SetNumEquations() {
+  MFEM_HOST_DEVICE void SetNumEquations() {
     num_equation = twoTemperature_ ? (nvel_ + 3 + numActiveSpecies) : (nvel_ + 2 + numActiveSpecies);
   }
 
  public:
   GasMixture(RunConfiguration &_runfile, int _dim, int nvel);
-  GasMixture(WorkingFluid f, int _dim, int nvel);
+  MFEM_HOST_DEVICE GasMixture(WorkingFluid f, int _dim, int nvel);
   GasMixture() {}
 
-  virtual ~GasMixture() {}
+  MFEM_HOST_DEVICE virtual ~GasMixture() {}
 
   void SetFluid(WorkingFluid _fluid);
 
@@ -132,13 +132,13 @@ class GasMixture {
   int GetNumVels() { return nvel_; }
   bool IsAmbipolar() { return ambipolar; }
   bool IsTwoTemperature() { return twoTemperature_; }
-  int getInputIndexOf(int mixtureIndex) { return mixtureToInputMap_[mixtureIndex]; }
+  virtual int getInputIndexOf(int mixtureIndex) { return 0; }
   // int getElectronMixtureIndex() { return (speciesMapping_.count("E")) ? speciesMapping_["E"] : -1; }
-  std::map<int, int> *getMixtureToInputMap() { return &mixtureToInputMap_; }
-  std::map<std::string, int> *getSpeciesMapping() { return &speciesMapping_; }
+  virtual std::map<int, int> *getMixtureToInputMap() { return NULL; }
+  virtual std::map<std::string, int> *getSpeciesMapping() { return NULL; }
   // DenseMatrix *getCompositions() { return &composition_; }
 
-  double GetGasParams(int species, GasParams param) { return gasParams(species, param); }
+  virtual double GetGasParams(int species, GasParams param) { return 0.0; }
 
   int GetNumConservativeVariables() { return Nconservative; }
   int GetNumPrimitiveVariables() { return Nprimitive; }
@@ -264,12 +264,17 @@ class DryAir : public GasMixture {
 
  public:
   DryAir(RunConfiguration &_runfile, int _dim, int nvel);
-  DryAir(const WorkingFluid f, const Equations eq_sys, const double viscosity_multiplier, const double bulk_viscosity,
-         int _dim, int nvel);
+  MFEM_HOST_DEVICE DryAir(const WorkingFluid f, const Equations eq_sys, const double viscosity_multiplier,
+                          const double bulk_viscosity, int _dim, int nvel);
   DryAir();  // this will only be usefull to get air constants
   // DryAir(int dim, int num_equation);
 
-  virtual ~DryAir() {}
+  MFEM_HOST_DEVICE virtual ~DryAir() {}
+
+  virtual double GetGasParams(int species, GasParams param) {
+    assert(param == GasParams::SPECIES_MW);
+    return UNIVERSALGASCONSTANT / gas_constant;
+  }
 
   // implementation virtual methods
   virtual double ComputePressure(const Vector &state, double *electronPressure = NULL);
@@ -500,12 +505,23 @@ class PerfectMixture : public GasMixture {
   Vector molarCV_;
   Vector molarCP_;
 
+  DenseMatrix gasParams;
+  std::map<int, int> mixtureToInputMap_;
+  std::map<std::string, int> speciesMapping_;
+
   // virtual void SetNumEquations();
  public:
   PerfectMixture(RunConfiguration &_runfile, int _dim, int nvel);
   // TestBinaryAir(); //this will only be usefull to get air constants
 
-  virtual ~PerfectMixture() {}
+  // FIXME: Generates compiler warning b/c this dtor implicitly calls
+  // Vector dtor, which is only a __host__ function!
+  MFEM_HOST_DEVICE virtual ~PerfectMixture() {}
+
+  virtual int getInputIndexOf(int mixtureIndex) { return mixtureToInputMap_[mixtureIndex]; }
+  virtual std::map<int, int> *getMixtureToInputMap() { return &mixtureToInputMap_; }
+  virtual std::map<std::string, int> *getSpeciesMapping() { return &speciesMapping_; }
+  virtual double GetGasParams(int species, GasParams param) { return gasParams(species, param); }
 
   virtual double getMolarCV(int species) { return molarCV_(species); }
   virtual double getMolarCP(int species) { return molarCP_(species); }

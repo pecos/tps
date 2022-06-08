@@ -36,7 +36,7 @@
 
 GasMixture::GasMixture(RunConfiguration &_runfile, int _dim, int nvel) : GasMixture(_runfile.workFluid, _dim, nvel) {}
 
-GasMixture::GasMixture(WorkingFluid f, int _dim, int nvel) {
+MFEM_HOST_DEVICE GasMixture::GasMixture(WorkingFluid f, int _dim, int nvel) {
   fluid = f;
   dim = _dim;
   nvel_ = nvel;
@@ -98,8 +98,8 @@ void GasMixture::modifyStateFromPrimitive(const Vector &state, const BoundaryPri
 DryAir::DryAir(RunConfiguration &_runfile, int _dim, int nvel)
     : DryAir(_runfile.workFluid, _runfile.GetEquationSystem(), _runfile.visc_mult, _runfile.bulk_visc, _dim, nvel) {}
 
-DryAir::DryAir(const WorkingFluid f, const Equations eq_sys, const double viscosity_multiplier,
-               const double bulk_viscosity, int _dim, int nvel)
+MFEM_HOST_DEVICE DryAir::DryAir(const WorkingFluid f, const Equations eq_sys, const double viscosity_multiplier,
+                                const double bulk_viscosity, int _dim, int nvel)
     : GasMixture(f, _dim, nvel) {
   numSpecies = (eq_sys == NS_PASSIVE) ? 2 : 1;
   ambipolar = false;
@@ -119,10 +119,6 @@ DryAir::DryAir(const WorkingFluid f, const Equations eq_sys, const double viscos
   cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
   Sc = 0.71;
 #endif
-
-  gasParams.SetSize(numSpecies, GasParams::NUM_GASPARAMS);
-  gasParams = 0.0;
-  gasParams(0, GasParams::SPECIES_MW) = UNIVERSALGASCONSTANT / gas_constant;
 
   // TODO(kevin): replace Nconservative/Nprimitive.
   // add extra equation for passive scalar

@@ -104,6 +104,31 @@ M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps) : mp
   }
 }
 
+#if defined(_CUDA_)
+// CUDA supports device new/delete
+__global__ void instantiateDeviceMixture(const WorkingFluid f, const Equations eq_sys,
+                                         const double viscosity_multiplier, const double bulk_viscosity, int _dim,
+                                         int nvel, GasMixture **mix) {
+  *mix = new DryAir(f, eq_sys, viscosity_multiplier, bulk_viscosity, _dim, nvel);
+}
+
+__global__ void freeDeviceMixture(GasMixture *mix) { delete mix; }
+#elif defined(_HIP_)
+// HIP doesn't support device new/delete, but
+// does support device malloc/free and placement new
+__global__ void instantiateDeviceMixture(const WorkingFluid f, const Equations eq_sys,
+                                         const double viscosity_multiplier, const double bulk_viscosity, int _dim,
+                                         int nvel, GasMixture **mix) {
+  void *tmp = malloc(sizeof(DryAir));
+  *mix = new (tmp) DryAir(f, eq_sys, viscosity_multiplier, bulk_viscosity, _dim, nvel);
+}
+
+__global__ void freeDeviceMixture(GasMixture *mix) {
+  mix->~GasMixture();  // explicit destructor call b/c placement new above
+  free(mix);
+}
+#endif
+
 void M2ulPhyS::initVariables() {
 #ifdef HAVE_GRVY
   grvy_timer_init("TPS");
@@ -294,6 +319,24 @@ void M2ulPhyS::initVariables() {
       break;
   }
   assert(mixture != NULL);
+
+#if defined(_CUDA_)
+  GasMixture **d_mixture_tmp;
+  cudaMalloc((void **)&d_mixture_tmp, sizeof(GasMixture **));
+  instantiateDeviceMixture<<<1, 1>>>(config.workFluid, config.GetEquationSystem(), config.visc_mult, config.bulk_visc,
+                                     dim, nvel, d_mixture_tmp);
+  cudaMemcpy(&d_mixture, d_mixture_tmp, sizeof(GasMixture *), cudaMemcpyDeviceToHost);
+  cudaFree(d_mixture_tmp);
+#elif defined(_HIP_)
+  GasMixture **d_mixture_tmp;
+  hipMalloc((void **)&d_mixture_tmp, sizeof(GasMixture **));
+  instantiateDeviceMixture<<<1, 1>>>(config.workFluid, config.GetEquationSystem(), config.visc_mult, config.bulk_visc,
+                                     dim, nvel, d_mixture_tmp);
+  hipMemcpy(&d_mixture, d_mixture_tmp, sizeof(GasMixture *), hipMemcpyDeviceToHost);
+  hipFree(d_mixture_tmp);
+#else
+  d_mixture = mixture;
+#endif
 
   order = config.GetSolutionOrder();
 
@@ -841,6 +884,9 @@ M2ulPhyS::~M2ulPhyS() {
   delete transportPtr;
   delete chemistry_;
   delete mixture;
+#if defined(_CUDA_) || defined(_HIP_)
+  freeDeviceMixture<<<1, 1>>>(d_mixture);
+#endif
   delete gradUpfes;
   delete vfes;
   delete dfes;

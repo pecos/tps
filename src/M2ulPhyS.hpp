@@ -143,7 +143,8 @@ class M2ulPhyS : public TPS::Solver {
   ODESolver *timeIntegrator;
 
   // Pointers to the different classes
-  GasMixture *mixture;
+  GasMixture *mixture;    // valid on host
+  GasMixture *d_mixture;  // valid on device, when available; otherwise = mixture
 
   TransportProperties *transportPtr = NULL;
 
