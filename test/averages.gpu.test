@@ -28,7 +28,7 @@ setup() {
     rm -f $SOLN_FILE
     ../src/tps -run $RUNFILE_A $OPT
     test -s $SOLN_FILE
-    ./soln_differ -d 2 $SOLN_FILE $REF_FILE -averages
+    ./soln_differ -a -d 2 $SOLN_FILE $REF_FILE
     
     rm -f $SOLN_FILE
 }
@@ -40,7 +40,7 @@ setup() {
     test -s $RUNFILE_B
     mpirun -n 4 ../src/tps -run $RUNFILE_B $OPT
     test -s $SOLN_FILE
-    ./soln_differ -r -d 2 $SOLN_FILE $REF_FILE -averages
+    ./soln_differ -a -r -d 2 $SOLN_FILE $REF_FILE
     
     rm -f $SOLN_FILE
 }
@@ -53,7 +53,7 @@ setup() {
     mpirun -n 4 ../src/tps -run $RUNFILE_C1 $OPT
     ../src/tps -run $RUNFILE_C2 $OPT
     test -s $SOLN_FILE
-    ./soln_differ -d 2 $SOLN_FILE $REF_FILE -averages
+    ./soln_differ -a -d 2 $SOLN_FILE $REF_FILE
     
     rm -f $SOLN_FILE
 }
@@ -63,7 +63,7 @@ setup() {
     ../src/tps -run $RUNFILE_D1 $OPT
     ../src/tps -run $RUNFILE_D2 $OPT
     test -s $SOLN_FILE
-    ./soln_differ -d 2 $SOLN_FILE $REF_FILE_REST -averages
+    ./soln_differ -a -d 2 $SOLN_FILE $REF_FILE_REST
     
     rm -f $SOLN_FILE
 }

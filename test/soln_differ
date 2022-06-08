@@ -2,8 +2,9 @@
 
 dim=3
 report="-q"
+averages=no
 
-while getopts ":d:r" args; do
+while getopts ":d:ra" args; do
     case "${args}" in
 	d)
 	    dim=${OPTARG}
@@ -11,16 +12,19 @@ while getopts ":d:r" args; do
 	r)
 	    report="-r"
 	    ;;
+	a)
+	    averages=yes
+	    ;;        
     esac
 done
 shift $((OPTIND-1))
 
 if [ $# -lt 2 ];then
-    echo "Usage: soln_differ [-d] <file1.h5> <file2.h5> [-averages]"
+    echo "Usage: soln_differ [-d] [-a] <file1.h5> <file2.h5>"
     echo ""
     echo "   -d <dim>   set dimension (1,2,3=default)"
     echo "   -r         report solution differences to stdout"
-    echo "   -averages  checks averages"
+    echo "   -a         check averages"
    exit 1
 fi
 
@@ -42,7 +46,7 @@ if [ $dim -eq 3 ];then
     h5diff ${report} --delta=${absTolrhovel}  $file1 $file2 /solution/rho-w   || exit 1
 fi
 
-if [ $3 = '-averages' ]; then
+if [ $averages == "yes" ]; then
    echo "averages"
    h5diff ${report} --delta=${absTolrhovel}  $file1 $file2 /meanSolution/meanDens   || exit 1
    h5diff ${report} --delta=${absTolrhovel}  $file1 $file2 /meanSolution/mean-u   || exit 1
