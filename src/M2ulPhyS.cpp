@@ -1050,7 +1050,9 @@ void M2ulPhyS::projectInitialSolution() {
   //     VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
   //     U->ProjectCoefficient(u0);
   //   }
-  std::cout << "restart: " << config.GetRestartCycle() << std::endl;
+  if (mpi.Root())
+    std::cout << "restart: " << config.GetRestartCycle() << std::endl;
+
   if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
     uniformInitialConditions();
 #ifdef HAVE_MASA
