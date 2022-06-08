@@ -130,7 +130,7 @@ void M2ulPhyS::initVariables() {
     if (rank0_) grvy_printf(ginfo, "Total # of mesh elements = %i\n", nelemGlobal_);
 
     if (nprocs_ > 1) {
-      if (config.RestartSerial() == "read") {
+      if (config.isRestartSerialized("read")) {
         assert(serial_mesh->Conforming());
         partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
         partitioning_file_hdf5("write");
@@ -1797,6 +1797,8 @@ void M2ulPhyS::parseIOSettings() {
     config.restart_serial = "write";
   } else if (restartMode == "singleFileRead") {
     config.restart_serial = "read";
+  } else if (restartMode == "singleFileReadWrite") {
+    config.restart_serial = "readwrite";
   } else if (restartMode != "standard") {
     grvy_printf(GRVY_ERROR, "\nUnknown restart mode -> %s\n", restartMode.c_str());
     exit(ERROR);
