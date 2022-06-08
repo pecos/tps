@@ -17,6 +17,10 @@ Version 1.2 (in progress)
     using pybind11 and can be enabled via a new `--enable-pybind` configure
     option (#117)
   * update minimum version requirement for MFEM to be v4.3 (#132)
+  * added a new [io] runtime option (restartMode = singleFileReadWrite) which
+    will serialize the restart files for both reading and writing into a
+    single .h5 file.  This is the recommended option when desiring to avoid 1
+    file per MPI rank.
 
 Version 1.1 (21 Dec 2021)
 
