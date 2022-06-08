@@ -40,7 +40,7 @@ headers              = averaging_and_rms.hpp equation_of_state.hpp transport_pro
 	               wallBC.hpp domain_integrator.hpp fluxes.hpp masa_handler.hpp riemann_solver.hpp \
 		       dgNonlinearForm.hpp gradNonLinearForm.hpp dataStructures.hpp utils.hpp io.hpp em_options.hpp \
 		       quasimagnetostatic.hpp gradients.hpp logger.hpp solver.hpp tps.hpp chemistry.hpp reaction.hpp \
-					 collision_integrals.hpp argon_transport.hpp source_term.hpp
+	               collision_integrals.hpp argon_transport.hpp source_term.hpp tps_mfem_wrap.hpp
 
 mfem_extra_headers   = ../utils/mfem_extras/pfem_extras.hpp
 
