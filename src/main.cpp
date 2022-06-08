@@ -32,15 +32,26 @@
 #include "tps.hpp"
 
 int main(int argc, char *argv[]) {
-  TPS::Tps tps;
+  int status;
+  {
+    TPS::Tps tps;
 
-  tps.parseCommandLineArgs(argc, argv);
-  tps.parseInput();
-  tps.chooseDevices();
-  tps.chooseSolver();
-  tps.initialize();
+    tps.parseCommandLineArgs(argc, argv);
+    tps.parseInput();
+    tps.chooseDevices();
+    tps.chooseSolver();
+    tps.initialize();
 
-  tps.solve();
+    tps.solve();
 
-  return (tps.getStatus());
+    status = tps.getStatus();
+  }
+
+#if defined(_CUDA_)
+  cudaDeviceReset();
+#elif defined(_HIP_)
+  hipDeviceReset();
+#endif
+
+  return status;
 }
