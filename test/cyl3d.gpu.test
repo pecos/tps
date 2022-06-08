@@ -4,6 +4,7 @@
 TEST="cyl3d.gpu"
 RUNFILE="inputs/input.dtconst.cyl.ini"
 RUNFILE_HEAT="inputs/input.dtconst.cyl.heatSource.ini"
+EXE="../src/tps"
 OPTS=""
 
 setup() {
@@ -146,3 +147,53 @@ setup() {
     ./soln_differ $SOLN_FILE $REF_FILE
 }
 
+@test "[$TEST] verify serialized restarts from 1 -> 2 -> 3 MPI processes" {
+
+    [ $NUM_GPUS -ge 2 ] || skip "Two GPUs not available"
+
+    RUNFILE=inputs/input.dtconst.2iters.cyl.ini
+    SOLFILE_BASE=restart_output.sol
+
+    RUNFILE_MOD=${RUNFILE}.mod
+
+    rm -f  restart_output.sol*.h5
+    rm -f  partition.*.h5
+    rm -f  $RUNFILE_MOD
+
+    # run 2 iterations using 1 tasks; use serialized i/o for read and write
+    cp $RUNFILE $RUNFILE_MOD
+    echo "[io]" >> $RUNFILE_MOD
+    echo "restartMode = singleFileReadWrite" >> $RUNFILE_MOD
+
+    test -s $RUNFILE_MOD
+    $EXE --runFile $RUNFILE_MOD
+    test -s ${SOLFILE_BASE}.h5
+
+    run h5dump  -a iteration  ${SOLFILE_BASE}.h5
+    [ "${lines[5]}" = "   (0): 2" ]
+
+    # now, restart and run 1 additional iteration using 2 mpi tasks
+    sed -i 's/maxIters = 2/maxIters = 3/' $RUNFILE_MOD
+    echo "enableRestart = True" >> $RUNFILE_MOD
+    mpirun -np 2 $EXE --runFile $RUNFILE_MOD
+
+    test -s partition.2p.h5
+    test -s ${SOLFILE_BASE}.h5
+    run h5dump  -a iteration  ${SOLFILE_BASE}.h5
+    [ "${lines[5]}" = "   (0): 3" ]
+
+    # now, repeat and run 1 additional iteration using 3 mpi tasks
+    sed -i 's/maxIters = 3/maxIters = 4/' $RUNFILE_MOD
+    run mpirun -np 3 $EXE --runFile $RUNFILE_MOD
+
+    test -s partition.2p.h5
+    run h5dump  -a iteration  ${SOLFILE_BASE}.h5
+    [ "${lines[5]}" = "   (0): 4" ]
+
+    # compare to reference serial file
+    ./soln_differ ${SOLFILE_BASE}.h5 $REF_FILE
+
+    # clean up if we got this far
+    rm -f $RUNFILE_MOD
+    rm -f restart_output.sol.*.h5
+}

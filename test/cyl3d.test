@@ -109,7 +109,7 @@ setup() {
     ./soln_differ $SOLN_FILE $REF_FILE
 }
 
-@test "[$TEST] verify serial restart consistency using 2 mpi tasks" {
+@test "[$TEST] verify singleFileWrite restart consistency using 2 mpi tasks" {
     RUNFILE=inputs/input.4iters.cyl.ini
     RUNFILE_PART=${RUNFILE}.part
     SOLN_FILE=restart_output.sol.h5
@@ -124,6 +124,33 @@ setup() {
     # request single file restart
     echo "[io]" >> $RUNFILE_PART
     echo "restartMode = singleFileWrite" >> $RUNFILE_PART
+
+    # run 2 tasks
+    mpirun -np 2 $EXE --runFile $RUNFILE_PART
+    test -s $SOLN_FILE_SERIAL
+
+    ./soln_differ $SOLN_FILE $REF_FILE
+
+    # clean up if we got this far
+    rm -f $RUNFILE_PART
+    rm -f restart_output.sol.*.h5
+}
+
+@test "[$TEST] verify singleFileReadWRite restart consistency using 2 mpi tasks" {
+    RUNFILE=inputs/input.4iters.cyl.ini
+    RUNFILE_PART=${RUNFILE}.part
+    SOLN_FILE=restart_output.sol.h5
+
+    rm -f $RUNFILE_PART
+    rm -f $SOLN_FILE
+
+    # copy the run file, b/c I want to edit it
+    test -s $RUNFILE
+    cp $RUNFILE $RUNFILE_PART
+
+    # request single file restart
+    echo "[io]" >> $RUNFILE_PART
+    echo "restartMode = singleFileReadWrite" >> $RUNFILE_PART
 
     # run 2 tasks
     mpirun -np 2 $EXE --runFile $RUNFILE_PART
@@ -194,7 +221,7 @@ setup() {
     cp $RUNFILE $RUNFILE_MOD
     echo "[io]" >> $RUNFILE_MOD
     echo "restartMode   = singleFileRead" >> $RUNFILE_MOD
-    echo "enableRestart = true" >> $RUNFILE_MOD
+    echo "enableRestart = True" >> $RUNFILE_MOD
 
     mpirun -np 4 $EXE --runFile $RUNFILE_MOD
     test -s partition.4p.h5
@@ -256,7 +283,7 @@ setup() {
     cp $RUNFILE $RUNFILE_MOD
     echo "[io]" >> $RUNFILE_MOD
     echo "restartMode   = singleFileWrite" >> $RUNFILE_MOD
-    echo "enableRestart = true" >> $RUNFILE_MOD
+    echo "enableRestart = True" >> $RUNFILE_MOD
 
     mpirun -np 2 $EXE --runFile $RUNFILE_MOD
     test -s partition.2p.h5
@@ -327,4 +354,101 @@ setup() {
    done
 
    rm -rf $TMPDIR
+}
+
+
+@test "[$TEST] verify two back to back (serialized) restarts using 2 tasks" {
+    RUNFILE=inputs/input.4iters.cyl.ini
+    SOLFILE_BASE=restart_output.sol
+
+    RUNFILE_MOD=${RUNFILE}.mod
+
+    rm -f  restart_output.sol*.h5
+    rm -f  partition.*.h5
+    rm -f  $RUNFILE_MOD
+
+    # run 2 iterations using 2 tasks
+    sed  's/maxIters = 4/maxIters = 2/' $RUNFILE > $RUNFILE_MOD
+
+    # use serialied i/o for read and write
+    echo "[io]" >> $RUNFILE_MOD
+    echo "restartMode = singleFileReadWrite" >> $RUNFILE_MOD
+
+    test -s $RUNFILE
+    mpirun -np 2 $EXE --runFile $RUNFILE_MOD
+    test -s ${SOLFILE_BASE}.h5
+    test -s partition.2p.h5
+
+    run h5dump  -a iteration  ${SOLFILE_BASE}.h5
+    [ "${lines[5]}" = "   (0): 2" ]
+
+    # now, restart and run 1 additional iteration
+    sed -i 's/maxIters = 2/maxIters = 3/' $RUNFILE_MOD
+    run mpirun -np 2 $EXE --runFile $RUNFILE_MOD
+
+    run h5dump  -a iteration  ${SOLFILE_BASE}.h5
+    [ "${lines[5]}" = "   (0): 3" ]
+
+    # now, repeat and run 1 additional iteration
+    sed -i 's/maxIters = 3/maxIters = 4/' $RUNFILE_MOD
+    run mpirun -np 2 $EXE --runFile $RUNFILE_MOD
+
+    run h5dump  -a iteration  ${SOLFILE_BASE}.h5
+    [ "${lines[5]}" = "   (0): 4" ]
+
+    # compare to reference serial file
+    ./soln_differ ${SOLFILE_BASE}.h5 $REF_FILE
+
+    # clean up if we got this far
+    rm -f $RUNFILE_MOD
+    rm -f restart_output.sol.*.h5
+}
+
+@test "[$TEST] verify serialized restarts from 1 -> 2 -> 3 MPI processes" {
+    RUNFILE=inputs/input.4iters.cyl.ini
+    SOLFILE_BASE=restart_output.sol
+
+    RUNFILE_MOD=${RUNFILE}.mod
+
+    rm -f  restart_output.sol*.h5
+    rm -f  partition.*.h5
+    rm -f  $RUNFILE_MOD
+
+    # run 2 iterations using 1 tasks
+    sed  's/maxIters = 4/maxIters = 2/' $RUNFILE > $RUNFILE_MOD
+
+    # use serialied i/o for read and write
+    echo "[io]" >> $RUNFILE_MOD
+    echo "restartMode = singleFileReadWrite" >> $RUNFILE_MOD
+
+    test -s $RUNFILE
+    $EXE --runFile $RUNFILE_MOD
+    test -s ${SOLFILE_BASE}.h5
+
+    run h5dump  -a iteration  ${SOLFILE_BASE}.h5
+    [ "${lines[5]}" = "   (0): 2" ]
+
+    # now, restart and run 1 additional iteration using 2 mpi tasks
+    echo "enableRestart = True" >> $RUNFILE_MOD
+    sed -i 's/maxIters = 2/maxIters = 3/' $RUNFILE_MOD
+    mpirun -np 2 $EXE --runFile $RUNFILE_MOD
+
+    test -s partition.2p.h5
+    run h5dump  -a iteration  ${SOLFILE_BASE}.h5
+    [ "${lines[5]}" = "   (0): 3" ]
+
+    # now, repeat and run 1 additional iteration using 3 mpi tasks
+    sed -i 's/maxIters = 3/maxIters = 4/' $RUNFILE_MOD
+    run mpirun -np 3 $EXE --runFile $RUNFILE_MOD
+
+    test -s partition.3p.h5
+    run h5dump  -a iteration  ${SOLFILE_BASE}.h5
+    [ "${lines[5]}" = "   (0): 4" ]
+
+    # compare to reference serial file
+    ./soln_differ ${SOLFILE_BASE}.h5 $REF_FILE
+
+    # clean up if we got this far
+    rm -f $RUNFILE_MOD
+    rm -f restart_output.sol.*.h5
 }
