@@ -239,19 +239,11 @@ void exactSolnFunction(const Vector &x, double tin, Vector &y) {
 
 void exactDenFunction(const Vector &x, double tin, Vector &y) {
   MFEM_ASSERT(x.Size() == 3, "");
-
-  DryAir eqState;
-  const double gamma = eqState.GetSpecificHeatRatio();
-
   y(0) = MASA::masa_eval_exact_rho<double>(x[0], x[1], x[2], tin);  // rho
 }
 
 void exactVelFunction(const Vector &x, double tin, Vector &y) {
   MFEM_ASSERT(x.Size() == 3, "");
-
-  DryAir eqState;
-  const double gamma = eqState.GetSpecificHeatRatio();
-
   y(0) = MASA::masa_eval_exact_u<double>(x[0], x[1], x[2], tin);
   y(1) = MASA::masa_eval_exact_v<double>(x[0], x[1], x[2], tin);
   y(2) = MASA::masa_eval_exact_w<double>(x[0], x[1], x[2], tin);
@@ -259,10 +251,6 @@ void exactVelFunction(const Vector &x, double tin, Vector &y) {
 
 void exactPreFunction(const Vector &x, double tin, Vector &y) {
   MFEM_ASSERT(x.Size() == 3, "");
-
-  DryAir eqState;
-  const double gamma = eqState.GetSpecificHeatRatio();
-
   y(0) = MASA::masa_eval_exact_p<double>(x[0], x[1], x[2], tin);
 }
 
