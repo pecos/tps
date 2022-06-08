@@ -893,7 +893,7 @@ void MASA_forcings::updateTerms(Vector &in) {
 
   for (int el = 0; el < numElem; el++) {
     const FiniteElement *elem = vfes->GetFE(el);
-    ElementTransformation *Tr = vfes->GetElementTransformation(el);
+    // ElementTransformation *Tr = vfes->GetElementTransformation(el);
     const int dof_elem = elem->GetDof();
 
     // nodes of the element
