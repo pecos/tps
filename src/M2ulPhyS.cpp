@@ -1926,7 +1926,7 @@ void M2ulPhyS::parseFluidPreset() {
     exit(ERROR);
   }
 
-  if (config.workFluid != USER_DEFINED)
+  if (mpi.Root() && (config.workFluid != USER_DEFINED))
     cout << "Fluid is set to the preset '" << fluidTypeStr << "'. Input options in [plasma_models] will not be used."
          << endl;
 }
