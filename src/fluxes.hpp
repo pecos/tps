@@ -56,24 +56,19 @@ using namespace mfem;
 class Fluxes {
  private:
   GasMixture *mixture;
-  Equations &eqSystem;
+  Equations eqSystem;
 
   TransportProperties *transport;
 
-  const int &dim;
+  const int dim;
   int nvel;
   const bool axisymmetric_;
 
-  const int &num_equation;
-  double Rg;
-  Vector gradT;
-  Vector vel;
-  Vector vtmp;
-  DenseMatrix stress;
+  const int num_equation;
 
  public:
-  Fluxes(GasMixture *_mixture, Equations &_eqSystem, TransportProperties *_transport, const int &_num_equation,
-         const int &_dim, bool axisym);
+  MFEM_HOST_DEVICE Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
+                          const int _num_equation, const int _dim, bool axisym);
 
   Equations GetEquationSystem() { return eqSystem; }
 

@@ -113,6 +113,13 @@ __global__ void instantiateDeviceMixture(const WorkingFluid f, const Equations e
 }
 
 __global__ void freeDeviceMixture(GasMixture *mix) { delete mix; }
+
+__global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
+                                        const int _num_equation, const int _dim, bool axisym, Fluxes **f) {
+  *f = new Fluxes(_mixture, _eqSystem, _transport, _num_equation, _dim, axisym);
+}
+
+__global__ void freeDeviceFluxes(Fluxes *f) { delete f; }
 #elif defined(_HIP_)
 // HIP doesn't support device new/delete, but
 // does support device malloc/free and placement new
@@ -435,7 +442,16 @@ void M2ulPhyS::initVariables() {
   ioData.initializeSerial(mpi.Root(), (config.RestartSerial() != "no"), serial_mesh);
   projectInitialSolution();
 
+#if defined(_CUDA_)
+  Fluxes **d_flux_tmp;
+  cudaMalloc((void **)&d_flux_tmp, sizeof(Fluxes **));
+  instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(),
+                                    d_flux_tmp);
+  cudaMemcpy(&fluxClass, d_flux_tmp, sizeof(Fluxes *), cudaMemcpyDeviceToHost);
+  cudaFree(d_flux_tmp);
+#else
   fluxClass = new Fluxes(mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric());
+#endif
 
   alpha = 0.5;
   isSBP = config.isSBP();
@@ -880,7 +896,11 @@ M2ulPhyS::~M2ulPhyS() {
   // delete inlet/outlet integrators
 
   delete rsolver;
+#if defined(_CUDA_)
+  freeDeviceFluxes<<<1, 1>>>(fluxClass);
+#else
   delete fluxClass;
+#endif
   delete transportPtr;
   delete chemistry_;
   delete mixture;

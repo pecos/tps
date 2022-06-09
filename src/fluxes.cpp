@@ -31,24 +31,15 @@
 // -----------------------------------------------------------------------------------el-
 #include "fluxes.hpp"
 
-Fluxes::Fluxes(GasMixture *_mixture, Equations &_eqSystem, TransportProperties *_transport, const int &_num_equation,
-               const int &_dim, bool axisym)
+MFEM_HOST_DEVICE Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
+                                const int _num_equation, const int _dim, bool axisym)
     : mixture(_mixture),
       eqSystem(_eqSystem),
       transport(_transport),
       dim(_dim),
       nvel(axisym ? 3 : _dim),
       axisymmetric_(axisym),
-      num_equation(_num_equation) {
-  gradT.SetSize(dim);
-  vel.SetSize(dim);
-  vtmp.SetSize(dim);
-  stress.SetSize(dim, dim);
-  // TODO(kevin): Ultimately, take Up as input variable.
-  // Multi-species cannot use this, since it is not clear which species gas constant is needed.
-  // Also we should not repeat primitive computations here.
-  Rg = mixture->GetGasConstant();
-}
+      num_equation(_num_equation) {}
 
 void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, DenseMatrix &flux) {
   switch (eqSystem) {
@@ -106,6 +97,10 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   if (eqSystem == EULER) {
     return;
   }
+
+  Vector vel(dim);
+  Vector vtmp(dim);
+  DenseMatrix stress(dim, dim);
 
   // // TODO(kevin): Ultimately, take Up as input variable.
   // // TODO(kevin): pressure and temperature must be comptued by mixture only.
@@ -224,6 +219,8 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
   if (eqSystem == EULER) {
     return;
   }
+
+  DenseMatrix stress(dim, dim);
 
   // TODO(kevin): update E-field with EM coupling.
   Vector Efield(nvel);
