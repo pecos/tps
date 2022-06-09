@@ -35,12 +35,13 @@
 
 #include "riemann_solver.hpp"
 
-DGNonLinearForm::DGNonLinearForm(Fluxes *_flux, ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradFes,
+DGNonLinearForm::DGNonLinearForm(RiemannSolver *rsolver, Fluxes *_flux, ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradFes,
                                  ParGridFunction *_gradUp, BCintegrator *_bcIntegrator, IntegrationRules *_intRules,
                                  const int _dim, const int _num_equation, GasMixture *_mixture,
                                  const volumeFaceIntegrationArrays &_gpuArrays, const int &_maxIntPoints,
                                  const int &_maxDofs)
     : ParNonlinearForm(_vfes),
+      rsolver_(rsolver),
       fluxes(_flux),
       vfes(_vfes),
       gradFes(_gradFes),
@@ -306,6 +307,8 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;
 
+  const RiemannSolver *d_rsolver = rsolver_;
+
   // clang-format off
   MFEM_FORALL(iface, Nf,
   {
@@ -337,7 +340,7 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
       }
 
       // evaluate flux
-      RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
+      d_rsolver->Eval_LF(u1, u2, nor, Rflux);
       Fluxes::viscousFlux_serial_gpu(&vFlux1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
                                      num_equation);
       Fluxes::viscousFlux_serial_gpu(&vFlux2[0], &u2[0], &gradUp2[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,

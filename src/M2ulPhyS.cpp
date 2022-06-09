@@ -487,7 +487,7 @@ void M2ulPhyS::initVariables() {
 
   // A->SetAssemblyLevel(AssemblyLevel::PARTIAL);
 
-  A = new DGNonLinearForm(fluxClass, vfes, gradUpfes, gradUp, bcIntegrator, intRules, dim, num_equation, mixture,
+  A = new DGNonLinearForm(rsolver, fluxClass, vfes, gradUpfes, gradUp, bcIntegrator, intRules, dim, num_equation, mixture,
                           gpuArrays, maxIntPoints, maxDofs);
   if (local_attr.Size() > 0) A->AddBdrFaceIntegrator(bcIntegrator);
 
