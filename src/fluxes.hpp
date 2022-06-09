@@ -75,6 +75,7 @@ class Fluxes {
   void ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &flux);
 
   void ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux);
+  MFEM_HOST_DEVICE void ComputeConvectiveFluxes(const double *state, double *flux) const;
 
   void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, DenseMatrix &flux);
 

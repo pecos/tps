@@ -249,6 +249,22 @@ double DryAir::ComputeMaxCharSpeed(const Vector &state) {
   return vel + sound;
 }
 
+MFEM_HOST_DEVICE double DryAir::ComputeMaxCharSpeed(const double *state) const {
+  const double den = state[0];
+
+  double den_vel2 = 0;
+  for (int d = 0; d < nvel_; d++) {
+    den_vel2 += state[d + 1] * state[d + 1];
+  }
+  den_vel2 /= den;
+
+  const double pres = ComputePressure(state);
+  const double sound = sqrt(specific_heat_ratio * pres / den);
+  const double vel = sqrt(den_vel2 / den);
+
+  return vel + sound;
+}
+
 void DryAir::GetConservativesFromPrimitives(const Vector &primit, Vector &conserv) {
   conserv = primit;
 

@@ -59,7 +59,6 @@ class RiemannSolver {
   bool useRoe;
   const bool axisymmetric_;
 
-  void Eval_LF(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux);
   void Eval_Roe(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux);
 
  public:
@@ -69,6 +68,12 @@ class RiemannSolver {
   void Eval(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux, bool LF = false);
 
   void ComputeFluxDotN(const Vector &state, const Vector &nor, Vector &fluxN);
+
+  MFEM_HOST_DEVICE void ComputeFluxDotN(const double *state, const double *nor, double *fluxN) const;
+
+  void Eval_LF(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux);
+  MFEM_HOST_DEVICE void Eval_LF(const double *state1, const double *state2, const double *nor, double *flux) const;
+
 
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void convFluxDotNorm_gpu(double *fluxN, const double *state, const double &pres,

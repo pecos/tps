@@ -83,6 +83,20 @@ void RiemannSolver::ComputeFluxDotN(const Vector &state, const Vector &nor, Vect
   }
 }
 
+// Compute the scalar F(u).n
+MFEM_HOST_DEVICE void RiemannSolver::ComputeFluxDotN(const double *state, const double *nor, double *fluxN) const {
+  const int dim = mixture->GetDimension();
+  double *fluxes = new double[num_equation * dim];
+  fluxClass->ComputeConvectiveFluxes(state, fluxes);
+  for (int eq = 0; eq < num_equation; eq++) {
+    fluxN[eq] = 0;
+    for (int d = 0; d < dim; d++) {
+      fluxN[eq] += fluxes[eq + d * num_equation] * nor[d];
+    }
+  }
+  delete[] fluxes;
+}
+
 void RiemannSolver::Eval(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux, bool LF) {
   if (useRoe && !LF) {
     Eval_Roe(state1, state2, nor, flux);
@@ -119,6 +133,34 @@ void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Ve
   for (int i = 0; i < num_equation; i++) {
     flux(i) = 0.5 * (flux1(i) + flux2(i)) - 0.5 * maxE * (state2(i) - state1(i)) * normag;
   }
+}
+
+MFEM_HOST_DEVICE void RiemannSolver::Eval_LF(const double *state1, const double *state2, const double *nor, double *flux) const {
+  const int dim = mixture->GetDimension();
+
+  const double maxE1 = mixture->ComputeMaxCharSpeed(state1);
+  const double maxE2 = mixture->ComputeMaxCharSpeed(state2);
+
+  const double maxE = max(maxE1, maxE2);
+
+  double *flux1 = new double[num_equation];
+  double *flux2 = new double[num_equation];
+
+  ComputeFluxDotN(state1, nor, flux1);
+  ComputeFluxDotN(state2, nor, flux2);
+
+  double normag = 0;
+  for (int i = 0; i < dim; i++) {
+    normag += nor[i] * nor[i];
+  }
+  normag = sqrt(normag);
+
+  for (int i = 0; i < num_equation; i++) {
+    flux[i] = 0.5 * (flux1[i] + flux2[i]) - 0.5 * maxE * (state2[i] - state1[i]) * normag;
+  }
+
+  delete[] flux1;
+  delete[] flux2;
 }
 
 // TODO(kevin): need to write for multiple species and two temperature.

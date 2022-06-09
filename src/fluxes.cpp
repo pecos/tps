@@ -91,6 +91,43 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
   }
 }
 
+MFEM_HOST_DEVICE void Fluxes::ComputeConvectiveFluxes(const double *state, double *flux) const {
+  double Pe = 0.0;
+  const double pres = mixture->ComputePressure(state, &Pe);
+  const int numActiveSpecies = mixture->GetNumActiveSpecies();
+  const bool twoTemperature = mixture->IsTwoTemperature();
+
+  // For consistency with version above, where flux is a DenseMatrix,
+  // indexing into flux is column-major
+
+  for (int d = 0; d < dim; d++) {
+    flux[0 + d * num_equation] = state[d + 1];
+    for (int i = 0; i < nvel; i++) {
+      flux[1 + i + d * num_equation] = state[i + 1] * state[d + 1] / state[0];
+    }
+    flux[1 + d + d * num_equation] += pres;
+  }
+
+  const double H = (state[1 + nvel] + pres) / state[0];
+  for (int d = 0; d < dim; d++) {
+    flux[1 + nvel + d * num_equation] = state[d + 1] * H;
+  }
+
+  // Kevin: even NS_PASSIVE will be controlled by this. no need of if statement.
+  for (int sp = 0; sp < numActiveSpecies; sp++) {
+    for (int d = 0; d < dim; d++) {
+      flux[nvel + 2 + sp + d * num_equation] = state[nvel + 2 + sp] * state[1 + d] / state[0];
+    }
+  }
+
+  if (twoTemperature) {
+    const double electronEnthalpy = (state[num_equation - 1] + Pe) / state[0];
+    for (int d = 0; d < dim; d++) {
+      flux[num_equation - 1 + d * num_equation] = electronEnthalpy * state[1 + d];
+    }
+  }
+}
+
 // TODO(kevin): check/complete axisymmetric setting for multi-component flow.
 void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, DenseMatrix &flux) {
   flux = 0.;

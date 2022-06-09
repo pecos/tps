@@ -126,12 +126,12 @@ class GasMixture {
   WorkingFluid GetWorkingFluid() { return fluid; }
 
   int GetNumSpecies() { return numSpecies; }
-  int GetNumActiveSpecies() { return numActiveSpecies; }
+  MFEM_HOST_DEVICE int GetNumActiveSpecies() const { return numActiveSpecies; }
   int GetNumEquations() { return num_equation; }
-  int GetDimension() { return dim; }
+  MFEM_HOST_DEVICE int GetDimension() const { return dim; }
   int GetNumVels() { return nvel_; }
   bool IsAmbipolar() { return ambipolar; }
-  bool IsTwoTemperature() { return twoTemperature_; }
+  MFEM_HOST_DEVICE bool IsTwoTemperature() const { return twoTemperature_; }
   virtual int getInputIndexOf(int mixtureIndex) { return 0; }
   // int getElectronMixtureIndex() { return (speciesMapping_.count("E")) ? speciesMapping_["E"] : -1; }
   virtual std::map<int, int> *getMixtureToInputMap() { return NULL; }
@@ -145,6 +145,12 @@ class GasMixture {
 
   virtual double ComputePressure(const Vector &state,
                                  double *electronPressure = NULL) = 0;  // pressure from conservatives
+  MFEM_HOST_DEVICE virtual double ComputePressure(const double *state,
+                                                  double *electronPressure = NULL) const {
+    mfem_error("ComputePressure not implemented");
+    return 0;
+  }
+
   virtual double ComputePressureFromPrimitives(const Vector &Up) = 0;   // pressure from primitive variables
   virtual double ComputeTemperature(const Vector &state) = 0;
   virtual double Temperature(double *rho, double *p,
@@ -162,6 +168,10 @@ class GasMixture {
 
   // Compute the maximum characteristic speed.
   virtual double ComputeMaxCharSpeed(const Vector &state) = 0;
+  MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeed(const double *state) const {
+    mfem_error("ComputeMaxCharSpeed not implemented");
+    return 0;
+  }
 
   virtual double ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive = true) = 0;
 
@@ -278,6 +288,9 @@ class DryAir : public GasMixture {
 
   // implementation virtual methods
   virtual double ComputePressure(const Vector &state, double *electronPressure = NULL);
+  MFEM_HOST_DEVICE virtual double ComputePressure(const double *state,
+                                                  double *electronPressure = NULL) const;
+
   virtual double ComputePressureFromPrimitives(const Vector &Up);
   virtual double ComputeTemperature(const Vector &state);
   virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / gas_constant / rho[0]; }
@@ -291,6 +304,7 @@ class DryAir : public GasMixture {
 
   // Compute the maximum characteristic speed.
   virtual double ComputeMaxCharSpeed(const Vector &state);
+  MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeed(const double *state) const;
 
   virtual double ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive = true);
 
@@ -481,6 +495,16 @@ inline double DryAir::ComputePressure(const Vector &state, double *electronPress
   if (electronPressure != NULL) *electronPressure = 0.0;
   double den_vel2 = 0;
   for (int d = 0; d < nvel_; d++) den_vel2 += state(d + 1) * state(d + 1);
+  den_vel2 /= state[0];
+
+  return (specific_heat_ratio - 1.0) * (state[1 + nvel_] - 0.5 * den_vel2);
+}
+
+// additional functions inlined for speed...
+MFEM_HOST_DEVICE inline double DryAir::ComputePressure(const double *state, double *electronPressure) const {
+  if (electronPressure != NULL) *electronPressure = 0.0;
+  double den_vel2 = 0;
+  for (int d = 0; d < nvel_; d++) den_vel2 += state[d + 1] * state[d + 1];
   den_vel2 /= state[0];
 
   return (specific_heat_ratio - 1.0) * (state[1 + nvel_] - 0.5 * den_vel2);
