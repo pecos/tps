@@ -35,17 +35,14 @@
 using namespace mfem;
 
 // Implementation of class RiemannSolver
-RiemannSolver::RiemannSolver(int &_num_equation, GasMixture *_mixture, Equations &_eqSystem, Fluxes *_fluxClass,
-                             bool _useRoe, bool axisym)
+MFEM_HOST_DEVICE RiemannSolver::RiemannSolver(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
+                                              Fluxes *_fluxClass, bool _useRoe, bool axisym)
     : num_equation(_num_equation),
       mixture(_mixture),
       eqSystem(_eqSystem),
       fluxClass(_fluxClass),
       useRoe(_useRoe),
-      axisymmetric_(axisym) {
-  flux1.SetSize(num_equation);
-  flux2.SetSize(num_equation);
-}
+      axisymmetric_(axisym) {}
 
 // Compute the scalar F(u).n
 void RiemannSolver::ComputeFluxDotN(const Vector &state, const Vector &nor, Vector &fluxN) {
@@ -106,6 +103,9 @@ void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Ve
   const double maxE2 = mixture->ComputeMaxCharSpeed(state2);
 
   const double maxE = max(maxE1, maxE2);
+
+  Vector flux1(num_equation);
+  Vector flux2(num_equation);
 
   ComputeFluxDotN(state1, nor, flux1);
   ComputeFluxDotN(state2, nor, flux2);

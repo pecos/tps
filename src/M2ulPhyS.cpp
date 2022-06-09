@@ -120,6 +120,13 @@ __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSyste
 }
 
 __global__ void freeDeviceFluxes(Fluxes *f) { delete f; }
+
+__global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
+                                         Fluxes *_fluxClass, bool _useRoe, bool axisym, RiemannSolver **r) {
+  *r = new RiemannSolver(_num_equation, _mixture, _eqSystem, _fluxClass, _useRoe, axisym);
+}
+
+__global__ void freeDeviceRiemann(RiemannSolver *r) { delete r; }
 #elif defined(_HIP_)
 // HIP doesn't support device new/delete, but
 // does support device malloc/free and placement new
@@ -449,16 +456,23 @@ void M2ulPhyS::initVariables() {
                                     d_flux_tmp);
   cudaMemcpy(&fluxClass, d_flux_tmp, sizeof(Fluxes *), cudaMemcpyDeviceToHost);
   cudaFree(d_flux_tmp);
+
+  RiemannSolver **d_riemann_tmp;
+  cudaMalloc((void **)&d_riemann_tmp, sizeof(RiemannSolver **));
+  instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, fluxClass, config.RoeRiemannSolver(),
+                                     config.isAxisymmetric(), d_riemann_tmp);
+
+  cudaMemcpy(&rsolver, d_riemann_tmp, sizeof(RiemannSolver *), cudaMemcpyDeviceToHost);
+  cudaFree(d_riemann_tmp);
 #else
   fluxClass = new Fluxes(mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric());
+
+  rsolver =
+      new RiemannSolver(num_equation, mixture, eqSystem, fluxClass, config.RoeRiemannSolver(), config.isAxisymmetric());
 #endif
 
   alpha = 0.5;
   isSBP = config.isSBP();
-
-  // Create Riemann Solver
-  rsolver =
-      new RiemannSolver(num_equation, mixture, eqSystem, fluxClass, config.RoeRiemannSolver(), config.isAxisymmetric());
 
   // Boundary attributes in present partition
   Array<int> local_attr;
@@ -895,10 +909,11 @@ M2ulPhyS::~M2ulPhyS() {
   delete timeIntegrator;
   // delete inlet/outlet integrators
 
-  delete rsolver;
 #if defined(_CUDA_)
+  freeDeviceRiemann<<<1, 1>>>(rsolver);
   freeDeviceFluxes<<<1, 1>>>(fluxClass);
 #else
+  delete rsolver;
   delete fluxClass;
 #endif
   delete transportPtr;

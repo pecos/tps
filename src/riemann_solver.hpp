@@ -50,13 +50,10 @@ using namespace mfem;
 // Implements a simple Rusanov flux
 class RiemannSolver {
  private:
-  const int &num_equation;
-
-  Vector flux1;
-  Vector flux2;
+  const int num_equation;
 
   GasMixture *mixture;
-  Equations &eqSystem;
+  Equations eqSystem;
   Fluxes *fluxClass;
 
   bool useRoe;
@@ -66,8 +63,8 @@ class RiemannSolver {
   void Eval_Roe(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux);
 
  public:
-  RiemannSolver(int &_num_equation, GasMixture *mixture, Equations &_eqSystem, Fluxes *_fluxClass, bool _useRoe,
-                bool axisym);
+  MFEM_HOST_DEVICE RiemannSolver(int _num_equation, GasMixture *mixture, Equations _eqSystem, Fluxes *_fluxClass,
+                                 bool _useRoe, bool axisym);
 
   void Eval(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux, bool LF = false);
 
