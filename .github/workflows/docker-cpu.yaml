@@ -23,7 +23,7 @@ jobs:
        - name: DockerPATH configuration
          run: echo "DOCKERPATH=$DOCKERPATH"
        - name: DockerPATH - check if files in docker path changed
-         if: contains(steps.files.outputs.all,env.DOCKERPATH)
+         if: contains(steps.files.outputs.all,env.DOCKERPATH) || contains(steps.files.outputs.all,'docker-cpu.yaml')
          run: |
            echo "CI container needs rebuilding..."
            echo "CI_NEEDS_REBUILD=true" >> $GITHUB_ENV
