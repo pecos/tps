@@ -1,0 +1,32 @@
+variables:
+  CUSTOM_CI_BUILDS_DIR: "/usr/workspace/utaustin/gitlab-runner"
+  
+
+## job1:
+##  tags:
+##    - quartz
+##    - shell
+##  script:
+##    - echo "hello world2"
+
+lassen:
+ variables:
+   COMPILER:  "gcc/8.3.1"
+   CUDA_ARCH: "sm_70"
+   CUDA_VER:  "11.2.0"
+   CUDA_PATH: "/usr/tce/packages/cuda/cuda-${CUDA_VER}"   
+   SW_HOME:   "/usr/workspace/utaustin/software/lassen"
+ stage: build
+ tags:
+   - lassen
+   - shell
+ script:
+   - echo "Lassen Build/Test -> ${COMPILER}"
+   - export MODULEPATH=${SW_HOME}/modules/gcc:$MODULEPATH
+   - module swap xl ${COMPILER}
+   - module load grvy mfem-cuda hypre metis cuda/${CUDA_VER}
+   - module list
+   - ./bootstrap
+   - ./configure CUDA_ARCH=${CUDA_ARCH} --disable-valgrind --enable-gpu-cuda --with-cuda=${CUDA_PATH}
+   - make -j 2
+   - lalloc 1 -q pdebug make check
