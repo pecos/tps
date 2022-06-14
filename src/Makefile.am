@@ -5,7 +5,7 @@ AM_CPPFLAGS += -dc $(CUDA_CXXFLAGS)
 endif
 
 if HIP_ENABLED
-AM_CPPFLAGS += $(HIP_CXXFLAGS)
+AM_CPPFLAGS += -fgpu-rdc $(HIP_CXXFLAGS)
 endif
 
 if GSLIB_ENABLED
@@ -23,6 +23,10 @@ bin_PROGRAMS         = tps
 tps_SOURCES          = main.cpp
 tps_LDADD            = libtps.la
 tps_LDFLAGS         += $(PYTHON_LIBS) $(MFEM_LIBS)
+
+if HIP_ENABLED
+tps_LDFLAGS += -fgpu-rdc
+endif
 
 # C++ solver library sources
 cxx_sources          = averaging_and_rms.cpp faceGradientIntegration.cpp M2ulPhyS.cpp rhs_operator.cpp wallBC.cpp \
@@ -52,6 +56,8 @@ libtps_la_SOURCES    = $(cxx_sources) $(mfem_extra_sources) $(headers) $(mfem_ex
 libtps_la_LIBADD     = $(MFEM_LIBS)
 libtps_la_LIBADD    += $(HDF5_LIBS)
 libtps_la_LIBADD    += $(GRVY_LIBS)
+
+libtps_la_LDFLAGS   =
 
 if SLURM_ENABLED
 libtps_la_LIBADD    += -lslurm
@@ -87,6 +93,8 @@ endif
 
 if HIP_ENABLED
 libtps_la_LIBADD    += $(HIP_LDFLAGS)
+# Need link to have -fgpu-rdc.  Protect with -Xcompiler to libtool does not strip.
+libtps_la_LDFLAGS += -Xcompiler -fgpu-rdc
 endif
 
 if GSLIB_ENABLED

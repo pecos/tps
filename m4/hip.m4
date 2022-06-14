@@ -40,6 +40,7 @@ AC_DEFUN([AX_HIP_CHECK],[
         if test "x$HIPCC" = "xno" ; then
            AC_MSG_ERROR([hipcc must be available, please update PATH accordingly.])
         fi
+        CC=hipcc # setting CC=hipcc forces libtool to link with hipcc
         CXX=hipcc
         HIP_CXXFLAGS="-I$MPI_DIR/include"
         HIP_LDFLAGS="-L$MPI_DIR/lib -lmpi"
