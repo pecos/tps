@@ -191,8 +191,10 @@ if test x$ENABLE_GPU != xyes; then
    AX_HIP_CHECK()
    AM_CONDITIONAL(GPU_ENABLED,test x$ENABLE_HIP = xyes)
 
-   dnl Absolutely insist that libtool has CC=hipcc for tag=CXX
-   _LT_TAGVAR(compiler,CXX)='hipcc'
+   if test x$ENABLE_HIP = xyes; then
+       dnl Absolutely insist that   libtool has CC=hipcc for tag=CXX
+       _LT_TAGVAR(compiler,CXX)='hipcc'
+   fi
 fi
 AM_CONDITIONAL(HIP_ENABLED,test x$ENABLE_HIP = xyes)
 
