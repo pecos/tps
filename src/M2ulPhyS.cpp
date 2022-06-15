@@ -128,19 +128,36 @@ __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture
 
 __global__ void freeDeviceRiemann(RiemannSolver *r) { delete r; }
 #elif defined(_HIP_)
-// HIP doesn't support device new/delete, but
-// does support device malloc/free and placement new
+// HIP doesn't support device new/delete.  There is
+// (experimental?... requires -D__HIP_ENABLE_DEVICE_MALLOC__) support
+// for device malloc and placement new.  So, we could in theory mimick
+// the CUDA approach above by doing malloc then placement new.
+// However, I prefer instead to avoid device malloc, so we allocate
+// outside of the instantiate functions below with hipMalloc and the
+// use placement new.  Maybe should adopt this approach for CUDA as
+// well, as it seems actually slightly cleaner.
 __global__ void instantiateDeviceMixture(const WorkingFluid f, const Equations eq_sys,
                                          const double viscosity_multiplier, const double bulk_viscosity, int _dim,
-                                         int nvel, GasMixture **mix) {
-  void *tmp = malloc(sizeof(DryAir));
-  *mix = new (tmp) DryAir(f, eq_sys, viscosity_multiplier, bulk_viscosity, _dim, nvel);
+                                         int nvel, void *mix) {
+  mix = new (mix) DryAir(f, eq_sys, viscosity_multiplier, bulk_viscosity, _dim, nvel);
 }
 
 __global__ void freeDeviceMixture(GasMixture *mix) {
   mix->~GasMixture();  // explicit destructor call b/c placement new above
-  free(mix);
 }
+__global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
+                                        const int _num_equation, const int _dim, bool axisym, void *f) {
+  f = new (f) Fluxes(_mixture, _eqSystem, _transport, _num_equation, _dim, axisym);
+}
+
+__global__ void freeDeviceFluxes(Fluxes *f) { f->~Fluxes(); }
+
+__global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
+                                         Fluxes *_fluxClass, bool _useRoe, bool axisym, void *r) {
+  r = new (r) RiemannSolver(_num_equation, _mixture, _eqSystem, _fluxClass, _useRoe, axisym);
+}
+
+__global__ void freeDeviceRiemann(RiemannSolver *r) { r->~RiemannSolver(); }
 #endif
 
 void M2ulPhyS::initVariables() {
@@ -342,12 +359,9 @@ void M2ulPhyS::initVariables() {
   cudaMemcpy(&d_mixture, d_mixture_tmp, sizeof(GasMixture *), cudaMemcpyDeviceToHost);
   cudaFree(d_mixture_tmp);
 #elif defined(_HIP_)
-  GasMixture **d_mixture_tmp;
-  hipMalloc((void **)&d_mixture_tmp, sizeof(GasMixture **));
+  hipMalloc((void **)&d_mixture, sizeof(DryAir));
   instantiateDeviceMixture<<<1, 1>>>(config.workFluid, config.GetEquationSystem(), config.visc_mult, config.bulk_visc,
-                                     dim, nvel, d_mixture_tmp);
-  hipMemcpy(&d_mixture, d_mixture_tmp, sizeof(GasMixture *), hipMemcpyDeviceToHost);
-  hipFree(d_mixture_tmp);
+                                     dim, nvel, d_mixture);
 #else
   d_mixture = mixture;
 #endif
@@ -464,6 +478,14 @@ void M2ulPhyS::initVariables() {
 
   cudaMemcpy(&rsolver, d_riemann_tmp, sizeof(RiemannSolver *), cudaMemcpyDeviceToHost);
   cudaFree(d_riemann_tmp);
+#elif defined(_HIP_)
+  hipMalloc((void **)&fluxClass, sizeof(Fluxes));
+  instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(),
+                                    fluxClass);
+
+  hipMalloc((void **)&rsolver, sizeof(RiemannSolver));
+  instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, fluxClass, config.RoeRiemannSolver(),
+                                     config.isAxisymmetric(), rsolver);
 #else
   fluxClass = new Fluxes(mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric());
 
@@ -487,8 +509,8 @@ void M2ulPhyS::initVariables() {
 
   // A->SetAssemblyLevel(AssemblyLevel::PARTIAL);
 
-  A = new DGNonLinearForm(rsolver, fluxClass, vfes, gradUpfes, gradUp, bcIntegrator, intRules, dim, num_equation, mixture,
-                          gpuArrays, maxIntPoints, maxDofs);
+  A = new DGNonLinearForm(rsolver, fluxClass, vfes, gradUpfes, gradUp, bcIntegrator, intRules, dim, num_equation,
+                          mixture, gpuArrays, maxIntPoints, maxDofs);
   if (local_attr.Size() > 0) A->AddBdrFaceIntegrator(bcIntegrator);
 
   {
@@ -909,19 +931,30 @@ M2ulPhyS::~M2ulPhyS() {
   delete timeIntegrator;
   // delete inlet/outlet integrators
 
-#if defined(_CUDA_)
+#if defined(_CUDA_) || defined(_HIP_)
   freeDeviceRiemann<<<1, 1>>>(rsolver);
   freeDeviceFluxes<<<1, 1>>>(fluxClass);
 #else
   delete rsolver;
   delete fluxClass;
 #endif
+
+#ifdef _HIP_
+  hipFree(rsolver);
+  hipFree(fluxClass);
+#endif
+
   delete transportPtr;
   delete chemistry_;
   delete mixture;
 #if defined(_CUDA_) || defined(_HIP_)
   freeDeviceMixture<<<1, 1>>>(d_mixture);
 #endif
+
+#ifdef _HIP_
+  hipFree(d_mixture);
+#endif
+
   delete gradUpfes;
   delete vfes;
   delete dfes;
@@ -1127,8 +1160,7 @@ void M2ulPhyS::projectInitialSolution() {
   //     VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
   //     U->ProjectCoefficient(u0);
   //   }
-  if (mpi.Root())
-    std::cout << "restart: " << config.GetRestartCycle() << std::endl;
+  if (mpi.Root()) std::cout << "restart: " << config.GetRestartCycle() << std::endl;
 
   if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
     uniformInitialConditions();
@@ -1664,6 +1696,9 @@ void M2ulPhyS::Check_NAN() {
 
 #ifdef _GPU_
   { local_print = M2ulPhyS::Check_NaN_GPU(U, dof * num_equation, loc_print); }
+  if (local_print > 0) {
+    cout << "Found a NaN!" << endl;
+  }
 #else
   const double *dataU = U->HostRead();
 
@@ -1701,7 +1736,7 @@ void M2ulPhyS::Check_NAN() {
 
 int M2ulPhyS::Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_print) {
   const double *dataU = U->Read();
-  auto d_temp = loc_print.Write();
+  auto d_temp = loc_print.ReadWrite();
 
   MFEM_FORALL(n, lengthU, {
     double val = dataU[n];

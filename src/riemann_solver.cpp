@@ -86,7 +86,9 @@ void RiemannSolver::ComputeFluxDotN(const Vector &state, const Vector &nor, Vect
 // Compute the scalar F(u).n
 MFEM_HOST_DEVICE void RiemannSolver::ComputeFluxDotN(const double *state, const double *nor, double *fluxN) const {
   const int dim = mixture->GetDimension();
-  double *fluxes = new double[num_equation * dim];
+
+  // TODO(trevilo): replace 5 with a compile time constant for max number of eqns and 3 with compile time max dim
+  double fluxes[5 * 3];
   fluxClass->ComputeConvectiveFluxes(state, fluxes);
   for (int eq = 0; eq < num_equation; eq++) {
     fluxN[eq] = 0;
@@ -94,7 +96,6 @@ MFEM_HOST_DEVICE void RiemannSolver::ComputeFluxDotN(const double *state, const 
       fluxN[eq] += fluxes[eq + d * num_equation] * nor[d];
     }
   }
-  delete[] fluxes;
 }
 
 void RiemannSolver::Eval(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux, bool LF) {
@@ -135,16 +136,20 @@ void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Ve
   }
 }
 
-MFEM_HOST_DEVICE void RiemannSolver::Eval_LF(const double *state1, const double *state2, const double *nor, double *flux) const {
+MFEM_HOST_DEVICE void RiemannSolver::Eval_LF(const double *state1, const double *state2, const double *nor,
+                                             double *flux) const {
   const int dim = mixture->GetDimension();
 
+  double Pe = 0.0;
   const double maxE1 = mixture->ComputeMaxCharSpeed(state1);
   const double maxE2 = mixture->ComputeMaxCharSpeed(state2);
 
-  const double maxE = max(maxE1, maxE2);
+  // const double maxE = max(maxE1, maxE2);
+  const double maxE = fmax(maxE1, maxE2);
 
-  double *flux1 = new double[num_equation];
-  double *flux2 = new double[num_equation];
+  // TODO(trevilo): replace 5 with a compile time constant for max number of eqns
+  double flux1[5];
+  double flux2[5];
 
   ComputeFluxDotN(state1, nor, flux1);
   ComputeFluxDotN(state2, nor, flux2);
@@ -158,9 +163,6 @@ MFEM_HOST_DEVICE void RiemannSolver::Eval_LF(const double *state1, const double 
   for (int i = 0; i < num_equation; i++) {
     flux[i] = 0.5 * (flux1[i] + flux2[i]) - 0.5 * maxE * (state2[i] - state1[i]) * normag;
   }
-
-  delete[] flux1;
-  delete[] flux2;
 }
 
 // TODO(kevin): need to write for multiple species and two temperature.

@@ -35,11 +35,11 @@
 
 #include "riemann_solver.hpp"
 
-DGNonLinearForm::DGNonLinearForm(RiemannSolver *rsolver, Fluxes *_flux, ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradFes,
-                                 ParGridFunction *_gradUp, BCintegrator *_bcIntegrator, IntegrationRules *_intRules,
-                                 const int _dim, const int _num_equation, GasMixture *_mixture,
-                                 const volumeFaceIntegrationArrays &_gpuArrays, const int &_maxIntPoints,
-                                 const int &_maxDofs)
+DGNonLinearForm::DGNonLinearForm(RiemannSolver *rsolver, Fluxes *_flux, ParFiniteElementSpace *_vfes,
+                                 ParFiniteElementSpace *_gradFes, ParGridFunction *_gradUp, BCintegrator *_bcIntegrator,
+                                 IntegrationRules *_intRules, const int _dim, const int _num_equation,
+                                 GasMixture *_mixture, const volumeFaceIntegrationArrays &_gpuArrays,
+                                 const int &_maxIntPoints, const int &_maxDofs)
     : ParNonlinearForm(_vfes),
       rsolver_(rsolver),
       fluxes(_flux),
@@ -340,7 +340,21 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
       }
 
       // evaluate flux
-      d_rsolver->Eval_LF(u1, u2, nor, Rflux);
+      // d_rsolver->Eval_LF(u1, u2, nor, Rflux);
+
+      // For some unknown reason, the hip build is very sensitive to
+      // how Eval_LF is called.  If we copy the state to u1, u2 and
+      // normal to nor and then call as above (which behaves correctly
+      // for CUDA), the resulting flux is nonsense.  But, if we just
+      // point into d_uk_el1 at the right spots, all is well.  This
+      // problem seems to have something to do with virtual functions
+      // and pointer arguments, but I don't understand it.  However,
+      // this approach is working.
+      d_rsolver->Eval_LF(d_uk_el1 + k * num_equation + iface * maxIntPoints * num_equation,
+                         d_uk_el2 + k * num_equation + iface * maxIntPoints * num_equation,
+                         d_shapeWnor1 + offsetShape1 + maxDofs + 1 + k * (maxDofs + 1 + dim),
+                         Rflux);
+
       Fluxes::viscousFlux_serial_gpu(&vFlux1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
                                      num_equation);
       Fluxes::viscousFlux_serial_gpu(&vFlux2[0], &u2[0], &gradUp2[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,

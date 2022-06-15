@@ -74,7 +74,6 @@ class RiemannSolver {
   void Eval_LF(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux);
   MFEM_HOST_DEVICE void Eval_LF(const double *state1, const double *state2, const double *nor, double *flux) const;
 
-
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void convFluxDotNorm_gpu(double *fluxN, const double *state, const double &pres,
                                                    const double *nor, const int &num_equation, const int &dim,

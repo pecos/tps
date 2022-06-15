@@ -145,13 +145,12 @@ class GasMixture {
 
   virtual double ComputePressure(const Vector &state,
                                  double *electronPressure = NULL) = 0;  // pressure from conservatives
-  MFEM_HOST_DEVICE virtual double ComputePressure(const double *state,
-                                                  double *electronPressure = NULL) const {
-    mfem_error("ComputePressure not implemented");
+  MFEM_HOST_DEVICE virtual double ComputePressure(const double *state, double *electronPressure = NULL) const {
+    // mfem_error("ComputePressure not implemented");
     return 0;
   }
 
-  virtual double ComputePressureFromPrimitives(const Vector &Up) = 0;   // pressure from primitive variables
+  virtual double ComputePressureFromPrimitives(const Vector &Up) = 0;  // pressure from primitive variables
   virtual double ComputeTemperature(const Vector &state) = 0;
   virtual double Temperature(double *rho, double *p,
                              int nsp) = 0;  // temperature given densities and pressures of all species
@@ -169,7 +168,7 @@ class GasMixture {
   // Compute the maximum characteristic speed.
   virtual double ComputeMaxCharSpeed(const Vector &state) = 0;
   MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeed(const double *state) const {
-    mfem_error("ComputeMaxCharSpeed not implemented");
+    // mfem_error("ComputeMaxCharSpeed not implemented");
     return 0;
   }
 
@@ -288,8 +287,7 @@ class DryAir : public GasMixture {
 
   // implementation virtual methods
   virtual double ComputePressure(const Vector &state, double *electronPressure = NULL);
-  MFEM_HOST_DEVICE virtual double ComputePressure(const double *state,
-                                                  double *electronPressure = NULL) const;
+  MFEM_HOST_DEVICE virtual double ComputePressure(const double *state, double *electronPressure = NULL) const;
 
   virtual double ComputePressureFromPrimitives(const Vector &Up);
   virtual double ComputeTemperature(const Vector &state);
