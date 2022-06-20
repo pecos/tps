@@ -144,7 +144,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   }
 
   if (joule_heating_ != NULL) {
-    forcing.Append(new JouleHeating(dim, num_equation, _order, mixture, eqSystem, intRuleType, intRules, vfes, Up,
+    forcing.Append(new JouleHeating(dim, num_equation, _order, mixture, eqSystem, intRuleType, intRules, vfes, U_, Up,
                                     gradUp, gpuArrays, _config, joule_heating_));
   }
 

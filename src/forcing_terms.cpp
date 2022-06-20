@@ -392,10 +392,10 @@ void AxisymmetricSource::updateTerms(Vector &in) {
 
 JouleHeating::JouleHeating(const int &_dim, const int &_num_equation, const int &_order, GasMixture *_mixture,
                            const Equations &_eqSystem, const int &_intRuleType, IntegrationRules *_intRules,
-                           ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
+                           ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp,
                            const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config,
                            ParGridFunction *jh_)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, _Up, _gradUp, gpuArrays,
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()),
       eqSystem(_eqSystem),
       joule_heating_(jh_) {

@@ -137,7 +137,7 @@ class JouleHeating : public ForcingTerms {
  public:
   JouleHeating(const int &_dim, const int &_num_equation, const int &_order, GasMixture *_mixture,
                const Equations &_eqSystem, const int &_intRuleType, IntegrationRules *_intRules,
-               ParFiniteElementSpace *_vfes, ParGridFunction *_Up, ParGridFunction *_gradUp,
+               ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp,
                const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config, ParGridFunction *jh_);
   ~JouleHeating();
 
