@@ -1,7 +1,6 @@
 variables:
   CUSTOM_CI_BUILDS_DIR: "/usr/workspace/utaustin/gitlab-runner"
   
-
 ## job1:
 ##  tags:
 ##    - quartz
