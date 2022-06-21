@@ -398,7 +398,8 @@ JouleHeating::JouleHeating(const int &_dim, const int &_num_equation, const int 
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()),
       eqSystem(_eqSystem),
-      joule_heating_(jh_) {
+      joule_heating_(jh_),
+      mixture_(_mixture) {
   // no-op
 }
 
@@ -430,13 +431,25 @@ void JouleHeating::updateTerms(Vector &in) {
     vfes->GetElementVDofs(el, nodes);
 
     Array<double> ip_forcing(num_equation);
-    Vector x(dim);
+    //Vector x(dim);
+
+    // Add Joule heating to total energy
     for (int n = 0; n < dof_elem; n++) {
       const int h_index = nodes[n];
       const double heating = jh[h_index];
       // std::cout << "heating = " << heating << std::endl;
       const int e_index = h_index + (nvel + 1) * dof;
       data[e_index] += heating;
+    }
+
+    // Add Joule heating to electron energy (assumes ion Joule heating is negligible)
+    if (mixture_->IsTwoTemperature()) {
+      for (int n = 0; n < dof_elem; n++) {
+        const int h_index = nodes[n];
+        const double heating = jh[h_index];
+        const int ee_index = h_index + (num_equation - 1) * dof;
+        data[ee_index] += heating;
+      }
     }
   }
 }

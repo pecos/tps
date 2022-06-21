@@ -133,6 +133,7 @@ class JouleHeating : public ForcingTerms {
  private:
   const Equations &eqSystem;
   ParGridFunction *joule_heating_;
+  GasMixture *mixture_;
 
  public:
   JouleHeating(const int &_dim, const int &_num_equation, const int &_order, GasMixture *_mixture,
