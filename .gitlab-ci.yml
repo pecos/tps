@@ -22,6 +22,8 @@ lassen:
  script:
    - echo "Lassen Build/Test -> ${COMPILER}"
    - export MODULEPATH=${SW_HOME}/modules/gcc:$MODULEPATH
+   - module --force purge
+   - module load StdEnv
    - module swap xl ${COMPILER}
    - module load grvy mfem-cuda hypre metis cuda/${CUDA_VER}
    - module list
