@@ -44,7 +44,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
                          ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
                          ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A,
                          BCintegrator *_bcIntegrator, bool &_isSBP, double &_alpha, RunConfiguration &_config,
-                         ParGridFunction *jh)
+                         ParGridFunction *pc, ParGridFunction *jh)
     : TimeDependentOperator(_A->Height()),
       config_(_config),
       iter(_iter),
@@ -75,6 +75,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
       gradUpfes(_gradUpfes),
       gradUp_A(_gradUp_A),
       bcIntegrator(_bcIntegrator),
+      plasma_conductivity_(pc),
       joule_heating_(jh) {
   flux.SetSize(vfes->GetNDofs(), dim, num_equation);
   z.UseDevice(true);
@@ -121,7 +122,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   // NOTE: check if this logic is sound
   if (_config.GetWorkingFluid() != WorkingFluid::DRY_AIR) {
     forcing.Append(new SourceTerm(dim, num_equation, _order, intRuleType, intRules, vfes, U_, Up, gradUp, gpuArrays,
-                                  _config, mixture, _transport, _chemistry));
+                                  _config, mixture, _transport, _chemistry, plasma_conductivity_));
   }
 #ifdef HAVE_MASA
   if (config_.use_mms_) {

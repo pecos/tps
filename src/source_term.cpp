@@ -37,12 +37,13 @@ SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_or
                        IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
                        ParGridFunction *_Up, ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
                        RunConfiguration &_config, GasMixture *mixture, TransportProperties *transport,
-                       Chemistry *chemistry)
+                       Chemistry *chemistry, ParGridFunction *pc)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()),
       mixture_(mixture),
       transport_(transport),
-      chemistry_(chemistry) {
+      chemistry_(chemistry),
+      plasma_conductivity_(pc) {
   numSpecies_ = mixture->GetNumSpecies();
   numActiveSpecies_ = mixture->GetNumActiveSpecies();
   numReactions_ = chemistry_->getNumReactions();
@@ -62,6 +63,11 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
   const double *h_U = U_->HostRead();
   const double *h_gradUp = gradUp_->HostRead();
   double *h_in = in.HostReadWrite();
+
+  double *h_pc = NULL;
+  if (plasma_conductivity_ != NULL) {
+    h_pc = plasma_conductivity_->HostWrite();
+  }
 
   const int nnodes = vfes->GetNDofs();
 
@@ -121,6 +127,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     if (ambipolar_) {  // diffusion current using electric conductivity.
       // const double mho = globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY);
       // Jd = mho * Efield
+      if (h_pc != NULL) h_pc[n] = globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY);
 
     } else {  // diffusion current by definition.
       for (int sp = 0; sp < numSpecies_; sp++) {
