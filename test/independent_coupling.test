@@ -11,6 +11,7 @@ setup() {
 }
 
 @test "[$TEST] verify tps runs flow and EM in 'independent' coupling mode" {
+    rm -rf output-pipe
     test -s $RUNFILE
     test -s $RSTRT_FILE
     cp $RSTRT_FILE $SOLN_FILE

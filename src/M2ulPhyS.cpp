@@ -583,7 +583,7 @@ void M2ulPhyS::initVariables() {
       new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType, fluxClass,
                       mixture, d_mixture, chemistry_, transportPtr, vfes, gpuArrays, maxIntPoints, maxDofs, A, Aflux,
                       mesh, spaceVaryViscMult, U, Up, gradUp, gradUpfes, gradUp_A, bcIntegrator, isSBP, alpha, config,
-                      joule_heating_);
+                      plasma_conductivity_, joule_heating_);
 
   CFL = config.GetCFLNumber();
   rhsOperator->SetTime(time);
@@ -1088,6 +1088,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   plasma_conductivity_ = NULL;
   if (tpsP->isFlowEMCoupled()) {
     plasma_conductivity_ = new ParGridFunction(fes);
+    *plasma_conductivity_ = 0.0;
   }
 
   joule_heating_ = NULL;
@@ -1536,7 +1537,9 @@ void M2ulPhyS::uniformInitialConditions() {
         ne = initState(2 + nvel + numSpecies - 2) / mixture->GetGasParams(numSpecies - 2, GasParams::SPECIES_MW);
       }
 
-      initState(num_equation - 1) = config.initialElectronTemperature * ne * mixture->getMolarCV(numSpecies - 2);
+      //initState(num_equation - 1) = config.initialElectronTemperature * ne * mixture->getMolarCV(numSpecies - 2);
+      // FIXME (trevilo): initialElectronTemperature isn't read from input, so hardcoded here temporarily
+      initState(num_equation - 1) = 400.0 * ne * mixture->getMolarCV(numSpecies - 2);
     }
   }
 
@@ -1560,6 +1563,7 @@ void M2ulPhyS::uniformInitialConditions() {
   Vector Upi;
   Upi.UseDevice(false);
   Upi.SetSize(num_equation);
+
   mixture->GetPrimitivesFromConservatives(initState, Upi);
 
   for (int i = 0; i < dof; i++) {

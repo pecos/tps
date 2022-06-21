@@ -689,6 +689,7 @@ class PerfectMixture : public GasMixture {
   virtual double computePressureDerivativeFromConservatives(const Vector &dUp_dx, const Vector &Uin);
 
   // virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
+  virtual void UpdatePlasmaConductivityGridFunction(ParGridFunction *pc, const ParGridFunction *Up);
 
   // Compute the maximum characteristic speed.
   virtual double ComputeMaxCharSpeed(const Vector &state);

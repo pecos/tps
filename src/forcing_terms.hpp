@@ -140,7 +140,7 @@ class JouleHeating : public ForcingTerms {
                const Equations &_eqSystem, const int &_intRuleType, IntegrationRules *_intRules,
                ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp,
                const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config, ParGridFunction *jh_);
-  ~JouleHeating();
+  virtual ~JouleHeating() {}
 
   virtual void updateTerms(Vector &in);
 };

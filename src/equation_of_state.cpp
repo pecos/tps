@@ -1910,3 +1910,19 @@ MFEM_HOST_DEVICE void PerfectMixture::computeSheathBdrFlux(const double *state, 
         bcFlux.primFlux[numSpecies - 2] * (gamma + 2.0) * n_sp[numSpecies - 2] * UNIVERSALGASCONSTANT * T_e;
   }
 }
+
+void PerfectMixture::UpdatePlasmaConductivityGridFunction(ParGridFunction* pc, const ParGridFunction* Up) {
+  // quick return if pc is NULL (nothing to set)
+  if (pc == NULL) return;
+
+  // otherwise, set plasma conductivity based on temperature
+  double* plasma_conductivity_gf = pc->HostWrite();
+  const double* UpData = Up->HostRead();
+
+  const int nnode = pc->FESpace()->GetNDofs();
+
+  for (int n = 0; n < nnode; n++) {
+    // double temperature = UpData[n + (1 + dim) * nnode];
+    plasma_conductivity_gf[n] = 50.0;  // 0.0;  // TODO(trevilo): replace with some function of temperature
+  }
+}
