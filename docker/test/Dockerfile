@@ -10,7 +10,16 @@ RUN yum -y install make which git wget
 RUN yum -y install emacs-nox
 RUN yum -y install ohpc-autotools
 RUN yum -y --enablerepo powertools install lmod-ohpc
-RUN yum -y install mfem-gnu9-mpich-ohpc
+#RUN yum -y install mfem-gnu9-mpich-ohpc
+RUN yum -y install hypre-gnu9-mpich-ohpc
+RUN yum -y install metis-gnu9-ohpc
+RUN yum -y install phdf5-gnu9-mpich-ohpc
+RUN yum -y install netcdf-gnu9-mpich-ohpc
+RUN yum -y install petsc-gnu9-mpich-ohpc
+RUN yum -y install superlu_dist-gnu9-mpich-ohpc
+RUN yum -y install openblas-gnu9-ohpc
+RUN yum -y install scalapack-gnu9-mpich-ohpc
+RUN yum -y install ptscotch-gnu9-mpich-ohpc
 RUN yum -y install lmod-defaults-gnu9-mpich-ofi-ohpc
 RUN yum -y install gdb
 RUN yum -y install man
@@ -70,6 +79,45 @@ RUN . /etc/profile.d/lmod.sh \
     && make install
 RUN rm /tmp/grvy-$grvy_ver.tar.gz
 
+# gslib
+ENV gslib_ver="1.0.7"
+RUN wget https://github.com/Nek5000/gslib/archive/refs/tags/v$gslib_ver.tar.gz -P /tmp
+RUN cd /tmp; tar xvf /tmp/v$gslib_ver.tar.gz
+RUN . /etc/profile.d/lmod.sh \
+    && cd /tmp/gslib-$gslib_ver \
+    && make CC=mpicc CFLAGS="-O3 -fPIC" DESTDIR=/usr/local
+RUN rm /tmp/v$gslib_ver.tar.gz
+
+# MFEM (w/ gslib support)
+ENV mfem_ver="4.4"
+ENV mfem_prefix="/usr/local"
+RUN wget https://github.com/mfem/mfem/archive/refs/tags/v$mfem_ver.tar.gz -P /tmp
+RUN cd /tmp; tar xvf /tmp/v$mfem_ver.tar.gz
+
+
+RUN . /etc/profile.d/lmod.sh \
+    && module load hypre metis netcdf petsc superlu_dist \
+    && cd /tmp/mfem-$mfem_ver \
+    && make config \
+    PREFIX=$mfem_prefix \
+    CXXFLAGS="-O3 -fPIC -std=c++11" \
+    MFEM_USE_MPI=YES \
+    MFEM_USE_LAPACK=NO \
+    HYPRE_OPT=-I$HYPRE_INC HYPRE_LIB="-L$HYPRE_LIB -lHYPRE" \
+    METIS_OPT=-I$METIS_INC METIS_LIB="-L$METIS_LIB -lmetis" \
+    MFEM_USE_NETCDF=YES NETCDF_OPT=-I$NETCDF_INC NETCDF_LIB="-L$NETCDF_LIB -lnetcdf" \
+    MFEM_USE_PETSC=YES PETSC_OPT=-I$PETSC_INC PETSC_LIB="-L$PETSC_LIB -lpetsc" \
+    MFEM_USE_SUPERLU=YES SUPERLU_OPT=-I$SUPERLU_DIST_INC SUPERLU_LIB="-L$SUPERLU_DIST_LIB -lsuperlu_dist" \
+    MFEM_USE_GSLIB=YES GSLIB_OPT=-I/usr/local/include GSLIB_LIB="-L/usr/local/lib -lgs" \
+    STATIC=NO SHARED=YES MFEM_DEBUG=NO \
+    && make && make install
+
+# Fix MFEM permissions
+RUN find $mfem_prefix -path *mfem* -type f -exec chmod 644 -- {} +
+RUN find $mfem_prefix -name *mfem* -type f -exec chmod 644 -- {} +
+
+ENV MFEM_DIR=$mfem_prefix
+
 # additional packages
 RUN yum -y install git-lfs
 RUN yum -y install aspell
@@ -89,7 +137,14 @@ RUN ldconfig
 
 
 # load certain packages by default
-RUN echo "module try-add mfem" >> /etc/profile.d/lmod.sh
+RUN echo "module try-add metis" >> /etc/profile.d/lmod.sh
+RUN echo "module try-add hypre" >> /etc/profile.d/lmod.sh
+RUN echo "module try-add phdf5" >> /etc/profile.d/lmod.sh
+RUN echo "module try-add openblas" >> /etc/profile.d/lmod.sh
+RUN echo "module try-add ptscotch" >> /etc/profile.d/lmod.sh
+RUN echo "module try-add scalapack" >> /etc/profile.d/lmod.sh
+RUN echo "module try-add superlu_dist" >> /etc/profile.d/lmod.sh
+RUN echo "module try-add petsc" >> /etc/profile.d/lmod.sh
 RUN echo "module try-add boost" >> /etc/profile.d/lmod.sh
 RUN echo "module try-add valgrind" >> /etc/profile.d/lmod.sh
 

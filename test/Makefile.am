@@ -69,7 +69,7 @@ endif
 endif
 
 if GSLIB_ENABLED
-TESTS += cyl3d.interp.test
+#TESTS += cyl3d.interp.test
 endif
 
 check_PROGRAMS =

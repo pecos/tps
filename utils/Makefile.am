@@ -48,24 +48,15 @@ endif
 #simmesh_LDFLAGS += -L$(GSLIB_LIB) -lgs
 
 if GSLIB_ENABLED
-bin_PROGRAMS   += interp
-interp_SOURCES  = pfield_interpolate.cpp
-interp_LDADD    = ../src/libtps.la
-interp_LDADD    += $(HDF5_LIBS)
-interp_LDADD    += $(GRVY_LIBS)
-#interp_LDADD    += $(MFEM_LIBS)
-interp_LDFLAGS  = $(PYTHON_LIBS) $(MFEM_LIBS)
-# interp_LDFLAGS += $(HDF5_LIBS)
-# interp_LDFLAGS += -L$(HYPRE_LIB) -lHYPRE
-# interp_LDFLAGS += -L$(OPENBLAS_LIB) -lopenblas
-# interp_LDFLAGS += -L$(METIS_LIB) -lmetis
-# interp_LDFLAGS += $(GRVY_LIBS)
-# interp_LDFLAGS += -L$(SUPERLU_DIST_LIB) -lsuperlu_dist
-# interp_LDFLAGS += -L$(NETCDF_LIB) -lnetcdf
-# interp_LDFLAGS += -L$(GSLIB_LIB) -lgs
-if MASA_ENABLED
-interp_LDFLAGS += $(MASA_LIBS)
-endif
+#bin_PROGRAMS   += interp
+#interp_SOURCES  = pfield_interpolate.cpp
+#interp_LDADD    = ../src/libtps.la
+#interp_LDADD    += $(HDF5_LIBS)
+#interp_LDADD    += $(GRVY_LIBS)
+#interp_LDFLAGS  = $(PYTHON_LIBS) $(MFEM_LIBS)
+#if MASA_ENABLED
+#interp_LDFLAGS += $(MASA_LIBS)
+#endif
 endif
 
 bin_PROGRAMS += binaryic

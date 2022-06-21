@@ -12,6 +12,7 @@ AM_EXTRA_RECURSIVE_TARGETS([style enforcestyle])
 
 AX_SUMMARIZE_ENV
 # MPI
+AX_PROG_CC_MPI
 AX_PROG_CXX_MPI
 # libtool/dynamic library support
 AC_PROG_LIBTOOL([disable-static])
@@ -123,7 +124,6 @@ else
 fi
 
 AM_CONDITIONAL(GSLIB_ENABLED,test x$ENABLE_GSLIB = xyes)
-
 
 AH_TEMPLATE([_GPU_], [Build in GPU support])
 AH_TEMPLATE([_CUDA_],[CUDA backend])

@@ -8,10 +8,6 @@ if HIP_ENABLED
 AM_CPPFLAGS += -fgpu-rdc $(HIP_CXXFLAGS)
 endif
 
-if GSLIB_ENABLED
-AM_CPPFLAGS += -I$(GSLIB_INC)
-endif
-
 if MASA_ENABLED
 AM_CPPFLAGS += $(MASA_CXXFLAGS)
 endif
@@ -95,10 +91,6 @@ if HIP_ENABLED
 libtps_la_LIBADD    += $(HIP_LDFLAGS)
 # Need link to have -fgpu-rdc.  Protect with -Xcompiler to libtool does not strip.
 libtps_la_LDFLAGS += -Xcompiler -fgpu-rdc
-endif
-
-if GSLIB_ENABLED
-libtps_la_LIBADD    += -L$(GSLIB_LIB) -lgs
 endif
 
 if MASA_ENABLED
