@@ -1221,7 +1221,10 @@ void M2ulPhyS::projectInitialSolution() {
     mixture->UpdatePlasmaConductivityGridFunction(plasma_conductivity_, Up);
   }
 
-  paraviewColl->Save();
+  // only save paraview for initial run state if we don't already have it
+  if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
+    paraviewColl->Save();
+  }
 }
 
 void M2ulPhyS::solve() {
@@ -1485,14 +1488,14 @@ void M2ulPhyS::uniformInitialConditions() {
   initState(0) = inputRhoRhoVp[0];
   initState(1) = inputRhoRhoVp[1];
   initState(2) = inputRhoRhoVp[2];
-  if (dim == 3) initState(3) = inputRhoRhoVp[3];
+  if (nvel == 3) initState(3) = inputRhoRhoVp[3];
 
   if (mixture->GetWorkingFluid() == WorkingFluid::USER_DEFINED) {
     const int numSpecies = mixture->GetNumSpecies();
     const int numActiveSpecies = mixture->GetNumActiveSpecies();
     for (int sp = 0; sp < numActiveSpecies; sp++) {
       int inputIndex = mixture->getInputIndexOf(sp);
-      initState(2 + dim + sp) = inputRhoRhoVp[0] * config.initialMassFractions(inputIndex);
+      initState(2 + nvel + sp) = inputRhoRhoVp[0] * config.initialMassFractions(inputIndex);
     }
 
     // electron energy
@@ -1500,13 +1503,16 @@ void M2ulPhyS::uniformInitialConditions() {
       double ne = 0.;
       if (mixture->IsAmbipolar()) {
         for (int sp = 0; sp < numActiveSpecies; sp++)
-          ne += mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) * initState(2 + dim + sp) /
+          //ne += mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) * initState(2 + dim + sp) /
+          ne += mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) * initState(2 + nvel + sp) /
                 mixture->GetGasParams(sp, GasParams::SPECIES_MW);
       } else {
-        ne = initState(2 + dim + numSpecies - 2) / mixture->GetGasParams(numSpecies - 2, GasParams::SPECIES_MW);
+        ne = initState(2 + nvel + numSpecies - 2) / mixture->GetGasParams(numSpecies - 2, GasParams::SPECIES_MW);
       }
 
-      initState(num_equation - 1) = config.initialElectronTemperature * ne * mixture->getMolarCV(numSpecies - 2);
+      //initState(num_equation - 1) = config.initialElectronTemperature * ne * mixture->getMolarCV(numSpecies - 2);
+      // FIXME (trevilo): initialElectronTemperature isn't read from input, so hardcoded here temporarily
+      initState(num_equation - 1) = 400.0 * ne * mixture->getMolarCV(numSpecies - 2);
     }
   }
 
@@ -1530,6 +1536,7 @@ void M2ulPhyS::uniformInitialConditions() {
   Vector Upi;
   Upi.UseDevice(false);
   Upi.SetSize(num_equation);
+
   mixture->GetPrimitivesFromConservatives(initState, Upi);
 
   for (int i = 0; i < dof; i++) {
