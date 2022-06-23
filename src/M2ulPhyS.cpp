@@ -1537,9 +1537,7 @@ void M2ulPhyS::uniformInitialConditions() {
         ne = initState(2 + nvel + numSpecies - 2) / mixture->GetGasParams(numSpecies - 2, GasParams::SPECIES_MW);
       }
 
-      //initState(num_equation - 1) = config.initialElectronTemperature * ne * mixture->getMolarCV(numSpecies - 2);
-      // FIXME (trevilo): initialElectronTemperature isn't read from input, so hardcoded here temporarily
-      initState(num_equation - 1) = 400.0 * ne * mixture->getMolarCV(numSpecies - 2);
+      initState(num_equation - 1) = config.initialElectronTemperature * ne * mixture->getMolarCV(numSpecies - 2);
     }
   }
 
