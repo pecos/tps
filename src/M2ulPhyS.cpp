@@ -114,6 +114,12 @@ __global__ void instantiateDeviceMixture(const WorkingFluid f, const Equations e
 
 __global__ void freeDeviceMixture(GasMixture *mix) { delete mix; }
 
+__global__ void instantiateDeviceTransport(GasMixture *mixture, TransportProperties **trans) {
+  *trans = new TransportProperties(mixture);
+}
+
+__global__ void freeDeviceTransport(TransportProperties *trans) { delete trans; }
+
 __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
                                         const int _num_equation, const int _dim, bool axisym, Fluxes **f) {
   *f = new Fluxes(_mixture, _eqSystem, _transport, _num_equation, _dim, axisym);
@@ -358,6 +364,12 @@ void M2ulPhyS::initVariables() {
                                      dim, nvel, d_mixture_tmp);
   cudaMemcpy(&d_mixture, d_mixture_tmp, sizeof(GasMixture *), cudaMemcpyDeviceToHost);
   cudaFree(d_mixture_tmp);
+
+  TransportProperties **d_transport_tmp;
+  cudaMalloc((void **)&d_transport_tmp, sizeof(TransportProperties **));
+  instantiateDeviceTransport<<<1, 1>>>(d_mixture, d_transport_tmp);
+  cudaMemcpy(&d_transport, d_transport_tmp, sizeof(TransportProperties *), cudaMemcpyDeviceToHost);
+  cudaFree(d_transport_tmp);
 #elif defined(_HIP_)
   hipMalloc((void **)&d_mixture, sizeof(DryAir));
   instantiateDeviceMixture<<<1, 1>>>(config.workFluid, config.GetEquationSystem(), config.visc_mult, config.bulk_visc,

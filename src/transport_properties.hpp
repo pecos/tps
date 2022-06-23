@@ -69,8 +69,10 @@ class TransportProperties {
 
  public:
   TransportProperties(GasMixture *_mixture);
+  MFEM_HOST_DEVICE TransportProperties(GasMixture *_mixture);
 
   virtual ~TransportProperties() {}
+  MFEM_HOST_DEVICE virtual ~TransportProperties() {}
 
   // Currently, diffusion velocity is evaluated together with transport properties,
   // though diffusion velocity can vary according to models we use.

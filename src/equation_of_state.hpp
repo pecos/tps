@@ -125,12 +125,12 @@ class GasMixture {
 
   WorkingFluid GetWorkingFluid() { return fluid; }
 
-  int GetNumSpecies() { return numSpecies; }
+  MFEM_HOST_DEVICE int GetNumSpecies() const { return numSpecies; }
   MFEM_HOST_DEVICE int GetNumActiveSpecies() const { return numActiveSpecies; }
-  int GetNumEquations() { return num_equation; }
+  MFEM_HOST_DEVICE int GetNumEquations() const { return num_equation; }
   MFEM_HOST_DEVICE int GetDimension() const { return dim; }
-  int GetNumVels() { return nvel_; }
-  bool IsAmbipolar() { return ambipolar; }
+  MFEM_HOST_DEVICE int GetNumVels() const { return nvel_; }
+  MFEM_HOST_DEVICE bool IsAmbipolar() const { return ambipolar; }
   MFEM_HOST_DEVICE bool IsTwoTemperature() const { return twoTemperature_; }
   virtual int getInputIndexOf(int mixtureIndex) { return 0; }
   // int getElectronMixtureIndex() { return (speciesMapping_.count("E")) ? speciesMapping_["E"] : -1; }

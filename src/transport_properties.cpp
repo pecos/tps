@@ -42,6 +42,17 @@ TransportProperties::TransportProperties(GasMixture *_mixture) : mixture(_mixtur
   num_equation = mixture->GetNumEquations();
 }
 
+MFEM_HOST_DEVICE TransportProperties::TransportProperties(GasMixture *_mixture) {
+  mixture = _mixture
+  numSpecies = mixture->GetNumSpecies();
+  dim = mixture->GetDimension();
+  nvel_ = mixture->GetNumVels();
+  numActiveSpecies = mixture->GetNumActiveSpecies();
+  ambipolar = mixture->IsAmbipolar();
+  twoTemperature_ = mixture->IsTwoTemperature();
+  num_equation = mixture->GetNumEquations();
+}
+
 void TransportProperties::correctMassDiffusionFlux(const Vector &Y_sp, DenseMatrix &diffusionVelocity) {
   // Correction Velocity
   Vector Vc(nvel_);
