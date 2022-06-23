@@ -119,7 +119,6 @@ MFEM_HOST_DEVICE DryAir::DryAir(const WorkingFluid f, const Equations eq_sys, co
   cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
   Sc = 0.71;
 #endif
-
   // TODO(kevin): replace Nconservative/Nprimitive.
   // add extra equation for passive scalar
   if (eq_sys == Equations::NS_PASSIVE) {

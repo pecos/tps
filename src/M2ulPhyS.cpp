@@ -367,7 +367,6 @@ void M2ulPhyS::initVariables() {
       break;
   }
   assert(mixture != NULL);
-
 #if defined(_CUDA_)
   GasMixture **d_mixture_tmp;
   cudaMalloc((void **)&d_mixture_tmp, sizeof(GasMixture **));
@@ -979,6 +978,7 @@ M2ulPhyS::~M2ulPhyS() {
 #endif
 
 #ifdef _HIP_
+  hipFree(d_transport);
   hipFree(d_mixture);
 #endif
 

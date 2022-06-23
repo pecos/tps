@@ -193,8 +193,8 @@ class GasMixture {
   // TODO(kevin): Need to remove these and fix wherever they are used.
   // We cannot use these for multi species (heat ratio of which species?)
   // These are used in forcingTerm, Fluxes ASSUMING that the fluid is single species.
-  virtual double GetSpecificHeatRatio() { return specific_heat_ratio; }
-  virtual double GetGasConstant() { return gas_constant; }
+  MFEM_HOST_DEVICE virtual double GetSpecificHeatRatio() { return specific_heat_ratio; }
+  MFEM_HOST_DEVICE virtual double GetGasConstant() { return gas_constant; }
 #else
   virtual double GetSpecificHeatRatio() = 0;
   virtual double GetGasConstant() = 0;
@@ -309,8 +309,8 @@ class DryAir : public GasMixture {
   // Physicality check (at end)
   virtual bool StateIsPhysical(const Vector &state);
 
-  virtual double GetSpecificHeatRatio() { return specific_heat_ratio; }
-  virtual double GetGasConstant() { return gas_constant; }
+  MFEM_HOST_DEVICE virtual double GetSpecificHeatRatio() { return specific_heat_ratio; }
+  MFEM_HOST_DEVICE virtual double GetGasConstant() { return gas_constant; }
 
   virtual void ComputeMassFractionGradient(const double rho, const Vector &numberDensities, const DenseMatrix &gradUp,
                                            DenseMatrix &massFractionGrad) {
@@ -551,8 +551,8 @@ class PerfectMixture : public GasMixture {
   virtual double getSpecificGasConstant(int species) { return specificGasConstants_(species); }
 
   // Kevin: these are mixture heat ratio and gas constant. need to change argument.
-  virtual double GetSpecificHeatRatio() { return molarCP_(numSpecies - 1) / molarCV_(numSpecies - 1); }
-  virtual double GetGasConstant() { return specificGasConstants_(numSpecies - 1); }
+  MFEM_HOST_DEVICE virtual double GetSpecificHeatRatio() { return molarCP_(numSpecies - 1) / molarCV_(numSpecies - 1); }
+  MFEM_HOST_DEVICE virtual double GetGasConstant() { return specificGasConstants_(numSpecies - 1); }
 
   virtual double computeHeaviesHeatCapacity(const double *n_sp, const double &nB);
   virtual double computeAmbipolarElectronNumberDensity(const double *n_sp);

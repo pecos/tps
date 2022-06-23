@@ -26,7 +26,7 @@ setup() {
 
 @test "[$TEST] run tps with input -> $RUNFILE" {
     rm -f $SOLN_FILE
-    ../src/tps --runFile $RUNFILE
+    ../src/tps --runFile $RUNFILE &> run.log
 
     test -s $SOLN_FILE
 }
