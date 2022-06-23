@@ -187,6 +187,11 @@ void DryAir::computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthal
   return;
 }
 
+MFEM_HOST_DEVICE void DryAir::computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies) {
+  for (int sp = 0; sp < numSpecies; sp++) speciesEnthalpies[sp] = 0.0;
+  return;
+}
+
 bool DryAir::StateIsPhysical(const mfem::Vector &state) {
   const double den = state(0);
   const Vector den_vel(state.GetData() + 1, nvel_);

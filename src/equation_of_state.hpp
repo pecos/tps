@@ -159,6 +159,7 @@ class GasMixture {
     mfem_error("computeSpeciesPrimitives not implemented");
   }
   virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies) = 0;
+  MFEM_HOST_DEVICE virtual void computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies) = 0;
 
   virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit) = 0;
   virtual void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv) = 0;
@@ -294,6 +295,7 @@ class DryAir : public GasMixture {
   virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / gas_constant / rho[0]; }
 
   virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies);
+  MFEM_HOST_DEVICE virtual void computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies);
 
   virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit);
   virtual void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv);
