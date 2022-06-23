@@ -32,18 +32,8 @@
 
 #include "transport_properties.hpp"
 
-TransportProperties::TransportProperties(GasMixture *_mixture) : mixture(_mixture) {
-  numSpecies = mixture->GetNumSpecies();
-  dim = mixture->GetDimension();
-  nvel_ = mixture->GetNumVels();
-  numActiveSpecies = mixture->GetNumActiveSpecies();
-  ambipolar = mixture->IsAmbipolar();
-  twoTemperature_ = mixture->IsTwoTemperature();
-  num_equation = mixture->GetNumEquations();
-}
-
 MFEM_HOST_DEVICE TransportProperties::TransportProperties(GasMixture *_mixture) {
-  mixture = _mixture
+  mixture = _mixture;
   numSpecies = mixture->GetNumSpecies();
   dim = mixture->GetDimension();
   nvel_ = mixture->GetNumVels();

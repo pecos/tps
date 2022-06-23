@@ -960,6 +960,7 @@ M2ulPhyS::~M2ulPhyS() {
   delete chemistry_;
   delete mixture;
 #if defined(_CUDA_) || defined(_HIP_)
+  freeDeviceTransport<<<1, 1>>>(d_transport);
   freeDeviceMixture<<<1, 1>>>(d_mixture);
 #endif
 
