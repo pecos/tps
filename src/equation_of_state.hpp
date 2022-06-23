@@ -580,6 +580,7 @@ class PerfectMixture : public GasMixture {
                                        const double n_B, double &T_h, double &T_e);
 
   virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies);
+  MFEM_HOST_DEVICE virtual void computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies);
 
   // TODO(kevin): Kevin - I don't think we should use this for boundary condition.
   virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / rho[0] / GetGasConstant(); }

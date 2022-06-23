@@ -859,6 +859,13 @@ void PerfectMixture::computeSpeciesEnthalpies(const Vector &state, Vector &speci
   return;
 }
 
+MFEM_HOST_DEVICE void PerfectMixture::computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies) {
+  // TODO(kevin): develop gpu version.
+  exit(-1);
+
+  return;
+}
+
 double PerfectMixture::ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive) {
   if (primitive) {
     return computePressureDerivativeFromPrimitives(dUp_dx, Uin);
