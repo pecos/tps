@@ -201,8 +201,8 @@ MFEM_HOST_DEVICE void DryAirTransport::ComputeFluxTransportProperties(const doub
         if (fabs(state[2 + nvel_ + sp]) > 1e-10) {
           // compute mass fraction gradient
           double dY = UNIVERSALGASCONSTANT / mixture->GetGasConstant()
-                      * gradUp[2 + nvel_ + sp + d * num_equations];
-          dY -= state[2 + nvel_ + sp] / state[0] * gradUp[0 + d * num_equations];
+                      * gradUp[2 + nvel_ + sp + d * num_equation];
+          dY -= state[2 + nvel_ + sp] / state[0] * gradUp[0 + d * num_equation];
           dY /= state[0];
 
           diffusionVelocity[sp + d * numSpecies] = diffusivity * dY / state[2 + nvel_ + sp];
@@ -210,7 +210,7 @@ MFEM_HOST_DEVICE void DryAirTransport::ComputeFluxTransportProperties(const doub
       }
 
       for (int d = 0; d < nvel_; d++) {
-        assert(!isnan(diffusionVelocity[0 + d * num_equations]));
+        assert(!isnan(diffusionVelocity[0 + d * num_equation]));
       }
     }
   }
