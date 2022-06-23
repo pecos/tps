@@ -389,6 +389,7 @@ void M2ulPhyS::initVariables() {
   instantiateDeviceTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(), d_transport);
 #else
   d_mixture = mixture;
+  d_transport = transportPtr;
 #endif
 
   order = config.GetSolutionOrder();
@@ -491,7 +492,7 @@ void M2ulPhyS::initVariables() {
 #if defined(_CUDA_)
   Fluxes **d_flux_tmp;
   cudaMalloc((void **)&d_flux_tmp, sizeof(Fluxes **));
-  instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(),
+  instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, d_transport, num_equation, dim, config.isAxisymmetric(),
                                     d_flux_tmp);
   cudaMemcpy(&fluxClass, d_flux_tmp, sizeof(Fluxes *), cudaMemcpyDeviceToHost);
   cudaFree(d_flux_tmp);
@@ -505,7 +506,7 @@ void M2ulPhyS::initVariables() {
   cudaFree(d_riemann_tmp);
 #elif defined(_HIP_)
   hipMalloc((void **)&fluxClass, sizeof(Fluxes));
-  instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(),
+  instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, d_transport, num_equation, dim, config.isAxisymmetric(),
                                     fluxClass);
 
   hipMalloc((void **)&rsolver, sizeof(RiemannSolver));
