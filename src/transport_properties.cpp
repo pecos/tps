@@ -32,8 +32,8 @@
 
 #include "transport_properties.hpp"
 
-MFEM_HOST_DEVICE TransportProperties::TransportProperties(GasMixture *_mixture) {
-  mixture = _mixture;
+MFEM_HOST_DEVICE TransportProperties::TransportProperties(GasMixture *_mixture)
+    : mixture(_mixture) {
   numSpecies = mixture->GetNumSpecies();
   dim = mixture->GetDimension();
   nvel_ = mixture->GetNumVels();
@@ -121,13 +121,17 @@ void TransportProperties::CurtissHirschfelder(const Vector &X_sp, const Vector &
 //////// Dry Air mixture
 //////////////////////////////////////////////////////
 
-DryAirTransport::DryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile) : TransportProperties(_mixture) {
-  visc_mult = _runfile.GetViscMult();
-  bulk_visc_mult = _runfile.GetBulkViscMult();
+DryAirTransport::DryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile)
+    : DryAirTransport(_mixture, _runfile.GetViscMult(), _runfile.GetBulkViscMult()) {}
+
+MFEM_HOST_DEVICE DryAirTransport::DryAirTransport(GasMixture *_mixture, const double viscosity_multiplier,
+                                                  const double bulk_viscosity) : TransportProperties(_mixture) {
+  visc_mult = viscosity_multiplier;
+  bulk_visc_mult = bulk_viscosity;
 
   Pr = 0.71;
   Sc = 0.71;
-  gas_constant = UNIVERSALGASCONSTANT / mixture->GetGasParams(0, GasParams::SPECIES_MW);
+  gas_constant = mixture->GetGasConstant();
   const double specific_heat_ratio = mixture->GetSpecificHeatRatio();
   cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
 }

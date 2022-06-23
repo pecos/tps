@@ -87,7 +87,8 @@ class TransportProperties {
   // or in general evaluation of primitive variables.
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
                                               Vector &transportBuffer, DenseMatrix &diffusionVelocity) = 0;
-  // Vector &outputUp);
+  // virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp, const double *Efield,
+  //                                             double *transportBuffer, double *diffusionVelocity) = 0;
 
   // Source term will be constructed using ForcingTerms, which have pointers to primitive variables.
   // So we can use them in evaluating transport properties.
@@ -136,6 +137,8 @@ class DryAirTransport : public TransportProperties {
 
  public:
   DryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile);
+  MFEM_HOST_DEVICE DryAirTransport(GasMixture *_mixture, const double viscosity_multiplier,
+                                   const double bulk_viscosity);
 
   MFEM_HOST_DEVICE virtual ~DryAirTransport() {}
 
