@@ -38,6 +38,11 @@
 
 using namespace mfem;
 
+namespace gpudata {
+  const int MAXDIM = 3;
+  const int MAXSPECIES = 20;
+}
+
 enum Equations {
   EULER,      // Euler equations
   NS,         // Navier-Stokes equations

@@ -107,6 +107,10 @@ MFEM_HOST_DEVICE DryAir::DryAir(const WorkingFluid f, const Equations eq_sys, co
 
   SetNumActiveSpecies();
   SetNumEquations();
+#ifdef _GPU_
+  assert(nvel_ <= gpudata::MAXDIM);
+  assert(numSpecies <= gpudata::MAXSPECIES);
+#endif
 
   gas_constant = 287.058;
 

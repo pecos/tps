@@ -259,24 +259,24 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
     return;
   }
 
-  double vel[dim];
-  double vtmp[dim];
-  double stress[dim * dim];
+  double vel[gpudata::MAXDIM];
+  double vtmp[gpudata::MAXDIM];
+  double stress[gpudata::MAXDIM * gpudata::MAXDIM];
 
   // TODO(kevin): update E-field with EM coupling.
-  double Efield[nvel];
+  double Efield[gpudata::MAXDIM];
   for (int v = 0; v < nvel; v++) Efield[v] = 0.0;
 
   const int numSpecies = mixture->GetNumSpecies();
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
   const bool twoTemperature = mixture->IsTwoTemperature();
 
-  double speciesEnthalpies[numSpecies];
+  double speciesEnthalpies[gpudata::MAXSPECIES];
   mixture->computeSpeciesEnthalpies(state, speciesEnthalpies);
 
   double transportBuffer[FluxTrns::NUM_FLUX_TRANS];
   // NOTE(kevin): in flux, only dim-components of diffusionVelocity will be used.
-  double diffusionVelocity[numSpecies * nvel];
+  double diffusionVelocity[gpudata::MAXSPECIES * gpudata::MAXDIM];
   transport->ComputeFluxTransportProperties(state, gradUp, Efield, transportBuffer, diffusionVelocity);
   const double visc = transportBuffer[FluxTrns::VISCOSITY];
   double bulkViscosity = transportBuffer[FluxTrns::BULK_VISCOSITY];
@@ -290,7 +290,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
       flux[1 + nvel + d * num_equation] += qeFlux;
       flux[num_equation - 1 + d * num_equation] += qeFlux;
       flux[num_equation - 1 + d * num_equation] -= speciesEnthalpies[numSpecies - 2]
-                                                    * diffusionVelocity[numSpecies - 2 + d * num_equation];
+                                                    * diffusionVelocity[numSpecies - 2 + d * gpudata::MAXSPECIES];
     }
   } else {
     k += ke;
@@ -305,20 +305,20 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
   double divV = 0.;
   for (int i = 0; i < dim; i++) {
     for (int j = 0; j < dim; j++) {
-      stress[i + j * dim] = gradUp[(1 + j) + i * num_equation] + gradUp[(1 + i) + j * num_equation];
+      stress[i + j * gpudata::MAXDIM] = gradUp[(1 + j) + i * num_equation] + gradUp[(1 + i) + j * num_equation];
     }
     divV += gradUp[(1 + i) + i * num_equation];
   }
-  for (int i = 0; i < dim; i++) for (int j = 0; j < dim; j++) stress[i + j * dim] *= visc;
+  for (int i = 0; i < dim; i++) for (int j = 0; j < dim; j++) stress[i + j * gpudata::MAXDIM] *= visc;
 
   if (axisymmetric_ && radius > 0) {
     divV += ur / radius;
   }
 
-  for (int i = 0; i < dim; i++) stress[i + i * dim] += bulkViscosity * divV;
+  for (int i = 0; i < dim; i++) stress[i + i * gpudata::MAXDIM] += bulkViscosity * divV;
 
   for (int i = 0; i < dim; i++)
-    for (int j = 0; j < dim; j++) flux[(1 + i) + j * num_equation] = stress[i + j * dim];
+    for (int j = 0; j < dim; j++) flux[(1 + i) + j * num_equation] = stress[i + j * gpudata::MAXDIM];
 
   double tau_tr = 0, tau_tz = 0;
   if (axisymmetric_) {
@@ -343,7 +343,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
   for (int i = 0; i < dim; i++) {
     vtmp[i] = 0.0;
     for (int j = 0; j < dim; j++)
-      vtmp[i] += stress[i + j * dim] * vel[j];
+      vtmp[i] += stress[i + j * gpudata::MAXDIM] * vel[j];
   }
 
   for (int d = 0; d < dim; d++) {
@@ -352,7 +352,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
     // compute diffusive enthalpy flux.
     for (int sp = 0; sp < numSpecies; sp++) {
       flux[(1 + nvel) + d * num_equation] -= speciesEnthalpies[sp]
-                                              * diffusionVelocity[sp + d * num_equation];
+                                              * diffusionVelocity[sp + d * gpudata::MAXSPECIES];
     }
   }
 
@@ -371,7 +371,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
     // however only dim-components are used for flux.
     for (int d = 0; d < dim; d++)
       flux[(nvel + 2 + sp) + d * num_equation] = -state[nvel + 2 + sp]
-                                                  * diffusionVelocity[sp + d * num_equation];
+                                                  * diffusionVelocity[sp + d * gpudata::MAXSPECIES];
   }
 }
 
