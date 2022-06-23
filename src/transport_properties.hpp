@@ -68,10 +68,10 @@ class TransportProperties {
   const double Xeps_ = 1.0e-30;
 
  public:
-  TransportProperties(GasMixture *_mixture);
+  // TransportProperties(GasMixture *_mixture);
   MFEM_HOST_DEVICE TransportProperties(GasMixture *_mixture);
 
-  virtual ~TransportProperties() {}
+  // virtual ~TransportProperties() {}
   MFEM_HOST_DEVICE virtual ~TransportProperties() {}
 
   // Currently, diffusion velocity is evaluated together with transport properties,
@@ -137,7 +137,7 @@ class DryAirTransport : public TransportProperties {
  public:
   DryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile);
 
-  virtual ~DryAirTransport() {}
+  MFEM_HOST_DEVICE virtual ~DryAirTransport() {}
 
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
                                               Vector &transportBuffer, DenseMatrix &diffusionVelocity);
@@ -176,7 +176,7 @@ class ConstantTransport : public TransportProperties {
  public:
   ConstantTransport(GasMixture *_mixture, RunConfiguration &_runfile);
 
-  virtual ~ConstantTransport() {}
+  MFEM_HOST_DEVICE virtual ~ConstantTransport() {}
 
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
                                               Vector &transportBuffer, DenseMatrix &diffusionVelocity);
