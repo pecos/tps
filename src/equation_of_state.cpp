@@ -865,7 +865,7 @@ void PerfectMixture::computeSpeciesEnthalpies(const Vector &state, Vector &speci
 
 MFEM_HOST_DEVICE void PerfectMixture::computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies) {
   // TODO(kevin): develop gpu version.
-  exit(-1);
+  printf("ERROR: PerfextMixture::computeSpeciesEnthalpies is not yet developed for gpu!");
 
   return;
 }
