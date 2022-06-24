@@ -251,7 +251,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
 
 MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius, double *flux) {
   for (int d = 0; d < dim; d++) {
-    for (int eq = 0; eq < num_equations; eq++) {
+    for (int eq = 0; eq < num_equation; eq++) {
       flux[eq + d * num_equation] = 0.;
     }
   }

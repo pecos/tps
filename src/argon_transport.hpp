@@ -101,7 +101,8 @@ class ArgonMinimalTransport : public TransportProperties {
   // or in general evaluation of primitive variables.
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
                                               Vector &transportBuffer, DenseMatrix &diffusionVelocity);
-  // Vector &outputUp);
+  MFEM_HOST_DEVICE virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp, const double *Efield,
+                                              double *transportBuffer, double *diffusionVelocity) { exit(-1); return; }
 
   // Source term will be constructed using ForcingTerms, which have pointers to primitive variables.
   // So we can use them in evaluating transport properties.
@@ -166,6 +167,8 @@ class ArgonMixtureTransport : public ArgonMinimalTransport {
   // or in general evaluation of primitive variables.
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
                                               Vector &transportBuffer, DenseMatrix &diffusionVelocity);
+  MFEM_HOST_DEVICE virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp, const double *Efield,
+                                              double *transportBuffer, double *diffusionVelocity) { exit(-1); return; }
 
   // Source term will be constructed using ForcingTerms, which have pointers to primitive variables.
   // So we can use them in evaluating transport properties.
