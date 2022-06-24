@@ -158,7 +158,7 @@ __global__ void instantiateDeviceTransport(GasMixture *mixture, const double vis
   transport = new (transport) DryAirTransport(mixture, viscosity_multiplier, bulk_viscosity);
 }
 
-__global__ void freeDeviceMixture(GasMixture *transport) {
+__global__ void freeDeviceTransport(TransportProperties *transport) {
   transport->~TransportProperties();  // explicit destructor call b/c placement new above
 }
 
