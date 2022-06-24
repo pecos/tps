@@ -308,6 +308,7 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
   const int maxDofs = maxDofs_;
 
   const RiemannSolver *d_rsolver = rsolver_;
+  Fluxes *d_flux = fluxes;
 
   // clang-format off
   MFEM_FORALL(iface, Nf,
@@ -332,9 +333,13 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
         u2[eq] = d_uk_el2[eq + k * num_equation + iface * maxIntPoints * num_equation];
 
         for (int d = 0; d < dim; d++) {
-          gradUp1[eq + d * num_equation] = d_grad_uk_el1[eq + k * num_equation + d * maxIntPoints * num_equation +
+//          gradUp1[eq + d * num_equation] = d_grad_uk_el1[eq + k * num_equation + d * maxIntPoints * num_equation +
+//                                                         iface * dim * maxIntPoints * num_equation];
+//          gradUp2[eq + d * num_equation] = d_grad_uk_el2[eq + k * num_equation + d * maxIntPoints * num_equation +
+//                                                         iface * dim * maxIntPoints * num_equation];
+          gradUp1[eq + d * num_equation] = d_grad_uk_el1[eq + d * num_equation + k * dim * num_equation +
                                                          iface * dim * maxIntPoints * num_equation];
-          gradUp2[eq + d * num_equation] = d_grad_uk_el2[eq + k * num_equation + d * maxIntPoints * num_equation +
+          gradUp2[eq + d * num_equation] = d_grad_uk_el2[eq + d * num_equation + k * dim * num_equation +
                                                          iface * dim * maxIntPoints * num_equation];
         }
       }
@@ -355,8 +360,12 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
                          d_shapeWnor1 + offsetShape1 + maxDofs + 1 + k * (maxDofs + 1 + dim),
                          Rflux);
 
-      Fluxes::viscousFlux_serial_gpu(&vFlux1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
-                                     num_equation);
+      //d_flux->ComputeViscousFluxes(&u1[0], &gradUp1[0], 0.0, &vFlux1[0], iface+k, d_test2);
+      d_flux->ComputeViscousFluxes(d_uk_el1 + k * num_equation + iface * maxIntPoints * num_equation,
+                                   d_grad_uk_el1 + k * dim * num_equation + iface * maxIntPoints * dim * num_equation,
+                                   0.0, vFlux1);
+//      Fluxes::viscousFlux_serial_gpu(&vFlux1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
+//                                     num_equation);
       Fluxes::viscousFlux_serial_gpu(&vFlux2[0], &u2[0], &gradUp2[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
                                      num_equation);
       for (int d = 0; d < dim; d++) {
@@ -477,15 +486,19 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
           for (int eq = 0; eq < num_equation; eq++) {
             d_uk_el2[eq + k * num_equation + gFace * maxIntPoints * num_equation] = uk1[eq];
             for (int d = 0; d < dim; d++) {
-              d_grad_uk_el2[eq + k * num_equation + d * maxIntPoints * num_equation +
-                            gFace * dim * maxIntPoints * num_equation] = gradUpk1[eq + d * num_equation];
+//              d_grad_uk_el2[eq + k * num_equation + d * maxIntPoints * num_equation +
+//                            gFace * dim * maxIntPoints * num_equation] = gradUpk1[eq + d * num_equation];
+              d_grad_uk_el2[eq + d * num_equation + k * dim * num_equation +
+                            gFace * maxIntPoints * dim * num_equation] = gradUpk1[eq + d * num_equation];
             }
           }
         } else {
           for (int eq = 0; eq < num_equation; eq++) {
             d_uk_el1[eq + k * num_equation + gFace * maxIntPoints * num_equation] = uk1[eq];
             for (int d = 0; d < dim; d++) {
-              d_grad_uk_el1[eq + k * num_equation + d * maxIntPoints * num_equation +
+//              d_grad_uk_el1[eq + k * num_equation + d * maxIntPoints * num_equation +
+//                            gFace * dim * maxIntPoints * num_equation] = gradUpk1[eq + d * num_equation];
+              d_grad_uk_el1[eq + d * num_equation + k * dim * num_equation +
                             gFace * dim * maxIntPoints * num_equation] = gradUpk1[eq + d * num_equation];
             }
           }
@@ -604,6 +617,7 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
 
   double *d_shared_flux = shared_flux.Write();
 
+  const RiemannSolver *d_rsolver = rsolver_;
   MFEM_FORALL_2D(el, parallelData->sharedElemsFaces.Size() / 7, maxIntPoints, 1, 1, {
     double l1[216], l2[216];
     double u1[5], u2[5];
@@ -678,7 +692,8 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
         }
 
         // evaluate flux
-        RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
+        d_rsolver->Eval_LF(u1, u2, nor, Rflux);
+//        RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
         Fluxes::viscousFlux_serial_gpu(&vFlux1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
                                        num_equation);
         Fluxes::viscousFlux_serial_gpu(&vFlux2[0], &u2[0], &gradUp2[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
