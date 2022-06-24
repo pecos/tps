@@ -312,10 +312,10 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
   // clang-format off
   MFEM_FORALL(iface, Nf,
   {
-    double u1[5], gradUp1[5 * 3];
-    double u2[5], gradUp2[5 * 3];
-    double vFlux1[5 * 3], vFlux2[5 * 3];
-    double Rflux[5], nor[3];
+    double u1[gpudata::MAXEQUATIONS], gradUp1[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
+    double u2[gpudata::MAXEQUATIONS], gradUp2[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
+    double vFlux1[gpudata::MAXEQUATIONS * gpudata::MAXDIM], vFlux2[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
+    double Rflux[gpudata::MAXEQUATIONS], nor[gpudata::MAXDIM];
 
     const int Q = d_elems12Q[3 * iface + 2];
     const int offsetShape1 = iface * maxIntPoints * (maxDofs + 1 + dim);

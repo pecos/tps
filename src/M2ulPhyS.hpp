@@ -180,8 +180,8 @@ class M2ulPhyS : public TPS::Solver {
   ParFiniteElementSpace *vfes;
 
   // nodes IDs and indirection array
-  const int maxIntPoints = 64;  // corresponding to HEX face with p=5
-  const int maxDofs = 216;      // corresponding to HEX with p=5
+  const int maxIntPoints = gpudata::MAXINTPOINTS;  // corresponding to HEX face with p=5
+  const int maxDofs = gpudata::MAXDOFS;      // corresponding to HEX with p=5
 
   volumeFaceIntegrationArrays gpuArrays;
 
