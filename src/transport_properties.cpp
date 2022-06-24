@@ -189,7 +189,10 @@ MFEM_HOST_DEVICE void DryAirTransport::ComputeFluxTransportProperties(const doub
   // diffusionVelocity.SetSize(numSpecies, nvel_);
   for (int v = 0; v < nvel_; v++) {
     for (int sp = 0; sp < numSpecies; sp++) {
-      diffusionVelocity[sp + v * gpudata::MAXSPECIES] = 0.0;
+      // While the size of the array is set up to gpudata::MAXSPECIES,
+      // indexing does not have to follow the actual size,
+      // as long as it does not go beyond the size of array.
+      diffusionVelocity[sp + v * numSpecies] = 0.0;
     }
   }
   if (numActiveSpecies > 0) {
@@ -205,12 +208,12 @@ MFEM_HOST_DEVICE void DryAirTransport::ComputeFluxTransportProperties(const doub
           dY -= state[2 + nvel_ + sp] / state[0] * gradUp[0 + d * num_equation];
           dY /= state[0];
 
-          diffusionVelocity[sp + d * gpudata::MAXSPECIES] = diffusivity * dY / state[2 + nvel_ + sp];
+          diffusionVelocity[sp + d * numSpecies] = diffusivity * dY / state[2 + nvel_ + sp];
         }
       }
 
       for (int d = 0; d < nvel_; d++) {
-        assert(!isnan(diffusionVelocity[0 + d * gpudata::MAXSPECIES]));
+        assert(!isnan(diffusionVelocity[0 + d * numSpecies]));
       }
     }
   }
