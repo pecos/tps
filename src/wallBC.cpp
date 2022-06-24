@@ -516,8 +516,8 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
 
-  const RiemannSolver *d_rsolver = rsolver_;
-  Fluxes *d_fluxclass = fluxes;
+  const RiemannSolver *d_rsolver = rsolver;
+  Fluxes *d_fluxclass = fluxClass;
 
   // clang-format on
   // el_wall is index within wall boundary elements?
@@ -588,7 +588,7 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
 #if defined(_CUDA_)
         d_rsolver->Eval_LF(u1, u2, nor, Rflux);
         d_fluxclass->ComputeViscousFluxes(u1, gradUp1, 0.0, vF1);
-        d_fluxclass->ComputeViscousFluxes(u2, gradUp2, 0.0, vF2);
+        d_fluxclass->ComputeViscousFluxes(u2, gradUp1, 0.0, vF2);
 #elif defined(_HIP_)
         RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
         Fluxes::viscousFlux_serial_gpu(&vF1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,

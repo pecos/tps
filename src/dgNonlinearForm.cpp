@@ -622,6 +622,8 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
   double *d_shared_flux = shared_flux.Write();
 
   const RiemannSolver *d_rsolver = rsolver_;
+  Fluxes *d_flux = fluxes;
+
   MFEM_FORALL_2D(el, parallelData->sharedElemsFaces.Size() / 7, maxIntPoints, 1, 1, {
     double l1[216], l2[216];
     double u1[5], u2[5];
