@@ -516,13 +516,17 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
 
+  const RiemannSolver *d_rsolver = rsolver_;
+  Fluxes *d_fluxclass = fluxes;
+
   // clang-format on
   // el_wall is index within wall boundary elements?
   MFEM_FORALL_2D(el_wall, wallElems.Size() / 7, maxIntPoints, 1, 1, {
-    double u1[5], u2[5], nor[3], Rflux[5], vF1[5 * 3], vF2[5 * 3];
-    double gradUp1[5 * 3];
-    double shape[216];
-    int index_i[216];
+    double u1[gpudata::MAXEQUATIONS], u2[gpudata::MAXEQUATIONS], nor[gpudata::MAXDIM], Rflux[gpudata::MAXEQUATIONS];
+    double vF1[gpudata::MAXEQUATIONS * gpudata::MAXDIM], vF2[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
+    double gradUp1[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
+    double shape[gpudata::MAXDOFS];
+    int index_i[gpudata::MAXDOFS];
 
     const int numFaces = d_wallElems[0 + el_wall * 7];
 
@@ -581,11 +585,17 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
         }
 
         // evaluate flux
+#if defined(_CUDA_)
+        d_rsolver->Eval_LF(u1, u2, nor, Rflux);
+        d_fluxclass->ComputeViscousFluxes(u1, gradUp1, 0.0, vF1);
+        d_fluxclass->ComputeViscousFluxes(u2, gradUp2, 0.0, vF2);
+#elif defined(_HIP_)
         RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
         Fluxes::viscousFlux_serial_gpu(&vF1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
                                        num_equation);
         Fluxes::viscousFlux_serial_gpu(&vF2[0], &u2[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
                                        num_equation);
+#endif
 
         // add visc flux contribution
         for (int eq = 0; eq < num_equation; eq++)

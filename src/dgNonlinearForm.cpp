@@ -360,14 +360,18 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
                          d_shapeWnor1 + offsetShape1 + maxDofs + 1 + k * (maxDofs + 1 + dim),
                          Rflux);
 
-      //d_flux->ComputeViscousFluxes(&u1[0], &gradUp1[0], 0.0, &vFlux1[0], iface+k, d_test2);
-      d_flux->ComputeViscousFluxes(d_uk_el1 + k * num_equation + iface * maxIntPoints * num_equation,
-                                   d_grad_uk_el1 + k * dim * num_equation + iface * maxIntPoints * dim * num_equation,
-                                   0.0, vFlux1);
-//      Fluxes::viscousFlux_serial_gpu(&vFlux1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
-//                                     num_equation);
+#if defined(_CUDA_)
+      d_flux->ComputeViscousFluxes(u1, gradUp1, 0.0, vFlux1);
+      d_flux->ComputeViscousFluxes(u2, gradUp2, 0.0, vFlux2);
+      // d_flux->ComputeViscousFluxes(d_uk_el1 + k * num_equation + iface * maxIntPoints * num_equation,
+      //                              d_grad_uk_el1 + k * dim * num_equation + iface * maxIntPoints * dim * num_equation,
+      //                              0.0, vFlux1);
+#elif defined(_HIP_)
+      Fluxes::viscousFlux_serial_gpu(&vFlux1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
+                                     num_equation);
       Fluxes::viscousFlux_serial_gpu(&vFlux2[0], &u2[0], &gradUp2[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
                                      num_equation);
+#endif
       for (int d = 0; d < dim; d++) {
         for (int eq = 0; eq < num_equation; eq++) {
           vFlux1[eq + d * num_equation] = 0.5 * (vFlux1[eq + d * num_equation] + vFlux2[eq + d * num_equation]);
@@ -692,12 +696,17 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
         }
 
         // evaluate flux
+#if defined(_CUDA_)
         d_rsolver->Eval_LF(u1, u2, nor, Rflux);
-//        RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
+        d_flux->ComputeViscousFluxes(u1, gradUp1, 0.0, vFlux1);
+        d_flux->ComputeViscousFluxes(u2, gradUp2, 0.0, vFlux2);
+#elif defined(_HIP_)
+        RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
         Fluxes::viscousFlux_serial_gpu(&vFlux1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
                                        num_equation);
         Fluxes::viscousFlux_serial_gpu(&vFlux2[0], &u2[0], &gradUp2[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
                                        num_equation);
+#endif
 
         for (int eq = 0; eq < num_equation; eq++) {
           for (int d = 0; d < dim; d++)
