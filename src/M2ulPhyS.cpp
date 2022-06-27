@@ -378,18 +378,18 @@ void M2ulPhyS::initVariables() {
   TransportProperties **d_transport_tmp;
   cudaMalloc((void **)&d_transport_tmp, sizeof(TransportProperties **));
   instantiateDeviceTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(), d_transport_tmp);
-  cudaMemcpy(&d_transport, d_transport_tmp, sizeof(TransportProperties *), cudaMemcpyDeviceToHost);
+  cudaMemcpy(&transportPtr, d_transport_tmp, sizeof(TransportProperties *), cudaMemcpyDeviceToHost);
   cudaFree(d_transport_tmp);
 #elif defined(_HIP_)
   hipMalloc((void **)&d_mixture, sizeof(DryAir));
   instantiateDeviceMixture<<<1, 1>>>(config.workFluid, config.GetEquationSystem(), config.visc_mult, config.bulk_visc,
                                      dim, nvel, d_mixture);
 
-  hipMalloc((void **)&d_transport, sizeof(DryAirTransport));
-  instantiateDeviceTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(), d_transport);
+  hipMalloc((void **)&transportPtr, sizeof(DryAirTransport));
+  instantiateDeviceTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(), transportPtr);
 #else
   d_mixture = mixture;
-  d_transport = transportPtr;
+  // d_transport = transportPtr;
 #endif
 
   order = config.GetSolutionOrder();
@@ -492,7 +492,7 @@ void M2ulPhyS::initVariables() {
 #if defined(_CUDA_)
   Fluxes **d_flux_tmp;
   cudaMalloc((void **)&d_flux_tmp, sizeof(Fluxes **));
-  instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, d_transport, num_equation, dim, config.isAxisymmetric(),
+  instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(),
                                     d_flux_tmp);
   cudaMemcpy(&fluxClass, d_flux_tmp, sizeof(Fluxes *), cudaMemcpyDeviceToHost);
   cudaFree(d_flux_tmp);
@@ -506,7 +506,7 @@ void M2ulPhyS::initVariables() {
   cudaFree(d_riemann_tmp);
 #elif defined(_HIP_)
   hipMalloc((void **)&fluxClass, sizeof(Fluxes));
-  instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, d_transport, num_equation, dim, config.isAxisymmetric(),
+  instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(),
                                     fluxClass);
 
   hipMalloc((void **)&rsolver, sizeof(RiemannSolver));
@@ -974,12 +974,12 @@ M2ulPhyS::~M2ulPhyS() {
   delete chemistry_;
   delete mixture;
 #if defined(_CUDA_) || defined(_HIP_)
-  freeDeviceTransport<<<1, 1>>>(d_transport);
+  freeDeviceTransport<<<1, 1>>>(transportPtr);
   freeDeviceMixture<<<1, 1>>>(d_mixture);
 #endif
 
 #ifdef _HIP_
-  hipFree(d_transport);
+  hipFree(transportPtr);
   hipFree(d_mixture);
 #endif
 
