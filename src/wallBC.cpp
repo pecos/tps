@@ -586,6 +586,7 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
 
         // evaluate flux
 #if defined(_CUDA_)
+        // TODO(kevin): implement radius.
         d_rsolver->Eval_LF(u1, u2, nor, Rflux);
         d_fluxclass->ComputeViscousFluxes(u1, gradUp1, 0.0, vF1);
         d_fluxclass->ComputeViscousFluxes(u2, gradUp1, 0.0, vF2);
