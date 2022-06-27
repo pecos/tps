@@ -146,7 +146,7 @@ class M2ulPhyS : public TPS::Solver {
   GasMixture *mixture;    // valid on host
   GasMixture *d_mixture;  // valid on device, when available; otherwise = mixture
 
-  TransportProperties *transportPtr = NULL; // valid on both host and device
+  TransportProperties *transportPtr = NULL;  // valid on both host and device
   // TransportProperties *d_transport = NULL;  // valid on device, when available; otherwise = transportPtr
 
   Chemistry *chemistry_ = NULL;
@@ -181,7 +181,7 @@ class M2ulPhyS : public TPS::Solver {
 
   // nodes IDs and indirection array
   const int maxIntPoints = gpudata::MAXINTPOINTS;  // corresponding to HEX face with p=5
-  const int maxDofs = gpudata::MAXDOFS;      // corresponding to HEX with p=5
+  const int maxDofs = gpudata::MAXDOFS;            // corresponding to HEX with p=5
 
   volumeFaceIntegrationArrays gpuArrays;
 

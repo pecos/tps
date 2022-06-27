@@ -39,14 +39,14 @@
 using namespace mfem;
 
 namespace gpudata {
-  // nodes IDs and indirection array
-  const int MAXINTPOINTS = 64;  // corresponding to HEX face with p=5
-  const int MAXDOFS = 216;      // corresponding to HEX with p=5
+// nodes IDs and indirection array
+const int MAXINTPOINTS = 64;  // corresponding to HEX face with p=5
+const int MAXDOFS = 216;      // corresponding to HEX with p=5
 
-  const int MAXDIM = 3;
-  const int MAXSPECIES = 15;
-  const int MAXEQUATIONS = MAXDIM + 2 + MAXSPECIES; // momentum + two energies + species
-}
+const int MAXDIM = 3;
+const int MAXSPECIES = 15;
+const int MAXEQUATIONS = MAXDIM + 2 + MAXSPECIES;  // momentum + two energies + species
+}  // namespace gpudata
 
 enum Equations {
   EULER,      // Euler equations

@@ -249,7 +249,8 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   }
 }
 
-MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius, double *flux) {
+MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius,
+                                                   double *flux) {
   for (int d = 0; d < dim; d++) {
     for (int eq = 0; eq < num_equation; eq++) {
       flux[eq + d * num_equation] = 0.;
@@ -289,8 +290,8 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
       double qeFlux = ke * gradUp[num_equation - 1 + d * num_equation];
       flux[1 + nvel + d * num_equation] += qeFlux;
       flux[num_equation - 1 + d * num_equation] += qeFlux;
-      flux[num_equation - 1 + d * num_equation] -= speciesEnthalpies[numSpecies - 2]
-                                                    * diffusionVelocity[numSpecies - 2 + d * numSpecies];
+      flux[num_equation - 1 + d * num_equation] -=
+          speciesEnthalpies[numSpecies - 2] * diffusionVelocity[numSpecies - 2 + d * numSpecies];
     }
   } else {
     k += ke;
@@ -309,7 +310,8 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
     }
     divV += gradUp[(1 + i) + i * num_equation];
   }
-  for (int i = 0; i < dim; i++) for (int j = 0; j < dim; j++) stress[i + j * dim] *= visc;
+  for (int i = 0; i < dim; i++)
+    for (int j = 0; j < dim; j++) stress[i + j * dim] *= visc;
 
   if (axisymmetric_ && radius > 0) {
     divV += ur / radius;
@@ -342,8 +344,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
   // stress.Mult(vel, vtmp);
   for (int i = 0; i < dim; i++) {
     vtmp[i] = 0.0;
-    for (int j = 0; j < dim; j++)
-      vtmp[i] += stress[i + j * dim] * vel[j];
+    for (int j = 0; j < dim; j++) vtmp[i] += stress[i + j * dim] * vel[j];
   }
 
   for (int d = 0; d < dim; d++) {
@@ -351,8 +352,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
     flux[(1 + nvel) + d * num_equation] += k * gradUp[(1 + nvel) + d * num_equation];
     // compute diffusive enthalpy flux.
     for (int sp = 0; sp < numSpecies; sp++) {
-      flux[(1 + nvel) + d * num_equation] -= speciesEnthalpies[sp]
-                                              * diffusionVelocity[sp + d * numSpecies];
+      flux[(1 + nvel) + d * num_equation] -= speciesEnthalpies[sp] * diffusionVelocity[sp + d * numSpecies];
     }
   }
 
@@ -370,8 +370,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
     // NOTE: diffusionVelocity is set to be (numSpecies,nvel)-matrix.
     // however only dim-components are used for flux.
     for (int d = 0; d < dim; d++)
-      flux[(nvel + 2 + sp) + d * num_equation] = -state[nvel + 2 + sp]
-                                                  * diffusionVelocity[sp + d * numSpecies];
+      flux[(nvel + 2 + sp) + d * num_equation] = -state[nvel + 2 + sp] * diffusionVelocity[sp + d * numSpecies];
   }
 }
 

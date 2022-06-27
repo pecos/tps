@@ -970,13 +970,14 @@ M2ulPhyS::~M2ulPhyS() {
   hipFree(fluxClass);
 #endif
 
-  delete transportPtr;
-  delete chemistry_;
-  delete mixture;
 #if defined(_CUDA_) || defined(_HIP_)
   freeDeviceTransport<<<1, 1>>>(transportPtr);
   freeDeviceMixture<<<1, 1>>>(d_mixture);
+#else
+  delete transportPtr;
 #endif
+  delete chemistry_;
+  delete mixture;
 
 #ifdef _HIP_
   hipFree(transportPtr);

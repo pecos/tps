@@ -32,8 +32,7 @@
 
 #include "transport_properties.hpp"
 
-MFEM_HOST_DEVICE TransportProperties::TransportProperties(GasMixture *_mixture)
-    : mixture(_mixture) {
+MFEM_HOST_DEVICE TransportProperties::TransportProperties(GasMixture *_mixture) : mixture(_mixture) {
   numSpecies = mixture->GetNumSpecies();
   dim = mixture->GetDimension();
   nvel_ = mixture->GetNumVels();
@@ -125,7 +124,8 @@ DryAirTransport::DryAirTransport(GasMixture *_mixture, RunConfiguration &_runfil
     : DryAirTransport(_mixture, _runfile.GetViscMult(), _runfile.GetBulkViscMult()) {}
 
 MFEM_HOST_DEVICE DryAirTransport::DryAirTransport(GasMixture *_mixture, const double viscosity_multiplier,
-                                                  const double bulk_viscosity) : TransportProperties(_mixture) {
+                                                  const double bulk_viscosity)
+    : TransportProperties(_mixture) {
   visc_mult = viscosity_multiplier;
   bulk_visc_mult = bulk_viscosity;
 
@@ -203,8 +203,7 @@ MFEM_HOST_DEVICE void DryAirTransport::ComputeFluxTransportProperties(const doub
       for (int d = 0; d < dim; d++) {
         if (fabs(state[2 + nvel_ + sp]) > 1e-10) {
           // compute mass fraction gradient
-          double dY = UNIVERSALGASCONSTANT / mixture->GetGasConstant()
-                      * gradUp[2 + nvel_ + sp + d * num_equation];
+          double dY = UNIVERSALGASCONSTANT / mixture->GetGasConstant() * gradUp[2 + nvel_ + sp + d * num_equation];
           dY -= state[2 + nvel_ + sp] / state[0] * gradUp[0 + d * num_equation];
           dY /= state[0];
 
