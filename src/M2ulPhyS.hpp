@@ -304,8 +304,12 @@ class M2ulPhyS : public TPS::Solver {
   void uniformInitialConditions();
   void initGradUp();
 
-  // i/o routines
+  // NOTE(kevin): this routine is currently obsolete.
+  // It computes `dof`-averaged state and time-derivative, which are useless at this point.
+  // This will not be supported.
   void writeHistoryFile();
+
+  // i/o routines
   void write_restart_files();
   void read_restart_files();
   void read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data);

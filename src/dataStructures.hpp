@@ -46,6 +46,8 @@ const int MAXDOFS = 216;      // corresponding to HEX with p=5
 const int MAXDIM = 3;
 const int MAXSPECIES = 5;
 const int MAXEQUATIONS = MAXDIM + 2 + MAXSPECIES;  // momentum + two energies + species
+// NOTE: (presumably from marc) lets make sure we don't have more than 20 eq.
+// NOTE(kevin): with MAXEQUATIONS=20, marvin fails with out-of-memery with 3 MPI process.
 }  // namespace gpudata
 
 enum Equations {

@@ -92,6 +92,9 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
     paraviewMean->RegisterField("rms", rms);
     if (eqSystem == NS_PASSIVE) paraviewMean->RegisterField("passScalar", meanScalar);
 
+    // NOTE(kevin): this variable is currently obsolete.
+    // It represents `dof`-averaged state, which is useless at this point.
+    // This will not be supported.
     local_sums.UseDevice(true);
     local_sums.SetSize(5 + 6);
     local_sums = 0.;
@@ -291,6 +294,9 @@ void Averaging::initiMeanAndRMS() {
   }
 }
 
+// NOTE(kevin): this routine is currently obsolete.
+// It computes `dof`-averaged state and time-derivative, which are useless at this point.
+// This will not be supported.
 const double *Averaging::getLocalSums() {
 #ifdef _GPU_
   sumValues_gpu(*meanUp, *rms, local_sums, tmp_vector, num_equation, dim);
@@ -328,8 +334,10 @@ void Averaging::addSample_gpu(ParGridFunction *meanUp, ParGridFunction *rms, int
   const double Rg = mixture->GetGasConstant();
 
   MFEM_FORALL(n, Ndof, {
-    double meanVel[3], vel[3];
-    double nUp[20];  // NOTE: lets make sure we don't have more than 20 eq.
+    double meanVel[gpudata::MAXDIM], vel[gpudata::MAXDIM]; // double meanVel[3], vel[3];
+    // double nUp[20];  // NOTE: lets make sure we don't have more than 20 eq.
+    // NOTE(kevin): (presumably) marc left this hidden note here..
+    double nUp[gpudata::MAXEQUATIONS];
 
     for (int eq = 0; eq < num_equation; eq++) {
       nUp[eq] = d_Up[n + eq * Ndof];
@@ -392,6 +400,9 @@ void Averaging::addSample_gpu(ParGridFunction *meanUp, ParGridFunction *rms, int
   });
 }
 
+// NOTE(kevin): this routine is currently obsolete.
+// It computes `dof`-averaged state and time-derivative, which are useless at this point.
+// This will not be supported.
 void Averaging::sumValues_gpu(const Vector &meanUp, const Vector &rms, Vector &local_sums, Vector &tmp_vector,
                               const int &num_equation, const int &dim) {
   const int NDof = meanUp.Size() / num_equation;
