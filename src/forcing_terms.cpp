@@ -84,6 +84,7 @@ ForcingTerms::~ForcingTerms() {
 // #endif
 // }
 
+// TODO(kevin): gpu capability.
 ConstantPressureGradient::ConstantPressureGradient(const int &_dim, const int &_num_equation, const int &_order,
                                                    const int &_intRuleType, IntegrationRules *_intRules,
                                                    ParFiniteElementSpace *_vfes, ParGridFunction *U,
@@ -182,9 +183,11 @@ void ConstantPressureGradient::updateTerms_gpu(const int numElems, const int off
   // clang-format off
   MFEM_FORALL_2D(el, numElems, elDof, 1, 1, {
     MFEM_FOREACH_THREAD(i, x, elDof) {
-      MFEM_SHARED double Ui[gpudata::MAXDOFS * gpudata::MAXEQUATIONS], // MFEM_SHARED double Ui[216 * 5],
-                         gradUpi[gpudata::MAXDOFS * gpudata::MAXEQUATIONS * gpudata::MAXDIM]; // gradUpi[216 * 5 * 3];
-      MFEM_SHARED double pGrad[gpudata::MAXDIM]; // MFEM_SHARED double pGrad[3];
+      MFEM_SHARED double Ui[216 * 5], gradUpi[216 * 5 * 3];
+      MFEM_SHARED double pGrad[3];
+//      MFEM_SHARED double Ui[gpudata::MAXDOFS * gpudata::MAXEQUATIONS], // MFEM_SHARED double Ui[216 * 5],
+//                         gradUpi[gpudata::MAXDOFS * gpudata::MAXEQUATIONS * gpudata::MAXDIM]; // gradUpi[216 * 5 * 3];
+//      MFEM_SHARED double pGrad[gpudata::MAXDIM]; // MFEM_SHARED double pGrad[3];
 
       const int eli = el + offsetElems;
       const int offsetIDs    = d_posDofIds[2 * eli];
