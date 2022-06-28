@@ -524,15 +524,41 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 }
 
 void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
-// #if defined(_CUDA_)
-// #elif defined(_HIP_)
+#if defined(_CUDA_)
+  auto dataIn = x.Read();
+  auto d_flux = flux.Write();
+
+  const int dof = vfes->GetNDofs();
+
+  MFEM_FORALL(n, dof, {
+    double Un[gpudata::MAXEQUATIONS]; // double Un[20];
+    double fluxn[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
+
+    for (int eq = 0; eq < num_equation; eq++) {
+      Un[eq] = dataIn[n + eq * dof];
+    }
+
+    fluxClass->ComputeConvectiveFluxes(Un, fluxn);
+
+    for (int eq = 0; eq < num_equation; eq++) {
+      for (int d = 0; d < dim; d++) {
+        d_flux[n + d * dof + eq * dof * dim] = fluxn[eq + d * num_equation];
+      }
+    }
+  });
+
+  if (eqSystem != EULER) {
+    Fluxes::viscousFluxes_gpu(x, gradUp, flux, eqSystem, mixture, spaceVaryViscMult, linViscData, vfes->GetNDofs(), dim,
+                              num_equation);
+  }
+#elif defined(_HIP_)
   // ComputeConvectiveFluxes
   Fluxes::convectiveFluxes_gpu(x, flux, eqSystem, mixture, vfes->GetNDofs(), dim, num_equation);
   if (eqSystem != EULER) {
     Fluxes::viscousFluxes_gpu(x, gradUp, flux, eqSystem, mixture, spaceVaryViscMult, linViscData, vfes->GetNDofs(), dim,
                               num_equation);
   }
-// #endif
+#endif
 }
 
 void RHSoperator::updatePrimitives(const Vector &x_in) const {
