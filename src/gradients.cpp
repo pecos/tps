@@ -298,9 +298,9 @@ void Gradients::interpFaceData_gpu(const Vector &Up, int elType, int elemOffset,
   {
     // assuming max. num of equations = 20
     // and max elem dof is 216 (a p=5 hex)
-    double uk1[20];
-    double shape[216];
-    int indexes_i[216];
+    double uk1[gpudata::MAXEQUATIONS]; // double uk1[20];
+    double shape[gpudata::MAXDOFS]; // double shape[216];
+    int indexes_i[gpudata::MAXDOFS]; // int indexes_i[216];
 
     const int eli = elemOffset + el;
     const int offsetEl1 = d_posDofIds[2 * eli];
@@ -388,8 +388,9 @@ void Gradients::computeGradients_gpu(const int elType, const int offsetElems, co
 
     const int keoffset = d_Ke_pos[eli];
 
-    int index_i[216];
-    MFEM_SHARED double Ui[216], gradUpi[216 * 3];
+    int index_i[gpudata::MAXDOFS]; // int index_i[216];
+    MFEM_SHARED double Ui[gpudata::MAXDOFS], // MFEM_SHARED double Ui[216],
+                       gradUpi[gpudata::MAXDOFS * gpudata::MAXDIM]; //  gradUpi[216 * 3];
 
     for (int i = 0; i < elDof; i++) {
       index_i[i] = d_nodesIDs[offsetIDs + i];
@@ -444,7 +445,9 @@ void Gradients::evalFaceIntegrand_gpu() {
   const int maxDofs = maxDofs_;
 
   MFEM_FORALL(iface, Nf, {
-    double u1[20], u2[20], nor[3];
+    double u1[gpudata::MAXEQUATIONS],
+           u2[gpudata::MAXEQUATIONS],
+           nor[gpudata::MAXDIM]; // double u1[20], u2[20], nor[3];
 
     const int Q = d_elems12Q[3 * iface + 2];
     const int offsetShape1 = iface * maxIntPoints * (maxDofs + 1 + dim);
@@ -452,7 +455,7 @@ void Gradients::evalFaceIntegrand_gpu() {
     for (int k = 0; k < Q; k++) {
       const double weight = d_shapeWnor1[offsetShape1 + maxDofs + k * (maxDofs + 1 + dim)];
 
-      double du[20];
+      double du[gpudata::MAXEQUATIONS]; // double du[20];
       for (int eq = 0; eq < num_equation; eq++) {
         u1[eq] = d_uk_el1[eq + k * num_equation + iface * maxIntPoints * num_equation];
         u2[eq] = d_uk_el2[eq + k * num_equation + iface * maxIntPoints * num_equation];
@@ -561,9 +564,11 @@ void Gradients::interpGradSharedFace_gpu() {
   const int Ndofs = vfes->GetNDofs();
 
   MFEM_FORALL_2D(el, maxNumElems, maxIntPoints, 1, 1, {
-    double l1[216], l2[216], nor[3];
+    double l1[gpudata::MAXDOFS],
+           l2[gpudata::MAXDOFS],
+           nor[gpudata::MAXDIM]; // double l1[216], l2[216], nor[3];
     double u1, u2;
-    int index_i[216];
+    int index_i[gpudata::MAXDOFS]; // int index_i[216];
 
     const int el1 = d_sharedElemsFaces[0 + el * 7];
     const int numFaces = d_sharedElemsFaces[1 + el * 7];
@@ -614,6 +619,7 @@ void Gradients::interpGradSharedFace_gpu() {
             u2 += d_faceData[index] * l2[j];
           }
 
+          // TODO(kevin): MAXNUMFACE
           const int idx = dim * (eq + k * num_equation + elFace * maxIntPoints * num_equation +
                                  el * 5 * maxIntPoints * num_equation);
           for (int d = 0; d < dim; d++) {
@@ -663,6 +669,7 @@ void Gradients::integrationGradSharedFace_gpu() {
 
           // add contribution
           for (int eq = 0; eq < num_equation; eq++) {
+            // TODO(kevin): MAXNUMFACE
             const int idxR = dim * (eq + k * num_equation + elFace * maxIntPoints * num_equation +
                                     el * 5 * maxIntPoints * num_equation);
             for (int d = 0; d < dim; d++) {
@@ -688,7 +695,7 @@ void Gradients::multInverse_gpu(const int numElems, const int offsetElems, const
   const int num_equation = num_equation_;
 
   MFEM_FORALL_2D(el, numElems, elDof, 1, 1, {
-    MFEM_SHARED double gradUpi[216 * 3];
+    MFEM_SHARED double gradUpi[gpudata::MAXDOFS * gpudata::MAXDIM]; // MFEM_SHARED double gradUpi[216 * 3];
 
     const int eli = el + offsetElems;
     const int offsetIDs = d_posDofIds[2 * eli];

@@ -86,6 +86,7 @@ void DGNonLinearForm::setParallelData(parallelFacesIntegrationArrays *_parallelD
   shared_flux.UseDevice(true);
 
   int maxNumElems = parallelData->sharedElemsFaces.Size() / 7;  // elements with shared faces
+  // TODO(kevin): MAXNUMFACE
   shared_flux.SetSize(maxNumElems * 5 * maxIntPoints_ * num_equation_);
 }
 
@@ -567,7 +568,7 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
           d_sharedShapeWnor1[maxDofs + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
 
         for (int eq = 0; eq < num_equation; eq++) {
-          // NOTE: this 5 seems to be the max number of faces?
+          // TODO(kevin): MAXNUMFACE
           const int idxu = eq + k*num_equation + elFace*maxIntPoints*num_equation + el*5*maxIntPoints*num_equation;
           Rflux[eq] = d_shared_flux[idxu];
         }
@@ -726,6 +727,7 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
         }
 
         for (int eq = 0; eq < num_equation; eq++) {
+          // TODO(kevin): MAXNUMFACE
           const int idx =
               eq + k * num_equation + elFace * maxIntPoints * num_equation + el * 5 * maxIntPoints * num_equation;
           d_shared_flux[idx] = Rflux[eq];
