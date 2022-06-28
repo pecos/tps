@@ -137,6 +137,7 @@ class RHSoperator : public TimeDependentOperator {
 
   // void GetFlux(const DenseMatrix &state, DenseTensor &flux) const;
   void GetFlux(const Vector &state, DenseTensor &flux) const;
+  void GetFlux_gpu(const Vector &state, DenseTensor &flux) const;
 
   mutable Vector local_timeDerivatives;
   void computeMeanTimeDerivatives(Vector &y) const;
