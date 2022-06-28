@@ -87,8 +87,7 @@ void RiemannSolver::ComputeFluxDotN(const Vector &state, const Vector &nor, Vect
 MFEM_HOST_DEVICE void RiemannSolver::ComputeFluxDotN(const double *state, const double *nor, double *fluxN) const {
   const int dim = mixture->GetDimension();
 
-  // TODO(trevilo): replace 5 with a compile time constant for max number of eqns and 3 with compile time max dim
-  double fluxes[5 * 3];
+  double fluxes[gpudata::MAXEQUATIONS * gpudata::MAXDIM]; // double fluxes[5 * 3];
   fluxClass->ComputeConvectiveFluxes(state, fluxes);
   for (int eq = 0; eq < num_equation; eq++) {
     fluxN[eq] = 0;
@@ -147,9 +146,8 @@ MFEM_HOST_DEVICE void RiemannSolver::Eval_LF(const double *state1, const double 
   // const double maxE = max(maxE1, maxE2);
   const double maxE = fmax(maxE1, maxE2);
 
-  // TODO(trevilo): replace 5 with a compile time constant for max number of eqns
-  double flux1[5];
-  double flux2[5];
+  double flux1[gpudata::MAXEQUATIONS]; // double flux1[5];
+  double flux2[gpudata::MAXEQUATIONS]; // double flux2[5];
 
   ComputeFluxDotN(state1, nor, flux1);
   ComputeFluxDotN(state2, nor, flux2);
