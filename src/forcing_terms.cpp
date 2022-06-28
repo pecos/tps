@@ -182,8 +182,9 @@ void ConstantPressureGradient::updateTerms_gpu(const int numElems, const int off
   // clang-format off
   MFEM_FORALL_2D(el, numElems, elDof, 1, 1, {
     MFEM_FOREACH_THREAD(i, x, elDof) {
-      MFEM_SHARED double Ui[216 * 5], gradUpi[216 * 5 * 3];
-      MFEM_SHARED double pGrad[3];
+      MFEM_SHARED double Ui[gpudata::MAXDOFS * gpudata::MAXEQUATIONS], // MFEM_SHARED double Ui[216 * 5],
+                         gradUpi[gpudata::MAXDOFS * gpudata::MAXEQUATIONS * gpudata::MAXDIM]; // gradUpi[216 * 5 * 3];
+      MFEM_SHARED double pGrad[gpudata::MAXDIM]; // MFEM_SHARED double pGrad[3];
 
       const int eli = el + offsetElems;
       const int offsetIDs    = d_posDofIds[2 * eli];
@@ -683,17 +684,11 @@ PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const in
     psData_[i]->nodes.DeleteAll();
   }
 
-  std::cout << "worked out so far. 2" << std::endl;
-
   // find nodes for each passive scalar location
   ParFiniteElementSpace dfes(vfes->GetParMesh(), vfes->FEColl(), dim,
                              Ordering::byNODES);  // Kevin: Had a seg fault from this line.
-  std::cout << "worked out so far. 2-1" << std::endl;
   ParGridFunction coordinates(&dfes);
-  std::cout << "worked out so far. 2-2" << std::endl;
   vfes->GetParMesh()->GetNodes(coordinates);
-
-  std::cout << "worked out so far. 3" << std::endl;
 
   int nnodes = vfes->GetNDofs();
 
