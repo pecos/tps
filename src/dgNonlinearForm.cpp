@@ -309,6 +309,7 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
 
   const RiemannSolver *d_rsolver = rsolver_;
   Fluxes *d_flux = fluxes;
+  GasMixture *d_mix = mixture;
 
   // clang-format off
   MFEM_FORALL(iface, Nf,
@@ -368,8 +369,11 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
       //             d_grad_uk_el1 + k * dim * num_equation + iface * maxIntPoints * dim * num_equation,
       //             0.0, vFlux1);
 #elif defined(_HIP_)
-      Fluxes::viscousFlux_serial_gpu(&vFlux1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
-                                     num_equation);
+      d_flux->ComputeViscousFluxes(d_uk_el1 + k * num_equation + iface * maxIntPoints * num_equation,
+                                   d_grad_uk_el1 + k * dim * num_equation + iface * maxIntPoints * dim * num_equation,
+                                   0.0, vFlux1, d_mix);
+      // Fluxes::viscousFlux_serial_gpu(&vFlux1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
+      //                                num_equation);
       Fluxes::viscousFlux_serial_gpu(&vFlux2[0], &u2[0], &gradUp2[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
                                      num_equation);
 #endif

@@ -250,7 +250,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
 }
 
 MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius,
-                                                   double *flux) {
+                                                   double *flux, GasMixture *d_mixture) {
   for (int d = 0; d < dim; d++) {
     for (int eq = 0; eq < num_equation; eq++) {
       flux[eq + d * num_equation] = 0.;
@@ -273,12 +273,32 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
   const bool twoTemperature = mixture->IsTwoTemperature();
 
   double speciesEnthalpies[gpudata::MAXSPECIES];
-  mixture->computeSpeciesEnthalpies(state, speciesEnthalpies);
+  speciesEnthalpies[0] = 1.0; // If correctly working, this will be reset to 0 by the function below.
+  d_mixture->computeSpeciesEnthalpies(state, speciesEnthalpies);
 
   double transportBuffer[FluxTrns::NUM_FLUX_TRANS];
   // NOTE(kevin): in flux, only dim-components of diffusionVelocity will be used.
   double diffusionVelocity[gpudata::MAXSPECIES * gpudata::MAXDIM];
-  transport->ComputeFluxTransportProperties(state, gradUp, Efield, transportBuffer, diffusionVelocity);
+  diffusionVelocity[0] = 1.0; // If the function above does not work, this will fail the test.
+{
+  double gas_constant = 287.058;
+  double visc_mult = 1.0;
+  double bulk_visc_mult = 0.0;
+  double Pr = 0.71;
+  double specific_heat_ratio = 1.4;
+  double cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
+  
+  double p = d_mixture->ComputePressure(state);
+  double temp = p / gas_constant / state[0];
+
+  transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
+  transportBuffer = 0.0;
+  double viscosity = (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
+  transportBuffer[FluxTrns::VISCOSITY] = viscosity;
+  transportBuffer[FluxTrns::BULK_VISCOSITY] = bulk_visc_mult * viscosity;
+  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = cp_div_pr * transportBuffer[FluxTrns::VISCOSITY];
+}
+  // transport->ComputeFluxTransportProperties(state, gradUp, Efield, transportBuffer, diffusionVelocity);
   const double visc = transportBuffer[FluxTrns::VISCOSITY];
   double bulkViscosity = transportBuffer[FluxTrns::BULK_VISCOSITY];
   bulkViscosity -= 2. / 3. * visc;
