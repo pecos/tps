@@ -344,12 +344,8 @@ void OutletBC::updateMean_gpu(ParGridFunction *Up, Vector &localMeanUp, const in
   MFEM_FORALL(el, numBdrElems, {
     const int elDof = d_bdrElemQ[2 * el];
     const int Q = d_bdrElemQ[2 * el + 1];
-    //     double elUp[5*maxDofs];
-    //     double shape[maxDofs];
-    // compiler does not allow to have maxDofs.
-    // currently maxDofs = 64;
-    double elUp[20 * 216];
-    double shape[216];
+    double elUp[gpudata::MAXEQUATIONS * gpudata::MAXDOFS]; // double elUp[20 * 216];
+    double shape[gpudata::MAXDOFS]; // double shape[216];
     double sum;
 
     // retreive data
@@ -1043,8 +1039,8 @@ void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const Array<int>
   // clang-format off
   MFEM_FORALL_2D(n, numBdrElem, maxDofs, 1, 1,
   {
-    MFEM_SHARED double Fcontrib[216 * 20];
-    double Rflux[20];
+    MFEM_SHARED double Fcontrib[gpudata::MAXDOFS * gpudata::MAXEQUATIONS]; // MFEM_SHARED double Fcontrib[216 * 20];
+    double Rflux[gpudata::MAXEQUATIONS]; // double Rflux[20];
 
     const int el = d_listElems[n];
 
@@ -1131,9 +1127,13 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const Array<int> &nodesID
   // MFEM_FORALL(n, numBdrElem, {
   MFEM_FORALL_2D(n, numBdrElem, maxIntPoints, 1, 1, {
     //
-    double shape[216];
-    double u1[5], u2[5], gradUp1[5 * 3], Rflux[5], nor[3];
-    int index_i[216];
+    double shape[gpudata::MAXDOFS]; // double shape[216];
+    double u1[gpudata::MAXEQUATIONS],
+           u2[gpudata::MAXEQUATIONS],
+           gradUp1[gpudata::MAXEQUATIONS * gpudata::MAXDIM],
+           Rflux[gpudata::MAXEQUATIONS],
+           nor[gpudata::MAXDIM]; // double u1[5], u2[5], gradUp1[5 * 3], Rflux[5], nor[3];
+    int index_i[gpudata::MAXDOFS]; // int index_i[216];
 
     const int el = d_listElems[n];
     const int offsetBdrU = d_offsetBoundaryU[n];
