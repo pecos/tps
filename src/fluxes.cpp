@@ -532,8 +532,8 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const Equa
   double Sc = mixture->GetSchmidtNum();
 
   MFEM_FORALL(n, dof, {
-    double Un[20];
-    double KE[3];
+    double Un[gpudata::MAXEQUATIONS]; // double Un[20];
+    double KE[gpudata::MAXDIM]; // double KE[3];
     double p;
 
     for (int eq = 0; eq < num_equation; eq++) {
@@ -592,9 +592,9 @@ void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTe
   // clang-format off
   MFEM_FORALL(n, dof,
   {
-    double Un[5];
-    double gradUpn[5 * 3];
-    double vFlux[5 * 3];
+    double Un[gpudata:MAXEQUATIONS]; // double Un[5];
+    double gradUpn[gpudata:MAXEQUATIONS * gpudata::MAXDIM]; // double gradUpn[5 * 3];
+    double vFlux[gpudata:MAXEQUATIONS * gpudata::MAXDIM]; // double vFlux[5 * 3];
     double linVisc;
 
     // init. State
