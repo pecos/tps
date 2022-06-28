@@ -291,8 +291,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
   double p = d_mixture->ComputePressure(state);
   double temp = p / gas_constant / state[0];
 
-  transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
-  transportBuffer = 0.0;
+  for (int k = 0; k < FluxTrns::NUM_FLUX_TRANS; k++) transportBuffer[k] = 0.0;
   double viscosity = (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
   transportBuffer[FluxTrns::VISCOSITY] = viscosity;
   transportBuffer[FluxTrns::BULK_VISCOSITY] = bulk_visc_mult * viscosity;

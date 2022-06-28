@@ -363,8 +363,8 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
 
 #if defined(_CUDA_)
       // TODO(kevin): implement radius.
-      d_flux->ComputeViscousFluxes(u1, gradUp1, 0.0, vFlux1);
-      d_flux->ComputeViscousFluxes(u2, gradUp2, 0.0, vFlux2);
+      d_flux->ComputeViscousFluxes(u1, gradUp1, 0.0, vFlux1, d_mix);
+      d_flux->ComputeViscousFluxes(u2, gradUp2, 0.0, vFlux2, d_mix);
       // d_flux->ComputeViscousFluxes(d_uk_el1 + k * num_equation + iface * maxIntPoints * num_equation,
       //             d_grad_uk_el1 + k * dim * num_equation + iface * maxIntPoints * dim * num_equation,
       //             0.0, vFlux1);
