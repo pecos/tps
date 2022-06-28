@@ -44,7 +44,7 @@ const int MAXINTPOINTS = 64;  // corresponding to HEX face with p=5
 const int MAXDOFS = 216;      // corresponding to HEX with p=5
 
 const int MAXDIM = 3;
-const int MAXSPECIES = 15;
+const int MAXSPECIES = 5;
 const int MAXEQUATIONS = MAXDIM + 2 + MAXSPECIES;  // momentum + two energies + species
 }  // namespace gpudata
 
