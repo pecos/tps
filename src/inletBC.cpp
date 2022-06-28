@@ -338,10 +338,8 @@ void InletBC::updateMean_gpu(ParGridFunction *Up, Vector &localMeanUp, const int
   MFEM_FORALL(el, numBdrElems, {
     const int elDof = d_bdrElemQ[2 * el];
     const int Q = d_bdrElemQ[2 * el + 1];
-    //     double elUp[5*maxDofs];
-    //     double shape[maxDofs];
-    double elUp[20 * 216];
-    double shape[216];
+    double elUp[gpudata::MAXEQUATIONS * gpudata::MAXDOFS]; // double elUp[20 * 216];
+    double shape[gpudata::MAXDOFS]; // double shape[216];
     double sum;
 
     // retreive data
@@ -755,8 +753,8 @@ void InletBC::integrateInlets_gpu(Vector &y, const Vector &x, const Array<int> &
   const int maxDofs = maxDofs_;
 
   MFEM_FORALL_2D(n, numBdrElem, maxDofs, 1, 1, {
-    MFEM_SHARED double Fcontrib[216 * 5];
-    double Rflux[5];
+    MFEM_SHARED double Fcontrib[gpudata::MAXDOFS * gpudata::MAXEQUATIONS]; // MFEM_SHARED double Fcontrib[216 * 5];
+    double Rflux[gpudata::MAXEQUATIONS]; // double Rflux[5];
 
     const int el = d_listElems[n];
     const int Q = d_intPointsElIDBC[2 * el];
@@ -828,8 +826,11 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const Array<int> &nodesIDs,
 
   // MFEM_FORALL(n, numBdrElem, {
   MFEM_FORALL_2D(n, numBdrElem, maxIntPoints, 1, 1, {
-    double shape[216];
-    double u1[5], u2[5], Rflux[5], nor[3];
+    double shape[gpudata::MAXDOFS]; // double shape[216];
+    double u1[gpudata::MAXEQUATIONS],
+           u2[gpudata::MAXEQUATIONS],
+           Rflux[gpudata::MAXEQUATIONS],
+           nor[gpudata::MAXDIM]; // double u1[5], u2[5], Rflux[5], nor[3];
 
     const int el = d_listElems[n];
     const int Q = d_intPointsElIDBC[2 * el];
