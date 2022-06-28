@@ -527,7 +527,26 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const Equa
 #ifdef _GPU_
   auto dataIn = x.Read();
   auto d_flux = flux.Write();
+#endif // _GPU_
 
+#if defined(_CUDA_)
+  MFEM_FORALL(n, dof, {
+    double Un[gpudata::MAXEQUATIONS]; // double Un[20];
+    double fluxn[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
+
+    for (int eq = 0; eq < num_equation; eq++) {
+      Un[eq] = dataIn[n + eq * dof];
+    }
+
+    ComputeConvectiveFluxes(Un, fluxn);
+
+    for (int eq = 0; eq < num_equation; eq++) {
+      for (int d = 0; d < dim; d++) {
+        d_flux[n + d * dof + eq * dof * dim] = fluxn[eq + d * num_equation];
+      }
+    }
+  });
+#elif defined(_HIP_)
   double gamma = mixture->GetSpecificHeatRatio();
   double Sc = mixture->GetSchmidtNum();
 
@@ -562,8 +581,7 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const Equa
       }
     }
   });
-
-#endif
+#endif // defined(_HIP_)
 }
 
 void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTensor &flux, const Equations &eqSystem,
