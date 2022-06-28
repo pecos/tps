@@ -309,7 +309,6 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
 
   const RiemannSolver *d_rsolver = rsolver_;
   Fluxes *d_flux = fluxes;
-  GasMixture *d_mix = mixture;
 
   // clang-format off
   MFEM_FORALL(iface, Nf,
@@ -363,15 +362,15 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
 
 #if defined(_CUDA_)
       // TODO(kevin): implement radius.
-      d_flux->ComputeViscousFluxes(u1, gradUp1, 0.0, vFlux1, d_mix);
-      d_flux->ComputeViscousFluxes(u2, gradUp2, 0.0, vFlux2, d_mix);
+      d_flux->ComputeViscousFluxes(u1, gradUp1, 0.0, vFlux1);
+      d_flux->ComputeViscousFluxes(u2, gradUp2, 0.0, vFlux2);
       // d_flux->ComputeViscousFluxes(d_uk_el1 + k * num_equation + iface * maxIntPoints * num_equation,
       //             d_grad_uk_el1 + k * dim * num_equation + iface * maxIntPoints * dim * num_equation,
       //             0.0, vFlux1);
 #elif defined(_HIP_)
       d_flux->ComputeViscousFluxes(d_uk_el1 + k * num_equation + iface * maxIntPoints * num_equation,
                                    d_grad_uk_el1 + k * dim * num_equation + iface * maxIntPoints * dim * num_equation,
-                                   0.0, vFlux1, d_mix);
+                                   0.0, vFlux1);
       // Fluxes::viscousFlux_serial_gpu(&vFlux1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
       //                                num_equation);
       Fluxes::viscousFlux_serial_gpu(&vFlux2[0], &u2[0], &gradUp2[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,

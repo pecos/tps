@@ -91,6 +91,12 @@ void GasMixture::modifyStateFromPrimitive(const Vector &state, const BoundaryPri
   GetConservativesFromPrimitives(prim, outputState);
 }
 
+// NOTE(kevin): only for the demonstration purpose!
+MFEM_HOST_DEVICE void GasMixture::computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies) {
+  for (int sp = 0; sp < numSpecies; sp++) speciesEnthalpies[sp] = 0.0;
+  return;
+}
+
 //////////////////////////////////////////////////////
 //////// Dry Air mixture
 //////////////////////////////////////////////////////
@@ -191,10 +197,10 @@ void DryAir::computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthal
   return;
 }
 
-MFEM_HOST_DEVICE void DryAir::computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies) {
-  for (int sp = 0; sp < numSpecies; sp++) speciesEnthalpies[sp] = 0.0;
-  return;
-}
+//MFEM_HOST_DEVICE void DryAir::computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies) const {
+//  for (int sp = 0; sp < numSpecies; sp++) speciesEnthalpies[sp] = 0.0;
+//  return;
+//}
 
 bool DryAir::StateIsPhysical(const mfem::Vector &state) {
   const double den = state(0);
@@ -863,12 +869,12 @@ void PerfectMixture::computeSpeciesEnthalpies(const Vector &state, Vector &speci
   return;
 }
 
-MFEM_HOST_DEVICE void PerfectMixture::computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies) {
-  // TODO(kevin): develop gpu version.
-  printf("ERROR: PerfextMixture::computeSpeciesEnthalpies is not yet developed for gpu!");
-
-  return;
-}
+//MFEM_HOST_DEVICE void PerfectMixture::computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies) const {
+//  // TODO(kevin): develop gpu version.
+//  printf("ERROR: PerfextMixture::computeSpeciesEnthalpies is not yet developed for gpu!");
+//
+//  return;
+//}
 
 double PerfectMixture::ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive) {
   if (primitive) {

@@ -250,7 +250,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
 }
 
 MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius,
-                                                   double *flux, GasMixture *d_mixture) {
+                                                   double *flux) {
   for (int d = 0; d < dim; d++) {
     for (int eq = 0; eq < num_equation; eq++) {
       flux[eq + d * num_equation] = 0.;
@@ -274,7 +274,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
 
   double speciesEnthalpies[gpudata::MAXSPECIES];
   speciesEnthalpies[0] = 1.0; // If correctly working, this will be reset to 0 by the function below.
-  d_mixture->computeSpeciesEnthalpies(state, speciesEnthalpies);
+  mixture->computeSpeciesEnthalpies(state, speciesEnthalpies);
 
   double transportBuffer[FluxTrns::NUM_FLUX_TRANS];
   // NOTE(kevin): in flux, only dim-components of diffusionVelocity will be used.
@@ -288,7 +288,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
   double specific_heat_ratio = 1.4;
   double cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
   
-  double p = d_mixture->ComputePressure(state);
+  double p = mixture->ComputePressure(state);
   double temp = p / gas_constant / state[0];
 
   for (int k = 0; k < FluxTrns::NUM_FLUX_TRANS; k++) transportBuffer[k] = 0.0;
