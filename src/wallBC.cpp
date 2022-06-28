@@ -423,8 +423,8 @@ void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const Array<int> &no
     // double shape[216];
     // double Rflux[20], u1[20], u2[20], nor[3], gradUpi[20 * 3];
     // double vF1[20 * 3], vF2[20 * 3];
-    MFEM_SHARED double Fcontrib[216 * 5];
-    double Rflux[5];
+    MFEM_SHARED double Fcontrib[gpudata::MAXDOFS * gpudata::MAXEQUATIONS]; // MFEM_SHARED double Fcontrib[216 * 5];
+    double Rflux[gpudata::MAXEQUATIONS]; // double Rflux[5];
 
     const int numFaces = d_wallElems[0 + el_wall * 7];
     bool elemDataRecovered = false;
