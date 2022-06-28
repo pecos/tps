@@ -206,10 +206,10 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset,
   // clang-format off
   MFEM_FORALL_2D(el, NumElemType, elDof, 1, 1,
   {
-    MFEM_SHARED double shape[216];
-    MFEM_SHARED double Fcontrib[216 * 5];
-    double Rflux[5];
-    int indexes_i[216];
+    MFEM_SHARED double shape[gpudata::MAXDOFS]; // shape[216];
+    MFEM_SHARED double Fcontrib[gpudata::MAXDOFS * gpudata::MAXEQUATIONS]; // Fcontrib[216 * 5];
+    double Rflux[gpudata::MAXEQUATIONS]; // double Rflux[5];
+    int indexes_i[gpudata::MAXDOFS]; // int indexes_i[216];
 
     const int eli = elemOffset + el;
     const int offsetEl1 = d_posDofIds[2 * eli];
@@ -423,9 +423,9 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
   {
     // assuming max. num of equations = 20
     // and max elem dof is 216 (a p=5 hex)
-    double uk1[20], gradUpk1[20 * 3];
-    double shape[216];
-    int indexes_i[216];
+    double uk1[gpudata::MAXEQUATIONS], gradUpk1[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
+    double shape[gpudata::MAXDOFS];
+    int indexes_i[gpudata::MAXDOFS];
 
     const int eli = elemOffset + el;
     const int offsetEl1 = d_posDofIds[2 * eli];
@@ -542,9 +542,9 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
 
   MFEM_FORALL_2D(el, parallelData->sharedElemsFaces.Size() / 7, maxDofs, 1, 1, {
     //
-    double Fcontrib[216 * 5];
-    double Rflux[5];
-    int index_i[216];
+    double Fcontrib[gpudata::MAXDOFS * gpudata::MAXEQUATIONS]; //double Fcontrib[216 * 5];
+    double Rflux[gpudata::MAXEQUATIONS]; //double Rflux[5];
+    int index_i[gpudata::MAXDOFS]; //int index_i[216];
 
     const int el1      = d_sharedElemsFaces[0 + el * 7];
     const int offsetEl1 = d_posDofIds[2 * el1];
@@ -567,6 +567,7 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
           d_sharedShapeWnor1[maxDofs + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
 
         for (int eq = 0; eq < num_equation; eq++) {
+          // NOTE: this 5 seems to be the max number of faces?
           const int idxu = eq + k*num_equation + elFace*maxIntPoints*num_equation + el*5*maxIntPoints*num_equation;
           Rflux[eq] = d_shared_flux[idxu];
         }
@@ -626,11 +627,15 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
   Fluxes *d_flux = fluxes;
 
   MFEM_FORALL_2D(el, parallelData->sharedElemsFaces.Size() / 7, maxIntPoints, 1, 1, {
-    double l1[216], l2[216];
-    double u1[5], u2[5];
-    double gradUp1[3 * 5], gradUp2[3 * 5], nor[3];
-    double Rflux[5], vFlux1[3 * 5], vFlux2[3 * 5];
-    int index_i[216];
+    double l1[gpudata::MAXDOFS], l2[gpudata::MAXDOFS]; //double l1[216], l2[216];
+    double u1[gpudata::MAXEQUATIONS], u2[gpudata::MAXEQUATIONS]; //double u1[5], u2[5];
+    double gradUp1[gpudata::MAXDIM * gpudata::MAXEQUATIONS], //double gradUp1[3 * 5];
+           gradUp2[gpudata::MAXDIM * gpudata::MAXEQUATIONS], //gradUp2[3 * 5];
+           nor[gpudata::MAXDIM]; //nor[3];
+    double Rflux[gpudata::MAXEQUATIONS], //double Rflux[5];
+           vFlux1[gpudata::MAXDIM * gpudata::MAXEQUATIONS], //vFlux1[3 * 5];
+           vFlux2[gpudata::MAXDIM * gpudata::MAXEQUATIONS]; //vFlux2[3 * 5];
+    int index_i[gpudata::MAXDOFS]; //int index_i[216];
 
     const int el1 = d_sharedElemsFaces[0 + el * 7];
     const int numFaces = d_sharedElemsFaces[1 + el * 7];
