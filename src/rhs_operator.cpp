@@ -553,9 +553,9 @@ void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const dou
   auto dataIn = x_in->Read();  // make sure data is available in GPU
 
   MFEM_FORALL(n, ndofs, {
-    double state[20];  // assuming 20 equations
+    double state[gpudata::MAXEQUATIONS]; // double state[20];
     // MFEM_SHARED double p;
-    double KE[3];
+    double KE[gpudata::MAXDIM]; // double KE[3];
 
     for (int eq = 0; eq < num_equation; eq++) {
       state[eq] = dataIn[n + eq * ndofs];  // loads data into shared memory
@@ -615,7 +615,7 @@ void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceInteg
   const double *d_invM = invMArray.Read();
 
   MFEM_FORALL_2D(el, NE, dof, 1, 1, {
-    MFEM_SHARED double data[216 * 20];
+    MFEM_SHARED double data[gpudata::MAXDOFS * gpudata::MAXEQUATIONS]; // MFEM_SHARED double data[216 * 20];
 
     int eli = el + elemOffset;
     int offsetInv = d_posDofInvM[2 * eli];
