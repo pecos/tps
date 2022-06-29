@@ -310,7 +310,7 @@ void DryAir::GetPrimitivesFromConservatives(const Vector &conserv, Vector &primi
 
 MFEM_HOST_DEVICE void DryAir::GetPrimitivesFromConservatives(const double *conserv, double *primit) {
   double T = ComputeTemperature(conserv);
-  primit = conserv;
+  for (int eq = 0; eq < num_equation; eq++) primit[eq] = conserv[eq];
 
   for (int d = 0; d < nvel_; d++) primit[1 + d] /= conserv[0];
 

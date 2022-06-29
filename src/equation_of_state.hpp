@@ -152,7 +152,10 @@ class GasMixture {
 
   virtual double ComputePressureFromPrimitives(const Vector &Up) = 0;  // pressure from primitive variables
   virtual double ComputeTemperature(const Vector &state) = 0;
-  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state) = 0;
+  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state) {
+    mfem_error("ComputeTemperature is not implemented.");
+    return -1.0;
+  }
   virtual double Temperature(double *rho, double *p,
                              int nsp) = 0;  // temperature given densities and pressures of all species
 
@@ -165,7 +168,10 @@ class GasMixture {
   virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit) = 0;
   virtual void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv) = 0;
 
-  MFEM_HOST_DEVICE virtual void GetPrimitivesFromConservatives(const double *conserv, double *primit) = 0;
+  MFEM_HOST_DEVICE virtual void GetPrimitivesFromConservatives(const double *conserv, double *primit) {
+    mfem_error("GetPrimitivesFromConservatives is not implemented.");
+    return;
+  }
 
   virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true) = 0;
 
@@ -302,7 +308,7 @@ class DryAir : public GasMixture {
   MFEM_HOST_DEVICE virtual void computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies);
 
   virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit);
-  MFEM_HOST_DEVICE virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit);
+  MFEM_HOST_DEVICE virtual void GetPrimitivesFromConservatives(const double *conserv, double *primit);
   virtual void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv);
 
   virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true);
