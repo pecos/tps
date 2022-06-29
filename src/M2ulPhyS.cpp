@@ -528,7 +528,7 @@ void M2ulPhyS::initVariables() {
 
   bcIntegrator = NULL;
   if (local_attr.Size() > 0) {
-    bcIntegrator = new BCintegrator(groupsMPI, mesh, vfes, intRules, rsolver, dt, mixture, fluxClass, Up, gradUp,
+    bcIntegrator = new BCintegrator(groupsMPI, mesh, vfes, intRules, rsolver, dt, mixture, d_mixture, fluxClass, Up, gradUp,
                                     shapesBC, normalsWBC, intPointsElIDBC, dim, num_equation, max_char_speed, config,
                                     local_attr, maxIntPoints, maxDofs);
   }

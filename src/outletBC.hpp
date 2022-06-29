@@ -45,11 +45,13 @@ using namespace mfem;
 class OutletBC : public BoundaryCondition {
  private:
   MPI_Groups *groupsMPI;
+  GasMixture *d_mixture_;
 
   const OutletType outletType_;
 
   // In/out conditions specified in the configuration file
   const Array<double> inputState;
+  double d_inputState[gpudata::MAXEQUATIONS];
 
   // Mean boundary state
   Vector meanUp;
@@ -96,7 +98,7 @@ class OutletBC : public BoundaryCondition {
   void computeParallelArea();
 
  public:
-  OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *rsolver_, GasMixture *mixture,
+  OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *rsolver_, GasMixture *mixture, GasMixture *d_mixture,
            ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
            const int _num_equation, int _patchNumber, double _refLength, OutletType _bcType,
            const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs, bool axisym);
@@ -126,6 +128,12 @@ class OutletBC : public BoundaryCondition {
                         ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
                         Array<int> &listElems, Array<int> &offsetsBoundaryU);
 
+  MFEM_HOST_DEVICE void subsonicReflectingPressure(const double *normal, const double *stateIn, double *bdrFlux);
+  MFEM_HOST_DEVICE void modifyEnergyForPressure(const double *stateIn, double *state2, const double p) {
+printf("entered outlet modify.\n");
+    d_mixture_->modifyEnergyForPressure(stateIn, state2, p);
+    return;
+  }
 #ifdef _GPU_  // GPU functions
   static MFEM_HOST_DEVICE void computeSubPressure(const double *u1, double *u2, const double *nor, const double &press,
                                                   const double &gamma, const double &Rg, const int &dim,

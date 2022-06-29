@@ -385,6 +385,18 @@ void DryAir::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::Vector &
   stateOut(1 + nvel_) = p / (specific_heat_ratio - 1.) + ke;
 }
 
+MFEM_HOST_DEVICE void DryAir::modifyEnergyForPressure(const double *stateIn, double *stateOut, const double &p,
+                                                      bool modifyElectronEnergy) {
+printf("entered dry air modify.\n");
+  for (int eq = 0; eq < num_equation; eq++) stateOut[eq] = stateIn[eq];
+
+  double ke = 0.;
+  for (int d = 0; d < nvel_; d++) ke += stateIn[1 + d] * stateIn[1 + d];
+  ke *= 0.5 / stateIn[0];
+
+  stateOut[1 + nvel_] = p / (specific_heat_ratio - 1.) + ke;
+}
+
 // TODO(kevin): check if this works for axisymmetric case.
 void DryAir::computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
                                                      Vector &conservedState) {

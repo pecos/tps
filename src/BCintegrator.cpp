@@ -38,7 +38,7 @@
 #include "wallBC.hpp"
 
 BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElementSpace *_vfes,
-                           IntegrationRules *_intRules, RiemannSolver *rsolver_, double &_dt, GasMixture *_mixture,
+                           IntegrationRules *_intRules, RiemannSolver *rsolver_, double &_dt, GasMixture *_mixture, GasMixture *d_mixture,
                            Fluxes *_fluxClass, ParGridFunction *_Up, ParGridFunction *_gradUp, Vector &_shapesBC,
                            Vector &_normalsWBC, Array<int> &_intPointsElIDBC, const int _dim, const int _num_equation,
                            double &_max_char_speed, RunConfiguration &_runFile, Array<int> &local_attr,
@@ -94,7 +94,7 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
     if (attrInMesh) {
       Array<double> data = config.GetOutletData(o);
       outletBCmap[patchANDtype.first] =
-          new OutletBC(groupsMPI, _runFile.GetEquationSystem(), rsolver, mixture, vfes, intRules, _dt, dim,
+          new OutletBC(groupsMPI, _runFile.GetEquationSystem(), rsolver, mixture, d_mixture, vfes, intRules, _dt, dim,
                        num_equation, patchANDtype.first, config.GetReferenceLength(), patchANDtype.second, data,
                        _maxIntPoints, _maxDofs, config.isAxisymmetric());
     }

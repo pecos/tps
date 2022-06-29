@@ -105,6 +105,15 @@ void RiemannSolver::Eval(const Vector &state1, const Vector &state2, const Vecto
   }
 }
 
+MFEM_HOST_DEVICE void RiemannSolver::Eval(const double *state1, const double *state2, const double *nor, double *flux, bool LF) {
+  if (useRoe && !LF) {
+    // TODO(kevin): implement MFEM_HOST_DEVICE Eval_Roe.
+    //Eval_Roe(state1, state2, nor, flux);
+  } else {
+    Eval_LF(state1, state2, nor, flux);
+  }
+}
+
 void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux) {
   // NOTE: nor in general is not a unit normal
   const int dim = nor.Size();

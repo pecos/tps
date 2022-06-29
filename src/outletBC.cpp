@@ -35,17 +35,19 @@
 #include "riemann_solver.hpp"
 
 // TODO(kevin): non-reflecting BC for plasma.
-OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rsolver, GasMixture *_mixture,
+OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rsolver, GasMixture *_mixture, GasMixture *d_mixture,
                    ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
                    const int _num_equation, int _patchNumber, double _refLength, OutletType _bcType,
                    const Array<double> &_inputData, const int &_maxIntPoints, const int &_maxDofs, bool axisym)
     : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
                         _refLength, axisym),
+      d_mixture_(d_mixture),
       groupsMPI(_groupsMPI),
       outletType_(_bcType),
       inputState(_inputData),
       maxIntPoints_(_maxIntPoints),
       maxDofs_(_maxDofs) {
+  d_inputState[0] = inputState[0];
   groupsMPI->setPatch(_patchNumber);
 
   meanUp.UseDevice(true);
@@ -721,6 +723,14 @@ void OutletBC::subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vecto
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
+MFEM_HOST_DEVICE void OutletBC::subsonicReflectingPressure(const double *normal, const double *stateIn, double *bdrFlux) {
+  double state2[gpudata::MAXEQUATIONS];
+
+  mixture->modifyEnergyForPressure(stateIn, state2, inputState[0]);
+
+  rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
+}
+
 void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
   const double gamma = mixture->GetSpecificHeatRatio();
 
@@ -1124,6 +1134,9 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const Array<int> &nodesID
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;
 
+  const RiemannSolver *d_rsolver = rsolver;
+  GasMixture *d_mix = d_mixture_;
+
   // MFEM_FORALL(n, numBdrElem, {
   MFEM_FORALL_2D(n, numBdrElem, maxIntPoints, 1, 1, {
     //
@@ -1180,7 +1193,10 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const Array<int> &nodesID
       // compute mirror state
       switch (type) {
         case OutletType::SUB_P:
-          computeSubPressure_gpu_serial(&u1[0], &u2[0], &nor[0], d_inputState[0], gamma, Rg, dim, num_equation, fluid);
+printf("came up to here.\n");
+          //d_mix->modifyEnergyForPressure(u1, u2, d_inputState[0]);
+          modifyEnergyForPressure(u1, u2, d_inputState[0]);
+          //computeSubPressure_gpu_serial(&u1[0], &u2[0], &nor[0], d_inputState[0], gamma, Rg, dim, num_equation, fluid);
           break;
         case OutletType::SUB_P_NR:
           computeNRSubPress_serial(offsetBdrU + q, &u1[0], &gradUp1[0], d_meanUp, dtloc, &u2[0], d_boundaryU,
@@ -1198,7 +1214,8 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const Array<int> &nodesID
       }
 
       // compute flux
-      RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
+      d_rsolver->Eval_LF(u1, u2, nor, Rflux);
+      //RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
 
       for (int eq = 0; eq < num_equation; eq++) {
         d_flux[eq + q * num_equation + n * maxIntPoints * num_equation] = Rflux[eq];
