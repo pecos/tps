@@ -537,8 +537,13 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
   const int num_equation = num_equation_;
 
   const bool axisymmetric = config_.isAxisymmetric();
-  auto d_coord = coordsDof->Read();
-  double *d_gradUp = gradUp->Read();
+  const double *d_coord;
+  if (axisymmetric) {
+    d_coord = coordsDof->Read();
+  } else {
+    d_coord = NULL;
+  }
+  const double *d_gradUp = gradUp->Read();
 
   const double *d_spaceVaryViscMult;
   if (spaceVaryViscMult != NULL) {
@@ -580,22 +585,17 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
       for (int d = 0; d < dim; d++) {
         for (int eq = 0; eq < num_equation; eq++) {
           fvisc[eq + d * num_equation] *= linVisc;
-          fluxn[eq + d * num_equation] -= fvisc[eq + d * num_equation];
         }
       }
     }
 
     for (int eq = 0; eq < num_equation; eq++) {
       for (int d = 0; d < dim; d++) {
-        d_flux[n + d * dof + eq * dof * dim] = fluxn[eq + d * num_equation];
+        d_flux[n + d * dof + eq * dof * dim] = fluxn[eq + d * num_equation]
+                                             - fvisc[eq + d * num_equation];
       }
     }
   });
-
-  // if (eqSystem != EULER) {
-  //   Fluxes::viscousFluxes_gpu(x, gradUp, flux, eqSystem, mixture, spaceVaryViscMult, linViscData, vfes->GetNDofs(), dim,
-  //                             num_equation);
-  // }
 #elif defined(_HIP_)
   // ComputeConvectiveFluxes
   Fluxes::convectiveFluxes_gpu(x, flux, eqSystem, mixture, vfes->GetNDofs(), dim_, num_equation_);
