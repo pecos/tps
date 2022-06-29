@@ -580,6 +580,24 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
           }
         }
 
+        // fill out the boundary data.
+        for (int eq = 0; eq < gpudata::MAXEQUATIONS; eq++) {
+          bcState.primIdxs[eq] = (*d_bcState).primIdxs[eq];
+          bcState.prim[eq] = (*d_bcState).prim[eq];
+
+          bcFlux.primFluxIdxs[eq] = (*d_bcFlux).primFluxIdxs[eq];
+          bcFlux.primFlux[eq] = (*d_bcFlux).primFlux[eq];
+        }
+        for (int d = 0; d < dim; d++) {
+          bcFlux.normal[d] = nor[d];
+        }
+        printf("bcState: %f (%s) %f (%s) %f (%s) %f (%s) %f (%s)\n",
+               bcState.prim[0], bcState.primIdxs[0],
+               bcState.prim[1], bcState.primIdxs[1],
+               bcState.prim[2], bcState.primIdxs[2],
+               bcState.prim[3], bcState.primIdxs[3],
+               bcState.prim[4], bcState.primIdxs[4],);
+
 // only implemented general wall flux, as it can supersede all the other types.
 // TODO(kevin): implement radius.
         // compute mirror state
