@@ -152,6 +152,7 @@ class GasMixture {
 
   virtual double ComputePressureFromPrimitives(const Vector &Up) = 0;  // pressure from primitive variables
   virtual double ComputeTemperature(const Vector &state) = 0;
+  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state) = 0;
   virtual double Temperature(double *rho, double *p,
                              int nsp) = 0;  // temperature given densities and pressures of all species
 
@@ -163,6 +164,8 @@ class GasMixture {
 
   virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit) = 0;
   virtual void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv) = 0;
+
+  MFEM_HOST_DEVICE virtual void GetPrimitivesFromConservatives(const double *conserv, double *primit) = 0;
 
   virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true) = 0;
 
@@ -292,12 +295,14 @@ class DryAir : public GasMixture {
 
   virtual double ComputePressureFromPrimitives(const Vector &Up);
   virtual double ComputeTemperature(const Vector &state);
+  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state);
   virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / gas_constant / rho[0]; }
 
   virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies);
   MFEM_HOST_DEVICE virtual void computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies);
 
   virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit);
+  MFEM_HOST_DEVICE virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit);
   virtual void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv);
 
   virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true);
@@ -513,6 +518,14 @@ MFEM_HOST_DEVICE inline double DryAir::ComputePressure(const double *state, doub
 inline double DryAir::ComputeTemperature(const Vector &state) {
   double den_vel2 = 0;
   for (int d = 0; d < nvel_; d++) den_vel2 += state(d + 1) * state(d + 1);
+  den_vel2 /= state[0];
+
+  return (specific_heat_ratio - 1.0) / gas_constant * (state[1 + nvel_] - 0.5 * den_vel2) / state[0];
+}
+
+MFEM_HOST_DEVICE inline double DryAir::ComputeTemperature(const double *state) {
+  double den_vel2 = 0;
+  for (int d = 0; d < nvel_; d++) den_vel2 += state[d + 1] * state[d + 1];
   den_vel2 /= state[0];
 
   return (specific_heat_ratio - 1.0) / gas_constant * (state[1 + nvel_] - 0.5 * den_vel2) / state[0];

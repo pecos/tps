@@ -308,6 +308,22 @@ void DryAir::GetPrimitivesFromConservatives(const Vector &conserv, Vector &primi
   }
 }
 
+MFEM_HOST_DEVICE void DryAir::GetPrimitivesFromConservatives(const double *conserv, double *primit) {
+  double T = ComputeTemperature(conserv);
+  primit = conserv;
+
+  for (int d = 0; d < nvel_; d++) primit[1 + d] /= conserv[0];
+
+  primit[nvel_ + 1] = T;
+
+  // case of passive scalar
+  if (num_equation > nvel_ + 2) {
+    for (int n = 0; n < num_equation - nvel_ - 2; n++) {
+      primit[nvel_ + 2 + n] /= primit[0];
+    }
+  }
+}
+
 double DryAir::ComputeSpeedOfSound(const mfem::Vector &Uin, bool primitive) {
   double T;
 
