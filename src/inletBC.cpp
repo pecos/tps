@@ -35,16 +35,21 @@
 #include "riemann_solver.hpp"
 
 // TODO(kevin): non-reflecting bc for plasam.
-InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rsolver, GasMixture *_mixture,
+InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rsolver, GasMixture *_mixture, GasMixture *d_mixture,
                  ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
                  const int _num_equation, int _patchNumber, double _refLength, InletType _bcType,
                  const Array<double> &_inputData, const int &_maxIntPoints, const int &_maxDofs, bool axisym)
     : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
                         _refLength, axisym),
       groupsMPI(_groupsMPI),
+      d_mixture_(d_mixture),
       inletType_(_bcType),
       maxIntPoints_(_maxIntPoints),
       maxDofs_(_maxDofs) {
+  if ((mixture->GetWorkingFluid() != DRY_AIR) && (outletType_ != SUB_DENS_VEL)) {
+    grvy_printf(GRVY_ERROR, "Plasma only supports subsonic reflecting density velocity inlet!\n");
+    exit(-1);
+  }
   inputState.UseDevice(true);
   inputState.SetSize(_inputData.Size());
   auto hinputState = inputState.HostWrite();
@@ -819,10 +824,20 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const Array<int> &nodesIDs,
 
   const InletType type = inletType_;
 
+  if ((fluid != DRY_AIR) && (type != SUB_DENS_VEL)) {
+    mfem_error("Plasma only supports subsonic reflecting density velocity inlet!\n");
+    exit(-1);
+  }
+
   const int dim = dim_;
+  const int nvel = nvel_;
   const int num_equation = num_equation_;
+  const int numActiveSpecies = numActiveSpecies_;
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;
+
+  const RiemannSolver *d_rsolver = rsolver;
+  GasMixture *d_mix = d_mixture_;
 
   // MFEM_FORALL(n, numBdrElem, {
   MFEM_FORALL_2D(n, numBdrElem, maxIntPoints, 1, 1, {
@@ -857,7 +872,20 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const Array<int> &nodesIDs,
       // compute mirror state
       switch (type) {
         case InletType::SUB_DENS_VEL:
+#if defined(_CUDA_)
+          double p = d_mix->ComputePressure(u1);
+          u2[0] = d_inputState[0];
+          for (int v = 0; v < nvel; v++) u2[1 + v] = d_inputState[0] * d_inputState[1 + v];
+          if (numActiveSpecies > 0) {
+            for (int sp = 0; sp < numActiveSpecies; sp++)
+              // NOTE: inlet BC does not specify total energy. therefore skips one index.
+              // NOTE: regardless of dim_ension, inletBC save the first 4 elements for density and velocity.
+              u2[nvel + 2 + sp] = d_inputState[4 + v];
+          }
+          d_mix->modifyEnergyForPressure(u2, u2, p, true);
+#elif defined(_HIP_)
           computeSubDenseVel_gpu_serial(&u1[0], &u2[0], &nor[0], d_inputState, gamma, Rg, dim, num_equation, fluid);
+#endif
           break;
         case InletType::SUB_DENS_VEL_NR:
           printf("INLET BC NOT IMPLEMENTED");
@@ -868,7 +896,11 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const Array<int> &nodesIDs,
       }
 
       // compute flux
+#if defined(_CUDA_)
+      d_rsolver->Eval_LF(u1, u2, nor, Rflux);
+#elif defined(_HIP_)
       RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
+#endif
 
       // save to global memory
       for (int eq = 0; eq < num_equation; eq++) {

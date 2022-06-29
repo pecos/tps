@@ -47,6 +47,8 @@ class InletBC : public BoundaryCondition {
  private:
   MPI_Groups *groupsMPI;
 
+  GasMixture *d_mixture_; // used only in the device
+
   const InletType inletType_;
 
   // In/out conditions specified in the configuration file
@@ -88,7 +90,7 @@ class InletBC : public BoundaryCondition {
   virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up);
 
  public:
-  InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *rsolver_, GasMixture *_mixture,
+  InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *rsolver_, GasMixture *_mixture, GasMixture *d_mixture,
           ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
           const int _num_equation, int _patchNumber, double _refLength, InletType _bcType,
           const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs, bool axisym);

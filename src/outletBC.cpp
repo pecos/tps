@@ -48,7 +48,7 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
       maxIntPoints_(_maxIntPoints),
       maxDofs_(_maxDofs) {
   if ((mixture->GetWorkingFluid() != DRY_AIR) && (outletType_ != SUB_P)) {
-    grvy_printf(GRVY_ERROR, "Plasma only support subsonic reflecting pressure outlet!\n");
+    grvy_printf(GRVY_ERROR, "Plasma only supports subsonic reflecting pressure outlet!\n");
     exit(-1);
   }
   groupsMPI->setPatch(_patchNumber);
@@ -1125,7 +1125,7 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const Array<int> &nodesID
   const OutletType type = outletType_;
 
   if ((fluid != DRY_AIR) && (type != SUB_P)) {
-    mfem_error("Plasma only support subsonic reflecting pressure outlet!\n");
+    mfem_error("Plasma only supports subsonic reflecting pressure outlet!\n");
     exit(-1);
   }
 
@@ -1193,8 +1193,11 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const Array<int> &nodesID
       // compute mirror state
       switch (type) {
         case OutletType::SUB_P:
+#if defined(_CUDA_)
           d_mix->modifyEnergyForPressure(u1, u2, d_inputState[0]);
-          //computeSubPressure_gpu_serial(&u1[0], &u2[0], &nor[0], d_inputState[0], gamma, Rg, dim, num_equation, fluid);
+#elif defined(_HIP_)
+          computeSubPressure_gpu_serial(&u1[0], &u2[0], &nor[0], d_inputState[0], gamma, Rg, dim, num_equation, fluid);
+#endif
           break;
         case OutletType::SUB_P_NR:
           computeNRSubPress_serial(offsetBdrU + q, &u1[0], &gradUp1[0], d_meanUp, dtloc, &u2[0], d_boundaryU,
@@ -1212,7 +1215,11 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const Array<int> &nodesID
       }
 
       // compute flux
+#if defined(_CUDA_)
       d_rsolver->Eval_LF(u1, u2, nor, Rflux);
+#elif defined(_HIP_)
+      RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
+#endif
 
       for (int eq = 0; eq < num_equation; eq++) {
         d_flux[eq + q * num_equation + n * maxIntPoints * num_equation] = Rflux[eq];

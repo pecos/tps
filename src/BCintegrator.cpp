@@ -77,7 +77,7 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
     if (attrInMesh) {
       Array<double> data = config.GetInletData(in);
       inletBCmap[patchANDtype.first] =
-          new InletBC(groupsMPI, _runFile.GetEquationSystem(), rsolver, mixture, vfes, intRules, _dt, dim, num_equation,
+          new InletBC(groupsMPI, _runFile.GetEquationSystem(), rsolver, mixture, d_mixture, vfes, intRules, _dt, dim, num_equation,
                       patchANDtype.first, config.GetReferenceLength(), patchANDtype.second, data, _maxIntPoints,
                       _maxDofs, config.isAxisymmetric());
     }
