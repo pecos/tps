@@ -62,13 +62,13 @@ class RHSoperator : public TimeDependentOperator {
 
   int &iter;
 
-  const int dim;
+  const int dim_;
   const int nvel;
 
   const Equations &eqSystem;
 
   double &max_char_speed;
-  const int &num_equation;
+  const int &num_equation_;
 
   IntegrationRules *intRules;
   const int intRuleType;
