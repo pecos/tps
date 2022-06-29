@@ -613,7 +613,7 @@ void RHSoperator::updatePrimitives(const Vector &x_in) const {
                                     vfes->GetNDofs(), dim_, num_equation_, eqSystem);
 #elif defined(_CUDA_)
   auto dataUp = Up->Write();   // make sure data is available in GPU
-  auto dataIn = x_in->Read();  // make sure data is available in GPU
+  auto dataIn = x_in.Read();  // make sure data is available in GPU
 
   const int ndofs = vfes->GetNDofs();
   const int num_equation = num_equation_;

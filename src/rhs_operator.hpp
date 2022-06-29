@@ -144,7 +144,7 @@ class RHSoperator : public TimeDependentOperator {
  public:
   RHSoperator(int &_iter, const int _dim, const int &_num_equation, const int &_order, const Equations &_eqSystem,
               double &_max_char_speed, IntegrationRules *_intRules, int _intRuleType, Fluxes *_fluxClass,
-              GasMixture *_mixture, Chemistry *chemistry, TransportProperties *transport, ParFiniteElementSpace *_vfes,
+              GasMixture *_mixture, GasMixture *d_mixture, Chemistry *chemistry, TransportProperties *transport, ParFiniteElementSpace *_vfes,
               const volumeFaceIntegrationArrays &gpuArrays, const int &_maxIntPoints, const int &_maxDofs,
               DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult,
               ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes,
