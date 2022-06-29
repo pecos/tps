@@ -522,7 +522,7 @@ void Fluxes::ComputeSplitFlux(const mfem::Vector &state, mfem::DenseMatrix &a_ma
   }
 }
 
-void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const Equations &eqSystem, GasMixture *mixture,
+void Fluxes::convectiveFluxes_hip(const Vector &x, DenseTensor &flux, const Equations &eqSystem, GasMixture *mixture,
                                   const int &dof, const int &dim, const int &num_equation) {
 #ifdef _GPU_
   auto dataIn = x.Read();
@@ -565,7 +565,7 @@ void Fluxes::convectiveFluxes_gpu(const Vector &x, DenseTensor &flux, const Equa
 #endif // _GPU_
 }
 
-void Fluxes::viscousFluxes_gpu(const Vector &x, ParGridFunction *gradUp, DenseTensor &flux, const Equations &eqSystem,
+void Fluxes::viscousFluxes_hip(const Vector &x, ParGridFunction *gradUp, DenseTensor &flux, const Equations &eqSystem,
                                GasMixture *mixture, const ParGridFunction *spaceVaryViscMult,
                                const linearlyVaryingVisc &linViscData, const int &dof, const int &dim,
                                const int &num_equation) {

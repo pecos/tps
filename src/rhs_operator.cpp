@@ -37,8 +37,8 @@ FunctionCoefficient radiusFcn(getRadius);
 // Implementation of class RHSoperator
 RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, const int &_order,
                          const Equations &_eqSystem, double &_max_char_speed, IntegrationRules *_intRules,
-                         int _intRuleType, Fluxes *_fluxClass, GasMixture *_mixture, Chemistry *_chemistry,
-                         TransportProperties *_transport, ParFiniteElementSpace *_vfes,
+                         int _intRuleType, Fluxes *_fluxClass, GasMixture *_mixture, GasMixture *d_mixture,
+                         Chemistry *_chemistry, TransportProperties *_transport, ParFiniteElementSpace *_vfes,
                          const volumeFaceIntegrationArrays &_gpuArrays, const int &_maxIntPoints, const int &_maxDofs,
                          DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh,
                          ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
@@ -56,6 +56,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
       intRuleType(_intRuleType),
       fluxClass(_fluxClass),
       mixture(_mixture),
+      d_mixture_(d_mixture),
       transport_(_transport),
       vfes(_vfes),
       gpuArrays(_gpuArrays),
@@ -598,19 +599,35 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
   });
 #elif defined(_HIP_)
   // ComputeConvectiveFluxes
-  Fluxes::convectiveFluxes_gpu(x, flux, eqSystem, mixture, vfes->GetNDofs(), dim_, num_equation_);
+  Fluxes::convectiveFluxes_hip(x, flux, eqSystem, mixture, vfes->GetNDofs(), dim_, num_equation_);
   if (eqSystem != EULER) {
-    Fluxes::viscousFluxes_gpu(x, gradUp, flux, eqSystem, mixture, spaceVaryViscMult, linViscData, vfes->GetNDofs(), dim_,
+    Fluxes::viscousFluxes_hip(x, gradUp, flux, eqSystem, mixture, spaceVaryViscMult, linViscData, vfes->GetNDofs(), dim_,
                               num_equation_);
   }
 #endif
 }
 
 void RHSoperator::updatePrimitives(const Vector &x_in) const {
-#ifdef _GPU_
-
-  RHSoperator::updatePrimitives_gpu(Up, &x_in, mixture->GetSpecificHeatRatio(), mixture->GetGasConstant(),
+#if defined(_HIP_)
+  RHSoperator::updatePrimitives_hip(Up, &x_in, mixture->GetSpecificHeatRatio(), mixture->GetGasConstant(),
                                     vfes->GetNDofs(), dim_, num_equation_, eqSystem);
+#elif defined(_CUDA_)
+  auto dataUp = Up->Write();   // make sure data is available in GPU
+  auto dataIn = x_in->Read();  // make sure data is available in GPU
+
+  const int ndofs = vfes->GetNDofs();
+  const int num_equation = num_equation_;
+
+  GasMixture *d_mix = d_mixture_;
+
+  MFEM_FORALL(n, ndofs, {
+    double state[gpudata::MAXEQUATIONS],
+           prim[gpudata::MAXEQUATIONS]; // double state[20];
+
+    for (int eq = 0; eq < num_equation; eq++) state[eq] = dataIn[n + eq * ndofs];
+    d_mix->GetPrimitivesFromConservatives(state, prim);
+    for (int eq = 0; eq < num_equation; eq++) dataUp[n + eq * ndofs] = prim[eq];
+  });
 #else
   double *dataUp = Up->GetData();
   for (int i = 0; i < vfes->GetNDofs(); i++) {
@@ -623,7 +640,7 @@ void RHSoperator::updatePrimitives(const Vector &x_in) const {
 #endif  // _GPU_
 }
 
-void RHSoperator::updatePrimitives_gpu(Vector *Up, const Vector *x_in, const double gamma, const double Rgas,
+void RHSoperator::updatePrimitives_hip(Vector *Up, const Vector *x_in, const double gamma, const double Rgas,
                                        const int ndofs, const int dim, const int num_equation,
                                        const Equations &eqSystem) {
 #ifdef _GPU_
