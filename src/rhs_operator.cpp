@@ -483,6 +483,10 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
     // TODO(Kevin): - This needs to be incorporated in Fluxes::ComputeConvectiveFluxes.
     // Kevin: we need to think through this.
     if (isSBP) {
+      // NOTE(kevin): SBP part was never implemented for gpu, and it is outdated for cpu.
+      grvy_printf(GRVY_ERROR, "SBP capability is currently outdated and unsupported!\n");
+      exit(-1);
+
       f *= alpha;  // *= alpha
       double p = mixture->ComputePressure(state);
       p *= 1. - alpha;
@@ -532,17 +536,54 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
   const int dim = dim_;
   const int num_equation = num_equation_;
 
+  const bool axisymmetric = config_.isAxisymmetric();
+  auto d_coord = coordsDof->Read();
+  double *d_gradUp = gradUp->Read();
+
+  const double *d_spaceVaryViscMult;
+  if (spaceVaryViscMult != NULL) {
+    d_spaceVaryViscMult = spaceVaryViscMult->Read();
+  } else {
+    d_spaceVaryViscMult = NULL;
+  }
+
   Fluxes *d_fluxClass = fluxClass;
 
   MFEM_FORALL(n, dof, {
     double Un[gpudata::MAXEQUATIONS]; // double Un[20];
-    double fluxn[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
+    double fluxn[gpudata::MAXEQUATIONS * gpudata::MAXDIM],
+           fvisc[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
+    double gradUpn[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
+    double linVisc;
 
     for (int eq = 0; eq < num_equation; eq++) {
       Un[eq] = dataIn[n + eq * dof];
+      for (int d = 0; d < dim; d++) {
+        gradUpn[eq + d * num_equation] = d_gradUp[n + eq * dof + d * num_equation * dof];
+      }
     }
 
     d_fluxClass->ComputeConvectiveFluxes(Un, fluxn);
+
+    // TODO(kevin): implement radius.
+    // Is this correct?
+    double radius = 1.0;
+    if (axisymmetric) {
+      radius = d_coord[n + 0 * dof];
+    }
+
+    d_fluxClass->ComputeViscousFluxes(Un, gradUpn, radius, fvisc);
+
+    if (d_spaceVaryViscMult != NULL) {
+      linVisc = d_spaceVaryViscMult[n];
+
+      for (int d = 0; d < dim; d++) {
+        for (int eq = 0; eq < num_equation; eq++) {
+          fvisc[eq + d * num_equation] *= linVisc;
+          fluxn[eq + d * num_equation] -= fvisc[eq + d * num_equation];
+        }
+      }
+    }
 
     for (int eq = 0; eq < num_equation; eq++) {
       for (int d = 0; d < dim; d++) {
@@ -551,10 +592,10 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
     }
   });
 
-  if (eqSystem != EULER) {
-    Fluxes::viscousFluxes_gpu(x, gradUp, flux, eqSystem, mixture, spaceVaryViscMult, linViscData, vfes->GetNDofs(), dim,
-                              num_equation);
-  }
+  // if (eqSystem != EULER) {
+  //   Fluxes::viscousFluxes_gpu(x, gradUp, flux, eqSystem, mixture, spaceVaryViscMult, linViscData, vfes->GetNDofs(), dim,
+  //                             num_equation);
+  // }
 #elif defined(_HIP_)
   // ComputeConvectiveFluxes
   Fluxes::convectiveFluxes_gpu(x, flux, eqSystem, mixture, vfes->GetNDofs(), dim_, num_equation_);
