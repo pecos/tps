@@ -876,14 +876,7 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const Array<int> &nodesIDs,
         case InletType::SUB_DENS_VEL:
 #if defined(_CUDA_)
           p = d_mix->ComputePressure(u1);
-          u2[0] = d_inputState[0];
-          for (int v = 0; v < nvel; v++) u2[1 + v] = d_inputState[0] * d_inputState[1 + v];
-          if (numActiveSpecies > 0) {
-            for (int sp = 0; sp < numActiveSpecies; sp++)
-              // NOTE: inlet BC does not specify total energy. therefore skips one index.
-              // NOTE: regardless of dim_ension, inletBC save the first 4 elements for density and velocity.
-              u2[nvel + 2 + sp] = d_inputState[4 + sp];
-          }
+          pluginInputState(d_inputState, u2, nvel, numActiveSpecies);
           d_mix->modifyEnergyForPressure(u2, u2, p, true);
 #elif defined(_HIP_)
           computeSubDenseVel_gpu_serial(&u1[0], &u2[0], &nor[0], d_inputState, gamma, Rg, dim, num_equation, fluid);

@@ -120,6 +120,15 @@ class InletBC : public BoundaryCondition {
                        Array<int> &offsetsBoundaryU);
 
 #ifdef _GPU_
+  MFEM_HOST_DEVICE void pluginInputState(const double *inputState, double *u2, const int nvel, const int numActiveSpecies) {
+    u2[0] = inputState[0];
+    for (int v = 0; v < nvel; v++) u2[1 + v] = inputState[0] * inputState[1 + v];
+    if (numActiveSpecies > 0) {
+      for (int sp = 0; sp < numActiveSpecies; sp++) u2[nvel + 2 + sp] = inputState[4 + sp];
+    }
+    return;
+  }
+
   static MFEM_HOST_DEVICE void computeSubDenseVel(const double *u1, double *u2, const double *nor,
                                                   const double *inputState, const double &gamma, const double &Rg,
                                                   const int &dim, const int &num_equation, const WorkingFluid &fluid,
