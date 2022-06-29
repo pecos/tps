@@ -286,11 +286,30 @@ struct BoundaryViscousFluxData {
   */
   double primFlux[gpudata::MAXEQUATIONS];
   bool primFluxIdxs[gpudata::MAXEQUATIONS];
+
+  // NOTE(kevin): while auto-generated operator= works in the same way,
+  //              the function is still defined to be safe.
+  MFEM_HOST_DEVICE BoundaryViscousFluxData& operator=(const BoundaryViscousFluxData &rhs) {
+    for (int eq = 0; eq < gpudata::MAXEQUATIONS; eq++) {
+      primFlux[eq] = rhs.primFlux[eq];
+      primFluxIdxs[eq] = rhs.primFluxIdxs[eq];
+    }
+    for (int d = 0; d < gpudata::MAXDIM; d++) normal[d] = rhs.normal[d];
+    return *this;
+  }
 };
 
 struct BoundaryPrimitiveData {
   double prim[gpudata::MAXEQUATIONS];
   bool primIdxs[gpudata::MAXEQUATIONS];
+
+  MFEM_HOST_DEVICE BoundaryPrimitiveData& operator=(const BoundaryPrimitiveData &rhs) {
+    for (int eq = 0; eq < gpudata::MAXEQUATIONS; eq++) {
+      prim[eq] = rhs.prim[eq];
+      primIdxs[eq] = rhs.primIdxs[eq];
+    }
+    return *this;
+  }
 };
 
 #endif  // DATASTRUCTURES_HPP_
