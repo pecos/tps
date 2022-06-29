@@ -589,10 +589,15 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
           bcFlux.normal[d] = nor[d] / sqrt(normN);
         }
 
-// only implemented general wall flux, as it can supersede all the other types.
+// only implemented general viscous wall flux, as it can supersede all the other viscous wall types.
 // TODO(kevin): implement radius.
 #if defined(_CUDA_)
-        d_mix->modifyStateFromPrimitive(u1, bcState, u2);
+        if (type == WallType::INV) {
+          // compute mirror state
+          computeInvWallState_gpu_serial(&u1[0], &u2[0], &nor[0], dim, num_equation);
+        } else {
+          d_mix->modifyStateFromPrimitive(u1, bcState, u2);
+        }
         d_rsolver->Eval_LF(u1, u2, nor, Rflux);
         d_fluxclass->ComputeViscousFluxes(u1, gradUp1, 0.0, vF1);
         d_fluxclass->ComputeViscousFluxes(u2, gradUp1, 0.0, vF2);
