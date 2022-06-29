@@ -387,7 +387,6 @@ void DryAir::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::Vector &
 
 MFEM_HOST_DEVICE void DryAir::modifyEnergyForPressure(const double *stateIn, double *stateOut, const double &p,
                                                       bool modifyElectronEnergy) {
-printf("entered dry air modify.\n");
   for (int eq = 0; eq < num_equation; eq++) stateOut[eq] = stateIn[eq];
 
   double ke = 0.;

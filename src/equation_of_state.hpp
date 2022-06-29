@@ -243,7 +243,10 @@ class GasMixture {
     mfem_error("modifyEnergyForPressure not implemented");
   }
   MFEM_HOST_DEVICE virtual void modifyEnergyForPressure(const double *stateIn, double *stateOut, const double &p,
-                                       bool modifyElectronEnergy = false) {}
+                                                        bool modifyElectronEnergy = false) {
+    mfem_error("modifyEnergyForPressure not implemented");
+    return;
+  }
 
   // Modify state with a prescribed condition at boundary.
   // TODO(kevin): it is possible to use this routine for all BCs, so no need of making so many functions as above.
@@ -345,7 +348,7 @@ class DryAir : public GasMixture {
   virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p,
                                        bool modifyElectronEnergy = false);
   MFEM_HOST_DEVICE virtual void modifyEnergyForPressure(const double *stateIn, double *stateOut, const double &p,
-                                       bool modifyElectronEnergy = false);
+                                                        bool modifyElectronEnergy = false);
 
   virtual void computeSheathBdrFlux(const Vector &state, BoundaryViscousFluxData &bcFlux) {
     mfem_error("computeSheathBdrFlux not implemented");

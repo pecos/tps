@@ -51,7 +51,6 @@ class OutletBC : public BoundaryCondition {
 
   // In/out conditions specified in the configuration file
   const Array<double> inputState;
-  double d_inputState[gpudata::MAXEQUATIONS];
 
   // Mean boundary state
   Vector meanUp;
@@ -128,12 +127,6 @@ class OutletBC : public BoundaryCondition {
                         ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
                         Array<int> &listElems, Array<int> &offsetsBoundaryU);
 
-  MFEM_HOST_DEVICE void subsonicReflectingPressure(const double *normal, const double *stateIn, double *bdrFlux);
-  MFEM_HOST_DEVICE void modifyEnergyForPressure(const double *stateIn, double *state2, const double p) {
-printf("entered outlet modify.\n");
-    d_mixture_->modifyEnergyForPressure(stateIn, state2, p);
-    return;
-  }
 #ifdef _GPU_  // GPU functions
   static MFEM_HOST_DEVICE void computeSubPressure(const double *u1, double *u2, const double *nor, const double &press,
                                                   const double &gamma, const double &Rg, const int &dim,

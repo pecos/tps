@@ -47,7 +47,10 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
       inputState(_inputData),
       maxIntPoints_(_maxIntPoints),
       maxDofs_(_maxDofs) {
-  d_inputState[0] = inputState[0];
+  if ((mixture->GetWorkingFluid() != DRY_AIR) && (outletType_ != SUB_P)) {
+    grvy_printf(GRVY_ERROR, "Plasma only support subsonic reflecting pressure outlet!\n");
+    exit(-1);
+  }
   groupsMPI->setPatch(_patchNumber);
 
   meanUp.UseDevice(true);
@@ -723,14 +726,6 @@ void OutletBC::subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vecto
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
-MFEM_HOST_DEVICE void OutletBC::subsonicReflectingPressure(const double *normal, const double *stateIn, double *bdrFlux) {
-  double state2[gpudata::MAXEQUATIONS];
-
-  mixture->modifyEnergyForPressure(stateIn, state2, inputState[0]);
-
-  rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
-}
-
 void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
   const double gamma = mixture->GetSpecificHeatRatio();
 
@@ -1129,6 +1124,11 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const Array<int> &nodesID
 
   const OutletType type = outletType_;
 
+  if ((fluid != DRY_AIR) && (type != SUB_P)) {
+    mfem_error("Plasma only support subsonic reflecting pressure outlet!\n");
+    exit(-1);
+  }
+
   const int dim = dim_;
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
@@ -1193,9 +1193,7 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const Array<int> &nodesID
       // compute mirror state
       switch (type) {
         case OutletType::SUB_P:
-printf("came up to here.\n");
-          //d_mix->modifyEnergyForPressure(u1, u2, d_inputState[0]);
-          modifyEnergyForPressure(u1, u2, d_inputState[0]);
+          d_mix->modifyEnergyForPressure(u1, u2, d_inputState[0]);
           //computeSubPressure_gpu_serial(&u1[0], &u2[0], &nor[0], d_inputState[0], gamma, Rg, dim, num_equation, fluid);
           break;
         case OutletType::SUB_P_NR:
@@ -1215,7 +1213,6 @@ printf("came up to here.\n");
 
       // compute flux
       d_rsolver->Eval_LF(u1, u2, nor, Rflux);
-      //RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
 
       for (int eq = 0; eq < num_equation; eq++) {
         d_flux[eq + q * num_equation + n * maxIntPoints * num_equation] = Rflux[eq];

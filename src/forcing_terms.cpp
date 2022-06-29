@@ -388,6 +388,7 @@ void AxisymmetricSource::updateTerms(Vector &in) {
   }
 }
 
+// TODO(kevin): implment gpu
 SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                        Fluxes *_fluxClass, GasMixture *_mixture, IntegrationRules *_intRules,
                        ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp,
