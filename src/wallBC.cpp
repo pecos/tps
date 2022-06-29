@@ -615,12 +615,12 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
                                        num_equation);
         Fluxes::viscousFlux_serial_gpu(&vF2[0], &u2[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
                                        num_equation);
+#endif
 
         // add visc flux contribution
         for (int eq = 0; eq < num_equation; eq++)
           for (int d = 0; d < dim; d++)
             Rflux[eq] -= 0.5 * (vF2[eq + d * num_equation] + vF1[eq + d * num_equation]) * nor[d];
-#endif
 
         // store flux (TODO: change variable name)
         for (int eq = 0; eq < num_equation; eq++) {
