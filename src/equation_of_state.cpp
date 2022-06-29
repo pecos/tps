@@ -91,6 +91,17 @@ void GasMixture::modifyStateFromPrimitive(const Vector &state, const BoundaryPri
   GetConservativesFromPrimitives(prim, outputState);
 }
 
+MFEM_HOST_DEVICE void GasMixture::modifyStateFromPrimitive(const double *state, const BoundaryPrimitiveData &bcState,
+                                                           double *outputState) {
+  double prim[gpudata::MAXEQUATIONS];
+  GetPrimitivesFromConservatives(state, prim);
+  for (int i = 0; i < num_equation; i++) {
+    if (bcState.primIdxs[i]) prim[i] = bcState.prim[i];
+  }
+
+  GetConservativesFromPrimitives(prim, outputState);
+}
+
 //////////////////////////////////////////////////////
 //////// Dry Air mixture
 //////////////////////////////////////////////////////
@@ -275,6 +286,25 @@ MFEM_HOST_DEVICE double DryAir::ComputeMaxCharSpeed(const double *state) const {
 
 void DryAir::GetConservativesFromPrimitives(const Vector &primit, Vector &conserv) {
   conserv = primit;
+
+  double v2 = 0.;
+  for (int d = 0; d < nvel_; d++) {
+    v2 += primit[1 + d] * primit[1 + d];
+    conserv[1 + d] *= primit[0];
+  }
+  // total energy
+  conserv[1 + nvel_] = gas_constant * primit[0] * primit[1 + nvel_] / (specific_heat_ratio - 1.) + 0.5 * primit[0] * v2;
+
+  // case of passive scalar
+  if (num_equation > nvel_ + 2) {
+    for (int n = 0; n < num_equation - nvel_ - 2; n++) {
+      conserv[nvel_ + 2 + n] *= primit[0];
+    }
+  }
+}
+
+MFEM_HOST_DEVICE void DryAir::GetConservativesFromPrimitives(const double *primit, double *conserv) {
+  for (int eq = 0; eq < num_equation; eq++) conserv[eq] = primit[eq];
 
   double v2 = 0.;
   for (int d = 0; d < nvel_; d++) {

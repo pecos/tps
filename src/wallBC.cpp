@@ -534,6 +534,7 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
 
     BoundaryPrimitiveData bcState;
     BoundaryViscousFluxData bcFlux;
+    double unitNorm[gpudata::MAXDIM], normN;
 
     const int numFaces = d_wallElems[0 + el_wall * 7];
 
@@ -565,8 +566,10 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
         }
 
         // extract normal vector at this quad point
+        normN = 0.0;
         for (int d = 0; d < dim; d++) {
           nor[d] = d_normW[d + q * (dim + 1) + el_bdry * maxIntPoints * (dim + 1)];
+          normN += nor[d] * nor[d];
         }
 
         // interpolate to this quad point
@@ -583,11 +586,17 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
         bcState = d_bcState;
         bcFlux = d_bcFlux;
         for (int d = 0; d < dim; d++) {
-          bcFlux.normal[d] = nor[d];
+          bcFlux.normal[d] = nor[d] / sqrt(normN);
         }
 
 // only implemented general wall flux, as it can supersede all the other types.
 // TODO(kevin): implement radius.
+#if defined(_CUDA_)
+        d_mix->modifyStateFromPrimitive(u1, bcState, u2);
+        d_rsolver->Eval_LF(u1, u2, nor, Rflux);
+        d_fluxclass->ComputeViscousFluxes(u1, gradUp1, 0.0, vF1);
+        d_fluxclass->ComputeViscousFluxes(u2, gradUp1, 0.0, vF2);
+#elif defined(_HIP_)
         // compute mirror state
         switch (type) {
           case WallType::INV:
@@ -600,23 +609,18 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
             break;
         }
 
-#if defined(_CUDA_)
-        d_rsolver->Eval_LF(u1, u2, nor, Rflux);
-        d_fluxclass->ComputeViscousFluxes(u1, gradUp1, 0.0, vF1);
-        d_fluxclass->ComputeViscousFluxes(u2, gradUp1, 0.0, vF2);
-#elif defined(_HIP_)
           // evaluate flux
         RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
         Fluxes::viscousFlux_serial_gpu(&vF1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
                                        num_equation);
         Fluxes::viscousFlux_serial_gpu(&vF2[0], &u2[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
                                        num_equation);
-#endif
 
         // add visc flux contribution
         for (int eq = 0; eq < num_equation; eq++)
           for (int d = 0; d < dim; d++)
             Rflux[eq] -= 0.5 * (vF2[eq + d * num_equation] + vF1[eq + d * num_equation]) * nor[d];
+#endif
 
         // store flux (TODO: change variable name)
         for (int eq = 0; eq < num_equation; eq++) {

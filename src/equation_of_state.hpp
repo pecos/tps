@@ -172,6 +172,10 @@ class GasMixture {
     mfem_error("GetPrimitivesFromConservatives is not implemented.");
     return;
   }
+  MFEM_HOST_DEVICE virtual void GetConservativesFromPrimitives(const double *primit, double *conserv) {
+    mfem_error("GetPrimitivesFromConservatives is not implemented.");
+    return;
+  }
 
   virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true) = 0;
 
@@ -251,6 +255,7 @@ class GasMixture {
   // Modify state with a prescribed condition at boundary.
   // TODO(kevin): it is possible to use this routine for all BCs, so no need of making so many functions as above.
   void modifyStateFromPrimitive(const Vector &state, const BoundaryPrimitiveData &bcState, Vector &outputState);
+  MFEM_HOST_DEVICE void modifyStateFromPrimitive(const double *state, const BoundaryPrimitiveData &bcState, double *outputState);
   virtual void computeSheathBdrFlux(const Vector &state, BoundaryViscousFluxData &bcFlux) = 0;
 
   virtual double computeAmbipolarElectronNumberDensity(const double *n_sp) {
@@ -316,6 +321,7 @@ class DryAir : public GasMixture {
   virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit);
   MFEM_HOST_DEVICE virtual void GetPrimitivesFromConservatives(const double *conserv, double *primit);
   virtual void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv);
+  MFEM_HOST_DEVICE virtual void GetConservativesFromPrimitives(const double *primit, double *conserv);
 
   virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true);
 
