@@ -33,7 +33,7 @@
 
 #include "riemann_solver.hpp"
 
-WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSystem, Fluxes *_fluxClass,
+WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, GasMixture *d_mixture, Equations _eqSystem, Fluxes *_fluxClass,
                ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
                const int _num_equation, int _patchNumber, WallType _bcType, const WallData _inputData,
                const Array<int> &_intPointsElIDBC, const int &_maxIntPoints, bool axisym)
@@ -41,6 +41,7 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSyste
                         axisym),  // so far walls do not require ref. length. Left at 1
       wallType_(_bcType),
       wallData_(_inputData),
+      d_mixture_(d_mixture),
       fluxClass(_fluxClass),
       intPointsElIDBC(_intPointsElIDBC),
       maxIntPoints_(_maxIntPoints) {
@@ -516,7 +517,11 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
 
+  const BoundaryPrimitiveData *d_bcState = &bcState_;
+  const BoundaryViscousFluxData *d_bcFlux = &bcFlux_;
+
   const RiemannSolver *d_rsolver = rsolver;
+  GasMixture *d_mix = d_mixture_;
   Fluxes *d_fluxclass = fluxClass;
 
   // clang-format on
@@ -527,6 +532,9 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
     double gradUp1[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
     double shape[gpudata::MAXDOFS];
     int index_i[gpudata::MAXDOFS];
+
+    BoundaryPrimitiveData bcState;
+    BoundaryViscousFluxData bcFlux;
 
     const int numFaces = d_wallElems[0 + el_wall * 7];
 
@@ -572,6 +580,8 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
           }
         }
 
+// only implemented general wall flux, as it can supersede all the other types.
+// TODO(kevin): implement radius.
         // compute mirror state
         switch (type) {
           case WallType::INV:
@@ -584,13 +594,12 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
             break;
         }
 
-          // evaluate flux
 #if defined(_CUDA_)
-        // TODO(kevin): implement radius.
         d_rsolver->Eval_LF(u1, u2, nor, Rflux);
         d_fluxclass->ComputeViscousFluxes(u1, gradUp1, 0.0, vF1);
         d_fluxclass->ComputeViscousFluxes(u2, gradUp1, 0.0, vF2);
 #elif defined(_HIP_)
+          // evaluate flux
         RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
         Fluxes::viscousFlux_serial_gpu(&vF1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
                                        num_equation);

@@ -47,6 +47,7 @@ class WallBC : public BoundaryCondition {
   const WallType wallType_;
   const WallData wallData_;
 
+  GasMixture *d_mixture_;  // only used in the device.
   Fluxes *fluxClass;
 
   // TODO(kevin): eventually replace this with wallPrim.
@@ -70,7 +71,7 @@ class WallBC : public BoundaryCondition {
   void computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux);
 
  public:
-  WallBC(RiemannSolver *rsolver_, GasMixture *_mixture, Equations _eqSystem, Fluxes *_fluxClass,
+  WallBC(RiemannSolver *rsolver_, GasMixture *_mixture, GasMixture *d_mixture, Equations _eqSystem, Fluxes *_fluxClass,
          ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
          const int _num_equation, int _patchNumber, WallType _bcType, const WallData _inputData,
          const Array<int> &intPointsElIDBC, const int &maxIntPoints, bool axisym);
