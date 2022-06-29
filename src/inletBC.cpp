@@ -46,7 +46,7 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
       inletType_(_bcType),
       maxIntPoints_(_maxIntPoints),
       maxDofs_(_maxDofs) {
-  if ((mixture->GetWorkingFluid() != DRY_AIR) && (outletType_ != SUB_DENS_VEL)) {
+  if ((mixture->GetWorkingFluid() != DRY_AIR) && (inletType_ != SUB_DENS_VEL)) {
     grvy_printf(GRVY_ERROR, "Plasma only supports subsonic reflecting density velocity inlet!\n");
     exit(-1);
   }
@@ -847,6 +847,8 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const Array<int> &nodesIDs,
            Rflux[gpudata::MAXEQUATIONS],
            nor[gpudata::MAXDIM]; // double u1[5], u2[5], Rflux[5], nor[3];
 
+    double p;
+
     const int el = d_listElems[n];
     const int Q = d_intPointsElIDBC[2 * el];
     const int elID = d_intPointsElIDBC[2 * el + 1];
@@ -873,14 +875,14 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const Array<int> &nodesIDs,
       switch (type) {
         case InletType::SUB_DENS_VEL:
 #if defined(_CUDA_)
-          double p = d_mix->ComputePressure(u1);
+          p = d_mix->ComputePressure(u1);
           u2[0] = d_inputState[0];
           for (int v = 0; v < nvel; v++) u2[1 + v] = d_inputState[0] * d_inputState[1 + v];
           if (numActiveSpecies > 0) {
             for (int sp = 0; sp < numActiveSpecies; sp++)
               // NOTE: inlet BC does not specify total energy. therefore skips one index.
               // NOTE: regardless of dim_ension, inletBC save the first 4 elements for density and velocity.
-              u2[nvel + 2 + sp] = d_inputState[4 + v];
+              u2[nvel + 2 + sp] = d_inputState[4 + sp];
           }
           d_mix->modifyEnergyForPressure(u2, u2, p, true);
 #elif defined(_HIP_)
