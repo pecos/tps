@@ -137,7 +137,6 @@ class RHSoperator : public TimeDependentOperator {
 
   // void GetFlux(const DenseMatrix &state, DenseTensor &flux) const;
   void GetFlux(const Vector &state, DenseTensor &flux) const;
-  void GetFlux_gpu(const Vector &state, DenseTensor &flux) const;
 
   mutable Vector local_timeDerivatives;
   void computeMeanTimeDerivatives(Vector &y) const;
@@ -165,6 +164,7 @@ class RHSoperator : public TimeDependentOperator {
   static void waitAllDataTransfer(ParFiniteElementSpace *pfes, dataTransferArrays &dataTransfer);
 
   // GPU functions
+  void GetFlux_gpu(const Vector &state, DenseTensor &flux) const;
   static void copyZk2Z_gpu(Vector &z, Vector &zk, const int eq, const int dof);
   static void copyDataForFluxIntegration_gpu(const Vector &z, DenseTensor &flux, Vector &fk, Vector &zk, const int eq,
                                              const int dof, const int dim);

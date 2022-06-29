@@ -532,6 +532,8 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
   const int dim = dim_;
   const int num_equation = num_equation_;
 
+  Fluxes *d_fluxClass = fluxClass;
+
   MFEM_FORALL(n, dof, {
     double Un[gpudata::MAXEQUATIONS]; // double Un[20];
     double fluxn[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
@@ -540,7 +542,7 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
       Un[eq] = dataIn[n + eq * dof];
     }
 
-    fluxClass->ComputeConvectiveFluxes(Un, fluxn);
+    d_fluxClass->ComputeConvectiveFluxes(Un, fluxn);
 
     for (int eq = 0; eq < num_equation; eq++) {
       for (int d = 0; d < dim; d++) {
