@@ -414,12 +414,12 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
   for (int sp = 0; sp < numSpecies; sp++) {
     // NOTE: diffusionVelocity is set to be (numSpecies,nvel)-matrix.
     // however only dim-components are used for flux.
-    for (int d = 0; d < dim; d++) normalPrimFlux(sp) += diffusionVelocity(sp, d) * bcFlux.normal(d);
+    for (int d = 0; d < dim; d++) normalPrimFlux(sp) += diffusionVelocity(sp, d) * bcFlux.normal[d];
   }
 
   // Replace with the prescribed boundary fluxes.
   for (int i = 0; i < numSpecies; i++) {
-    if (bcFlux.primFluxIdxs[i]) normalPrimFlux(i) = bcFlux.primFlux(i);
+    if (bcFlux.primFluxIdxs[i]) normalPrimFlux(i) = bcFlux.primFlux[i];
   }
 
   // Compute the stress.
@@ -440,7 +440,7 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
   for (int i = 0; i < dim; i++) stress(i, i) += bulkViscosity * divV;
 
   for (int i = 0; i < dim; i++) {
-    for (int j = 0; j < dim; j++) normalPrimFlux(numSpecies + i) += stress(i, j) * bcFlux.normal(j);
+    for (int j = 0; j < dim; j++) normalPrimFlux(numSpecies + i) += stress(i, j) * bcFlux.normal[j];
   }
 
   double tau_tr = 0, tau_tz = 0;
@@ -453,22 +453,22 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
 
     tau_tz = visc * ut_z;
 
-    normalPrimFlux(numSpecies + nvel - 1) += tau_tr * bcFlux.normal(0);
-    normalPrimFlux(numSpecies + nvel - 1) += tau_tz * bcFlux.normal(1);
+    normalPrimFlux(numSpecies + nvel - 1) += tau_tr * bcFlux.normal[0];
+    normalPrimFlux(numSpecies + nvel - 1) += tau_tz * bcFlux.normal[1];
   }
 
   // Compute the electron heat flux.
   if (twoTemperature) {
     // NOTE(kevin): followed the standard sign of heat flux.
     for (int d = 0; d < dim; d++)
-      normalPrimFlux(primFluxSize - 1) -= ke * gradUp(num_equation - 1, d) * bcFlux.normal(d);
+      normalPrimFlux(primFluxSize - 1) -= ke * gradUp(num_equation - 1, d) * bcFlux.normal[d];
     normalPrimFlux(primFluxSize - 1) += speciesEnthalpies(numSpecies - 2) * normalPrimFlux(numSpecies - 2);
   } else {
     k += ke;
   }
   // Compute the heavies heat flux.
   // NOTE(kevin): followed the standard sign of heat flux.
-  for (int d = 0; d < dim; d++) normalPrimFlux(numSpecies + nvel) -= k * gradUp(1 + nvel, d) * bcFlux.normal(d);
+  for (int d = 0; d < dim; d++) normalPrimFlux(numSpecies + nvel) -= k * gradUp(1 + nvel, d) * bcFlux.normal[d];
   for (int sp = 0; sp < numSpecies; sp++) {
     if (twoTemperature && (sp == numSpecies - 2)) continue;
     normalPrimFlux(numSpecies + nvel) += speciesEnthalpies(sp) * normalPrimFlux(sp);
@@ -476,7 +476,7 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
 
   // Replace with the prescribed boundary fluxes.
   for (int i = numSpecies; i < primFluxSize; i++) {
-    if (bcFlux.primFluxIdxs[i]) normalPrimFlux(i) = bcFlux.primFlux(i);
+    if (bcFlux.primFluxIdxs[i]) normalPrimFlux(i) = bcFlux.primFlux[i];
   }
 
   Vector vel0(nvel);

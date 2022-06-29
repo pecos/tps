@@ -277,20 +277,20 @@ struct WallData {
 };
 
 struct BoundaryViscousFluxData {
-  Vector normal;
+  double normal[gpudata::MAXDIM];
   /* Primitive viscous flux index order:
    diffusion velocity - numSpecies,
    stress             - nvel,
    heavy_heat         - 1,
    electron_heat      - 1
   */
-  Vector primFlux;
-  Array<bool> primFluxIdxs;
+  double primFlux[gpudata::MAXEQUATIONS];
+  bool primFluxIdxs[gpudata::MAXEQUATIONS];
 };
 
 struct BoundaryPrimitiveData {
-  Vector prim;
-  Array<bool> primIdxs;
+  double prim[gpudata::MAXEQUATIONS];
+  bool primIdxs[gpudata::MAXEQUATIONS];
 };
 
 #endif  // DATASTRUCTURES_HPP_

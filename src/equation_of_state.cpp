@@ -80,12 +80,12 @@ void GasMixture::computeStagnationState(const mfem::Vector &stateIn, mfem::Vecto
 void GasMixture::modifyStateFromPrimitive(const Vector &state, const BoundaryPrimitiveData &bcState,
                                           Vector &outputState) {
   outputState.SetSize(num_equation);
-  assert(bcState.prim.Size() == num_equation);
+  // assert(bcState.prim.Size() == num_equation);
 
   Vector prim(num_equation);
   GetPrimitivesFromConservatives(state, prim);
   for (int i = 0; i < num_equation; i++) {
-    if (bcState.primIdxs[i]) prim(i) = bcState.prim(i);
+    if (bcState.primIdxs[i]) prim(i) = bcState.prim[i];
   }
 
   GetConservativesFromPrimitives(prim, outputState);
@@ -1385,7 +1385,7 @@ void PerfectMixture::computeSheathBdrFlux(const Vector &state, BoundaryViscousFl
   double T_h, T_e;
   computeTemperaturesBase(state, &n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
 
-  for (int sp = 0; sp < numSpecies; sp++) bcFlux.primFlux(sp) = 0.0;
+  for (int sp = 0; sp < numSpecies; sp++) bcFlux.primFlux[sp] = 0.0;
 
   // Compute Bohm velocity for positive ions.
   for (int sp = 0; sp < numSpecies; sp++) {
@@ -1394,21 +1394,21 @@ void PerfectMixture::computeSheathBdrFlux(const Vector &state, BoundaryViscousFl
       double msp = gasParams(sp, GasParams::SPECIES_MW);
       double VB = sqrt((T_h + Zsp * T_e) * UNIVERSALGASCONSTANT / msp);
       // TODO(kevin): need to check the sign (out of wall or into the wall)
-      bcFlux.primFlux(sp) = VB;
-      bcFlux.primFlux(numSpecies - 2) += Zsp * n_sp(sp) * VB;
-      bcFlux.primFlux(numSpecies - 1) -= msp * n_sp(sp) * VB;  // fully catalytic wall.
+      bcFlux.primFlux[sp] = VB;
+      bcFlux.primFlux[numSpecies - 2] += Zsp * n_sp(sp) * VB;
+      bcFlux.primFlux[numSpecies - 1] -= msp * n_sp(sp) * VB;  // fully catalytic wall.
     }
   }
-  bcFlux.primFlux(numSpecies - 2) /= n_sp(numSpecies - 2);
-  bcFlux.primFlux(numSpecies - 1) -=
-      gasParams(numSpecies - 2, GasParams::SPECIES_MW) * n_sp(numSpecies - 2) * bcFlux.primFlux(numSpecies - 2);
-  bcFlux.primFlux(numSpecies - 1) /= gasParams(numSpecies - 1, GasParams::SPECIES_MW) * n_sp(numSpecies - 1);
+  bcFlux.primFlux[numSpecies - 2] /= n_sp(numSpecies - 2);
+  bcFlux.primFlux[numSpecies - 1] -=
+      gasParams(numSpecies - 2, GasParams::SPECIES_MW) * n_sp(numSpecies - 2) * bcFlux.primFlux[numSpecies - 2];
+  bcFlux.primFlux[numSpecies - 1] /= gasParams(numSpecies - 1, GasParams::SPECIES_MW) * n_sp(numSpecies - 1);
 
   if (twoTemperature_) {
     double vTe = sqrt(8.0 * UNIVERSALGASCONSTANT * T_e / PI / gasParams(numSpecies - 2, GasParams::SPECIES_MW));
-    double gamma = -log(4.0 / vTe * bcFlux.primFlux(numSpecies - 2));
+    double gamma = -log(4.0 / vTe * bcFlux.primFlux[numSpecies - 2]);
 
-    bcFlux.primFlux(numSpecies + nvel_ + 1) =
-        bcFlux.primFlux(numSpecies - 2) * (gamma + 2.0) * n_sp(numSpecies - 2) * UNIVERSALGASCONSTANT * T_e;
+    bcFlux.primFlux[numSpecies + nvel_ + 1] =
+        bcFlux.primFlux[numSpecies - 2] * (gamma + 2.0) * n_sp(numSpecies - 2) * UNIVERSALGASCONSTANT * T_e;
   }
 }

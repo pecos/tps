@@ -133,10 +133,10 @@ bool testComputeBdrViscousFlux(RunConfiguration &srcConfig, const int dim) {
 
   grvy_printf(GRVY_INFO, "\n ComputeBdrViscousFluxes. \n");
   BoundaryViscousFluxData bcFlux;
-  bcFlux.normal = dir;
-  bcFlux.primFlux.SetSize(primFluxSize);
-  bcFlux.primFluxIdxs.SetSize(primFluxSize);
-  bcFlux.primFlux = 0.0;
+  for (int d = 0; d < dim; d++) bcFlux.normal[d] = dir[d];
+  // bcFlux.primFlux.SetSize(primFluxSize);
+  // bcFlux.primFluxIdxs.SetSize(primFluxSize);
+  for (int i = 0; i < primFluxSize; i++) bcFlux.primFlux[i] = 0.0;
   for (int i = 0; i < primFluxSize; i++) bcFlux.primFluxIdxs[i] = false;
 
   Vector wallViscF(num_equation);

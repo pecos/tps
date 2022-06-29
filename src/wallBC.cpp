@@ -45,17 +45,17 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSyste
       intPointsElIDBC(_intPointsElIDBC),
       maxIntPoints_(_maxIntPoints) {
   // Initialize bc state.
-  bcState_.prim.SetSize(num_equation_);
-  bcState_.primIdxs.SetSize(num_equation_);
-  bcState_.prim = 0.0;
+  // bcState_.prim.SetSize(num_equation_);
+  // bcState_.primIdxs.SetSize(num_equation_);
+  for (int eq = 0; eq < num_equation_; eq++) bcState_.prim[eq] = 0.0;
   for (int eq = 0; eq < num_equation_; eq++) bcState_.primIdxs[eq] = false;
 
   // Initialize bc flux.
   const int numSpecies = mixture->GetNumSpecies();
   const int primFluxSize = (mixture->IsTwoTemperature()) ? numSpecies + nvel_ + 2 : numSpecies + nvel_ + 1;
-  bcFlux_.primFlux.SetSize(primFluxSize);
-  bcFlux_.primFluxIdxs.SetSize(primFluxSize);
-  bcFlux_.primFlux = 0.0;
+  // bcFlux_.primFlux.SetSize(primFluxSize);
+  // bcFlux_.primFluxIdxs.SetSize(primFluxSize);
+  for (int i = 0; i < primFluxSize; i++) bcFlux_.primFlux[i] = 0.0;
   for (int i = 0; i < primFluxSize; i++) bcFlux_.primFluxIdxs[i] = false;
 
   switch (wallType_) {
@@ -88,11 +88,11 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSyste
       wallTemp_ = _inputData.Th;
       // no slip condition.
       for (int d = 0; d < nvel_; d++) bcState_.primIdxs[d + 1] = true;
-      bcState_.prim(nvel_ + 1) = _inputData.Th;
+      bcState_.prim[nvel_ + 1] = _inputData.Th;
       bcState_.primIdxs[nvel_ + 1] = true;
       if (mixture->IsTwoTemperature()) {
         // NOTE(kevin): for VISC_ISOTH, _inputData.Th == _inputData.Te
-        bcState_.prim(num_equation_ - 1) = _inputData.Te;
+        bcState_.prim[num_equation_ - 1] = _inputData.Te;
         bcState_.primIdxs[num_equation_ - 1] = true;
       }
     } break;
@@ -104,7 +104,7 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSyste
       // Heavy-species isothermal condition.
       switch (wallData_.hvyThermalCond) {
         case ISOTH: {
-          bcState_.prim(nvel_ + 1) = wallData_.Th;
+          bcState_.prim[nvel_ + 1] = wallData_.Th;
           bcState_.primIdxs[nvel_ + 1] = true;
         } break;
         case ADIAB: {  // Heat flux is already set to zero.
@@ -117,7 +117,7 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSyste
       // Electron isothermal condition.
       switch (wallData_.elecThermalCond) {
         case ISOTH: {
-          bcState_.prim(num_equation_ - 1) = wallData_.Te;
+          bcState_.prim[num_equation_ - 1] = wallData_.Te;
           bcState_.primIdxs[num_equation_ - 1] = true;
         } break;
         case ADIAB: {  // Heat flux is already set to zero.
@@ -258,7 +258,7 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
     for (int d = 0; d < dim_; d++) normN += normal[d] * normal[d];
     unitNorm *= 1. / sqrt(normN);
 
-    bcFlux_.normal = unitNorm;
+    for (int d = 0; d < dim_; d++) bcFlux_.normal[d] = unitNorm[d];
     fluxClass->ComputeBdrViscousFluxes(stateMirror, gradState, radius, bcFlux_, wallViscF);
     wallViscF *= sqrt(normN);  // in case normal is not a unit vector..
   } else {
@@ -297,7 +297,7 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
   double normN = 0.;
   for (int d = 0; d < dim_; d++) normN += normal[d] * normal[d];
   unitNorm *= 1. / sqrt(normN);
-  bcFlux_.normal = unitNorm;
+  for (int d = 0; d < dim_; d++) bcFlux_.normal[d] = unitNorm[d];
 
   if (eqSystem == NS_PASSIVE) {
     for (int d = 0; d < dim_; d++) gradState(num_equation_ - 1, d) = 0.;
@@ -336,7 +336,7 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
   double normN = 0.;
   for (int d = 0; d < dim_; d++) normN += normal[d] * normal[d];
   unitNorm *= 1. / sqrt(normN);
-  bcFlux_.normal = unitNorm;
+  for (int d = 0; d < dim_; d++) bcFlux_.normal[d] = unitNorm[d];
 
   // evaluate viscous fluxes at the wall
   Vector wallViscF(num_equation_);
@@ -367,7 +367,7 @@ void WallBC::computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix
   double normN = 0.;
   for (int d = 0; d < dim_; d++) normN += normal[d] * normal[d];
   unitNorm *= 1. / sqrt(normN);
-  bcFlux_.normal = unitNorm;
+  for (int d = 0; d < dim_; d++) bcFlux_.normal[d] = unitNorm[d];
 
   if (wallData_.elecThermalCond == SHTH) mixture->computeSheathBdrFlux(wallState, bcFlux_);
 
