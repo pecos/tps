@@ -173,11 +173,11 @@ class GasMixture {
   virtual void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv) = 0;
 
   MFEM_HOST_DEVICE virtual void GetPrimitivesFromConservatives(const double *conserv, double *primit) {
-    mfem_error("GetPrimitivesFromConservatives is not implemented.");
+    printf("GetPrimitivesFromConservatives is not implemented.");
     return;
   }
   MFEM_HOST_DEVICE virtual void GetConservativesFromPrimitives(const double *primit, double *conserv) {
-    mfem_error("GetPrimitivesFromConservatives is not implemented.");
+    printf("GetPrimitivesFromConservatives is not implemented.");
     return;
   }
 
@@ -369,7 +369,7 @@ class DryAir : public GasMixture {
     mfem_error("computeSheathBdrFlux not implemented");
   }
   MFEM_HOST_DEVICE virtual void computeSheathBdrFlux(const double *state, BoundaryViscousFluxData &bcFlux) {
-    mfem_error("ERROR: computeSheathBdrFlux is not supposed to be executed for DryAir!");
+    printf("ERROR: computeSheathBdrFlux is not supposed to be executed for DryAir!");
     return;
   }
 
