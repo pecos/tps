@@ -68,14 +68,45 @@ using namespace mfem;
 using namespace std;
 
 #if defined(_CUDA_)
+// CUDA supports device new/delete
 __global__ void instantiateDeviceMixture(const DryAirInput inputs, int _dim,
                                          int nvel, GasMixture **mix);
+__global__ void instantiateDeviceTransport(GasMixture *mixture, const double viscosity_multiplier,
+                                           const double bulk_viscosity, TransportProperties **trans);
+__global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
+                                        const int _num_equation, const int _dim, bool axisym, Fluxes **f);
+__global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
+                                         Fluxes *_fluxClass, bool _useRoe, bool axisym, RiemannSolver **r);
+
+__global__ void freeDeviceMixture(GasMixture *mix) { delete mix; }
+__global__ void freeDeviceTransport(TransportProperties *trans) { delete trans; }
+__global__ void freeDeviceFluxes(Fluxes *f) { delete f; }
+__global__ void freeDeviceRiemann(RiemannSolver *r) { delete r; }
 #elif defined(_HIP_)
+// HIP doesn't support device new/delete.  There is
+// (experimental?... requires -D__HIP_ENABLE_DEVICE_MALLOC__) support
+// for device malloc and placement new.  So, we could in theory mimick
+// the CUDA approach above by doing malloc then placement new.
+// However, I prefer instead to avoid device malloc, so we allocate
+// outside of the instantiate functions below with hipMalloc and the
+// use placement new.  Maybe should adopt this approach for CUDA as
+// well, as it seems actually slightly cleaner.
 __global__ void instantiateDeviceMixture(const DryAirInput inputs, int _dim,
                                          int nvel, void *mix);
+__global__ void instantiateDeviceTransport(GasMixture *mixture, const double viscosity_multiplier,
+                                           const double bulk_viscosity, void *transport);
+__global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
+                                        const int _num_equation, const int _dim, bool axisym, void *f);
+__global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
+                                         Fluxes *_fluxClass, bool _useRoe, bool axisym, void *r);
+
+__global__ void freeDeviceMixture(GasMixture *mix) { mix->~GasMixture(); }  // explicit destructor call b/c placement new above
+__global__ void freeDeviceTransport(TransportProperties *transport) { transport->~TransportProperties(); }
+__global__ void freeDeviceFluxes(Fluxes *f) { f->~Fluxes(); }
+__global__ void freeDeviceRiemann(RiemannSolver *r) { r->~RiemannSolver(); }
 #endif
 
-
+// NOTE(kevin): Do not use it. For some unknown reason, this wrapper causes a memory issue, at a random place far after this instantiation.
 void assignMixture(const DryAirInput inputs, const int dim, const int nvel, GasMixture *dMixture);
 
 #endif  // GPU_CONSTRUCTOR_HPP_

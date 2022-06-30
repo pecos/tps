@@ -34,18 +34,60 @@
 
 #if defined(_CUDA_)
 // CUDA supports device new/delete
+// __global__ void instantiateDeviceMixture(const WorkingFluid f, const Equations eq_sys,
+//                                          const double viscosity_multiplier, const double bulk_viscosity, int _dim,
+//                                          int nvel, GasMixture **mix) {
+//  // *mix = new DryAir(f, eq_sys, viscosity_multiplier, bulk_viscosity, _dim, nvel);
+//  *mix = new DryAir(inputs, _dim, nvel);
+//}
 __global__ void instantiateDeviceMixture(const DryAirInput inputs, int _dim,
                                          int nvel, GasMixture **mix) {
   *mix = new DryAir(inputs, _dim, nvel);
 }
+
+__global__ void instantiateDeviceTransport(GasMixture *mixture, const double viscosity_multiplier,
+                                           const double bulk_viscosity, TransportProperties **trans) {
+  *trans = new DryAirTransport(mixture, viscosity_multiplier, bulk_viscosity);
+}
+
+__global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
+                                        const int _num_equation, const int _dim, bool axisym, Fluxes **f) {
+  *f = new Fluxes(_mixture, _eqSystem, _transport, _num_equation, _dim, axisym);
+}
+
+__global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
+                                         Fluxes *_fluxClass, bool _useRoe, bool axisym, RiemannSolver **r) {
+  *r = new RiemannSolver(_num_equation, _mixture, _eqSystem, _fluxClass, _useRoe, axisym);
+}
+
 #elif defined(_HIP_)
+// __global__ void instantiateDeviceMixture(const WorkingFluid f, const Equations eq_sys,
+//                                          const double viscosity_multiplier, const double bulk_viscosity, int _dim,
+//                                          int nvel, void *mix) {
+//  mix = new (mix) DryAir(inputs, _dim, nvel);
+//}
 __global__ void instantiateDeviceMixture(const DryAirInput inputs, int _dim,
                                          int nvel, void *mix) {
   mix = new (mix) DryAir(inputs, _dim, nvel);
 }
+
+__global__ void instantiateDeviceTransport(GasMixture *mixture, const double viscosity_multiplier,
+                                           const double bulk_viscosity, void *transport) {
+  transport = new (transport) DryAirTransport(mixture, viscosity_multiplier, bulk_viscosity);
+}
+
+__global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
+                                        const int _num_equation, const int _dim, bool axisym, void *f) {
+  f = new (f) Fluxes(_mixture, _eqSystem, _transport, _num_equation, _dim, axisym);
+}
+
+__global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
+                                         Fluxes *_fluxClass, bool _useRoe, bool axisym, void *r) {
+  r = new (r) RiemannSolver(_num_equation, _mixture, _eqSystem, _fluxClass, _useRoe, axisym);
+}
 #endif
 
-// NOTE(kevin): for some unknown reason, this wrapper causes a memory issue, at a random place far after this instantiation.
+// NOTE(kevin): Do not use it. For some unknown reason, this wrapper causes a memory issue, at a random place far after this instantiation.
 void assignMixture(const DryAirInput inputs, const int dim, const int nvel, GasMixture *dMixture) {
 #if defined(_CUDA_)
   GasMixture **d_mixture_tmp;
@@ -58,4 +100,3 @@ void assignMixture(const DryAirInput inputs, const int dim, const int nvel, GasM
   instantiateDeviceMixture<<<1, 1>>>(inputs, dim, nvel, dMixture);
 #endif
 }
-
