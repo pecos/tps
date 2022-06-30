@@ -43,10 +43,13 @@ namespace gpu {
 //  // *mix = new DryAir(f, eq_sys, viscosity_multiplier, bulk_viscosity, _dim, nvel);
 //  *mix = new DryAir(inputs, _dim, nvel);
 //}
-__global__ void instantiateDeviceMixture(const DryAirInput inputs, int _dim,
+template <typename MixtureInput, typename Mixture>
+__global__ void instantiateDeviceMixture(const MixtureInput inputs, int _dim,
                                          int nvel, GasMixture **mix) {
-  *mix = new DryAir(inputs, _dim, nvel);
+  *mix = new Mixture(inputs, _dim, nvel);
 }
+template __global__ void instantiateDeviceMixture<DryAirInput, DryAir>(const DryAirInput inputs, int _dim,
+                                                                       int nvel, GasMixture **mix);
 
 __global__ void instantiateDeviceTransport(GasMixture *mixture, const double viscosity_multiplier,
                                            const double bulk_viscosity, TransportProperties **trans) {

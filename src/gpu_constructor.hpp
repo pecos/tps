@@ -71,7 +71,8 @@ namespace gpu {
 
 #if defined(_CUDA_)
 // CUDA supports device new/delete
-__global__ void instantiateDeviceMixture(const DryAirInput inputs, int _dim,
+template <typename MixtureInput, typename Mixture>
+__global__ void instantiateDeviceMixture(const MixtureInput inputs, int _dim,
                                          int nvel, GasMixture **mix);
 __global__ void instantiateDeviceTransport(GasMixture *mixture, const double viscosity_multiplier,
                                            const double bulk_viscosity, TransportProperties **trans);
