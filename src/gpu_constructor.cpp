@@ -45,8 +45,7 @@ __global__ void instantiateDeviceMixture(const DryAirInput inputs, int _dim,
 }
 #endif
 
-namespace mms {
-
+// NOTE(kevin): for some unknown reason, this wrapper causes a memory issue, at a random place far after this instantiation.
 void assignMixture(const DryAirInput inputs, const int dim, const int nvel, GasMixture *dMixture) {
 #if defined(_CUDA_)
   GasMixture **d_mixture_tmp;
@@ -60,6 +59,3 @@ void assignMixture(const DryAirInput inputs, const int dim, const int nvel, GasM
 #endif
 }
 
-}
-
-#endif  // GPU_CONSTRUCTOR_HPP_

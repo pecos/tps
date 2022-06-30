@@ -106,14 +106,14 @@ M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps) : mp
 
 #if defined(_CUDA_)
 // CUDA supports device new/delete
-// __global__ void instantiateDeviceMixture(const WorkingFluid f, const Equations eq_sys,
-//                                          const double viscosity_multiplier, const double bulk_viscosity, int _dim,
-//                                          int nvel, GasMixture **mix) {
-__global__ void instantiateDeviceMixture(const DryAirInput inputs, int _dim,
-                                         int nvel, GasMixture **mix) {
-  // *mix = new DryAir(f, eq_sys, viscosity_multiplier, bulk_viscosity, _dim, nvel);
-  *mix = new DryAir(inputs, _dim, nvel);
-}
+//// __global__ void instantiateDeviceMixture(const WorkingFluid f, const Equations eq_sys,
+////                                          const double viscosity_multiplier, const double bulk_viscosity, int _dim,
+////                                          int nvel, GasMixture **mix) {
+//__global__ void instantiateDeviceMixture(const DryAirInput inputs, int _dim,
+//                                         int nvel, GasMixture **mix) {
+//  // *mix = new DryAir(f, eq_sys, viscosity_multiplier, bulk_viscosity, _dim, nvel);
+//  *mix = new DryAir(inputs, _dim, nvel);
+//}
 
 __global__ void freeDeviceMixture(GasMixture *mix) { delete mix; }
 
@@ -149,10 +149,10 @@ __global__ void freeDeviceRiemann(RiemannSolver *r) { delete r; }
 // __global__ void instantiateDeviceMixture(const WorkingFluid f, const Equations eq_sys,
 //                                          const double viscosity_multiplier, const double bulk_viscosity, int _dim,
 //                                          int nvel, void *mix) {
-__global__ void instantiateDeviceMixture(const DryAirInput inputs, int _dim,
-                                         int nvel, void *mix) {
-  mix = new (mix) DryAir(inputs, _dim, nvel);
-}
+//__global__ void instantiateDeviceMixture(const DryAirInput inputs, int _dim,
+//                                         int nvel, void *mix) {
+//  mix = new (mix) DryAir(inputs, _dim, nvel);
+//}
 
 __global__ void freeDeviceMixture(GasMixture *mix) {
   mix->~GasMixture();  // explicit destructor call b/c placement new above

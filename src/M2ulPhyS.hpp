@@ -61,6 +61,7 @@ class Tps;
 #include "faceGradientIntegration.hpp"
 #include "face_integrator.hpp"
 #include "fluxes.hpp"
+#include "gpu_constructor.hpp"
 #include "gradNonLinearForm.hpp"
 #include "io.hpp"
 #include "logger.hpp"

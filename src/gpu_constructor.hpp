@@ -67,8 +67,15 @@
 using namespace mfem;
 using namespace std;
 
-namespace gpu {
-  void assignMixture(const DryAirInput inputs, const int dim, const int nvel, GasMixture *dMixture);
-}
+#if defined(_CUDA_)
+__global__ void instantiateDeviceMixture(const DryAirInput inputs, int _dim,
+                                         int nvel, GasMixture **mix);
+#elif defined(_HIP_)
+__global__ void instantiateDeviceMixture(const DryAirInput inputs, int _dim,
+                                         int nvel, void *mix);
+#endif
+
+
+void assignMixture(const DryAirInput inputs, const int dim, const int nvel, GasMixture *dMixture);
 
 #endif  // GPU_CONSTRUCTOR_HPP_
