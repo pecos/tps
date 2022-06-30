@@ -32,7 +32,10 @@
 
 #include "gpu_constructor.hpp"
 
+namespace gpu {
+
 #if defined(_CUDA_)
+
 // CUDA supports device new/delete
 // __global__ void instantiateDeviceMixture(const WorkingFluid f, const Equations eq_sys,
 //                                          const double viscosity_multiplier, const double bulk_viscosity, int _dim,
@@ -60,7 +63,13 @@ __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture
   *r = new RiemannSolver(_num_equation, _mixture, _eqSystem, _fluxClass, _useRoe, axisym);
 }
 
+__global__ void freeDeviceMixture(GasMixture *mix) { delete mix; }
+__global__ void freeDeviceTransport(TransportProperties *trans) { delete trans; }
+__global__ void freeDeviceFluxes(Fluxes *f) { delete f; }
+__global__ void freeDeviceRiemann(RiemannSolver *r) { delete r; }
+
 #elif defined(_HIP_)
+
 // __global__ void instantiateDeviceMixture(const WorkingFluid f, const Equations eq_sys,
 //                                          const double viscosity_multiplier, const double bulk_viscosity, int _dim,
 //                                          int nvel, void *mix) {
@@ -85,7 +94,13 @@ __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture
                                          Fluxes *_fluxClass, bool _useRoe, bool axisym, void *r) {
   r = new (r) RiemannSolver(_num_equation, _mixture, _eqSystem, _fluxClass, _useRoe, axisym);
 }
-#endif
+
+__global__ void freeDeviceMixture(GasMixture *mix) { mix->~GasMixture(); }  // explicit destructor call b/c placement new above
+__global__ void freeDeviceTransport(TransportProperties *transport) { transport->~TransportProperties(); }
+__global__ void freeDeviceFluxes(Fluxes *f) { f->~Fluxes(); }
+__global__ void freeDeviceRiemann(RiemannSolver *r) { r->~RiemannSolver(); }
+
+#endif  // defined(_CUDA_)
 
 // NOTE(kevin): Do not use it. For some unknown reason, this wrapper causes a memory issue, at a random place far after this instantiation.
 void assignMixture(const DryAirInput inputs, const int dim, const int nvel, GasMixture *dMixture) {
@@ -100,3 +115,5 @@ void assignMixture(const DryAirInput inputs, const int dim, const int nvel, GasM
   instantiateDeviceMixture<<<1, 1>>>(inputs, dim, nvel, dMixture);
 #endif
 }
+
+}  // namespace gpu

@@ -67,6 +67,8 @@
 using namespace mfem;
 using namespace std;
 
+namespace gpu {
+
 #if defined(_CUDA_)
 // CUDA supports device new/delete
 __global__ void instantiateDeviceMixture(const DryAirInput inputs, int _dim,
@@ -78,10 +80,10 @@ __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSyste
 __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
                                          Fluxes *_fluxClass, bool _useRoe, bool axisym, RiemannSolver **r);
 
-__global__ void freeDeviceMixture(GasMixture *mix) { delete mix; }
-__global__ void freeDeviceTransport(TransportProperties *trans) { delete trans; }
-__global__ void freeDeviceFluxes(Fluxes *f) { delete f; }
-__global__ void freeDeviceRiemann(RiemannSolver *r) { delete r; }
+__global__ void freeDeviceMixture(GasMixture *mix);
+__global__ void freeDeviceTransport(TransportProperties *trans);
+__global__ void freeDeviceFluxes(Fluxes *f);
+__global__ void freeDeviceRiemann(RiemannSolver *r);
 #elif defined(_HIP_)
 // HIP doesn't support device new/delete.  There is
 // (experimental?... requires -D__HIP_ENABLE_DEVICE_MALLOC__) support
@@ -100,13 +102,15 @@ __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSyste
 __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
                                          Fluxes *_fluxClass, bool _useRoe, bool axisym, void *r);
 
-__global__ void freeDeviceMixture(GasMixture *mix) { mix->~GasMixture(); }  // explicit destructor call b/c placement new above
-__global__ void freeDeviceTransport(TransportProperties *transport) { transport->~TransportProperties(); }
-__global__ void freeDeviceFluxes(Fluxes *f) { f->~Fluxes(); }
-__global__ void freeDeviceRiemann(RiemannSolver *r) { r->~RiemannSolver(); }
+__global__ void freeDeviceMixture(GasMixture *mix);
+__global__ void freeDeviceTransport(TransportProperties *transport);
+__global__ void freeDeviceFluxes(Fluxes *f);
+__global__ void freeDeviceRiemann(RiemannSolver *r);
 #endif
 
 // NOTE(kevin): Do not use it. For some unknown reason, this wrapper causes a memory issue, at a random place far after this instantiation.
 void assignMixture(const DryAirInput inputs, const int dim, const int nvel, GasMixture *dMixture);
+
+}  // namespace gpu
 
 #endif  // GPU_CONSTRUCTOR_HPP_

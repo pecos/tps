@@ -299,25 +299,25 @@ void M2ulPhyS::initVariables() {
   cudaMalloc((void **)&d_mixture_tmp, sizeof(GasMixture **));
   // instantiateDeviceMixture<<<1, 1>>>(config.workFluid, config.GetEquationSystem(), config.visc_mult, config.bulk_visc,
   //                                    dim, nvel, d_mixture_tmp);
-  instantiateDeviceMixture<<<1, 1>>>(config.dryAirInput,
+  gpu::instantiateDeviceMixture<<<1, 1>>>(config.dryAirInput,
                                      dim, nvel, d_mixture_tmp);
   cudaMemcpy(&d_mixture, d_mixture_tmp, sizeof(GasMixture *), cudaMemcpyDeviceToHost);
   cudaFree(d_mixture_tmp);
 
   TransportProperties **d_transport_tmp;
   cudaMalloc((void **)&d_transport_tmp, sizeof(TransportProperties **));
-  instantiateDeviceTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(), d_transport_tmp);
+  gpu::instantiateDeviceTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(), d_transport_tmp);
   cudaMemcpy(&transportPtr, d_transport_tmp, sizeof(TransportProperties *), cudaMemcpyDeviceToHost);
   cudaFree(d_transport_tmp);
 #elif defined(_HIP_)
   hipMalloc((void **)&d_mixture, sizeof(DryAir));
   // instantiateDeviceMixture<<<1, 1>>>(config.workFluid, config.GetEquationSystem(), config.visc_mult, config.bulk_visc,
   //                                    dim, nvel, d_mixture);
-  instantiateDeviceMixture<<<1, 1>>>(config.dryAirInput,
+  gpu::instantiateDeviceMixture<<<1, 1>>>(config.dryAirInput,
                                      dim, nvel, d_mixture);
 
   hipMalloc((void **)&transportPtr, sizeof(DryAirTransport));
-  instantiateDeviceTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(), transportPtr);
+  gpu::instantiateDeviceTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(), transportPtr);
 #else
   d_mixture = mixture;
   // d_transport = transportPtr;
@@ -428,25 +428,25 @@ void M2ulPhyS::initVariables() {
 #if defined(_CUDA_)
   Fluxes **d_flux_tmp;
   cudaMalloc((void **)&d_flux_tmp, sizeof(Fluxes **));
-  instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(),
+  gpu::instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(),
                                     d_flux_tmp);
   cudaMemcpy(&fluxClass, d_flux_tmp, sizeof(Fluxes *), cudaMemcpyDeviceToHost);
   cudaFree(d_flux_tmp);
 
   RiemannSolver **d_riemann_tmp;
   cudaMalloc((void **)&d_riemann_tmp, sizeof(RiemannSolver **));
-  instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, fluxClass, config.RoeRiemannSolver(),
+  gpu::instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, fluxClass, config.RoeRiemannSolver(),
                                      config.isAxisymmetric(), d_riemann_tmp);
 
   cudaMemcpy(&rsolver, d_riemann_tmp, sizeof(RiemannSolver *), cudaMemcpyDeviceToHost);
   cudaFree(d_riemann_tmp);
 #elif defined(_HIP_)
   hipMalloc((void **)&fluxClass, sizeof(Fluxes));
-  instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(),
+  gpu::instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(),
                                     fluxClass);
 
   hipMalloc((void **)&rsolver, sizeof(RiemannSolver));
-  instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, fluxClass, config.RoeRiemannSolver(),
+  gpu::instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, fluxClass, config.RoeRiemannSolver(),
                                      config.isAxisymmetric(), rsolver);
 #else
   fluxClass = new Fluxes(mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric());
@@ -894,8 +894,8 @@ M2ulPhyS::~M2ulPhyS() {
   // delete inlet/outlet integrators
 
 #if defined(_CUDA_) || defined(_HIP_)
-  freeDeviceRiemann<<<1, 1>>>(rsolver);
-  freeDeviceFluxes<<<1, 1>>>(fluxClass);
+  gpu::freeDeviceRiemann<<<1, 1>>>(rsolver);
+  gpu::freeDeviceFluxes<<<1, 1>>>(fluxClass);
 #else
   delete rsolver;
   delete fluxClass;
@@ -907,8 +907,8 @@ M2ulPhyS::~M2ulPhyS() {
 #endif
 
 #if defined(_CUDA_) || defined(_HIP_)
-  freeDeviceTransport<<<1, 1>>>(transportPtr);
-  freeDeviceMixture<<<1, 1>>>(d_mixture);
+  gpu::freeDeviceTransport<<<1, 1>>>(transportPtr);
+  gpu::freeDeviceMixture<<<1, 1>>>(d_mixture);
 #else
   delete transportPtr;
 #endif
