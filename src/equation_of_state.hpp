@@ -257,6 +257,10 @@ class GasMixture {
   void modifyStateFromPrimitive(const Vector &state, const BoundaryPrimitiveData &bcState, Vector &outputState);
   MFEM_HOST_DEVICE void modifyStateFromPrimitive(const double *state, const BoundaryPrimitiveData &bcState, double *outputState);
   virtual void computeSheathBdrFlux(const Vector &state, BoundaryViscousFluxData &bcFlux) = 0;
+  MFEM_HOST_DEVICE virtual void computeSheathBdrFlux(const double *state, BoundaryViscousFluxData &bcFlux) {
+    mfem_error("computeSheathBdrFlux is not implemented");
+    return;
+  }
 
   virtual double computeAmbipolarElectronNumberDensity(const double *n_sp) {
     mfem_error("computeAmbipolarElectronNumberDensity not implemented");
@@ -358,6 +362,10 @@ class DryAir : public GasMixture {
 
   virtual void computeSheathBdrFlux(const Vector &state, BoundaryViscousFluxData &bcFlux) {
     mfem_error("computeSheathBdrFlux not implemented");
+  }
+  MFEM_HOST_DEVICE virtual void computeSheathBdrFlux(const double *state, BoundaryViscousFluxData &bcFlux) {
+    mfem_error("ERROR: computeSheathBdrFlux is not supposed to be executed for DryAir!");
+    return;
   }
 
   virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,

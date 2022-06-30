@@ -497,6 +497,132 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
   }
 }
 
+MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius,
+                                                      const BoundaryViscousFluxData &bcFlux, double *normalFlux) {
+  // normalFlux.SetSize(num_equation);
+  for (int eq = 0; eq < num_equation; eq++) normalFlux[eq] = 0.;
+  if (eqSystem == EULER) {
+    return;
+  }
+
+  double stress[gpudata::MAXDIM * gpudata::MAXDIM];
+
+  // TODO(kevin): update E-field with EM coupling.
+  double Efield[gpudata::MAXDIM];
+  for (int v = 0; v < nvel; v++) Efield[v] = 0.0;
+
+  const int numSpecies = mixture->GetNumSpecies();
+  const int numActiveSpecies = mixture->GetNumActiveSpecies();
+  const bool twoTemperature = mixture->IsTwoTemperature();
+
+  double speciesEnthalpies[gpudata::MAXSPECIES];
+  mixture->computeSpeciesEnthalpies(state, speciesEnthalpies);
+
+  double transportBuffer[FluxTrns::NUM_FLUX_TRANS];
+  // NOTE(kevin): in flux, only dim-components of diffusionVelocity will be used.
+  double diffusionVelocity[gpudata::MAXSPECIES * gpudata::MAXDIM];
+  transport->ComputeFluxTransportProperties(state, gradUp, Efield, transportBuffer, diffusionVelocity);
+  const double visc = transportBuffer[FluxTrns::VISCOSITY];
+  double bulkViscosity = transportBuffer[FluxTrns::BULK_VISCOSITY];
+  bulkViscosity -= 2. / 3. * visc;
+  double k = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY];
+  double ke = transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY];
+
+  // Primitive viscous fluxes.
+  const int primFluxSize = (twoTemperature) ? numSpecies + nvel + 2 : numSpecies + nvel + 1;
+  double normalPrimFlux[gpudata::MAXEQUATIONS];
+  for (int eq = 0; eq < primFluxSize; eq++) normalPrimFlux[eq] = 0.0;
+
+  // Compute the diffusion velocities.
+  for (int sp = 0; sp < numSpecies; sp++) {
+    // NOTE: diffusionVelocity is set to be (numSpecies,nvel)-matrix.
+    // however only dim-components are used for flux.
+    for (int d = 0; d < dim; d++) normalPrimFlux[sp] += diffusionVelocity[sp + d * numSpecies] * bcFlux.normal[d];
+  }
+
+  // Replace with the prescribed boundary fluxes.
+  for (int i = 0; i < numSpecies; i++) {
+    if (bcFlux.primFluxIdxs[i]) normalPrimFlux[i] = bcFlux.primFlux[i];
+  }
+
+  // Compute the stress.
+  const double ur = (axisymmetric_ ? state[1] / state[0] : 0);
+  const double ut = (axisymmetric_ ? state[3] / state[0] : 0);
+
+  double divV = 0.;
+  for (int i = 0; i < dim; i++) {
+    for (int j = 0; j < dim; j++) {
+      stress[i + j * dim] = gradUp[(1 + j) + i * num_equation] + gradUp[(1 + i) + j * num_equation];
+    }
+    divV += gradUp[(1 + i) + i * num_equation];
+  }
+  for (int i = 0; i < dim; i++)
+    for (int j = 0; j < dim; j++) stress[i + j * dim] *= visc;
+
+  if (axisymmetric_ && radius > 0) {
+    divV += ur / radius;
+  }
+
+  for (int i = 0; i < dim; i++) stress[i + i * dim] += bulkViscosity * divV;
+
+  for (int i = 0; i < dim; i++) {
+    for (int j = 0; j < dim; j++) normalPrimFlux[numSpecies + i] += stress[i + j * dim] * bcFlux.normal[j];
+  }
+
+  double tau_tr = 0, tau_tz = 0;
+  if (axisymmetric_) {
+    const double ut_r = gradUp[3 + 0 * num_equation];
+    const double ut_z = gradUp[3 + 1 * num_equation];
+    tau_tr = ut_r;
+    if (radius > 0) tau_tr -= ut / radius;
+    tau_tr *= visc;
+
+    tau_tz = visc * ut_z;
+
+    normalPrimFlux[numSpecies + nvel - 1] += tau_tr * bcFlux.normal[0];
+    normalPrimFlux[numSpecies + nvel - 1] += tau_tz * bcFlux.normal[1];
+  }
+
+  // Compute the electron heat flux.
+  if (twoTemperature) {
+    // NOTE(kevin): followed the standard sign of heat flux.
+    for (int d = 0; d < dim; d++)
+      normalPrimFlux[primFluxSize - 1] -= ke * gradUp[(num_equation - 1) + d * num_equation] * bcFlux.normal[d];
+    normalPrimFlux[primFluxSize - 1] += speciesEnthalpies[numSpecies - 2] * normalPrimFlux[numSpecies - 2];
+  } else {
+    k += ke;
+  }
+  // Compute the heavies heat flux.
+  // NOTE(kevin): followed the standard sign of heat flux.
+  for (int d = 0; d < dim; d++) normalPrimFlux[numSpecies + nvel] -= k * gradUp[(1 + nvel) + d * num_equation] * bcFlux.normal[d];
+  for (int sp = 0; sp < numSpecies; sp++) {
+    if (twoTemperature && (sp == numSpecies - 2)) continue;
+    normalPrimFlux[numSpecies + nvel] += speciesEnthalpies[sp] * normalPrimFlux[sp];
+  }
+
+  // Replace with the prescribed boundary fluxes.
+  for (int i = numSpecies; i < primFluxSize; i++) {
+    if (bcFlux.primFluxIdxs[i]) normalPrimFlux[i] = bcFlux.primFlux[i];
+  }
+
+  double vel0[gpudata::MAXDIM];
+  for (int d = 0; d < nvel; d++) vel0[d] = state[1 + d] / state[0];
+
+  // convert back to the conservative viscous flux.
+  // NOTE(kevin): negative sign comes in from the definition of numerical viscous flux.
+  // normalFlux(0) = 0.0;
+  for (int sp = 0; sp < numActiveSpecies; sp++) {
+    normalFlux[nvel + 2 + sp] = -state[nvel + 2 + sp] * normalPrimFlux[sp];
+  }
+  for (int d = 0; d < nvel; d++) normalFlux[d + 1] = normalPrimFlux[numSpecies + d];
+  for (int d = 0; d < nvel; d++) normalFlux[nvel + 1] += normalPrimFlux[numSpecies + d] * vel0[d];
+  normalFlux[nvel + 1] -= normalPrimFlux[numSpecies + nvel];
+  if (twoTemperature) {
+    normalFlux[nvel + 1] -= normalPrimFlux[primFluxSize - 1];
+    normalFlux[num_equation - 1] = -normalPrimFlux[primFluxSize - 1];
+  }
+}
+
 void Fluxes::ComputeSplitFlux(const mfem::Vector &state, mfem::DenseMatrix &a_mat, mfem::DenseMatrix &c_mat) {
   const int num_equation = state.Size();
   const int dim = num_equation - 2;

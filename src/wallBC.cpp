@@ -519,6 +519,8 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
   const BoundaryPrimitiveData d_bcState = bcState_;
   const BoundaryViscousFluxData d_bcFlux = bcFlux_;
 
+  const bool computeSheath = (wallData_.elecThermalCond == SHTH);
+
   const RiemannSolver *d_rsolver = rsolver;
   GasMixture *d_mix = d_mixture_;
   Fluxes *d_fluxclass = fluxClass;
@@ -527,7 +529,12 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
   // el_wall is index within wall boundary elements?
   MFEM_FORALL_2D(el_wall, wallElems.Size() / 7, maxIntPoints, 1, 1, {
     double u1[gpudata::MAXEQUATIONS], u2[gpudata::MAXEQUATIONS], nor[gpudata::MAXDIM], Rflux[gpudata::MAXEQUATIONS];
-    double vF1[gpudata::MAXEQUATIONS * gpudata::MAXDIM], vF2[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
+    double vF1[gpudata::MAXEQUATIONS * gpudata::MAXDIM],
+#if defined(_CUDA_)
+           vF2[gpudata::MAXEQUATIONS];
+#elif defined(_HIP_)
+           vF2[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
+#endif
     double gradUp1[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
     double shape[gpudata::MAXDOFS];
     int index_i[gpudata::MAXDOFS];
@@ -592,6 +599,8 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
 // only implemented general viscous wall flux, as it can supersede all the other viscous wall types.
 // TODO(kevin): implement radius.
 #if defined(_CUDA_)
+        if (computeSheath) d_mix->computeSheathBdrFlux(u2, bcFlux);
+
         if (type == WallType::INV) {
           // compute mirror state
           computeInvWallState_gpu_serial(&u1[0], &u2[0], &nor[0], dim, num_equation);
@@ -600,7 +609,15 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
         }
         d_rsolver->Eval_LF(u1, u2, nor, Rflux);
         d_fluxclass->ComputeViscousFluxes(u1, gradUp1, 0.0, vF1);
-        d_fluxclass->ComputeViscousFluxes(u2, gradUp1, 0.0, vF2);
+        d_fluxclass->ComputeBdrViscousFluxes(u2, gradUp1, 0.0, bcFlux, vF2);
+        for (int eq = 0; eq < num_equation; eq++) vF2[eq] *= sqrt(normN);
+
+        // add visc flux contribution
+        for (int eq = 0; eq < num_equation; eq++) {
+          Rflux[eq] -= 0.5 * vF2[eq];
+          for (int d = 0; d < dim; d++)
+            Rflux[eq] -= 0.5 * vF1[eq + d * num_equation] * nor[d];
+        }
 #elif defined(_HIP_)
         // compute mirror state
         switch (type) {
@@ -620,12 +637,12 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
                                        num_equation);
         Fluxes::viscousFlux_serial_gpu(&vF2[0], &u2[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
                                        num_equation);
-#endif
 
         // add visc flux contribution
         for (int eq = 0; eq < num_equation; eq++)
           for (int d = 0; d < dim; d++)
             Rflux[eq] -= 0.5 * (vF2[eq + d * num_equation] + vF1[eq + d * num_equation]) * nor[d];
+#endif
 
         // store flux (TODO: change variable name)
         for (int eq = 0; eq < num_equation; eq++) {

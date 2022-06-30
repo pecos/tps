@@ -83,6 +83,8 @@ class Fluxes {
   // Compute viscous flux with prescribed boundary flux.
   void ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius,
                                const BoundaryViscousFluxData &bcFlux, Vector &normalFlux);
+  MFEM_HOST_DEVICE void ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius,
+                                                const BoundaryViscousFluxData &bcFlux, double *normalFlux);
 
   // Compute the split fersion of the flux for SBP operations
   // Output matrices a_mat, c_mat need not have the right size
