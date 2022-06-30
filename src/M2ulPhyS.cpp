@@ -2614,7 +2614,7 @@ void M2ulPhyS::packUpGasMixtureInput() {
   config.dryAirInput.eq_sys = config.eqSystem;
 #if defined(_HIP_)
   config.dryAirInput.visc_mult = config.visc_mult;
-  config.dryAirInput.bulk_visc_mult = config.bulk_visc_mult;
+  config.dryAirInput.bulk_visc_mult = config.bulk_visc;
 #endif
 }
 

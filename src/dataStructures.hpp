@@ -323,6 +323,6 @@ struct DryAirInput {
   double bulk_visc_mult;
 #else
 #endif
-}
+};
 
 #endif  // DATASTRUCTURES_HPP_
