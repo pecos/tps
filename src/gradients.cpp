@@ -298,9 +298,9 @@ void Gradients::interpFaceData_gpu(const Vector &Up, int elType, int elemOffset,
   {
     // assuming max. num of equations = 20
     // and max elem dof is 216 (a p=5 hex)
-    double uk1[gpudata::MAXEQUATIONS]; // double uk1[20];
-    double shape[gpudata::MAXDOFS]; // double shape[216];
-    int indexes_i[gpudata::MAXDOFS]; // int indexes_i[216];
+    double uk1[gpudata::MAXEQUATIONS];  // double uk1[20];
+    double shape[gpudata::MAXDOFS];  // double shape[216];
+    int indexes_i[gpudata::MAXDOFS];  // int indexes_i[216];
 
     const int eli = elemOffset + el;
     const int offsetEl1 = d_posDofIds[2 * eli];

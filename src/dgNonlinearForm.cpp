@@ -207,10 +207,10 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset,
   // clang-format off
   MFEM_FORALL_2D(el, NumElemType, elDof, 1, 1,
   {
-    MFEM_SHARED double shape[gpudata::MAXDOFS]; // shape[216];
-    MFEM_SHARED double Fcontrib[gpudata::MAXDOFS * gpudata::MAXEQUATIONS]; // Fcontrib[216 * 5];
-    double Rflux[gpudata::MAXEQUATIONS]; // double Rflux[5];
-    int indexes_i[gpudata::MAXDOFS]; // int indexes_i[216];
+    MFEM_SHARED double shape[gpudata::MAXDOFS];  // shape[216];
+    MFEM_SHARED double Fcontrib[gpudata::MAXDOFS * gpudata::MAXEQUATIONS];  // Fcontrib[216 * 5];
+    double Rflux[gpudata::MAXEQUATIONS];  // double Rflux[5];
+    int indexes_i[gpudata::MAXDOFS];  // int indexes_i[216];
 
     const int eli = elemOffset + el;
     const int offsetEl1 = d_posDofIds[2 * eli];
@@ -543,9 +543,9 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
 
   MFEM_FORALL_2D(el, parallelData->sharedElemsFaces.Size() / 7, maxDofs, 1, 1, {
     //
-    double Fcontrib[gpudata::MAXDOFS * gpudata::MAXEQUATIONS]; //double Fcontrib[216 * 5];
-    double Rflux[gpudata::MAXEQUATIONS]; //double Rflux[5];
-    int index_i[gpudata::MAXDOFS]; //int index_i[216];
+    double Fcontrib[gpudata::MAXDOFS * gpudata::MAXEQUATIONS];  // double Fcontrib[216 * 5];
+    double Rflux[gpudata::MAXEQUATIONS];  // double Rflux[5];
+    int index_i[gpudata::MAXDOFS];  // int index_i[216];
 
     const int el1      = d_sharedElemsFaces[0 + el * 7];
     const int offsetEl1 = d_posDofIds[2 * el1];

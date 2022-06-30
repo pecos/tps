@@ -1044,8 +1044,8 @@ void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const Array<int>
   // clang-format off
   MFEM_FORALL_2D(n, numBdrElem, maxDofs, 1, 1,
   {
-    MFEM_SHARED double Fcontrib[gpudata::MAXDOFS * gpudata::MAXEQUATIONS]; // MFEM_SHARED double Fcontrib[216 * 20];
-    double Rflux[gpudata::MAXEQUATIONS]; // double Rflux[20];
+    MFEM_SHARED double Fcontrib[gpudata::MAXDOFS * gpudata::MAXEQUATIONS];  // MFEM_SHARED double Fcontrib[216 * 20];
+    double Rflux[gpudata::MAXEQUATIONS];  // double Rflux[20];
 
     const int el = d_listElems[n];
 
