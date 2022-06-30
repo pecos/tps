@@ -43,13 +43,10 @@ namespace gpu {
 //  // *mix = new DryAir(f, eq_sys, viscosity_multiplier, bulk_viscosity, _dim, nvel);
 //  *mix = new DryAir(inputs, _dim, nvel);
 //}
-template <typename MixtureInput, typename Mixture>
-__global__ void instantiateDeviceMixture(const MixtureInput inputs, int _dim,
-                                         int nvel, GasMixture **mix) {
-  *mix = new Mixture(inputs, _dim, nvel);
+__global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim,
+                                        int nvel, GasMixture **mix) {
+  *mix = new DryAir(inputs, _dim, nvel);
 }
-template __global__ void instantiateDeviceMixture<DryAirInput, DryAir>(const DryAirInput inputs, int _dim,
-                                                                       int nvel, GasMixture **mix);
 
 __global__ void instantiateDeviceTransport(GasMixture *mixture, const double viscosity_multiplier,
                                            const double bulk_viscosity, TransportProperties **trans) {
@@ -78,8 +75,8 @@ __global__ void freeDeviceRiemann(RiemannSolver *r) { delete r; }
 //                                          int nvel, void *mix) {
 //  mix = new (mix) DryAir(inputs, _dim, nvel);
 //}
-__global__ void instantiateDeviceMixture(const DryAirInput inputs, int _dim,
-                                         int nvel, void *mix) {
+__global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim,
+                                        int nvel, void *mix) {
   mix = new (mix) DryAir(inputs, _dim, nvel);
 }
 
@@ -105,17 +102,17 @@ __global__ void freeDeviceRiemann(RiemannSolver *r) { r->~RiemannSolver(); }
 
 #endif  // defined(_CUDA_)
 
-// NOTE(kevin): Do not use it. For some unknown reason, this wrapper causes a memory issue, at a random place far after this instantiation.
+// NOTE(kevin): Do not use this. For some unknown reason, this wrapper causes a memory issue, at a random place far after this instantiation.
 void assignMixture(const DryAirInput inputs, const int dim, const int nvel, GasMixture *dMixture) {
 #if defined(_CUDA_)
   GasMixture **d_mixture_tmp;
   cudaMalloc((void **)&d_mixture_tmp, sizeof(GasMixture **));
-  instantiateDeviceMixture<<<1, 1>>>(inputs, dim, nvel, d_mixture_tmp);
+  instantiateDeviceDryAir<<<1, 1>>>(inputs, dim, nvel, d_mixture_tmp);
   cudaMemcpy(&dMixture, d_mixture_tmp, sizeof(GasMixture *), cudaMemcpyDeviceToHost);
   cudaFree(d_mixture_tmp);
 #elif defined(_HIP_)
   hipMalloc((void **)&dMixture, sizeof(DryAir));
-  instantiateDeviceMixture<<<1, 1>>>(inputs, dim, nvel, dMixture);
+  instantiateDeviceDryAir<<<1, 1>>>(inputs, dim, nvel, dMixture);
 #endif
 }
 

@@ -270,13 +270,13 @@ void M2ulPhyS::initVariables() {
     case WorkingFluid::DRY_AIR:
       mixture = new DryAir(config, dim, nvel);
 #if defined(_CUDA_)
-      gpu::instantiateDeviceMixture<<<1, 1>>>(config.dryAirInput, dim, nvel, d_mixture_tmp);
+      gpu::instantiateDeviceDryAir<<<1, 1>>>(config.dryAirInput, dim, nvel, d_mixture_tmp);
       cudaMemcpy(&d_mixture, d_mixture_tmp, sizeof(GasMixture *), cudaMemcpyDeviceToHost);
 
       gpu::instantiateDeviceTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(), d_transport_tmp);
       cudaMemcpy(&transportPtr, d_transport_tmp, sizeof(TransportProperties *), cudaMemcpyDeviceToHost);
 #elif defined(_HIP_)
-      gpu::instantiateDeviceMixture<<<1, 1>>>(config.dryAirInput, dim, nvel, d_mixture);
+      gpu::instantiateDeviceDryAir<<<1, 1>>>(config.dryAirInput, dim, nvel, d_mixture);
       gpu::instantiateDeviceTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(), transportPtr);
 #else
       transportPtr = new DryAirTransport(mixture, config);

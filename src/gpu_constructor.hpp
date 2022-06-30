@@ -71,9 +71,8 @@ namespace gpu {
 
 #if defined(_CUDA_)
 // CUDA supports device new/delete
-template <typename MixtureInput, typename Mixture>
-__global__ void instantiateDeviceMixture(const MixtureInput inputs, int _dim,
-                                         int nvel, GasMixture **mix);
+__global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim,
+                                        int nvel, GasMixture **mix);
 __global__ void instantiateDeviceTransport(GasMixture *mixture, const double viscosity_multiplier,
                                            const double bulk_viscosity, TransportProperties **trans);
 __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
@@ -94,8 +93,8 @@ __global__ void freeDeviceRiemann(RiemannSolver *r);
 // outside of the instantiate functions below with hipMalloc and the
 // use placement new.  Maybe should adopt this approach for CUDA as
 // well, as it seems actually slightly cleaner.
-__global__ void instantiateDeviceMixture(const DryAirInput inputs, int _dim,
-                                         int nvel, void *mix);
+__global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim,
+                                        int nvel, void *mix);
 __global__ void instantiateDeviceTransport(GasMixture *mixture, const double viscosity_multiplier,
                                            const double bulk_viscosity, void *transport);
 __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
