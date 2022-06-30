@@ -151,6 +151,10 @@ class GasMixture {
   }
 
   virtual double ComputePressureFromPrimitives(const Vector &Up) = 0;  // pressure from primitive variables
+  MFEM_HOST_DEVICE virtual double ComputePressureFromPrimitives(const double *Up) {
+    mfem_error("ComputePressureFromPrimitives is not implemented.");
+    return -1.0;
+  }
   virtual double ComputeTemperature(const Vector &state) = 0;
   MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state) {
     mfem_error("ComputeTemperature is not implemented.");
@@ -315,6 +319,7 @@ class DryAir : public GasMixture {
   MFEM_HOST_DEVICE virtual double ComputePressure(const double *state, double *electronPressure = NULL) const;
 
   virtual double ComputePressureFromPrimitives(const Vector &Up);
+  MFEM_HOST_DEVICE virtual double ComputePressureFromPrimitives(const double *Up);
   virtual double ComputeTemperature(const Vector &state);
   MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state);
   virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / gas_constant / rho[0]; }

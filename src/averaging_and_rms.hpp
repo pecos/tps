@@ -116,8 +116,8 @@ class Averaging {
 
   // GPU functions
 #ifdef _GPU_
-  static void addSample_gpu(ParGridFunction *meanUp, ParGridFunction *rms, int &samplesMean, GasMixture *mixture,
-                            const ParGridFunction *Up, const int &Ndof, const int &dim, const int &num_equation);
+  void addSample_gpu(ParGridFunction *meanUp, ParGridFunction *rms, int &samplesMean, GasMixture *mixture,
+                     const ParGridFunction *Up, const int &Ndof, const int &dim, const int &num_equation);
   static void sumValues_gpu(const Vector &meanUp, const Vector &rms, Vector &local_sums, Vector &tmp_vector,
                             const int &num_equation, const int &dim);
 #endif  // _GPU_

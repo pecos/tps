@@ -448,7 +448,11 @@ void M2ulPhyS::initVariables() {
   initIndirectionArrays();
   initSolutionAndVisualizationVectors();
 
+#ifdef _GPU_
+  average = new Averaging(Up, mesh, fec, fes, dfes, vfes, eqSystem, d_mixture, num_equation, dim, config, groupsMPI);
+#else
   average = new Averaging(Up, mesh, fec, fes, dfes, vfes, eqSystem, mixture, num_equation, dim, config, groupsMPI);
+#endif
   average->read_meanANDrms_restart_files();
 
   // NOTE: this should also be completed by the GasMixture class

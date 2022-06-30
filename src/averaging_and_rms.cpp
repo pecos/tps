@@ -330,8 +330,9 @@ void Averaging::addSample_gpu(ParGridFunction *meanUp, ParGridFunction *rms, int
 
   double dSamplesMean = (double)samplesMean;
 
-  WorkingFluid fluid = mixture->GetWorkingFluid();
-  const double Rg = mixture->GetGasConstant();
+  // WorkingFluid fluid = mixture->GetWorkingFluid();
+  // const double Rg = mixture->GetGasConstant();
+  GasMixture *d_mixture = mixture;
 
   MFEM_FORALL(n, Ndof, {
     double meanVel[gpudata::MAXDIM], vel[gpudata::MAXDIM]; // double meanVel[3], vel[3];
@@ -352,10 +353,7 @@ void Averaging::addSample_gpu(ParGridFunction *meanUp, ParGridFunction *rms, int
       if (eq != 1 + dim) {
         newMeanUp = (mVal + nUp[eq]) / (dSamplesMean + 1);
       } else {  // eq == 1+dim
-        double p;
-        if (fluid == DRY_AIR) {
-          p = DryAir::ComputePressureFromPrimitives_gpu(&nUp[0], Rg, dim);
-        }
+        double p = d_mixture->ComputePressureFromPrimitives(nUp);
         newMeanUp = (mVal + p) / (dSamplesMean + 1);
       }
 

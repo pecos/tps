@@ -380,6 +380,8 @@ double DryAir::ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin
 
 double DryAir::ComputePressureFromPrimitives(const mfem::Vector &Up) { return gas_constant * Up[0] * Up[1 + nvel_]; }
 
+MFEM_HOST_DEVICE double DryAir::ComputePressureFromPrimitives(const double *Up) { return gas_constant * Up[0] * Up[1 + nvel_]; }
+
 void DryAir::computeStagnationState(const mfem::Vector &stateIn, mfem::Vector &stagnationState) {
   const double p = ComputePressure(stateIn);
 
