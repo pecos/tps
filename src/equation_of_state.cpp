@@ -107,12 +107,12 @@ MFEM_HOST_DEVICE void GasMixture::modifyStateFromPrimitive(const double *state, 
 //////////////////////////////////////////////////////
 
 DryAir::DryAir(RunConfiguration &_runfile, int _dim, int nvel)
-    : DryAir(_runfile.workFluid, _runfile.GetEquationSystem(), _runfile.visc_mult, _runfile.bulk_visc, _dim, nvel) {}
+    // : DryAir(_runfile.workFluid, _runfile.GetEquationSystem(), _runfile.visc_mult, _runfile.bulk_visc, _dim, nvel) {}
+    : DryAir(_runfile.dryAirInput, _dim, nvel) {}
 
-MFEM_HOST_DEVICE DryAir::DryAir(const WorkingFluid f, const Equations eq_sys, const double viscosity_multiplier,
-                                const double bulk_viscosity, int _dim, int nvel)
-    : GasMixture(f, _dim, nvel) {
-  numSpecies = (eq_sys == NS_PASSIVE) ? 2 : 1;
+MFEM_HOST_DEVICE DryAir::DryAir(const DryAirInput inputs, int _dim, int nvel)
+    : GasMixture(inputs.f, _dim, nvel) {
+  numSpecies = (inputs.eq_sys == NS_PASSIVE) ? 2 : 1;
   ambipolar = false;
   twoTemperature_ = false;
 
@@ -128,8 +128,8 @@ MFEM_HOST_DEVICE DryAir::DryAir(const WorkingFluid f, const Equations eq_sys, co
   specific_heat_ratio = 1.4;
 // TODO(kevin): GPU routines are not yet fully gas-agnostic. Need to be removed.
 #ifdef _GPU_
-  visc_mult = viscosity_multiplier;
-  bulk_visc_mult = bulk_viscosity;
+  visc_mult = inputs.visc_mult;
+  bulk_visc_mult = inputs.bulk_visc_mult;
   Pr = 0.71;
   cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
   Sc = 0.71;

@@ -312,4 +312,17 @@ struct BoundaryPrimitiveData {
   }
 };
 
+// pack up inputs for all GasMixture-derived classes.
+struct DryAirInput {
+  WorkingFluid f;
+
+  // DryAir inputs.
+  Equations eq_sys;
+#if defined(_HIP_)
+  double visc_mult;
+  double bulk_visc_mult;
+#else
+#endif
+}
+
 #endif  // DATASTRUCTURES_HPP_

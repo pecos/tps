@@ -358,6 +358,8 @@ class M2ulPhyS : public TPS::Solver {
   void parseBCInputs();
   void parseSpongeZoneInputs();
 
+  void packUpGasMixtureInput();
+
   void checkSolverOptions() const;
   void projectInitialSolution();
   void writeHDF5(string inputFileName = std::string()) { restart_files_hdf5("write", inputFileName); }

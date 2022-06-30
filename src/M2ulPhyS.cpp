@@ -106,10 +106,13 @@ M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps) : mp
 
 #if defined(_CUDA_)
 // CUDA supports device new/delete
-__global__ void instantiateDeviceMixture(const WorkingFluid f, const Equations eq_sys,
-                                         const double viscosity_multiplier, const double bulk_viscosity, int _dim,
+// __global__ void instantiateDeviceMixture(const WorkingFluid f, const Equations eq_sys,
+//                                          const double viscosity_multiplier, const double bulk_viscosity, int _dim,
+//                                          int nvel, GasMixture **mix) {
+__global__ void instantiateDeviceMixture(const DryAirInput inputs, int _dim,
                                          int nvel, GasMixture **mix) {
-  *mix = new DryAir(f, eq_sys, viscosity_multiplier, bulk_viscosity, _dim, nvel);
+  // *mix = new DryAir(f, eq_sys, viscosity_multiplier, bulk_viscosity, _dim, nvel);
+  *mix = new DryAir(inputs, _dim, nvel);
 }
 
 __global__ void freeDeviceMixture(GasMixture *mix) { delete mix; }
@@ -143,10 +146,12 @@ __global__ void freeDeviceRiemann(RiemannSolver *r) { delete r; }
 // outside of the instantiate functions below with hipMalloc and the
 // use placement new.  Maybe should adopt this approach for CUDA as
 // well, as it seems actually slightly cleaner.
-__global__ void instantiateDeviceMixture(const WorkingFluid f, const Equations eq_sys,
-                                         const double viscosity_multiplier, const double bulk_viscosity, int _dim,
+// __global__ void instantiateDeviceMixture(const WorkingFluid f, const Equations eq_sys,
+//                                          const double viscosity_multiplier, const double bulk_viscosity, int _dim,
+//                                          int nvel, void *mix) {
+__global__ void instantiateDeviceMixture(const DryAirInput inputs, int _dim,
                                          int nvel, void *mix) {
-  mix = new (mix) DryAir(f, eq_sys, viscosity_multiplier, bulk_viscosity, _dim, nvel);
+  mix = new (mix) DryAir(inputs, _dim, nvel);
 }
 
 __global__ void freeDeviceMixture(GasMixture *mix) {
@@ -370,7 +375,9 @@ void M2ulPhyS::initVariables() {
 #if defined(_CUDA_)
   GasMixture **d_mixture_tmp;
   cudaMalloc((void **)&d_mixture_tmp, sizeof(GasMixture **));
-  instantiateDeviceMixture<<<1, 1>>>(config.workFluid, config.GetEquationSystem(), config.visc_mult, config.bulk_visc,
+  // instantiateDeviceMixture<<<1, 1>>>(config.workFluid, config.GetEquationSystem(), config.visc_mult, config.bulk_visc,
+  //                                    dim, nvel, d_mixture_tmp);
+  instantiateDeviceMixture<<<1, 1>>>(config.dryAirInput,
                                      dim, nvel, d_mixture_tmp);
   cudaMemcpy(&d_mixture, d_mixture_tmp, sizeof(GasMixture *), cudaMemcpyDeviceToHost);
   cudaFree(d_mixture_tmp);
@@ -382,7 +389,9 @@ void M2ulPhyS::initVariables() {
   cudaFree(d_transport_tmp);
 #elif defined(_HIP_)
   hipMalloc((void **)&d_mixture, sizeof(DryAir));
-  instantiateDeviceMixture<<<1, 1>>>(config.workFluid, config.GetEquationSystem(), config.visc_mult, config.bulk_visc,
+  // instantiateDeviceMixture<<<1, 1>>>(config.workFluid, config.GetEquationSystem(), config.visc_mult, config.bulk_visc,
+  //                                    dim, nvel, d_mixture);
+  instantiateDeviceMixture<<<1, 1>>>(config.dryAirInput,
                                      dim, nvel, d_mixture);
 
   hipMalloc((void **)&transportPtr, sizeof(DryAirTransport));
@@ -1880,6 +1889,9 @@ void M2ulPhyS::parseSolverOptions2() {
   // sponge zone
   parseSpongeZoneInputs();
 
+  // Pack up input parameters for device objects.
+  packUpGasMixtureInput();
+
   return;
 }
 
@@ -2595,6 +2607,15 @@ void M2ulPhyS::parseSpongeZoneInputs() {
       }
     }
   }
+}
+
+void M2ulPhyS::packUpGasMixtureInput() {
+  config.dryAirInput.f = config.workFluid;
+  config.dryAirInput.eq_sys = config.eqSystem;
+#if defined(_HIP_)
+  config.dryAirInput.visc_mult = config.visc_mult;
+  config.dryAirInput.bulk_visc_mult = config.bulk_visc_mult;
+#endif
 }
 
 void M2ulPhyS::checkSolverOptions() const {

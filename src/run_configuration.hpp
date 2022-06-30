@@ -234,6 +234,8 @@ class RunConfiguration {
   bool mmsCompareRhs_ = false;   // used for utils/compare_rhs
   bool mmsSaveDetails_ = false;  // used for utils/compare_rhs
 
+  DryAirInput dryAirInput;
+
   RunConfiguration();
   ~RunConfiguration();
 

@@ -303,8 +303,9 @@ class DryAir : public GasMixture {
 
  public:
   DryAir(RunConfiguration &_runfile, int _dim, int nvel);
-  MFEM_HOST_DEVICE DryAir(const WorkingFluid f, const Equations eq_sys, const double viscosity_multiplier,
-                          const double bulk_viscosity, int _dim, int nvel);
+  // MFEM_HOST_DEVICE DryAir(const WorkingFluid f, const Equations eq_sys, const double viscosity_multiplier,
+  //                         const double bulk_viscosity, int _dim, int nvel);
+  MFEM_HOST_DEVICE DryAir(const DryAirInput inputs, int _dim, int nvel);
   DryAir();  // this will only be usefull to get air constants
   // DryAir(int dim, int num_equation);
 
