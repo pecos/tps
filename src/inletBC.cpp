@@ -35,9 +35,9 @@
 #include "riemann_solver.hpp"
 
 // TODO(kevin): non-reflecting bc for plasam.
-InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rsolver, GasMixture *_mixture, GasMixture *d_mixture,
-                 ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
-                 const int _num_equation, int _patchNumber, double _refLength, InletType _bcType,
+InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rsolver, GasMixture *_mixture,
+                 GasMixture *d_mixture, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt,
+                 const int _dim, const int _num_equation, int _patchNumber, double _refLength, InletType _bcType,
                  const Array<double> &_inputData, const int &_maxIntPoints, const int &_maxDofs, bool axisym)
     : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
                         _refLength, axisym),
@@ -343,8 +343,8 @@ void InletBC::updateMean_gpu(ParGridFunction *Up, Vector &localMeanUp, const int
   MFEM_FORALL(el, numBdrElems, {
     const int elDof = d_bdrElemQ[2 * el];
     const int Q = d_bdrElemQ[2 * el + 1];
-    double elUp[gpudata::MAXEQUATIONS * gpudata::MAXDOFS]; // double elUp[20 * 216];
-    double shape[gpudata::MAXDOFS]; // double shape[216];
+    double elUp[gpudata::MAXEQUATIONS * gpudata::MAXDOFS];  // double elUp[20 * 216];
+    double shape[gpudata::MAXDOFS];                         // double shape[216];
     double sum;
 
     // retreive data
@@ -758,8 +758,8 @@ void InletBC::integrateInlets_gpu(Vector &y, const Vector &x, const Array<int> &
   const int maxDofs = maxDofs_;
 
   MFEM_FORALL_2D(n, numBdrElem, maxDofs, 1, 1, {
-    MFEM_SHARED double Fcontrib[gpudata::MAXDOFS * gpudata::MAXEQUATIONS]; // MFEM_SHARED double Fcontrib[216 * 5];
-    double Rflux[gpudata::MAXEQUATIONS]; // double Rflux[5];
+    MFEM_SHARED double Fcontrib[gpudata::MAXDOFS * gpudata::MAXEQUATIONS];  // MFEM_SHARED double Fcontrib[216 * 5];
+    double Rflux[gpudata::MAXEQUATIONS];                                    // double Rflux[5];
 
     const int el = d_listElems[n];
     const int Q = d_intPointsElIDBC[2 * el];
@@ -841,11 +841,9 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const Array<int> &nodesIDs,
 
   // MFEM_FORALL(n, numBdrElem, {
   MFEM_FORALL_2D(n, numBdrElem, maxIntPoints, 1, 1, {
-    double shape[gpudata::MAXDOFS]; // double shape[216];
-    double u1[gpudata::MAXEQUATIONS],
-           u2[gpudata::MAXEQUATIONS],
-           Rflux[gpudata::MAXEQUATIONS],
-           nor[gpudata::MAXDIM]; // double u1[5], u2[5], Rflux[5], nor[3];
+    double shape[gpudata::MAXDOFS];  // double shape[216];
+    double u1[gpudata::MAXEQUATIONS], u2[gpudata::MAXEQUATIONS], Rflux[gpudata::MAXEQUATIONS],
+        nor[gpudata::MAXDIM];  // double u1[5], u2[5], Rflux[5], nor[3];
 
     double p;
 
@@ -890,7 +888,7 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const Array<int> &nodesIDs,
           break;
       }
 
-      // compute flux
+        // compute flux
 #if defined(_CUDA_)
       d_rsolver->Eval_LF(u1, u2, nor, Rflux);
 #elif defined(_HIP_)

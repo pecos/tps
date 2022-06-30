@@ -533,9 +533,9 @@ void M2ulPhyS::initVariables() {
 
   bcIntegrator = NULL;
   if (local_attr.Size() > 0) {
-    bcIntegrator = new BCintegrator(groupsMPI, mesh, vfes, intRules, rsolver, dt, mixture, d_mixture, fluxClass, Up, gradUp,
-                                    shapesBC, normalsWBC, intPointsElIDBC, dim, num_equation, max_char_speed, config,
-                                    local_attr, maxIntPoints, maxDofs);
+    bcIntegrator = new BCintegrator(groupsMPI, mesh, vfes, intRules, rsolver, dt, mixture, d_mixture, fluxClass, Up,
+                                    gradUp, shapesBC, normalsWBC, intPointsElIDBC, dim, num_equation, max_char_speed,
+                                    config, local_attr, maxIntPoints, maxDofs);
   }
 
   // A->SetAssemblyLevel(AssemblyLevel::PARTIAL);
@@ -597,8 +597,8 @@ void M2ulPhyS::initVariables() {
 
   rhsOperator =
       new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType, fluxClass,
-                      mixture, d_mixture, chemistry_, transportPtr, vfes, gpuArrays, maxIntPoints, maxDofs, A, Aflux, mesh,
-                      spaceVaryViscMult, U, Up, gradUp, gradUpfes, gradUp_A, bcIntegrator, isSBP, alpha, config);
+                      mixture, d_mixture, chemistry_, transportPtr, vfes, gpuArrays, maxIntPoints, maxDofs, A, Aflux,
+                      mesh, spaceVaryViscMult, U, Up, gradUp, gradUpfes, gradUp_A, bcIntegrator, isSBP, alpha, config);
 
   CFL = config.GetCFLNumber();
   rhsOperator->SetTime(time);

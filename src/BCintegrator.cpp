@@ -38,11 +38,11 @@
 #include "wallBC.hpp"
 
 BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElementSpace *_vfes,
-                           IntegrationRules *_intRules, RiemannSolver *rsolver_, double &_dt, GasMixture *_mixture, GasMixture *d_mixture,
-                           Fluxes *_fluxClass, ParGridFunction *_Up, ParGridFunction *_gradUp, Vector &_shapesBC,
-                           Vector &_normalsWBC, Array<int> &_intPointsElIDBC, const int _dim, const int _num_equation,
-                           double &_max_char_speed, RunConfiguration &_runFile, Array<int> &local_attr,
-                           const int &_maxIntPoints, const int &_maxDofs)
+                           IntegrationRules *_intRules, RiemannSolver *rsolver_, double &_dt, GasMixture *_mixture,
+                           GasMixture *d_mixture, Fluxes *_fluxClass, ParGridFunction *_Up, ParGridFunction *_gradUp,
+                           Vector &_shapesBC, Vector &_normalsWBC, Array<int> &_intPointsElIDBC, const int _dim,
+                           const int _num_equation, double &_max_char_speed, RunConfiguration &_runFile,
+                           Array<int> &local_attr, const int &_maxIntPoints, const int &_maxDofs)
     : groupsMPI(_groupsMPI),
       config(_runFile),
       rsolver(rsolver_),
@@ -77,9 +77,9 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
     if (attrInMesh) {
       Array<double> data = config.GetInletData(in);
       inletBCmap[patchANDtype.first] =
-          new InletBC(groupsMPI, _runFile.GetEquationSystem(), rsolver, mixture, d_mixture, vfes, intRules, _dt, dim, num_equation,
-                      patchANDtype.first, config.GetReferenceLength(), patchANDtype.second, data, _maxIntPoints,
-                      _maxDofs, config.isAxisymmetric());
+          new InletBC(groupsMPI, _runFile.GetEquationSystem(), rsolver, mixture, d_mixture, vfes, intRules, _dt, dim,
+                      num_equation, patchANDtype.first, config.GetReferenceLength(), patchANDtype.second, data,
+                      _maxIntPoints, _maxDofs, config.isAxisymmetric());
     }
   }
 
@@ -113,9 +113,9 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
     if (patchInMesh) {
       WallData wallData = config.GetWallData(w);
 
-      wallBCmap[patchType.first] = new WallBC(rsolver, mixture, d_mixture, _runFile.GetEquationSystem(), fluxClass, vfes, intRules,
-                                              _dt, dim, num_equation, patchType.first, patchType.second, wallData,
-                                              intPointsElIDBC, _maxIntPoints, config.isAxisymmetric());
+      wallBCmap[patchType.first] = new WallBC(rsolver, mixture, d_mixture, _runFile.GetEquationSystem(), fluxClass,
+                                              vfes, intRules, _dt, dim, num_equation, patchType.first, patchType.second,
+                                              wallData, intPointsElIDBC, _maxIntPoints, config.isAxisymmetric());
     }
   }
 

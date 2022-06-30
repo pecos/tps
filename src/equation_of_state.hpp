@@ -259,7 +259,8 @@ class GasMixture {
   // Modify state with a prescribed condition at boundary.
   // TODO(kevin): it is possible to use this routine for all BCs, so no need of making so many functions as above.
   void modifyStateFromPrimitive(const Vector &state, const BoundaryPrimitiveData &bcState, Vector &outputState);
-  MFEM_HOST_DEVICE void modifyStateFromPrimitive(const double *state, const BoundaryPrimitiveData &bcState, double *outputState);
+  MFEM_HOST_DEVICE void modifyStateFromPrimitive(const double *state, const BoundaryPrimitiveData &bcState,
+                                                 double *outputState);
   virtual void computeSheathBdrFlux(const Vector &state, BoundaryViscousFluxData &bcFlux) = 0;
   MFEM_HOST_DEVICE virtual void computeSheathBdrFlux(const double *state, BoundaryViscousFluxData &bcFlux) {
     mfem_error("computeSheathBdrFlux is not implemented");

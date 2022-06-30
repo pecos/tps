@@ -97,9 +97,9 @@ class OutletBC : public BoundaryCondition {
   void computeParallelArea();
 
  public:
-  OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *rsolver_, GasMixture *mixture, GasMixture *d_mixture,
-           ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
-           const int _num_equation, int _patchNumber, double _refLength, OutletType _bcType,
+  OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *rsolver_, GasMixture *mixture,
+           GasMixture *d_mixture, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt,
+           const int _dim, const int _num_equation, int _patchNumber, double _refLength, OutletType _bcType,
            const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs, bool axisym);
   ~OutletBC();
 

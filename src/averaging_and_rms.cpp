@@ -338,7 +338,7 @@ void Averaging::addSample_gpu(ParGridFunction *meanUp, ParGridFunction *rms, int
 #endif
 
   MFEM_FORALL(n, Ndof, {
-    double meanVel[gpudata::MAXDIM], vel[gpudata::MAXDIM]; // double meanVel[3], vel[3];
+    double meanVel[gpudata::MAXDIM], vel[gpudata::MAXDIM];  // double meanVel[3], vel[3];
     // double nUp[20];  // NOTE: lets make sure we don't have more than 20 eq.
     // NOTE(kevin): (presumably) marc left this hidden note here..
     double nUp[gpudata::MAXEQUATIONS];

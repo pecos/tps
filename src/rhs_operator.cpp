@@ -97,23 +97,23 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   forcing.DeleteAll();
 
   if (_config.thereIsForcing()) {
-    forcing.Append(new ConstantPressureGradient(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up, gradUp,
-                                                gpuArrays, _config, mixture));
+    forcing.Append(new ConstantPressureGradient(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up,
+                                                gradUp, gpuArrays, _config, mixture));
   }
   if (_config.GetPassiveScalarData().Size() > 0)
     forcing.Append(new PassiveScalar(dim_, num_equation_, _order, intRuleType, intRules, vfes, mixture, U_, Up, gradUp,
                                      gpuArrays, _config));
   if (_config.numSpongeRegions_ > 0) {
     for (int sz = 0; sz < _config.numSpongeRegions_; sz++) {
-      forcing.Append(new SpongeZone(dim_, num_equation_, _order, intRuleType, fluxClass, mixture, intRules, vfes, U_, Up,
-                                    gradUp, gpuArrays, _config, sz));
+      forcing.Append(new SpongeZone(dim_, num_equation_, _order, intRuleType, fluxClass, mixture, intRules, vfes, U_,
+                                    Up, gradUp, gpuArrays, _config, sz));
     }
   }
   if (_config.numHeatSources > 0) {
     for (int s = 0; s < _config.numHeatSources; s++) {
       if (_config.heatSource[s].isEnabled) {
-        forcing.Append(new HeatSource(dim_, num_equation_, _order, intRuleType, _config.heatSource[s], mixture, intRules,
-                                      vfes, U_, Up, gradUp, gpuArrays, _config));
+        forcing.Append(new HeatSource(dim_, num_equation_, _order, intRuleType, _config.heatSource[s], mixture,
+                                      intRules, vfes, U_, Up, gradUp, gpuArrays, _config));
       }
     }
   }
@@ -125,8 +125,8 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
 #ifdef HAVE_MASA
   if (config_.use_mms_) {
     masaForcingIndex_ = forcing.Size();
-    forcing.Append(
-        new MASA_forcings(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up, gradUp, gpuArrays, _config));
+    forcing.Append(new MASA_forcings(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up, gradUp,
+                                     gpuArrays, _config));
   }
 #endif
 
@@ -556,9 +556,8 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
   Fluxes *d_fluxClass = fluxClass;
 
   MFEM_FORALL(n, dof, {
-    double Un[gpudata::MAXEQUATIONS]; // double Un[20];
-    double fluxn[gpudata::MAXEQUATIONS * gpudata::MAXDIM],
-           fvisc[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
+    double Un[gpudata::MAXEQUATIONS];  // double Un[20];
+    double fluxn[gpudata::MAXEQUATIONS * gpudata::MAXDIM], fvisc[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
     double gradUpn[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
     double linVisc;
 
@@ -592,8 +591,7 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
 
     for (int eq = 0; eq < num_equation; eq++) {
       for (int d = 0; d < dim; d++) {
-        d_flux[n + d * dof + eq * dof * dim] = fluxn[eq + d * num_equation]
-                                             - fvisc[eq + d * num_equation];
+        d_flux[n + d * dof + eq * dof * dim] = fluxn[eq + d * num_equation] - fvisc[eq + d * num_equation];
       }
     }
   });
@@ -601,8 +599,8 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
   // ComputeConvectiveFluxes
   Fluxes::convectiveFluxes_hip(x, flux, eqSystem, mixture, vfes->GetNDofs(), dim_, num_equation_);
   if (eqSystem != EULER) {
-    Fluxes::viscousFluxes_hip(x, gradUp, flux, eqSystem, mixture, spaceVaryViscMult, linViscData, vfes->GetNDofs(), dim_,
-                              num_equation_);
+    Fluxes::viscousFluxes_hip(x, gradUp, flux, eqSystem, mixture, spaceVaryViscMult, linViscData, vfes->GetNDofs(),
+                              dim_, num_equation_);
   }
 #endif
 }
@@ -612,7 +610,7 @@ void RHSoperator::updatePrimitives(const Vector &x_in) const {
   RHSoperator::updatePrimitives_hip(Up, &x_in, mixture->GetSpecificHeatRatio(), mixture->GetGasConstant(),
                                     vfes->GetNDofs(), dim_, num_equation_, eqSystem);
 #elif defined(_CUDA_)
-  auto dataUp = Up->Write();   // make sure data is available in GPU
+  auto dataUp = Up->Write();  // make sure data is available in GPU
   auto dataIn = x_in.Read();  // make sure data is available in GPU
 
   const int ndofs = vfes->GetNDofs();
@@ -622,7 +620,7 @@ void RHSoperator::updatePrimitives(const Vector &x_in) const {
 
   MFEM_FORALL(n, ndofs, {
     double state[gpudata::MAXEQUATIONS],
-           prim[gpudata::MAXEQUATIONS]; // double state[20];
+        prim[gpudata::MAXEQUATIONS];  // double state[20];
 
     for (int eq = 0; eq < num_equation; eq++) state[eq] = dataIn[n + eq * ndofs];
     d_mix->GetPrimitivesFromConservatives(state, prim);
@@ -648,9 +646,9 @@ void RHSoperator::updatePrimitives_hip(Vector *Up, const Vector *x_in, const dou
   auto dataIn = x_in->Read();  // make sure data is available in GPU
 
   MFEM_FORALL(n, ndofs, {
-    double state[gpudata::MAXEQUATIONS]; // double state[20];
+    double state[gpudata::MAXEQUATIONS];  // double state[20];
     // MFEM_SHARED double p;
-    double KE[gpudata::MAXDIM]; // double KE[3];
+    double KE[gpudata::MAXDIM];  // double KE[3];
 
     for (int eq = 0; eq < num_equation; eq++) {
       state[eq] = dataIn[n + eq * ndofs];  // loads data into shared memory
@@ -710,7 +708,7 @@ void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceInteg
   const double *d_invM = invMArray.Read();
 
   MFEM_FORALL_2D(el, NE, dof, 1, 1, {
-    MFEM_SHARED double data[gpudata::MAXDOFS * gpudata::MAXEQUATIONS]; // MFEM_SHARED double data[216 * 20];
+    MFEM_SHARED double data[gpudata::MAXDOFS * gpudata::MAXEQUATIONS];  // MFEM_SHARED double data[216 * 20];
 
     int eli = el + elemOffset;
     int offsetInv = d_posDofInvM[2 * eli];

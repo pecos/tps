@@ -628,15 +628,15 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
   Fluxes *d_flux = fluxes;
 
   MFEM_FORALL_2D(el, parallelData->sharedElemsFaces.Size() / 7, maxIntPoints, 1, 1, {
-    double l1[gpudata::MAXDOFS], l2[gpudata::MAXDOFS]; //double l1[216], l2[216];
-    double u1[gpudata::MAXEQUATIONS], u2[gpudata::MAXEQUATIONS]; //double u1[5], u2[5];
-    double gradUp1[gpudata::MAXDIM * gpudata::MAXEQUATIONS], //double gradUp1[3 * 5];
-           gradUp2[gpudata::MAXDIM * gpudata::MAXEQUATIONS], //gradUp2[3 * 5];
-           nor[gpudata::MAXDIM]; //nor[3];
-    double Rflux[gpudata::MAXEQUATIONS], //double Rflux[5];
-           vFlux1[gpudata::MAXDIM * gpudata::MAXEQUATIONS], //vFlux1[3 * 5];
-           vFlux2[gpudata::MAXDIM * gpudata::MAXEQUATIONS]; //vFlux2[3 * 5];
-    int index_i[gpudata::MAXDOFS]; //int index_i[216];
+    double l1[gpudata::MAXDOFS], l2[gpudata::MAXDOFS];            // double l1[216], l2[216];
+    double u1[gpudata::MAXEQUATIONS], u2[gpudata::MAXEQUATIONS];  // double u1[5], u2[5];
+    double gradUp1[gpudata::MAXDIM * gpudata::MAXEQUATIONS],      // double gradUp1[3 * 5];
+        gradUp2[gpudata::MAXDIM * gpudata::MAXEQUATIONS],         // gradUp2[3 * 5];
+        nor[gpudata::MAXDIM];                                     // nor[3];
+    double Rflux[gpudata::MAXEQUATIONS],                          // double Rflux[5];
+        vFlux1[gpudata::MAXDIM * gpudata::MAXEQUATIONS],          // vFlux1[3 * 5];
+        vFlux2[gpudata::MAXDIM * gpudata::MAXEQUATIONS];          // vFlux2[3 * 5];
+    int index_i[gpudata::MAXDOFS];                                // int index_i[216];
 
     const int el1 = d_sharedElemsFaces[0 + el * 7];
     const int numFaces = d_sharedElemsFaces[1 + el * 7];

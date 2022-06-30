@@ -47,7 +47,7 @@ class InletBC : public BoundaryCondition {
  private:
   MPI_Groups *groupsMPI;
 
-  GasMixture *d_mixture_; // used only in the device
+  GasMixture *d_mixture_;  // used only in the device
 
   const InletType inletType_;
 
@@ -90,8 +90,8 @@ class InletBC : public BoundaryCondition {
   virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up);
 
  public:
-  InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *rsolver_, GasMixture *_mixture, GasMixture *d_mixture,
-          ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
+  InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *rsolver_, GasMixture *_mixture,
+          GasMixture *d_mixture, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
           const int _num_equation, int _patchNumber, double _refLength, InletType _bcType,
           const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs, bool axisym);
   ~InletBC();
@@ -120,7 +120,8 @@ class InletBC : public BoundaryCondition {
                        Array<int> &offsetsBoundaryU);
 
 #ifdef _GPU_
-  MFEM_HOST_DEVICE void pluginInputState(const double *inputState, double *u2, const int nvel, const int numActiveSpecies) {
+  MFEM_HOST_DEVICE void pluginInputState(const double *inputState, double *u2, const int nvel,
+                                         const int numActiveSpecies) {
     u2[0] = inputState[0];
     for (int v = 0; v < nvel; v++) u2[1 + v] = inputState[0] * inputState[1 + v];
     if (numActiveSpecies > 0) {

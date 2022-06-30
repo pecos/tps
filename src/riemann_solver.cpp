@@ -87,7 +87,7 @@ void RiemannSolver::ComputeFluxDotN(const Vector &state, const Vector &nor, Vect
 MFEM_HOST_DEVICE void RiemannSolver::ComputeFluxDotN(const double *state, const double *nor, double *fluxN) const {
   const int dim = mixture->GetDimension();
 
-  double fluxes[gpudata::MAXEQUATIONS * gpudata::MAXDIM]; // double fluxes[5 * 3];
+  double fluxes[gpudata::MAXEQUATIONS * gpudata::MAXDIM];  // double fluxes[5 * 3];
   fluxClass->ComputeConvectiveFluxes(state, fluxes);
   for (int eq = 0; eq < num_equation; eq++) {
     fluxN[eq] = 0;
@@ -105,11 +105,12 @@ void RiemannSolver::Eval(const Vector &state1, const Vector &state2, const Vecto
   }
 }
 
-MFEM_HOST_DEVICE void RiemannSolver::Eval(const double *state1, const double *state2, const double *nor, double *flux, bool LF) {
+MFEM_HOST_DEVICE void RiemannSolver::Eval(const double *state1, const double *state2, const double *nor, double *flux,
+                                          bool LF) {
   if (useRoe && !LF) {
     // TODO(kevin): implement MFEM_HOST_DEVICE Eval_Roe.
     printf("Roe RiemannSolver is not implmented for gpu!");
-    //Eval_Roe(state1, state2, nor, flux);
+    // Eval_Roe(state1, state2, nor, flux);
   } else {
     Eval_LF(state1, state2, nor, flux);
   }
@@ -156,8 +157,8 @@ MFEM_HOST_DEVICE void RiemannSolver::Eval_LF(const double *state1, const double 
   // const double maxE = max(maxE1, maxE2);
   const double maxE = fmax(maxE1, maxE2);
 
-  double flux1[gpudata::MAXEQUATIONS]; // double flux1[5];
-  double flux2[gpudata::MAXEQUATIONS]; // double flux2[5];
+  double flux1[gpudata::MAXEQUATIONS];  // double flux1[5];
+  double flux2[gpudata::MAXEQUATIONS];  // double flux2[5];
 
   ComputeFluxDotN(state1, nor, flux1);
   ComputeFluxDotN(state2, nor, flux2);

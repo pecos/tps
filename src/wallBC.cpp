@@ -33,9 +33,9 @@
 
 #include "riemann_solver.hpp"
 
-WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, GasMixture *d_mixture, Equations _eqSystem, Fluxes *_fluxClass,
-               ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
-               const int _num_equation, int _patchNumber, WallType _bcType, const WallData _inputData,
+WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, GasMixture *d_mixture, Equations _eqSystem,
+               Fluxes *_fluxClass, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt,
+               const int _dim, const int _num_equation, int _patchNumber, WallType _bcType, const WallData _inputData,
                const Array<int> &_intPointsElIDBC, const int &_maxIntPoints, bool axisym)
     : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber, 1,
                         axisym),  // so far walls do not require ref. length. Left at 1
@@ -424,8 +424,8 @@ void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const Array<int> &no
     // double shape[216];
     // double Rflux[20], u1[20], u2[20], nor[3], gradUpi[20 * 3];
     // double vF1[20 * 3], vF2[20 * 3];
-    MFEM_SHARED double Fcontrib[gpudata::MAXDOFS * gpudata::MAXEQUATIONS]; // MFEM_SHARED double Fcontrib[216 * 5];
-    double Rflux[gpudata::MAXEQUATIONS]; // double Rflux[5];
+    MFEM_SHARED double Fcontrib[gpudata::MAXDOFS * gpudata::MAXEQUATIONS];  // MFEM_SHARED double Fcontrib[216 * 5];
+    double Rflux[gpudata::MAXEQUATIONS];                                    // double Rflux[5];
 
     const int numFaces = d_wallElems[0 + el_wall * 7];
     bool elemDataRecovered = false;
@@ -531,7 +531,7 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
     double u1[gpudata::MAXEQUATIONS], u2[gpudata::MAXEQUATIONS], nor[gpudata::MAXDIM], Rflux[gpudata::MAXEQUATIONS];
     double vF1[gpudata::MAXEQUATIONS * gpudata::MAXDIM],
 #if defined(_CUDA_)
-           vF2[gpudata::MAXEQUATIONS];
+        vF2[gpudata::MAXEQUATIONS];
 #elif defined(_HIP_)
            vF2[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
 #endif
@@ -615,8 +615,7 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
         // add visc flux contribution
         for (int eq = 0; eq < num_equation; eq++) {
           Rflux[eq] -= 0.5 * vF2[eq];
-          for (int d = 0; d < dim; d++)
-            Rflux[eq] -= 0.5 * vF1[eq + d * num_equation] * nor[d];
+          for (int d = 0; d < dim; d++) Rflux[eq] -= 0.5 * vF1[eq + d * num_equation] * nor[d];
         }
 #elif defined(_HIP_)
         // compute mirror state

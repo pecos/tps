@@ -66,7 +66,8 @@ class RiemannSolver {
                                  bool _useRoe, bool axisym);
 
   void Eval(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux, bool LF = false);
-  MFEM_HOST_DEVICE void Eval(const double *state1, const double *state2, const double *nor, double *flux, bool LF = false);
+  MFEM_HOST_DEVICE void Eval(const double *state1, const double *state2, const double *nor, double *flux,
+                             bool LF = false);
 
   void ComputeFluxDotN(const Vector &state, const Vector &nor, Vector &fluxN);
 

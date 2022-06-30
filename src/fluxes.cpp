@@ -594,7 +594,8 @@ MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const
   }
   // Compute the heavies heat flux.
   // NOTE(kevin): followed the standard sign of heat flux.
-  for (int d = 0; d < dim; d++) normalPrimFlux[numSpecies + nvel] -= k * gradUp[(1 + nvel) + d * num_equation] * bcFlux.normal[d];
+  for (int d = 0; d < dim; d++)
+    normalPrimFlux[numSpecies + nvel] -= k * gradUp[(1 + nvel) + d * num_equation] * bcFlux.normal[d];
   for (int sp = 0; sp < numSpecies; sp++) {
     if (twoTemperature && (sp == numSpecies - 2)) continue;
     normalPrimFlux[numSpecies + nvel] += speciesEnthalpies[sp] * normalPrimFlux[sp];
@@ -658,8 +659,8 @@ void Fluxes::convectiveFluxes_hip(const Vector &x, DenseTensor &flux, const Equa
   double Sc = mixture->GetSchmidtNum();
 
   MFEM_FORALL(n, dof, {
-    double Un[gpudata::MAXEQUATIONS]; // double Un[20];
-    double KE[gpudata::MAXDIM]; // double KE[3];
+    double Un[gpudata::MAXEQUATIONS];  // double Un[20];
+    double KE[gpudata::MAXDIM];        // double KE[3];
     double p;
 
     for (int eq = 0; eq < num_equation; eq++) {
@@ -688,7 +689,7 @@ void Fluxes::convectiveFluxes_hip(const Vector &x, DenseTensor &flux, const Equa
       }
     }
   });
-#endif // _GPU_
+#endif  // _GPU_
 }
 
 void Fluxes::viscousFluxes_hip(const Vector &x, ParGridFunction *gradUp, DenseTensor &flux, const Equations &eqSystem,
