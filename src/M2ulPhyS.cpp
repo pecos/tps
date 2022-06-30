@@ -255,10 +255,26 @@ void M2ulPhyS::initVariables() {
   eqSystem = config.GetEquationSystem();
 
   mixture = NULL;
+#if defined(_CUDA_)
+  GasMixture **d_mixture_tmp;
+  cudaMalloc((void **)&d_mixture_tmp, sizeof(GasMixture **));
+
+  TransportProperties **d_transport_tmp;
+  cudaMalloc((void **)&d_transport_tmp, sizeof(TransportProperties **));
+#elif defined(_HIP_)
+  hipMalloc((void **)&d_mixture, sizeof(DryAir));
+  hipMalloc((void **)&transportPtr, sizeof(DryAirTransport));
+#endif
+
   switch (config.GetWorkingFluid()) {
     case WorkingFluid::DRY_AIR:
       mixture = new DryAir(config, dim, nvel);
       transportPtr = new DryAirTransport(mixture, config);
+#if defined(_CUDA_)
+      gpu::instantiateDeviceMixture<<<1, 1>>>(config.dryAirInput, dim, nvel, d_mixture_tmp);
+#elif defined(_HIP_)
+      gpu::instantiateDeviceMixture<<<1, 1>>>(config.dryAirInput, dim, nvel, d_mixture);
+#endif
       break;
     case WorkingFluid::USER_DEFINED:
       switch (config.GetGasModel()) {
@@ -295,29 +311,12 @@ void M2ulPhyS::initVariables() {
   }
   assert(mixture != NULL);
 #if defined(_CUDA_)
-  GasMixture **d_mixture_tmp;
-  cudaMalloc((void **)&d_mixture_tmp, sizeof(GasMixture **));
-  // instantiateDeviceMixture<<<1, 1>>>(config.workFluid, config.GetEquationSystem(), config.visc_mult, config.bulk_visc,
-  //                                    dim, nvel, d_mixture_tmp);
-  gpu::instantiateDeviceMixture<<<1, 1>>>(config.dryAirInput,
-                                     dim, nvel, d_mixture_tmp);
   cudaMemcpy(&d_mixture, d_mixture_tmp, sizeof(GasMixture *), cudaMemcpyDeviceToHost);
   cudaFree(d_mixture_tmp);
 
-  TransportProperties **d_transport_tmp;
-  cudaMalloc((void **)&d_transport_tmp, sizeof(TransportProperties **));
-  gpu::instantiateDeviceTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(), d_transport_tmp);
   cudaMemcpy(&transportPtr, d_transport_tmp, sizeof(TransportProperties *), cudaMemcpyDeviceToHost);
   cudaFree(d_transport_tmp);
 #elif defined(_HIP_)
-  hipMalloc((void **)&d_mixture, sizeof(DryAir));
-  // instantiateDeviceMixture<<<1, 1>>>(config.workFluid, config.GetEquationSystem(), config.visc_mult, config.bulk_visc,
-  //                                    dim, nvel, d_mixture);
-  gpu::instantiateDeviceMixture<<<1, 1>>>(config.dryAirInput,
-                                     dim, nvel, d_mixture);
-
-  hipMalloc((void **)&transportPtr, sizeof(DryAirTransport));
-  gpu::instantiateDeviceTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(), transportPtr);
 #else
   d_mixture = mixture;
   // d_transport = transportPtr;
