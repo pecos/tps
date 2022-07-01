@@ -138,7 +138,10 @@ class GasMixture {
   // virtual std::map<std::string, int> *getSpeciesMapping() { return NULL; }
   // DenseMatrix *getCompositions() { return &composition_; }
 
-  MFEM_HOST_DEVICE virtual double GetGasParams(int species, GasParams param) const { return 0.0; }
+  MFEM_HOST_DEVICE virtual double GetGasParams(int species, GasParams param) const {
+    printf("GetGasParams not implemented!\n");
+    return 0.0;
+  }
 
   int GetNumConservativeVariables() { return Nconservative; }
   int GetNumPrimitiveVariables() { return Nprimitive; }
@@ -146,7 +149,7 @@ class GasMixture {
   virtual double ComputePressure(const Vector &state,
                                  double *electronPressure = NULL) = 0;  // pressure from conservatives
   MFEM_HOST_DEVICE virtual double ComputePressure(const double *state, double *electronPressure = NULL) const {
-    // mfem_error("ComputePressure not implemented");
+    printf("ComputePressure not implemented");
     return 0;
   }
 
@@ -186,7 +189,7 @@ class GasMixture {
   // Compute the maximum characteristic speed.
   virtual double ComputeMaxCharSpeed(const Vector &state) = 0;
   MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeed(const double *state) const {
-    // mfem_error("ComputeMaxCharSpeed not implemented");
+    printf("ComputeMaxCharSpeed not implemented");
     return 0;
   }
 

@@ -652,25 +652,26 @@ MFEM_HOST_DEVICE double PerfectMixture::computeBackgroundMassDensity(const doubl
 // Additional primitive variables (such as temperature currently) needs to be evaluated every time it is needed.
 // Gradient computation can still keep the same number, while expanding the primitive variables.
 void PerfectMixture::GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit) {
-  Vector n_sp;
-  computeNumberDensities(conserv, n_sp);
-
-  // NOTE: we fix the number density as "necessary" species primitive and
-  // compute its gradient only.
-  // Conversion from grad n to grad X or grad Y will be provided.
-  // Conversion routines will benefit from expanding Up with all X, Y and n.
-  for (int sp = 0; sp < numActiveSpecies; sp++) primit[nvel_ + 2 + sp] = n_sp[sp];
-
-  primit[0] = conserv[0];
-  for (int d = 0; d < nvel_; d++) primit[d + 1] = conserv[d + 1] / conserv[0];
-
-  double T_h, T_e;
-  computeTemperaturesBase(&conserv[0], &n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
-
-  primit[nvel_ + 1] = T_h;
-
-  if (twoTemperature_)  // electron temperature as primitive variable.
-    primit[num_equation - 1] = T_e;
+  // Vector n_sp;
+  // computeNumberDensities(conserv, n_sp);
+  //
+  // // NOTE: we fix the number density as "necessary" species primitive and
+  // // compute its gradient only.
+  // // Conversion from grad n to grad X or grad Y will be provided.
+  // // Conversion routines will benefit from expanding Up with all X, Y and n.
+  // for (int sp = 0; sp < numActiveSpecies; sp++) primit[nvel_ + 2 + sp] = n_sp[sp];
+  //
+  // primit[0] = conserv[0];
+  // for (int d = 0; d < nvel_; d++) primit[d + 1] = conserv[d + 1] / conserv[0];
+  //
+  // double T_h, T_e;
+  // computeTemperaturesBase(&conserv[0], &n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
+  //
+  // primit[nvel_ + 1] = T_h;
+  //
+  // if (twoTemperature_)  // electron temperature as primitive variable.
+  //   primit[num_equation - 1] = T_e;
+  GetPrimitivesFromConservatives(&conserv[0], &primit[0]);
 }
 
 MFEM_HOST_DEVICE void PerfectMixture::GetPrimitivesFromConservatives(const double *conserv, double *primit) {
@@ -696,44 +697,45 @@ MFEM_HOST_DEVICE void PerfectMixture::GetPrimitivesFromConservatives(const doubl
 }
 
 void PerfectMixture::GetConservativesFromPrimitives(const Vector &primit, Vector &conserv) {
-  conserv[0] = primit[0];
-  for (int d = 0; d < nvel_; d++) conserv[d + 1] = primit[d + 1] * primit[0];
-
-  // Convert species rhoY first.
-  for (int sp = 0; sp < numActiveSpecies; sp++) {
-    conserv[nvel_ + 2 + sp] = primit[nvel_ + 2 + sp] * GetGasParams(sp, GasParams::SPECIES_MW);
-  }
-
-  // NOTE: For now, we do not include all species number densities into Up.
-  // This requires us to re-evaluate electron/background-species number density.
-  double n_e = 0.0;
-  if (ambipolar) {
-    n_e = computeAmbipolarElectronNumberDensity(&primit[nvel_ + 2]);
-  } else {
-    n_e = primit[nvel_ + 2 + numSpecies - 2];
-  }
-  double rhoB = computeBackgroundMassDensity(primit[0], &primit[nvel_ + 2], n_e, true);
-  double nB = rhoB / GetGasParams(numSpecies - 1, GasParams::SPECIES_MW);
-
-  if (twoTemperature_) conserv[num_equation - 1] = n_e * molarCV_[numSpecies - 2] * primit[num_equation - 1];
-
-  // compute mixture heat capacity.
-  double totalHeatCapacity = computeHeaviesHeatCapacity(&primit[nvel_ + 2], nB);
-  if (!twoTemperature_) totalHeatCapacity += n_e * molarCV_[numSpecies - 2];
-
-  double totalEnergy = 0.0;
-  for (int d = 0; d < nvel_; d++) totalEnergy += primit[d + 1] * primit[d + 1];
-  totalEnergy *= 0.5 * primit[0];
-  totalEnergy += totalHeatCapacity * primit[nvel_ + 1];
-  if (twoTemperature_) {
-    totalEnergy += conserv[num_equation - 1];
-  }
-
-  for (int sp = 0; sp < numSpecies - 2; sp++) {
-    totalEnergy += primit[nvel_ + 2 + sp] * GetGasParams(sp, GasParams::FORMATION_ENERGY);
-  }
-
-  conserv[nvel_ + 1] = totalEnergy;
+  // conserv[0] = primit[0];
+  // for (int d = 0; d < nvel_; d++) conserv[d + 1] = primit[d + 1] * primit[0];
+  //
+  // // Convert species rhoY first.
+  // for (int sp = 0; sp < numActiveSpecies; sp++) {
+  //   conserv[nvel_ + 2 + sp] = primit[nvel_ + 2 + sp] * GetGasParams(sp, GasParams::SPECIES_MW);
+  // }
+  //
+  // // NOTE: For now, we do not include all species number densities into Up.
+  // // This requires us to re-evaluate electron/background-species number density.
+  // double n_e = 0.0;
+  // if (ambipolar) {
+  //   n_e = computeAmbipolarElectronNumberDensity(&primit[nvel_ + 2]);
+  // } else {
+  //   n_e = primit[nvel_ + 2 + numSpecies - 2];
+  // }
+  // double rhoB = computeBackgroundMassDensity(primit[0], &primit[nvel_ + 2], n_e, true);
+  // double nB = rhoB / GetGasParams(numSpecies - 1, GasParams::SPECIES_MW);
+  //
+  // if (twoTemperature_) conserv[num_equation - 1] = n_e * molarCV_[numSpecies - 2] * primit[num_equation - 1];
+  //
+  // // compute mixture heat capacity.
+  // double totalHeatCapacity = computeHeaviesHeatCapacity(&primit[nvel_ + 2], nB);
+  // if (!twoTemperature_) totalHeatCapacity += n_e * molarCV_[numSpecies - 2];
+  //
+  // double totalEnergy = 0.0;
+  // for (int d = 0; d < nvel_; d++) totalEnergy += primit[d + 1] * primit[d + 1];
+  // totalEnergy *= 0.5 * primit[0];
+  // totalEnergy += totalHeatCapacity * primit[nvel_ + 1];
+  // if (twoTemperature_) {
+  //   totalEnergy += conserv[num_equation - 1];
+  // }
+  //
+  // for (int sp = 0; sp < numSpecies - 2; sp++) {
+  //   totalEnergy += primit[nvel_ + 2 + sp] * GetGasParams(sp, GasParams::FORMATION_ENERGY);
+  // }
+  //
+  // conserv[nvel_ + 1] = totalEnergy;
+  GetConservativesFromPrimitives(&primit[0], &conserv[0]);
 }
 
 MFEM_HOST_DEVICE void PerfectMixture::GetConservativesFromPrimitives(const double *primit, double *conserv) {
@@ -830,19 +832,20 @@ void PerfectMixture::computeSpeciesPrimitives(const Vector &conservedState, Vect
 
 void PerfectMixture::computeNumberDensities(const Vector &conservedState, Vector &n_sp) {
   n_sp.SetSize(numSpecies);
-  n_sp = 0.0;
-
-  double n_e = 0.0;
-  for (int sp = 0; sp < numActiveSpecies; sp++) {
-    n_sp[sp] = conservedState[nvel_ + 2 + sp] / GetGasParams(sp, GasParams::SPECIES_MW);
-  }
-  if (ambipolar) {
-    n_e = computeAmbipolarElectronNumberDensity(&n_sp[0]);
-    n_sp[numSpecies - 2] = n_e;  // Electron species is assumed be to the second to last species.
-  }
-  double rhoB = computeBackgroundMassDensity(conservedState[0], &n_sp[0], n_e, true);
-
-  n_sp[numSpecies - 1] = rhoB / GetGasParams(numSpecies - 1, GasParams::SPECIES_MW);
+  // n_sp = 0.0;
+  //
+  // double n_e = 0.0;
+  // for (int sp = 0; sp < numActiveSpecies; sp++) {
+  //   n_sp[sp] = conservedState[nvel_ + 2 + sp] / GetGasParams(sp, GasParams::SPECIES_MW);
+  // }
+  // if (ambipolar) {
+  //   n_e = computeAmbipolarElectronNumberDensity(&n_sp[0]);
+  //   n_sp[numSpecies - 2] = n_e;  // Electron species is assumed be to the second to last species.
+  // }
+  // double rhoB = computeBackgroundMassDensity(conservedState[0], &n_sp[0], n_e, true);
+  //
+  // n_sp[numSpecies - 1] = rhoB / GetGasParams(numSpecies - 1, GasParams::SPECIES_MW);
+  computeNumberDensities(&conservedState[0], &n_sp[0]);
 }
 
 MFEM_HOST_DEVICE void PerfectMixture::computeNumberDensities(const double *conservedState, double *n_sp) const {
@@ -862,27 +865,28 @@ MFEM_HOST_DEVICE void PerfectMixture::computeNumberDensities(const double *conse
 }
 
 double PerfectMixture::ComputePressureFromPrimitives(const mfem::Vector &Up) {
-  // NOTE: For now, we do not include all species number densities into Up.
-  // This requires us to re-evaluate electron/background-species number density.
-  double n_e = 0.0;
-  if (ambipolar) {
-    n_e = computeAmbipolarElectronNumberDensity(&Up[nvel_ + 2]);
-  } else {
-    n_e = Up[nvel_ + 2 + numSpecies - 2];
-  }
-  double rhoB = computeBackgroundMassDensity(Up[0], &Up[nvel_ + 2], n_e, true);
-  double nB = rhoB / GetGasParams(numSpecies - 1, GasParams::SPECIES_MW);
-
-  double T_h = Up[nvel_ + 1];
-  double T_e;
-  if (twoTemperature_) {
-    T_e = Up[num_equation - 1];
-  } else {
-    T_e = Up[nvel_ + 1];
-  }
-  double p = computePressureBase(&Up[nvel_ + 2], n_e, nB, T_h, T_e);
-
-  return p;
+  // // NOTE: For now, we do not include all species number densities into Up.
+  // // This requires us to re-evaluate electron/background-species number density.
+  // double n_e = 0.0;
+  // if (ambipolar) {
+  //   n_e = computeAmbipolarElectronNumberDensity(&Up[nvel_ + 2]);
+  // } else {
+  //   n_e = Up[nvel_ + 2 + numSpecies - 2];
+  // }
+  // double rhoB = computeBackgroundMassDensity(Up[0], &Up[nvel_ + 2], n_e, true);
+  // double nB = rhoB / GetGasParams(numSpecies - 1, GasParams::SPECIES_MW);
+  //
+  // double T_h = Up[nvel_ + 1];
+  // double T_e;
+  // if (twoTemperature_) {
+  //   T_e = Up[num_equation - 1];
+  // } else {
+  //   T_e = Up[nvel_ + 1];
+  // }
+  // double p = computePressureBase(&Up[nvel_ + 2], n_e, nB, T_h, T_e);
+  //
+  // return p;
+  return ComputePressureFromPrimitives(&Up[0]);
 }
 
 MFEM_HOST_DEVICE double PerfectMixture::ComputePressureFromPrimitives(const double *Up) {
@@ -911,18 +915,19 @@ MFEM_HOST_DEVICE double PerfectMixture::ComputePressureFromPrimitives(const doub
 
 // NOTE: This is almost the same as GetPrimitivesFromConservatives except storing other primitive variables.
 double PerfectMixture::ComputePressure(const Vector &state, double *electronPressure) {
-  Vector n_sp;
-  computeNumberDensities(state, n_sp);
-
-  double T_h, T_e;
-  computeTemperaturesBase(&state[0], &n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
-
-  if (electronPressure != NULL) *electronPressure = n_sp(numSpecies - 2) * UNIVERSALGASCONSTANT * T_e;
-
-  // NOTE: compute pressure.
-  double p = computePressureBase(&n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
-
-  return p;
+  // Vector n_sp;
+  // computeNumberDensities(state, n_sp);
+  //
+  // double T_h, T_e;
+  // computeTemperaturesBase(&state[0], &n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
+  //
+  // if (electronPressure != NULL) *electronPressure = n_sp(numSpecies - 2) * UNIVERSALGASCONSTANT * T_e;
+  //
+  // // NOTE: compute pressure.
+  // double p = computePressureBase(&n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
+  //
+  // return p;
+  return ComputePressure(&state[0], electronPressure);
 }
 
 MFEM_HOST_DEVICE double PerfectMixture::ComputePressure(const double *state, double *electronPressure) const {
@@ -1016,13 +1021,14 @@ bool PerfectMixture::StateIsPhysical(const Vector &state) {
 
 // NOTE: this routine only return heavy-species temperature. Need name-change.
 double PerfectMixture::ComputeTemperature(const Vector &state) {
-  Vector n_sp;
-  computeNumberDensities(state, n_sp);
-
-  double T_h, T_e;
-  computeTemperaturesBase(&state[0], &n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
-
-  return T_h;
+  // Vector n_sp;
+  // computeNumberDensities(state, n_sp);
+  //
+  // double T_h, T_e;
+  // computeTemperaturesBase(&state[0], &n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
+  //
+  // return T_h;
+  return ComputeTemperature(&state[0]);
 }
 
 // NOTE: this routine only return heavy-species temperature. Need name-change.
@@ -1071,16 +1077,17 @@ MFEM_HOST_DEVICE void PerfectMixture::computeTemperaturesBase(const double *cons
 void PerfectMixture::computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies) {
   speciesEnthalpies.SetSize(numSpecies);
 
-  Vector n_sp;
-  computeNumberDensities(state, n_sp);
-
-  double T_h, T_e;
-  computeTemperaturesBase(&state[0], &n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
-
-  for (int sp = 0; sp < numSpecies; sp++) {
-    double temp = (sp == numSpecies - 2) ? T_e : T_h;
-    speciesEnthalpies(sp) = n_sp[sp] * (molarCP_[sp] * temp + GetGasParams(sp, GasParams::FORMATION_ENERGY));
-  }
+  // Vector n_sp;
+  // computeNumberDensities(state, n_sp);
+  //
+  // double T_h, T_e;
+  // computeTemperaturesBase(&state[0], &n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
+  //
+  // for (int sp = 0; sp < numSpecies; sp++) {
+  //   double temp = (sp == numSpecies - 2) ? T_e : T_h;
+  //   speciesEnthalpies(sp) = n_sp[sp] * (molarCP_[sp] * temp + GetGasParams(sp, GasParams::FORMATION_ENERGY));
+  // }
+  computeSpeciesEnthalpies(&state[0], &speciesEnthalpies[0]);
 
   return;
 }
@@ -1235,19 +1242,20 @@ MFEM_HOST_DEVICE double PerfectMixture::computeSpeedOfSoundBase(const double *n_
 
 // Compute the maximum characteristic speed.
 double PerfectMixture::ComputeMaxCharSpeed(const Vector &state) {
-  const double den = state(0);
-  const Vector den_vel(state.GetData() + 1, nvel_);
-
-  double den_vel2 = 0;
-  for (int d = 0; d < nvel_; d++) {
-    den_vel2 += den_vel(d) * den_vel(d);
-  }
-  den_vel2 /= den;
-
-  const double sound = ComputeSpeedOfSound(state, false);
-  const double vel = sqrt(den_vel2 / den);
-
-  return vel + sound;
+  // const double den = state(0);
+  // const Vector den_vel(state.GetData() + 1, nvel_);
+  //
+  // double den_vel2 = 0;
+  // for (int d = 0; d < nvel_; d++) {
+  //   den_vel2 += den_vel(d) * den_vel(d);
+  // }
+  // den_vel2 /= den;
+  //
+  // const double sound = ComputeSpeedOfSound(state, false);
+  // const double vel = sqrt(den_vel2 / den);
+  //
+  // return vel + sound;
+  return ComputeMaxCharSpeed(&state[0]);
 }
 
 MFEM_HOST_DEVICE double PerfectMixture::ComputeMaxCharSpeed(const double *state) {
@@ -1267,32 +1275,33 @@ MFEM_HOST_DEVICE double PerfectMixture::ComputeMaxCharSpeed(const double *state)
 }
 
 double PerfectMixture::ComputeSpeedOfSound(const mfem::Vector &Uin, bool primitive) {
-  if (primitive) {
-    double n_e = 0.0;
-    if (ambipolar) {
-      n_e = computeAmbipolarElectronNumberDensity(&Uin[nvel_ + 2]);
-    } else {
-      n_e = Uin[nvel_ + 2 + numSpecies - 2];
-    }
-    double rhoB = computeBackgroundMassDensity(Uin[0], &Uin[nvel_ + 2], n_e, true);
-    double nB = rhoB / GetGasParams(numSpecies - 1, GasParams::SPECIES_MW);
-
-    double T_e = (twoTemperature_) ? Uin[num_equation - 1] : Uin[nvel_ + 1];
-    double p = computePressureBase(&Uin[nvel_ + 2], n_e, nB, Uin[nvel_ + 1], T_e);
-
-    return computeSpeedOfSoundBase(&Uin[nvel_ + 2], nB, Uin[0], p);
-
-  } else {
-    Vector n_sp;
-    computeNumberDensities(Uin, n_sp);
-
-    double T_h, T_e;
-    computeTemperaturesBase(&Uin[0], &n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
-
-    double p = computePressureBase(&n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
-
-    return computeSpeedOfSoundBase(&n_sp[0], n_sp[numSpecies - 1], Uin[0], p);
-  }
+  // if (primitive) {
+  //   double n_e = 0.0;
+  //   if (ambipolar) {
+  //     n_e = computeAmbipolarElectronNumberDensity(&Uin[nvel_ + 2]);
+  //   } else {
+  //     n_e = Uin[nvel_ + 2 + numSpecies - 2];
+  //   }
+  //   double rhoB = computeBackgroundMassDensity(Uin[0], &Uin[nvel_ + 2], n_e, true);
+  //   double nB = rhoB / GetGasParams(numSpecies - 1, GasParams::SPECIES_MW);
+  //
+  //   double T_e = (twoTemperature_) ? Uin[num_equation - 1] : Uin[nvel_ + 1];
+  //   double p = computePressureBase(&Uin[nvel_ + 2], n_e, nB, Uin[nvel_ + 1], T_e);
+  //
+  //   return computeSpeedOfSoundBase(&Uin[nvel_ + 2], nB, Uin[0], p);
+  //
+  // } else {
+  //   Vector n_sp;
+  //   computeNumberDensities(Uin, n_sp);
+  //
+  //   double T_h, T_e;
+  //   computeTemperaturesBase(&Uin[0], &n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
+  //
+  //   double p = computePressureBase(&n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
+  //
+  //   return computeSpeedOfSoundBase(&n_sp[0], n_sp[numSpecies - 1], Uin[0], p);
+  // }
+  return ComputeSpeedOfSound(&Uin[0], primitive);
 }
 
 MFEM_HOST_DEVICE double PerfectMixture::ComputeSpeedOfSound(const double *Uin, bool primitive) {
@@ -1452,75 +1461,76 @@ void PerfectMixture::computeStagnantStateWithTemp(const mfem::Vector &stateIn, c
 // pressure is p.
 void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::Vector &stateOut, const double &p,
                                              bool modifyElectronEnergy) {
-  // will change the total energy to adjust to p
-  stateOut.SetSize(num_equation);
-  stateOut = stateIn;
-
-  // number densities
-  Vector n_sp(numSpecies);
-  computeNumberDensities(stateIn, n_sp);
-
-  double Th = 0., pe = 0.0;
-  if (twoTemperature_ && (!modifyElectronEnergy)) {
-    double Xeps = 1.0e-30;  // To avoid dividing by zero.
-    double Te = stateIn(num_equation - 1) / (n_sp(numSpecies - 2) + Xeps) / molarCV_[numSpecies - 2];
-    pe = n_sp(numSpecies - 2) * UNIVERSALGASCONSTANT * Te;
-  }
-
-  for (int sp = 0; sp < numSpecies; sp++) {
-    if (twoTemperature_ && (!modifyElectronEnergy) && (sp == numSpecies - 2)) continue;
-    Th += n_sp(sp);
-  }
-  Th = (p - pe) / (Th * UNIVERSALGASCONSTANT);
-
-  // compute total energy with the modified temperature of heavies
-  double totalHeatCapacity = computeHeaviesHeatCapacity(&n_sp[0], n_sp[numSpecies - 1]);
-  // if (!twoTemperature_) totalHeatCapacity += n_sp[numSpecies - 2] * molarCV_(numSpecies - 2);
-  double rE = totalHeatCapacity * Th;
-  // if (twoTemperature_) rE += stateIn(num_equation - 1);
-
-  double electronEnergy = 0.0;
-  if (twoTemperature_) {
-    electronEnergy =
-        (modifyElectronEnergy) ? n_sp[numSpecies - 2] * molarCV_[numSpecies - 2] * Th : stateIn(num_equation - 1);
-    stateOut(num_equation - 1) = electronEnergy;
-  } else {
-    electronEnergy = n_sp[numSpecies - 2] * molarCV_[numSpecies - 2] * Th;
-  }
-  rE += electronEnergy;
-
-  for (int d = 0; d < nvel_; d++) rE += 0.5 * stateIn[d + 1] * stateIn[d + 1] / stateIn[0];
-
-  // double nB = stateIn(0);  // background species
-  // for (int sp = 0; sp < numActiveSpecies; sp++) nB -= stateIn(2 + nvel_ + sp);
+  // // will change the total energy to adjust to p
+  // stateOut.SetSize(num_equation);
+  // stateOut = stateIn;
   //
-  // if (ambipolar) nB -= ne * gasParams(numSpecies - 2, GasParams::SPECIES_MW);
-  // nB /= gasParams(numSpecies - 1, GasParams::SPECIES_MW);
+  // // number densities
+  // Vector n_sp(numSpecies);
+  // computeNumberDensities(stateIn, n_sp);
   //
-  // double Th = 0., Te = 0.;
-  // if (twoTemperature) {
-  //   Te = stateIn(num_equation - 1) / ne / molarCV_(numSpecies - 2);
-  //   double pe = stateIn(2 + nvel_ + numSpecies - 2) / GetGasParams(numSpecies - 2, GasParams::SPECIES_MW) *
-  //               UNIVERSALGASCONSTANT * Te;
-  //
-  //   for (int sp = 0; sp < numActiveSpecies; sp++) Th += n_s(sp);
-  //   Th += nB;
-  //   Th = (p - pe) / (Th * UNIVERSALGASCONSTANT);
-  // } else {
-  //   for (int sp = 0; sp < numActiveSpecies; sp++) Th += stateIn(2 + nvel_ + sp) / gasParams(sp,
-  //   GasParams::SPECIES_MW); if (ambipolar) Th += ne; Th += nB; Th = p / (Th * UNIVERSALGASCONSTANT);
+  // double Th = 0., pe = 0.0;
+  // if (twoTemperature_ && (!modifyElectronEnergy)) {
+  //   double Xeps = 1.0e-30;  // To avoid dividing by zero.
+  //   double Te = stateIn(num_equation - 1) / (n_sp(numSpecies - 2) + Xeps) / molarCV_[numSpecies - 2];
+  //   pe = n_sp(numSpecies - 2) * UNIVERSALGASCONSTANT * Te;
   // }
   //
+  // for (int sp = 0; sp < numSpecies; sp++) {
+  //   if (twoTemperature_ && (!modifyElectronEnergy) && (sp == numSpecies - 2)) continue;
+  //   Th += n_sp(sp);
+  // }
+  // Th = (p - pe) / (Th * UNIVERSALGASCONSTANT);
+  //
   // // compute total energy with the modified temperature of heavies
-  // double rE = 0.;
-  // for (int sp = 0; sp < numActiveSpecies; sp++) rE += n_s(sp) * molarCV_(sp) * Th;
-  // if (twoTemperature) rE += ne * molarCV_(numSpecies - 2) * Te;
-  // rE += nB * molarCV_(numSpecies - 1) * Th;
-
-  // Kevin: added formation energies.
-  for (int sp = 0; sp < numSpecies - 2; sp++) rE += n_sp(sp) * GetGasParams(sp, GasParams::FORMATION_ENERGY);
-
-  stateOut(1 + nvel_) = rE;
+  // double totalHeatCapacity = computeHeaviesHeatCapacity(&n_sp[0], n_sp[numSpecies - 1]);
+  // // if (!twoTemperature_) totalHeatCapacity += n_sp[numSpecies - 2] * molarCV_(numSpecies - 2);
+  // double rE = totalHeatCapacity * Th;
+  // // if (twoTemperature_) rE += stateIn(num_equation - 1);
+  //
+  // double electronEnergy = 0.0;
+  // if (twoTemperature_) {
+  //   electronEnergy =
+  //       (modifyElectronEnergy) ? n_sp[numSpecies - 2] * molarCV_[numSpecies - 2] * Th : stateIn(num_equation - 1);
+  //   stateOut(num_equation - 1) = electronEnergy;
+  // } else {
+  //   electronEnergy = n_sp[numSpecies - 2] * molarCV_[numSpecies - 2] * Th;
+  // }
+  // rE += electronEnergy;
+  //
+  // for (int d = 0; d < nvel_; d++) rE += 0.5 * stateIn[d + 1] * stateIn[d + 1] / stateIn[0];
+  //
+  // // double nB = stateIn(0);  // background species
+  // // for (int sp = 0; sp < numActiveSpecies; sp++) nB -= stateIn(2 + nvel_ + sp);
+  // //
+  // // if (ambipolar) nB -= ne * gasParams(numSpecies - 2, GasParams::SPECIES_MW);
+  // // nB /= gasParams(numSpecies - 1, GasParams::SPECIES_MW);
+  // //
+  // // double Th = 0., Te = 0.;
+  // // if (twoTemperature) {
+  // //   Te = stateIn(num_equation - 1) / ne / molarCV_(numSpecies - 2);
+  // //   double pe = stateIn(2 + nvel_ + numSpecies - 2) / GetGasParams(numSpecies - 2, GasParams::SPECIES_MW) *
+  // //               UNIVERSALGASCONSTANT * Te;
+  // //
+  // //   for (int sp = 0; sp < numActiveSpecies; sp++) Th += n_s(sp);
+  // //   Th += nB;
+  // //   Th = (p - pe) / (Th * UNIVERSALGASCONSTANT);
+  // // } else {
+  // //   for (int sp = 0; sp < numActiveSpecies; sp++) Th += stateIn(2 + nvel_ + sp) / gasParams(sp,
+  // //   GasParams::SPECIES_MW); if (ambipolar) Th += ne; Th += nB; Th = p / (Th * UNIVERSALGASCONSTANT);
+  // // }
+  // //
+  // // // compute total energy with the modified temperature of heavies
+  // // double rE = 0.;
+  // // for (int sp = 0; sp < numActiveSpecies; sp++) rE += n_s(sp) * molarCV_(sp) * Th;
+  // // if (twoTemperature) rE += ne * molarCV_(numSpecies - 2) * Te;
+  // // rE += nB * molarCV_(numSpecies - 1) * Th;
+  //
+  // // Kevin: added formation energies.
+  // for (int sp = 0; sp < numSpecies - 2; sp++) rE += n_sp(sp) * GetGasParams(sp, GasParams::FORMATION_ENERGY);
+  //
+  // stateOut(1 + nvel_) = rE;
+  modifyEnergyForPressure(&stateIn, &stateOut, p, modifyElectronEnergy);
 }
 
 MFEM_HOST_DEVICE void PerfectMixture::modifyEnergyForPressure(const double *stateIn, double *stateOut, const double &p,
@@ -1675,38 +1685,39 @@ void PerfectMixture::computeElectronPressureGrad(const double n_e, const double 
 // For air plasma, we will need specific reaction inputs.
 // We may need to move this to rather chemistry class.
 void PerfectMixture::computeSheathBdrFlux(const Vector &state, BoundaryViscousFluxData &bcFlux) {
-  Vector n_sp(numSpecies);
-  computeNumberDensities(state, n_sp);
-
-  double T_h, T_e;
-  computeTemperaturesBase(&state[0], &n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
-
-  for (int sp = 0; sp < numSpecies; sp++) bcFlux.primFlux[sp] = 0.0;
-
-  // Compute Bohm velocity for positive ions.
-  for (int sp = 0; sp < numSpecies; sp++) {
-    double Zsp = GetGasParams(sp, GasParams::SPECIES_CHARGES);
-    if (Zsp > 0.0) {
-      double msp = GetGasParams(sp, GasParams::SPECIES_MW);
-      double VB = sqrt((T_h + Zsp * T_e) * UNIVERSALGASCONSTANT / msp);
-      // TODO(kevin): need to check the sign (out of wall or into the wall)
-      bcFlux.primFlux[sp] = VB;
-      bcFlux.primFlux[numSpecies - 2] += Zsp * n_sp(sp) * VB;
-      bcFlux.primFlux[numSpecies - 1] -= msp * n_sp(sp) * VB;  // fully catalytic wall.
-    }
-  }
-  bcFlux.primFlux[numSpecies - 2] /= n_sp(numSpecies - 2);
-  bcFlux.primFlux[numSpecies - 1] -=
-      GetGasParams(numSpecies - 2, GasParams::SPECIES_MW) * n_sp(numSpecies - 2) * bcFlux.primFlux[numSpecies - 2];
-  bcFlux.primFlux[numSpecies - 1] /= GetGasParams(numSpecies - 1, GasParams::SPECIES_MW) * n_sp(numSpecies - 1);
-
-  if (twoTemperature_) {
-    double vTe = sqrt(8.0 * UNIVERSALGASCONSTANT * T_e / PI / GetGasParams(numSpecies - 2, GasParams::SPECIES_MW));
-    double gamma = -log(4.0 / vTe * bcFlux.primFlux[numSpecies - 2]);
-
-    bcFlux.primFlux[numSpecies + nvel_ + 1] =
-        bcFlux.primFlux[numSpecies - 2] * (gamma + 2.0) * n_sp(numSpecies - 2) * UNIVERSALGASCONSTANT * T_e;
-  }
+  // Vector n_sp(numSpecies);
+  // computeNumberDensities(state, n_sp);
+  //
+  // double T_h, T_e;
+  // computeTemperaturesBase(&state[0], &n_sp[0], n_sp[numSpecies - 2], n_sp[numSpecies - 1], T_h, T_e);
+  //
+  // for (int sp = 0; sp < numSpecies; sp++) bcFlux.primFlux[sp] = 0.0;
+  //
+  // // Compute Bohm velocity for positive ions.
+  // for (int sp = 0; sp < numSpecies; sp++) {
+  //   double Zsp = GetGasParams(sp, GasParams::SPECIES_CHARGES);
+  //   if (Zsp > 0.0) {
+  //     double msp = GetGasParams(sp, GasParams::SPECIES_MW);
+  //     double VB = sqrt((T_h + Zsp * T_e) * UNIVERSALGASCONSTANT / msp);
+  //     // TODO(kevin): need to check the sign (out of wall or into the wall)
+  //     bcFlux.primFlux[sp] = VB;
+  //     bcFlux.primFlux[numSpecies - 2] += Zsp * n_sp(sp) * VB;
+  //     bcFlux.primFlux[numSpecies - 1] -= msp * n_sp(sp) * VB;  // fully catalytic wall.
+  //   }
+  // }
+  // bcFlux.primFlux[numSpecies - 2] /= n_sp(numSpecies - 2);
+  // bcFlux.primFlux[numSpecies - 1] -=
+  //     GetGasParams(numSpecies - 2, GasParams::SPECIES_MW) * n_sp(numSpecies - 2) * bcFlux.primFlux[numSpecies - 2];
+  // bcFlux.primFlux[numSpecies - 1] /= GetGasParams(numSpecies - 1, GasParams::SPECIES_MW) * n_sp(numSpecies - 1);
+  //
+  // if (twoTemperature_) {
+  //   double vTe = sqrt(8.0 * UNIVERSALGASCONSTANT * T_e / PI / GetGasParams(numSpecies - 2, GasParams::SPECIES_MW));
+  //   double gamma = -log(4.0 / vTe * bcFlux.primFlux[numSpecies - 2]);
+  //
+  //   bcFlux.primFlux[numSpecies + nvel_ + 1] =
+  //       bcFlux.primFlux[numSpecies - 2] * (gamma + 2.0) * n_sp(numSpecies - 2) * UNIVERSALGASCONSTANT * T_e;
+  // }
+  computeSheathBdrFlux(&state[0], bcFlux);
 }
 
 MFEM_HOST_DEVICE void PerfectMixture::computeSheathBdrFlux(const double *state, BoundaryViscousFluxData &bcFlux) {
