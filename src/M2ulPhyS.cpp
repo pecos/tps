@@ -2175,7 +2175,7 @@ void M2ulPhyS::parseSpeciesInputs() {
       int paramIdx = 0;  // new species index.
       int targetIdx;
       for (int sp = 0; sp < config.numSpecies; sp++) {  // input file species index.
-        if (sp == config.backgroundInputIndex - 1) {
+        if (sp == config.backgroundIndex - 1) {
           targetIdx = config.numSpecies - 1;
         } else if (inputSpeciesNames[sp] == "E") {
           targetIdx = config.numSpecies - 2;
@@ -2187,8 +2187,10 @@ void M2ulPhyS::parseSpeciesInputs() {
         config.speciesMapping[inputSpeciesNames[sp]] = targetIdx;
         config.speciesNames[targetIdx] = inputSpeciesNames[sp];
         config.mixtureToInputMap[targetIdx] = sp;
-        std::cout << "name, input index, mixture index: " << config.speciesNames[targetIdx] << ", " << sp << ", " << targetIdx
-                  << std::endl;
+        if (mpi.Root()) {
+          std::cout << "name, input index, mixture index: " << config.speciesNames[targetIdx] << ", " << sp << ", " << targetIdx
+                    << std::endl;
+        }
 
         for (int param = 0; param < GasParams::NUM_GASPARAMS; param++)
           config.gasParams(targetIdx, param) = inputGasParams(sp, param);
