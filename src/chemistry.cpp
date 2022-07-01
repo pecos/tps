@@ -45,7 +45,7 @@ Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : mixture_(m
 
   model_ = config.GetChemistryModel();
 
-  mixtureToInputMap_ = mixture->getMixtureToInputMap();
+  // mixtureToInputMap_ = mixture->getMixtureToInputMap();
   speciesMapping_ = mixture->getSpeciesMapping();
   electronIndex_ = (speciesMapping_->count("E")) ? (*speciesMapping_)["E"] : -1;
 
@@ -64,9 +64,9 @@ Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : mixture_(m
 
   for (int r = 0; r < numReactions_; r++) {
     for (int mixSp = 0; mixSp < numSpecies_; mixSp++) {
-      int inputSp = (*mixtureToInputMap_)[mixSp];
-      reactantStoich_(mixSp, r) = config.reactantStoich(inputSp, r);
-      productStoich_(mixSp, r) = config.productStoich(inputSp, r);
+      // int inputSp = (*mixtureToInputMap_)[mixSp];
+      reactantStoich_(mixSp, r) = config.reactantStoich(mixSp, r);
+      productStoich_(mixSp, r) = config.productStoich(mixSp, r);
     }
 
     // check conservations.
@@ -91,9 +91,9 @@ Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : mixture_(m
       // mass conservation. (already ensured with atom but checking again.)
       double reactMass = 0.0, prodMass = 0.0;
       for (int sp = 0; sp < numSpecies_; sp++) {
-        int inputSp = (*mixtureToInputMap_)[sp];
-        reactMass += react(inputSp) * mixture->GetGasParams(sp, SPECIES_MW);
-        prodMass += product(inputSp) * mixture->GetGasParams(sp, SPECIES_MW);
+        // int inputSp = (*mixtureToInputMap_)[sp];
+        reactMass += react(sp) * mixture->GetGasParams(sp, SPECIES_MW);
+        prodMass += product(sp) * mixture->GetGasParams(sp, SPECIES_MW);
       }
       // This may be too strict..
       if (abs(reactMass - prodMass) > 1.0e-15) {
@@ -106,9 +106,9 @@ Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : mixture_(m
       // TODO(kevin): this will need an adjustion when radiation comes into play.
       double reactEnergy = 0.0, prodEnergy = 0.0;
       for (int sp = 0; sp < numSpecies_; sp++) {
-        int inputSp = (*mixtureToInputMap_)[sp];
-        reactEnergy += react(inputSp) * mixture->GetGasParams(sp, FORMATION_ENERGY);
-        prodEnergy += product(inputSp) * mixture->GetGasParams(sp, FORMATION_ENERGY);
+        // int inputSp = (*mixtureToInputMap_)[sp];
+        reactEnergy += react(sp) * mixture->GetGasParams(sp, FORMATION_ENERGY);
+        prodEnergy += product(sp) * mixture->GetGasParams(sp, FORMATION_ENERGY);
       }
       // This may be too strict..
       if (reactEnergy + reactionEnergies_(r) != prodEnergy) {

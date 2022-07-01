@@ -542,6 +542,8 @@ PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim, int nvel) :
       twoTemperature_ = _runfile.IsTwoTemperature();
     }
 
+    speciesMapping_[_runfile.speciesNames[sp]] = sp;
+
     for (int param = 0; param < GasParams::NUM_GASPARAMS; param++)
       gasParams(sp, param) = _runfile.gasParams(sp, param);
   }

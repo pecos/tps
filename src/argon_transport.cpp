@@ -443,11 +443,11 @@ ArgonMixtureTransport::ArgonMixtureTransport(GasMixture *_mixture, RunConfigurat
   }
 
   composition_.SetSize(numSpecies, numAtoms_);
-  mixtureToInputMap_ = mixture->getMixtureToInputMap();
+  // mixtureToInputMap_ = mixture->getMixtureToInputMap();
   for (int sp = 0; sp < numSpecies; sp++) {
-    int inputSp = (*mixtureToInputMap_)[sp];
+    // int inputSp = (*mixtureToInputMap_)[sp];
     for (int a = 0; a < numAtoms_; a++) {
-      composition_(sp, a) = _runfile.speciesComposition(inputSp, a);
+      composition_(sp, a) = _runfile.speciesComposition(sp, a);
     }
   }
 
@@ -493,7 +493,8 @@ void ArgonMixtureTransport::identifySpeciesType() {
         if (argonMonomer) {
           speciesType_[sp] = AR;
         } else {
-          std::string name = speciesNames_[(*mixtureToInputMap_)[sp]];
+          // std::string name = speciesNames_[(*mixtureToInputMap_)[sp]];
+          std::string name = speciesNames_[sp];
           grvy_printf(GRVY_ERROR, "The atom composition of species %s is not supported by ArgonMixtureTransport! \n",
                       name.c_str());
           exit(-1);
@@ -511,13 +512,15 @@ void ArgonMixtureTransport::identifySpeciesType() {
       if (electron) {
         speciesType_[sp] = ELECTRON;
       } else {
-        std::string name = speciesNames_[(*mixtureToInputMap_)[sp]];
+        // std::string name = speciesNames_[(*mixtureToInputMap_)[sp]];
+        std::string name = speciesNames_[sp];
         grvy_printf(GRVY_ERROR, "The atom composition of species %s is not supported by ArgonMixtureTransport! \n",
                     name.c_str());
         exit(-1);
       }
     } else {
-      std::string name = speciesNames_[(*mixtureToInputMap_)[sp]];
+      // std::string name = speciesNames_[(*mixtureToInputMap_)[sp]];
+      std::string name = speciesNames_[sp];
       grvy_printf(GRVY_ERROR, "The atom composition of species %s is not supported by ArgonMixtureTransport! \n",
                   name.c_str());
       exit(-1);
@@ -527,7 +530,8 @@ void ArgonMixtureTransport::identifySpeciesType() {
   // Check all species are identified.
   for (int sp = 0; sp < numSpecies; sp++) {
     if (speciesType_[sp] == NONE_ARGSPCS) {
-      std::string name = speciesNames_[(*mixtureToInputMap_)[sp]];
+      // std::string name = speciesNames_[(*mixtureToInputMap_)[sp]];
+      std::string name = speciesNames_[sp];
       grvy_printf(GRVY_ERROR, "The species %s is not identified in ArgonMixtureTransport! \n", name.c_str());
       exit(-1);
     }
@@ -558,8 +562,10 @@ void ArgonMixtureTransport::identifyCollisionType() {
                    ((speciesType_[spI] == ELECTRON) && (speciesType_[spJ] == AR))) {
           collisionIndex_[spI][spJ] = AR_E;
         } else {
-          std::string name1 = speciesNames_[(*mixtureToInputMap_)[spI]];
-          std::string name2 = speciesNames_[(*mixtureToInputMap_)[spJ]];
+          // std::string name1 = speciesNames_[(*mixtureToInputMap_)[spI]];
+          // std::string name2 = speciesNames_[(*mixtureToInputMap_)[spJ]];
+          std::string name1 = speciesNames_[spI];
+          std::string name2 = speciesNames_[spJ];
           grvy_printf(GRVY_ERROR, "%s-%s is not supported in ArgonMixtureTransport! \n", name1.c_str(), name2.c_str());
           exit(-1);
         }
@@ -571,8 +577,10 @@ void ArgonMixtureTransport::identifyCollisionType() {
   for (int spI = 0; spI < numSpecies; spI++) {
     for (int spJ = spI; spJ < numSpecies; spJ++) {
       if (collisionIndex_[spI][spJ] == NONE_ARGCOLL) {
-        std::string name1 = speciesNames_[(*mixtureToInputMap_)[spI]];
-        std::string name2 = speciesNames_[(*mixtureToInputMap_)[spJ]];
+        // std::string name1 = speciesNames_[(*mixtureToInputMap_)[spI]];
+        // std::string name2 = speciesNames_[(*mixtureToInputMap_)[spJ]];
+        std::string name1 = speciesNames_[spI];
+        std::string name2 = speciesNames_[spJ];
         grvy_printf(GRVY_ERROR, "%s-%s is not initialized in ArgonMixtureTransport! \n", name1.c_str(), name2.c_str());
         exit(-1);
       }

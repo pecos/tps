@@ -409,12 +409,12 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
 
     int numActiveSpecies_ = mixture->GetNumActiveSpecies();
     if (numActiveSpecies_ > 0) {  // read species input state for multi-component flow.
-      std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
+      // std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
       // NOTE: input Up will always contain 3 velocity components.
       for (int sp = 0; sp < numActiveSpecies_; sp++) {
-        int inputIndex = (*mixtureToInputMap)[sp];
+        // int inputIndex = (*mixtureToInputMap)[sp];
         // store species density into inputState in the order of mixture-sorted index.
-        conserved[dim + 2 + sp] = szData.targetUp[0] * szData.targetUp[5 + inputIndex];
+        conserved[dim + 2 + sp] = szData.targetUp[0] * szData.targetUp[5 + sp];
       }
     }
 

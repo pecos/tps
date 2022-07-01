@@ -409,8 +409,8 @@ void M2ulPhyS::initVariables() {
       // Only for NS_PASSIVE.
       if ((eqSystem == NS_PASSIVE) && (sp == 1)) break;
 
-      int inputSpeciesIndex = mixture->getInputIndexOf(sp);
-      std::string speciesName = config.speciesNames[inputSpeciesIndex];
+      // int inputSpeciesIndex = mixture->getInputIndexOf(sp);
+      std::string speciesName = config.speciesNames[sp];
       ioData.registerIOVar("/meanSolution", "mean-Y" + speciesName, sp + nvel + 2);
     }
 
@@ -1040,8 +1040,8 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     // Only for NS_PASSIVE.
     if ((eqSystem == NS_PASSIVE) && (sp == 1)) break;
 
-    int inputSpeciesIndex = mixture->getInputIndexOf(sp);
-    std::string speciesName = config.speciesNames[inputSpeciesIndex];
+    // int inputSpeciesIndex = mixture->getInputIndexOf(sp);
+    std::string speciesName = config.speciesNames[sp];
     ioData.registerIOVar("/solution", "rho-Y_" + speciesName, sp + nvel + 2);
   }
 
@@ -1088,8 +1088,8 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     // TODO(kevin): for now, keep the number of primitive variables same as conserved variables.
     // will need to add full list of species.
     for (int sp = 0; sp < numActiveSpecies; sp++) {
-      int inputSpeciesIndex = mixture->getInputIndexOf(sp);
-      std::string speciesName = config.speciesNames[inputSpeciesIndex];
+      // int inputSpeciesIndex = mixture->getInputIndexOf(sp);
+      std::string speciesName = config.speciesNames[sp];
       paraviewColl->RegisterField("partial_density_" + speciesName, visualizationVariables[sp]);
     }
   }
@@ -1433,8 +1433,8 @@ void M2ulPhyS::uniformInitialConditions() {
     const int numSpecies = mixture->GetNumSpecies();
     const int numActiveSpecies = mixture->GetNumActiveSpecies();
     for (int sp = 0; sp < numActiveSpecies; sp++) {
-      int inputIndex = mixture->getInputIndexOf(sp);
-      initState(2 + dim + sp) = inputRhoRhoVp[0] * config.initialMassFractions(inputIndex);
+      // int inputIndex = mixture->getInputIndexOf(sp);
+      initState(2 + dim + sp) = inputRhoRhoVp[0] * config.initialMassFractions(sp);
     }
 
     // electron energy
@@ -2241,12 +2241,13 @@ void M2ulPhyS::parseTransportInputs() {
       config.constantTransport.mtFreq.SetSize(config.numSpecies);
       config.constantTransport.diffusivity = 0.0;
       config.constantTransport.mtFreq = 0.0;
-      for (int sp = 1; sp <= config.numSpecies; sp++) {
-        tpsP->getRequiredInput((diffpath + "/species" + std::to_string(sp)).c_str(),
-                               config.constantTransport.diffusivity(sp - 1));
+      for (int sp = 0; sp < config.numSpecies; sp++) {  // mixture species index.
+        int inputSp = config.mixtureToInputMap[sp];
+        tpsP->getRequiredInput((diffpath + "/species" + std::to_string(inputSp + 1)).c_str(),
+                               config.constantTransport.diffusivity(sp));
         if (config.twoTemperature)
-          tpsP->getRequiredInput((mtpath + "/species" + std::to_string(sp)).c_str(),
-                                 config.constantTransport.mtFreq(sp - 1));
+          tpsP->getRequiredInput((mtpath + "/species" + std::to_string(inputSp + 1)).c_str(),
+                                 config.constantTransport.mtFreq(sp));
       }
     } break;
     default:
@@ -2320,9 +2321,15 @@ void M2ulPhyS::parseReactionInputs() {
 
     Array<double> stoich(config.numSpecies);
     tpsP->getRequiredVec((basepath + "/reactant_stoichiometry").c_str(), stoich, config.numSpecies);
-    for (int sp = 0; sp < config.numSpecies; sp++) config.reactantStoich(sp, r - 1) = stoich[sp];
+    for (int sp = 0; sp < config.numSpecies; sp++) {
+      int inputSp = config.mixtureToInputMap[sp];
+      config.reactantStoich(sp, r - 1) = stoich[inputSp];
+    }
     tpsP->getRequiredVec((basepath + "/product_stoichiometry").c_str(), stoich, config.numSpecies);
-    for (int sp = 0; sp < config.numSpecies; sp++) config.productStoich(sp, r - 1) = stoich[sp];
+    for (int sp = 0; sp < config.numSpecies; sp++) {
+      int inputSp = config.mixtureToInputMap[sp];
+      config.productStoich(sp, r - 1) = stoich[inputSp];
+    }
   }
 }
 
@@ -2463,10 +2470,11 @@ void M2ulPhyS::parseBCInputs() {
       grvy_printf(GRVY_INFO, "\nInlet mass fraction of background species will not be used. \n");
       if (config.ambipolar) grvy_printf(GRVY_INFO, "\nInlet mass fraction of electron will not be used. \n");
 
-      for (int sp = 1; sp <= config.numSpecies; sp++) {
+      for (int sp = 0; sp < config.numSpecies; sp++) {  // mixture species index
         double Ysp;
         // read mass fraction of species as listed in the input file.
-        std::string speciesBasePath(basepath + "/mass_fraction/species" + std::to_string(sp));
+        int inputSp = config.mixtureToInputMap[sp];
+        std::string speciesBasePath(basepath + "/mass_fraction/species" + std::to_string(inputSp + 1));
         tpsP->getRequiredInput(speciesBasePath.c_str(), Ysp);
         config.inletBC.Append(Ysp);
       }
@@ -2562,10 +2570,11 @@ void M2ulPhyS::parseSpongeZoneInputs() {
             grvy_printf(GRVY_INFO, "\nInlet mass fraction of background species will not be used. \n");
             if (config.ambipolar) grvy_printf(GRVY_INFO, "\nInlet mass fraction of electron will not be used. \n");
 
-            for (int sp = 1; sp <= config.numSpecies; sp++) {
+            for (int sp = 0; sp < config.numSpecies; sp++) {  // mixture species index.
               // read mass fraction of species as listed in the input file.
-              std::string speciesBasePath(base + "/mass_fraction/species" + std::to_string(sp));
-              tpsP->getRequiredInput(speciesBasePath.c_str(), hup[4 + sp]);
+              int inputSp = config.mixtureToInputMap[sp];
+              std::string speciesBasePath(base + "/mass_fraction/species" + std::to_string(inputSp + 1));
+              tpsP->getRequiredInput(speciesBasePath.c_str(), hup[5 + sp]);
             }
           }
 

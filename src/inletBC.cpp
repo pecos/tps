@@ -58,12 +58,12 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
 
   numActiveSpecies_ = mixture->GetNumActiveSpecies();
   if (numActiveSpecies_ > 0) {  // read species input state for multi-component flow.
-    std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
+    // std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
     // NOTE: Inlet BC do not specify total energy, therefore skips one index.
     for (int sp = 0; sp < numActiveSpecies_; sp++) {
-      int inputIndex = (*mixtureToInputMap)[sp];
+      // int inputIndex = (*mixtureToInputMap)[sp];
       // store species density into inputState in the order of mixture-sorted index.
-      hinputState[4 + sp] = _inputData[0] * _inputData[4 + inputIndex];
+      hinputState[4 + sp] = _inputData[0] * _inputData[4 + sp];
     }
   }
 

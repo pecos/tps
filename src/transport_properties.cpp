@@ -230,11 +230,11 @@ ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_ru
 
   diffusivity_.SetSize(numSpecies);
   mtFreq_.SetSize(numSpecies);
-  std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
+  // std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
   for (int mixSp = 0; mixSp < numSpecies; mixSp++) {
-    int inputSp = (*mixtureToInputMap)[mixSp];
-    diffusivity_(mixSp) = _runfile.constantTransport.diffusivity(inputSp);
-    mtFreq_(mixSp) = _runfile.constantTransport.mtFreq(inputSp);
+    // int inputSp = (*mixtureToInputMap)[mixSp];
+    diffusivity_(mixSp) = _runfile.constantTransport.diffusivity(mixSp);
+    mtFreq_(mixSp) = _runfile.constantTransport.mtFreq(mixSp);
   }
 
   if (mixture->IsTwoTemperature()) {

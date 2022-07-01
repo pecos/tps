@@ -132,9 +132,9 @@ class GasMixture {
   MFEM_HOST_DEVICE int GetNumVels() const { return nvel_; }
   MFEM_HOST_DEVICE bool IsAmbipolar() const { return ambipolar; }
   MFEM_HOST_DEVICE bool IsTwoTemperature() const { return twoTemperature_; }
-  virtual int getInputIndexOf(int mixtureIndex) { return 0; }
+  // virtual int getInputIndexOf(int mixtureIndex) { return 0; }
   // int getElectronMixtureIndex() { return (speciesMapping_.count("E")) ? speciesMapping_["E"] : -1; }
-  virtual std::map<int, int> *getMixtureToInputMap() { return NULL; }
+  // virtual std::map<int, int> *getMixtureToInputMap() { return NULL; }
   virtual std::map<std::string, int> *getSpeciesMapping() { return NULL; }
   // DenseMatrix *getCompositions() { return &composition_; }
 
@@ -590,8 +590,8 @@ class PerfectMixture : public GasMixture {
   // Vector dtor, which is only a __host__ function!
   MFEM_HOST_DEVICE virtual ~PerfectMixture() {}
 
-  virtual int getInputIndexOf(int mixtureIndex) { return mixtureToInputMap_[mixtureIndex]; }
-  virtual std::map<int, int> *getMixtureToInputMap() { return &mixtureToInputMap_; }
+  // virtual int getInputIndexOf(int mixtureIndex) { return mixtureToInputMap_[mixtureIndex]; }
+  // virtual std::map<int, int> *getMixtureToInputMap() { return &mixtureToInputMap_; }
   virtual std::map<std::string, int> *getSpeciesMapping() { return &speciesMapping_; }
   virtual double GetGasParams(int species, GasParams param) { return gasParams(species, param); }
 
