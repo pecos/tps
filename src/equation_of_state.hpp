@@ -572,12 +572,17 @@ MFEM_HOST_DEVICE inline double DryAir::ComputeTemperature(const double *state) {
 
 class PerfectMixture : public GasMixture {
  private:
-  Vector specificHeatRatios_;
-  Vector specificGasConstants_;
-  Vector molarCV_;
-  Vector molarCP_;
+  // Vector specificHeatRatios_;
+  // Vector specificGasConstants_;
+  // Vector molarCV_;
+  // Vector molarCP_;
+  double specificHeatRatios_[gpudata::MAXSPECIES];
+  double specificGasConstants_[gpudata::MAXSPECIES];
+  double molarCV_[gpudata::MAXSPECIES];
+  double molarCP_[gpudata::MAXSPECIES];
 
-  DenseMatrix gasParams;
+  // DenseMatrix gasParams;
+  double gasParams[gpudata::MAXSPECIES * GasParams::NUM_GASPARAMS];
   // std::map<int, int> mixtureToInputMap_;
   // std::map<std::string, int> speciesMapping_;
 
@@ -593,16 +598,16 @@ class PerfectMixture : public GasMixture {
   // virtual int getInputIndexOf(int mixtureIndex) { return mixtureToInputMap_[mixtureIndex]; }
   // virtual std::map<int, int> *getMixtureToInputMap() { return &mixtureToInputMap_; }
   // virtual std::map<std::string, int> *getSpeciesMapping() { return &speciesMapping_; }
-  virtual double GetGasParams(int species, GasParams param) { return gasParams(species, param); }
+  virtual double GetGasParams(int species, GasParams param) { return gasParams[species + param * numSpecies]; }
 
-  virtual double getMolarCV(int species) { return molarCV_(species); }
-  virtual double getMolarCP(int species) { return molarCP_(species); }
-  virtual double getSpecificHeatRatio(int species) { return specificHeatRatios_(species); }
-  virtual double getSpecificGasConstant(int species) { return specificGasConstants_(species); }
+  virtual double getMolarCV(int species) { return molarCV_[species]; }
+  virtual double getMolarCP(int species) { return molarCP_[species]; }
+  virtual double getSpecificHeatRatio(int species) { return specificHeatRatios_[species]; }
+  virtual double getSpecificGasConstant(int species) { return specificGasConstants_[species]; }
 
   // Kevin: these are mixture heat ratio and gas constant. need to change argument.
-  MFEM_HOST_DEVICE virtual double GetSpecificHeatRatio() { return molarCP_(numSpecies - 1) / molarCV_(numSpecies - 1); }
-  MFEM_HOST_DEVICE virtual double GetGasConstant() { return specificGasConstants_(numSpecies - 1); }
+  MFEM_HOST_DEVICE virtual double GetSpecificHeatRatio() { return molarCP_[numSpecies - 1] / molarCV_[numSpecies - 1]; }
+  MFEM_HOST_DEVICE virtual double GetGasConstant() { return specificGasConstants_[numSpecies - 1]; }
 
   virtual double computeHeaviesHeatCapacity(const double *n_sp, const double &nB);
   virtual double computeAmbipolarElectronNumberDensity(const double *n_sp);
@@ -663,7 +668,7 @@ class PerfectMixture : public GasMixture {
                                                        Vector &conservedState);
 
   virtual double computeElectronEnergy(const double n_e, const double T_e) {
-    return n_e * molarCV_(numSpecies - 2) * T_e;
+    return n_e * molarCV_[numSpecies - 2] * T_e;
   }
   virtual double computeElectronPressure(const double n_e, const double T_e) {
     return n_e * UNIVERSALGASCONSTANT * T_e;
