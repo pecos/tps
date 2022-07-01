@@ -169,6 +169,10 @@ class GasMixture {
   virtual void computeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp) {
     mfem_error("computeSpeciesPrimitives not implemented");
   }
+  MFEM_HOST_DEVICE virtual void computeSpeciesPrimitives(const double *conservedState, double *X_sp, double *Y_sp, double *n_sp) {
+    printf("ERROR: computeSpeciesPrimitives is not implemented!\n");
+    assert(false);  // device-compatible exit?
+  }
   virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies) = 0;
   MFEM_HOST_DEVICE virtual void computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies) = 0;
 
@@ -204,6 +208,8 @@ class GasMixture {
                                            DenseMatrix &massFractionGrad) = 0;
   virtual void ComputeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
                                            DenseMatrix &moleFractionGrad) = 0;
+  MFEM_HOST_DEVICE virtual void ComputeMoleFractionGradient(const double *numberDensities, const double *gradUp,
+                                                            double *moleFractionGrad) = 0;
   // TODO(kevin): Compute pressure gradient from temperature gradient.
   virtual void ComputePressureGradient(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &PressureGrad) {
     mfem_error("ComputePressureGradient not implemented");
@@ -291,6 +297,8 @@ class GasMixture {
   // NOTE(kevin): for axisymmetric case, this handles only r- and z-direction.
   virtual void computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix &gradUp,
                                            Vector &gradPe) = 0;
+  MFEM_HOST_DEVICE virtual void computeElectronPressureGrad(const double n_e, const double T_e, const double *gradUp,
+                                                            double *gradPe) = 0;
 };
 
 //////////////////////////////////////////////////////
@@ -359,6 +367,11 @@ class DryAir : public GasMixture {
                                            DenseMatrix &moleFractionGrad) {
     mfem_error("computeMoleFractionGradient not implemented");
   }
+  MFEM_HOST_DEVICE virtual void ComputeMoleFractionGradient(const double *numberDensities, const double *gradUp,
+                                                            double *moleFractionGrad) {
+    printf("computeMoleFractionGradient not implemented");
+    assert(false);
+  }
 
   // virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
 
@@ -391,6 +404,10 @@ class DryAir : public GasMixture {
   }
   virtual void computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix &gradUp,
                                            Vector &gradPe) {
+    mfem_error("computeElectronPressureGrad not implemented");
+  }
+  MFEM_HOST_DEVICE virtual void computeElectronPressureGrad(const double n_e, const double T_e, const double *gradUp,
+                                                            double *gradPe) {
     mfem_error("computeElectronPressureGrad not implemented");
   }
   // GPU functions
@@ -624,6 +641,7 @@ class PerfectMixture : public GasMixture {
   MFEM_HOST_DEVICE virtual void GetConservativesFromPrimitives(const double *primit, double *conserv);
 
   virtual void computeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp);
+  MFEM_HOST_DEVICE virtual void computeSpeciesPrimitives(const double *conservedState, double *X_sp, double *Y_sp, double *n_sp);
   virtual void computeNumberDensities(const Vector &conservedState, Vector &n_sp);
   MFEM_HOST_DEVICE virtual void computeNumberDensities(const double *conservedState, double *n_sp) const;
 
@@ -669,6 +687,8 @@ class PerfectMixture : public GasMixture {
                                            DenseMatrix &massFractionGrad);
   virtual void ComputeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
                                            DenseMatrix &moleFractionGrad);
+  MFEM_HOST_DEVICE virtual void ComputeMoleFractionGradient(const double *numberDensities, const double *gradUp,
+                                                            double *moleFractionGrad);
 
   // functions needed for BCs
   virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut);
@@ -690,6 +710,8 @@ class PerfectMixture : public GasMixture {
   }
   virtual void computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix &gradUp,
                                            Vector &gradPe);
+  MFEM_HOST_DEVICE virtual void computeElectronPressureGrad(const double n_e, const double T_e, const double *gradUp,
+                                                            double *gradPe);
   // GPU functions
 #ifdef _GPU_
 

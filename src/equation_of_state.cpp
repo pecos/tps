@@ -787,9 +787,56 @@ void PerfectMixture::computeSpeciesPrimitives(const Vector &conservedState, Vect
   X_sp.SetSize(numSpecies);
   Y_sp.SetSize(numSpecies);
   n_sp.SetSize(numSpecies);
-  X_sp = 0.0;
-  Y_sp = 0.0;
-  n_sp = 0.0;
+  // X_sp = 0.0;
+  // Y_sp = 0.0;
+  // n_sp = 0.0;
+  //
+  // double n_e = 0.0;
+  // double n = 0.0;
+  // for (int sp = 0; sp < numActiveSpecies; sp++) {
+  //   n_sp[sp] = conservedState[nvel_ + 2 + sp] / GetGasParams(sp, GasParams::SPECIES_MW);
+  //   n += n_sp[sp];
+  //   if (ambipolar) n_e += GetGasParams(sp, GasParams::SPECIES_CHARGES) * n_sp[sp];
+  // }  // Background species doesn't have to be included due to its neutral charge.
+  // if (ambipolar) {
+  //   n_sp[numSpecies - 2] = n_e;  // Electron species is assumed be to the second to last species.
+  //   n += n_e;
+  // }
+  //
+  // double Yb = 1.;
+  // for (int sp = 0; sp < numActiveSpecies; sp++) {
+  //   Y_sp[sp] = conservedState[nvel_ + 2 + sp] / conservedState[0];
+  //   Yb -= Y_sp[sp];
+  // }
+  //
+  // if (ambipolar) {  // Electron species is assumed be to the second to last species.
+  //   Y_sp[numSpecies - 2] = n_e * GetGasParams(numSpecies - 2, GasParams::SPECIES_MW) / conservedState[0];
+  //   Yb -= Y_sp[numSpecies - 2];
+  // }
+  // if (Yb < 0.0) {
+  //   std::cout << "rho: " << conservedState(0) << std::endl;
+  //   std::cout << "n_sp: ";
+  //   for (int sp = 0; sp < numActiveSpecies; sp++) std::cout << n_sp[sp] << ",\t";
+  //   std::cout << std::endl;
+  //   std::cout << "n_e: " << n_e << std::endl;
+  //   std::cout << "Yb: " << Yb << std::endl;
+  //   assert(Yb >= 0.0);  // In case of negative mass fraction.
+  // }
+  // Y_sp[numSpecies - 1] = Yb;
+  //
+  // n_sp[numSpecies - 1] = Y_sp[numSpecies - 1] * conservedState[0] / GetGasParams(numSpecies - 1, GasParams::SPECIES_MW);
+  // n += n_sp[numSpecies - 1];
+  //
+  // for (int sp = 0; sp < numSpecies; sp++) X_sp[sp] = n_sp[sp] / n;
+  computeSpeciesPrimitives(&conservedState[0], &X_sp[0], &Y_sp[0], &n_sp[0]);
+}
+
+MFEM_HOST_DEVICE void PerfectMixture::computeSpeciesPrimitives(const double *conservedState, double *X_sp, double *Y_sp, double *n_sp) {
+  for (int sp = 0; sp < numSpecies; sp++) {
+    X_sp[sp] = 0.0;
+    Y_sp[sp] = 0.0;
+    n_sp[sp] = 0.0;
+  }
 
   double n_e = 0.0;
   double n = 0.0;
@@ -814,12 +861,12 @@ void PerfectMixture::computeSpeciesPrimitives(const Vector &conservedState, Vect
     Yb -= Y_sp[numSpecies - 2];
   }
   if (Yb < 0.0) {
-    std::cout << "rho: " << conservedState(0) << std::endl;
-    std::cout << "n_sp: ";
-    for (int sp = 0; sp < numActiveSpecies; sp++) std::cout << n_sp[sp] << ",\t";
-    std::cout << std::endl;
-    std::cout << "n_e: " << n_e << std::endl;
-    std::cout << "Yb: " << Yb << std::endl;
+    printf("rho: %.5E\n", conservedState[0]);
+    printf("n_sp: ");
+    for (int sp = 0; sp < numActiveSpecies; sp++) printf("%.5E,\t", n_sp[sp]);
+    printf("\n");
+    printf("n_e: %.5E\n", n_e);
+    printf("Yb: %.5E\n", Yb);
     assert(Yb >= 0.0);  // In case of negative mass fraction.
   }
   Y_sp[numSpecies - 1] = Yb;
@@ -1377,54 +1424,114 @@ void PerfectMixture::ComputeMassFractionGradient(const double rho, const Vector 
 void PerfectMixture::ComputeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
                                                  DenseMatrix &moleFractionGrad) {
   moleFractionGrad.SetSize(numSpecies, dim);
-  double totalN = 0.0;
-  for (int sp = 0; sp < numSpecies; sp++) totalN += numberDensities(sp);
+  // double totalN = 0.0;
+  // for (int sp = 0; sp < numSpecies; sp++) totalN += numberDensities(sp);
+  //
+  // Vector neGrad;
+  // neGrad.SetSize(dim);
+  // neGrad = 0.0;
+  // if (ambipolar) {
+  //   for (int sp = 0; sp < numActiveSpecies; sp++) {
+  //     for (int d = 0; d < dim; d++) neGrad(d) += gradUp(nvel_ + 2 + sp, d) * GetGasParams(sp, GasParams::SPECIES_CHARGES);
+  //   }
+  // }
+  //
+  // Vector nBGrad(dim);
+  // for (int d = 0; d < dim; d++) nBGrad(d) = gradUp(0, d);
+  // for (int sp = 0; sp < numActiveSpecies; sp++) {
+  //   for (int d = 0; d < dim; d++) nBGrad(d) -= gradUp(nvel_ + 2 + sp, d) * GetGasParams(sp, GasParams::SPECIES_MW);
+  // }
+  // if (ambipolar) {
+  //   // nBGrad -= gasParams(numSpecies - 2, GasParams::SPECIES_MW) / gasParams(numSpecies - 1, GasParams::SPECIES_MW) *
+  //   // neGrad;
+  //   nBGrad.Add(-GetGasParams(numSpecies - 2, GasParams::SPECIES_MW), neGrad);
+  // }
+  // nBGrad /= GetGasParams(numSpecies - 1, GasParams::SPECIES_MW);
+  //
+  // Vector totalNGrad;
+  // totalNGrad.SetSize(dim);
+  // totalNGrad = 0.0;
+  // for (int sp = 0; sp < numActiveSpecies; sp++) {  // if not ambipolar, electron is included.
+  //   for (int d = 0; d < dim; d++) totalNGrad(d) += gradUp(nvel_ + 2 + sp, d);
+  // }
+  // if (ambipolar) totalNGrad += neGrad;
+  // totalNGrad += nBGrad;
+  //
+  // for (int sp = 0; sp < numActiveSpecies; sp++) {
+  //   for (int d = 0; d < dim; d++) {
+  //     moleFractionGrad(sp, d) =
+  //         gradUp(nvel_ + 2 + sp, d) / totalN - numberDensities(sp) / totalN / totalN * totalNGrad(d);
+  //   }
+  // }
+  // if (ambipolar) {
+  //   int sp = numSpecies - 2;
+  //   for (int d = 0; d < dim; d++) {
+  //     moleFractionGrad(sp, d) = neGrad(d) / totalN - numberDensities(sp) / totalN / totalN * totalNGrad(d);
+  //   }
+  // }
+  // int sp = numSpecies - 1;
+  // for (int d = 0; d < dim; d++) {
+  //   moleFractionGrad(sp, d) = nBGrad(d) / totalN - numberDensities(sp) / totalN / totalN * totalNGrad(d);
+  // }
+  ComputeMoleFractionGradient(&numberDensities[0], &gradUp[0], &moleFractionGrad[0]);
+}
 
-  Vector neGrad;
-  neGrad.SetSize(dim);
-  neGrad = 0.0;
+MFEM_HOST_DEVICE void PerfectMixture::ComputeMoleFractionGradient(const double *numberDensities, const double *gradUp,
+                                                                  double *moleFractionGrad) {
+  // moleFractionGrad.SetSize(numSpecies, dim);
+  for (int d = 0; d < dim; d++) {
+    for (int sp = 0; sp < numSpecies; sp++)
+      moleFractionGrad[sp + d * numSpecies] = 0.0;
+  }
+  double totalN = 0.0;
+  for (int sp = 0; sp < numSpecies; sp++) totalN += numberDensities[sp];
+
+  double neGrad[gpudata::MAXDIM];
+  for (int d = 0; d < dim; d++) neGrad[d] = 0.0;
   if (ambipolar) {
     for (int sp = 0; sp < numActiveSpecies; sp++) {
-      for (int d = 0; d < dim; d++) neGrad(d) += gradUp(nvel_ + 2 + sp, d) * GetGasParams(sp, GasParams::SPECIES_CHARGES);
+      for (int d = 0; d < dim; d++) neGrad[d] += gradUp[(nvel_ + 2 + sp) + d * num_equation] *
+                                                   GetGasParams(sp, GasParams::SPECIES_CHARGES);
     }
   }
 
-  Vector nBGrad(dim);
-  for (int d = 0; d < dim; d++) nBGrad(d) = gradUp(0, d);
+  double nBGrad[gpudata::MAXDIM];
+  for (int d = 0; d < dim; d++) nBGrad[d] = gradUp[0 + d * num_equation];
   for (int sp = 0; sp < numActiveSpecies; sp++) {
-    for (int d = 0; d < dim; d++) nBGrad(d) -= gradUp(nvel_ + 2 + sp, d) * GetGasParams(sp, GasParams::SPECIES_MW);
+    for (int d = 0; d < dim; d++) nBGrad[d] -= gradUp[(nvel_ + 2 + sp) + d * num_equation] *
+                                                 GetGasParams(sp, GasParams::SPECIES_MW);
   }
   if (ambipolar) {
-    // nBGrad -= gasParams(numSpecies - 2, GasParams::SPECIES_MW) / gasParams(numSpecies - 1, GasParams::SPECIES_MW) *
-    // neGrad;
-    nBGrad.Add(-GetGasParams(numSpecies - 2, GasParams::SPECIES_MW), neGrad);
+    // nBGrad.Add(-GetGasParams(numSpecies - 2, GasParams::SPECIES_MW), neGrad);
+    for (int d = 0; d < dim; d++) nBGrad[d] += -GetGasParams(numSpecies - 2, GasParams::SPECIES_MW) * neGrad[d];
   }
   nBGrad /= GetGasParams(numSpecies - 1, GasParams::SPECIES_MW);
 
-  Vector totalNGrad;
-  totalNGrad.SetSize(dim);
-  totalNGrad = 0.0;
+  double totalNGrad[gpudata::MAXDIM];
+  for (int d = 0; d < dim; d++) totalNGrad[d] = 0.0;
+
   for (int sp = 0; sp < numActiveSpecies; sp++) {  // if not ambipolar, electron is included.
-    for (int d = 0; d < dim; d++) totalNGrad(d) += gradUp(nvel_ + 2 + sp, d);
+    for (int d = 0; d < dim; d++) totalNGrad[d] += gradUp[(nvel_ + 2 + sp) + d * num_equation];
   }
-  if (ambipolar) totalNGrad += neGrad;
-  totalNGrad += nBGrad;
+  if (ambipolar) {
+    for (int d = 0; d < dim; d++) totalNGrad[d] += neGrad[d];
+  for (int d = 0; d < dim; d++) totalNGrad[d] += nBGrad[d];
 
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     for (int d = 0; d < dim; d++) {
-      moleFractionGrad(sp, d) =
-          gradUp(nvel_ + 2 + sp, d) / totalN - numberDensities(sp) / totalN / totalN * totalNGrad(d);
+      moleFractionGrad[sp + d * numSpecies] =
+          gradUp[(nvel_ + 2 + sp) + d * num_equation] / totalN - numberDensities[sp] / totalN / totalN * totalNGrad[d];
     }
   }
   if (ambipolar) {
     int sp = numSpecies - 2;
     for (int d = 0; d < dim; d++) {
-      moleFractionGrad(sp, d) = neGrad(d) / totalN - numberDensities(sp) / totalN / totalN * totalNGrad(d);
+      moleFractionGrad[sp + d * numSpecies] = neGrad[d] / totalN - numberDensities[sp] / totalN / totalN * totalNGrad[d];
     }
   }
   int sp = numSpecies - 1;
   for (int d = 0; d < dim; d++) {
-    moleFractionGrad(sp, d) = nBGrad(d) / totalN - numberDensities(sp) / totalN / totalN * totalNGrad(d);
+    moleFractionGrad[sp + d * numSpecies] = nBGrad[d] / totalN - numberDensities[sp] / totalN / totalN * totalNGrad[d];
   }
 }
 
@@ -1663,19 +1770,41 @@ void PerfectMixture::computeElectronPressureGrad(const double n_e, const double 
                                                  Vector &gradPe) {
   gradPe.SetSize(dim);
 
-  Vector neGrad;
-  neGrad.SetSize(dim);
-  neGrad = 0.0;
+  // Vector neGrad;
+  // neGrad.SetSize(dim);
+  // neGrad = 0.0;
+  // if (ambipolar) {
+  //   for (int sp = 0; sp < numActiveSpecies; sp++) {
+  //     for (int d = 0; d < dim; d++) neGrad(d) += gradUp(nvel_ + 2 + sp, d) * GetGasParams(sp, GasParams::SPECIES_CHARGES);
+  //   }
+  // } else {
+  //   for (int d = 0; d < dim; d++) neGrad(d) = gradUp(nvel_ + numSpecies, d);  // nvel_ + 2 + (numSpecies - 2)
+  // }
+  //
+  // for (int d = 0; d < dim; d++)
+  //   gradPe(d) = (neGrad(d) * T_e + n_e * gradUp(num_equation - 1, d)) * UNIVERSALGASCONSTANT;
+  //
+  // return;
+  computeElectronPressureGrad(n_e, T_e, &gradUp[0], &gradPe[0]);
+}
+
+MFEM_HOST_DEVICE void PerfectMixture::computeElectronPressureGrad(const double n_e, const double T_e, const double *gradUp,
+                                                                  double *gradPe) {
+  for (int d = 0; d < dim; d++) gradPe[d] = 0.0;
+
+  double neGrad[gpudata::MAXDIM];
+  for (int d = 0; d < dim; d++) neGrad[d] = 0.0;
   if (ambipolar) {
     for (int sp = 0; sp < numActiveSpecies; sp++) {
-      for (int d = 0; d < dim; d++) neGrad(d) += gradUp(nvel_ + 2 + sp, d) * GetGasParams(sp, GasParams::SPECIES_CHARGES);
+      for (int d = 0; d < dim; d++) neGrad[d] += gradUp[(nvel_ + 2 + sp) + d * num_equation] *
+                                                   GetGasParams(sp, GasParams::SPECIES_CHARGES);
     }
   } else {
-    for (int d = 0; d < dim; d++) neGrad(d) = gradUp(nvel_ + numSpecies, d);  // nvel_ + 2 + (numSpecies - 2)
+    for (int d = 0; d < dim; d++) neGrad[d] = gradUp[(nvel_ + numSpecies) + d * num_equation];  // nvel_ + 2 + (numSpecies - 2)
   }
 
   for (int d = 0; d < dim; d++)
-    gradPe(d) = (neGrad(d) * T_e + n_e * gradUp(num_equation - 1, d)) * UNIVERSALGASCONSTANT;
+    gradPe[d] = (neGrad[d] * T_e + n_e * gradUp[(num_equation - 1) + d * num_equation]) * UNIVERSALGASCONSTANT;
 
   return;
 }
