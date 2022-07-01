@@ -604,7 +604,7 @@ MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesHeatCapacity(const double 
   return heatCapacity;
 }
 
-MFEM_HOST_DEVICE double PerfectMixture::computeAmbipolarElectronNumberDensity(const double *n_sp) {
+MFEM_HOST_DEVICE double PerfectMixture::computeAmbipolarElectronNumberDensity(const double *n_sp) const {
   double n_e = 0.0;
 
   for (int sp = 0; sp < numActiveSpecies; sp++) {
@@ -616,7 +616,7 @@ MFEM_HOST_DEVICE double PerfectMixture::computeAmbipolarElectronNumberDensity(co
 }
 
 MFEM_HOST_DEVICE double PerfectMixture::computeBackgroundMassDensity(const double &rho, const double *n_sp, double &n_e,
-                                                                     bool isElectronComputed) {
+                                                                     bool isElectronComputed) const {
   if ((!isElectronComputed) && (ambipolar)) {
     n_e = computeAmbipolarElectronNumberDensity(n_sp);
   }

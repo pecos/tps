@@ -598,7 +598,7 @@ class PerfectMixture : public GasMixture {
   // virtual int getInputIndexOf(int mixtureIndex) { return mixtureToInputMap_[mixtureIndex]; }
   // virtual std::map<int, int> *getMixtureToInputMap() { return &mixtureToInputMap_; }
   // virtual std::map<std::string, int> *getSpeciesMapping() { return &speciesMapping_; }
-  MFEM_HOST_DEVICE virtual double GetGasParams(int species, GasParams param) { return gasParams[species + param * numSpecies]; }
+  MFEM_HOST_DEVICE virtual double GetGasParams(int species, GasParams param) const { return gasParams[species + param * numSpecies]; }
 
   virtual double getMolarCV(int species) { return molarCV_[species]; }
   virtual double getMolarCP(int species) { return molarCP_[species]; }
@@ -610,9 +610,9 @@ class PerfectMixture : public GasMixture {
   MFEM_HOST_DEVICE virtual double GetGasConstant() { return specificGasConstants_[numSpecies - 1]; }
 
   MFEM_HOST_DEVICE virtual double computeHeaviesHeatCapacity(const double *n_sp, const double &nB);
-  MFEM_HOST_DEVICE virtual double computeAmbipolarElectronNumberDensity(const double *n_sp);
+  MFEM_HOST_DEVICE virtual double computeAmbipolarElectronNumberDensity(const double *n_sp) const;
   MFEM_HOST_DEVICE virtual double computeBackgroundMassDensity(const double &rho, const double *n_sp, double &n_e,
-                                                               bool isElectronComputed = false);
+                                                               bool isElectronComputed = false) const;
 
   virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit);
   virtual void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv);
