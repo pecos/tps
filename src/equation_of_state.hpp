@@ -598,7 +598,7 @@ class PerfectMixture : public GasMixture {
   // virtual int getInputIndexOf(int mixtureIndex) { return mixtureToInputMap_[mixtureIndex]; }
   // virtual std::map<int, int> *getMixtureToInputMap() { return &mixtureToInputMap_; }
   // virtual std::map<std::string, int> *getSpeciesMapping() { return &speciesMapping_; }
-  virtual double GetGasParams(int species, GasParams param) { return gasParams[species + param * numSpecies]; }
+  MFEM_HOST_DEVICE virtual double GetGasParams(int species, GasParams param) { return gasParams[species + param * numSpecies]; }
 
   virtual double getMolarCV(int species) { return molarCV_[species]; }
   virtual double getMolarCP(int species) { return molarCP_[species]; }
@@ -609,28 +609,35 @@ class PerfectMixture : public GasMixture {
   MFEM_HOST_DEVICE virtual double GetSpecificHeatRatio() { return molarCP_[numSpecies - 1] / molarCV_[numSpecies - 1]; }
   MFEM_HOST_DEVICE virtual double GetGasConstant() { return specificGasConstants_[numSpecies - 1]; }
 
-  virtual double computeHeaviesHeatCapacity(const double *n_sp, const double &nB);
-  virtual double computeAmbipolarElectronNumberDensity(const double *n_sp);
-  virtual double computeBackgroundMassDensity(const double &rho, const double *n_sp, double &n_e,
-                                              bool isElectronComputed = false);
+  MFEM_HOST_DEVICE virtual double computeHeaviesHeatCapacity(const double *n_sp, const double &nB);
+  MFEM_HOST_DEVICE virtual double computeAmbipolarElectronNumberDensity(const double *n_sp);
+  MFEM_HOST_DEVICE virtual double computeBackgroundMassDensity(const double &rho, const double *n_sp, double &n_e,
+                                                               bool isElectronComputed = false);
 
   virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit);
   virtual void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv);
 
+  MFEM_HOST_DEVICE virtual void GetPrimitivesFromConservatives(const double *conserv, double *primit);
+  MFEM_HOST_DEVICE virtual void GetConservativesFromPrimitives(const double *primit, double *conserv);
+
   virtual void computeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp);
   virtual void computeNumberDensities(const Vector &conservedState, Vector &n_sp);
+  MFEM_HOST_DEVICE virtual void computeNumberDensities(const double *conservedState, double *n_sp);
 
   virtual double ComputePressure(const Vector &state, double *electronPressure = NULL);
+  MFEM_HOST_DEVICE virtual double ComputePressure(const double *state, double *electronPressure = NULL) const;
   virtual double ComputePressureFromPrimitives(const Vector &Up);
-  virtual double computePressureBase(const double *n_sp, const double n_e, const double n_B, const double T_h,
-                                     const double T_e);
+  MFEM_HOST_DEVICE virtual double ComputePressureFromPrimitives(const double *Up);
+  MFEM_HOST_DEVICE virtual double computePressureBase(const double *n_sp, const double n_e, const double n_B, const double T_h,
+                                                      const double T_e);
 
   // Physicality check (at end)
   virtual bool StateIsPhysical(const Vector &state);
 
   virtual double ComputeTemperature(const Vector &state);
-  virtual void computeTemperaturesBase(const Vector &conservedState, const double *n_sp, const double n_e,
-                                       const double n_B, double &T_h, double &T_e);
+  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state);
+  MFEM_HOST_DEVICE virtual void computeTemperaturesBase(const double *conservedState, const double *n_sp, const double n_e,
+                                                        const double n_B, double &T_h, double &T_e);
 
   virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies);
   MFEM_HOST_DEVICE virtual void computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies);
@@ -646,12 +653,14 @@ class PerfectMixture : public GasMixture {
 
   // Compute the maximum characteristic speed.
   virtual double ComputeMaxCharSpeed(const Vector &state);
+  MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeed(const double *state);
 
   virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true);
-  virtual double computeSpeedOfSoundBase(const double *n_sp, const double n_B, const double rho, const double p);
+  MFEM_HOST_DEVICE virtual double ComputeSpeedOfSound(const double *Uin, bool primitive = true);
+  MFEM_HOST_DEVICE virtual double computeSpeedOfSoundBase(const double *n_sp, const double n_B, const double rho, const double p);
 
-  virtual double computeHeaviesMixtureCV(const double *n_sp, const double n_B);
-  virtual double computeHeaviesMixtureHeatRatio(const double *n_sp, const double n_B);
+  MFEM_HOST_DEVICE virtual double computeHeaviesMixtureCV(const double *n_sp, const double n_B);
+  MFEM_HOST_DEVICE virtual double computeHeaviesMixtureHeatRatio(const double *n_sp, const double n_B);
 
   virtual void ComputeMassFractionGradient(const double rho, const Vector &numberDensities, const DenseMatrix &gradUp,
                                            DenseMatrix &massFractionGrad);
@@ -662,7 +671,10 @@ class PerfectMixture : public GasMixture {
   virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut);
   virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p,
                                        bool modifyElectronEnergy = false);
+  MFEM_HOST_DEVICE virtual void modifyEnergyForPressure(const double *stateIn, double *stateOut, const double &p,
+                                                        bool modifyElectronEnergy = false);
   virtual void computeSheathBdrFlux(const Vector &state, BoundaryViscousFluxData &bcFlux);
+  MFEM_HOST_DEVICE virtual void computeSheathBdrFlux(const double *state, BoundaryViscousFluxData &bcFlux);
 
   virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
                                                        Vector &conservedState);
