@@ -578,7 +578,7 @@ class PerfectMixture : public GasMixture {
   Vector molarCP_;
 
   DenseMatrix gasParams;
-  std::map<int, int> mixtureToInputMap_;
+  // std::map<int, int> mixtureToInputMap_;
   std::map<std::string, int> speciesMapping_;
 
   // virtual void SetNumEquations();
