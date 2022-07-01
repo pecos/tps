@@ -138,7 +138,7 @@ class GasMixture {
   // virtual std::map<std::string, int> *getSpeciesMapping() { return NULL; }
   // DenseMatrix *getCompositions() { return &composition_; }
 
-  virtual double GetGasParams(int species, GasParams param) { return 0.0; }
+  MFEM_HOST_DEVICE virtual double GetGasParams(int species, GasParams param) const { return 0.0; }
 
   int GetNumConservativeVariables() { return Nconservative; }
   int GetNumPrimitiveVariables() { return Nprimitive; }
@@ -267,12 +267,12 @@ class GasMixture {
     return;
   }
 
-  virtual double computeAmbipolarElectronNumberDensity(const double *n_sp) {
+  MFEM_HOST_DEVICE virtual double computeAmbipolarElectronNumberDensity(const double *n_sp) const {
     mfem_error("computeAmbipolarElectronNumberDensity not implemented");
     return 0;
   }
-  virtual double computeBackgroundMassDensity(const double &rho, const double *n_sp, double &n_e,
-                                              bool isElectronComputed = false) {
+  MFEM_HOST_DEVICE virtual double computeBackgroundMassDensity(const double &rho, const double *n_sp, double &n_e,
+                                                               bool isElectronComputed = false) const {
     mfem_error("computeBackgroundMassDensity not implemented");
     return 0;
   }
