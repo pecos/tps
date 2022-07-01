@@ -2647,12 +2647,40 @@ void M2ulPhyS::parseSpongeZoneInputs() {
 }
 
 void M2ulPhyS::packUpGasMixtureInput() {
-  config.dryAirInput.f = config.workFluid;
-  config.dryAirInput.eq_sys = config.eqSystem;
+  if (config.workFluid == DRY_AIR) {
+    config.dryAirInput.f = config.workFluid;
+    config.dryAirInput.eq_sys = config.eqSystem;
 #if defined(_HIP_)
-  config.dryAirInput.visc_mult = config.visc_mult;
-  config.dryAirInput.bulk_visc_mult = config.bulk_visc;
+    config.dryAirInput.visc_mult = config.visc_mult;
+    config.dryAirInput.bulk_visc_mult = config.bulk_visc;
 #endif
+  } else if (config.workFluid == USER_DEFINED) {
+    switch (config.gasModel) {
+      case PERFECT_MIXTURE: {
+        config.perfectMixtureInput.f = config.workFluid;
+        config.perfectMixtureInput.numSpecies = config.numSpecies;
+        if (config.speciesMapping.count("E")) {
+          config.perfectMixtureInput.isElectronIncluded = true;
+        } else {
+          config.perfectMixtureInput.isElectronIncluded = false;
+        }
+        config.perfectMixtureInput.ambipolar = config.ambipolar;
+        config.perfectMixtureInput.twoTemperature = config.twoTemperature;
+
+        for (int sp = 0; sp < config.numSpecies; sp++) {
+          for (int param = 0; param < (int) GasParams::NUM_GASPARAMS; param++) {
+            config.perfectMixtureInput.gasParams[sp + param * config.numSpecies] =
+              config.gasParams(sp, param);
+          }
+          config.perfectMixtureInput.molarCV[sp] = config.constantMolarCV(sp);
+        }
+      } break;
+      default:
+        grvy_printf(GRVY_ERROR, "Gas model is not specified!\n");
+        exit(ERROR);
+      break;
+    }  // switch gasModel
+  }  // workFluid == USER_DEFINED
 }
 
 void M2ulPhyS::checkSolverOptions() const {

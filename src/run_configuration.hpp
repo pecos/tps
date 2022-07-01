@@ -237,6 +237,7 @@ class RunConfiguration {
   bool mmsSaveDetails_ = false;  // used for utils/compare_rhs
 
   DryAirInput dryAirInput;
+  PerfectMixtureInput perfectMixtureInput;
   ArgonTransportInput argonTransportInput;
   ChemistryInput chemistryInput;
 

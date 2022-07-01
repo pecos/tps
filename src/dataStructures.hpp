@@ -331,7 +331,13 @@ struct PerfectMixtureInput {
   WorkingFluid f;
 
   int numSpecies;
-  int backgroundIndex;
+
+  bool isElectronIncluded;
+  bool ambipolar;
+  bool twoTemperature;
+
+  double gasParams[gpudata::MAXSPECIES * GasParams::NUM_GASPARAMS];
+  double molarCV[gpudata::MAXSPECIES];
 };
 
 struct ArgonTransportInput {

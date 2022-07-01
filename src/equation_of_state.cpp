@@ -492,16 +492,24 @@ double EquationOfState::pressure( double *state,
 ////// Perfect Mixture GasMixture                     ////////////////////
 //////////////////////////////////////////////////////////////////////////
 
-PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim, int nvel) : GasMixture(_runfile, _dim, nvel) {
-  numSpecies = _runfile.GetNumSpecies();
-  backgroundInputIndex_ = _runfile.backgroundIndex;
-  assert((backgroundInputIndex_ > 0) && (backgroundInputIndex_ <= numSpecies));
+PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim, int nvel)
+    : PerfectMixture(_runfile.perfectMixtureInput, _dim, nvel) {}
+
+MFEM_HOST_DEVICE PerfectMixture::PerfectMixture(PerfectMixtureInput &inputs, int _dim, int nvel)
+    : GasMixture(inputs.f, _dim, nvel) {
+  numSpecies = inputs.numSpecies;
+  // backgroundInputIndex_ = _runfile.backgroundIndex;
+  // assert((backgroundInputIndex_ > 0) && (backgroundInputIndex_ <= numSpecies));
   // If electron is not included, then ambipolar and two-temperature are false.
   ambipolar = false;
   twoTemperature_ = false;
 
-  // TODO(kevin): electron species is enforced to be included in the input file.
-  bool isElectronIncluded = false;
+  // NOTE(kevin): electron species is enforced to be included in the input file.
+  // bool isElectronIncluded = false;
+  if (inputs.isElectronIncluded) {
+    ambipolar = inputs.ambipolar;
+    twoTemperature_ = inputs.twoTemperature;
+  }
 
   gasParams.SetSize(numSpecies, GasParams::NUM_GASPARAMS);
   // composition_.SetSize(numSpecies, _runfile.numAtoms);
@@ -536,16 +544,17 @@ PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim, int nvel) :
   //   //   composition_(targetIdx, a) = _runfile.speciesComposition(sp, a);
   // }
   for (int sp = 0; sp < numSpecies; sp++) {
-    if (_runfile.speciesNames[sp] == "E") {
-      isElectronIncluded = true;
-      ambipolar = _runfile.IsAmbipolar();
-      twoTemperature_ = _runfile.IsTwoTemperature();
-    }
+    // if (_runfile.speciesNames[sp] == "E") {
+    //   isElectronIncluded = true;
+    //   ambipolar = _runfile.IsAmbipolar();
+    //   twoTemperature_ = _runfile.IsTwoTemperature();
+    // }
 
     // speciesMapping_[_runfile.speciesNames[sp]] = sp;
 
     for (int param = 0; param < GasParams::NUM_GASPARAMS; param++)
-      gasParams(sp, param) = _runfile.gasParams(sp, param);
+      // gasParams(sp, param) = _runfile.gasParams(sp, param);
+      gasParams(sp, param) = inputs.gasParams[sp + param * numSpecies];
   }
 
   SetNumActiveSpecies();
@@ -554,7 +563,7 @@ PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim, int nvel) :
   // We assume the background species is neutral.
   assert(gasParams(numSpecies - 1, GasParams::SPECIES_CHARGES) == 0.0);
   // TODO(kevin): release electron species enforcing.
-  assert(isElectronIncluded);
+  assert(inputs.isElectronIncluded);
   // We assume the background species and electron have zero formation energy.
   assert(gasParams(numSpecies - 2, GasParams::FORMATION_ENERGY) == 0.0);
   assert(gasParams(numSpecies - 1, GasParams::FORMATION_ENERGY) == 0.0);
@@ -570,7 +579,7 @@ PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim, int nvel) :
 
     // TODO(kevin): read these from input parser.
     // molarCV_(sp) = _runfile.getConstantMolarCV(inputSp) * UNIVERSALGASCONSTANT;
-    molarCV_(sp) = _runfile.getConstantMolarCV(sp) * UNIVERSALGASCONSTANT;
+    molarCV_(sp) = inputs.molarCV[sp] * UNIVERSALGASCONSTANT;
     // NOTE: for perfect gas, CP = CV + R
     molarCP_(sp) = molarCV_(sp) + UNIVERSALGASCONSTANT;
     specificHeatRatios_(sp) = molarCP_(sp) / molarCV_(sp);

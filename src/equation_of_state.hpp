@@ -69,7 +69,7 @@ class GasMixture {
   int numSpecies;
   int numActiveSpecies;
 
-  int backgroundInputIndex_ = MAXSPECIES;
+  // int backgroundInputIndex_ = MAXSPECIES;
 
   bool ambipolar;
   bool twoTemperature_;
@@ -584,7 +584,7 @@ class PerfectMixture : public GasMixture {
   // virtual void SetNumEquations();
  public:
   PerfectMixture(RunConfiguration &_runfile, int _dim, int nvel);
-  // TestBinaryAir(); //this will only be usefull to get air constants
+  MFEM_HOST_DEVICE PerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel);
 
   // FIXME: Generates compiler warning b/c this dtor implicitly calls
   // Vector dtor, which is only a __host__ function!
