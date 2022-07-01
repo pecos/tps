@@ -622,14 +622,14 @@ class PerfectMixture : public GasMixture {
 
   virtual void computeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp);
   virtual void computeNumberDensities(const Vector &conservedState, Vector &n_sp);
-  MFEM_HOST_DEVICE virtual void computeNumberDensities(const double *conservedState, double *n_sp);
+  MFEM_HOST_DEVICE virtual void computeNumberDensities(const double *conservedState, double *n_sp) const;
 
   virtual double ComputePressure(const Vector &state, double *electronPressure = NULL);
   MFEM_HOST_DEVICE virtual double ComputePressure(const double *state, double *electronPressure = NULL) const;
   virtual double ComputePressureFromPrimitives(const Vector &Up);
   MFEM_HOST_DEVICE virtual double ComputePressureFromPrimitives(const double *Up);
   MFEM_HOST_DEVICE virtual double computePressureBase(const double *n_sp, const double n_e, const double n_B, const double T_h,
-                                                      const double T_e);
+                                                      const double T_e) const;
 
   // Physicality check (at end)
   virtual bool StateIsPhysical(const Vector &state);
@@ -637,7 +637,7 @@ class PerfectMixture : public GasMixture {
   virtual double ComputeTemperature(const Vector &state);
   MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state);
   MFEM_HOST_DEVICE virtual void computeTemperaturesBase(const double *conservedState, const double *n_sp, const double n_e,
-                                                        const double n_B, double &T_h, double &T_e);
+                                                        const double n_B, double &T_h, double &T_e) const;
 
   virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies);
   MFEM_HOST_DEVICE virtual void computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies);

@@ -845,7 +845,7 @@ void PerfectMixture::computeNumberDensities(const Vector &conservedState, Vector
   n_sp[numSpecies - 1] = rhoB / GetGasParams(numSpecies - 1, GasParams::SPECIES_MW);
 }
 
-MFEM_HOST_DEVICE void PerfectMixture::computeNumberDensities(const double *conservedState, double *n_sp) {
+MFEM_HOST_DEVICE void PerfectMixture::computeNumberDensities(const double *conservedState, double *n_sp) const {
   for (int sp = 0; sp < numSpecies; sp++) n_sp[sp] = 0.0;
 
   double n_e = 0.0;
@@ -941,7 +941,7 @@ MFEM_HOST_DEVICE double PerfectMixture::ComputePressure(const double *state, dou
 }
 
 MFEM_HOST_DEVICE double PerfectMixture::computePressureBase(const double *n_sp, const double n_e, const double n_B, const double T_h,
-                                                            const double T_e) {
+                                                            const double T_e) const {
   // NOTE: compute pressure.
   double n_h = 0.0;  // total number density of all heavy species.
   for (int sp = 0; sp < numActiveSpecies; sp++) {
@@ -1037,7 +1037,7 @@ MFEM_HOST_DEVICE double PerfectMixture::ComputeTemperature(const double *state) 
 }
 
 MFEM_HOST_DEVICE void PerfectMixture::computeTemperaturesBase(const double *conservedState, const double *n_sp, const double n_e,
-                                                              const double n_B, double &T_h, double &T_e) {
+                                                              const double n_B, double &T_h, double &T_e) const {
   // compute mixture heat capacity.
   double totalHeatCapacity = computeHeaviesHeatCapacity(&n_sp[0], n_B);
   if (!twoTemperature_) totalHeatCapacity += n_e * molarCV_[numSpecies - 2];
