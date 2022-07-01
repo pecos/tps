@@ -495,7 +495,7 @@ double EquationOfState::pressure( double *state,
 PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim, int nvel)
     : PerfectMixture(_runfile.perfectMixtureInput, _dim, nvel) {}
 
-MFEM_HOST_DEVICE PerfectMixture::PerfectMixture(PerfectMixtureInput &inputs, int _dim, int nvel)
+MFEM_HOST_DEVICE PerfectMixture::PerfectMixture(PerfectMixtureInput inputs, int _dim, int nvel)
     : GasMixture(inputs.f, _dim, nvel) {
   numSpecies = inputs.numSpecies;
   // backgroundInputIndex_ = _runfile.backgroundIndex;
