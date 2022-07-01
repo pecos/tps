@@ -506,34 +506,44 @@ PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim, int nvel) :
   gasParams.SetSize(numSpecies, GasParams::NUM_GASPARAMS);
   // composition_.SetSize(numSpecies, _runfile.numAtoms);
 
-  gasParams = 0.0;
-  int paramIdx = 0;  // new species index.
-  int targetIdx;
-  for (int sp = 0; sp < numSpecies; sp++) {  // input file species index.
-    if (sp == backgroundInputIndex_ - 1) {
-      targetIdx = numSpecies - 1;
-    } else if (_runfile.speciesNames[sp] == "E") {
-      targetIdx = numSpecies - 2;
+  // gasParams = 0.0;
+  // int paramIdx = 0;  // new species index.
+  // int targetIdx;
+  // for (int sp = 0; sp < numSpecies; sp++) {  // input file species index.
+  //   if (sp == backgroundInputIndex_ - 1) {
+  //     targetIdx = numSpecies - 1;
+  //   } else if (_runfile.speciesNames[sp] == "E") {
+  //     targetIdx = numSpecies - 2;
+  //     isElectronIncluded = true;
+  //     // Set ambipolar and twoTemperature if electron is included.
+  //     ambipolar = _runfile.IsAmbipolar();
+  //     twoTemperature_ = _runfile.IsTwoTemperature();
+  //   } else {
+  //     targetIdx = paramIdx;
+  //     paramIdx++;
+  //   }
+  //   speciesMapping_[_runfile.speciesNames[sp]] = targetIdx;
+  //   mixtureToInputMap_[targetIdx] = sp;
+  //   std::cout << "name, input index, mixture index: " << _runfile.speciesNames[sp] << ", " << sp << ", " << targetIdx
+  //             << std::endl;
+  //
+  //   for (int param = 0; param < GasParams::NUM_GASPARAMS; param++)
+  //     gasParams(targetIdx, param) = _runfile.GetGasParams(sp, (GasParams)param);
+  //
+  //   /* TODO(kevin): not sure we need atomMW and composition in GasMixture.
+  //      not initialized at thit point. */
+  //   // for (int a = 0; a < _runfile.numAtoms; a++)
+  //   //   composition_(targetIdx, a) = _runfile.speciesComposition(sp, a);
+  // }
+  for (int sp = 0; sp < numSpecies; sp++) {
+    if (_runfile.speciesNames[sp] == "E") {
       isElectronIncluded = true;
-      // Set ambipolar and twoTemperature if electron is included.
       ambipolar = _runfile.IsAmbipolar();
       twoTemperature_ = _runfile.IsTwoTemperature();
-    } else {
-      targetIdx = paramIdx;
-      paramIdx++;
     }
-    speciesMapping_[_runfile.speciesNames[sp]] = targetIdx;
-    mixtureToInputMap_[targetIdx] = sp;
-    std::cout << "name, input index, mixture index: " << _runfile.speciesNames[sp] << ", " << sp << ", " << targetIdx
-              << std::endl;
 
     for (int param = 0; param < GasParams::NUM_GASPARAMS; param++)
-      gasParams(targetIdx, param) = _runfile.GetGasParams(sp, (GasParams)param);
-
-    /* TODO(kevin): not sure we need atomMW and composition in GasMixture.
-       not initialized at thit point. */
-    // for (int a = 0; a < _runfile.numAtoms; a++)
-    //   composition_(targetIdx, a) = _runfile.speciesComposition(sp, a);
+      gasParams(sp, param) = _runfile.gasParams(sp, param);
   }
 
   SetNumActiveSpecies();
@@ -553,11 +563,12 @@ PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim, int nvel) :
   specificHeatRatios_.SetSize(numSpecies);
 
   for (int sp = 0; sp < numSpecies; sp++) {
-    double inputSp = mixtureToInputMap_[sp];
+    // double inputSp = mixtureToInputMap_[sp];
     specificGasConstants_(sp) = UNIVERSALGASCONSTANT / gasParams(sp, GasParams::SPECIES_MW);
 
     // TODO(kevin): read these from input parser.
-    molarCV_(sp) = _runfile.getConstantMolarCV(inputSp) * UNIVERSALGASCONSTANT;
+    // molarCV_(sp) = _runfile.getConstantMolarCV(inputSp) * UNIVERSALGASCONSTANT;
+    molarCV_(sp) = _runfile.getConstantMolarCV(sp) * UNIVERSALGASCONSTANT;
     // NOTE: for perfect gas, CP = CV + R
     molarCP_(sp) = molarCV_(sp) + UNIVERSALGASCONSTANT;
     specificHeatRatios_(sp) = molarCP_(sp) / molarCV_(sp);

@@ -2068,17 +2068,23 @@ void M2ulPhyS::parsePlasmaModels() {
 }
 
 void M2ulPhyS::parseSpeciesInputs() {
+  // Take parameters from input. These will be sorted into config attributes.
+  DenseMatrix inputGasParams;
+  Vector inputCV, inputCP;
+  Vector inputInitialMassFraction;
+  std::vector<std::string> inputSpeciesNames;
+  DenseMatrix inputSpeciesComposition;
+
   // number of species defined
   if (config.eqSystem != NS_PASSIVE) {
     tpsP->getInput("species/numSpecies", config.numSpecies, 1);
-    config.gasParams.SetSize(config.numSpecies, GasParams::NUM_GASPARAMS);
-    // config.speciesNames.SetSize(config.numSpecies);
-    config.initialMassFractions.SetSize(config.numSpecies);
-    config.speciesNames.resize(config.numSpecies);
+    inputGasParams.SetSize(config.numSpecies, GasParams::NUM_GASPARAMS);
+    inputInitialMassFraction.SetSize(config.numSpecies);
+    inputSpeciesNames.resize(config.numSpecies);
 
     if (config.gasModel == PERFECT_MIXTURE) {
-      config.constantMolarCV.SetSize(config.numSpecies);
-      config.constantMolarCP.SetSize(config.numSpecies);
+      inputCV.SetSize(config.numSpecies);
+      // config.constantMolarCP.SetSize(config.numSpecies);
     }
   }
 
@@ -2105,8 +2111,8 @@ void M2ulPhyS::parseSpeciesInputs() {
   // Gas Params
   if (config.workFluid != DRY_AIR) {
     assert(config.numAtoms > 0);
-    config.speciesComposition.SetSize(config.numSpecies, config.numAtoms);
-    config.speciesComposition = 0.0;
+    inputSpeciesComposition.SetSize(config.numSpecies, config.numAtoms);
+    inputSpeciesComposition = 0.0;
     for (int i = 1; i <= config.numSpecies; i++) {
       // double mw, charge;
       double formEnergy;
@@ -2115,13 +2121,13 @@ void M2ulPhyS::parseSpeciesInputs() {
       std::string basepath("species/species" + std::to_string(i));
 
       tpsP->getRequiredInput((basepath + "/name").c_str(), speciesName);
-      config.speciesNames[i - 1] = speciesName;
+      inputSpeciesNames[i - 1] = speciesName;
 
       tpsP->getRequiredPairs((basepath + "/composition").c_str(), composition);
       for (size_t c = 0; c < composition.size(); c++) {
         if (config.atomMap.count(composition[c].first)) {
           int atomIdx = config.atomMap[composition[c].first];
-          config.speciesComposition(i - 1, atomIdx) = stoi(composition[c].second);
+          inputSpeciesComposition(i - 1, atomIdx) = stoi(composition[c].second);
         } else {
           grvy_printf(GRVY_ERROR, "Requested atom %s for species %s is not available!\n", composition[c].first.c_str(),
                       speciesName.c_str());
@@ -2129,9 +2135,9 @@ void M2ulPhyS::parseSpeciesInputs() {
       }
 
       tpsP->getRequiredInput((basepath + "/formation_energy").c_str(), formEnergy);
-      config.gasParams(i - 1, GasParams::FORMATION_ENERGY) = formEnergy;
+      inputGasParams(i - 1, GasParams::FORMATION_ENERGY) = formEnergy;
 
-      tpsP->getRequiredInput((basepath + "/initialMassFraction").c_str(), config.initialMassFractions(i - 1));
+      tpsP->getRequiredInput((basepath + "/initialMassFraction").c_str(), inputInitialMassFraction(i - 1));
 
       //// require initial electron temperature
       // if (speciesName == "E")
@@ -2140,17 +2146,63 @@ void M2ulPhyS::parseSpeciesInputs() {
 
       if (config.gasModel == PERFECT_MIXTURE) {
         tpsP->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(),
-                               config.constantMolarCV(i - 1));
+                               inputCV(i - 1));
         // NOTE: For perfect gas, CP will be automatically set from CV.
       }
     }
 
     Vector speciesMass(config.numSpecies), speciesCharge(config.numSpecies);
-    config.speciesComposition.Mult(config.atomMW, speciesMass);
-    config.speciesComposition.GetColumn(config.atomMap["E"], speciesCharge);
+    inputSpeciesComposition.Mult(config.atomMW, speciesMass);
+    inputSpeciesComposition.GetColumn(config.atomMap["E"], speciesCharge);
     speciesCharge *= -1.0;
-    config.gasParams.SetCol(GasParams::SPECIES_MW, speciesMass);
-    config.gasParams.SetCol(GasParams::SPECIES_CHARGES, speciesCharge);
+    inputGasParams.SetCol(GasParams::SPECIES_MW, speciesMass);
+    inputGasParams.SetCol(GasParams::SPECIES_CHARGES, speciesCharge);
+
+    // Sort the gas params for mixture and save mapping.
+    {
+      config.gasParams.SetSize(config.numSpecies, GasParams::NUM_GASPARAMS);
+      config.initialMassFractions.SetSize(config.numSpecies);
+      config.speciesNames.resize(config.numSpecies);
+      config.constantMolarCV.SetSize(config.numSpecies);
+
+      config.speciesComposition.SetSize(config.numSpecies, config.numAtoms);
+      config.speciesComposition = 0.0;
+
+      // TODO(kevin): electron species is enforced to be included in the input file.
+      bool isElectronIncluded = false;
+
+      config.gasParams = 0.0;
+      int paramIdx = 0;  // new species index.
+      int targetIdx;
+      for (int sp = 0; sp < config.numSpecies; sp++) {  // input file species index.
+        if (sp == config.backgroundInputIndex - 1) {
+          targetIdx = config.numSpecies - 1;
+        } else if (inputSpeciesNames[sp] == "E") {
+          targetIdx = config.numSpecies - 2;
+          isElectronIncluded = true;
+        } else {
+          targetIdx = paramIdx;
+          paramIdx++;
+        }
+        config.speciesMapping[inputSpeciesNames[sp]] = targetIdx;
+        config.speciesNames[targetIdx] = inputSpeciesNames[sp];
+        config.mixtureToInputMap[targetIdx] = sp;
+        std::cout << "name, input index, mixture index: " << config.speciesNames[targetIdx] << ", " << sp << ", " << targetIdx
+                  << std::endl;
+
+        for (int param = 0; param < GasParams::NUM_GASPARAMS; param++)
+          config.gasParams(targetIdx, param) = inputGasParams(sp, param);
+      }
+      assert(isElectronIncluded);
+
+      for (int sp = 0; sp < config.numSpecies; sp++) {
+        int inputIdx = config.mixtureToInputMap[sp];
+        config.initialMassFractions(sp) = inputInitialMassFraction(inputIdx);
+        config.constantMolarCV(sp) = inputCV(inputIdx);
+        for (int a = 0; a < config.numAtoms; a++)
+          config.speciesComposition(sp, a) = inputSpeciesComposition(inputIdx, a);
+      }
+    }
   }
 }
 

@@ -202,6 +202,8 @@ class RunConfiguration {
   Array<bool> detailedBalance;
   std::vector<std::vector<double>> equilibriumConstantParams;
 
+  std::map<int, int> mixtureToInputMap;
+  std::map<std::string, int> speciesMapping;
   DenseMatrix gasParams;
   Vector constantMolarCV;
   Vector constantMolarCP;

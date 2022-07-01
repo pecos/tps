@@ -325,4 +325,11 @@ struct DryAirInput {
 #endif
 };
 
+struct PerfectMixtureInput {
+  WorkingFluid f;
+
+  int numSpecies;
+  int backgroundIndex;
+};
+
 #endif  // DATASTRUCTURES_HPP_
