@@ -105,6 +105,7 @@ int main (int argc, char *argv[])
   {
     srcConfig.ambipolar = false;
     srcConfig.twoTemperature = false;
+    srcField->packUpGasMixtureInput();
     PerfectMixture *mixture = new PerfectMixture(srcConfig, dim, dim);
 
     grvy_printf(GRVY_INFO, "\n Setting a random primitive variable. \n");
@@ -519,6 +520,7 @@ int main (int argc, char *argv[])
   {
     srcConfig.ambipolar = true;
     srcConfig.twoTemperature = false;
+    srcField->packUpGasMixtureInput();
     PerfectMixture *mixture = new PerfectMixture(srcConfig, dim, dim);
 
     grvy_printf(GRVY_INFO, "\n Setting a random primitive variable. \n");
@@ -878,6 +880,7 @@ int main (int argc, char *argv[])
   {
     srcConfig.ambipolar = false;
     srcConfig.twoTemperature = true;
+    srcField->packUpGasMixtureInput();
     PerfectMixture *mixture = new PerfectMixture(srcConfig, dim, dim);
 
     grvy_printf(GRVY_INFO, "\n Setting a random primitive variable. \n");
@@ -1239,6 +1242,7 @@ int main (int argc, char *argv[])
   {
     srcConfig.ambipolar = true;
     srcConfig.twoTemperature = true;
+    srcField->packUpGasMixtureInput();
     PerfectMixture *mixture = new PerfectMixture(srcConfig, dim, dim);
 
     grvy_printf(GRVY_INFO, "\n Setting a random primitive variable. \n");
