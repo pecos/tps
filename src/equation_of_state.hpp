@@ -609,7 +609,7 @@ class PerfectMixture : public GasMixture {
   MFEM_HOST_DEVICE virtual double GetSpecificHeatRatio() { return molarCP_[numSpecies - 1] / molarCV_[numSpecies - 1]; }
   MFEM_HOST_DEVICE virtual double GetGasConstant() { return specificGasConstants_[numSpecies - 1]; }
 
-  MFEM_HOST_DEVICE virtual double computeHeaviesHeatCapacity(const double *n_sp, const double &nB);
+  MFEM_HOST_DEVICE virtual double computeHeaviesHeatCapacity(const double *n_sp, const double &nB) const;
   MFEM_HOST_DEVICE virtual double computeAmbipolarElectronNumberDensity(const double *n_sp) const;
   MFEM_HOST_DEVICE virtual double computeBackgroundMassDensity(const double &rho, const double *n_sp, double &n_e,
                                                                bool isElectronComputed = false) const;

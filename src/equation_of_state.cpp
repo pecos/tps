@@ -592,7 +592,7 @@ MFEM_HOST_DEVICE PerfectMixture::PerfectMixture(PerfectMixtureInput inputs, int 
 }
 
 // compute heavy-species heat capacity from number densities.
-MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesHeatCapacity(const double *n_sp, const double &nB) {
+MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesHeatCapacity(const double *n_sp, const double &nB) const {
   double heatCapacity = 0.0;
 
   for (int sp = 0; sp < numActiveSpecies; sp++) {
