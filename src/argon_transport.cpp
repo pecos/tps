@@ -66,17 +66,17 @@ ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture, RunConfigurat
   //   grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
   //   exit(ERROR);
   // }
-  neutralIndex_ = _runfile.ArgonMinimalTransportInput.neutralIndex;
+  neutralIndex_ = _runfile.argonTransportInput.neutralIndex;
   if (neutralIndex_ < 0) {
     grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar' !\n");
     exit(ERROR);
   }
-  ionIndex_ = _runfile.ArgonMinimalTransportInput.ionIndex;
+  ionIndex_ = _runfile.argonTransportInput.ionIndex;
   if (ionIndex_ < 0) {
     grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar.+1' !\n");
     exit(ERROR);
   }
-  electronIndex_ = _runfile.ArgonMinimalTransportInput.electronIndex;
+  electronIndex_ = _runfile.argonTransportInput.electronIndex;
   if (electronIndex_ < 0) {
     grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
     exit(ERROR);

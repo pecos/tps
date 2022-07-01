@@ -237,7 +237,7 @@ ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_ru
     mtFreq_(mixSp) = _runfile.constantTransport.mtFreq(mixSp);
   }
 
-  electronIndex_ = _runfile.constantTransportData.electronIndex;
+  electronIndex_ = _runfile.constantTransport.electronIndex;
   if (mixture->IsTwoTemperature()) {
     // std::map<std::string, int> *speciesMapping = mixture->getSpeciesMapping();
     // if (speciesMapping->count("E")) {

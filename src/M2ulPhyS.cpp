@@ -2281,10 +2281,10 @@ void M2ulPhyS::parseTransportInputs() {
           tpsP->getRequiredInput((mtpath + "/species" + std::to_string(inputSp + 1)).c_str(),
                                  config.constantTransport.mtFreq(sp));
       }
-      config.constantTransportData.electronIndex = -1;
+      config.constantTransport.electronIndex = -1;
       if (config.IsTwoTemperature()) {
         if (config.speciesMapping.count("E")) {
-          config.constantTransportData.electronIndex = config.speciesMapping["E"];
+          config.constantTransport.electronIndex = config.speciesMapping["E"];
         } else {
           grvy_printf(GRVY_ERROR, "\nConstant transport: two-temperature plasma requires the species 'E' !\n");
           exit(ERROR);
