@@ -1474,7 +1474,8 @@ void PerfectMixture::ComputeMoleFractionGradient(const Vector &numberDensities, 
   //   moleFractionGrad(sp, d) = nBGrad(d) / totalN - numberDensities(sp) / totalN / totalN * totalNGrad(d);
   // }
   const double *d_gradUp = gradUp.Read();
-  ComputeMoleFractionGradient(&numberDensities[0], d_gradUp, &moleFractionGrad[0]);
+  double *d_moleFractionGrad = moleFractionGrad.Write();
+  ComputeMoleFractionGradient(&numberDensities[0], d_gradUp, d_moleFractionGrad);
 }
 
 MFEM_HOST_DEVICE void PerfectMixture::ComputeMoleFractionGradient(const double *numberDensities, const double *gradUp,
@@ -1506,7 +1507,7 @@ MFEM_HOST_DEVICE void PerfectMixture::ComputeMoleFractionGradient(const double *
     // nBGrad.Add(-GetGasParams(numSpecies - 2, GasParams::SPECIES_MW), neGrad);
     for (int d = 0; d < dim; d++) nBGrad[d] += -GetGasParams(numSpecies - 2, GasParams::SPECIES_MW) * neGrad[d];
   }
-  nBGrad /= GetGasParams(numSpecies - 1, GasParams::SPECIES_MW);
+  for (int d = 0; d < dim; d++) nBGrad[d] /= GetGasParams(numSpecies - 1, GasParams::SPECIES_MW);
 
   double totalNGrad[gpudata::MAXDIM];
   for (int d = 0; d < dim; d++) totalNGrad[d] = 0.0;
@@ -1514,7 +1515,7 @@ MFEM_HOST_DEVICE void PerfectMixture::ComputeMoleFractionGradient(const double *
   for (int sp = 0; sp < numActiveSpecies; sp++) {  // if not ambipolar, electron is included.
     for (int d = 0; d < dim; d++) totalNGrad[d] += gradUp[(nvel_ + 2 + sp) + d * num_equation];
   }
-  if (ambipolar) {
+  if (ambipolar)
     for (int d = 0; d < dim; d++) totalNGrad[d] += neGrad[d];
   for (int d = 0; d < dim; d++) totalNGrad[d] += nBGrad[d];
 
