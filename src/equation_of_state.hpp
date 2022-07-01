@@ -135,7 +135,7 @@ class GasMixture {
   // virtual int getInputIndexOf(int mixtureIndex) { return 0; }
   // int getElectronMixtureIndex() { return (speciesMapping_.count("E")) ? speciesMapping_["E"] : -1; }
   // virtual std::map<int, int> *getMixtureToInputMap() { return NULL; }
-  virtual std::map<std::string, int> *getSpeciesMapping() { return NULL; }
+  // virtual std::map<std::string, int> *getSpeciesMapping() { return NULL; }
   // DenseMatrix *getCompositions() { return &composition_; }
 
   virtual double GetGasParams(int species, GasParams param) { return 0.0; }
@@ -579,7 +579,7 @@ class PerfectMixture : public GasMixture {
 
   DenseMatrix gasParams;
   // std::map<int, int> mixtureToInputMap_;
-  std::map<std::string, int> speciesMapping_;
+  // std::map<std::string, int> speciesMapping_;
 
   // virtual void SetNumEquations();
  public:
@@ -592,7 +592,7 @@ class PerfectMixture : public GasMixture {
 
   // virtual int getInputIndexOf(int mixtureIndex) { return mixtureToInputMap_[mixtureIndex]; }
   // virtual std::map<int, int> *getMixtureToInputMap() { return &mixtureToInputMap_; }
-  virtual std::map<std::string, int> *getSpeciesMapping() { return &speciesMapping_; }
+  // virtual std::map<std::string, int> *getSpeciesMapping() { return &speciesMapping_; }
   virtual double GetGasParams(int species, GasParams param) { return gasParams(species, param); }
 
   virtual double getMolarCV(int species) { return molarCV_(species); }

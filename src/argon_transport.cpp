@@ -47,22 +47,37 @@ ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture, RunConfigurat
     exit(ERROR);
   }
 
-  std::map<std::string, int> *speciesMapping = mixture->getSpeciesMapping();
-  if (speciesMapping->count("Ar")) {
-    neutralIndex_ = (*speciesMapping)["Ar"];
-  } else {
+  // std::map<std::string, int> *speciesMapping = mixture->getSpeciesMapping();
+  // if (speciesMapping->count("Ar")) {
+  //   neutralIndex_ = (*speciesMapping)["Ar"];
+  // } else {
+  //   grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar' !\n");
+  //   exit(ERROR);
+  // }
+  // if (speciesMapping->count("Ar.+1")) {
+  //   ionIndex_ = (*speciesMapping)["Ar.+1"];
+  // } else {
+  //   grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar.+1' !\n");
+  //   exit(ERROR);
+  // }
+  // if (speciesMapping->count("E")) {
+  //   electronIndex_ = (*speciesMapping)["E"];
+  // } else {
+  //   grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
+  //   exit(ERROR);
+  // }
+  neutralIndex_ = _runfile.ArgonMinimalTransportInput.neutralIndex;
+  if (neutralIndex_ < 0) {
     grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar' !\n");
     exit(ERROR);
   }
-  if (speciesMapping->count("Ar.+1")) {
-    ionIndex_ = (*speciesMapping)["Ar.+1"];
-  } else {
+  ionIndex_ = _runfile.ArgonMinimalTransportInput.ionIndex;
+  if (ionIndex_ < 0) {
     grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar.+1' !\n");
     exit(ERROR);
   }
-  if (speciesMapping->count("E")) {
-    electronIndex_ = (*speciesMapping)["E"];
-  } else {
+  electronIndex_ = _runfile.ArgonMinimalTransportInput.electronIndex;
+  if (electronIndex_ < 0) {
     grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
     exit(ERROR);
   }
@@ -434,10 +449,15 @@ ArgonMixtureTransport::ArgonMixtureTransport(GasMixture *_mixture, RunConfigurat
       numAtoms_(_runfile.numAtoms),
       atomMap_(_runfile.atomMap),
       speciesNames_(_runfile.speciesNames) {
-  std::map<std::string, int> *speciesMapping = mixture->getSpeciesMapping();
-  if (speciesMapping->count("E")) {
-    electronIndex_ = (*speciesMapping)["E"];
-  } else {
+  // std::map<std::string, int> *speciesMapping = mixture->getSpeciesMapping();
+  // if (speciesMapping->count("E")) {
+  //   electronIndex_ = (*speciesMapping)["E"];
+  // } else {
+  //   grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
+  //   exit(ERROR);
+  // }
+  electronIndex_ = _runfile.argonTransportInput.electronIndex;
+  if (electronIndex_ < 0) {
     grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
     exit(ERROR);
   }

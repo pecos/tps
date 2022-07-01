@@ -258,6 +258,8 @@ struct constantTransportData {
   double thermalConductivity;
   double electronThermalConductivity;
   Vector mtFreq;  // momentum transfer frequency
+
+  int electronIndex;
 };
 
 struct collisionInputs {
@@ -330,6 +332,16 @@ struct PerfectMixtureInput {
 
   int numSpecies;
   int backgroundIndex;
+};
+
+struct ArgonTransportInput {
+  int neutralIndex;
+  int ionIndex;
+  int electronIndex;
+};
+
+struct ChemistryInput {
+  int electronIndex;
 };
 
 #endif  // DATASTRUCTURES_HPP_

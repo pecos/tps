@@ -71,10 +71,10 @@ int main (int argc, char *argv[])
   int numSpecies = mixture->GetNumSpecies();
   int numActiveSpecies = mixture->GetNumActiveSpecies();
   int num_equation = mixture->GetNumEquations();
-  std::map<std::string, int> *speciesMapping = mixture->getSpeciesMapping();
-  int electronIndex = (*speciesMapping)["E"];
-  int ionIndex = (*speciesMapping)["Ar.+1"];
-  int neutralIndex = (*speciesMapping)["Ar"];
+  // std::map<std::string, int> *speciesMapping = mixture->getSpeciesMapping();
+  int electronIndex = srcConfig.speciesMapping["E"];
+  int ionIndex = srcConfig.speciesMapping["Ar.+1"];
+  int neutralIndex = srcConfig.speciesMapping["Ar"];
 
   std::string fileName = "./ref_solns/transport/Chung.transport.h5";
   std::string datasetName = "transport";

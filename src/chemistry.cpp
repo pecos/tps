@@ -46,8 +46,9 @@ Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : mixture_(m
   model_ = config.GetChemistryModel();
 
   // mixtureToInputMap_ = mixture->getMixtureToInputMap();
-  speciesMapping_ = mixture->getSpeciesMapping();
-  electronIndex_ = (speciesMapping_->count("E")) ? (*speciesMapping_)["E"] : -1;
+  // speciesMapping_ = mixture->getSpeciesMapping();
+  // electronIndex_ = (speciesMapping_->count("E")) ? (*speciesMapping_)["E"] : -1;
+  electronIndex_ = config.chemistryInput.electronIndex;
 
   numReactions_ = config.numReactions;
   reactionEnergies_.SetSize(numReactions_);

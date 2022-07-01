@@ -237,11 +237,13 @@ ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_ru
     mtFreq_(mixSp) = _runfile.constantTransport.mtFreq(mixSp);
   }
 
+  electronIndex_ = _runfile.constantTransportData.electronIndex;
   if (mixture->IsTwoTemperature()) {
-    std::map<std::string, int> *speciesMapping = mixture->getSpeciesMapping();
-    if (speciesMapping->count("E")) {
-      electronIndex_ = (*speciesMapping)["E"];
-    } else {
+    // std::map<std::string, int> *speciesMapping = mixture->getSpeciesMapping();
+    // if (speciesMapping->count("E")) {
+    //   electronIndex_ = (*speciesMapping)["E"];
+    // } else {
+    if (electronIndex_ < 0) {
       grvy_printf(GRVY_ERROR, "\nConstant transport: two-temperature plasma requires the species 'E' !\n");
       exit(ERROR);
     }

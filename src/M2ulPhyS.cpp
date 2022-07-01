@@ -2210,7 +2210,7 @@ void M2ulPhyS::parseSpeciesInputs() {
 
 void M2ulPhyS::parseTransportInputs() {
   switch (config.transportModel) {
-    case ARGON_MINIMAL:
+    case ARGON_MINIMAL: {
       // Check if unsupported species are included.
       for (int sp = 0; sp < config.numSpecies; sp++) {
         if ((config.speciesNames[sp] != "Ar") && (config.speciesNames[sp] != "Ar.+1") &&
@@ -2222,11 +2222,43 @@ void M2ulPhyS::parseTransportInputs() {
       }
       tpsP->getInput("plasma_models/transport_model/argon_minimal/third_order_thermal_conductivity",
                      config.thirdOrderkElectron, true);
-      break;
-    case ARGON_MIXTURE:
+
+      // pack up argon minimal transport input.
+      {
+        if (config.speciesMapping.count("Ar")) {
+          config.argonTransportInput.neutralIndex = config.speciesMapping["Ar"];
+        } else {
+          grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar' !\n");
+          exit(ERROR);
+        }
+        if (config.speciesMapping.count("Ar.+1")) {
+          config.argonTransportInput.ionIndex = config.speciesMapping["Ar.+1"];
+        } else {
+          grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar.+1' !\n");
+          exit(ERROR);
+        }
+        if (config.speciesMapping.count("E")) {
+          config.argonTransportInput.electronIndex = config.speciesMapping["E"];
+        } else {
+          grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
+          exit(ERROR);
+        }
+      }
+    } break;
+    case ARGON_MIXTURE: {
       tpsP->getInput("plasma_models/transport_model/argon_mixture/third_order_thermal_conductivity",
                      config.thirdOrderkElectron, true);
-      break;
+
+      // pack up argon transport input.
+      {
+        if (config.speciesMapping.count("E")) {
+          config.argonTransportInput.electronIndex = config.speciesMapping["E"];
+        } else {
+          grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
+          exit(ERROR);
+        }
+      }
+    } break;
     case CONSTANT: {
       tpsP->getRequiredInput("plasma_models/transport_model/constant/viscosity", config.constantTransport.viscosity);
       tpsP->getRequiredInput("plasma_models/transport_model/constant/bulk_viscosity",
@@ -2248,6 +2280,15 @@ void M2ulPhyS::parseTransportInputs() {
         if (config.twoTemperature)
           tpsP->getRequiredInput((mtpath + "/species" + std::to_string(inputSp + 1)).c_str(),
                                  config.constantTransport.mtFreq(sp));
+      }
+      config.constantTransportData.electronIndex = -1;
+      if (config.IsTwoTemperature()) {
+        if (config.speciesMapping.count("E")) {
+          config.constantTransportData.electronIndex = config.speciesMapping["E"];
+        } else {
+          grvy_printf(GRVY_ERROR, "\nConstant transport: two-temperature plasma requires the species 'E' !\n");
+          exit(ERROR);
+        }
       }
     } break;
     default:
@@ -2329,6 +2370,15 @@ void M2ulPhyS::parseReactionInputs() {
     for (int sp = 0; sp < config.numSpecies; sp++) {
       int inputSp = config.mixtureToInputMap[sp];
       config.productStoich(sp, r - 1) = stoich[inputSp];
+    }
+  }
+
+  // Pack up chemistry input for instantiation.
+  {
+    if (config.speciesMapping.count("E")) {
+      config.chemistryInput.electronIndex = config.speciesMapping["E"];
+    } else {
+      config.chemistryInput.electronIndex = -1;
     }
   }
 }
