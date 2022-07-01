@@ -1473,7 +1473,8 @@ void PerfectMixture::ComputeMoleFractionGradient(const Vector &numberDensities, 
   // for (int d = 0; d < dim; d++) {
   //   moleFractionGrad(sp, d) = nBGrad(d) / totalN - numberDensities(sp) / totalN / totalN * totalNGrad(d);
   // }
-  ComputeMoleFractionGradient(&numberDensities[0], &gradUp[0], &moleFractionGrad[0]);
+  const double *d_gradUp = gradUp.Read();
+  ComputeMoleFractionGradient(&numberDensities[0], d_gradUp, &moleFractionGrad[0]);
 }
 
 MFEM_HOST_DEVICE void PerfectMixture::ComputeMoleFractionGradient(const double *numberDensities, const double *gradUp,
@@ -1785,7 +1786,8 @@ void PerfectMixture::computeElectronPressureGrad(const double n_e, const double 
   //   gradPe(d) = (neGrad(d) * T_e + n_e * gradUp(num_equation - 1, d)) * UNIVERSALGASCONSTANT;
   //
   // return;
-  computeElectronPressureGrad(n_e, T_e, &gradUp[0], &gradPe[0]);
+  const double *d_gradUp = gradUp.Read();
+  computeElectronPressureGrad(n_e, T_e, d_gradUp, &gradPe[0]);
 }
 
 MFEM_HOST_DEVICE void PerfectMixture::computeElectronPressureGrad(const double n_e, const double T_e, const double *gradUp,
