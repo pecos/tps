@@ -67,7 +67,16 @@ int main (int argc, char *argv[])
   double pressure = 101325.0;
 
   PerfectMixture *mixture = new PerfectMixture(srcConfig, dim, dim);
-  ArgonMinimalTransport *transport = new ArgonMinimalTransport(mixture, srcConfig);
+  TransportProperties *transport;
+  switch (srcConfig.GetTranportModel()) {
+    case ARGON_MINIMAL:
+      transport = new ArgonMinimalTransport(mixture, srcConfig);
+      break;
+    case ARGON_MIXTURE:
+      transport = new ArgonMixtureTransport(mixture, srcConfig);
+      break;
+  }
+  //ArgonMinimalTransport *transport = new ArgonMinimalTransport(mixture, srcConfig);
   int numSpecies = mixture->GetNumSpecies();
   int numActiveSpecies = mixture->GetNumActiveSpecies();
   int num_equation = mixture->GetNumEquations();
