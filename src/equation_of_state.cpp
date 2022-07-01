@@ -514,7 +514,7 @@ MFEM_HOST_DEVICE PerfectMixture::PerfectMixture(PerfectMixtureInput inputs, int 
     twoTemperature_ = inputs.twoTemperature;
   }
 
-  gasParams.SetSize(numSpecies, GasParams::NUM_GASPARAMS);
+  // gasParams.SetSize(numSpecies, GasParams::NUM_GASPARAMS);
   // composition_.SetSize(numSpecies, _runfile.numAtoms);
 
   // gasParams = 0.0;
