@@ -1530,7 +1530,7 @@ void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::
   // for (int sp = 0; sp < numSpecies - 2; sp++) rE += n_sp(sp) * GetGasParams(sp, GasParams::FORMATION_ENERGY);
   //
   // stateOut(1 + nvel_) = rE;
-  modifyEnergyForPressure(&stateIn, &stateOut, p, modifyElectronEnergy);
+  modifyEnergyForPressure(&stateIn[0], &stateOut[0], p, modifyElectronEnergy);
 }
 
 MFEM_HOST_DEVICE void PerfectMixture::modifyEnergyForPressure(const double *stateIn, double *stateOut, const double &p,
