@@ -148,7 +148,7 @@ class ArgonMixtureTransport : public ArgonMinimalTransport {
   std::map<std::string, int> atomMap_;
   Array<ArgonSpcs> speciesType_;
   std::vector<std::string> speciesNames_;
-  std::map<int, int> *mixtureToInputMap_;
+  // std::map<int, int> *mixtureToInputMap_;
 
   // integer matrix. only upper triangular part will be used.
   std::vector<std::vector<ArgonColl>> collisionIndex_;

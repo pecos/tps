@@ -66,7 +66,7 @@ class Chemistry {
   std::vector<Reaction *> reactions_;
   Vector reactionEnergies_;
 
-  std::map<int, int> *mixtureToInputMap_;
+  // std::map<int, int> *mixtureToInputMap_;
   std::map<std::string, int> *speciesMapping_;
   int electronIndex_ = -1;
 

@@ -502,12 +502,12 @@ void initTernary2DBase(GasMixture *mixture, RunConfiguration &config, const doub
     assert(config.numReactions == 1);
     assert(config.reactionModels[0] == ARRHENIUS);
     assert(config.detailedBalance[0]);
-    assert(config.reactantStoich((*mixtureToInputMap)[0], 0) == 0);
-    assert(config.reactantStoich((*mixtureToInputMap)[1], 0) == 1);
-    assert(config.reactantStoich((*mixtureToInputMap)[2], 0) == 1);
-    assert(config.productStoich((*mixtureToInputMap)[0], 0) == 1);
-    assert(config.productStoich((*mixtureToInputMap)[1], 0) == 2);
-    assert(config.productStoich((*mixtureToInputMap)[2], 0) == 0);
+    assert(config.reactantStoich(0, 0) == 0);
+    assert(config.reactantStoich(1, 0) == 1);
+    assert(config.reactantStoich(2, 0) == 1);
+    assert(config.productStoich(0, 0) == 1);
+    assert(config.productStoich(1, 0) == 2);
+    assert(config.productStoich(2, 0) == 0);
 
     Af = (config.reactionModelParams[0])[0];
     bf = (config.reactionModelParams[0])[1];
@@ -660,8 +660,9 @@ void initTernary2D2TAmbipolarInoutlet(GasMixture *mixture, RunConfiguration &con
   double rho0 = inlet0[0];
   double u0 = inlet0[1];
   double v0 = inlet0[2];
-  int ionIndex = (*mixtureToInputMap)[0];
-  double YI = inlet0[4 + ionIndex];
+  // int ionIndex = (*mixtureToInputMap)[0];
+  // double YI = inlet0[4 + ionIndex];
+  double YI = inlet0[4 + 0];
   assert(p0[0] > 0.0);
   assert(rho0 > 0.0);
   assert(YI > 0.0);
