@@ -326,7 +326,7 @@ class DryAir : public GasMixture {
 
   MFEM_HOST_DEVICE virtual ~DryAir() {}
 
-  virtual double GetGasParams(int species, GasParams param) {
+  MFEM_HOST_DEVICE virtual double GetGasParams(int species, GasParams param) const {
     assert(param == GasParams::SPECIES_MW);
     return UNIVERSALGASCONSTANT / gas_constant;
   }
