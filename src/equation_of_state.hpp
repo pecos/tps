@@ -414,7 +414,7 @@ class DryAir : public GasMixture {
   }
   MFEM_HOST_DEVICE virtual void computeElectronPressureGrad(const double n_e, const double T_e, const double *gradUp,
                                                             double *gradPe) {
-    mfem_error("computeElectronPressureGrad not implemented");
+    printf("computeElectronPressureGrad not implemented");
   }
   // GPU functions
   // TODO(kevin): GPU part is not refactored for axisymmetric case.
