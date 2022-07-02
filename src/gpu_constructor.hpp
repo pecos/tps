@@ -72,8 +72,9 @@ namespace gpu {
 #if defined(_CUDA_)
 // CUDA supports device new/delete
 __global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int nvel, GasMixture **mix);
-__global__ void instantiateDeviceTransport(GasMixture *mixture, const double viscosity_multiplier,
-                                           const double bulk_viscosity, TransportProperties **trans);
+__global__ void instantiateDeviceDryAirTransport(GasMixture *mixture, const double viscosity_multiplier,
+                                                 const double bulk_viscosity, TransportProperties **trans);
+__global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, GasMixture **mix);
 __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
                                         const int _num_equation, const int _dim, bool axisym, Fluxes **f);
 __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
@@ -93,8 +94,9 @@ __global__ void freeDeviceRiemann(RiemannSolver *r);
 // use placement new.  Maybe should adopt this approach for CUDA as
 // well, as it seems actually slightly cleaner.
 __global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int nvel, void *mix);
-__global__ void instantiateDeviceTransport(GasMixture *mixture, const double viscosity_multiplier,
-                                           const double bulk_viscosity, void *transport);
+__global__ void instantiateDeviceDryAirTransport(GasMixture *mixture, const double viscosity_multiplier,
+                                                 const double bulk_viscosity, void *transport);
+__global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, void *mix);
 __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
                                         const int _num_equation, const int _dim, bool axisym, void *f);
 __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,

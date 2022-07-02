@@ -47,9 +47,13 @@ __global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int 
   *mix = new DryAir(inputs, _dim, nvel);
 }
 
-__global__ void instantiateDeviceTransport(GasMixture *mixture, const double viscosity_multiplier,
-                                           const double bulk_viscosity, TransportProperties **trans) {
+__global__ void instantiateDeviceDryAirTransport(GasMixture *mixture, const double viscosity_multiplier,
+                                                 const double bulk_viscosity, TransportProperties **trans) {
   *trans = new DryAirTransport(mixture, viscosity_multiplier, bulk_viscosity);
+}
+
+__global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, GasMixture **mix) {
+  *mix = new PerfectMixture(inputs, _dim, nvel);
 }
 
 __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
@@ -78,9 +82,13 @@ __global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int 
   mix = new (mix) DryAir(inputs, _dim, nvel);
 }
 
-__global__ void instantiateDeviceTransport(GasMixture *mixture, const double viscosity_multiplier,
-                                           const double bulk_viscosity, void *transport) {
+__global__ void instantiateDeviceDryAirTransport(GasMixture *mixture, const double viscosity_multiplier,
+                                                 const double bulk_viscosity, void *transport) {
   transport = new (transport) DryAirTransport(mixture, viscosity_multiplier, bulk_viscosity);
+}
+
+__global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, void *mix) {
+  mix = new (mix) PerfectMixture(inputs, _dim, nvel);
 }
 
 __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,

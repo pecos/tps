@@ -273,13 +273,13 @@ void M2ulPhyS::initVariables() {
       gpu::instantiateDeviceDryAir<<<1, 1>>>(config.dryAirInput, dim, nvel, d_mixture_tmp);
       cudaMemcpy(&d_mixture, d_mixture_tmp, sizeof(GasMixture *), cudaMemcpyDeviceToHost);
 
-      gpu::instantiateDeviceTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(),
-                                                d_transport_tmp);
+      gpu::instantiateDeviceDryAirTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(),
+                                                      d_transport_tmp);
       cudaMemcpy(&transportPtr, d_transport_tmp, sizeof(TransportProperties *), cudaMemcpyDeviceToHost);
 #elif defined(_HIP_)
       gpu::instantiateDeviceDryAir<<<1, 1>>>(config.dryAirInput, dim, nvel, d_mixture);
-      gpu::instantiateDeviceTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(),
-                                                transportPtr);
+      gpu::instantiateDeviceDryAirTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(),
+                                                      transportPtr);
 #else
       transportPtr = new DryAirTransport(mixture, config);
 #endif
@@ -288,6 +288,13 @@ void M2ulPhyS::initVariables() {
       switch (config.GetGasModel()) {
         case GasModel::PERFECT_MIXTURE:
           mixture = new PerfectMixture(config, dim, nvel);
+#if defined(_CUDA_)
+          gpu::instantiateDevicePerfectMixture<<<1, 1>>>(config.perfectMixtureInput, dim, nvel, d_mixture_tmp);
+          cudaMemcpy(&d_mixture, d_mixture_tmp, sizeof(GasMixture *), cudaMemcpyDeviceToHost);
+#elif defined(_HIP_)
+          mfem_error("PerfectMixture is not supported for HIP!");
+          gpu::instantiateDevicePerfectMixture<<<1, 1>>>(config.perfectMixtureInput, dim, nvel, d_mixture);
+#endif
           break;
         default:
           mfem_error("GasModel not recognized.");
