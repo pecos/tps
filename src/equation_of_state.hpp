@@ -280,15 +280,15 @@ class GasMixture {
     return;
   }
 
-//  MFEM_HOST_DEVICE virtual double computeAmbipolarElectronNumberDensity(const double *n_sp) const {
-//    mfem_error("computeAmbipolarElectronNumberDensity not implemented");
-//    return 0;
-//  }
-//  MFEM_HOST_DEVICE virtual double computeBackgroundMassDensity(const double &rho, const double *n_sp, double &n_e,
-//                                                               bool isElectronComputed = false) const {
-//    mfem_error("computeBackgroundMassDensity not implemented");
-//    return 0;
-//  }
+  //  MFEM_HOST_DEVICE virtual double computeAmbipolarElectronNumberDensity(const double *n_sp) const {
+  //    mfem_error("computeAmbipolarElectronNumberDensity not implemented");
+  //    return 0;
+  //  }
+  //  MFEM_HOST_DEVICE virtual double computeBackgroundMassDensity(const double &rho, const double *n_sp, double &n_e,
+  //                                                               bool isElectronComputed = false) const {
+  //    mfem_error("computeBackgroundMassDensity not implemented");
+  //    return 0;
+  //  }
 
   // TODO(kevin): check if this works for axisymmetric case.
   virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
@@ -686,7 +686,8 @@ class PerfectMixture : public GasMixture {
 
   virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true);
   MFEM_HOST_DEVICE virtual double ComputeSpeedOfSound(const double *Uin, bool primitive = true);
-  MFEM_HOST_DEVICE double computeSpeedOfSoundBase(const double *n_sp, const double n_B, const double rho, const double p);
+  MFEM_HOST_DEVICE double computeSpeedOfSoundBase(const double *n_sp, const double n_B, const double rho,
+                                                  const double p);
 
   MFEM_HOST_DEVICE double computeHeaviesMixtureCV(const double *n_sp, const double n_B);
   MFEM_HOST_DEVICE double computeHeaviesMixtureHeatRatio(const double *n_sp, const double n_B);
