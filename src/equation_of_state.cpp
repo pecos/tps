@@ -1519,8 +1519,9 @@ MFEM_HOST_DEVICE void PerfectMixture::ComputeMoleFractionGradient(const double *
   for (int sp = 0; sp < numActiveSpecies; sp++) {  // if not ambipolar, electron is included.
     for (int d = 0; d < dim; d++) totalNGrad[d] += gradUp[(nvel_ + 2 + sp) + d * num_equation];
   }
-  if (ambipolar)
+  if (ambipolar) {
     for (int d = 0; d < dim; d++) totalNGrad[d] += neGrad[d];
+  }
   for (int d = 0; d < dim; d++) totalNGrad[d] += nBGrad[d];
 
   for (int sp = 0; sp < numActiveSpecies; sp++) {

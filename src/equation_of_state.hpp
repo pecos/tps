@@ -57,7 +57,10 @@ static const double BOLTZMANNCONSTANT = UNIVERSALGASCONSTANT / AVOGADRONUMBER;
 static const double VACUUMPERMITTIVITY = 8.8541878128e-12;
 static const double ELECTRONCHARGE = 1.60218e-19;
 static const double MOLARELECTRONCHARGE = ELECTRONCHARGE * AVOGADRONUMBER;
-static const double PI = 4.0 * atan(1.0);
+static const double PI = 3.14159265358979323846;
+// NOTE(kevin): using atan when initializing static const variable is not allowed in the device.
+//              chose an easy fix.
+// static const double PI = 4.0 * atan(1.0);
 
 class GasMixture {
  protected:
