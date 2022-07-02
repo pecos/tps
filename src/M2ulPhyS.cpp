@@ -273,11 +273,13 @@ void M2ulPhyS::initVariables() {
       gpu::instantiateDeviceDryAir<<<1, 1>>>(config.dryAirInput, dim, nvel, d_mixture_tmp);
       cudaMemcpy(&d_mixture, d_mixture_tmp, sizeof(GasMixture *), cudaMemcpyDeviceToHost);
 
-      gpu::instantiateDeviceTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(), d_transport_tmp);
+      gpu::instantiateDeviceTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(),
+                                                d_transport_tmp);
       cudaMemcpy(&transportPtr, d_transport_tmp, sizeof(TransportProperties *), cudaMemcpyDeviceToHost);
 #elif defined(_HIP_)
       gpu::instantiateDeviceDryAir<<<1, 1>>>(config.dryAirInput, dim, nvel, d_mixture);
-      gpu::instantiateDeviceTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(), transportPtr);
+      gpu::instantiateDeviceTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(),
+                                                transportPtr);
 #else
       transportPtr = new DryAirTransport(mixture, config);
 #endif
@@ -431,25 +433,25 @@ void M2ulPhyS::initVariables() {
   Fluxes **d_flux_tmp;
   cudaMalloc((void **)&d_flux_tmp, sizeof(Fluxes **));
   gpu::instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(),
-                                    d_flux_tmp);
+                                         d_flux_tmp);
   cudaMemcpy(&fluxClass, d_flux_tmp, sizeof(Fluxes *), cudaMemcpyDeviceToHost);
   cudaFree(d_flux_tmp);
 
   RiemannSolver **d_riemann_tmp;
   cudaMalloc((void **)&d_riemann_tmp, sizeof(RiemannSolver **));
   gpu::instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, fluxClass, config.RoeRiemannSolver(),
-                                     config.isAxisymmetric(), d_riemann_tmp);
+                                          config.isAxisymmetric(), d_riemann_tmp);
 
   cudaMemcpy(&rsolver, d_riemann_tmp, sizeof(RiemannSolver *), cudaMemcpyDeviceToHost);
   cudaFree(d_riemann_tmp);
 #elif defined(_HIP_)
   hipMalloc((void **)&fluxClass, sizeof(Fluxes));
   gpu::instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(),
-                                    fluxClass);
+                                         fluxClass);
 
   hipMalloc((void **)&rsolver, sizeof(RiemannSolver));
   gpu::instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, fluxClass, config.RoeRiemannSolver(),
-                                     config.isAxisymmetric(), rsolver);
+                                          config.isAxisymmetric(), rsolver);
 #else
   fluxClass = new Fluxes(mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric());
 
@@ -2145,8 +2147,7 @@ void M2ulPhyS::parseSpeciesInputs() {
       //                         config.initialElectronTemperature);
 
       if (config.gasModel == PERFECT_MIXTURE) {
-        tpsP->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(),
-                               inputCV(i - 1));
+        tpsP->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(), inputCV(i - 1));
         // NOTE: For perfect gas, CP will be automatically set from CV.
       }
     }
@@ -2188,8 +2189,8 @@ void M2ulPhyS::parseSpeciesInputs() {
         config.speciesNames[targetIdx] = inputSpeciesNames[sp];
         config.mixtureToInputMap[targetIdx] = sp;
         if (mpi.Root()) {
-          std::cout << "name, input index, mixture index: " << config.speciesNames[targetIdx] << ", " << sp << ", " << targetIdx
-                    << std::endl;
+          std::cout << "name, input index, mixture index: " << config.speciesNames[targetIdx] << ", " << sp << ", "
+                    << targetIdx << std::endl;
         }
 
         for (int param = 0; param < GasParams::NUM_GASPARAMS; param++)
@@ -2668,9 +2669,8 @@ void M2ulPhyS::packUpGasMixtureInput() {
         config.perfectMixtureInput.twoTemperature = config.twoTemperature;
 
         for (int sp = 0; sp < config.numSpecies; sp++) {
-          for (int param = 0; param < (int) GasParams::NUM_GASPARAMS; param++) {
-            config.perfectMixtureInput.gasParams[sp + param * config.numSpecies] =
-              config.gasParams(sp, param);
+          for (int param = 0; param < (int)GasParams::NUM_GASPARAMS; param++) {
+            config.perfectMixtureInput.gasParams[sp + param * config.numSpecies] = config.gasParams(sp, param);
           }
           config.perfectMixtureInput.molarCV[sp] = config.constantMolarCV(sp);
         }
@@ -2678,9 +2678,9 @@ void M2ulPhyS::packUpGasMixtureInput() {
       default:
         grvy_printf(GRVY_ERROR, "Gas model is not specified!\n");
         exit(ERROR);
-      break;
+        break;
     }  // switch gasModel
-  }  // workFluid == USER_DEFINED
+  }    // workFluid == USER_DEFINED
 }
 
 void M2ulPhyS::checkSolverOptions() const {

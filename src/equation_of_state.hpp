@@ -169,7 +169,8 @@ class GasMixture {
   virtual void computeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp) {
     mfem_error("computeSpeciesPrimitives not implemented");
   }
-  MFEM_HOST_DEVICE virtual void computeSpeciesPrimitives(const double *conservedState, double *X_sp, double *Y_sp, double *n_sp) {
+  MFEM_HOST_DEVICE virtual void computeSpeciesPrimitives(const double *conservedState, double *X_sp, double *Y_sp,
+                                                         double *n_sp) {
     printf("ERROR: computeSpeciesPrimitives is not implemented!\n");
     assert(false);  // device-compatible exit?
   }
@@ -618,7 +619,9 @@ class PerfectMixture : public GasMixture {
   // virtual int getInputIndexOf(int mixtureIndex) { return mixtureToInputMap_[mixtureIndex]; }
   // virtual std::map<int, int> *getMixtureToInputMap() { return &mixtureToInputMap_; }
   // virtual std::map<std::string, int> *getSpeciesMapping() { return &speciesMapping_; }
-  MFEM_HOST_DEVICE virtual double GetGasParams(int species, GasParams param) const { return gasParams[species + param * numSpecies]; }
+  MFEM_HOST_DEVICE virtual double GetGasParams(int species, GasParams param) const {
+    return gasParams[species + param * numSpecies];
+  }
 
   virtual double getMolarCV(int species) { return molarCV_[species]; }
   virtual double getMolarCP(int species) { return molarCP_[species]; }
@@ -641,7 +644,8 @@ class PerfectMixture : public GasMixture {
   MFEM_HOST_DEVICE virtual void GetConservativesFromPrimitives(const double *primit, double *conserv);
 
   virtual void computeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp);
-  MFEM_HOST_DEVICE virtual void computeSpeciesPrimitives(const double *conservedState, double *X_sp, double *Y_sp, double *n_sp);
+  MFEM_HOST_DEVICE virtual void computeSpeciesPrimitives(const double *conservedState, double *X_sp, double *Y_sp,
+                                                         double *n_sp);
   virtual void computeNumberDensities(const Vector &conservedState, Vector &n_sp);
   MFEM_HOST_DEVICE virtual void computeNumberDensities(const double *conservedState, double *n_sp) const;
 
@@ -649,16 +653,17 @@ class PerfectMixture : public GasMixture {
   MFEM_HOST_DEVICE virtual double ComputePressure(const double *state, double *electronPressure = NULL) const;
   virtual double ComputePressureFromPrimitives(const Vector &Up);
   MFEM_HOST_DEVICE virtual double ComputePressureFromPrimitives(const double *Up);
-  MFEM_HOST_DEVICE virtual double computePressureBase(const double *n_sp, const double n_e, const double n_B, const double T_h,
-                                                      const double T_e) const;
+  MFEM_HOST_DEVICE virtual double computePressureBase(const double *n_sp, const double n_e, const double n_B,
+                                                      const double T_h, const double T_e) const;
 
   // Physicality check (at end)
   virtual bool StateIsPhysical(const Vector &state);
 
   virtual double ComputeTemperature(const Vector &state);
   MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state);
-  MFEM_HOST_DEVICE virtual void computeTemperaturesBase(const double *conservedState, const double *n_sp, const double n_e,
-                                                        const double n_B, double &T_h, double &T_e) const;
+  MFEM_HOST_DEVICE virtual void computeTemperaturesBase(const double *conservedState, const double *n_sp,
+                                                        const double n_e, const double n_B, double &T_h,
+                                                        double &T_e) const;
 
   virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies);
   MFEM_HOST_DEVICE virtual void computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies);
@@ -678,7 +683,8 @@ class PerfectMixture : public GasMixture {
 
   virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true);
   MFEM_HOST_DEVICE virtual double ComputeSpeedOfSound(const double *Uin, bool primitive = true);
-  MFEM_HOST_DEVICE virtual double computeSpeedOfSoundBase(const double *n_sp, const double n_B, const double rho, const double p);
+  MFEM_HOST_DEVICE virtual double computeSpeedOfSoundBase(const double *n_sp, const double n_B, const double rho,
+                                                          const double p);
 
   MFEM_HOST_DEVICE virtual double computeHeaviesMixtureCV(const double *n_sp, const double n_B);
   MFEM_HOST_DEVICE virtual double computeHeaviesMixtureHeatRatio(const double *n_sp, const double n_B);

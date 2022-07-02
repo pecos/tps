@@ -43,8 +43,7 @@ namespace gpu {
 //  // *mix = new DryAir(f, eq_sys, viscosity_multiplier, bulk_viscosity, _dim, nvel);
 //  *mix = new DryAir(inputs, _dim, nvel);
 //}
-__global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim,
-                                        int nvel, GasMixture **mix) {
+__global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int nvel, GasMixture **mix) {
   *mix = new DryAir(inputs, _dim, nvel);
 }
 
@@ -75,8 +74,7 @@ __global__ void freeDeviceRiemann(RiemannSolver *r) { delete r; }
 //                                          int nvel, void *mix) {
 //  mix = new (mix) DryAir(inputs, _dim, nvel);
 //}
-__global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim,
-                                        int nvel, void *mix) {
+__global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int nvel, void *mix) {
   mix = new (mix) DryAir(inputs, _dim, nvel);
 }
 
@@ -95,14 +93,17 @@ __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture
   r = new (r) RiemannSolver(_num_equation, _mixture, _eqSystem, _fluxClass, _useRoe, axisym);
 }
 
-__global__ void freeDeviceMixture(GasMixture *mix) { mix->~GasMixture(); }  // explicit destructor call b/c placement new above
+__global__ void freeDeviceMixture(GasMixture *mix) {
+  mix->~GasMixture();
+}  // explicit destructor call b/c placement new above
 __global__ void freeDeviceTransport(TransportProperties *transport) { transport->~TransportProperties(); }
 __global__ void freeDeviceFluxes(Fluxes *f) { f->~Fluxes(); }
 __global__ void freeDeviceRiemann(RiemannSolver *r) { r->~RiemannSolver(); }
 
 #endif  // defined(_CUDA_)
 
-// NOTE(kevin): Do not use this. For some unknown reason, this wrapper causes a memory issue, at a random place far after this instantiation.
+// NOTE(kevin): Do not use this. For some unknown reason, this wrapper causes a memory issue, at a random place far
+// after this instantiation.
 void assignMixture(const DryAirInput inputs, const int dim, const int nvel, GasMixture *dMixture) {
 #if defined(_CUDA_)
   GasMixture **d_mixture_tmp;
