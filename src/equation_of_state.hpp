@@ -280,12 +280,10 @@ class GasMixture {
     return;
   }
 
-#ifndef _GPU_
-  MFEM_HOST_DEVICE virtual double computeAmbipolarElectronNumberDensity(const double *n_sp) const {
-    mfem_error("computeAmbipolarElectronNumberDensity not implemented");
-    return 0;
-  }
-#endif
+//  MFEM_HOST_DEVICE virtual double computeAmbipolarElectronNumberDensity(const double *n_sp) const {
+//    mfem_error("computeAmbipolarElectronNumberDensity not implemented");
+//    return 0;
+//  }
 //  MFEM_HOST_DEVICE virtual double computeBackgroundMassDensity(const double &rho, const double *n_sp, double &n_e,
 //                                                               bool isElectronComputed = false) const {
 //    mfem_error("computeBackgroundMassDensity not implemented");

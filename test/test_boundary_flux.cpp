@@ -14,7 +14,7 @@ double uniformRandomNumber() {
   return (double) rand() / (RAND_MAX);
 }
 
-double getRandomPrimitiveState(GasMixture *mixture, Vector &primitiveState) {
+double getRandomPrimitiveState(PerfectMixture *mixture, Vector &primitiveState) {
   const double numEquation = mixture->GetNumEquations();
   const double numSpecies = mixture->GetNumSpecies();
   const double numActiveSpecies = mixture->GetNumActiveSpecies();
