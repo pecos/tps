@@ -80,7 +80,8 @@ double TransportProperties::computeMixtureElectricConductivity(const Vector &mob
   // return mho;
 }
 
-MFEM_HOST_DEVICE double TransportProperties::computeMixtureElectricConductivity(const double *mobility, const double *n_sp) {
+MFEM_HOST_DEVICE double TransportProperties::computeMixtureElectricConductivity(const double *mobility,
+                                                                                const double *n_sp) {
   double mho = 0.0;  // electric conductivity.
 
   for (int sp = 0; sp < numSpecies; sp++) {
@@ -119,7 +120,8 @@ MFEM_HOST_DEVICE void TransportProperties::addAmbipolarEfield(const double *mobi
   for (int v = 0; v < nvel_; v++) ambE[v] = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) {
     for (int d = 0; d < nvel_; d++) {
-      ambE[d] -= diffusionVelocity[sp + d * numSpecies] * n_sp[sp] * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+      ambE[d] -=
+          diffusionVelocity[sp + d * numSpecies] * n_sp[sp] * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
     }
   }
 
@@ -141,8 +143,8 @@ void TransportProperties::addMixtureDrift(const Vector &mobility, const Vector &
   // }
 }
 
-MFEM_HOST_DEVICE void TransportProperties::addMixtureDrift(const double *mobility, const double *n_sp, const double *Efield,
-                                                           double *diffusionVelocity) {
+MFEM_HOST_DEVICE void TransportProperties::addMixtureDrift(const double *mobility, const double *n_sp,
+                                                           const double *Efield, double *diffusionVelocity) {
   for (int sp = 0; sp < numSpecies; sp++) {
     if (mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) == 0.0) continue;
 
@@ -167,8 +169,8 @@ MFEM_HOST_DEVICE double TransportProperties::linearAverage(const double *X_sp, c
   return average;
 }
 
-void TransportProperties::CurtissHirschfelder(const Vector &X_sp, const Vector &Y_sp,
-                                              const DenseMatrix &binaryDiff, Vector &avgDiff) {
+void TransportProperties::CurtissHirschfelder(const Vector &X_sp, const Vector &Y_sp, const DenseMatrix &binaryDiff,
+                                              Vector &avgDiff) {
   CurtissHirschfelder(&X_sp[0], &Y_sp[0], binaryDiff.Read(), &avgDiff[0]);
   // avgDiff.SetSize(numSpecies);
   // avgDiff = 0.0;
@@ -411,8 +413,8 @@ MFEM_HOST_DEVICE void ConstantTransport::ComputeFluxTransportProperties(const do
   double gradX[gpudata::MAXSPECIES * gpudata::MAXDIM];
   mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
   for (int sp = 0; sp < numSpecies; sp++) {
-    for (int d = 0; d < dim; d++) diffusionVelocity[sp + d * numSpecies] =
-      -diffusivity_[sp] * gradX[sp + d * numSpecies] / (X_sp[sp] + Xeps_);
+    for (int d = 0; d < dim; d++)
+      diffusionVelocity[sp + d * numSpecies] = -diffusivity_[sp] * gradX[sp + d * numSpecies] / (X_sp[sp] + Xeps_);
   }
 
   double mobility[gpudata::MAXSPECIES];
@@ -501,7 +503,8 @@ void ConstantTransport::ComputeSourceTransportProperties(const Vector &state, co
 
 MFEM_HOST_DEVICE void ConstantTransport::ComputeSourceTransportProperties(const double *state, const double *Up,
                                                                           const double *gradUp, const double *Efield,
-                                                                          double *globalTransport, double *speciesTransport,
+                                                                          double *globalTransport,
+                                                                          double *speciesTransport,
                                                                           double *diffusionVelocity, double *n_sp) {
   for (int i = 0; i < SrcTrns::NUM_SRC_TRANS; i++) globalTransport[i] = 0.0;
   for (int c = 0; c < SpeciesTrns::NUM_SPECIES_COEFFS; c++)
@@ -527,8 +530,8 @@ MFEM_HOST_DEVICE void ConstantTransport::ComputeSourceTransportProperties(const 
   double gradX[gpudata::MAXSPECIES * gpudata::MAXDIM];
   mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
   for (int sp = 0; sp < numSpecies; sp++) {
-    for (int d = 0; d < dim; d++) diffusionVelocity[sp + d * numSpecies] =
-      -diffusivity_[sp] * gradX[sp + d * numSpecies] / (X_sp[sp] + Xeps_);
+    for (int d = 0; d < dim; d++)
+      diffusionVelocity[sp + d * numSpecies] = -diffusivity_[sp] * gradX[sp + d * numSpecies] / (X_sp[sp] + Xeps_);
   }
 
   double mobility[gpudata::MAXSPECIES];

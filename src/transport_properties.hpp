@@ -120,8 +120,7 @@ class TransportProperties {
   double linearAverage(const Vector &X_sp, const Vector &speciesTransport);
   MFEM_HOST_DEVICE double linearAverage(const double *X_sp, const double *speciesTransport);
   // Curtiss-Hirschfelder approximation of diffusivity.
-  void CurtissHirschfelder(const Vector &X_sp, const Vector &Y_sp, const DenseMatrix &binaryDiff,
-                           Vector &avgDiff);
+  void CurtissHirschfelder(const Vector &X_sp, const Vector &Y_sp, const DenseMatrix &binaryDiff, Vector &avgDiff);
   MFEM_HOST_DEVICE void CurtissHirschfelder(const double *X_sp, const double *Y_sp, const double *binaryDiff,
                                             double *avgDiff);
 };
@@ -202,13 +201,14 @@ class ConstantTransport : public TransportProperties {
                                                 const Vector &Efield, Vector &globalTransport,
                                                 DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
                                                 Vector &n_sp);
-  MFEM_HOST_DEVICE virtual void ComputeSourceTransportProperties(const double *state, const double *Up, const double *gradUp,
-                                                                 const double *Efield, double *globalTransport,
-                                                                 double *speciesTransport, double *diffusionVelocity,
-                                                                 double *n_sp);
+  MFEM_HOST_DEVICE virtual void ComputeSourceTransportProperties(const double *state, const double *Up,
+                                                                 const double *gradUp, const double *Efield,
+                                                                 double *globalTransport, double *speciesTransport,
+                                                                 double *diffusionVelocity, double *n_sp);
 
   virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc);
-  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double &visc, double &bulkVisc);
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double &visc,
+                                       double &bulkVisc);
 };
 
 inline void ConstantTransport::GetViscosities(const Vector &conserved, const Vector &primitive, double &visc,
@@ -217,8 +217,8 @@ inline void ConstantTransport::GetViscosities(const Vector &conserved, const Vec
   return;
 }
 
-MFEM_HOST_DEVICE inline void ConstantTransport::GetViscosities(const double *conserved, const double *primitive, double &visc,
-                                                               double &bulkVisc) {
+MFEM_HOST_DEVICE inline void ConstantTransport::GetViscosities(const double *conserved, const double *primitive,
+                                                               double &visc, double &bulkVisc) {
   visc = viscosity_;
   bulkVisc = bulkViscosity_;
   return;
