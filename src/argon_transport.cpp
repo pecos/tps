@@ -190,13 +190,20 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
                                                                (collision::charged::rep22(nondimTe) * debyeCircle);
   }
 
-  DenseSymmetricMatrix binaryDiff(3);
+  DenseMatrix binaryDiff(3);
+  int spI, spJ;
   binaryDiff = 0.0;
-  binaryDiff(electronIndex_, neutralIndex_) =
+  spI = min(electronIndex_, neutralIndex_);
+  spJ = max(electronIndex_, neutralIndex_);
+  binaryDiff(spI, spJ) =
       diffusivityFactor_ * sqrt(Te / muw_(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
-  binaryDiff(neutralIndex_, ionIndex_) =
+  spI = min(neutralIndex_, ionIndex_);
+  spJ = max(neutralIndex_, ionIndex_);
+  binaryDiff(spI, spJ) =
       diffusivityFactor_ * sqrt(Th / muw_(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
-  binaryDiff(ionIndex_, electronIndex_) = diffusivityFactor_ * sqrt(Te / muw_(ionIndex_, electronIndex_)) / nTotal /
+  spI = min(electronIndex_, ionIndex_);
+  spJ = max(electronIndex_, ionIndex_);
+  binaryDiff(spI, spJ) = diffusivityFactor_ * sqrt(Te / muw_(ionIndex_, electronIndex_)) / nTotal /
                                           (collision::charged::att11(nondimTe) * debyeCircle);
 
   Vector diffusivity(3), mobility(3);
@@ -307,13 +314,20 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
   double nondimTe = debyeLength * 4.0 * PI_ * debyeFactor_ * Te;
   // double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
 
-  DenseSymmetricMatrix binaryDiff(3);
+  DenseMatrix binaryDiff(3);
+  int spI, spJ;
   binaryDiff = 0.0;
-  binaryDiff(electronIndex_, neutralIndex_) =
+  spI = min(electronIndex_, neutralIndex_);
+  spJ = max(electronIndex_, neutralIndex_);
+  binaryDiff(spI, spJ) =
       diffusivityFactor_ * sqrt(Te / muw_(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
-  binaryDiff(neutralIndex_, ionIndex_) =
+  spI = min(ionIndex_, neutralIndex_);
+  spJ = max(ionIndex_, neutralIndex_);
+  binaryDiff(spI, spJ) =
       diffusivityFactor_ * sqrt(Th / muw_(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
-  binaryDiff(ionIndex_, electronIndex_) = diffusivityFactor_ * sqrt(Te / muw_(ionIndex_, electronIndex_)) / nTotal /
+  spI = min(electronIndex_, ionIndex_);
+  spJ = max(electronIndex_, ionIndex_);
+  binaryDiff(spI, spJ) = diffusivityFactor_ * sqrt(Te / muw_(ionIndex_, electronIndex_)) / nTotal /
                                           (collision::charged::att11(nondimTe) * debyeCircle);
 
   diffusivity.SetSize(3);
@@ -351,12 +365,19 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
   double Qai = collision::argon::ArAr1P11(Th);
   double Qie = collision::charged::att11(nondimTe) * debyeCircle;
 
-  DenseSymmetricMatrix binaryDiff(3);
+  DenseMatrix binaryDiff(3);
+  int spI, spJ;
   binaryDiff = 0.0;
-  binaryDiff(electronIndex_, neutralIndex_) =
+  spI = min(electronIndex_, neutralIndex_);
+  spJ = max(electronIndex_, neutralIndex_);
+  binaryDiff(spI, spJ) =
       diffusivityFactor_ * sqrt(Te / muw_(electronIndex_, neutralIndex_)) / nTotal / Qea;
-  binaryDiff(neutralIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Th / muw_(neutralIndex_, ionIndex_)) / nTotal / Qai;
-  binaryDiff(ionIndex_, electronIndex_) =
+  spI = min(neutralIndex_, ionIndex_);
+  spJ = max(neutralIndex_, ionIndex_);
+  binaryDiff(spI, spJ) = diffusivityFactor_ * sqrt(Th / muw_(neutralIndex_, ionIndex_)) / nTotal / Qai;
+  spI = min(electronIndex_, ionIndex_);
+  spJ = max(electronIndex_, ionIndex_);
+  binaryDiff(spI, spJ) =
       diffusivityFactor_ * sqrt(Te / muw_(ionIndex_, electronIndex_)) / nTotal / Qie;
 
   Vector diffusivity(3), mobility(3);
@@ -814,7 +835,7 @@ void ArgonMixtureTransport::ComputeFluxTransportProperties(const Vector &state, 
         collisionIntegral(electronIndex_, electronIndex_, 2, 2, collInputs);
   }
 
-  DenseSymmetricMatrix binaryDiff(numSpecies);
+  DenseMatrix binaryDiff(numSpecies);
   binaryDiff = 0.0;
   for (int spI = 0; spI < numSpecies - 1; spI++) {
     for (int spJ = spI + 1; spJ < numSpecies; spJ++) {
@@ -903,7 +924,7 @@ void ArgonMixtureTransport::ComputeSourceTransportProperties(const Vector &state
 
   collisionInputs collInputs = computeCollisionInputs(Up, n_sp);
 
-  DenseSymmetricMatrix binaryDiff(numSpecies);
+  DenseMatrix binaryDiff(numSpecies);
   binaryDiff = 0.0;
   for (int spI = 0; spI < numSpecies - 1; spI++) {
     for (int spJ = spI + 1; spJ < numSpecies; spJ++) {

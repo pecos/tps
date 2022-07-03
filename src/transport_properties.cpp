@@ -168,32 +168,33 @@ MFEM_HOST_DEVICE double TransportProperties::linearAverage(const double *X_sp, c
 }
 
 void TransportProperties::CurtissHirschfelder(const Vector &X_sp, const Vector &Y_sp,
-                                              const DenseSymmetricMatrix &binaryDiff, Vector &avgDiff) {
-  CurtissHirschfelder(&X_sp[0], &Y_sp[0], binaryDiff.Read(), &avgDiff[0]);
-  // avgDiff.SetSize(numSpecies);
-  // avgDiff = 0.0;
-  //
-  // for (int spI = 0; spI < numSpecies; spI++) {
-  //   for (int spJ = 0; spJ < numSpecies; spJ++) {
-  //     if (spI == spJ) continue;
-  //     avgDiff(spI) += (X_sp(spJ) + Xeps_) / binaryDiff(spI, spJ);
-  //   }
-  //   avgDiff(spI) = (1.0 - Y_sp(spI)) / avgDiff(spI);
-  // }
-}
-
-MFEM_HOST_DEVICE void TransportProperties::CurtissHirschfelder(const double *X_sp, const double *Y_sp,
-                                                               const double *binaryDiff, double *avgDiff) {
-  for (int sp = 0; sp < numSpecies; sp++) avgDiff[sp] = 0.0;
+                                              const DenseMatrix &binaryDiff, Vector &avgDiff) {
+  // CurtissHirschfelder(&X_sp[0], &Y_sp[0], binaryDiff.Read(), &avgDiff[0]);
+  avgDiff.SetSize(numSpecies);
+  avgDiff = 0.0;
 
   for (int spI = 0; spI < numSpecies; spI++) {
     for (int spJ = 0; spJ < numSpecies; spJ++) {
       if (spI == spJ) continue;
-      avgDiff[spI] += (X_sp[spJ] + Xeps_) / binaryDiff[spI + spJ * numSpecies];
+      double bD = (spI < spJ) ? binaryDiff(spI, spJ) : binaryDiff(spJ, spI);
+      avgDiff(spI) += (X_sp(spJ) + Xeps_) / bD;
     }
-    avgDiff[spI] = (1.0 - Y_sp[spI]) / avgDiff[spI];
+    avgDiff(spI) = (1.0 - Y_sp(spI)) / avgDiff(spI);
   }
 }
+
+// MFEM_HOST_DEVICE void TransportProperties::CurtissHirschfelder(const double *X_sp, const double *Y_sp,
+//                                                                const double *binaryDiff, double *avgDiff) {
+//   for (int sp = 0; sp < numSpecies; sp++) avgDiff[sp] = 0.0;
+//
+//   for (int spI = 0; spI < numSpecies; spI++) {
+//     for (int spJ = 0; spJ < numSpecies; spJ++) {
+//       if (spI == spJ) continue;
+//       avgDiff[spI] += (X_sp[spJ] + Xeps_) / binaryDiff[spI + spJ * numSpecies];
+//     }
+//     avgDiff[spI] = (1.0 - Y_sp[spI]) / avgDiff[spI];
+//   }
+// }
 
 //////////////////////////////////////////////////////
 //////// Dry Air mixture
