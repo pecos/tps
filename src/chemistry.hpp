@@ -113,7 +113,7 @@ class Chemistry {
   int getNumReactions() { return numReactions_; }
 
   bool isElectronInvolvedAt(const int reactionIndex) {
-    return (electronIndex_ < 0) ? false : (reactantStoich_(electronIndex_, reactionIndex) != 0);
+    return (electronIndex_ < 0) ? false : (reactantStoich_[electronIndex_ + reactionIndex * numSpecies_] != 0);
   }
 
   ChemistryModel getChemistryModel() { return model_; }

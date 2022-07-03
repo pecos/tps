@@ -63,13 +63,13 @@ Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : mixture_(m
   // productStoich_.SetSize(numSpecies_, numReactions_);
   // equilibriumConstantParams_.SetSize(numReactions_, 3);
   for (int r = 0; r < numReactions_; r++)
-    for (int p = 0; p < 3; p++) equilibriumConstantParams_[p] = 0.0;
+    for (int p = 0; p < 3; p++) equilibriumConstantParams_[r + p * numReactions_] = 0.0;
 
   for (int r = 0; r < numReactions_; r++) {
     for (int mixSp = 0; mixSp < numSpecies_; mixSp++) {
       // int inputSp = (*mixtureToInputMap_)[mixSp];
-      reactantStoich_[mixSp + r * numSpecies] = config.reactantStoich(mixSp, r);
-      productStoich_[mixSp + r * numSpecies] = config.productStoich(mixSp, r);
+      reactantStoich_[mixSp + r * numSpecies_] = config.reactantStoich(mixSp, r);
+      productStoich_[mixSp + r * numSpecies_] = config.productStoich(mixSp, r);
     }
 
     // check conservations.
@@ -141,7 +141,7 @@ Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : mixture_(m
     }
     if (detailedBalance_[r]) {
       for (int d = 0; d < 3; d++) {
-        equilibriumConstantParams_(r, d) = (config.equilibriumConstantParams[r])[d];
+        equilibriumConstantParams_[r + d * numReactions_] = (config.equilibriumConstantParams[r])[d];
       }
       std::cout << std::endl;
     }
@@ -177,8 +177,8 @@ void Chemistry::computeEquilibriumConstants(const double T_h, const double T_e, 
   for (int r = 0; r < numReactions_; r++) {
     double temp = (isElectronInvolvedAt(r)) ? T_e : T_h;
     if (detailedBalance_[r]) {
-      kC(r) = equilibriumConstantParams_(r, 0) * pow(temp, equilibriumConstantParams_(r, 1)) *
-              exp(-equilibriumConstantParams_(r, 2) / temp);
+      kC(r) = equilibriumConstantParams_[r + 0 * numReactions_] * pow(temp, equilibriumConstantParams_[r + 1 * numReactions_]) *
+              exp(-equilibriumConstantParams_[r + 2 * numReactions_] / temp);
     }
   }
 
@@ -192,10 +192,10 @@ void Chemistry::computeProgressRate(const mfem::Vector& ns, const mfem::Vector& 
   for (int r = 0; r < numReactions_; r++) {
     // forward reaction rate
     double rate = 1.;
-    for (int sp = 0; sp < numSpecies_; sp++) rate *= pow(ns(sp), reactantStoich_[sp + r * numSpecies]);
+    for (int sp = 0; sp < numSpecies_; sp++) rate *= pow(ns(sp), reactantStoich_[sp + r * numSpecies_]);
     if (detailedBalance_[r]) {
       double rateBWD = 1.;
-      for (int sp = 0; sp < numSpecies_; sp++) rateBWD *= pow(ns(sp), productStoich_[sp + r * numSpecies]);
+      for (int sp = 0; sp < numSpecies_; sp++) rateBWD *= pow(ns(sp), productStoich_[sp + r * numSpecies_]);
       rate -= rateBWD / keq(r);
     }
 
@@ -209,7 +209,7 @@ void Chemistry::computeCreationRate(const mfem::Vector& progressRate, mfem::Vect
   creationRate = 0.;
   for (int sp = 0; sp < numSpecies_; sp++) {
     for (int r = 0; r < numReactions_; r++) {
-      creationRate(sp) += progressRate(r) * (productStoich_[sp + r * numSpecies] - reactantStoich_[sp + r * numSpecies]);
+      creationRate(sp) += progressRate(r) * (productStoich_[sp + r * numSpecies_] - reactantStoich_[sp + r * numSpecies_]);
     }
     creationRate(sp) *= mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
   }
