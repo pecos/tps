@@ -186,11 +186,11 @@ int main (int argc, char *argv[])
   srcConfig.constantTransport.bulkViscosity = uniformRandomNumber();
   srcConfig.constantTransport.thermalConductivity = uniformRandomNumber();
   srcConfig.constantTransport.electronThermalConductivity = uniformRandomNumber();
-  srcConfig.constantTransport.diffusivity.SetSize(srcConfig.numSpecies);
-  srcConfig.constantTransport.mtFreq.SetSize(srcConfig.numSpecies);
+  // srcConfig.constantTransport.diffusivity.SetSize(srcConfig.numSpecies);
+  // srcConfig.constantTransport.mtFreq.SetSize(srcConfig.numSpecies);
   for (int sp = 1; sp <= srcConfig.numSpecies; sp++) {
-    srcConfig.constantTransport.diffusivity(sp - 1) = uniformRandomNumber();
-    srcConfig.constantTransport.mtFreq(sp - 1) = uniformRandomNumber();
+    srcConfig.constantTransport.diffusivity[sp - 1] = uniformRandomNumber();
+    srcConfig.constantTransport.mtFreq[sp - 1] = uniformRandomNumber();
   }
 
   int dim = 2;
@@ -203,8 +203,8 @@ int main (int argc, char *argv[])
       for (int trial = 0; trial < nTrials; trial++)
       {
         for (int sp = 1; sp <= srcConfig.numSpecies; sp++) {
-          srcConfig.constantTransport.diffusivity(sp - 1) = uniformRandomNumber();
-          srcConfig.constantTransport.mtFreq(sp - 1) = uniformRandomNumber();
+          srcConfig.constantTransport.diffusivity[sp - 1] = uniformRandomNumber();
+          srcConfig.constantTransport.mtFreq[sp - 1] = uniformRandomNumber();
         }
 
         srcConfig.axisymmetric_ = false;
@@ -217,7 +217,7 @@ int main (int argc, char *argv[])
         success = (success && testComputeBdrViscousFlux(srcConfig, dim));
         if (!success) break;
 
-        srcConfig.constantTransport.diffusivity = 0.0;
+        for (int sp = 0; sp < srcConfig.numSpecies; sp++) srcConfig.constantTransport.diffusivity[sp] = 0.0;
 
         srcConfig.axisymmetric_ = false;
 
