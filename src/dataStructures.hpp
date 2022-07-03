@@ -254,10 +254,10 @@ struct heatSourceData {
 struct constantTransportData {
   double viscosity;
   double bulkViscosity;
-  Vector diffusivity;
+  double diffusivity[gpudata::MAXSPECIES];
   double thermalConductivity;
   double electronThermalConductivity;
-  Vector mtFreq;  // momentum transfer frequency
+  double mtFreq[gpudata::MAXSPECIES];  // momentum transfer frequency
 
   int electronIndex;
 };

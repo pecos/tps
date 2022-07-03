@@ -2282,11 +2282,13 @@ void M2ulPhyS::parseTransportInputs() {
       tpsP->getRequiredInput("plasma_models/transport_model/constant/electron_thermal_conductivity",
                              config.constantTransport.electronThermalConductivity);
       std::string diffpath("plasma_models/transport_model/constant/diffusivity");
-      config.constantTransport.diffusivity.SetSize(config.numSpecies);
+      // config.constantTransport.diffusivity.SetSize(config.numSpecies);
       std::string mtpath("plasma_models/transport_model/constant/momentum_transfer_frequency");
-      config.constantTransport.mtFreq.SetSize(config.numSpecies);
-      config.constantTransport.diffusivity = 0.0;
-      config.constantTransport.mtFreq = 0.0;
+      // config.constantTransport.mtFreq.SetSize(config.numSpecies);
+      for (int sp = 0; sp < config.numSpecies; sp++) {
+        config.constantTransport.diffusivity[sp] = 0.0;
+        config.constantTransport.mtFreq[sp] = 0.0;
+      }
       for (int sp = 0; sp < config.numSpecies; sp++) {  // mixture species index.
         int inputSp = config.mixtureToInputMap[sp];
         tpsP->getRequiredInput((diffpath + "/species" + std::to_string(inputSp + 1)).c_str(),
