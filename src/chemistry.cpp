@@ -51,23 +51,25 @@ Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : mixture_(m
   electronIndex_ = config.chemistryInput.electronIndex;
 
   numReactions_ = config.numReactions;
-  reactionEnergies_.SetSize(numReactions_);
-  reactionEnergies_ = config.reactionEnergies;
-
-  detailedBalance_.SetSize(numReactions_);
-  detailedBalance_ = config.detailedBalance;
+  // reactionEnergies_.SetSize(numReactions_);
+  // detailedBalance_.SetSize(numReactions_);
+  for (int r = 0; r < numReactions_; r++) {
+    reactionEnergies_[r] = config.reactionEnergies[r];
+    detailedBalance_[r] = config.detailedBalance;
+  }
 
   reactions_.resize(numReactions_);
-  reactantStoich_.SetSize(numSpecies_, numReactions_);
-  productStoich_.SetSize(numSpecies_, numReactions_);
-  equilibriumConstantParams_.SetSize(numReactions_, 3);
-  equilibriumConstantParams_ = 0.0;
+  // reactantStoich_.SetSize(numSpecies_, numReactions_);
+  // productStoich_.SetSize(numSpecies_, numReactions_);
+  // equilibriumConstantParams_.SetSize(numReactions_, 3);
+  for (int r = 0; r < numReactions_; r++)
+    for (int p = 0; p < 3; p++) equilibriumConstantParams_[p] = 0.0;
 
   for (int r = 0; r < numReactions_; r++) {
     for (int mixSp = 0; mixSp < numSpecies_; mixSp++) {
       // int inputSp = (*mixtureToInputMap_)[mixSp];
-      reactantStoich_(mixSp, r) = config.reactantStoich(mixSp, r);
-      productStoich_(mixSp, r) = config.productStoich(mixSp, r);
+      reactantStoich_[mixSp + r * numSpecies] = config.reactantStoich(mixSp, r);
+      productStoich_[mixSp + r * numSpecies] = config.productStoich(mixSp, r);
     }
 
     // check conservations.
@@ -112,10 +114,10 @@ Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : mixture_(m
         prodEnergy += product(sp) * mixture->GetGasParams(sp, FORMATION_ENERGY);
       }
       // This may be too strict..
-      if (reactEnergy + reactionEnergies_(r) != prodEnergy) {
+      if (reactEnergy + reactionEnergies_[r] != prodEnergy) {
         grvy_printf(GRVY_ERROR, "Reaction %d does not conserve energy.\n", r);
-        grvy_printf(GRVY_ERROR, "%.8E + %.8E = %.8E =/= %.8E\n", reactEnergy, reactionEnergies_(r),
-                    reactEnergy + reactionEnergies_(r), prodEnergy);
+        grvy_printf(GRVY_ERROR, "%.8E + %.8E = %.8E =/= %.8E\n", reactEnergy, reactionEnergies_[r],
+                    reactEnergy + reactionEnergies_[r], prodEnergy);
         exit(-1);
       }
     }
@@ -190,10 +192,10 @@ void Chemistry::computeProgressRate(const mfem::Vector& ns, const mfem::Vector& 
   for (int r = 0; r < numReactions_; r++) {
     // forward reaction rate
     double rate = 1.;
-    for (int sp = 0; sp < numSpecies_; sp++) rate *= pow(ns(sp), reactantStoich_(sp, r));
+    for (int sp = 0; sp < numSpecies_; sp++) rate *= pow(ns(sp), reactantStoich_[sp + r * numSpecies]);
     if (detailedBalance_[r]) {
       double rateBWD = 1.;
-      for (int sp = 0; sp < numSpecies_; sp++) rateBWD *= pow(ns(sp), productStoich_(sp, r));
+      for (int sp = 0; sp < numSpecies_; sp++) rateBWD *= pow(ns(sp), productStoich_[sp + r * numSpecies]);
       rate -= rateBWD / keq(r);
     }
 
@@ -207,7 +209,7 @@ void Chemistry::computeCreationRate(const mfem::Vector& progressRate, mfem::Vect
   creationRate = 0.;
   for (int sp = 0; sp < numSpecies_; sp++) {
     for (int r = 0; r < numReactions_; r++) {
-      creationRate(sp) += progressRate(r) * (productStoich_(sp, r) - reactantStoich_(sp, r));
+      creationRate(sp) += progressRate(r) * (productStoich_[sp + r * numSpecies] - reactantStoich_[sp + r * numSpecies]);
     }
     creationRate(sp) *= mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
   }

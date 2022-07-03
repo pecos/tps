@@ -61,17 +61,19 @@ class Chemistry {
   bool twoTemperature_;
 
   int numReactions_ = 0;
-  DenseMatrix reactantStoich_, productStoich_;  // size of (numSpecies, numReactions)
+  // size of (numSpecies, numReactions)
+  double reactantStoich_[gpudata::MAXSPECIES * gpudata::MAXREACTIONS],
+         productStoich_[gpudata::MAXSPECIES * gpudata::MAXREACTIONS];
 
   std::vector<Reaction *> reactions_;
-  Vector reactionEnergies_;
+  double reactionEnergies_[gpudata::MAXREACTIONS];
 
   // std::map<int, int> *mixtureToInputMap_;
   // std::map<std::string, int> *speciesMapping_;
   int electronIndex_ = -1;
 
-  Array<bool> detailedBalance_;
-  DenseMatrix equilibriumConstantParams_;
+  bool detailedBalance_[gpudata::MAXREACTIONS];
+  double equilibriumConstantParams_[gpudata::MAXREACTIONS * 3];
 
   ChemistryModel model_;
 
@@ -100,14 +102,14 @@ class Chemistry {
   // reactionIndex is taken from reactionMapping.right.
   // virtual Vector computeRateCoeffOf(const int reactionIndex, const double T_h, const double T_e) {};
 
-  const double *getReactantStoichiometry(const int reactionIndex) { return reactantStoich_.GetColumn(reactionIndex); }
-  const double *getProductStoichiometry(const int reactionIndex) { return productStoich_.GetColumn(reactionIndex); }
+  const double *getReactantStoichiometry(const int reactionIndex) { return &reactantStoich_[reactionIndex * numSpecies_]; }
+  const double *getProductStoichiometry(const int reactionIndex) { return &productStoich_[reactionIndex * numSpecies_]; }
 
   // compute progress rate by mass-action law.
   void computeProgressRate(const Vector &ns, const Vector &kfwd, const Vector &keq, Vector &progressRate);
   void computeCreationRate(const Vector &progressRate, Vector &creationRate);
 
-  double getReactionEnergy(const int reactionIndex) { return reactionEnergies_(reactionIndex); }
+  double getReactionEnergy(const int reactionIndex) { return reactionEnergies_[reactionIndex]; }
   int getNumReactions() { return numReactions_; }
 
   bool isElectronInvolvedAt(const int reactionIndex) {
