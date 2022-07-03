@@ -184,14 +184,29 @@ MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double &T_h, con
 }
 
 // NOTE: if not detailedBalance, equilibrium constant is returned as zero, though it cannot be used.
-void Chemistry::computeEquilibriumConstants(const double T_h, const double T_e, Vector& kC) {
+void Chemistry::computeEquilibriumConstants(const double &T_h, const double &T_e, Vector& kC) {
   kC.SetSize(numReactions_);
-  kC = 0.0;
+  computeEquilibriumConstants(T_h, T_e, &kC[0]);
+  // kC = 0.0;
+  //
+  // for (int r = 0; r < numReactions_; r++) {
+  //   double temp = (isElectronInvolvedAt(r)) ? T_e : T_h;
+  //   if (detailedBalance_[r]) {
+  //     kC(r) = equilibriumConstantParams_[0 + r * gpudata::MAXCHEMPARAMS] * pow(temp, equilibriumConstantParams_[1 + r * gpudata::MAXCHEMPARAMS]) *
+  //             exp(-equilibriumConstantParams_[2 + r * gpudata::MAXCHEMPARAMS] / temp);
+  //   }
+  // }
+
+  return;
+}
+
+MFEM_HOST_DEVICE void Chemistry::computeEquilibriumConstants(const double &T_h, const double &T_e, double *kC) {
+  for (int r = 0; r < numReactions; r++) kC[r] = 0.0;
 
   for (int r = 0; r < numReactions_; r++) {
     double temp = (isElectronInvolvedAt(r)) ? T_e : T_h;
     if (detailedBalance_[r]) {
-      kC(r) = equilibriumConstantParams_[0 + r * gpudata::MAXCHEMPARAMS] * pow(temp, equilibriumConstantParams_[1 + r * gpudata::MAXCHEMPARAMS]) *
+      kC[r] = equilibriumConstantParams_[0 + r * gpudata::MAXCHEMPARAMS] * pow(temp, equilibriumConstantParams_[1 + r * gpudata::MAXCHEMPARAMS]) *
               exp(-equilibriumConstantParams_[2 + r * gpudata::MAXCHEMPARAMS] / temp);
     }
   }

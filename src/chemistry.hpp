@@ -99,7 +99,8 @@ class Chemistry {
   void computeForwardRateCoeffs(const double &T_h, const double &T_e, Vector &kfwd);
   MFEM_HOST_DEVICE void computeForwardRateCoeffs(const double &T_h, const double &T_e, double *kfwd);
 
-  void computeEquilibriumConstants(const double T_h, const double T_e, Vector &kC);
+  void computeEquilibriumConstants(const double &T_h, const double &T_e, Vector &kC);
+  MFEM_HOST_DEVICE void computeEquilibriumConstants(const double &T_h, const double &T_e, double *kC);
 
   // return rate coefficients of (reactionIndex)-th reaction. (start from 0)
   // reactionIndex is taken from reactionMapping.right.
