@@ -43,15 +43,29 @@ MFEM_HOST_DEVICE TransportProperties::TransportProperties(GasMixture *_mixture) 
 }
 
 void TransportProperties::correctMassDiffusionFlux(const Vector &Y_sp, DenseMatrix &diffusionVelocity) {
+  correctMassDiffusionFlux(&Y_sp[0], diffusionVelocity.Write());
+  // // Correction Velocity
+  // Vector Vc(nvel_);
+  // Vc = 0.0;
+  // for (int sp = 0; sp < numSpecies; sp++) {
+  //   // NOTE: we'll have to handle small Y case.
+  //   for (int d = 0; d < nvel_; d++) Vc(d) += Y_sp(sp) * diffusionVelocity(sp, d);
+  // }
+  // for (int sp = 0; sp < numSpecies; sp++) {
+  //   for (int d = 0; d < nvel_; d++) diffusionVelocity(sp, d) -= Vc(d);
+  // }
+}
+
+MFEM_HOST_DEVICE void TransportProperties::correctMassDiffusionFlux(const double *Y_sp, double *diffusionVelocity) {
   // Correction Velocity
-  Vector Vc(nvel_);
-  Vc = 0.0;
+  double Vc[gpudata::MAXDIM];
+  for (int v = 0; v < nvel_; v++) Vc[v] = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) {
     // NOTE: we'll have to handle small Y case.
-    for (int d = 0; d < nvel_; d++) Vc(d) += Y_sp(sp) * diffusionVelocity(sp, d);
+    for (int d = 0; d < nvel_; d++) Vc[d] += Y_sp[sp] * diffusionVelocity[sp + d * numSpecies];
   }
   for (int sp = 0; sp < numSpecies; sp++) {
-    for (int d = 0; d < nvel_; d++) diffusionVelocity(sp, d) -= Vc(d);
+    for (int d = 0; d < nvel_; d++) diffusionVelocity[sp + d * numSpecies] -= Vc[d];
   }
 }
 

@@ -103,6 +103,7 @@ class TransportProperties {
 
   // For mixture-averaged diffusion, correct for mass conservation.
   void correctMassDiffusionFlux(const Vector &Y_sp, DenseMatrix &diffusionVelocity);
+  MFEM_HOST_DEVICE void correctMassDiffusionFlux(const double *Y_sp, double *diffusionVelocity);
 
   // compute electric conductivity for mixture-averaged diffusions.
   // NOTE: in unit of ELECTRONCHARGE * AVOGADRONUMBER.
