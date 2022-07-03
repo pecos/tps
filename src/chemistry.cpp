@@ -218,34 +218,70 @@ MFEM_HOST_DEVICE void Chemistry::computeEquilibriumConstants(const double &T_h, 
 void Chemistry::computeProgressRate(const mfem::Vector& ns, const mfem::Vector& kfwd, const mfem::Vector& keq,
                                     mfem::Vector& progressRate) {
   progressRate.SetSize(numReactions_);
+  computeProgressRate(&ns[0], &kfwd[0], &keq[0], &progressRate[0]);
+  // for (int r = 0; r < numReactions_; r++) {
+  //   // forward reaction rate
+  //   double rate = 1.;
+  //   for (int sp = 0; sp < numSpecies_; sp++) rate *= pow(ns(sp), reactantStoich_[sp + r * numSpecies_]);
+  //   if (detailedBalance_[r]) {
+  //     double rateBWD = 1.;
+  //     for (int sp = 0; sp < numSpecies_; sp++) rateBWD *= pow(ns(sp), productStoich_[sp + r * numSpecies_]);
+  //     rate -= rateBWD / keq(r);
+  //   }
+  //
+  //   progressRate(r) = kfwd(r) * rate;
+  // }
+}
+
+MFEM_HOST_DEVICE void Chemistry::computeProgressRate(const double *ns, const double *kfwd, const double *keq,
+                                                     double *progressRate) {
+  // progressRate.SetSize(numReactions_);
   for (int r = 0; r < numReactions_; r++) {
     // forward reaction rate
     double rate = 1.;
-    for (int sp = 0; sp < numSpecies_; sp++) rate *= pow(ns(sp), reactantStoich_[sp + r * numSpecies_]);
+    for (int sp = 0; sp < numSpecies_; sp++) rate *= pow(ns[sp], reactantStoich_[sp + r * numSpecies_]);
     if (detailedBalance_[r]) {
       double rateBWD = 1.;
-      for (int sp = 0; sp < numSpecies_; sp++) rateBWD *= pow(ns(sp), productStoich_[sp + r * numSpecies_]);
-      rate -= rateBWD / keq(r);
+      for (int sp = 0; sp < numSpecies_; sp++) rateBWD *= pow(ns[sp], productStoich_[sp + r * numSpecies_]);
+      rate -= rateBWD / keq[r];
     }
 
-    progressRate(r) = kfwd(r) * rate;
+    progressRate[r] = kfwd[r] * rate;
   }
 }
 
 // compute creation rate based on progress rates.
 void Chemistry::computeCreationRate(const mfem::Vector& progressRate, mfem::Vector& creationRate) {
   creationRate.SetSize(numSpecies_);
-  creationRate = 0.;
+  computeCreationRate(&progressRate[0], &creationRate[0]);
+  // creationRate = 0.;
+  // for (int sp = 0; sp < numSpecies_; sp++) {
+  //   for (int r = 0; r < numReactions_; r++) {
+  //     creationRate(sp) += progressRate(r) * (productStoich_[sp + r * numSpecies_] - reactantStoich_[sp + r * numSpecies_]);
+  //   }
+  //   creationRate(sp) *= mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+  // }
+  //
+  // // check total created mass is 0
+  // double totMass = 0.;
+  // for (int sp = 0; sp < numSpecies_; sp++) totMass += creationRate(sp);
+  // // NOTE: this assertion below should be made non-dimensional with dt and density
+  // //   assert(fabs(totMass) < 1e-7);
+}
+
+MFEM_HOST_DEVICE void Chemistry::computeCreationRate(const double *progressRate, double *creationRate) {
+  // creationRate.SetSize(numSpecies_);
+  for (int sp = 0; sp < numSpecies_; sp++) creationRate[sp] = 0.;
   for (int sp = 0; sp < numSpecies_; sp++) {
     for (int r = 0; r < numReactions_; r++) {
-      creationRate(sp) += progressRate(r) * (productStoich_[sp + r * numSpecies_] - reactantStoich_[sp + r * numSpecies_]);
+      creationRate[sp] += progressRate[r] * (productStoich_[sp + r * numSpecies_] - reactantStoich_[sp + r * numSpecies_]);
     }
-    creationRate(sp) *= mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+    creationRate[sp] *= mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
   }
 
   // check total created mass is 0
   double totMass = 0.;
-  for (int sp = 0; sp < numSpecies_; sp++) totMass += creationRate(sp);
+  for (int sp = 0; sp < numSpecies_; sp++) totMass += creationRate[p];
   // NOTE: this assertion below should be made non-dimensional with dt and density
   //   assert(fabs(totMass) < 1e-7);
 }

@@ -111,9 +111,11 @@ class Chemistry {
 
   // compute progress rate by mass-action law.
   void computeProgressRate(const Vector &ns, const Vector &kfwd, const Vector &keq, Vector &progressRate);
+  MFEM_HOST_DEVICE void computeProgressRate(const double *ns, const double *kfwd, const double *keq, double *progressRate);
   void computeCreationRate(const Vector &progressRate, Vector &creationRate);
+  MFEM_HOST_DEVICE void computeCreationRate(const double *progressRate, double *creationRate);
 
-  double getReactionEnergy(const int reactionIndex) { return reactionEnergies_[reactionIndex]; }
+  MFEM_HOST_DEVICE double getReactionEnergy(const int &reactionIndex) { return reactionEnergies_[reactionIndex]; }
   int getNumReactions() { return numReactions_; }
 
   MFEM_HOST_DEVICE bool isElectronInvolvedAt(const int &reactionIndex) {
