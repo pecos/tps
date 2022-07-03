@@ -73,7 +73,7 @@ class Chemistry {
   int electronIndex_ = -1;
 
   bool detailedBalance_[gpudata::MAXREACTIONS];
-  double equilibriumConstantParams_[gpudata::MAXREACTIONS * 3];
+  double equilibriumConstantParams_[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
 
   ChemistryModel model_;
 
@@ -88,6 +88,7 @@ class Chemistry {
 
  public:
   Chemistry(GasMixture *mixture, RunConfiguration &config);
+  Chemistry(GasMixture *mixture, const ChemistryInput &inputs);
 
   ~Chemistry();
 

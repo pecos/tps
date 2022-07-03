@@ -322,7 +322,7 @@ void M2ulPhyS::initVariables() {
       }
       switch (config.GetChemistryModel()) {
         default:
-          chemistry_ = new Chemistry(mixture, config);
+          chemistry_ = new Chemistry(mixture, config.chemistryInput);
           break;
       }
       break;
@@ -2322,9 +2322,9 @@ void M2ulPhyS::parseReactionInputs() {
     config.reactantStoich.SetSize(config.numSpecies, config.numReactions);
     config.productStoich.SetSize(config.numSpecies, config.numReactions);
 
-    config.reactionModelParams.resize(config.numReactions);
+    // config.reactionModelParams.resize(config.numReactions);
     config.detailedBalance.SetSize(config.numReactions);
-    config.equilibriumConstantParams.resize(config.numReactions);
+    // config.equilibriumConstantParams.resize(config.numReactions);
   }
 
   for (int r = 1; r <= config.numReactions; r++) {
@@ -2343,21 +2343,28 @@ void M2ulPhyS::parseReactionInputs() {
 
     if (model == "arrhenius") {
       config.reactionModels[r - 1] = ARRHENIUS;
-      config.reactionModelParams[r - 1].resize(3);
+      // config.reactionModelParams[r - 1].resize(3);
       double A, b, E;
       tpsP->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
       tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
       tpsP->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
-      config.reactionModelParams[r - 1] = {A, b, E};
+      // config.reactionModelParams[r - 1] = {A, b, E};
+      config.reactionModelParams[0 + (r - 1) * gpudata::MAXCHEMPARAMS] = A;
+      config.reactionModelParams[1 + (r - 1) * gpudata::MAXCHEMPARAMS] = b;
+      config.reactionModelParams[2 + (r - 1) * gpudata::MAXCHEMPARAMS] = E;
 
     } else if (model == "hoffert_lien") {
       config.reactionModels[r - 1] = HOFFERTLIEN;
-      config.reactionModelParams[r - 1].resize(3);
+      // config.reactionModelParams[r - 1].resize(3);
       double A, b, E;
       tpsP->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
       tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
       tpsP->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
-      config.reactionModelParams[r - 1] = {A, b, E};
+      // config.reactionModelParams[r - 1] = {A, b, E};
+      // NOTE(kevin): this array keeps max param in the indexing, as reactions can have different number of params.
+      config.reactionModelParams[0 + (r - 1) * gpudata::MAXCHEMPARAMS] = A;
+      config.reactionModelParams[1 + (r - 1) * gpudata::MAXCHEMPARAMS] = b;
+      config.reactionModelParams[2 + (r - 1) * gpudata::MAXCHEMPARAMS] = E;
 
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
@@ -2368,12 +2375,16 @@ void M2ulPhyS::parseReactionInputs() {
     tpsP->getInput((basepath + "/detailed_balance").c_str(), detailedBalance, false);
     config.detailedBalance[r - 1] = detailedBalance;
     if (detailedBalance) {
-      config.equilibriumConstantParams[r - 1].resize(3);
+      // config.equilibriumConstantParams[r - 1].resize(3);
       double A, b, E;
       tpsP->getRequiredInput((basepath + "/equilibrium_constant/A").c_str(), A);
       tpsP->getRequiredInput((basepath + "/equilibrium_constant/b").c_str(), b);
       tpsP->getRequiredInput((basepath + "/equilibrium_constant/E").c_str(), E);
-      config.equilibriumConstantParams[r - 1] = {A, b, E};
+      // config.equilibriumConstantParams[r - 1] = {A, b, E};
+      // NOTE(kevin): this array keeps max param in the indexing, as reactions can have different number of params.
+      config.equilibriumConstantParams[0 + (r - 1) * gpudata::MAXCHEMPARAMS] = A;
+      config.equilibriumConstantParams[1 + (r - 1) * gpudata::MAXCHEMPARAMS] = b;
+      config.equilibriumConstantParams[2 + (r - 1) * gpudata::MAXCHEMPARAMS] = E;
     }
 
     Array<double> stoich(config.numSpecies);
@@ -2445,10 +2456,28 @@ void M2ulPhyS::parseReactionInputs() {
 
   // Pack up chemistry input for instantiation.
   {
+    config.chemistryInput.model = config.chemistryModel_;
+    const int numSpecies = config.numSpecies;
     if (config.speciesMapping.count("E")) {
       config.chemistryInput.electronIndex = config.speciesMapping["E"];
     } else {
       config.chemistryInput.electronIndex = -1;
+    }
+
+    config.chemistryInput.numReactions = config.numReactions;
+    for (int r = 0; r < config.numReactions; r++) {
+      config.chemistryInput.reactionEnergies[r] = config.reactionEnergies[r];
+      config.chemistryInput.detailedBalance[r] = config.detailedBalance[r];
+      for (int sp = 0; sp < config.numSpecies; sp++) {
+        config.chemistryInput.reactantStoich[sp + r * numSpecies] = config.reactantStoich(sp, r);
+        config.chemistryInput.productStoich[sp + r * numSpecies] = config.productStoich(sp, r);
+      }
+
+      config.chemistryInput.reactionModels[r] = config.reactionModels[r];
+      for (int p = 0; p < gpudata::MAXCHEMPARAMS; p++) {
+        config.chemistryInput.reactionModelParams[p + r * gpudata::MAXCHEMPARAMS] = config.reactionModelParams[p + r * gpudata::MAXCHEMPARAMS];
+        config.chemistryInput.equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS] = config.equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS];
+      }
     }
   }
 }

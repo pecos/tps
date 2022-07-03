@@ -35,7 +35,9 @@
 using namespace mfem;
 using namespace std;
 
-Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : mixture_(mixture) {
+Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : Chemistry(mixture, config.chemistryInput) {}
+
+Chemistry::Chemistry(GasMixture* mixture, const ChemistryInput &inputs) : mixture_(mixture) {
   numEquations_ = mixture->GetNumEquations();
   numSpecies_ = mixture->GetNumSpecies();
   numActiveSpecies_ = mixture->GetNumActiveSpecies();
@@ -43,19 +45,19 @@ Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : mixture_(m
   twoTemperature_ = mixture->IsTwoTemperature();
   dim_ = mixture->GetDimension();
 
-  model_ = config.GetChemistryModel();
+  model_ = inputs.model;
 
   // mixtureToInputMap_ = mixture->getMixtureToInputMap();
   // speciesMapping_ = mixture->getSpeciesMapping();
   // electronIndex_ = (speciesMapping_->count("E")) ? (*speciesMapping_)["E"] : -1;
-  electronIndex_ = config.chemistryInput.electronIndex;
+  electronIndex_ = inputs.electronIndex;
 
-  numReactions_ = config.numReactions;
+  numReactions_ = inputs.numReactions;
   // reactionEnergies_.SetSize(numReactions_);
   // detailedBalance_.SetSize(numReactions_);
   for (int r = 0; r < numReactions_; r++) {
-    reactionEnergies_[r] = config.reactionEnergies[r];
-    detailedBalance_[r] = config.detailedBalance[r];
+    reactionEnergies_[r] = inputs.reactionEnergies[r];
+    detailedBalance_[r] = inputs.detailedBalance[r];
   }
 
   reactions_.resize(numReactions_);
@@ -63,13 +65,13 @@ Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : mixture_(m
   // productStoich_.SetSize(numSpecies_, numReactions_);
   // equilibriumConstantParams_.SetSize(numReactions_, 3);
   for (int r = 0; r < numReactions_; r++)
-    for (int p = 0; p < 3; p++) equilibriumConstantParams_[r + p * numReactions_] = 0.0;
+    for (int p = 0; p < 3; p++) equilibriumConstantParams_[p + r * gpudata::MAXCHEMPARAMS] = 0.0;
 
   for (int r = 0; r < numReactions_; r++) {
     for (int mixSp = 0; mixSp < numSpecies_; mixSp++) {
       // int inputSp = (*mixtureToInputMap_)[mixSp];
-      reactantStoich_[mixSp + r * numSpecies_] = config.reactantStoich(mixSp, r);
-      productStoich_[mixSp + r * numSpecies_] = config.productStoich(mixSp, r);
+      reactantStoich_[mixSp + r * numSpecies_] = inputs.reactantStoich[mixSp + r * numSpecies_];
+      productStoich_[mixSp + r * numSpecies_] = inputs.productStoich[mixSp + r * numSpecies_];
     }
 
     // // check conservations.
@@ -124,15 +126,15 @@ Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : mixture_(m
 
     switch (config.reactionModels[r]) {
       case ARRHENIUS: {
-        double A = (config.reactionModelParams[r])[0];
-        double b = (config.reactionModelParams[r])[1];
-        double E = (config.reactionModelParams[r])[2];
+        double A = inputs.reactionModelParams[0 + r * gpudata::MAXCHEMPARAMS];
+        double b = inputs.reactionModelParams[1 + r * gpudata::MAXCHEMPARAMS];
+        double E = inputs.reactionModelParams[2 + r * gpudata::MAXCHEMPARAMS];
         reactions_[r] = new Arrhenius(A, b, E);
       } break;
       case HOFFERTLIEN: {
-        double A = (config.reactionModelParams[r])[0];
-        double b = (config.reactionModelParams[r])[1];
-        double E = (config.reactionModelParams[r])[2];
+        double A = inputs.reactionModelParams[0 + r * gpudata::MAXCHEMPARAMS];
+        double b = inputs.reactionModelParams[1 + r * gpudata::MAXCHEMPARAMS];
+        double E = inputs.reactionModelParams[2 + r * gpudata::MAXCHEMPARAMS];
         reactions_[r] = new HoffertLien(A, b, E);
       } break;
       default:
@@ -141,9 +143,8 @@ Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : mixture_(m
     }
     if (detailedBalance_[r]) {
       for (int d = 0; d < 3; d++) {
-        equilibriumConstantParams_[r + d * numReactions_] = (config.equilibriumConstantParams[r])[d];
+        equilibriumConstantParams_[d + r * gpudata::MAXCHEMPARAMS] = inputs.equilibriumConstantParams[d + r * gpudata::MAXCHEMPARAMS];
       }
-      std::cout << std::endl;
     }
   }
 }
@@ -177,8 +178,8 @@ void Chemistry::computeEquilibriumConstants(const double T_h, const double T_e, 
   for (int r = 0; r < numReactions_; r++) {
     double temp = (isElectronInvolvedAt(r)) ? T_e : T_h;
     if (detailedBalance_[r]) {
-      kC(r) = equilibriumConstantParams_[r + 0 * numReactions_] * pow(temp, equilibriumConstantParams_[r + 1 * numReactions_]) *
-              exp(-equilibriumConstantParams_[r + 2 * numReactions_] / temp);
+      kC(r) = equilibriumConstantParams_[0 + r * gpudata::MAXCHEMPARAMS] * pow(temp, equilibriumConstantParams_[1 + r * gpudata::MAXCHEMPARAMS]) *
+              exp(-equilibriumConstantParams_[2 + r * gpudata::MAXCHEMPARAMS] / temp);
     }
   }
 

@@ -50,6 +50,7 @@ const int MAXEQUATIONS = MAXDIM + 2 + MAXSPECIES;  // momentum + two energies + 
 // NOTE(kevin): with MAXEQUATIONS=20, marvin fails with out-of-memery with 3 MPI process.
 
 const int MAXREACTIONS = 20;
+const int MAXCHEMPARAMS = 3;
 }  // namespace gpudata
 
 enum Equations {
@@ -349,7 +350,17 @@ struct ArgonTransportInput {
 };
 
 struct ChemistryInput {
+  ChemistryModel model;
+
   int electronIndex;
+  int numReactions;
+  double reactionEnergies[gpudata::MAXREACTIONS];
+  bool detailedBalance[gpudata::MAXREACTIONS];
+  double reactantStoich[gpudata::MAXSPECIES * gpudata::MAXREACTIONS];
+  double productStoich[gpudata::MAXSPECIES * gpudata::MAXREACTIONS];
+  ReactionModel reactionModels[gpudata::MAXREACTIONS];
+  double reactionModelParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
+  double equilibriumConstantParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
 };
 
 #endif  // DATASTRUCTURES_HPP_
