@@ -96,7 +96,8 @@ class Chemistry {
   // return Vector of reaction rate coefficients, with the size of numReaction_.
   // WARNING(marc) I have removed "virtual" qualifier here assuming these functions will not
   // change for child classes. Correct if wrong
-  void computeForwardRateCoeffs(const double T_h, const double T_e, Vector &kfwd);
+  void computeForwardRateCoeffs(const double &T_h, const double &T_e, Vector &kfwd);
+  MFEM_HOST_DEVICE void computeForwardRateCoeffs(const double &T_h, const double &T_e, double *kfwd);
 
   void computeEquilibriumConstants(const double T_h, const double T_e, Vector &kC);
 
@@ -114,7 +115,7 @@ class Chemistry {
   double getReactionEnergy(const int reactionIndex) { return reactionEnergies_[reactionIndex]; }
   int getNumReactions() { return numReactions_; }
 
-  bool isElectronInvolvedAt(const int reactionIndex) {
+  MFEM_HOST_DEVICE bool isElectronInvolvedAt(const int &reactionIndex) {
     return (electronIndex_ < 0) ? false : (reactantStoich_[electronIndex_ + reactionIndex * numSpecies_] != 0);
   }
 

@@ -158,13 +158,26 @@ MFEM_HOST_DEVICE Chemistry::~Chemistry() {
   }
 }
 
-void Chemistry::computeForwardRateCoeffs(const double T_h, const double T_e, Vector& kfwd) {
+void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, Vector& kfwd) {
   kfwd.SetSize(numReactions_);
-  kfwd = 0.0;
+  computeForwardRateCoeffs(T_h, T_e, &kfwd[0]);
+  // kfwd = 0.0;
+  //
+  // for (int r = 0; r < numReactions_; r++) {
+  //   bool isElectronInvolved = isElectronInvolvedAt(r);
+  //   kfwd(r) = reactions_[r]->computeRateCoefficient(T_h, T_e, isElectronInvolved);
+  // }
+
+  return;
+}
+
+MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, double *kfwd) {
+  // kfwd.SetSize(numReactions_);
+  for (int r = 0; r < numReactions_; r++) kfwd[r] = 0.0;
 
   for (int r = 0; r < numReactions_; r++) {
     bool isElectronInvolved = isElectronInvolvedAt(r);
-    kfwd(r) = reactions_[r]->computeRateCoefficient(T_h, T_e, isElectronInvolved);
+    kfwd[r] = reactions_[r]->computeRateCoefficient(T_h, T_e, isElectronInvolved);
   }
 
   return;
