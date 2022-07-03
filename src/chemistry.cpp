@@ -124,7 +124,7 @@ Chemistry::Chemistry(GasMixture* mixture, const ChemistryInput &inputs) : mixtur
     //   }
     // }
 
-    switch (config.reactionModels[r]) {
+    switch (inputs.reactionModels[r]) {
       case ARRHENIUS: {
         double A = inputs.reactionModelParams[0 + r * gpudata::MAXCHEMPARAMS];
         double b = inputs.reactionModelParams[1 + r * gpudata::MAXCHEMPARAMS];
