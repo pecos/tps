@@ -52,7 +52,8 @@ __global__ void instantiateDeviceDryAirTransport(GasMixture *mixture, const doub
   *trans = new DryAirTransport(mixture, viscosity_multiplier, bulk_viscosity);
 }
 
-__global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, GasMixture **mix) {
+__global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel,
+                                                GasMixture **mix) {
   *mix = new PerfectMixture(inputs, _dim, nvel);
 }
 
