@@ -306,7 +306,8 @@ MFEM_HOST_DEVICE void DryAirTransport::ComputeFluxTransportProperties(const doub
 
 ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_runfile)
     : ConstantTransport(_mixture, _runfile.constantTransport) {}
-// ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_runfile) : TransportProperties(_mixture) {
+// ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_runfile) :
+// TransportProperties(_mixture) {
 //   viscosity_ = _runfile.constantTransport.viscosity;
 //   bulkViscosity_ = _runfile.constantTransport.bulkViscosity;
 //   thermalConductivity_ = _runfile.constantTransport.thermalConductivity;
@@ -334,7 +335,8 @@ ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_ru
 //   }
 // }
 
-MFEM_HOST_DEVICE ConstantTransport::ConstantTransport(GasMixture *_mixture, const constantTransportData &inputs) : TransportProperties(_mixture) {
+MFEM_HOST_DEVICE ConstantTransport::ConstantTransport(GasMixture *_mixture, const constantTransportData &inputs)
+    : TransportProperties(_mixture) {
   viscosity_ = inputs.viscosity;
   bulkViscosity_ = inputs.bulkViscosity;
   thermalConductivity_ = inputs.thermalConductivity;

@@ -57,7 +57,8 @@ __global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs
   *mix = new PerfectMixture(inputs, _dim, nvel);
 }
 
-__global__ void instantiateDeviceConstantTransport(GasMixture *mixture, const constantTransportData inputs, TransportProperties **trans) {
+__global__ void instantiateDeviceConstantTransport(GasMixture *mixture, const constantTransportData inputs,
+                                                   TransportProperties **trans) {
   *trans = new ConstantTransport(mixture, inputs);
 }
 

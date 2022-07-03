@@ -310,8 +310,7 @@ void M2ulPhyS::initVariables() {
         case CONSTANT:
           transportPtr = new ConstantTransport(mixture, config);
 #if defined(_CUDA_)
-          gpu::instantiateDeviceConstantTransport<<<1, 1>>>(d_mixture, config.constantTransport,
-                                                            d_transport_tmp);
+          gpu::instantiateDeviceConstantTransport<<<1, 1>>>(d_mixture, config.constantTransport, d_transport_tmp);
           cudaMemcpy(&transportPtr, d_transport_tmp, sizeof(TransportProperties *), cudaMemcpyDeviceToHost);
 #elif defined(_HIP_)
           mfem_error("ConstantTransport is not supported for HIP!");
