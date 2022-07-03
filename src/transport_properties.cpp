@@ -70,10 +70,21 @@ MFEM_HOST_DEVICE void TransportProperties::correctMassDiffusionFlux(const double
 }
 
 double TransportProperties::computeMixtureElectricConductivity(const Vector &mobility, const Vector &n_sp) {
+  return computeMixtureElectricConductivity(&mobility[0], &n_sp[0]);
+  // double mho = 0.0;  // electric conductivity.
+  //
+  // for (int sp = 0; sp < numSpecies; sp++) {
+  //   mho += mobility(sp) * n_sp(sp) * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+  // }
+  //
+  // return mho;
+}
+
+MFEM_HOST_DEVICE double TransportProperties::computeMixtureElectricConductivity(const double *mobility, const double *n_sp) {
   double mho = 0.0;  // electric conductivity.
 
   for (int sp = 0; sp < numSpecies; sp++) {
-    mho += mobility(sp) * n_sp(sp) * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+    mho += mobility[sp] * n_sp[sp] * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
   }
 
   return mho;

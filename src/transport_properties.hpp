@@ -108,6 +108,7 @@ class TransportProperties {
   // compute electric conductivity for mixture-averaged diffusions.
   // NOTE: in unit of ELECTRONCHARGE * AVOGADRONUMBER.
   double computeMixtureElectricConductivity(const Vector &mobility, const Vector &n_sp);
+  MFEM_HOST_DEVICE double computeMixtureElectricConductivity(const double *mobility, const double *n_sp);
 
   // These are only for mixture-averaged diffusivity models.
   void addAmbipolarEfield(const Vector &mobility, const Vector &n_sp, DenseMatrix &diffusionVelocity);
