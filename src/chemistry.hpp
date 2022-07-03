@@ -63,10 +63,10 @@ class Chemistry {
   int numReactions_ = 0;
   // size of (numSpecies, numReactions)
   double reactantStoich_[gpudata::MAXSPECIES * gpudata::MAXREACTIONS],
-         productStoich_[gpudata::MAXSPECIES * gpudata::MAXREACTIONS];
+      productStoich_[gpudata::MAXSPECIES * gpudata::MAXREACTIONS];
 
   // std::vector<Reaction *> reactions_;
-  Reaction* reactions_[gpudata::MAXREACTIONS];
+  Reaction *reactions_[gpudata::MAXREACTIONS];
   double reactionEnergies_[gpudata::MAXREACTIONS];
 
   // std::map<int, int> *mixtureToInputMap_;
@@ -106,12 +106,17 @@ class Chemistry {
   // reactionIndex is taken from reactionMapping.right.
   // virtual Vector computeRateCoeffOf(const int reactionIndex, const double T_h, const double T_e) {};
 
-  const double *getReactantStoichiometry(const int reactionIndex) { return &reactantStoich_[reactionIndex * numSpecies_]; }
-  const double *getProductStoichiometry(const int reactionIndex) { return &productStoich_[reactionIndex * numSpecies_]; }
+  const double *getReactantStoichiometry(const int reactionIndex) {
+    return &reactantStoich_[reactionIndex * numSpecies_];
+  }
+  const double *getProductStoichiometry(const int reactionIndex) {
+    return &productStoich_[reactionIndex * numSpecies_];
+  }
 
   // compute progress rate by mass-action law.
   void computeProgressRate(const Vector &ns, const Vector &kfwd, const Vector &keq, Vector &progressRate);
-  MFEM_HOST_DEVICE void computeProgressRate(const double *ns, const double *kfwd, const double *keq, double *progressRate);
+  MFEM_HOST_DEVICE void computeProgressRate(const double *ns, const double *kfwd, const double *keq,
+                                            double *progressRate);
   void computeCreationRate(const Vector &progressRate, Vector &creationRate);
   MFEM_HOST_DEVICE void computeCreationRate(const double *progressRate, double *creationRate);
 
