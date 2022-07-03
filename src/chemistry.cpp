@@ -149,7 +149,7 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture* mixture, const ChemistryInput 
   }
 }
 
-Chemistry::~Chemistry() {
+MFEM_HOST_DEVICE Chemistry::~Chemistry() {
   //   if (mixture_ != NULL) delete mixture_;
   //   if (mixtureToInputMap_ != NULL) delete mixtureToInputMap_;
   //   if (speciesMapping_ != NULL) delete speciesMapping_;

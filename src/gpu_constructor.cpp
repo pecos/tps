@@ -73,7 +73,7 @@ __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture
 }
 
 __global__ void instantiateDeviceChemistry(GasMixture *mixture, const ChemistryInput inputs, Chemistry **chem) {
-  *chem = new ConstantTransport(mixture, inputs);
+  *chem = new Chemistry(mixture, inputs);
 }
 
 __global__ void freeDeviceMixture(GasMixture *mix) { delete mix; }

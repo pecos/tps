@@ -91,7 +91,7 @@ class Chemistry {
   Chemistry(GasMixture *mixture, RunConfiguration &config);
   MFEM_HOST_DEVICE Chemistry(GasMixture *mixture, const ChemistryInput &inputs);
 
-  ~Chemistry();
+  MFEM_HOST_DEVICE ~Chemistry();
 
   // return Vector of reaction rate coefficients, with the size of numReaction_.
   // WARNING(marc) I have removed "virtual" qualifier here assuming these functions will not
