@@ -208,10 +208,17 @@ class ConstantTransport : public TransportProperties {
                                                                  double *n_sp);
 
   virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc);
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double &visc, double &bulkVisc);
 };
 
 inline void ConstantTransport::GetViscosities(const Vector &conserved, const Vector &primitive, double &visc,
                                               double &bulkVisc) {
+  GetViscosities(&conserved[0], &primitive[0], visc, bulkVisc);
+  return;
+}
+
+MFEM_HOST_DEVICE inline void ConstantTransport::GetViscosities(const double *conserved, const double *primitive, double &visc,
+                                                               double &bulkVisc) {
   visc = viscosity_;
   bulkVisc = bulkViscosity_;
   return;
