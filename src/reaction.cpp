@@ -35,17 +35,17 @@
 using namespace mfem;
 using namespace std;
 
-Arrhenius::Arrhenius(const double A, const double b, const double E) : Reaction(), A_(A), b_(b), E_(E) {}
+MFEM_HOST_DEVICE Arrhenius::Arrhenius(const double &A, const double &b, const double &E) : Reaction(), A_(A), b_(b), E_(E) {}
 
-double Arrhenius::computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved) {
+MFEM_HOST_DEVICE double Arrhenius::computeRateCoefficient(const double &T_h, const double &T_e, const bool isElectronInvolved) {
   double temp = (isElectronInvolved) ? T_e : T_h;
 
   return A_ * pow(temp, b_) * exp(-E_ / UNIVERSALGASCONSTANT / temp);
 }
 
-HoffertLien::HoffertLien(const double A, const double b, const double E) : Reaction(), A_(A), b_(b), E_(E) {}
+MFEM_HOST_DEVICE HoffertLien::HoffertLien(const double &A, const double &b, const double &E) : Reaction(), A_(A), b_(b), E_(E) {}
 
-double HoffertLien::computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved) {
+MFEM_HOST_DEVICE double HoffertLien::computeRateCoefficient(const double &T_h, const double &T_e, const bool isElectronInvolved) {
   double temp = (isElectronInvolved) ? T_e : T_h;
   double tempFactor = E_ / BOLTZMANNCONSTANT / temp;
 

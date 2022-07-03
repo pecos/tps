@@ -52,11 +52,11 @@ using namespace std;
 class Reaction {
  protected:
  public:
-  Reaction() {}
+  MFEM_HOST_DEVICE Reaction() {}
 
-  virtual ~Reaction() {}
+  MFEM_HOST_DEVICE virtual ~Reaction() {}
 
-  virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved = false) {
+  MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double &T_h, const double &T_e, const bool isElectronInvolved = false) {
     mfem_error("computeRateCoefficient not implemented");
     return 0;
   }
@@ -70,11 +70,11 @@ class Arrhenius : public Reaction {
   double E_;
 
  public:
-  Arrhenius(const double A, const double b, const double E);
+  MFEM_HOST_DEVICE Arrhenius(const double &A, const double &b, const double &E);
 
-  virtual ~Arrhenius() {}
+  MFEM_HOST_DEVICE virtual ~Arrhenius() {}
 
-  virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved = false);
+  MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double &T_h, const double &T_e, const bool isElectronInvolved = false);
 };
 
 class HoffertLien : public Reaction {
@@ -89,11 +89,11 @@ class HoffertLien : public Reaction {
   double E_;
 
  public:
-  HoffertLien(const double A, const double b, const double E);
+  MFEM_HOST_DEVICE HoffertLien(const double &A, const double &b, const double &E);
 
-  virtual ~HoffertLien() {}
+  MFEM_HOST_DEVICE virtual ~HoffertLien() {}
 
-  virtual double computeRateCoefficient(const double T_h, const double T_e, const bool isElectronInvolved = false);
+  MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double &T_h, const double &T_e, const bool isElectronInvolved = false);
 };
 
 #endif  // REACTION_HPP_
