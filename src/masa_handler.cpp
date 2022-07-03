@@ -487,9 +487,9 @@ void initTernary2DBase(GasMixture *mixture, RunConfiguration &config, const doub
       "k_heat", config.constantTransport.thermalConductivity + config.constantTransport.electronThermalConductivity);
 
   // std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
-  MASA::masa_set_param<double>("D_A", config.constantTransport.diffusivity(numSpecies - 1));
-  MASA::masa_set_param<double>("D_I", config.constantTransport.diffusivity(0));
-  MASA::masa_set_param<double>("D_E", config.constantTransport.diffusivity(numSpecies - 2));
+  MASA::masa_set_param<double>("D_A", config.constantTransport.diffusivity[numSpecies - 1]);
+  MASA::masa_set_param<double>("D_I", config.constantTransport.diffusivity[0]);
+  MASA::masa_set_param<double>("D_E", config.constantTransport.diffusivity[numSpecies - 2]);
 
   MASA::masa_set_param<double>("qe", ELECTRONCHARGE);
   MASA::masa_set_param<double>("kB", BOLTZMANNCONSTANT);
@@ -577,8 +577,8 @@ void initTernary2D2TPeriodicAmbipolar(GasMixture *mixture, RunConfiguration &con
 
   const int numSpecies = mixture->GetNumSpecies();
   // std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
-  MASA::masa_set_param<double>("nu_I", config.constantTransport.mtFreq(0));
-  MASA::masa_set_param<double>("nu_A", config.constantTransport.mtFreq(numSpecies - 1));
+  MASA::masa_set_param<double>("nu_I", config.constantTransport.mtFreq[0]);
+  MASA::masa_set_param<double>("nu_A", config.constantTransport.mtFreq[numSpecies - 1]);
 }
 
 void initTernary2D2TAmbipolarWall(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly) {
@@ -601,8 +601,8 @@ void initTernary2D2TAmbipolarWall(GasMixture *mixture, RunConfiguration &config,
 
   const int numSpecies = mixture->GetNumSpecies();
   // std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
-  MASA::masa_set_param<double>("nu_I", config.constantTransport.mtFreq(0));
-  MASA::masa_set_param<double>("nu_A", config.constantTransport.mtFreq(numSpecies - 1));
+  MASA::masa_set_param<double>("nu_I", config.constantTransport.mtFreq[0]);
+  MASA::masa_set_param<double>("nu_A", config.constantTransport.mtFreq[numSpecies - 1]);
 
   assert(config.wallBC.size() == 2);
   double T0 = -1.0;
@@ -650,8 +650,8 @@ void initTernary2D2TAmbipolarInoutlet(GasMixture *mixture, RunConfiguration &con
 
   const int numSpecies = mixture->GetNumSpecies();
   // std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
-  MASA::masa_set_param<double>("nu_I", config.constantTransport.mtFreq(0));
-  MASA::masa_set_param<double>("nu_A", config.constantTransport.mtFreq(numSpecies - 1));
+  MASA::masa_set_param<double>("nu_I", config.constantTransport.mtFreq[0]);
+  MASA::masa_set_param<double>("nu_A", config.constantTransport.mtFreq[numSpecies - 1]);
 
   assert(config.GetOutletPatchType()->size() == 1);
   Array<double> p0 = config.GetOutletData(0);
@@ -712,8 +712,8 @@ void initTernary2DSheath(GasMixture *mixture, RunConfiguration &config, const do
 
   const int numSpecies = mixture->GetNumSpecies();
   // std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
-  MASA::masa_set_param<double>("nu_I", config.constantTransport.mtFreq(0));
-  MASA::masa_set_param<double>("nu_A", config.constantTransport.mtFreq(numSpecies - 1));
+  MASA::masa_set_param<double>("nu_I", config.constantTransport.mtFreq[0]);
+  MASA::masa_set_param<double>("nu_A", config.constantTransport.mtFreq[numSpecies - 1]);
 
   MASA::masa_set_param<double>("Te0", 5.0e-1);
   MASA::masa_set_param<double>("Th0", 10.0e-1);
