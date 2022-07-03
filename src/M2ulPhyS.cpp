@@ -2434,10 +2434,10 @@ void M2ulPhyS::parseReactionInputs() {
         prodEnergy += product(sp) * config.gasParams(sp, FORMATION_ENERGY);
       }
       // This may be too strict..
-      if (reactEnergy + reactionEnergies_[r] != prodEnergy) {
+      if (reactEnergy + config.reactionEnergies[r] != prodEnergy) {
         grvy_printf(GRVY_ERROR, "Reaction %d does not conserve energy.\n", r);
-        grvy_printf(GRVY_ERROR, "%.8E + %.8E = %.8E =/= %.8E\n", reactEnergy, reactionEnergies_[r],
-                    reactEnergy + reactionEnergies_[r], prodEnergy);
+        grvy_printf(GRVY_ERROR, "%.8E + %.8E = %.8E =/= %.8E\n", reactEnergy, config.reactionEnergies[r],
+                    reactEnergy + config.reactionEnergies[r], prodEnergy);
         exit(-1);
       }
     }
