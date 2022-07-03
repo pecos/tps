@@ -201,7 +201,7 @@ void Chemistry::computeEquilibriumConstants(const double &T_h, const double &T_e
 }
 
 MFEM_HOST_DEVICE void Chemistry::computeEquilibriumConstants(const double &T_h, const double &T_e, double *kC) {
-  for (int r = 0; r < numReactions; r++) kC[r] = 0.0;
+  for (int r = 0; r < numReactions_; r++) kC[r] = 0.0;
 
   for (int r = 0; r < numReactions_; r++) {
     double temp = (isElectronInvolvedAt(r)) ? T_e : T_h;
