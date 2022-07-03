@@ -2292,10 +2292,10 @@ void M2ulPhyS::parseTransportInputs() {
       for (int sp = 0; sp < config.numSpecies; sp++) {  // mixture species index.
         int inputSp = config.mixtureToInputMap[sp];
         tpsP->getRequiredInput((diffpath + "/species" + std::to_string(inputSp + 1)).c_str(),
-                               config.constantTransport.diffusivity(sp));
+                               config.constantTransport.diffusivity[sp]);
         if (config.twoTemperature)
           tpsP->getRequiredInput((mtpath + "/species" + std::to_string(inputSp + 1)).c_str(),
-                                 config.constantTransport.mtFreq(sp));
+                                 config.constantTransport.mtFreq[sp]);
       }
       config.constantTransport.electronIndex = -1;
       if (config.IsTwoTemperature()) {
