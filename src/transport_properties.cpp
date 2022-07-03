@@ -151,9 +151,18 @@ MFEM_HOST_DEVICE void TransportProperties::addMixtureDrift(const double *mobilit
 }
 
 double TransportProperties::linearAverage(const Vector &X_sp, const Vector &speciesTransport) {
+  return linearAverage(&X_sp[0], &speciesTransport[0]);
+  // double average = 0.0;
+  //
+  // for (int sp = 0; sp < numSpecies; sp++) average += X_sp(sp) * speciesTransport(sp);
+  //
+  // return average;
+}
+
+MFEM_HOST_DEVICE double TransportProperties::linearAverage(const double *X_sp, const double *speciesTransport) {
   double average = 0.0;
 
-  for (int sp = 0; sp < numSpecies; sp++) average += X_sp(sp) * speciesTransport(sp);
+  for (int sp = 0; sp < numSpecies; sp++) average += X_sp[sp] * speciesTransport[sp];
 
   return average;
 }

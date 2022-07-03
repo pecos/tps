@@ -118,6 +118,7 @@ class TransportProperties {
   MFEM_HOST_DEVICE void addMixtureDrift(const double *mobility, const double *n_sp, const double *Efield,
                                         double *diffusionVelocity);
   double linearAverage(const Vector &X_sp, const Vector &speciesTransport);
+  MFEM_HOST_DEVICE double linearAverage(const double *X_sp, const double *speciesTransport);
   // Curtiss-Hirschfelder approximation of diffusivity.
   void CurtissHirschfelder(const Vector &X_sp, const Vector &Y_sp, const DenseSymmetricMatrix &binaryDiff,
                            Vector &avgDiff);
