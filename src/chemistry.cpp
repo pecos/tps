@@ -281,7 +281,7 @@ MFEM_HOST_DEVICE void Chemistry::computeCreationRate(const double *progressRate,
 
   // check total created mass is 0
   double totMass = 0.;
-  for (int sp = 0; sp < numSpecies_; sp++) totMass += creationRate[p];
+  for (int sp = 0; sp < numSpecies_; sp++) totMass += creationRate[sp];
   // NOTE: this assertion below should be made non-dimensional with dt and density
   //   assert(fabs(totMass) < 1e-7);
 }
