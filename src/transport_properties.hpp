@@ -122,8 +122,8 @@ class TransportProperties {
   // Curtiss-Hirschfelder approximation of diffusivity.
   void CurtissHirschfelder(const Vector &X_sp, const Vector &Y_sp, const DenseMatrix &binaryDiff,
                            Vector &avgDiff);
-  // MFEM_HOST_DEVICE void CurtissHirschfelder(const double *X_sp, const double *Y_sp, const double *binaryDiff,
-  //                                           double *avgDiff);
+  MFEM_HOST_DEVICE void CurtissHirschfelder(const double *X_sp, const double *Y_sp, const double *binaryDiff,
+                                            double *avgDiff);
 };
 
 //////////////////////////////////////////////////////
