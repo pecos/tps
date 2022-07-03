@@ -176,8 +176,8 @@ void TransportProperties::CurtissHirschfelder(const Vector &X_sp, const Vector &
   for (int spI = 0; spI < numSpecies; spI++) {
     for (int spJ = 0; spJ < numSpecies; spJ++) {
       if (spI == spJ) continue;
-      double bD = (spI < spJ) ? binaryDiff(spI, spJ) : binaryDiff(spJ, spI);
-      avgDiff(spI) += (X_sp(spJ) + Xeps_) / bD;
+      // double bD = (spI < spJ) ? binaryDiff(spI, spJ) : binaryDiff(spJ, spI);
+      avgDiff(spI) += (X_sp(spJ) + Xeps_) / binaryDiff(spI, spJ);
     }
     avgDiff(spI) = (1.0 - Y_sp(spI)) / avgDiff(spI);
   }

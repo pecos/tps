@@ -191,20 +191,16 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   }
 
   DenseMatrix binaryDiff(3);
-  int spI, spJ;
   binaryDiff = 0.0;
-  spI = min(electronIndex_, neutralIndex_);
-  spJ = max(electronIndex_, neutralIndex_);
-  binaryDiff(spI, spJ) =
+  binaryDiff(electronIndex_, neutralIndex_) =
       diffusivityFactor_ * sqrt(Te / muw_(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
-  spI = min(neutralIndex_, ionIndex_);
-  spJ = max(neutralIndex_, ionIndex_);
-  binaryDiff(spI, spJ) =
+  binaryDiff(neutralIndex_, electronIndex_) = binaryDiff(electronIndex_, neutralIndex_);
+  binaryDiff(neutralIndex_, ionIndex_) =
       diffusivityFactor_ * sqrt(Th / muw_(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
-  spI = min(electronIndex_, ionIndex_);
-  spJ = max(electronIndex_, ionIndex_);
-  binaryDiff(spI, spJ) = diffusivityFactor_ * sqrt(Te / muw_(ionIndex_, electronIndex_)) / nTotal /
+  binaryDiff(ionIndex_, neutralIndex_) = binaryDiff(neutralIndex_, ionIndex_);
+  binaryDiff(electronIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Te / muw_(ionIndex_, electronIndex_)) / nTotal /
                                           (collision::charged::att11(nondimTe) * debyeCircle);
+  binaryDiff(ionIndex_, electronIndex_) = binaryDiff(electronIndex_, ionIndex_);
 
   Vector diffusivity(3), mobility(3);
   CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
@@ -315,20 +311,16 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
   // double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
 
   DenseMatrix binaryDiff(3);
-  int spI, spJ;
   binaryDiff = 0.0;
-  spI = min(electronIndex_, neutralIndex_);
-  spJ = max(electronIndex_, neutralIndex_);
-  binaryDiff(spI, spJ) =
+  binaryDiff(electronIndex_, neutralIndex_) =
       diffusivityFactor_ * sqrt(Te / muw_(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
-  spI = min(ionIndex_, neutralIndex_);
-  spJ = max(ionIndex_, neutralIndex_);
-  binaryDiff(spI, spJ) =
+  binaryDiff(neutralIndex_, electronIndex_) = binaryDiff(electronIndex_, neutralIndex_);
+  binaryDiff(ionIndex_, neutralIndex_) =
       diffusivityFactor_ * sqrt(Th / muw_(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
-  spI = min(electronIndex_, ionIndex_);
-  spJ = max(electronIndex_, ionIndex_);
-  binaryDiff(spI, spJ) = diffusivityFactor_ * sqrt(Te / muw_(ionIndex_, electronIndex_)) / nTotal /
+  binaryDiff(neutralIndex_, ionIndex_) = binaryDiff(ionIndex_, neutralIndex_);
+  binaryDiff(electronIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Te / muw_(ionIndex_, electronIndex_)) / nTotal /
                                           (collision::charged::att11(nondimTe) * debyeCircle);
+  binaryDiff(ionIndex_, electronIndex_) = binaryDiff(electronIndex_, ionIndex_);
 
   diffusivity.SetSize(3);
   diffusivity = 0.0;
@@ -366,19 +358,15 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
   double Qie = collision::charged::att11(nondimTe) * debyeCircle;
 
   DenseMatrix binaryDiff(3);
-  int spI, spJ;
   binaryDiff = 0.0;
-  spI = min(electronIndex_, neutralIndex_);
-  spJ = max(electronIndex_, neutralIndex_);
-  binaryDiff(spI, spJ) =
+  binaryDiff(electronIndex_, neutralIndex_) =
       diffusivityFactor_ * sqrt(Te / muw_(electronIndex_, neutralIndex_)) / nTotal / Qea;
-  spI = min(neutralIndex_, ionIndex_);
-  spJ = max(neutralIndex_, ionIndex_);
-  binaryDiff(spI, spJ) = diffusivityFactor_ * sqrt(Th / muw_(neutralIndex_, ionIndex_)) / nTotal / Qai;
-  spI = min(electronIndex_, ionIndex_);
-  spJ = max(electronIndex_, ionIndex_);
-  binaryDiff(spI, spJ) =
+  binaryDiff(neutralIndex_, electronIndex_) = binaryDiff(electronIndex_, neutralIndex_);
+  binaryDiff(neutralIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Th / muw_(neutralIndex_, ionIndex_)) / nTotal / Qai;
+  binaryDiff(ionIndex_, neutralIndex_) = binaryDiff(neutralIndex_, ionIndex_);
+  binaryDiff(electronIndex_, ionIndex_) =
       diffusivityFactor_ * sqrt(Te / muw_(ionIndex_, electronIndex_)) / nTotal / Qie;
+  binaryDiff(ionIndex_, electronIndex_) = binaryDiff(electronIndex_, ionIndex_);
 
   Vector diffusivity(3), mobility(3);
   CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
@@ -842,6 +830,7 @@ void ArgonMixtureTransport::ComputeFluxTransportProperties(const Vector &state, 
       double temp = ((spI == electronIndex_) || (spJ == electronIndex_)) ? collInputs.Te : collInputs.Th;
       binaryDiff(spI, spJ) =
           diffusivityFactor_ * sqrt(temp / muw_(spI, spJ)) / nTotal / collisionIntegral(spI, spJ, 1, 1, collInputs);
+      binaryDiff(spJ, spI) = binaryDiff(spI, spJ);
     }
   }
 
@@ -932,6 +921,7 @@ void ArgonMixtureTransport::ComputeSourceTransportProperties(const Vector &state
 
       binaryDiff(spI, spJ) =
           diffusivityFactor_ * sqrt(temp / muw_(spI, spJ)) / nTotal / collisionIntegral(spI, spJ, 1, 1, collInputs);
+      binaryDiff(spJ, spI) = binaryDiff(spI, spJ);
     }
   }
 
