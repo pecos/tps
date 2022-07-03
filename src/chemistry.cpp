@@ -138,7 +138,8 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
         reactions_[r] = new HoffertLien(A, b, E);
       } break;
       default:
-        mfem_error("Unknown reactionModel.");
+        printf("Unknown reactionModel.");
+        assert(false);
         break;
     }
     if (detailedBalance_[r]) {

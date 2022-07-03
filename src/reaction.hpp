@@ -58,7 +58,7 @@ class Reaction {
 
   MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double &T_h, const double &T_e,
                                                          const bool isElectronInvolved = false) {
-    mfem_error("computeRateCoefficient not implemented");
+    printf("computeRateCoefficient not implemented");
     return 0;
   }
 };
