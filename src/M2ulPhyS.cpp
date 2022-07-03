@@ -2389,6 +2389,60 @@ void M2ulPhyS::parseReactionInputs() {
     }
   }
 
+  // check conservations.
+  {
+    const int numReactions_ = config.numReactions;
+    const int numSpecies_ = config.numSpecies;
+    for (int r = 0; r < numReactions_; r++) {
+      Vector react(numSpecies_), product(numSpecies_);
+      config.reactantStoich.GetColumn(r, react);
+      config.productStoich.GetColumn(r, product);
+
+      // atom conservation.
+      DenseMatrix composition;
+      composition.Transpose(config.speciesComposition);
+      Vector reactAtom(config.numAtoms), prodAtom(config.numAtoms);
+      composition.Mult(react, reactAtom);
+      composition.Mult(product, prodAtom);
+      for (int a = 0; a < config.numAtoms; a++) {
+        if (reactAtom(a) != prodAtom(a)) {
+          grvy_printf(GRVY_ERROR, "Reaction %d does not conserve atom %d.\n", r, a);
+          exit(-1);
+        }
+      }
+
+      // mass conservation. (already ensured with atom but checking again.)
+      double reactMass = 0.0, prodMass = 0.0;
+      for (int sp = 0; sp < numSpecies_; sp++) {
+        // int inputSp = (*mixtureToInputMap_)[sp];
+        reactMass += react(sp) * config.gasParams(sp, SPECIES_MW);
+        prodMass += product(sp) * config.gasParams(sp, SPECIES_MW);
+      }
+      // This may be too strict..
+      if (abs(reactMass - prodMass) > 1.0e-15) {
+        grvy_printf(GRVY_ERROR, "Reaction %d does not conserve mass.\n", r);
+        grvy_printf(GRVY_ERROR, "%.8E =/= %.8E\n", reactMass, prodMass);
+        exit(-1);
+      }
+
+      // energy conservation.
+      // TODO(kevin): this will need an adjustion when radiation comes into play.
+      double reactEnergy = 0.0, prodEnergy = 0.0;
+      for (int sp = 0; sp < numSpecies_; sp++) {
+        // int inputSp = (*mixtureToInputMap_)[sp];
+        reactEnergy += react(sp) * config.gasParams(sp, FORMATION_ENERGY);
+        prodEnergy += product(sp) * config.gasParams(sp, FORMATION_ENERGY);
+      }
+      // This may be too strict..
+      if (reactEnergy + reactionEnergies_[r] != prodEnergy) {
+        grvy_printf(GRVY_ERROR, "Reaction %d does not conserve energy.\n", r);
+        grvy_printf(GRVY_ERROR, "%.8E + %.8E = %.8E =/= %.8E\n", reactEnergy, reactionEnergies_[r],
+                    reactEnergy + reactionEnergies_[r], prodEnergy);
+        exit(-1);
+      }
+    }
+  }
+
   // Pack up chemistry input for instantiation.
   {
     if (config.speciesMapping.count("E")) {
