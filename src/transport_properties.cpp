@@ -92,21 +92,42 @@ MFEM_HOST_DEVICE double TransportProperties::computeMixtureElectricConductivity(
 
 void TransportProperties::addAmbipolarEfield(const Vector &mobility, const Vector &n_sp,
                                              DenseMatrix &diffusionVelocity) {
+  addAmbipolarEfield(&mobility[0], &n_sp[0], diffusionVelocity.Write());
+  // double mho = computeMixtureElectricConductivity(mobility, n_sp);
+  //
+  // Vector ambE(nvel_);
+  // ambE = 0.0;
+  // for (int sp = 0; sp < numSpecies; sp++) {
+  //   for (int d = 0; d < nvel_; d++) {
+  //     ambE(d) -= diffusionVelocity(sp, d) * n_sp(sp) * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+  //   }
+  // }
+  //
+  // for (int d = 0; d < nvel_; d++)
+  //   ambE(d) /= (mho + Xeps_);  // NOTE: add Xeps for the case of no charged-species at the point.
+  //
+  // for (int sp = 0; sp < numSpecies; sp++) {
+  //   for (int d = 0; d < nvel_; d++) diffusionVelocity(sp, d) += mobility(sp) * ambE(d);
+  // }
+}
+
+MFEM_HOST_DEVICE void TransportProperties::addAmbipolarEfield(const double *mobility, const double *n_sp,
+                                                              double *diffusionVelocity) {
   double mho = computeMixtureElectricConductivity(mobility, n_sp);
 
-  Vector ambE(nvel_);
-  ambE = 0.0;
+  double ambE[gpudata::MAXDIM];
+  for (int v = 0; v < nvel_; v++) ambE[v] = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) {
     for (int d = 0; d < nvel_; d++) {
-      ambE(d) -= diffusionVelocity(sp, d) * n_sp(sp) * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+      ambE[d] -= diffusionVelocity[sp + d * numSpecies] * n_sp[sp] * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
     }
   }
 
   for (int d = 0; d < nvel_; d++)
-    ambE(d) /= (mho + Xeps_);  // NOTE: add Xeps for the case of no charged-species at the point.
+    ambE[d] /= (mho + Xeps_);  // NOTE: add Xeps for the case of no charged-species at the point.
 
   for (int sp = 0; sp < numSpecies; sp++) {
-    for (int d = 0; d < nvel_; d++) diffusionVelocity(sp, d) += mobility(sp) * ambE(d);
+    for (int d = 0; d < nvel_; d++) diffusionVelocity[sp + d * numSpecies] += mobility[sp] * ambE[d];
   }
 }
 
