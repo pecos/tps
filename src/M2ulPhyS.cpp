@@ -261,9 +261,14 @@ void M2ulPhyS::initVariables() {
 
   TransportProperties **d_transport_tmp;
   cudaMalloc((void **)&d_transport_tmp, sizeof(TransportProperties **));
+
+  Chemistry **d_chemistry_tmp;
+  cudaMalloc((void **)&d_chemistry_tmp, sizeof(Chemistry **));
 #elif defined(_HIP_)
   hipMalloc((void **)&d_mixture, sizeof(DryAir));
   hipMalloc((void **)&transportPtr, sizeof(DryAirTransport));
+
+  // TODO(kevin): support chemistry for hip.
 #endif
 
   switch (config.GetWorkingFluid()) {
@@ -308,12 +313,13 @@ void M2ulPhyS::initVariables() {
           transportPtr = new ArgonMixtureTransport(mixture, config);
           break;
         case CONSTANT:
-          transportPtr = new ConstantTransport(mixture, config);
 #if defined(_CUDA_)
           gpu::instantiateDeviceConstantTransport<<<1, 1>>>(d_mixture, config.constantTransport, d_transport_tmp);
           cudaMemcpy(&transportPtr, d_transport_tmp, sizeof(TransportProperties *), cudaMemcpyDeviceToHost);
 #elif defined(_HIP_)
           mfem_error("ConstantTransport is not supported for HIP!");
+#else
+          transportPtr = new ConstantTransport(mixture, config);
 #endif
           break;
         default:
@@ -322,7 +328,14 @@ void M2ulPhyS::initVariables() {
       }
       switch (config.GetChemistryModel()) {
         default:
+#if defined(_CUDA_)
+          gpu::instantiateDeviceChemistry<<<1, 1>>>(d_mixture, config.chemistryInput, d_chemistry_tmp);
+          cudaMemcpy(&chemistry_, d_chemistry_tmp, sizeof(Chemistry *), cudaMemcpyDeviceToHost);
+#elif defined(_HIP_)
+          mfem_error("Chemistry is not supported for HIP!");
+#else
           chemistry_ = new Chemistry(mixture, config.chemistryInput);
+#endif
           break;
       }
       break;

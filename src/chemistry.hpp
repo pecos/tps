@@ -65,7 +65,8 @@ class Chemistry {
   double reactantStoich_[gpudata::MAXSPECIES * gpudata::MAXREACTIONS],
          productStoich_[gpudata::MAXSPECIES * gpudata::MAXREACTIONS];
 
-  std::vector<Reaction *> reactions_;
+  // std::vector<Reaction *> reactions_;
+  Reaction* reactions_[gpudata::MAXREACTIONS];
   double reactionEnergies_[gpudata::MAXREACTIONS];
 
   // std::map<int, int> *mixtureToInputMap_;
@@ -88,7 +89,7 @@ class Chemistry {
 
  public:
   Chemistry(GasMixture *mixture, RunConfiguration &config);
-  Chemistry(GasMixture *mixture, const ChemistryInput &inputs);
+  MFEM_HOST_DEVICE Chemistry(GasMixture *mixture, const ChemistryInput &inputs);
 
   ~Chemistry();
 

@@ -81,11 +81,13 @@ __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSyste
                                         const int _num_equation, const int _dim, bool axisym, Fluxes **f);
 __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
                                          Fluxes *_fluxClass, bool _useRoe, bool axisym, RiemannSolver **r);
+__global__ void instantiateDeviceChemistry(GasMixture *mixture, const ChemistryInput inputs, Chemistry **chem);
 
 __global__ void freeDeviceMixture(GasMixture *mix);
 __global__ void freeDeviceTransport(TransportProperties *trans);
 __global__ void freeDeviceFluxes(Fluxes *f);
 __global__ void freeDeviceRiemann(RiemannSolver *r);
+__global__ void freeDeviceChemistry(Chemistry *chem);
 #elif defined(_HIP_)
 // HIP doesn't support device new/delete.  There is
 // (experimental?... requires -D__HIP_ENABLE_DEVICE_MALLOC__) support

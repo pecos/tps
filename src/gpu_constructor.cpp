@@ -72,10 +72,15 @@ __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture
   *r = new RiemannSolver(_num_equation, _mixture, _eqSystem, _fluxClass, _useRoe, axisym);
 }
 
+__global__ void instantiateDeviceChemistry(GasMixture *mixture, const ChemistryInput inputs, Chemistry **chem) {
+  *chem = new ConstantTransport(mixture, inputs);
+}
+
 __global__ void freeDeviceMixture(GasMixture *mix) { delete mix; }
 __global__ void freeDeviceTransport(TransportProperties *trans) { delete trans; }
 __global__ void freeDeviceFluxes(Fluxes *f) { delete f; }
 __global__ void freeDeviceRiemann(RiemannSolver *r) { delete r; }
+__global__ void freeDeviceChemistry(Chemistry *chem) { delete chem; }
 
 #elif defined(_HIP_)
 

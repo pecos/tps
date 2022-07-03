@@ -37,7 +37,7 @@ using namespace std;
 
 Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : Chemistry(mixture, config.chemistryInput) {}
 
-Chemistry::Chemistry(GasMixture* mixture, const ChemistryInput &inputs) : mixture_(mixture) {
+MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture* mixture, const ChemistryInput &inputs) : mixture_(mixture) {
   numEquations_ = mixture->GetNumEquations();
   numSpecies_ = mixture->GetNumSpecies();
   numActiveSpecies_ = mixture->GetNumActiveSpecies();
@@ -60,7 +60,7 @@ Chemistry::Chemistry(GasMixture* mixture, const ChemistryInput &inputs) : mixtur
     detailedBalance_[r] = inputs.detailedBalance[r];
   }
 
-  reactions_.resize(numReactions_);
+  // reactions_.resize(numReactions_);
   // reactantStoich_.SetSize(numSpecies_, numReactions_);
   // productStoich_.SetSize(numSpecies_, numReactions_);
   // equilibriumConstantParams_.SetSize(numReactions_, 3);
