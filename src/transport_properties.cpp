@@ -133,10 +133,20 @@ MFEM_HOST_DEVICE void TransportProperties::addAmbipolarEfield(const double *mobi
 
 void TransportProperties::addMixtureDrift(const Vector &mobility, const Vector &n_sp, const Vector &Efield,
                                           DenseMatrix &diffusionVelocity) {
+  addMixtureDrift(&mobility[0], &n_sp[0], &Efield[0], diffusionVelocity.Write());
+  // for (int sp = 0; sp < numSpecies; sp++) {
+  //   if (mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) == 0.0) continue;
+  //
+  //   for (int d = 0; d < nvel_; d++) diffusionVelocity(sp, d) += mobility(sp) * Efield(d);
+  // }
+}
+
+MFEM_HOST_DEVICE void TransportProperties::addMixtureDrift(const double *mobility, const double *n_sp, const double *Efield,
+                                                           double *diffusionVelocity) {
   for (int sp = 0; sp < numSpecies; sp++) {
     if (mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) == 0.0) continue;
 
-    for (int d = 0; d < nvel_; d++) diffusionVelocity(sp, d) += mobility(sp) * Efield(d);
+    for (int d = 0; d < nvel_; d++) diffusionVelocity[sp + d * numSpecies] += mobility[sp] * Efield[d];
   }
 }
 
