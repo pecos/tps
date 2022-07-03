@@ -304,30 +304,62 @@ MFEM_HOST_DEVICE void DryAirTransport::ComputeFluxTransportProperties(const doub
 //////// Constant transport
 //////////////////////////////////////////////////////
 
-ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_runfile) : TransportProperties(_mixture) {
-  viscosity_ = _runfile.constantTransport.viscosity;
-  bulkViscosity_ = _runfile.constantTransport.bulkViscosity;
-  thermalConductivity_ = _runfile.constantTransport.thermalConductivity;
-  electronThermalConductivity_ = _runfile.constantTransport.electronThermalConductivity;
+ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_runfile)
+    : ConstantTransport(_mixture, _runfile.constantTransport) {}
+// ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_runfile) : TransportProperties(_mixture) {
+//   viscosity_ = _runfile.constantTransport.viscosity;
+//   bulkViscosity_ = _runfile.constantTransport.bulkViscosity;
+//   thermalConductivity_ = _runfile.constantTransport.thermalConductivity;
+//   electronThermalConductivity_ = _runfile.constantTransport.electronThermalConductivity;
+//
+//   diffusivity_.SetSize(numSpecies);
+//   mtFreq_.SetSize(numSpecies);
+//   // std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
+//   for (int mixSp = 0; mixSp < numSpecies; mixSp++) {
+//     // int inputSp = (*mixtureToInputMap)[mixSp];
+//     diffusivity_(mixSp) = _runfile.constantTransport.diffusivity(mixSp);
+//     mtFreq_(mixSp) = _runfile.constantTransport.mtFreq(mixSp);
+//   }
+//
+//   electronIndex_ = _runfile.constantTransport.electronIndex;
+//   if (mixture->IsTwoTemperature()) {
+//     // std::map<std::string, int> *speciesMapping = mixture->getSpeciesMapping();
+//     // if (speciesMapping->count("E")) {
+//     //   electronIndex_ = (*speciesMapping)["E"];
+//     // } else {
+//     if (electronIndex_ < 0) {
+//       grvy_printf(GRVY_ERROR, "\nConstant transport: two-temperature plasma requires the species 'E' !\n");
+//       exit(ERROR);
+//     }
+//   }
+// }
 
-  diffusivity_.SetSize(numSpecies);
-  mtFreq_.SetSize(numSpecies);
+MFEM_HOST_DEVICE ConstantTransport::ConstantTransport(GasMixture *_mixture, const constantTransportData &inputs) : TransportProperties(_mixture) {
+  viscosity_ = inputs.viscosity;
+  bulkViscosity_ = inputs.bulkViscosity;
+  thermalConductivity_ = inputs.thermalConductivity;
+  electronThermalConductivity_ = inputs.electronThermalConductivity;
+
+  // diffusivity_.SetSize(numSpecies);
+  // mtFreq_.SetSize(numSpecies);
   // std::map<int, int> *mixtureToInputMap = mixture->getMixtureToInputMap();
   for (int mixSp = 0; mixSp < numSpecies; mixSp++) {
     // int inputSp = (*mixtureToInputMap)[mixSp];
-    diffusivity_(mixSp) = _runfile.constantTransport.diffusivity(mixSp);
-    mtFreq_(mixSp) = _runfile.constantTransport.mtFreq(mixSp);
+    diffusivity_[mixSp] = inputs.diffusivity[mixSp];
+    mtFreq_[mixSp] = inputs.mtFreq[mixSp];
   }
 
-  electronIndex_ = _runfile.constantTransport.electronIndex;
+  electronIndex_ = inputs.electronIndex;
   if (mixture->IsTwoTemperature()) {
     // std::map<std::string, int> *speciesMapping = mixture->getSpeciesMapping();
     // if (speciesMapping->count("E")) {
     //   electronIndex_ = (*speciesMapping)["E"];
     // } else {
     if (electronIndex_ < 0) {
-      grvy_printf(GRVY_ERROR, "\nConstant transport: two-temperature plasma requires the species 'E' !\n");
-      exit(ERROR);
+      // grvy_printf(GRVY_ERROR, "\nConstant transport: two-temperature plasma requires the species 'E' !\n");
+      // exit(ERROR);
+      printf("\nConstant transport: two-temperature plasma requires the species 'E' !\n");
+      assert(false);
     }
   }
 }

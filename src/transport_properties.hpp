@@ -179,16 +179,17 @@ class ConstantTransport : public TransportProperties {
  protected:
   double viscosity_;
   double bulkViscosity_;
-  Vector diffusivity_;
+  double diffusivity_[gpudata::MAXSPECIES];
   double thermalConductivity_;
   double electronThermalConductivity_;
-  Vector mtFreq_;
+  double mtFreq_[gpudata::MAXSPECIES];
 
   int electronIndex_ = -1;
   const double qeOverkB_ = ELECTRONCHARGE / BOLTZMANNCONSTANT;
 
  public:
   ConstantTransport(GasMixture *_mixture, RunConfiguration &_runfile);
+  MFEM_HOST_DEVICE ConstantTransport(GasMixture *_mixture, const constantTransportData &inputs);
 
   MFEM_HOST_DEVICE virtual ~ConstantTransport() {}
 

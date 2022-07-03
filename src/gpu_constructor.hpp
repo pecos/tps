@@ -75,6 +75,7 @@ __global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int 
 __global__ void instantiateDeviceDryAirTransport(GasMixture *mixture, const double viscosity_multiplier,
                                                  const double bulk_viscosity, TransportProperties **trans);
 __global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, GasMixture **mix);
+__global__ void instantiateDeviceConstantTransport(GasMixture *mixture, const constantTransportData inputs, TransportProperties **trans);
 __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
                                         const int _num_equation, const int _dim, bool axisym, Fluxes **f);
 __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
