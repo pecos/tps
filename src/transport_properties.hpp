@@ -197,10 +197,7 @@ class ConstantTransport : public TransportProperties {
                                               Vector &transportBuffer, DenseMatrix &diffusionVelocity);
   MFEM_HOST_DEVICE virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp,
                                                                const double *Efield, double *transportBuffer,
-                                                               double *diffusionVelocity) {
-    exit(-1);
-    return;
-  }
+                                                               double *diffusionVelocity);
   virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
                                                 const Vector &Efield, Vector &globalTransport,
                                                 DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
