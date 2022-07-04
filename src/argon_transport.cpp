@@ -37,14 +37,81 @@
 //////////////////////////////////////////////////////
 
 ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture, RunConfiguration &_runfile)
+    : ArgonMinimalTransport(_mixture, _runfile.argonTransportInput) {}
+//     : TransportProperties(_mixture) {
+//   // if (!ambipolar) {
+//   //   grvy_printf(GRVY_ERROR, "\nArgon ternary transport currently supports ambipolar condition only. Set
+//   //   plasma_models/ambipolar = true.\n"); exit(ERROR);
+//   // }
+//   if (numSpecies != 3) {
+//     grvy_printf(GRVY_ERROR, "\nArgon ternary transport only supports ternary mixture of Ar, Ar.+1, and E !\n");
+//     exit(ERROR);
+//   }
+//
+//   // std::map<std::string, int> *speciesMapping = mixture->getSpeciesMapping();
+//   // if (speciesMapping->count("Ar")) {
+//   //   neutralIndex_ = (*speciesMapping)["Ar"];
+//   // } else {
+//   //   grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar' !\n");
+//   //   exit(ERROR);
+//   // }
+//   // if (speciesMapping->count("Ar.+1")) {
+//   //   ionIndex_ = (*speciesMapping)["Ar.+1"];
+//   // } else {
+//   //   grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar.+1' !\n");
+//   //   exit(ERROR);
+//   // }
+//   // if (speciesMapping->count("E")) {
+//   //   electronIndex_ = (*speciesMapping)["E"];
+//   // } else {
+//   //   grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
+//   //   exit(ERROR);
+//   // }
+//   neutralIndex_ = _runfile.argonTransportInput.neutralIndex;
+//   if (neutralIndex_ < 0) {
+//     grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar' !\n");
+//     exit(ERROR);
+//   }
+//   ionIndex_ = _runfile.argonTransportInput.ionIndex;
+//   if (ionIndex_ < 0) {
+//     grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar.+1' !\n");
+//     exit(ERROR);
+//   }
+//   electronIndex_ = _runfile.argonTransportInput.electronIndex;
+//   if (electronIndex_ < 0) {
+//     grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
+//     exit(ERROR);
+//   }
+//
+//   // TODO(kevin): need to factor out avogadro numbers throughout all transport property.
+//   // multiplying/dividing big numbers are risky of losing precision.
+//   // mw_.SetSize(3);
+//   mw_[electronIndex_] = mixture->GetGasParams(electronIndex_, GasParams::SPECIES_MW);
+//   mw_[neutralIndex_] = mixture->GetGasParams(neutralIndex_, GasParams::SPECIES_MW);
+//   mw_[ionIndex_] = mixture->GetGasParams(ionIndex_, GasParams::SPECIES_MW);
+//   // assumes input mass is consistent with this.
+//   assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-15);
+//   mw_ /= AVOGADRONUMBER;
+//   // mA_ /= AVOGADRONUMBER;
+//   // mI_ /= AVOGADRONUMBER;
+//
+//   // muw_.SetSize(3);
+//   computeEffectiveMass(mw_, muw_);
+//
+//   thirdOrderkElectron_ = _runfile.thirdOrderkElectron;
+// }
+
+MFEM_HOST_DEVICE ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture, const ArgonTransportInput &inputs)
     : TransportProperties(_mixture) {
   // if (!ambipolar) {
   //   grvy_printf(GRVY_ERROR, "\nArgon ternary transport currently supports ambipolar condition only. Set
   //   plasma_models/ambipolar = true.\n"); exit(ERROR);
   // }
   if (numSpecies != 3) {
-    grvy_printf(GRVY_ERROR, "\nArgon ternary transport only supports ternary mixture of Ar, Ar.+1, and E !\n");
-    exit(ERROR);
+    // grvy_printf(GRVY_ERROR, "\nArgon ternary transport only supports ternary mixture of Ar, Ar.+1, and E !\n");
+    // exit(ERROR);
+    printf( "\nArgon ternary transport only supports ternary mixture of Ar, Ar.+1, and E !\n");
+    assert(false);
   }
 
   // std::map<std::string, int> *speciesMapping = mixture->getSpeciesMapping();
@@ -66,20 +133,22 @@ ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture, RunConfigurat
   //   grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
   //   exit(ERROR);
   // }
-  neutralIndex_ = _runfile.argonTransportInput.neutralIndex;
+  neutralIndex_ = inputs.neutralIndex;
   if (neutralIndex_ < 0) {
-    grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar' !\n");
-    exit(ERROR);
+    // grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar' !\n");
+    // exit(ERROR);
+    printf("\nArgon ternary transport requires the species 'Ar' !\n");
+    assert(false);
   }
-  ionIndex_ = _runfile.argonTransportInput.ionIndex;
+  ionIndex_ = inputs.ionIndex;
   if (ionIndex_ < 0) {
-    grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar.+1' !\n");
-    exit(ERROR);
+    printf("\nArgon ternary transport requires the species 'Ar.+1' !\n");
+    assert(false);
   }
-  electronIndex_ = _runfile.argonTransportInput.electronIndex;
+  electronIndex_ = inputs.electronIndex;
   if (electronIndex_ < 0) {
-    grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
-    exit(ERROR);
+    printf("\nArgon ternary transport requires the species 'E' !\n");
+    assert(false);
   }
 
   // TODO(kevin): need to factor out avogadro numbers throughout all transport property.
@@ -97,7 +166,7 @@ ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture, RunConfigurat
   // muw_.SetSize(3);
   computeEffectiveMass(mw_, muw_);
 
-  thirdOrderkElectron_ = _runfile.thirdOrderkElectron;
+  thirdOrderkElectron_ = inputs.thirdOrderkElectron;
 }
 
 ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture) : TransportProperties(_mixture) {}

@@ -2270,6 +2270,8 @@ void M2ulPhyS::parseTransportInputs() {
           grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
           exit(ERROR);
         }
+
+        config.argonTransportInput.thirdOrderkElectron = config.thirdOrderkElectron;
       }
     } break;
     case ARGON_MIXTURE: {
@@ -2284,6 +2286,8 @@ void M2ulPhyS::parseTransportInputs() {
           grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
           exit(ERROR);
         }
+
+        config.argonTransportInput.thirdOrderkElectron = config.thirdOrderkElectron;
       }
     } break;
     case CONSTANT: {

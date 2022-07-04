@@ -347,6 +347,8 @@ struct ArgonTransportInput {
   int neutralIndex;
   int ionIndex;
   int electronIndex;
+
+  bool thirdOrderkElectron;
 };
 
 struct ChemistryInput {
