@@ -97,6 +97,7 @@ class ArgonMinimalTransport : public TransportProperties {
   int getIonIndex() { return ionIndex_; }
 
   virtual collisionInputs computeCollisionInputs(const Vector &primitive, const Vector &n_sp);
+  MFEM_HOST_DEVICE collisionInputs computeCollisionInputs(const double *primitive, const double *n_sp);
 
   // Currently, transport properties are evaluated in flux and source term separately.
   // Flux does not take primitive variables as input, rather evaluate them whenever needed.

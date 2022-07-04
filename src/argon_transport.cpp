@@ -185,6 +185,27 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::computeEffectiveMass(const double *
 }
 
 collisionInputs ArgonMinimalTransport::computeCollisionInputs(const Vector &primitive, const Vector &n_sp) {
+  return computeCollisionInputs(&primitive[0], &n_sp[0]);
+  // collisionInputs collInputs;
+  // collInputs.Te = (twoTemperature_) ? primitive[num_equation - 1] : primitive[nvel_ + 1];
+  // collInputs.Th = primitive[nvel_ + 1];
+  //
+  // // Add Xeps to avoid zero number density case.
+  // double nOverT = 0.0;
+  // for (int sp = 0; sp < numSpecies; sp++) {
+  //   nOverT += (n_sp(sp) + Xeps_) / collInputs.Te * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) *
+  //             mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+  // }
+  // double debyeLength = sqrt(debyeFactor_ / AVOGADRONUMBER / nOverT);
+  // collInputs.debyeCircle = PI_ * debyeLength * debyeLength;
+  //
+  // collInputs.ndimTe = debyeLength * 4.0 * PI_ * debyeFactor_ * collInputs.Te;
+  // collInputs.ndimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * collInputs.Th;
+  //
+  // return collInputs;
+}
+
+MFEM_HOST_DEVICE collisionInputs ArgonMinimalTransport::computeCollisionInputs(const double *primitive, const double *n_sp) {
   collisionInputs collInputs;
   collInputs.Te = (twoTemperature_) ? primitive[num_equation - 1] : primitive[nvel_ + 1];
   collInputs.Th = primitive[nvel_ + 1];
@@ -192,7 +213,7 @@ collisionInputs ArgonMinimalTransport::computeCollisionInputs(const Vector &prim
   // Add Xeps to avoid zero number density case.
   double nOverT = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) {
-    nOverT += (n_sp(sp) + Xeps_) / collInputs.Te * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) *
+    nOverT += (n_sp[sp] + Xeps_) / collInputs.Te * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) *
               mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
   }
   double debyeLength = sqrt(debyeFactor_ / AVOGADRONUMBER / nOverT);
