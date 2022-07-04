@@ -90,7 +90,7 @@ ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture, RunConfigurat
   mw_[ionIndex_] = mixture->GetGasParams(ionIndex_, GasParams::SPECIES_MW);
   // assumes input mass is consistent with this.
   assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-15);
-  mw_ /= AVOGADRONUMBER;
+  for (int sp = 0; sp < numSpecies; sp++) mw_[sp] /= AVOGADRONUMBER;
   // mA_ /= AVOGADRONUMBER;
   // mI_ /= AVOGADRONUMBER;
 
@@ -489,7 +489,7 @@ ArgonMixtureTransport::ArgonMixtureTransport(GasMixture *_mixture, RunConfigurat
   // multiplying/dividing big numbers are risky of losing precision.
   // mw_.SetSize(numSpecies);
   for (int sp = 0; sp < numSpecies; sp++) mw_[sp] = mixture->GetGasParams(sp, GasParams::SPECIES_MW);
-  mw_ /= AVOGADRONUMBER;
+  for (int sp = 0; sp < numSpecies; sp++) mw_[sp] /= AVOGADRONUMBER;
 
   // muw_.SetSize(numSpecies);
   computeEffectiveMass(mw_, muw_);
