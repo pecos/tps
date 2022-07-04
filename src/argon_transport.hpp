@@ -69,7 +69,8 @@ class ArgonMinimalTransport : public TransportProperties {
   const double qe_ = ELECTRONCHARGE;
   const double R_ = UNIVERSALGASCONSTANT;
   const double debyeFactor_ = kB_ * eps0_ / qe_ / qe_;
-  const double PI_ = 4.0 * atan(1.0);
+  // const double PI_ = 4.0 * atan(1.0);
+  const double PI_ = PI;
   const double qeOverkB_ = qe_ / kB_;
 
   // standard Chapman-Enskog coefficients
@@ -78,8 +79,9 @@ class ArgonMinimalTransport : public TransportProperties {
   const double diffusivityFactor_ = 3. / 16. * sqrt(2.0 * PI_ * kB_) / AVOGADRONUMBER;
   const double mfFreqFactor_ = 4. / 3. * AVOGADRONUMBER * sqrt(8. * kB_ / PI_);
 
-  Vector mw_;
-  DenseSymmetricMatrix muw_;  // effective mass
+  // molecular mass per each particle. [kg^-1]
+  double mw_[gpudata::MAXSPECIES];
+  double muw_[gpudata::MAXSPECIES * gpudata::MAXSPECIES];  // effective mass
 
   bool thirdOrderkElectron_;
 
@@ -88,6 +90,8 @@ class ArgonMinimalTransport : public TransportProperties {
   ArgonMinimalTransport(GasMixture *_mixture);
 
   MFEM_HOST_DEVICE virtual ~ArgonMinimalTransport() {}
+
+  MFEM_HOST_DEVICE double getMuw(const int &spI, const int &spJ) { return muw_[spI + spJ * numSpecies]; }
 
   int getIonIndex() { return ionIndex_; }
 
@@ -134,7 +138,7 @@ class ArgonMinimalTransport : public TransportProperties {
     return 19.140625 * Q1(0) - 91.875 * Q1(1) + 199.5 * Q1(2) - 210. * Q1(3) + 90. * Q1(4);
   }
 
-  void computeEffectiveMass(const Vector &mw, DenseSymmetricMatrix &muw);
+  MFEM_HOST_DEVICE void computeEffectiveMass(const double *mw, double *muw);
 };
 
 //////////////////////////////////////////////////////

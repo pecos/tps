@@ -84,17 +84,17 @@ ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture, RunConfigurat
 
   // TODO(kevin): need to factor out avogadro numbers throughout all transport property.
   // multiplying/dividing big numbers are risky of losing precision.
-  mw_.SetSize(3);
-  mw_(electronIndex_) = mixture->GetGasParams(electronIndex_, GasParams::SPECIES_MW);
-  mw_(neutralIndex_) = mixture->GetGasParams(neutralIndex_, GasParams::SPECIES_MW);
-  mw_(ionIndex_) = mixture->GetGasParams(ionIndex_, GasParams::SPECIES_MW);
+  // mw_.SetSize(3);
+  mw_[electronIndex_] = mixture->GetGasParams(electronIndex_, GasParams::SPECIES_MW);
+  mw_[neutralIndex_] = mixture->GetGasParams(neutralIndex_, GasParams::SPECIES_MW);
+  mw_[ionIndex_] = mixture->GetGasParams(ionIndex_, GasParams::SPECIES_MW);
   // assumes input mass is consistent with this.
-  assert(abs(mw_(neutralIndex_) - mw_(electronIndex_) - mw_(ionIndex_)) < 1.0e-15);
+  assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-15);
   mw_ /= AVOGADRONUMBER;
   // mA_ /= AVOGADRONUMBER;
   // mI_ /= AVOGADRONUMBER;
 
-  muw_.SetSize(3);
+  // muw_.SetSize(3);
   computeEffectiveMass(mw_, muw_);
 
   thirdOrderkElectron_ = _runfile.thirdOrderkElectron;
@@ -102,12 +102,17 @@ ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture, RunConfigurat
 
 ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture) : TransportProperties(_mixture) {}
 
-void ArgonMinimalTransport::computeEffectiveMass(const Vector &mw, DenseSymmetricMatrix &muw) {
-  muw.SetSize(numSpecies);
-  muw = 0.0;
+// void ArgonMinimalTransport::computeEffectiveMass(const Vector &mw, DenseSymmetricMatrix &muw) {
+MFEM_HOST_DEVICE void ArgonMinimalTransport::computeEffectiveMass(const double *mw, double *muw) {
+  // muw.SetSize(numSpecies);
+  // muw = 0.0;
 
-  for (int spI = 0; spI < numSpecies; spI++)
-    for (int spJ = spI + 1; spJ < numSpecies; spJ++) muw(spI, spJ) = mw(spI) * mw(spJ) / (mw(spI) + mw(spJ));
+  for (int spI = 0; spI < numSpecies; spI++) {
+    for (int spJ = spI; spJ < numSpecies; spJ++) {
+      muw[spI + spJ * numSpecies] = mw[spI] * mw[spJ] / (mw[spI] + mw[spJ]);
+      if (spI != spJ) muw[spJ + spI * numSpecies] = muw[spI + spJ * numSpecies];
+    }
+  }
 }
 
 collisionInputs ArgonMinimalTransport::computeCollisionInputs(const Vector &primitive, const Vector &n_sp) {
@@ -169,13 +174,13 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
 
   Vector speciesViscosity(3), speciesHvyThrmCnd(3);
   speciesViscosity(ionIndex_) =
-      viscosityFactor_ * sqrt(mw_(ionIndex_) * Th) / (collision::charged::rep22(nondimTh) * debyeCircle);
-  speciesViscosity(neutralIndex_) = viscosityFactor_ * sqrt(mw_(neutralIndex_) * Th) / collision::argon::ArAr22(Th);
+      viscosityFactor_ * sqrt(mw_[ionIndex_] * Th) / (collision::charged::rep22(nondimTh) * debyeCircle);
+  speciesViscosity(neutralIndex_) = viscosityFactor_ * sqrt(mw_[neutralIndex_] * Th) / collision::argon::ArAr22(Th);
   speciesViscosity(electronIndex_) = 0.0;
   // speciesViscosity(0) = 5. / 16. * sqrt(PI_ * mI_ * kB_ * Th) / (collision::charged::rep22(nondimTe) * PI_ *
   // debyeLength * debyeLength);
   for (int sp = 0; sp < numSpecies; sp++) {
-    speciesHvyThrmCnd(sp) = speciesViscosity(sp) * kOverEtaFactor_ / mw_(sp);
+    speciesHvyThrmCnd(sp) = speciesViscosity(sp) * kOverEtaFactor_ / mw_[sp];
   }
   transportBuffer[FluxTrns::VISCOSITY] = linearAverage(X_sp, speciesViscosity);
   transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = linearAverage(X_sp, speciesHvyThrmCnd);
@@ -186,19 +191,19 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
         computeThirdOrderElectronThermalConductivity(X_sp, debyeLength, Te, nondimTe);
   } else {
     transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] = viscosityFactor_ * kOverEtaFactor_ *
-                                                               sqrt(Te / mw_(electronIndex_)) * X_sp(electronIndex_) /
+                                                               sqrt(Te / mw_[electronIndex_]) * X_sp(electronIndex_) /
                                                                (collision::charged::rep22(nondimTe) * debyeCircle);
   }
 
   DenseMatrix binaryDiff(3);
   binaryDiff = 0.0;
   binaryDiff(electronIndex_, neutralIndex_) =
-      diffusivityFactor_ * sqrt(Te / muw_(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
+      diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
   binaryDiff(neutralIndex_, electronIndex_) = binaryDiff(electronIndex_, neutralIndex_);
   binaryDiff(neutralIndex_, ionIndex_) =
-      diffusivityFactor_ * sqrt(Th / muw_(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
+      diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
   binaryDiff(ionIndex_, neutralIndex_) = binaryDiff(neutralIndex_, ionIndex_);
-  binaryDiff(electronIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Te / muw_(ionIndex_, electronIndex_)) / nTotal /
+  binaryDiff(electronIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
                                           (collision::charged::att11(nondimTe) * debyeCircle);
   binaryDiff(ionIndex_, electronIndex_) = binaryDiff(electronIndex_, ionIndex_);
 
@@ -286,7 +291,7 @@ double ArgonMinimalTransport::computeThirdOrderElectronThermalConductivity(const
   // std::cout << "L12: " << L12 << std::endl;
   // std::cout << "L22: " << L22 << std::endl;
 
-  return viscosityFactor_ * kOverEtaFactor_ * sqrt(2.0 * Te / mw_(electronIndex_)) * X_sp(electronIndex_) /
+  return viscosityFactor_ * kOverEtaFactor_ * sqrt(2.0 * Te / mw_[electronIndex_]) * X_sp(electronIndex_) /
          (L11 - L12 * L12 / L22);
 }
 
@@ -313,12 +318,12 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
   DenseMatrix binaryDiff(3);
   binaryDiff = 0.0;
   binaryDiff(electronIndex_, neutralIndex_) =
-      diffusivityFactor_ * sqrt(Te / muw_(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
+      diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
   binaryDiff(neutralIndex_, electronIndex_) = binaryDiff(electronIndex_, neutralIndex_);
   binaryDiff(ionIndex_, neutralIndex_) =
-      diffusivityFactor_ * sqrt(Th / muw_(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
+      diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
   binaryDiff(neutralIndex_, ionIndex_) = binaryDiff(ionIndex_, neutralIndex_);
-  binaryDiff(electronIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Te / muw_(ionIndex_, electronIndex_)) / nTotal /
+  binaryDiff(electronIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
                                           (collision::charged::att11(nondimTe) * debyeCircle);
   binaryDiff(ionIndex_, electronIndex_) = binaryDiff(electronIndex_, ionIndex_);
 
@@ -360,12 +365,12 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
   DenseMatrix binaryDiff(3);
   binaryDiff = 0.0;
   binaryDiff(electronIndex_, neutralIndex_) =
-      diffusivityFactor_ * sqrt(Te / muw_(electronIndex_, neutralIndex_)) / nTotal / Qea;
+      diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / Qea;
   binaryDiff(neutralIndex_, electronIndex_) = binaryDiff(electronIndex_, neutralIndex_);
-  binaryDiff(neutralIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Th / muw_(neutralIndex_, ionIndex_)) / nTotal / Qai;
+  binaryDiff(neutralIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / Qai;
   binaryDiff(ionIndex_, neutralIndex_) = binaryDiff(neutralIndex_, ionIndex_);
   binaryDiff(electronIndex_, ionIndex_) =
-      diffusivityFactor_ * sqrt(Te / muw_(ionIndex_, electronIndex_)) / nTotal / Qie;
+      diffusivityFactor_ * sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal / Qie;
   binaryDiff(ionIndex_, electronIndex_) = binaryDiff(electronIndex_, ionIndex_);
 
   Vector diffusivity(3), mobility(3);
@@ -400,9 +405,9 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
   correctMassDiffusionFlux(Y_sp, diffusionVelocity);
 
   speciesTransport(ionIndex_, SpeciesTrns::MF_FREQUENCY) =
-      mfFreqFactor_ * sqrt(Te / mw_(electronIndex_)) * n_sp(ionIndex_) * Qie;
+      mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp(ionIndex_) * Qie;
   speciesTransport(neutralIndex_, SpeciesTrns::MF_FREQUENCY) =
-      mfFreqFactor_ * sqrt(Te / mw_(electronIndex_)) * n_sp(neutralIndex_) * Qea;
+      mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp(neutralIndex_) * Qea;
   // // relative electron collision speed
   // double ge = sqrt(8.0 * kB_ * Te / PI_ / mw_(electronIndex_));
   // speciesTransport(ionIndex_, SpeciesTrns::MF_FREQUENCY) = 4.0 / 3.0 * AVOGADRONUMBER * n_sp(ionIndex_) * ge * Qie;
@@ -439,8 +444,8 @@ void ArgonMinimalTransport::GetViscosities(const Vector &conserved, const Vector
 
   Vector speciesViscosity(3);
   speciesViscosity(ionIndex_) =
-      viscosityFactor_ * sqrt(mw_(ionIndex_) * Th) / (collision::charged::rep22(nondimTh) * debyeCircle);
-  speciesViscosity(neutralIndex_) = viscosityFactor_ * sqrt(mw_(neutralIndex_) * Th) / collision::argon::ArAr22(Th);
+      viscosityFactor_ * sqrt(mw_[ionIndex_] * Th) / (collision::charged::rep22(nondimTh) * debyeCircle);
+  speciesViscosity(neutralIndex_) = viscosityFactor_ * sqrt(mw_[neutralIndex_] * Th) / collision::argon::ArAr22(Th);
   speciesViscosity(electronIndex_) = 0.0;
 
   visc = linearAverage(X_sp, speciesViscosity);
@@ -482,11 +487,11 @@ ArgonMixtureTransport::ArgonMixtureTransport(GasMixture *_mixture, RunConfigurat
 
   // TODO(kevin): need to factor out avogadro numbers throughout all transport property.
   // multiplying/dividing big numbers are risky of losing precision.
-  mw_.SetSize(numSpecies);
-  for (int sp = 0; sp < numSpecies; sp++) mw_(sp) = mixture->GetGasParams(sp, GasParams::SPECIES_MW);
+  // mw_.SetSize(numSpecies);
+  for (int sp = 0; sp < numSpecies; sp++) mw_[sp] = mixture->GetGasParams(sp, GasParams::SPECIES_MW);
   mw_ /= AVOGADRONUMBER;
 
-  muw_.SetSize(numSpecies);
+  // muw_.SetSize(numSpecies);
   computeEffectiveMass(mw_, muw_);
 
   thirdOrderkElectron_ = _runfile.thirdOrderkElectron;
@@ -807,8 +812,8 @@ void ArgonMixtureTransport::ComputeFluxTransportProperties(const Vector &state, 
       continue;
     }
     speciesViscosity(sp) =
-        viscosityFactor_ * sqrt(mw_(sp) * collInputs.Th) / collisionIntegral(sp, sp, 2, 2, collInputs);
-    speciesHvyThrmCnd(sp) = speciesViscosity(sp) * kOverEtaFactor_ / mw_(sp);
+        viscosityFactor_ * sqrt(mw_[sp] * collInputs.Th) / collisionIntegral(sp, sp, 2, 2, collInputs);
+    speciesHvyThrmCnd(sp) = speciesViscosity(sp) * kOverEtaFactor_ / mw_[sp];
   }
   transportBuffer[FluxTrns::VISCOSITY] = linearAverage(X_sp, speciesViscosity);
   transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = linearAverage(X_sp, speciesHvyThrmCnd);
@@ -819,7 +824,7 @@ void ArgonMixtureTransport::ComputeFluxTransportProperties(const Vector &state, 
         computeThirdOrderElectronThermalConductivity(X_sp, collInputs);
   } else {
     transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
-        viscosityFactor_ * kOverEtaFactor_ * sqrt(collInputs.Te / mw_(electronIndex_)) * X_sp(electronIndex_) /
+        viscosityFactor_ * kOverEtaFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) * X_sp(electronIndex_) /
         collisionIntegral(electronIndex_, electronIndex_, 2, 2, collInputs);
   }
 
@@ -829,7 +834,7 @@ void ArgonMixtureTransport::ComputeFluxTransportProperties(const Vector &state, 
     for (int spJ = spI + 1; spJ < numSpecies; spJ++) {
       double temp = ((spI == electronIndex_) || (spJ == electronIndex_)) ? collInputs.Te : collInputs.Th;
       binaryDiff(spI, spJ) =
-          diffusivityFactor_ * sqrt(temp / muw_(spI, spJ)) / nTotal / collisionIntegral(spI, spJ, 1, 1, collInputs);
+          diffusivityFactor_ * sqrt(temp / getMuw(spI, spJ)) / nTotal / collisionIntegral(spI, spJ, 1, 1, collInputs);
       binaryDiff(spJ, spI) = binaryDiff(spI, spJ);
     }
   }
@@ -892,7 +897,7 @@ double ArgonMixtureTransport::computeThirdOrderElectronThermalConductivity(const
     L22 += X_sp(sp) * L22ea(Q1);
   }
 
-  return viscosityFactor_ * kOverEtaFactor_ * sqrt(2.0 * collInputs.Te / mw_(electronIndex_)) * X_sp(electronIndex_) /
+  return viscosityFactor_ * kOverEtaFactor_ * sqrt(2.0 * collInputs.Te / mw_[electronIndex_]) * X_sp(electronIndex_) /
          (L11 - L12 * L12 / L22);
 }
 
@@ -920,7 +925,7 @@ void ArgonMixtureTransport::ComputeSourceTransportProperties(const Vector &state
       double temp = ((spI == electronIndex_) || (spJ == electronIndex_)) ? collInputs.Te : collInputs.Th;
 
       binaryDiff(spI, spJ) =
-          diffusivityFactor_ * sqrt(temp / muw_(spI, spJ)) / nTotal / collisionIntegral(spI, spJ, 1, 1, collInputs);
+          diffusivityFactor_ * sqrt(temp / getMuw(spI, spJ)) / nTotal / collisionIntegral(spI, spJ, 1, 1, collInputs);
       binaryDiff(spJ, spI) = binaryDiff(spI, spJ);
     }
   }
@@ -959,7 +964,7 @@ void ArgonMixtureTransport::ComputeSourceTransportProperties(const Vector &state
   // NOTE(kevin): collision integrals could be reused from diffusivities.. but not done that way at this point.
   for (int sp = 0; sp < numSpecies; sp++) {
     if (sp == electronIndex_) continue;
-    speciesTransport(sp, SpeciesTrns::MF_FREQUENCY) = mfFreqFactor_ * sqrt(collInputs.Te / mw_(electronIndex_)) *
+    speciesTransport(sp, SpeciesTrns::MF_FREQUENCY) = mfFreqFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) *
                                                       n_sp(sp) *
                                                       collisionIntegral(sp, electronIndex_, 1, 1, collInputs);
   }
@@ -992,7 +997,7 @@ void ArgonMixtureTransport::GetViscosities(const Vector &conserved, const Vector
       continue;
     }
     speciesViscosity(sp) =
-        viscosityFactor_ * sqrt(mw_(sp) * collInputs.Th) / collisionIntegral(sp, sp, 2, 2, collInputs);
+        viscosityFactor_ * sqrt(mw_[sp] * collInputs.Th) / collisionIntegral(sp, sp, 2, 2, collInputs);
   }
   visc = linearAverage(X_sp, speciesViscosity);
   bulkVisc = 0.0;
