@@ -284,8 +284,8 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   //       computeThirdOrderElectronThermalConductivity(&X_sp[0], debyeLength, Te, nondimTe);
   // } else {
   //   transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] = viscosityFactor_ * kOverEtaFactor_ *
-  //                                                              sqrt(Te / mw_[electronIndex_]) * X_sp(electronIndex_) /
-  //                                                              (collision::charged::rep22(nondimTe) * debyeCircle);
+  //                                                              sqrt(Te / mw_[electronIndex_]) * X_sp(electronIndex_)
+  //                                                              / (collision::charged::rep22(nondimTe) * debyeCircle);
   // }
   //
   // DenseMatrix binaryDiff(3);
@@ -296,7 +296,8 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   // binaryDiff(neutralIndex_, ionIndex_) =
   //     diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
   // binaryDiff(ionIndex_, neutralIndex_) = binaryDiff(neutralIndex_, ionIndex_);
-  // binaryDiff(electronIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
+  // binaryDiff(electronIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal
+  // /
   //                                         (collision::charged::att11(nondimTe) * debyeCircle);
   // binaryDiff(ionIndex_, electronIndex_) = binaryDiff(electronIndex_, ionIndex_);
   //
