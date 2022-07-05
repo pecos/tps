@@ -121,6 +121,7 @@ class ArgonMinimalTransport : public TransportProperties {
 
   // NOTE(kevin): only for AxisymmetricSource
   virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc);
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double &visc, double &bulkVisc);
 
   // virtual double computeThirdOrderElectronThermalConductivity(const Vector &X_sp, const double debyeLength,
   //                                                             const double Te, const double nondimTe);
