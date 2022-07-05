@@ -230,113 +230,115 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
                                                            const Vector &Efield, Vector &transportBuffer,
                                                            DenseMatrix &diffusionVelocity) {
   transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
-  transportBuffer = 0.0;
-
-  Vector primitiveState(num_equation);
-  mixture->GetPrimitivesFromConservatives(state, primitiveState);
-
-  // Vector n_sp(3); //number densities
-  // n_sp(ionIndex_) = primitiveState[dim + 2 + ionIndex_];
-  // n_sp(electronIndex_) = mixture->computeAmbipolarElectronNumberDensity(&primitiveState[dim + 2]);
-  // n_sp(neutralIndex_) = mixture->computeBackgroundMassDensity(state[0], &primitiveState[dim + 2],
-  // n_sp(electronIndex_), true); n_sp(neutralIndex_) /= mixture->GetGasParams(neutralIndex_, GasParams::SPECIES_MW);
-  // double nTotal = n_sp(0) + n_sp(1) + n_sp(2);
-  // Vector X_sp(3), Y_sp(3);
-  // for (int sp = 0; sp < numSpecies; sp++) {
-  //   X_sp(sp) = n_sp(sp) / nTotal;
-  //   Y_sp(sp) = n_sp(sp) / state(0) * mixture->GetGasParams(sp, GasParams::SPECIES_MW);
-  // }
-  Vector n_sp(3), X_sp(3), Y_sp(3);
-  mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
-  double nTotal = 0.0;
-  for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
-
-  double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : primitiveState[nvel_ + 1];
-  double Th = primitiveState[nvel_ + 1];
-  // std::cout << "temp: " << Th << ",\t" << Te << std::endl;
-
-  // Add Xeps to avoid zero number density case.
-  double nOverT = (n_sp(electronIndex_) + Xeps_) / Te + (n_sp(ionIndex_) + Xeps_) / Th;
-  double debyeLength = sqrt(debyeFactor_ / AVOGADRONUMBER / nOverT);
-  double debyeCircle = PI_ * debyeLength * debyeLength;
-
-  double nondimTe = debyeLength * 4.0 * PI_ * debyeFactor_ * Te;
-  double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
-
-  Vector speciesViscosity(3), speciesHvyThrmCnd(3);
-  speciesViscosity(ionIndex_) =
-      viscosityFactor_ * sqrt(mw_[ionIndex_] * Th) / (collision::charged::rep22(nondimTh) * debyeCircle);
-  speciesViscosity(neutralIndex_) = viscosityFactor_ * sqrt(mw_[neutralIndex_] * Th) / collision::argon::ArAr22(Th);
-  speciesViscosity(electronIndex_) = 0.0;
-  // speciesViscosity(0) = 5. / 16. * sqrt(PI_ * mI_ * kB_ * Th) / (collision::charged::rep22(nondimTe) * PI_ *
-  // debyeLength * debyeLength);
-  for (int sp = 0; sp < numSpecies; sp++) {
-    speciesHvyThrmCnd(sp) = speciesViscosity(sp) * kOverEtaFactor_ / mw_[sp];
-  }
-  transportBuffer[FluxTrns::VISCOSITY] = linearAverage(X_sp, speciesViscosity);
-  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = linearAverage(X_sp, speciesHvyThrmCnd);
-  transportBuffer[FluxTrns::BULK_VISCOSITY] = 0.0;
-
-  if (thirdOrderkElectron_) {
-    transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
-        computeThirdOrderElectronThermalConductivity(&X_sp[0], debyeLength, Te, nondimTe);
-  } else {
-    transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] = viscosityFactor_ * kOverEtaFactor_ *
-                                                               sqrt(Te / mw_[electronIndex_]) * X_sp(electronIndex_) /
-                                                               (collision::charged::rep22(nondimTe) * debyeCircle);
-  }
-
-  DenseMatrix binaryDiff(3);
-  binaryDiff = 0.0;
-  binaryDiff(electronIndex_, neutralIndex_) =
-      diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
-  binaryDiff(neutralIndex_, electronIndex_) = binaryDiff(electronIndex_, neutralIndex_);
-  binaryDiff(neutralIndex_, ionIndex_) =
-      diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
-  binaryDiff(ionIndex_, neutralIndex_) = binaryDiff(neutralIndex_, ionIndex_);
-  binaryDiff(electronIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
-                                          (collision::charged::att11(nondimTe) * debyeCircle);
-  binaryDiff(ionIndex_, electronIndex_) = binaryDiff(electronIndex_, ionIndex_);
-
-  Vector diffusivity(3), mobility(3);
-  CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
-
-  for (int sp = 0; sp < numSpecies; sp++) {
-    double temp = (sp == electronIndex_) ? Te : Th;
-    mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity(sp);
-  }
-
-  DenseMatrix gradX(numSpecies, dim);
-  mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
-
-  // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
   diffusionVelocity.SetSize(numSpecies, nvel_);
-  diffusionVelocity = 0.0;
-  for (int sp = 0; sp < numSpecies; sp++) {
-    // concentration-driven diffusion only determines the first dim-components.
-    for (int d = 0; d < dim; d++) {
-      double DgradX = diffusivity(sp) * gradX(sp, d);
-      // NOTE: we'll have to handle small X case.
-      diffusionVelocity(sp, d) = -DgradX / (X_sp(sp) + Xeps_);
-    }
-  }
-
-  if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
-
-  addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
-
-  correctMassDiffusionFlux(Y_sp, diffusionVelocity);
-
-  double charSpeed = 0.0;
-  for (int sp = 0; sp < numActiveSpecies; sp++) {
-    double speciesSpeed = 0.0;
-    // azimuthal component does not participate in flux.
-    for (int d = 0; d < dim; d++) speciesSpeed += diffusionVelocity(sp, d) * diffusionVelocity(sp, d);
-    speciesSpeed = sqrt(speciesSpeed);
-    if (speciesSpeed > charSpeed) charSpeed = speciesSpeed;
-    // charSpeed = max(charSpeed, speciesSpeed);
-  }
-  // std::cout << "max diff. vel: " << charSpeed << std::endl;
+  ComputeFluxTransportProperties(&state[0], gradUp.Read(), &Efield[0], &transportBuffer[0], diffusionVelocity.Write());
+  // transportBuffer = 0.0;
+  //
+  // Vector primitiveState(num_equation);
+  // mixture->GetPrimitivesFromConservatives(state, primitiveState);
+  //
+  // // Vector n_sp(3); //number densities
+  // // n_sp(ionIndex_) = primitiveState[dim + 2 + ionIndex_];
+  // // n_sp(electronIndex_) = mixture->computeAmbipolarElectronNumberDensity(&primitiveState[dim + 2]);
+  // // n_sp(neutralIndex_) = mixture->computeBackgroundMassDensity(state[0], &primitiveState[dim + 2],
+  // // n_sp(electronIndex_), true); n_sp(neutralIndex_) /= mixture->GetGasParams(neutralIndex_, GasParams::SPECIES_MW);
+  // // double nTotal = n_sp(0) + n_sp(1) + n_sp(2);
+  // // Vector X_sp(3), Y_sp(3);
+  // // for (int sp = 0; sp < numSpecies; sp++) {
+  // //   X_sp(sp) = n_sp(sp) / nTotal;
+  // //   Y_sp(sp) = n_sp(sp) / state(0) * mixture->GetGasParams(sp, GasParams::SPECIES_MW);
+  // // }
+  // Vector n_sp(3), X_sp(3), Y_sp(3);
+  // mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
+  // double nTotal = 0.0;
+  // for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
+  //
+  // double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : primitiveState[nvel_ + 1];
+  // double Th = primitiveState[nvel_ + 1];
+  // // std::cout << "temp: " << Th << ",\t" << Te << std::endl;
+  //
+  // // Add Xeps to avoid zero number density case.
+  // double nOverT = (n_sp(electronIndex_) + Xeps_) / Te + (n_sp(ionIndex_) + Xeps_) / Th;
+  // double debyeLength = sqrt(debyeFactor_ / AVOGADRONUMBER / nOverT);
+  // double debyeCircle = PI_ * debyeLength * debyeLength;
+  //
+  // double nondimTe = debyeLength * 4.0 * PI_ * debyeFactor_ * Te;
+  // double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
+  //
+  // Vector speciesViscosity(3), speciesHvyThrmCnd(3);
+  // speciesViscosity(ionIndex_) =
+  //     viscosityFactor_ * sqrt(mw_[ionIndex_] * Th) / (collision::charged::rep22(nondimTh) * debyeCircle);
+  // speciesViscosity(neutralIndex_) = viscosityFactor_ * sqrt(mw_[neutralIndex_] * Th) / collision::argon::ArAr22(Th);
+  // speciesViscosity(electronIndex_) = 0.0;
+  // // speciesViscosity(0) = 5. / 16. * sqrt(PI_ * mI_ * kB_ * Th) / (collision::charged::rep22(nondimTe) * PI_ *
+  // // debyeLength * debyeLength);
+  // for (int sp = 0; sp < numSpecies; sp++) {
+  //   speciesHvyThrmCnd(sp) = speciesViscosity(sp) * kOverEtaFactor_ / mw_[sp];
+  // }
+  // transportBuffer[FluxTrns::VISCOSITY] = linearAverage(X_sp, speciesViscosity);
+  // transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = linearAverage(X_sp, speciesHvyThrmCnd);
+  // transportBuffer[FluxTrns::BULK_VISCOSITY] = 0.0;
+  //
+  // if (thirdOrderkElectron_) {
+  //   transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
+  //       computeThirdOrderElectronThermalConductivity(&X_sp[0], debyeLength, Te, nondimTe);
+  // } else {
+  //   transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] = viscosityFactor_ * kOverEtaFactor_ *
+  //                                                              sqrt(Te / mw_[electronIndex_]) * X_sp(electronIndex_) /
+  //                                                              (collision::charged::rep22(nondimTe) * debyeCircle);
+  // }
+  //
+  // DenseMatrix binaryDiff(3);
+  // binaryDiff = 0.0;
+  // binaryDiff(electronIndex_, neutralIndex_) =
+  //     diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
+  // binaryDiff(neutralIndex_, electronIndex_) = binaryDiff(electronIndex_, neutralIndex_);
+  // binaryDiff(neutralIndex_, ionIndex_) =
+  //     diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
+  // binaryDiff(ionIndex_, neutralIndex_) = binaryDiff(neutralIndex_, ionIndex_);
+  // binaryDiff(electronIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
+  //                                         (collision::charged::att11(nondimTe) * debyeCircle);
+  // binaryDiff(ionIndex_, electronIndex_) = binaryDiff(electronIndex_, ionIndex_);
+  //
+  // Vector diffusivity(3), mobility(3);
+  // CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
+  //
+  // for (int sp = 0; sp < numSpecies; sp++) {
+  //   double temp = (sp == electronIndex_) ? Te : Th;
+  //   mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity(sp);
+  // }
+  //
+  // DenseMatrix gradX(numSpecies, dim);
+  // mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
+  //
+  // // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
+  // diffusionVelocity.SetSize(numSpecies, nvel_);
+  // diffusionVelocity = 0.0;
+  // for (int sp = 0; sp < numSpecies; sp++) {
+  //   // concentration-driven diffusion only determines the first dim-components.
+  //   for (int d = 0; d < dim; d++) {
+  //     double DgradX = diffusivity(sp) * gradX(sp, d);
+  //     // NOTE: we'll have to handle small X case.
+  //     diffusionVelocity(sp, d) = -DgradX / (X_sp(sp) + Xeps_);
+  //   }
+  // }
+  //
+  // if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
+  //
+  // addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
+  //
+  // correctMassDiffusionFlux(Y_sp, diffusionVelocity);
+  //
+  // double charSpeed = 0.0;
+  // for (int sp = 0; sp < numActiveSpecies; sp++) {
+  //   double speciesSpeed = 0.0;
+  //   // azimuthal component does not participate in flux.
+  //   for (int d = 0; d < dim; d++) speciesSpeed += diffusionVelocity(sp, d) * diffusionVelocity(sp, d);
+  //   speciesSpeed = sqrt(speciesSpeed);
+  //   if (speciesSpeed > charSpeed) charSpeed = speciesSpeed;
+  //   // charSpeed = max(charSpeed, speciesSpeed);
+  // }
+  // // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
 MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,
