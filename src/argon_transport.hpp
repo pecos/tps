@@ -118,6 +118,10 @@ class ArgonMinimalTransport : public TransportProperties {
                                                 const Vector &Efield, Vector &globalTransport,
                                                 DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
                                                 Vector &n_sp);
+  MFEM_HOST_DEVICE virtual void ComputeSourceTransportProperties(const double *state, const double *Up, const double *gradUp,
+                                                                 const double *Efield, double *globalTransport,
+                                                                 double *speciesTransport, double *diffusionVelocity,
+                                                                 double *n_sp);
 
   // NOTE(kevin): only for AxisymmetricSource
   virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc);
