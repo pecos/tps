@@ -338,6 +338,110 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
+MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,
+                                                                            const double *Efield, double *transportBuffer,
+                                                                            double *diffusionVelocity) {
+  // transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
+  for (int p = 0; p < FluxTrns::NUM_FLUX_TRANS; p++) transportBuffer[p] = 0.0;
+
+  double primitiveState[gpudata::MAXEQUATIONS];
+  mixture->GetPrimitivesFromConservatives(state, primitiveState);
+
+  double n_sp[gpudata::MAXSPECIES], X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES];
+  mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
+  double nTotal = 0.0;
+  for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp[sp];
+
+  double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : primitiveState[nvel_ + 1];
+  double Th = primitiveState[nvel_ + 1];
+  // std::cout << "temp: " << Th << ",\t" << Te << std::endl;
+
+  // Add Xeps to avoid zero number density case.
+  double nOverT = (n_sp[electronIndex_] + Xeps_) / Te + (n_sp[ionIndex_] + Xeps_) / Th;
+  double debyeLength = sqrt(debyeFactor_ / AVOGADRONUMBER / nOverT);
+  double debyeCircle = PI_ * debyeLength * debyeLength;
+
+  double nondimTe = debyeLength * 4.0 * PI_ * debyeFactor_ * Te;
+  double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
+
+  double speciesViscosity[gpudata::MAXSPECIES], speciesHvyThrmCnd[gpudata::MAXSPECIES];
+  speciesViscosity[ionIndex_] =
+      viscosityFactor_ * sqrt(mw_[ionIndex_] * Th) / (collision::charged::rep22(nondimTh) * debyeCircle);
+  speciesViscosity[neutralIndex_] = viscosityFactor_ * sqrt(mw_[neutralIndex_] * Th) / collision::argon::ArAr22(Th);
+  speciesViscosity[electronIndex_] = 0.0;
+  // speciesViscosity(0) = 5. / 16. * sqrt(PI_ * mI_ * kB_ * Th) / (collision::charged::rep22(nondimTe) * PI_ *
+  // debyeLength * debyeLength);
+  for (int sp = 0; sp < numSpecies; sp++) {
+    speciesHvyThrmCnd[sp] = speciesViscosity[sp] * kOverEtaFactor_ / mw_[sp];
+  }
+  transportBuffer[FluxTrns::VISCOSITY] = linearAverage(X_sp, speciesViscosity);
+  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = linearAverage(X_sp, speciesHvyThrmCnd);
+  transportBuffer[FluxTrns::BULK_VISCOSITY] = 0.0;
+
+  if (thirdOrderkElectron_) {
+    transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
+        computeThirdOrderElectronThermalConductivity(X_sp, debyeLength, Te, nondimTe);
+  } else {
+    transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] = viscosityFactor_ * kOverEtaFactor_ *
+                                                               sqrt(Te / mw_[electronIndex_]) * X_sp[electronIndex_] /
+                                                               (collision::charged::rep22(nondimTe) * debyeCircle);
+  }
+
+  double binaryDiff[3 * 3];
+  for (int i = 0; i < 3 * 3; i++) binaryDiff[i] = 0.0;
+  binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] =
+      diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
+  binaryDiff[neutralIndex_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + neutralIndex_ * numSpecies];
+  binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
+      diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
+  binaryDiff[ionIndex_ + neutralIndex_ * numSpecies] = binaryDiff[neutralIndex_ + ionIndex_ * numSpecies];
+  binaryDiff[electronIndex_ + ionIndex_ * numSpecies] = diffusivityFactor_ * sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
+                                          (collision::charged::att11(nondimTe) * debyeCircle);
+  binaryDiff[ionIndex_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + ionIndex_ * numSpecies];
+
+  double diffusivity[3], mobility[3];
+  CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
+
+  for (int sp = 0; sp < numSpecies; sp++) {
+    double temp = (sp == electronIndex_) ? Te : Th;
+    mobility[sp] = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity[sp];
+  }
+
+  // DenseMatrix gradX(numSpecies, dim);
+  double gradX[gpudata::MAXSPECIES * gpudata::MAXDIM];
+  mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
+
+  // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
+  // diffusionVelocity.SetSize(numSpecies, nvel_);
+  for (int v = 0; v < nvel_; v++)
+    for (int sp = 0; sp < numSpecies; sp++) diffusionVelocity[sp + v * numSpecies] = 0.0;
+  for (int sp = 0; sp < numSpecies; sp++) {
+    // concentration-driven diffusion only determines the first dim-components.
+    for (int d = 0; d < dim; d++) {
+      double DgradX = diffusivity[sp] * gradX[sp + d * numSpecies];
+      // NOTE: we'll have to handle small X case.
+      diffusionVelocity[sp + d * numSpecies] = -DgradX / (X_sp[sp] + Xeps_);
+    }
+  }
+
+  if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
+
+  addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
+
+  correctMassDiffusionFlux(Y_sp, diffusionVelocity);
+
+  double charSpeed = 0.0;
+  for (int sp = 0; sp < numActiveSpecies; sp++) {
+    double speciesSpeed = 0.0;
+    // azimuthal component does not participate in flux.
+    for (int d = 0; d < dim; d++) speciesSpeed += diffusionVelocity[sp + d * numSpecies] * diffusionVelocity[sp + d * numSpecies];
+    speciesSpeed = sqrt(speciesSpeed);
+    if (speciesSpeed > charSpeed) charSpeed = speciesSpeed;
+    // charSpeed = max(charSpeed, speciesSpeed);
+  }
+  // std::cout << "max diff. vel: " << charSpeed << std::endl;
+}
+
 MFEM_HOST_DEVICE double ArgonMinimalTransport::computeThirdOrderElectronThermalConductivity(const double *X_sp, const double debyeLength,
                                                                                             const double Te, const double nondimTe) {
   double debyeCircle = PI_ * debyeLength * debyeLength;

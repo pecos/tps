@@ -109,10 +109,7 @@ class ArgonMinimalTransport : public TransportProperties {
                                               Vector &transportBuffer, DenseMatrix &diffusionVelocity);
   MFEM_HOST_DEVICE virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp,
                                                                const double *Efield, double *transportBuffer,
-                                                               double *diffusionVelocity) {
-    exit(-1);
-    return;
-  }
+                                                               double *diffusionVelocity);
 
   // Source term will be constructed using ForcingTerms, which have pointers to primitive variables.
   // So we can use them in evaluating transport properties.
