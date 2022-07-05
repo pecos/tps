@@ -307,7 +307,14 @@ void M2ulPhyS::initVariables() {
       }
       switch (config.GetTranportModel()) {
         case ARGON_MINIMAL:
+#if defined(_CUDA_)
+          gpu::instantiateDeviceArgonMinimalTransport<<<1, 1>>>(d_mixture, config.argonTransportInput, d_transport_tmp);
+          cudaMemcpy(&transportPtr, d_transport_tmp, sizeof(TransportProperties *), cudaMemcpyDeviceToHost);
+#elif defined(_HIP_)
+          mfem_error("ArgonMinimalTransport is not supported for HIP!");
+#else
           transportPtr = new ArgonMinimalTransport(mixture, config);
+#endif
           break;
         case ARGON_MIXTURE:
           transportPtr = new ArgonMixtureTransport(mixture, config);

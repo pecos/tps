@@ -62,6 +62,11 @@ __global__ void instantiateDeviceConstantTransport(GasMixture *mixture, const co
   *trans = new ConstantTransport(mixture, inputs);
 }
 
+__global__ void instantiateDeviceArgonMinimalTransport(GasMixture *mixture, const ArgonTransportInput inputs,
+                                                       TransportProperties **trans) {
+  *trans = new ArgonMinimalTransport(mixture, inputs);
+}
+
 __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
                                         const int _num_equation, const int _dim, bool axisym, Fluxes **f) {
   *f = new Fluxes(_mixture, _eqSystem, _transport, _num_equation, _dim, axisym);
