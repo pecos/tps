@@ -668,7 +668,6 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeSourceTransportProperties(co
                                                                               double *globalTransport, double *speciesTransport,
                                                                               double *diffusionVelocity, double *n_sp) {
   for (int p = 0; p < SrcTrns::NUM_SRC_TRANS; p++) globalTransport[p] = 0.0;
-  speciesTransport.SetSize(numSpecies, SpeciesTrns::NUM_SPECIES_COEFFS);
   for (int p = 0; p < SpeciesTrns::NUM_SPECIES_COEFFS; p++)
     for (int sp = 0; sp < numSpecies; sp++) speciesTransport[sp + p * numSpecies] = 0.0;
 
