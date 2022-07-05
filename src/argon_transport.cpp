@@ -278,7 +278,7 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
 
   if (thirdOrderkElectron_) {
     transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
-        computeThirdOrderElectronThermalConductivity(X_sp, debyeLength, Te, nondimTe);
+        computeThirdOrderElectronThermalConductivity(&X_sp[0], debyeLength, Te, nondimTe);
   } else {
     transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] = viscosityFactor_ * kOverEtaFactor_ *
                                                                sqrt(Te / mw_[electronIndex_]) * X_sp(electronIndex_) /
@@ -338,50 +338,50 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
-double ArgonMinimalTransport::computeThirdOrderElectronThermalConductivity(const Vector &X_sp, const double debyeLength,
-                                                                           const double Te, const double nondimTe) {
+MFEM_HOST_DEVICE double ArgonMinimalTransport::computeThirdOrderElectronThermalConductivity(const double *X_sp, const double debyeLength,
+                                                                                            const double Te, const double nondimTe) {
   double debyeCircle = PI_ * debyeLength * debyeLength;
   // std::cout << "LD: " << debyeLength << std::endl;
-  Vector Q2(3);
-  Q2(0) = debyeCircle * collision::charged::rep22(nondimTe);
-  Q2(1) = debyeCircle * collision::charged::rep23(nondimTe);
-  Q2(2) = debyeCircle * collision::charged::rep24(nondimTe);
+  double Q2[3];
+  Q2[0] = debyeCircle * collision::charged::rep22(nondimTe);
+  Q2[1] = debyeCircle * collision::charged::rep23(nondimTe);
+  Q2[2] = debyeCircle * collision::charged::rep24(nondimTe);
   // std::cout << "Q2r: " << Q2(0) << ",\t" << Q2(1) << ",\t" << Q2(2) << std::endl;
 
-  Vector Q1Ion(5);
-  Q1Ion(0) = debyeCircle * collision::charged::att11(nondimTe);
-  Q1Ion(1) = debyeCircle * collision::charged::att12(nondimTe);
-  Q1Ion(2) = debyeCircle * collision::charged::att13(nondimTe);
-  Q1Ion(3) = debyeCircle * collision::charged::att14(nondimTe);
-  Q1Ion(4) = debyeCircle * collision::charged::att15(nondimTe);
+  double Q1Ion[5];
+  Q1Ion[0] = debyeCircle * collision::charged::att11(nondimTe);
+  Q1Ion[1] = debyeCircle * collision::charged::att12(nondimTe);
+  Q1Ion[2] = debyeCircle * collision::charged::att13(nondimTe);
+  Q1Ion[3] = debyeCircle * collision::charged::att14(nondimTe);
+  Q1Ion[4] = debyeCircle * collision::charged::att15(nondimTe);
   //   std::cout << "Q1i: ";
   // for (int i = 0; i < 5; i++) std::cout << Q1Ion(i) << ",\t";
   // std::cout << std::endl;
 
-  Vector Q1Neutral(5);
-  Q1Neutral(0) = collision::argon::eAr11(Te);
-  Q1Neutral(1) = collision::argon::eAr12(Te);
-  Q1Neutral(2) = collision::argon::eAr13(Te);
-  Q1Neutral(3) = collision::argon::eAr14(Te);
-  Q1Neutral(4) = collision::argon::eAr15(Te);
+  double Q1Neutral[5];
+  Q1Neutral[0] = collision::argon::eAr11(Te);
+  Q1Neutral[1] = collision::argon::eAr12(Te);
+  Q1Neutral[2] = collision::argon::eAr13(Te);
+  Q1Neutral[3] = collision::argon::eAr14(Te);
+  Q1Neutral[4] = collision::argon::eAr15(Te);
   //   std::cout << "Q1A: ";
   // for (int i = 0; i < 5; i++) std::cout << Q1Neutral(i) << ",\t";
   // std::cout << std::endl;
 
-  double L11 = sqrt(2.0) * X_sp(electronIndex_) * L11ee(Q2);
-  L11 += X_sp(ionIndex_) * L11ea(Q1Ion);
-  L11 += X_sp(neutralIndex_) * L11ea(Q1Neutral);
-  double L12 = sqrt(2.0) * X_sp(electronIndex_) * L12ee(Q2);
-  L12 += X_sp(ionIndex_) * L12ea(Q1Ion);
-  L12 += X_sp(neutralIndex_) * L12ea(Q1Neutral);
-  double L22 = sqrt(2.0) * X_sp(electronIndex_) * L22ee(Q2);
-  L22 += X_sp(ionIndex_) * L22ea(Q1Ion);
-  L22 += X_sp(neutralIndex_) * L22ea(Q1Neutral);
+  double L11 = sqrt(2.0) * X_sp[electronIndex_] * L11ee(Q2);
+  L11 += X_sp[ionIndex_] * L11ea(Q1Ion);
+  L11 += X_sp[neutralIndex_] * L11ea(Q1Neutral);
+  double L12 = sqrt(2.0) * X_sp[electronIndex_] * L12ee(Q2);
+  L12 += X_sp[ionIndex_] * L12ea(Q1Ion);
+  L12 += X_sp[neutralIndex_] * L12ea(Q1Neutral);
+  double L22 = sqrt(2.0) * X_sp[electronIndex_] * L22ee(Q2);
+  L22 += X_sp[ionIndex_] * L22ea(Q1Ion);
+  L22 += X_sp[neutralIndex_] * L22ea(Q1Neutral);
   // std::cout << "L11: " << L11 << std::endl;
   // std::cout << "L12: " << L12 << std::endl;
   // std::cout << "L22: " << L22 << std::endl;
 
-  return viscosityFactor_ * kOverEtaFactor_ * sqrt(2.0 * Te / mw_[electronIndex_]) * X_sp(electronIndex_) /
+  return viscosityFactor_ * kOverEtaFactor_ * sqrt(2.0 * Te / mw_[electronIndex_]) * X_sp[electronIndex_] /
          (L11 - L12 * L12 / L22);
 }
 
