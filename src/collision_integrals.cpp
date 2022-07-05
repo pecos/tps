@@ -50,37 +50,69 @@ namespace charged {
   laser-plasma interactions. Journal of Computational Physics, 406, 109190. https://doi.org/10.1016/j.jcp.2019.109190
 */
 
-MFEM_HOST_DEVICE double att11(const double &Tp) { return 0.2150 * pow(log(1.0 + 5.2194 * pow(Tp, 1.0472)), 1.2435) / Tp / Tp; }
+MFEM_HOST_DEVICE double att11(const double &Tp) {
+  return 0.2150 * pow(log(1.0 + 5.2194 * pow(Tp, 1.0472)), 1.2435) / Tp / Tp;
+}
 
-MFEM_HOST_DEVICE double att12(const double &Tp) { return 0.0991 * pow(log(1.0 + 7.4684 * pow(Tp, 1.0155)), 1.1536) / Tp / Tp; }
+MFEM_HOST_DEVICE double att12(const double &Tp) {
+  return 0.0991 * pow(log(1.0 + 7.4684 * pow(Tp, 1.0155)), 1.1536) / Tp / Tp;
+}
 
-MFEM_HOST_DEVICE double att13(const double &Tp) { return 0.0616 * pow(log(1.0 + 7.8271 * pow(Tp, 0.9452)), 1.1105) / Tp / Tp; }
+MFEM_HOST_DEVICE double att13(const double &Tp) {
+  return 0.0616 * pow(log(1.0 + 7.8271 * pow(Tp, 0.9452)), 1.1105) / Tp / Tp;
+}
 
-MFEM_HOST_DEVICE double att14(const double &Tp) { return 0.0308 * pow(log(1.0 + 13.9567 * pow(Tp, 0.9511)), 1.1803) / Tp / Tp; }
+MFEM_HOST_DEVICE double att14(const double &Tp) {
+  return 0.0308 * pow(log(1.0 + 13.9567 * pow(Tp, 0.9511)), 1.1803) / Tp / Tp;
+}
 
-MFEM_HOST_DEVICE double att15(const double &Tp) { return 0.0232 * pow(log(1.0 + 13.7888 * pow(Tp, 0.9148)), 1.1532) / Tp / Tp; }
+MFEM_HOST_DEVICE double att15(const double &Tp) {
+  return 0.0232 * pow(log(1.0 + 13.7888 * pow(Tp, 0.9148)), 1.1532) / Tp / Tp;
+}
 
-MFEM_HOST_DEVICE double att22(const double &Tp) { return 0.2423 * pow(log(1.0 + 4.6796 * pow(Tp, 1.3290)), 1.1279) / Tp / Tp; }
+MFEM_HOST_DEVICE double att22(const double &Tp) {
+  return 0.2423 * pow(log(1.0 + 4.6796 * pow(Tp, 1.3290)), 1.1279) / Tp / Tp;
+}
 
-MFEM_HOST_DEVICE double att23(const double &Tp) { return 0.1221 * pow(log(1.0 + 8.7542 * pow(Tp, 1.3875)), 1.1110) / Tp / Tp; }
+MFEM_HOST_DEVICE double att23(const double &Tp) {
+  return 0.1221 * pow(log(1.0 + 8.7542 * pow(Tp, 1.3875)), 1.1110) / Tp / Tp;
+}
 
-MFEM_HOST_DEVICE double att24(const double &Tp) { return 0.0619 * pow(log(1.0 + 18.2538 * pow(Tp, 1.4341)), 1.1618) / Tp / Tp; }
+MFEM_HOST_DEVICE double att24(const double &Tp) {
+  return 0.0619 * pow(log(1.0 + 18.2538 * pow(Tp, 1.4341)), 1.1618) / Tp / Tp;
+}
 
-MFEM_HOST_DEVICE double rep11(const double &Tp) { return 0.3904 * pow(log(1.0 + 0.9100 * pow(Tp, 1.1025)), 1.0544) / Tp / Tp; }
+MFEM_HOST_DEVICE double rep11(const double &Tp) {
+  return 0.3904 * pow(log(1.0 + 0.9100 * pow(Tp, 1.1025)), 1.0544) / Tp / Tp;
+}
 
-MFEM_HOST_DEVICE double rep12(const double &Tp) { return 0.1547 * pow(log(1.0 + 1.6597 * pow(Tp, 1.1725)), 0.9792) / Tp / Tp; }
+MFEM_HOST_DEVICE double rep12(const double &Tp) {
+  return 0.1547 * pow(log(1.0 + 1.6597 * pow(Tp, 1.1725)), 0.9792) / Tp / Tp;
+}
 
-MFEM_HOST_DEVICE double rep13(const double &Tp) { return 0.0814 * pow(log(1.0 + 2.5815 * pow(Tp, 1.1948)), 0.9570) / Tp / Tp; }
+MFEM_HOST_DEVICE double rep13(const double &Tp) {
+  return 0.0814 * pow(log(1.0 + 2.5815 * pow(Tp, 1.1948)), 0.9570) / Tp / Tp;
+}
 
-MFEM_HOST_DEVICE double rep14(const double &Tp) { return 0.0683 * pow(log(1.0 + 1.9774 * pow(Tp, 1.2033)), 0.8264) / Tp / Tp; }
+MFEM_HOST_DEVICE double rep14(const double &Tp) {
+  return 0.0683 * pow(log(1.0 + 1.9774 * pow(Tp, 1.2033)), 0.8264) / Tp / Tp;
+}
 
-MFEM_HOST_DEVICE double rep15(const double &Tp) { return 0.0346 * pow(log(1.0 + 4.5177 * pow(Tp, 1.2132)), 0.9294) / Tp / Tp; }
+MFEM_HOST_DEVICE double rep15(const double &Tp) {
+  return 0.0346 * pow(log(1.0 + 4.5177 * pow(Tp, 1.2132)), 0.9294) / Tp / Tp;
+}
 
-MFEM_HOST_DEVICE double rep22(const double &Tp) { return 0.4128 * pow(log(1.0 + 1.2436 * pow(Tp, 1.1830)), 1.0123) / Tp / Tp; }
+MFEM_HOST_DEVICE double rep22(const double &Tp) {
+  return 0.4128 * pow(log(1.0 + 1.2436 * pow(Tp, 1.1830)), 1.0123) / Tp / Tp;
+}
 
-MFEM_HOST_DEVICE double rep23(const double &Tp) { return 0.2203 * pow(log(1.0 + 1.8832 * pow(Tp, 1.2059)), 0.9851) / Tp / Tp; }
+MFEM_HOST_DEVICE double rep23(const double &Tp) {
+  return 0.2203 * pow(log(1.0 + 1.8832 * pow(Tp, 1.2059)), 0.9851) / Tp / Tp;
+}
 
-MFEM_HOST_DEVICE double rep24(const double &Tp) { return 0.1323 * pow(log(1.0 + 2.7248 * pow(Tp, 1.2129)), 0.9847) / Tp / Tp; }
+MFEM_HOST_DEVICE double rep24(const double &Tp) {
+  return 0.1323 * pow(log(1.0 + 2.7248 * pow(Tp, 1.2129)), 0.9847) / Tp / Tp;
+}
 
 }  // namespace charged
 

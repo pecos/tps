@@ -33,6 +33,7 @@
 #define COLLISION_INTEGRALS_HPP_
 
 #include <math.h>
+
 #include <mfem/general/forall.hpp>
 
 using namespace std;

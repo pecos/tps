@@ -118,18 +118,20 @@ class ArgonMinimalTransport : public TransportProperties {
                                                 const Vector &Efield, Vector &globalTransport,
                                                 DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
                                                 Vector &n_sp);
-  MFEM_HOST_DEVICE virtual void ComputeSourceTransportProperties(const double *state, const double *Up, const double *gradUp,
-                                                                 const double *Efield, double *globalTransport,
-                                                                 double *speciesTransport, double *diffusionVelocity,
-                                                                 double *n_sp);
+  MFEM_HOST_DEVICE virtual void ComputeSourceTransportProperties(const double *state, const double *Up,
+                                                                 const double *gradUp, const double *Efield,
+                                                                 double *globalTransport, double *speciesTransport,
+                                                                 double *diffusionVelocity, double *n_sp);
 
   // NOTE(kevin): only for AxisymmetricSource
   virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc);
-  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double &visc, double &bulkVisc);
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double &visc,
+                                       double &bulkVisc);
 
   // virtual double computeThirdOrderElectronThermalConductivity(const Vector &X_sp, const double debyeLength,
   //                                                             const double Te, const double nondimTe);
-  MFEM_HOST_DEVICE virtual double computeThirdOrderElectronThermalConductivity(const double *X_sp, const double debyeLength,
+  MFEM_HOST_DEVICE virtual double computeThirdOrderElectronThermalConductivity(const double *X_sp,
+                                                                               const double debyeLength,
                                                                                const double Te, const double nondimTe);
 
   virtual void computeMixtureAverageDiffusivity(const Vector &state, Vector &diffusivity);
@@ -139,7 +141,9 @@ class ArgonMinimalTransport : public TransportProperties {
   MFEM_HOST_DEVICE double L11ee(const double *Q2) { return Q2[0]; }
   MFEM_HOST_DEVICE double L11ea(const double *Q1) { return 6.25 * Q1[0] - 15. * Q1[1] + 12. * Q1[2]; }
   MFEM_HOST_DEVICE double L12ee(const double *Q2) { return 1.75 * Q2[0] - 2.0 * Q2[1]; }
-  MFEM_HOST_DEVICE double L12ea(const double *Q1) { return 10.9375 * Q1[0] - 39.375 * Q1[1] + 57. * Q1[2] - 30. * Q1[3]; }
+  MFEM_HOST_DEVICE double L12ea(const double *Q1) {
+    return 10.9375 * Q1[0] - 39.375 * Q1[1] + 57. * Q1[2] - 30. * Q1[3];
+  }
   MFEM_HOST_DEVICE double L22ee(const double *Q2) { return 4.8125 * Q2[0] - 7.0 * Q2[1] + 5. * Q2[2]; }
   MFEM_HOST_DEVICE double L22ea(const double *Q1) {
     return 19.140625 * Q1[0] - 91.875 * Q1[1] + 199.5 * Q1[2] - 210. * Q1[3] + 90. * Q1[4];

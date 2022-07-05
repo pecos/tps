@@ -110,7 +110,7 @@ MFEM_HOST_DEVICE ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixtu
   if (numSpecies != 3) {
     // grvy_printf(GRVY_ERROR, "\nArgon ternary transport only supports ternary mixture of Ar, Ar.+1, and E !\n");
     // exit(ERROR);
-    printf( "\nArgon ternary transport only supports ternary mixture of Ar, Ar.+1, and E !\n");
+    printf("\nArgon ternary transport only supports ternary mixture of Ar, Ar.+1, and E !\n");
     assert(false);
   }
 
@@ -205,7 +205,8 @@ collisionInputs ArgonMinimalTransport::computeCollisionInputs(const Vector &prim
   // return collInputs;
 }
 
-MFEM_HOST_DEVICE collisionInputs ArgonMinimalTransport::computeCollisionInputs(const double *primitive, const double *n_sp) {
+MFEM_HOST_DEVICE collisionInputs ArgonMinimalTransport::computeCollisionInputs(const double *primitive,
+                                                                               const double *n_sp) {
   collisionInputs collInputs;
   collInputs.Te = (twoTemperature_) ? primitive[num_equation - 1] : primitive[nvel_ + 1];
   collInputs.Th = primitive[nvel_ + 1];
@@ -339,7 +340,8 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
 }
 
 MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                                            const double *Efield, double *transportBuffer,
+                                                                            const double *Efield,
+                                                                            double *transportBuffer,
                                                                             double *diffusionVelocity) {
   // transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   for (int p = 0; p < FluxTrns::NUM_FLUX_TRANS; p++) transportBuffer[p] = 0.0;
@@ -395,8 +397,9 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeFluxTransportProperties(cons
   binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
       diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
   binaryDiff[ionIndex_ + neutralIndex_ * numSpecies] = binaryDiff[neutralIndex_ + ionIndex_ * numSpecies];
-  binaryDiff[electronIndex_ + ionIndex_ * numSpecies] = diffusivityFactor_ * sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
-                                          (collision::charged::att11(nondimTe) * debyeCircle);
+  binaryDiff[electronIndex_ + ionIndex_ * numSpecies] = diffusivityFactor_ *
+                                                        sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
+                                                        (collision::charged::att11(nondimTe) * debyeCircle);
   binaryDiff[ionIndex_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + ionIndex_ * numSpecies];
 
   double diffusivity[3], mobility[3];
@@ -434,7 +437,8 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeFluxTransportProperties(cons
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     double speciesSpeed = 0.0;
     // azimuthal component does not participate in flux.
-    for (int d = 0; d < dim; d++) speciesSpeed += diffusionVelocity[sp + d * numSpecies] * diffusionVelocity[sp + d * numSpecies];
+    for (int d = 0; d < dim; d++)
+      speciesSpeed += diffusionVelocity[sp + d * numSpecies] * diffusionVelocity[sp + d * numSpecies];
     speciesSpeed = sqrt(speciesSpeed);
     if (speciesSpeed > charSpeed) charSpeed = speciesSpeed;
     // charSpeed = max(charSpeed, speciesSpeed);
@@ -442,8 +446,10 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeFluxTransportProperties(cons
   // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
-MFEM_HOST_DEVICE double ArgonMinimalTransport::computeThirdOrderElectronThermalConductivity(const double *X_sp, const double debyeLength,
-                                                                                            const double Te, const double nondimTe) {
+MFEM_HOST_DEVICE double ArgonMinimalTransport::computeThirdOrderElectronThermalConductivity(const double *X_sp,
+                                                                                            const double debyeLength,
+                                                                                            const double Te,
+                                                                                            const double nondimTe) {
   double debyeCircle = PI_ * debyeLength * debyeLength;
   // std::cout << "LD: " << debyeLength << std::endl;
   double Q2[3];
@@ -520,7 +526,8 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
   // binaryDiff(ionIndex_, neutralIndex_) =
   //     diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
   // binaryDiff(neutralIndex_, ionIndex_) = binaryDiff(ionIndex_, neutralIndex_);
-  // binaryDiff(electronIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
+  // binaryDiff(electronIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal
+  // /
   //                                         (collision::charged::att11(nondimTe) * debyeCircle);
   // binaryDiff(ionIndex_, electronIndex_) = binaryDiff(electronIndex_, ionIndex_);
   //
@@ -529,7 +536,8 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
   // CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
 }
 
-MFEM_HOST_DEVICE void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const double *state, double *diffusivity) {
+MFEM_HOST_DEVICE void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const double *state,
+                                                                              double *diffusivity) {
   double primitiveState[gpudata::MAXEQUATIONS];
   mixture->GetPrimitivesFromConservatives(state, primitiveState);
 
@@ -557,8 +565,9 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::computeMixtureAverageDiffusivity(co
   binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
       diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
   binaryDiff[ionIndex_ + neutralIndex_ * numSpecies] = binaryDiff[neutralIndex_ + ionIndex_ * numSpecies];
-  binaryDiff[electronIndex_ + ionIndex_ * numSpecies] = diffusivityFactor_ * sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
-                                          (collision::charged::att11(nondimTe) * debyeCircle);
+  binaryDiff[electronIndex_ + ionIndex_ * numSpecies] = diffusivityFactor_ *
+                                                        sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
+                                                        (collision::charged::att11(nondimTe) * debyeCircle);
   binaryDiff[ionIndex_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + ionIndex_ * numSpecies];
 
   // diffusivity.SetSize(3);
@@ -606,9 +615,9 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
   // binaryDiff(electronIndex_, neutralIndex_) =
   //     diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / Qea;
   // binaryDiff(neutralIndex_, electronIndex_) = binaryDiff(electronIndex_, neutralIndex_);
-  // binaryDiff(neutralIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / Qai;
-  // binaryDiff(ionIndex_, neutralIndex_) = binaryDiff(neutralIndex_, ionIndex_);
-  // binaryDiff(electronIndex_, ionIndex_) =
+  // binaryDiff(neutralIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal /
+  // Qai; binaryDiff(ionIndex_, neutralIndex_) = binaryDiff(neutralIndex_, ionIndex_); binaryDiff(electronIndex_,
+  // ionIndex_) =
   //     diffusivityFactor_ * sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal / Qie;
   // binaryDiff(ionIndex_, electronIndex_) = binaryDiff(electronIndex_, ionIndex_);
   //
@@ -649,7 +658,8 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
   //     mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp(neutralIndex_) * Qea;
   // // // relative electron collision speed
   // // double ge = sqrt(8.0 * kB_ * Te / PI_ / mw_(electronIndex_));
-  // // speciesTransport(ionIndex_, SpeciesTrns::MF_FREQUENCY) = 4.0 / 3.0 * AVOGADRONUMBER * n_sp(ionIndex_) * ge * Qie;
+  // // speciesTransport(ionIndex_, SpeciesTrns::MF_FREQUENCY) = 4.0 / 3.0 * AVOGADRONUMBER * n_sp(ionIndex_) * ge *
+  // Qie;
   //
   // double charSpeed = 0.0;
   // for (int sp = 0; sp < numActiveSpecies; sp++) {
@@ -663,10 +673,9 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
   // // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
-MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeSourceTransportProperties(const double *state, const double *Up,
-                                                                              const double *gradUp, const double *Efield,
-                                                                              double *globalTransport, double *speciesTransport,
-                                                                              double *diffusionVelocity, double *n_sp) {
+MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeSourceTransportProperties(
+    const double *state, const double *Up, const double *gradUp, const double *Efield, double *globalTransport,
+    double *speciesTransport, double *diffusionVelocity, double *n_sp) {
   for (int p = 0; p < SrcTrns::NUM_SRC_TRANS; p++) globalTransport[p] = 0.0;
   for (int p = 0; p < SpeciesTrns::NUM_SPECIES_COEFFS; p++)
     for (int sp = 0; sp < numSpecies; sp++) speciesTransport[sp + p * numSpecies] = 0.0;
@@ -700,8 +709,9 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeSourceTransportProperties(co
   binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
       diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
   binaryDiff[ionIndex_ + neutralIndex_ * numSpecies] = binaryDiff[neutralIndex_ + ionIndex_ * numSpecies];
-  binaryDiff[electronIndex_ + ionIndex_ * numSpecies] = diffusivityFactor_ * sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
-                                          (collision::charged::att11(nondimTe) * debyeCircle);
+  binaryDiff[electronIndex_ + ionIndex_ * numSpecies] = diffusivityFactor_ *
+                                                        sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
+                                                        (collision::charged::att11(nondimTe) * debyeCircle);
   binaryDiff[ionIndex_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + ionIndex_ * numSpecies];
 
   double diffusivity[3], mobility[3];
@@ -747,7 +757,8 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeSourceTransportProperties(co
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     double speciesSpeed = 0.0;
     // azimuthal component does not participate in flux.
-    for (int d = 0; d < dim; d++) speciesSpeed += diffusionVelocity[sp + d * numSpecies] * diffusionVelocity[sp + d * numSpecies];
+    for (int d = 0; d < dim; d++)
+      speciesSpeed += diffusionVelocity[sp + d * numSpecies] * diffusionVelocity[sp + d * numSpecies];
     speciesSpeed = sqrt(speciesSpeed);
     if (speciesSpeed > charSpeed) charSpeed = speciesSpeed;
     // charSpeed = max(charSpeed, speciesSpeed);
@@ -786,8 +797,8 @@ void ArgonMinimalTransport::GetViscosities(const Vector &conserved, const Vector
   return;
 }
 
-MFEM_HOST_DEVICE void ArgonMinimalTransport::GetViscosities(const double *conserved, const double *primitive, double &visc,
-                                                            double &bulkVisc) {
+MFEM_HOST_DEVICE void ArgonMinimalTransport::GetViscosities(const double *conserved, const double *primitive,
+                                                            double &visc, double &bulkVisc) {
   double n_sp[3], X_sp[3], Y_sp[3];
   mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
   double nTotal = 0.0;
