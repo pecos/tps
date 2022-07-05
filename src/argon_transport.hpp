@@ -128,6 +128,7 @@ class ArgonMinimalTransport : public TransportProperties {
                                                                                const double Te, const double nondimTe);
 
   virtual void computeMixtureAverageDiffusivity(const Vector &state, Vector &diffusivity);
+  MFEM_HOST_DEVICE void computeMixtureAverageDiffusivity(const double *state, double *diffusivity);
 
   // These are used to compute third-order electron thermal conductivity based on standard Chapman--Enskog method.
   MFEM_HOST_DEVICE double L11ee(const double *Q2) { return Q2[0]; }

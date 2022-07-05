@@ -490,39 +490,79 @@ MFEM_HOST_DEVICE double ArgonMinimalTransport::computeThirdOrderElectronThermalC
 }
 
 void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state, Vector &diffusivity) {
-  Vector primitiveState(num_equation);
+  diffusivity.SetSize(3);
+  diffusivity = 0.0;
+  computeMixtureAverageDiffusivity(&state[0], &diffusivity[0]);
+  // Vector primitiveState(num_equation);
+  // mixture->GetPrimitivesFromConservatives(state, primitiveState);
+  //
+  // Vector n_sp(3), X_sp(3), Y_sp(3);
+  // mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
+  // double nTotal = 0.0;
+  // for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
+  //
+  // double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : primitiveState[nvel_ + 1];
+  // double Th = primitiveState[nvel_ + 1];
+  //
+  // // Add Xeps to avoid zero number density case.
+  // double nOverT = (n_sp(electronIndex_) + Xeps_) / Te + (n_sp(ionIndex_) + Xeps_) / Th;
+  // double debyeLength = sqrt(debyeFactor_ / AVOGADRONUMBER / nOverT);
+  // double debyeCircle = PI_ * debyeLength * debyeLength;
+  //
+  // double nondimTe = debyeLength * 4.0 * PI_ * debyeFactor_ * Te;
+  // // double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
+  //
+  // DenseMatrix binaryDiff(3);
+  // binaryDiff = 0.0;
+  // binaryDiff(electronIndex_, neutralIndex_) =
+  //     diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
+  // binaryDiff(neutralIndex_, electronIndex_) = binaryDiff(electronIndex_, neutralIndex_);
+  // binaryDiff(ionIndex_, neutralIndex_) =
+  //     diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
+  // binaryDiff(neutralIndex_, ionIndex_) = binaryDiff(ionIndex_, neutralIndex_);
+  // binaryDiff(electronIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
+  //                                         (collision::charged::att11(nondimTe) * debyeCircle);
+  // binaryDiff(ionIndex_, electronIndex_) = binaryDiff(electronIndex_, ionIndex_);
+  //
+  // diffusivity.SetSize(3);
+  // diffusivity = 0.0;
+  // CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
+}
+
+MFEM_HOST_DEVICE void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const double *state, double *diffusivity) {
+  double primitiveState[gpudata::MAXEQUATIONS];
   mixture->GetPrimitivesFromConservatives(state, primitiveState);
 
-  Vector n_sp(3), X_sp(3), Y_sp(3);
+  double n_sp[3], X_sp[3], Y_sp[3];
   mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
   double nTotal = 0.0;
-  for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
+  for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp[sp];
 
   double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : primitiveState[nvel_ + 1];
   double Th = primitiveState[nvel_ + 1];
 
   // Add Xeps to avoid zero number density case.
-  double nOverT = (n_sp(electronIndex_) + Xeps_) / Te + (n_sp(ionIndex_) + Xeps_) / Th;
+  double nOverT = (n_sp[electronIndex_] + Xeps_) / Te + (n_sp[ionIndex_] + Xeps_) / Th;
   double debyeLength = sqrt(debyeFactor_ / AVOGADRONUMBER / nOverT);
   double debyeCircle = PI_ * debyeLength * debyeLength;
 
   double nondimTe = debyeLength * 4.0 * PI_ * debyeFactor_ * Te;
   // double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
 
-  DenseMatrix binaryDiff(3);
-  binaryDiff = 0.0;
-  binaryDiff(electronIndex_, neutralIndex_) =
+  double binaryDiff[3 * 3];
+  for (int i = 0; i < 3 * 3; i++) binaryDiff[i] = 0.0;
+  binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] =
       diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
-  binaryDiff(neutralIndex_, electronIndex_) = binaryDiff(electronIndex_, neutralIndex_);
-  binaryDiff(ionIndex_, neutralIndex_) =
+  binaryDiff[neutralIndex_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + neutralIndex_ * numSpecies];
+  binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
       diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
-  binaryDiff(neutralIndex_, ionIndex_) = binaryDiff(ionIndex_, neutralIndex_);
-  binaryDiff(electronIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
+  binaryDiff[ionIndex_ + neutralIndex_ * numSpecies] = binaryDiff[neutralIndex_ + ionIndex_ * numSpecies];
+  binaryDiff[electronIndex_ + ionIndex_ * numSpecies] = diffusivityFactor_ * sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
                                           (collision::charged::att11(nondimTe) * debyeCircle);
-  binaryDiff(ionIndex_, electronIndex_) = binaryDiff(electronIndex_, ionIndex_);
+  binaryDiff[ionIndex_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + ionIndex_ * numSpecies];
 
-  diffusivity.SetSize(3);
-  diffusivity = 0.0;
+  // diffusivity.SetSize(3);
+  for (int sp = 0; sp < 3; sp++) diffusivity[sp] = 0.0;
   CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
 }
 
