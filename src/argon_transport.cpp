@@ -975,16 +975,16 @@ double ArgonMixtureTransport::computeThirdOrderElectronThermalConductivity(const
   Vector Q2(3);
   for (int r = 0; r < 3; r++) Q2(r) = collisionIntegral(electronIndex_, electronIndex_, 2, r + 2, collInputs);
 
-  double L11 = sqrt(2.0) * X_sp(electronIndex_) * L11ee(Q2);
-  double L12 = sqrt(2.0) * X_sp(electronIndex_) * L12ee(Q2);
-  double L22 = sqrt(2.0) * X_sp(electronIndex_) * L22ee(Q2);
+  double L11 = sqrt(2.0) * X_sp(electronIndex_) * L11ee(&Q2[0]);
+  double L12 = sqrt(2.0) * X_sp(electronIndex_) * L12ee(&Q2[0]);
+  double L22 = sqrt(2.0) * X_sp(electronIndex_) * L22ee(&Q2[0]);
   for (int sp = 0; sp < numSpecies; sp++) {
     if (sp == electronIndex_) continue;
     Vector Q1(5);
     for (int r = 0; r < 5; r++) Q1(r) = collisionIntegral(sp, electronIndex_, 1, r + 1, collInputs);
-    L11 += X_sp(sp) * L11ea(Q1);
-    L12 += X_sp(sp) * L12ea(Q1);
-    L22 += X_sp(sp) * L22ea(Q1);
+    L11 += X_sp(sp) * L11ea(&Q1[0]);
+    L12 += X_sp(sp) * L12ea(&Q1[0]);
+    L22 += X_sp(sp) * L22ea(&Q1[0]);
   }
 
   return viscosityFactor_ * kOverEtaFactor_ * sqrt(2.0 * collInputs.Te / mw_[electronIndex_]) * X_sp(electronIndex_) /

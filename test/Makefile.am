@@ -45,16 +45,7 @@ TESTS += cyl3d.gpu.python.test
 endif
 
 else
-TESTS += cyl3d.test \
-	 cyl3d.mflow.test \
-	 cyl3d.dtconst.test \
-	 averages.test \
-	 wedge.test \
-	 qms.rings.test \
-	 sponge_zone.test \
-	 annulus.test \
-	 pipe.test \
-	 perfect_gas.test \
+TESTS += perfect_gas.test \
 	 collision_integrals.test \
 	 argon_minimal.test \
 	 argon_minimal.binary.test \
@@ -89,8 +80,7 @@ TESTS           += cuda-memcheck.test
 endif
 
 if MASA_ENABLED
-TESTS += mms.euler.test \
-	 mms.ternary_2d.test \
+TESTS += mms.ternary_2d.test \
 	 mms.ternary_2d_wall.test \
 	 mms.ternary_2d_inout.test \
 	 mms.general_wall.test
