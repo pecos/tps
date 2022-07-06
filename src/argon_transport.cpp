@@ -1073,7 +1073,7 @@ void ArgonMixtureTransport::ComputeFluxTransportProperties(const Vector &state, 
 
   if (thirdOrderkElectron_) {
     transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
-        computeThirdOrderElectronThermalConductivity(X_sp, collInputs);
+        computeThirdOrderElectronThermalConductivity(&X_sp[0], collInputs);
   } else {
     transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
         viscosityFactor_ * kOverEtaFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) * X_sp(electronIndex_) /
@@ -1132,24 +1132,24 @@ void ArgonMixtureTransport::ComputeFluxTransportProperties(const Vector &state, 
   // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
-double ArgonMixtureTransport::computeThirdOrderElectronThermalConductivity(const Vector &X_sp,
-                                                                           const collisionInputs &collInputs) {
-  Vector Q2(3);
-  for (int r = 0; r < 3; r++) Q2(r) = collisionIntegral(electronIndex_, electronIndex_, 2, r + 2, collInputs);
+MFEM_HOST_DEVICE double ArgonMixtureTransport::computeThirdOrderElectronThermalConductivity(const double *X_sp,
+                                                                                            const collisionInputs &collInputs) {
+  double Q2[3];
+  for (int r = 0; r < 3; r++) Q2[r] = collisionIntegral(electronIndex_, electronIndex_, 2, r + 2, collInputs);
 
-  double L11 = sqrt(2.0) * X_sp(electronIndex_) * L11ee(&Q2[0]);
-  double L12 = sqrt(2.0) * X_sp(electronIndex_) * L12ee(&Q2[0]);
-  double L22 = sqrt(2.0) * X_sp(electronIndex_) * L22ee(&Q2[0]);
+  double L11 = sqrt(2.0) * X_sp[electronIndex_] * L11ee(Q2);
+  double L12 = sqrt(2.0) * X_sp[electronIndex_] * L12ee(Q2);
+  double L22 = sqrt(2.0) * X_sp[electronIndex_] * L22ee(Q2);
   for (int sp = 0; sp < numSpecies; sp++) {
     if (sp == electronIndex_) continue;
-    Vector Q1(5);
-    for (int r = 0; r < 5; r++) Q1(r) = collisionIntegral(sp, electronIndex_, 1, r + 1, collInputs);
-    L11 += X_sp(sp) * L11ea(&Q1[0]);
-    L12 += X_sp(sp) * L12ea(&Q1[0]);
-    L22 += X_sp(sp) * L22ea(&Q1[0]);
+    double Q1[5];
+    for (int r = 0; r < 5; r++) Q1[r] = collisionIntegral(sp, electronIndex_, 1, r + 1, collInputs);
+    L11 += X_sp[sp] * L11ea(Q1);
+    L12 += X_sp[sp] * L12ea(Q1);
+    L22 += X_sp[sp] * L22ea(Q1);
   }
 
-  return viscosityFactor_ * kOverEtaFactor_ * sqrt(2.0 * collInputs.Te / mw_[electronIndex_]) * X_sp(electronIndex_) /
+  return viscosityFactor_ * kOverEtaFactor_ * sqrt(2.0 * collInputs.Te / mw_[electronIndex_]) * X_sp[electronIndex_] /
          (L11 - L12 * L12 / L22);
 }
 
