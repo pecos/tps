@@ -59,6 +59,11 @@ SourceTerm::~SourceTerm() {
 }
 
 void SourceTerm::updateTerms(mfem::Vector &in) {
+#if defined(_HIP_)
+  mfem_error("Source term is not supported on hip path!\n");
+#elif defined(_CUDA_)
+  updateTerms_gpu(in);
+#else
   const double *h_Up = Up_->HostRead();
   const double *h_U = U_->HostRead();
   const double *h_gradUp = gradUp_->HostRead();
@@ -81,99 +86,228 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     Vector Efield(nvel);
     Efield = 0.0;
 
-    Vector globalTransport(numSpecies_);
-    DenseMatrix speciesTransport(numSpecies_, SpeciesTrns::NUM_SPECIES_COEFFS);
-    // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
-    DenseMatrix diffusionVelocity(numSpecies_, nvel);
-    diffusionVelocity = 0.0;
-    Vector ns(numSpecies_);
-    transport_->ComputeSourceTransportProperties(Un, upn, gradUpn, globalTransport, Efield, speciesTransport,
-                                                 diffusionVelocity, ns);
-
-    srcTerm = 0.0;
-
-    double Th = 0., Te = 0.;
-    Th = upn[1 + nvel];
-    if (mixture_->IsTwoTemperature()) {
-      Te = upn[num_equation - 1];
-    } else {
-      Te = Th;
-    }
-
-    Vector kfwd, kC;
-    chemistry_->computeForwardRateCoeffs(Th, Te, kfwd);
-    chemistry_->computeEquilibriumConstants(Th, Te, kC);
-
-    // get reaction rates
-    Vector progressRates(numReactions_), creationRates(numSpecies_);
-    progressRates = 0.0;
-    creationRates = 0.0;
-    chemistry_->computeProgressRate(ns, kfwd, kC, progressRates);
-    chemistry_->computeCreationRate(progressRates, creationRates);
-
-    // add species creation rates
-    for (int sp = 0; sp < numActiveSpecies_; sp++) {
-      srcTerm(2 + nvel + sp) += creationRates(sp);
-    }
-
-    // Terms required for EM-coupling.
-    Vector Jd(nvel);  // diffusion current.
-    Jd = 0.0;
-    if (ambipolar_) {  // diffusion current using electric conductivity.
-      // const double mho = globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY);
-      // Jd = mho * Efield
-
-    } else {  // diffusion current by definition.
-      for (int sp = 0; sp < numSpecies_; sp++) {
-        for (int d = 0; d < nvel; d++)
-          Jd(d) += diffusionVelocity(sp, d) * ns(sp) * MOLARELECTRONCHARGE *
-                   mixture_->GetGasParams(sp, GasParams::SPECIES_CHARGES);
-      }
-    }
-
-    // TODO(kevin): may move axisymmetric source terms to here.
-
-    // TODO(kevin): energy sink for radiative reaction.
-
-    if (twoTemperature_) {
-      // energy sink from electron-impact reactions.
-      for (int r = 0; r < numReactions_; r++) {
-        if (chemistry_->isElectronInvolvedAt(r))
-          srcTerm(num_equation - 1) -= chemistry_->getReactionEnergy(r) * progressRates(r);
-      }
-
-      // work by electron pressure
-      // const double pe = mixture_->computeElectronPressure(ns(numSpecies_ - 2), Te);
-      // for (int d = 0; d < dim; d++) srcTerm(num_equation - 1) -= pe * gradUpn(d + 1, d);
-      Vector gradPe(dim);
-      mixture_->computeElectronPressureGrad(ns(numSpecies_ - 2), Te, gradUpn, gradPe);
-      for (int d = 0; d < dim; d++) srcTerm(num_equation - 1) += gradPe(d) * upn(d + 1);
-
-      // energy transfer by elastic momentum transfer
-      const double me = mixture_->GetGasParams(numSpecies_ - 2, GasParams::SPECIES_MW);
-      const double ne = ns(numSpecies_ - 2);
-      for (int sp = 0; sp < numSpecies_; sp++) {
-        if (sp == numSpecies_ - 2) continue;
-
-        double m_sp = mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
-        // kB is converted to R, as number densities are provided in mol.
-        double energy = 1.5 * UNIVERSALGASCONSTANT * (Te - Th);
-        // TODO(kevin): diffusion-driven term is often neglected.
-        // Let's neglect this now and add it later if more refined physics is needed.
-        // for (int d = 0; d < dim; d++) {
-        //   energy += 0.5 * (m_sp - me) * diffusionVelocity(sp, d) * diffusionVelocity(numSpecies_, d);
-        // }
-        energy *= 2.0 * me * m_sp / (m_sp + me) / (m_sp + me) * ne * speciesTransport(sp, SpeciesTrns::MF_FREQUENCY);
-
-        srcTerm(num_equation - 1) -= energy;
-      }
-
-      // TODO(kevin): work by electron diffusion - rho_e V_e * Du/Dt
-    }
+    updateTermAtNode(&Un[0], &upn[0], gradUpn.Read(), &Efield[0], &srcTerm[0]);
+    // Vector globalTransport(numSpecies_);
+    // DenseMatrix speciesTransport(numSpecies_, SpeciesTrns::NUM_SPECIES_COEFFS);
+    // // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
+    // DenseMatrix diffusionVelocity(numSpecies_, nvel);
+    // diffusionVelocity = 0.0;
+    // Vector ns(numSpecies_);
+    // transport_->ComputeSourceTransportProperties(Un, upn, gradUpn, globalTransport, Efield, speciesTransport,
+    //                                              diffusionVelocity, ns);
+    //
+    // srcTerm = 0.0;
+    //
+    // double Th = 0., Te = 0.;
+    // Th = upn[1 + nvel];
+    // if (mixture_->IsTwoTemperature()) {
+    //   Te = upn[num_equation - 1];
+    // } else {
+    //   Te = Th;
+    // }
+    //
+    // Vector kfwd, kC;
+    // chemistry_->computeForwardRateCoeffs(Th, Te, kfwd);
+    // chemistry_->computeEquilibriumConstants(Th, Te, kC);
+    //
+    // // get reaction rates
+    // Vector progressRates(numReactions_), creationRates(numSpecies_);
+    // progressRates = 0.0;
+    // creationRates = 0.0;
+    // chemistry_->computeProgressRate(ns, kfwd, kC, progressRates);
+    // chemistry_->computeCreationRate(progressRates, creationRates);
+    //
+    // // add species creation rates
+    // for (int sp = 0; sp < numActiveSpecies_; sp++) {
+    //   srcTerm(2 + nvel + sp) += creationRates(sp);
+    // }
+    //
+    // // Terms required for EM-coupling.
+    // Vector Jd(nvel);  // diffusion current.
+    // Jd = 0.0;
+    // if (ambipolar_) {  // diffusion current using electric conductivity.
+    //   // const double mho = globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY);
+    //   // Jd = mho * Efield
+    //
+    // } else {  // diffusion current by definition.
+    //   for (int sp = 0; sp < numSpecies_; sp++) {
+    //     for (int d = 0; d < nvel; d++)
+    //       Jd(d) += diffusionVelocity(sp, d) * ns(sp) * MOLARELECTRONCHARGE *
+    //                mixture_->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+    //   }
+    // }
+    //
+    // // TODO(kevin): may move axisymmetric source terms to here.
+    //
+    // // TODO(kevin): energy sink for radiative reaction.
+    //
+    // if (twoTemperature_) {
+    //   // energy sink from electron-impact reactions.
+    //   for (int r = 0; r < numReactions_; r++) {
+    //     if (chemistry_->isElectronInvolvedAt(r))
+    //       srcTerm(num_equation - 1) -= chemistry_->getReactionEnergy(r) * progressRates(r);
+    //   }
+    //
+    //   // work by electron pressure
+    //   // const double pe = mixture_->computeElectronPressure(ns(numSpecies_ - 2), Te);
+    //   // for (int d = 0; d < dim; d++) srcTerm(num_equation - 1) -= pe * gradUpn(d + 1, d);
+    //   Vector gradPe(dim);
+    //   mixture_->computeElectronPressureGrad(ns(numSpecies_ - 2), Te, gradUpn, gradPe);
+    //   for (int d = 0; d < dim; d++) srcTerm(num_equation - 1) += gradPe(d) * upn(d + 1);
+    //
+    //   // energy transfer by elastic momentum transfer
+    //   const double me = mixture_->GetGasParams(numSpecies_ - 2, GasParams::SPECIES_MW);
+    //   const double ne = ns(numSpecies_ - 2);
+    //   for (int sp = 0; sp < numSpecies_; sp++) {
+    //     if (sp == numSpecies_ - 2) continue;
+    //
+    //     double m_sp = mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+    //     // kB is converted to R, as number densities are provided in mol.
+    //     double energy = 1.5 * UNIVERSALGASCONSTANT * (Te - Th);
+    //     // TODO(kevin): diffusion-driven term is often neglected.
+    //     // Let's neglect this now and add it later if more refined physics is needed.
+    //     // for (int d = 0; d < dim; d++) {
+    //     //   energy += 0.5 * (m_sp - me) * diffusionVelocity(sp, d) * diffusionVelocity(numSpecies_, d);
+    //     // }
+    //     energy *= 2.0 * me * m_sp / (m_sp + me) / (m_sp + me) * ne * speciesTransport(sp, SpeciesTrns::MF_FREQUENCY);
+    //
+    //     srcTerm(num_equation - 1) -= energy;
+    //   }
+    //
+    //   // TODO(kevin): work by electron diffusion - rho_e V_e * Du/Dt
+    // }
 
     // add source term to buffer
     for (int eq = 0; eq < num_equation; eq++) {
       h_in[n + eq * nnodes] += srcTerm(eq);
     }
   }
+#endif  // defined(_HIP_)
+}
+
+MFEM_HOST_DEVICE void SourceTerm::updateTermAtNode(const double *Un, const double *upn, const double *gradUpn, const double *Efield, double *srcTerm) {
+  double globalTransport[gpudata::MAXSPECIES];
+  double speciesTransport[gpudata::MAXSPECIES * SpeciesTrns::NUM_SPECIES_COEFFS];
+  // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
+  double diffusionVelocity[gpudata::MAXSPECIES * gpudata::MAXDIM];
+  for (int v = 0; v < nvel; v++) for (int sp = 0; sp < numSpecies_; sp++) diffusionVelocity[sp + v * numSpecies_] = 0.0;
+  double ns[gpudata::MAXSPECIES];
+  transport_->ComputeSourceTransportProperties(Un, upn, gradUpn, globalTransport, Efield, speciesTransport,
+                                               diffusionVelocity, ns);
+
+  for (int eq = 0; eq < num_equation; eq++) srcTerm[eq] = 0.0;
+
+  double Th = 0., Te = 0.;
+  Th = upn[1 + nvel];
+  if (mixture_->IsTwoTemperature()) {
+    Te = upn[num_equation - 1];
+  } else {
+    Te = Th;
+  }
+
+  double kfwd[gpudata::MAXREACTIONS], kC[gpudata::MAXREACTIONS];
+  chemistry_->computeForwardRateCoeffs(Th, Te, kfwd);
+  chemistry_->computeEquilibriumConstants(Th, Te, kC);
+
+  // get reaction rates
+  double progressRates[gpudata::MAXREACTIONS], creationRates[gpudata::MAXREACTIONS];
+  for (int r = 0; r < numReactions_; r++) {
+    progressRates[r] = 0.0;
+    creationRates[r] = 0.0;
+  }
+  chemistry_->computeProgressRate(ns, kfwd, kC, progressRates);
+  chemistry_->computeCreationRate(progressRates, creationRates);
+
+  // add species creation rates
+  for (int sp = 0; sp < numActiveSpecies_; sp++) {
+    srcTerm[2 + nvel + sp] += creationRates[sp];
+  }
+
+  // Terms required for EM-coupling.
+  double Jd[gpudata::MAXDIM];  // diffusion current.
+  for (int v = 0; v < nvel; v++) Jd[v] = 0.0;
+  if (ambipolar_) {  // diffusion current using electric conductivity.
+    // const double mho = globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY);
+    // Jd = mho * Efield
+
+  } else {  // diffusion current by definition.
+    for (int sp = 0; sp < numSpecies_; sp++) {
+      for (int d = 0; d < nvel; d++)
+        Jd[d] += diffusionVelocity[sp + d * numSpecies_] * ns[sp] * MOLARELECTRONCHARGE *
+                 mixture_->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+    }
+  }
+
+  // TODO(kevin): may move axisymmetric source terms to here.
+
+  // TODO(kevin): energy sink for radiative reaction.
+
+  if (twoTemperature_) {
+    // energy sink from electron-impact reactions.
+    for (int r = 0; r < numReactions_; r++) {
+      if (chemistry_->isElectronInvolvedAt(r))
+        srcTerm[num_equation - 1] -= chemistry_->getReactionEnergy(r) * progressRates[r];
+    }
+
+    // work by electron pressure
+    // const double pe = mixture_->computeElectronPressure(ns(numSpecies_ - 2), Te);
+    // for (int d = 0; d < dim; d++) srcTerm(num_equation - 1) -= pe * gradUpn(d + 1, d);
+    double gradPe[gpudata::MAXDIM];
+    mixture_->computeElectronPressureGrad(ns[numSpecies_ - 2], Te, gradUpn, gradPe);
+    for (int d = 0; d < dim; d++) srcTerm[num_equation - 1] += gradPe[d] * upn[d + 1];
+
+    // energy transfer by elastic momentum transfer
+    const double me = mixture_->GetGasParams(numSpecies_ - 2, GasParams::SPECIES_MW);
+    const double ne = ns[numSpecies_ - 2];
+    for (int sp = 0; sp < numSpecies_; sp++) {
+      if (sp == numSpecies_ - 2) continue;
+
+      double m_sp = mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+      // kB is converted to R, as number densities are provided in mol.
+      double energy = 1.5 * UNIVERSALGASCONSTANT * (Te - Th);
+      // TODO(kevin): diffusion-driven term is often neglected.
+      // Let's neglect this now and add it later if more refined physics is needed.
+      // for (int d = 0; d < dim; d++) {
+      //   energy += 0.5 * (m_sp - me) * diffusionVelocity(sp, d) * diffusionVelocity(numSpecies_, d);
+      // }
+      energy *= 2.0 * me * m_sp / (m_sp + me) / (m_sp + me) * ne * speciesTransport(sp, SpeciesTrns::MF_FREQUENCY);
+
+      srcTerm[num_equation - 1] -= energy;
+    }
+
+    // TODO(kevin): work by electron diffusion - rho_e V_e * Du/Dt
+  }
+}
+
+void SourceTerm::updateTerms_gpu(mfem::Vector &in) {
+  const double *h_Up = Up_->Read();
+  const double *h_U = U_->Read();
+  const double *h_gradUp = gradUp_->Read();
+  double *h_in = in.ReadWrite();
+
+  const int nnodes = vfes->GetNDofs();
+
+  MFEM_FORALL(n, nnodes, {
+    double upn[gpudata::MAXEQUATIONS];
+    double Un[gpudata::MAXEQUATIONS];
+    double gradUpn[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
+    double srcTerm[gpudata::MAXEQUATIONS];
+
+    for (int eq = 0; eq < num_equation; eq++) {
+      upn[eq] = h_Up[n + eq * nnodes];
+      Un[eq] = h_U[n + eq * nnodes];
+      for (int d = 0; d < dim; d++) gradUpn[eq + d * num_equation] = h_gradUp[n + eq * nnodes + d * num_equation * nnodes];
+    }
+    // TODO(kevin): update E-field with EM coupling.
+    // E-field can have azimuthal component.
+    double Efield[gpudata::MAXDIM];
+    for (int v = 0; v < nvel; v++) Efield[v] = 0.0;
+
+    updateTermAtNode(Un, upn, gradUpn, Efield, srcTerm);
+
+    // add source term to buffer
+    for (int eq = 0; eq < num_equation; eq++) {
+      h_in[n + eq * nnodes] += srcTerm[eq];
+    }
+  });
 }

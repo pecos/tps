@@ -88,9 +88,10 @@ class SourceTerm : public ForcingTerms {
   // Terms do not need updating
   virtual void updateTerms(Vector &in);
 
+  MFEM_HOST_DEVICE void updateTermAtNode(const double *Un, const double *upn, const double *gradUpn, const double *Efield, double *srcTerm);
   // GPU functions
 #ifdef _GPU_
-
+  void updateTerms_gpu(Vector &in);
 #endif
 };
 
