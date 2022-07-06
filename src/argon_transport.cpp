@@ -1132,9 +1132,9 @@ void ArgonMixtureTransport::ComputeFluxTransportProperties(const Vector &state, 
   // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
-MFEM_HOST_DEVICE virtual void ArgonMixtureTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                                                    const double *Efield, double *transportBuffer,
-                                                                                    double *diffusionVelocity) {
+MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,
+                                                                            const double *Efield, double *transportBuffer,
+                                                                            double *diffusionVelocity) {
   for (int p = 0; p < FluxTrns::NUM_FLUX_TRANS; p++) transportBuffer[p] = 0.0;
 
   double primitiveState[gpudata::MAXEQUATIONS];
@@ -1172,7 +1172,7 @@ MFEM_HOST_DEVICE virtual void ArgonMixtureTransport::ComputeFluxTransportPropert
   }
 
   double binaryDiff[gpudata::MAXSPECIES * gpudata::MAXSPECIES];
-  binaryDiff = 0.0;
+  // binaryDiff = 0.0;
   for (int spI = 0; spI < numSpecies - 1; spI++) {
     for (int spJ = spI + 1; spJ < numSpecies; spJ++) {
       double temp = ((spI == electronIndex_) || (spJ == electronIndex_)) ? collInputs.Te : collInputs.Th;
