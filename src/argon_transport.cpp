@@ -169,7 +169,7 @@ MFEM_HOST_DEVICE ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixtu
   thirdOrderkElectron_ = inputs.thirdOrderkElectron;
 }
 
-ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture) : TransportProperties(_mixture) {}
+MFEM_HOST_DEVICE ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture) : TransportProperties(_mixture) {}
 
 // void ArgonMinimalTransport::computeEffectiveMass(const Vector &mw, DenseSymmetricMatrix &muw) {
 MFEM_HOST_DEVICE void ArgonMinimalTransport::computeEffectiveMass(const double *mw, double *muw) {
