@@ -1259,7 +1259,7 @@ double PerfectMixture::computePressureDerivativeFromConservatives(const Vector &
   return pressureGradient;
 }
 
-MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesMixtureCV(const double *n_sp, const double n_B) {
+MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesMixtureCV(const double *n_sp, const double n_B) const {
   double mixtureCV = 0.0;
 
   for (int sp = 0; sp < numActiveSpecies; sp++) {
@@ -1271,7 +1271,7 @@ MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesMixtureCV(const double *n_
   return mixtureCV;
 }
 
-MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesMixtureHeatRatio(const double *n_sp, const double n_B) {
+MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesMixtureHeatRatio(const double *n_sp, const double n_B) const {
   double mixtureCV = computeHeaviesMixtureCV(n_sp, n_B);
   double n_h = n_B;
   for (int sp = 0; sp < numActiveSpecies; sp++) {
@@ -1283,7 +1283,7 @@ MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesMixtureHeatRatio(const dou
 }
 
 MFEM_HOST_DEVICE double PerfectMixture::computeSpeedOfSoundBase(const double *n_sp, const double n_B, const double rho,
-                                                                const double p) {
+                                                                const double p) const {
   double gamma = computeHeaviesMixtureHeatRatio(n_sp, n_B);
 
   return sqrt(gamma * p / rho);
@@ -1307,7 +1307,7 @@ double PerfectMixture::ComputeMaxCharSpeed(const Vector &state) {
   return ComputeMaxCharSpeed(&state[0]);
 }
 
-MFEM_HOST_DEVICE double PerfectMixture::ComputeMaxCharSpeed(const double *state) {
+MFEM_HOST_DEVICE double PerfectMixture::ComputeMaxCharSpeed(const double *state) const {
   const double den = state[0];
   // const double den_vel(state.GetData() + 1, nvel_);
 
@@ -1353,7 +1353,7 @@ double PerfectMixture::ComputeSpeedOfSound(const mfem::Vector &Uin, bool primiti
   return ComputeSpeedOfSound(&Uin[0], primitive);
 }
 
-MFEM_HOST_DEVICE double PerfectMixture::ComputeSpeedOfSound(const double *Uin, bool primitive) {
+MFEM_HOST_DEVICE double PerfectMixture::ComputeSpeedOfSound(const double *Uin, bool primitive) const {
   if (primitive) {
     double n_e = 0.0;
     if (ambipolar) {

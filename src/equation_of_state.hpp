@@ -682,15 +682,15 @@ class PerfectMixture : public GasMixture {
 
   // Compute the maximum characteristic speed.
   virtual double ComputeMaxCharSpeed(const Vector &state);
-  MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeed(const double *state);
+  MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeed(const double *state) const;
 
   virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true);
-  MFEM_HOST_DEVICE virtual double ComputeSpeedOfSound(const double *Uin, bool primitive = true);
+  MFEM_HOST_DEVICE virtual double ComputeSpeedOfSound(const double *Uin, bool primitive = true) const;
   MFEM_HOST_DEVICE double computeSpeedOfSoundBase(const double *n_sp, const double n_B, const double rho,
-                                                  const double p);
+                                                  const double p) const;
 
-  MFEM_HOST_DEVICE double computeHeaviesMixtureCV(const double *n_sp, const double n_B);
-  MFEM_HOST_DEVICE double computeHeaviesMixtureHeatRatio(const double *n_sp, const double n_B);
+  MFEM_HOST_DEVICE double computeHeaviesMixtureCV(const double *n_sp, const double n_B) const;
+  MFEM_HOST_DEVICE double computeHeaviesMixtureHeatRatio(const double *n_sp, const double n_B) const;
 
   virtual void ComputeMassFractionGradient(const double rho, const Vector &numberDensities, const DenseMatrix &gradUp,
                                            DenseMatrix &massFractionGrad);
