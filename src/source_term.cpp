@@ -192,7 +192,7 @@ MFEM_HOST_DEVICE void SourceTerm::updateTermAtNode(const double *Un, const doubl
   double diffusionVelocity[gpudata::MAXSPECIES * gpudata::MAXDIM];
   for (int v = 0; v < nvel; v++) for (int sp = 0; sp < numSpecies_; sp++) diffusionVelocity[sp + v * numSpecies_] = 0.0;
   double ns[gpudata::MAXSPECIES];
-  transport_->ComputeSourceTransportProperties(Un, upn, gradUpn, globalTransport, Efield, speciesTransport,
+  transport_->ComputeSourceTransportProperties(Un, upn, gradUpn, Efield, globalTransport, speciesTransport,
                                                diffusionVelocity, ns);
 
   for (int eq = 0; eq < num_equation; eq++) srcTerm[eq] = 0.0;
@@ -270,7 +270,7 @@ MFEM_HOST_DEVICE void SourceTerm::updateTermAtNode(const double *Un, const doubl
       // for (int d = 0; d < dim; d++) {
       //   energy += 0.5 * (m_sp - me) * diffusionVelocity(sp, d) * diffusionVelocity(numSpecies_, d);
       // }
-      energy *= 2.0 * me * m_sp / (m_sp + me) / (m_sp + me) * ne * speciesTransport(sp, SpeciesTrns::MF_FREQUENCY);
+      energy *= 2.0 * me * m_sp / (m_sp + me) / (m_sp + me) * ne * speciesTransport[sp + SpeciesTrns::MF_FREQUENCY * numSpecies_];
 
       srcTerm[num_equation - 1] -= energy;
     }
