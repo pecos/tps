@@ -178,7 +178,7 @@ class ArgonMixtureTransport : public ArgonMinimalTransport {
 
   MFEM_HOST_DEVICE virtual ~ArgonMixtureTransport() {}
 
-  double collisionIntegral(const int _spI, const int _spJ, const int l, const int r, const collisionInputs collInputs);
+  MFEM_HOST_DEVICE double collisionIntegral(const int _spI, const int _spJ, const int l, const int r, const collisionInputs collInputs);
 
   // Currently, transport properties are evaluated in flux and source term separately.
   // Flux does not take primitive variables as input, rather evaluate them whenever needed.

@@ -887,8 +887,8 @@ MFEM_HOST_DEVICE ArgonMixtureTransport::ArgonMixtureTransport(GasMixture *_mixtu
       collisionIndex_[spI + spJ * numSpecies] = inputs.collisionIndex[spI + spJ * numSpecies];
 }
 
-double ArgonMixtureTransport::collisionIntegral(const int _spI, const int _spJ, const int l, const int r,
-                                                const collisionInputs collInputs) {
+MFEM_HOST_DEVICE double ArgonMixtureTransport::collisionIntegral(const int _spI, const int _spJ, const int l, const int r,
+                                                                 const collisionInputs collInputs) {
   const int spI = (_spI > _spJ) ? _spJ : _spI;
   const int spJ = (_spI > _spJ) ? _spI : _spJ;
 
@@ -920,11 +920,9 @@ double ArgonMixtureTransport::collisionIntegral(const int _spI, const int _spJ, 
             return collInputs.debyeCircle * collision::charged::att15(temp);
             break;
           default:
-            grvy_printf(GRVY_ERROR,
-                        "(%d, %d)-collision integral for attractive Coulomb potential is not supported in "
-                        "ArgonMixtureTransport! \n",
-                        l, r);
-            exit(-1);
+            printf("(%d, %d)-collision integral for attractive Coulomb potential is not supported in "
+                   "ArgonMixtureTransport! \n", l, r);
+            assert(false);
             break;
         }
       } else if (l == 2) {
@@ -939,11 +937,9 @@ double ArgonMixtureTransport::collisionIntegral(const int _spI, const int _spJ, 
             return collInputs.debyeCircle * collision::charged::att24(temp);
             break;
           default:
-            grvy_printf(GRVY_ERROR,
-                        "(%d, %d)-collision integral for attractive Coulomb potential is not supported in "
-                        "ArgonMixtureTransport! \n",
-                        l, r);
-            exit(-1);
+            printf("(%d, %d)-collision integral for attractive Coulomb potential is not supported in "
+                   "ArgonMixtureTransport! \n", l, r);
+            assert(false);
             break;
         }
       }
@@ -967,11 +963,9 @@ double ArgonMixtureTransport::collisionIntegral(const int _spI, const int _spJ, 
             return collInputs.debyeCircle * collision::charged::rep15(temp);
             break;
           default:
-            grvy_printf(GRVY_ERROR,
-                        "(%d, %d)-collision integral for repulsive Coulomb potential is not supported in "
-                        "ArgonMixtureTransport! \n",
-                        l, r);
-            exit(-1);
+            printf("(%d, %d)-collision integral for repulsive Coulomb potential is not supported in "
+                   "ArgonMixtureTransport! \n", l, r);
+            assert(false);
             break;
         }
       } else if (l == 2) {
@@ -986,11 +980,9 @@ double ArgonMixtureTransport::collisionIntegral(const int _spI, const int _spJ, 
             return collInputs.debyeCircle * collision::charged::rep24(temp);
             break;
           default:
-            grvy_printf(GRVY_ERROR,
-                        "(%d, %d)-collision integral for repulsive Coulomb potential is not supported in "
-                        "ArgonMixtureTransport! \n",
-                        l, r);
-            exit(-1);
+            printf("(%d, %d)-collision integral for repulsive Coulomb potential is not supported in "
+                   "ArgonMixtureTransport! \n", l, r);
+            assert(false);
             break;
         }
       }
@@ -999,10 +991,8 @@ double ArgonMixtureTransport::collisionIntegral(const int _spI, const int _spJ, 
       if ((l == 1) && (r == 1)) {
         return collision::argon::ArAr1P11(temp);
       } else {
-        grvy_printf(GRVY_ERROR,
-                    "(%d, %d)-collision integral for Ar-Ar.1+ pair is not supported in ArgonMixtureTransport! \n", l,
-                    r);
-        exit(-1);
+        printf("(%d, %d)-collision integral for Ar-Ar.1+ pair is not supported in ArgonMixtureTransport! \n", l, r);
+        assert(false);
       }
     } break;
     case AR_E: {
@@ -1024,17 +1014,14 @@ double ArgonMixtureTransport::collisionIntegral(const int _spI, const int _spJ, 
             return collision::argon::eAr15(temp);
             break;
           default:
-            grvy_printf(GRVY_ERROR,
-                        "(%d, %d)-collision integral for repulsive Coulomb potential is not supported in "
-                        "ArgonMixtureTransport! \n",
-                        l, r);
-            exit(-1);
+            printf("(%d, %d)-collision integral for repulsive Coulomb potential is not supported in "
+                   "ArgonMixtureTransport! \n", l, r);
+            assert(false);
             break;
         }
       } else {
-        grvy_printf(GRVY_ERROR,
-                    "(%d, %d)-collision integral for Ar-E pair is not supported in ArgonMixtureTransport! \n", l, r);
-        exit(-1);
+        printf("(%d, %d)-collision integral for Ar-E pair is not supported in ArgonMixtureTransport! \n", l, r);
+        assert(false);
       }
     } break;
     case AR_AR: {
@@ -1043,9 +1030,8 @@ double ArgonMixtureTransport::collisionIntegral(const int _spI, const int _spJ, 
       } else if ((l == 2) && (r == 2)) {
         return collision::argon::ArAr22(temp);
       } else {
-        grvy_printf(GRVY_ERROR,
-                    "(%d, %d)-collision integral for Ar-Ar pair is not supported in ArgonMixtureTransport! \n", l, r);
-        exit(-1);
+        printf("(%d, %d)-collision integral for Ar-Ar pair is not supported in ArgonMixtureTransport! \n", l, r);
+        assert(false);
       }
     } break;
     default:
