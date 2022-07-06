@@ -1044,92 +1044,94 @@ void ArgonMixtureTransport::ComputeFluxTransportProperties(const Vector &state, 
                                                            const Vector &Efield, Vector &transportBuffer,
                                                            DenseMatrix &diffusionVelocity) {
   transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
-  transportBuffer = 0.0;
-
-  Vector primitiveState(num_equation);
-  mixture->GetPrimitivesFromConservatives(state, primitiveState);
-
-  Vector n_sp(numSpecies), X_sp(numSpecies), Y_sp(numSpecies);
-  mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
-  double nTotal = 0.0;
-  for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
-
-  collisionInputs collInputs = computeCollisionInputs(primitiveState, n_sp);
-
-  Vector speciesViscosity(numSpecies), speciesHvyThrmCnd(numSpecies);
-  for (int sp = 0; sp < numSpecies; sp++) {
-    if (sp == electronIndex_) {
-      speciesViscosity(sp) = 0.0;
-      speciesHvyThrmCnd(sp) = 0.0;
-      continue;
-    }
-    speciesViscosity(sp) =
-        viscosityFactor_ * sqrt(mw_[sp] * collInputs.Th) / collisionIntegral(sp, sp, 2, 2, collInputs);
-    speciesHvyThrmCnd(sp) = speciesViscosity(sp) * kOverEtaFactor_ / mw_[sp];
-  }
-  transportBuffer[FluxTrns::VISCOSITY] = linearAverage(X_sp, speciesViscosity);
-  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = linearAverage(X_sp, speciesHvyThrmCnd);
-  transportBuffer[FluxTrns::BULK_VISCOSITY] = 0.0;
-
-  if (thirdOrderkElectron_) {
-    transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
-        computeThirdOrderElectronThermalConductivity(&X_sp[0], collInputs);
-  } else {
-    transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
-        viscosityFactor_ * kOverEtaFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) * X_sp(electronIndex_) /
-        collisionIntegral(electronIndex_, electronIndex_, 2, 2, collInputs);
-  }
-
-  DenseMatrix binaryDiff(numSpecies);
-  binaryDiff = 0.0;
-  for (int spI = 0; spI < numSpecies - 1; spI++) {
-    for (int spJ = spI + 1; spJ < numSpecies; spJ++) {
-      double temp = ((spI == electronIndex_) || (spJ == electronIndex_)) ? collInputs.Te : collInputs.Th;
-      binaryDiff(spI, spJ) =
-          diffusivityFactor_ * sqrt(temp / getMuw(spI, spJ)) / nTotal / collisionIntegral(spI, spJ, 1, 1, collInputs);
-      binaryDiff(spJ, spI) = binaryDiff(spI, spJ);
-    }
-  }
-
-  Vector diffusivity(numSpecies), mobility(numSpecies);
-  CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
-
-  for (int sp = 0; sp < numSpecies; sp++) {
-    double temp = (sp == electronIndex_) ? collInputs.Te : collInputs.Th;
-    mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity(sp);
-  }
-
-  DenseMatrix gradX(numSpecies, dim);
-  mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
-
-  // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
   diffusionVelocity.SetSize(numSpecies, nvel_);
-  diffusionVelocity = 0.0;
-  for (int sp = 0; sp < numSpecies; sp++) {
-    // concentration-driven diffusion only determines the first dim-components.
-    for (int d = 0; d < dim; d++) {
-      double DgradX = diffusivity(sp) * gradX(sp, d);
-      // NOTE: we'll have to handle small X case.
-      diffusionVelocity(sp, d) = -DgradX / (X_sp(sp) + Xeps_);
-    }
-  }
-
-  if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
-
-  addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
-
-  correctMassDiffusionFlux(Y_sp, diffusionVelocity);
-
-  double charSpeed = 0.0;
-  for (int sp = 0; sp < numActiveSpecies; sp++) {
-    double speciesSpeed = 0.0;
-    // azimuthal component does not participate in flux.
-    for (int d = 0; d < dim; d++) speciesSpeed += diffusionVelocity(sp, d) * diffusionVelocity(sp, d);
-    speciesSpeed = sqrt(speciesSpeed);
-    if (speciesSpeed > charSpeed) charSpeed = speciesSpeed;
-    // charSpeed = max(charSpeed, speciesSpeed);
-  }
-  // std::cout << "max diff. vel: " << charSpeed << std::endl;
+  ComputeFluxTransportProperties(&state[0], gradUp.Read(), &Efield[0], &transportBuffer[0], diffusionVelocity.Write());
+  // transportBuffer = 0.0;
+  //
+  // Vector primitiveState(num_equation);
+  // mixture->GetPrimitivesFromConservatives(state, primitiveState);
+  //
+  // Vector n_sp(numSpecies), X_sp(numSpecies), Y_sp(numSpecies);
+  // mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
+  // double nTotal = 0.0;
+  // for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
+  //
+  // collisionInputs collInputs = computeCollisionInputs(primitiveState, n_sp);
+  //
+  // Vector speciesViscosity(numSpecies), speciesHvyThrmCnd(numSpecies);
+  // for (int sp = 0; sp < numSpecies; sp++) {
+  //   if (sp == electronIndex_) {
+  //     speciesViscosity(sp) = 0.0;
+  //     speciesHvyThrmCnd(sp) = 0.0;
+  //     continue;
+  //   }
+  //   speciesViscosity(sp) =
+  //       viscosityFactor_ * sqrt(mw_[sp] * collInputs.Th) / collisionIntegral(sp, sp, 2, 2, collInputs);
+  //   speciesHvyThrmCnd(sp) = speciesViscosity(sp) * kOverEtaFactor_ / mw_[sp];
+  // }
+  // transportBuffer[FluxTrns::VISCOSITY] = linearAverage(X_sp, speciesViscosity);
+  // transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = linearAverage(X_sp, speciesHvyThrmCnd);
+  // transportBuffer[FluxTrns::BULK_VISCOSITY] = 0.0;
+  //
+  // if (thirdOrderkElectron_) {
+  //   transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
+  //       computeThirdOrderElectronThermalConductivity(&X_sp[0], collInputs);
+  // } else {
+  //   transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
+  //       viscosityFactor_ * kOverEtaFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) * X_sp(electronIndex_) /
+  //       collisionIntegral(electronIndex_, electronIndex_, 2, 2, collInputs);
+  // }
+  //
+  // DenseMatrix binaryDiff(numSpecies);
+  // binaryDiff = 0.0;
+  // for (int spI = 0; spI < numSpecies - 1; spI++) {
+  //   for (int spJ = spI + 1; spJ < numSpecies; spJ++) {
+  //     double temp = ((spI == electronIndex_) || (spJ == electronIndex_)) ? collInputs.Te : collInputs.Th;
+  //     binaryDiff(spI, spJ) =
+  //         diffusivityFactor_ * sqrt(temp / getMuw(spI, spJ)) / nTotal / collisionIntegral(spI, spJ, 1, 1, collInputs);
+  //     binaryDiff(spJ, spI) = binaryDiff(spI, spJ);
+  //   }
+  // }
+  //
+  // Vector diffusivity(numSpecies), mobility(numSpecies);
+  // CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
+  //
+  // for (int sp = 0; sp < numSpecies; sp++) {
+  //   double temp = (sp == electronIndex_) ? collInputs.Te : collInputs.Th;
+  //   mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity(sp);
+  // }
+  //
+  // DenseMatrix gradX(numSpecies, dim);
+  // mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
+  //
+  // // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
+  // diffusionVelocity.SetSize(numSpecies, nvel_);
+  // diffusionVelocity = 0.0;
+  // for (int sp = 0; sp < numSpecies; sp++) {
+  //   // concentration-driven diffusion only determines the first dim-components.
+  //   for (int d = 0; d < dim; d++) {
+  //     double DgradX = diffusivity(sp) * gradX(sp, d);
+  //     // NOTE: we'll have to handle small X case.
+  //     diffusionVelocity(sp, d) = -DgradX / (X_sp(sp) + Xeps_);
+  //   }
+  // }
+  //
+  // if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
+  //
+  // addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
+  //
+  // correctMassDiffusionFlux(Y_sp, diffusionVelocity);
+  //
+  // double charSpeed = 0.0;
+  // for (int sp = 0; sp < numActiveSpecies; sp++) {
+  //   double speciesSpeed = 0.0;
+  //   // azimuthal component does not participate in flux.
+  //   for (int d = 0; d < dim; d++) speciesSpeed += diffusionVelocity(sp, d) * diffusionVelocity(sp, d);
+  //   speciesSpeed = sqrt(speciesSpeed);
+  //   if (speciesSpeed > charSpeed) charSpeed = speciesSpeed;
+  //   // charSpeed = max(charSpeed, speciesSpeed);
+  // }
+  // // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
 MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,
@@ -1251,52 +1253,134 @@ void ArgonMixtureTransport::ComputeSourceTransportProperties(const Vector &state
                                                              Vector &globalTransport, DenseMatrix &speciesTransport,
                                                              DenseMatrix &diffusionVelocity, Vector &n_sp) {
   globalTransport.SetSize(SrcTrns::NUM_SRC_TRANS);
-  globalTransport = 0.0;
   speciesTransport.SetSize(numSpecies, SpeciesTrns::NUM_SPECIES_COEFFS);
-  speciesTransport = 0.0;
-
+  diffusionVelocity.SetSize(numSpecies, nvel_);
   n_sp.SetSize(numSpecies);
-  Vector X_sp(numSpecies), Y_sp(numSpecies);
+  ComputeSourceTransportProperties(&state[0], &Up[0], gradUp.Read(), &Efield[0], &globalTransport[0], speciesTransport.Write(), diffusionVelocity.Write(), &n_sp[0]);
+  // globalTransport = 0.0;
+  // speciesTransport.SetSize(numSpecies, SpeciesTrns::NUM_SPECIES_COEFFS);
+  // speciesTransport = 0.0;
+  //
+  // n_sp.SetSize(numSpecies);
+  // Vector X_sp(numSpecies), Y_sp(numSpecies);
+  // mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
+  // double nTotal = 0.0;
+  // for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
+  //
+  // collisionInputs collInputs = computeCollisionInputs(Up, n_sp);
+  //
+  // DenseMatrix binaryDiff(numSpecies);
+  // binaryDiff = 0.0;
+  // for (int spI = 0; spI < numSpecies - 1; spI++) {
+  //   for (int spJ = spI + 1; spJ < numSpecies; spJ++) {
+  //     double temp = ((spI == electronIndex_) || (spJ == electronIndex_)) ? collInputs.Te : collInputs.Th;
+  //
+  //     binaryDiff(spI, spJ) =
+  //         diffusivityFactor_ * sqrt(temp / getMuw(spI, spJ)) / nTotal / collisionIntegral(spI, spJ, 1, 1, collInputs);
+  //     binaryDiff(spJ, spI) = binaryDiff(spI, spJ);
+  //   }
+  // }
+  //
+  // Vector diffusivity(3), mobility(3);
+  // CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
+  //
+  // for (int sp = 0; sp < numSpecies; sp++) {
+  //   double temp = (sp == electronIndex_) ? collInputs.Te : collInputs.Th;
+  //   mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity(sp);
+  // }
+  // globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY) =
+  //     computeMixtureElectricConductivity(mobility, n_sp) * MOLARELECTRONCHARGE;
+  //
+  // DenseMatrix gradX(numSpecies, dim);
+  // mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
+  //
+  // // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
+  // diffusionVelocity.SetSize(numSpecies, nvel_);
+  // diffusionVelocity = 0.0;
+  // for (int sp = 0; sp < numSpecies; sp++) {
+  //   // concentration-driven diffusion only determines the first dim-components.
+  //   for (int d = 0; d < dim; d++) {
+  //     double DgradX = diffusivity(sp) * gradX(sp, d);
+  //     // NOTE: we'll have to handle small X case.
+  //     diffusionVelocity(sp, d) = -DgradX / (X_sp(sp) + Xeps_);
+  //   }
+  // }
+  //
+  // if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
+  //
+  // addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
+  //
+  // correctMassDiffusionFlux(Y_sp, diffusionVelocity);
+  //
+  // // NOTE(kevin): collision integrals could be reused from diffusivities.. but not done that way at this point.
+  // for (int sp = 0; sp < numSpecies; sp++) {
+  //   if (sp == electronIndex_) continue;
+  //   speciesTransport(sp, SpeciesTrns::MF_FREQUENCY) = mfFreqFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) *
+  //                                                     n_sp(sp) *
+  //                                                     collisionIntegral(sp, electronIndex_, 1, 1, collInputs);
+  // }
+  //
+  // double charSpeed = 0.0;
+  // for (int sp = 0; sp < numActiveSpecies; sp++) {
+  //   double speciesSpeed = 0.0;
+  //   // azimuthal component does not participate in flux.
+  //   for (int d = 0; d < dim; d++) speciesSpeed += diffusionVelocity(sp, d) * diffusionVelocity(sp, d);
+  //   speciesSpeed = sqrt(speciesSpeed);
+  //   if (speciesSpeed > charSpeed) charSpeed = speciesSpeed;
+  //   // charSpeed = max(charSpeed, speciesSpeed);
+  // }
+  // // std::cout << "max diff. vel: " << charSpeed << std::endl;
+}
+
+MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeSourceTransportProperties(const double *state, const double *Up,
+                                                                              const double *gradUp, const double *Efield,
+                                                                              double *globalTransport, double *speciesTransport,
+                                                                              double *diffusionVelocity, double *n_sp) {
+  for (int p = 0; p < SrcTrns::NUM_SRC_TRANS; p++) globalTransport[p] = 0.0;
+  for (int p = 0; p < SpeciesTrns::NUM_SPECIES_COEFFS; p++)
+    for (int sp = 0; sp < numSpecies; sp++) speciesTransport[sp + p * numSpecies] = 0.0;
+
+  for (int sp = 0; sp < numSpecies; sp++) n_sp[sp] = 0.0;
+  double X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES];
   mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
   double nTotal = 0.0;
-  for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
+  for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp[sp];
 
   collisionInputs collInputs = computeCollisionInputs(Up, n_sp);
 
-  DenseMatrix binaryDiff(numSpecies);
-  binaryDiff = 0.0;
+  double binaryDiff[gpudata::MAXSPECIES * gpudata::MAXSPECIES];
+  // binaryDiff = 0.0;
   for (int spI = 0; spI < numSpecies - 1; spI++) {
     for (int spJ = spI + 1; spJ < numSpecies; spJ++) {
       double temp = ((spI == electronIndex_) || (spJ == electronIndex_)) ? collInputs.Te : collInputs.Th;
-
-      binaryDiff(spI, spJ) =
+      binaryDiff[spI + spJ * numSpecies] =
           diffusivityFactor_ * sqrt(temp / getMuw(spI, spJ)) / nTotal / collisionIntegral(spI, spJ, 1, 1, collInputs);
-      binaryDiff(spJ, spI) = binaryDiff(spI, spJ);
+      binaryDiff[spJ + spI * numSpecies] = binaryDiff[spI + spJ * numSpecies];
     }
   }
 
-  Vector diffusivity(3), mobility(3);
+  double diffusivity[gpudata::MAXSPECIES], mobility[gpudata::MAXSPECIES];
   CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
 
   for (int sp = 0; sp < numSpecies; sp++) {
     double temp = (sp == electronIndex_) ? collInputs.Te : collInputs.Th;
-    mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity(sp);
+    mobility[sp] = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity[sp];
   }
   globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY) =
       computeMixtureElectricConductivity(mobility, n_sp) * MOLARELECTRONCHARGE;
 
-  DenseMatrix gradX(numSpecies, dim);
+  double gradX[gpudata::MAXSPECIES * gpudata::MAXDIM];
   mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
 
   // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
-  diffusionVelocity.SetSize(numSpecies, nvel_);
-  diffusionVelocity = 0.0;
+  for (int v = 0; v < nvel_; v++)
+    for (int sp = 0; sp < numSpecies; sp++) diffusionVelocity[sp + v * numSpecies] = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) {
     // concentration-driven diffusion only determines the first dim-components.
     for (int d = 0; d < dim; d++) {
-      double DgradX = diffusivity(sp) * gradX(sp, d);
+      double DgradX = diffusivity[sp] * gradX[sp + d * numSpecies];
       // NOTE: we'll have to handle small X case.
-      diffusionVelocity(sp, d) = -DgradX / (X_sp(sp) + Xeps_);
+      diffusionVelocity[sp + d * numSpecies] = -DgradX / (X_sp[sp] + Xeps_);
     }
   }
 
@@ -1309,8 +1393,8 @@ void ArgonMixtureTransport::ComputeSourceTransportProperties(const Vector &state
   // NOTE(kevin): collision integrals could be reused from diffusivities.. but not done that way at this point.
   for (int sp = 0; sp < numSpecies; sp++) {
     if (sp == electronIndex_) continue;
-    speciesTransport(sp, SpeciesTrns::MF_FREQUENCY) = mfFreqFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) *
-                                                      n_sp(sp) *
+    speciesTransport[sp + SpeciesTrns::MF_FREQUENCY * numSpecies] = mfFreqFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) *
+                                                      n_sp[sp] *
                                                       collisionIntegral(sp, electronIndex_, 1, 1, collInputs);
   }
 
@@ -1318,7 +1402,7 @@ void ArgonMixtureTransport::ComputeSourceTransportProperties(const Vector &state
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     double speciesSpeed = 0.0;
     // azimuthal component does not participate in flux.
-    for (int d = 0; d < dim; d++) speciesSpeed += diffusionVelocity(sp, d) * diffusionVelocity(sp, d);
+    for (int d = 0; d < dim; d++) speciesSpeed += diffusionVelocity[sp + d * numSpecies] * diffusionVelocity[sp + d * numSpecies];
     speciesSpeed = sqrt(speciesSpeed);
     if (speciesSpeed > charSpeed) charSpeed = speciesSpeed;
     // charSpeed = max(charSpeed, speciesSpeed);
