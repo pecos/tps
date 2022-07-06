@@ -1366,7 +1366,7 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeSourceTransportProperties(co
     double temp = (sp == electronIndex_) ? collInputs.Te : collInputs.Th;
     mobility[sp] = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity[sp];
   }
-  globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY) =
+  globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] =
       computeMixtureElectricConductivity(mobility, n_sp) * MOLARELECTRONCHARGE;
 
   double gradX[gpudata::MAXSPECIES * gpudata::MAXDIM];
