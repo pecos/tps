@@ -360,6 +360,8 @@ class M2ulPhyS : public TPS::Solver {
   void parseSpongeZoneInputs();
 
   void packUpGasMixtureInput();
+  void identifySpeciesType(Array<ArgonSpcs> &speciesType);
+  void identifyCollisionType(const Array<ArgonSpcs> &speciesType, ArgonColl *collisionIndex);
 
   void checkSolverOptions() const;
   void projectInitialSolution();

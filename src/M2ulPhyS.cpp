@@ -2295,6 +2295,10 @@ void M2ulPhyS::parseTransportInputs() {
         }
 
         config.argonTransportInput.thirdOrderkElectron = config.thirdOrderkElectron;
+
+        Array<ArgonSpcs> speciesType(config.numSpecies);
+        identifySpeciesType(speciesType);
+        identifyCollisionType(speciesType, config.argonTransportInput.collisionIndex);
       }
     } break;
     case CONSTANT: {
@@ -2805,6 +2809,129 @@ void M2ulPhyS::packUpGasMixtureInput() {
         break;
     }  // switch gasModel
   }    // workFluid == USER_DEFINED
+}
+
+void M2ulPhyS::identifySpeciesType(Array<ArgonSpcs> &speciesType) {
+  speciesType.SetSize(config.numSpecies);
+
+  for (int sp = 0; sp < numSpecies; sp++) {
+    speciesType[sp] = NONE_ARGSPCS;
+
+    Vector spComp(config.numAtoms);
+    config.speciesComposition.GetRow(sp, spComp);
+
+    if (spComp(config.atomMap["Ar"]) == 1.0) {
+      if (spComp(config.atomMap["E"]) == -1.0) {
+        speciesType[sp] = AR1P;
+      } else {
+        bool argonMonomer = true;
+        for (int a = 0; a < config.numAtoms; a++) {
+          if (a == config.atomMap["Ar"]) continue;
+          if (spComp(a) != 0.0) {
+            argonMonomer = false;
+            break;
+          }
+        }
+        if (argonMonomer) {
+          speciesType[sp] = AR;
+        } else {
+          // std::string name = speciesNames_[(*mixtureToInputMap_)[sp]];
+          std::string name = config.speciesNames[sp];
+          grvy_printf(GRVY_ERROR, "The atom composition of species %s is not supported by ArgonMixtureTransport! \n",
+                      name.c_str());
+          exit(-1);
+        }
+      }
+    } else if (spComp(config.atomMap["E"]) == 1.0) {
+      bool electron = true;
+      for (int a = 0; a < config.numAtoms; a++) {
+        if (a == config.atomMap["E"]) continue;
+        if (spComp(a) != 0.0) {
+          electron = false;
+          break;
+        }
+      }
+      if (electron) {
+        speciesType[sp] = ELECTRON;
+      } else {
+        // std::string name = speciesNames_[(*mixtureToInputMap_)[sp]];
+        std::string name = config.speciesNames[sp];
+        grvy_printf(GRVY_ERROR, "The atom composition of species %s is not supported by ArgonMixtureTransport! \n",
+                    name.c_str());
+        exit(-1);
+      }
+    } else {
+      // std::string name = speciesNames_[(*mixtureToInputMap_)[sp]];
+      std::string name = config.speciesNames[sp];
+      grvy_printf(GRVY_ERROR, "The atom composition of species %s is not supported by ArgonMixtureTransport! \n",
+                  name.c_str());
+      exit(-1);
+    }
+  }
+
+  // Check all species are identified.
+  for (int sp = 0; sp < config.numSpecies; sp++) {
+    if (speciesType[sp] == NONE_ARGSPCS) {
+      // std::string name = speciesNames_[(*mixtureToInputMap_)[sp]];
+      std::string name = config.speciesNames[sp];
+      grvy_printf(GRVY_ERROR, "The species %s is not identified in ArgonMixtureTransport! \n", name.c_str());
+      exit(-1);
+    }
+  }
+
+  return;
+}
+
+void M2ulPhyS::identifyCollisionType(const Array<ArgonSpcs> &speciesType, ArgonColl *collisionIndex) {
+  // collisionIndex_.resize(numSpecies);
+  for (int spI = 0; spI < config.numSpecies; spI++) {
+    // collisionIndex_[spI].resize(numSpecies - spI);
+    for (int spJ = spI; spJ < config.numSpecies; spJ++) {
+      // If not initialized, will raise an error.
+      collisionIndex[spI + spJ * config.numSpecies] = NONE_ARGCOLL;
+
+      const double pairType = mixture->GetGasParams(spI, GasParams::SPECIES_CHARGES) *
+                              mixture->GetGasParams(spJ, GasParams::SPECIES_CHARGES);
+      if (pairType > 0.0) {  // Repulsive screened Coulomb potential
+        collisionIndex[spI + spJ * config.numSpecies] = CLMB_REP;
+      } else if (pairType < 0.0) {  // Attractive screened Coulomb potential
+        collisionIndex[spI + spJ * config.numSpecies] = CLMB_ATT;
+      } else {  // determines collision type by species pairs.
+        if ((speciesType[spI] == AR) && (speciesType[spJ] == AR)) {
+          collisionIndex[spI + spJ * config.numSpecies] = AR_AR;
+        } else if (((speciesType[spI] == AR) && (speciesType[spJ] == AR1P)) ||
+                   ((speciesType[spI] == AR1P) && (speciesType[spJ] == AR))) {
+          collisionIndex[spI + spJ * config.numSpecies] = AR_AR1P;
+        } else if (((speciesType[spI] == AR) && (speciesType[spJ] == ELECTRON)) ||
+                   ((speciesType[spI] == ELECTRON) && (speciesType[spJ] == AR))) {
+          collisionIndex[spI + spJ * config.numSpecies] = AR_E;
+        } else {
+          // std::string name1 = speciesNames_[(*mixtureToInputMap_)[spI]];
+          // std::string name2 = speciesNames_[(*mixtureToInputMap_)[spJ]];
+          std::string name1 = config.speciesNames[spI];
+          std::string name2 = config.speciesNames[spJ];
+          grvy_printf(GRVY_ERROR, "%s-%s is not supported in ArgonMixtureTransport! \n", name1.c_str(), name2.c_str());
+          exit(-1);
+        }
+      }
+    }
+  }
+
+  // Check all collision types are initialized.
+  for (int spI = 0; spI < config.numSpecies; spI++) {
+    for (int spJ = spI; spJ < config.numSpecies; spJ++) {
+      if (collisionIndex[spI + spJ * config.numSpecies] == NONE_ARGCOLL) {
+        // std::string name1 = speciesNames_[(*mixtureToInputMap_)[spI]];
+        // std::string name2 = speciesNames_[(*mixtureToInputMap_)[spJ]];
+        std::string name1 = config.speciesNames[spI];
+        std::string name2 = config.speciesNames[spJ];
+        grvy_printf(GRVY_ERROR, "%s-%s is not initialized in ArgonMixtureTransport! \n", name1.c_str(), name2.c_str());
+        exit(-1);
+      }
+    }
+  }
+
+  return;
 }
 
 void M2ulPhyS::checkSolverOptions() const {

@@ -349,6 +349,9 @@ struct ArgonTransportInput {
   int electronIndex;
 
   bool thirdOrderkElectron;
+
+  // ArgonMixtureTransport
+  ArgonColl collisionIndex[gpudata::MAXSPECIES * gpudata::MAXSPECIES];
 };
 
 struct ChemistryInput {
