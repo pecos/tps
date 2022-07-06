@@ -158,21 +158,23 @@ class ArgonMinimalTransport : public TransportProperties {
 
 class ArgonMixtureTransport : public ArgonMinimalTransport {
  private:
-  int numAtoms_;
-  DenseMatrix composition_;
-  std::map<std::string, int> atomMap_;
-  Array<ArgonSpcs> speciesType_;
-  std::vector<std::string> speciesNames_;
+  // int numAtoms_;
+  // DenseMatrix composition_;
+  // std::map<std::string, int> atomMap_;
+  // Array<ArgonSpcs> speciesType_;
+  // std::vector<std::string> speciesNames_;
   // std::map<int, int> *mixtureToInputMap_;
 
   // integer matrix. only upper triangular part will be used.
-  std::vector<std::vector<ArgonColl>> collisionIndex_;
+  // std::vector<std::vector<ArgonColl>> collisionIndex_;
+  ArgonColl collisionIndex_[gpudata::MAXSPECIES * gpudata::MAXSPECIES];
 
-  void identifySpeciesType();
-  void identifyCollisionType();
+  // void identifySpeciesType();
+  // void identifyCollisionType();
 
  public:
   ArgonMixtureTransport(GasMixture *_mixture, RunConfiguration &_runfile);
+  ArgonMixtureTransport(GasMixture *_mixture, const ArgonTransportInput &inputs);
 
   MFEM_HOST_DEVICE virtual ~ArgonMixtureTransport() {}
 
