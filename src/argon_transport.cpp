@@ -837,7 +837,7 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::GetViscosities(const double *conser
 ArgonMixtureTransport::ArgonMixtureTransport(GasMixture *_mixture, RunConfiguration &_runfile)
     : ArgonMixtureTransport(_mixture, _runfile.argonTransportInput) {}
 
-ArgonMixtureTransport::ArgonMixtureTransport(GasMixture *_mixture, const ArgonTransportInput &inputs)
+MFEM_HOST_DEVICE ArgonMixtureTransport::ArgonMixtureTransport(GasMixture *_mixture, const ArgonTransportInput &inputs)
     : ArgonMinimalTransport(_mixture) {
       // numAtoms_(_runfile.numAtoms),
       // atomMap_(_runfile.atomMap),
@@ -851,8 +851,10 @@ ArgonMixtureTransport::ArgonMixtureTransport(GasMixture *_mixture, const ArgonTr
   // }
   electronIndex_ = inputs.electronIndex;
   if (electronIndex_ < 0) {
-    grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
-    exit(ERROR);
+    // grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
+    // exit(ERROR);
+    printf("\nArgon ternary transport requires the species 'E' !\n");
+    assert(false);
   }
 
   // composition_.SetSize(numSpecies, numAtoms_);

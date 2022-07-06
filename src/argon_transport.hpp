@@ -174,7 +174,7 @@ class ArgonMixtureTransport : public ArgonMinimalTransport {
 
  public:
   ArgonMixtureTransport(GasMixture *_mixture, RunConfiguration &_runfile);
-  ArgonMixtureTransport(GasMixture *_mixture, const ArgonTransportInput &inputs);
+  MFEM_HOST_DEVICE ArgonMixtureTransport(GasMixture *_mixture, const ArgonTransportInput &inputs);
 
   MFEM_HOST_DEVICE virtual ~ArgonMixtureTransport() {}
 
