@@ -317,7 +317,14 @@ void M2ulPhyS::initVariables() {
 #endif
           break;
         case ARGON_MIXTURE:
+#if defined(_CUDA_)
+          gpu::instantiateDeviceArgonMixtureTransport<<<1, 1>>>(d_mixture, config.argonTransportInput, d_transport_tmp);
+          cudaMemcpy(&transportPtr, d_transport_tmp, sizeof(TransportProperties *), cudaMemcpyDeviceToHost);
+#elif defined(_HIP_)
+          mfem_error("ArgonMixtureTransport is not supported for HIP!");
+#else
           transportPtr = new ArgonMixtureTransport(mixture, config);
+#endif
           break;
         case CONSTANT:
 #if defined(_CUDA_)

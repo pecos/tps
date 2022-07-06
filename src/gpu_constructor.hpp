@@ -79,6 +79,8 @@ __global__ void instantiateDeviceConstantTransport(GasMixture *mixture, const co
                                                    TransportProperties **trans);
 __global__ void instantiateDeviceArgonMinimalTransport(GasMixture *mixture, const ArgonTransportInput inputs,
                                                        TransportProperties **trans);
+__global__ void instantiateDeviceArgonMixtureTransport(GasMixture *mixture, const ArgonTransportInput inputs,
+                                                       TransportProperties **trans);
 __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
                                         const int _num_equation, const int _dim, bool axisym, Fluxes **f);
 __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
