@@ -279,6 +279,8 @@ MFEM_HOST_DEVICE void SourceTerm::updateTermAtNode(const double *Un, const doubl
   }
 }
 
+#ifdef _GPU_
+
 void SourceTerm::updateTerms_gpu(mfem::Vector &in) {
   const double *h_Up = Up_->Read();
   const double *h_U = U_->Read();
@@ -311,3 +313,5 @@ void SourceTerm::updateTerms_gpu(mfem::Vector &in) {
     }
   });
 }
+
+#endif  // _GPU_
