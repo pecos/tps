@@ -2890,8 +2890,8 @@ void M2ulPhyS::identifyCollisionType(const Array<ArgonSpcs> &speciesType, ArgonC
       // If not initialized, will raise an error.
       collisionIndex[spI + spJ * config.numSpecies] = NONE_ARGCOLL;
 
-      const double pairType = config.gasParams(spI, GasParams::SPECIES_CHARGES) *
-                              config.gasParams(spJ, GasParams::SPECIES_CHARGES);
+      const double pairType =
+          config.gasParams(spI, GasParams::SPECIES_CHARGES) * config.gasParams(spJ, GasParams::SPECIES_CHARGES);
       if (pairType > 0.0) {  // Repulsive screened Coulomb potential
         collisionIndex[spI + spJ * config.numSpecies] = CLMB_REP;
       } else if (pairType < 0.0) {  // Attractive screened Coulomb potential

@@ -839,9 +839,9 @@ ArgonMixtureTransport::ArgonMixtureTransport(GasMixture *_mixture, RunConfigurat
 
 MFEM_HOST_DEVICE ArgonMixtureTransport::ArgonMixtureTransport(GasMixture *_mixture, const ArgonTransportInput &inputs)
     : ArgonMinimalTransport(_mixture) {
-      // numAtoms_(_runfile.numAtoms),
-      // atomMap_(_runfile.atomMap),
-      // speciesNames_(_runfile.speciesNames) {
+  // numAtoms_(_runfile.numAtoms),
+  // atomMap_(_runfile.atomMap),
+  // speciesNames_(_runfile.speciesNames) {
   // std::map<std::string, int> *speciesMapping = mixture->getSpeciesMapping();
   // if (speciesMapping->count("E")) {
   //   electronIndex_ = (*speciesMapping)["E"];
@@ -887,8 +887,8 @@ MFEM_HOST_DEVICE ArgonMixtureTransport::ArgonMixtureTransport(GasMixture *_mixtu
       collisionIndex_[spI + spJ * numSpecies] = inputs.collisionIndex[spI + spJ * numSpecies];
 }
 
-MFEM_HOST_DEVICE double ArgonMixtureTransport::collisionIntegral(const int _spI, const int _spJ, const int l, const int r,
-                                                                 const collisionInputs collInputs) {
+MFEM_HOST_DEVICE double ArgonMixtureTransport::collisionIntegral(const int _spI, const int _spJ, const int l,
+                                                                 const int r, const collisionInputs collInputs) {
   const int spI = (_spI > _spJ) ? _spJ : _spI;
   const int spJ = (_spI > _spJ) ? _spI : _spJ;
 
@@ -920,8 +920,10 @@ MFEM_HOST_DEVICE double ArgonMixtureTransport::collisionIntegral(const int _spI,
             return collInputs.debyeCircle * collision::charged::att15(temp);
             break;
           default:
-            printf("(%d, %d)-collision integral for attractive Coulomb potential is not supported in "
-                   "ArgonMixtureTransport! \n", l, r);
+            printf(
+                "(%d, %d)-collision integral for attractive Coulomb potential is not supported in "
+                "ArgonMixtureTransport! \n",
+                l, r);
             assert(false);
             break;
         }
@@ -937,8 +939,10 @@ MFEM_HOST_DEVICE double ArgonMixtureTransport::collisionIntegral(const int _spI,
             return collInputs.debyeCircle * collision::charged::att24(temp);
             break;
           default:
-            printf("(%d, %d)-collision integral for attractive Coulomb potential is not supported in "
-                   "ArgonMixtureTransport! \n", l, r);
+            printf(
+                "(%d, %d)-collision integral for attractive Coulomb potential is not supported in "
+                "ArgonMixtureTransport! \n",
+                l, r);
             assert(false);
             break;
         }
@@ -963,8 +967,10 @@ MFEM_HOST_DEVICE double ArgonMixtureTransport::collisionIntegral(const int _spI,
             return collInputs.debyeCircle * collision::charged::rep15(temp);
             break;
           default:
-            printf("(%d, %d)-collision integral for repulsive Coulomb potential is not supported in "
-                   "ArgonMixtureTransport! \n", l, r);
+            printf(
+                "(%d, %d)-collision integral for repulsive Coulomb potential is not supported in "
+                "ArgonMixtureTransport! \n",
+                l, r);
             assert(false);
             break;
         }
@@ -980,8 +986,10 @@ MFEM_HOST_DEVICE double ArgonMixtureTransport::collisionIntegral(const int _spI,
             return collInputs.debyeCircle * collision::charged::rep24(temp);
             break;
           default:
-            printf("(%d, %d)-collision integral for repulsive Coulomb potential is not supported in "
-                   "ArgonMixtureTransport! \n", l, r);
+            printf(
+                "(%d, %d)-collision integral for repulsive Coulomb potential is not supported in "
+                "ArgonMixtureTransport! \n",
+                l, r);
             assert(false);
             break;
         }
@@ -1014,8 +1022,10 @@ MFEM_HOST_DEVICE double ArgonMixtureTransport::collisionIntegral(const int _spI,
             return collision::argon::eAr15(temp);
             break;
           default:
-            printf("(%d, %d)-collision integral for repulsive Coulomb potential is not supported in "
-                   "ArgonMixtureTransport! \n", l, r);
+            printf(
+                "(%d, %d)-collision integral for repulsive Coulomb potential is not supported in "
+                "ArgonMixtureTransport! \n",
+                l, r);
             assert(false);
             break;
         }
@@ -1088,7 +1098,8 @@ void ArgonMixtureTransport::ComputeFluxTransportProperties(const Vector &state, 
   //   for (int spJ = spI + 1; spJ < numSpecies; spJ++) {
   //     double temp = ((spI == electronIndex_) || (spJ == electronIndex_)) ? collInputs.Te : collInputs.Th;
   //     binaryDiff(spI, spJ) =
-  //         diffusivityFactor_ * sqrt(temp / getMuw(spI, spJ)) / nTotal / collisionIntegral(spI, spJ, 1, 1, collInputs);
+  //         diffusivityFactor_ * sqrt(temp / getMuw(spI, spJ)) / nTotal / collisionIntegral(spI, spJ, 1, 1,
+  //         collInputs);
   //     binaryDiff(spJ, spI) = binaryDiff(spI, spJ);
   //   }
   // }
@@ -1135,7 +1146,8 @@ void ArgonMixtureTransport::ComputeFluxTransportProperties(const Vector &state, 
 }
 
 MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                                            const double *Efield, double *transportBuffer,
+                                                                            const double *Efield,
+                                                                            double *transportBuffer,
                                                                             double *diffusionVelocity) {
   for (int p = 0; p < FluxTrns::NUM_FLUX_TRANS; p++) transportBuffer[p] = 0.0;
 
@@ -1219,7 +1231,8 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeFluxTransportProperties(cons
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     double speciesSpeed = 0.0;
     // azimuthal component does not participate in flux.
-    for (int d = 0; d < dim; d++) speciesSpeed += diffusionVelocity[sp + d * numSpecies] * diffusionVelocity[sp + d * numSpecies];
+    for (int d = 0; d < dim; d++)
+      speciesSpeed += diffusionVelocity[sp + d * numSpecies] * diffusionVelocity[sp + d * numSpecies];
     speciesSpeed = sqrt(speciesSpeed);
     if (speciesSpeed > charSpeed) charSpeed = speciesSpeed;
     // charSpeed = max(charSpeed, speciesSpeed);
@@ -1227,8 +1240,8 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeFluxTransportProperties(cons
   // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
-MFEM_HOST_DEVICE double ArgonMixtureTransport::computeThirdOrderElectronThermalConductivity(const double *X_sp,
-                                                                                            const collisionInputs &collInputs) {
+MFEM_HOST_DEVICE double ArgonMixtureTransport::computeThirdOrderElectronThermalConductivity(
+    const double *X_sp, const collisionInputs &collInputs) {
   double Q2[3];
   for (int r = 0; r < 3; r++) Q2[r] = collisionIntegral(electronIndex_, electronIndex_, 2, r + 2, collInputs);
 
@@ -1256,7 +1269,8 @@ void ArgonMixtureTransport::ComputeSourceTransportProperties(const Vector &state
   speciesTransport.SetSize(numSpecies, SpeciesTrns::NUM_SPECIES_COEFFS);
   diffusionVelocity.SetSize(numSpecies, nvel_);
   n_sp.SetSize(numSpecies);
-  ComputeSourceTransportProperties(&state[0], &Up[0], gradUp.Read(), &Efield[0], &globalTransport[0], speciesTransport.Write(), diffusionVelocity.Write(), &n_sp[0]);
+  ComputeSourceTransportProperties(&state[0], &Up[0], gradUp.Read(), &Efield[0], &globalTransport[0],
+                                   speciesTransport.Write(), diffusionVelocity.Write(), &n_sp[0]);
   // globalTransport = 0.0;
   // speciesTransport.SetSize(numSpecies, SpeciesTrns::NUM_SPECIES_COEFFS);
   // speciesTransport = 0.0;
@@ -1276,7 +1290,8 @@ void ArgonMixtureTransport::ComputeSourceTransportProperties(const Vector &state
   //     double temp = ((spI == electronIndex_) || (spJ == electronIndex_)) ? collInputs.Te : collInputs.Th;
   //
   //     binaryDiff(spI, spJ) =
-  //         diffusivityFactor_ * sqrt(temp / getMuw(spI, spJ)) / nTotal / collisionIntegral(spI, spJ, 1, 1, collInputs);
+  //         diffusivityFactor_ * sqrt(temp / getMuw(spI, spJ)) / nTotal / collisionIntegral(spI, spJ, 1, 1,
+  //         collInputs);
   //     binaryDiff(spJ, spI) = binaryDiff(spI, spJ);
   //   }
   // }
@@ -1332,10 +1347,9 @@ void ArgonMixtureTransport::ComputeSourceTransportProperties(const Vector &state
   // // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
-MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeSourceTransportProperties(const double *state, const double *Up,
-                                                                              const double *gradUp, const double *Efield,
-                                                                              double *globalTransport, double *speciesTransport,
-                                                                              double *diffusionVelocity, double *n_sp) {
+MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeSourceTransportProperties(
+    const double *state, const double *Up, const double *gradUp, const double *Efield, double *globalTransport,
+    double *speciesTransport, double *diffusionVelocity, double *n_sp) {
   for (int p = 0; p < SrcTrns::NUM_SRC_TRANS; p++) globalTransport[p] = 0.0;
   for (int p = 0; p < SpeciesTrns::NUM_SPECIES_COEFFS; p++)
     for (int sp = 0; sp < numSpecies; sp++) speciesTransport[sp + p * numSpecies] = 0.0;
@@ -1393,16 +1407,17 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeSourceTransportProperties(co
   // NOTE(kevin): collision integrals could be reused from diffusivities.. but not done that way at this point.
   for (int sp = 0; sp < numSpecies; sp++) {
     if (sp == electronIndex_) continue;
-    speciesTransport[sp + SpeciesTrns::MF_FREQUENCY * numSpecies] = mfFreqFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) *
-                                                      n_sp[sp] *
-                                                      collisionIntegral(sp, electronIndex_, 1, 1, collInputs);
+    speciesTransport[sp + SpeciesTrns::MF_FREQUENCY * numSpecies] =
+        mfFreqFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) * n_sp[sp] *
+        collisionIntegral(sp, electronIndex_, 1, 1, collInputs);
   }
 
   double charSpeed = 0.0;
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     double speciesSpeed = 0.0;
     // azimuthal component does not participate in flux.
-    for (int d = 0; d < dim; d++) speciesSpeed += diffusionVelocity[sp + d * numSpecies] * diffusionVelocity[sp + d * numSpecies];
+    for (int d = 0; d < dim; d++)
+      speciesSpeed += diffusionVelocity[sp + d * numSpecies] * diffusionVelocity[sp + d * numSpecies];
     speciesSpeed = sqrt(speciesSpeed);
     if (speciesSpeed > charSpeed) charSpeed = speciesSpeed;
     // charSpeed = max(charSpeed, speciesSpeed);
@@ -1435,8 +1450,8 @@ void ArgonMixtureTransport::GetViscosities(const Vector &conserved, const Vector
   return;
 }
 
-MFEM_HOST_DEVICE void ArgonMixtureTransport::GetViscosities(const double *conserved, const double *primitive, double &visc,
-                                                            double &bulkVisc) {
+MFEM_HOST_DEVICE void ArgonMixtureTransport::GetViscosities(const double *conserved, const double *primitive,
+                                                            double &visc, double &bulkVisc) {
   double n_sp[gpudata::MAXSPECIES], X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES];
   mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
   double nTotal = 0.0;

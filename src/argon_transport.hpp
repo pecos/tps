@@ -178,7 +178,8 @@ class ArgonMixtureTransport : public ArgonMinimalTransport {
 
   MFEM_HOST_DEVICE virtual ~ArgonMixtureTransport() {}
 
-  MFEM_HOST_DEVICE double collisionIntegral(const int _spI, const int _spJ, const int l, const int r, const collisionInputs collInputs);
+  MFEM_HOST_DEVICE double collisionIntegral(const int _spI, const int _spJ, const int l, const int r,
+                                            const collisionInputs collInputs);
 
   // Currently, transport properties are evaluated in flux and source term separately.
   // Flux does not take primitive variables as input, rather evaluate them whenever needed.
@@ -206,9 +207,11 @@ class ArgonMixtureTransport : public ArgonMinimalTransport {
 
   // NOTE(kevin): only for AxisymmetricSource
   virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc);
-  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double &visc, double &bulkVisc);
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double &visc,
+                                       double &bulkVisc);
 
-  MFEM_HOST_DEVICE virtual double computeThirdOrderElectronThermalConductivity(const double *X_sp, const collisionInputs &collInputs);
+  MFEM_HOST_DEVICE virtual double computeThirdOrderElectronThermalConductivity(const double *X_sp,
+                                                                               const collisionInputs &collInputs);
   //
   // virtual void computeMixtureAverageDiffusivity(const Vector &state, Vector &diffusivity);
 };
