@@ -120,7 +120,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   // NOTE: check if this logic is sound
   if (_config.GetWorkingFluid() != WorkingFluid::DRY_AIR) {
     forcing.Append(new SourceTerm(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up, gradUp, gpuArrays,
-                                  _config, mixture, _transport, _chemistry));
+                                  _config, mixture, d_mixture_, _transport, _chemistry));
   }
 #ifdef HAVE_MASA
   if (config_.use_mms_) {

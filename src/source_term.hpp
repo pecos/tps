@@ -74,6 +74,7 @@ class SourceTerm : public ForcingTerms {
   bool twoTemperature_;
 
   GasMixture *mixture_ = NULL;
+  GasMixture *d_mixture_ = NULL;
   TransportProperties *transport_ = NULL;
   Chemistry *chemistry_ = NULL;
 
@@ -81,7 +82,7 @@ class SourceTerm : public ForcingTerms {
   SourceTerm(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
              IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up,
              ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config,
-             GasMixture *mixture, TransportProperties *transport, Chemistry *chemistry);
+             GasMixture *mixture, GasMixture *d_mixture, TransportProperties *transport, Chemistry *chemistry);
   ~SourceTerm();
 
   // Terms do not need updating
