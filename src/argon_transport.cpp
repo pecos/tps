@@ -1412,20 +1412,45 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeSourceTransportProperties(co
 
 void ArgonMixtureTransport::GetViscosities(const Vector &conserved, const Vector &primitive, double &visc,
                                            double &bulkVisc) {
-  Vector n_sp(numSpecies), X_sp(numSpecies), Y_sp(numSpecies);
+  GetViscosities(&conserved[0], &primitive[0], visc, bulkVisc);
+  // Vector n_sp(numSpecies), X_sp(numSpecies), Y_sp(numSpecies);
+  // mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
+  // double nTotal = 0.0;
+  // for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
+  //
+  // collisionInputs collInputs = computeCollisionInputs(primitive, n_sp);
+  //
+  // Vector speciesViscosity(numSpecies);
+  // for (int sp = 0; sp < numSpecies; sp++) {
+  //   if (sp == electronIndex_) {
+  //     speciesViscosity(sp) = 0.0;
+  //     continue;
+  //   }
+  //   speciesViscosity(sp) =
+  //       viscosityFactor_ * sqrt(mw_[sp] * collInputs.Th) / collisionIntegral(sp, sp, 2, 2, collInputs);
+  // }
+  // visc = linearAverage(X_sp, speciesViscosity);
+  // bulkVisc = 0.0;
+
+  return;
+}
+
+MFEM_HOST_DEVICE void ArgonMixtureTransport::GetViscosities(const double *conserved, const double *primitive, double &visc,
+                                                            double &bulkVisc) {
+  double n_sp[gpudata::MAXSPECIES], X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES];
   mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
   double nTotal = 0.0;
-  for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
+  for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp[sp];
 
   collisionInputs collInputs = computeCollisionInputs(primitive, n_sp);
 
-  Vector speciesViscosity(numSpecies);
+  double speciesViscosity[gpudata::MAXSPECIES];
   for (int sp = 0; sp < numSpecies; sp++) {
     if (sp == electronIndex_) {
-      speciesViscosity(sp) = 0.0;
+      speciesViscosity[sp] = 0.0;
       continue;
     }
-    speciesViscosity(sp) =
+    speciesViscosity[sp] =
         viscosityFactor_ * sqrt(mw_[sp] * collInputs.Th) / collisionIntegral(sp, sp, 2, 2, collInputs);
   }
   visc = linearAverage(X_sp, speciesViscosity);

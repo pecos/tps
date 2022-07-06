@@ -206,6 +206,7 @@ class ArgonMixtureTransport : public ArgonMinimalTransport {
 
   // NOTE(kevin): only for AxisymmetricSource
   virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc);
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double &visc, double &bulkVisc);
 
   MFEM_HOST_DEVICE virtual double computeThirdOrderElectronThermalConductivity(const double *X_sp, const collisionInputs &collInputs);
   //
