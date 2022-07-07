@@ -47,6 +47,7 @@ endif
 if CUDA_ENABLED
 TESTS += argon_minimal.binary.test \
 	 diffusion_wall.test \
+	 reaction.test \
 	 inflow_outflow.test
 endif
 

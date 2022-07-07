@@ -12,7 +12,7 @@ setup() {
 @test "[$TEST] Test correct equilibrium is achieved" {
     test -s $RUNFILE
     rm -f $SOLN_FILE
-    ../src/tps -run $RUNFILE
+    ../src/tps -run $RUNFILE &> run.log
     test -s $SOLN_FILE
     test -s $REF_FILE
     ./soln_differ -d 2 $SOLN_FILE $REF_FILE
