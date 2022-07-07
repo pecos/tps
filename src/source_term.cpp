@@ -63,20 +63,25 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
   mfem_error("Source term is not supported on hip path!\n");
   exit(-1);
 #endif
+
+#if defined(_CUDA_)
+  const double *h_Up = Up_->Read();
+  const double *h_U = U_->Read();
+  const double *h_gradUp = gradUp_->Read();
+  double *h_in = in.ReadWrite();
+
+  GasMixture *_mixture = d_mixture_;
+#else
   const double *h_Up = Up_->HostRead();
   const double *h_U = U_->HostRead();
   const double *h_gradUp = gradUp_->HostRead();
   double *h_in = in.HostReadWrite();
 
-  const int nnodes = vfes->GetNDofs();
-
-#if defined(_CUDA_)
-  GasMixture *_mixture = d_mixture_;
-#else
   GasMixture *_mixture = mixture_;
 #endif
   TransportProperties *_transport = transport_;
   Chemistry *_chemistry = chemistry_;
+  const int nnodes = vfes->GetNDofs();
   const int _dim = dim;
   const int _nvel = nvel;
   const int _num_equation = num_equation;
@@ -202,6 +207,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
 
       // TODO(kevin): work by electron diffusion - rho_e V_e * Du/Dt
     }
+
     // Vector globalTransport(numSpecies_);
     // DenseMatrix speciesTransport(numSpecies_, SpeciesTrns::NUM_SPECIES_COEFFS);
     // // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
