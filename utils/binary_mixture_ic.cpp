@@ -54,7 +54,7 @@ int main (int argc, char *argv[])
   ParGridFunction coordinates(&dfes);
   src_fes->GetParMesh()->GetNodes(coordinates);
 
-  double *dataU = src_state->GetData();
+  double *dataU = src_state->HostWrite();
   int NDof = src_fes->GetNDofs();
 
   std::string basepath("utils/binary_initial_condition");
