@@ -98,10 +98,10 @@ class TransportProperties {
                                                 const Vector &Efield, Vector &globalTransport,
                                                 DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
                                                 Vector &n_sp) = 0;
-  MFEM_HOST_DEVICE virtual void ComputeSourceTransportProperties(const double *state, const double *Up, const double *gradUp,
-                                                                 const double *Efield, double *globalTransport,
-                                                                 double *speciesTransport, double *diffusionVelocity,
-                                                                 double *n_sp) = 0;
+  MFEM_HOST_DEVICE virtual void ComputeSourceTransportProperties(const double *state, const double *Up,
+                                                                 const double *gradUp, const double *Efield,
+                                                                 double *globalTransport, double *speciesTransport,
+                                                                 double *diffusionVelocity, double *n_sp) = 0;
   // NOTE: only for AxisymmetricSource
   virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc) = 0;
 
@@ -163,10 +163,10 @@ class DryAirTransport : public TransportProperties {
                                                 const Vector &Efield, Vector &globalTransport,
                                                 DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
                                                 Vector &n_sp) {}
-  MFEM_HOST_DEVICE virtual void ComputeSourceTransportProperties(const double *state, const double *Up, const double *gradUp,
-                                                                 const double *Efield, double *globalTransport,
-                                                                 double *speciesTransport, double *diffusionVelocity,
-                                                                 double *n_sp) {}
+  MFEM_HOST_DEVICE virtual void ComputeSourceTransportProperties(const double *state, const double *Up,
+                                                                 const double *gradUp, const double *Efield,
+                                                                 double *globalTransport, double *speciesTransport,
+                                                                 double *diffusionVelocity, double *n_sp) {}
 
   virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc);
 };

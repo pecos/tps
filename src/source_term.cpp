@@ -36,8 +36,8 @@
 SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                        IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
                        ParGridFunction *_Up, ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
-                       RunConfiguration &_config, GasMixture *mixture, GasMixture *d_mixture, TransportProperties *transport,
-                       Chemistry *chemistry)
+                       RunConfiguration &_config, GasMixture *mixture, GasMixture *d_mixture,
+                       TransportProperties *transport, Chemistry *chemistry)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()),
       mixture_(mixture),
@@ -185,12 +185,14 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
 #endif  // defined(_HIP_)
 }
 
-MFEM_HOST_DEVICE void SourceTerm::updateTermAtNode(const double *Un, const double *upn, const double *gradUpn, const double *Efield, double *srcTerm) {
+MFEM_HOST_DEVICE void SourceTerm::updateTermAtNode(const double *Un, const double *upn, const double *gradUpn,
+                                                   const double *Efield, double *srcTerm) {
   double globalTransport[gpudata::MAXSPECIES];
   double speciesTransport[gpudata::MAXSPECIES * SpeciesTrns::NUM_SPECIES_COEFFS];
   // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
   double diffusionVelocity[gpudata::MAXSPECIES * gpudata::MAXDIM];
-  for (int v = 0; v < nvel; v++) for (int sp = 0; sp < numSpecies_; sp++) diffusionVelocity[sp + v * numSpecies_] = 0.0;
+  for (int v = 0; v < nvel; v++)
+    for (int sp = 0; sp < numSpecies_; sp++) diffusionVelocity[sp + v * numSpecies_] = 0.0;
   double ns[gpudata::MAXSPECIES];
   transport_->ComputeSourceTransportProperties(Un, upn, gradUpn, Efield, globalTransport, speciesTransport,
                                                diffusionVelocity, ns);
@@ -270,7 +272,8 @@ MFEM_HOST_DEVICE void SourceTerm::updateTermAtNode(const double *Un, const doubl
       // for (int d = 0; d < dim; d++) {
       //   energy += 0.5 * (m_sp - me) * diffusionVelocity(sp, d) * diffusionVelocity(numSpecies_, d);
       // }
-      energy *= 2.0 * me * m_sp / (m_sp + me) / (m_sp + me) * ne * speciesTransport[sp + SpeciesTrns::MF_FREQUENCY * numSpecies_];
+      energy *= 2.0 * me * m_sp / (m_sp + me) / (m_sp + me) * ne *
+                speciesTransport[sp + SpeciesTrns::MF_FREQUENCY * numSpecies_];
 
       srcTerm[num_equation - 1] -= energy;
     }
@@ -289,30 +292,28 @@ void SourceTerm::updateTerms_gpu(mfem::Vector &in) {
 
   const int nnodes = vfes->GetNDofs();
 
-//  MFEM_FORALL(n, nnodes, {
-//    double upn[gpudata::MAXEQUATIONS];
-//    double Un[gpudata::MAXEQUATIONS];
-//    double gradUpn[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
-//    double srcTerm[gpudata::MAXEQUATIONS];
-//
-////    for (int eq = 0; eq < num_equation; eq++) {
-////      upn[eq] = h_Up[n + eq * nnodes];
-////      Un[eq] = h_U[n + eq * nnodes];
-////      for (int d = 0; d < dim; d++) gradUpn[eq + d * num_equation] = h_gradUp[n + eq * nnodes + d * num_equation * nnodes];
-////    }
-////    // TODO(kevin): update E-field with EM coupling.
-////    // E-field can have azimuthal component.
-////    double Efield[gpudata::MAXDIM];
-////    for (int v = 0; v < nvel; v++) Efield[v] = 0.0;
-////
-////    updateTermAtNode(Un, upn, gradUpn, Efield, srcTerm);
-//
-//    // add source term to buffer
-//    for (int eq = 0; eq < num_equation; eq++) {
-////      h_in[n + eq * nnodes] += srcTerm[eq];
-//      h_in[n + eq * nnodes] += 0.0;
-//    }
-//  });
+  //  MFEM_FORALL(n, nnodes, {
+  //    double upn[gpudata::MAXEQUATIONS];
+  //    double Un[gpudata::MAXEQUATIONS];
+  //    double gradUpn[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
+  //    double srcTerm[gpudata::MAXEQUATIONS];
+  //
+  ////    for (int eq = 0; eq < num_equation; eq++) {
+  ////      upn[eq] = h_Up[n + eq * nnodes];
+  ////      Un[eq] = h_U[n + eq * nnodes];
+  ////      for (int d = 0; d < dim; d++) gradUpn[eq + d * num_equation] = h_gradUp[n + eq * nnodes + d * num_equation *
+  ///nnodes]; /    } /    // TODO(kevin): update E-field with EM coupling. /    // E-field can have azimuthal component.
+  ////    double Efield[gpudata::MAXDIM];
+  ////    for (int v = 0; v < nvel; v++) Efield[v] = 0.0;
+  ////
+  ////    updateTermAtNode(Un, upn, gradUpn, Efield, srcTerm);
+  //
+  //    // add source term to buffer
+  //    for (int eq = 0; eq < num_equation; eq++) {
+  ////      h_in[n + eq * nnodes] += srcTerm[eq];
+  //      h_in[n + eq * nnodes] += 0.0;
+  //    }
+  //  });
 }
 
 #endif  // _GPU_

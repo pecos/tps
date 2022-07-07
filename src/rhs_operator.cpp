@@ -421,7 +421,7 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
     forcing[i]->updateTerms(y);
   }
 
-//  computeMeanTimeDerivatives(y);
+  //  computeMeanTimeDerivatives(y);
 }
 
 void RHSoperator::copyZk2Z_gpu(Vector &z, Vector &zk, const int eq, const int dof) {
