@@ -87,11 +87,6 @@ class SourceTerm : public ForcingTerms {
 
   // Terms do not need updating
   virtual void updateTerms(Vector &in);
-
-  // GPU functions
-#ifdef _GPU_
-  void updateTerms_gpu(Vector &in);
-#endif
 };
 
 #endif  // SOURCE_TERM_HPP_
