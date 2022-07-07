@@ -20,8 +20,6 @@ endif
 # Possible there is nothing to do
 bin_PROGRAMS =
 
-if !GPU_ENABLED
-
 bin_PROGRAMS += beam_mesh
 beam_mesh_SOURCES  = beam_mesh.cpp
 beam_mesh_LDADD    =
@@ -113,6 +111,8 @@ compute_rhs_LDFLAGS  = $(PYTHON_LIBS) $(MFEM_LIBS)
 if MASA_ENABLED
 compute_rhs_LDFLAGS += $(MASA_LIBS)
 endif
+
+if !GPU_ENABLED
 
 endif # if !GPU_ENABLED
 

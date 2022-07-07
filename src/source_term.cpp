@@ -289,29 +289,30 @@ void SourceTerm::updateTerms_gpu(mfem::Vector &in) {
 
   const int nnodes = vfes->GetNDofs();
 
-  MFEM_FORALL(n, nnodes, {
-    double upn[gpudata::MAXEQUATIONS];
-    double Un[gpudata::MAXEQUATIONS];
-    double gradUpn[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
-    double srcTerm[gpudata::MAXEQUATIONS];
-
-    for (int eq = 0; eq < num_equation; eq++) {
-      upn[eq] = h_Up[n + eq * nnodes];
-      Un[eq] = h_U[n + eq * nnodes];
-      for (int d = 0; d < dim; d++) gradUpn[eq + d * num_equation] = h_gradUp[n + eq * nnodes + d * num_equation * nnodes];
-    }
-    // TODO(kevin): update E-field with EM coupling.
-    // E-field can have azimuthal component.
-    double Efield[gpudata::MAXDIM];
-    for (int v = 0; v < nvel; v++) Efield[v] = 0.0;
-
-    updateTermAtNode(Un, upn, gradUpn, Efield, srcTerm);
-
-    // add source term to buffer
-    for (int eq = 0; eq < num_equation; eq++) {
-      h_in[n + eq * nnodes] += srcTerm[eq];
-    }
-  });
+//  MFEM_FORALL(n, nnodes, {
+//    double upn[gpudata::MAXEQUATIONS];
+//    double Un[gpudata::MAXEQUATIONS];
+//    double gradUpn[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
+//    double srcTerm[gpudata::MAXEQUATIONS];
+//
+////    for (int eq = 0; eq < num_equation; eq++) {
+////      upn[eq] = h_Up[n + eq * nnodes];
+////      Un[eq] = h_U[n + eq * nnodes];
+////      for (int d = 0; d < dim; d++) gradUpn[eq + d * num_equation] = h_gradUp[n + eq * nnodes + d * num_equation * nnodes];
+////    }
+////    // TODO(kevin): update E-field with EM coupling.
+////    // E-field can have azimuthal component.
+////    double Efield[gpudata::MAXDIM];
+////    for (int v = 0; v < nvel; v++) Efield[v] = 0.0;
+////
+////    updateTermAtNode(Un, upn, gradUpn, Efield, srcTerm);
+//
+//    // add source term to buffer
+//    for (int eq = 0; eq < num_equation; eq++) {
+////      h_in[n + eq * nnodes] += srcTerm[eq];
+//      h_in[n + eq * nnodes] += 0.0;
+//    }
+//  });
 }
 
 #endif  // _GPU_

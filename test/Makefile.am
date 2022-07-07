@@ -44,6 +44,12 @@ if PYTHON_ENABLED
 TESTS += cyl3d.gpu.python.test
 endif
 
+if CUDA_ENABLED
+TESTS += argon_minimal.binary.test \
+	 diffusion_wall.test \
+	 inflow_outflow.test
+endif
+
 else
 TESTS += cyl3d.test \
 	 cyl3d.mflow.test \
