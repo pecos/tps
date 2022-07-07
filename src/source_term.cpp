@@ -289,11 +289,11 @@ void SourceTerm::updateTerms_gpu(mfem::Vector &in) {
 
   const int nnodes = vfes->GetNDofs();
 
-//  MFEM_FORALL(n, nnodes, {
-//    double upn[gpudata::MAXEQUATIONS];
-//    double Un[gpudata::MAXEQUATIONS];
-//    double gradUpn[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
-//    double srcTerm[gpudata::MAXEQUATIONS];
+  MFEM_FORALL(n, nnodes, {
+    double upn[gpudata::MAXEQUATIONS];
+    double Un[gpudata::MAXEQUATIONS];
+    double gradUpn[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
+    double srcTerm[gpudata::MAXEQUATIONS];
 //
 ////    for (int eq = 0; eq < num_equation; eq++) {
 ////      upn[eq] = h_Up[n + eq * nnodes];
@@ -307,12 +307,12 @@ void SourceTerm::updateTerms_gpu(mfem::Vector &in) {
 ////
 ////    updateTermAtNode(Un, upn, gradUpn, Efield, srcTerm);
 //
-//    // add source term to buffer
-//    for (int eq = 0; eq < num_equation; eq++) {
-////      h_in[n + eq * nnodes] += srcTerm[eq];
-//      h_in[n + eq * nnodes] += 0.0;
-//    }
-//  });
+    // add source term to buffer
+    for (int eq = 0; eq < num_equation; eq++) {
+//      h_in[n + eq * nnodes] += srcTerm[eq];
+      h_in[n + eq * nnodes] += 0.0;
+    }
+  });
 }
 
 #endif  // _GPU_

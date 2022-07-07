@@ -35,7 +35,7 @@ setup() {
 }
 
 @test "[$TEST] run tps with input -> $RUNFILE" {
-    ../src/tps -run $RUNFILE
+    ../src/tps -run $RUNFILE &> run.log
 
     test -s $SOLN_FILE
     test ! -e DIE
