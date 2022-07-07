@@ -291,30 +291,35 @@ void SourceTerm::updateTerms_gpu(mfem::Vector &in) {
   double *h_in = in.ReadWrite();
 
   const int nnodes = vfes->GetNDofs();
+  const int d_num_equation = num_equation;
+  const int d_dim = dim;
+  const int d_nvel = nvel;
 
-  //  MFEM_FORALL(n, nnodes, {
-  //    double upn[gpudata::MAXEQUATIONS];
-  //    double Un[gpudata::MAXEQUATIONS];
-  //    double gradUpn[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
-  //    double srcTerm[gpudata::MAXEQUATIONS];
-  //
-  ////    for (int eq = 0; eq < num_equation; eq++) {
-  ////      upn[eq] = h_Up[n + eq * nnodes];
-  ////      Un[eq] = h_U[n + eq * nnodes];
-  ////      for (int d = 0; d < dim; d++) gradUpn[eq + d * num_equation] = h_gradUp[n + eq * nnodes + d * num_equation *
-  //        /nnodes]; /    } /    // TODO(kevin): update E-field with EM coupling. /
-  // E-field can have azimuthal component.
-  ////    double Efield[gpudata::MAXDIM];
-  ////    for (int v = 0; v < nvel; v++) Efield[v] = 0.0;
-  ////
-  ////    updateTermAtNode(Un, upn, gradUpn, Efield, srcTerm);
-  //
-  //    // add source term to buffer
-  //    for (int eq = 0; eq < num_equation; eq++) {
-  ////      h_in[n + eq * nnodes] += srcTerm[eq];
-  //      h_in[n + eq * nnodes] += 0.0;
-  //    }
-  //  });
+  MFEM_FORALL(n, nnodes, {
+    double upn[gpudata::MAXEQUATIONS];
+    double Un[gpudata::MAXEQUATIONS];
+    double gradUpn[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
+    double srcTerm[gpudata::MAXEQUATIONS];
+
+    for (int eq = 0; eq < d_num_equation; eq++) {
+      upn[eq] = h_Up[n + eq * nnodes];
+      Un[eq] = h_U[n + eq * nnodes];
+      srcTerm[eq] = 0.0;
+      for (int d = 0; d < d_dim; d++) gradUpn[eq + d * d_num_equation] =
+        h_gradUp[n + eq * nnodes + d * d_num_equation * nnodes];
+    }
+    // TODO(kevin): update E-field with EM coupling.
+    // E-field can have azimuthal component.
+    double Efield[gpudata::MAXDIM];
+    for (int v = 0; v < d_nvel; v++) Efield[v] = 0.0;
+
+//    updateTermAtNode(Un, upn, gradUpn, Efield, srcTerm);
+
+    // add source term to buffer
+    for (int eq = 0; eq < d_num_equation; eq++) {
+      h_in[n + eq * nnodes] += srcTerm[eq];
+    }
+  });
 }
 
 #endif  // _GPU_
