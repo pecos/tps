@@ -302,7 +302,8 @@ void SourceTerm::updateTerms_gpu(mfem::Vector &in) {
   ////      upn[eq] = h_Up[n + eq * nnodes];
   ////      Un[eq] = h_U[n + eq * nnodes];
   ////      for (int d = 0; d < dim; d++) gradUpn[eq + d * num_equation] = h_gradUp[n + eq * nnodes + d * num_equation *
-  //        /nnodes]; /    } /    // TODO(kevin): update E-field with EM coupling. /    // E-field can have azimuthal component.
+  //        /nnodes]; /    } /    // TODO(kevin): update E-field with EM coupling. /
+  // E-field can have azimuthal component.
   ////    double Efield[gpudata::MAXDIM];
   ////    for (int v = 0; v < nvel; v++) Efield[v] = 0.0;
   ////
