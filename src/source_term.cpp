@@ -106,8 +106,8 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
       upn[eq] = h_Up[n + eq * nnodes];
       Un[eq] = h_U[n + eq * nnodes];
       srcTerm[eq] = 0.0;
-      for (int d = 0; d < _dim; d++) gradUpn[eq + d * _num_equation] =
-        h_gradUp[n + eq * nnodes + d * _num_equation * nnodes];
+      for (int d = 0; d < _dim; d++)
+        gradUpn[eq + d * _num_equation] = h_gradUp[n + eq * nnodes + d * _num_equation * nnodes];
     }
     // TODO(kevin): update E-field with EM coupling.
     // E-field can have azimuthal component.
