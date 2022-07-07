@@ -88,17 +88,6 @@ class SourceTerm : public ForcingTerms {
   // Terms do not need updating
   virtual void updateTerms(Vector &in);
 
-  MFEM_HOST_DEVICE void updateTermAtNode(const double *Un, const double *upn, const double *gradUpn,
-                                         const double *Efield, double *srcTerm,
-                                         // These are inputs for gpu.
-                                         GasMixture *_mixture = mixture_,
-                                         TransportProperties *_transport = transport_,
-                                         Chemistry *_chemistry = chemistry_,
-                                         const int &_dim = dim, const int &_nvel = nvel,
-                                         const int &_num_equation = num_equation,
-                                         const int &_numSpecies = numSpecies_,
-                                         const int &_numActiveSpecies = numActiveSpecies_,
-                                         const int &_numReactions = numReactions_);
   // GPU functions
 #ifdef _GPU_
   void updateTerms_gpu(Vector &in);
