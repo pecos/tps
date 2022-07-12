@@ -186,7 +186,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
       for (int d = 0; d < _dim; d++) srcTerm[_num_equation - 1] += gradPe[d] * upn[d + 1];
 
       // energy transfer by elastic momentum transfer
-      const double me = _mixture->GetGasParams(numSpecies_ - 2, GasParams::SPECIES_MW);
+      const double me = _mixture->GetGasParams(_numSpecies - 2, GasParams::SPECIES_MW);
       const double ne = ns[_numSpecies - 2];
       for (int sp = 0; sp < _numSpecies; sp++) {
         if (sp == _numSpecies - 2) continue;
