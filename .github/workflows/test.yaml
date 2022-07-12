@@ -76,6 +76,7 @@ jobs:
     name: Build/GPU (Cuda)
     env:
       MFEM_DIR: /home/karl/sw/mfem-gpu-4.4
+      MASA_DIR: /home/oliver/sw/masa
     steps:
       - name: Cancel previous runs
         uses: styfle/cancel-workflow-action@0.9.0
