@@ -99,8 +99,10 @@ if MASA_ENABLED
 TESTS += mms.euler.test \
 	 mms.ternary_2d.test \
 	 mms.ternary_2d_wall.test \
-	 mms.ternary_2d_inout.test \
-	 mms.general_wall.test
+	 mms.ternary_2d_inout.test
+if !GPU_ENABLED
+TESTS += mms.general_wall.test
+endif
 endif
 
 if !GPU_ENABLED
