@@ -22,7 +22,7 @@ RUNFILE_2="inputs/mms.euler.3d.r2.ini"
     # evaluate the convergence rate
     rho_rate=$(echo "l ($rho_err_r2 / $rho_err_r1) / l (0.5)" | bc -l)
 
-    # empirically observed rate 2.1676
+    # empirically observed rate 2.1646
     rate_p1_lo=2.16
     rate_p1_hi=2.17
 
@@ -41,7 +41,7 @@ RUNFILE_2="inputs/mms.euler.3d.r2.ini"
     # evaluate the convergence rate
     vel_rate=$(echo "l ($vel_err_r2 / $vel_err_r1) / l (0.5)" | bc -l)
 
-    # empirically observed rate 2.0344
+    # empirically observed rate 2.0385
     rate_p1_lo=2.03
     rate_p1_hi=2.04
 
@@ -60,9 +60,9 @@ RUNFILE_2="inputs/mms.euler.3d.r2.ini"
     # evaluate the convergence rate
     pre_rate=$(echo "l ($pre_err_r2 / $pre_err_r1) / l (0.5)" | bc -l)
 
-    # empirically observed rate 2.0698
-    rate_p1_lo=2.06
-    rate_p1_hi=2.08
+    # empirically observed rate 2.1718
+    rate_p1_lo=2.17
+    rate_p1_hi=2.18
 
     # make sure rate isn't too low or too high
     rate_check_lo=$( echo "$pre_rate > $rate_p1_lo" | bc -l )
