@@ -112,6 +112,11 @@ if MASA_ENABLED
 compute_rhs_LDFLAGS += $(MASA_LIBS)
 endif
 
+if CUDA_ENABLED
+compute_rhs_LDFLAGS += $(CUDA_LDFLAGS)
+endif
+
+
 if !GPU_ENABLED
 
 endif # if !GPU_ENABLED
