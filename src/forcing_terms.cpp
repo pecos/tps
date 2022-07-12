@@ -880,7 +880,7 @@ void MASA_forcings::updateTerms(Vector &in) {
   int numElem = vfes->GetNE();
   int dof = vfes->GetNDofs();
 
-  double *data = in.GetData();
+  double *data = in.HostReadWrite();
   // const double *dataUp = Up->GetData();
 
   // get coords
