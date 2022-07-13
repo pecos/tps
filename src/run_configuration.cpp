@@ -104,6 +104,9 @@ RunConfiguration::RunConfiguration() {
   exit_checkFrequency_ = 500;  // 500 iterations
 
   initialElectronTemperature = 0.;
+
+  twoTemperature = false;
+  ambipolar = false;
 }
 
 RunConfiguration::~RunConfiguration() {

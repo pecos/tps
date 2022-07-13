@@ -1038,6 +1038,11 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   temperature = new ParGridFunction(fes, Up->HostReadWrite() + (1 + nvel) * fes->GetNDofs());
 
+  electron_temp_field = NULL;
+  if (config.twoTemperature) {
+    electron_temp_field = new ParGridFunction(fes, Up->HostReadWrite() + (num_equation - 1) * fes->GetNDofs());
+  }
+
   // this variable is purely for visualization
   press = new ParGridFunction(fes);
 
@@ -1092,6 +1097,10 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     ioData.registerIOVar("/solution", "rho-Y_" + speciesName, sp + nvel + 2);
   }
 
+  if (config.twoTemperature) {
+    ioData.registerIOVar("/solution", "rhoE_e", num_equation - 1);
+  }
+
   // compute factor to multiply viscosity when this option is active
   spaceVaryViscMult = NULL;
   ParGridFunction coordsDof(dfes);
@@ -1140,6 +1149,11 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
       paraviewColl->RegisterField("partial_density_" + speciesName, visualizationVariables[sp]);
     }
   }
+
+  if (config.twoTemperature) {
+    paraviewColl->RegisterField("Te", electron_temp_field);
+  }
+
 
 // If mms, add exact solution.
 #ifdef HAVE_MASA
