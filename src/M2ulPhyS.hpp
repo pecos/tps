@@ -229,6 +229,7 @@ class M2ulPhyS : public TPS::Solver {
 
   // Visualization functions (these are pointers to Up)
   ParGridFunction *temperature, *dens, *vel, *vtheta, *passiveScalar;
+  ParGridFunction *electron_temp_field;
   ParGridFunction *press;
   std::vector<ParGridFunction *> visualizationVariables;
 
