@@ -11,6 +11,9 @@ setup() {
 }
 
 @test "[$TEST] verify axisymmetric tps output with input -> $RUNFILE" {
+    # paraview+restart will fail if data in output-pipe is from after restart
+    rm -rf output-pipe
+
     test -s $RUNFILE
     test -s $RSTRT_FILE
     cp $RSTRT_FILE $SOLN_FILE

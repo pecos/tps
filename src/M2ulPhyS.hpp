@@ -396,7 +396,7 @@ class M2ulPhyS : public TPS::Solver {
   void updatePrimitives();
 
   const ParGridFunction *GetPlasmaConductivityGF() {
-    mixture->UpdatePlasmaConductivityGridFunction(plasma_conductivity_, Up);
+    //mixture->UpdatePlasmaConductivityGridFunction(plasma_conductivity_, Up);
     return plasma_conductivity_;
   }
   ParGridFunction *GetJouleHeatingGF() { return joule_heating_; }
@@ -409,6 +409,10 @@ class M2ulPhyS : public TPS::Solver {
     return;
   }
   int getStatus() override { return exit_status_; }
+
+  int getMaximumIterations() const { return MaxIters; }
+  int getCurrentIterations() const { return iter; }
+  void setMaximumIterations(int value) { MaxIters = value; }
 };
 
 #endif  // M2ULPHYS_HPP_

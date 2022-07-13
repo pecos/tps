@@ -35,8 +35,8 @@
 #include "em_options.hpp"
 #include "quasimagnetostatic.hpp"
 
-CycleAvgJouleCoupling::CycleAvgJouleCoupling(MPI_Session &mpi, string &inputFileName, TPS::Tps *tps)
-    : mpi_(mpi), em_opt_() {
+CycleAvgJouleCoupling::CycleAvgJouleCoupling(MPI_Session &mpi, string &inputFileName, TPS::Tps *tps, int max_out)
+    : mpi_(mpi), em_opt_(), max_outer_iters_(max_out) {
   qmsa_solver_ = new QuasiMagnetostaticSolverAxiSym(mpi, em_opt_, tps);
   flow_solver_ = new M2ulPhyS(mpi, inputFileName, tps);
   interp_flow_to_em_ = new FindPointsGSLIB(MPI_COMM_WORLD);
@@ -151,8 +151,22 @@ void CycleAvgJouleCoupling::initialize() {
 }
 
 void CycleAvgJouleCoupling::solve() {
-  interpConductivityFromFlowToEM();
-  qmsa_solver_->solve();
-  interpJouleHeatingFromEMToFlow();
-  flow_solver_->solve();
+
+  const int increment = flow_solver_->getMaximumIterations();
+  int curr_iter = flow_solver_->getCurrentIterations();
+  flow_solver_->setMaximumIterations(curr_iter + increment);
+
+  for (int outer_iters = 0; outer_iters < max_outer_iters_; outer_iters++) {
+    // EM
+    interpConductivityFromFlowToEM();
+    qmsa_solver_->solve();
+
+    // flow
+    interpJouleHeatingFromEMToFlow();
+    flow_solver_->solve();
+
+    // update max solver iters so that on the next time through the flow solver does something
+    curr_iter = flow_solver_->getCurrentIterations();
+    flow_solver_->setMaximumIterations(curr_iter + increment);
+  }
 }

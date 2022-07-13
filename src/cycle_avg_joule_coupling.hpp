@@ -52,6 +52,8 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   QuasiMagnetostaticSolverAxiSym *qmsa_solver_;
   M2ulPhyS *flow_solver_;
 
+  int max_outer_iters_;
+
   FindPointsGSLIB *interp_flow_to_em_;
   FindPointsGSLIB *interp_em_to_flow_;
 
@@ -60,7 +62,7 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   void interpJouleHeatingFromEMToFlow();
 
  public:
-  CycleAvgJouleCoupling(MPI_Session &mpi, string &inputFileName, TPS::Tps *tps);
+  CycleAvgJouleCoupling(MPI_Session &mpi, string &inputFileName, TPS::Tps *tps, int max_out);
   ~CycleAvgJouleCoupling();
 
   void parseSolverOptions() override;
