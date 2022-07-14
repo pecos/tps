@@ -2096,6 +2096,12 @@ void M2ulPhyS::parsePlasmaModels() {
   tpsP->getInput("plasma_models/ambipolar", config.ambipolar, false);
   tpsP->getInput("plasma_models/two_temperature", config.twoTemperature, false);
 
+  if (config.twoTemperature) {
+    tpsP->getInput("plasma_models/electron_temp_ic", config.initialElectronTemperature, 300.0);
+  } else {
+    config.initialElectronTemperature = -1;
+  }
+
   std::string gasModelStr;
   tpsP->getInput("plasma_models/gas_model", gasModelStr, std::string("perfect_mixture"));
   if (gasModelStr == "perfect_mixture") {
@@ -2199,11 +2205,6 @@ void M2ulPhyS::parseSpeciesInputs() {
       inputGasParams(i - 1, GasParams::FORMATION_ENERGY) = formEnergy;
 
       tpsP->getRequiredInput((basepath + "/initialMassFraction").c_str(), inputInitialMassFraction(i - 1));
-
-      //// require initial electron temperature
-      // if (speciesName == "E")
-      //  tpsP->getRequiredInput((basepath + "/initialElectronTemperature").c_str(),
-      //                         config.initialElectronTemperature);
 
       if (config.gasModel == PERFECT_MIXTURE) {
         tpsP->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(), inputCV(i - 1));
