@@ -315,6 +315,7 @@ void M2ulPhyS::initVariables() {
           mfem_error("GasModel not recognized.");
           break;
       }
+
       switch (config.GetTranportModel()) {
         case ARGON_MINIMAL:
 #if defined(_CUDA_) || defined(_HIP_)
@@ -367,6 +368,17 @@ void M2ulPhyS::initVariables() {
       mfem_error("WorkingFluid not recognized.");
       break;
   }
+
+  if (config.use_mixing_length) {
+#if defined(_CUDA_) || defined(_HIP_)
+    mfem_error("MixingLengthTransport is not yet supported for GPU builds!");
+#else
+    // Build mixing length transport using whatever molecular transport we've already instantiated
+    TransportProperties *temporary_transport = transportPtr;
+    transportPtr = new MixingLengthTransport(mixture, config, temporary_transport);
+#endif
+  }
+
   switch (config.radiationInput.model) {
     case NET_EMISSION:
 #if defined(_CUDA_) || defined(_HIP_)
@@ -2181,6 +2193,15 @@ void M2ulPhyS::parseFlowOptions() {
   tpsP->getInput("flow/refinement_levels", config.ref_levels, 0);
   tpsP->getInput("flow/computeDistance", config.compute_distance, false);
 
+  tpsP->getInput("flow/useMixingLength", config.use_mixing_length, false);
+  if (config.use_mixing_length) {
+    // Default value for mixing length is zero, which turns model off
+    tpsP->getInput("flow/mixing-length/max-mixing-length", config.mix_length_trans_input_.max_mixing_length_, 0.0);
+    tpsP->getInput("flow/mixing-length/Pr_ratio", config.mix_length_trans_input_.Prt_, 1.0);
+    tpsP->getInput("flow/mixing-length/Let", config.mix_length_trans_input_.Let_, 1.0);
+  }
+
+
   assert(config.solOrder > 0);
   assert(config.numIters >= 0);
   assert(config.itersOut > 0);
@@ -2413,6 +2434,7 @@ void M2ulPhyS::parsePlasmaModels() {
   } else if (transportModelStr == "constant") {
     config.transportModel = CONSTANT;
   }
+  printf("config.transportModel = %s\n", transportModelStr.c_str()); fflush(stdout);
   // } else {
   //   grvy_printf(GRVY_ERROR, "\nUnknown transport_model -> %s", transportModelStr.c_str());
   //   exit(ERROR);
