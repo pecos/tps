@@ -231,6 +231,7 @@ class RunConfiguration {
 
   // data structure for constant transport property class
   constantTransportData constantTransport;
+  mixingLengthTransportData mix_length_trans_input_;
 
   // Use MMS
   bool use_mms_;

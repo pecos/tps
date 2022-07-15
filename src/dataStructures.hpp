@@ -265,6 +265,23 @@ struct constantTransportData {
   int electronIndex;
 };
 
+struct mixingLengthTransportData {
+  // for molecular transport calculations
+  double mu0_;  // reference viscosity for power law
+  double T0_;   // reference temperature for viscosity power law
+  double visc_power_;
+  double Pr_;   // Prandtl number
+  double Le_;   // Lewis number
+  double nDe_;  // electron diffusivity x background number density
+
+  // for turbulent transport calculations
+  double mixing_length_;  // user-specifed mixing length
+  double Prt_;            // eddy Prandtl number
+  double Let_;            // eddy Lewis number
+
+  int electronIndex_;
+};
+
 struct collisionInputs {
   double debyeCircle;
   double Th;
