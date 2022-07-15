@@ -67,6 +67,7 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
 
   const double rho = state[0];
   const double Th = primitiveState[nvel_ + 1];
+  const double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : Th;
 
   // viscosity
   const double mu = mu0_ * pow(Th / T0_, visc_power_);
@@ -88,14 +89,70 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
   }
   S = sqrt(S);
 
-  const double mut = mixing_length_ * mixing_length_ * S;
+  const double mut = rho * mixing_length_ * mixing_length_ * S;
 
   // eddy thermal conductivity
   const double kappat = mut * cp / Prt_;
 
+  const double diff = (mu / rho) / (Le_ * Pr_);
+  const double difft = (mut / rho) / (Let_ * Prt_);
+
+  double n_sp[gpudata::MAXSPECIES], X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES];
+  mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
+
+  double diffusivity[gpudata::MAXSPECIES];
+  for (int i = 0; i < numSpecies; i++) {
+    diffusivity[i] = diff + difft;
+  }
+  if (electronIndex_ >= 0) {
+    diffusivity[electronIndex_] = nDe_ / n_sp[electronIndex_];
+  }
+
+  // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
+  // diffusionVelocity.SetSize(numSpecies, nvel_);
+  for (int v = 0; v < nvel_; v++)
+    for (int sp = 0; sp < numSpecies; sp++) diffusionVelocity[sp + v * numSpecies] = 0.0;
+
+  // Compute mole fraction gradient from number density gradient.
+  // concentration-driven diffusion only determines the first dim-components.
+  // DenseMatrix gradX(numSpecies, dim);
+  double gradX[gpudata::MAXSPECIES * gpudata::MAXDIM];
+  mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
+  for (int sp = 0; sp < numSpecies; sp++) {
+    for (int d = 0; d < dim; d++)
+      diffusionVelocity[sp + d * numSpecies] = -diffusivity[sp] * gradX[sp + d * numSpecies] / (X_sp[sp] + Xeps_);
+  }
+
+  double mobility[gpudata::MAXSPECIES];
+  for (int sp = 0; sp < numSpecies; sp++) {
+    double temp = (sp == electronIndex_) ? Te : Th;
+    mobility[sp] = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity[sp];
+  }
+
+  if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
+
+  addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
+
+  correctMassDiffusionFlux(Y_sp, diffusionVelocity);
+
+  for (int sp = 0; sp < numSpecies; sp++) {
+    for (int d = 0; d < nvel_; d++) {
+      if (isnan(diffusionVelocity[sp + d * numSpecies])) {
+        // grvy_printf(GRVY_ERROR, "\nDiffusion velocity of species %d is NaN! -> %f\n", sp, diffusionVelocity(sp, d));
+        printf("\nDiffusion velocity of species %d is NaN! -> %f\n", sp, diffusionVelocity[sp + d * numSpecies]);
+        // exit(-1);
+        assert(false);
+      }
+    }
+  }
+
   // Set output params
   transportBuffer[FluxTrns::VISCOSITY] = mu + mut;
+  transportBuffer[FluxTrns::BULK_VISCOSITY] = 0.0;
   transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = kappa + kappat;
+  transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] = 2.5 * UNIVERSALGASCONSTANT * nDe_;
+
+
 
   // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
   // diffusionVelocity.SetSize(numSpecies, nvel_);
@@ -140,48 +197,86 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeSourceTransportProperties(co
   for (int v = 0; v < nvel_; v++)
     for (int sp = 0; sp < numSpecies; sp++) diffusionVelocity[sp + v * numSpecies] = 0.0;
 
-  // double primitiveState[gpudata::MAXEQUATIONS];
-  // mixture->GetPrimitivesFromConservatives(state, primitiveState);
-  // double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : primitiveState[nvel_ + 1];
-  // double Th = primitiveState[nvel_ + 1];
+  double primitiveState[gpudata::MAXEQUATIONS];
+  mixture->GetPrimitivesFromConservatives(state, primitiveState);
 
-  // double X_sp[gpudata::MAXEQUATIONS], Y_sp[gpudata::MAXEQUATIONS];
-  // mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
+  const double rho = state[0];
+  const double Th = primitiveState[nvel_ + 1];
+  const double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : Th;
 
-  // // Compute mole fraction gradient from number density gradient.
-  // // concentration-driven diffusion only determines the first dim-components.
-  // // DenseMatrix gradX(numSpecies, dim);
-  // double gradX[gpudata::MAXSPECIES * gpudata::MAXDIM];
-  // mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
-  // for (int sp = 0; sp < numSpecies; sp++) {
-  //   for (int d = 0; d < dim; d++)
-  //     diffusionVelocity[sp + d * numSpecies] = -diffusivity_[sp] * gradX[sp + d * numSpecies] / (X_sp[sp] + Xeps_);
-  // }
+  // viscosity
+  const double mu = mu0_ * pow(Th / T0_, visc_power_);
 
-  // double mobility[gpudata::MAXSPECIES];
-  // for (int sp = 0; sp < numSpecies; sp++) {
-  //   double temp = (sp == electronIndex_) ? Te : Th;
-  //   mobility[sp] = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity_[sp];
-  // }
-  // globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] =
-  //     computeMixtureElectricConductivity(mobility, n_sp) * MOLARELECTRONCHARGE;
+  const double gas_constant = mixture->GetGasConstant();
+  const double specific_heat_ratio = mixture->GetSpecificHeatRatio();
+  const double cp = specific_heat_ratio * gas_constant / (specific_heat_ratio - 1.);
 
-  // if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
+  // heavy thermal conductivity
+  const double kappa = mu * cp / Pr_;
 
-  // addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
+  // eddy viscosity
+  double S = 0;
+  for (int i = 0; i < dim; i++) {
+    for (int j = 0; j < dim; j++) {
+      const double u_x = gradUp[(1 + i) + j * num_equation];
+      S += 2 * u_x * u_x; // todo: subtract divergence part
+    }
+  }
+  S = sqrt(S);
 
-  // correctMassDiffusionFlux(Y_sp, diffusionVelocity);
+  const double mut = rho * mixing_length_ * mixing_length_ * S;
 
-  // for (int sp = 0; sp < numSpecies; sp++) speciesTransport[sp + SpeciesTrns::MF_FREQUENCY * numSpecies] = mtFreq_[sp];
+  // eddy thermal conductivity
+  const double kappat = mut * cp / Prt_;
 
-  // for (int sp = 0; sp < numSpecies; sp++) {
-  //   for (int d = 0; d < nvel_; d++) {
-  //     if (isnan(diffusionVelocity[sp + d * numSpecies])) {
-  //       // grvy_printf(GRVY_ERROR, "\nDiffusion velocity of species %d is NaN! -> %f\n", sp, diffusionVelocity(sp, d));
-  //       printf("\nDiffusion velocity of species %d is NaN! -> %f\n", sp, diffusionVelocity[sp + d * numSpecies]);
-  //       // exit(-1);
-  //       assert(false);
-  //     }
-  //   }
-  // }
+  const double diff = (mu / rho) / (Le_ * Pr_);
+  const double difft = (mut / rho) / (Let_ * Prt_);
+
+  double X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES];
+  mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
+
+  double diffusivity[gpudata::MAXSPECIES];
+  for (int i = 0; i < numSpecies; i++) {
+    diffusivity[i] = diff + difft;
+  }
+  if (electronIndex_ >= 0) {
+    diffusivity[electronIndex_] = nDe_ / n_sp[electronIndex_];
+  }
+
+  // Compute mole fraction gradient from number density gradient.
+  // concentration-driven diffusion only determines the first dim-components.
+  // DenseMatrix gradX(numSpecies, dim);
+  double gradX[gpudata::MAXSPECIES * gpudata::MAXDIM];
+  mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
+  for (int sp = 0; sp < numSpecies; sp++) {
+    for (int d = 0; d < dim; d++)
+      diffusionVelocity[sp + d * numSpecies] = -diffusivity[sp] * gradX[sp + d * numSpecies] / (X_sp[sp] + Xeps_);
+  }
+
+  double mobility[gpudata::MAXSPECIES];
+  for (int sp = 0; sp < numSpecies; sp++) {
+    double temp = (sp == electronIndex_) ? Te : Th;
+    mobility[sp] = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity[sp];
+  }
+  globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] =
+      computeMixtureElectricConductivity(mobility, n_sp) * MOLARELECTRONCHARGE;
+
+  if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
+
+  addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
+
+  correctMassDiffusionFlux(Y_sp, diffusionVelocity);
+
+  //for (int sp = 0; sp < numSpecies; sp++) speciesTransport[sp + SpeciesTrns::MF_FREQUENCY * numSpecies] = 0.0;
+
+  for (int sp = 0; sp < numSpecies; sp++) {
+    for (int d = 0; d < nvel_; d++) {
+      if (isnan(diffusionVelocity[sp + d * numSpecies])) {
+        // grvy_printf(GRVY_ERROR, "\nDiffusion velocity of species %d is NaN! -> %f\n", sp, diffusionVelocity(sp, d));
+        printf("\nDiffusion velocity of species %d is NaN! -> %f\n", sp, diffusionVelocity[sp + d * numSpecies]);
+        // exit(-1);
+        assert(false);
+      }
+    }
+  }
 }

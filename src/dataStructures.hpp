@@ -65,7 +65,7 @@ enum WorkingFluid { DRY_AIR, USER_DEFINED };
 // These are the type of EquationOfState.
 enum GasModel { /* PERFECT_SINGLE, */ PERFECT_MIXTURE, /* CANTERA, */ NUM_GASMODEL };
 
-enum TransportModel { ARGON_MINIMAL, ARGON_MIXTURE, CONSTANT, NUM_TRANSPORTMODEL };
+enum TransportModel { ARGON_MINIMAL, ARGON_MIXTURE, CONSTANT, MIXING_LENGTH, NUM_TRANSPORTMODEL };
 
 enum ChemistryModel { /* CANTERA, */ NUM_CHEMISTRYMODEL };
 

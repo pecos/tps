@@ -65,6 +65,7 @@ class Tps;
 #include "gradNonLinearForm.hpp"
 #include "io.hpp"
 #include "logger.hpp"
+#include "mixing_length_transport.hpp"
 #include "mpi_groups.hpp"
 #include "rhs_operator.hpp"
 #include "riemann_solver.hpp"

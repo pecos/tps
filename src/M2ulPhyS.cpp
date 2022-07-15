@@ -305,6 +305,7 @@ void M2ulPhyS::initVariables() {
           mfem_error("GasModel not recognized.");
           break;
       }
+
       switch (config.GetTranportModel()) {
         case ARGON_MINIMAL:
 #if defined(_CUDA_)
@@ -334,6 +335,13 @@ void M2ulPhyS::initVariables() {
           mfem_error("ConstantTransport is not supported for HIP!");
 #else
           transportPtr = new ConstantTransport(mixture, config);
+#endif
+          break;
+        case MIXING_LENGTH:
+#if defined(_CUDA_) || defined(_HIP_)
+          mfem_error("MixingLengthTransport is not yet supported for GPU builds!");
+#else
+          transportPtr = new MixingLengthTransport(mixture, config);
 #endif
           break;
         default:
@@ -2119,7 +2127,11 @@ void M2ulPhyS::parsePlasmaModels() {
     config.transportModel = ARGON_MIXTURE;
   } else if (transportModelStr == "constant") {
     config.transportModel = CONSTANT;
+  } else if (transportModelStr == "mixing-length") {
+    printf("hola\n");
+    config.transportModel = MIXING_LENGTH;
   }
+  printf("config.transportModel = %s\n", transportModelStr.c_str()); fflush(stdout);
   // } else {
   //   grvy_printf(GRVY_ERROR, "\nUnknown transport_model -> %s", transportModelStr.c_str());
   //   exit(ERROR);
@@ -2358,6 +2370,30 @@ void M2ulPhyS::parseTransportInputs() {
           config.constantTransport.electronIndex = config.speciesMapping["E"];
         } else {
           grvy_printf(GRVY_ERROR, "\nConstant transport: two-temperature plasma requires the species 'E' !\n");
+          exit(ERROR);
+        }
+      }
+    } break;
+    case MIXING_LENGTH: {
+      tpsP->getRequiredInput("plasma_models/transport_model/mixing-length/mu0", config.mix_length_trans_input_.mu0_);
+      tpsP->getRequiredInput("plasma_models/transport_model/mixing-length/T0", config.mix_length_trans_input_.T0_);
+      tpsP->getRequiredInput("plasma_models/transport_model/mixing-length/visc-exponent",
+                             config.mix_length_trans_input_.visc_power_);
+      tpsP->getRequiredInput("plasma_models/transport_model/mixing-length/Pr", config.mix_length_trans_input_.Pr_);
+      tpsP->getRequiredInput("plasma_models/transport_model/mixing-length/Le", config.mix_length_trans_input_.Le_);
+      tpsP->getRequiredInput("plasma_models/transport_model/mixing-length/nDe", config.mix_length_trans_input_.nDe_);
+
+      tpsP->getRequiredInput("plasma_models/transport_model/mixing-length/mixing-length",
+                             config.mix_length_trans_input_.mixing_length_);
+      tpsP->getRequiredInput("plasma_models/transport_model/mixing-length/Prt", config.mix_length_trans_input_.Prt_);
+      tpsP->getRequiredInput("plasma_models/transport_model/mixing-length/Let", config.mix_length_trans_input_.Let_);
+
+      config.mix_length_trans_input_.electronIndex_ = -1;
+      if (config.IsTwoTemperature()) {
+        if (config.speciesMapping.count("E")) {
+          config.mix_length_trans_input_.electronIndex_ = config.speciesMapping["E"];
+        } else {
+          grvy_printf(GRVY_ERROR, "\nMixing length transport: two-temperature plasma requires the species 'E' !\n");
           exit(ERROR);
         }
       }

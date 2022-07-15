@@ -57,6 +57,7 @@ class MixingLengthTransport : public TransportProperties {
   const double Let_;            // eddy Lewis number
 
   int electronIndex_ = -1;
+  const double qeOverkB_ = ELECTRONCHARGE / BOLTZMANNCONSTANT;
 
  public:
 
