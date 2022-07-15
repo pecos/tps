@@ -1488,14 +1488,14 @@ void M2ulPhyS::uniformInitialConditions() {
   initState(0) = inputRhoRhoVp[0];
   initState(1) = inputRhoRhoVp[1];
   initState(2) = inputRhoRhoVp[2];
-  if (dim == 3) initState(3) = inputRhoRhoVp[3];
+  if (nvel == 3) initState(3) = inputRhoRhoVp[3];
 
   if (mixture->GetWorkingFluid() == WorkingFluid::USER_DEFINED) {
     const int numSpecies = mixture->GetNumSpecies();
     const int numActiveSpecies = mixture->GetNumActiveSpecies();
     for (int sp = 0; sp < numActiveSpecies; sp++) {
       // int inputIndex = mixture->getInputIndexOf(sp);
-      initState(2 + dim + sp) = inputRhoRhoVp[0] * config.initialMassFractions(sp);
+      initState(2 + nvel + sp) = inputRhoRhoVp[0] * config.initialMassFractions(sp);
     }
 
     // electron energy
@@ -1503,10 +1503,10 @@ void M2ulPhyS::uniformInitialConditions() {
       double ne = 0.;
       if (mixture->IsAmbipolar()) {
         for (int sp = 0; sp < numActiveSpecies; sp++)
-          ne += mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) * initState(2 + dim + sp) /
+          ne += mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) * initState(2 + nvel + sp) /
                 mixture->GetGasParams(sp, GasParams::SPECIES_MW);
       } else {
-        ne = initState(2 + dim + numSpecies - 2) / mixture->GetGasParams(numSpecies - 2, GasParams::SPECIES_MW);
+        ne = initState(2 + nvel + numSpecies - 2) / mixture->GetGasParams(numSpecies - 2, GasParams::SPECIES_MW);
       }
 
       initState(num_equation - 1) = config.initialElectronTemperature * ne * mixture->getMolarCV(numSpecies - 2);
