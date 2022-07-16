@@ -430,6 +430,10 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
       }
     }
     mixture->modifyEnergyForPressure(conserved, targetU, szData.targetUp[4], singleTemperature_);
+  } else if (szData.szSolType == SpongeZoneSolution::USERDEF_CONS) {
+    for (int i = 0; i < num_equation; i++) {
+      targetU[i] = szData.targetUp[i];
+    }
   }
 
   // make sure normal is unitary

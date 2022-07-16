@@ -2827,7 +2827,17 @@ void M2ulPhyS::parseSpongeZoneInputs() {
             }
           }
         }
-
+      } else if (type == "userDefConserved") {
+        config.spongeData_[sz].szSolType = SpongeZoneSolution::USERDEF_CONS;
+        // This gets parse before we have figured out the eqn number,
+        // so make user tell us *sigh*
+        int neqn;
+        tpsP->getRequiredInput((base + "/num_equation").c_str(), neqn);
+        config.spongeData_[sz].targetUp.SetSize(neqn);
+        auto hup = config.spongeData_[sz].targetUp.HostWrite();
+        for (int i = 0; i < neqn; i++) {
+          tpsP->getRequiredVecElem((base + "/conservedState").c_str(), hup[i], i);
+        }
       } else if (type == "mixedOut") {
         config.spongeData_[sz].szSolType = SpongeZoneSolution::MIXEDOUT;
       } else {

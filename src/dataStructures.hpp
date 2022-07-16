@@ -156,6 +156,7 @@ struct linearlyVaryingVisc {
 
 enum SpongeZoneSolution {
   USERDEF,   // User defined target solution
+  USERDEF_CONS, // User defined target (user provides conserved state directly)
   MIXEDOUT,  // Mixed-out values will be computed at the pInit plane and
              // used as target solution in the sponge zone
   NONE = -1  // Invalid value
