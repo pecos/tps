@@ -395,7 +395,7 @@ class M2ulPhyS : public TPS::Solver {
 
   void updatePrimitives();
 
-  const ParGridFunction *GetPlasmaConductivityGF() {
+  ParGridFunction *GetPlasmaConductivityGF() {
     //mixture->UpdatePlasmaConductivityGridFunction(plasma_conductivity_, Up);
     return plasma_conductivity_;
   }

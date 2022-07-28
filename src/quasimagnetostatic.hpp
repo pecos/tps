@@ -181,6 +181,7 @@ class QuasiMagnetostaticSolverAxiSym : public TPS::Solver {
   void solve() override;
 
   mfem::ParMesh *getMesh() const { return pmesh_; }
+  mfem::ParFiniteElementSpace *getFESpace() { return Atheta_space_; }
   mfem::ParGridFunction *getPlasmaConductivityGF() { return plasma_conductivity_; }
   mfem::ParGridFunction *getJouleHeatingGF() { return joule_heating_; }
 };

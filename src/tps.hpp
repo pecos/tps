@@ -131,6 +131,7 @@ class Tps {
   mfem::MPI_Session &getMPISession() { return mpi_; }
   std::string &getInputFilename() { return iFile_; }
   bool isFlowEMCoupled() const { return isFlowEMCoupledMode_; }
+  const std::string &getSolverType() { return input_solver_type_; }
 };
 
 std::string ltrim(const std::string &s);

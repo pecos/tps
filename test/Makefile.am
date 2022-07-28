@@ -29,7 +29,7 @@ EXTRA_DIST      = tap-driver.sh soln_differ inputs meshes ref_solns/*.h5 \
 	 	  argon_minimal.test argon_minimal.binary.test diffusion_wall.test \
 	 	  inflow_outflow.test mms.ternary_2d.test mms.ternary_2d_wall.test \
 	 	  mms.ternary_2d_inout.test cuda-memcheck.test mms.general_wall.test \
-		  independent_coupling.test
+		  independent_coupling.test interp_em.test
 
 TESTS = vpath.sh
 XFAIL_TESTS =
@@ -69,7 +69,8 @@ TESTS += cyl3d.test \
 	 diffusion_wall.test \
 	 reaction.test \
 	 inflow_outflow.test \
-	 independent_coupling.test
+	 independent_coupling.test \
+	 interp_em.test
 
 if PYTHON_ENABLED
 TESTS += cyl3d.python.test
@@ -162,6 +163,17 @@ test_bdr_flux_LDFLAGS  				= $(PYTHON_LIBS) $(MFEM_LIBS)
 
 if MASA_ENABLED
 test_bdr_flux_LDFLAGS 			 += $(MASA_LIBS)
+endif
+
+check_PROGRAMS               += test_interp_em
+test_interp_em_SOURCES    = test_interp_em.cpp
+test_interp_em_LDADD      = ../src/libtps.la
+test_interp_em_LDADD     += $(HDF5_LIBS)
+test_interp_em_LDADD     += $(GRVY_LIBS)
+test_interp_em_LDFLAGS    = $(PYTHON_LIBS) $(MFEM_LIBS)
+
+if MASA_ENABLED
+test_interp_em_LDFLAGS 	 += $(MASA_LIBS)
 endif
 
 endif # if !GPU_ENABLED

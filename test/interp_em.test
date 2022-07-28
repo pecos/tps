@@ -1,0 +1,15 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="interp_em"
+
+setup() {
+    RUNFILE_AXISYM="inputs/interp-em-test.ini"
+}
+
+@test "[$TEST] flow/em interpolation: test 2d (axisymmetric) interpolation capability" {
+    test -s $RUNFILE_AXISYM
+    test -e ./test_interp_em
+    ./test_interp_em -run $RUNFILE_AXISYM
+}
+

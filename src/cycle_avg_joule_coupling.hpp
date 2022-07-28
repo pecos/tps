@@ -57,16 +57,19 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   FindPointsGSLIB *interp_flow_to_em_;
   FindPointsGSLIB *interp_em_to_flow_;
 
-  void initializeInterpolationData();
-  void interpConductivityFromFlowToEM();
-  void interpJouleHeatingFromEMToFlow();
-
  public:
   CycleAvgJouleCoupling(MPI_Session &mpi, string &inputFileName, TPS::Tps *tps, int max_out);
   ~CycleAvgJouleCoupling();
 
+  void initializeInterpolationData();
+  void interpConductivityFromFlowToEM();
+  void interpJouleHeatingFromEMToFlow();
+
   void parseSolverOptions() override;
   void initialize() override;
   void solve() override;
+
+  M2ulPhyS* getFlowSolver() { return flow_solver_; }
+  QuasiMagnetostaticSolverAxiSym* getEMSolver() { return qmsa_solver_; }
 };
 #endif  // CYCLE_AVG_JOULE_COUPLING_HPP_

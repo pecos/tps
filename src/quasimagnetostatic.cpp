@@ -590,6 +590,7 @@ void QuasiMagnetostaticSolverAxiSym::initialize() {
   //-----------------------------------------------------
 
   // 1a) Read the serial mesh (on each mpi rank)
+  std::cout << "Reading mesh = " << em_opts_.mesh_file.c_str() << std::endl;
   Mesh *mesh = new Mesh(em_opts_.mesh_file.c_str(), 1, 1);
   dim_ = mesh->Dimension();
   if (dim_ != 2) {
@@ -672,7 +673,14 @@ void QuasiMagnetostaticSolverAxiSym::InitializeCurrent() {
   assert(operator_initialized_);
 
   // ensure the mesh volume attributes conform to our expectations
-  assert(pmesh_->attributes.Max() == 5);
+  //assert(pmesh_->attributes.Max() == 5);
+  if (pmesh_->attributes.Max() != 5) {
+    printf("WARNING: Could not initialize current source.\n");
+    printf("         This probably means you should fix your mesh,\n");
+    printf("         but I will continue anyway with no source.\n");
+    current_initialized_ = false;
+    return;
+  }
 
   // Compute the right hand side in 3 steps...
 
