@@ -43,7 +43,7 @@ using namespace mfem::common;
 void JFun(const Vector &x, Vector &f);
 
 QuasiMagnetostaticSolver3D::QuasiMagnetostaticSolver3D(MPI_Session &mpi, ElectromagneticOptions em_opts, TPS::Tps *tps)
-    : mpi_(mpi), em_opts_(em_opts) {
+  : mpi_(mpi), em_opts_(em_opts), offsets_(3) {
   tpsP_ = tps;
 
   // verify running on cpu
@@ -63,16 +63,28 @@ QuasiMagnetostaticSolver3D::QuasiMagnetostaticSolver3D(MPI_Session &mpi, Electro
   Bspace_ = NULL;
   K_ = NULL;
   r_ = NULL;
-  A_ = NULL;
-  B_ = NULL;
+  Areal_ = NULL;
+  Aimag_ = NULL;
+  Breal_ = NULL;
+  Bimag_ = NULL;
+
+  plasma_conductivity_ = NULL;
+  plasma_conductivity_coef_ = NULL;
+
+  true_size_ = 0;
+  offsets_ = 0;
 
   operator_initialized_ = false;
   current_initialized_ = false;
 }
 
 QuasiMagnetostaticSolver3D::~QuasiMagnetostaticSolver3D() {
-  delete B_;
-  delete A_;
+  delete plasma_conductivity_coef_;
+  delete plasma_conductivity_;
+  delete Bimag_;
+  delete Breal_;
+  delete Aimag_;
+  delete Areal_;
   delete r_;
   delete K_;
   delete Bspace_;
@@ -128,6 +140,12 @@ void QuasiMagnetostaticSolver3D::initialize() {
   pspace_ = new ParFiniteElementSpace(pmesh_, h1_);
   Bspace_ = new ParFiniteElementSpace(pmesh_, hdiv_);
 
+  true_size_ = Aspace_->TrueVSize();
+  offsets_[0] = 0;
+  offsets_[1] = true_size_;
+  offsets_[2] = true_size_;
+  offsets_.PartialSum();
+
   //-----------------------------------------------------
   // 3) Get BC dofs (everything is essential---i.e., PEC)
   //-----------------------------------------------------
@@ -151,6 +169,12 @@ void QuasiMagnetostaticSolver3D::initialize() {
 
   // initialize current
   InitializeCurrent();
+
+  // initialize conductivity
+  plasma_conductivity_ = new ParGridFunction(pspace_);
+  *plasma_conductivity_ = 0.0;
+
+  plasma_conductivity_coef_ = new GridFunctionCoefficient(plasma_conductivity_);
 }
 
 void QuasiMagnetostaticSolver3D::InitializeCurrent() {
@@ -172,18 +196,21 @@ void QuasiMagnetostaticSolver3D::InitializeCurrent() {
   //    source current domain for 5 total attributes.
   Vector J0(pmesh_->attributes.Max());
   J0 = 0.0;
+
+  const double mu0J = em_opts_.mu0 * em_opts_.current_amplitude;
+
   if (em_opts_.bot_only) {
     // only bottom rings
-    J0(1) = J0(2) = 1.0;
+    J0(1) = J0(2) = mu0J;
     J0(3) = J0(4) = 0.0;
   } else if (em_opts_.top_only) {
     // only top rings
     J0(1) = J0(2) = 0.0;
-    J0(3) = J0(4) = 1.0;
+    J0(3) = J0(4) = mu0J;
   } else {
     // all rings
-    J0(1) = J0(2) = 1.0;
-    J0(3) = J0(4) = 1.0;
+    J0(1) = J0(2) = mu0J;
+    J0(3) = J0(4) = mu0J;
   }
 
   PWConstCoefficient J0coef(J0);
@@ -254,6 +281,10 @@ void QuasiMagnetostaticSolver3D::parseSolverOptions() {
   tpsP_->getInput("em/top_only", em_opts_.top_only, false);
   tpsP_->getInput("em/bot_only", em_opts_.bot_only, false);
 
+  tpsP_->getInput("em/current_amplitude", em_opts_.current_amplitude, 1.0);
+  tpsP_->getInput("em/current_frequency", em_opts_.current_frequency, 1.0);
+  tpsP_->getInput("em/permeability", em_opts_.mu0, 1.0);
+
   // dump options to screen for user inspection
   if (mpi_.Root()) {
     em_opts_.print(std::cout);
@@ -266,50 +297,142 @@ void QuasiMagnetostaticSolver3D::solve() {
 
   assert(operator_initialized_ && current_initialized_);
 
+  // Set up block structure
+  BlockVector Avec(offsets_), rhs(offsets_);
+
+  Areal_ = new ParGridFunction(Aspace_);
+  *Areal_ = 0.0;
+
+  Aimag_ = new ParGridFunction(Aspace_);
+  *Aimag_ = 0.0;
+
+  Areal_->ParallelAssemble(Avec.GetBlock(0));
+  Aimag_->ParallelAssemble(Avec.GetBlock(1));
+
+  // NB: Driving current assumed to have *only* real content
+  r_->ParallelAssemble(rhs.GetBlock(0));
+  rhs.GetBlock(1) = 0.0;
+
   // Solve for the magnetic vector potential and magnetic field in 3 steps
+  std::cout << "Here 0!\n" << std::endl;
 
-  // 1) Solve the curl(curl(A)) = J for magnetic vector potential
-  //    using operators set up by Initialize() and InitializeCurrent()
-  //    fcns
-  A_ = new ParGridFunction(Aspace_);
-  *A_ = 0;
+  // Set up block operator
+  OperatorPtr Kdiag;
+  K_->FormSystemMatrix(ess_bdr_tdofs_, Kdiag);
+  K_->EliminateVDofsInRHS(ess_bdr_tdofs_, Avec.GetBlock(0), rhs.GetBlock(0));
+  K_->EliminateVDofsInRHS(ess_bdr_tdofs_, Avec.GetBlock(1), rhs.GetBlock(1));
 
-  HypreParMatrix K;
-  HypreParVector x(Aspace_);
-  HypreParVector b(Aspace_);
+  std::cout << "Here 1!\n" << std::endl;
 
-  K_->FormLinearSystem(ess_bdr_tdofs_, *A_, *r_, K, x, b);
+  const double mu0_omega = em_opts_.mu0 * em_opts_.current_frequency * 2 * M_PI;
+  ProductCoefficient mu_sigma_omega(mu0_omega, *plasma_conductivity_coef_);
 
-  // Set up the preconditioner
-  HypreAMS *iK;
-  iK = new HypreAMS(K, Aspace_);
-  iK->SetSingularProblem();
-  iK->iterative_mode = false;
+  ParBilinearForm *Kconductivity = new ParBilinearForm(Aspace_);
+  Kconductivity->AddDomainIntegrator(new VectorFEMassIntegrator(mu_sigma_omega));
+  Kconductivity->Assemble();
 
-  MINRESSolver solver(MPI_COMM_WORLD);
-  solver.SetAbsTol(em_opts_.atol);
+  std::cout << "Here 2!\n" << std::endl;
+
+  OperatorPtr Koffd;
+  Kconductivity->FormSystemMatrix(ess_bdr_tdofs_, Koffd);
+
+  HypreParMatrix *Kdiag_mat = Kdiag.As<HypreParMatrix>();
+  HypreParMatrix *Koffd_mat = Koffd.As<HypreParMatrix>();
+
+  Koffd_mat->EliminateRows(ess_bdr_tdofs_);
+
+  BlockOperator *qms = new BlockOperator(offsets_);
+
+  qms->SetBlock(0, 0, Kdiag_mat);
+  qms->SetBlock(0, 1, Koffd_mat, -1);
+  qms->SetBlock(1, 0, Koffd_mat);
+  qms->SetBlock(1, 1, Kdiag_mat);
+
+  // Set up block preconditioner
+  HypreAMS *prec;
+  prec = new HypreAMS(*Kdiag_mat, Aspace_);
+  prec->SetSingularProblem();
+  prec->iterative_mode = false;
+
+  BlockDiagonalPreconditioner BDP(offsets_);
+  BDP.SetDiagonalBlock(0, prec);
+  BDP.SetDiagonalBlock(1, prec);
+
+  FGMRESSolver solver(MPI_COMM_WORLD);
+
+  solver.SetPreconditioner(BDP);
+  solver.SetOperator(*qms);
+
   solver.SetRelTol(em_opts_.rtol);
+  solver.SetAbsTol(em_opts_.atol);
   solver.SetMaxIter(em_opts_.max_iter);
-  solver.SetOperator(K);
-  solver.SetPreconditioner(*iK);
-  solver.SetPrintLevel(1);
-  solver.Mult(b, x);
-  delete iK;
+  solver.SetPreconditioner(*prec);
 
-  K_->RecoverFEMSolution(x, *r_, *A_);
+  solver.Mult(rhs, Avec);
+  delete prec;
+
+  Areal_->Distribute(&(Avec.GetBlock(0)));
+  Aimag_->Distribute(&(Avec.GetBlock(1)));
 
   // 2) Determine B from A according to B = curl(A).  Here we use an
   //    interpolator rather than a projection.
   if (verbose) grvy_printf(ginfo, "Evaluating curl(A) to get the magnetic field.\n");
-  B_ = new ParGridFunction(Bspace_);
-  *B_ = 0;
+  Breal_ = new ParGridFunction(Bspace_);
+  *Breal_ = 0;
+
+  Bimag_ = new ParGridFunction(Bspace_);
+  *Breal_ = 0;
 
   ParDiscreteLinearOperator *curl = new ParDiscreteLinearOperator(Aspace_, Bspace_);
   curl->AddDomainInterpolator(new CurlInterpolator);
   curl->Assemble();
   curl->Finalize();
-  curl->Mult(*A_, *B_);
+  curl->Mult(*Areal_, *Breal_);
+  curl->Mult(*Aimag_, *Bimag_);
   delete curl;
+
+  // // 1) Solve the curl(curl(A)) = J for magnetic vector potential
+  // //    using operators set up by Initialize() and InitializeCurrent()
+  // //    fcns
+  // A_ = new ParGridFunction(Aspace_);
+  // *A_ = 0;
+
+  // HypreParMatrix K;
+  // HypreParVector x(Aspace_);
+  // HypreParVector b(Aspace_);
+
+  // K_->FormLinearSystem(ess_bdr_tdofs_, *A_, *r_, K, x, b);
+
+  // // Set up the preconditioner
+  // HypreAMS *iK;
+  // iK = new HypreAMS(K, Aspace_);
+  // iK->SetSingularProblem();
+  // iK->iterative_mode = false;
+
+  // MINRESSolver solver(MPI_COMM_WORLD);
+  // solver.SetAbsTol(em_opts_.atol);
+  // solver.SetRelTol(em_opts_.rtol);
+  // solver.SetMaxIter(em_opts_.max_iter);
+  // solver.SetOperator(K);
+  // solver.SetPreconditioner(*iK);
+  // solver.SetPrintLevel(1);
+  // solver.Mult(b, x);
+  // delete iK;
+
+  // K_->RecoverFEMSolution(x, *r_, *A_);
+
+  // // 2) Determine B from A according to B = curl(A).  Here we use an
+  // //    interpolator rather than a projection.
+  // if (verbose) grvy_printf(ginfo, "Evaluating curl(A) to get the magnetic field.\n");
+  // B_ = new ParGridFunction(Bspace_);
+  // *B_ = 0;
+
+  // ParDiscreteLinearOperator *curl = new ParDiscreteLinearOperator(Aspace_, Bspace_);
+  // curl->AddDomainInterpolator(new CurlInterpolator);
+  // curl->Assemble();
+  // curl->Finalize();
+  // curl->Mult(*A_, *B_);
+  // delete curl;
 
   // 3) Output A and B fields for visualization using paraview
   if (verbose) grvy_printf(ginfo, "Writing solution to paraview output.\n");
@@ -320,12 +443,14 @@ void QuasiMagnetostaticSolver3D::solve() {
   paraview_dc.SetDataFormat(VTKFormat::BINARY);
   paraview_dc.SetHighOrderOutput(true);
   paraview_dc.SetTime(0.0);
-  paraview_dc.RegisterField("magvecpot", A_);
-  paraview_dc.RegisterField("magnfield", B_);
+  paraview_dc.RegisterField("magvecpot_real", Areal_);
+  paraview_dc.RegisterField("magvecpot_imag", Aimag_);
+  paraview_dc.RegisterField("magnfield_real", Breal_);
+  paraview_dc.RegisterField("magnfield_imag", Bimag_);
   paraview_dc.Save();
 
   // Compute and dump the magnetic field on the axis
-  InterpolateToYAxis();
+  //InterpolateToYAxis();
 
   if (mpi_.Root()) {
     std::cout << "EM simulation complete" << std::endl;
@@ -361,7 +486,8 @@ void QuasiMagnetostaticSolver3D::InterpolateToYAxis() const {
   // And interpolate
   for (int ipt = 0; ipt < em_opts_.nBy; ipt++) {
     if (eid[ipt] >= 0) {
-      B_->GetVectorValue(eid[ipt], ips[ipt], Bpoint);
+      //B_->GetVectorValue(eid[ipt], ips[ipt], Bpoint);
+      Breal_->GetVectorValue(eid[ipt], ips[ipt], Bpoint);
       Byloc[ipt] = Bpoint[1];
     } else {
       Byloc[ipt] = 0;

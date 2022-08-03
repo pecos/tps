@@ -61,6 +61,9 @@ class QuasiMagnetostaticSolver3D : public TPS::Solver {
   mfem::ParMesh *pmesh_;
   int dim_;
 
+  int true_size_;
+  Array<int> offsets_;
+
   mfem::FiniteElementCollection *hcurl_;
   mfem::FiniteElementCollection *h1_;
   mfem::FiniteElementCollection *hdiv_;
@@ -74,8 +77,15 @@ class QuasiMagnetostaticSolver3D : public TPS::Solver {
   mfem::ParBilinearForm *K_;
   mfem::ParLinearForm *r_;
 
-  mfem::ParGridFunction *A_;
-  mfem::ParGridFunction *B_;
+  mfem::ParGridFunction *Areal_;
+  mfem::ParGridFunction *Aimag_;
+
+  mfem::ParGridFunction *Breal_;
+  mfem::ParGridFunction *Bimag_;
+
+  mfem::ParGridFunction *plasma_conductivity_;
+  mfem::GridFunctionCoefficient *plasma_conductivity_coef_;
+
 
   bool operator_initialized_;
   bool current_initialized_;
