@@ -1218,7 +1218,12 @@ void M2ulPhyS::projectInitialSolution() {
   // update pressure grid function
   mixture->UpdatePressureGridFunction(press, Up);
 
-  paraviewColl->Save();
+  if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
+    // Only save IC from fresh start.  On restart, will save viz at
+    // next requested iter.  This avoids possibility of trying to
+    // overwrite existing paraview data for the current iteration.
+    paraviewColl->Save();
+  }
 }
 
 void M2ulPhyS::solve() {
