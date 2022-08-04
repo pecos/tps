@@ -43,7 +43,7 @@ using namespace mfem::common;
 void JFun(const Vector &x, Vector &f);
 
 QuasiMagnetostaticSolver3D::QuasiMagnetostaticSolver3D(MPI_Session &mpi, ElectromagneticOptions em_opts, TPS::Tps *tps)
-  : mpi_(mpi), em_opts_(em_opts), offsets_(3) {
+    : mpi_(mpi), em_opts_(em_opts), offsets_(3) {
   tpsP_ = tps;
 
   // verify running on cpu
@@ -450,7 +450,7 @@ void QuasiMagnetostaticSolver3D::solve() {
   paraview_dc.Save();
 
   // Compute and dump the magnetic field on the axis
-  //InterpolateToYAxis();
+  // InterpolateToYAxis();
 
   if (mpi_.Root()) {
     std::cout << "EM simulation complete" << std::endl;
@@ -486,7 +486,7 @@ void QuasiMagnetostaticSolver3D::InterpolateToYAxis() const {
   // And interpolate
   for (int ipt = 0; ipt < em_opts_.nBy; ipt++) {
     if (eid[ipt] >= 0) {
-      //B_->GetVectorValue(eid[ipt], ips[ipt], Bpoint);
+      // B_->GetVectorValue(eid[ipt], ips[ipt], Bpoint);
       Breal_->GetVectorValue(eid[ipt], ips[ipt], Bpoint);
       Byloc[ipt] = Bpoint[1];
     } else {
@@ -569,17 +569,12 @@ void JFun(const Vector &x, Vector &J) {
   J = axx;
 }
 
+static double radius(const Vector &x) { return x[0]; }
 
-static double radius(const Vector &x) {
-  return x[0];
-}
+static double oneOverRadius(const Vector &x) { return 1.0 / x[0]; }
 
-static double oneOverRadius(const Vector &x) {
-  return 1.0/x[0];
-}
-
-QuasiMagnetostaticSolverAxiSym::QuasiMagnetostaticSolverAxiSym(MPI_Session &mpi,
-                                                               ElectromagneticOptions em_opts, TPS::Tps *tps)
+QuasiMagnetostaticSolverAxiSym::QuasiMagnetostaticSolverAxiSym(MPI_Session &mpi, ElectromagneticOptions em_opts,
+                                                               TPS::Tps *tps)
     : mpi_(mpi), em_opts_(em_opts), offsets_(3) {
   tpsP_ = tps;
 
@@ -747,7 +742,6 @@ void QuasiMagnetostaticSolverAxiSym::InitializeCurrent() {
 
   current_initialized_ = true;
 }
-
 
 void QuasiMagnetostaticSolverAxiSym::parseSolverOptions() {
   tpsP_->getRequiredInput("em/mesh", em_opts_.mesh_file);

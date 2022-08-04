@@ -1154,7 +1154,6 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     paraviewColl->RegisterField("Te", electron_temp_field);
   }
 
-
 // If mms, add exact solution.
 #ifdef HAVE_MASA
   if (config.use_mms_ && config.mmsSaveDetails_) {
