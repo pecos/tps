@@ -86,7 +86,6 @@ class QuasiMagnetostaticSolver3D : public TPS::Solver {
   mfem::ParGridFunction *plasma_conductivity_;
   mfem::GridFunctionCoefficient *plasma_conductivity_coef_;
 
-
   bool operator_initialized_;
   bool current_initialized_;
 
