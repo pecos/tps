@@ -297,7 +297,16 @@ void QuasiMagnetostaticSolver3D::solve() {
 
   assert(operator_initialized_ && current_initialized_);
 
-  // Set up block structure
+  // Solve for the magnetic vector potential and magnetic field in 4 steps
+
+  // 0) Set up block operators for the QMS system
+  //
+  //  [ K                -\omega M(\sigma) ] [real(A)] = [real(J)]
+  //  [ \omega M(\sigma)  K                ] [imag(A)] = [imag(J)]
+  //
+  // where K corresponds to the discrete curl(curl()) operator and
+  // \omega M(\sigma) comes from \sigma dA/dt.
+
   BlockVector Avec(offsets_), rhs(offsets_);
 
   Areal_ = new ParGridFunction(Aspace_);
@@ -313,16 +322,11 @@ void QuasiMagnetostaticSolver3D::solve() {
   r_->ParallelAssemble(rhs.GetBlock(0));
   rhs.GetBlock(1) = 0.0;
 
-  // Solve for the magnetic vector potential and magnetic field in 3 steps
-  std::cout << "Here 0!\n" << std::endl;
-
   // Set up block operator
   OperatorPtr Kdiag;
   K_->FormSystemMatrix(ess_bdr_tdofs_, Kdiag);
   K_->EliminateVDofsInRHS(ess_bdr_tdofs_, Avec.GetBlock(0), rhs.GetBlock(0));
   K_->EliminateVDofsInRHS(ess_bdr_tdofs_, Avec.GetBlock(1), rhs.GetBlock(1));
-
-  std::cout << "Here 1!\n" << std::endl;
 
   const double mu0_omega = em_opts_.mu0 * em_opts_.current_frequency * 2 * M_PI;
   ProductCoefficient mu_sigma_omega(mu0_omega, *plasma_conductivity_coef_);
@@ -330,8 +334,6 @@ void QuasiMagnetostaticSolver3D::solve() {
   ParBilinearForm *Kconductivity = new ParBilinearForm(Aspace_);
   Kconductivity->AddDomainIntegrator(new VectorFEMassIntegrator(mu_sigma_omega));
   Kconductivity->Assemble();
-
-  std::cout << "Here 2!\n" << std::endl;
 
   OperatorPtr Koffd;
   Kconductivity->FormSystemMatrix(ess_bdr_tdofs_, Koffd);
@@ -358,6 +360,9 @@ void QuasiMagnetostaticSolver3D::solve() {
   BDP.SetDiagonalBlock(0, prec);
   BDP.SetDiagonalBlock(1, prec);
 
+  // 1) Solve QMS (i.e., i \omega A + curl(curl(A)) = J) for magnetic
+  //    vector potential using operators set up by Initialize() and
+  //    InitializeCurrent() fcns
   FGMRESSolver solver(MPI_COMM_WORLD);
 
   solver.SetPreconditioner(BDP);
@@ -391,49 +396,6 @@ void QuasiMagnetostaticSolver3D::solve() {
   curl->Mult(*Aimag_, *Bimag_);
   delete curl;
 
-  // // 1) Solve the curl(curl(A)) = J for magnetic vector potential
-  // //    using operators set up by Initialize() and InitializeCurrent()
-  // //    fcns
-  // A_ = new ParGridFunction(Aspace_);
-  // *A_ = 0;
-
-  // HypreParMatrix K;
-  // HypreParVector x(Aspace_);
-  // HypreParVector b(Aspace_);
-
-  // K_->FormLinearSystem(ess_bdr_tdofs_, *A_, *r_, K, x, b);
-
-  // // Set up the preconditioner
-  // HypreAMS *iK;
-  // iK = new HypreAMS(K, Aspace_);
-  // iK->SetSingularProblem();
-  // iK->iterative_mode = false;
-
-  // MINRESSolver solver(MPI_COMM_WORLD);
-  // solver.SetAbsTol(em_opts_.atol);
-  // solver.SetRelTol(em_opts_.rtol);
-  // solver.SetMaxIter(em_opts_.max_iter);
-  // solver.SetOperator(K);
-  // solver.SetPreconditioner(*iK);
-  // solver.SetPrintLevel(1);
-  // solver.Mult(b, x);
-  // delete iK;
-
-  // K_->RecoverFEMSolution(x, *r_, *A_);
-
-  // // 2) Determine B from A according to B = curl(A).  Here we use an
-  // //    interpolator rather than a projection.
-  // if (verbose) grvy_printf(ginfo, "Evaluating curl(A) to get the magnetic field.\n");
-  // B_ = new ParGridFunction(Bspace_);
-  // *B_ = 0;
-
-  // ParDiscreteLinearOperator *curl = new ParDiscreteLinearOperator(Aspace_, Bspace_);
-  // curl->AddDomainInterpolator(new CurlInterpolator);
-  // curl->Assemble();
-  // curl->Finalize();
-  // curl->Mult(*A_, *B_);
-  // delete curl;
-
   // 3) Output A and B fields for visualization using paraview
   if (verbose) grvy_printf(ginfo, "Writing solution to paraview output.\n");
   ParaViewDataCollection paraview_dc("magnetostatic", pmesh_);
@@ -450,7 +412,7 @@ void QuasiMagnetostaticSolver3D::solve() {
   paraview_dc.Save();
 
   // Compute and dump the magnetic field on the axis
-  // InterpolateToYAxis();
+  InterpolateToYAxis();
 
   if (mpi_.Root()) {
     std::cout << "EM simulation complete" << std::endl;
@@ -646,7 +608,7 @@ void QuasiMagnetostaticSolverAxiSym::initialize() {
   // 1c) Partition the mesh
   pmesh_ = new ParMesh(MPI_COMM_WORLD, *mesh);
   delete mesh;  // no longer need the serial mesh
-  pmesh_->ReorientTetMesh();
+  // pmesh_->ReorientTetMesh();
 
   //-----------------------------------------------------
   // 2) Prepare the required finite element and sizes
