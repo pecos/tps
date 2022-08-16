@@ -39,21 +39,26 @@ CycleAvgJouleCoupling::CycleAvgJouleCoupling(MPI_Session &mpi, string &inputFile
     : mpi_(mpi), em_opt_(), max_outer_iters_(max_out) {
   qmsa_solver_ = new QuasiMagnetostaticSolverAxiSym(mpi, em_opt_, tps);
   flow_solver_ = new M2ulPhyS(mpi, inputFileName, tps);
+#ifdef HAVE_GSLIB
   interp_flow_to_em_ = new FindPointsGSLIB(MPI_COMM_WORLD);
   interp_em_to_flow_ = new FindPointsGSLIB(MPI_COMM_WORLD);
+#endif
 }
 
 CycleAvgJouleCoupling::~CycleAvgJouleCoupling() {
   delete flow_solver_;
   delete qmsa_solver_;
+#ifdef HAVE_GSLIB
   delete interp_flow_to_em_;
   delete interp_em_to_flow_;
+#endif
 }
 
 void CycleAvgJouleCoupling::initializeInterpolationData() {
   bool verbose = mpi_.Root();
   if (verbose) grvy_printf(ginfo, "Initializing interpolation data.\n");
 
+#ifdef HAVE_GSLIB
   ParMesh *flow_mesh = flow_solver_->GetMesh();
   ParMesh *em_mesh = qmsa_solver_->getMesh();
   assert(flow_mesh != NULL);
@@ -70,6 +75,9 @@ void CycleAvgJouleCoupling::initializeInterpolationData() {
   // TODO(trevilo): Add em to flow interpolation
   interp_em_to_flow_->Setup(*(qmsa_solver_->getMesh()));
   interp_em_to_flow_->SetDefaultInterpolationValue(0);
+#else
+  mfem_error("Cannot initialize interpolation without GSLIB support.");
+#endif
 }
 
 void CycleAvgJouleCoupling::interpConductivityFromFlowToEM() {
@@ -82,6 +90,7 @@ void CycleAvgJouleCoupling::interpConductivityFromFlowToEM() {
   const int nsp = em_fespace->GetFE(0)->GetNodes().GetNPoints();
   const int dim = em_mesh->Dimension();
 
+#ifdef HAVE_GSLIB
   // Generate list of points where the grid function will be evaluated.
   Vector vxyz;
 
@@ -130,6 +139,9 @@ void CycleAvgJouleCoupling::interpConductivityFromFlowToEM() {
   }
 
   conductivity_em_gf->SetFromTrueVector();
+#else
+  mfem_error("Cannot interpolate without GSLIB support.");
+#endif
 }
 
 void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
@@ -142,6 +154,7 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
   const int nsp = flow_fespace->GetFE(0)->GetNodes().GetNPoints();
   const int dim = flow_mesh->Dimension();
 
+#ifdef HAVE_GSLIB
   // Generate list of points where the grid function will be evaluated.
   Vector vxyz;
 
@@ -175,6 +188,9 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
 
   ParGridFunction *joule_heating_flow = flow_solver_->GetJouleHeatingGF();
   joule_heating_flow->SetFromTrueDofs(interp_vals);
+#else
+  mfem_error("Cannot interpolate without GSLIB support.");
+#endif
 }
 
 void CycleAvgJouleCoupling::parseSolverOptions() {

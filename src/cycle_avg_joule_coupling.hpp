@@ -39,6 +39,7 @@ class Tps;
 
 #include <iostream>
 #include <mfem.hpp>
+#include <tps_config.h>
 
 #include "M2ulPhyS.hpp"
 #include "em_options.hpp"
@@ -54,8 +55,10 @@ class CycleAvgJouleCoupling : public TPS::Solver {
 
   int max_outer_iters_;
 
+#ifdef HAVE_GSLIB
   FindPointsGSLIB *interp_flow_to_em_;
   FindPointsGSLIB *interp_em_to_flow_;
+#endif
 
  public:
   CycleAvgJouleCoupling(MPI_Session &mpi, string &inputFileName, TPS::Tps *tps, int max_out);
