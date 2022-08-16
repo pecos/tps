@@ -133,7 +133,7 @@ void CycleAvgJouleCoupling::interpConductivityFromFlowToEM() {
     vals.SetSize(vdofs.Size());
     for (int j = 0; j < nsp; j++) {
       // Arrange values byNodes
-      elem_dof_vals(j) = conductivity_em(i*nsp + j);
+      elem_dof_vals(j) = conductivity_em(i * nsp + j);
     }
     conductivity_em_gf->SetSubVector(vdofs, elem_dof_vals);
   }
@@ -205,7 +205,6 @@ void CycleAvgJouleCoupling::initialize() {
 }
 
 void CycleAvgJouleCoupling::solve() {
-
   const int increment = flow_solver_->getMaximumIterations();
   int curr_iter = flow_solver_->getCurrentIterations();
   flow_solver_->setMaximumIterations(curr_iter + increment);

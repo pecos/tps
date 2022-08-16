@@ -673,7 +673,7 @@ void QuasiMagnetostaticSolverAxiSym::InitializeCurrent() {
   assert(operator_initialized_);
 
   // ensure the mesh volume attributes conform to our expectations
-  //assert(pmesh_->attributes.Max() == 5);
+  // assert(pmesh_->attributes.Max() == 5);
   if (pmesh_->attributes.Max() != 5) {
     printf("WARNING: Could not initialize current source.\n");
     printf("         This probably means you should fix your mesh,\n");

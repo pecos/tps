@@ -473,13 +473,13 @@ void DryAir::computeConservedStateFromConvectiveFlux(const Vector &meanNormalFlu
 //   }
 // }
 
-void DryAir::UpdatePlasmaConductivityGridFunction(ParGridFunction* pc, const ParGridFunction* Up) {
+void DryAir::UpdatePlasmaConductivityGridFunction(ParGridFunction *pc, const ParGridFunction *Up) {
   // quick return if pc is NULL (nothing to set)
   if (pc == NULL) return;
 
   // otherwise, set plasma conductivity based on temperature
-  double* plasma_conductivity_gf = pc->HostWrite();
-  const double* UpData = Up->HostRead();
+  double *plasma_conductivity_gf = pc->HostWrite();
+  const double *UpData = Up->HostRead();
 
   const int nnode = pc->FESpace()->GetNDofs();
 
@@ -1911,13 +1911,13 @@ MFEM_HOST_DEVICE void PerfectMixture::computeSheathBdrFlux(const double *state, 
   }
 }
 
-void PerfectMixture::UpdatePlasmaConductivityGridFunction(ParGridFunction* pc, const ParGridFunction* Up) {
+void PerfectMixture::UpdatePlasmaConductivityGridFunction(ParGridFunction *pc, const ParGridFunction *Up) {
   // quick return if pc is NULL (nothing to set)
   if (pc == NULL) return;
 
   // otherwise, set plasma conductivity based on temperature
-  double* plasma_conductivity_gf = pc->HostWrite();
-  const double* UpData = Up->HostRead();
+  double *plasma_conductivity_gf = pc->HostWrite();
+  const double *UpData = Up->HostRead();
 
   const int nnode = pc->FESpace()->GetNDofs();
 

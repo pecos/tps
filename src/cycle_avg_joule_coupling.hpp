@@ -37,9 +37,10 @@ namespace TPS {
 class Tps;
 }
 
+#include <tps_config.h>
+
 #include <iostream>
 #include <mfem.hpp>
-#include <tps_config.h>
 
 #include "M2ulPhyS.hpp"
 #include "em_options.hpp"
@@ -72,7 +73,7 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   void initialize() override;
   void solve() override;
 
-  M2ulPhyS* getFlowSolver() { return flow_solver_; }
-  QuasiMagnetostaticSolverAxiSym* getEMSolver() { return qmsa_solver_; }
+  M2ulPhyS *getFlowSolver() { return flow_solver_; }
+  QuasiMagnetostaticSolverAxiSym *getEMSolver() { return qmsa_solver_; }
 };
 #endif  // CYCLE_AVG_JOULE_COUPLING_HPP_
