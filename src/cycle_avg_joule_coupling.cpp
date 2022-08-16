@@ -76,22 +76,60 @@ void CycleAvgJouleCoupling::interpConductivityFromFlowToEM() {
   bool verbose = mpi_.Root();
   if (verbose) grvy_printf(ginfo, "Interpolating conductivity to EM mesh.\n");
   const ParMesh *em_mesh = qmsa_solver_->getMesh();
+  const ParFiniteElementSpace *em_fespace = qmsa_solver_->getFESpace();
 
-  // NB: Code below only valid if 1) conductivity treated as H1
-  // function, 2) order of conductivity field is same as the order of
-  // the mesh and 3) nodes for em mesh are ordered byNODES
-  //
-  // TODO(trevilo): Generalize beyond the constraints above
-  const Vector vxyz_em = *(em_mesh->GetNodes());
+  const int NE = em_mesh->GetNE();
+  const int nsp = em_fespace->GetFE(0)->GetNodes().GetNPoints();
   const int dim = em_mesh->Dimension();
-  const int n_mesh_nodes = vxyz_em.Size() / dim;
 
-  Vector conductivity_em(n_mesh_nodes);
+  // Generate list of points where the grid function will be evaluated.
+  Vector vxyz;
+
+  vxyz.SetSize(nsp * NE * dim);
+  for (int i = 0; i < NE; i++) {
+    const FiniteElement *fe = em_fespace->GetFE(i);
+    const IntegrationRule ir = fe->GetNodes();
+    ElementTransformation *et = em_fespace->GetElementTransformation(i);
+
+    DenseMatrix pos;
+    et->Transform(ir, pos);
+    Vector rowx(vxyz.GetData() + i * nsp, nsp);
+    Vector rowy(vxyz.GetData() + i * nsp + NE * nsp, nsp);
+    Vector rowz;
+    if (dim == 3) {
+      rowz.SetDataAndSize(vxyz.GetData() + i * nsp + 2 * NE * nsp, nsp);
+    }
+    pos.GetRow(0, rowx);
+    pos.GetRow(1, rowy);
+    if (dim == 3) {
+      pos.GetRow(2, rowz);
+    }
+  }
+  const int nodes_cnt = vxyz.Size() / dim;
+
+  // Interpolate
+  Vector conductivity_em(nodes_cnt);
   const ParGridFunction *conductivity_flow_gf = flow_solver_->GetPlasmaConductivityGF();
-  interp_flow_to_em_->Interpolate(vxyz_em, *conductivity_flow_gf, conductivity_em);
+  interp_flow_to_em_->Interpolate(vxyz, *conductivity_flow_gf, conductivity_em);
 
+  // Set grid function
   ParGridFunction *conductivity_em_gf = qmsa_solver_->getPlasmaConductivityGF();
-  *conductivity_em_gf = conductivity_em;
+
+  Array<int> vdofs;
+  Vector vals;
+  Vector elem_dof_vals(nsp);
+
+  for (int i = 0; i < NE; i++) {
+    em_fespace->GetElementVDofs(i, vdofs);
+    vals.SetSize(vdofs.Size());
+    for (int j = 0; j < nsp; j++) {
+      // Arrange values byNodes
+      elem_dof_vals(j) = conductivity_em(i*nsp + j);
+    }
+    conductivity_em_gf->SetSubVector(vdofs, elem_dof_vals);
+  }
+
+  conductivity_em_gf->SetFromTrueVector();
 }
 
 void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
