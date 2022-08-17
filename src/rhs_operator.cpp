@@ -72,12 +72,12 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
       alpha(_alpha),
       U_(U),
       Up(_Up),
+      plasma_conductivity_(pc),
+      joule_heating_(jh),
       gradUp(_gradUp),
       gradUpfes(_gradUpfes),
       gradUp_A(_gradUp_A),
-      bcIntegrator(_bcIntegrator),
-      plasma_conductivity_(pc),
-      joule_heating_(jh) {
+      bcIntegrator(_bcIntegrator) {
   flux.SetSize(vfes->GetNDofs(), dim_, num_equation_);
   z.UseDevice(true);
   z.SetSize(A->Height());
