@@ -109,6 +109,8 @@ class GasMixture {
   double Sc;  // Schmidt number
 #endif
 
+  double const_plasma_conductivity_;
+
   // If not ambipolar, one species continuity equation is replaced by global continuity equation.
   // If ambipolar, electron continuity equation is also replaced by an algebraic equation (determined by GasMixture).
   MFEM_HOST_DEVICE void SetNumActiveSpecies() { numActiveSpecies = ambipolar ? (numSpecies - 2) : (numSpecies - 1); }
@@ -119,7 +121,7 @@ class GasMixture {
 
  public:
   GasMixture(RunConfiguration &_runfile, int _dim, int nvel);
-  MFEM_HOST_DEVICE GasMixture(WorkingFluid f, int _dim, int nvel);
+  MFEM_HOST_DEVICE GasMixture(WorkingFluid f, int _dim, int nvel, double pc = 0);
   GasMixture() {}
 
   MFEM_HOST_DEVICE virtual ~GasMixture() {}

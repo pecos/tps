@@ -243,6 +243,8 @@ class RunConfiguration {
   ArgonTransportInput argonTransportInput;
   ChemistryInput chemistryInput;
 
+  double const_plasma_conductivity_;
+
   RunConfiguration();
   ~RunConfiguration();
 

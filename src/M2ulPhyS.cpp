@@ -2156,6 +2156,8 @@ void M2ulPhyS::parsePlasmaModels() {
   std::string chemistryModelStr;
   tpsP->getInput("plasma_models/chemistry_model", chemistryModelStr, std::string(""));
 
+  tpsP->getInput("plasma_models/const_plasma_conductivity", config.const_plasma_conductivity_, 0.0);
+
   // TODO(kevin): cantera wrapper
   // if (chemistryModelStr == "cantera") {
   //   config.chemistryModel_ = ChemistryModel::CANTERA;

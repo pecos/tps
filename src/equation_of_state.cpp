@@ -34,12 +34,13 @@
 
 // EquationOfState::EquationOfState() {}
 
-GasMixture::GasMixture(RunConfiguration &_runfile, int _dim, int nvel) : GasMixture(_runfile.workFluid, _dim, nvel) {}
+GasMixture::GasMixture(RunConfiguration &_runfile, int _dim, int nvel) : GasMixture(_runfile.workFluid, _dim, nvel, _runfile.const_plasma_conductivity_) {}
 
-MFEM_HOST_DEVICE GasMixture::GasMixture(WorkingFluid f, int _dim, int nvel) {
+MFEM_HOST_DEVICE GasMixture::GasMixture(WorkingFluid f, int _dim, int nvel, double pc) {
   fluid = f;
   dim = _dim;
   nvel_ = nvel;
+  const_plasma_conductivity_ = pc;
 }
 
 void GasMixture::SetConstantPlasmaConductivity(ParGridFunction *pc, const ParGridFunction *Up) {
@@ -53,7 +54,7 @@ void GasMixture::SetConstantPlasmaConductivity(ParGridFunction *pc, const ParGri
   const int nnode = pc->FESpace()->GetNDofs();
 
   for (int n = 0; n < nnode; n++) {
-    plasma_conductivity_gf[n] = 50.0;
+    plasma_conductivity_gf[n] = const_plasma_conductivity_;
   }
 }
 
