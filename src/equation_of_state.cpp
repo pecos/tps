@@ -34,7 +34,8 @@
 
 // EquationOfState::EquationOfState() {}
 
-GasMixture::GasMixture(RunConfiguration &_runfile, int _dim, int nvel) : GasMixture(_runfile.workFluid, _dim, nvel, _runfile.const_plasma_conductivity_) {}
+GasMixture::GasMixture(RunConfiguration &_runfile, int _dim, int nvel)
+    : GasMixture(_runfile.workFluid, _dim, nvel, _runfile.const_plasma_conductivity_) {}
 
 MFEM_HOST_DEVICE GasMixture::GasMixture(WorkingFluid f, int _dim, int nvel, double pc) {
   fluid = f;
@@ -488,7 +489,6 @@ void DryAir::computeConservedStateFromConvectiveFlux(const Vector &meanNormalFlu
 //     pGridFunc[n] = rho*gas_constant*tmp;
 //   }
 // }
-
 
 // GPU FUNCTIONS
 /*#ifdef _GPU_
