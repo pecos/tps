@@ -235,13 +235,7 @@ class GasMixture {
     mfem_error("computeNumberDensities not implemented");
   }
 
-  // virtual double GetViscosity(const Vector &state) = 0;
-  // virtual double GetViscosityFromPrimitive(const Vector &state) = 0;
-  // virtual double GetThermalConductivity(const Vector &state) = 0;
-
-  virtual void UpdatePlasmaConductivityGridFunction(ParGridFunction *pc, const ParGridFunction *Up) {
-    mfem_error("UpdatePlasmaConductivityGridFunction not implemented");
-  }
+  void SetConstantPlasmaConductivity(ParGridFunction *pc, const ParGridFunction *Up);
 
   virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
 
@@ -402,8 +396,6 @@ class DryAir : public GasMixture {
     printf("ERROR: computeSheathBdrFlux is not supposed to be executed for DryAir!");
     return;
   }
-
-  virtual void UpdatePlasmaConductivityGridFunction(ParGridFunction *pc, const ParGridFunction *Up);
 
   virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
                                                        Vector &conservedState);
@@ -689,7 +681,6 @@ class PerfectMixture : public GasMixture {
   virtual double computePressureDerivativeFromConservatives(const Vector &dUp_dx, const Vector &Uin);
 
   // virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
-  virtual void UpdatePlasmaConductivityGridFunction(ParGridFunction *pc, const ParGridFunction *Up);
 
   // Compute the maximum characteristic speed.
   virtual double ComputeMaxCharSpeed(const Vector &state);

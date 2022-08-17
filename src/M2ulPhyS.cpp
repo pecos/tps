@@ -1240,7 +1240,7 @@ void M2ulPhyS::projectInitialSolution() {
 
   // update plasma electrical conductivity
   if (tpsP->isFlowEMCoupled()) {
-    mixture->UpdatePlasmaConductivityGridFunction(plasma_conductivity_, Up);
+    mixture->SetConstantPlasmaConductivity(plasma_conductivity_, Up);
   }
 
   if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
