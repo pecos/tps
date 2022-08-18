@@ -63,7 +63,8 @@ double BoundaryCondition::aggregateArea(int bndry_patchnum, MPI_Comm bc_comm) {
       const IntegrationRule &ir = IntRules.Get(Tr->GetGeometryType(), Tr->OrderJ());
 
       for (int p = 0; p < ir.GetNPoints(); p++) {
-        const IntegrationPoint &ip = ir.IntPoint(p);
+        const IntegrationPoint ip = ir.IntPoint(p);
+        Tr->SetIntPoint(&ip);
         area += Tr->Weight() * ip.weight;
       }
     }
