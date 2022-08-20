@@ -42,9 +42,11 @@ using namespace mfem::common;
 
 void JFun(const Vector &x, Vector &f);
 
-QuasiMagnetostaticSolver3D::QuasiMagnetostaticSolver3D(MPI_Session &mpi, ElectromagneticOptions em_opts, TPS::Tps *tps)
+QuasiMagnetostaticSolverBase::QuasiMagnetostaticSolverBase(MPI_Session &mpi, ElectromagneticOptions em_opts,
+                                                           TPS::Tps *tps)
     : mpi_(mpi), em_opts_(em_opts), offsets_(3) {
   tpsP_ = tps;
+  pmesh_ = NULL;
 
   // verify running on cpu
   if (tpsP_->getDeviceConfig() != "cpu") {
@@ -54,7 +56,13 @@ QuasiMagnetostaticSolver3D::QuasiMagnetostaticSolver3D(MPI_Session &mpi, Electro
     exit(1);
   }
 
-  pmesh_ = NULL;
+  plasma_conductivity_ = NULL;
+  plasma_conductivity_coef_ = NULL;
+  joule_heating_ = NULL;
+}
+
+QuasiMagnetostaticSolver3D::QuasiMagnetostaticSolver3D(MPI_Session &mpi, ElectromagneticOptions em_opts, TPS::Tps *tps)
+    : QuasiMagnetostaticSolverBase(mpi, em_opts, tps) {
   hcurl_ = NULL;
   h1_ = NULL;
   hdiv_ = NULL;
@@ -67,9 +75,6 @@ QuasiMagnetostaticSolver3D::QuasiMagnetostaticSolver3D(MPI_Session &mpi, Electro
   Aimag_ = NULL;
   Breal_ = NULL;
   Bimag_ = NULL;
-
-  plasma_conductivity_ = NULL;
-  plasma_conductivity_coef_ = NULL;
 
   true_size_ = 0;
   offsets_ = 0;
@@ -537,18 +542,7 @@ static double oneOverRadius(const Vector &x) { return 1.0 / x[0]; }
 
 QuasiMagnetostaticSolverAxiSym::QuasiMagnetostaticSolverAxiSym(MPI_Session &mpi, ElectromagneticOptions em_opts,
                                                                TPS::Tps *tps)
-    : mpi_(mpi), em_opts_(em_opts), offsets_(3) {
-  tpsP_ = tps;
-
-  // verify running on cpu
-  if (tpsP_->getDeviceConfig() != "cpu") {
-    if (mpi_.Root()) {
-      grvy_printf(GRVY_ERROR, "[ERROR] EM simulation currently only supported on cpu.\n");
-    }
-    exit(1);
-  }
-
-  pmesh_ = NULL;
+    : QuasiMagnetostaticSolverBase(mpi, em_opts, tps) {
   h1_ = NULL;
   Atheta_space_ = NULL;
   K_ = NULL;
@@ -557,7 +551,6 @@ QuasiMagnetostaticSolverAxiSym::QuasiMagnetostaticSolverAxiSym(MPI_Session &mpi,
   Atheta_imag_ = NULL;
   plasma_conductivity_ = NULL;
   plasma_conductivity_coef_ = NULL;
-  joule_heating_ = NULL;
 
   true_size_ = 0;
   offsets_ = 0;

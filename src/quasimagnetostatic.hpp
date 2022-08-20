@@ -44,14 +44,11 @@ class Tps;
 #include "tps.hpp"
 #include "tps_mfem_wrap.hpp"
 
-/** Solve quasi-magnetostatic approximation of Maxwell
- *
- *  Solves the quasi-magnetostatic approximation of Maxwell's
- *  equations for a user-specified source current.
+/** Base class for quasimagntostatic solvers
  *
  */
-class QuasiMagnetostaticSolver3D : public TPS::Solver {
- private:
+class QuasiMagnetostaticSolverBase : public TPS::Solver {
+ protected:
   mfem::MPI_Session &mpi_;
   ElectromagneticOptions em_opts_;
 
@@ -60,10 +57,40 @@ class QuasiMagnetostaticSolver3D : public TPS::Solver {
 
   mfem::ParMesh *pmesh_;
   int dim_;
-
   int true_size_;
   Array<int> offsets_;
 
+  mfem::ParGridFunction *plasma_conductivity_;
+  mfem::GridFunctionCoefficient *plasma_conductivity_coef_;
+
+  mfem::ParGridFunction *joule_heating_;
+
+ public:
+  QuasiMagnetostaticSolverBase(mfem::MPI_Session &mpi, ElectromagneticOptions em_opts, TPS::Tps *tps);
+  virtual ~QuasiMagnetostaticSolverBase(){};
+
+  /** Initialize current for axisymmetric quasi-magnetostatic problem
+   *
+   *  Build the source current function
+   */
+  virtual void InitializeCurrent() = 0;
+
+  mfem::ParMesh *getMesh() const { return pmesh_; }
+  mfem::ParGridFunction *getPlasmaConductivityGF() { return plasma_conductivity_; }
+  mfem::ParGridFunction *getJouleHeatingGF() { return joule_heating_; }
+
+  virtual mfem::ParFiniteElementSpace *getFESpace() = 0;
+};
+
+/** Solve quasi-magnetostatic approximation of Maxwell
+ *
+ *  Solves the quasi-magnetostatic approximation of Maxwell's
+ *  equations for a user-specified source current.
+ *
+ */
+// class QuasiMagnetostaticSolver3D : public TPS::Solver {
+class QuasiMagnetostaticSolver3D : public QuasiMagnetostaticSolverBase {
+ protected:
   mfem::FiniteElementCollection *hcurl_;
   mfem::FiniteElementCollection *h1_;
   mfem::FiniteElementCollection *hdiv_;
@@ -83,8 +110,8 @@ class QuasiMagnetostaticSolver3D : public TPS::Solver {
   mfem::ParGridFunction *Breal_;
   mfem::ParGridFunction *Bimag_;
 
-  mfem::ParGridFunction *plasma_conductivity_;
-  mfem::GridFunctionCoefficient *plasma_conductivity_coef_;
+  // mfem::ParGridFunction *plasma_conductivity_;
+  // mfem::GridFunctionCoefficient *plasma_conductivity_coef_;
 
   bool operator_initialized_;
   bool current_initialized_;
@@ -114,6 +141,8 @@ class QuasiMagnetostaticSolver3D : public TPS::Solver {
 
   /** Solve quasi-magnetostatic problem */
   void solve() override;
+
+  mfem::ParFiniteElementSpace *getFESpace() { return Aspace_; }
 };
 
 /** Solve quasi-magnetostatic approximation of Maxwell for 2-D axisymmetric
@@ -122,19 +151,8 @@ class QuasiMagnetostaticSolver3D : public TPS::Solver {
  *  element spaces from the 3D solver.
  *
  */
-class QuasiMagnetostaticSolverAxiSym : public TPS::Solver {
- private:
-  mfem::MPI_Session &mpi_;
-  ElectromagneticOptions em_opts_;
-
-  // pointer to parent Tps class
-  TPS::Tps *tpsP_;
-
-  mfem::ParMesh *pmesh_;
-  int dim_;
-  int true_size_;
-  Array<int> offsets_;
-
+class QuasiMagnetostaticSolverAxiSym : public QuasiMagnetostaticSolverBase {  // public TPS::Solver {
+ protected:
   mfem::FiniteElementCollection *h1_;
 
   mfem::ParFiniteElementSpace *Atheta_space_;
@@ -146,11 +164,6 @@ class QuasiMagnetostaticSolverAxiSym : public TPS::Solver {
 
   mfem::ParGridFunction *Atheta_real_;
   mfem::ParGridFunction *Atheta_imag_;
-
-  mfem::ParGridFunction *plasma_conductivity_;
-  mfem::GridFunctionCoefficient *plasma_conductivity_coef_;
-
-  mfem::ParGridFunction *joule_heating_;
 
   bool operator_initialized_;
   bool current_initialized_;
@@ -180,10 +193,7 @@ class QuasiMagnetostaticSolverAxiSym : public TPS::Solver {
   /** Solve quasi-magnetostatic problem */
   void solve() override;
 
-  mfem::ParMesh *getMesh() const { return pmesh_; }
   mfem::ParFiniteElementSpace *getFESpace() { return Atheta_space_; }
-  mfem::ParGridFunction *getPlasmaConductivityGF() { return plasma_conductivity_; }
-  mfem::ParGridFunction *getJouleHeatingGF() { return joule_heating_; }
 };
 
 #endif  // QUASIMAGNETOSTATIC_HPP_
