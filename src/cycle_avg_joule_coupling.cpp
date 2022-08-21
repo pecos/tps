@@ -241,6 +241,10 @@ void CycleAvgJouleCoupling::solve() {
     // EM
     interpConductivityFromFlowToEM();
     qmsa_solver_->solve();
+    const double tot_jh = qmsa_solver_->totalJouleHeating();
+    if (mpi_.Root()) {
+      grvy_printf(GRVY_INFO, "The total input Joule heating = %.6e\n", tot_jh);
+    }
 
     // flow
     interpJouleHeatingFromEMToFlow();
