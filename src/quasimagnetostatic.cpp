@@ -520,6 +520,13 @@ void QuasiMagnetostaticSolver3D::InterpolateToYAxis() const {
   delete By;
 }
 
+double QuasiMagnetostaticSolver3D::elementJouleHeating(const FiniteElement &el, ElementTransformation &Tr,
+                                                       const Vector &elfun) {
+  return 0;
+}
+
+double QuasiMagnetostaticSolver3D::totalJouleHeating() { return 0; }
+
 void JFun(const Vector &x, Vector &J) {
   Vector a(3);
   a(0) = 0.0;
@@ -867,4 +874,85 @@ void QuasiMagnetostaticSolverAxiSym::solve() {
   if (mpi_.Root()) {
     std::cout << "EM simulation complete" << std::endl;
   }
+}
+
+double QuasiMagnetostaticSolverAxiSym::elementJouleHeating(const FiniteElement &el, ElementTransformation &Tr,
+                                                           const Vector &elfun) {
+  // Get size info
+  const int dof = el.GetDof();
+  const int dim = el.GetDim();
+  const int nvar = 1;
+
+  assert(dim == 2);
+
+  // Storage for basis fcns, derivatives, fluxes
+  Vector shape;
+  shape.SetSize(dof);
+  Vector soln;
+  soln.SetSize(nvar);
+
+  // View elfun and elvec as matrices (make life easy below)
+  DenseMatrix elfun_mat(elfun.GetData(), dof, nvar);
+
+  // Get quadrature rule
+  const int order = el.GetOrder();
+  const int intorder = order + 1;
+  const IntegrationRule *ir = &IntRules.Get(el.GetGeomType(), intorder);
+
+  double elem_jh = 0;
+
+  // for every quadrature point...
+  for (int i = 0; i < ir->GetNPoints(); i++) {
+    const IntegrationPoint &ip = ir->IntPoint(i);
+    Tr.SetIntPoint(&ip);
+
+    // evaluate radius
+    double x[3];
+    Vector transip(x, 3);
+    Tr.Transform(ip, transip);
+    const double radius = transip[0];
+
+    // evaluate basis functions
+    el.CalcShape(ip, shape);
+
+    // Interpolate solution
+    elfun_mat.MultTranspose(shape, soln);
+
+    // Add quad point contribution to integral
+    double qpcontrib = soln[0] * radius;
+
+    const double wt = ip.weight * Tr.Weight();
+    elem_jh += qpcontrib * wt;
+  }
+
+  return elem_jh;
+}
+
+double QuasiMagnetostaticSolverAxiSym::totalJouleHeating() {
+  const int NE = pmesh_->GetNE();
+  const ParFiniteElementSpace *fes = this->getFESpace();
+
+  double int_jh = 0;
+
+  Array<int> vdofs;
+  Vector el_x;
+
+  // loop over elements on this mpi rank and integrate joule heating
+  for (int ielem = 0; ielem < NE; ielem++) {
+    const FiniteElement *fe = fes->GetFE(ielem);
+    DofTransformation *doftrans = fes->GetElementVDofs(ielem, vdofs);
+    ElementTransformation *T = fes->GetElementTransformation(ielem);
+    joule_heating_->GetSubVector(vdofs, el_x);
+    if (doftrans) {
+      doftrans->InvTransformPrimal(el_x);
+    }
+
+    int_jh += elementJouleHeating(*fe, *T, el_x);
+  }
+
+  // sum over mpi ranks
+  double total_int_jh = 0;
+  MPI_Allreduce(&int_jh, &total_int_jh, 1, MPI_DOUBLE, MPI_SUM, fes->GetComm());
+
+  return total_int_jh;
 }

@@ -80,6 +80,9 @@ class QuasiMagnetostaticSolverBase : public TPS::Solver {
   mfem::ParGridFunction *getJouleHeatingGF() { return joule_heating_; }
 
   virtual mfem::ParFiniteElementSpace *getFESpace() = 0;
+
+  virtual double elementJouleHeating(const FiniteElement &el, ElementTransformation &Tr, const Vector &elfun) = 0;
+  virtual double totalJouleHeating() = 0;
 };
 
 /** Solve quasi-magnetostatic approximation of Maxwell
@@ -143,6 +146,9 @@ class QuasiMagnetostaticSolver3D : public QuasiMagnetostaticSolverBase {
   void solve() override;
 
   mfem::ParFiniteElementSpace *getFESpace() { return Aspace_; }
+
+  double elementJouleHeating(const FiniteElement &el, ElementTransformation &Tr, const Vector &elfun) override;
+  double totalJouleHeating() override;
 };
 
 /** Solve quasi-magnetostatic approximation of Maxwell for 2-D axisymmetric
@@ -194,6 +200,9 @@ class QuasiMagnetostaticSolverAxiSym : public QuasiMagnetostaticSolverBase {  //
   void solve() override;
 
   mfem::ParFiniteElementSpace *getFESpace() { return Atheta_space_; }
+
+  double elementJouleHeating(const FiniteElement &el, ElementTransformation &Tr, const Vector &elfun) override;
+  double totalJouleHeating() override;
 };
 
 #endif  // QUASIMAGNETOSTATIC_HPP_
