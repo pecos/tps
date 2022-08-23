@@ -83,6 +83,13 @@ void CycleAvgJouleCoupling::initializeInterpolationData() {
     n_em_interp_nodes_ += em_fespace->GetFE(i)->GetNodes().GetNPoints();
   }
 
+  // Determine numbers of points to interpolate to
+  const ParFiniteElementSpace *flow_fespace = flow_solver_->GetFESpace();
+  n_flow_interp_nodes_ = 0;
+  for (int i = 0; i < flow_mesh->GetNE(); i++) {
+    n_flow_interp_nodes_ += flow_fespace->GetFE(i)->GetNodes().GetNPoints();
+  }
+
 #else
   mfem_error("Cannot initialize interpolation without GSLIB support.");
 #endif
@@ -167,37 +174,42 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
   const ParFiniteElementSpace *flow_fespace = flow_solver_->GetFESpace();
 
   const int NE = flow_mesh->GetNE();
-  const int nsp = flow_fespace->GetFE(0)->GetNodes().GetNPoints();
   const int dim = flow_mesh->Dimension();
 
 #ifdef HAVE_GSLIB
   // Generate list of points where the grid function will be evaluated.
   Vector vxyz;
 
-  vxyz.SetSize(nsp * NE * dim);
+  vxyz.SetSize(n_flow_interp_nodes_ * dim);
+
+  int n0 = 0;
   for (int i = 0; i < NE; i++) {
     const FiniteElement *fe = flow_fespace->GetFE(i);
     const IntegrationRule ir = fe->GetNodes();
     ElementTransformation *et = flow_fespace->GetElementTransformation(i);
 
+    const int nsp = ir.GetNPoints();
+
     DenseMatrix pos;
     et->Transform(ir, pos);
-    Vector rowx(vxyz.GetData() + i * nsp, nsp);
-    Vector rowy(vxyz.GetData() + i * nsp + NE * nsp, nsp);
+    Vector rowx(vxyz.GetData() + n0, nsp);
+    Vector rowy(vxyz.GetData() + n0 + n_flow_interp_nodes_, nsp);
     Vector rowz;
     if (dim == 3) {
-      rowz.SetDataAndSize(vxyz.GetData() + i * nsp + 2 * NE * nsp, nsp);
+      rowz.SetDataAndSize(vxyz.GetData() + n0 + 2 * n_flow_interp_nodes_, nsp);
     }
+    n0 += nsp;
+
     pos.GetRow(0, rowx);
     pos.GetRow(1, rowy);
     if (dim == 3) {
       pos.GetRow(2, rowz);
     }
   }
-  const int nodes_cnt = vxyz.Size() / dim;
+  assert(n0 == n_flow_interp_nodes_);
 
   // Evaluate source grid function.
-  Vector interp_vals(nodes_cnt);
+  Vector interp_vals(n_flow_interp_nodes_);
 
   const ParGridFunction *joule_heating_gf = qmsa_solver_->getJouleHeatingGF();
   interp_em_to_flow_->Interpolate(vxyz, *joule_heating_gf, interp_vals);
