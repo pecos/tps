@@ -243,7 +243,7 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeFluxTransportProperties(cons
   // Apply artificial multipliers.
   if (multiply_) {
     for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++)
-      transportBuffer[t] *= fluxTrnsMultiplier_[t]
+      transportBuffer[t] *= fluxTrnsMultiplier_[t];
     for (int sp = 0; sp < numSpecies; sp++) {
       diffusivity[sp] *= diffMult_;
       mobility[sp] *= mobilMult_;
@@ -861,7 +861,7 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeFluxTransportProperties(cons
   // Apply artificial multipliers.
   if (multiply_) {
     for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++)
-      transportBuffer[t] *= fluxTrnsMultiplier_[t]
+      transportBuffer[t] *= fluxTrnsMultiplier_[t];
     for (int sp = 0; sp < numSpecies; sp++) {
       diffusivity[sp] *= diffMult_;
       mobility[sp] *= mobilMult_;
