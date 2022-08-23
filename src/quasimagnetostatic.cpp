@@ -954,5 +954,6 @@ double QuasiMagnetostaticSolverAxiSym::totalJouleHeating() {
   double total_int_jh = 0;
   MPI_Allreduce(&int_jh, &total_int_jh, 1, MPI_DOUBLE, MPI_SUM, fes->GetComm());
 
-  return total_int_jh;
+  // Factor of 2*pi from azimuthal direction integral
+  return 2 * M_PI * total_int_jh;
 }
