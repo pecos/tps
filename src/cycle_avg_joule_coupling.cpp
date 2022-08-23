@@ -69,12 +69,20 @@ void CycleAvgJouleCoupling::initializeInterpolationData() {
     em_mesh->SetCurvature(1, false, -1, 0);
   }
 
+  // Set up GSLIB interpolators
   interp_flow_to_em_->Setup(*flow_mesh);
   interp_flow_to_em_->SetDefaultInterpolationValue(0.0);
 
-  // TODO(trevilo): Add em to flow interpolation
   interp_em_to_flow_->Setup(*(qmsa_solver_->getMesh()));
   interp_em_to_flow_->SetDefaultInterpolationValue(0);
+
+  // Determine numbers of points to interpolate to
+  const ParFiniteElementSpace *em_fespace = qmsa_solver_->getFESpace();
+  n_em_interp_nodes_ = 0;
+  for (int i = 0; i < em_mesh->GetNE(); i++) {
+    n_em_interp_nodes_ += em_fespace->GetFE(i)->GetNodes().GetNPoints();
+  }
+
 #else
   mfem_error("Cannot initialize interpolation without GSLIB support.");
 #endif
@@ -87,37 +95,42 @@ void CycleAvgJouleCoupling::interpConductivityFromFlowToEM() {
   const ParFiniteElementSpace *em_fespace = qmsa_solver_->getFESpace();
 
   const int NE = em_mesh->GetNE();
-  const int nsp = em_fespace->GetFE(0)->GetNodes().GetNPoints();
   const int dim = em_mesh->Dimension();
 
 #ifdef HAVE_GSLIB
   // Generate list of points where the grid function will be evaluated.
   Vector vxyz;
 
-  vxyz.SetSize(nsp * NE * dim);
+  vxyz.SetSize(n_em_interp_nodes_ * dim);
+
+  int n0 = 0;  // running total of starting index
   for (int i = 0; i < NE; i++) {
     const FiniteElement *fe = em_fespace->GetFE(i);
     const IntegrationRule ir = fe->GetNodes();
     ElementTransformation *et = em_fespace->GetElementTransformation(i);
 
+    const int nsp = ir.GetNPoints();
+
     DenseMatrix pos;
     et->Transform(ir, pos);
-    Vector rowx(vxyz.GetData() + i * nsp, nsp);
-    Vector rowy(vxyz.GetData() + i * nsp + NE * nsp, nsp);
+    Vector rowx(vxyz.GetData() + n0, nsp);
+    Vector rowy(vxyz.GetData() + n0 + n_em_interp_nodes_, nsp);
     Vector rowz;
     if (dim == 3) {
-      rowz.SetDataAndSize(vxyz.GetData() + i * nsp + 2 * NE * nsp, nsp);
+      rowz.SetDataAndSize(vxyz.GetData() + n0 + 2 * n_em_interp_nodes_, nsp);
     }
+    n0 += nsp;
+
     pos.GetRow(0, rowx);
     pos.GetRow(1, rowy);
     if (dim == 3) {
       pos.GetRow(2, rowz);
     }
   }
-  const int nodes_cnt = vxyz.Size() / dim;
+  assert(n0 == n_em_interp_nodes_);
 
   // Interpolate
-  Vector conductivity_em(nodes_cnt);
+  Vector conductivity_em(n_em_interp_nodes_);
   const ParGridFunction *conductivity_flow_gf = flow_solver_->GetPlasmaConductivityGF();
   interp_flow_to_em_->Interpolate(vxyz, *conductivity_flow_gf, conductivity_em);
 
@@ -125,17 +138,19 @@ void CycleAvgJouleCoupling::interpConductivityFromFlowToEM() {
   ParGridFunction *conductivity_em_gf = qmsa_solver_->getPlasmaConductivityGF();
 
   Array<int> vdofs;
-  Vector vals;
-  Vector elem_dof_vals(nsp);
+  Vector elem_dof_vals;
 
+  n0 = 0;
   for (int i = 0; i < NE; i++) {
     em_fespace->GetElementVDofs(i, vdofs);
-    vals.SetSize(vdofs.Size());
+    const int nsp = em_fespace->GetFE(i)->GetNodes().GetNPoints();
+    assert(nsp == vdofs.Size());
+    elem_dof_vals.SetSize(nsp);
     for (int j = 0; j < nsp; j++) {
-      // Arrange values byNodes
-      elem_dof_vals(j) = conductivity_em(i * nsp + j);
+      elem_dof_vals(j) = conductivity_em(n0 + j);
     }
     conductivity_em_gf->SetSubVector(vdofs, elem_dof_vals);
+    n0 += nsp;
   }
 
   conductivity_em_gf->SetTrueVector();

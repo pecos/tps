@@ -61,6 +61,9 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   FindPointsGSLIB *interp_em_to_flow_;
 #endif
 
+  int n_em_interp_nodes_;
+  int n_flow_interp_nodes_;
+
  public:
   CycleAvgJouleCoupling(MPI_Session &mpi, string &inputFileName, TPS::Tps *tps, int max_out);
   ~CycleAvgJouleCoupling();
