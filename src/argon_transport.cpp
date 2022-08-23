@@ -38,68 +38,6 @@
 
 ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture, RunConfiguration &_runfile)
     : ArgonMinimalTransport(_mixture, _runfile.argonTransportInput) {}
-//     : TransportProperties(_mixture) {
-//   // if (!ambipolar) {
-//   //   grvy_printf(GRVY_ERROR, "\nArgon ternary transport currently supports ambipolar condition only. Set
-//   //   plasma_models/ambipolar = true.\n"); exit(ERROR);
-//   // }
-//   if (numSpecies != 3) {
-//     grvy_printf(GRVY_ERROR, "\nArgon ternary transport only supports ternary mixture of Ar, Ar.+1, and E !\n");
-//     exit(ERROR);
-//   }
-//
-//   // std::map<std::string, int> *speciesMapping = mixture->getSpeciesMapping();
-//   // if (speciesMapping->count("Ar")) {
-//   //   neutralIndex_ = (*speciesMapping)["Ar"];
-//   // } else {
-//   //   grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar' !\n");
-//   //   exit(ERROR);
-//   // }
-//   // if (speciesMapping->count("Ar.+1")) {
-//   //   ionIndex_ = (*speciesMapping)["Ar.+1"];
-//   // } else {
-//   //   grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar.+1' !\n");
-//   //   exit(ERROR);
-//   // }
-//   // if (speciesMapping->count("E")) {
-//   //   electronIndex_ = (*speciesMapping)["E"];
-//   // } else {
-//   //   grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
-//   //   exit(ERROR);
-//   // }
-//   neutralIndex_ = _runfile.argonTransportInput.neutralIndex;
-//   if (neutralIndex_ < 0) {
-//     grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar' !\n");
-//     exit(ERROR);
-//   }
-//   ionIndex_ = _runfile.argonTransportInput.ionIndex;
-//   if (ionIndex_ < 0) {
-//     grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar.+1' !\n");
-//     exit(ERROR);
-//   }
-//   electronIndex_ = _runfile.argonTransportInput.electronIndex;
-//   if (electronIndex_ < 0) {
-//     grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
-//     exit(ERROR);
-//   }
-//
-//   // TODO(kevin): need to factor out avogadro numbers throughout all transport property.
-//   // multiplying/dividing big numbers are risky of losing precision.
-//   // mw_.SetSize(3);
-//   mw_[electronIndex_] = mixture->GetGasParams(electronIndex_, GasParams::SPECIES_MW);
-//   mw_[neutralIndex_] = mixture->GetGasParams(neutralIndex_, GasParams::SPECIES_MW);
-//   mw_[ionIndex_] = mixture->GetGasParams(ionIndex_, GasParams::SPECIES_MW);
-//   // assumes input mass is consistent with this.
-//   assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-15);
-//   mw_ /= AVOGADRONUMBER;
-//   // mA_ /= AVOGADRONUMBER;
-//   // mI_ /= AVOGADRONUMBER;
-//
-//   // muw_.SetSize(3);
-//   computeEffectiveMass(mw_, muw_);
-//
-//   thirdOrderkElectron_ = _runfile.thirdOrderkElectron;
-// }
 
 MFEM_HOST_DEVICE ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture, const ArgonTransportInput &inputs)
     : TransportProperties(_mixture) {
@@ -167,6 +105,8 @@ MFEM_HOST_DEVICE ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixtu
   computeEffectiveMass(mw_, muw_);
 
   thirdOrderkElectron_ = inputs.thirdOrderkElectron;
+
+  setArtificialMultipliers(inputs);
 }
 
 MFEM_HOST_DEVICE ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture) : TransportProperties(_mixture) {}
@@ -184,25 +124,20 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::computeEffectiveMass(const double *
   }
 }
 
+MFEM_HOST_DEVICE void ArgonMinimalTransport::setArtificialMultipliers(const ArgonTransportInput &inputs) {
+  multiply_ = inputs.multiply;
+  if (multiply_) {
+    for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++)
+      fluxTrnsMultiplier_[t] = inputs.fluxTrnsMultiplier[t];
+    for (int t = 0; t < SpeciesTrns::NUM_SPECIES_COEFFS; t++)
+      spcsTrnsMultiplier_[t] = inputs.spcsTrnsMultiplier[t];
+    diffMult_ = inputs.diffMult;
+    mobilMult_ = inputs.mobilMult;
+  }
+}
+
 collisionInputs ArgonMinimalTransport::computeCollisionInputs(const Vector &primitive, const Vector &n_sp) {
   return computeCollisionInputs(&primitive[0], &n_sp[0]);
-  // collisionInputs collInputs;
-  // collInputs.Te = (twoTemperature_) ? primitive[num_equation - 1] : primitive[nvel_ + 1];
-  // collInputs.Th = primitive[nvel_ + 1];
-  //
-  // // Add Xeps to avoid zero number density case.
-  // double nOverT = 0.0;
-  // for (int sp = 0; sp < numSpecies; sp++) {
-  //   nOverT += (n_sp(sp) + Xeps_) / collInputs.Te * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) *
-  //             mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
-  // }
-  // double debyeLength = sqrt(debyeFactor_ / AVOGADRONUMBER / nOverT);
-  // collInputs.debyeCircle = PI_ * debyeLength * debyeLength;
-  //
-  // collInputs.ndimTe = debyeLength * 4.0 * PI_ * debyeFactor_ * collInputs.Te;
-  // collInputs.ndimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * collInputs.Th;
-  //
-  // return collInputs;
 }
 
 MFEM_HOST_DEVICE collisionInputs ArgonMinimalTransport::computeCollisionInputs(const double *primitive,
@@ -232,114 +167,6 @@ void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, 
   transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   diffusionVelocity.SetSize(numSpecies, nvel_);
   ComputeFluxTransportProperties(&state[0], gradUp.Read(), &Efield[0], &transportBuffer[0], diffusionVelocity.Write());
-  // transportBuffer = 0.0;
-  //
-  // Vector primitiveState(num_equation);
-  // mixture->GetPrimitivesFromConservatives(state, primitiveState);
-  //
-  // // Vector n_sp(3); //number densities
-  // // n_sp(ionIndex_) = primitiveState[dim + 2 + ionIndex_];
-  // // n_sp(electronIndex_) = mixture->computeAmbipolarElectronNumberDensity(&primitiveState[dim + 2]);
-  // // n_sp(neutralIndex_) = mixture->computeBackgroundMassDensity(state[0], &primitiveState[dim + 2],
-  // // n_sp(electronIndex_), true); n_sp(neutralIndex_) /= mixture->GetGasParams(neutralIndex_, GasParams::SPECIES_MW);
-  // // double nTotal = n_sp(0) + n_sp(1) + n_sp(2);
-  // // Vector X_sp(3), Y_sp(3);
-  // // for (int sp = 0; sp < numSpecies; sp++) {
-  // //   X_sp(sp) = n_sp(sp) / nTotal;
-  // //   Y_sp(sp) = n_sp(sp) / state(0) * mixture->GetGasParams(sp, GasParams::SPECIES_MW);
-  // // }
-  // Vector n_sp(3), X_sp(3), Y_sp(3);
-  // mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
-  // double nTotal = 0.0;
-  // for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
-  //
-  // double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : primitiveState[nvel_ + 1];
-  // double Th = primitiveState[nvel_ + 1];
-  // // std::cout << "temp: " << Th << ",\t" << Te << std::endl;
-  //
-  // // Add Xeps to avoid zero number density case.
-  // double nOverT = (n_sp(electronIndex_) + Xeps_) / Te + (n_sp(ionIndex_) + Xeps_) / Th;
-  // double debyeLength = sqrt(debyeFactor_ / AVOGADRONUMBER / nOverT);
-  // double debyeCircle = PI_ * debyeLength * debyeLength;
-  //
-  // double nondimTe = debyeLength * 4.0 * PI_ * debyeFactor_ * Te;
-  // double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
-  //
-  // Vector speciesViscosity(3), speciesHvyThrmCnd(3);
-  // speciesViscosity(ionIndex_) =
-  //     viscosityFactor_ * sqrt(mw_[ionIndex_] * Th) / (collision::charged::rep22(nondimTh) * debyeCircle);
-  // speciesViscosity(neutralIndex_) = viscosityFactor_ * sqrt(mw_[neutralIndex_] * Th) / collision::argon::ArAr22(Th);
-  // speciesViscosity(electronIndex_) = 0.0;
-  // // speciesViscosity(0) = 5. / 16. * sqrt(PI_ * mI_ * kB_ * Th) / (collision::charged::rep22(nondimTe) * PI_ *
-  // // debyeLength * debyeLength);
-  // for (int sp = 0; sp < numSpecies; sp++) {
-  //   speciesHvyThrmCnd(sp) = speciesViscosity(sp) * kOverEtaFactor_ / mw_[sp];
-  // }
-  // transportBuffer[FluxTrns::VISCOSITY] = linearAverage(X_sp, speciesViscosity);
-  // transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = linearAverage(X_sp, speciesHvyThrmCnd);
-  // transportBuffer[FluxTrns::BULK_VISCOSITY] = 0.0;
-  //
-  // if (thirdOrderkElectron_) {
-  //   transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
-  //       computeThirdOrderElectronThermalConductivity(&X_sp[0], debyeLength, Te, nondimTe);
-  // } else {
-  //   transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] = viscosityFactor_ * kOverEtaFactor_ *
-  //                                                              sqrt(Te / mw_[electronIndex_]) * X_sp(electronIndex_)
-  //                                                              / (collision::charged::rep22(nondimTe) * debyeCircle);
-  // }
-  //
-  // DenseMatrix binaryDiff(3);
-  // binaryDiff = 0.0;
-  // binaryDiff(electronIndex_, neutralIndex_) =
-  //     diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
-  // binaryDiff(neutralIndex_, electronIndex_) = binaryDiff(electronIndex_, neutralIndex_);
-  // binaryDiff(neutralIndex_, ionIndex_) =
-  //     diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
-  // binaryDiff(ionIndex_, neutralIndex_) = binaryDiff(neutralIndex_, ionIndex_);
-  // binaryDiff(electronIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal
-  // /
-  //                                         (collision::charged::att11(nondimTe) * debyeCircle);
-  // binaryDiff(ionIndex_, electronIndex_) = binaryDiff(electronIndex_, ionIndex_);
-  //
-  // Vector diffusivity(3), mobility(3);
-  // CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
-  //
-  // for (int sp = 0; sp < numSpecies; sp++) {
-  //   double temp = (sp == electronIndex_) ? Te : Th;
-  //   mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity(sp);
-  // }
-  //
-  // DenseMatrix gradX(numSpecies, dim);
-  // mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
-  //
-  // // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
-  // diffusionVelocity.SetSize(numSpecies, nvel_);
-  // diffusionVelocity = 0.0;
-  // for (int sp = 0; sp < numSpecies; sp++) {
-  //   // concentration-driven diffusion only determines the first dim-components.
-  //   for (int d = 0; d < dim; d++) {
-  //     double DgradX = diffusivity(sp) * gradX(sp, d);
-  //     // NOTE: we'll have to handle small X case.
-  //     diffusionVelocity(sp, d) = -DgradX / (X_sp(sp) + Xeps_);
-  //   }
-  // }
-  //
-  // if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
-  //
-  // addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
-  //
-  // correctMassDiffusionFlux(Y_sp, diffusionVelocity);
-  //
-  // double charSpeed = 0.0;
-  // for (int sp = 0; sp < numActiveSpecies; sp++) {
-  //   double speciesSpeed = 0.0;
-  //   // azimuthal component does not participate in flux.
-  //   for (int d = 0; d < dim; d++) speciesSpeed += diffusionVelocity(sp, d) * diffusionVelocity(sp, d);
-  //   speciesSpeed = sqrt(speciesSpeed);
-  //   if (speciesSpeed > charSpeed) charSpeed = speciesSpeed;
-  //   // charSpeed = max(charSpeed, speciesSpeed);
-  // }
-  // // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
 MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,
@@ -411,6 +238,16 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeFluxTransportProperties(cons
   for (int sp = 0; sp < numSpecies; sp++) {
     double temp = (sp == electronIndex_) ? Te : Th;
     mobility[sp] = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity[sp];
+  }
+
+  // Apply artificial multipliers.
+  if (multiply_) {
+    for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++)
+      transportBuffer[t] *= fluxTrnsMultiplier_[t]
+    for (int sp = 0; sp < numSpecies; sp++) {
+      diffusivity[sp] *= diffMult_;
+      mobility[sp] *= mobilMult_;
+    }
   }
 
   // DenseMatrix gradX(numSpecies, dim);
@@ -588,92 +425,6 @@ void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state
   n_sp.SetSize(3);
   ComputeSourceTransportProperties(&state[0], &Up[0], gradUp.Read(), &Efield[0], &globalTransport[0],
                                    speciesTransport.Write(), diffusionVelocity.Write(), &n_sp[0]);
-  // globalTransport = 0.0;
-  // speciesTransport.SetSize(numSpecies, SpeciesTrns::NUM_SPECIES_COEFFS);
-  // speciesTransport = 0.0;
-  //
-  // n_sp.SetSize(3);
-  // Vector X_sp(3), Y_sp(3);
-  // mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
-  // double nTotal = 0.0;
-  // for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
-  //
-  // double Te = (twoTemperature_) ? Up[num_equation - 1] : Up[nvel_ + 1];
-  // double Th = Up[nvel_ + 1];
-  //
-  // // Add Xeps to avoid zero number density case.
-  // double nOverT = (n_sp(electronIndex_) + Xeps_) / Te + (n_sp(ionIndex_) + Xeps_) / Th;
-  // double debyeLength = sqrt(debyeFactor_ / AVOGADRONUMBER / nOverT);
-  // double debyeCircle = PI_ * debyeLength * debyeLength;
-  //
-  // double nondimTe = debyeLength * 4.0 * PI_ * debyeFactor_ * Te;
-  // // double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
-  //
-  // double Qea = collision::argon::eAr11(Te);
-  // double Qai = collision::argon::ArAr1P11(Th);
-  // double Qie = collision::charged::att11(nondimTe) * debyeCircle;
-  //
-  // DenseMatrix binaryDiff(3);
-  // binaryDiff = 0.0;
-  // binaryDiff(electronIndex_, neutralIndex_) =
-  //     diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / Qea;
-  // binaryDiff(neutralIndex_, electronIndex_) = binaryDiff(electronIndex_, neutralIndex_);
-  // binaryDiff(neutralIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal /
-  // Qai; binaryDiff(ionIndex_, neutralIndex_) = binaryDiff(neutralIndex_, ionIndex_); binaryDiff(electronIndex_,
-  // ionIndex_) =
-  //     diffusivityFactor_ * sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal / Qie;
-  // binaryDiff(ionIndex_, electronIndex_) = binaryDiff(electronIndex_, ionIndex_);
-  //
-  // Vector diffusivity(3), mobility(3);
-  // CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
-  //
-  // for (int sp = 0; sp < numSpecies; sp++) {
-  //   double temp = (sp == electronIndex_) ? Te : Th;
-  //   mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity(sp);
-  // }
-  // globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY) =
-  //     computeMixtureElectricConductivity(mobility, n_sp) * MOLARELECTRONCHARGE;
-  //
-  // DenseMatrix gradX(numSpecies, dim);
-  // mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
-  //
-  // // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
-  // diffusionVelocity.SetSize(numSpecies, nvel_);
-  // diffusionVelocity = 0.0;
-  // for (int sp = 0; sp < numSpecies; sp++) {
-  //   // concentration-driven diffusion only determines the first dim-components.
-  //   for (int d = 0; d < dim; d++) {
-  //     double DgradX = diffusivity(sp) * gradX(sp, d);
-  //     // NOTE: we'll have to handle small X case.
-  //     diffusionVelocity(sp, d) = -DgradX / (X_sp(sp) + Xeps_);
-  //   }
-  // }
-  //
-  // if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
-  //
-  // addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
-  //
-  // correctMassDiffusionFlux(Y_sp, diffusionVelocity);
-  //
-  // speciesTransport(ionIndex_, SpeciesTrns::MF_FREQUENCY) =
-  //     mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp(ionIndex_) * Qie;
-  // speciesTransport(neutralIndex_, SpeciesTrns::MF_FREQUENCY) =
-  //     mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp(neutralIndex_) * Qea;
-  // // // relative electron collision speed
-  // // double ge = sqrt(8.0 * kB_ * Te / PI_ / mw_(electronIndex_));
-  // // speciesTransport(ionIndex_, SpeciesTrns::MF_FREQUENCY) = 4.0 / 3.0 * AVOGADRONUMBER * n_sp(ionIndex_) * ge *
-  // Qie;
-  //
-  // double charSpeed = 0.0;
-  // for (int sp = 0; sp < numActiveSpecies; sp++) {
-  //   double speciesSpeed = 0.0;
-  //   // azimuthal component does not participate in flux.
-  //   for (int d = 0; d < dim; d++) speciesSpeed += diffusionVelocity(sp, d) * diffusionVelocity(sp, d);
-  //   speciesSpeed = sqrt(speciesSpeed);
-  //   if (speciesSpeed > charSpeed) charSpeed = speciesSpeed;
-  //   // charSpeed = max(charSpeed, speciesSpeed);
-  // }
-  // // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
 MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeSourceTransportProperties(
@@ -724,6 +475,21 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeSourceTransportProperties(
     double temp = (sp == electronIndex_) ? Te : Th;
     mobility[sp] = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity[sp];
   }
+
+  speciesTransport[ionIndex_ + SpeciesTrns::MF_FREQUENCY * numSpecies] =
+      mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp[ionIndex_] * Qie;
+  speciesTransport[neutralIndex_ + SpeciesTrns::MF_FREQUENCY * numSpecies] =
+      mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp[neutralIndex_] * Qea;
+
+  // Apply artificial multipliers.
+  if (multiply_) {
+    for (int sp = 0; sp < numSpecies; sp++) {
+      diffusivity[sp] *= diffMult_;
+      mobility[sp] *= mobilMult_;
+      speciesTransport[sp + SpeciesTrns::MF_FREQUENCY * numSpecies] *= spcsTrnsMultiplier_[SpeciesTrns::MF_FREQUENCY];
+    }
+  }
+
   globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] =
       computeMixtureElectricConductivity(mobility, n_sp) * MOLARELECTRONCHARGE;
 
@@ -748,14 +514,6 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeSourceTransportProperties(
 
   correctMassDiffusionFlux(Y_sp, diffusionVelocity);
 
-  speciesTransport[ionIndex_ + SpeciesTrns::MF_FREQUENCY * numSpecies] =
-      mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp[ionIndex_] * Qie;
-  speciesTransport[neutralIndex_ + SpeciesTrns::MF_FREQUENCY * numSpecies] =
-      mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp[neutralIndex_] * Qea;
-  // // relative electron collision speed
-  // double ge = sqrt(8.0 * kB_ * Te / PI_ / mw_(electronIndex_));
-  // speciesTransport(ionIndex_, SpeciesTrns::MF_FREQUENCY) = 4.0 / 3.0 * AVOGADRONUMBER * n_sp(ionIndex_) * ge * Qie;
-
   double charSpeed = 0.0;
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     double speciesSpeed = 0.0;
@@ -772,31 +530,6 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeSourceTransportProperties(
 void ArgonMinimalTransport::GetViscosities(const Vector &conserved, const Vector &primitive, double &visc,
                                            double &bulkVisc) {
   GetViscosities(&conserved[0], &primitive[0], visc, bulkVisc);
-  // Vector n_sp(3), X_sp(3), Y_sp(3);
-  // mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
-  // double nTotal = 0.0;
-  // for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
-  //
-  // double Te = (twoTemperature_) ? primitive[num_equation - 1] : primitive[nvel_ + 1];
-  // double Th = primitive[nvel_ + 1];
-  //
-  // // Add Xeps to avoid zero number density case.
-  // double nOverT = (n_sp(electronIndex_) + Xeps_) / Te + (n_sp(ionIndex_) + Xeps_) / Th;
-  // double debyeLength = sqrt(debyeFactor_ / AVOGADRONUMBER / nOverT);
-  // double debyeCircle = PI_ * debyeLength * debyeLength;
-  //
-  // // double nondimTe = debyeLength * 4.0 * PI_ * debyeFactor_ * Te;
-  // double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
-  //
-  // Vector speciesViscosity(3);
-  // speciesViscosity(ionIndex_) =
-  //     viscosityFactor_ * sqrt(mw_[ionIndex_] * Th) / (collision::charged::rep22(nondimTh) * debyeCircle);
-  // speciesViscosity(neutralIndex_) = viscosityFactor_ * sqrt(mw_[neutralIndex_] * Th) / collision::argon::ArAr22(Th);
-  // speciesViscosity(electronIndex_) = 0.0;
-  //
-  // visc = linearAverage(X_sp, speciesViscosity);
-  // bulkVisc = 0.0;
-
   return;
 }
 
@@ -826,6 +559,12 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::GetViscosities(const double *conser
 
   visc = linearAverage(X_sp, speciesViscosity);
   bulkVisc = 0.0;
+
+  // Apply artificial multipliers.
+  if (multiply_) {
+    visc *= fluxTrnsMultiplier_[FluxTrns::VISCOSITY];
+    bulkVisc *= fluxTrnsMultiplier_[FluxTrns::BULK_VISCOSITY];
+  }
 
   return;
 }
@@ -885,6 +624,8 @@ MFEM_HOST_DEVICE ArgonMixtureTransport::ArgonMixtureTransport(GasMixture *_mixtu
   for (int spI = 0; spI < numSpecies; spI++)
     for (int spJ = spI; spJ < numSpecies; spJ++)
       collisionIndex_[spI + spJ * numSpecies] = inputs.collisionIndex[spI + spJ * numSpecies];
+
+  setArtificialMultipliers(inputs);
 }
 
 MFEM_HOST_DEVICE double ArgonMixtureTransport::collisionIntegral(const int _spI, const int _spJ, const int l,
@@ -1056,93 +797,6 @@ void ArgonMixtureTransport::ComputeFluxTransportProperties(const Vector &state, 
   transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   diffusionVelocity.SetSize(numSpecies, nvel_);
   ComputeFluxTransportProperties(&state[0], gradUp.Read(), &Efield[0], &transportBuffer[0], diffusionVelocity.Write());
-  // transportBuffer = 0.0;
-  //
-  // Vector primitiveState(num_equation);
-  // mixture->GetPrimitivesFromConservatives(state, primitiveState);
-  //
-  // Vector n_sp(numSpecies), X_sp(numSpecies), Y_sp(numSpecies);
-  // mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
-  // double nTotal = 0.0;
-  // for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
-  //
-  // collisionInputs collInputs = computeCollisionInputs(primitiveState, n_sp);
-  //
-  // Vector speciesViscosity(numSpecies), speciesHvyThrmCnd(numSpecies);
-  // for (int sp = 0; sp < numSpecies; sp++) {
-  //   if (sp == electronIndex_) {
-  //     speciesViscosity(sp) = 0.0;
-  //     speciesHvyThrmCnd(sp) = 0.0;
-  //     continue;
-  //   }
-  //   speciesViscosity(sp) =
-  //       viscosityFactor_ * sqrt(mw_[sp] * collInputs.Th) / collisionIntegral(sp, sp, 2, 2, collInputs);
-  //   speciesHvyThrmCnd(sp) = speciesViscosity(sp) * kOverEtaFactor_ / mw_[sp];
-  // }
-  // transportBuffer[FluxTrns::VISCOSITY] = linearAverage(X_sp, speciesViscosity);
-  // transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = linearAverage(X_sp, speciesHvyThrmCnd);
-  // transportBuffer[FluxTrns::BULK_VISCOSITY] = 0.0;
-  //
-  // if (thirdOrderkElectron_) {
-  //   transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
-  //       computeThirdOrderElectronThermalConductivity(&X_sp[0], collInputs);
-  // } else {
-  //   transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
-  //       viscosityFactor_ * kOverEtaFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) * X_sp(electronIndex_) /
-  //       collisionIntegral(electronIndex_, electronIndex_, 2, 2, collInputs);
-  // }
-  //
-  // DenseMatrix binaryDiff(numSpecies);
-  // binaryDiff = 0.0;
-  // for (int spI = 0; spI < numSpecies - 1; spI++) {
-  //   for (int spJ = spI + 1; spJ < numSpecies; spJ++) {
-  //     double temp = ((spI == electronIndex_) || (spJ == electronIndex_)) ? collInputs.Te : collInputs.Th;
-  //     binaryDiff(spI, spJ) =
-  //         diffusivityFactor_ * sqrt(temp / getMuw(spI, spJ)) / nTotal / collisionIntegral(spI, spJ, 1, 1,
-  //         collInputs);
-  //     binaryDiff(spJ, spI) = binaryDiff(spI, spJ);
-  //   }
-  // }
-  //
-  // Vector diffusivity(numSpecies), mobility(numSpecies);
-  // CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
-  //
-  // for (int sp = 0; sp < numSpecies; sp++) {
-  //   double temp = (sp == electronIndex_) ? collInputs.Te : collInputs.Th;
-  //   mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity(sp);
-  // }
-  //
-  // DenseMatrix gradX(numSpecies, dim);
-  // mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
-  //
-  // // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
-  // diffusionVelocity.SetSize(numSpecies, nvel_);
-  // diffusionVelocity = 0.0;
-  // for (int sp = 0; sp < numSpecies; sp++) {
-  //   // concentration-driven diffusion only determines the first dim-components.
-  //   for (int d = 0; d < dim; d++) {
-  //     double DgradX = diffusivity(sp) * gradX(sp, d);
-  //     // NOTE: we'll have to handle small X case.
-  //     diffusionVelocity(sp, d) = -DgradX / (X_sp(sp) + Xeps_);
-  //   }
-  // }
-  //
-  // if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
-  //
-  // addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
-  //
-  // correctMassDiffusionFlux(Y_sp, diffusionVelocity);
-  //
-  // double charSpeed = 0.0;
-  // for (int sp = 0; sp < numActiveSpecies; sp++) {
-  //   double speciesSpeed = 0.0;
-  //   // azimuthal component does not participate in flux.
-  //   for (int d = 0; d < dim; d++) speciesSpeed += diffusionVelocity(sp, d) * diffusionVelocity(sp, d);
-  //   speciesSpeed = sqrt(speciesSpeed);
-  //   if (speciesSpeed > charSpeed) charSpeed = speciesSpeed;
-  //   // charSpeed = max(charSpeed, speciesSpeed);
-  // }
-  // // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
 MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,
@@ -1202,6 +856,16 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeFluxTransportProperties(cons
   for (int sp = 0; sp < numSpecies; sp++) {
     double temp = (sp == electronIndex_) ? collInputs.Te : collInputs.Th;
     mobility[sp] = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity[sp];
+  }
+
+  // Apply artificial multipliers.
+  if (multiply_) {
+    for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++)
+      transportBuffer[t] *= fluxTrnsMultiplier_[t]
+    for (int sp = 0; sp < numSpecies; sp++) {
+      diffusivity[sp] *= diffMult_;
+      mobility[sp] *= mobilMult_;
+    }
   }
 
   // DenseMatrix gradX(numSpecies, dim);
@@ -1271,80 +935,6 @@ void ArgonMixtureTransport::ComputeSourceTransportProperties(const Vector &state
   n_sp.SetSize(numSpecies);
   ComputeSourceTransportProperties(&state[0], &Up[0], gradUp.Read(), &Efield[0], &globalTransport[0],
                                    speciesTransport.Write(), diffusionVelocity.Write(), &n_sp[0]);
-  // globalTransport = 0.0;
-  // speciesTransport.SetSize(numSpecies, SpeciesTrns::NUM_SPECIES_COEFFS);
-  // speciesTransport = 0.0;
-  //
-  // n_sp.SetSize(numSpecies);
-  // Vector X_sp(numSpecies), Y_sp(numSpecies);
-  // mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
-  // double nTotal = 0.0;
-  // for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
-  //
-  // collisionInputs collInputs = computeCollisionInputs(Up, n_sp);
-  //
-  // DenseMatrix binaryDiff(numSpecies);
-  // binaryDiff = 0.0;
-  // for (int spI = 0; spI < numSpecies - 1; spI++) {
-  //   for (int spJ = spI + 1; spJ < numSpecies; spJ++) {
-  //     double temp = ((spI == electronIndex_) || (spJ == electronIndex_)) ? collInputs.Te : collInputs.Th;
-  //
-  //     binaryDiff(spI, spJ) =
-  //         diffusivityFactor_ * sqrt(temp / getMuw(spI, spJ)) / nTotal / collisionIntegral(spI, spJ, 1, 1,
-  //         collInputs);
-  //     binaryDiff(spJ, spI) = binaryDiff(spI, spJ);
-  //   }
-  // }
-  //
-  // Vector diffusivity(3), mobility(3);
-  // CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
-  //
-  // for (int sp = 0; sp < numSpecies; sp++) {
-  //   double temp = (sp == electronIndex_) ? collInputs.Te : collInputs.Th;
-  //   mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity(sp);
-  // }
-  // globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY) =
-  //     computeMixtureElectricConductivity(mobility, n_sp) * MOLARELECTRONCHARGE;
-  //
-  // DenseMatrix gradX(numSpecies, dim);
-  // mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
-  //
-  // // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
-  // diffusionVelocity.SetSize(numSpecies, nvel_);
-  // diffusionVelocity = 0.0;
-  // for (int sp = 0; sp < numSpecies; sp++) {
-  //   // concentration-driven diffusion only determines the first dim-components.
-  //   for (int d = 0; d < dim; d++) {
-  //     double DgradX = diffusivity(sp) * gradX(sp, d);
-  //     // NOTE: we'll have to handle small X case.
-  //     diffusionVelocity(sp, d) = -DgradX / (X_sp(sp) + Xeps_);
-  //   }
-  // }
-  //
-  // if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
-  //
-  // addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
-  //
-  // correctMassDiffusionFlux(Y_sp, diffusionVelocity);
-  //
-  // // NOTE(kevin): collision integrals could be reused from diffusivities.. but not done that way at this point.
-  // for (int sp = 0; sp < numSpecies; sp++) {
-  //   if (sp == electronIndex_) continue;
-  //   speciesTransport(sp, SpeciesTrns::MF_FREQUENCY) = mfFreqFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) *
-  //                                                     n_sp(sp) *
-  //                                                     collisionIntegral(sp, electronIndex_, 1, 1, collInputs);
-  // }
-  //
-  // double charSpeed = 0.0;
-  // for (int sp = 0; sp < numActiveSpecies; sp++) {
-  //   double speciesSpeed = 0.0;
-  //   // azimuthal component does not participate in flux.
-  //   for (int d = 0; d < dim; d++) speciesSpeed += diffusionVelocity(sp, d) * diffusionVelocity(sp, d);
-  //   speciesSpeed = sqrt(speciesSpeed);
-  //   if (speciesSpeed > charSpeed) charSpeed = speciesSpeed;
-  //   // charSpeed = max(charSpeed, speciesSpeed);
-  // }
-  // // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
 MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeSourceTransportProperties(
@@ -1380,6 +970,24 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeSourceTransportProperties(
     double temp = (sp == electronIndex_) ? collInputs.Te : collInputs.Th;
     mobility[sp] = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity[sp];
   }
+
+  // NOTE(kevin): collision integrals could be reused from diffusivities.. but not done that way at this point.
+  for (int sp = 0; sp < numSpecies; sp++) {
+    if (sp == electronIndex_) continue;
+    speciesTransport[sp + SpeciesTrns::MF_FREQUENCY * numSpecies] =
+        mfFreqFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) * n_sp[sp] *
+        collisionIntegral(sp, electronIndex_, 1, 1, collInputs);
+  }
+
+  // Apply artificial multipliers.
+  if (multiply_) {
+    for (int sp = 0; sp < numSpecies; sp++) {
+      diffusivity[sp] *= diffMult_;
+      mobility[sp] *= mobilMult_;
+      speciesTransport[sp + SpeciesTrns::MF_FREQUENCY * numSpecies] *= spcsTrnsMultiplier_[SpeciesTrns::MF_FREQUENCY];
+    }
+  }
+
   globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] =
       computeMixtureElectricConductivity(mobility, n_sp) * MOLARELECTRONCHARGE;
 
@@ -1404,14 +1012,6 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeSourceTransportProperties(
 
   correctMassDiffusionFlux(Y_sp, diffusionVelocity);
 
-  // NOTE(kevin): collision integrals could be reused from diffusivities.. but not done that way at this point.
-  for (int sp = 0; sp < numSpecies; sp++) {
-    if (sp == electronIndex_) continue;
-    speciesTransport[sp + SpeciesTrns::MF_FREQUENCY * numSpecies] =
-        mfFreqFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) * n_sp[sp] *
-        collisionIntegral(sp, electronIndex_, 1, 1, collInputs);
-  }
-
   double charSpeed = 0.0;
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     double speciesSpeed = 0.0;
@@ -1428,25 +1028,6 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeSourceTransportProperties(
 void ArgonMixtureTransport::GetViscosities(const Vector &conserved, const Vector &primitive, double &visc,
                                            double &bulkVisc) {
   GetViscosities(&conserved[0], &primitive[0], visc, bulkVisc);
-  // Vector n_sp(numSpecies), X_sp(numSpecies), Y_sp(numSpecies);
-  // mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
-  // double nTotal = 0.0;
-  // for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp(sp);
-  //
-  // collisionInputs collInputs = computeCollisionInputs(primitive, n_sp);
-  //
-  // Vector speciesViscosity(numSpecies);
-  // for (int sp = 0; sp < numSpecies; sp++) {
-  //   if (sp == electronIndex_) {
-  //     speciesViscosity(sp) = 0.0;
-  //     continue;
-  //   }
-  //   speciesViscosity(sp) =
-  //       viscosityFactor_ * sqrt(mw_[sp] * collInputs.Th) / collisionIntegral(sp, sp, 2, 2, collInputs);
-  // }
-  // visc = linearAverage(X_sp, speciesViscosity);
-  // bulkVisc = 0.0;
-
   return;
 }
 
@@ -1470,6 +1051,12 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::GetViscosities(const double *conser
   }
   visc = linearAverage(X_sp, speciesViscosity);
   bulkVisc = 0.0;
+
+  // Apply artificial multipliers.
+  if (multiply_) {
+    visc *= fluxTrnsMultiplier_[FluxTrns::VISCOSITY];
+    bulkVisc *= fluxTrnsMultiplier_[FluxTrns::BULK_VISCOSITY];
+  }
 
   return;
 }
