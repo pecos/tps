@@ -61,14 +61,25 @@ QuasiMagnetostaticSolverBase::QuasiMagnetostaticSolverBase(MPI_Session &mpi, Ele
   joule_heating_ = NULL;
 }
 
+double JouleHeatingCoefficient3D::Eval(ElementTransformation &T, const IntegrationPoint &ip) {
+  Vector Er, Ei;
+  double sig;
+  Ereal_.GetVectorValue(T, ip, Er);
+  Eimag_.GetVectorValue(T, ip, Ei);
+  sig = sigma_.Eval(T, ip);
+  return sig * (Er * Er + Ei * Ei);
+}
+
 QuasiMagnetostaticSolver3D::QuasiMagnetostaticSolver3D(MPI_Session &mpi, ElectromagneticOptions em_opts, TPS::Tps *tps)
     : QuasiMagnetostaticSolverBase(mpi, em_opts, tps) {
   hcurl_ = NULL;
   h1_ = NULL;
   hdiv_ = NULL;
+  L2_ = NULL;
   Aspace_ = NULL;
   pspace_ = NULL;
   Bspace_ = NULL;
+  jh_space_ = NULL;
   K_ = NULL;
   r_ = NULL;
   Areal_ = NULL;
@@ -92,9 +103,11 @@ QuasiMagnetostaticSolver3D::~QuasiMagnetostaticSolver3D() {
   delete Areal_;
   delete r_;
   delete K_;
+  delete jh_space_;
   delete Bspace_;
   delete pspace_;
   delete Aspace_;
+  delete L2_;
   delete hdiv_;
   delete h1_;
   delete hcurl_;
@@ -140,10 +153,12 @@ void QuasiMagnetostaticSolver3D::initialize() {
   hcurl_ = new ND_FECollection(em_opts_.order, dim_);
   h1_ = new H1_FECollection(em_opts_.order, dim_);
   hdiv_ = new RT_FECollection(em_opts_.order - 1, dim_);
+  L2_ = new L2_FECollection(em_opts_.order, dim_);
 
   Aspace_ = new ParFiniteElementSpace(pmesh_, hcurl_);
   pspace_ = new ParFiniteElementSpace(pmesh_, h1_);
   Bspace_ = new ParFiniteElementSpace(pmesh_, hdiv_);
+  jh_space_ = new ParFiniteElementSpace(pmesh_, L2_);
 
   true_size_ = Aspace_->TrueVSize();
   offsets_[0] = 0;
@@ -175,11 +190,14 @@ void QuasiMagnetostaticSolver3D::initialize() {
   // initialize current
   InitializeCurrent();
 
-  // initialize conductivity
+  // initialize conductivity and Joule heating
   plasma_conductivity_ = new ParGridFunction(pspace_);
   *plasma_conductivity_ = 0.0;
 
   plasma_conductivity_coef_ = new GridFunctionCoefficient(plasma_conductivity_);
+
+  joule_heating_ = new ParGridFunction(jh_space_);
+  *joule_heating_ = 0.0;
 }
 
 void QuasiMagnetostaticSolver3D::InitializeCurrent() {
@@ -333,6 +351,8 @@ void QuasiMagnetostaticSolver3D::solve() {
   K_->EliminateVDofsInRHS(ess_bdr_tdofs_, Avec.GetBlock(0), rhs.GetBlock(0));
   K_->EliminateVDofsInRHS(ess_bdr_tdofs_, Avec.GetBlock(1), rhs.GetBlock(1));
 
+  plasma_conductivity_coef_->SetGridFunction(plasma_conductivity_);
+
   const double mu0_omega = em_opts_.mu0 * em_opts_.current_frequency * 2 * M_PI;
   ProductCoefficient mu_sigma_omega(mu0_omega, *plasma_conductivity_coef_);
 
@@ -401,6 +421,14 @@ void QuasiMagnetostaticSolver3D::solve() {
   curl->Mult(*Aimag_, *Bimag_);
   delete curl;
 
+  // Compute Joule heating
+  const double omega = (2 * M_PI * em_opts_.current_frequency);
+  const double omega2 = omega * omega;
+
+  JouleHeatingCoefficient3D jh_coeff(*plasma_conductivity_coef_, *Areal_, *Aimag_);
+  joule_heating_->ProjectCoefficient(jh_coeff);
+  (*joule_heating_) *= omega2;
+
   // 3) Output A and B fields for visualization using paraview
   if (verbose) grvy_printf(ginfo, "Writing solution to paraview output.\n");
   ParaViewDataCollection paraview_dc("magnetostatic", pmesh_);
@@ -414,6 +442,7 @@ void QuasiMagnetostaticSolver3D::solve() {
   paraview_dc.RegisterField("magvecpot_imag", Aimag_);
   paraview_dc.RegisterField("magnfield_real", Breal_);
   paraview_dc.RegisterField("magnfield_imag", Bimag_);
+  paraview_dc.RegisterField("joule_heating", joule_heating_);
   paraview_dc.Save();
 
   // Compute and dump the magnetic field on the axis

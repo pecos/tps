@@ -85,6 +85,24 @@ class QuasiMagnetostaticSolverBase : public TPS::Solver {
   virtual double totalJouleHeating() = 0;
 };
 
+/** Helper class for Joule heating evaluation
+ *
+ *  Patterned off the mfem Joule miniapp:
+ *  https://github.com/mfem/mfem/blob/641078645f6eb2762ce7d9b05050a247e74aafb2/miniapps/electromagnetics/joule_solver.hpp#L225
+ */
+class JouleHeatingCoefficient3D : public Coefficient {
+ private:
+  GridFunctionCoefficient &sigma_;
+  ParGridFunction &Ereal_;
+  ParGridFunction &Eimag_;
+
+ public:
+  JouleHeatingCoefficient3D(GridFunctionCoefficient &sigma, ParGridFunction &Ereal, ParGridFunction &Eimag)
+      : sigma_(sigma), Ereal_(Ereal), Eimag_(Eimag) {}
+  virtual double Eval(ElementTransformation &T, const IntegrationPoint &ip);
+  virtual ~JouleHeatingCoefficient3D() {}
+};
+
 /** Solve quasi-magnetostatic approximation of Maxwell
  *
  *  Solves the quasi-magnetostatic approximation of Maxwell's
@@ -97,10 +115,12 @@ class QuasiMagnetostaticSolver3D : public QuasiMagnetostaticSolverBase {
   mfem::FiniteElementCollection *hcurl_;
   mfem::FiniteElementCollection *h1_;
   mfem::FiniteElementCollection *hdiv_;
+  mfem::FiniteElementCollection *L2_;
 
   mfem::ParFiniteElementSpace *Aspace_;
   mfem::ParFiniteElementSpace *pspace_;
   mfem::ParFiniteElementSpace *Bspace_;
+  mfem::ParFiniteElementSpace *jh_space_;
 
   mfem::Array<int> ess_bdr_tdofs_;
 
