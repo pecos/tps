@@ -617,7 +617,7 @@ class PerfectMixture : public GasMixture {
   // virtual void SetNumEquations();
  public:
   PerfectMixture(RunConfiguration &_runfile, int _dim, int nvel);
-  MFEM_HOST_DEVICE PerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel);
+  MFEM_HOST_DEVICE PerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, double pc = 0);
 
   // FIXME: Generates compiler warning b/c this dtor implicitly calls
   // Vector dtor, which is only a __host__ function!

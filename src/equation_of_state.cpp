@@ -509,10 +509,10 @@ double EquationOfState::pressure( double *state,
 //////////////////////////////////////////////////////////////////////////
 
 PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim, int nvel)
-    : PerfectMixture(_runfile.perfectMixtureInput, _dim, nvel) {}
+    : PerfectMixture(_runfile.perfectMixtureInput, _dim, nvel, _runfile.const_plasma_conductivity_) {}
 
-MFEM_HOST_DEVICE PerfectMixture::PerfectMixture(PerfectMixtureInput inputs, int _dim, int nvel)
-    : GasMixture(inputs.f, _dim, nvel) {
+MFEM_HOST_DEVICE PerfectMixture::PerfectMixture(PerfectMixtureInput inputs, int _dim, int nvel, double pc)
+    : GasMixture(inputs.f, _dim, nvel, pc) {
   numSpecies = inputs.numSpecies;
   assert(nvel_ <= gpudata::MAXDIM);
   assert(numSpecies <= gpudata::MAXSPECIES);
