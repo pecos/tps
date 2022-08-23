@@ -163,6 +163,22 @@ int main (int argc, char *argv[])
     DenseMatrix diffusionVelocity(numSpecies, dim);
     transport->ComputeFluxTransportProperties(conservedState, gradUp, Efield, transportBuffer, diffusionVelocity);
 
+    double visc, bulkVisc;
+    transport->GetViscosities(conservedState, primitiveState, visc, bulkVisc);
+    
+    double visc_err = abs(visc - transportBuffer[FluxTrns::VISCOSITY]);
+    double bulk_visc_err = abs(bulkVisc - transportBuffer[FluxTrns::BULK_VISCOSITY]);
+    double consistencyThreshold = 1.0e-18;
+    if (visc_err > consistencyThreshold) {
+      grvy_printf(GRVY_ERROR, "\n ComputeFluxTransportProperties and GetViscosities are not consistent!");
+      grvy_printf(GRVY_ERROR, "\n Viscosity Error: %.15E", visc_err);
+      exit(ERROR);
+    } else if (bulk_visc_err > consistencyThreshold) {
+      grvy_printf(GRVY_ERROR, "\n ComputeFluxTransportProperties and GetViscosities are not consistent!");
+      grvy_printf(GRVY_ERROR, "\n Bulk Viscosity Error: %.15E", bulk_visc_err);
+      exit(ERROR);
+    }
+
     // Check if the artificial multipliers are applied correctly.
     if (srcConfig.argonTransportInput.multiply) {
       for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++)
