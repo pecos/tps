@@ -138,6 +138,7 @@ void CycleAvgJouleCoupling::interpConductivityFromFlowToEM() {
     conductivity_em_gf->SetSubVector(vdofs, elem_dof_vals);
   }
 
+  conductivity_em_gf->SetTrueVector();
   conductivity_em_gf->SetFromTrueVector();
 #else
   mfem_error("Cannot interpolate without GSLIB support.");
