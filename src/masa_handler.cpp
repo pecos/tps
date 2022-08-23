@@ -213,10 +213,10 @@ void evaluateForcing(const Vector &x, double time, Array<double> &y) {
 namespace dryair2d {
 
 void evaluateForcing(const Vector &x, double time, Array<double> &y) {
-  y[0] = MASA::masa_eval_source_rho<double>(x[0], x[1]);  // rho
-  y[1] = MASA::masa_eval_source_rho_u<double>(x[0], x[1]);    // rho*u
-  y[2] = MASA::masa_eval_source_rho_v<double>(x[0], x[1]);    // rho*v
-  y[3] = MASA::masa_eval_source_rho_e<double>(x[0], x[1]);    // rhp*e
+  y[0] = MASA::masa_eval_source_rho<double>(x[0], x[1]);    // rho
+  y[1] = MASA::masa_eval_source_rho_u<double>(x[0], x[1]);  // rho*u
+  y[2] = MASA::masa_eval_source_rho_v<double>(x[0], x[1]);  // rho*v
+  y[3] = MASA::masa_eval_source_rho_e<double>(x[0], x[1]);  // rhp*e
 }
 
 void exactSolnFunction(const Vector &x, double tin, Vector &y) {
@@ -279,9 +279,9 @@ void initCNS2DSutherlands(const int dim, RunConfiguration &config) {
   MASA::masa_set_param<double>("Cmu", 110.4);
   MASA::masa_set_param<double>("bulkViscMult", bulkVisc);
 
-  MASA::masa_set_param<double>("rho_0",1.02);
-  MASA::masa_set_param<double>("rho_x",0.11);
-  MASA::masa_set_param<double>("rho_y",0.13);
+  MASA::masa_set_param<double>("rho_0", 1.02);
+  MASA::masa_set_param<double>("rho_x", 0.11);
+  MASA::masa_set_param<double>("rho_y", 0.13);
   MASA::masa_set_param<double>("a_rhox", 2.);
   MASA::masa_set_param<double>("a_rhoy", 2.);
 
@@ -295,7 +295,7 @@ void initCNS2DSutherlands(const int dim, RunConfiguration &config) {
   MASA::masa_set_param<double>("a_py", 2.);
 }
 
-}
+}  // namespace dryair2d
 
 namespace dryair3d {
 

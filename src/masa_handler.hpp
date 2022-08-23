@@ -58,7 +58,7 @@ void exactSolnFunction(const Vector &x, double tin, Vector &y);
 void initEuler2D(const int dim, RunConfiguration &config);
 void initCNS2DSutherlands(const int dim, RunConfiguration &config);
 
-}
+}  // namespace dryair2d
 
 namespace dryair3d {
 
