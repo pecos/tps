@@ -123,7 +123,7 @@ int main (int argc, char *argv[])
 
   int max_out = 1;
   CycleAvgJouleCoupling *solver = new CycleAvgJouleCoupling(tps.getMPISession(), tps.getInputFilename(), &tps,
-                                                            max_out);
+                                                            max_out, true);
 
   solver->parseSolverOptions();
   solver->initialize();

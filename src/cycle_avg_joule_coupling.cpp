@@ -35,9 +35,13 @@
 #include "em_options.hpp"
 #include "quasimagnetostatic.hpp"
 
-CycleAvgJouleCoupling::CycleAvgJouleCoupling(MPI_Session &mpi, string &inputFileName, TPS::Tps *tps, int max_out)
+CycleAvgJouleCoupling::CycleAvgJouleCoupling(MPI_Session &mpi, string &inputFileName, TPS::Tps *tps, int max_out, bool axisym)
     : mpi_(mpi), em_opt_(), max_outer_iters_(max_out) {
-  qmsa_solver_ = new QuasiMagnetostaticSolverAxiSym(mpi, em_opt_, tps);
+  if (axisym) {
+    qmsa_solver_ = new QuasiMagnetostaticSolverAxiSym(mpi, em_opt_, tps);
+  } else {
+    qmsa_solver_ = new QuasiMagnetostaticSolver3D(mpi, em_opt_, tps);
+  }
   flow_solver_ = new M2ulPhyS(mpi, inputFileName, tps);
 #ifdef HAVE_GSLIB
   interp_flow_to_em_ = new FindPointsGSLIB(MPI_COMM_WORLD);
