@@ -352,6 +352,13 @@ struct ArgonTransportInput {
 
   // ArgonMixtureTransport
   ArgonColl collisionIndex[gpudata::MAXSPECIES * gpudata::MAXSPECIES];
+
+  // artificial multipliers
+  bool multiply;
+  double fluxTrnsMultiplier[FluxTrns::NUM_FLUX_TRANS];
+  double spcsTrnsMultiplier[SpeciesTrns::NUM_SPECIES_COEFFS];
+  double diffMult;
+  double mobilMult;
 };
 
 struct ChemistryInput {

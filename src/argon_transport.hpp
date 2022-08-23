@@ -85,6 +85,13 @@ class ArgonMinimalTransport : public TransportProperties {
 
   bool thirdOrderkElectron_;
 
+  // artificial multipliers
+  bool multiply_ = false;
+  double fluxTrnsMultiplier_[FluxTrns::NUM_FLUX_TRANS];
+  double spcsTrnsMultiplier_[SpeciesTrns::NUM_SPECIES_COEFFS];
+  double diffMult_;
+  double mobilMult_;
+
  public:
   ArgonMinimalTransport(GasMixture *_mixture, RunConfiguration &_runfile);
   MFEM_HOST_DEVICE ArgonMinimalTransport(GasMixture *_mixture, const ArgonTransportInput &inputs);
@@ -150,6 +157,9 @@ class ArgonMinimalTransport : public TransportProperties {
   }
 
   MFEM_HOST_DEVICE void computeEffectiveMass(const double *mw, double *muw);
+
+  // For artificial multipliers
+  MFEM_HOST_DEVICE void setArtificialMultipliers(const ArgonTransportInput &inputs);
 };
 
 //////////////////////////////////////////////////////
