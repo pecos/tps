@@ -165,7 +165,7 @@ class QuasiMagnetostaticSolver3D : public QuasiMagnetostaticSolverBase {
   /** Solve quasi-magnetostatic problem */
   void solve() override;
 
-  mfem::ParFiniteElementSpace *getFESpace() { return Aspace_; }
+  mfem::ParFiniteElementSpace *getFESpace() { return pspace_; }
 
   double elementJouleHeating(const FiniteElement &el, ElementTransformation &Tr, const Vector &elfun) override;
   double totalJouleHeating() override;
