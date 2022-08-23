@@ -6,6 +6,7 @@ TEST="argon_transport"
 setup() {
 
     RUNFILE_ARGON="inputs/argonMinimal.ini"
+    RUNFILE_ARGON_MULT="inputs/argonMinimal.multipliers.ini"
 
 }
 
@@ -22,4 +23,14 @@ setup() {
     RUNFILE_MOD=${RUNFILE_ARGON}.mod
     sed  's/transport_model = argon_minimal/transport_model = argon_mixture/' $RUNFILE_ARGON > $RUNFILE_MOD
     ./test_argon_minimal -run $RUNFILE_MOD
+}
+
+@test "[$TEST] test artificial multipliers are properly applied" {
+    test -s $RUNFILE_ARGON_MULT
+    test -e ./test_argon_minimal
+    ./test_argon_minimal -run $RUNFILE_ARGON_MULT
+
+    RUNFILE_MULT_MOD=${RUNFILE_ARGON_MULT}.mod
+    sed  's/transport_model = argon_minimal/transport_model = argon_mixture/' $RUNFILE_ARGON_MULT > $RUNFILE_MULT_MOD
+    ./test_argon_minimal -run $RUNFILE_MULT_MOD
 }

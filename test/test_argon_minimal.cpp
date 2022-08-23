@@ -163,6 +163,12 @@ int main (int argc, char *argv[])
     DenseMatrix diffusionVelocity(numSpecies, dim);
     transport->ComputeFluxTransportProperties(conservedState, gradUp, Efield, transportBuffer, diffusionVelocity);
 
+    // Check if the artificial multipliers are applied correctly.
+    if (srcConfig.argonTransportInput.multiply) {
+      for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++)
+        transportBuffer[t] /= srcConfig.argonTransportInput.fluxTrnsMultiplier[t];
+    }
+
     // error = max(error, abs(refValues(i,1) - transportBuffer[FluxTrns::VISCOSITY]) / refValues(i,1));
     error(0) = abs(refValues(i,1) - transportBuffer[FluxTrns::VISCOSITY]) / refValues(i,1);
     if (error(0) > relErrorThreshold(0)) {
