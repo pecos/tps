@@ -2342,15 +2342,15 @@ void M2ulPhyS::parseTransportInputs() {
                          config.argonTransportInput.multiply, false);
           if (config.argonTransportInput.multiply) {
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/viscosity",
-                           &config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::VISCOSITY], 1.0);
+                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::VISCOSITY], 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/bulk_viscosity",
-                           &config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::BULK_VISCOSITY], 1.0);
+                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::BULK_VISCOSITY], 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/heavy_thermal_conductivity",
-                           &config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY], 1.0);
+                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY], 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/electron_thermal_conductivity",
-                           &config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY], 1.0);
+                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY], 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/momentum_transfer_frequency",
-                           &config.argonTransportInput.spcsTrnsMultiplier[SpeciesTrns::MF_FREQUENCY], 1.0);
+                           config.argonTransportInput.spcsTrnsMultiplier[SpeciesTrns::MF_FREQUENCY], 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/diffusivity",
                            config.argonTransportInput.diffMult, 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/mobility",
@@ -2384,15 +2384,15 @@ void M2ulPhyS::parseTransportInputs() {
                          config.argonTransportInput.multiply, false);
           if (config.argonTransportInput.multiply) {
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/viscosity",
-                           &config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::VISCOSITY], 1.0);
+                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::VISCOSITY], 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/bulk_viscosity",
-                           &config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::BULK_VISCOSITY], 1.0);
+                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::BULK_VISCOSITY], 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/heavy_thermal_conductivity",
-                           &config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY], 1.0);
+                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY], 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/electron_thermal_conductivity",
-                           &config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY], 1.0);
+                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY], 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/momentum_transfer_frequency",
-                           &config.argonTransportInput.spcsTrnsMultiplier[SpeciesTrns::MF_FREQUENCY], 1.0);
+                           config.argonTransportInput.spcsTrnsMultiplier[SpeciesTrns::MF_FREQUENCY], 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/diffusivity",
                            config.argonTransportInput.diffMult, 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/mobility",
