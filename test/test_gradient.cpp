@@ -16,7 +16,7 @@ double uniformRandomNumber() {
   return ((double) rand()) / (RAND_MAX);
 }
 
-void setRandomPrimitiveState(GasMixture *mixture) {
+void setRandomPrimitiveState(PerfectMixture *mixture) {
   const double numEquation = mixture->GetNumEquations();
   const double numSpecies = mixture->GetNumSpecies();
   const double numActiveSpecies = mixture->GetNumActiveSpecies();
@@ -91,7 +91,7 @@ int main (int argc, char *argv[])
 {
   srand (time(NULL));
 
-  TPS::Tps tps(argc, argv);
+  TPS::Tps tps;
   tps.parseCommandLineArgs(argc, argv);
   tps.parseInput();
   tps.chooseDevices();
@@ -102,15 +102,15 @@ int main (int argc, char *argv[])
 
   M2ulPhyS *srcField = new M2ulPhyS(tps.getMPISession(), tps.getInputFilename(), &tps);
   RunConfiguration& srcConfig = srcField->GetConfig();
-
-  GasMixture *mixture = srcField->getMixture();
-  int numSpecies = mixture->GetNumSpecies();
-  int num_equation = mixture->GetNumEquations();
-
   // Get meshes
   ParMesh* mesh = srcField->GetMesh();
-
   const int dim = mesh->Dimension();
+
+  assert(srcConfig.GetWorkingFluid()==WorkingFluid::USER_DEFINED);
+  assert(srcConfig.GetGasModel()==PERFECT_MIXTURE);
+  PerfectMixture *mixture = new PerfectMixture(srcConfig, dim, dim);
+  int num_equation = mixture->GetNumEquations();
+
   Up0_.SetSize(num_equation);
   dUp_.SetSize(num_equation, dim);
   setRandomPrimitiveState(mixture);
@@ -128,8 +128,6 @@ int main (int argc, char *argv[])
     for (int d = 0; d < dim; d++) offset_(eq, d) = uniformRandomNumber();
 
   if (mesh->GetNodes() == NULL) { mesh->SetCurvature(1); }
-  const int mesh_poly_deg =
-    mesh->GetNodes()->FESpace()->GetElementOrder(0);
   cout << "Source mesh curvature: "
        << mesh->GetNodes()->OwnFEC()->Name() << endl;
 

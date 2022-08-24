@@ -29,7 +29,7 @@ EXTRA_DIST      = tap-driver.sh soln_differ inputs meshes ref_solns/*.h5 \
 	 	  argon_minimal.test argon_minimal.binary.test diffusion_wall.test \
 	 	  inflow_outflow.test mms.ternary_2d.test mms.ternary_2d_wall.test \
 	 	  mms.ternary_2d_inout.test cuda-memcheck.test mms.general_wall.test \
-		  independent_coupling.test interp_em.test
+		  independent_coupling.test interp_em.test mms.euler_2d.test mms.cns_2d.test
 
 TESTS = vpath.sh
 XFAIL_TESTS =
@@ -70,7 +70,8 @@ TESTS += cyl3d.test \
 	 reaction.test \
 	 inflow_outflow.test \
 	 independent_coupling.test \
-	 interp_em.test
+	 interp_em.test \
+	 gradient.test
 
 if PYTHON_ENABLED
 TESTS += cyl3d.python.test
@@ -100,13 +101,13 @@ endif
 
 if MASA_ENABLED
 TESTS += mms.euler.test \
-	 mms.euler_2d.test \
-	 mms.cns_2d.test \
 	 mms.ternary_2d.test \
 	 mms.ternary_2d_wall.test \
 	 mms.ternary_2d_inout.test
 if !GPU_ENABLED
-TESTS += mms.general_wall.test
+TESTS += mms.general_wall.test \
+	 mms.euler_2d.test \
+	 mms.cns_2d.test
 endif
 endif
 
@@ -178,15 +179,15 @@ if MASA_ENABLED
 test_interp_em_LDFLAGS 	 += $(MASA_LIBS)
 endif
 
-#check_PROGRAMS += test_grad
-#test_grad_SOURCES  = test_gradient.cpp
-#test_grad_LDADD    = ../src/libtps.a
-#test_grad_LDADD    += $(HDF5_LIBS)
-#test_grad_LDADD    += $(GRVY_LIBS)
-#test_grad_LDFLAGS  = $(PYTHON_LIBS) $(MFEM_LIBS)
-#
-#if MASA_ENABLED
-#test_grad_LDFLAGS += $(MASA_LIBS)
-#endif
+check_PROGRAMS += test_grad
+test_grad_SOURCES  = test_gradient.cpp
+test_grad_LDADD    = ../src/libtps.la
+test_grad_LDADD    += $(HDF5_LIBS)
+test_grad_LDADD    += $(GRVY_LIBS)
+test_grad_LDFLAGS  = $(PYTHON_LIBS) $(MFEM_LIBS)
+
+if MASA_ENABLED
+test_grad_LDFLAGS += $(MASA_LIBS)
+endif
 
 endif # if !GPU_ENABLED

@@ -245,6 +245,8 @@ void initEuler2D(const int dim, RunConfiguration &config) {
 
   MASA::masa_init<double>("forcing handler", "euler_2d");
 
+  MASA::masa_set_param<double>("L", 3.02);
+
   MASA::masa_set_param<double>("Gamma", 1.4);
 
   MASA::masa_set_param<double>("a_rhox", 2.);
@@ -271,6 +273,8 @@ void initCNS2DSutherlands(const int dim, RunConfiguration &config) {
   MASA::masa_init<double>("forcing handler", "ad_cns_2d_sutherlands");
 
   // fluid parameters
+  MASA::masa_set_param<double>("L", 3.02);
+
   MASA::masa_set_param<double>("Gamma", 1.4);
   MASA::masa_set_param<double>("R", 287.058);
   MASA::masa_set_param<double>("Pr", 0.71);
