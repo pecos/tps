@@ -1,0 +1,47 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="gradient"
+RUNFILE="inputs/plasma.gradient.ini"
+
+setup() {
+    REPORT_FILE=argon.gradient_error.txt
+    MESH_FILE=beam-quad-o3-s1-r1-p.mesh
+    TOL=2e-4
+}
+
+@test "[$TEST] check for input file $RUNFILE" {
+    test -s $RUNFILE
+}
+
+@test "[$TEST] create a mesh file" {
+    ../utils/beam_mesh -nx 1 -nt 5 -b 5 -rs 1
+
+    test -s $MESH_FILE
+}
+
+@test "[$TEST] gradient test with input -> $RUNFILE" {
+    test -s ./test_grad
+    mpirun -np 2 ./test_grad --runFile $RUNFILE
+    test -s $REPORT_FILE
+}
+
+@test "[$TEST] check if the relative error is similar to the reported value" {
+    while IFS=$'\t' read -r nx e0 dmp dmp dmp dmp dmp e1 dmp dmp dmp dmp dmp;
+    do
+      test $nx -eq 25600
+      # empirically observed error 2.2988e-4
+      check_lo=$(awk 'BEGIN{print ('$e0'>2.295e-4)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e0'<2.305e-4)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 5.7471e-5
+      check_lo=$(awk 'BEGIN{print ('$e1'>5.74e-5)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e1'<5.75e-5)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+    done < $REPORT_FILE
+    
+    rm $MESH_FILE
+    rm $REPORT_FILE
+}
