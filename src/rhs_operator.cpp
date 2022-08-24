@@ -162,8 +162,6 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
     MassIntegrator mi;
 
     int integrationOrder = 2 * vfes->GetFE(i)->GetOrder();
-    // if (intRuleType == 1 && vfes->GetFE(i)->GetGeomType() == Geometry::SQUARE)
-    //   integrationOrder--;  // when Gauss-Lobatto
     const IntegrationRule intRule = intRules->Get(vfes->GetFE(i)->GetGeomType(), integrationOrder);
 
     mi.SetIntRule(&intRule);
@@ -237,8 +235,6 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
     Kx = 0.;
     ElementTransformation *Tr = vfes->GetElementTransformation(elem);
     int integrationOrder = 2 * vfes->GetFE(elem)->GetOrder();
-    // if (intRuleType == 1 && vfes->GetFE(elem)->GetGeomType() == Geometry::SQUARE)
-    //   integrationOrder--;  // when Gauss-Lobatto
     const IntegrationRule intRule = intRules->Get(vfes->GetFE(elem)->GetGeomType(), integrationOrder);
     for (int k = 0; k < intRule.GetNPoints(); k++) {
       const IntegrationPoint &ip = intRule.IntPoint(k);
@@ -1057,13 +1053,6 @@ void RHSoperator::computeMeanTimeDerivatives(Vector &y) const {
         local_timeDerivatives[eq] += fabs(y[n + eq * Ndof]) / (static_cast<double>(Ndof));
       }
     }
-
-    // NOTE(kevin): This unnecessary part spares one space for third component of velocity even for 2d solution.
-    //              This is commented out as it causes seg-fault error.
-    // if (dim == 2) {
-    //   local_timeDerivatives[4] = local_timeDerivatives[3];
-    //   local_timeDerivatives[3] = 0.;
-    // }
 #endif
   }
 }

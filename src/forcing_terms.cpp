@@ -282,7 +282,6 @@ void AxisymmetricSource::updateTerms(Vector &in) {
   //   const int order = elem->GetOrder();
   //   //cout<<"order :"<<maxorder<<" dof: "<<dof_elem<<endl;
   //   int intorder = 2*order;
-  //   //if(intRuleType==1 && trial_fe.GetGeomType()==Geometry::SQUARE) intorder--; // when Gauss-Lobatto
   //   const IntegrationRule *ir = &intRules->Get(elem->GetGeomType(), intorder);
   //   for (int k= 0; k< ir->GetNPoints(); k++)
   //     {
@@ -999,7 +998,6 @@ void MASA_forcings::updateTerms(Vector &in) {
     //     const int order = elem->GetOrder();
     //     //cout<<"order :"<<maxorder<<" dof: "<<dof_elem<<endl;
     //     int intorder = 2*order;
-    //     //if(intRuleType==1 && trial_fe.GetGeomType()==Geometry::SQUARE) intorder--; // when Gauss-Lobatto
     //     const IntegrationRule *ir = &intRules->Get(elem->GetGeomType(), intorder);
     //     for (int k= 0; k< ir->GetNPoints(); k++)
     //     {
