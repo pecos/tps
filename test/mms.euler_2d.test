@@ -1,0 +1,86 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="mms/euler_2d"
+RUNFILE_QUAD="inputs/mms.euler.2d.quad.ini"
+RUNFILE_TRI="inputs/mms.euler.2d.tri.ini"
+
+setup() {
+    REPORT_QUAD="euler_2d.rhs_error.quad.p2.txt"
+    REPORT_TRI="euler_2d.rhs_error.tri.p2.txt"
+    QUAD_MESH=beam-quad-o3-s1-p.mesh
+    TRI_MESH=beam-tri-o3-s1-p.mesh
+}
+
+@test "[$TEST] check for input file $RUNFILE" {
+    test -s $RUNFILE
+}
+
+@test "[$TEST] create a mesh file" {
+    ../utils/beam_mesh -nx 1 -nt 5 -rs 0 -a 3.02 -b 3.02 -e 4
+    test -s $QUAD_MESH
+
+    ../utils/beam_mesh -nx 1 -nt 5 -rs 0 -a 3.02 -b 3.02 -e 6
+    test -s $TRI_MESH
+}
+
+@test "[$TEST] compare rhs for a manufactured solution with input -> $RUNFILE_QUAD" {
+    test -e ../utils/compute_rhs
+    mpirun -np 2 ../utils/compute_rhs --runFile $RUNFILE_QUAD
+
+    test -s $REPORT_QUAD
+
+    while IFS=$'\t' read -r nx e0 e1 e2;
+    do
+      test $nx -eq 25600
+      # empirically observed error 5.74794e-5
+      check_lo=$(awk 'BEGIN{print ('$e0'>5.74e-5)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e0'<5.75e-5)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 5.75172e-5
+      check_lo=$(awk 'BEGIN{print ('$e1'>5.745e-5)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e1'<5.755e-5)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 5.7516e-5
+      check_lo=$(awk 'BEGIN{print ('$e2'>5.745e-5)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e2'<5.755e-5)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+    done < $REPORT_QUAD
+
+    rm $REPORT_QUAD
+    rm $QUAD_MESH
+}
+
+@test "[$TEST] compare rhs for a manufactured solution with input -> $RUNFILE_TRI" {
+    test -e ../utils/compute_rhs
+    mpirun -np 2 ../utils/compute_rhs --runFile $RUNFILE_TRI
+
+    test -s $REPORT_TRI
+
+    while IFS=$'\t' read -r nx e0 e1 e2;
+    do
+      test $nx -eq 51200
+      # empirically observed error 5.74824e-5
+      check_lo=$(awk 'BEGIN{print ('$e0'>5.745e-5)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e0'<5.755e-5)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 5.75279e-5
+      check_lo=$(awk 'BEGIN{print ('$e1'>5.75e-5)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e1'<5.76e-5)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+      # empirically observed error 5.75426e-5
+      check_lo=$(awk 'BEGIN{print ('$e2'>5.75e-5)?1:0}')
+      check_hi=$(awk 'BEGIN{print ('$e2'<5.76e-5)?1:0}')
+      test $check_lo -eq 1
+      test $check_hi -eq 1
+    done < $REPORT_TRI
+
+    rm $REPORT_TRI
+    rm $TRI_MESH
+}
+

@@ -100,6 +100,7 @@ endif
 
 if MASA_ENABLED
 TESTS += mms.euler.test \
+	 mms.euler_2d.test \
 	 mms.ternary_2d.test \
 	 mms.ternary_2d_wall.test \
 	 mms.ternary_2d_inout.test
