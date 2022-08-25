@@ -39,3 +39,51 @@ MFEM_HOST_DEVICE TableInterpolator::TableInterpolator(const int &Ndata, const do
     fdata_[k] = fdata[k];
   }
 }
+
+// Find the data interval where the input value lies within.
+// The algorithm is a copy version of std::upper_bound, which is similar to binary search.
+// This has O(log_2(Ndata)) complexity.
+MFEM_HOST_DEVICE int TableInterpolator::findInterval(const double &xEval) {
+  int count = Ndata_;
+  int first = 0;
+  int it, step;
+
+  // Find the first index which value is larger than xEval.
+  while (count > 0) {
+    it = first;
+    step = count / 2;
+    it += step;
+    if (xEval > xdata_[it]) {
+      first = ++it;
+      count -= step + 1;
+    } else {
+      count = step;
+    }
+  }
+  // if xEval is outside the range, first has either 0 or Ndata_. Limit the value.
+  first = max(1, min(Ndata_-1, first));
+  // We want the left index of the interval.
+  return first - 1;
+}
+
+//////////////////////////////////////////////////////
+//////// Linear interpolation
+//////////////////////////////////////////////////////
+
+MFEM_HOST_DEVICE LinearTable::LinearTable(const TableInput &input) : TableInterpolator(input.Ndata, input.xdata, input.ydata, input.xLogScale, input.fLogScale) {
+  for (int k = 0; k < Ndata_-1; k++) {
+    a_[k] = (fLogScale_) ? log(fdata_[k]) : fdata_[k];
+    double df = (fLogScale_) ? (log(fdata_[k+1]) - log(fdata_[k])) : (fdata_[k+1] - fdata_[k]);
+    b_[k] = (xLogScale_) ? df / (log(xdata_[k+1]) - log(xdata_[k])) : df / (xdata_[k+1] - xdata_[k]);
+    a_[k] -= (xLogScale_) ? b_[k] * log(xdata_[k]) : b_[k] * xdata_[k];
+  }
+}
+
+MFEM_HOST_DEVICE double LinearTable::eval(const double &xEval) {
+  int index = findInterval(xEval);
+  double xt = (xLogScale_) ? log(xEval) : xEval;
+  double ft = a_[index] + b_[index] * xt;
+  if (fLogScale_) ft = exp(ft);
+
+  return ft;
+}

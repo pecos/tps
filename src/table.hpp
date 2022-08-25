@@ -54,10 +54,30 @@ public:
 
   MFEM_HOST_DEVICE virtual ~TableInterpolator() {}
 
+  MFEM_HOST_DEVICE int findInterval(const double &xEval);
+
   MFEM_HOST_DEVICE virtual double eval(const double &xEval) {
     printf("TableInterpolator not initialized!");
     return nan("");
   }
+};
+
+//////////////////////////////////////////////////////
+//////// Linear interpolation
+//////////////////////////////////////////////////////
+
+class LinearTable : public TableInterpolator {
+private:
+  // f[j](x) = a + b * x
+  double a_[gpudata::MAXTABLE];
+  double b_[gpudata::MAXTABLE];
+
+public:
+  MFEM_HOST_DEVICE LinearTable(const TableInput &input);
+
+  MFEM_HOST_DEVICE virtual ~LinearTable() {}
+
+  MFEM_HOST_DEVICE virtual double eval(const double &xEval);
 };
 
 #endif  // TABLE_HPP_
