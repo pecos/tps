@@ -70,7 +70,7 @@ MFEM_HOST_DEVICE int TableInterpolator::findInterval(const double &xEval) {
 //////// Linear interpolation
 //////////////////////////////////////////////////////
 
-MFEM_HOST_DEVICE LinearTable::LinearTable(const TableInput &input) : TableInterpolator(input.Ndata, input.xdata, input.ydata, input.xLogScale, input.fLogScale) {
+MFEM_HOST_DEVICE LinearTable::LinearTable(const TableInput &input) : TableInterpolator(input.Ndata, input.xdata, input.fdata, input.xLogScale, input.fLogScale) {
   for (int k = 0; k < Ndata_-1; k++) {
     a_[k] = (fLogScale_) ? log(fdata_[k]) : fdata_[k];
     double df = (fLogScale_) ? (log(fdata_[k+1]) - log(fdata_[k])) : (fdata_[k+1] - fdata_[k]);

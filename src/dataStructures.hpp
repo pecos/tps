@@ -377,4 +377,12 @@ struct ChemistryInput {
   double equilibriumConstantParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
 };
 
+struct TableInput {
+  int Ndata;
+  double xdata[gpudata::MAXTABLE];
+  double fdata[gpudata::MAXTABLE];
+  bool xLogScale;
+  bool fLogScale;
+};
+
 #endif  // DATASTRUCTURES_HPP_
