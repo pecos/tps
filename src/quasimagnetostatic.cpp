@@ -304,6 +304,7 @@ void QuasiMagnetostaticSolver3D::parseSolverOptions() {
   tpsP_->getInput("em/max_iter", em_opts_.max_iter, 100);
   tpsP_->getInput("em/rtol", em_opts_.rtol, 1.0e-6);
   tpsP_->getInput("em/atol", em_opts_.atol, 1.0e-10);
+  tpsP_->getInput("em/preconditioner_background_sigma", em_opts_.preconditioner_background_sigma, -1.0);
   tpsP_->getInput("em/evaluate_magnetic_field", em_opts_.evaluate_magnetic_field, true);
   tpsP_->getInput("em/nBy", em_opts_.nBy, 0);
   tpsP_->getInput("em/yinterp_min", em_opts_.yinterp_min, 0.0);
@@ -389,15 +390,34 @@ void QuasiMagnetostaticSolver3D::solve() {
   qms->SetBlock(1, 0, Koffd_mat);
   qms->SetBlock(1, 1, Kdiag_mat);
 
-  // Set up block preconditioner
-  HypreAMS *prec;
-  prec = new HypreAMS(*Kdiag_mat, Aspace_);
-  prec->SetSingularProblem();
-  prec->iterative_mode = false;
+  // preconditioner
+  ParBilinearForm *Kpre = new ParBilinearForm(Aspace_);
+  Kpre->AddDomainIntegrator(new CurlCurlIntegrator);
+  Kpre->AddDomainIntegrator(new VectorFEMassIntegrator(mu_sigma_omega));
+
+  bool preconditioner_spd = false;
+  if (em_opts_.preconditioner_background_sigma > 0) {
+    ConstantCoefficient reg(mu0_omega * em_opts_.preconditioner_background_sigma);
+    Kpre->AddDomainIntegrator(new VectorFEMassIntegrator(reg));
+    preconditioner_spd = true;
+  }
+  Kpre->Assemble();
+
+  OperatorPtr Kpre_op;
+  Kpre->FormSystemMatrix(ess_bdr_tdofs_, Kpre_op);
+
+  HypreAMS *Paar = new HypreAMS(*Kpre_op.As<HypreParMatrix>(), Aspace_);
+  Paar->iterative_mode = false;
+  if (!preconditioner_spd) {
+    Paar->SetSingularProblem();
+  }
+
+  Operator *Paai = new ScaledOperator(Paar,-1.0);
 
   BlockDiagonalPreconditioner BDP(offsets_);
-  BDP.SetDiagonalBlock(0, prec);
-  BDP.SetDiagonalBlock(1, prec);
+  BDP.SetDiagonalBlock(0, Paar);
+  BDP.SetDiagonalBlock(1, Paai);
+
 
   // 1) Solve QMS (i.e., i \omega A + curl(curl(A)) = J) for magnetic
   //    vector potential using operators set up by Initialize() and
@@ -410,10 +430,9 @@ void QuasiMagnetostaticSolver3D::solve() {
   solver.SetRelTol(em_opts_.rtol);
   solver.SetAbsTol(em_opts_.atol);
   solver.SetMaxIter(em_opts_.max_iter);
-  solver.SetPreconditioner(*prec);
+  solver.SetPrintLevel(1);
 
   solver.Mult(rhs, Avec);
-  delete prec;
 
   Areal_->Distribute(&(Avec.GetBlock(0)));
   Aimag_->Distribute(&(Avec.GetBlock(1)));

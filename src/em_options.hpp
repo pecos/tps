@@ -50,6 +50,7 @@ class ElectromagneticOptions {
   int max_iter; /**< Maximum number of linear solver iterations */
   double rtol;  /**< Linear solver relative tolerance */
   double atol;  /**< Linear solver absolute tolerance */
+  double preconditioner_background_sigma;  /**< Uniform conductivity to use to preconditioner (ignored if <= 0) */
 
   bool top_only; /**< Flag to specify current in top rings only */
   bool bot_only; /**< Flag to specify current in bottom rings only */
@@ -72,6 +73,7 @@ class ElectromagneticOptions {
     max_iter = 100;
     rtol = 1.0e-6;
     atol = 1.0e-10;
+    preconditioner_background_sigma = -1;
     evaluate_magnetic_field = true;
     nBy = 0;
     yinterp_min = 0.0;
