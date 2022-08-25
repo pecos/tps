@@ -1012,12 +1012,16 @@ double QuasiMagnetostaticSolverAxiSym::totalJouleHeating() {
   // loop over elements on this mpi rank and integrate joule heating
   for (int ielem = 0; ielem < NE; ielem++) {
     const FiniteElement *fe = fes->GetFE(ielem);
-    DofTransformation *doftrans = fes->GetElementVDofs(ielem, vdofs);
     ElementTransformation *T = fes->GetElementTransformation(ielem);
+#if MFEM_VERSION >= 40400
+    DofTransformation *doftrans = fes->GetElementVDofs(ielem, vdofs);
     joule_heating_->GetSubVector(vdofs, el_x);
     if (doftrans) {
       doftrans->InvTransformPrimal(el_x);
     }
+#else
+    joule_heating_->GetSubVector(vdofs, el_x);
+#endif
 
     int_jh += elementJouleHeating(*fe, *T, el_x);
   }
