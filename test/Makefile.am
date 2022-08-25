@@ -192,4 +192,11 @@ if MASA_ENABLED
 test_grad_LDFLAGS += $(MASA_LIBS)
 endif
 
+check_PROGRAMS += test_table
+test_table_SOURCES  = test_table.cpp
+test_table_LDADD    = ../src/libtps.la
+test_table_LDADD    += $(HDF5_LIBS)
+test_table_LDADD    += $(GRVY_LIBS)
+test_table_LDFLAGS  = $(PYTHON_LIBS) $(MFEM_LIBS)
+
 endif # if !GPU_ENABLED
