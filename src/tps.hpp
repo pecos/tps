@@ -103,6 +103,9 @@ class Tps {
   template <typename T>
   void getInput(const char *name, T &var, T varDefault);
 
+  // read optional mfem::Vector input (set to vdef if absent in input file)
+  void getVec(const char *name, Vector &vec, size_t numElems, const Vector &vdef);
+
   // input parsing support (variants where value is required to be provided)
   // supported types are T={int,double,std::string}
   template <typename T>

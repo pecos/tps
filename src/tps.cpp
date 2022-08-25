@@ -287,6 +287,21 @@ void Tps::getRequiredVec(const char *name, Vector &vec, size_t numElems) {
   }
 }
 
+/// read an input vector for keyword [name] and store in MFEM vector. The size of the vector
+/// is numElems
+void Tps::getVec(const char *name, Vector &vec, size_t numElems, const Vector &vdef) {
+  if ((size_t)vdef.Size() < numElems) exit(ERROR);
+  if ((size_t)vec.Size() < numElems) vec.SetSize(numElems);
+  if (!iparse_.Read_Var_Vec(name, vec.HostWrite(), numElems)) {
+    grvy_printf(GRVY_INFO, "Setting input vector %s to default.", name);
+    double *hv = vec.HostWrite();
+    const double *hd = vdef.HostRead();
+    for (size_t i = 0; i < numElems; i++) {
+      hv[i] = hd[i];
+    }
+  }
+}
+
 /// read the ith entry from an input vector for keyword [name].
 void Tps::getRequiredVecElem(const char *name, double &value, int ithElem) {
 #if 1

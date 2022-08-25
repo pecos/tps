@@ -40,6 +40,7 @@
 using namespace mfem;
 using namespace mfem::common;
 
+static Vector axis(3);
 void JFun(const Vector &x, Vector &f);
 
 QuasiMagnetostaticSolverBase::QuasiMagnetostaticSolverBase(MPI_Session &mpi, ElectromagneticOptions em_opts,
@@ -82,6 +83,8 @@ QuasiMagnetostaticSolver3D::QuasiMagnetostaticSolver3D(MPI_Session &mpi, Electro
   jh_space_ = NULL;
   K_ = NULL;
   r_ = NULL;
+  grad_ = NULL;
+  div_free_ = NULL;
   Areal_ = NULL;
   Aimag_ = NULL;
   Breal_ = NULL;
@@ -101,6 +104,8 @@ QuasiMagnetostaticSolver3D::~QuasiMagnetostaticSolver3D() {
   delete Breal_;
   delete Aimag_;
   delete Areal_;
+  delete div_free_;
+  delete grad_;
   delete r_;
   delete K_;
   delete jh_space_;
@@ -184,6 +189,13 @@ void QuasiMagnetostaticSolver3D::initialize() {
   K_->Assemble();
   K_->Finalize();
 
+  grad_ = new ParDiscreteGradOperator(pspace_, Aspace_);
+  grad_->Assemble();
+  grad_->Finalize();
+
+  int irOrder = pspace_->GetElementTransformation(0)->OrderW() + 2 * em_opts_.order;
+  div_free_ = new DivergenceFreeProjector(*pspace_, *Aspace_, irOrder, NULL, NULL, grad_);
+
   // All done
   operator_initialized_ = true;
 
@@ -217,6 +229,10 @@ void QuasiMagnetostaticSolver3D::InitializeCurrent() {
   //    uniformly distributed current density in rings defined by
   //    volume attributes in the mesh.  We assume 4 rings, plus a zero
   //    source current domain for 5 total attributes.
+  axis[0] = em_opts_.current_axis[0];
+  axis[1] = em_opts_.current_axis[1];
+  axis[2] = em_opts_.current_axis[2];
+
   Vector J0(pmesh_->attributes.Max());
   J0 = 0.0;
 
@@ -247,13 +263,6 @@ void QuasiMagnetostaticSolver3D::InitializeCurrent() {
 
   r_ = new ParLinearForm(Aspace_);
 
-  int irOrder = pspace_->GetElementTransformation(0)->OrderW() + 2 * em_opts_.order;
-  ParDiscreteGradOperator *grad = new ParDiscreteGradOperator(pspace_, Aspace_);
-  grad->Assemble();
-  grad->Finalize();
-
-  DivergenceFreeProjector *div_free = new DivergenceFreeProjector(*pspace_, *Aspace_, irOrder, NULL, NULL, grad);
-
   // This call (i.e., GlobalProjectDiscCoefficient) replaces the
   // functionality of Jorig->ProjectCoefficient(current) in a way that
   // gives the same results in parallel for discontinuous functions.
@@ -268,10 +277,8 @@ void QuasiMagnetostaticSolver3D::InitializeCurrent() {
   // GridFunction::ProjectDiscCoefficient (or worse, silently runs
   // incorrectly).
   GlobalProjectDiscCoefficient(*Jorig, current);
-  div_free->Mult(*Jorig, *Jproj);
+  div_free_->Mult(*Jorig, *Jproj);
 
-  delete div_free;
-  delete grad;
   delete Jorig;
 
   // 3) Multiply by the mass matrix to get the RHS vector
@@ -308,6 +315,12 @@ void QuasiMagnetostaticSolver3D::parseSolverOptions() {
   tpsP_->getInput("em/current_amplitude", em_opts_.current_amplitude, 1.0);
   tpsP_->getInput("em/current_frequency", em_opts_.current_frequency, 1.0);
   tpsP_->getInput("em/permeability", em_opts_.mu0, 1.0);
+
+  Vector default_axis(3);
+  default_axis[0] = 0;
+  default_axis[1] = 1;
+  default_axis[2] = 0;
+  tpsP_->getVec("em/current_axis", em_opts_.current_axis, 3, default_axis);
 
   // dump options to screen for user inspection
   if (mpi_.Root()) {
@@ -427,11 +440,18 @@ void QuasiMagnetostaticSolver3D::solve() {
     InterpolateToYAxis();
   }
 
+  // Divergence free projection of A (so that we can evaluate E and Joule heating correctly)
+  ParGridFunction *Areal_df = new ParGridFunction(Aspace_);
+  ParGridFunction *Aimag_df = new ParGridFunction(Aspace_);
+
+  div_free_->Mult(*Areal_, *Areal_df);
+  div_free_->Mult(*Aimag_, *Aimag_df);
+
   // Compute Joule heating
   const double omega = (2 * M_PI * em_opts_.current_frequency);
   const double omega2 = omega * omega;
 
-  JouleHeatingCoefficient3D jh_coeff(*plasma_conductivity_coef_, *Areal_, *Aimag_);
+  JouleHeatingCoefficient3D jh_coeff(*plasma_conductivity_coef_, *Areal_df, *Aimag_df);
   joule_heating_->ProjectCoefficient(jh_coeff);
   (*joule_heating_) *= omega2;
 
@@ -446,6 +466,8 @@ void QuasiMagnetostaticSolver3D::solve() {
   paraview_dc.SetTime(0.0);
   paraview_dc.RegisterField("magvecpot_real", Areal_);
   paraview_dc.RegisterField("magvecpot_imag", Aimag_);
+  paraview_dc.RegisterField("magvecpot_real_df", Areal_df);
+  paraview_dc.RegisterField("magvecpot_imag_df", Aimag_df);
   paraview_dc.RegisterField("joule_heating", joule_heating_);
 
   if (em_opts_.evaluate_magnetic_field) {
@@ -564,16 +586,11 @@ double QuasiMagnetostaticSolver3D::elementJouleHeating(const FiniteElement &el, 
 double QuasiMagnetostaticSolver3D::totalJouleHeating() { return 0; }
 
 void JFun(const Vector &x, Vector &J) {
-  Vector a(3);
-  a(0) = 0.0;
-  a(1) = 1.0;
-  a(2) = 0.0;
-
   Vector axx(3);
 
-  axx(0) = a(1) * x(2) - a(2) * x(1);
-  axx(1) = a(2) * x(0) - a(0) * x(2);
-  axx(2) = a(0) * x(1) - a(1) * x(0);
+  axx(0) = axis(1) * x(2) - axis(2) * x(1);
+  axx(1) = axis(2) * x(0) - axis(0) * x(2);
+  axx(2) = axis(0) * x(1) - axis(1) * x(0);
   axx /= axx.Norml2();
 
   J = axx;

@@ -64,6 +64,8 @@ class ElectromagneticOptions {
   double current_frequency; /**< Frequency of source current */
   double mu0;               /**< Permeability of free space */
 
+  mfem::Vector current_axis;
+
   ElectromagneticOptions() {
     order = 1;
     ref_levels = 0;
