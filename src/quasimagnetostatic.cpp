@@ -297,6 +297,7 @@ void QuasiMagnetostaticSolver3D::parseSolverOptions() {
   tpsP_->getInput("em/max_iter", em_opts_.max_iter, 100);
   tpsP_->getInput("em/rtol", em_opts_.rtol, 1.0e-6);
   tpsP_->getInput("em/atol", em_opts_.atol, 1.0e-10);
+  tpsP_->getInput("em/evaluate_magnetic_field", em_opts_.evaluate_magnetic_field, true);
   tpsP_->getInput("em/nBy", em_opts_.nBy, 0);
   tpsP_->getInput("em/yinterp_min", em_opts_.yinterp_min, 0.0);
   tpsP_->getInput("em/yinterp_max", em_opts_.yinterp_max, 1.0);
@@ -404,22 +405,27 @@ void QuasiMagnetostaticSolver3D::solve() {
   Areal_->Distribute(&(Avec.GetBlock(0)));
   Aimag_->Distribute(&(Avec.GetBlock(1)));
 
-  // 2) Determine B from A according to B = curl(A).  Here we use an
-  //    interpolator rather than a projection.
-  if (verbose) grvy_printf(ginfo, "Evaluating curl(A) to get the magnetic field.\n");
-  Breal_ = new ParGridFunction(Bspace_);
-  *Breal_ = 0;
+  if (em_opts_.evaluate_magnetic_field) {
+    // 2) Determine B from A according to B = curl(A).  Here we use an
+    //    interpolator rather than a projection.
+    if (verbose) grvy_printf(ginfo, "Evaluating curl(A) to get the magnetic field.\n");
+    Breal_ = new ParGridFunction(Bspace_);
+    *Breal_ = 0;
 
-  Bimag_ = new ParGridFunction(Bspace_);
-  *Breal_ = 0;
+    Bimag_ = new ParGridFunction(Bspace_);
+    *Breal_ = 0;
 
-  ParDiscreteLinearOperator *curl = new ParDiscreteLinearOperator(Aspace_, Bspace_);
-  curl->AddDomainInterpolator(new CurlInterpolator);
-  curl->Assemble();
-  curl->Finalize();
-  curl->Mult(*Areal_, *Breal_);
-  curl->Mult(*Aimag_, *Bimag_);
-  delete curl;
+    ParDiscreteLinearOperator *curl = new ParDiscreteLinearOperator(Aspace_, Bspace_);
+    curl->AddDomainInterpolator(new CurlInterpolator);
+    curl->Assemble();
+    curl->Finalize();
+    curl->Mult(*Areal_, *Breal_);
+    curl->Mult(*Aimag_, *Bimag_);
+    delete curl;
+
+    // Compute and dump the magnetic field on the axis
+    InterpolateToYAxis();
+  }
 
   // Compute Joule heating
   const double omega = (2 * M_PI * em_opts_.current_frequency);
@@ -440,13 +446,14 @@ void QuasiMagnetostaticSolver3D::solve() {
   paraview_dc.SetTime(0.0);
   paraview_dc.RegisterField("magvecpot_real", Areal_);
   paraview_dc.RegisterField("magvecpot_imag", Aimag_);
-  paraview_dc.RegisterField("magnfield_real", Breal_);
-  paraview_dc.RegisterField("magnfield_imag", Bimag_);
   paraview_dc.RegisterField("joule_heating", joule_heating_);
-  paraview_dc.Save();
 
-  // Compute and dump the magnetic field on the axis
-  InterpolateToYAxis();
+  if (em_opts_.evaluate_magnetic_field) {
+    paraview_dc.RegisterField("magnfield_real", Breal_);
+    paraview_dc.RegisterField("magnfield_imag", Bimag_);
+  }
+
+  paraview_dc.Save();
 
   if (mpi_.Root()) {
     std::cout << "EM simulation complete" << std::endl;
@@ -756,6 +763,7 @@ void QuasiMagnetostaticSolverAxiSym::parseSolverOptions() {
   tpsP_->getInput("em/max_iter", em_opts_.max_iter, 100);
   tpsP_->getInput("em/rtol", em_opts_.rtol, 1.0e-6);
   tpsP_->getInput("em/atol", em_opts_.atol, 1.0e-10);
+  tpsP_->getInput("em/evaluate_magnetic_field", em_opts_.evaluate_magnetic_field, false);
   tpsP_->getInput("em/nBy", em_opts_.nBy, 0);
   tpsP_->getInput("em/yinterp_min", em_opts_.yinterp_min, 0.0);
   tpsP_->getInput("em/yinterp_max", em_opts_.yinterp_max, 1.0);

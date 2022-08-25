@@ -54,6 +54,7 @@ class ElectromagneticOptions {
   bool top_only; /**< Flag to specify current in top rings only */
   bool bot_only; /**< Flag to specify current in bottom rings only */
 
+  bool evaluate_magnetic_field;
   std::string By_file; /**< Filename for vertical component of magnetic field on y-axis */
   int nBy;             /**< Number of uniformly spaced points for By output */
   double yinterp_min;  /**< Begin value for uniformly spaced points */
@@ -69,6 +70,7 @@ class ElectromagneticOptions {
     max_iter = 100;
     rtol = 1.0e-6;
     atol = 1.0e-10;
+    evaluate_magnetic_field = true;
     nBy = 0;
     yinterp_min = 0.0;
     yinterp_max = 1.0;
