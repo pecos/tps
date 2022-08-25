@@ -363,6 +363,25 @@ struct ArgonTransportInput {
   double mobilMult;
 };
 
+struct TableInput {
+  int Ndata;
+  // double xdata[gpudata::MAXTABLE];
+  // double fdata[gpudata::MAXTABLE];
+  double *xdata;
+  double *fdata;
+  bool xLogScale;
+  bool fLogScale;
+};
+
+// ReactionInput must be able to support various types of evaluation.
+// At the same time, allocating maximum size of memory can be prohibitive in gpu device.
+// the datatype therefore contains pointers, which can be allocated only when they are used.
+struct ReactionInput {
+  TableInput *tableInput;
+  double *modelParams;
+  double *equilibriumConstantParams;
+};
+
 struct ChemistryInput {
   ChemistryModel model;
 
@@ -375,14 +394,7 @@ struct ChemistryInput {
   ReactionModel reactionModels[gpudata::MAXREACTIONS];
   double reactionModelParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
   double equilibriumConstantParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
-};
-
-struct TableInput {
-  int Ndata;
-  double xdata[gpudata::MAXTABLE];
-  double fdata[gpudata::MAXTABLE];
-  bool xLogScale;
-  bool fLogScale;
+  // ReactionInput reactionInputs[gpudata::MAXREACTIONS];
 };
 
 #endif  // DATASTRUCTURES_HPP_
