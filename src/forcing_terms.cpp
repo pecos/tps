@@ -407,8 +407,6 @@ JouleHeating::JouleHeating(const int &_dim, const int &_num_equation, const int 
 }
 
 void JouleHeating::updateTerms(Vector &in) {
-  // make sure we are in a 2D case (otherwise can't be axisymmetric)
-  assert(dim == 2);
   assert(nvel == 3);
 
   int numElem = vfes->GetNE();
