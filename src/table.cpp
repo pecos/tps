@@ -33,7 +33,7 @@
 #include "table.hpp"
 
 MFEM_HOST_DEVICE TableInterpolator::TableInterpolator(const int &Ndata, const double *xdata, const double *fdata, const bool &xLogScale, const bool &fLogScale)
-    : Ndata_(Ndata), xLogScale_(xLogScale), yLogScale_(yLogScale) {
+    : Ndata_(Ndata), xLogScale_(xLogScale), fLogScale_(fLogScale) {
   for (int k = 0; k < Ndata_; k++) {
     xdata_[k] = xdata[k];
     fdata_[k] = fdata[k];

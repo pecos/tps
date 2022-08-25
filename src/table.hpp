@@ -50,7 +50,7 @@ protected:
   bool fLogScale_;
 
 public:
-  MFEM_HOST_DEVICE TableInterpolator(const int Ndata, const double *xdata, const double *fdata, const bool xLogScale, const bool fLogScale);
+  MFEM_HOST_DEVICE TableInterpolator(const int &Ndata, const double *xdata, const double *fdata, const bool &xLogScale, const bool &fLogScale);
 
   MFEM_HOST_DEVICE virtual ~TableInterpolator() {}
 
@@ -58,6 +58,6 @@ public:
     printf("TableInterpolator not initialized!");
     return nan("");
   }
-}
+};
 
 #endif  // TABLE_HPP_
