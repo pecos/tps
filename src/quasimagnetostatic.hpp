@@ -68,7 +68,7 @@ class QuasiMagnetostaticSolverBase : public TPS::Solver {
 
  public:
   QuasiMagnetostaticSolverBase(mfem::MPI_Session &mpi, ElectromagneticOptions em_opts, TPS::Tps *tps);
-  virtual ~QuasiMagnetostaticSolverBase(){};
+  virtual ~QuasiMagnetostaticSolverBase() {}
 
   /** Initialize current for axisymmetric quasi-magnetostatic problem
    *
