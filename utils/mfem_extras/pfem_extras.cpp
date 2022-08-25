@@ -119,14 +119,10 @@ IrrotationalProjector
    ess_bdr_ = 1;
    H1FESpace_->GetEssentialTrueDofs(ess_bdr_, ess_bdr_tdofs_);
 
-   int geom = H1FESpace_->GetFE(0)->GetGeomType();
-   const IntegrationRule * ir = &IntRules.Get(geom, irOrder);
-
    if ( s0 == NULL )
    {
       s0_ = new ParBilinearForm(H1FESpace_);
       BilinearFormIntegrator * diffInteg = new DiffusionIntegrator;
-      diffInteg->SetIntRule(ir);
       s0_->AddDomainIntegrator(diffInteg);
       s0_->Assemble();
       s0_->Finalize();
@@ -136,7 +132,6 @@ IrrotationalProjector
    {
       weakDiv_ = new ParMixedBilinearForm(HCurlFESpace_, H1FESpace_);
       BilinearFormIntegrator * wdivInteg = new VectorFEWeakDivergenceIntegrator;
-      wdivInteg->SetIntRule(ir);
       weakDiv_->AddDomainIntegrator(wdivInteg);
       weakDiv_->Assemble();
       weakDiv_->Finalize();
