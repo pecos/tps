@@ -35,7 +35,8 @@
 #include "em_options.hpp"
 #include "quasimagnetostatic.hpp"
 
-CycleAvgJouleCoupling::CycleAvgJouleCoupling(MPI_Session &mpi, string &inputFileName, TPS::Tps *tps, int max_out, bool axisym)
+CycleAvgJouleCoupling::CycleAvgJouleCoupling(MPI_Session &mpi, string &inputFileName, TPS::Tps *tps, int max_out,
+                                             bool axisym)
     : mpi_(mpi), em_opt_(), max_outer_iters_(max_out) {
   if (axisym) {
     qmsa_solver_ = new QuasiMagnetostaticSolverAxiSym(mpi, em_opt_, tps);

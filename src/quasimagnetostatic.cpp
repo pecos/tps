@@ -412,12 +412,11 @@ void QuasiMagnetostaticSolver3D::solve() {
     Paar->SetSingularProblem();
   }
 
-  Operator *Paai = new ScaledOperator(Paar,-1.0);
+  Operator *Paai = new ScaledOperator(Paar, -1.0);
 
   BlockDiagonalPreconditioner BDP(offsets_);
   BDP.SetDiagonalBlock(0, Paar);
   BDP.SetDiagonalBlock(1, Paai);
-
 
   // 1) Solve QMS (i.e., i \omega A + curl(curl(A)) = J) for magnetic
   //    vector potential using operators set up by Initialize() and
