@@ -51,6 +51,8 @@ const int MAXEQUATIONS = MAXDIM + 2 + MAXSPECIES;  // momentum + two energies + 
 
 const int MAXREACTIONS = 20;
 const int MAXCHEMPARAMS = 3;
+
+const int MAXTABLE = 512;
 }  // namespace gpudata
 
 enum Equations {
