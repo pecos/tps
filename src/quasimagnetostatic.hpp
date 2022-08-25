@@ -40,6 +40,7 @@ class Tps;
 
 #include <iostream>
 
+#include "../utils/mfem_extras/pfem_extras.hpp"
 #include "em_options.hpp"
 #include "tps.hpp"
 #include "tps_mfem_wrap.hpp"
@@ -126,6 +127,9 @@ class QuasiMagnetostaticSolver3D : public QuasiMagnetostaticSolverBase {
 
   mfem::ParBilinearForm *K_;
   mfem::ParLinearForm *r_;
+
+  mfem::common::ParDiscreteGradOperator *grad_;
+  mfem::common::DivergenceFreeProjector *div_free_;
 
   mfem::ParGridFunction *Areal_;
   mfem::ParGridFunction *Aimag_;
