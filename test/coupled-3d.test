@@ -1,0 +1,20 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="coupling/cycle-avg-joule-coupling"
+RUNFILE="inputs/coupled-3d.ini"
+
+setup() {
+    SOLN_FILE=restart_output-coupled-3d.sol.h5
+    REF_FILE=ref_solns/coupled-3d.sol.h5
+}
+
+@test "[$TEST] verify tps runs in cylce-avg-joule-coupling mode (3D)" {
+    test -s $RUNFILE
+    mpirun -np 2 ../src/tps --runFile $RUNFILE
+
+    test -s $SOLN_FILE
+    test -s $REF_FILE
+
+    ./soln_differ -r $SOLN_FILE $REF_FILE
+}
