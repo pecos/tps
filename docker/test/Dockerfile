@@ -28,9 +28,6 @@ RUN yum -y install gcc gcc-c++
 RUN yum -y install valgrind-ohpc
 RUN yum -y install boost-gnu9-mpich-ohpc
 
-RUN yum -y install python38-pip
-RUN pip3 install matplotlib
-
 RUN yum -y install procps-ng
 RUN yum -y install diffutils
 
@@ -136,15 +133,61 @@ RUN yum -y install bc
 RUN yum -y install clang-tools-extra
 RUN yum -y install zlib-devel
 RUN yum -y install libcurl-devel
+RUN yum -y install python38
 RUN yum -y install python38-devel
+RUN yum -y install python38-pip
 RUN yum -y install pybind11-devel
-RUN yum -y install python3-pybind11
 RUN yum -y install perl-Data-Dumper
+
+# Python packages, some utilities and their dependencies
+# including everything needed for bluest
+RUN yum -y install htop
+RUN yum -y install vim
+RUN yum -y install curl
+RUN yum -y install mlocate
+
+RUN python3.8 -m pip install --upgrade pip
+RUN python3.8 -m pip install --upgrade setuptools
+RUN python3.8 -m pip install numpy
+RUN python3.8 -m pip install scipy
+RUN python3.8 -m pip install pybind11
+
+RUN . /etc/profile.d/lmod.sh && python3.8 -m pip install mpi4py
+
+RUN yum -y install suitesparse
+RUN yum -y install glpk
+RUN yum -y install glpk-utils
+RUN yum -y install glpk-devel
+RUN python3.8 -m pip install swiglpk
+
+RUN python3.8 -m pip install ipython
+RUN python3.8 -m pip install matplotlib
+RUN python3.8 -m pip install jupyter-core
+RUN python3.8 -m pip install pyyaml
+RUN python3.8 -m pip install cvxopt
+RUN python3.8 -m pip install cvxpy
+RUN python3.8 -m pip install networkx
+RUN python3.8 -m pip install h5py
+
+## Install IPOPT and its dependencies
+RUN yum -y install mumps-gnu9-mpich-ohpc
+
+RUN cd /tmp; git clone https://github.com/coin-or/Ipopt.git
+RUN cd /tmp/Ipopt; mkdir build
+RUN . /etc/profile.d/lmod.sh \
+    && module load mumps scalapack openblas \
+    && cd /tmp/Ipopt/build \
+    && ../configure \
+    --with-lapack-lflags="-L${OPENBLAS_LIB} -lopenblas" \
+    --with-mumps-cflags="-I${MUMPS_INC}" \
+    --with-mumps-lflags="-L${MUMPS_LIB} -L${MPI_DIR}/lib -L${SCALAPACK_DIR}/lib -lcmumps -ldmumps -lmumps_common -lsmumps -lzmumps -lscalapack" \
+    && C_INCLUDE_PATH=$C_INCLUDE_PATH:$MPI_DIR/include/ CPLUS_INCLUDE_PATH=$CPLUS_INCLUDE_PATH:/$MPI_DIR/include/ make -j 4 \
+    && make install
+RUN PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/local/lib/pkgconfig/ LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/ python3.8 -m pip install cyipopt
 
 # Register new libs installed into /usr/local/lib with linker
 RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/class.conf
 RUN ldconfig
-
 
 # load certain packages by default
 RUN echo "module try-add metis" >> /etc/profile.d/lmod.sh
@@ -157,6 +200,7 @@ RUN echo "module try-add superlu_dist" >> /etc/profile.d/lmod.sh
 RUN echo "module try-add petsc" >> /etc/profile.d/lmod.sh
 RUN echo "module try-add boost" >> /etc/profile.d/lmod.sh
 RUN echo "module try-add valgrind" >> /etc/profile.d/lmod.sh
+RUN echo "module try-add mumps" >> /etc/profile.d/lmod.sh
 
 # include git sha in motd
 COPY motd.sh /etc/profile.d/motd.sh
