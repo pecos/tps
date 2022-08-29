@@ -2469,17 +2469,26 @@ void M2ulPhyS::parseReactionInputs() {
     tpsP->getRequiredInput((basepath + "/reaction_energy").c_str(), energy);
     config.reactionEnergies[r - 1] = energy;
 
+    // NOTE: reaction inputs are stored directly into ChemistryInput.
+    // Initialize the pointers with null.
+    config.chemistryInput.reactionInputs[r - 1].tableInput = NULL;
+    config.chemistryInput.reactionInputs[r - 1].modelParams = NULL;
+
     if (model == "arrhenius") {
       config.reactionModels[r - 1] = ARRHENIUS;
-      // config.reactionModelParams[r - 1].resize(3);
+
       double A, b, E;
       tpsP->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
       tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
       tpsP->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
-      // config.reactionModelParams[r - 1] = {A, b, E};
-      config.reactionModelParams[0 + (r - 1) * gpudata::MAXCHEMPARAMS] = A;
-      config.reactionModelParams[1 + (r - 1) * gpudata::MAXCHEMPARAMS] = b;
-      config.reactionModelParams[2 + (r - 1) * gpudata::MAXCHEMPARAMS] = E;
+
+      config.chemistryInput.reactionInputs[r - 1].modelParams = new double[gpudata::MAXCHEMPARAMS];
+      config.chemistryInput.reactionInputs[r - 1].modelParams[0] = A;
+      config.chemistryInput.reactionInputs[r - 1].modelParams[1] = b;
+      config.chemistryInput.reactionInputs[r - 1].modelParams[2] = E;
+      // config.reactionModelParams[0 + (r - 1) * gpudata::MAXCHEMPARAMS] = A;
+      // config.reactionModelParams[1 + (r - 1) * gpudata::MAXCHEMPARAMS] = b;
+      // config.reactionModelParams[2 + (r - 1) * gpudata::MAXCHEMPARAMS] = E;
 
     } else if (model == "hoffert_lien") {
       config.reactionModels[r - 1] = HOFFERTLIEN;
@@ -2488,11 +2497,15 @@ void M2ulPhyS::parseReactionInputs() {
       tpsP->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
       tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
       tpsP->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
-      // config.reactionModelParams[r - 1] = {A, b, E};
+
       // NOTE(kevin): this array keeps max param in the indexing, as reactions can have different number of params.
-      config.reactionModelParams[0 + (r - 1) * gpudata::MAXCHEMPARAMS] = A;
-      config.reactionModelParams[1 + (r - 1) * gpudata::MAXCHEMPARAMS] = b;
-      config.reactionModelParams[2 + (r - 1) * gpudata::MAXCHEMPARAMS] = E;
+      config.chemistryInput.reactionInputs[r - 1].modelParams = new double[gpudata::MAXCHEMPARAMS];
+      config.chemistryInput.reactionInputs[r - 1].modelParams[0] = A;
+      config.chemistryInput.reactionInputs[r - 1].modelParams[1] = b;
+      config.chemistryInput.reactionInputs[r - 1].modelParams[2] = E;
+      // config.reactionModelParams[0 + (r - 1) * gpudata::MAXCHEMPARAMS] = A;
+      // config.reactionModelParams[1 + (r - 1) * gpudata::MAXCHEMPARAMS] = b;
+      // config.reactionModelParams[2 + (r - 1) * gpudata::MAXCHEMPARAMS] = E;
 
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
@@ -2503,12 +2516,11 @@ void M2ulPhyS::parseReactionInputs() {
     tpsP->getInput((basepath + "/detailed_balance").c_str(), detailedBalance, false);
     config.detailedBalance[r - 1] = detailedBalance;
     if (detailedBalance) {
-      // config.equilibriumConstantParams[r - 1].resize(3);
       double A, b, E;
       tpsP->getRequiredInput((basepath + "/equilibrium_constant/A").c_str(), A);
       tpsP->getRequiredInput((basepath + "/equilibrium_constant/b").c_str(), b);
       tpsP->getRequiredInput((basepath + "/equilibrium_constant/E").c_str(), E);
-      // config.equilibriumConstantParams[r - 1] = {A, b, E};
+
       // NOTE(kevin): this array keeps max param in the indexing, as reactions can have different number of params.
       config.equilibriumConstantParams[0 + (r - 1) * gpudata::MAXCHEMPARAMS] = A;
       config.equilibriumConstantParams[1 + (r - 1) * gpudata::MAXCHEMPARAMS] = b;
@@ -2603,8 +2615,8 @@ void M2ulPhyS::parseReactionInputs() {
 
       config.chemistryInput.reactionModels[r] = config.reactionModels[r];
       for (int p = 0; p < gpudata::MAXCHEMPARAMS; p++) {
-        config.chemistryInput.reactionModelParams[p + r * gpudata::MAXCHEMPARAMS] =
-            config.reactionModelParams[p + r * gpudata::MAXCHEMPARAMS];
+        // config.chemistryInput.reactionModelParams[p + r * gpudata::MAXCHEMPARAMS] =
+        //     config.reactionModelParams[p + r * gpudata::MAXCHEMPARAMS];
         config.chemistryInput.equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS] =
             config.equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS];
       }

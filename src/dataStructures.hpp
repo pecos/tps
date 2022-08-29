@@ -381,7 +381,7 @@ struct TableInput {
 struct ReactionInput {
   TableInput *tableInput;
   double *modelParams;
-  double *equilibriumConstantParams;
+  // double *equilibriumConstantParams;
 };
 
 struct ChemistryInput {
@@ -394,9 +394,9 @@ struct ChemistryInput {
   double reactantStoich[gpudata::MAXSPECIES * gpudata::MAXREACTIONS];
   double productStoich[gpudata::MAXSPECIES * gpudata::MAXREACTIONS];
   ReactionModel reactionModels[gpudata::MAXREACTIONS];
-  double reactionModelParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
+  // double reactionModelParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
   double equilibriumConstantParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
-  // ReactionInput reactionInputs[gpudata::MAXREACTIONS];
+  ReactionInput reactionInputs[gpudata::MAXREACTIONS];
 };
 
 #endif  // DATASTRUCTURES_HPP_

@@ -47,23 +47,14 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
 
   model_ = inputs.model;
 
-  // mixtureToInputMap_ = mixture->getMixtureToInputMap();
-  // speciesMapping_ = mixture->getSpeciesMapping();
-  // electronIndex_ = (speciesMapping_->count("E")) ? (*speciesMapping_)["E"] : -1;
   electronIndex_ = inputs.electronIndex;
 
   numReactions_ = inputs.numReactions;
-  // reactionEnergies_.SetSize(numReactions_);
-  // detailedBalance_.SetSize(numReactions_);
   for (int r = 0; r < numReactions_; r++) {
     reactionEnergies_[r] = inputs.reactionEnergies[r];
     detailedBalance_[r] = inputs.detailedBalance[r];
   }
 
-  // reactions_.resize(numReactions_);
-  // reactantStoich_.SetSize(numSpecies_, numReactions_);
-  // productStoich_.SetSize(numSpecies_, numReactions_);
-  // equilibriumConstantParams_.SetSize(numReactions_, 3);
   for (int r = 0; r < numReactions_; r++)
     for (int p = 0; p < 3; p++) equilibriumConstantParams_[p + r * gpudata::MAXCHEMPARAMS] = 0.0;
 
@@ -74,67 +65,25 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
       productStoich_[mixSp + r * numSpecies_] = inputs.productStoich[mixSp + r * numSpecies_];
     }
 
-    // // check conservations.
-    // {
-    //   Vector react(numSpecies_), product(numSpecies_);
-    //   config.reactantStoich.GetColumn(r, react);
-    //   config.productStoich.GetColumn(r, product);
-    //
-    //   // atom conservation.
-    //   DenseMatrix composition;
-    //   composition.Transpose(config.speciesComposition);
-    //   Vector reactAtom(config.numAtoms), prodAtom(config.numAtoms);
-    //   composition.Mult(react, reactAtom);
-    //   composition.Mult(product, prodAtom);
-    //   for (int a = 0; a < config.numAtoms; a++) {
-    //     if (reactAtom(a) != prodAtom(a)) {
-    //       grvy_printf(GRVY_ERROR, "Reaction %d does not conserve atom %d.\n", r, a);
-    //       exit(-1);
-    //     }
-    //   }
-    //
-    //   // mass conservation. (already ensured with atom but checking again.)
-    //   double reactMass = 0.0, prodMass = 0.0;
-    //   for (int sp = 0; sp < numSpecies_; sp++) {
-    //     // int inputSp = (*mixtureToInputMap_)[sp];
-    //     reactMass += react(sp) * mixture->GetGasParams(sp, SPECIES_MW);
-    //     prodMass += product(sp) * mixture->GetGasParams(sp, SPECIES_MW);
-    //   }
-    //   // This may be too strict..
-    //   if (abs(reactMass - prodMass) > 1.0e-15) {
-    //     grvy_printf(GRVY_ERROR, "Reaction %d does not conserve mass.\n", r);
-    //     grvy_printf(GRVY_ERROR, "%.8E =/= %.8E\n", reactMass, prodMass);
-    //     exit(-1);
-    //   }
-    //
-    //   // energy conservation.
-    //   // TODO(kevin): this will need an adjustion when radiation comes into play.
-    //   double reactEnergy = 0.0, prodEnergy = 0.0;
-    //   for (int sp = 0; sp < numSpecies_; sp++) {
-    //     // int inputSp = (*mixtureToInputMap_)[sp];
-    //     reactEnergy += react(sp) * mixture->GetGasParams(sp, FORMATION_ENERGY);
-    //     prodEnergy += product(sp) * mixture->GetGasParams(sp, FORMATION_ENERGY);
-    //   }
-    //   // This may be too strict..
-    //   if (reactEnergy + reactionEnergies_[r] != prodEnergy) {
-    //     grvy_printf(GRVY_ERROR, "Reaction %d does not conserve energy.\n", r);
-    //     grvy_printf(GRVY_ERROR, "%.8E + %.8E = %.8E =/= %.8E\n", reactEnergy, reactionEnergies_[r],
-    //                 reactEnergy + reactionEnergies_[r], prodEnergy);
-    //     exit(-1);
-    //   }
-    // }
-
     switch (inputs.reactionModels[r]) {
       case ARRHENIUS: {
-        double A = inputs.reactionModelParams[0 + r * gpudata::MAXCHEMPARAMS];
-        double b = inputs.reactionModelParams[1 + r * gpudata::MAXCHEMPARAMS];
-        double E = inputs.reactionModelParams[2 + r * gpudata::MAXCHEMPARAMS];
+        assert(inputs.reactionInputs[r - 1].modelParams != NULL);
+        double A = inputs.reactionInputs[r - 1].modelParams[0];
+        double b = inputs.reactionInputs[r - 1].modelParams[1];
+        double E = inputs.reactionInputs[r - 1].modelParams[2];
+        // double A = inputs.reactionModelParams[0 + r * gpudata::MAXCHEMPARAMS];
+        // double b = inputs.reactionModelParams[1 + r * gpudata::MAXCHEMPARAMS];
+        // double E = inputs.reactionModelParams[2 + r * gpudata::MAXCHEMPARAMS];
         reactions_[r] = new Arrhenius(A, b, E);
       } break;
       case HOFFERTLIEN: {
-        double A = inputs.reactionModelParams[0 + r * gpudata::MAXCHEMPARAMS];
-        double b = inputs.reactionModelParams[1 + r * gpudata::MAXCHEMPARAMS];
-        double E = inputs.reactionModelParams[2 + r * gpudata::MAXCHEMPARAMS];
+        assert(inputs.reactionInputs[r - 1].modelParams != NULL);
+        double A = inputs.reactionInputs[r - 1].modelParams[0];
+        double b = inputs.reactionInputs[r - 1].modelParams[1];
+        double E = inputs.reactionInputs[r - 1].modelParams[2];
+        // double A = inputs.reactionModelParams[0 + r * gpudata::MAXCHEMPARAMS];
+        // double b = inputs.reactionModelParams[1 + r * gpudata::MAXCHEMPARAMS];
+        // double E = inputs.reactionModelParams[2 + r * gpudata::MAXCHEMPARAMS];
         reactions_[r] = new HoffertLien(A, b, E);
       } break;
       default:
@@ -152,9 +101,6 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
 }
 
 MFEM_HOST_DEVICE Chemistry::~Chemistry() {
-  //   if (mixture_ != NULL) delete mixture_;
-  //   if (mixtureToInputMap_ != NULL) delete mixtureToInputMap_;
-  //   if (speciesMapping_ != NULL) delete speciesMapping_;
   for (int r = 0; r < numReactions_; r++) {
     if (reactions_[r] != NULL) delete reactions_[r];
   }

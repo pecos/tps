@@ -198,11 +198,11 @@ class RunConfiguration {
   std::vector<std::string> reactionEquations;
   Array<ReactionModel> reactionModels;
   // std::vector<std::vector<double>> reactionModelParams;
-  double reactionModelParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
+  // double reactionModelParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
   DenseMatrix reactantStoich, productStoich;
   Array<bool> detailedBalance;
   // std::vector<std::vector<double>> equilibriumConstantParams;
-  double equilibriumConstantParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
+  // double equilibriumConstantParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
 
   std::map<int, int> mixtureToInputMap;
   std::map<std::string, int> speciesMapping;
