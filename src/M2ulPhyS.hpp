@@ -411,6 +411,8 @@ class M2ulPhyS : public TPS::Solver {
   int getMaximumIterations() const { return MaxIters; }
   int getCurrentIterations() const { return iter; }
   void setMaximumIterations(int value) { MaxIters = value; }
+
+  TableInput readTable(const std::string &inputPath);
 };
 
 #endif  // M2ULPHYS_HPP_

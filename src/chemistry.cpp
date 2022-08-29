@@ -86,6 +86,10 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
         // double E = inputs.reactionModelParams[2 + r * gpudata::MAXCHEMPARAMS];
         reactions_[r] = new HoffertLien(A, b, E);
       } break;
+      case TABULATED: {
+        assert(inputs.reactionInputs[r].tableInput != NULL);
+        reactions_[r] = new Tabulated(*(inputs.reactionInputs[r].tableInput));
+      }
       default:
         printf("Unknown reactionModel.");
         assert(false);

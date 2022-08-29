@@ -2506,7 +2506,10 @@ void M2ulPhyS::parseReactionInputs() {
       // config.reactionModelParams[0 + (r - 1) * gpudata::MAXCHEMPARAMS] = A;
       // config.reactionModelParams[1 + (r - 1) * gpudata::MAXCHEMPARAMS] = b;
       // config.reactionModelParams[2 + (r - 1) * gpudata::MAXCHEMPARAMS] = E;
-
+    } else if (model == "tabulated") {
+      config.reactionModels[r - 1] = TABULATED;
+      std::string inputPath(basepath + "/tabulated");
+      config.chemistryInput.reactionInputs[r - 1].tableInput = readTable(inputPath);
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
       exit(ERROR);

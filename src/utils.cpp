@@ -268,7 +268,7 @@ void GlobalProjectDiscCoefficient(ParGridFunction &gf, VectorCoefficient &coeff)
   delete tv;
 }
 
-mfem::Array<int> h5ReadTable(const std::string fileName, const std::string datasetName, mfem::DenseMatrix &output) {
+mfem::Array<int> h5ReadTable(const std::string &fileName, const std::string &datasetName, mfem::DenseMatrix &output) {
   hid_t file = -1;
   if (file_exists(fileName)) {
     file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
@@ -305,4 +305,3 @@ mfem::Array<int> h5ReadTable(const std::string fileName, const std::string datas
 
   return shape;
 }
-
