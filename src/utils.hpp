@@ -79,43 +79,7 @@ void h5_read_attribute(hid_t source, std::string attribute, T &value) {
 
 // A simple HDF5 routine to read two-dimensional array into DenseMatrix.
 // Return shape of the DenseMatrix.
-Array<int> h5ReadTable(const string fileName, const string datasetName, DenseMatrix &output) {
-  hid_t file = -1;
-  if (file_exists(fileName)) {
-    file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
-  } else {
-    grvy_printf(GRVY_ERROR, "[ERROR]: Unable to open file -> %s\n", fileName.c_str());
-    exit(ERROR);
-  }
-  assert(file >= 0);
-
-  hid_t datasetID, dataspace;
-  datasetID = H5Dopen2(file, datasetName.c_str(), H5P_DEFAULT);
-  assert(datasetID >= 0);
-  dataspace = H5Dget_space(datasetID);
-  const int ndims = H5Sget_simple_extent_ndims(dataspace);
-  hsize_t dims[ndims];
-  // int dummy = H5Sget_simple_extent_dims(dataspace,dims,NULL);
-  H5Sget_simple_extent_dims(dataspace,dims,NULL);
-
-  // DenseMatrix memory is column-major, while HDF5 follows row-major.
-  output.SetSize(dims[1], dims[0]);
-
-  herr_t status;
-  status = H5Dread(datasetID, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, output.HostReadWrite());
-  assert(status >= 0);
-  H5Dclose(datasetID);
-  H5Fclose(file);
-
-  // DenseMatrix memory is column-major, while HDF5 follows row-major.
-  output.Transpose();
-
-  Array<int> shape(2);
-  shape[0] = dims[0];
-  shape[1] = dims[1];
-
-  return shape;
-}
+mfem::Array<int> h5ReadTable(const std::string fileName, const std::string datasetName, mfem::DenseMatrix &output);
 
 // MFEM extensions
 

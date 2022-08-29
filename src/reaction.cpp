@@ -62,8 +62,8 @@ MFEM_HOST_DEVICE Tabulated::Tabulated(const TableInput &input) : Reaction() {
       table_ = new LinearTable(input);
     } break;
     default: {
-      printf("Given interpolation order is not supported for TableInterpolator!")
-      assert(false);
+      printf("Given interpolation order is not supported for TableInterpolator!");
+      exit(-1);
     } break;
   }
 }
