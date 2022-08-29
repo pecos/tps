@@ -71,7 +71,7 @@ enum TransportModel { ARGON_MINIMAL, ARGON_MIXTURE, CONSTANT, NUM_TRANSPORTMODEL
 
 enum ChemistryModel { /* CANTERA, */ NUM_CHEMISTRYMODEL };
 
-enum ReactionModel { ARRHENIUS, HOFFERTLIEN, NUM_REACTIONMODEL };
+enum ReactionModel { ARRHENIUS, HOFFERTLIEN, TABULATED, NUM_REACTIONMODEL };
 
 enum GasParams { SPECIES_MW, SPECIES_CHARGES, FORMATION_ENERGY, /* SPECIES_HEAT_RATIO, */ NUM_GASPARAMS };
 
@@ -371,6 +371,8 @@ struct TableInput {
   double *fdata;
   bool xLogScale;
   bool fLogScale;
+
+  int order;  // interpolation order. Currently only support order=1.
 };
 
 // ReactionInput must be able to support various types of evaluation.

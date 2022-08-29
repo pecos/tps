@@ -44,6 +44,7 @@
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
 #include "run_configuration.hpp"
+#include "table.hpp"
 #include "tps_mfem_wrap.hpp"
 
 using namespace mfem;
@@ -94,6 +95,19 @@ class HoffertLien : public Reaction {
   MFEM_HOST_DEVICE HoffertLien(const double &A, const double &b, const double &E);
 
   MFEM_HOST_DEVICE virtual ~HoffertLien() {}
+
+  MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double &T_h, const double &T_e,
+                                                         const bool isElectronInvolved = false);
+};
+
+class Tabulated : public Reaction {
+private:
+  TableInterpolator *table_ = NULL;
+
+public:
+  MFEM_HOST_DEVICE Tabulated(const TableInput &input);
+
+  MFEM_HOST_DEVICE virtual ~Tabulated();
 
   MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double &T_h, const double &T_e,
                                                          const bool isElectronInvolved = false);

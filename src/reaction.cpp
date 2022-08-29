@@ -55,3 +55,25 @@ MFEM_HOST_DEVICE double HoffertLien::computeRateCoefficient(const double &T_h, c
 
   return A_ * pow(temp, b_) * (tempFactor + 2.0) * exp(-tempFactor);
 }
+
+MFEM_HOST_DEVICE Tabulated::Tabulated(const TableInput &input) : Reaction() {
+  switch (input.order) {
+    case 1: {
+      table_ = new LinearTable(input);
+    } break;
+    default: {
+      printf("Given interpolation order is not supported for TableInterpolator!")
+      assert(false);
+    } break;
+  }
+}
+
+MFEM_HOST_DEVICE Tabulated::~Tabulated() {
+  delete table_;
+}
+
+MFEM_HOST_DEVICE double Tabulated::computeRateCoefficient(const double &T_h, const double &T_e,
+                                                          const bool isElectronInvolved) {
+  double temp = (isElectronInvolved) ? T_e : T_h;
+  return table_->eval(temp);
+}
