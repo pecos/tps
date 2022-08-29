@@ -687,8 +687,7 @@ void M2ulPhyS::writeHistoryFile() {
   if (mpi.Root()) histFile << endl;
 }
 
-TableInput M2ulPhyS::readTable(const std::string &inputPath) {
-  TableInput result;
+void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
   result.xdata = new double[gpudata::MAXTABLE];
   result.fdata = new double[gpudata::MAXTABLE];
 
@@ -721,7 +720,7 @@ TableInput M2ulPhyS::readTable(const std::string &inputPath) {
     result.xdata[k] = xdata[k];
     result.fdata[k] = fdata[k];
   }
-  return result;
+  return;
 }
 
 // ---------------------------------------------

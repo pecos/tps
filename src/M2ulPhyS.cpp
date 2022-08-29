@@ -2509,7 +2509,8 @@ void M2ulPhyS::parseReactionInputs() {
     } else if (model == "tabulated") {
       config.reactionModels[r - 1] = TABULATED;
       std::string inputPath(basepath + "/tabulated");
-      config.chemistryInput.reactionInputs[r - 1].tableInput = readTable(inputPath);
+      config.chemistryInput.reactionInputs[r - 1].tableInput = new TableInput;
+      readTable(inputPath, *(config.chemistryInput.reactionInputs[r - 1].tableInput));
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
       exit(ERROR);
