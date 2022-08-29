@@ -67,20 +67,20 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
 
     switch (inputs.reactionModels[r]) {
       case ARRHENIUS: {
-        assert(inputs.reactionInputs[r - 1].modelParams != NULL);
-        double A = inputs.reactionInputs[r - 1].modelParams[0];
-        double b = inputs.reactionInputs[r - 1].modelParams[1];
-        double E = inputs.reactionInputs[r - 1].modelParams[2];
+        assert(inputs.reactionInputs[r].modelParams != NULL);
+        double A = inputs.reactionInputs[r].modelParams[0];
+        double b = inputs.reactionInputs[r].modelParams[1];
+        double E = inputs.reactionInputs[r].modelParams[2];
         // double A = inputs.reactionModelParams[0 + r * gpudata::MAXCHEMPARAMS];
         // double b = inputs.reactionModelParams[1 + r * gpudata::MAXCHEMPARAMS];
         // double E = inputs.reactionModelParams[2 + r * gpudata::MAXCHEMPARAMS];
         reactions_[r] = new Arrhenius(A, b, E);
       } break;
       case HOFFERTLIEN: {
-        assert(inputs.reactionInputs[r - 1].modelParams != NULL);
-        double A = inputs.reactionInputs[r - 1].modelParams[0];
-        double b = inputs.reactionInputs[r - 1].modelParams[1];
-        double E = inputs.reactionInputs[r - 1].modelParams[2];
+        assert(inputs.reactionInputs[r].modelParams != NULL);
+        double A = inputs.reactionInputs[r].modelParams[0];
+        double b = inputs.reactionInputs[r].modelParams[1];
+        double E = inputs.reactionInputs[r].modelParams[2];
         // double A = inputs.reactionModelParams[0 + r * gpudata::MAXCHEMPARAMS];
         // double b = inputs.reactionModelParams[1 + r * gpudata::MAXCHEMPARAMS];
         // double E = inputs.reactionModelParams[2 + r * gpudata::MAXCHEMPARAMS];
