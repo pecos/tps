@@ -202,7 +202,7 @@ class RunConfiguration {
   DenseMatrix reactantStoich, productStoich;
   Array<bool> detailedBalance;
   // std::vector<std::vector<double>> equilibriumConstantParams;
-  // double equilibriumConstantParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
+  double equilibriumConstantParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
 
   std::map<int, int> mixtureToInputMap;
   std::map<std::string, int> speciesMapping;
