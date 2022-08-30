@@ -379,6 +379,7 @@ struct TableInput {
 // the datatype therefore contains pointers, which can be allocated only when they are used.
 struct ReactionInput {
   TableInput tableInput;
+  // NOTE(kevin): with gpu, this pointer is only valid on the device.
   const double *modelParams;
 };
 
