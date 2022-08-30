@@ -63,7 +63,7 @@ MFEM_HOST_DEVICE Tabulated::Tabulated(const TableInput &input) : Reaction() {
     } break;
     default: {
       printf("Given interpolation order is not supported for TableInterpolator!");
-      exit(-1);
+      assert(false);
     } break;
   }
 }
