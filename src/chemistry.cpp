@@ -89,7 +89,7 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
       case TABULATED: {
         assert(inputs.reactionInputs[r].tableInput != NULL);
         reactions_[r] = new Tabulated(*(inputs.reactionInputs[r].tableInput));
-      }
+      } break;
       default:
         printf("Unknown reactionModel.");
         assert(false);

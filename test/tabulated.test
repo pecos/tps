@@ -1,0 +1,14 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="tabulated reaction"
+RUNFILE="inputs/input.tabulated_reaction.ini"
+
+@test "[$TEST] Test exact interpolation from tabulated values" {
+    test -s $RUNFILE
+    test -s ./test_table
+
+    # mpirun to check if the table is broadcast to all ranks.
+    mpirun -n 2 ./test_table -run $RUNFILE
+}
+
