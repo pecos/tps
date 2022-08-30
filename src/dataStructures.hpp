@@ -381,7 +381,8 @@ struct TableInput {
 // the datatype therefore contains pointers, which can be allocated only when they are used.
 struct ReactionInput {
   TableInput *tableInput;
-  double *modelParams;
+  const double *modelParams;
+//  double modelParams[gpudata::MAXCHEMPARAMS];
   // double *equilibriumConstantParams;
 };
 

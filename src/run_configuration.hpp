@@ -199,6 +199,9 @@ class RunConfiguration {
   Array<ReactionModel> reactionModels;
   // std::vector<std::vector<double>> reactionModelParams;
   // double reactionModelParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
+  // NOTE(kevin): this array of Vectors is to provide a proper pointer for both gpu and cpu.
+  // Indexes of this array do not correspond exactly to reaction index.
+  std::vector<mfem::Vector> rxnModelParamsHost;
   DenseMatrix reactantStoich, productStoich;
   Array<bool> detailedBalance;
   // std::vector<std::vector<double>> equilibriumConstantParams;

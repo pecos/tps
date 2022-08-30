@@ -2454,6 +2454,7 @@ void M2ulPhyS::parseReactionInputs() {
     config.detailedBalance.SetSize(config.numReactions);
     // config.equilibriumConstantParams.resize(config.numReactions);
   }
+  config.rxnModelParamsHost.clear();
 
   for (int r = 1; r <= config.numReactions; r++) {
     std::string basepath("reactions/reaction" + std::to_string(r));
@@ -2481,11 +2482,13 @@ void M2ulPhyS::parseReactionInputs() {
       tpsP->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
       tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
       tpsP->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
+      config.rxnModelParamsHost.push_back(Vector({A, b, E}));
 
-      config.chemistryInput.reactionInputs[r - 1].modelParams = new double[gpudata::MAXCHEMPARAMS];
-      config.chemistryInput.reactionInputs[r - 1].modelParams[0] = A;
-      config.chemistryInput.reactionInputs[r - 1].modelParams[1] = b;
-      config.chemistryInput.reactionInputs[r - 1].modelParams[2] = E;
+      config.chemistryInput.reactionInputs[r - 1].modelParams = config.rxnModelParamsHost.back().Read();
+//      config.chemistryInput.reactionInputs[r - 1].modelParams = new double[gpudata::MAXCHEMPARAMS];
+//      config.chemistryInput.reactionInputs[r - 1].modelParams[0] = A;
+//      config.chemistryInput.reactionInputs[r - 1].modelParams[1] = b;
+//      config.chemistryInput.reactionInputs[r - 1].modelParams[2] = E;
       // config.reactionModelParams[0 + (r - 1) * gpudata::MAXCHEMPARAMS] = A;
       // config.reactionModelParams[1 + (r - 1) * gpudata::MAXCHEMPARAMS] = b;
       // config.reactionModelParams[2 + (r - 1) * gpudata::MAXCHEMPARAMS] = E;
@@ -2497,12 +2500,14 @@ void M2ulPhyS::parseReactionInputs() {
       tpsP->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
       tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
       tpsP->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
+      config.rxnModelParamsHost.push_back(Vector({A, b, E}));
 
+      config.chemistryInput.reactionInputs[r - 1].modelParams = config.rxnModelParamsHost.back().Read();
       // NOTE(kevin): this array keeps max param in the indexing, as reactions can have different number of params.
-      config.chemistryInput.reactionInputs[r - 1].modelParams = new double[gpudata::MAXCHEMPARAMS];
-      config.chemistryInput.reactionInputs[r - 1].modelParams[0] = A;
-      config.chemistryInput.reactionInputs[r - 1].modelParams[1] = b;
-      config.chemistryInput.reactionInputs[r - 1].modelParams[2] = E;
+//      config.chemistryInput.reactionInputs[r - 1].modelParams = new double[gpudata::MAXCHEMPARAMS];
+//      config.chemistryInput.reactionInputs[r - 1].modelParams[0] = A;
+//      config.chemistryInput.reactionInputs[r - 1].modelParams[1] = b;
+//      config.chemistryInput.reactionInputs[r - 1].modelParams[2] = E;
       // config.reactionModelParams[0 + (r - 1) * gpudata::MAXCHEMPARAMS] = A;
       // config.reactionModelParams[1 + (r - 1) * gpudata::MAXCHEMPARAMS] = b;
       // config.reactionModelParams[2 + (r - 1) * gpudata::MAXCHEMPARAMS] = E;
