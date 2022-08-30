@@ -688,39 +688,36 @@ void M2ulPhyS::writeHistoryFile() {
 }
 
 void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
-  result.xdata = new double[gpudata::MAXTABLE];
-  result.fdata = new double[gpudata::MAXTABLE];
-
   tpsP->getInput((inputPath + "/x_log").c_str(), result.xLogScale, false);
   tpsP->getInput((inputPath + "/f_log").c_str(), result.fLogScale, false);
   tpsP->getInput((inputPath + "/order").c_str(), result.order, 1);
 
+  config.tableHost.push_back(DenseMatrix());
+
   int Ndata;
-  double xdata[gpudata::MAXTABLE], fdata[gpudata::MAXTABLE];
+  Array<int> dims(2);
   if (mpi.Root()) {
-    DenseMatrix data;
     std::string filename;
     tpsP->getRequiredInput((inputPath + "/filename").c_str(), filename);
-    Array<int> dims = h5ReadTable(filename, "table", data);
+    dims = h5ReadTable(filename, "table", config.tableHost.back());
     assert(dims[0] > 0);
     assert(dims[1] == 2);
 
     // TODO(kevin): extend for multi-column array?
     Ndata = dims[0];
-    for (int k = 0; k < Ndata; k++) {
-      xdata[k] = data(k, 0);
-      fdata[k] = data(k, 1);
-    }
   }
+
+  int *d_dims = dims.GetData();
   MPI_Bcast(&Ndata, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast(xdata, Ndata, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-  MPI_Bcast(fdata, Ndata, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast(d_dims, 2, MPI_INT, 0, MPI_COMM_WORLD);
+  if (!mpi.Root()) (config.tableHost.back()).SetSize(dims[0], dims[1]);
+  double *d_table = config.tableHost.back().GetData();
+  MPI_Bcast(d_table, dims[0] * dims[1], MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
   result.Ndata = Ndata;
-  for (int k = 0; k < result.Ndata; k++) {
-    result.xdata[k] = xdata[k];
-    result.fdata[k] = fdata[k];
-  }
+  result.xdata = (config.tableHost.back()).Read();
+  result.fdata = (config.tableHost.back()).Read() + Ndata;
+
   return;
 }
 

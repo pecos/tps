@@ -366,10 +366,8 @@ struct ArgonTransportInput {
 
 struct TableInput {
   int Ndata;
-  // double xdata[gpudata::MAXTABLE];
-  // double fdata[gpudata::MAXTABLE];
-  double *xdata;
-  double *fdata;
+  const double *xdata;
+  const double *fdata;
   bool xLogScale;
   bool fLogScale;
 
@@ -380,10 +378,8 @@ struct TableInput {
 // At the same time, allocating maximum size of memory can be prohibitive in gpu device.
 // the datatype therefore contains pointers, which can be allocated only when they are used.
 struct ReactionInput {
-  TableInput *tableInput;
+  TableInput tableInput;
   const double *modelParams;
-//  double modelParams[gpudata::MAXCHEMPARAMS];
-  // double *equilibriumConstantParams;
 };
 
 struct ChemistryInput {

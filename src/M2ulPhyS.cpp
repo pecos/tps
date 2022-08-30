@@ -2459,8 +2459,6 @@ void M2ulPhyS::parseReactionInputs() {
   for (int r = 1; r <= config.numReactions; r++) {
     std::string basepath("reactions/reaction" + std::to_string(r));
 
-    // TODO(kevin): make tps input parser accessible to all classes.
-    // TODO(kevin): reaction classes read input options directly in their initialization.
     std::string equation, model;
     tpsP->getRequiredInput((basepath + "/equation").c_str(), equation);
     config.reactionEquations[r - 1] = equation;
@@ -2472,7 +2470,6 @@ void M2ulPhyS::parseReactionInputs() {
 
     // NOTE: reaction inputs are stored directly into ChemistryInput.
     // Initialize the pointers with null.
-    config.chemistryInput.reactionInputs[r - 1].tableInput = NULL;
     config.chemistryInput.reactionInputs[r - 1].modelParams = NULL;
 
     if (model == "arrhenius") {
@@ -2485,17 +2482,9 @@ void M2ulPhyS::parseReactionInputs() {
       config.rxnModelParamsHost.push_back(Vector({A, b, E}));
 
       config.chemistryInput.reactionInputs[r - 1].modelParams = config.rxnModelParamsHost.back().Read();
-//      config.chemistryInput.reactionInputs[r - 1].modelParams = new double[gpudata::MAXCHEMPARAMS];
-//      config.chemistryInput.reactionInputs[r - 1].modelParams[0] = A;
-//      config.chemistryInput.reactionInputs[r - 1].modelParams[1] = b;
-//      config.chemistryInput.reactionInputs[r - 1].modelParams[2] = E;
-      // config.reactionModelParams[0 + (r - 1) * gpudata::MAXCHEMPARAMS] = A;
-      // config.reactionModelParams[1 + (r - 1) * gpudata::MAXCHEMPARAMS] = b;
-      // config.reactionModelParams[2 + (r - 1) * gpudata::MAXCHEMPARAMS] = E;
 
     } else if (model == "hoffert_lien") {
       config.reactionModels[r - 1] = HOFFERTLIEN;
-      // config.reactionModelParams[r - 1].resize(3);
       double A, b, E;
       tpsP->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
       tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
@@ -2504,18 +2493,11 @@ void M2ulPhyS::parseReactionInputs() {
 
       config.chemistryInput.reactionInputs[r - 1].modelParams = config.rxnModelParamsHost.back().Read();
       // NOTE(kevin): this array keeps max param in the indexing, as reactions can have different number of params.
-//      config.chemistryInput.reactionInputs[r - 1].modelParams = new double[gpudata::MAXCHEMPARAMS];
-//      config.chemistryInput.reactionInputs[r - 1].modelParams[0] = A;
-//      config.chemistryInput.reactionInputs[r - 1].modelParams[1] = b;
-//      config.chemistryInput.reactionInputs[r - 1].modelParams[2] = E;
-      // config.reactionModelParams[0 + (r - 1) * gpudata::MAXCHEMPARAMS] = A;
-      // config.reactionModelParams[1 + (r - 1) * gpudata::MAXCHEMPARAMS] = b;
-      // config.reactionModelParams[2 + (r - 1) * gpudata::MAXCHEMPARAMS] = E;
+
     } else if (model == "tabulated") {
       config.reactionModels[r - 1] = TABULATED;
       std::string inputPath(basepath + "/tabulated");
-      config.chemistryInput.reactionInputs[r - 1].tableInput = new TableInput;
-      readTable(inputPath, *(config.chemistryInput.reactionInputs[r - 1].tableInput));
+      readTable(inputPath, config.chemistryInput.reactionInputs[r - 1].tableInput);
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
       exit(ERROR);

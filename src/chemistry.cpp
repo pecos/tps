@@ -71,9 +71,7 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
         double A = inputs.reactionInputs[r].modelParams[0];
         double b = inputs.reactionInputs[r].modelParams[1];
         double E = inputs.reactionInputs[r].modelParams[2];
-        // double A = inputs.reactionModelParams[0 + r * gpudata::MAXCHEMPARAMS];
-        // double b = inputs.reactionModelParams[1 + r * gpudata::MAXCHEMPARAMS];
-        // double E = inputs.reactionModelParams[2 + r * gpudata::MAXCHEMPARAMS];
+
         reactions_[r] = new Arrhenius(A, b, E);
       } break;
       case HOFFERTLIEN: {
@@ -81,14 +79,11 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
         double A = inputs.reactionInputs[r].modelParams[0];
         double b = inputs.reactionInputs[r].modelParams[1];
         double E = inputs.reactionInputs[r].modelParams[2];
-        // double A = inputs.reactionModelParams[0 + r * gpudata::MAXCHEMPARAMS];
-        // double b = inputs.reactionModelParams[1 + r * gpudata::MAXCHEMPARAMS];
-        // double E = inputs.reactionModelParams[2 + r * gpudata::MAXCHEMPARAMS];
+
         reactions_[r] = new HoffertLien(A, b, E);
       } break;
       case TABULATED: {
-        assert(inputs.reactionInputs[r].tableInput != NULL);
-        reactions_[r] = new Tabulated(*(inputs.reactionInputs[r].tableInput));
+        reactions_[r] = new Tabulated(inputs.reactionInputs[r].tableInput);
       } break;
       default:
         printf("Unknown reactionModel.");

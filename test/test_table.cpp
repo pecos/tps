@@ -30,11 +30,13 @@ int main (int argc, char *argv[])
 
   TableInput input;
   input.Ndata = Ndata;
-  input.xdata = new double[gpudata::MAXTABLE];
-  input.fdata = new double[gpudata::MAXTABLE];
+  DenseMatrix data;
+  data.SetSize(Ndata, 2);
   for (int k = 0; k < Ndata; k++) {
-    input.xdata[k] = k * dx + 0.4 * dx * (2.0 * uniformRandomNumber() - 1.0);
+    data(k, 0) = k * dx + 0.4 * dx * (2.0 * uniformRandomNumber() - 1.0);
   }
+  input.xdata = data.Read();
+  input.fdata = data.Read() + Ndata;
   TableInterpolator *table = new LinearTable(input);
 
   // test findInterval routine.
