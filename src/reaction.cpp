@@ -68,9 +68,7 @@ MFEM_HOST_DEVICE Tabulated::Tabulated(const TableInput &input) : Reaction() {
   }
 }
 
-MFEM_HOST_DEVICE Tabulated::~Tabulated() {
-  delete table_;
-}
+MFEM_HOST_DEVICE Tabulated::~Tabulated() { delete table_; }
 
 MFEM_HOST_DEVICE double Tabulated::computeRateCoefficient(const double &T_h, const double &T_e,
                                                           const bool isElectronInvolved) {

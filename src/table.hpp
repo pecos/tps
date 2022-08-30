@@ -41,7 +41,7 @@
 using namespace std;
 
 class TableInterpolator {
-protected:
+ protected:
   double xdata_[gpudata::MAXTABLE];
   double fdata_[gpudata::MAXTABLE];
   int Ndata_;
@@ -49,8 +49,9 @@ protected:
   bool xLogScale_;
   bool fLogScale_;
 
-public:
-  MFEM_HOST_DEVICE TableInterpolator(const int &Ndata, const double *xdata, const double *fdata, const bool &xLogScale, const bool &fLogScale);
+ public:
+  MFEM_HOST_DEVICE TableInterpolator(const int &Ndata, const double *xdata, const double *fdata, const bool &xLogScale,
+                                     const bool &fLogScale);
 
   MFEM_HOST_DEVICE virtual ~TableInterpolator() {}
 
@@ -67,12 +68,12 @@ public:
 //////////////////////////////////////////////////////
 
 class LinearTable : public TableInterpolator {
-private:
+ private:
   // f[j](x) = a + b * x
   double a_[gpudata::MAXTABLE];
   double b_[gpudata::MAXTABLE];
 
-public:
+ public:
   MFEM_HOST_DEVICE LinearTable(const TableInput &input);
 
   MFEM_HOST_DEVICE virtual ~LinearTable() {}

@@ -101,10 +101,10 @@ class HoffertLien : public Reaction {
 };
 
 class Tabulated : public Reaction {
-private:
+ private:
   TableInterpolator *table_ = NULL;
 
-public:
+ public:
   MFEM_HOST_DEVICE Tabulated(const TableInput &input);
 
   MFEM_HOST_DEVICE virtual ~Tabulated();

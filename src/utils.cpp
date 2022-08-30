@@ -285,7 +285,7 @@ mfem::Array<int> h5ReadTable(const std::string &fileName, const std::string &dat
   const int ndims = H5Sget_simple_extent_ndims(dataspace);
   hsize_t dims[ndims];
   // int dummy = H5Sget_simple_extent_dims(dataspace,dims,NULL);
-  H5Sget_simple_extent_dims(dataspace,dims,NULL);
+  H5Sget_simple_extent_dims(dataspace, dims, NULL);
 
   // DenseMatrix memory is column-major, while HDF5 follows row-major.
   output.SetSize(dims[1], dims[0]);

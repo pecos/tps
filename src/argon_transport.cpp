@@ -127,10 +127,8 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::computeEffectiveMass(const double *
 MFEM_HOST_DEVICE void ArgonMinimalTransport::setArtificialMultipliers(const ArgonTransportInput &inputs) {
   multiply_ = inputs.multiply;
   if (multiply_) {
-    for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++)
-      fluxTrnsMultiplier_[t] = inputs.fluxTrnsMultiplier[t];
-    for (int t = 0; t < SpeciesTrns::NUM_SPECIES_COEFFS; t++)
-      spcsTrnsMultiplier_[t] = inputs.spcsTrnsMultiplier[t];
+    for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++) fluxTrnsMultiplier_[t] = inputs.fluxTrnsMultiplier[t];
+    for (int t = 0; t < SpeciesTrns::NUM_SPECIES_COEFFS; t++) spcsTrnsMultiplier_[t] = inputs.spcsTrnsMultiplier[t];
     diffMult_ = inputs.diffMult;
     mobilMult_ = inputs.mobilMult;
   }
@@ -242,8 +240,7 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeFluxTransportProperties(cons
 
   // Apply artificial multipliers.
   if (multiply_) {
-    for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++)
-      transportBuffer[t] *= fluxTrnsMultiplier_[t];
+    for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++) transportBuffer[t] *= fluxTrnsMultiplier_[t];
     for (int sp = 0; sp < numSpecies; sp++) {
       diffusivity[sp] *= diffMult_;
       mobility[sp] *= mobilMult_;
@@ -860,8 +857,7 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeFluxTransportProperties(cons
 
   // Apply artificial multipliers.
   if (multiply_) {
-    for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++)
-      transportBuffer[t] *= fluxTrnsMultiplier_[t];
+    for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++) transportBuffer[t] *= fluxTrnsMultiplier_[t];
     for (int sp = 0; sp < numSpecies; sp++) {
       diffusivity[sp] *= diffMult_;
       mobility[sp] *= mobilMult_;
