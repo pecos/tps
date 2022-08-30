@@ -393,6 +393,7 @@ class M2ulPhyS : public TPS::Solver {
   IntegrationRules *getIntegrationRules() { return intRules; }
   RunConfiguration &GetConfig() { return config; }
   GasMixture *getMixture() { return mixture; }
+  Chemistry *getChemistry() { return chemistry_; }
 
   void updatePrimitives();
 

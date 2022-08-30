@@ -693,13 +693,14 @@ void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
 
   tpsP->getInput((inputPath + "/x_log").c_str(), result.xLogScale, false);
   tpsP->getInput((inputPath + "/f_log").c_str(), result.fLogScale, false);
-  tpsP->getRequiredInput((inputPath + "/f_log").c_str(), result.order);
+  tpsP->getInput((inputPath + "/order").c_str(), result.order, 1);
 
   int Ndata;
   double xdata[gpudata::MAXTABLE], fdata[gpudata::MAXTABLE];
   if (mpi.Root()) {
     DenseMatrix data;
-    std::string filename(inputPath + "/filename");
+    std::string filename;
+    tpsP->getRequiredInput((inputPath + "/filename").c_str(), filename);
     Array<int> dims = h5ReadTable(filename, "table", data);
     assert(dims[0] > 0);
     assert(dims[1] == 2);

@@ -1,7 +1,8 @@
-#include "../src/table.hpp"
-#include "../src/tps.hpp"
+// #include "../src/table.hpp"
+// #include "../src/tps.hpp"
+#include "../src/M2ulPhyS.hpp"
 #include "mfem.hpp"
-#include "../src/utils.hpp"
+// #include "../src/utils.hpp"
 #include <fstream>
 #include <hdf5.h>
 
@@ -64,20 +65,36 @@ int main (int argc, char *argv[])
 
   delete table;
 
-  std::string fileName = "ref_solns/reaction/excitation.3000K.ion1e-4.h5";
+  M2ulPhyS *srcField = new M2ulPhyS(tps.getMPISession(), &tps);
+  RunConfiguration& srcConfig = srcField->GetConfig();
+  Chemistry *chem = srcField->getChemistry();
+  assert(srcConfig.numReactions == 1);
+  assert(srcConfig.reactionModels[0] = TABULATED);
+  std::string basePath("reactions/reaction1/tabulated");
+
+  std::string fileName;
+  tpsP->getRequiredInput((basePath + "/filename").c_str(), filename);
   std::string datasetName = "table";
   DenseMatrix refValues;
   Array<int> dims1 = h5ReadTable(fileName, datasetName, refValues);
-  input.Ndata = dims1[0];
-  for (int k = 0; k < input.Ndata; k++) {
-    input.xdata[k] = refValues(k, 0);
-    input.fdata[k] = refValues(k, 1);
-  }
-  input.xLogScale = true;
-  input.fLogScale = true;
-  table = new LinearTable(input);
+  // input.Ndata = dims1[0];
+  // for (int k = 0; k < input.Ndata; k++) {
+  //   input.xdata[k] = refValues(k, 0);
+  //   input.fdata[k] = refValues(k, 1);
+  // }
+  // input.xLogScale = true;
+  // input.fLogScale = true;
+  // table = new LinearTable(input);
 
   // TODO(kevin): write a sort of sanity check for this. The values are manually checked at this point.
+   for (int k = 0; k < dims1[0]; k++) {
+     // double xtest = 300.0 * pow(1.0e4 / 300.0, 1.0 * k / Ntest);
+     double xtest = refValues(k, 0);
+     double fref = refValues(k, 1);
+     double ftest[gpudata::MAXREACTIONS];
+     chem->computeForwardRateCoeffs(xtest, xtest, ftest);
+     printf("%.5E: %.5E ?= %.5E", xtest, fref, ftest[0]);
+   }
 //  std::cout << "[";
 //  for (int k = 0; k < Ntest; k++) {
 //    double xtest = 300.0 * pow(1.0e4 / 300.0, 1.0 * k / Ntest);
@@ -88,7 +105,7 @@ int main (int argc, char *argv[])
 //  }
 //  std::cout << "]" << std::endl;
 
-  delete table;
+  // delete table;
 
   return 0;
 }
