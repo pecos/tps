@@ -283,7 +283,7 @@ mfem::Array<int> h5ReadTable(const std::string &fileName, const std::string &dat
   assert(datasetID >= 0);
   dataspace = H5Dget_space(datasetID);
   const int ndims = H5Sget_simple_extent_ndims(dataspace);
-  hsize_t dims[ndims];
+  hsize_t dims[gpudata::MAXTABLEDIM];
   // int dummy = H5Sget_simple_extent_dims(dataspace,dims,NULL);
   H5Sget_simple_extent_dims(dataspace, dims, NULL);
 

@@ -53,6 +53,7 @@ const int MAXREACTIONS = 20;
 const int MAXCHEMPARAMS = 3;
 
 const int MAXTABLE = 512;
+const int MAXTABLEDIM = 2;
 }  // namespace gpudata
 
 enum Equations {
