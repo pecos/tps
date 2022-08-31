@@ -80,7 +80,12 @@ int main (int argc, char *argv[])
   tps.getRequiredInput((basePath + "/filename").c_str(), fileName);
   std::string datasetName = "table";
   DenseMatrix refValues;
-  Array<int> dims1 = h5ReadTable(fileName, datasetName, refValues);
+  Array<int> dims1(2);
+  bool success = h5ReadTable(fileName, datasetName, refValues, dims1);
+  if (!success) {
+    grvy_printf(GRVY_ERROR, "Reading the table file %s failed!\n", fileName.c_str());
+    exit(ERROR);
+  }
 
   if (rank == 0) printf("Table read.\n");
 

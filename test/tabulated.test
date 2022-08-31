@@ -3,10 +3,12 @@
 
 TEST="tabulated reaction"
 RUNFILE="inputs/input.tabulated_reaction.ini"
+REFFILE="ref_solns/reaction/excitation.3000K.ion1e-4.h5"
 
 @test "[$TEST] Test exact interpolation from tabulated values" {
     test -s $RUNFILE
     test -s ./test_table
+#    test -s $REFFILE
 
     # mpirun to check if the table is broadcast to all ranks.
     mpirun -n 2 ./test_table -run $RUNFILE

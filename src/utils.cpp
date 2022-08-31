@@ -268,19 +268,21 @@ void GlobalProjectDiscCoefficient(ParGridFunction &gf, VectorCoefficient &coeff)
   delete tv;
 }
 
-mfem::Array<int> h5ReadTable(const std::string &fileName, const std::string &datasetName, mfem::DenseMatrix &output) {
+bool h5ReadTable(const std::string &fileName, const std::string &datasetName, mfem::DenseMatrix &output,
+                 mfem::Array<int> &shape) {
+  bool success = false;
   hid_t file = -1;
   if (file_exists(fileName)) {
     file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
   } else {
     grvy_printf(GRVY_ERROR, "[ERROR]: Unable to open file -> %s\n", fileName.c_str());
-    exit(ERROR);
+    return success;
   }
-  assert(file >= 0);
+  if (file < 0) return success;
 
   hid_t datasetID, dataspace;
   datasetID = H5Dopen2(file, datasetName.c_str(), H5P_DEFAULT);
-  assert(datasetID >= 0);
+  if (datasetID < 0) return success;
   dataspace = H5Dget_space(datasetID);
   const int ndims = H5Sget_simple_extent_ndims(dataspace);
   hsize_t dims[gpudata::MAXTABLEDIM];
@@ -292,16 +294,17 @@ mfem::Array<int> h5ReadTable(const std::string &fileName, const std::string &dat
 
   herr_t status;
   status = H5Dread(datasetID, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, output.HostReadWrite());
-  assert(status >= 0);
+  if (status < 0) return success;
   H5Dclose(datasetID);
   H5Fclose(file);
 
   // DenseMatrix memory is column-major, while HDF5 follows row-major.
   output.Transpose();
 
-  mfem::Array<int> shape(2);
+  shape.SetSize(2);
   shape[0] = dims[0];
   shape[1] = dims[1];
 
-  return shape;
+  success = true;
+  return success;
 }

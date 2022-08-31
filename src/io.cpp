@@ -696,20 +696,24 @@ void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
 
   int Ndata;
   Array<int> dims(2);
+  bool success = false;
   if (mpi.Root()) {
     std::string filename;
     tpsP->getRequiredInput((inputPath + "/filename").c_str(), filename);
-    dims = h5ReadTable(filename, "table", config.tableHost.back());
-    assert(dims[0] > 0);
-    assert(dims[1] == 2);
+    success = h5ReadTable(filename, "table", config.tableHost.back(), dims);
 
     // TODO(kevin): extend for multi-column array?
     Ndata = dims[0];
   }
+  MPI_Bcast(&success, 1, MPI_CXX_BOOL, 0, MPI_COMM_WORLD);
+  if (!success) exit(ERROR);
 
   int *d_dims = dims.GetData();
   MPI_Bcast(&Ndata, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast(d_dims, 2, MPI_INT, 0, MPI_COMM_WORLD);
+  assert(dims[0] > 0);
+  assert(dims[1] == 2);
+
   if (!mpi.Root()) (config.tableHost.back()).SetSize(dims[0], dims[1]);
   double *d_table = config.tableHost.back().GetData();
   MPI_Bcast(d_table, dims[0] * dims[1], MPI_DOUBLE, 0, MPI_COMM_WORLD);
