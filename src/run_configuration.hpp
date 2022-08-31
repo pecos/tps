@@ -251,6 +251,8 @@ class RunConfiguration {
 
   double const_plasma_conductivity_;
 
+  PostProcessInput postprocessInput;
+
   RunConfiguration();
   ~RunConfiguration();
 

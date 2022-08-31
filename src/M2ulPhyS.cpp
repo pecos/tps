@@ -1904,6 +1904,9 @@ void M2ulPhyS::parseSolverOptions2() {
   // Pack up input parameters for device objects.
   packUpGasMixtureInput();
 
+  // post-process visualization inputs
+  parsePostProcessVisualizationInputs();
+
   return;
 }
 
@@ -2876,6 +2879,15 @@ void M2ulPhyS::parseSpongeZoneInputs() {
   }
 }
 
+void M2ulPhyS::parsePostProcessVisualizationInputs() {
+  if (tpsP->isVisualizationMode()) {
+    tpsP->getRequiredInput("post-process/visualization/prefix", config.postprocessInput.prefix);
+    tpsP->getRequiredInput("post-process/visualization/start-iter", config.postprocessInput.startIter);
+    tpsP->getRequiredInput("post-process/visualization/end-iter", config.postprocessInput.endIter);
+    tpsP->getRequiredInput("post-process/visualization/frequency", config.postprocessInput.freq);
+  }
+}
+
 void M2ulPhyS::packUpGasMixtureInput() {
   if (config.workFluid == DRY_AIR) {
     config.dryAirInput.f = config.workFluid;
@@ -3136,4 +3148,87 @@ void M2ulPhyS::updatePrimitives() {
     mixture->GetPrimitivesFromConservatives(state, Upi);
     for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * dof] = Upi[eq];
   }
+}
+
+void M2ulPhyS::visualization() {
+  double tlast = grvy_timer_elapsed_global();
+
+#ifdef HAVE_MASA
+  if (config.use_mms_) {
+    checkSolutionError(time);
+  }
+#endif
+
+  iter = config.postprocessInput.startIter;
+
+  // Read solution files per frequency.
+  while (iter <= config.postprocessInput.endIter) {
+    grvy_timer_begin(__func__);
+
+    // periodically report on time/iteratino
+    if (mpi.Root()) {
+      double timePerIter = (grvy_timer_elapsed_global() - tlast);
+      grvy_printf(ginfo, "Iteration = %i: wall clock time/snapshot = %.3f (secs)\n", iter, timePerIter);
+      tlast = grvy_timer_elapsed_global();
+    }
+
+    int oldIter = iter;
+    size_t digits = 8;
+    int precision = digits - std::min(digits, std::to_string(iter).size());
+    // pad leading zeros to iter.
+    std::string iterStr = std::string(precision, '0').append(std::to_string(iter));
+    std::string filename(config.postprocessInput.prefix + "-" + iterStr + ".h5");
+    restart_files_hdf5("read", filename);
+    assert(oldIter == iter);  // make sure iter in the solution file matches its filename.
+
+    // paraviewColl->SetCycle(iter);
+    // paraviewColl->SetTime(time);
+    // paraviewColl->UseRestartMode(true);
+
+    updatePrimitives();
+
+    // update pressure grid function
+    mixture->UpdatePressureGridFunction(press, Up);
+
+    Check_NAN();
+
+    iter += config.postprocessInput.freq;
+
+#ifdef HAVE_MASA
+    if (config.use_mms_) {
+      if (config.mmsSaveDetails_) {
+        rhsOperator->Mult(*U, *masaRhs_);
+        projectExactSolution(time, masaU_);
+      }
+      checkSolutionError(time);
+    } else {
+      if (mpi.Root()) cout << "time step: " << iter << ", physical time " << time << "s" << endl;
+    }
+#else
+    if (mpi.Root()) cout << "time step: " << iter << ", physical time " << time << "s" << endl;
+#endif
+
+    paraviewColl->SetCycle(iter);
+    paraviewColl->SetTime(time);
+    paraviewColl->Save();
+    // auto dUp = Up->ReadWrite();  // sets memory to GPU
+    // Up->ReadWrite();  // sets memory to GPU
+
+    average->write_meanANDrms_restart_files(iter, time);
+
+    average->addSampleMean(iter);
+
+    // periodically check for DIE file which requests to terminate early
+    if (Check_ExitEarly(iter)) {
+      MaxIters = iter;
+      SetStatus(EARLY_EXIT);
+      break;
+    }
+
+    grvy_timer_end(__func__);
+  }  // <-- end main timestep iteration loop
+
+  if (mpi.Root()) cout << "Final timestep iteration = " << config.postprocessInput.endIter << endl;
+
+  return;
 }
