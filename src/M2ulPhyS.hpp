@@ -361,6 +361,7 @@ class M2ulPhyS : public TPS::Solver {
   void parseReactionInputs();
   void parseBCInputs();
   void parseSpongeZoneInputs();
+  void parsePostProcessVisualizationInputs();
 
   void packUpGasMixtureInput();
   void identifySpeciesType(Array<ArgonSpcs> &speciesType);
@@ -377,6 +378,7 @@ class M2ulPhyS : public TPS::Solver {
   }
 
   void solve() override;
+  void visualization() override;
 
   // Accessors
   RHSoperator *getRHSoperator() { return rhsOperator; }

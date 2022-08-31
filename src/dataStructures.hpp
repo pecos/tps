@@ -397,4 +397,11 @@ struct ChemistryInput {
   ReactionInput reactionInputs[gpudata::MAXREACTIONS];
 };
 
+struct PostProcessInput {
+  std::string prefix;
+  int startIter;
+  int endIter;
+  int freq;
+};
+
 #endif  // DATASTRUCTURES_HPP_
