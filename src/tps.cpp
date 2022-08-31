@@ -63,6 +63,9 @@ Tps::Tps() {
   isEMOnlyMode_ = false;
   isFlowEMCoupledMode_ = false;
 
+  // default post-process visualization mode
+  isVisualizationMode_ = false;
+
   // execution device inferred from build setup
 #ifdef _HIP_
   deviceConfig_ = "hip";
@@ -102,6 +105,7 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
   mfem::OptionsParser args(argc, argv);
   bool showVersion = false;
   bool debugMode = false;
+  bool visualMode = false;
   const char *astring = iFile_.c_str();
 
   if (isRank0_) {
@@ -113,6 +117,7 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
   args.AddOption(&showVersion, "-v", "--version", "", "--no-version", "Print code version and exit,");
   args.AddOption(&astring, "-run", "--runFile", "Name of the input file with run options.");
   args.AddOption(&debugMode, "-d", "--debug", "", "--no-debug", "Launch in debug mode for gdb attach.");
+  args.AddOption(&visualMode, "-visual", "--visualization", "", "--no-visualization", "Launch post-process visualization.");
 
   args.Parse();
 
@@ -122,6 +127,7 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
   }
 
   iFile_ = astring;
+  isVisualizationMode_ = visualMode;
 
   // Version info
   printHeader();
