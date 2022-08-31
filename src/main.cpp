@@ -42,7 +42,11 @@ int main(int argc, char *argv[]) {
     tps.chooseSolver();
     tps.initialize();
 
-    tps.solve();
+    if (tps.isVisualizationMode()) {  // post-process visualization process.
+      tps.visualization();
+    } else {  // regular forward time-integration.
+      tps.solve();
+    }
 
     status = tps.getStatus();
   }

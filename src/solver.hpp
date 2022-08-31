@@ -58,6 +58,10 @@ class Solver {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
   }
+  virtual void visualization() {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+  }
 };
 
 }  // end namespace TPS

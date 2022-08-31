@@ -87,6 +87,9 @@ class Tps {
   // pointer to solver implementation chosen at runtime
   TPS::Solver *solver_ = NULL;
 
+  // post-process visualization mode
+  bool isVisualizationMode_;
+
  public:
   Tps();                           // constructor
   ~Tps();                          // destructor
@@ -126,6 +129,10 @@ class Tps {
     solver_->solve();
     return;
   }
+  void visualization() {
+    solver_->visualization();
+    return;
+  }
   void printHeader();
   void parseCommandLineArgs(int argc, char *argv[]);  // variant used in C++ interface
   void parseArgs(std::vector<std::string> argv);      // variant used in python interface
@@ -134,6 +141,7 @@ class Tps {
   mfem::MPI_Session &getMPISession() { return mpi_; }
   std::string &getInputFilename() { return iFile_; }
   bool isFlowEMCoupled() const { return isFlowEMCoupledMode_; }
+  bool isVisualizationMode() const { return isVisualizationMode_; }
   const std::string &getSolverType() { return input_solver_type_; }
 };
 
