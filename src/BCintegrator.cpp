@@ -221,14 +221,14 @@ void BCintegrator::initBCs() {
 }
 
 void BCintegrator::computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState,
-                                  double radius, Vector &bdrFlux) {
+                                  double radius, Vector transip, Vector &bdrFlux) {
   std::unordered_map<int, BoundaryCondition *>::const_iterator ibc = inletBCmap.find(attr);
   std::unordered_map<int, BoundaryCondition *>::const_iterator obc = outletBCmap.find(attr);
   std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = wallBCmap.find(attr);
 
-  if (ibc != inletBCmap.end()) ibc->second->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
-  if (obc != outletBCmap.end()) obc->second->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
-  if (wbc != wallBCmap.end()) wbc->second->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
+  if (ibc != inletBCmap.end()) ibc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, bdrFlux);
+  if (obc != outletBCmap.end()) obc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, bdrFlux);
+  if (wbc != wallBCmap.end()) wbc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, bdrFlux);
 
   //   BCmap[attr]->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
 }
@@ -379,14 +379,14 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
     CalcOrtho(Tr.Jacobian(), nor);
 
     double radius = 1;
+    double x[3];
+    Vector transip(x, 3);
+    Tr.Transform(ip, transip);  // x-y-z coordinates of int pts
     if (config.isAxisymmetric()) {
-      double x[3];
-      Vector transip(x, 3);
-      Tr.Transform(ip, transip);
       radius = transip[0];
     }
 
-    computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, radius, fluxN);
+    computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, radius, transip, fluxN);
     fluxN *= ip.weight;
 
     if (config.isAxisymmetric()) {

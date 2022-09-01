@@ -77,7 +77,8 @@ class WallBC : public BoundaryCondition {
          const Array<int> &intPointsElIDBC, const int &maxIntPoints, bool axisym);
   ~WallBC();
 
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux);
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
+                      Vector &bdrFlux);
 
   virtual void initBCs();
 

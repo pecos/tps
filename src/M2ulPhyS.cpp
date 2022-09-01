@@ -2828,12 +2828,14 @@ void M2ulPhyS::parseBCInputs() {
   // Inlet Bcs
   std::map<std::string, InletType> inletMapping;
   inletMapping["subsonic"] = SUB_DENS_VEL;
-  inletMapping["nonreflecting"] = SUB_DENS_VEL_NR;
-  inletMapping["nonreflectingConstEntropy"] = SUB_VEL_CONST_ENT;
+  inletMapping["nonReflecting"] = SUB_DENS_VEL_NR;
+  inletMapping["nonReflectingConstEntropy"] = SUB_VEL_CONST_ENT;
+  inletMapping["nonReflectingConstTemp"] = SUB_VEL_CONST_TMP;
 
   for (int i = 1; i <= numInlets; i++) {
     int patch;
     double density;
+    double temperature;
     std::string type;
     std::string basepath("boundaryConditions/inlet" + std::to_string(i));
 
@@ -2842,9 +2844,15 @@ void M2ulPhyS::parseBCInputs() {
     // all inlet BCs require 4 inputs (density + vel(3))
     {
       Array<double> uvw;
-      tpsP->getRequiredInput((basepath + "/density").c_str(), density);
+      if (type == "nonReflectingConstTemp") {
+        tpsP->getRequiredInput((basepath + "/temperature").c_str(), temperature);
+        config.inletBC.Append(temperature);
+      } else {
+        tpsP->getRequiredInput((basepath + "/density").c_str(), density);
+        config.inletBC.Append(density);
+      }
+
       tpsP->getRequiredVec((basepath + "/uvw").c_str(), uvw, 3);
-      config.inletBC.Append(density);
       config.inletBC.Append(uvw, 3);
     }
     // For multi-component gas, require (numActiveSpecies)-more inputs.
@@ -2876,16 +2884,21 @@ void M2ulPhyS::parseBCInputs() {
 
   for (int i = 1; i <= numOutlets; i++) {
     int patch;
-    double pressure, massFlow;
+    double pressure, massFlow, sigma;
     std::string type;
     std::string basepath("boundaryConditions/outlet" + std::to_string(i));
 
     tpsP->getRequiredInput((basepath + "/patch").c_str(), patch);
     tpsP->getRequiredInput((basepath + "/type").c_str(), type);
 
-    if ((type == "subsonicPressure") || (type == "nonReflectingPressure")) {
+    if (type == "subsonicPressure") {
       tpsP->getRequiredInput((basepath + "/pressure").c_str(), pressure);
       config.outletBC.Append(pressure);
+    } else if (type == "nonReflectingPressure") {
+      tpsP->getRequiredInput((basepath + "/pressure").c_str(), pressure);
+      config.outletBC.Append(pressure);
+      tpsP->getRequiredInput((basepath + "/sigma").c_str(), sigma);
+      config.outletBC.Append(sigma);
     } else if ((type == "nonReflectingMassFlow") || (type == "nonReflectingPointBasedMassFlow")) {
       tpsP->getRequiredInput((basepath + "/massFlow").c_str(), massFlow);
       config.outletBC.Append(massFlow);

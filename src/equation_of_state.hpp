@@ -100,6 +100,7 @@ class GasMixture {
 #ifdef _GPU_
   double specific_heat_ratio;
   double gas_constant;
+  double specific_heat_constV;
   double visc_mult;
   double bulk_visc_mult;
   // Prandtl number
@@ -228,9 +229,11 @@ class GasMixture {
   // These are used in forcingTerm, Fluxes ASSUMING that the fluid is single species.
   MFEM_HOST_DEVICE virtual double GetSpecificHeatRatio() { return specific_heat_ratio; }
   MFEM_HOST_DEVICE virtual double GetGasConstant() { return gas_constant; }
+  //  MFEM_HOST_DEVICE virtual double GetSpecificHeatConstV() { return specific_heat_constV; }
 #else
   virtual double GetSpecificHeatRatio() = 0;
   virtual double GetGasConstant() = 0;
+  //  virtual double GetSpecificHeatConstV() = 0;
 #endif
 
   virtual void computeNumberDensities(const Vector &conservedState, Vector &n_sp) {
@@ -317,6 +320,7 @@ class DryAir : public GasMixture {
  private:
   double specific_heat_ratio;
   double gas_constant;
+  double specific_heat_constV;
 
   virtual void setNumEquations();
 
@@ -366,6 +370,7 @@ class DryAir : public GasMixture {
 
   MFEM_HOST_DEVICE virtual double GetSpecificHeatRatio() { return specific_heat_ratio; }
   MFEM_HOST_DEVICE virtual double GetGasConstant() { return gas_constant; }
+  //  MFEM_HOST_DEVICE virtual double GetSpecificHeatConstV() { return specific_heat_constV; }
 
   virtual void ComputeMassFractionGradient(const double rho, const Vector &numberDensities, const DenseMatrix &gradUp,
                                            DenseMatrix &massFractionGrad) {
@@ -695,6 +700,7 @@ class PerfectMixture : public GasMixture {
 
   MFEM_HOST_DEVICE double computeHeaviesMixtureCV(const double *n_sp, const double n_B) const;
   MFEM_HOST_DEVICE double computeHeaviesMixtureHeatRatio(const double *n_sp, const double n_B) const;
+  MFEM_HOST_DEVICE double computeHeaviesMixtureCVprim(const Vector &Uin) const;
 
   virtual void ComputeMassFractionGradient(const double rho, const Vector &numberDensities, const DenseMatrix &gradUp,
                                            DenseMatrix &massFractionGrad);

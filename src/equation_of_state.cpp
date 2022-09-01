@@ -140,8 +140,8 @@ MFEM_HOST_DEVICE DryAir::DryAir(const DryAirInput inputs, int _dim, int nvel) : 
 #endif
 
   gas_constant = 287.058;
-
   specific_heat_ratio = 1.4;
+  specific_heat_constV = gas_constant / (specific_heat_ratio - 1.0);
 // TODO(kevin): GPU routines are not yet fully gas-agnostic. Need to be removed.
 #if defined(_HIP_)
   visc_mult = inputs.visc_mult;
@@ -1284,6 +1284,31 @@ MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesMixtureCV(const double *n_
     mixtureCV += n_sp[sp] * molarCV_[sp];
   }
   mixtureCV += n_B * molarCV_[numSpecies - 1];
+
+  return mixtureCV;
+}
+
+// jump
+MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesMixtureCVprim(const mfem::Vector &Uin) const {
+  double mixtureCV = 0.0;
+
+  double n_e = 0.0;
+  if (ambipolar) {
+    n_e = computeAmbipolarElectronNumberDensity(&Uin[nvel_ + 2]);
+  } else {
+    n_e = Uin[nvel_ + 2 + numSpecies - 2];
+  }
+  double rhoB = computeBackgroundMassDensity(Uin[0], &Uin[nvel_ + 2], n_e, true);
+  double nB = rhoB / GetGasParams(numSpecies - 1, GasParams::SPECIES_MW);
+
+  Vector n_sp;
+  computeNumberDensities(Uin, n_sp);
+
+  for (int sp = 0; sp < numActiveSpecies; sp++) {
+    if (sp == numSpecies - 2) continue;
+    mixtureCV += n_sp[sp] * molarCV_[sp];
+  }
+  mixtureCV += nB * molarCV_[numSpecies - 1];
 
   return mixtureCV;
 }

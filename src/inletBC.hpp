@@ -87,6 +87,9 @@ class InletBC : public BoundaryCondition {
 
   void subsonicNonReflectingDensityVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
 
+  void subsonicNonReflectingTemperatureVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
+                                                Vector &bdrFlux);
+
   virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up);
 
  public:
@@ -96,7 +99,9 @@ class InletBC : public BoundaryCondition {
           const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs, bool axisym);
   ~InletBC();
 
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux);
+  //  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux);
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
+                      Vector &bdrFlux);
 
   virtual void initBCs();
 

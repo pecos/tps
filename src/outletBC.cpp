@@ -298,7 +298,8 @@ void OutletBC::initBCs() {
   }
 }
 
-void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux) {
+void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
+                              Vector &bdrFlux) {
   switch (outletType_) {
     case SUB_P:
       subsonicReflectingPressure(normal, stateIn, bdrFlux);
@@ -560,6 +561,7 @@ void OutletBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodes
                        x, nodesIDs, posDofIds, shapesBC, normalsWBC, intPointsElIDBC, listElems, offsetsBoundaryU);
 }
 
+// jump
 void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
   const double gamma = mixture->GetSpecificHeatRatio();
 
@@ -570,18 +572,22 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
     unitNorm *= 1. / sqrt(mod);
   }
 
+  Vector Up(num_equation_);
+  mixture->GetPrimitivesFromConservatives(stateIn, Up);
+  double rho = Up[0];
+
   // mean velocity in inlet normal and tangent directions
   Vector meanVel(dim_);
   meanVel = 0.;
   for (int d = 0; d < dim_; d++) {
-    meanVel[0] += unitNorm[d] * meanUp[d + 1];
-    meanVel[1] += tangent1[d] * meanUp[d + 1];
+    meanVel[0] += unitNorm[d] * Up[d + 1];
+    meanVel[1] += tangent1[d] * Up[d + 1];
   }
   if (dim_ == 3) {
     tangent2[0] = unitNorm[1] * tangent1[2] - unitNorm[2] * tangent1[1];
     tangent2[1] = unitNorm[2] * tangent1[0] - unitNorm[0] * tangent1[2];
     tangent2[2] = unitNorm[0] * tangent1[1] - unitNorm[1] * tangent1[0];
-    for (int d = 0; d < dim_; d++) meanVel[2] += tangent2[d] * meanUp[d + 1];
+    for (int d = 0; d < dim_; d++) meanVel[2] += tangent2[d] * Up[d + 1];
   }
 
   double meanP = mixture->ComputePressureFromPrimitives(meanUp);
@@ -593,34 +599,37 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
     // NOTE(kevin): for axisymmetric case, azimuthal normal component will be always zero.
     for (int d = 0; d < dim_; d++) normGrad[eq] += unitNorm[d] * gradState(eq, d);
   }
+
   // gradient of pressure in normal direction
   double dpdn = mixture->ComputePressureDerivative(normGrad, stateIn, false);
 
-  const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
+  // speed of sound
+  const double speedSound = mixture->ComputeSpeedOfSound(Up);
 
+  // kinetic energy
   double meanK = 0.;
-  for (int d = 0; d < dim_; d++) meanK += meanUp[1 + d] * meanUp[1 + d];
+  for (int d = 0; d < nvel_; d++) meanK += Up[1 + d] * Up[1 + d];
   meanK *= 0.5;
 
   // compute outgoing characteristics
   double L2 = speedSound * speedSound * normGrad[0] - dpdn;
   L2 *= meanVel[0];
 
-  double L3 = 0;
+  // transverse
+  double L3 = 0.;
   for (int d = 0; d < dim_; d++) L3 += tangent1[d] * normGrad[1 + d];
-  L3 *= meanVel[0];
+  L3 *= meanVel[1];
 
   double L4 = 0.;
   if (dim_ == 3) {
     for (int d = 0; d < dim_; d++) L4 += tangent2[d] * normGrad[1 + d];
-    L4 *= meanVel[0];
+    L4 *= meanVel[1];
   }
 
   double L5 = 0.;
   for (int d = 0; d < dim_; d++) L5 += unitNorm[d] * normGrad[1 + d];
-  //   L5 = normGrad[num_equation-1] +rho*speedSound*L5;
-  L5 = dpdn + meanUp[0] * speedSound * L5;
-  L5 *= meanVel[0] + speedSound;
+  L5 = dpdn + rho * speedSound * L5;
+  L5 *= (meanVel[0] + speedSound);  // (un+c) * (dpdn + rho*c*dundn) => correct
 
   double L6 = 0.;
   if (eqSystem == NS_PASSIVE) L6 = meanVel[0] * normGrad[num_equation_ - 1];
@@ -628,28 +637,31 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   // const double p = eqState->ComputePressure(stateIn, dim_);
 
   // estimate ingoing characteristic
-  const double sigma = speedSound / refLength;
-  //   double L1 = sigma * (meanUp[1 + dim_] - inputState[0]);
-  double L1 = sigma * (meanP - inputState[0]);
+  // should be K = sigma*(1-Ma^2)*c/L where L is the domain length normal to the outflow and sigma is user set ~0.2
+  // const double sigma = 0.2;
+  double sigma = inputState[1];  // input param now
+  double Mach = meanVel[0] / speedSound;
+  double Ldom = refLength;
+  double kP = sigma * (1. - Mach * Mach) * speedSound / Ldom;
+  double L1 = kP * (meanP - inputState[0]);
 
   // calc vector d
-  const double d1 = (L2 + 0.5 * (L5 + L1)) / speedSound / speedSound;
-  //   const double d2 = 0.5*(L5-L1)/rho/speedSound;
-  const double d2 = 0.5 * (L5 - L1) / meanUp[0] / speedSound;
+  const double d1 = (L2 + 0.5 * (L5 + L1)) / (speedSound * speedSound);
+  const double d2 = 0.5 * (L5 - L1) / (rho * speedSound);  // typically in d3 slot
   const double d3 = L3;
   const double d4 = L4;
-  const double d5 = 0.5 * (L5 + L1);
+  const double d5 = 0.5 * (L5 + L1);  // typically d2 but energy is in 5 slot
   double d6 = 0.;
   if (eqSystem == NS_PASSIVE) d6 = L6;
 
   // dF/dx
   bdrFlux[0] = d1;
-  bdrFlux[1] = meanVel[0] * d1 + meanUp[0] * d2;
-  bdrFlux[2] = meanVel[1] * d1 + meanUp[0] * d3;
-  if (dim_ == 3) bdrFlux[3] = meanVel[2] * d1 + meanUp[0] * d4;
-  bdrFlux[1 + dim_] = meanUp[0] * meanVel[0] * d2;
-  bdrFlux[1 + dim_] += meanUp[0] * meanVel[1] * d3;
-  if (dim_ == 3) bdrFlux[1 + dim_] += meanUp[0] * meanVel[2] * d4;
+  bdrFlux[1] = meanVel[0] * d1 + rho * d2;
+  bdrFlux[2] = meanVel[1] * d1 + rho * d3;
+  if (dim_ == 3) bdrFlux[3] = meanVel[2] * d1 + rho * d4;
+  bdrFlux[1 + dim_] = rho * meanVel[0] * d2;
+  bdrFlux[1 + dim_] += rho * meanVel[1] * d3;
+  if (dim_ == 3) bdrFlux[1 + dim_] += rho * meanVel[2] * d4;
   bdrFlux[1 + dim_] += meanK * d1 + d5 / (gamma - 1.);
 
   if (eqSystem == NS_PASSIVE) bdrFlux[num_equation_ - 1] = d1 * meanUp[num_equation_ - 1] + meanUp[0] * d6;
@@ -712,9 +724,11 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
     for (int d = 0; d < dim_; d++) newU[1 + d] = momX[d];
   }
   for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + bdrN * num_equation_] = newU[eq];
-  bdrN++;
 
-  rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
+  // rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
+  rsolver->Eval(stateIn, boundaryU, normal, bdrFlux, true);
+
+  bdrN++;
 }
 
 // This is more or less right formulation even for two-temperature case.
