@@ -1209,17 +1209,24 @@ void M2ulPhyS::projectInitialSolution() {
   //   }
   if (mpi.Root()) std::cout << "restart: " << config.GetRestartCycle() << std::endl;
 
+#ifdef HAVE_MASA
+  if (config.use_mms_) {
+    initMasaHandler();
+  }
+#endif
+
   if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
     uniformInitialConditions();
 #ifdef HAVE_MASA
     if (config.use_mms_) {
-      initMasaHandler();
-
       projectExactSolution(0.0, U);
       if (config.mmsSaveDetails_) projectExactSolution(0.0, masaU_);
     }
 #endif
   } else {
+#ifdef HAVE_MASA
+    if (config.use_mms_ && config.mmsSaveDetails_) projectExactSolution(0.0, masaU_);
+#endif
     if (config.RestartHDFConversion())
       read_restart_files();
     else
@@ -1246,7 +1253,8 @@ void M2ulPhyS::projectInitialSolution() {
     // Only save IC from fresh start.  On restart, will save viz at
     // next requested iter.  This avoids possibility of trying to
     // overwrite existing paraview data for the current iteration.
-    paraviewColl->Save();
+    if (!(tpsP->isVisualizationMode()))
+      paraviewColl->Save();
   }
 }
 
@@ -3192,8 +3200,6 @@ void M2ulPhyS::visualization() {
 
     Check_NAN();
 
-    iter += config.postprocessInput.freq;
-
 #ifdef HAVE_MASA
     if (config.use_mms_) {
       if (config.mmsSaveDetails_) {
@@ -3224,6 +3230,8 @@ void M2ulPhyS::visualization() {
       SetStatus(EARLY_EXIT);
       break;
     }
+
+    iter += config.postprocessInput.freq;
 
     grvy_timer_end(__func__);
   }  // <-- end main timestep iteration loop
