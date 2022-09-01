@@ -231,7 +231,8 @@ class M2ulPhyS : public TPS::Solver {
   ParGridFunction *temperature, *dens, *vel, *vtheta, *passiveScalar;
   ParGridFunction *electron_temp_field;
   ParGridFunction *press;
-  std::vector<ParGridFunction *> visualizationVariables;
+  std::vector<ParGridFunction *> visualizationVariables_;
+  std::vector<std::string> visualizationNames_;
   ParGridFunction *plasma_conductivity_;
   ParGridFunction *joule_heating_;
 
