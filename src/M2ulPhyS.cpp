@@ -1022,6 +1022,9 @@ void M2ulPhyS::getAttributesInPartition(Array<int> &local_attr) {
 }
 
 void M2ulPhyS::initSolutionAndVisualizationVectors() {
+  visualizationVariables_.clear();
+  visualizationNames_.clear();
+
   offsets = new Array<int>(num_equation + 1);
   for (int k = 0; k <= num_equation; k++) {
     (*offsets)[k] = k * vfes->GetNDofs();
@@ -1060,10 +1063,18 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   } else {
     // TODO(kevin): for now, keep the number of primitive variables same as conserved variables.
     // will need to add full list of species.
-    visualizationVariables.resize(numActiveSpecies);
+    // visualizationVariables_.resize(numActiveSpecies);
     for (int sp = 0; sp < numActiveSpecies; sp++) {
-      visualizationVariables[sp] = new ParGridFunction(fes, U->HostReadWrite() + (sp + nvel + 2) * fes->GetNDofs());
+      std::string speciesName = config.speciesNames[sp];
+      visualizationVariables_.push_back(new ParGridFunction(fes, U->HostReadWrite() + (sp + nvel + 2) * fes->GetNDofs()));
+      visualizationNames_.push_back(std::string("partial_density_" + speciesName));
     }
+  }
+
+  // add visualization variables if tps is run on post-process visualization mode.
+  // TODO(kevin): maybe enable users to specify what to visualize.
+  if (tpsP->isVisualizationMode()) {
+
   }
 
   // If mms, add conserved and exact solution.
@@ -1074,12 +1085,18 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     masaU_ = new ParGridFunction(vfes, masaUBlock_->HostReadWrite());
     masaRhs_ = new ParGridFunction(*U);
 
-    for (int eq = 0; eq < num_equation; eq++)
-      visualizationVariables.push_back(new ParGridFunction(fes, U->HostReadWrite() + eq * fes->GetNDofs()));
-    for (int eq = 0; eq < num_equation; eq++)
-      visualizationVariables.push_back(new ParGridFunction(fes, masaU_->HostReadWrite() + eq * fes->GetNDofs()));
-    for (int eq = 0; eq < num_equation; eq++)
-      visualizationVariables.push_back(new ParGridFunction(fes, masaRhs_->HostReadWrite() + eq * fes->GetNDofs()));
+    for (int eq = 0; eq < num_equation; eq++) {
+      visualizationVariables_.push_back(new ParGridFunction(fes, U->HostReadWrite() + eq * fes->GetNDofs()));
+      visualizationNames_.push_back(std::string("U" + std::to_string(eq)));
+    }
+    for (int eq = 0; eq < num_equation; eq++) {
+      visualizationVariables_.push_back(new ParGridFunction(fes, masaU_->HostReadWrite() + eq * fes->GetNDofs()));
+      visualizationNames_.push_back(std::string("mms_U" + std::to_string(eq)));
+    }
+    for (int eq = 0; eq < num_equation; eq++) {
+      visualizationVariables_.push_back(new ParGridFunction(fes, masaRhs_->HostReadWrite() + eq * fes->GetNDofs()));
+      visualizationNames_.push_back(std::string("RHS" + std::to_string(eq)));
+    }
   }
 #endif
 
@@ -1160,33 +1177,37 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   paraviewColl->RegisterField("press", press);
   if (eqSystem == NS_PASSIVE) {
     paraviewColl->RegisterField("passiveScalar", passiveScalar);
-  } else if (numActiveSpecies > 0) {
-    // TODO(kevin): for now, keep the number of primitive variables same as conserved variables.
-    // will need to add full list of species.
-    for (int sp = 0; sp < numActiveSpecies; sp++) {
-      // int inputSpeciesIndex = mixture->getInputIndexOf(sp);
-      std::string speciesName = config.speciesNames[sp];
-      paraviewColl->RegisterField("partial_density_" + speciesName, visualizationVariables[sp]);
-    }
+  // } else if (numActiveSpecies > 0) {
+  //   // TODO(kevin): for now, keep the number of primitive variables same as conserved variables.
+  //   // will need to add full list of species.
+  //   for (int sp = 0; sp < numActiveSpecies; sp++) {
+  //     // int inputSpeciesIndex = mixture->getInputIndexOf(sp);
+  //     std::string speciesName = config.speciesNames[sp];
+  //     paraviewColl->RegisterField("partial_density_" + speciesName, visualizationVariables_[sp]);
+  //   }
   }
 
   if (config.twoTemperature) {
     paraviewColl->RegisterField("Te", electron_temp_field);
   }
 
-// If mms, add exact solution.
-#ifdef HAVE_MASA
-  if (config.use_mms_ && config.mmsSaveDetails_) {
-    for (int eq = 0; eq < num_equation; eq++)
-      paraviewColl->RegisterField("U" + std::to_string(eq), visualizationVariables[numActiveSpecies + eq]);
-    for (int eq = 0; eq < num_equation; eq++)
-      paraviewColl->RegisterField("mms_U" + std::to_string(eq),
-                                  visualizationVariables[numActiveSpecies + num_equation + eq]);
-    for (int eq = 0; eq < num_equation; eq++)
-      paraviewColl->RegisterField("RHS" + std::to_string(eq),
-                                  visualizationVariables[numActiveSpecies + 2 * num_equation + eq]);
+// // If mms, add exact solution.
+// #ifdef HAVE_MASA
+//   if (config.use_mms_ && config.mmsSaveDetails_) {
+//     for (int eq = 0; eq < num_equation; eq++)
+//       paraviewColl->RegisterField("U" + std::to_string(eq), visualizationVariables_[numActiveSpecies + eq]);
+//     for (int eq = 0; eq < num_equation; eq++)
+//       paraviewColl->RegisterField("mms_U" + std::to_string(eq),
+//                                   visualizationVariables_[numActiveSpecies + num_equation + eq]);
+//     for (int eq = 0; eq < num_equation; eq++)
+//       paraviewColl->RegisterField("RHS" + std::to_string(eq),
+//                                   visualizationVariables_[numActiveSpecies + 2 * num_equation + eq]);
+//   }
+// #endif
+
+  for (int var = 0; var < visualizationVariables_.size(); var++) {
+    paraviewColl->RegisterField(visualizationNames_[var], visualizationVariables_[var]);
   }
-#endif
 
   if (spaceVaryViscMult != NULL) paraviewColl->RegisterField("viscMult", spaceVaryViscMult);
 
