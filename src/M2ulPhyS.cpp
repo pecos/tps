@@ -3167,31 +3167,29 @@ void M2ulPhyS::visualization() {
   }
 #endif
 
-  iter = config.postprocessInput.startIter;
+  int fileIter = config.postprocessInput.startIter;
 
   // Read solution files per frequency.
-  while (iter <= config.postprocessInput.endIter) {
+  while (fileIter <= config.postprocessInput.endIter) {
     grvy_timer_begin(__func__);
 
     // periodically report on time/iteratino
     if (mpi.Root()) {
       double timePerIter = (grvy_timer_elapsed_global() - tlast);
-      grvy_printf(ginfo, "Iteration = %i: wall clock time/snapshot = %.3f (secs)\n", iter, timePerIter);
+      grvy_printf(ginfo, "Iteration = %i: wall clock time/snapshot = %.3f (secs)\n", fileIter, timePerIter);
       tlast = grvy_timer_elapsed_global();
     }
 
-    int oldIter = iter;
+    // int oldIter = iter;
     size_t digits = 8;
-    int precision = digits - std::min(digits, std::to_string(iter).size());
+    int precision = digits - std::min(digits, std::to_string(fileIter).size());
     // pad leading zeros to iter.
-    std::string iterStr = std::string(precision, '0').append(std::to_string(iter));
+    std::string iterStr = std::string(precision, '0').append(std::to_string(fileIter));
     std::string filename(config.postprocessInput.prefix + "-" + iterStr + ".h5");
+    // iter and time will be set from the file.
     restart_files_hdf5("read", filename);
-    assert(oldIter == iter);  // make sure iter in the solution file matches its filename.
-
-    // paraviewColl->SetCycle(iter);
-    // paraviewColl->SetTime(time);
-    // paraviewColl->UseRestartMode(true);
+    // NOTE(kevin): file iter does not have to be the same as actual timestep.
+    // assert(oldIter == iter);  // make sure iter in the solution file matches its filename.
 
     updatePrimitives();
 
@@ -3214,24 +3212,23 @@ void M2ulPhyS::visualization() {
     if (mpi.Root()) cout << "time step: " << iter << ", physical time " << time << "s" << endl;
 #endif
 
+    // set iter and time based on the file.
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
     paraviewColl->Save();
-    // auto dUp = Up->ReadWrite();  // sets memory to GPU
-    // Up->ReadWrite();  // sets memory to GPU
 
     average->write_meanANDrms_restart_files(iter, time);
 
     average->addSampleMean(iter);
 
     // periodically check for DIE file which requests to terminate early
-    if (Check_ExitEarly(iter)) {
-      MaxIters = iter;
+    if (Check_ExitEarly(fileIter)) {
+      fileIter = config.postprocessInput.endIter;
       SetStatus(EARLY_EXIT);
       break;
     }
 
-    iter += config.postprocessInput.freq;
+    fileIter += config.postprocessInput.freq;
 
     grvy_timer_end(__func__);
   }  // <-- end main timestep iteration loop
