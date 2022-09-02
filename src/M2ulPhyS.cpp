@@ -1074,7 +1074,26 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   // add visualization variables if tps is run on post-process visualization mode.
   // TODO(kevin): maybe enable users to specify what to visualize.
   if (tpsP->isVisualizationMode()) {
-
+    if (config.workFluid != DRY_AIR) {
+      visualizationIndexes_.Xsp = visualizationVariables_.size();
+      for (int sp = 0; sp < numSpecies; sp++) {
+        std::string speciesName = config.speciesNames[sp];
+        visualizationVariables_.push_back(new ParGridFunction(fes));
+        visualizationNames_.push_back(std::string("X_" + speciesName));
+      }
+      visualizationIndexes_.Ysp = visualizationVariables_.size();
+      for (int sp = 0; sp < numSpecies; sp++) {
+        std::string speciesName = config.speciesNames[sp];
+        visualizationVariables_.push_back(new ParGridFunction(fes));
+        visualizationNames_.push_back(std::string("Y_" + speciesName));
+      }
+      visualizationIndexes_.nsp = visualizationVariables_.size();
+      for (int sp = 0; sp < numSpecies; sp++) {
+        std::string speciesName = config.speciesNames[sp];
+        visualizationVariables_.push_back(new ParGridFunction(fes));
+        visualizationNames_.push_back(std::string("n_" + speciesName));
+      }
+    }
   }
 
   // If mms, add conserved and exact solution.
@@ -3212,10 +3231,13 @@ void M2ulPhyS::visualization() {
     // NOTE(kevin): file iter does not have to be the same as actual timestep.
     // assert(oldIter == iter);  // make sure iter in the solution file matches its filename.
 
-    updatePrimitives();
+    // use RhsOperator::updatePrimitives and updateGradients which uses both gpu and cpu.
+    rhsOperator->updateGradients(*U, false);
 
     // update pressure grid function
     mixture->UpdatePressureGridFunction(press, Up);
+
+    updateVisualizationVariables();
 
     Check_NAN();
 
@@ -3257,4 +3279,52 @@ void M2ulPhyS::visualization() {
   if (mpi.Root()) cout << "Final timestep iteration = " << config.postprocessInput.endIter << endl;
 
   return;
+}
+
+void M2ulPhyS::updateVisualizationVariables() {
+#ifdef _GPU_
+  grvy_printf(GRVY_ERROR, "Post-process visualization is not implemented for gpu!");
+  exit(ERROR);
+#endif  // _GPU_
+
+  // NOTE(kevin): additional visualization variables will be updated according to their names in visualizationNames_.
+  // this uses std::string, which is prohibitive for gpu path.
+  // Since it is inevitable to manually assign values computed from each object (mixture, transport, ...),
+  // using the variable names explicitly seems to be the only way at this point.
+
+  double *dataU = U->GetData();
+  double *dataUp = Up->GetData();
+  double *dataGradUp = gradUp->GetData();
+  const int ndofs = vfes->GetNDofs();
+  const int _dim = dim;
+  const int _nvel = nvel;
+  const int _num_equation = num_equation;
+  const int _numSpecies = numSpecies;
+
+  GasMixture *in_mix = mixture;
+  const bool computeSpeciesPrimitives = (config.workFluid != DRY_AIR);
+
+  const int nVisual = visualizationVariables_.size();
+  const AuxiliaryVisualizationIndexes visualIdxs = visualizationIndexes_;
+  double *dataVis[gpudata::MAXVISUAL];
+  for (int vis = 0; vis < nVisual; vis++) dataVis[vis] = visualizationVariables_[vis]->GetData();
+
+  for (int n = 0; n < ndofs; n++) {
+    double state[gpudata::MAXEQUATIONS];
+    double Xsp[gpudata::MAXSPECIES];
+    double Ysp[gpudata::MAXSPECIES];
+    double nsp[gpudata::MAXSPECIES];
+
+    for (int eq = 0; eq < _num_equation; eq++) state[eq] = dataU[n + eq * ndofs];
+    if (computeSpeciesPrimitives) {
+      in_mix->computeSpeciesPrimitives(state, Xsp, Ysp, nsp);
+
+      for (int sp = 0; sp < _numSpecies; sp++) {
+        dataVis[visualIdxs.Xsp + sp][n] = Xsp[sp];
+        dataVis[visualIdxs.Ysp + sp][n] = Ysp[sp];
+        dataVis[visualIdxs.nsp + sp][n] = nsp[sp];
+      }
+    }
+  }
+
 }

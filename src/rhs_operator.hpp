@@ -155,6 +155,7 @@ class RHSoperator : public TimeDependentOperator {
 
   virtual void Mult(const Vector &x, Vector &y) const;
   void updatePrimitives(const Vector &x) const;
+  void updateGradients(const Vector &x, const bool &primitiveUpdated) const;
 
   virtual ~RHSoperator();
 
