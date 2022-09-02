@@ -1067,7 +1067,8 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     // visualizationVariables_.resize(numActiveSpecies);
     for (int sp = 0; sp < numActiveSpecies; sp++) {
       std::string speciesName = config.speciesNames[sp];
-      visualizationVariables_.push_back(new ParGridFunction(fes, U->HostReadWrite() + (sp + nvel + 2) * fes->GetNDofs()));
+      visualizationVariables_.push_back(
+          new ParGridFunction(fes, U->HostReadWrite() + (sp + nvel + 2) * fes->GetNDofs()));
       visualizationNames_.push_back(std::string("partial_density_" + speciesName));
     }
   }
@@ -1168,8 +1169,8 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
         visualizationNames_.push_back(std::string("rxn_rate_" + std::to_string(r + 1)));
         // visualizationNames_.push_back(std::string("rxn_rate: " + config.reactionEquations[r]));
       }
-    }   // if (config.workFluid != DRY_AIR)
-  }   // if tpsP->isVisualizationMode()
+    }  // if (config.workFluid != DRY_AIR)
+  }    // if tpsP->isVisualizationMode()
 
   // If mms, add conserved and exact solution.
 #ifdef HAVE_MASA
@@ -1271,33 +1272,33 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   paraviewColl->RegisterField("press", press);
   if (eqSystem == NS_PASSIVE) {
     paraviewColl->RegisterField("passiveScalar", passiveScalar);
-  // } else if (numActiveSpecies > 0) {
-  //   // TODO(kevin): for now, keep the number of primitive variables same as conserved variables.
-  //   // will need to add full list of species.
-  //   for (int sp = 0; sp < numActiveSpecies; sp++) {
-  //     // int inputSpeciesIndex = mixture->getInputIndexOf(sp);
-  //     std::string speciesName = config.speciesNames[sp];
-  //     paraviewColl->RegisterField("partial_density_" + speciesName, visualizationVariables_[sp]);
-  //   }
+    // } else if (numActiveSpecies > 0) {
+    //   // TODO(kevin): for now, keep the number of primitive variables same as conserved variables.
+    //   // will need to add full list of species.
+    //   for (int sp = 0; sp < numActiveSpecies; sp++) {
+    //     // int inputSpeciesIndex = mixture->getInputIndexOf(sp);
+    //     std::string speciesName = config.speciesNames[sp];
+    //     paraviewColl->RegisterField("partial_density_" + speciesName, visualizationVariables_[sp]);
+    //   }
   }
 
   if (config.twoTemperature) {
     paraviewColl->RegisterField("Te", electron_temp_field);
   }
 
-// // If mms, add exact solution.
-// #ifdef HAVE_MASA
-//   if (config.use_mms_ && config.mmsSaveDetails_) {
-//     for (int eq = 0; eq < num_equation; eq++)
-//       paraviewColl->RegisterField("U" + std::to_string(eq), visualizationVariables_[numActiveSpecies + eq]);
-//     for (int eq = 0; eq < num_equation; eq++)
-//       paraviewColl->RegisterField("mms_U" + std::to_string(eq),
-//                                   visualizationVariables_[numActiveSpecies + num_equation + eq]);
-//     for (int eq = 0; eq < num_equation; eq++)
-//       paraviewColl->RegisterField("RHS" + std::to_string(eq),
-//                                   visualizationVariables_[numActiveSpecies + 2 * num_equation + eq]);
-//   }
-// #endif
+  // // If mms, add exact solution.
+  // #ifdef HAVE_MASA
+  //   if (config.use_mms_ && config.mmsSaveDetails_) {
+  //     for (int eq = 0; eq < num_equation; eq++)
+  //       paraviewColl->RegisterField("U" + std::to_string(eq), visualizationVariables_[numActiveSpecies + eq]);
+  //     for (int eq = 0; eq < num_equation; eq++)
+  //       paraviewColl->RegisterField("mms_U" + std::to_string(eq),
+  //                                   visualizationVariables_[numActiveSpecies + num_equation + eq]);
+  //     for (int eq = 0; eq < num_equation; eq++)
+  //       paraviewColl->RegisterField("RHS" + std::to_string(eq),
+  //                                   visualizationVariables_[numActiveSpecies + 2 * num_equation + eq]);
+  //   }
+  // #endif
 
   for (int var = 0; var < visualizationVariables_.size(); var++) {
     paraviewColl->RegisterField(visualizationNames_[var], visualizationVariables_[var]);
@@ -1368,8 +1369,7 @@ void M2ulPhyS::projectInitialSolution() {
     // Only save IC from fresh start.  On restart, will save viz at
     // next requested iter.  This avoids possibility of trying to
     // overwrite existing paraview data for the current iteration.
-    if (!(tpsP->isVisualizationMode()))
-      paraviewColl->Save();
+    if (!(tpsP->isVisualizationMode())) paraviewColl->Save();
   }
 }
 
@@ -3420,8 +3420,7 @@ void M2ulPhyS::updateVisualizationVariables() {
         dataVis[visualIdxs.FluxTrns + t][n] = fluxTrns[t];
       }
       for (int sp = 0; sp < _numSpecies; sp++) {
-        for (int v = 0; v < _nvel; v++)
-          dataVis[visualIdxs.diffVel + sp][n + v * ndofs] = diffVel[sp + v * _numSpecies];
+        for (int v = 0; v < _nvel; v++) dataVis[visualIdxs.diffVel + sp][n + v * ndofs] = diffVel[sp + v * _numSpecies];
       }
 
       // update source transport properties.
@@ -3452,7 +3451,6 @@ void M2ulPhyS::updateVisualizationVariables() {
         dataVis[visualIdxs.rxn + r][n] = progressRates[r];
       }
 
-    }   // if (!isDryAir)
-  }   // for (int n = 0; n < ndofs; n++)
-
+    }  // if (!isDryAir)
+  }    // for (int n = 0; n < ndofs; n++)
 }
