@@ -151,11 +151,10 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     _chemistry->computeEquilibriumConstants(Th, Te, kC);
 
     // get reaction rates
-    double progressRates[gpudata::MAXREACTIONS], creationRates[gpudata::MAXREACTIONS];
-    for (int r = 0; r < _numReactions; r++) {
-      progressRates[r] = 0.0;
-      creationRates[r] = 0.0;
-    }
+    double progressRates[gpudata::MAXREACTIONS], creationRates[gpudata::MAXSPECIES];
+    for (int r = 0; r < _numReactions; r++) progressRates[r] = 0.0;
+    for (int sp = 0; sp < _numSpecies; sp++) creationRates[sp] = 0.0;
+
     _chemistry->computeProgressRate(ns, kfwd, kC, progressRates);
     _chemistry->computeCreationRate(progressRates, creationRates);
 
