@@ -233,6 +233,7 @@ class M2ulPhyS : public TPS::Solver {
   ParGridFunction *press;
   std::vector<ParGridFunction *> visualizationVariables_;
   std::vector<std::string> visualizationNames_;
+  AuxiliaryVisualizationIndexes visualizationIndexes_;
   ParGridFunction *plasma_conductivity_;
   ParGridFunction *joule_heating_;
 
@@ -380,6 +381,7 @@ class M2ulPhyS : public TPS::Solver {
 
   void solve() override;
   void visualization() override;
+  void updateVisualizationVariables();
 
   // Accessors
   RHSoperator *getRHSoperator() { return rhsOperator; }

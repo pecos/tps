@@ -54,6 +54,8 @@ const int MAXCHEMPARAMS = 3;
 
 const int MAXTABLE = 512;
 const int MAXTABLEDIM = 2;
+
+const int MAXVISUAL = 128;
 }  // namespace gpudata
 
 enum Equations {
@@ -402,6 +404,10 @@ struct PostProcessInput {
   int startIter;
   int endIter;
   int freq;
+};
+
+struct AuxiliaryVisualizationIndexes {
+  int Xsp, Ysp, nsp;  // species primitive.
 };
 
 #endif  // DATASTRUCTURES_HPP_

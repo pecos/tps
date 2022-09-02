@@ -700,6 +700,28 @@ void RHSoperator::updatePrimitives_hip(Vector *Up, const Vector *x_in, const dou
 #endif
 }
 
+void RHSoperator::updateGradients(const Vector &x, const bool &primitiveUpdated) const {
+  // Update primite varibales
+  if (!primitiveUpdated) updatePrimitives(x);
+
+#ifdef _GPU_
+  // GPU version requires the exchange of data before gradient computation
+  initNBlockDataTransfer(*Up, vfes, transferUp);
+  initNBlockDataTransfer(x, vfes, transferU);
+
+  gradients->computeGradients_domain();
+  waitAllDataTransfer(vfes, transferUp);
+
+  gradients->computeGradients_bdr();
+  initNBlockDataTransfer(*gradUp, gradUpfes, transferGradUp);
+
+  waitAllDataTransfer(vfes, transferU);
+  waitAllDataTransfer(gradUpfes, transferGradUp);
+#else
+  gradients->computeGradients();
+#endif
+}
+
 void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceIntegrationArrays &gpuArrays,
                                      const Vector &invMArray, const Array<int> &posDofInvM, const int num_equation,
                                      const int totNumDof, const int NE, const int elemOffset, const int dof) {
