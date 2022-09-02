@@ -1131,7 +1131,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
       for (int t = 0; t < SrcTrns::NUM_SRC_TRANS; t++) {
         std::string fieldName;
         switch (t) {
-          case SrcTrans::ELECTRIC_CONDUCTIVITY:
+          case SrcTrns::ELECTRIC_CONDUCTIVITY:
             fieldName = "electric_cond";
             break;
           default:
