@@ -426,6 +426,7 @@ void M2ulPhyS::initVariables() {
   // FE Spaces
   fes = new ParFiniteElementSpace(mesh, fec);
   dfes = new ParFiniteElementSpace(mesh, fec, dim, Ordering::byNODES);
+  nvelfes = new ParFiniteElementSpace(mesh, fec, nvel, Ordering::byNODES);
   vfes = new ParFiniteElementSpace(mesh, fec, num_equation, Ordering::byNODES);
   gradUpfes = new ParFiniteElementSpace(mesh, fec, num_equation * dim, Ordering::byNODES);
 
@@ -1075,6 +1076,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   // TODO(kevin): maybe enable users to specify what to visualize.
   if (tpsP->isVisualizationMode()) {
     if (config.workFluid != DRY_AIR) {
+      // species primitives.
       visualizationIndexes_.Xsp = visualizationVariables_.size();
       for (int sp = 0; sp < numSpecies; sp++) {
         std::string speciesName = config.speciesNames[sp];
@@ -1092,6 +1094,71 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
         std::string speciesName = config.speciesNames[sp];
         visualizationVariables_.push_back(new ParGridFunction(fes));
         visualizationNames_.push_back(std::string("n_" + speciesName));
+      }
+
+      // transport properties.
+      visualizationIndexes_.FluxTrns = visualizationVariables_.size();
+      for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++) {
+        std::string fieldName;
+        switch (t) {
+          case FluxTrns::VISCOSITY:
+            fieldName = "viscosity";
+            break;
+          case FluxTrns::BULK_VISCOSITY:
+            fieldName = "bulk_viscosity";
+            break;
+          case FluxTrns::HEAVY_THERMAL_CONDUCTIVITY:
+            fieldName = "thermal_cond_heavy";
+            break;
+          case FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY:
+            fieldName = "thermal_cond_elec";
+            break;
+          default:
+            grvy_printf(GRVY_ERROR, "Error in initializing visualization: Unknown flux transport property!");
+            exit(ERROR);
+            break;
+        }
+        visualizationVariables_.push_back(new ParGridFunction(fes));
+        visualizationNames_.push_back(fieldName);
+      }
+      visualizationIndexes_.diffVel = visualizationVariables_.size();
+      for (int sp = 0; sp < numSpecies; sp++) {
+        std::string speciesName = config.speciesNames[sp];
+        visualizationVariables_.push_back(new ParGridFunction(nvelfes));
+        visualizationNames_.push_back(std::string("diff_vel_" + speciesName));
+      }
+      visualizationIndexes_.SrcTrns = visualizationVariables_.size();
+      for (int t = 0; t < SrcTrns::NUM_SRC_TRANS; t++) {
+        std::string fieldName;
+        switch (t) {
+          case SrcTrans::ELECTRIC_CONDUCTIVITY:
+            fieldName = "electric_cond";
+            break;
+          default:
+            grvy_printf(GRVY_ERROR, "Error in initializing visualization: Unknown source transport property!");
+            exit(ERROR);
+            break;
+        }
+        visualizationVariables_.push_back(new ParGridFunction(fes));
+        visualizationNames_.push_back(fieldName);
+      }
+      visualizationIndexes_.SpeciesTrns = visualizationVariables_.size();
+      for (int t = 0; t < SpeciesTrns::NUM_SPECIES_COEFFS; t++) {
+        std::string fieldName;
+        switch (t) {
+          case SpeciesTrns::MF_FREQUENCY:
+            fieldName = "momentum_tranfer_freq";
+            break;
+          default:
+            grvy_printf(GRVY_ERROR, "Error in initializing visualization: Unknown species transport property!");
+            exit(ERROR);
+            break;
+        }
+        for (int sp = 0; sp < numSpecies; sp++) {
+          std::string speciesName = config.speciesNames[sp];
+          visualizationVariables_.push_back(new ParGridFunction(fes));
+          visualizationNames_.push_back(std::string(fieldName + "_" + speciesName));
+        }
       }
     }
   }
@@ -3287,10 +3354,8 @@ void M2ulPhyS::updateVisualizationVariables() {
   exit(ERROR);
 #endif  // _GPU_
 
-  // NOTE(kevin): additional visualization variables will be updated according to their names in visualizationNames_.
-  // this uses std::string, which is prohibitive for gpu path.
-  // Since it is inevitable to manually assign values computed from each object (mixture, transport, ...),
-  // using the variable names explicitly seems to be the only way at this point.
+  // TODO(kevin): The routine here currently only supports cpu path, though it is written in a gpu-compatible way.
+  // Will require some minor #ifdef additions to implement gpu path.
 
   double *dataU = U->GetData();
   double *dataUp = Up->GetData();
@@ -3302,7 +3367,9 @@ void M2ulPhyS::updateVisualizationVariables() {
   const int _numSpecies = numSpecies;
 
   GasMixture *in_mix = mixture;
-  const bool computeSpeciesPrimitives = (config.workFluid != DRY_AIR);
+  TransportProperties *in_transport = transportPtr;
+  Chemistry *in_chem = chemistry_;
+  const bool isDryAir = (config.workFluid == DRY_AIR);
 
   const int nVisual = visualizationVariables_.size();
   const AuxiliaryVisualizationIndexes visualIdxs = visualizationIndexes_;
@@ -3311,18 +3378,54 @@ void M2ulPhyS::updateVisualizationVariables() {
 
   for (int n = 0; n < ndofs; n++) {
     double state[gpudata::MAXEQUATIONS];
-    double Xsp[gpudata::MAXSPECIES];
-    double Ysp[gpudata::MAXSPECIES];
-    double nsp[gpudata::MAXSPECIES];
+    double prim[gpudata::MAXEQUATIONS];
+    double gradUpn[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
+    double Efield[gpudata::MAXDIM];
+    for (int eq = 0; eq < _num_equation; eq++) {
+      state[eq] = dataU[n + eq * ndofs];
+      prim[eq] = dataUp[n + eq * ndofs];
+      for (int d = 0; d < _dim; d++)
+        gradUpn[eq + d * _num_equation] = dataGradUp[n + eq * ndofs + d * _num_equation * ndofs];
+    }
+    // TODO(kevin): EM coupling update.
+    for (int d = 0; d < _dim; d++) Efield[d] = 0.0;
 
-    for (int eq = 0; eq < _num_equation; eq++) state[eq] = dataU[n + eq * ndofs];
-    if (computeSpeciesPrimitives) {
+    if (!isDryAir) {
+      // update species primitives.
+      double Xsp[gpudata::MAXSPECIES];
+      double Ysp[gpudata::MAXSPECIES];
+      double nsp[gpudata::MAXSPECIES];
       in_mix->computeSpeciesPrimitives(state, Xsp, Ysp, nsp);
 
       for (int sp = 0; sp < _numSpecies; sp++) {
         dataVis[visualIdxs.Xsp + sp][n] = Xsp[sp];
         dataVis[visualIdxs.Ysp + sp][n] = Ysp[sp];
         dataVis[visualIdxs.nsp + sp][n] = nsp[sp];
+      }
+
+      // update flux transport properties.
+      double fluxTrns[FluxTrns::NUM_FLUX_TRANS];
+      double diffVel[gpudata::MAXSPECIES * gpudata::MAXDIM];
+      in_transport->ComputeFluxTransportProperties(state, gradUpn, Efield, fluxTrns, diffVel);
+      for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++) {
+        dataVis[visualIdxs.FluxTrns + t][n] = fluxTrns[t];
+      }
+      for (int sp = 0; sp < _numSpecies; sp++) {
+        for (int v = 0; v < _nvel; v++)
+          dataVis[visualIdxs.diffVel + sp][n + v * ndofs] = diffVel[sp + v * _numSpecies];
+      }
+
+      // update source transport properties.
+      double srcTrns[SrcTrns::NUM_SRC_TRANS];
+      double speciesTrns[gpudata::MAXSPECIES * SpeciesTrns::NUM_SPECIES_COEFFS];
+      in_transport->ComputeSourceTransportProperties(state, prim, gradUpn, Efield, srcTrns, speciesTrns, diffVel, nsp);
+      for (int t = 0; t < SrcTrns::NUM_SRC_TRANS; t++) {
+        dataVis[visualIdxs.SrcTrns + t][n] = srcTrns[t];
+      }
+      for (int t = 0; t < SpeciesTrns::NUM_SPECIES_COEFFS; t++) {
+        for (int sp = 0; sp < _numSpecies; sp++) {
+          dataVis[visualIdxs.SpeciesTrns + sp + t * _numSpecies][n] = speciesTrns[sp + t * _numSpecies];
+        }
       }
     }
   }

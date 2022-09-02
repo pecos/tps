@@ -100,7 +100,7 @@ class M2ulPhyS : public TPS::Solver {
   // History file
   std::ofstream histFile;
 
-  // Number of simensions
+  // Number of dimensions
   int dim;
   int nvel;
 
@@ -176,6 +176,9 @@ class M2ulPhyS : public TPS::Solver {
 
   // Finite element space for a mesh-dim vector quantity (momentum)
   ParFiniteElementSpace *dfes;
+
+  // Finite element space for a nvel vector quantity. only for visualization (diffusion velocity).
+  ParFiniteElementSpace *nvelfes;
 
   // Finite element space for all variables together (total thermodynamic state)
   ParFiniteElementSpace *vfes;
