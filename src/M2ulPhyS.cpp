@@ -1165,7 +1165,8 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
       visualizationIndexes_.rxn = visualizationVariables_.size();
       for (int r = 0; r < config.numReactions; r++) {
         visualizationVariables_.push_back(new ParGridFunction(fes));
-        visualizationNames_.push_back(std::string("rxn_rate: " + config.reactionEquations[r]));
+        visualizationNames_.push_back(std::string("rxn_rate_" + std::to_string(r + 1)));
+        // visualizationNames_.push_back(std::string("rxn_rate: " + config.reactionEquations[r]));
       }
     }   // if (config.workFluid != DRY_AIR)
   }   // if tpsP->isVisualizationMode()
