@@ -409,6 +409,7 @@ struct PostProcessInput {
 struct AuxiliaryVisualizationIndexes {
   int Xsp, Ysp, nsp;  // species primitive.
   int FluxTrns, SrcTrns, SpeciesTrns, diffVel;  // transport.
+  int rxn;  // reactions.
 };
 
 #endif  // DATASTRUCTURES_HPP_

@@ -1160,8 +1160,15 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
           visualizationNames_.push_back(std::string(fieldName + "_" + speciesName));
         }
       }
-    }
-  }
+
+      // chemistry reaction rates.
+      visualizationIndexes_.rxn = visualizationVariables_.size();
+      for (int r = 0; r < config.numReactions; r++) {
+        visualizationVariables_.push_back(new ParGridFunction(fes));
+        visualizationNames_.push_back(std::string("rxn_rate: " + config.reactionEquations[r]));
+      }
+    }   // if (config.workFluid != DRY_AIR)
+  }   // if tpsP->isVisualizationMode()
 
   // If mms, add conserved and exact solution.
 #ifdef HAVE_MASA
@@ -3365,6 +3372,7 @@ void M2ulPhyS::updateVisualizationVariables() {
   const int _nvel = nvel;
   const int _num_equation = num_equation;
   const int _numSpecies = numSpecies;
+  const int _numReactions = config.numReactions;
 
   GasMixture *in_mix = mixture;
   TransportProperties *in_transport = transportPtr;
@@ -3427,7 +3435,23 @@ void M2ulPhyS::updateVisualizationVariables() {
           dataVis[visualIdxs.SpeciesTrns + sp + t * _numSpecies][n] = speciesTrns[sp + t * _numSpecies];
         }
       }
-    }
-  }
+
+      // update chemistry.
+      double Th = 0., Te = 0.;
+      Th = prim[1 + _nvel];
+      Te = (in_mix->IsTwoTemperature()) ? prim[_num_equation - 1] : Th;
+      double kfwd[gpudata::MAXREACTIONS], kC[gpudata::MAXREACTIONS];
+      in_chem->computeForwardRateCoeffs(Th, Te, kfwd);
+      in_chem->computeEquilibriumConstants(Th, Te, kC);
+      // get reaction rates
+      double progressRates[gpudata::MAXREACTIONS];
+      for (int r = 0; r < _numReactions; r++) progressRates[r] = 0.0;
+      in_chem->computeProgressRate(nsp, kfwd, kC, progressRates);
+      for (int r = 0; r < _numReactions; r++) {
+        dataVis[visualIdxs.rxn + r][n] = progressRates[r];
+      }
+
+    }   // if (!isDryAir)
+  }   // for (int n = 0; n < ndofs; n++)
 
 }
