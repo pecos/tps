@@ -117,7 +117,8 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
   args.AddOption(&showVersion, "-v", "--version", "", "--no-version", "Print code version and exit,");
   args.AddOption(&astring, "-run", "--runFile", "Name of the input file with run options.");
   args.AddOption(&debugMode, "-d", "--debug", "", "--no-debug", "Launch in debug mode for gdb attach.");
-  args.AddOption(&visualMode, "-visual", "--visualization", "", "--no-visualization", "Launch post-process visualization.");
+  args.AddOption(&visualMode, "-visual", "--visualization", "", "--no-visualization",
+                 "Launch post-process visualization.");
 
   args.Parse();
 
