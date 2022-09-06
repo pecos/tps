@@ -1064,7 +1064,6 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   } else {
     // TODO(kevin): for now, keep the number of primitive variables same as conserved variables.
     // will need to add full list of species.
-    // visualizationVariables_.resize(numActiveSpecies);
     for (int sp = 0; sp < numActiveSpecies; sp++) {
       std::string speciesName = config.speciesNames[sp];
       visualizationVariables_.push_back(
@@ -1224,7 +1223,6 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     // Only for NS_PASSIVE.
     if ((eqSystem == NS_PASSIVE) && (sp == 1)) break;
 
-    // int inputSpeciesIndex = mixture->getInputIndexOf(sp);
     std::string speciesName = config.speciesNames[sp];
     ioData.registerIOVar("/solution", "rho-Y_" + speciesName, sp + nvel + 2);
   }
@@ -1272,33 +1270,11 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   paraviewColl->RegisterField("press", press);
   if (eqSystem == NS_PASSIVE) {
     paraviewColl->RegisterField("passiveScalar", passiveScalar);
-    // } else if (numActiveSpecies > 0) {
-    //   // TODO(kevin): for now, keep the number of primitive variables same as conserved variables.
-    //   // will need to add full list of species.
-    //   for (int sp = 0; sp < numActiveSpecies; sp++) {
-    //     // int inputSpeciesIndex = mixture->getInputIndexOf(sp);
-    //     std::string speciesName = config.speciesNames[sp];
-    //     paraviewColl->RegisterField("partial_density_" + speciesName, visualizationVariables_[sp]);
-    //   }
   }
 
   if (config.twoTemperature) {
     paraviewColl->RegisterField("Te", electron_temp_field);
   }
-
-  // // If mms, add exact solution.
-  // #ifdef HAVE_MASA
-  //   if (config.use_mms_ && config.mmsSaveDetails_) {
-  //     for (int eq = 0; eq < num_equation; eq++)
-  //       paraviewColl->RegisterField("U" + std::to_string(eq), visualizationVariables_[numActiveSpecies + eq]);
-  //     for (int eq = 0; eq < num_equation; eq++)
-  //       paraviewColl->RegisterField("mms_U" + std::to_string(eq),
-  //                                   visualizationVariables_[numActiveSpecies + num_equation + eq]);
-  //     for (int eq = 0; eq < num_equation; eq++)
-  //       paraviewColl->RegisterField("RHS" + std::to_string(eq),
-  //                                   visualizationVariables_[numActiveSpecies + 2 * num_equation + eq]);
-  //   }
-  // #endif
 
   for (int var = 0; var < visualizationVariables_.size(); var++) {
     paraviewColl->RegisterField(visualizationNames_[var], visualizationVariables_[var]);
