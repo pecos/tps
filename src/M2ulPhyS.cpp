@@ -2606,8 +2606,6 @@ void M2ulPhyS::parseReactionInputs() {
 
       config.chemistryInput.reactionModels[r] = config.reactionModels[r];
       for (int p = 0; p < gpudata::MAXCHEMPARAMS; p++) {
-        // config.chemistryInput.reactionModelParams[p + r * gpudata::MAXCHEMPARAMS] =
-        //     config.reactionModelParams[p + r * gpudata::MAXCHEMPARAMS];
         config.chemistryInput.equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS] =
             config.equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS];
       }
