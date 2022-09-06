@@ -197,12 +197,18 @@ class RunConfiguration {
   Vector reactionEnergies;
   std::vector<std::string> reactionEquations;
   Array<ReactionModel> reactionModels;
-  // std::vector<std::vector<double>> reactionModelParams;
-  double reactionModelParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
+  // NOTE(kevin): this array of Vectors is to provide a proper pointer for both gpu and cpu.
+  // Indexes of this array do not correspond exactly to reaction index.
+  std::vector<mfem::Vector> rxnModelParamsHost;
   DenseMatrix reactantStoich, productStoich;
   Array<bool> detailedBalance;
   // std::vector<std::vector<double>> equilibriumConstantParams;
   double equilibriumConstantParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
+
+  // NOTE(kevin): this vector of DenseMatrix stores all the tables and provides a proper pointer for both gpu and cpu.
+  // note that this will store all types of tabulated data- rxn rate, collision integrals, etc.
+  // Indexes of this vector therefore do not correspond exactly to rxn index or other quantities.
+  std::vector<mfem::DenseMatrix> tableHost;
 
   std::map<int, int> mixtureToInputMap;
   std::map<std::string, int> speciesMapping;

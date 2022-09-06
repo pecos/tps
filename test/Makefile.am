@@ -20,7 +20,7 @@ endif
 TEST_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) $(top_srcdir)/test/tap-driver.sh
 
 EXTRA_DIST      = tap-driver.sh soln_differ inputs meshes ref_solns/*.h5 \
-		  ref_solns/collisions/*.h5 ref_solns/transport/*.h5 \
+		  ref_solns/collisions/*.h5 ref_solns/transport/*.h5 ref_solns/reaction/*.h5 \
 		  vpath.sh die.sh cyl3d.gpu.test cyl3d.mflow.gpu.test wedge.gpu.test \
 	          averages.gpu.test cyl3d.test cyl3d.mflow.test cyl3d.dtconst.test \
 		  die.test averages.test wedge.test cyl3d.interp.test qms.rings.test qms.axisym.test \
@@ -30,7 +30,7 @@ EXTRA_DIST      = tap-driver.sh soln_differ inputs meshes ref_solns/*.h5 \
 	 	  inflow_outflow.test mms.ternary_2d.test mms.ternary_2d_wall.test \
 	 	  mms.ternary_2d_inout.test cuda-memcheck.test mms.general_wall.test \
 		  independent_coupling.test interp_em.test mms.euler_2d.test mms.cns_2d.test \
-		  gradient.test coupled-3d.test
+		  gradient.test coupled-3d.test tabulated.test
 
 TESTS = vpath.sh
 XFAIL_TESTS =
@@ -73,7 +73,8 @@ TESTS += cyl3d.test \
 	 independent_coupling.test \
 	 interp_em.test \
 	 gradient.test \
-	 coupled-3d.test
+	 coupled-3d.test \
+	 tabulated.test
 
 if PYTHON_ENABLED
 TESTS += cyl3d.python.test
@@ -191,5 +192,12 @@ test_grad_LDFLAGS  = $(PYTHON_LIBS) $(MFEM_LIBS)
 if MASA_ENABLED
 test_grad_LDFLAGS += $(MASA_LIBS)
 endif
+
+check_PROGRAMS += test_table
+test_table_SOURCES  = test_table.cpp
+test_table_LDADD    = ../src/libtps.la
+test_table_LDADD    += $(HDF5_LIBS)
+test_table_LDADD    += $(GRVY_LIBS)
+test_table_LDFLAGS  = $(PYTHON_LIBS) $(MFEM_LIBS)
 
 endif # if !GPU_ENABLED

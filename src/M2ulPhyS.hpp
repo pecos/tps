@@ -393,6 +393,7 @@ class M2ulPhyS : public TPS::Solver {
   IntegrationRules *getIntegrationRules() { return intRules; }
   RunConfiguration &GetConfig() { return config; }
   GasMixture *getMixture() { return mixture; }
+  Chemistry *getChemistry() { return chemistry_; }
 
   void updatePrimitives();
 
@@ -411,6 +412,8 @@ class M2ulPhyS : public TPS::Solver {
   int getMaximumIterations() const { return MaxIters; }
   int getCurrentIterations() const { return iter; }
   void setMaximumIterations(int value) { MaxIters = value; }
+
+  void readTable(const std::string &inputPath, TableInput &result);
 };
 
 #endif  // M2ULPHYS_HPP_

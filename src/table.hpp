@@ -29,49 +29,56 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
+#ifndef TABLE_HPP_
+#define TABLE_HPP_
 
-#include "reaction.hpp"
+#include <math.h>
 
-using namespace mfem;
+#include <mfem/general/forall.hpp>
+
+#include "dataStructures.hpp"
+
 using namespace std;
 
-MFEM_HOST_DEVICE Arrhenius::Arrhenius(const double &A, const double &b, const double &E)
-    : Reaction(), A_(A), b_(b), E_(E) {}
+class TableInterpolator {
+ protected:
+  double xdata_[gpudata::MAXTABLE];
+  double fdata_[gpudata::MAXTABLE];
+  int Ndata_;
 
-MFEM_HOST_DEVICE double Arrhenius::computeRateCoefficient(const double &T_h, const double &T_e,
-                                                          const bool isElectronInvolved) {
-  double temp = (isElectronInvolved) ? T_e : T_h;
+  bool xLogScale_;
+  bool fLogScale_;
 
-  return A_ * pow(temp, b_) * exp(-E_ / UNIVERSALGASCONSTANT / temp);
-}
+ public:
+  MFEM_HOST_DEVICE TableInterpolator(const int &Ndata, const double *xdata, const double *fdata, const bool &xLogScale,
+                                     const bool &fLogScale);
 
-MFEM_HOST_DEVICE HoffertLien::HoffertLien(const double &A, const double &b, const double &E)
-    : Reaction(), A_(A), b_(b), E_(E) {}
+  MFEM_HOST_DEVICE virtual ~TableInterpolator() {}
 
-MFEM_HOST_DEVICE double HoffertLien::computeRateCoefficient(const double &T_h, const double &T_e,
-                                                            const bool isElectronInvolved) {
-  double temp = (isElectronInvolved) ? T_e : T_h;
-  double tempFactor = E_ / BOLTZMANNCONSTANT / temp;
+  MFEM_HOST_DEVICE int findInterval(const double &xEval);
 
-  return A_ * pow(temp, b_) * (tempFactor + 2.0) * exp(-tempFactor);
-}
-
-MFEM_HOST_DEVICE Tabulated::Tabulated(const TableInput &input) : Reaction() {
-  switch (input.order) {
-    case 1: {
-      table_ = new LinearTable(input);
-    } break;
-    default: {
-      printf("Given interpolation order is not supported for TableInterpolator!");
-      assert(false);
-    } break;
+  MFEM_HOST_DEVICE virtual double eval(const double &xEval) {
+    printf("TableInterpolator not initialized!");
+    return nan("");
   }
-}
+};
 
-MFEM_HOST_DEVICE Tabulated::~Tabulated() { delete table_; }
+//////////////////////////////////////////////////////
+//////// Linear interpolation
+//////////////////////////////////////////////////////
 
-MFEM_HOST_DEVICE double Tabulated::computeRateCoefficient(const double &T_h, const double &T_e,
-                                                          const bool isElectronInvolved) {
-  double temp = (isElectronInvolved) ? T_e : T_h;
-  return table_->eval(temp);
-}
+class LinearTable : public TableInterpolator {
+ private:
+  // f[j](x) = a + b * x
+  double a_[gpudata::MAXTABLE];
+  double b_[gpudata::MAXTABLE];
+
+ public:
+  MFEM_HOST_DEVICE LinearTable(const TableInput &input);
+
+  MFEM_HOST_DEVICE virtual ~LinearTable() {}
+
+  MFEM_HOST_DEVICE virtual double eval(const double &xEval);
+};
+
+#endif  // TABLE_HPP_

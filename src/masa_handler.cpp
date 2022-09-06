@@ -593,9 +593,13 @@ void initTernary2DBase(GasMixture *mixture, RunConfiguration &config, const doub
     assert(config.productStoich(1, 0) == 2);
     assert(config.productStoich(2, 0) == 0);
 
-    Af = (config.reactionModelParams[0 + 0]);
-    bf = (config.reactionModelParams[1 + 0]);
-    Ef = (config.reactionModelParams[2 + 0]);
+    // NOTE(kevin): need to read params from host.
+    Af = config.rxnModelParamsHost[0](0);
+    bf = config.rxnModelParamsHost[0](1);
+    Ef = config.rxnModelParamsHost[0](2);
+    // Af = config.chemistryInput.reactionInputs[0].modelParams[0];
+    // bf = config.chemistryInput.reactionInputs[0].modelParams[1];
+    // Ef = config.chemistryInput.reactionInputs[0].modelParams[2];
 
     Ab = (config.equilibriumConstantParams[0 + 0]);
     bb = (config.equilibriumConstantParams[1 + 0]);

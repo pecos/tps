@@ -16,3 +16,4 @@ test/ref_solns/transport/Devoto1973.transport.h5 filter=lfs diff=lfs merge=lfs -
 test/ref_solns/reaction.test.h5 filter=lfs diff=lfs merge=lfs -text
 test/ref_solns/collisions/Amdur_Mason.estimated.h5 filter=lfs diff=lfs merge=lfs -text
 test/ref_solns/collisions/Amdur_Mason.h5 filter=lfs diff=lfs merge=lfs -text
+test/ref_solns/reaction/excitation.3000K.ion1e-4.h5 filter=lfs diff=lfs merge=lfs -text

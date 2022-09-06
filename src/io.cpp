@@ -687,6 +687,44 @@ void M2ulPhyS::writeHistoryFile() {
   if (mpi.Root()) histFile << endl;
 }
 
+void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
+  tpsP->getInput((inputPath + "/x_log").c_str(), result.xLogScale, false);
+  tpsP->getInput((inputPath + "/f_log").c_str(), result.fLogScale, false);
+  tpsP->getInput((inputPath + "/order").c_str(), result.order, 1);
+
+  config.tableHost.push_back(DenseMatrix());
+
+  int Ndata;
+  Array<int> dims(2);
+  bool success = false;
+  if (mpi.Root()) {
+    std::string filename;
+    tpsP->getRequiredInput((inputPath + "/filename").c_str(), filename);
+    success = h5ReadTable(filename, "table", config.tableHost.back(), dims);
+
+    // TODO(kevin): extend for multi-column array?
+    Ndata = dims[0];
+  }
+  MPI_Bcast(&success, 1, MPI_CXX_BOOL, 0, MPI_COMM_WORLD);
+  if (!success) exit(ERROR);
+
+  int *d_dims = dims.GetData();
+  MPI_Bcast(&Ndata, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(d_dims, 2, MPI_INT, 0, MPI_COMM_WORLD);
+  assert(dims[0] > 0);
+  assert(dims[1] == 2);
+
+  if (!mpi.Root()) (config.tableHost.back()).SetSize(dims[0], dims[1]);
+  double *d_table = config.tableHost.back().GetData();
+  MPI_Bcast(d_table, dims[0] * dims[1], MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+  result.Ndata = Ndata;
+  result.xdata = (config.tableHost.back()).Read();
+  result.fdata = (config.tableHost.back()).Read() + Ndata;
+
+  return;
+}
+
 // ---------------------------------------------
 // Routines for I/O data organizer helper class
 // ---------------------------------------------

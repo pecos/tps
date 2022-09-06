@@ -77,6 +77,11 @@ void h5_read_attribute(hid_t source, std::string attribute, T &value) {
   H5Aclose(attr);
 }
 
+// A simple HDF5 routine to read two-dimensional array into DenseMatrix.
+// Return result as boolean.
+bool h5ReadTable(const std::string &fileName, const std::string &datasetName, mfem::DenseMatrix &output,
+                 mfem::Array<int> &shape);
+
 // MFEM extensions
 
 /** Project discontinous function onto FE space

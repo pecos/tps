@@ -51,6 +51,9 @@ const int MAXEQUATIONS = MAXDIM + 2 + MAXSPECIES;  // momentum + two energies + 
 
 const int MAXREACTIONS = 20;
 const int MAXCHEMPARAMS = 3;
+
+const int MAXTABLE = 512;
+const int MAXTABLEDIM = 2;
 }  // namespace gpudata
 
 enum Equations {
@@ -69,7 +72,7 @@ enum TransportModel { ARGON_MINIMAL, ARGON_MIXTURE, CONSTANT, NUM_TRANSPORTMODEL
 
 enum ChemistryModel { /* CANTERA, */ NUM_CHEMISTRYMODEL };
 
-enum ReactionModel { ARRHENIUS, HOFFERTLIEN, NUM_REACTIONMODEL };
+enum ReactionModel { ARRHENIUS, HOFFERTLIEN, TABULATED, NUM_REACTIONMODEL };
 
 enum GasParams { SPECIES_MW, SPECIES_CHARGES, FORMATION_ENERGY, /* SPECIES_HEAT_RATIO, */ NUM_GASPARAMS };
 
@@ -361,6 +364,25 @@ struct ArgonTransportInput {
   double mobilMult;
 };
 
+struct TableInput {
+  int Ndata;
+  const double *xdata;
+  const double *fdata;
+  bool xLogScale;
+  bool fLogScale;
+
+  int order;  // interpolation order. Currently only support order=1.
+};
+
+// ReactionInput must be able to support various types of evaluation.
+// At the same time, allocating maximum size of memory can be prohibitive in gpu device.
+// the datatype therefore contains pointers, which can be allocated only when they are used.
+struct ReactionInput {
+  TableInput tableInput;
+  // NOTE(kevin): with gpu, this pointer is only valid on the device.
+  const double *modelParams;
+};
+
 struct ChemistryInput {
   ChemistryModel model;
 
@@ -371,8 +393,8 @@ struct ChemistryInput {
   double reactantStoich[gpudata::MAXSPECIES * gpudata::MAXREACTIONS];
   double productStoich[gpudata::MAXSPECIES * gpudata::MAXREACTIONS];
   ReactionModel reactionModels[gpudata::MAXREACTIONS];
-  double reactionModelParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
   double equilibriumConstantParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
+  ReactionInput reactionInputs[gpudata::MAXREACTIONS];
 };
 
 #endif  // DATASTRUCTURES_HPP_
