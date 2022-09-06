@@ -3426,7 +3426,6 @@ void M2ulPhyS::updateVisualizationVariables() {
       for (int r = 0; r < _numReactions; r++) {
         dataVis[visualIdxs.rxn + r][n] = progressRates[r];
       }
-
     }  // if (!isDryAir)
   }    // for (int n = 0; n < ndofs; n++)
 }
