@@ -590,7 +590,7 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
     for (int d = 0; d < dim_; d++) meanVel[2] += tangent2[d] * Up[d + 1];
   }
 
-  double meanP = mixture->ComputePressureFromPrimitives(meanUp);
+  double meanP = mixture->ComputePressureFromPrimitives(Up);
 
   // normal gradients
   Vector normGrad(num_equation_);
@@ -617,14 +617,14 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
 
   // transverse
   double L3 = 0.;
-  for (int d = 0; d < dim_; d++) L3 += tangent1[d] * normGrad[1 + d];
-  L3 *= meanVel[1];
+  //for (int d = 0; d < dim_; d++) L3 += tangent1[d] * normGrad[1 + d];
+  //L3 *= meanVel[1];
 
   double L4 = 0.;
-  if (dim_ == 3) {
-    for (int d = 0; d < dim_; d++) L4 += tangent2[d] * normGrad[1 + d];
-    L4 *= meanVel[1];
-  }
+  //if (dim_ == 3) {
+  //  for (int d = 0; d < dim_; d++) L4 += tangent2[d] * normGrad[1 + d];
+  //  L4 *= meanVel[1];
+  //}
 
   double L5 = 0.;
   for (int d = 0; d < dim_; d++) L5 += unitNorm[d] * normGrad[1 + d];
