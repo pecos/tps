@@ -430,7 +430,7 @@ void DryAir::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::Vector &
 
   double ke = 0.;
   for (int d = 0; d < nvel_; d++) ke += stateIn(1 + d) * stateIn(1 + d);
-  ke *= 0.5 / stateIn(0);
+  ke *= 0.5 / stateIn(0); 
 
   stateOut(1 + nvel_) = p / (specific_heat_ratio - 1.) + ke;
 }
