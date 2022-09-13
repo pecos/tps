@@ -2583,8 +2583,6 @@ void M2ulPhyS::parseReactionInputs() {
       tpsP->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
       config.rxnModelParamsHost.push_back(Vector({A, b, E}));
 
-      config.chemistryInput.reactionInputs[r - 1].modelParams = config.rxnModelParamsHost.back().Read();
-
     } else if (model == "hoffert_lien") {
       config.reactionModels[r - 1] = HOFFERTLIEN;
       double A, b, E;
@@ -2592,9 +2590,6 @@ void M2ulPhyS::parseReactionInputs() {
       tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
       tpsP->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
       config.rxnModelParamsHost.push_back(Vector({A, b, E}));
-
-      config.chemistryInput.reactionInputs[r - 1].modelParams = config.rxnModelParamsHost.back().Read();
-      // NOTE(kevin): this array keeps max param in the indexing, as reactions can have different number of params.
 
     } else if (model == "tabulated") {
       config.reactionModels[r - 1] = TABULATED;
@@ -2697,6 +2692,8 @@ void M2ulPhyS::parseReactionInputs() {
       config.chemistryInput.electronIndex = -1;
     }
 
+    int rxn_param_idx = 0;
+
     config.chemistryInput.numReactions = config.numReactions;
     for (int r = 0; r < config.numReactions; r++) {
       config.chemistryInput.reactionEnergies[r] = config.reactionEnergies[r];
@@ -2710,6 +2707,12 @@ void M2ulPhyS::parseReactionInputs() {
       for (int p = 0; p < gpudata::MAXCHEMPARAMS; p++) {
         config.chemistryInput.equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS] =
             config.equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS];
+      }
+
+      if (config.reactionModels[r] != TABULATED) {
+        assert(rxn_param_idx < config.rxnModelParamsHost.size());
+        config.chemistryInput.reactionInputs[r].modelParams = config.rxnModelParamsHost[rxn_param_idx].Read();
+        rxn_param_idx += 1;
       }
     }
   }
