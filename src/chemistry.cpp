@@ -72,8 +72,6 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
         double b = inputs.reactionInputs[r].modelParams[1];
         double E = inputs.reactionInputs[r].modelParams[2];
 
-        printf("Instantiating Arrhenius rxn with A = %.6e, b = %.6e, E = %.6e\n", A, b, E);
-        fflush(stdout);
         reactions_[r] = new Arrhenius(A, b, E);
       } break;
       case HOFFERTLIEN: {
