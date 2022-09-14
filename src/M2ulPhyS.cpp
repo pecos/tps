@@ -2831,6 +2831,7 @@ void M2ulPhyS::parseBCInputs() {
   inletMapping["nonReflecting"] = SUB_DENS_VEL_NR;
   inletMapping["nonReflectingConstEntropy"] = SUB_VEL_CONST_ENT;
   inletMapping["nonReflectingConstTemp"] = SUB_VEL_CONST_TMP;
+  inletMapping["nonReflectingConstTempUser"] = SUB_VEL_CONST_TMP_USR;  
 
   for (int i = 1; i <= numInlets; i++) {
     int patch;
@@ -2844,7 +2845,7 @@ void M2ulPhyS::parseBCInputs() {
     // all inlet BCs require 4 inputs (density + vel(3))
     {
       Array<double> uvw;
-      if (type == "nonReflectingConstTemp") {
+      if (type == "nonReflectingConstTemp" || type == "nonReflectingConstTempUser") {
         tpsP->getRequiredInput((basepath + "/temperature").c_str(), temperature);
         config.inletBC.Append(temperature);
       } else {

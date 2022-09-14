@@ -115,10 +115,11 @@ enum ArgonSpcs {
 enum SpeciesPrimitiveType { MASS_FRACTION, MOLE_FRACTION, NUMBER_DENSITY, NUM_SPECIES_PRIMITIVES };
 
 enum InletType {
-  SUB_DENS_VEL,      // Subsonic inlet specified by the density and velocity components
-  SUB_DENS_VEL_NR,   // Non-reflecting subsonic inlet specified by the density and velocity components
-  SUB_VEL_CONST_ENT, // Subsonic non-reflecting. Specified vel, keeps entropy constant
-  SUB_VEL_CONST_TMP  // Subsonic, specified u,v,w, and T  
+  SUB_DENS_VEL,          // Subsonic inlet specified by the density and velocity components
+  SUB_DENS_VEL_NR,       // Non-reflecting subsonic inlet specified by the density and velocity components
+  SUB_VEL_CONST_ENT,     // Subsonic non-reflecting. Specified vel, keeps entropy constant
+  SUB_VEL_CONST_TMP,     // Subsonic, specified u,v,w, and T
+  SUB_VEL_CONST_TMP_USR  // Subsonic, specified u,v,w, and T with user defined spatial distribution
 };
 
 enum OutletType {

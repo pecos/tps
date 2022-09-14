@@ -465,6 +465,9 @@ void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradS
     case SUB_VEL_CONST_TMP:
       subsonicNonReflectingTemperatureVelocity(normal, stateIn, gradState, bdrFlux);
       break;
+    case SUB_VEL_CONST_TMP_USR:
+      subsonicNonReflectingTemperatureVelocityUser(normal, stateIn, gradState, transip, bdrFlux);
+      break;      
   }
 }
 
@@ -743,7 +746,7 @@ void InletBC::subsonicNonReflectingTemperatureVelocity(Vector &normal, Vector &s
                                                        Vector &bdrFlux) {
   const double gamma = mixture->GetSpecificHeatRatio();
   // const double pressure = eqState->ComputePressure(stateIn, dim);
-
+  
   Vector unitNorm = normal;
   {
     double mod = 0.;
@@ -754,7 +757,7 @@ void InletBC::subsonicNonReflectingTemperatureVelocity(Vector &normal, Vector &s
   Vector Up(num_equation_);
   mixture->GetPrimitivesFromConservatives(stateIn, Up);
   double rho = Up[0];
-
+  
   // specific heat
   // double Cv = mixture->GetSpecificHeatConstV();
   // double gamma = mixture->GetSpecificHeatRatio();
@@ -915,6 +918,268 @@ void InletBC::subsonicNonReflectingTemperatureVelocity(Vector &normal, Vector &s
 
   bdrN++;
 }
+
+
+// jump
+void InletBC::subsonicNonReflectingTemperatureVelocityUser(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
+                                                           Vector transip, Vector &bdrFlux) {
+  const double gamma = mixture->GetSpecificHeatRatio();
+  // const double pressure = eqState->ComputePressure(stateIn, dim);
+  
+  Vector unitNorm = normal;
+  {
+    double mod = 0.;
+    for (int d = 0; d < dim_; d++) mod += normal[d] * normal[d];
+    unitNorm *= -1. / sqrt(mod);  // point into domain!!
+  }
+
+  Vector Up(num_equation_);
+  mixture->GetPrimitivesFromConservatives(stateIn, Up);
+  double rho = Up[0];
+
+
+  // specific for torch.................
+  double pi = 3.14159265359;
+  double theta_injection = 49.0*pi/180.0; // off from from inlet center to torch center
+  double Un = inputState[1]*cos(theta_injection);
+  double Ut = inputState[1]*sin(theta_injection);
+  double l_diamond = 0.0012; // each edge of the diamond inlet
+  double theta_diamond = 45.0*pi/180.0;
+  double h_diamond;
+  h_diamond = 2.0*l_diamond*cos(theta_diamond);
+  double r_diamond;
+  r_diamond = 0.5/sqrt(2.0) * h_diamond;
+  
+  double h = transip[0];
+  double wgt = 1.0;
+  if (h > (r_diamond+0.5*h_diamond)) {
+    wgt = 0.0;
+  }
+  if (h < (0.5*h_diamond - r_diamond)) {
+    wgt = 0.0;
+  }  
+
+  double r_torch = sqrt(transip[1]*transip[1] + transip[2]*transip[2]); 
+  Vector jet1(3);
+  Vector jet2(3);
+  Vector jet3(3);
+  Vector jet4(3);
+
+  jet1[0] = 0.5*h_diamond;
+  jet2[0] = 0.5*h_diamond;
+  jet3[0] = 0.5*h_diamond;
+  jet4[0] = 0.5*h_diamond;
+
+  jet1[1] = 0.0;
+  jet2[1] = r_torch;
+  jet3[1] = 0.0;
+  jet4[1] = -r_torch;
+
+  jet1[2] = r_torch;
+  jet2[2] = 0.0;
+  jet3[2] = -r_torch;
+  jet4[2] = 0.0;
+
+  Vector s1(3);
+  Vector s2(3);
+  Vector s3(3);
+  Vector s4(3);
+
+  for (int d = 0; d < 3; d++) s1[d] = transip[d] - jet1[d];
+  for (int d = 0; d < 3; d++) s2[d] = transip[d] - jet2[d];
+  for (int d = 0; d < 3; d++) s3[d] = transip[d] - jet3[d];
+  for (int d = 0; d < 3; d++) s4[d] = transip[d] - jet4[d];  
+ 
+  double dist1 = sqrt(s1[0]*s1[0] + s1[1]*s1[1] + s1[2]*s1[2]);
+  double dist2 = sqrt(s2[0]*s2[0] + s2[1]*s2[1] + s2[2]*s2[2]);
+  double dist3 = sqrt(s3[0]*s3[0] + s3[1]*s3[1] + s3[2]*s3[2]);
+  double dist4 = sqrt(s4[0]*s4[0] + s4[1]*s4[1] + s4[2]*s4[2]);
+
+  if ( dist1>r_diamond && dist2>r_diamond && dist3>r_diamond && dist4>r_diamond ) {
+    wgt = 0.0;
+  }
+
+  unitNorm = transip; // because center is at (0,0,0)
+  unitNorm[0] = 0.0;
+  double mag = 0.0;
+  for (int d = 0; d < dim_; d++) mag += unitNorm[d] * unitNorm[d];
+  unitNorm *= -1.0/sqrt(mag);  // point into domain!!
+
+  // aligned with x-axis
+  tangent2[0] = 1.0;
+  tangent2[1] = 0.0;
+  tangent2[2] = 0.0;
+
+  // tangent is then orthogonal to both normal and x-axis
+  tangent1[0] = +(unitNorm[1]*tangent2[2] - unitNorm[2]*tangent2[1]);
+  tangent1[1] = -(unitNorm[0]*tangent2[2] - unitNorm[2]*tangent2[0]);
+  tangent1[2] = +(unitNorm[0]*tangent2[1] - unitNorm[1]*tangent2[0]);  
+  
+  // ...................................  
+  
+  
+  // specific heat
+  // double Cv = mixture->GetSpecificHeatConstV();
+  // double gamma = mixture->GetSpecificHeatRatio();
+  double Rgas = mixture->GetGasConstant();
+  double Cv;
+  Cv = Rgas / (gamma - 1.0);
+
+  // mean velocity in inlet normal and tangent directions
+  Vector meanVel(nvel_);
+  meanVel = 0.;
+  for (int d = 0; d < dim_; d++) {
+    meanVel[0] += unitNorm[d] * Up[d + 1];
+    meanVel[1] += tangent1[d] * Up[d + 1];
+  }
+  if (dim_ == 3) {
+    tangent2[0] = unitNorm[1] * tangent1[2] - unitNorm[2] * tangent1[1];
+    tangent2[1] = unitNorm[2] * tangent1[0] - unitNorm[0] * tangent1[2];
+    tangent2[2] = unitNorm[0] * tangent1[1] - unitNorm[1] * tangent1[0];
+    for (int d = 0; d < dim_; d++) meanVel[2] += tangent2[d] * Up[d + 1];
+  }
+
+  // gradients in inlet normal direction
+  Vector normGrad(num_equation_);
+  normGrad = 0.;
+  for (int eq = 0; eq < num_equation_; eq++) {
+    // NOTE(kevin): for axisymmetric case, azimuthal normal component will be always zero.
+    for (int d = 0; d < dim_; d++)
+      normGrad[eq] += unitNorm[d] * gradState(eq, d);  // phi_{eq,d} * n_d (n is INWARD facing normal)
+  }
+  // gradient of pressure in normal direction
+  double dpdn = mixture->ComputePressureDerivative(normGrad, stateIn, false);  // w.r.t. inward facing normal
+
+  // speed of sound
+  const double speedSound = mixture->ComputeSpeedOfSound(Up);
+
+  // kinetic energy
+  double meanK = 0.;
+  for (int d = 0; d < nvel_; d++) meanK += Up[1 + d] * Up[1 + d];
+  meanK *= 0.5;
+
+  // compute outgoing characteristic
+  double L1 = 0.;
+  for (int d = 0; d < dim_; d++) L1 += unitNorm[d] * normGrad[1 + d];
+  L1 = dpdn - rho * speedSound * L1;
+  L1 *= (meanVel[0] - speedSound);
+
+  // estimate ingoing characteristic
+  double L5 = 0.;
+  L5 = L1;
+
+  // tangential part of incoming waves :: should be un * dutdn
+  double L3 = 0.;
+  for (int d = 0; d < dim_; d++) L3 += tangent1[d] * normGrad[1 + d];
+  L3 *= meanVel[1];
+
+  double L4 = 0.;
+  if (dim_ == 3) {
+    for (int d = 0; d < dim_; d++) L4 += tangent2[d] * normGrad[1 + d];
+    L4 *= meanVel[1];
+  }
+
+  // entropy waves
+  double L2 = 0.;
+  L2 = 0.5 * (gamma - 1.) * (L5 + L1);
+
+  // calc vector d
+  const double d1 = (L2 + 0.5 * (L5 + L1)) / (speedSound * speedSound);
+  const double d2 = 0.5 * (L5 - L1) / (rho * speedSound);
+  const double d3 = L3;
+  const double d4 = L4;
+  const double d5 = 0.5 * (L5 + L1);
+
+  // dF/dx
+  bdrFlux[0] = d1;                                          // dFndn
+  bdrFlux[1] = meanVel[0] * d1 + rho * d2;                  // ux * dFndn + rho*d2, should be ux*dFndn + rho*d3
+  bdrFlux[2] = meanVel[1] * d1 + rho * d3;                  // uy * dFndn + rho*d3, should be uy*dFndn + rho*d4
+  if (nvel_ == 3) bdrFlux[3] = meanVel[2] * d1 + rho * d4;  // uz * dFndn + rho*d4, should be uz*dFndn + rho*d5
+  bdrFlux[1 + nvel_] = rho * meanVel[0] * d2;
+  bdrFlux[1 + nvel_] += rho * meanVel[1] * d3;
+  if (nvel_ == 3) bdrFlux[1 + nvel_] += rho * meanVel[2] * d4;
+  bdrFlux[1 + nvel_] += meanK * d1 + d5 / (gamma - 1.);  // rho*ux*d2 + rho*uy*d3 + rho*uz*d4 + K*d1 + d5/(gamma-1)
+
+  // flux gradients in other directions
+  //   Vector fluxY(num_equation);
+  //   {
+  //     // gradients in tangent1 direction
+  //     Vector tg1Grads(num_equation);
+  //     tg1Grads = 0.;
+  //     for(int eq=0;eq<num_equation;eq++)
+  //     {
+  //       for(int d=0;d<dim;d++) tg1Grads[eq] += tangent1[d]*gradState(eq,d);
+  //     }
+  //
+  //
+  //     const double dy_rv = tg1Grads(0)*meanVt1 + rho*tg1Grads(2);
+  //     const double dy_ruv = meanVn*dy_rv + rho*meanVt1*tg1Grads(1);
+  //     const double dy_rv2 = meanVt1*dy_rv + rho*meanVt1*tg1Grads(2);
+  //     const double dy_p = tg1Grads(3);
+  //     const double dy_E = dy_p/(gamma-1.) + k*tg1Grads(0) +
+  //                         rho*(meanVn*tg1Grads(1) + meanVt1*tg1Grads(2) );
+  //     const double dy_vp = meanVt1*dy_p + p*tg1Grads(2);
+  //
+  //     fluxY[0] = dy_rv;
+  //     fluxY[1] = dy_ruv;
+  //     fluxY[2] = dy_rv2 + dy_p;
+  //     fluxY[3] = stateIn(3)/rho*dy_rv + rho*meanVt1*dy_E + dy_vp;
+  //   }
+
+  // boundaryU_N copied to state2
+  Vector state2(num_equation_);
+  for (int eq = 0; eq < num_equation_; eq++) state2[eq] = boundaryU[eq + bdrN * num_equation_];
+
+  // boundaryU_N coped to stateN and rotated to 1-dir in inward facing normal direction
+  Vector stateN = state2;
+  for (int d = 0; d < nvel_; d++) stateN[1 + d] = 0.;
+  for (int d = 0; d < dim_; d++) {
+    stateN[1] += state2[1 + d] * unitNorm[d];
+    stateN[2] += state2[1 + d] * tangent1[d];
+    if (dim_ == 3) stateN[3] += state2[1 + d] * tangent2[d];
+  }
+
+  // updates boundaryU_N(rotated) with U^{N+1} = U^{N} - dt*dFdn ?
+  Vector newU(num_equation_);
+  // for(int i=0; i<num_equation; i++) newU[i] = state2[i]- dt*(bdrFlux[i] /*+ fluxY[i]*/);
+  // for (int i = 0; i < num_equation_; i++) newU[i] = stateN[i] - dt*bdrFlux[i];
+  newU[0] = stateN[0] - dt * bdrFlux[0];  // floating rho
+  newU[1] = stateN[0] * (wgt*Un); //inputState[1];
+  newU[2] = stateN[0] * (wgt*Ut); //inputState[2];
+  if (nvel_ == 3) newU[3] = stateN[0] * 0.0; //* inputState[3];
+  //  newU[4] = inputState[1] * inputState[1] + inputState[2] * inputState[2] + inputState[3] * inputState[3];
+  newU[4] = (wgt*wgt) * (Un*Un + Ut*Ut);
+  newU[4] = stateN[0] * (0.5 * newU[4] + Cv * inputState[0]);
+  //  newU[4] = stateN[0] * (0.5*newU[4] + 718.0*inputState[0]); // Cv=0.718 kJ/kg*K <= HARD CODE Cv
+  if (eqSystem == NS_PASSIVE) newU[num_equation_ - 1] = 0.;
+
+  // transform back into x-y coords
+  {
+    DenseMatrix M(dim_, dim_);
+    for (int d = 0; d < dim_; d++) {
+      M(0, d) = unitNorm[d];
+      M(1, d) = tangent1[d];
+      if (dim_ == 3) M(2, d) = tangent2[d];
+    }
+
+    DenseMatrix invM(dim_, dim_);
+    mfem::CalcInverse(M, invM);
+    Vector momN(dim_), momX(dim_);
+    for (int d = 0; d < dim_; d++) momN[d] = newU[1 + d];
+    invM.Mult(momN, momX);
+    for (int d = 0; d < dim_; d++) newU[1 + d] = momX[d];
+  }
+  for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + bdrN * num_equation_] = newU[eq];
+
+  // bdrFLux is over-written here, state2 is lagged
+  // rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
+
+  // not lagged
+  rsolver->Eval(stateIn, boundaryU, normal, bdrFlux, true);
+
+  bdrN++;
+}
+
 
 void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
   // NOTE: it is likely that for two-temperature case inlet will also specify electron temperature,
