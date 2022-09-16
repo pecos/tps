@@ -221,14 +221,15 @@ void BCintegrator::initBCs() {
 }
 
 void BCintegrator::computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState,
-                                  double radius, Vector transip, Vector &bdrFlux) {
+                                  double radius, Vector transip, int bdrN, Vector &bdrFlux) {
+  
   std::unordered_map<int, BoundaryCondition *>::const_iterator ibc = inletBCmap.find(attr);
   std::unordered_map<int, BoundaryCondition *>::const_iterator obc = outletBCmap.find(attr);
   std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = wallBCmap.find(attr);
 
-  if (ibc != inletBCmap.end()) ibc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, bdrFlux);
-  if (obc != outletBCmap.end()) obc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, bdrFlux);
-  if (wbc != wallBCmap.end()) wbc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, bdrFlux);
+  if (ibc != inletBCmap.end()) ibc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, bdrN, bdrFlux);
+  if (obc != outletBCmap.end()) obc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, bdrN, bdrFlux);
+  if (wbc != wallBCmap.end()) wbc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, bdrN, bdrFlux);
 
   //   BCmap[attr]->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
 }
@@ -343,7 +344,9 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
 
   const IntegrationRule *ir = &intRules->Get(Tr.GetGeometryType(), intorder);
 
+  int bdrN = 0; // this didnt seem to be intialized anywhere else, so doing it here and passing to computeBdrFlux
   for (int i = 0; i < ir->GetNPoints(); i++) {
+    
     const IntegrationPoint &ip = ir->IntPoint(i);
 
     Tr.SetAllIntPoints(&ip);  // set face and element int. points
@@ -386,7 +389,9 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
       radius = transip[0];
     }
 
-    computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, radius, transip, fluxN);
+    // all bc's handeled here? in integration pts loop
+    computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, radius, transip, bdrN, fluxN);
+    bdrN++; // and increment here
     fluxN *= ip.weight;
 
     if (config.isAxisymmetric()) {

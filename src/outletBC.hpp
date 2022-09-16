@@ -86,7 +86,7 @@ class OutletBC : public BoundaryCondition {
 
   void subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vector &bdrFlux);
 
-  void subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
+  void subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, DenseMatrix &gradState, int ibrdN, Vector &bdrFlux);
 
   void subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
 
@@ -103,7 +103,7 @@ class OutletBC : public BoundaryCondition {
            const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs, bool axisym);
   ~OutletBC();
 
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, int ibdrN, 
                       Vector &bdrFlux);
 
   virtual void initBCs();

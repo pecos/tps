@@ -298,14 +298,14 @@ void OutletBC::initBCs() {
   }
 }
 
-void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
+void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, int ibdrN,
                               Vector &bdrFlux) {
   switch (outletType_) {
     case SUB_P:
       subsonicReflectingPressure(normal, stateIn, bdrFlux);
       break;
     case SUB_P_NR:
-      subsonicNonReflectingPressure(normal, stateIn, gradState, bdrFlux);
+      subsonicNonReflectingPressure(normal, stateIn, gradState, ibdrN, bdrFlux);
       break;
     case SUB_MF_NR:
       subsonicNonRefMassFlow(normal, stateIn, gradState, bdrFlux);
@@ -458,10 +458,10 @@ void OutletBC::initBoundaryU(ParGridFunction *Up) {
 }
 
 void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
+
   if (outletType_ == SUB_P) return;
 
   bdrN = 0;
-
   int Nbdr = 0;
 
 #ifdef _GPU_
@@ -562,16 +562,33 @@ void OutletBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodes
 }
 
 // jump
-void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
-  const double gamma = mixture->GetSpecificHeatRatio();
+void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, DenseMatrix &gradState, int ibdrN, Vector &bdrFlux) {
 
+  const double gamma = mixture->GetSpecificHeatRatio();
+  const double p = mixture->ComputePressure(stateIn);
+  
   Vector unitNorm = normal;
   {
     double mod = 0.;
     for (int d = 0; d < dim_; d++) mod += normal[d] * normal[d];
-    unitNorm *= 1. / sqrt(mod);
+    unitNorm *= 1. / sqrt(mod); // this is outward facing normal
   }
 
+  // testing
+  /*
+  unitNorm[0] = 0.0;
+  unitNorm[1] = 1.0;
+  unitNorm[2] = 0.0;
+  
+  tangent1[0] = 1.0;
+  tangent1[2] = 0.0;
+  tangent1[3] = 0.0;
+  
+  tangent2[0] = 0.0;
+  tangent2[2] = 0.0;
+  tangent2[3] = 1.0;    
+  */
+  
   Vector Up(num_equation_);
   mixture->GetPrimitivesFromConservatives(stateIn, Up);
   double rho = Up[0];
@@ -590,7 +607,7 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
     for (int d = 0; d < dim_; d++) meanVel[2] += tangent2[d] * Up[d + 1];
   }
 
-  double meanP = mixture->ComputePressureFromPrimitives(Up);
+  //double meanP = mixture->ComputePressureFromPrimitives(Up);
 
   // normal gradients
   Vector normGrad(num_equation_);
@@ -605,12 +622,13 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
 
   // speed of sound
   const double speedSound = mixture->ComputeSpeedOfSound(Up);
-
+  
   // kinetic energy
   double meanK = 0.;
   for (int d = 0; d < nvel_; d++) meanK += Up[1 + d] * Up[1 + d];
+  double umag = sqrt(meanK);
   meanK *= 0.5;
-
+  
   // compute outgoing characteristics
   double L2 = speedSound * speedSound * normGrad[0] - dpdn;
   L2 *= meanVel[0];
@@ -633,38 +651,40 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
 
   double L6 = 0.;
   if (eqSystem == NS_PASSIVE) L6 = meanVel[0] * normGrad[num_equation_ - 1];
-
-  // const double p = eqState->ComputePressure(stateIn, dim_);
-
+ 
   // estimate ingoing characteristic
   // should be K = sigma*(1-Ma^2)*c/L where L is the domain length normal to the outflow and sigma is user set ~0.2
   // const double sigma = 0.2;
   double sigma = inputState[1];  // input param now
-  double Mach = meanVel[0] / speedSound;
+  double Ma = umag / speedSound;
   double Ldom = refLength;
-  double kP = sigma * (1. - Mach * Mach) * speedSound / Ldom;
-  double L1 = kP * (meanP - inputState[0]);
+  double kP = sigma * (1.0 - Ma*Ma) * speedSound / Ldom;
+  double L1 = kP * (p - inputState[0]);
 
+  // testing
+  //L1 = 0.0;
+  
   // calc vector d
   const double d1 = (L2 + 0.5 * (L5 + L1)) / (speedSound * speedSound);
   const double d2 = 0.5 * (L5 - L1) / (rho * speedSound);  // typically in d3 slot
   const double d3 = L3;
   const double d4 = L4;
   const double d5 = 0.5 * (L5 + L1);  // typically d2 but energy is in 5 slot
-  double d6 = 0.;
+  double d6 = 0.0;
   if (eqSystem == NS_PASSIVE) d6 = L6;
 
   // dF/dx
   bdrFlux[0] = d1;
-  bdrFlux[1] = meanVel[0] * d1 + rho * d2;
-  bdrFlux[2] = meanVel[1] * d1 + rho * d3;
-  if (dim_ == 3) bdrFlux[3] = meanVel[2] * d1 + rho * d4;
-  bdrFlux[1 + dim_] = rho * meanVel[0] * d2;
-  bdrFlux[1 + dim_] += rho * meanVel[1] * d3;
-  if (dim_ == 3) bdrFlux[1 + dim_] += rho * meanVel[2] * d4;
-  bdrFlux[1 + dim_] += meanK * d1 + d5 / (gamma - 1.);
+  bdrFlux[1] = meanVel[0]*d1 + rho*d2;
+  bdrFlux[2] = meanVel[1]*d1 + rho*d3;
+  if (dim_ == 3) bdrFlux[3] = meanVel[2]*d1 + rho*d4;
+  bdrFlux[1 + dim_] = meanVel[0]*d2;
+  bdrFlux[1 + dim_] += meanVel[1]*d3;
+  if (dim_ == 3) bdrFlux[1 + dim_] += meanVel[2]*d4;
+  bdrFlux[1 + dim_] *= rho;
+  bdrFlux[1 + dim_] += meanK*d1 + d5/(gamma - 1.);
 
-  if (eqSystem == NS_PASSIVE) bdrFlux[num_equation_ - 1] = d1 * meanUp[num_equation_ - 1] + meanUp[0] * d6;
+  if (eqSystem == NS_PASSIVE) bdrFlux[num_equation_ - 1] = d1 * Up[num_equation_ - 1] + Up[0] * d6;
 
   // flux gradients in other directions
   //   Vector fluxY(num_equation);

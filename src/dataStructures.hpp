@@ -116,6 +116,8 @@ enum SpeciesPrimitiveType { MASS_FRACTION, MOLE_FRACTION, NUMBER_DENSITY, NUM_SP
 
 enum InletType {
   SUB_DENS_VEL,          // Subsonic inlet specified by the density and velocity components
+  SUB_TEMP_VEL,          // Subsonic inlet specified by the temperature and velocity components
+  SUB_TEMP_VEL_USR,      // Subsonic inlet specified by the temperature and velocity components with user defined spatial distro
   SUB_DENS_VEL_NR,       // Non-reflecting subsonic inlet specified by the density and velocity components
   SUB_VEL_CONST_ENT,     // Subsonic non-reflecting. Specified vel, keeps entropy constant
   SUB_VEL_CONST_TMP,     // Subsonic, specified u,v,w, and T

@@ -191,7 +191,7 @@ void WallBC::buildWallElemsArray(const Array<int> &intPointsElIDBC) {
   wallElems.ReadWrite();
 }
 
-void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
+void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, int ibdrN, 
                             Vector &bdrFlux) {
   switch (wallType_) {
     case INV:

@@ -2828,6 +2828,8 @@ void M2ulPhyS::parseBCInputs() {
   // Inlet Bcs
   std::map<std::string, InletType> inletMapping;
   inletMapping["subsonic"] = SUB_DENS_VEL;
+  inletMapping["subsonicConstTemp"] = SUB_TEMP_VEL;
+  inletMapping["subsonicConstTempUser"] = SUB_TEMP_VEL_USR;  
   inletMapping["nonReflecting"] = SUB_DENS_VEL_NR;
   inletMapping["nonReflectingConstEntropy"] = SUB_VEL_CONST_ENT;
   inletMapping["nonReflectingConstTemp"] = SUB_VEL_CONST_TMP;
@@ -2845,7 +2847,7 @@ void M2ulPhyS::parseBCInputs() {
     // all inlet BCs require 4 inputs (density + vel(3))
     {
       Array<double> uvw;
-      if (type == "nonReflectingConstTemp" || type == "nonReflectingConstTempUser") {
+      if (type == "nonReflectingConstTemp" || type == "nonReflectingConstTempUser" || type == "subsonicConstTemp" || type == "subsonicConstTempUser") {
         tpsP->getRequiredInput((basepath + "/temperature").c_str(), temperature);
         config.inletBC.Append(temperature);
       } else {
