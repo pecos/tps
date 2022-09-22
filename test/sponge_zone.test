@@ -3,6 +3,7 @@
 
 TEST="sponge_zone.test"
 RUNFILE="inputs/input.sponge_zone.periodic.ini"
+RUNFILE_SP="inputs/input.sponge_zone.periodic.species.ini"
 SOLN_FILE=restart_sponge_zone.sol.h5
 REF_FILE=ref_solns/forcing-periodic-square.h5
 
@@ -22,4 +23,12 @@ REF_FILE=ref_solns/forcing-periodic-square.h5
     
     test -s $SOLN_FILE
     ./soln_differ -d 2 $SOLN_FILE $REF_FILE
+}
+
+@test "[$TEST] verify ability to run sponge-zone with species" {
+    rm -f $SOLN_FILE
+
+    ../src/tps --runFile $RUNFILE_SP
+
+    test -s $SOLN_FILE
 }
