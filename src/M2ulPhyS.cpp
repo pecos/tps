@@ -2931,7 +2931,7 @@ void M2ulPhyS::parseSpongeZoneInputs() {
       config.spongeData_[sz].normal.SetSize(3);
       config.spongeData_[sz].point0.SetSize(3);
       config.spongeData_[sz].pointInit.SetSize(3);
-      config.spongeData_[sz].targetUp.SetSize(5);
+      config.spongeData_[sz].targetUp.SetSize(5 + config.numSpecies + 2);  // always large enough now
 
       tpsP->getRequiredVec((base + "/normal").c_str(), config.spongeData_[sz].normal, 3);
       tpsP->getRequiredVec((base + "/p0").c_str(), config.spongeData_[sz].point0, 3);
