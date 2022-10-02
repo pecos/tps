@@ -66,6 +66,7 @@ class Tps;
 #include "io.hpp"
 #include "logger.hpp"
 #include "mpi_groups.hpp"
+#include "radiation.hpp"
 #include "rhs_operator.hpp"
 #include "riemann_solver.hpp"
 #include "run_configuration.hpp"

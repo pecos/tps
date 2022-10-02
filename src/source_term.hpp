@@ -41,6 +41,7 @@
 #include "equation_of_state.hpp"
 #include "fluxes.hpp"
 #include "forcing_terms.hpp"
+#include "radiation.hpp"
 #include "run_configuration.hpp"
 #include "tps_mfem_wrap.hpp"
 #include "transport_properties.hpp"

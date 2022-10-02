@@ -3044,7 +3044,7 @@ void M2ulPhyS::parseRadiationInputs() {
       exit(ERROR);
     }
   } else if (type == "none") {
-    config.radiationInput.model = NONE;
+    config.radiationInput.model = NONE_RAD;
   } else {
     grvy_printf(GRVY_ERROR, "\nUnknown radiation model -> %s\n", type.c_str());
     exit(ERROR);

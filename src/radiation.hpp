@@ -48,7 +48,7 @@ using namespace std;
 class Radiation {
  protected:
  public:
-  MFEM_HOST_DEVICE Radiation(const RadiationInput &inputs) {}
+  MFEM_HOST_DEVICE Radiation() {}
 
   MFEM_HOST_DEVICE virtual ~Radiation() {}
 
@@ -70,7 +70,7 @@ class NetEmission : public Radiation {
  public:
   MFEM_HOST_DEVICE NetEmission(const RadiationInput &inputs);
 
-  MFEM_HOST_DEVICE virtual ~NetEmission() {}
+  MFEM_HOST_DEVICE virtual ~NetEmission();
 
   MFEM_HOST_DEVICE virtual double computeEnergySink(const double &T_h);
 };

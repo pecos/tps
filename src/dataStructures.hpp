@@ -421,6 +421,6 @@ struct RadiationInput {
 
   NetEmissionCoefficientModel necModel;
   TableInput necTableInput;
-}
+};
 
 #endif  // DATASTRUCTURES_HPP_
