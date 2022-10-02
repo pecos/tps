@@ -147,12 +147,13 @@ class RHSoperator : public TimeDependentOperator {
  public:
   RHSoperator(int &_iter, const int _dim, const int &_num_equation, const int &_order, const Equations &_eqSystem,
               double &_max_char_speed, IntegrationRules *_intRules, int _intRuleType, Fluxes *_fluxClass,
-              GasMixture *_mixture, GasMixture *d_mixture, Chemistry *_chemistry, TransportProperties *_transport, Radiation *_radiation,
-              ParFiniteElementSpace *_vfes, const volumeFaceIntegrationArrays &gpuArrays, const int &_maxIntPoints,
-              const int &_maxDofs, DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh,
-              ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp,
-              ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A, BCintegrator *_bcIntegrator,
-              bool &_isSBP, double &_alpha, RunConfiguration &_config, ParGridFunction *pc, ParGridFunction *jh);
+              GasMixture *_mixture, GasMixture *d_mixture, Chemistry *_chemistry, TransportProperties *_transport,
+              Radiation *_radiation, ParFiniteElementSpace *_vfes, const volumeFaceIntegrationArrays &gpuArrays,
+              const int &_maxIntPoints, const int &_maxDofs, DGNonLinearForm *_A, MixedBilinearForm *_Aflux,
+              ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
+              ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A,
+              BCintegrator *_bcIntegrator, bool &_isSBP, double &_alpha, RunConfiguration &_config, ParGridFunction *pc,
+              ParGridFunction *jh);
 
   virtual void Mult(const Vector &x, Vector &y) const;
   void updatePrimitives(const Vector &x) const;

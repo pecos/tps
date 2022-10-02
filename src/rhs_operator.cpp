@@ -38,10 +38,10 @@ FunctionCoefficient radiusFcn(getRadius);
 RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, const int &_order,
                          const Equations &_eqSystem, double &_max_char_speed, IntegrationRules *_intRules,
                          int _intRuleType, Fluxes *_fluxClass, GasMixture *_mixture, GasMixture *d_mixture,
-                         Chemistry *_chemistry, TransportProperties *_transport, Radiation *_radiation, ParFiniteElementSpace *_vfes,
-                         const volumeFaceIntegrationArrays &_gpuArrays, const int &_maxIntPoints, const int &_maxDofs,
-                         DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh,
-                         ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
+                         Chemistry *_chemistry, TransportProperties *_transport, Radiation *_radiation,
+                         ParFiniteElementSpace *_vfes, const volumeFaceIntegrationArrays &_gpuArrays,
+                         const int &_maxIntPoints, const int &_maxDofs, DGNonLinearForm *_A, MixedBilinearForm *_Aflux,
+                         ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
                          ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A,
                          BCintegrator *_bcIntegrator, bool &_isSBP, double &_alpha, RunConfiguration &_config,
                          ParGridFunction *pc, ParGridFunction *jh)
@@ -123,7 +123,8 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   // NOTE: check if this logic is sound
   if (_config.GetWorkingFluid() != WorkingFluid::DRY_AIR) {
     forcing.Append(new SourceTerm(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up, gradUp, gpuArrays,
-                                  _config, mixture, d_mixture_, _transport, _chemistry, _radiation, plasma_conductivity_));
+                                  _config, mixture, d_mixture_, _transport, _chemistry, _radiation,
+                                  plasma_conductivity_));
   }
 #ifdef HAVE_MASA
   if (config_.use_mms_) {

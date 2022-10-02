@@ -62,6 +62,4 @@ MFEM_HOST_DEVICE NetEmission::~NetEmission() {
   if (necTable_ != NULL) delete necTable_;
 }
 
-MFEM_HOST_DEVICE double NetEmission::computeEnergySink(const double &T_h) {
-  return -4.0 * PI_ * necTable_->eval(T_h);
-}
+MFEM_HOST_DEVICE double NetEmission::computeEnergySink(const double &T_h) { return -4.0 * PI_ * necTable_->eval(T_h); }
