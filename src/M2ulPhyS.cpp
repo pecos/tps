@@ -380,7 +380,7 @@ void M2ulPhyS::initVariables() {
       radiation_ = new NetEmission(config.radiationInput);
 #endif
       break;
-    case NONE:
+    case NONE_RAD:
       break;
     default:
       mfem_error("RadiationModel not recognized.");

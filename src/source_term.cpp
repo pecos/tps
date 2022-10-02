@@ -52,7 +52,7 @@ SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_or
 
   ambipolar_ = mixture->IsAmbipolar();
   twoTemperature_ = mixture->IsTwoTemperature();
-  enableRadiation_ = (_config.radiationInput.model != NONE);
+  enableRadiation_ = (_config.radiationInput.model != NONE_RAD);
 }
 
 SourceTerm::~SourceTerm() {
