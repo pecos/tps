@@ -37,13 +37,14 @@ SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_or
                        IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
                        ParGridFunction *_Up, ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
                        RunConfiguration &_config, GasMixture *mixture, GasMixture *d_mixture,
-                       TransportProperties *transport, Chemistry *chemistry, ParGridFunction *pc)
+                       TransportProperties *transport, Chemistry *chemistry, Radiation *radiation, ParGridFunction *pc)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()),
       mixture_(mixture),
       d_mixture_(d_mixture),
       transport_(transport),
       chemistry_(chemistry),
+      radiation_(radiation),
       plasma_conductivity_(pc) {
   numSpecies_ = mixture->GetNumSpecies();
   numActiveSpecies_ = mixture->GetNumActiveSpecies();
@@ -51,6 +52,7 @@ SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_or
 
   ambipolar_ = mixture->IsAmbipolar();
   twoTemperature_ = mixture->IsTwoTemperature();
+  enableRadiation_ = (_config.radiationInput.model != NONE);
 }
 
 SourceTerm::~SourceTerm() {
@@ -92,6 +94,8 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
 #endif
   TransportProperties *_transport = transport_;
   Chemistry *_chemistry = chemistry_;
+  Radiation *_radiation = radiation_;
+  const bool _enableRadiation = enableRadiation_;
 
   const int nnodes = vfes->GetNDofs();
   const int _dim = dim;
@@ -182,6 +186,9 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     // TODO(kevin): may move axisymmetric source terms to here.
 
     // TODO(kevin): energy sink for radiative reaction.
+    if (_enableRadiation) {
+      srcTerm[1 + _nvel] += _radiation->computeEnergySink(Th);
+    }
 
     if (_mixture->IsTwoTemperature()) {
       // energy sink from electron-impact reactions.

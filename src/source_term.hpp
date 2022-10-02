@@ -72,11 +72,13 @@ class SourceTerm : public ForcingTerms {
 
   bool ambipolar_;
   bool twoTemperature_;
+  bool enableRadiation_;
 
   GasMixture *mixture_ = NULL;
   GasMixture *d_mixture_ = NULL;
   TransportProperties *transport_ = NULL;
   Chemistry *chemistry_ = NULL;
+  Radiation *radiation_ = NULL;
   ParGridFunction *plasma_conductivity_;
 
  public:
@@ -84,7 +86,7 @@ class SourceTerm : public ForcingTerms {
              IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up,
              ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config,
              GasMixture *mixture, GasMixture *d_mixture, TransportProperties *transport, Chemistry *chemistry,
-             ParGridFunction *pc);
+             Radiation *radiation, ParGridFunction *pc);
   ~SourceTerm();
 
   // Terms do not need updating

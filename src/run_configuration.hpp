@@ -248,6 +248,7 @@ class RunConfiguration {
   PerfectMixtureInput perfectMixtureInput;
   ArgonTransportInput argonTransportInput;
   ChemistryInput chemistryInput;
+  RadiationInput radiationInput;
 
   double const_plasma_conductivity_;
 

@@ -76,6 +76,10 @@ enum ChemistryModel { /* CANTERA, */ NUM_CHEMISTRYMODEL };
 
 enum ReactionModel { ARRHENIUS, HOFFERTLIEN, TABULATED, NUM_REACTIONMODEL };
 
+enum RadiationModel { NONE, NET_EMISSION, NUM_RADIATIONMODEL };
+
+enum NetEmissionCoefficientModel { TABULATED, NUM_NECMODEL };
+
 enum GasParams { SPECIES_MW, SPECIES_CHARGES, FORMATION_ENERGY, /* SPECIES_HEAT_RATIO, */ NUM_GASPARAMS };
 
 enum FluxTrns { VISCOSITY, BULK_VISCOSITY, HEAVY_THERMAL_CONDUCTIVITY, ELECTRON_THERMAL_CONDUCTIVITY, NUM_FLUX_TRANS };
@@ -411,5 +415,12 @@ struct AuxiliaryVisualizationIndexes {
   int FluxTrns, SrcTrns, SpeciesTrns, diffVel;  // transport.
   int rxn;                                      // reactions.
 };
+
+struct RadiationInput {
+  RadiationModel model;
+
+  NetEmissionCoefficientModel necModel;
+  TableInput necTableInput;
+}
 
 #endif  // DATASTRUCTURES_HPP_

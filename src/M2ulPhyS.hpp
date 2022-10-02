@@ -152,6 +152,8 @@ class M2ulPhyS : public TPS::Solver {
 
   Chemistry *chemistry_ = NULL;
 
+  Radiation *radiation_ = NULL;
+
   ParGridFunction *spaceVaryViscMult;  // space varying viscosity multiplier
 
   Fluxes *fluxClass;
@@ -367,6 +369,7 @@ class M2ulPhyS : public TPS::Solver {
   void parseBCInputs();
   void parseSpongeZoneInputs();
   void parsePostProcessVisualizationInputs();
+  void parseRadiationInputs();
 
   void packUpGasMixtureInput();
   void identifySpeciesType(Array<ArgonSpcs> &speciesType);

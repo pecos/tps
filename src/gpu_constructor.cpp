@@ -86,11 +86,16 @@ __global__ void instantiateDeviceChemistry(GasMixture *mixture, const ChemistryI
   *chem = new Chemistry(mixture, inputs);
 }
 
+__global__ void instantiateDeviceNetEmission(const RadiationInput inputs, Radiation **radiation) {
+  *radiation = new NetEmission(inputs);
+}
+
 __global__ void freeDeviceMixture(GasMixture *mix) { delete mix; }
 __global__ void freeDeviceTransport(TransportProperties *trans) { delete trans; }
 __global__ void freeDeviceFluxes(Fluxes *f) { delete f; }
 __global__ void freeDeviceRiemann(RiemannSolver *r) { delete r; }
 __global__ void freeDeviceChemistry(Chemistry *chem) { delete chem; }
+__global__ void freeDeviceRadiation(Radiation *radiation) { delete radiation; }
 
 #elif defined(_HIP_)
 

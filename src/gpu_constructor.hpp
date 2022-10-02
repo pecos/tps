@@ -55,6 +55,7 @@
 #include "logger.hpp"
 #include "mpi_groups.hpp"
 // #include "rhs_operator.hpp"
+#include "radiation.hpp"
 #include "riemann_solver.hpp"
 #include "run_configuration.hpp"
 // #include "sbp_integrators.hpp"
@@ -86,12 +87,14 @@ __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSyste
 __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
                                          Fluxes *_fluxClass, bool _useRoe, bool axisym, RiemannSolver **r);
 __global__ void instantiateDeviceChemistry(GasMixture *mixture, const ChemistryInput inputs, Chemistry **chem);
+__global__ void instantiateDeviceNetEmission(const RadiationInput inputs, Radiation **radiation);
 
 __global__ void freeDeviceMixture(GasMixture *mix);
 __global__ void freeDeviceTransport(TransportProperties *trans);
 __global__ void freeDeviceFluxes(Fluxes *f);
 __global__ void freeDeviceRiemann(RiemannSolver *r);
 __global__ void freeDeviceChemistry(Chemistry *chem);
+__global__ void freeDeviceRadiation(Radiation *radiation);
 #elif defined(_HIP_)
 // HIP doesn't support device new/delete.  There is
 // (experimental?... requires -D__HIP_ENABLE_DEVICE_MALLOC__) support

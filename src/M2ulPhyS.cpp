@@ -273,11 +273,14 @@ void M2ulPhyS::initVariables() {
 
   Chemistry **d_chemistry_tmp;
   cudaMalloc((void **)&d_chemistry_tmp, sizeof(Chemistry **));
+
+  Radiation **d_radiation_tmp;
+  cudaMalloc((void **)&d_radiation_tmp, sizeof(Radiation **));
 #elif defined(_HIP_)
   hipMalloc((void **)&d_mixture, sizeof(DryAir));
   hipMalloc((void **)&transportPtr, sizeof(DryAirTransport));
 
-  // TODO(kevin): support chemistry for hip.
+  // TODO(kevin): support chemistry/radiation for hip.
 #endif
 
   switch (config.GetWorkingFluid()) {
@@ -366,10 +369,29 @@ void M2ulPhyS::initVariables() {
       mfem_error("WorkingFluid not recognized.");
       break;
   }
+  switch (config.radiationInput.model) {
+    case NET_EMISSION:
+#if defined(_CUDA_)
+      gpu::instantiateDeviceNetEmission<<<1, 1>>>(config.radiationInput, d_radiation_tmp);
+      cudaMemcpy(&radiation_, d_radiation_tmp, sizeof(Radiation *), cudaMemcpyDeviceToHost);
+#elif defined(_HIP_)
+      mfem_error("Radiation is not supported for HIP!");
+#else
+      radiation_ = new NetEmission(config.radiationInput);
+#endif
+      break;
+    case NONE:
+      break;
+    default:
+      mfem_error("RadiationModel not recognized.");
+      break;
+  }
   assert(mixture != NULL);
 #if defined(_CUDA_)
   cudaFree(d_mixture_tmp);
   cudaFree(d_transport_tmp);
+  cudaFree(d_chemistry_tmp);
+  cudaFree(d_radiation_tmp);
 #elif defined(_HIP_)
 #else
   d_mixture = mixture;
@@ -581,7 +603,7 @@ void M2ulPhyS::initVariables() {
   gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
 
   rhsOperator = new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType,
-                                fluxClass, mixture, d_mixture, chemistry_, transportPtr, vfes, gpuArrays, maxIntPoints,
+                                fluxClass, mixture, d_mixture, chemistry_, transportPtr, radiation_, vfes, gpuArrays, maxIntPoints,
                                 maxDofs, A, Aflux, mesh, spaceVaryViscMult, U, Up, gradUp, gradUpfes, gradUp_A,
                                 bcIntegrator, isSBP, alpha, config, plasma_conductivity_, joule_heating_);
 
@@ -965,6 +987,14 @@ M2ulPhyS::~M2ulPhyS() {
 #else
   delete chemistry_;
 #endif
+
+#if defined(_CUDA_)
+  gpu::freeDeviceRadiation<<<1, 1>>>(radiation_);
+#elif defined(_HIP_)
+#else
+  delete radiation_;
+#endif
+
 #if defined(_CUDA_) || defined(_HIP_)
   gpu::freeDeviceTransport<<<1, 1>>>(transportPtr);
   gpu::freeDeviceMixture<<<1, 1>>>(d_mixture);
@@ -2003,6 +2033,9 @@ void M2ulPhyS::parseSolverOptions2() {
   // Pack up input parameters for device objects.
   packUpGasMixtureInput();
 
+  // Radiation model
+  parseRadiationInputs();
+
   // post-process visualization inputs
   parsePostProcessVisualizationInputs();
 
@@ -2987,6 +3020,34 @@ void M2ulPhyS::parsePostProcessVisualizationInputs() {
     tpsP->getRequiredInput("post-process/visualization/start-iter", config.postprocessInput.startIter);
     tpsP->getRequiredInput("post-process/visualization/end-iter", config.postprocessInput.endIter);
     tpsP->getRequiredInput("post-process/visualization/frequency", config.postprocessInput.freq);
+  }
+}
+
+void M2ulPhyS::parseRadiationInputs() {
+  std::string type;
+  std::string basepath("plasma_models/radiation_model");
+
+  tpsP->getInput(basepath.c_str(), type, std::string("none"));
+  std::string modelInputPath(basepath + "/" + type);
+
+  if (type == "net_emission") {
+    config.radiationInput.model = NET_EMISSION;
+
+    std::string coefficientType;
+    tpsP->getRequiredInput((modelInputPath + "/coefficient").c_str(), coefficientType);
+    if (coefficientType == "tabulated") {
+      config.radiationInput.necModel = TABULATED;
+      std::string inputPath(modelInputPath + "/tabulated");
+      readTable(inputPath, config.radiationInput.necTableInput);
+    } else {
+      grvy_printf(GRVY_ERROR, "\nUnknown net emission coefficient type -> %s\n", coefficientType.c_str());
+      exit(ERROR);
+    }
+  } else if (type == "none") {
+    config.radiationInput.model = NONE;
+  } else {
+    grvy_printf(GRVY_ERROR, "\nUnknown radiation model -> %s\n", type.c_str());
+    exit(ERROR);
   }
 }
 
