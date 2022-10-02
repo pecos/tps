@@ -71,7 +71,7 @@ int main (int argc, char *argv[])
   RunConfiguration& srcConfig = srcField->GetConfig();
   Chemistry *chem = srcField->getChemistry();
   assert(srcConfig.numReactions == 1);
-  assert(srcConfig.reactionModels[0] = TABULATED);
+  assert(srcConfig.reactionModels[0] = TABULATED_RXN);
   std::string basePath("reactions/reaction1/tabulated");
 
   if (rank == 0) printf("chemistry initialized.\n");

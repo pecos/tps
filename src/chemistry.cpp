@@ -82,7 +82,7 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
 
         reactions_[r] = new HoffertLien(A, b, E);
       } break;
-      case TABULATED: {
+      case TABULATED_RXN: {
         reactions_[r] = new Tabulated(inputs.reactionInputs[r].tableInput);
       } break;
       default:

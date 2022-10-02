@@ -2625,7 +2625,7 @@ void M2ulPhyS::parseReactionInputs() {
       config.rxnModelParamsHost.push_back(Vector({A, b, E}));
 
     } else if (model == "tabulated") {
-      config.reactionModels[r - 1] = TABULATED;
+      config.reactionModels[r - 1] = TABULATED_RXN;
       std::string inputPath(basepath + "/tabulated");
       readTable(inputPath, config.chemistryInput.reactionInputs[r - 1].tableInput);
     } else {
@@ -2742,7 +2742,7 @@ void M2ulPhyS::parseReactionInputs() {
             config.equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS];
       }
 
-      if (config.reactionModels[r] != TABULATED) {
+      if (config.reactionModels[r] != TABULATED_RXN) {
         assert(rxn_param_idx < config.rxnModelParamsHost.size());
         config.chemistryInput.reactionInputs[r].modelParams = config.rxnModelParamsHost[rxn_param_idx].Read();
         rxn_param_idx += 1;
@@ -3036,7 +3036,7 @@ void M2ulPhyS::parseRadiationInputs() {
     std::string coefficientType;
     tpsP->getRequiredInput((modelInputPath + "/coefficient").c_str(), coefficientType);
     if (coefficientType == "tabulated") {
-      config.radiationInput.necModel = TABULATED;
+      config.radiationInput.necModel = TABULATED_NEC;
       std::string inputPath(modelInputPath + "/tabulated");
       readTable(inputPath, config.radiationInput.necTableInput);
     } else {
