@@ -34,11 +34,10 @@
 
 #include <tps_config.h>
 
-#include <mfem/general/forall.hpp>
+//#include <mfem/general/forall.hpp>
 
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
-#include "run_configuration.hpp"
 #include "table.hpp"
 #include "tps_mfem_wrap.hpp"
 
@@ -52,9 +51,11 @@ class Radiation {
 
   MFEM_HOST_DEVICE virtual ~Radiation() {}
 
+  // NOTE(kevin): Although this function is clearly overrided and thus must be specified as virtual,
+  //              specifying so causes an nvlink warning for cuda, and a memory fault at runtime.
   // NOTE(kevin): not sure this is a good naming..
   // Currently has the minimal format required for NEC model.
-  MFEM_HOST_DEVICE virtual double computeEnergySink(const double &T_h) {
+  MFEM_HOST_DEVICE double computeEnergySink(const double &T_h) {
     printf("computeEnergySink not implemented");
     assert(false);
     return 0;
@@ -72,7 +73,7 @@ class NetEmission : public Radiation {
 
   MFEM_HOST_DEVICE virtual ~NetEmission();
 
-  MFEM_HOST_DEVICE virtual double computeEnergySink(const double &T_h);
+  MFEM_HOST_DEVICE double computeEnergySink(const double &T_h) { return -4.0 * PI_ * necTable_->eval(T_h); }
 };
 
 #endif  // RADIATION_HPP_
