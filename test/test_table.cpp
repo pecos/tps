@@ -29,6 +29,7 @@ int main (int argc, char *argv[])
   double dx = L / (Ndata - 1);
 
   TableInput input;
+  input.order = 1;
   input.Ndata = Ndata;
   DenseMatrix data;
   data.SetSize(Ndata, 2);
