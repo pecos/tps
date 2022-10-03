@@ -221,15 +221,15 @@ void BCintegrator::initBCs() {
 }
 
 void BCintegrator::computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState,
-                                  double radius, Vector transip, int bdrN, Vector &bdrFlux) {
+                                  double radius, Vector transip, double delta, int bdrN, Vector &bdrFlux) {
   
   std::unordered_map<int, BoundaryCondition *>::const_iterator ibc = inletBCmap.find(attr);
   std::unordered_map<int, BoundaryCondition *>::const_iterator obc = outletBCmap.find(attr);
   std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = wallBCmap.find(attr);
 
-  if (ibc != inletBCmap.end()) ibc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, bdrN, bdrFlux);
-  if (obc != outletBCmap.end()) obc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, bdrN, bdrFlux);
-  if (wbc != wallBCmap.end()) wbc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, bdrN, bdrFlux);
+  if (ibc != inletBCmap.end()) ibc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, delta, bdrN, bdrFlux);
+  if (obc != outletBCmap.end()) obc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, delta, bdrN, bdrFlux);
+  if (wbc != wallBCmap.end()) wbc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, delta, bdrN, bdrFlux);
 
   //   BCmap[attr]->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
 }
@@ -316,6 +316,14 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
   vfes->GetElementVDofs(Tr.Elem1No, vdofs);
   int eldDof = vfes->GetFE(Tr.Elem1No)->GetDof();
   DenseTensor elGradUp(eldDof, num_equation, dim);
+
+  // element size
+  double delta;  
+  Mesh *mesh = vfes->GetMesh();  
+  delta = mesh->GetElementSize(Tr.Elem1No, 1);
+  //cout << "delta: " << delta << endl; fflush(stdout); 
+
+  
 #ifdef _GPU_
   retrieveGradientsData_gpu(gradUp, elGradUp, vdofs, num_equation, dim, vfes->GetNDofs(), eldDof);
   elGradUp.HostRead();
@@ -348,7 +356,7 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
   for (int i = 0; i < ir->GetNPoints(); i++) {
     
     const IntegrationPoint &ip = ir->IntPoint(i);
-
+    
     Tr.SetAllIntPoints(&ip);  // set face and element int. points
 
     // Calculate basis functions on both elements at the face
@@ -390,7 +398,7 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
     }
 
     // all bc's handeled here? in integration pts loop
-    computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, radius, transip, bdrN, fluxN);
+    computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, radius, transip, delta, bdrN, fluxN);
     bdrN++; // and increment here
     fluxN *= ip.weight;
 

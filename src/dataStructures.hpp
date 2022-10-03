@@ -145,6 +145,14 @@ enum ThermalCondition {
   NONE_THMCND
 };
 
+/*
+enum sgsType {
+  NOSGS,   // none
+  SMAGO,   // Smagorinsky
+  SIGMA    // Sigma
+};
+*/
+
 // The following four keywords define two planes in which
 // a linearly varying viscosity can be defined between these two.
 // The planes are defined by the normal and one point being the

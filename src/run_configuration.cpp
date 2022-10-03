@@ -42,11 +42,13 @@ RunConfiguration::RunConfiguration() {
   ref_levels = 0;
   timeIntegratorType = 4;
   solOrder = 4;
+  sgsModelType = 0;
+  sgsFloor = 0.;  
 
   integrationRule = 1;
   basisType = 1;
 
-  cflNum = 0.12;
+  cflNum = 0.1;
   constantTimeStep = false;
   dt_fixed = -1.0;
   numIters = 10;
@@ -312,7 +314,7 @@ void RunConfiguration::readInputFile(std::string inpuFileName) {
         ss >> word;
         exit_checkFrequency_ = stoi(word);
 
-        // working fluid
+      // working fluid
       } else if (word.compare("FLUID") == 0) {
         ss >> word;
         int typeFluid = stoi(word);

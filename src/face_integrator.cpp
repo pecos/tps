@@ -1,3 +1,4 @@
+
 // -----------------------------------------------------------------------------------bl-
 // BSD 3-Clause License
 //
@@ -225,6 +226,12 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
   viscF1.SetSize(num_equation, dim);
   viscF2.SetSize(num_equation, dim);
 
+  // element size
+  double delta;
+  Mesh *mesh = vfes->GetMesh();  
+  delta = mesh->GetElementSize(Tr.Elem1No, 1);
+  
+  
   for (int i = 0; i < ir->GetNPoints(); i++) {
     const IntegrationPoint &ip = ir->IntPoint(i);
 
@@ -254,18 +261,18 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     rsolver->Eval(funval1, funval2, nor, fluxN);
 
     double radius = 1;
-    if (axisymmetric_) {
-      double x[3];
-      Vector transip(x, 3);
-      Tr.Transform(ip, transip);
+    double x[3];
+    Vector transip(x, 3);
+    Tr.Transform(ip, transip);
+    if (axisymmetric_) {      
       radius = transip[0];
     }
 
     // compute viscous fluxes
     viscF1 = viscF2 = 0.;
 
-    fluxClass->ComputeViscousFluxes(funval1, gradUp1i, radius, viscF1);
-    fluxClass->ComputeViscousFluxes(funval2, gradUp2i, radius, viscF2);
+    fluxClass->ComputeViscousFluxes(funval1, gradUp1i, radius, transip, delta, viscF1);
+    fluxClass->ComputeViscousFluxes(funval2, gradUp2i, radius, transip, delta, viscF2);
 
     // compute mean flux
     viscF1 += viscF2;
@@ -368,12 +375,26 @@ void FaceIntegrator::MassMatrixFaceIntegral(const FiniteElement &el1, const Fini
       }
     }
 
+    // element size
+    double delta;
+    Mesh *mesh = vfes->GetMesh();  
+    delta = mesh->GetElementSize(Tr.Elem1No, 1);
+    
+    
     const IntegrationRule *ir = &intRules->Get(Tr.GetGeometryType(), intorder);
     for (int i = 0; i < ir->GetNPoints(); i++) {
       const IntegrationPoint &ip = ir->IntPoint(i);
       Tr.SetAllIntPoints(&ip);
       CalcOrtho(Tr.Jacobian(), nor);
 
+      double radius = 1;
+      double x[3];
+      Vector transip(x, 3);
+      Tr.Transform(ip, transip);
+      if (axisymmetric_) {      
+        radius = transip[0];
+      }  
+      
       int index1 = 0, index2 = 0;
       el1.CalcShape(Tr.GetElement1IntPoint(), shape1);
       el2.CalcShape(Tr.GetElement2IntPoint(), shape2);
@@ -400,8 +421,8 @@ void FaceIntegrator::MassMatrixFaceIntegral(const FiniteElement &el1, const Fini
       }
 
       DenseMatrix viscF1(num_equation, dim), viscF2(num_equation, dim);
-      fluxClass->ComputeViscousFluxes(state1, igradUp1, 1, viscF1);
-      fluxClass->ComputeViscousFluxes(state2, igradUp2, 1, viscF2);
+      fluxClass->ComputeViscousFluxes(state1, igradUp1, 1, transip, delta, viscF1);
+      fluxClass->ComputeViscousFluxes(state2, igradUp2, 1, transip, delta, viscF2);
       for (int eq = 0; eq < num_equation; eq++) {
         for (int d = 0; d < dim; d++) viscF1(eq, d) += viscF2(eq, d);
       }

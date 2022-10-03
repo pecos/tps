@@ -271,6 +271,9 @@ class M2ulPhyS : public TPS::Solver {
   // minimum element size
   double hmin;
 
+  // maximum element size
+  double hmax;  
+
   // exit status code;
   int exit_status_;
 
@@ -365,6 +368,7 @@ class M2ulPhyS : public TPS::Solver {
   void parseTransportInputs();
   void parseReactionInputs();
   void parseBCInputs();
+  //void parseSGSInputs();  
   void parseSpongeZoneInputs();
   void parsePostProcessVisualizationInputs();
 

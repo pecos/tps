@@ -32,14 +32,15 @@
 #include "fluxes.hpp"
 
 MFEM_HOST_DEVICE Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
-                                const int _num_equation, const int _dim, bool axisym)
+                                const int _num_equation, const int _dim, bool axisym, RunConfiguration &_config)
     : mixture(_mixture),
       eqSystem(_eqSystem),
       transport(_transport),
       dim(_dim),
       nvel(axisym ? 3 : _dim),
       axisymmetric_(axisym),
-      num_equation(_num_equation) {}
+      config_(_config),            
+      num_equation(_num_equation) {}      
 
 void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, DenseMatrix &flux) {
   switch (eqSystem) {
@@ -48,11 +49,17 @@ void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, D
       break;
     case NS:
     case NS_PASSIVE: {
+      
       DenseMatrix convF(num_equation, dim);
       ComputeConvectiveFluxes(state, convF);
 
+      double x[3];
+      Vector transip(x, 3); // empty just to build
+      double delta = 0.;
+      printf("WARNING, CVF called in wrong place\n"); fflush(stdout);
+      
       DenseMatrix viscF(num_equation, dim);
-      ComputeViscousFluxes(state, gradUpi, 1, viscF);
+      ComputeViscousFluxes(state, gradUpi, 1, transip, delta, viscF);
       for (int eq = 0; eq < num_equation; eq++) {
         for (int d = 0; d < dim; d++) flux(eq, d) = convF(eq, d) - viscF(eq, d);
       }
@@ -128,8 +135,12 @@ MFEM_HOST_DEVICE void Fluxes::ComputeConvectiveFluxes(const double *state, doubl
   }
 }
 
+// jump
 // TODO(kevin): check/complete axisymmetric setting for multi-component flow.
-void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, DenseMatrix &flux) {
+void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip, double delta, DenseMatrix &flux) {
+
+  //  printf("CVF caught\n"); fflush(stdout);
+  
   flux = 0.;
   if (eqSystem == EULER) {
     return;
@@ -163,12 +174,54 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   // NOTE(kevin): in flux, only dim-components of diffusionVelocity will be used.
   DenseMatrix diffusionVelocity(numSpecies, nvel);
   transport->ComputeFluxTransportProperties(state, gradUp, Efield, transportBuffer, diffusionVelocity);
-  const double visc = transportBuffer[FluxTrns::VISCOSITY];
+  double visc = transportBuffer[FluxTrns::VISCOSITY];
   double bulkViscosity = transportBuffer[FluxTrns::BULK_VISCOSITY];
   bulkViscosity -= 2. / 3. * visc;
   double k = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY];
   double ke = transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY];
+  double Pr_Cp = visc / k;
 
+  //double h = mesh->GetElementSize(i, 1)
+
+  // viscous sponge..................................
+  /*
+  // make these input options
+  double Lmax_y = 0.0141948 + 0.004;
+  double sponge_y = 0.0091948;
+  double sponge_scale = 100.;
+  if (transip[2] > sponge_y) {
+    double wgt;
+    wgt = (transip[2] - sponge_y) / (Lmax_y - sponge_y) ;
+    wgt *= wgt;
+    wgt += 1.;
+    wgt *= sponge_scale;
+    visc *= wgt;
+    bulkViscosity *= wgt;
+    k *= wgt;
+  } 
+  */
+  // ................................................
+
+  /*
+  switch (config_.GetSgsModelType()) {
+  case 1:
+    break;
+  case 2:
+    break;
+  default:
+  }
+  */
+  //cout << "sgsModelType: " << config_.GetSgsModelType() << endl; fflush(stdout);
+  
+  // subgrid scale model
+  double mu_sgs = 0.;
+  if(config_.GetSgsModelType() == 1) sgsSmag(state, gradUp, delta, mu_sgs);
+  if(config_.GetSgsModelType() == 2) sgsSigma(state, gradUp, delta, mu_sgs);  
+  bulkViscosity *= (1.0 + mu_sgs/visc); 
+  visc += mu_sgs;
+  k += (mu_sgs / Pr_Cp); 
+
+  
   if (twoTemperature) {
     for (int d = 0; d < dim; d++) {
       double qeFlux = ke * gradUp(num_equation - 1, d);
@@ -249,8 +302,11 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   }
 }
 
-MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius,
+MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius, Vector transip,
                                                    double *flux) {
+
+  //  printf("CVF HD caught\n"); fflush(stdout);
+  
   for (int d = 0; d < dim; d++) {
     for (int eq = 0; eq < num_equation; eq++) {
       flux[eq + d * num_equation] = 0.;
@@ -374,8 +430,12 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
   }
 }
 
-void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius,
+// must modify this guy to be consistent with ComputeViscousFluxes
+void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip, double delta, 
                                      const BoundaryViscousFluxData &bcFlux, Vector &normalFlux) {
+
+  //  printf("CBdrVF caught\n"); fflush(stdout);  
+  
   normalFlux.SetSize(num_equation);
   normalFlux = 0.;
   if (eqSystem == EULER) {
@@ -399,12 +459,42 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
   // NOTE(kevin): in flux, only dim-components of diffusionVelocity will be used.
   DenseMatrix diffusionVelocity(numSpecies, nvel);
   transport->ComputeFluxTransportProperties(state, gradUp, Efield, transportBuffer, diffusionVelocity);
-  const double visc = transportBuffer[FluxTrns::VISCOSITY];
+  double visc = transportBuffer[FluxTrns::VISCOSITY];
   double bulkViscosity = transportBuffer[FluxTrns::BULK_VISCOSITY];
-  bulkViscosity -= 2. / 3. * visc;
+  bulkViscosity -= 2.0/3.0 * visc;
   double k = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY];
   double ke = transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY];
+  double Pr_Cp = visc / k;
+  
+  
+  // viscous sponge..................................
+  /*
+  // make these input options
+  double Lmax_y = 0.0141948 + 0.004;
+  double sponge_y = 0.0091948;
+  double sponge_scale = 100.;
+  if (transip[2] > sponge_y) {
+    double wgt;
+    wgt = (transip[2] - sponge_y) / (Lmax_y - sponge_y) ;
+    wgt *= wgt;
+    wgt += 1.;
+    wgt *= sponge_scale;
+    visc *= wgt;
+    bulkViscosity *= wgt;
+    k *= wgt;    
+  } 
+  */
+  // ................................................
 
+  // subgrid scale model
+  double mu_sgs = 0.;
+  if(config_.GetSgsModelType() == 1) sgsSmag(state, gradUp, delta, mu_sgs);
+  if(config_.GetSgsModelType() == 2) sgsSigma(state, gradUp, delta, mu_sgs);    
+  bulkViscosity *= (1.0 + mu_sgs/visc); 
+  visc += mu_sgs;
+  k += (mu_sgs / Pr_Cp); 
+  
+  
   // Primitive viscous fluxes.
   const int primFluxSize = (twoTemperature) ? numSpecies + nvel + 2 : numSpecies + nvel + 1;
   Vector normalPrimFlux(primFluxSize);
@@ -497,7 +587,7 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
   }
 }
 
-MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius,
+MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius, Vector transip, 
                                                       const BoundaryViscousFluxData &bcFlux, double *normalFlux) {
   // normalFlux.SetSize(num_equation);
   for (int eq = 0; eq < num_equation; eq++) normalFlux[eq] = 0.;
@@ -522,7 +612,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const
   // NOTE(kevin): in flux, only dim-components of diffusionVelocity will be used.
   double diffusionVelocity[gpudata::MAXSPECIES * gpudata::MAXDIM];
   transport->ComputeFluxTransportProperties(state, gradUp, Efield, transportBuffer, diffusionVelocity);
-  const double visc = transportBuffer[FluxTrns::VISCOSITY];
+  double visc = transportBuffer[FluxTrns::VISCOSITY];
   double bulkViscosity = transportBuffer[FluxTrns::BULK_VISCOSITY];
   bulkViscosity -= 2. / 3. * visc;
   double k = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY];
@@ -759,4 +849,127 @@ void Fluxes::viscousFluxes_hip(const Vector &x, ParGridFunction *gradUp, DenseTe
   });  // end MFEM_FORALL
 #endif
 }
+
+// these probably should go in another file, but fine for now
+void Fluxes::sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu) {
+
+  Vector Sij(6);
+  double Smag = 0.;
+  double Cd = 0.12;
+  double l_floor;
+  double d_model;
+
+  // gradUp is in (eq,dim) form with eq=0 being rho slot
+  Sij[0] = gradUp(1,0);
+  Sij[1] = gradUp(2,1);
+  Sij[2] = gradUp(3,2);  
+  Sij[3] = 0.5*(gradUp(1,1) + gradUp(2,0));
+  Sij[4] = 0.5*(gradUp(1,2) + gradUp(3,0));
+  Sij[5] = 0.5*(gradUp(2,2) + gradUp(3,1));
+    
+  for (int i = 0; i < 3; i++) Smag += Sij[i]*Sij[i];
+  for (int i = 3; i < 6; i++) Smag += 2.0*Sij[i]*Sij[i];
+  Smag = sqrt(2.0*Smag);
+
+  l_floor = config_.GetSgsFloor();
+  d_model = Cd * max(delta-l_floor,0.0);
+  mu = state[0] * d_model * d_model * Smag;
+  
+}
+
+void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu) {
+
+  DenseMatrix Qij(dim,dim);
+  DenseMatrix du(dim,dim);
+  DenseMatrix B(dim,dim);  
+  Vector ev(dim);
+  Vector sigma(dim);  
+  double Cd = 0.135;
+  double sml = 1.0e-15;
+  double pi = 3.14159265359;
+  double onethird = 1./3.;  
+  double l_floor, d_model, d4;
+  double p1, p2, p, q, detB, r, phi;
+
+
+  // Qij = u_{k,i}*u_{k,j}
+  for (int i = 0; i < dim; i++) {
+     for (int j = 0; j < dim; j++) {
+       Qij(i,j) = 0.;
+     }    
+  }    
+  for (int i = 0; i < dim; i++) {
+     for (int j = 0; j < dim; j++) {
+        for (int k = 0; k < dim; k++) {
+	  Qij(i,j) += gradUp(k+1,i) * gradUp(k+1,j);
+        }           
+     }    
+  }
+
+  // d should really be sqrt of J^T*J
+  l_floor = config_.GetSgsFloor();
+  d_model = max(delta-l_floor,0.0);  
+  d4 = pow(d_model,4);
+  for (int i = 0; i < dim; i++) {
+     for (int j = 0; j < dim; j++) {
+       Qij(i,j) *= d4;
+     }    
+  }  
+  
+  // eigenvalues for symmetric, symm pos-def 3x3
+  p1 = Qij(0,1) * Qij(0,1) + \
+       Qij(0,2) * Qij(0,2) + \
+       Qij(1,2) * Qij(1,2);
+  q = onethird * (Qij(0,0) + Qij(1,1) + Qij(2,2));
+  p2 = (Qij(0,0) - q) * (Qij(0,0) - q) + \
+       (Qij(1,1) - q) * (Qij(1,1) - q) + \
+       (Qij(2,2) - q) * (Qij(2,2) - q) + 2.0*p1;
+  p2 += sml;
+  p = sqrt((p2,sml)/6.0);
+  for (int i = 0; i < dim; i++) {
+     for (int j = 0; j < dim; j++) {
+       B(i,j) = Qij(i,j);
+     }    
+  }    
+  for (int i = 0; i < dim; i++) {
+     B(i,i) -= q;
+  }    
+  for (int i = 0; i < dim; i++) {
+     for (int j = 0; j < dim; j++) {
+       B(i,j) *= (1.0/p);
+     }    
+  }    
+  detB = B(1,1) * (B(2,2)*B(3,3) - B(3,2)*B(2,3)) - \
+         B(1,2) * (B(2,1)*B(3,3) - B(3,1)*B(2,3)) + \
+         B(1,3) * (B(2,1)*B(3,2) - B(3,1)*B(2,2));
+  r = 0.5*detB;
+
+  if (r <= -1.0) {
+    phi = onethird*pi;
+  } else if (r >= 1.0) {
+    phi = 0.0;
+  } else {
+    phi = onethird*acos(r);
+  }
+
+  // eigenvalues satisfy eig3 <= eig2 <= eig1 (L^4/T^2)
+  ev[0] = q + 2.0 * p * cos(phi);
+  ev[1] = q + 2.0 * p * cos(phi + (2.0*onethird*pi));
+  ev[2] = 3.0 * q - ev(1) - ev(3);
+
+  // actual sigma (L^2/T)
+  sigma[0] = sqrt(max(ev[0],sml));
+  sigma[1] = sqrt(max(ev[1],sml));
+  sigma[2] = sqrt(max(ev[2],sml));
+
+  // eddy viscosity
+  mu = sigma[2] * (sigma[0] - sigma[1]) * (sigma[1]-sigma[2]);
+  mu = max(mu, 0.0);
+  mu /= (sigma[0]*sigma[0] + sml);
+  mu *= (Cd*Cd);
+  mu *= state[0];
+  
+}
+
+
 // clang-format on

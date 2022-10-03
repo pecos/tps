@@ -73,7 +73,7 @@ class BoundaryCondition {
                     const int _patchNumber, const double _refLength, bool axisym);
   virtual ~BoundaryCondition();
 
-  virtual void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, int bdrN,
+  virtual void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, int bdrN,
                               Vector &bdrFlux) = 0;
 
   // holding function for any miscellaneous items needed to initialize BCs

@@ -503,7 +503,7 @@ void M2ulPhyS::initVariables() {
   gpu::instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, fluxClass, config.RoeRiemannSolver(),
                                           config.isAxisymmetric(), rsolver);
 #else
-  fluxClass = new Fluxes(mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric());
+  fluxClass = new Fluxes(mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(), config);
 
   rsolver =
       new RiemannSolver(num_equation, mixture, eqSystem, fluxClass, config.RoeRiemannSolver(), config.isAxisymmetric());
@@ -581,7 +581,7 @@ void M2ulPhyS::initVariables() {
   gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
 
   rhsOperator = new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType,
-                                fluxClass, mixture, d_mixture, chemistry_, transportPtr, vfes, gpuArrays, maxIntPoints,
+                                fluxClass, mixture, d_mixture, chemistry_, transportPtr, vfes, fes, gpuArrays, maxIntPoints,
                                 maxDofs, A, Aflux, mesh, spaceVaryViscMult, U, Up, gradUp, gradUpfes, gradUp_A,
                                 bcIntegrator, isSBP, alpha, config, plasma_conductivity_, joule_heating_);
 
@@ -589,22 +589,35 @@ void M2ulPhyS::initVariables() {
   rhsOperator->SetTime(time);
   timeIntegrator->Init(*rhsOperator);
 
+  
   // Determine the minimum element size.
   {
-    double local_hmin = mesh->GetElementSize(0, 1);
-    for (int i = 1; i < mesh->GetNE(); i++) {
+    //double local_hmin = mesh->GetElementSize(0, 1);
+    double local_hmin = 1.0e18;
+    for (int i = 0; i < mesh->GetNE(); i++) {
       // if(sqrt(mesh->GetElementVolume(i))<1e-3) cout<<sqrt(mesh->GetElementVolume(i))<<endl;
       local_hmin = min(mesh->GetElementSize(i, 1), local_hmin);
-      // local_hmin = min(sqrt(mesh->GetElementVolume(i)), local_hmin);
+      // local_hmin = min(sqrt(mesh->GetElementVolume(i)), local_hmin);      
     }
     MPI_Allreduce(&local_hmin, &hmin, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
   }
 
+  // maximum size
+  {
+    double local_hmax = 1.0e-15;
+    for (int i = 0; i < mesh->GetNE(); i++) {
+      local_hmax = max(mesh->GetElementSize(i, 1), local_hmax);
+    }
+    MPI_Allreduce(&local_hmax, &hmax, 1, MPI_DOUBLE, MPI_MAX, mesh->GetComm());
+  }
+  
   // estimate initial dt
   Up->ExchangeFaceNbrData();
   gradUp->ExchangeFaceNbrData();
 
   if (config.GetRestartCycle() == 0) initialTimeStep();
+  if (mpi.Root()) cout << "Maximum element size: " << hmax << "m" << endl;    
+  if (mpi.Root()) cout << "Minimum element size: " << hmin << "m" << endl;  
   if (mpi.Root()) cout << "Initial time-step: " << dt << "s" << endl;
 
   // t_final = MaxIters*dt;
@@ -1041,7 +1054,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   dens = new ParGridFunction(fes, Up->HostReadWrite());
   vel = new ParGridFunction(dfes, Up->HostReadWrite() + fes->GetNDofs());
-
+  
   if (config.isAxisymmetric()) {
     vtheta = new ParGridFunction(fes, Up->HostReadWrite() + 3 * fes->GetNDofs());
   } else {
@@ -1057,7 +1070,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   // this variable is purely for visualization
   press = new ParGridFunction(fes);
-
+  
   passiveScalar = NULL;
   if (eqSystem == NS_PASSIVE) {
     passiveScalar = new ParGridFunction(fes, Up->HostReadWrite() + (num_equation - 1) * fes->GetNDofs());
@@ -1070,6 +1083,10 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
           new ParGridFunction(fes, U->HostReadWrite() + (sp + nvel + 2) * fes->GetNDofs()));
       visualizationNames_.push_back(std::string("partial_density_" + speciesName));
     }
+
+  // jump
+  //elSize = new ParGridFunction(fes); //, Up->HostReadWrite());
+    
   }
 
   // add visualization variables if tps is run on post-process visualization mode.
@@ -1231,6 +1248,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     ioData.registerIOVar("/solution", "rhoE_e", num_equation - 1);
   }
 
+  // warp old viscoisty multiplier stuff
   // compute factor to multiply viscosity when this option is active
   spaceVaryViscMult = NULL;
   ParGridFunction coordsDof(dfes);
@@ -1379,7 +1397,7 @@ void M2ulPhyS::solve() {
       }
     }
 
-    timeIntegrator->Step(*U, time, dt);
+    timeIntegrator->Step(*U, time, dt); //meat
 
     Check_NAN();
 
@@ -2003,13 +2021,20 @@ void M2ulPhyS::parseSolverOptions2() {
   // Pack up input parameters for device objects.
   packUpGasMixtureInput();
 
+  // subgrid scale model
+  //parseSGSInputs();
+  
   // post-process visualization inputs
   parsePostProcessVisualizationInputs();
-
+  
   return;
 }
 
 void M2ulPhyS::parseFlowOptions() {
+  std::map<std::string, int> sgsModel;
+  sgsModel["none"] = 0;
+  sgsModel["smagorinsky"] = 1;
+  sgsModel["sigma"] = 2;
   tpsP->getInput("flow/order", config.solOrder, 4);
   tpsP->getInput("flow/integrationRule", config.integrationRule, 1);
   tpsP->getInput("flow/basisType", config.basisType, 1);
@@ -2027,11 +2052,16 @@ void M2ulPhyS::parseFlowOptions() {
     for (int d = 0; d < 3; d++) tpsP->getRequiredVecElem("flow/pressureGrad", config.gradPress[d], d);
   }
   tpsP->getInput("flow/refinement_levels", config.ref_levels, 0);
+  std::string type;  
+  tpsP->getInput("flow/sgsModel", type, std::string("none"));  
 
   assert(config.solOrder > 0);
   assert(config.numIters >= 0);
   assert(config.itersOut > 0);
   assert(config.refLength > 0);
+
+  config.sgsModelType = sgsModel[type];
+  
 }
 
 void M2ulPhyS::parseTimeIntegrationOptions() {
@@ -2716,6 +2746,7 @@ void M2ulPhyS::parseReactionInputs() {
 }
 
 void M2ulPhyS::parseBCInputs() {
+  
   // number of BC regions defined
   int numWalls, numInlets, numOutlets;
   tpsP->getInput("boundaryConditions/numWalls", numWalls, 0);
@@ -2993,6 +3024,37 @@ void M2ulPhyS::parseSpongeZoneInputs() {
     }
   }
 }
+
+// SGS Model
+/*
+void M2ulPhyS::parseSGSInputs() {
+
+  std::map<std::string, sgsType> sgsModel;
+  sgsModel["none"] = NOSGS;
+  sgsModel["smagorinsky"] = SMAGO;
+  sgsModel["sigma"] = SIGMA;
+
+  double coeff;
+  std::string type;
+  std::string basepath("sgsModel/" + std::to_string(i));
+
+  tpsP->getRequiredInput((basepath + "/type").c_str(), type);
+
+  if (type == "none") {
+    // do nothing
+  } else if (type == "smagorinsky") {
+    tpsP->getRequiredInput((basepath + "/coefficient").c_str(), coeff);
+    config.sgsModel.Append(coeff);
+  } else if (type == "sigma") {
+    tpsP->getRequiredInput((basepath + "/coefficient").c_str(), coeff);
+    config.sgsModel.Append(coeff);      
+  } else {
+    grvy_printf(GRVY_ERROR, "\nUnknown SGS model supplied at runtime -> %s", type.c_str());
+    exit(ERROR);
+  }
+    
+}
+*/
 
 void M2ulPhyS::parsePostProcessVisualizationInputs() {
   if (tpsP->isVisualizationMode()) {

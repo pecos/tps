@@ -449,7 +449,7 @@ void InletBC::initBoundaryU(ParGridFunction *Up) {
 
 //  void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector
 //  &bdrFlux) {
-void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, int ibdrN, 
+void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, int ibdrN, 
                              Vector &bdrFlux) {
   switch (inletType_) {
     case SUB_DENS_VEL:
@@ -578,6 +578,8 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   // &gradState,
   //                                                   Vector &bdrFlux) {
 
+  //  printf("hello world 1\n"); fflush(stdout);
+  
   const double gamma = mixture->GetSpecificHeatRatio();
   // const double pressure = eqState->ComputePressure(stateIn, dim);
 
@@ -741,7 +743,7 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   // rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 
   // not lagged
-  rsolver->Eval(stateIn, boundaryU, normal, bdrFlux, true);
+  rsolver->Eval(stateIn, newU, normal, bdrFlux, true);
 
   bdrN++;
 }
@@ -750,6 +752,8 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
 void InletBC::subsonicNonReflectingTemperatureVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
                                                        Vector &bdrFlux) {
 
+  //  printf("hello world 2\n"); fflush(stdout);
+  
   const double gamma = mixture->GetSpecificHeatRatio();
   const double p = mixture->ComputePressure(stateIn);  
   
@@ -918,7 +922,7 @@ void InletBC::subsonicNonReflectingTemperatureVelocity(Vector &normal, Vector &s
   //rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 
   // not lagged
-  rsolver->Eval(stateIn, boundaryU, normal, bdrFlux, true);
+  rsolver->Eval(stateIn, newU, normal, bdrFlux, true);
 
   bdrN++;
   
@@ -928,6 +932,9 @@ void InletBC::subsonicNonReflectingTemperatureVelocity(Vector &normal, Vector &s
 // jump
 void InletBC::subsonicNonReflectingTemperatureVelocityUser(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
                                                            Vector transip, Vector &bdrFlux) {
+
+  //  printf("hello world 3\n"); fflush(stdout);
+  
   const double gamma = mixture->GetSpecificHeatRatio();
   // const double pressure = eqState->ComputePressure(stateIn, dim);
   
@@ -1181,7 +1188,7 @@ void InletBC::subsonicNonReflectingTemperatureVelocityUser(Vector &normal, Vecto
   // rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 
   // not lagged
-  rsolver->Eval(stateIn, boundaryU, normal, bdrFlux, true);
+  rsolver->Eval(stateIn, newU, normal, bdrFlux, true);
 
   bdrN++;
 }
@@ -1190,6 +1197,9 @@ void InletBC::subsonicNonReflectingTemperatureVelocityUser(Vector &normal, Vecto
 void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
   // NOTE: it is likely that for two-temperature case inlet will also specify electron temperature,
   // whether it is equal to the gas temperature or not.
+
+  //  printf("hello world 4\n"); fflush(stdout);
+  
   const double p = mixture->ComputePressure(stateIn);
 
   Vector state2(num_equation_);
@@ -1219,6 +1229,8 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
 
 void InletBC::subsonicReflectingTemperatureVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
 
+  //  printf("hello world 5\n"); fflush(stdout);
+  
   const double p = mixture->ComputePressure(stateIn);
 
   Vector state2(num_equation_);
@@ -1250,6 +1262,8 @@ void InletBC::subsonicReflectingTemperatureVelocity(Vector &normal, Vector &stat
 
 void InletBC::subsonicReflectingTemperatureVelocityUser(Vector &normal, Vector &stateIn, Vector transip, Vector &bdrFlux) {
 
+  //  printf("hello world 6\n"); fflush(stdout);
+  
   const double p = mixture->ComputePressure(stateIn);
 
   Vector state2(num_equation_);
