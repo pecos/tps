@@ -58,6 +58,4 @@ MFEM_HOST_DEVICE NetEmission::NetEmission(const RadiationInput &inputs) : Radiat
   }
 }
 
-MFEM_HOST_DEVICE NetEmission::~NetEmission() {
-  delete necTable_;
-}
+MFEM_HOST_DEVICE NetEmission::~NetEmission() { delete necTable_; }
