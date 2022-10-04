@@ -997,7 +997,7 @@ void Fluxes::viscSpongePlanar(Vector x, double &wgt) {
   factor = config_.GetLinearVaryingData().viscRatio;
   width = config_.GetLinearVaryingData().width;
 
-  // ensure unit normal
+  // ensure normal is actually a unit normal
   for (int d = 0; d < dim; d++) Nmag += normal[d] * normal[d];
   Nmag = sqrt(Nmag);
   for (int d = 0; d < dim; d++) normal[d] /= Nmag;  
@@ -1009,6 +1009,7 @@ void Fluxes::viscSpongePlanar(Vector x, double &wgt) {
   // weight
   wgt = 0.5*(tanh(dist/width - 2.0) + 1.0);
   wgt *= (factor-1.0);
+  wgt += 1.0;
   
 }
 
