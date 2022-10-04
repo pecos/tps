@@ -1248,7 +1248,10 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     ioData.registerIOVar("/solution", "rhoE_e", num_equation - 1);
   }
 
-  // warp old viscoisty multiplier stuff
+  // (warp) old viscosity multiplier stuff => moved to fluxes.cpp but should really be calculated
+  // here only once, this is currently incomplete (never implemented for Bdr and faces) and not
+  // used (or at least it shouldnt be...)
+  
   // compute factor to multiply viscosity when this option is active
   spaceVaryViscMult = NULL;
   ParGridFunction coordsDof(dfes);
@@ -1257,6 +1260,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     spaceVaryViscMult = new ParGridFunction(fes);
     double *viscMult = spaceVaryViscMult->HostWrite();
     for (int n = 0; n < fes->GetNDofs(); n++) {
+      /*
       double alpha = 1.;
       auto hcoords = coordsDof.HostRead();  // get coords
       double dist_pi = 0., dist_p0 = 0., dist_pi0 = 0.;
@@ -1273,6 +1277,8 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
         alpha += (config.GetLinearVaryingData().viscRatio - 1.) / dist_pi0 * dist_pi;
       }
       viscMult[n] = alpha;
+      */
+      viscMult[n] = 1.0; // just to be safe...      
     }
   }
 
@@ -2158,6 +2164,7 @@ void M2ulPhyS::parseHeatSrcOptions() {
 void M2ulPhyS::parseViscosityOptions() {
   tpsP->getInput("viscosityMultiplierFunction/isEnabled", config.linViscData.isEnabled, false);
   if (config.linViscData.isEnabled) {
+    
     auto normal = config.linViscData.normal.HostWrite();
     tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[0], 0);
     tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[1], 1);
@@ -2168,12 +2175,15 @@ void M2ulPhyS::parseViscosityOptions() {
     tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[1], 1);
     tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[2], 2);
 
-    auto pointInit = config.linViscData.pointInit.HostWrite();
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[0], 0);
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[1], 1);
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[2], 2);
+    // what is the point of this?
+    //    auto pointInit = config.linViscData.pointInit.HostWrite();
+    //    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[0], 0);
+    //    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[1], 1);
+    //    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[2], 2);
 
+    tpsP->getRequiredInput("viscosityMultiplierFunction/width", config.linViscData.width);
     tpsP->getRequiredInput("viscosityMultiplierFunction/viscosityRatio", config.linViscData.viscRatio);
+    
   }
 }
 

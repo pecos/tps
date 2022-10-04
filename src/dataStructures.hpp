@@ -166,8 +166,9 @@ enum sgsType {
 struct linearlyVaryingVisc {
   Vector normal;
   Vector point0;
-  Vector pointInit;
+  //Vector pointInit;
   double viscRatio;
+  double width;  
   bool isEnabled;
 };
 

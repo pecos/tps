@@ -201,26 +201,25 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   } 
   */
   // ................................................
-
-  /*
-  switch (config_.GetSgsModelType()) {
-  case 1:
-    break;
-  case 2:
-    break;
-  default:
-  }
-  */
-  //cout << "sgsModelType: " << config_.GetSgsModelType() << endl; fflush(stdout);
-  
+      
   // subgrid scale model
-  double mu_sgs = 0.;
-  if(config_.GetSgsModelType() == 1) sgsSmag(state, gradUp, delta, mu_sgs);
-  if(config_.GetSgsModelType() == 2) sgsSigma(state, gradUp, delta, mu_sgs);  
-  bulkViscosity *= (1.0 + mu_sgs/visc); 
-  visc += mu_sgs;
-  k += (mu_sgs / Pr_Cp); 
+  if(config_.GetSgsModelType() > 0) {  
+     double mu_sgs = 0.;
+     if(config_.GetSgsModelType() == 1) sgsSmag(state, gradUp, delta, mu_sgs);
+     if(config_.GetSgsModelType() == 2) sgsSigma(state, gradUp, delta, mu_sgs);  
+     bulkViscosity *= (1.0 + mu_sgs/visc); 
+     visc += mu_sgs;
+     k += (mu_sgs / Pr_Cp);
+  }
 
+  // viscous sponge
+  if (config_.linViscData.isEnabled) {
+     double wgt = 0.;
+     viscSpongePlanar(transip, wgt);
+     visc *= wgt;
+     bulkViscosity *= wgt;
+     k *= wgt;
+  }
   
   if (twoTemperature) {
     for (int d = 0; d < dim; d++) {
@@ -493,7 +492,15 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
   bulkViscosity *= (1.0 + mu_sgs/visc); 
   visc += mu_sgs;
   k += (mu_sgs / Pr_Cp); 
-  
+
+  // viscous sponge
+  if (config_.linViscData.isEnabled) {
+     double wgt = 0.;
+     viscSpongePlanar(transip, wgt);
+     visc *= wgt;
+     bulkViscosity *= wgt;
+     k *= wgt;
+  }  
   
   // Primitive viscous fluxes.
   const int primFluxSize = (twoTemperature) ? numSpecies + nvel + 2 : numSpecies + nvel + 1;
@@ -971,5 +978,38 @@ void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double del
   
 }
 
+// should only be done once but ther structure of the code makes it terrible to correct
+void Fluxes::viscSpongePlanar(Vector x, double &wgt) {
+
+  Vector normal(3);
+  Vector point(3);
+  Vector s(3);  
+  double Nmag, factor, width, dist;
+
+  
+  // initialize
+  Nmag = 0.;
+  dist = 0.;  
+
+  // get settings
+  for (int d = 0; d < dim; d++) normal[d] = config_.GetLinearVaryingData().normal(d);
+  for (int d = 0; d < dim; d++) normal[d] = config_.GetLinearVaryingData().point0(d);
+  factor = config_.GetLinearVaryingData().viscRatio;
+  width = config_.GetLinearVaryingData().width;
+
+  // ensure unit normal
+  for (int d = 0; d < dim; d++) Nmag += normal[d] * normal[d];
+  Nmag = sqrt(Nmag);
+  for (int d = 0; d < dim; d++) normal[d] /= Nmag;  
+  
+  // distance from plane  
+  for (int d = 0; d < dim; d++) s[d] = (x[d] - point[d]);
+  for (int d = 0; d < dim; d++) dist += s[d]*normal[d];  
+  
+  // weight
+  wgt = 0.5*(tanh(dist/width - 2.0) + 1.0);
+  wgt *= (factor-1.0);
+  
+}
 
 // clang-format on
