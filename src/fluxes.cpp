@@ -486,12 +486,14 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
   // ................................................
 
   // subgrid scale model
-  double mu_sgs = 0.;
-  if(config_.GetSgsModelType() == 1) sgsSmag(state, gradUp, delta, mu_sgs);
-  if(config_.GetSgsModelType() == 2) sgsSigma(state, gradUp, delta, mu_sgs);    
-  bulkViscosity *= (1.0 + mu_sgs/visc); 
-  visc += mu_sgs;
-  k += (mu_sgs / Pr_Cp); 
+  if(config_.GetSgsModelType() > 0) {  
+     double mu_sgs = 0.;
+     if(config_.GetSgsModelType() == 1) sgsSmag(state, gradUp, delta, mu_sgs);
+     if(config_.GetSgsModelType() == 2) sgsSigma(state, gradUp, delta, mu_sgs);  
+     bulkViscosity *= (1.0 + mu_sgs/visc); 
+     visc += mu_sgs;
+     k += (mu_sgs / Pr_Cp);
+  }  
 
   // viscous sponge
   if (config_.linViscData.isEnabled) {
@@ -526,8 +528,8 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
   double divV = 0.;
   for (int i = 0; i < dim; i++) {
     for (int j = 0; j < dim; j++) stress(i, j) = gradUp(1 + j, i) + gradUp(1 + i, j);
-    divV += gradUp(1 + i, i);
   }
+  for (int i = 0; i < dim; i++) divV += gradUp(1 + i, i);
   stress *= visc;
 
   if (axisymmetric_ && radius > 0) {
@@ -857,6 +859,7 @@ void Fluxes::viscousFluxes_hip(const Vector &x, ParGridFunction *gradUp, DenseTe
 #endif
 }
 
+
 // these probably should go in another file, but fine for now
 void Fluxes::sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu) {
 
@@ -873,11 +876,13 @@ void Fluxes::sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delt
   Sij[3] = 0.5*(gradUp(1,1) + gradUp(2,0));
   Sij[4] = 0.5*(gradUp(1,2) + gradUp(3,0));
   Sij[5] = 0.5*(gradUp(2,2) + gradUp(3,1));
-    
+
+  // strain magnitude with silly sqrt(2) factor
   for (int i = 0; i < 3; i++) Smag += Sij[i]*Sij[i];
   for (int i = 3; i < 6; i++) Smag += 2.0*Sij[i]*Sij[i];
   Smag = sqrt(2.0*Smag);
 
+  // eddy viscosity with delta shift
   l_floor = config_.GetSgsFloor();
   d_model = Cd * max(delta-l_floor,0.0);
   mu = state[0] * d_model * d_model * Smag;
@@ -913,7 +918,7 @@ void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double del
      }    
   }
 
-  // d should really be sqrt of J^T*J
+  // shifted grid scale, d should really be sqrt of J^T*J
   l_floor = config_.GetSgsFloor();
   d_model = max(delta-l_floor,0.0);  
   d4 = pow(d_model,4);
@@ -923,7 +928,7 @@ void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double del
      }    
   }  
   
-  // eigenvalues for symmetric, symm pos-def 3x3
+  // eigenvalues for symmetric pos-def 3x3
   p1 = Qij(0,1) * Qij(0,1) + \
        Qij(0,2) * Qij(0,2) + \
        Qij(1,2) * Qij(1,2);
@@ -978,7 +983,7 @@ void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double del
   
 }
 
-// should only be done once but ther structure of the code makes it terrible to correct
+// should only be done once but the structure of the code makes it terrible to correct
 void Fluxes::viscSpongePlanar(Vector x, double &wgt) {
 
   Vector normal(3);
@@ -993,8 +998,9 @@ void Fluxes::viscSpongePlanar(Vector x, double &wgt) {
 
   // get settings
   for (int d = 0; d < dim; d++) normal[d] = config_.GetLinearVaryingData().normal(d);
-  for (int d = 0; d < dim; d++) normal[d] = config_.GetLinearVaryingData().point0(d);
+  for (int d = 0; d < dim; d++) point[d] = config_.GetLinearVaryingData().point0(d);
   factor = config_.GetLinearVaryingData().viscRatio;
+  factor = max(factor, 1.0);
   width = config_.GetLinearVaryingData().width;
 
   // ensure normal is actually a unit normal
@@ -1010,6 +1016,10 @@ void Fluxes::viscSpongePlanar(Vector x, double &wgt) {
   wgt = 0.5*(tanh(dist/width - 2.0) + 1.0);
   wgt *= (factor-1.0);
   wgt += 1.0;
+
+  //if (x[0] == 0.5 && x[1] == 0.5) {
+  //  cout << "z, dist, wgt: " << x[2] << ", " << dist << ", " << wgt << endl; fflush(stdout);
+  //}
   
 }
 
