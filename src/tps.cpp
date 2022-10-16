@@ -233,12 +233,10 @@ void Tps::chooseSolver() {
   solver_->parseSolverOptions();
 }
 
-
 void Tps::parseInput(std::string iFile) {
   iFile_ = iFile;
   parseInput();
 }
-
 
 /// Read runtime input file on single MPI process and distribute so that
 /// runtime inputs are available for query on on all processors.
