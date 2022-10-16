@@ -1,7 +1,9 @@
-#!../utils/bats/bin/bats
+#!./bats
 # -*- mode: sh -*-
 
 TEST="cyl3d.interp"
+TPS="../src/tps"
+EXE="../utils/interp"
 
 setup() {
     SOLN_FILE=restart_output.sol.h5
@@ -12,19 +14,26 @@ setup() {
     INTERP_FILE_P0=restart_output_ref0.sol.0.h5
     INTERP_FILE_P1=restart_output_ref0.sol.1.h5
 
-    RUNFILE_FRESH="inputs/input.dtconst.cyl"
-    RUNFILE_RESTART="inputs/input.dtconst.restart.cyl"
-    RUNFILE_INTERP0="inputs/input.refine0.cyl"
-    RUNFILE_INTERP1="inputs/input.refine1.cyl"
+    RUNFILE_FRESH="inputs/input.dtconst.cyl.ini"
+    RUNFILE_RESTART="inputs/input.dtconst.restart.cyl.ini"
+    RUNFILE_INTERP0="inputs/input.refine0.cyl.ini"
+#    RUNFILE_INTERP1="inputs/input.refine1.cyl"
+}
+
+@test "[$TEST] check for pfield_interpolate executable and input files" {
+    test -x $EXE
+    test -s $RUNFILE_FRESH
+    test -s $RUNFILE_RESTART
+    test -s $RUNFILE_INTERP0
 }
 
 @test "[$TEST] run serial interp with same input and output grids" {
     # generate restart file
-    ../src/tps --runFile $RUNFILE_FRESH
+    $TPS --runFile $RUNFILE_FRESH
     test -s $SOLN_FILE
 
     # interpolation
-    ../utils/interp -r1 $RUNFILE_RESTART -r2 $RUNFILE_INTERP0
+    $EXE -r1 $RUNFILE_RESTART -r2 $RUNFILE_INTERP0
     test -s $INTERP_FILE
 
     # verify soln didn't change
@@ -38,12 +47,12 @@ setup() {
 
 @test "[$TEST] run parallel (np=2) interp with same input and output grids" {
     # generate restart file
-    mpirun -np 2 ../src/tps --runFile $RUNFILE_FRESH
+    mpirun -np 2 $TPS --runFile $RUNFILE_FRESH
     test -s $SOLN_FILE_P0
     test -s $SOLN_FILE_P1
 
     # interpolation
-    mpirun -np 2 ../utils/interp -r1 $RUNFILE_RESTART -r2 $RUNFILE_INTERP0
+    mpirun -np 2 $EXE -r1 $RUNFILE_RESTART -r2 $RUNFILE_INTERP0
     test -s $INTERP_FILE_P0
     test -s $INTERP_FILE_P1
 
