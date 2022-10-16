@@ -46,15 +46,15 @@ endif
 #simmesh_LDFLAGS += -L$(GSLIB_LIB) -lgs
 
 if GSLIB_ENABLED
-#bin_PROGRAMS   += interp
-#interp_SOURCES  = pfield_interpolate.cpp
-#interp_LDADD    = ../src/libtps.la
-#interp_LDADD    += $(HDF5_LIBS)
-#interp_LDADD    += $(GRVY_LIBS)
-#interp_LDFLAGS  = $(PYTHON_LIBS) $(MFEM_LIBS)
-#if MASA_ENABLED
-#interp_LDFLAGS += $(MASA_LIBS)
-#endif
+bin_PROGRAMS   += interp
+interp_SOURCES  = pfield_interpolate.cpp
+interp_LDADD    = ../src/libtps.la
+interp_LDADD    += $(HDF5_LIBS)
+interp_LDADD    += $(GRVY_LIBS)
+interp_LDFLAGS  = $(PYTHON_LIBS) $(MFEM_LIBS)
+if MASA_ENABLED
+interp_LDFLAGS += $(MASA_LIBS)
+endif
 endif
 
 bin_PROGRAMS += binaryic

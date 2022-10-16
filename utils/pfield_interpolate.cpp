@@ -1,5 +1,6 @@
 /* A utility to transfer tps solutions from one mesh to another */
 
+#include "tps.hpp"
 #include "M2ulPhyS.hpp"
 #include "mfem.hpp"
 #include <fstream>
@@ -9,7 +10,8 @@ using namespace std;
 
 int main (int argc, char *argv[])
 {
-  MPI_Session mpi(argc, argv);
+  //MPI_Session mpi(argc, argv);
+
 
   // Set the method's default parameters.
   const char *src_input_file = "coarse.run";
@@ -37,22 +39,37 @@ int main (int argc, char *argv[])
   // input file.  So, we require that RESTART_CYCLE is set in the
   // *source* run file....
   string srcFileName(src_input_file);
-  M2ulPhyS srcField( mpi, srcFileName );
+
+  TPS::Tps tps;
+  tps.parseInput(srcFileName);
+  tps.chooseDevices();
+
+  M2ulPhyS srcField( tps.getMPISession(), srcFileName, &tps );
   RunConfiguration& srcConfig = srcField.GetConfig();
   assert(srcConfig.GetRestartCycle()>0);
+
+  tps.closeInput();
+
+  ParMesh* mesh_1 = srcField.GetMesh();
+  const int dim = mesh_1->Dimension();
+
 
   // but, we require that RESTART_CYCLE is *not* set in the
   // target run file, since the target restart files do not exist yet.
   string tarFileName(tar_input_file);
-  M2ulPhyS tarField( mpi, tarFileName );
+
+  tps.parseInput(tarFileName);
+
+  M2ulPhyS tarField( tps.getMPISession(), tarFileName, &tps );
   RunConfiguration& tarConfig = tarField.GetConfig();
   assert(tarConfig.GetRestartCycle()==0);
 
+  tps.closeInput();
+
   // Get meshes
-  ParMesh* mesh_1 = srcField.GetMesh();
   ParMesh* mesh_2 = tarField.GetMesh();
 
-  const int dim = mesh_1->Dimension();
+  //const int dim = mesh_1->Dimension();
 
   // GSLIB only works in 2 and 3 dimensions
   assert(dim>1);
