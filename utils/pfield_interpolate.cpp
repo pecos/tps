@@ -41,14 +41,14 @@ int main (int argc, char *argv[])
   string srcFileName(src_input_file);
 
   TPS::Tps tps;
-  tps.parseInput(srcFileName);
+  tps.parseInputFile(srcFileName);
   tps.chooseDevices();
 
   M2ulPhyS srcField( tps.getMPISession(), srcFileName, &tps );
   RunConfiguration& srcConfig = srcField.GetConfig();
   assert(srcConfig.GetRestartCycle()>0);
 
-  tps.closeInput();
+  tps.closeInputFile();
 
   ParMesh* mesh_1 = srcField.GetMesh();
   const int dim = mesh_1->Dimension();
@@ -58,13 +58,13 @@ int main (int argc, char *argv[])
   // target run file, since the target restart files do not exist yet.
   string tarFileName(tar_input_file);
 
-  tps.parseInput(tarFileName);
+  tps.parseInputFile(tarFileName);
 
   M2ulPhyS tarField( tps.getMPISession(), tarFileName, &tps );
   RunConfiguration& tarConfig = tarField.GetConfig();
   assert(tarConfig.GetRestartCycle()==0);
 
-  tps.closeInput();
+  tps.closeInputFile();
 
   // Get meshes
   ParMesh* mesh_2 = tarField.GetMesh();
