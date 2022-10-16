@@ -233,7 +233,7 @@ void Tps::chooseSolver() {
   solver_->parseSolverOptions();
 }
 
-void Tps::parseInput(std::string iFile) {
+void Tps::parseInputFile(std::string iFile) {
   iFile_ = iFile;
   parseInput();
 }
