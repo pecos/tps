@@ -39,6 +39,7 @@
 #include "fluxes.hpp"
 #include "mpi_groups.hpp"
 #include "riemann_solver.hpp"
+#include "transport_properties.hpp"
 #include "run_configuration.hpp"
 #include "tps_mfem_wrap.hpp"
 #include "unordered_map"
@@ -51,14 +52,13 @@ class BCintegrator : public NonlinearFormIntegrator {
   MPI_Groups *groupsMPI;
 
   RunConfiguration &config;
-
+  TransportProperties *transport;
   RiemannSolver *rsolver;
   GasMixture *mixture;
   Fluxes *fluxClass;
 
   double &max_char_speed;
   IntegrationRules *intRules;
-
   ParMesh *mesh;
 
   // pointer to finite element space
@@ -66,7 +66,6 @@ class BCintegrator : public NonlinearFormIntegrator {
 
   // pointer to primitive varibales
   ParGridFunction *Up;
-
   ParGridFunction *gradUp;
 
   Vector &shapesBC;
@@ -75,7 +74,6 @@ class BCintegrator : public NonlinearFormIntegrator {
 
   const int dim;
   const int num_equation;
-
   const int &maxIntPoints;
   const int &maxDofs;
 
@@ -84,15 +82,15 @@ class BCintegrator : public NonlinearFormIntegrator {
   std::unordered_map<int, BoundaryCondition *> wallBCmap;
 
   // void calcMeanState();
-  void computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
-                      Vector transip, double delta, int bdrN, Vector &bdrFlux);
+  void computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius,
+                      Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux);
 
  public:
   BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules,
                RiemannSolver *rsolver_, double &_dt, GasMixture *mixture, GasMixture *d_mixture, Fluxes *_fluxClass,
                ParGridFunction *_Up, ParGridFunction *_gradUp, Vector &_shapesBC, Vector &_normalsWBC,
                Array<int> &_intPointsElIDBC, const int _dim, const int _num_equation, double &_max_char_speed,
-               RunConfiguration &_runFile, Array<int> &local_bdr_attr, const int &_maxIntPoints, const int &_maxDofs);
+               RunConfiguration &_runFile, Array<int> &local_bdr_attr, const int &_maxIntPoints, const int &_maxDofs, TransportProperties *_transport);
   ~BCintegrator();
 
   virtual void AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,

@@ -30,7 +30,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 #include "inletBC.hpp"
-
 #include "dgNonlinearForm.hpp"
 #include "riemann_solver.hpp"
 
@@ -449,8 +448,8 @@ void InletBC::initBoundaryU(ParGridFunction *Up) {
 
 //  void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector
 //  &bdrFlux) {
-void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, int ibdrN, 
-                             Vector &bdrFlux) {
+void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius,
+			     Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux) {
   switch (inletType_) {
     case SUB_DENS_VEL:
       subsonicReflectingDensityVelocity(normal, stateIn, bdrFlux);
@@ -531,7 +530,8 @@ void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
             sum += shape[d] * elUp(d + eq * elDofs);
           }
           localMeanUp[eq] += sum;
-          if (!bdrUInit) boundaryU[eq + Nbdr * num_equation_] = sum;
+          //if (!bdrUInit) boundaryU[eq + Nbdr * num_equation_] = sum;
+          if (!bdrUInit) boundaryU[eq + Nbdr * num_equation_] = iState[eq];
         }
         Nbdr++;
       }

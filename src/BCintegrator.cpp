@@ -30,9 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 #include "BCintegrator.hpp"
-
 #include <mfem/general/forall.hpp>
-
 #include "inletBC.hpp"
 #include "outletBC.hpp"
 #include "wallBC.hpp"
@@ -42,7 +40,7 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
                            GasMixture *d_mixture, Fluxes *_fluxClass, ParGridFunction *_Up, ParGridFunction *_gradUp,
                            Vector &_shapesBC, Vector &_normalsWBC, Array<int> &_intPointsElIDBC, const int _dim,
                            const int _num_equation, double &_max_char_speed, RunConfiguration &_runFile,
-                           Array<int> &local_attr, const int &_maxIntPoints, const int &_maxDofs)
+                           Array<int> &local_attr, const int &_maxIntPoints, const int &_maxDofs, TransportProperties *_transport)
     : groupsMPI(_groupsMPI),
       config(_runFile),
       rsolver(rsolver_),
@@ -60,7 +58,8 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
       dim(_dim),
       num_equation(_num_equation),
       maxIntPoints(_maxIntPoints),
-      maxDofs(_maxDofs) {
+      maxDofs(_maxDofs),
+      transport(_transport) {
   inletBCmap.clear();
   outletBCmap.clear();
   wallBCmap.clear();
@@ -220,16 +219,16 @@ void BCintegrator::initBCs() {
   }
 }
 
-void BCintegrator::computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState,
-                                  double radius, Vector transip, double delta, int bdrN, Vector &bdrFlux) {
+void BCintegrator::computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState,
+                                  double radius, Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux) {
   
   std::unordered_map<int, BoundaryCondition *>::const_iterator ibc = inletBCmap.find(attr);
   std::unordered_map<int, BoundaryCondition *>::const_iterator obc = outletBCmap.find(attr);
   std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = wallBCmap.find(attr);
 
-  if (ibc != inletBCmap.end()) ibc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, delta, bdrN, bdrFlux);
-  if (obc != outletBCmap.end()) obc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, delta, bdrN, bdrFlux);
-  if (wbc != wallBCmap.end()) wbc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, delta, bdrN, bdrFlux);
+  if (ibc != inletBCmap.end()) ibc->second->computeBdrFlux(normal, stateIn, gradState, delState, radius, transip, delta, _transport, bdrFlux);
+  if (obc != outletBCmap.end()) obc->second->computeBdrFlux(normal, stateIn, gradState, delState, radius, transip, delta, _transport, bdrFlux);
+  if (wbc != wallBCmap.end()) wbc->second->computeBdrFlux(normal, stateIn, gradState, delState, radius, transip, delta, _transport, bdrFlux);
 
   //   BCmap[attr]->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
 }
@@ -352,7 +351,11 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
 
   const IntegrationRule *ir = &intRules->Get(Tr.GetGeometryType(), intorder);
 
-  int bdrN = 0; // this didnt seem to be intialized anywhere else, so doing it here and passing to computeBdrFlux
+  DenseMatrix dshape;
+  dshape.SetSize(dof1,dim);
+  Vector iDelUp(num_equation);  
+  
+  //int bdrN = 0; // this didnt seem to be intialized anywhere else, so doing it here and passing to computeBdrFlux
   for (int i = 0; i < ir->GetNPoints(); i++) {
     
     const IntegrationPoint &ip = ir->IntPoint(i);
@@ -386,6 +389,21 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
       }
     }
 
+	
+    // if we wanted second derivatives for nscbc, calculate here
+    el1.CalcPhysDShape(Tr, dshape);
+    for (int eq = 0; eq < num_equation; eq++) {      
+
+      // interpolation laplacian (?)
+      double sum = 0.;      
+      for (int d = 0; d < dim; d++) {
+        for (int k = 0; k < eldDof; k++) {
+          sum += elGradUp(k, eq, d) * dshape(k,d);
+        }
+      }
+      iDelUp(eq) = sum;
+    }    
+
     // Get the normal vector and the flux on the face
     CalcOrtho(Tr.Jacobian(), nor);
 
@@ -398,8 +416,8 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
     }
 
     // all bc's handeled here? in integration pts loop
-    computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, radius, transip, delta, bdrN, fluxN);
-    bdrN++; // and increment here
+    computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, iDelUp, radius, transip, delta, transport, fluxN);
+    //bdrN++; // and increment here
     fluxN *= ip.weight;
 
     if (config.isAxisymmetric()) {

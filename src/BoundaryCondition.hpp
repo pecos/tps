@@ -39,6 +39,7 @@
 
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
+#include "transport_properties.hpp"
 #include "riemann_solver.hpp"
 #include "tps_mfem_wrap.hpp"
 
@@ -73,8 +74,8 @@ class BoundaryCondition {
                     const int _patchNumber, const double _refLength, bool axisym);
   virtual ~BoundaryCondition();
 
-  virtual void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, int bdrN,
-                              Vector &bdrFlux) = 0;
+  virtual void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius,
+			      Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux) = 0;
 
   // holding function for any miscellaneous items needed to initialize BCs
   // prior to use (and require MPI)

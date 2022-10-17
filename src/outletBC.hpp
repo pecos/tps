@@ -36,6 +36,7 @@
 
 #include "BoundaryCondition.hpp"
 #include "dataStructures.hpp"
+#include "transport_properties.hpp"
 #include "logger.hpp"
 #include "mpi_groups.hpp"
 #include "tps_mfem_wrap.hpp"
@@ -85,11 +86,8 @@ class OutletBC : public BoundaryCondition {
   void initBoundaryU(ParGridFunction *Up);
 
   void subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vector &bdrFlux);
-
-  void subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, DenseMatrix &gradState, int ibrdN, Vector &bdrFlux);
-
+  void subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, TransportProperties *_transport, Vector &bdrFlux);
   void subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
-
   void subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
 
   virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up);
@@ -103,8 +101,8 @@ class OutletBC : public BoundaryCondition {
            const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs, bool axisym);
   ~OutletBC();
 
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, int ibdrN, 
-                      Vector &bdrFlux);
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius,
+		      Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux);
 
   virtual void initBCs();
 

@@ -37,6 +37,7 @@
 #include "BoundaryCondition.hpp"
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
+#include "transport_properties.hpp"
 #include "logger.hpp"
 #include "mpi_groups.hpp"
 #include "tps_mfem_wrap.hpp"
@@ -100,8 +101,8 @@ class InletBC : public BoundaryCondition {
   ~InletBC();
 
   //  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux);
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, int ibdrN, 
-                      Vector &bdrFlux);
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius,
+		      Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux);
 
   virtual void initBCs();
 

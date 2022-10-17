@@ -29,6 +29,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
+
 /*
  * Implementation of the class Problem
  */
@@ -445,9 +446,9 @@ void M2ulPhyS::initVariables() {
   // Kevin: Do we need GasMixture class for this?
   // register rms and mean sol into ioData
   if (average->ComputeMean()) {
-    // meanUp
-    ioData.registerIOFamily("Time-averaged primitive vars", "/meanSolution", average->GetMeanUp(), false,
-                            config.GetRestartMean());
+
+    // meanUp    
+    ioData.registerIOFamily("Time-averaged primitive vars", "/meanSolution", average->GetMeanUp(), false, config.GetRestartMean());
     ioData.registerIOVar("/meanSolution", "meanDens", 0);
     ioData.registerIOVar("/meanSolution", "mean-u", 1);
     ioData.registerIOVar("/meanSolution", "mean-v", 2);
@@ -457,7 +458,9 @@ void M2ulPhyS::initVariables() {
     } else {
       ioData.registerIOVar("/meanSolution", "mean-p", dim + 1);
     }
+    
     for (int sp = 0; sp < numActiveSpecies; sp++) {
+      
       // Only for NS_PASSIVE.
       if ((eqSystem == NS_PASSIVE) && (sp == 1)) break;
 
@@ -476,6 +479,37 @@ void M2ulPhyS::initVariables() {
     ioData.registerIOVar("/rmsData", "vw", 5);
   }
 
+  // boundary integration vector for NSCBC: no native Vector support
+  /*
+  if ( ) {
+
+    // outlet
+    if () {
+       ioData.registerIOFamily("NSCBC ", "/outletSolution", <ParGridFunction data here>, false, config.GetRestartBdr());
+       ioData.registerIOVar("/outletSolution", "Dens", 0);
+       ioData.registerIOVar("/outletSolution", "u", 1);
+       ioData.registerIOVar("/outletSolution", "v", 2);
+       if (nvel == 3) {
+          ioData.registerIOVar("/outletSolution", "w", 3);
+          ioData.registerIOVar("/outletSolution", "E", 4);
+       }
+    }
+
+    // inlet
+    if () {
+       ioData.registerIOFamily("NSCBC ", "/inletSolution", <ParGridFunction data here>, false, config.GetRestartBdr());
+       ioData.registerIOVar("/inletSolution", "Dens", 0);
+       ioData.registerIOVar("/inletSolution", "u", 1);
+       ioData.registerIOVar("/inletSolution", "v", 2);
+       if (nvel == 3) {
+          ioData.registerIOVar("/intletSolution", "w", 3);
+          ioData.registerIOVar("/intletSolution", "E", 4);
+       }      
+    }
+    
+  }
+  */
+  
   ioData.initializeSerial(mpi.Root(), (config.RestartSerial() != "no"), serial_mesh);
   projectInitialSolution();
 
@@ -520,7 +554,7 @@ void M2ulPhyS::initVariables() {
   if (local_attr.Size() > 0) {
     bcIntegrator = new BCintegrator(groupsMPI, mesh, vfes, intRules, rsolver, dt, mixture, d_mixture, fluxClass, Up,
                                     gradUp, shapesBC, normalsWBC, intPointsElIDBC, dim, num_equation, max_char_speed,
-                                    config, local_attr, maxIntPoints, maxDofs);
+                                    config, local_attr, maxIntPoints, maxDofs, transportPtr);
   }
 
   // A->SetAssemblyLevel(AssemblyLevel::PARTIAL);
@@ -1259,10 +1293,18 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   if (config.linViscData.isEnabled) {
     spaceVaryViscMult = new ParGridFunction(fes);
     double *viscMult = spaceVaryViscMult->HostWrite();
+    double wgt = 0.;
     for (int n = 0; n < fes->GetNDofs(); n++) {
-      /*
+
       double alpha = 1.;
       auto hcoords = coordsDof.HostRead();  // get coords
+      Vector coords(3);
+      for (int d = 0; d < dim; d++) {
+        coords[d] = hcoords[n + d * vfes->GetNDofs()];
+      }
+
+      
+      /*      
       double dist_pi = 0., dist_p0 = 0., dist_pi0 = 0.;
       for (int d = 0; d < dim; d++) {
         dist_pi += config.GetLinearVaryingData().normal(d) *
@@ -1278,7 +1320,9 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
       }
       viscMult[n] = alpha;
       */
-      viscMult[n] = 1.0; // just to be safe...      
+      //viscMult[n] = 1.0; // just to be safe...
+      viscMultPlanar(coords, wgt);
+      viscMult[n] = wgt; 
     }
   }
 
@@ -3418,6 +3462,46 @@ void M2ulPhyS::visualization() {
   if (mpi.Root()) cout << "Final timestep iteration = " << config.postprocessInput.endIter << endl;
 
   return;
+}
+
+// should only be done once but the structure of the code makes it terrible to correct
+void M2ulPhyS::viscMultPlanar(Vector x, double &wgt) {
+
+  Vector normal(3);
+  Vector point(3);
+  Vector s(3);  
+  double Nmag, factor, width, dist;
+
+  
+  // initialize
+  Nmag = 0.;
+  dist = 0.;  
+
+  // get settings
+  for (int d = 0; d < dim; d++) normal[d] = config.GetLinearVaryingData().normal(d);
+  for (int d = 0; d < dim; d++) point[d] = config.GetLinearVaryingData().point0(d);
+  factor = config.GetLinearVaryingData().viscRatio;
+  factor = max(factor, 1.0);
+  width = config.GetLinearVaryingData().width;
+
+  // ensure normal is actually a unit normal
+  for (int d = 0; d < dim; d++) Nmag += normal[d] * normal[d];
+  Nmag = sqrt(Nmag);
+  for (int d = 0; d < dim; d++) normal[d] /= Nmag;  
+  
+  // distance from plane  
+  for (int d = 0; d < dim; d++) s[d] = (x[d] - point[d]);
+  for (int d = 0; d < dim; d++) dist += s[d]*normal[d];  
+  
+  // weight
+  wgt = 0.5*(tanh(dist/width - 2.0) + 1.0);
+  wgt *= (factor-1.0);
+  wgt += 1.0;
+
+  //if (x[0] == 0.5 && x[1] == 0.5) {
+  //  cout << "z, dist, wgt: " << x[2] << ", " << dist << ", " << wgt << endl; fflush(stdout);
+  //}
+  
 }
 
 void M2ulPhyS::updateVisualizationVariables() {
