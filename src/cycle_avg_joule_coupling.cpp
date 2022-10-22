@@ -36,8 +36,8 @@
 #include "quasimagnetostatic.hpp"
 
 CycleAvgJouleCoupling::CycleAvgJouleCoupling(MPI_Session &mpi, string &inputFileName, TPS::Tps *tps, int max_out,
-                                             bool axisym)
-    : mpi_(mpi), em_opt_(), max_outer_iters_(max_out) {
+                                             bool axisym, double input_power)
+    : mpi_(mpi), em_opt_(), max_outer_iters_(max_out), input_power_(input_power) {
   if (axisym) {
     qmsa_solver_ = new QuasiMagnetostaticSolverAxiSym(mpi, em_opt_, tps);
   } else {
@@ -249,6 +249,15 @@ void CycleAvgJouleCoupling::solve() {
     const double tot_jh = qmsa_solver_->totalJouleHeating();
     if (mpi_.Root()) {
       grvy_printf(GRVY_INFO, "The total input Joule heating = %.6e\n", tot_jh);
+    }
+
+    if (input_power_ > 0) {
+      const double ratio = input_power_ / tot_jh;
+      qmsa_solver_->scaleJouleHeating(ratio);
+      const double upd_jh = qmsa_solver_->totalJouleHeating();
+      if (mpi_.Root()) {
+        grvy_printf(GRVY_INFO, "The total input Joule heating after scaling = %.6e\n", upd_jh);
+      }
     }
 
     // flow

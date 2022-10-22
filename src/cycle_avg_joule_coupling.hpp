@@ -64,8 +64,11 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   int n_em_interp_nodes_;
   int n_flow_interp_nodes_;
 
+  double input_power_;
+
  public:
-  CycleAvgJouleCoupling(MPI_Session &mpi, string &inputFileName, TPS::Tps *tps, int max_out, bool axisym);
+  CycleAvgJouleCoupling(MPI_Session &mpi, string &inputFileName, TPS::Tps *tps, int max_out, bool axisym,
+                        double input_power = -1.);
   ~CycleAvgJouleCoupling();
 
   void initializeInterpolationData();

@@ -240,7 +240,9 @@ void Tps::chooseSolver() {
     getRequiredInput("solver/max-outer-iters", max_out);
     bool axisym = false;
     getInput("solver/axisymmetric", axisym, false);
-    solver_ = new CycleAvgJouleCoupling(mpi_, iFile_, this, max_out, axisym);
+    double input_power;
+    getInput("solver/input-power", input_power, -1.);
+    solver_ = new CycleAvgJouleCoupling(mpi_, iFile_, this, max_out, axisym, input_power);
   } else if (input_solver_type_ == "coupled") {
     isFlowEMCoupledMode_ = true;
     grvy_printf(GRVY_ERROR, "\nSlow your roll.  Solid high-five for whoever implements this coupled solver mode!\n");
