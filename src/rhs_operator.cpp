@@ -602,10 +602,7 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
 }
 
 void RHSoperator::updatePrimitives(const Vector &x_in) const {
-#if defined(_HIP_)
-  RHSoperator::updatePrimitives_hip(Up, &x_in, mixture->GetSpecificHeatRatio(), mixture->GetGasConstant(),
-                                    vfes->GetNDofs(), dim_, num_equation_, eqSystem);
-#elif defined(_CUDA_)
+#ifdef _GPU_
   auto dataUp = Up->Write();  // make sure data is available in GPU
   auto dataIn = x_in.Read();  // make sure data is available in GPU
 
@@ -632,64 +629,6 @@ void RHSoperator::updatePrimitives(const Vector &x_in) const {
     for (int eq = 0; eq < num_equation_; eq++) dataUp[i + eq * vfes->GetNDofs()] = primitiveState[eq];
   }
 #endif  // _GPU_
-}
-
-void RHSoperator::updatePrimitives_hip(Vector *Up, const Vector *x_in, const double gamma, const double Rgas,
-                                       const int ndofs, const int dim, const int num_equation,
-                                       const Equations &eqSystem) {
-#ifdef _GPU_
-  auto dataUp = Up->Write();   // make sure data is available in GPU
-  auto dataIn = x_in->Read();  // make sure data is available in GPU
-
-  MFEM_FORALL(n, ndofs, {
-    double state[gpudata::MAXEQUATIONS];  // double state[20];
-    // MFEM_SHARED double p;
-    double KE[gpudata::MAXDIM];  // double KE[3];
-
-    for (int eq = 0; eq < num_equation; eq++) {
-      state[eq] = dataIn[n + eq * ndofs];  // loads data into shared memory
-    }
-
-    for (int d = 0; d < dim; d++) {
-      KE[d] = 0.5 * state[1 + d] * state[1 + d] / state[0];
-    }
-    if (dim == 2) KE[2] = 0;
-
-    dataUp[n] = state[0];
-    dataUp[n + ndofs] = state[1] / state[0];
-    dataUp[n + 2 * ndofs] = state[2] / state[0];
-    if (dim == 3) dataUp[n + 3 * ndofs] = state[3] / state[0];
-    dataUp[n + (1 + dim) * ndofs] = DryAir::temperature(&state[0], &KE[0], gamma, Rgas, dim, num_equation);
-    if (eqSystem == NS_PASSIVE) dataUp[n + (num_equation - 1) * ndofs] = state[num_equation - 1] / state[0];
-  });
-
-  // MFEM_FORALL_2D(n, ndofs, num_equation, 1, 1, {
-  //   MFEM_SHARED double state[20];  // assuming 20 equations
-  //   // MFEM_SHARED double p;
-  //   MFEM_SHARED double KE[3];
-
-  //   MFEM_FOREACH_THREAD(eq, x, num_equation) {
-  //     state[eq] = dataIn[n + eq * ndofs];  // loads data into shared memory
-  //     MFEM_SYNC_THREAD;
-
-  //     // compute temperature
-  //     if (eq < dim) KE[eq] = 0.5 * state[1 + eq] * state[1 + eq] / state[0];
-  //     if (eq == num_equation - 1 && dim == 2) KE[2] = 0;
-  //     MFEM_SYNC_THREAD;
-
-  //     // each thread writes to global memory
-  //     if (eq == 0) dataUp[n] = state[0];
-  //     if (eq == 1) dataUp[n + ndofs] = state[1] / state[0];
-  //     if (eq == 2) dataUp[n + 2 * ndofs] = state[2] / state[0];
-  //     if (eq == 3 && dim == 3) dataUp[n + 3 * ndofs] = state[3] / state[0];
-  //     if (eq == 1 + dim)
-  //       dataUp[n + (1 + dim) * ndofs] = DryAir::temperature(&state[0], &KE[0], gamma, Rgas, dim, num_equation);
-  //     if (eq == num_equation - 1 && eqSystem == NS_PASSIVE)
-  //       dataUp[n + (num_equation - 1) * ndofs] = state[num_equation - 1] / state[0];
-  //   }
-  // });
-
-#endif
 }
 
 void RHSoperator::updateGradients(const Vector &x, const bool &primitiveUpdated) const {
