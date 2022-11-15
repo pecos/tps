@@ -1191,11 +1191,7 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const Array<int> &nodesID
       // compute mirror state
       switch (type) {
         case OutletType::SUB_P:
-#if defined(_CUDA_)
           d_mix->modifyEnergyForPressure(u1, u2, d_inputState[0]);
-#elif defined(_HIP_)
-          computeSubPressure_gpu_serial(&u1[0], &u2[0], &nor[0], d_inputState[0], gamma, Rg, dim, num_equation, fluid);
-#endif
           break;
         case OutletType::SUB_P_NR:
           computeNRSubPress_serial(offsetBdrU + q, &u1[0], &gradUp1[0], d_meanUp, dtloc, &u2[0], d_boundaryU,

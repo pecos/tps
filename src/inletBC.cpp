@@ -872,13 +872,9 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const Array<int> &nodesIDs,
       // compute mirror state
       switch (type) {
         case InletType::SUB_DENS_VEL:
-#if defined(_CUDA_)
           p = d_mix->ComputePressure(u1);
           pluginInputState(d_inputState, u2, nvel, numActiveSpecies);
           d_mix->modifyEnergyForPressure(u2, u2, p, true);
-#elif defined(_HIP_)
-          computeSubDenseVel_gpu_serial(&u1[0], &u2[0], &nor[0], d_inputState, gamma, Rg, dim, num_equation, fluid);
-#endif
           break;
         case InletType::SUB_DENS_VEL_NR:
           printf("INLET BC NOT IMPLEMENTED");
