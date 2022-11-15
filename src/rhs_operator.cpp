@@ -534,7 +534,6 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 }
 
 void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
-  //#if defined(_CUDA_)
   auto dataIn = x.Read();
   auto d_flux = flux.Write();
 
@@ -600,14 +599,6 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
       }
     }
   });
-// #elif defined(_HIP_)
-//   // ComputeConvectiveFluxes
-//   Fluxes::convectiveFluxes_hip(x, flux, eqSystem, mixture, vfes->GetNDofs(), dim_, num_equation_);
-//   if (eqSystem != EULER) {
-//     Fluxes::viscousFluxes_hip(x, gradUp, flux, eqSystem, mixture, spaceVaryViscMult, linViscData, vfes->GetNDofs(),
-//                               dim_, num_equation_);
-//   }
-// #endif
 }
 
 void RHSoperator::updatePrimitives(const Vector &x_in) const {
