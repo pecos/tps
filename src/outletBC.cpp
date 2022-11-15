@@ -1212,12 +1212,8 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const Array<int> &nodesID
           break;
       }
 
-        // compute flux
-#if defined(_CUDA_)
+      // compute flux
       d_rsolver->Eval_LF(u1, u2, nor, Rflux);
-#elif defined(_HIP_)
-      RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
-#endif
 
       for (int eq = 0; eq < num_equation; eq++) {
         d_flux[eq + q * num_equation + n * maxIntPoints * num_equation] = Rflux[eq];
