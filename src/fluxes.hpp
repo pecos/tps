@@ -78,6 +78,10 @@ class Fluxes {
   MFEM_HOST_DEVICE void ComputeConvectiveFluxes(const double *state, double *flux) const;
 
   void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, DenseMatrix &flux);
+
+#if defined(_HIP_)
+  __noinline__
+#endif
   MFEM_HOST_DEVICE void ComputeViscousFluxes(const double *state, const double *gradUp, double radius, double *flux);
 
   // Compute viscous flux with prescribed boundary flux.
