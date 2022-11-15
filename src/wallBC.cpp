@@ -529,12 +529,7 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
   // el_wall is index within wall boundary elements?
   MFEM_FORALL_2D(el_wall, wallElems.Size() / 7, maxIntPoints, 1, 1, {
     double u1[gpudata::MAXEQUATIONS], u2[gpudata::MAXEQUATIONS], nor[gpudata::MAXDIM], Rflux[gpudata::MAXEQUATIONS];
-    double vF1[gpudata::MAXEQUATIONS * gpudata::MAXDIM],
-#if defined(_CUDA_)
-        vF2[gpudata::MAXEQUATIONS];
-#elif defined(_HIP_)
-           vF2[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
-#endif
+    double vF1[gpudata::MAXEQUATIONS * gpudata::MAXDIM], vF2[gpudata::MAXEQUATIONS];
     double gradUp1[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
     double shape[gpudata::MAXDOFS];
     int index_i[gpudata::MAXDOFS];
