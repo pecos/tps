@@ -62,13 +62,14 @@ SourceTerm::~SourceTerm() {
 }
 
 void SourceTerm::updateTerms(mfem::Vector &in) {
-#if defined(_HIP_)
-  mfem_error("Source term is not supported on hip path!\n");
-  exit(-1);
-#endif
+// #if defined(_HIP_)
+//   mfem_error("Source term is not supported on hip path!\n");
+//   exit(-1);
+// #endif
 
   double *h_pc = NULL;
-#if defined(_CUDA_)
+  //#if defined(_CUDA_)
+#ifdef _GPU_
   const double *h_Up = Up_->Read();
   const double *h_U = U_->Read();
   const double *h_gradUp = gradUp_->Read();
