@@ -596,9 +596,6 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
           bcFlux.normal[d] = nor[d] / sqrt(normN);
         }
 
-// only implemented general viscous wall flux, as it can supersede all the other viscous wall types.
-// TODO(kevin): implement radius.
-#if defined(_CUDA_)
         if (computeSheath) d_mix->computeSheathBdrFlux(u2, bcFlux);
 
         if (type == WallType::INV) {
@@ -617,31 +614,53 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
           Rflux[eq] -= 0.5 * vF2[eq];
           for (int d = 0; d < dim; d++) Rflux[eq] -= 0.5 * vF1[eq + d * num_equation] * nor[d];
         }
-#elif defined(_HIP_)
-        // compute mirror state
-        switch (type) {
-          case WallType::INV:
-            computeInvWallState_gpu_serial(&u1[0], &u2[0], &nor[0], dim, num_equation);
-            break;
-          case WallType::VISC_ISOTH:
-            computeIsothermalState_gpu_serial(&u1[0], &u2[0], &nor[0], wallTemp, gamma, Rg, dim, num_equation, fluid);
-            break;
-          case WallType::VISC_ADIAB:
-            break;
-        }
 
-          // evaluate flux
-        RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
-        Fluxes::viscousFlux_serial_gpu(&vF1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
-                                       num_equation);
-        Fluxes::viscousFlux_serial_gpu(&vF2[0], &u2[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
-                                       num_equation);
+// // only implemented general viscous wall flux, as it can supersede all the other viscous wall types.
+// // TODO(kevin): implement radius.
+// #if defined(_CUDA_)
+//         if (computeSheath) d_mix->computeSheathBdrFlux(u2, bcFlux);
 
-        // add visc flux contribution
-        for (int eq = 0; eq < num_equation; eq++)
-          for (int d = 0; d < dim; d++)
-            Rflux[eq] -= 0.5 * (vF2[eq + d * num_equation] + vF1[eq + d * num_equation]) * nor[d];
-#endif
+//         if (type == WallType::INV) {
+//           // compute mirror state
+//           computeInvWallState_gpu_serial(&u1[0], &u2[0], &nor[0], dim, num_equation);
+//         } else {
+//           d_mix->modifyStateFromPrimitive(u1, bcState, u2);
+//         }
+//         d_rsolver->Eval_LF(u1, u2, nor, Rflux);
+//         d_fluxclass->ComputeViscousFluxes(u1, gradUp1, 0.0, vF1);
+//         d_fluxclass->ComputeBdrViscousFluxes(u2, gradUp1, 0.0, bcFlux, vF2);
+//         for (int eq = 0; eq < num_equation; eq++) vF2[eq] *= sqrt(normN);
+
+//         // add visc flux contribution
+//         for (int eq = 0; eq < num_equation; eq++) {
+//           Rflux[eq] -= 0.5 * vF2[eq];
+//           for (int d = 0; d < dim; d++) Rflux[eq] -= 0.5 * vF1[eq + d * num_equation] * nor[d];
+//         }
+// #elif defined(_HIP_)
+//         // compute mirror state
+//         switch (type) {
+//           case WallType::INV:
+//             computeInvWallState_gpu_serial(&u1[0], &u2[0], &nor[0], dim, num_equation);
+//             break;
+//           case WallType::VISC_ISOTH:
+//             computeIsothermalState_gpu_serial(&u1[0], &u2[0], &nor[0], wallTemp, gamma, Rg, dim, num_equation, fluid);
+//             break;
+//           case WallType::VISC_ADIAB:
+//             break;
+//         }
+
+//           // evaluate flux
+//         RiemannSolver::riemannLF_serial_gpu(&u1[0], &u2[0], &Rflux[0], &nor[0], gamma, Rg, dim, num_equation);
+//         Fluxes::viscousFlux_serial_gpu(&vF1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
+//                                        num_equation);
+//         Fluxes::viscousFlux_serial_gpu(&vF2[0], &u2[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
+//                                        num_equation);
+
+//         // add visc flux contribution
+//         for (int eq = 0; eq < num_equation; eq++)
+//           for (int d = 0; d < dim; d++)
+//             Rflux[eq] -= 0.5 * (vF2[eq + d * num_equation] + vF1[eq + d * num_equation]) * nor[d];
+// #endif
 
         // store flux (TODO: change variable name)
         for (int eq = 0; eq < num_equation; eq++) {

@@ -87,6 +87,10 @@ class Fluxes {
   // Compute viscous flux with prescribed boundary flux.
   void ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius,
                                const BoundaryViscousFluxData &bcFlux, Vector &normalFlux);
+
+#if defined(_HIP_)
+  __noinline__
+#endif
   MFEM_HOST_DEVICE void ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius,
                                                 const BoundaryViscousFluxData &bcFlux, double *normalFlux);
 
