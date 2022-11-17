@@ -29,6 +29,11 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
+
+/** @file
+ * C++ driver application for TPS simulation.
+ */
+
 #include "tps.hpp"
 
 int main(int argc, char *argv[]) {

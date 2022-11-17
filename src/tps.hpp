@@ -32,6 +32,10 @@
 #ifndef TPS_HPP_
 #define TPS_HPP_
 
+/** @file
+ * Top-level TPS class
+ */
+
 #include <grvy.h>
 #include <tps_config.h>
 
@@ -58,7 +62,12 @@
 
 namespace TPS {
 
-// Top-level TPS class
+/** \brief Top-level TPS class.
+ *
+ * Top-level class that provides input parsing, initialization of
+ * devices (e.g., gpus), initialization of solver classes requested
+ * through input file, and execution of solve.
+ */
 class Tps {
  private:
   std::string tpsVersion_;  // code version
@@ -91,9 +100,9 @@ class Tps {
   bool isVisualizationMode_;
 
  public:
-  Tps();                           // constructor
-  ~Tps();                          // destructor
-  GRVY::GRVY_Input_Class iparse_;  // runtime input parser
+  Tps();
+  ~Tps();
+  GRVY::GRVY_Input_Class iparse_;  ///< runtime input parser (from libgrvy)
 
   void chooseSolver();
   void chooseDevices();
@@ -101,38 +110,49 @@ class Tps {
 
   // TPS::Solver getSolver() { return solver_; }
 
-  // input parsing support (variants with default value supplied)
-  // supported types are T={int,double,bool,std::string}
+  /// Input parsing support (variants with default value supplied)
   template <typename T>
   void getInput(const char *name, T &var, T varDefault);
 
-  // read optional mfem::Vector input (set to vdef if absent in input file)
+  /// Read optional mfem::Vector input (set to vdef if absent in input file)
   void getVec(const char *name, Vector &vec, size_t numElems, const Vector &vdef);
 
-  // input parsing support (variants where value is required to be provided)
-  // supported types are T={int,double,std::string}
+  /// Parsing support for required (scalar) inputs
   template <typename T>
   void getRequiredInput(const char *name, T &var);
+
+  /// Parsing support for required (vector) inputs
   void getRequiredVec(const char *name, std::vector<double> &var, size_t numElems);
   void getRequiredVec(const char *name, Vector &var, size_t numElems);
   void getRequiredVec(const char *name, Array<double> &var, size_t numElems);
+
+  /// Parsing support for required (single element of vector) inputs
   void getRequiredVecElem(const char *name, double &var, int ithElem);
 
+  /// Read string-string pairs for keyword [name] and store in var.
   void getRequiredPairs(const char *name, std::vector<pair<std::string, std::string>> &var);
 
+  /// Get solver status
   int getStatus() { return solver_->getStatus(); }
+
+  /// Initialize the requested solver
   void initialize() {
     solver_->initialize();
     return;
   }
+
+  /// Execute the requested solve
   void solve() {
     solver_->solve();
     return;
   }
+
+  /// Execute the solver 'visualization' mode for post-processing
   void visualization() {
     solver_->visualization();
     return;
   }
+
   void printHeader();
   void parseCommandLineArgs(int argc, char *argv[]);  // variant used in C++ interface
   void parseArgs(std::vector<std::string> argv);      // variant used in python interface
