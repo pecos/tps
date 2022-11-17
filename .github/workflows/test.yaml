@@ -26,11 +26,11 @@ jobs:
      name: Code style
      steps:
        - name: Cancel previous runs
-         uses: styfle/cancel-workflow-action@0.9.0
+         uses: styfle/cancel-workflow-action@0.11.0
          with:
            access_token: ${{ github.token }}
        - name: Checkout code
-         uses: actions/checkout@v2
+         uses: actions/checkout@v3
        - name: Bootstrap
          run:  ./bootstrap
        - name: Configure
@@ -46,11 +46,11 @@ jobs:
      name: Build/CPU
      steps:
        - name: Cancel previous runs
-         uses: styfle/cancel-workflow-action@0.9.0
+         uses: styfle/cancel-workflow-action@0.11.0
          with:
            access_token: ${{ github.token }}     
        - name: Checkout code
-         uses: actions/checkout@v2
+         uses: actions/checkout@v3
          with:
            lfs: true
        - name: Query modules loaded
@@ -79,11 +79,11 @@ jobs:
       MASA_DIR: /home/oliver/sw/masa
     steps:
       - name: Cancel previous runs
-        uses: styfle/cancel-workflow-action@0.9.0
+        uses: styfle/cancel-workflow-action@0.11.0
         with:
           access_token: ${{ github.token }}    
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           lfs: true
       - name: MFEM Tree
@@ -105,11 +105,11 @@ jobs:
       MFEM_DIR: /home/karl/sw/mfem-hip-4.3
     steps:
       - name: Cancel previous runs
-        uses: styfle/cancel-workflow-action@0.9.0
+        uses: styfle/cancel-workflow-action@0.11.0
         with:
           access_token: ${{ github.token }}    
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           lfs: true
       - name: Set ROCm path
@@ -143,11 +143,11 @@ jobs:
      name: Create dist tarball
      steps:
        - name: Cancel previous runs
-         uses: styfle/cancel-workflow-action@0.9.0
+         uses: styfle/cancel-workflow-action@0.11.0
          with:
            access_token: ${{ github.token }}     
        - name: Checkout code
-         uses: actions/checkout@v2
+         uses: actions/checkout@v3
          with:
            lfs: true         
        - name: Bootstrap
@@ -157,7 +157,7 @@ jobs:
        - name: Dist
          run:  make dist
        - name: Archive tarball
-         uses: actions/upload-artifact@v2
+         uses: actions/upload-artifact@v3
          with:
            name: tarball-${{ github.event.pull_request.head.sha }}
            path: tps-*.tar.gz
@@ -170,11 +170,11 @@ jobs:
      name: CPU release tarball tests
      steps:
        - name: Cancel previous runs
-         uses: styfle/cancel-workflow-action@0.9.0
+         uses: styfle/cancel-workflow-action@0.11.0
          with:
            access_token: ${{ github.token }}     
        - name: Access tarball
-         uses: actions/download-artifact@v2
+         uses: actions/download-artifact@v3
          with:
            name: tarball-${{ github.event.pull_request.head.sha }}
        - name: Expand
@@ -203,11 +203,11 @@ jobs:
        MFEM_DIR: /home/karl/sw/mfem-gpu-4.4
      steps:
        - name: Cancel previous runs
-         uses: styfle/cancel-workflow-action@0.9.0
+         uses: styfle/cancel-workflow-action@0.11.0
          with:
            access_token: ${{ github.token }}    
        - name: Access tarball
-         uses: actions/download-artifact@v2
+         uses: actions/download-artifact@v3
          with:
            name: tarball-${{ github.event.pull_request.head.sha }}
        - name: Expand
