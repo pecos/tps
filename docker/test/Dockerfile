@@ -141,6 +141,8 @@ RUN yum -y install pybind11-devel
 RUN yum -y install python3-pybind11
 RUN yum -y install perl-Data-Dumper
 
+RUN pip3 install gcovr
+
 # Register new libs installed into /usr/local/lib with linker
 RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/class.conf
 RUN ldconfig
