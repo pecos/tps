@@ -64,6 +64,12 @@ dnl AC_PROG_RANLIB
 AX_VALGRIND_CHECK()
 AM_CONDITIONAL(VALGRIND_ENABLED,test x$enable_valgrind = xyes)
 
+#----------------------------------------------
+# Optionally enable code coverage tool
+#----------------------------------------------
+AX_CODE_COVERAGE
+
+
 #-- Slurm job restart support
 ENABLE_SLURM=no
 AH_TEMPLATE([HAVE_SLURM],[Enable SLURM resource manager support])
