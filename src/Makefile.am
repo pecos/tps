@@ -142,3 +142,14 @@ license:
 	@echo 'Running license update tool for src files'
 	@$(top_srcdir)/utils/update_license.pl -S=$(top_srcdir)/src $(top_srcdir)/LICENSE \
 		 $(headers) $(cxx_sources) main.cpp
+
+#---------------------------------
+# doxygen documentation
+#---------------------------------
+doc:
+	@echo ""
+	@echo "-------------------------------------------"
+	@echo "Generating doxygen documentation           "
+	@echo "-------------------------------------------"
+	@echo ""
+	@cd $(top_srcdir) && $(DOXYGEN) $(abs_top_builddir)/doc/Doxyfile

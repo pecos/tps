@@ -29,6 +29,11 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
+
+/** @file
+ * @copydoc tps.hpp
+ */
+
 #include "tps.hpp"
 
 #ifdef HAVE_MPI_EXT
@@ -47,6 +52,12 @@
 
 namespace TPS {
 
+/** \brief Constructs default Tps object.
+ *
+ * Only generic initialization is done.  After construction, user must
+ * call input parsing functions, choose solver, and initialize to set
+ * information for simulation.  For an example, see main.cpp.
+ */
 Tps::Tps() {
   nprocs_ = mpi_.WorldSize();
   rank_ = mpi_.WorldRank();
@@ -76,10 +87,12 @@ Tps::Tps() {
 #endif
 }
 
+/// Destructor
 Tps::~Tps() {
   if (solver_ != NULL) delete solver_;
 }
 
+/// Print a pretty ascii header including version information
 void Tps::printHeader() {
   if (isRank0_) {
     grvy_printf(ginfo, "\n------------------------------------\n");
@@ -156,8 +169,11 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
   return;
 }
 
-/// Wrapper function for parseCommandLineArgs that takes command-line args as
-/// a vector of strings (intended for use with Python interface)
+/** \brief Wrapper function for parseCommandLineArgs
+ *
+ * This wrapper takes the command-line args as a vector of strings.
+ * It is intended for use with Python interface.
+ */
 void Tps::parseArgs(std::vector<std::string> argv) {
   std::vector<char *> argv_char;
   for (auto &s : argv) argv_char.push_back(&s.front());
@@ -197,7 +213,12 @@ void Tps::chooseDevices() {
   return;
 }
 
-/// Choose desired solver class
+/** \brief Choose desired solver class
+ *
+ * Based on the solver requested in the input file, instantiate the
+ * appropriate solver class and parse the input file for
+ * solver-specific options.
+ */
 void Tps::chooseSolver() {
   if (input_solver_type_ == "flow") {
     isFlowOnlyMode_ = true;
@@ -233,13 +254,21 @@ void Tps::chooseSolver() {
   solver_->parseSolverOptions();
 }
 
+/** \brief Read runtime input file
+ *
+ * The file is read on single MPI process and then distributed so that
+ * runtime inputs are available for query on on all processors.
+ */
 void Tps::parseInputFile(std::string iFile) {
   iFile_ = iFile;
   parseInput();
 }
 
-/// Read runtime input file on single MPI process and distribute so that
-/// runtime inputs are available for query on on all processors.
+/** @copydoc Tps::parseInputFile
+ *
+ * This variant reads from file specified by private variable iFile_,
+ * which can be set, for example, by Tps::parseCommandLineArgs
+ */
 void Tps::parseInput() {
   std::stringstream buffer;
   std::string ss;
@@ -278,29 +307,22 @@ void Tps::parseInput() {
   return;
 }
 
-/// read an input value for keyword [name] and store in STL vector - error if value
-/// is not supplied
+
+/** Read an input value for keyword [name] and store in var - use defaultValue if
+ *  keyword not present.  Supported types are T={int,double,bool,std::string}
+ */
 template <typename T>
-void Tps::getRequiredInput(const char *name, T &var) {
-  if (!iparse_.Read_Var(name, &var)) {
-    std::cout << "ERROR: Unable to read required input variable -> " << name << std::endl;
+void Tps::getInput(const char *name, T &var, T varDefault) {
+  if (!iparse_.Read_Var(name, &var, varDefault)) {
+    std::cout << "ERROR: Unable to read input variable -> " << name << std::endl;
     exit(ERROR);
   }
   return;
 }
 
-/// read an input vector for keyword [name] and store in MFEM vector. The size of the vector
-/// is numElems
-void Tps::getRequiredVec(const char *name, Vector &vec, size_t numElems) {
-  if ((size_t)vec.Size() < numElems) vec.SetSize(numElems);
-  if (!iparse_.Read_Var_Vec(name, vec.HostWrite(), numElems)) {
-    std::cout << "ERROR: Unable to read input vector -> " << name << std::endl;
-    exit(ERROR);
-  }
-}
-
-/// read an input vector for keyword [name] and store in MFEM vector. The size of the vector
-/// is numElems
+/** Read an input vector for keyword [name] and store in var - use vdef if
+ *  keyword not present.  Only mfem::Vector supported.
+ */
 void Tps::getVec(const char *name, Vector &vec, size_t numElems, const Vector &vdef) {
   if ((size_t)vdef.Size() < numElems) exit(ERROR);
   if ((size_t)vec.Size() < numElems) vec.SetSize(numElems);
@@ -314,7 +336,57 @@ void Tps::getVec(const char *name, Vector &vec, size_t numElems, const Vector &v
   }
 }
 
-/// read the ith entry from an input vector for keyword [name].
+/** Read an input value for keyword [name] and store in var.  If
+ *  keyword not present in input, exits with error.  Supported types
+ *  are T={int,double,bool,std::string}
+ */
+template <typename T>
+void Tps::getRequiredInput(const char *name, T &var) {
+  if (!iparse_.Read_Var(name, &var)) {
+    std::cout << "ERROR: Unable to read required input variable -> " << name << std::endl;
+    exit(ERROR);
+  }
+  return;
+}
+
+/** \brief Input parsing for vector quantities that must be provided.
+ *
+ *  @param[in] name of require input
+ *  @param[out] var vector variable to set (resized if necessary)
+ *  @param[in] numElems length of vector
+ */
+void Tps::getRequiredVec(const char *name, std::vector<double> &vec, size_t numElems) {
+  if (vec.size() < numElems) vec.reserve(numElems);
+  if (!iparse_.Read_Var_Vec(name, vec.data(), numElems)) {
+    std::cout << "ERROR: Unable to read input vector -> " << name << std::endl;
+    exit(ERROR);
+  }
+}
+
+/// @copydoc Tps::getRequiredVec(const char *,std::vector<double> &,size_t)
+void Tps::getRequiredVec(const char *name, Vector &vec, size_t numElems) {
+  if ((size_t)vec.Size() < numElems) vec.SetSize(numElems);
+  if (!iparse_.Read_Var_Vec(name, vec.HostWrite(), numElems)) {
+    std::cout << "ERROR: Unable to read input vector -> " << name << std::endl;
+    exit(ERROR);
+  }
+}
+
+/// @copydoc Tps::getRequiredVec(const char *,Vector &,size_t)
+void Tps::getRequiredVec(const char *name, mfem::Array<double> &vec, size_t numElems) {
+  if ((size_t)vec.Size() < numElems) vec.SetSize(numElems);
+  if (!iparse_.Read_Var_Vec(name, vec.HostWrite(), numElems)) {
+    std::cout << "ERROR: Unable to read input vector -> " << name << std::endl;
+    exit(ERROR);
+  }
+}
+
+/** Input parsing for an individual element of a vector that must be provided.
+ *
+ * @param[in] name of require input
+ * @param[inout] var vector variable to set
+ * @param[in] ithElem index of element to set
+ */
 void Tps::getRequiredVecElem(const char *name, double &value, int ithElem) {
 #if 1
   if (!iparse_.Read_Var_iVec(name, &value, ithElem)) {
@@ -324,38 +396,7 @@ void Tps::getRequiredVecElem(const char *name, double &value, int ithElem) {
 #endif
 }
 
-/// read an input vector for keyword [name] and store in MFEM array. The size of the vector
-/// is numElems
-void Tps::getRequiredVec(const char *name, mfem::Array<double> &vec, size_t numElems) {
-  if ((size_t)vec.Size() < numElems) vec.SetSize(numElems);
-  if (!iparse_.Read_Var_Vec(name, vec.HostWrite(), numElems)) {
-    std::cout << "ERROR: Unable to read input vector -> " << name << std::endl;
-    exit(ERROR);
-  }
-}
 
-/// read an input vector for keyword [name] and store in vec. The size of the vector
-/// is numElems
-void Tps::getRequiredVec(const char *name, std::vector<double> &vec, size_t numElems) {
-  if (vec.size() < numElems) vec.reserve(numElems);
-  if (!iparse_.Read_Var_Vec(name, vec.data(), numElems)) {
-    std::cout << "ERROR: Unable to read input vector -> " << name << std::endl;
-    exit(ERROR);
-  }
-}
-
-/// read an input value for keyword [name] and store in var - use defaultValue if
-/// keyword not present
-template <typename T>
-void Tps::getInput(const char *name, T &var, T varDefault) {
-  if (!iparse_.Read_Var(name, &var, varDefault)) {
-    std::cout << "ERROR: Unable to read input variable -> " << name << std::endl;
-    exit(ERROR);
-  }
-  return;
-}
-
-/// read string-string pairs for keyword [name] and store in var.
 void Tps::getRequiredPairs(const char *name, std::vector<pair<std::string, std::string>> &var) {
   std::string inputString;
   if (!iparse_.Read_Var(name, &inputString)) {

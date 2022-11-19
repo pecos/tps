@@ -223,6 +223,15 @@ fi
 AX_PATH_MFEM([4.3],  [yes])
 
 
+# -------------------------------------------------------------
+# Doxygen - look for doxygen (a documentation tool)
+# -------------------------------------------------------------
+AC_CONFIG_FILES(doc/Doxyfile)
+AC_PATH_PROG(DOXYGEN, doxygen)
+AC_SUBST(DOXYGEN)
+# -------------------------------------------------------------
+
+
 dnl --
 
 AC_OUTPUT([Makefile src/Makefile test/Makefile utils/Makefile])
