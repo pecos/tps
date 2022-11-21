@@ -20,7 +20,14 @@ Version 1.2 (in progress)
   * added a new [io] runtime option (restartMode = singleFileReadWrite) which
     will serialize the restart files for both reading and writing into a
     single .h5 file.  This is the recommended option when desiring to avoid 1
-    file per MPI rank.
+    file per MPI rank. (#138)
+  * introduction of multi-component, reactive, 2T plasma models (#119, #121, #122, #126)
+  * refactor gpu code path to reduce code duplication with cpu path
+    (#128, #130, #131, #142, #146, #147, #149, #150, #152, #153, #155)
+  * introduce 'cylce-averaged' coupling mode between EM and flow/plasma (#166, #167, #174)
+  * introdece net emission coefficient (NEC) radiation model (#183)
+  * add doxygen support (#186)
+  * add code coverage (gcov+gcovr) support (#188)
 
 Version 1.1 (21 Dec 2021)
 
