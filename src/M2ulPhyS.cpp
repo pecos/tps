@@ -481,6 +481,7 @@ void M2ulPhyS::initVariables() {
 
   alpha = 0.5;
   isSBP = config.isSBP();
+  assert(!isSBP);
 
   // Boundary attributes in present partition
   Array<int> local_attr;
@@ -507,10 +508,12 @@ void M2ulPhyS::initVariables() {
                                         gradUp, gradUpfes, max_char_speed, config.isAxisymmetric());
   }
   A->AddInteriorFaceIntegrator(faceIntegrator);
+#ifdef _BUILD_DEPRECATED_
   if (isSBP) {
     SBPoperator = new SBPintegrator(mixture, fluxClass, intRules, dim, num_equation, alpha);
     A->AddDomainIntegrator(SBPoperator);
   }
+#endif
 
   Aflux = new MixedBilinearForm(dfes, fes);
   domainIntegrator = new DomainIntegrator(fluxClass, intRules, intRuleType, dim, num_equation, config.isAxisymmetric());
@@ -909,7 +912,9 @@ M2ulPhyS::~M2ulPhyS() {
   delete rhsOperator;
   // delete domainIntegrator;
   delete Aflux;  // fails to delete (follow this)
+#ifdef _BUILD_DEPRECATED_
   if (isSBP) delete SBPoperator;
+#endif
   // delete faceIntegrator;
   delete A;  // fails to delete (follow this)
 
@@ -1288,10 +1293,15 @@ void M2ulPhyS::projectInitialSolution() {
 #ifdef HAVE_MASA
     if (config.use_mms_ && config.mmsSaveDetails_) projectExactSolution(0.0, masaU_);
 #endif
+
+#ifdef _BUILD_DEPRECATED_
     if (config.RestartHDFConversion())
       read_restart_files();
     else
       restart_files_hdf5("read");
+#else
+    restart_files_hdf5("read");
+#endif
 
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
@@ -1699,6 +1709,7 @@ void M2ulPhyS::initGradUp() {
   }
 }
 
+#ifdef _BUILD_DEPRECATED_
 void M2ulPhyS::write_restart_files() {
   string serialName = "restart_p";
   serialName.append(to_string(order));
@@ -1815,6 +1826,7 @@ void M2ulPhyS::read_restart_files() {
   U->ReadWrite();
   //  if( loadFromAuxSol ) auto dausUp = aux_Up->ReadWrite();
 }
+#endif
 
 void M2ulPhyS::Check_NAN() {
   int local_print = 0;

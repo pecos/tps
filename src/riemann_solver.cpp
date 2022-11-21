@@ -117,6 +117,7 @@ MFEM_HOST_DEVICE void RiemannSolver::Eval(const double *state1, const double *st
 }
 
 void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux) {
+#ifdef _BUILD_DEPRECATED_
   // NOTE: nor in general is not a unit normal
   const int dim = nor.Size();
   // const int nvel = (axisymmetric_ ? 3 : dim);
@@ -144,6 +145,9 @@ void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Ve
   for (int i = 0; i < num_equation; i++) {
     flux(i) = 0.5 * (flux1(i) + flux2(i)) - 0.5 * maxE * (state2(i) - state1(i)) * normag;
   }
+#else
+  Eval_LF(state1.GetData(), state2.GetData(), nor.GetData(), flux.GetData());
+#endif
 }
 
 MFEM_HOST_DEVICE void RiemannSolver::Eval_LF(const double *state1, const double *state2, const double *nor,

@@ -41,6 +41,7 @@ MFEM_HOST_DEVICE Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, Trans
       axisymmetric_(axisym),
       num_equation(_num_equation) {}
 
+#ifdef _BUILD_DEPRECATED_
 void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, DenseMatrix &flux) {
   switch (eqSystem) {
     case EULER:
@@ -59,8 +60,10 @@ void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, D
     } break;
   }
 }
+#endif
 
 void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
+#ifdef _BUILD_DEPRECATED_
   double Pe = 0.0;
   const double pres = mixture->ComputePressure(state, &Pe);
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
@@ -89,6 +92,9 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
     for (int d = 0; d < dim; d++) flux(num_equation - 1, d) = electronEnthalpy * state(1 + d);
     // for (int d = 0; d < dim; d++) flux(num_equation - 1, d) = state(num_equation - 1) * state(1 + d) / state(0);
   }
+#else
+  ComputeConvectiveFluxes(state.GetData(), flux.GetData());
+#endif
 }
 
 MFEM_HOST_DEVICE void Fluxes::ComputeConvectiveFluxes(const double *state, double *flux) const {
@@ -130,6 +136,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeConvectiveFluxes(const double *state, doubl
 
 // TODO(kevin): check/complete axisymmetric setting for multi-component flow.
 void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, DenseMatrix &flux) {
+#ifdef _BUILD_DEPRECATED_
   flux = 0.;
   if (eqSystem == EULER) {
     return;
@@ -247,6 +254,9 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
     // however only dim-components are used for flux.
     for (int d = 0; d < dim; d++) flux(nvel + 2 + sp, d) = -state[nvel + 2 + sp] * diffusionVelocity(sp, d);
   }
+#else
+  ComputeViscousFluxes(state.GetData(), gradUp.GetData(), radius, flux.GetData());
+#endif
 }
 
 MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius,
@@ -624,6 +634,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const
   }
 }
 
+#ifdef _BUILD_DEPRECATED_
 void Fluxes::ComputeSplitFlux(const mfem::Vector &state, mfem::DenseMatrix &a_mat, mfem::DenseMatrix &c_mat) {
   const int num_equation = state.Size();
   const int dim = num_equation - 2;
@@ -648,5 +659,6 @@ void Fluxes::ComputeSplitFlux(const mfem::Vector &state, mfem::DenseMatrix &a_ma
     c_mat(num_equation - 1, d) = rhoE /*+p*/;
   }
 }
+#endif
 
 // clang-format on

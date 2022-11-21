@@ -253,6 +253,7 @@ bool DryAir::StateIsPhysical(const mfem::Vector &state) {
 // Diffusion velocity contributes to the characteristic speed, which mixture cannot handle or know.
 // Compute the maximum characteristic speed.
 double DryAir::ComputeMaxCharSpeed(const Vector &state) {
+#ifdef _BUILD_DEPRECATED_
   const double den = state(0);
   const Vector den_vel(state.GetData() + 1, nvel_);
 
@@ -267,6 +268,9 @@ double DryAir::ComputeMaxCharSpeed(const Vector &state) {
   const double vel = sqrt(den_vel2 / den);
 
   return vel + sound;
+#else
+  return ComputeMaxCharSpeed(state.GetData());
+#endif
 }
 
 MFEM_HOST_DEVICE double DryAir::ComputeMaxCharSpeed(const double *state) const {
@@ -286,6 +290,7 @@ MFEM_HOST_DEVICE double DryAir::ComputeMaxCharSpeed(const double *state) const {
 }
 
 void DryAir::GetConservativesFromPrimitives(const Vector &primit, Vector &conserv) {
+#ifdef _BUILD_DEPRECATED_
   conserv = primit;
 
   double v2 = 0.;
@@ -302,6 +307,9 @@ void DryAir::GetConservativesFromPrimitives(const Vector &primit, Vector &conser
       conserv[nvel_ + 2 + n] *= primit[0];
     }
   }
+#else
+  GetConservativesFromPrimitives(primit.GetData(), conserv.GetData());
+#endif
 }
 
 MFEM_HOST_DEVICE void DryAir::GetConservativesFromPrimitives(const double *primit, double *conserv) {
@@ -324,6 +332,7 @@ MFEM_HOST_DEVICE void DryAir::GetConservativesFromPrimitives(const double *primi
 }
 
 void DryAir::GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit) {
+#ifdef _BUILD_DEPRECATED_
   double T = ComputeTemperature(conserv);
   primit = conserv;
 
@@ -337,6 +346,9 @@ void DryAir::GetPrimitivesFromConservatives(const Vector &conserv, Vector &primi
       primit[nvel_ + 2 + n] /= primit[0];
     }
   }
+#else
+  GetPrimitivesFromConservatives(conserv.GetData(), primit.GetData());
+#endif
 }
 
 MFEM_HOST_DEVICE void DryAir::GetPrimitivesFromConservatives(const double *conserv, double *primit) {

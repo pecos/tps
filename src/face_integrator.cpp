@@ -47,12 +47,16 @@ FaceIntegrator::FaceIntegrator(IntegrationRules *_intRules, RiemannSolver *rsolv
       intRules(_intRules),
       useLinear(_useLinear),
       axisymmetric_(axisym) {
+#ifdef _BUILD_DEPRECATED_
   if (useLinear) {
     faceMassMatrix1 = new DenseMatrix[vfes->GetNF() - vfes->GetNBE()];
     faceMassMatrix2 = new DenseMatrix[vfes->GetNF() - vfes->GetNBE()];
     faceMassMatrixComputed = false;
     faceNum = 0;
   }
+#else
+  assert(!useLinear);
+#endif
 
   totDofs = vfes->GetNDofs();
 }
@@ -167,7 +171,11 @@ void FaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteEl
                                         FaceElementTransformations &Tr, const Vector &elfun, Vector &elvect) {
   if (useLinear) {
     assert(!axisymmetric_);  // axisym not supported in useLinear path
+#ifdef _BUILD_DEPRECATED_
     MassMatrixFaceIntegral(el1, el2, Tr, elfun, elvect);
+#else
+    assert(false);
+#endif
   } else {
     NonLinearFaceIntegration(el1, el2, Tr, elfun, elvect);
   }
@@ -285,6 +293,7 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
   }
 }
 
+#ifdef _BUILD_DEPRECATED_
 void FaceIntegrator::MassMatrixFaceIntegral(const FiniteElement &el1, const FiniteElement &el2,
                                             FaceElementTransformations &Tr, const Vector &elfun, Vector &elvect) {
   // Compute the term <F.n(u),[w]> on the interior faces.
@@ -430,3 +439,4 @@ void FaceIntegrator::MassMatrixFaceIntegral(const FiniteElement &el1, const Fini
     faceMassMatrixComputed = true;
   }
 }
+#endif
