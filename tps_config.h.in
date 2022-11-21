@@ -117,6 +117,9 @@
 /* Version number of package */
 #undef VERSION
 
+/* Build deprecated functionality */
+#undef _BUILD_DEPRECATED_
+
 /* CUDA backend */
 #undef _CUDA_
 

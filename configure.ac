@@ -231,6 +231,7 @@ AC_PATH_PROG(DOXYGEN, doxygen)
 AC_SUBST(DOXYGEN)
 # -------------------------------------------------------------
 
+
 # -------------------------------------------------------------
 # GSL - look for Gnu Scientific Library
 # -------------------------------------------------------------
@@ -241,6 +242,16 @@ if test x$ENABLE_GSL = xyes; then
    AC_DEFINE([HAVE_GSL])
 fi
 AM_CONDITIONAL(GSL_ENABLED,test x$ENABLE_GSL = xyes)
+
+
+# -------------------------------------------------------------
+# build deprecated capabilities if requested
+# -------------------------------------------------------------
+AH_TEMPLATE([_BUILD_DEPRECATED_], [Build deprecated functionality])
+AC_ARG_ENABLE([build-deprecated],
+         [AS_HELP_STRING([--enable-build-deprecated],[Enable support for deprecated functionality.])],
+	 [AC_DEFINE([_BUILD_DEPRECATED_])],[])
+
 
 dnl --
 
