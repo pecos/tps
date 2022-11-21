@@ -38,8 +38,9 @@ XFAIL_TESTS =
 if GPU_ENABLED
 TESTS += cyl3d.gpu.test \
 	 cyl3d.mflow.gpu.test \
-	 wedge.gpu.test \
-	 averages.gpu.test
+	 wedge.gpu.test
+
+#	 averages.gpu.test
 
 if PYTHON_ENABLED
 TESTS += cyl3d.gpu.python.test
