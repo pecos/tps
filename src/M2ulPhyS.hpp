@@ -272,7 +272,7 @@ class M2ulPhyS : public TPS::Solver {
   double hmin;
 
   // maximum element size
-  double hmax;  
+  double hmax;
 
   // exit status code;
   int exit_status_;
@@ -368,7 +368,7 @@ class M2ulPhyS : public TPS::Solver {
   void parseTransportInputs();
   void parseReactionInputs();
   void parseBCInputs();
-  //void parseSGSInputs();  
+  // void parseSGSInputs();
   void parseSpongeZoneInputs();
   void parsePostProcessVisualizationInputs();
 
@@ -390,8 +390,8 @@ class M2ulPhyS : public TPS::Solver {
   void visualization() override;
   void updateVisualizationVariables();
 
-  void viscMultPlanar(Vector coords, double &wgt);  
-  
+  void viscMultPlanar(Vector coords, double &wgt);
+
   // Accessors
   RHSoperator *getRHSoperator() { return rhsOperator; }
   ParMesh *GetMesh() { return mesh; }

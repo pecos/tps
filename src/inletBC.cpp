@@ -30,6 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 #include "inletBC.hpp"
+
 #include "dgNonlinearForm.hpp"
 #include "riemann_solver.hpp"
 
@@ -449,7 +450,7 @@ void InletBC::initBoundaryU(ParGridFunction *Up) {
 //  void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector
 //  &bdrFlux) {
 void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius,
-			     Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux) {
+                             Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux) {
   switch (inletType_) {
     case SUB_DENS_VEL:
       subsonicReflectingDensityVelocity(normal, stateIn, bdrFlux);
@@ -459,7 +460,7 @@ void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradS
       break;
     case SUB_TEMP_VEL_USR:
       subsonicReflectingTemperatureVelocityUser(normal, stateIn, transip, bdrFlux);
-      break;            
+      break;
     case SUB_DENS_VEL_NR:
       subsonicNonReflectingDensityVelocity(normal, stateIn, gradState, bdrFlux);
       break;
@@ -471,7 +472,7 @@ void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradS
       break;
     case SUB_VEL_CONST_TMP_USR:
       subsonicNonReflectingTemperatureVelocityUser(normal, stateIn, gradState, transip, bdrFlux);
-      break;      
+      break;
   }
 }
 
@@ -530,7 +531,7 @@ void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
             sum += shape[d] * elUp(d + eq * elDofs);
           }
           localMeanUp[eq] += sum;
-          //if (!bdrUInit) boundaryU[eq + Nbdr * num_equation_] = sum;
+          // if (!bdrUInit) boundaryU[eq + Nbdr * num_equation_] = sum;
           if (!bdrUInit) boundaryU[eq + Nbdr * num_equation_] = iState[eq];
         }
         Nbdr++;
@@ -579,7 +580,7 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   //                                                   Vector &bdrFlux) {
 
   //  printf("hello world 1\n"); fflush(stdout);
-  
+
   const double gamma = mixture->GetSpecificHeatRatio();
   // const double pressure = eqState->ComputePressure(stateIn, dim);
 
@@ -751,12 +752,11 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
 // jump
 void InletBC::subsonicNonReflectingTemperatureVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
                                                        Vector &bdrFlux) {
-
   //  printf("hello world 2\n"); fflush(stdout);
-  
+
   const double gamma = mixture->GetSpecificHeatRatio();
-  const double p = mixture->ComputePressure(stateIn);  
-  
+  const double p = mixture->ComputePressure(stateIn);
+
   Vector unitNorm = normal;
   {
     double mod = 0.;
@@ -767,7 +767,7 @@ void InletBC::subsonicNonReflectingTemperatureVelocity(Vector &normal, Vector &s
   Vector Up(num_equation_);
   mixture->GetPrimitivesFromConservatives(stateIn, Up);
   double rho = Up[0];
-  
+
   // specific heat
   double Rgas = mixture->GetGasConstant();
   double Cv;
@@ -819,11 +819,11 @@ void InletBC::subsonicNonReflectingTemperatureVelocity(Vector &normal, Vector &s
 
   // tangential part of incoming waves :: should be un * dutdn
   double L3 = 0.;
-  //for (int d = 0; d < dim_; d++) L3 += tangent1[d] * normGrad[1 + d];
-  //L3 *= meanVel[1];
+  // for (int d = 0; d < dim_; d++) L3 += tangent1[d] * normGrad[1 + d];
+  // L3 *= meanVel[1];
 
   double L4 = 0.;
-  //if (dim_ == 3) {
+  // if (dim_ == 3) {
   //  for (int d = 0; d < dim_; d++) L4 += tangent2[d] * normGrad[1 + d];
   //  L4 *= meanVel[1];
   //}
@@ -896,7 +896,7 @@ void InletBC::subsonicNonReflectingTemperatureVelocity(Vector &normal, Vector &s
   newU[1] = stateN[0] * inputState[1];
   newU[2] = stateN[0] * inputState[2];
   if (nvel_ == 3) newU[3] = stateN[0] * inputState[3];
-  newU[4] = inputState[1]*inputState[1] + inputState[2]*inputState[2] + inputState[3]*inputState[3];
+  newU[4] = inputState[1] * inputState[1] + inputState[2] * inputState[2] + inputState[3] * inputState[3];
   newU[4] = stateN[0] * (0.5 * newU[4] + Cv * inputState[0]);
   if (eqSystem == NS_PASSIVE) newU[num_equation_ - 1] = 0.;
 
@@ -919,25 +919,22 @@ void InletBC::subsonicNonReflectingTemperatureVelocity(Vector &normal, Vector &s
   for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + bdrN * num_equation_] = newU[eq];
 
   // bdrFLux is over-written here, state2 is lagged
-  //rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
+  // rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 
   // not lagged
   rsolver->Eval(stateIn, newU, normal, bdrFlux, true);
 
   bdrN++;
-  
 }
-
 
 // jump
 void InletBC::subsonicNonReflectingTemperatureVelocityUser(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
                                                            Vector transip, Vector &bdrFlux) {
-
   //  printf("hello world 3\n"); fflush(stdout);
-  
+
   const double gamma = mixture->GetSpecificHeatRatio();
   // const double pressure = eqState->ComputePressure(stateIn, dim);
-  
+
   Vector unitNorm = normal;
   {
     double mod = 0.;
@@ -949,39 +946,38 @@ void InletBC::subsonicNonReflectingTemperatureVelocityUser(Vector &normal, Vecto
   mixture->GetPrimitivesFromConservatives(stateIn, Up);
   double rho = Up[0];
 
-
   // specific for torch.................
   double pi = 3.14159265359;
-  //double theta_injection = 49.0*pi/180.0; // off from from inlet center to torch center
-  double theta_injection = atan(inputState[2]/inputState[1]);
-  double Un = inputState[1]; //inputState[1]*cos(theta_injection);
-  double Ut = inputState[2]; //inputState[1]*sin(theta_injection);
-  double l_diamond = 0.0012; // each edge of the diamond inlet
-  double theta_diamond = 45.0*pi/180.0;
+  // double theta_injection = 49.0*pi/180.0; // off from from inlet center to torch center
+  double theta_injection = atan(inputState[2] / inputState[1]);
+  double Un = inputState[1];  // inputState[1]*cos(theta_injection);
+  double Ut = inputState[2];  // inputState[1]*sin(theta_injection);
+  double l_diamond = 0.0012;  // each edge of the diamond inlet
+  double theta_diamond = 45.0 * pi / 180.0;
   double h_diamond;
-  h_diamond = 2.0*l_diamond*cos(theta_diamond);
+  h_diamond = 2.0 * l_diamond * cos(theta_diamond);
   double r_diamond;
-  r_diamond = 0.5/sqrt(2.0) * h_diamond;
-  
+  r_diamond = 0.5 / sqrt(2.0) * h_diamond;
+
   double h = transip[0];
   double wgt = 1.0;
-  if (h > (r_diamond+0.5*h_diamond)) {
+  if (h > (r_diamond + 0.5 * h_diamond)) {
     wgt = 0.0;
   }
-  if (h < (0.5*h_diamond - r_diamond)) {
+  if (h < (0.5 * h_diamond - r_diamond)) {
     wgt = 0.0;
-  }  
+  }
 
-  double r_torch = sqrt(transip[1]*transip[1] + transip[2]*transip[2]); 
+  double r_torch = sqrt(transip[1] * transip[1] + transip[2] * transip[2]);
   Vector jet1(3);
   Vector jet2(3);
   Vector jet3(3);
   Vector jet4(3);
 
-  jet1[0] = 0.5*h_diamond;
-  jet2[0] = 0.5*h_diamond;
-  jet3[0] = 0.5*h_diamond;
-  jet4[0] = 0.5*h_diamond;
+  jet1[0] = 0.5 * h_diamond;
+  jet2[0] = 0.5 * h_diamond;
+  jet3[0] = 0.5 * h_diamond;
+  jet4[0] = 0.5 * h_diamond;
 
   jet1[1] = 0.0;
   jet2[1] = r_torch;
@@ -1001,22 +997,22 @@ void InletBC::subsonicNonReflectingTemperatureVelocityUser(Vector &normal, Vecto
   for (int d = 0; d < 3; d++) s1[d] = transip[d] - jet1[d];
   for (int d = 0; d < 3; d++) s2[d] = transip[d] - jet2[d];
   for (int d = 0; d < 3; d++) s3[d] = transip[d] - jet3[d];
-  for (int d = 0; d < 3; d++) s4[d] = transip[d] - jet4[d];  
- 
-  double dist1 = sqrt(s1[0]*s1[0] + s1[1]*s1[1] + s1[2]*s1[2]);
-  double dist2 = sqrt(s2[0]*s2[0] + s2[1]*s2[1] + s2[2]*s2[2]);
-  double dist3 = sqrt(s3[0]*s3[0] + s3[1]*s3[1] + s3[2]*s3[2]);
-  double dist4 = sqrt(s4[0]*s4[0] + s4[1]*s4[1] + s4[2]*s4[2]);
+  for (int d = 0; d < 3; d++) s4[d] = transip[d] - jet4[d];
 
-  if ( dist1>r_diamond && dist2>r_diamond && dist3>r_diamond && dist4>r_diamond ) {
+  double dist1 = sqrt(s1[0] * s1[0] + s1[1] * s1[1] + s1[2] * s1[2]);
+  double dist2 = sqrt(s2[0] * s2[0] + s2[1] * s2[1] + s2[2] * s2[2]);
+  double dist3 = sqrt(s3[0] * s3[0] + s3[1] * s3[1] + s3[2] * s3[2]);
+  double dist4 = sqrt(s4[0] * s4[0] + s4[1] * s4[1] + s4[2] * s4[2]);
+
+  if (dist1 > r_diamond && dist2 > r_diamond && dist3 > r_diamond && dist4 > r_diamond) {
     wgt = 0.0;
   }
 
-  unitNorm = transip; // because center is at (0,0,0)
+  unitNorm = transip;  // because center is at (0,0,0)
   unitNorm[0] = 0.0;
   double mag = 0.0;
   for (int d = 0; d < dim_; d++) mag += unitNorm[d] * unitNorm[d];
-  unitNorm *= -1.0/sqrt(mag);  // point into domain!!
+  unitNorm *= -1.0 / sqrt(mag);  // point into domain!!
 
   // tangent2 aligned with x-axis
   tangent2[0] = 1.0;
@@ -1024,13 +1020,12 @@ void InletBC::subsonicNonReflectingTemperatureVelocityUser(Vector &normal, Vecto
   tangent2[2] = 0.0;
 
   // tangent1 is then orthogonal to both normal and x-axis
-  tangent1[0] = +(unitNorm[1]*tangent2[2] - unitNorm[2]*tangent2[1]);
-  tangent1[1] = -(unitNorm[0]*tangent2[2] - unitNorm[2]*tangent2[0]);
-  tangent1[2] = +(unitNorm[0]*tangent2[1] - unitNorm[1]*tangent2[0]);  
-  
-  // ...................................  
-  
-  
+  tangent1[0] = +(unitNorm[1] * tangent2[2] - unitNorm[2] * tangent2[1]);
+  tangent1[1] = -(unitNorm[0] * tangent2[2] - unitNorm[2] * tangent2[0]);
+  tangent1[2] = +(unitNorm[0] * tangent2[1] - unitNorm[1] * tangent2[0]);
+
+  // ...................................
+
   // specific heat
   // double Cv = mixture->GetSpecificHeatConstV();
   // double gamma = mixture->GetSpecificHeatRatio();
@@ -1156,12 +1151,12 @@ void InletBC::subsonicNonReflectingTemperatureVelocityUser(Vector &normal, Vecto
   Vector newU(num_equation_);
   // for(int i=0; i<num_equation; i++) newU[i] = state2[i]- dt*(bdrFlux[i] /*+ fluxY[i]*/);
   // for (int i = 0; i < num_equation_; i++) newU[i] = stateN[i] - dt*bdrFlux[i];
-  newU[0] = stateN[0] - dt * bdrFlux[0];  // floating rho
-  newU[1] = stateN[0] * (wgt*Un); //inputState[1];
-  newU[2] = stateN[0] * (wgt*Ut); //inputState[2];
-  if (nvel_ == 3) newU[3] = stateN[0] * 0.0; //* inputState[3];
+  newU[0] = stateN[0] - dt * bdrFlux[0];      // floating rho
+  newU[1] = stateN[0] * (wgt * Un);           // inputState[1];
+  newU[2] = stateN[0] * (wgt * Ut);           // inputState[2];
+  if (nvel_ == 3) newU[3] = stateN[0] * 0.0;  //* inputState[3];
   //  newU[4] = inputState[1] * inputState[1] + inputState[2] * inputState[2] + inputState[3] * inputState[3];
-  newU[4] = (wgt*wgt) * (Un*Un + Ut*Ut);
+  newU[4] = (wgt * wgt) * (Un * Un + Ut * Ut);
   newU[4] = stateN[0] * (0.5 * newU[4] + Cv * inputState[0]);
   //  newU[4] = stateN[0] * (0.5*newU[4] + 718.0*inputState[0]); // Cv=0.718 kJ/kg*K <= HARD CODE Cv
   if (eqSystem == NS_PASSIVE) newU[num_equation_ - 1] = 0.;
@@ -1193,13 +1188,12 @@ void InletBC::subsonicNonReflectingTemperatureVelocityUser(Vector &normal, Vecto
   bdrN++;
 }
 
-
 void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
   // NOTE: it is likely that for two-temperature case inlet will also specify electron temperature,
   // whether it is equal to the gas temperature or not.
 
   //  printf("hello world 4\n"); fflush(stdout);
-  
+
   const double p = mixture->ComputePressure(stateIn);
 
   Vector state2(num_equation_);
@@ -1226,17 +1220,15 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
-
 void InletBC::subsonicReflectingTemperatureVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
-
   //  printf("hello world 5\n"); fflush(stdout);
-  
+
   const double p = mixture->ComputePressure(stateIn);
 
   Vector state2(num_equation_);
   state2 = stateIn;
 
-  double Rgas = mixture->GetGasConstant();  
+  double Rgas = mixture->GetGasConstant();
 
   // here: takes values input from ini file and assigns to boundary
   state2[0] = p / (Rgas * inputState[0]);
@@ -1259,51 +1251,50 @@ void InletBC::subsonicReflectingTemperatureVelocity(Vector &normal, Vector &stat
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
-
-void InletBC::subsonicReflectingTemperatureVelocityUser(Vector &normal, Vector &stateIn, Vector transip, Vector &bdrFlux) {
-
+void InletBC::subsonicReflectingTemperatureVelocityUser(Vector &normal, Vector &stateIn, Vector transip,
+                                                        Vector &bdrFlux) {
   //  printf("hello world 6\n"); fflush(stdout);
-  
+
   const double p = mixture->ComputePressure(stateIn);
 
   Vector state2(num_equation_);
   state2 = stateIn;
 
-  double Rgas = mixture->GetGasConstant();  
+  double Rgas = mixture->GetGasConstant();
   Vector unitNorm;
 
   // specific for torch.................
   double pi = 3.14159265359;
   // double theta_injection = 49.0*pi/180.0; // off from from inlet center to torch center
-  double theta_injection = atan(inputState[2]/inputState[1]);
-  double Un = inputState[1]; //inputState[1]*cos(theta_injection);
-  double Ut = inputState[2]; //inputState[1]*sin(theta_injection);  
-  double l_diamond = 0.0012; // each edge of the diamond inlet
-  double theta_diamond = 45.0*pi/180.0;
+  double theta_injection = atan(inputState[2] / inputState[1]);
+  double Un = inputState[1];  // inputState[1]*cos(theta_injection);
+  double Ut = inputState[2];  // inputState[1]*sin(theta_injection);
+  double l_diamond = 0.0012;  // each edge of the diamond inlet
+  double theta_diamond = 45.0 * pi / 180.0;
   double h_diamond;
-  h_diamond = 2.0*l_diamond*cos(theta_diamond);
+  h_diamond = 2.0 * l_diamond * cos(theta_diamond);
   double r_diamond;
-  r_diamond = 0.5/sqrt(2.0) * h_diamond;
-  
+  r_diamond = 0.5 / sqrt(2.0) * h_diamond;
+
   double h = transip[0];
   double wgt = 1.0;
-  if (h > (r_diamond+0.5*h_diamond)) {
+  if (h > (r_diamond + 0.5 * h_diamond)) {
     wgt = 0.0;
   }
-  if (h < (0.5*h_diamond - r_diamond)) {
+  if (h < (0.5 * h_diamond - r_diamond)) {
     wgt = 0.0;
-  }  
+  }
 
-  double r_torch = sqrt(transip[1]*transip[1] + transip[2]*transip[2]); 
+  double r_torch = sqrt(transip[1] * transip[1] + transip[2] * transip[2]);
   Vector jet1(3);
   Vector jet2(3);
   Vector jet3(3);
   Vector jet4(3);
 
-  jet1[0] = 0.5*h_diamond;
-  jet2[0] = 0.5*h_diamond;
-  jet3[0] = 0.5*h_diamond;
-  jet4[0] = 0.5*h_diamond;
+  jet1[0] = 0.5 * h_diamond;
+  jet2[0] = 0.5 * h_diamond;
+  jet3[0] = 0.5 * h_diamond;
+  jet4[0] = 0.5 * h_diamond;
 
   jet1[1] = 0.0;
   jet2[1] = r_torch;
@@ -1323,22 +1314,22 @@ void InletBC::subsonicReflectingTemperatureVelocityUser(Vector &normal, Vector &
   for (int d = 0; d < 3; d++) s1[d] = transip[d] - jet1[d];
   for (int d = 0; d < 3; d++) s2[d] = transip[d] - jet2[d];
   for (int d = 0; d < 3; d++) s3[d] = transip[d] - jet3[d];
-  for (int d = 0; d < 3; d++) s4[d] = transip[d] - jet4[d];  
- 
-  double dist1 = sqrt(s1[0]*s1[0] + s1[1]*s1[1] + s1[2]*s1[2]);
-  double dist2 = sqrt(s2[0]*s2[0] + s2[1]*s2[1] + s2[2]*s2[2]);
-  double dist3 = sqrt(s3[0]*s3[0] + s3[1]*s3[1] + s3[2]*s3[2]);
-  double dist4 = sqrt(s4[0]*s4[0] + s4[1]*s4[1] + s4[2]*s4[2]);
+  for (int d = 0; d < 3; d++) s4[d] = transip[d] - jet4[d];
 
-  if ( dist1>r_diamond && dist2>r_diamond && dist3>r_diamond && dist4>r_diamond ) {
+  double dist1 = sqrt(s1[0] * s1[0] + s1[1] * s1[1] + s1[2] * s1[2]);
+  double dist2 = sqrt(s2[0] * s2[0] + s2[1] * s2[1] + s2[2] * s2[2]);
+  double dist3 = sqrt(s3[0] * s3[0] + s3[1] * s3[1] + s3[2] * s3[2]);
+  double dist4 = sqrt(s4[0] * s4[0] + s4[1] * s4[1] + s4[2] * s4[2]);
+
+  if (dist1 > r_diamond && dist2 > r_diamond && dist3 > r_diamond && dist4 > r_diamond) {
     wgt = 0.0;
   }
 
-  unitNorm = transip; // because center is at (0,0,0)
+  unitNorm = transip;  // because center is at (0,0,0)
   unitNorm[0] = 0.0;
   double mag = 0.0;
   for (int d = 0; d < dim_; d++) mag += unitNorm[d] * unitNorm[d];
-  unitNorm *= -1.0/sqrt(mag);  // point into domain!!
+  unitNorm *= -1.0 / sqrt(mag);  // point into domain!!
 
   // aligned with x-axis
   tangent2[0] = 1.0;
@@ -1346,18 +1337,17 @@ void InletBC::subsonicReflectingTemperatureVelocityUser(Vector &normal, Vector &
   tangent2[2] = 0.0;
 
   // tangent is then orthogonal to both normal and x-axis
-  tangent1[0] = +(unitNorm[1]*tangent2[2] - unitNorm[2]*tangent2[1]);
-  tangent1[1] = -(unitNorm[0]*tangent2[2] - unitNorm[2]*tangent2[0]);
-  tangent1[2] = +(unitNorm[0]*tangent2[1] - unitNorm[1]*tangent2[0]);  
-  
-  // ...................................  
-    
-  
+  tangent1[0] = +(unitNorm[1] * tangent2[2] - unitNorm[2] * tangent2[1]);
+  tangent1[1] = -(unitNorm[0] * tangent2[2] - unitNorm[2] * tangent2[0]);
+  tangent1[2] = +(unitNorm[0] * tangent2[1] - unitNorm[1] * tangent2[0]);
+
+  // ...................................
+
   // aligned with face coords
   state2[0] = p / (Rgas * inputState[0]);
-  state2[1] = state2[0] * wgt*Un; //inputState[1];
-  state2[2] = state2[0] * wgt*Ut; //inputState[2];
-  if (nvel_ == 3) state2[3] = state2[0] * 0.0; //inputState[3];
+  state2[1] = state2[0] * wgt * Un;             // inputState[1];
+  state2[2] = state2[0] * wgt * Ut;             // inputState[2];
+  if (nvel_ == 3) state2[3] = state2[0] * 0.0;  // inputState[3];
 
   if (eqSystem == NS_PASSIVE) {
     state2[num_equation_ - 1] = 0.;
@@ -1368,7 +1358,6 @@ void InletBC::subsonicReflectingTemperatureVelocityUser(Vector &normal, Vector &
       state2[nvel_ + 2 + sp] = inputState[4 + sp];
     }
   }
-
 
   // transform from face coords to global
   {
@@ -1387,12 +1376,10 @@ void InletBC::subsonicReflectingTemperatureVelocityUser(Vector &normal, Vector &
     for (int d = 0; d < dim_; d++) state2[1 + d] = momX[d];
   }
 
-  
   // NOTE: If two-temperature, BC for electron temperature is T_e = T_h, where the total pressure is p.
   mixture->modifyEnergyForPressure(state2, state2, p, true);
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
-
 
 void InletBC::integrateInlets_gpu(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                                   Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,

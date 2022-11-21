@@ -191,7 +191,8 @@ void WallBC::buildWallElemsArray(const Array<int> &intPointsElIDBC) {
   wallElems.ReadWrite();
 }
 
-void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius, Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux) {
+void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius,
+                            Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux) {
   switch (wallType_) {
     case INV:
       computeINVwallFlux(normal, stateIn, gradState, radius, transip, delta, bdrFlux);
@@ -217,8 +218,8 @@ void WallBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesID
                      x, nodesIDs, posDofIds, shapesBC, normalsWBC, intPointsElIDBC, maxDofs);
 }
 
-void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, 
-                                Vector &bdrFlux) {
+void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
+                                double delta, Vector &bdrFlux) {
   Vector vel(nvel_);
   for (int d = 0; d < nvel_; d++) vel[d] = stateIn[1 + d] / stateIn[0];
 
@@ -280,8 +281,8 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
   }
 }
 
-void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, 
-                                      Vector &bdrFlux) {
+void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                      Vector transip, double delta, Vector &bdrFlux) {
   Vector wallState(num_equation_);
   mixture->computeStagnationState(stateIn, wallState);
 
@@ -321,8 +322,8 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
   }
 }
 
-void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, 
-                                       Vector &bdrFlux) {
+void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                       Vector transip, double delta, Vector &bdrFlux) {
   Vector wallState(num_equation_);
   mixture->computeStagnantStateWithTemp(stateIn, wallTemp_, wallState);
   // TODO(kevin): set stangant state with two separate temperature.
@@ -355,8 +356,8 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
   }
 }
 
-void WallBC::computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, 
-                                    Vector &bdrFlux) {
+void WallBC::computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                    Vector transip, double delta, Vector &bdrFlux) {
   Vector wallState(num_equation_);
   mixture->modifyStateFromPrimitive(stateIn, bcState_, wallState);
 

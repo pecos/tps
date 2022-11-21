@@ -43,7 +43,7 @@ RunConfiguration::RunConfiguration() {
   timeIntegratorType = 4;
   solOrder = 4;
   sgsModelType = 0;
-  sgsFloor = 0.;  
+  sgsFloor = 0.;
 
   integrationRule = 1;
   basisType = 1;
@@ -77,15 +77,15 @@ RunConfiguration::RunConfiguration() {
 
   linViscData.normal.UseDevice(true);
   linViscData.point0.UseDevice(true);
-  //linViscData.pointInit.UseDevice(true);
+  // linViscData.pointInit.UseDevice(true);
 
   linViscData.normal.SetSize(3);
   linViscData.point0.SetSize(3);
-  //linViscData.pointInit.SetSize(3);
+  // linViscData.pointInit.SetSize(3);
 
   linViscData.normal = 0.;
   linViscData.point0 = 0.;
-  //linViscData.pointInit = 0.;
+  // linViscData.pointInit = 0.;
   linViscData.viscRatio = 0.;
 
   //   initSpongeData();
@@ -226,7 +226,7 @@ void RunConfiguration::readInputFile(std::string inpuFileName) {
       } else if (word.compare("RESTART_CONVERSION") == 0) {
         ss >> word;
         restart_hdf5_conversion = true;
-	
+
       } else if (word.compare("RESTART_SERIAL") == 0) {
         ss >> word;
         assert((word == "read") || (word == "write"));
@@ -315,7 +315,7 @@ void RunConfiguration::readInputFile(std::string inpuFileName) {
         ss >> word;
         exit_checkFrequency_ = stoi(word);
 
-      // working fluid
+        // working fluid
       } else if (word.compare("FLUID") == 0) {
         ss >> word;
         int typeFluid = stoi(word);
@@ -421,14 +421,14 @@ void RunConfiguration::readInputFile(std::string inpuFileName) {
         ss >> word;
         point0[2] = stod(word);
 
-	/*}  else if (word.compare("LV_PLANE_PINIT") == 0) {
+        /*}  else if (word.compare("LV_PLANE_PINIT") == 0) {
         auto pointInit = linViscData.pointInit.HostWrite();
         ss >> word;
         pointInit[0] = stod(word);
         ss >> word;
         pointInit[1] = stod(word);
         ss >> word;
-        pointInit[2] = stod(word); 
+        pointInit[2] = stod(word);
         */
 
       } else if (word.compare("LV_VISC_RATIO") == 0) {

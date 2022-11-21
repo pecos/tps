@@ -228,10 +228,9 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
 
   // element size
   double delta;
-  Mesh *mesh = vfes->GetMesh();  
+  Mesh *mesh = vfes->GetMesh();
   delta = mesh->GetElementSize(Tr.Elem1No, 1);
-  
-  
+
   for (int i = 0; i < ir->GetNPoints(); i++) {
     const IntegrationPoint &ip = ir->IntPoint(i);
 
@@ -264,7 +263,7 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     double x[3];
     Vector transip(x, 3);
     Tr.Transform(ip, transip);
-    if (axisymmetric_) {      
+    if (axisymmetric_) {
       radius = transip[0];
     }
 
@@ -377,10 +376,9 @@ void FaceIntegrator::MassMatrixFaceIntegral(const FiniteElement &el1, const Fini
 
     // element size
     double delta;
-    Mesh *mesh = vfes->GetMesh();  
+    Mesh *mesh = vfes->GetMesh();
     delta = mesh->GetElementSize(Tr.Elem1No, 1);
-    
-    
+
     const IntegrationRule *ir = &intRules->Get(Tr.GetGeometryType(), intorder);
     for (int i = 0; i < ir->GetNPoints(); i++) {
       const IntegrationPoint &ip = ir->IntPoint(i);
@@ -391,10 +389,10 @@ void FaceIntegrator::MassMatrixFaceIntegral(const FiniteElement &el1, const Fini
       double x[3];
       Vector transip(x, 3);
       Tr.Transform(ip, transip);
-      if (axisymmetric_) {      
+      if (axisymmetric_) {
         radius = transip[0];
-      }  
-      
+      }
+
       int index1 = 0, index2 = 0;
       el1.CalcShape(Tr.GetElement1IntPoint(), shape1);
       el2.CalcShape(Tr.GetElement2IntPoint(), shape2);

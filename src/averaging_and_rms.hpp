@@ -79,17 +79,17 @@ class Averaging {
   ParaViewDataCollection *paraviewMean = NULL;
 
   int samplesMean;
-  //  int samplesVar;  
+  //  int samplesVar;
 
   // iteration interval between samples
   int sampleInterval;
   int startMean;
-  //  int startVar;  
+  //  int startVar;
   bool computeMean;
 
   void initiMeanAndRMS();
   void addSample_cpu();
-  //void addVarSample_cpu();  
+  // void addVarSample_cpu();
 
   Vector local_sums;
   Vector tmp_vector;

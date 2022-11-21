@@ -37,10 +37,10 @@
 #include "BoundaryCondition.hpp"
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
-#include "transport_properties.hpp"
 #include "logger.hpp"
 #include "mpi_groups.hpp"
 #include "tps_mfem_wrap.hpp"
+#include "transport_properties.hpp"
 
 using namespace mfem;
 
@@ -86,10 +86,12 @@ class InletBC : public BoundaryCondition {
 
   void subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux);
   void subsonicReflectingTemperatureVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux);
-  void subsonicReflectingTemperatureVelocityUser(Vector &normal, Vector &stateIn, Vector transip, Vector &bdrFlux);    
+  void subsonicReflectingTemperatureVelocityUser(Vector &normal, Vector &stateIn, Vector transip, Vector &bdrFlux);
   void subsonicNonReflectingDensityVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
-  void subsonicNonReflectingTemperatureVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
-  void subsonicNonReflectingTemperatureVelocityUser(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, Vector &bdrFlux);  
+  void subsonicNonReflectingTemperatureVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
+                                                Vector &bdrFlux);
+  void subsonicNonReflectingTemperatureVelocityUser(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
+                                                    Vector transip, Vector &bdrFlux);
 
   virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up);
 
@@ -102,7 +104,7 @@ class InletBC : public BoundaryCondition {
 
   //  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux);
   void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius,
-		      Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux);
+                      Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux);
 
   virtual void initBCs();
 

@@ -37,12 +37,14 @@
  */
 
 #include <tps_config.h>
+
 #include <mfem/general/forall.hpp>
+
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
+#include "run_configuration.hpp"
 #include "tps_mfem_wrap.hpp"
 #include "transport_properties.hpp"
-#include "run_configuration.hpp"
 
 using namespace mfem;
 
@@ -79,15 +81,16 @@ class Fluxes {
   void ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux);
   MFEM_HOST_DEVICE void ComputeConvectiveFluxes(const double *state, double *flux) const;
 
-  void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip, double delta, DenseMatrix &flux);
+  void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip, double delta,
+                            DenseMatrix &flux);
   MFEM_HOST_DEVICE void ComputeViscousFluxes(const double *state, const double *gradUp, double radius, double *flux);
 
   void sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu_sgs);
-  void sgsSigma(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu_sgs);  
-  
+  void sgsSigma(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu_sgs);
+
   // Compute viscous flux with prescribed boundary flux.
-  void ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip, double delta, 
-                               const BoundaryViscousFluxData &bcFlux, Vector &normalFlux);
+  void ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip,
+                               double delta, const BoundaryViscousFluxData &bcFlux, Vector &normalFlux);
   MFEM_HOST_DEVICE void ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius,
                                                 const BoundaryViscousFluxData &bcFlux, double *normalFlux);
 

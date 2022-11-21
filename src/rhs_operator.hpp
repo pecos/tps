@@ -34,7 +34,9 @@
 
 #include <grvy.h>
 #include <tps_config.h>
+
 #include <mfem/general/forall.hpp>
+
 #include "BCintegrator.hpp"
 #include "chemistry.hpp"
 #include "dataStructures.hpp"
@@ -76,7 +78,7 @@ class RHSoperator : public TimeDependentOperator {
   TransportProperties *transport_;
 
   ParFiniteElementSpace *vfes;
-  ParFiniteElementSpace *fes;  
+  ParFiniteElementSpace *fes;
 
   const volumeFaceIntegrationArrays &gpuArrays;
 
@@ -95,7 +97,7 @@ class RHSoperator : public TimeDependentOperator {
   ParFiniteElementSpace *dfes;
   ParGridFunction *coordsDof;
   ParGridFunction *elSize;
-  //ParGridFunction elSize;    
+  // ParGridFunction elSize;
 
   ParGridFunction *spaceVaryViscMult;
   linearlyVaryingVisc &linViscData;
@@ -106,7 +108,7 @@ class RHSoperator : public TimeDependentOperator {
   Vector invMArray;
   Array<int> posDofInvM;
 
-  //Array<int> vdofs_here;  
+  // Array<int> vdofs_here;
 
   const bool &isSBP;
   const double &alpha;
@@ -150,11 +152,12 @@ class RHSoperator : public TimeDependentOperator {
   RHSoperator(int &_iter, const int _dim, const int &_num_equation, const int &_order, const Equations &_eqSystem,
               double &_max_char_speed, IntegrationRules *_intRules, int _intRuleType, Fluxes *_fluxClass,
               GasMixture *_mixture, GasMixture *d_mixture, Chemistry *chemistry, TransportProperties *transport,
-              ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_fes, const volumeFaceIntegrationArrays &gpuArrays, const int &_maxIntPoints,
-              const int &_maxDofs, DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh,
-              ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp,
-              ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A, BCintegrator *_bcIntegrator,
-              bool &_isSBP, double &_alpha, RunConfiguration &_config, ParGridFunction *pc, ParGridFunction *jh);
+              ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_fes, const volumeFaceIntegrationArrays &gpuArrays,
+              const int &_maxIntPoints, const int &_maxDofs, DGNonLinearForm *_A, MixedBilinearForm *_Aflux,
+              ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
+              ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A,
+              BCintegrator *_bcIntegrator, bool &_isSBP, double &_alpha, RunConfiguration &_config, ParGridFunction *pc,
+              ParGridFunction *jh);
 
   virtual void Mult(const Vector &x, Vector &y) const;
   void updatePrimitives(const Vector &x) const;

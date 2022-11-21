@@ -73,7 +73,7 @@ class RunConfiguration {
   //  1: Smagorinsky
   //  2: Sigma
   int sgsModelType;
-  
+
   // order of the solution. Defaults to 4
   int solOrder;
 
@@ -119,7 +119,7 @@ class RunConfiguration {
   // mean and RMS
   int sampleInterval;
   int startIter;
-  //  int startVarIter;  
+  //  int startVarIter;
   bool restartMean;
   bool meanHistEnable;
 
@@ -155,7 +155,7 @@ class RunConfiguration {
   double refLength;
 
   // minimum grid size for SGS
-  double sgsFloor;  
+  double sgsFloor;
 
   // equations to be solved. Options thus far
   Equations eqSystem;
@@ -243,7 +243,7 @@ class RunConfiguration {
   ChemistryModel chemistryModel_;
 
   //  sgsModel sgsModel;
-  
+
   // flag for using third-order electron thermal conductivity
   bool thirdOrderkElectron;
 
@@ -276,7 +276,7 @@ class RunConfiguration {
   int GetUniformRefLevels() { return ref_levels; }
 
   int GetTimeIntegratorType() { return timeIntegratorType; }
-  int GetSgsModelType() { return sgsModelType; }  
+  int GetSgsModelType() { return sgsModelType; }
 
   int GetSolutionOrder() { return solOrder; }
   int GetIntegrationRule() { return integrationRule; }
@@ -290,7 +290,7 @@ class RunConfiguration {
   bool RoeRiemannSolver() const { return useRoe; }
 
   int GetMeanStartIter() { return startIter; }
-  //  int GetVarStartIter() { return startVarIter; }  
+  //  int GetVarStartIter() { return startVarIter; }
   int GetMeanSampleInterval() { return sampleInterval; }
   bool GetRestartMean() { return restartMean; }
   bool isMeanHistEnabled() { return meanHistEnable; }
@@ -299,7 +299,7 @@ class RunConfiguration {
   double GetViscMult() { return visc_mult; }
   double GetBulkViscMult() { return bulk_visc; }
   double GetReferenceLength() { return refLength; }
-  double GetSgsFloor() { return sgsFloor; }    
+  double GetSgsFloor() { return sgsFloor; }
   Equations GetEquationSystem() const { return eqSystem; }
   bool isAxisymmetric() const { return axisymmetric_; }
   bool isSBP() { return SBP; }
@@ -351,8 +351,7 @@ class RunConfiguration {
   double getConstantMolarCV(int species) { return constantMolarCV(species); }
   double getConstantMolarCP(int species) { return constantMolarCP(species); }
 
-  //  sgsModel GetSGSModel() { return sgsModel; }  
-  
+  //  sgsModel GetSGSModel() { return sgsModel; }
 };
 
 #endif  // RUN_CONFIGURATION_HPP_

@@ -56,14 +56,13 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
 
   sampleInterval = config.GetMeanSampleInterval();
   samplesMean = 0;
-  //samplesVar = 0;  
+  // samplesVar = 0;
   startMean = config.GetMeanStartIter();
-  //startVar = config.GetVarStartIter();  
+  // startVar = config.GetVarStartIter();
   computeMean = false;
   if (sampleInterval != 0) computeMean = true;
 
   if (computeMean) {
-    
     //     mixture = new DryAir(config,dim);
     rmsFes = new ParFiniteElementSpace(mesh, fec, numRMS, Ordering::byNODES);
     meanUp = new ParGridFunction(vfes);
@@ -124,7 +123,6 @@ Averaging::~Averaging() {
 
 void Averaging::addSampleMean(const int &iter) {
   if (computeMean) {
-    
     if (iter % sampleInterval == 0 && iter >= startMean) {
       if (iter == startMean && groupsMPI->getSession()->Root()) cout << "Starting mean calculation." << endl;
 #ifdef _GPU_
@@ -134,7 +132,7 @@ void Averaging::addSampleMean(const int &iter) {
 #endif
       samplesMean++;
     }
-    
+
     /*
     if (iter % sampleInterval == 0 && iter >= startVar) {
       if (iter == startVar && groupsMPI->getSession()->Root()) cout << "Starting variance calculation." << endl;
@@ -146,25 +144,22 @@ void Averaging::addSampleMean(const int &iter) {
       samplesVar++;
     }
     */
-    
   }
 }
 
 void Averaging::addSample_cpu() {
-  
   double *dataUp = Up->GetData();
   double *dataMean = meanUp->GetData();
   double *dataRMS = rms->GetData();
   int dof = fes->GetNDofs();
   Vector iUp(num_equation);
   Vector dataMean_prev(num_equation);
-  Vector meanVel(3), meanVel_prev(3), vel(3);  
+  Vector meanVel(3), meanVel_prev(3), vel(3);
   double val;
 
   for (int n = 0; n < dof; n++) {
-    
     for (int eq = 0; eq < num_equation; eq++) iUp[eq] = dataUp[n + eq * dof];
-    for (int eq = 0; eq < num_equation; eq++) dataMean_prev[eq] = dataMean[n + eq * dof];    
+    for (int eq = 0; eq < num_equation; eq++) dataMean_prev[eq] = dataMean[n + eq * dof];
 
     // mean
     for (int eq = 0; eq < num_equation; eq++) {
@@ -178,61 +173,58 @@ void Averaging::addSample_cpu() {
       }
     }
 
-    
     // Welford Algorithm
     meanVel = 0.;
-    meanVel_prev = 0.;    
+    meanVel_prev = 0.;
     vel = 0.;
     for (int d = 0; d < nvel; d++) {
       meanVel[d] = dataMean[n + dof * (d + 1)];
-      meanVel_prev[d] = dataMean_prev[n + dof * (d + 1)];      
+      meanVel_prev[d] = dataMean_prev[n + dof * (d + 1)];
       vel[d] = dataUp[n + dof * (d + 1)];
     }
-    
-    // xx 
+
+    // xx
     val = dataRMS[n];
-    val *= double(samplesMean-1);
+    val *= double(samplesMean - 1);
     val += ((vel[0] - meanVel_prev[0]) * (vel[0] - meanVel[0]));
-    dataRMS[n] = val/double(samplesMean);
-    
+    dataRMS[n] = val / double(samplesMean);
+
     // yy
     val = dataRMS[n + dof];
-    val *= double(samplesMean-1);
+    val *= double(samplesMean - 1);
     val += ((vel[1] - meanVel_prev[1]) * (vel[1] - meanVel[1]));
-    dataRMS[n + dof] = val/double(samplesMean);
-    
+    dataRMS[n + dof] = val / double(samplesMean);
+
     // zz
-    val = dataRMS[n + 2*dof];
-    val *= double(samplesMean-1);
+    val = dataRMS[n + 2 * dof];
+    val *= double(samplesMean - 1);
     val += ((vel[2] - meanVel_prev[2]) * (vel[2] - meanVel[2]));
-    dataRMS[n + 2*dof] = val/double(samplesMean);
-    
+    dataRMS[n + 2 * dof] = val / double(samplesMean);
+
     // xy
-    val = dataRMS[n + 3*dof];
-    val *= double(samplesMean-1);
-    val += (vel[0] - meanVel_prev[0]) * (vel[1] - meanVel[1]);    
-    //val += 0.5*((vel[0] - meanVel_prev[0]) * (vel[1] - meanVel[1]));
-    //val += 0.5*((vel[1] - meanVel_prev[1]) * (vel[0] - meanVel[0]));    
-    dataRMS[n + 3*dof] = val/double(samplesMean);
-    
+    val = dataRMS[n + 3 * dof];
+    val *= double(samplesMean - 1);
+    val += (vel[0] - meanVel_prev[0]) * (vel[1] - meanVel[1]);
+    // val += 0.5*((vel[0] - meanVel_prev[0]) * (vel[1] - meanVel[1]));
+    // val += 0.5*((vel[1] - meanVel_prev[1]) * (vel[0] - meanVel[0]));
+    dataRMS[n + 3 * dof] = val / double(samplesMean);
+
     // xz
-    val = dataRMS[n + 4*dof];
-    val *= double(samplesMean-1);
-    val += (vel[0] - meanVel_prev[0]) * (vel[2] - meanVel[2]);    
-    //val += 0.5*((vel[0] - meanVel_prev[0]) * (vel[2] - meanVel[2]));
-    //val += 0.5*((vel[2] - meanVel_prev[2]) * (vel[0] - meanVel[0]));    
-    dataRMS[n + 4*dof] = val/double(samplesMean);
-    
+    val = dataRMS[n + 4 * dof];
+    val *= double(samplesMean - 1);
+    val += (vel[0] - meanVel_prev[0]) * (vel[2] - meanVel[2]);
+    // val += 0.5*((vel[0] - meanVel_prev[0]) * (vel[2] - meanVel[2]));
+    // val += 0.5*((vel[2] - meanVel_prev[2]) * (vel[0] - meanVel[0]));
+    dataRMS[n + 4 * dof] = val / double(samplesMean);
+
     // yz
-    val = dataRMS[n + 5*dof];
-    val *= double(samplesMean-1);
-    val += (vel[1] - meanVel_prev[1]) * (vel[2] - meanVel[2]);    
-    //val += 0.5*((vel[1] - meanVel_prev[1]) * (vel[2] - meanVel[2]));
-    //val += 0.5*((vel[2] - meanVel_prev[2]) * (vel[1] - meanVel[1]));  
-    dataRMS[n + 5*dof] = val/double(samplesMean);
-
-  }    
-
+    val = dataRMS[n + 5 * dof];
+    val *= double(samplesMean - 1);
+    val += (vel[1] - meanVel_prev[1]) * (vel[2] - meanVel[2]);
+    // val += 0.5*((vel[1] - meanVel_prev[1]) * (vel[2] - meanVel[2]));
+    // val += 0.5*((vel[2] - meanVel_prev[2]) * (vel[1] - meanVel[1]));
+    dataRMS[n + 5 * dof] = val / double(samplesMean);
+  }
 }
 
 /*
@@ -256,31 +248,36 @@ void Averaging::addVarSample_cpu() {
       vel[d] = dataUp[n + dof * (d + 1)];
     }
 
-    // (<u'u'>*n + (u-<u>)*(u-<u>))/(n+1) 
-    // xx 
+    // (<u'u'>*n + (u-<u>)*(u-<u>))/(n+1)
+    // xx
     double val = dataRMS[n];
     dataRMS[n] = (val * double(samplesVar) + (vel[0] - meanVel[0]) * (vel[0] - meanVel[0])) / double(samplesVar + 1);
-    
+
     // yy
     val = dataRMS[n + dof];
-    dataRMS[n + dof] = (val * double(samplesVar) + (vel[1] - meanVel[1]) * (vel[1] - meanVel[1])) / double(samplesVar + 1);
-    
+    dataRMS[n + dof] = (val * double(samplesVar) + (vel[1] - meanVel[1]) * (vel[1] - meanVel[1])) / double(samplesVar +
+1);
+
     // zz
     val = dataRMS[n + 2 * dof];
-    dataRMS[n + 2 * dof] = (val * double(samplesVar) + (vel[2] - meanVel[2]) * (vel[2] - meanVel[2])) / double(samplesVar + 1);
-    
+    dataRMS[n + 2 * dof] = (val * double(samplesVar) + (vel[2] - meanVel[2]) * (vel[2] - meanVel[2])) /
+double(samplesVar + 1);
+
     // xy
     val = dataRMS[n + 3 * dof];
-    dataRMS[n + 3 * dof] = (val * double(samplesVar) + (vel[0] - meanVel[0]) * (vel[1] - meanVel[1])) / double(samplesVar + 1);
-    
+    dataRMS[n + 3 * dof] = (val * double(samplesVar) + (vel[0] - meanVel[0]) * (vel[1] - meanVel[1])) /
+double(samplesVar + 1);
+
     // xz
     val = dataRMS[n + 4 * dof];
-    dataRMS[n + 4 * dof] = (val * double(samplesVar) + (vel[0] - meanVel[0]) * (vel[2] - meanVel[2])) / double(samplesVar + 1);
-    
+    dataRMS[n + 4 * dof] = (val * double(samplesVar) + (vel[0] - meanVel[0]) * (vel[2] - meanVel[2])) /
+double(samplesVar + 1);
+
     // yz
     val = dataRMS[n + 5 * dof];
-    dataRMS[n + 5 * dof] = (val * double(samplesVar) + (vel[1] - meanVel[1]) * (vel[2] - meanVel[2])) / double(samplesVar + 1);
-    
+    dataRMS[n + 5 * dof] = (val * double(samplesVar) + (vel[1] - meanVel[1]) * (vel[2] - meanVel[2])) /
+double(samplesVar + 1);
+
   }
 }
 */
