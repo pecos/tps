@@ -32,7 +32,7 @@
 #include "fluxes.hpp"
 
 MFEM_HOST_DEVICE Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
-                                const int _num_equation, const int _dim, bool axisym, RunConfiguration &_config)
+                                const int _num_equation, const int _dim, bool axisym, RunConfiguration *_config)
     : mixture(_mixture),
       eqSystem(_eqSystem),
       transport(_transport),
@@ -203,17 +203,18 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   // ................................................
       
   // subgrid scale model
-  if(config_.GetSgsModelType() > 0) {  
+  assert(config_ != NULL);
+  if(config_->GetSgsModelType() > 0) {  
      double mu_sgs = 0.;
-     if(config_.GetSgsModelType() == 1) sgsSmag(state, gradUp, delta, mu_sgs);
-     if(config_.GetSgsModelType() == 2) sgsSigma(state, gradUp, delta, mu_sgs);  
+     if(config_->GetSgsModelType() == 1) sgsSmag(state, gradUp, delta, mu_sgs);
+     if(config_->GetSgsModelType() == 2) sgsSigma(state, gradUp, delta, mu_sgs);  
      bulkViscosity *= (1.0 + mu_sgs/visc); 
      visc += mu_sgs;
      k += (mu_sgs / Pr_Cp);
   }
 
   // viscous sponge
-  if (config_.linViscData.isEnabled) {
+  if (config_->linViscData.isEnabled) {
      double wgt = 0.;
      viscSpongePlanar(transip, wgt);
      visc *= wgt;
@@ -301,7 +302,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   }
 }
 
-MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius, Vector transip,
+MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius,
                                                    double *flux) {
 
   //  printf("CVF HD caught\n"); fflush(stdout);
@@ -486,17 +487,18 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
   // ................................................
 
   // subgrid scale model
-  if(config_.GetSgsModelType() > 0) {  
+  assert(config_ != NULL);
+  if(config_->GetSgsModelType() > 0) {  
      double mu_sgs = 0.;
-     if(config_.GetSgsModelType() == 1) sgsSmag(state, gradUp, delta, mu_sgs);
-     if(config_.GetSgsModelType() == 2) sgsSigma(state, gradUp, delta, mu_sgs);  
+     if(config_->GetSgsModelType() == 1) sgsSmag(state, gradUp, delta, mu_sgs);
+     if(config_->GetSgsModelType() == 2) sgsSigma(state, gradUp, delta, mu_sgs);  
      bulkViscosity *= (1.0 + mu_sgs/visc); 
      visc += mu_sgs;
      k += (mu_sgs / Pr_Cp);
   }  
 
   // viscous sponge
-  if (config_.linViscData.isEnabled) {
+  if (config_->linViscData.isEnabled) {
      double wgt = 0.;
      viscSpongePlanar(transip, wgt);
      visc *= wgt;
@@ -596,7 +598,7 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
   }
 }
 
-MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius, Vector transip, 
+MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius,
                                                       const BoundaryViscousFluxData &bcFlux, double *normalFlux) {
   // normalFlux.SetSize(num_equation);
   for (int eq = 0; eq < num_equation; eq++) normalFlux[eq] = 0.;
@@ -883,7 +885,8 @@ void Fluxes::sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delt
   Smag = sqrt(2.0*Smag);
 
   // eddy viscosity with delta shift
-  l_floor = config_.GetSgsFloor();
+  assert(config_ != NULL);
+  l_floor = config_->GetSgsFloor();
   d_model = Cd * max(delta-l_floor,0.0);
   mu = state[0] * d_model * d_model * Smag;
   
@@ -919,7 +922,8 @@ void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double del
   }
 
   // shifted grid scale, d should really be sqrt of J^T*J
-  l_floor = config_.GetSgsFloor();
+  assert(config_ != NULL);
+  l_floor = config_->GetSgsFloor();
   d_model = max(delta-l_floor,0.0);  
   d4 = pow(d_model,4);
   for (int i = 0; i < dim; i++) {
@@ -997,11 +1001,12 @@ void Fluxes::viscSpongePlanar(Vector x, double &wgt) {
   dist = 0.;  
 
   // get settings
-  for (int d = 0; d < dim; d++) normal[d] = config_.GetLinearVaryingData().normal(d);
-  for (int d = 0; d < dim; d++) point[d] = config_.GetLinearVaryingData().point0(d);
-  factor = config_.GetLinearVaryingData().viscRatio;
+  assert(config_ != NULL);
+  for (int d = 0; d < dim; d++) normal[d] = config_->GetLinearVaryingData().normal(d);
+  for (int d = 0; d < dim; d++) point[d] = config_->GetLinearVaryingData().point0(d);
+  factor = config_->GetLinearVaryingData().viscRatio;
   factor = max(factor, 1.0);
-  width = config_.GetLinearVaryingData().width;
+  width = config_->GetLinearVaryingData().width;
 
   // ensure normal is actually a unit normal
   for (int d = 0; d < dim; d++) Nmag += normal[d] * normal[d];
