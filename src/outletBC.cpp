@@ -619,13 +619,18 @@ void OutletBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodes
 }
 
 
-// jump, stateIn is conserved, grad and del are primitive
+/**
+Non-reflecting outflow boundary following from Poinsot and Lele, "Boundary Conditions for Direct Simulations 
+of Compressible Viscous Flows", JCP, 1992.  Known issues: 
+ - restarts will hiccup with a reflecting step as boundaryU is not saved in restarts  
+ - time integration is not correct and should be treated with a proper RK4
+ - viscous portion only includes divergence-free part of viscous stress
+ - limits to damp backflow not working and commented
+*/
 void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState,
 					     TransportProperties *_transport, Vector &bdrFlux) {
 
-  //cout << dt << endl;  
-  //printf("hello world\n"); fflush(stdout);  
-  
+  // <jump> stateIn is conserved, grad and del are primitive  
   const double gamma = mixture->GetSpecificHeatRatio();
   const double p = mixture->ComputePressure(stateIn);
 
@@ -633,12 +638,7 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   mixture->GetPrimitivesFromConservatives(stateIn, Up);
   double rho = Up[0];
   
-  // additions for viscous portion
-  //const double visc = mixture->GetViscosity(stateIn);
-  //const double bulkViscMult = mixture->GetBulkViscMultiplyer();
-  //const double k = mixture->GetThermalConductivity(stateIn);
-  
-  // viscous portion..............................
+  // viscous bits
   Vector Efield(nvel_);
   Efield = 0.0;
   const int numSpecies = mixture->GetNumSpecies();
@@ -656,8 +656,8 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   bulkViscosity -= 2. / 3. * visc;
   double k = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY];
   double ke = transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY];
-  // .............................................    
-  
+
+  // unit normal
   Vector unitNorm = normal;
   double normMag = 0.;  
   for (int d = 0; d < dim_; d++) normMag += normal[d] * normal[d];
@@ -766,12 +766,10 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   bdrFlux[1 + dim_] += meanK*d1 + d5/(gamma - 1.);
 
   // add diffusion portion, does not account for compressibility
-  // delState comes in weak form, so need area?  not sure here... 
-  bdrFlux[1] -= visc*delState[1]; //*normMag;
-  bdrFlux[2] -= visc*delState[2]; //*normMag;
-  bdrFlux[3] -= visc*delState[3]; //*normMag;
-  bdrFlux[4] -= k*delState[4]; //*normMag;
-  
+  bdrFlux[1] -= visc*delState[1]; 
+  bdrFlux[2] -= visc*delState[2]; 
+  bdrFlux[3] -= visc*delState[3]; 
+  bdrFlux[4] -= k*delState[4]; 
 
   // limite w/o L's
   /*
@@ -883,38 +881,13 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   }
   for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + bdrN * num_equation_] = newU[eq];
 
-  // NOT SURE HERE, modify newU to Reimann so the average of stateIn and modified newU is actual newU?
+  // modify newU to Reimann so the average of stateIn and modified newU is actual newU?
   Vector tmpU(num_equation_);
   //for (int i = 0; i < num_equation_; i++) tmpU[i] = newU[i];
   for (int i = 0; i < num_equation_; i++) tmpU[i] = 2.0*newU[i] - stateIn[i];
 
   // reimann solver
   rsolver->Eval(stateIn, tmpU, normal, bdrFlux, true);
-
-  /*
-  // evaluate viscous fluxes at outlet  
-  Vector outletViscF(num_equation_);
-  //for (int d = 0; d < dim_; d++) bcFlux_.normal[d] = unitNorm[d];  
-  //fluxClass->ComputeBdrViscousFluxes(stateIn, gradState, radius, transip, delta, bcFlux_, outletViscF);
-
-  // copy of desired part of ComputeBdrViscousFluxes
-  DenseMatrix stress(dim_, dim_);  
-  for (int i = 0; i < dim_; i++) {
-    for (int j = 0; j < dim_; j++) stress(i, j) = gradState(1 + j, i) + gradState(1 + i, j);
-  }
-  stress *= visc;
-
-  double divV = 0.;  
-  for (int i = 0; i < dim_; i++) divV += gradState(1 + i, i);
-  for (int i = 0; i < dim_; i++) stress(i, i) += 2.0/3.0 * bulkViscosity * divV;
-
-  // rho_Yi are in the first slots?
-  for (int i = 0; i < dim_; i++) {
-    for (int j = 0; j < dim_; j++) outletViscF(numSpecies + i) += stress(i, j) * unitNorm[j];
-  }
-  
-  for (int eq = 1; eq < dim_; eq++)  bdrFlux[eq] += 0.25 * outletViscF(eq);
-  */
   
   bdrN++;
 }

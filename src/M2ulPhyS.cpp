@@ -2080,8 +2080,7 @@ void M2ulPhyS::parseSolverOptions2() {
   // parsed first. Then, a section corresponding to each defined boundary is parsed afterwards
   parseBCInputs();
 
-  // changed the order of parsing in order to use species list.
-  // sponge zone
+  // changed the order of parsing in order to use species list. sponge
   parseSpongeZoneInputs();
 
   // Pack up input parameters for device objects.
@@ -3096,36 +3095,6 @@ void M2ulPhyS::parseSpongeZoneInputs() {
   }
 }
 
-// SGS Model
-/*
-void M2ulPhyS::parseSGSInputs() {
-
-  std::map<std::string, sgsType> sgsModel;
-  sgsModel["none"] = NOSGS;
-  sgsModel["smagorinsky"] = SMAGO;
-  sgsModel["sigma"] = SIGMA;
-
-  double coeff;
-  std::string type;
-  std::string basepath("sgsModel/" + std::to_string(i));
-
-  tpsP->getRequiredInput((basepath + "/type").c_str(), type);
-
-  if (type == "none") {
-    // do nothing
-  } else if (type == "smagorinsky") {
-    tpsP->getRequiredInput((basepath + "/coefficient").c_str(), coeff);
-    config.sgsModel.Append(coeff);
-  } else if (type == "sigma") {
-    tpsP->getRequiredInput((basepath + "/coefficient").c_str(), coeff);
-    config.sgsModel.Append(coeff);      
-  } else {
-    grvy_printf(GRVY_ERROR, "\nUnknown SGS model supplied at runtime -> %s", type.c_str());
-    exit(ERROR);
-  }
-    
-}
-*/
 
 void M2ulPhyS::parsePostProcessVisualizationInputs() {
   if (tpsP->isVisualizationMode()) {
@@ -3135,6 +3104,7 @@ void M2ulPhyS::parsePostProcessVisualizationInputs() {
     tpsP->getRequiredInput("post-process/visualization/frequency", config.postprocessInput.freq);
   }
 }
+
 
 void M2ulPhyS::packUpGasMixtureInput() {
   if (config.workFluid == DRY_AIR) {
@@ -3171,6 +3141,7 @@ void M2ulPhyS::packUpGasMixtureInput() {
     }  // switch gasModel
   }    // workFluid == USER_DEFINED
 }
+
 
 void M2ulPhyS::identifySpeciesType(Array<ArgonSpcs> &speciesType) {
   speciesType.SetSize(config.numSpecies);
@@ -3242,6 +3213,7 @@ void M2ulPhyS::identifySpeciesType(Array<ArgonSpcs> &speciesType) {
 
   return;
 }
+
 
 void M2ulPhyS::identifyCollisionType(const Array<ArgonSpcs> &speciesType, ArgonColl *collisionIndex) {
   // collisionIndex_.resize(numSpecies);
@@ -3482,7 +3454,12 @@ void M2ulPhyS::visualization() {
   return;
 }
 
-// should only be done once but the structure of the code makes it terrible to correct
+
+/**
+Copy of viscous sponge code in fluxes.cpp.  This is currently only used for visualization purposes
+but should only be done once as opposed to repeating every step in fluxes.cpp.  Code structure 
+makes this difficult to correct.
+*/
 void M2ulPhyS::viscMultPlanar(Vector x, double &wgt) {
 
   Vector normal(3);
@@ -3515,12 +3492,9 @@ void M2ulPhyS::viscMultPlanar(Vector x, double &wgt) {
   wgt = 0.5*(tanh(dist/width - 2.0) + 1.0);
   wgt *= (factor-1.0);
   wgt += 1.0;
-
-  //if (x[0] == 0.5 && x[1] == 0.5) {
-  //  cout << "z, dist, wgt: " << x[2] << ", " << dist << ", " << wgt << endl; fflush(stdout);
-  //}
   
 }
+
 
 void M2ulPhyS::updateVisualizationVariables() {
 #ifdef _GPU_

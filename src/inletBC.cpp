@@ -574,23 +574,25 @@ void InletBC::integrationBC(Vector &y,  // output
                       x, nodesIDs, posDofIds, shapesBC, normalsWBC, intPointsElIDBC, listElems, offsetsBoundaryU);
 }
 
-// jump
+
+/**
+Non-reflecting inflow boundary with specified density following from Poinsot and Lele, "Boundary Conditions 
+for Direct Simulations of Compressible Viscous Flows", JCP, 1992.  Known issues: 
+ - restarts will hiccup with a reflecting step as boundaryU is not saved in restarts  
+ - time integration is not correct and should be treated with a proper RK4
+ - viscous portions ommited
+*/
 void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
                                                    Vector &bdrFlux) {
-  // void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector transip, Vector &stateIn, DenseMatrix
-  // &gradState,
-  //                                                   Vector &bdrFlux) {
 
-  //  printf("hello world 1\n"); fflush(stdout);
-  
+  // <jump>  
   const double gamma = mixture->GetSpecificHeatRatio();
-  // const double pressure = eqState->ComputePressure(stateIn, dim);
 
   Vector unitNorm = normal;
   {
     double mod = 0.;
     for (int d = 0; d < dim_; d++) mod += normal[d] * normal[d];
-    unitNorm *= -1. / sqrt(mod);  // point into domain!!
+    unitNorm *= -1. / sqrt(mod);  // points into domain!!
   }
 
   Vector Up(num_equation_);
@@ -665,14 +667,14 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   const double d5 = 0.5 * (L5 + L1);
 
   // dF/dx
-  bdrFlux[0] = d1;                                          // dFndn
-  bdrFlux[1] = meanVel[0] * d1 + rho * d2;                  // ux * dFndn + rho*d2, should be ux*dFndn + rho*d3
-  bdrFlux[2] = meanVel[1] * d1 + rho * d3;                  // uy * dFndn + rho*d3, should be uy*dFndn + rho*d4
-  if (nvel_ == 3) bdrFlux[3] = meanVel[2] * d1 + rho * d4;  // uz * dFndn + rho*d4, should be uz*dFndn + rho*d5
+  bdrFlux[0] = d1;
+  bdrFlux[1] = meanVel[0] * d1 + rho * d2;
+  bdrFlux[2] = meanVel[1] * d1 + rho * d3;
+  if (nvel_ == 3) bdrFlux[3] = meanVel[2] * d1 + rho * d4;
   bdrFlux[1 + nvel_] = rho * meanVel[0] * d2;
   bdrFlux[1 + nvel_] += rho * meanVel[1] * d3;
   if (nvel_ == 3) bdrFlux[1 + nvel_] += rho * meanVel[2] * d4;
-  bdrFlux[1 + nvel_] += meanK * d1 + d5 / (gamma - 1.);  // rho*ux*d2 + rho*uy*d3 + rho*uz*d4 + K*d1 + d5/(gamma-1)
+  bdrFlux[1 + nvel_] += meanK * d1 + d5 / (gamma - 1.);
 
   // flux gradients in other directions
   //   Vector fluxY(num_equation);
@@ -721,7 +723,7 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   newU[1] = inputState[0] * inputState[1];
   newU[2] = inputState[0] * inputState[2];
   if (nvel_ == 3) newU[3] = inputState[0] * inputState[3];
-  newU[4] = stateN[4] - dt * bdrFlux[4];  // floating T/energy
+  newU[4] = stateN[4] - 0.25 * dt * bdrFlux[4];  // floating T/energy
   if (eqSystem == NS_PASSIVE) newU[num_equation_ - 1] = 0.;
 
   // transform back into x-y coords
@@ -742,20 +744,29 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   }
   for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + bdrN * num_equation_] = newU[eq];
 
+  // modify newU to Reimann so the average of stateIn and modified newU is actual newU?
+  Vector tmpU(num_equation_);
+  for (int i = 0; i < num_equation_; i++) tmpU[i] = 2.0*newU[i] - stateIn[i];  
+
   // bdrFLux is over-written here, state2 is lagged
   // rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 
   // not lagged
-  rsolver->Eval(stateIn, newU, normal, bdrFlux, true);
+  rsolver->Eval(stateIn, tmpU, normal, bdrFlux, true);
 
   bdrN++;
 }
 
-// jump
+
+/**
+Non-reflecting inflow boundary with specified temperature following from Poinsot and Lele, "Boundary Conditions 
+for Direct Simulations of Compressible Viscous Flows", JCP, 1992.  Known issues: 
+ - restarts will hiccup with a reflecting step as boundaryU is not saved in restarts  
+ - time integration is not correct and should be treated with a proper RK4
+ - viscous portions ommited
+*/
 void InletBC::subsonicNonReflectingTemperatureVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
                                                        Vector &bdrFlux) {
-
-  //  printf("hello world 2\n"); fflush(stdout);
   
   const double gamma = mixture->GetSpecificHeatRatio();
   const double p = mixture->ComputePressure(stateIn);  
@@ -843,14 +854,14 @@ void InletBC::subsonicNonReflectingTemperatureVelocity(Vector &normal, Vector &s
   const double d5 = 0.5 * (L5 + L1);
 
   // dF/dx
-  bdrFlux[0] = d1;                                          // dFndn
-  bdrFlux[1] = meanVel[0] * d1 + rho * d2;                  // ux * dFndn + rho*d2, should be ux*dFndn + rho*d3
-  bdrFlux[2] = meanVel[1] * d1 + rho * d3;                  // uy * dFndn + rho*d3, should be uy*dFndn + rho*d4
-  if (nvel_ == 3) bdrFlux[3] = meanVel[2] * d1 + rho * d4;  // uz * dFndn + rho*d4, should be uz*dFndn + rho*d5
+  bdrFlux[0] = d1;
+  bdrFlux[1] = meanVel[0] * d1 + rho * d2;
+  bdrFlux[2] = meanVel[1] * d1 + rho * d3;
+  if (nvel_ == 3) bdrFlux[3] = meanVel[2] * d1 + rho * d4; 
   bdrFlux[1 + nvel_] = rho * meanVel[0] * d2;
   bdrFlux[1 + nvel_] += rho * meanVel[1] * d3;
   if (nvel_ == 3) bdrFlux[1 + nvel_] += rho * meanVel[2] * d4;
-  bdrFlux[1 + nvel_] += meanK * d1 + d5 / (gamma - 1.);  // rho*ux*d2 + rho*uy*d3 + rho*uz*d4 + K*d1 + d5/(gamma-1)
+  bdrFlux[1 + nvel_] += meanK * d1 + d5 / (gamma - 1.);
 
   // flux gradients in other directions
   //   Vector fluxY(num_equation);
@@ -895,7 +906,7 @@ void InletBC::subsonicNonReflectingTemperatureVelocity(Vector &normal, Vector &s
   Vector newU(num_equation_);
   // for(int i=0; i<num_equation; i++) newU[i] = state2[i]- dt*(bdrFlux[i] /*+ fluxY[i]*/);
   // for (int i = 0; i < num_equation_; i++) newU[i] = stateN[i] - dt*bdrFlux[i];
-  newU[0] = stateN[0] - dt * bdrFlux[0];  // floating rho
+  newU[0] = stateN[0] - 0.25 * dt * bdrFlux[0];  // floating rho
   newU[1] = stateN[0] * inputState[1];
   newU[2] = stateN[0] * inputState[2];
   if (nvel_ == 3) newU[3] = stateN[0] * inputState[3];
@@ -921,22 +932,32 @@ void InletBC::subsonicNonReflectingTemperatureVelocity(Vector &normal, Vector &s
   }
   for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + bdrN * num_equation_] = newU[eq];
 
+  // modify newU to Reimann so the average of stateIn and modified newU is actual newU?
+  Vector tmpU(num_equation_);
+  for (int i = 0; i < num_equation_; i++) tmpU[i] = 2.0*newU[i] - stateIn[i];  
+  
   // bdrFLux is over-written here, state2 is lagged
   //rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 
   // not lagged
-  rsolver->Eval(stateIn, newU, normal, bdrFlux, true);
+  rsolver->Eval(stateIn, tmpU, normal, bdrFlux, true);
 
   bdrN++;
   
 }
 
 
-// jump
+/**
+Incomplete: Non-reflecting inflow boundary with specified temperature and spatially varying inflow 
+following from Poinsot and Lele, "Boundary Conditions for Direct Simulations of Compressible 
+Viscous Flows", JCP, 1992.  For lack of a better method, use must modify this routine for the 
+particualr case.  Known issues: 
+ - restarts will hiccup with a reflecting step as boundaryU is not saved in restarts  
+ - time integration is not correct and should be treated with a proper RK4
+ - viscous portions ommited
+*/
 void InletBC::subsonicNonReflectingTemperatureVelocityUser(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
                                                            Vector transip, Vector &bdrFlux) {
-
-  //  printf("hello world 3\n"); fflush(stdout);
   
   const double gamma = mixture->GetSpecificHeatRatio();
   // const double pressure = eqState->ComputePressure(stateIn, dim);
@@ -1197,12 +1218,13 @@ void InletBC::subsonicNonReflectingTemperatureVelocityUser(Vector &normal, Vecto
 }
 
 
+/**
+Reflecting inflow with a specified density.  Temperature is backed out with the interior pressure.
+*/
 void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
-  // NOTE: it is likely that for two-temperature case inlet will also specify electron temperature,
-  // whether it is equal to the gas temperature or not.
-
-  //  printf("hello world 4\n"); fflush(stdout);
   
+  // NOTE: it is likely that for two-temperature case inlet will also specify electron temperature,
+  // whether it is equal to the gas temperature or not.  
   const double p = mixture->ComputePressure(stateIn);
 
   Vector state2(num_equation_);
@@ -1230,9 +1252,10 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
 }
 
 
+/**
+Reflecting inflow with a specified temperature.  Density is backed out with the interior pressure.
+*/
 void InletBC::subsonicReflectingTemperatureVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
-
-  //  printf("hello world 5\n"); fflush(stdout);
   
   const double p = mixture->ComputePressure(stateIn);
 
@@ -1263,9 +1286,11 @@ void InletBC::subsonicReflectingTemperatureVelocity(Vector &normal, Vector &stat
 }
 
 
+/**
+Reflecting inflow with a specified temperature and velocity profile.  Density is backed out with the interior pressure.
+For lack of a better method, this routine must be modified as desired for the particular run.
+*/
 void InletBC::subsonicReflectingTemperatureVelocityUser(Vector &normal, Vector &stateIn, Vector transip, Vector &bdrFlux) {
-
-  //  printf("hello world 6\n"); fflush(stdout);
   
   const double p = mixture->ComputePressure(stateIn);
 

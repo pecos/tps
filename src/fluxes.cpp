@@ -863,7 +863,9 @@ void Fluxes::viscousFluxes_hip(const Vector &x, ParGridFunction *gradUp, DenseTe
 }
 
 
-// these probably should go in another file, but fine for now
+/**
+Basic Smagorinksy subgrid model with user-specified cutoff grid length
+*/
 void Fluxes::sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu) {
 
   Vector Sij(6);
@@ -892,6 +894,11 @@ void Fluxes::sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delt
   
 }
 
+
+/**
+NOT TESTED: Sigma subgrid model following Nicoud et.al., "Using singular values to build a 
+subgrid-scale model for large eddy simulations", PoF 2011.
+*/
 void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu) {
 
   DenseMatrix Qij(dim,dim);
@@ -999,7 +1006,10 @@ void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double del
 }
 
 
-// should only be done once but the structure of the code makes it terrible to correct
+/**
+Simple planar viscous sponge layer with smooth tanh-transtion using user-specified width and
+total amplification.  Note: duplicate in M2
+*/
 void Fluxes::viscSpongePlanar(Vector x, double &wgt) {
 
   Vector normal(3);
@@ -1032,10 +1042,6 @@ void Fluxes::viscSpongePlanar(Vector x, double &wgt) {
   wgt = 0.5*(tanh(dist/width - 2.0) + 1.0);
   wgt *= (factor-1.0);
   wgt += 1.0;
-
-  //if (x[0] == 0.5 && x[1] == 0.5) {
-  //  cout << "z, dist, wgt: " << x[2] << ", " << dist << ", " << wgt << endl; fflush(stdout);
-  //}
   
 }
 
