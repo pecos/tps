@@ -34,9 +34,7 @@
 
 #include <grvy.h>
 #include <tps_config.h>
-
 #include <mfem/general/forall.hpp>
-
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
 #include "transport_properties.hpp"
@@ -47,12 +45,14 @@ using namespace mfem;
 
 class BoundaryCondition {
  protected:
+  
   RiemannSolver *rsolver;
   GasMixture *mixture;
   Equations eqSystem;
   ParFiniteElementSpace *vfes;
   IntegrationRules *intRules;
   double &dt;
+  
   const int dim_;
   const int nvel_;
   const int num_equation_;
@@ -63,10 +63,10 @@ class BoundaryCondition {
   bool BCinit;
 
   Array<int> listElems;  // list of boundary elements (position in the BC array)
-
   Array<int> offsetsBoundaryU;
-
   Vector face_flux_;
+
+  int total_bdrN;
 
  public:
   BoundaryCondition(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSystem, ParFiniteElementSpace *_vfes,
@@ -81,7 +81,13 @@ class BoundaryCondition {
   // prior to use (and require MPI)
   virtual void initBCs() = 0;
 
-  virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up) = 0;
+  //int GetBdrN() { return total_bdrN; }
+  virtual int GetBdrN() = 0;
+  virtual double GetBdrU(int ii) = 0;
+  virtual Vector *GetOutletBdrU_ptr() = 0;  
+  
+  //  virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up) = 0;
+  virtual void updateMean(IntegrationRules *intRules, ParGridFunction *U_, ParGridFunction *Up) = 0;  
 
   // aggregate boundary area
   double aggregateArea(int bndry_attr, MPI_Comm bc_comm);

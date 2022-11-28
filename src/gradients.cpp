@@ -34,7 +34,7 @@
 #include "dgNonlinearForm.hpp"
 
 Gradients::Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradUpfes, int _dim, int _num_equation,
-                     ParGridFunction *_Up, ParGridFunction *_gradUp, GasMixture *_mixture, GradNonLinearForm *_gradUp_A,
+                     ParGridFunction *_Up, ParGridFunction *_gradUp, GasMixture *_mixture, GradNonLinearForm *_gradUp_A, 
                      IntegrationRules *_intRules, int _intRuleType, const volumeFaceIntegrationArrays &_gpuArrays,
                      Array<DenseMatrix *> &_Me_inv, Vector &_invMArray, Array<int> &_posDofInvM,
                      const int &_maxIntPoints, const int &_maxDofs)
@@ -47,6 +47,7 @@ Gradients::Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradU
       gradUp(_gradUp),
       mixture(_mixture),
       gradUp_A(_gradUp_A),
+      //delUp_A(_delUp_A),      
       intRules(_intRules),
       intRuleType(_intRuleType),
       gpuArrays(_gpuArrays),
@@ -128,11 +129,79 @@ Gradients::Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradU
 
   Ke_array_.ReadWrite();
   Ke_positions_.ReadWrite();
+
+  /*
+  // same for second derivatives?
+  Ke2_positions_.SetSize(vfes->GetNE());
+  auto h_Ke2_positions = Ke2_positions_.HostWrite();
+
+  //std::vector<double> temp;
+  temp.clear();
+
+  // element derivative (ii) stiffness matrix
+  Ke2.SetSize(vfes->GetNE());  
+  for (int el = 0; el < vfes->GetNE(); el++) {
+    const FiniteElement *elem = vfes->GetFE(el);
+    ElementTransformation *Tr = vfes->GetElementTransformation(el);
+    const int eldDof = elem->GetDof();
+
+    Ke2[el] = new DenseMatrix(eldDof, eldDof);
+
+    // element volume integral
+    int intorder = 2 * elem->GetOrder();
+    const IntegrationRule *ir = &intRules->Get(elem->GetGeomType(), intorder);
+
+    Vector shape(eldDof);
+    //DenseMatrix dshape(eldDof, dim_);
+    Vector d2shape(eldDof);
+    DenseMatrix iGradUp(num_equation_, dim_);
+
+    for (int i = 0; i < ir->GetNPoints(); i++) {
+      IntegrationPoint ip = ir->IntPoint(i);
+      Tr->SetIntPoint(&ip);
+
+      // Calculate the shape functions
+      elem->CalcShape(ip, shape);
+      //elem->CalcPhysDShape(*Tr, dshape);
+      elem->CalcPhysLaplacian(*Tr, d2shape);
+
+      double detJac = Tr->Jacobian().Det() * ip.weight;
+
+      //for (int d = 0; d < dim_; d++) {
+        for (int k = 0; k < eldDof; k++) {
+          for (int j = 0; j < eldDof; j++) {
+            (*Ke2[el])(j,k) = shape(j) * d2shape(k) * detJac;
+          }
+        }
+	//}
+    }
+
+    h_Ke2_positions[el] = temp.size();
+    for (int j = 0; j < eldDof; j++) {
+      for (int k = 0; k < eldDof; k++) {
+        temp.push_back((*Ke2[el])(j,k));
+      }
+    }
+  }
+
+  Ke2_array_.UseDevice(true);
+  Ke2_array_.SetSize(temp.size());
+  auto h_Ke2_array = Ke2_array_.HostWrite();
+  for (int i = 0; i < static_cast<int>(temp.size()); i++) h_Ke2_array[i] = temp[i];
+
+  Ke2_array_.ReadWrite();
+  Ke2_positions_.ReadWrite();  
+  */
 }
+
 
 Gradients::~Gradients() {
   for (int n = 0; n < Ke.Size(); n++) delete Ke[n];
+
+  // for laplacian
+  //for (int n = 0; n < Ke2.Size(); n++) delete Ke2[n];  
 }
+
 
 void Gradients::computeGradients() {
   const int totalDofs = vfes->GetNDofs();
@@ -206,7 +275,8 @@ void Gradients::computeGradients() {
           //           rhs[k] = gradUp[index+eq*totalDofs+d*num_equation_*totalDofs]+
           //                   faceContrib[index+eq*totalDofs+d*num_equation_*totalDofs];
           rhs[k] = -dataGradUp[index + eq * totalDofs + d * num_equation_ * totalDofs] +
-                   faceContrib[index + eq * totalDofs + d * num_equation_ * totalDofs];
+	    faceContrib[index + eq * totalDofs + d * num_equation_ * totalDofs];
+	  // faceContrib looks like just the difference between the ele val and the mean val of the sharing faces * n_i
         }
 
         // mult by inv mass matrix
@@ -223,6 +293,106 @@ void Gradients::computeGradients() {
 
   gradUp->ExchangeFaceNbrData();
 }
+
+
+//...
+/*
+void Gradients::computeLaplacian() {
+  
+  const int totalDofs = vfes->GetNDofs();
+  double *dataUp = Up->GetData();
+  double *dataDelUp = delUp->GetData();
+
+  // Vars for face contributions
+  //Vector faceContrib(dim_ * num_equation_ * totalDofs);
+  Vector faceContrib(num_equation_ * totalDofs);
+  faceContrib = 0.;
+
+  // compute volume integral and fill out above vectors
+  DenseMatrix elDelUp;
+  for (int el = 0; el < vfes->GetNE(); el++) {
+    const FiniteElement *elem = vfes->GetFE(el);
+
+    // get local primitive variables
+    Array<int> vdofs;
+    vfes->GetElementVDofs(el, vdofs);
+    const int eldDof = elem->GetDof();
+    DenseMatrix elUp(eldDof, num_equation_);
+    for (int d = 0; d < eldDof; d++) {
+      int index = vdofs[d];
+      for (int eq = 0; eq < num_equation_; eq++) {
+        elUp(d, eq) = dataUp[index + eq * totalDofs];
+      }
+    }
+
+    elDelUp.SetSize(eldDof, num_equation_);
+    elDelUp = 0.;
+
+    // Add volume contrubutions to gradient
+    for (int eq = 0; eq < num_equation_; eq++) {
+      //for (int d = 0; d < dim_; d++) {
+        for (int j = 0; j < eldDof; j++) {
+          for (int k = 0; k < eldDof; k++) {
+            elDelUp(j, eq + num_equation_) += (*Ke2[el])(j, k + eldDof) * elUp(k, eq);
+          }
+        }
+	//}
+    }
+
+    // transfer result into gradUp
+    for (int k = 0; k < eldDof; k++) {
+      int index = vdofs[k];
+      for (int eq = 0; eq < num_equation_; eq++) {
+        //for (int d = 0; d < dim_; d++) {
+          dataDelUp[index + eq * totalDofs + num_equation_ * totalDofs] = -elDelUp(k, eq + num_equation_);
+	  //}
+      }
+    }
+  }
+
+  // Calc boundary contribution (can  we get away with reusing gradUp_A here?)
+  //delUp_A->Mult(Up, faceContrib);
+  gradUp_A->Mult(Up, faceContrib);
+
+  // Add contributions and multiply by invers mass matrix
+  for (int el = 0; el < vfes->GetNE(); el++) {
+    const FiniteElement *elem = vfes->GetFE(el);
+    const int eldDof = elem->GetDof();
+
+    Array<int> vdofs;
+    vfes->GetElementVDofs(el, vdofs);
+
+    Vector aux(eldDof);
+    Vector rhs(eldDof);
+
+    //for (int d = 0; d < dim_; d++) {
+      for (int eq = 0; eq < num_equation_; eq++) {
+        for (int k = 0; k < eldDof; k++) {
+          int index = vdofs[k];
+          //rhs[k] = -dataGradUp[index + eq * totalDofs + d * num_equation_ * totalDofs] +
+          //         faceContrib[index + eq * totalDofs + d * num_equation_ * totalDofs];
+          rhs[k] = -dataDelUp[index + eq * totalDofs + num_equation_ * totalDofs] +
+                   faceContrib[index + eq * totalDofs + 1 * num_equation_ * totalDofs];
+        }
+
+        // mult by inv mass matrix
+        Me_inv[el]->Mult(rhs, aux);
+
+        // save this in gradUp
+        for (int k = 0; k < eldDof; k++) {
+          int index = vdofs[k];
+          dataDelUp[index + eq * totalDofs + num_equation_ * totalDofs] = aux[k];
+        }
+      }
+      //}
+  }
+
+  delUp->ExchangeFaceNbrData();
+}
+*/
+//...
+
+
 
 #ifdef _GPU_
 void Gradients::computeGradients_domain() {

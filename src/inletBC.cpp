@@ -87,6 +87,7 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
   auto hmeanUp = meanUp.HostWrite();
 
   // swh: why is this hardcoded?
+  /*
   hmeanUp[0] = 1.2;                 // rho
   hmeanUp[1] = 60;                  // u
   hmeanUp[2] = 0;                   // v
@@ -99,6 +100,7 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
       hmeanUp[nvel_ + 2 + sp] = 0.0;  // species
     }
   }
+  */
 
   Array<double> coords;
 
@@ -149,7 +151,7 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
   iUp.SetSize(num_equation_);
   auto hboundaryU = boundaryU.HostWrite();
   for (int i = 0; i < bdrN; i++) {
-    for (int eq = 0; eq < num_equation_; eq++) iUp(eq) = hmeanUp[eq];
+    for (int eq = 0; eq < num_equation_; eq++) iUp(eq) = hmeanUp[eq]; // this makes no sense but wtf is hboundaryU anyway?
     mixture->GetConservativesFromPrimitives(iUp, iState);
 
     //     double gamma = mixture->GetSpecificHeatRatio();
@@ -475,7 +477,7 @@ void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradS
   }
 }
 
-void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
+void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *U_, ParGridFunction *Up) {
   if (inletType_ == SUB_DENS_VEL) return;
   bdrN = 0;
 
@@ -530,8 +532,8 @@ void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
             sum += shape[d] * elUp(d + eq * elDofs);
           }
           localMeanUp[eq] += sum;
-          //if (!bdrUInit) boundaryU[eq + Nbdr * num_equation_] = sum;
-          if (!bdrUInit) boundaryU[eq + Nbdr * num_equation_] = iState[eq];
+          if (!bdrUInit) boundaryU[eq + Nbdr * num_equation_] = sum;
+	  
         }
         Nbdr++;
       }
@@ -556,6 +558,7 @@ void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
       mixture->GetConservativesFromPrimitives(iUp, iState);
 
       for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + i * num_equation_] = iState[eq];
+      
     }
     bdrUInit = true;
   }

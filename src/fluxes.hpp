@@ -82,6 +82,8 @@ class Fluxes {
 
   void sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu_sgs);
   void sgsSigma(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu_sgs);  
+
+  void viscSpongePlanar(Vector x, double &wgt);
   
   // Compute viscous flux with prescribed boundary flux.
   void ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip, double delta, 

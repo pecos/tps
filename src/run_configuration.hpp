@@ -123,6 +123,8 @@ class RunConfiguration {
   bool restartMean;
   bool meanHistEnable;
 
+  bool restartBdr;  
+
   // working fluid. Options thus far
   // DRY_AIR
   // Defaults to DRAY_AIR
@@ -295,6 +297,8 @@ class RunConfiguration {
   bool GetRestartMean() { return restartMean; }
   bool isMeanHistEnabled() { return meanHistEnable; }
 
+  bool GetRestartBdr() { return restartBdr; }
+  
   WorkingFluid GetWorkingFluid() { return workFluid; }
   double GetViscMult() { return visc_mult; }
   double GetBulkViscMult() { return bulk_visc; }

@@ -133,6 +133,7 @@ enum OutletType {
 
 enum WallType {
   INV,         // Inviscid wall
+  SLIP,        // Slip/zero-pentration wall  
   VISC_ADIAB,  // Viscous adiabatic wall
   VISC_ISOTH,  // Viscous isothermal wall
   VISC_GNRL    // Viscous general wall

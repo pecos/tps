@@ -38,6 +38,7 @@ GradFaceIntegrator::GradFaceIntegrator(IntegrationRules *_intRules, const int _d
 
 void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2,
                                             FaceElementTransformations &Tr, const Vector &elfun, Vector &elvect) {
+  
   // Compute the term <nU,[w]> on the interior faces.
   Vector shape1;
   shape1.UseDevice(false);
@@ -83,6 +84,7 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
   if (el1.Space() == FunctionSpace::Pk) {
     intorder++;
   }
+  
   // IntegrationRules IntRules2(0, Quadrature1D::GaussLobatto);
   const IntegrationRule *ir = &intRules->Get(Tr.GetGeometryType(), intorder);
 
@@ -102,6 +104,7 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
     iUp1.SetSize(num_equation);
     iUp2.SetSize(num_equation);
     for (int eq = 0; eq < num_equation; eq++) {
+      
       double sum = 0.;
       for (int k = 0; k < dof1; k++) {
 #ifdef _GPU_
@@ -111,6 +114,7 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
 #endif
       }
       iUp1(eq) = sum;
+      
       sum = 0.;
       for (int k = 0; k < dof2; k++) {
 #ifdef _GPU_
@@ -120,7 +124,8 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
 #endif
       }
       iUp2(eq) = sum;
-      mean(eq) = (iUp1(eq) + iUp2(eq)) / 2.;
+      
+      mean(eq) = 0.5 * (iUp1(eq) + iUp2(eq));
     }
 
     // Get the normal vector and the flux on the face
@@ -130,8 +135,10 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
 
     for (int d = 0; d < dim; d++) {
       for (int eq = 0; eq < num_equation; eq++) {
+	
         const double du1n = (mean(eq) - iUp1(eq)) * nor(d);
         const double du2n = (mean(eq) - iUp2(eq)) * nor(d);
+	
         for (int k = 0; k < dof1; k++) {
 #ifdef _GPU_
           elvect(k + eq + d * num_equation) += du1n * shape1(k);
@@ -139,6 +146,7 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
           elvect1_mat(k, eq + d * num_equation) += du1n * shape1(k);
 #endif
         }
+	
         for (int k = 0; k < dof2; k++) {
 #ifdef _GPU_
           elvect(k + eq + d * num_equation + dof1 * num_equation * dim) -= du2n * shape2(k);
@@ -146,6 +154,7 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
           elvect2_mat(k, eq + d * num_equation) -= du2n * shape2(k);
 #endif
         }
+	
       }
     }
   }

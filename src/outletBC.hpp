@@ -57,7 +57,9 @@ class OutletBC : public BoundaryCondition {
   Vector meanUp;
 
   Vector boundaryU;
-  int bdrN;
+  Vector boundaryU_element;  
+  int bdrN, total_bdrN;
+  int bdrN_element;
   bool bdrUInit;
 
   // boundary mean calculation variables
@@ -90,7 +92,7 @@ class OutletBC : public BoundaryCondition {
   void subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
   void subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
 
-  virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up);
+  virtual void updateMean(IntegrationRules *intRules, ParGridFunction *U_, ParGridFunction *Up);
 
   void computeParallelArea();
 
@@ -105,6 +107,13 @@ class OutletBC : public BoundaryCondition {
 		      Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux);
 
   virtual void initBCs();
+
+  //int GetBdrN() { return total_bdrN; }
+  //double GetBdrU(int ii) { return boundaryU[ii]; }
+  
+  int GetBdrN() { return bdrN_element; }
+  double GetBdrU(int ii) { return boundaryU_element[ii]; }
+  Vector *GetOutletBdrU_ptr() { return &boundaryU_element; }  
 
   virtual void integrationBC(Vector &y,  // output
                              const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,

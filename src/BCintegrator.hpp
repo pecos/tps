@@ -33,7 +33,6 @@
 #define BCINTEGRATOR_HPP_
 
 #include <tps_config.h>
-
 #include "BoundaryCondition.hpp"
 #include "equation_of_state.hpp"
 #include "fluxes.hpp"
@@ -81,6 +80,11 @@ class BCintegrator : public NonlinearFormIntegrator {
   std::unordered_map<int, BoundaryCondition *> outletBCmap;
   std::unordered_map<int, BoundaryCondition *> wallBCmap;
 
+  int ObdrN;
+  Vector oBoundaryU;
+  Vector *oBoundaryU_ptr;  
+  //Vector oBoundaryU_ele;  
+
   // void calcMeanState();
   void computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius,
                       Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux);
@@ -97,7 +101,14 @@ class BCintegrator : public NonlinearFormIntegrator {
                                   const Vector &elfun, Vector &elvect);
   void initBCs();
 
-  void updateBCMean(ParGridFunction *Up);
+  int GetBdrN_Outlet() const { return ObdrN; }
+  double GetBdrU(int ii) { return oBoundaryU[ii]; }
+  //double* GetOutletBdrU_ptr(int ii) { return &oBoundaryU[ii]; }
+  //Vector *GetOutletBdrU_ptr() { return &oBoundaryU; }
+  Vector *GetOutletBdrU_ptr() { return oBoundaryU_ptr; }        
+  
+  //void updateBCMean(ParGridFunction *Up);
+  void updateBCMean(ParGridFunction *U_, ParGridFunction *Up);  
   void integrateBCs(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds);
 
   // GPU functions

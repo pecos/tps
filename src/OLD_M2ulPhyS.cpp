@@ -29,7 +29,6 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
-
 /*
  * Implementation of the class Problem
  */
@@ -201,15 +200,6 @@ void M2ulPhyS::initVariables() {
 
     time = 0.;
     iter = 0;
-  }
-
-  // This line is necessary to ensure that GetNodes does not return
-  // NULL, which is required when we set up interpolation between
-  // meshes.  We do it here b/c waiting until later (e.g., right
-  // before interpolation set up) leads to a seg fault when running in
-  // parallel, which is not yet understood.
-  if (mesh->GetNodes() == NULL) {
-    mesh->SetCurvature(1);
   }
 
 #ifdef _GPU_
@@ -427,7 +417,6 @@ void M2ulPhyS::initVariables() {
   // FE Spaces
   fes = new ParFiniteElementSpace(mesh, fec);
   dfes = new ParFiniteElementSpace(mesh, fec, dim, Ordering::byNODES);
-  nvelfes = new ParFiniteElementSpace(mesh, fec, nvel, Ordering::byNODES);
   vfes = new ParFiniteElementSpace(mesh, fec, num_equation, Ordering::byNODES);
   gradUpfes = new ParFiniteElementSpace(mesh, fec, num_equation * dim, Ordering::byNODES);
 
@@ -446,9 +435,9 @@ void M2ulPhyS::initVariables() {
   // Kevin: Do we need GasMixture class for this?
   // register rms and mean sol into ioData
   if (average->ComputeMean()) {
-
-    // meanUp    
-    ioData.registerIOFamily("Time-averaged primitive vars", "/meanSolution", average->GetMeanUp(), false, config.GetRestartMean());
+    // meanUp
+    ioData.registerIOFamily("Time-averaged primitive vars", "/meanSolution", average->GetMeanUp(), false,
+                            config.GetRestartMean());
     ioData.registerIOVar("/meanSolution", "meanDens", 0);
     ioData.registerIOVar("/meanSolution", "mean-u", 1);
     ioData.registerIOVar("/meanSolution", "mean-v", 2);
@@ -458,9 +447,7 @@ void M2ulPhyS::initVariables() {
     } else {
       ioData.registerIOVar("/meanSolution", "mean-p", dim + 1);
     }
-    
     for (int sp = 0; sp < numActiveSpecies; sp++) {
-      
       // Only for NS_PASSIVE.
       if ((eqSystem == NS_PASSIVE) && (sp == 1)) break;
 
@@ -479,38 +466,6 @@ void M2ulPhyS::initVariables() {
     ioData.registerIOVar("/rmsData", "vw", 5);
   }
 
- 
-  // boundary integration vector for NSCBC: no native Vector support <warp>
-  //if ( ) {
-
-    // outlet
-  /*
-    ioData.registerIOFamilyVector("Boundary", "/outletSolution", outlet_bdrU_ptr, false, config.GetRestartBdr());
-    ioData.registerIOVar("/outletSolution", "Dens", 0);
-    ioData.registerIOVar("/outletSolution", "u", 1);
-    ioData.registerIOVar("/outletSolution", "v", 2);
-    if (nvel == 3) {
-      ioData.registerIOVar("/outletSolution", "w", 3);
-      ioData.registerIOVar("/outletSolution", "E", 4);
-    }
-  */
-
-    // inlet
-    /*
-    if () {
-       ioData.registerIOFamily("NSCBC ", "/inletSolution", <ParGridFunction data here>, false, config.GetRestartBdr());
-       ioData.registerIOVar("/inletSolution", "Dens", 0);
-       ioData.registerIOVar("/inletSolution", "u", 1);
-       ioData.registerIOVar("/inletSolution", "v", 2);
-       if (nvel == 3) {
-          ioData.registerIOVar("/intletSolution", "w", 3);
-          ioData.registerIOVar("/intletSolution", "E", 4);
-       }      
-    }
-    
-  }
-  */
-  
   ioData.initializeSerial(mpi.Root(), (config.RestartSerial() != "no"), serial_mesh);
   projectInitialSolution();
 
@@ -538,7 +493,7 @@ void M2ulPhyS::initVariables() {
   gpu::instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, fluxClass, config.RoeRiemannSolver(),
                                           config.isAxisymmetric(), rsolver);
 #else
-  fluxClass = new Fluxes(mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(), config);
+  fluxClass = new Fluxes(mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric());
 
   rsolver =
       new RiemannSolver(num_equation, mixture, eqSystem, fluxClass, config.RoeRiemannSolver(), config.isAxisymmetric());
@@ -555,17 +510,7 @@ void M2ulPhyS::initVariables() {
   if (local_attr.Size() > 0) {
     bcIntegrator = new BCintegrator(groupsMPI, mesh, vfes, intRules, rsolver, dt, mixture, d_mixture, fluxClass, Up,
                                     gradUp, shapesBC, normalsWBC, intPointsElIDBC, dim, num_equation, max_char_speed,
-                                    config, local_attr, maxIntPoints, maxDofs, transportPtr);
-
-    // size of boundaryU <jump>
-    outlet_bdrN = bcIntegrator->GetBdrN_Outlet();
-    //cout << "bdrN: " << outlet_bdrN << endl; fflush(stdout);
-    //outlet_bdrU.SetSize(outlet_bdrN*num_equation);
-    if (outlet_bdrN > 0) {
-      //      outlet_bdrU_ptr = bcIntegrator->GetOutletBdrU_ptr(0);
-      outlet_bdrU_ptr = bcIntegrator->GetOutletBdrU_ptr();      
-      //cout << "bdrU pointer: " << outlet_bdrU_ptr << " " << *outlet_bdrU_ptr << endl; fflush(stdout);
-    }
+                                    config, local_attr, maxIntPoints, maxDofs);
   }
 
   // A->SetAssemblyLevel(AssemblyLevel::PARTIAL);
@@ -625,44 +570,31 @@ void M2ulPhyS::initVariables() {
       intRules, dim, num_equation, gpuArrays, maxIntPoints, maxDofs);
   gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
 
-  rhsOperator = new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType,
-                                fluxClass, mixture, d_mixture, chemistry_, transportPtr, vfes, fes, gpuArrays, maxIntPoints,
-                                maxDofs, A, Aflux, mesh, spaceVaryViscMult, U, Up, gradUp, gradUpfes, gradUp_A,
-                                bcIntegrator, isSBP, alpha, config, plasma_conductivity_, joule_heating_);
+  rhsOperator =
+      new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType, fluxClass,
+                      mixture, d_mixture, chemistry_, transportPtr, vfes, gpuArrays, maxIntPoints, maxDofs, A, Aflux,
+                      mesh, spaceVaryViscMult, U, Up, gradUp, gradUpfes, gradUp_A, bcIntegrator, isSBP, alpha, config);
 
   CFL = config.GetCFLNumber();
   rhsOperator->SetTime(time);
   timeIntegrator->Init(*rhsOperator);
 
-  
   // Determine the minimum element size.
   {
-    //double local_hmin = mesh->GetElementSize(0, 1);
-    double local_hmin = 1.0e18;
-    for (int i = 0; i < mesh->GetNE(); i++) {
+    double local_hmin = mesh->GetElementSize(0, 1);
+    for (int i = 1; i < mesh->GetNE(); i++) {
       // if(sqrt(mesh->GetElementVolume(i))<1e-3) cout<<sqrt(mesh->GetElementVolume(i))<<endl;
       local_hmin = min(mesh->GetElementSize(i, 1), local_hmin);
-      // local_hmin = min(sqrt(mesh->GetElementVolume(i)), local_hmin);      
+      // local_hmin = min(sqrt(mesh->GetElementVolume(i)), local_hmin);
     }
     MPI_Allreduce(&local_hmin, &hmin, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
   }
 
-  // maximum size
-  {
-    double local_hmax = 1.0e-15;
-    for (int i = 0; i < mesh->GetNE(); i++) {
-      local_hmax = max(mesh->GetElementSize(i, 1), local_hmax);
-    }
-    MPI_Allreduce(&local_hmax, &hmax, 1, MPI_DOUBLE, MPI_MAX, mesh->GetComm());
-  }
-  
   // estimate initial dt
   Up->ExchangeFaceNbrData();
   gradUp->ExchangeFaceNbrData();
 
   if (config.GetRestartCycle() == 0) initialTimeStep();
-  if (mpi.Root()) cout << "Maximum element size: " << hmax << "m" << endl;    
-  if (mpi.Root()) cout << "Minimum element size: " << hmin << "m" << endl;  
   if (mpi.Root()) cout << "Initial time-step: " << dt << "s" << endl;
 
   // t_final = MaxIters*dt;
@@ -808,27 +740,24 @@ void M2ulPhyS::initIndirectionArrays() {
         shape1i.SetSize(dof1);
         shape2i.SetSize(dof2);
         for (int k = 0; k < ir->GetNPoints(); k++) {
-	  
           const IntegrationPoint &ip = ir->IntPoint(k);
           tr->SetAllIntPoints(&ip);
-	  
           // shape functions
           fe1->CalcShape(tr->GetElement1IntPoint(), shape1i);
           fe2->CalcShape(tr->GetElement2IntPoint(), shape2i);
           for (int j = 0; j < dof1; j++)
             hshapeWnor1[face * (maxDofs + dim + 1) * maxIntPoints + j + k * (dim + 1 + maxDofs)] = shape1i[j];
           for (int j = 0; j < dof2; j++) hshape2[face * maxDofs * maxIntPoints + j + k * maxDofs] = shape2i[j];
+
           hshapeWnor1[face * (maxDofs + dim + 1) * maxIntPoints + maxDofs + k * (dim + 1 + maxDofs)] = ip.weight;
-	  
-          // normals (multiplied by determinant of jacobian)
+          // normals (multiplied by determinant of jacobian
           Vector nor;
           nor.UseDevice(false);
           nor.SetSize(dim);
           CalcOrtho(tr->Jacobian(), nor);
           for (int d = 0; d < dim; d++)
             hshapeWnor1[face * (maxDofs + dim + 1) * maxIntPoints + maxDofs + 1 + d + k * (maxDofs + dim + 1)] = nor[d];
-	  
-        }	
+        }
       }
     }
   }
@@ -920,6 +849,7 @@ void M2ulPhyS::initIndirectionArrays() {
 
       // element volume integral
       int intorder = 2 * elem->GetOrder();
+      if (intRuleType == 1 && elem->GetGeomType() == Geometry::SQUARE) intorder--;  // when Gauss-Lobatto
       const IntegrationRule *ir = &intRules->Get(elem->GetGeomType(), intorder);
 
       positions.push_back(ir->GetNPoints());
@@ -1084,9 +1014,6 @@ void M2ulPhyS::getAttributesInPartition(Array<int> &local_attr) {
 }
 
 void M2ulPhyS::initSolutionAndVisualizationVectors() {
-  visualizationVariables_.clear();
-  visualizationNames_.clear();
-
   offsets = new Array<int>(num_equation + 1);
   for (int k = 0; k <= num_equation; k++) {
     (*offsets)[k] = k * vfes->GetNDofs();
@@ -1102,7 +1029,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   dens = new ParGridFunction(fes, Up->HostReadWrite());
   vel = new ParGridFunction(dfes, Up->HostReadWrite() + fes->GetNDofs());
-  
+
   if (config.isAxisymmetric()) {
     vtheta = new ParGridFunction(fes, Up->HostReadWrite() + 3 * fes->GetNDofs());
   } else {
@@ -1118,123 +1045,18 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   // this variable is purely for visualization
   press = new ParGridFunction(fes);
-  
+
   passiveScalar = NULL;
   if (eqSystem == NS_PASSIVE) {
     passiveScalar = new ParGridFunction(fes, Up->HostReadWrite() + (num_equation - 1) * fes->GetNDofs());
   } else {
     // TODO(kevin): for now, keep the number of primitive variables same as conserved variables.
     // will need to add full list of species.
+    visualizationVariables.resize(numActiveSpecies);
     for (int sp = 0; sp < numActiveSpecies; sp++) {
-      std::string speciesName = config.speciesNames[sp];
-      visualizationVariables_.push_back(
-          new ParGridFunction(fes, U->HostReadWrite() + (sp + nvel + 2) * fes->GetNDofs()));
-      visualizationNames_.push_back(std::string("partial_density_" + speciesName));
+      visualizationVariables[sp] = new ParGridFunction(fes, U->HostReadWrite() + (sp + nvel + 2) * fes->GetNDofs());
     }
-
-  // jump
-  //elSize = new ParGridFunction(fes); //, Up->HostReadWrite());
-    
   }
-
-  // add visualization variables if tps is run on post-process visualization mode.
-  // TODO(kevin): maybe enable users to specify what to visualize.
-  if (tpsP->isVisualizationMode()) {
-    if (config.workFluid != DRY_AIR) {
-      // species primitives.
-      visualizationIndexes_.Xsp = visualizationVariables_.size();
-      for (int sp = 0; sp < numSpecies; sp++) {
-        std::string speciesName = config.speciesNames[sp];
-        visualizationVariables_.push_back(new ParGridFunction(fes));
-        visualizationNames_.push_back(std::string("X_" + speciesName));
-      }
-      visualizationIndexes_.Ysp = visualizationVariables_.size();
-      for (int sp = 0; sp < numSpecies; sp++) {
-        std::string speciesName = config.speciesNames[sp];
-        visualizationVariables_.push_back(new ParGridFunction(fes));
-        visualizationNames_.push_back(std::string("Y_" + speciesName));
-      }
-      visualizationIndexes_.nsp = visualizationVariables_.size();
-      for (int sp = 0; sp < numSpecies; sp++) {
-        std::string speciesName = config.speciesNames[sp];
-        visualizationVariables_.push_back(new ParGridFunction(fes));
-        visualizationNames_.push_back(std::string("n_" + speciesName));
-      }
-
-      // transport properties.
-      visualizationIndexes_.FluxTrns = visualizationVariables_.size();
-      for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++) {
-        std::string fieldName;
-        switch (t) {
-          case FluxTrns::VISCOSITY:
-            fieldName = "viscosity";
-            break;
-          case FluxTrns::BULK_VISCOSITY:
-            fieldName = "bulk_viscosity";
-            break;
-          case FluxTrns::HEAVY_THERMAL_CONDUCTIVITY:
-            fieldName = "thermal_cond_heavy";
-            break;
-          case FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY:
-            fieldName = "thermal_cond_elec";
-            break;
-          default:
-            grvy_printf(GRVY_ERROR, "Error in initializing visualization: Unknown flux transport property!");
-            exit(ERROR);
-            break;
-        }
-        visualizationVariables_.push_back(new ParGridFunction(fes));
-        visualizationNames_.push_back(fieldName);
-      }
-      visualizationIndexes_.diffVel = visualizationVariables_.size();
-      for (int sp = 0; sp < numSpecies; sp++) {
-        std::string speciesName = config.speciesNames[sp];
-        visualizationVariables_.push_back(new ParGridFunction(nvelfes));
-        visualizationNames_.push_back(std::string("diff_vel_" + speciesName));
-      }
-      visualizationIndexes_.SrcTrns = visualizationVariables_.size();
-      for (int t = 0; t < SrcTrns::NUM_SRC_TRANS; t++) {
-        std::string fieldName;
-        switch (t) {
-          case SrcTrns::ELECTRIC_CONDUCTIVITY:
-            fieldName = "electric_cond";
-            break;
-          default:
-            grvy_printf(GRVY_ERROR, "Error in initializing visualization: Unknown source transport property!");
-            exit(ERROR);
-            break;
-        }
-        visualizationVariables_.push_back(new ParGridFunction(fes));
-        visualizationNames_.push_back(fieldName);
-      }
-      visualizationIndexes_.SpeciesTrns = visualizationVariables_.size();
-      for (int t = 0; t < SpeciesTrns::NUM_SPECIES_COEFFS; t++) {
-        std::string fieldName;
-        switch (t) {
-          case SpeciesTrns::MF_FREQUENCY:
-            fieldName = "momentum_tranfer_freq";
-            break;
-          default:
-            grvy_printf(GRVY_ERROR, "Error in initializing visualization: Unknown species transport property!");
-            exit(ERROR);
-            break;
-        }
-        for (int sp = 0; sp < numSpecies; sp++) {
-          std::string speciesName = config.speciesNames[sp];
-          visualizationVariables_.push_back(new ParGridFunction(fes));
-          visualizationNames_.push_back(std::string(fieldName + "_" + speciesName));
-        }
-      }
-
-      // chemistry reaction rates.
-      visualizationIndexes_.rxn = visualizationVariables_.size();
-      for (int r = 0; r < config.numReactions; r++) {
-        visualizationVariables_.push_back(new ParGridFunction(fes));
-        visualizationNames_.push_back(std::string("rxn_rate_" + std::to_string(r + 1)));
-        // visualizationNames_.push_back(std::string("rxn_rate: " + config.reactionEquations[r]));
-      }
-    }  // if (config.workFluid != DRY_AIR)
-  }    // if tpsP->isVisualizationMode()
 
   // If mms, add conserved and exact solution.
 #ifdef HAVE_MASA
@@ -1244,32 +1066,14 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     masaU_ = new ParGridFunction(vfes, masaUBlock_->HostReadWrite());
     masaRhs_ = new ParGridFunction(*U);
 
-    for (int eq = 0; eq < num_equation; eq++) {
-      visualizationVariables_.push_back(new ParGridFunction(fes, U->HostReadWrite() + eq * fes->GetNDofs()));
-      visualizationNames_.push_back(std::string("U" + std::to_string(eq)));
-    }
-    for (int eq = 0; eq < num_equation; eq++) {
-      visualizationVariables_.push_back(new ParGridFunction(fes, masaU_->HostReadWrite() + eq * fes->GetNDofs()));
-      visualizationNames_.push_back(std::string("mms_U" + std::to_string(eq)));
-    }
-    for (int eq = 0; eq < num_equation; eq++) {
-      visualizationVariables_.push_back(new ParGridFunction(fes, masaRhs_->HostReadWrite() + eq * fes->GetNDofs()));
-      visualizationNames_.push_back(std::string("RHS" + std::to_string(eq)));
-    }
+    for (int eq = 0; eq < num_equation; eq++)
+      visualizationVariables.push_back(new ParGridFunction(fes, U->HostReadWrite() + eq * fes->GetNDofs()));
+    for (int eq = 0; eq < num_equation; eq++)
+      visualizationVariables.push_back(new ParGridFunction(fes, masaU_->HostReadWrite() + eq * fes->GetNDofs()));
+    for (int eq = 0; eq < num_equation; eq++)
+      visualizationVariables.push_back(new ParGridFunction(fes, masaRhs_->HostReadWrite() + eq * fes->GetNDofs()));
   }
 #endif
-
-  plasma_conductivity_ = NULL;
-  if (tpsP->isFlowEMCoupled()) {
-    plasma_conductivity_ = new ParGridFunction(fes);
-    *plasma_conductivity_ = 0.0;
-  }
-
-  joule_heating_ = NULL;
-  if (tpsP->isFlowEMCoupled()) {
-    joule_heating_ = new ParGridFunction(fes);
-    *joule_heating_ = 0.0;
-  }
 
   // define solution parameters for i/o
   ioData.registerIOFamily("Solution state variables", "/solution", U);
@@ -1288,6 +1092,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     // Only for NS_PASSIVE.
     if ((eqSystem == NS_PASSIVE) && (sp == 1)) break;
 
+    // int inputSpeciesIndex = mixture->getInputIndexOf(sp);
     std::string speciesName = config.speciesNames[sp];
     ioData.registerIOVar("/solution", "rho-Y_" + speciesName, sp + nvel + 2);
   }
@@ -1296,10 +1101,6 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     ioData.registerIOVar("/solution", "rhoE_e", num_equation - 1);
   }
 
-  // (warp) old viscosity multiplier stuff => moved to fluxes.cpp but should really be calculated
-  // here only once, this is currently incomplete (never implemented for Bdr and faces) and not
-  // used (or at least it shouldnt be...)
-  
   // compute factor to multiply viscosity when this option is active
   spaceVaryViscMult = NULL;
   ParGridFunction coordsDof(dfes);
@@ -1307,18 +1108,9 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   if (config.linViscData.isEnabled) {
     spaceVaryViscMult = new ParGridFunction(fes);
     double *viscMult = spaceVaryViscMult->HostWrite();
-    double wgt = 0.;
     for (int n = 0; n < fes->GetNDofs(); n++) {
-
       double alpha = 1.;
       auto hcoords = coordsDof.HostRead();  // get coords
-      Vector coords(3);
-      for (int d = 0; d < dim; d++) {
-        coords[d] = hcoords[n + d * vfes->GetNDofs()];
-      }
-
-      
-      /*      
       double dist_pi = 0., dist_p0 = 0., dist_pi0 = 0.;
       for (int d = 0; d < dim; d++) {
         dist_pi += config.GetLinearVaryingData().normal(d) *
@@ -1333,10 +1125,6 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
         alpha += (config.GetLinearVaryingData().viscRatio - 1.) / dist_pi0 * dist_pi;
       }
       viscMult[n] = alpha;
-      */
-      //viscMult[n] = 1.0; // just to be safe...
-      viscMultPlanar(coords, wgt);
-      viscMult[n] = wgt; 
     }
   }
 
@@ -1352,15 +1140,33 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   paraviewColl->RegisterField("press", press);
   if (eqSystem == NS_PASSIVE) {
     paraviewColl->RegisterField("passiveScalar", passiveScalar);
+  } else if (numActiveSpecies > 0) {
+    // TODO(kevin): for now, keep the number of primitive variables same as conserved variables.
+    // will need to add full list of species.
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      // int inputSpeciesIndex = mixture->getInputIndexOf(sp);
+      std::string speciesName = config.speciesNames[sp];
+      paraviewColl->RegisterField("partial_density_" + speciesName, visualizationVariables[sp]);
+    }
   }
 
   if (config.twoTemperature) {
     paraviewColl->RegisterField("Te", electron_temp_field);
   }
 
-  for (int var = 0; var < visualizationVariables_.size(); var++) {
-    paraviewColl->RegisterField(visualizationNames_[var], visualizationVariables_[var]);
+// If mms, add exact solution.
+#ifdef HAVE_MASA
+  if (config.use_mms_ && config.mmsSaveDetails_) {
+    for (int eq = 0; eq < num_equation; eq++)
+      paraviewColl->RegisterField("U" + std::to_string(eq), visualizationVariables[numActiveSpecies + eq]);
+    for (int eq = 0; eq < num_equation; eq++)
+      paraviewColl->RegisterField("mms_U" + std::to_string(eq),
+                                  visualizationVariables[numActiveSpecies + num_equation + eq]);
+    for (int eq = 0; eq < num_equation; eq++)
+      paraviewColl->RegisterField("RHS" + std::to_string(eq),
+                                  visualizationVariables[numActiveSpecies + 2 * num_equation + eq]);
   }
+#endif
 
   if (spaceVaryViscMult != NULL) paraviewColl->RegisterField("viscMult", spaceVaryViscMult);
 
@@ -1383,24 +1189,17 @@ void M2ulPhyS::projectInitialSolution() {
   //   }
   if (mpi.Root()) std::cout << "restart: " << config.GetRestartCycle() << std::endl;
 
-#ifdef HAVE_MASA
-  if (config.use_mms_) {
-    initMasaHandler();
-  }
-#endif
-
   if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
     uniformInitialConditions();
 #ifdef HAVE_MASA
     if (config.use_mms_) {
+      initMasaHandler();
+
       projectExactSolution(0.0, U);
       if (config.mmsSaveDetails_) projectExactSolution(0.0, masaU_);
     }
 #endif
   } else {
-#ifdef HAVE_MASA
-    if (config.use_mms_ && config.mmsSaveDetails_) projectExactSolution(0.0, masaU_);
-#endif
     if (config.RestartHDFConversion())
       read_restart_files();
     else
@@ -1418,16 +1217,11 @@ void M2ulPhyS::projectInitialSolution() {
   // update pressure grid function
   mixture->UpdatePressureGridFunction(press, Up);
 
-  // update plasma electrical conductivity
-  if (tpsP->isFlowEMCoupled()) {
-    mixture->SetConstantPlasmaConductivity(plasma_conductivity_, Up);
-  }
-
   if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
     // Only save IC from fresh start.  On restart, will save viz at
     // next requested iter.  This avoids possibility of trying to
     // overwrite existing paraview data for the current iteration.
-    if (!(tpsP->isVisualizationMode())) paraviewColl->Save();
+    paraviewColl->Save();
   }
 }
 
@@ -1461,7 +1255,7 @@ void M2ulPhyS::solve() {
       }
     }
 
-    timeIntegrator->Step(*U, time, dt); //meat
+    timeIntegrator->Step(*U, time, dt);
 
     Check_NAN();
 
@@ -1507,7 +1301,6 @@ void M2ulPhyS::solve() {
         // auto dUp = Up->ReadWrite();  // sets memory to GPU
         Up->ReadWrite();  // sets memory to GPU
 
-	// HERE
         average->write_meanANDrms_restart_files(iter, time);
       }
     }
@@ -1548,7 +1341,6 @@ void M2ulPhyS::solve() {
     paraviewColl->SetTime(time);
     paraviewColl->Save();
 
-    // HERE
     average->write_meanANDrms_restart_files(iter, time);
 
 #ifndef HAVE_MASA
@@ -1742,7 +1534,6 @@ void M2ulPhyS::uniformInitialConditions() {
   Vector Upi;
   Upi.UseDevice(false);
   Upi.SetSize(num_equation);
-
   mixture->GetPrimitivesFromConservatives(initState, Upi);
 
   for (int i = 0; i < dof; i++) {
@@ -2087,20 +1878,10 @@ void M2ulPhyS::parseSolverOptions2() {
   // Pack up input parameters for device objects.
   packUpGasMixtureInput();
 
-  // subgrid scale model
-  //parseSGSInputs();
-  
-  // post-process visualization inputs
-  parsePostProcessVisualizationInputs();
-  
   return;
 }
 
 void M2ulPhyS::parseFlowOptions() {
-  std::map<std::string, int> sgsModel;
-  sgsModel["none"] = 0;
-  sgsModel["smagorinsky"] = 1;
-  sgsModel["sigma"] = 2;
   tpsP->getInput("flow/order", config.solOrder, 4);
   tpsP->getInput("flow/integrationRule", config.integrationRule, 1);
   tpsP->getInput("flow/basisType", config.basisType, 1);
@@ -2118,16 +1899,11 @@ void M2ulPhyS::parseFlowOptions() {
     for (int d = 0; d < 3; d++) tpsP->getRequiredVecElem("flow/pressureGrad", config.gradPress[d], d);
   }
   tpsP->getInput("flow/refinement_levels", config.ref_levels, 0);
-  std::string type;  
-  tpsP->getInput("flow/sgsModel", type, std::string("none"));  
 
   assert(config.solOrder > 0);
   assert(config.numIters >= 0);
   assert(config.itersOut > 0);
   assert(config.refLength > 0);
-
-  config.sgsModelType = sgsModel[type];
-  
 }
 
 void M2ulPhyS::parseTimeIntegrationOptions() {
@@ -2224,7 +2000,6 @@ void M2ulPhyS::parseHeatSrcOptions() {
 void M2ulPhyS::parseViscosityOptions() {
   tpsP->getInput("viscosityMultiplierFunction/isEnabled", config.linViscData.isEnabled, false);
   if (config.linViscData.isEnabled) {
-    
     auto normal = config.linViscData.normal.HostWrite();
     tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[0], 0);
     tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[1], 1);
@@ -2235,15 +2010,12 @@ void M2ulPhyS::parseViscosityOptions() {
     tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[1], 1);
     tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[2], 2);
 
-    // what is the point of this?
-    //    auto pointInit = config.linViscData.pointInit.HostWrite();
-    //    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[0], 0);
-    //    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[1], 1);
-    //    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[2], 2);
+    auto pointInit = config.linViscData.pointInit.HostWrite();
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[0], 0);
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[1], 1);
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[2], 2);
 
-    tpsP->getRequiredInput("viscosityMultiplierFunction/width", config.linViscData.width);
     tpsP->getRequiredInput("viscosityMultiplierFunction/viscosityRatio", config.linViscData.viscRatio);
-    
   }
 }
 
@@ -2356,8 +2128,6 @@ void M2ulPhyS::parsePlasmaModels() {
 
   std::string chemistryModelStr;
   tpsP->getInput("plasma_models/chemistry_model", chemistryModelStr, std::string(""));
-
-  tpsP->getInput("plasma_models/const_plasma_conductivity", config.const_plasma_conductivity_, 0.0);
 
   // TODO(kevin): cantera wrapper
   // if (chemistryModelStr == "cantera") {
@@ -2537,28 +2307,6 @@ void M2ulPhyS::parseTransportInputs() {
         }
 
         config.argonTransportInput.thirdOrderkElectron = config.thirdOrderkElectron;
-
-        // inputs for artificial transport multipliers.
-        {
-          tpsP->getInput("plasma_models/transport_model/artificial_multiplier/enabled",
-                         config.argonTransportInput.multiply, false);
-          if (config.argonTransportInput.multiply) {
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/viscosity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::VISCOSITY], 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/bulk_viscosity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::BULK_VISCOSITY], 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/heavy_thermal_conductivity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY], 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/electron_thermal_conductivity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY], 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/momentum_transfer_frequency",
-                           config.argonTransportInput.spcsTrnsMultiplier[SpeciesTrns::MF_FREQUENCY], 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/diffusivity",
-                           config.argonTransportInput.diffMult, 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/mobility",
-                           config.argonTransportInput.mobilMult, 1.0);
-          }
-        }
       }
     } break;
     case ARGON_MIXTURE: {
@@ -2579,28 +2327,6 @@ void M2ulPhyS::parseTransportInputs() {
         Array<ArgonSpcs> speciesType(config.numSpecies);
         identifySpeciesType(speciesType);
         identifyCollisionType(speciesType, config.argonTransportInput.collisionIndex);
-
-        // inputs for artificial transport multipliers.
-        {
-          tpsP->getInput("plasma_models/transport_model/artificial_multiplier/enabled",
-                         config.argonTransportInput.multiply, false);
-          if (config.argonTransportInput.multiply) {
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/viscosity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::VISCOSITY], 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/bulk_viscosity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::BULK_VISCOSITY], 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/heavy_thermal_conductivity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY], 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/electron_thermal_conductivity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY], 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/momentum_transfer_frequency",
-                           config.argonTransportInput.spcsTrnsMultiplier[SpeciesTrns::MF_FREQUENCY], 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/diffusivity",
-                           config.argonTransportInput.diffMult, 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/mobility",
-                           config.argonTransportInput.mobilMult, 1.0);
-          }
-        }
       }
     } break;
     case CONSTANT: {
@@ -2656,11 +2382,12 @@ void M2ulPhyS::parseReactionInputs() {
     config.detailedBalance.SetSize(config.numReactions);
     // config.equilibriumConstantParams.resize(config.numReactions);
   }
-  config.rxnModelParamsHost.clear();
 
   for (int r = 1; r <= config.numReactions; r++) {
     std::string basepath("reactions/reaction" + std::to_string(r));
 
+    // TODO(kevin): make tps input parser accessible to all classes.
+    // TODO(kevin): reaction classes read input options directly in their initialization.
     std::string equation, model;
     tpsP->getRequiredInput((basepath + "/equation").c_str(), equation);
     config.reactionEquations[r - 1] = equation;
@@ -2670,36 +2397,31 @@ void M2ulPhyS::parseReactionInputs() {
     tpsP->getRequiredInput((basepath + "/reaction_energy").c_str(), energy);
     config.reactionEnergies[r - 1] = energy;
 
-    // NOTE: reaction inputs are stored directly into ChemistryInput.
-    // Initialize the pointers with null.
-    config.chemistryInput.reactionInputs[r - 1].modelParams = NULL;
-
     if (model == "arrhenius") {
       config.reactionModels[r - 1] = ARRHENIUS;
-
+      // config.reactionModelParams[r - 1].resize(3);
       double A, b, E;
       tpsP->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
       tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
       tpsP->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
-      config.rxnModelParamsHost.push_back(Vector({A, b, E}));
-
-      config.chemistryInput.reactionInputs[r - 1].modelParams = config.rxnModelParamsHost.back().Read();
+      // config.reactionModelParams[r - 1] = {A, b, E};
+      config.reactionModelParams[0 + (r - 1) * gpudata::MAXCHEMPARAMS] = A;
+      config.reactionModelParams[1 + (r - 1) * gpudata::MAXCHEMPARAMS] = b;
+      config.reactionModelParams[2 + (r - 1) * gpudata::MAXCHEMPARAMS] = E;
 
     } else if (model == "hoffert_lien") {
       config.reactionModels[r - 1] = HOFFERTLIEN;
+      // config.reactionModelParams[r - 1].resize(3);
       double A, b, E;
       tpsP->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
       tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
       tpsP->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
-      config.rxnModelParamsHost.push_back(Vector({A, b, E}));
-
-      config.chemistryInput.reactionInputs[r - 1].modelParams = config.rxnModelParamsHost.back().Read();
+      // config.reactionModelParams[r - 1] = {A, b, E};
       // NOTE(kevin): this array keeps max param in the indexing, as reactions can have different number of params.
+      config.reactionModelParams[0 + (r - 1) * gpudata::MAXCHEMPARAMS] = A;
+      config.reactionModelParams[1 + (r - 1) * gpudata::MAXCHEMPARAMS] = b;
+      config.reactionModelParams[2 + (r - 1) * gpudata::MAXCHEMPARAMS] = E;
 
-    } else if (model == "tabulated") {
-      config.reactionModels[r - 1] = TABULATED;
-      std::string inputPath(basepath + "/tabulated");
-      readTable(inputPath, config.chemistryInput.reactionInputs[r - 1].tableInput);
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
       exit(ERROR);
@@ -2709,11 +2431,12 @@ void M2ulPhyS::parseReactionInputs() {
     tpsP->getInput((basepath + "/detailed_balance").c_str(), detailedBalance, false);
     config.detailedBalance[r - 1] = detailedBalance;
     if (detailedBalance) {
+      // config.equilibriumConstantParams[r - 1].resize(3);
       double A, b, E;
       tpsP->getRequiredInput((basepath + "/equilibrium_constant/A").c_str(), A);
       tpsP->getRequiredInput((basepath + "/equilibrium_constant/b").c_str(), b);
       tpsP->getRequiredInput((basepath + "/equilibrium_constant/E").c_str(), E);
-
+      // config.equilibriumConstantParams[r - 1] = {A, b, E};
       // NOTE(kevin): this array keeps max param in the indexing, as reactions can have different number of params.
       config.equilibriumConstantParams[0 + (r - 1) * gpudata::MAXCHEMPARAMS] = A;
       config.equilibriumConstantParams[1 + (r - 1) * gpudata::MAXCHEMPARAMS] = b;
@@ -2808,6 +2531,8 @@ void M2ulPhyS::parseReactionInputs() {
 
       config.chemistryInput.reactionModels[r] = config.reactionModels[r];
       for (int p = 0; p < gpudata::MAXCHEMPARAMS; p++) {
+        config.chemistryInput.reactionModelParams[p + r * gpudata::MAXCHEMPARAMS] =
+            config.reactionModelParams[p + r * gpudata::MAXCHEMPARAMS];
         config.chemistryInput.equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS] =
             config.equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS];
       }
@@ -2816,7 +2541,6 @@ void M2ulPhyS::parseReactionInputs() {
 }
 
 void M2ulPhyS::parseBCInputs() {
-  
   // number of BC regions defined
   int numWalls, numInlets, numOutlets;
   tpsP->getInput("boundaryConditions/numWalls", numWalls, 0);
@@ -2826,7 +2550,6 @@ void M2ulPhyS::parseBCInputs() {
   // Wall Bcs
   std::map<std::string, WallType> wallMapping;
   wallMapping["inviscid"] = INV;
-  wallMapping["slip"] = SLIP;  
   wallMapping["viscous_adiabatic"] = VISC_ADIAB;
   wallMapping["viscous_isothermal"] = VISC_ISOTH;
   wallMapping["viscous_general"] = VISC_GNRL;
@@ -2930,17 +2653,12 @@ void M2ulPhyS::parseBCInputs() {
   // Inlet Bcs
   std::map<std::string, InletType> inletMapping;
   inletMapping["subsonic"] = SUB_DENS_VEL;
-  inletMapping["subsonicConstTemp"] = SUB_TEMP_VEL;
-  inletMapping["subsonicConstTempUser"] = SUB_TEMP_VEL_USR;  
-  inletMapping["nonReflecting"] = SUB_DENS_VEL_NR;
-  inletMapping["nonReflectingConstEntropy"] = SUB_VEL_CONST_ENT;
-  inletMapping["nonReflectingConstTemp"] = SUB_VEL_CONST_TMP;
-  inletMapping["nonReflectingConstTempUser"] = SUB_VEL_CONST_TMP_USR;  
+  inletMapping["nonreflecting"] = SUB_DENS_VEL_NR;
+  inletMapping["nonreflectingConstEntropy"] = SUB_VEL_CONST_ENT;
 
   for (int i = 1; i <= numInlets; i++) {
     int patch;
     double density;
-    double temperature;
     std::string type;
     std::string basepath("boundaryConditions/inlet" + std::to_string(i));
 
@@ -2949,17 +2667,11 @@ void M2ulPhyS::parseBCInputs() {
     // all inlet BCs require 4 inputs (density + vel(3))
     {
       Array<double> uvw;
-      if (type == "nonReflectingConstTemp" || type == "nonReflectingConstTempUser" || type == "subsonicConstTemp" || type == "subsonicConstTempUser") {
-        tpsP->getRequiredInput((basepath + "/temperature").c_str(), temperature);
-        config.inletBC.Append(temperature);
-      } else {
-        tpsP->getRequiredInput((basepath + "/density").c_str(), density);
-        config.inletBC.Append(density);
-      }
-
-      tpsP->getRequiredVec((basepath + "/uvw").c_str(), uvw, 3);
+      tpsP->getRequiredInput((basepath + "/density").c_str(), density); // copies the input to density
+      tpsP->getRequiredVec((basepath + "/uvw").c_str(), uvw, 3); // copies the input to uvw 
+      config.inletBC.Append(density);
       config.inletBC.Append(uvw, 3);
-    }
+    } // swh: why no temp at inlet?
     // For multi-component gas, require (numActiveSpecies)-more inputs.
     if ((config.workFluid != DRY_AIR) && (config.numSpecies > 1)) {
       grvy_printf(GRVY_INFO, "\nInlet mass fraction of background species will not be used. \n");
@@ -2989,21 +2701,16 @@ void M2ulPhyS::parseBCInputs() {
 
   for (int i = 1; i <= numOutlets; i++) {
     int patch;
-    double pressure, massFlow, sigma;
+    double pressure, massFlow;
     std::string type;
     std::string basepath("boundaryConditions/outlet" + std::to_string(i));
 
     tpsP->getRequiredInput((basepath + "/patch").c_str(), patch);
     tpsP->getRequiredInput((basepath + "/type").c_str(), type);
 
-    if (type == "subsonicPressure") {
+    if ((type == "subsonicPressure") || (type == "nonReflectingPressure")) {
       tpsP->getRequiredInput((basepath + "/pressure").c_str(), pressure);
       config.outletBC.Append(pressure);
-    } else if (type == "nonReflectingPressure") {
-      tpsP->getRequiredInput((basepath + "/pressure").c_str(), pressure);
-      config.outletBC.Append(pressure);
-      tpsP->getRequiredInput((basepath + "/sigma").c_str(), sigma);
-      config.outletBC.Append(sigma);
     } else if ((type == "nonReflectingMassFlow") || (type == "nonReflectingPointBasedMassFlow")) {
       tpsP->getRequiredInput((basepath + "/massFlow").c_str(), massFlow);
       config.outletBC.Append(massFlow);
@@ -3063,7 +2770,8 @@ void M2ulPhyS::parseSpongeZoneInputs() {
         tpsP->getRequiredVecElem((base + "/uvw").c_str(), hup[2], 1);  // v
         tpsP->getRequiredVecElem((base + "/uvw").c_str(), hup[3], 2);  // w
         tpsP->getRequiredInput((base + "/pressure").c_str(), hup[4]);  // P
-
+        // swh: so the inlet is also a sponge zone???
+	
         // For multi-component gas, require (numActiveSpecies)-more inputs.
         if (config.workFluid != DRY_AIR) {
           if (config.numSpecies > 1) {
@@ -3093,46 +2801,6 @@ void M2ulPhyS::parseSpongeZoneInputs() {
         exit(ERROR);
       }
     }
-  }
-}
-
-// SGS Model
-/*
-void M2ulPhyS::parseSGSInputs() {
-
-  std::map<std::string, sgsType> sgsModel;
-  sgsModel["none"] = NOSGS;
-  sgsModel["smagorinsky"] = SMAGO;
-  sgsModel["sigma"] = SIGMA;
-
-  double coeff;
-  std::string type;
-  std::string basepath("sgsModel/" + std::to_string(i));
-
-  tpsP->getRequiredInput((basepath + "/type").c_str(), type);
-
-  if (type == "none") {
-    // do nothing
-  } else if (type == "smagorinsky") {
-    tpsP->getRequiredInput((basepath + "/coefficient").c_str(), coeff);
-    config.sgsModel.Append(coeff);
-  } else if (type == "sigma") {
-    tpsP->getRequiredInput((basepath + "/coefficient").c_str(), coeff);
-    config.sgsModel.Append(coeff);      
-  } else {
-    grvy_printf(GRVY_ERROR, "\nUnknown SGS model supplied at runtime -> %s", type.c_str());
-    exit(ERROR);
-  }
-    
-}
-*/
-
-void M2ulPhyS::parsePostProcessVisualizationInputs() {
-  if (tpsP->isVisualizationMode()) {
-    tpsP->getRequiredInput("post-process/visualization/prefix", config.postprocessInput.prefix);
-    tpsP->getRequiredInput("post-process/visualization/start-iter", config.postprocessInput.startIter);
-    tpsP->getRequiredInput("post-process/visualization/end-iter", config.postprocessInput.endIter);
-    tpsP->getRequiredInput("post-process/visualization/frequency", config.postprocessInput.freq);
   }
 }
 
@@ -3396,226 +3064,4 @@ void M2ulPhyS::updatePrimitives() {
     mixture->GetPrimitivesFromConservatives(state, Upi);
     for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * dof] = Upi[eq];
   }
-}
-
-void M2ulPhyS::visualization() {
-  double tlast = grvy_timer_elapsed_global();
-
-#ifdef HAVE_MASA
-  if (config.use_mms_) {
-    checkSolutionError(time);
-  }
-#endif
-
-  int fileIter = config.postprocessInput.startIter;
-
-  // Read solution files per frequency.
-  while (fileIter <= config.postprocessInput.endIter) {
-    grvy_timer_begin(__func__);
-
-    // periodically report on time/iteratino
-    if (mpi.Root()) {
-      double timePerIter = (grvy_timer_elapsed_global() - tlast);
-      grvy_printf(ginfo, "Iteration = %i: wall clock time/snapshot = %.3f (secs)\n", fileIter, timePerIter);
-      tlast = grvy_timer_elapsed_global();
-    }
-
-    // int oldIter = iter;
-    size_t digits = 8;
-    int precision = digits - std::min(digits, std::to_string(fileIter).size());
-    // pad leading zeros to iter.
-    std::string iterStr = std::string(precision, '0').append(std::to_string(fileIter));
-    std::string filename(config.postprocessInput.prefix + "-" + iterStr + ".h5");
-    // iter and time will be set from the file.
-    restart_files_hdf5("read", filename);
-    // NOTE(kevin): file iter does not have to be the same as actual timestep.
-    // assert(oldIter == iter);  // make sure iter in the solution file matches its filename.
-
-    // use RhsOperator::updatePrimitives and updateGradients which uses both gpu and cpu.
-    rhsOperator->updateGradients(*U, false);
-
-    // update pressure grid function
-    mixture->UpdatePressureGridFunction(press, Up);
-
-    updateVisualizationVariables();
-
-    Check_NAN();
-
-#ifdef HAVE_MASA
-    if (config.use_mms_) {
-      if (config.mmsSaveDetails_) {
-        rhsOperator->Mult(*U, *masaRhs_);
-        projectExactSolution(time, masaU_);
-      }
-      checkSolutionError(time);
-    } else {
-      if (mpi.Root()) cout << "time step: " << iter << ", physical time " << time << "s" << endl;
-    }
-#else
-    if (mpi.Root()) cout << "time step: " << iter << ", physical time " << time << "s" << endl;
-#endif
-
-    // set iter and time based on the file.
-    paraviewColl->SetCycle(iter);
-    paraviewColl->SetTime(time);
-    paraviewColl->Save();
-
-    // HERE
-    average->write_meanANDrms_restart_files(iter, time);
-
-    average->addSampleMean(iter);
-
-    // periodically check for DIE file which requests to terminate early
-    if (Check_ExitEarly(fileIter)) {
-      fileIter = config.postprocessInput.endIter;
-      SetStatus(EARLY_EXIT);
-      break;
-    }
-
-    fileIter += config.postprocessInput.freq;
-
-    grvy_timer_end(__func__);
-  }  // <-- end main timestep iteration loop
-
-  if (mpi.Root()) cout << "Final timestep iteration = " << config.postprocessInput.endIter << endl;
-
-  return;
-}
-
-// should only be done once but the structure of the code makes it terrible to correct
-void M2ulPhyS::viscMultPlanar(Vector x, double &wgt) {
-
-  Vector normal(3);
-  Vector point(3);
-  Vector s(3);  
-  double Nmag, factor, width, dist;
-
-  
-  // initialize
-  Nmag = 0.;
-  dist = 0.;  
-
-  // get settings
-  for (int d = 0; d < dim; d++) normal[d] = config.GetLinearVaryingData().normal(d);
-  for (int d = 0; d < dim; d++) point[d] = config.GetLinearVaryingData().point0(d);
-  factor = config.GetLinearVaryingData().viscRatio;
-  factor = max(factor, 1.0);
-  width = config.GetLinearVaryingData().width;
-
-  // ensure normal is actually a unit normal
-  for (int d = 0; d < dim; d++) Nmag += normal[d] * normal[d];
-  Nmag = sqrt(Nmag);
-  for (int d = 0; d < dim; d++) normal[d] /= Nmag;  
-  
-  // distance from plane  
-  for (int d = 0; d < dim; d++) s[d] = (x[d] - point[d]);
-  for (int d = 0; d < dim; d++) dist += s[d]*normal[d];  
-  
-  // weight
-  wgt = 0.5*(tanh(dist/width - 2.0) + 1.0);
-  wgt *= (factor-1.0);
-  wgt += 1.0;
-
-  //if (x[0] == 0.5 && x[1] == 0.5) {
-  //  cout << "z, dist, wgt: " << x[2] << ", " << dist << ", " << wgt << endl; fflush(stdout);
-  //}
-  
-}
-
-void M2ulPhyS::updateVisualizationVariables() {
-#ifdef _GPU_
-  grvy_printf(GRVY_ERROR, "Post-process visualization is not implemented for gpu!");
-  exit(ERROR);
-#endif  // _GPU_
-
-  // TODO(kevin): The routine here currently only supports cpu path, though it is written in a gpu-compatible way.
-  // Will require some minor #ifdef additions to implement gpu path.
-
-  double *dataU = U->GetData();
-  double *dataUp = Up->GetData();
-  double *dataGradUp = gradUp->GetData();
-  const int ndofs = vfes->GetNDofs();
-  const int _dim = dim;
-  const int _nvel = nvel;
-  const int _num_equation = num_equation;
-  const int _numSpecies = numSpecies;
-  const int _numReactions = config.numReactions;
-
-  GasMixture *in_mix = mixture;
-  TransportProperties *in_transport = transportPtr;
-  Chemistry *in_chem = chemistry_;
-  const bool isDryAir = (config.workFluid == DRY_AIR);
-
-  const int nVisual = visualizationVariables_.size();
-  const AuxiliaryVisualizationIndexes visualIdxs = visualizationIndexes_;
-  double *dataVis[gpudata::MAXVISUAL];
-  for (int vis = 0; vis < nVisual; vis++) dataVis[vis] = visualizationVariables_[vis]->GetData();
-
-  for (int n = 0; n < ndofs; n++) {
-    double state[gpudata::MAXEQUATIONS];
-    double prim[gpudata::MAXEQUATIONS];
-    double gradUpn[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
-    double Efield[gpudata::MAXDIM];
-    for (int eq = 0; eq < _num_equation; eq++) {
-      state[eq] = dataU[n + eq * ndofs];
-      prim[eq] = dataUp[n + eq * ndofs];
-      for (int d = 0; d < _dim; d++)
-        gradUpn[eq + d * _num_equation] = dataGradUp[n + eq * ndofs + d * _num_equation * ndofs];
-    }
-    // TODO(kevin): EM coupling update.
-    for (int d = 0; d < _dim; d++) Efield[d] = 0.0;
-
-    if (!isDryAir) {
-      // update species primitives.
-      double Xsp[gpudata::MAXSPECIES];
-      double Ysp[gpudata::MAXSPECIES];
-      double nsp[gpudata::MAXSPECIES];
-      in_mix->computeSpeciesPrimitives(state, Xsp, Ysp, nsp);
-
-      for (int sp = 0; sp < _numSpecies; sp++) {
-        dataVis[visualIdxs.Xsp + sp][n] = Xsp[sp];
-        dataVis[visualIdxs.Ysp + sp][n] = Ysp[sp];
-        dataVis[visualIdxs.nsp + sp][n] = nsp[sp];
-      }
-
-      // update flux transport properties.
-      double fluxTrns[FluxTrns::NUM_FLUX_TRANS];
-      double diffVel[gpudata::MAXSPECIES * gpudata::MAXDIM];
-      in_transport->ComputeFluxTransportProperties(state, gradUpn, Efield, fluxTrns, diffVel);
-      for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++) {
-        dataVis[visualIdxs.FluxTrns + t][n] = fluxTrns[t];
-      }
-      for (int sp = 0; sp < _numSpecies; sp++) {
-        for (int v = 0; v < _nvel; v++) dataVis[visualIdxs.diffVel + sp][n + v * ndofs] = diffVel[sp + v * _numSpecies];
-      }
-
-      // update source transport properties.
-      double srcTrns[SrcTrns::NUM_SRC_TRANS];
-      double speciesTrns[gpudata::MAXSPECIES * SpeciesTrns::NUM_SPECIES_COEFFS];
-      in_transport->ComputeSourceTransportProperties(state, prim, gradUpn, Efield, srcTrns, speciesTrns, diffVel, nsp);
-      for (int t = 0; t < SrcTrns::NUM_SRC_TRANS; t++) {
-        dataVis[visualIdxs.SrcTrns + t][n] = srcTrns[t];
-      }
-      for (int t = 0; t < SpeciesTrns::NUM_SPECIES_COEFFS; t++) {
-        for (int sp = 0; sp < _numSpecies; sp++) {
-          dataVis[visualIdxs.SpeciesTrns + sp + t * _numSpecies][n] = speciesTrns[sp + t * _numSpecies];
-        }
-      }
-
-      // update chemistry.
-      double Th = 0., Te = 0.;
-      Th = prim[1 + _nvel];
-      Te = (in_mix->IsTwoTemperature()) ? prim[_num_equation - 1] : Th;
-      double kfwd[gpudata::MAXREACTIONS], kC[gpudata::MAXREACTIONS];
-      in_chem->computeForwardRateCoeffs(Th, Te, kfwd);
-      in_chem->computeEquilibriumConstants(Th, Te, kC);
-      // get reaction rates
-      double progressRates[gpudata::MAXREACTIONS];
-      for (int r = 0; r < _numReactions; r++) progressRates[r] = 0.0;
-      in_chem->computeProgressRate(nsp, kfwd, kC, progressRates);
-      for (int r = 0; r < _numReactions; r++) {
-        dataVis[visualIdxs.rxn + r][n] = progressRates[r];
-      }
-    }  // if (!isDryAir)
-  }    // for (int n = 0; n < ndofs; n++)
 }

@@ -83,6 +83,7 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
   }
 
   // Init outlet BCs
+  ObdrN = 0;
   for (size_t o = 0; o < config.GetOutletPatchType()->size(); o++) {
     std::pair<int, OutletType> patchANDtype = (*config.GetOutletPatchType())[o];
     // check if attribute is in mesh
@@ -96,6 +97,19 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
           new OutletBC(groupsMPI, _runFile.GetEquationSystem(), rsolver, mixture, d_mixture, vfes, intRules, _dt, dim,
                        num_equation, patchANDtype.first, config.GetReferenceLength(), patchANDtype.second, data,
                        _maxIntPoints, _maxDofs, config.isAxisymmetric());
+
+      // size of boundaryU
+      ObdrN = outletBCmap[patchANDtype.first]->GetBdrN();
+      //cout << "bdrN: " << ObdrN << endl; fflush(stdout);
+      //cout << "P&T.first: " << patchANDtype.first << endl; fflush(stdout);
+      //oBoundaryU.SetSize(ObdrN*num_equation);
+      //oBoundaryU_ele.SetSize(ObdrN*num_equation);
+
+      // set pointer to element-average
+      //oBoundaryU_ptr.SetSize(ObdrN*num_equation);      
+      oBoundaryU_ptr = outletBCmap[patchANDtype.first]->GetOutletBdrU_ptr();     
+      //data = GetOutletBdrU_single(0);
+      
     }
   }
 
@@ -226,24 +240,24 @@ void BCintegrator::computeBdrFlux(const int attr, Vector &normal, Vector &stateI
   std::unordered_map<int, BoundaryCondition *>::const_iterator obc = outletBCmap.find(attr);
   std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = wallBCmap.find(attr);
 
-  if (ibc != inletBCmap.end()) ibc->second->computeBdrFlux(normal, stateIn, gradState, delState, radius, transip, delta, _transport, bdrFlux);
+  if (ibc != inletBCmap.end())  ibc->second->computeBdrFlux(normal, stateIn, gradState, delState, radius, transip, delta, _transport, bdrFlux);
   if (obc != outletBCmap.end()) obc->second->computeBdrFlux(normal, stateIn, gradState, delState, radius, transip, delta, _transport, bdrFlux);
-  if (wbc != wallBCmap.end()) wbc->second->computeBdrFlux(normal, stateIn, gradState, delState, radius, transip, delta, _transport, bdrFlux);
+  if (wbc != wallBCmap.end())   wbc->second->computeBdrFlux(normal, stateIn, gradState, delState, radius, transip, delta, _transport, bdrFlux);
 
   //   BCmap[attr]->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
 }
 
-void BCintegrator::updateBCMean(ParGridFunction *Up) {
+void BCintegrator::updateBCMean(ParGridFunction *U_, ParGridFunction *Up) {
   for (auto bc = inletBCmap.begin(); bc != inletBCmap.end(); bc++) {
-    bc->second->updateMean(intRules, Up);
+    bc->second->updateMean(intRules, U_, Up);
   }
 
   for (auto bc = outletBCmap.begin(); bc != outletBCmap.end(); bc++) {
-    bc->second->updateMean(intRules, Up);
+    bc->second->updateMean(intRules, U_, Up);
   }
 
   for (auto bc = wallBCmap.begin(); bc != wallBCmap.end(); bc++) {
-    bc->second->updateMean(intRules, Up);
+    bc->second->updateMean(intRules, U_, Up);
   }
 }
 
@@ -289,11 +303,14 @@ void BCintegrator::retrieveGradientsData_gpu(ParGridFunction *gradUp, DenseTenso
 
 void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2,
                                       FaceElementTransformations &Tr, const Vector &elfun, Vector &elvect) {
+  
   Vector shape1;
   Vector funval1(num_equation);
   Vector nor(dim);
   Vector fluxN(num_equation);
 
+  Vector d2shape;
+  
 #ifndef _GPU_
   const double *dataGradUp = gradUp->HostRead();
 #endif
@@ -353,9 +370,10 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
 
   DenseMatrix dshape;
   dshape.SetSize(dof1,dim);
+  d2shape.SetSize(dof1);  
+  
   Vector iDelUp(num_equation);  
   
-  //int bdrN = 0; // this didnt seem to be intialized anywhere else, so doing it here and passing to computeBdrFlux
   for (int i = 0; i < ir->GetNPoints(); i++) {
     
     const IntegrationPoint &ip = ir->IntPoint(i);
@@ -371,6 +389,7 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
     // interpolated gradients
     DenseMatrix iGradUp(num_equation, dim);
     for (int eq = 0; eq < num_equation; eq++) {
+      
       // interpolation state
       double sum = 0.;
       for (int k = 0; k < eldDof; k++) {
@@ -382,16 +401,18 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
       for (int d = 0; d < dim; d++) {
         sum = 0.;
         for (int k = 0; k < eldDof; k++) {
-          sum += elGradUp(k, eq, d) * shape1(k);
+          sum += elGradUp(k, eq, d) * shape1(k); // if the below is correct (as per TO), why not just use elfun * dshape here?
         }
         iGradUp(eq, d) = sum;
         // iGradUp(eq+d*num_equation) = sum;
       }
     }
-
 	
     // if we wanted second derivatives for nscbc, calculate here
-    el1.CalcPhysDShape(Tr, dshape);
+    el1.CalcDShape(Tr.GetElement1IntPoint(), dshape);    
+    //el1.CalcPhysDShape(Tr, dshape);
+    //el1.CalcLaplacian(Tr.GetElement1IntPoint(), d2shape);    ...doesnt exist
+    //el1.CalcPhysLaplacian(Tr, d2shape); causes error
     for (int eq = 0; eq < num_equation; eq++) {      
 
       // interpolation laplacian (?)
@@ -401,6 +422,9 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
           sum += elGradUp(k, eq, d) * dshape(k,d);
         }
       }
+      //for (int k = 0; k < eldDof; k++) {
+      //  sum += elfun(k + eq * eldDof) * d2shape(k);
+      //}      
       iDelUp(eq) = sum;
     }    
 
@@ -415,9 +439,8 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
       radius = transip[0];
     }
 
-    // all bc's handeled here? in integration pts loop
+    // all bc's handeled here <jump>
     computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, iDelUp, radius, transip, delta, transport, fluxN);
-    //bdrN++; // and increment here
     fluxN *= ip.weight;
 
     if (config.isAxisymmetric()) {
@@ -434,4 +457,20 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
       //          }
     }
   }  // end loop over integration points
+
+  
+  // pass boundaryU up the chain => CANT DO THIS HERE, called on a per element basis
+  /*
+  if (ObdrN > 0 ) {    
+   for (size_t o = 0; o < config.GetOutletPatchType()->size(); o++) {
+     std::pair<int, OutletType> patchANDtype = (*config.GetOutletPatchType())[o];  
+     for (int i = 0; i < ObdrN; i++) {    
+       for (int eq = 0; eq < num_equation; eq++) oBoundaryU[eq + i*num_equation] = outletBCmap[patchANDtype.first]->GetBdrU(eq + i*num_equation);
+       //for (int eq = 0; eq < num_equation; eq++) oBoundaryU[eq + i*num_equation] = outletBCmap[3]->GetBdrU(eq + i*num_equation);       
+     }
+    }
+   //cout << "oBoundary: " << oBoundaryU[0] << " " << oBoundaryU[1] << endl; fflush(stdout);
+  }
+  */
+  
 }

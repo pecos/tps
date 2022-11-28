@@ -361,8 +361,8 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
   gradients->computeGradients();
 #endif
 
-  // update boundary conditions
-  if (bcIntegrator != NULL) bcIntegrator->updateBCMean(Up);
+  // update boundary conditions => all this does is initialize to interior values and updates the mean
+  if (bcIntegrator != NULL) bcIntegrator->updateBCMean(U_,Up);
 
 #ifdef _GPU_
   z = 0.;

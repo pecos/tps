@@ -286,14 +286,15 @@ void Averaging::addVarSample_cpu() {
 */
 
 void Averaging::write_meanANDrms_restart_files(const int &iter, const double &time) {
+  
   if (computeMean) {
     if (config.isMeanHistEnabled()) {
       paraviewMean->SetCycle(iter);
       paraviewMean->SetTime(time);
     }
-
     paraviewMean->Save();
   }
+  
 }
 
 void Averaging::read_meanANDrms_restart_files() {

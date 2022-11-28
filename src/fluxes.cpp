@@ -73,6 +73,7 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
   const bool twoTemperature = mixture->IsTwoTemperature();
 
+  // rho*u*u + P
   for (int d = 0; d < dim; d++) {
     flux(0, d) = state(d + 1);
     for (int i = 0; i < nvel; i++) {
@@ -81,6 +82,7 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
     flux(1 + d, d) += pres;
   }
 
+  // u*(e+P)/rho
   const double H = (state[1 + nvel] + pres) / state[0];
   for (int d = 0; d < dim; d++) {
     flux(1 + nvel, d) = state(d + 1) * H;
@@ -97,6 +99,7 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
     // for (int d = 0; d < dim; d++) flux(num_equation - 1, d) = state(num_equation - 1) * state(1 + d) / state(0);
   }
 }
+
 
 MFEM_HOST_DEVICE void Fluxes::ComputeConvectiveFluxes(const double *state, double *flux) const {
   double Pe = 0.0;
@@ -897,35 +900,37 @@ void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double del
   Vector ev(dim);
   Vector sigma(dim);  
   double Cd = 0.135;
-  double sml = 1.0e-15;
+  double sml = 1.0e-12;
   double pi = 3.14159265359;
   double onethird = 1./3.;  
   double l_floor, d_model, d4;
   double p1, p2, p, q, detB, r, phi;
 
 
+  //cout << " ...in sgsSigma..." << endl; fflush(stdout);
+  
   // Qij = u_{k,i}*u_{k,j}
-  for (int i = 0; i < dim; i++) {
-     for (int j = 0; j < dim; j++) {
-       Qij(i,j) = 0.;
-     }    
-  }    
-  for (int i = 0; i < dim; i++) {
-     for (int j = 0; j < dim; j++) {
-        for (int k = 0; k < dim; k++) {
-	  Qij(i,j) += gradUp(k+1,i) * gradUp(k+1,j);
-        }           
-     }    
+  for (int j = 0; j < dim; j++) {  
+    for (int i = 0; i < dim; i++) {
+      Qij(i,j) = 0.;
+    }    
+  }
+  for (int k = 0; k < dim; k++) {  
+    for (int j = 0; j < dim; j++) {
+      for (int i = 0; i < dim; i++) {
+        Qij(i,j) += gradUp(k+1,i) * gradUp(k+1,j);
+      }           
+    }    
   }
 
   // shifted grid scale, d should really be sqrt of J^T*J
   l_floor = config_.GetSgsFloor();
-  d_model = max(delta-l_floor,0.0);  
+  d_model = max((delta-l_floor), sml);  
   d4 = pow(d_model,4);
-  for (int i = 0; i < dim; i++) {
-     for (int j = 0; j < dim; j++) {
-       Qij(i,j) *= d4;
-     }    
+  for (int j = 0; j < dim; j++) { 
+    for (int i = 0; i < dim; i++) {      
+      Qij(i,j) *= d4;
+    }    
   }  
   
   // eigenvalues for symmetric pos-def 3x3
@@ -936,25 +941,29 @@ void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double del
   p2 = (Qij(0,0) - q) * (Qij(0,0) - q) + \
        (Qij(1,1) - q) * (Qij(1,1) - q) + \
        (Qij(2,2) - q) * (Qij(2,2) - q) + 2.0*p1;
-  p2 += sml;
-  p = sqrt((p2,sml)/6.0);
-  for (int i = 0; i < dim; i++) {
-     for (int j = 0; j < dim; j++) {
-       B(i,j) = Qij(i,j);
-     }    
+  p = sqrt(max(p2,0.0)/6.0);
+  
+  //cout << "p1, q, p2, p: " << p1 << " " << q << " " << p2 << " " << p << endl; fflush(stdout);
+  
+  for (int j = 0; j < dim; j++) {
+    for (int i = 0; i < dim; i++) {       
+      B(i,j) = Qij(i,j);
+    }    
   }    
   for (int i = 0; i < dim; i++) {
      B(i,i) -= q;
   }    
-  for (int i = 0; i < dim; i++) {
-     for (int j = 0; j < dim; j++) {
-       B(i,j) *= (1.0/p);
-     }    
+  for (int j = 0; j < dim; j++) {
+    for (int i = 0; i < dim; i++) {       
+      B(i,j) *= (1.0/max(p,sml));
+    }    
   }    
   detB = B(1,1) * (B(2,2)*B(3,3) - B(3,2)*B(2,3)) - \
          B(1,2) * (B(2,1)*B(3,3) - B(3,1)*B(2,3)) + \
          B(1,3) * (B(2,1)*B(3,2) - B(3,1)*B(2,2));
   r = 0.5*detB;
+
+  //cout << "r: " << r << endl; fflush(stdout);  
 
   if (r <= -1.0) {
     phi = onethird*pi;
@@ -964,24 +973,31 @@ void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double del
     phi = onethird*acos(r);
   }
 
+  // CHECK THIS PART
   // eigenvalues satisfy eig3 <= eig2 <= eig1 (L^4/T^2)
   ev[0] = q + 2.0 * p * cos(phi);
-  ev[1] = q + 2.0 * p * cos(phi + (2.0*onethird*pi));
-  ev[2] = 3.0 * q - ev(1) - ev(3);
+  ev[2] = q + 2.0 * p * cos(phi + (2.0*onethird*pi));
+  ev[1] = 3.0 * q - ev[0] - ev[2];
 
   // actual sigma (L^2/T)
   sigma[0] = sqrt(max(ev[0],sml));
   sigma[1] = sqrt(max(ev[1],sml));
   sigma[2] = sqrt(max(ev[2],sml));
 
+  //cout << "sigma: " << sigma[0] << " " << sigma[1] << " " << sigma[2] << endl; fflush(stdout);
+  
   // eddy viscosity
   mu = sigma[2] * (sigma[0] - sigma[1]) * (sigma[1]-sigma[2]);
   mu = max(mu, 0.0);
-  mu /= (sigma[0]*sigma[0] + sml);
+  mu /= (sigma[0]*sigma[0]);
   mu *= (Cd*Cd);
   mu *= state[0];
+
+  //cout << "mu: " << mu << endl; fflush(stdout);
+  if (mu != mu) mu = 0.0;
   
 }
+
 
 // should only be done once but the structure of the code makes it terrible to correct
 void Fluxes::viscSpongePlanar(Vector x, double &wgt) {

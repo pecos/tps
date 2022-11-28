@@ -124,9 +124,14 @@ void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Ve
   // MFEM_ASSERT(eqState->StateIsPhysical(state1, dim), "");
   // MFEM_ASSERT(eqState->StateIsPhysical(state2, dim), "");
 
+  // these are just |u| + c
   const double maxE1 = mixture->ComputeMaxCharSpeed(state1);
   const double maxE2 = mixture->ComputeMaxCharSpeed(state2);
 
+  // |u_n| + c
+  //const double maxE1 = mixture->ComputeMaxCharSpeedNormal(state1,nor);
+  //const double maxE2 = mixture->ComputeMaxCharSpeedNormal(state2,nor);
+ 
   const double maxE = max(maxE1, maxE2);
 
   Vector flux1(num_equation);
@@ -142,9 +147,13 @@ void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Ve
   normag = sqrt(normag);
 
   for (int i = 0; i < num_equation; i++) {
-    flux(i) = 0.5 * (flux1(i) + flux2(i)) - 0.5 * maxE * (state2(i) - state1(i)) * normag;
+    flux(i) = (flux1(i) + flux2(i)) - (maxE*normag) * (state2(i) - state1(i));
+    //flux(i) = (flux1(i) + flux2(i)) - maxE * (state2(i) - state1(i)); // with normal used in ComputeMaxCharSpeedNormal dimensional
+    flux(i) *= 0.5;
   }
+  
 }
+
 
 MFEM_HOST_DEVICE void RiemannSolver::Eval_LF(const double *state1, const double *state2, const double *nor,
                                              double *flux) const {

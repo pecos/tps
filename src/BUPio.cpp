@@ -63,7 +63,6 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
   assert((mode == "read") || (mode == "write"));
 
   // determine restart file name (either serial or partitioned)
-
   if (config.isRestartSerialized(mode)) {
     fileName = serialName;
   } else {
@@ -74,8 +73,9 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
   FiniteElementCollection *aux_fec = NULL;
   ParFiniteElementSpace *aux_vfes = NULL;
   ParGridFunction *aux_U = NULL;
-  double *aux_U_data = NULL;
+  double *aux_U_data = NULL;  
   int auxOrder = -1;
+  //double *aux_U_dataVector = NULL;  
 
   if (mpi.Root()) cout << "HDF5 restart files mode: " << mode << endl;
 
@@ -92,6 +92,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
         assert(file >= 0);
       }
     } else {
+      
       // verify we have all desired files and open on each process
       int gstatus;
       int status = static_cast<int>(file_exists(fileName));
@@ -113,25 +114,37 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
 
   // hid_t aid, attr;
   hid_t attr;
+  int oSize;
   if (mode == "write") {
+    
     // note: all tasks save unless we are writing a serial restart file
     if (mpi.Root() || config.isRestartPartitioned(mode)) {
+      
       // current iteration count
       h5_save_attribute(file, "iteration", iter);
+      
       // total time
       h5_save_attribute(file, "time", time);
+      
       // timestep
       h5_save_attribute(file, "dt", dt);
+      
       // solution order
       h5_save_attribute(file, "order", order);
+      
       // spatial dimension
       h5_save_attribute(file, "dimension", dim);
 
+      // outlet boundaryU size
+      //oSize = GetOutletBdrN();
+      //h5_save_attribute(file, "outlet_size", oSize);
+      
+      // samples meanUp      
       if (average->ComputeMean()) {
-        // samples meanUp
         h5_save_attribute(file, "samplesMean", average->GetSamplesMean());
         h5_save_attribute(file, "samplesInterval", average->GetSamplesInterval());
       }
+      
       // code revision
 #ifdef BUILD_VERSION
       {
@@ -178,6 +191,8 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
         average->SetSamplesMean(samplesMean);
         average->SetSamplesInterval(intervals);
       }
+      // outlet boundaryU size
+      //h5_read_attribute(file, "outlet_size", oSize);
     }
 
     if (config.isRestartSerialized(mode)) {
@@ -191,6 +206,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
         MPI_Bcast(&sampMean, 1, MPI_INT, 0, MPI_COMM_WORLD);
         MPI_Bcast(&intervals, 1, MPI_INT, 0, MPI_COMM_WORLD);
       }
+      //MPI_Bcast(&oSize, 1, MPI_INT, 0, MPI_COMM_WORLD);      
     }
 
     if (loadFromAuxSol) {
@@ -206,6 +222,10 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
 
       aux_U_data = new double[num_equation * aux_vfes->GetNDofs()];
       aux_U = new ParGridFunction(aux_vfes, aux_U_data);
+
+      //aux_U_dataVector = new double[num_equation * oSize];
+      //aux_UVector = new Vector(aux_vfes, aux_U_dataVector);
+      
     } else {
       assert(read_order == order);
     }
@@ -223,7 +243,6 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
   // -------------------------------------------------------------------
   // Read/write solution data defined by IO families
   // -------------------------------------------------------------------
-
   hsize_t dims[1];
   // hsize_t maxdims[1];
   hsize_t numInSoln = 0;
@@ -232,9 +251,12 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
   // Loop over defined IO families to save desired output
   //-------------------------------------------------------
   for (size_t n = 0; n < ioData.families_.size(); n++) {
+    
     IOFamily &fam = ioData.families_[n];
+    //IOFamilyVector &famVector = ioData.familiesVector_[n];
 
     if (mode == "write") {
+      
       if ((config.isRestartSerialized(mode)) && (nprocs_ > 1) && (mpi.Root())) {
         assert((locToGlobElem != NULL) && (partitioning_ != NULL));
         assert(fam.serial_fes != NULL);
@@ -242,6 +264,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
       } else {
         dims[0] = fam.pfunc_->ParFESpace()->GetNDofs();
       }
+      
       // define groups based on defined IO families
       if (rank0_) {
         grvy_printf(ginfo, "\nCreating HDF5 group for defined IO families\n");
@@ -250,10 +273,9 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
 
       hid_t group = -1;
       hid_t dataspace = -1;
-      //cout << " OKAY " << endl; fflush(stdout);      
 
+      // problem with average files here
       if (rank0_ || !config.isRestartSerialized(mode)) {
-        //cout << " okay" << endl; fflush(stdout);	
         dataspace = H5Screate_simple(1, dims, NULL);
         assert(dataspace >= 0);
         group = H5Gcreate(file, fam.group_.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
@@ -262,6 +284,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
 
       // get pointer to raw data
       double *data = fam.pfunc_->HostReadWrite();
+      
       // special case if writing a serial restart
       if ((config.isRestartSerialized(mode)) && (nprocs_ > 1)) {
         serialize_soln_for_write(fam);
@@ -277,10 +300,71 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
       }
 
       if (group >= 0) H5Gclose(group);
-      if (dataspace >= 0) H5Sclose(dataspace);
+      if (dataspace >= 0) H5Sclose(dataspace);      
 
-    } else if (fam.inReastartFile) {  // read mode
-      if (rank0_) cout << "Reading in solutiond data from restart..." << endl;
+      
+      // Vector portion
+      /*
+      if ((config.isRestartSerialized(mode)) && (nprocs_ > 1) && (mpi.Root())) {
+        assert((locToGlobElem != NULL) && (partitioning_ != NULL));
+        assert(fam.serial_fes != NULL);
+        dims[0] = oSize*num_equation; //famVector.serial_fes->GetNDofs();
+      } else {
+        dims[0] = oSize*num_equation; //famVector.pfunc_->ParFESpace()->GetNDofs();
+      }
+      
+      // define groups based on defined IO families
+      if (rank0_) {
+        grvy_printf(ginfo, "\nCreating HDF5 group for defined Vector-based IO families\n");
+        grvy_printf(ginfo, "--> %s : %s\n", famVector.group_.c_str(), famVector.description_.c_str());
+      }
+
+      if (rank0_ || !config.isRestartSerialized(mode)) {
+        dataspace = H5Screate_simple(1, dims, NULL);
+        assert(dataspace >= 0);
+        group = H5Gcreate(file, famVector.group_.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        assert(group >= 0);
+      }
+
+      // get pointer to raw data 
+      Vector *dataVec = GetOutletBdrU();     
+      data = GetOutletBdrU_single(0); //famVec.pfunc_->HostReadWrite();
+
+      // FIX FIX FIX
+      // special case if writing a serial restart
+      //if ((config.isRestartSerialized(mode)) && (nprocs_ > 1)) {
+      //  serialize_soln_for_write(fam);
+      //  if (rank0_) dataVec = famVec.serial_sol->HostReadWrite();
+      // }
+
+      // get defined variables for this IO family
+      vars = ioData.vars_[famVector.group_];
+
+      // save raw data
+      if (mpi.Root() || config.isRestartPartitioned(mode)) {
+        for (auto var : vars) write_soln_data(group, var.varName_, dataspace, data + var.index_ * dims[0]);
+      }
+
+      if (group >= 0) H5Gclose(group);
+      if (dataspace >= 0) H5Sclose(dataspace);
+      */
+
+      // testing... need another if mode write for the new vector family
+      /*
+      Vector outlet_boundaryU;
+      outlet_boundaryU.SetSize(oSize*num_equation);      
+      if (oSize > 0 ) {
+        for (int i = 0; i < oSize; i++) {    
+          for (int eq = 0; eq < num_equation; eq++) outlet_boundaryU[eq + i*num_equation] = GetOutletBdrU(eq + i*num_equation);
+	}
+      }
+      */
+
+      
+    // ParGrid read mode      
+    } else if (fam.inReastartFile) { 
+      
+      if (rank0_) cout << "Reading in ParGrid solution data from restart..." << endl;
 
       // verify Dofs match expectations with current mesh
       if (mpi.Root() || config.isRestartPartitioned(mode)) {
@@ -329,12 +413,74 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
         else
           read_serialized_soln_data(file, h5Path.c_str(), dof, var.index_, data, fam);
       }
-    }
+
+
+    // Vectors read mode
+    /*
+    } else if (famVector.inReastartFile) { 
+      
+      if (rank0_) cout << "Reading in Vector solution data from restart..." << endl;
+
+      // verify Dofs match expectations with current mesh
+      if (mpi.Root() || config.isRestartPartitioned(mode)) {
+        hid_t dataspace;
+
+        vector<IOVar> vars = ioData.vars_[famVector.group_];
+        string varGroupName = famVector.group_;	
+        varGroupName.append("/");
+        varGroupName.append(vars[0].varName_);
+
+        data_soln = H5Dopen2(file, varGroupName.c_str(), H5P_DEFAULT);
+        assert(data_soln >= 0);
+        dataspace = H5Dget_space(data_soln);
+        numInSoln = H5Sget_simple_extent_npoints(dataspace);
+        H5Dclose(data_soln);
+      }
+
+      //int dof = fam.pfunc_->ParFESpace()->GetNDofs();
+      int dof = oSize*num_equation;
+      if (config.isRestartSerialized(mode)) {
+        int dof_global;
+        MPI_Reduce(&dof, &dof_global, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+        dof = dof_global;
+      }
+
+      if (loadFromAuxSol && famVector.allowsAuxRestart) dof = oSize*num_equation; //aux_vfes->GetNDofs();
+
+      if (rank0_ || config.isRestartPartitioned(mode)) assert((int)numInSoln == dof);
+
+      // get pointer to raw data
+      //double *data = fam.pfunc_->HostReadWrite();
+      Vector *dataVec = GetOutletBdrU();     
+      double *data = GetOutletBdrU_single(0);      
+      
+      // special case if starting from aux soln  FIX FOR BOUNDARY
+      if (loadFromAuxSol && fam.allowsAuxRestart) {
+        data = aux_UVector->HostReadWrite();
+
+        // ks note: would need to add additional logic to handle read of
+        // multiple pargridfunctions when changing the solution order
+        assert(ioData.families_.size() == 1);
+      }
+
+      vector<IOVar> vars = ioData.vars_[famVector.group_];
+      for (auto var : vars) {
+        std::string h5Path = fam.group_ + "/" + var.varName_;
+        if (rank0_) grvy_printf(ginfo, "--> Reading h5 path = %s\n", h5Path.c_str());
+        if (config.isRestartPartitioned(mode))
+          read_partitioned_soln_data(file, h5Path.c_str(), var.index_ * numInSoln, data);
+        else
+          read_serialized_soln_data(file, h5Path.c_str(), dof, var.index_, data, fam);
+      }      
+      
+      }*/
+    
   }
 
   if (file >= 0) H5Fclose(file);
 
   if (mode == "read" && loadFromAuxSol) {
+    
     if (mpi.Root()) cout << "Interpolating from auxOrder = " << auxOrder << " to order = " << order << endl;
 
     // Interpolate from aux to new order
@@ -365,6 +511,56 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
       for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * vfes->GetNDofs()] = conservedState[eq];
     }
 
+    // FIX FIX FIX
+    // add logic for old boundaryU
+    // read aux_UVector to auxU via elDof system
+    // interp new auxU to U
+    // read from U to new boundaryU via elDof system
+
+    // other way
+    /*
+    Vector elUp;
+    Vector shape;
+
+    for (int bel = 0; bel < vfes->GetNBE(); bel++) {
+      int attr = vfes->GetBdrAttribute(bel);
+      if (attr == patchNumber) {
+        FaceElementTransformations *Tr = vfes->GetMesh()->GetBdrFaceTransformations(bel);
+
+        int elDofs = vfes->GetFE(Tr->Elem1No)->GetDof();
+
+        Array<int> dofs;
+        vfes->GetElementVDofs(Tr->Elem1No, dofs);
+
+        // retreive data
+        elUp.SetSize(elDofs * num_equation_);
+        Up->GetSubVector(dofs, elUp);
+
+        int intorder = Tr->Elem1->OrderW() + 2 * vfes->GetFE(Tr->Elem1No)->GetOrder();
+        if (vfes->GetFE(Tr->Elem1No)->Space() == FunctionSpace::Pk) {
+          intorder++;
+        }
+        const IntegrationRule ir = intRules->Get(Tr->GetGeometryType(), intorder);
+        for (int i = 0; i < ir.GetNPoints(); i++) {
+          IntegrationPoint ip = ir.IntPoint(i);
+          Tr->SetAllIntPoints(&ip);
+          shape.SetSize(elDofs);
+          vfes->GetFE(Tr->Elem1No)->CalcShape(Tr->GetElement1IntPoint(), shape);
+          Vector iUp(num_equation_);
+
+          for (int eq = 0; eq < num_equation_; eq++) {
+            double sum = 0.;
+            for (int d = 0; d < elDofs; d++) {
+              sum += shape[d] * elUp(d + eq * elDofs);
+            }
+            if (!bdrUInit) boundaryU[eq + Nbdr * num_equation_] = sum; // boundaryU now has primitive state	  
+          }
+        Nbdr++;
+      }
+    */
+    }
+          
+    
     // clean up aux data
     delete aux_U;
     delete aux_U_data;
@@ -725,7 +921,6 @@ void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
   return;
 }
 
-
 // ---------------------------------------------
 // Routines for I/O data organizer helper class
 // ---------------------------------------------
@@ -743,6 +938,22 @@ void IODataOrganizer::registerIOFamily(std::string description, std::string grou
 
   return;
 }
+
+/*
+// same except for read/write vectors instead of ParGridFunctions
+void IODataOrganizer::registerIOFamilyVector(std::string description, std::string group, Vector *vect,
+                                             bool auxRestart, bool _inReastartFile) {
+  IOFamilyVector familyVector{description, group, vect};
+  std::vector<IOVar> vars;
+  familyVector.allowsAuxRestart = auxRestart;
+  familyVector.inReastartFile = _inReastartFile;
+
+  familiesVector_.push_back(familyVector);
+  vars_[group] = vars;
+
+  return;
+}
+*/
 
 // register individual variables for IO family
 void IODataOrganizer::registerIOVar(std::string group, std::string varName, int index) {

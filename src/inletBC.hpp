@@ -60,7 +60,10 @@ class InletBC : public BoundaryCondition {
   Vector meanUp;
 
   Vector boundaryU;
+  Vector boundaryU_element;    
   int bdrN;
+  int total_bdrN;
+  int bdrN_element;  
   bool bdrUInit;
 
   // boundary mean calculation variables
@@ -91,7 +94,7 @@ class InletBC : public BoundaryCondition {
   void subsonicNonReflectingTemperatureVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
   void subsonicNonReflectingTemperatureVelocityUser(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, Vector &bdrFlux);  
 
-  virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up);
+  virtual void updateMean(IntegrationRules *intRules, ParGridFunction *U_, ParGridFunction *Up);
 
  public:
   InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *rsolver_, GasMixture *_mixture,
@@ -106,6 +109,10 @@ class InletBC : public BoundaryCondition {
 
   virtual void initBCs();
 
+  int GetBdrN() { return total_bdrN; }
+  double GetBdrU(int ii) { return boundaryU[ii]; }
+  Vector *GetOutletBdrU_ptr() { return &boundaryU_element; }    
+  
   virtual void integrationBC(Vector &y,  // output
                              const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                              ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,

@@ -65,6 +65,8 @@ RunConfiguration::RunConfiguration() {
   restartMean = false;
   meanHistEnable = false;
 
+  restartBdr = false;
+  
   itersOut = 50;
   workFluid = DRY_AIR;
   eqSystem = EULER;
@@ -501,6 +503,9 @@ void RunConfiguration::readInputFile(std::string inpuFileName) {
           case 2:
             patchType.second = VISC_ISOTH;
             break;
+          case 3:	    
+            patchType.second = SLIP;
+            break;	    
         }
         wallPatchType.push_back(patchType);
         WallData wData;

@@ -61,10 +61,21 @@ class WallBC : public BoundaryCondition {
   const Array<int> &intPointsElIDBC;
   const int &maxIntPoints_;
 
+  Vector boundaryU;
+  Vector boundaryU_element;    
+  int total_bdrN, bdrN_element;  
+
+  // Unit trangent vector 1 & 2
+  //Vector tangent1;
+  //Vector tangent2;
+  //Vector inverseNorm2cartesian;
+  //Vector bdrShape;       // shape functions evaluated at the integration points  
+  
   Array<int> wallElems;
   void buildWallElemsArray(const Array<int> &intPointsElIDBC);
 
   void computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, Vector &bdrFlux);
+  void computeSlipWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, Vector &bdrFlux);  
   void computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, Vector &bdrFlux);
   void computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, Vector &bdrFlux);
   void computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, Vector &bdrFlux);
@@ -80,7 +91,11 @@ class WallBC : public BoundaryCondition {
 
   virtual void initBCs();
 
-  virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up) {}
+  int GetBdrN() { return total_bdrN; }
+  double GetBdrU(int ii) { return boundaryU[ii]; }
+  Vector *GetOutletBdrU_ptr() { return &boundaryU_element; }    
+  
+  virtual void updateMean(IntegrationRules *intRules, ParGridFunction *U_, ParGridFunction *Up) {}
 
   // functions for BC integration on GPU
 

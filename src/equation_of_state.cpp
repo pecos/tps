@@ -300,6 +300,50 @@ MFEM_HOST_DEVICE double DryAir::ComputeMaxCharSpeed(const double *state) const {
   return vel + sound;
 }
 
+double DryAir::ComputeMaxCharSpeedNormal(const Vector &state, const Vector &normal) {
+  const double den = state(0);
+  const Vector den_vel(state.GetData() + 1, nvel_);
+
+  /*
+  Vector unitNorm = normal;
+  {
+    double mod = 0.;
+    for (int d = 0; d < dim; d++) mod += normal[d] * normal[d];
+    unitNorm *= 1. / sqrt(mod); // this is outward facing normal 
+  }
+  */
+  
+  double den_velNorm = 0;
+  for (int d = 0; d < nvel_; d++) {
+    //den_velNorm += den_velNorm(d) * unitNorm(d);
+    den_velNorm += den_vel(d) * normal(d);    
+  }
+
+  const double pres = ComputePressure(state);
+  const double sound = sqrt(specific_heat_ratio * pres / den);
+  double vel = den_velNorm / den;
+  vel = abs(vel);
+
+  return vel + sound;
+}
+
+// not updated
+MFEM_HOST_DEVICE double DryAir::ComputeMaxCharSpeedNormal(const double *state, const double *normal) const {
+  const double den = state[0];
+
+  double den_vel2 = 0;
+  for (int d = 0; d < nvel_; d++) {
+    den_vel2 += state[d + 1] * state[d + 1];
+  }
+  den_vel2 /= den;
+
+  const double pres = ComputePressure(state);
+  const double sound = sqrt(specific_heat_ratio * pres / den);
+  const double vel = sqrt(den_vel2 / den);
+
+  return vel + sound;
+}
+
 void DryAir::GetConservativesFromPrimitives(const Vector &primit, Vector &conserv) {
   conserv = primit;
 
@@ -1349,6 +1393,24 @@ double PerfectMixture::ComputeMaxCharSpeed(const Vector &state) {
   return ComputeMaxCharSpeed(&state[0]);
 }
 
+double PerfectMixture::ComputeMaxCharSpeedNormal(const Vector &state, const Vector &normal) {
+  // const double den = state(0);
+  // const Vector den_vel(state.GetData() + 1, nvel_);
+  //
+  // double den_vel2 = 0;
+  // for (int d = 0; d < nvel_; d++) {
+  //   den_vel2 += den_vel(d) * den_vel(d);
+  // }
+  // den_vel2 /= den;
+  //
+  // const double sound = ComputeSpeedOfSound(state, false);
+  // const double vel = sqrt(den_vel2 / den);
+  //
+  // return vel + sound;
+  return ComputeMaxCharSpeedNormal(&state[0],&normal[0]);
+}
+
+
 MFEM_HOST_DEVICE double PerfectMixture::ComputeMaxCharSpeed(const double *state) const {
   const double den = state[0];
   // const double den_vel(state.GetData() + 1, nvel_);
@@ -1364,6 +1426,24 @@ MFEM_HOST_DEVICE double PerfectMixture::ComputeMaxCharSpeed(const double *state)
 
   return vel + sound;
 }
+
+// not updated
+MFEM_HOST_DEVICE double PerfectMixture::ComputeMaxCharSpeedNormal(const double *state, const double *normal) const {
+  const double den = state[0];
+  // const double den_vel(state.GetData() + 1, nvel_);
+
+  double den_vel2 = 0;
+  for (int d = 0; d < nvel_; d++) {
+    den_vel2 += state[d + 1] * state[d + 1];
+  }
+  den_vel2 /= den;
+
+  const double sound = ComputeSpeedOfSound(state, false);
+  const double vel = sqrt(den_vel2 / den);
+
+  return vel + sound;
+}
+
 
 double PerfectMixture::ComputeSpeedOfSound(const mfem::Vector &Uin, bool primitive) {
   // if (primitive) {

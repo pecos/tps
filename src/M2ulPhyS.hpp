@@ -274,6 +274,13 @@ class M2ulPhyS : public TPS::Solver {
   // maximum element size
   double hmax;  
 
+  // size of outlet boundary
+  int outlet_bdrN, inlet_bdrN;
+
+  // boundaryU for restart
+  Vector outlet_bdrU;
+  Vector *outlet_bdrU_ptr;
+  
   // exit status code;
   int exit_status_;
 
@@ -283,7 +290,7 @@ class M2ulPhyS : public TPS::Solver {
   // a serial mesh, finite element space, and grid function
   // for use if we want to write a serial file
   Mesh *serial_mesh;
-
+  
   // I/O organizer
   IODataOrganizer ioData;
 
@@ -409,6 +416,12 @@ class M2ulPhyS : public TPS::Solver {
   GasMixture *getMixture() { return mixture; }
   Chemistry *getChemistry() { return chemistry_; }
 
+  int GetOutletBdrN() const { return outlet_bdrN; }
+  //double GetOutletBdrU(int ii) { return outlet_bdrU[ii]; }
+  //double GetOutletBdrU_single(int ii) { return *(outlet_bdrU_ptr + ii); }  
+  double *GetOutletBdrU_single(int ii) { return (outlet_bdrU_ptr[0] + ii); }
+  Vector *GetOutletBdrU() { return outlet_bdrU_ptr; }    
+  
   void updatePrimitives();
 
   ParGridFunction *GetPlasmaConductivityGF() { return plasma_conductivity_; }

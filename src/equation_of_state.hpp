@@ -152,14 +152,14 @@ class GasMixture {
   int GetNumConservativeVariables() { return Nconservative; }
   int GetNumPrimitiveVariables() { return Nprimitive; }
 
-  virtual double ComputePressure(const Vector &state,
-                                 double *electronPressure = NULL) = 0;  // pressure from conservatives
+  virtual double ComputePressure(const Vector &state, double *electronPressure = NULL) = 0;  // pressure from conservatives
   MFEM_HOST_DEVICE virtual double ComputePressure(const double *state, double *electronPressure = NULL) const {
     printf("ComputePressure not implemented");
     return 0;
   }
 
-  virtual double ComputePressureFromPrimitives(const Vector &Up) = 0;  // pressure from primitive variables
+  // pressure from primitive variables  
+  virtual double ComputePressureFromPrimitives(const Vector &Up) = 0;  
   MFEM_HOST_DEVICE virtual double ComputePressureFromPrimitives(const double *Up) {
     mfem_error("ComputePressureFromPrimitives is not implemented.");
     return -1.0;
@@ -169,8 +169,9 @@ class GasMixture {
     mfem_error("ComputeTemperature is not implemented.");
     return -1.0;
   }
-  virtual double Temperature(double *rho, double *p,
-                             int nsp) = 0;  // temperature given densities and pressures of all species
+
+  // temperature given densities and pressures of all species  
+  virtual double Temperature(double *rho, double *p, int nsp) = 0;  
 
   virtual void computeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp) {
     mfem_error("computeSpeciesPrimitives not implemented");
@@ -203,6 +204,12 @@ class GasMixture {
     printf("ComputeMaxCharSpeed not implemented");
     return 0;
   }
+  
+  virtual double ComputeMaxCharSpeedNormal(const Vector &state, const Vector &normal) = 0;
+  MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeedNormal(const double *state, const double *normal) const {
+    printf("ComputeMaxCharSpeedNormal not implemented");
+    return 0;
+  }  
 
   virtual double ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive = true) = 0;
 
@@ -363,6 +370,9 @@ class DryAir : public GasMixture {
   virtual double ComputeMaxCharSpeed(const Vector &state);
   MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeed(const double *state) const;
 
+  virtual double ComputeMaxCharSpeedNormal(const Vector &state, const Vector &normal);
+  MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeedNormal(const double *state, const double *normal) const;
+  
   virtual double ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive = true);
 
   // Physicality check (at end)
@@ -693,6 +703,9 @@ class PerfectMixture : public GasMixture {
   virtual double ComputeMaxCharSpeed(const Vector &state);
   MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeed(const double *state) const;
 
+  virtual double ComputeMaxCharSpeedNormal(const Vector &state, const Vector &normal);
+  MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeedNormal(const double *state, const double *normal) const;
+  
   virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true);
   MFEM_HOST_DEVICE virtual double ComputeSpeedOfSound(const double *Uin, bool primitive = true) const;
   MFEM_HOST_DEVICE double computeSpeedOfSoundBase(const double *n_sp, const double n_B, const double rho,

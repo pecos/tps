@@ -48,11 +48,13 @@ class Gradients : public ParNonlinearForm {
  private:
   ParFiniteElementSpace *vfes;
   ParFiniteElementSpace *gradUpfes;
+  ParFiniteElementSpace *delUpfes;  
   const int dim_;
   const int num_equation_;
 
   ParGridFunction *Up;
   ParGridFunction *gradUp;
+  ParGridFunction *delUp;  
 
   GasMixture *mixture;
 
@@ -76,6 +78,11 @@ class Gradients : public ParNonlinearForm {
   Vector Ke_array_;
   Array<int> Ke_positions_;
 
+  // for second derivative
+  //Array<DenseMatrix *> Ke2;
+  //Vector Ke2_array_;
+  //Array<int> Ke2_positions_;  
+  
   Vector &invMArray;
   Array<int> &posDofInvM;
 
@@ -112,6 +119,8 @@ class Gradients : public ParNonlinearForm {
   }
 
   void computeGradients();
+
+  //void computeLaplacian();  
 
 #ifdef _GPU_
   void computeGradients_domain();
