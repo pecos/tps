@@ -33,12 +33,17 @@
 #define TABLE_HPP_
 
 #include <math.h>
+#include <tps_config.h>
+
+#ifdef HAVE_GSL
+#include <gsl/gsl_math.h>
+#include <gsl/gsl_interp2d.h>
+#include <gsl/gsl_spline2d.h>
+#endif  // HAVE_GSL
 
 #include <mfem/general/forall.hpp>
 
 #include "dataStructures.hpp"
-
-using namespace std;
 
 class TableInterpolator {
  protected:
@@ -80,5 +85,56 @@ class LinearTable : public TableInterpolator {
 
   MFEM_HOST_DEVICE virtual double eval(const double &xEval);
 };
+
+
+/** \brief 2-D interpolation base class
+ *
+ * Specifies interface for two-dimensional table look-up (i.e.,
+ * interpolation).
+ */
+class TableInterpolator2D {
+ protected:
+  double *xdata_;
+  double *ydata_;
+  double *fdata_;
+
+  const unsigned int nx_;
+  const unsigned int ny_;
+
+ public:
+  TableInterpolator2D(unsigned int nx, unsigned int ny);
+  virtual ~TableInterpolator2D();
+
+  /// Interpolate fcn to (x,y) --- must be implemented in derived class
+  virtual double eval(const double &x, const double &y) {
+    printf("TableInterpolator2D not initialized!");
+    return -1.0;
+  }
+};
+
+#ifdef HAVE_GSL
+
+/** \brief 2-D interpolation using GSL
+ *
+ * Provided 2-D table look-up using the Gnu Scientific Library.  See
+ * https://www.gnu.org/software/gsl/doc/html/interp.html# for GSL
+ * documentation.
+ */
+class GslTableInterpolator2D : public TableInterpolator2D{
+ protected:
+  const gsl_interp2d_type *itype_;
+  gsl_spline2d *spline_;
+  gsl_interp_accel *xacc_, *yacc_;
+
+ public:
+  GslTableInterpolator2D(unsigned int nx, unsigned int ny, const double *xdata, const double *ydata,
+                         const double *fdata);
+  virtual ~GslTableInterpolator2D();
+
+  /// Interpolate function to (x,y)
+  virtual double eval(const double &x, const double &y) { return gsl_spline2d_eval(spline_, x, y, xacc_, yacc_); }
+};
+
+#endif  // HAVE_GSL
 
 #endif  // TABLE_HPP_
