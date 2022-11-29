@@ -32,6 +32,8 @@
 
 #include "table.hpp"
 
+using namespace std;
+
 MFEM_HOST_DEVICE TableInterpolator::TableInterpolator(const int &Ndata, const double *xdata, const double *fdata,
                                                       const bool &xLogScale, const bool &fLogScale)
     : Ndata_(Ndata), xLogScale_(xLogScale), fLogScale_(fLogScale) {
@@ -91,3 +93,64 @@ MFEM_HOST_DEVICE double LinearTable::eval(const double &xEval) {
 
   return ft;
 }
+
+/** \brief Constructs 2-D interpolation base class
+ *
+ * Allocates memory for required data arrays based on input sizes.
+ * Memory is uninitialized.
+ */
+TableInterpolator2D::TableInterpolator2D(unsigned int nx, unsigned int ny) : nx_(nx), ny_(ny) {
+  xdata_ = new double[nx_];
+  ydata_ = new double[ny_];
+  fdata_ = new double[nx_ * ny_];
+}
+
+/** \brief 2-D interpolation base class destructor
+ *
+ * Frees memory allocated by ctor
+ */
+TableInterpolator2D::~TableInterpolator2D() {
+  delete[] xdata_;
+  delete[] ydata_;
+  delete[] fdata_;
+}
+
+#ifdef HAVE_GSL
+
+/** \brief Constructs GSL 2-D interpolation object
+ *
+ * Initializes data using input pointers.  Allocates and initializes
+ * all required GSL objects.
+ */
+GslTableInterpolator2D::GslTableInterpolator2D(unsigned int nx, unsigned int ny, const double *xdata,
+                                               const double *ydata, const double *fdata)
+    : TableInterpolator2D(nx, ny), itype_(gsl_interp2d_bilinear) {
+  for (unsigned int i = 0; i < nx_; ++i) {
+    xdata_[i] = xdata[i];
+  }
+  for (unsigned int i = 0; i < ny_; ++i) {
+    ydata_[i] = ydata[i];
+  }
+  for (unsigned int i = 0; i < nx_ * ny_; ++i) {
+    fdata_[i] = fdata[i];
+  }
+
+  spline_ = gsl_spline2d_alloc(itype_, nx_, ny_);
+
+  xacc_ = gsl_interp_accel_alloc();
+  yacc_ = gsl_interp_accel_alloc();
+
+  gsl_spline2d_init(spline_, xdata_, ydata_, fdata_, nx_, ny_);
+}
+
+/** \brief GSL 2-D interpolation destructor
+ *
+ * Frees GSL objects allocated by constructor
+ */
+GslTableInterpolator2D::~GslTableInterpolator2D() {
+  gsl_interp_accel_free(yacc_);
+  gsl_interp_accel_free(xacc_);
+  gsl_spline2d_free(spline_);
+}
+
+#endif  // HAVE_GSL

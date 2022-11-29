@@ -1,3 +1,4 @@
+#include <tps_config.h>
 #include "../src/M2ulPhyS.hpp"
 #include "mfem.hpp"
 #include <fstream>
@@ -12,16 +13,7 @@ double uniformRandomNumber() {
   return (double) rand() / (RAND_MAX);
 }
 
-int main (int argc, char *argv[])
-{
-  TPS::Tps tps;
-  tps.parseCommandLineArgs(argc, argv);
-  tps.parseInput();
-  tps.chooseDevices();
-
-  MPI_Session mpi = tps.getMPISession();
-  int rank = mpi.WorldRank();
-
+void testTableInterpolator1D(TPS::Tps &tps, int rank) {
   srand (time(NULL));
 
   const int Ndata = 57;
@@ -116,6 +108,79 @@ int main (int argc, char *argv[])
 //  std::cout << "]" << std::endl;
 
   // delete table;
+}
 
-  return 0;
+
+#ifdef HAVE_GSL
+int testGslTableInterpolator2D() {
+  //   ^
+  //   |
+  //   *     *
+  //   |
+  //   |
+  //   *  o  *
+  //   |
+  //   |
+  //   *-----*-->
+  //
+  // Have data at *, interpolate to o
+
+  const unsigned int nx = 2;
+  const unsigned int ny = 3;
+
+  double *xx = new double[nx];
+  double *yy = new double[ny];
+
+  xx[0] = 0.; xx[1] = 1.;
+  yy[0] = -2.; yy[1] = 0.; yy[2] = 2.;
+
+  double *fval = new double[nx * ny];
+
+  fval[0] = 0.;
+  fval[1] = 1.;
+  fval[2] = -1.;
+  fval[3] = 0.;
+  fval[4] = -3.;
+  fval[5] = -2.;
+
+  int ierr = 0;
+  {
+    GslTableInterpolator2D interp(nx, ny, xx, yy, fval);
+    const double fexact = -0.5;
+    double x0 = 0.5;
+    double y0 = 0.0;
+    double f0 = interp.eval(x0, y0);
+    if (std::abs(f0 - fexact) > 1e-15) {
+      ierr += 1;
+    }
+
+  }
+
+  delete[] fval;
+  delete[] yy;
+  delete[] xx;
+
+  return ierr;
+}
+#endif  // HAVE_GSL
+
+
+int main (int argc, char *argv[])
+{
+  TPS::Tps tps;
+  tps.parseCommandLineArgs(argc, argv);
+  tps.parseInput();
+  tps.chooseDevices();
+
+  MPI_Session mpi = tps.getMPISession();
+  int rank = mpi.WorldRank();
+
+  testTableInterpolator1D(tps, rank);
+
+  int ierr = 0;
+#ifdef HAVE_GSL
+  ierr = testGslTableInterpolator2D();
+#endif
+
+  return ierr;
 }
