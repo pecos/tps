@@ -74,6 +74,13 @@ AS_ECHO("`$srcdir/m4/wrap_lines.py --maxWidth 110 --first 1 --remain 31 --prefix
 fi
 
 echo GPU build enabled for cpu... : $enable_gpu_cpu
+
+echo GSL support enabled........ : $ENABLE_GSL
+if test "x$ENABLE_GSL" = "xyes"; then
+echo '  ' CXX flags................ : $GSL_CFLAGS
+echo '  ' LIBS..................... : $GSL_LIBS
+fi
+
 echo '-----------------------------------------------------------------------------------'
 
 ])

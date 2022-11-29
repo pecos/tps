@@ -12,6 +12,10 @@ if MASA_ENABLED
 AM_CPPFLAGS += $(MASA_CXXFLAGS)
 endif
 
+if GSL_ENABLED
+AM_CPPFLAGS += $(GSL_CFLAGS)
+endif
+
 tps_LDFLAGS=
 
 # C++ main solver binary
@@ -97,6 +101,10 @@ endif
 
 if MASA_ENABLED
 libtps_la_LIBADD += $(MASA_LIBS)
+endif
+
+if GSL_ENABLED
+libtps_la_LIBADD += $(GSL_LIBS)
 endif
 
 

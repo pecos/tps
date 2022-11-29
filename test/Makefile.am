@@ -1,5 +1,5 @@
-AM_CPPFLAGS          = -g -I$(top_srcdir)/src $(MFEM_CXXFLAGS) $(HDF5_CFLAGS) $(GRVY_CFLAGS)
-#EXTRA_DIST           = bats cpplint
+AM_CPPFLAGS = -g -I$(top_srcdir)/src $(MFEM_CXXFLAGS) $(HDF5_CFLAGS) $(GRVY_CFLAGS)
+AM_LDFLAGS = $(PYTHON_LIBS) $(MFEM_LIBS)
 
 if CUDA_ENABLED
 AM_CPPFLAGS += $(CUDA_CXXFLAGS)
@@ -9,12 +9,14 @@ if HIP_ENABLED
 AM_CPPFLAGS += $(HIP_CXXFLAGS)
 endif
 
-if GSLIB_ENABLED
-AM_CPPFLAGS += -I$(GSLIB_INC)
-endif
-
 if MASA_ENABLED
 AM_CPPFLAGS += $(MASA_CXXFLAGS)
+AM_LDFLAGS += $(MASA_LIBS)
+endif
+
+if GSL_ENABLED
+AM_CPPFLAGS += $(GSL_CFLAGS)
+AM_LDFLAGS += $(GSL_LIBS)
 endif
 
 TEST_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) $(top_srcdir)/test/tap-driver.sh
@@ -118,83 +120,47 @@ perfect_mixture_test_SOURCES  = test_perfect_mixture.cpp
 perfect_mixture_test_LDADD    = ../src/libtps.la
 perfect_mixture_test_LDADD   += $(HDF5_LIBS)
 perfect_mixture_test_LDADD   += $(GRVY_LIBS)
-perfect_mixture_test_LDFLAGS  = $(PYTHON_LIBS) $(MFEM_LIBS)
-
-if MASA_ENABLED
-perfect_mixture_test_LDFLAGS += $(MASA_LIBS)
-endif
 
 check_PROGRAMS               += test_speed_of_sound
 test_speed_of_sound_SOURCES   = test_speed_of_sound.cpp
 test_speed_of_sound_LDADD     = ../src/libtps.la
 test_speed_of_sound_LDADD     += $(HDF5_LIBS)
 test_speed_of_sound_LDADD     += $(GRVY_LIBS)
-test_speed_of_sound_LDFLAGS   = $(PYTHON_LIBS) $(MFEM_LIBS)
-
-if MASA_ENABLED
-test_speed_of_sound_LDFLAGS  += $(MASA_LIBS)
-endif
 
 check_PROGRAMS               += test_collision
 test_collision_SOURCES        = test_collision_integral.cpp
 test_collision_LDADD          = ../src/libtps.la
 test_collision_LDADD         += $(HDF5_LIBS)
 test_collision_LDADD         += $(GRVY_LIBS)
-test_collision_LDFLAGS        = $(PYTHON_LIBS) $(MFEM_LIBS)
-
-if MASA_ENABLED
-test_collision_LDFLAGS       += $(MASA_LIBS)
-endif
 
 check_PROGRAMS               += test_argon_minimal
 test_argon_minimal_SOURCES    = test_argon_minimal.cpp
 test_argon_minimal_LDADD      = ../src/libtps.la
 test_argon_minimal_LDADD     += $(HDF5_LIBS)
 test_argon_minimal_LDADD     += $(GRVY_LIBS)
-test_argon_minimal_LDFLAGS    = $(PYTHON_LIBS) $(MFEM_LIBS)
 
-if MASA_ENABLED
-test_argon_minimal_LDFLAGS 	 += $(MASA_LIBS)
-endif
-
-check_PROGRAMS 							 += test_bdr_flux
-test_bdr_flux_SOURCES  				= test_boundary_flux.cpp
-test_bdr_flux_LDADD    				= ../src/libtps.la
-test_bdr_flux_LDADD    			 += $(HDF5_LIBS)
-test_bdr_flux_LDADD    			 += $(GRVY_LIBS)
-test_bdr_flux_LDFLAGS  				= $(PYTHON_LIBS) $(MFEM_LIBS)
-
-if MASA_ENABLED
-test_bdr_flux_LDFLAGS 			 += $(MASA_LIBS)
-endif
+check_PROGRAMS               += test_bdr_flux
+test_bdr_flux_SOURCES  	      = test_boundary_flux.cpp
+test_bdr_flux_LDADD    	      = ../src/libtps.la
+test_bdr_flux_LDADD    	     += $(HDF5_LIBS)
+test_bdr_flux_LDADD    	     += $(GRVY_LIBS)
 
 check_PROGRAMS               += test_interp_em
-test_interp_em_SOURCES    = test_interp_em.cpp
-test_interp_em_LDADD      = ../src/libtps.la
-test_interp_em_LDADD     += $(HDF5_LIBS)
-test_interp_em_LDADD     += $(GRVY_LIBS)
-test_interp_em_LDFLAGS    = $(PYTHON_LIBS) $(MFEM_LIBS)
+test_interp_em_SOURCES        = test_interp_em.cpp
+test_interp_em_LDADD          = ../src/libtps.la
+test_interp_em_LDADD         += $(HDF5_LIBS)
+test_interp_em_LDADD         += $(GRVY_LIBS)
 
-if MASA_ENABLED
-test_interp_em_LDFLAGS 	 += $(MASA_LIBS)
-endif
+check_PROGRAMS               += test_grad
+test_grad_SOURCES             = test_gradient.cpp
+test_grad_LDADD               = ../src/libtps.la
+test_grad_LDADD              += $(HDF5_LIBS)
+test_grad_LDADD              += $(GRVY_LIBS)
 
-check_PROGRAMS += test_grad
-test_grad_SOURCES  = test_gradient.cpp
-test_grad_LDADD    = ../src/libtps.la
-test_grad_LDADD    += $(HDF5_LIBS)
-test_grad_LDADD    += $(GRVY_LIBS)
-test_grad_LDFLAGS  = $(PYTHON_LIBS) $(MFEM_LIBS)
-
-if MASA_ENABLED
-test_grad_LDFLAGS += $(MASA_LIBS)
-endif
-
-check_PROGRAMS += test_table
-test_table_SOURCES  = test_table.cpp
-test_table_LDADD    = ../src/libtps.la
-test_table_LDADD    += $(HDF5_LIBS)
-test_table_LDADD    += $(GRVY_LIBS)
-test_table_LDFLAGS  = $(PYTHON_LIBS) $(MFEM_LIBS)
+check_PROGRAMS               += test_table
+test_table_SOURCES            = test_table.cpp
+test_table_LDADD              = ../src/libtps.la
+test_table_LDADD             += $(HDF5_LIBS)
+test_table_LDADD             += $(GRVY_LIBS)
 
 endif # if !GPU_ENABLED
