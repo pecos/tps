@@ -126,7 +126,10 @@ RUN . /etc/profile.d/lmod.sh \
 RUN find $mfem_prefix -path *mfem* -type f -exec chmod 644 -- {} +
 RUN find $mfem_prefix -name *mfem* -type f -exec chmod 644 -- {} +
 
+# Set some environment variables
 ENV MFEM_DIR=$mfem_prefix
+ENV GRVY_DIR=/usr/local
+ENV MASA_DIR=/usr/local
 
 # additional packages
 RUN yum -y install git-lfs
@@ -153,6 +156,8 @@ RUN rm /tmp/doxygen-1.9.5.src.tar.gz
 RUN yum -y install graphviz
 RUN pip3 install gcovr
 
+RUN yum -y install gsl-gnu9-ohpc
+
 RUN pip3 install "pybind11[global]"
 
 # Register new libs installed into /usr/local/lib with linker
@@ -171,6 +176,7 @@ RUN echo "module try-add superlu_dist" >> /etc/profile.d/lmod.sh
 RUN echo "module try-add petsc" >> /etc/profile.d/lmod.sh
 RUN echo "module try-add boost" >> /etc/profile.d/lmod.sh
 RUN echo "module try-add valgrind" >> /etc/profile.d/lmod.sh
+RUN echo "module try-add gsl" >> /etc/profile.d/lmod.sh
 
 # include git sha in motd
 COPY motd.sh /etc/profile.d/motd.sh
