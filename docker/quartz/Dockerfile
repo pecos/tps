@@ -111,6 +111,8 @@ RUN ldconfig
 RUN pip3 install numpy
 RUN yum -y install perl-Data-Dumper
 
+RUN yum -y install gsl-gnu9-ohpc
+
 RUN pip3 install "pybind11[global]"
 
 # load mfem by default
@@ -124,6 +126,7 @@ RUN echo "module try-add superlu_dist" >> /etc/profile.d/lmod.sh
 RUN echo "module try-add netcdf" >> /etc/profile.d/lmod.sh
 RUN echo "module try-add boost" >> /etc/profile.d/lmod.sh
 RUN echo "module try-add valgrind" >> /etc/profile.d/lmod.sh
+RUN echo "module try-add gsl" >> /etc/profile.d/lmod.sh
 
 # include git sha in motd
 COPY motd.sh /etc/profile.d/motd.sh
