@@ -231,6 +231,16 @@ AC_PATH_PROG(DOXYGEN, doxygen)
 AC_SUBST(DOXYGEN)
 # -------------------------------------------------------------
 
+# -------------------------------------------------------------
+# GSL - look for Gnu Scientific Library
+# -------------------------------------------------------------
+AH_TEMPLATE([HAVE_GSL],[Enable Gnu Scientific Library support])
+ENABLE_GSL=no
+AX_PATH_GSL(2.5, [ENABLE_GSL=yes], )
+if test x$ENABLE_GSL = xyes; then
+   AC_DEFINE([HAVE_GSL])
+fi
+AM_CONDITIONAL(GSL_ENABLED,test x$ENABLE_GSL = xyes)
 
 dnl --
 

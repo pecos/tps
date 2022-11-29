@@ -1,20 +1,25 @@
-AM_CPPFLAGS          = -g -I$(top_srcdir)/src $(MFEM_CXXFLAGS) $(HDF5_CFLAGS) $(GRVY_CFLAGS)
-EXTRA_DIST           = bats cpplint
+AM_CPPFLAGS = -g -I$(top_srcdir)/src $(MFEM_CXXFLAGS) $(HDF5_CFLAGS) $(GRVY_CFLAGS)
+AM_LDFLAGS = $(PYTHON_LIBS) $(MFEM_LIBS)
+
+EXTRA_DIST = bats cpplint
 
 if CUDA_ENABLED
 AM_CPPFLAGS += $(CUDA_CXXFLAGS)
+AM_LDFLAGS += $(CUDA_LDFLAGS)
 endif
 
 if HIP_ENABLED
 AM_CPPFLAGS += $(HIP_CXXFLAGS)
 endif
 
-if GSLIB_ENABLED
-AM_CPPFLAGS += -I$(GSLIB_INC)
-endif
-
 if MASA_ENABLED
 AM_CPPFLAGS += $(MASA_CXXFLAGS)
+AM_LDFLAGS += $(MASA_LIBS)
+endif
+
+if GSL_ENABLED
+AM_CPPFLAGS += $(GSL_CFLAGS)
+AM_LDFLAGS += $(GSL_LIBS)
 endif
 
 # Possible there is nothing to do
@@ -25,11 +30,6 @@ beam_mesh_SOURCES  = beam_mesh.cpp
 beam_mesh_LDADD    =
 beam_mesh_LDADD    += $(HDF5_LIBS)
 beam_mesh_LDADD    += $(GRVY_LIBS)
-beam_mesh_LDFLAGS   = $(PYTHON_LIBS) $(MFEM_LIBS)
-
-if MASA_ENABLED
-beam_mesh_LDFLAGS += $(MASA_LIBS)
-endif
 
 #bin_PROGRAMS += simmesh
 #simmesh_SOURCES  = simple_periodic_mesh.cpp
@@ -51,10 +51,6 @@ interp_SOURCES  = pfield_interpolate.cpp
 interp_LDADD    = ../src/libtps.la
 interp_LDADD    += $(HDF5_LIBS)
 interp_LDADD    += $(GRVY_LIBS)
-interp_LDFLAGS  = $(PYTHON_LIBS) $(MFEM_LIBS)
-if MASA_ENABLED
-interp_LDFLAGS += $(MASA_LIBS)
-endif
 endif
 
 bin_PROGRAMS += binaryic
@@ -62,60 +58,30 @@ binaryic_SOURCES  = binary_mixture_ic.cpp
 binaryic_LDADD    = ../src/libtps.la
 binaryic_LDADD   += $(HDF5_LIBS)
 binaryic_LDADD   += $(GRVY_LIBS)
-binaryic_LDFLAGS  = $(PYTHON_LIBS) $(MFEM_LIBS)
-
-if MASA_ENABLED
-binaryic_LDFLAGS += $(MASA_LIBS)
-endif
 
 bin_PROGRAMS     += tanhic
 tanhic_SOURCES    = tanh_ic.cpp
-tanhic_LDADD      = ../src/libtps.la -lmfem
+tanhic_LDADD      = ../src/libtps.la
 tanhic_LDADD     += $(HDF5_LIBS)
 tanhic_LDADD     += $(GRVY_LIBS)
-tanhic_LDFLAGS    = $(PYTHON_LIBS) $(MFEM_LIBS)
-
-if MASA_ENABLED
-tanhic_LDFLAGS += $(MASA_LIBS)
-endif
 
 bin_PROGRAMS    += sineic
 sineic_SOURCES   = sine_ic.cpp
-sineic_LDADD     = ../src/libtps.la -lmfem
+sineic_LDADD     = ../src/libtps.la
 sineic_LDADD    += $(HDF5_LIBS)
 sineic_LDADD    += $(GRVY_LIBS)
-sineic_LDFLAGS   = $(PYTHON_LIBS) $(MFEM_LIBS)
-
-if MASA_ENABLED
-sineic_LDFLAGS += $(MASA_LIBS)
-endif
 
 bin_PROGRAMS     += l2diff
 l2diff_SOURCES    = L2_diff.cpp
-l2diff_LDADD      = ../src/libtps.la -lmfem
+l2diff_LDADD      = ../src/libtps.la
 l2diff_LDADD     += $(HDF5_LIBS)
 l2diff_LDADD     += $(GRVY_LIBS)
-l2diff_LDFLAGS    = $(PYTHON_LIBS) $(MFEM_LIBS)
-
-if MASA_ENABLED
-l2diff_LDFLAGS += $(MASA_LIBS)
-endif
 
 bin_PROGRAMS        += compute_rhs
 compute_rhs_SOURCES  = compute_rhs.cpp
-compute_rhs_LDADD    = ../src/libtps.la -lmfem
+compute_rhs_LDADD    = ../src/libtps.la
 compute_rhs_LDADD   += $(HDF5_LIBS)
 compute_rhs_LDADD   += $(GRVY_LIBS)
-compute_rhs_LDFLAGS  = $(PYTHON_LIBS) $(MFEM_LIBS)
-
-if MASA_ENABLED
-compute_rhs_LDFLAGS += $(MASA_LIBS)
-endif
-
-if CUDA_ENABLED
-compute_rhs_LDFLAGS += $(CUDA_LDFLAGS)
-endif
-
 
 if !GPU_ENABLED
 
