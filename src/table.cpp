@@ -32,6 +32,8 @@
 
 #include "table.hpp"
 
+#include <stdio.h>
+
 using namespace std;
 
 MFEM_HOST_DEVICE TableInterpolator::TableInterpolator(const int &Ndata, const double *xdata, const double *fdata,
@@ -94,6 +96,12 @@ MFEM_HOST_DEVICE double LinearTable::eval(const double &xEval) {
   return ft;
 }
 
+/** \brief Default ctor
+ *
+ * Sizes set to zero.  Nothing allocated.
+ */
+TableInterpolator2D::TableInterpolator2D() : nx_(0), ny_(0) {}
+
 /** \brief Constructs 2-D interpolation base class
  *
  * Allocates memory for required data arrays based on input sizes.
@@ -115,7 +123,79 @@ TableInterpolator2D::~TableInterpolator2D() {
   delete[] fdata_;
 }
 
+/**
+ * Resets sizes and re-allocates data.  Use with care.  Any
+ * pre-existing data is destroyed.  Resuling allocated arrays are not
+ * initialized.
+ */
+void TableInterpolator2D::resize(unsigned int nx, unsigned int ny) {
+  if (nx_ > 0) {
+    delete[] xdata_;
+  }
+  if (ny_ > 0) {
+    delete[] ydata_;
+  }
+  if (nx_ > 0 && ny_ > 0) {
+    delete[] fdata_;
+  }
+
+  nx_ = nx;
+  ny_ = ny;
+  xdata_ = new double[nx_];
+  ydata_ = new double[ny_];
+  fdata_ = new double[nx_ * ny_];
+}
+
 #ifdef HAVE_GSL
+
+/** \brief Constructs GSL 2-D interpolation object
+ *
+ * Reads data from plato_file
+ */
+GslTableInterpolator2D::GslTableInterpolator2D(std::string plato_file, int xcol, int ycol, int fcol)
+    : TableInterpolator2D(), itype_(gsl_interp2d_bilinear) {
+  // open plato file
+  FILE *table_input_file;
+  table_input_file = fopen(plato_file.c_str(), "r");
+  if (!table_input_file) {
+    std::cout << "Unable to open " << plato_file << std::endl;
+    assert(false);
+  }
+
+  // read size info from plato file
+  unsigned int nxt, nyt;
+  int ierr = fscanf(table_input_file, "%u %u\n", &nxt, &nyt);
+  assert(ierr == 2);
+
+  // set table sizes and allocate data arrays
+  resize(nxt, nyt);
+
+  // read data
+  double ftmp[11];
+  for (unsigned int jj = 0; jj < ny_; ++jj) {
+    for (unsigned int ii = 0; ii < nx_; ++ii) {
+      ierr = fscanf(table_input_file, "%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf\n", &ftmp[0], &ftmp[1], &ftmp[2],
+                    &ftmp[3], &ftmp[4], &ftmp[5], &ftmp[6], &ftmp[7], &ftmp[8], &ftmp[9], &ftmp[10]);
+      assert(ierr == 11);
+
+      // NB: We assume that ftmp[xcol] is same for each jj
+      xdata_[ii] = ftmp[xcol];
+      ydata_[jj] = ftmp[ycol];
+      fdata_[jj * nx_ + ii] = ftmp[fcol];
+    }
+  }
+
+  // close file
+  fclose(table_input_file);
+
+  // set up gsl objects
+  spline_ = gsl_spline2d_alloc(itype_, nx_, ny_);
+
+  xacc_ = gsl_interp_accel_alloc();
+  yacc_ = gsl_interp_accel_alloc();
+
+  gsl_spline2d_init(spline_, xdata_, ydata_, fdata_, nx_, ny_);
+}
 
 /** \brief Constructs GSL 2-D interpolation object
  *
