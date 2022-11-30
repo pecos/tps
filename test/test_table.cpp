@@ -113,52 +113,94 @@ void testTableInterpolator1D(TPS::Tps &tps, int rank) {
 
 #ifdef HAVE_GSL
 int testGslTableInterpolator2D() {
-  //   ^
-  //   |
-  //   *     *
-  //   |
-  //   |
-  //   *  o  *
-  //   |
-  //   |
-  //   *-----*-->
-  //
-  // Have data at *, interpolate to o
-
-  const unsigned int nx = 2;
-  const unsigned int ny = 3;
-
-  double *xx = new double[nx];
-  double *yy = new double[ny];
-
-  xx[0] = 0.; xx[1] = 1.;
-  yy[0] = -2.; yy[1] = 0.; yy[2] = 2.;
-
-  double *fval = new double[nx * ny];
-
-  fval[0] = 0.;
-  fval[1] = 1.;
-  fval[2] = -1.;
-  fval[3] = 0.;
-  fval[4] = -3.;
-  fval[5] = -2.;
-
   int ierr = 0;
+
+  // Test 1: A trivial test
   {
-    GslTableInterpolator2D interp(nx, ny, xx, yy, fval);
-    const double fexact = -0.5;
-    double x0 = 0.5;
-    double y0 = 0.0;
-    double f0 = interp.eval(x0, y0);
-    if (std::abs(f0 - fexact) > 1e-15) {
-      ierr += 1;
+    //   ^
+    //   |
+    //   *     *
+    //   |
+    //   |
+    //   *  o  *
+    //   |
+    //   |
+    //   *-----*-->
+    //
+    // Have data at *, interpolate to o
+
+    const unsigned int nx = 2;
+    const unsigned int ny = 3;
+
+    double *xx = new double[nx];
+    double *yy = new double[ny];
+
+    xx[0] = 0.; xx[1] = 1.;
+    yy[0] = -2.; yy[1] = 0.; yy[2] = 2.;
+
+    double *fval = new double[nx * ny];
+
+    fval[0] = 0.;
+    fval[1] = 1.;
+    fval[2] = -1.;
+    fval[3] = 0.;
+    fval[4] = -3.;
+    fval[5] = -2.;
+
+    {
+      GslTableInterpolator2D interp(nx, ny, xx, yy, fval);
+      const double fexact = -0.5;
+      double x0 = 0.5;
+      double y0 = 0.0;
+      double f0 = interp.eval(x0, y0);
+      if (std::abs(f0 - fexact) > 1e-15) {
+        ierr += 1;
+      }
     }
 
+    delete[] fval;
+    delete[] yy;
+    delete[] xx;
   }
 
-  delete[] fval;
-  delete[] yy;
-  delete[] xx;
+  // Test 2: Read thermo data from a plato file
+  {
+    {
+      std::string plato_file("./inputs/argon_lte_thermo_table.dat");
+      GslTableInterpolator2D pressure_interp(plato_file, 0, 1, 2);
+
+      // spot check a couple points
+      double pexact = 2.0813213725000001e+03;
+      double T = 2000;
+      double rho = 0.005;
+      double p = pressure_interp.eval(T, rho);
+      if (std::abs(p - pexact) > 1e-15) {
+        ierr += 1;
+      }
+
+      pexact = 5.3260479727500002e+05;
+      T = 9950.;
+      rho = 0.255;
+      p = pressure_interp.eval(T, rho);
+      if (std::abs(p - pexact) > 1e-15) {
+        ierr += 1;
+      }
+    }
+
+    {
+      std::string plato_file("./inputs/argon_lte_thermo_table.dat");
+      GslTableInterpolator2D R_interp(plato_file, 0, 1, 6);
+
+      // spot check a couple points
+      double Rexact = 208.1321372;
+      double T = 2000;
+      double rho = 0.005;
+      double R = R_interp.eval(T, rho);
+      if (std::abs(R - Rexact) > 1e-15) {
+        ierr += 1;
+      }
+    }
+  }
 
   return ierr;
 }

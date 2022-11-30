@@ -36,8 +36,8 @@
 #include <tps_config.h>
 
 #ifdef HAVE_GSL
-#include <gsl/gsl_math.h>
 #include <gsl/gsl_interp2d.h>
+#include <gsl/gsl_math.h>
 #include <gsl/gsl_spline2d.h>
 #endif  // HAVE_GSL
 
@@ -86,7 +86,6 @@ class LinearTable : public TableInterpolator {
   MFEM_HOST_DEVICE virtual double eval(const double &xEval);
 };
 
-
 /** \brief 2-D interpolation base class
  *
  * Specifies interface for two-dimensional table look-up (i.e.,
@@ -98,12 +97,16 @@ class TableInterpolator2D {
   double *ydata_;
   double *fdata_;
 
-  const unsigned int nx_;
-  const unsigned int ny_;
+  unsigned int nx_;
+  unsigned int ny_;
 
  public:
+  TableInterpolator2D();
   TableInterpolator2D(unsigned int nx, unsigned int ny);
   virtual ~TableInterpolator2D();
+
+  /// Reset size and re-allocate data arrays
+  void resize(unsigned int nx, unsigned int ny);
 
   /// Interpolate fcn to (x,y) --- must be implemented in derived class
   virtual double eval(const double &x, const double &y) {
@@ -120,13 +123,14 @@ class TableInterpolator2D {
  * https://www.gnu.org/software/gsl/doc/html/interp.html# for GSL
  * documentation.
  */
-class GslTableInterpolator2D : public TableInterpolator2D{
+class GslTableInterpolator2D : public TableInterpolator2D {
  protected:
   const gsl_interp2d_type *itype_;
   gsl_spline2d *spline_;
   gsl_interp_accel *xacc_, *yacc_;
 
  public:
+  GslTableInterpolator2D(std::string plato_file, int xcol, int ycol, int fcol);
   GslTableInterpolator2D(unsigned int nx, unsigned int ny, const double *xdata, const double *ydata,
                          const double *fdata);
   virtual ~GslTableInterpolator2D();
