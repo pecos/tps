@@ -1,0 +1,10 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="lte_mixture"
+
+@test "[$TEST] Unit tests for LteMixture class" {
+    test -e ./test_lte_mixture
+    ./test_lte_mixture
+}
+

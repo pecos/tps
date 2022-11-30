@@ -246,6 +246,7 @@ class RunConfiguration {
 
   DryAirInput dryAirInput;
   PerfectMixtureInput perfectMixtureInput;
+  LteMixtureInput lteMixtureInput;
   ArgonTransportInput argonTransportInput;
   ChemistryInput chemistryInput;
   RadiationInput radiationInput;

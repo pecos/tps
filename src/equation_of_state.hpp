@@ -168,8 +168,8 @@ class GasMixture {
     // mfem_error("ComputeTemperature is not implemented.");
     return -1.0;
   }
-  virtual double Temperature(double *rho, double *p,
-                             int nsp) = 0;  // temperature given densities and pressures of all species
+  // virtual double Temperature(double *rho, double *p,
+  //                            int nsp) = 0;  // temperature given densities and pressures of all species
 
   virtual void computeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp) {
     mfem_error("computeSpeciesPrimitives not implemented");
@@ -343,7 +343,7 @@ class DryAir : public GasMixture {
   MFEM_HOST_DEVICE virtual double ComputePressureFromPrimitives(const double *Up);
   virtual double ComputeTemperature(const Vector &state);
   MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state);
-  virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / gas_constant / rho[0]; }
+  // virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / gas_constant / rho[0]; }
 
   virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies);
   MFEM_HOST_DEVICE virtual void computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies);
@@ -676,7 +676,7 @@ class PerfectMixture : public GasMixture {
   MFEM_HOST_DEVICE virtual void computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies);
 
   // TODO(kevin): Kevin - I don't think we should use this for boundary condition.
-  virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / rho[0] / GetGasConstant(); }
+  // virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / rho[0] / GetGasConstant(); }
 
   virtual double ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive = true);
   virtual double computePressureDerivativeFromPrimitives(const Vector &dUp_dx, const Vector &Uin);
