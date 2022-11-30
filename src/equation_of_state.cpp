@@ -448,7 +448,7 @@ void DryAir::computeConservedStateFromConvectiveFlux(const Vector &meanNormalFlu
 
   Vector Up(num_equation);
   Up[0] = meanNormalFluxes[0] * meanNormalFluxes[0] / (temp - p);
-  Up[1 + nvel_] = Temperature(&Up[0], &p, 1);
+  Up[1 + nvel_] = p / (gas_constant * Up[0]);  // Temperature(&Up[0], &p, 1);
   //   Up[1+dim] = p;
 
   for (int d = 0; d < nvel_; d++) {

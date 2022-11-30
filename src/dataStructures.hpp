@@ -65,7 +65,7 @@ enum Equations {
 };
 
 // These are presets of combination of EquationOfState, TranportProperties, and Chemistry.
-enum WorkingFluid { DRY_AIR, USER_DEFINED };
+enum WorkingFluid { DRY_AIR, USER_DEFINED, LTE_FLUID };
 
 // These are the type of EquationOfState.
 enum GasModel { /* PERFECT_SINGLE, */ PERFECT_MIXTURE, /* CANTERA, */ NUM_GASMODEL };
@@ -350,6 +350,11 @@ struct PerfectMixtureInput {
 
   double gasParams[gpudata::MAXSPECIES * GasParams::NUM_GASPARAMS];
   double molarCV[gpudata::MAXSPECIES];
+};
+
+struct LteMixtureInput {
+  WorkingFluid f;
+  std::string thermo_file_name;
 };
 
 struct ArgonTransportInput {

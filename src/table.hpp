@@ -113,6 +113,18 @@ class TableInterpolator2D {
     printf("TableInterpolator2D not initialized!");
     return -1.0;
   }
+
+  /// Derivative of interpolant wrt x
+  virtual double eval_x(const double &x, const double &y) {
+    printf("TableInterpolator2D not initialized!");
+    return -1.0;
+  }
+
+  /// Derivative of interpolant wrt y
+  virtual double eval_y(const double &x, const double &y) {
+    printf("TableInterpolator2D not initialized!");
+    return -1.0;
+  }
 };
 
 #ifdef HAVE_GSL
@@ -135,8 +147,18 @@ class GslTableInterpolator2D : public TableInterpolator2D {
                          const double *fdata);
   virtual ~GslTableInterpolator2D();
 
-  /// Interpolate function to (x,y)
+  /// Interpolate function to (x,y) using GSL
   virtual double eval(const double &x, const double &y) { return gsl_spline2d_eval(spline_, x, y, xacc_, yacc_); }
+
+  /// Derivative of GSL interpolant wrt x
+  virtual double eval_x(const double &x, const double &y) {
+    return gsl_spline2d_eval_deriv_x(spline_, x, y, xacc_, yacc_);
+  }
+
+  /// Derivative of GSL interpolant wrt y
+  virtual double eval_y(const double &x, const double &y) {
+    return gsl_spline2d_eval_deriv_y(spline_, x, y, xacc_, yacc_);
+  }
 };
 
 #endif  // HAVE_GSL
