@@ -364,6 +364,13 @@ void M2ulPhyS::initVariables() {
           break;
       }
       break;
+    case WorkingFluid::LTE_FLUID:
+      mixture = new LteMixture(config, dim, nvel);
+      transportPtr = new DryAirTransport(mixture, config);
+#if defined(_GPU_)
+      mfem_error("LTE_FLUID not supported for GPU.");
+#endif
+      break;
     default:
       mfem_error("WorkingFluid not recognized.");
       break;
@@ -1333,13 +1340,16 @@ void M2ulPhyS::projectInitialSolution() {
 #endif
 
   if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
-    uniformInitialConditions();
-#ifdef HAVE_MASA
     if (config.use_mms_) {
+#ifdef HAVE_MASA
       projectExactSolution(0.0, U);
       if (config.mmsSaveDetails_) projectExactSolution(0.0, masaU_);
-    }
+#else
+      mfem_error("Require MASA support to use MMS.");
 #endif
+    } else {
+      uniformInitialConditions();
+    }
   } else {
 #ifdef HAVE_MASA
     if (config.use_mms_ && config.mmsSaveDetails_) projectExactSolution(0.0, masaU_);
@@ -2224,6 +2234,11 @@ void M2ulPhyS::parseFluidPreset() {
     config.workFluid = DRY_AIR;
   } else if (fluidTypeStr == "user_defined") {
     config.workFluid = USER_DEFINED;
+  } else if (fluidTypeStr == "lte_table") {
+    config.workFluid = LTE_FLUID;
+    std::string thermo_file;
+    tpsP->getRequiredInput("flow/lte/thermo_table", thermo_file);
+    config.lteMixtureInput.thermo_file_name = thermo_file;
   } else {
     grvy_printf(GRVY_ERROR, "\nUnknown fluid preset supplied at runtime -> %s", fluidTypeStr.c_str());
     exit(ERROR);
@@ -2294,6 +2309,12 @@ void M2ulPhyS::parsePlasmaModels() {
 }
 
 void M2ulPhyS::parseSpeciesInputs() {
+  // quick return if can't use these inputs
+  if (config.workFluid == LTE_FLUID) {
+    config.numSpecies = 1;
+    return;
+  }
+
   // Take parameters from input. These will be sorted into config attributes.
   DenseMatrix inputGasParams;
   Vector inputCV, inputCP;
@@ -3079,7 +3100,12 @@ void M2ulPhyS::packUpGasMixtureInput() {
         exit(ERROR);
         break;
     }  // switch gasModel
-  }    // workFluid == USER_DEFINED
+  } else if (config.workFluid == LTE_FLUID) {
+    config.lteMixtureInput.f = config.workFluid;
+    //config.lteMixtureInput.thermo_file_name // already set in parseFluidPreset
+    assert(config.numSpecies == 1); // inconsistent to specify lte and carry species
+    assert(!config.twoTemperature); // inconsistent to specify lte and have two temperatures
+  }
 }
 
 void M2ulPhyS::identifySpeciesType(Array<ArgonSpcs> &speciesType) {
