@@ -65,6 +65,7 @@ class Tps;
 #include "gradNonLinearForm.hpp"
 #include "io.hpp"
 #include "logger.hpp"
+#include "lte_mixture.hpp"
 #include "mpi_groups.hpp"
 #include "radiation.hpp"
 #include "rhs_operator.hpp"
