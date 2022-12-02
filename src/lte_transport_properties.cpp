@@ -34,26 +34,22 @@
 
 #ifndef _GPU_
 
-LteTransport::LteTransport(GasMixture *_mixture, RunConfiguration &_runfile)
-    : TransportProperties(_mixture) {
+LteTransport::LteTransport(GasMixture *_mixture, RunConfiguration &_runfile) : TransportProperties(_mixture) {
 #ifdef HAVE_GSL
-  mu_table_ = new GslTableInterpolator2D(_runfile.lteMixtureInput.trans_file_name,
-                                         0, /* temperature column */
-                                         1, /* density column */
-                                         2, /* viscosity column */
-                                         5  /* total number of columns */ );
+  mu_table_ = new GslTableInterpolator2D(_runfile.lteMixtureInput.trans_file_name, 0, /* temperature column */
+                                         1,                                           /* density column */
+                                         2,                                           /* viscosity column */
+                                         5 /* total number of columns */);
 
-  kappa_table_ = new GslTableInterpolator2D(_runfile.lteMixtureInput.trans_file_name,
-                                            0,  /* temperature column */
-                                            1,  /* density column */
-                                            3,  /* thermal conductivity column */
-                                            5   /* total number of columns */ );
+  kappa_table_ = new GslTableInterpolator2D(_runfile.lteMixtureInput.trans_file_name, 0, /* temperature column */
+                                            1,                                           /* density column */
+                                            3, /* thermal conductivity column */
+                                            5 /* total number of columns */);
 
-  sigma_table_ = new GslTableInterpolator2D(_runfile.lteMixtureInput.trans_file_name,
-                                            0,  /* temperature column */
-                                            1,  /* density column */
-                                            4,  /* electrical conductivity column */
-                                            5   /* total number of columns */ );
+  sigma_table_ = new GslTableInterpolator2D(_runfile.lteMixtureInput.trans_file_name, 0, /* temperature column */
+                                            1,                                           /* density column */
+                                            4, /* electrical conductivity column */
+                                            5 /* total number of columns */);
 #else
   mu_table_ = NULL;
   kappa_table_ = NULL;
@@ -68,9 +64,8 @@ LteTransport::~LteTransport() {
   delete mu_table_;
 }
 
-void LteTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
-                                                  const Vector &Efield, Vector &transportBuffer,
-                                                  DenseMatrix &diffusionVelocity) {
+void LteTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
+                                                  Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
   const double rho = state[0];
   const double T = mixture->ComputeTemperature(state);
 
@@ -85,10 +80,10 @@ void LteTransport::ComputeFluxTransportProperties(const Vector &state, const Den
   diffusionVelocity = 0.0;
 }
 
-void LteTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up,
-                                                    const DenseMatrix &gradUp, const Vector &Efield,
-                                                    Vector &globalTransport, DenseMatrix &speciesTransport,
-                                                    DenseMatrix &diffusionVelocity, Vector &n_sp) {
+void LteTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
+                                                    const Vector &Efield, Vector &globalTransport,
+                                                    DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
+                                                    Vector &n_sp) {
   globalTransport.SetSize(SrcTrns::NUM_SRC_TRANS);
   speciesTransport.SetSize(numSpecies, SpeciesTrns::NUM_SPECIES_COEFFS);
   n_sp.SetSize(numSpecies);
