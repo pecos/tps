@@ -3035,9 +3035,9 @@ void M2ulPhyS::packUpGasMixtureInput() {
     }  // switch gasModel
   } else if (config.workFluid == LTE_FLUID) {
     config.lteMixtureInput.f = config.workFluid;
-    //config.lteMixtureInput.thermo_file_name // already set in parseFluidPreset
-    assert(config.numSpecies == 1); // inconsistent to specify lte and carry species
-    assert(!config.twoTemperature); // inconsistent to specify lte and have two temperatures
+    // config.lteMixtureInput.thermo_file_name // already set in parseFluidPreset
+    assert(config.numSpecies == 1);  // inconsistent to specify lte and carry species
+    assert(!config.twoTemperature);  // inconsistent to specify lte and have two temperatures
   }
 }
 

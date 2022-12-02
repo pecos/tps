@@ -90,7 +90,7 @@ void M2ulPhyS::initMasaHandler() {
 void M2ulPhyS::projectExactSolution(const double _time, ParGridFunction *prjU) {
   void (*exactSolnFunction)(const Vector &, double, Vector &);
 
-  if (config.workFluid == DRY_AIR) {
+  if (config.workFluid == DRY_AIR || config.workFluid == LTE_FLUID) {
     if (dim == 2) {
       exactSolnFunction = &(dryair2d::exactSolnFunction);
     } else {
@@ -106,7 +106,7 @@ void M2ulPhyS::projectExactSolution(const double _time, ParGridFunction *prjU) {
 }
 
 void M2ulPhyS::initMMSCoefficients() {
-  if (config.workFluid == DRY_AIR) {
+  if (config.workFluid == DRY_AIR || config.workFluid == LTE_FLUID) {
     DenMMS_ = new VectorFunctionCoefficient(1, &(dryair3d::exactDenFunction));
     VelMMS_ = new VectorFunctionCoefficient(dim, &(dryair3d::exactVelFunction));
     PreMMS_ = new VectorFunctionCoefficient(1, &(dryair3d::exactPreFunction));
@@ -139,7 +139,7 @@ void M2ulPhyS::checkSolutionError(const double _time, const bool final) {
   mixture->UpdatePressureGridFunction(press, Up);
 
   // and dump error before we take any steps
-  if (config.workFluid == DRY_AIR) {
+  if (config.workFluid == DRY_AIR || config.workFluid == LTE_FLUID) {
     DenMMS_->SetTime(_time);
     VelMMS_->SetTime(_time);
     PreMMS_->SetTime(_time);
@@ -349,7 +349,7 @@ void exactPreFunction(const Vector &x, double tin, Vector &y) {
 
 void initEuler3DTransient(const int dim, RunConfiguration &config) {
   assert(dim == 3);
-  assert(config.workFluid == DRY_AIR);
+  assert(config.workFluid == DRY_AIR || config.workFluid == LTE_FLUID);
   assert(config.GetEquationSystem() == EULER);
   assert(config.mms_name_ == "euler_transient_3d");
 
