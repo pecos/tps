@@ -155,9 +155,9 @@ void TableInterpolator2D::resize(unsigned int nx, unsigned int ny) {
 GslTableInterpolator2D::GslTableInterpolator2D(std::string plato_file, int xcol, int ycol, int fcol, int ncol)
     : TableInterpolator2D(), itype_(gsl_interp2d_bilinear) {
   // assert that incoming sizes make sense
-  assert( xcol >= 0 && xcol < ncol);
-  assert( ycol >= 0 && ycol < ncol);
-  assert( fcol >= 0 && fcol < ncol);
+  assert(xcol >= 0 && xcol < ncol);
+  assert(ycol >= 0 && ycol < ncol);
+  assert(fcol >= 0 && fcol < ncol);
 
   // open plato file
   FILE *table_input_file;

@@ -67,22 +67,19 @@ class LteTransport : public TransportProperties {
 
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
                                               Vector &transportBuffer, DenseMatrix &diffusionVelocity);
-  virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                              const double *Efield, double *transportBuffer,
-                                              double *diffusionVelocity) {
+  virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp, const double *Efield,
+                                              double *transportBuffer, double *diffusionVelocity) {
     mfem_error("This variant of LteTransport::ComputeFluxTransportProperties is not implemented\n");
   }
   virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
                                                 const Vector &Efield, Vector &globalTransport,
                                                 DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
                                                 Vector &n_sp);
-  virtual void ComputeSourceTransportProperties(const double *state, const double *Up,
-                                                const double *gradUp, const double *Efield,
-                                                double *globalTransport, double *speciesTransport,
+  virtual void ComputeSourceTransportProperties(const double *state, const double *Up, const double *gradUp,
+                                                const double *Efield, double *globalTransport, double *speciesTransport,
                                                 double *diffusionVelocity, double *n_sp) {
     mfem_error("This variant of LteTransport::ComputeSourceTransportProperties is not implemented\n");
   }
-
 
   virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc);
 };

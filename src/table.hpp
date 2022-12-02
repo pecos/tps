@@ -142,7 +142,7 @@ class GslTableInterpolator2D : public TableInterpolator2D {
   gsl_interp_accel *xacc_, *yacc_;
 
  public:
-  GslTableInterpolator2D(std::string plato_file, int xcol, int ycol, int fcol, int ncol=11);
+  GslTableInterpolator2D(std::string plato_file, int xcol, int ycol, int fcol, int ncol = 11);
   GslTableInterpolator2D(unsigned int nx, unsigned int ny, const double *xdata, const double *ydata,
                          const double *fdata);
   virtual ~GslTableInterpolator2D();
