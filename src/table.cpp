@@ -152,8 +152,13 @@ void TableInterpolator2D::resize(unsigned int nx, unsigned int ny) {
  *
  * Reads data from plato_file
  */
-GslTableInterpolator2D::GslTableInterpolator2D(std::string plato_file, int xcol, int ycol, int fcol)
+GslTableInterpolator2D::GslTableInterpolator2D(std::string plato_file, int xcol, int ycol, int fcol, int ncol)
     : TableInterpolator2D(), itype_(gsl_interp2d_bilinear) {
+  // assert that incoming sizes make sense
+  assert( xcol >= 0 && xcol < ncol);
+  assert( ycol >= 0 && ycol < ncol);
+  assert( fcol >= 0 && fcol < ncol);
+
   // open plato file
   FILE *table_input_file;
   table_input_file = fopen(plato_file.c_str(), "r");
@@ -171,12 +176,15 @@ GslTableInterpolator2D::GslTableInterpolator2D(std::string plato_file, int xcol,
   resize(nxt, nyt);
 
   // read data
-  double ftmp[11];
+  char stmp;
+  double *ftmp = new double[ncol];
   for (unsigned int jj = 0; jj < ny_; ++jj) {
     for (unsigned int ii = 0; ii < nx_; ++ii) {
-      ierr = fscanf(table_input_file, "%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf\n", &ftmp[0], &ftmp[1], &ftmp[2],
-                    &ftmp[3], &ftmp[4], &ftmp[5], &ftmp[6], &ftmp[7], &ftmp[8], &ftmp[9], &ftmp[10]);
-      assert(ierr == 11);
+      ierr = 0;
+      for (int c = 0; c < ncol; ++c) {
+        ierr += fscanf(table_input_file, "%lf", &ftmp[c]);
+      }
+      assert(ierr == ncol);
 
       // NB: We assume that ftmp[xcol] is same for each jj
       xdata_[ii] = ftmp[xcol];
@@ -184,6 +192,8 @@ GslTableInterpolator2D::GslTableInterpolator2D(std::string plato_file, int xcol,
       fdata_[jj * nx_ + ii] = ftmp[fcol];
     }
   }
+
+  delete[] ftmp;
 
   // close file
   fclose(table_input_file);

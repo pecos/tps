@@ -3,6 +3,7 @@
 #include "dataStructures.hpp"
 #include "run_configuration.hpp"
 #include "lte_mixture.hpp"
+#include "lte_transport_properties.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -108,14 +109,59 @@ int checkTemperature(LteMixture *lte_mix, double rtol) {
   return ierr;
 }
 
+int checkTransport(LteTransport *lte_trans, LteMixture *lte_mix, double rtol) {
+  int ierr = 0;
+
+  // low T case
+  {
+    double rho = 1.225; // transport props for this test do not actually depend on density
+    double T = 350.0;
+    Vector Up(5);
+    Up = 0.;
+    Up[0] = rho;
+    Up[4] = T;
+
+    Vector U;
+    lte_mix->GetConservativesFromPrimitives(Up, U);
+
+    DenseMatrix gradUp(5,3);
+    Vector E(3);
+
+    Vector transport;
+    DenseMatrix diffusion;
+
+    lte_trans->ComputeFluxTransportProperties(U, gradUp, E, transport, diffusion);
+
+    const double muexact = 2.0656339881365003e-05;
+    const double mu = transport[FluxTrns::VISCOSITY];
+
+    if (std::abs(mu - muexact)/muexact > rtol) {
+      std::cout << "Incorrect viscosity at rho = " << rho << ", T = " << T << std::endl;
+      ierr += 1;
+    }
+  }
+
+  return ierr;
+}
+
 int main (int argc, char *argv[]) {
   int ierr = 0;
   double rtol = 10. * std::numeric_limits<double>::epsilon();
 
+  // Need a minimal configuration
   RunConfiguration config;
   config.lteMixtureInput.f = LTE_FLUID;
   config.lteMixtureInput.thermo_file_name = "./inputs/argon_lte_thermo_table.dat";
 
+  // NB: This transport file is inconsistent with the mixture thermo
+  // file.  It is ok here b/c the tests don't require consistency, but
+  // obviously any real simulation should be run with consistent
+  // transport and thermo
+  config.lteMixtureInput.trans_file_name = "./inputs/air_simple_transport_table.dat";
+
+  //-------------------------------------------------------------------
+  // Spot check mixture class
+  //-------------------------------------------------------------------
   LteMixture *lte_mix = new LteMixture(config, 3, 3);
 
   // check that we can compute pressure from rho and T
@@ -124,6 +170,17 @@ int main (int argc, char *argv[]) {
   // check that we can compute temperature from conserved state
   ierr += checkTemperature(lte_mix, rtol);
 
+  //-------------------------------------------------------------------
+  // Spot check transport class
+  //-------------------------------------------------------------------
+  LteTransport *lte_trans = new LteTransport(lte_mix, config);
+
+  // check that we can compute transport
+  ierr += checkTransport(lte_trans, lte_mix, rtol);
+
+  // clean up
+  delete lte_trans;
   delete lte_mix;
+
   return ierr;
 }

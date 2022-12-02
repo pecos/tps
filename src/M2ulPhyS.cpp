@@ -2172,6 +2172,9 @@ void M2ulPhyS::parseFluidPreset() {
     std::string thermo_file;
     tpsP->getRequiredInput("flow/lte/thermo_table", thermo_file);
     config.lteMixtureInput.thermo_file_name = thermo_file;
+    std::string trans_file;
+    tpsP->getRequiredInput("flow/lte/transport_table", trans_file);
+    config.lteMixtureInput.trans_file_name = trans_file;
   } else {
     grvy_printf(GRVY_ERROR, "\nUnknown fluid preset supplied at runtime -> %s", fluidTypeStr.c_str());
     exit(ERROR);
