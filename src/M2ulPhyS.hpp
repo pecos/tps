@@ -66,6 +66,7 @@ class Tps;
 #include "io.hpp"
 #include "logger.hpp"
 #include "lte_mixture.hpp"
+#include "lte_transport_properties.hpp"
 #include "mpi_groups.hpp"
 #include "radiation.hpp"
 #include "rhs_operator.hpp"
