@@ -945,7 +945,7 @@ MASA_forcings::MASA_forcings(const int &_dim, const int &_num_equation, const in
                    _config.isAxisymmetric()) {
   // NOTE: This has been taken care of by M2ulPhyS.masaHandler_.
   // initMasaHandler("forcing", dim, _config.GetEquationSystem(), _config.GetViscMult(), _config.mms_name_);
-  if (_config.workFluid == DRY_AIR) {
+  if (_config.workFluid == DRY_AIR || _config.workFluid == LTE_FLUID) {
     switch (dim) {
       case 2: {
         evaluateForcing_ = &(dryair2d::evaluateForcing);

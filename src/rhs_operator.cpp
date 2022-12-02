@@ -121,7 +121,11 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
     }
   }
   // NOTE: check if this logic is sound
-  if (_config.GetWorkingFluid() != WorkingFluid::DRY_AIR) {
+  // TODO(trevilo): right now can't use SoureTerm with LTE_FLUID,
+  // since the chemistry is NULL.  Need to generalized SourceTerm so
+  // that it can handle this case, b/c need to be able to account for
+  // radiation, even in LTE case.
+  if (_config.GetWorkingFluid() != WorkingFluid::DRY_AIR && _config.GetWorkingFluid() != WorkingFluid::LTE_FLUID) {
     forcing.Append(new SourceTerm(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up, gradUp, gpuArrays,
                                   _config, mixture, d_mixture_, _transport, _chemistry, _radiation,
                                   plasma_conductivity_));
