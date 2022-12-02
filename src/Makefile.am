@@ -35,7 +35,8 @@ cxx_sources          = averaging_and_rms.cpp faceGradientIntegration.cpp M2ulPhy
 	               sbp_integrators.cpp equation_of_state.cpp transport_properties.cpp inletBC.cpp outletBC.cpp utils.cpp io.cpp \
 		       dgNonlinearForm.cpp gradients.cpp gradNonLinearForm.cpp quasimagnetostatic.cpp tps.cpp chemistry.cpp \
                        reaction.cpp collision_integrals.cpp argon_transport.cpp source_term.cpp gpu_constructor.cpp \
-                       independent_coupling.cpp cycle_avg_joule_coupling.cpp table.cpp radiation.cpp lte_mixture.cpp
+                       independent_coupling.cpp cycle_avg_joule_coupling.cpp table.cpp radiation.cpp lte_mixture.cpp \
+                       lte_transport_properties.cpp
 
 mfem_extra_sources   = ../utils/mfem_extras/pfem_extras.cpp
 
@@ -46,7 +47,8 @@ headers              = averaging_and_rms.hpp equation_of_state.hpp transport_pro
 		       dgNonlinearForm.hpp gradNonLinearForm.hpp dataStructures.hpp utils.hpp io.hpp em_options.hpp \
 		       quasimagnetostatic.hpp gradients.hpp logger.hpp solver.hpp tps.hpp chemistry.hpp reaction.hpp \
 	               collision_integrals.hpp argon_transport.hpp source_term.hpp tps_mfem_wrap.hpp gpu_constructor.hpp \
-                       independent_coupling.hpp cycle_avg_joule_coupling.hpp table.hpp radiation.hpp lte_mixture.hpp
+                       independent_coupling.hpp cycle_avg_joule_coupling.hpp table.hpp radiation.hpp lte_mixture.hpp \
+                       lte_transport_properties.hpp
 
 mfem_extra_headers   = ../utils/mfem_extras/pfem_extras.hpp
 

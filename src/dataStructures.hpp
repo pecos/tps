@@ -70,7 +70,7 @@ enum WorkingFluid { DRY_AIR, USER_DEFINED, LTE_FLUID };
 // These are the type of EquationOfState.
 enum GasModel { /* PERFECT_SINGLE, */ PERFECT_MIXTURE, /* CANTERA, */ NUM_GASMODEL };
 
-enum TransportModel { ARGON_MINIMAL, ARGON_MIXTURE, CONSTANT, NUM_TRANSPORTMODEL };
+enum TransportModel { ARGON_MINIMAL, ARGON_MIXTURE, CONSTANT, LTE_TRANSPORT, NUM_TRANSPORTMODEL };
 
 enum ChemistryModel { /* CANTERA, */ NUM_CHEMISTRYMODEL };
 
@@ -355,6 +355,7 @@ struct PerfectMixtureInput {
 struct LteMixtureInput {
   WorkingFluid f;
   std::string thermo_file_name;
+  std::string trans_file_name;
 };
 
 struct ArgonTransportInput {
