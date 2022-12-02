@@ -125,14 +125,17 @@ Averaging::~Averaging() {
 void Averaging::addSampleMean(const int &iter) {
   if (computeMean) {
     
-    if (iter % sampleInterval == 0 && iter >= startMean) {
+    if (iter % sampleInterval == 0 && iter >= startMean) {      
       if (iter == startMean && groupsMPI->getSession()->Root()) cout << "Starting mean calculation." << endl;
+
+      samplesMean++;      
+      
 #ifdef _GPU_
       addSample_gpu(meanUp, rms, samplesMean, mixture, Up, fes->GetNDofs(), dim, num_equation);
 #else
       addSample_cpu();
 #endif
-      samplesMean++;
+      //samplesMean++;  This should be incremented BEFORE addSample
     }
     
     /*
@@ -169,12 +172,14 @@ void Averaging::addSample_cpu() {
     // mean
     for (int eq = 0; eq < num_equation; eq++) {
       double mVal = double(samplesMean) * dataMean[n + eq * dof];
-      dataMean[n + eq * dof] = (mVal + iUp[eq]) / double(samplesMean + 1);
+      //dataMean[n + eq * dof] = (mVal + iUp[eq]) / double(samplesMean + 1);
+      dataMean[n + eq * dof] = (mVal + iUp[eq]) / double(samplesMean);
 
       // pressure-temperature change
       if (eq == dim + 1) {
         double p = mixture->ComputePressureFromPrimitives(iUp);
-        dataMean[n + eq * dof] = (mVal + p) / double(samplesMean + 1);
+        //dataMean[n + eq * dof] = (mVal + p) / double(samplesMean + 1);
+	dataMean[n + eq * dof] = (mVal + p) / double(samplesMean);
       }
     }
 
