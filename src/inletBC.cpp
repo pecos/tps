@@ -89,7 +89,7 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
   hmeanUp[1] = 60;
   hmeanUp[2] = 0;
   if (nvel_ == 3) hmeanUp[3] = 0.;
-  hmeanUp[1 + nvel_] = 101300;
+  hmeanUp[1 + nvel_] = 300.0;  // 101300;
   if (eqSystem == NS_PASSIVE) {
     hmeanUp[num_equation_ - 1] = 0.;
   } else if (numActiveSpecies_ > 0) {

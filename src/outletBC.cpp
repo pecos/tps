@@ -71,7 +71,7 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
   hmeanUp[1] = 60;
   hmeanUp[2] = 0;
   if (nvel_ == 3) hmeanUp[3] = 0.;
-  hmeanUp[1 + nvel_] = 101300;
+  hmeanUp[1 + nvel_] = 300.0;  // 101300;
   if (eqSystem == NS_PASSIVE) hmeanUp[num_equation_ - 1] = 0.;
 
   area_ = 0.;

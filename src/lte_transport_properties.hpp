@@ -77,9 +77,7 @@ class LteTransport : public TransportProperties {
                                                 Vector &n_sp);
   virtual void ComputeSourceTransportProperties(const double *state, const double *Up, const double *gradUp,
                                                 const double *Efield, double *globalTransport, double *speciesTransport,
-                                                double *diffusionVelocity, double *n_sp) {
-    mfem_error("This variant of LteTransport::ComputeSourceTransportProperties is not implemented\n");
-  }
+                                                double *diffusionVelocity, double *n_sp);
 
   virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc);
 };
