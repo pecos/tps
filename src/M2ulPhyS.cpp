@@ -334,10 +334,11 @@ void M2ulPhyS::initVariables() {
       }
       break;
     case WorkingFluid::LTE_FLUID:
-      mixture = new LteMixture(config, dim, nvel);
-      transportPtr = new LteTransport(mixture, config);
 #if defined(_GPU_)
       mfem_error("LTE_FLUID not supported for GPU.");
+#else
+      mixture = new LteMixture(config, dim, nvel);
+      transportPtr = new LteTransport(mixture, config);
 #endif
       break;
     default:
