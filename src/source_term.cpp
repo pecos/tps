@@ -141,37 +141,42 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
       Te = Th;
     }
 
-    double kfwd[gpudata::MAXREACTIONS], kC[gpudata::MAXREACTIONS];
-    _chemistry->computeForwardRateCoeffs(Th, Te, kfwd);
-    _chemistry->computeEquilibriumConstants(Th, Te, kC);
-
-    // get reaction rates
     double progressRates[gpudata::MAXREACTIONS], creationRates[gpudata::MAXSPECIES];
-    for (int r = 0; r < _numReactions; r++) progressRates[r] = 0.0;
-    for (int sp = 0; sp < _numSpecies; sp++) creationRates[sp] = 0.0;
+    if (_numSpecies > 1 && _numReactions > 0) {
+      double kfwd[gpudata::MAXREACTIONS], kC[gpudata::MAXREACTIONS];
+      _chemistry->computeForwardRateCoeffs(Th, Te, kfwd);
+      _chemistry->computeEquilibriumConstants(Th, Te, kC);
 
-    _chemistry->computeProgressRate(ns, kfwd, kC, progressRates);
-    _chemistry->computeCreationRate(progressRates, creationRates);
+      // get reaction rates
+      for (int r = 0; r < _numReactions; r++) progressRates[r] = 0.0;
+      for (int sp = 0; sp < _numSpecies; sp++) creationRates[sp] = 0.0;
 
-    // add species creation rates
-    for (int sp = 0; sp < _numActiveSpecies; sp++) {
-      srcTerm[2 + _nvel + sp] += creationRates[sp];
-    }
+      _chemistry->computeProgressRate(ns, kfwd, kC, progressRates);
+      _chemistry->computeCreationRate(progressRates, creationRates);
 
-    // Terms required for EM-coupling.
-    double Jd[gpudata::MAXDIM];  // diffusion current.
-    for (int v = 0; v < _nvel; v++) Jd[v] = 0.0;
-    if (_mixture->IsAmbipolar()) {  // diffusion current using electric conductivity.
-      // const double mho = globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY);
-      // Jd = mho * Efield
-      if (h_pc != NULL) h_pc[n] = globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY];
-
-    } else {  // diffusion current by definition.
-      for (int sp = 0; sp < _numSpecies; sp++) {
-        for (int d = 0; d < _nvel; d++)
-          Jd[d] += diffusionVelocity[sp + d * _numSpecies] * ns[sp] * MOLARELECTRONCHARGE *
-                   _mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+      // add species creation rates
+      for (int sp = 0; sp < _numActiveSpecies; sp++) {
+        srcTerm[2 + _nvel + sp] += creationRates[sp];
       }
+
+      // Terms required for EM-coupling.
+      double Jd[gpudata::MAXDIM];  // diffusion current.
+      for (int v = 0; v < _nvel; v++) Jd[v] = 0.0;
+      if (_mixture->IsAmbipolar()) {  // diffusion current using electric conductivity.
+        // const double mho = globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY);
+        // Jd = mho * Efield
+        if (h_pc != NULL) h_pc[n] = globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY];
+
+      } else {  // diffusion current by definition.
+        for (int sp = 0; sp < _numSpecies; sp++) {
+          for (int d = 0; d < _nvel; d++)
+            Jd[d] += diffusionVelocity[sp + d * _numSpecies] * ns[sp] * MOLARELECTRONCHARGE *
+                     _mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+        }
+      }
+    } else {
+      // only makes sense to be here for LTE model... assert this?
+      if (h_pc != NULL) h_pc[n] = globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY];
     }
 
     // TODO(kevin): may move axisymmetric source terms to here.
