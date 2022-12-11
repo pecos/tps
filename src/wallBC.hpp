@@ -88,6 +88,7 @@ class WallBC : public BoundaryCondition {
   ~WallBC();
 
   void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius, Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux);
+  MFEM_HOST_DEVICE void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius, Vector transip, Vector &bdrFlux);
 
   virtual void initBCs();
 

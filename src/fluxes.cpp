@@ -32,15 +32,15 @@
 #include "fluxes.hpp"
 
 MFEM_HOST_DEVICE Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
-                                const int _num_equation, const int _dim, bool axisym, RunConfiguration &_config)
+                                const int _num_equation, const int _dim, bool axisym, RunConfiguration *_config)
     : mixture(_mixture),
       eqSystem(_eqSystem),
       transport(_transport),
       dim(_dim),
       nvel(axisym ? 3 : _dim),
       axisymmetric_(axisym),
-      config_(_config),            
-      num_equation(_num_equation) {}      
+      config_(_config),
+      num_equation(_num_equation) {}
 
 void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, DenseMatrix &flux) {
   switch (eqSystem) {
@@ -49,15 +49,15 @@ void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, D
       break;
     case NS:
     case NS_PASSIVE: {
-      
       DenseMatrix convF(num_equation, dim);
       ComputeConvectiveFluxes(state, convF);
 
       double x[3];
-      Vector transip(x, 3); // empty just to build
+      Vector transip(x, 3);  // empty just to build
       double delta = 0.;
-      printf("WARNING, CVF called in wrong place\n"); fflush(stdout);
-      
+      printf("WARNING, CVF called in wrong place\n");
+      fflush(stdout);
+
       DenseMatrix viscF(num_equation, dim);
       ComputeViscousFluxes(state, gradUpi, 1, transip, delta, viscF);
       for (int eq = 0; eq < num_equation; eq++) {
@@ -73,7 +73,6 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
   const bool twoTemperature = mixture->IsTwoTemperature();
 
-  // rho*u*u + P
   for (int d = 0; d < dim; d++) {
     flux(0, d) = state(d + 1);
     for (int i = 0; i < nvel; i++) {
@@ -82,7 +81,6 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
     flux(1 + d, d) += pres;
   }
 
-  // u*(e+P)/rho
   const double H = (state[1 + nvel] + pres) / state[0];
   for (int d = 0; d < dim; d++) {
     flux(1 + nvel, d) = state(d + 1) * H;
@@ -99,7 +97,6 @@ void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
     // for (int d = 0; d < dim; d++) flux(num_equation - 1, d) = state(num_equation - 1) * state(1 + d) / state(0);
   }
 }
-
 
 MFEM_HOST_DEVICE void Fluxes::ComputeConvectiveFluxes(const double *state, double *flux) const {
   double Pe = 0.0;
@@ -140,10 +137,10 @@ MFEM_HOST_DEVICE void Fluxes::ComputeConvectiveFluxes(const double *state, doubl
 
 // jump
 // TODO(kevin): check/complete axisymmetric setting for multi-component flow.
-void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip, double delta, DenseMatrix &flux) {
-
+void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip,
+                                  double delta, DenseMatrix &flux) {
   //  printf("CVF caught\n"); fflush(stdout);
-  
+
   flux = 0.;
   if (eqSystem == EULER) {
     return;
@@ -184,7 +181,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   double ke = transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY];
   double Pr_Cp = visc / k;
 
-  //double h = mesh->GetElementSize(i, 1)
+  // double h = mesh->GetElementSize(i, 1)
 
   // viscous sponge..................................
   /*
@@ -201,29 +198,30 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
     visc *= wgt;
     bulkViscosity *= wgt;
     k *= wgt;
-  } 
+  }
   */
   // ................................................
-      
+
   // subgrid scale model
-  if(config_.GetSgsModelType() > 0) {  
-     double mu_sgs = 0.;
-     if(config_.GetSgsModelType() == 1) sgsSmag(state, gradUp, delta, mu_sgs);
-     if(config_.GetSgsModelType() == 2) sgsSigma(state, gradUp, delta, mu_sgs);  
-     bulkViscosity *= (1.0 + mu_sgs/visc); 
-     visc += mu_sgs;
-     k += (mu_sgs / Pr_Cp);
+  assert(config_ != NULL);
+  if (config_->GetSgsModelType() > 0) {
+    double mu_sgs = 0.;
+    if (config_->GetSgsModelType() == 1) sgsSmag(state, gradUp, delta, mu_sgs);
+    if (config_->GetSgsModelType() == 2) sgsSigma(state, gradUp, delta, mu_sgs);
+    bulkViscosity *= (1.0 + mu_sgs / visc);
+    visc += mu_sgs;
+    k += (mu_sgs / Pr_Cp);
   }
 
   // viscous sponge
-  if (config_.linViscData.isEnabled) {
-     double wgt = 0.;
-     viscSpongePlanar(transip, wgt);
-     visc *= wgt;
-     bulkViscosity *= wgt;
-     k *= wgt;
+  if (config_->linViscData.isEnabled) {
+    double wgt = 0.;
+    viscSpongePlanar(transip, wgt);
+    visc *= wgt;
+    bulkViscosity *= wgt;
+    k *= wgt;
   }
-  
+
   if (twoTemperature) {
     for (int d = 0; d < dim; d++) {
       double qeFlux = ke * gradUp(num_equation - 1, d);
@@ -304,11 +302,10 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   }
 }
 
-MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius, Vector transip,
+MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius,
                                                    double *flux) {
-
   //  printf("CVF HD caught\n"); fflush(stdout);
-  
+
   for (int d = 0; d < dim; d++) {
     for (int eq = 0; eq < num_equation; eq++) {
       flux[eq + d * num_equation] = 0.;
@@ -433,11 +430,10 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
 }
 
 // must modify this guy to be consistent with ComputeViscousFluxes
-void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip, double delta, 
-                                     const BoundaryViscousFluxData &bcFlux, Vector &normalFlux) {
+void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip,
+                                     double delta, const BoundaryViscousFluxData &bcFlux, Vector &normalFlux) {
+  //  printf("CBdrVF caught\n"); fflush(stdout);
 
-  //  printf("CBdrVF caught\n"); fflush(stdout);  
-  
   normalFlux.SetSize(num_equation);
   normalFlux = 0.;
   if (eqSystem == EULER) {
@@ -463,12 +459,11 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
   transport->ComputeFluxTransportProperties(state, gradUp, Efield, transportBuffer, diffusionVelocity);
   double visc = transportBuffer[FluxTrns::VISCOSITY];
   double bulkViscosity = transportBuffer[FluxTrns::BULK_VISCOSITY];
-  bulkViscosity -= 2.0/3.0 * visc;
+  bulkViscosity -= 2.0 / 3.0 * visc;
   double k = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY];
   double ke = transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY];
   double Pr_Cp = visc / k;
-  
-  
+
   // viscous sponge..................................
   /*
   // make these input options
@@ -483,30 +478,31 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
     wgt *= sponge_scale;
     visc *= wgt;
     bulkViscosity *= wgt;
-    k *= wgt;    
-  } 
+    k *= wgt;
+  }
   */
   // ................................................
 
   // subgrid scale model
-  if(config_.GetSgsModelType() > 0) {  
-     double mu_sgs = 0.;
-     if(config_.GetSgsModelType() == 1) sgsSmag(state, gradUp, delta, mu_sgs);
-     if(config_.GetSgsModelType() == 2) sgsSigma(state, gradUp, delta, mu_sgs);  
-     bulkViscosity *= (1.0 + mu_sgs/visc); 
-     visc += mu_sgs;
-     k += (mu_sgs / Pr_Cp);
-  }  
+  assert(config_ != NULL);
+  if (config_->GetSgsModelType() > 0) {
+    double mu_sgs = 0.;
+    if (config_->GetSgsModelType() == 1) sgsSmag(state, gradUp, delta, mu_sgs);
+    if (config_->GetSgsModelType() == 2) sgsSigma(state, gradUp, delta, mu_sgs);
+    bulkViscosity *= (1.0 + mu_sgs / visc);
+    visc += mu_sgs;
+    k += (mu_sgs / Pr_Cp);
+  }
 
   // viscous sponge
-  if (config_.linViscData.isEnabled) {
-     double wgt = 0.;
-     viscSpongePlanar(transip, wgt);
-     visc *= wgt;
-     bulkViscosity *= wgt;
-     k *= wgt;
-  }  
-  
+  if (config_->linViscData.isEnabled) {
+    double wgt = 0.;
+    viscSpongePlanar(transip, wgt);
+    visc *= wgt;
+    bulkViscosity *= wgt;
+    k *= wgt;
+  }
+
   // Primitive viscous fluxes.
   const int primFluxSize = (twoTemperature) ? numSpecies + nvel + 2 : numSpecies + nvel + 1;
   Vector normalPrimFlux(primFluxSize);
@@ -599,7 +595,7 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
   }
 }
 
-MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius, Vector transip, 
+MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius,
                                                       const BoundaryViscousFluxData &bcFlux, double *normalFlux) {
   // normalFlux.SetSize(num_equation);
   for (int eq = 0; eq < num_equation; eq++) normalFlux[eq] = 0.;
@@ -888,7 +884,7 @@ void Fluxes::sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delt
   Smag = sqrt(2.0*Smag);
 
   // eddy viscosity with delta shift
-  l_floor = config_.GetSgsFloor();
+  l_floor = config_->GetSgsFloor();
   d_model = Cd * max(delta-l_floor,0.0);
   mu = state[0] * d_model * d_model * Smag;
   
@@ -931,7 +927,7 @@ void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double del
   }
 
   // shifted grid scale, d should really be sqrt of J^T*J
-  l_floor = config_.GetSgsFloor();
+  l_floor = config_->GetSgsFloor();
   d_model = max((delta-l_floor), sml);  
   d4 = pow(d_model,4);
   for (int j = 0; j < dim; j++) { 
@@ -1023,11 +1019,11 @@ void Fluxes::viscSpongePlanar(Vector x, double &wgt) {
   dist = 0.;  
 
   // get settings
-  for (int d = 0; d < dim; d++) normal[d] = config_.GetLinearVaryingData().normal(d);
-  for (int d = 0; d < dim; d++) point[d] = config_.GetLinearVaryingData().point0(d);
-  factor = config_.GetLinearVaryingData().viscRatio;
+  for (int d = 0; d < dim; d++) normal[d] = config_->GetLinearVaryingData().normal(d);
+  for (int d = 0; d < dim; d++) point[d] = config_->GetLinearVaryingData().point0(d);
+  factor = config_->GetLinearVaryingData().viscRatio;
   factor = max(factor, 1.0);
-  width = config_.GetLinearVaryingData().width;
+  width = config_->GetLinearVaryingData().width;
 
   // ensure normal is actually a unit normal
   for (int d = 0; d < dim; d++) Nmag += normal[d] * normal[d];

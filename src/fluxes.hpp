@@ -37,12 +37,14 @@
  */
 
 #include <tps_config.h>
+
 #include <mfem/general/forall.hpp>
+
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
+#include "run_configuration.hpp"
 #include "tps_mfem_wrap.hpp"
 #include "transport_properties.hpp"
-#include "run_configuration.hpp"
 
 using namespace mfem;
 
@@ -56,7 +58,7 @@ class Fluxes {
  private:
   GasMixture *mixture;
   Equations eqSystem;
-  RunConfiguration &config_;  
+  RunConfiguration *config_;
 
   TransportProperties *transport;
 
@@ -66,9 +68,11 @@ class Fluxes {
 
   const int num_equation;
 
+  void viscSpongePlanar(Vector x, double &wgt);
+
  public:
   MFEM_HOST_DEVICE Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
-                          const int _num_equation, const int _dim, bool axisym, RunConfiguration &_config);
+                          const int _num_equation, const int _dim, bool axisym, RunConfiguration *_config = NULL);
 
   Equations GetEquationSystem() { return eqSystem; }
 
@@ -77,18 +81,19 @@ class Fluxes {
   void ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux);
   MFEM_HOST_DEVICE void ComputeConvectiveFluxes(const double *state, double *flux) const;
 
-  void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip, double delta, DenseMatrix &flux);
-  MFEM_HOST_DEVICE void ComputeViscousFluxes(const double *state, const double *gradUp, double radius, Vector transip, double *flux);
+  void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip, double delta,
+                            DenseMatrix &flux);
+  MFEM_HOST_DEVICE void ComputeViscousFluxes(const double *state, const double *gradUp, double radius, double *flux);
 
   void sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu_sgs);
-  void sgsSigma(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu_sgs);  
+  void sgsSigma(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu_sgs);
 
-  void viscSpongePlanar(Vector x, double &wgt);
-  
+  //void viscSpongePlanar(Vector x, double &wgt);
+
   // Compute viscous flux with prescribed boundary flux.
-  void ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip, double delta, 
-                               const BoundaryViscousFluxData &bcFlux, Vector &normalFlux);
-  MFEM_HOST_DEVICE void ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius, Vector transip, 
+  void ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip,
+                               double delta, const BoundaryViscousFluxData &bcFlux, Vector &normalFlux);
+  MFEM_HOST_DEVICE void ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius,
                                                 const BoundaryViscousFluxData &bcFlux, double *normalFlux);
 
   // Compute the split fersion of the flux for SBP operations
