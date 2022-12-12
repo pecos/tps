@@ -39,8 +39,9 @@ DGNonLinearForm::DGNonLinearForm(RiemannSolver *rsolver, Fluxes *_flux, ParFinit
                                  ParFiniteElementSpace *_gradFes, ParGridFunction *_gradUp, BCintegrator *_bcIntegrator,
                                  IntegrationRules *_intRules, const int _dim, const int _num_equation,
                                  GasMixture *_mixture, const volumeFaceIntegrationArrays &_gpuArrays,
-                                 const int &_maxIntPoints, const int &_maxDofs)
-    : ParNonlinearForm(_vfes),
+                                 const int &_maxIntPoints, const int &_maxDofs, const Equations eqSys)
+    : eqSystem_(eqSys),
+      ParNonlinearForm(_vfes),
       rsolver_(rsolver),
       fluxes(_flux),
       vfes(_vfes),
@@ -311,6 +312,8 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
   const RiemannSolver *d_rsolver = rsolver_;
   Fluxes *d_flux = fluxes;
 
+  const bool d_not_euler = (eqSystem_ != EULER);
+
   // clang-format off
   MFEM_FORALL(iface, Nf,
   {
@@ -332,17 +335,6 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
       for (int eq = 0; eq < num_equation; eq++) {
         u1[eq] = d_uk_el1[eq + k * num_equation + iface * maxIntPoints * num_equation];
         u2[eq] = d_uk_el2[eq + k * num_equation + iface * maxIntPoints * num_equation];
-
-        for (int d = 0; d < dim; d++) {
-//          gradUp1[eq + d * num_equation] = d_grad_uk_el1[eq + k * num_equation + d * maxIntPoints * num_equation +
-//                                                         iface * dim * maxIntPoints * num_equation];
-//          gradUp2[eq + d * num_equation] = d_grad_uk_el2[eq + k * num_equation + d * maxIntPoints * num_equation +
-//                                                         iface * dim * maxIntPoints * num_equation];
-          gradUp1[eq + d * num_equation] = d_grad_uk_el1[eq + d * num_equation + k * dim * num_equation +
-                                                         iface * dim * maxIntPoints * num_equation];
-          gradUp2[eq + d * num_equation] = d_grad_uk_el2[eq + d * num_equation + k * dim * num_equation +
-                                                         iface * dim * maxIntPoints * num_equation];
-        }
       }
 
       // evaluate flux
@@ -361,28 +353,37 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
                          d_shapeWnor1 + offsetShape1 + maxDofs + 1 + k * (maxDofs + 1 + dim),
                          Rflux);
 
-#if defined(_CUDA_)
-      // TODO(kevin): implement radius.
-      d_flux->ComputeViscousFluxes(u1, gradUp1, 0.0, vFlux1);
-      d_flux->ComputeViscousFluxes(u2, gradUp2, 0.0, vFlux2);
-      // d_flux->ComputeViscousFluxes(d_uk_el1 + k * num_equation + iface * maxIntPoints * num_equation,
-      //             d_grad_uk_el1 + k * dim * num_equation + iface * maxIntPoints * dim * num_equation,
-      //             0.0, vFlux1);
-#elif defined(_HIP_)
-      Fluxes::viscousFlux_serial_gpu(&vFlux1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
-                                     num_equation);
-      Fluxes::viscousFlux_serial_gpu(&vFlux2[0], &u2[0], &gradUp2[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
-                                     num_equation);
-#endif
-      for (int d = 0; d < dim; d++) {
+      if (d_not_euler) {
+        // get gradient
         for (int eq = 0; eq < num_equation; eq++) {
-          vFlux1[eq + d * num_equation] = 0.5 * (vFlux1[eq + d * num_equation] + vFlux2[eq + d * num_equation]);
+          for (int d = 0; d < dim; d++) {
+            gradUp1[eq + d * num_equation] = d_grad_uk_el1[eq + d * num_equation + k * dim * num_equation +
+                                                           iface * dim * maxIntPoints * num_equation];
+            gradUp2[eq + d * num_equation] = d_grad_uk_el2[eq + d * num_equation + k * dim * num_equation +
+                                                           iface * dim * maxIntPoints * num_equation];
+          }
         }
-      }
 
-      for (int d = 0; d < dim; d++) {
-        for (int eq = 0; eq < num_equation; eq++) {
-          Rflux[eq] -= vFlux1[eq + d * num_equation] * nor[d];
+#if defined(_CUDA_)
+        // TODO(kevin): implement radius.
+        d_flux->ComputeViscousFluxes(u1, gradUp1, 0.0, vFlux1);
+        d_flux->ComputeViscousFluxes(u2, gradUp2, 0.0, vFlux2);
+#elif defined(_HIP_)
+        Fluxes::viscousFlux_serial_gpu(&vFlux1[0], &u1[0], &gradUp1[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
+                                       num_equation);
+        Fluxes::viscousFlux_serial_gpu(&vFlux2[0], &u2[0], &gradUp2[0], gamma, Rg, viscMult, bulkViscMult, Pr, dim,
+                                       num_equation);
+#endif
+        for (int d = 0; d < dim; d++) {
+          for (int eq = 0; eq < num_equation; eq++) {
+            vFlux1[eq + d * num_equation] = 0.5 * (vFlux1[eq + d * num_equation] + vFlux2[eq + d * num_equation]);
+          }
+        }
+
+        for (int d = 0; d < dim; d++) {
+          for (int eq = 0; eq < num_equation; eq++) {
+            Rflux[eq] -= vFlux1[eq + d * num_equation] * nor[d];
+          }
         }
       }
 
@@ -418,6 +419,8 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;
+
+  const bool d_not_euler = (eqSystem_ != EULER);
 
   // clang-format off
   MFEM_FORALL_2D(el, NumElemsType, maxIntPoints, 1, 1,
@@ -457,9 +460,6 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
         // set interpolation data to 0
         for (int n = 0; n < num_equation; n++) {
           uk1[n] = 0.;
-          for (int d = 0; d < dim; d++) {
-            gradUpk1[n + d * num_equation] = 0.;
-          }
         }
 
         // load shape functions
@@ -478,38 +478,60 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
             uk1[eq] += d_x[index + eq * Ndofs] * shape[j];
           }
 
-          // interpolate gradient
-          for (int d = 0; d < dim; d++) {
-            for (int j = 0; j < dof1; j++) {
-              index = indexes_i[j];
-              gradUpk1[eq + d * num_equation] += d_gradUp[index + eq * Ndofs + d * num_equation * Ndofs] * shape[j];
-            }
-          }
         }
 
         // save quad pt data to global memory
         if (swapElems) {
           for (int eq = 0; eq < num_equation; eq++) {
             d_uk_el2[eq + k * num_equation + gFace * maxIntPoints * num_equation] = uk1[eq];
-            for (int d = 0; d < dim; d++) {
-//              d_grad_uk_el2[eq + k * num_equation + d * maxIntPoints * num_equation +
-//                            gFace * dim * maxIntPoints * num_equation] = gradUpk1[eq + d * num_equation];
-              d_grad_uk_el2[eq + d * num_equation + k * dim * num_equation +
-                            gFace * maxIntPoints * dim * num_equation] = gradUpk1[eq + d * num_equation];
-            }
           }
         } else {
           for (int eq = 0; eq < num_equation; eq++) {
             d_uk_el1[eq + k * num_equation + gFace * maxIntPoints * num_equation] = uk1[eq];
-            for (int d = 0; d < dim; d++) {
-//              d_grad_uk_el1[eq + k * num_equation + d * maxIntPoints * num_equation +
-//                            gFace * dim * maxIntPoints * num_equation] = gradUpk1[eq + d * num_equation];
-              d_grad_uk_el1[eq + d * num_equation + k * dim * num_equation +
-                            gFace * dim * maxIntPoints * num_equation] = gradUpk1[eq + d * num_equation];
-            }
           }
         }
-      }   // end loop over integration points (MFEM_FOREACH_THREAD)
+
+        // if not an Euler simulation, need gradients also
+        if (d_not_euler) {
+
+          for (int n = 0; n < num_equation; n++) {
+            for (int d = 0; d < dim; d++) {
+              gradUpk1[n + d * num_equation] = 0.;
+            }
+          }
+
+          for (int eq = 0; eq < num_equation; eq++) {
+            int index;
+
+            // interpolate gradient
+            for (int d = 0; d < dim; d++) {
+              for (int j = 0; j < dof1; j++) {
+                index = indexes_i[j];
+                gradUpk1[eq + d * num_equation] += d_gradUp[index + eq * Ndofs + d * num_equation * Ndofs] * shape[j];
+              }
+            }
+          }
+
+          // save quad pt data to global memory
+          if (swapElems) {
+            for (int eq = 0; eq < num_equation; eq++) {
+              for (int d = 0; d < dim; d++) {
+                d_grad_uk_el2[eq + d * num_equation + k * dim * num_equation +
+                              gFace * maxIntPoints * dim * num_equation] = gradUpk1[eq + d * num_equation];
+              }
+            }
+          } else {
+            for (int eq = 0; eq < num_equation; eq++) {
+              for (int d = 0; d < dim; d++) {
+                d_grad_uk_el1[eq + d * num_equation + k * dim * num_equation +
+                              gFace * dim * maxIntPoints * num_equation] = gradUpk1[eq + d * num_equation];
+              }
+            }
+          }
+
+        }  // end if d_not_euler
+
+      }  // end loop over integration points (MFEM_FOREACH_THREAD)
     }  // end loop over faces
   });
   // clang-format on

@@ -324,13 +324,19 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
   initNBlockDataTransfer(*Up, vfes, transferUp);
   initNBlockDataTransfer(x, vfes, transferU);
 
-  gradients->computeGradients_domain();
+  if (eqSystem != EULER) {
+    gradients->computeGradients_domain();
+  }
   waitAllDataTransfer(vfes, transferUp);
 
-  gradients->computeGradients_bdr();
-  initNBlockDataTransfer(*gradUp, gradUpfes, transferGradUp);
+  if (eqSystem != EULER) {
+    gradients->computeGradients_bdr();
+    initNBlockDataTransfer(*gradUp, gradUpfes, transferGradUp);
+  }
 #else
-  gradients->computeGradients();
+  if (eqSystem != EULER) {
+    gradients->computeGradients();
+  }
 #endif
 
   // update boundary conditions
@@ -341,7 +347,9 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
   A->Mult_domain(x, z);
 
   waitAllDataTransfer(vfes, transferU);
-  waitAllDataTransfer(gradUpfes, transferGradUp);
+  if (eqSystem != EULER) {
+    waitAllDataTransfer(gradUpfes, transferGradUp);
+  }
   A->Mult_bdr(x, z);
 #else
   A->Mult(x, z);
@@ -560,6 +568,8 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
 
   Fluxes *d_fluxClass = fluxClass;
 
+  const bool d_not_euler = (eqSystem != EULER);
+
   MFEM_FORALL(n, dof, {
     double Un[gpudata::MAXEQUATIONS];  // double Un[20];
     double fluxn[gpudata::MAXEQUATIONS * gpudata::MAXDIM], fvisc[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
@@ -568,35 +578,46 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
 
     for (int eq = 0; eq < num_equation; eq++) {
       Un[eq] = dataIn[n + eq * dof];
-      for (int d = 0; d < dim; d++) {
-        gradUpn[eq + d * num_equation] = d_gradUp[n + eq * dof + d * num_equation * dof];
-      }
     }
 
     d_fluxClass->ComputeConvectiveFluxes(Un, fluxn);
 
-    // TODO(kevin): implement radius.
-    // Is this correct?
-    double radius = 1.0;
-    if (axisymmetric) {
-      radius = d_coord[n + 0 * dof];
-    }
+    if (d_not_euler) {
+      for (int eq = 0; eq < num_equation; eq++) {
+        for (int d = 0; d < dim; d++) {
+          gradUpn[eq + d * num_equation] = d_gradUp[n + eq * dof + d * num_equation * dof];
+        }
+      }
 
-    d_fluxClass->ComputeViscousFluxes(Un, gradUpn, radius, fvisc);
+      // TODO(kevin): implement radius.
+      // Is this correct?
+      double radius = 1.0;
+      if (axisymmetric) {
+        radius = d_coord[n + 0 * dof];
+      }
 
-    if (d_spaceVaryViscMult != NULL) {
-      linVisc = d_spaceVaryViscMult[n];
+      d_fluxClass->ComputeViscousFluxes(Un, gradUpn, radius, fvisc);
+
+      if (d_spaceVaryViscMult != NULL) {
+        linVisc = d_spaceVaryViscMult[n];
+
+        for (int d = 0; d < dim; d++) {
+          for (int eq = 0; eq < num_equation; eq++) {
+            fvisc[eq + d * num_equation] *= linVisc;
+          }
+        }
+      }
 
       for (int d = 0; d < dim; d++) {
         for (int eq = 0; eq < num_equation; eq++) {
-          fvisc[eq + d * num_equation] *= linVisc;
+          fluxn[eq + d * num_equation] -= fvisc[eq + d * num_equation];
         }
       }
     }
 
     for (int eq = 0; eq < num_equation; eq++) {
       for (int d = 0; d < dim; d++) {
-        d_flux[n + d * dof + eq * dof * dim] = fluxn[eq + d * num_equation] - fvisc[eq + d * num_equation];
+        d_flux[n + d * dof + eq * dof * dim] = fluxn[eq + d * num_equation];
       }
     }
   });
