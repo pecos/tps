@@ -1404,7 +1404,7 @@ void M2ulPhyS::solve() {
     if ((iter % config.timingFreq) == 0) {
       if (mpi.Root()) {
         double timePerIter = (grvy_timer_elapsed_global() - tlast) / config.timingFreq;
-        grvy_printf(ginfo, "Iteration = %i: wall clock time/iter = %.3f (secs)\n", iter, timePerIter);
+        grvy_printf(ginfo, "Iteration = %i: wall clock time/iter = %.3e (secs)\n", iter, timePerIter);
         tlast = grvy_timer_elapsed_global();
       }
     }
