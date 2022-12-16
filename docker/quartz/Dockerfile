@@ -109,9 +109,9 @@ RUN ldconfig
 
 # additional packages
 RUN pip3 install numpy
-RUN yum -y install pybind11-devel
-RUN yum -y install python38-devel
 RUN yum -y install perl-Data-Dumper
+
+RUN pip3 install "pybind11[global]"
 
 # load mfem by default
 RUN echo "module try-add metis" >> /etc/profile.d/lmod.sh
