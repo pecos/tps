@@ -31,3 +31,37 @@ lassen:
    - ./configure CUDA_ARCH=${CUDA_ARCH} --disable-valgrind --enable-gpu-cuda --with-cuda=${CUDA_PATH}
    - make -j 2
    - lalloc 1 -q pdebug make check
+
+tioga:
+ variables:
+   ROCM_VER: "5.4.1"
+   CCE_VER: "15.0.0c"
+   MPICH_VER: "8.1.21"
+   SW_HOME: "/usr/workspace/oliver33/tioga/sw"
+ stage: build
+ tags:
+   - tioga
+   - shell
+ script:
+   - echo "Tioga Build/Test -> ROCM ${ROCM_VER}"
+   - echo "Set up module environment"
+   - module --force purge
+   - module load StdEnv
+   - module load rocmcc-tce/${ROCM_VER}-cce-${CCE_VER}
+   - module load cray-mpich-tce/${MPICH_VER}
+   - module list
+   - echo "Set up tps dependencies"
+   - export GRVY_DIR=${SW_HOME}/grvy
+   - export METIS_DIR=${SW_HOME}/metis
+   - export HYPRE_DIR=${SW_HOME}/hypre-2.18.1
+   - export MFEM_DIR=${SW_HOME}/mfem
+   - export HDF5_DIR=${SW_HOME}/hdf5
+   - export MPI_DIR=/usr/tce/packages/cray-mpich-tce/cray-mpich-8.1.21-rocmcc-5.4.1-cce-15.0.0c
+   - export RESOLVE_CRAY_LIB=/usr/tce/packages/cce-tce/cce-15.0.0c/cce/x86_64/lib/
+   - export LD_LIBRARY_PATH=$HYPRE_DIR/lib:$METIS_DIR/lib:$LD_LIBRARY_PATH
+   - export LD_LIBRARY_PATH=$RESOLVE_CRAY_LIB:$LD_LIBRARY_PATH
+   - echo "Compiling tps"
+   - ./bootstrap
+   - ./configure CXXFLAGS="-g -O3" --enable-gpu-hip HIP_ARCH=gfx90a --without-masa --disable-valgrind
+   - make -j2
+   - flux mini run -N1 make check
