@@ -137,8 +137,6 @@ RUN yum -y install clang-tools-extra
 RUN yum -y install zlib-devel
 RUN yum -y install libcurl-devel
 RUN yum -y install python38-devel
-RUN yum -y install pybind11-devel
-RUN yum -y install python3-pybind11
 RUN yum -y install perl-Data-Dumper
 RUN yum -y install flex
 RUN yum -y install bison
@@ -147,12 +145,15 @@ RUN yum -y install bison
 RUN wget https://www.doxygen.nl/files/doxygen-1.9.5.src.tar.gz -P /tmp
 RUN cd /tmp; tar xvf /tmp/doxygen-1.9.5.src.tar.gz
 RUN . /etc/profile.d/lmod.sh \
+    && module load cmake \
     && cd /tmp/doxygen-1.9.5 \
     && cmake -G "Unix Makefiles" && make && make install
 RUN rm /tmp/doxygen-1.9.5.src.tar.gz
 
 RUN yum -y install graphviz
 RUN pip3 install gcovr
+
+RUN pip3 install "pybind11[global]"
 
 # Register new libs installed into /usr/local/lib with linker
 RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/class.conf

@@ -17,7 +17,7 @@ jobs:
          with:
            fetch-depth: 0
 #       - uses: jitterbit/get-changed-files@v1
-       - uses: Ana06/get-changed-files@v2.1.0       
+       - uses: Ana06/get-changed-files@v2.2.0       
          id: files
 #         continue-on-error: true
        - name: DockerPATH configuration
