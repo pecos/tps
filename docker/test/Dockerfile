@@ -145,6 +145,7 @@ RUN yum -y install bison
 RUN wget https://www.doxygen.nl/files/doxygen-1.9.5.src.tar.gz -P /tmp
 RUN cd /tmp; tar xvf /tmp/doxygen-1.9.5.src.tar.gz
 RUN . /etc/profile.d/lmod.sh \
+    && module load cmake \
     && cd /tmp/doxygen-1.9.5 \
     && cmake -G "Unix Makefiles" && make && make install
 RUN rm /tmp/doxygen-1.9.5.src.tar.gz
