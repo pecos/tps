@@ -39,17 +39,14 @@ if GPU_ENABLED
 TESTS += cyl3d.gpu.test \
 	 cyl3d.mflow.gpu.test \
 	 wedge.gpu.test \
-	 averages.gpu.test
-
-if PYTHON_ENABLED
-TESTS += cyl3d.gpu.python.test
-endif
-
-if CUDA_ENABLED
-TESTS += argon_minimal.binary.test \
+	 averages.gpu.test \
+	 argon_minimal.binary.test \
 	 diffusion_wall.test \
 	 reaction.test \
 	 inflow_outflow.test
+
+if PYTHON_ENABLED
+TESTS += cyl3d.gpu.python.test
 endif
 
 else
