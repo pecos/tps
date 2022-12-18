@@ -307,7 +307,6 @@ void Tps::parseInput() {
   return;
 }
 
-
 /** Read an input value for keyword [name] and store in var - use defaultValue if
  *  keyword not present.  Supported types are T={int,double,bool,std::string}
  */
@@ -395,7 +394,6 @@ void Tps::getRequiredVecElem(const char *name, double &value, int ithElem) {
   }
 #endif
 }
-
 
 void Tps::getRequiredPairs(const char *name, std::vector<pair<std::string, std::string>> &var) {
   std::string inputString;

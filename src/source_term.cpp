@@ -62,10 +62,10 @@ SourceTerm::~SourceTerm() {
 }
 
 void SourceTerm::updateTerms(mfem::Vector &in) {
-// #if defined(_HIP_)
-//   mfem_error("Source term is not supported on hip path!\n");
-//   exit(-1);
-// #endif
+  // #if defined(_HIP_)
+  //   mfem_error("Source term is not supported on hip path!\n");
+  //   exit(-1);
+  // #endif
 
   double *h_pc = NULL;
   //#if defined(_CUDA_)

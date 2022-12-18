@@ -160,12 +160,12 @@ class GasMixture {
 
   virtual double ComputePressureFromPrimitives(const Vector &Up) = 0;  // pressure from primitive variables
   MFEM_HOST_DEVICE virtual double ComputePressureFromPrimitives(const double *Up) {
-    //mfem_error("ComputePressureFromPrimitives is not implemented.");
+    // mfem_error("ComputePressureFromPrimitives is not implemented.");
     return -1.0;
   }
   virtual double ComputeTemperature(const Vector &state) = 0;
   MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state) {
-    //mfem_error("ComputeTemperature is not implemented.");
+    // mfem_error("ComputeTemperature is not implemented.");
     return -1.0;
   }
   virtual double Temperature(double *rho, double *p,
@@ -269,7 +269,7 @@ class GasMixture {
   }
   MFEM_HOST_DEVICE virtual void modifyEnergyForPressure(const double *stateIn, double *stateOut, const double &p,
                                                         bool modifyElectronEnergy = false) {
-    //mfem_error("modifyEnergyForPressure not implemented");
+    // mfem_error("modifyEnergyForPressure not implemented");
     return;
   }
 
@@ -280,7 +280,7 @@ class GasMixture {
                                                  double *outputState);
   virtual void computeSheathBdrFlux(const Vector &state, BoundaryViscousFluxData &bcFlux) = 0;
   MFEM_HOST_DEVICE virtual void computeSheathBdrFlux(const double *state, BoundaryViscousFluxData &bcFlux) {
-    //mfem_error("computeSheathBdrFlux is not implemented");
+    // mfem_error("computeSheathBdrFlux is not implemented");
     return;
   }
 
