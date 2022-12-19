@@ -106,7 +106,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
   const int _numActiveSpecies = numActiveSpecies_;
   const int _numReactions = numReactions_;
 
-#if defined(_CUDA_)
+#if defined(_GPU_)
   MFEM_FORALL(n, nnodes, {
     double upn[gpudata::MAXEQUATIONS];
     double Un[gpudata::MAXEQUATIONS];
@@ -232,7 +232,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     for (int eq = 0; eq < _num_equation; eq++) {
       h_in[n + eq * nnodes] += srcTerm[eq];
     }
-#if defined(_CUDA_)
+#if defined(_GPU_)
   });  // MFEM_FORALL(n, nnodes, {
 #else
   }  // for (int n = 0; n < nnodes; n++)

@@ -108,15 +108,23 @@ __global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int 
 __global__ void instantiateDeviceDryAirTransport(GasMixture *mixture, const double viscosity_multiplier,
                                                  const double bulk_viscosity, void *transport);
 __global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, void *mix);
+__global__ void instantiateDeviceConstantTransport(GasMixture *mixture, const constantTransportData inputs,
+                                                   void *trans);
+__global__ void instantiateDeviceArgonMinimalTransport(GasMixture *mixture, const ArgonTransportInput inputs,
+                                                       void *trans);
+__global__ void instantiateDeviceArgonMixtureTransport(GasMixture *mixture, const ArgonTransportInput inputs,
+                                                       void *trans);
 __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
                                         const int _num_equation, const int _dim, bool axisym, void *f);
 __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
                                          Fluxes *_fluxClass, bool _useRoe, bool axisym, void *r);
+__global__ void instantiateDeviceChemistry(GasMixture *mixture, const ChemistryInput inputs, void *chem);
 
 __global__ void freeDeviceMixture(GasMixture *mix);
 __global__ void freeDeviceTransport(TransportProperties *transport);
 __global__ void freeDeviceFluxes(Fluxes *f);
 __global__ void freeDeviceRiemann(RiemannSolver *r);
+__global__ void freeDeviceChemistry(Chemistry *chem);
 #endif
 
 // NOTE(kevin): Do not use it. For some unknown reason, this wrapper causes a memory issue, at a random place far after

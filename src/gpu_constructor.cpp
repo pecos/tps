@@ -117,6 +117,19 @@ __global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs
   mix = new (mix) PerfectMixture(inputs, _dim, nvel);
 }
 
+__global__ void instantiateDeviceConstantTransport(GasMixture *mixture, const constantTransportData inputs,
+                                                   void *trans) {
+  trans = new (trans) ConstantTransport(mixture, inputs);
+}
+__global__ void instantiateDeviceArgonMinimalTransport(GasMixture *mixture, const ArgonTransportInput inputs,
+                                                       void *trans) {
+  trans = new (trans) ArgonMinimalTransport(mixture, inputs);
+}
+__global__ void instantiateDeviceArgonMixtureTransport(GasMixture *mixture, const ArgonTransportInput inputs,
+                                                       void *trans) {
+  trans = new (trans) ArgonMixtureTransport(mixture, inputs);
+}
+
 __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
                                         const int _num_equation, const int _dim, bool axisym, void *f) {
   f = new (f) Fluxes(_mixture, _eqSystem, _transport, _num_equation, _dim, axisym);
@@ -127,12 +140,17 @@ __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture
   r = new (r) RiemannSolver(_num_equation, _mixture, _eqSystem, _fluxClass, _useRoe, axisym);
 }
 
+__global__ void instantiateDeviceChemistry(GasMixture *mixture, const ChemistryInput inputs, void *chem) {
+  chem = new (chem) Chemistry(mixture, inputs);
+}
+
 __global__ void freeDeviceMixture(GasMixture *mix) {
   mix->~GasMixture();
 }  // explicit destructor call b/c placement new above
 __global__ void freeDeviceTransport(TransportProperties *transport) { transport->~TransportProperties(); }
 __global__ void freeDeviceFluxes(Fluxes *f) { f->~Fluxes(); }
 __global__ void freeDeviceRiemann(RiemannSolver *r) { r->~RiemannSolver(); }
+__global__ void freeDeviceChemistry(Chemistry *chem) { chem->~Chemistry(); }
 
 #endif  // defined(_CUDA_)
 
