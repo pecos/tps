@@ -159,7 +159,7 @@ jobs:
       - name: VPATH make
         run:  cd build; module restore tps-gpu-cpu; make -j 2
       - name: VPATH tests
-         run:  cd build; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
+        run:  cd build; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
    distbuild:
      runs-on: ubuntu-20.04
      needs: [cpuimage]
