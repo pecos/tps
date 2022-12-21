@@ -55,20 +55,10 @@ SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_or
   enableRadiation_ = (_config.radiationInput.model != NONE_RAD);
 }
 
-SourceTerm::~SourceTerm() {
-  //   if (mixture_ != NULL) delete mixture_;
-  //   if (transport_ != NULL) delete transport_;
-  //   if (chemistry_ != NULL) delete chemistry_;
-}
+SourceTerm::~SourceTerm() {}
 
 void SourceTerm::updateTerms(mfem::Vector &in) {
-  // #if defined(_HIP_)
-  //   mfem_error("Source term is not supported on hip path!\n");
-  //   exit(-1);
-  // #endif
-
   double *h_pc = NULL;
-  //#if defined(_CUDA_)
 #ifdef _GPU_
   const double *h_Up = Up_->Read();
   const double *h_U = U_->Read();
@@ -236,7 +226,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
   });  // MFEM_FORALL(n, nnodes, {
 #else
   }  // for (int n = 0; n < nnodes; n++)
-#endif  // defined(_CUDA_)
+#endif
 }
 
 // NOTE(kevin): previous cpu routine.
