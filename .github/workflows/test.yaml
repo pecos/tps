@@ -121,19 +121,45 @@ jobs:
       - name: Bootstrap
         run:  module restore tps-gpu; ./bootstrap
       - name: Configure
-        run: module restore tps-gpu; ./configure -enable-pybind11 --enable-gpu-hip HIP_ARCH=gfx803
+        run: module restore tps-gpu; ./configure --enable-pybind11 --enable-gpu-hip HIP_ARCH=gfx803
       - name: Make
         run: module restore tps-gpu; make -j 2
-      - name: Tests
-        run: module restore tps-gpu; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
       - name: Distclean
         run:  make distclean
       - name: VPATH configure
         run:  mkdir build; cd build; module restore tps-gpu; ../configure --enable-pybind11 --enable-gpu-hip HIP_ARCH=gfx803
       - name: VPATH make
         run:  cd build; module restore tps-gpu; make -j 2
+   build-gpu-cpu:
+    runs-on: [self-hosted, linux, x64, gpu, hip]
+    name: Build/GPU-CPU
+    steps:
+      - name: Cancel previous runs
+        uses: styfle/cancel-workflow-action@0.11.0
+        with:
+          access_token: ${{ github.token }}
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          lfs: true
+      - name: Query modules loaded
+        run:  module restore tps-gpu-cpu; module list
+      - name: Bootstrap
+        run:  module restore tps-gpu-cpu; ./bootstrap
+      - name: Configure
+        run: module restore tps-gpu-cpu; ./configure --enable-pybind11 --enable-gpu-cpu
+      - name: Make
+        run: module restore tps-gpu-cpu; make -j 2
+      - name: Tests
+        run: module restore tps-gpu-cpu; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
+      - name: Distclean
+        run:  make distclean
+      - name: VPATH configure
+        run:  mkdir build; cd build; module restore tps-gpu-cpu; ../configure --enable-pybind11 --enable-gpu-cpu
+      - name: VPATH make
+        run:  cd build; module restore tps-gpu-cpu; make -j 2
       - name: VPATH tests
-        run:  cd build; module restore tps-gpu; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
+         run:  cd build; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
    distbuild:
      runs-on: ubuntu-20.04
      needs: [cpuimage]
