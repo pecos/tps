@@ -140,16 +140,8 @@ MFEM_HOST_DEVICE DryAir::DryAir(const DryAirInput inputs, int _dim, int nvel) : 
 #endif
 
   gas_constant = 287.058;
-
   specific_heat_ratio = 1.4;
-// TODO(kevin): GPU routines are not yet fully gas-agnostic. Need to be removed.
-#if defined(_HIP_)
-  visc_mult = inputs.visc_mult;
-  bulk_visc_mult = inputs.bulk_visc_mult;
-  Pr = 0.71;
-  cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
-  Sc = 0.71;
-#endif
+
   // TODO(kevin): replace Nconservative/Nprimitive.
   // add extra equation for passive scalar
   if (inputs.eq_sys == Equations::NS_PASSIVE) {
@@ -163,13 +155,6 @@ DryAir::DryAir() {
   gas_constant = 287.058;
   // gas_constant = 1.; // for comparison against ex18
   specific_heat_ratio = 1.4;
-// TODO(kevin): GPU routines are not yet fully gas-agnostic. Need to be removed.
-#ifdef _GPU_
-  visc_mult = 1.;
-  Pr = 0.71;
-  cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
-  Sc = 0.71;
-#endif
 }
 
 // DryAir::DryAir(int _dim, int _num_equation) {
