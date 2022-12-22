@@ -38,7 +38,7 @@
 #ifndef _GPU_  // this class only available for CPU currently
 
 LteMixture::LteMixture(RunConfiguration &_runfile, int _dim, int nvel)
-    : GasMixture(_runfile.lteMixtureInput.f, _dim, nvel) {
+    : GasMixture(_runfile.lteMixtureInput.f, _dim, nvel, _runfile.const_plasma_conductivity_) {
   numSpecies = 1;
   ambipolar = false;
   twoTemperature_ = false;
