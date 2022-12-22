@@ -1315,6 +1315,9 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   if (spaceVaryViscMult != NULL) paraviewColl->RegisterField("viscMult", spaceVaryViscMult);
 
+  if (plasma_conductivity_ != NULL) paraviewColl->RegisterField("sigma", plasma_conductivity_);
+  if (joule_heating_ != NULL) paraviewColl->RegisterField("Sjoule", joule_heating_);
+
   paraviewColl->SetOwnData(true);
   // paraviewColl->Save();
 }
@@ -1374,7 +1377,10 @@ void M2ulPhyS::projectInitialSolution() {
 
   // update plasma electrical conductivity
   if (tpsP->isFlowEMCoupled()) {
-    mixture->SetConstantPlasmaConductivity(plasma_conductivity_, Up);
+    ParGridFunction *coordsDof = new ParGridFunction(dfes);
+    mesh->GetNodes(*coordsDof);
+    mixture->SetConstantPlasmaConductivity(plasma_conductivity_, Up, coordsDof);
+    delete coordsDof;
   }
 
   if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
@@ -2015,6 +2021,8 @@ void M2ulPhyS::parseSolverOptions2() {
     parsePlasmaModels();
   } else {
     // parse options for other plasma presets.
+    //printf("Setting plasma conductivity to 50!\n"); fflush(stdout);
+    config.const_plasma_conductivity_ = 50.0;
   }
 
   // species list.
