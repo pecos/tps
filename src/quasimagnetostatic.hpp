@@ -84,6 +84,8 @@ class QuasiMagnetostaticSolverBase : public TPS::Solver {
 
   virtual double elementJouleHeating(const FiniteElement &el, ElementTransformation &Tr, const Vector &elfun) = 0;
   virtual double totalJouleHeating() = 0;
+
+  void scaleJouleHeating(const double val) { (*joule_heating_) *= val; }
 };
 
 /** Helper class for Joule heating evaluation
