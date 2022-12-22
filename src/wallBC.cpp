@@ -319,6 +319,8 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
     bdrFlux[eq] -= 0.5 * wallViscF(eq);
     for (int d = 0; d < dim_; d++) bdrFlux[eq] -= 0.5 * viscF(eq, d) * normal[d];
   }
+
+  bdrFlux[0] = 0.;
 }
 
 void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
@@ -356,6 +358,8 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
     bdrFlux[eq] -= 0.5 * wallViscF(eq);
     for (int d = 0; d < dim_; d++) bdrFlux[eq] -= 0.5 * viscF(eq, d) * normal[d];
   }
+
+  bdrFlux[0] = 0.;
 }
 
 void WallBC::computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
@@ -389,6 +393,8 @@ void WallBC::computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix
     bdrFlux[eq] -= 0.5 * wallViscF(eq);
     for (int d = 0; d < dim_; d++) bdrFlux[eq] -= 0.5 * viscF(eq, d) * normal[d];
   }
+
+  bdrFlux[0] = 0.;
 }
 
 void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
