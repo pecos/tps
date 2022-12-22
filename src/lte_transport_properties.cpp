@@ -96,14 +96,17 @@ void LteTransport::ComputeSourceTransportProperties(const Vector &state, const V
   for (int v = 0; v < nvel_; v++)
     for (int sp = 0; sp < numSpecies; sp++) diffusionVelocity(sp, v) = 0.0;
 
-  // TODO(trevilo): Compute conductivity!
-  globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] = 0.;
+  const double rho = Up[0];
+  const double T = Up[1 + nvel_];
+  globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] = sigma_table_->eval(T, rho);
 }
 
 void LteTransport::ComputeSourceTransportProperties(const double *state, const double *Up, const double *gradUp,
                                                     const double *Efield, double *globalTransport,
                                                     double *speciesTransport, double *diffusionVelocity, double *n_sp) {
-  globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] = 0.;
+  const double rho = Up[0];
+  const double T = Up[1 + nvel_];
+  globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] = sigma_table_->eval(T, rho);
 }
 
 void LteTransport::GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc) {
