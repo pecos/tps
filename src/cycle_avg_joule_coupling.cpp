@@ -242,6 +242,13 @@ void CycleAvgJouleCoupling::solve() {
   int curr_iter = flow_solver_->getCurrentIterations();
   flow_solver_->setMaximumIterations(curr_iter + increment);
 
+  flow_solver_->setConstantPlasmaConductivityGF();
+
+  // flow_solver_->setMaximumIterations(curr_iter + 1);
+
+  // // take 1 step (just to evaluate the conductivity)
+  // flow_solver_->solve();
+
   for (int outer_iters = 0; outer_iters < max_outer_iters_; outer_iters++) {
     // EM
     interpConductivityFromFlowToEM();
@@ -251,12 +258,52 @@ void CycleAvgJouleCoupling::solve() {
       grvy_printf(GRVY_INFO, "The total input Joule heating = %.6e\n", tot_jh);
     }
 
-    // flow
+    // first 1 M after cold flow
+    //double targetPower = 30. + 30. * outer_iters;
+    //double targetPower = 6000. + 30. * outer_iters;
+    double targetPower = 10500. + 30. * outer_iters;
+
+    // if (targetPower > 30000) {
+    //   targetPower = 30000.;
+    // }
+
+    //double targetPower = 30000.;
+    //double targetPower = 20000.;
+    //double targetPower = 10000.;
+    const double ratio = targetPower / tot_jh;
+
+    qmsa_solver_->scaleJouleHeating(ratio);
+    const double upd_jh = qmsa_solver_->totalJouleHeating();
+    if (mpi_.Root()) {
+      grvy_printf(GRVY_INFO, "The total input Joule heating after scaling = %.6e\n", upd_jh);
+    }
+
+        // flow
     interpJouleHeatingFromEMToFlow();
     flow_solver_->solve();
 
     // update max solver iters so that on the next time through the flow solver does something
     curr_iter = flow_solver_->getCurrentIterations();
     flow_solver_->setMaximumIterations(curr_iter + increment);
+
+    flow_solver_->setConstantPlasmaConductivityGF();
   }
+
+  // for (int outer_iters = 0; outer_iters < max_outer_iters_; outer_iters++) {
+  //   // EM
+  //   interpConductivityFromFlowToEM();
+  //   qmsa_solver_->solve();
+  //   const double tot_jh = qmsa_solver_->totalJouleHeating();
+  //   if (mpi_.Root()) {
+  //     grvy_printf(GRVY_INFO, "The total input Joule heating = %.6e\n", tot_jh);
+  //   }
+
+  //   // flow
+  //   interpJouleHeatingFromEMToFlow();
+  //   flow_solver_->solve();
+
+  //   // update max solver iters so that on the next time through the flow solver does something
+  //   curr_iter = flow_solver_->getCurrentIterations();
+  //   flow_solver_->setMaximumIterations(curr_iter + increment);
+  // }
 }
