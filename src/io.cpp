@@ -359,13 +359,13 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
     // that code is duplicated here.
     // TODO(kevin): use mixture comptue primitive.
     double *dataUp = Up->HostReadWrite();
-    double *x = U->HostReadWrite();
+    const double *x = U->HostRead();
     for (int i = 0; i < vfes->GetNDofs(); i++) {
-      Vector iState(num_equation);
-      Vector conservedState(num_equation);
-      for (int eq = 0; eq < num_equation; eq++) iState[eq] = x[i + eq * vfes->GetNDofs()];
-      mixture->GetConservativesFromPrimitives(iState, conservedState);
-      for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * vfes->GetNDofs()] = conservedState[eq];
+      Vector conserved(num_equation);
+      Vector primitive(num_equation);
+      for (int eq = 0; eq < num_equation; eq++) conserved[eq] = x[i + eq * vfes->GetNDofs()];
+      mixture->GetPrimitivesFromConservatives(conserved, primitive);
+      for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * vfes->GetNDofs()] = primitive[eq];
     }
 
     // clean up aux data
