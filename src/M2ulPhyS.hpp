@@ -430,6 +430,13 @@ class M2ulPhyS : public TPS::Solver {
 
   static int Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_print);
 
+  void setConstantPlasmaConductivityGF() {
+    ParGridFunction *coordsDof = new ParGridFunction(dfes);
+    mesh->GetNodes(*coordsDof);
+    mixture->SetConstantPlasmaConductivity(plasma_conductivity_, Up, coordsDof);
+    delete coordsDof;
+  }
+
   // Exit code access
   void SetStatus(int code) {
     exit_status_ = code;

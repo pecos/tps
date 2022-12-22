@@ -267,7 +267,7 @@ class GasMixture {
     mfem_error("computeNumberDensities not implemented");
   }
 
-  void SetConstantPlasmaConductivity(ParGridFunction *pc, const ParGridFunction *Up);
+  void SetConstantPlasmaConductivity(ParGridFunction *pc, const ParGridFunction *Up, const ParGridFunction *coords);
 
   virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
 
