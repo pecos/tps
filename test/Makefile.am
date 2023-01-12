@@ -219,4 +219,3 @@ if MASA_ENABLED
 ping_jacobian_global_LDADD += $(MASA_LIBS)
 endif
 
-endif
