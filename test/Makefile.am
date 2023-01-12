@@ -178,7 +178,7 @@ endif # if !GPU_ENABLED
 # local Jacobian tests
 check_PROGRAMS += ping_jacobian_local
 ping_jacobian_local_SOURCES = ping_jacobian_local.cpp
-ping_jacobian_local_LDADD   = ../src/libtps.a
+ping_jacobian_local_LDADD   = ../src/libtps.la
 ping_jacobian_local_LDADD  += $(HDF5_LIBS)
 ping_jacobian_local_LDADD  += $(GRVY_LIBS)
 ping_jacobian_local_LDADD  += $(MFEM_LIBS)
@@ -200,7 +200,7 @@ endif
 # global Jacobian tests
 check_PROGRAMS += ping_jacobian_global
 ping_jacobian_global_SOURCES = ping_jacobian_global.cpp
-ping_jacobian_global_LDADD   = ../src/libtps.a
+ping_jacobian_global_LDADD   = ../src/libtps.la
 ping_jacobian_global_LDADD  += $(HDF5_LIBS)
 ping_jacobian_global_LDADD  += $(GRVY_LIBS)
 ping_jacobian_global_LDADD  += $(MFEM_LIBS)

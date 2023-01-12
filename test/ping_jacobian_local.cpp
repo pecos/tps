@@ -46,9 +46,13 @@ int pingNormalFlux() {
   bool axisym = false;
   bool roe = false;
 
+  DryAirInput config;
+  config.f = DRY_AIR;
+  config.eq_sys = eqSystem;
+
   // Instantiate objects needed to evaluate the flux
-  GasMixture *mixture = new DryAir(ndim, neqn);
-  Fluxes *flux = new Fluxes(mixture, eqSystem, neqn, ndim, axisym);
+  GasMixture *mixture = new DryAir(config, ndim, ndim);
+  Fluxes *flux = new Fluxes(mixture, eqSystem, NULL, neqn, ndim, axisym);
   RiemannSolver *rsolver = new RiemannSolver(neqn, mixture, eqSystem, flux, roe, axisym);
 
   Vector nhat(ndim);
@@ -150,9 +154,13 @@ int pingFluxVector() {
   bool axisym = false;
   bool roe = false;
 
+  DryAirInput config;
+  config.f = DRY_AIR;
+  config.eq_sys = eqSystem;
+
   // Instantiate objects needed to evaluate the flux
-  GasMixture *mixture = new DryAir(ndim, neqn);
-  Fluxes *flux = new Fluxes(mixture, eqSystem, neqn, ndim, axisym);
+  GasMixture *mixture = new DryAir(config, ndim, ndim);
+  Fluxes *flux = new Fluxes(mixture, eqSystem, NULL, neqn, ndim, axisym);
 
   Vector U0(neqn);
   Vector U1(neqn);
@@ -262,9 +270,13 @@ int pingRiemannSolver() {
   bool axisym = false;
   bool roe = false;
 
+  DryAirInput config;
+  config.f = DRY_AIR;
+  config.eq_sys = eqSystem;
+
   // Instantiate objects needed to evaluate the flux
-  GasMixture *mixture = new DryAir(ndim, neqn);
-  Fluxes *flux = new Fluxes(mixture, eqSystem, neqn, ndim, axisym);
+  GasMixture *mixture = new DryAir(config, ndim, ndim);
+  Fluxes *flux = new Fluxes(mixture, eqSystem, NULL, neqn, ndim, axisym);
   RiemannSolver *rsolver = new RiemannSolver(neqn, mixture, eqSystem, flux, roe, axisym);
 
   Vector nhat(ndim);

@@ -169,7 +169,7 @@ int main(int argc, char *argv[]) {
   int ierr = 0;
 
   {
-    TPS::Tps tps(argc, argv);
+    TPS::Tps tps;
     tps.parseCommandLineArgs(argc, argv);
     tps.parseInput();
     tps.chooseDevices();
