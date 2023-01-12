@@ -112,23 +112,9 @@ void RiemannSolver::ComputeFluxDotNJacobian(const Vector &state, const Vector &n
   // MFEM_ASSERT(eqState->StateIsPhysical(state, dim), "");
   const double pres = mixture->ComputePressure(state);
 
-  // First, evaluate the derivative of the pressure with respect to the conserved state.
-  // NB: this code is only valid for a perfect gas, and really doesn't belong here anyway.
-  // TODO(trevilo): Generalize beyond perfect gas and move to mixture class.
-  const double gam = mixture->GetSpecificHeatRatio();
-  const double gm1 = gam - 1;
+  // First, get the Jacobian of the pressure (wrt conserved state)
   Vector p_U(num_equation);
-  p_U[0] = 0;
-  for (int d = 0; d < nvel; d++) {
-    p_U[0] += (den_vel(d) / den) * (den_vel(d) / den);
-  }
-  p_U[0] *= 0.5 * gm1;
-
-  for (int d = 0; d < nvel; d++) {
-    p_U[d + 1] = -gm1 * den_vel(d) / den;
-  }
-
-  p_U[nvel + 1] = gm1;
+  mixture->computePressureJacobian(state, p_U);
 
   // Second compute derivative of rho*u_n (normal velocity) wrt conserved state
   Vector den_velN_U(num_equation);

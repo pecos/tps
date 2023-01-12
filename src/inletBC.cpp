@@ -752,22 +752,12 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
 void InletBC::subsonicReflectingDensityVelocityJacobian(Vector &normal, Vector &stateIn, DenseMatrix &bdrFluxJacobian) {
   const double p = mixture->ComputePressure(stateIn);
 
+  Vector p_U(num_equation_);
+  mixture->computePressureJacobian(stateIn, p_U);
+
   // TODO(trevilo): only valid for single species ideal gas
   const double gam = mixture->GetSpecificHeatRatio();
   const double gm1 = gam - 1;
-
-  Vector p_U(num_equation_);
-  p_U[0] = 0;
-  for (int d = 0; d < nvel_; d++) {
-    p_U[0] += (stateIn[d + 1] / stateIn[0]) * (stateIn[d + 1] / stateIn[0]);
-  }
-  p_U[0] *= 0.5 * gm1;
-
-  for (int d = 0; d < nvel_; d++) {
-    p_U[d + 1] = -gm1 * stateIn[d + 1] / stateIn[0];
-  }
-
-  p_U[nvel_ + 1] = gm1;
 
   Vector state2(num_equation_);
   state2 = stateIn;

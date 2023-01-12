@@ -158,6 +158,10 @@ class GasMixture {
     return 0;
   }
 
+  virtual void computePressureJacobian(const Vector &state, Vector &p_U) {
+    mfem_error("computePressureJacobian is not implemented for this mixture.");
+  }
+
   virtual double ComputePressureFromPrimitives(const Vector &Up) = 0;  // pressure from primitive variables
   MFEM_HOST_DEVICE virtual double ComputePressureFromPrimitives(const double *Up) {
     // mfem_error("ComputePressureFromPrimitives is not implemented.");
@@ -338,6 +342,8 @@ class DryAir : public GasMixture {
   // implementation virtual methods
   virtual double ComputePressure(const Vector &state, double *electronPressure = NULL);
   MFEM_HOST_DEVICE virtual double ComputePressure(const double *state, double *electronPressure = NULL) const;
+
+  virtual void computePressureJacobian(const Vector &state, Vector &p_U);
 
   virtual double ComputePressureFromPrimitives(const Vector &Up);
   MFEM_HOST_DEVICE virtual double ComputePressureFromPrimitives(const double *Up);
@@ -570,6 +576,27 @@ inline double DryAir::ComputePressure(const Vector &state, double *electronPress
 #else
   return ComputePressure(state.GetData(), electronPressure);
 #endif
+}
+
+inline void DryAir::computePressureJacobian(const Vector &state, Vector &p_U) {
+  p_U = 0.;
+
+  const double gm1 = specific_heat_ratio - 1;
+
+  // Derivative of p wrt density
+  for (int d = 0; d < nvel_; d++) {
+    const double u = state[d + 1] / state[0];
+    p_U[0] += u * u;
+  }
+  p_U[0] *= 0.5 * gm1;
+
+  // Derivative of p wrt momentum
+  for (int d = 0; d < nvel_; d++) {
+    p_U[d + 1] = -gm1 * state[d + 1] / state[0];
+  }
+
+  // Derivative of p wrt total energy
+  p_U[nvel_ + 1] = gm1;
 }
 
 // additional functions inlined for speed...
