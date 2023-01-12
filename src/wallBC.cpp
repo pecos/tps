@@ -210,7 +210,7 @@ void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradSt
 
 void WallBC::computeBdrFluxJacobian(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
                                     DenseMatrix &bdrFluxJacobian) {
-  switch (wallType) {
+  switch (wallType_) {
     case INV:
       computeINVwallFluxJacobian(normal, stateIn, gradState, radius, bdrFluxJacobian);
       break;
@@ -297,33 +297,33 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
 void WallBC::computeINVwallFluxJacobian(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
                                         DenseMatrix &bdrFluxJacobian) {
   double norm = 0.;
-  for (int d = 0; d < dim; d++) norm += normal[d] * normal[d];
+  for (int d = 0; d < dim_; d++) norm += normal[d] * normal[d];
   norm = sqrt(norm);
 
-  Vector unitN(dim);
-  for (int d = 0; d < dim; d++) unitN[d] = normal[d] / norm;
+  Vector unitN(dim_);
+  for (int d = 0; d < dim_; d++) unitN[d] = normal[d] / norm;
 
   double rvn = 0;
-  for (int d = 0; d < dim; d++) rvn += stateIn[1 + d] * unitN[d];
+  for (int d = 0; d < dim_; d++) rvn += stateIn[1 + d] * unitN[d];
 
-  Vector stateMirror(num_equation);
+  Vector stateMirror(num_equation_);
   stateMirror = stateIn;
 
   // only momentum needs to be changed
   stateMirror[1] = stateIn[1] - 2. * rvn * unitN[0];
   stateMirror[2] = stateIn[2] - 2. * rvn * unitN[1];
-  if (dim == 3) stateMirror[3] = stateIn[3] - 2. * rvn * unitN[2];
+  if (dim_ == 3) stateMirror[3] = stateIn[3] - 2. * rvn * unitN[2];
   // if ((nvel == 3) && (dim == 2)) stateMirror[3] = stateIn[0] * vel[2];
 
   DenseMatrix mirror_wrt_in;  // Jacobian of mirror state wrt interior state
-  mirror_wrt_in.Diag(1., num_equation);
-  for (int i = 0; i < dim; i++) {
-    for (int j = 0; j < dim; j++) {
+  mirror_wrt_in.Diag(1., num_equation_);
+  for (int i = 0; i < dim_; i++) {
+    for (int j = 0; j < dim_; j++) {
       mirror_wrt_in(1 + i, 1 + j) -= 2. * unitN[i] * unitN[j];
     }
   }
 
-  DenseMatrix JL(num_equation, num_equation), JR(num_equation, num_equation);
+  DenseMatrix JL(num_equation_, num_equation_), JR(num_equation_, num_equation_);
   rsolver->Jacobian(stateIn, stateMirror, normal, JL, JR);
 
   bdrFluxJacobian = JL;

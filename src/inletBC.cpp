@@ -459,7 +459,7 @@ void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradS
 
 void InletBC::computeBdrFluxJacobian(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
                                      DenseMatrix &bdrFluxJacobian) {
-  switch (inletType) {
+  switch (inletType_) {
     case SUB_DENS_VEL:
       subsonicReflectingDensityVelocityJacobian(normal, stateIn, bdrFluxJacobian);
       break;
@@ -756,20 +756,20 @@ void InletBC::subsonicReflectingDensityVelocityJacobian(Vector &normal, Vector &
   const double gam = mixture->GetSpecificHeatRatio();
   const double gm1 = gam - 1;
 
-  Vector p_U(num_equation);
+  Vector p_U(num_equation_);
   p_U[0] = 0;
-  for (int d = 0; d < nvel; d++) {
+  for (int d = 0; d < nvel_; d++) {
     p_U[0] += (stateIn[d + 1] / stateIn[0]) * (stateIn[d + 1] / stateIn[0]);
   }
   p_U[0] *= 0.5 * gm1;
 
-  for (int d = 0; d < nvel; d++) {
+  for (int d = 0; d < nvel_; d++) {
     p_U[d + 1] = -gm1 * stateIn[d + 1] / stateIn[0];
   }
 
-  p_U[nvel + 1] = gm1;
+  p_U[nvel_ + 1] = gm1;
 
-  Vector state2(num_equation);
+  Vector state2(num_equation_);
   state2 = stateIn;
 
   // NOTE: In the case of active species some more work needs to be done here.
@@ -777,16 +777,16 @@ void InletBC::subsonicReflectingDensityVelocityJacobian(Vector &normal, Vector &
   state2[0] = inputState[0];
   state2[1] = inputState[0] * inputState[1];
   state2[2] = inputState[0] * inputState[2];
-  if (nvel == 3) state2[3] = inputState[0] * inputState[3];
+  if (nvel_ == 3) state2[3] = inputState[0] * inputState[3];
 
-  if (eqSystem == NS_PASSIVE) state2[num_equation - 1] = 0.;
+  if (eqSystem == NS_PASSIVE) state2[num_equation_ - 1] = 0.;
 
   mixture->modifyEnergyForPressure(state2, state2, p);
 
-  DenseMatrix UR_UL(num_equation, num_equation);
+  DenseMatrix UR_UL(num_equation_, num_equation_);
   UR_UL = 0.;
-  for (int i=0; i<num_equation; i++) {
-    UR_UL(nvel + 1, i) = p_U[i] / gm1;
+  for (int i=0; i<num_equation_; i++) {
+    UR_UL(nvel_ + 1, i) = p_U[i] / gm1;
   }
 
   DenseMatrix F_UL, F_UR;

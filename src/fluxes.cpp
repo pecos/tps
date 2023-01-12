@@ -146,7 +146,7 @@ void Fluxes::ComputeConvectiveFluxJacobian(const Vector &state, DenseTensor &jac
   // TODO(trevilo): Generalize beyond perfect gas and move to mixture class.
   const double gam = mixture->GetSpecificHeatRatio();
   const double gm1 = gam - 1;
-  Vector p_U(num_equations);
+  Vector p_U(num_equation);
   p_U[0] = 0;
   for (int d = 0; d < nvel; d++) {
     p_U[0] += (den_vel(d) / den) * (den_vel(d) / den);
@@ -161,14 +161,14 @@ void Fluxes::ComputeConvectiveFluxJacobian(const Vector &state, DenseTensor &jac
 
   // Third, Jacobian of total enthalpy
   const double H = (den_energy + pres) / den;
-  Vector H_U(num_equations);
+  Vector H_U(num_equation);
   H_U[0] = -H / den + p_U[0] / den;
   for (int d = 0; d < nvel; d++) {
     H_U[1 + d] = p_U[1 + d] / den;
   }
   H_U[1 + nvel] = (1. + p_U[1 + nvel]) / den;
 
-  jacobian.SetSize(num_equations, dim, num_equations);
+  jacobian.SetSize(num_equation, dim, num_equation);
   jacobian = 0.;
 
   for (int d = 0; d < dim; d++) {
@@ -182,7 +182,7 @@ void Fluxes::ComputeConvectiveFluxJacobian(const Vector &state, DenseTensor &jac
       jacobian(1 + i, d, 1 + d) += state(i + 1) / state[0];
     }
     // flux(1 + d, d) += pres;
-    for (int k = 0; k < num_equations; k++) {
+    for (int k = 0; k < num_equation; k++) {
       jacobian(1 + d, d, k) += p_U[k];
     }
   }
@@ -190,7 +190,7 @@ void Fluxes::ComputeConvectiveFluxJacobian(const Vector &state, DenseTensor &jac
   for (int d = 0; d < dim; d++) {
     // flux(1 + nvel, d) = state(d + 1) * H;
     jacobian(1 + nvel, d, d + 1) += H;
-    for (int k = 0; k < num_equations; k++) {
+    for (int k = 0; k < num_equation; k++) {
       jacobian(1 + nvel, d, k) += state(d + 1) * H_U[k];
     }
   }

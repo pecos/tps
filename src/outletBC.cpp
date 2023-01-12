@@ -317,7 +317,7 @@ void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &grad
 
 void OutletBC::computeBdrFluxJacobian(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
                                       DenseMatrix &bdrFluxJacobian) {
-  switch (outletType) {
+  switch (outletType_) {
     case SUB_P:
       subsonicReflectingPressureJacobian(normal, stateIn, bdrFluxJacobian);
       break;
@@ -743,22 +743,22 @@ void OutletBC::subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vecto
 
 void OutletBC::subsonicReflectingPressureJacobian(Vector &normal, Vector &stateIn, DenseMatrix &bdrFluxJacobian) {
   const double gamma = mixture->GetSpecificHeatRatio();
-  Vector state2(num_equation);
+  Vector state2(num_equation_);
   state2 = stateIn;
   double k = 0.;
-  for (int d = 0; d < nvel; d++) k += stateIn[1 + d] * stateIn[1 + d];
-  state2[1 + nvel] = inputState[0] / (gamma - 1.) + 0.5 * k / stateIn[0];
+  for (int d = 0; d < nvel_; d++) k += stateIn[1 + d] * stateIn[1 + d];
+  state2[1 + nvel_] = inputState[0] / (gamma - 1.) + 0.5 * k / stateIn[0];
 
-  DenseMatrix UR_UL(num_equation, num_equation);
+  DenseMatrix UR_UL(num_equation_, num_equation_);
   UR_UL = 0.;
-  for (int i=0; i<num_equation; i++) {
+  for (int i=0; i<num_equation_; i++) {
     UR_UL(i, i) = 1.0;
   }
-  UR_UL(1 + nvel, 0) = -0.5 * k / stateIn[0] / stateIn[0];
-  for (int d = 0; d < nvel; d++) {
-    UR_UL(1 + nvel, 1 + d) = stateIn[1 + d] / stateIn[0];
+  UR_UL(1 + nvel_, 0) = -0.5 * k / stateIn[0] / stateIn[0];
+  for (int d = 0; d < nvel_; d++) {
+    UR_UL(1 + nvel_, 1 + d) = stateIn[1 + d] / stateIn[0];
   }
-  UR_UL(1 + nvel, 1 + nvel) = 0.0;
+  UR_UL(1 + nvel_, 1 + nvel_) = 0.0;
 
   //rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
   DenseMatrix F_UL, F_UR;

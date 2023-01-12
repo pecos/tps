@@ -296,7 +296,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
 
   if (Aflux == NULL) {
     VectorMassIntegrator *vmi = new VectorMassIntegrator();
-    vmi->SetVDim(num_equation);
+    vmi->SetVDim(num_equation_);
 
     global_mass_bf_ = new ParBilinearForm(vfes);
     global_mass_bf_->AddDomainIntegrator(vmi);
