@@ -73,12 +73,14 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
       if (patchANDtype.first == local_attr[i]) attrInMesh = true;
     }
 
+    // inlet bc created here
     if (attrInMesh) {
+      //cout << "Attempting to create a new inlet BC... " << endl; fflush(stdout);      
       Array<double> data = config.GetInletData(in);
-      inletBCmap[patchANDtype.first] =
-          new InletBC(groupsMPI, _runFile.GetEquationSystem(), rsolver, mixture, d_mixture, vfes, intRules, _dt, dim,
-                      num_equation, patchANDtype.first, config.GetReferenceLength(), patchANDtype.second, data,
-                      _maxIntPoints, _maxDofs, config.isAxisymmetric());
+      inletBCmap[patchANDtype.first] = new InletBC(groupsMPI, _runFile.GetEquationSystem(), rsolver,
+		      mixture, d_mixture, vfes, intRules, _dt, dim, num_equation, patchANDtype.first,
+		      config.GetReferenceLength(), patchANDtype.second, data, _maxIntPoints, _maxDofs,
+		      config.isAxisymmetric());
     }
   }
 
@@ -234,21 +236,28 @@ void BCintegrator::initBCs() {
 }
 
 void BCintegrator::computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState,
-                                  double radius, Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux) {
+				  //                                  double radius, Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux) {		  
+                                  double radius, Vector transip, double delta, TransportProperties *_transport, int ip, Vector &bdrFlux) {
   
   std::unordered_map<int, BoundaryCondition *>::const_iterator ibc = inletBCmap.find(attr);
   std::unordered_map<int, BoundaryCondition *>::const_iterator obc = outletBCmap.find(attr);
   std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = wallBCmap.find(attr);
 
-  if (ibc != inletBCmap.end())  ibc->second->computeBdrFlux(normal, stateIn, gradState, delState, radius, transip, delta, _transport, bdrFlux);
-  if (obc != outletBCmap.end()) obc->second->computeBdrFlux(normal, stateIn, gradState, delState, radius, transip, delta, _transport, bdrFlux);
-  if (wbc != wallBCmap.end())   wbc->second->computeBdrFlux(normal, stateIn, gradState, delState, radius, transip, delta, _transport, bdrFlux);
+  //if (ibc != inletBCmap.end())  ibc->second->computeBdrFlux(normal, stateIn, gradState, delState, radius, transip, delta, _transport, bdrFlux);
+  //if (obc != outletBCmap.end()) obc->second->computeBdrFlux(normal, stateIn, gradState, delState, radius, transip, delta, _transport, bdrFlux);
+  //if (wbc != wallBCmap.end())   wbc->second->computeBdrFlux(normal, stateIn, gradState, delState, radius, transip, delta, _transport, bdrFlux);
 
+  if (ibc != inletBCmap.end())  ibc->second->computeBdrFlux(normal, stateIn, gradState, delState, radius, transip, delta, _transport, ip, bdrFlux);
+  if (obc != outletBCmap.end()) obc->second->computeBdrFlux(normal, stateIn, gradState, delState, radius, transip, delta, _transport, ip, bdrFlux);
+  if (wbc != wallBCmap.end())   wbc->second->computeBdrFlux(normal, stateIn, gradState, delState, radius, transip, delta, _transport, ip, bdrFlux);
+  
   //   BCmap[attr]->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
 }
 
 void BCintegrator::updateBCMean(ParGridFunction *U_, ParGridFunction *Up) {
+  
   for (auto bc = inletBCmap.begin(); bc != inletBCmap.end(); bc++) {
+    //cout << "calling updateMean for inlet " << endl; fflush(stdout);       
     bc->second->updateMean(intRules, U_, Up);
   }
 
@@ -440,7 +449,8 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
     }
 
     // all bc's handeled here <jump>
-    computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, iDelUp, radius, transip, delta, transport, fluxN);
+    computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, iDelUp, radius, transip, delta, transport, i, fluxN);
+    //    computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, iDelUp, radius, transip, delta, transport, fluxN);    
     fluxN *= ip.weight;
 
     if (config.isAxisymmetric()) {

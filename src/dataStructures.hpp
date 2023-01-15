@@ -116,24 +116,28 @@ enum SpeciesPrimitiveType { MASS_FRACTION, MOLE_FRACTION, NUMBER_DENSITY, NUM_SP
 
 enum InletType {
   SUB_DENS_VEL,          // Subsonic inlet specified by the density and velocity components
+  SUB_DENS_VEL_USR,      // Subsonic inlet with specified by the density and velocity components with spatial distro  
   SUB_TEMP_VEL,          // Subsonic inlet specified by the temperature and velocity components
   SUB_TEMP_VEL_USR,      // Subsonic inlet specified by the temperature and velocity components with user defined spatial distro
   SUB_DENS_VEL_NR,       // Non-reflecting subsonic inlet specified by the density and velocity components
   SUB_VEL_CONST_ENT,     // Subsonic non-reflecting. Specified vel, keeps entropy constant
   SUB_VEL_CONST_TMP,     // Subsonic, specified u,v,w, and T
   SUB_VEL_CONST_TMP_USR  // Subsonic, specified u,v,w, and T with user defined spatial distribution
+
 };
 
 enum OutletType {
   SUB_P,        // subsonic outlet specified with pressure
   SUB_P_NR,     // non-reflecting subsonic outlet specified with pressure
   SUB_MF_NR,    // Mass-flow non-reflecting
+  PER_LEFT,     // periodic pair, left side
+  PER_RIGHT,    // periodic pair, right side    
   SUB_MF_NR_PW  // point-based non-reflecting massflow BC
 };
 
 enum WallType {
   INV,         // Inviscid wall
-  SLIP,        // Slip/zero-pentration wall  
+  SLIP,        // Slip/zero-pentration wall
   VISC_ADIAB,  // Viscous adiabatic wall
   VISC_ISOTH,  // Viscous isothermal wall
   VISC_GNRL    // Viscous general wall

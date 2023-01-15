@@ -440,7 +440,11 @@ void M2ulPhyS::initVariables() {
   // NOTE(kevin): _HIP_ path does not use device mixture.
   average = new Averaging(Up, mesh, fec, fes, dfes, vfes, eqSystem, mixture, num_equation, dim, config, groupsMPI);
 #endif
-  average->read_meanANDrms_restart_files();
+
+  // swh: this should only be done if enableContinuation is set to true
+  if (config.restartMean == true) {
+    average->read_meanANDrms_restart_files();
+  }
 
   // NOTE: this should also be completed by the GasMixture class
   // Kevin: Do we need GasMixture class for this?
@@ -456,7 +460,8 @@ void M2ulPhyS::initVariables() {
       ioData.registerIOVar("/meanSolution", "mean-w", 3);
       ioData.registerIOVar("/meanSolution", "mean-E", 4);
     } else {
-      ioData.registerIOVar("/meanSolution", "mean-p", dim + 1);
+      //ioData.registerIOVar("/meanSolution", "mean-p", dim + 1);
+      ioData.registerIOVar("/meanSolution", "mean-T", dim + 1);
     }
     
     for (int sp = 0; sp < numActiveSpecies; sp++) {
@@ -538,7 +543,7 @@ void M2ulPhyS::initVariables() {
   gpu::instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, fluxClass, config.RoeRiemannSolver(),
                                           config.isAxisymmetric(), rsolver);
 #else
-  fluxClass = new Fluxes(mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(), config);
+  fluxClass = new Fluxes(mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(), &config); // here
 
   rsolver =
       new RiemannSolver(num_equation, mixture, eqSystem, fluxClass, config.RoeRiemannSolver(), config.isAxisymmetric());
@@ -684,6 +689,8 @@ void M2ulPhyS::initVariables() {
   }
 }
 
+// <warp> fills arrays with inaccesible info to gpus
+// see volumeFaceIntegrationArray in dataStructures.hpp
 void M2ulPhyS::initIndirectionArrays() {
   gpuArrays.posDofIds.SetSize(2 * vfes->GetNE());
   gpuArrays.posDofIds = 0;
@@ -2825,7 +2832,7 @@ void M2ulPhyS::parseBCInputs() {
   // Wall Bcs
   std::map<std::string, WallType> wallMapping;
   wallMapping["inviscid"] = INV;
-  wallMapping["slip"] = SLIP;  
+  wallMapping["slip"] = SLIP;
   wallMapping["viscous_adiabatic"] = VISC_ADIAB;
   wallMapping["viscous_isothermal"] = VISC_ISOTH;
   wallMapping["viscous_general"] = VISC_GNRL;
@@ -2929,8 +2936,9 @@ void M2ulPhyS::parseBCInputs() {
   // Inlet Bcs
   std::map<std::string, InletType> inletMapping;
   inletMapping["subsonic"] = SUB_DENS_VEL;
+  inletMapping["subsonicUser"] = SUB_DENS_VEL_USR;    
   inletMapping["subsonicConstTemp"] = SUB_TEMP_VEL;
-  inletMapping["subsonicConstTempUser"] = SUB_TEMP_VEL_USR;  
+  inletMapping["subsonicConstTempUser"] = SUB_TEMP_VEL_USR;
   inletMapping["nonReflecting"] = SUB_DENS_VEL_NR;
   inletMapping["nonReflectingConstEntropy"] = SUB_VEL_CONST_ENT;
   inletMapping["nonReflectingConstTemp"] = SUB_VEL_CONST_TMP;
@@ -2985,6 +2993,8 @@ void M2ulPhyS::parseBCInputs() {
   outletMapping["nonReflectingPressure"] = SUB_P_NR;
   outletMapping["nonReflectingMassFlow"] = SUB_MF_NR;
   outletMapping["nonReflectingPointBasedMassFlow"] = SUB_MF_NR_PW;
+  outletMapping["periodicLeft"] = PER_LEFT;
+  outletMapping["periodicRight"] = PER_RIGHT;     
 
   for (int i = 1; i <= numOutlets; i++) {
     int patch;
@@ -3006,6 +3016,10 @@ void M2ulPhyS::parseBCInputs() {
     } else if ((type == "nonReflectingMassFlow") || (type == "nonReflectingPointBasedMassFlow")) {
       tpsP->getRequiredInput((basepath + "/massFlow").c_str(), massFlow);
       config.outletBC.Append(massFlow);
+    } else if (type == "periodicLeft") {
+      // nothing for now, add offset vector for periodic plane pair later
+    } else if (type == "periodicRight") {
+      // nothing for now, add offset vector for periodic plane pair later      
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown outlet BC supplied at runtime -> %s", type.c_str());
       exit(ERROR);

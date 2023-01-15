@@ -200,7 +200,10 @@ void WallBC::buildWallElemsArray(const Array<int> &intPointsElIDBC) {
   wallElems.ReadWrite();
 }
 
-void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius, Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux) {
+void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState,
+			    double radius, Vector transip, double delta, TransportProperties *_transport,
+			    //			    Vector &bdrFlux) {
+			    int ip, Vector &bdrFlux) {
   
   switch (wallType_) {
     case INV:
@@ -232,7 +235,7 @@ void WallBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesID
 }
 
 /**
-Old inviscid boundary condition.  There is a bug in mirror-state calcualtion (will break for some orientations 
+Old inviscid boundary condition.  There is a bug in mirror-state calculation (will break for some orientations 
 of flow and wall).  Also, viscous terms are included.
 */
 void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, 
@@ -380,7 +383,7 @@ void WallBC::computeSlipWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &g
   M.Mult(momN, momX);
   for (int d = 0; d < dim_; d++) nVel[d] = momX[d];
 
-  // energy of normal component not necessary
+  // energy of normal component: not necessary
   //double ke_n = 0.5*nVel[0]*nVel[0];
 
   // mirror normal component  
@@ -400,7 +403,7 @@ void WallBC::computeSlipWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &g
   state2[2] = stateIn[0] * nVel[1];
   if (dim_ == 3) state2[3] = stateIn[0] * nVel[2];
   
-  // now send to Reimann solver (should normal be unitNorm?)
+  // now send to Reimann solver 
   rsolver->Eval(stateIn, state2, normal, bdrFlux);
   
 }

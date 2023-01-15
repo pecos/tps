@@ -310,13 +310,18 @@ void OutletBC::initBCs() {
   }
 }
 
-void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius, Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux) {
+void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState,
+			      double radius, Vector transip, double delta, TransportProperties *_transport,
+			      //			      Vector &bdrFlux) {			      
+			      int ip, Vector &bdrFlux) {
+  
   switch (outletType_) {
     case SUB_P:
       subsonicReflectingPressure(normal, stateIn, bdrFlux);
       break;
     case SUB_P_NR:
-      subsonicNonReflectingPressure(normal, stateIn, gradState, delState, _transport, bdrFlux);
+      subsonicNonReflectingPressure(normal, stateIn, gradState, delState, _transport, ip, bdrFlux);
+      //      subsonicNonReflectingPressure(normal, stateIn, gradState, delState, _transport, bdrFlux);      
       break;
     case SUB_MF_NR:
       subsonicNonRefMassFlow(normal, stateIn, gradState, bdrFlux);
@@ -324,7 +329,14 @@ void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &grad
     case SUB_MF_NR_PW:
       subsonicNonRefPWMassFlow(normal, stateIn, gradState, bdrFlux);
       break;
+      //case PER_LEFT:
+      //periodic(normal, stateIn, bdrFlux);
+      //break;
+      //case PER_RIGHT:
+      //periodic(normal, stateIn, bdrFlux);
+      //break;            
   }
+  
 }
 
 void OutletBC::computeParallelArea() {
@@ -470,6 +482,7 @@ void OutletBC::initBoundaryU(ParGridFunction *Up) {
 
 void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *U_, ParGridFunction *Up) {
 
+  //  cout << " in update mean (outlet)..." << endl; fflush(stdout);
   if (outletType_ == SUB_P) return;
 
   bdrN = 0; // incremented in computeBdr
@@ -628,7 +641,8 @@ of Compressible Viscous Flows", JCP, 1992.  Known issues:
  - limits to damp backflow not working and commented
 */
 void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState,
-					     TransportProperties *_transport, Vector &bdrFlux) {
+					     //					     TransportProperties *_transport, Vector &bdrFlux) {					     
+					     TransportProperties *_transport, int ip, Vector &bdrFlux) {
 
   // <jump> stateIn is conserved, grad and del are primitive  
   const double gamma = mixture->GetSpecificHeatRatio();
@@ -814,7 +828,7 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   //   }
 
   Vector state2(num_equation_);
-  for (int eq = 0; eq < num_equation_; eq++) state2[eq] = boundaryU[eq + bdrN * num_equation_];  
+  for (int eq = 0; eq < num_equation_; eq++) state2[eq] = boundaryU[eq + bdrN * num_equation_];
   
   // testing
   /*
@@ -883,8 +897,8 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
 
   // modify newU to Reimann so the average of stateIn and modified newU is actual newU?
   Vector tmpU(num_equation_);
-  //for (int i = 0; i < num_equation_; i++) tmpU[i] = newU[i];
-  for (int i = 0; i < num_equation_; i++) tmpU[i] = 2.0*newU[i] - stateIn[i];
+  for (int i = 0; i < num_equation_; i++) tmpU[i] = newU[i];
+  //for (int i = 0; i < num_equation_; i++) tmpU[i] = 2.0*newU[i] - stateIn[i];
 
   // reimann solver
   rsolver->Eval(stateIn, tmpU, normal, bdrFlux, true);
