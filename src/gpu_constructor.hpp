@@ -86,19 +86,20 @@ namespace gpu {
 __global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int nvel, void *mix);
 __global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, void *mix);
 
+__global__ void instantiateDeviceDryAirTransport(GasMixture *mixture, const double viscosity_multiplier,
+                                                 const double bulk_viscosity, void *transport);
+__global__ void instantiateDeviceConstantTransport(GasMixture *mixture, const constantTransportData inputs,
+                                                   void *trans);
+__global__ void instantiateDeviceArgonMinimalTransport(GasMixture *mixture, const ArgonTransportInput inputs,
+                                                       void *trans);
+__global__ void instantiateDeviceArgonMixtureTransport(GasMixture *mixture, const ArgonTransportInput inputs,
+                                                       void *trans);
+
+__global__ void freeDeviceMixture(GasMixture *mix);
+__global__ void freeDeviceTransport(TransportProperties *transport);
+
 #if defined(_CUDA_)
 // CUDA supports device new/delete
-//__global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int nvel, GasMixture **mix);
-__global__ void instantiateDeviceDryAirTransport(GasMixture *mixture, const double viscosity_multiplier,
-                                                 const double bulk_viscosity, TransportProperties **trans);
-//__global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, GasMixture
-//**mix);
-__global__ void instantiateDeviceConstantTransport(GasMixture *mixture, const constantTransportData inputs,
-                                                   TransportProperties **trans);
-__global__ void instantiateDeviceArgonMinimalTransport(GasMixture *mixture, const ArgonTransportInput inputs,
-                                                       TransportProperties **trans);
-__global__ void instantiateDeviceArgonMixtureTransport(GasMixture *mixture, const ArgonTransportInput inputs,
-                                                       TransportProperties **trans);
 __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
                                         const int _num_equation, const int _dim, bool axisym, Fluxes **f);
 __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
@@ -106,8 +107,6 @@ __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture
 __global__ void instantiateDeviceChemistry(GasMixture *mixture, const ChemistryInput inputs, Chemistry **chem);
 __global__ void instantiateDeviceNetEmission(const RadiationInput inputs, Radiation **radiation);
 
-__global__ void freeDeviceMixture(GasMixture *mix);
-__global__ void freeDeviceTransport(TransportProperties *trans);
 __global__ void freeDeviceFluxes(Fluxes *f);
 __global__ void freeDeviceRiemann(RiemannSolver *r);
 __global__ void freeDeviceChemistry(Chemistry *chem);
@@ -121,24 +120,12 @@ __global__ void freeDeviceRadiation(Radiation *radiation);
 // outside of the instantiate functions below with hipMalloc and the
 // use placement new.  Maybe should adopt this approach for CUDA as
 // well, as it seems actually slightly cleaner.
-//__global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int nvel, void *mix);
-__global__ void instantiateDeviceDryAirTransport(GasMixture *mixture, const double viscosity_multiplier,
-                                                 const double bulk_viscosity, void *transport);
-//__global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, void *mix);
-__global__ void instantiateDeviceConstantTransport(GasMixture *mixture, const constantTransportData inputs,
-                                                   void *trans);
-__global__ void instantiateDeviceArgonMinimalTransport(GasMixture *mixture, const ArgonTransportInput inputs,
-                                                       void *trans);
-__global__ void instantiateDeviceArgonMixtureTransport(GasMixture *mixture, const ArgonTransportInput inputs,
-                                                       void *trans);
 __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
                                         const int _num_equation, const int _dim, bool axisym, void *f);
 __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
                                          Fluxes *_fluxClass, bool _useRoe, bool axisym, void *r);
 __global__ void instantiateDeviceChemistry(GasMixture *mixture, const ChemistryInput inputs, void *chem);
 
-__global__ void freeDeviceMixture(GasMixture *mix);
-__global__ void freeDeviceTransport(TransportProperties *transport);
 __global__ void freeDeviceFluxes(Fluxes *f);
 __global__ void freeDeviceRiemann(RiemannSolver *r);
 __global__ void freeDeviceChemistry(Chemistry *chem);

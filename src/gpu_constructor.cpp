@@ -42,46 +42,30 @@ __global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs
   mix = new (mix) PerfectMixture(inputs, _dim, nvel);
 }
 
+__global__ void instantiateDeviceDryAirTransport(GasMixture *mixture, const double viscosity_multiplier,
+                                                 const double bulk_viscosity, void *transport) {
+  transport = new (transport) DryAirTransport(mixture, viscosity_multiplier, bulk_viscosity);
+}
+
+__global__ void instantiateDeviceConstantTransport(GasMixture *mixture, const constantTransportData inputs,
+                                                   void *trans) {
+  trans = new (trans) ConstantTransport(mixture, inputs);
+}
+__global__ void instantiateDeviceArgonMinimalTransport(GasMixture *mixture, const ArgonTransportInput inputs,
+                                                       void *trans) {
+  trans = new (trans) ArgonMinimalTransport(mixture, inputs);
+}
+__global__ void instantiateDeviceArgonMixtureTransport(GasMixture *mixture, const ArgonTransportInput inputs,
+                                                       void *trans) {
+  trans = new (trans) ArgonMixtureTransport(mixture, inputs);
+}
+
 __global__ void freeDeviceMixture(GasMixture *mix) { mix->~GasMixture(); }
+__global__ void freeDeviceTransport(TransportProperties *transport) { transport->~TransportProperties(); }
 
 #if defined(_CUDA_)
 
 // CUDA supports device new/delete
-// __global__ void instantiateDeviceMixture(const WorkingFluid f, const Equations eq_sys,
-//                                          const double viscosity_multiplier, const double bulk_viscosity, int _dim,
-//                                          int nvel, GasMixture **mix) {
-//  // *mix = new DryAir(f, eq_sys, viscosity_multiplier, bulk_viscosity, _dim, nvel);
-//  *mix = new DryAir(inputs, _dim, nvel);
-//}
-// __global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int nvel, GasMixture **mix) {
-//   *mix = new DryAir(inputs, _dim, nvel);
-// }
-
-__global__ void instantiateDeviceDryAirTransport(GasMixture *mixture, const double viscosity_multiplier,
-                                                 const double bulk_viscosity, TransportProperties **trans) {
-  *trans = new DryAirTransport(mixture, viscosity_multiplier, bulk_viscosity);
-}
-
-// __global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel,
-//                                                 GasMixture **mix) {
-//   *mix = new PerfectMixture(inputs, _dim, nvel);
-// }
-
-__global__ void instantiateDeviceConstantTransport(GasMixture *mixture, const constantTransportData inputs,
-                                                   TransportProperties **trans) {
-  *trans = new ConstantTransport(mixture, inputs);
-}
-
-__global__ void instantiateDeviceArgonMinimalTransport(GasMixture *mixture, const ArgonTransportInput inputs,
-                                                       TransportProperties **trans) {
-  *trans = new ArgonMinimalTransport(mixture, inputs);
-}
-
-__global__ void instantiateDeviceArgonMixtureTransport(GasMixture *mixture, const ArgonTransportInput inputs,
-                                                       TransportProperties **trans) {
-  *trans = new ArgonMixtureTransport(mixture, inputs);
-}
-
 __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
                                         const int _num_equation, const int _dim, bool axisym, Fluxes **f) {
   *f = new Fluxes(_mixture, _eqSystem, _transport, _num_equation, _dim, axisym);
@@ -100,45 +84,12 @@ __global__ void instantiateDeviceNetEmission(const RadiationInput inputs, Radiat
   *radiation = new NetEmission(inputs);
 }
 
-//__global__ void freeDeviceMixture(GasMixture *mix) { delete mix; }
-__global__ void freeDeviceTransport(TransportProperties *trans) { delete trans; }
 __global__ void freeDeviceFluxes(Fluxes *f) { delete f; }
 __global__ void freeDeviceRiemann(RiemannSolver *r) { delete r; }
 __global__ void freeDeviceChemistry(Chemistry *chem) { delete chem; }
 __global__ void freeDeviceRadiation(Radiation *radiation) { delete radiation; }
 
 #elif defined(_HIP_)
-
-// __global__ void instantiateDeviceMixture(const WorkingFluid f, const Equations eq_sys,
-//                                          const double viscosity_multiplier, const double bulk_viscosity, int _dim,
-//                                          int nvel, void *mix) {
-//  mix = new (mix) DryAir(inputs, _dim, nvel);
-//}
-// __global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int nvel, void *mix) {
-//   mix = new (mix) DryAir(inputs, _dim, nvel);
-// }
-
-__global__ void instantiateDeviceDryAirTransport(GasMixture *mixture, const double viscosity_multiplier,
-                                                 const double bulk_viscosity, void *transport) {
-  transport = new (transport) DryAirTransport(mixture, viscosity_multiplier, bulk_viscosity);
-}
-
-// __global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, void *mix) {
-//   mix = new (mix) PerfectMixture(inputs, _dim, nvel);
-// }
-
-__global__ void instantiateDeviceConstantTransport(GasMixture *mixture, const constantTransportData inputs,
-                                                   void *trans) {
-  trans = new (trans) ConstantTransport(mixture, inputs);
-}
-__global__ void instantiateDeviceArgonMinimalTransport(GasMixture *mixture, const ArgonTransportInput inputs,
-                                                       void *trans) {
-  trans = new (trans) ArgonMinimalTransport(mixture, inputs);
-}
-__global__ void instantiateDeviceArgonMixtureTransport(GasMixture *mixture, const ArgonTransportInput inputs,
-                                                       void *trans) {
-  trans = new (trans) ArgonMixtureTransport(mixture, inputs);
-}
 
 __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
                                         const int _num_equation, const int _dim, bool axisym, void *f) {
@@ -154,11 +105,7 @@ __global__ void instantiateDeviceChemistry(GasMixture *mixture, const ChemistryI
   chem = new (chem) Chemistry(mixture, inputs);
 }
 
-// __global__ void freeDeviceMixture(GasMixture *mix) {
-//   mix->~GasMixture();
-// }
 // explicit destructor call b/c placement new above
-__global__ void freeDeviceTransport(TransportProperties *transport) { transport->~TransportProperties(); }
 __global__ void freeDeviceFluxes(Fluxes *f) { f->~Fluxes(); }
 __global__ void freeDeviceRiemann(RiemannSolver *r) { r->~RiemannSolver(); }
 __global__ void freeDeviceChemistry(Chemistry *chem) { chem->~Chemistry(); }
