@@ -264,16 +264,6 @@ void M2ulPhyS::initVariables() {
   eqSystem = config.GetEquationSystem();
 
   mixture = NULL;
-#if defined(_CUDA_)
-  Chemistry **d_chemistry_tmp;
-  cudaMalloc((void **)&d_chemistry_tmp, sizeof(Chemistry **));
-
-  Radiation **d_radiation_tmp;
-  cudaMalloc((void **)&d_radiation_tmp, sizeof(Radiation **));
-#elif defined(_HIP_)
-  hipMalloc((void **)&chemistry_, sizeof(Chemistry));
-  hipMalloc((void **)&radiation_, sizeof(Radiation));
-#endif
 
   switch (config.GetWorkingFluid()) {
     case WorkingFluid::DRY_AIR:
@@ -334,10 +324,8 @@ void M2ulPhyS::initVariables() {
       }
       switch (config.GetChemistryModel()) {
         default:
-#if defined(_CUDA_)
-          gpu::instantiateDeviceChemistry<<<1, 1>>>(d_mixture, config.chemistryInput, d_chemistry_tmp);
-          cudaMemcpy(&chemistry_, d_chemistry_tmp, sizeof(Chemistry *), cudaMemcpyDeviceToHost);
-#elif defined(_HIP_)
+#if defined(_CUDA_) || defined(_HIP_)
+          tpsGpuMalloc((void **)&chemistry_, sizeof(Chemistry));
           gpu::instantiateDeviceChemistry<<<1, 1>>>(d_mixture, config.chemistryInput, chemistry_);
 #else
           chemistry_ = new Chemistry(mixture, config.chemistryInput);
@@ -351,11 +339,9 @@ void M2ulPhyS::initVariables() {
   }
   switch (config.radiationInput.model) {
     case NET_EMISSION:
-#if defined(_CUDA_)
-      gpu::instantiateDeviceNetEmission<<<1, 1>>>(config.radiationInput, d_radiation_tmp);
-      cudaMemcpy(&radiation_, d_radiation_tmp, sizeof(Radiation *), cudaMemcpyDeviceToHost);
-#elif defined(_HIP_)
-      mfem_error("Radiation is not supported for HIP!");
+#if defined(_CUDA_) || defined(_HIP_)
+      tpsGpuMalloc((void **)(&radiation_), sizeof(NetEmission));
+      gpu::instantiateDeviceNetEmission<<<1, 1>>>(config.radiationInput, radiation_);
 #else
       radiation_ = new NetEmission(config.radiationInput);
 #endif
@@ -367,10 +353,7 @@ void M2ulPhyS::initVariables() {
       break;
   }
   assert(mixture != NULL);
-#if defined(_CUDA_)
-  cudaFree(d_chemistry_tmp);
-  cudaFree(d_radiation_tmp);
-#elif defined(_HIP_)
+#if defined(_CUDA_) || defined(_HIP_)
 #else
   d_mixture = mixture;
 #endif
@@ -938,13 +921,14 @@ M2ulPhyS::~M2ulPhyS() {
 
 #if defined(_CUDA_) || defined(_HIP_)
   gpu::freeDeviceChemistry<<<1, 1>>>(chemistry_);
+  tpsGpuFree(chemistry_);
 #else
   delete chemistry_;
 #endif
 
-#if defined(_CUDA_)
+#if defined(_CUDA_) || defined(_HIP_)
   gpu::freeDeviceRadiation<<<1, 1>>>(radiation_);
-#elif defined(_HIP_)
+  tpsGpuFree(radiation_);
 #else
   delete radiation_;
 #endif
@@ -956,11 +940,6 @@ M2ulPhyS::~M2ulPhyS() {
   delete transportPtr;
 #endif
   delete mixture;
-
-#ifdef _HIP_
-  hipFree(radiation_);
-  hipFree(chemistry_);
-#endif
 
 #if defined(_CUDA_) || defined(_HIP_)
   tpsGpuFree(d_mixture);
