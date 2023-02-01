@@ -910,41 +910,31 @@ M2ulPhyS::~M2ulPhyS() {
 
 #if defined(_CUDA_) || defined(_HIP_)
   gpu::freeDeviceRiemann<<<1, 1>>>(rsolver);
-  gpu::freeDeviceFluxes<<<1, 1>>>(fluxClass);
-
   tpsGpuFree(rsolver);
+
+  gpu::freeDeviceFluxes<<<1, 1>>>(fluxClass);
   tpsGpuFree(fluxClass);
+
+  gpu::freeDeviceChemistry<<<1, 1>>>(chemistry_);
+  tpsGpuFree(chemistry_);
+
+  gpu::freeDeviceRadiation<<<1, 1>>>(radiation_);
+  tpsGpuFree(radiation_);
+
+  gpu::freeDeviceTransport<<<1, 1>>>(transportPtr);
+  tpsGpuFree(transportPtr);
+
+  gpu::freeDeviceMixture<<<1, 1>>>(d_mixture);
+  tpsGpuFree(d_mixture);
 #else
   delete rsolver;
   delete fluxClass;
-#endif
-
-#if defined(_CUDA_) || defined(_HIP_)
-  gpu::freeDeviceChemistry<<<1, 1>>>(chemistry_);
-  tpsGpuFree(chemistry_);
-#else
   delete chemistry_;
-#endif
-
-#if defined(_CUDA_) || defined(_HIP_)
-  gpu::freeDeviceRadiation<<<1, 1>>>(radiation_);
-  tpsGpuFree(radiation_);
-#else
   delete radiation_;
-#endif
-
-#if defined(_CUDA_) || defined(_HIP_)
-  gpu::freeDeviceTransport<<<1, 1>>>(transportPtr);
-  gpu::freeDeviceMixture<<<1, 1>>>(d_mixture);
-#else
   delete transportPtr;
 #endif
-  delete mixture;
 
-#if defined(_CUDA_) || defined(_HIP_)
-  tpsGpuFree(d_mixture);
-  tpsGpuFree(transportPtr);
-#endif
+  delete mixture;
 
   delete gradUpfes;
   delete vfes;
