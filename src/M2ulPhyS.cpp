@@ -473,27 +473,12 @@ void M2ulPhyS::initVariables() {
   ioData.initializeSerial(mpi.Root(), (config.RestartSerial() != "no"), serial_mesh);
   projectInitialSolution();
 
-#if defined(_CUDA_)
-  Fluxes **d_flux_tmp;
-  cudaMalloc((void **)&d_flux_tmp, sizeof(Fluxes **));
-  gpu::instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(),
-                                         d_flux_tmp);
-  cudaMemcpy(&fluxClass, d_flux_tmp, sizeof(Fluxes *), cudaMemcpyDeviceToHost);
-  cudaFree(d_flux_tmp);
-
-  RiemannSolver **d_riemann_tmp;
-  cudaMalloc((void **)&d_riemann_tmp, sizeof(RiemannSolver **));
-  gpu::instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, fluxClass, config.RoeRiemannSolver(),
-                                          config.isAxisymmetric(), d_riemann_tmp);
-
-  cudaMemcpy(&rsolver, d_riemann_tmp, sizeof(RiemannSolver *), cudaMemcpyDeviceToHost);
-  cudaFree(d_riemann_tmp);
-#elif defined(_HIP_)
-  hipMalloc((void **)&fluxClass, sizeof(Fluxes));
+#if defined(_CUDA_) || defined(_HIP_)
+  tpsGpuMalloc((void **)&fluxClass, sizeof(Fluxes));
   gpu::instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(),
                                          fluxClass);
 
-  hipMalloc((void **)&rsolver, sizeof(RiemannSolver));
+  tpsGpuMalloc((void **)&rsolver, sizeof(RiemannSolver));
   gpu::instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, fluxClass, config.RoeRiemannSolver(),
                                           config.isAxisymmetric(), rsolver);
 #else
@@ -943,14 +928,12 @@ M2ulPhyS::~M2ulPhyS() {
 #if defined(_CUDA_) || defined(_HIP_)
   gpu::freeDeviceRiemann<<<1, 1>>>(rsolver);
   gpu::freeDeviceFluxes<<<1, 1>>>(fluxClass);
+
+  tpsGpuFree(rsolver);
+  tpsGpuFree(fluxClass);
 #else
   delete rsolver;
   delete fluxClass;
-#endif
-
-#ifdef _HIP_
-  hipFree(rsolver);
-  hipFree(fluxClass);
 #endif
 
 #if defined(_CUDA_) || defined(_HIP_)
