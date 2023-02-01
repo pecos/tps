@@ -32,30 +32,19 @@
 
 #include "radiation.hpp"
 
-using namespace mfem;
-using namespace std;
-
-MFEM_HOST_DEVICE NetEmission::NetEmission(const RadiationInput &inputs) : Radiation() {
+MFEM_HOST_DEVICE NetEmission::NetEmission(const RadiationInput &inputs)
+    : Radiation(), necTable_(LinearTable(inputs.necTableInput)) {
   assert(inputs.model == NET_EMISSION);
-  switch (inputs.necModel) {
-    case TABULATED_NEC: {
-      switch (inputs.necTableInput.order) {
-        case 1: {
-          necTable_ = new LinearTable(inputs.necTableInput);
-        } break;
-        default: {
-          printf("NetEmission: given interpolation order is not supported for TableInterpolator!");
-          assert(false);
-        } break;
-      }
-      break;
-    }
-    default: {
-      printf("NetEmission: given coefficient model is not supported!");
-      assert(false);
-      break;
-    }
-  }
+  assert(inputs.necModel == TABULATED_NEC);
+  assert(inputs.necTableInput.order == 1);
+  // To generalize beyond LinearTable, need to have necTable_ be a
+  // pointer to TableInterpolator and then instantiate the appropriate
+  // class here (e.g., necTable_ = new LinearTable(inputs.necTableInput);).
+  // However, this design causes unexplained problems for the CUDA
+  // version.  See Issue #184.  To avoid this issue, we use the design
+  // here (i.e., necTable_ has type LinearTable).  Since this is the
+  // only option currently supported, this approach is ok.  It will
+  // have to be revisited if other options are added in the future.
 }
 
-MFEM_HOST_DEVICE NetEmission::~NetEmission() { delete necTable_; }
+MFEM_HOST_DEVICE NetEmission::~NetEmission() {}
