@@ -70,34 +70,29 @@ __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture
   r = new (r) RiemannSolver(_num_equation, _mixture, _eqSystem, _fluxClass, _useRoe, axisym);
 }
 
-__global__ void freeDeviceFluxes(Fluxes *f) { f->~Fluxes(); }
-__global__ void freeDeviceRiemann(RiemannSolver *r) { r->~RiemannSolver(); }
-__global__ void freeDeviceMixture(GasMixture *mix) { mix->~GasMixture(); }
-__global__ void freeDeviceTransport(TransportProperties *transport) { transport->~TransportProperties(); }
-
-#if defined(_CUDA_)
-
-// CUDA supports device new/delete
-__global__ void instantiateDeviceChemistry(GasMixture *mixture, const ChemistryInput inputs, Chemistry **chem) {
-  *chem = new Chemistry(mixture, inputs);
-}
-
-__global__ void instantiateDeviceNetEmission(const RadiationInput inputs, Radiation **radiation) {
-  *radiation = new NetEmission(inputs);
-}
-
-__global__ void freeDeviceChemistry(Chemistry *chem) { delete chem; }
-__global__ void freeDeviceRadiation(Radiation *radiation) { delete radiation; }
-
-#elif defined(_HIP_)
-
 __global__ void instantiateDeviceChemistry(GasMixture *mixture, const ChemistryInput inputs, void *chem) {
   chem = new (chem) Chemistry(mixture, inputs);
 }
 
-// explicit destructor call b/c placement new above
-__global__ void freeDeviceChemistry(Chemistry *chem) { chem->~Chemistry(); }
+__global__ void instantiateDeviceNetEmission(const RadiationInput inputs, void *radiation) {
+  radiation = new (radiation) NetEmission(inputs);
+}
 
+// explicit destructor call b/c placement new above
+__global__ void freeDeviceFluxes(Fluxes *f) { f->~Fluxes(); }
+__global__ void freeDeviceRiemann(RiemannSolver *r) { r->~RiemannSolver(); }
+__global__ void freeDeviceMixture(GasMixture *mix) { mix->~GasMixture(); }
+__global__ void freeDeviceTransport(TransportProperties *transport) { transport->~TransportProperties(); }
+__global__ void freeDeviceChemistry(Chemistry *chem) {
+  if (chem != NULL) chem->~Chemistry();
+}
+__global__ void freeDeviceRadiation(Radiation *radiation) {
+  if (radiation != NULL) radiation->~Radiation();
+}
+
+#if defined(_CUDA_)
+// CUDA supports device new/delete
+#elif defined(_HIP_)
 #endif  // defined(_CUDA_)
 
 // NOTE(kevin): Do not use this. For some unknown reason, this wrapper causes a memory issue, at a random place far
