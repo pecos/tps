@@ -37,6 +37,8 @@
 #include "gpu_constructor.hpp"
 
 namespace gpu {
+
+#if defined(_CUDA_) || defined(_HIP_)
 //---------------------------------------------------
 // Constructors first
 //---------------------------------------------------
@@ -98,4 +100,5 @@ __global__ void freeDeviceRadiation(Radiation *radiation) {
   if (radiation != NULL) radiation->~Radiation();
 }
 
+#endif  // cuda or hip
 }  // namespace gpu

@@ -86,6 +86,8 @@
 #endif
 
 namespace gpu {
+
+#if defined(_CUDA_) || defined(_HIP_)
 //! Instantiate DryAir object on the device with placement new
 __global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int nvel, void *mix);
 
@@ -140,6 +142,7 @@ __global__ void freeDeviceChemistry(Chemistry *chem);
 //! Explicit call to Radiation destructor on the device
 __global__ void freeDeviceRadiation(Radiation *radiation);
 
+#endif  // cuda or hip
 }  // namespace gpu
 
 #endif  // GPU_CONSTRUCTOR_HPP_
