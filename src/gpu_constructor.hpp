@@ -65,17 +65,34 @@
 #include "transport_properties.hpp"
 #include "utils.hpp"
 
+#if defined(_CUDA_)
+// cuda malloc and free
+#define tpsGpuMalloc(ptr, size) cudaMalloc(ptr, size)
+#define tpsGpuFree(ptr) cudaFree(ptr)
+#elif defined(_HIP)
+// hip malloc and free
+#define tpsGpuMalloc(ptr, size) hipMalloc(ptr, size)
+#define tpsGpuFree(ptr) hipFree(ptr)
+#else
+// these should be unreachable if properly used
+#define tpsGpuMalloc(ptr, size) assert(false)
+#define tpsGpuFree(ptr) assert(false)
+#endif
+
 using namespace mfem;
 using namespace std;
 
 namespace gpu {
+__global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int nvel, void *mix);
+__global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, void *mix);
 
 #if defined(_CUDA_)
 // CUDA supports device new/delete
-__global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int nvel, GasMixture **mix);
+//__global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int nvel, GasMixture **mix);
 __global__ void instantiateDeviceDryAirTransport(GasMixture *mixture, const double viscosity_multiplier,
                                                  const double bulk_viscosity, TransportProperties **trans);
-__global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, GasMixture **mix);
+//__global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, GasMixture
+//**mix);
 __global__ void instantiateDeviceConstantTransport(GasMixture *mixture, const constantTransportData inputs,
                                                    TransportProperties **trans);
 __global__ void instantiateDeviceArgonMinimalTransport(GasMixture *mixture, const ArgonTransportInput inputs,
@@ -104,10 +121,10 @@ __global__ void freeDeviceRadiation(Radiation *radiation);
 // outside of the instantiate functions below with hipMalloc and the
 // use placement new.  Maybe should adopt this approach for CUDA as
 // well, as it seems actually slightly cleaner.
-__global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int nvel, void *mix);
+//__global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int nvel, void *mix);
 __global__ void instantiateDeviceDryAirTransport(GasMixture *mixture, const double viscosity_multiplier,
                                                  const double bulk_viscosity, void *transport);
-__global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, void *mix);
+//__global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, void *mix);
 __global__ void instantiateDeviceConstantTransport(GasMixture *mixture, const constantTransportData inputs,
                                                    void *trans);
 __global__ void instantiateDeviceArgonMinimalTransport(GasMixture *mixture, const ArgonTransportInput inputs,

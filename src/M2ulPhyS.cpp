@@ -265,9 +265,6 @@ void M2ulPhyS::initVariables() {
 
   mixture = NULL;
 #if defined(_CUDA_)
-  GasMixture **d_mixture_tmp;
-  cudaMalloc((void **)&d_mixture_tmp, sizeof(GasMixture **));
-
   TransportProperties **d_transport_tmp;
   cudaMalloc((void **)&d_transport_tmp, sizeof(TransportProperties **));
 
@@ -277,7 +274,6 @@ void M2ulPhyS::initVariables() {
   Radiation **d_radiation_tmp;
   cudaMalloc((void **)&d_radiation_tmp, sizeof(Radiation **));
 #elif defined(_HIP_)
-  hipMalloc((void **)&d_mixture, sizeof(GasMixture));
   hipMalloc((void **)&transportPtr, sizeof(TransportProperties));
   hipMalloc((void **)&chemistry_, sizeof(Chemistry));
   hipMalloc((void **)&radiation_, sizeof(Radiation));
@@ -286,15 +282,17 @@ void M2ulPhyS::initVariables() {
   switch (config.GetWorkingFluid()) {
     case WorkingFluid::DRY_AIR:
       mixture = new DryAir(config, dim, nvel);
-#if defined(_CUDA_)
-      gpu::instantiateDeviceDryAir<<<1, 1>>>(config.dryAirInput, dim, nvel, d_mixture_tmp);
-      cudaMemcpy(&d_mixture, d_mixture_tmp, sizeof(GasMixture *), cudaMemcpyDeviceToHost);
 
+#if defined(_CUDA_) || defined(_HIP_)
+      tpsGpuMalloc((void **)(&d_mixture), sizeof(DryAir));
+      gpu::instantiateDeviceDryAir<<<1, 1>>>(config.dryAirInput, dim, nvel, d_mixture);
+#endif
+
+#if defined(_CUDA_)
       gpu::instantiateDeviceDryAirTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(),
                                                       d_transport_tmp);
       cudaMemcpy(&transportPtr, d_transport_tmp, sizeof(TransportProperties *), cudaMemcpyDeviceToHost);
 #elif defined(_HIP_)
-      gpu::instantiateDeviceDryAir<<<1, 1>>>(config.dryAirInput, dim, nvel, d_mixture);
       gpu::instantiateDeviceDryAirTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(),
                                                       transportPtr);
 #else
@@ -305,10 +303,8 @@ void M2ulPhyS::initVariables() {
       switch (config.GetGasModel()) {
         case GasModel::PERFECT_MIXTURE:
           mixture = new PerfectMixture(config, dim, nvel);
-#if defined(_CUDA_)
-          gpu::instantiateDevicePerfectMixture<<<1, 1>>>(config.perfectMixtureInput, dim, nvel, d_mixture_tmp);
-          cudaMemcpy(&d_mixture, d_mixture_tmp, sizeof(GasMixture *), cudaMemcpyDeviceToHost);
-#elif defined(_HIP_)
+#if defined(_CUDA_) || defined(_HIP_)
+          tpsGpuMalloc((void **)(&d_mixture), sizeof(PerfectMixture));
           gpu::instantiateDevicePerfectMixture<<<1, 1>>>(config.perfectMixtureInput, dim, nvel, d_mixture);
 #endif
           break;
@@ -387,7 +383,6 @@ void M2ulPhyS::initVariables() {
   }
   assert(mixture != NULL);
 #if defined(_CUDA_)
-  cudaFree(d_mixture_tmp);
   cudaFree(d_transport_tmp);
   cudaFree(d_chemistry_tmp);
   cudaFree(d_radiation_tmp);
@@ -1000,7 +995,10 @@ M2ulPhyS::~M2ulPhyS() {
   hipFree(radiation_);
   hipFree(chemistry_);
   hipFree(transportPtr);
-  hipFree(d_mixture);
+#endif
+
+#if defined(_CUDA_) || defined(_HIP_)
+  tpsGpuFree(d_mixture);
 #endif
 
   delete gradUpfes;
