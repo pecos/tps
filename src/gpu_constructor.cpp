@@ -60,37 +60,6 @@ __global__ void instantiateDeviceArgonMixtureTransport(GasMixture *mixture, cons
   trans = new (trans) ArgonMixtureTransport(mixture, inputs);
 }
 
-__global__ void freeDeviceMixture(GasMixture *mix) { mix->~GasMixture(); }
-__global__ void freeDeviceTransport(TransportProperties *transport) { transport->~TransportProperties(); }
-
-#if defined(_CUDA_)
-
-// CUDA supports device new/delete
-__global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
-                                        const int _num_equation, const int _dim, bool axisym, Fluxes **f) {
-  *f = new Fluxes(_mixture, _eqSystem, _transport, _num_equation, _dim, axisym);
-}
-
-__global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
-                                         Fluxes *_fluxClass, bool _useRoe, bool axisym, RiemannSolver **r) {
-  *r = new RiemannSolver(_num_equation, _mixture, _eqSystem, _fluxClass, _useRoe, axisym);
-}
-
-__global__ void instantiateDeviceChemistry(GasMixture *mixture, const ChemistryInput inputs, Chemistry **chem) {
-  *chem = new Chemistry(mixture, inputs);
-}
-
-__global__ void instantiateDeviceNetEmission(const RadiationInput inputs, Radiation **radiation) {
-  *radiation = new NetEmission(inputs);
-}
-
-__global__ void freeDeviceFluxes(Fluxes *f) { delete f; }
-__global__ void freeDeviceRiemann(RiemannSolver *r) { delete r; }
-__global__ void freeDeviceChemistry(Chemistry *chem) { delete chem; }
-__global__ void freeDeviceRadiation(Radiation *radiation) { delete radiation; }
-
-#elif defined(_HIP_)
-
 __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
                                         const int _num_equation, const int _dim, bool axisym, void *f) {
   f = new (f) Fluxes(_mixture, _eqSystem, _transport, _num_equation, _dim, axisym);
@@ -101,13 +70,32 @@ __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture
   r = new (r) RiemannSolver(_num_equation, _mixture, _eqSystem, _fluxClass, _useRoe, axisym);
 }
 
+__global__ void freeDeviceFluxes(Fluxes *f) { f->~Fluxes(); }
+__global__ void freeDeviceRiemann(RiemannSolver *r) { r->~RiemannSolver(); }
+__global__ void freeDeviceMixture(GasMixture *mix) { mix->~GasMixture(); }
+__global__ void freeDeviceTransport(TransportProperties *transport) { transport->~TransportProperties(); }
+
+#if defined(_CUDA_)
+
+// CUDA supports device new/delete
+__global__ void instantiateDeviceChemistry(GasMixture *mixture, const ChemistryInput inputs, Chemistry **chem) {
+  *chem = new Chemistry(mixture, inputs);
+}
+
+__global__ void instantiateDeviceNetEmission(const RadiationInput inputs, Radiation **radiation) {
+  *radiation = new NetEmission(inputs);
+}
+
+__global__ void freeDeviceChemistry(Chemistry *chem) { delete chem; }
+__global__ void freeDeviceRadiation(Radiation *radiation) { delete radiation; }
+
+#elif defined(_HIP_)
+
 __global__ void instantiateDeviceChemistry(GasMixture *mixture, const ChemistryInput inputs, void *chem) {
   chem = new (chem) Chemistry(mixture, inputs);
 }
 
 // explicit destructor call b/c placement new above
-__global__ void freeDeviceFluxes(Fluxes *f) { f->~Fluxes(); }
-__global__ void freeDeviceRiemann(RiemannSolver *r) { r->~RiemannSolver(); }
 __global__ void freeDeviceChemistry(Chemistry *chem) { chem->~Chemistry(); }
 
 #endif  // defined(_CUDA_)
