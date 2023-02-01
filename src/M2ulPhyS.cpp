@@ -265,16 +265,12 @@ void M2ulPhyS::initVariables() {
 
   mixture = NULL;
 #if defined(_CUDA_)
-  TransportProperties **d_transport_tmp;
-  cudaMalloc((void **)&d_transport_tmp, sizeof(TransportProperties **));
-
   Chemistry **d_chemistry_tmp;
   cudaMalloc((void **)&d_chemistry_tmp, sizeof(Chemistry **));
 
   Radiation **d_radiation_tmp;
   cudaMalloc((void **)&d_radiation_tmp, sizeof(Radiation **));
 #elif defined(_HIP_)
-  hipMalloc((void **)&transportPtr, sizeof(TransportProperties));
   hipMalloc((void **)&chemistry_, sizeof(Chemistry));
   hipMalloc((void **)&radiation_, sizeof(Radiation));
 #endif
@@ -286,13 +282,8 @@ void M2ulPhyS::initVariables() {
 #if defined(_CUDA_) || defined(_HIP_)
       tpsGpuMalloc((void **)(&d_mixture), sizeof(DryAir));
       gpu::instantiateDeviceDryAir<<<1, 1>>>(config.dryAirInput, dim, nvel, d_mixture);
-#endif
 
-#if defined(_CUDA_)
-      gpu::instantiateDeviceDryAirTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(),
-                                                      d_transport_tmp);
-      cudaMemcpy(&transportPtr, d_transport_tmp, sizeof(TransportProperties *), cudaMemcpyDeviceToHost);
-#elif defined(_HIP_)
+      tpsGpuMalloc((void **)&transportPtr, sizeof(DryAirTransport));
       gpu::instantiateDeviceDryAirTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(),
                                                       transportPtr);
 #else
@@ -314,30 +305,24 @@ void M2ulPhyS::initVariables() {
       }
       switch (config.GetTranportModel()) {
         case ARGON_MINIMAL:
-#if defined(_CUDA_)
-          gpu::instantiateDeviceArgonMinimalTransport<<<1, 1>>>(d_mixture, config.argonTransportInput, d_transport_tmp);
-          cudaMemcpy(&transportPtr, d_transport_tmp, sizeof(TransportProperties *), cudaMemcpyDeviceToHost);
-#elif defined(_HIP_)
+#if defined(_CUDA_) || defined(_HIP_)
+          tpsGpuMalloc((void **)&transportPtr, sizeof(ArgonMinimalTransport));
           gpu::instantiateDeviceArgonMinimalTransport<<<1, 1>>>(d_mixture, config.argonTransportInput, transportPtr);
 #else
           transportPtr = new ArgonMinimalTransport(mixture, config);
 #endif
           break;
         case ARGON_MIXTURE:
-#if defined(_CUDA_)
-          gpu::instantiateDeviceArgonMixtureTransport<<<1, 1>>>(d_mixture, config.argonTransportInput, d_transport_tmp);
-          cudaMemcpy(&transportPtr, d_transport_tmp, sizeof(TransportProperties *), cudaMemcpyDeviceToHost);
-#elif defined(_HIP_)
+#if defined(_CUDA_) || defined(_HIP_)
+          tpsGpuMalloc((void **)&transportPtr, sizeof(ArgonMixtureTransport));
           gpu::instantiateDeviceArgonMixtureTransport<<<1, 1>>>(d_mixture, config.argonTransportInput, transportPtr);
 #else
           transportPtr = new ArgonMixtureTransport(mixture, config);
 #endif
           break;
         case CONSTANT:
-#if defined(_CUDA_)
-          gpu::instantiateDeviceConstantTransport<<<1, 1>>>(d_mixture, config.constantTransport, d_transport_tmp);
-          cudaMemcpy(&transportPtr, d_transport_tmp, sizeof(TransportProperties *), cudaMemcpyDeviceToHost);
-#elif defined(_HIP_)
+#if defined(_CUDA_) || defined(_HIP_)
+          tpsGpuMalloc((void **)&transportPtr, sizeof(ConstantTransport));
           gpu::instantiateDeviceConstantTransport<<<1, 1>>>(d_mixture, config.constantTransport, transportPtr);
 #else
           transportPtr = new ConstantTransport(mixture, config);
@@ -383,13 +368,11 @@ void M2ulPhyS::initVariables() {
   }
   assert(mixture != NULL);
 #if defined(_CUDA_)
-  cudaFree(d_transport_tmp);
   cudaFree(d_chemistry_tmp);
   cudaFree(d_radiation_tmp);
 #elif defined(_HIP_)
 #else
   d_mixture = mixture;
-  // d_transport = transportPtr;
 #endif
 
   order = config.GetSolutionOrder();
@@ -994,11 +977,11 @@ M2ulPhyS::~M2ulPhyS() {
 #ifdef _HIP_
   hipFree(radiation_);
   hipFree(chemistry_);
-  hipFree(transportPtr);
 #endif
 
 #if defined(_CUDA_) || defined(_HIP_)
   tpsGpuFree(d_mixture);
+  tpsGpuFree(transportPtr);
 #endif
 
   delete gradUpfes;
