@@ -30,10 +30,16 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 
+/** @file
+ * @copydoc gpu_constructor.hpp
+ */
+
 #include "gpu_constructor.hpp"
 
 namespace gpu {
-
+//---------------------------------------------------
+// Constructors first
+//---------------------------------------------------
 __global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int nvel, void *mix) {
   mix = new (mix) DryAir(inputs, _dim, nvel);
 }
@@ -78,7 +84,9 @@ __global__ void instantiateDeviceNetEmission(const RadiationInput inputs, void *
   radiation = new (radiation) NetEmission(inputs);
 }
 
-// explicit destructor call b/c placement new above
+//---------------------------------------------------
+// And then destructors
+//---------------------------------------------------
 __global__ void freeDeviceFluxes(Fluxes *f) { f->~Fluxes(); }
 __global__ void freeDeviceRiemann(RiemannSolver *r) { r->~RiemannSolver(); }
 __global__ void freeDeviceMixture(GasMixture *mix) { mix->~GasMixture(); }
@@ -88,26 +96,6 @@ __global__ void freeDeviceChemistry(Chemistry *chem) {
 }
 __global__ void freeDeviceRadiation(Radiation *radiation) {
   if (radiation != NULL) radiation->~Radiation();
-}
-
-#if defined(_CUDA_)
-// CUDA supports device new/delete
-#elif defined(_HIP_)
-#endif  // defined(_CUDA_)
-
-// NOTE(kevin): Do not use this. For some unknown reason, this wrapper causes a memory issue, at a random place far
-// after this instantiation.
-void assignMixture(const DryAirInput inputs, const int dim, const int nvel, GasMixture *dMixture) {
-#if defined(_CUDA_)
-  GasMixture **d_mixture_tmp;
-  cudaMalloc((void **)&d_mixture_tmp, sizeof(GasMixture **));
-  instantiateDeviceDryAir<<<1, 1>>>(inputs, dim, nvel, d_mixture_tmp);
-  cudaMemcpy(&dMixture, d_mixture_tmp, sizeof(GasMixture *), cudaMemcpyDeviceToHost);
-  cudaFree(d_mixture_tmp);
-#elif defined(_HIP_)
-  hipMalloc((void **)&dMixture, sizeof(DryAir));
-  instantiateDeviceDryAir<<<1, 1>>>(inputs, dim, nvel, dMixture);
-#endif
 }
 
 }  // namespace gpu
