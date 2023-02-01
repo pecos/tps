@@ -39,9 +39,6 @@
 #include "table.hpp"
 #include "tps_mfem_wrap.hpp"
 
-using namespace mfem;
-using namespace std;
-
 class Radiation {
  protected:
  public:
@@ -49,11 +46,8 @@ class Radiation {
 
   MFEM_HOST_DEVICE virtual ~Radiation() {}
 
-  // NOTE(kevin): Although this function is clearly overrided and thus must be specified as virtual,
-  //              specifying so causes an nvlink warning for cuda, and a memory fault at runtime.
-  // NOTE(kevin): not sure this is a good naming..
   // Currently has the minimal format required for NEC model.
-  MFEM_HOST_DEVICE double computeEnergySink(const double &T_h) {
+  MFEM_HOST_DEVICE virtual double computeEnergySink(const double &T_h) {
     printf("computeEnergySink not implemented");
     assert(false);
     return 0;
@@ -63,15 +57,16 @@ class Radiation {
 class NetEmission : public Radiation {
  private:
   const double PI_ = PI;
+
   // NOTE(kevin): currently only takes tabulated data.
-  TableInterpolator *necTable_ = NULL;
+  LinearTable necTable_;
 
  public:
   MFEM_HOST_DEVICE NetEmission(const RadiationInput &inputs);
 
-  MFEM_HOST_DEVICE virtual ~NetEmission();
+  MFEM_HOST_DEVICE ~NetEmission();
 
-  MFEM_HOST_DEVICE double computeEnergySink(const double &T_h) { return -4.0 * PI_ * necTable_->eval(T_h); }
+  MFEM_HOST_DEVICE double computeEnergySink(const double &T_h) override { return -4.0 * PI_ * necTable_.eval(T_h); }
 };
 
 #endif  // RADIATION_HPP_
