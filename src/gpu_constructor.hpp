@@ -75,7 +75,7 @@
 // cuda malloc and free
 #define tpsGpuMalloc(ptr, size) cudaMalloc(ptr, size)
 #define tpsGpuFree(ptr) cudaFree(ptr)
-#elif defined(_HIP)
+#elif defined(_HIP_)
 // hip malloc and free
 #define tpsGpuMalloc(ptr, size) hipMalloc(ptr, size)
 #define tpsGpuFree(ptr) hipFree(ptr)
