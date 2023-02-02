@@ -152,6 +152,7 @@ int main (int argc, char *argv[]) {
   RunConfiguration config;
   config.lteMixtureInput.f = LTE_FLUID;
   config.lteMixtureInput.thermo_file_name = "./inputs/argon_lte_thermo_table.dat";
+  config.lteMixtureInput.e_rev_file_name = "./inputs/argon_lte_e_rev_table.dat";
 
   // NB: This transport file is inconsistent with the mixture thermo
   // file.  It is ok here b/c the tests don't require consistency, but

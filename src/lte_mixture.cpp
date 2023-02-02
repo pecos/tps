@@ -37,7 +37,7 @@
 
 #ifndef _GPU_  // this class only available for CPU currently
 
-LteMixture::LteMixture(RunConfiguration &_runfile, int _dim, int nvel, bool generate_e_to_T)
+LteMixture::LteMixture(RunConfiguration &_runfile, int _dim, int nvel)
     : GasMixture(_runfile.lteMixtureInput.f, _dim, nvel) {
   numSpecies = 1;
   ambipolar = false;
@@ -57,11 +57,11 @@ LteMixture::LteMixture(RunConfiguration &_runfile, int _dim, int nvel, bool gene
                                         1,                                            /* density column */
                                         8 /* speed of sound column */);
 
-  T_table_ = NULL;
-  if (generate_e_to_T) {
-    // not implemented yet
-    assert(false);
-  }
+  T_table_ = new GslTableInterpolator2D(_runfile.lteMixtureInput.e_rev_file_name, /* (energy,density) -> temp data */
+                                        0,                                        /* energy column */
+                                        1,                                        /* density column */
+                                        2,                                        /* temperature column */
+                                        3);                                       /* number of columns */
 #else
   energy_table_ = NULL;
   R_table_ = NULL;
@@ -111,12 +111,7 @@ double LteMixture::ComputeTemperature(const Vector &state) {
   const double energy = (state[1 + nvel_] - 0.5 * den_vel2) / rho;
 
   double T;
-  if (T_table_ != NULL) {
-    T = T_table_->eval(energy, rho);
-  } else {
-    // TODO(trevilo): How should we set initial guess when T_table_ not present?
-    T = ((1.6667 - 1.0) / 208.) * energy;
-  }
+  T = T_table_->eval(energy, rho);
 
   double res = energy - energy_table_->eval(T, rho);
   const double res0 = abs(res);
