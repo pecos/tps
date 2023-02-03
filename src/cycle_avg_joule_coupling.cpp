@@ -36,8 +36,12 @@
 #include "quasimagnetostatic.hpp"
 
 CycleAvgJouleCoupling::CycleAvgJouleCoupling(MPI_Session &mpi, string &inputFileName, TPS::Tps *tps, int max_out,
-                                             bool axisym, double input_power)
-    : mpi_(mpi), em_opt_(), max_outer_iters_(max_out), input_power_(input_power) {
+                                             bool axisym, double input_power, double initial_input_power)
+    : mpi_(mpi),
+      em_opt_(),
+      max_outer_iters_(max_out),
+      input_power_(input_power),
+      initial_input_power_(initial_input_power) {
   if (axisym) {
     qmsa_solver_ = new QuasiMagnetostaticSolverAxiSym(mpi, em_opt_, tps);
   } else {
@@ -242,6 +246,11 @@ void CycleAvgJouleCoupling::solve() {
   int curr_iter = flow_solver_->getCurrentIterations();
   flow_solver_->setMaximumIterations(curr_iter + increment);
 
+  double delta_power = 0;
+  if (input_power_ > 0) {
+    delta_power = (input_power_ - initial_input_power_) / max_outer_iters_;
+  }
+
   for (int outer_iters = 0; outer_iters < max_outer_iters_; outer_iters++) {
     // EM
     interpConductivityFromFlowToEM();
@@ -252,7 +261,8 @@ void CycleAvgJouleCoupling::solve() {
     }
 
     if (input_power_ > 0) {
-      const double ratio = input_power_ / tot_jh;
+      const double target_power = initial_input_power_ + (outer_iters + 1) * delta_power;
+      const double ratio = target_power / tot_jh;
       qmsa_solver_->scaleJouleHeating(ratio);
       const double upd_jh = qmsa_solver_->totalJouleHeating();
       if (mpi_.Root()) {
