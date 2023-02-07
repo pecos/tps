@@ -55,10 +55,14 @@ class flowLinearSolver : public mfem::Solver {
       int block_size = vfes->GetFE(0)->GetDof();
       prec_ = new mfem::BlockILU(block_size, mfem::BlockILU::Reordering::MINIMUM_DISCARDED_FILL);
     } else {
+#if MFEM_HYPRE_VERSION >= 21900
       // Regular ILU preconditioner
       mfem::HypreILU *ilu = new mfem::HypreILU();
       ilu->SetLevelOfFill(0);
       prec_ = ilu;
+#else
+      mfem_error("HypreILU unavailable.  Upgrade to hypre 2.19 or more recent.");
+#endif
     }
 
     // TODO(trevilo): Allow user to set thse
