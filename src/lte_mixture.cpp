@@ -79,6 +79,10 @@ LteMixture::~LteMixture() {
 
 /// Compute pressure from conserved state
 double LteMixture::ComputePressure(const Vector &state, double *electronPressure) {
+  return ComputePressure(state.GetData(), electronPressure);
+}
+
+double LteMixture::ComputePressure(const double *state, double *electronPressure) const {
   const double rho = state[0];
   const double T = ComputeTemperature(state);
   const double R = R_table_->eval(T, rho);
@@ -121,6 +125,10 @@ double LteMixture::ComputePressureFromPrimitives(const Vector &Up) {
  * table.
  */
 double LteMixture::ComputeTemperature(const Vector &state) {
+  return ComputeTemperature(state.GetData());
+}
+
+double LteMixture::ComputeTemperature(const double *state) const {
   const double rho = state[0];
 
   double den_vel2 = 0;

@@ -1093,7 +1093,7 @@ double PerfectMixture::ComputeTemperature(const Vector &state) {
 }
 
 // NOTE: this routine only return heavy-species temperature. Need name-change.
-MFEM_HOST_DEVICE double PerfectMixture::ComputeTemperature(const double *state) {
+MFEM_HOST_DEVICE double PerfectMixture::ComputeTemperature(const double *state) const {
   double n_sp[gpudata::MAXSPECIES];
   computeNumberDensities(state, n_sp);
 

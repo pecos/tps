@@ -168,7 +168,7 @@ class GasMixture {
     return -1.0;
   }
   virtual double ComputeTemperature(const Vector &state) = 0;
-  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state) {
+  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state) const {
     // mfem_error("ComputeTemperature is not implemented.");
     return -1.0;
   }
@@ -348,7 +348,7 @@ class DryAir : public GasMixture {
   virtual double ComputePressureFromPrimitives(const Vector &Up);
   MFEM_HOST_DEVICE virtual double ComputePressureFromPrimitives(const double *Up);
   virtual double ComputeTemperature(const Vector &state);
-  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state);
+  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state) const;
   // virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / gas_constant / rho[0]; }
 
   virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies);
@@ -621,7 +621,7 @@ inline double DryAir::ComputeTemperature(const Vector &state) {
 #endif
 }
 
-MFEM_HOST_DEVICE inline double DryAir::ComputeTemperature(const double *state) {
+MFEM_HOST_DEVICE inline double DryAir::ComputeTemperature(const double *state) const {
   double den_vel2 = 0;
   for (int d = 0; d < nvel_; d++) den_vel2 += state[d + 1] * state[d + 1];
   den_vel2 /= state[0];
@@ -702,7 +702,7 @@ class PerfectMixture : public GasMixture {
   virtual bool StateIsPhysical(const Vector &state);
 
   virtual double ComputeTemperature(const Vector &state);
-  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state);
+  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state) const;
   MFEM_HOST_DEVICE virtual void computeTemperaturesBase(const double *conservedState, const double *n_sp,
                                                         const double n_e, const double n_B, double &T_h,
                                                         double &T_e) const;
