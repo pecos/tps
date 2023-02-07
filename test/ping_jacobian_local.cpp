@@ -36,6 +36,7 @@
 #include "../src/dataStructures.hpp"
 #include "../src/equation_of_state.hpp"
 #include "../src/fluxes.hpp"
+#include "../src/lte_mixture.hpp"
 #include "../src/riemann_solver.hpp"
 
 int pingNormalFlux() {
@@ -422,12 +423,143 @@ int pingRiemannSolver() {
 }
 
 
+
+int pingFluxVectorLTE() {
+  int ierr = 0;
+  int ndim = 3;
+  int neqn = 5;
+  Equations eqSystem = EULER;
+  bool axisym = false;
+  bool roe = false;
+
+  // Need a minimal configuration
+  RunConfiguration config;
+  config.lteMixtureInput.f = LTE_FLUID;
+  config.lteMixtureInput.thermo_file_name = "./inputs/argon_lte_thermo_table.dat";
+  config.lteMixtureInput.e_rev_file_name = "./inputs/argon_lte_e_rev_table.dat";
+
+  // NB: This transport file is inconsistent with the mixture thermo
+  // file.  It is ok here b/c the tests don't require consistency, but
+  // obviously any real simulation should be run with consistent
+  // transport and thermo
+  config.lteMixtureInput.trans_file_name = "./inputs/air_simple_transport_table.dat";
+
+  // Instantiate objects needed to evaluate the flux
+  GasMixture *mixture = new LteMixture(config, 3, 3);
+  Fluxes *flux = new Fluxes(mixture, eqSystem, NULL, neqn, ndim, axisym);
+
+  Vector U0(neqn);
+  Vector U1(neqn);
+  DenseMatrix F0(neqn, ndim);
+  DenseMatrix F1(neqn, ndim);
+  DenseTensor F_U0(neqn, ndim, neqn), F_U1(neqn, ndim, neqn);
+  DenseTensor J_fd(neqn, ndim, neqn), J_an(neqn, ndim, neqn);
+
+  DenseMatrix err_mat(neqn, neqn), non_dim(neqn, neqn);
+
+  // Set the state to something
+  const double density = 1.2;
+  const double u1 = 20., u2 = 30., u3 = -25.;
+  const double Usq = u1 * u1 + u2 * u2 + u3 * u3;
+  const double pressure = 101325.;
+  const double gamma = 1.667; //mixture->GetSpecificHeatRatio();
+
+  U0[0] = density;
+  U0[1] = density * u1;
+  U0[2] = density * u2;
+  U0[3] = density * u3;
+  U0[4] = pressure / (gamma - 1) + 0.5 * density * Usq;
+
+  // Evaluate flux and Jacobian at 'nominal' state
+  flux->ComputeConvectiveFluxes(U0, F0);
+  std::cout << "pingFluxVectorLTE..." << std::endl;
+  flux->ComputeConvectiveFluxJacobian(U0, F_U0);
+
+  // For this 'ping' test, we take the difference between the
+  // first-order finite difference derivative and the average of the
+  // analytic derivatives.  If the analytic derivatives are correct
+  // (and the function is smooth) this difference converges at
+  // O(eps**2), where eps is the step size used for the finite
+  // difference.  Thus, the check for this test is whether we observe
+  // the correct convergence rate.  This removes the need to supply a
+  // tolerance on the discrepancy between the finite difference and
+  // analytic results, but also means we have to use a large enough
+  // step size that finite difference error (as opposed to rounding
+  // error) dominates the discrepancy.  That is why the perturbation
+  // as chosen as it is below.
+
+
+  double perturbation = 2e-2;
+  double delta_rel[3][5];
+
+  // Perturb the state and evaluate finite difference Jacobian approx
+  // at three different step sizes
+  for (int rep = 0; rep < 3; rep++) {
+
+    for (int i = 0; i < neqn; i++) {
+      U1 = U0;
+      U1[i] += U0[i]*perturbation;
+
+      flux->ComputeConvectiveFluxes(U1, F1);
+      flux->ComputeConvectiveFluxJacobian(U1, F_U1);
+
+      for (int j = 0; j < neqn; j++) {
+        for (int k = 0; k < ndim; k++) {
+          // finite difference
+          J_fd(j, k, i) = (F1(j, k) - F0(j, k)) / (U1[i] - U0[i]);
+
+          // 'analytic' (average of results at U0 and U1)
+          J_an(j, k, i) = 0.5*(F_U0(j, k, i) + F_U1(j, k, i));
+        }
+      }
+    }
+
+    for (int j = 0; j < ndim; j++) {
+
+      for (int i = 0; i < neqn; i++) {
+        for (int k = 0; k < neqn; k++) {
+          err_mat(i, k) = J_an(i, j, k) - J_fd(i, j, k);
+          non_dim(i, k) = J_an(i, j, k);
+          std::cout << J_an(i,j,k) << " " << J_fd(i,j,k) << " " << err_mat(i, k) << std::endl;
+        }
+      }
+      // Evaluate a relative error metric (based on Frobenius norm)
+      delta_rel[rep][j] = err_mat.FNorm() / non_dim.FNorm();
+    }
+
+    // Prep for next time through by decreasing the FD step
+    perturbation *= 0.5;
+  }
+
+  for (int j = 0; j < ndim; j++) {
+    const double rate1 = std::log(delta_rel[1][j] / delta_rel[0][j]) / std::log(0.5);
+    const double rate2 = std::log(delta_rel[2][j] / delta_rel[1][j]) / std::log(0.5);
+
+    std::cout << "ComputeConvectiveFluxJacobian rates = " << rate1 << ", " << rate2 << std::endl;
+
+    // Fail the test if the rate isn't what we expect
+    if ( (rate1 < 1.95) || (rate1 > 2.05) ||
+         (rate2 < 1.95) || (rate2 > 2.05) ) {
+      ierr = 1;
+    }
+  }
+  delete flux;
+  delete mixture;
+
+  return ierr;
+}
+
+
 int main(int argc, char *argv[]) {
   int ierr = 0;
 
+  // DryAir
   ierr += pingFluxVector();
   ierr += pingNormalFlux();
   ierr += pingRiemannSolver();
+
+  // LTE
+  ierr += pingFluxVectorLTE();
 
   return ierr;
 }

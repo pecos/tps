@@ -171,8 +171,6 @@ test_lte_mixture_LDADD        = ../src/libtps.la
 test_lte_mixture_LDADD       += $(HDF5_LIBS)
 test_lte_mixture_LDADD       += $(GRVY_LIBS)
 
-endif # if !GPU_ENABLED
-
 # extra cpu test programs
 
 # local Jacobian tests
@@ -181,21 +179,6 @@ ping_jacobian_local_SOURCES = ping_jacobian_local.cpp
 ping_jacobian_local_LDADD   = ../src/libtps.la
 ping_jacobian_local_LDADD  += $(HDF5_LIBS)
 ping_jacobian_local_LDADD  += $(GRVY_LIBS)
-ping_jacobian_local_LDADD  += $(MFEM_LIBS)
-
-ping_jacobian_local_LDFLAGS =
-if SLURM_ENABLED
-ping_jacobian_local_LDFLAGS += -lslurm
-endif
-
-if GSLIB_ENABLED
-ping_jacobian_local_LDADD   += -lgs
-ping_jacobian_local_LDFLAGS += -L$(GSLIB_LIB)
-endif
-
-if MASA_ENABLED
-ping_jacobian_local_LDADD += $(MASA_LIBS)
-endif
 
 # global Jacobian tests
 check_PROGRAMS += ping_jacobian_global
@@ -205,17 +188,5 @@ ping_jacobian_global_LDADD  += $(HDF5_LIBS)
 ping_jacobian_global_LDADD  += $(GRVY_LIBS)
 ping_jacobian_global_LDADD  += $(MFEM_LIBS)
 
-ping_jacobian_global_LDFLAGS =
-if SLURM_ENABLED
-ping_jacobian_global_LDFLAGS += -lslurm
-endif
-
-if GSLIB_ENABLED
-ping_jacobian_global_LDADD   += -lgs
-ping_jacobian_global_LDFLAGS += -L$(GSLIB_LIB)
-endif
-
-if MASA_ENABLED
-ping_jacobian_global_LDADD += $(MASA_LIBS)
-endif
+endif # if !GPU_ENABLED
 
