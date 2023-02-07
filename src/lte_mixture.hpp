@@ -74,9 +74,12 @@ class LteMixture : public GasMixture {
 
   virtual double ComputePressure(const Vector &state, double *electronPressure = NULL);
 
+  virtual void computePressureJacobian(const Vector &state, Vector &p_U);
+
   virtual double ComputePressureFromPrimitives(const Vector &Up);
 
   virtual double ComputeTemperature(const Vector &state);
+  void computeTemperatureJacobian(const Vector &state, const double T, Vector &T_U);
 
   double ComputeTemperatureFromDensityPressure(const double rho, const double p);
 
