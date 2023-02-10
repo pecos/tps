@@ -239,45 +239,45 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
   stateMirror[1] = stateIn[0] * (vel[0] - 2. * vn * unitN[0]);
   stateMirror[2] = stateIn[0] * (vel[1] - 2. * vn * unitN[1]);
   if (dim_ == 3) stateMirror[3] = stateIn[0] * (vel[2] - 2. * vn * unitN[2]);
-  if ((nvel_ == 3) && (dim_ == 2)) stateMirror[3] = stateIn[0] * vel[2];
+  if ((nvel_ == 3) && (dim_ == 2)) stateMirror[3] = -stateIn[0] * vel[2];
 
   rsolver->Eval(stateIn, stateMirror, normal, bdrFlux);
 
-  Vector wallViscF(num_equation_);
-  DenseMatrix viscF(num_equation_, dim_);
+  // Vector wallViscF(num_equation_);
+  // DenseMatrix viscF(num_equation_, dim_);
 
-  if (axisymmetric_) {
-    // here we have hijacked the inviscid wall condition to implement
-    // the axis... but... should implement this separately
+  // if (axisymmetric_) {
+  //   // here we have hijacked the inviscid wall condition to implement
+  //   // the axis... but... should implement this separately
 
-    // incoming visc flux
-    fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, viscF);
+  //   // incoming visc flux
+  //   fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, viscF);
 
-    // modify gradients so that wall is adibatic
-    Vector unitNorm = normal;
-    double normN = 0.;
-    for (int d = 0; d < dim_; d++) normN += normal[d] * normal[d];
-    unitNorm *= 1. / sqrt(normN);
+  //   // modify gradients so that wall is adibatic
+  //   Vector unitNorm = normal;
+  //   double normN = 0.;
+  //   for (int d = 0; d < dim_; d++) normN += normal[d] * normal[d];
+  //   unitNorm *= 1. / sqrt(normN);
 
-    for (int d = 0; d < dim_; d++) bcFlux_.normal[d] = unitNorm[d];
-    fluxClass->ComputeBdrViscousFluxes(stateMirror, gradState, radius, bcFlux_, wallViscF);
-    wallViscF *= sqrt(normN);  // in case normal is not a unit vector..
-  } else {
-    DenseMatrix viscFw(num_equation_, dim_);
+  //   for (int d = 0; d < dim_; d++) bcFlux_.normal[d] = unitNorm[d];
+  //   fluxClass->ComputeBdrViscousFluxes(stateMirror, gradState, radius, bcFlux_, wallViscF);
+  //   wallViscF *= sqrt(normN);  // in case normal is not a unit vector..
+  // } else {
+  //   DenseMatrix viscFw(num_equation_, dim_);
 
-    // evaluate viscous fluxes at the wall
-    fluxClass->ComputeViscousFluxes(stateMirror, gradState, radius, viscFw);
-    viscFw.Mult(normal, wallViscF);
+  //   // evaluate viscous fluxes at the wall
+  //   fluxClass->ComputeViscousFluxes(stateMirror, gradState, radius, viscFw);
+  //   viscFw.Mult(normal, wallViscF);
 
-    // evaluate internal viscous fluxes
-    fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, viscF);
-  }
+  //   // evaluate internal viscous fluxes
+  //   fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, viscF);
+  // }
 
-  // Add visc fluxes (we skip density eq.)
-  for (int eq = 1; eq < num_equation_; eq++) {
-    bdrFlux[eq] -= 0.5 * wallViscF(eq);
-    for (int d = 0; d < dim_; d++) bdrFlux[eq] -= 0.5 * viscF(eq, d) * normal[d];
-  }
+  // // Add visc fluxes (we skip density eq.)
+  // for (int eq = 1; eq < num_equation_; eq++) {
+  //   bdrFlux[eq] -= 0.5 * wallViscF(eq);
+  //   for (int d = 0; d < dim_; d++) bdrFlux[eq] -= 0.5 * viscF(eq, d) * normal[d];
+  // }
 }
 
 void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
@@ -331,6 +331,9 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
 
   // Normal convective flux
   rsolver->Eval(stateIn, wallState, normal, bdrFlux, true);
+
+  // conserve mass at least
+  bdrFlux[0] = 0.0;
 
   // unit normal vector
   Vector unitNorm = normal;
