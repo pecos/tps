@@ -121,11 +121,11 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
     }
   }
 
-  if (_config.GetWorkingFluid() != WorkingFluid::DRY_AIR) {
-    forcing.Append(new SourceTerm(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up, gradUp, gpuArrays,
-                                  _config, mixture, d_mixture_, _transport, _chemistry, _radiation,
-                                  plasma_conductivity_));
-  }
+  //  if (_config.GetWorkingFluid() != WorkingFluid::DRY_AIR) {
+  forcing.Append(new SourceTerm(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up, gradUp, gpuArrays,
+                                _config, mixture, d_mixture_, _transport, _chemistry, _radiation,
+                                plasma_conductivity_));
+    //}
 #ifdef HAVE_MASA
   if (config_.use_mms_) {
     masaForcingIndex_ = forcing.Size();
@@ -135,8 +135,12 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
 #endif
 
   if (config_.isAxisymmetric()) {
-    forcing.Append(new AxisymmetricSource(dim_, num_equation_, _order, mixture, transport_, eqSystem, intRuleType,
-                                          intRules, vfes, U_, Up, gradUp, spaceVaryViscMult, gpuArrays, _config));
+    // forcing.Append(new AxisymmetricSource(dim_, num_equation_, _order, mixture, transport_, eqSystem, intRuleType,
+    //                                       intRules, vfes, U_, Up, gradUp, spaceVaryViscMult, gpuArrays, _config));
+
+    axi_src_ = new AxisymmetricSource(dim_, num_equation_, _order, mixture, transport_, eqSystem, intRuleType,
+                                      intRules, vfes, U_, Up, gradUp, spaceVaryViscMult, gpuArrays, _config);
+
     const FiniteElementCollection *fec = vfes->FEColl();
     dfes = new ParFiniteElementSpace(mesh, fec, dim_, Ordering::byNODES);
     coordsDof = new ParGridFunction(dfes);
@@ -162,11 +166,20 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
 
     MassIntegrator mi;
 
-    int integrationOrder = 2 * vfes->GetFE(i)->GetOrder();
+    int integrationOrder = 2 * vfes->GetFE(i)->GetOrder() + 1;
+    //int integrationOrder = 2 * vfes->GetFE(i)->GetOrder() - 1;
     const IntegrationRule intRule = intRules->Get(vfes->GetFE(i)->GetGeomType(), integrationOrder);
 
     mi.SetIntRule(&intRule);
     mi.AssembleElementMatrix(*(vfes->GetFE(i)), *(vfes->GetElementTransformation(i)), Me);
+    if (i==0) {
+      for (int n = 0; n < dof; n++) {
+        for (int j = 0; j < dof; j++) {
+          printf("Me[%d, %d] = %.6e\n", n, j, Me(n, j)); fflush(stdout);
+        }
+      }
+    }
+
 
     Me.Invert();
     for (int n = 0; n < dof; n++)
@@ -379,6 +392,7 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
   //   forcing[i]->setTime(this->GetTime());
   //   forcing[i]->updateTerms(z);
   // }
+  axi_src_->updateTerms(z);
 
   // 3. Multiply element-wise by the inverse mass matrices.
 #ifdef _GPU_
