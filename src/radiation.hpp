@@ -53,7 +53,7 @@ class Radiation {
   //              specifying so causes an nvlink warning for cuda, and a memory fault at runtime.
   // NOTE(kevin): not sure this is a good naming..
   // Currently has the minimal format required for NEC model.
-  MFEM_HOST_DEVICE double computeEnergySink(const double &T_h) {
+  virtual MFEM_HOST_DEVICE double computeEnergySink(const double &T_h) {
     printf("computeEnergySink not implemented");
     assert(false);
     return 0;
