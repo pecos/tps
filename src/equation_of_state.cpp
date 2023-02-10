@@ -57,15 +57,15 @@ void GasMixture::SetConstantPlasmaConductivity(ParGridFunction *pc, const ParGri
   const int nnode = pc->FESpace()->GetNDofs();
 
   if (coords != NULL) {
-    //printf("Setting variable PC with const_plasma_conductivity = %.3e\n", const_plasma_conductivity_); fflush(stdout);
-    // for (int n = 0; n < nnode; n++) {
-    //   const double r0 = 0.005; // 5mm
-    //   const double x = (*coords)[n + 0 * nnode];
-    //   plasma_conductivity_gf[n] = 10.0 * const_plasma_conductivity_ * std::exp(-0.5 * (x / r0) * (x / r0));
-    // }
+    printf("Setting variable PC with const_plasma_conductivity = %.3e\n", const_plasma_conductivity_); fflush(stdout);
     for (int n = 0; n < nnode; n++) {
-      plasma_conductivity_gf[n] = const_plasma_conductivity_;
+      const double r0 = 0.005; // 5mm
+      const double x = (*coords)[n + 0 * nnode];
+      plasma_conductivity_gf[n] = 10.0 * const_plasma_conductivity_ * std::exp(-0.5 * (x / r0) * (x / r0));
     }
+    // for (int n = 0; n < nnode; n++) {
+    //   plasma_conductivity_gf[n] = const_plasma_conductivity_;
+    // }
   } else {
     for (int n = 0; n < nnode; n++) {
       plasma_conductivity_gf[n] = const_plasma_conductivity_;
@@ -141,7 +141,7 @@ DryAir::DryAir(RunConfiguration &_runfile, int _dim, int nvel)
     // : DryAir(_runfile.workFluid, _runfile.GetEquationSystem(), _runfile.visc_mult, _runfile.bulk_visc, _dim, nvel) {}
     : DryAir(_runfile.dryAirInput, _dim, nvel) {}
 
-MFEM_HOST_DEVICE DryAir::DryAir(const DryAirInput inputs, int _dim, int nvel) : GasMixture(inputs.f, _dim, nvel) {
+MFEM_HOST_DEVICE DryAir::DryAir(const DryAirInput inputs, int _dim, int nvel) : GasMixture(inputs.f, _dim, nvel, 50.0) {
   numSpecies = (inputs.eq_sys == NS_PASSIVE) ? 2 : 1;
   ambipolar = false;
   twoTemperature_ = false;
