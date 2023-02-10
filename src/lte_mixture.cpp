@@ -116,6 +116,7 @@ double LteMixture::ComputeTemperature(const Vector &state) {
   } else {
     // TODO(trevilo): How should we set initial guess when T_table_ not present?
     T = ((1.6667 - 1.0) / 208.) * energy;
+    if (T > 12000.0) T = 12000.0;
   }
 
   double res = energy - energy_table_->eval(T, rho);
