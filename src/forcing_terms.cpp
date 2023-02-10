@@ -270,127 +270,171 @@ void AxisymmetricSource::updateTerms(Vector &in) {
   // \theta} contribution is neglected, but this could be added if we
   // switch to this formulation.  See comments at L348 of rhs_operator.cpp
 
-  // for (int el = 0; el < numElem; el++) {
-  //   const FiniteElement *elem = vfes->GetFE(el);
-  //   ElementTransformation *Tr = vfes->GetElementTransformation(el);
-  //   const int dof_elem = elem->GetDof();
-
-  //   // nodes of the element
-  //   Array<int> nodes;
-  //   vfes->GetElementVDofs(el, nodes);
-
-  //   const int order = elem->GetOrder();
-  //   //cout<<"order :"<<maxorder<<" dof: "<<dof_elem<<endl;
-  //   int intorder = 2*order;
-  //   const IntegrationRule *ir = &intRules->Get(elem->GetGeomType(), intorder);
-  //   for (int k= 0; k< ir->GetNPoints(); k++)
-  //     {
-  //       const IntegrationPoint &ip = ir->IntPoint(k);
-
-  //       Vector shape(dof_elem);
-  //       elem->CalcShape(ip, shape);
-
-  //       double pressure = 0.0;
-  //       for (int k = 0; k < dof_elem; k++) pressure += dataUp[nodes[k] + (1+dim)*dof] * shape[k];
-
-  //       Tr->SetIntPoint(&ip);
-  //       shape *= Tr->Jacobian().Det()*ip.weight;
-
-  //       // get coordinates of integration point
-  //       double x[3];
-  //       Vector transip(x, 3);
-  //       Tr->Transform(ip,transip);
-
-  //       for (int j= 0;j<dof_elem;j++)
-  //         {
-  //           int i = nodes[j];
-  //           data[i + 1*dof] += pressure*shape[j];
-  //         }
-
-  //     }
-  // }
+  Vector conserv(num_equation);
+  Vector prim(num_equation);
+  double ur_r, uz_z, ut_r, radius;
 
   for (int el = 0; el < numElem; el++) {
     const FiniteElement *elem = vfes->GetFE(el);
-    // ElementTransformation *Tr = vfes->GetElementTransformation(el);
+    ElementTransformation *Tr = vfes->GetElementTransformation(el);
     const int dof_elem = elem->GetDof();
 
     // nodes of the element
     Array<int> nodes;
     vfes->GetElementVDofs(el, nodes);
 
-    Array<double> ip_forcing(num_equation);
-    Vector x(dim);
-    for (int n = 0; n < dof_elem; n++) {
-      int index = nodes[n];
-      for (int d = 0; d < dim; d++) x[d] = coordsDof[index + d * dof];
-      const double radius = x[0];
+    const int order = elem->GetOrder();
+    //cout<<"order :"<<maxorder<<" dof: "<<dof_elem<<endl;
+    int intorder = 2*order;
+    const IntegrationRule *ir = &intRules->Get(elem->GetGeomType(), intorder);
+    for (int q = 0; q < ir->GetNPoints(); q++) {
+      const IntegrationPoint &ip = ir->IntPoint(q);
+      Tr->SetIntPoint(&ip);
 
-      Vector prim(num_equation), conserv(num_equation);
-      for (int eq = 0; eq < num_equation; eq++) {
-        prim(eq) = dataUp[index + eq * dof];
-        conserv(eq) = dataU[index + eq * dof];
+      Vector shape(dof_elem);
+      elem->CalcShape(ip, shape);
+
+      // interpolate conserved state to quad point
+      conserv = 0.;
+      ur_r = uz_z = ut_r = 0.;
+      for (int k = 0; k < dof_elem; k++) {
+        for (int ieqn = 0; ieqn < num_equation; ieqn++) {
+          conserv[ieqn] += dataU[nodes[k] + ieqn * dof] * shape[k];
+        }
+
+        ur_r += dataGradUp[nodes[k] + (1 * dof) + (0 * dof * num_equation)] * shape[k];
+        uz_z += dataGradUp[nodes[k] + (2 * dof) + (1 * dof * num_equation)] * shape[k];
+        ut_r += dataGradUp[nodes[k] + (3 * dof) + (0 * dof * num_equation)] * shape[k];
+
       }
 
-      const double rho = prim(0);
-      const double ur = prim(1);
-      // const double uz = prim(2);
-      const double ut = prim(3);
+      const double rho = conserv(0);
+      const double ur = conserv(1) / rho;
+      const double ut = conserv(3) / rho;
       // const double temperature = prim(1 + nvel);
 
-      const double pressure = mixture->ComputePressureFromPrimitives(prim);
+      const double pressure = mixture->ComputePressure(conserv);
 
       const double rurut = rho * ur * ut;
       const double rutut = rho * ut * ut;
 
+      // get coordinates of integration point
+      double x[3];
+      Vector transip(x, 3);
+      Tr->Transform(ip,transip);
+      radius = transip[0];
+
       double tau_tt, tau_tr;
-      if (eqSystem == EULER) {
-        tau_tt = tau_tr = 0.0;
-      } else {
-        const double ur_r = dataGradUp[index + (1 * dof) + (0 * dof * num_equation)];
-        const double uz_z = dataGradUp[index + (2 * dof) + (1 * dof * num_equation)];
-        const double ut_r = dataGradUp[index + (3 * dof) + (0 * dof * num_equation)];
+      tau_tt = tau_tr = 0.0;
 
-        double visc, bulkVisc;
-        transport_->GetViscosities(conserv, prim, visc, bulkVisc);
-        bulkVisc -= 2. / 3. * visc;
+      mixture->GetPrimitivesFromConservatives(conserv, prim);
 
-        if (space_vary_viscosity_mult_ != NULL) {
-          auto *alpha = space_vary_viscosity_mult_->GetData();
-          visc *= alpha[index];
-        }
+      double visc, bulkVisc;
+      transport_->GetViscosities(conserv, prim, visc, bulkVisc);
+      bulkVisc -= 2. / 3. * visc;
 
-        double divV = ur_r + uz_z;
-        if (radius > 0) divV += ur / radius;
+      double divV = ur_r + uz_z;
+      if (radius > 0) divV += ur / radius;
 
-        tau_tt = (radius > 0) ? 2.0 * ur / radius * visc : 0.0;
-        tau_tt += bulkVisc * divV;
+      tau_tt = (radius > 0) ? 2.0 * ur / radius * visc : 0.0;
+      tau_tt += bulkVisc * divV;
 
-        tau_tr = ut_r;
-        if (radius > 0) tau_tr -= ut / radius;
+      tau_tr = ut_r;
+      if (radius > 0) tau_tr -= ut / radius;
 
-        tau_tr *= visc;
-      }
+      tau_tr *= visc;
 
-      // Add to r-momentum eqn
+      shape *= Tr->Jacobian().Det()*ip.weight;
 
-      // NB: 1/r factor here is necessary b/c of way the source terms
-      // are handled in RHSoperator.  This term must be an
-      // approximation of Mr^{-1}*\int \phi * pressure, where Mr =
-      // \int r * \phi * \phi dr dz is the mass matrix in cylindrical
-      // coords
-
-      if (radius > 0) {
-        data[index + 1 * dof] += (pressure + rutut - tau_tt) / radius;
-        data[index + 3 * dof] += (-rurut + tau_tr) / radius;
-      } else {
-        // TODO(trevilo): Fix axis
-        double fake_radius = 1e-3;
-        data[index + 1 * dof] += (pressure - tau_tt) / fake_radius;
-        data[index + 3 * dof] += (tau_tr) / fake_radius;
+      for (int j= 0;j<dof_elem;j++) {
+        int i = nodes[j];
+        data[i + 1 * dof] += shape[j] * (pressure + rutut - tau_tt);
+        data[i + 3 * dof] += shape[j] * (-rurut + tau_tr);
       }
     }
   }
+
+  // for (int el = 0; el < numElem; el++) {
+  //   const FiniteElement *elem = vfes->GetFE(el);
+  //   // ElementTransformation *Tr = vfes->GetElementTransformation(el);
+  //   const int dof_elem = elem->GetDof();
+
+  //   // nodes of the element
+  //   Array<int> nodes;
+  //   vfes->GetElementVDofs(el, nodes);
+
+  //   Array<double> ip_forcing(num_equation);
+  //   Vector x(dim);
+  //   for (int n = 0; n < dof_elem; n++) {
+  //     int index = nodes[n];
+  //     for (int d = 0; d < dim; d++) x[d] = coordsDof[index + d * dof];
+  //     const double radius = x[0];
+
+  //     Vector prim(num_equation), conserv(num_equation);
+  //     for (int eq = 0; eq < num_equation; eq++) {
+  //       prim(eq) = dataUp[index + eq * dof];
+  //       conserv(eq) = dataU[index + eq * dof];
+  //     }
+
+  //     const double rho = prim(0);
+  //     const double ur = prim(1);
+  //     // const double uz = prim(2);
+  //     const double ut = prim(3);
+  //     // const double temperature = prim(1 + nvel);
+
+  //     const double pressure = mixture->ComputePressureFromPrimitives(prim);
+
+  //     const double rurut = rho * ur * ut;
+  //     const double rutut = rho * ut * ut;
+
+  //     double tau_tt, tau_tr;
+  //     if (eqSystem == EULER) {
+  //       tau_tt = tau_tr = 0.0;
+  //     } else {
+  //       const double ur_r = dataGradUp[index + (1 * dof) + (0 * dof * num_equation)];
+  //       const double uz_z = dataGradUp[index + (2 * dof) + (1 * dof * num_equation)];
+  //       const double ut_r = dataGradUp[index + (3 * dof) + (0 * dof * num_equation)];
+
+  //       double visc, bulkVisc;
+  //       transport_->GetViscosities(conserv, prim, visc, bulkVisc);
+  //       bulkVisc -= 2. / 3. * visc;
+
+  //       if (space_vary_viscosity_mult_ != NULL) {
+  //         auto *alpha = space_vary_viscosity_mult_->GetData();
+  //         visc *= alpha[index];
+  //       }
+
+  //       double divV = ur_r + uz_z;
+  //       if (radius > 0) divV += ur / radius;
+
+  //       tau_tt = (radius > 0) ? 2.0 * ur / radius * visc : 0.0;
+  //       tau_tt += bulkVisc * divV;
+
+  //       tau_tr = ut_r;
+  //       if (radius > 0) tau_tr -= ut / radius;
+
+  //       tau_tr *= visc;
+  //     }
+
+  //     // Add to r-momentum eqn
+
+  //     // NB: 1/r factor here is necessary b/c of way the source terms
+  //     // are handled in RHSoperator.  This term must be an
+  //     // approximation of Mr^{-1}*\int \phi * pressure, where Mr =
+  //     // \int r * \phi * \phi dr dz is the mass matrix in cylindrical
+  //     // coords
+
+  //     if (radius > 0) {
+  //       data[index + 1 * dof] += (pressure + rutut - tau_tt) / radius;
+  //       data[index + 3 * dof] += (-rurut + tau_tr) / radius;
+  //     } else {
+  //       // TODO(trevilo): Fix axis
+  //       double fake_radius = 1e-3;
+  //       data[index + 1 * dof] += (pressure - tau_tt) / fake_radius;
+  //       data[index + 3 * dof] += (tau_tr) / fake_radius;
+  //     }
+  //   }
+  // }
 }
 
 JouleHeating::JouleHeating(const int &_dim, const int &_num_equation, const int &_order, GasMixture *_mixture,
