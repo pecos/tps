@@ -37,6 +37,22 @@ ElementIntegrator::ElementIntegrator(int dim, int num_eqn, bool axisym, Fluxes *
                                      ParFiniteElementSpace *vfes, ParGridFunction *gradUp)
     : dim_(dim), num_eqn_(num_eqn), axisym_(axisym), flux_(flux), int_rules_(int_rules), vfes_(vfes), gradUp_(gradUp) {}
 
+void ElementIntegrator::getElementGrad(const int elemNo, const FiniteElement &el, DenseTensor &gradUpElem) {
+  const int totDofs = vfes_->GetNDofs();
+  const double *dataGradUp = gradUp_->HostRead();
+
+  vfes_->GetElementVDofs(elemNo, vdofs_);
+  int eldDof = el.GetDof();
+  for (int n = 0; n < eldDof; n++) {
+    int index = vdofs_[n];
+    for (int eq = 0; eq < num_eqn_; eq++) {
+      for (int d = 0; d < dim_; d++) {
+        gradUpElem(n, eq, d) = dataGradUp[index + (eq + d * num_eqn_) * totDofs];
+      }
+    }
+  }
+}
+
 void ElementIntegrator::AssembleElementVector(const FiniteElement &el, ElementTransformation &Tr, const Vector &elfun,
                                               Vector &elvec) {
   const int dof = el.GetDof();
@@ -54,6 +70,7 @@ void ElementIntegrator::AssembleElementVector(const FiniteElement &el, ElementTr
   DenseMatrix soln_x;
   DenseMatrix Fflux;
   DenseMatrix Gflux;
+  DenseTensor gradUpElem;
 
   shape.SetSize(dof);
   soln.SetSize(num_eqn_);
@@ -63,6 +80,7 @@ void ElementIntegrator::AssembleElementVector(const FiniteElement &el, ElementTr
   soln_x.SetSize(num_eqn_, dim_);
   Fflux.SetSize(num_eqn_, dim_);
   Gflux.SetSize(num_eqn_, dim_);
+  gradUpElem.SetSize(dof, num_eqn_, dim_);
 
   // View elfun and elvec as matrices (make life easy below)
   DenseMatrix elfun_mat(elfun.GetData(), dof, num_eqn_);
@@ -83,7 +101,7 @@ void ElementIntegrator::AssembleElementVector(const FiniteElement &el, ElementTr
 
     // evaluate basis functions and derivatives (wrt reference)
     el.CalcShape(ip, shape);
-    el.CalcDShape(ip, shape_r);
+    //el.CalcDShape(ip, shape_r);
 
     // Mult(shape_r, Tr.InverseJacobian(), shape_x);
 
@@ -92,16 +110,41 @@ void ElementIntegrator::AssembleElementVector(const FiniteElement &el, ElementTr
     // elfun_mat.MultTranspose(shape_x, soln_x);
     // MultAtB(elfun_mat, shape_x, soln_x);
 
-    // Evaluate the flux (only inviscid for now!!)
+    // Interpolate gradient
+    soln_x = 0.;
+    for (int eq = 0; eq < num_eqn_; eq++) {
+      for (int d = 0; d < dim_; d++) {
+        for (int k = 0; k < dof; k++) {
+          soln_x(eq, d) += gradUpElem(k, eq, d) * shape(k);
+        }
+      }
+    }
+
+    // Get radius
+    double radius = 1;
+    if (axisym_) {
+      double x[3];
+      Vector transip(x, 3);
+      Tr.Transform(ip, transip);
+      radius = transip[0];
+    }
+
+    // Evaluate the fluxes
+    Fflux = 0.;
     flux_->ComputeConvectiveFluxes(soln, Fflux);
-    // inviscidFluxVector(soln, Fflux);
-    // viscousFluxVector(soln, soln_x, Gflux);
+
+    Gflux = 0.;
+    flux_->ComputeViscousFluxes(soln, soln_x, radius, Gflux);
 
     // total flux
-    // Fflux -= Gflux;
+    Fflux -= Gflux;
 
     MultABt(Fflux, Tr.AdjugateJacobian(), adjJflux);
     adjJflux *= ip.weight;
+
+    if (axisym_) {
+      adjJflux *= radius;
+    }
 
     AddMultABt(shape_r, adjJflux, elvec_mat);
   }
