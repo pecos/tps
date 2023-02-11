@@ -420,6 +420,7 @@ class M2ulPhyS : public TPS::Solver {
   Chemistry *getChemistry() { return chemistry_; }
 
   void updatePrimitives();
+  void updatePlasmaConductivity();
 
   ParGridFunction *GetPlasmaConductivityGF() { return plasma_conductivity_; }
   ParGridFunction *GetJouleHeatingGF() { return joule_heating_; }

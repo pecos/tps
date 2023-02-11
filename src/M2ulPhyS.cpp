@@ -521,8 +521,7 @@ void M2ulPhyS::initVariables() {
     // Formulate interior contribution using 'standard' method
     // (quadrature applied to each element)
     Aflux = NULL;
-    A->AddDomainIntegrator(
-        new ElementIntegrator(dim, num_equation, config.isAxisymmetric(), fluxClass, intRules, vfes, gradUp));
+    A->AddDomainIntegrator(new ElementIntegrator(dim, num_equation, config.isAxisymmetric(), eqSystem, fluxClass, intRules, vfes, gradUp));
   } else {
     // Formulation interior contributionas B * F, where B is operator
     // from MixedBilinearForm and F is flux evaluated at nodes
@@ -3237,6 +3236,10 @@ void M2ulPhyS::updatePrimitives() {
     mixture->GetPrimitivesFromConservatives(state, Upi);
     for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * dof] = Upi[eq];
   }
+}
+
+void M2ulPhyS::updatePlasmaConductivity() {
+
 }
 
 void M2ulPhyS::visualization() {
