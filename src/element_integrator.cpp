@@ -210,9 +210,19 @@ void ElementIntegrator::AssembleElementGrad(const FiniteElement &el, ElementTran
     // Evaluate the (inviscid) flux Jacobian
     flux_->ComputeConvectiveFluxJacobian(soln, Jacobian);
 
+    // Get radius
+    double radius = 1;
+    if (axisym_) {
+      double x[3];
+      Vector transip(x, 3);
+      Tr.Transform(ip, transip);
+      radius = transip[0];
+    }
+
+
     for (int jeqn = 0; jeqn < num_eqn_; jeqn++) {
       MultABt(Jacobian(jeqn), Tr.AdjugateJacobian(), adjJflux_U(jeqn));
-      adjJflux_U(jeqn) *= ip.weight;
+      adjJflux_U(jeqn) *= ip.weight * radius;
     }
 
     for (int ieqn = 0; ieqn < num_eqn_; ieqn++) {
