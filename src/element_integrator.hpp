@@ -41,6 +41,7 @@
 // Element interior term: <grad w, F>
 class ElementIntegrator : public mfem::NonlinearFormIntegrator {
  private:
+  const Equations eqSys_;
   const int dim_;
   const int num_eqn_;
   const bool axisym_;
@@ -57,7 +58,7 @@ class ElementIntegrator : public mfem::NonlinearFormIntegrator {
   void getElementGrad(const int elemNo, const FiniteElement &el, DenseTensor &gradUpElem);
 
  public:
-  ElementIntegrator(int dim, int num_eqn, bool axisym, Fluxes *flux, mfem::IntegrationRules *int_rules,
+  ElementIntegrator(int dim, int num_eqn, bool axisym, Equations eqSys, Fluxes *flux, mfem::IntegrationRules *int_rules,
                     mfem::ParFiniteElementSpace *vfes, mfem::ParGridFunction *gradUp);
 
   virtual void AssembleElementVector(const mfem::FiniteElement &el, mfem::ElementTransformation &Tr,

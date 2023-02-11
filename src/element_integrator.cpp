@@ -33,9 +33,9 @@
 
 using namespace mfem;
 
-ElementIntegrator::ElementIntegrator(int dim, int num_eqn, bool axisym, Fluxes *flux, IntegrationRules *int_rules,
+ElementIntegrator::ElementIntegrator(int dim, int num_eqn, bool axisym, Equations eqSys, Fluxes *flux, IntegrationRules *int_rules,
                                      ParFiniteElementSpace *vfes, ParGridFunction *gradUp)
-    : dim_(dim), num_eqn_(num_eqn), axisym_(axisym), flux_(flux), int_rules_(int_rules), vfes_(vfes), gradUp_(gradUp) {}
+    : dim_(dim), num_eqn_(num_eqn), axisym_(axisym), eqSys_(eqSys), flux_(flux), int_rules_(int_rules), vfes_(vfes), gradUp_(gradUp) {}
 
 void ElementIntegrator::getElementGrad(const int elemNo, const FiniteElement &el, DenseTensor &gradUpElem) {
   const int totDofs = vfes_->GetNDofs();
@@ -101,7 +101,7 @@ void ElementIntegrator::AssembleElementVector(const FiniteElement &el, ElementTr
 
     // evaluate basis functions and derivatives (wrt reference)
     el.CalcShape(ip, shape);
-    //el.CalcDShape(ip, shape_r);
+    el.CalcDShape(ip, shape_r);
 
     // Mult(shape_r, Tr.InverseJacobian(), shape_x);
 
@@ -110,15 +110,9 @@ void ElementIntegrator::AssembleElementVector(const FiniteElement &el, ElementTr
     // elfun_mat.MultTranspose(shape_x, soln_x);
     // MultAtB(elfun_mat, shape_x, soln_x);
 
-    // Interpolate gradient
-    soln_x = 0.;
-    for (int eq = 0; eq < num_eqn_; eq++) {
-      for (int d = 0; d < dim_; d++) {
-        for (int k = 0; k < dof; k++) {
-          soln_x(eq, d) += gradUpElem(k, eq, d) * shape(k);
-        }
-      }
-    }
+    // Evaluate the fluxes
+    Fflux = 0.;
+    flux_->ComputeConvectiveFluxes(soln, Fflux);
 
     // Get radius
     double radius = 1;
@@ -129,15 +123,25 @@ void ElementIntegrator::AssembleElementVector(const FiniteElement &el, ElementTr
       radius = transip[0];
     }
 
-    // Evaluate the fluxes
-    Fflux = 0.;
-    flux_->ComputeConvectiveFluxes(soln, Fflux);
 
-    Gflux = 0.;
-    flux_->ComputeViscousFluxes(soln, soln_x, radius, Gflux);
+    if (eqSys_ != EULER) {
+      // Interpolate gradient
+      soln_x = 0.;
+      for (int eq = 0; eq < num_eqn_; eq++) {
+        for (int d = 0; d < dim_; d++) {
+          for (int k = 0; k < dof; k++) {
+            soln_x(eq, d) += gradUpElem(k, eq, d) * shape(k);
+          }
+        }
+      }
 
-    // total flux
-    Fflux -= Gflux;
+
+      Gflux = 0.;
+      flux_->ComputeViscousFluxes(soln, soln_x, radius, Gflux);
+
+      // total flux
+      Fflux -= Gflux;
+    }
 
     MultABt(Fflux, Tr.AdjugateJacobian(), adjJflux);
     adjJflux *= ip.weight;
