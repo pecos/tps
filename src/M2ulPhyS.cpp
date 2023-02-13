@@ -593,7 +593,15 @@ void M2ulPhyS::initVariables() {
   Up->ExchangeFaceNbrData();
   gradUp->ExchangeFaceNbrData();
 
-  if (config.GetRestartCycle() == 0) initialTimeStep();
+  if (config.GetRestartCycle() == 0) {
+    initialTimeStep();
+  } else {
+    const double dt_fixed = config.GetFixedDT();
+    if (dt_fixed > 0) {
+      dt = dt_fixed;
+    }
+  }
+
   if (mpi.Root()) cout << "Initial time-step: " << dt << "s" << endl;
 
   // t_final = MaxIters*dt;
