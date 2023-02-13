@@ -214,8 +214,10 @@ void WallBC::computeBdrFluxJacobian(Vector &normal, Vector &stateIn, DenseMatrix
     case INV:
       computeINVwallFluxJacobian(normal, stateIn, gradState, radius, bdrFluxJacobian);
       break;
-    case VISC_ADIAB:
     case VISC_ISOTH:
+      computeIsothermalWallJacobian(normal, stateIn, gradState, radius, bdrFluxJacobian);
+      break;
+    case VISC_ADIAB:
     default:
       MFEM_ASSERT(false, "Only inviscid wall Jacobians are supported.");
       break;
@@ -377,8 +379,6 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
   mixture->computeStagnantStateWithTemp(stateIn, wallTemp_, wallState);
   // TODO(kevin): set stangant state with two separate temperature.
 
-  if (eqSystem == NS_PASSIVE) wallState[num_equation_ - 1] = stateIn[num_equation_ - 1];
-
   // Normal convective flux
   rsolver->Eval(stateIn, wallState, normal, bdrFlux, true);
 
@@ -403,6 +403,33 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
     bdrFlux[eq] -= 0.5 * wallViscF(eq);
     for (int d = 0; d < dim_; d++) bdrFlux[eq] -= 0.5 * viscF(eq, d) * normal[d];
   }
+
+}
+
+void WallBC::computeIsothermalWallJacobian(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                           DenseMatrix &bdrFluxJacobian) {
+  Vector wallState(num_equation_);
+  mixture->computeStagnantStateWithTemp(stateIn, wallTemp_, wallState);
+  // TODO(kevin): set stangant state with two separate temperature.
+
+  DenseMatrix wall_wrt_in;  // Jacobian of wall state wrt interior state
+  wall_wrt_in.Diag(1., num_equation_);
+  for (int i = 0; i < nvel_; i++) {
+    for (int j = 0; j < nvel_; j++) {
+      wall_wrt_in(1 + i, 1 + j) = 0.;
+    }
+  }
+
+  const double specific_heat_ratio = mixture->GetSpecificHeatRatio();
+  const double gas_constant = mixture->GetGasConstant();
+  wall_wrt_in(1 + nvel_, 0) =  gas_constant / (specific_heat_ratio - 1.) * wallTemp_;
+  wall_wrt_in(1 + nvel_, 1 + nvel_) = 0.;
+
+  DenseMatrix JL(num_equation_, num_equation_), JR(num_equation_, num_equation_);
+  rsolver->Jacobian(stateIn, wallState, normal, JL, JR);
+
+  bdrFluxJacobian = JL;
+  AddMult(JR, wall_wrt_in, bdrFluxJacobian);
 }
 
 void WallBC::computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,

@@ -72,6 +72,9 @@ class WallBC : public BoundaryCondition {
 
   void computeINVwallFluxJacobian(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
                                   DenseMatrix &bdrFluxJacobian);
+  void computeIsothermalWallJacobian(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                     DenseMatrix &bdrFluxJacobian);
+
 
  public:
   WallBC(RiemannSolver *rsolver_, GasMixture *_mixture, GasMixture *d_mixture, Equations _eqSystem, Fluxes *_fluxClass,
