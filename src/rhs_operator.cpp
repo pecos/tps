@@ -295,7 +295,12 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
 #endif
 
   if (Aflux == NULL) {
-    VectorMassIntegrator *vmi = new VectorMassIntegrator();
+    VectorMassIntegrator *vmi;
+    if (config_.isAxisymmetric()) {
+      vmi = new VectorMassIntegrator(radiusFcn, 1);
+    } else {
+      vmi = new VectorMassIntegrator();
+    }
     vmi->SetVDim(num_equation_);
 
     global_mass_bf_ = new ParBilinearForm(vfes);
@@ -484,6 +489,7 @@ void RHSoperator::ImplicitSolve(const double dt, const Vector &x, Vector &k) {
   flow_linear_solver_->SetOperator(*A);
   flow_linear_solver_->Mult(z, k);
   delete A;
+
 }
 
 void RHSoperator::copyZk2Z_gpu(Vector &z, Vector &zk, const int eq, const int dof) {
