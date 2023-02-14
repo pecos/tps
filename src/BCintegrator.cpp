@@ -233,6 +233,19 @@ void BCintegrator::computeBdrFlux(const int attr, Vector &normal, Vector &stateI
   //   BCmap[attr]->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
 }
 
+void BCintegrator::computeBdrFluxJacobian(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState,
+                                          double radius, DenseMatrix &bdrFluxJacobian) {
+  std::unordered_map<int, BoundaryCondition *>::const_iterator ibc = inletBCmap.find(attr);
+  std::unordered_map<int, BoundaryCondition *>::const_iterator obc = outletBCmap.find(attr);
+  std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = wallBCmap.find(attr);
+
+  if (ibc != inletBCmap.end()) ibc->second->computeBdrFluxJacobian(normal, stateIn, gradState, radius, bdrFluxJacobian);
+  if (obc != outletBCmap.end()) obc->second->computeBdrFluxJacobian(normal, stateIn, gradState, radius, bdrFluxJacobian);
+  if (wbc != wallBCmap.end()) wbc->second->computeBdrFluxJacobian(normal, stateIn, gradState, radius, bdrFluxJacobian);
+
+  //   BCmap[attr]->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
+}
+
 void BCintegrator::updateBCMean(ParGridFunction *Up) {
   for (auto bc = inletBCmap.begin(); bc != inletBCmap.end(); bc++) {
     bc->second->updateMean(intRules, Up);
@@ -444,6 +457,9 @@ void BCintegrator::AssembleFaceGrad(const FiniteElement &el1, const FiniteElemen
     // Interpolate elfun at the point
     elfun1_mat.MultTranspose(shape1, funval1);
 
+    DenseMatrix iGradUp(num_equation, dim);
+    iGradUp = 0.; // currently unused in computeBdrFluxJacobian
+
     // Get the normal vector and the flux on the face
     CalcOrtho(Tr.Jacobian(), nor);
 
@@ -456,7 +472,7 @@ void BCintegrator::AssembleFaceGrad(const FiniteElement &el1, const FiniteElemen
     }
 
     // computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, radius, fluxN);
-    // computeBdrFluxJacobian(Tr.Attribute, nor, funval1, iGradUp, radius, fluxN);
+    computeBdrFluxJacobian(Tr.Attribute, nor, funval1, iGradUp, radius, fluxN_U);
     fluxN_U *= ip.weight;
 
     if (config.isAxisymmetric()) {
