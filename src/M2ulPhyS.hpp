@@ -74,6 +74,7 @@ class Tps;
 #include "run_configuration.hpp"
 #include "sbp_integrators.hpp"
 #include "solver.hpp"
+#include "source_fcn.hpp"
 #include "tps.hpp"
 #include "tps_mfem_wrap.hpp"
 #include "transport_properties.hpp"
@@ -160,6 +161,7 @@ class M2ulPhyS : public TPS::Solver {
   ParGridFunction *spaceVaryViscMult;  // space varying viscosity multiplier
 
   Fluxes *fluxClass;
+  SourceFunction *srcFcn_;
 
   RHSoperator *rhsOperator;
 

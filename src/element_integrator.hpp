@@ -37,6 +37,7 @@
 #include <mfem.hpp>
 
 #include "fluxes.hpp"
+#include "source_fcn.hpp"
 
 // Element interior term: <grad w, F>
 class ElementIntegrator : public mfem::NonlinearFormIntegrator {
@@ -47,6 +48,7 @@ class ElementIntegrator : public mfem::NonlinearFormIntegrator {
   const bool axisym_;
 
   Fluxes *flux_;
+  SourceFunction *srcFcn_;
   mfem::IntegrationRules *int_rules_;
 
   // NB: Only necessary b/c of viscous scheme.  Can eliminate if we switch to SIPG.
@@ -58,8 +60,9 @@ class ElementIntegrator : public mfem::NonlinearFormIntegrator {
   void getElementGrad(const int elemNo, const FiniteElement &el, DenseTensor &gradUpElem);
 
  public:
-  ElementIntegrator(int dim, int num_eqn, bool axisym, Equations eqSys, Fluxes *flux, mfem::IntegrationRules *int_rules,
-                    mfem::ParFiniteElementSpace *vfes, mfem::ParGridFunction *gradUp);
+  ElementIntegrator(int dim, int num_eqn, bool axisym, Equations eqSys, Fluxes *flux, SourceFunction *srcFcn,
+                    mfem::IntegrationRules *int_rules, mfem::ParFiniteElementSpace *vfes,
+                    mfem::ParGridFunction *gradUp);
 
   virtual void AssembleElementVector(const mfem::FiniteElement &el, mfem::ElementTransformation &Tr,
                                      const mfem::Vector &elfun, mfem::Vector &elvec);

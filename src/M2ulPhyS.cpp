@@ -479,6 +479,12 @@ void M2ulPhyS::initVariables() {
 
   rsolver =
       new RiemannSolver(num_equation, mixture, eqSystem, fluxClass, config.RoeRiemannSolver(), config.isAxisymmetric());
+
+  if (config.isAxisymmetric() && !config.isNodalInterior()) {
+    srcFcn_ = new AxisymmetricSourceFunction(dim, nvel, num_equation, eqSystem, mixture, transportPtr);
+  } else {
+    srcFcn_ = NULL;
+  }
 #endif
 
   alpha = 0.5;
@@ -521,7 +527,7 @@ void M2ulPhyS::initVariables() {
     // Formulate interior contribution using 'standard' method
     // (quadrature applied to each element)
     Aflux = NULL;
-    A->AddDomainIntegrator(new ElementIntegrator(dim, num_equation, config.isAxisymmetric(), eqSystem, fluxClass, intRules, vfes, gradUp));
+    A->AddDomainIntegrator(new ElementIntegrator(dim, num_equation, config.isAxisymmetric(), eqSystem, fluxClass, srcFcn_, intRules, vfes, gradUp));
   } else {
     // Formulation interior contributionas B * F, where B is operator
     // from MixedBilinearForm and F is flux evaluated at nodes

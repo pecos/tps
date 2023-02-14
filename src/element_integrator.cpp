@@ -33,9 +33,9 @@
 
 using namespace mfem;
 
-ElementIntegrator::ElementIntegrator(int dim, int num_eqn, bool axisym, Equations eqSys, Fluxes *flux, IntegrationRules *int_rules,
+ElementIntegrator::ElementIntegrator(int dim, int num_eqn, bool axisym, Equations eqSys, Fluxes *flux, SourceFunction *srcFcn, IntegrationRules *int_rules,
                                      ParFiniteElementSpace *vfes, ParGridFunction *gradUp)
-    : dim_(dim), num_eqn_(num_eqn), axisym_(axisym), eqSys_(eqSys), flux_(flux), int_rules_(int_rules), vfes_(vfes), gradUp_(gradUp) {}
+  : dim_(dim), num_eqn_(num_eqn), axisym_(axisym), eqSys_(eqSys), flux_(flux), srcFcn_(srcFcn), int_rules_(int_rules), vfes_(vfes), gradUp_(gradUp) {}
 
 void ElementIntegrator::getElementGrad(const int elemNo, const FiniteElement &el, DenseTensor &gradUpElem) {
   const int totDofs = vfes_->GetNDofs();
