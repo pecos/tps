@@ -134,9 +134,14 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   }
 #endif
 
-  if (config_.isAxisymmetric()) {
+  if (config_.isAxisymmetric() && config_.isNodalInterior()) {
     forcing.Append(new AxisymmetricSource(dim_, num_equation_, _order, mixture, transport_, eqSystem, intRuleType,
                                           intRules, vfes, U_, Up, gradUp, spaceVaryViscMult, gpuArrays, _config));
+    const FiniteElementCollection *fec = vfes->FEColl();
+    dfes = new ParFiniteElementSpace(mesh, fec, dim_, Ordering::byNODES);
+    coordsDof = new ParGridFunction(dfes);
+    mesh->GetNodes(*coordsDof);
+  } else if (config_.isAxisymmetric() && !config_.isNodalInterior()) {
     const FiniteElementCollection *fec = vfes->FEColl();
     dfes = new ParFiniteElementSpace(mesh, fec, dim_, Ordering::byNODES);
     coordsDof = new ParGridFunction(dfes);

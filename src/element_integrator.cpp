@@ -64,6 +64,7 @@ void ElementIntegrator::AssembleElementVector(const FiniteElement &el, ElementTr
   // Storage for basis fcns, derivatives, fluxes
   Vector shape;
   Vector soln;
+  Vector src;
   DenseMatrix adjJflux;
   DenseMatrix shape_r;
   DenseMatrix shape_x;
@@ -74,6 +75,7 @@ void ElementIntegrator::AssembleElementVector(const FiniteElement &el, ElementTr
 
   shape.SetSize(dof);
   soln.SetSize(num_eqn_);
+  src.SetSize(num_eqn_);
   adjJflux.SetSize(num_eqn_, dim_);
   shape_r.SetSize(dof, dim_);
   shape_x.SetSize(dof, dim_);
@@ -119,9 +121,9 @@ void ElementIntegrator::AssembleElementVector(const FiniteElement &el, ElementTr
 
     // Get radius
     double radius = 1;
+    double x[3];
+    Vector transip(x, 3);
     if (axisym_) {
-      double x[3];
-      Vector transip(x, 3);
       Tr.Transform(ip, transip);
       radius = transip[0];
     }
@@ -137,7 +139,7 @@ void ElementIntegrator::AssembleElementVector(const FiniteElement &el, ElementTr
         }
       }
 
-
+      // evaluate viscous contribution to flux
       Gflux = 0.;
       flux_->ComputeViscousFluxes(soln, soln_x, radius, Gflux);
 
@@ -153,6 +155,13 @@ void ElementIntegrator::AssembleElementVector(const FiniteElement &el, ElementTr
     }
 
     AddMultABt(shape_r, adjJflux, elvec_mat);
+
+
+    if (srcFcn_ != NULL) {
+      srcFcn_->evaluate(transip, soln, soln_x, src);
+      src *= Tr.Weight() * ip.weight;
+      AddMultVWt(shape, src, elvec_mat);
+    }
   }
 }
 
