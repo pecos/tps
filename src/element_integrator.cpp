@@ -86,6 +86,9 @@ void ElementIntegrator::AssembleElementVector(const FiniteElement &el, ElementTr
   DenseMatrix elfun_mat(elfun.GetData(), dof, num_eqn_);
   DenseMatrix elvec_mat(elvec.GetData(), dof, num_eqn_);
 
+  // Get gradient for this element
+  getElementGrad(Tr.ElementNo, el, gradUpElem);
+
   // Determine integration rule
   int intorder;
   intorder = Tr.OrderW() + 2 * el.GetOrder();
@@ -122,7 +125,6 @@ void ElementIntegrator::AssembleElementVector(const FiniteElement &el, ElementTr
       Tr.Transform(ip, transip);
       radius = transip[0];
     }
-
 
     if (eqSys_ != EULER) {
       // Interpolate gradient
