@@ -556,9 +556,14 @@ void M2ulPhyS::initVariables() {
   Array<int> local_attr;
   getAttributesInPartition(local_attr);
 
+  double * pTime;
+  pTime = &time;
+  //if (mpi.Root()) {
+  //  cout << "time, &time, pTime, *pTime " << time << ", " << &time << ", " << pTime << ", " << *pTime << endl; fflush(stdout);
+  //}
   bcIntegrator = NULL;
   if (local_attr.Size() > 0) {
-    bcIntegrator = new BCintegrator(groupsMPI, mesh, vfes, intRules, rsolver, dt, mixture, d_mixture, fluxClass, Up,
+    bcIntegrator = new BCintegrator(mpi.Root(),groupsMPI, mesh, vfes, intRules, rsolver, dt, pTime, mixture, d_mixture, fluxClass, Up,
                                     gradUp, shapesBC, normalsWBC, intPointsElIDBC, dim, num_equation, max_char_speed,
                                     config, local_attr, maxIntPoints, maxDofs, transportPtr);
 
@@ -628,7 +633,17 @@ void M2ulPhyS::initVariables() {
       gradUpfes,
 #endif
       intRules, dim, num_equation, gpuArrays, maxIntPoints, maxDofs);
-  gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
+  //  gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
+  gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation, config, local_attr, vfes, rsolver, mixture, d_mixture, fluxClass, dt, intPointsElIDBC, maxIntPoints, maxDofs, groupsMPI));
+
+  /* compare
+  bcIntegrator = new BCintegrator(mpi.Root(),groupsMPI, mesh, vfes, intRules, rsolver, dt, pTime, mixture, d_mixture, fluxClass, Up,
+                                    gradUp, shapesBC, normalsWBC, intPointsElIDBC, dim, num_equation, max_char_speed,
+                                    config, local_attr, maxIntPoints, maxDofs, transportPtr);
+  */  
+  
+  //gradUp_A->AddBdrFaceIntegrator(new GradBdrFaceIntegrator(intRules, dim, num_equation, ...));  //w/o this, grad calcs assume U_int = U_bc
+  gradUp_A->AddBdrFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation, config, local_attr, vfes, rsolver, mixture, d_mixture, fluxClass, dt, intPointsElIDBC, maxIntPoints, maxDofs, groupsMPI));  
 
   rhsOperator = new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType,
                                 fluxClass, mixture, d_mixture, chemistry_, transportPtr, vfes, fes, gpuArrays, maxIntPoints,

@@ -310,8 +310,8 @@ void OutletBC::initBCs() {
   }
 }
 
-void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState,
-			      double radius, Vector transip, double delta, TransportProperties *_transport,
+void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, 
+			      double radius, Vector transip, double delta, double time, TransportProperties *_transport,
 			      //			      Vector &bdrFlux) {			      
 			      int ip, Vector &bdrFlux) {
   
@@ -321,7 +321,6 @@ void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &grad
       break;
     case SUB_P_NR:
       subsonicNonReflectingPressure(normal, stateIn, gradState, delState, _transport, ip, bdrFlux);
-      //      subsonicNonReflectingPressure(normal, stateIn, gradState, delState, _transport, bdrFlux);      
       break;
     case SUB_MF_NR:
       subsonicNonRefMassFlow(normal, stateIn, gradState, bdrFlux);
@@ -641,7 +640,6 @@ of Compressible Viscous Flows", JCP, 1992.  Known issues:
  - limits to damp backflow not working and commented
 */
 void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState,
-					     //					     TransportProperties *_transport, Vector &bdrFlux) {					     
 					     TransportProperties *_transport, int ip, Vector &bdrFlux) {
 
   // <jump> stateIn is conserved, grad and del are primitive  
@@ -898,7 +896,7 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   // modify newU to Reimann so the average of stateIn and modified newU is actual newU?
   Vector tmpU(num_equation_);
   for (int i = 0; i < num_equation_; i++) tmpU[i] = newU[i];
-  //for (int i = 0; i < num_equation_; i++) tmpU[i] = 2.0*newU[i] - stateIn[i];
+  for (int i = 1; i <= dim_; i++) tmpU[i] = 2.0*newU[i] - stateIn[i];
 
   // reimann solver
   rsolver->Eval(stateIn, tmpU, normal, bdrFlux, true);
@@ -911,8 +909,13 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
 void OutletBC::subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
   Vector state2(num_equation_);
 
-  mixture->modifyEnergyForPressure(stateIn, state2, inputState[0]);
-  rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
+  //mixture->modifyEnergyForPressure(stateIn, state2, inputState[0]);
+  //rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
+  
+  Vector tmpU(num_equation_);
+  for (int i = 0; i < num_equation_; i++) tmpU[i] = state2[i];
+  for (int i = 1; i <= dim_; i++) tmpU[i] = state2[i] + (state2[i] - stateIn[i]);  
+  rsolver->Eval(stateIn, tmpU, normal, bdrFlux, true);  
   
 }
 

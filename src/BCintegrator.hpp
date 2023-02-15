@@ -83,16 +83,20 @@ class BCintegrator : public NonlinearFormIntegrator {
   int ObdrN;
   Vector oBoundaryU;
   Vector *oBoundaryU_ptr;  
-  //Vector oBoundaryU_ele;  
+  //Vector oBoundaryU_ele;
+  bool mpiRoot;
 
+  double time;
+  double * pTime;  
+  
   // void calcMeanState();
   void computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius,
 		      //                      Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux); 
-                      Vector transip, double delta, TransportProperties *_transport, int ip, Vector &bdrFlux);
+                      Vector transip, double delta, double time, TransportProperties *_transport, int ip, Vector &bdrFlux);
 
  public:
-  BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules,
-               RiemannSolver *rsolver_, double &_dt, GasMixture *mixture, GasMixture *d_mixture, Fluxes *_fluxClass,
+  BCintegrator(bool _mpiRoot, MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules,
+               RiemannSolver *rsolver_, double &_dt, double *_time, GasMixture *mixture, GasMixture *d_mixture, Fluxes *_fluxClass,
                ParGridFunction *_Up, ParGridFunction *_gradUp, Vector &_shapesBC, Vector &_normalsWBC,
                Array<int> &_intPointsElIDBC, const int _dim, const int _num_equation, double &_max_char_speed,
                RunConfiguration &_runFile, Array<int> &local_bdr_attr, const int &_maxIntPoints, const int &_maxDofs, TransportProperties *_transport);
@@ -106,7 +110,8 @@ class BCintegrator : public NonlinearFormIntegrator {
   double GetBdrU(int ii) { return oBoundaryU[ii]; }
   //double* GetOutletBdrU_ptr(int ii) { return &oBoundaryU[ii]; }
   //Vector *GetOutletBdrU_ptr() { return &oBoundaryU; }
-  Vector *GetOutletBdrU_ptr() { return oBoundaryU_ptr; }        
+  Vector *GetOutletBdrU_ptr() { return oBoundaryU_ptr; }
+  bool GetRootStatus() const { return mpiRoot; }  
   
   //void updateBCMean(ParGridFunction *Up);
   void updateBCMean(ParGridFunction *U_, ParGridFunction *Up);  

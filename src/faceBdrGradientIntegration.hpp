@@ -29,50 +29,33 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
-#ifndef FACEGRADIENTINTEGRATION_HPP_
-#define FACEGRADIENTINTEGRATION_HPP_
+#ifndef FACEBDRGRADIENTINTEGRATION_HPP_
+#define FACEBDRGRADIENTINTEGRATION_HPP_
 
 #include <tps_config.h>
-#include "tps_mfem_wrap.hpp"
-
 #include "BoundaryCondition.hpp"
-#include "equation_of_state.hpp"
-#include "fluxes.hpp"
-#include "mpi_groups.hpp"
-#include "riemann_solver.hpp"
-#include "transport_properties.hpp"
-#include "run_configuration.hpp"
-#include "unordered_map"
-
+#include "tps_mfem_wrap.hpp"
 
 using namespace mfem;
 
 // Interior face term: <F.n(u),[w]>
-class GradFaceIntegrator : public NonlinearFormIntegrator {
+class GradBdrFaceIntegrator : public NonlinearFormIntegrator {
  private:
   const int dim;
   const int num_equation;
   IntegrationRules *intRules;
+  const int patchNumber;
+  //const InletType bcType;  
 
-  std::unordered_map<int, BoundaryCondition *> inletBCmap;
-  std::unordered_map<int, BoundaryCondition *> outletBCmap;  
-  std::unordered_map<int, BoundaryCondition *> wallBCmap;
-  ParFiniteElementSpace *vfes;
-  RunConfiguration &config;
-  RiemannSolver *rsolver;
-  GasMixture *mixture;
-  Fluxes *fluxClass;
-  Array<int> &intPointsElIDBC;
-  const int &maxIntPoints;
-  const int &maxDofs;
-  MPI_Groups *groupsMPI;  
+  std::unordered_map<int, BoundaryCondition *>::const_iterator ibc;
+  std::unordered_map<int, BoundaryCondition *>::const_iterator obc;
+  std::unordered_map<int, BoundaryCondition *>::const_iterator wbc;
   
  public:
-  GradFaceIntegrator(IntegrationRules *_intRules, const int _dim, const int _num_equation,
-		     RunConfiguration &_runFile, Array<int> &local_attr, ParFiniteElementSpace *_vfes, RiemannSolver *rsolver_, GasMixture *_mixture, GasMixture *d_mixture, Fluxes *_fluxClass, double &_dt, Array<int> &_intPointsElIDBC, const int &_maxIntPoints, const int &_maxDofs, MPI_Groups *_groupsMPI);
+  GradBdrFaceIntegrator(IntegrationRules *_intRules, const int _dim, const int _num_equation, int _patchNumber, const int attr); // add additional stuff herw and in private
 
   virtual void AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,
                                   const Vector &elfun, Vector &elvect);
 };
 
-#endif  // FACEGRADIENTINTEGRATION_HPP_
+#endif  // FACEBDRGRADIENTINTEGRATION_HPP_

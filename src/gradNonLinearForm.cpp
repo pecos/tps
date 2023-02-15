@@ -45,6 +45,7 @@ GradNonLinearForm::GradNonLinearForm(ParFiniteElementSpace *_vfes, IntegrationRu
       maxIntPoints(_maxIntPoints),
       maxDofs(_maxDofs) {}
 
+
 void GradNonLinearForm::Mult(const ParGridFunction *Up, Vector &y) {
   Vector x;
 
@@ -63,6 +64,7 @@ void GradNonLinearForm::Mult(const ParGridFunction *Up, Vector &y) {
   ParNonlinearForm::Mult(x, y);
 #endif
 }
+
 
 #ifdef _GPU_
 void GradNonLinearForm::Mult_gpu(const Vector &x, Vector &y) {
@@ -108,6 +110,7 @@ void GradNonLinearForm::Mult_gpu(const Vector &x, Vector &y) {
     }
   }
 }
+
 
 void GradNonLinearForm::IndexedAddToGlobalMemory(const Array<int> &vdofs, Vector &y, const Vector &el_y, const int &dof,
                                                  const int &elDof, const int &num_equation, const int &dim) {

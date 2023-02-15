@@ -65,6 +65,7 @@ class InletBC : public BoundaryCondition {
   int total_bdrN;
   int bdrN_element;  
   bool bdrUInit;
+  Vector iboundaryU;  
 
   // boundary mean calculation variables
   Vector bdrUp;          // Up at
@@ -88,7 +89,7 @@ class InletBC : public BoundaryCondition {
   void initBoundaryU(ParGridFunction *Up);
 
   void subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux);
-  void subsonicReflectingDensityVelocityUser(Vector &normal, Vector &stateIn, Vector transip, int ip, Vector &bdrFlux);
+  void subsonicReflectingDensityVelocityUser(Vector &normal, Vector &stateIn, Vector transip, double time, int ip, Vector &bdrFlux);
   //  void subsonicReflectingDensityVelocityUser(Vector &normal, Vector &stateIn, Vector transip, Vector &bdrFlux);      
   void subsonicReflectingTemperatureVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux);
   void subsonicReflectingTemperatureVelocityUser(Vector &normal, Vector &stateIn, Vector transip, Vector &bdrFlux);    
@@ -106,9 +107,9 @@ class InletBC : public BoundaryCondition {
   ~InletBC();
 
   //  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux);
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius,
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius, 
 		      //		      Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux);
-		      Vector transip, double delta, TransportProperties *_transport, int ip, Vector &bdrFlux);  
+		      Vector transip, double delta, double time, TransportProperties *_transport, int ip, Vector &bdrFlux);  
 
   virtual void initBCs();
 

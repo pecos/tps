@@ -362,6 +362,7 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
 #endif
 
   // update boundary conditions => all this does is initialize to interior values and updates the mean
+  //cout << "calling updateBCMean " << endl; fflush(stdout);  
   if (bcIntegrator != NULL) bcIntegrator->updateBCMean(U_,Up);
 
 #ifdef _GPU_
@@ -851,7 +852,9 @@ void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceInteg
 #endif
 }
 
+
 void RHSoperator::fillSharedData() {
+  
   ParFiniteElementSpace *pfes = Up->ParFESpace();
   ParMesh *mesh = pfes->GetParMesh();
   mesh->ExchangeFaceNbrNodes();

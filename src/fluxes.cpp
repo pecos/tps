@@ -40,6 +40,7 @@ MFEM_HOST_DEVICE Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, Trans
       nvel(axisym ? 3 : _dim),
       axisymmetric_(axisym),
       config_(_config),
+      //config(_config),
       num_equation(_num_equation) {}
 
 void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, DenseMatrix &flux) {

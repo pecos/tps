@@ -250,7 +250,7 @@ class M2ulPhyS : public TPS::Solver {
   Averaging *average;
 
   // time variable
-  double time;
+  //double time;
 
   // time step
   double dt;
@@ -355,6 +355,8 @@ class M2ulPhyS : public TPS::Solver {
   M2ulPhyS(MPI_Session &_mpi, TPS::Tps *tps);
   ~M2ulPhyS();
 
+  double time;
+  
   void parseSolverOptions() override;
   void parseSolverOptions2();
   // NOTE(kevin): had to split parseSolverOptions2 to enforce style..
@@ -429,6 +431,8 @@ class M2ulPhyS : public TPS::Solver {
 
   static int Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_print);
 
+  double getTime() { return time; }
+  
   // Exit code access
   void SetStatus(int code) {
     exit_status_ = code;

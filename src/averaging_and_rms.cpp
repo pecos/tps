@@ -51,6 +51,7 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
       config(_config),
       groupsMPI(_groupsMPI),
       mixture(_mixture) {
+  
   // Always assume 6 components of the Reynolds stress tensor
   numRMS = 6;
 
@@ -70,12 +71,14 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
     rms = new ParGridFunction(rmsFes);
     meanRho = new ParGridFunction(fes, meanUp->GetData());
     meanV = new ParGridFunction(dfes, meanUp->GetData() + fes->GetNDofs());
-    meanP = new ParGridFunction(fes, meanUp->GetData() + (1 + nvel) * fes->GetNDofs());
+    //meanP = new ParGridFunction(fes, meanUp->GetData() + (1 + nvel) * fes->GetNDofs());
+    meanT = new ParGridFunction(fes, meanUp->GetData() + (1 + nvel) * fes->GetNDofs());    
 
     meanScalar = NULL;
     if (eqSystem == NS_PASSIVE)
       meanScalar = new ParGridFunction(fes, meanUp->GetData() + (num_equation - 1) * fes->GetNDofs());
 
+    // sets to zero, actually shouldnt matter with samplesMean starting at zero
     initiMeanAndRMS();
 
     // ParaviewMean
@@ -88,7 +91,8 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
 
     paraviewMean->RegisterField("dens", meanRho);
     paraviewMean->RegisterField("vel", meanV);
-    paraviewMean->RegisterField("press", meanP);
+    //paraviewMean->RegisterField("press", meanP);
+    paraviewMean->RegisterField("temp", meanT);
     paraviewMean->RegisterField("rms", rms);
     if (eqSystem == NS_PASSIVE) paraviewMean->RegisterField("passScalar", meanScalar);
 
@@ -105,22 +109,23 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
   }
 }
 
+
 Averaging::~Averaging() {
   if (computeMean) {
-    //     delete mixture;
+    
+    //delete mixture;
     delete paraviewMean;
-
-    delete meanP;
+    delete meanT;
     delete meanV;
     delete meanRho;
     if (eqSystem == NS_PASSIVE) delete meanScalar;
-
     delete rms;
     delete meanUp;
-
     delete rmsFes;
+    
   }
 }
+
 
 void Averaging::addSampleMean(const int &iter) {
   if (computeMean) {
@@ -128,14 +133,14 @@ void Averaging::addSampleMean(const int &iter) {
     if (iter % sampleInterval == 0 && iter >= startMean) {      
       if (iter == startMean && groupsMPI->getSession()->Root()) cout << "Starting mean calculation." << endl;
 
-      samplesMean++;      
+      //samplesMean++;      
       
 #ifdef _GPU_
       addSample_gpu(meanUp, rms, samplesMean, mixture, Up, fes->GetNDofs(), dim, num_equation);
 #else
       addSample_cpu();
 #endif
-      //samplesMean++;  This should be incremented BEFORE addSample
+      samplesMean++;  //This should be incremented BEFORE addSample?
     }
     
     /*
@@ -153,6 +158,7 @@ void Averaging::addSampleMean(const int &iter) {
   }
 }
 
+
 void Averaging::addSample_cpu() {
   
   double *dataUp = Up->GetData();
@@ -162,8 +168,12 @@ void Averaging::addSample_cpu() {
   Vector iUp(num_equation);
   Vector dataMean_prev(num_equation);
   Vector meanVel(3), meanVel_prev(3), vel(3);  
-  double val;
+  double val, sM, sMp;
 
+  
+  sM = double(samplesMean);
+  sMp = double(samplesMean+1);    
+  
   for (int n = 0; n < dof; n++) {
     
     for (int eq = 0; eq < num_equation; eq++) iUp[eq] = dataUp[n + eq * dof];
@@ -171,16 +181,19 @@ void Averaging::addSample_cpu() {
 
     // mean
     for (int eq = 0; eq < num_equation; eq++) {
-      double mVal = double(samplesMean) * dataMean[n + eq * dof];
-      //dataMean[n + eq * dof] = (mVal + iUp[eq]) / double(samplesMean + 1);
-      dataMean[n + eq * dof] = (mVal + iUp[eq]) / double(samplesMean);
+      double mVal = sM * dataMean[n + eq * dof];
+      dataMean[n + eq * dof] = (mVal + iUp[eq]) / sMp;
+      //double mVal = double(samplesMean-1) * dataMean[n + eq * dof];      
+      //dataMean[n + eq * dof] = (mVal + iUp[eq]) / double(samplesMean);
 
-      // pressure-temperature change
+      // pressure-temperature change => wtf is this?
+      /*
       if (eq == dim + 1) {
         double p = mixture->ComputePressureFromPrimitives(iUp);
-        //dataMean[n + eq * dof] = (mVal + p) / double(samplesMean + 1);
-	dataMean[n + eq * dof] = (mVal + p) / double(samplesMean);
+        dataMean[n + eq * dof] = (mVal + p) / double(samplesMean + 1);
+	//dataMean[n + eq * dof] = (mVal + p) / double(samplesMean);
       }
+      */
     }
 
     
@@ -190,51 +203,51 @@ void Averaging::addSample_cpu() {
     vel = 0.;
     for (int d = 0; d < nvel; d++) {
       meanVel[d] = dataMean[n + dof * (d + 1)];
-      meanVel_prev[d] = dataMean_prev[n + dof * (d + 1)];      
+      meanVel_prev[d] = dataMean_prev[d + 1];      
       vel[d] = dataUp[n + dof * (d + 1)];
     }
     
     // xx 
-    val = dataRMS[n];
-    val *= double(samplesMean-1);
+    val = dataRMS[n + 0*dof];
+    val *= sM;
     val += ((vel[0] - meanVel_prev[0]) * (vel[0] - meanVel[0]));
-    dataRMS[n] = val/double(samplesMean);
+    dataRMS[n + 0*dof] = val/sMp;
     
     // yy
-    val = dataRMS[n + dof];
-    val *= double(samplesMean-1);
+    val = dataRMS[n + 1*dof];
+    val *= sM;
     val += ((vel[1] - meanVel_prev[1]) * (vel[1] - meanVel[1]));
-    dataRMS[n + dof] = val/double(samplesMean);
+    dataRMS[n + 1*dof] = val/sMp;
     
     // zz
     val = dataRMS[n + 2*dof];
-    val *= double(samplesMean-1);
+    val *= sM;
     val += ((vel[2] - meanVel_prev[2]) * (vel[2] - meanVel[2]));
-    dataRMS[n + 2*dof] = val/double(samplesMean);
+    dataRMS[n + 2*dof] = val/sMp;
     
     // xy
     val = dataRMS[n + 3*dof];
-    val *= double(samplesMean-1);
+    val *= sM;
     val += (vel[0] - meanVel_prev[0]) * (vel[1] - meanVel[1]);    
     //val += 0.5*((vel[0] - meanVel_prev[0]) * (vel[1] - meanVel[1]));
     //val += 0.5*((vel[1] - meanVel_prev[1]) * (vel[0] - meanVel[0]));    
-    dataRMS[n + 3*dof] = val/double(samplesMean);
+    dataRMS[n + 3*dof] = val/sMp;
     
     // xz
     val = dataRMS[n + 4*dof];
-    val *= double(samplesMean-1);
+    val *= sM;
     val += (vel[0] - meanVel_prev[0]) * (vel[2] - meanVel[2]);    
     //val += 0.5*((vel[0] - meanVel_prev[0]) * (vel[2] - meanVel[2]));
     //val += 0.5*((vel[2] - meanVel_prev[2]) * (vel[0] - meanVel[0]));    
-    dataRMS[n + 4*dof] = val/double(samplesMean);
+    dataRMS[n + 4*dof] = val/sMp;
     
     // yz
     val = dataRMS[n + 5*dof];
-    val *= double(samplesMean-1);
+    val *= sM;
     val += (vel[1] - meanVel_prev[1]) * (vel[2] - meanVel[2]);    
     //val += 0.5*((vel[1] - meanVel_prev[1]) * (vel[2] - meanVel[2]));
     //val += 0.5*((vel[2] - meanVel_prev[2]) * (vel[1] - meanVel[1]));  
-    dataRMS[n + 5*dof] = val/double(samplesMean);
+    dataRMS[n + 5*dof] = val/sMp;
 
   }    
 
@@ -303,83 +316,85 @@ void Averaging::write_meanANDrms_restart_files(const int &iter, const double &ti
 }
 
 void Averaging::read_meanANDrms_restart_files() {
-  //   if( computeMean && config.GetRestartMean() )
-  //   {
-  //     string serialName = "restart_mean_";
-  //     serialName.append( config.GetOutputName() );
-  //     serialName.append( ".sol" );
-  //
-  //     string serialNameRMS = "restart_rms_";
-  //     serialNameRMS.append( config.GetOutputName() );
-  //     serialNameRMS.append( ".sol" );
-  //
-  //     string fileName = groupsMPI->getParallelName( serialName );
-  //     ifstream file( fileName );
-  //
-  //     if( !file.is_open() )
-  //     {
-  //       cout<< "Could not open file \""<<fileName<<"\""<<endl;
-  //       return;
-  //     }else
-  //     {
-  //       double *dataUp = meanUp->GetData();
-  //
-  //       string line;
-  //       // read time and iters
-  //       {
-  //         getline(file,line);
-  //         istringstream ss(line);
-  //         string word;
-  //         ss >> word;
-  //         samplesMean = stoi( word );
-  //
-  //         ss >> word;
-  //         sampleInterval = stof( word );
-  //       }
-  //
-  //       int lines = 0;
-  //       while( getline(file,line) )
-  //       {
-  //         istringstream ss(line);
-  //         string word;
-  //         ss >> word;
-  //
-  //         dataUp[lines] = stof( word );
-  //         lines++;
-  //       }
-  //       file.close();
-  //     }
-  //
-  //     // read RMS
-  //     string rmsName  = groupsMPI->getParallelName( serialNameRMS );
-  //     ifstream rmsfile( rmsName );
-  //
-  //     if( !rmsfile.is_open() )
-  //     {
-  //       cout<< "Could not open file \""<<rmsName<<"\""<<endl;
-  //       return;
-  //     }else
-  //     {
-  //       double *dataRMS = rms->GetData();
-  //
-  //       string line;
-  //
-  //       int lines = 0;
-  //       while( getline(rmsfile,line) )
-  //       {
-  //         istringstream ss(line);
-  //         string word;
-  //         ss >> word;
-  //
-  //         dataRMS[lines] = stof( word );
-  //         lines++;
-  //       }
-  //       rmsfile.close();
-  //     }
-  //   }
+     if( computeMean && config.GetRestartMean() )
+     {
+       string serialName = "restart_mean_";
+       serialName.append( config.GetOutputName() );
+       serialName.append( ".sol" );
+  
+       string serialNameRMS = "restart_rms_";
+       serialNameRMS.append( config.GetOutputName() );
+       serialNameRMS.append( ".sol" );
+  
+       string fileName = groupsMPI->getParallelName( serialName );
+       ifstream file( fileName );
+  
+       if( !file.is_open() )
+       {
+         cout<< "Could not open file \""<<fileName<<"\""<<endl;
+         return;
+       }else
+       {
+         double *dataUp = meanUp->GetData();
+  
+         string line;
+         // read time and iters
+         {
+           getline(file,line);
+           istringstream ss(line);
+           string word;
+           ss >> word;
+           samplesMean = stoi( word );
+  
+           ss >> word;
+           sampleInterval = stof( word );
+         }
+  
+         int lines = 0;
+         while( getline(file,line) )
+         {
+           istringstream ss(line);
+           string word;
+           ss >> word;
+  
+           dataUp[lines] = stof( word );
+           lines++;
+         }
+         file.close();
+       }
+  
+       // read RMS
+       string rmsName  = groupsMPI->getParallelName( serialNameRMS );
+       ifstream rmsfile( rmsName );
+  
+       if( !rmsfile.is_open() )
+       {
+         cout<< "Could not open file \""<<rmsName<<"\""<<endl;
+         return;
+       }else
+       {
+         double *dataRMS = rms->GetData();
+  
+         string line;
+  
+         int lines = 0;
+         while( getline(rmsfile,line) )
+         {
+           istringstream ss(line);
+           string word;
+           ss >> word;
+  
+           dataRMS[lines] = stof( word );
+           lines++;
+         }
+         rmsfile.close();
+       }
+     }
 }
 
+
 void Averaging::initiMeanAndRMS() {
+  
   double *dataMean = meanUp->HostWrite();
   double *dataRMS = rms->HostWrite();
   int dof = vfes->GetNDofs();
@@ -388,7 +403,9 @@ void Averaging::initiMeanAndRMS() {
     for (int eq = 0; eq < num_equation; eq++) dataMean[i + eq * dof] = 0.;
     for (int n = 0; n < numRMS; n++) dataRMS[i + dof * n] = 0.;
   }
+  
 }
+
 
 // NOTE(kevin): this routine is currently obsolete.
 // It computes `dof`-averaged state and time-derivative, which are useless at this point.
@@ -503,6 +520,7 @@ void Averaging::addSample_gpu(ParGridFunction *meanUp, ParGridFunction *rms, int
     d_rms[n + 5 * Ndof] = (val * dSamplesMean + (vel[1] - meanVel[1]) * (vel[2] - meanVel[2])) / (dSamplesMean + 1);
   });
 }
+
 
 // NOTE(kevin): this routine is currently obsolete.
 // It computes `dof`-averaged state and time-derivative, which are useless at this point.

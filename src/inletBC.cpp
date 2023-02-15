@@ -31,6 +31,7 @@
 // -----------------------------------------------------------------------------------el-
 #include "inletBC.hpp"
 #include "mpi_groups.hpp"
+#include "M2ulPhyS.hpp"
 #include "dgNonlinearForm.hpp"
 #include "riemann_solver.hpp"
 
@@ -146,6 +147,12 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
   boundaryU.UseDevice(true);
   boundaryU.SetSize(bdrN * num_equation_);
   boundaryU = 0.;
+
+  // testing
+  iboundaryU.UseDevice(true);
+  iboundaryU.SetSize(bdrN * num_equation_);
+  iboundaryU = 0.;
+  
   Vector iState, iUp;
   iState.UseDevice(false);
   iUp.UseDevice(false);
@@ -458,15 +465,15 @@ void InletBC::initBoundaryU(ParGridFunction *Up) {
 
 //  void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector
 //  &bdrFlux) {
-void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius,
+void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius,  
 			     //			     Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux) {			     
-			     Vector transip, double delta, TransportProperties *_transport, int ip, Vector &bdrFlux) {
+			     Vector transip, double delta, double time, TransportProperties *_transport, int ip, Vector &bdrFlux) {
   switch (inletType_) {
     case SUB_DENS_VEL:
       subsonicReflectingDensityVelocity(normal, stateIn, bdrFlux);
       break;
     case SUB_DENS_VEL_USR:
-      subsonicReflectingDensityVelocityUser(normal, stateIn, transip, ip, bdrFlux);
+      subsonicReflectingDensityVelocityUser(normal, stateIn, transip, time, ip, bdrFlux);
       break;      
     case SUB_TEMP_VEL:
       subsonicReflectingTemperatureVelocity(normal, stateIn, bdrFlux);
@@ -691,14 +698,25 @@ void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *U_, ParGri
         FaceElementTransformations *Tr = vfes->GetMesh()->GetBdrFaceTransformations(bel);	
         Array<int> dofs;
         vfes->GetElementVDofs(Tr->Elem1No, dofs);
+
+	// all boundary so dont need the check
         int intorder = Tr->Elem1->OrderW() + 2 * vfes->GetFE(Tr->Elem1No)->GetOrder();
+	/*
+  int intorder;
+  if (Tr->Elem2No >= 0) {
+    intorder = (min(Tr->Elem1->OrderW(), Tr->Elem2->OrderW()) + 2 * max(vfes->GetFE(Tr->Elem1No)->GetOrder(), vfes->GetFE(Tr->Elem2No)->GetOrder()));
+  } else {
+    intorder = Tr->Elem1->OrderW() + 2 * vfes->GetFE(Tr->Elem1No)->GetOrder();
+  }
+	*/
+	
         if (vfes->GetFE(Tr->Elem1No)->Space() == FunctionSpace::Pk) {
           intorder++;
         }
       
         const IntegrationRule ir = intRules->Get(Tr->GetGeometryType(), intorder);
         for (int i = 0; i < ir.GetNPoints(); i++) {
-	  
+
           //IntegrationPoint &ip = ir.IntPoint(i);
           IntegrationPoint ip = ir.IntPoint(i);	  
           Tr->SetAllIntPoints(&ip);
@@ -772,6 +790,9 @@ void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *U_, ParGri
 	  //cout << "interpolated v: " << boundaryU[1 + i * num_equation_] << " " << wt_tot << " " << iCount << endl; fflush(stdout);
           //boundaryU[4 + Nbdr * num_equation_] = xp[0]; // for testing
 
+          // testing
+	  iboundaryU[0 + Nbdr * num_equation_] = float(i);
+	  
           Nbdr++;		  
 	  
         }
@@ -1492,8 +1513,14 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
   }
 
   // NOTE: If two-temperature, BC for electron temperature is T_e = T_h, where the total pressure is p.
-  mixture->modifyEnergyForPressure(state2, state2, p, true);
-  rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
+  //mixture->modifyEnergyForPressure(state2, state2, p, true);
+  //rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
+
+  Vector tmpU(num_equation_);
+  for (int eq = 0; eq < num_equation_; eq++) tmpU[eq] = state2[eq];  
+  for (int eq = 0; eq <= dim_; eq++) tmpU[eq] = tmpU[eq] - (stateIn[eq] - state2[eq]);
+  rsolver->Eval(stateIn, tmpU, normal, bdrFlux, true);
+  
 }
 
 
@@ -1535,10 +1562,25 @@ void InletBC::subsonicReflectingTemperatureVelocity(Vector &normal, Vector &stat
 Reflecting inflow with a specified density and velocity profile.  Temperature is backed out with the interior pressure.
 For lack of a better method, this routine must be modified as desired for the particular run.
 */
-void InletBC::subsonicReflectingDensityVelocityUser(Vector &normal, Vector &stateIn, Vector transip, int ip, Vector &bdrFlux) {
+void InletBC::subsonicReflectingDensityVelocityUser(Vector &normal, Vector &stateIn, Vector transip, double time, int ip, Vector &bdrFlux) {
   
   const double p = mixture->ComputePressure(stateIn);
 
+  double tRamp, wt;
+  tRamp = 0.1; // make this readable
+  //wt = 0.5*(tanh(time/tRamp - 4.0) + 1);
+  wt = time/tRamp;
+  wt = min(wt,1.0);
+  //cout << "time:" << time << " " << wt << endl; fflush(stdout);
+  //wt = 1.0;
+
+  // testing
+  /*
+  if(iboundaryU[0 + bdrN * num_equation_] != float(ip)) {
+    cout << "BAD inlet bc pairing!" << iboundaryU[0 + bdrN * num_equation_] << ", " << float(ip) << ", " << bdrN << endl; fflush(stdout);
+  }
+  */
+  
   Vector state2(num_equation_);
   Vector iUp(num_equation_);
   Vector bU(num_equation_);    
@@ -1564,8 +1606,8 @@ void InletBC::subsonicReflectingDensityVelocityUser(Vector &normal, Vector &stat
   tangent1[2] = +(unitNorm[0]*tangent2[1] - unitNorm[1]*tangent2[0]);  
 
   // copy from full boundaryU array
-  //for (int eq = 0; eq < num_equation_; eq++)  bU[eq] = boundaryU[eq + ip * num_equation_];
-  for (int eq = 0; eq < num_equation_; eq++)  bU[eq] = boundaryU[eq + bdrN * num_equation_];  
+  //for (int eq = 0; eq < num_equation_; eq++) bU[eq] = boundaryU[eq + ip * num_equation_];
+  for (int eq = 0; eq < num_equation_; eq++) bU[eq] = boundaryU[eq + bdrN * num_equation_];  
 
   // testing
   //if (abs(transip[0]-bU[4]) > 1.0e-15) cout << "BAD INTERP LOCATION!!!" << bdrN << endl; fflush(stdout);
@@ -1580,26 +1622,38 @@ void InletBC::subsonicReflectingDensityVelocityUser(Vector &normal, Vector &stat
   bU[2] = 1.0 * (1.0-pow(radius,8)) * bU[0];
   bU[3] = 0.0;  
   */
+
+  /*
+  if (eqSystem == NS_PASSIVE) {
+    state2[num_equation_ - 1] = 0.;
+  } else if (numActiveSpecies_ > 0) {
+    for (int sp = 0; sp < numActiveSpecies_; sp++) {
+      state2[nvel_ + 2 + sp] = inputState[4 + sp];
+    }
+  }
+  */
   
-  // primitive bc state
-  iUp[0] = bU[0];
-  iUp[1] = bU[1]/bU[0];
-  iUp[2] = bU[2]/bU[0];
-  iUp[3] = bU[3]/bU[0];    
-  iUp[4] = p/(bU[0]*Rgas);
+  // primitive bc state with time ramp
+  iUp[0] = (1.0-wt)*inputState[0] + wt*bU[0];
+  iUp[1] = (1.0-wt)*inputState[1] + wt*bU[1]/bU[0];
+  iUp[2] = (1.0-wt)*inputState[2] + wt*bU[2]/bU[0];
+  iUp[3] = (1.0-wt)*inputState[3] + wt*bU[3]/bU[0];    
+  iUp[4] = (1.0-wt)*p/(inputState[0]*Rgas) + wt*p/(bU[0]*Rgas);
   
   // get energy bc  
   mixture->GetConservativesFromPrimitives(iUp, state2);
   bU[4] = state2[4];
+
+  // NOTE: If two-temperature, BC for electron temperature is T_e = T_h, where the total pressure is p.
+  //mixture->modifyEnergyForPressure(state2, state2, p, true);
+  //rsolver->Eval(stateIn, state2, normal, bdrFlux, true);    
   
   // modify newU to Reimann so the average of stateIn and modified newU is actual newU?
-  //Vector tmpU(num_equation_);
-  //for (int i = 0; i < num_equation_; i++) tmpU[i] = 2.0*newU[i] - boundaryU[i + bdrN*num_equation_];  
+  Vector tmpU(num_equation_);
+  for (int eq = 0; eq < num_equation_; eq++) tmpU[eq] = state2[eq];  
+  for (int eq = 0; eq <= dim_; eq++) tmpU[eq] = tmpU[eq] - (stateIn[eq] - state2[eq]);
+  rsolver->Eval(stateIn, tmpU, normal, bdrFlux, true);
   
-  // not lagged
-  //rsolver->Eval(bU, bU, normal, bdrFlux, true);  
-  rsolver->Eval(stateIn, bU, normal, bdrFlux, true);  
-  //rsolver->Eval(stateIn, tmpU, normal, bdrFlux, true);
   bdrN++;
   
 }

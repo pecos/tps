@@ -34,9 +34,7 @@
 
 #include <mpi.h>
 #include <tps_config.h>
-
 #include <string>
-
 #include "tps_mfem_wrap.hpp"
 
 using namespace mfem;

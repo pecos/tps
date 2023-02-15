@@ -73,7 +73,7 @@ class Averaging {
   ParGridFunction *rms;
 
   // time averaged p, rho, vel (pointers to meanUp) for Visualization
-  ParGridFunction *meanP, *meanRho, *meanV;
+  ParGridFunction *meanP, *meanRho, *meanV, *meanT;
   ParGridFunction *meanScalar;
 
   ParaViewDataCollection *paraviewMean = NULL;

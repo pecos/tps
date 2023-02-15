@@ -48,6 +48,7 @@
 namespace TPS {
 
 Tps::Tps() {
+  
   nprocs_ = mpi_.WorldSize();
   rank_ = mpi_.WorldRank();
   if (rank_ == 0)

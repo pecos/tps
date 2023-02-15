@@ -87,9 +87,9 @@ class WallBC : public BoundaryCondition {
          const Array<int> &intPointsElIDBC, const int &maxIntPoints, bool axisym);
   ~WallBC();
 
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius,
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius, 
 		      //		      Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux);		      
-		      Vector transip, double delta, TransportProperties *_transport, int ip, Vector &bdrFlux);
+		      Vector transip, double delta, double time, TransportProperties *_transport, int ip, Vector &bdrFlux);
   MFEM_HOST_DEVICE void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius, Vector transip, Vector &bdrFlux);
 
   virtual void initBCs();
@@ -101,7 +101,6 @@ class WallBC : public BoundaryCondition {
   virtual void updateMean(IntegrationRules *intRules, ParGridFunction *U_, ParGridFunction *Up) {}
 
   // functions for BC integration on GPU
-
   virtual void integrationBC(Vector &y,  // output
                              const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                              ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
