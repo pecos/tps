@@ -68,6 +68,12 @@ class RunConfiguration {
   //  6: RK6Solver
   int timeIntegratorType;
 
+  // subgrid scale model. Possible values
+  //  0: None
+  //  1: Smagorinsky
+  //  2: Sigma
+  int sgsModelType;
+
   // order of the solution. Defaults to 4
   int solOrder;
 
@@ -146,6 +152,9 @@ class RunConfiguration {
 
   // Reference length
   double refLength;
+
+  // minimum grid size for SGS
+  double sgsFloor;
 
   // equations to be solved. Options thus far
   Equations eqSystem;
@@ -270,6 +279,7 @@ class RunConfiguration {
   int GetUniformRefLevels() { return ref_levels; }
 
   int GetTimeIntegratorType() { return timeIntegratorType; }
+  int GetSgsModelType() { return sgsModelType; }
 
   int GetSolutionOrder() { return solOrder; }
   int GetIntegrationRule() { return integrationRule; }
@@ -291,6 +301,7 @@ class RunConfiguration {
   double GetViscMult() { return visc_mult; }
   double GetBulkViscMult() { return bulk_visc; }
   double GetReferenceLength() { return refLength; }
+  double GetSgsFloor() { return sgsFloor; }
   Equations GetEquationSystem() const { return eqSystem; }
   bool isAxisymmetric() const { return axisymmetric_; }
   bool isSBP() { return SBP; }

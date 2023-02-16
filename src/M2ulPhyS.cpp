@@ -497,7 +497,7 @@ void M2ulPhyS::initVariables() {
   gpu::instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, fluxClass, config.RoeRiemannSolver(),
                                           config.isAxisymmetric(), rsolver);
 #else
-  fluxClass = new Fluxes(mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric());
+  fluxClass = new Fluxes(mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(), &config);
 
   rsolver =
       new RiemannSolver(num_equation, mixture, eqSystem, fluxClass, config.RoeRiemannSolver(), config.isAxisymmetric());
@@ -579,7 +579,7 @@ void M2ulPhyS::initVariables() {
 
   rhsOperator =
       new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType, fluxClass,
-                      mixture, d_mixture, chemistry_, transportPtr, radiation_, vfes, gpu_precomputed_data_,
+                      mixture, d_mixture, chemistry_, transportPtr, radiation_, vfes, fes, gpu_precomputed_data_,
                       maxIntPoints, maxDofs, A, Aflux, mesh, spaceVaryViscMult, U, Up, gradUp, gradUpfes, gradUp_A,
                       bcIntegrator, isSBP, alpha, config, plasma_conductivity_, joule_heating_);
 
@@ -589,13 +589,20 @@ void M2ulPhyS::initVariables() {
 
   // Determine the minimum element size.
   {
-    double local_hmin = mesh->GetElementSize(0, 1);
-    for (int i = 1; i < mesh->GetNE(); i++) {
-      // if(sqrt(mesh->GetElementVolume(i))<1e-3) cout<<sqrt(mesh->GetElementVolume(i))<<endl;
+    double local_hmin = 1.0e18;
+    for (int i = 0; i < mesh->GetNE(); i++) {
       local_hmin = min(mesh->GetElementSize(i, 1), local_hmin);
-      // local_hmin = min(sqrt(mesh->GetElementVolume(i)), local_hmin);
     }
     MPI_Allreduce(&local_hmin, &hmin, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
+  }
+
+  // maximum size
+  {
+    double local_hmax = 1.0e-15;
+    for (int i = 0; i < mesh->GetNE(); i++) {
+      local_hmax = max(mesh->GetElementSize(i, 1), local_hmax);
+    }
+    MPI_Allreduce(&local_hmax, &hmax, 1, MPI_DOUBLE, MPI_MAX, mesh->GetComm());
   }
 
   // estimate initial dt
@@ -603,6 +610,8 @@ void M2ulPhyS::initVariables() {
   gradUp->ExchangeFaceNbrData();
 
   if (config.GetRestartCycle() == 0) initialTimeStep();
+  if (mpi.Root()) cout << "Maximum element size: " << hmax << "m" << endl;
+  if (mpi.Root()) cout << "Minimum element size: " << hmin << "m" << endl;
   if (mpi.Root()) cout << "Initial time-step: " << dt << "s" << endl;
 
   // t_final = MaxIters*dt;
@@ -2162,6 +2171,10 @@ void M2ulPhyS::parseSolverOptions2() {
 }
 
 void M2ulPhyS::parseFlowOptions() {
+  std::map<std::string, int> sgsModel;
+  sgsModel["none"] = 0;
+  sgsModel["smagorinsky"] = 1;
+  sgsModel["sigma"] = 2;
   tpsP->getInput("flow/order", config.solOrder, 4);
   tpsP->getInput("flow/integrationRule", config.integrationRule, 1);
   tpsP->getInput("flow/basisType", config.basisType, 1);
@@ -2181,10 +2194,15 @@ void M2ulPhyS::parseFlowOptions() {
   tpsP->getInput("flow/refinement_levels", config.ref_levels, 0);
   tpsP->getInput("flow/computeDistance", config.compute_distance, false);
 
+  std::string type;
+  tpsP->getInput("flow/sgsModel", type, std::string("none"));
+
   assert(config.solOrder > 0);
   assert(config.numIters >= 0);
   assert(config.itersOut > 0);
   assert(config.refLength > 0);
+
+  config.sgsModelType = sgsModel[type];
 }
 
 void M2ulPhyS::parseTimeIntegrationOptions() {

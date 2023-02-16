@@ -42,6 +42,8 @@ RunConfiguration::RunConfiguration() {
   ref_levels = 0;
   timeIntegratorType = 4;
   solOrder = 4;
+  sgsModelType = 0;
+  sgsFloor = 0.;
 
   integrationRule = 1;
   basisType = 1;

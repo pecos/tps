@@ -79,6 +79,7 @@ class RHSoperator : public TimeDependentOperator {
   TransportProperties *transport_;
 
   ParFiniteElementSpace *vfes;
+  ParFiniteElementSpace *fes;
 
   const precomputedIntegrationData &gpu_precomputed_data_;
 
@@ -95,6 +96,7 @@ class RHSoperator : public TimeDependentOperator {
 
   ParFiniteElementSpace *dfes;
   ParGridFunction *coordsDof;
+  ParGridFunction *elSize;
 
   ParGridFunction *spaceVaryViscMult;
   linearlyVaryingVisc &linViscData;
@@ -147,7 +149,7 @@ class RHSoperator : public TimeDependentOperator {
   RHSoperator(int &_iter, const int _dim, const int &_num_equation, const int &_order, const Equations &_eqSystem,
               double &_max_char_speed, IntegrationRules *_intRules, int _intRuleType, Fluxes *_fluxClass,
               GasMixture *_mixture, GasMixture *d_mixture, Chemistry *_chemistry, TransportProperties *_transport,
-              Radiation *_radiation, ParFiniteElementSpace *_vfes,
+              Radiation *_radiation, ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_fes,
               const precomputedIntegrationData &gpu_precomputed_data, const int &_maxIntPoints, const int &_maxDofs,
               DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult,
               ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes,
