@@ -1011,14 +1011,14 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + bdrN * num_equation_] = newU[eq];
 
   // modify newU to Reimann so the average of stateIn and modified newU is actual newU?
-  Vector tmpU(num_equation_);
-  for (int i = 0; i < num_equation_; i++) tmpU[i] = 2.0*newU[i] - stateIn[i];  
+  //Vector tmpU(num_equation_);
+  //for (int i = 0; i < num_equation_; i++) tmpU[i] = 2.0*newU[i] - stateIn[i];  
 
   // bdrFLux is over-written here, state2 is lagged
-  // rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
+  rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 
   // not lagged
-  rsolver->Eval(stateIn, tmpU, normal, bdrFlux, true);
+  //rsolver->Eval(stateIn, tmpU, normal, bdrFlux, true);
 
   bdrN++;
 }
@@ -1514,12 +1514,8 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
 
   // NOTE: If two-temperature, BC for electron temperature is T_e = T_h, where the total pressure is p.
   //mixture->modifyEnergyForPressure(state2, state2, p, true);
-  //rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
-
-  Vector tmpU(num_equation_);
-  for (int eq = 0; eq < num_equation_; eq++) tmpU[eq] = state2[eq];  
-  for (int eq = 0; eq <= dim_; eq++) tmpU[eq] = tmpU[eq] - (stateIn[eq] - state2[eq]);
-  rsolver->Eval(stateIn, tmpU, normal, bdrFlux, true);
+  for (int eq = 1; eq <= dim_; eq++) state2[eq] = 2.0*state2[eq] - stateIn[eq];
+  rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
   
 }
 
@@ -1649,10 +1645,8 @@ void InletBC::subsonicReflectingDensityVelocityUser(Vector &normal, Vector &stat
   //rsolver->Eval(stateIn, state2, normal, bdrFlux, true);    
   
   // modify newU to Reimann so the average of stateIn and modified newU is actual newU?
-  Vector tmpU(num_equation_);
-  for (int eq = 0; eq < num_equation_; eq++) tmpU[eq] = state2[eq];  
-  for (int eq = 0; eq <= dim_; eq++) tmpU[eq] = tmpU[eq] - (stateIn[eq] - state2[eq]);
-  rsolver->Eval(stateIn, tmpU, normal, bdrFlux, true);
+  for (int eq = 1; eq <= dim_; eq++) state2[eq] = 2.0*state2[eq] - stateIn[eq];
+  rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
   
   bdrN++;
   

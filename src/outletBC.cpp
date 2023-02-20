@@ -909,13 +909,13 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
 void OutletBC::subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
   Vector state2(num_equation_);
 
-  //mixture->modifyEnergyForPressure(stateIn, state2, inputState[0]);
-  //rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
+  mixture->modifyEnergyForPressure(stateIn, state2, inputState[0]);
+  rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
   
-  Vector tmpU(num_equation_);
-  for (int i = 0; i < num_equation_; i++) tmpU[i] = state2[i];
-  for (int i = 1; i <= dim_; i++) tmpU[i] = state2[i] + (state2[i] - stateIn[i]);  
-  rsolver->Eval(stateIn, tmpU, normal, bdrFlux, true);  
+  //Vector tmpU(num_equation_);
+  //for (int i = 0; i < num_equation_; i++) tmpU[i] = state2[i];
+  //for (int i = 1; i <= dim_; i++) tmpU[i] = state2[i] + (state2[i] - stateIn[i]);  
+  //rsolver->Eval(stateIn, tmpU, normal, bdrFlux, true);  
   
 }
 

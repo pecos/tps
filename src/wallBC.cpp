@@ -456,12 +456,14 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
 				       Vector transip, double delta, Vector &bdrFlux) {
 
   Vector wallState(num_equation_);
+  
   //mixture->computeStagnantStateWithTemp(stateIn, wallTemp_, wallState);
   // TODO(kevin): set stangant state with two separate temperature.
 
   // reflected state (rho*u only) to prevent penetration
-  for (int eq = 0; eq <= num_equation_; eq++) wallState[eq] = stateIn[eq];  
+  for (int eq = 0; eq < num_equation_; eq++) wallState[eq] = stateIn[eq];  
   for (int eq = 1; eq <= dim_; eq++) wallState[eq] = -stateIn[eq];
+  //for (int eq = 1; eq <= dim_; eq++) wallState[eq] = -wallState[eq];
   
   if (eqSystem == NS_PASSIVE) wallState[num_equation_ - 1] = stateIn[num_equation_ - 1];
 
