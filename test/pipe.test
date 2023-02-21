@@ -3,6 +3,7 @@
 
 TEST="axisymmetric/pipe"
 RUNFILE="inputs/pipe.axisym.viscous.ini"
+RUNFILE_MOD="inputs/pipe.axisym.viscous.ini.element_mod"
 
 setup() {
     SOLN_FILE=restart_output-pipe.sol.h5
@@ -19,6 +20,26 @@ setup() {
     cp $RSTRT_FILE $SOLN_FILE
 
     ../src/tps --runFile $RUNFILE >& run.log
+
+    test -s $SOLN_FILE
+    test -s $REF_FILE
+    ./soln_differ -r $SOLN_FILE $REF_FILE
+}
+
+@test "[$TEST] verify axisymmetric tps output using ElementIntegrator" {
+    # paraview+restart will fail if data in output-pipe is from after restart
+    rm -rf output-pipe
+
+    test -s $RUNFILE
+    test -s $RSTRT_FILE
+    cp $RSTRT_FILE $SOLN_FILE
+
+    rm -rf $RUNFILE_MOD
+    cp $RUNFILE $RUNFILE_MOD
+    echo "[]" >> $RUNFILE_MOD
+    echo "flow/useNodalInterior = 0" >> $RUNFILE_MOD
+
+    ../src/tps --runFile $RUNFILE_MOD >& run.element.log
 
     test -s $SOLN_FILE
     test -s $REF_FILE
