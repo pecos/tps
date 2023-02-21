@@ -47,6 +47,8 @@ using namespace mfem;
 
 // Boundary face term: <F.n(u),[w]>
 class BCintegrator : public NonlinearFormIntegrator {
+  friend class GradFaceIntegrator;
+
  protected:
   MPI_Groups *groupsMPI;
 
