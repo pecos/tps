@@ -57,12 +57,6 @@ class GradNonLinearForm : public ParNonlinearForm {
                     const volumeFaceIntegrationArrays &gpuArrays, const int &maxIntPoints, const int &maxDofs);
 
   void Mult(const ParGridFunction *Up, Vector &y);
-
-#ifdef _GPU_
-  void Mult_gpu(const Vector &x, Vector &y);
-  static void IndexedAddToGlobalMemory(const Array<int> &vdofs, Vector &y, const Vector &el_y, const int &dof,
-                                       const int &elDof, const int &num_equation, const int &dim);
-#endif
 };
 
 #endif  // GRADNONLINEARFORM_HPP_

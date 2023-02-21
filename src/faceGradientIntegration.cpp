@@ -60,18 +60,17 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
   elvect.SetSize((dof1 + dof2) * num_equation * dim);
   elvect = 0.0;
 
-// #ifdef _GPU_
-//   DenseMatrix elfun1_mat(elfun.GetData(), dof1, num_equation);
-//   DenseMatrix elfun2_mat(elfun.GetData()+dof1*num_equation,
-//                          dof2, num_equation);
-#ifndef _GPU_
-  DenseMatrix elfun1_mat(elfun.GetData(), dof1, num_equation * dim);
-  DenseMatrix elfun2_mat(elfun.GetData() + dof1 * num_equation * dim, dof2, num_equation * dim);
+  // NB: Incoming Vector &elfun is in gradient space.  The first
+  // component is the state, and the rest is zero.  See
+  // GradNonLinearForm::Mult in gradNonLinearForm.cpp for details.
+  DenseMatrix elfun1_mat(elfun.GetData(), dof1, num_equation);
+  DenseMatrix elfun2_mat(elfun.GetData() + dof1 * num_equation * dim, dof2, num_equation);
+
+
   DenseMatrix elvect1_mat(elvect.GetData(), dof1, num_equation * dim);
   DenseMatrix elvect2_mat(elvect.GetData() + dof1 * num_equation * dim, dof2, num_equation * dim);
   elvect1_mat = 0.;
   elvect2_mat = 0.;
-#endif
 
   // Integration order calculation from DGTraceIntegrator
   int intorder;
@@ -104,20 +103,12 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
     for (int eq = 0; eq < num_equation; eq++) {
       double sum = 0.;
       for (int k = 0; k < dof1; k++) {
-#ifdef _GPU_
-        sum += shape1(k) * elfun(k + eq * dof1);
-#else
         sum += shape1[k] * elfun1_mat(k, eq);
-#endif
       }
       iUp1(eq) = sum;
       sum = 0.;
       for (int k = 0; k < dof2; k++) {
-#ifdef _GPU_
-        sum += shape2(k) * elfun(k + eq * dof2 + dof1 * num_equation);
-#else
         sum += shape2[k] * elfun2_mat(k, eq);
-#endif
       }
       iUp2(eq) = sum;
       mean(eq) = (iUp1(eq) + iUp2(eq)) / 2.;
@@ -133,18 +124,10 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
         const double du1n = (mean(eq) - iUp1(eq)) * nor(d);
         const double du2n = (mean(eq) - iUp2(eq)) * nor(d);
         for (int k = 0; k < dof1; k++) {
-#ifdef _GPU_
-          elvect(k + eq + d * num_equation) += du1n * shape1(k);
-#else
           elvect1_mat(k, eq + d * num_equation) += du1n * shape1(k);
-#endif
         }
         for (int k = 0; k < dof2; k++) {
-#ifdef _GPU_
-          elvect(k + eq + d * num_equation + dof1 * num_equation * dim) -= du2n * shape2(k);
-#else
           elvect2_mat(k, eq + d * num_equation) -= du2n * shape2(k);
-#endif
         }
       }
     }
