@@ -39,24 +39,17 @@ GradFaceIntegrator::GradFaceIntegrator(IntegrationRules *_intRules, const int _d
 void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2,
                                             FaceElementTransformations &Tr, const Vector &elfun, Vector &elvect) {
   // Compute the term <nU,[w]> on the interior faces.
-  Vector shape1;
-  shape1.UseDevice(false);
-  Vector shape2;
-  shape2.UseDevice(false);
   Vector nor(dim);
-  nor.UseDevice(false);
-  Vector mean;
-  mean.UseDevice(false);
-  mean.SetSize(num_equation);
+  Vector mean(num_equation);
+  Vector iUp1(num_equation), iUp2(num_equation);
+  Vector du1n(dim * num_equation), du2n(dim * num_equation);
 
   const int dof1 = el1.GetDof();
   const int dof2 = el2.GetDof();
 
-  shape1.SetSize(dof1);
-  shape2.SetSize(dof2);
+  Vector shape1(dof1);
+  Vector shape2(dof2);
 
-  elfun.Read();
-  elvect.UseDevice(true);
   elvect.SetSize((dof1 + dof2) * num_equation * dim);
   elvect = 0.0;
 
@@ -65,7 +58,6 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
   // GradNonLinearForm::Mult in gradNonLinearForm.cpp for details.
   DenseMatrix elfun1_mat(elfun.GetData(), dof1, num_equation);
   DenseMatrix elfun2_mat(elfun.GetData() + dof1 * num_equation * dim, dof2, num_equation);
-
 
   DenseMatrix elvect1_mat(elvect.GetData(), dof1, num_equation * dim);
   DenseMatrix elvect2_mat(elvect.GetData() + dof1 * num_equation * dim, dof2, num_equation * dim);
@@ -82,7 +74,6 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
   if (el1.Space() == FunctionSpace::Pk) {
     intorder++;
   }
-  // IntegrationRules IntRules2(0, Quadrature1D::GaussLobatto);
   const IntegrationRule *ir = &intRules->Get(Tr.GetGeometryType(), intorder);
 
   for (int i = 0; i < ir->GetNPoints(); i++) {
@@ -95,41 +86,27 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
     el2.CalcShape(Tr.GetElement2IntPoint(), shape2);
 
     // Interpolate U values at the point
-    Vector iUp1, iUp2;
-    iUp1.UseDevice(false);
-    iUp2.UseDevice(false);
-    iUp1.SetSize(num_equation);
-    iUp2.SetSize(num_equation);
-    for (int eq = 0; eq < num_equation; eq++) {
-      double sum = 0.;
-      for (int k = 0; k < dof1; k++) {
-        sum += shape1[k] * elfun1_mat(k, eq);
-      }
-      iUp1(eq) = sum;
-      sum = 0.;
-      for (int k = 0; k < dof2; k++) {
-        sum += shape2[k] * elfun2_mat(k, eq);
-      }
-      iUp2(eq) = sum;
-      mean(eq) = (iUp1(eq) + iUp2(eq)) / 2.;
-    }
+    elfun1_mat.MultTranspose(shape1, iUp1);
+    elfun2_mat.MultTranspose(shape2, iUp2);
 
-    // Get the normal vector and the flux on the face
+    // Compute average
+    // NB: Code below is mathematically equivalent to mean = 0.5*(iUp1
+    // + iUp2), but mfem::Vector does not provide operator+
+    mean.Set(0.5, iUp1);
+    mean.Add(0.5, iUp2);
+
+    // Get the normal vector
     CalcOrtho(Tr.Jacobian(), nor);
-
     nor *= ip.weight;
 
     for (int d = 0; d < dim; d++) {
       for (int eq = 0; eq < num_equation; eq++) {
-        const double du1n = (mean(eq) - iUp1(eq)) * nor(d);
-        const double du2n = (mean(eq) - iUp2(eq)) * nor(d);
-        for (int k = 0; k < dof1; k++) {
-          elvect1_mat(k, eq + d * num_equation) += du1n * shape1(k);
-        }
-        for (int k = 0; k < dof2; k++) {
-          elvect2_mat(k, eq + d * num_equation) -= du2n * shape2(k);
-        }
+        du1n[eq + d * num_equation] = (mean(eq) - iUp1(eq)) * nor(d);
+        du2n[eq + d * num_equation] = (iUp2(eq) - mean(eq)) * nor(d);
       }
     }
+
+    AddMultVWt(shape1, du1n, elvect1_mat);
+    AddMultVWt(shape2, du2n, elvect2_mat);
   }
 }
