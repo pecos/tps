@@ -603,17 +603,10 @@ void M2ulPhyS::initVariables() {
       cout << "Unknown ODE solver type: " << config.GetTimeIntegratorType() << '\n';
   }
 
-  //   gradUp_A = new ParNonlinearForm(gradUpfes);
-  //   gradUp_A->AddInteriorFaceIntegrator(
-  //       new GradFaceIntegrator(intRules, dim, num_equation) );
-  gradUp_A = new GradNonLinearForm(
-#ifdef _GPU_
-      vfes,
-#else
-      gradUpfes,
-#endif
-      intRules, dim, num_equation);
+
+  gradUp_A = new GradNonLinearForm(gradUpfes, intRules, dim, num_equation);
   gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
+  gradUp_A->AddBdrFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation, bcIntegrator));
 
   rhsOperator =
       new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType, d_fluxClass,

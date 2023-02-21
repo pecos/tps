@@ -34,6 +34,7 @@
 
 #include <tps_config.h>
 
+#include "BCintegrator.hpp"
 #include "tps_mfem_wrap.hpp"
 
 using namespace mfem;
@@ -44,9 +45,10 @@ class GradFaceIntegrator : public NonlinearFormIntegrator {
   const int dim;
   const int num_equation;
   IntegrationRules *intRules;
+  BCintegrator *bc_;  // NB: GradFaceIntegrator is a friend of BCintegrator
 
  public:
-  GradFaceIntegrator(IntegrationRules *_intRules, const int _dim, const int _num_equation);
+  GradFaceIntegrator(IntegrationRules *_intRules, const int _dim, const int _num_equation, BCintegrator *bc = NULL);
 
   virtual void AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,
                                   const Vector &elfun, Vector &elvect);
