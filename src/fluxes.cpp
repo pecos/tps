@@ -270,8 +270,8 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   }
 }
 
-MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius, double delta,
-                                                   double *flux) {
+MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius,
+                                                   double delta, double *flux) {
   for (int d = 0; d < dim; d++) {
     for (int eq = 0; eq < num_equation; eq++) {
       flux[eq + d * num_equation] = 0.;
@@ -530,8 +530,9 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
   }
 }
 
-MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius, double delta,
-                                                      const BoundaryViscousFluxData &bcFlux, double *normalFlux) {
+MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius,
+                                                      double delta, const BoundaryViscousFluxData &bcFlux,
+                                                      double *normalFlux) {
   for (int eq = 0; eq < num_equation; eq++) normalFlux[eq] = 0.;
   if (eqSystem == EULER) {
     return;

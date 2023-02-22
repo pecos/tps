@@ -84,7 +84,8 @@ class Fluxes {
   void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, double delta,
                             DenseMatrix &flux);
 
-  MFEM_HOST_DEVICE void ComputeViscousFluxes(const double *state, const double *gradUp, double radius, double delta, double *flux);
+  MFEM_HOST_DEVICE void ComputeViscousFluxes(const double *state, const double *gradUp, double radius, double delta,
+                                             double *flux);
 
   void sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu_sgs);
   void sgsSigma(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu_sgs);
@@ -93,8 +94,8 @@ class Fluxes {
   void ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, double delta,
                                const BoundaryViscousFluxData &bcFlux, Vector &normalFlux);
 
-MFEM_HOST_DEVICE void ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius, double delta,
-                                              const BoundaryViscousFluxData &bcFlux, double *normalFlux);
+  MFEM_HOST_DEVICE void ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius, double delta,
+                                                const BoundaryViscousFluxData &bcFlux, double *normalFlux);
 
   // Compute the split fersion of the flux for SBP operations
   // Output matrices a_mat, c_mat need not have the right size
