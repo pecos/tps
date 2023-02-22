@@ -47,6 +47,8 @@ class WallBC : public BoundaryCondition {
   const WallType wallType_;
   const WallData wallData_;
 
+  const bool useBCinGrad_;
+
   GasMixture *d_mixture_;  // only used in the device.
   Fluxes *fluxClass;
 
@@ -78,7 +80,8 @@ class WallBC : public BoundaryCondition {
   WallBC(RiemannSolver *rsolver_, GasMixture *_mixture, GasMixture *d_mixture, Equations _eqSystem, Fluxes *_fluxClass,
          ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
          const int _num_equation, int _patchNumber, WallType _bcType, const WallData _inputData,
-         const boundaryFaceIntegrationData &boundary_face_data, const int &maxIntPoints, bool axisym);
+         const boundaryFaceIntegrationData &boundary_face_data, const int &maxIntPoints, bool axisym,
+         bool useBCinGrad = false);
   ~WallBC();
 
   void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, double delta,

@@ -37,7 +37,8 @@
 WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, GasMixture *d_mixture, Equations _eqSystem,
                Fluxes *_fluxClass, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt,
                const int _dim, const int _num_equation, int _patchNumber, WallType _bcType, const WallData _inputData,
-               const boundaryFaceIntegrationData &boundary_face_data, const int &_maxIntPoints, bool axisym)
+               const boundaryFaceIntegrationData &boundary_face_data, const int &_maxIntPoints, bool axisym,
+               bool useBCinGrad)
     : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber, 1,
                         axisym),  // so far walls do not require ref. length. Left at 1
       wallType_(_bcType),
@@ -45,7 +46,8 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, GasMixture *d_mixt
       d_mixture_(d_mixture),
       fluxClass(_fluxClass),
       boundary_face_data_(boundary_face_data),
-      maxIntPoints_(_maxIntPoints) {
+      maxIntPoints_(_maxIntPoints),
+      useBCinGrad_(useBCinGrad) {
   // Initialize bc state.
   // bcState_.prim.SetSize(num_equation_);
   // bcState_.primIdxs.SetSize(num_equation_);
@@ -470,10 +472,15 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
 void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip,
                                        double delta, Vector &bdrFlux) {
   Vector wallState(num_equation_);
-  mixture->computeStagnantStateWithTemp(stateIn, wallTemp_, wallState);
-  // TODO(kevin): set stangant state with two separate temperature.
+  wallState = stateIn;
 
-  if (eqSystem == NS_PASSIVE) wallState[num_equation_ - 1] = stateIn[num_equation_ - 1];
+  if (useBCinGrad_) {
+    for (int i = 0; i < nvel_; i++) {
+      wallState[i + 1] *= -1.0;
+    }
+  } else {
+    mixture->computeStagnantStateWithTemp(stateIn, wallTemp_, wallState);
+  }
 
   // Normal convective flux
   rsolver->Eval(stateIn, wallState, normal, bdrFlux, true);
@@ -486,6 +493,8 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
   for (int d = 0; d < dim_; d++) bcFlux_.normal[d] = unitNorm[d];
 
   // evaluate viscous fluxes at the wall
+  wallState = stateIn;
+  mixture->computeStagnantStateWithTemp(stateIn, wallTemp_, wallState);
   Vector wallViscF(num_equation_);
   fluxClass->ComputeBdrViscousFluxes(wallState, gradState, transip, delta, 0.0, bcFlux_, wallViscF);
   wallViscF *= sqrt(normN);  // in case normal is not a unit vector..
