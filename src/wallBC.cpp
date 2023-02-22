@@ -208,6 +208,30 @@ void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradSt
   }
 }
 
+void WallBC::computeBdrPrimitiveStateForGradient(const Vector &primIn, Vector &primBC) const {
+  primBC = primIn;
+
+  switch (wallType_) {
+    case INV:
+      // TODO(trevilo): fix
+      break;
+    case VISC_ADIAB:
+      // TODO(trevilo): fix
+      break;
+    case VISC_ISOTH:
+      // no-slip
+      for (int i = 0; i < nvel_; i++) {
+        primBC[1 + i] = 0.0;
+      }
+      // isothermal
+      primBC[nvel_ + 1] = wallTemp_;
+      break;
+    case VISC_GNRL:
+      // TODO(trevilo): fix
+      break;
+  }
+}
+
 void WallBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                            ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                            Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
