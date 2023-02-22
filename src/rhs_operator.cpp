@@ -121,11 +121,12 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
     }
   }
 
-  //  if (_config.GetWorkingFluid() != WorkingFluid::DRY_AIR) {
-  forcing.Append(new SourceTerm(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up, gradUp, gpuArrays,
-                                _config, mixture, d_mixture_, _transport, _chemistry, _radiation,
-                                plasma_conductivity_));
-    //}
+  if (_config.GetWorkingFluid() != WorkingFluid::DRY_AIR) {
+    forcing.Append(new SourceTerm(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up, gradUp, gpuArrays,
+                                  _config, mixture, d_mixture_, _transport, _chemistry, _radiation,
+                                  plasma_conductivity_));
+  }
+
 #ifdef HAVE_MASA
   if (config_.use_mms_) {
     masaForcingIndex_ = forcing.Size();
@@ -148,6 +149,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   } else {
     coordsDof = NULL;
     dfes = NULL;
+    axi_src_ = NULL;
   }
 
   if (joule_heating_ != NULL) {
@@ -392,7 +394,9 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
   //   forcing[i]->setTime(this->GetTime());
   //   forcing[i]->updateTerms(z);
   // }
-  axi_src_->updateTerms(z);
+  if (axi_src_ != NULL) {
+    axi_src_->updateTerms(z);
+  }
 
   // 3. Multiply element-wise by the inverse mass matrices.
 #ifdef _GPU_

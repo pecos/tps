@@ -71,10 +71,9 @@ void LteTransport::ComputeFluxTransportProperties(const Vector &state, const Den
 
   transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   transportBuffer = 0.0;
-  const double viscosity = mu_table_->eval(T, rho);
-  transportBuffer[FluxTrns::VISCOSITY] = 10.0 * viscosity;
-  transportBuffer[FluxTrns::BULK_VISCOSITY] = 10.0 * viscosity;
-  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = 10.0 * kappa_table_->eval(T, rho);
+  transportBuffer[FluxTrns::VISCOSITY] = mu_table_->eval(T, rho);
+  transportBuffer[FluxTrns::BULK_VISCOSITY] = 0.0;  // bulk_visc_mult * viscosity;
+  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = kappa_table_->eval(T, rho);
 
   // Diffusion velocities are never needed in LTE model since we don't carry individual species
   diffusionVelocity.SetSize(numSpecies, nvel_);
@@ -97,6 +96,7 @@ void LteTransport::ComputeSourceTransportProperties(const Vector &state, const V
   for (int v = 0; v < nvel_; v++)
     for (int sp = 0; sp < numSpecies; sp++) diffusionVelocity(sp, v) = 0.0;
 
+
   const double rho = Up[0];
   const double T = Up[1 + nvel_];
   globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] = sigma_table_->eval(T, rho);
@@ -114,9 +114,8 @@ void LteTransport::GetViscosities(const Vector &conserved, const Vector &primiti
   const double rho = primitive[0];
   const double T = primitive[1 + nvel_];
 
-  double internal_visc = mu_table_->eval(T, rho);
-  visc = 10.0 * internal_visc;
-  bulkVisc = 10.0 * internal_visc;
+  visc = mu_table_->eval(T, rho);
+  bulkVisc = 0.;
 }
 
 #endif  // _GPU_

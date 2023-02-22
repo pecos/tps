@@ -33,7 +33,7 @@
 #define LTE_MIXTURE_HPP_
 
 /** @file
- * Provides themodynamic properties are related functions for a gas or
+ * Provides themodynamic properties and related functions for a gas or
  * plasma in local thermodynamic equilibrium.
  */
 
@@ -61,14 +61,12 @@ class LteMixture : public GasMixture {
   TableInterpolator2D *R_table_;
   TableInterpolator2D *c_table_;
 
-  // if generate_e_to_T is true at construction, generate this table,
-  // which maps (rho, energy) to temperature.  This table is used to
-  // get a good IC for the Newton solve when evaluating the
-  // temperature from the converved variables.
+  // This table is used to get a good IC for the Newton solve when
+  // evaluating the temperature from the converved variables.
   TableInterpolator2D *T_table_;
 
  public:
-  LteMixture(RunConfiguration &_runfile, int _dim, int nvel, bool generate_e_to_T = false);
+  LteMixture(RunConfiguration &_runfile, int _dim, int nvel);
   virtual ~LteMixture();
 
   double evaluateInternalEnergy(const double &T, const double &rho) { return energy_table_->eval(T, rho); }

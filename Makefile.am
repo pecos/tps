@@ -29,10 +29,10 @@ gcovr-report:
 	    --html-details $(gcovr_dir)/gcovr-report.html
 gcovr-reset:
 	@rm -rf $(gcovr_dir)
-	@rm -f $(find . -name "*.gcda")
+	@find . -name "*.gcda" -exec rm -f {} \;
 
 gcovr-clean: gcovr-reset
-	@rm -f $(find . -name "*.gcno")
+	@find . -name "*.gcno" -exec rm -f {} \;
 
 coverage: gcovr-reset check gcovr-report
 

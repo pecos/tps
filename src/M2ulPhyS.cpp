@@ -264,37 +264,16 @@ void M2ulPhyS::initVariables() {
   eqSystem = config.GetEquationSystem();
 
   mixture = NULL;
-#if defined(_CUDA_)
-  GasMixture **d_mixture_tmp;
-  cudaMalloc((void **)&d_mixture_tmp, sizeof(GasMixture **));
-
-  TransportProperties **d_transport_tmp;
-  cudaMalloc((void **)&d_transport_tmp, sizeof(TransportProperties **));
-
-  Chemistry **d_chemistry_tmp;
-  cudaMalloc((void **)&d_chemistry_tmp, sizeof(Chemistry **));
-
-  Radiation **d_radiation_tmp;
-  cudaMalloc((void **)&d_radiation_tmp, sizeof(Radiation **));
-#elif defined(_HIP_)
-  hipMalloc((void **)&d_mixture, sizeof(GasMixture));
-  hipMalloc((void **)&transportPtr, sizeof(TransportProperties));
-  hipMalloc((void **)&chemistry_, sizeof(Chemistry));
-  hipMalloc((void **)&radiation_, sizeof(Radiation));
-#endif
 
   switch (config.GetWorkingFluid()) {
     case WorkingFluid::DRY_AIR:
       mixture = new DryAir(config, dim, nvel);
-#if defined(_CUDA_)
-      gpu::instantiateDeviceDryAir<<<1, 1>>>(config.dryAirInput, dim, nvel, d_mixture_tmp);
-      cudaMemcpy(&d_mixture, d_mixture_tmp, sizeof(GasMixture *), cudaMemcpyDeviceToHost);
 
-      gpu::instantiateDeviceDryAirTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(),
-                                                      d_transport_tmp);
-      cudaMemcpy(&transportPtr, d_transport_tmp, sizeof(TransportProperties *), cudaMemcpyDeviceToHost);
-#elif defined(_HIP_)
+#if defined(_CUDA_) || defined(_HIP_)
+      tpsGpuMalloc((void **)(&d_mixture), sizeof(DryAir));
       gpu::instantiateDeviceDryAir<<<1, 1>>>(config.dryAirInput, dim, nvel, d_mixture);
+
+      tpsGpuMalloc((void **)&transportPtr, sizeof(DryAirTransport));
       gpu::instantiateDeviceDryAirTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(),
                                                       transportPtr);
 #else
@@ -305,10 +284,8 @@ void M2ulPhyS::initVariables() {
       switch (config.GetGasModel()) {
         case GasModel::PERFECT_MIXTURE:
           mixture = new PerfectMixture(config, dim, nvel);
-#if defined(_CUDA_)
-          gpu::instantiateDevicePerfectMixture<<<1, 1>>>(config.perfectMixtureInput, dim, nvel, d_mixture_tmp);
-          cudaMemcpy(&d_mixture, d_mixture_tmp, sizeof(GasMixture *), cudaMemcpyDeviceToHost);
-#elif defined(_HIP_)
+#if defined(_CUDA_) || defined(_HIP_)
+          tpsGpuMalloc((void **)(&d_mixture), sizeof(PerfectMixture));
           gpu::instantiateDevicePerfectMixture<<<1, 1>>>(config.perfectMixtureInput, dim, nvel, d_mixture);
 #endif
           break;
@@ -318,30 +295,24 @@ void M2ulPhyS::initVariables() {
       }
       switch (config.GetTranportModel()) {
         case ARGON_MINIMAL:
-#if defined(_CUDA_)
-          gpu::instantiateDeviceArgonMinimalTransport<<<1, 1>>>(d_mixture, config.argonTransportInput, d_transport_tmp);
-          cudaMemcpy(&transportPtr, d_transport_tmp, sizeof(TransportProperties *), cudaMemcpyDeviceToHost);
-#elif defined(_HIP_)
+#if defined(_CUDA_) || defined(_HIP_)
+          tpsGpuMalloc((void **)&transportPtr, sizeof(ArgonMinimalTransport));
           gpu::instantiateDeviceArgonMinimalTransport<<<1, 1>>>(d_mixture, config.argonTransportInput, transportPtr);
 #else
           transportPtr = new ArgonMinimalTransport(mixture, config);
 #endif
           break;
         case ARGON_MIXTURE:
-#if defined(_CUDA_)
-          gpu::instantiateDeviceArgonMixtureTransport<<<1, 1>>>(d_mixture, config.argonTransportInput, d_transport_tmp);
-          cudaMemcpy(&transportPtr, d_transport_tmp, sizeof(TransportProperties *), cudaMemcpyDeviceToHost);
-#elif defined(_HIP_)
+#if defined(_CUDA_) || defined(_HIP_)
+          tpsGpuMalloc((void **)&transportPtr, sizeof(ArgonMixtureTransport));
           gpu::instantiateDeviceArgonMixtureTransport<<<1, 1>>>(d_mixture, config.argonTransportInput, transportPtr);
 #else
           transportPtr = new ArgonMixtureTransport(mixture, config);
 #endif
           break;
         case CONSTANT:
-#if defined(_CUDA_)
-          gpu::instantiateDeviceConstantTransport<<<1, 1>>>(d_mixture, config.constantTransport, d_transport_tmp);
-          cudaMemcpy(&transportPtr, d_transport_tmp, sizeof(TransportProperties *), cudaMemcpyDeviceToHost);
-#elif defined(_HIP_)
+#if defined(_CUDA_) || defined(_HIP_)
+          tpsGpuMalloc((void **)&transportPtr, sizeof(ConstantTransport));
           gpu::instantiateDeviceConstantTransport<<<1, 1>>>(d_mixture, config.constantTransport, transportPtr);
 #else
           transportPtr = new ConstantTransport(mixture, config);
@@ -353,10 +324,8 @@ void M2ulPhyS::initVariables() {
       }
       switch (config.GetChemistryModel()) {
         default:
-#if defined(_CUDA_)
-          gpu::instantiateDeviceChemistry<<<1, 1>>>(d_mixture, config.chemistryInput, d_chemistry_tmp);
-          cudaMemcpy(&chemistry_, d_chemistry_tmp, sizeof(Chemistry *), cudaMemcpyDeviceToHost);
-#elif defined(_HIP_)
+#if defined(_CUDA_) || defined(_HIP_)
+          tpsGpuMalloc((void **)&chemistry_, sizeof(Chemistry));
           gpu::instantiateDeviceChemistry<<<1, 1>>>(d_mixture, config.chemistryInput, chemistry_);
 #else
           chemistry_ = new Chemistry(mixture, config.chemistryInput);
@@ -378,11 +347,9 @@ void M2ulPhyS::initVariables() {
   }
   switch (config.radiationInput.model) {
     case NET_EMISSION:
-#if defined(_CUDA_)
-      gpu::instantiateDeviceNetEmission<<<1, 1>>>(config.radiationInput, d_radiation_tmp);
-      cudaMemcpy(&radiation_, d_radiation_tmp, sizeof(Radiation *), cudaMemcpyDeviceToHost);
-#elif defined(_HIP_)
-      mfem_error("Radiation is not supported for HIP!");
+#if defined(_CUDA_) || defined(_HIP_)
+      tpsGpuMalloc((void **)(&radiation_), sizeof(NetEmission));
+      gpu::instantiateDeviceNetEmission<<<1, 1>>>(config.radiationInput, radiation_);
 #else
       radiation_ = new NetEmission(config.radiationInput);
 #endif
@@ -394,15 +361,9 @@ void M2ulPhyS::initVariables() {
       break;
   }
   assert(mixture != NULL);
-#if defined(_CUDA_)
-  cudaFree(d_mixture_tmp);
-  cudaFree(d_transport_tmp);
-  cudaFree(d_chemistry_tmp);
-  cudaFree(d_radiation_tmp);
-#elif defined(_HIP_)
+#if defined(_CUDA_) || defined(_HIP_)
 #else
   d_mixture = mixture;
-  // d_transport = transportPtr;
 #endif
 
   order = config.GetSolutionOrder();
@@ -503,27 +464,12 @@ void M2ulPhyS::initVariables() {
   ioData.initializeSerial(mpi.Root(), (config.RestartSerial() != "no"), serial_mesh);
   projectInitialSolution();
 
-#if defined(_CUDA_)
-  Fluxes **d_flux_tmp;
-  cudaMalloc((void **)&d_flux_tmp, sizeof(Fluxes **));
-  gpu::instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(),
-                                         d_flux_tmp);
-  cudaMemcpy(&fluxClass, d_flux_tmp, sizeof(Fluxes *), cudaMemcpyDeviceToHost);
-  cudaFree(d_flux_tmp);
-
-  RiemannSolver **d_riemann_tmp;
-  cudaMalloc((void **)&d_riemann_tmp, sizeof(RiemannSolver **));
-  gpu::instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, fluxClass, config.RoeRiemannSolver(),
-                                          config.isAxisymmetric(), d_riemann_tmp);
-
-  cudaMemcpy(&rsolver, d_riemann_tmp, sizeof(RiemannSolver *), cudaMemcpyDeviceToHost);
-  cudaFree(d_riemann_tmp);
-#elif defined(_HIP_)
-  hipMalloc((void **)&fluxClass, sizeof(Fluxes));
+#if defined(_CUDA_) || defined(_HIP_)
+  tpsGpuMalloc((void **)&fluxClass, sizeof(Fluxes));
   gpu::instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(),
                                          fluxClass);
 
-  hipMalloc((void **)&rsolver, sizeof(RiemannSolver));
+  tpsGpuMalloc((void **)&rsolver, sizeof(RiemannSolver));
   gpu::instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, fluxClass, config.RoeRiemannSolver(),
                                           config.isAxisymmetric(), rsolver);
 #else
@@ -535,6 +481,7 @@ void M2ulPhyS::initVariables() {
 
   alpha = 0.5;
   isSBP = config.isSBP();
+  assert(!isSBP);
 
   // Boundary attributes in present partition
   Array<int> local_attr;
@@ -561,10 +508,12 @@ void M2ulPhyS::initVariables() {
                                         gradUp, gradUpfes, max_char_speed, config.isAxisymmetric());
   }
   A->AddInteriorFaceIntegrator(faceIntegrator);
+#ifdef _BUILD_DEPRECATED_
   if (isSBP) {
     SBPoperator = new SBPintegrator(mixture, fluxClass, intRules, dim, num_equation, alpha);
     A->AddDomainIntegrator(SBPoperator);
   }
+#endif
 
   Aflux = new MixedBilinearForm(dfes, fes);
   domainIntegrator = new DomainIntegrator(fluxClass, intRules, intRuleType, dim, num_equation, config.isAxisymmetric());
@@ -592,17 +541,9 @@ void M2ulPhyS::initVariables() {
       cout << "Unknown ODE solver type: " << config.GetTimeIntegratorType() << '\n';
   }
 
-  //   gradUp_A = new ParNonlinearForm(gradUpfes);
-  //   gradUp_A->AddInteriorFaceIntegrator(
-  //       new GradFaceIntegrator(intRules, dim, num_equation) );
-  gradUp_A = new GradNonLinearForm(
-#ifdef _GPU_
-      vfes,
-#else
-      gradUpfes,
-#endif
-      intRules, dim, num_equation, gpuArrays, maxIntPoints, maxDofs);
+  gradUp_A = new GradNonLinearForm(gradUpfes, intRules, dim, num_equation, gpuArrays, maxIntPoints, maxDofs);
   gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
+  gradUp_A->AddBdrFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation, bcIntegrator));
 
   rhsOperator = new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType,
                                 fluxClass, mixture, d_mixture, chemistry_, transportPtr, radiation_, vfes, gpuArrays,
@@ -963,7 +904,9 @@ M2ulPhyS::~M2ulPhyS() {
   delete rhsOperator;
   // delete domainIntegrator;
   delete Aflux;  // fails to delete (follow this)
+#ifdef _BUILD_DEPRECATED_
   if (isSBP) delete SBPoperator;
+#endif
   // delete faceIntegrator;
   delete A;  // fails to delete (follow this)
 
@@ -972,44 +915,31 @@ M2ulPhyS::~M2ulPhyS() {
 
 #if defined(_CUDA_) || defined(_HIP_)
   gpu::freeDeviceRiemann<<<1, 1>>>(rsolver);
+  tpsGpuFree(rsolver);
+
   gpu::freeDeviceFluxes<<<1, 1>>>(fluxClass);
+  tpsGpuFree(fluxClass);
+
+  gpu::freeDeviceChemistry<<<1, 1>>>(chemistry_);
+  tpsGpuFree(chemistry_);
+
+  gpu::freeDeviceRadiation<<<1, 1>>>(radiation_);
+  tpsGpuFree(radiation_);
+
+  gpu::freeDeviceTransport<<<1, 1>>>(transportPtr);
+  tpsGpuFree(transportPtr);
+
+  gpu::freeDeviceMixture<<<1, 1>>>(d_mixture);
+  tpsGpuFree(d_mixture);
 #else
   delete rsolver;
   delete fluxClass;
-#endif
-
-#ifdef _HIP_
-  hipFree(rsolver);
-  hipFree(fluxClass);
-#endif
-
-#if defined(_CUDA_) || defined(_HIP_)
-  gpu::freeDeviceChemistry<<<1, 1>>>(chemistry_);
-#else
   delete chemistry_;
-#endif
-
-#if defined(_CUDA_)
-  gpu::freeDeviceRadiation<<<1, 1>>>(radiation_);
-#elif defined(_HIP_)
-#else
   delete radiation_;
-#endif
-
-#if defined(_CUDA_) || defined(_HIP_)
-  gpu::freeDeviceTransport<<<1, 1>>>(transportPtr);
-  gpu::freeDeviceMixture<<<1, 1>>>(d_mixture);
-#else
   delete transportPtr;
 #endif
-  delete mixture;
 
-#ifdef _HIP_
-  hipFree(radiation_);
-  hipFree(chemistry_);
-  hipFree(transportPtr);
-  hipFree(d_mixture);
-#endif
+  delete mixture;
 
   delete gradUpfes;
   delete vfes;
@@ -1358,10 +1288,15 @@ void M2ulPhyS::projectInitialSolution() {
 #ifdef HAVE_MASA
     if (config.use_mms_ && config.mmsSaveDetails_) projectExactSolution(0.0, masaU_);
 #endif
+
+#ifdef _BUILD_DEPRECATED_
     if (config.RestartHDFConversion())
       read_restart_files();
     else
       restart_files_hdf5("read");
+#else
+    restart_files_hdf5("read");
+#endif
 
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
@@ -1772,6 +1707,7 @@ void M2ulPhyS::initGradUp() {
   }
 }
 
+#ifdef _BUILD_DEPRECATED_
 void M2ulPhyS::write_restart_files() {
   string serialName = "restart_p";
   serialName.append(to_string(order));
@@ -1888,6 +1824,7 @@ void M2ulPhyS::read_restart_files() {
   U->ReadWrite();
   //  if( loadFromAuxSol ) auto dausUp = aux_Up->ReadWrite();
 }
+#endif
 
 void M2ulPhyS::Check_NAN() {
   int local_print = 0;
@@ -2251,6 +2188,9 @@ void M2ulPhyS::parseFluidPreset() {
     std::string trans_file;
     tpsP->getRequiredInput("flow/lte/transport_table", trans_file);
     config.lteMixtureInput.trans_file_name = trans_file;
+    std::string e_rev_file;
+    tpsP->getRequiredInput("flow/lte/e_rev_table", e_rev_file);
+    config.lteMixtureInput.e_rev_file_name = e_rev_file;
   } else {
     grvy_printf(GRVY_ERROR, "\nUnknown fluid preset supplied at runtime -> %s", fluidTypeStr.c_str());
     exit(ERROR);

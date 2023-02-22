@@ -33,104 +33,116 @@
 #ifndef GPU_CONSTRUCTOR_HPP_
 #define GPU_CONSTRUCTOR_HPP_
 
-#include <hdf5.h>
+/** @file
+ * @brief Contains utilities for aiding in instantiating various
+ * classes on the device.
+ *
+ * These utilities should be used, for example, for polymorphic
+ * classes with virtual functions that need to be called on the
+ * device.  In this situation, for the virtual function table to be
+ * correct, the class object must be constructed on the device.  To
+ * achieve this, the functions declared in this file use placement new
+ * (since HIP does not support device-side new at this time; cuda
+ * does, but to achieve a unified approach, it is not used here).
+ * Because of the use of placement new, the required memory must be
+ * explicitly allocated prior to the placement new, and then freed
+ * after explicitly calling the relevant destructor on the device.
+ * This file also provides macros for this.
+ */
+
 #include <tps_config.h>
 
-#include <fstream>
-#include <mfem/general/forall.hpp>
-
-// #include "BCintegrator.hpp"
 #include "argon_transport.hpp"
-// #include "averaging_and_rms.hpp"
 #include "chemistry.hpp"
 #include "dataStructures.hpp"
-// #include "dgNonlinearForm.hpp"
-// #include "domain_integrator.hpp"
 #include "equation_of_state.hpp"
-// #include "faceGradientIntegration.hpp"
-// #include "face_integrator.hpp"
 #include "fluxes.hpp"
-// #include "gradNonLinearForm.hpp"
-// #include "io.hpp"
-#include "logger.hpp"
-#include "mpi_groups.hpp"
-// #include "rhs_operator.hpp"
 #include "radiation.hpp"
 #include "riemann_solver.hpp"
-#include "run_configuration.hpp"
-// #include "sbp_integrators.hpp"
-#include "solver.hpp"
-#include "tps.hpp"
-#include "tps_mfem_wrap.hpp"
 #include "transport_properties.hpp"
-#include "utils.hpp"
 
-using namespace mfem;
-using namespace std;
+/*!
+  @def tpsGpuMalloc(ptr, size)
+  Translates to a call to cudaMalloc(ptr, size) or hipMalloc(ptr, size)
+  depending on if cuda or hip is being used.  Otherwise compiles
+  to assert(false).
+
+  @def tpsGpuFree(ptr)
+  Translates to a call to cudaFree(ptr) or hipFree(ptr) depending on
+  if cuda or hip is being used.  Otherwise compiles to assert(false).
+*/
+#if defined(_CUDA_)
+// cuda malloc and free
+#define tpsGpuMalloc(ptr, size) cudaMalloc(ptr, size)
+#define tpsGpuFree(ptr) cudaFree(ptr)
+#elif defined(_HIP_)
+// hip malloc and free
+#define tpsGpuMalloc(ptr, size) hipMalloc(ptr, size)
+#define tpsGpuFree(ptr) hipFree(ptr)
+#else
+// these should be unreachable if properly used, if not, assert(false)
+#define tpsGpuMalloc(ptr, size) assert(false)
+#define tpsGpuFree(ptr) assert(false)
+#endif
 
 namespace gpu {
 
-#if defined(_CUDA_)
-// CUDA supports device new/delete
-__global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int nvel, GasMixture **mix);
-__global__ void instantiateDeviceDryAirTransport(GasMixture *mixture, const double viscosity_multiplier,
-                                                 const double bulk_viscosity, TransportProperties **trans);
-__global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, GasMixture **mix);
-__global__ void instantiateDeviceConstantTransport(GasMixture *mixture, const constantTransportData inputs,
-                                                   TransportProperties **trans);
-__global__ void instantiateDeviceArgonMinimalTransport(GasMixture *mixture, const ArgonTransportInput inputs,
-                                                       TransportProperties **trans);
-__global__ void instantiateDeviceArgonMixtureTransport(GasMixture *mixture, const ArgonTransportInput inputs,
-                                                       TransportProperties **trans);
-__global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
-                                        const int _num_equation, const int _dim, bool axisym, Fluxes **f);
-__global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
-                                         Fluxes *_fluxClass, bool _useRoe, bool axisym, RiemannSolver **r);
-__global__ void instantiateDeviceChemistry(GasMixture *mixture, const ChemistryInput inputs, Chemistry **chem);
-__global__ void instantiateDeviceNetEmission(const RadiationInput inputs, Radiation **radiation);
-
-__global__ void freeDeviceMixture(GasMixture *mix);
-__global__ void freeDeviceTransport(TransportProperties *trans);
-__global__ void freeDeviceFluxes(Fluxes *f);
-__global__ void freeDeviceRiemann(RiemannSolver *r);
-__global__ void freeDeviceChemistry(Chemistry *chem);
-__global__ void freeDeviceRadiation(Radiation *radiation);
-#elif defined(_HIP_)
-// HIP doesn't support device new/delete.  There is
-// (experimental?... requires -D__HIP_ENABLE_DEVICE_MALLOC__) support
-// for device malloc and placement new.  So, we could in theory mimick
-// the CUDA approach above by doing malloc then placement new.
-// However, I prefer instead to avoid device malloc, so we allocate
-// outside of the instantiate functions below with hipMalloc and the
-// use placement new.  Maybe should adopt this approach for CUDA as
-// well, as it seems actually slightly cleaner.
+#if defined(_CUDA_) || defined(_HIP_)
+//! Instantiate DryAir object on the device with placement new
 __global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int nvel, void *mix);
+
+//! Instantiate PerfectMixture object on the device with placement new
+__global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, void *mix);
+
+//! Instantiate DryAirTransport object on the device with placement new
 __global__ void instantiateDeviceDryAirTransport(GasMixture *mixture, const double viscosity_multiplier,
                                                  const double bulk_viscosity, void *transport);
-__global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, void *mix);
+
+//! Instantiate ConstantTransport object on the device with placement new
 __global__ void instantiateDeviceConstantTransport(GasMixture *mixture, const constantTransportData inputs,
                                                    void *trans);
+
+//! Instantiate ArgonMinimalTransport object on the device with placement new
 __global__ void instantiateDeviceArgonMinimalTransport(GasMixture *mixture, const ArgonTransportInput inputs,
                                                        void *trans);
+
+//! Instantiate ArgonMixtureTransport object on the device with placement new
 __global__ void instantiateDeviceArgonMixtureTransport(GasMixture *mixture, const ArgonTransportInput inputs,
                                                        void *trans);
+
+//! Instantiate Fluxes object on the device with placement new
 __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
                                         const int _num_equation, const int _dim, bool axisym, void *f);
+
+//! Instantiate RiemannSolver object on the device with placement new
 __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
                                          Fluxes *_fluxClass, bool _useRoe, bool axisym, void *r);
+
+//! Instantiate Chemistry object on the device with placement new
 __global__ void instantiateDeviceChemistry(GasMixture *mixture, const ChemistryInput inputs, void *chem);
 
+//! Instantiate NetEmission object on the device with placement new
+__global__ void instantiateDeviceNetEmission(const RadiationInput inputs, void *radiation);
+
+//! Explicit call to GasMixture destructor on the device
 __global__ void freeDeviceMixture(GasMixture *mix);
+
+//! Explicit call to TransportProperties destructor on the device
 __global__ void freeDeviceTransport(TransportProperties *transport);
+
+//! Explicit call to Fluxes destructor on the device
 __global__ void freeDeviceFluxes(Fluxes *f);
+
+//! Explicit call to RiemannSolver destructor on the device
 __global__ void freeDeviceRiemann(RiemannSolver *r);
+
+//! Explicit call to Chemistry destructor on the device
 __global__ void freeDeviceChemistry(Chemistry *chem);
-#endif
 
-// NOTE(kevin): Do not use it. For some unknown reason, this wrapper causes a memory issue, at a random place far after
-// this instantiation.
-void assignMixture(const DryAirInput inputs, const int dim, const int nvel, GasMixture *dMixture);
+//! Explicit call to Radiation destructor on the device
+__global__ void freeDeviceRadiation(Radiation *radiation);
 
+#endif  // cuda or hip
 }  // namespace gpu
 
 #endif  // GPU_CONSTRUCTOR_HPP_

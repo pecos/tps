@@ -560,12 +560,16 @@ class DryAir : public GasMixture {
 
 // additional functions inlined for speed...
 inline double DryAir::ComputePressure(const Vector &state, double *electronPressure) {
+#ifdef _BUILD_DEPRECATED_
   if (electronPressure != NULL) *electronPressure = 0.0;
   double den_vel2 = 0;
   for (int d = 0; d < nvel_; d++) den_vel2 += state(d + 1) * state(d + 1);
   den_vel2 /= state[0];
 
   return (specific_heat_ratio - 1.0) * (state[1 + nvel_] - 0.5 * den_vel2);
+#else
+  return ComputePressure(state.GetData(), electronPressure);
+#endif
 }
 
 // additional functions inlined for speed...
@@ -579,11 +583,15 @@ MFEM_HOST_DEVICE inline double DryAir::ComputePressure(const double *state, doub
 }
 
 inline double DryAir::ComputeTemperature(const Vector &state) {
+#ifdef _BUILD_DEPRECATED_
   double den_vel2 = 0;
   for (int d = 0; d < nvel_; d++) den_vel2 += state(d + 1) * state(d + 1);
   den_vel2 /= state[0];
 
   return (specific_heat_ratio - 1.0) / gas_constant * (state[1 + nvel_] - 0.5 * den_vel2) / state[0];
+#else
+  return ComputeTemperature(state.GetData());
+#endif
 }
 
 MFEM_HOST_DEVICE inline double DryAir::ComputeTemperature(const double *state) {

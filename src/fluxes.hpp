@@ -72,7 +72,9 @@ class Fluxes {
 
   Equations GetEquationSystem() { return eqSystem; }
 
+#ifdef _BUILD_DEPRECATED_
   void ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &flux);
+#endif
 
   void ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux);
   MFEM_HOST_DEVICE void ComputeConvectiveFluxes(const double *state, double *flux) const;

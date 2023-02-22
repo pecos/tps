@@ -40,6 +40,7 @@
 
 using namespace mfem;
 
+#ifdef _BUILD_DEPRECATED_
 // Volume integrals...DESCRIBE THE OPERATIONS
 class SBPintegrator : public NonlinearFormIntegrator {
  private:
@@ -60,5 +61,6 @@ class SBPintegrator : public NonlinearFormIntegrator {
   virtual void AssembleElementVector(const FiniteElement &el, ElementTransformation &Tr, const Vector &elfun,
                                      Vector &elvect);
 };
+#endif
 
 #endif  // SBP_INTEGRATORS_HPP_

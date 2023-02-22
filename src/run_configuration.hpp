@@ -258,7 +258,9 @@ class RunConfiguration {
   RunConfiguration();
   ~RunConfiguration();
 
+#ifdef _BUILD_DEPRECATED_
   void readInputFile(std::string inpuFileName);
+#endif
 
   string GetMeshFileName() { return meshFile; }
   string GetOutputName() { return outputFile; }

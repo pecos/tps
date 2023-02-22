@@ -356,6 +356,7 @@ struct LteMixtureInput {
   WorkingFluid f;
   std::string thermo_file_name;
   std::string trans_file_name;
+  std::string e_rev_file_name;
 };
 
 struct ArgonTransportInput {

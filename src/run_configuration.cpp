@@ -159,6 +159,7 @@ void RunConfiguration::initSpongeData() {
   //   spongeData.szType = SpongeZoneSolution::NONE;
 }
 
+#ifdef _BUILD_DEPRECATED_
 // Note from ks: this method to be deprecated. Superceded by
 // M2ulPhyS::parseSolverOptions2()
 void RunConfiguration::readInputFile(std::string inpuFileName) {
@@ -559,6 +560,7 @@ void RunConfiguration::readInputFile(std::string inpuFileName) {
 
   runFile.close();
 }
+#endif
 
 Array<double> RunConfiguration::GetInletData(int i) {
   int length = 4;

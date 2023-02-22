@@ -36,8 +36,12 @@
 #include "quasimagnetostatic.hpp"
 
 CycleAvgJouleCoupling::CycleAvgJouleCoupling(MPI_Session &mpi, string &inputFileName, TPS::Tps *tps, int max_out,
-                                             bool axisym)
-    : mpi_(mpi), em_opt_(), max_outer_iters_(max_out) {
+                                             bool axisym, double input_power, double initial_input_power)
+    : mpi_(mpi),
+      em_opt_(),
+      max_outer_iters_(max_out),
+      input_power_(input_power),
+      initial_input_power_(initial_input_power) {
   if (axisym) {
     qmsa_solver_ = new QuasiMagnetostaticSolverAxiSym(mpi, em_opt_, tps);
   } else {
@@ -242,29 +246,16 @@ void CycleAvgJouleCoupling::solve() {
   int curr_iter = flow_solver_->getCurrentIterations();
   flow_solver_->setMaximumIterations(curr_iter + increment);
 
-  // for (int outer_iters = 0; outer_iters < max_outer_iters_; outer_iters++) {
-  //   // EM
-  //   interpConductivityFromFlowToEM();
-  //   qmsa_solver_->solve();
-  //   const double tot_jh = qmsa_solver_->totalJouleHeating();
-  //   if (mpi_.Root()) {
-  //     grvy_printf(GRVY_INFO, "The total input Joule heating = %.6e\n", tot_jh);
-  //   }
-
-  //   // flow
-  //   interpJouleHeatingFromEMToFlow();
-  //   flow_solver_->solve();
-
-  //   // update max solver iters so that on the next time through the flow solver does something
-  //   curr_iter = flow_solver_->getCurrentIterations();
-  //   flow_solver_->setMaximumIterations(curr_iter + increment);
-  // }
-
   flow_solver_->setConstantPlasmaConductivityGF();
 
   // flow_solver_->setMaximumIterations(curr_iter + 1);
   // // take 1 step (just to evaluate the conductivity)
   // flow_solver_->solve();
+
+  double delta_power = 0;
+  if (input_power_ > 0) {
+    delta_power = (input_power_ - initial_input_power_) / max_outer_iters_;
+  }
 
   for (int outer_iters = 0; outer_iters < max_outer_iters_; outer_iters++) {
     // EM
@@ -275,26 +266,17 @@ void CycleAvgJouleCoupling::solve() {
       grvy_printf(GRVY_INFO, "The total input Joule heating = %.6e\n", tot_jh);
     }
 
-    // first 1 M after cold flow
-    //double targetPower = 30. + 30. * outer_iters;
-    //double targetPower = 9480. + 30. * outer_iters;
-    //double targetPower = 18120. + 30. * outer_iters;
-    //double targetPower = 19000.;
-    double targetPower = 14000.;
-
-    if (targetPower > 14000) {
-      targetPower = 14000.;
+    if (input_power_ > 0) {
+      const double target_power = initial_input_power_ + (outer_iters + 1) * delta_power;
+      const double ratio = target_power / tot_jh;
+      qmsa_solver_->scaleJouleHeating(ratio);
+      const double upd_jh = qmsa_solver_->totalJouleHeating();
+      if (mpi_.Root()) {
+        grvy_printf(GRVY_INFO, "The total input Joule heating after scaling = %.6e\n", upd_jh);
+      }
     }
 
-    const double ratio = targetPower / tot_jh;
-
-    qmsa_solver_->scaleJouleHeating(ratio);
-    const double upd_jh = qmsa_solver_->totalJouleHeating();
-    if (mpi_.Root()) {
-      grvy_printf(GRVY_INFO, "The total input Joule heating after scaling = %.6e\n", upd_jh);
-    }
-
-        // flow
+    // flow
     interpJouleHeatingFromEMToFlow();
     flow_solver_->solve();
 

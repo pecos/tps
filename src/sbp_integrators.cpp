@@ -31,6 +31,7 @@
 // -----------------------------------------------------------------------------------el-
 #include "sbp_integrators.hpp"
 
+#ifdef _BUILD_DEPRECATED_
 SBPintegrator::SBPintegrator(GasMixture* _mixture, Fluxes* _fluxClass, IntegrationRules* _intRules, const int _dim,
                              const int _num_equation, double& _alpha)
     : dim(_dim),
@@ -133,3 +134,4 @@ void SBPintegrator::AssembleElementVector(const FiniteElement& el, ElementTransf
     }
   }
 }
+#endif
