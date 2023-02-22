@@ -36,11 +36,12 @@
 WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, GasMixture *d_mixture, Equations _eqSystem,
                Fluxes *_fluxClass, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt,
                const int _dim, const int _num_equation, int _patchNumber, WallType _bcType, const WallData _inputData,
-               const Array<int> &_intPointsElIDBC, const int &_maxIntPoints, bool axisym)
+               const Array<int> &_intPointsElIDBC, const int &_maxIntPoints, bool axisym, bool useBCinGrad)
     : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber, 1,
                         axisym),  // so far walls do not require ref. length. Left at 1
       wallType_(_bcType),
       wallData_(_inputData),
+      useBCinGrad_(useBCinGrad),
       d_mixture_(d_mixture),
       fluxClass(_fluxClass),
       intPointsElIDBC(_intPointsElIDBC),
@@ -208,6 +209,30 @@ void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradSt
   }
 }
 
+void WallBC::computeBdrPrimitiveStateForGradient(const Vector &primIn, Vector &primBC) const {
+  primBC = primIn;
+
+  switch (wallType_) {
+    case INV:
+      // TODO(trevilo): fix
+      break;
+    case VISC_ADIAB:
+      // TODO(trevilo): fix
+      break;
+    case VISC_ISOTH:
+      // no-slip
+      for (int i = 0; i < nvel_; i++) {
+        primBC[1 + i] = 0.0;
+      }
+      // isothermal
+      primBC[nvel_ + 1] = wallTemp_;
+      break;
+    case VISC_GNRL:
+      // TODO(trevilo): fix
+      break;
+  }
+}
+
 void WallBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                            ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                            Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
@@ -326,10 +351,15 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
 void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
                                        Vector &bdrFlux) {
   Vector wallState(num_equation_);
-  mixture->computeStagnantStateWithTemp(stateIn, wallTemp_, wallState);
-  // TODO(kevin): set stangant state with two separate temperature.
+  wallState = stateIn;
 
-  if (eqSystem == NS_PASSIVE) wallState[num_equation_ - 1] = stateIn[num_equation_ - 1];
+  if (useBCinGrad_) {
+    for (int i = 0; i < nvel_; i++) {
+      wallState[i + 1] *= -1.0;
+    }
+  } else {
+    mixture->computeStagnantStateWithTemp(stateIn, wallTemp_, wallState);
+  }
 
   // Normal convective flux
   rsolver->Eval(stateIn, wallState, normal, bdrFlux, true);
@@ -345,6 +375,8 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
   for (int d = 0; d < dim_; d++) bcFlux_.normal[d] = unitNorm[d];
 
   // evaluate viscous fluxes at the wall
+  wallState = stateIn;
+  mixture->computeStagnantStateWithTemp(stateIn, wallTemp_, wallState);
   Vector wallViscF(num_equation_);
   fluxClass->ComputeBdrViscousFluxes(wallState, gradState, radius, bcFlux_, wallViscF);
   wallViscF *= sqrt(normN);  // in case normal is not a unit vector..
