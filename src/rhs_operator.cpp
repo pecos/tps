@@ -616,7 +616,7 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
       radius = d_coord[n + 0 * dof];
     }
 
-    d_fluxClass->ComputeViscousFluxes(Un, gradUpn, radius, fvisc);
+    d_fluxClass->ComputeViscousFluxes(Un, gradUpn, radius, 0.0, fvisc);
 
     if (d_spaceVaryViscMult != NULL) {
       linVisc = d_spaceVaryViscMult[n];

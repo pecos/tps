@@ -355,8 +355,8 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
                          d_normal + offset + k * dim,
                          Rflux);
 
-      d_flux->ComputeViscousFluxes(u1, gradUp1, xyz[0], vFlux1);
-      d_flux->ComputeViscousFluxes(u2, gradUp2, xyz[0], vFlux2);
+      d_flux->ComputeViscousFluxes(u1, gradUp1, xyz[0], 0.0, vFlux1);
+      d_flux->ComputeViscousFluxes(u2, gradUp2, xyz[0], 0.0, vFlux2);
 
       for (int d = 0; d < dim; d++) {
         for (int eq = 0; eq < num_equation; eq++) {
@@ -716,8 +716,8 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
         // evaluate flux
         // TODO(kevin): implement radius.
         d_rsolver->Eval_LF(u1, u2, nor, Rflux);
-        d_flux->ComputeViscousFluxes(u1, gradUp1, xyz[0], vFlux1);
-        d_flux->ComputeViscousFluxes(u2, gradUp2, xyz[0], vFlux2);
+        d_flux->ComputeViscousFluxes(u1, gradUp1, xyz[0], 0.0, vFlux1);
+        d_flux->ComputeViscousFluxes(u2, gradUp2, xyz[0], 0.0, vFlux2);
 
         for (int eq = 0; eq < num_equation; eq++) {
           for (int d = 0; d < dim; d++)
