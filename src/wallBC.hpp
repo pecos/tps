@@ -90,8 +90,10 @@ class WallBC : public BoundaryCondition {
          const boundaryFaceIntegrationData &boundary_face_data, const int &maxIntPoints, bool axisym);
   ~WallBC();
 
+
   void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
                       double delta, Vector &bdrFlux);
+  void computeBdrPrimitiveStateForGradient(const Vector &primIn, Vector &primBC) const override;
 
   virtual void initBCs();
 
