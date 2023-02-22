@@ -1389,7 +1389,7 @@ void M2ulPhyS::solve() {
       if (mpi.Root()) cout << "time step: " << iter << ", physical time " << time << "s" << endl;
 #endif
 
-      if (iter != MaxIters) {
+      //      if (iter != MaxIters) {
         // auto hUp = Up->HostRead();
         Up->HostRead();
         mixture->UpdatePressureGridFunction(press, Up);
@@ -1403,7 +1403,7 @@ void M2ulPhyS::solve() {
         Up->ReadWrite();  // sets memory to GPU
 
         average->write_meanANDrms_restart_files(iter, time);
-      }
+        //      }
     }
 
 #ifdef HAVE_SLURM
@@ -1430,38 +1430,38 @@ void M2ulPhyS::solve() {
     grvy_timer_end(__func__);
   }  // <-- end main timestep iteration loop
 
-  if (iter == MaxIters) {
-    // auto hUp = Up->HostRead();
-    Up->HostRead();
-    mixture->UpdatePressureGridFunction(press, Up);
+//   if (iter == MaxIters) {
+//     // auto hUp = Up->HostRead();
+//     Up->HostRead();
+//     mixture->UpdatePressureGridFunction(press, Up);
 
-    // write_restart_files();
-    restart_files_hdf5("write");
+//     // write_restart_files();
+//     restart_files_hdf5("write");
 
-    paraviewColl->SetCycle(iter);
-    paraviewColl->SetTime(time);
-    paraviewColl->Save();
+//     paraviewColl->SetCycle(iter);
+//     paraviewColl->SetTime(time);
+//     paraviewColl->Save();
 
-    average->write_meanANDrms_restart_files(iter, time);
+//     average->write_meanANDrms_restart_files(iter, time);
 
-#ifndef HAVE_MASA
-    // // If HAVE_MASA is defined, this is handled above
-    // void (*initialConditionFunction)(const Vector &, Vector &);
-    // initialConditionFunction = &(this->InitialConditionEulerVortex);
+// #ifndef HAVE_MASA
+//     // // If HAVE_MASA is defined, this is handled above
+//     // void (*initialConditionFunction)(const Vector &, Vector &);
+//     // initialConditionFunction = &(this->InitialConditionEulerVortex);
 
-    // VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
-    // const double error = U->ComputeLpError(2, u0);
-    // if (mpi.Root()) cout << "Solution error: " << error << endl;
-#else
-    if (config.use_mms_) {
-      checkSolutionError(time, true);
-    } else {
-      if (mpi.Root()) cout << "Final timestep iteration = " << MaxIters << endl;
-    }
-#endif
+//     // VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
+//     // const double error = U->ComputeLpError(2, u0);
+//     // if (mpi.Root()) cout << "Solution error: " << error << endl;
+// #else
+//     if (config.use_mms_) {
+//       checkSolutionError(time, true);
+//     } else {
+//       if (mpi.Root()) cout << "Final timestep iteration = " << MaxIters << endl;
+//     }
+// #endif
 
-    if (mpi.Root()) cout << "Final timestep iteration = " << MaxIters << endl;
-  }
+//     if (mpi.Root()) cout << "Final timestep iteration = " << MaxIters << endl;
+//   }
 
   return;
 }

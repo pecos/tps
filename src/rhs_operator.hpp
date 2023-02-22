@@ -126,7 +126,7 @@ class RHSoperator : public TimeDependentOperator {
   BCintegrator *bcIntegrator;
 
   Array<ForcingTerms *> forcing;
-  AxisymmetricSource *axi_src_;
+  AxisymmetricSource *axi_src_ = NULL;
   int masaForcingIndex_ = -1;
 
   mutable DenseTensor flux;
