@@ -185,6 +185,9 @@ class RunConfiguration {
   std::vector<WallData> wallBC;
   std::vector<pair<int, WallType>> wallPatchType;
 
+  // Apply BCs in gradient calculation
+  bool useBCinGrad;
+
   // Passive scalar data
   Array<passiveScalarData*> arrayPassiveScalar;
 

@@ -34,8 +34,8 @@
 
 // Implementation of class FaceIntegrator
 GradFaceIntegrator::GradFaceIntegrator(IntegrationRules *_intRules, const int _dim, const int _num_equation,
-                                       BCintegrator *bc)
-    : dim(_dim), num_equation(_num_equation), intRules(_intRules), bc_(bc) {}
+                                       BCintegrator *bc, bool useBCinGrad)
+    : dim(_dim), num_equation(_num_equation), intRules(_intRules), bc_(bc), useBCinGrad_(useBCinGrad) {}
 
 void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2,
                                             FaceElementTransformations &Tr, const Vector &elfun, Vector &elvect) {
@@ -96,18 +96,22 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
     if (Tr.Elem2No < 0) {
       assert(bc_ != NULL);
 
-      const int attr = Tr.Attribute;
-      std::unordered_map<int, BoundaryCondition *>::const_iterator ibc = bc_->inletBCmap.find(attr);
-      std::unordered_map<int, BoundaryCondition *>::const_iterator obc = bc_->outletBCmap.find(attr);
-      std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = bc_->wallBCmap.find(attr);
-      if (ibc != bc_->inletBCmap.end()) {
-        ibc->second->computeBdrPrimitiveStateForGradient(iUp1, iUp2);
-      }
-      if (obc != bc_->outletBCmap.end()) {
-        obc->second->computeBdrPrimitiveStateForGradient(iUp1, iUp2);
-      }
-      if (wbc != bc_->wallBCmap.end()) {
-        wbc->second->computeBdrPrimitiveStateForGradient(iUp1, iUp2);
+      if (useBCinGrad_) {
+        const int attr = Tr.Attribute;
+        std::unordered_map<int, BoundaryCondition *>::const_iterator ibc = bc_->inletBCmap.find(attr);
+        std::unordered_map<int, BoundaryCondition *>::const_iterator obc = bc_->outletBCmap.find(attr);
+        std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = bc_->wallBCmap.find(attr);
+        if (ibc != bc_->inletBCmap.end()) {
+          ibc->second->computeBdrPrimitiveStateForGradient(iUp1, iUp2);
+        }
+        if (obc != bc_->outletBCmap.end()) {
+          obc->second->computeBdrPrimitiveStateForGradient(iUp1, iUp2);
+        }
+        if (wbc != bc_->wallBCmap.end()) {
+          wbc->second->computeBdrPrimitiveStateForGradient(iUp1, iUp2);
+        }
+      } else {
+        iUp2 = iUp1;
       }
     } else {
       elfun2_mat.MultTranspose(shape2, iUp2);
