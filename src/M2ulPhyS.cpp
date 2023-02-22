@@ -534,7 +534,7 @@ void M2ulPhyS::initVariables() {
 
   gradUp_A = new GradNonLinearForm(gradUpfes, intRules, dim, num_equation);
   gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
-  gradUp_A->AddBdrFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation, bcIntegrator));
+  gradUp_A->AddBdrFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation, bcIntegrator, config.useBCinGrad));
 
   rhsOperator =
       new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType, fluxClass,
@@ -2819,6 +2819,8 @@ void M2ulPhyS::parseReactionInputs() {
 }
 
 void M2ulPhyS::parseBCInputs() {
+  tpsP->getInput("boundaryConditions/useBCinGrad", config.useBCinGrad, false);
+
   // number of BC regions defined
   int numWalls, numInlets, numOutlets;
   tpsP->getInput("boundaryConditions/numWalls", numWalls, 0);
