@@ -851,63 +851,6 @@ void M2ulPhyS::initIndirectionArrays() {
     intPointsElIDBC = 0.;
   }
 
-  {
-    // fill out gradient shape function arrays and their indirections
-    std::vector<double> temp;
-    std::vector<int> positions;
-    temp.clear();
-    positions.clear();
-
-    for (int el = 0; el < vfes->GetNE(); el++) {
-      positions.push_back((int)temp.size());
-
-      const FiniteElement *elem = vfes->GetFE(el);
-      ElementTransformation *Tr = vfes->GetElementTransformation(el);
-      const int elDof = elem->GetDof();
-
-      // element volume integral
-      int intorder = 2 * elem->GetOrder();
-      const IntegrationRule *ir = &intRules->Get(elem->GetGeomType(), intorder);
-
-      positions.push_back(ir->GetNPoints());
-
-      for (int i = 0; i < ir->GetNPoints(); i++) {
-        IntegrationPoint ip = ir->IntPoint(i);
-        Tr->SetIntPoint(&ip);
-
-        // Calculate the shape functions
-        Vector shape;
-        shape.UseDevice(false);
-        shape.SetSize(elDof);
-        Vector dshapeVec;
-        dshapeVec.UseDevice(false);
-        dshapeVec.SetSize(elDof * dim);
-        dshapeVec = 0.;
-        DenseMatrix dshape(dshapeVec.HostReadWrite(), elDof, dim);
-        elem->CalcShape(ip, shape);
-        elem->CalcPhysDShape(*Tr, dshape);
-        double detJac = Tr->Jacobian().Det() * ip.weight;
-
-        for (int n = 0; n < elDof; n++) temp.push_back(shape[n]);
-        for (int d = 0; d < dim; d++)
-          for (int n = 0; n < elDof; n++) temp.push_back(dshape(n, d));
-        temp.push_back(detJac);
-      }
-    }
-
-    gpuArrays.elemShapeDshapeWJ.UseDevice(true);
-    gpuArrays.elemShapeDshapeWJ.SetSize((int)temp.size());
-    gpuArrays.elemShapeDshapeWJ = 0.;
-    auto helemShapeDshapeWJ = gpuArrays.elemShapeDshapeWJ.HostWrite();
-    for (int i = 0; i < gpuArrays.elemShapeDshapeWJ.Size(); i++) helemShapeDshapeWJ[i] = temp[i];
-    gpuArrays.elemShapeDshapeWJ.Read();
-
-    gpuArrays.elemPosQ_shapeDshapeWJ.SetSize((int)positions.size());
-    for (int i = 0; i < gpuArrays.elemPosQ_shapeDshapeWJ.Size(); i++)
-      gpuArrays.elemPosQ_shapeDshapeWJ[i] = positions[i];
-    gpuArrays.elemPosQ_shapeDshapeWJ.Read();
-  }
-
 #ifdef _GPU_
   auto dnumElems = gpuArrays.numElems.Read();
   auto dposDofIds = gpuArrays.posDofIds.Read();

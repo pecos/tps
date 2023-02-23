@@ -276,12 +276,6 @@ struct volumeFaceIntegrationArrays {
 
   /** for each interior face, number of quadrature points */
   Array<int> face_num_quad;
-
-  // used in gradient computation:
-  // gradients of shape functions for all nodes and weight multiplied by det(Jac)
-  // at each integration point
-  Vector elemShapeDshapeWJ;           // [...l_0(i),...,l_dof(i),l_0_x(i),...,l_dof_d(i), w_i*detJac_i ...]
-  Array<int> elemPosQ_shapeDshapeWJ;  // position and num. of integration points for each element
 };
 
 struct parallelFacesIntegrationArrays {
