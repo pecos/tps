@@ -214,7 +214,6 @@ struct SpongeZoneData {
  *
  */
 struct volumeFaceIntegrationArrays {
-
   /** Maps element index to position of dofs in nodesIDs and number of dofs
    *  Specifically, for element index i,
    *  posDofIds[2*i] = offset to element i's dofs within nodesIDs
@@ -222,12 +221,37 @@ struct volumeFaceIntegrationArrays {
    */
   Array<int> posDofIds;
 
+  /** Dof array offset for element i
+   *
+   *  To be used with element_dofs_list.  Specifically,
+   *
+   *  element_dofs_list[element_dof_offset[i] + j] = index of jth dof of element i
+   */
+  Array<int> element_dof_offset;
+
+  /** Number of dofs for each element
+   *
+   *  element_dof_number[i] = number of dofs for element i
+   */
+  Array<int> element_dof_number;
+
   /** List of dof indices, ordered by element.  For element i, use
    *  posDofIds to get to correct position inside nodesIDs.
    *  Specifically, nodesIDs[posDofIds[2*i] + j] gives the dof index
    *  for the jth dof for element i.
    */
   Array<int> nodesIDs;
+
+  /** List of dof indices, ordered by element.
+   *
+   *  I.e. [ (dof indices for elem 0), (dof indices for elem 1), ... (dof indices for elem Ne-1) ]
+   *
+   *  Since elements may have different numbers of dofs, use
+   *  element_dof_offset to aid in indexing as follows:
+   *
+   *  element_dofs_list[element_dof_offset[i] + j] = index of jth dof of element i
+   */
+  Array<int> element_dofs_list;
 
   /** Number of elements of each type (e.g, number of tets, number of hexes, etc) */
   Array<int> numElems;

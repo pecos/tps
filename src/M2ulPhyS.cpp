@@ -604,6 +604,14 @@ void M2ulPhyS::initIndirectionArrays() {
   gpuArrays.posDofIds = 0;
   auto hposDofIds = gpuArrays.posDofIds.HostWrite();
 
+  gpuArrays.element_dof_offset.SetSize(vfes->GetNE());
+  gpuArrays.element_dof_offset = -1;  // invalid
+  auto h_element_dof_offset = gpuArrays.element_dof_offset.HostWrite();
+
+  gpuArrays.element_dof_number.SetSize(vfes->GetNE());
+  gpuArrays.element_dof_number = -1;  // invalid
+  auto h_element_dof_number = gpuArrays.element_dof_number.HostWrite();
+
   std::vector<int> tempNodes;
   tempNodes.clear();
 
@@ -612,7 +620,11 @@ void M2ulPhyS::initIndirectionArrays() {
 
     // get the nodes IDs
     hposDofIds[2 * i] = tempNodes.size();
+    h_element_dof_offset[i] = tempNodes.size();
+
     hposDofIds[2 * i + 1] = dof;
+    h_element_dof_number[i] = dof;
+
     Array<int> dofs;
     vfes->GetElementVDofs(i, dofs);
     for (int n = 0; n < dof; n++) tempNodes.push_back(dofs[n]);
@@ -622,6 +634,13 @@ void M2ulPhyS::initIndirectionArrays() {
   gpuArrays.nodesIDs = 0;
   auto hnodesIDs = gpuArrays.nodesIDs.HostWrite();
   for (int i = 0; i < gpuArrays.nodesIDs.Size(); i++) hnodesIDs[i] = tempNodes[i];
+
+  gpuArrays.element_dofs_list.SetSize(tempNodes.size());
+  gpuArrays.element_dofs_list = 0;
+  auto h_element_dofs_list = gpuArrays.element_dofs_list.HostWrite();
+  for (int i = 0; i < gpuArrays.element_dofs_list.Size(); i++) {
+    h_element_dofs_list[i] = tempNodes[i];
+  }
 
   // count number of each type of element
   std::vector<int> tempNumElems;

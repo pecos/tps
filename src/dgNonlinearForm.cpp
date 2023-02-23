@@ -54,9 +54,6 @@ DGNonLinearForm::DGNonLinearForm(RiemannSolver *rsolver, Fluxes *_flux, ParFinit
       gpuArrays(_gpuArrays),
       maxIntPoints_(_maxIntPoints),
       maxDofs_(_maxDofs) {
-  h_numElems = gpuArrays.numElems.HostRead();
-  h_posDofIds = gpuArrays.posDofIds.HostRead();
-
   uk_el1.UseDevice(true);
   uk_el2.UseDevice(true);
   grad_upk_el1.UseDevice(true);
@@ -142,7 +139,8 @@ void DGNonLinearForm::Mult(const Vector &x, Vector &y) {
 
 #ifdef _GPU_
 void DGNonLinearForm::Mult_domain(const Vector &x, Vector &y) {
-  // setToZero_gpu(y, y.Size());  // assume y comes in set to zero (or that we are updating)
+  auto h_numElems = gpuArrays.numElems.HostRead();
+  auto h_elem_dof_num = gpuArrays.element_dof_number.HostRead();
 
   // Internal face integration
   if (fnfi.Size()) {
@@ -150,7 +148,7 @@ void DGNonLinearForm::Mult_domain(const Vector &x, Vector &y) {
     for (int elType = 0; elType < gpuArrays.numElems.Size(); elType++) {
       int elemOffset = 0;
       for (int i = 0; i < elType; i++) elemOffset += h_numElems[i];
-      int dof_el = h_posDofIds[2 * elemOffset + 1];
+      int dof_el = h_elem_dof_num[elemOffset];
       interpFaceData_gpu(x, elType, elemOffset, dof_el);
     }
 
@@ -161,7 +159,7 @@ void DGNonLinearForm::Mult_domain(const Vector &x, Vector &y) {
     for (int elType = 0; elType < gpuArrays.numElems.Size(); elType++) {
       int elemOffset = 0;
       for (int i = 0; i < elType; i++) elemOffset += h_numElems[i];
-      int dof_el = h_posDofIds[2 * elemOffset + 1];
+      int dof_el = h_elem_dof_num[elemOffset];
       faceIntegration_gpu(y, elType, elemOffset, dof_el);
     }
   }
@@ -186,13 +184,16 @@ void DGNonLinearForm::setToZero_gpu(Vector &x, const int size) {
 }
 
 void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset, int elDof) {
+  auto h_numElems = gpuArrays.numElems.HostRead();
+
   // double *d_y = y.Write();
   double *d_y = y.ReadWrite();
   const double *d_f = face_flux_.Read();
 
   auto d_elemFaces = gpuArrays.elemFaces.Read();
   auto d_nodesIDs = gpuArrays.nodesIDs.Read();
-  auto d_posDofIds = gpuArrays.posDofIds.Read();
+  auto d_elem_dof_off = gpuArrays.element_dof_offset.Read();
+  auto d_elem_dof_num = gpuArrays.element_dof_number.Read();
   auto d_shapeWnor1 = gpuArrays.shapeWnor1.Read();
   const double *d_shape2 = gpuArrays.shape2.Read();
   auto d_elems12Q = gpuArrays.elems12Q.Read();
@@ -213,7 +214,7 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset,
     int indexes_i[gpudata::MAXDOFS];  // int indexes_i[216];
 
     const int eli = elemOffset + el;
-    const int offsetEl1 = d_posDofIds[2 * eli];
+    const int offsetEl1 = d_elem_dof_off[eli];
     const int elFaces = d_elemFaces[7 * eli];
 
     // elem1 data
@@ -241,9 +242,9 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset,
       }
 
       int dof1 = elDof;
-      int dof2 = d_posDofIds[2 * elj + 1];
+      int dof2 = d_elem_dof_num[elj];
       if (swapElems) {
-        dof1 = d_posDofIds[2 * elj + 1];
+        dof1 = dof2; // = d_elem_dof_num[elj]
         dof2 = elDof;
       }
 
@@ -386,6 +387,8 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
 }
 
 void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOffset, int elDof) {
+  auto h_numElems = gpuArrays.numElems.HostRead();
+
   auto d_x = x.Read();
   double *d_uk_el1 = uk_el1.Write();
   double *d_uk_el2 = uk_el2.Write();
@@ -397,7 +400,7 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
   const double *d_gradUp = gradUp->Read();
   auto d_elemFaces = gpuArrays.elemFaces.Read();
   auto d_nodesIDs = gpuArrays.nodesIDs.Read();
-  auto d_posDofIds = gpuArrays.posDofIds.Read();
+  auto d_elem_dof_off = gpuArrays.element_dof_offset.Read();
   auto d_shapeWnor1 = gpuArrays.shapeWnor1.Read();
   const double *d_shape2 = gpuArrays.shape2.Read();
   auto d_elems12Q = gpuArrays.elems12Q.Read();
@@ -419,7 +422,7 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
     int indexes_i[gpudata::MAXDOFS];
 
     const int eli = elemOffset + el;
-    const int offsetEl1 = d_posDofIds[2 * eli];
+    const int offsetEl1 = d_elem_dof_off[eli];
     const int elFaces = d_elemFaces[7 * eli];
     const int dof1 = elDof;
 
@@ -509,7 +512,7 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
 void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
   double *d_y = y.ReadWrite();
   const int *d_nodesIDs = gpuArrays.nodesIDs.Read();
-  const int *d_posDofIds = gpuArrays.posDofIds.Read();
+  auto d_elem_dof_off = gpuArrays.element_dof_offset.Read();
 
   const double gamma = mixture->GetSpecificHeatRatio();
   const double Rg    = mixture->GetGasConstant();
@@ -538,7 +541,7 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
     int index_i[gpudata::MAXDOFS];  // int index_i[216];
 
     const int el1      = d_sharedElemsFaces[0 + el * 7];
-    const int offsetEl1 = d_posDofIds[2 * el1];
+    const int offsetEl1 = d_elem_dof_off[el1];
     const int numFaces = d_sharedElemsFaces[1 + el * 7];
     const int dof1     = d_sharedElem1Dof12Q[1 + d_sharedElemsFaces[2 + el * 7] * 4];
 
@@ -590,7 +593,7 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
   const double *d_faceGradUp = transferGradUp->face_nbr_data.Read();
   const double *d_faceData = transferU->face_nbr_data.Read();
   const int *d_nodesIDs = gpuArrays.nodesIDs.Read();
-  const int *d_posDofIds = gpuArrays.posDofIds.Read();
+  auto d_elem_dof_off = gpuArrays.element_dof_offset.Read();
 
   const double *d_sharedShapeWnor1 = parallelData->sharedShapeWnor1.Read();
   const double *d_sharedShape2 = parallelData->sharedShape2.Read();
@@ -632,7 +635,7 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
     const int numFaces = d_sharedElemsFaces[1 + el * 7];
     const int dof1 = d_sharedElem1Dof12Q[1 + d_sharedElemsFaces[2 + el * 7] * 4];
 
-    const int offsetEl1 = d_posDofIds[2 * el1];
+    const int offsetEl1 = d_elem_dof_off[el1];
 
     for (int i = 0; i < dof1; i++) {
       index_i[i] = d_nodesIDs[offsetEl1 + i];

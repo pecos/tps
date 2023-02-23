@@ -64,9 +64,6 @@ class DGNonLinearForm : public ParNonlinearForm {
 
   const volumeFaceIntegrationArrays &gpuArrays;
 
-  const int *h_numElems;
-  const int *h_posDofIds;
-
   // Parallel shared faces integration
   parallelFacesIntegrationArrays *parallelData;
   mutable dataTransferArrays *transferU;
