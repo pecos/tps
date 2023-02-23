@@ -740,7 +740,8 @@ void InletBC::integrateInlets_gpu(Vector &y, const Vector &x, const elementIndex
 #ifdef _GPU_
   double *d_y = y.Write();
   const int *d_elem_dofs_list = elem_index_data.element_dofs_list.Read();
-  const int *d_posDofIds = elem_index_data.posDofIds.Read();
+  const int *d_elem_dof_off = elem_index_data.element_dof_offset.Read();
+  const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
   const double *d_shapesBC = shapesBC.Read();
   const double *d_normW = normalsWBC.Read();
   const int *d_intPointsElIDBC = intPointsElIDBC.Read();
@@ -764,8 +765,8 @@ void InletBC::integrateInlets_gpu(Vector &y, const Vector &x, const elementIndex
     const int el = d_listElems[n];
     const int Q = d_intPointsElIDBC[2 * el];
     const int elID = d_intPointsElIDBC[2 * el + 1];
-    const int elOffset = d_posDofIds[2 * elID];
-    const int elDof = d_posDofIds[2 * elID + 1];
+    const int elOffset = d_elem_dof_off[elID];
+    const int elDof = d_elem_dof_num[elID];
 
     MFEM_FOREACH_THREAD(i, x, elDof) {
       for (int eq = 0; eq < num_equation; eq++) Fcontrib[i + eq * elDof] = 0.;
@@ -805,7 +806,8 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x,  const elementIndexingData 
   const double *d_inputState = inputState.Read();
   const double *d_U = x.Read();
   const int *d_elem_dofs_list = elem_index_data.element_dofs_list.Read();
-  const int *d_posDofIds = elem_index_data.posDofIds.Read();
+  const int *d_elem_dof_off = elem_index_data.element_dof_offset.Read();
+  const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
   const double *d_shapesBC = shapesBC.Read();
   const double *d_normW = normalsWBC.Read();
   const int *d_intPointsElIDBC = intPointsElIDBC.Read();
@@ -850,8 +852,8 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x,  const elementIndexingData 
     const int el = d_listElems[n];
     const int Q = d_intPointsElIDBC[2 * el];
     const int elID = d_intPointsElIDBC[2 * el + 1];
-    const int elOffset = d_posDofIds[2 * elID];
-    const int elDof = d_posDofIds[2 * elID + 1];
+    const int elOffset = d_elem_dof_off[elID];
+    const int elDof = d_elem_dof_num[elID];
 
     // for (int q = 0; q < Q; q++) {
     MFEM_FOREACH_THREAD(q, x, Q) {

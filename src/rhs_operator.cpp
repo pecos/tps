@@ -90,7 +90,6 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
 
   const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
   h_numElems = elem_data.numElems.HostRead();
-  h_posDofIds = elem_data.posDofIds.HostRead();
 
   Me_inv.SetSize(vfes->GetNE());
   Me_inv_rad.SetSize(vfes->GetNE());
@@ -384,12 +383,13 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
   // 3. Multiply element-wise by the inverse mass matrices.
 #ifdef _GPU_
   const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
+  auto h_elem_dof_num = elem_data.element_dof_number.HostRead();
   for (int eltype = 0; eltype < elem_data.numElems.Size(); eltype++) {
     int elemOffset = 0;
     if (eltype != 0) {
       for (int i = 0; i < eltype; i++) elemOffset += h_numElems[i];
     }
-    int dof = h_posDofIds[2 * elemOffset + 1];
+    int dof = h_elem_dof_num[elemOffset];
     const int totDofs = vfes->GetNDofs();
 
     RHSoperator::multiPlyInvers_gpu(y, z, gpuArrays, invMArray, posDofInvM, num_equation_, totDofs, h_numElems[eltype],
@@ -664,7 +664,7 @@ void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const precomputedInte
 
   const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
   auto d_elem_dofs_list = elem_data.element_dofs_list.Read();
-  auto d_posDofIds = elem_data.posDofIds.Read();
+  auto d_elem_dof_off = elem_data.element_dof_offset.Read();
   auto d_posDofInvM = posDofInvM.Read();
   const double *d_invM = invMArray.Read();
 
@@ -673,7 +673,7 @@ void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const precomputedInte
 
     int eli = el + elemOffset;
     int offsetInv = d_posDofInvM[2 * eli];
-    int offsetIds = d_posDofIds[2 * eli];
+    int offsetIds = d_elem_dof_off[eli];
 
     MFEM_FOREACH_THREAD(i, x, dof) {
       int index = d_elem_dofs_list[offsetIds + i];
@@ -693,53 +693,6 @@ void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const precomputedInte
     }
     MFEM_SYNC_THREAD;
   });
-
-  //   MFEM_FORALL_2D(el, NE, dof, 1, 1,
-  // {
-  //   MFEM_FOREACH_THREAD(i, x, dof) {
-  //     MFEM_SHARED double data[216 * 20];
-
-  //     int eli = el + elemOffset;
-  //     int offsetInv = d_posDofInvM[2 * eli];
-  //     int offsetIds = d_posDofIds[2 * eli];
-
-  //     int index = d_nodesIDs[offsetIds + i];
-
-  //     for (int eq = 0; eq < num_equation; eq++) {
-  //       data[i + eq * dof] = d_z[index + eq * totNumDof];
-  //     }
-  //     MFEM_SYNC_THREAD;
-
-  //     for (int eq = 0; eq < num_equation; eq++) {
-  //       double tmp = 0.;
-  //       for (int k = 0; k < dof; k++) tmp += d_invM[offsetInv + i * dof + k] * data[k + eq * dof];
-  //       d_y[index + eq * totNumDof] = tmp;
-  //     }
-  //   }
-  // });
-
-//   MFEM_FORALL_2D(el,NE,dof,1,1,
-//   {
-//     int eli = el + elemOffset;
-//     int offsetInv = d_posDofInvM[2*eli];
-//     int offsetIds = d_posDofIds[2*eli];
-//     // find out how to dinamically allocate shared memory to
-//     // store invMatrix values
-//     MFEM_FOREACH_THREAD(eq,y,num_equation)
-//     {
-//       MFEM_FOREACH_THREAD(i,x,dof)
-//       {
-//         int index = d_nodesIDs[offsetIds+i];
-//         double temp = 0;
-//         for(int k=0;k<dof;k++)
-//         {
-//           int indexk = d_nodesIDs[offsetIds +k];
-//           temp += d_invM[offsetInv +i*dof +k]*d_z[indexk + eq*totNumDof];
-//         }
-//         d_y[index+eq*totNumDof] = temp;
-//       }
-//     }
-//   });
 #endif
 }
 

@@ -83,7 +83,6 @@ class RHSoperator : public TimeDependentOperator {
   const precomputedIntegrationData &gpuArrays;
 
   const int *h_numElems;
-  const int *h_posDofIds;
 
   const int &maxIntPoints;
   const int &maxDofs;

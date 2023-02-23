@@ -68,7 +68,6 @@ class Gradients : public ParNonlinearForm {
   Vector dun_face;
 
   const int *h_numElems;
-  const int *h_posDofIds;
 
   // DenseMatrix *Me_inv;
   Array<DenseMatrix *> &Me_inv;

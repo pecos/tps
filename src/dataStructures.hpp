@@ -214,13 +214,6 @@ struct SpongeZoneData {
  * object.
  */
 struct elementIndexingData {
-  /** Maps element index to position of dofs in element_dofs_list and number of dofs
-   *  Specifically, for element index i,
-   *  posDofIds[2*i] = offset to element i's dofs within element_dofs_list
-   *  posDofIds[2*i+1] = number of dofs for element i
-   */
-  Array<int> posDofIds;
-
   /** Dof array offset for element i
    *
    *  To be used with element_dofs_list.  Specifically,

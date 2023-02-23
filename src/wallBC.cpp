@@ -395,7 +395,8 @@ void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const elementIndexin
   double *d_y = y.Write();
   //   const double *d_U = x.Read();
   const int *d_elem_dofs_list = elem_index_data.element_dofs_list.Read();
-  const int *d_posDofIds = elem_index_data.posDofIds.Read();
+  const int *d_elem_dof_off = elem_index_data.element_dof_offset.Read();
+  const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
   const double *d_shapesBC = shapesBC.Read();
   const double *d_normW = normalsWBC.Read();
   const int *d_intPointsElIDBC = intPointsElIDBC.Read();
@@ -442,8 +443,8 @@ void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const elementIndexin
 
       el = d_intPointsElIDBC[2 * el_bdry + 1];
 
-      elOffset = d_posDofIds[2 * el];
-      elDof = d_posDofIds[2 * el + 1];
+      elOffset = d_elem_dof_off[el];
+      elDof = d_elem_dof_num[el];
 
       if (!elemDataRecovered) {
         MFEM_FOREACH_THREAD(i, x, elDof) {
@@ -493,7 +494,8 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
   const double *d_U = x.Read();
   const double *d_gradUp = gradUp->Read();
   const int *d_elem_dofs_list = elem_index_data.element_dofs_list.Read();
-  const int *d_posDofIds = elem_index_data.posDofIds.Read();
+  const int *d_elem_dof_off = elem_index_data.element_dof_offset.Read();
+  const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
   const double *d_shapesBC = shapesBC.Read();
   const double *d_normW = normalsWBC.Read();
   const int *d_intPointsElIDBC = intPointsElIDBC.Read();
@@ -547,8 +549,8 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
       const int Q = d_intPointsElIDBC[2 * el_bdry];
       const int el = d_intPointsElIDBC[2 * el_bdry + 1];  // global element number (on this mpi rank) ?
 
-      const int elOffset = d_posDofIds[2 * el];
-      const int elDof = d_posDofIds[2 * el + 1];
+      const int elOffset = d_elem_dof_off[el];
+      const int elDof = d_elem_dof_num[el];
 
       for (int i = 0; i < elDof; i++) {
         index_i[i] = d_elem_dofs_list[elOffset + i];

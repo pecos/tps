@@ -603,10 +603,6 @@ void M2ulPhyS::initIndirectionArrays() {
   elementIndexingData &elem_data = gpuArrays.element_indexing_data;
   interiorFaceIntegrationData &face_data = gpuArrays.interior_face_data;
 
-  elem_data.posDofIds.SetSize(2 * vfes->GetNE());
-  elem_data.posDofIds = 0;
-  auto hposDofIds = elem_data.posDofIds.HostWrite();
-
   elem_data.element_dof_offset.SetSize(vfes->GetNE());
   elem_data.element_dof_offset = -1;  // invalid
   auto h_element_dof_offset = elem_data.element_dof_offset.HostWrite();
@@ -622,10 +618,7 @@ void M2ulPhyS::initIndirectionArrays() {
     const int dof = vfes->GetFE(i)->GetDof();
 
     // get the nodes IDs
-    hposDofIds[2 * i] = tempNodes.size();
     h_element_dof_offset[i] = tempNodes.size();
-
-    hposDofIds[2 * i + 1] = dof;
     h_element_dof_number[i] = dof;
 
     Array<int> dofs;
@@ -643,10 +636,10 @@ void M2ulPhyS::initIndirectionArrays() {
   // count number of each type of element
   std::vector<int> tempNumElems;
   tempNumElems.clear();
-  int dof1 = hposDofIds[1];
+  int dof1 = h_element_dof_number[0];
   int typeElems = 0;
-  for (int el = 0; el < elem_data.posDofIds.Size() / 2; el++) {
-    int dofi = hposDofIds[2 * el + 1];
+  for (int el = 0; el < elem_data.element_dof_number.Size(); el++) {
+    int dofi = h_element_dof_number[el];
     if (dofi == dof1) {
       typeElems++;
     } else {

@@ -1024,7 +1024,8 @@ void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const elementInd
   double *d_y = y.Write();
   const double *d_U = x.Read();
   const int *d_elem_dofs_list = elem_index_data.element_dofs_list.Read();
-  const int *d_posDofIds = elem_index_data.posDofIds.Read();
+  const int *d_elem_dof_off = elem_index_data.element_dof_offset.Read();
+  const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
 
   const double *d_shapesBC = shapesBC.Read();
   const double *d_normW = normalsWBC.Read();
@@ -1053,8 +1054,8 @@ void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const elementInd
     const int Q    = d_intPointsElIDBC[2 * el  ];
     const int elID = d_intPointsElIDBC[2 * el + 1];
 
-    const int elOffset = d_posDofIds[2 * elID  ];
-    const int elDof    = d_posDofIds[2 * elID + 1];
+    const int elOffset = d_elem_dof_off[elID];
+    const int elDof = d_elem_dof_num[elID];
 
     MFEM_FOREACH_THREAD(i, x, elDof) {
       for ( int eq = 0; eq < num_equation; eq++ ) Fcontrib[i+eq*elDof] = 0.;
@@ -1096,7 +1097,8 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
   const double *d_U = x.Read();
   const double *d_gradUp = gradUp->Read();
   const int *d_elem_dofs_list = elem_index_data.element_dofs_list.Read();
-  const int *d_posDofIds = elem_index_data.posDofIds.Read();
+  const int *d_elem_dof_off = elem_index_data.element_dof_offset.Read();
+  const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
   const double *d_shapesBC = shapesBC.Read();
   const double *d_normW = normalsWBC.Read();
   const int *d_intPointsElIDBC = intPointsElIDBC.Read();
@@ -1151,8 +1153,9 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
     const int offsetBdrU = d_offsetBoundaryU[n];
     const int Q = d_intPointsElIDBC[2 * el];
     const int elID = d_intPointsElIDBC[2 * el + 1];
-    const int elOffset = d_posDofIds[2 * elID];
-    const int elDof = d_posDofIds[2 * elID + 1];
+    const int elOffset = d_elem_dof_off[elID];
+    const int elDof = d_elem_dof_num[elID];
+
 
     // get data
     for (int i = 0; i < elDof; i++) {

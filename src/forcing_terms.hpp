@@ -69,7 +69,6 @@ class ForcingTerms {
 
   const precomputedIntegrationData &gpuArrays;
   const int *h_numElems;
-  const int *h_posDofIds;
 
   // added term
   //   ParGridFunction *b;

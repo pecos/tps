@@ -51,7 +51,6 @@ ForcingTerms::ForcingTerms(const int &_dim, const int &_num_equation, const int 
       gpuArrays(_gpuArrays) {
   const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
   h_numElems = elem_data.numElems.HostRead();
-  h_posDofIds = elem_data.posDofIds.HostRead();
 
   //   b = new ParGridFunction(vfes);
   //
@@ -117,12 +116,14 @@ void ConstantPressureGradient::updateTerms(Vector &in) {
 #ifdef _GPU_
   const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
 
+  auto h_elem_dof_number = elem_data.element_dof_number.HostRead();
+
   for (int elType = 0; elType < elem_data.numElems.Size(); elType++) {
     int elemOffset = 0;
     if (elType != 0) {
       for (int i = 0; i < elType; i++) elemOffset += h_numElems[i];
     }
-    int dof_el = h_posDofIds[2 * elemOffset + 1];
+    int dof_el = h_elem_dof_number[elemOffset];
 
     updateTerms_gpu(h_numElems[elType], elemOffset, dof_el, vfes->GetNDofs(), pressGrad, in, *Up_, *gradUp_,
                     num_equation, dim, gpuArrays);
@@ -182,7 +183,7 @@ void ConstantPressureGradient::updateTerms_gpu(const int numElems, const int off
   double *d_gradUp = gradUp.ReadWrite();
 
   const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
-  auto d_posDofIds = elem_data.posDofIds.Read();
+  auto d_elem_dof_off = elem_data.element_dof_offset.Read();
   auto d_elem_dofs_list = elem_data.element_dofs_list.Read();
 
   // clang-format off
@@ -195,7 +196,7 @@ void ConstantPressureGradient::updateTerms_gpu(const int numElems, const int off
 //      MFEM_SHARED double pGrad[gpudata::MAXDIM]; // MFEM_SHARED double pGrad[3];
 
       const int eli = el + offsetElems;
-      const int offsetIDs    = d_posDofIds[2 * eli];
+      const int offsetIDs = d_elem_dof_off[eli];
 
       const int indexi = d_elem_dofs_list[offsetIDs + i];
 
