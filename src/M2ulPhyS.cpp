@@ -674,9 +674,17 @@ void M2ulPhyS::initIndirectionArrays() {
 
     Mesh *mesh = vfes->GetMesh();
 
-    gpuArrays.elems12Q.SetSize(3 * mesh->GetNumFaces());
-    gpuArrays.elems12Q = 0;
-    auto helems12Q = gpuArrays.elems12Q.HostWrite();
+    gpuArrays.face_el1.SetSize(mesh->GetNumFaces());
+    gpuArrays.face_el1 = 0;
+    auto h_face_el1 = gpuArrays.face_el1.HostWrite();
+
+    gpuArrays.face_el2.SetSize(mesh->GetNumFaces());
+    gpuArrays.face_el2 = 0;
+    auto h_face_el2 = gpuArrays.face_el2.HostWrite();
+
+    gpuArrays.face_num_quad.SetSize(mesh->GetNumFaces());
+    gpuArrays.face_num_quad = 0;
+    auto h_face_num_quad = gpuArrays.face_num_quad.HostWrite();
 
     gpuArrays.face_el1_shape.UseDevice(true);
     gpuArrays.face_el1_shape.SetSize(maxDofs * maxIntPoints * mesh->GetNumFaces());
@@ -735,9 +743,9 @@ void M2ulPhyS::initIndirectionArrays() {
         }
         const IntegrationRule *ir = &intRules->Get(tr->GetGeometryType(), intorder);
 
-        helems12Q[3 * face] = tr->Elem1No;
-        helems12Q[3 * face + 1] = tr->Elem2No;
-        helems12Q[3 * face + 2] = ir->GetNPoints();
+        h_face_el1[face] = tr->Elem1No;
+        h_face_el2[face] = tr->Elem2No;
+        h_face_num_quad[face] = ir->GetNPoints();
 
         Vector shape1i, shape2i;
         shape1i.UseDevice(false);
@@ -905,7 +913,6 @@ void M2ulPhyS::initIndirectionArrays() {
   auto dposDofIds = gpuArrays.posDofIds.Read();
 
   auto delemFaces = gpuArrays.elemFaces.Read();
-  auto delems12Q = gpuArrays.elems12Q.Read();
 
   auto dshapesBC = shapesBC.Read();
   auto dnormalsBC = normalsWBC.Read();

@@ -268,13 +268,14 @@ struct volumeFaceIntegrationArrays {
    */
   Array<int> elemFaces;  // number and faces IDs of each element
 
-  /** for each face, element 1, element 2, and number of quadrature points
-   *
-   * elems12Q[3*f + 0] = element 1 index for face f
-   * elems12Q[3*f + 1] = element 2 index for face f
-   * elems12Q[3*f + 2] = number of quadrature points for face f
-   */
-  Array<int> elems12Q;
+  /** for each interior face, index of element 1 */
+  Array<int> face_el1;
+
+  /** for each interior face, index of element 2 */
+  Array<int> face_el2;
+
+  /** for each interior face, number of quadrature points */
+  Array<int> face_num_quad;
 
   // used in gradient computation:
   // gradients of shape functions for all nodes and weight multiplied by det(Jac)

@@ -197,7 +197,9 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset,
   auto d_shape1 = gpuArrays.face_el1_shape.Read();
   auto d_weight = gpuArrays.face_quad_weight.Read();
   const double *d_shape2 = gpuArrays.face_el2_shape.Read();
-  auto d_elems12Q = gpuArrays.elems12Q.Read();
+  auto d_face_el1 = gpuArrays.face_el1.Read();
+  auto d_face_el2 = gpuArrays.face_el1.Read();
+  auto d_face_nqp = gpuArrays.face_num_quad.Read();
 
   const int Ndofs = vfes->GetNDofs();
   const int NumElemType = h_numElems[elType];
@@ -229,14 +231,14 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset,
 
     for (int face = 0; face < elFaces; face++) {
       const int gFace = d_elemFaces[7 * eli + face + 1];
-      const int Q = d_elems12Q[3 * gFace + 2];
+      const int Q = d_face_nqp[gFace];
       const int offset_shape = gFace * maxIntPoints * maxDofs;
       bool swapElems = false;
 
       // get neighbor
-      int elj = d_elems12Q[3 * gFace];
+      int elj = d_face_el1[gFace];
       if (elj == eli) {
-        elj = d_elems12Q[3 * gFace + 1];
+        elj = d_face_el2[gFace];
       } else {
         swapElems = true;
       }
@@ -292,7 +294,7 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
   const double *d_grad_uk_el2 = grad_upk_el2.Read();
 
   auto d_normal = gpuArrays.face_normal.Read();
-  auto d_elems12Q = gpuArrays.elems12Q.Read();
+  auto d_face_nqp = gpuArrays.face_num_quad.Read();
 
   const double gamma = mixture->GetSpecificHeatRatio();
   const double Rg = mixture->GetGasConstant();
@@ -320,7 +322,7 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
     double vFlux1[gpudata::MAXEQUATIONS * gpudata::MAXDIM], vFlux2[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
     double Rflux[gpudata::MAXEQUATIONS], nor[gpudata::MAXDIM];
 
-    const int Q = d_elems12Q[3 * iface + 2];
+    const int Q = d_face_nqp[iface];
     const int offset = iface * maxIntPoints * dim;
 
     // loop over quad points on this face
@@ -403,7 +405,8 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
   auto d_elem_dof_off = gpuArrays.element_dof_offset.Read();
   auto d_shape1 = gpuArrays.face_el1_shape.Read();
   const double *d_shape2 = gpuArrays.face_el2_shape.Read();
-  auto d_elems12Q = gpuArrays.elems12Q.Read();
+  auto d_face_el1 = gpuArrays.face_el1.Read();
+  auto d_face_nqp = gpuArrays.face_num_quad.Read();
 
   const int Ndofs = vfes->GetNDofs();
   const int NumElemsType = h_numElems[elType];
@@ -434,7 +437,7 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
     // loop over faces
     for (int face = 0; face < elFaces; face++) {
       const int gFace = d_elemFaces[7 * eli + face + 1];
-      const int Q = d_elems12Q[3 * gFace + 2];
+      const int Q = d_face_nqp[gFace];
       //int offsetShape1 = gFace * maxIntPoints * (maxDofs + 1 + dim);
       int offsetShape1 = gFace * maxIntPoints * maxDofs;
       int offsetShape2 = gFace * maxIntPoints * maxDofs;
@@ -442,7 +445,7 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
       // swapElems = false indicates that el is "element 1" for this face
       // swapElems = true  indicates that el is "element 2" for this face
       bool swapElems = false;
-      if (eli != d_elems12Q[3 * gFace]) {
+      if (eli != d_face_el1[gFace]) {
         swapElems = true;
       }
 
