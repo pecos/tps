@@ -247,23 +247,22 @@ void BCintegrator::updateBCMean(ParGridFunction *Up) {
   }
 }
 
-void BCintegrator::integrateBCs(Vector &y, const Vector &x, const Array<int> &elem_dofs_list,
-                                const Array<int> &posDofIds) {
+void BCintegrator::integrateBCs(Vector &y, const Vector &x,  const elementIndexingData &elem_index_data) {
   for (auto bc = inletBCmap.begin(); bc != inletBCmap.end(); bc++) {
     bc->second->integrationBC(y,  // output
-                              x, elem_dofs_list, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC,
+                              x, elem_index_data, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC,
                               maxIntPoints, maxDofs);
   }
 
   for (auto bc = outletBCmap.begin(); bc != outletBCmap.end(); bc++) {
     bc->second->integrationBC(y,  // output
-                              x, elem_dofs_list, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC,
+                              x, elem_index_data, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC,
                               maxIntPoints, maxDofs);
   }
 
   for (auto bc = wallBCmap.begin(); bc != wallBCmap.end(); bc++) {
     bc->second->integrationBC(y,  // output
-                              x, elem_dofs_list, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC,
+                              x, elem_index_data, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC,
                               maxIntPoints, maxDofs);
   }
 }

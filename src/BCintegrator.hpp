@@ -100,7 +100,7 @@ class BCintegrator : public NonlinearFormIntegrator {
   void initBCs();
 
   void updateBCMean(ParGridFunction *Up);
-  void integrateBCs(Vector &y, const Vector &x, const Array<int> &elem_dofs_list, const Array<int> &posDofIds);
+  void integrateBCs(Vector &y, const Vector &x, const elementIndexingData &elem_index_data);
 
   // GPU functions
   static void retrieveGradientsData_gpu(ParGridFunction *gradUp, DenseTensor &elGradUp, Array<int> &vdofs,

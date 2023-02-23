@@ -167,7 +167,7 @@ void DGNonLinearForm::Mult_domain(const Vector &x, Vector &y) {
   }
 
   // INTEGRATION BOUNDARIES
-  if (bfnfi.Size()) bcIntegrator->integrateBCs(y, x, elem_data.element_dofs_list, elem_data.posDofIds);
+  if (bfnfi.Size()) bcIntegrator->integrateBCs(y, x, elem_data);
 }
 
 void DGNonLinearForm::Mult_bdr(const Vector &x, Vector &y) {

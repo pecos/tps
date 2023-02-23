@@ -86,15 +86,15 @@ class WallBC : public BoundaryCondition {
   // functions for BC integration on GPU
 
   virtual void integrationBC(Vector &y,  // output
-                             const Vector &x, const Array<int> &elem_dofs_list, const Array<int> &posDofIds,
+                             const Vector &x, const elementIndexingData &elem_index_data,
                              ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                              Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs);
 
   void integrateWalls_gpu(Vector &y,  // output
-                          const Vector &x, const Array<int> &elem_dofs_list, const Array<int> &posDofIds,
+                          const Vector &x, const elementIndexingData &elem_index_data,
                           Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC, const int &maxDofs);
 
-  void interpWalls_gpu(const Vector &x, const Array<int> &elem_dofs_list, const Array<int> &posDofIds,
+  void interpWalls_gpu(const Vector &x, const elementIndexingData &elem_index_data,
                        ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                        Array<int> &intPointsElIDBC, const int &maxDofs);
 

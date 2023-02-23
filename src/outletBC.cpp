@@ -550,14 +550,14 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
   }
 }
 
-void OutletBC::integrationBC(Vector &y, const Vector &x, const Array<int> &elem_dofs_list, const Array<int> &posDofIds,
+void OutletBC::integrationBC(Vector &y, const Vector &x, const elementIndexingData &elem_index_data,
                              ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                              Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
-  interpOutlet_gpu(x, elem_dofs_list, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC, listElems,
+  interpOutlet_gpu(x, elem_index_data, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC, listElems,
                    offsetsBoundaryU);
 
   integrateOutlets_gpu(y,  // output
-                       x, elem_dofs_list, posDofIds, shapesBC, normalsWBC, intPointsElIDBC, listElems,
+                       x, elem_index_data, shapesBC, normalsWBC, intPointsElIDBC, listElems,
                        offsetsBoundaryU);
 }
 
@@ -1017,14 +1017,14 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
-void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const Array<int> &elem_dofs_list,
-                                    const Array<int> &posDofIds, Vector &shapesBC, Vector &normalsWBC,
+void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const elementIndexingData &elem_index_data,
+                                    Vector &shapesBC, Vector &normalsWBC,
                                     Array<int> &intPointsElIDBC, Array<int> &listElems, Array<int> &offsetsBoundaryU) {
 #ifdef _GPU_
   double *d_y = y.Write();
   const double *d_U = x.Read();
-  const int *d_elem_dofs_list = elem_dofs_list.Read();
-  const int *d_posDofIds = posDofIds.Read();
+  const int *d_elem_dofs_list = elem_index_data.element_dofs_list.Read();
+  const int *d_posDofIds = elem_index_data.posDofIds.Read();
 
   const double *d_shapesBC = shapesBC.Read();
   const double *d_normW = normalsWBC.Read();
@@ -1087,7 +1087,7 @@ void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const Array<int>
   // clang-format on
 }
 
-void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const Array<int> &elem_dofs_list, const Array<int> &posDofIds,
+void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData &elem_index_data,
                                 mfem::ParGridFunction *Up, mfem::ParGridFunction *gradUp, mfem::Vector &shapesBC,
                                 mfem::Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
                                 Array<int> &offsetsBoundaryU) {
@@ -1095,8 +1095,8 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const Array<int> &elem_do
   const double *d_inputState = inputState.Read();
   const double *d_U = x.Read();
   const double *d_gradUp = gradUp->Read();
-  const int *d_elem_dofs_list = elem_dofs_list.Read();
-  const int *d_posDofIds = posDofIds.Read();
+  const int *d_elem_dofs_list = elem_index_data.element_dofs_list.Read();
+  const int *d_posDofIds = elem_index_data.posDofIds.Read();
   const double *d_shapesBC = shapesBC.Read();
   const double *d_normW = normalsWBC.Read();
   const int *d_intPointsElIDBC = intPointsElIDBC.Read();
