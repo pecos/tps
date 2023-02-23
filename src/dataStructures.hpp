@@ -205,18 +205,53 @@ struct SpongeZoneData {
   bool singleTemperature;
 };
 
+/** @brief Storage for data used in the _GPU_ code path
+ *
+ * The _GPU_ path requires pre-computation of a number of quantities,
+ * such as the values of the shape functions at each quadrature point
+ * on each face.  These quantities, which are documented below, are
+ * stored in this struct.
+ *
+ */
 struct volumeFaceIntegrationArrays {
-  // nodes IDs and indirection array
-  Array<int> nodesIDs;
+
+  /** Maps element index to position of dofs in nodesIDs and number of dofs
+   *  Specifically, for element index i,
+   *  posDofIds[2*i] = offset to element i's dofs within nodesIDs
+   *  posDofIds[2*i+1] = number of dofs for element i
+   */
   Array<int> posDofIds;
-  // count of number of elements of each type
+
+  /** List of dof indices, ordered by element.  For element i, use
+   *  posDofIds to get to correct position inside nodesIDs.
+   *  Specifically, nodesIDs[posDofIds[2*i] + j] gives the dof index
+   *  for the jth dof for element i.
+   */
+  Array<int> nodesIDs;
+
+  /** Number of elements of each type (e.g, number of tets, number of hexes, etc) */
   Array<int> numElems;
-  // Array<int> posDofQshape1; // position, num. dof and integration points for each face
-  Vector shapeWnor1;  // shape functions, weight and normal for each face at ach integration point
+
+  /** shape functions, weight and normal for each face at each integration point */
+  Vector shapeWnor1;
+
+  /** shape functions for each face at each quadrature point */
   Vector shape2;
 
+  /** maps from element index to face indices
+   *
+   *  elemFaces[7*i] = number of faces for element i
+   *  elemFaces[7*i + 1 + f] = face index for local face f of element i
+   */
   Array<int> elemFaces;  // number and faces IDs of each element
-  Array<int> elems12Q;   // elements connecting a face and integration points
+
+  /** for each face, element 1, element 2, and number of quadrature points
+   *
+   * elems12Q[3*f + 0] = element 1 index for face f
+   * elems12Q[3*f + 1] = element 2 index for face f
+   * elems12Q[3*f + 2] = number of quadrature points for face f
+   */
+  Array<int> elems12Q;
 
   // used in gradient computation:
   // gradients of shape functions for all nodes and weight multiplied by det(Jac)
