@@ -678,13 +678,21 @@ void M2ulPhyS::initIndirectionArrays() {
     gpuArrays.elems12Q = 0;
     auto helems12Q = gpuArrays.elems12Q.HostWrite();
 
-    gpuArrays.shapeWnor1.UseDevice(true);
-    gpuArrays.shapeWnor1.SetSize((maxDofs + 1 + dim) * maxIntPoints * mesh->GetNumFaces());
+    gpuArrays.face_el1_shape.UseDevice(true);
+    gpuArrays.face_el1_shape.SetSize(maxDofs * maxIntPoints * mesh->GetNumFaces());
+
+    gpuArrays.face_quad_weight.UseDevice(true);
+    gpuArrays.face_quad_weight.SetSize(maxIntPoints * mesh->GetNumFaces());
+
+    gpuArrays.face_normal.UseDevice(true);
+    gpuArrays.face_normal.SetSize(dim * maxIntPoints * mesh->GetNumFaces());
 
     gpuArrays.shape2.UseDevice(true);
     gpuArrays.shape2.SetSize(maxDofs * maxIntPoints * mesh->GetNumFaces());
 
-    auto hshapeWnor1 = gpuArrays.shapeWnor1.HostWrite();
+    auto hshape1 = gpuArrays.face_el1_shape.HostWrite();
+    auto hweight = gpuArrays.face_quad_weight.HostWrite();
+    auto hnormal = gpuArrays.face_normal.HostWrite();
     auto hshape2 = gpuArrays.shape2.HostWrite();
 
     for (int face = 0; face < mesh->GetNumFaces(); face++) {
@@ -742,18 +750,20 @@ void M2ulPhyS::initIndirectionArrays() {
           // shape functions
           fe1->CalcShape(tr->GetElement1IntPoint(), shape1i);
           fe2->CalcShape(tr->GetElement2IntPoint(), shape2i);
-          for (int j = 0; j < dof1; j++)
-            hshapeWnor1[face * (maxDofs + dim + 1) * maxIntPoints + j + k * (dim + 1 + maxDofs)] = shape1i[j];
+          for (int j = 0; j < dof1; j++) {
+            hshape1[face * maxDofs * maxIntPoints + k * maxDofs + j] = shape1i[j];
+          }
           for (int j = 0; j < dof2; j++) hshape2[face * maxDofs * maxIntPoints + j + k * maxDofs] = shape2i[j];
 
-          hshapeWnor1[face * (maxDofs + dim + 1) * maxIntPoints + maxDofs + k * (dim + 1 + maxDofs)] = ip.weight;
+          hweight[face * maxIntPoints + k] = ip.weight;
           // normals (multiplied by determinant of jacobian
           Vector nor;
           nor.UseDevice(false);
           nor.SetSize(dim);
           CalcOrtho(tr->Jacobian(), nor);
-          for (int d = 0; d < dim; d++)
-            hshapeWnor1[face * (maxDofs + dim + 1) * maxIntPoints + maxDofs + 1 + d + k * (maxDofs + dim + 1)] = nor[d];
+          for (int d = 0; d < dim; d++) {
+            hnormal[face * dim * maxIntPoints + k * dim + d] = nor[d];
+          }
         }
       }
     }
@@ -891,7 +901,6 @@ void M2ulPhyS::initIndirectionArrays() {
   auto dnumElems = gpuArrays.numElems.Read();
   auto dposDofIds = gpuArrays.posDofIds.Read();
 
-  auto dshapeWnor1 = gpuArrays.shapeWnor1.Read();
   auto dshape2 = gpuArrays.shape2.Read();
 
   auto delemFaces = gpuArrays.elemFaces.Read();

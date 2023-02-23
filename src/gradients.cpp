@@ -281,7 +281,7 @@ void Gradients::interpFaceData_gpu(const Vector &Up, int elType, int elemOffset,
   auto d_elemFaces = gpuArrays.elemFaces.Read();
   auto d_elem_dofs_list = gpuArrays.element_dofs_list.Read();
   auto d_posDofIds = gpuArrays.posDofIds.Read();
-  auto d_shapeWnor1 = gpuArrays.shapeWnor1.Read();
+  auto d_shape1 = gpuArrays.face_el1_shape.Read();
   const double *d_shape2 = gpuArrays.shape2.Read();
   auto d_elems12Q = gpuArrays.elems12Q.Read();
 
@@ -315,8 +315,8 @@ void Gradients::interpFaceData_gpu(const Vector &Up, int elType, int elemOffset,
     for (int face = 0; face < elFaces; face++) {
       const int gFace = d_elemFaces[7 * eli + face + 1];
       const int Q = d_elems12Q[3 * gFace + 2];
-      int offsetShape1 = gFace * maxIntPoints * (maxDofs + 1 + dim);
-      int offsetShape2 = gFace * maxIntPoints * maxDofs;
+      //int offsetShape1 = gFace * maxIntPoints * (maxDofs + 1 + dim);
+      int offset_shape = gFace * maxIntPoints * maxDofs;
 
       // swapElems = false indicates that el is "element 1" for this face
       // swapElems = true  indicates that el is "element 2" for this face
@@ -334,9 +334,9 @@ void Gradients::interpFaceData_gpu(const Vector &Up, int elType, int elemOffset,
 
         // load shape functions
         if (swapElems) {
-          for (int j = 0; j < dof1; j++) shape[j] = d_shape2[offsetShape2 + j + k * maxDofs];
+          for (int j = 0; j < dof1; j++) shape[j] = d_shape2[offset_shape + k * maxDofs + j];
         } else {
-          for (int j = 0; j < dof1; j++) shape[j] = d_shapeWnor1[offsetShape1 + j + k * (maxDofs + 1 + dim)];
+          for (int j = 0; j < dof1; j++) shape[j] = d_shape1[offset_shape + k * maxDofs + j];
         }
 
         for (int eq = 0; eq < num_equation; eq++) {
@@ -432,7 +432,8 @@ void Gradients::evalFaceIntegrand_gpu() {
   const double *d_uk_el1 = uk_el1.Read();
   const double *d_uk_el2 = uk_el2.Read();
 
-  auto d_shapeWnor1 = gpuArrays.shapeWnor1.Read();
+  auto d_weight = gpuArrays.face_quad_weight.Read();
+  auto d_normal = gpuArrays.face_normal.Read();
   auto d_elems12Q = gpuArrays.elems12Q.Read();
 
   Mesh *mesh = fes->GetMesh();
@@ -448,10 +449,11 @@ void Gradients::evalFaceIntegrand_gpu() {
         nor[gpudata::MAXDIM];  // double u1[20], u2[20], nor[3];
 
     const int Q = d_elems12Q[3 * iface + 2];
-    const int offsetShape1 = iface * maxIntPoints * (maxDofs + 1 + dim);
+    const int weight_offset = iface * maxIntPoints;
+    const int normal_offset = iface * maxIntPoints * dim;
 
     for (int k = 0; k < Q; k++) {
-      const double weight = d_shapeWnor1[offsetShape1 + maxDofs + k * (maxDofs + 1 + dim)];
+      const double weight = d_weight[weight_offset + k];
 
       double du[gpudata::MAXEQUATIONS];  // double du[20];
       for (int eq = 0; eq < num_equation; eq++) {
@@ -463,7 +465,7 @@ void Gradients::evalFaceIntegrand_gpu() {
       const int idx0 = iface * dim * maxIntPoints * num_equation + k * num_equation;
       for (int d = 0; d < dim; d++) {
         const int idx1 = idx0 + d * maxIntPoints * num_equation;
-        nor[d] = weight * 0.5 * d_shapeWnor1[offsetShape1 + maxDofs + 1 + d + k * (maxDofs + 1 + dim)];
+        nor[d] = weight * 0.5 * d_normal[normal_offset + k * dim + d];
         for (int eq = 0; eq < num_equation; eq++) {
           d_dun[eq + idx1] = du[eq] * nor[d];
         }
@@ -482,7 +484,7 @@ void Gradients::faceContrib_gpu(const int elType, const int offsetElems, const i
 
   // pointers for face integration
   auto d_elemFaces = gpuArrays.elemFaces.Read();
-  auto d_shapeWnor1 = gpuArrays.shapeWnor1.Read();
+  auto d_shape1 = gpuArrays.face_el1_shape.Read();
   const double *d_shape2 = gpuArrays.shape2.Read();
   auto d_elems12Q = gpuArrays.elems12Q.Read();
 
@@ -507,8 +509,7 @@ void Gradients::faceContrib_gpu(const int elType, const int offsetElems, const i
       for (int face = 0; face < elFaces; face++) {
         const int gFace = d_elemFaces[7 * eli + face + 1];
         const int Q = d_elems12Q[3 * gFace + 2];
-        const int offsetShape1 = gFace * maxIntPoints * (maxDofs + 1 + dim);
-        const int offsetShape2 = gFace * maxIntPoints * maxDofs;
+        const int offset_shape = gFace * maxIntPoints * maxDofs;
         bool swapElems = false;
 
         // get neighbor
@@ -520,9 +521,9 @@ void Gradients::faceContrib_gpu(const int elType, const int offsetElems, const i
         for (int k = 0; k < Q; k++) {
           // load interpolators
           if (swapElems) {
-            shape = d_shape2 + offsetShape2 + k * maxDofs;
+            shape = d_shape2 + offset_shape + k * maxDofs;
           } else {
-            shape = d_shapeWnor1 + offsetShape1 + k * (maxDofs + 1 + dim);
+            shape = d_shape1 + offset_shape + k * maxDofs;
           }
 
           const int idx0 = k * num_equation + gFace * dim * maxIntPoints * num_equation;

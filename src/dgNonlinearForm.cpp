@@ -194,7 +194,8 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset,
   auto d_elem_dofs_list = gpuArrays.element_dofs_list.Read();
   auto d_elem_dof_off = gpuArrays.element_dof_offset.Read();
   auto d_elem_dof_num = gpuArrays.element_dof_number.Read();
-  auto d_shapeWnor1 = gpuArrays.shapeWnor1.Read();
+  auto d_shape1 = gpuArrays.face_el1_shape.Read();
+  auto d_weight = gpuArrays.face_quad_weight.Read();
   const double *d_shape2 = gpuArrays.shape2.Read();
   auto d_elems12Q = gpuArrays.elems12Q.Read();
 
@@ -229,8 +230,7 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset,
     for (int face = 0; face < elFaces; face++) {
       const int gFace = d_elemFaces[7 * eli + face + 1];
       const int Q = d_elems12Q[3 * gFace + 2];
-      const int offsetShape1 = gFace * maxIntPoints * (maxDofs + 1 + dim);
-      const int offsetShape2 = gFace * maxIntPoints * maxDofs;
+      const int offset_shape = gFace * maxIntPoints * maxDofs;
       bool swapElems = false;
 
       // get neighbor
@@ -249,14 +249,14 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset,
       }
 
       for (int k = 0; k < Q; k++) {
-        // get shapes and normal
-        const double weight = d_shapeWnor1[offsetShape1 + maxDofs + k * (maxDofs + 1 + dim)];
+        // get shape functions and quad point weight at this quad point
+        const double weight = d_weight[gFace * maxIntPoints + k];
 
         if (swapElems) {
-          MFEM_FOREACH_THREAD(j, x, elDof) { shape[j] = d_shape2[offsetShape2 + j + k * maxDofs]; }
+          MFEM_FOREACH_THREAD(j, x, elDof) { shape[j] = d_shape2[offset_shape + k * maxDofs + j]; }
         } else {
           // NB: Negaive sign correct b/c we *add* to flux below regardless of swapElems
-          MFEM_FOREACH_THREAD(j, x, elDof) { shape[j] = -d_shapeWnor1[offsetShape1 + j + k * (maxDofs + 1 + dim)]; }
+          MFEM_FOREACH_THREAD(j, x, elDof) { shape[j] = -d_shape1[offset_shape + k * maxDofs + j]; }
         }
         MFEM_SYNC_THREAD;
 
@@ -291,7 +291,7 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
   const double *d_grad_uk_el1 = grad_upk_el1.Read();
   const double *d_grad_uk_el2 = grad_upk_el2.Read();
 
-  auto d_shapeWnor1 = gpuArrays.shapeWnor1.Read();
+  auto d_normal = gpuArrays.face_normal.Read();
   auto d_elems12Q = gpuArrays.elems12Q.Read();
 
   const double gamma = mixture->GetSpecificHeatRatio();
@@ -321,13 +321,13 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
     double Rflux[gpudata::MAXEQUATIONS], nor[gpudata::MAXDIM];
 
     const int Q = d_elems12Q[3 * iface + 2];
-    const int offsetShape1 = iface * maxIntPoints * (maxDofs + 1 + dim);
+    const int offset = iface * maxIntPoints * dim;
 
     // loop over quad points on this face
     for (int k = 0; k < Q; k++) {
       // get normal vector
       for (int d = 0; d < dim; d++)
-        nor[d] = d_shapeWnor1[offsetShape1 + maxDofs + 1 + d + k * (maxDofs + 1 + dim)];
+        nor[d] = d_normal[offset + k * dim + d];
 
       // get state and gradient
       for (int eq = 0; eq < num_equation; eq++) {
@@ -359,7 +359,7 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
       // this approach is working.
       d_rsolver->Eval_LF(d_uk_el1 + k * num_equation + iface * maxIntPoints * num_equation,
                          d_uk_el2 + k * num_equation + iface * maxIntPoints * num_equation,
-                         d_shapeWnor1 + offsetShape1 + maxDofs + 1 + k * (maxDofs + 1 + dim),
+                         d_normal + offset + k * dim,
                          Rflux);
 
       d_flux->ComputeViscousFluxes(u1, gradUp1, 0.0, vFlux1);
@@ -401,7 +401,7 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
   auto d_elemFaces = gpuArrays.elemFaces.Read();
   auto d_elem_dofs_list = gpuArrays.element_dofs_list.Read();
   auto d_elem_dof_off = gpuArrays.element_dof_offset.Read();
-  auto d_shapeWnor1 = gpuArrays.shapeWnor1.Read();
+  auto d_shape1 = gpuArrays.face_el1_shape.Read();
   const double *d_shape2 = gpuArrays.shape2.Read();
   auto d_elems12Q = gpuArrays.elems12Q.Read();
 
@@ -435,7 +435,8 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
     for (int face = 0; face < elFaces; face++) {
       const int gFace = d_elemFaces[7 * eli + face + 1];
       const int Q = d_elems12Q[3 * gFace + 2];
-      int offsetShape1 = gFace * maxIntPoints * (maxDofs + 1 + dim);
+      //int offsetShape1 = gFace * maxIntPoints * (maxDofs + 1 + dim);
+      int offsetShape1 = gFace * maxIntPoints * maxDofs;
       int offsetShape2 = gFace * maxIntPoints * maxDofs;
 
       // swapElems = false indicates that el is "element 1" for this face
@@ -459,7 +460,7 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
         if (swapElems) {
           for (int j = 0; j < dof1; j++) shape[j] = d_shape2[offsetShape2 + j + k * maxDofs];
         } else {
-          for (int j = 0; j < dof1; j++) shape[j] = d_shapeWnor1[offsetShape1 + j + k * (maxDofs + 1 + dim)];
+          for (int j = 0; j < dof1; j++) shape[j] = d_shape1[offsetShape1 + k * maxDofs + j];
         }
 
         for (int eq = 0; eq < num_equation; eq++) {

@@ -249,8 +249,14 @@ struct volumeFaceIntegrationArrays {
   /** Number of elements of each type (e.g, number of tets, number of hexes, etc) */
   Array<int> numElems;
 
-  /** shape functions, weight and normal for each face at each integration point */
-  Vector shapeWnor1;
+  /** Shape functions for "element 1" evaluated at all interior face quadrature points */
+  Vector face_el1_shape;
+
+  /** Weights associated with all interior face quadrature points */
+  Vector face_quad_weight;
+
+  /** Normal vector (oriented from elem 1 toward elem 2) for all interior face quadrature points */
+  Vector face_normal;
 
   /** shape functions for each face at each quadrature point */
   Vector shape2;
