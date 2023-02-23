@@ -178,7 +178,7 @@ void ConstantPressureGradient::updateTerms_gpu(const int numElems, const int off
   const double *d_Up = Up.Read();
   double *d_gradUp = gradUp.ReadWrite();
   auto d_posDofIds = gpuArrays.posDofIds.Read();
-  auto d_nodesIDs = gpuArrays.nodesIDs.Read();
+  auto d_elem_dofs_list = gpuArrays.element_dofs_list.Read();
 
   // clang-format off
   MFEM_FORALL_2D(el, numElems, elDof, 1, 1, {
@@ -192,7 +192,7 @@ void ConstantPressureGradient::updateTerms_gpu(const int numElems, const int off
       const int eli = el + offsetElems;
       const int offsetIDs    = d_posDofIds[2 * eli];
 
-      const int indexi = d_nodesIDs[offsetIDs + i];
+      const int indexi = d_elem_dofs_list[offsetIDs + i];
 
       if (i < 3) pGrad[i] = d_pressGrad[i];
 

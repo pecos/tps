@@ -279,7 +279,7 @@ void Gradients::interpFaceData_gpu(const Vector &Up, int elType, int elemOffset,
   double *d_uk_el2 = uk_el2.Write();
 
   auto d_elemFaces = gpuArrays.elemFaces.Read();
-  auto d_nodesIDs = gpuArrays.nodesIDs.Read();
+  auto d_elem_dofs_list = gpuArrays.element_dofs_list.Read();
   auto d_posDofIds = gpuArrays.posDofIds.Read();
   auto d_shapeWnor1 = gpuArrays.shapeWnor1.Read();
   const double *d_shape2 = gpuArrays.shape2.Read();
@@ -307,7 +307,7 @@ void Gradients::interpFaceData_gpu(const Vector &Up, int elType, int elemOffset,
     const int dof1 = elDof;
 
     for (int i = 0; i < elDof; i++) {
-      int index = d_nodesIDs[offsetEl1 + i];
+      int index = d_elem_dofs_list[offsetEl1 + i];
       indexes_i[i] = index;
     }
 
@@ -369,7 +369,7 @@ void Gradients::computeGradients_gpu(const int elType, const int offsetElems, co
   const double *d_Up = Up->Read();
   double *d_gradUp = gradUp->ReadWrite();
   auto d_posDofIds = gpuArrays.posDofIds.Read();
-  auto d_nodesIDs = gpuArrays.nodesIDs.Read();
+  auto d_elem_dofs_list = gpuArrays.element_dofs_list.Read();
 
   auto d_Ke = Ke_array_.Read();
   auto d_Ke_pos = Ke_positions_.Read();
@@ -392,7 +392,7 @@ void Gradients::computeGradients_gpu(const int elType, const int offsetElems, co
         gradUpi[gpudata::MAXDOFS * gpudata::MAXDIM];  //  gradUpi[216 * 3];
 
     for (int i = 0; i < elDof; i++) {
-      index_i[i] = d_nodesIDs[offsetIDs + i];
+      index_i[i] = d_elem_dofs_list[offsetIDs + i];
     }
 
     for (int eq = 0; eq < num_equation; eq++) {
@@ -478,7 +478,7 @@ void Gradients::faceContrib_gpu(const int elType, const int offsetElems, const i
 
   double *d_gradUp = gradUp->Write();  // NB: I assume this comes in set to zero!
   auto d_posDofIds = gpuArrays.posDofIds.Read();
-  auto d_nodesIDs = gpuArrays.nodesIDs.Read();
+  auto d_elem_dofs_list = gpuArrays.element_dofs_list.Read();
 
   // pointers for face integration
   auto d_elemFaces = gpuArrays.elemFaces.Read();
@@ -499,7 +499,7 @@ void Gradients::faceContrib_gpu(const int elType, const int offsetElems, const i
     const int offsetIDs = d_posDofIds[2 * eli];
 
     MFEM_FOREACH_THREAD(i, x, elDof) {
-      const int idx = d_nodesIDs[offsetIDs + i];
+      const int idx = d_elem_dofs_list[offsetIDs + i];
       double const *shape;
 
       // ================  FACE CONTRIBUTION  ================
@@ -543,7 +543,7 @@ void Gradients::faceContrib_gpu(const int elType, const int offsetElems, const i
 void Gradients::interpGradSharedFace_gpu() {
   const double *d_up = Up->Read();
   const double *d_faceData = transferUp->face_nbr_data.Read();
-  const int *d_nodesIDs = gpuArrays.nodesIDs.Read();
+  const int *d_elem_dofs_list = gpuArrays.element_dofs_list.Read();
   const int *d_posDofIds = gpuArrays.posDofIds.Read();
 
   const double *d_sharedShapeWnor1 = parallelData->sharedShapeWnor1.Read();
@@ -574,7 +574,7 @@ void Gradients::interpGradSharedFace_gpu() {
     const int offsetEl1 = d_posDofIds[2 * el1];
 
     for (int i = 0; i < dof1; i++) {
-      index_i[i] = d_nodesIDs[offsetEl1 + i];
+      index_i[i] = d_elem_dofs_list[offsetEl1 + i];
     }
 
     for (int elFace = 0; elFace < numFaces; elFace++) {
@@ -631,7 +631,7 @@ void Gradients::interpGradSharedFace_gpu() {
 void Gradients::integrationGradSharedFace_gpu() {
   double *d_gradUp = gradUp->ReadWrite();
 
-  const int *d_nodesIDs = gpuArrays.nodesIDs.Read();
+  const int *d_elem_dofs_list = gpuArrays.element_dofs_list.Read();
   const int *d_posDofIds = gpuArrays.posDofIds.Read();
 
   const double *d_sharedShapeWnor1 = parallelData->sharedShapeWnor1.Read();
@@ -655,7 +655,7 @@ void Gradients::integrationGradSharedFace_gpu() {
     const int offsetEl1 = d_posDofIds[2 * el1];
 
     MFEM_FOREACH_THREAD(i, x, dof1) {
-      const int indexi = d_nodesIDs[offsetEl1 + i];
+      const int indexi = d_elem_dofs_list[offsetEl1 + i];
 
       for (int elFace = 0; elFace < numFaces; elFace++) {
         const int f = d_sharedElemsFaces[1 + elFace + 1 + el * 7];
@@ -683,7 +683,7 @@ void Gradients::integrationGradSharedFace_gpu() {
 void Gradients::multInverse_gpu(const int numElems, const int offsetElems, const int elDof) {
   double *d_gradUp = gradUp->ReadWrite();
   auto d_posDofIds = gpuArrays.posDofIds.Read();
-  auto d_nodesIDs = gpuArrays.nodesIDs.Read();
+  auto d_elem_dofs_list = gpuArrays.element_dofs_list.Read();
   const double *d_invMArray = invMArray.Read();
   auto d_posDofInvM = posDofInvM.Read();
 
@@ -701,13 +701,13 @@ void Gradients::multInverse_gpu(const int numElems, const int offsetElems, const
     for (int eq = 0; eq < num_equation; eq++) {
       for (int d = 0; d < dim; d++) {
         MFEM_FOREACH_THREAD(i, x, elDof) {
-          const int indexi = d_nodesIDs[offsetIDs + i];
+          const int indexi = d_elem_dofs_list[offsetIDs + i];
           gradUpi[i + d * elDof] = d_gradUp[indexi + eq * totalDofs + d * num_equation * totalDofs];
         }
         MFEM_SYNC_THREAD;
 
         MFEM_FOREACH_THREAD(i, x, elDof) {
-          const int indexi = d_nodesIDs[offsetIDs + i];
+          const int indexi = d_elem_dofs_list[offsetIDs + i];
           double temp = 0;
           for (int n = 0; n < elDof; n++) {
             temp += gradUpi[n + d * elDof] * d_invMArray[offsetInv + i * elDof + n];

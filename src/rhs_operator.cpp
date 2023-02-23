@@ -659,7 +659,7 @@ void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceInteg
 #ifdef _GPU_
   double *d_y = y.ReadWrite();
   const double *d_z = z.Read();
-  auto d_nodesIDs = gpuArrays.nodesIDs.Read();
+  auto d_elem_dofs_list = gpuArrays.element_dofs_list.Read();
   auto d_posDofIds = gpuArrays.posDofIds.Read();
   auto d_posDofInvM = posDofInvM.Read();
   const double *d_invM = invMArray.Read();
@@ -672,7 +672,7 @@ void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceInteg
     int offsetIds = d_posDofIds[2 * eli];
 
     MFEM_FOREACH_THREAD(i, x, dof) {
-      int index = d_nodesIDs[offsetIds + i];
+      int index = d_elem_dofs_list[offsetIds + i];
       for (int eq = 0; eq < num_equation; eq++) {
         data[i + eq * dof] = d_z[index + eq * totNumDof];
       }
@@ -680,7 +680,7 @@ void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceInteg
     MFEM_SYNC_THREAD;
 
     MFEM_FOREACH_THREAD(i, x, dof) {
-      int index = d_nodesIDs[offsetIds + i];
+      int index = d_elem_dofs_list[offsetIds + i];
       for (int eq = 0; eq < num_equation; eq++) {
         double tmp = 0.;
         for (int k = 0; k < dof; k++) tmp += d_invM[offsetInv + i * dof + k] * data[k + eq * dof];

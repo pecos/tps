@@ -92,7 +92,7 @@ class BoundaryCondition {
 
   virtual void integrationBC(Vector &y,        // output
                              const Vector &x,  // conservative vars (input)
-                             const Array<int> &nodesIDs, const Array<int> &posDofIds, ParGridFunction *Up,
+                             const Array<int> &elem_dofs_list, const Array<int> &posDofIds, ParGridFunction *Up,
                              ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
                              const int &maxIntPoints, const int &maxDofs) = 0;
 

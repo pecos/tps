@@ -208,13 +208,13 @@ void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradSt
   }
 }
 
-void WallBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+void WallBC::integrationBC(Vector &y, const Vector &x, const Array<int> &elem_dofs_list, const Array<int> &posDofIds,
                            ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                            Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
-  interpWalls_gpu(x, nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC, maxDofs);
+  interpWalls_gpu(x, elem_dofs_list, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC, maxDofs);
 
   integrateWalls_gpu(y,  // output
-                     x, nodesIDs, posDofIds, shapesBC, normalsWBC, intPointsElIDBC, maxDofs);
+                     x, elem_dofs_list, posDofIds, shapesBC, normalsWBC, intPointsElIDBC, maxDofs);
 }
 
 void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
@@ -388,12 +388,13 @@ void WallBC::computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix
   }
 }
 
-void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
-                                Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC, const int &maxDofs) {
+void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const Array<int> &elem_dofs_list,
+                                const Array<int> &posDofIds, Vector &shapesBC, Vector &normalsWBC,
+                                Array<int> &intPointsElIDBC, const int &maxDofs) {
 #ifdef _GPU_
   double *d_y = y.Write();
   //   const double *d_U = x.Read();
-  const int *d_nodesIDs = nodesIDs.Read();
+  const int *d_elem_dofs_list = elem_dofs_list.Read();
   const int *d_posDofIds = posDofIds.Read();
   const double *d_shapesBC = shapesBC.Read();
   const double *d_normW = normalsWBC.Read();
@@ -475,7 +476,7 @@ void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const Array<int> &no
     // add to global data
     // for (int i = 0; i < elDof; i++) {
     MFEM_FOREACH_THREAD(i, x, elDof) {
-      const int indexi = d_nodesIDs[elOffset + i];
+      const int indexi = d_elem_dofs_list[elOffset + i];
       for (int eq = 0; eq < num_equation; eq++) d_y[indexi + eq * totDofs] += Fcontrib[i + eq * elDof];
     }
     MFEM_SYNC_THREAD;
@@ -483,7 +484,7 @@ void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const Array<int> &no
 #endif
 }
 
-void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &elem_dofs_list, const Array<int> &posDofIds,
                              mfem::ParGridFunction *Up, mfem::ParGridFunction *gradUp, mfem::Vector &shapesBC,
                              mfem::Vector &normalsWBC, Array<int> &intPointsElIDBC, const int &maxDofs) {
 #ifdef _GPU_
@@ -491,7 +492,7 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
 
   const double *d_U = x.Read();
   const double *d_gradUp = gradUp->Read();
-  const int *d_nodesIDs = nodesIDs.Read();
+  const int *d_elem_dofs_list = elem_dofs_list.Read();
   const int *d_posDofIds = posDofIds.Read();
   const double *d_shapesBC = shapesBC.Read();
   const double *d_normW = normalsWBC.Read();
@@ -550,7 +551,7 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, 
       const int elDof = d_posDofIds[2 * el + 1];
 
       for (int i = 0; i < elDof; i++) {
-        index_i[i] = d_nodesIDs[elOffset + i];
+        index_i[i] = d_elem_dofs_list[elOffset + i];
       }
 
       MFEM_FOREACH_THREAD(q, x, Q) {

@@ -630,11 +630,6 @@ void M2ulPhyS::initIndirectionArrays() {
     for (int n = 0; n < dof; n++) tempNodes.push_back(dofs[n]);
   }
 
-  gpuArrays.nodesIDs.SetSize(tempNodes.size());
-  gpuArrays.nodesIDs = 0;
-  auto hnodesIDs = gpuArrays.nodesIDs.HostWrite();
-  for (int i = 0; i < gpuArrays.nodesIDs.Size(); i++) hnodesIDs[i] = tempNodes[i];
-
   gpuArrays.element_dofs_list.SetSize(tempNodes.size());
   gpuArrays.element_dofs_list = 0;
   auto h_element_dofs_list = gpuArrays.element_dofs_list.HostWrite();
@@ -893,7 +888,6 @@ void M2ulPhyS::initIndirectionArrays() {
   }
 
 #ifdef _GPU_
-  auto dnodesID = gpuArrays.nodesIDs.Read();
   auto dnumElems = gpuArrays.numElems.Read();
   auto dposDofIds = gpuArrays.posDofIds.Read();
 

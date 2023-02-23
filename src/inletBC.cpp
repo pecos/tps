@@ -543,13 +543,13 @@ void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
 }
 
 void InletBC::integrationBC(Vector &y,  // output
-                            const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+                            const Vector &x, const Array<int> &elem_dofs_list, const Array<int> &posDofIds,
                             ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                             Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
-  interpInlet_gpu(x, nodesIDs, posDofIds, shapesBC, normalsWBC, intPointsElIDBC, listElems, offsetsBoundaryU);
+  interpInlet_gpu(x, elem_dofs_list, posDofIds, shapesBC, normalsWBC, intPointsElIDBC, listElems, offsetsBoundaryU);
 
   integrateInlets_gpu(y,  // output
-                      x, nodesIDs, posDofIds, shapesBC, normalsWBC, intPointsElIDBC, listElems, offsetsBoundaryU);
+                      x, elem_dofs_list, posDofIds, shapesBC, normalsWBC, intPointsElIDBC, listElems, offsetsBoundaryU);
 }
 
 void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
@@ -734,12 +734,12 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
-void InletBC::integrateInlets_gpu(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
-                                  Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
-                                  Array<int> &listElems, Array<int> &offsetsBoundaryU) {
+void InletBC::integrateInlets_gpu(Vector &y, const Vector &x, const Array<int> &elem_dofs_list,
+                                  const Array<int> &posDofIds, Vector &shapesBC, Vector &normalsWBC,
+                                  Array<int> &intPointsElIDBC, Array<int> &listElems, Array<int> &offsetsBoundaryU) {
 #ifdef _GPU_
   double *d_y = y.Write();
-  const int *d_nodesIDs = nodesIDs.Read();
+  const int *d_elem_dofs_list = elem_dofs_list.Read();
   const int *d_posDofIds = posDofIds.Read();
   const double *d_shapesBC = shapesBC.Read();
   const double *d_normW = normalsWBC.Read();
@@ -790,7 +790,7 @@ void InletBC::integrateInlets_gpu(Vector &y, const Vector &x, const Array<int> &
 
     // add to global data
     MFEM_FOREACH_THREAD(i, x, elDof) {
-      const int indexi = d_nodesIDs[elOffset + i];
+      const int indexi = d_elem_dofs_list[elOffset + i];
       for (int eq = 0; eq < num_equation; eq++) d_y[indexi + eq * totDofs] += Fcontrib[i + eq * elDof];
     }
     MFEM_SYNC_THREAD;
@@ -798,13 +798,13 @@ void InletBC::integrateInlets_gpu(Vector &y, const Vector &x, const Array<int> &
 #endif
 }
 
-void InletBC::interpInlet_gpu(const mfem::Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+void InletBC::interpInlet_gpu(const mfem::Vector &x, const Array<int> &elem_dofs_list, const Array<int> &posDofIds,
                               mfem::Vector &shapesBC, mfem::Vector &normalsWBC, Array<int> &intPointsElIDBC,
                               Array<int> &listElems, Array<int> &offsetsBoundaryU) {
 #ifdef _GPU_
   const double *d_inputState = inputState.Read();
   const double *d_U = x.Read();
-  const int *d_nodesIDs = nodesIDs.Read();
+  const int *d_elem_dofs_list = elem_dofs_list.Read();
   const int *d_posDofIds = posDofIds.Read();
   const double *d_shapesBC = shapesBC.Read();
   const double *d_normW = normalsWBC.Read();
@@ -864,7 +864,7 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const Array<int> &nodesIDs,
       for (int eq = 0; eq < num_equation; eq++) {
         u1[eq] = 0.;
         for (int i = 0; i < elDof; i++) {
-          const int indexi = d_nodesIDs[elOffset + i];
+          const int indexi = d_elem_dofs_list[elOffset + i];
           u1[eq] += d_U[indexi + eq * totDofs] * shape[i];
         }
       }

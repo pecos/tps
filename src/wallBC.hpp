@@ -86,17 +86,17 @@ class WallBC : public BoundaryCondition {
   // functions for BC integration on GPU
 
   virtual void integrationBC(Vector &y,  // output
-                             const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+                             const Vector &x, const Array<int> &elem_dofs_list, const Array<int> &posDofIds,
                              ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                              Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs);
 
   void integrateWalls_gpu(Vector &y,  // output
-                          const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds, Vector &shapesBC,
-                          Vector &normalsWBC, Array<int> &intPointsElIDBC, const int &maxDofs);
+                          const Vector &x, const Array<int> &elem_dofs_list, const Array<int> &posDofIds,
+                          Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC, const int &maxDofs);
 
-  void interpWalls_gpu(const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds, ParGridFunction *Up,
-                       ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
-                       const int &maxDofs);
+  void interpWalls_gpu(const Vector &x, const Array<int> &elem_dofs_list, const Array<int> &posDofIds,
+                       ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
+                       Array<int> &intPointsElIDBC, const int &maxDofs);
 
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void computeInvWallState(const double *u1, double *u2, const double *nor, const int &dim,

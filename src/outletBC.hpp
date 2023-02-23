@@ -108,7 +108,7 @@ class OutletBC : public BoundaryCondition {
   virtual void initBCs();
 
   virtual void integrationBC(Vector &y,  // output
-                             const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
+                             const Vector &x, const Array<int> &elem_dofs_list, const Array<int> &posDofIds,
                              ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
                              Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs);
 
@@ -119,13 +119,13 @@ class OutletBC : public BoundaryCondition {
   // functions for BC integration on GPU
 
   void integrateOutlets_gpu(Vector &y,  // output
-                            const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds, Vector &shapesBC,
-                            Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
+                            const Vector &x, const Array<int> &elem_dofs_list, const Array<int> &posDofIds,
+                            Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
                             Array<int> &offsetBoundaryU);
 
-  void interpOutlet_gpu(const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds, ParGridFunction *Up,
-                        ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
-                        Array<int> &listElems, Array<int> &offsetsBoundaryU);
+  void interpOutlet_gpu(const Vector &x, const Array<int> &elem_dofs_list, const Array<int> &posDofIds,
+                        ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
+                        Array<int> &intPointsElIDBC, Array<int> &listElems, Array<int> &offsetsBoundaryU);
 
 #ifdef _GPU_  // GPU functions
   static MFEM_HOST_DEVICE void computeSubPressure(const double *u1, double *u2, const double *nor, const double &press,
