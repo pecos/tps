@@ -282,7 +282,7 @@ void Gradients::interpFaceData_gpu(const Vector &Up, int elType, int elemOffset,
   auto d_elem_dofs_list = gpuArrays.element_dofs_list.Read();
   auto d_posDofIds = gpuArrays.posDofIds.Read();
   auto d_shape1 = gpuArrays.face_el1_shape.Read();
-  const double *d_shape2 = gpuArrays.shape2.Read();
+  const double *d_shape2 = gpuArrays.face_el2_shape.Read();
   auto d_elems12Q = gpuArrays.elems12Q.Read();
 
   const int Ndofs = vfes->GetNDofs();
@@ -485,7 +485,7 @@ void Gradients::faceContrib_gpu(const int elType, const int offsetElems, const i
   // pointers for face integration
   auto d_elemFaces = gpuArrays.elemFaces.Read();
   auto d_shape1 = gpuArrays.face_el1_shape.Read();
-  const double *d_shape2 = gpuArrays.shape2.Read();
+  const double *d_shape2 = gpuArrays.face_el2_shape.Read();
   auto d_elems12Q = gpuArrays.elems12Q.Read();
 
   const int numElems = h_numElems[elType];

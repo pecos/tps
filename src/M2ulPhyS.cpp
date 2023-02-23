@@ -681,19 +681,19 @@ void M2ulPhyS::initIndirectionArrays() {
     gpuArrays.face_el1_shape.UseDevice(true);
     gpuArrays.face_el1_shape.SetSize(maxDofs * maxIntPoints * mesh->GetNumFaces());
 
+    gpuArrays.face_el2_shape.UseDevice(true);
+    gpuArrays.face_el2_shape.SetSize(maxDofs * maxIntPoints * mesh->GetNumFaces());
+
     gpuArrays.face_quad_weight.UseDevice(true);
     gpuArrays.face_quad_weight.SetSize(maxIntPoints * mesh->GetNumFaces());
 
     gpuArrays.face_normal.UseDevice(true);
     gpuArrays.face_normal.SetSize(dim * maxIntPoints * mesh->GetNumFaces());
 
-    gpuArrays.shape2.UseDevice(true);
-    gpuArrays.shape2.SetSize(maxDofs * maxIntPoints * mesh->GetNumFaces());
-
     auto hshape1 = gpuArrays.face_el1_shape.HostWrite();
+    auto hshape2 = gpuArrays.face_el2_shape.HostWrite();
     auto hweight = gpuArrays.face_quad_weight.HostWrite();
     auto hnormal = gpuArrays.face_normal.HostWrite();
-    auto hshape2 = gpuArrays.shape2.HostWrite();
 
     for (int face = 0; face < mesh->GetNumFaces(); face++) {
       FaceElementTransformations *tr;
@@ -753,9 +753,12 @@ void M2ulPhyS::initIndirectionArrays() {
           for (int j = 0; j < dof1; j++) {
             hshape1[face * maxDofs * maxIntPoints + k * maxDofs + j] = shape1i[j];
           }
-          for (int j = 0; j < dof2; j++) hshape2[face * maxDofs * maxIntPoints + j + k * maxDofs] = shape2i[j];
+          for (int j = 0; j < dof2; j++) {
+            hshape2[face * maxDofs * maxIntPoints + k * maxDofs + j] = shape2i[j];
+          }
 
           hweight[face * maxIntPoints + k] = ip.weight;
+
           // normals (multiplied by determinant of jacobian
           Vector nor;
           nor.UseDevice(false);
@@ -900,8 +903,6 @@ void M2ulPhyS::initIndirectionArrays() {
 #ifdef _GPU_
   auto dnumElems = gpuArrays.numElems.Read();
   auto dposDofIds = gpuArrays.posDofIds.Read();
-
-  auto dshape2 = gpuArrays.shape2.Read();
 
   auto delemFaces = gpuArrays.elemFaces.Read();
   auto delems12Q = gpuArrays.elems12Q.Read();

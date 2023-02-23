@@ -196,7 +196,7 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset,
   auto d_elem_dof_num = gpuArrays.element_dof_number.Read();
   auto d_shape1 = gpuArrays.face_el1_shape.Read();
   auto d_weight = gpuArrays.face_quad_weight.Read();
-  const double *d_shape2 = gpuArrays.shape2.Read();
+  const double *d_shape2 = gpuArrays.face_el2_shape.Read();
   auto d_elems12Q = gpuArrays.elems12Q.Read();
 
   const int Ndofs = vfes->GetNDofs();
@@ -402,7 +402,7 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
   auto d_elem_dofs_list = gpuArrays.element_dofs_list.Read();
   auto d_elem_dof_off = gpuArrays.element_dof_offset.Read();
   auto d_shape1 = gpuArrays.face_el1_shape.Read();
-  const double *d_shape2 = gpuArrays.shape2.Read();
+  const double *d_shape2 = gpuArrays.face_el2_shape.Read();
   auto d_elems12Q = gpuArrays.elems12Q.Read();
 
   const int Ndofs = vfes->GetNDofs();
