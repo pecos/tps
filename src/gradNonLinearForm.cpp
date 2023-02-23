@@ -34,7 +34,7 @@
 #include "riemann_solver.hpp"
 
 GradNonLinearForm::GradNonLinearForm(ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, const int _dim,
-                                     const int _num_equation, const volumeFaceIntegrationArrays &_gpuArrays,
+                                     const int _num_equation, const precomputedIntegrationData &_gpuArrays,
                                      const int &_maxIntPoints, const int &_maxDofs)
     : ParNonlinearForm(_vfes),
       vfes(_vfes),

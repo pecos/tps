@@ -39,7 +39,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
                          const Equations &_eqSystem, double &_max_char_speed, IntegrationRules *_intRules,
                          int _intRuleType, Fluxes *_fluxClass, GasMixture *_mixture, GasMixture *d_mixture,
                          Chemistry *_chemistry, TransportProperties *_transport, Radiation *_radiation,
-                         ParFiniteElementSpace *_vfes, const volumeFaceIntegrationArrays &_gpuArrays,
+                         ParFiniteElementSpace *_vfes, const precomputedIntegrationData &_gpuArrays,
                          const int &_maxIntPoints, const int &_maxDofs, DGNonLinearForm *_A, MixedBilinearForm *_Aflux,
                          ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
                          ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A,
@@ -88,8 +88,9 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   fk.SetSize(dim_ * vfes->GetNDofs());
   zk.SetSize(vfes->GetNDofs());
 
-  h_numElems = gpuArrays.numElems.HostRead();
-  h_posDofIds = gpuArrays.posDofIds.HostRead();
+  const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
+  h_numElems = elem_data.numElems.HostRead();
+  h_posDofIds = elem_data.posDofIds.HostRead();
 
   Me_inv.SetSize(vfes->GetNE());
   Me_inv_rad.SetSize(vfes->GetNE());
@@ -382,7 +383,8 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
 
   // 3. Multiply element-wise by the inverse mass matrices.
 #ifdef _GPU_
-  for (int eltype = 0; eltype < gpuArrays.numElems.Size(); eltype++) {
+  const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
+  for (int eltype = 0; eltype < elem_data.numElems.Size(); eltype++) {
     int elemOffset = 0;
     if (eltype != 0) {
       for (int i = 0; i < eltype; i++) elemOffset += h_numElems[i];
@@ -653,14 +655,16 @@ void RHSoperator::updateGradients(const Vector &x, const bool &primitiveUpdated)
 #endif
 }
 
-void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceIntegrationArrays &gpuArrays,
+void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const precomputedIntegrationData &gpuArrays,
                                      const Vector &invMArray, const Array<int> &posDofInvM, const int num_equation,
                                      const int totNumDof, const int NE, const int elemOffset, const int dof) {
 #ifdef _GPU_
   double *d_y = y.ReadWrite();
   const double *d_z = z.Read();
-  auto d_elem_dofs_list = gpuArrays.element_dofs_list.Read();
-  auto d_posDofIds = gpuArrays.posDofIds.Read();
+
+  const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
+  auto d_elem_dofs_list = elem_data.element_dofs_list.Read();
+  auto d_posDofIds = elem_data.posDofIds.Read();
   auto d_posDofInvM = posDofInvM.Read();
   const double *d_invM = invMArray.Read();
 

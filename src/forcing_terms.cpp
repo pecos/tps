@@ -35,8 +35,8 @@
 
 ForcingTerms::ForcingTerms(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                            IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
-                           ParGridFunction *_Up, ParGridFunction *_gradUp,
-                           const volumeFaceIntegrationArrays &_gpuArrays, bool axisym)
+                           ParGridFunction *_Up, ParGridFunction *_gradUp, const precomputedIntegrationData &_gpuArrays,
+                           bool axisym)
     : dim(_dim),
       nvel(axisym ? 3 : _dim),
       num_equation(_num_equation),
@@ -49,8 +49,9 @@ ForcingTerms::ForcingTerms(const int &_dim, const int &_num_equation, const int 
       Up_(_Up),
       gradUp_(_gradUp),
       gpuArrays(_gpuArrays) {
-  h_numElems = gpuArrays.numElems.HostRead();
-  h_posDofIds = gpuArrays.posDofIds.HostRead();
+  const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
+  h_numElems = elem_data.numElems.HostRead();
+  h_posDofIds = elem_data.posDofIds.HostRead();
 
   //   b = new ParGridFunction(vfes);
   //
@@ -89,7 +90,7 @@ ConstantPressureGradient::ConstantPressureGradient(const int &_dim, const int &_
                                                    const int &_intRuleType, IntegrationRules *_intRules,
                                                    ParFiniteElementSpace *_vfes, ParGridFunction *U,
                                                    ParGridFunction *_Up, ParGridFunction *_gradUp,
-                                                   const volumeFaceIntegrationArrays &_gpuArrays,
+                                                   const precomputedIntegrationData &_gpuArrays,
                                                    RunConfiguration &_config, GasMixture *mixture)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, _gpuArrays,
                    _config.isAxisymmetric()),
@@ -114,7 +115,9 @@ ConstantPressureGradient::ConstantPressureGradient(const int &_dim, const int &_
 
 void ConstantPressureGradient::updateTerms(Vector &in) {
 #ifdef _GPU_
-  for (int elType = 0; elType < gpuArrays.numElems.Size(); elType++) {
+  const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
+
+  for (int elType = 0; elType < elem_data.numElems.Size(); elType++) {
     int elemOffset = 0;
     if (elType != 0) {
       for (int i = 0; i < elType; i++) elemOffset += h_numElems[i];
@@ -171,14 +174,16 @@ void ConstantPressureGradient::updateTerms(Vector &in) {
 void ConstantPressureGradient::updateTerms_gpu(const int numElems, const int offsetElems, const int elDof,
                                                const int totalDofs, Vector &pressGrad, Vector &in, const Vector &Up,
                                                Vector &gradUp, const int num_equation, const int dim,
-                                               const volumeFaceIntegrationArrays &gpuArrays) {
+                                               const precomputedIntegrationData &gpuArrays) {
   const double *d_pressGrad = pressGrad.Read();
   double *d_in = in.ReadWrite();
 
   const double *d_Up = Up.Read();
   double *d_gradUp = gradUp.ReadWrite();
-  auto d_posDofIds = gpuArrays.posDofIds.Read();
-  auto d_elem_dofs_list = gpuArrays.element_dofs_list.Read();
+
+  const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
+  auto d_posDofIds = elem_data.posDofIds.Read();
+  auto d_elem_dofs_list = elem_data.element_dofs_list.Read();
 
   // clang-format off
   MFEM_FORALL_2D(el, numElems, elDof, 1, 1, {
@@ -234,7 +239,7 @@ AxisymmetricSource::AxisymmetricSource(const int &_dim, const int &_num_equation
                                        const Equations &_eqSystem, const int &_intRuleType, IntegrationRules *_intRules,
                                        ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up,
                                        ParGridFunction *_gradUp, ParGridFunction *spaceVaryViscMult,
-                                       const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
+                                       const precomputedIntegrationData &gpuArrays, RunConfiguration &_config)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()),
       mixture(_mixture),
@@ -396,7 +401,7 @@ void AxisymmetricSource::updateTerms(Vector &in) {
 JouleHeating::JouleHeating(const int &_dim, const int &_num_equation, const int &_order, GasMixture *_mixture,
                            const Equations &_eqSystem, const int &_intRuleType, IntegrationRules *_intRules,
                            ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up,
-                           ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
+                           ParGridFunction *_gradUp, const precomputedIntegrationData &gpuArrays,
                            RunConfiguration &_config, ParGridFunction *jh_)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()),
@@ -458,7 +463,7 @@ void JouleHeating::updateTerms(Vector &in) {
 SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                        Fluxes *_fluxClass, GasMixture *_mixture, IntegrationRules *_intRules,
                        ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp,
-                       const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config, const int sz)
+                       const precomputedIntegrationData &gpuArrays, RunConfiguration &_config, const int sz)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()),
       fluxes(_fluxClass),
@@ -751,7 +756,7 @@ void SpongeZone::computeMixedOutValues() {
 PassiveScalar::PassiveScalar(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                              IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, GasMixture *_mixture,
                              ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp,
-                             const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
+                             const precomputedIntegrationData &gpuArrays, RunConfiguration &_config)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()),
       mixture(_mixture) {
@@ -856,7 +861,7 @@ void PassiveScalar::updateTerms_gpu(Vector &in, ParGridFunction *Up, Array<passi
 HeatSource::HeatSource(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                        heatSourceData &_heatSource, GasMixture *_mixture, mfem::IntegrationRules *_intRules,
                        mfem::ParFiniteElementSpace *_vfes, ParGridFunction *U, mfem::ParGridFunction *_Up,
-                       mfem::ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
+                       mfem::ParGridFunction *_gradUp, const precomputedIntegrationData &gpuArrays,
                        RunConfiguration &_config)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()),
@@ -940,7 +945,7 @@ void HeatSource::updateTerms_gpu(mfem::Vector &in) {
 MASA_forcings::MASA_forcings(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                              IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
                              ParGridFunction *_Up, ParGridFunction *_gradUp,
-                             const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config)
+                             const precomputedIntegrationData &gpuArrays, RunConfiguration &_config)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
                    _config.isAxisymmetric()) {
   // NOTE: This has been taken care of by M2ulPhyS.masaHandler_.

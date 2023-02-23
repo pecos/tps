@@ -62,7 +62,7 @@ class Gradients : public ParNonlinearForm {
   IntegrationRules *intRules;
   const int intRuleType;
 
-  const volumeFaceIntegrationArrays &gpuArrays;
+  const precomputedIntegrationData &gpuArrays;
   Vector uk_el1;
   Vector uk_el2;
   Vector dun_face;
@@ -95,7 +95,7 @@ class Gradients : public ParNonlinearForm {
  public:
   Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradUpfes, int _dim, int _num_equation,
             ParGridFunction *_Up, ParGridFunction *_gradUp, GasMixture *_mixture, GradNonLinearForm *_gradUp_A,
-            IntegrationRules *_intRules, int _intRuleType, const volumeFaceIntegrationArrays &gpuArrays,
+            IntegrationRules *_intRules, int _intRuleType, const precomputedIntegrationData &gpuArrays,
             Array<DenseMatrix *> &Me_inv, Vector &_invMArray, Array<int> &_posDofInvM, const int &_maxIntPoints,
             const int &_maxDofs);
 

@@ -192,7 +192,7 @@ class M2ulPhyS : public TPS::Solver {
   const int maxIntPoints = gpudata::MAXINTPOINTS;  // corresponding to HEX face with p=5
   const int maxDofs = gpudata::MAXDOFS;            // corresponding to HEX with p=5
 
-  volumeFaceIntegrationArrays gpuArrays;
+  precomputedIntegrationData gpuArrays;
 
   // BC integration
   Vector shapesBC;

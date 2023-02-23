@@ -80,7 +80,7 @@ class RHSoperator : public TimeDependentOperator {
 
   ParFiniteElementSpace *vfes;
 
-  const volumeFaceIntegrationArrays &gpuArrays;
+  const precomputedIntegrationData &gpuArrays;
 
   const int *h_numElems;
   const int *h_posDofIds;
@@ -148,7 +148,7 @@ class RHSoperator : public TimeDependentOperator {
   RHSoperator(int &_iter, const int _dim, const int &_num_equation, const int &_order, const Equations &_eqSystem,
               double &_max_char_speed, IntegrationRules *_intRules, int _intRuleType, Fluxes *_fluxClass,
               GasMixture *_mixture, GasMixture *d_mixture, Chemistry *_chemistry, TransportProperties *_transport,
-              Radiation *_radiation, ParFiniteElementSpace *_vfes, const volumeFaceIntegrationArrays &gpuArrays,
+              Radiation *_radiation, ParFiniteElementSpace *_vfes, const precomputedIntegrationData &gpuArrays,
               const int &_maxIntPoints, const int &_maxDofs, DGNonLinearForm *_A, MixedBilinearForm *_Aflux,
               ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
               ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A,
@@ -176,7 +176,7 @@ class RHSoperator : public TimeDependentOperator {
   static void copyZk2Z_gpu(Vector &z, Vector &zk, const int eq, const int dof);
   static void copyDataForFluxIntegration_gpu(const Vector &z, DenseTensor &flux, Vector &fk, Vector &zk, const int eq,
                                              const int dof, const int dim);
-  static void multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceIntegrationArrays &gpuArrays,
+  static void multiPlyInvers_gpu(Vector &y, Vector &z, const precomputedIntegrationData &gpuArrays,
                                  const Vector &invMArray, const Array<int> &posDofInvM, const int num_equation,
                                  const int totNumDof, const int NE, const int elemOffset, const int dof);
 

@@ -205,15 +205,15 @@ struct SpongeZoneData {
   bool singleTemperature;
 };
 
-/** @brief Storage for data used in the _GPU_ code path
+/** @brief Array providing information about dof indices for elements
  *
- * The _GPU_ path requires pre-computation of a number of quantities,
- * such as the values of the shape functions at each quadrature point
- * on each face.  These quantities, which are documented below, are
- * stored in this struct.
- *
+ * These arrays store information about the degrees of freedom
+ * associated with each element.  They are used in the _GPU_ code path
+ * to provide information that would otherwise (i.e., on the cpu path)
+ * come from, for instance, a FiniteElement or FiniteElementSpace
+ * object.
  */
-struct volumeFaceIntegrationArrays {
+struct elementIndexingData {
   /** Maps element index to position of dofs in element_dofs_list and number of dofs
    *  Specifically, for element index i,
    *  posDofIds[2*i] = offset to element i's dofs within element_dofs_list
@@ -248,7 +248,17 @@ struct volumeFaceIntegrationArrays {
 
   /** Number of elements of each type (e.g, number of tets, number of hexes, etc) */
   Array<int> numElems;
+};
 
+/** @brief Storage for data used in the _GPU_ code path
+ *
+ * The _GPU_ path requires pre-computation of a number of quantities,
+ * such as the values of the shape functions at each quadrature point
+ * on each face.  These quantities, which are documented below, are
+ * stored in this struct.
+ *
+ */
+struct interiorFaceIntegrationData {
   /** Shape functions for "element 1" evaluated at all interior face quadrature points */
   Vector face_el1_shape;
 
@@ -276,6 +286,16 @@ struct volumeFaceIntegrationArrays {
 
   /** for each interior face, number of quadrature points */
   Array<int> face_num_quad;
+};
+
+/** @brief Storage for data used in the _GPU_ code path
+ *
+ * The _GPU_ path requires pre-computation of a number of quantities.
+ * These quantities are stored in this struct.
+ */
+struct precomputedIntegrationData {
+  elementIndexingData element_indexing_data;
+  interiorFaceIntegrationData interior_face_data;
 };
 
 struct parallelFacesIntegrationArrays {

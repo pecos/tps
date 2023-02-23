@@ -62,7 +62,7 @@ class DGNonLinearForm : public ParNonlinearForm {
   const int num_equation_;
   GasMixture *mixture;
 
-  const volumeFaceIntegrationArrays &gpuArrays;
+  const precomputedIntegrationData &gpuArrays;
 
   // Parallel shared faces integration
   parallelFacesIntegrationArrays *parallelData;
@@ -81,7 +81,7 @@ class DGNonLinearForm : public ParNonlinearForm {
  public:
   DGNonLinearForm(RiemannSolver *rsolver, Fluxes *_flux, ParFiniteElementSpace *f, ParFiniteElementSpace *gradFes,
                   ParGridFunction *_gradUp, BCintegrator *_bcIntegrator, IntegrationRules *intRules, const int dim,
-                  const int num_equation, GasMixture *mixture, const volumeFaceIntegrationArrays &_gpuArrays,
+                  const int num_equation, GasMixture *mixture, const precomputedIntegrationData &_gpuArrays,
                   const int &maxIntPoints, const int &maxDofs);
 
   void Mult(const Vector &x, Vector &y);

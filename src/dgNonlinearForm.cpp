@@ -38,7 +38,7 @@
 DGNonLinearForm::DGNonLinearForm(RiemannSolver *rsolver, Fluxes *_flux, ParFiniteElementSpace *_vfes,
                                  ParFiniteElementSpace *_gradFes, ParGridFunction *_gradUp, BCintegrator *_bcIntegrator,
                                  IntegrationRules *_intRules, const int _dim, const int _num_equation,
-                                 GasMixture *_mixture, const volumeFaceIntegrationArrays &_gpuArrays,
+                                 GasMixture *_mixture, const precomputedIntegrationData &_gpuArrays,
                                  const int &_maxIntPoints, const int &_maxDofs)
     : ParNonlinearForm(_vfes),
       rsolver_(rsolver),
@@ -139,13 +139,15 @@ void DGNonLinearForm::Mult(const Vector &x, Vector &y) {
 
 #ifdef _GPU_
 void DGNonLinearForm::Mult_domain(const Vector &x, Vector &y) {
-  auto h_numElems = gpuArrays.numElems.HostRead();
-  auto h_elem_dof_num = gpuArrays.element_dof_number.HostRead();
+  const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
+
+  auto h_numElems = elem_data.numElems.HostRead();
+  auto h_elem_dof_num = elem_data.element_dof_number.HostRead();
 
   // Internal face integration
   if (fnfi.Size()) {
     // Interpolate state info the faces (loops over elements)
-    for (int elType = 0; elType < gpuArrays.numElems.Size(); elType++) {
+    for (int elType = 0; elType < elem_data.numElems.Size(); elType++) {
       int elemOffset = 0;
       for (int i = 0; i < elType; i++) elemOffset += h_numElems[i];
       int dof_el = h_elem_dof_num[elemOffset];
@@ -156,7 +158,7 @@ void DGNonLinearForm::Mult_domain(const Vector &x, Vector &y) {
     evalFaceFlux_gpu();
 
     // Compute flux contributions to residual (loops over elements)
-    for (int elType = 0; elType < gpuArrays.numElems.Size(); elType++) {
+    for (int elType = 0; elType < elem_data.numElems.Size(); elType++) {
       int elemOffset = 0;
       for (int i = 0; i < elType; i++) elemOffset += h_numElems[i];
       int dof_el = h_elem_dof_num[elemOffset];
@@ -165,7 +167,7 @@ void DGNonLinearForm::Mult_domain(const Vector &x, Vector &y) {
   }
 
   // INTEGRATION BOUNDARIES
-  if (bfnfi.Size()) bcIntegrator->integrateBCs(y, x, gpuArrays.element_dofs_list, gpuArrays.posDofIds);
+  if (bfnfi.Size()) bcIntegrator->integrateBCs(y, x, elem_data.element_dofs_list, elem_data.posDofIds);
 }
 
 void DGNonLinearForm::Mult_bdr(const Vector &x, Vector &y) {
@@ -184,22 +186,25 @@ void DGNonLinearForm::setToZero_gpu(Vector &x, const int size) {
 }
 
 void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset, int elDof) {
-  auto h_numElems = gpuArrays.numElems.HostRead();
+  const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
+  const interiorFaceIntegrationData &face_data = gpuArrays.interior_face_data;
+
+  auto h_numElems = elem_data.numElems.HostRead();
 
   // double *d_y = y.Write();
   double *d_y = y.ReadWrite();
   const double *d_f = face_flux_.Read();
 
-  auto d_elemFaces = gpuArrays.elemFaces.Read();
-  auto d_elem_dofs_list = gpuArrays.element_dofs_list.Read();
-  auto d_elem_dof_off = gpuArrays.element_dof_offset.Read();
-  auto d_elem_dof_num = gpuArrays.element_dof_number.Read();
-  auto d_shape1 = gpuArrays.face_el1_shape.Read();
-  auto d_weight = gpuArrays.face_quad_weight.Read();
-  const double *d_shape2 = gpuArrays.face_el2_shape.Read();
-  auto d_face_el1 = gpuArrays.face_el1.Read();
-  auto d_face_el2 = gpuArrays.face_el1.Read();
-  auto d_face_nqp = gpuArrays.face_num_quad.Read();
+  auto d_elemFaces = face_data.elemFaces.Read();
+  auto d_elem_dofs_list = elem_data.element_dofs_list.Read();
+  auto d_elem_dof_off = elem_data.element_dof_offset.Read();
+  auto d_elem_dof_num = elem_data.element_dof_number.Read();
+  auto d_shape1 = face_data.face_el1_shape.Read();
+  auto d_weight = face_data.face_quad_weight.Read();
+  const double *d_shape2 = face_data.face_el2_shape.Read();
+  auto d_face_el1 = face_data.face_el1.Read();
+  auto d_face_el2 = face_data.face_el1.Read();
+  auto d_face_nqp = face_data.face_num_quad.Read();
 
   const int Ndofs = vfes->GetNDofs();
   const int NumElemType = h_numElems[elType];
@@ -293,8 +298,11 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
   const double *d_grad_uk_el1 = grad_upk_el1.Read();
   const double *d_grad_uk_el2 = grad_upk_el2.Read();
 
-  auto d_normal = gpuArrays.face_normal.Read();
-  auto d_face_nqp = gpuArrays.face_num_quad.Read();
+  const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
+  const interiorFaceIntegrationData &face_data = gpuArrays.interior_face_data;
+
+  auto d_normal = face_data.face_normal.Read();
+  auto d_face_nqp = face_data.face_num_quad.Read();
 
   const double gamma = mixture->GetSpecificHeatRatio();
   const double Rg = mixture->GetGasConstant();
@@ -389,7 +397,10 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
 }
 
 void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOffset, int elDof) {
-  auto h_numElems = gpuArrays.numElems.HostRead();
+  const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
+  const interiorFaceIntegrationData &face_data = gpuArrays.interior_face_data;
+
+  auto h_numElems = elem_data.numElems.HostRead();
 
   auto d_x = x.Read();
   double *d_uk_el1 = uk_el1.Write();
@@ -400,13 +411,13 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
   const ParGridFunction *gradUp = gradUp_;
 
   const double *d_gradUp = gradUp->Read();
-  auto d_elemFaces = gpuArrays.elemFaces.Read();
-  auto d_elem_dofs_list = gpuArrays.element_dofs_list.Read();
-  auto d_elem_dof_off = gpuArrays.element_dof_offset.Read();
-  auto d_shape1 = gpuArrays.face_el1_shape.Read();
-  const double *d_shape2 = gpuArrays.face_el2_shape.Read();
-  auto d_face_el1 = gpuArrays.face_el1.Read();
-  auto d_face_nqp = gpuArrays.face_num_quad.Read();
+  auto d_elemFaces = face_data.elemFaces.Read();
+  auto d_elem_dofs_list = elem_data.element_dofs_list.Read();
+  auto d_elem_dof_off = elem_data.element_dof_offset.Read();
+  auto d_shape1 = face_data.face_el1_shape.Read();
+  const double *d_shape2 = face_data.face_el2_shape.Read();
+  auto d_face_el1 = face_data.face_el1.Read();
+  auto d_face_nqp = face_data.face_num_quad.Read();
 
   const int Ndofs = vfes->GetNDofs();
   const int NumElemsType = h_numElems[elType];
@@ -515,8 +526,12 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
 // clang-format off
 void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
   double *d_y = y.ReadWrite();
-  auto d_elem_dofs_list = gpuArrays.element_dofs_list.Read();
-  auto d_elem_dof_off = gpuArrays.element_dof_offset.Read();
+
+  const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
+  const interiorFaceIntegrationData &face_data = gpuArrays.interior_face_data;
+
+  auto d_elem_dofs_list = elem_data.element_dofs_list.Read();
+  auto d_elem_dof_off = elem_data.element_dof_offset.Read();
 
   const double gamma = mixture->GetSpecificHeatRatio();
   const double Rg    = mixture->GetGasConstant();
@@ -596,8 +611,12 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
   const double *d_gradUp = gradUp_->Read();
   const double *d_faceGradUp = transferGradUp->face_nbr_data.Read();
   const double *d_faceData = transferU->face_nbr_data.Read();
-  auto d_elem_dofs_list = gpuArrays.element_dofs_list.Read();
-  auto d_elem_dof_off = gpuArrays.element_dof_offset.Read();
+
+  const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
+  const interiorFaceIntegrationData &face_data = gpuArrays.interior_face_data;
+
+  auto d_elem_dofs_list = elem_data.element_dofs_list.Read();
+  auto d_elem_dof_off = elem_data.element_dof_offset.Read();
 
   const double *d_sharedShapeWnor1 = parallelData->sharedShapeWnor1.Read();
   const double *d_sharedShape2 = parallelData->sharedShape2.Read();

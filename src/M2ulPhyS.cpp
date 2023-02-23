@@ -600,17 +600,20 @@ void M2ulPhyS::initVariables() {
 }
 
 void M2ulPhyS::initIndirectionArrays() {
-  gpuArrays.posDofIds.SetSize(2 * vfes->GetNE());
-  gpuArrays.posDofIds = 0;
-  auto hposDofIds = gpuArrays.posDofIds.HostWrite();
+  elementIndexingData &elem_data = gpuArrays.element_indexing_data;
+  interiorFaceIntegrationData &face_data = gpuArrays.interior_face_data;
 
-  gpuArrays.element_dof_offset.SetSize(vfes->GetNE());
-  gpuArrays.element_dof_offset = -1;  // invalid
-  auto h_element_dof_offset = gpuArrays.element_dof_offset.HostWrite();
+  elem_data.posDofIds.SetSize(2 * vfes->GetNE());
+  elem_data.posDofIds = 0;
+  auto hposDofIds = elem_data.posDofIds.HostWrite();
 
-  gpuArrays.element_dof_number.SetSize(vfes->GetNE());
-  gpuArrays.element_dof_number = -1;  // invalid
-  auto h_element_dof_number = gpuArrays.element_dof_number.HostWrite();
+  elem_data.element_dof_offset.SetSize(vfes->GetNE());
+  elem_data.element_dof_offset = -1;  // invalid
+  auto h_element_dof_offset = elem_data.element_dof_offset.HostWrite();
+
+  elem_data.element_dof_number.SetSize(vfes->GetNE());
+  elem_data.element_dof_number = -1;  // invalid
+  auto h_element_dof_number = elem_data.element_dof_number.HostWrite();
 
   std::vector<int> tempNodes;
   tempNodes.clear();
@@ -630,10 +633,10 @@ void M2ulPhyS::initIndirectionArrays() {
     for (int n = 0; n < dof; n++) tempNodes.push_back(dofs[n]);
   }
 
-  gpuArrays.element_dofs_list.SetSize(tempNodes.size());
-  gpuArrays.element_dofs_list = 0;
-  auto h_element_dofs_list = gpuArrays.element_dofs_list.HostWrite();
-  for (int i = 0; i < gpuArrays.element_dofs_list.Size(); i++) {
+  elem_data.element_dofs_list.SetSize(tempNodes.size());
+  elem_data.element_dofs_list = 0;
+  auto h_element_dofs_list = elem_data.element_dofs_list.HostWrite();
+  for (int i = 0; i < elem_data.element_dofs_list.Size(); i++) {
     h_element_dofs_list[i] = tempNodes[i];
   }
 
@@ -642,7 +645,7 @@ void M2ulPhyS::initIndirectionArrays() {
   tempNumElems.clear();
   int dof1 = hposDofIds[1];
   int typeElems = 0;
-  for (int el = 0; el < gpuArrays.posDofIds.Size() / 2; el++) {
+  for (int el = 0; el < elem_data.posDofIds.Size() / 2; el++) {
     int dofi = hposDofIds[2 * el + 1];
     if (dofi == dof1) {
       typeElems++;
@@ -653,9 +656,9 @@ void M2ulPhyS::initIndirectionArrays() {
     }
   }
   tempNumElems.push_back(typeElems);
-  gpuArrays.numElems.SetSize(tempNumElems.size());
-  gpuArrays.numElems = 0;
-  auto hnumElems = gpuArrays.numElems.HostWrite();
+  elem_data.numElems.SetSize(tempNumElems.size());
+  elem_data.numElems = 0;
+  auto hnumElems = elem_data.numElems.HostWrite();
   for (int i = 0; i < (int)tempNumElems.size(); i++) hnumElems[i] = tempNumElems[i];
 
   {
@@ -664,9 +667,9 @@ void M2ulPhyS::initIndirectionArrays() {
     //     const int maxIntPoints = 49; // corresponding to square face with p=5
     //     const int maxDofs = 216; //HEX with p=5
 
-    gpuArrays.elemFaces.SetSize(7 * vfes->GetNE());
-    gpuArrays.elemFaces = 0;
-    auto helemFaces = gpuArrays.elemFaces.HostWrite();
+    face_data.elemFaces.SetSize(7 * vfes->GetNE());
+    face_data.elemFaces = 0;
+    auto helemFaces = face_data.elemFaces.HostWrite();
 
     std::vector<double> shapes2, shapes1;
     shapes1.clear();
@@ -674,34 +677,34 @@ void M2ulPhyS::initIndirectionArrays() {
 
     Mesh *mesh = vfes->GetMesh();
 
-    gpuArrays.face_el1.SetSize(mesh->GetNumFaces());
-    gpuArrays.face_el1 = 0;
-    auto h_face_el1 = gpuArrays.face_el1.HostWrite();
+    face_data.face_el1.SetSize(mesh->GetNumFaces());
+    face_data.face_el1 = 0;
+    auto h_face_el1 = face_data.face_el1.HostWrite();
 
-    gpuArrays.face_el2.SetSize(mesh->GetNumFaces());
-    gpuArrays.face_el2 = 0;
-    auto h_face_el2 = gpuArrays.face_el2.HostWrite();
+    face_data.face_el2.SetSize(mesh->GetNumFaces());
+    face_data.face_el2 = 0;
+    auto h_face_el2 = face_data.face_el2.HostWrite();
 
-    gpuArrays.face_num_quad.SetSize(mesh->GetNumFaces());
-    gpuArrays.face_num_quad = 0;
-    auto h_face_num_quad = gpuArrays.face_num_quad.HostWrite();
+    face_data.face_num_quad.SetSize(mesh->GetNumFaces());
+    face_data.face_num_quad = 0;
+    auto h_face_num_quad = face_data.face_num_quad.HostWrite();
 
-    gpuArrays.face_el1_shape.UseDevice(true);
-    gpuArrays.face_el1_shape.SetSize(maxDofs * maxIntPoints * mesh->GetNumFaces());
+    face_data.face_el1_shape.UseDevice(true);
+    face_data.face_el1_shape.SetSize(maxDofs * maxIntPoints * mesh->GetNumFaces());
 
-    gpuArrays.face_el2_shape.UseDevice(true);
-    gpuArrays.face_el2_shape.SetSize(maxDofs * maxIntPoints * mesh->GetNumFaces());
+    face_data.face_el2_shape.UseDevice(true);
+    face_data.face_el2_shape.SetSize(maxDofs * maxIntPoints * mesh->GetNumFaces());
 
-    gpuArrays.face_quad_weight.UseDevice(true);
-    gpuArrays.face_quad_weight.SetSize(maxIntPoints * mesh->GetNumFaces());
+    face_data.face_quad_weight.UseDevice(true);
+    face_data.face_quad_weight.SetSize(maxIntPoints * mesh->GetNumFaces());
 
-    gpuArrays.face_normal.UseDevice(true);
-    gpuArrays.face_normal.SetSize(dim * maxIntPoints * mesh->GetNumFaces());
+    face_data.face_normal.UseDevice(true);
+    face_data.face_normal.SetSize(dim * maxIntPoints * mesh->GetNumFaces());
 
-    auto hshape1 = gpuArrays.face_el1_shape.HostWrite();
-    auto hshape2 = gpuArrays.face_el2_shape.HostWrite();
-    auto hweight = gpuArrays.face_quad_weight.HostWrite();
-    auto hnormal = gpuArrays.face_normal.HostWrite();
+    auto hshape1 = face_data.face_el1_shape.HostWrite();
+    auto hshape2 = face_data.face_el2_shape.HostWrite();
+    auto hweight = face_data.face_quad_weight.HostWrite();
+    auto hnormal = face_data.face_normal.HostWrite();
 
     for (int face = 0; face < mesh->GetNumFaces(); face++) {
       FaceElementTransformations *tr;
@@ -852,11 +855,6 @@ void M2ulPhyS::initIndirectionArrays() {
   }
 
 #ifdef _GPU_
-  auto dnumElems = gpuArrays.numElems.Read();
-  auto dposDofIds = gpuArrays.posDofIds.Read();
-
-  auto delemFaces = gpuArrays.elemFaces.Read();
-
   auto dshapesBC = shapesBC.Read();
   auto dnormalsBC = normalsWBC.Read();
   auto dintPointsELIBC = intPointsElIDBC.Read();

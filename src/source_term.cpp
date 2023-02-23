@@ -35,7 +35,7 @@
 
 SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                        IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
-                       ParGridFunction *_Up, ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
+                       ParGridFunction *_Up, ParGridFunction *_gradUp, const precomputedIntegrationData &gpuArrays,
                        RunConfiguration &_config, GasMixture *mixture, GasMixture *d_mixture,
                        TransportProperties *transport, Chemistry *chemistry, Radiation *radiation, ParGridFunction *pc)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
