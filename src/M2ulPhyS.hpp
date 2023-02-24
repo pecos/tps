@@ -194,7 +194,6 @@ class M2ulPhyS : public TPS::Solver {
 
   precomputedIntegrationData gpuArrays;
 
-
   // The solution u has components {density, x-momentum, y-momentum, energy}.
   // These are stored contiguously in the BlockVector u_block.
   Array<int> *offsets;

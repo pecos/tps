@@ -208,9 +208,8 @@ void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradSt
   }
 }
 
-void WallBC::integrationBC(Vector &y, const Vector &x, const elementIndexingData &elem_index_data,
-                           ParGridFunction *Up, ParGridFunction *gradUp,
-                           boundaryFaceIntegrationData &boundary_face_data,
+void WallBC::integrationBC(Vector &y, const Vector &x, const elementIndexingData &elem_index_data, ParGridFunction *Up,
+                           ParGridFunction *gradUp, boundaryFaceIntegrationData &boundary_face_data,
                            const int &maxIntPoints, const int &maxDofs) {
   interpWalls_gpu(x, elem_index_data, Up, gradUp, boundary_face_data, maxDofs);
 

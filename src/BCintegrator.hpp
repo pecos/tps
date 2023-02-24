@@ -89,8 +89,8 @@ class BCintegrator : public NonlinearFormIntegrator {
   BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules,
                RiemannSolver *rsolver_, double &_dt, GasMixture *mixture, GasMixture *d_mixture, Fluxes *_fluxClass,
                ParGridFunction *_Up, ParGridFunction *_gradUp, boundaryFaceIntegrationData &boundary_face_data,
-               const int _dim, const int _num_equation, double &_max_char_speed,
-               RunConfiguration &_runFile, Array<int> &local_bdr_attr, const int &_maxIntPoints, const int &_maxDofs);
+               const int _dim, const int _num_equation, double &_max_char_speed, RunConfiguration &_runFile,
+               Array<int> &local_bdr_attr, const int &_maxIntPoints, const int &_maxDofs);
   ~BCintegrator();
 
   virtual void AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,

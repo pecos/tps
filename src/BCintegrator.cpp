@@ -40,9 +40,9 @@
 BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElementSpace *_vfes,
                            IntegrationRules *_intRules, RiemannSolver *rsolver_, double &_dt, GasMixture *_mixture,
                            GasMixture *d_mixture, Fluxes *_fluxClass, ParGridFunction *_Up, ParGridFunction *_gradUp,
-                           boundaryFaceIntegrationData &boundary_face_data, const int _dim,
-                           const int _num_equation, double &_max_char_speed, RunConfiguration &_runFile,
-                           Array<int> &local_attr, const int &_maxIntPoints, const int &_maxDofs)
+                           boundaryFaceIntegrationData &boundary_face_data, const int _dim, const int _num_equation,
+                           double &_max_char_speed, RunConfiguration &_runFile, Array<int> &local_attr,
+                           const int &_maxIntPoints, const int &_maxDofs)
     : groupsMPI(_groupsMPI),
       config(_runFile),
       rsolver(rsolver_),
@@ -245,23 +245,20 @@ void BCintegrator::updateBCMean(ParGridFunction *Up) {
   }
 }
 
-void BCintegrator::integrateBCs(Vector &y, const Vector &x,  const elementIndexingData &elem_index_data) {
+void BCintegrator::integrateBCs(Vector &y, const Vector &x, const elementIndexingData &elem_index_data) {
   for (auto bc = inletBCmap.begin(); bc != inletBCmap.end(); bc++) {
     bc->second->integrationBC(y,  // output
-                              x, elem_index_data, Up, gradUp, boundary_face_data_,
-                              maxIntPoints, maxDofs);
+                              x, elem_index_data, Up, gradUp, boundary_face_data_, maxIntPoints, maxDofs);
   }
 
   for (auto bc = outletBCmap.begin(); bc != outletBCmap.end(); bc++) {
     bc->second->integrationBC(y,  // output
-                              x, elem_index_data, Up, gradUp, boundary_face_data_,
-                              maxIntPoints, maxDofs);
+                              x, elem_index_data, Up, gradUp, boundary_face_data_, maxIntPoints, maxDofs);
   }
 
   for (auto bc = wallBCmap.begin(); bc != wallBCmap.end(); bc++) {
     bc->second->integrationBC(y,  // output
-                              x, elem_index_data, Up, gradUp, boundary_face_data_,
-                              maxIntPoints, maxDofs);
+                              x, elem_index_data, Up, gradUp, boundary_face_data_, maxIntPoints, maxDofs);
   }
 }
 

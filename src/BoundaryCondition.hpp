@@ -92,9 +92,9 @@ class BoundaryCondition {
 
   virtual void integrationBC(Vector &y,        // output
                              const Vector &x,  // conservative vars (input)
-                             const elementIndexingData &elem_index_data, ParGridFunction *Up,
-                             ParGridFunction *gradUp, boundaryFaceIntegrationData &boundary_face_data,
-                             const int &maxIntPoints, const int &maxDofs) = 0;
+                             const elementIndexingData &elem_index_data, ParGridFunction *Up, ParGridFunction *gradUp,
+                             boundaryFaceIntegrationData &boundary_face_data, const int &maxIntPoints,
+                             const int &maxDofs) = 0;
 
   static void copyValues(const Vector &orig, Vector &target, const double &mult);
 };

@@ -490,8 +490,8 @@ void M2ulPhyS::initVariables() {
   bcIntegrator = NULL;
   if (local_attr.Size() > 0) {
     bcIntegrator = new BCintegrator(groupsMPI, mesh, vfes, intRules, rsolver, dt, mixture, d_mixture, fluxClass, Up,
-                                    gradUp, gpuArrays.boundary_face_data, dim, num_equation, max_char_speed,
-                                    config, local_attr, maxIntPoints, maxDofs);
+                                    gradUp, gpuArrays.boundary_face_data, dim, num_equation, max_char_speed, config,
+                                    local_attr, maxIntPoints, maxDofs);
   }
 
   // A->SetAssemblyLevel(AssemblyLevel::PARTIAL);
