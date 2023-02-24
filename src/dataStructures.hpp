@@ -307,8 +307,18 @@ struct boundaryFaceIntegrationData {
 };
 
 struct sharedFaceIntegrationData {
-  Vector sharedShapeWnor1;
-  Vector sharedShape2;
+  /** Shape functions for "element 1" evaluated at all shared face quadrature points */
+  Vector face_el1_shape;
+
+  /** Shape functions for "element 2" evaluated at all shared face quadrature points */
+  Vector face_el2_shape;
+
+  /** Weights associated with all shared face quadrature points */
+  Vector face_quad_weight;
+
+  /** Normal vector (oriented from elem 1 toward elem 2) for all shared face quadrature points */
+  Vector face_normal;
+
   Array<int> sharedElem1Dof12Q;
   Array<int> sharedVdofs;
   Array<int> sharedVdofsGradUp;
@@ -326,7 +336,6 @@ struct precomputedIntegrationData {
   boundaryFaceIntegrationData boundary_face_data;
   sharedFaceIntegrationData shared_face_data;
 };
-
 
 struct dataTransferArrays {
   // vectors for data transfer

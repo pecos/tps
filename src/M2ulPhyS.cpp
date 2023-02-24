@@ -892,26 +892,37 @@ void M2ulPhyS::initIndirectionArrays() {
   gradUpfes->ExchangeFaceNbrData();
 
   if (Nshared > 0) {
-    parallelData.sharedShapeWnor1.UseDevice(true);
-    parallelData.sharedShape2.UseDevice(true);
-
-    parallelData.sharedShapeWnor1.SetSize(Nshared * maxIntPoints * (maxDofs + 1 + dim));
-    parallelData.sharedShape2.SetSize(Nshared * maxIntPoints * maxDofs);
     parallelData.sharedElem1Dof12Q.SetSize(Nshared * 4);
     parallelData.sharedVdofs.SetSize(Nshared * num_equation * maxDofs);
     parallelData.sharedVdofsGradUp.SetSize(Nshared * num_equation * maxDofs * dim);
 
-    parallelData.sharedShapeWnor1 = 0.;
-    parallelData.sharedShape2 = 0.;
     parallelData.sharedElem1Dof12Q = 0;
     parallelData.sharedVdofs = 0;
     parallelData.sharedVdofsGradUp = 0;
 
-    auto hsharedShapeWnor1 = parallelData.sharedShapeWnor1.HostReadWrite();
-    auto hsharedShape2 = parallelData.sharedShape2.HostReadWrite();
     auto hsharedElem1Dof12Q = parallelData.sharedElem1Dof12Q.HostReadWrite();
     auto hsharedVdofs = parallelData.sharedVdofs.HostReadWrite();
     auto hsharedVdofsGrads = parallelData.sharedVdofsGradUp.HostReadWrite();
+
+    parallelData.face_el1_shape.UseDevice(true);
+    parallelData.face_el2_shape.UseDevice(true);
+    parallelData.face_quad_weight.UseDevice(true);
+    parallelData.face_normal.UseDevice(true);
+
+    parallelData.face_el1_shape.SetSize(Nshared * maxIntPoints * maxDofs);
+    parallelData.face_el2_shape.SetSize(Nshared * maxIntPoints * maxDofs);
+    parallelData.face_quad_weight.SetSize(Nshared * maxIntPoints);
+    parallelData.face_normal.SetSize(Nshared * maxIntPoints * dim);
+
+    parallelData.face_el1_shape = 0.;
+    parallelData.face_el2_shape = 0.;
+    parallelData.face_quad_weight = 0.;
+    parallelData.face_normal = 0.;
+
+    auto h_shape1 = parallelData.face_el1_shape.HostWrite();
+    auto h_shape2 = parallelData.face_el2_shape.HostWrite();
+    auto h_face_quad_weight = parallelData.face_quad_weight.HostWrite();
+    auto h_face_normal = parallelData.face_normal.HostWrite();
 
     std::vector<int> unicElems;
     unicElems.clear();
@@ -919,7 +930,6 @@ void M2ulPhyS::initIndirectionArrays() {
     Array<int> vdofs2, vdofsGrad;
     FaceElementTransformations *tr;
     for (int i = 0; i < Nshared; i++) {
-
       tr = mesh->GetSharedFaceTransformations(i, true);
       int Elem2NbrNo = tr->Elem2No - mesh->GetNE();
 
@@ -982,15 +992,15 @@ void M2ulPhyS::initIndirectionArrays() {
         CalcOrtho(tr->Jacobian(), nor);
 
         for (int n = 0; n < dof1; n++) {
-          hsharedShapeWnor1[n + q * (maxDofs + 1 + dim) + i * maxIntPoints * (maxDofs + 1 + dim)] = shape1[n];
+          h_shape1[i * maxIntPoints * maxDofs + q * maxDofs + n] = shape1[n];
         }
-        hsharedShapeWnor1[maxDofs + q * (maxDofs + 1 + dim) + i * maxIntPoints * (maxDofs + 1 + dim)] = ip.weight;
+        h_face_quad_weight[i * maxIntPoints + q] = ip.weight;
 
-        for (int d = 0; d < dim; d++)
-          hsharedShapeWnor1[maxDofs + 1 + d + q * (maxDofs + 1 + dim) + i * maxIntPoints * (maxDofs + 1 + dim)] =
-              nor[d];
+        for (int d = 0; d < dim; d++) {
+          h_face_normal[i * maxIntPoints * dim + q * dim + d] = nor[d];
+        }
         for (int n = 0; n < dof2; n++) {
-          hsharedShape2[n + q * maxDofs + i * maxIntPoints * maxDofs] = shape2[n];
+          h_shape2[i * maxIntPoints * maxDofs + q * maxDofs + n] = shape2[n];
         }
       }
     }
@@ -1012,8 +1022,6 @@ void M2ulPhyS::initIndirectionArrays() {
       }
     }
   } else {
-    parallelData.sharedShapeWnor1.SetSize(1);
-    parallelData.sharedShape2.SetSize(1);
     parallelData.sharedElem1Dof12Q.SetSize(1);
     parallelData.sharedVdofs.SetSize(1);
     parallelData.sharedVdofsGradUp.SetSize(1);
@@ -1021,8 +1029,6 @@ void M2ulPhyS::initIndirectionArrays() {
   }
 
 #ifdef _GPU_
-  auto dsharedShapeWnor1 = parallelData.sharedShapeWnor1.ReadWrite();
-  auto dsharedShape2 = parallelData.sharedShape2.ReadWrite();
   auto dsharedElemDof12Q = parallelData.sharedElem1Dof12Q.ReadWrite();
   auto dsharedVdofs = parallelData.sharedVdofs.ReadWrite();
   auto dsharedVdofsGradUp = parallelData.sharedVdofsGradUp.ReadWrite();

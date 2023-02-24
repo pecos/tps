@@ -74,8 +74,7 @@ DGNonLinearForm::DGNonLinearForm(RiemannSolver *rsolver, Fluxes *_flux, ParFinit
   face_flux_ = 0.;
 }
 
-void DGNonLinearForm::setParallelData(dataTransferArrays *_transferU,
-                                      dataTransferArrays *_transferGradUp) {
+void DGNonLinearForm::setParallelData(dataTransferArrays *_transferU, dataTransferArrays *_transferGradUp) {
   transferU = _transferU;
   transferGradUp = _transferGradUp;
 
@@ -540,7 +539,8 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
   // const double Sc = mixture->GetSchmidtNum();
 
   const sharedFaceIntegrationData &parallelData = gpuArrays.shared_face_data;
-  const double *d_sharedShapeWnor1 = parallelData.sharedShapeWnor1.Read();
+  const double *d_weight = parallelData.face_quad_weight.Read();
+  const double *d_shape1 = parallelData.face_el1_shape.Read();
   const int *d_sharedElem1Dof12Q = parallelData.sharedElem1Dof12Q.Read();
   const int *d_sharedElemsFaces = parallelData.sharedElemsFaces.Read();
 
@@ -576,8 +576,7 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
       const int Q = d_sharedElem1Dof12Q[3 + f * 4];
 
       for (int k = 0; k < Q; k++) {
-        const double weight =
-          d_sharedShapeWnor1[maxDofs + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
+        const double weight = d_weight[f * maxIntPoints + k];
 
         for (int eq = 0; eq < num_equation; eq++) {
           // TODO(kevin): MAXNUMFACE
@@ -587,7 +586,7 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
 
         // add integration point contribution
         MFEM_FOREACH_THREAD(i, x, dof1) {
-          const double shape = d_sharedShapeWnor1[i + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
+          const double shape = d_shape1[f * maxIntPoints * maxDofs + k * maxDofs + i];
           for (int eq = 0; eq < num_equation; eq++) {
             Fcontrib[i + eq * dof1] -= weight * shape * Rflux[eq];
           }
@@ -619,8 +618,9 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
   auto d_elem_dof_off = elem_data.element_dof_offset.Read();
 
   const sharedFaceIntegrationData &parallelData = gpuArrays.shared_face_data;
-  const double *d_sharedShapeWnor1 = parallelData.sharedShapeWnor1.Read();
-  const double *d_sharedShape2 = parallelData.sharedShape2.Read();
+  const double *d_normal = parallelData.face_normal.Read();
+  const double *d_shape1 = parallelData.face_el1_shape.Read();
+  const double *d_shape2 = parallelData.face_el2_shape.Read();
   const int *d_sharedElem1Dof12Q = parallelData.sharedElem1Dof12Q.Read();
   const int *d_sharedVdofs = parallelData.sharedVdofs.Read();
   const int *d_sharedVdofsGrads = parallelData.sharedVdofsGradUp.Read();
@@ -674,15 +674,14 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
       MFEM_FOREACH_THREAD(k, x, Q) {
         // load interpolating functions
         for (int i = 0; i < dof1; i++) {
-          l1[i] = d_sharedShapeWnor1[i + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
+          l1[i] = d_shape1[f * maxIntPoints * maxDofs + k * maxDofs + i];
         }
         for (int i = 0; i < dof2; i++) {
-          l2[i] = d_sharedShape2[i + k * maxDofs + f * maxIntPoints * maxDofs];
+          l2[i] = d_shape2[f * maxIntPoints * maxDofs + k * maxDofs + i];
         }
 
         for (int d = 0; d < dim; d++) {
-          nor[d] =
-              d_sharedShapeWnor1[maxDofs + 1 + d + k * (maxDofs + 1 + dim) + f * maxIntPoints * (maxDofs + 1 + dim)];
+          nor[d] = d_normal[f * maxIntPoints * dim + k * dim + d];
         }
 
         // set array for interpolated data to 0
