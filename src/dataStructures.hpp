@@ -281,11 +281,23 @@ struct interiorFaceIntegrationData {
   Array<int> face_num_quad;
 };
 
-// BC integration
+/** @brief Data for boundary face integral calculations
+ *
+ * The _GPU_ path requires pre-computation of a number of quantities,
+ * such as the values of the shape functions at each quadrature point
+ * on each face.  For the boundary faces, these quantities, which are
+ * documented in more detail below, are stored in this struct.
+ *
+ */
 struct boundaryFaceIntegrationData {
+  /** Shape functions evaluated at all boundary face quadrature points */
   Vector face_shape;
-  Vector face_normal;
+
+  /** Weights associated with all boundary face quadrature points */
   Vector face_quad_weight;
+
+  /** Normal vector (outward pointing) for all boundary face quadrature points */
+  Vector face_normal;
 
   /** for each boundary face, index of corresponding element */
   Array<int> face_el;
