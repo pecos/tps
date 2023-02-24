@@ -880,7 +880,7 @@ void M2ulPhyS::initIndirectionArrays() {
   // Shared faces (i.e., interior faces at boundary of decomposition,
   // such that element1 and element2 live on different mpi ranks)
   //-----------------------------------------------------------------
-  parallelFacesIntegrationArrays &parallelData = gpuArrays.shared_face_data;
+  sharedFaceIntegrationData &parallelData = gpuArrays.shared_face_data;
 
   // NB: mesh from above is out of scope
   ParMesh *mesh = fes->GetParMesh();

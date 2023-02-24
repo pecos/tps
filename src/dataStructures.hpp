@@ -306,7 +306,7 @@ struct boundaryFaceIntegrationData {
   Array<int> face_num_quad;
 };
 
-struct parallelFacesIntegrationArrays {
+struct sharedFaceIntegrationData {
   Vector sharedShapeWnor1;
   Vector sharedShape2;
   Array<int> sharedElem1Dof12Q;
@@ -324,7 +324,7 @@ struct precomputedIntegrationData {
   elementIndexingData element_indexing_data;
   interiorFaceIntegrationData interior_face_data;
   boundaryFaceIntegrationData boundary_face_data;
-  parallelFacesIntegrationArrays shared_face_data;
+  sharedFaceIntegrationData shared_face_data;
 };
 
 
