@@ -786,10 +786,15 @@ void M2ulPhyS::initIndirectionArrays() {
     bdry_face_data.face_shape = 0.;
     auto hshapesBC = bdry_face_data.face_shape.HostWrite();
 
-    bdry_face_data.normalsWBC.UseDevice(true);
-    bdry_face_data.normalsWBC.SetSize(NumBCelems * maxIntPoints * (dim + 1));
-    bdry_face_data.normalsWBC = 0.;
-    auto hnormalsWBC = bdry_face_data.normalsWBC.HostWrite();
+    bdry_face_data.face_normal.UseDevice(true);
+    bdry_face_data.face_normal.SetSize(NumBCelems * maxIntPoints * dim);
+    bdry_face_data.face_normal = 0.;
+    auto h_face_normal = bdry_face_data.face_normal.HostWrite();
+
+    bdry_face_data.face_quad_weight.UseDevice(true);
+    bdry_face_data.face_quad_weight.SetSize(NumBCelems * maxIntPoints);
+    bdry_face_data.face_quad_weight = 0.;
+    auto h_face_quad_weight = bdry_face_data.face_quad_weight.HostWrite();
 
     bdry_face_data.intPointsElIDBC.SetSize(NumBCelems * 2);
     bdry_face_data.intPointsElIDBC = 0;
@@ -826,8 +831,11 @@ void M2ulPhyS::initIndirectionArrays() {
           nor.UseDevice(false);
           nor.SetSize(dim);
           CalcOrtho(tr->Jacobian(), nor);
-          hnormalsWBC[dim + q * (dim + 1) + f * maxIntPoints * (dim + 1)] = ip.weight;
-          for (int d = 0; d < dim; d++) hnormalsWBC[d + q * (dim + 1) + f * maxIntPoints * (dim + 1)] = nor[d];
+          h_face_quad_weight[f * maxIntPoints + q] = ip.weight;
+
+          for (int d = 0; d < dim; d++) {
+            h_face_normal[f * maxIntPoints * dim + q * dim + d] = nor[d];
+          }
 
           Vector shape1;
           shape1.UseDevice(false);
@@ -841,8 +849,11 @@ void M2ulPhyS::initIndirectionArrays() {
     bdry_face_data.face_shape.SetSize(1);
     bdry_face_data.face_shape = 0.;
 
-    bdry_face_data.normalsWBC.SetSize(1);
-    bdry_face_data.normalsWBC = 0.;
+    bdry_face_data.face_normal.SetSize(1);
+    bdry_face_data.face_normal = 0.;
+
+    bdry_face_data.face_quad_weight.SetSize(1);
+    bdry_face_data.face_quad_weight = 0.;
 
     bdry_face_data.intPointsElIDBC.SetSize(1);
     bdry_face_data.intPointsElIDBC = 0.;

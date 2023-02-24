@@ -1026,7 +1026,7 @@ void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const elementInd
   const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
 
   const double *d_face_shape = boundary_face_data.face_shape.Read();
-  const double *d_normW = boundary_face_data.normalsWBC.Read();
+  const double *d_weight = boundary_face_data.face_quad_weight.Read();
   const int *d_intPointsElIDBC = boundary_face_data.intPointsElIDBC.Read();
   const int *d_listElems = listElems.Read();
   const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
@@ -1061,7 +1061,7 @@ void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const elementInd
     MFEM_SYNC_THREAD;
 
     for (int q = 0; q < Q; q++) {  // loop over int. points
-      const double weight = d_normW[dim + q * (dim + 1) + el * maxIntPoints * (dim + 1)];
+      const double weight = d_weight[el * maxIntPoints + q];
 
       // get interpolated data
       for (int eq = 0; eq < num_equation; eq++) {
@@ -1098,7 +1098,7 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
   const int *d_elem_dof_off = elem_index_data.element_dof_offset.Read();
   const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
   const double *d_face_shape = boundary_face_data.face_shape.Read();
-  const double *d_normW = boundary_face_data.normalsWBC.Read();
+  const double *d_normal = boundary_face_data.face_normal.Read();
   const int *d_intPointsElIDBC = boundary_face_data.intPointsElIDBC.Read();
   const int *d_listElems = listElems.Read();
   const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
@@ -1177,7 +1177,7 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
 
       // extract normal vector at this quad point
       for (int d = 0; d < dim; d++) {
-        nor[d] = d_normW[d + q * (dim + 1) + el * maxIntPoints * (dim + 1)];
+        nor[d] = d_normal[el * maxIntPoints * dim + q * dim + d];
       }
 
       // interpolate to this quad point

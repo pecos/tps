@@ -398,7 +398,7 @@ void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const elementIndexin
   const int *d_elem_dof_off = elem_index_data.element_dof_offset.Read();
   const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
   const double *d_face_shape = boundary_face_data.face_shape.Read();
-  const double *d_normW = boundary_face_data.normalsWBC.Read();
+  const double *d_weight = boundary_face_data.face_quad_weight.Read();
   const int *d_intPointsElIDBC = boundary_face_data.intPointsElIDBC.Read();
   const int *d_wallElems = wallElems.Read();
   const int *d_listElems = listElems.Read();
@@ -457,7 +457,7 @@ void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const elementIndexin
       }
 
       for (int q = 0; q < Q; q++) {  // loop over int. points
-        const double weight = d_normW[dim + q * (dim + 1) + el_bdry * maxIntPoints * (dim + 1)];
+        const double weight = d_weight[el_bdry * maxIntPoints + q];
 
         for (int eq = 0; eq < num_equation; eq++)
           Rflux[eq] = weight * d_flux[eq + q * num_equation + n * maxIntPoints * num_equation];
@@ -497,7 +497,7 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
   const int *d_elem_dof_off = elem_index_data.element_dof_offset.Read();
   const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
   const double *d_face_shape = boundary_face_data.face_shape.Read();
-  const double *d_normW = boundary_face_data.normalsWBC.Read();
+  const double *d_normal = boundary_face_data.face_normal.Read();
   const int *d_intPointsElIDBC = boundary_face_data.intPointsElIDBC.Read();
   const int *d_wallElems = wallElems.Read();
   const int *d_listElems = listElems.Read();
@@ -573,7 +573,7 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
         // extract normal vector at this quad point
         normN = 0.0;
         for (int d = 0; d < dim; d++) {
-          nor[d] = d_normW[d + q * (dim + 1) + el_bdry * maxIntPoints * (dim + 1)];
+          nor[d] = d_normal[el_bdry * maxIntPoints * dim + q * dim + d];
           normN += nor[d] * nor[d];
         }
 
