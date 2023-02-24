@@ -283,7 +283,7 @@ struct interiorFaceIntegrationData {
 
 // BC integration
 struct boundaryFaceIntegrationData {
-  Vector shapesBC;
+  Vector face_shape;
   Vector normalsWBC;
   Array<int> intPointsElIDBC;  // integration points and element ID
 };

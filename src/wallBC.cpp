@@ -397,7 +397,7 @@ void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const elementIndexin
   const int *d_elem_dofs_list = elem_index_data.element_dofs_list.Read();
   const int *d_elem_dof_off = elem_index_data.element_dof_offset.Read();
   const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
-  const double *d_shapesBC = boundary_face_data.shapesBC.Read();
+  const double *d_face_shape = boundary_face_data.face_shape.Read();
   const double *d_normW = boundary_face_data.normalsWBC.Read();
   const int *d_intPointsElIDBC = boundary_face_data.intPointsElIDBC.Read();
   const int *d_wallElems = wallElems.Read();
@@ -465,7 +465,7 @@ void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const elementIndexin
         // sum contributions to integral
         // for (int i = 0; i < elDof; i++) {
         MFEM_FOREACH_THREAD(i, x, elDof) {
-          const double shape = d_shapesBC[i + q * maxDofs + el_bdry * maxIntPoints * maxDofs];
+          const double shape = d_face_shape[i + q * maxDofs + el_bdry * maxIntPoints * maxDofs];
           for (int eq = 0; eq < num_equation; eq++) {
             Fcontrib[i + eq * elDof] -= Rflux[eq] * shape;
           }
@@ -496,7 +496,7 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
   const int *d_elem_dofs_list = elem_index_data.element_dofs_list.Read();
   const int *d_elem_dof_off = elem_index_data.element_dof_offset.Read();
   const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
-  const double *d_shapesBC = boundary_face_data.shapesBC.Read();
+  const double *d_face_shape = boundary_face_data.face_shape.Read();
   const double *d_normW = boundary_face_data.normalsWBC.Read();
   const int *d_intPointsElIDBC = boundary_face_data.intPointsElIDBC.Read();
   const int *d_wallElems = wallElems.Read();
@@ -567,7 +567,7 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
 
         // extract shape functions at this quad point
         for (int j = 0; j < elDof; j++) {
-          shape[j] = d_shapesBC[j + q * maxDofs + el_bdry * maxIntPoints * maxDofs];
+          shape[j] = d_face_shape[j + q * maxDofs + el_bdry * maxIntPoints * maxDofs];
         }
 
         // extract normal vector at this quad point

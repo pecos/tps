@@ -1025,7 +1025,7 @@ void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const elementInd
   const int *d_elem_dof_off = elem_index_data.element_dof_offset.Read();
   const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
 
-  const double *d_shapesBC = boundary_face_data.shapesBC.Read();
+  const double *d_face_shape = boundary_face_data.face_shape.Read();
   const double *d_normW = boundary_face_data.normalsWBC.Read();
   const int *d_intPointsElIDBC = boundary_face_data.intPointsElIDBC.Read();
   const int *d_listElems = listElems.Read();
@@ -1069,7 +1069,7 @@ void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const elementInd
       }
 
       MFEM_FOREACH_THREAD(i, x, elDof) {
-        const double shape = d_shapesBC[i + q * maxDofs + el * maxIntPoints * maxDofs];
+        const double shape = d_face_shape[i + q * maxDofs + el * maxIntPoints * maxDofs];
         for (int eq = 0; eq < num_equation; eq++) Fcontrib[i + eq * elDof] -= Rflux[eq] * shape;
       }
       MFEM_SYNC_THREAD;
@@ -1097,7 +1097,7 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
   const int *d_elem_dofs_list = elem_index_data.element_dofs_list.Read();
   const int *d_elem_dof_off = elem_index_data.element_dof_offset.Read();
   const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
-  const double *d_shapesBC = boundary_face_data.shapesBC.Read();
+  const double *d_face_shape = boundary_face_data.face_shape.Read();
   const double *d_normW = boundary_face_data.normalsWBC.Read();
   const int *d_intPointsElIDBC = boundary_face_data.intPointsElIDBC.Read();
   const int *d_listElems = listElems.Read();
@@ -1172,7 +1172,7 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
 
       // extract shape functions at this quad point
       for (int j = 0; j < elDof; j++) {
-        shape[j] = d_shapesBC[j + q * maxDofs + el * maxIntPoints * maxDofs];
+        shape[j] = d_face_shape[j + q * maxDofs + el * maxIntPoints * maxDofs];
       }
 
       // extract normal vector at this quad point

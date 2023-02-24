@@ -742,7 +742,7 @@ void InletBC::integrateInlets_gpu(Vector &y, const Vector &x, const elementIndex
   const int *d_elem_dofs_list = elem_index_data.element_dofs_list.Read();
   const int *d_elem_dof_off = elem_index_data.element_dof_offset.Read();
   const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
-  const double *d_shapesBC = boundary_face_data.shapesBC.Read();
+  const double *d_face_shape = boundary_face_data.face_shape.Read();
   const double *d_normW = boundary_face_data.normalsWBC.Read();
   const int *d_intPointsElIDBC = boundary_face_data.intPointsElIDBC.Read();
   const int *d_listElems = listElems.Read();
@@ -783,7 +783,7 @@ void InletBC::integrateInlets_gpu(Vector &y, const Vector &x, const elementIndex
 
       // sum contributions to integral
       MFEM_FOREACH_THREAD(i, x, elDof) {
-        const double shape = d_shapesBC[i + q * maxDofs + el * maxIntPoints * maxDofs];
+        const double shape = d_face_shape[i + q * maxDofs + el * maxIntPoints * maxDofs];
         for (int eq = 0; eq < num_equation; eq++) Fcontrib[i + eq * elDof] -= Rflux[eq] * shape;
       }
       MFEM_SYNC_THREAD;
@@ -808,7 +808,7 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x,  const elementIndexingData 
   const int *d_elem_dofs_list = elem_index_data.element_dofs_list.Read();
   const int *d_elem_dof_off = elem_index_data.element_dof_offset.Read();
   const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
-  const double *d_shapesBC = boundary_face_data.shapesBC.Read();
+  const double *d_face_shape = boundary_face_data.face_shape.Read();
   const double *d_normW = boundary_face_data.normalsWBC.Read();
   const int *d_intPointsElIDBC = boundary_face_data.intPointsElIDBC.Read();
   const int *d_listElems = listElems.Read();
@@ -860,7 +860,7 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x,  const elementIndexingData 
       for (int d = 0; d < dim; d++) nor[d] = d_normW[d + q * (dim + 1) + el * maxIntPoints * (dim + 1)];
 
       for (int i = 0; i < elDof; i++) {
-        shape[i] = d_shapesBC[i + q * maxDofs + el * maxIntPoints * maxDofs];
+        shape[i] = d_face_shape[i + q * maxDofs + el * maxIntPoints * maxDofs];
       }
 
       for (int eq = 0; eq < num_equation; eq++) {

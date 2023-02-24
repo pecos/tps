@@ -781,10 +781,10 @@ void M2ulPhyS::initIndirectionArrays() {
   if (fes->GetNBE() > 0) {
     const int NumBCelems = fes->GetNBE();
 
-    bdry_face_data.shapesBC.UseDevice(true);
-    bdry_face_data.shapesBC.SetSize(NumBCelems * maxIntPoints * maxDofs);
-    bdry_face_data.shapesBC = 0.;
-    auto hshapesBC = bdry_face_data.shapesBC.HostWrite();
+    bdry_face_data.face_shape.UseDevice(true);
+    bdry_face_data.face_shape.SetSize(NumBCelems * maxIntPoints * maxDofs);
+    bdry_face_data.face_shape = 0.;
+    auto hshapesBC = bdry_face_data.face_shape.HostWrite();
 
     bdry_face_data.normalsWBC.UseDevice(true);
     bdry_face_data.normalsWBC.SetSize(NumBCelems * maxIntPoints * (dim + 1));
@@ -838,8 +838,8 @@ void M2ulPhyS::initIndirectionArrays() {
       }
     }
   } else {
-    bdry_face_data.shapesBC.SetSize(1);
-    bdry_face_data.shapesBC = 0.;
+    bdry_face_data.face_shape.SetSize(1);
+    bdry_face_data.face_shape = 0.;
 
     bdry_face_data.normalsWBC.SetSize(1);
     bdry_face_data.normalsWBC = 0.;
