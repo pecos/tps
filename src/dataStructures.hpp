@@ -319,7 +319,15 @@ struct sharedFaceIntegrationData {
   /** Normal vector (oriented from elem 1 toward elem 2) for all shared face quadrature points */
   Vector face_normal;
 
-  Array<int> sharedElem1Dof12Q;
+  /** for each shared face, index of element 1 */
+  Array<int> face_el1;
+
+  /** for each shared face, number of dofs for element 2 */
+  Array<int> face_num_quad;
+
+  /** for each shared face, number of quadrature points */
+  Array<int> face_num_dof2;
+
   Array<int> sharedVdofs;
   Array<int> sharedVdofsGradUp;
   Array<int> sharedElemsFaces;

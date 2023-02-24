@@ -892,15 +892,12 @@ void M2ulPhyS::initIndirectionArrays() {
   gradUpfes->ExchangeFaceNbrData();
 
   if (Nshared > 0) {
-    parallelData.sharedElem1Dof12Q.SetSize(Nshared * 4);
     parallelData.sharedVdofs.SetSize(Nshared * num_equation * maxDofs);
     parallelData.sharedVdofsGradUp.SetSize(Nshared * num_equation * maxDofs * dim);
 
-    parallelData.sharedElem1Dof12Q = 0;
     parallelData.sharedVdofs = 0;
     parallelData.sharedVdofsGradUp = 0;
 
-    auto hsharedElem1Dof12Q = parallelData.sharedElem1Dof12Q.HostReadWrite();
     auto hsharedVdofs = parallelData.sharedVdofs.HostReadWrite();
     auto hsharedVdofsGrads = parallelData.sharedVdofsGradUp.HostReadWrite();
 
@@ -913,16 +910,25 @@ void M2ulPhyS::initIndirectionArrays() {
     parallelData.face_el2_shape.SetSize(Nshared * maxIntPoints * maxDofs);
     parallelData.face_quad_weight.SetSize(Nshared * maxIntPoints);
     parallelData.face_normal.SetSize(Nshared * maxIntPoints * dim);
+    parallelData.face_el1.SetSize(Nshared);
+    parallelData.face_num_quad.SetSize(Nshared);
+    parallelData.face_num_dof2.SetSize(Nshared);
 
     parallelData.face_el1_shape = 0.;
     parallelData.face_el2_shape = 0.;
     parallelData.face_quad_weight = 0.;
     parallelData.face_normal = 0.;
+    parallelData.face_el1 = 0;
+    parallelData.face_num_quad = 0;
+    parallelData.face_num_dof2 = 0;
 
     auto h_shape1 = parallelData.face_el1_shape.HostWrite();
     auto h_shape2 = parallelData.face_el2_shape.HostWrite();
     auto h_face_quad_weight = parallelData.face_quad_weight.HostWrite();
     auto h_face_normal = parallelData.face_normal.HostWrite();
+    auto h_face_el1 = parallelData.face_el1.HostWrite();
+    auto h_face_num_quad = parallelData.face_num_quad.HostWrite();
+    auto h_face_num_dof2 = parallelData.face_num_dof2.HostWrite();
 
     std::vector<int> unicElems;
     unicElems.clear();
@@ -964,10 +970,9 @@ void M2ulPhyS::initIndirectionArrays() {
       // IntegrationRules IntRules2(0, Quadrature1D::GaussLobatto);
       const IntegrationRule *ir = &intRules->Get(tr->GetGeometryType(), intorder);
 
-      hsharedElem1Dof12Q[0 + i * 4] = tr->Elem1No;
-      hsharedElem1Dof12Q[1 + i * 4] = dof1;
-      hsharedElem1Dof12Q[2 + i * 4] = dof2;
-      hsharedElem1Dof12Q[3 + i * 4] = ir->GetNPoints();
+      h_face_el1[i] = tr->Elem1No;
+      h_face_num_quad[i] = ir->GetNPoints();
+      h_face_num_dof2[i] = dof2;
 
       bool inList = false;
       for (size_t n = 0; n < unicElems.size(); n++) {
@@ -1010,9 +1015,9 @@ void M2ulPhyS::initIndirectionArrays() {
     auto hsharedElemsFaces = parallelData.sharedElemsFaces.HostWrite();
     for (size_t el = 0; el < unicElems.size(); el++) {
       const int eli = unicElems[el];
-      for (int f = 0; f < parallelData.sharedElem1Dof12Q.Size() / 4; f++) {
-        if (eli == hsharedElem1Dof12Q[0 + f * 4]) {
-          hsharedElemsFaces[0 + 7 * el] = hsharedElem1Dof12Q[0 + f * 4];
+      for (int f = 0; f < parallelData.face_el1.Size(); f++) {
+        if (eli == h_face_el1[f]) {
+          hsharedElemsFaces[0 + 7 * el] = h_face_el1[f];
           int numFace = hsharedElemsFaces[1 + 7 * el];
           if (numFace == -1) numFace = 0;
           numFace++;
@@ -1022,14 +1027,12 @@ void M2ulPhyS::initIndirectionArrays() {
       }
     }
   } else {
-    parallelData.sharedElem1Dof12Q.SetSize(1);
     parallelData.sharedVdofs.SetSize(1);
     parallelData.sharedVdofsGradUp.SetSize(1);
     parallelData.sharedElemsFaces.SetSize(1);
   }
 
 #ifdef _GPU_
-  auto dsharedElemDof12Q = parallelData.sharedElem1Dof12Q.ReadWrite();
   auto dsharedVdofs = parallelData.sharedVdofs.ReadWrite();
   auto dsharedVdofsGradUp = parallelData.sharedVdofsGradUp.ReadWrite();
   auto dsharedElemsFaces = parallelData.sharedElemsFaces.ReadWrite();

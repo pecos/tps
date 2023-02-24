@@ -530,6 +530,7 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
 
   auto d_elem_dofs_list = elem_data.element_dofs_list.Read();
   auto d_elem_dof_off = elem_data.element_dof_offset.Read();
+  auto d_elem_dof_num = elem_data.element_dof_number.Read();
 
   const double gamma = mixture->GetSpecificHeatRatio();
   const double Rg    = mixture->GetGasConstant();
@@ -541,7 +542,7 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
   const sharedFaceIntegrationData &parallelData = gpuArrays.shared_face_data;
   const double *d_weight = parallelData.face_quad_weight.Read();
   const double *d_shape1 = parallelData.face_el1_shape.Read();
-  const int *d_sharedElem1Dof12Q = parallelData.sharedElem1Dof12Q.Read();
+  const int *d_face_num_quad = parallelData.face_num_quad.Read();
   const int *d_sharedElemsFaces = parallelData.sharedElemsFaces.Read();
 
   const double *d_shared_flux = shared_flux.Read();
@@ -562,7 +563,7 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
     const int el1      = d_sharedElemsFaces[0 + el * 7];
     const int offsetEl1 = d_elem_dof_off[el1];
     const int numFaces = d_sharedElemsFaces[1 + el * 7];
-    const int dof1     = d_sharedElem1Dof12Q[1 + d_sharedElemsFaces[2 + el * 7] * 4];
+    const int dof1     = d_elem_dof_num[el1];
 
     for (int i = 0; i <  dof1; i++) {
       index_i[i] = d_elem_dofs_list[offsetEl1 + i];
@@ -573,7 +574,7 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
 
     for (int elFace = 0; elFace < numFaces; elFace++) {
       const int f = d_sharedElemsFaces[1 + elFace + 1 + el * 7];
-      const int Q = d_sharedElem1Dof12Q[3 + f * 4];
+      const int Q = d_face_num_quad[f];
 
       for (int k = 0; k < Q; k++) {
         const double weight = d_weight[f * maxIntPoints + k];
@@ -616,12 +617,14 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
 
   auto d_elem_dofs_list = elem_data.element_dofs_list.Read();
   auto d_elem_dof_off = elem_data.element_dof_offset.Read();
+  auto d_elem_dof_num = elem_data.element_dof_number.Read();
 
   const sharedFaceIntegrationData &parallelData = gpuArrays.shared_face_data;
   const double *d_normal = parallelData.face_normal.Read();
   const double *d_shape1 = parallelData.face_el1_shape.Read();
   const double *d_shape2 = parallelData.face_el2_shape.Read();
-  const int *d_sharedElem1Dof12Q = parallelData.sharedElem1Dof12Q.Read();
+  const int *d_face_num_quad = parallelData.face_num_quad.Read();
+  const int *d_face_num_dof2 = parallelData.face_num_dof2.Read();
   const int *d_sharedVdofs = parallelData.sharedVdofs.Read();
   const int *d_sharedVdofsGrads = parallelData.sharedVdofsGradUp.Read();
   const int *d_sharedElemsFaces = parallelData.sharedElemsFaces.Read();
@@ -657,7 +660,7 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
 
     const int el1 = d_sharedElemsFaces[0 + el * 7];
     const int numFaces = d_sharedElemsFaces[1 + el * 7];
-    const int dof1 = d_sharedElem1Dof12Q[1 + d_sharedElemsFaces[2 + el * 7] * 4];
+    const int dof1 = d_elem_dof_num[el1];
 
     const int offsetEl1 = d_elem_dof_off[el1];
 
@@ -667,8 +670,8 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
 
     for (int elFace = 0; elFace < numFaces; elFace++) {
       const int f = d_sharedElemsFaces[1 + elFace + 1 + el * 7];
-      const int dof2 = d_sharedElem1Dof12Q[2 + f * 4];
-      const int Q = d_sharedElem1Dof12Q[3 + f * 4];
+      const int dof2 = d_face_num_dof2[f];
+      const int Q = d_face_num_quad[f];
 
       // begin loop through integration points
       MFEM_FOREACH_THREAD(k, x, Q) {

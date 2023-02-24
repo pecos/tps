@@ -570,13 +570,15 @@ void Gradients::interpGradSharedFace_gpu() {
 
   const int *d_elem_dofs_list = elem_data.element_dofs_list.Read();
   const int *d_elem_dof_off = elem_data.element_dof_offset.Read();
+  const int *d_elem_dof_num = elem_data.element_dof_number.Read();
 
   const sharedFaceIntegrationData &parallelData = gpuArrays.shared_face_data;
   const double *d_weight = parallelData.face_quad_weight.Read();
   const double *d_normal = parallelData.face_normal.Read();
   const double *d_shape1 = parallelData.face_el1_shape.Read();
   const double *d_shape2 = parallelData.face_el2_shape.Read();
-  const int *d_sharedElem1Dof12Q = parallelData.sharedElem1Dof12Q.Read();
+  const int *d_face_num_quad = parallelData.face_num_quad.Read();
+  const int *d_face_num_dof2 = parallelData.face_num_dof2.Read();
   const int *d_sharedVdofs = parallelData.sharedVdofs.Read();
   const int *d_sharedElemsFaces = parallelData.sharedElemsFaces.Read();
 
@@ -597,7 +599,7 @@ void Gradients::interpGradSharedFace_gpu() {
 
     const int el1 = d_sharedElemsFaces[0 + el * 7];
     const int numFaces = d_sharedElemsFaces[1 + el * 7];
-    const int dof1 = d_sharedElem1Dof12Q[1 + d_sharedElemsFaces[2 + el * 7] * 4];
+    const int dof1 = d_elem_dof_num[el1];
 
     const int offsetEl1 = d_elem_dof_off[el1];
 
@@ -607,8 +609,8 @@ void Gradients::interpGradSharedFace_gpu() {
 
     for (int elFace = 0; elFace < numFaces; elFace++) {
       const int f = d_sharedElemsFaces[1 + elFace + 1 + el * 7];
-      const int dof2 = d_sharedElem1Dof12Q[2 + f * 4];
-      const int Q = d_sharedElem1Dof12Q[3 + f * 4];
+      const int dof2 = d_face_num_dof2[f];
+      const int Q = d_face_num_quad[f];
 
       // begin loop through integration points
       // for (int k = 0; k < Q; k++) {
@@ -662,10 +664,11 @@ void Gradients::integrationGradSharedFace_gpu() {
 
   const int *d_elem_dofs_list = elem_data.element_dofs_list.Read();
   const int *d_elem_dof_off = elem_data.element_dof_offset.Read();
+  const int *d_elem_dof_num = elem_data.element_dof_number.Read();
 
   const sharedFaceIntegrationData &parallelData = gpuArrays.shared_face_data;
   const double *d_shape1 = parallelData.face_el1_shape.Read();
-  const int *d_sharedElem1Dof12Q = parallelData.sharedElem1Dof12Q.Read();
+  const int *d_face_num_quad = parallelData.face_num_quad.Read();
   const int *d_sharedElemsFaces = parallelData.sharedElemsFaces.Read();
 
   const double *d_dun = dun_shared_face.Read();
@@ -681,7 +684,7 @@ void Gradients::integrationGradSharedFace_gpu() {
 
     const int el1 = d_sharedElemsFaces[0 + el * 7];
     const int numFaces = d_sharedElemsFaces[1 + el * 7];
-    const int dof1 = d_sharedElem1Dof12Q[1 + d_sharedElemsFaces[2 + el * 7] * 4];
+    const int dof1 = d_elem_dof_num[el1];
     const int offsetEl1 = d_elem_dof_off[el1];
 
     MFEM_FOREACH_THREAD(i, x, dof1) {
@@ -689,7 +692,7 @@ void Gradients::integrationGradSharedFace_gpu() {
 
       for (int elFace = 0; elFace < numFaces; elFace++) {
         const int f = d_sharedElemsFaces[1 + elFace + 1 + el * 7];
-        const int Q = d_sharedElem1Dof12Q[3 + f * 4];
+        const int Q = d_face_num_quad[f];
 
         for (int k = 0; k < Q; k++) {
           const double l1 = d_shape1[f * maxIntPoints * maxDofs + k * maxDofs + i];
