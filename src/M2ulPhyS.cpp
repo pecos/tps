@@ -779,6 +779,8 @@ void M2ulPhyS::initIndirectionArrays() {
 
   //  BC  integration arrays
   if (fes->GetNBE() > 0) {
+    // This is supposed to be number of boundary faces, and for
+    // non-periodic cases it is.  See #199 for more info.
     const int NumBCelems = fes->GetNBE();
 
     bdry_face_data.face_shape.UseDevice(true);
