@@ -306,6 +306,15 @@ struct boundaryFaceIntegrationData {
   Array<int> face_num_quad;
 };
 
+struct parallelFacesIntegrationArrays {
+  Vector sharedShapeWnor1;
+  Vector sharedShape2;
+  Array<int> sharedElem1Dof12Q;
+  Array<int> sharedVdofs;
+  Array<int> sharedVdofsGradUp;
+  Array<int> sharedElemsFaces;
+};
+
 /** @brief Storage for data used in the _GPU_ code path
  *
  * The _GPU_ path requires pre-computation of a number of quantities.
@@ -315,16 +324,9 @@ struct precomputedIntegrationData {
   elementIndexingData element_indexing_data;
   interiorFaceIntegrationData interior_face_data;
   boundaryFaceIntegrationData boundary_face_data;
+  parallelFacesIntegrationArrays shared_face_data;
 };
 
-struct parallelFacesIntegrationArrays {
-  Vector sharedShapeWnor1;
-  Vector sharedShape2;
-  Array<int> sharedElem1Dof12Q;
-  Array<int> sharedVdofs;
-  Array<int> sharedVdofsGradUp;
-  Array<int> sharedElemsFaces;
-};
 
 struct dataTransferArrays {
   // vectors for data transfer

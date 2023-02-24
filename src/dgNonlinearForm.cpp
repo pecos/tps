@@ -74,15 +74,14 @@ DGNonLinearForm::DGNonLinearForm(RiemannSolver *rsolver, Fluxes *_flux, ParFinit
   face_flux_ = 0.;
 }
 
-void DGNonLinearForm::setParallelData(parallelFacesIntegrationArrays *_parallelData, dataTransferArrays *_transferU,
+void DGNonLinearForm::setParallelData(dataTransferArrays *_transferU,
                                       dataTransferArrays *_transferGradUp) {
-  parallelData = _parallelData;
   transferU = _transferU;
   transferGradUp = _transferGradUp;
 
   shared_flux.UseDevice(true);
 
-  int maxNumElems = parallelData->sharedElemsFaces.Size() / 7;  // elements with shared faces
+  int maxNumElems = gpuArrays.shared_face_data.sharedElemsFaces.Size() / 7;  // elements with shared faces
   // TODO(kevin): MAXNUMFACE
   shared_flux.SetSize(maxNumElems * 5 * maxIntPoints_ * num_equation_);
 }
@@ -540,20 +539,21 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
   const double Pr = mixture->GetPrandtlNum();
   // const double Sc = mixture->GetSchmidtNum();
 
-  const double *d_sharedShapeWnor1 = parallelData->sharedShapeWnor1.Read();
-  const int *d_sharedElem1Dof12Q = parallelData->sharedElem1Dof12Q.Read();
-  const int *d_sharedElemsFaces = parallelData->sharedElemsFaces.Read();
+  const parallelFacesIntegrationArrays &parallelData = gpuArrays.shared_face_data;
+  const double *d_sharedShapeWnor1 = parallelData.sharedShapeWnor1.Read();
+  const int *d_sharedElem1Dof12Q = parallelData.sharedElem1Dof12Q.Read();
+  const int *d_sharedElemsFaces = parallelData.sharedElemsFaces.Read();
 
   const double *d_shared_flux = shared_flux.Read();
 
-  const int maxNumElems = parallelData->sharedElemsFaces.Size()/7;  // elements with shared faces
+  const int maxNumElems = parallelData.sharedElemsFaces.Size()/7;  // elements with shared faces
   const int Ndofs = vfes->GetNDofs();
   const int dim = dim_;
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;
 
-  MFEM_FORALL_2D(el, parallelData->sharedElemsFaces.Size() / 7, maxDofs, 1, 1, {
+  MFEM_FORALL_2D(el, parallelData.sharedElemsFaces.Size() / 7, maxDofs, 1, 1, {
     //
     double Fcontrib[gpudata::MAXDOFS * gpudata::MAXEQUATIONS];  // double Fcontrib[216 * 5];
     double Rflux[gpudata::MAXEQUATIONS];  // double Rflux[5];
@@ -618,14 +618,15 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
   auto d_elem_dofs_list = elem_data.element_dofs_list.Read();
   auto d_elem_dof_off = elem_data.element_dof_offset.Read();
 
-  const double *d_sharedShapeWnor1 = parallelData->sharedShapeWnor1.Read();
-  const double *d_sharedShape2 = parallelData->sharedShape2.Read();
-  const int *d_sharedElem1Dof12Q = parallelData->sharedElem1Dof12Q.Read();
-  const int *d_sharedVdofs = parallelData->sharedVdofs.Read();
-  const int *d_sharedVdofsGrads = parallelData->sharedVdofsGradUp.Read();
-  const int *d_sharedElemsFaces = parallelData->sharedElemsFaces.Read();
+  const parallelFacesIntegrationArrays &parallelData = gpuArrays.shared_face_data;
+  const double *d_sharedShapeWnor1 = parallelData.sharedShapeWnor1.Read();
+  const double *d_sharedShape2 = parallelData.sharedShape2.Read();
+  const int *d_sharedElem1Dof12Q = parallelData.sharedElem1Dof12Q.Read();
+  const int *d_sharedVdofs = parallelData.sharedVdofs.Read();
+  const int *d_sharedVdofsGrads = parallelData.sharedVdofsGradUp.Read();
+  const int *d_sharedElemsFaces = parallelData.sharedElemsFaces.Read();
 
-  const int maxNumElems = parallelData->sharedElemsFaces.Size() / 7;  // elements with shared faces
+  const int maxNumElems = parallelData.sharedElemsFaces.Size() / 7;  // elements with shared faces
   const int Ndofs = vfes->GetNDofs();
   const int dim = dim_;
   const int num_equation = num_equation_;
@@ -643,7 +644,7 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
   const RiemannSolver *d_rsolver = rsolver_;
   Fluxes *d_flux = fluxes;
 
-  MFEM_FORALL_2D(el, parallelData->sharedElemsFaces.Size() / 7, maxIntPoints, 1, 1, {
+  MFEM_FORALL_2D(el, parallelData.sharedElemsFaces.Size() / 7, maxIntPoints, 1, 1, {
     double l1[gpudata::MAXDOFS], l2[gpudata::MAXDOFS];            // double l1[216], l2[216];
     double u1[gpudata::MAXEQUATIONS], u2[gpudata::MAXEQUATIONS];  // double u1[5], u2[5];
     double gradUp1[gpudata::MAXDIM * gpudata::MAXEQUATIONS],      // double gradUp1[3 * 5];

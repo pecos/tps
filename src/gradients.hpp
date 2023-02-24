@@ -86,7 +86,6 @@ class Gradients : public ParNonlinearForm {
   //   Vector elemShapeDshapeWJ; // [...l_0(i),...,l_dof(i),l_0_x(i),...,l_dof_d(i), w_i*detJac_i ...]
   //   Array<int> elemPosQ_shapeDshapeWJ; // position and num. of integration points for each element
 
-  parallelFacesIntegrationArrays *parallelData;
   dataTransferArrays *transferUp;
 
   Vector dun_shared_face;
@@ -100,13 +99,12 @@ class Gradients : public ParNonlinearForm {
 
   ~Gradients();
 
-  void setParallelData(parallelFacesIntegrationArrays *_parData, dataTransferArrays *_transferUp) {
-    parallelData = _parData;
+  void setParallelData(dataTransferArrays *_transferUp) {
     transferUp = _transferUp;
 
     dun_shared_face.UseDevice(true);
 
-    int maxNumElems = parallelData->sharedElemsFaces.Size() / 7;  // elements with shared faces
+    int maxNumElems = gpuArrays.shared_face_data.sharedElemsFaces.Size() / 7;  // elements with shared faces
     dun_shared_face.SetSize(dim_ * maxNumElems * 5 * maxIntPoints_ * num_equation_);
   }
 

@@ -64,8 +64,6 @@ class DGNonLinearForm : public ParNonlinearForm {
 
   const precomputedIntegrationData &gpuArrays;
 
-  // Parallel shared faces integration
-  parallelFacesIntegrationArrays *parallelData;
   mutable dataTransferArrays *transferU;
   mutable dataTransferArrays *transferGradUp;
 
@@ -86,8 +84,7 @@ class DGNonLinearForm : public ParNonlinearForm {
 
   void Mult(const Vector &x, Vector &y);
 
-  void setParallelData(parallelFacesIntegrationArrays *_parallelData, dataTransferArrays *_transferU,
-                       dataTransferArrays *_transferGradUp);
+  void setParallelData(dataTransferArrays *_transferU, dataTransferArrays *_transferGradUp);
 
   void faceIntegration_gpu(Vector &y, int elType, int elemOffset, int elDof);
 
