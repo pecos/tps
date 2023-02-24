@@ -544,12 +544,12 @@ void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
 
 void InletBC::integrationBC(Vector &y,  // output
                             const Vector &x, const elementIndexingData &elem_index_data,
-                            ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
-                            Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
-  interpInlet_gpu(x, elem_index_data, shapesBC, normalsWBC, intPointsElIDBC, listElems, offsetsBoundaryU);
+                            ParGridFunction *Up, ParGridFunction *gradUp, boundaryFaceIntegrationData &boundary_face_data,
+                            const int &maxIntPoints, const int &maxDofs) {
+  interpInlet_gpu(x, elem_index_data, boundary_face_data, listElems, offsetsBoundaryU);
 
   integrateInlets_gpu(y,  // output
-                      x, elem_index_data, shapesBC, normalsWBC, intPointsElIDBC, listElems, offsetsBoundaryU);
+                      x, elem_index_data, boundary_face_data, listElems, offsetsBoundaryU);
 }
 
 void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
@@ -735,16 +735,16 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
 }
 
 void InletBC::integrateInlets_gpu(Vector &y, const Vector &x, const elementIndexingData &elem_index_data,
-                                  Vector &shapesBC, Vector &normalsWBC,
-                                  Array<int> &intPointsElIDBC, Array<int> &listElems, Array<int> &offsetsBoundaryU) {
+                                  boundaryFaceIntegrationData &boundary_face_data,
+                                  Array<int> &listElems, Array<int> &offsetsBoundaryU) {
 #ifdef _GPU_
   double *d_y = y.Write();
   const int *d_elem_dofs_list = elem_index_data.element_dofs_list.Read();
   const int *d_elem_dof_off = elem_index_data.element_dof_offset.Read();
   const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
-  const double *d_shapesBC = shapesBC.Read();
-  const double *d_normW = normalsWBC.Read();
-  const int *d_intPointsElIDBC = intPointsElIDBC.Read();
+  const double *d_shapesBC = boundary_face_data.shapesBC.Read();
+  const double *d_normW = boundary_face_data.normalsWBC.Read();
+  const int *d_intPointsElIDBC = boundary_face_data.intPointsElIDBC.Read();
   const int *d_listElems = listElems.Read();
   const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
 
@@ -800,7 +800,7 @@ void InletBC::integrateInlets_gpu(Vector &y, const Vector &x, const elementIndex
 }
 
 void InletBC::interpInlet_gpu(const mfem::Vector &x,  const elementIndexingData &elem_index_data,
-                              mfem::Vector &shapesBC, mfem::Vector &normalsWBC, Array<int> &intPointsElIDBC,
+                              boundaryFaceIntegrationData &boundary_face_data,
                               Array<int> &listElems, Array<int> &offsetsBoundaryU) {
 #ifdef _GPU_
   const double *d_inputState = inputState.Read();
@@ -808,9 +808,9 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x,  const elementIndexingData 
   const int *d_elem_dofs_list = elem_index_data.element_dofs_list.Read();
   const int *d_elem_dof_off = elem_index_data.element_dof_offset.Read();
   const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
-  const double *d_shapesBC = shapesBC.Read();
-  const double *d_normW = normalsWBC.Read();
-  const int *d_intPointsElIDBC = intPointsElIDBC.Read();
+  const double *d_shapesBC = boundary_face_data.shapesBC.Read();
+  const double *d_normW = boundary_face_data.normalsWBC.Read();
+  const int *d_intPointsElIDBC = boundary_face_data.intPointsElIDBC.Read();
   const int *d_listElems = listElems.Read();
   const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
 

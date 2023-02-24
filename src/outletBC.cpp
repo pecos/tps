@@ -551,14 +551,12 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
 }
 
 void OutletBC::integrationBC(Vector &y, const Vector &x, const elementIndexingData &elem_index_data,
-                             ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
-                             Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
-  interpOutlet_gpu(x, elem_index_data, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC, listElems,
-                   offsetsBoundaryU);
+                             ParGridFunction *Up, ParGridFunction *gradUp,
+                             boundaryFaceIntegrationData &boundary_face_data, const int &maxIntPoints, const int &maxDofs) {
+  interpOutlet_gpu(x, elem_index_data, Up, gradUp, boundary_face_data, listElems, offsetsBoundaryU);
 
   integrateOutlets_gpu(y,  // output
-                       x, elem_index_data, shapesBC, normalsWBC, intPointsElIDBC, listElems,
-                       offsetsBoundaryU);
+                       x, elem_index_data, boundary_face_data, listElems, offsetsBoundaryU);
 }
 
 void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
@@ -1018,8 +1016,8 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
 }
 
 void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const elementIndexingData &elem_index_data,
-                                    Vector &shapesBC, Vector &normalsWBC,
-                                    Array<int> &intPointsElIDBC, Array<int> &listElems, Array<int> &offsetsBoundaryU) {
+                                    boundaryFaceIntegrationData &boundary_face_data,
+                                    Array<int> &listElems, Array<int> &offsetsBoundaryU) {
 #ifdef _GPU_
   double *d_y = y.Write();
   const double *d_U = x.Read();
@@ -1027,9 +1025,9 @@ void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const elementInd
   const int *d_elem_dof_off = elem_index_data.element_dof_offset.Read();
   const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
 
-  const double *d_shapesBC = shapesBC.Read();
-  const double *d_normW = normalsWBC.Read();
-  const int *d_intPointsElIDBC = intPointsElIDBC.Read();
+  const double *d_shapesBC = boundary_face_data.shapesBC.Read();
+  const double *d_normW = boundary_face_data.normalsWBC.Read();
+  const int *d_intPointsElIDBC = boundary_face_data.intPointsElIDBC.Read();
   const int *d_listElems = listElems.Read();
   const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
 
@@ -1089,8 +1087,8 @@ void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const elementInd
 }
 
 void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData &elem_index_data,
-                                mfem::ParGridFunction *Up, mfem::ParGridFunction *gradUp, mfem::Vector &shapesBC,
-                                mfem::Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
+                                mfem::ParGridFunction *Up, mfem::ParGridFunction *gradUp,
+                                boundaryFaceIntegrationData &boundary_face_data, Array<int> &listElems,
                                 Array<int> &offsetsBoundaryU) {
 #ifdef _GPU_
   const double *d_inputState = inputState.Read();
@@ -1099,9 +1097,9 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
   const int *d_elem_dofs_list = elem_index_data.element_dofs_list.Read();
   const int *d_elem_dof_off = elem_index_data.element_dof_offset.Read();
   const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
-  const double *d_shapesBC = shapesBC.Read();
-  const double *d_normW = normalsWBC.Read();
-  const int *d_intPointsElIDBC = intPointsElIDBC.Read();
+  const double *d_shapesBC = boundary_face_data.shapesBC.Read();
+  const double *d_normW = boundary_face_data.normalsWBC.Read();
+  const int *d_intPointsElIDBC = boundary_face_data.intPointsElIDBC.Read();
   const int *d_listElems = listElems.Read();
   const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
   const double *d_meanUp = meanUp.Read();

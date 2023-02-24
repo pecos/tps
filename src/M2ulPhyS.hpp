@@ -194,10 +194,6 @@ class M2ulPhyS : public TPS::Solver {
 
   precomputedIntegrationData gpuArrays;
 
-  // BC integration
-  Vector shapesBC;
-  Vector normalsWBC;
-  Array<int> intPointsElIDBC;  // integration points and element ID
 
   // The solution u has components {density, x-momentum, y-momentum, energy}.
   // These are stored contiguously in the BlockVector u_block.

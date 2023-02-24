@@ -281,6 +281,13 @@ struct interiorFaceIntegrationData {
   Array<int> face_num_quad;
 };
 
+// BC integration
+struct boundaryFaceIntegrationData {
+  Vector shapesBC;
+  Vector normalsWBC;
+  Array<int> intPointsElIDBC;  // integration points and element ID
+};
+
 /** @brief Storage for data used in the _GPU_ code path
  *
  * The _GPU_ path requires pre-computation of a number of quantities.
@@ -289,6 +296,7 @@ struct interiorFaceIntegrationData {
 struct precomputedIntegrationData {
   elementIndexingData element_indexing_data;
   interiorFaceIntegrationData interior_face_data;
+  boundaryFaceIntegrationData boundary_face_data;
 };
 
 struct parallelFacesIntegrationArrays {

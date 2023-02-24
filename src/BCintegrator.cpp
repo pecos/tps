@@ -40,7 +40,7 @@
 BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElementSpace *_vfes,
                            IntegrationRules *_intRules, RiemannSolver *rsolver_, double &_dt, GasMixture *_mixture,
                            GasMixture *d_mixture, Fluxes *_fluxClass, ParGridFunction *_Up, ParGridFunction *_gradUp,
-                           Vector &_shapesBC, Vector &_normalsWBC, Array<int> &_intPointsElIDBC, const int _dim,
+                           boundaryFaceIntegrationData &boundary_face_data, const int _dim,
                            const int _num_equation, double &_max_char_speed, RunConfiguration &_runFile,
                            Array<int> &local_attr, const int &_maxIntPoints, const int &_maxDofs)
     : groupsMPI(_groupsMPI),
@@ -54,9 +54,7 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
       vfes(_vfes),
       Up(_Up),
       gradUp(_gradUp),
-      shapesBC(_shapesBC),
-      normalsWBC(_normalsWBC),
-      intPointsElIDBC(_intPointsElIDBC),
+      boundary_face_data_(boundary_face_data),
       dim(_dim),
       num_equation(_num_equation),
       maxIntPoints(_maxIntPoints),
@@ -115,7 +113,7 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
 
       wallBCmap[patchType.first] = new WallBC(rsolver, mixture, d_mixture, _runFile.GetEquationSystem(), fluxClass,
                                               vfes, intRules, _dt, dim, num_equation, patchType.first, patchType.second,
-                                              wallData, intPointsElIDBC, _maxIntPoints, config.isAxisymmetric());
+                                              wallData, boundary_face_data_.intPointsElIDBC, _maxIntPoints, config.isAxisymmetric());
     }
   }
 
@@ -250,19 +248,19 @@ void BCintegrator::updateBCMean(ParGridFunction *Up) {
 void BCintegrator::integrateBCs(Vector &y, const Vector &x,  const elementIndexingData &elem_index_data) {
   for (auto bc = inletBCmap.begin(); bc != inletBCmap.end(); bc++) {
     bc->second->integrationBC(y,  // output
-                              x, elem_index_data, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC,
+                              x, elem_index_data, Up, gradUp, boundary_face_data_,
                               maxIntPoints, maxDofs);
   }
 
   for (auto bc = outletBCmap.begin(); bc != outletBCmap.end(); bc++) {
     bc->second->integrationBC(y,  // output
-                              x, elem_index_data, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC,
+                              x, elem_index_data, Up, gradUp, boundary_face_data_,
                               maxIntPoints, maxDofs);
   }
 
   for (auto bc = wallBCmap.begin(); bc != wallBCmap.end(); bc++) {
     bc->second->integrationBC(y,  // output
-                              x, elem_index_data, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC,
+                              x, elem_index_data, Up, gradUp, boundary_face_data_,
                               maxIntPoints, maxDofs);
   }
 }

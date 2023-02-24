@@ -209,12 +209,13 @@ void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradSt
 }
 
 void WallBC::integrationBC(Vector &y, const Vector &x, const elementIndexingData &elem_index_data,
-                           ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
-                           Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs) {
-  interpWalls_gpu(x, elem_index_data, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC, maxDofs);
+                           ParGridFunction *Up, ParGridFunction *gradUp,
+                           boundaryFaceIntegrationData &boundary_face_data,
+                           const int &maxIntPoints, const int &maxDofs) {
+  interpWalls_gpu(x, elem_index_data, Up, gradUp, boundary_face_data, maxDofs);
 
   integrateWalls_gpu(y,  // output
-                     x, elem_index_data, shapesBC, normalsWBC, intPointsElIDBC, maxDofs);
+                     x, elem_index_data, boundary_face_data, maxDofs);
 }
 
 void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
@@ -389,17 +390,16 @@ void WallBC::computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix
 }
 
 void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const elementIndexingData &elem_index_data,
-                                Vector &shapesBC, Vector &normalsWBC,
-                                Array<int> &intPointsElIDBC, const int &maxDofs) {
+                                boundaryFaceIntegrationData &boundary_face_data, const int &maxDofs) {
 #ifdef _GPU_
   double *d_y = y.Write();
   //   const double *d_U = x.Read();
   const int *d_elem_dofs_list = elem_index_data.element_dofs_list.Read();
   const int *d_elem_dof_off = elem_index_data.element_dof_offset.Read();
   const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
-  const double *d_shapesBC = shapesBC.Read();
-  const double *d_normW = normalsWBC.Read();
-  const int *d_intPointsElIDBC = intPointsElIDBC.Read();
+  const double *d_shapesBC = boundary_face_data.shapesBC.Read();
+  const double *d_normW = boundary_face_data.normalsWBC.Read();
+  const int *d_intPointsElIDBC = boundary_face_data.intPointsElIDBC.Read();
   const int *d_wallElems = wallElems.Read();
   const int *d_listElems = listElems.Read();
 
@@ -486,8 +486,8 @@ void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const elementIndexin
 }
 
 void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &elem_index_data,
-                             mfem::ParGridFunction *Up, mfem::ParGridFunction *gradUp, mfem::Vector &shapesBC,
-                             mfem::Vector &normalsWBC, Array<int> &intPointsElIDBC, const int &maxDofs) {
+                             mfem::ParGridFunction *Up, mfem::ParGridFunction *gradUp,
+                             boundaryFaceIntegrationData &boundary_face_data, const int &maxDofs) {
 #ifdef _GPU_
   double *d_flux = face_flux_.Write();
 
@@ -496,9 +496,9 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
   const int *d_elem_dofs_list = elem_index_data.element_dofs_list.Read();
   const int *d_elem_dof_off = elem_index_data.element_dof_offset.Read();
   const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
-  const double *d_shapesBC = shapesBC.Read();
-  const double *d_normW = normalsWBC.Read();
-  const int *d_intPointsElIDBC = intPointsElIDBC.Read();
+  const double *d_shapesBC = boundary_face_data.shapesBC.Read();
+  const double *d_normW = boundary_face_data.normalsWBC.Read();
+  const int *d_intPointsElIDBC = boundary_face_data.intPointsElIDBC.Read();
   const int *d_wallElems = wallElems.Read();
   const int *d_listElems = listElems.Read();
 

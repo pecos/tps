@@ -102,8 +102,9 @@ class InletBC : public BoundaryCondition {
 
   virtual void integrationBC(Vector &y,  // output
                              const Vector &x, const elementIndexingData &elem_index_data,
-                             ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
-                             Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs);
+                             ParGridFunction *Up, ParGridFunction *gradUp,
+                             boundaryFaceIntegrationData &boundary_face_data, const int &maxIntPoints,
+                             const int &maxDofs);
 
   static void updateMean_gpu(ParGridFunction *Up, Vector &localMeanUp, const int _num_equation, const int numBdrElems,
                              const int totalDofs, Vector &bdrUp, Array<int> &bdrElemsQ, Array<int> &bdrDofs,
@@ -113,10 +114,10 @@ class InletBC : public BoundaryCondition {
 
   void integrateInlets_gpu(Vector &y,  // output
                            const Vector &x, const elementIndexingData &elem_index_data,
-                           Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
+                           boundaryFaceIntegrationData &boundary_face_data, Array<int> &listElems,
                            Array<int> &offsetsBoundaryU);
-  void interpInlet_gpu(const Vector &x, const elementIndexingData &elem_index_data, Vector &shapesBC,
-                       Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
+  void interpInlet_gpu(const Vector &x, const elementIndexingData &elem_index_data,
+                       boundaryFaceIntegrationData &boundary_face_data, Array<int> &listElems,
                        Array<int> &offsetsBoundaryU);
 
 #ifdef _GPU_

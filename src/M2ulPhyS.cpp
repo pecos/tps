@@ -490,7 +490,7 @@ void M2ulPhyS::initVariables() {
   bcIntegrator = NULL;
   if (local_attr.Size() > 0) {
     bcIntegrator = new BCintegrator(groupsMPI, mesh, vfes, intRules, rsolver, dt, mixture, d_mixture, fluxClass, Up,
-                                    gradUp, shapesBC, normalsWBC, intPointsElIDBC, dim, num_equation, max_char_speed,
+                                    gradUp, gpuArrays.boundary_face_data, dim, num_equation, max_char_speed,
                                     config, local_attr, maxIntPoints, maxDofs);
   }
 
@@ -602,6 +602,7 @@ void M2ulPhyS::initVariables() {
 void M2ulPhyS::initIndirectionArrays() {
   elementIndexingData &elem_data = gpuArrays.element_indexing_data;
   interiorFaceIntegrationData &face_data = gpuArrays.interior_face_data;
+  boundaryFaceIntegrationData &bdry_face_data = gpuArrays.boundary_face_data;
 
   elem_data.element_dof_offset.SetSize(vfes->GetNE());
   elem_data.element_dof_offset = -1;  // invalid
@@ -780,19 +781,19 @@ void M2ulPhyS::initIndirectionArrays() {
   if (fes->GetNBE() > 0) {
     const int NumBCelems = fes->GetNBE();
 
-    shapesBC.UseDevice(true);
-    shapesBC.SetSize(NumBCelems * maxIntPoints * maxDofs);
-    shapesBC = 0.;
-    auto hshapesBC = shapesBC.HostWrite();
+    bdry_face_data.shapesBC.UseDevice(true);
+    bdry_face_data.shapesBC.SetSize(NumBCelems * maxIntPoints * maxDofs);
+    bdry_face_data.shapesBC = 0.;
+    auto hshapesBC = bdry_face_data.shapesBC.HostWrite();
 
-    normalsWBC.UseDevice(true);
-    normalsWBC.SetSize(NumBCelems * maxIntPoints * (dim + 1));
-    normalsWBC = 0.;
-    auto hnormalsWBC = normalsWBC.HostWrite();
+    bdry_face_data.normalsWBC.UseDevice(true);
+    bdry_face_data.normalsWBC.SetSize(NumBCelems * maxIntPoints * (dim + 1));
+    bdry_face_data.normalsWBC = 0.;
+    auto hnormalsWBC = bdry_face_data.normalsWBC.HostWrite();
 
-    intPointsElIDBC.SetSize(NumBCelems * 2);
-    intPointsElIDBC = 0;
-    auto hintPointsElIDBC = intPointsElIDBC.HostWrite();
+    bdry_face_data.intPointsElIDBC.SetSize(NumBCelems * 2);
+    bdry_face_data.intPointsElIDBC = 0;
+    auto hintPointsElIDBC = bdry_face_data.intPointsElIDBC.HostWrite();
 
     const FiniteElement *fe;
     FaceElementTransformations *tr;
@@ -837,21 +838,15 @@ void M2ulPhyS::initIndirectionArrays() {
       }
     }
   } else {
-    shapesBC.SetSize(1);
-    shapesBC = 0.;
+    bdry_face_data.shapesBC.SetSize(1);
+    bdry_face_data.shapesBC = 0.;
 
-    normalsWBC.SetSize(1);
-    normalsWBC = 0.;
+    bdry_face_data.normalsWBC.SetSize(1);
+    bdry_face_data.normalsWBC = 0.;
 
-    intPointsElIDBC.SetSize(1);
-    intPointsElIDBC = 0.;
+    bdry_face_data.intPointsElIDBC.SetSize(1);
+    bdry_face_data.intPointsElIDBC = 0.;
   }
-
-#ifdef _GPU_
-  auto dshapesBC = shapesBC.Read();
-  auto dnormalsBC = normalsWBC.Read();
-  auto dintPointsELIBC = intPointsElIDBC.Read();
-#endif
 }
 
 M2ulPhyS::~M2ulPhyS() {
