@@ -796,9 +796,13 @@ void M2ulPhyS::initIndirectionArrays() {
     bdry_face_data.face_quad_weight = 0.;
     auto h_face_quad_weight = bdry_face_data.face_quad_weight.HostWrite();
 
-    bdry_face_data.intPointsElIDBC.SetSize(NumBCelems * 2);
-    bdry_face_data.intPointsElIDBC = 0;
-    auto hintPointsElIDBC = bdry_face_data.intPointsElIDBC.HostWrite();
+    bdry_face_data.face_el.SetSize(NumBCelems);
+    bdry_face_data.face_el = 0;
+    auto h_face_el = bdry_face_data.face_el.HostWrite();
+
+    bdry_face_data.face_num_quad.SetSize(NumBCelems);
+    bdry_face_data.face_num_quad = 0;
+    auto h_face_num_quad = bdry_face_data.face_num_quad.HostWrite();
 
     const FiniteElement *fe;
     FaceElementTransformations *tr;
@@ -821,8 +825,8 @@ void M2ulPhyS::initIndirectionArrays() {
         }
         const IntegrationRule *ir = &intRules->Get(tr->GetGeometryType(), intorder);
 
-        hintPointsElIDBC[2 * f] = ir->GetNPoints();
-        hintPointsElIDBC[2 * f + 1] = tr->Elem1No;
+        h_face_el[f] = tr->Elem1No;
+        h_face_num_quad[f] = ir->GetNPoints();
 
         for (int q = 0; q < ir->GetNPoints(); q++) {
           const IntegrationPoint &ip = ir->IntPoint(q);
@@ -855,8 +859,11 @@ void M2ulPhyS::initIndirectionArrays() {
     bdry_face_data.face_quad_weight.SetSize(1);
     bdry_face_data.face_quad_weight = 0.;
 
-    bdry_face_data.intPointsElIDBC.SetSize(1);
-    bdry_face_data.intPointsElIDBC = 0.;
+    bdry_face_data.face_el.SetSize(1);
+    bdry_face_data.face_el = -1;
+
+    bdry_face_data.face_num_quad.SetSize(1);
+    bdry_face_data.face_num_quad = 0;
   }
 }
 

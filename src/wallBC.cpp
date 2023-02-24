@@ -36,14 +36,14 @@
 WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, GasMixture *d_mixture, Equations _eqSystem,
                Fluxes *_fluxClass, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt,
                const int _dim, const int _num_equation, int _patchNumber, WallType _bcType, const WallData _inputData,
-               const Array<int> &_intPointsElIDBC, const int &_maxIntPoints, bool axisym)
+               const boundaryFaceIntegrationData &boundary_face_data, const int &_maxIntPoints, bool axisym)
     : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber, 1,
                         axisym),  // so far walls do not require ref. length. Left at 1
       wallType_(_bcType),
       wallData_(_inputData),
       d_mixture_(d_mixture),
       fluxClass(_fluxClass),
-      intPointsElIDBC(_intPointsElIDBC),
+      boundary_face_data_(boundary_face_data),
       maxIntPoints_(_maxIntPoints) {
   // Initialize bc state.
   // bcState_.prim.SetSize(num_equation_);
@@ -140,7 +140,7 @@ WallBC::~WallBC() {}
 
 void WallBC::initBCs() {
   if (!BCinit) {
-    buildWallElemsArray(intPointsElIDBC);
+    buildWallElemsArray();
 
 #ifdef _GPU_
     face_flux_.UseDevice(true);
@@ -152,16 +152,16 @@ void WallBC::initBCs() {
   }
 }
 
-void WallBC::buildWallElemsArray(const Array<int> &intPointsElIDBC) {
+void WallBC::buildWallElemsArray() {
   auto hlistElems = listElems.HostRead();  // this is actually a list of faces
-  auto hintPointsElIDBC = intPointsElIDBC.HostRead();
+  auto h_face_el = boundary_face_data_.face_el.HostRead();
 
   std::vector<int> unicElems;
   unicElems.clear();
 
   for (int f = 0; f < listElems.Size(); f++) {
     int bcFace = hlistElems[f];
-    int elID = hintPointsElIDBC[2 * bcFace + 1];
+    int elID = h_face_el[bcFace];
 
     bool elInList = false;
     for (size_t i = 0; i < unicElems.size(); i++) {
@@ -177,7 +177,7 @@ void WallBC::buildWallElemsArray(const Array<int> &intPointsElIDBC) {
     int elID = unicElems[el];
     for (int f = 0; f < listElems.Size(); f++) {
       int bcFace = hlistElems[f];
-      int elID2 = hintPointsElIDBC[2 * bcFace + 1];
+      int elID2 = h_face_el[bcFace];
       if (elID2 == elID) {
         int nf = hwallElems[0 + 7 * el];
         if (nf == -1) nf = 0;
@@ -399,7 +399,8 @@ void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const elementIndexin
   const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
   const double *d_face_shape = boundary_face_data.face_shape.Read();
   const double *d_weight = boundary_face_data.face_quad_weight.Read();
-  const int *d_intPointsElIDBC = boundary_face_data.intPointsElIDBC.Read();
+  const int *d_face_el = boundary_face_data.face_el.Read();
+  const int *d_face_num_quad = boundary_face_data.face_num_quad.Read();
   const int *d_wallElems = wallElems.Read();
   const int *d_listElems = listElems.Read();
 
@@ -439,9 +440,9 @@ void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const elementIndexin
       const int n = d_wallElems[1 + f + el_wall * 7];
 
       const int el_bdry = d_listElems[n];
-      const int Q = d_intPointsElIDBC[2 * el_bdry];
+      const int Q = d_face_num_quad[el_bdry];
 
-      el = d_intPointsElIDBC[2 * el_bdry + 1];
+      el = d_face_el[el_bdry];
 
       elOffset = d_elem_dof_off[el];
       elDof = d_elem_dof_num[el];
@@ -498,7 +499,8 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
   const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
   const double *d_face_shape = boundary_face_data.face_shape.Read();
   const double *d_normal = boundary_face_data.face_normal.Read();
-  const int *d_intPointsElIDBC = boundary_face_data.intPointsElIDBC.Read();
+  const int *d_face_num_quad = boundary_face_data.face_num_quad.Read();
+  const int *d_face_el = boundary_face_data.face_el.Read();
   const int *d_wallElems = wallElems.Read();
   const int *d_listElems = listElems.Read();
 
@@ -546,8 +548,8 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
     for (int f = 0; f < numFaces; f++) {
       const int n = d_wallElems[1 + f + el_wall * 7];
       const int el_bdry = d_listElems[n];  // element number within all boundary elements?
-      const int Q = d_intPointsElIDBC[2 * el_bdry];
-      const int el = d_intPointsElIDBC[2 * el_bdry + 1];  // global element number (on this mpi rank) ?
+      const int Q = d_face_num_quad[el_bdry];
+      const int el = d_face_el[el_bdry];  // global element number (on this mpi rank) ?
 
       const int elOffset = d_elem_dof_off[el];
       const int elDof = d_elem_dof_num[el];

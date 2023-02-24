@@ -57,11 +57,11 @@ class WallBC : public BoundaryCondition {
   BoundaryViscousFluxData bcFlux_;
   BoundaryPrimitiveData bcState_;
 
-  const Array<int> &intPointsElIDBC;
+  const boundaryFaceIntegrationData &boundary_face_data_;
   const int &maxIntPoints_;
 
   Array<int> wallElems;
-  void buildWallElemsArray(const Array<int> &intPointsElIDBC);
+  void buildWallElemsArray();
 
   void computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux);
   void computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
@@ -74,7 +74,7 @@ class WallBC : public BoundaryCondition {
   WallBC(RiemannSolver *rsolver_, GasMixture *_mixture, GasMixture *d_mixture, Equations _eqSystem, Fluxes *_fluxClass,
          ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
          const int _num_equation, int _patchNumber, WallType _bcType, const WallData _inputData,
-         const Array<int> &intPointsElIDBC, const int &maxIntPoints, bool axisym);
+         const boundaryFaceIntegrationData &boundary_face_data, const int &maxIntPoints, bool axisym);
   ~WallBC();
 
   void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux);

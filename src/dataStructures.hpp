@@ -287,7 +287,11 @@ struct boundaryFaceIntegrationData {
   Vector face_normal;
   Vector face_quad_weight;
 
-  Array<int> intPointsElIDBC;  // integration points and element ID
+  /** for each boundary face, index of corresponding element */
+  Array<int> face_el;
+
+  /** for each boundary face, number of quadrature points */
+  Array<int> face_num_quad;
 };
 
 /** @brief Storage for data used in the _GPU_ code path

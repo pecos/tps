@@ -1027,7 +1027,8 @@ void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const elementInd
 
   const double *d_face_shape = boundary_face_data.face_shape.Read();
   const double *d_weight = boundary_face_data.face_quad_weight.Read();
-  const int *d_intPointsElIDBC = boundary_face_data.intPointsElIDBC.Read();
+  const int *d_face_el = boundary_face_data.face_el.Read();
+  const int *d_face_num_quad = boundary_face_data.face_num_quad.Read();
   const int *d_listElems = listElems.Read();
   const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
 
@@ -1049,8 +1050,8 @@ void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const elementInd
 
     const int el = d_listElems[n];
 
-    const int Q    = d_intPointsElIDBC[2 * el  ];
-    const int elID = d_intPointsElIDBC[2 * el + 1];
+    const int Q    = d_face_num_quad[el];
+    const int elID = d_face_el[el];
 
     const int elOffset = d_elem_dof_off[elID];
     const int elDof = d_elem_dof_num[elID];
@@ -1099,7 +1100,8 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
   const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
   const double *d_face_shape = boundary_face_data.face_shape.Read();
   const double *d_normal = boundary_face_data.face_normal.Read();
-  const int *d_intPointsElIDBC = boundary_face_data.intPointsElIDBC.Read();
+  const int *d_face_el = boundary_face_data.face_el.Read();
+  const int *d_face_num_quad = boundary_face_data.face_num_quad.Read();
   const int *d_listElems = listElems.Read();
   const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
   const double *d_meanUp = meanUp.Read();
@@ -1149,8 +1151,8 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
 
     const int el = d_listElems[n];
     const int offsetBdrU = d_offsetBoundaryU[n];
-    const int Q = d_intPointsElIDBC[2 * el];
-    const int elID = d_intPointsElIDBC[2 * el + 1];
+    const int Q = d_face_num_quad[el];
+    const int elID = d_face_el[el];
     const int elOffset = d_elem_dof_off[elID];
     const int elDof = d_elem_dof_num[elID];
 
