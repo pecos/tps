@@ -579,7 +579,7 @@ void Gradients::interpGradSharedFace_gpu() {
   const double *d_shape2 = parallelData.face_el2_shape.Read();
   const int *d_face_num_quad = parallelData.face_num_quad.Read();
   const int *d_face_num_dof2 = parallelData.face_num_dof2.Read();
-  const int *d_sharedVdofs = parallelData.sharedVdofs.Read();
+  const int *d_elem2_dofs = parallelData.elem2_dofs.Read();
   const int *d_sharedElemsFaces = parallelData.sharedElemsFaces.Read();
 
   double *d_dun = dun_shared_face.Write();
@@ -640,7 +640,7 @@ void Gradients::interpGradSharedFace_gpu() {
 
           // load data elem2
           for (int j = 0; j < dof2; j++) {
-            int index = d_sharedVdofs[j + eq * maxDofs + f * num_equation * maxDofs];
+            int index = d_elem2_dofs[j + eq * maxDofs + f * num_equation * maxDofs];
             u2 += d_faceData[index] * l2[j];
           }
 

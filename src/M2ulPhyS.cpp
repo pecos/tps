@@ -892,14 +892,14 @@ void M2ulPhyS::initIndirectionArrays() {
   gradUpfes->ExchangeFaceNbrData();
 
   if (Nshared > 0) {
-    parallelData.sharedVdofs.SetSize(Nshared * num_equation * maxDofs);
-    parallelData.sharedVdofsGradUp.SetSize(Nshared * num_equation * maxDofs * dim);
+    parallelData.elem2_dofs.SetSize(Nshared * num_equation * maxDofs);
+    parallelData.elem2_grad_dofs.SetSize(Nshared * num_equation * maxDofs * dim);
 
-    parallelData.sharedVdofs = 0;
-    parallelData.sharedVdofsGradUp = 0;
+    parallelData.elem2_dofs = 0;
+    parallelData.elem2_grad_dofs = 0;
 
-    auto hsharedVdofs = parallelData.sharedVdofs.HostReadWrite();
-    auto hsharedVdofsGrads = parallelData.sharedVdofsGradUp.HostReadWrite();
+    auto h_elem2_dofs = parallelData.elem2_dofs.HostReadWrite();
+    auto h_elem2_grad_dofs = parallelData.elem2_grad_dofs.HostReadWrite();
 
     parallelData.face_el1_shape.UseDevice(true);
     parallelData.face_el2_shape.UseDevice(true);
@@ -950,10 +950,10 @@ void M2ulPhyS::initIndirectionArrays() {
 
       for (int n = 0; n < dof2; n++) {
         for (int eq = 0; eq < num_equation; eq++) {
-          hsharedVdofs[n + eq * maxDofs + i * num_equation * maxDofs] = vdofs2[n + eq * dof2];
+          h_elem2_dofs[n + eq * maxDofs + i * num_equation * maxDofs] = vdofs2[n + eq * dof2];
           for (int d = 0; d < dim; d++) {
             int index = n + eq * maxDofs + d * num_equation * maxDofs + i * dim * num_equation * maxDofs;
-            hsharedVdofsGrads[index] = vdofsGrad[n + eq * dof2 + d * num_equation * dof2];
+            h_elem2_grad_dofs[index] = vdofsGrad[n + eq * dof2 + d * num_equation * dof2];
           }
         }
       }
@@ -1026,17 +1026,7 @@ void M2ulPhyS::initIndirectionArrays() {
         }
       }
     }
-  } else {
-    parallelData.sharedVdofs.SetSize(1);
-    parallelData.sharedVdofsGradUp.SetSize(1);
-    parallelData.sharedElemsFaces.SetSize(1);
   }
-
-#ifdef _GPU_
-  auto dsharedVdofs = parallelData.sharedVdofs.ReadWrite();
-  auto dsharedVdofsGradUp = parallelData.sharedVdofsGradUp.ReadWrite();
-  auto dsharedElemsFaces = parallelData.sharedElemsFaces.ReadWrite();
-#endif
 }
 
 M2ulPhyS::~M2ulPhyS() {

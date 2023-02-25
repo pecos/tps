@@ -340,8 +340,11 @@ struct sharedFaceIntegrationData {
    */
   Array<int> sharedElemsFaces;
 
-  Array<int> sharedVdofs;
-  Array<int> sharedVdofsGradUp;
+  /** Degrees of freedom indices for element 2 */
+  Array<int> elem2_dofs;
+
+  /** Degrees of freedom indices for the gradient variables for element 2 */
+  Array<int> elem2_grad_dofs;
 };
 
 /** @brief Storage for data used in the _GPU_ code path
