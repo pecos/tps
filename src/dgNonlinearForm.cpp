@@ -249,7 +249,7 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset,
       int dof1 = elDof;
       int dof2 = d_elem_dof_num[elj];
       if (swapElems) {
-        dof1 = dof2; // = d_elem_dof_num[elj]
+        dof1 = dof2;  // = d_elem_dof_num[elj]
         dof2 = elDof;
       }
 
@@ -447,7 +447,6 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
     for (int face = 0; face < elFaces; face++) {
       const int gFace = d_elemFaces[7 * eli + face + 1];
       const int Q = d_face_nqp[gFace];
-      //int offsetShape1 = gFace * maxIntPoints * (maxDofs + 1 + dim);
       int offsetShape1 = gFace * maxIntPoints * maxDofs;
       int offsetShape2 = gFace * maxIntPoints * maxDofs;
 

@@ -325,7 +325,6 @@ void Gradients::interpFaceData_gpu(const Vector &Up, int elType, int elemOffset,
     for (int face = 0; face < elFaces; face++) {
       const int gFace = d_elemFaces[7 * eli + face + 1];
       const int Q = d_face_nqp[gFace];
-      //int offsetShape1 = gFace * maxIntPoints * (maxDofs + 1 + dim);
       int offset_shape = gFace * maxIntPoints * maxDofs;
 
       // swapElems = false indicates that el is "element 1" for this face
