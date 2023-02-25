@@ -554,6 +554,19 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;
 
+  // TODO(trevilo): Is this approach (i.e., looping over elements with
+  // shared faces rather than shared faces) really worthwhile?  It may
+  // (probably does) improve performance for any elements with
+  // multiple shared faces, but do we ever have enough of those for it
+  // to make enough of an overall performance difference to justify
+  // the increase in code complexity?  The alternative is to directly
+  // loop through the shared faces, which would allow simplification
+  // of some of the data structures (e.g., we could eliminate
+  // sharedElemsFaces entirely).  I am skeptical the approach here is
+  // significantly better; it feels like a premature optimization.
+  // So, for now I am leaving it alone, but the todo is to investigate
+  // how much difference this makes.
+
   MFEM_FORALL_2D(el, parallelData.sharedElemsFaces.Size() / 7, maxDofs, 1, 1, {
     //
     double Fcontrib[gpudata::MAXDOFS * gpudata::MAXEQUATIONS];  // double Fcontrib[216 * 5];

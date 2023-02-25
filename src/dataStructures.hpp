@@ -328,9 +328,20 @@ struct sharedFaceIntegrationData {
   /** for each shared face, number of quadrature points */
   Array<int> face_num_dof2;
 
+  /** @brief Map from shared element index to shared face index(ices)
+   *
+   *  This mapping makes it possible to loop over the elements with
+   *  shared faces rather than the shared faces themselves.  It
+   *  contains the following information:
+   *
+   * sharedElemsFaces[7*i] = element number for ith element with shared faces
+   * sharedElemsFaces[7*i + 1] = number of shared faces on ith elem with shared faces
+   * sharedElemsFaces[7*i + 1 + j] = shared face index for the jth shared face on the ith element with shared faces
+   */
+  Array<int> sharedElemsFaces;
+
   Array<int> sharedVdofs;
   Array<int> sharedVdofsGradUp;
-  Array<int> sharedElemsFaces;
 };
 
 /** @brief Storage for data used in the _GPU_ code path
