@@ -383,7 +383,7 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
   // 3. Multiply element-wise by the inverse mass matrices.
 #ifdef _GPU_
   const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
-  auto h_elem_dof_num = elem_data.element_dof_number.HostRead();
+  auto h_elem_dof_num = elem_data.dof_number.HostRead();
   for (int eltype = 0; eltype < elem_data.num_elems_of_type.Size(); eltype++) {
     int elemOffset = 0;
     if (eltype != 0) {
@@ -663,8 +663,8 @@ void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const precomputedInte
   const double *d_z = z.Read();
 
   const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
-  auto d_elem_dofs_list = elem_data.element_dofs_list.Read();
-  auto d_elem_dof_off = elem_data.element_dof_offset.Read();
+  auto d_elem_dofs_list = elem_data.dofs_list.Read();
+  auto d_elem_dof_off = elem_data.dof_offset.Read();
   auto d_posDofInvM = posDofInvM.Read();
   const double *d_invM = invMArray.Read();
 

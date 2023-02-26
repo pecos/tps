@@ -1022,14 +1022,14 @@ void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const elementInd
 #ifdef _GPU_
   double *d_y = y.Write();
   const double *d_U = x.Read();
-  const int *d_elem_dofs_list = elem_index_data.element_dofs_list.Read();
-  const int *d_elem_dof_off = elem_index_data.element_dof_offset.Read();
-  const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
+  const int *d_elem_dofs_list = elem_index_data.dofs_list.Read();
+  const int *d_elem_dof_off = elem_index_data.dof_offset.Read();
+  const int *d_elem_dof_num = elem_index_data.dof_number.Read();
 
-  const double *d_face_shape = boundary_face_data.face_shape.Read();
-  const double *d_weight = boundary_face_data.face_quad_weight.Read();
-  const int *d_face_el = boundary_face_data.face_el.Read();
-  const int *d_face_num_quad = boundary_face_data.face_num_quad.Read();
+  const double *d_face_shape = boundary_face_data.shape.Read();
+  const double *d_weight = boundary_face_data.quad_weight.Read();
+  const int *d_face_el = boundary_face_data.el.Read();
+  const int *d_face_num_quad = boundary_face_data.num_quad.Read();
   const int *d_listElems = listElems.Read();
   const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
 
@@ -1096,13 +1096,13 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
   const double *d_inputState = inputState.Read();
   const double *d_U = x.Read();
   const double *d_gradUp = gradUp->Read();
-  const int *d_elem_dofs_list = elem_index_data.element_dofs_list.Read();
-  const int *d_elem_dof_off = elem_index_data.element_dof_offset.Read();
-  const int *d_elem_dof_num = elem_index_data.element_dof_number.Read();
-  const double *d_face_shape = boundary_face_data.face_shape.Read();
-  const double *d_normal = boundary_face_data.face_normal.Read();
-  const int *d_face_el = boundary_face_data.face_el.Read();
-  const int *d_face_num_quad = boundary_face_data.face_num_quad.Read();
+  const int *d_elem_dofs_list = elem_index_data.dofs_list.Read();
+  const int *d_elem_dof_off = elem_index_data.dof_offset.Read();
+  const int *d_elem_dof_num = elem_index_data.dof_number.Read();
+  const double *d_face_shape = boundary_face_data.shape.Read();
+  const double *d_normal = boundary_face_data.normal.Read();
+  const int *d_face_el = boundary_face_data.el.Read();
+  const int *d_face_num_quad = boundary_face_data.num_quad.Read();
   const int *d_listElems = listElems.Read();
   const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
   const double *d_meanUp = meanUp.Read();

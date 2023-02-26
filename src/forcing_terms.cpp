@@ -116,7 +116,7 @@ void ConstantPressureGradient::updateTerms(Vector &in) {
 #ifdef _GPU_
   const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
 
-  auto h_elem_dof_number = elem_data.element_dof_number.HostRead();
+  auto h_elem_dof_number = elem_data.dof_number.HostRead();
 
   for (int elType = 0; elType < elem_data.num_elems_of_type.Size(); elType++) {
     int elemOffset = 0;
@@ -183,8 +183,8 @@ void ConstantPressureGradient::updateTerms_gpu(const int numElems, const int off
   double *d_gradUp = gradUp.ReadWrite();
 
   const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
-  auto d_elem_dof_off = elem_data.element_dof_offset.Read();
-  auto d_elem_dofs_list = elem_data.element_dofs_list.Read();
+  auto d_elem_dof_off = elem_data.dof_offset.Read();
+  auto d_elem_dofs_list = elem_data.dofs_list.Read();
 
   // clang-format off
   MFEM_FORALL_2D(el, numElems, elDof, 1, 1, {

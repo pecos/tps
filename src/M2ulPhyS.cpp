@@ -607,13 +607,13 @@ void M2ulPhyS::initIndirectionArrays() {
   //-----------------------------------------------------------------
   // Element data
   //-----------------------------------------------------------------
-  elem_data.element_dof_offset.SetSize(vfes->GetNE());
-  elem_data.element_dof_offset = -1;  // invalid
-  auto h_element_dof_offset = elem_data.element_dof_offset.HostWrite();
+  elem_data.dof_offset.SetSize(vfes->GetNE());
+  elem_data.dof_offset = -1;  // invalid
+  auto h_dof_offset = elem_data.dof_offset.HostWrite();
 
-  elem_data.element_dof_number.SetSize(vfes->GetNE());
-  elem_data.element_dof_number = -1;  // invalid
-  auto h_element_dof_number = elem_data.element_dof_number.HostWrite();
+  elem_data.dof_number.SetSize(vfes->GetNE());
+  elem_data.dof_number = -1;  // invalid
+  auto h_dof_number = elem_data.dof_number.HostWrite();
 
   std::vector<int> tempNodes;
   tempNodes.clear();
@@ -622,28 +622,28 @@ void M2ulPhyS::initIndirectionArrays() {
     const int dof = vfes->GetFE(i)->GetDof();
 
     // get the nodes IDs
-    h_element_dof_offset[i] = tempNodes.size();
-    h_element_dof_number[i] = dof;
+    h_dof_offset[i] = tempNodes.size();
+    h_dof_number[i] = dof;
 
     Array<int> dofs;
     vfes->GetElementVDofs(i, dofs);
     for (int n = 0; n < dof; n++) tempNodes.push_back(dofs[n]);
   }
 
-  elem_data.element_dofs_list.SetSize(tempNodes.size());
-  elem_data.element_dofs_list = 0;
-  auto h_element_dofs_list = elem_data.element_dofs_list.HostWrite();
-  for (int i = 0; i < elem_data.element_dofs_list.Size(); i++) {
-    h_element_dofs_list[i] = tempNodes[i];
+  elem_data.dofs_list.SetSize(tempNodes.size());
+  elem_data.dofs_list = 0;
+  auto h_dofs_list = elem_data.dofs_list.HostWrite();
+  for (int i = 0; i < elem_data.dofs_list.Size(); i++) {
+    h_dofs_list[i] = tempNodes[i];
   }
 
   // count number of each type of element
   std::vector<int> tempNumElems;
   tempNumElems.clear();
-  int dof1 = h_element_dof_number[0];
+  int dof1 = h_dof_number[0];
   int typeElems = 0;
-  for (int el = 0; el < elem_data.element_dof_number.Size(); el++) {
-    int dofi = h_element_dof_number[el];
+  for (int el = 0; el < elem_data.dof_number.Size(); el++) {
+    int dofi = h_dof_number[el];
     if (dofi == dof1) {
       typeElems++;
     } else {
@@ -677,34 +677,34 @@ void M2ulPhyS::initIndirectionArrays() {
 
     Mesh *mesh = vfes->GetMesh();
 
-    face_data.face_el1.SetSize(mesh->GetNumFaces());
-    face_data.face_el1 = 0;
-    auto h_face_el1 = face_data.face_el1.HostWrite();
+    face_data.el1.SetSize(mesh->GetNumFaces());
+    face_data.el1 = 0;
+    auto h_face_el1 = face_data.el1.HostWrite();
 
-    face_data.face_el2.SetSize(mesh->GetNumFaces());
-    face_data.face_el2 = 0;
-    auto h_face_el2 = face_data.face_el2.HostWrite();
+    face_data.el2.SetSize(mesh->GetNumFaces());
+    face_data.el2 = 0;
+    auto h_face_el2 = face_data.el2.HostWrite();
 
-    face_data.face_num_quad.SetSize(mesh->GetNumFaces());
-    face_data.face_num_quad = 0;
-    auto h_face_num_quad = face_data.face_num_quad.HostWrite();
+    face_data.num_quad.SetSize(mesh->GetNumFaces());
+    face_data.num_quad = 0;
+    auto h_face_num_quad = face_data.num_quad.HostWrite();
 
-    face_data.face_el1_shape.UseDevice(true);
-    face_data.face_el1_shape.SetSize(maxDofs * maxIntPoints * mesh->GetNumFaces());
+    face_data.el1_shape.UseDevice(true);
+    face_data.el1_shape.SetSize(maxDofs * maxIntPoints * mesh->GetNumFaces());
 
-    face_data.face_el2_shape.UseDevice(true);
-    face_data.face_el2_shape.SetSize(maxDofs * maxIntPoints * mesh->GetNumFaces());
+    face_data.el2_shape.UseDevice(true);
+    face_data.el2_shape.SetSize(maxDofs * maxIntPoints * mesh->GetNumFaces());
 
-    face_data.face_quad_weight.UseDevice(true);
-    face_data.face_quad_weight.SetSize(maxIntPoints * mesh->GetNumFaces());
+    face_data.quad_weight.UseDevice(true);
+    face_data.quad_weight.SetSize(maxIntPoints * mesh->GetNumFaces());
 
-    face_data.face_normal.UseDevice(true);
-    face_data.face_normal.SetSize(dim * maxIntPoints * mesh->GetNumFaces());
+    face_data.normal.UseDevice(true);
+    face_data.normal.SetSize(dim * maxIntPoints * mesh->GetNumFaces());
 
-    auto hshape1 = face_data.face_el1_shape.HostWrite();
-    auto hshape2 = face_data.face_el2_shape.HostWrite();
-    auto hweight = face_data.face_quad_weight.HostWrite();
-    auto hnormal = face_data.face_normal.HostWrite();
+    auto hshape1 = face_data.el1_shape.HostWrite();
+    auto hshape2 = face_data.el2_shape.HostWrite();
+    auto hweight = face_data.quad_weight.HostWrite();
+    auto hnormal = face_data.normal.HostWrite();
 
     for (int face = 0; face < mesh->GetNumFaces(); face++) {
       FaceElementTransformations *tr;
@@ -791,28 +791,28 @@ void M2ulPhyS::initIndirectionArrays() {
     // non-periodic cases it is.  See #199 for more info.
     const int NumBCelems = fes->GetNBE();
 
-    bdry_face_data.face_shape.UseDevice(true);
-    bdry_face_data.face_shape.SetSize(NumBCelems * maxIntPoints * maxDofs);
-    bdry_face_data.face_shape = 0.;
-    auto hshapesBC = bdry_face_data.face_shape.HostWrite();
+    bdry_face_data.shape.UseDevice(true);
+    bdry_face_data.shape.SetSize(NumBCelems * maxIntPoints * maxDofs);
+    bdry_face_data.shape = 0.;
+    auto hshapesBC = bdry_face_data.shape.HostWrite();
 
-    bdry_face_data.face_normal.UseDevice(true);
-    bdry_face_data.face_normal.SetSize(NumBCelems * maxIntPoints * dim);
-    bdry_face_data.face_normal = 0.;
-    auto h_face_normal = bdry_face_data.face_normal.HostWrite();
+    bdry_face_data.normal.UseDevice(true);
+    bdry_face_data.normal.SetSize(NumBCelems * maxIntPoints * dim);
+    bdry_face_data.normal = 0.;
+    auto h_face_normal = bdry_face_data.normal.HostWrite();
 
-    bdry_face_data.face_quad_weight.UseDevice(true);
-    bdry_face_data.face_quad_weight.SetSize(NumBCelems * maxIntPoints);
-    bdry_face_data.face_quad_weight = 0.;
-    auto h_face_quad_weight = bdry_face_data.face_quad_weight.HostWrite();
+    bdry_face_data.quad_weight.UseDevice(true);
+    bdry_face_data.quad_weight.SetSize(NumBCelems * maxIntPoints);
+    bdry_face_data.quad_weight = 0.;
+    auto h_face_quad_weight = bdry_face_data.quad_weight.HostWrite();
 
-    bdry_face_data.face_el.SetSize(NumBCelems);
-    bdry_face_data.face_el = 0;
-    auto h_face_el = bdry_face_data.face_el.HostWrite();
+    bdry_face_data.el.SetSize(NumBCelems);
+    bdry_face_data.el = 0;
+    auto h_face_el = bdry_face_data.el.HostWrite();
 
-    bdry_face_data.face_num_quad.SetSize(NumBCelems);
-    bdry_face_data.face_num_quad = 0;
-    auto h_face_num_quad = bdry_face_data.face_num_quad.HostWrite();
+    bdry_face_data.num_quad.SetSize(NumBCelems);
+    bdry_face_data.num_quad = 0;
+    auto h_face_num_quad = bdry_face_data.num_quad.HostWrite();
 
     const FiniteElement *fe;
     FaceElementTransformations *tr;
@@ -860,20 +860,20 @@ void M2ulPhyS::initIndirectionArrays() {
       }
     }
   } else {
-    bdry_face_data.face_shape.SetSize(1);
-    bdry_face_data.face_shape = 0.;
+    bdry_face_data.shape.SetSize(1);
+    bdry_face_data.shape = 0.;
 
-    bdry_face_data.face_normal.SetSize(1);
-    bdry_face_data.face_normal = 0.;
+    bdry_face_data.normal.SetSize(1);
+    bdry_face_data.normal = 0.;
 
-    bdry_face_data.face_quad_weight.SetSize(1);
-    bdry_face_data.face_quad_weight = 0.;
+    bdry_face_data.quad_weight.SetSize(1);
+    bdry_face_data.quad_weight = 0.;
 
-    bdry_face_data.face_el.SetSize(1);
-    bdry_face_data.face_el = -1;
+    bdry_face_data.el.SetSize(1);
+    bdry_face_data.el = -1;
 
-    bdry_face_data.face_num_quad.SetSize(1);
-    bdry_face_data.face_num_quad = 0;
+    bdry_face_data.num_quad.SetSize(1);
+    bdry_face_data.num_quad = 0;
   }
 
   //-----------------------------------------------------------------
@@ -901,34 +901,34 @@ void M2ulPhyS::initIndirectionArrays() {
     auto h_elem2_dofs = parallelData.elem2_dofs.HostReadWrite();
     auto h_elem2_grad_dofs = parallelData.elem2_grad_dofs.HostReadWrite();
 
-    parallelData.face_el1_shape.UseDevice(true);
-    parallelData.face_el2_shape.UseDevice(true);
-    parallelData.face_quad_weight.UseDevice(true);
-    parallelData.face_normal.UseDevice(true);
+    parallelData.el1_shape.UseDevice(true);
+    parallelData.el2_shape.UseDevice(true);
+    parallelData.quad_weight.UseDevice(true);
+    parallelData.normal.UseDevice(true);
 
-    parallelData.face_el1_shape.SetSize(Nshared * maxIntPoints * maxDofs);
-    parallelData.face_el2_shape.SetSize(Nshared * maxIntPoints * maxDofs);
-    parallelData.face_quad_weight.SetSize(Nshared * maxIntPoints);
-    parallelData.face_normal.SetSize(Nshared * maxIntPoints * dim);
-    parallelData.face_el1.SetSize(Nshared);
-    parallelData.face_num_quad.SetSize(Nshared);
-    parallelData.face_num_dof2.SetSize(Nshared);
+    parallelData.el1_shape.SetSize(Nshared * maxIntPoints * maxDofs);
+    parallelData.el2_shape.SetSize(Nshared * maxIntPoints * maxDofs);
+    parallelData.quad_weight.SetSize(Nshared * maxIntPoints);
+    parallelData.normal.SetSize(Nshared * maxIntPoints * dim);
+    parallelData.el1.SetSize(Nshared);
+    parallelData.num_quad.SetSize(Nshared);
+    parallelData.num_dof2.SetSize(Nshared);
 
-    parallelData.face_el1_shape = 0.;
-    parallelData.face_el2_shape = 0.;
-    parallelData.face_quad_weight = 0.;
-    parallelData.face_normal = 0.;
-    parallelData.face_el1 = 0;
-    parallelData.face_num_quad = 0;
-    parallelData.face_num_dof2 = 0;
+    parallelData.el1_shape = 0.;
+    parallelData.el2_shape = 0.;
+    parallelData.quad_weight = 0.;
+    parallelData.normal = 0.;
+    parallelData.el1 = 0;
+    parallelData.num_quad = 0;
+    parallelData.num_dof2 = 0;
 
-    auto h_shape1 = parallelData.face_el1_shape.HostWrite();
-    auto h_shape2 = parallelData.face_el2_shape.HostWrite();
-    auto h_face_quad_weight = parallelData.face_quad_weight.HostWrite();
-    auto h_face_normal = parallelData.face_normal.HostWrite();
-    auto h_face_el1 = parallelData.face_el1.HostWrite();
-    auto h_face_num_quad = parallelData.face_num_quad.HostWrite();
-    auto h_face_num_dof2 = parallelData.face_num_dof2.HostWrite();
+    auto h_shape1 = parallelData.el1_shape.HostWrite();
+    auto h_shape2 = parallelData.el2_shape.HostWrite();
+    auto h_face_quad_weight = parallelData.quad_weight.HostWrite();
+    auto h_face_normal = parallelData.normal.HostWrite();
+    auto h_face_el1 = parallelData.el1.HostWrite();
+    auto h_face_num_quad = parallelData.num_quad.HostWrite();
+    auto h_face_num_dof2 = parallelData.num_dof2.HostWrite();
 
     std::vector<int> unicElems;
     unicElems.clear();
@@ -1015,7 +1015,7 @@ void M2ulPhyS::initIndirectionArrays() {
     auto h_shared_elements_to_shared_faces = parallelData.shared_elements_to_shared_faces.HostWrite();
     for (size_t el = 0; el < unicElems.size(); el++) {
       const int eli = unicElems[el];
-      for (int f = 0; f < parallelData.face_el1.Size(); f++) {
+      for (int f = 0; f < parallelData.el1.Size(); f++) {
         if (eli == h_face_el1[f]) {
           h_shared_elements_to_shared_faces[0 + 7 * el] = h_face_el1[f];
           int numFace = h_shared_elements_to_shared_faces[1 + 7 * el];

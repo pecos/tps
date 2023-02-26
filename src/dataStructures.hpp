@@ -216,28 +216,28 @@ struct SpongeZoneData {
 struct elementIndexingData {
   /** Dof array offset for element i
    *
-   *  To be used with element_dofs_list.  Specifically,
+   *  To be used with dofs_list.  Specifically,
    *
-   *  element_dofs_list[element_dof_offset[i] + j] = index of jth dof of element i
+   *  dofs_list[dof_offset[i] + j] = index of jth dof of element i
    */
-  Array<int> element_dof_offset;
+  Array<int> dof_offset;
 
   /** Number of dofs for each element
    *
-   *  element_dof_number[i] = number of dofs for element i
+   *  dof_number[i] = number of dofs for element i
    */
-  Array<int> element_dof_number;
+  Array<int> dof_number;
 
   /** List of dof indices, ordered by element.
    *
    *  I.e. [ (dof indices for elem 0), (dof indices for elem 1), ... (dof indices for elem Ne-1) ]
    *
    *  Since elements may have different numbers of dofs, use
-   *  element_dof_offset to aid in indexing as follows:
+   *  dof_offset to aid in indexing as follows:
    *
-   *  element_dofs_list[element_dof_offset[i] + j] = index of jth dof of element i
+   *  dofs_list[dof_offset[i] + j] = index of jth dof of element i
    */
-  Array<int> element_dofs_list;
+  Array<int> dofs_list;
 
   /** Number of elements of each type (e.g, number of tets, number of hexes, etc) */
   Array<int> num_elems_of_type;
@@ -253,16 +253,16 @@ struct elementIndexingData {
  */
 struct interiorFaceIntegrationData {
   /** Shape functions for "element 1" evaluated at all interior face quadrature points */
-  Vector face_el1_shape;
+  Vector el1_shape;
 
   /** Shape functions for "element 2" evaluated at all interior face quadrature points */
-  Vector face_el2_shape;
+  Vector el2_shape;
 
   /** Weights associated with all interior face quadrature points */
-  Vector face_quad_weight;
+  Vector quad_weight;
 
   /** Normal vector (oriented from elem 1 toward elem 2) for all interior face quadrature points */
-  Vector face_normal;
+  Vector normal;
 
   /** maps from element index to face indices
    *
@@ -272,13 +272,13 @@ struct interiorFaceIntegrationData {
   Array<int> element_to_faces;
 
   /** for each interior face, index of element 1 */
-  Array<int> face_el1;
+  Array<int> el1;
 
   /** for each interior face, index of element 2 */
-  Array<int> face_el2;
+  Array<int> el2;
 
   /** for each interior face, number of quadrature points */
-  Array<int> face_num_quad;
+  Array<int> num_quad;
 };
 
 /** @brief Data for boundary face integral calculations
@@ -291,19 +291,19 @@ struct interiorFaceIntegrationData {
  */
 struct boundaryFaceIntegrationData {
   /** Shape functions evaluated at all boundary face quadrature points */
-  Vector face_shape;
+  Vector shape;
 
   /** Weights associated with all boundary face quadrature points */
-  Vector face_quad_weight;
+  Vector quad_weight;
 
   /** Normal vector (outward pointing) for all boundary face quadrature points */
-  Vector face_normal;
+  Vector normal;
 
   /** for each boundary face, index of corresponding element */
-  Array<int> face_el;
+  Array<int> el;
 
   /** for each boundary face, number of quadrature points */
-  Array<int> face_num_quad;
+  Array<int> num_quad;
 };
 
 /** @brief Data for shared face integral calculations
@@ -318,25 +318,25 @@ struct boundaryFaceIntegrationData {
  */
 struct sharedFaceIntegrationData {
   /** Shape functions for "element 1" evaluated at all shared face quadrature points */
-  Vector face_el1_shape;
+  Vector el1_shape;
 
   /** Shape functions for "element 2" evaluated at all shared face quadrature points */
-  Vector face_el2_shape;
+  Vector el2_shape;
 
   /** Weights associated with all shared face quadrature points */
-  Vector face_quad_weight;
+  Vector quad_weight;
 
   /** Normal vector (oriented from elem 1 toward elem 2) for all shared face quadrature points */
-  Vector face_normal;
+  Vector normal;
 
   /** for each shared face, index of element 1 */
-  Array<int> face_el1;
+  Array<int> el1;
 
   /** for each shared face, number of dofs for element 2 */
-  Array<int> face_num_quad;
+  Array<int> num_quad;
 
   /** for each shared face, number of quadrature points */
-  Array<int> face_num_dof2;
+  Array<int> num_dof2;
 
   /** @brief Map from shared element index to shared face index(ices)
    *
