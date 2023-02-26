@@ -89,7 +89,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   zk.SetSize(vfes->GetNDofs());
 
   const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
-  h_numElems = elem_data.numElems.HostRead();
+  h_num_elems_of_type = elem_data.num_elems_of_type.HostRead();
 
   Me_inv.SetSize(vfes->GetNE());
   Me_inv_rad.SetSize(vfes->GetNE());
@@ -384,16 +384,16 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
 #ifdef _GPU_
   const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
   auto h_elem_dof_num = elem_data.element_dof_number.HostRead();
-  for (int eltype = 0; eltype < elem_data.numElems.Size(); eltype++) {
+  for (int eltype = 0; eltype < elem_data.num_elems_of_type.Size(); eltype++) {
     int elemOffset = 0;
     if (eltype != 0) {
-      for (int i = 0; i < eltype; i++) elemOffset += h_numElems[i];
+      for (int i = 0; i < eltype; i++) elemOffset += h_num_elems_of_type[i];
     }
     int dof = h_elem_dof_num[elemOffset];
     const int totDofs = vfes->GetNDofs();
 
-    RHSoperator::multiPlyInvers_gpu(y, z, gpuArrays, invMArray, posDofInvM, num_equation_, totDofs, h_numElems[eltype],
-                                    elemOffset, dof);
+    RHSoperator::multiPlyInvers_gpu(y, z, gpuArrays, invMArray, posDofInvM, num_equation_, totDofs,
+                                    h_num_elems_of_type[eltype], elemOffset, dof);
   }
 
 #else

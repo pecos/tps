@@ -653,10 +653,10 @@ void M2ulPhyS::initIndirectionArrays() {
     }
   }
   tempNumElems.push_back(typeElems);
-  elem_data.numElems.SetSize(tempNumElems.size());
-  elem_data.numElems = 0;
-  auto hnumElems = elem_data.numElems.HostWrite();
-  for (int i = 0; i < (int)tempNumElems.size(); i++) hnumElems[i] = tempNumElems[i];
+  elem_data.num_elems_of_type.SetSize(tempNumElems.size());
+  elem_data.num_elems_of_type = 0;
+  auto h_num_elems_of_type = elem_data.num_elems_of_type.HostWrite();
+  for (int i = 0; i < (int)tempNumElems.size(); i++) h_num_elems_of_type[i] = tempNumElems[i];
 
   //-----------------------------------------------------------------
   // Interior faces
@@ -667,9 +667,9 @@ void M2ulPhyS::initIndirectionArrays() {
     //     const int maxIntPoints = 49; // corresponding to square face with p=5
     //     const int maxDofs = 216; //HEX with p=5
 
-    face_data.elemFaces.SetSize(7 * vfes->GetNE());
-    face_data.elemFaces = 0;
-    auto helemFaces = face_data.elemFaces.HostWrite();
+    face_data.element_to_faces.SetSize(7 * vfes->GetNE());
+    face_data.element_to_faces = 0;
+    auto h_element_to_faces = face_data.element_to_faces.HostWrite();
 
     std::vector<double> shapes2, shapes1;
     shapes1.clear();
@@ -716,17 +716,17 @@ void M2ulPhyS::initIndirectionArrays() {
         fes->GetElementVDofs(tr->Elem2No, vdofs2);
 
         {
-          int nf = helemFaces[7 * tr->Elem1No];
+          int nf = h_element_to_faces[7 * tr->Elem1No];
           if (nf < 0) nf = 0;
-          helemFaces[7 * tr->Elem1No + nf + 1] = face;
+          h_element_to_faces[7 * tr->Elem1No + nf + 1] = face;
           nf++;
-          helemFaces[7 * tr->Elem1No] = nf;
+          h_element_to_faces[7 * tr->Elem1No] = nf;
 
-          nf = helemFaces[7 * tr->Elem2No];
+          nf = h_element_to_faces[7 * tr->Elem2No];
           if (nf < 0) nf = 0;
-          helemFaces[7 * tr->Elem2No + nf + 1] = face;
+          h_element_to_faces[7 * tr->Elem2No + nf + 1] = face;
           nf++;
-          helemFaces[7 * tr->Elem2No] = nf;
+          h_element_to_faces[7 * tr->Elem2No] = nf;
         }
 
         const FiniteElement *fe1 = fes->GetFE(tr->Elem1No);

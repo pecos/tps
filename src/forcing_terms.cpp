@@ -50,7 +50,7 @@ ForcingTerms::ForcingTerms(const int &_dim, const int &_num_equation, const int 
       gradUp_(_gradUp),
       gpuArrays(_gpuArrays) {
   const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
-  h_numElems = elem_data.numElems.HostRead();
+  h_num_elems_of_type = elem_data.num_elems_of_type.HostRead();
 
   //   b = new ParGridFunction(vfes);
   //
@@ -118,14 +118,14 @@ void ConstantPressureGradient::updateTerms(Vector &in) {
 
   auto h_elem_dof_number = elem_data.element_dof_number.HostRead();
 
-  for (int elType = 0; elType < elem_data.numElems.Size(); elType++) {
+  for (int elType = 0; elType < elem_data.num_elems_of_type.Size(); elType++) {
     int elemOffset = 0;
     if (elType != 0) {
-      for (int i = 0; i < elType; i++) elemOffset += h_numElems[i];
+      for (int i = 0; i < elType; i++) elemOffset += h_num_elems_of_type[i];
     }
     int dof_el = h_elem_dof_number[elemOffset];
 
-    updateTerms_gpu(h_numElems[elType], elemOffset, dof_el, vfes->GetNDofs(), pressGrad, in, *Up_, *gradUp_,
+    updateTerms_gpu(h_num_elems_of_type[elType], elemOffset, dof_el, vfes->GetNDofs(), pressGrad, in, *Up_, *gradUp_,
                     num_equation, dim, gpuArrays);
   }
 #else

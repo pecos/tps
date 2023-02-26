@@ -240,7 +240,7 @@ struct elementIndexingData {
   Array<int> element_dofs_list;
 
   /** Number of elements of each type (e.g, number of tets, number of hexes, etc) */
-  Array<int> numElems;
+  Array<int> num_elems_of_type;
 };
 
 /** @brief Storage for data used in the _GPU_ code path
@@ -269,7 +269,7 @@ struct interiorFaceIntegrationData {
    *  elemFaces[7*i] = number of faces for element i
    *  elemFaces[7*i + 1 + f] = face index for local face f of element i
    */
-  Array<int> elemFaces;  // number and faces IDs of each element
+  Array<int> element_to_faces;
 
   /** for each interior face, index of element 1 */
   Array<int> face_el1;

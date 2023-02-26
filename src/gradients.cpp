@@ -56,7 +56,7 @@ Gradients::Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradU
       maxIntPoints_(_maxIntPoints),
       maxDofs_(_maxDofs) {
   const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
-  h_numElems = elem_data.numElems.HostRead();
+  h_num_elems_of_type = elem_data.num_elems_of_type.HostRead();
 
   uk_el1.UseDevice(true);
   uk_el2.UseDevice(true);
@@ -232,25 +232,25 @@ void Gradients::computeGradients_domain() {
   auto h_elem_dof_num = elem_data.element_dof_number.HostRead();
 
   // Interpolate state info the faces (loops over elements)
-  for (int elType = 0; elType < elem_data.numElems.Size(); elType++) {
+  for (int elType = 0; elType < elem_data.num_elems_of_type.Size(); elType++) {
     int elemOffset = 0;
-    for (int i = 0; i < elType; i++) elemOffset += h_numElems[i];
+    for (int i = 0; i < elType; i++) elemOffset += h_num_elems_of_type[i];
     int dof_el = h_elem_dof_num[elemOffset];
     interpFaceData_gpu(*Up, elType, elemOffset, dof_el);
   }
 
   evalFaceIntegrand_gpu();
 
-  for (int elType = 0; elType < elem_data.numElems.Size(); elType++) {
+  for (int elType = 0; elType < elem_data.num_elems_of_type.Size(); elType++) {
     int elemOffset = 0;
-    for (int i = 0; i < elType; i++) elemOffset += h_numElems[i];
+    for (int i = 0; i < elType; i++) elemOffset += h_num_elems_of_type[i];
     int dof_el = h_elem_dof_num[elemOffset];
     faceContrib_gpu(elType, elemOffset, dof_el);
   }
 
-  for (int elType = 0; elType < elem_data.numElems.Size(); elType++) {
+  for (int elType = 0; elType < elem_data.num_elems_of_type.Size(); elType++) {
     int elemOffset = 0;
-    for (int i = 0; i < elType; i++) elemOffset += h_numElems[i];
+    for (int i = 0; i < elType; i++) elemOffset += h_num_elems_of_type[i];
     int dof_el = h_elem_dof_num[elemOffset];
     computeGradients_gpu(elType, elemOffset, dof_el);
   }
@@ -268,11 +268,11 @@ void Gradients::computeGradients_bdr() {
   auto h_elem_dof_num = elem_data.element_dof_number.HostRead();
 
   // Multiply by inverse mass matrix
-  for (int elType = 0; elType < elem_data.numElems.Size(); elType++) {
+  for (int elType = 0; elType < elem_data.num_elems_of_type.Size(); elType++) {
     int elemOffset = 0;
-    for (int i = 0; i < elType; i++) elemOffset += h_numElems[i];
+    for (int i = 0; i < elType; i++) elemOffset += h_num_elems_of_type[i];
     int dof_el = h_elem_dof_num[elemOffset];
-    multInverse_gpu(h_numElems[elType], elemOffset, dof_el);
+    multInverse_gpu(h_num_elems_of_type[elType], elemOffset, dof_el);
     // multInverse_gpu(h_numElems[elType], elemOffset, dof_el, vfes->GetNDofs(), *gradUp, num_equation_, dim_,
     // gpuArrays,
     //                 invMArray, posDofInvM);
@@ -287,7 +287,7 @@ void Gradients::interpFaceData_gpu(const Vector &Up, int elType, int elemOffset,
   const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
   const interiorFaceIntegrationData &face_data = gpuArrays.interior_face_data;
 
-  auto d_elemFaces = face_data.elemFaces.Read();
+  auto d_element_to_faces = face_data.element_to_faces.Read();
   auto d_elem_dofs_list = elem_data.element_dofs_list.Read();
   auto d_elem_dof_off = elem_data.element_dof_offset.Read();
   auto d_shape1 = face_data.face_el1_shape.Read();
@@ -296,7 +296,7 @@ void Gradients::interpFaceData_gpu(const Vector &Up, int elType, int elemOffset,
   auto d_face_nqp = face_data.face_num_quad.Read();
 
   const int Ndofs = vfes->GetNDofs();
-  const int NumElemsType = h_numElems[elType];
+  const int NumElemsType = h_num_elems_of_type[elType];
   const int dim = dim_;
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
@@ -313,7 +313,7 @@ void Gradients::interpFaceData_gpu(const Vector &Up, int elType, int elemOffset,
 
     const int eli = elemOffset + el;
     const int offsetEl1 = d_elem_dof_off[eli];
-    const int elFaces = d_elemFaces[7 * eli];
+    const int elFaces = d_element_to_faces[7 * eli];
     const int dof1 = elDof;
 
     for (int i = 0; i < elDof; i++) {
@@ -323,7 +323,7 @@ void Gradients::interpFaceData_gpu(const Vector &Up, int elType, int elemOffset,
 
     // loop over faces
     for (int face = 0; face < elFaces; face++) {
-      const int gFace = d_elemFaces[7 * eli + face + 1];
+      const int gFace = d_element_to_faces[7 * eli + face + 1];
       const int Q = d_face_nqp[gFace];
       int offset_shape = gFace * maxIntPoints * maxDofs;
 
@@ -385,14 +385,14 @@ void Gradients::computeGradients_gpu(const int elType, const int offsetElems, co
   auto d_Ke = Ke_array_.Read();
   auto d_Ke_pos = Ke_positions_.Read();
 
-  const int numElems = h_numElems[elType];
+  const int num_elems = h_num_elems_of_type[elType];
   const int totalDofs = vfes->GetNDofs();
 
   const int num_equation = num_equation_;
   const int dim = dim_;
 
-  // MFEM_FORALL(el, numElems, {
-  MFEM_FORALL_2D(el, numElems, elDof, 1, 1, {
+  // MFEM_FORALL(el, num_elems, {
+  MFEM_FORALL_2D(el, num_elems, elDof, 1, 1, {
     const int eli = el + offsetElems;
     const int offsetIDs = d_elem_dof_off[eli];
 
@@ -501,13 +501,13 @@ void Gradients::faceContrib_gpu(const int elType, const int offsetElems, const i
   auto d_elem_dofs_list = elem_data.element_dofs_list.Read();
 
   // pointers for face integration
-  auto d_elemFaces = face_data.elemFaces.Read();
+  auto d_element_to_faces = face_data.element_to_faces.Read();
   auto d_shape1 = face_data.face_el1_shape.Read();
   const double *d_shape2 = face_data.face_el2_shape.Read();
   auto d_face_el1 = face_data.face_el1.Read();
   auto d_face_nqp = face_data.face_num_quad.Read();
 
-  const int numElems = h_numElems[elType];
+  const int num_elems = h_num_elems_of_type[elType];
   const int totalDofs = vfes->GetNDofs();
 
   const int dim = dim_;
@@ -515,7 +515,7 @@ void Gradients::faceContrib_gpu(const int elType, const int offsetElems, const i
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;
 
-  MFEM_FORALL_2D(el, numElems, elDof, 1, 1, {
+  MFEM_FORALL_2D(el, num_elems, elDof, 1, 1, {
     const int eli = el + offsetElems;
     const int offsetIDs = d_elem_dof_off[eli];
 
@@ -524,9 +524,9 @@ void Gradients::faceContrib_gpu(const int elType, const int offsetElems, const i
       double const *shape;
 
       // ================  FACE CONTRIBUTION  ================
-      const int elFaces = d_elemFaces[7 * eli];
+      const int elFaces = d_element_to_faces[7 * eli];
       for (int face = 0; face < elFaces; face++) {
-        const int gFace = d_elemFaces[7 * eli + face + 1];
+        const int gFace = d_element_to_faces[7 * eli + face + 1];
         const int Q = d_face_nqp[gFace];
         const int offset_shape = gFace * maxIntPoints * maxDofs;
         bool swapElems = false;

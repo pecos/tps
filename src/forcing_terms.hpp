@@ -68,7 +68,7 @@ class ForcingTerms {
   ParGridFunction *gradUp_;
 
   const precomputedIntegrationData &gpuArrays;
-  const int *h_numElems;
+  const int *h_num_elems_of_type;
 
   // added term
   //   ParGridFunction *b;
