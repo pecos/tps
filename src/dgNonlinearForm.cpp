@@ -80,7 +80,8 @@ void DGNonLinearForm::setParallelData(dataTransferArrays *_transferU, dataTransf
 
   shared_flux.UseDevice(true);
 
-  int maxNumElems = gpuArrays.shared_face_data.sharedElemsFaces.Size() / 7;  // elements with shared faces
+  int maxNumElems =
+      gpuArrays.shared_face_data.shared_elements_to_shared_faces.Size() / 7;  // elements with shared faces
   // TODO(kevin): MAXNUMFACE
   shared_flux.SetSize(maxNumElems * 5 * maxIntPoints_ * num_equation_);
 }
@@ -542,11 +543,11 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
   const double *d_weight = parallelData.face_quad_weight.Read();
   const double *d_shape1 = parallelData.face_el1_shape.Read();
   const int *d_face_num_quad = parallelData.face_num_quad.Read();
-  const int *d_sharedElemsFaces = parallelData.sharedElemsFaces.Read();
+  const int *d_shared_elements_to_shared_faces = parallelData.shared_elements_to_shared_faces.Read();
 
   const double *d_shared_flux = shared_flux.Read();
 
-  const int maxNumElems = parallelData.sharedElemsFaces.Size()/7;  // elements with shared faces
+  const int maxNumElems = parallelData.shared_elements_to_shared_faces.Size()/7;  // elements with shared faces
   const int Ndofs = vfes->GetNDofs();
   const int dim = dim_;
   const int num_equation = num_equation_;
@@ -561,20 +562,20 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
   // the increase in code complexity?  The alternative is to directly
   // loop through the shared faces, which would allow simplification
   // of some of the data structures (e.g., we could eliminate
-  // sharedElemsFaces entirely).  I am skeptical the approach here is
+  // shared_elements_to_shared_faces entirely).  I am skeptical the approach here is
   // significantly better; it feels like a premature optimization.
   // So, for now I am leaving it alone, but the todo is to investigate
   // how much difference this makes.
 
-  MFEM_FORALL_2D(el, parallelData.sharedElemsFaces.Size() / 7, maxDofs, 1, 1, {
+  MFEM_FORALL_2D(el, parallelData.shared_elements_to_shared_faces.Size() / 7, maxDofs, 1, 1, {
     //
     double Fcontrib[gpudata::MAXDOFS * gpudata::MAXEQUATIONS];  // double Fcontrib[216 * 5];
     double Rflux[gpudata::MAXEQUATIONS];  // double Rflux[5];
     int index_i[gpudata::MAXDOFS];  // int index_i[216];
 
-    const int el1      = d_sharedElemsFaces[0 + el * 7];
+    const int el1      = d_shared_elements_to_shared_faces[0 + el * 7];
     const int offsetEl1 = d_elem_dof_off[el1];
-    const int numFaces = d_sharedElemsFaces[1 + el * 7];
+    const int numFaces = d_shared_elements_to_shared_faces[1 + el * 7];
     const int dof1     = d_elem_dof_num[el1];
 
     for (int i = 0; i <  dof1; i++) {
@@ -585,7 +586,7 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
     }
 
     for (int elFace = 0; elFace < numFaces; elFace++) {
-      const int f = d_sharedElemsFaces[1 + elFace + 1 + el * 7];
+      const int f = d_shared_elements_to_shared_faces[1 + elFace + 1 + el * 7];
       const int Q = d_face_num_quad[f];
 
       for (int k = 0; k < Q; k++) {
@@ -639,9 +640,9 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
   const int *d_face_num_dof2 = parallelData.face_num_dof2.Read();
   const int *d_elem2_dofs = parallelData.elem2_dofs.Read();
   const int *d_elem2_grad_dofs = parallelData.elem2_grad_dofs.Read();
-  const int *d_sharedElemsFaces = parallelData.sharedElemsFaces.Read();
+  const int *d_shared_elements_to_shared_faces = parallelData.shared_elements_to_shared_faces.Read();
 
-  const int maxNumElems = parallelData.sharedElemsFaces.Size() / 7;  // elements with shared faces
+  const int maxNumElems = parallelData.shared_elements_to_shared_faces.Size() / 7;  // elements with shared faces
   const int Ndofs = vfes->GetNDofs();
   const int dim = dim_;
   const int num_equation = num_equation_;
@@ -659,7 +660,7 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
   const RiemannSolver *d_rsolver = rsolver_;
   Fluxes *d_flux = fluxes;
 
-  MFEM_FORALL_2D(el, parallelData.sharedElemsFaces.Size() / 7, maxIntPoints, 1, 1, {
+  MFEM_FORALL_2D(el, parallelData.shared_elements_to_shared_faces.Size() / 7, maxIntPoints, 1, 1, {
     double l1[gpudata::MAXDOFS], l2[gpudata::MAXDOFS];            // double l1[216], l2[216];
     double u1[gpudata::MAXEQUATIONS], u2[gpudata::MAXEQUATIONS];  // double u1[5], u2[5];
     double gradUp1[gpudata::MAXDIM * gpudata::MAXEQUATIONS],      // double gradUp1[3 * 5];
@@ -670,8 +671,8 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
         vFlux2[gpudata::MAXDIM * gpudata::MAXEQUATIONS];          // vFlux2[3 * 5];
     int index_i[gpudata::MAXDOFS];                                // int index_i[216];
 
-    const int el1 = d_sharedElemsFaces[0 + el * 7];
-    const int numFaces = d_sharedElemsFaces[1 + el * 7];
+    const int el1 = d_shared_elements_to_shared_faces[0 + el * 7];
+    const int numFaces = d_shared_elements_to_shared_faces[1 + el * 7];
     const int dof1 = d_elem_dof_num[el1];
 
     const int offsetEl1 = d_elem_dof_off[el1];
@@ -681,7 +682,7 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
     }
 
     for (int elFace = 0; elFace < numFaces; elFace++) {
-      const int f = d_sharedElemsFaces[1 + elFace + 1 + el * 7];
+      const int f = d_shared_elements_to_shared_faces[1 + elFace + 1 + el * 7];
       const int dof2 = d_face_num_dof2[f];
       const int Q = d_face_num_quad[f];
 

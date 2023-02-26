@@ -1010,19 +1010,19 @@ void M2ulPhyS::initIndirectionArrays() {
       }
     }
 
-    parallelData.sharedElemsFaces.SetSize(7 * unicElems.size());
-    parallelData.sharedElemsFaces = -1;
-    auto hsharedElemsFaces = parallelData.sharedElemsFaces.HostWrite();
+    parallelData.shared_elements_to_shared_faces.SetSize(7 * unicElems.size());
+    parallelData.shared_elements_to_shared_faces = -1;
+    auto h_shared_elements_to_shared_faces = parallelData.shared_elements_to_shared_faces.HostWrite();
     for (size_t el = 0; el < unicElems.size(); el++) {
       const int eli = unicElems[el];
       for (int f = 0; f < parallelData.face_el1.Size(); f++) {
         if (eli == h_face_el1[f]) {
-          hsharedElemsFaces[0 + 7 * el] = h_face_el1[f];
-          int numFace = hsharedElemsFaces[1 + 7 * el];
+          h_shared_elements_to_shared_faces[0 + 7 * el] = h_face_el1[f];
+          int numFace = h_shared_elements_to_shared_faces[1 + 7 * el];
           if (numFace == -1) numFace = 0;
           numFace++;
-          hsharedElemsFaces[1 + numFace + 7 * el] = f;
-          hsharedElemsFaces[1 + 7 * el] = numFace;
+          h_shared_elements_to_shared_faces[1 + numFace + 7 * el] = f;
+          h_shared_elements_to_shared_faces[1 + 7 * el] = numFace;
         }
       }
     }

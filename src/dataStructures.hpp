@@ -344,11 +344,12 @@ struct sharedFaceIntegrationData {
    *  shared faces rather than the shared faces themselves.  It
    *  contains the following information:
    *
-   * sharedElemsFaces[7*i] = element number for ith element with shared faces
-   * sharedElemsFaces[7*i + 1] = number of shared faces on ith elem with shared faces
-   * sharedElemsFaces[7*i + 1 + j] = shared face index for the jth shared face on the ith element with shared faces
+   * shared_elements_to_shared_faces[7*i] = element number for ith element with shared faces
+   * shared_elements_to_shared_faces[7*i + 1] = number of shared faces on ith elem with shared faces
+   * shared_elements_to_shared_faces[7*i + 1 + j] = shared face index for the jth shared face on the ith element with
+   * shared faces
    */
-  Array<int> sharedElemsFaces;
+  Array<int> shared_elements_to_shared_faces;
 
   /** Degrees of freedom indices for element 2 */
   Array<int> elem2_dofs;

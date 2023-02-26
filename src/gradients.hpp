@@ -104,7 +104,8 @@ class Gradients : public ParNonlinearForm {
 
     dun_shared_face.UseDevice(true);
 
-    int maxNumElems = gpuArrays.shared_face_data.sharedElemsFaces.Size() / 7;  // elements with shared faces
+    int maxNumElems =
+        gpuArrays.shared_face_data.shared_elements_to_shared_faces.Size() / 7;  // elements with shared faces
     dun_shared_face.SetSize(dim_ * maxNumElems * 5 * maxIntPoints_ * num_equation_);
   }
 
