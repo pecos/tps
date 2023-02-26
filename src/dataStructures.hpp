@@ -243,12 +243,12 @@ struct elementIndexingData {
   Array<int> num_elems_of_type;
 };
 
-/** @brief Storage for data used in the _GPU_ code path
+/** @brief Data for interior face integral calculations
  *
  * The _GPU_ path requires pre-computation of a number of quantities,
  * such as the values of the shape functions at each quadrature point
- * on each face.  These quantities, which are documented below, are
- * stored in this struct.
+ * on each face.  For the interior faces, these quantities, which are
+ * documented in more detail below, are stored in this struct.
  *
  */
 struct interiorFaceIntegrationData {
@@ -306,6 +306,16 @@ struct boundaryFaceIntegrationData {
   Array<int> face_num_quad;
 };
 
+/** @brief Data for shared face integral calculations
+ *
+ * The _GPU_ path requires pre-computation of a number of quantities,
+ * such as the values of the shape functions at each quadrature point
+ * on each face.  For shared faces (i.e., faces at the domain
+ * decomposition boundaries---interior faces whose elements sit on
+ * different mpi ranks), these quantities, which are documented in
+ * more detail below, are stored in this struct.
+ *
+ */
 struct sharedFaceIntegrationData {
   /** Shape functions for "element 1" evaluated at all shared face quadrature points */
   Vector face_el1_shape;
