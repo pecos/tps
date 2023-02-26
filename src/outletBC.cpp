@@ -552,7 +552,7 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
 
 void OutletBC::integrationBC(Vector &y, const Vector &x, const elementIndexingData &elem_index_data,
                              ParGridFunction *Up, ParGridFunction *gradUp,
-                             boundaryFaceIntegrationData &boundary_face_data, const int &maxIntPoints,
+                             const boundaryFaceIntegrationData &boundary_face_data, const int &maxIntPoints,
                              const int &maxDofs) {
   interpOutlet_gpu(x, elem_index_data, Up, gradUp, boundary_face_data, listElems, offsetsBoundaryU);
 
@@ -1017,7 +1017,7 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
 }
 
 void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const elementIndexingData &elem_index_data,
-                                    boundaryFaceIntegrationData &boundary_face_data, Array<int> &listElems,
+                                    const boundaryFaceIntegrationData &boundary_face_data, Array<int> &listElems,
                                     Array<int> &offsetsBoundaryU) {
 #ifdef _GPU_
   double *d_y = y.Write();
@@ -1090,7 +1090,7 @@ void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const elementInd
 
 void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData &elem_index_data,
                                 mfem::ParGridFunction *Up, mfem::ParGridFunction *gradUp,
-                                boundaryFaceIntegrationData &boundary_face_data, Array<int> &listElems,
+                                const boundaryFaceIntegrationData &boundary_face_data, Array<int> &listElems,
                                 Array<int> &offsetsBoundaryU) {
 #ifdef _GPU_
   const double *d_inputState = inputState.Read();

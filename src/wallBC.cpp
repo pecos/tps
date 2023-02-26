@@ -209,7 +209,7 @@ void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradSt
 }
 
 void WallBC::integrationBC(Vector &y, const Vector &x, const elementIndexingData &elem_index_data, ParGridFunction *Up,
-                           ParGridFunction *gradUp, boundaryFaceIntegrationData &boundary_face_data,
+                           ParGridFunction *gradUp, const boundaryFaceIntegrationData &boundary_face_data,
                            const int &maxIntPoints, const int &maxDofs) {
   interpWalls_gpu(x, elem_index_data, Up, gradUp, boundary_face_data, maxDofs);
 
@@ -389,7 +389,7 @@ void WallBC::computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix
 }
 
 void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const elementIndexingData &elem_index_data,
-                                boundaryFaceIntegrationData &boundary_face_data, const int &maxDofs) {
+                                const boundaryFaceIntegrationData &boundary_face_data, const int &maxDofs) {
 #ifdef _GPU_
   double *d_y = y.Write();
   //   const double *d_U = x.Read();
@@ -487,7 +487,7 @@ void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const elementIndexin
 
 void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &elem_index_data,
                              mfem::ParGridFunction *Up, mfem::ParGridFunction *gradUp,
-                             boundaryFaceIntegrationData &boundary_face_data, const int &maxDofs) {
+                             const boundaryFaceIntegrationData &boundary_face_data, const int &maxDofs) {
 #ifdef _GPU_
   double *d_flux = face_flux_.Write();
 
