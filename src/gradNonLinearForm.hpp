@@ -47,14 +47,8 @@ class GradNonLinearForm : public ParNonlinearForm {
   const int dim;
   const int num_equation;
 
-  const precomputedIntegrationData &gpuArrays;
-
-  const int &maxIntPoints;
-  const int &maxDofs;
-
  public:
-  GradNonLinearForm(ParFiniteElementSpace *f, IntegrationRules *intRules, const int dim, const int num_equation,
-                    const precomputedIntegrationData &gpuArrays, const int &maxIntPoints, const int &maxDofs);
+  GradNonLinearForm(ParFiniteElementSpace *f, IntegrationRules *intRules, const int dim, const int num_equation);
 
   void Mult(const ParGridFunction *Up, Vector &y);
 

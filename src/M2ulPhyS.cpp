@@ -550,7 +550,7 @@ void M2ulPhyS::initVariables() {
 #else
       gradUpfes,
 #endif
-      intRules, dim, num_equation, gpuArrays, maxIntPoints, maxDofs);
+      intRules, dim, num_equation);
   gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
 
   rhsOperator = new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType,
