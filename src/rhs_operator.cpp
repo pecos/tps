@@ -206,7 +206,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   auto hinvMArray = invMArray.HostWrite();
   for (int i = 0; i < static_cast<int>(temp.size()); i++) hinvMArray[i] = temp[i];
 
-  fillSharedData();
+  allocateTransferData();
 
   A->setParallelData(&transferU, &transferGradUp);
 
@@ -696,7 +696,7 @@ void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const precomputedInte
 #endif
 }
 
-void RHSoperator::fillSharedData() {
+void RHSoperator::allocateTransferData() {
   ParFiniteElementSpace *pfes = Up->ParFESpace();
   ParMesh *mesh = pfes->GetParMesh();
   mesh->ExchangeFaceNbrNodes();

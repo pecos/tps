@@ -134,7 +134,7 @@ class RHSoperator : public TimeDependentOperator {
   mutable dataTransferArrays transferU;
   mutable dataTransferArrays transferUp;
   mutable dataTransferArrays transferGradUp;
-  void fillSharedData();
+  void allocateTransferData();
 
   // void GetFlux(const DenseMatrix &state, DenseTensor &flux) const;
   void GetFlux(const Vector &state, DenseTensor &flux) const;
