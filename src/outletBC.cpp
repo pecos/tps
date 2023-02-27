@@ -461,8 +461,6 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
 
   bdrN = 0;
 
-  int Nbdr = 0;
-
 #ifdef _GPU_
   DGNonLinearForm::setToZero_gpu(bdrUp, bdrUp.Size());
 
@@ -474,6 +472,7 @@ void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
   if (!bdrUInit) initBoundaryU(Up);
 
 #else
+  int Nbdr = 0;
 
   Vector elUp;
   Vector shape;
@@ -1021,7 +1020,6 @@ void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const elementInd
                                     Array<int> &offsetsBoundaryU) {
 #ifdef _GPU_
   double *d_y = y.Write();
-  const double *d_U = x.Read();
   const int *d_elem_dofs_list = elem_index_data.dofs_list.Read();
   const int *d_elem_dof_off = elem_index_data.dof_offset.Read();
   const int *d_elem_dof_num = elem_index_data.dof_number.Read();
@@ -1031,12 +1029,11 @@ void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const elementInd
   const int *d_face_el = boundary_face_data.el.Read();
   const int *d_face_num_quad = boundary_face_data.num_quad.Read();
   const int *d_listElems = listElems.Read();
-  const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
+  // const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
 
   const int totDofs = x.Size() / num_equation_;
   const int numBdrElem = listElems.Size();
 
-  const int dim = dim_;
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;

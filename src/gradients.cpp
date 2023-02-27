@@ -282,19 +282,18 @@ void Gradients::interpFaceData_gpu(const Vector &Up, int elType, int elemOffset,
   double *d_uk_el2 = uk_el2.Write();
 
   const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
-  const interiorFaceIntegrationData &face_data = gpu_precomputed_data_.interior_face_data;
-
-  auto d_element_to_faces = face_data.element_to_faces.Read();
   auto d_elem_dofs_list = elem_data.dofs_list.Read();
   auto d_elem_dof_off = elem_data.dof_offset.Read();
+
+  const interiorFaceIntegrationData &face_data = gpu_precomputed_data_.interior_face_data;
+  auto d_element_to_faces = face_data.element_to_faces.Read();
   auto d_shape1 = face_data.el1_shape.Read();
-  const double *d_shape2 = face_data.el2_shape.Read();
+  auto d_shape2 = face_data.el2_shape.Read();
   auto d_face_el1 = face_data.el1.Read();
   auto d_face_nqp = face_data.num_quad.Read();
 
   const int Ndofs = vfes->GetNDofs();
   const int NumElemsType = h_num_elems_of_type[elType];
-  const int dim = dim_;
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;
@@ -440,9 +439,7 @@ void Gradients::evalFaceIntegrand_gpu() {
   const double *d_uk_el1 = uk_el1.Read();
   const double *d_uk_el2 = uk_el2.Read();
 
-  const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
   const interiorFaceIntegrationData &face_data = gpu_precomputed_data_.interior_face_data;
-
   auto d_weight = face_data.quad_weight.Read();
   auto d_normal = face_data.normal.Read();
   auto d_face_nqp = face_data.num_quad.Read();
@@ -453,7 +450,6 @@ void Gradients::evalFaceIntegrand_gpu() {
   const int dim = dim_;
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
-  const int maxDofs = maxDofs_;
 
   MFEM_FORALL(iface, Nf, {
     double u1[gpudata::MAXEQUATIONS], u2[gpudata::MAXEQUATIONS],
@@ -492,15 +488,13 @@ void Gradients::faceContrib_gpu(const int elType, const int offsetElems, const i
   double *d_gradUp = gradUp->Write();  // NB: I assume this comes in set to zero!
 
   const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
-  const interiorFaceIntegrationData &face_data = gpu_precomputed_data_.interior_face_data;
-
   auto d_elem_dof_off = elem_data.dof_offset.Read();
   auto d_elem_dofs_list = elem_data.dofs_list.Read();
 
-  // pointers for face integration
+  const interiorFaceIntegrationData &face_data = gpu_precomputed_data_.interior_face_data;
   auto d_element_to_faces = face_data.element_to_faces.Read();
   auto d_shape1 = face_data.el1_shape.Read();
-  const double *d_shape2 = face_data.el2_shape.Read();
+  auto d_shape2 = face_data.el2_shape.Read();
   auto d_face_el1 = face_data.el1.Read();
   auto d_face_nqp = face_data.num_quad.Read();
 
@@ -562,8 +556,6 @@ void Gradients::interpGradSharedFace_gpu() {
   const double *d_faceData = transferUp->face_nbr_data.Read();
 
   const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
-  const interiorFaceIntegrationData &face_data = gpu_precomputed_data_.interior_face_data;
-
   const int *d_elem_dofs_list = elem_data.dofs_list.Read();
   const int *d_elem_dof_off = elem_data.dof_offset.Read();
   const int *d_elem_dof_num = elem_data.dof_number.Read();
@@ -656,8 +648,6 @@ void Gradients::integrationGradSharedFace_gpu() {
   double *d_gradUp = gradUp->ReadWrite();
 
   const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
-  const interiorFaceIntegrationData &face_data = gpu_precomputed_data_.interior_face_data;
-
   const int *d_elem_dofs_list = elem_data.dofs_list.Read();
   const int *d_elem_dof_off = elem_data.dof_offset.Read();
   const int *d_elem_dof_num = elem_data.dof_number.Read();
@@ -713,10 +703,9 @@ void Gradients::multInverse_gpu(const int numElems, const int offsetElems, const
   double *d_gradUp = gradUp->ReadWrite();
 
   const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
-  const interiorFaceIntegrationData &face_data = gpu_precomputed_data_.interior_face_data;
-
   auto d_elem_dof_off = elem_data.dof_offset.Read();
   auto d_elem_dofs_list = elem_data.dofs_list.Read();
+
   const double *d_invMArray = invMArray.Read();
   auto d_posDofInvM = posDofInvM.Read();
 

@@ -403,16 +403,8 @@ void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const elementIndexin
   const int *d_listElems = listElems.Read();
 
   const int totDofs = x.Size() / num_equation_;
-  const int numBdrElem = listElems.Size();
+  // const int numBdrElem = listElems.Size();
 
-  const double Rg = mixture->GetGasConstant();
-  const double gamma = mixture->GetSpecificHeatRatio();
-  const double viscMult = mixture->GetViscMultiplyer();
-  const double bulkViscMult = mixture->GetBulkViscMultiplyer();
-  const double Pr = mixture->GetPrandtlNum();
-  const double Sc = mixture->GetSchmidtNum();
-
-  const int dim = dim_;
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
 
@@ -503,18 +495,9 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
   const int *d_listElems = listElems.Read();
 
   const int totDofs = x.Size() / num_equation_;
-  const int numBdrElem = listElems.Size();
+  // const int numBdrElem = listElems.Size();
 
-  const double Rg = mixture->GetGasConstant();
-  const double gamma = mixture->GetSpecificHeatRatio();
-  const double viscMult = mixture->GetViscMultiplyer();
-  const double bulkViscMult = mixture->GetBulkViscMultiplyer();
-  const double Pr = mixture->GetPrandtlNum();
-  const double Sc = mixture->GetSchmidtNum();
-
-  const WorkingFluid fluid = mixture->GetWorkingFluid();
   const WallType type = wallType_;
-  const double wallTemp = wallTemp_;
 
   const int dim = dim_;
   const int num_equation = num_equation_;
@@ -539,7 +522,8 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
 
     BoundaryPrimitiveData bcState;
     BoundaryViscousFluxData bcFlux;
-    double unitNorm[gpudata::MAXDIM], normN;
+    // double unitNorm[gpudata::MAXDIM], normN;
+    double normN;
 
     const int numFaces = d_wallElems[0 + el_wall * 7];
 

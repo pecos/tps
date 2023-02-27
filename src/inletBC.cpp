@@ -148,14 +148,6 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
   for (int i = 0; i < bdrN; i++) {
     for (int eq = 0; eq < num_equation_; eq++) iUp(eq) = hmeanUp[eq];
     mixture->GetConservativesFromPrimitives(iUp, iState);
-
-    //     double gamma = mixture->GetSpecificHeatRatio();
-    //     double k = 0.;
-    //     for (int d = 0; d < dim; d++) k += iState[1 + d] * iState[1 + d];
-    //     double rE = iState[1 + dim] / (gamma - 1.) + 0.5 * iState[0] * k;
-    //
-    //     for (int d = 0; d < dim; d++) iState[1 + d] *= iState[0];
-    //     iState[1 + dim] = rE;
     for (int eq = 0; eq < num_equation_; eq++) hboundaryU[eq + i * num_equation_] = iState[eq];
   }
   bdrUInit = false;
@@ -461,8 +453,6 @@ void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
   if (inletType_ == SUB_DENS_VEL) return;
   bdrN = 0;
 
-  int Nbdr = 0;
-
 #ifdef _GPU_
   DGNonLinearForm::setToZero_gpu(bdrUp, bdrUp.Size());
 
@@ -473,6 +463,7 @@ void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
 
   if (!bdrUInit) initBoundaryU(Up);
 #else
+  int Nbdr = 0;
 
   Vector elUp;
   Vector shape;
@@ -747,14 +738,13 @@ void InletBC::integrateInlets_gpu(Vector &y, const Vector &x, const elementIndex
   const int *d_face_el = boundary_face_data.el.Read();
   const int *d_face_num_quad = boundary_face_data.num_quad.Read();
   const int *d_listElems = listElems.Read();
-  const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
+  // const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
 
   const double *d_flux = face_flux_.Read();
 
   const int totDofs = x.Size() / num_equation_;
   const int numBdrElem = listElems.Size();
 
-  const int dim = dim_;
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;
@@ -814,15 +804,12 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const elementIndexingData &
   const int *d_face_el = boundary_face_data.el.Read();
   const int *d_face_num_quad = boundary_face_data.num_quad.Read();
   const int *d_listElems = listElems.Read();
-  const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
+  // const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
 
   double *d_flux = face_flux_.Write();
 
   const int totDofs = x.Size() / num_equation_;
   const int numBdrElem = listElems.Size();
-
-  const double Rg = mixture->GetGasConstant();
-  const double gamma = mixture->GetSpecificHeatRatio();
 
   const WorkingFluid fluid = mixture->GetWorkingFluid();
 

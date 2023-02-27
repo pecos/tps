@@ -83,18 +83,6 @@ M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps) : mp
   // set default solver state
   exit_status_ = NORMAL;
 
-  // This example depends on this ordering of the space.
-  // MFEM_ASSERT(fes.GetOrdering() == Ordering::byNODES, "");
-#ifdef _GPU_
-  // write to GPU global memory
-  gradUp->ReadWrite();
-  U->ReadWrite();
-  Up->ReadWrite();
-  auto vgradUp = gradUp->ReadWrite();
-  auto v_U = U->ReadWrite();
-  auto vUp = Up->ReadWrite();
-#endif  // _GPU_
-
   // remove DIE file if present
   if (rank0_) {
     if (file_exists("DIE")) {

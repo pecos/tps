@@ -185,29 +185,26 @@ void DGNonLinearForm::setToZero_gpu(Vector &x, const int size) {
 }
 
 void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset, int elDof) {
-  const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
-  const interiorFaceIntegrationData &face_data = gpu_precomputed_data_.interior_face_data;
-
-  auto h_num_elems_of_type = elem_data.num_elems_of_type.HostRead();
-
-  // double *d_y = y.Write();
   double *d_y = y.ReadWrite();
   const double *d_f = face_flux_.Read();
 
-  auto d_element_to_faces = face_data.element_to_faces.Read();
+  const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
+  auto h_num_elems_of_type = elem_data.num_elems_of_type.HostRead();
+
   auto d_elem_dofs_list = elem_data.dofs_list.Read();
   auto d_elem_dof_off = elem_data.dof_offset.Read();
-  auto d_elem_dof_num = elem_data.dof_number.Read();
+
+  const interiorFaceIntegrationData &face_data = gpu_precomputed_data_.interior_face_data;
+  auto d_element_to_faces = face_data.element_to_faces.Read();
   auto d_shape1 = face_data.el1_shape.Read();
   auto d_weight = face_data.quad_weight.Read();
-  const double *d_shape2 = face_data.el2_shape.Read();
+  auto d_shape2 = face_data.el2_shape.Read();
   auto d_face_el1 = face_data.el1.Read();
   auto d_face_el2 = face_data.el1.Read();
   auto d_face_nqp = face_data.num_quad.Read();
 
   const int Ndofs = vfes->GetNDofs();
   const int NumElemType = h_num_elems_of_type[elType];
-  const int dim = dim_;
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;
@@ -245,13 +242,6 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset,
         elj = d_face_el2[gFace];
       } else {
         swapElems = true;
-      }
-
-      int dof1 = elDof;
-      int dof2 = d_elem_dof_num[elj];
-      if (swapElems) {
-        dof1 = dof2;  // = d_elem_dof_num[elj]
-        dof2 = elDof;
       }
 
       for (int k = 0; k < Q; k++) {
@@ -297,18 +287,10 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
   const double *d_grad_uk_el1 = grad_upk_el1.Read();
   const double *d_grad_uk_el2 = grad_upk_el2.Read();
 
-  const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
   const interiorFaceIntegrationData &face_data = gpu_precomputed_data_.interior_face_data;
 
   auto d_normal = face_data.normal.Read();
   auto d_face_nqp = face_data.num_quad.Read();
-
-  const double gamma = mixture->GetSpecificHeatRatio();
-  const double Rg = mixture->GetGasConstant();
-  const double viscMult = mixture->GetViscMultiplyer();
-  const double bulkViscMult = mixture->GetBulkViscMultiplyer();
-  const double Pr = mixture->GetPrandtlNum();
-  // const double Sc = mixture->GetSchmidtNum();
 
   Mesh *mesh = fes->GetMesh();
   const int Nf = mesh->GetNumFaces();
@@ -316,7 +298,6 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
   const int dim = dim_;
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
-  const int maxDofs = maxDofs_;
 
   const RiemannSolver *d_rsolver = rsolver_;
   Fluxes *d_flux = fluxes;
@@ -526,18 +507,9 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
   double *d_y = y.ReadWrite();
 
   const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
-  const interiorFaceIntegrationData &face_data = gpu_precomputed_data_.interior_face_data;
-
   auto d_elem_dofs_list = elem_data.dofs_list.Read();
   auto d_elem_dof_off = elem_data.dof_offset.Read();
   auto d_elem_dof_num = elem_data.dof_number.Read();
-
-  const double gamma = mixture->GetSpecificHeatRatio();
-  const double Rg    = mixture->GetGasConstant();
-  const double viscMult = mixture->GetViscMultiplyer();
-  const double bulkViscMult = mixture->GetBulkViscMultiplyer();
-  const double Pr = mixture->GetPrandtlNum();
-  // const double Sc = mixture->GetSchmidtNum();
 
   const sharedFaceIntegrationData &shared_face_data = gpu_precomputed_data_.shared_face_data;
   const double *d_weight = shared_face_data.quad_weight.Read();
@@ -549,7 +521,6 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
 
   const int maxNumElems = shared_face_data.shared_elements_to_shared_faces.Size()/7;  // elements with shared faces
   const int Ndofs = vfes->GetNDofs();
-  const int dim = dim_;
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;
@@ -567,7 +538,7 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
   // So, for now I am leaving it alone, but the todo is to investigate
   // how much difference this makes.
 
-  MFEM_FORALL_2D(el, shared_face_data.shared_elements_to_shared_faces.Size() / 7, maxDofs, 1, 1, {
+  MFEM_FORALL_2D(el, maxNumElems, maxDofs, 1, 1, {
     //
     double Fcontrib[gpudata::MAXDOFS * gpudata::MAXEQUATIONS];  // double Fcontrib[216 * 5];
     double Rflux[gpudata::MAXEQUATIONS];  // double Rflux[5];
@@ -626,8 +597,6 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
   const double *d_faceData = transferU->face_nbr_data.Read();
 
   const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
-  const interiorFaceIntegrationData &face_data = gpu_precomputed_data_.interior_face_data;
-
   auto d_elem_dofs_list = elem_data.dofs_list.Read();
   auto d_elem_dof_off = elem_data.dof_offset.Read();
   auto d_elem_dof_num = elem_data.dof_number.Read();
@@ -649,18 +618,12 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;
 
-  const double gamma = mixture->GetSpecificHeatRatio();
-  const double Rg = mixture->GetGasConstant();
-  const double viscMult = mixture->GetViscMultiplyer();
-  const double bulkViscMult = mixture->GetBulkViscMultiplyer();
-  const double Pr = mixture->GetPrandtlNum();
-
   double *d_shared_flux = shared_flux.Write();
 
   const RiemannSolver *d_rsolver = rsolver_;
   Fluxes *d_flux = fluxes;
 
-  MFEM_FORALL_2D(el, shared_face_data.shared_elements_to_shared_faces.Size() / 7, maxIntPoints, 1, 1, {
+  MFEM_FORALL_2D(el, maxNumElems, maxIntPoints, 1, 1, {
     double l1[gpudata::MAXDOFS], l2[gpudata::MAXDOFS];            // double l1[216], l2[216];
     double u1[gpudata::MAXEQUATIONS], u2[gpudata::MAXEQUATIONS];  // double u1[5], u2[5];
     double gradUp1[gpudata::MAXDIM * gpudata::MAXEQUATIONS],      // double gradUp1[3 * 5];
