@@ -571,19 +571,19 @@ void Gradients::interpGradSharedFace_gpu() {
   const int *d_elem_dof_off = elem_data.dof_offset.Read();
   const int *d_elem_dof_num = elem_data.dof_number.Read();
 
-  const sharedFaceIntegrationData &parallelData = gpuArrays.shared_face_data;
-  const double *d_weight = parallelData.quad_weight.Read();
-  const double *d_normal = parallelData.normal.Read();
-  const double *d_shape1 = parallelData.el1_shape.Read();
-  const double *d_shape2 = parallelData.el2_shape.Read();
-  const int *d_face_num_quad = parallelData.num_quad.Read();
-  const int *d_face_num_dof2 = parallelData.num_dof2.Read();
-  const int *d_elem2_dofs = parallelData.elem2_dofs.Read();
-  const int *d_shared_elements_to_shared_faces = parallelData.shared_elements_to_shared_faces.Read();
+  const sharedFaceIntegrationData &shared_face_data = gpuArrays.shared_face_data;
+  const double *d_weight = shared_face_data.quad_weight.Read();
+  const double *d_normal = shared_face_data.normal.Read();
+  const double *d_shape1 = shared_face_data.el1_shape.Read();
+  const double *d_shape2 = shared_face_data.el2_shape.Read();
+  const int *d_face_num_quad = shared_face_data.num_quad.Read();
+  const int *d_face_num_dof2 = shared_face_data.num_dof2.Read();
+  const int *d_elem2_dofs = shared_face_data.elem2_dofs.Read();
+  const int *d_shared_elements_to_shared_faces = shared_face_data.shared_elements_to_shared_faces.Read();
 
   double *d_dun = dun_shared_face.Write();
 
-  const int maxNumElems = parallelData.shared_elements_to_shared_faces.Size() / 7;  // elements with shared faces
+  const int maxNumElems = shared_face_data.shared_elements_to_shared_faces.Size() / 7;  // elements with shared faces
   const int dim = dim_;
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
@@ -665,10 +665,10 @@ void Gradients::integrationGradSharedFace_gpu() {
   const int *d_elem_dof_off = elem_data.dof_offset.Read();
   const int *d_elem_dof_num = elem_data.dof_number.Read();
 
-  const sharedFaceIntegrationData &parallelData = gpuArrays.shared_face_data;
-  const double *d_shape1 = parallelData.el1_shape.Read();
-  const int *d_face_num_quad = parallelData.num_quad.Read();
-  const int *d_shared_elements_to_shared_faces = parallelData.shared_elements_to_shared_faces.Read();
+  const sharedFaceIntegrationData &shared_face_data = gpuArrays.shared_face_data;
+  const double *d_shape1 = shared_face_data.el1_shape.Read();
+  const int *d_face_num_quad = shared_face_data.num_quad.Read();
+  const int *d_shared_elements_to_shared_faces = shared_face_data.shared_elements_to_shared_faces.Read();
 
   const double *d_dun = dun_shared_face.Read();
 
@@ -678,7 +678,7 @@ void Gradients::integrationGradSharedFace_gpu() {
   const int maxDofs = maxDofs_;
   const int Ndofs = vfes->GetNDofs();
 
-  MFEM_FORALL_2D(el, parallelData.shared_elements_to_shared_faces.Size() / 7, maxDofs, 1, 1, {  // NOLINT
+  MFEM_FORALL_2D(el, shared_face_data.shared_elements_to_shared_faces.Size() / 7, maxDofs, 1, 1, {  // NOLINT
     // double l1[216];
 
     const int el1 = d_shared_elements_to_shared_faces[0 + el * 7];

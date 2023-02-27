@@ -880,7 +880,7 @@ void M2ulPhyS::initIndirectionArrays() {
   // Shared faces (i.e., interior faces at boundary of decomposition,
   // such that element1 and element2 live on different mpi ranks)
   //-----------------------------------------------------------------
-  sharedFaceIntegrationData &parallelData = gpuArrays.shared_face_data;
+  sharedFaceIntegrationData &shared_face_data = gpuArrays.shared_face_data;
 
   // NB: mesh from above is out of scope
   ParMesh *mesh = fes->GetParMesh();
@@ -892,43 +892,43 @@ void M2ulPhyS::initIndirectionArrays() {
   gradUpfes->ExchangeFaceNbrData();
 
   if (Nshared > 0) {
-    parallelData.elem2_dofs.SetSize(Nshared * num_equation * maxDofs);
-    parallelData.elem2_grad_dofs.SetSize(Nshared * num_equation * maxDofs * dim);
+    shared_face_data.elem2_dofs.SetSize(Nshared * num_equation * maxDofs);
+    shared_face_data.elem2_grad_dofs.SetSize(Nshared * num_equation * maxDofs * dim);
 
-    parallelData.elem2_dofs = 0;
-    parallelData.elem2_grad_dofs = 0;
+    shared_face_data.elem2_dofs = 0;
+    shared_face_data.elem2_grad_dofs = 0;
 
-    auto h_elem2_dofs = parallelData.elem2_dofs.HostReadWrite();
-    auto h_elem2_grad_dofs = parallelData.elem2_grad_dofs.HostReadWrite();
+    auto h_elem2_dofs = shared_face_data.elem2_dofs.HostReadWrite();
+    auto h_elem2_grad_dofs = shared_face_data.elem2_grad_dofs.HostReadWrite();
 
-    parallelData.el1_shape.UseDevice(true);
-    parallelData.el2_shape.UseDevice(true);
-    parallelData.quad_weight.UseDevice(true);
-    parallelData.normal.UseDevice(true);
+    shared_face_data.el1_shape.UseDevice(true);
+    shared_face_data.el2_shape.UseDevice(true);
+    shared_face_data.quad_weight.UseDevice(true);
+    shared_face_data.normal.UseDevice(true);
 
-    parallelData.el1_shape.SetSize(Nshared * maxIntPoints * maxDofs);
-    parallelData.el2_shape.SetSize(Nshared * maxIntPoints * maxDofs);
-    parallelData.quad_weight.SetSize(Nshared * maxIntPoints);
-    parallelData.normal.SetSize(Nshared * maxIntPoints * dim);
-    parallelData.el1.SetSize(Nshared);
-    parallelData.num_quad.SetSize(Nshared);
-    parallelData.num_dof2.SetSize(Nshared);
+    shared_face_data.el1_shape.SetSize(Nshared * maxIntPoints * maxDofs);
+    shared_face_data.el2_shape.SetSize(Nshared * maxIntPoints * maxDofs);
+    shared_face_data.quad_weight.SetSize(Nshared * maxIntPoints);
+    shared_face_data.normal.SetSize(Nshared * maxIntPoints * dim);
+    shared_face_data.el1.SetSize(Nshared);
+    shared_face_data.num_quad.SetSize(Nshared);
+    shared_face_data.num_dof2.SetSize(Nshared);
 
-    parallelData.el1_shape = 0.;
-    parallelData.el2_shape = 0.;
-    parallelData.quad_weight = 0.;
-    parallelData.normal = 0.;
-    parallelData.el1 = 0;
-    parallelData.num_quad = 0;
-    parallelData.num_dof2 = 0;
+    shared_face_data.el1_shape = 0.;
+    shared_face_data.el2_shape = 0.;
+    shared_face_data.quad_weight = 0.;
+    shared_face_data.normal = 0.;
+    shared_face_data.el1 = 0;
+    shared_face_data.num_quad = 0;
+    shared_face_data.num_dof2 = 0;
 
-    auto h_shape1 = parallelData.el1_shape.HostWrite();
-    auto h_shape2 = parallelData.el2_shape.HostWrite();
-    auto h_face_quad_weight = parallelData.quad_weight.HostWrite();
-    auto h_face_normal = parallelData.normal.HostWrite();
-    auto h_face_el1 = parallelData.el1.HostWrite();
-    auto h_face_num_quad = parallelData.num_quad.HostWrite();
-    auto h_face_num_dof2 = parallelData.num_dof2.HostWrite();
+    auto h_shape1 = shared_face_data.el1_shape.HostWrite();
+    auto h_shape2 = shared_face_data.el2_shape.HostWrite();
+    auto h_face_quad_weight = shared_face_data.quad_weight.HostWrite();
+    auto h_face_normal = shared_face_data.normal.HostWrite();
+    auto h_face_el1 = shared_face_data.el1.HostWrite();
+    auto h_face_num_quad = shared_face_data.num_quad.HostWrite();
+    auto h_face_num_dof2 = shared_face_data.num_dof2.HostWrite();
 
     std::vector<int> unicElems;
     unicElems.clear();
@@ -1010,12 +1010,12 @@ void M2ulPhyS::initIndirectionArrays() {
       }
     }
 
-    parallelData.shared_elements_to_shared_faces.SetSize(7 * unicElems.size());
-    parallelData.shared_elements_to_shared_faces = -1;
-    auto h_shared_elements_to_shared_faces = parallelData.shared_elements_to_shared_faces.HostWrite();
+    shared_face_data.shared_elements_to_shared_faces.SetSize(7 * unicElems.size());
+    shared_face_data.shared_elements_to_shared_faces = -1;
+    auto h_shared_elements_to_shared_faces = shared_face_data.shared_elements_to_shared_faces.HostWrite();
     for (size_t el = 0; el < unicElems.size(); el++) {
       const int eli = unicElems[el];
-      for (int f = 0; f < parallelData.el1.Size(); f++) {
+      for (int f = 0; f < shared_face_data.el1.Size(); f++) {
         if (eli == h_face_el1[f]) {
           h_shared_elements_to_shared_faces[0 + 7 * el] = h_face_el1[f];
           int numFace = h_shared_elements_to_shared_faces[1 + 7 * el];
