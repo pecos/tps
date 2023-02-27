@@ -35,8 +35,8 @@
 
 ForcingTerms::ForcingTerms(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                            IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
-                           ParGridFunction *_Up, ParGridFunction *_gradUp, const precomputedIntegrationData &gpu_precomputed_data,
-                           bool axisym)
+                           ParGridFunction *_Up, ParGridFunction *_gradUp,
+                           const precomputedIntegrationData &gpu_precomputed_data, bool axisym)
     : dim(_dim),
       nvel(axisym ? 3 : _dim),
       num_equation(_num_equation),
@@ -240,7 +240,8 @@ AxisymmetricSource::AxisymmetricSource(const int &_dim, const int &_num_equation
                                        const Equations &_eqSystem, const int &_intRuleType, IntegrationRules *_intRules,
                                        ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up,
                                        ParGridFunction *_gradUp, ParGridFunction *spaceVaryViscMult,
-                                       const precomputedIntegrationData &gpu_precomputed_data, RunConfiguration &_config)
+                                       const precomputedIntegrationData &gpu_precomputed_data,
+                                       RunConfiguration &_config)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpu_precomputed_data,
                    _config.isAxisymmetric()),
       mixture(_mixture),

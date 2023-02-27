@@ -122,9 +122,9 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   }
 
   if (_config.GetWorkingFluid() != WorkingFluid::DRY_AIR) {
-    forcing.Append(new SourceTerm(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up, gradUp, gpu_precomputed_data_,
-                                  _config, mixture, d_mixture_, _transport, _chemistry, _radiation,
-                                  plasma_conductivity_));
+    forcing.Append(new SourceTerm(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up, gradUp,
+                                  gpu_precomputed_data_, _config, mixture, d_mixture_, _transport, _chemistry,
+                                  _radiation, plasma_conductivity_));
   }
 #ifdef HAVE_MASA
   if (config_.use_mms_) {
@@ -136,7 +136,8 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
 
   if (config_.isAxisymmetric()) {
     forcing.Append(new AxisymmetricSource(dim_, num_equation_, _order, mixture, transport_, eqSystem, intRuleType,
-                                          intRules, vfes, U_, Up, gradUp, spaceVaryViscMult, gpu_precomputed_data_, _config));
+                                          intRules, vfes, U_, Up, gradUp, spaceVaryViscMult, gpu_precomputed_data_,
+                                          _config));
     const FiniteElementCollection *fec = vfes->FEColl();
     dfes = new ParFiniteElementSpace(mesh, fec, dim_, Ordering::byNODES);
     coordsDof = new ParGridFunction(dfes);

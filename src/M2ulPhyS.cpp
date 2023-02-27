@@ -480,8 +480,8 @@ void M2ulPhyS::initVariables() {
   bcIntegrator = NULL;
   if (local_attr.Size() > 0) {
     bcIntegrator = new BCintegrator(groupsMPI, mesh, vfes, intRules, rsolver, dt, mixture, d_mixture, fluxClass, Up,
-                                    gradUp, gpu_precomputed_data_.boundary_face_data, dim, num_equation, max_char_speed, config,
-                                    local_attr, maxIntPoints, maxDofs);
+                                    gradUp, gpu_precomputed_data_.boundary_face_data, dim, num_equation, max_char_speed,
+                                    config, local_attr, maxIntPoints, maxDofs);
   }
 
   // A->SetAssemblyLevel(AssemblyLevel::PARTIAL);
@@ -543,10 +543,11 @@ void M2ulPhyS::initVariables() {
       intRules, dim, num_equation);
   gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
 
-  rhsOperator = new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType,
-                                fluxClass, mixture, d_mixture, chemistry_, transportPtr, radiation_, vfes, gpu_precomputed_data_,
-                                maxIntPoints, maxDofs, A, Aflux, mesh, spaceVaryViscMult, U, Up, gradUp, gradUpfes,
-                                gradUp_A, bcIntegrator, isSBP, alpha, config, plasma_conductivity_, joule_heating_);
+  rhsOperator =
+      new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType, fluxClass,
+                      mixture, d_mixture, chemistry_, transportPtr, radiation_, vfes, gpu_precomputed_data_,
+                      maxIntPoints, maxDofs, A, Aflux, mesh, spaceVaryViscMult, U, Up, gradUp, gradUpfes, gradUp_A,
+                      bcIntegrator, isSBP, alpha, config, plasma_conductivity_, joule_heating_);
 
   CFL = config.GetCFLNumber();
   rhsOperator->SetTime(time);
@@ -658,8 +659,6 @@ void M2ulPhyS::initIndirectionArrays() {
   std::vector<double> shapes2, shapes1;
   shapes1.clear();
   shapes2.clear();
-
-  //Mesh *mesh = vfes->GetMesh();
 
   face_data.el1.SetSize(mesh->GetNumFaces());
   face_data.el1 = 0;

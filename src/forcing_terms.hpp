@@ -94,8 +94,9 @@ class ConstantPressureGradient : public ForcingTerms {
  public:
   ConstantPressureGradient(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                            IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
-                           ParGridFunction *_Up, ParGridFunction *_gradUp, const precomputedIntegrationData &gpu_precomputed_data,
-                           RunConfiguration &_config, GasMixture *mixture);
+                           ParGridFunction *_Up, ParGridFunction *_gradUp,
+                           const precomputedIntegrationData &gpu_precomputed_data, RunConfiguration &_config,
+                           GasMixture *mixture);
   virtual ~ConstantPressureGradient() {}
 
   // Terms do not need updating
@@ -226,7 +227,8 @@ class MASA_forcings : public ForcingTerms {
  public:
   MASA_forcings(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                 IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up,
-                ParGridFunction *_gradUp, const precomputedIntegrationData &gpu_precomputed_data, RunConfiguration &_config);
+                ParGridFunction *_gradUp, const precomputedIntegrationData &gpu_precomputed_data,
+                RunConfiguration &_config);
 
   virtual void updateTerms(Vector &in);
 };

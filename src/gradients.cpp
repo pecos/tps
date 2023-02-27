@@ -35,9 +35,9 @@
 
 Gradients::Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradUpfes, int _dim, int _num_equation,
                      ParGridFunction *_Up, ParGridFunction *_gradUp, GasMixture *_mixture, GradNonLinearForm *_gradUp_A,
-                     IntegrationRules *_intRules, int _intRuleType, const precomputedIntegrationData &gpu_precomputed_data,
-                     Array<DenseMatrix *> &_Me_inv, Vector &_invMArray, Array<int> &_posDofInvM,
-                     const int &_maxIntPoints, const int &_maxDofs)
+                     IntegrationRules *_intRules, int _intRuleType,
+                     const precomputedIntegrationData &gpu_precomputed_data, Array<DenseMatrix *> &_Me_inv,
+                     Vector &_invMArray, Array<int> &_posDofInvM, const int &_maxIntPoints, const int &_maxDofs)
     : ParNonlinearForm(_vfes),
       vfes(_vfes),
       gradUpfes(_gradUpfes),
