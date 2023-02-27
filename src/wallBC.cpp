@@ -140,9 +140,8 @@ WallBC::~WallBC() {}
 
 void WallBC::initBCs() {
   if (!BCinit) {
-    buildWallElemsArray();
-
 #ifdef _GPU_
+    buildWallElemsArray();
     face_flux_.UseDevice(true);
     face_flux_.SetSize(num_equation_ * maxIntPoints_ * listElems.Size());
     face_flux_ = 0.;

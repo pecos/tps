@@ -192,6 +192,7 @@ class M2ulPhyS : public TPS::Solver {
   const int maxIntPoints = gpudata::MAXINTPOINTS;  // corresponding to HEX face with p=5
   const int maxDofs = gpudata::MAXDOFS;            // corresponding to HEX with p=5
 
+  /// Data required for residual evaluation in _GPU_ path
   precomputedIntegrationData gpuArrays;
 
   // The solution u has components {density, x-momentum, y-momentum, energy}.
@@ -303,6 +304,13 @@ class M2ulPhyS : public TPS::Solver {
 
   void getAttributesInPartition(Array<int> &local_attr);
 
+  /** @brief Fill precomputedIntegrationData struct
+   *
+   *  The _GPU_ path required some quantities (e.g., basis function at
+   *  all face quadrature points) to be evaluated and stored at the
+   *  beginning of a simulation.  These quantities are evaluated by
+   *  this function.
+   */
   void initIndirectionArrays();
 
   void initVariables();
