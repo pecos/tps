@@ -62,7 +62,7 @@ class Gradients : public ParNonlinearForm {
   IntegrationRules *intRules;
   const int intRuleType;
 
-  const precomputedIntegrationData &gpuArrays;
+  const precomputedIntegrationData &gpu_precomputed_data_;
   Vector uk_el1;
   Vector uk_el2;
   Vector dun_face;
@@ -93,7 +93,7 @@ class Gradients : public ParNonlinearForm {
  public:
   Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradUpfes, int _dim, int _num_equation,
             ParGridFunction *_Up, ParGridFunction *_gradUp, GasMixture *_mixture, GradNonLinearForm *_gradUp_A,
-            IntegrationRules *_intRules, int _intRuleType, const precomputedIntegrationData &gpuArrays,
+            IntegrationRules *_intRules, int _intRuleType, const precomputedIntegrationData &gpu_precomputed_data,
             Array<DenseMatrix *> &Me_inv, Vector &_invMArray, Array<int> &_posDofInvM, const int &_maxIntPoints,
             const int &_maxDofs);
 
@@ -105,7 +105,7 @@ class Gradients : public ParNonlinearForm {
     dun_shared_face.UseDevice(true);
 
     int maxNumElems =
-        gpuArrays.shared_face_data.shared_elements_to_shared_faces.Size() / 7;  // elements with shared faces
+        gpu_precomputed_data_.shared_face_data.shared_elements_to_shared_faces.Size() / 7;  // elements with shared faces
     dun_shared_face.SetSize(dim_ * maxNumElems * 5 * maxIntPoints_ * num_equation_);
   }
 

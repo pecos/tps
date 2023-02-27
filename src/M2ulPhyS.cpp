@@ -492,14 +492,14 @@ void M2ulPhyS::initVariables() {
   bcIntegrator = NULL;
   if (local_attr.Size() > 0) {
     bcIntegrator = new BCintegrator(groupsMPI, mesh, vfes, intRules, rsolver, dt, mixture, d_mixture, fluxClass, Up,
-                                    gradUp, gpuArrays.boundary_face_data, dim, num_equation, max_char_speed, config,
+                                    gradUp, gpu_precomputed_data_.boundary_face_data, dim, num_equation, max_char_speed, config,
                                     local_attr, maxIntPoints, maxDofs);
   }
 
   // A->SetAssemblyLevel(AssemblyLevel::PARTIAL);
 
   A = new DGNonLinearForm(rsolver, fluxClass, vfes, gradUpfes, gradUp, bcIntegrator, intRules, dim, num_equation,
-                          mixture, gpuArrays, maxIntPoints, maxDofs);
+                          mixture, gpu_precomputed_data_, maxIntPoints, maxDofs);
   if (local_attr.Size() > 0) A->AddBdrFaceIntegrator(bcIntegrator);
 
   {
@@ -556,7 +556,7 @@ void M2ulPhyS::initVariables() {
   gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
 
   rhsOperator = new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType,
-                                fluxClass, mixture, d_mixture, chemistry_, transportPtr, radiation_, vfes, gpuArrays,
+                                fluxClass, mixture, d_mixture, chemistry_, transportPtr, radiation_, vfes, gpu_precomputed_data_,
                                 maxIntPoints, maxDofs, A, Aflux, mesh, spaceVaryViscMult, U, Up, gradUp, gradUpfes,
                                 gradUp_A, bcIntegrator, isSBP, alpha, config, plasma_conductivity_, joule_heating_);
 
@@ -605,7 +605,7 @@ void M2ulPhyS::initIndirectionArrays() {
   //-----------------------------------------------------------------
   // Element data
   //-----------------------------------------------------------------
-  elementIndexingData &elem_data = gpuArrays.element_indexing_data;
+  elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
 
   elem_data.dof_offset.SetSize(vfes->GetNE());
   elem_data.dof_offset = -1;  // invalid
@@ -661,7 +661,7 @@ void M2ulPhyS::initIndirectionArrays() {
   //-----------------------------------------------------------------
   // Interior faces
   //-----------------------------------------------------------------
-  interiorFaceIntegrationData &face_data = gpuArrays.interior_face_data;
+  interiorFaceIntegrationData &face_data = gpu_precomputed_data_.interior_face_data;
 
   face_data.element_to_faces.SetSize(7 * vfes->GetNE());
   face_data.element_to_faces = 0;
@@ -781,7 +781,7 @@ void M2ulPhyS::initIndirectionArrays() {
   //-----------------------------------------------------------------
   // Boundary faces
   //-----------------------------------------------------------------
-  boundaryFaceIntegrationData &bdry_face_data = gpuArrays.boundary_face_data;
+  boundaryFaceIntegrationData &bdry_face_data = gpu_precomputed_data_.boundary_face_data;
 
   // This is supposed to be number of boundary faces, and for
   // non-periodic cases it is.  See #199 for more info.
@@ -862,7 +862,7 @@ void M2ulPhyS::initIndirectionArrays() {
   // Shared faces (i.e., interior faces at boundary of decomposition,
   // such that element1 and element2 live on different mpi ranks)
   //-----------------------------------------------------------------
-  sharedFaceIntegrationData &shared_face_data = gpuArrays.shared_face_data;
+  sharedFaceIntegrationData &shared_face_data = gpu_precomputed_data_.shared_face_data;
 
   mesh->ExchangeFaceNbrNodes();
   mesh->ExchangeFaceNbrData();

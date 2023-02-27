@@ -63,7 +63,7 @@ class SourceTerm : public ForcingTerms {
   // ParGridFunction *Up;
   // ParGridFunction *gradUp;
   //
-  // const precomputedIntegrationData &gpuArrays;
+  // const precomputedIntegrationData &gpu_precomputed_data_
   // const int *h_num_elems_of_type;
 
   int numSpecies_;

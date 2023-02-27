@@ -193,7 +193,7 @@ class M2ulPhyS : public TPS::Solver {
   const int maxDofs = gpudata::MAXDOFS;            // corresponding to HEX with p=5
 
   /// Data required for residual evaluation in _GPU_ path
-  precomputedIntegrationData gpuArrays;
+  precomputedIntegrationData gpu_precomputed_data_;
 
   // The solution u has components {density, x-momentum, y-momentum, energy}.
   // These are stored contiguously in the BlockVector u_block.

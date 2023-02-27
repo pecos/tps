@@ -35,10 +35,10 @@
 
 SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                        IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
-                       ParGridFunction *_Up, ParGridFunction *_gradUp, const precomputedIntegrationData &gpuArrays,
+                       ParGridFunction *_Up, ParGridFunction *_gradUp, const precomputedIntegrationData &gpu_precomputed_data,
                        RunConfiguration &_config, GasMixture *mixture, GasMixture *d_mixture,
                        TransportProperties *transport, Chemistry *chemistry, Radiation *radiation, ParGridFunction *pc)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpu_precomputed_data,
                    _config.isAxisymmetric()),
       mixture_(mixture),
       d_mixture_(d_mixture),

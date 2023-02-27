@@ -39,7 +39,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
                          const Equations &_eqSystem, double &_max_char_speed, IntegrationRules *_intRules,
                          int _intRuleType, Fluxes *_fluxClass, GasMixture *_mixture, GasMixture *d_mixture,
                          Chemistry *_chemistry, TransportProperties *_transport, Radiation *_radiation,
-                         ParFiniteElementSpace *_vfes, const precomputedIntegrationData &_gpuArrays,
+                         ParFiniteElementSpace *_vfes, const precomputedIntegrationData &gpu_precomputed_data,
                          const int &_maxIntPoints, const int &_maxDofs, DGNonLinearForm *_A, MixedBilinearForm *_Aflux,
                          ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
                          ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A,
@@ -60,7 +60,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
       d_mixture_(d_mixture),
       transport_(_transport),
       vfes(_vfes),
-      gpuArrays(_gpuArrays),
+      gpu_precomputed_data_(gpu_precomputed_data),
       maxIntPoints(_maxIntPoints),
       maxDofs(_maxDofs),
       A(_A),
@@ -88,7 +88,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   fk.SetSize(dim_ * vfes->GetNDofs());
   zk.SetSize(vfes->GetNDofs());
 
-  const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
+  const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
   h_num_elems_of_type = elem_data.num_elems_of_type.HostRead();
 
   Me_inv.SetSize(vfes->GetNE());
@@ -101,28 +101,28 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
 
   if (_config.thereIsForcing()) {
     forcing.Append(new ConstantPressureGradient(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up,
-                                                gradUp, gpuArrays, _config, mixture));
+                                                gradUp, gpu_precomputed_data_, _config, mixture));
   }
   if (_config.GetPassiveScalarData().Size() > 0)
     forcing.Append(new PassiveScalar(dim_, num_equation_, _order, intRuleType, intRules, vfes, mixture, U_, Up, gradUp,
-                                     gpuArrays, _config));
+                                     gpu_precomputed_data_, _config));
   if (_config.numSpongeRegions_ > 0) {
     for (int sz = 0; sz < _config.numSpongeRegions_; sz++) {
       forcing.Append(new SpongeZone(dim_, num_equation_, _order, intRuleType, fluxClass, mixture, intRules, vfes, U_,
-                                    Up, gradUp, gpuArrays, _config, sz));
+                                    Up, gradUp, gpu_precomputed_data_, _config, sz));
     }
   }
   if (_config.numHeatSources > 0) {
     for (int s = 0; s < _config.numHeatSources; s++) {
       if (_config.heatSource[s].isEnabled) {
         forcing.Append(new HeatSource(dim_, num_equation_, _order, intRuleType, _config.heatSource[s], mixture,
-                                      intRules, vfes, U_, Up, gradUp, gpuArrays, _config));
+                                      intRules, vfes, U_, Up, gradUp, gpu_precomputed_data_, _config));
       }
     }
   }
 
   if (_config.GetWorkingFluid() != WorkingFluid::DRY_AIR) {
-    forcing.Append(new SourceTerm(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up, gradUp, gpuArrays,
+    forcing.Append(new SourceTerm(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up, gradUp, gpu_precomputed_data_,
                                   _config, mixture, d_mixture_, _transport, _chemistry, _radiation,
                                   plasma_conductivity_));
   }
@@ -130,13 +130,13 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   if (config_.use_mms_) {
     masaForcingIndex_ = forcing.Size();
     forcing.Append(new MASA_forcings(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up, gradUp,
-                                     gpuArrays, _config));
+                                     gpu_precomputed_data_, _config));
   }
 #endif
 
   if (config_.isAxisymmetric()) {
     forcing.Append(new AxisymmetricSource(dim_, num_equation_, _order, mixture, transport_, eqSystem, intRuleType,
-                                          intRules, vfes, U_, Up, gradUp, spaceVaryViscMult, gpuArrays, _config));
+                                          intRules, vfes, U_, Up, gradUp, spaceVaryViscMult, gpu_precomputed_data_, _config));
     const FiniteElementCollection *fec = vfes->FEColl();
     dfes = new ParFiniteElementSpace(mesh, fec, dim_, Ordering::byNODES);
     coordsDof = new ParGridFunction(dfes);
@@ -148,7 +148,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
 
   if (joule_heating_ != NULL) {
     forcing.Append(new JouleHeating(dim_, num_equation_, _order, mixture, eqSystem, intRuleType, intRules, vfes, U_, Up,
-                                    gradUp, gpuArrays, _config, joule_heating_));
+                                    gradUp, gpu_precomputed_data_, _config, joule_heating_));
   }
 
   std::vector<double> temp;
@@ -217,7 +217,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
 
   // create gradients object
   gradients = new Gradients(vfes, gradUpfes, dim_, num_equation_, Up, gradUp, mixture, gradUp_A, intRules, intRuleType,
-                            gpuArrays, Me_inv, invMArray, posDofInvM, maxIntPoints, maxDofs);
+                            gpu_precomputed_data_, Me_inv, invMArray, posDofInvM, maxIntPoints, maxDofs);
   gradients->setParallelData(&transferUp);
 
   local_timeDerivatives.UseDevice(true);
@@ -382,7 +382,7 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
 
   // 3. Multiply element-wise by the inverse mass matrices.
 #ifdef _GPU_
-  const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
+  const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
   auto h_elem_dof_num = elem_data.dof_number.HostRead();
   for (int eltype = 0; eltype < elem_data.num_elems_of_type.Size(); eltype++) {
     int elemOffset = 0;
@@ -392,7 +392,7 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
     int dof = h_elem_dof_num[elemOffset];
     const int totDofs = vfes->GetNDofs();
 
-    RHSoperator::multiPlyInvers_gpu(y, z, gpuArrays, invMArray, posDofInvM, num_equation_, totDofs,
+    RHSoperator::multiPlyInvers_gpu(y, z, gpu_precomputed_data_, invMArray, posDofInvM, num_equation_, totDofs,
                                     h_num_elems_of_type[eltype], elemOffset, dof);
   }
 
@@ -655,14 +655,14 @@ void RHSoperator::updateGradients(const Vector &x, const bool &primitiveUpdated)
 #endif
 }
 
-void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const precomputedIntegrationData &gpuArrays,
+void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const precomputedIntegrationData &gpu_precomputed_data,
                                      const Vector &invMArray, const Array<int> &posDofInvM, const int num_equation,
                                      const int totNumDof, const int NE, const int elemOffset, const int dof) {
 #ifdef _GPU_
   double *d_y = y.ReadWrite();
   const double *d_z = z.Read();
 
-  const elementIndexingData &elem_data = gpuArrays.element_indexing_data;
+  const elementIndexingData &elem_data = gpu_precomputed_data.element_indexing_data;
   auto d_elem_dofs_list = elem_data.dofs_list.Read();
   auto d_elem_dof_off = elem_data.dof_offset.Read();
   auto d_posDofInvM = posDofInvM.Read();
