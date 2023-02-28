@@ -3362,14 +3362,6 @@ void M2ulPhyS::checkSolverOptions() const {
       exit(ERROR);
     }
   }
-
-  if (config.isAxisymmetric()) {
-    if (mpi.Root()) {
-      std::cerr << "[ERROR]: Axisymmetric simulations not supported on GPU." << std::endl;
-      std::cerr << std::endl;
-      exit(ERROR);
-    }
-  }
 #endif
 
   // Axisymmetric solver does not yet support all options.  Check that
