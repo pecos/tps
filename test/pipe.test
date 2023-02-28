@@ -7,7 +7,7 @@ RUNFILE="inputs/pipe.axisym.viscous.ini"
 setup() {
     SOLN_FILE=restart_output-pipe.sol.h5
     RSTRT_FILE=ref_solns/pipe.restart.sol.h5
-    REF_FILE=ref_solns/pipe.100100.sol.h5
+    REF_FILE=ref_solns/pipe.100100.dtconst.sol.h5
 }
 
 @test "[$TEST] verify axisymmetric tps output with input -> $RUNFILE" {
