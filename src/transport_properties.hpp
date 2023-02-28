@@ -103,7 +103,12 @@ class TransportProperties {
                                                                  double *globalTransport, double *speciesTransport,
                                                                  double *diffusionVelocity, double *n_sp) = 0;
   // NOTE: only for AxisymmetricSource
-  virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc) = 0;
+  void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc) {
+    GetViscosities(conserved.GetData(), primitive.GetData(), visc, bulkVisc);
+  }
+
+  MFEM_HOST_DEVICE virtual void GetViscosities(const double *conserved, const double *primitive, double &visc,
+                                               double &bulk_visc) = 0;
 
   // For mixture-averaged diffusion, correct for mass conservation.
   void correctMassDiffusionFlux(const Vector &Y_sp, DenseMatrix &diffusionVelocity);
@@ -168,15 +173,15 @@ class DryAirTransport : public TransportProperties {
                                                                  double *globalTransport, double *speciesTransport,
                                                                  double *diffusionVelocity, double *n_sp) {}
 
-  virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc);
+  MFEM_HOST_DEVICE virtual void GetViscosities(const double *conserved, const double *primitive, double &visc,
+                                               double &bulk_visc) override;
 };
 
-inline void DryAirTransport::GetViscosities(const Vector &conserved, const Vector &primitive, double &visc,
-                                            double &bulkVisc) {
-  double temp = primitive[1 + nvel_];
+MFEM_HOST_DEVICE inline void DryAirTransport::GetViscosities(const double *conserved, const double *primitive,
+                                                             double &visc, double &bulk_visc) {
+  const double temp = primitive[1 + nvel_];
   visc = (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
-  bulkVisc = bulk_visc_mult * visc;
-  return;
+  bulk_visc = bulk_visc_mult * visc;
 }
 
 //////////////////////////////////////////////////////
@@ -215,22 +220,14 @@ class ConstantTransport : public TransportProperties {
                                                                  double *globalTransport, double *speciesTransport,
                                                                  double *diffusionVelocity, double *n_sp);
 
-  virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc);
-  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double &visc,
-                                       double &bulkVisc);
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive,
+                                       double &visc, double &bulk_visc) override;
 };
 
-inline void ConstantTransport::GetViscosities(const Vector &conserved, const Vector &primitive, double &visc,
-                                              double &bulkVisc) {
-  GetViscosities(&conserved[0], &primitive[0], visc, bulkVisc);
-  return;
-}
-
 MFEM_HOST_DEVICE inline void ConstantTransport::GetViscosities(const double *conserved, const double *primitive,
-                                                               double &visc, double &bulkVisc) {
+                                                               double &visc, double &bulk_visc) {
   visc = viscosity_;
-  bulkVisc = bulkViscosity_;
-  return;
+  bulk_visc = bulkViscosity_;
 }
 
 #endif  // TRANSPORT_PROPERTIES_HPP_

@@ -131,9 +131,8 @@ class ArgonMinimalTransport : public TransportProperties {
                                                                  double *diffusionVelocity, double *n_sp);
 
   // NOTE(kevin): only for AxisymmetricSource
-  virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc);
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double &visc,
-                                       double &bulkVisc);
+                                       double &bulk_visc) override;
 
   // virtual double computeThirdOrderElectronThermalConductivity(const Vector &X_sp, const double debyeLength,
   //                                                             const double Te, const double nondimTe);
@@ -216,9 +215,8 @@ class ArgonMixtureTransport : public ArgonMinimalTransport {
                                                                  double *diffusionVelocity, double *n_sp);
 
   // NOTE(kevin): only for AxisymmetricSource
-  virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc);
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double &visc,
-                                       double &bulkVisc);
+                                       double &bulk_visc) override;
 
   MFEM_HOST_DEVICE virtual double computeThirdOrderElectronThermalConductivity(const double *X_sp,
                                                                                const collisionInputs &collInputs);

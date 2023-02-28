@@ -524,14 +524,8 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeSourceTransportProperties(
   // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
-void ArgonMinimalTransport::GetViscosities(const Vector &conserved, const Vector &primitive, double &visc,
-                                           double &bulkVisc) {
-  GetViscosities(&conserved[0], &primitive[0], visc, bulkVisc);
-  return;
-}
-
 MFEM_HOST_DEVICE void ArgonMinimalTransport::GetViscosities(const double *conserved, const double *primitive,
-                                                            double &visc, double &bulkVisc) {
+                                                            double &visc, double &bulk_visc) {
   double n_sp[3], X_sp[3], Y_sp[3];
   mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
   double nTotal = 0.0;
@@ -555,12 +549,12 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::GetViscosities(const double *conser
   speciesViscosity[electronIndex_] = 0.0;
 
   visc = linearAverage(X_sp, speciesViscosity);
-  bulkVisc = 0.0;
+  bulk_visc = 0.0;
 
   // Apply artificial multipliers.
   if (multiply_) {
     visc *= fluxTrnsMultiplier_[FluxTrns::VISCOSITY];
-    bulkVisc *= fluxTrnsMultiplier_[FluxTrns::BULK_VISCOSITY];
+    bulk_visc *= fluxTrnsMultiplier_[FluxTrns::BULK_VISCOSITY];
   }
 
   return;
@@ -1021,14 +1015,8 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeSourceTransportProperties(
   // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
-void ArgonMixtureTransport::GetViscosities(const Vector &conserved, const Vector &primitive, double &visc,
-                                           double &bulkVisc) {
-  GetViscosities(&conserved[0], &primitive[0], visc, bulkVisc);
-  return;
-}
-
 MFEM_HOST_DEVICE void ArgonMixtureTransport::GetViscosities(const double *conserved, const double *primitive,
-                                                            double &visc, double &bulkVisc) {
+                                                            double &visc, double &bulk_visc) {
   double n_sp[gpudata::MAXSPECIES], X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES];
   mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
   double nTotal = 0.0;
@@ -1046,12 +1034,12 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::GetViscosities(const double *conser
         viscosityFactor_ * sqrt(mw_[sp] * collInputs.Th) / collisionIntegral(sp, sp, 2, 2, collInputs);
   }
   visc = linearAverage(X_sp, speciesViscosity);
-  bulkVisc = 0.0;
+  bulk_visc = 0.0;
 
   // Apply artificial multipliers.
   if (multiply_) {
     visc *= fluxTrnsMultiplier_[FluxTrns::VISCOSITY];
-    bulkVisc *= fluxTrnsMultiplier_[FluxTrns::BULK_VISCOSITY];
+    bulk_visc *= fluxTrnsMultiplier_[FluxTrns::BULK_VISCOSITY];
   }
 
   return;

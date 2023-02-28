@@ -135,7 +135,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
 #endif
 
   if (config_.isAxisymmetric()) {
-    forcing.Append(new AxisymmetricSource(dim_, num_equation_, _order, mixture, transport_, eqSystem, intRuleType,
+    forcing.Append(new AxisymmetricSource(dim_, num_equation_, _order, d_mixture_, transport_, eqSystem, intRuleType,
                                           intRules, vfes, U_, Up, gradUp, spaceVaryViscMult, gpu_precomputed_data_,
                                           _config));
     const FiniteElementCollection *fec = vfes->FEColl();
@@ -411,7 +411,6 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
       RHSoperator::multiPlyInvers_gpu(y, z, gpu_precomputed_data_, invMArray, posDofInvM, num_equation_, totDofs,
                                       h_num_elems_of_type[eltype], elemOffset, dof);
     }
-
   }
 
 #else

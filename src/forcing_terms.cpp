@@ -252,17 +252,15 @@ AxisymmetricSource::AxisymmetricSource(const int &_dim, const int &_num_equation
 }
 
 void AxisymmetricSource::updateTerms(Vector &in) {
-  // make sure we are in a 2D case (otherwise can't be axisymmetric)
   assert(dim == 2);
   assert(nvel == 3);
 
-  int numElem = vfes->GetNE();
-  int dof = vfes->GetNDofs();
+  double *d_y = in.ReadWrite();
+  const double *d_U = U_->Read();
+  const double *d_Up = Up_->Read();
+  const double *d_gradUp = gradUp_->Read();
 
-  double *data = in.GetData();
-  const double *dataU = U_->GetData();
-  const double *dataUp = Up_->GetData();
-  const double *dataGradUp = gradUp_->GetData();
+  int dof = vfes->GetNDofs();
 
   // get coords
   const FiniteElementCollection *fec = vfes->FEColl();
@@ -270,6 +268,96 @@ void AxisymmetricSource::updateTerms(Vector &in) {
   ParFiniteElementSpace dfes(mesh, fec, dim, Ordering::byNODES);
   ParGridFunction coordsDof(&dfes);
   mesh->GetNodes(coordsDof);
+  auto d_coords = coordsDof.Read();
+
+  const double *alpha;
+  if (space_vary_viscosity_mult_ != NULL) {
+    alpha = space_vary_viscosity_mult_->Read();
+  } else {
+    alpha = NULL;
+  }
+
+  const int neqn = num_equation;
+  const int sdim = dim;
+
+  const Equations eqSys = eqSystem;
+
+  GasMixture *d_mix = mixture;
+  TransportProperties *d_trans = transport_;
+
+  std::cout << "AxisymmetricSource::updateTerms..." << std::endl;
+  MFEM_FORALL(n, dof, {
+    double U[gpudata::MAXEQUATIONS];
+    double Up[gpudata::MAXEQUATIONS];
+    double gradUp[gpudata::MAXDIM * gpudata::MAXEQUATIONS];
+    double x[gpudata::MAXDIM];
+
+    // Extract state information
+    for (int eq = 0; eq < neqn; eq++) {
+      U[eq] = d_U[n + eq * dof];
+      Up[eq] = d_Up[n + eq * dof];
+      for (int d = 0; d < sdim; d++) {
+        gradUp[eq + d * neqn] = d_gradUp[n + eq * dof + d * neqn * dof];
+      }
+    }
+
+    // Extract radius
+    for (int d = 0; d < sdim; d++) x[d] = d_coords[n + d * dof];
+    const double radius = x[0];
+
+    // Evaluate quantities required for axisym source
+    const double rho = Up[0];
+    const double ur = Up[1];
+    const double ut = Up[3];
+
+    const double pressure = d_mix->ComputePressureFromPrimitives(Up);
+
+    const double rurut = rho * ur * ut;
+    const double rutut = rho * ut * ut;
+
+    double tau_tt, tau_tr;
+    if (eqSys == EULER) {
+      tau_tt = tau_tr = 0.0;
+    } else {
+      const double ur_r = gradUp[1 + 0 * neqn];
+      const double uz_z = gradUp[2 + 1 * neqn];
+      const double ut_r = gradUp[3 + 0 * neqn];
+
+      double visc, bulkVisc;
+      d_trans->GetViscosities(U, Up, visc, bulkVisc);
+      bulkVisc -= 2. / 3. * visc;
+
+      if (alpha != NULL) {
+        visc *= alpha[n];
+      }
+
+      double divV = ur_r + uz_z;
+      if (radius > 0) divV += ur / radius;
+
+      tau_tt = (radius > 0) ? 2.0 * ur / radius * visc : 0.0;
+      tau_tt += bulkVisc * divV;
+
+      tau_tr = ut_r;
+      if (radius > 0) tau_tr -= ut / radius;
+
+      tau_tr *= visc;
+    }
+
+    // Put source into the right spot
+    d_y[n + 1 * dof] += (pressure + rutut - tau_tt) / radius;
+    d_y[n + 3 * dof] += (-rurut + tau_tr) / radius;
+
+    // if (radius > 0) {
+    //   d_y[n + 1 * dof] += (pressure + rutut - tau_tt) / radius;
+    //   d_y[n + 3 * dof] += (-rurut + tau_tr) / radius;
+    // } else {
+    //   // TODO(trevilo): Fix axis
+    //   double fake_radius = 1e-3;
+    //   d_y[n + 1 * dof] += (pressure - tau_tt) / fake_radius;
+    //   d_y[n + 3 * dof] += (tau_tr) / fake_radius;
+    // }
+  });
+  std::cout << "done." << std::endl;
 
   // Commented out code below has the right structure if we want to
   // add axisym source terms to rhs of weak form (as opposed to
@@ -277,6 +365,7 @@ void AxisymmetricSource::updateTerms(Vector &in) {
   // \theta} contribution is neglected, but this could be added if we
   // switch to this formulation.  See comments at L348 of rhs_operator.cpp
 
+  // int numElem = vfes->GetNE();
   // for (int el = 0; el < numElem; el++) {
   //   const FiniteElement *elem = vfes->GetFE(el);
   //   ElementTransformation *Tr = vfes->GetElementTransformation(el);
@@ -316,88 +405,6 @@ void AxisymmetricSource::updateTerms(Vector &in) {
 
   //     }
   // }
-
-  for (int el = 0; el < numElem; el++) {
-    const FiniteElement *elem = vfes->GetFE(el);
-    // ElementTransformation *Tr = vfes->GetElementTransformation(el);
-    const int dof_elem = elem->GetDof();
-
-    // nodes of the element
-    Array<int> nodes;
-    vfes->GetElementVDofs(el, nodes);
-
-    Array<double> ip_forcing(num_equation);
-    Vector x(dim);
-    for (int n = 0; n < dof_elem; n++) {
-      int index = nodes[n];
-      for (int d = 0; d < dim; d++) x[d] = coordsDof[index + d * dof];
-      const double radius = x[0];
-
-      Vector prim(num_equation), conserv(num_equation);
-      for (int eq = 0; eq < num_equation; eq++) {
-        prim(eq) = dataUp[index + eq * dof];
-        conserv(eq) = dataU[index + eq * dof];
-      }
-
-      const double rho = prim(0);
-      const double ur = prim(1);
-      // const double uz = prim(2);
-      const double ut = prim(3);
-      // const double temperature = prim(1 + nvel);
-
-      const double pressure = mixture->ComputePressureFromPrimitives(prim);
-
-      const double rurut = rho * ur * ut;
-      const double rutut = rho * ut * ut;
-
-      double tau_tt, tau_tr;
-      if (eqSystem == EULER) {
-        tau_tt = tau_tr = 0.0;
-      } else {
-        const double ur_r = dataGradUp[index + (1 * dof) + (0 * dof * num_equation)];
-        const double uz_z = dataGradUp[index + (2 * dof) + (1 * dof * num_equation)];
-        const double ut_r = dataGradUp[index + (3 * dof) + (0 * dof * num_equation)];
-
-        double visc, bulkVisc;
-        transport_->GetViscosities(conserv, prim, visc, bulkVisc);
-        bulkVisc -= 2. / 3. * visc;
-
-        if (space_vary_viscosity_mult_ != NULL) {
-          auto *alpha = space_vary_viscosity_mult_->GetData();
-          visc *= alpha[index];
-        }
-
-        double divV = ur_r + uz_z;
-        if (radius > 0) divV += ur / radius;
-
-        tau_tt = (radius > 0) ? 2.0 * ur / radius * visc : 0.0;
-        tau_tt += bulkVisc * divV;
-
-        tau_tr = ut_r;
-        if (radius > 0) tau_tr -= ut / radius;
-
-        tau_tr *= visc;
-      }
-
-      // Add to r-momentum eqn
-
-      // NB: 1/r factor here is necessary b/c of way the source terms
-      // are handled in RHSoperator.  This term must be an
-      // approximation of Mr^{-1}*\int \phi * pressure, where Mr =
-      // \int r * \phi * \phi dr dz is the mass matrix in cylindrical
-      // coords
-
-      if (radius > 0) {
-        data[index + 1 * dof] += (pressure + rutut - tau_tt) / radius;
-        data[index + 3 * dof] += (-rurut + tau_tr) / radius;
-      } else {
-        // TODO(trevilo): Fix axis
-        double fake_radius = 1e-3;
-        data[index + 1 * dof] += (pressure - tau_tt) / fake_radius;
-        data[index + 3 * dof] += (tau_tr) / fake_radius;
-      }
-    }
-  }
 }
 
 JouleHeating::JouleHeating(const int &_dim, const int &_num_equation, const int &_order, GasMixture *_mixture,
