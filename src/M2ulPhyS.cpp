@@ -718,10 +718,16 @@ void M2ulPhyS::initIndirectionArrays() {
   face_data.normal.UseDevice(true);
   face_data.normal.SetSize(dim * maxIntPoints * mesh->GetNumFaces());
 
+  face_data.xyz.UseDevice(true);
+  face_data.xyz.SetSize(dim * maxIntPoints * mesh->GetNumFaces());
+
   auto hshape1 = face_data.el1_shape.HostWrite();
   auto hshape2 = face_data.el2_shape.HostWrite();
   auto hweight = face_data.quad_weight.HostWrite();
   auto hnormal = face_data.normal.HostWrite();
+  auto h_xyz = face_data.xyz.HostWrite();
+
+  Vector xyz(dim);
 
   for (int face = 0; face < mesh->GetNumFaces(); face++) {
     FaceElementTransformations *tr;
@@ -787,6 +793,9 @@ void M2ulPhyS::initIndirectionArrays() {
 
         hweight[face * maxIntPoints + k] = ip.weight;
 
+        // Position in physical space
+        tr->Transform(ip, xyz);
+
         // normals (multiplied by determinant of jacobian
         Vector nor;
         nor.UseDevice(false);
@@ -794,6 +803,7 @@ void M2ulPhyS::initIndirectionArrays() {
         CalcOrtho(tr->Jacobian(), nor);
         for (int d = 0; d < dim; d++) {
           hnormal[face * dim * maxIntPoints + k * dim + d] = nor[d];
+          h_xyz[face * dim * maxIntPoints + k * dim + d] = xyz[d];
         }
       }
     }
@@ -818,6 +828,11 @@ void M2ulPhyS::initIndirectionArrays() {
     bdry_face_data.normal.SetSize(NumBCelems * maxIntPoints * dim);
     bdry_face_data.normal = 0.;
     auto h_face_normal = bdry_face_data.normal.HostWrite();
+
+    bdry_face_data.xyz.UseDevice(true);
+    bdry_face_data.xyz.SetSize(NumBCelems * maxIntPoints * dim);
+    bdry_face_data.xyz = 0.;
+    auto h_face_xyz = bdry_face_data.xyz.HostWrite();
 
     bdry_face_data.quad_weight.UseDevice(true);
     bdry_face_data.quad_weight.SetSize(NumBCelems * maxIntPoints);
@@ -865,8 +880,11 @@ void M2ulPhyS::initIndirectionArrays() {
           CalcOrtho(tr->Jacobian(), nor);
           h_face_quad_weight[f * maxIntPoints + q] = ip.weight;
 
+          tr->Transform(ip, xyz);
+
           for (int d = 0; d < dim; d++) {
             h_face_normal[f * maxIntPoints * dim + q * dim + d] = nor[d];
+            h_face_xyz[f * maxIntPoints * dim + q * dim + d] = xyz[d];
           }
 
           Vector shape1;
@@ -930,6 +948,11 @@ void M2ulPhyS::initIndirectionArrays() {
     auto h_face_el1 = shared_face_data.el1.HostWrite();
     auto h_face_num_quad = shared_face_data.num_quad.HostWrite();
     auto h_face_num_dof2 = shared_face_data.num_dof2.HostWrite();
+
+    shared_face_data.xyz.UseDevice(true);
+    shared_face_data.xyz.SetSize(Nshared * maxIntPoints * dim);
+    shared_face_data.xyz = 0.;
+    auto h_face_xyz = shared_face_data.xyz.HostWrite();
 
     std::vector<int> unicElems;
     unicElems.clear();
@@ -1002,8 +1025,11 @@ void M2ulPhyS::initIndirectionArrays() {
         }
         h_face_quad_weight[i * maxIntPoints + q] = ip.weight;
 
+        tr->Transform(ip, xyz);
+
         for (int d = 0; d < dim; d++) {
           h_face_normal[i * maxIntPoints * dim + q * dim + d] = nor[d];
+          h_face_xyz[i * maxIntPoints * dim + q * dim + d] = xyz[d];
         }
         for (int n = 0; n < dof2; n++) {
           h_shape2[i * maxIntPoints * maxDofs + q * maxDofs + n] = shape2[n];

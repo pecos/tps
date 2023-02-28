@@ -291,6 +291,7 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
 
   auto d_normal = face_data.normal.Read();
   auto d_face_nqp = face_data.num_quad.Read();
+  auto d_xyz = face_data.xyz.Read();
 
   Mesh *mesh = fes->GetMesh();
   const int Nf = mesh->GetNumFaces();
@@ -308,7 +309,7 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
     double u1[gpudata::MAXEQUATIONS], gradUp1[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
     double u2[gpudata::MAXEQUATIONS], gradUp2[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
     double vFlux1[gpudata::MAXEQUATIONS * gpudata::MAXDIM], vFlux2[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
-    double Rflux[gpudata::MAXEQUATIONS], nor[gpudata::MAXDIM];
+    double Rflux[gpudata::MAXEQUATIONS], nor[gpudata::MAXDIM], xyz[gpudata::MAXDIM];
 
     const int Q = d_face_nqp[iface];
     const int offset = iface * maxIntPoints * dim;
@@ -316,8 +317,10 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
     // loop over quad points on this face
     for (int k = 0; k < Q; k++) {
       // get normal vector
-      for (int d = 0; d < dim; d++)
+      for (int d = 0; d < dim; d++) {
         nor[d] = d_normal[offset + k * dim + d];
+        xyz[d] = d_xyz[offset + k * dim + d];
+      }
 
       // get state and gradient
       for (int eq = 0; eq < num_equation; eq++) {
@@ -352,8 +355,8 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
                          d_normal + offset + k * dim,
                          Rflux);
 
-      d_flux->ComputeViscousFluxes(u1, gradUp1, 0.0, vFlux1);
-      d_flux->ComputeViscousFluxes(u2, gradUp2, 0.0, vFlux2);
+      d_flux->ComputeViscousFluxes(u1, gradUp1, xyz[0], vFlux1);
+      d_flux->ComputeViscousFluxes(u2, gradUp2, xyz[0], vFlux2);
 
       for (int d = 0; d < dim; d++) {
         for (int eq = 0; eq < num_equation; eq++) {
@@ -603,6 +606,7 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
 
   const sharedFaceIntegrationData &shared_face_data = gpu_precomputed_data_.shared_face_data;
   const double *d_normal = shared_face_data.normal.Read();
+  const double *d_xyz = shared_face_data.xyz.Read();
   const double *d_shape1 = shared_face_data.el1_shape.Read();
   const double *d_shape2 = shared_face_data.el2_shape.Read();
   const int *d_face_num_quad = shared_face_data.num_quad.Read();
@@ -629,6 +633,7 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
     double gradUp1[gpudata::MAXDIM * gpudata::MAXEQUATIONS],      // double gradUp1[3 * 5];
         gradUp2[gpudata::MAXDIM * gpudata::MAXEQUATIONS],         // gradUp2[3 * 5];
         nor[gpudata::MAXDIM];                                     // nor[3];
+    double xyz[gpudata::MAXDIM];
     double Rflux[gpudata::MAXEQUATIONS],                          // double Rflux[5];
         vFlux1[gpudata::MAXDIM * gpudata::MAXEQUATIONS],          // vFlux1[3 * 5];
         vFlux2[gpudata::MAXDIM * gpudata::MAXEQUATIONS];          // vFlux2[3 * 5];
@@ -661,6 +666,7 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
 
         for (int d = 0; d < dim; d++) {
           nor[d] = d_normal[f * maxIntPoints * dim + k * dim + d];
+          xyz[d] = d_xyz[f * maxIntPoints * dim + k * dim + d];
         }
 
         // set array for interpolated data to 0
@@ -702,8 +708,8 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
         // evaluate flux
         // TODO(kevin): implement radius.
         d_rsolver->Eval_LF(u1, u2, nor, Rflux);
-        d_flux->ComputeViscousFluxes(u1, gradUp1, 0.0, vFlux1);
-        d_flux->ComputeViscousFluxes(u2, gradUp2, 0.0, vFlux2);
+        d_flux->ComputeViscousFluxes(u1, gradUp1, xyz[0], vFlux1);
+        d_flux->ComputeViscousFluxes(u2, gradUp2, xyz[0], vFlux2);
 
         for (int eq = 0; eq < num_equation; eq++) {
           for (int d = 0; d < dim; d++)
@@ -711,6 +717,13 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
         }
         for (int eq = 0; eq < num_equation; eq++) {
           for (int d = 0; d < dim; d++) Rflux[eq] -= vFlux1[eq + d * num_equation] * nor[d];
+        }
+
+        if (d_flux->isAxisymmetric()) {
+          const double radius = xyz[0];
+          for (int eq = 0; eq < num_equation; eq++) {
+            Rflux[eq] *= radius;
+          }
         }
 
         for (int eq = 0; eq < num_equation; eq++) {

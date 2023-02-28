@@ -264,6 +264,9 @@ struct interiorFaceIntegrationData {
   /** Normal vector (oriented from elem 1 toward elem 2) for all interior face quadrature points */
   Vector normal;
 
+  /** Position in physical space for all interior face quadrature points */
+  Vector xyz;
+
   /** maps from element index to face indices
    *
    *  elemFaces[7*i] = number of faces for element i
@@ -299,6 +302,9 @@ struct boundaryFaceIntegrationData {
   /** Normal vector (outward pointing) for all boundary face quadrature points */
   Vector normal;
 
+  /** Position in physical space for all boundary face quadrature points */
+  Vector xyz;
+
   /** for each boundary face, index of corresponding element */
   Array<int> el;
 
@@ -328,6 +334,9 @@ struct sharedFaceIntegrationData {
 
   /** Normal vector (oriented from elem 1 toward elem 2) for all shared face quadrature points */
   Vector normal;
+
+  /** Position in physical space for all shared face quadrature points */
+  Vector xyz;
 
   /** for each shared face, index of element 1 */
   Array<int> el1;

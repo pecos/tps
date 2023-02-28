@@ -489,6 +489,7 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
   const int *d_elem_dof_num = elem_index_data.dof_number.Read();
   const double *d_face_shape = boundary_face_data.shape.Read();
   const double *d_normal = boundary_face_data.normal.Read();
+  const double *d_xyz = boundary_face_data.xyz.Read();
   const int *d_face_num_quad = boundary_face_data.num_quad.Read();
   const int *d_face_el = boundary_face_data.el.Read();
   const int *d_wallElems = wallElems.Read();
@@ -515,6 +516,7 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
   // el_wall is index within wall boundary elements?
   MFEM_FORALL_2D(el_wall, wallElems.Size() / 7, maxIntPoints, 1, 1, {
     double u1[gpudata::MAXEQUATIONS], u2[gpudata::MAXEQUATIONS], nor[gpudata::MAXDIM], Rflux[gpudata::MAXEQUATIONS];
+    double xyz[gpudata::MAXDIM];
     double vF1[gpudata::MAXEQUATIONS * gpudata::MAXDIM], vF2[gpudata::MAXEQUATIONS];
     double gradUp1[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
     double shape[gpudata::MAXDOFS];
@@ -559,6 +561,8 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
         for (int d = 0; d < dim; d++) {
           nor[d] = d_normal[el_bdry * maxIntPoints * dim + q * dim + d];
           normN += nor[d] * nor[d];
+
+          xyz[d] = d_xyz[el_bdry * maxIntPoints * dim + q * dim + d];
         }
 
         // interpolate to this quad point
@@ -587,8 +591,8 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
           d_mix->modifyStateFromPrimitive(u1, bcState, u2);
         }
         d_rsolver->Eval_LF(u1, u2, nor, Rflux);
-        d_fluxclass->ComputeViscousFluxes(u1, gradUp1, 0.0, vF1);
-        d_fluxclass->ComputeBdrViscousFluxes(u2, gradUp1, 0.0, bcFlux, vF2);
+        d_fluxclass->ComputeViscousFluxes(u1, gradUp1, xyz[0], vF1);
+        d_fluxclass->ComputeBdrViscousFluxes(u2, gradUp1, xyz[0], bcFlux, vF2);
         for (int eq = 0; eq < num_equation; eq++) vF2[eq] *= sqrt(normN);
 
         // add visc flux contribution
