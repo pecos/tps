@@ -801,6 +801,7 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const elementIndexingData &
   const int *d_elem_dof_num = elem_index_data.dof_number.Read();
   const double *d_face_shape = boundary_face_data.shape.Read();
   const double *d_normal = boundary_face_data.normal.Read();
+  const double *d_xyz = boundary_face_data.xyz.Read();
   const int *d_face_el = boundary_face_data.el.Read();
   const int *d_face_num_quad = boundary_face_data.num_quad.Read();
   const int *d_listElems = listElems.Read();
@@ -835,6 +836,7 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const elementIndexingData &
     double shape[gpudata::MAXDOFS];  // double shape[216];
     double u1[gpudata::MAXEQUATIONS], u2[gpudata::MAXEQUATIONS], Rflux[gpudata::MAXEQUATIONS],
         nor[gpudata::MAXDIM];  // double u1[5], u2[5], Rflux[5], nor[3];
+    double xyz[gpudata::MAXDIM];
 
     double p;
 
@@ -848,6 +850,7 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const elementIndexingData &
     MFEM_FOREACH_THREAD(q, x, Q) {
       for (int d = 0; d < dim; d++) {
         nor[d] = d_normal[el * maxIntPoints * dim + q * dim + d];
+        xyz[d] = d_xyz[el * maxIntPoints * dim + q * dim + d];
       }
 
       for (int i = 0; i < elDof; i++) {
@@ -879,6 +882,13 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const elementIndexingData &
 
       // compute flux
       d_rsolver->Eval_LF(u1, u2, nor, Rflux);
+
+      if (d_rsolver->isAxisymmetric()) {
+        const double radius = xyz[0];
+        for (int eq = 0; eq < num_equation; eq++) {
+          Rflux[eq] *= radius;
+        }
+      }
 
       // save to global memory
       for (int eq = 0; eq < num_equation; eq++) {

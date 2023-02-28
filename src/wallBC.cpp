@@ -601,6 +601,14 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
           for (int d = 0; d < dim; d++) Rflux[eq] -= 0.5 * vF1[eq + d * num_equation] * nor[d];
         }
 
+        if (d_fluxclass->isAxisymmetric()) {
+          const double radius = xyz[0];
+          for (int eq = 0; eq < num_equation; eq++) {
+            Rflux[eq] *= radius;
+          }
+        }
+
+
         // store flux (TODO: change variable name)
         for (int eq = 0; eq < num_equation; eq++) {
           d_flux[eq + q * num_equation + n * maxIntPoints * num_equation] = Rflux[eq];

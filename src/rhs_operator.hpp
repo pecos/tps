@@ -103,6 +103,7 @@ class RHSoperator : public TimeDependentOperator {
   Array<DenseMatrix *> Me_inv_rad;
 
   Vector invMArray;
+  Vector invMArray_rad;
   Array<int> posDofInvM;
 
   const bool &isSBP;

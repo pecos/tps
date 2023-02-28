@@ -152,8 +152,9 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
                                     gradUp, gpu_precomputed_data_, _config, joule_heating_));
   }
 
-  std::vector<double> temp;
+  std::vector<double> temp, temp_rad;
   temp.clear();
+  temp_rad.clear();
 
   for (int i = 0; i < vfes->GetNE(); i++) {
     // Standard local assembly and inversion for energy mass matrices.
@@ -199,6 +200,13 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
         temp.push_back((*Me_inv[i])(j, k));
       }
     }
+    if (config_.isAxisymmetric()) {
+      for (int j = 0; j < dof; j++) {
+        for (int k = 0; k < dof; k++) {
+          temp_rad.push_back((*Me_inv_rad[i])(j, k));
+        }
+      }
+    }
   }
 
   invMArray.UseDevice(true);
@@ -206,6 +214,14 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   invMArray = 0.;
   auto hinvMArray = invMArray.HostWrite();
   for (int i = 0; i < static_cast<int>(temp.size()); i++) hinvMArray[i] = temp[i];
+
+  if (config_.isAxisymmetric()) {
+    invMArray_rad.UseDevice(true);
+    invMArray_rad.SetSize(temp.size());
+    invMArray_rad = 0.;
+    auto hinvMArray_rad = invMArray_rad.HostWrite();
+    for (int i = 0; i < static_cast<int>(temp_rad.size()); i++) hinvMArray_rad[i] = temp_rad[i];
+  }
 
   allocateTransferData();
 
@@ -388,8 +404,14 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
     int dof = h_elem_dof_num[elemOffset];
     const int totDofs = vfes->GetNDofs();
 
-    RHSoperator::multiPlyInvers_gpu(y, z, gpu_precomputed_data_, invMArray, posDofInvM, num_equation_, totDofs,
-                                    h_num_elems_of_type[eltype], elemOffset, dof);
+    if (config_.isAxisymmetric()) {
+      RHSoperator::multiPlyInvers_gpu(y, z, gpu_precomputed_data_, invMArray_rad, posDofInvM, num_equation_, totDofs,
+                                      h_num_elems_of_type[eltype], elemOffset, dof);
+    } else {
+      RHSoperator::multiPlyInvers_gpu(y, z, gpu_precomputed_data_, invMArray, posDofInvM, num_equation_, totDofs,
+                                      h_num_elems_of_type[eltype], elemOffset, dof);
+    }
+
   }
 
 #else

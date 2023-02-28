@@ -1098,6 +1098,7 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
   const int *d_elem_dof_num = elem_index_data.dof_number.Read();
   const double *d_face_shape = boundary_face_data.shape.Read();
   const double *d_normal = boundary_face_data.normal.Read();
+  const double *d_xyz = boundary_face_data.xyz.Read();
   const int *d_face_el = boundary_face_data.el.Read();
   const int *d_face_num_quad = boundary_face_data.num_quad.Read();
   const int *d_listElems = listElems.Read();
@@ -1145,6 +1146,7 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
     double u1[gpudata::MAXEQUATIONS], u2[gpudata::MAXEQUATIONS], gradUp1[gpudata::MAXEQUATIONS * gpudata::MAXDIM],
         Rflux[gpudata::MAXEQUATIONS],
         nor[gpudata::MAXDIM];       // double u1[5], u2[5], gradUp1[5 * 3], Rflux[5], nor[3];
+    double xyz[gpudata::MAXDIM];
     int index_i[gpudata::MAXDOFS];  // int index_i[216];
 
     const int el = d_listElems[n];
@@ -1177,6 +1179,7 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
       // extract normal vector at this quad point
       for (int d = 0; d < dim; d++) {
         nor[d] = d_normal[el * maxIntPoints * dim + q * dim + d];
+        xyz[d] = d_xyz[el * maxIntPoints * dim + q * dim + d];
       }
 
       // interpolate to this quad point
@@ -1211,6 +1214,13 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
 
       // compute flux
       d_rsolver->Eval_LF(u1, u2, nor, Rflux);
+
+      if (d_rsolver->isAxisymmetric()) {
+        const double radius = xyz[0];
+        for (int eq = 0; eq < num_equation; eq++) {
+          Rflux[eq] *= radius;
+        }
+      }
 
       for (int eq = 0; eq < num_equation; eq++) {
         d_flux[eq + q * num_equation + n * maxIntPoints * num_equation] = Rflux[eq];

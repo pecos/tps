@@ -370,6 +370,14 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
         }
       }
 
+      if (d_flux->isAxisymmetric()) {
+        const double radius = xyz[0];
+        for (int eq = 0; eq < num_equation; eq++) {
+          Rflux[eq] *= radius;
+        }
+      }
+
+
       // store
       for (int eq = 0; eq < num_equation; eq++) {
         d_f[eq + k * num_equation + iface * maxIntPoints * num_equation] = Rflux[eq];

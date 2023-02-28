@@ -93,6 +93,8 @@ class Fluxes {
   // Compute the split fersion of the flux for SBP operations
   // Output matrices a_mat, c_mat need not have the right size
   void ComputeSplitFlux(const Vector &state, DenseMatrix &a_mat, DenseMatrix &c_mat);
+
+  MFEM_HOST_DEVICE bool isAxisymmetric() const { return axisymmetric_; }
 };
 
 #endif  // FLUXES_HPP_
