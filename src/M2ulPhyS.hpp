@@ -290,6 +290,7 @@ class M2ulPhyS : public TPS::Solver {
   // a serial mesh, finite element space, and grid function
   // for use if we want to write a serial file
   Mesh *serial_mesh;
+  //Mesh buffer_mesh;  
   
   // I/O organizer
   IODataOrganizer ioData;
@@ -379,6 +380,7 @@ class M2ulPhyS : public TPS::Solver {
   void parseBCInputs();
   //void parseSGSInputs();  
   void parseSpongeZoneInputs();
+  void parsePeriodicInputs();
   void parsePostProcessVisualizationInputs();
 
   void packUpGasMixtureInput();

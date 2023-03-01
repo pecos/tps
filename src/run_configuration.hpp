@@ -265,6 +265,11 @@ class RunConfiguration {
 
   double const_plasma_conductivity_;
 
+  // mesh periodicitity
+  bool periodic;
+  double xTrans, yTrans, zTrans;
+  
+  
   PostProcessInput postprocessInput;
 
   RunConfiguration();
@@ -272,6 +277,11 @@ class RunConfiguration {
 
   void readInputFile(std::string inpuFileName);
 
+  bool GetPeriodic() { return periodic; }
+  double GetXTrans() { return xTrans; }
+  double GetYTrans() { return yTrans; }
+  double GetZTrans() { return zTrans; }    
+  
   string GetMeshFileName() { return meshFile; }
   string GetOutputName() { return outputFile; }
   string GetPartitionBaseName() { return partFile; }

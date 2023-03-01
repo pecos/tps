@@ -36,6 +36,7 @@
 #include <string>
 
 RunConfiguration::RunConfiguration() {
+  
   // Initialize with default values
   partFile = "partition";
 
@@ -111,6 +112,12 @@ RunConfiguration::RunConfiguration() {
 
   twoTemperature = false;
   ambipolar = false;
+
+  periodic = false;
+  xTrans = 1.0e12;
+  yTrans = 1.0e12;
+  zTrans = 1.0e12;  
+  
 }
 
 RunConfiguration::~RunConfiguration() {

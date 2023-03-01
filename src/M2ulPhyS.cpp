@@ -117,8 +117,36 @@ void M2ulPhyS::initVariables() {
     // read serial mesh and corresponding partition file (the hdf file that was generated
     // when starting from scratch).
 
-    serial_mesh = new Mesh(config.GetMeshFileName().c_str());
+    // w/o ini periodic option
+    //serial_mesh = new Mesh(config.GetMeshFileName().c_str());
 
+    // periodic treatments
+    if(config.GetPeriodic()) {
+      /*
+      Mesh *temp_mesh = new Mesh(config.GetMeshFileName().c_str());
+      Vector x_translation({config.GetXTrans(), 0.0, 0.0});
+      Vector y_translation({0.0, config.GetYTrans(), 0.0});
+      Vector z_translation({0.0, 0.0, config.GetZTrans()});      
+      std::vector<Vector> translations = {x_translation, y_translation, z_translation};
+      //serial_mesh = Mesh::MakePeriodic(*temp_mesh, temp_mesh->CreatePeriodicVertexMapping(translations));
+      //serial_mesh = &Mesh::MakePeriodic(*temp_mesh, temp_mesh->CreatePeriodicVertexMapping(translations));
+      buffer_mesh = Mesh::MakePeriodic(*temp_mesh, temp_mesh->CreatePeriodicVertexMapping(translations));
+      serial_mesh = &buffer_mesh;
+      */
+
+      Mesh temp_mesh = Mesh(config.GetMeshFileName().c_str());
+      Vector x_translation({config.GetXTrans(), 0.0, 0.0});
+      Vector y_translation({0.0, config.GetYTrans(), 0.0});
+      Vector z_translation({0.0, 0.0, config.GetZTrans()});      
+      std::vector<Vector> translations = {x_translation, y_translation, z_translation};
+      serial_mesh = new Mesh(std::move(Mesh::MakePeriodic(temp_mesh, temp_mesh.CreatePeriodicVertexMapping(translations))));
+      
+    }
+    else {
+      serial_mesh = new Mesh(config.GetMeshFileName().c_str());      
+    }
+        
+    
     if (config.GetUniformRefLevels() > 0) {
       if (mpi.Root()) {
         std::cerr << "ERROR: Uniform mesh refinement not supported upon restart." << std::endl;
@@ -144,6 +172,7 @@ void M2ulPhyS::initVariables() {
 
     // only need serial mesh if on rank 0 and using single restart file option
     if (!mpi.Root() || (config.RestartSerial() == "no")) delete serial_mesh;
+    //if (!mpi.Root() || (config.RestartSerial() == "no")) buffer_mesh.Destroy();        
 
     // Paraview setup
     paraviewColl = new ParaViewDataCollection(config.GetOutputName(), mesh);
@@ -186,6 +215,7 @@ void M2ulPhyS::initVariables() {
 
     // we only need serial mesh if on rank 0 and using the serial restart file option
     if (!mpi.Root() || (config.RestartSerial() == "no")) delete serial_mesh;
+    //if (!mpi.Root() || (config.RestartSerial() == "no")) buffer_mesh.Destroy();    
 
     // VisIt setup
     //     visitColl = new VisItDataCollection(config.GetOutputName(), mesh);
@@ -2110,6 +2140,9 @@ void M2ulPhyS::parseSolverOptions2() {
 
   // subgrid scale model
   //parseSGSInputs();
+
+  // periodicity
+  parsePeriodicInputs();  
   
   // post-process visualization inputs
   parsePostProcessVisualizationInputs();
@@ -3132,6 +3165,13 @@ void M2ulPhyS::parsePostProcessVisualizationInputs() {
     tpsP->getRequiredInput("post-process/visualization/end-iter", config.postprocessInput.endIter);
     tpsP->getRequiredInput("post-process/visualization/frequency", config.postprocessInput.freq);
   }
+}
+
+void M2ulPhyS::parsePeriodicInputs() {
+  tpsP->getInput("periodicity/enablePeriodic", config.periodic, false);
+  tpsP->getInput("periodicity/xTrans", config.xTrans, 1.0e12);
+  tpsP->getInput("periodicity/yTrans", config.xTrans, 1.0e12);
+  tpsP->getInput("periodicity/zTrans", config.zTrans, 1.0e12);    
 }
 
 
