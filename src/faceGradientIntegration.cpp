@@ -274,6 +274,9 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
   // IntegrationRules IntRules2(0, Quadrature1D::GaussLobatto);
   const IntegrationRule *ir = &intRules->Get(Tr.GetGeometryType(), intorder);
 
+  //double wallTemp = config.wallBC[0].Th;
+  double wallTemp = config.GetWallTemp();  
+  
   for (int i = 0; i < ir->GetNPoints(); i++) {
     const IntegrationPoint &ip = ir->IntPoint(i);
 
@@ -342,6 +345,7 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
         if (wbc != wallBCmap.end()) {
 	  //if (radius <= 0.02) cout << "Wall BC grad hack at: " << radius << endl; fflush(stdout);
           if (eq==1 || eq==2 || eq==3) iUp2(eq) = 0.0;
+          if (eq==4) iUp2(eq) = wallTemp;	  
         }
       }           
       mean(eq) = 0.5 * (iUp1(eq) + iUp2(eq));

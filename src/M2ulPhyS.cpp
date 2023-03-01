@@ -2900,6 +2900,7 @@ void M2ulPhyS::parseBCInputs() {
       config.wallBC[i - 1].elecThermalCond = ISOTH;
       config.wallBC[i - 1].Th = temperature;
       config.wallBC[i - 1].Te = temperature;
+      config.wallTemperature = temperature;      
     } else if (type == "viscous_adiabatic") {
       config.wallBC[i - 1].hvyThermalCond = ADIAB;
       config.wallBC[i - 1].elecThermalCond = ADIAB;
