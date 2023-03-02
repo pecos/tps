@@ -127,18 +127,6 @@ void M2ulPhyS::initVariables() {
       }
     }
 
-    mesh = new ParMesh(MPI_COMM_WORLD, *serial_mesh, partitioning_);
-
-    // only need serial mesh if on rank 0 and using single restart file option
-    if (!mpi.Root() || (config.RestartSerial() == "no")) delete serial_mesh;
-
-    // Paraview setup
-    paraviewColl = new ParaViewDataCollection(config.GetOutputName(), mesh);
-    paraviewColl->SetLevelsOfDetail(config.GetSolutionOrder());
-    paraviewColl->SetHighOrderOutput(true);
-    paraviewColl->SetPrecision(8);
-    // paraviewColl->SetDataFormat(VTKFormat::ASCII);
-
   } else {
     // remove previous solution
     if (mpi.Root()) {
@@ -169,26 +157,72 @@ void M2ulPhyS::initVariables() {
       MPI_Barrier(MPI_COMM_WORLD);
     }
 
-    mesh = new ParMesh(MPI_COMM_WORLD, *serial_mesh, partitioning_);
-
-    // we only need serial mesh if on rank 0 and using the serial restart file option
-    if (!mpi.Root() || (config.RestartSerial() == "no")) delete serial_mesh;
-
-    // VisIt setup
-    //     visitColl = new VisItDataCollection(config.GetOutputName(), mesh);
-    //     visitColl->SetPrefixPath(config.GetOutputName());
-    //     visitColl->SetPrecision(8);
-
-    // Paraview setup
-    paraviewColl = new ParaViewDataCollection(config.GetOutputName(), mesh);
-    paraviewColl->SetLevelsOfDetail(config.GetSolutionOrder());
-    paraviewColl->SetHighOrderOutput(true);
-    paraviewColl->SetPrecision(8);
-    // paraviewColl->SetDataFormat(VTKFormat::ASCII);
-
     time = 0.;
     iter = 0;
   }
+
+  // If requested, evaluate the distance function (i.e., the distance to the nearest no-slip wall)
+  distance_ = NULL;
+  GridFunction *serial_distance = NULL;
+  if (config.compute_distance) {
+    order = config.GetSolutionOrder();
+    dim = serial_mesh->Dimension();
+    basisType = config.GetBasisType();
+    DG_FECollection *tmp_fec = NULL;
+    if (basisType == 0) {
+      tmp_fec = new DG_FECollection(order, dim, BasisType::GaussLegendre);
+    } else if (basisType == 1) {
+      tmp_fec = new DG_FECollection(order, dim, BasisType::GaussLobatto);
+    }
+
+    // Serial FE space for scalar variable
+    FiniteElementSpace *serial_fes = new FiniteElementSpace(serial_mesh, tmp_fec);
+
+    // Serial grid function for scalar variable
+    serial_distance = new GridFunction(serial_fes);
+
+    // Build a list of wall patches
+    Array<int> wall_patch_list;
+    for (int i = 0; i < config.wallPatchType.size(); i++) {
+      if (config.wallPatchType[i].second != WallType::INV) {
+        wall_patch_list.Append(config.wallPatchType[i].first);
+      }
+    }
+
+    if (serial_mesh->GetNodes() == NULL) {
+      serial_mesh->SetCurvature(1);
+    }
+
+    FiniteElementSpace *tmp_dfes = new FiniteElementSpace(serial_mesh, tmp_fec, dim, Ordering::byNODES);
+    GridFunction coordinates(tmp_dfes);
+    serial_mesh->GetNodes(coordinates);
+
+    // Evaluate the distance function
+    evaluateDistanceSerial(*serial_mesh, wall_patch_list, coordinates, *serial_distance);
+  }
+
+  // Instantiate parallel mesh
+  mesh = new ParMesh(MPI_COMM_WORLD, *serial_mesh, partitioning_);
+
+  // If necessary, parallelize distance function
+  if (config.compute_distance) {
+    distance_ = new ParGridFunction(mesh, serial_distance, partitioning_);
+    if (partitioning_ == NULL) {
+      // In this case, ctor call above does not copy data, so explicitly call assignment
+      *distance_ = *serial_distance;
+    }
+    // Done with serial_distance
+    delete serial_distance;
+  }
+
+  // only need serial mesh if on rank 0 and using single restart file option
+  if (!mpi.Root() || (config.RestartSerial() == "no")) delete serial_mesh;
+
+  // Paraview setup
+  paraviewColl = new ParaViewDataCollection(config.GetOutputName(), mesh);
+  paraviewColl->SetLevelsOfDetail(config.GetSolutionOrder());
+  paraviewColl->SetHighOrderOutput(true);
+  paraviewColl->SetPrecision(8);
 
   // This line is necessary to ensure that GetNodes does not return
   // NULL, which is required when we set up interpolation between
@@ -1359,6 +1393,8 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   if (spaceVaryViscMult != NULL) paraviewColl->RegisterField("viscMult", spaceVaryViscMult);
 
+  if (distance_ != NULL) paraviewColl->RegisterField("distance", distance_);
+
   paraviewColl->SetOwnData(true);
   // paraviewColl->Save();
 }
@@ -2117,6 +2153,7 @@ void M2ulPhyS::parseFlowOptions() {
     for (int d = 0; d < 3; d++) tpsP->getRequiredVecElem("flow/pressureGrad", config.gradPress[d], d);
   }
   tpsP->getInput("flow/refinement_levels", config.ref_levels, 0);
+  tpsP->getInput("flow/computeDistance", config.compute_distance, false);
 
   assert(config.solOrder > 0);
   assert(config.numIters >= 0);

@@ -32,6 +32,10 @@
 #ifndef UTILS_HPP_
 #define UTILS_HPP_
 
+/** @file
+ * @brief A place for miscellaneous utility functions.
+ */
+
 #include <assert.h>
 #include <hdf5.h>
 
@@ -108,5 +112,23 @@ void LocalProjectDiscCoefficient(mfem::GridFunction &gf, mfem::VectorCoefficient
  * LocalProjectDiscCoefficient.
  */
 void GlobalProjectDiscCoefficient(mfem::ParGridFunction &gf, mfem::VectorCoefficient &coeff);
+
+/** @brief Evaluate the distance function
+ *
+ *  Compute minimum distance from each node to a no-slip wall.
+ *
+ *  @param mesh A serial mesh
+ *  @param wall_patches Array of patch indices corresponding to walls
+ *  @param coords Grid function containing mesh coordinates
+ *  @param distance Grid function to store the distance
+ *
+ *  No allocation or resizing is done.  The incoming
+ *  GridFunction objects must already be set up and sized correctly.
+ *
+ *  This function is not guarenteed to work for nonlinear elements.
+ *  See comments in source about why.
+ */
+void evaluateDistanceSerial(mfem::Mesh &mesh, const mfem::Array<int> &wall_patches, const mfem::GridFunction &coords,
+                            mfem::GridFunction &distance);
 
 #endif  // UTILS_HPP_

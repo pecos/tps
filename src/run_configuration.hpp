@@ -255,6 +255,8 @@ class RunConfiguration {
 
   PostProcessInput postprocessInput;
 
+  bool compute_distance;
+
   RunConfiguration();
   ~RunConfiguration();
 

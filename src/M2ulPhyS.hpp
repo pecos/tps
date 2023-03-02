@@ -159,6 +159,9 @@ class M2ulPhyS : public TPS::Solver {
 
   ParGridFunction *spaceVaryViscMult;  // space varying viscosity multiplier
 
+  /// Distance to nearest no-slip wall
+  ParGridFunction *distance_;
+
   Fluxes *fluxClass;
 
   RHSoperator *rhsOperator;
