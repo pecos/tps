@@ -32,7 +32,7 @@ EXTRA_DIST      = tap-driver.sh soln_differ inputs meshes ref_solns/*.h5 \
 	 	  inflow_outflow.test mms.ternary_2d.test mms.ternary_2d_wall.test \
 	 	  mms.ternary_2d_inout.test cuda-memcheck.test mms.general_wall.test \
 		  independent_coupling.test interp_em.test mms.euler_2d.test mms.cns_2d.test \
-		  gradient.test coupled-3d.test tabulated.test lte_mixture.test
+		  gradient.test coupled-3d.test tabulated.test lte_mixture.test distance_fcn.test
 
 TESTS = vpath.sh
 XFAIL_TESTS =
@@ -169,5 +169,11 @@ test_lte_mixture_SOURCES      = test_lte_mixture.cpp
 test_lte_mixture_LDADD        = ../src/libtps.la
 test_lte_mixture_LDADD       += $(HDF5_LIBS)
 test_lte_mixture_LDADD       += $(GRVY_LIBS)
+
+check_PROGRAMS               += test_distance_fcn
+test_distance_fcn_SOURCES     = test_distance_fcn.cpp
+test_distance_fcn_LDADD       = ../src/libtps.la
+test_distance_fcn_LDADD      += $(HDF5_LIBS)
+test_distance_fcn_LDADD      += $(GRVY_LIBS)
 
 endif # if !GPU_ENABLED

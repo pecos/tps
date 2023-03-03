@@ -419,6 +419,8 @@ class M2ulPhyS : public TPS::Solver {
   GasMixture *getMixture() { return mixture; }
   Chemistry *getChemistry() { return chemistry_; }
 
+  const ParGridFunction *getDistanceFcn() { return distance_; }
+
   void updatePrimitives();
 
   ParGridFunction *GetPlasmaConductivityGF() { return plasma_conductivity_; }
