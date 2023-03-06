@@ -41,27 +41,6 @@ MFEM_HOST_DEVICE Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, Trans
       axisymmetric_(axisym),
       num_equation(_num_equation) {}
 
-#ifdef _BUILD_DEPRECATED_
-void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, DenseMatrix &flux) {
-  switch (eqSystem) {
-    case EULER:
-      ComputeConvectiveFluxes(state, flux);
-      break;
-    case NS:
-    case NS_PASSIVE: {
-      DenseMatrix convF(num_equation, dim);
-      ComputeConvectiveFluxes(state, convF);
-
-      DenseMatrix viscF(num_equation, dim);
-      ComputeViscousFluxes(state, gradUpi, 1, viscF);
-      for (int eq = 0; eq < num_equation; eq++) {
-        for (int d = 0; d < dim; d++) flux(eq, d) = convF(eq, d) - viscF(eq, d);
-      }
-    } break;
-  }
-}
-#endif
-
 void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
 #ifdef _BUILD_DEPRECATED_
   double Pe = 0.0;
@@ -135,128 +114,8 @@ MFEM_HOST_DEVICE void Fluxes::ComputeConvectiveFluxes(const double *state, doubl
 }
 
 // TODO(kevin): check/complete axisymmetric setting for multi-component flow.
-void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, DenseMatrix &flux) {
-#ifdef _BUILD_DEPRECATED_
-  flux = 0.;
-  if (eqSystem == EULER) {
-    return;
-  }
-
-  Vector vel(dim);
-  Vector vtmp(dim);
-  DenseMatrix stress(dim, dim);
-
-  // // TODO(kevin): Ultimately, take Up as input variable.
-  // // TODO(kevin): pressure and temperature must be comptued by mixture only.
-  // const double p = mixture->ComputePressure(state);
-  // const double temp = p / state[0] / UNIVERSALGASCONSTANT * mixture->GetGasParams(0,GasParams::SPECIES_MW);
-  // const double temp = p / state[0] / Rg;
-  // const double visc = mixture->GetViscosity(state);
-  // const double bulkViscMult = mixture->GetBulkViscMultiplyer();
-  // const double k = mixture->GetThermalConductivity(state);
-
-  // TODO(kevin): update E-field with EM coupling.
-  Vector Efield(nvel);
-  Efield = 0.0;
-
-  const int numSpecies = mixture->GetNumSpecies();
-  const int numActiveSpecies = mixture->GetNumActiveSpecies();
-  const bool twoTemperature = mixture->IsTwoTemperature();
-
-  Vector speciesEnthalpies(numSpecies);
-  mixture->computeSpeciesEnthalpies(state, speciesEnthalpies);
-
-  Vector transportBuffer;
-  // NOTE(kevin): in flux, only dim-components of diffusionVelocity will be used.
-  DenseMatrix diffusionVelocity(numSpecies, nvel);
-  transport->ComputeFluxTransportProperties(state, gradUp, Efield, transportBuffer, diffusionVelocity);
-  const double visc = transportBuffer[FluxTrns::VISCOSITY];
-  double bulkViscosity = transportBuffer[FluxTrns::BULK_VISCOSITY];
-  bulkViscosity -= 2. / 3. * visc;
-  double k = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY];
-  double ke = transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY];
-
-  if (twoTemperature) {
-    for (int d = 0; d < dim; d++) {
-      double qeFlux = ke * gradUp(num_equation - 1, d);
-      flux(1 + nvel, d) += qeFlux;
-      flux(num_equation - 1, d) += qeFlux;
-      flux(num_equation - 1, d) -= speciesEnthalpies(numSpecies - 2) * diffusionVelocity(numSpecies - 2, d);
-    }
-  } else {
-    k += ke;
-  }
-
-  const double ur = (axisymmetric_ ? state[1] / state[0] : 0);
-  const double ut = (axisymmetric_ ? state[3] / state[0] : 0);
-
-  // make sure density visc. flux is 0
-  for (int d = 0; d < dim; d++) flux(0, d) = 0.;
-
-  double divV = 0.;
-  for (int i = 0; i < dim; i++) {
-    for (int j = 0; j < dim; j++) stress(i, j) = gradUp(1 + j, i) + gradUp(1 + i, j);
-    divV += gradUp(1 + i, i);
-  }
-  stress *= visc;
-
-  if (axisymmetric_ && radius > 0) {
-    divV += ur / radius;
-  }
-
-  for (int i = 0; i < dim; i++) stress(i, i) += bulkViscosity * divV;
-
-  for (int i = 0; i < dim; i++)
-    for (int j = 0; j < dim; j++) flux(1 + i, j) = stress(i, j);
-
-  double tau_tr = 0, tau_tz = 0;
-  if (axisymmetric_) {
-    const double ut_r = gradUp(3, 0);
-    const double ut_z = gradUp(3, 1);
-    tau_tr = ut_r;
-    if (radius > 0) tau_tr -= ut / radius;
-    tau_tr *= visc;
-
-    tau_tz = visc * ut_z;
-
-    flux(1 + 2, 0) = tau_tr;
-    flux(1 + 2, 1) = tau_tz;
-  }
-
-  // temperature gradient
-  //       for (int d = 0; d < dim; d++) gradT[d] = temp * (gradUp(1 + dim, d) / p - gradUp(0, d) / state[0]);
-
-  for (int d = 0; d < dim; d++) vel(d) = state[1 + d] / state[0];
-
-  stress.Mult(vel, vtmp);
-
-  for (int d = 0; d < dim; d++) {
-    flux(1 + nvel, d) += vtmp[d];
-    flux(1 + nvel, d) += k * gradUp(1 + nvel, d);
-    // compute diffusive enthalpy flux.
-    for (int sp = 0; sp < numSpecies; sp++) {
-      flux(1 + nvel, d) -= speciesEnthalpies(sp) * diffusionVelocity(sp, d);
-    }
-  }
-
-  if (axisymmetric_) {
-    flux(1 + nvel, 0) += ut * tau_tr;
-    flux(1 + nvel, 1) += ut * tau_tz;
-  }
-
-  // if (eqSystem == NS_PASSIVE) {
-  //   double Sc = mixture->GetSchmidtNum();
-  //   for (int d = 0; d < dim; d++) flux(num_equation - 1, d) = visc / Sc * gradUp(num_equation - 1, d);
-  // }
-  // NOTE: NS_PASSIVE will not be needed (automatically incorporated).
-  for (int sp = 0; sp < numActiveSpecies; sp++) {
-    // NOTE: diffusionVelocity is set to be (numSpecies,nvel)-matrix.
-    // however only dim-components are used for flux.
-    for (int d = 0; d < dim; d++) flux(nvel + 2 + sp, d) = -state[nvel + 2 + sp] * diffusionVelocity(sp, d);
-  }
-#else
-  ComputeViscousFluxes(state.GetData(), gradUp.GetData(), radius, flux.GetData());
-#endif
+void Fluxes::ComputeViscousFluxes(quadraturePointData &input, DenseMatrix &flux) {
+  ComputeViscousFluxes(input.flow_conserved_, input.flow_primitive_grad_, input.radius_, flux.GetData());
 }
 
 MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius,

@@ -184,6 +184,8 @@ void FaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteEl
 void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const FiniteElement &el2,
                                               FaceElementTransformations &Tr, const Vector &elfun, Vector &elvect) {
   // Compute the term <F.n(u),[w]> on the interior faces.
+  quadraturePointData flux_inputs_1;
+  quadraturePointData flux_inputs_2;
 
   funval1.SetSize(num_equation);
   funval2.SetSize(num_equation);
@@ -269,11 +271,20 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
       radius = transip[0];
     }
 
+    // prepare flux inputs
+    flux_inputs_1.flow_conserved_ = funval1.HostRead();
+    flux_inputs_2.flow_conserved_ = funval2.HostRead();
+
+    flux_inputs_1.flow_primitive_grad_ = gradUp1i.HostRead();
+    flux_inputs_2.flow_primitive_grad_ = gradUp2i.HostRead();
+
+    flux_inputs_1.radius_ = flux_inputs_2.radius_ = radius;
+
     // compute viscous fluxes
     viscF1 = viscF2 = 0.;
 
-    fluxClass->ComputeViscousFluxes(funval1, gradUp1i, radius, viscF1);
-    fluxClass->ComputeViscousFluxes(funval2, gradUp2i, radius, viscF2);
+    fluxClass->ComputeViscousFluxes(flux_inputs_1, viscF1);
+    fluxClass->ComputeViscousFluxes(flux_inputs_2, viscF2);
 
     // compute mean flux
     viscF1 += viscF2;

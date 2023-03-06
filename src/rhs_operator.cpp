@@ -459,6 +459,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 
   GetFlux_gpu(x, flux);
 #else
+  quadraturePointData flux_inputs;
 
   DenseMatrix xmat(x.GetData(), vfes->GetNDofs(), num_equation_);
   DenseMatrix f(num_equation_, dim_);
@@ -501,8 +502,12 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
     }
 
     if (eqSystem != EULER) {
+      flux_inputs.flow_conserved_ = state.HostRead();
+      flux_inputs.flow_primitive_grad_ = gradUpi.HostRead();
+      flux_inputs.radius_ = radius;
+
       DenseMatrix fvisc(num_equation_, dim);
-      fluxClass->ComputeViscousFluxes(state, gradUpi, radius, fvisc);
+      fluxClass->ComputeViscousFluxes(flux_inputs, fvisc);
 
       // TODO(kevin): This needs to be incorporated in Fluxes::ComputeViscousFluxes.
       if (spaceVaryViscMult != NULL) {

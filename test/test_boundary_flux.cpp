@@ -124,7 +124,12 @@ bool testComputeBdrViscousFlux(RunConfiguration &srcConfig, const int dim) {
   grvy_printf(GRVY_INFO, "\n ComputeViscousFluxes * normal. \n");
   DenseMatrix viscF(num_equation, dim);
   Vector viscFdotNorm(num_equation);
-  flux->ComputeViscousFluxes(testConserved, gradUp, radius, viscF);
+
+  quadraturePointData flux_inputs;
+  flux_inputs.flow_conserved_ = testConserved.HostRead();
+  flux_inputs.flow_primitive_grad_ = gradUp.HostRead();
+  flux_inputs.radius_ = radius;
+  flux->ComputeViscousFluxes(flux_inputs, viscF);
   viscF.Mult(dir, viscFdotNorm);
   for (int eq = 0; eq < num_equation; eq++) {
     grvy_printf(GRVY_INFO, "%.8E\t", viscFdotNorm(eq));

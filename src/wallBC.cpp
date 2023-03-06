@@ -218,6 +218,8 @@ void WallBC::integrationBC(Vector &y, const Vector &x, const elementIndexingData
 
 void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
                                 Vector &bdrFlux) {
+  quadraturePointData flux_inputs;
+
   Vector vel(nvel_);
   for (int d = 0; d < nvel_; d++) vel[d] = stateIn[1 + d] / stateIn[0];
 
@@ -250,7 +252,10 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
     // the axis... but... should implement this separately
 
     // incoming visc flux
-    fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, viscF);
+    flux_inputs.flow_conserved_ = stateIn.HostRead();
+    flux_inputs.flow_primitive_grad_ = gradState.HostRead();
+    flux_inputs.radius_ = radius;
+    fluxClass->ComputeViscousFluxes(flux_inputs, viscF);
 
     // modify gradients so that wall is adibatic
     Vector unitNorm = normal;
@@ -265,11 +270,15 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
     DenseMatrix viscFw(num_equation_, dim_);
 
     // evaluate viscous fluxes at the wall
-    fluxClass->ComputeViscousFluxes(stateMirror, gradState, radius, viscFw);
+    flux_inputs.flow_conserved_ = stateMirror.HostRead();
+    flux_inputs.flow_primitive_grad_ = gradState.HostRead();
+    flux_inputs.radius_ = radius;
+    fluxClass->ComputeViscousFluxes(flux_inputs, viscF);
     viscFw.Mult(normal, wallViscF);
 
     // evaluate internal viscous fluxes
-    fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, viscF);
+    flux_inputs.flow_conserved_ = stateIn.HostRead();
+    fluxClass->ComputeViscousFluxes(flux_inputs, viscF);
   }
 
   // Add visc fluxes (we skip density eq.)
@@ -289,8 +298,13 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
   if (eqSystem == NS_PASSIVE) bdrFlux[num_equation_ - 1] = 0.;
 
   // incoming visc flux
+  quadraturePointData flux_inputs;
+  flux_inputs.flow_conserved_ = stateIn.HostRead();
+  flux_inputs.flow_primitive_grad_ = gradState.HostRead();
+  flux_inputs.radius_ = radius;
+
   DenseMatrix viscF(num_equation_, dim_);
-  fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, viscF);
+  fluxClass->ComputeViscousFluxes(flux_inputs, viscF);
 
   // modify gradients so that wall is adibatic
   Vector unitNorm = normal;
@@ -344,8 +358,13 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
   wallViscF *= sqrt(normN);  // in case normal is not a unit vector..
 
   // evaluate internal viscous fluxes
+  quadraturePointData flux_inputs;
+  flux_inputs.flow_conserved_ = stateIn.HostRead();
+  flux_inputs.flow_primitive_grad_ = gradState.HostRead();
+  flux_inputs.radius_ = radius;
+
   DenseMatrix viscF(num_equation_, dim_);
-  fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, viscF);
+  fluxClass->ComputeViscousFluxes(flux_inputs, viscF);
 
   // Add visc fluxes (we skip density eq.)
   for (int eq = 1; eq < num_equation_; eq++) {
@@ -377,8 +396,13 @@ void WallBC::computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix
   wallViscF *= sqrt(normN);  // in case normal is not a unit vector..
 
   // evaluate internal viscous fluxes
+  quadraturePointData flux_inputs;
+  flux_inputs.flow_conserved_ = stateIn.HostRead();
+  flux_inputs.flow_primitive_grad_ = gradState.HostRead();
+  flux_inputs.radius_ = radius;
+
   DenseMatrix viscF(num_equation_, dim_);
-  fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, viscF);
+  fluxClass->ComputeViscousFluxes(flux_inputs, viscF);
 
   // Add visc fluxes (we skip density eq.)
   for (int eq = 1; eq < num_equation_; eq++) {

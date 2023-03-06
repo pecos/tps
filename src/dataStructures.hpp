@@ -205,6 +205,24 @@ struct SpongeZoneData {
   bool singleTemperature;
 };
 
+/** @brief Struct containing information at a single point
+ *
+ * This struct contains state and other data needed to evaluate fluxes
+ * or source terms at a single quadrature point.  Not all information
+ * is always guarenteed to be valid (e.g., pointers may be NULL) so
+ * user must be aware of what information is set (e.g., see
+ * FaceIntegrator::AssembleFaceVector) prior to usage (e.g., in
+ * Fluxes::ComputeViscousFluxes).
+ */
+struct quadraturePointData {
+  const double *flow_conserved_;
+  const double *flow_primitive_;
+  const double *flow_primitive_grad_;
+  const double *electric_field_;
+
+  double radius_;
+};
+
 /** @brief Array providing information about dof indices for elements
  *
  * These arrays store information about the degrees of freedom
