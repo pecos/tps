@@ -323,8 +323,10 @@ void AxisymmetricSource::updateTerms(Vector &in) {
       const double uz_z = gradUp[2 + 1 * neqn];
       const double ut_r = gradUp[3 + 0 * neqn];
 
-      double visc, bulkVisc;
-      d_trans->GetViscosities(U, Up, visc, bulkVisc);
+      double visc, bulkVisc, visc_vec[2];
+      d_trans->GetViscosities(U, Up, visc_vec);
+      visc = visc_vec[0];
+      bulkVisc = visc_vec[1];
       bulkVisc -= 2. / 3. * visc;
 
       if (alpha != NULL) {

@@ -79,7 +79,7 @@ class LteTransport : public TransportProperties {
                                                 const double *Efield, double *globalTransport, double *speciesTransport,
                                                 double *diffusionVelocity, double *n_sp);
 
-  void GetViscosities(const double *conserved, const double *primitive, double &visc, double &bulkVisc) override;
+  void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
 };
 
 #endif  // _GPU_

@@ -525,7 +525,7 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeSourceTransportProperties(
 }
 
 MFEM_HOST_DEVICE void ArgonMinimalTransport::GetViscosities(const double *conserved, const double *primitive,
-                                                            double &visc, double &bulk_visc) {
+                                                            double *visc) {
   double n_sp[3], X_sp[3], Y_sp[3];
   mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
   double nTotal = 0.0;
@@ -548,16 +548,14 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::GetViscosities(const double *conser
   speciesViscosity[neutralIndex_] = viscosityFactor_ * sqrt(mw_[neutralIndex_] * Th) / collision::argon::ArAr22(Th);
   speciesViscosity[electronIndex_] = 0.0;
 
-  visc = linearAverage(X_sp, speciesViscosity);
-  bulk_visc = 0.0;
+  visc[0] = linearAverage(X_sp, speciesViscosity);
+  visc[1] = 0.0;
 
   // Apply artificial multipliers.
   if (multiply_) {
-    visc *= fluxTrnsMultiplier_[FluxTrns::VISCOSITY];
-    bulk_visc *= fluxTrnsMultiplier_[FluxTrns::BULK_VISCOSITY];
+    visc[0] *= fluxTrnsMultiplier_[FluxTrns::VISCOSITY];
+    visc[1] *= fluxTrnsMultiplier_[FluxTrns::BULK_VISCOSITY];
   }
-
-  return;
 }
 
 //////////////////////////////////////////////////////
@@ -1016,7 +1014,7 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeSourceTransportProperties(
 }
 
 MFEM_HOST_DEVICE void ArgonMixtureTransport::GetViscosities(const double *conserved, const double *primitive,
-                                                            double &visc, double &bulk_visc) {
+                                                            double *visc) {
   double n_sp[gpudata::MAXSPECIES], X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES];
   mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
   double nTotal = 0.0;
@@ -1033,13 +1031,13 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::GetViscosities(const double *conser
     speciesViscosity[sp] =
         viscosityFactor_ * sqrt(mw_[sp] * collInputs.Th) / collisionIntegral(sp, sp, 2, 2, collInputs);
   }
-  visc = linearAverage(X_sp, speciesViscosity);
-  bulk_visc = 0.0;
+  visc[0] = linearAverage(X_sp, speciesViscosity);
+  visc[1] = 0.0;
 
   // Apply artificial multipliers.
   if (multiply_) {
-    visc *= fluxTrnsMultiplier_[FluxTrns::VISCOSITY];
-    bulk_visc *= fluxTrnsMultiplier_[FluxTrns::BULK_VISCOSITY];
+    visc[0] *= fluxTrnsMultiplier_[FluxTrns::VISCOSITY];
+    visc[1] *= fluxTrnsMultiplier_[FluxTrns::BULK_VISCOSITY];
   }
 
   return;
