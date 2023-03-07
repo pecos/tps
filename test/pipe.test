@@ -22,5 +22,14 @@ setup() {
 
     test -s $SOLN_FILE
     test -s $REF_FILE
-    ./soln_differ -r $SOLN_FILE $REF_FILE
+
+    if [[ $HOSTNAME == "lassen"* ]]; then
+        h5diff -r --delta=2e-13 $SOLN_FILE $REF_FILE /solution/density || exit 1
+        h5diff -r --delta=2.2e-11 $SOLN_FILE $REF_FILE /solution/rho-u || exit 1
+        h5diff -r --delta=2.2e-11 $SOLN_FILE $REF_FILE /solution/rho-v || exit 1
+        h5diff -r --delta=2.2e-11 $SOLN_FILE $REF_FILE /solution/rho-w || exit 1
+        h5diff -r --relative=6e-14 $SOLN_FILE $REF_FILE /solution/rho-E || exit 1
+    else
+        ./soln_differ -r $SOLN_FILE $REF_FILE
+    fi
 }

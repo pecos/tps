@@ -45,7 +45,8 @@ TESTS += cyl3d.gpu.test \
 	 argon_minimal.binary.test \
 	 diffusion_wall.test \
 	 reaction.test \
-	 inflow_outflow.test
+	 inflow_outflow.test \
+	 pipe.test
 
 if PYTHON_ENABLED
 TESTS += cyl3d.gpu.python.test
