@@ -642,10 +642,10 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
         gradUp2[gpudata::MAXDIM * gpudata::MAXEQUATIONS],         // gradUp2[3 * 5];
         nor[gpudata::MAXDIM];                                     // nor[3];
     double xyz[gpudata::MAXDIM];
-    double Rflux[gpudata::MAXEQUATIONS],                          // double Rflux[5];
-        vFlux1[gpudata::MAXDIM * gpudata::MAXEQUATIONS],          // vFlux1[3 * 5];
-        vFlux2[gpudata::MAXDIM * gpudata::MAXEQUATIONS];          // vFlux2[3 * 5];
-    int index_i[gpudata::MAXDOFS];                                // int index_i[216];
+    double Rflux[gpudata::MAXEQUATIONS],                  // double Rflux[5];
+        vFlux1[gpudata::MAXDIM * gpudata::MAXEQUATIONS],  // vFlux1[3 * 5];
+        vFlux2[gpudata::MAXDIM * gpudata::MAXEQUATIONS];  // vFlux2[3 * 5];
+    int index_i[gpudata::MAXDOFS];                        // int index_i[216];
 
     const int el1 = d_shared_elements_to_shared_faces[0 + el * 7];
     const int numFaces = d_shared_elements_to_shared_faces[1 + el * 7];

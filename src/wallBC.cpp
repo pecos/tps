@@ -608,7 +608,6 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
           }
         }
 
-
         // store flux (TODO: change variable name)
         for (int eq = 0; eq < num_equation; eq++) {
           d_flux[eq + q * num_equation + n * maxIntPoints * num_equation] = Rflux[eq];

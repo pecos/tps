@@ -179,7 +179,7 @@ class DryAirTransport : public TransportProperties {
                                                                  double *globalTransport, double *speciesTransport,
                                                                  double *diffusionVelocity, double *n_sp) {}
 
-  MFEM_HOST_DEVICE virtual void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
 };
 
 MFEM_HOST_DEVICE inline void DryAirTransport::GetViscosities(const double *conserved, const double *primitive,

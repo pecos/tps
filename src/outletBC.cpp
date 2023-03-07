@@ -1145,7 +1145,7 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
     double shape[gpudata::MAXDOFS];  // double shape[216];
     double u1[gpudata::MAXEQUATIONS], u2[gpudata::MAXEQUATIONS], gradUp1[gpudata::MAXEQUATIONS * gpudata::MAXDIM],
         Rflux[gpudata::MAXEQUATIONS],
-        nor[gpudata::MAXDIM];       // double u1[5], u2[5], gradUp1[5 * 3], Rflux[5], nor[3];
+        nor[gpudata::MAXDIM];  // double u1[5], u2[5], gradUp1[5 * 3], Rflux[5], nor[3];
     double xyz[gpudata::MAXDIM];
     int index_i[gpudata::MAXDOFS];  // int index_i[216];
 
