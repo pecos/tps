@@ -72,15 +72,15 @@ class WallBC : public BoundaryCondition {
   void computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux);
   */
 
-  void computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
+  void computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip,
                           double delta, Vector &bdrFlux);
-  void computeSlipWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
+  void computeSlipWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip,
                            double delta, Vector &bdrFlux);
-  void computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
+  void computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip,
                                 double delta, Vector &bdrFlux);
-  void computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
+  void computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip,
                                  double delta, Vector &bdrFlux);
-  void computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
+  void computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip,
                               double delta, Vector &bdrFlux);
 
  public:
@@ -90,8 +90,8 @@ class WallBC : public BoundaryCondition {
          const boundaryFaceIntegrationData &boundary_face_data, const int &maxIntPoints, bool axisym);
   ~WallBC();
 
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
-                      double delta, Vector &bdrFlux);
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip,
+                      double delta, double distance, Vector &bdrFlux);
 
   virtual void initBCs();
 

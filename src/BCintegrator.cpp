@@ -42,7 +42,7 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
                            GasMixture *d_mixture, Fluxes *_fluxClass, ParGridFunction *_Up, ParGridFunction *_gradUp,
                            const boundaryFaceIntegrationData &boundary_face_data, const int _dim,
                            const int _num_equation, double &_max_char_speed, RunConfiguration &_runFile,
-                           Array<int> &local_attr, const int &_maxIntPoints, const int &_maxDofs)
+                           Array<int> &local_attr, const int &_maxIntPoints, const int &_maxDofs, ParGridFunction *distance)
     : groupsMPI(_groupsMPI),
       config(_runFile),
       rsolver(rsolver_),
@@ -58,7 +58,8 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
       dim(_dim),
       num_equation(_num_equation),
       maxIntPoints(_maxIntPoints),
-      maxDofs(_maxDofs) {
+      maxDofs(_maxDofs),
+      distance_(distance) {
   inletBCmap.clear();
   outletBCmap.clear();
   wallBCmap.clear();
@@ -219,15 +220,15 @@ void BCintegrator::initBCs() {
 }
 
 void BCintegrator::computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState,
-                                  double radius, Vector transip, double delta, Vector &bdrFlux) {
+                                  Vector transip, double delta, double distance, Vector &bdrFlux) {
   std::unordered_map<int, BoundaryCondition *>::const_iterator ibc = inletBCmap.find(attr);
   std::unordered_map<int, BoundaryCondition *>::const_iterator obc = outletBCmap.find(attr);
   std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = wallBCmap.find(attr);
 
-  if (ibc != inletBCmap.end()) ibc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, delta, bdrFlux);
+  if (ibc != inletBCmap.end()) ibc->second->computeBdrFlux(normal, stateIn, gradState, transip, delta, distance, bdrFlux);
   if (obc != outletBCmap.end())
-    obc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, delta, bdrFlux);
-  if (wbc != wallBCmap.end()) wbc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, delta, bdrFlux);
+    obc->second->computeBdrFlux(normal, stateIn, gradState, transip, delta, distance, bdrFlux);
+  if (wbc != wallBCmap.end()) wbc->second->computeBdrFlux(normal, stateIn, gradState, transip, delta, distance, bdrFlux);
 
   //   BCmap[attr]->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
 }
@@ -332,6 +333,16 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
   }
 #endif
 
+  // Retrieve distance function (if available)
+  Vector dist;
+  if (distance_ != NULL) {
+    Array<int> dofs;
+    distance_->ParFESpace()->GetElementVDofs(Tr.Elem1No, dofs);
+    dist.SetSize(dofs.Size());
+    distance_->GetSubVector(dofs, dist);
+  }
+
+
   // Integration order calculation from DGTraceIntegrator
   int intorder;
   if (Tr.Elem2No >= 0) {
@@ -377,6 +388,11 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
       }
     }
 
+    double d1 = 0;
+    if (distance_ != NULL) {
+      d1 = dist * shape1;
+    }
+
     // Get the normal vector and the flux on the face
     CalcOrtho(Tr.Jacobian(), nor);
 
@@ -388,7 +404,7 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
       radius = transip[0];
     }
 
-    computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, radius, transip, delta, fluxN);
+    computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, transip, delta, d1, fluxN);
     fluxN *= ip.weight;
 
     if (config.isAxisymmetric()) {
