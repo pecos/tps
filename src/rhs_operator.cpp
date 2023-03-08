@@ -523,7 +523,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 
     if (eqSystem != EULER) {
       DenseMatrix fvisc(num_equation_, dim);
-      fluxClass->ComputeViscousFluxes(state, gradUpi, radius, fvisc);
+      fluxClass->ComputeViscousFluxes(state, gradUpi, radius, -1, fvisc);
 
       // TODO(kevin): This needs to be incorporated in Fluxes::ComputeViscousFluxes.
       if (spaceVaryViscMult != NULL) {
@@ -600,7 +600,7 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
       radius = d_coord[n + 0 * dof];
     }
 
-    d_fluxClass->ComputeViscousFluxes(Un, gradUpn, radius, fvisc);
+    d_fluxClass->ComputeViscousFluxes(Un, gradUpn, radius, -1, fvisc);
 
     if (d_spaceVaryViscMult != NULL) {
       linVisc = d_spaceVaryViscMult[n];

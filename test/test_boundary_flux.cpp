@@ -124,7 +124,7 @@ bool testComputeBdrViscousFlux(RunConfiguration &srcConfig, const int dim) {
   grvy_printf(GRVY_INFO, "\n ComputeViscousFluxes * normal. \n");
   DenseMatrix viscF(num_equation, dim);
   Vector viscFdotNorm(num_equation);
-  flux->ComputeViscousFluxes(testConserved, gradUp, radius, viscF);
+  flux->ComputeViscousFluxes(testConserved, gradUp, radius, -1.0, viscF);
   viscF.Mult(dir, viscFdotNorm);
   for (int eq = 0; eq < num_equation; eq++) {
     grvy_printf(GRVY_INFO, "%.8E\t", viscFdotNorm(eq));
