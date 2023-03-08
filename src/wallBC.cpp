@@ -219,7 +219,7 @@ void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradSt
       */
 
     case INV:
-      computeINVwallFlux(normal, stateIn, gradState, transip, delta, bdrFlux);
+      computeINVwallFlux(normal, stateIn, gradState, transip, delta, distance, bdrFlux);
       break;
     case SLIP:
       computeSlipWallFlux(normal, stateIn, gradState, transip, delta, bdrFlux);
@@ -246,7 +246,7 @@ void WallBC::integrationBC(Vector &y, const Vector &x, const elementIndexingData
 }
 
 void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip,
-                                double delta, Vector &bdrFlux) {
+                                double delta, double distance, Vector &bdrFlux) {
   Vector vel(nvel_);
   for (int d = 0; d < nvel_; d++) vel[d] = stateIn[1 + d] / stateIn[0];
 
@@ -279,7 +279,7 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
     // the axis... but... should implement this separately
 
     // incoming visc flux
-    fluxClass->ComputeViscousFluxes(stateIn, gradState, transip, delta, -1, viscF);
+    fluxClass->ComputeViscousFluxes(stateIn, gradState, transip, delta, distance, viscF);
 
     // modify gradients so that wall is adibatic
     Vector unitNorm = normal;
@@ -294,11 +294,11 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
     DenseMatrix viscFw(num_equation_, dim_);
 
     // evaluate viscous fluxes at the wall
-    fluxClass->ComputeViscousFluxes(stateMirror, gradState, transip, delta, -1, viscFw);
+    fluxClass->ComputeViscousFluxes(stateMirror, gradState, transip, delta, distance, viscFw);
     viscFw.Mult(normal, wallViscF);
 
     // evaluate internal viscous fluxes
-    fluxClass->ComputeViscousFluxes(stateIn, gradState, transip, delta, -1, viscF);
+    fluxClass->ComputeViscousFluxes(stateIn, gradState, transip, delta, distance, viscF);
   }
 
   // Add visc fluxes (we skip density eq.)
