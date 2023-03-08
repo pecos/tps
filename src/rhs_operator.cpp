@@ -524,7 +524,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 
     if (eqSystem != EULER) {
       DenseMatrix fvisc(num_equation_, dim);
-      fluxClass->ComputeViscousFluxes(state, gradUpi, xyz, delta, fvisc);
+      fluxClass->ComputeViscousFluxes(state, gradUpi, xyz, delta, -1, fvisc);
       f -= fvisc;
     }
 
@@ -581,7 +581,7 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
     double xyz[3];
     for (int d = 0; d < dim; d++) xyz[d] = d_coord[n + d * dof];
 
-    d_fluxClass->ComputeViscousFluxes(Un, gradUpn, xyz, d_elSize[n], fvisc);
+    d_fluxClass->ComputeViscousFluxes(Un, gradUpn, xyz, d_elSize[n], -1, fvisc);
 
     for (int eq = 0; eq < num_equation; eq++) {
       for (int d = 0; d < dim; d++) {

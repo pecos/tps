@@ -569,7 +569,7 @@ void M2ulPhyS::initVariables() {
     //    if( basisType==1 && intRuleType==1 ) useLinearIntegration = true;
 
     faceIntegrator = new FaceIntegrator(intRules, rsolver, d_fluxClass, vfes, useLinearIntegration, dim, num_equation,
-                                        gradUp, gradUpfes, max_char_speed, config.isAxisymmetric());
+                                        gradUp, gradUpfes, max_char_speed, config.isAxisymmetric(), distance_);
   }
   A->AddInteriorFaceIntegrator(faceIntegrator);
 

@@ -94,10 +94,10 @@ class Fluxes {
   void ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux);
   MFEM_HOST_DEVICE void ComputeConvectiveFluxes(const double *state, double *flux) const;
 
-  void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, Vector transip, double delta,
+  void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, Vector transip, double delta, double distance,
                             DenseMatrix &flux);
 
-  MFEM_HOST_DEVICE void ComputeViscousFluxes(const double *state, const double *gradUp, double *transip, double delta,
+  MFEM_HOST_DEVICE void ComputeViscousFluxes(const double *state, const double *gradUp, double *transip, double delta, double distance,
                                              double *flux);
 
   void sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu_sgs);
