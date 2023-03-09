@@ -44,7 +44,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
                          ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
                          ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A,
                          BCintegrator *_bcIntegrator, bool &_isSBP, double &_alpha, RunConfiguration &_config,
-                         ParGridFunction *pc, ParGridFunction *jh)
+                         ParGridFunction *pc, ParGridFunction *jh, ParGridFunction *distance)
     : TimeDependentOperator(_A->Height()),
       config_(_config),
       iter(_iter),
@@ -77,7 +77,8 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
       gradUp(_gradUp),
       gradUpfes(_gradUpfes),
       gradUp_A(_gradUp_A),
-      bcIntegrator(_bcIntegrator) {
+      bcIntegrator(_bcIntegrator),
+      distance_(distance) {
   flux.SetSize(vfes->GetNDofs(), dim_, num_equation_);
   z.UseDevice(true);
   z.SetSize(A->Height());
@@ -137,7 +138,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   if (config_.isAxisymmetric()) {
     forcing.Append(new AxisymmetricSource(dim_, num_equation_, _order, d_mixture_, transport_, eqSystem, intRuleType,
                                           intRules, vfes, U_, Up, gradUp, spaceVaryViscMult, gpu_precomputed_data_,
-                                          _config));
+                                          _config, distance_));
     const FiniteElementCollection *fec = vfes->FEColl();
     dfes = new ParFiniteElementSpace(mesh, fec, dim_, Ordering::byNODES);
     coordsDof = new ParGridFunction(dfes);
@@ -522,8 +523,11 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
     }
 
     if (eqSystem != EULER) {
+      double dist = 0;
+      if (distance_ != NULL) dist = (*distance_)[i];
+
       DenseMatrix fvisc(num_equation_, dim);
-      fluxClass->ComputeViscousFluxes(state, gradUpi, radius, -1, fvisc);
+      fluxClass->ComputeViscousFluxes(state, gradUpi, radius, dist, fvisc);
 
       // TODO(kevin): This needs to be incorporated in Fluxes::ComputeViscousFluxes.
       if (spaceVaryViscMult != NULL) {
