@@ -65,7 +65,7 @@ LteTransport::~LteTransport() {
 }
 
 void LteTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
-                                                  Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
+                                                  double distance, Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
   const double rho = state[0];
   const double T = mixture->ComputeTemperature(state);
 
@@ -81,7 +81,7 @@ void LteTransport::ComputeFluxTransportProperties(const Vector &state, const Den
 }
 
 void LteTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
-                                                    const Vector &Efield, Vector &globalTransport,
+                                                    const Vector &Efield, double distance, Vector &globalTransport,
                                                     DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
                                                     Vector &n_sp) {
   globalTransport.SetSize(SrcTrns::NUM_SRC_TRANS);
@@ -101,12 +101,12 @@ void LteTransport::ComputeSourceTransportProperties(const Vector &state, const V
 }
 
 void LteTransport::ComputeSourceTransportProperties(const double *state, const double *Up, const double *gradUp,
-                                                    const double *Efield, double *globalTransport,
+                                                    const double *Efield, double distance, double *globalTransport,
                                                     double *speciesTransport, double *diffusionVelocity, double *n_sp) {
   globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] = 0.;
 }
 
-void LteTransport::GetViscosities(const double *conserved, const double *primitive, double *visc) {
+void LteTransport::GetViscosities(const double *conserved, const double *primitive, double distance, double *visc) {
   const double rho = primitive[0];
   const double T = primitive[1 + nvel_];
 

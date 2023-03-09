@@ -129,7 +129,9 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     for (int v = 0; v < _nvel; v++)
       for (int sp = 0; sp < _numSpecies; sp++) diffusionVelocity[sp + v * _numSpecies] = 0.0;
     double ns[gpudata::MAXSPECIES];
-    _transport->ComputeSourceTransportProperties(Un, upn, gradUpn, Efield, globalTransport, speciesTransport,
+
+    // TODO: Get distance
+    _transport->ComputeSourceTransportProperties(Un, upn, gradUpn, Efield, -1, globalTransport, speciesTransport,
                                                  diffusionVelocity, ns);
 
     for (int eq = 0; eq < _num_equation; eq++) srcTerm[eq] = 0.0;

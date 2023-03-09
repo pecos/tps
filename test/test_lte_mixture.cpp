@@ -130,7 +130,7 @@ int checkTransport(LteTransport *lte_trans, LteMixture *lte_mix, double rtol) {
     Vector transport;
     DenseMatrix diffusion;
 
-    lte_trans->ComputeFluxTransportProperties(U, gradUp, E, transport, diffusion);
+    lte_trans->ComputeFluxTransportProperties(U, gradUp, E, -1, transport, diffusion);
 
     const double muexact = 2.0656339881365003e-05;
     const double mu = transport[FluxTrns::VISCOSITY];

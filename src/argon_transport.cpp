@@ -170,15 +170,15 @@ MFEM_HOST_DEVICE collisionInputs ArgonMinimalTransport::computeCollisionInputs(c
 }
 
 void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
-                                                           const Vector &Efield, Vector &transportBuffer,
+                                                           const Vector &Efield, double distance, Vector &transportBuffer,
                                                            DenseMatrix &diffusionVelocity) {
   transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   diffusionVelocity.SetSize(numSpecies, nvel_);
-  ComputeFluxTransportProperties(&state[0], gradUp.Read(), &Efield[0], &transportBuffer[0], diffusionVelocity.Write());
+  ComputeFluxTransportProperties(&state[0], gradUp.Read(), &Efield[0], distance, &transportBuffer[0], diffusionVelocity.Write());
 }
 
 MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                                            const double *Efield,
+                                                                            const double *Efield, double distance,
                                                                             double *transportBuffer,
                                                                             double *diffusionVelocity) {
   // transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
@@ -424,19 +424,19 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::computeMixtureAverageDiffusivity(co
 
 void ArgonMinimalTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up,
                                                              const DenseMatrix &gradUp, const Vector &Efield,
-                                                             Vector &globalTransport, DenseMatrix &speciesTransport,
+                                                             double distance, Vector &globalTransport, DenseMatrix &speciesTransport,
                                                              DenseMatrix &diffusionVelocity, Vector &n_sp) {
   globalTransport.SetSize(SrcTrns::NUM_SRC_TRANS);
   speciesTransport.SetSize(numSpecies, SpeciesTrns::NUM_SPECIES_COEFFS);
   diffusionVelocity.SetSize(numSpecies, nvel_);
   n_sp.SetSize(3);
-  ComputeSourceTransportProperties(&state[0], &Up[0], gradUp.Read(), &Efield[0], &globalTransport[0],
+  ComputeSourceTransportProperties(&state[0], &Up[0], gradUp.Read(), &Efield[0], distance, &globalTransport[0],
                                    speciesTransport.Write(), diffusionVelocity.Write(), &n_sp[0]);
 }
 
 MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeSourceTransportProperties(
-    const double *state, const double *Up, const double *gradUp, const double *Efield, double *globalTransport,
-    double *speciesTransport, double *diffusionVelocity, double *n_sp) {
+    const double *state, const double *Up, const double *gradUp, const double *Efield, double distance,
+    double *globalTransport, double *speciesTransport, double *diffusionVelocity, double *n_sp) {
   for (int p = 0; p < SrcTrns::NUM_SRC_TRANS; p++) globalTransport[p] = 0.0;
   for (int p = 0; p < SpeciesTrns::NUM_SPECIES_COEFFS; p++)
     for (int sp = 0; sp < numSpecies; sp++) speciesTransport[sp + p * numSpecies] = 0.0;
@@ -535,7 +535,7 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeSourceTransportProperties(
 }
 
 MFEM_HOST_DEVICE void ArgonMinimalTransport::GetViscosities(const double *conserved, const double *primitive,
-                                                            double *visc) {
+                                                            double distance, double *visc) {
   double n_sp[3], X_sp[3], Y_sp[3];
   mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
   double nTotal = 0.0;
@@ -791,15 +791,15 @@ MFEM_HOST_DEVICE double ArgonMixtureTransport::collisionIntegral(const int _spI,
 }
 
 void ArgonMixtureTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
-                                                           const Vector &Efield, Vector &transportBuffer,
+                                                           const Vector &Efield, double distance, Vector &transportBuffer,
                                                            DenseMatrix &diffusionVelocity) {
   transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   diffusionVelocity.SetSize(numSpecies, nvel_);
-  ComputeFluxTransportProperties(&state[0], gradUp.Read(), &Efield[0], &transportBuffer[0], diffusionVelocity.Write());
+  ComputeFluxTransportProperties(&state[0], gradUp.Read(), &Efield[0], distance, &transportBuffer[0], diffusionVelocity.Write());
 }
 
 MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                                            const double *Efield,
+                                                                            const double *Efield, double distance,
                                                                             double *transportBuffer,
                                                                             double *diffusionVelocity) {
   for (int p = 0; p < FluxTrns::NUM_FLUX_TRANS; p++) transportBuffer[p] = 0.0;
@@ -925,18 +925,18 @@ MFEM_HOST_DEVICE double ArgonMixtureTransport::computeThirdOrderElectronThermalC
 
 void ArgonMixtureTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up,
                                                              const DenseMatrix &gradUp, const Vector &Efield,
-                                                             Vector &globalTransport, DenseMatrix &speciesTransport,
+                                                             double distance, Vector &globalTransport, DenseMatrix &speciesTransport,
                                                              DenseMatrix &diffusionVelocity, Vector &n_sp) {
   globalTransport.SetSize(SrcTrns::NUM_SRC_TRANS);
   speciesTransport.SetSize(numSpecies, SpeciesTrns::NUM_SPECIES_COEFFS);
   diffusionVelocity.SetSize(numSpecies, nvel_);
   n_sp.SetSize(numSpecies);
-  ComputeSourceTransportProperties(&state[0], &Up[0], gradUp.Read(), &Efield[0], &globalTransport[0],
+  ComputeSourceTransportProperties(&state[0], &Up[0], gradUp.Read(), &Efield[0], distance, &globalTransport[0],
                                    speciesTransport.Write(), diffusionVelocity.Write(), &n_sp[0]);
 }
 
 MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeSourceTransportProperties(
-    const double *state, const double *Up, const double *gradUp, const double *Efield, double *globalTransport,
+    const double *state, const double *Up, const double *gradUp, const double *Efield, double distance, double *globalTransport,
     double *speciesTransport, double *diffusionVelocity, double *n_sp) {
   for (int p = 0; p < SrcTrns::NUM_SRC_TRANS; p++) globalTransport[p] = 0.0;
   for (int p = 0; p < SpeciesTrns::NUM_SPECIES_COEFFS; p++)
@@ -1024,7 +1024,7 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeSourceTransportProperties(
 }
 
 MFEM_HOST_DEVICE void ArgonMixtureTransport::GetViscosities(const double *conserved, const double *primitive,
-                                                            double *visc) {
+                                                            double distance, double *visc) {
   double n_sp[gpudata::MAXSPECIES], X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES];
   mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
   double nTotal = 0.0;

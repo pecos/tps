@@ -3608,7 +3608,9 @@ void M2ulPhyS::updateVisualizationVariables() {
       // update flux transport properties.
       double fluxTrns[FluxTrns::NUM_FLUX_TRANS];
       double diffVel[gpudata::MAXSPECIES * gpudata::MAXDIM];
-      in_transport->ComputeFluxTransportProperties(state, gradUpn, Efield, fluxTrns, diffVel);
+      double distance = 0;
+      if (distance_ != NULL) distance = (*distance_)[n];
+      in_transport->ComputeFluxTransportProperties(state, gradUpn, Efield, distance, fluxTrns, diffVel);
       for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++) {
         dataVis[visualIdxs.FluxTrns + t][n] = fluxTrns[t];
       }
@@ -3619,7 +3621,7 @@ void M2ulPhyS::updateVisualizationVariables() {
       // update source transport properties.
       double srcTrns[SrcTrns::NUM_SRC_TRANS];
       double speciesTrns[gpudata::MAXSPECIES * SpeciesTrns::NUM_SPECIES_COEFFS];
-      in_transport->ComputeSourceTransportProperties(state, prim, gradUpn, Efield, srcTrns, speciesTrns, diffVel, nsp);
+      in_transport->ComputeSourceTransportProperties(state, prim, gradUpn, Efield, distance, srcTrns, speciesTrns, diffVel, nsp);
       for (int t = 0; t < SrcTrns::NUM_SRC_TRANS; t++) {
         dataVis[visualIdxs.SrcTrns + t][n] = srcTrns[t];
       }
