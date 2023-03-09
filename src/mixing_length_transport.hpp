@@ -76,15 +76,16 @@ class MixingLengthTransport : public TransportProperties {
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, const double *gradUp,
                                        double distance, double *visc) override;
-
 };
 
-MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double *conserved, const double *primitive, double *visc) {
+MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double *conserved, const double *primitive,
+                                                                   double *visc) {
   assert(false);
 }
 
 MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double *conserved, const double *primitive,
-                                                                   const double *gradUp, double distance, double *visc) {
+                                                                   const double *gradUp, double distance,
+                                                                   double *visc) {
   molecular_transport_->GetViscosities(conserved, primitive, visc);
 
   const double rho = primitive[0];
@@ -94,7 +95,7 @@ MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double 
   for (int i = 0; i < dim; i++) {
     for (int j = 0; j < dim; j++) {
       const double u_x = gradUp[(1 + i) + j * num_equation];
-      S += 2 * u_x * u_x; // todo: subtract divergence part
+      S += 2 * u_x * u_x;  // todo: subtract divergence part
     }
   }
   S = sqrt(S);

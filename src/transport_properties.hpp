@@ -118,7 +118,6 @@ class TransportProperties {
    */
   MFEM_HOST_DEVICE virtual void GetViscosities(const double *conserved, const double *primitive, double *visc) = 0;
 
-
   /** @brief Evaluate viscosity and bulk viscosity
    *
    * Evaluate the viscosity and bulk viscosity.  This is only used to
@@ -134,11 +133,10 @@ class TransportProperties {
    * @param distance  Distance to the nearest no-slip wall
    * @param visc      Pointer to viscosities (visc[0] = dynamic viscosity, visc[1] = bulk viscosity)
    */
-  MFEM_HOST_DEVICE virtual void GetViscosities(const double *conserved, const double *primitive,
-                                               const double *gradUp, double distance, double *visc) {
+  MFEM_HOST_DEVICE virtual void GetViscosities(const double *conserved, const double *primitive, const double *gradUp,
+                                               double distance, double *visc) {
     GetViscosities(conserved, primitive, visc);
   }
-
 
   // For mixture-averaged diffusion, correct for mass conservation.
   void correctMassDiffusionFlux(const Vector &Y_sp, DenseMatrix &diffusionVelocity);
@@ -211,7 +209,8 @@ class DryAirTransport : public TransportProperties {
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
 };
 
-MFEM_HOST_DEVICE inline void DryAirTransport::GetViscosities(const double *conserved, const double *primitive, double *visc) {
+MFEM_HOST_DEVICE inline void DryAirTransport::GetViscosities(const double *conserved, const double *primitive,
+                                                             double *visc) {
   const double temp = primitive[1 + nvel_];
   visc[0] = (C1_ * visc_mult * pow(temp, 1.5) / (temp + S0_));
   visc[1] = bulk_visc_mult * visc[0];
@@ -257,7 +256,8 @@ class ConstantTransport : public TransportProperties {
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
 };
 
-MFEM_HOST_DEVICE inline void ConstantTransport::GetViscosities(const double *conserved, const double *primitive, double *visc) {
+MFEM_HOST_DEVICE inline void ConstantTransport::GetViscosities(const double *conserved, const double *primitive,
+                                                               double *visc) {
   visc[0] = viscosity_;
   visc[1] = bulkViscosity_;
 }
