@@ -318,13 +318,13 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
 }
 
 void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, Vector transip, double delta,
-                                     const BoundaryViscousFluxData &bcFlux, Vector &normalFlux) {
+                                     double distance, const BoundaryViscousFluxData &bcFlux, Vector &normalFlux) {
   normalFlux.SetSize(num_equation);
-  ComputeBdrViscousFluxes(state.GetData(), gradUp.GetData(), transip.GetData(), delta, bcFlux, normalFlux.GetData());
+  ComputeBdrViscousFluxes(state.GetData(), gradUp.GetData(), transip.GetData(), delta, distance, bcFlux, normalFlux.GetData());
 }
 
 MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double *transip,
-                                                      double delta, const BoundaryViscousFluxData &bcFlux,
+                                                      double delta, double distance, const BoundaryViscousFluxData &bcFlux,
                                                       double *normalFlux) {
   // normalFlux.SetSize(num_equation);
   for (int eq = 0; eq < num_equation; eq++) normalFlux[eq] = 0.;

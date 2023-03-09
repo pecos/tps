@@ -108,11 +108,11 @@ class Fluxes {
   MFEM_HOST_DEVICE void viscSpongePlanar(double *x, double &wgt);
 
   // Compute viscous flux with prescribed boundary flux.
-  void ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, Vector transip, double delta,
+  void ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, Vector transip, double delta, double distance,
                                const BoundaryViscousFluxData &bcFlux, Vector &normalFlux);
 
   MFEM_HOST_DEVICE void ComputeBdrViscousFluxes(const double *state, const double *gradUp, double *transip,
-                                                double delta, const BoundaryViscousFluxData &bcFlux,
+                                                double delta, double distance, const BoundaryViscousFluxData &bcFlux,
                                                 double *normalFlux);
 
   MFEM_HOST_DEVICE bool isAxisymmetric() const { return axisymmetric_; }

@@ -288,7 +288,7 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
     unitNorm *= 1. / sqrt(normN);
 
     for (int d = 0; d < dim_; d++) bcFlux_.normal[d] = unitNorm[d];
-    fluxClass->ComputeBdrViscousFluxes(stateMirror, gradState, transip, delta, bcFlux_, wallViscF);
+    fluxClass->ComputeBdrViscousFluxes(stateMirror, gradState, transip, delta, distance, bcFlux_, wallViscF);
     wallViscF *= sqrt(normN);  // in case normal is not a unit vector..
   } else {
     DenseMatrix viscFw(num_equation_, dim_);
@@ -433,7 +433,7 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
 
   // evaluate viscous fluxes at the wall
   Vector wallViscF(num_equation_);
-  fluxClass->ComputeBdrViscousFluxes(wallState, gradState, transip, delta, bcFlux_, wallViscF);
+  fluxClass->ComputeBdrViscousFluxes(wallState, gradState, transip, delta, 0.0, bcFlux_, wallViscF);
   wallViscF *= sqrt(normN);  // in case normal is not a unit vector..
 
   // Add visc fluxes (we skip density eq.)
@@ -463,7 +463,7 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
 
   // evaluate viscous fluxes at the wall
   Vector wallViscF(num_equation_);
-  fluxClass->ComputeBdrViscousFluxes(wallState, gradState, transip, delta, bcFlux_, wallViscF);
+  fluxClass->ComputeBdrViscousFluxes(wallState, gradState, transip, delta, 0.0, bcFlux_, wallViscF);
   wallViscF *= sqrt(normN);  // in case normal is not a unit vector..
 
   // evaluate internal viscous fluxes
@@ -496,7 +496,7 @@ void WallBC::computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix
 
   // evaluate viscous fluxes at the wall
   Vector wallViscF(num_equation_);
-  fluxClass->ComputeBdrViscousFluxes(wallState, gradState, transip, delta, bcFlux_, wallViscF);
+  fluxClass->ComputeBdrViscousFluxes(wallState, gradState, transip, delta, 0.0, bcFlux_, wallViscF);
   wallViscF *= sqrt(normN);  // in case normal is not a unit vector..
 
   // evaluate internal viscous fluxes
@@ -719,7 +719,7 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
 
         if (type != WallType::SLIP) {
           d_fluxclass->ComputeViscousFluxes(u1, gradUp1, xyz, d_delta[el_bdry], 0.0, vF1);
-          d_fluxclass->ComputeBdrViscousFluxes(u2, gradUp1, xyz, d_delta[el_bdry], bcFlux, vF2);
+          d_fluxclass->ComputeBdrViscousFluxes(u2, gradUp1, xyz, d_delta[el_bdry], 0.0, bcFlux, vF2);
           for (int eq = 0; eq < num_equation; eq++) vF2[eq] *= sqrt(normN);
 
           // add visc flux contribution
