@@ -536,8 +536,7 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeSourceTransportProperties(
   // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
-MFEM_HOST_DEVICE void ArgonMinimalTransport::GetViscosities(const double *conserved, const double *primitive,
-                                                            double distance, double *visc) {
+MFEM_HOST_DEVICE void ArgonMinimalTransport::GetViscosities(const double *conserved, const double *primitive, double *visc) {
   double n_sp[3], X_sp[3], Y_sp[3];
   mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
   double nTotal = 0.0;
@@ -1027,8 +1026,7 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeSourceTransportProperties(
   // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
-MFEM_HOST_DEVICE void ArgonMixtureTransport::GetViscosities(const double *conserved, const double *primitive,
-                                                            double distance, double *visc) {
+MFEM_HOST_DEVICE void ArgonMixtureTransport::GetViscosities(const double *conserved, const double *primitive, double *visc) {
   double n_sp[gpudata::MAXSPECIES], X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES];
   mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
   double nTotal = 0.0;

@@ -116,8 +116,29 @@ class TransportProperties {
    * @param primitive Pointer to primitive state vector
    * @param visc      Pointer to viscosities (visc[0] = dynamic viscosity, visc[1] = bulk viscosity)
    */
-  MFEM_HOST_DEVICE virtual void GetViscosities(const double *conserved, const double *primitive, double distance,
-                                               double *visc) = 0;
+  MFEM_HOST_DEVICE virtual void GetViscosities(const double *conserved, const double *primitive, double *visc) = 0;
+
+
+  /** @brief Evaluate viscosity and bulk viscosity
+   *
+   * Evaluate the viscosity and bulk viscosity.  This is only used to
+   * provide support the evaluation of the axisymmetric forcing terms,
+   * where the viscosity is necessary but no other transport
+   * properties are required.  This variant also takes the primitive
+   * gradient and the distance function, so that a mixing length model
+   * based eddy viscosity may be computed.
+   *
+   * @param conserved Pointer to conserved state vector
+   * @param primitive Pointer to primitive state vector
+   * @param primitive Pointer to gradient of primitive state vector
+   * @param distance  Distance to the nearest no-slip wall
+   * @param visc      Pointer to viscosities (visc[0] = dynamic viscosity, visc[1] = bulk viscosity)
+   */
+  MFEM_HOST_DEVICE virtual void GetViscosities(const double *conserved, const double *primitive,
+                                               const double *gradUp, double distance, double *visc) {
+    GetViscosities(conserved, primitive, visc);
+  }
+
 
   // For mixture-averaged diffusion, correct for mass conservation.
   void correctMassDiffusionFlux(const Vector &Y_sp, DenseMatrix &diffusionVelocity);
@@ -187,12 +208,10 @@ class DryAirTransport : public TransportProperties {
                                                                  double *speciesTransport, double *diffusionVelocity,
                                                                  double *n_sp) {}
 
-  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double distance,
-                                       double *visc) override;
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
 };
 
-MFEM_HOST_DEVICE inline void DryAirTransport::GetViscosities(const double *conserved, const double *primitive,
-                                                             double distance, double *visc) {
+MFEM_HOST_DEVICE inline void DryAirTransport::GetViscosities(const double *conserved, const double *primitive, double *visc) {
   const double temp = primitive[1 + nvel_];
   visc[0] = (C1_ * visc_mult * pow(temp, 1.5) / (temp + S0_));
   visc[1] = bulk_visc_mult * visc[0];
@@ -235,12 +254,10 @@ class ConstantTransport : public TransportProperties {
                                                                  double *speciesTransport, double *diffusionVelocity,
                                                                  double *n_sp);
 
-  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double distance,
-                                       double *visc) override;
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
 };
 
-MFEM_HOST_DEVICE inline void ConstantTransport::GetViscosities(const double *conserved, const double *primitive,
-                                                               double distance, double *visc) {
+MFEM_HOST_DEVICE inline void ConstantTransport::GetViscosities(const double *conserved, const double *primitive, double *visc) {
   visc[0] = viscosity_;
   visc[1] = bulkViscosity_;
 }

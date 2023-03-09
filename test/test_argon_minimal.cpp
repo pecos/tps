@@ -166,7 +166,7 @@ int main (int argc, char *argv[])
     transport->ComputeFluxTransportProperties(conservedState, gradUp, Efield, -1, transportBuffer, diffusionVelocity);
 
     double visc, bulkVisc, visc_vec[2];
-    transport->GetViscosities(conservedState, primitiveState, -1, visc_vec);
+    transport->GetViscosities(conservedState, primitiveState, visc_vec);
     visc = visc_vec[0];
     bulkVisc = visc_vec[1];
 

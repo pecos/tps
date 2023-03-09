@@ -73,13 +73,36 @@ class MixingLengthTransport : public TransportProperties {
                                                                  double *speciesTransport, double *diffusionVelocity,
                                                                  double *n_sp);
 
-  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double distance,
-                                       double *visc) override;
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, const double *gradUp,
+                                       double distance, double *visc) override;
+
 };
 
+MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double *conserved, const double *primitive, double *visc) {
+  assert(false);
+}
+
 MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double *conserved, const double *primitive,
-                                                                   double distance, double *visc) {
-  molecular_transport_->GetViscosities(conserved, primitive, distance, visc);
+                                                                   const double *gradUp, double distance, double *visc) {
+  molecular_transport_->GetViscosities(conserved, primitive, visc);
+
+  const double rho = primitive[0];
+
+  // eddy viscosity
+  double S = 0;
+  for (int i = 0; i < dim; i++) {
+    for (int j = 0; j < dim; j++) {
+      const double u_x = gradUp[(1 + i) + j * num_equation];
+      S += 2 * u_x * u_x; // todo: subtract divergence part
+    }
+  }
+  S = sqrt(S);
+
+  const double mixing_length = std::max(0.41 * distance, max_mixing_length_);
+  const double mut = rho * mixing_length * mixing_length * S;
+
+  visc[0] += mut;
 }
 
 

@@ -58,7 +58,8 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
   molecular_transport_->ComputeFluxTransportProperties(state, gradUp, Efield, distance, transportBuffer,
                                                        diffusionVelocity);
 
-  const double cp_over_Pr = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] / transportBuffer[FluxTrns::VISCOSITY];
+  const double cp_over_Pr =
+      transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] / transportBuffer[FluxTrns::VISCOSITY];
 
   // Add mixing length model results to computed molecular transport
   double primitiveState[gpudata::MAXEQUATIONS];
@@ -72,7 +73,7 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
   for (int i = 0; i < dim; i++) {
     for (int j = 0; j < dim; j++) {
       const double u_x = gradUp[(1 + i) + j * num_equation];
-      S += 2 * u_x * u_x; // todo: subtract divergence part
+      S += 2 * u_x * u_x;  // todo: subtract divergence part
     }
   }
   S = sqrt(S);
@@ -83,7 +84,7 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
   transportBuffer[FluxTrns::VISCOSITY] += mut;
 
   // eddy thermal conductivity
-  const double Pr_over_Prt = Prt_; // FIXME: change varaible name
+  const double Pr_over_Prt = Prt_;  // FIXME: change varaible name
   const double kappat = mut * cp_over_Pr * Pr_over_Prt;
   transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] += kappat;
 }

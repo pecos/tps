@@ -336,7 +336,7 @@ void AxisymmetricSource::updateTerms(Vector &in) {
       double dist = 0;
       if (d_dist != NULL) dist = d_dist[n];
 
-      d_trans->GetViscosities(U, Up, dist, visc_vec);
+      d_trans->GetViscosities(U, Up, gradUp, dist, visc_vec);
       visc = visc_vec[0];
       bulkVisc = visc_vec[1];
       bulkVisc -= 2. / 3. * visc;
