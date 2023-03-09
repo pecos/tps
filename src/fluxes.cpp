@@ -135,7 +135,8 @@ MFEM_HOST_DEVICE void Fluxes::ComputeConvectiveFluxes(const double *state, doubl
 }
 
 // TODO(kevin): check/complete axisymmetric setting for multi-component flow.
-void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, double distance, DenseMatrix &flux) {
+void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, double distance,
+                                  DenseMatrix &flux) {
 #ifdef _BUILD_DEPRECATED_
   flux = 0.;
   if (eqSystem == EULER) {
@@ -259,8 +260,8 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
 #endif
 }
 
-MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius, double distance,
-                                                   double *flux) {
+MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius,
+                                                   double distance, double *flux) {
   for (int d = 0; d < dim; d++) {
     for (int eq = 0; eq < num_equation; eq++) {
       flux[eq + d * num_equation] = 0.;
@@ -507,8 +508,9 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
   }
 }
 
-MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius, double distance,
-                                                      const BoundaryViscousFluxData &bcFlux, double *normalFlux) {
+MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius,
+                                                      double distance, const BoundaryViscousFluxData &bcFlux,
+                                                      double *normalFlux) {
   // normalFlux.SetSize(num_equation);
   for (int eq = 0; eq < num_equation; eq++) normalFlux[eq] = 0.;
   if (eqSystem == EULER) {

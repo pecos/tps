@@ -2201,7 +2201,6 @@ void M2ulPhyS::parseFlowOptions() {
     tpsP->getInput("flow/mixing-length/Let", config.mix_length_trans_input_.Let_, 1.0);
   }
 
-
   assert(config.solOrder > 0);
   assert(config.numIters >= 0);
   assert(config.itersOut > 0);
@@ -2434,7 +2433,8 @@ void M2ulPhyS::parsePlasmaModels() {
   } else if (transportModelStr == "constant") {
     config.transportModel = CONSTANT;
   }
-  printf("config.transportModel = %s\n", transportModelStr.c_str()); fflush(stdout);
+  printf("config.transportModel = %s\n", transportModelStr.c_str());
+  fflush(stdout);
   // } else {
   //   grvy_printf(GRVY_ERROR, "\nUnknown transport_model -> %s", transportModelStr.c_str());
   //   exit(ERROR);

@@ -75,7 +75,8 @@ class MixingLengthTransport : public TransportProperties {
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
 };
 
-MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double *conserved, const double *primitive, double *visc) {
+MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double *conserved, const double *primitive,
+                                                                   double *visc) {
   molecular_transport_->GetViscosities(conserved, primitive, visc);
 }
 

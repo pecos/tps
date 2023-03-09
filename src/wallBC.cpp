@@ -190,7 +190,8 @@ void WallBC::buildWallElemsArray() {
   wallElems.ReadWrite();
 }
 
-void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, double distance, Vector &bdrFlux) {
+void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, double distance,
+                            Vector &bdrFlux) {
   switch (wallType_) {
     case INV:
       computeINVwallFlux(normal, stateIn, gradState, radius, distance, bdrFlux);
@@ -216,8 +217,8 @@ void WallBC::integrationBC(Vector &y, const Vector &x, const elementIndexingData
                      x, elem_index_data, boundary_face_data, maxDofs);
 }
 
-void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
-                                double distance, Vector &bdrFlux) {
+void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, double distance,
+                                Vector &bdrFlux) {
   Vector vel(nvel_);
   for (int d = 0; d < nvel_; d++) vel[d] = stateIn[1 + d] / stateIn[0];
 

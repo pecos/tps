@@ -42,7 +42,8 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
                            GasMixture *d_mixture, Fluxes *_fluxClass, ParGridFunction *_Up, ParGridFunction *_gradUp,
                            const boundaryFaceIntegrationData &boundary_face_data, const int _dim,
                            const int _num_equation, double &_max_char_speed, RunConfiguration &_runFile,
-                           Array<int> &local_attr, const int &_maxIntPoints, const int &_maxDofs, ParGridFunction *distance)
+                           Array<int> &local_attr, const int &_maxIntPoints, const int &_maxDofs,
+                           ParGridFunction *distance)
     : groupsMPI(_groupsMPI),
       config(_runFile),
       rsolver(rsolver_),
@@ -334,7 +335,6 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
     dist.SetSize(dofs.Size());
     distance_->GetSubVector(dofs, dist);
   }
-
 
   // Integration order calculation from DGTraceIntegrator
   int intorder;

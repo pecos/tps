@@ -79,16 +79,19 @@ class Fluxes {
   void ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux);
   MFEM_HOST_DEVICE void ComputeConvectiveFluxes(const double *state, double *flux) const;
 
-  void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, double distance, DenseMatrix &flux);
+  void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, double distance,
+                            DenseMatrix &flux);
 
-  MFEM_HOST_DEVICE void ComputeViscousFluxes(const double *state, const double *gradUp, double radius, double distance, double *flux);
+  MFEM_HOST_DEVICE void ComputeViscousFluxes(const double *state, const double *gradUp, double radius, double distance,
+                                             double *flux);
 
   // Compute viscous flux with prescribed boundary flux.
   void ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, double distance,
                                const BoundaryViscousFluxData &bcFlux, Vector &normalFlux);
 
-  MFEM_HOST_DEVICE void ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius, double distance,
-                                                const BoundaryViscousFluxData &bcFlux, double *normalFlux);
+  MFEM_HOST_DEVICE void ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius,
+                                                double distance, const BoundaryViscousFluxData &bcFlux,
+                                                double *normalFlux);
 
   // Compute the split fersion of the flux for SBP operations
   // Output matrices a_mat, c_mat need not have the right size
