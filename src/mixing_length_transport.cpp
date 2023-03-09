@@ -43,18 +43,20 @@ MFEM_HOST_DEVICE MixingLengthTransport::MixingLengthTransport(GasMixture *mix, c
     : TransportProperties(mix), max_mixing_length_(inputs.max_mixing_length_), Prt_(inputs.Prt_), Let_(inputs.Let_), molecular_transport_(molecular_transport) {}
 
 void MixingLengthTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
-                                                           const Vector &Efield, double distance, Vector &transportBuffer,
-                                                           DenseMatrix &diffusionVelocity) {
+                                                           const Vector &Efield, double distance,
+                                                           Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
   transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   diffusionVelocity.SetSize(numSpecies, nvel_);
-  ComputeFluxTransportProperties(&state[0], gradUp.Read(), &Efield[0], distance, &transportBuffer[0], diffusionVelocity.Write());
+  ComputeFluxTransportProperties(&state[0], gradUp.Read(), &Efield[0], distance, &transportBuffer[0],
+                                 diffusionVelocity.Write());
 }
 
 MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,
                                                                             const double *Efield, double distance,
                                                                             double *transportBuffer,
                                                                             double *diffusionVelocity) {
-  molecular_transport_->ComputeFluxTransportProperties(state, gradUp, Efield, distance, transportBuffer, diffusionVelocity);
+  molecular_transport_->ComputeFluxTransportProperties(state, gradUp, Efield, distance, transportBuffer,
+                                                       diffusionVelocity);
 
   // Add mixing length model results to computed molecular transport
   //
@@ -85,7 +87,8 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
 
 void MixingLengthTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up,
                                                              const DenseMatrix &gradUp, const Vector &Efield,
-                                                             double distance, Vector &globalTransport, DenseMatrix &speciesTransport,
+                                                             double distance, Vector &globalTransport,
+                                                             DenseMatrix &speciesTransport,
                                                              DenseMatrix &diffusionVelocity, Vector &n_sp) {
   globalTransport.SetSize(SrcTrns::NUM_SRC_TRANS);
   speciesTransport.SetSize(numSpecies, SpeciesTrns::NUM_SPECIES_COEFFS);
@@ -105,10 +108,10 @@ void MixingLengthTransport::ComputeSourceTransportProperties(const Vector &state
 }
 
 MFEM_HOST_DEVICE void MixingLengthTransport::ComputeSourceTransportProperties(
-    const double *state, const double *Up, const double *gradUp, const double *Efield, double distance, double *globalTransport,
-    double *speciesTransport, double *diffusionVelocity, double *n_sp) {
-  molecular_transport_->ComputeSourceTransportProperties(state, Up, gradUp, Efield, distance, globalTransport, speciesTransport,
-                                                         diffusionVelocity, n_sp);
+    const double *state, const double *Up, const double *gradUp, const double *Efield, double distance,
+    double *globalTransport, double *speciesTransport, double *diffusionVelocity, double *n_sp) {
+  molecular_transport_->ComputeSourceTransportProperties(state, Up, gradUp, Efield, distance, globalTransport,
+                                                         speciesTransport, diffusionVelocity, n_sp);
 
   // Add mixing length model results to computed molecular transport
   //

@@ -260,7 +260,8 @@ void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const 
 }
 
 MFEM_HOST_DEVICE void DryAirTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                                      const double *Efield, double distance, double *transportBuffer,
+                                                                      const double *Efield, double distance,
+                                                                      double *transportBuffer,
                                                                       double *diffusionVelocity) {
   double p = mixture->ComputePressure(state);
   double temp = p / gas_constant / state[0];
@@ -374,7 +375,8 @@ void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, cons
                                                        DenseMatrix &diffusionVelocity) {
   transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   diffusionVelocity.SetSize(numSpecies, nvel_);
-  ComputeFluxTransportProperties(&state[0], gradUp.Read(), &Efield[0], distance, &transportBuffer[0], diffusionVelocity.Write());
+  ComputeFluxTransportProperties(&state[0], gradUp.Read(), &Efield[0], distance, &transportBuffer[0],
+                                 diffusionVelocity.Write());
   // transportBuffer[FluxTrns::VISCOSITY] = viscosity_;
   // transportBuffer[FluxTrns::BULK_VISCOSITY] = bulkViscosity_;
   // transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = thermalConductivity_;
@@ -423,7 +425,8 @@ void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, cons
 }
 
 MFEM_HOST_DEVICE void ConstantTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                                        const double *Efield, double distance, double *transportBuffer,
+                                                                        const double *Efield, double distance,
+                                                                        double *transportBuffer,
                                                                         double *diffusionVelocity) {
   // transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   transportBuffer[FluxTrns::VISCOSITY] = viscosity_;
@@ -480,8 +483,9 @@ MFEM_HOST_DEVICE void ConstantTransport::ComputeFluxTransportProperties(const do
 
 void ConstantTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up,
                                                          const DenseMatrix &gradUp, const Vector &Efield,
-                                                         double distance, Vector &globalTransport, DenseMatrix &speciesTransport,
-                                                         DenseMatrix &diffusionVelocity, Vector &n_sp) {
+                                                         double distance, Vector &globalTransport,
+                                                         DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
+                                                         Vector &n_sp) {
   globalTransport.SetSize(SrcTrns::NUM_SRC_TRANS);
   speciesTransport.SetSize(numSpecies, SpeciesTrns::NUM_SPECIES_COEFFS);
   n_sp.SetSize(numSpecies);

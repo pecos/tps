@@ -116,8 +116,8 @@ class ArgonMinimalTransport : public TransportProperties {
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
                                               double distance, Vector &transportBuffer, DenseMatrix &diffusionVelocity);
   MFEM_HOST_DEVICE virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                               const double *Efield, double distance, double *transportBuffer,
-                                                               double *diffusionVelocity);
+                                                               const double *Efield, double distance,
+                                                               double *transportBuffer, double *diffusionVelocity);
 
   // Source term will be constructed using ForcingTerms, which have pointers to primitive variables.
   // So we can use them in evaluating transport properties.
@@ -128,12 +128,13 @@ class ArgonMinimalTransport : public TransportProperties {
                                                 Vector &n_sp);
   MFEM_HOST_DEVICE virtual void ComputeSourceTransportProperties(const double *state, const double *Up,
                                                                  const double *gradUp, const double *Efield,
-                                                                 double distance, 
-                                                                 double *globalTransport, double *speciesTransport,
-                                                                 double *diffusionVelocity, double *n_sp);
+                                                                 double distance, double *globalTransport,
+                                                                 double *speciesTransport, double *diffusionVelocity,
+                                                                 double *n_sp);
 
   // NOTE(kevin): only for AxisymmetricSource
-  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double distance, double *visc) override;
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double distance,
+                                       double *visc) override;
 
   // virtual double computeThirdOrderElectronThermalConductivity(const Vector &X_sp, const double debyeLength,
   //                                                             const double Te, const double nondimTe);
@@ -200,8 +201,8 @@ class ArgonMixtureTransport : public ArgonMinimalTransport {
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
                                               double distance, Vector &transportBuffer, DenseMatrix &diffusionVelocity);
   MFEM_HOST_DEVICE virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                               const double *Efield, double distance, double *transportBuffer,
-                                                               double *diffusionVelocity);
+                                                               const double *Efield, double distance,
+                                                               double *transportBuffer, double *diffusionVelocity);
 
   // Source term will be constructed using ForcingTerms, which have pointers to primitive variables.
   // So we can use them in evaluating transport properties.
@@ -212,11 +213,13 @@ class ArgonMixtureTransport : public ArgonMinimalTransport {
                                                 Vector &n_sp);
   MFEM_HOST_DEVICE virtual void ComputeSourceTransportProperties(const double *state, const double *Up,
                                                                  const double *gradUp, const double *Efield,
-                                                                 double distance, double *globalTransport, double *speciesTransport,
-                                                                 double *diffusionVelocity, double *n_sp);
+                                                                 double distance, double *globalTransport,
+                                                                 double *speciesTransport, double *diffusionVelocity,
+                                                                 double *n_sp);
 
   // NOTE(kevin): only for AxisymmetricSource
-  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double distance, double *visc) override;
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double distance,
+                                       double *visc) override;
 
   MFEM_HOST_DEVICE virtual double computeThirdOrderElectronThermalConductivity(const double *X_sp,
                                                                                const collisionInputs &collInputs);

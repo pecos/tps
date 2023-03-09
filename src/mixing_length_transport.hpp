@@ -61,18 +61,20 @@ class MixingLengthTransport : public TransportProperties {
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
                                               double distance, Vector &transportBuffer, DenseMatrix &diffusionVelocity);
   MFEM_HOST_DEVICE virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                               const double *Efield, double distance, double *transportBuffer,
-                                                               double *diffusionVelocity);
+                                                               const double *Efield, double distance,
+                                                               double *transportBuffer, double *diffusionVelocity);
   virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
                                                 const Vector &Efield, double distance, Vector &globalTransport,
                                                 DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
                                                 Vector &n_sp);
   MFEM_HOST_DEVICE virtual void ComputeSourceTransportProperties(const double *state, const double *Up,
                                                                  const double *gradUp, const double *Efield,
-                                                                 double distance, double *globalTransport, double *speciesTransport,
-                                                                 double *diffusionVelocity, double *n_sp);
-  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double distance, double *visc) override;
+                                                                 double distance, double *globalTransport,
+                                                                 double *speciesTransport, double *diffusionVelocity,
+                                                                 double *n_sp);
 
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double distance,
+                                       double *visc) override;
 };
 
 MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double *conserved, const double *primitive,

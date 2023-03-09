@@ -3621,7 +3621,8 @@ void M2ulPhyS::updateVisualizationVariables() {
       // update source transport properties.
       double srcTrns[SrcTrns::NUM_SRC_TRANS];
       double speciesTrns[gpudata::MAXSPECIES * SpeciesTrns::NUM_SPECIES_COEFFS];
-      in_transport->ComputeSourceTransportProperties(state, prim, gradUpn, Efield, distance, srcTrns, speciesTrns, diffVel, nsp);
+      in_transport->ComputeSourceTransportProperties(state, prim, gradUpn, Efield, distance, srcTrns, speciesTrns,
+                                                     diffVel, nsp);
       for (int t = 0; t < SrcTrns::NUM_SRC_TRANS; t++) {
         dataVis[visualIdxs.SrcTrns + t][n] = srcTrns[t];
       }

@@ -76,8 +76,8 @@ class LteTransport : public TransportProperties {
                                                 DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
                                                 Vector &n_sp);
   virtual void ComputeSourceTransportProperties(const double *state, const double *Up, const double *gradUp,
-                                                const double *Efield, double distance, double *globalTransport, double *speciesTransport,
-                                                double *diffusionVelocity, double *n_sp);
+                                                const double *Efield, double distance, double *globalTransport,
+                                                double *speciesTransport, double *diffusionVelocity, double *n_sp);
 
   void GetViscosities(const double *conserved, const double *primitive, double distance, double *visc) override;
 };
