@@ -107,7 +107,7 @@ void LteTransport::ComputeSourceTransportProperties(const double *state, const d
   globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] = 0.;
 }
 
-void LteTransport::GetViscosities(const double *conserved, const double *primitive, double distance, double *visc) {
+void LteTransport::GetViscosities(const double *conserved, const double *primitive, double *visc) {
   const double rho = primitive[0];
   const double T = primitive[1 + nvel_];
 
