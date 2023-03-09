@@ -58,31 +58,34 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
   molecular_transport_->ComputeFluxTransportProperties(state, gradUp, Efield, distance, transportBuffer,
                                                        diffusionVelocity);
 
+  const double cp_over_Pr = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] / transportBuffer[FluxTrns::VISCOSITY];
+
   // Add mixing length model results to computed molecular transport
-  //
-  // double primitiveState[gpudata::MAXEQUATIONS];
-  // mixture->GetPrimitivesFromConservatives(state, primitiveState);
+  double primitiveState[gpudata::MAXEQUATIONS];
+  mixture->GetPrimitivesFromConservatives(state, primitiveState);
 
-  // const double rho = state[0];
-  // const double Th = primitiveState[nvel_ + 1];
+  const double rho = state[0];
+  const double Th = primitiveState[nvel_ + 1];
 
-  // // eddy viscosity
-  // double S = 0;
-  // for (int i = 0; i < dim; i++) {
-  //   for (int j = 0; j < dim; j++) {
-  //     const double u_x = gradUp[(1 + i) + j * num_equation];
-  //     S += 2 * u_x * u_x; // todo: subtract divergence part
-  //   }
-  // }
-  // S = sqrt(S);
+  // eddy viscosity
+  double S = 0;
+  for (int i = 0; i < dim; i++) {
+    for (int j = 0; j < dim; j++) {
+      const double u_x = gradUp[(1 + i) + j * num_equation];
+      S += 2 * u_x * u_x; // todo: subtract divergence part
+    }
+  }
+  S = sqrt(S);
 
-  // //const double mut = rho * mixing_length_ * mixing_length_ * S;
+  const double mixing_length = std::max(0.41 * distance, max_mixing_length_);
+  const double mut = rho * mixing_length * mixing_length * S;
 
-  // // eddy thermal conductivity
-  // //const double kappat = mut * cp / Prt_;
+  transportBuffer[FluxTrns::VISCOSITY] += mut;
 
-  // // TODO(trevilo): Evaluate molecular transport
-
+  // eddy thermal conductivity
+  const double Pr_over_Prt = Prt_; // FIXME: change varaible name
+  const double kappat = mut * cp_over_Pr * Pr_over_Prt;
+  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] += kappat;
 }
 
 void MixingLengthTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up,
