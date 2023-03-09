@@ -116,14 +116,15 @@ class AxisymmetricSource : public ForcingTerms {
   TransportProperties *transport_;
   const Equations &eqSystem;
   ParGridFunction *space_vary_viscosity_mult_;
+  ParGridFunction *distance_;
 
  public:
   AxisymmetricSource(const int &_dim, const int &_num_equation, const int &_order, GasMixture *_mixture,
-
                      TransportProperties *_transport, const Equations &_eqSystem, const int &_intRuleType,
                      IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
                      ParGridFunction *_Up, ParGridFunction *_gradUp, ParGridFunction *spaceVaryViscMult,
-                     const precomputedIntegrationData &gpu_precomputed_data, RunConfiguration &_config);
+                     const precomputedIntegrationData &gpu_precomputed_data, RunConfiguration &_config,
+                     ParGridFunction *distance);
   virtual ~AxisymmetricSource() {}
 
   virtual void updateTerms(Vector &in);

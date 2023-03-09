@@ -45,7 +45,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
                          ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
                          ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A,
                          BCintegrator *_bcIntegrator, RunConfiguration &_config, ParGridFunction *pc,
-                         ParGridFunction *jh)
+                         ParGridFunction *jh, ParGridFunction *distance)
     : TimeDependentOperator(_A->Height()),
       config_(_config),
       iter(_iter),
@@ -77,7 +77,8 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
       gradUp(_gradUp),
       gradUpfes(_gradUpfes),
       gradUp_A(_gradUp_A),
-      bcIntegrator(_bcIntegrator) {
+      bcIntegrator(_bcIntegrator),
+      distance_(distance) {
   flux.SetSize(vfes->GetNDofs(), dim_, num_equation_);
   z.UseDevice(true);
   z.SetSize(A->Height());
@@ -157,7 +158,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   if (config_.isAxisymmetric()) {
     forcing.Append(new AxisymmetricSource(dim_, num_equation_, _order, d_mixture_, transport_, eqSystem, intRuleType,
                                           intRules, vfes, U_, Up, gradUp, spaceVaryViscMult, gpu_precomputed_data_,
-                                          _config));
+                                          _config, distance_));
   }
 
   if (joule_heating_ != NULL) {
@@ -523,8 +524,11 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
     fluxClass->ComputeConvectiveFluxes(state, f);
 
     if (eqSystem != EULER) {
+      double dist = 0;
+      if (distance_ != NULL) dist = (*distance_)[i];
+
       DenseMatrix fvisc(num_equation_, dim);
-      fluxClass->ComputeViscousFluxes(state, gradUpi, xyz, delta, -1, fvisc);
+      fluxClass->ComputeViscousFluxes(state, gradUpi, xyz, delta, dist, fvisc);
       f -= fvisc;
     }
 

@@ -241,13 +241,14 @@ AxisymmetricSource::AxisymmetricSource(const int &_dim, const int &_num_equation
                                        ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up,
                                        ParGridFunction *_gradUp, ParGridFunction *spaceVaryViscMult,
                                        const precomputedIntegrationData &gpu_precomputed_data,
-                                       RunConfiguration &_config)
+                                       RunConfiguration &_config, ParGridFunction *distance)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpu_precomputed_data,
                    _config.isAxisymmetric()),
       mixture(_mixture),
       transport_(_transport),
       eqSystem(_eqSystem),
-      space_vary_viscosity_mult_(spaceVaryViscMult) {
+      space_vary_viscosity_mult_(spaceVaryViscMult),
+      distance_(distance) {
   // no-op
 }
 
@@ -275,6 +276,14 @@ void AxisymmetricSource::updateTerms(Vector &in) {
     alpha = space_vary_viscosity_mult_->Read();
   } else {
     alpha = NULL;
+  }
+
+  // and distance
+  const double *d_dist;
+  if (distance_ != NULL) {
+    d_dist = distance_->Read();
+  } else {
+    d_dist = NULL;
   }
 
   const int neqn = num_equation;
@@ -323,8 +332,11 @@ void AxisymmetricSource::updateTerms(Vector &in) {
       const double ut_r = gradUp[3 + 0 * neqn];
 
       double visc, bulkVisc, visc_vec[2];
-      // TODO: Get distance
-      d_trans->GetViscosities(U, Up, -1, visc_vec);
+
+      double dist = 0;
+      if (d_dist != NULL) dist = d_dist[n];
+
+      d_trans->GetViscosities(U, Up, dist, visc_vec);
       visc = visc_vec[0];
       bulkVisc = visc_vec[1];
       bulkVisc -= 2. / 3. * visc;

@@ -115,6 +115,7 @@ class RHSoperator : public TimeDependentOperator {
   ParGridFunction *Up;
   ParGridFunction *plasma_conductivity_;
   ParGridFunction *joule_heating_;
+  ParGridFunction *distance_;
 
   // gradients of primitives and associated forms&FE space
   ParGridFunction *gradUp;
@@ -151,7 +152,7 @@ class RHSoperator : public TimeDependentOperator {
               DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult,
               ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes,
               GradNonLinearForm *_gradUp_A, BCintegrator *_bcIntegrator, RunConfiguration &_config, ParGridFunction *pc,
-              ParGridFunction *jh);
+              ParGridFunction *jh, ParGridFunction *distance);
 
   virtual void Mult(const Vector &x, Vector &y) const;
   void updatePrimitives(const Vector &x) const;

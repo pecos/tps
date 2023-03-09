@@ -616,7 +616,7 @@ void M2ulPhyS::initVariables() {
       new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType, d_fluxClass,
                       mixture, d_mixture, chemistry_, transportPtr, radiation_, vfes, fes, gpu_precomputed_data_,
                       maxIntPoints, maxDofs, A, Aflux, mesh, spaceVaryViscMult, U, Up, gradUp, gradUpfes, gradUp_A,
-                      bcIntegrator, config, plasma_conductivity_, joule_heating_);
+                      bcIntegrator, config, plasma_conductivity_, joule_heating_, distance_);
 
   CFL = config.GetCFLNumber();
   rhsOperator->SetTime(time);
