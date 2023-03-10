@@ -63,9 +63,8 @@ class SourceTerm : public ForcingTerms {
   // ParGridFunction *Up;
   // ParGridFunction *gradUp;
   //
-  // const volumeFaceIntegrationArrays &gpuArrays;
-  // const int *h_numElems;
-  // const int *h_posDofIds;
+  // const precomputedIntegrationData &gpu_precomputed_data_
+  // const int *h_num_elems_of_type;
 
   int numSpecies_;
   int numActiveSpecies_;
@@ -85,7 +84,7 @@ class SourceTerm : public ForcingTerms {
  public:
   SourceTerm(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
              IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up,
-             ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays, RunConfiguration &_config,
+             ParGridFunction *_gradUp, const precomputedIntegrationData &gpuArrays, RunConfiguration &_config,
              GasMixture *mixture, GasMixture *d_mixture, TransportProperties *transport, Chemistry *chemistry,
              Radiation *radiation, ParGridFunction *pc);
   ~SourceTerm();

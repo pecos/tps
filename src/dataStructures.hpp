@@ -70,7 +70,7 @@ enum WorkingFluid { DRY_AIR, USER_DEFINED, LTE_FLUID };
 // These are the type of EquationOfState.
 enum GasModel { /* PERFECT_SINGLE, */ PERFECT_MIXTURE, /* CANTERA, */ NUM_GASMODEL };
 
-enum TransportModel { ARGON_MINIMAL, ARGON_MIXTURE, CONSTANT, LTE_TRANSPORT, NUM_TRANSPORTMODEL };
+enum TransportModel { ARGON_MINIMAL, ARGON_MIXTURE, CONSTANT, LTE_TRANSPORT, MIXING_LENGTH, NUM_TRANSPORTMODEL };
 
 enum ChemistryModel { /* CANTERA, */ NUM_CHEMISTRYMODEL };
 
@@ -205,33 +205,178 @@ struct SpongeZoneData {
   bool singleTemperature;
 };
 
-struct volumeFaceIntegrationArrays {
-  // nodes IDs and indirection array
-  Array<int> nodesIDs;
-  Array<int> posDofIds;
-  // count of number of elements of each type
-  Array<int> numElems;
-  // Array<int> posDofQshape1; // position, num. dof and integration points for each face
-  Vector shapeWnor1;  // shape functions, weight and normal for each face at ach integration point
-  Vector shape2;
+/** @brief Array providing information about dof indices for elements
+ *
+ * These arrays store information about the degrees of freedom
+ * associated with each element.  They are used in the _GPU_ code path
+ * to provide information that would otherwise (i.e., on the cpu path)
+ * come from, for instance, a FiniteElement or FiniteElementSpace
+ * object.
+ */
+struct elementIndexingData {
+  /** Dof array offset for element i
+   *
+   *  To be used with dofs_list.  Specifically,
+   *
+   *  dofs_list[dof_offset[i] + j] = index of jth dof of element i
+   */
+  Array<int> dof_offset;
 
-  Array<int> elemFaces;  // number and faces IDs of each element
-  Array<int> elems12Q;   // elements connecting a face and integration points
+  /** Number of dofs for each element
+   *
+   *  dof_number[i] = number of dofs for element i
+   */
+  Array<int> dof_number;
 
-  // used in gradient computation:
-  // gradients of shape functions for all nodes and weight multiplied by det(Jac)
-  // at each integration point
-  Vector elemShapeDshapeWJ;           // [...l_0(i),...,l_dof(i),l_0_x(i),...,l_dof_d(i), w_i*detJac_i ...]
-  Array<int> elemPosQ_shapeDshapeWJ;  // position and num. of integration points for each element
+  /** List of dof indices, ordered by element.
+   *
+   *  I.e. [ (dof indices for elem 0), (dof indices for elem 1), ... (dof indices for elem Ne-1) ]
+   *
+   *  Since elements may have different numbers of dofs, use
+   *  dof_offset to aid in indexing as follows:
+   *
+   *  dofs_list[dof_offset[i] + j] = index of jth dof of element i
+   */
+  Array<int> dofs_list;
+
+  /** Number of elements of each type (e.g, number of tets, number of hexes, etc) */
+  Array<int> num_elems_of_type;
 };
 
-struct parallelFacesIntegrationArrays {
-  Vector sharedShapeWnor1;
-  Vector sharedShape2;
-  Array<int> sharedElem1Dof12Q;
-  Array<int> sharedVdofs;
-  Array<int> sharedVdofsGradUp;
-  Array<int> sharedElemsFaces;
+/** @brief Data for interior face integral calculations
+ *
+ * The _GPU_ path requires pre-computation of a number of quantities,
+ * such as the values of the shape functions at each quadrature point
+ * on each face.  For the interior faces, these quantities, which are
+ * documented in more detail below, are stored in this struct.
+ *
+ */
+struct interiorFaceIntegrationData {
+  /** Shape functions for "element 1" evaluated at all interior face quadrature points */
+  Vector el1_shape;
+
+  /** Shape functions for "element 2" evaluated at all interior face quadrature points */
+  Vector el2_shape;
+
+  /** Weights associated with all interior face quadrature points */
+  Vector quad_weight;
+
+  /** Normal vector (oriented from elem 1 toward elem 2) for all interior face quadrature points */
+  Vector normal;
+
+  /** Position in physical space for all interior face quadrature points */
+  Vector xyz;
+
+  /** maps from element index to face indices
+   *
+   *  elemFaces[7*i] = number of faces for element i
+   *  elemFaces[7*i + 1 + f] = face index for local face f of element i
+   */
+  Array<int> element_to_faces;
+
+  /** for each interior face, index of element 1 */
+  Array<int> el1;
+
+  /** for each interior face, index of element 2 */
+  Array<int> el2;
+
+  /** for each interior face, number of quadrature points */
+  Array<int> num_quad;
+};
+
+/** @brief Data for boundary face integral calculations
+ *
+ * The _GPU_ path requires pre-computation of a number of quantities,
+ * such as the values of the shape functions at each quadrature point
+ * on each face.  For the boundary faces, these quantities, which are
+ * documented in more detail below, are stored in this struct.
+ *
+ */
+struct boundaryFaceIntegrationData {
+  /** Shape functions evaluated at all boundary face quadrature points */
+  Vector shape;
+
+  /** Weights associated with all boundary face quadrature points */
+  Vector quad_weight;
+
+  /** Normal vector (outward pointing) for all boundary face quadrature points */
+  Vector normal;
+
+  /** Position in physical space for all boundary face quadrature points */
+  Vector xyz;
+
+  /** for each boundary face, index of corresponding element */
+  Array<int> el;
+
+  /** for each boundary face, number of quadrature points */
+  Array<int> num_quad;
+};
+
+/** @brief Data for shared face integral calculations
+ *
+ * The _GPU_ path requires pre-computation of a number of quantities,
+ * such as the values of the shape functions at each quadrature point
+ * on each face.  For shared faces (i.e., faces at the domain
+ * decomposition boundaries---interior faces whose elements sit on
+ * different mpi ranks), these quantities, which are documented in
+ * more detail below, are stored in this struct.
+ *
+ */
+struct sharedFaceIntegrationData {
+  /** Shape functions for "element 1" evaluated at all shared face quadrature points */
+  Vector el1_shape;
+
+  /** Shape functions for "element 2" evaluated at all shared face quadrature points */
+  Vector el2_shape;
+
+  /** Weights associated with all shared face quadrature points */
+  Vector quad_weight;
+
+  /** Normal vector (oriented from elem 1 toward elem 2) for all shared face quadrature points */
+  Vector normal;
+
+  /** Position in physical space for all shared face quadrature points */
+  Vector xyz;
+
+  /** for each shared face, index of element 1 */
+  Array<int> el1;
+
+  /** for each shared face, number of dofs for element 2 */
+  Array<int> num_quad;
+
+  /** for each shared face, number of quadrature points */
+  Array<int> num_dof2;
+
+  /** @brief Map from shared element index to shared face index(ices)
+   *
+   *  This mapping makes it possible to loop over the elements with
+   *  shared faces rather than the shared faces themselves.  It
+   *  contains the following information:
+   *
+   * shared_elements_to_shared_faces[7*i] = element number for ith element with shared faces
+   * shared_elements_to_shared_faces[7*i + 1] = number of shared faces on ith elem with shared faces
+   * shared_elements_to_shared_faces[7*i + 1 + j] = shared face index for the jth shared face on the ith element with
+   * shared faces
+   */
+  Array<int> shared_elements_to_shared_faces;
+
+  /** Degrees of freedom indices for element 2 */
+  Array<int> elem2_dofs;
+
+  /** Degrees of freedom indices for the gradient variables for element 2 */
+  Array<int> elem2_grad_dofs;
+};
+
+/** @brief Storage for data used in the _GPU_ code path
+ *
+ * The _GPU_ path requires pre-computation of a number of quantities.
+ * These quantities are stored in this struct.
+ */
+struct precomputedIntegrationData {
+  elementIndexingData element_indexing_data;
+  interiorFaceIntegrationData interior_face_data;
+  boundaryFaceIntegrationData boundary_face_data;
+  sharedFaceIntegrationData shared_face_data;
 };
 
 struct dataTransferArrays {
@@ -272,6 +417,13 @@ struct constantTransportData {
   double mtFreq[gpudata::MAXSPECIES];  // momentum transfer frequency
 
   int electronIndex;
+};
+
+struct mixingLengthTransportData {
+  // for turbulent transport calculations
+  double max_mixing_length_;  // user-specifed mixing length
+  double Prt_;                // eddy Prandtl number
+  double Let_;                // eddy Lewis number
 };
 
 struct collisionInputs {

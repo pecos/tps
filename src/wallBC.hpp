@@ -59,13 +59,14 @@ class WallBC : public BoundaryCondition {
   BoundaryViscousFluxData bcFlux_;
   BoundaryPrimitiveData bcState_;
 
-  const Array<int> &intPointsElIDBC;
+  const boundaryFaceIntegrationData &boundary_face_data_;
   const int &maxIntPoints_;
 
   Array<int> wallElems;
-  void buildWallElemsArray(const Array<int> &intPointsElIDBC);
+  void buildWallElemsArray();
 
-  void computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux);
+  void computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, double distance,
+                          Vector &bdrFlux);
   void computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
                                 Vector &bdrFlux);
   void computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
@@ -76,10 +77,11 @@ class WallBC : public BoundaryCondition {
   WallBC(RiemannSolver *rsolver_, GasMixture *_mixture, GasMixture *d_mixture, Equations _eqSystem, Fluxes *_fluxClass,
          ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
          const int _num_equation, int _patchNumber, WallType _bcType, const WallData _inputData,
-         const Array<int> &intPointsElIDBC, const int &maxIntPoints, bool axisym, bool useBCinGrad = false);
+         const boundaryFaceIntegrationData &boundary_face_data, const int &maxIntPoints, bool axisym, bool useBCinGrad);
   ~WallBC();
 
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux);
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, double distance,
+                      Vector &bdrFlux);
   void computeBdrPrimitiveStateForGradient(const Vector &primIn, Vector &primBC) const override;
 
   virtual void initBCs();
@@ -89,16 +91,16 @@ class WallBC : public BoundaryCondition {
   // functions for BC integration on GPU
 
   virtual void integrationBC(Vector &y,  // output
-                             const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
-                             ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
-                             Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs);
+                             const Vector &x, const elementIndexingData &elem_index_data, ParGridFunction *Up,
+                             ParGridFunction *gradUp, const boundaryFaceIntegrationData &boundary_face_data,
+                             const int &maxIntPoints, const int &maxDofs);
 
   void integrateWalls_gpu(Vector &y,  // output
-                          const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds, Vector &shapesBC,
-                          Vector &normalsWBC, Array<int> &intPointsElIDBC, const int &maxDofs);
+                          const Vector &x, const elementIndexingData &elem_index_data,
+                          const boundaryFaceIntegrationData &boundary_face_data, const int &maxDofs);
 
-  void interpWalls_gpu(const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds, ParGridFunction *Up,
-                       ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
+  void interpWalls_gpu(const Vector &x, const elementIndexingData &elem_index_data, ParGridFunction *Up,
+                       ParGridFunction *gradUp, const boundaryFaceIntegrationData &boundary_face_data,
                        const int &maxDofs);
 
 #ifdef _GPU_

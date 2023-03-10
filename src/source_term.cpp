@@ -35,10 +35,11 @@
 
 SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
                        IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
-                       ParGridFunction *_Up, ParGridFunction *_gradUp, const volumeFaceIntegrationArrays &gpuArrays,
-                       RunConfiguration &_config, GasMixture *mixture, GasMixture *d_mixture,
-                       TransportProperties *transport, Chemistry *chemistry, Radiation *radiation, ParGridFunction *pc)
-    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpuArrays,
+                       ParGridFunction *_Up, ParGridFunction *_gradUp,
+                       const precomputedIntegrationData &gpu_precomputed_data, RunConfiguration &_config,
+                       GasMixture *mixture, GasMixture *d_mixture, TransportProperties *transport, Chemistry *chemistry,
+                       Radiation *radiation, ParGridFunction *pc)
+    : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpu_precomputed_data,
                    _config.isAxisymmetric()),
       mixture_(mixture),
       d_mixture_(d_mixture),
@@ -128,7 +129,9 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     for (int v = 0; v < _nvel; v++)
       for (int sp = 0; sp < _numSpecies; sp++) diffusionVelocity[sp + v * _numSpecies] = 0.0;
     double ns[gpudata::MAXSPECIES];
-    _transport->ComputeSourceTransportProperties(Un, upn, gradUpn, Efield, globalTransport, speciesTransport,
+
+    // TODO: Get distance
+    _transport->ComputeSourceTransportProperties(Un, upn, gradUpn, Efield, -1, globalTransport, speciesTransport,
                                                  diffusionVelocity, ns);
 
     for (int eq = 0; eq < _num_equation; eq++) srcTerm[eq] = 0.0;

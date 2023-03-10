@@ -35,7 +35,7 @@
 FaceIntegrator::FaceIntegrator(IntegrationRules *_intRules, RiemannSolver *rsolver_, Fluxes *_fluxClass,
                                ParFiniteElementSpace *_vfes, bool _useLinear, const int _dim, const int _num_equation,
                                ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, double &_max_char_speed,
-                               bool axisym)
+                               bool axisym, ParGridFunction *distance)
     : rsolver(rsolver_),
       fluxClass(_fluxClass),
       vfes(_vfes),
@@ -46,7 +46,8 @@ FaceIntegrator::FaceIntegrator(IntegrationRules *_intRules, RiemannSolver *rsolv
       gradUpfes(_gradUpfes),
       intRules(_intRules),
       useLinear(_useLinear),
-      axisymmetric_(axisym) {
+      axisymmetric_(axisym),
+      distance_(distance) {
 #ifdef _BUILD_DEPRECATED_
   if (useLinear) {
     faceMassMatrix1 = new DenseMatrix[vfes->GetNF() - vfes->GetNBE()];
@@ -167,6 +168,33 @@ void FaceIntegrator::getElementsGrads_gpu(const ParGridFunction *gradUp, ParFini
   }
 }
 
+void FaceIntegrator::getDistanceDofs(FaceElementTransformations &Tr, const FiniteElement &el1, const FiniteElement &el2,
+                                     Vector &dist1, Vector &dist2) {
+  assert(distance_ != NULL);
+
+  const ParFiniteElementSpace *pfes = distance_->ParFESpace();
+
+  Array<int> dofs1;
+  pfes->GetElementVDofs(Tr.Elem1->ElementNo, dofs1);
+
+  dist1.SetSize(dofs1.Size());
+  distance_->GetSubVector(dofs1, dist1);
+
+  int no2 = Tr.Elem2->ElementNo;
+  int NE = pfes->GetNE();
+  Array<int> dofs2;
+  if (no2 >= NE) {
+    int Elem2NbrNo = no2 - NE;
+    pfes->GetFaceNbrElementVDofs(Elem2NbrNo, dofs2);
+    dist2.SetSize(dofs2.Size());
+    distance_->FaceNbrData().GetSubVector(dofs2, dist2);
+  } else {
+    pfes->GetElementVDofs(no2, vdofs2);
+    dist2.SetSize(dofs2.Size());
+    distance_->GetSubVector(dofs2, dist2);
+  }
+}
+
 void FaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2,
                                         FaceElementTransformations &Tr, const Vector &elfun, Vector &elvect) {
   if (useLinear) {
@@ -214,6 +242,11 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
   getElementsGrads_cpu(Tr, el1, el2, gradUp1, gradUp2);
 #endif
 
+  Vector dist1, dist2;
+  if (distance_ != NULL) {
+    getDistanceDofs(Tr, el1, el2, dist1, dist2);
+  }
+
   // Integration order calculation from DGTraceIntegrator
   int intorder;
   if (Tr.Elem2No >= 0) {
@@ -246,6 +279,14 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     elfun1_mat.MultTranspose(shape1, funval1);
     elfun2_mat.MultTranspose(shape2, funval2);
 
+    // // Interpolate the distance function
+    double d1 = 0;
+    double d2 = 0;
+    if (distance_ != NULL) {
+      d1 = dist1 * shape1;
+      d2 = dist2 * shape2;
+    }
+
     // Interpolate gradients at int. point
     gradUp1i = 0.;
     gradUp2i = 0.;
@@ -272,8 +313,8 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     // compute viscous fluxes
     viscF1 = viscF2 = 0.;
 
-    fluxClass->ComputeViscousFluxes(funval1, gradUp1i, radius, viscF1);
-    fluxClass->ComputeViscousFluxes(funval2, gradUp2i, radius, viscF2);
+    fluxClass->ComputeViscousFluxes(funval1, gradUp1i, radius, d1, viscF1);
+    fluxClass->ComputeViscousFluxes(funval2, gradUp2i, radius, d2, viscF2);
 
     // compute mean flux
     viscF1 += viscF2;
@@ -409,8 +450,8 @@ void FaceIntegrator::MassMatrixFaceIntegral(const FiniteElement &el1, const Fini
       }
 
       DenseMatrix viscF1(num_equation, dim), viscF2(num_equation, dim);
-      fluxClass->ComputeViscousFluxes(state1, igradUp1, 1, viscF1);
-      fluxClass->ComputeViscousFluxes(state2, igradUp2, 1, viscF2);
+      fluxClass->ComputeViscousFluxes(state1, igradUp1, 1, -1, viscF1);
+      fluxClass->ComputeViscousFluxes(state2, igradUp2, 1, -1, viscF2);
       for (int eq = 0; eq < num_equation; eq++) {
         for (int d = 0; d < dim; d++) viscF1(eq, d) += viscF2(eq, d);
       }

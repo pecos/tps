@@ -66,20 +66,22 @@ class LteTransport : public TransportProperties {
   virtual ~LteTransport();
 
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
-                                              Vector &transportBuffer, DenseMatrix &diffusionVelocity);
+                                              double radius, double distance, Vector &transportBuffer,
+                                              DenseMatrix &diffusionVelocity);
   virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp, const double *Efield,
-                                              double *transportBuffer, double *diffusionVelocity) {
+                                              double radius, double distance, double *transportBuffer,
+                                              double *diffusionVelocity) {
     mfem_error("This variant of LteTransport::ComputeFluxTransportProperties is not implemented\n");
   }
   virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
-                                                const Vector &Efield, Vector &globalTransport,
+                                                const Vector &Efield, double distance, Vector &globalTransport,
                                                 DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
                                                 Vector &n_sp);
   virtual void ComputeSourceTransportProperties(const double *state, const double *Up, const double *gradUp,
-                                                const double *Efield, double *globalTransport, double *speciesTransport,
-                                                double *diffusionVelocity, double *n_sp);
+                                                const double *Efield, double distance, double *globalTransport,
+                                                double *speciesTransport, double *diffusionVelocity, double *n_sp);
 
-  virtual void GetViscosities(const Vector &conserved, const Vector &primitive, double &visc, double &bulkVisc);
+  void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
 };
 
 #endif  // _GPU_

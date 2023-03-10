@@ -80,10 +80,9 @@ class RHSoperator : public TimeDependentOperator {
 
   ParFiniteElementSpace *vfes;
 
-  const volumeFaceIntegrationArrays &gpuArrays;
+  const precomputedIntegrationData &gpu_precomputed_data_;
 
-  const int *h_numElems;
-  const int *h_posDofIds;
+  const int *h_num_elems_of_type;
 
   const int &maxIntPoints;
   const int &maxDofs;
@@ -104,6 +103,7 @@ class RHSoperator : public TimeDependentOperator {
   Array<DenseMatrix *> Me_inv_rad;
 
   Vector invMArray;
+  Vector invMArray_rad;
   Array<int> posDofInvM;
 
   const bool &isSBP;
@@ -116,6 +116,7 @@ class RHSoperator : public TimeDependentOperator {
   ParGridFunction *Up;
   ParGridFunction *plasma_conductivity_;
   ParGridFunction *joule_heating_;
+  ParGridFunction *distance_;
 
   // gradients of primitives and associated forms&FE space
   ParGridFunction *gradUp;
@@ -133,11 +134,10 @@ class RHSoperator : public TimeDependentOperator {
   mutable Vector z;
   mutable Vector fk, zk;  // temp vectors for flux volume integral
 
-  mutable parallelFacesIntegrationArrays parallelData;
   mutable dataTransferArrays transferU;
   mutable dataTransferArrays transferUp;
   mutable dataTransferArrays transferGradUp;
-  void fillSharedData();
+  void allocateTransferData();
 
   // void GetFlux(const DenseMatrix &state, DenseTensor &flux) const;
   void GetFlux(const Vector &state, DenseTensor &flux) const;
@@ -149,12 +149,12 @@ class RHSoperator : public TimeDependentOperator {
   RHSoperator(int &_iter, const int _dim, const int &_num_equation, const int &_order, const Equations &_eqSystem,
               double &_max_char_speed, IntegrationRules *_intRules, int _intRuleType, Fluxes *_fluxClass,
               GasMixture *_mixture, GasMixture *d_mixture, Chemistry *_chemistry, TransportProperties *_transport,
-              Radiation *_radiation, ParFiniteElementSpace *_vfes, const volumeFaceIntegrationArrays &gpuArrays,
-              const int &_maxIntPoints, const int &_maxDofs, DGNonLinearForm *_A, MixedBilinearForm *_Aflux,
-              ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
-              ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A,
-              BCintegrator *_bcIntegrator, bool &_isSBP, double &_alpha, RunConfiguration &_config, ParGridFunction *pc,
-              ParGridFunction *jh);
+              Radiation *_radiation, ParFiniteElementSpace *_vfes,
+              const precomputedIntegrationData &gpu_precomputed_data, const int &_maxIntPoints, const int &_maxDofs,
+              DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult,
+              ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes,
+              GradNonLinearForm *_gradUp_A, BCintegrator *_bcIntegrator, bool &_isSBP, double &_alpha,
+              RunConfiguration &_config, ParGridFunction *pc, ParGridFunction *jh, ParGridFunction *distance);
 
   virtual void Mult(const Vector &x, Vector &y) const;
   void updatePrimitives(const Vector &x) const;
@@ -177,7 +177,7 @@ class RHSoperator : public TimeDependentOperator {
   static void copyZk2Z_gpu(Vector &z, Vector &zk, const int eq, const int dof);
   static void copyDataForFluxIntegration_gpu(const Vector &z, DenseTensor &flux, Vector &fk, Vector &zk, const int eq,
                                              const int dof, const int dim);
-  static void multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceIntegrationArrays &gpuArrays,
+  static void multiPlyInvers_gpu(Vector &y, Vector &z, const precomputedIntegrationData &gpu_precomputed_data,
                                  const Vector &invMArray, const Array<int> &posDofInvM, const int num_equation,
                                  const int totNumDof, const int NE, const int elemOffset, const int dof);
 

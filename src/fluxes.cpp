@@ -53,7 +53,7 @@ void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, D
       ComputeConvectiveFluxes(state, convF);
 
       DenseMatrix viscF(num_equation, dim);
-      ComputeViscousFluxes(state, gradUpi, 1, viscF);
+      ComputeViscousFluxes(state, gradUpi, 1, -1, viscF);
       for (int eq = 0; eq < num_equation; eq++) {
         for (int d = 0; d < dim; d++) flux(eq, d) = convF(eq, d) - viscF(eq, d);
       }
@@ -135,7 +135,8 @@ MFEM_HOST_DEVICE void Fluxes::ComputeConvectiveFluxes(const double *state, doubl
 }
 
 // TODO(kevin): check/complete axisymmetric setting for multi-component flow.
-void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, DenseMatrix &flux) {
+void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, double distance,
+                                  DenseMatrix &flux) {
 #ifdef _BUILD_DEPRECATED_
   flux = 0.;
   if (eqSystem == EULER) {
@@ -169,7 +170,8 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   Vector transportBuffer;
   // NOTE(kevin): in flux, only dim-components of diffusionVelocity will be used.
   DenseMatrix diffusionVelocity(numSpecies, nvel);
-  transport->ComputeFluxTransportProperties(state, gradUp, Efield, transportBuffer, diffusionVelocity);
+  transport->ComputeFluxTransportProperties(state, gradUp, Efield, radius, distance, transportBuffer,
+                                            diffusionVelocity);
   const double visc = transportBuffer[FluxTrns::VISCOSITY];
   double bulkViscosity = transportBuffer[FluxTrns::BULK_VISCOSITY];
   bulkViscosity -= 2. / 3. * visc;
@@ -255,12 +257,12 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
     for (int d = 0; d < dim; d++) flux(nvel + 2 + sp, d) = -state[nvel + 2 + sp] * diffusionVelocity(sp, d);
   }
 #else
-  ComputeViscousFluxes(state.GetData(), gradUp.GetData(), radius, flux.GetData());
+  ComputeViscousFluxes(state.GetData(), gradUp.GetData(), radius, distance, flux.GetData());
 #endif
 }
 
 MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius,
-                                                   double *flux) {
+                                                   double distance, double *flux) {
   for (int d = 0; d < dim; d++) {
     for (int eq = 0; eq < num_equation; eq++) {
       flux[eq + d * num_equation] = 0.;
@@ -288,7 +290,8 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
   double transportBuffer[FluxTrns::NUM_FLUX_TRANS];
   // NOTE(kevin): in flux, only dim-components of diffusionVelocity will be used.
   double diffusionVelocity[gpudata::MAXSPECIES * gpudata::MAXDIM];
-  transport->ComputeFluxTransportProperties(state, gradUp, Efield, transportBuffer, diffusionVelocity);
+  transport->ComputeFluxTransportProperties(state, gradUp, Efield, radius, distance, transportBuffer,
+                                            diffusionVelocity);
   const double visc = transportBuffer[FluxTrns::VISCOSITY];
   double bulkViscosity = transportBuffer[FluxTrns::BULK_VISCOSITY];
   bulkViscosity -= 2. / 3. * visc;
@@ -384,7 +387,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
   }
 }
 
-void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius,
+void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, double distance,
                                      const BoundaryViscousFluxData &bcFlux, Vector &normalFlux) {
   normalFlux.SetSize(num_equation);
   normalFlux = 0.;
@@ -408,7 +411,8 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
   Vector transportBuffer;
   // NOTE(kevin): in flux, only dim-components of diffusionVelocity will be used.
   DenseMatrix diffusionVelocity(numSpecies, nvel);
-  transport->ComputeFluxTransportProperties(state, gradUp, Efield, transportBuffer, diffusionVelocity);
+  transport->ComputeFluxTransportProperties(state, gradUp, Efield, radius, distance, transportBuffer,
+                                            diffusionVelocity);
   const double visc = transportBuffer[FluxTrns::VISCOSITY];
   double bulkViscosity = transportBuffer[FluxTrns::BULK_VISCOSITY];
   bulkViscosity -= 2. / 3. * visc;
@@ -508,7 +512,8 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
 }
 
 MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius,
-                                                      const BoundaryViscousFluxData &bcFlux, double *normalFlux) {
+                                                      double distance, const BoundaryViscousFluxData &bcFlux,
+                                                      double *normalFlux) {
   // normalFlux.SetSize(num_equation);
   for (int eq = 0; eq < num_equation; eq++) normalFlux[eq] = 0.;
   if (eqSystem == EULER) {
@@ -531,7 +536,8 @@ MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const
   double transportBuffer[FluxTrns::NUM_FLUX_TRANS];
   // NOTE(kevin): in flux, only dim-components of diffusionVelocity will be used.
   double diffusionVelocity[gpudata::MAXSPECIES * gpudata::MAXDIM];
-  transport->ComputeFluxTransportProperties(state, gradUp, Efield, transportBuffer, diffusionVelocity);
+  transport->ComputeFluxTransportProperties(state, gradUp, Efield, radius, distance, transportBuffer,
+                                            diffusionVelocity);
   const double visc = transportBuffer[FluxTrns::VISCOSITY];
   double bulkViscosity = transportBuffer[FluxTrns::BULK_VISCOSITY];
   bulkViscosity -= 2. / 3. * visc;

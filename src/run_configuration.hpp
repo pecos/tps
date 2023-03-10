@@ -238,8 +238,12 @@ class RunConfiguration {
   // flag for using third-order electron thermal conductivity
   bool thirdOrderkElectron;
 
+  // flag to use mixing length model
+  bool use_mixing_length;
+
   // data structure for constant transport property class
   constantTransportData constantTransport;
+  mixingLengthTransportData mix_length_trans_input_;
 
   // Use MMS
   bool use_mms_;
@@ -257,6 +261,8 @@ class RunConfiguration {
   double const_plasma_conductivity_;
 
   PostProcessInput postprocessInput;
+
+  bool compute_distance;
 
   RunConfiguration();
   ~RunConfiguration();

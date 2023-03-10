@@ -161,11 +161,13 @@ int main (int argc, char *argv[])
     Vector transportBuffer;
     transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
     DenseMatrix diffusionVelocity(numSpecies, dim);
-    transport->ComputeFluxTransportProperties(conservedState, gradUp, Efield, transportBuffer, diffusionVelocity);
+    transport->ComputeFluxTransportProperties(conservedState, gradUp, Efield, -1, -1, transportBuffer, diffusionVelocity);
 
-    double visc, bulkVisc;
-    transport->GetViscosities(conservedState, primitiveState, visc, bulkVisc);
-    
+    double visc, bulkVisc, visc_vec[2];
+    transport->GetViscosities(conservedState, primitiveState, visc_vec);
+    visc = visc_vec[0];
+    bulkVisc = visc_vec[1];
+
     double visc_err = abs(visc - transportBuffer[FluxTrns::VISCOSITY]);
     double bulk_visc_err = abs(bulkVisc - transportBuffer[FluxTrns::BULK_VISCOSITY]);
     double consistencyThreshold = 1.0e-18;

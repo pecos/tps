@@ -67,6 +67,7 @@ class Tps;
 #include "logger.hpp"
 #include "lte_mixture.hpp"
 #include "lte_transport_properties.hpp"
+#include "mixing_length_transport.hpp"
 #include "mpi_groups.hpp"
 #include "radiation.hpp"
 #include "rhs_operator.hpp"
@@ -159,6 +160,9 @@ class M2ulPhyS : public TPS::Solver {
 
   ParGridFunction *spaceVaryViscMult;  // space varying viscosity multiplier
 
+  /// Distance to nearest no-slip wall
+  ParGridFunction *distance_;
+
   Fluxes *fluxClass;
 
   RHSoperator *rhsOperator;
@@ -192,12 +196,8 @@ class M2ulPhyS : public TPS::Solver {
   const int maxIntPoints = gpudata::MAXINTPOINTS;  // corresponding to HEX face with p=5
   const int maxDofs = gpudata::MAXDOFS;            // corresponding to HEX with p=5
 
-  volumeFaceIntegrationArrays gpuArrays;
-
-  // BC integration
-  Vector shapesBC;
-  Vector normalsWBC;
-  Array<int> intPointsElIDBC;  // integration points and element ID
+  /// Data required for residual evaluation in _GPU_ path
+  precomputedIntegrationData gpu_precomputed_data_;
 
   // The solution u has components {density, x-momentum, y-momentum, energy}.
   // These are stored contiguously in the BlockVector u_block.
@@ -308,6 +308,13 @@ class M2ulPhyS : public TPS::Solver {
 
   void getAttributesInPartition(Array<int> &local_attr);
 
+  /** @brief Fill precomputedIntegrationData struct
+   *
+   *  The _GPU_ path required some quantities (e.g., basis function at
+   *  all face quadrature points) to be evaluated and stored at the
+   *  beginning of a simulation.  These quantities are evaluated by
+   *  this function.
+   */
   void initIndirectionArrays();
 
   void initVariables();
@@ -412,6 +419,8 @@ class M2ulPhyS : public TPS::Solver {
   RunConfiguration &GetConfig() { return config; }
   GasMixture *getMixture() { return mixture; }
   Chemistry *getChemistry() { return chemistry_; }
+
+  const ParGridFunction *getDistanceFcn() { return distance_; }
 
   void updatePrimitives();
 

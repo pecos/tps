@@ -75,6 +75,8 @@ class RiemannSolver {
 
   void Eval_LF(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux);
   MFEM_HOST_DEVICE void Eval_LF(const double *state1, const double *state2, const double *nor, double *flux) const;
+
+  MFEM_HOST_DEVICE bool isAxisymmetric() const { return axisymmetric_; }
 };
 
 #endif  // RIEMANN_SOLVER_HPP_

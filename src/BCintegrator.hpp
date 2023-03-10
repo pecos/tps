@@ -71,9 +71,9 @@ class BCintegrator : public NonlinearFormIntegrator {
 
   ParGridFunction *gradUp;
 
-  Vector &shapesBC;
-  Vector &normalsWBC;
-  Array<int> &intPointsElIDBC;
+  ParGridFunction *distance_;
+
+  const boundaryFaceIntegrationData &boundary_face_data_;
 
   const int dim;
   const int num_equation;
@@ -87,14 +87,14 @@ class BCintegrator : public NonlinearFormIntegrator {
 
   // void calcMeanState();
   void computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
-                      Vector &bdrFlux);
+                      double distance, Vector &bdrFlux);
 
  public:
   BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules,
                RiemannSolver *rsolver_, double &_dt, GasMixture *mixture, GasMixture *d_mixture, Fluxes *_fluxClass,
-               ParGridFunction *_Up, ParGridFunction *_gradUp, Vector &_shapesBC, Vector &_normalsWBC,
-               Array<int> &_intPointsElIDBC, const int _dim, const int _num_equation, double &_max_char_speed,
-               RunConfiguration &_runFile, Array<int> &local_bdr_attr, const int &_maxIntPoints, const int &_maxDofs);
+               ParGridFunction *_Up, ParGridFunction *_gradUp, const boundaryFaceIntegrationData &boundary_face_data,
+               const int _dim, const int _num_equation, double &_max_char_speed, RunConfiguration &_runFile,
+               Array<int> &local_bdr_attr, const int &_maxIntPoints, const int &_maxDofs, ParGridFunction *distance_);
   ~BCintegrator();
 
   virtual void AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,
@@ -102,7 +102,7 @@ class BCintegrator : public NonlinearFormIntegrator {
   void initBCs();
 
   void updateBCMean(ParGridFunction *Up);
-  void integrateBCs(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds);
+  void integrateBCs(Vector &y, const Vector &x, const elementIndexingData &elem_index_data);
 
   // GPU functions
   static void retrieveGradientsData_gpu(ParGridFunction *gradUp, DenseTensor &elGradUp, Array<int> &vdofs,

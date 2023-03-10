@@ -83,18 +83,6 @@ M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps) : mp
   // set default solver state
   exit_status_ = NORMAL;
 
-  // This example depends on this ordering of the space.
-  // MFEM_ASSERT(fes.GetOrdering() == Ordering::byNODES, "");
-#ifdef _GPU_
-  // write to GPU global memory
-  gradUp->ReadWrite();
-  U->ReadWrite();
-  Up->ReadWrite();
-  auto vgradUp = gradUp->ReadWrite();
-  auto v_U = U->ReadWrite();
-  auto vUp = Up->ReadWrite();
-#endif  // _GPU_
-
   // remove DIE file if present
   if (rank0_) {
     if (file_exists("DIE")) {
@@ -139,18 +127,6 @@ void M2ulPhyS::initVariables() {
       }
     }
 
-    mesh = new ParMesh(MPI_COMM_WORLD, *serial_mesh, partitioning_);
-
-    // only need serial mesh if on rank 0 and using single restart file option
-    if (!mpi.Root() || (config.RestartSerial() == "no")) delete serial_mesh;
-
-    // Paraview setup
-    paraviewColl = new ParaViewDataCollection(config.GetOutputName(), mesh);
-    paraviewColl->SetLevelsOfDetail(config.GetSolutionOrder());
-    paraviewColl->SetHighOrderOutput(true);
-    paraviewColl->SetPrecision(8);
-    // paraviewColl->SetDataFormat(VTKFormat::ASCII);
-
   } else {
     // remove previous solution
     if (mpi.Root()) {
@@ -181,26 +157,75 @@ void M2ulPhyS::initVariables() {
       MPI_Barrier(MPI_COMM_WORLD);
     }
 
-    mesh = new ParMesh(MPI_COMM_WORLD, *serial_mesh, partitioning_);
-
-    // we only need serial mesh if on rank 0 and using the serial restart file option
-    if (!mpi.Root() || (config.RestartSerial() == "no")) delete serial_mesh;
-
-    // VisIt setup
-    //     visitColl = new VisItDataCollection(config.GetOutputName(), mesh);
-    //     visitColl->SetPrefixPath(config.GetOutputName());
-    //     visitColl->SetPrecision(8);
-
-    // Paraview setup
-    paraviewColl = new ParaViewDataCollection(config.GetOutputName(), mesh);
-    paraviewColl->SetLevelsOfDetail(config.GetSolutionOrder());
-    paraviewColl->SetHighOrderOutput(true);
-    paraviewColl->SetPrecision(8);
-    // paraviewColl->SetDataFormat(VTKFormat::ASCII);
-
     time = 0.;
     iter = 0;
   }
+
+  // If requested, evaluate the distance function (i.e., the distance to the nearest no-slip wall)
+  distance_ = NULL;
+  GridFunction *serial_distance = NULL;
+  if (config.compute_distance) {
+    order = config.GetSolutionOrder();
+    dim = serial_mesh->Dimension();
+    basisType = config.GetBasisType();
+    DG_FECollection *tmp_fec = NULL;
+    if (basisType == 0) {
+      tmp_fec = new DG_FECollection(order, dim, BasisType::GaussLegendre);
+    } else if (basisType == 1) {
+      tmp_fec = new DG_FECollection(order, dim, BasisType::GaussLobatto);
+    }
+
+    // Serial FE space for scalar variable
+    FiniteElementSpace *serial_fes = new FiniteElementSpace(serial_mesh, tmp_fec);
+
+    // Serial grid function for scalar variable
+    serial_distance = new GridFunction(serial_fes);
+
+    // Build a list of wall patches
+    Array<int> wall_patch_list;
+    for (int i = 0; i < config.wallPatchType.size(); i++) {
+      if (config.wallPatchType[i].second != WallType::INV) {
+        wall_patch_list.Append(config.wallPatchType[i].first);
+      }
+    }
+
+    if (serial_mesh->GetNodes() == NULL) {
+      serial_mesh->SetCurvature(1);
+    }
+
+    FiniteElementSpace *tmp_dfes = new FiniteElementSpace(serial_mesh, tmp_fec, dim, Ordering::byNODES);
+    GridFunction coordinates(tmp_dfes);
+    serial_mesh->GetNodes(coordinates);
+
+    // Evaluate the distance function
+    evaluateDistanceSerial(*serial_mesh, wall_patch_list, coordinates, *serial_distance);
+  }
+
+  // Instantiate parallel mesh
+  mesh = new ParMesh(MPI_COMM_WORLD, *serial_mesh, partitioning_);
+
+  // If necessary, parallelize distance function
+  if (config.compute_distance) {
+    distance_ = new ParGridFunction(mesh, serial_distance, partitioning_);
+    if (partitioning_ == NULL) {
+      // In this case, ctor call above does not copy data, so explicitly call assignment
+      *distance_ = *serial_distance;
+    }
+    // Done with serial_distance
+    delete serial_distance;
+
+    distance_->ParFESpace()->ExchangeFaceNbrData();
+    distance_->ExchangeFaceNbrData();
+  }
+
+  // only need serial mesh if on rank 0 and using single restart file option
+  if (!mpi.Root() || (config.RestartSerial() == "no")) delete serial_mesh;
+
+  // Paraview setup
+  paraviewColl = new ParaViewDataCollection(config.GetOutputName(), mesh);
+  paraviewColl->SetLevelsOfDetail(config.GetSolutionOrder());
+  paraviewColl->SetHighOrderOutput(true);
+  paraviewColl->SetPrecision(8);
 
   // This line is necessary to ensure that GetNodes does not return
   // NULL, which is required when we set up interpolation between
@@ -293,6 +318,7 @@ void M2ulPhyS::initVariables() {
           mfem_error("GasModel not recognized.");
           break;
       }
+
       switch (config.GetTranportModel()) {
         case ARGON_MINIMAL:
 #if defined(_CUDA_) || defined(_HIP_)
@@ -345,6 +371,17 @@ void M2ulPhyS::initVariables() {
       mfem_error("WorkingFluid not recognized.");
       break;
   }
+
+  if (config.use_mixing_length) {
+#if defined(_CUDA_) || defined(_HIP_)
+    mfem_error("MixingLengthTransport is not yet supported for GPU builds!");
+#else
+    // Build mixing length transport using whatever molecular transport we've already instantiated
+    TransportProperties *temporary_transport = transportPtr;
+    transportPtr = new MixingLengthTransport(mixture, config, temporary_transport);
+#endif
+  }
+
   switch (config.radiationInput.model) {
     case NET_EMISSION:
 #if defined(_CUDA_) || defined(_HIP_)
@@ -420,7 +457,9 @@ void M2ulPhyS::initVariables() {
   vfes = new ParFiniteElementSpace(mesh, fec, num_equation, Ordering::byNODES);
   gradUpfes = new ParFiniteElementSpace(mesh, fec, num_equation * dim, Ordering::byNODES);
 
+#ifdef _GPU_
   initIndirectionArrays();
+#endif
   initSolutionAndVisualizationVectors();
 
   average = new Averaging(Up, mesh, fec, fes, dfes, vfes, eqSystem, d_mixture, num_equation, dim, config, groupsMPI);
@@ -490,14 +529,14 @@ void M2ulPhyS::initVariables() {
   bcIntegrator = NULL;
   if (local_attr.Size() > 0) {
     bcIntegrator = new BCintegrator(groupsMPI, mesh, vfes, intRules, rsolver, dt, mixture, d_mixture, fluxClass, Up,
-                                    gradUp, shapesBC, normalsWBC, intPointsElIDBC, dim, num_equation, max_char_speed,
-                                    config, local_attr, maxIntPoints, maxDofs);
+                                    gradUp, gpu_precomputed_data_.boundary_face_data, dim, num_equation, max_char_speed,
+                                    config, local_attr, maxIntPoints, maxDofs, distance_);
   }
 
   // A->SetAssemblyLevel(AssemblyLevel::PARTIAL);
 
   A = new DGNonLinearForm(rsolver, fluxClass, vfes, gradUpfes, gradUp, bcIntegrator, intRules, dim, num_equation,
-                          mixture, gpuArrays, maxIntPoints, maxDofs);
+                          mixture, gpu_precomputed_data_, maxIntPoints, maxDofs);
   if (local_attr.Size() > 0) A->AddBdrFaceIntegrator(bcIntegrator);
 
   {
@@ -505,7 +544,7 @@ void M2ulPhyS::initVariables() {
     //    if( basisType==1 && intRuleType==1 ) useLinearIntegration = true;
 
     faceIntegrator = new FaceIntegrator(intRules, rsolver, fluxClass, vfes, useLinearIntegration, dim, num_equation,
-                                        gradUp, gradUpfes, max_char_speed, config.isAxisymmetric());
+                                        gradUp, gradUpfes, max_char_speed, config.isAxisymmetric(), distance_);
   }
   A->AddInteriorFaceIntegrator(faceIntegrator);
 #ifdef _BUILD_DEPRECATED_
@@ -541,14 +580,15 @@ void M2ulPhyS::initVariables() {
       cout << "Unknown ODE solver type: " << config.GetTimeIntegratorType() << '\n';
   }
 
-  gradUp_A = new GradNonLinearForm(gradUpfes, intRules, dim, num_equation, gpuArrays, maxIntPoints, maxDofs);
+  gradUp_A = new GradNonLinearForm(gradUpfes, intRules, dim, num_equation);
   gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
   gradUp_A->AddBdrFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation, bcIntegrator, config.useBCinGrad));
 
-  rhsOperator = new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType,
-                                fluxClass, mixture, d_mixture, chemistry_, transportPtr, radiation_, vfes, gpuArrays,
-                                maxIntPoints, maxDofs, A, Aflux, mesh, spaceVaryViscMult, U, Up, gradUp, gradUpfes,
-                                gradUp_A, bcIntegrator, isSBP, alpha, config, plasma_conductivity_, joule_heating_);
+  rhsOperator =
+      new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType, fluxClass,
+                      mixture, d_mixture, chemistry_, transportPtr, radiation_, vfes, gpu_precomputed_data_,
+                      maxIntPoints, maxDofs, A, Aflux, mesh, spaceVaryViscMult, U, Up, gradUp, gradUpfes, gradUp_A,
+                      bcIntegrator, isSBP, alpha, config, plasma_conductivity_, joule_heating_, distance_);
 
   CFL = config.GetCFLNumber();
   rhsOperator->SetTime(time);
@@ -592,9 +632,18 @@ void M2ulPhyS::initVariables() {
 }
 
 void M2ulPhyS::initIndirectionArrays() {
-  gpuArrays.posDofIds.SetSize(2 * vfes->GetNE());
-  gpuArrays.posDofIds = 0;
-  auto hposDofIds = gpuArrays.posDofIds.HostWrite();
+  //-----------------------------------------------------------------
+  // Element data
+  //-----------------------------------------------------------------
+  elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
+
+  elem_data.dof_offset.SetSize(vfes->GetNE());
+  elem_data.dof_offset = -1;  // invalid
+  auto h_dof_offset = elem_data.dof_offset.HostWrite();
+
+  elem_data.dof_number.SetSize(vfes->GetNE());
+  elem_data.dof_number = -1;  // invalid
+  auto h_dof_number = elem_data.dof_number.HostWrite();
 
   std::vector<int> tempNodes;
   tempNodes.clear();
@@ -603,25 +652,28 @@ void M2ulPhyS::initIndirectionArrays() {
     const int dof = vfes->GetFE(i)->GetDof();
 
     // get the nodes IDs
-    hposDofIds[2 * i] = tempNodes.size();
-    hposDofIds[2 * i + 1] = dof;
+    h_dof_offset[i] = tempNodes.size();
+    h_dof_number[i] = dof;
+
     Array<int> dofs;
     vfes->GetElementVDofs(i, dofs);
     for (int n = 0; n < dof; n++) tempNodes.push_back(dofs[n]);
   }
 
-  gpuArrays.nodesIDs.SetSize(tempNodes.size());
-  gpuArrays.nodesIDs = 0;
-  auto hnodesIDs = gpuArrays.nodesIDs.HostWrite();
-  for (int i = 0; i < gpuArrays.nodesIDs.Size(); i++) hnodesIDs[i] = tempNodes[i];
+  elem_data.dofs_list.SetSize(tempNodes.size());
+  elem_data.dofs_list = 0;
+  auto h_dofs_list = elem_data.dofs_list.HostWrite();
+  for (int i = 0; i < elem_data.dofs_list.Size(); i++) {
+    h_dofs_list[i] = tempNodes[i];
+  }
 
   // count number of each type of element
   std::vector<int> tempNumElems;
   tempNumElems.clear();
-  int dof1 = hposDofIds[1];
+  int dof1 = h_dof_number[0];
   int typeElems = 0;
-  for (int el = 0; el < gpuArrays.posDofIds.Size() / 2; el++) {
-    int dofi = hposDofIds[2 * el + 1];
+  for (int el = 0; el < elem_data.dof_number.Size(); el++) {
+    int dofi = h_dof_number[el];
     if (dofi == dof1) {
       typeElems++;
     } else {
@@ -631,129 +683,176 @@ void M2ulPhyS::initIndirectionArrays() {
     }
   }
   tempNumElems.push_back(typeElems);
-  gpuArrays.numElems.SetSize(tempNumElems.size());
-  gpuArrays.numElems = 0;
-  auto hnumElems = gpuArrays.numElems.HostWrite();
-  for (int i = 0; i < (int)tempNumElems.size(); i++) hnumElems[i] = tempNumElems[i];
+  elem_data.num_elems_of_type.SetSize(tempNumElems.size());
+  elem_data.num_elems_of_type = 0;
+  auto h_num_elems_of_type = elem_data.num_elems_of_type.HostWrite();
+  for (int i = 0; i < (int)tempNumElems.size(); i++) h_num_elems_of_type[i] = tempNumElems[i];
 
-  {
-    // Initialize vectors and arrays to be used in
-    // face integrations
-    //     const int maxIntPoints = 49; // corresponding to square face with p=5
-    //     const int maxDofs = 216; //HEX with p=5
+  //-----------------------------------------------------------------
+  // Interior faces
+  //-----------------------------------------------------------------
+  interiorFaceIntegrationData &face_data = gpu_precomputed_data_.interior_face_data;
 
-    gpuArrays.elemFaces.SetSize(7 * vfes->GetNE());
-    gpuArrays.elemFaces = 0;
-    auto helemFaces = gpuArrays.elemFaces.HostWrite();
+  face_data.element_to_faces.SetSize(7 * vfes->GetNE());
+  face_data.element_to_faces = 0;
+  auto h_element_to_faces = face_data.element_to_faces.HostWrite();
 
-    std::vector<double> shapes2, shapes1;
-    shapes1.clear();
-    shapes2.clear();
+  std::vector<double> shapes2, shapes1;
+  shapes1.clear();
+  shapes2.clear();
 
-    Mesh *mesh = vfes->GetMesh();
+  face_data.el1.SetSize(mesh->GetNumFaces());
+  face_data.el1 = 0;
+  auto h_face_el1 = face_data.el1.HostWrite();
 
-    gpuArrays.elems12Q.SetSize(3 * mesh->GetNumFaces());
-    gpuArrays.elems12Q = 0;
-    auto helems12Q = gpuArrays.elems12Q.HostWrite();
+  face_data.el2.SetSize(mesh->GetNumFaces());
+  face_data.el2 = 0;
+  auto h_face_el2 = face_data.el2.HostWrite();
 
-    gpuArrays.shapeWnor1.UseDevice(true);
-    gpuArrays.shapeWnor1.SetSize((maxDofs + 1 + dim) * maxIntPoints * mesh->GetNumFaces());
+  face_data.num_quad.SetSize(mesh->GetNumFaces());
+  face_data.num_quad = 0;
+  auto h_face_num_quad = face_data.num_quad.HostWrite();
 
-    gpuArrays.shape2.UseDevice(true);
-    gpuArrays.shape2.SetSize(maxDofs * maxIntPoints * mesh->GetNumFaces());
+  face_data.el1_shape.UseDevice(true);
+  face_data.el1_shape.SetSize(maxDofs * maxIntPoints * mesh->GetNumFaces());
 
-    auto hshapeWnor1 = gpuArrays.shapeWnor1.HostWrite();
-    auto hshape2 = gpuArrays.shape2.HostWrite();
+  face_data.el2_shape.UseDevice(true);
+  face_data.el2_shape.SetSize(maxDofs * maxIntPoints * mesh->GetNumFaces());
 
-    for (int face = 0; face < mesh->GetNumFaces(); face++) {
-      FaceElementTransformations *tr;
-      tr = mesh->GetInteriorFaceTransformations(face);
-      if (tr != NULL) {
-        Array<int> vdofs;
-        Array<int> vdofs2;
-        fes->GetElementVDofs(tr->Elem1No, vdofs);
-        fes->GetElementVDofs(tr->Elem2No, vdofs2);
+  face_data.quad_weight.UseDevice(true);
+  face_data.quad_weight.SetSize(maxIntPoints * mesh->GetNumFaces());
 
-        {
-          int nf = helemFaces[7 * tr->Elem1No];
-          if (nf < 0) nf = 0;
-          helemFaces[7 * tr->Elem1No + nf + 1] = face;
-          nf++;
-          helemFaces[7 * tr->Elem1No] = nf;
+  face_data.normal.UseDevice(true);
+  face_data.normal.SetSize(dim * maxIntPoints * mesh->GetNumFaces());
 
-          nf = helemFaces[7 * tr->Elem2No];
-          if (nf < 0) nf = 0;
-          helemFaces[7 * tr->Elem2No + nf + 1] = face;
-          nf++;
-          helemFaces[7 * tr->Elem2No] = nf;
+  face_data.xyz.UseDevice(true);
+  face_data.xyz.SetSize(dim * maxIntPoints * mesh->GetNumFaces());
+
+  auto hshape1 = face_data.el1_shape.HostWrite();
+  auto hshape2 = face_data.el2_shape.HostWrite();
+  auto hweight = face_data.quad_weight.HostWrite();
+  auto hnormal = face_data.normal.HostWrite();
+  auto h_xyz = face_data.xyz.HostWrite();
+
+  Vector xyz(dim);
+
+  for (int face = 0; face < mesh->GetNumFaces(); face++) {
+    FaceElementTransformations *tr;
+    tr = mesh->GetInteriorFaceTransformations(face);
+    if (tr != NULL) {
+      Array<int> vdofs;
+      Array<int> vdofs2;
+      fes->GetElementVDofs(tr->Elem1No, vdofs);
+      fes->GetElementVDofs(tr->Elem2No, vdofs2);
+
+      {
+        int nf = h_element_to_faces[7 * tr->Elem1No];
+        if (nf < 0) nf = 0;
+        h_element_to_faces[7 * tr->Elem1No + nf + 1] = face;
+        nf++;
+        h_element_to_faces[7 * tr->Elem1No] = nf;
+
+        nf = h_element_to_faces[7 * tr->Elem2No];
+        if (nf < 0) nf = 0;
+        h_element_to_faces[7 * tr->Elem2No + nf + 1] = face;
+        nf++;
+        h_element_to_faces[7 * tr->Elem2No] = nf;
+      }
+
+      const FiniteElement *fe1 = fes->GetFE(tr->Elem1No);
+      const FiniteElement *fe2 = fes->GetFE(tr->Elem2No);
+
+      const int dof1 = fe1->GetDof();
+      const int dof2 = fe2->GetDof();
+
+      int intorder;
+      if (tr->Elem2No >= 0) {
+        intorder = (min(tr->Elem1->OrderW(), tr->Elem2->OrderW()) + 2 * max(fe1->GetOrder(), fe2->GetOrder()));
+      } else {
+        intorder = tr->Elem1->OrderW() + 2 * fe1->GetOrder();
+      }
+      if (fe1->Space() == FunctionSpace::Pk) {
+        intorder++;
+      }
+      const IntegrationRule *ir = &intRules->Get(tr->GetGeometryType(), intorder);
+
+      h_face_el1[face] = tr->Elem1No;
+      h_face_el2[face] = tr->Elem2No;
+      h_face_num_quad[face] = ir->GetNPoints();
+
+      Vector shape1i, shape2i;
+      shape1i.UseDevice(false);
+      shape2i.UseDevice(false);
+      shape1i.SetSize(dof1);
+      shape2i.SetSize(dof2);
+      for (int k = 0; k < ir->GetNPoints(); k++) {
+        const IntegrationPoint &ip = ir->IntPoint(k);
+        tr->SetAllIntPoints(&ip);
+        // shape functions
+        fe1->CalcShape(tr->GetElement1IntPoint(), shape1i);
+        fe2->CalcShape(tr->GetElement2IntPoint(), shape2i);
+        for (int j = 0; j < dof1; j++) {
+          hshape1[face * maxDofs * maxIntPoints + k * maxDofs + j] = shape1i[j];
+        }
+        for (int j = 0; j < dof2; j++) {
+          hshape2[face * maxDofs * maxIntPoints + k * maxDofs + j] = shape2i[j];
         }
 
-        const FiniteElement *fe1 = fes->GetFE(tr->Elem1No);
-        const FiniteElement *fe2 = fes->GetFE(tr->Elem2No);
+        hweight[face * maxIntPoints + k] = ip.weight;
 
-        const int dof1 = fe1->GetDof();
-        const int dof2 = fe2->GetDof();
+        // Position in physical space
+        tr->Transform(ip, xyz);
 
-        int intorder;
-        if (tr->Elem2No >= 0) {
-          intorder = (min(tr->Elem1->OrderW(), tr->Elem2->OrderW()) + 2 * max(fe1->GetOrder(), fe2->GetOrder()));
-        } else {
-          intorder = tr->Elem1->OrderW() + 2 * fe1->GetOrder();
-        }
-        if (fe1->Space() == FunctionSpace::Pk) {
-          intorder++;
-        }
-        const IntegrationRule *ir = &intRules->Get(tr->GetGeometryType(), intorder);
-
-        helems12Q[3 * face] = tr->Elem1No;
-        helems12Q[3 * face + 1] = tr->Elem2No;
-        helems12Q[3 * face + 2] = ir->GetNPoints();
-
-        Vector shape1i, shape2i;
-        shape1i.UseDevice(false);
-        shape2i.UseDevice(false);
-        shape1i.SetSize(dof1);
-        shape2i.SetSize(dof2);
-        for (int k = 0; k < ir->GetNPoints(); k++) {
-          const IntegrationPoint &ip = ir->IntPoint(k);
-          tr->SetAllIntPoints(&ip);
-          // shape functions
-          fe1->CalcShape(tr->GetElement1IntPoint(), shape1i);
-          fe2->CalcShape(tr->GetElement2IntPoint(), shape2i);
-          for (int j = 0; j < dof1; j++)
-            hshapeWnor1[face * (maxDofs + dim + 1) * maxIntPoints + j + k * (dim + 1 + maxDofs)] = shape1i[j];
-          for (int j = 0; j < dof2; j++) hshape2[face * maxDofs * maxIntPoints + j + k * maxDofs] = shape2i[j];
-
-          hshapeWnor1[face * (maxDofs + dim + 1) * maxIntPoints + maxDofs + k * (dim + 1 + maxDofs)] = ip.weight;
-          // normals (multiplied by determinant of jacobian
-          Vector nor;
-          nor.UseDevice(false);
-          nor.SetSize(dim);
-          CalcOrtho(tr->Jacobian(), nor);
-          for (int d = 0; d < dim; d++)
-            hshapeWnor1[face * (maxDofs + dim + 1) * maxIntPoints + maxDofs + 1 + d + k * (maxDofs + dim + 1)] = nor[d];
+        // normals (multiplied by determinant of jacobian
+        Vector nor;
+        nor.UseDevice(false);
+        nor.SetSize(dim);
+        CalcOrtho(tr->Jacobian(), nor);
+        for (int d = 0; d < dim; d++) {
+          hnormal[face * dim * maxIntPoints + k * dim + d] = nor[d];
+          h_xyz[face * dim * maxIntPoints + k * dim + d] = xyz[d];
         }
       }
     }
   }
 
-  //  BC  integration arrays
-  if (fes->GetNBE() > 0) {
-    const int NumBCelems = fes->GetNBE();
+  //-----------------------------------------------------------------
+  // Boundary faces
+  //-----------------------------------------------------------------
+  boundaryFaceIntegrationData &bdry_face_data = gpu_precomputed_data_.boundary_face_data;
 
-    shapesBC.UseDevice(true);
-    shapesBC.SetSize(NumBCelems * maxIntPoints * maxDofs);
-    shapesBC = 0.;
-    auto hshapesBC = shapesBC.HostWrite();
+  // This is supposed to be number of boundary faces, and for
+  // non-periodic cases it is.  See #199 for more info.
+  const int NumBCelems = fes->GetNBE();
 
-    normalsWBC.UseDevice(true);
-    normalsWBC.SetSize(NumBCelems * maxIntPoints * (dim + 1));
-    normalsWBC = 0.;
-    auto hnormalsWBC = normalsWBC.HostWrite();
+  if (NumBCelems > 0) {
+    bdry_face_data.shape.UseDevice(true);
+    bdry_face_data.shape.SetSize(NumBCelems * maxIntPoints * maxDofs);
+    bdry_face_data.shape = 0.;
+    auto hshapesBC = bdry_face_data.shape.HostWrite();
 
-    intPointsElIDBC.SetSize(NumBCelems * 2);
-    intPointsElIDBC = 0;
-    auto hintPointsElIDBC = intPointsElIDBC.HostWrite();
+    bdry_face_data.normal.UseDevice(true);
+    bdry_face_data.normal.SetSize(NumBCelems * maxIntPoints * dim);
+    bdry_face_data.normal = 0.;
+    auto h_face_normal = bdry_face_data.normal.HostWrite();
+
+    bdry_face_data.xyz.UseDevice(true);
+    bdry_face_data.xyz.SetSize(NumBCelems * maxIntPoints * dim);
+    bdry_face_data.xyz = 0.;
+    auto h_face_xyz = bdry_face_data.xyz.HostWrite();
+
+    bdry_face_data.quad_weight.UseDevice(true);
+    bdry_face_data.quad_weight.SetSize(NumBCelems * maxIntPoints);
+    bdry_face_data.quad_weight = 0.;
+    auto h_face_quad_weight = bdry_face_data.quad_weight.HostWrite();
+
+    bdry_face_data.el.SetSize(NumBCelems);
+    bdry_face_data.el = 0;
+    auto h_face_el = bdry_face_data.el.HostWrite();
+
+    bdry_face_data.num_quad.SetSize(NumBCelems);
+    bdry_face_data.num_quad = 0;
+    auto h_face_num_quad = bdry_face_data.num_quad.HostWrite();
 
     const FiniteElement *fe;
     FaceElementTransformations *tr;
@@ -776,8 +875,8 @@ void M2ulPhyS::initIndirectionArrays() {
         }
         const IntegrationRule *ir = &intRules->Get(tr->GetGeometryType(), intorder);
 
-        hintPointsElIDBC[2 * f] = ir->GetNPoints();
-        hintPointsElIDBC[2 * f + 1] = tr->Elem1No;
+        h_face_el[f] = tr->Elem1No;
+        h_face_num_quad[f] = ir->GetNPoints();
 
         for (int q = 0; q < ir->GetNPoints(); q++) {
           const IntegrationPoint &ip = ir->IntPoint(q);
@@ -786,8 +885,14 @@ void M2ulPhyS::initIndirectionArrays() {
           nor.UseDevice(false);
           nor.SetSize(dim);
           CalcOrtho(tr->Jacobian(), nor);
-          hnormalsWBC[dim + q * (dim + 1) + f * maxIntPoints * (dim + 1)] = ip.weight;
-          for (int d = 0; d < dim; d++) hnormalsWBC[d + q * (dim + 1) + f * maxIntPoints * (dim + 1)] = nor[d];
+          h_face_quad_weight[f * maxIntPoints + q] = ip.weight;
+
+          tr->Transform(ip, xyz);
+
+          for (int d = 0; d < dim; d++) {
+            h_face_normal[f * maxIntPoints * dim + q * dim + d] = nor[d];
+            h_face_xyz[f * maxIntPoints * dim + q * dim + d] = xyz[d];
+          }
 
           Vector shape1;
           shape1.UseDevice(false);
@@ -797,89 +902,165 @@ void M2ulPhyS::initIndirectionArrays() {
         }
       }
     }
-  } else {
-    shapesBC.SetSize(1);
-    shapesBC = 0.;
-
-    normalsWBC.SetSize(1);
-    normalsWBC = 0.;
-
-    intPointsElIDBC.SetSize(1);
-    intPointsElIDBC = 0.;
   }
 
-  {
-    // fill out gradient shape function arrays and their indirections
-    std::vector<double> temp;
-    std::vector<int> positions;
-    temp.clear();
-    positions.clear();
+  //-----------------------------------------------------------------
+  // Shared faces (i.e., interior faces at boundary of decomposition,
+  // such that element1 and element2 live on different mpi ranks)
+  //-----------------------------------------------------------------
+  sharedFaceIntegrationData &shared_face_data = gpu_precomputed_data_.shared_face_data;
 
-    for (int el = 0; el < vfes->GetNE(); el++) {
-      positions.push_back((int)temp.size());
+  mesh->ExchangeFaceNbrNodes();
+  mesh->ExchangeFaceNbrData();
+  const int Nshared = mesh->GetNSharedFaces();
 
-      const FiniteElement *elem = vfes->GetFE(el);
-      ElementTransformation *Tr = vfes->GetElementTransformation(el);
-      const int elDof = elem->GetDof();
+  vfes->ExchangeFaceNbrData();
+  gradUpfes->ExchangeFaceNbrData();
 
-      // element volume integral
-      int intorder = 2 * elem->GetOrder();
-      const IntegrationRule *ir = &intRules->Get(elem->GetGeomType(), intorder);
+  if (Nshared > 0) {
+    shared_face_data.elem2_dofs.SetSize(Nshared * num_equation * maxDofs);
+    shared_face_data.elem2_grad_dofs.SetSize(Nshared * num_equation * maxDofs * dim);
 
-      positions.push_back(ir->GetNPoints());
+    shared_face_data.elem2_dofs = 0;
+    shared_face_data.elem2_grad_dofs = 0;
 
-      for (int i = 0; i < ir->GetNPoints(); i++) {
-        IntegrationPoint ip = ir->IntPoint(i);
-        Tr->SetIntPoint(&ip);
+    auto h_elem2_dofs = shared_face_data.elem2_dofs.HostReadWrite();
+    auto h_elem2_grad_dofs = shared_face_data.elem2_grad_dofs.HostReadWrite();
 
-        // Calculate the shape functions
-        Vector shape;
-        shape.UseDevice(false);
-        shape.SetSize(elDof);
-        Vector dshapeVec;
-        dshapeVec.UseDevice(false);
-        dshapeVec.SetSize(elDof * dim);
-        dshapeVec = 0.;
-        DenseMatrix dshape(dshapeVec.HostReadWrite(), elDof, dim);
-        elem->CalcShape(ip, shape);
-        elem->CalcPhysDShape(*Tr, dshape);
-        double detJac = Tr->Jacobian().Det() * ip.weight;
+    shared_face_data.el1_shape.UseDevice(true);
+    shared_face_data.el2_shape.UseDevice(true);
+    shared_face_data.quad_weight.UseDevice(true);
+    shared_face_data.normal.UseDevice(true);
 
-        for (int n = 0; n < elDof; n++) temp.push_back(shape[n]);
-        for (int d = 0; d < dim; d++)
-          for (int n = 0; n < elDof; n++) temp.push_back(dshape(n, d));
-        temp.push_back(detJac);
+    shared_face_data.el1_shape.SetSize(Nshared * maxIntPoints * maxDofs);
+    shared_face_data.el2_shape.SetSize(Nshared * maxIntPoints * maxDofs);
+    shared_face_data.quad_weight.SetSize(Nshared * maxIntPoints);
+    shared_face_data.normal.SetSize(Nshared * maxIntPoints * dim);
+    shared_face_data.el1.SetSize(Nshared);
+    shared_face_data.num_quad.SetSize(Nshared);
+    shared_face_data.num_dof2.SetSize(Nshared);
+
+    shared_face_data.el1_shape = 0.;
+    shared_face_data.el2_shape = 0.;
+    shared_face_data.quad_weight = 0.;
+    shared_face_data.normal = 0.;
+    shared_face_data.el1 = 0;
+    shared_face_data.num_quad = 0;
+    shared_face_data.num_dof2 = 0;
+
+    auto h_shape1 = shared_face_data.el1_shape.HostWrite();
+    auto h_shape2 = shared_face_data.el2_shape.HostWrite();
+    auto h_face_quad_weight = shared_face_data.quad_weight.HostWrite();
+    auto h_face_normal = shared_face_data.normal.HostWrite();
+    auto h_face_el1 = shared_face_data.el1.HostWrite();
+    auto h_face_num_quad = shared_face_data.num_quad.HostWrite();
+    auto h_face_num_dof2 = shared_face_data.num_dof2.HostWrite();
+
+    shared_face_data.xyz.UseDevice(true);
+    shared_face_data.xyz.SetSize(Nshared * maxIntPoints * dim);
+    shared_face_data.xyz = 0.;
+    auto h_face_xyz = shared_face_data.xyz.HostWrite();
+
+    std::vector<int> unicElems;
+    unicElems.clear();
+
+    Array<int> vdofs2, vdofsGrad;
+    FaceElementTransformations *tr;
+    for (int i = 0; i < Nshared; i++) {
+      tr = mesh->GetSharedFaceTransformations(i, true);
+      int Elem2NbrNo = tr->Elem2No - mesh->GetNE();
+
+      const FiniteElement *fe1 = vfes->GetFE(tr->Elem1No);
+      const FiniteElement *fe2 = vfes->GetFaceNbrFE(Elem2NbrNo);
+      const int dof1 = fe1->GetDof();
+      const int dof2 = fe2->GetDof();
+
+      // vfes->GetElementVDofs(tr->Elem1No, vdofs1); // get these from nodesIDs
+      vfes->GetFaceNbrElementVDofs(Elem2NbrNo, vdofs2);
+      gradUpfes->GetFaceNbrElementVDofs(Elem2NbrNo, vdofsGrad);
+
+      for (int n = 0; n < dof2; n++) {
+        for (int eq = 0; eq < num_equation; eq++) {
+          h_elem2_dofs[n + eq * maxDofs + i * num_equation * maxDofs] = vdofs2[n + eq * dof2];
+          for (int d = 0; d < dim; d++) {
+            int index = n + eq * maxDofs + d * num_equation * maxDofs + i * dim * num_equation * maxDofs;
+            h_elem2_grad_dofs[index] = vdofsGrad[n + eq * dof2 + d * num_equation * dof2];
+          }
+        }
+      }
+
+      int intorder;
+      if (tr->Elem2No >= 0) {
+        intorder = (min(tr->Elem1->OrderW(), tr->Elem2->OrderW()) + 2 * max(fe1->GetOrder(), fe2->GetOrder()));
+      } else {
+        intorder = tr->Elem1->OrderW() + 2 * fe1->GetOrder();
+      }
+      if (fe1->Space() == FunctionSpace::Pk) {
+        intorder++;
+      }
+      // IntegrationRules IntRules2(0, Quadrature1D::GaussLobatto);
+      const IntegrationRule *ir = &intRules->Get(tr->GetGeometryType(), intorder);
+
+      h_face_el1[i] = tr->Elem1No;
+      h_face_num_quad[i] = ir->GetNPoints();
+      h_face_num_dof2[i] = dof2;
+
+      bool inList = false;
+      for (size_t n = 0; n < unicElems.size(); n++) {
+        if (unicElems[n] == tr->Elem1No) inList = true;
+      }
+      if (!inList) unicElems.push_back(tr->Elem1No);
+
+      Vector shape1, shape2, nor;
+      shape1.UseDevice(false);
+      shape2.UseDevice(false);
+      nor.UseDevice(false);
+      shape1.SetSize(dof1);
+      shape2.SetSize(dof2);
+      nor.SetSize(dim);
+
+      for (int q = 0; q < ir->GetNPoints(); q++) {
+        const IntegrationPoint &ip = ir->IntPoint(q);
+        tr->SetAllIntPoints(&ip);
+
+        fe1->CalcShape(tr->GetElement1IntPoint(), shape1);
+        fe2->CalcShape(tr->GetElement2IntPoint(), shape2);
+        CalcOrtho(tr->Jacobian(), nor);
+
+        for (int n = 0; n < dof1; n++) {
+          h_shape1[i * maxIntPoints * maxDofs + q * maxDofs + n] = shape1[n];
+        }
+        h_face_quad_weight[i * maxIntPoints + q] = ip.weight;
+
+        tr->Transform(ip, xyz);
+
+        for (int d = 0; d < dim; d++) {
+          h_face_normal[i * maxIntPoints * dim + q * dim + d] = nor[d];
+          h_face_xyz[i * maxIntPoints * dim + q * dim + d] = xyz[d];
+        }
+        for (int n = 0; n < dof2; n++) {
+          h_shape2[i * maxIntPoints * maxDofs + q * maxDofs + n] = shape2[n];
+        }
       }
     }
 
-    gpuArrays.elemShapeDshapeWJ.UseDevice(true);
-    gpuArrays.elemShapeDshapeWJ.SetSize((int)temp.size());
-    gpuArrays.elemShapeDshapeWJ = 0.;
-    auto helemShapeDshapeWJ = gpuArrays.elemShapeDshapeWJ.HostWrite();
-    for (int i = 0; i < gpuArrays.elemShapeDshapeWJ.Size(); i++) helemShapeDshapeWJ[i] = temp[i];
-    gpuArrays.elemShapeDshapeWJ.Read();
-
-    gpuArrays.elemPosQ_shapeDshapeWJ.SetSize((int)positions.size());
-    for (int i = 0; i < gpuArrays.elemPosQ_shapeDshapeWJ.Size(); i++)
-      gpuArrays.elemPosQ_shapeDshapeWJ[i] = positions[i];
-    gpuArrays.elemPosQ_shapeDshapeWJ.Read();
+    shared_face_data.shared_elements_to_shared_faces.SetSize(7 * unicElems.size());
+    shared_face_data.shared_elements_to_shared_faces = -1;
+    auto h_shared_elements_to_shared_faces = shared_face_data.shared_elements_to_shared_faces.HostWrite();
+    for (size_t el = 0; el < unicElems.size(); el++) {
+      const int eli = unicElems[el];
+      for (int f = 0; f < shared_face_data.el1.Size(); f++) {
+        if (eli == h_face_el1[f]) {
+          h_shared_elements_to_shared_faces[0 + 7 * el] = h_face_el1[f];
+          int numFace = h_shared_elements_to_shared_faces[1 + 7 * el];
+          if (numFace == -1) numFace = 0;
+          numFace++;
+          h_shared_elements_to_shared_faces[1 + numFace + 7 * el] = f;
+          h_shared_elements_to_shared_faces[1 + 7 * el] = numFace;
+        }
+      }
+    }
   }
-
-#ifdef _GPU_
-  auto dnodesID = gpuArrays.nodesIDs.Read();
-  auto dnumElems = gpuArrays.numElems.Read();
-  auto dposDofIds = gpuArrays.posDofIds.Read();
-
-  auto dshapeWnor1 = gpuArrays.shapeWnor1.Read();
-  auto dshape2 = gpuArrays.shape2.Read();
-
-  auto delemFaces = gpuArrays.elemFaces.Read();
-  auto delems12Q = gpuArrays.elems12Q.Read();
-
-  auto dshapesBC = shapesBC.Read();
-  auto dnormalsBC = normalsWBC.Read();
-  auto dintPointsELIBC = intPointsElIDBC.Read();
-#endif
 }
 
 M2ulPhyS::~M2ulPhyS() {
@@ -1245,8 +1426,10 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   if (spaceVaryViscMult != NULL) paraviewColl->RegisterField("viscMult", spaceVaryViscMult);
 
+
   if (plasma_conductivity_ != NULL) paraviewColl->RegisterField("sigma", plasma_conductivity_);
   if (joule_heating_ != NULL) paraviewColl->RegisterField("Sjoule", joule_heating_);
+  if (distance_ != NULL) paraviewColl->RegisterField("distance", distance_);
 
   paraviewColl->SetOwnData(true);
   // paraviewColl->Save();
@@ -2011,6 +2194,15 @@ void M2ulPhyS::parseFlowOptions() {
     for (int d = 0; d < 3; d++) tpsP->getRequiredVecElem("flow/pressureGrad", config.gradPress[d], d);
   }
   tpsP->getInput("flow/refinement_levels", config.ref_levels, 0);
+  tpsP->getInput("flow/computeDistance", config.compute_distance, false);
+
+  tpsP->getInput("flow/useMixingLength", config.use_mixing_length, false);
+  if (config.use_mixing_length) {
+    // Default value for mixing length is zero, which turns model off
+    tpsP->getInput("flow/mixing-length/max-mixing-length", config.mix_length_trans_input_.max_mixing_length_, 0.0);
+    tpsP->getInput("flow/mixing-length/Pr_ratio", config.mix_length_trans_input_.Prt_, 1.0);
+    tpsP->getInput("flow/mixing-length/Let", config.mix_length_trans_input_.Let_, 1.0);
+  }
 
   assert(config.solOrder > 0);
   assert(config.numIters >= 0);
@@ -2244,6 +2436,8 @@ void M2ulPhyS::parsePlasmaModels() {
   } else if (transportModelStr == "constant") {
     config.transportModel = CONSTANT;
   }
+  printf("config.transportModel = %s\n", transportModelStr.c_str());
+  fflush(stdout);
   // } else {
   //   grvy_printf(GRVY_ERROR, "\nUnknown transport_model -> %s", transportModelStr.c_str());
   //   exit(ERROR);
@@ -3195,14 +3389,6 @@ void M2ulPhyS::checkSolverOptions() const {
       exit(ERROR);
     }
   }
-
-  if (config.isAxisymmetric()) {
-    if (mpi.Root()) {
-      std::cerr << "[ERROR]: Axisymmetric simulations not supported on GPU." << std::endl;
-      std::cerr << std::endl;
-      exit(ERROR);
-    }
-  }
 #endif
 
   // Axisymmetric solver does not yet support all options.  Check that
@@ -3430,7 +3616,9 @@ void M2ulPhyS::updateVisualizationVariables() {
       // update flux transport properties.
       double fluxTrns[FluxTrns::NUM_FLUX_TRANS];
       double diffVel[gpudata::MAXSPECIES * gpudata::MAXDIM];
-      in_transport->ComputeFluxTransportProperties(state, gradUpn, Efield, fluxTrns, diffVel);
+      double distance = 0;
+      if (distance_ != NULL) distance = (*distance_)[n];
+      in_transport->ComputeFluxTransportProperties(state, gradUpn, Efield, -1, distance, fluxTrns, diffVel);
       for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++) {
         dataVis[visualIdxs.FluxTrns + t][n] = fluxTrns[t];
       }
@@ -3441,7 +3629,8 @@ void M2ulPhyS::updateVisualizationVariables() {
       // update source transport properties.
       double srcTrns[SrcTrns::NUM_SRC_TRANS];
       double speciesTrns[gpudata::MAXSPECIES * SpeciesTrns::NUM_SPECIES_COEFFS];
-      in_transport->ComputeSourceTransportProperties(state, prim, gradUpn, Efield, srcTrns, speciesTrns, diffVel, nsp);
+      in_transport->ComputeSourceTransportProperties(state, prim, gradUpn, Efield, distance, srcTrns, speciesTrns,
+                                                     diffVel, nsp);
       for (int t = 0; t < SrcTrns::NUM_SRC_TRANS; t++) {
         dataVis[visualIdxs.SrcTrns + t][n] = srcTrns[t];
       }

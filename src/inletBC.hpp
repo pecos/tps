@@ -96,14 +96,15 @@ class InletBC : public BoundaryCondition {
           const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs, bool axisym);
   ~InletBC();
 
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux);
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, double distance,
+                      Vector &bdrFlux);
 
   virtual void initBCs();
 
   virtual void integrationBC(Vector &y,  // output
-                             const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
-                             ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
-                             Array<int> &intPointsElIDBC, const int &maxIntPoints, const int &maxDofs);
+                             const Vector &x, const elementIndexingData &elem_index_data, ParGridFunction *Up,
+                             ParGridFunction *gradUp, const boundaryFaceIntegrationData &boundary_face_data,
+                             const int &maxIntPoints, const int &maxDofs);
 
   static void updateMean_gpu(ParGridFunction *Up, Vector &localMeanUp, const int _num_equation, const int numBdrElems,
                              const int totalDofs, Vector &bdrUp, Array<int> &bdrElemsQ, Array<int> &bdrDofs,
@@ -112,11 +113,11 @@ class InletBC : public BoundaryCondition {
   // functions for BC integration on GPU
 
   void integrateInlets_gpu(Vector &y,  // output
-                           const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds, Vector &shapesBC,
-                           Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
+                           const Vector &x, const elementIndexingData &elem_index_data,
+                           const boundaryFaceIntegrationData &boundary_face_data, Array<int> &listElems,
                            Array<int> &offsetsBoundaryU);
-  void interpInlet_gpu(const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds, Vector &shapesBC,
-                       Vector &normalsWBC, Array<int> &intPointsElIDBC, Array<int> &listElems,
+  void interpInlet_gpu(const Vector &x, const elementIndexingData &elem_index_data,
+                       const boundaryFaceIntegrationData &boundary_face_data, Array<int> &listElems,
                        Array<int> &offsetsBoundaryU);
 
 #ifdef _GPU_

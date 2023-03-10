@@ -39,12 +39,12 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
                          const Equations &_eqSystem, double &_max_char_speed, IntegrationRules *_intRules,
                          int _intRuleType, Fluxes *_fluxClass, GasMixture *_mixture, GasMixture *d_mixture,
                          Chemistry *_chemistry, TransportProperties *_transport, Radiation *_radiation,
-                         ParFiniteElementSpace *_vfes, const volumeFaceIntegrationArrays &_gpuArrays,
+                         ParFiniteElementSpace *_vfes, const precomputedIntegrationData &gpu_precomputed_data,
                          const int &_maxIntPoints, const int &_maxDofs, DGNonLinearForm *_A, MixedBilinearForm *_Aflux,
                          ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
                          ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A,
                          BCintegrator *_bcIntegrator, bool &_isSBP, double &_alpha, RunConfiguration &_config,
-                         ParGridFunction *pc, ParGridFunction *jh)
+                         ParGridFunction *pc, ParGridFunction *jh, ParGridFunction *distance)
     : TimeDependentOperator(_A->Height()),
       config_(_config),
       iter(_iter),
@@ -60,7 +60,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
       d_mixture_(d_mixture),
       transport_(_transport),
       vfes(_vfes),
-      gpuArrays(_gpuArrays),
+      gpu_precomputed_data_(gpu_precomputed_data),
       maxIntPoints(_maxIntPoints),
       maxDofs(_maxDofs),
       A(_A),
@@ -77,7 +77,8 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
       gradUp(_gradUp),
       gradUpfes(_gradUpfes),
       gradUp_A(_gradUp_A),
-      bcIntegrator(_bcIntegrator) {
+      bcIntegrator(_bcIntegrator),
+      distance_(distance) {
   flux.SetSize(vfes->GetNDofs(), dim_, num_equation_);
   z.UseDevice(true);
   z.SetSize(A->Height());
@@ -88,8 +89,8 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   fk.SetSize(dim_ * vfes->GetNDofs());
   zk.SetSize(vfes->GetNDofs());
 
-  h_numElems = gpuArrays.numElems.HostRead();
-  h_posDofIds = gpuArrays.posDofIds.HostRead();
+  const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
+  h_num_elems_of_type = elem_data.num_elems_of_type.HostRead();
 
   Me_inv.SetSize(vfes->GetNE());
   Me_inv_rad.SetSize(vfes->GetNE());
@@ -101,47 +102,44 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
 
   if (_config.thereIsForcing()) {
     forcing.Append(new ConstantPressureGradient(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up,
-                                                gradUp, gpuArrays, _config, mixture));
+                                                gradUp, gpu_precomputed_data_, _config, mixture));
   }
   if (_config.GetPassiveScalarData().Size() > 0)
     forcing.Append(new PassiveScalar(dim_, num_equation_, _order, intRuleType, intRules, vfes, mixture, U_, Up, gradUp,
-                                     gpuArrays, _config));
+                                     gpu_precomputed_data_, _config));
   if (_config.numSpongeRegions_ > 0) {
     for (int sz = 0; sz < _config.numSpongeRegions_; sz++) {
       forcing.Append(new SpongeZone(dim_, num_equation_, _order, intRuleType, fluxClass, mixture, intRules, vfes, U_,
-                                    Up, gradUp, gpuArrays, _config, sz));
+                                    Up, gradUp, gpu_precomputed_data_, _config, sz));
     }
   }
   if (_config.numHeatSources > 0) {
     for (int s = 0; s < _config.numHeatSources; s++) {
       if (_config.heatSource[s].isEnabled) {
         forcing.Append(new HeatSource(dim_, num_equation_, _order, intRuleType, _config.heatSource[s], mixture,
-                                      intRules, vfes, U_, Up, gradUp, gpuArrays, _config));
+                                      intRules, vfes, U_, Up, gradUp, gpu_precomputed_data_, _config));
       }
     }
   }
 
   if (_config.GetWorkingFluid() != WorkingFluid::DRY_AIR) {
-    forcing.Append(new SourceTerm(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up, gradUp, gpuArrays,
-                                  _config, mixture, d_mixture_, _transport, _chemistry, _radiation,
-                                  plasma_conductivity_));
+    forcing.Append(new SourceTerm(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up, gradUp,
+                                  gpu_precomputed_data_, _config, mixture, d_mixture_, _transport, _chemistry,
+                                  _radiation, plasma_conductivity_));
   }
 
 #ifdef HAVE_MASA
   if (config_.use_mms_) {
     masaForcingIndex_ = forcing.Size();
     forcing.Append(new MASA_forcings(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up, gradUp,
-                                     gpuArrays, _config));
+                                     gpu_precomputed_data_, _config));
   }
 #endif
 
   if (config_.isAxisymmetric()) {
-    // forcing.Append(new AxisymmetricSource(dim_, num_equation_, _order, mixture, transport_, eqSystem, intRuleType,
-    //                                       intRules, vfes, U_, Up, gradUp, spaceVaryViscMult, gpuArrays, _config));
-
-    axi_src_ = new AxisymmetricSource(dim_, num_equation_, _order, mixture, transport_, eqSystem, intRuleType,
-                                      intRules, vfes, U_, Up, gradUp, spaceVaryViscMult, gpuArrays, _config);
-
+    forcing.Append(new AxisymmetricSource(dim_, num_equation_, _order, d_mixture_, transport_, eqSystem, intRuleType,
+                                          intRules, vfes, U_, Up, gradUp, spaceVaryViscMult, gpu_precomputed_data_,
+                                          _config, distance_));
     const FiniteElementCollection *fec = vfes->FEColl();
     dfes = new ParFiniteElementSpace(mesh, fec, dim_, Ordering::byNODES);
     coordsDof = new ParGridFunction(dfes);
@@ -154,11 +152,12 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
 
   if (joule_heating_ != NULL) {
     forcing.Append(new JouleHeating(dim_, num_equation_, _order, mixture, eqSystem, intRuleType, intRules, vfes, U_, Up,
-                                    gradUp, gpuArrays, _config, joule_heating_));
+                                    gradUp, gpu_precomputed_data_, _config, joule_heating_));
   }
 
-  std::vector<double> temp;
+  std::vector<double> temp, temp_rad;
   temp.clear();
+  temp_rad.clear();
 
   for (int i = 0; i < vfes->GetNE(); i++) {
     // Standard local assembly and inversion for energy mass matrices.
@@ -213,6 +212,13 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
         temp.push_back((*Me_inv[i])(j, k));
       }
     }
+    if (config_.isAxisymmetric()) {
+      for (int j = 0; j < dof; j++) {
+        for (int k = 0; k < dof; k++) {
+          temp_rad.push_back((*Me_inv_rad[i])(j, k));
+        }
+      }
+    }
   }
 
   invMArray.UseDevice(true);
@@ -221,19 +227,22 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   auto hinvMArray = invMArray.HostWrite();
   for (int i = 0; i < static_cast<int>(temp.size()); i++) hinvMArray[i] = temp[i];
 
-  fillSharedData();
+  if (config_.isAxisymmetric()) {
+    invMArray_rad.UseDevice(true);
+    invMArray_rad.SetSize(temp.size());
+    invMArray_rad = 0.;
+    auto hinvMArray_rad = invMArray_rad.HostWrite();
+    for (int i = 0; i < static_cast<int>(temp_rad.size()); i++) hinvMArray_rad[i] = temp_rad[i];
+  }
 
-  A->setParallelData(&parallelData, &transferU, &transferGradUp);
+  allocateTransferData();
 
-#ifdef _GPU_
-  auto dposDogInvM = posDofInvM.ReadWrite();
-  auto dinvMarray = invMArray.ReadWrite();
-#endif
+  A->setParallelData(&transferU, &transferGradUp);
 
   // create gradients object
   gradients = new Gradients(vfes, gradUpfes, dim_, num_equation_, Up, gradUp, mixture, gradUp_A, intRules, intRuleType,
-                            gpuArrays, Me_inv, invMArray, posDofInvM, maxIntPoints, maxDofs);
-  gradients->setParallelData(&parallelData, &transferUp);
+                            gpu_precomputed_data_, Me_inv, invMArray, posDofInvM, maxIntPoints, maxDofs);
+  gradients->setParallelData(&transferUp);
 
   local_timeDerivatives.UseDevice(true);
   local_timeDerivatives.SetSize(num_equation_);
@@ -400,16 +409,23 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
 
   // 3. Multiply element-wise by the inverse mass matrices.
 #ifdef _GPU_
-  for (int eltype = 0; eltype < gpuArrays.numElems.Size(); eltype++) {
+  const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
+  auto h_elem_dof_num = elem_data.dof_number.HostRead();
+  for (int eltype = 0; eltype < elem_data.num_elems_of_type.Size(); eltype++) {
     int elemOffset = 0;
     if (eltype != 0) {
-      for (int i = 0; i < eltype; i++) elemOffset += h_numElems[i];
+      for (int i = 0; i < eltype; i++) elemOffset += h_num_elems_of_type[i];
     }
-    int dof = h_posDofIds[2 * elemOffset + 1];
+    int dof = h_elem_dof_num[elemOffset];
     const int totDofs = vfes->GetNDofs();
 
-    RHSoperator::multiPlyInvers_gpu(y, z, gpuArrays, invMArray, posDofInvM, num_equation_, totDofs, h_numElems[eltype],
-                                    elemOffset, dof);
+    if (config_.isAxisymmetric()) {
+      RHSoperator::multiPlyInvers_gpu(y, z, gpu_precomputed_data_, invMArray_rad, posDofInvM, num_equation_, totDofs,
+                                      h_num_elems_of_type[eltype], elemOffset, dof);
+    } else {
+      RHSoperator::multiPlyInvers_gpu(y, z, gpu_precomputed_data_, invMArray, posDofInvM, num_equation_, totDofs,
+                                      h_num_elems_of_type[eltype], elemOffset, dof);
+    }
   }
 
 #else
@@ -521,8 +537,11 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
     }
 
     if (eqSystem != EULER) {
+      double dist = 0;
+      if (distance_ != NULL) dist = (*distance_)[i];
+
       DenseMatrix fvisc(num_equation_, dim);
-      fluxClass->ComputeViscousFluxes(state, gradUpi, radius, fvisc);
+      fluxClass->ComputeViscousFluxes(state, gradUpi, radius, dist, fvisc);
 
       // TODO(kevin): This needs to be incorporated in Fluxes::ComputeViscousFluxes.
       if (spaceVaryViscMult != NULL) {
@@ -599,7 +618,7 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
       radius = d_coord[n + 0 * dof];
     }
 
-    d_fluxClass->ComputeViscousFluxes(Un, gradUpn, radius, fvisc);
+    d_fluxClass->ComputeViscousFluxes(Un, gradUpn, radius, -1, fvisc);
 
     if (d_spaceVaryViscMult != NULL) {
       linVisc = d_spaceVaryViscMult[n];
@@ -671,14 +690,16 @@ void RHSoperator::updateGradients(const Vector &x, const bool &primitiveUpdated)
 #endif
 }
 
-void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceIntegrationArrays &gpuArrays,
+void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const precomputedIntegrationData &gpu_precomputed_data,
                                      const Vector &invMArray, const Array<int> &posDofInvM, const int num_equation,
                                      const int totNumDof, const int NE, const int elemOffset, const int dof) {
 #ifdef _GPU_
   double *d_y = y.ReadWrite();
   const double *d_z = z.Read();
-  auto d_nodesIDs = gpuArrays.nodesIDs.Read();
-  auto d_posDofIds = gpuArrays.posDofIds.Read();
+
+  const elementIndexingData &elem_data = gpu_precomputed_data.element_indexing_data;
+  auto d_elem_dofs_list = elem_data.dofs_list.Read();
+  auto d_elem_dof_off = elem_data.dof_offset.Read();
   auto d_posDofInvM = posDofInvM.Read();
   const double *d_invM = invMArray.Read();
 
@@ -687,10 +708,10 @@ void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceInteg
 
     int eli = el + elemOffset;
     int offsetInv = d_posDofInvM[2 * eli];
-    int offsetIds = d_posDofIds[2 * eli];
+    int offsetIds = d_elem_dof_off[eli];
 
     MFEM_FOREACH_THREAD(i, x, dof) {
-      int index = d_nodesIDs[offsetIds + i];
+      int index = d_elem_dofs_list[offsetIds + i];
       for (int eq = 0; eq < num_equation; eq++) {
         data[i + eq * dof] = d_z[index + eq * totNumDof];
       }
@@ -698,7 +719,7 @@ void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceInteg
     MFEM_SYNC_THREAD;
 
     MFEM_FOREACH_THREAD(i, x, dof) {
-      int index = d_nodesIDs[offsetIds + i];
+      int index = d_elem_dofs_list[offsetIds + i];
       for (int eq = 0; eq < num_equation; eq++) {
         double tmp = 0.;
         for (int k = 0; k < dof; k++) tmp += d_invM[offsetInv + i * dof + k] * data[k + eq * dof];
@@ -707,57 +728,10 @@ void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const volumeFaceInteg
     }
     MFEM_SYNC_THREAD;
   });
-
-  //   MFEM_FORALL_2D(el, NE, dof, 1, 1,
-  // {
-  //   MFEM_FOREACH_THREAD(i, x, dof) {
-  //     MFEM_SHARED double data[216 * 20];
-
-  //     int eli = el + elemOffset;
-  //     int offsetInv = d_posDofInvM[2 * eli];
-  //     int offsetIds = d_posDofIds[2 * eli];
-
-  //     int index = d_nodesIDs[offsetIds + i];
-
-  //     for (int eq = 0; eq < num_equation; eq++) {
-  //       data[i + eq * dof] = d_z[index + eq * totNumDof];
-  //     }
-  //     MFEM_SYNC_THREAD;
-
-  //     for (int eq = 0; eq < num_equation; eq++) {
-  //       double tmp = 0.;
-  //       for (int k = 0; k < dof; k++) tmp += d_invM[offsetInv + i * dof + k] * data[k + eq * dof];
-  //       d_y[index + eq * totNumDof] = tmp;
-  //     }
-  //   }
-  // });
-
-//   MFEM_FORALL_2D(el,NE,dof,1,1,
-//   {
-//     int eli = el + elemOffset;
-//     int offsetInv = d_posDofInvM[2*eli];
-//     int offsetIds = d_posDofIds[2*eli];
-//     // find out how to dinamically allocate shared memory to
-//     // store invMatrix values
-//     MFEM_FOREACH_THREAD(eq,y,num_equation)
-//     {
-//       MFEM_FOREACH_THREAD(i,x,dof)
-//       {
-//         int index = d_nodesIDs[offsetIds+i];
-//         double temp = 0;
-//         for(int k=0;k<dof;k++)
-//         {
-//           int indexk = d_nodesIDs[offsetIds +k];
-//           temp += d_invM[offsetInv +i*dof +k]*d_z[indexk + eq*totNumDof];
-//         }
-//         d_y[index+eq*totNumDof] = temp;
-//       }
-//     }
-//   });
 #endif
 }
 
-void RHSoperator::fillSharedData() {
+void RHSoperator::allocateTransferData() {
   ParFiniteElementSpace *pfes = Up->ParFESpace();
   ParMesh *mesh = pfes->GetParMesh();
   mesh->ExchangeFaceNbrNodes();
@@ -768,127 +742,7 @@ void RHSoperator::fillSharedData() {
 
   const int Nshared = mesh->GetNSharedFaces();
   if (Nshared > 0) {
-    parallelData.sharedShapeWnor1.UseDevice(true);
-    parallelData.sharedShape2.UseDevice(true);
-
-    parallelData.sharedShapeWnor1.SetSize(Nshared * maxIntPoints * (maxDofs + 1 + dim_));
-    parallelData.sharedShape2.SetSize(Nshared * maxIntPoints * maxDofs);
-    parallelData.sharedElem1Dof12Q.SetSize(Nshared * 4);
-    parallelData.sharedVdofs.SetSize(Nshared * num_equation_ * maxDofs);
-    parallelData.sharedVdofsGradUp.SetSize(Nshared * num_equation_ * maxDofs * dim_);
-
-    parallelData.sharedShapeWnor1 = 0.;
-    parallelData.sharedShape2 = 0.;
-    parallelData.sharedElem1Dof12Q = 0;
-    parallelData.sharedVdofs = 0;
-    parallelData.sharedVdofsGradUp = 0;
-
-    auto hsharedShapeWnor1 = parallelData.sharedShapeWnor1.HostReadWrite();
-    auto hsharedShape2 = parallelData.sharedShape2.HostReadWrite();
-    auto hsharedElem1Dof12Q = parallelData.sharedElem1Dof12Q.HostReadWrite();
-    auto hsharedVdofs = parallelData.sharedVdofs.HostReadWrite();
-    auto hsharedVdofsGrads = parallelData.sharedVdofsGradUp.HostReadWrite();
-
-    std::vector<int> unicElems;
-    unicElems.clear();
-
-    Array<int> vdofs2, vdofsGrad;
-    FaceElementTransformations *tr;
-    for (int i = 0; i < Nshared; i++) {
-      tr = mesh->GetSharedFaceTransformations(i, true);
-      int Elem2NbrNo = tr->Elem2No - mesh->GetNE();
-
-      const FiniteElement *fe1 = vfes->GetFE(tr->Elem1No);
-      const FiniteElement *fe2 = vfes->GetFaceNbrFE(Elem2NbrNo);
-      const int dof1 = fe1->GetDof();
-      const int dof2 = fe2->GetDof();
-
-      // vfes->GetElementVDofs(tr->Elem1No, vdofs1); // get these from nodesIDs
-      vfes->GetFaceNbrElementVDofs(Elem2NbrNo, vdofs2);
-      gradFes->GetFaceNbrElementVDofs(Elem2NbrNo, vdofsGrad);
-
-      for (int n = 0; n < dof2; n++) {
-        for (int eq = 0; eq < num_equation_; eq++) {
-          hsharedVdofs[n + eq * maxDofs + i * num_equation_ * maxDofs] = vdofs2[n + eq * dof2];
-          for (int d = 0; d < dim_; d++) {
-            int index = n + eq * maxDofs + d * num_equation_ * maxDofs + i * dim_ * num_equation_ * maxDofs;
-            hsharedVdofsGrads[index] = vdofsGrad[n + eq * dof2 + d * num_equation_ * dof2];
-          }
-        }
-      }
-
-      int intorder;
-      if (tr->Elem2No >= 0) {
-        intorder = (min(tr->Elem1->OrderW(), tr->Elem2->OrderW()) + 2 * max(fe1->GetOrder(), fe2->GetOrder()));
-      } else {
-        intorder = tr->Elem1->OrderW() + 2 * fe1->GetOrder();
-      }
-      if (fe1->Space() == FunctionSpace::Pk) {
-        intorder++;
-      }
-      // IntegrationRules IntRules2(0, Quadrature1D::GaussLobatto);
-      const IntegrationRule *ir = &intRules->Get(tr->GetGeometryType(), intorder);
-
-      hsharedElem1Dof12Q[0 + i * 4] = tr->Elem1No;
-      hsharedElem1Dof12Q[1 + i * 4] = dof1;
-      hsharedElem1Dof12Q[2 + i * 4] = dof2;
-      hsharedElem1Dof12Q[3 + i * 4] = ir->GetNPoints();
-
-      bool inList = false;
-      for (size_t n = 0; n < unicElems.size(); n++) {
-        if (unicElems[n] == tr->Elem1No) inList = true;
-      }
-      if (!inList) unicElems.push_back(tr->Elem1No);
-
-      Vector shape1, shape2, nor;
-      shape1.UseDevice(false);
-      shape2.UseDevice(false);
-      nor.UseDevice(false);
-      shape1.SetSize(dof1);
-      shape2.SetSize(dof2);
-      nor.SetSize(dim_);
-
-      for (int q = 0; q < ir->GetNPoints(); q++) {
-        const IntegrationPoint &ip = ir->IntPoint(q);
-        tr->SetAllIntPoints(&ip);
-
-        fe1->CalcShape(tr->GetElement1IntPoint(), shape1);
-        fe2->CalcShape(tr->GetElement2IntPoint(), shape2);
-        CalcOrtho(tr->Jacobian(), nor);
-
-        for (int n = 0; n < dof1; n++) {
-          hsharedShapeWnor1[n + q * (maxDofs + 1 + dim_) + i * maxIntPoints * (maxDofs + 1 + dim_)] = shape1[n];
-        }
-        hsharedShapeWnor1[maxDofs + q * (maxDofs + 1 + dim_) + i * maxIntPoints * (maxDofs + 1 + dim_)] = ip.weight;
-
-        for (int d = 0; d < dim_; d++)
-          hsharedShapeWnor1[maxDofs + 1 + d + q * (maxDofs + 1 + dim_) + i * maxIntPoints * (maxDofs + 1 + dim_)] =
-              nor[d];
-        for (int n = 0; n < dof2; n++) {
-          hsharedShape2[n + q * maxDofs + i * maxIntPoints * maxDofs] = shape2[n];
-        }
-      }
-    }
-
-    parallelData.sharedElemsFaces.SetSize(7 * unicElems.size());
-    parallelData.sharedElemsFaces = -1;
-    auto hsharedElemsFaces = parallelData.sharedElemsFaces.HostWrite();
-    for (size_t el = 0; el < unicElems.size(); el++) {
-      const int eli = unicElems[el];
-      for (int f = 0; f < parallelData.sharedElem1Dof12Q.Size() / 4; f++) {
-        if (eli == hsharedElem1Dof12Q[0 + f * 4]) {
-          hsharedElemsFaces[0 + 7 * el] = hsharedElem1Dof12Q[0 + f * 4];
-          int numFace = hsharedElemsFaces[1 + 7 * el];
-          if (numFace == -1) numFace = 0;
-          numFace++;
-          hsharedElemsFaces[1 + numFace + 7 * el] = f;
-          hsharedElemsFaces[1 + 7 * el] = numFace;
-        }
-      }
-    }
-
     // data transfer arrays
-
     vfes->ExchangeFaceNbrData();
     gradUpfes->ExchangeFaceNbrData();
     transferU.face_nbr_data.UseDevice(true);
@@ -926,13 +780,6 @@ void RHSoperator::fillSharedData() {
     transferUp.statuses = new MPI_Status[transferUp.num_face_nbrs];
     transferGradUp.statuses = new MPI_Status[transferGradUp.num_face_nbrs];
   } else {
-    parallelData.sharedShapeWnor1.SetSize(1);
-    parallelData.sharedShape2.SetSize(1);
-    parallelData.sharedElem1Dof12Q.SetSize(1);
-    parallelData.sharedVdofs.SetSize(1);
-    parallelData.sharedVdofsGradUp.SetSize(1);
-    parallelData.sharedElemsFaces.SetSize(1);
-
     transferU.requests = NULL;
     transferUp.requests = NULL;
     transferGradUp.requests = NULL;
@@ -941,15 +788,6 @@ void RHSoperator::fillSharedData() {
     transferUp.statuses = NULL;
     transferGradUp.statuses = NULL;
   }
-
-#ifdef _GPU_
-  auto dsharedShapeWnor1 = parallelData.sharedShapeWnor1.ReadWrite();
-  auto dsharedShape2 = parallelData.sharedShape2.ReadWrite();
-  auto dsharedElemDof12Q = parallelData.sharedElem1Dof12Q.ReadWrite();
-  auto dsharedVdofs = parallelData.sharedVdofs.ReadWrite();
-  auto dsharedVdofsGradUp = parallelData.sharedVdofsGradUp.ReadWrite();
-  auto dsharedElemsFaces = parallelData.sharedElemsFaces.ReadWrite();
-#endif
 }
 
 void RHSoperator::initNBlockDataTransfer(const Vector &x, ParFiniteElementSpace *pfes,

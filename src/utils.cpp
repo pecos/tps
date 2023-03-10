@@ -29,6 +29,11 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
+
+/** @file
+ * @copydoc gpu_constructor.hpp
+ */
+
 #include "utils.hpp"
 
 #include <sys/stat.h>
@@ -307,4 +312,149 @@ bool h5ReadTable(const std::string &fileName, const std::string &datasetName, mf
 
   success = true;
   return success;
+}
+
+void evaluateDistanceSerial(mfem::Mesh &mesh, const mfem::Array<int> &wall_patches, const mfem::GridFunction &coords,
+                            mfem::GridFunction &distance) {
+  distance = -1.0;  // Initialize with invalid data
+
+  // Tolerance for solve
+  const int iter_max = 20;
+  const double rel_tol = 1e-10;
+  const double abs_tol = 1e-16;
+
+  Geometry geometry;
+  double phys[3], dphys[3], ref[3], dref[3];
+  double xloc[3];
+  double residual[3];
+
+  const int dim = mesh.Dimension();
+  const int dof = distance.Size();
+
+  auto h_dist = distance.HostWrite();
+  auto h_coords = coords.HostRead();
+
+  // For every node
+  for (int i = 0; i < distance.Size(); i++) {
+    // Get current point in physical space
+    Vector xp(xloc, dim);
+    for (int d = 0; d < dim; d++) {
+      xp[d] = h_coords[d * dof + i];
+    }
+
+    // Evaluate distance to the wall...
+    double dist_to_wall = 1e30;
+
+    // Loop through mesh boundary elements
+    for (int bel = 0; bel < mesh.GetNBE(); bel++) {
+      const int attr = mesh.GetBdrAttribute(bel);
+
+      bool is_wall = false;
+      for (int ip = 0; ip < wall_patches.Size(); ip++) {
+        if (attr == wall_patches[ip]) {
+          is_wall = true;
+          break;
+        }
+      }
+
+      // If this boundary element is a wall, compute distance to it
+      if (is_wall) {
+        // For wall boundary faces, we solve for the position in the
+        // reference element (of the face of course) that minimizes
+        // the distance to the current point (xp).  If this point is
+        // outside the face, we ignore it.  If it is inside the face,
+        // the distance from xp to the point we found is computed.  If
+        // that is less that the current minimum distance to the wall,
+        // the wall distance is updated.
+
+        // Get information about the current face
+        FaceElementTransformations *Tr = mesh.GetBdrFaceTransformations(bel);
+        const Geometry::Type gt = Tr->GetGeometryType();
+        const int rdim = Tr->GetDimension();  // dim of reference space (should be dim-1)
+        assert(rdim == dim - 1);
+
+        // Below we do an approximate Newton solve to find the point
+        // in the reference space that minimizes the distance to xp.
+        // It is approximate because we neglect the Hessian of the map
+        // from reference to physical space.  For a linear map, this
+        // Hessian is zero and there is no approximation.  For a
+        // nonlinear map, this method should generally still converge
+        // as long as the curvature of the element is not too extreme.
+
+        // Initial guess for the approximate Newton solve is the center of reference element
+        IntegrationPoint ip(geometry.GetCenter(gt));
+        Tr->SetIntPoint(&ip);
+
+        // xx is location in physical space corresponding to ip
+        Vector xx(phys, dim);
+        Tr->Transform(ip, xx);
+
+        // dx = vector from xx to xp
+        Vector dx(dphys, dim);
+        subtract(xp, xx, dx);
+
+        // res = - J^T dx
+        Vector res(residual, dim);
+        res = 0.0;
+        Tr->Jacobian().AddMultTranspose_a(-1.0, dx, res);
+
+        const double r0 = res.Norml2();
+        double rnorm = r0;
+
+        int iter = 0;
+        Vector dxi(dref, rdim);
+        while (rnorm > abs_tol && rnorm / r0 > rel_tol && iter < iter_max) {
+          // Solve for update to reference space coords.  Note that J
+          // is (dim x rdim) so it is singular.  In this case,
+          // InverseJacobian returns [J^t.J]^{-1}.J^t, which is
+          // exactly what we need.
+          Tr->InverseJacobian().Mult(dx, dxi);
+
+          // Update reference coordinates
+          Vector xi(ref, rdim);
+          ip.Get(xi, rdim);
+          xi += dxi;
+          ip.Set(xi, rdim);
+
+          // Update dx and residual
+          Tr->SetIntPoint(&ip);
+          Tr->Transform(ip, xx);
+          subtract(xp, xx, dx);
+
+          res = 0.0;
+          Tr->Jacobian().AddMultTranspose_a(-1.0, dx, res);
+
+          rnorm = res.Norml2();
+
+          iter++;
+        }
+
+        if (rnorm > abs_tol && rnorm / r0 > rel_tol) {
+          std::cerr << "WARNING: Distance fcn Newton solve did not converge.  Results may be inaccurate." << std::endl;
+          std::cerr << "  rnorm = " << rnorm << ", rnorm / r0 = " << rnorm / r0 << std::endl;
+        }
+
+        // If converged outside reference element, move back to closest point inside
+        bool inside_ref_elem = Geometry::CheckPoint(gt, ip);
+        if (!inside_ref_elem) {
+          inside_ref_elem = Geometry::ProjectPoint(gt, ip);
+        }
+
+        double dist_to_face = 1e30;
+        Tr->SetIntPoint(&ip);
+        Tr->Transform(ip, xx);
+        subtract(xp, xx, dx);
+        dist_to_face = dx.Norml2();
+
+        if (dist_to_face < 0.0) {
+          std::cerr << "WARNING: The distance cannot be negative!" << std::endl;
+        }
+
+        // If this face has a closer point than see so far, update distance to wall
+        if (dist_to_face < dist_to_wall) dist_to_wall = dist_to_face;
+      }
+    }
+    // After looping over all wall faces, we've found the closest point
+    h_dist[i] = dist_to_wall;
+  }  // end loop over points in GridFunction for distance
 }

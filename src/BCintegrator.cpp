@@ -40,9 +40,10 @@
 BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElementSpace *_vfes,
                            IntegrationRules *_intRules, RiemannSolver *rsolver_, double &_dt, GasMixture *_mixture,
                            GasMixture *d_mixture, Fluxes *_fluxClass, ParGridFunction *_Up, ParGridFunction *_gradUp,
-                           Vector &_shapesBC, Vector &_normalsWBC, Array<int> &_intPointsElIDBC, const int _dim,
+                           const boundaryFaceIntegrationData &boundary_face_data, const int _dim,
                            const int _num_equation, double &_max_char_speed, RunConfiguration &_runFile,
-                           Array<int> &local_attr, const int &_maxIntPoints, const int &_maxDofs)
+                           Array<int> &local_attr, const int &_maxIntPoints, const int &_maxDofs,
+                           ParGridFunction *distance)
     : groupsMPI(_groupsMPI),
       config(_runFile),
       rsolver(rsolver_),
@@ -54,13 +55,12 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
       vfes(_vfes),
       Up(_Up),
       gradUp(_gradUp),
-      shapesBC(_shapesBC),
-      normalsWBC(_normalsWBC),
-      intPointsElIDBC(_intPointsElIDBC),
+      boundary_face_data_(boundary_face_data),
       dim(_dim),
       num_equation(_num_equation),
       maxIntPoints(_maxIntPoints),
-      maxDofs(_maxDofs) {
+      maxDofs(_maxDofs),
+      distance_(distance) {
   inletBCmap.clear();
   outletBCmap.clear();
   wallBCmap.clear();
@@ -115,7 +115,7 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
 
       wallBCmap[patchType.first] = new WallBC(rsolver, mixture, d_mixture, _runFile.GetEquationSystem(), fluxClass,
                                               vfes, intRules, _dt, dim, num_equation, patchType.first, patchType.second,
-                                              wallData, intPointsElIDBC, _maxIntPoints, config.isAxisymmetric(),
+                                              wallData, boundary_face_data_, _maxIntPoints, config.isAxisymmetric(),
                                               config.useBCinGrad);
     }
   }
@@ -222,14 +222,14 @@ void BCintegrator::initBCs() {
 }
 
 void BCintegrator::computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState,
-                                  double radius, Vector &bdrFlux) {
+                                  double radius, double distance, Vector &bdrFlux) {
   std::unordered_map<int, BoundaryCondition *>::const_iterator ibc = inletBCmap.find(attr);
   std::unordered_map<int, BoundaryCondition *>::const_iterator obc = outletBCmap.find(attr);
   std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = wallBCmap.find(attr);
 
-  if (ibc != inletBCmap.end()) ibc->second->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
-  if (obc != outletBCmap.end()) obc->second->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
-  if (wbc != wallBCmap.end()) wbc->second->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
+  if (ibc != inletBCmap.end()) ibc->second->computeBdrFlux(normal, stateIn, gradState, radius, distance, bdrFlux);
+  if (obc != outletBCmap.end()) obc->second->computeBdrFlux(normal, stateIn, gradState, radius, distance, bdrFlux);
+  if (wbc != wallBCmap.end()) wbc->second->computeBdrFlux(normal, stateIn, gradState, radius, distance, bdrFlux);
 
   //   BCmap[attr]->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
 }
@@ -248,23 +248,20 @@ void BCintegrator::updateBCMean(ParGridFunction *Up) {
   }
 }
 
-void BCintegrator::integrateBCs(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds) {
+void BCintegrator::integrateBCs(Vector &y, const Vector &x, const elementIndexingData &elem_index_data) {
   for (auto bc = inletBCmap.begin(); bc != inletBCmap.end(); bc++) {
     bc->second->integrationBC(y,  // output
-                              x, nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC, maxIntPoints,
-                              maxDofs);
+                              x, elem_index_data, Up, gradUp, boundary_face_data_, maxIntPoints, maxDofs);
   }
 
   for (auto bc = outletBCmap.begin(); bc != outletBCmap.end(); bc++) {
     bc->second->integrationBC(y,  // output
-                              x, nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC, maxIntPoints,
-                              maxDofs);
+                              x, elem_index_data, Up, gradUp, boundary_face_data_, maxIntPoints, maxDofs);
   }
 
   for (auto bc = wallBCmap.begin(); bc != wallBCmap.end(); bc++) {
     bc->second->integrationBC(y,  // output
-                              x, nodesIDs, posDofIds, Up, gradUp, shapesBC, normalsWBC, intPointsElIDBC, maxIntPoints,
-                              maxDofs);
+                              x, elem_index_data, Up, gradUp, boundary_face_data_, maxIntPoints, maxDofs);
   }
 }
 
@@ -331,6 +328,15 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
   }
 #endif
 
+  // Retrieve distance function (if available)
+  Vector dist;
+  if (distance_ != NULL) {
+    Array<int> dofs;
+    distance_->ParFESpace()->GetElementVDofs(Tr.Elem1No, dofs);
+    dist.SetSize(dofs.Size());
+    distance_->GetSubVector(dofs, dist);
+  }
+
   // Integration order calculation from DGTraceIntegrator
   int intorder;
   if (Tr.Elem2No >= 0) {
@@ -376,6 +382,11 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
       }
     }
 
+    double d1 = 0;
+    if (distance_ != NULL) {
+      d1 = dist * shape1;
+    }
+
     // Get the normal vector and the flux on the face
     CalcOrtho(Tr.Jacobian(), nor);
 
@@ -387,7 +398,7 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
       radius = transip[0];
     }
 
-    computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, radius, fluxN);
+    computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, radius, d1, fluxN);
     fluxN *= ip.weight;
 
     if (config.isAxisymmetric()) {

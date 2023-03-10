@@ -73,7 +73,7 @@ class BoundaryCondition {
                     const int _patchNumber, const double _refLength, bool axisym);
   virtual ~BoundaryCondition();
 
-  virtual void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+  virtual void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, double distance,
                               Vector &bdrFlux) = 0;
 
   /** \brief Set the boundary state used in the gradient evaluation
@@ -102,9 +102,9 @@ class BoundaryCondition {
 
   virtual void integrationBC(Vector &y,        // output
                              const Vector &x,  // conservative vars (input)
-                             const Array<int> &nodesIDs, const Array<int> &posDofIds, ParGridFunction *Up,
-                             ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC, Array<int> &intPointsElIDBC,
-                             const int &maxIntPoints, const int &maxDofs) = 0;
+                             const elementIndexingData &elem_index_data, ParGridFunction *Up, ParGridFunction *gradUp,
+                             const boundaryFaceIntegrationData &boundary_face_data, const int &maxIntPoints,
+                             const int &maxDofs) = 0;
 
   static void copyValues(const Vector &orig, Vector &target, const double &mult);
 };
