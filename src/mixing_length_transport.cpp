@@ -78,7 +78,7 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
   double ur = 0;
   if (nvel_ != dim) {
     ur = primitiveState[1];
-    divV += ur / radius;
+    if (radius > 0) divV += ur / radius;
   }
 
   // eddy viscosity
@@ -99,11 +99,13 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
     const double ut_r = gradUp[3 + 0 * num_equation];
     const double ut_z = gradUp[3 + 1 * num_equation];
 
-    const double Szx = 0.5 * (ut_r - ut / radius);
+    double Szx = 0.5 * ut_r;
+    if (radius > 0) Szx -= 0.5 * ut / radius;
     const double Szy = 0.5 * ut_z;
-    const double Szz = ur / radius;
+    double Szz = - divV / 3.;
+    if (radius > 0) Szz += ur / radius;
 
-    S += 2 * (2 * Szx * Szx + 2 * Szy * Szy + Szz);
+    S += 2 * (2 * Szx * Szx + 2 * Szy * Szy + Szz * Szz);
   }
 
   S = sqrt(S);
