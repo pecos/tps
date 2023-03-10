@@ -43,19 +43,19 @@ MFEM_HOST_DEVICE MixingLengthTransport::MixingLengthTransport(GasMixture *mix, c
     : TransportProperties(mix), max_mixing_length_(inputs.max_mixing_length_), Prt_(inputs.Prt_), Let_(inputs.Let_), molecular_transport_(molecular_transport) {}
 
 void MixingLengthTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
-                                                           const Vector &Efield, double distance,
+                                                           const Vector &Efield, double radius, double distance,
                                                            Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
   transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   diffusionVelocity.SetSize(numSpecies, nvel_);
-  ComputeFluxTransportProperties(&state[0], gradUp.Read(), &Efield[0], distance, &transportBuffer[0],
+  ComputeFluxTransportProperties(&state[0], gradUp.Read(), &Efield[0], radius, distance, &transportBuffer[0],
                                  diffusionVelocity.Write());
 }
 
 MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                                            const double *Efield, double distance,
-                                                                            double *transportBuffer,
+                                                                            const double *Efield, double radius,
+                                                                            double distance, double *transportBuffer,
                                                                             double *diffusionVelocity) {
-  molecular_transport_->ComputeFluxTransportProperties(state, gradUp, Efield, distance, transportBuffer,
+  molecular_transport_->ComputeFluxTransportProperties(state, gradUp, Efield, radius, distance, transportBuffer,
                                                        diffusionVelocity);
 
   const double cp_over_Pr =
@@ -68,17 +68,47 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
   const double rho = state[0];
   const double Th = primitiveState[nvel_ + 1];
 
+  // Compute divergence
+  double divV = 0.;
+  for (int i = 0; i < dim; i++) {
+    divV += gradUp[(1 + i) + i * num_equation];
+  }
+
+  // If axisymmetric
+  double ur = 0;
+  if (nvel_ != dim) {
+    ur =  primitiveState[1];
+    divV += ur / radius;
+  }
+
   // eddy viscosity
   double S = 0;
   for (int i = 0; i < dim; i++) {
     for (int j = 0; j < dim; j++) {
-      const double u_x = gradUp[(1 + i) + j * num_equation];
-      S += 2 * u_x * u_x;  // todo: subtract divergence part
+      const double ui_xj = gradUp[(1 + i) + j * num_equation];
+      const double uj_xi = gradUp[(1 + j) + i * num_equation];
+      double Sij = 0.5 * (ui_xj + uj_xi);
+      if (i == j) Sij -= divV / 3.;
+      S += 2 * Sij * Sij;
     }
   }
+
+  // If axisymmetric, update S to account for utheta contributions
+  if (nvel_ != dim) {
+    const double ut = primitiveState[3];
+    const double ut_r = gradUp[3 + 0 * num_equation];
+    const double ut_z = gradUp[3 + 1 * num_equation];
+
+    const double Szx = 0.5 * (ut_r - ut / radius);
+    const double Szy = 0.5 * ut_z;
+    const double Szz = ur / radius;
+
+    S += 2 * (2 * Szx * Szx + 2 * Szy * Szy + Szz);
+  }
+
   S = sqrt(S);
 
-  const double mixing_length = std::max(0.41 * distance, max_mixing_length_);
+  const double mixing_length = std::min(0.41 * distance, max_mixing_length_);
   const double mut = rho * mixing_length * mixing_length * S;
 
   transportBuffer[FluxTrns::VISCOSITY] += mut;

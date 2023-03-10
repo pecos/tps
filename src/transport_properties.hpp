@@ -86,10 +86,10 @@ class TransportProperties {
   // TODO(kevin): need to discuss whether to reuse computed primitive variables in flux evaluation,
   // or in general evaluation of primitive variables.
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
-                                              double distance, Vector &transportBuffer,
+                                              double radius, double distance, Vector &transportBuffer,
                                               DenseMatrix &diffusionVelocity) = 0;
   MFEM_HOST_DEVICE virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                               const double *Efield, double distance,
+                                                               const double *Efield, double radius, double distance,
                                                                double *transportBuffer, double *diffusionVelocity) = 0;
 
   // Source term will be constructed using ForcingTerms, which have pointers to primitive variables.
@@ -192,9 +192,9 @@ class DryAirTransport : public TransportProperties {
   MFEM_HOST_DEVICE virtual ~DryAirTransport() {}
 
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
-                                              double distance, Vector &transportBuffer, DenseMatrix &diffusionVelocity);
+                                              double radius, double distance, Vector &transportBuffer, DenseMatrix &diffusionVelocity);
   MFEM_HOST_DEVICE virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                               const double *Efield, double distance,
+                                                               const double *Efield, double radius, double distance,
                                                                double *transportBuffer, double *diffusionVelocity);
   virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
                                                 const Vector &Efield, double distance, Vector &globalTransport,
@@ -239,9 +239,10 @@ class ConstantTransport : public TransportProperties {
   MFEM_HOST_DEVICE virtual ~ConstantTransport() {}
 
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
-                                              double distance, Vector &transportBuffer, DenseMatrix &diffusionVelocity);
+                                              double radius, double distance, Vector &transportBuffer,
+                                              DenseMatrix &diffusionVelocity);
   MFEM_HOST_DEVICE virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                               const double *Efield, double distance,
+                                                               const double *Efield, double radius, double distance,
                                                                double *transportBuffer, double *diffusionVelocity);
   virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
                                                 const Vector &Efield, double distance, Vector &globalTransport,

@@ -163,7 +163,7 @@ int main (int argc, char *argv[])
     Vector transportBuffer;
     transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
     DenseMatrix diffusionVelocity(numSpecies, dim);
-    transport->ComputeFluxTransportProperties(conservedState, gradUp, Efield, -1, transportBuffer, diffusionVelocity);
+    transport->ComputeFluxTransportProperties(conservedState, gradUp, Efield, -1, -1, transportBuffer, diffusionVelocity);
 
     double visc, bulkVisc, visc_vec[2];
     transport->GetViscosities(conservedState, primitiveState, visc_vec);

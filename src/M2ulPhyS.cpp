@@ -3610,7 +3610,7 @@ void M2ulPhyS::updateVisualizationVariables() {
       double diffVel[gpudata::MAXSPECIES * gpudata::MAXDIM];
       double distance = 0;
       if (distance_ != NULL) distance = (*distance_)[n];
-      in_transport->ComputeFluxTransportProperties(state, gradUpn, Efield, distance, fluxTrns, diffVel);
+      in_transport->ComputeFluxTransportProperties(state, gradUpn, Efield, -1, distance, fluxTrns, diffVel);
       for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++) {
         dataVis[visualIdxs.FluxTrns + t][n] = fluxTrns[t];
       }

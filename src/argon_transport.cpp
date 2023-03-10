@@ -170,17 +170,17 @@ MFEM_HOST_DEVICE collisionInputs ArgonMinimalTransport::computeCollisionInputs(c
 }
 
 void ArgonMinimalTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
-                                                           const Vector &Efield, double distance,
+                                                           const Vector &Efield, double radius, double distance,
                                                            Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
   transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   diffusionVelocity.SetSize(numSpecies, nvel_);
-  ComputeFluxTransportProperties(&state[0], gradUp.Read(), &Efield[0], distance, &transportBuffer[0],
+  ComputeFluxTransportProperties(&state[0], gradUp.Read(), &Efield[0], radius, distance, &transportBuffer[0],
                                  diffusionVelocity.Write());
 }
 
 MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                                            const double *Efield, double distance,
-                                                                            double *transportBuffer,
+                                                                            const double *Efield, double radius,
+                                                                            double distance, double *transportBuffer,
                                                                             double *diffusionVelocity) {
   // transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   for (int p = 0; p < FluxTrns::NUM_FLUX_TRANS; p++) transportBuffer[p] = 0.0;
@@ -793,17 +793,17 @@ MFEM_HOST_DEVICE double ArgonMixtureTransport::collisionIntegral(const int _spI,
 }
 
 void ArgonMixtureTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
-                                                           const Vector &Efield, double distance,
+                                                           const Vector &Efield, double radius, double distance,
                                                            Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
   transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   diffusionVelocity.SetSize(numSpecies, nvel_);
-  ComputeFluxTransportProperties(&state[0], gradUp.Read(), &Efield[0], distance, &transportBuffer[0],
+  ComputeFluxTransportProperties(&state[0], gradUp.Read(), &Efield[0], radius, distance, &transportBuffer[0],
                                  diffusionVelocity.Write());
 }
 
 MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                                            const double *Efield, double distance,
-                                                                            double *transportBuffer,
+                                                                            const double *Efield, double radius,
+                                                                            double distance, double *transportBuffer,
                                                                             double *diffusionVelocity) {
   for (int p = 0; p < FluxTrns::NUM_FLUX_TRANS; p++) transportBuffer[p] = 0.0;
 
