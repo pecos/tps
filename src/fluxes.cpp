@@ -202,7 +202,8 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
   // NOTE(kevin): in flux, only dim-components of diffusionVelocity will be used.
   double diffusionVelocity[gpudata::MAXSPECIES * gpudata::MAXDIM];
 
-  transport->ComputeFluxTransportProperties(state, gradUp, Efield, radius, distance, transportBuffer, diffusionVelocity);
+  transport->ComputeFluxTransportProperties(state, gradUp, Efield, radius, distance, transportBuffer,
+                                            diffusionVelocity);
   double visc = transportBuffer[FluxTrns::VISCOSITY];
   double bulkViscosity = transportBuffer[FluxTrns::BULK_VISCOSITY];
   bulkViscosity -= 2. / 3. * visc;
@@ -321,7 +322,8 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
 void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, Vector transip, double delta,
                                      double distance, const BoundaryViscousFluxData &bcFlux, Vector &normalFlux) {
   normalFlux.SetSize(num_equation);
-  ComputeBdrViscousFluxes(state.GetData(), gradUp.GetData(), transip.GetData(), delta, distance, bcFlux, normalFlux.GetData());
+  ComputeBdrViscousFluxes(state.GetData(), gradUp.GetData(), transip.GetData(), delta, distance, bcFlux,
+                          normalFlux.GetData());
 }
 
 MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double *transip,
@@ -356,7 +358,8 @@ MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const
   // NOTE(kevin): in flux, only dim-components of diffusionVelocity will be used.
   double diffusionVelocity[gpudata::MAXSPECIES * gpudata::MAXDIM];
 
-  transport->ComputeFluxTransportProperties(state, gradUp, Efield, radius, distance, transportBuffer, diffusionVelocity);
+  transport->ComputeFluxTransportProperties(state, gradUp, Efield, radius, distance, transportBuffer,
+                                            diffusionVelocity);
   double visc = transportBuffer[FluxTrns::VISCOSITY];
   double bulkViscosity = transportBuffer[FluxTrns::BULK_VISCOSITY];
   bulkViscosity -= 2. / 3. * visc;

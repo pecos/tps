@@ -192,7 +192,8 @@ class DryAirTransport : public TransportProperties {
   MFEM_HOST_DEVICE virtual ~DryAirTransport() {}
 
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
-                                              double radius, double distance, Vector &transportBuffer, DenseMatrix &diffusionVelocity);
+                                              double radius, double distance, Vector &transportBuffer,
+                                              DenseMatrix &diffusionVelocity);
   MFEM_HOST_DEVICE virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp,
                                                                const double *Efield, double radius, double distance,
                                                                double *transportBuffer, double *diffusionVelocity);

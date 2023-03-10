@@ -77,7 +77,7 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
   // If axisymmetric
   double ur = 0;
   if (nvel_ != dim) {
-    ur =  primitiveState[1];
+    ur = primitiveState[1];
     divV += ur / radius;
   }
 

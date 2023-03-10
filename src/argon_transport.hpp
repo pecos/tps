@@ -114,7 +114,8 @@ class ArgonMinimalTransport : public TransportProperties {
   // TODO(kevin): need to discuss whether to reuse computed primitive variables in flux evaluation,
   // or in general evaluation of primitive variables.
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
-                                              double radius, double distance, Vector &transportBuffer, DenseMatrix &diffusionVelocity);
+                                              double radius, double distance, Vector &transportBuffer,
+                                              DenseMatrix &diffusionVelocity);
   MFEM_HOST_DEVICE virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp,
                                                                const double *Efield, double radius, double distance,
                                                                double *transportBuffer, double *diffusionVelocity);
@@ -198,7 +199,8 @@ class ArgonMixtureTransport : public ArgonMinimalTransport {
   // TODO(kevin): need to discuss whether to reuse computed primitive variables in flux evaluation,
   // or in general evaluation of primitive variables.
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
-                                              double radius, double distance, Vector &transportBuffer, DenseMatrix &diffusionVelocity);
+                                              double radius, double distance, Vector &transportBuffer,
+                                              DenseMatrix &diffusionVelocity);
   MFEM_HOST_DEVICE virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp,
                                                                const double *Efield, double radius, double distance,
                                                                double *transportBuffer, double *diffusionVelocity);

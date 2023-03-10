@@ -59,7 +59,8 @@ class MixingLengthTransport : public TransportProperties {
   MFEM_HOST_DEVICE virtual ~MixingLengthTransport() { delete molecular_transport_; }
 
   virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
-                                              double radius, double distance, Vector &transportBuffer, DenseMatrix &diffusionVelocity);
+                                              double radius, double distance, Vector &transportBuffer,
+                                              DenseMatrix &diffusionVelocity);
   MFEM_HOST_DEVICE virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp,
                                                                const double *Efield, double radius, double distance,
                                                                double *transportBuffer, double *diffusionVelocity);
@@ -102,7 +103,7 @@ MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double 
 
   const double mixing_length = std::min(0.41 * distance, max_mixing_length_);
   const double mut = rho * mixing_length * mixing_length * S;
-  //const double mut = 0.0;
+  // const double mut = 0.0;
 
   visc[0] += mut;
 }
