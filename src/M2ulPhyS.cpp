@@ -217,6 +217,9 @@ void M2ulPhyS::initVariables() {
     }
     // Done with serial_distance
     delete serial_distance;
+
+    distance_->ParFESpace()->ExchangeFaceNbrData();
+    distance_->ExchangeFaceNbrData();
   }
 
   // only need serial mesh if on rank 0 and using single restart file option
