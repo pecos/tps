@@ -134,7 +134,7 @@ class TransportProperties {
    * @param visc      Pointer to viscosities (visc[0] = dynamic viscosity, visc[1] = bulk viscosity)
    */
   MFEM_HOST_DEVICE virtual void GetViscosities(const double *conserved, const double *primitive, const double *gradUp,
-                                               double distance, double *visc) {
+                                               double radius, double distance, double *visc) {
     GetViscosities(conserved, primitive, visc);
   }
 

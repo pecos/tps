@@ -76,7 +76,7 @@ class MixingLengthTransport : public TransportProperties {
 
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, const double *gradUp,
-                                       double distance, double *visc) override;
+                                       double radius, double distance, double *visc) override;
 };
 
 MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double *conserved, const double *primitive,
@@ -85,25 +85,56 @@ MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double 
 }
 
 MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double *conserved, const double *primitive,
-                                                                   const double *gradUp, double distance,
+                                                                   const double *gradUp, double radius, double distance,
                                                                    double *visc) {
   molecular_transport_->GetViscosities(conserved, primitive, visc);
 
-  const double rho = primitive[0];
+  const double rho = conserved[0];
+
+  // Compute divergence
+  double divV = 0.;
+  for (int i = 0; i < dim; i++) {
+    divV += gradUp[(1 + i) + i * num_equation];
+  }
+
+  // If axisymmetric
+  double ur = 0;
+  if (nvel_ != dim) {
+    ur = primitive[1];
+    if (radius > 0) divV += ur / radius;
+  }
 
   // eddy viscosity
   double S = 0;
   for (int i = 0; i < dim; i++) {
     for (int j = 0; j < dim; j++) {
-      const double u_x = gradUp[(1 + i) + j * num_equation];
-      S += 2 * u_x * u_x;  // todo: subtract divergence part
+      const double ui_xj = gradUp[(1 + i) + j * num_equation];
+      const double uj_xi = gradUp[(1 + j) + i * num_equation];
+      double Sij = 0.5 * (ui_xj + uj_xi);
+      if (i == j) Sij -= divV / 3.;
+      S += 2 * Sij * Sij;
     }
   }
+
+  // If axisymmetric, update S to account for utheta contributions
+  if (nvel_ != dim) {
+    const double ut = primitive[3];
+    const double ut_r = gradUp[3 + 0 * num_equation];
+    const double ut_z = gradUp[3 + 1 * num_equation];
+
+    double Szx = 0.5 * ut_r;
+    if (radius > 0) Szx -= 0.5 * ut / radius;
+    const double Szy = 0.5 * ut_z;
+    double Szz = - divV / 3.;
+    if (radius > 0) Szz += ur / radius;
+
+    S += 2 * (2 * Szx * Szx + 2 * Szy * Szy + Szz * Szz);
+  }
+
   S = sqrt(S);
 
   const double mixing_length = std::min(0.41 * distance, max_mixing_length_);
   const double mut = rho * mixing_length * mixing_length * S;
-  // const double mut = 0.0;
 
   visc[0] += mut;
 }
