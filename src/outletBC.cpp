@@ -76,6 +76,12 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
   if (eqSystem == NS_PASSIVE) hmeanUp[num_equation_ - 1] = 0.;
   */
 
+  Ct.SetSize(4);  
+  Ct[0] = 1.0/6.0;
+  Ct[1] = 1.0/3.0;
+  Ct[2] = 1.0/3.0;
+  Ct[3] = 1.0/6.0;  
+  
   area_ = 0.;
   parallelAreaComputed = false;
 
@@ -126,8 +132,23 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
   boundaryU.UseDevice(true);
   boundaryU.SetSize(bdrN * num_equation_);
   boundaryU = 0.;
-  //cout << "Outlet bdrN: " << total_bdrN << endl; fflush(stdout);
   boundaryU_element.SetSize(bdrN_element * num_equation_);
+
+  // internal rk4 of nscbc
+  /*
+  kU1.UseDevice(true);
+  kU2.UseDevice(true);
+  kU3.UseDevice(true);
+  kU4.UseDevice(true); 
+  kU1.SetSize(bdrN * num_equation_);
+  kU2.SetSize(bdrN * num_equation_);
+  kU3.SetSize(bdrN * num_equation_);
+  kU4.SetSize(bdrN * num_equation_);  
+  kU1 = 0.;
+  kU2 = 0.;
+  kU3 = 0.;
+  kU4 = 0.;
+  */
   
   Vector iState, iUp;
   iState.UseDevice(false);
@@ -312,13 +333,15 @@ void OutletBC::initBCs() {
 
 void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, 
 			      double radius, Vector transip, double delta, double time, TransportProperties *_transport,
-			      //			      Vector &bdrFlux) {			      
 			      int ip, Vector &bdrFlux) {
   
   switch (outletType_) {
     case SUB_P:
       subsonicReflectingPressure(normal, stateIn, bdrFlux);
       break;
+    case SUB_P_SEMI:
+      subsonicSemiReflectingPressure(normal, stateIn, bdrFlux);
+      break;      
     case SUB_P_NR:
       subsonicNonReflectingPressure(normal, stateIn, gradState, delState, _transport, ip, bdrFlux);
       break;
@@ -328,12 +351,6 @@ void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &grad
     case SUB_MF_NR_PW:
       subsonicNonRefPWMassFlow(normal, stateIn, gradState, bdrFlux);
       break;
-      //case PER_LEFT:
-      //periodic(normal, stateIn, bdrFlux);
-      //break;
-      //case PER_RIGHT:
-      //periodic(normal, stateIn, bdrFlux);
-      //break;            
   }
   
 }
@@ -778,10 +795,12 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   bdrFlux[1 + dim_] += meanK*d1 + d5/(gamma - 1.);
 
   // add diffusion portion, does not account for compressibility
+  /*
   bdrFlux[1] -= visc*delState[1]; 
   bdrFlux[2] -= visc*delState[2]; 
   bdrFlux[3] -= visc*delState[3]; 
   bdrFlux[4] -= k*delState[4]; 
+  */
 
   // limite w/o L's
   /*
@@ -826,7 +845,11 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   //   }
 
   Vector state2(num_equation_);
-  for (int eq = 0; eq < num_equation_; eq++) state2[eq] = boundaryU[eq + bdrN * num_equation_];
+  //if(rkStep == 1) {
+  //  for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + bdrN * num_equation_] = stateIn[eq];    
+  //}
+  //for (int eq = 0; eq < num_equation_; eq++) state2[eq] = boundaryU[eq + bdrN * num_equation_];
+  for (int eq = 0; eq < num_equation_; eq++) state2[eq] = stateIn[eq];  
   
   // testing
   /*
@@ -873,8 +896,16 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   
   Vector newU(num_equation_);
   // for(int i=0; i<num_equation;i++) newU[i] = state2[i]- dt*(bdrFlux[i] /*+ fluxY[i]*/);
-  for (int i = 0; i < num_equation_; i++) newU[i] = stateN[i] - Ct*dt*bdrFlux[i];
+  //for (int i = 0; i < num_equation_; i++) newU[i] = state2[i]- Ct*dt*bdrFlux[i];
+  for (int i = 0; i < num_equation_; i++) newU[i] = state2[i]- dt*bdrFlux[i];  
 
+  /*
+  if(rkStep==1)   {for (int i = 0; i < num_equation_; i++) kU1[i] = bdrFlux[i];}
+  else(rkStep==2) {for (int i = 0; i < num_equation_; i++) kU2[i] = bdrFlux[i];}
+  else(rkStep==3) {for (int i = 0; i < num_equation_; i++) kU3[i] = bdrFlux[i];}
+  else(rkStep==4) {for (int i = 0; i < num_equation_; i++) kU4[i] = bdrFlux[i];}
+  */ 
+  
   // transform back into x-y coords
   {
     DenseMatrix M(dim_, dim_);
@@ -894,12 +925,13 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + bdrN * num_equation_] = newU[eq];
 
   // modify newU to Reimann so the average of stateIn and modified newU is actual newU?
-  Vector tmpU(num_equation_);
-  for (int i = 0; i < num_equation_; i++) tmpU[i] = newU[i];
-  for (int i = 1; i <= dim_; i++) tmpU[i] = 2.0*newU[i] - stateIn[i];
+  //Vector tmpU(num_equation_);
+  //for (int i = 0; i < num_equation_; i++) tmpU[i] = newU[i];
+  //for (int i = 1; i <= dim_; i++) tmpU[i] = 2.0*newU[i] - stateIn[i];
 
   // reimann solver
-  rsolver->Eval(stateIn, tmpU, normal, bdrFlux, true);
+  rsolver->Eval(stateIn, newU, normal, bdrFlux, true);  
+  //rsolver->Eval(stateIn, tmpU, normal, bdrFlux, true);
   
   bdrN++;
 }
@@ -907,19 +939,36 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
 
 // This is more or less right formulation even for two-temperature case.
 void OutletBC::subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
+  
   Vector state2(num_equation_);
-
   mixture->modifyEnergyForPressure(stateIn, state2, inputState[0]);
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
+    
+}
+
+/** 
+Outflow allowing for semi to perfectly non-reflecting
+*/
+void OutletBC::subsonicSemiReflectingPressure(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
+ 
+  // pressure to modify energy
+  double pInt = mixture->ComputePressure(stateIn);
+  double pExt = inputState[0];  
+  double wgt = inputState[1];  
+  double pB = wgt*pExt + (1.0-wgt)*pInt;  
+  // double pB = 2.0*pExt - pInt;  // from Mengaldo, but is a specific case with wgt = 2
   
-  //Vector tmpU(num_equation_);
-  //for (int i = 0; i < num_equation_; i++) tmpU[i] = state2[i];
-  //for (int i = 1; i <= dim_; i++) tmpU[i] = state2[i] + (state2[i] - stateIn[i]);  
-  //rsolver->Eval(stateIn, tmpU, normal, bdrFlux, true);  
+  // return to previous
+  Vector state2(num_equation_);
+  mixture->modifyEnergyForPressure(stateIn, state2, pB);
+  rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
   
 }
 
-void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
+
+
+void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux)
+{
   const double gamma = mixture->GetSpecificHeatRatio();
 
   //  cout << "Testing 2..." << endl;

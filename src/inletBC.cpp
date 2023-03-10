@@ -478,6 +478,9 @@ void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradS
     case SUB_TEMP_VEL:
       subsonicReflectingTemperatureVelocity(normal, stateIn, bdrFlux);
       break;
+    case SUB_ALL:
+      subsonicReflectingAll(normal, stateIn, bdrFlux);
+      break;      
     case SUB_TEMP_VEL_USR:
       subsonicReflectingTemperatureVelocityUser(normal, stateIn, transip, bdrFlux);
       break;            
@@ -1551,6 +1554,108 @@ void InletBC::subsonicReflectingTemperatureVelocity(Vector &normal, Vector &stat
   // NOTE: If two-temperature, BC for electron temperature is T_e = T_h, where the total pressure is p.
   mixture->modifyEnergyForPressure(state2, state2, p, true);
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
+}
+
+/**
+Reflecting inflow with a specified density & temperature. Should only be used with perfectly NR outflow.
+Based on Mengaldo, G., et al., "A Guide to the Implementation of Boundary Conditions in Compact 
+High-Order Methods for Compressible Aerodynamics", 2014.
+*/
+void InletBC::subsonicReflectingAll(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
+
+  
+  // unit normals pointing out of domain
+  Vector unitNorm = normal;
+  double mod = 0.;
+  for (int d = 0; d < dim_; d++) mod += normal[d] * normal[d];
+  unitNorm *= +1.0 / sqrt(mod);
+
+  // mutual state
+  double Rgas = mixture->GetGasConstant();
+  double gamma = mixture->GetSpecificHeatRatio();
+  double gmo = gamma - 1.0;
+  double Cv = Rgas / gmo;
+
+  /**/
+  // interior state variables
+  Vector Up(num_equation_);
+  mixture->GetPrimitivesFromConservatives(stateIn, Up);  
+  double rhoInt = stateIn[0];
+  double Pint = mixture->ComputePressure(stateIn);
+  double cInt = mixture->ComputeSpeedOfSound(Up);  
+  Vector VelInt(nvel_);
+  for (int i = 0; i < nvel_; i++) VelInt[i] = stateIn[i+1]/rhoInt;
+  double UInt = 0.;
+  for (int i = 0; i < nvel_; i++) UInt += VelInt[i]*unitNorm[i];
+
+  // exterior state
+  double rhoExt = inputState[0]; 
+  double tempExt = 298.0; //inputState[4]; 
+  double Pext = (Rgas*rhoExt) * tempExt;
+  double c2Ext = (gamma*Pext) / rhoExt;
+  double cExt = std::sqrt(c2Ext);
+  Vector VelExt(nvel_);
+  for (int i = 0; i < nvel_; i++) VelExt[i] = inputState[i]/rhoExt;  
+  double UExt = 0.;
+  for (int i = 0; i < nvel_; i++) UExt += VelExt[i]*unitNorm[i];
+
+  // Reimann invariants
+  double Rp = UInt + 2.0*cInt / gmo;
+  double Rm = UExt - 2.0*cExt / gmo;  
+
+  // boundary values
+  double VbMag = 0.5 * (Rp+Rm);
+  double cB = 0.25 * gmo * (Rp-Rm);
+  Vector Vb(nvel_);
+  for (int i = 0; i < nvel_; i++) Vb[i] = VelExt[i] + (VbMag - UExt)*unitNorm(i);
+  double sB = c2Ext / (gamma * (std::pow(rhoExt,gmo)) );
+  double rhoB = (cB*cB) / (gamma*sB);
+  double Pb = rhoB * (cB*cB) / gamma;
+
+  // state for weak-prescribed flux
+  Vector state2(num_equation_);
+  state2 = stateIn;  
+  state2[0] = rhoB;
+  for (int i = 0; i < nvel_; i++) state2[i+1] = Vb[i] * rhoB;
+  /**/
+
+  
+  /*
+  //const double p = mixture->ComputePressure(stateIn);
+  double rhoExt = inputState[0]; 
+  double tempExt = 298.0; //inputState[4];
+  double Pext = (Rgas*rhoExt) * tempExt;
+  double Pb = Pext;
+  
+  Vector state2(num_equation_);
+  state2 = stateIn;
+
+  // here: takes values input from ini file and assigns to boundary
+  state2[0] = rhoExt;
+  state2[1] = state2[0] * inputState[1];
+  state2[2] = state2[0] * inputState[2];
+  if (nvel_ == 3) state2[3] = state2[0] * inputState[3];
+  */
+  
+  
+  // additional scalars
+  if (eqSystem == NS_PASSIVE) {
+    state2[num_equation_ - 1] = 0.;
+  } else if (numActiveSpecies_ > 0) {
+    for (int sp = 0; sp < numActiveSpecies_; sp++) {
+      // NOTE: inlet BC does not specify total energy. therefore skips one index.
+      // NOTE: regardless of dim_ension, inletBC save the first 4 elements for density and velocity.
+      //state2[nvel_ + 2 + sp] = inputState[4 + sp];
+      // for this bc, additional slot is used for temp
+      state2[nvel_ + 2 + sp] = inputState[5 + sp];
+    }
+  }  
+
+  // NOTE: If two-temperature, BC for electron temperature is T_e = T_h, where the total pressure is p.
+  mixture->modifyEnergyForPressure(state2, state2, Pb, true);  
+  //rsolver->Eval(state2, state2, normal, bdrFlux, true);
+  rsolver->Eval(stateIn, state2, normal, bdrFlux, true);  
+  
 }
 
 

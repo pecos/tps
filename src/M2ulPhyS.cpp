@@ -122,23 +122,19 @@ void M2ulPhyS::initVariables() {
 
     // periodic treatments
     if(config.GetPeriodic()) {
-      /*
-      Mesh *temp_mesh = new Mesh(config.GetMeshFileName().c_str());
-      Vector x_translation({config.GetXTrans(), 0.0, 0.0});
-      Vector y_translation({0.0, config.GetYTrans(), 0.0});
-      Vector z_translation({0.0, 0.0, config.GetZTrans()});      
-      std::vector<Vector> translations = {x_translation, y_translation, z_translation};
-      //serial_mesh = Mesh::MakePeriodic(*temp_mesh, temp_mesh->CreatePeriodicVertexMapping(translations));
-      //serial_mesh = &Mesh::MakePeriodic(*temp_mesh, temp_mesh->CreatePeriodicVertexMapping(translations));
-      buffer_mesh = Mesh::MakePeriodic(*temp_mesh, temp_mesh->CreatePeriodicVertexMapping(translations));
-      serial_mesh = &buffer_mesh;
-      */
 
       Mesh temp_mesh = Mesh(config.GetMeshFileName().c_str());
       Vector x_translation({config.GetXTrans(), 0.0, 0.0});
       Vector y_translation({0.0, config.GetYTrans(), 0.0});
       Vector z_translation({0.0, 0.0, config.GetZTrans()});      
       std::vector<Vector> translations = {x_translation, y_translation, z_translation};
+
+      if (mpi.Root()) {
+        std::cout << " xTrans: " << config.GetXTrans() << std::endl;
+        std::cout << " yTrans: " << config.GetYTrans() << std::endl;
+        std::cout << " zTrans: " << config.GetZTrans() << std::endl;		
+      }
+      
       serial_mesh = new Mesh(std::move(Mesh::MakePeriodic(temp_mesh, temp_mesh.CreatePeriodicVertexMapping(translations))));
       
     }
@@ -192,8 +188,31 @@ void M2ulPhyS::initVariables() {
       }
     }
 
-    serial_mesh = new Mesh(config.GetMeshFileName().c_str());
+    //serial_mesh = new Mesh(config.GetMeshFileName().c_str());
 
+    // periodic treatments
+    if(config.GetPeriodic()) {
+
+      Mesh temp_mesh = Mesh(config.GetMeshFileName().c_str());
+      Vector x_translation({config.GetXTrans(), 0.0, 0.0});
+      Vector y_translation({0.0, config.GetYTrans(), 0.0});
+      Vector z_translation({0.0, 0.0, config.GetZTrans()});      
+      std::vector<Vector> translations = {x_translation, y_translation, z_translation};
+
+      if (mpi.Root()) {
+        std::cout << " xTrans: " << config.GetXTrans() << std::endl;
+        std::cout << " yTrans: " << config.GetYTrans() << std::endl;
+        std::cout << " zTrans: " << config.GetZTrans() << std::endl;		
+      }
+      
+      serial_mesh = new Mesh(std::move(Mesh::MakePeriodic(temp_mesh, temp_mesh.CreatePeriodicVertexMapping(translations))));
+      
+    }
+    else {
+      serial_mesh = new Mesh(config.GetMeshFileName().c_str());      
+    }
+
+    
     // uniform refinement, user-specified number of times
     for (int l = 0; l < config.GetUniformRefLevels(); l++) {
       if (mpi.Root()) {
@@ -1135,7 +1154,9 @@ void M2ulPhyS::getAttributesInPartition(Array<int> &local_attr) {
   }
 }
 
+
 void M2ulPhyS::initSolutionAndVisualizationVectors() {
+  
   visualizationVariables_.clear();
   visualizationNames_.clear();
 
@@ -1162,7 +1183,8 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   }
 
   temperature = new ParGridFunction(fes, Up->HostReadWrite() + (1 + nvel) * fes->GetNDofs());
-
+  //viscTotal = new ParGridFunction(fes, Up->HostReadWrite());
+  
   electron_temp_field = NULL;
   if (config.twoTemperature) {
     electron_temp_field = new ParGridFunction(fes, Up->HostReadWrite() + (num_equation - 1) * fes->GetNDofs());
@@ -1388,10 +1410,21 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
       */
       //viscMult[n] = 1.0; // just to be safe...
       viscMultPlanar(coords, wgt);
-      viscMult[n] = wgt; 
+      viscMult[n] = wgt;
     }
   }
 
+  // vis of total viscosity (inc subgrid)
+  //double *viscMult = spaceVaryViscMult->HostWrite();
+  /*
+  double wgt = 0.;
+  for (int n = 0; n < fes->GetNDofs(); n++) {
+    in_transport->ComputeFluxTransportProperties(state, gradUpn, Efield, fluxTrns, diffVel);    
+    wgt = fluxTrns[FluxTrns::VISCOSITY];    
+    viscTotal[n] = wgt;
+  } 
+  */
+  
   paraviewColl->SetCycle(0);
   paraviewColl->SetTime(0.);
 
@@ -1415,6 +1448,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   }
 
   if (spaceVaryViscMult != NULL) paraviewColl->RegisterField("viscMult", spaceVaryViscMult);
+  //paraviewColl->RegisterField("viscTotal", viscTotal); 
 
   paraviewColl->SetOwnData(true);
   // paraviewColl->Save();
@@ -1442,7 +1476,8 @@ void M2ulPhyS::projectInitialSolution() {
 #endif
 
   if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
-    uniformInitialConditions();
+    //    uniformInitialConditions();
+        nonuniformInitialConditions();
 #ifdef HAVE_MASA
     if (config.use_mms_) {
       projectExactSolution(0.0, U);
@@ -1482,6 +1517,7 @@ void M2ulPhyS::projectInitialSolution() {
     if (!(tpsP->isVisualizationMode())) paraviewColl->Save();
   }
 }
+
 
 void M2ulPhyS::solve() {
   double tlast = grvy_timer_elapsed_global();
@@ -1812,6 +1848,87 @@ void M2ulPhyS::uniformInitialConditions() {
   //   delete eqState;
 }
 
+
+void M2ulPhyS::nonuniformInitialConditions() {
+
+  double pi = 3.14159265359;
+  double *data = U->HostWrite();
+  double *dataUp = Up->HostWrite();
+  double *dataGradUp = gradUp->HostWrite();
+  int dof = vfes->GetNDofs();
+  double *inputRhoRhoVp = config.GetConstantInitialCondition();
+  Vector initState(num_equation);  
+
+  // build initial state
+  if (mixture->GetWorkingFluid() == WorkingFluid::USER_DEFINED) {
+    const int numSpecies = mixture->GetNumSpecies();
+    const int numActiveSpecies = mixture->GetNumActiveSpecies();
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      initState[2 + nvel + sp] = inputRhoRhoVp[0] * config.initialMassFractions(sp);
+    }
+
+    // electron energy
+    if (mixture->IsTwoTemperature()) {
+      double ne = 0.;
+      if (mixture->IsAmbipolar()) {
+        for (int sp = 0; sp < numActiveSpecies; sp++)
+          ne += mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) * initState(2 + nvel + sp) /
+                mixture->GetGasParams(sp, GasParams::SPECIES_MW);
+      } else {
+        ne = initState[2 + nvel + numSpecies - 2] / mixture->GetGasParams(numSpecies - 2, GasParams::SPECIES_MW);
+      }
+      initState[num_equation - 1] = config.initialElectronTemperature * ne * mixture->getMolarCV(numSpecies - 2);
+    }
+  }
+
+  Vector state;
+  state.UseDevice(false);
+  state.SetSize(num_equation);
+  Vector Upi;
+  Upi.UseDevice(false);
+  Upi.SetSize(num_equation);
+   
+  const FiniteElementCollection *fec = vfes->FEColl();
+  dfes = new ParFiniteElementSpace(mesh, fec, dim, Ordering::byNODES);
+  ParGridFunction *coordsDof;
+  coordsDof = new ParGridFunction(dfes);  
+  mesh->GetNodes(*coordsDof);
+  Vector xyz(dim);
+
+  // 2D Taylor-Green initialization
+  double AA = +1.0;
+  double BB = -1.0;
+  double Lx = pi;
+  double Ly = pi;  
+  double Umag = 0.;
+  for (int d = 0; d < dim; d++) Umag += inputRhoRhoVp[d+1]*inputRhoRhoVp[d+1];
+  Umag = std::sqrt(Umag);
+  
+  for (int i = 0; i < dof; i++) {    
+    for (int d = 0; d < dim; d++) xyz[d] = (*coordsDof)[i + d * dof];      
+    double uTG = AA * Umag * cos(xyz[0]*Lx) * sin(xyz[1]*Ly);
+    double vTG = BB * Umag * sin(xyz[0]*Lx) * cos(xyz[1]*Ly);
+    initState[0] = inputRhoRhoVp[0];
+    initState[1] = uTG;
+    initState[2] = vTG;
+    if (nvel == 3) initState[3] = 0.0;
+    mixture->modifyEnergyForPressure(initState, initState, inputRhoRhoVp[4]);
+    for (int eq = 0; eq < num_equation; eq++) data[i + eq*dof] = initState[eq];
+    mixture->GetPrimitivesFromConservatives(initState, Upi);
+    for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * dof] = Upi[eq];    
+  }
+
+  // shouldnt need to set this as the gradients are calculated every step
+  // prior to forming rhs
+  for (int i = 0; i < dof; i++) {
+    for (int d = 0; d < dim; d++) {
+      for (int eq = 0; eq < num_equation; eq++) dataGradUp[i + eq*dof + d*num_equation*dof] = 0.0;
+    }
+  }
+
+}
+
+
 // void M2ulPhyS::uniformInitialConditions() {
 //   if (config.GetWorkingFluid() == DRY_AIR) {
 //     dryAirUniformInitialConditions();
@@ -1853,6 +1970,7 @@ void M2ulPhyS::uniformInitialConditions() {
 //   return;
 // }
 
+
 void M2ulPhyS::initGradUp() {
   double *dataGradUp = gradUp->HostWrite();
   int dof = vfes->GetNDofs();
@@ -1865,6 +1983,7 @@ void M2ulPhyS::initGradUp() {
     }
   }
 }
+
 
 void M2ulPhyS::write_restart_files() {
   string serialName = "restart_p";
@@ -1892,6 +2011,7 @@ void M2ulPhyS::write_restart_files() {
 
   file.close();
 }
+
 
 void M2ulPhyS::read_restart_files() {
   if (mpi.Root()) {
@@ -1983,6 +2103,7 @@ void M2ulPhyS::read_restart_files() {
   //  if( loadFromAuxSol ) auto dausUp = aux_Up->ReadWrite();
 }
 
+
 void M2ulPhyS::Check_NAN() {
   int local_print = 0;
   int dof = vfes->GetNDofs();
@@ -2039,6 +2160,7 @@ int M2ulPhyS::Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_pri
   auto htemp = loc_print.HostRead();
   return htemp[0];
 }
+
 
 void M2ulPhyS::initialTimeStep() {
   auto dataU = U->HostReadWrite();
@@ -2987,13 +3109,16 @@ void M2ulPhyS::parseBCInputs() {
   inletMapping["subsonic"] = SUB_DENS_VEL;
   inletMapping["subsonicUser"] = SUB_DENS_VEL_USR;    
   inletMapping["subsonicConstTemp"] = SUB_TEMP_VEL;
+  inletMapping["subsonicAll"] = SUB_ALL;  
   inletMapping["subsonicConstTempUser"] = SUB_TEMP_VEL_USR;
   inletMapping["nonReflecting"] = SUB_DENS_VEL_NR;
   inletMapping["nonReflectingConstEntropy"] = SUB_VEL_CONST_ENT;
   inletMapping["nonReflectingConstTemp"] = SUB_VEL_CONST_TMP;
   inletMapping["nonReflectingConstTempUser"] = SUB_VEL_CONST_TMP_USR;  
 
+  
   for (int i = 1; i <= numInlets; i++) {
+    
     int patch;
     double density;
     double temperature;
@@ -3002,12 +3127,16 @@ void M2ulPhyS::parseBCInputs() {
 
     tpsP->getRequiredInput((basepath + "/patch").c_str(), patch);
     tpsP->getRequiredInput((basepath + "/type").c_str(), type);
+    
     // all inlet BCs require 4 inputs (density + vel(3))
     {
       Array<double> uvw;
       if (type == "nonReflectingConstTemp" || type == "nonReflectingConstTempUser" || type == "subsonicConstTemp" || type == "subsonicConstTempUser") {
         tpsP->getRequiredInput((basepath + "/temperature").c_str(), temperature);
         config.inletBC.Append(temperature);
+      } else if (type == "subsonicALL"){
+        tpsP->getRequiredInput((basepath + "/density").c_str(), density);
+        config.inletBC.Append(density);
       } else {
         tpsP->getRequiredInput((basepath + "/density").c_str(), density);
         config.inletBC.Append(density);
@@ -3015,7 +3144,16 @@ void M2ulPhyS::parseBCInputs() {
 
       tpsP->getRequiredVec((basepath + "/uvw").c_str(), uvw, 3);
       config.inletBC.Append(uvw, 3);
+      
+      /*
+      if (type == "subsonicALL"){
+        tpsP->getRequiredInput((basepath + "/temperature").c_str(), temperature);
+        config.inletBC.Append(temperature);
+      }
+      */
+      
     }
+    
     // For multi-component gas, require (numActiveSpecies)-more inputs.
     if ((config.workFluid != DRY_AIR) && (config.numSpecies > 1)) {
       grvy_printf(GRVY_INFO, "\nInlet mass fraction of background species will not be used. \n");
@@ -3039,11 +3177,10 @@ void M2ulPhyS::parseBCInputs() {
   // Outlet Bcs
   std::map<std::string, OutletType> outletMapping;
   outletMapping["subsonicPressure"] = SUB_P;
+  outletMapping["subsonicPressureMix"] = SUB_P_SEMI;  
   outletMapping["nonReflectingPressure"] = SUB_P_NR;
   outletMapping["nonReflectingMassFlow"] = SUB_MF_NR;
   outletMapping["nonReflectingPointBasedMassFlow"] = SUB_MF_NR_PW;
-  outletMapping["periodicLeft"] = PER_LEFT;
-  outletMapping["periodicRight"] = PER_RIGHT;     
 
   for (int i = 1; i <= numOutlets; i++) {
     int patch;
@@ -3057,6 +3194,11 @@ void M2ulPhyS::parseBCInputs() {
     if (type == "subsonicPressure") {
       tpsP->getRequiredInput((basepath + "/pressure").c_str(), pressure);
       config.outletBC.Append(pressure);
+    } else if (type == "subsonicPressureMix") {
+      tpsP->getRequiredInput((basepath + "/pressure").c_str(), pressure);
+      config.outletBC.Append(pressure);
+      tpsP->getRequiredInput((basepath + "/sigma").c_str(), sigma);
+      config.outletBC.Append(sigma);      
     } else if (type == "nonReflectingPressure") {
       tpsP->getRequiredInput((basepath + "/pressure").c_str(), pressure);
       config.outletBC.Append(pressure);
@@ -3065,10 +3207,6 @@ void M2ulPhyS::parseBCInputs() {
     } else if ((type == "nonReflectingMassFlow") || (type == "nonReflectingPointBasedMassFlow")) {
       tpsP->getRequiredInput((basepath + "/massFlow").c_str(), massFlow);
       config.outletBC.Append(massFlow);
-    } else if (type == "periodicLeft") {
-      // nothing for now, add offset vector for periodic plane pair later
-    } else if (type == "periodicRight") {
-      // nothing for now, add offset vector for periodic plane pair later      
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown outlet BC supplied at runtime -> %s", type.c_str());
       exit(ERROR);
@@ -3171,7 +3309,7 @@ void M2ulPhyS::parsePostProcessVisualizationInputs() {
 void M2ulPhyS::parsePeriodicInputs() {
   tpsP->getInput("periodicity/enablePeriodic", config.periodic, false);
   tpsP->getInput("periodicity/xTrans", config.xTrans, 1.0e12);
-  tpsP->getInput("periodicity/yTrans", config.xTrans, 1.0e12);
+  tpsP->getInput("periodicity/yTrans", config.yTrans, 1.0e12);
   tpsP->getInput("periodicity/zTrans", config.zTrans, 1.0e12);    
 }
 
@@ -3440,6 +3578,7 @@ void M2ulPhyS::updatePrimitives() {
   }
 }
 
+
 void M2ulPhyS::visualization() {
   double tlast = grvy_timer_elapsed_global();
 
@@ -3504,7 +3643,6 @@ void M2ulPhyS::visualization() {
 
     // HERE
     average->write_meanANDrms_restart_files(iter, time);
-
     average->addSampleMean(iter);
 
     // periodically check for DIE file which requests to terminate early
@@ -3661,5 +3799,14 @@ void M2ulPhyS::updateVisualizationVariables() {
         dataVis[visualIdxs.rxn + r][n] = progressRates[r];
       }
     }  // if (!isDryAir)
+    else {
+      /*
+      // update flux transport properties.
+      double fluxTrns[FluxTrns::NUM_FLUX_TRANS];
+      double diffVel[gpudata::MAXSPECIES * gpudata::MAXDIM];
+      in_transport->ComputeFluxTransportProperties(state, gradUpn, Efield, fluxTrns, diffVel);
+      viscTotal[n] = fluxTrns[FluxTrns::VISCOSITY];
+      */
+    }
   }    // for (int n = 0; n < ndofs; n++)
 }

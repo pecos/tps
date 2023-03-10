@@ -62,6 +62,8 @@ class OutletBC : public BoundaryCondition {
   int bdrN_element;
   bool bdrUInit;
 
+  Vector Ct;
+
   // boundary mean calculation variables
   Vector bdrUp;          // Up at
   Array<int> bdrElemsQ;  // element dofs and face num. of integration points
@@ -88,6 +90,7 @@ class OutletBC : public BoundaryCondition {
   void initBoundaryU(ParGridFunction *Up);
 
   void subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vector &bdrFlux);
+  void subsonicSemiReflectingPressure(Vector &normal, Vector &stateIn, Vector &bdrFlux);  
   void subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
 //				     Vector &delState, TransportProperties *_transport, Vector &bdrFlux);   
 				     Vector &delState, TransportProperties *_transport, int ip, Vector &bdrFlux);

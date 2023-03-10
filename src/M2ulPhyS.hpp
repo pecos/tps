@@ -153,7 +153,8 @@ class M2ulPhyS : public TPS::Solver {
   Chemistry *chemistry_ = NULL;
 
   ParGridFunction *spaceVaryViscMult;  // space varying viscosity multiplier
-
+  ParGridFunction *viscTotal;
+  
   Fluxes *fluxClass;
 
   RHSoperator *rhsOperator;
@@ -322,6 +323,7 @@ class M2ulPhyS : public TPS::Solver {
   static void testInitialCondition(const Vector &x, Vector &y);
   // void dryAirUniformInitialConditions();
   void uniformInitialConditions();
+  void nonuniformInitialConditions();  
   void initGradUp();
 
   // NOTE(kevin): this routine is currently obsolete.

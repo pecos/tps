@@ -92,6 +92,7 @@ class InletBC : public BoundaryCondition {
   void subsonicReflectingDensityVelocityUser(Vector &normal, Vector &stateIn, Vector transip, double time, int ip, Vector &bdrFlux);
   //  void subsonicReflectingDensityVelocityUser(Vector &normal, Vector &stateIn, Vector transip, Vector &bdrFlux);      
   void subsonicReflectingTemperatureVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux);
+  void subsonicReflectingAll(Vector &normal, Vector &stateIn, Vector &bdrFlux);  
   void subsonicReflectingTemperatureVelocityUser(Vector &normal, Vector &stateIn, Vector transip, Vector &bdrFlux);    
   void subsonicNonReflectingDensityVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
   void subsonicNonReflectingTemperatureVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);

@@ -118,6 +118,7 @@ enum InletType {
   SUB_DENS_VEL,          // Subsonic inlet specified by the density and velocity components
   SUB_DENS_VEL_USR,      // Subsonic inlet with specified by the density and velocity components with spatial distro  
   SUB_TEMP_VEL,          // Subsonic inlet specified by the temperature and velocity components
+  SUB_ALL,               // Specified density, vel AND temp, i.e. pressure is fixed at inlet and outle MUST be perfect NR
   SUB_TEMP_VEL_USR,      // Subsonic inlet specified by the temperature and velocity components with user defined spatial distro
   SUB_DENS_VEL_NR,       // Non-reflecting subsonic inlet specified by the density and velocity components
   SUB_VEL_CONST_ENT,     // Subsonic non-reflecting. Specified vel, keeps entropy constant
@@ -128,10 +129,9 @@ enum InletType {
 
 enum OutletType {
   SUB_P,        // subsonic outlet specified with pressure
+  SUB_P_SEMI,   // subsonic outlet with blended interior and specified pressure
   SUB_P_NR,     // non-reflecting subsonic outlet specified with pressure
   SUB_MF_NR,    // Mass-flow non-reflecting
-  PER_LEFT,     // periodic pair, left side
-  PER_RIGHT,    // periodic pair, right side    
   SUB_MF_NR_PW  // point-based non-reflecting massflow BC
 };
 
