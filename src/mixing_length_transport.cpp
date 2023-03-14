@@ -54,22 +54,17 @@ void MixingLengthTransport::ComputeFluxTransportProperties(const Vector &state, 
                                                            Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
   transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   diffusionVelocity.SetSize(numSpecies, nvel_);
-  ComputeFluxTransportProperties(&state[0], gradUp.Read(), &Efield[0], radius, distance, &transportBuffer[0],
-                                 diffusionVelocity.Write());
-}
-
-MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                                            const double *Efield, double radius,
-                                                                            double distance, double *transportBuffer,
-                                                                            double *diffusionVelocity) {
+  // ComputeFluxTransportProperties(&state[0], gradUp.Read(), &Efield[0], radius, distance, &transportBuffer[0],
+  //                                diffusionVelocity.Write());
   molecular_transport_->ComputeFluxTransportProperties(state, gradUp, Efield, radius, distance, transportBuffer,
                                                        diffusionVelocity);
+
 
   const double cp_over_Pr =
       transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] / transportBuffer[FluxTrns::VISCOSITY];
 
   // Add mixing length model results to computed molecular transport
-  double primitiveState[gpudata::MAXEQUATIONS];
+  Vector primitiveState(num_equation);
   mixture->GetPrimitivesFromConservatives(state, primitiveState);
 
   const double rho = state[0];
@@ -78,7 +73,8 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
   // Compute divergence
   double divV = 0.;
   for (int i = 0; i < dim; i++) {
-    divV += gradUp[(1 + i) + i * num_equation];
+    //divV += gradUp[(1 + i) + i * num_equation];
+    divV += gradUp(1 + i, i);
   }
 
   // If axisymmetric
@@ -92,8 +88,8 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
   double S = 0;
   for (int i = 0; i < dim; i++) {
     for (int j = 0; j < dim; j++) {
-      const double ui_xj = gradUp[(1 + i) + j * num_equation];
-      const double uj_xi = gradUp[(1 + j) + i * num_equation];
+      const double ui_xj = gradUp(1 + i, j);
+      const double uj_xi = gradUp(1 + j, i);
       double Sij = 0.5 * (ui_xj + uj_xi);
       if (i == j) Sij -= divV / 3.;
       S += 2 * Sij * Sij;
@@ -103,8 +99,8 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
   // If axisymmetric, update S to account for utheta contributions
   if (nvel_ != dim) {
     const double ut = primitiveState[3];
-    const double ut_r = gradUp[3 + 0 * num_equation];
-    const double ut_z = gradUp[3 + 1 * num_equation];
+    const double ut_r = gradUp(3, 0);
+    const double ut_z = gradUp(3, 1);
 
     double Szx = 0.5 * ut_r;
     if (radius > 0) Szx -= 0.5 * ut / radius;
@@ -126,6 +122,14 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
   const double Pr_over_Prt = Prt_;  // FIXME: change varaible name
   const double kappat = mut * cp_over_Pr * Pr_over_Prt;
   transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] += kappat;
+}
+
+MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,
+                                                                            const double *Efield, double radius,
+                                                                            double distance, double *transportBuffer,
+                                                                            double *diffusionVelocity) {
+  std::cout << "Why am I here??" << std::endl;
+  exit(1);
 }
 
 void MixingLengthTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up,
