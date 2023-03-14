@@ -262,6 +262,13 @@ class RunConfiguration {
 
   double const_plasma_conductivity_;
 
+  // mesh periodicitity
+  bool periodic;
+  double xTrans, yTrans, zTrans;
+
+  // the wall BC values are a mess and buried
+  double wallTemperature;
+  
   PostProcessInput postprocessInput;
 
   bool compute_distance;
@@ -273,6 +280,12 @@ class RunConfiguration {
   void readInputFile(std::string inpuFileName);
 #endif
 
+  bool GetPeriodic() { return periodic; }
+  double GetXTrans() { return xTrans; }
+  double GetYTrans() { return yTrans; }
+  double GetZTrans() { return zTrans; }
+  double GetWallTemp() { return wallTemperature; }      
+  
   string GetMeshFileName() { return meshFile; }
   string GetOutputName() { return outputFile; }
   string GetPartitionBaseName() { return partFile; }

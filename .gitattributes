@@ -17,3 +17,7 @@ test/ref_solns/reaction.test.h5 filter=lfs diff=lfs merge=lfs -text
 test/ref_solns/collisions/Amdur_Mason.estimated.h5 filter=lfs diff=lfs merge=lfs -text
 test/ref_solns/collisions/Amdur_Mason.h5 filter=lfs diff=lfs merge=lfs -text
 test/ref_solns/reaction/excitation.3000K.ion1e-4.h5 filter=lfs diff=lfs merge=lfs -text
+test/meshes/flatBox.msh filter=lfs diff=lfs merge=lfs -text
+test/ref_solns/noSGM1K/restart_output.sol.h5 filter=lfs diff=lfs merge=lfs -text
+test/ref_solns/sigma1K_1/restart_output.sol.h5 filter=lfs diff=lfs merge=lfs -text
+test/ref_solns/smag1K_1/restart_output.sol.h5 filter=lfs diff=lfs merge=lfs -text
