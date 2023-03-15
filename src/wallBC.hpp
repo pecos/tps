@@ -63,14 +63,21 @@ class WallBC : public BoundaryCondition {
   Array<int> wallElems;
   void buildWallElemsArray();
 
-  void computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, double delta,
-                          Vector &bdrFlux);
-  void computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, double delta,
+  /*
+  void computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux);
+  void computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
                                 Vector &bdrFlux);
   void computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, double delta,
                                  Vector &bdrFlux);
-  void computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, double delta,
-                              Vector &bdrFlux);
+  void computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux);
+  */
+
+  void computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, Vector &bdrFlux);
+  void computeSlipWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, Vector &bdrFlux);  
+  void computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, Vector &bdrFlux);
+  void computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, Vector &bdrFlux);
+  void computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, Vector &bdrFlux);
+ 
 
  public:
   WallBC(RiemannSolver *rsolver_, GasMixture *_mixture, GasMixture *d_mixture, Equations _eqSystem, Fluxes *_fluxClass,
@@ -79,15 +86,13 @@ class WallBC : public BoundaryCondition {
          const boundaryFaceIntegrationData &boundary_face_data, const int &maxIntPoints, bool axisym);
   ~WallBC();
 
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, double delta,
-                      Vector &bdrFlux);
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, Vector &bdrFlux);
 
   virtual void initBCs();
 
   virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up) {}
 
   // functions for BC integration on GPU
-
   virtual void integrationBC(Vector &y,  // output
                              const Vector &x, const elementIndexingData &elem_index_data, ParGridFunction *Up,
                              ParGridFunction *gradUp, const boundaryFaceIntegrationData &boundary_face_data,

@@ -56,21 +56,22 @@ using namespace mfem;
 // Need to discuss further.
 class Fluxes {
  private:
+  
   GasMixture *mixture;
   Equations eqSystem;
-  RunConfiguration *config_;
-
+  RunConfiguration *config_;  
   TransportProperties *transport;
 
+  int nvel;  
   const int dim;
-  int nvel;
   const bool axisymmetric_;
-
   const int num_equation;
 
   const int sgs_model_type_;
   const double sgs_model_floor_;
   const double sgs_model_const_;
+
+  void viscSpongePlanar(double *x, double &wgt);
 
  public:
   Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport, const int _num_equation,
@@ -90,11 +91,9 @@ class Fluxes {
   void ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux);
   MFEM_HOST_DEVICE void ComputeConvectiveFluxes(const double *state, double *flux) const;
 
-  void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, double delta,
-                            DenseMatrix &flux);
+  void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip, double delta, DenseMatrix &flux);
 
-  MFEM_HOST_DEVICE void ComputeViscousFluxes(const double *state, const double *gradUp, double radius, double delta,
-                                             double *flux);
+  MFEM_HOST_DEVICE void ComputeViscousFluxes(const double *state, const double *gradUp, double radius, Vector transip, double delta, double *flux);
 
   void sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu_sgs);
   MFEM_HOST_DEVICE void sgsSmag(const double *state, const double *gradUp, double delta, double &mu_sgs);
@@ -102,10 +101,9 @@ class Fluxes {
   MFEM_HOST_DEVICE void sgsSigma(const double *state, const double *gradUp, double delta, double &mu_sgs);
 
   // Compute viscous flux with prescribed boundary flux.
-  void ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, double delta,
-                               const BoundaryViscousFluxData &bcFlux, Vector &normalFlux);
+  void ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip, double delta, const BoundaryViscousFluxData &bcFlux, Vector &normalFlux);
 
-  MFEM_HOST_DEVICE void ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius, double delta,
+  MFEM_HOST_DEVICE void ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius, double *transip, double delta,
                                                 const BoundaryViscousFluxData &bcFlux, double *normalFlux);
 
   // Compute the split fersion of the flux for SBP operations

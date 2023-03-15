@@ -39,10 +39,9 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
                          const Equations &_eqSystem, double &_max_char_speed, IntegrationRules *_intRules,
                          int _intRuleType, Fluxes *_fluxClass, GasMixture *_mixture, GasMixture *d_mixture,
                          Chemistry *_chemistry, TransportProperties *_transport, Radiation *_radiation,
-                         ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_fes,
-                         const precomputedIntegrationData &gpu_precomputed_data, const int &_maxIntPoints,
-                         const int &_maxDofs, DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh,
-                         ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
+                         ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_fes, const precomputedIntegrationData &gpu_precomputed_data,
+                         const int &_maxIntPoints, const int &_maxDofs, DGNonLinearForm *_A, MixedBilinearForm *_Aflux,
+                         ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
                          ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A,
                          BCintegrator *_bcIntegrator, bool &_isSBP, double &_alpha, RunConfiguration &_config,
                          ParGridFunction *pc, ParGridFunction *jh)
@@ -61,7 +60,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
       d_mixture_(d_mixture),
       transport_(_transport),
       vfes(_vfes),
-      fes(_fes),
+      fes(_fes),            
       gpu_precomputed_data_(gpu_precomputed_data),
       maxIntPoints(_maxIntPoints),
       maxDofs(_maxDofs),
@@ -155,6 +154,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
       h_elSize[idx] = mesh->GetElementSize(j, 1) / fes->GetElementOrder(j);
     }
   }
+
 
   if (config_.isAxisymmetric()) {
     forcing.Append(new AxisymmetricSource(dim_, num_equation_, _order, d_mixture_, transport_, eqSystem, intRuleType,
@@ -515,9 +515,14 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
     }
 
     double radius = 1;
+    double delta;
+    Vector xyz(dim_);
     if (config_.isAxisymmetric()) {
       radius = (*coordsDof)[i + 0 * dof];
     }
+
+    // Extract position
+    for (int d = 0; d < dim_; d++) xyz[d] = (*coordsDof)[i + d * dof];
 
     // This element size is divided by element polynomial order when
     // elSize is set, in the RHSoperator ctor
@@ -543,7 +548,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 
     if (eqSystem != EULER) {
       DenseMatrix fvisc(num_equation_, dim);
-      fluxClass->ComputeViscousFluxes(state, gradUpi, radius, delta, fvisc);
+      fluxClass->ComputeViscousFluxes(state, gradUpi, radius, xyz, delta, fvisc);
 
       // TODO(kevin): This needs to be incorporated in Fluxes::ComputeViscousFluxes.
       if (spaceVaryViscMult != NULL) {
@@ -617,14 +622,15 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
 
     d_fluxClass->ComputeConvectiveFluxes(Un, fluxn);
 
-    // TODO(kevin): implement radius.
-    // Is this correct?
     double radius = 1.0;
-    if (axisymmetric) {
+    double delta;
+    double xyz[3];
+    if (config_.isAxisymmetric()) {
       radius = d_coord[n + 0 * dof];
     }
+    for (int d = 0; d < dim_; d++) xyz[d] = d_coord[n + d * dof];
 
-    d_fluxClass->ComputeViscousFluxes(Un, gradUpn, radius, d_elSize[n], fvisc);
+    d_fluxClass->ComputeViscousFluxes(Un, gradUpn, radius, xyz, d_elSize[n], fvisc);
 
     if (d_spaceVaryViscMult != NULL) {
       linVisc = d_spaceVaryViscMult[n];
