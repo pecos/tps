@@ -73,8 +73,8 @@ void LteTransport::ComputeFluxTransportProperties(const Vector &state, const Den
   transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   transportBuffer = 0.0;
 
-  transportBuffer[FluxTrns::VISCOSITY] = mu_table_->eval(T, rho);
-  transportBuffer[FluxTrns::BULK_VISCOSITY] = 0.0;  // bulk_visc_mult * viscosity;
+  transportBuffer[FluxTrns::VISCOSITY] = 5.0 * mu_table_->eval(T, rho);
+  transportBuffer[FluxTrns::BULK_VISCOSITY] = 5.0 * transportBuffer[FluxTrns::VISCOSITY];
   transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = kappa_table_->eval(T, rho);
 
   // const double viscosity = mu_table_->eval(T, rho);
@@ -121,12 +121,12 @@ void LteTransport::GetViscosities(const double *conserved, const double *primiti
   const double rho = primitive[0];
   const double T = primitive[1 + nvel_];
 
-  // double internal_visc = mu_table_->eval(T, rho);
-  // visc = 5.0 * internal_visc;
-  // bulkVisc = 5.0 * internal_visc;
+  double internal_visc = mu_table_->eval(T, rho);
+  visc[0] = 5.0 * internal_visc;
+  visc[1] = 5.0 * internal_visc;
 
-  visc[0] = mu_table_->eval(T, rho);
-  visc[1] = 0.;
+  // visc[0] = mu_table_->eval(T, rho);
+  // visc[1] = 0.;
 }
 
 #endif  // _GPU_

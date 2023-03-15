@@ -137,9 +137,12 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
 #endif
 
   if (config_.isAxisymmetric()) {
-    forcing.Append(new AxisymmetricSource(dim_, num_equation_, _order, d_mixture_, transport_, eqSystem, intRuleType,
-                                          intRules, vfes, U_, Up, gradUp, spaceVaryViscMult, gpu_precomputed_data_,
-                                          _config, distance_));
+    // forcing.Append(new AxisymmetricSource(dim_, num_equation_, _order, d_mixture_, transport_, eqSystem, intRuleType,
+    //                                       intRules, vfes, U_, Up, gradUp, spaceVaryViscMult, gpu_precomputed_data_,
+    //                                       _config, distance_));
+    axi_src_ = new AxisymmetricSource(dim_, num_equation_, _order, d_mixture_, transport_, eqSystem, intRuleType,
+                                      intRules, vfes, U_, Up, gradUp, spaceVaryViscMult, gpu_precomputed_data_,
+                                      _config, distance_);
     const FiniteElementCollection *fec = vfes->FEColl();
     dfes = new ParFiniteElementSpace(mesh, fec, dim_, Ordering::byNODES);
     coordsDof = new ParGridFunction(dfes);

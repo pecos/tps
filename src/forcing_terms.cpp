@@ -253,15 +253,17 @@ AxisymmetricSource::AxisymmetricSource(const int &_dim, const int &_num_equation
 }
 
 void AxisymmetricSource::updateTerms(Vector &in) {
+  // make sure we are in a 2D case (otherwise can't be axisymmetric)
   assert(dim == 2);
   assert(nvel == 3);
 
-  double *d_y = in.ReadWrite();
-  const double *d_U = U_->Read();
-  const double *d_Up = Up_->Read();
-  const double *d_gradUp = gradUp_->Read();
-
+  int numElem = vfes->GetNE();
   int dof = vfes->GetNDofs();
+
+  double *data = in.GetData();
+  const double *dataU = U_->GetData();
+  const double *dataUp = Up_->GetData();
+  const double *dataGradUp = gradUp_->GetData();
 
   // get coords
   const FiniteElementCollection *fec = vfes->FEColl();
@@ -269,81 +271,88 @@ void AxisymmetricSource::updateTerms(Vector &in) {
   ParFiniteElementSpace dfes(mesh, fec, dim, Ordering::byNODES);
   ParGridFunction coordsDof(&dfes);
   mesh->GetNodes(coordsDof);
-  auto d_coords = coordsDof.Read();
 
-  const double *alpha;
-  if (space_vary_viscosity_mult_ != NULL) {
-    alpha = space_vary_viscosity_mult_->Read();
-  } else {
-    alpha = NULL;
-  }
+  // Commented out code below has the right structure if we want to
+  // add axisym source terms to rhs of weak form (as opposed to
+  // M^{-1}*rhs).  It is not entirely correct b/c the \tau_{\theta
+  // \theta} contribution is neglected, but this could be added if we
+  // switch to this formulation.  See comments at L348 of rhs_operator.cpp
 
-  // and distance
-  const double *d_dist;
-  if (distance_ != NULL) {
-    d_dist = distance_->Read();
-  } else {
-    d_dist = NULL;
-  }
+  Vector conserv(num_equation);
+  Vector prim(num_equation);
+  DenseMatrix gradUp(num_equation, dim);
+  double ur_r, uz_z, ut_r, radius, dist;
 
-  const int neqn = num_equation;
-  const int sdim = dim;
+  for (int el = 0; el < numElem; el++) {
+    const FiniteElement *elem = vfes->GetFE(el);
+    ElementTransformation *Tr = vfes->GetElementTransformation(el);
+    const int dof_elem = elem->GetDof();
 
-  const Equations eqSys = eqSystem;
+    // nodes of the element
+    Array<int> nodes;
+    vfes->GetElementVDofs(el, nodes);
 
-  GasMixture *d_mix = mixture;
-  TransportProperties *d_trans = transport_;
+    const int order = elem->GetOrder();
+    //cout<<"order :"<<maxorder<<" dof: "<<dof_elem<<endl;
+    int intorder = 2*order;
+    const IntegrationRule *ir = &intRules->Get(elem->GetGeomType(), intorder);
+    for (int q = 0; q < ir->GetNPoints(); q++) {
+      const IntegrationPoint &ip = ir->IntPoint(q);
+      Tr->SetIntPoint(&ip);
 
-  MFEM_FORALL(n, dof, {
-    double U[gpudata::MAXEQUATIONS];
-    double Up[gpudata::MAXEQUATIONS];
-    double gradUp[gpudata::MAXDIM * gpudata::MAXEQUATIONS];
-    double x[gpudata::MAXDIM];
+      Vector shape(dof_elem);
+      elem->CalcShape(ip, shape);
 
-    // Extract state information
-    for (int eq = 0; eq < neqn; eq++) {
-      U[eq] = d_U[n + eq * dof];
-      Up[eq] = d_Up[n + eq * dof];
-      for (int d = 0; d < sdim; d++) {
-        gradUp[eq + d * neqn] = d_gradUp[n + eq * dof + d * neqn * dof];
+      // interpolate conserved state to quad point
+      conserv = 0.;
+      gradUp = 0.;
+      dist = 0.;
+      ur_r = uz_z = ut_r = 0.;
+      for (int k = 0; k < dof_elem; k++) {
+        for (int ieqn = 0; ieqn < num_equation; ieqn++) {
+          conserv[ieqn] += dataU[nodes[k] + ieqn * dof] * shape[k];
+          for (int d = 0; d < dim; d++) {
+            gradUp(ieqn, d) += dataGradUp[nodes[k] + (ieqn * dof) + (d * dof * num_equation)] * shape[k];
+          }
+        }
+
+        ur_r += dataGradUp[nodes[k] + (1 * dof) + (0 * dof * num_equation)] * shape[k];
+        uz_z += dataGradUp[nodes[k] + (2 * dof) + (1 * dof * num_equation)] * shape[k];
+        ut_r += dataGradUp[nodes[k] + (3 * dof) + (0 * dof * num_equation)] * shape[k];
+
+        //dist += (*distance_)[nodes[k]] * shape[k];
       }
-    }
 
-    // Extract radius
-    for (int d = 0; d < sdim; d++) x[d] = d_coords[n + d * dof];
-    const double radius = x[0];
+      const double rho = conserv(0);
+      const double ur = conserv(1) / rho;
+      const double ut = conserv(3) / rho;
+      // const double temperature = prim(1 + nvel);
 
-    // Evaluate quantities required for axisym source
-    const double rho = Up[0];
-    const double ur = Up[1];
-    const double ut = Up[3];
+      const double pressure = mixture->ComputePressure(conserv);
 
-    const double pressure = d_mix->ComputePressureFromPrimitives(Up);
+      const double rurut = rho * ur * ut;
+      const double rutut = rho * ut * ut;
 
-    const double rurut = rho * ur * ut;
-    const double rutut = rho * ut * ut;
+      // get coordinates of integration point
+      double x[3];
+      Vector transip(x, 3);
+      Tr->Transform(ip,transip);
+      radius = transip[0];
 
-    double tau_tt, tau_tr;
-    if (eqSys == EULER) {
+      double tau_tt, tau_tr;
       tau_tt = tau_tr = 0.0;
-    } else {
-      const double ur_r = gradUp[1 + 0 * neqn];
-      const double uz_z = gradUp[2 + 1 * neqn];
-      const double ut_r = gradUp[3 + 0 * neqn];
 
-      double visc, bulkVisc, visc_vec[2];
+      mixture->GetPrimitivesFromConservatives(conserv, prim);
 
-      double dist = 0;
-      if (d_dist != NULL) dist = d_dist[n];
-
-      d_trans->GetViscosities(U, Up, gradUp, radius, dist, visc_vec);
+      double visc_vec[2];
+      double visc, bulkVisc;
+      // transport_->GetViscosities(conserv, prim, visc, bulkVisc);
+      // bulkVisc -= 2. / 3. * visc;
+      transport_->GetViscosities(conserv.Read(), prim.Read(), gradUp.Read(), radius, dist, visc_vec);
       visc = visc_vec[0];
       bulkVisc = visc_vec[1];
       bulkVisc -= 2. / 3. * visc;
 
-      if (alpha != NULL) {
-        visc *= alpha[n];
-      }
 
       double divV = ur_r + uz_z;
       if (radius > 0) divV += ur / radius;
@@ -355,22 +364,134 @@ void AxisymmetricSource::updateTerms(Vector &in) {
       if (radius > 0) tau_tr -= ut / radius;
 
       tau_tr *= visc;
+
+      shape *= Tr->Jacobian().Det()*ip.weight;
+      for (int j= 0;j<dof_elem;j++) {
+        int i = nodes[j];
+        data[i + 1 * dof] += shape[j] * (pressure + rutut - tau_tt);
+        data[i + 3 * dof] += shape[j] * (-rurut + tau_tr);
+      }
     }
+  }
 
-    // Put source into the right spot
-    d_y[n + 1 * dof] += (pressure + rutut - tau_tt) / radius;
-    d_y[n + 3 * dof] += (-rurut + tau_tr) / radius;
+  // assert(dim == 2);
+  // assert(nvel == 3);
 
-    // if (radius > 0) {
-    //   d_y[n + 1 * dof] += (pressure + rutut - tau_tt) / radius;
-    //   d_y[n + 3 * dof] += (-rurut + tau_tr) / radius;
-    // } else {
-    //   // TODO(trevilo): Fix axis
-    //   double fake_radius = 1e-3;
-    //   d_y[n + 1 * dof] += (pressure - tau_tt) / fake_radius;
-    //   d_y[n + 3 * dof] += (tau_tr) / fake_radius;
-    // }
-  });
+  // double *d_y = in.ReadWrite();
+  // const double *d_U = U_->Read();
+  // const double *d_Up = Up_->Read();
+  // const double *d_gradUp = gradUp_->Read();
+
+  // int dof = vfes->GetNDofs();
+
+  // // get coords
+  // const FiniteElementCollection *fec = vfes->FEColl();
+  // ParMesh *mesh = vfes->GetParMesh();
+  // ParFiniteElementSpace dfes(mesh, fec, dim, Ordering::byNODES);
+  // ParGridFunction coordsDof(&dfes);
+  // mesh->GetNodes(coordsDof);
+  // auto d_coords = coordsDof.Read();
+
+  // const double *alpha;
+  // if (space_vary_viscosity_mult_ != NULL) {
+  //   alpha = space_vary_viscosity_mult_->Read();
+  // } else {
+  //   alpha = NULL;
+  // }
+
+  // // and distance
+  // const double *d_dist;
+  // if (distance_ != NULL) {
+  //   d_dist = distance_->Read();
+  // } else {
+  //   d_dist = NULL;
+  // }
+
+  // const int neqn = num_equation;
+  // const int sdim = dim;
+
+  // const Equations eqSys = eqSystem;
+
+  // GasMixture *d_mix = mixture;
+  // TransportProperties *d_trans = transport_;
+
+  // MFEM_FORALL(n, dof, {
+  //   double U[gpudata::MAXEQUATIONS];
+  //   double Up[gpudata::MAXEQUATIONS];
+  //   double gradUp[gpudata::MAXDIM * gpudata::MAXEQUATIONS];
+  //   double x[gpudata::MAXDIM];
+
+  //   // Extract state information
+  //   for (int eq = 0; eq < neqn; eq++) {
+  //     U[eq] = d_U[n + eq * dof];
+  //     Up[eq] = d_Up[n + eq * dof];
+  //     for (int d = 0; d < sdim; d++) {
+  //       gradUp[eq + d * neqn] = d_gradUp[n + eq * dof + d * neqn * dof];
+  //     }
+  //   }
+
+  //   // Extract radius
+  //   for (int d = 0; d < sdim; d++) x[d] = d_coords[n + d * dof];
+  //   const double radius = x[0];
+
+  //   // Evaluate quantities required for axisym source
+  //   const double rho = Up[0];
+  //   const double ur = Up[1];
+  //   const double ut = Up[3];
+
+  //   const double pressure = d_mix->ComputePressureFromPrimitives(Up);
+
+  //   const double rurut = rho * ur * ut;
+  //   const double rutut = rho * ut * ut;
+
+  //   double tau_tt, tau_tr;
+  //   if (eqSys == EULER) {
+  //     tau_tt = tau_tr = 0.0;
+  //   } else {
+  //     const double ur_r = gradUp[1 + 0 * neqn];
+  //     const double uz_z = gradUp[2 + 1 * neqn];
+  //     const double ut_r = gradUp[3 + 0 * neqn];
+
+  //     double visc, bulkVisc, visc_vec[2];
+
+  //     double dist = 0;
+  //     if (d_dist != NULL) dist = d_dist[n];
+
+  //     d_trans->GetViscosities(U, Up, gradUp, radius, dist, visc_vec);
+  //     visc = visc_vec[0];
+  //     bulkVisc = visc_vec[1];
+  //     bulkVisc -= 2. / 3. * visc;
+
+  //     if (alpha != NULL) {
+  //       visc *= alpha[n];
+  //     }
+
+  //     double divV = ur_r + uz_z;
+  //     if (radius > 0) divV += ur / radius;
+
+  //     tau_tt = (radius > 0) ? 2.0 * ur / radius * visc : 0.0;
+  //     tau_tt += bulkVisc * divV;
+
+  //     tau_tr = ut_r;
+  //     if (radius > 0) tau_tr -= ut / radius;
+
+  //     tau_tr *= visc;
+  //   }
+
+  //   // Put source into the right spot
+  //   d_y[n + 1 * dof] += (pressure + rutut - tau_tt) / radius;
+  //   d_y[n + 3 * dof] += (-rurut + tau_tr) / radius;
+
+  //   // if (radius > 0) {
+  //   //   d_y[n + 1 * dof] += (pressure + rutut - tau_tt) / radius;
+  //   //   d_y[n + 3 * dof] += (-rurut + tau_tr) / radius;
+  //   // } else {
+  //   //   // TODO(trevilo): Fix axis
+  //   //   double fake_radius = 1e-3;
+  //   //   d_y[n + 1 * dof] += (pressure - tau_tt) / fake_radius;
+  //   //   d_y[n + 3 * dof] += (tau_tr) / fake_radius;
+  //   // }
+  // });
 }
 
 JouleHeating::JouleHeating(const int &_dim, const int &_num_equation, const int &_order, GasMixture *_mixture,
