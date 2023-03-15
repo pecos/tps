@@ -688,7 +688,6 @@ void Fluxes::ComputeSplitFlux(const mfem::Vector &state, mfem::DenseMatrix &a_ma
 Basic Smagorinksy subgrid model with user-specified cutoff grid length
 */
 void Fluxes::sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu) {
-
   Vector Sij(6);
   double Smag = 0.;
   double Cd = 0.12;
@@ -696,129 +695,120 @@ void Fluxes::sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delt
   double d_model;
 
   // gradUp is in (eq,dim) form with eq=0 being rho slot
-  Sij[0] = gradUp(1,0);
-  Sij[1] = gradUp(2,1);
-  Sij[2] = gradUp(3,2);  
-  Sij[3] = 0.5*(gradUp(1,1) + gradUp(2,0));
-  Sij[4] = 0.5*(gradUp(1,2) + gradUp(3,0));
-  Sij[5] = 0.5*(gradUp(2,2) + gradUp(3,1));
+  Sij[0] = gradUp(1, 0);
+  Sij[1] = gradUp(2, 1);
+  Sij[2] = gradUp(3, 2);
+  Sij[3] = 0.5 * (gradUp(1, 1) + gradUp(2, 0));
+  Sij[4] = 0.5 * (gradUp(1, 2) + gradUp(3, 0));
+  Sij[5] = 0.5 * (gradUp(2, 2) + gradUp(3, 1));
 
   // strain magnitude with silly sqrt(2) factor
-  for (int i = 0; i < 3; i++) Smag += Sij[i]*Sij[i];
-  for (int i = 3; i < 6; i++) Smag += 2.0*Sij[i]*Sij[i];
-  Smag = sqrt(2.0*Smag);
+  for (int i = 0; i < 3; i++) Smag += Sij[i] * Sij[i];
+  for (int i = 3; i < 6; i++) Smag += 2.0 * Sij[i] * Sij[i];
+  Smag = sqrt(2.0 * Smag);
 
   // eddy viscosity with delta shift
   l_floor = config_->GetSgsFloor();
-  d_model = Cd * max(delta-l_floor,0.0);
+  d_model = Cd * max(delta - l_floor, 0.0);
   mu = state[0] * d_model * d_model * Smag;
-  
 }
 
-
 /**
-NOT TESTED: Sigma subgrid model following Nicoud et.al., "Using singular values to build a 
+NOT TESTED: Sigma subgrid model following Nicoud et.al., "Using singular values to build a
 subgrid-scale model for large eddy simulations", PoF 2011.
 */
 void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu) {
-
-  DenseMatrix Qij(dim,dim);
-  DenseMatrix du(dim,dim);
-  DenseMatrix B(dim,dim);  
+  DenseMatrix Qij(dim, dim);
+  DenseMatrix du(dim, dim);
+  DenseMatrix B(dim, dim);
   Vector ev(dim);
-  Vector sigma(dim);  
+  Vector sigma(dim);
   double Cd = 0.135;
   double sml = 1.0e-12;
   double pi = 3.14159265359;
-  double onethird = 1./3.;  
+  double onethird = 1. / 3.;
   double l_floor, d_model, d4;
   double p1, p2, p, q, detB, r, phi;
 
-  
   // Qij = u_{k,i}*u_{k,j}
-  for (int j = 0; j < dim; j++) {  
+  for (int j = 0; j < dim; j++) {
     for (int i = 0; i < dim; i++) {
-      Qij(i,j) = 0.;
-    }    
+      Qij(i, j) = 0.;
+    }
   }
-  for (int k = 0; k < dim; k++) {  
+  for (int k = 0; k < dim; k++) {
     for (int j = 0; j < dim; j++) {
       for (int i = 0; i < dim; i++) {
-        Qij(i,j) += gradUp(k+1,i) * gradUp(k+1,j);
-      }           
-    }    
+        Qij(i, j) += gradUp(k + 1, i) * gradUp(k + 1, j);
+      }
+    }
   }
 
   // shifted grid scale, d should really be sqrt of J^T*J
   l_floor = config_->GetSgsFloor();
-  d_model = max((delta-l_floor), sml);  
-  d4 = pow(d_model,4);
-  for (int j = 0; j < dim; j++) { 
-    for (int i = 0; i < dim; i++) {      
-      Qij(i,j) *= d4;
-    }    
-  }  
-  
+  d_model = max((delta - l_floor), sml);
+  d4 = pow(d_model, 4);
+  for (int j = 0; j < dim; j++) {
+    for (int i = 0; i < dim; i++) {
+      Qij(i, j) *= d4;
+    }
+  }
+
   // eigenvalues for symmetric pos-def 3x3
-  p1 = Qij(0,1) * Qij(0,1) + \
-       Qij(0,2) * Qij(0,2) + \
-       Qij(1,2) * Qij(1,2);
-  q = onethird * (Qij(0,0) + Qij(1,1) + Qij(2,2));
-  p2 = (Qij(0,0) - q) * (Qij(0,0) - q) + \
-       (Qij(1,1) - q) * (Qij(1,1) - q) + \
-       (Qij(2,2) - q) * (Qij(2,2) - q) + 2.0*p1;
-  p = std::sqrt(max(p2,0.0)/6.0);  
-  //cout << "p1, q, p2, p: " << p1 << " " << q << " " << p2 << " " << p << endl; fflush(stdout);
-  
+  p1 = Qij(0, 1) * Qij(0, 1) + Qij(0, 2) * Qij(0, 2) + Qij(1, 2) * Qij(1, 2);
+  q = onethird * (Qij(0, 0) + Qij(1, 1) + Qij(2, 2));
+  p2 = (Qij(0, 0) - q) * (Qij(0, 0) - q) + (Qij(1, 1) - q) * (Qij(1, 1) - q) + (Qij(2, 2) - q) * (Qij(2, 2) - q) +
+       2.0 * p1;
+  p = std::sqrt(max(p2, 0.0) / 6.0);
+  // cout << "p1, q, p2, p: " << p1 << " " << q << " " << p2 << " " << p << endl; fflush(stdout);
+
   for (int j = 0; j < dim; j++) {
-    for (int i = 0; i < dim; i++) {       
-      B(i,j) = Qij(i,j);
-    }    
-  }    
+    for (int i = 0; i < dim; i++) {
+      B(i, j) = Qij(i, j);
+    }
+  }
   for (int i = 0; i < dim; i++) {
-     B(i,i) -= q;
-  }    
+    B(i, i) -= q;
+  }
   for (int j = 0; j < dim; j++) {
-    for (int i = 0; i < dim; i++) {       
-      B(i,j) *= (1.0/max(p,sml));
-    }    
-  }    
-  detB = B(0,0) * (B(1,1)*B(2,2) - B(2,1)*B(1,2)) - \
-         B(0,1) * (B(1,0)*B(2,2) - B(2,0)*B(1,2)) + \
-         B(0,2) * (B(1,0)*B(2,1) - B(2,0)*B(1,1));
-  r = 0.5*detB;
-  //cout << "r: " << r << endl; fflush(stdout);
-  
+    for (int i = 0; i < dim; i++) {
+      B(i, j) *= (1.0 / max(p, sml));
+    }
+  }
+  detB = B(0, 0) * (B(1, 1) * B(2, 2) - B(2, 1) * B(1, 2)) - B(0, 1) * (B(1, 0) * B(2, 2) - B(2, 0) * B(1, 2)) +
+         B(0, 2) * (B(1, 0) * B(2, 1) - B(2, 0) * B(1, 1));
+  r = 0.5 * detB;
+  // cout << "r: " << r << endl; fflush(stdout);
+
   if (r <= -1.0) {
-    phi = onethird*pi;
+    phi = onethird * pi;
   } else if (r >= 1.0) {
     phi = 0.0;
   } else {
-    phi = onethird*acos(r);
+    phi = onethird * acos(r);
   }
 
   // eigenvalues satisfy eig3 <= eig2 <= eig1 (L^4/T^2)
   ev[0] = q + 2.0 * p * cos(phi);
-  ev[2] = q + 2.0 * p * cos(phi + (2.0*onethird*pi));
+  ev[2] = q + 2.0 * p * cos(phi + (2.0 * onethird * pi));
   ev[1] = 3.0 * q - ev[0] - ev[2];
 
   // actual sigma (L^2/T)
-  sigma[0] = sqrt(max(ev[0],sml));
-  sigma[1] = sqrt(max(ev[1],sml));
-  sigma[2] = sqrt(max(ev[2],sml));
-  //cout << "sigma: " << sigma[0] << " " << sigma[1] << " " << sigma[2] << endl; fflush(stdout);
-  
+  sigma[0] = sqrt(max(ev[0], sml));
+  sigma[1] = sqrt(max(ev[1], sml));
+  sigma[2] = sqrt(max(ev[2], sml));
+  // cout << "sigma: " << sigma[0] << " " << sigma[1] << " " << sigma[2] << endl; fflush(stdout);
+
   // eddy viscosity
-  mu = sigma[2] * (sigma[0]-sigma[1]) * (sigma[1]-sigma[2]);
-  mu = max(mu, 0.0);  
-  mu /= (sigma[0]*sigma[0]);
-  mu *= (Cd*Cd);
+  mu = sigma[2] * (sigma[0] - sigma[1]) * (sigma[1] - sigma[2]);
+  mu = max(mu, 0.0);
+  mu /= (sigma[0] * sigma[0]);
+  mu *= (Cd * Cd);
   mu *= state[0];
-  //cout << "mu: " << mu << endl; fflush(stdout);
+  // cout << "mu: " << mu << endl; fflush(stdout);
 
   // shouldnt be necessary
   if (mu != mu) mu = 0.0;
-  
 }
 
 // clang-format on

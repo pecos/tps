@@ -104,16 +104,15 @@ void M2ulPhyS::initVariables() {
     // read serial mesh and corresponding partition file (the hdf file that was generated
     // when starting from scratch).
 
-    // w/o ini periodic option    
-    //serial_mesh = new Mesh(config.GetMeshFileName().c_str());
+    // w/o ini periodic option
+    // serial_mesh = new Mesh(config.GetMeshFileName().c_str());
 
     // periodic treatments
-    if(config.GetPeriodic()) {
-
+    if (config.GetPeriodic()) {
       Mesh temp_mesh = Mesh(config.GetMeshFileName().c_str());
       Vector x_translation({config.GetXTrans(), 0.0, 0.0});
       Vector y_translation({0.0, config.GetYTrans(), 0.0});
-      Vector z_translation({0.0, 0.0, config.GetZTrans()});      
+      Vector z_translation({0.0, 0.0, config.GetZTrans()});
       std::vector<Vector> translations = {x_translation, y_translation, z_translation};
 
       if (mpi.Root()) {
@@ -121,15 +120,14 @@ void M2ulPhyS::initVariables() {
         std::cout << " yTrans: " << config.GetYTrans() << std::endl;
         std::cout << " zTrans: " << config.GetZTrans() << std::endl;
       }
-      
-      serial_mesh = new Mesh(std::move(Mesh::MakePeriodic(temp_mesh, temp_mesh.CreatePeriodicVertexMapping(translations))));
-      
-    }
-    else {
-      serial_mesh = new Mesh(config.GetMeshFileName().c_str());      
+
+      serial_mesh =
+          new Mesh(std::move(Mesh::MakePeriodic(temp_mesh, temp_mesh.CreatePeriodicVertexMapping(translations))));
+
+    } else {
+      serial_mesh = new Mesh(config.GetMeshFileName().c_str());
     }
 
-    
     if (config.GetUniformRefLevels() > 0) {
       if (mpi.Root()) {
         std::cerr << "ERROR: Uniform mesh refinement not supported upon restart." << std::endl;
@@ -162,31 +160,29 @@ void M2ulPhyS::initVariables() {
       }
     }
 
-    //serial_mesh = new Mesh(config.GetMeshFileName().c_str());
+    // serial_mesh = new Mesh(config.GetMeshFileName().c_str());
 
     // periodic treatments
-    if(config.GetPeriodic()) {
-
+    if (config.GetPeriodic()) {
       Mesh temp_mesh = Mesh(config.GetMeshFileName().c_str());
       Vector x_translation({config.GetXTrans(), 0.0, 0.0});
       Vector y_translation({0.0, config.GetYTrans(), 0.0});
-      Vector z_translation({0.0, 0.0, config.GetZTrans()});      
+      Vector z_translation({0.0, 0.0, config.GetZTrans()});
       std::vector<Vector> translations = {x_translation, y_translation, z_translation};
 
       if (mpi.Root()) {
         std::cout << " xTrans: " << config.GetXTrans() << std::endl;
         std::cout << " yTrans: " << config.GetYTrans() << std::endl;
-        std::cout << " zTrans: " << config.GetZTrans() << std::endl;		
+        std::cout << " zTrans: " << config.GetZTrans() << std::endl;
       }
-      
-      serial_mesh = new Mesh(std::move(Mesh::MakePeriodic(temp_mesh, temp_mesh.CreatePeriodicVertexMapping(translations))));
-      
-    }
-    else {
-      serial_mesh = new Mesh(config.GetMeshFileName().c_str());      
+
+      serial_mesh =
+          new Mesh(std::move(Mesh::MakePeriodic(temp_mesh, temp_mesh.CreatePeriodicVertexMapping(translations))));
+
+    } else {
+      serial_mesh = new Mesh(config.GetMeshFileName().c_str());
     }
 
-    
     // uniform refinement, user-specified number of times
     for (int l = 0; l < config.GetUniformRefLevels(); l++) {
       if (mpi.Root()) {
@@ -2212,8 +2208,8 @@ void M2ulPhyS::parseSolverOptions2() {
   parseRadiationInputs();
 
   // periodicity
-  parsePeriodicInputs();  
-  
+  parsePeriodicInputs();
+
   // post-process visualization inputs
   parsePostProcessVisualizationInputs();
 
@@ -3260,7 +3256,7 @@ void M2ulPhyS::parsePeriodicInputs() {
   tpsP->getInput("periodicity/enablePeriodic", config.periodic, false);
   tpsP->getInput("periodicity/xTrans", config.xTrans, 1.0e12);
   tpsP->getInput("periodicity/yTrans", config.yTrans, 1.0e12);
-  tpsP->getInput("periodicity/zTrans", config.zTrans, 1.0e12);    
+  tpsP->getInput("periodicity/zTrans", config.zTrans, 1.0e12);
 }
 
 void M2ulPhyS::packUpGasMixtureInput() {

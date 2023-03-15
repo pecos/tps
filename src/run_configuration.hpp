@@ -268,7 +268,7 @@ class RunConfiguration {
 
   // the wall BC values are a mess and buried
   double wallTemperature;
-  
+
   PostProcessInput postprocessInput;
 
   bool compute_distance;
@@ -284,8 +284,8 @@ class RunConfiguration {
   double GetXTrans() { return xTrans; }
   double GetYTrans() { return yTrans; }
   double GetZTrans() { return zTrans; }
-  double GetWallTemp() { return wallTemperature; }      
-  
+  double GetWallTemp() { return wallTemperature; }
+
   string GetMeshFileName() { return meshFile; }
   string GetOutputName() { return outputFile; }
   string GetPartitionBaseName() { return partFile; }

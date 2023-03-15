@@ -384,7 +384,7 @@ class M2ulPhyS : public TPS::Solver {
   void parseReactionInputs();
   void parseBCInputs();
   void parseSpongeZoneInputs();
-  void parsePeriodicInputs();  
+  void parsePeriodicInputs();
   void parsePostProcessVisualizationInputs();
   void parseRadiationInputs();
 
