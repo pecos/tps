@@ -32,14 +32,14 @@
 #include "fluxes.hpp"
 
 MFEM_HOST_DEVICE Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
-                                const int _num_equation, const int _dim, bool axisym, RunConfiguration *config)
+                                const int _num_equation, const int _dim, bool axisym, RunConfiguration *_config)
     : mixture(_mixture),
       eqSystem(_eqSystem),
       transport(_transport),
       dim(_dim),
       nvel(axisym ? 3 : _dim),
       axisymmetric_(axisym),
-      config_(config),
+      config_(_config),      
       num_equation(_num_equation) {}
 
 #ifdef _BUILD_DEPRECATED_
@@ -53,8 +53,15 @@ void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, D
       DenseMatrix convF(num_equation, dim);
       ComputeConvectiveFluxes(state, convF);
 
+      double x[3];
+      Vector transip(x, 3);  // empty just to build
+      double delta = 0.;
+      printf("WARNING, CVF called in wrong place\n");
+      fflush(stdout);
+      
       DenseMatrix viscF(num_equation, dim);
-      ComputeViscousFluxes(state, gradUpi, 1, delta, viscF);
+      ComputeViscousFluxes(state, gradUpi, 1, transip, delta, viscF);
+      
       for (int eq = 0; eq < num_equation; eq++) {
         for (int d = 0; d < dim; d++) flux(eq, d) = convF(eq, d) - viscF(eq, d);
       }
@@ -138,8 +145,9 @@ MFEM_HOST_DEVICE void Fluxes::ComputeConvectiveFluxes(const double *state, doubl
 }
 
 // TODO(kevin): check/complete axisymmetric setting for multi-component flow.
-void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, double delta,
-                                  DenseMatrix &flux) {
+void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip, double delta, DenseMatrix &flux) {
+#ifdef _BUILD_DEPRECATED_
+  
   flux = 0.;
   if (eqSystem == EULER) {
     return;
@@ -268,10 +276,14 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
     // however only dim-components are used for flux.
     for (int d = 0; d < dim; d++) flux(nvel + 2 + sp, d) = -state[nvel + 2 + sp] * diffusionVelocity(sp, d);
   }
+
+#else
+  ComputeViscousFluxes(state.GetData(), gradUp.GetData(), radius, transip, delta, flux.GetData());
+#endif
 }
 
-MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius,
-                                                   double delta, double *flux) {
+MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius, Vector transip, double delta, double *flux) {
+
   for (int d = 0; d < dim; d++) {
     for (int eq = 0; eq < num_equation; eq++) {
       flux[eq + d * num_equation] = 0.;
@@ -300,12 +312,21 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
   // NOTE(kevin): in flux, only dim-components of diffusionVelocity will be used.
   double diffusionVelocity[gpudata::MAXSPECIES * gpudata::MAXDIM];
   transport->ComputeFluxTransportProperties(state, gradUp, Efield, transportBuffer, diffusionVelocity);
-  const double visc = transportBuffer[FluxTrns::VISCOSITY];
+  double visc = transportBuffer[FluxTrns::VISCOSITY];
   double bulkViscosity = transportBuffer[FluxTrns::BULK_VISCOSITY];
   bulkViscosity -= 2. / 3. * visc;
   double k = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY];
   double ke = transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY];
 
+  // viscous sponge
+  if (config_->linViscData.isEnabled) {
+    double wgt = 0.;
+    viscSpongePlanar(transip, wgt);
+    visc *= wgt;
+    bulkViscosity *= wgt;
+    k *= wgt;
+  }
+  
   if (twoTemperature) {
     for (int d = 0; d < dim; d++) {
       double qeFlux = ke * gradUp[num_equation - 1 + d * num_equation];
@@ -395,9 +416,8 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
   }
 }
 
-// must modify this guy to be consistent with ComputeViscousFluxes
-void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, double delta,
-                                     const BoundaryViscousFluxData &bcFlux, Vector &normalFlux) {
+void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip, double delta,const BoundaryViscousFluxData &bcFlux, Vector &normalFlux) {
+  
   normalFlux.SetSize(num_equation);
   normalFlux = 0.;
   if (eqSystem == EULER) {
@@ -530,9 +550,11 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
   }
 }
 
-MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius,
-                                                      double delta, const BoundaryViscousFluxData &bcFlux,
-                                                      double *normalFlux) {
+
+MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius, Vector transip, double delta,
+                                                      const BoundaryViscousFluxData &bcFlux, double *normalFlux) {
+  
+  // normalFlux.SetSize(num_equation);
   for (int eq = 0; eq < num_equation; eq++) normalFlux[eq] = 0.;
   if (eqSystem == EULER) {
     return;
@@ -561,6 +583,15 @@ MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const
   double k = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY];
   double ke = transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY];
 
+  // viscous sponge
+  if (config_->linViscData.isEnabled) {
+    double wgt = 0.;
+    viscSpongePlanar(transip, wgt);
+    visc *= wgt;
+    bulkViscosity *= wgt;
+    k *= wgt;
+  }
+  
   // Primitive viscous fluxes.
   const int primFluxSize = (twoTemperature) ? numSpecies + nvel + 2 : numSpecies + nvel + 1;
   double normalPrimFlux[gpudata::MAXEQUATIONS];
@@ -809,6 +840,45 @@ void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double del
 
   // shouldnt be necessary
   if (mu != mu) mu = 0.0;
+}
+
+/**
+Simple planar viscous sponge layer with smooth tanh-transtion using user-specified width and
+total amplification.  Note: duplicate in M2
+*/
+void Fluxes::viscSpongePlanar(Vector x, double &wgt) {
+
+  Vector normal(3);
+  Vector point(3);
+  Vector s(3);  
+  double Nmag, factor, width, dist;
+
+  
+  // initialize
+  Nmag = 0.;
+  dist = 0.;  
+
+  // get settings
+  for (int d = 0; d < dim; d++) normal[d] = config_->GetLinearVaryingData().normal(d);
+  for (int d = 0; d < dim; d++) point[d] = config_->GetLinearVaryingData().point0(d);
+  factor = config_->GetLinearVaryingData().viscRatio;
+  factor = max(factor, 1.0);
+  width = config_->GetLinearVaryingData().width;
+
+  // ensure normal is actually a unit normal
+  for (int d = 0; d < dim; d++) Nmag += normal[d] * normal[d];
+  Nmag = sqrt(Nmag);
+  for (int d = 0; d < dim; d++) normal[d] /= Nmag;  
+  
+  // distance from plane  
+  for (int d = 0; d < dim; d++) s[d] = (x[d] - point[d]);
+  for (int d = 0; d < dim; d++) dist += s[d]*normal[d];  
+  
+  // weight
+  wgt = 0.5*(tanh(dist/width - 2.0) + 1.0);
+  wgt *= (factor-1.0);
+  wgt += 1.0;
+  
 }
 
 // clang-format on

@@ -219,14 +219,15 @@ void BCintegrator::initBCs() {
 }
 
 void BCintegrator::computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState,
-                                  double radius, double delta, Vector &bdrFlux) {
+                                  double radius, Vector transip, double delta, Vector &bdrFlux) {
+  
   std::unordered_map<int, BoundaryCondition *>::const_iterator ibc = inletBCmap.find(attr);
   std::unordered_map<int, BoundaryCondition *>::const_iterator obc = outletBCmap.find(attr);
   std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = wallBCmap.find(attr);
 
-  if (ibc != inletBCmap.end()) ibc->second->computeBdrFlux(normal, stateIn, gradState, radius, delta, bdrFlux);
-  if (obc != outletBCmap.end()) obc->second->computeBdrFlux(normal, stateIn, gradState, radius, delta, bdrFlux);
-  if (wbc != wallBCmap.end()) wbc->second->computeBdrFlux(normal, stateIn, gradState, radius, delta, bdrFlux);
+  if (ibc != inletBCmap.end()) ibc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, delta, bdrFlux);
+  if (obc != outletBCmap.end()) obc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, delta, bdrFlux);
+  if (wbc != wallBCmap.end()) wbc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, delta, bdrFlux);
 
   //   BCmap[attr]->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
 }
@@ -312,9 +313,11 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
   DenseTensor elGradUp(eldDof, num_equation, dim);
 
   // element size
-  double delta;
-  Mesh *mesh = vfes->GetMesh();
+  double delta;  
+  Mesh *mesh = vfes->GetMesh();  
   delta = mesh->GetElementSize(Tr.Elem1No, 1);
+  //cout << "delta: " << delta << endl; fflush(stdout); 
+  
 
 #ifdef _GPU_
   retrieveGradientsData_gpu(gradUp, elGradUp, vdofs, num_equation, dim, vfes->GetNDofs(), eldDof);
@@ -380,14 +383,14 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
     CalcOrtho(Tr.Jacobian(), nor);
 
     double radius = 1;
+    double x[3];
+    Vector transip(x, 3);
+    Tr.Transform(ip, transip);  // x-y-z coordinates of int pts
     if (config.isAxisymmetric()) {
-      double x[3];
-      Vector transip(x, 3);
-      Tr.Transform(ip, transip);
       radius = transip[0];
     }
-
-    computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, radius, delta, fluxN);
+    
+    computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, radius, transip, delta, fluxN);
     fluxN *= ip.weight;
 
     if (config.isAxisymmetric()) {

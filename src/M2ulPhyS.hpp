@@ -405,7 +405,8 @@ class M2ulPhyS : public TPS::Solver {
   void solve() override;
   void visualization() override;
   void updateVisualizationVariables();
-
+  void viscMultPlanar(Vector coords, double &wgt);  
+  
   // Accessors
   RHSoperator *getRHSoperator() { return rhsOperator; }
   ParMesh *GetMesh() { return mesh; }

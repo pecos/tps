@@ -236,9 +236,9 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
 
   // element size
   double delta;
-  Mesh *mesh = vfes->GetMesh();
-  delta = mesh->GetElementSize(Tr.Elem1No, 1);
-
+  Mesh *mesh = vfes->GetMesh();  
+  delta = mesh->GetElementSize(Tr.Elem1No, 1);  
+  
   for (int i = 0; i < ir->GetNPoints(); i++) {
     const IntegrationPoint &ip = ir->IntPoint(i);
 
@@ -271,16 +271,15 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     double x[3];
     Vector transip(x, 3);
     Tr.Transform(ip, transip);
-    if (axisymmetric_) {
+    if (axisymmetric_) {      
       radius = transip[0];
     }
-
+    
     // compute viscous fluxes
     viscF1 = viscF2 = 0.;
-
-    fluxClass->ComputeViscousFluxes(funval1, gradUp1i, radius, delta, viscF1);
-    fluxClass->ComputeViscousFluxes(funval2, gradUp2i, radius, delta, viscF2);
-
+    fluxClass->ComputeViscousFluxes(funval1, gradUp1i, radius, transip, delta, viscF1);
+    fluxClass->ComputeViscousFluxes(funval2, gradUp2i, radius, transip, delta, viscF2);
+    
     // compute mean flux
     viscF1 += viscF2;
     viscF1 *= -0.5;
