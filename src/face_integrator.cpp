@@ -180,7 +180,7 @@ void FaceIntegrator::getDistanceDofs(FaceElementTransformations &Tr, const Finit
     dist2.SetSize(dofs2.Size());
     distance_->FaceNbrData().GetSubVector(dofs2, dist2);
   } else {
-    pfes->GetElementVDofs(no2, vdofs2);
+    pfes->GetElementVDofs(no2, dofs2);
     dist2.SetSize(dofs2.Size());
     distance_->GetSubVector(dofs2, dist2);
   }
