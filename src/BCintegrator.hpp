@@ -87,7 +87,8 @@ class BCintegrator : public NonlinearFormIntegrator {
   bool mpiRoot;
 
   double time;
-  double * pTime;  
+  double * pTime;
+  int rkStep;
   
   // void calcMeanState();
   void computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius,
@@ -111,7 +112,8 @@ class BCintegrator : public NonlinearFormIntegrator {
   //double* GetOutletBdrU_ptr(int ii) { return &oBoundaryU[ii]; }
   //Vector *GetOutletBdrU_ptr() { return &oBoundaryU; }
   Vector *GetOutletBdrU_ptr() { return oBoundaryU_ptr; }
-  bool GetRootStatus() const { return mpiRoot; }  
+  bool GetRootStatus() const { return mpiRoot; }
+  int GetSubStep() const { return rkStep; }  
   
   //void updateBCMean(ParGridFunction *Up);
   void updateBCMean(ParGridFunction *U_, ParGridFunction *Up);  

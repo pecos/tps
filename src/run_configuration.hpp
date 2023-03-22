@@ -268,7 +268,9 @@ class RunConfiguration {
   // mesh periodicitity
   bool periodic;
   double xTrans, yTrans, zTrans;
-  
+
+  // the wall BC values are a mess and buried
+  double wallTemperature;
   
   PostProcessInput postprocessInput;
 
@@ -280,7 +282,8 @@ class RunConfiguration {
   bool GetPeriodic() { return periodic; }
   double GetXTrans() { return xTrans; }
   double GetYTrans() { return yTrans; }
-  double GetZTrans() { return zTrans; }    
+  double GetZTrans() { return zTrans; }
+  double GetWallTemp() { return wallTemperature; }      
   
   string GetMeshFileName() { return meshFile; }
   string GetOutputName() { return outputFile; }

@@ -1898,16 +1898,29 @@ void M2ulPhyS::nonuniformInitialConditions() {
   // 2D Taylor-Green initialization
   double AA = +1.0;
   double BB = -1.0;
-  double Lx = pi;
-  double Ly = pi;  
+  double Lx = 2.0*pi;
+  double Ly = 2.0*pi;  
   double Umag = 0.;
   for (int d = 0; d < dim; d++) Umag += inputRhoRhoVp[d+1]*inputRhoRhoVp[d+1];
   Umag = std::sqrt(Umag);
   
   for (int i = 0; i < dof; i++) {    
-    for (int d = 0; d < dim; d++) xyz[d] = (*coordsDof)[i + d * dof];      
+    for (int d = 0; d < dim; d++) xyz[d] = (*coordsDof)[i + d * dof];
+
+    /*
     double uTG = AA * Umag * cos(xyz[0]*Lx) * sin(xyz[1]*Ly);
     double vTG = BB * Umag * sin(xyz[0]*Lx) * cos(xyz[1]*Ly);
+    uTG += AA * std::pow(2.0,-2.0/3.0) * Umag * cos(xyz[0]*2.0*Lx) * sin(xyz[1]*2.0*Ly);
+    vTG += BB * std::pow(2.0,-2.0/3.0) * Umag * sin(xyz[0]*2.0*Lx) * cos(xyz[1]*2.0*Ly);
+    uTG += AA * std::pow(4.0,-2.0/3.0) * Umag * cos(xyz[0]*4.0*Lx) * sin(xyz[1]*4.0*Ly);
+    vTG += BB * std::pow(4.0,-2.0/3.0) * Umag * sin(xyz[0]*4.0*Lx) * cos(xyz[1]*4.0*Ly);
+    if(xyz[1]>0.25 && xyz[1]<0.75) {uTG += Umag;}
+    else {uTG -= Umag;}    
+    */
+
+    double uTG = Umag * 4.0* (xyz[1]*xyz[1]);
+    double vTG = 0.0;    
+    
     initState[0] = inputRhoRhoVp[0];
     initState[1] = uTG;
     initState[2] = vTG;

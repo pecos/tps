@@ -138,8 +138,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeConvectiveFluxes(const double *state, doubl
 
 // jump
 // TODO(kevin): check/complete axisymmetric setting for multi-component flow.
-void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip,
-                                  double delta, DenseMatrix &flux) {
+void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip, double delta, DenseMatrix &flux) {
   //  printf("CVF caught\n"); fflush(stdout);
 
   flux = 0.;
@@ -303,8 +302,7 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   }
 }
 
-MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius,
-                                                   double *flux) {
+MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius, double *flux) {
   //  printf("CVF HD caught\n"); fflush(stdout);
 
   for (int d = 0; d < dim; d++) {
@@ -910,8 +908,6 @@ void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double del
   double l_floor, d_model, d4;
   double p1, p2, p, q, detB, r, phi;
 
-
-  //cout << " ...in sgsSigma..." << endl; fflush(stdout);
   
   // Qij = u_{k,i}*u_{k,j}
   for (int j = 0; j < dim; j++) {  
@@ -945,8 +941,7 @@ void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double del
   p2 = (Qij(0,0) - q) * (Qij(0,0) - q) + \
        (Qij(1,1) - q) * (Qij(1,1) - q) + \
        (Qij(2,2) - q) * (Qij(2,2) - q) + 2.0*p1;
-  p = sqrt(max(p2,0.0)/6.0);
-  
+  p = std::sqrt(max(p2,0.0)/6.0);  
   //cout << "p1, q, p2, p: " << p1 << " " << q << " " << p2 << " " << p << endl; fflush(stdout);
   
   for (int j = 0; j < dim; j++) {
@@ -962,13 +957,12 @@ void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double del
       B(i,j) *= (1.0/max(p,sml));
     }    
   }    
-  detB = B(1,1) * (B(2,2)*B(3,3) - B(3,2)*B(2,3)) - \
-         B(1,2) * (B(2,1)*B(3,3) - B(3,1)*B(2,3)) + \
-         B(1,3) * (B(2,1)*B(3,2) - B(3,1)*B(2,2));
+  detB = B(0,0) * (B(1,1)*B(2,2) - B(2,1)*B(1,2)) - \
+         B(0,1) * (B(1,0)*B(2,2) - B(2,0)*B(1,2)) + \
+         B(0,2) * (B(1,0)*B(2,1) - B(2,0)*B(1,1));
   r = 0.5*detB;
-
-  //cout << "r: " << r << endl; fflush(stdout);  
-
+  //cout << "r: " << r << endl; fflush(stdout);
+  
   if (r <= -1.0) {
     phi = onethird*pi;
   } else if (r >= 1.0) {
@@ -977,7 +971,6 @@ void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double del
     phi = onethird*acos(r);
   }
 
-  // CHECK THIS PART
   // eigenvalues satisfy eig3 <= eig2 <= eig1 (L^4/T^2)
   ev[0] = q + 2.0 * p * cos(phi);
   ev[2] = q + 2.0 * p * cos(phi + (2.0*onethird*pi));
@@ -987,17 +980,17 @@ void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double del
   sigma[0] = sqrt(max(ev[0],sml));
   sigma[1] = sqrt(max(ev[1],sml));
   sigma[2] = sqrt(max(ev[2],sml));
-
   //cout << "sigma: " << sigma[0] << " " << sigma[1] << " " << sigma[2] << endl; fflush(stdout);
   
   // eddy viscosity
-  mu = sigma[2] * (sigma[0] - sigma[1]) * (sigma[1]-sigma[2]);
-  mu = max(mu, 0.0);
+  mu = sigma[2] * (sigma[0]-sigma[1]) * (sigma[1]-sigma[2]);
+  mu = max(mu, 0.0);  
   mu /= (sigma[0]*sigma[0]);
   mu *= (Cd*Cd);
   mu *= state[0];
-
   //cout << "mu: " << mu << endl; fflush(stdout);
+
+  // shouldnt be necessary
   if (mu != mu) mu = 0.0;
   
 }

@@ -1,4 +1,3 @@
-
 // -----------------------------------------------------------------------------------bl-
 // BSD 3-Clause License
 //
@@ -289,8 +288,10 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     // add to element vectors
     AddMultVWt(shape2, fluxN, elvect2_mat);
     AddMult_a_VWt(-1.0, shape1, fluxN, elvect1_mat);
+    
   }
 }
+
 
 void FaceIntegrator::MassMatrixFaceIntegral(const FiniteElement &el1, const FiniteElement &el2,
                                             FaceElementTransformations &Tr, const Vector &elfun, Vector &elvect) {

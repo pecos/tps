@@ -69,6 +69,7 @@ BCintegrator::BCintegrator(bool _mpiRoot, MPI_Groups *_groupsMPI, ParMesh *_mesh
   mpiRoot = _mpiRoot;
   time = *_time;
   pTime = _time;
+  //rkStep = 0;
   
   // Init inlet BCs
   for (size_t in = 0; in < config.GetInletPatchType()->size(); in++) {
@@ -390,6 +391,10 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
     cout << "BCi: time, &time, pTime, *pTime " << time << ", " << &time << ", " << pTime << ", " << *pTime << endl; fflush(stdout);
   }
   */
+
+  // internal bc integration
+  //if(rkStep == 4) rkStep = 0;
+  //rkStep++;
   
   for (int i = 0; i < ir->GetNPoints(); i++) {
     

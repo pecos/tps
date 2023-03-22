@@ -335,8 +335,8 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
         std::unordered_map<int, BoundaryCondition *>::const_iterator obc = outletBCmap.find(attr);	
         std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = wallBCmap.find(attr);
         if (ibc != inletBCmap.end()) {
-          iUp1(eq) = 0.0;	  
           iUp2(eq) = 0.0;
+          iUp1(eq) = 0.0;	  
         }	
         if (obc != outletBCmap.end()) {
           iUp1(eq) = 0.0;	  

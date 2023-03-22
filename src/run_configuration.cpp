@@ -577,7 +577,11 @@ void RunConfiguration::readInputFile(std::string inpuFileName) {
 }
 
 Array<double> RunConfiguration::GetInletData(int i) {
+
+  // WARNIING:  the structure of the inputs is stupid and will break as-is
+  // for combinations of different bc types and specified species 
   int length = 4;
+  //  int length = 5;
   if ((workFluid != DRY_AIR) && (numSpecies > 1)) length += numSpecies;
   Array<double> data(length);
   for (int j = 0; j < length; j++) data[j] = inletBC[j + length * i];
