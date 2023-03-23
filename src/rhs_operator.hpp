@@ -96,7 +96,7 @@ class RHSoperator : public TimeDependentOperator {
 
   ParFiniteElementSpace *dfes;
   ParGridFunction *coordsDof;
-  ParGridFunction *elSize;  
+  ParGridFunction *elSize;
 
   ParGridFunction *spaceVaryViscMult;
   linearlyVaryingVisc &linViscData;

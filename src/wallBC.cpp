@@ -31,6 +31,7 @@
 // -----------------------------------------------------------------------------------el-
 
 #include "wallBC.hpp"
+
 #include "riemann_solver.hpp"
 
 WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, GasMixture *d_mixture, Equations _eqSystem,
@@ -78,7 +79,7 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, GasMixture *d_mixt
         if (mixture->IsTwoTemperature()) {
           bcFlux_.primFluxIdxs[numSpecies + nvel_ + 1] = true;
         }
-      }      
+      }
     } break;
     case VISC_ADIAB: {
       // no diffusion and heat flux.
@@ -199,30 +200,30 @@ void WallBC::buildWallElemsArray() {
   wallElems.ReadWrite();
 }
 
-void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, Vector &bdrFlux) {
-
+void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
+                            double delta, Vector &bdrFlux) {
   switch (wallType_) {
-    /*
-    case INV:
-      computeINVwallFlux(normal, stateIn, gradState, radius, bdrFlux);
-      break;      
-    case VISC_ADIAB:
-      computeAdiabaticWallFlux(normal, stateIn, gradState, radius, delta, bdrFlux);
-      break;
-    case VISC_ISOTH:
-      computeIsothermalWallFlux(normal, stateIn, gradState, radius, delta, bdrFlux);
-      break;
-    case VISC_GNRL:
-      computeGeneralWallFlux(normal, stateIn, gradState, radius, delta, bdrFlux);
-      break;
-    */
+      /*
+      case INV:
+        computeINVwallFlux(normal, stateIn, gradState, radius, bdrFlux);
+        break;
+      case VISC_ADIAB:
+        computeAdiabaticWallFlux(normal, stateIn, gradState, radius, delta, bdrFlux);
+        break;
+      case VISC_ISOTH:
+        computeIsothermalWallFlux(normal, stateIn, gradState, radius, delta, bdrFlux);
+        break;
+      case VISC_GNRL:
+        computeGeneralWallFlux(normal, stateIn, gradState, radius, delta, bdrFlux);
+        break;
+      */
 
     case INV:
       computeINVwallFlux(normal, stateIn, gradState, radius, transip, delta, bdrFlux);
       break;
     case SLIP:
       computeSlipWallFlux(normal, stateIn, gradState, radius, transip, delta, bdrFlux);
-      break;      
+      break;
     case VISC_ADIAB:
       computeAdiabaticWallFlux(normal, stateIn, gradState, radius, transip, delta, bdrFlux);
       break;
@@ -231,8 +232,7 @@ void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradSt
       break;
     case VISC_GNRL:
       computeGeneralWallFlux(normal, stateIn, gradState, radius, transip, delta, bdrFlux);
-      break;      
-      
+      break;
   }
 }
 
@@ -245,8 +245,8 @@ void WallBC::integrationBC(Vector &y, const Vector &x, const elementIndexingData
                      x, elem_index_data, boundary_face_data, maxDofs);
 }
 
-void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, Vector &bdrFlux) {
-  
+void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
+                                double delta, Vector &bdrFlux) {
   Vector vel(nvel_);
   for (int d = 0; d < nvel_; d++) vel[d] = stateIn[1 + d] / stateIn[0];
 
@@ -279,7 +279,7 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
     // the axis... but... should implement this separately
 
     // incoming visc flux
-    fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, transip, delta,viscF);
+    fluxClass->ComputeViscousFluxes(stateIn, gradState, radius, transip, delta, viscF);
 
     // modify gradients so that wall is adibatic
     Vector unitNorm = normal;
@@ -309,67 +309,66 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
 }
 
 /**
-Inviscid slip boundary condition.  Finds interior velocity in wall-coordinates, flips normal 
+Inviscid slip boundary condition.  Finds interior velocity in wall-coordinates, flips normal
 component (mirror state), transforms back to global, send to riemann
 */
-void WallBC::computeSlipWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
-				 Vector transip, double delta, Vector &bdrFlux) {
-
+void WallBC::computeSlipWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
+                                 double delta, Vector &bdrFlux) {
   Vector prim(num_equation_);
   mixture->GetPrimitivesFromConservatives(stateIn, prim);
   double wallT = prim[dim_ + 1];
-  
+
   // stateIn is conserved
   Vector vel(nvel_);
   for (int d = 0; d < nvel_; d++) vel[d] = stateIn[1 + d] / stateIn[0];
-  
+
   // outward-facing normal
   double sml = 1.0e-15;
   Vector unitNorm = normal;
   double mod = 0.;
   double normN = 0.;
   for (int d = 0; d < dim_; d++) normN += normal[d] * normal[d];
-  normN = sqrt(max(normN,sml));
+  normN = sqrt(max(normN, sml));
   unitNorm *= 1. / normN;
 
   // build arbitrary tangents
   Vector tangent1 = unitNorm;
   Vector tangent2 = unitNorm;
   tangent1 = 0.;
-  tangent2 = 0.;  
+  tangent2 = 0.;
 
   // dominant direction
   int dir, next_dir, previous_dir;
-  if(abs(unitNorm[0]) >= abs(unitNorm[1]) && abs(unitNorm[0]) >= abs(unitNorm[2])) dir = 0;
-  if(abs(unitNorm[1]) >= abs(unitNorm[0]) && abs(unitNorm[1]) >= abs(unitNorm[2])) dir = 1;
-  if(abs(unitNorm[2]) >= abs(unitNorm[0]) && abs(unitNorm[2]) >= abs(unitNorm[1])) dir = 2;
-  next_dir = (dir+1) % (dim_);
-  previous_dir = (dir+2) % (dim_);
-  
+  if (abs(unitNorm[0]) >= abs(unitNorm[1]) && abs(unitNorm[0]) >= abs(unitNorm[2])) dir = 0;
+  if (abs(unitNorm[1]) >= abs(unitNorm[0]) && abs(unitNorm[1]) >= abs(unitNorm[2])) dir = 1;
+  if (abs(unitNorm[2]) >= abs(unitNorm[0]) && abs(unitNorm[2]) >= abs(unitNorm[1])) dir = 2;
+  next_dir = (dir + 1) % (dim_);
+  previous_dir = (dir + 2) % (dim_);
+
   // tangent 1
   tangent1[next_dir] = +1.;
   tangent1[previous_dir] = -1.;
-  tangent1[dir] = unitNorm[previous_dir]*tangent1[previous_dir] + unitNorm[next_dir]*tangent1[next_dir];
-  tangent1[dir] *= -1. / unitNorm[dir] ;  
+  tangent1[dir] = unitNorm[previous_dir] * tangent1[previous_dir] + unitNorm[next_dir] * tangent1[next_dir];
+  tangent1[dir] *= -1. / unitNorm[dir];
   mod = 0.;
   for (int d = 0; d < dim_; d++) mod += tangent1[d] * tangent1[d];
-  tangent1 *= 1. / max(sqrt(mod),sml); 
-    
+  tangent1 *= 1. / max(sqrt(mod), sml);
+
   // tangent 2
-  tangent2[0] = +(unitNorm[1]*tangent1[2] - unitNorm[2]*tangent1[1]);
-  tangent2[1] = -(unitNorm[0]*tangent1[2] - unitNorm[2]*tangent1[0]);
-  tangent2[2] = +(unitNorm[0]*tangent1[1] - unitNorm[1]*tangent1[0]);
+  tangent2[0] = +(unitNorm[1] * tangent1[2] - unitNorm[2] * tangent1[1]);
+  tangent2[1] = -(unitNorm[0] * tangent1[2] - unitNorm[2] * tangent1[0]);
+  tangent2[2] = +(unitNorm[0] * tangent1[1] - unitNorm[1] * tangent1[0]);
   mod = 0.;
   for (int d = 0; d < dim_; d++) mod += tangent2[d] * tangent2[d];
-  tangent2 *= 1. / max(sqrt(mod),sml); 
+  tangent2 *= 1. / max(sqrt(mod), sml);
 
   // velocity in wall coordinate system
-  Vector nVel(dim_);  
+  Vector nVel(dim_);
   nVel = 0.;
 
   // just re-use M
   DenseMatrix M(dim_, dim_);
-  Vector momN(dim_), momX(dim_);  
+  Vector momN(dim_), momX(dim_);
   for (int d = 0; d < dim_; d++) {
     M(0, d) = unitNorm[d];
     M(1, d) = tangent1[d];
@@ -380,9 +379,9 @@ void WallBC::computeSlipWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &g
   for (int d = 0; d < dim_; d++) nVel[d] = momX[d];
 
   // energy of normal component: not necessary
-  //double ke_n = 0.5*nVel[0]*nVel[0];
+  // double ke_n = 0.5*nVel[0]*nVel[0];
 
-  // mirror normal component  
+  // mirror normal component
   nVel[0] = -nVel[0];
 
   // transform back to global coords
@@ -394,18 +393,17 @@ void WallBC::computeSlipWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &g
 
   // zero-penetration conserved state
   Vector state2(num_equation_);
-  state2 = stateIn;  
+  state2 = stateIn;
   state2[1] = stateIn[0] * nVel[0];
   state2[2] = stateIn[0] * nVel[1];
   if (dim_ == 3) state2[3] = stateIn[0] * nVel[2];
-  
-  // now send to Reimann solver 
+
+  // now send to Reimann solver
   rsolver->Eval(stateIn, state2, normal, bdrFlux);
-  
 }
 
-void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, Vector &bdrFlux) {
-  
+void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                      Vector transip, double delta, Vector &bdrFlux) {
   Vector wallState(num_equation_);
   mixture->computeStagnationState(stateIn, wallState);
 
@@ -445,8 +443,8 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
   }
 }
 
-void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, Vector &bdrFlux) {
-  
+void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                       Vector transip, double delta, Vector &bdrFlux) {
   Vector wallState(num_equation_);
   mixture->computeStagnantStateWithTemp(stateIn, wallTemp_, wallState);
   // TODO(kevin): set stangant state with two separate temperature.
@@ -479,8 +477,8 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
   }
 }
 
-void WallBC::computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, Vector &bdrFlux) {
-
+void WallBC::computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                    Vector transip, double delta, Vector &bdrFlux) {
   Vector wallState(num_equation_);
   mixture->modifyStateFromPrimitive(stateIn, bcState_, wallState);
 

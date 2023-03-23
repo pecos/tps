@@ -39,9 +39,10 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
                          const Equations &_eqSystem, double &_max_char_speed, IntegrationRules *_intRules,
                          int _intRuleType, Fluxes *_fluxClass, GasMixture *_mixture, GasMixture *d_mixture,
                          Chemistry *_chemistry, TransportProperties *_transport, Radiation *_radiation,
-                         ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_fes, const precomputedIntegrationData &gpu_precomputed_data,
-                         const int &_maxIntPoints, const int &_maxDofs, DGNonLinearForm *_A, MixedBilinearForm *_Aflux,
-                         ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
+                         ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_fes,
+                         const precomputedIntegrationData &gpu_precomputed_data, const int &_maxIntPoints,
+                         const int &_maxDofs, DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh,
+                         ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
                          ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A,
                          BCintegrator *_bcIntegrator, bool &_isSBP, double &_alpha, RunConfiguration &_config,
                          ParGridFunction *pc, ParGridFunction *jh)
@@ -60,7 +61,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
       d_mixture_(d_mixture),
       transport_(_transport),
       vfes(_vfes),
-      fes(_fes),            
+      fes(_fes),
       gpu_precomputed_data_(gpu_precomputed_data),
       maxIntPoints(_maxIntPoints),
       maxDofs(_maxDofs),
@@ -154,7 +155,6 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
       h_elSize[idx] = mesh->GetElementSize(j, 1) / fes->GetElementOrder(j);
     }
   }
-
 
   if (config_.isAxisymmetric()) {
     forcing.Append(new AxisymmetricSource(dim_, num_equation_, _order, d_mixture_, transport_, eqSystem, intRuleType,

@@ -220,13 +220,13 @@ void BCintegrator::initBCs() {
 
 void BCintegrator::computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState,
                                   double radius, Vector transip, double delta, Vector &bdrFlux) {
-  
   std::unordered_map<int, BoundaryCondition *>::const_iterator ibc = inletBCmap.find(attr);
   std::unordered_map<int, BoundaryCondition *>::const_iterator obc = outletBCmap.find(attr);
   std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = wallBCmap.find(attr);
 
   if (ibc != inletBCmap.end()) ibc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, delta, bdrFlux);
-  if (obc != outletBCmap.end()) obc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, delta, bdrFlux);
+  if (obc != outletBCmap.end())
+    obc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, delta, bdrFlux);
   if (wbc != wallBCmap.end()) wbc->second->computeBdrFlux(normal, stateIn, gradState, radius, transip, delta, bdrFlux);
 
   //   BCmap[attr]->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
@@ -387,7 +387,7 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
     if (config.isAxisymmetric()) {
       radius = transip[0];
     }
-    
+
     computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, radius, transip, delta, fluxN);
     fluxN *= ip.weight;
 

@@ -90,10 +90,10 @@ void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, D
       double delta = 0.;
       printf("WARNING, CVF called in wrong place\n");
       fflush(stdout);
-      
+
       DenseMatrix viscF(num_equation, dim);
       ComputeViscousFluxes(state, gradUpi, 1, transip, delta, viscF);
-      
+
       for (int eq = 0; eq < num_equation; eq++) {
         for (int d = 0; d < dim; d++) flux(eq, d) = convF(eq, d) - viscF(eq, d);
       }
@@ -177,8 +177,6 @@ MFEM_HOST_DEVICE void Fluxes::ComputeConvectiveFluxes(const double *state, doubl
 }
 
 // TODO(kevin): check/complete axisymmetric setting for multi-component flow.
-
-
 void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip, double delta, DenseMatrix &flux) {
 #ifdef _BUILD_DEPRECATED_
   flux = 0.;
@@ -315,7 +313,6 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
 }
 
 MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius, double *transip, double delta, double *flux) {
-
   for (int d = 0; d < dim; d++) {
     for (int eq = 0; eq < num_equation; eq++) {
       flux[eq + d * num_equation] = 0.;
@@ -369,7 +366,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
     bulkViscosity *= wgt;
     k *= wgt;
   }
-  
+
   if (twoTemperature) {
     for (int d = 0; d < dim; d++) {
       double qeFlux = ke * gradUp[num_equation - 1 + d * num_equation];
@@ -459,8 +456,8 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
   }
 }
 
-void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip, double delta,const BoundaryViscousFluxData &bcFlux, Vector &normalFlux) {
-  
+void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip,
+                                     double delta, const BoundaryViscousFluxData &bcFlux, Vector &normalFlux) {
   normalFlux.SetSize(num_equation);
 #ifdef _BUILD_DEPRECATED_
   normalFlux = 0.;
@@ -597,10 +594,7 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
 #endif
 }
 
-
-MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius, double *transip, double delta,
-                                                      const BoundaryViscousFluxData &bcFlux, double *normalFlux) {
-  
+MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius, double *transip, double delta, const BoundaryViscousFluxData &bcFlux, double *normalFlux) {
   // normalFlux.SetSize(num_equation);
   for (int eq = 0; eq < num_equation; eq++) normalFlux[eq] = 0.;
   if (eqSystem == EULER) {
@@ -649,7 +643,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const
     bulkViscosity *= wgt;
     k *= wgt;
   }
-  
+
   // Primitive viscous fluxes.
   const int primFluxSize = (twoTemperature) ? numSpecies + nvel + 2 : numSpecies + nvel + 1;
   double normalPrimFlux[gpudata::MAXEQUATIONS];
@@ -962,11 +956,11 @@ void Fluxes::viscSpongePlanar(double *x, double &wgt) {
 
   // distance from plane
   for (int d = 0; d < dim; d++) s[d] = (x[d] - point[d]);
-  for (int d = 0; d < dim; d++) dist += s[d]*normal[d];
+  for (int d = 0; d < dim; d++) dist += s[d] * normal[d];
 
   // weight
-  wgt = 0.5*(tanh(dist/width - 2.0) + 1.0);
-  wgt *= (factor-1.0);
+  wgt = 0.5 * (tanh(dist / width - 2.0) + 1.0);
+  wgt *= (factor - 1.0);
   wgt += 1.0;
 }
 
