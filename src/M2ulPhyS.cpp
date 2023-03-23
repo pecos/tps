@@ -541,7 +541,8 @@ void M2ulPhyS::initVariables() {
                                           config.isAxisymmetric(), rsolver);
 #else
 
-  fluxClass = new Fluxes(mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(), &config); //modified
+  fluxClass =
+      new Fluxes(mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(), &config);  // modified
 
   rsolver =
       new RiemannSolver(num_equation, mixture, eqSystem, fluxClass, config.RoeRiemannSolver(), config.isAxisymmetric());
@@ -1428,7 +1429,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   if (config.linViscData.isEnabled) {
     spaceVaryViscMult = new ParGridFunction(fes);
     double *viscMult = spaceVaryViscMult->HostWrite();
-    double wgt = 0.;    
+    double wgt = 0.;
     for (int n = 0; n < fes->GetNDofs(); n++) {
       double alpha = 1.;
       auto hcoords = coordsDof.HostRead();  // get coords
@@ -1438,7 +1439,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
         coords[d] = hcoords[n + d * vfes->GetNDofs()];
       }
 
-      /*      
+      /*
       double dist_pi = 0., dist_p0 = 0., dist_pi0 = 0.;
       for (int d = 0; d < dim; d++) {
         dist_pi += config.GetLinearVaryingData().normal(d) *
@@ -1457,7 +1458,6 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
       viscMultPlanar(coords, wgt);
       viscMult[n] = wgt;
-      
     }
   }
 
@@ -3615,23 +3615,20 @@ void M2ulPhyS::visualization() {
   return;
 }
 
-
 /**
 Copy of viscous sponge code in fluxes.cpp.  This is currently only used for visualization purposes
-but should only be done once as opposed to repeating every step in fluxes.cpp.  Code structure 
+but should only be done once as opposed to repeating every step in fluxes.cpp.  Code structure
 makes this difficult to correct.
 */
 void M2ulPhyS::viscMultPlanar(Vector x, double &wgt) {
-
   Vector normal(3);
   Vector point(3);
-  Vector s(3);  
+  Vector s(3);
   double Nmag, factor, width, dist;
 
-  
   // initialize
   Nmag = 0.;
-  dist = 0.;  
+  dist = 0.;
 
   // get settings
   for (int d = 0; d < dim; d++) normal[d] = config.GetLinearVaryingData().normal(d);
@@ -3643,19 +3640,17 @@ void M2ulPhyS::viscMultPlanar(Vector x, double &wgt) {
   // ensure normal is actually a unit normal
   for (int d = 0; d < dim; d++) Nmag += normal[d] * normal[d];
   Nmag = sqrt(Nmag);
-  for (int d = 0; d < dim; d++) normal[d] /= Nmag;  
-  
-  // distance from plane  
-  for (int d = 0; d < dim; d++) s[d] = (x[d] - point[d]);
-  for (int d = 0; d < dim; d++) dist += s[d]*normal[d];  
-  
-  // weight
-  wgt = 0.5*(tanh(dist/width - 2.0) + 1.0);
-  wgt *= (factor-1.0);
-  wgt += 1.0;
-  
-}
+  for (int d = 0; d < dim; d++) normal[d] /= Nmag;
 
+  // distance from plane
+  for (int d = 0; d < dim; d++) s[d] = (x[d] - point[d]);
+  for (int d = 0; d < dim; d++) dist += s[d] * normal[d];
+
+  // weight
+  wgt = 0.5 * (tanh(dist / width - 2.0) + 1.0);
+  wgt *= (factor - 1.0);
+  wgt += 1.0;
+}
 
 void M2ulPhyS::updateVisualizationVariables() {
 #ifdef _GPU_

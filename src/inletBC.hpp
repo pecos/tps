@@ -96,12 +96,8 @@ class InletBC : public BoundaryCondition {
           const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs, bool axisym);
   ~InletBC();
 
-<<<<<<< HEAD
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, double delta,
-                      Vector &bdrFlux);
-=======
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, Vector &bdrFlux);
->>>>>>> d36a8a3 (visc sponge and slip building)
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
+                      double delta, Vector &bdrFlux);
 
   virtual void initBCs();
 
