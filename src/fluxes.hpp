@@ -83,7 +83,7 @@ class Fluxes {
   void ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux);
   MFEM_HOST_DEVICE void ComputeConvectiveFluxes(const double *state, double *flux) const;
 
-  void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, double *transip, double delta,
+  void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip, double delta,
                             DenseMatrix &flux);
 
   MFEM_HOST_DEVICE void ComputeViscousFluxes(const double *state, const double *gradUp, double radius, double *transip,
@@ -94,7 +94,7 @@ class Fluxes {
   void sgsSigma(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu_sgs);
 
   // Compute viscous flux with prescribed boundary flux.
-  void ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius,double *transip,
+  void ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip,
                                double delta, const BoundaryViscousFluxData &bcFlux, Vector &normalFlux);
 
   MFEM_HOST_DEVICE void ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius,

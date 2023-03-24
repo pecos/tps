@@ -54,13 +54,13 @@ void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, D
       ComputeConvectiveFluxes(state, convF);
 
       double x[3];
-      //Vector transip(x, 3);  // empty just to build      
+      Vector transip(x, 3);  // empty just to build
       double delta = 0.;
       printf("WARNING, CVF called in wrong place\n");
       fflush(stdout);
 
       DenseMatrix viscF(num_equation, dim);
-      ComputeViscousFluxes(state, gradUpi, 1, x, delta, viscF);
+      ComputeViscousFluxes(state, gradUpi, 1, transip, delta, viscF);
 
       for (int eq = 0; eq < num_equation; eq++) {
         for (int d = 0; d < dim; d++) flux(eq, d) = convF(eq, d) - viscF(eq, d);
@@ -145,7 +145,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeConvectiveFluxes(const double *state, doubl
 }
 
 // TODO(kevin): check/complete axisymmetric setting for multi-component flow.
-void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, double *transip,
+void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip,
                                   double delta, DenseMatrix &flux) {
 #ifdef _BUILD_DEPRECATED_
 
@@ -421,7 +421,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
   }
 }
 
-void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, double *transip,
+void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip,
                                      double delta, const BoundaryViscousFluxData &bcFlux, Vector &normalFlux) {
   normalFlux.SetSize(num_equation);
   normalFlux = 0.;
