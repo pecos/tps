@@ -284,7 +284,10 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
 }
 
 MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius,
-                                                   Vector transip, double delta, double *flux) {
+                                                   double *transip, double delta, double *flux) {
+//MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius,
+//                                                   double delta, double *flux) {
+  
   for (int d = 0; d < dim; d++) {
     for (int eq = 0; eq < num_equation; eq++) {
       flux[eq + d * num_equation] = 0.;
@@ -322,6 +325,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
   // viscous sponge
   if (config_->linViscData.isEnabled) {
     double wgt = 0.;
+    //viscSpongePlanar(transip, wgt);
     viscSpongePlanar(transip, wgt);
     visc *= wgt;
     bulkViscosity *= wgt;
@@ -552,7 +556,7 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
 }
 
 MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius,
-                                                      Vector transip, double delta,
+                                                      double *transip, double delta,
                                                       const BoundaryViscousFluxData &bcFlux, double *normalFlux) {
   // normalFlux.SetSize(num_equation);
   for (int eq = 0; eq < num_equation; eq++) normalFlux[eq] = 0.;
@@ -846,7 +850,7 @@ void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double del
 Simple planar viscous sponge layer with smooth tanh-transtion using user-specified width and
 total amplification.  Note: duplicate in M2
 */
-void Fluxes::viscSpongePlanar(Vector x, double &wgt) {
+void Fluxes::viscSpongePlanar(double *x, double &wgt) {
   Vector normal(3);
   Vector point(3);
   Vector s(3);
