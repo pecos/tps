@@ -515,7 +515,8 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 
     double radius = 1;
     double delta;
-    Vector xyz(dim_);
+    //Vector xyz(dim_);
+    double xyz[dim_];
     if (config_.isAxisymmetric()) {
       radius = (*coordsDof)[i + 0 * dof];
     }
