@@ -427,10 +427,10 @@ void FaceIntegrator::MassMatrixFaceIntegral(const FiniteElement &el1, const Fini
       }
 
       DenseMatrix viscF1(num_equation, dim), viscF2(num_equation, dim);
-      // fluxClass->ComputeViscousFluxes(state1, igradUp1, 1, transip, delta, viscF1);
-      // fluxClass->ComputeViscousFluxes(state2, igradUp2, 1, transip, delta, viscF2);
-      fluxClass->ComputeViscousFluxes(state1, igradUp1, 1, delta, viscF1);
-      fluxClass->ComputeViscousFluxes(state2, igradUp2, 1, delta, viscF2);
+      fluxClass->ComputeViscousFluxes(state1, igradUp1, 1, transip, delta, viscF1);
+      fluxClass->ComputeViscousFluxes(state2, igradUp2, 1, transip, delta, viscF2);
+      //fluxClass->ComputeViscousFluxes(state1, igradUp1, 1, delta, viscF1);
+      //fluxClass->ComputeViscousFluxes(state2, igradUp2, 1, delta, viscF2);
       for (int eq = 0; eq < num_equation; eq++) {
         for (int d = 0; d < dim; d++) viscF1(eq, d) += viscF2(eq, d);
       }
