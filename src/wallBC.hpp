@@ -72,15 +72,15 @@ class WallBC : public BoundaryCondition {
   void computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux);
   */
 
-  void computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, double *transip,
+  void computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
                           double delta, Vector &bdrFlux);
-  void computeSlipWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, double *transip,
+  void computeSlipWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
                            double delta, Vector &bdrFlux);
-  void computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, double *transip,
+  void computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
                                 double delta, Vector &bdrFlux);
-  void computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, double *transip,
+  void computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
                                  double delta, Vector &bdrFlux);
-  void computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, double *transip,
+  void computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
                               double delta, Vector &bdrFlux);
 
  public:
