@@ -589,7 +589,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const
   if (config_->linViscData.isEnabled) {
     double wgt = 0.;
     double x[3];
-    for (int d = 0; d < dim; d++) x[d] = transip[3];    
+    for (int d = 0; d < dim; d++) x[d] = transip[3];
     viscSpongePlanar(x, wgt);
     visc *= wgt;
     bulkViscosity *= wgt;

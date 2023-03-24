@@ -66,8 +66,8 @@ class Fluxes {
   const bool axisymmetric_;
   const int num_equation;
 
-  //void viscSpongePlanar(Vector x, double &wgt);
-  void viscSpongePlanar(double x[3], double &wgt);  
+  // void viscSpongePlanar(Vector x, double &wgt);
+  void viscSpongePlanar(double x[3], double &wgt);
 
  public:
   MFEM_HOST_DEVICE Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
@@ -86,8 +86,8 @@ class Fluxes {
   void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip, double delta,
                             DenseMatrix &flux);
 
-  MFEM_HOST_DEVICE void ComputeViscousFluxes(const double *state, const double *gradUp, double radius, double transip[3],
-                                             double delta, double *flux);
+  MFEM_HOST_DEVICE void ComputeViscousFluxes(const double *state, const double *gradUp, double radius,
+                                             double transip[3], double delta, double *flux);
 
   void sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu_sgs);
   void sgsSigma(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu_sgs);
