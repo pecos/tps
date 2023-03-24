@@ -623,23 +623,14 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
 
     double radius = 1.0;
     double delta;
-    /*    
     Vector xyz(dim_);
     xyz = 0.;
     if (config_.isAxisymmetric()) {
       radius = (*coordsDof)[n + 0 * dof];
     }
     for (int d = 0; d < dim_; d++) xyz[d] = (*coordsDof)[n + d * dof];
-    */
 
-    double xyz[3];  // no Vector on device 
-    if (axisymmetric) {
-       radius = d_coord[n + 0 * dof];  // have to have d_coord = coordsDof->Read(); before MFEM_FORALL above
-    }
-    for (int d = 0; d < dim; d++) xyz[d] = d_coord[n + d * dof];
-    
     d_fluxClass->ComputeViscousFluxes(Un, gradUpn, radius, xyz, delta, fvisc);
-    //d_fluxClass->ComputeViscousFluxes(Un, gradUpn, radius, delta, fvisc);
 
     if (d_spaceVaryViscMult != NULL) {
       linVisc = d_spaceVaryViscMult[n];
