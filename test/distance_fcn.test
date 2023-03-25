@@ -1,0 +1,9 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="distance_fcn"
+
+@test "[$TEST] Unit tests for the distance function calculation" {
+    test -e ./test_distance_fcn
+    ./test_distance_fcn -run inputs/pipe.axisym.viscous.ini
+}
