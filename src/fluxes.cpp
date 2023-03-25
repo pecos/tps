@@ -199,6 +199,17 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
     k += (mu_sgs / Pr_Cp);
   }
 
+  // viscous sponge
+  if (config_->linViscData.isEnabled) {
+    double wgt = 0.;
+    double x[3];
+    for (int d = 0; d < dim; d++) x[d] = transip[3];
+    viscSpongePlanar(x, wgt);
+    visc *= wgt;
+    bulkViscosity *= wgt;
+    k *= wgt;
+  }
+
   if (twoTemperature) {
     for (int d = 0; d < dim; d++) {
       double qeFlux = ke * gradUp(num_equation - 1, d);
@@ -320,6 +331,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
   double ke = transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY];
 
   // viscous sponge
+  /*
   if (config_->linViscData.isEnabled) {
     double wgt = 0.;
     double x[3];
@@ -329,6 +341,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
     bulkViscosity *= wgt;
     k *= wgt;
   }
+  */
 
   if (twoTemperature) {
     for (int d = 0; d < dim; d++) {
@@ -461,6 +474,17 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
     k += (mu_sgs / Pr_Cp);
   }
 
+  // viscous sponge
+  if (config_->linViscData.isEnabled) {
+    double wgt = 0.;
+    double x[3];
+    for (int d = 0; d < dim; d++) x[d] = transip[3];
+    viscSpongePlanar(x, wgt);
+    visc *= wgt;
+    bulkViscosity *= wgt;
+    k *= wgt;
+  }
+  
   // Primitive viscous fluxes.
   const int primFluxSize = (twoTemperature) ? numSpecies + nvel + 2 : numSpecies + nvel + 1;
   Vector normalPrimFlux(primFluxSize);
@@ -586,6 +610,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const
   double ke = transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY];
 
   // viscous sponge
+  /*
   if (config_->linViscData.isEnabled) {
     double wgt = 0.;
     double x[3];
@@ -595,6 +620,8 @@ MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const
     bulkViscosity *= wgt;
     k *= wgt;
   }
+  */
+  
 
   // Primitive viscous fluxes.
   const int primFluxSize = (twoTemperature) ? numSpecies + nvel + 2 : numSpecies + nvel + 1;
