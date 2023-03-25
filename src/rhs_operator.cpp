@@ -359,7 +359,7 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
   gradients->computeGradients();
 #endif
 
-  // update boundary conditions
+  // update boundary conditions: this also initializes Nbdr incrementer
   if (bcIntegrator != NULL) bcIntegrator->updateBCMean(Up);
 
 #ifdef _GPU_

@@ -84,7 +84,7 @@ class BoundaryCondition {
    *  term is zero.  If that is not what you want, you must override
    *  this method in a derived class.
    */
-  virtual void computeBdrPrimitiveStateForGradient(const Vector &stateIn, Vector &stateBC) const;
+  virtual void computeBdrPrimitiveStateForGradient(const int i, const Vector &stateIn, Vector &stateBC) const;
 
   // holding function for any miscellaneous items needed to initialize BCs
   // prior to use (and require MPI)

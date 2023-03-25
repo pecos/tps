@@ -38,7 +38,9 @@ GradFaceIntegrator::GradFaceIntegrator(IntegrationRules *_intRules, const int _d
     : dim(_dim), num_equation(_num_equation), intRules(_intRules), bc_(bc), useBCinGrad_(useBCinGrad) {}
 
 void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2,
-                                            FaceElementTransformations &Tr, const Vector &elfun, Vector &elvect) {
+                                            FaceElementTransformations &Tr, const Vector &elfun,
+					    Vector &elvect) {
+  
   // Compute the term <nU,[w]> on the interior faces.
   Vector nor(dim);
   Vector mean(num_equation);
@@ -102,13 +104,16 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
         std::unordered_map<int, BoundaryCondition *>::const_iterator obc = bc_->outletBCmap.find(attr);
         std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = bc_->wallBCmap.find(attr);
         if (ibc != bc_->inletBCmap.end()) {
-          ibc->second->computeBdrPrimitiveStateForGradient(iUp1, iUp2);
+          ibc->second->computeBdrPrimitiveStateForGradient(nbdrInlet, iUp1, iUp2);
+	  nbdrInlet++;
         }
         if (obc != bc_->outletBCmap.end()) {
-          obc->second->computeBdrPrimitiveStateForGradient(iUp1, iUp2);
+          obc->second->computeBdrPrimitiveStateForGradient(nbdrOutlet,iUp1, iUp2);
+	  nbdrOutlet++;
         }
         if (wbc != bc_->wallBCmap.end()) {
-          wbc->second->computeBdrPrimitiveStateForGradient(iUp1, iUp2);
+          wbc->second->computeBdrPrimitiveStateForGradient(nbdrWall,iUp1, iUp2);
+	  nbdrWall++;
         }
       } else {
         iUp2 = iUp1;

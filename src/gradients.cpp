@@ -134,6 +134,7 @@ Gradients::~Gradients() {
   for (int n = 0; n < Ke.Size(); n++) delete Ke[n];
 }
 
+
 void Gradients::computeGradients() {
   const int totalDofs = vfes->GetNDofs();
   double *dataUp = Up->GetData();

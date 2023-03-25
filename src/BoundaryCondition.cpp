@@ -52,7 +52,7 @@ BoundaryCondition::BoundaryCondition(RiemannSolver *_rsolver, GasMixture *_mixtu
 
 BoundaryCondition::~BoundaryCondition() {}
 
-void BoundaryCondition::computeBdrPrimitiveStateForGradient(const Vector &stateIn, Vector &stateBC) const {
+void BoundaryCondition::computeBdrPrimitiveStateForGradient(const int i, const Vector &stateIn, Vector &stateBC) const {
   stateBC = stateIn;
 }
 

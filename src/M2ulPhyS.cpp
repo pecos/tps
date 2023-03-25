@@ -862,7 +862,7 @@ void M2ulPhyS::initIndirectionArrays() {
         // Position in physical space
         tr->Transform(ip, xyz);
 
-        // normals (multiplied by determinant of jacobian
+        // normals (multiplied by determinant of jacobian)
         Vector nor;
         nor.UseDevice(false);
         nor.SetSize(dim);

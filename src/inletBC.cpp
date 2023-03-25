@@ -450,6 +450,19 @@ void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradS
   }
 }
 
+
+void InletBC::computeBdrPrimitiveStateForGradient(const int i, const Vector &primIn, Vector &primBC) const {
+  primBC = primIn;
+
+  switch (inletType_) {
+    case SUB_DENS_VEL:
+      for (int eq = 0; eq < num_equation_; eq++) primBC[eq] = boundaryU[eq + i * num_equation_];
+      break;
+  }
+  
+}
+
+
 void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
   if (inletType_ == SUB_DENS_VEL) return;
   bdrN = 0;
@@ -722,9 +735,16 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
 
   // NOTE: If two-temperature, BC for electron temperature is T_e = T_h, where the total pressure is p.
   mixture->modifyEnergyForPressure(state2, state2, p, true);
-
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
+
+  // fill boundaryU with primitives for gradient calc
+  Vector iUp(num_equation_);  
+  mixture->GetPrimitivesFromConservatives(state2, iUp);  
+  for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + bdrN * num_equation_] = iUp[eq];  
+  bdrN++;
+  
 }
+
 
 void InletBC::integrateInlets_gpu(Vector &y, const Vector &x, const elementIndexingData &elem_index_data,
                                   const boundaryFaceIntegrationData &boundary_face_data, Array<int> &listElems,

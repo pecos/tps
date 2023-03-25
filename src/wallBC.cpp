@@ -238,13 +238,16 @@ void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradSt
   }
 }
 
-void WallBC::computeBdrPrimitiveStateForGradient(const Vector &primIn, Vector &primBC) const {
+void WallBC::computeBdrPrimitiveStateForGradient(const int i, const Vector &primIn, Vector &primBC) const {
   primBC = primIn;
 
   switch (wallType_) {
     case INV:
-      // TODO(trevilo): fix
+      primBC = primIn;      
       break;
+    //case SLIP:
+    //   primBC = primIn;      
+    //   break;      
     case VISC_ADIAB:
       // TODO(trevilo): fix
       break;

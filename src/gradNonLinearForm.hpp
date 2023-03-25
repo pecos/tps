@@ -36,6 +36,7 @@
 
 #include "dataStructures.hpp"
 #include "tps_mfem_wrap.hpp"
+#include "faceGradientIntegration.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -47,10 +48,28 @@ class GradNonLinearForm : public ParNonlinearForm {
   const int dim;
   const int num_equation;
 
+  //int Nbdr_inlet, Nbdr_outlet, Nbdr_wall;  
+  
  public:
+  
   GradNonLinearForm(ParFiniteElementSpace *f, IntegrationRules *intRules, const int dim, const int num_equation);
 
   void Mult(const ParGridFunction *Up, Vector &y);
+
+  /*
+  int setNumInlet(int nbr) { Nbdr_inlet = nbr; }
+  int setNumOutlet(int nbr) { Nbdr_outlet = nbr; }
+  int setNumWall(int nbr) { Nbdr_wall = nbr; }
+
+  int getNumInlet() { return Nbdr_inlet; }
+  int getNumOutlet() { return Nbdr_outlet; }
+  int getNumWall() { return Nbdr_wall; }    
+
+  int incNumInlet() { Nbdr_inlet++; }
+  int incNumOutlet() { Nbdr_outlet++; }
+  int incNumWall() { Nbdr_wall++; }
+  */
+  
 };
 
 #endif  // GRADNONLINEARFORM_HPP_
