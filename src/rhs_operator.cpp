@@ -622,7 +622,7 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
     */
 
     double radius = 1.0;
-    double delta;
+    double delta = 0.0;
     double xyz[dim_];
     // xyz = 0.;
     if (axisymmetric) {
