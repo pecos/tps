@@ -98,6 +98,7 @@ class InletBC : public BoundaryCondition {
 
   void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
                       double delta, Vector &bdrFlux);
+  void computeBdrPrimitiveStateForGradient(const int i, const Vector &primIn, Vector &primBC) const override;
 
   virtual void initBCs();
 
