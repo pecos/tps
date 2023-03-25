@@ -76,10 +76,10 @@ void RiemannSolver::ComputeFluxDotN(const Vector &state, const Vector &nor, Vect
 
   // Kevin: used fluxClass to prevent rewriting in future.
   DenseMatrix fluxes(num_equation, dim);
-  fluxClass->ComputeConvectiveFluxes(state, fluxes);
+  fluxClass->ComputeConvectiveFluxes(state, fluxes); //just returns u*state (except for energy...)
   fluxN = 0.;
   for (int eq = 0; eq < num_equation; eq++) {
-    for (int d = 0; d < dim; d++) fluxN[eq] += fluxes(eq, d) * nor[d];
+    for (int d = 0; d < dim; d++) fluxN[eq] += fluxes(eq, d) * nor[d]; // nor should come in as unit normal
   }
 }
 

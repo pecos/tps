@@ -746,7 +746,7 @@ void M2ulPhyS::initIndirectionArrays() {
 
         hweight[face * maxIntPoints + k] = ip.weight;
 
-        // normals (multiplied by determinant of jacobian
+        // normals (multiplied by determinant of jacobian)
         Vector nor;
         nor.UseDevice(false);
         nor.SetSize(dim);

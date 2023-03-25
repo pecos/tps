@@ -67,6 +67,7 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
 
   auto hmeanUp = meanUp.HostWrite();
 
+  // REMOVE THIS CRAP
   hmeanUp[0] = 1.2;
   hmeanUp[1] = 60;
   hmeanUp[2] = 0;
@@ -314,6 +315,19 @@ void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &grad
       break;
   }
 }
+
+
+void OutletBC::computeBdrPrimitiveStateForGradient(const int i, const Vector &primIn, Vector &primBC) const {
+  primBC = primIn;
+
+  switch (outletType_) {
+    case SUB_P:
+      for (int eq = 0; eq < num_equation_; eq++) primBC[eq] = boundaryU[eq + i * num_equation_];      
+      break;
+  }
+  
+}
+
 
 void OutletBC::computeParallelArea() {
   if (parallelAreaComputed) return;
@@ -718,11 +732,17 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
 
 // This is more or less right formulation even for two-temperature case.
 void OutletBC::subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
+  
   Vector state2(num_equation_);
-
   mixture->modifyEnergyForPressure(stateIn, state2, inputState[0]);
-
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
+
+  // fill boundaryU with primitives for gradient calc
+  Vector iUp(num_equation_);  
+  mixture->GetPrimitivesFromConservatives(state2, iUp);  
+  for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + bdrN * num_equation_] = iUp[eq];
+  bdrN++;
+  
 }
 
 void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {
