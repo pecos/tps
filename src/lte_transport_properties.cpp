@@ -99,7 +99,13 @@ void LteTransport::ComputeSourceTransportProperties(const Vector &state, const V
 
   const double rho = Up[0];
   const double T = Up[1 + nvel_];
-  globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] = sigma_table_->eval(T, rho);
+  
+  //globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] = sigma_table_->eval(T, rho);
+  double sigma = sigma_table_->eval(T, rho);
+  if (sigma < 1.0) {
+    sigma = 1.0;
+  }
+  globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] = sigma;
 }
 
 void LteTransport::ComputeSourceTransportProperties(const double *state, const double *Up, const double *gradUp,
@@ -107,7 +113,12 @@ void LteTransport::ComputeSourceTransportProperties(const double *state, const d
                                                     double *speciesTransport, double *diffusionVelocity, double *n_sp) {
   const double rho = Up[0];
   const double T = Up[1 + nvel_];
-  globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] = sigma_table_->eval(T, rho);
+  double sigma = sigma_table_->eval(T, rho);
+
+  if (sigma < 1.0) {
+    sigma = 1.0;
+  }
+  globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] = sigma;
 }
 
 void LteTransport::GetViscosities(const double *conserved, const double *primitive, double *visc) {

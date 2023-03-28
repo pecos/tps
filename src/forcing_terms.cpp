@@ -466,7 +466,9 @@ void JouleHeating::updateTerms(Vector &in) {
       const double heating = jh[h_index];
       // std::cout << "heating = " << heating << std::endl;
       const int e_index = h_index + (nvel + 1) * dof;
-      data[e_index] += heating;
+      if (heating > 0.) {
+        data[e_index] += heating;
+      }
     }
 
     // Add Joule heating to electron energy (assumes ion Joule heating is negligible)
@@ -475,7 +477,9 @@ void JouleHeating::updateTerms(Vector &in) {
         const int h_index = nodes[n];
         const double heating = jh[h_index];
         const int ee_index = h_index + (num_equation - 1) * dof;
-        data[ee_index] += heating;
+        if (heating > 0.) {
+          data[ee_index] += heating;
+        }
       }
     }
   }

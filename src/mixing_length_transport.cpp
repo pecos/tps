@@ -69,6 +69,10 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
   const double cp_over_Pr =
       transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] / transportBuffer[FluxTrns::VISCOSITY];
 
+  const double kappa = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY];
+  const double mu = transportBuffer[FluxTrns::VISCOSITY];
+
+
   // Add mixing length model results to computed molecular transport
   double primitiveState[gpudata::MAXEQUATIONS];
   mixture->GetPrimitivesFromConservatives(state, primitiveState);
@@ -96,7 +100,7 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
       const double ui_xj = gradUp[(1 + i) + j * num_equation];
       const double uj_xi = gradUp[(1 + j) + i * num_equation];
       double Sij = 0.5 * (ui_xj + uj_xi);
-      if (i == j) Sij -= divV / 3.;
+      //if (i == j) Sij -= divV / 3.;
       S += 2 * Sij * Sij;
     }
   }
@@ -110,7 +114,7 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
     double Szx = 0.5 * ut_r;
     if (radius > 0) Szx -= 0.5 * ut / radius;
     const double Szy = 0.5 * ut_z;
-    double Szz = -divV / 3.;
+    double Szz = 0.0; //- divV / 3.;
     if (radius > 0) Szz += ur / radius;
 
     S += 2 * (2 * Szx * Szx + 2 * Szy * Szy + Szz * Szz);
@@ -119,14 +123,18 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
   S = sqrt(S);
 
   const double mixing_length = std::min(0.41 * distance, max_mixing_length_);
-  const double mut = rho * mixing_length * mixing_length * S;
+  double mut = rho * mixing_length * mixing_length * S;
 
   transportBuffer[FluxTrns::VISCOSITY] += mut;
+  transportBuffer[FluxTrns::BULK_VISCOSITY] += mut;
 
   // eddy thermal conductivity
   const double Pr_over_Prt = Prt_;  // FIXME: change varaible name
-  const double kappat = mut * cp_over_Pr * Pr_over_Prt;
-  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] += kappat;
+  double kappat = mut * cp_over_Pr * Pr_over_Prt;
+
+  // Don't update kappa... modeling choice
+  //kappat = 10. * kappa;
+  //transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] += kappat;
 }
 
 void MixingLengthTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up,
