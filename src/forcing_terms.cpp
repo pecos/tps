@@ -320,7 +320,7 @@ void AxisymmetricSource::updateTerms(Vector &in) {
         uz_z += dataGradUp[nodes[k] + (2 * dof) + (1 * dof * num_equation)] * shape[k];
         ut_r += dataGradUp[nodes[k] + (3 * dof) + (0 * dof * num_equation)] * shape[k];
 
-        //dist += (*distance_)[nodes[k]] * shape[k];
+        dist += (*distance_)[nodes[k]] * shape[k];
       }
 
       const double rho = conserv(0);
@@ -370,6 +370,9 @@ void AxisymmetricSource::updateTerms(Vector &in) {
         int i = nodes[j];
         data[i + 1 * dof] += shape[j] * (pressure + rutut - tau_tt);
         data[i + 3 * dof] += shape[j] * (-rurut + tau_tr);
+        // int i = nodes[j];
+        // data[i + 1 * dof] += shape[j] * (pressure + rutut);
+        // data[i + 3 * dof] += shape[j] * (-rurut);
       }
     }
   }
@@ -540,7 +543,9 @@ void JouleHeating::updateTerms(Vector &in) {
       const double heating = jh[h_index];
       // std::cout << "heating = " << heating << std::endl;
       const int e_index = h_index + (nvel + 1) * dof;
-      data[e_index] += heating;
+      if (heating > 0.) {
+        data[e_index] += heating;
+      }
     }
 
     // Add Joule heating to electron energy (assumes ion Joule heating is negligible)
@@ -549,7 +554,9 @@ void JouleHeating::updateTerms(Vector &in) {
         const int h_index = nodes[n];
         const double heating = jh[h_index];
         const int ee_index = h_index + (num_equation - 1) * dof;
-        data[ee_index] += heating;
+        if (heating > 0.) {
+          data[ee_index] += heating;
+        }
       }
     }
   }

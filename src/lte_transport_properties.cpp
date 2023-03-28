@@ -73,14 +73,14 @@ void LteTransport::ComputeFluxTransportProperties(const Vector &state, const Den
   transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   transportBuffer = 0.0;
 
-  transportBuffer[FluxTrns::VISCOSITY] = 5.0 * mu_table_->eval(T, rho);
-  transportBuffer[FluxTrns::BULK_VISCOSITY] = 5.0 * transportBuffer[FluxTrns::VISCOSITY];
-  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = kappa_table_->eval(T, rho);
+  // transportBuffer[FluxTrns::VISCOSITY] = mu_table_->eval(T, rho);
+  // transportBuffer[FluxTrns::BULK_VISCOSITY] = transportBuffer[FluxTrns::VISCOSITY];
+  // transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = kappa_table_->eval(T, rho);
 
-  // const double viscosity = mu_table_->eval(T, rho);
-  // transportBuffer[FluxTrns::VISCOSITY] = 5.0 * viscosity;
-  // transportBuffer[FluxTrns::BULK_VISCOSITY] = 5.0 * viscosity;
-  // transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = 5.0 * kappa_table_->eval(T, rho);
+  const double viscosity = mu_table_->eval(T, rho);
+  transportBuffer[FluxTrns::VISCOSITY] = viscosity;
+  transportBuffer[FluxTrns::BULK_VISCOSITY] = viscosity;
+  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = kappa_table_->eval(T, rho);
 
   // Diffusion velocities are never needed in LTE model since we don't carry individual species
   diffusionVelocity.SetSize(numSpecies, nvel_);
@@ -106,7 +106,13 @@ void LteTransport::ComputeSourceTransportProperties(const Vector &state, const V
 
   const double rho = Up[0];
   const double T = Up[1 + nvel_];
-  globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] = sigma_table_->eval(T, rho);
+  
+  //globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] = sigma_table_->eval(T, rho);
+  double sigma = sigma_table_->eval(T, rho);
+  if (sigma < 1.0) {
+    sigma = 1.0;
+  }
+  globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] = sigma;
 }
 
 void LteTransport::ComputeSourceTransportProperties(const double *state, const double *Up, const double *gradUp,
@@ -114,7 +120,12 @@ void LteTransport::ComputeSourceTransportProperties(const double *state, const d
                                                     double *speciesTransport, double *diffusionVelocity, double *n_sp) {
   const double rho = Up[0];
   const double T = Up[1 + nvel_];
-  globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] = sigma_table_->eval(T, rho);
+  double sigma = sigma_table_->eval(T, rho);
+
+  if (sigma < 1.0) {
+    sigma = 1.0;
+  }
+  globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] = sigma;
 }
 
 void LteTransport::GetViscosities(const double *conserved, const double *primitive, double *visc) {
@@ -122,8 +133,8 @@ void LteTransport::GetViscosities(const double *conserved, const double *primiti
   const double T = primitive[1 + nvel_];
 
   double internal_visc = mu_table_->eval(T, rho);
-  visc[0] = 5.0 * internal_visc;
-  visc[1] = 5.0 * internal_visc;
+  visc[0] = internal_visc;
+  visc[1] = internal_visc;
 
   // visc[0] = mu_table_->eval(T, rho);
   // visc[1] = 0.;
