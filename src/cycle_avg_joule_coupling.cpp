@@ -246,11 +246,11 @@ void CycleAvgJouleCoupling::solve() {
   int curr_iter = flow_solver_->getCurrentIterations();
   flow_solver_->setMaximumIterations(curr_iter + increment);
 
-  //flow_solver_->setConstantPlasmaConductivityGF();
+  flow_solver_->setConstantPlasmaConductivityGF();
 
-  // take 1 step (just to evaluate the conductivity)
-  flow_solver_->setMaximumIterations(curr_iter + 1);
-  flow_solver_->solve();
+  // // take 1 step (just to evaluate the conductivity)
+  // flow_solver_->setMaximumIterations(curr_iter + 1);
+  // flow_solver_->solve();
 
   double delta_power = 0;
   if (input_power_ > 0) {
@@ -284,7 +284,7 @@ void CycleAvgJouleCoupling::solve() {
     curr_iter = flow_solver_->getCurrentIterations();
     flow_solver_->setMaximumIterations(curr_iter + increment);
 
-    //flow_solver_->setConstantPlasmaConductivityGF();
+    flow_solver_->setConstantPlasmaConductivityGF();
   }
 
 }

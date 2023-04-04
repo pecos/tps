@@ -128,8 +128,23 @@ void MixingLengthTransport::ComputeFluxTransportProperties(const Vector &state, 
   double kappat = mut * cp_over_Pr * Pr_over_Prt;
 
   // Don't update kappa... modeling choice
-  //kappat = 10. * kappa;
-  //transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] += kappat;
+  if (kappat / kappa > 10.0) {
+    kappat = 10. * kappa;
+  }
+
+  // torch specific... if way downstream, increase kappa a lot
+  if (distance > 0.04) {
+    double scaled_d = (distance - 0.04) / 0.01;
+    if (scaled_d < 1.) {
+      kappat += 20.0 * scaled_d * kappa;
+      //printf("distance = %.6e: Scaling kappa by %.6e\n", distance, 20. * scaled_d); fflush(stdout);
+    } else {
+      kappat += 20.0 * kappa;
+      //printf("distance = %.6e, Scaling kappa by %.6e\n", distance, 20.); fflush(stdout);
+    }
+  }
+
+  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] += kappat;
 }
 
 MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,

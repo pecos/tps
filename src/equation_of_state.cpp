@@ -57,11 +57,17 @@ void GasMixture::SetConstantPlasmaConductivity(ParGridFunction *pc, const ParGri
   const int nnode = pc->FESpace()->GetNDofs();
 
   if (coords != NULL) {
-    printf("Setting variable PC with const_plasma_conductivity = %.3e\n", const_plasma_conductivity_); fflush(stdout);
+    //printf("Setting variable PC with const_plasma_conductivity = %.3e\n", const_plasma_conductivity_); fflush(stdout);
+    printf("Setting variable PC\n");
     for (int n = 0; n < nnode; n++) {
       const double r0 = 0.005; // 5mm
+      const double y0 = 0.135; // 5mm
+      const double ysig = 0.015;
       const double x = (*coords)[n + 0 * nnode];
-      plasma_conductivity_gf[n] = 10.0 * const_plasma_conductivity_ * std::exp(-0.5 * (x / r0) * (x / r0));
+      const double y = (*coords)[n + 1 * nnode];
+      //plasma_conductivity_gf[n] = 10.0 * const_plasma_conductivity_ * std::exp(-0.5 * (x / r0) * (x / r0)) *
+      plasma_conductivity_gf[n] = 2000. * std::exp(-0.5 * (x / r0) * (x / r0)) *
+        std::exp(-0.5 * ((y - y0) / ysig) * ((y - y0) / ysig));
     }
     // for (int n = 0; n < nnode; n++) {
     //   plasma_conductivity_gf[n] = const_plasma_conductivity_;
