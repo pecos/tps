@@ -99,35 +99,29 @@ void M2ulPhyS::initVariables() {
 
   loadFromAuxSol = config.RestartFromAux();
 
-  // check if a simulation is being restarted
-  if (config.GetRestartCycle() > 0) {
-    // read serial mesh and corresponding partition file (the hdf file that was generated
-    // when starting from scratch).
+  // Generate serial mesh, making it periodic if requested
+  if (config.GetPeriodic()) {
+    Mesh temp_mesh = Mesh(config.GetMeshFileName().c_str());
+    Vector x_translation({config.GetXTrans(), 0.0, 0.0});
+    Vector y_translation({0.0, config.GetYTrans(), 0.0});
+    Vector z_translation({0.0, 0.0, config.GetZTrans()});
+    std::vector<Vector> translations = {x_translation, y_translation, z_translation};
 
-    // w/o ini periodic option
-    // serial_mesh = new Mesh(config.GetMeshFileName().c_str());
-
-    // periodic treatments
-    if (config.GetPeriodic()) {
-      Mesh temp_mesh = Mesh(config.GetMeshFileName().c_str());
-      Vector x_translation({config.GetXTrans(), 0.0, 0.0});
-      Vector y_translation({0.0, config.GetYTrans(), 0.0});
-      Vector z_translation({0.0, 0.0, config.GetZTrans()});
-      std::vector<Vector> translations = {x_translation, y_translation, z_translation};
-
-      if (mpi.Root()) {
-        std::cout << " xTrans: " << config.GetXTrans() << std::endl;
-        std::cout << " yTrans: " << config.GetYTrans() << std::endl;
-        std::cout << " zTrans: " << config.GetZTrans() << std::endl;
-      }
-
-      serial_mesh =
-          new Mesh(std::move(Mesh::MakePeriodic(temp_mesh, temp_mesh.CreatePeriodicVertexMapping(translations))));
-
-    } else {
-      serial_mesh = new Mesh(config.GetMeshFileName().c_str());
+    if (mpi.Root()) {
+      std::cout << " Making the mesh periodic using the following offsets:" << std::endl;
+      std::cout << "   xTrans: " << config.GetXTrans() << std::endl;
+      std::cout << "   yTrans: " << config.GetYTrans() << std::endl;
+      std::cout << "   zTrans: " << config.GetZTrans() << std::endl;
     }
 
+    serial_mesh =
+        new Mesh(std::move(Mesh::MakePeriodic(temp_mesh, temp_mesh.CreatePeriodicVertexMapping(translations))));
+  } else {
+    serial_mesh = new Mesh(config.GetMeshFileName().c_str());
+  }
+
+  // check if a simulation is being restarted
+  if (config.GetRestartCycle() > 0) {
     if (config.GetUniformRefLevels() > 0) {
       if (mpi.Root()) {
         std::cerr << "ERROR: Uniform mesh refinement not supported upon restart." << std::endl;
@@ -158,29 +152,6 @@ void M2ulPhyS::initVariables() {
       if (err != 0) {
         cout << "Error deleting previous data in " << config.GetOutputName() << endl;
       }
-    }
-
-    // serial_mesh = new Mesh(config.GetMeshFileName().c_str());
-
-    // periodic treatments
-    if (config.GetPeriodic()) {
-      Mesh temp_mesh = Mesh(config.GetMeshFileName().c_str());
-      Vector x_translation({config.GetXTrans(), 0.0, 0.0});
-      Vector y_translation({0.0, config.GetYTrans(), 0.0});
-      Vector z_translation({0.0, 0.0, config.GetZTrans()});
-      std::vector<Vector> translations = {x_translation, y_translation, z_translation};
-
-      if (mpi.Root()) {
-        std::cout << " xTrans: " << config.GetXTrans() << std::endl;
-        std::cout << " yTrans: " << config.GetYTrans() << std::endl;
-        std::cout << " zTrans: " << config.GetZTrans() << std::endl;
-      }
-
-      serial_mesh =
-          new Mesh(std::move(Mesh::MakePeriodic(temp_mesh, temp_mesh.CreatePeriodicVertexMapping(translations))));
-
-    } else {
-      serial_mesh = new Mesh(config.GetMeshFileName().c_str());
     }
 
     // uniform refinement, user-specified number of times
