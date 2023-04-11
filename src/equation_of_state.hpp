@@ -54,9 +54,15 @@ static const int MAXSPECIES = 200;
 static const double UNIVERSALGASCONSTANT = 8.3144598;  // J * mol^(-1) * K^(-1)
 static const double AVOGADRONUMBER = 6.0221409e+23;    // mol^(-1)
 static const double BOLTZMANNCONSTANT = UNIVERSALGASCONSTANT / AVOGADRONUMBER;
+static const double PLANCKCONSTANT = 6.62607015e-34; // m^2 kg / s
 static const double VACUUMPERMITTIVITY = 8.8541878128e-12;
 static const double ELECTRONCHARGE = 1.60218e-19;
 static const double MOLARELECTRONCHARGE = ELECTRONCHARGE * AVOGADRONUMBER;
+static const double ELECTRONMASS = 9.1093837015e-31; // kg
+// static const double qeOverkB = ELECTRONCHARGE / BOLTZMANNCONSTANT;
+
+static const double IonizationEnergy_Argon = 13.598434599702; // eV
+
 static const double PI = 3.14159265358979323846;
 // NOTE(kevin): using atan when initializing static const variable is not allowed in the device.
 //              chose an easy fix.
@@ -76,6 +82,14 @@ class GasMixture {
 
   bool ambipolar;
   bool twoTemperature_;
+
+  // State Indices 
+  int iBackground;
+  int iElectron;
+  int iIon1;
+  int iIon2;
+  int iTe;
+ 
 
   // DenseMatrix gasParams;
   // // TODO(kevin): not initialized at this point.
@@ -119,6 +133,14 @@ class GasMixture {
     num_equation = twoTemperature_ ? (nvel_ + 3 + numActiveSpecies) : (nvel_ + 2 + numActiveSpecies);
   }
 
+  MFEM_HOST_DEVICE void SetSpeciesStateIndices() {
+    iBackground = numSpecies - 1;
+    iElectron   = numSpecies - 2;
+    iIon1       = numSpecies - 3;
+    iIon2       = numSpecies - 4;
+    if (twoTemperature_) {iTe = num_equation -1;}
+  }
+
  public:
   GasMixture(RunConfiguration &_runfile, int _dim, int nvel);
   MFEM_HOST_DEVICE GasMixture(WorkingFluid f, int _dim, int nvel, double pc = 0);
@@ -129,6 +151,7 @@ class GasMixture {
   void SetFluid(WorkingFluid _fluid);
 
   WorkingFluid GetWorkingFluid() { return fluid; }
+
 
   MFEM_HOST_DEVICE int GetNumSpecies() const { return numSpecies; }
   MFEM_HOST_DEVICE int GetNumActiveSpecies() const { return numActiveSpecies; }
@@ -142,6 +165,10 @@ class GasMixture {
   // virtual std::map<int, int> *getMixtureToInputMap() { return NULL; }
   // virtual std::map<std::string, int> *getSpeciesMapping() { return NULL; }
   // DenseMatrix *getCompositions() { return &composition_; }
+  MFEM_HOST_DEVICE int GetiBackground() const { return iBackground; }
+  MFEM_HOST_DEVICE int GetiElectron() const { return iElectron; }
+  MFEM_HOST_DEVICE int GetiIon1() const { return iIon1; }
+  MFEM_HOST_DEVICE int GetiIon2() const { return iIon2; }
 
   MFEM_HOST_DEVICE virtual double GetGasParams(int species, GasParams param) const {
     printf("GetGasParams not implemented!\n");
@@ -307,6 +334,12 @@ class GasMixture {
                                            Vector &gradPe) = 0;
   MFEM_HOST_DEVICE virtual void computeElectronPressureGrad(const double n_e, const double T_e, const double *gradUp,
                                                             double *gradPe) = 0;
+
+  virtual void GetSpeciesFromLTE(double *conserv, double *primit, bool RestartFromPrimitives){
+    printf("GetSpeciesFromLTE is not implemented.");
+    return;
+  }
+
 };
 
 //////////////////////////////////////////////////////
@@ -418,6 +451,13 @@ class DryAir : public GasMixture {
                                                             double *gradPe) {
     printf("computeElectronPressureGrad not implemented");
   }
+
+  // Compute species mass densities based on LTE assumptions.
+  virtual void GetSpeciesFromLTE(double *conserv, double *primit, bool RestartFromPrimitives){
+    printf("GetSpeciesFromLTE is not implemented.");
+    return;
+  }
+
   // GPU functions
   // TODO(kevin): GPU part is not refactored for axisymmetric case.
 #ifdef _GPU_
@@ -588,6 +628,9 @@ MFEM_HOST_DEVICE inline double DryAir::ComputeTemperature(const double *state) {
 //////////////////////////////////////////////////////////////////////////
 
 class PerfectMixture : public GasMixture {
+ protected:
+
+
  private:
   // Vector specificHeatRatios_;
   // Vector specificGasConstants_;
@@ -619,14 +662,15 @@ class PerfectMixture : public GasMixture {
     return gasParams[species + param * numSpecies];
   }
 
+
   virtual double getMolarCV(int species) { return molarCV_[species]; }
   virtual double getMolarCP(int species) { return molarCP_[species]; }
   virtual double getSpecificHeatRatio(int species) { return specificHeatRatios_[species]; }
   virtual double getSpecificGasConstant(int species) { return specificGasConstants_[species]; }
 
   // Kevin: these are mixture heat ratio and gas constant. need to change argument.
-  MFEM_HOST_DEVICE virtual double GetSpecificHeatRatio() { return molarCP_[numSpecies - 1] / molarCV_[numSpecies - 1]; }
-  MFEM_HOST_DEVICE virtual double GetGasConstant() { return specificGasConstants_[numSpecies - 1]; }
+  MFEM_HOST_DEVICE virtual double GetSpecificHeatRatio() { return molarCP_[iBackground] / molarCV_[iBackground]; }
+  MFEM_HOST_DEVICE virtual double GetGasConstant() { return specificGasConstants_[iBackground]; }
 
   MFEM_HOST_DEVICE double computeHeaviesHeatCapacity(const double *n_sp, const double &nB) const;
   MFEM_HOST_DEVICE double computeAmbipolarElectronNumberDensity(const double *n_sp) const;
@@ -705,7 +749,7 @@ class PerfectMixture : public GasMixture {
                                                        Vector &conservedState);
 
   virtual double computeElectronEnergy(const double n_e, const double T_e) {
-    return n_e * molarCV_[numSpecies - 2] * T_e;
+    return n_e * molarCV_[iElectron] * T_e;
   }
   virtual double computeElectronPressure(const double n_e, const double T_e) {
     return n_e * UNIVERSALGASCONSTANT * T_e;
@@ -714,6 +758,11 @@ class PerfectMixture : public GasMixture {
                                            Vector &gradPe);
   MFEM_HOST_DEVICE virtual void computeElectronPressureGrad(const double n_e, const double T_e, const double *gradUp,
                                                             double *gradPe);
+
+  // Compute species mass densities based on LTE assumptions.
+  virtual void GetSpeciesFromLTE(double *conserv, double *primit, bool RestartFromPrimitives);
+
+
   // GPU functions
 #ifdef _GPU_
 

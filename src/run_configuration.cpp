@@ -54,6 +54,7 @@ RunConfiguration::RunConfiguration() {
   numIters = 10;
   useRoe = false;
   restart = false;
+  restartFromLTE = false;
   restart_hdf5_conversion = false;
   restart_serial = "no";
   restart_cycle = 0;

@@ -285,6 +285,7 @@ class M2ulPhyS : public TPS::Solver {
 
   // I/O organizer
   IODataOrganizer ioData;
+  // bool inReastartFile_Var;
 
 #ifdef HAVE_MASA
   VectorFunctionCoefficient *DenMMS_, *VelMMS_, *PreMMS_;
@@ -321,6 +322,7 @@ class M2ulPhyS : public TPS::Solver {
   // void dryAirUniformInitialConditions();
   void uniformInitialConditions();
   void initGradUp();
+  void initilizeSpeciesFromLTE();
 
   // NOTE(kevin): this routine is currently obsolete.
   // It computes `dof`-averaged state and time-derivative, which are useless at this point.
@@ -391,6 +393,7 @@ class M2ulPhyS : public TPS::Solver {
     paraviewColl->Save();
   }
 
+
   void solve() override;
   void solveStep() override;
   void solveBegin() override;
@@ -418,6 +421,7 @@ class M2ulPhyS : public TPS::Solver {
   const ParGridFunction *getDistanceFcn() { return distance_; }
 
   void updatePrimitives();
+  void updateConservatives();
 
   ParGridFunction *GetPlasmaConductivityGF() { return plasma_conductivity_; }
   ParGridFunction *GetJouleHeatingGF() { return joule_heating_; }
