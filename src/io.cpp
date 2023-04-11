@@ -323,14 +323,18 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
 
       vector<IOVar> vars = ioData.vars_[fam.group_];
       for (auto var : vars) {
-        std::string h5Path = fam.group_ + "/" + var.varName_;
-        if (rank0_) grvy_printf(ginfo, "--> Reading h5 path = %s\n", h5Path.c_str());
-        if (config.isRestartPartitioned(mode))
-          read_partitioned_soln_data(file, h5Path.c_str(), var.index_ * numInSoln, data);
-        else
-          read_serialized_soln_data(file, h5Path.c_str(), dof, var.index_, data, fam);
+        if (var.inReastartFile_) {
+          std::string h5Path = fam.group_ + "/" + var.varName_;
+          if (rank0_) grvy_printf(ginfo, "--> Reading h5 path = %s\n", h5Path.c_str());
+          if (config.isRestartPartitioned(mode))
+            read_partitioned_soln_data(file, h5Path.c_str(), var.index_ * numInSoln, data);
+          else
+            read_serialized_soln_data(file, h5Path.c_str(), dof, var.index_, data, fam);
+        }
       }
     }
+
+
   }
 
   if (file >= 0) H5Fclose(file);
@@ -751,8 +755,8 @@ void IODataOrganizer::registerIOFamily(std::string description, std::string grou
 }
 
 // register individual variables for IO family
-void IODataOrganizer::registerIOVar(std::string group, std::string varName, int index) {
-  IOVar newvar{varName, index};
+void IODataOrganizer::registerIOVar(std::string group, std::string varName, int index, bool inReastartFile) {
+  IOVar newvar{varName, index, inReastartFile};
   vars_[group].push_back(newvar);
 
   return;

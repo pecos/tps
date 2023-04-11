@@ -1588,11 +1588,18 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     if ((eqSystem == NS_PASSIVE) && (sp == 1)) break;
 
     std::string speciesName = config.speciesNames[sp];
-    ioData.registerIOVar("/solution", "rho-Y_" + speciesName, sp + nvel + 2);
+    if (config.restartFromLTE) {
+      ioData.registerIOVar("/solution", "rho-Y_" + speciesName, sp + nvel + 2, false);
+    } else {
+      ioData.registerIOVar("/solution", "rho-Y_" + speciesName, sp + nvel + 2);
+    }
   }
-
   if (config.twoTemperature) {
-    ioData.registerIOVar("/solution", "rhoE_e", num_equation - 1);
+    if (config.restartFromLTE) {
+      ioData.registerIOVar("/solution", "rhoE_e", num_equation - 1, false);
+    } else {
+      ioData.registerIOVar("/solution", "rhoE_e", num_equation - 1);
+    }
   }
 
   // compute factor to multiply viscosity when this option is active
@@ -1685,6 +1692,8 @@ void M2ulPhyS::projectInitialSolution() {
 
     restart_files_hdf5("read");
 
+    if (config.restartFromLTE) initilizeSpeciesFromLTE();
+
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
     paraviewColl->UseRestartMode(true);
@@ -1693,6 +1702,7 @@ void M2ulPhyS::projectInitialSolution() {
   initGradUp();
 
   updatePrimitives();
+  //updateConservatives();
 
   // update pressure grid function
   mixture->UpdatePressureGridFunction(press, Up);
@@ -2114,6 +2124,7 @@ void M2ulPhyS::uniformInitialConditions() {
       initState(2 + nvel + sp) = inputRhoRhoVp[0] * config.initialMassFractions(sp);
     }
 
+
     // electron energy
     if (mixture->IsTwoTemperature()) {
       double ne = 0.;
@@ -2221,6 +2232,60 @@ void M2ulPhyS::initGradUp() {
   }
 }
 
+
+// NOTE(Mal): This is a method to be used when we restart from LTE simulation. 
+// It initilzes species mass densities based on LTE assumptions.
+void M2ulPhyS::initilizeSpeciesFromLTE() {
+  double *dataU = U->GetData();
+  double *dataUp = Up->GetData();
+  // double *dataGradUp = gradUp->HostWrite();
+
+  int dof = vfes->GetNDofs();
+
+  assert (mixture->GetWorkingFluid() == WorkingFluid::USER_DEFINED); 
+  const int numSpecies = mixture->GetNumSpecies();
+  const int numActiveSpecies = mixture->GetNumActiveSpecies();
+
+  double state[num_equation] = {0.0};
+  double prim[num_equation] = {0.0};
+  // double gradUpn[num_equation * dim] = {0.0};
+
+
+  for (int i = 0; i < dof; i++) {
+
+    //  Put values to zero. Not needed actually. 
+    memset(state, 0.0, num_equation * sizeof(double)); 
+    memset(prim, 0.0, num_equation * sizeof(double)); 
+    // memset(gradUpn, 0.0, num_equation * sizeof(double)); 
+
+    // Get state at each node.
+    for (int eq = 0; eq < num_equation; eq++) {
+      state[eq] = dataU[i + eq * dof];
+      prim[eq]  = dataUp[i + eq * dof];
+      // for (int d = 0; d < dim; d++) {
+        // gradUpn[eq + d * num_equation] = dataGradUp[i + eq * dof + d * num_equation * dof];
+      // }
+    }
+
+    // Calculate species mass densities bases based at LTE at node level.
+    mixture->GetSpeciesFromLTE(state,prim,true);
+
+    // mixture->GetPrimitivesFromConservatives(state, prim);
+
+    // Return new state at each node
+    for (int eq = 0; eq < num_equation; eq++) {
+      dataU[i + eq * dof] = state[eq];
+      dataUp[i + eq * dof] = prim[eq];
+      // for (int d = 0; d < dim; d++) {
+      //   dataGradUp[i + eq * dof + d * num_equation * dof] = gradUpn[eq + d * num_equation];
+      // }
+    }
+
+  }
+
+  //   delete eqState;
+}
+
 void M2ulPhyS::Check_NAN() {
   int local_print = 0;
   int dof = vfes->GetNDofs();
@@ -2240,7 +2305,7 @@ void M2ulPhyS::Check_NAN() {
     for (int eq = 0; eq < num_equation; eq++) {
       if (std::isnan(dataU[i + eq * dof])) {
         // thereIsNan = true;
-        cout << "NaN at node: " << i << " partition: " << rank_ << endl;
+        cout << "NaN at node: " << i << " , Eq: " << eq << " partition: " << rank_ << endl;
         local_print++;
         // MPI_Abort(MPI_COMM_WORLD,1);
       }
@@ -2476,6 +2541,7 @@ void M2ulPhyS::parseStatOptions() {
 void M2ulPhyS::parseIOSettings() {
   tpsP->getInput("io/outdirBase", config.outputFile, std::string("output-default"));
   tpsP->getInput("io/enableRestart", config.restart, false);
+  tpsP->getInput("io/restartFromLTE", config.restartFromLTE, false);
   tpsP->getInput("io/exitCheckFreq", config.exit_checkFrequency_, 500);
 
   std::string restartMode;
@@ -2749,7 +2815,7 @@ void M2ulPhyS::parseSpeciesInputs() {
 
   /*
     NOTE: for now, we force the user to set the background species as the last,
-    and the electron species as the second to last.
+    and the electron species as the second-to-last.
   */
   config.numAtoms = 0;
   if ((config.numSpecies > 1) && (config.eqSystem != NS_PASSIVE)) {
@@ -2775,6 +2841,7 @@ void M2ulPhyS::parseSpeciesInputs() {
     for (int i = 1; i <= config.numSpecies; i++) {
       // double mw, charge;
       double formEnergy;
+      double levelDegeneracy;
       std::string type, speciesName;
       std::vector<std::pair<std::string, std::string>> composition;
       std::string basepath("species/species" + std::to_string(i));
@@ -2796,6 +2863,10 @@ void M2ulPhyS::parseSpeciesInputs() {
       tpsP->getRequiredInput((basepath + "/formation_energy").c_str(), formEnergy);
       inputGasParams(i - 1, GasParams::FORMATION_ENERGY) = formEnergy;
 
+      //tpsP->getRequiredInput((basepath + "/level_degeneracy").c_str(), levelDegeneracy);
+      tpsP->getInput((basepath + "/level_degeneracy").c_str(), levelDegeneracy, 1.0);
+      inputGasParams(i - 1, GasParams::SPECIES_DEGENERACY) = levelDegeneracy;
+
       tpsP->getRequiredInput((basepath + "/initialMassFraction").c_str(), inputInitialMassFraction(i - 1));
 
       if (config.gasModel == PERFECT_MIXTURE) {
@@ -2811,6 +2882,7 @@ void M2ulPhyS::parseSpeciesInputs() {
     inputGasParams.SetCol(GasParams::SPECIES_MW, speciesMass);
     inputGasParams.SetCol(GasParams::SPECIES_CHARGES, speciesCharge);
 
+
     // Sort the gas params for mixture and save mapping.
     {
       config.gasParams.SetSize(config.numSpecies, GasParams::NUM_GASPARAMS);
@@ -2822,6 +2894,7 @@ void M2ulPhyS::parseSpeciesInputs() {
       config.speciesComposition = 0.0;
 
       // TODO(kevin): electron species is enforced to be included in the input file.
+      // TODO(Mal): We need to find a better way to define indices of the species. Probably through input file.
       bool isElectronIncluded = false;
 
       config.gasParams = 0.0;
@@ -2833,7 +2906,20 @@ void M2ulPhyS::parseSpeciesInputs() {
         } else if (inputSpeciesNames[sp] == "E") {
           targetIdx = config.numSpecies - 2;
           isElectronIncluded = true;
-        } else {
+        }
+        // TODO(trevilo): I am commenting this out b/c it causes some
+        // tests to seg fault.  Need to discuss with Malamas what he
+        // is wanting to achieve here and figure out how to make it
+        // work.
+        //
+        // else if (inputSpeciesNames[sp] == "Ar.+1" ||  inputSpeciesNames[sp] == "Ar+1" ) {
+        //   targetIdx = config.numSpecies - 3;
+        // } else if (inputSpeciesNames[sp] == "Ar.+2" ||  inputSpeciesNames[sp] == "Ar+2" ) {
+        //   targetIdx = config.numSpecies - 4;
+        // } else if (inputSpeciesNames[sp] == "Ar2.+1" ||  inputSpeciesNames[sp] == "Ar2+1" ) {
+        //   targetIdx = config.numSpecies - 5;
+        // }
+        else {
           targetIdx = paramIdx;
           paramIdx++;
         }
@@ -3747,6 +3833,29 @@ void M2ulPhyS::updatePrimitives() {
     for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * dof] = Upi[eq];
   }
 }
+
+void M2ulPhyS::updateConservatives() {
+  double *data = U->HostWrite();
+  double *dataUp = Up->HostWrite();
+  int dof = vfes->GetNDofs();
+
+  Vector state;
+  state.UseDevice(false);
+  state.SetSize(num_equation);
+
+  Vector Upi;
+  Upi.UseDevice(false);
+  Upi.SetSize(num_equation);
+
+  for (int i = 0; i < dof; i++) {
+    for (int eq = 0; eq < num_equation; eq++) Upi(eq) = dataUp[i + eq * dof];
+    mixture->GetConservativesFromPrimitives(Upi, state);
+    for (int eq = 0; eq < num_equation; eq++) data[i + eq * dof] = state[eq];
+  }
+}
+
+
+
 
 void M2ulPhyS::visualization() {
   double tlast = grvy_timer_elapsed_global();

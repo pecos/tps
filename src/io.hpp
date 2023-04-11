@@ -55,6 +55,7 @@ class IOVar {
  public:
   std::string varName_;  // solution variable
   int index_;            // variable index in the pargrid function
+  bool inReastartFile_;  // Check if we want to read this variable
 };
 
 class IODataOrganizer {
@@ -66,7 +67,7 @@ class IODataOrganizer {
                         bool auxRestart = true, bool inRestartFile = true);
   ~IODataOrganizer();
 
-  void registerIOVar(std::string group, std::string varName, int index);
+  void registerIOVar(std::string group, std::string varName, int index, bool inReastartFile = true);
   int getIOFamilyIndex(std::string group);
 
   void initializeSerial(bool root, bool serial, mfem::Mesh *serial_mesh);
