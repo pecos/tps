@@ -144,13 +144,15 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
 
   // element size by dof index
   elSize = new ParGridFunction(fes);
+  elSize->UseDevice(true);
+  auto h_elSize = elSize->HostWrite();
   Array<int> vdofs_here;
   for (int j = 0; j < mesh->GetNE(); j++) {
     fes->GetElementVDofs(j, vdofs_here);
     int Ndofs = vdofs_here.Size();
     for (int n = 0; n < Ndofs; n++) {
       int idx = vdofs_here[n];
-      (*elSize)[idx] = mesh->GetElementSize(j, 1);
+      h_elSize[idx] = mesh->GetElementSize(j, 1);
     }
   }
 
@@ -594,6 +596,8 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
 
   Fluxes *d_fluxClass = fluxClass;
 
+  auto d_elSize = elSize->Read();
+
   MFEM_FORALL(n, dof, {
     double Un[gpudata::MAXEQUATIONS];  // double Un[20];
     double fluxn[gpudata::MAXEQUATIONS * gpudata::MAXDIM], fvisc[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
@@ -616,7 +620,7 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
       radius = d_coord[n + 0 * dof];
     }
 
-    d_fluxClass->ComputeViscousFluxes(Un, gradUpn, radius, 0.0, fvisc);
+    d_fluxClass->ComputeViscousFluxes(Un, gradUpn, radius, d_elSize[n], fvisc);
 
     if (d_spaceVaryViscMult != NULL) {
       linVisc = d_spaceVaryViscMult[n];

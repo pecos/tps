@@ -505,7 +505,7 @@ void M2ulPhyS::initVariables() {
 #if defined(_CUDA_) || defined(_HIP_)
   tpsGpuMalloc((void **)&fluxClass, sizeof(Fluxes));
   gpu::instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(),
-                                         fluxClass);
+                                         config.GetSgsModelType(), config.GetSgsFloor(), fluxClass);
 
   tpsGpuMalloc((void **)&rsolver, sizeof(RiemannSolver));
   gpu::instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, fluxClass, config.RoeRiemannSolver(),
@@ -744,11 +744,20 @@ void M2ulPhyS::initIndirectionArrays() {
   face_data.xyz.UseDevice(true);
   face_data.xyz.SetSize(dim * maxIntPoints * mesh->GetNumFaces());
 
+  face_data.delta_el1.UseDevice(true);
+  face_data.delta_el1.SetSize(mesh->GetNumFaces());
+
+  face_data.delta_el2.UseDevice(true);
+  face_data.delta_el2.SetSize(mesh->GetNumFaces());
+
+
   auto hshape1 = face_data.el1_shape.HostWrite();
   auto hshape2 = face_data.el2_shape.HostWrite();
   auto hweight = face_data.quad_weight.HostWrite();
   auto hnormal = face_data.normal.HostWrite();
   auto h_xyz = face_data.xyz.HostWrite();
+  auto h_delta_el1 = face_data.delta_el1.HostWrite();
+  auto h_delta_el2 = face_data.delta_el2.HostWrite();
 
   Vector xyz(dim);
 
@@ -795,6 +804,9 @@ void M2ulPhyS::initIndirectionArrays() {
       h_face_el1[face] = tr->Elem1No;
       h_face_el2[face] = tr->Elem2No;
       h_face_num_quad[face] = ir->GetNPoints();
+
+      h_delta_el1[face] = mesh->GetElementSize(tr->Elem1No, 1);
+      h_delta_el2[face] = mesh->GetElementSize(tr->Elem2No, 1);
 
       Vector shape1i, shape2i;
       shape1i.UseDevice(false);
@@ -3405,14 +3417,14 @@ void M2ulPhyS::checkSolverOptions() const {
     }
   }
 
-  if (config.sgsModelType != 0) {
-    if (mpi.Root()) {
-      std::cerr << "[ERROR]: GPU runs do not yet support SGS models."
-                << std::endl;
-      std::cerr << std::endl;
-      exit(ERROR);
-    }
-  }
+  // if (config.sgsModelType != 0) {
+  //   if (mpi.Root()) {
+  //     std::cerr << "[ERROR]: GPU runs do not yet support SGS models."
+  //               << std::endl;
+  //     std::cerr << std::endl;
+  //     exit(ERROR);
+  //   }
+  // }
 #endif
 
   // Axisymmetric solver does not yet support all options.  Check that
