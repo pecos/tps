@@ -96,8 +96,8 @@ class Fluxes {
 
   void sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu_sgs);
   MFEM_HOST_DEVICE void sgsSmag(const double *state, const double *gradUp, double delta, double &mu_sgs);
-  //MFEM_HOST_DEVICE void sgsSigma(const double *state, const double *gradUp, double delta, double &mu_sgs);
   void sgsSigma(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu_sgs);
+  MFEM_HOST_DEVICE void sgsSigma(const double *state, const double *gradUp, double delta, double &mu_sgs);
 
   // Compute viscous flux with prescribed boundary flux.
   void ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, double delta,

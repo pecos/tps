@@ -49,7 +49,8 @@ TESTS += cyl3d.gpu.test \
 	 reaction.test \
 	 inflow_outflow.test \
 	 pipe.test \
-	 sgsSmag.test
+	 sgsSmag.test \
+	 sgsSigma.test
 
 if PYTHON_ENABLED
 TESTS += cyl3d.gpu.python.test
