@@ -344,7 +344,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
   if (sgs_model_type_ > 0) {
     double mu_sgs = 0.;
     if (sgs_model_type_ == 1) sgsSmag(state, gradUp, delta, mu_sgs);
-    //if (sgs_model_type_ == 2) sgsSigma(state, gradUp, delta, mu_sgs);
+    if (sgs_model_type_ == 2) sgsSigma(state, gradUp, delta, mu_sgs);
     bulkViscosity *= (1.0 + mu_sgs / visc);
     visc += mu_sgs;
     k += (mu_sgs / Pr_Cp);
@@ -766,11 +766,15 @@ NOT TESTED: Sigma subgrid model following Nicoud et.al., "Using singular values 
 subgrid-scale model for large eddy simulations", PoF 2011.
 */
 void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu) {
-  DenseMatrix Qij(dim, dim);
-  DenseMatrix du(dim, dim);
-  DenseMatrix B(dim, dim);
-  Vector ev(dim);
-  Vector sigma(dim);
+  sgsSigma(state.GetData(), gradUp.GetData(), delta, mu);
+}
+
+MFEM_HOST_DEVICE void Fluxes::sgsSigma(const double *state, const double *gradUp, double delta, double &mu) {
+  double Qij[3][3];  // DenseMatrix Qij(dim, dim);
+  double du[3][3];  // DenseMatrix du(dim, dim);
+  double B[3][3];  // DenseMatrix B(dim, dim);
+  double ev[3];  // Vector ev(dim);
+  double sigma[3];  // Vector sigma(dim);
   double Cd = 0.135;
   double sml = 1.0e-12;
   double pi = 3.14159265359;
@@ -781,13 +785,14 @@ void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double del
   // Qij = u_{k,i}*u_{k,j}
   for (int j = 0; j < dim; j++) {
     for (int i = 0; i < dim; i++) {
-      Qij(i, j) = 0.;
+      Qij[i][j] = 0.;  // Qij(i, j) = 0.;
     }
   }
   for (int k = 0; k < dim; k++) {
     for (int j = 0; j < dim; j++) {
       for (int i = 0; i < dim; i++) {
-        Qij(i, j) += gradUp(k + 1, i) * gradUp(k + 1, j);
+        // Qij(i, j) += gradUp(k + 1, i) * gradUp(k + 1, j);
+        Qij[i][j] += gradUp[k + 1 + i * num_equation] * gradUp[k + 1 + j * num_equation];
       }
     }
   }
@@ -798,33 +803,42 @@ void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double del
   d4 = pow(d_model, 4);
   for (int j = 0; j < dim; j++) {
     for (int i = 0; i < dim; i++) {
-      Qij(i, j) *= d4;
+      // Qij(i, j) *= d4;
+      Qij[i][j] *= d4;
     }
   }
 
   // eigenvalues for symmetric pos-def 3x3
-  p1 = Qij(0, 1) * Qij(0, 1) + Qij(0, 2) * Qij(0, 2) + Qij(1, 2) * Qij(1, 2);
-  q = onethird * (Qij(0, 0) + Qij(1, 1) + Qij(2, 2));
-  p2 = (Qij(0, 0) - q) * (Qij(0, 0) - q) + (Qij(1, 1) - q) * (Qij(1, 1) - q) + (Qij(2, 2) - q) * (Qij(2, 2) - q) +
+  // p1 = Qij(0, 1) * Qij(0, 1) + Qij(0, 2) * Qij(0, 2) + Qij(1, 2) * Qij(1, 2);
+  // q = onethird * (Qij(0, 0) + Qij(1, 1) + Qij(2, 2));
+  // p2 = (Qij(0, 0) - q) * (Qij(0, 0) - q) + (Qij(1, 1) - q) * (Qij(1, 1) - q) + (Qij(2, 2) - q) * (Qij(2, 2) - q) +
+  //      2.0 * p1;
+
+  p1 = Qij[0][1] * Qij[0][1] + Qij[0][2] * Qij[0][2] + Qij[1][2] * Qij[1][2];
+  q = onethird * (Qij[0][0] + Qij[1][1] + Qij[2][2]);
+  p2 = (Qij[0][0] - q) * (Qij[0][0] - q) + (Qij[1][1] - q) * (Qij[1][1] - q) + (Qij[2][2] - q) * (Qij[2][2] - q) +
        2.0 * p1;
   p = std::sqrt(max(p2, 0.0) / 6.0);
   // cout << "p1, q, p2, p: " << p1 << " " << q << " " << p2 << " " << p << endl; fflush(stdout);
 
   for (int j = 0; j < dim; j++) {
     for (int i = 0; i < dim; i++) {
-      B(i, j) = Qij(i, j);
+      // B(i, j) = Qij(i, j);
+      B[i][j] = Qij[i][j];
     }
   }
   for (int i = 0; i < dim; i++) {
-    B(i, i) -= q;
+    //B(i, i) -= q;
+    B[i][i] -= q;
   }
   for (int j = 0; j < dim; j++) {
     for (int i = 0; i < dim; i++) {
-      B(i, j) *= (1.0 / max(p, sml));
+      //B(i, j) *= (1.0 / max(p, sml));
+      B[i][j] *= (1.0 / max(p, sml));
     }
   }
-  detB = B(0, 0) * (B(1, 1) * B(2, 2) - B(2, 1) * B(1, 2)) - B(0, 1) * (B(1, 0) * B(2, 2) - B(2, 0) * B(1, 2)) +
-         B(0, 2) * (B(1, 0) * B(2, 1) - B(2, 0) * B(1, 1));
+  detB = B[0][0] * (B[1][1] * B[2][2] - B[2][1] * B[1][2]) - B[0][1] * (B[1][0] * B[2][2] - B[2][0] * B[1][2]) +
+         B[0][2] * (B[1][0] * B[2][1] - B[2][0] * B[1][1]);
   r = 0.5 * detB;
   // cout << "r: " << r << endl; fflush(stdout);
 
