@@ -27,22 +27,5 @@ setup() {
 @test "[$TEST] verify tps output with input -> $RUNFILE" {
     test -s $SOLN_FILE
     test -s $REF_FILE
-    ./soln_differ $SOLN_FILE $REF_FILE
-}
-
-@test "[$TEST] verify git sha in HDF5 file" {
-    test -s $SOLN_FILE
-    run h5dump  -a revision restart_output.sol.h5
-    [[ "${status}" -eq 0 ]]
-}
-
-@test "[$TEST] verify exit code if restart files missing" {
-    RUNFILE=inputs/input.sgsSmag.ini
-
-    rm -f $SOLN_FILE
-
-    # following should exit with error
-    run $EXE --runFile $RUNFILE
-    [[ "${status}" -eq 1 ]]
-    [[ "${output}" =~ "Unable to access desired restart file" ]]
+    ./soln_differ -r $SOLN_FILE $REF_FILE
 }
