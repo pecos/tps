@@ -68,9 +68,16 @@ class Fluxes {
 
   const int num_equation;
 
+  const int sgs_model_type_;
+  const double sgs_model_floor_;
+
  public:
+  Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
+         const int _num_equation, const int _dim, bool axisym);
+  Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
+         const int _num_equation, const int _dim, bool axisym, RunConfiguration *config);
   MFEM_HOST_DEVICE Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
-                          const int _num_equation, const int _dim, bool axisym, RunConfiguration *config = NULL);
+                          const int _num_equation, const int _dim, bool axisym, int sgs_type, double sgs_floor);
 
   Equations GetEquationSystem() { return eqSystem; }
 
@@ -88,6 +95,8 @@ class Fluxes {
                                              double *flux);
 
   void sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu_sgs);
+  MFEM_HOST_DEVICE void sgsSmag(const double *state, const double *gradUp, double delta, double &mu_sgs);
+  //MFEM_HOST_DEVICE void sgsSigma(const double *state, const double *gradUp, double delta, double &mu_sgs);
   void sgsSigma(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu_sgs);
 
   // Compute viscous flux with prescribed boundary flux.

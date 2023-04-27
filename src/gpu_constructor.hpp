@@ -112,7 +112,8 @@ __global__ void instantiateDeviceArgonMixtureTransport(GasMixture *mixture, cons
 
 //! Instantiate Fluxes object on the device with placement new
 __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
-                                        const int _num_equation, const int _dim, bool axisym, void *f);
+                                        const int _num_equation, const int _dim, bool axisym, int sgs_model,
+                                        double sgs_floor, void *f);
 
 //! Instantiate RiemannSolver object on the device with placement new
 __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,

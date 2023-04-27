@@ -31,16 +31,45 @@
 // -----------------------------------------------------------------------------------el-
 #include "fluxes.hpp"
 
-MFEM_HOST_DEVICE Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
-                                const int _num_equation, const int _dim, bool axisym, RunConfiguration *config)
+Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
+               const int _num_equation, const int _dim, bool axisym)
     : mixture(_mixture),
       eqSystem(_eqSystem),
       transport(_transport),
+      num_equation(_num_equation),
+      dim(_dim),
+      nvel(axisym ? 3 : _dim),
+      axisymmetric_(axisym),
+      config_(NULL),
+      sgs_model_type_(0),
+      sgs_model_floor_(0.0) {}
+
+Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
+               const int _num_equation, const int _dim, bool axisym, RunConfiguration *config)
+    : mixture(_mixture),
+      eqSystem(_eqSystem),
+      transport(_transport),
+      num_equation(_num_equation),
       dim(_dim),
       nvel(axisym ? 3 : _dim),
       axisymmetric_(axisym),
       config_(config),
-      num_equation(_num_equation) {}
+      sgs_model_type_(config->GetSgsModelType()),
+      sgs_model_floor_(config->GetSgsFloor()) {}
+
+MFEM_HOST_DEVICE Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
+                                const int _num_equation, const int _dim, bool axisym, int sgs_type, double sgs_floor)
+    : mixture(_mixture),
+      eqSystem(_eqSystem),
+      transport(_transport),
+      num_equation(_num_equation),
+      dim(_dim),
+      nvel(axisym ? 3 : _dim),
+      axisymmetric_(axisym),
+      config_(NULL),
+      sgs_model_type_(sgs_type),
+      sgs_model_floor_(sgs_floor) {}
+
 
 #ifdef _BUILD_DEPRECATED_
 void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, DenseMatrix &flux) {
@@ -140,6 +169,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeConvectiveFluxes(const double *state, doubl
 // TODO(kevin): check/complete axisymmetric setting for multi-component flow.
 void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, double delta,
                                   DenseMatrix &flux) {
+#ifdef _BUILD_DEPRECATED_
   flux = 0.;
   if (eqSystem == EULER) {
     return;
@@ -181,10 +211,10 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   double Pr_Cp = visc / k;
 
   // subgrid scale model
-  if (config_ != NULL && config_->GetSgsModelType() > 0) {
+  if (sgs_model_type_ > 0) {
     double mu_sgs = 0.;
-    if (config_->GetSgsModelType() == 1) sgsSmag(state, gradUp, delta, mu_sgs);
-    if (config_->GetSgsModelType() == 2) sgsSigma(state, gradUp, delta, mu_sgs);
+    if (sgs_model_type_ == 1) sgsSmag(state, gradUp, delta, mu_sgs);
+    if (sgs_model_type_ == 2) sgsSigma(state, gradUp, delta, mu_sgs);
     bulkViscosity *= (1.0 + mu_sgs / visc);
     visc += mu_sgs;
     k += (mu_sgs / Pr_Cp);
@@ -268,6 +298,9 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
     // however only dim-components are used for flux.
     for (int d = 0; d < dim; d++) flux(nvel + 2 + sp, d) = -state[nvel + 2 + sp] * diffusionVelocity(sp, d);
   }
+#else
+  ComputeViscousFluxes(state.GetData(), gradUp.GetData(), radius, delta, flux.GetData());
+#endif
 }
 
 MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius,
@@ -300,11 +333,22 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
   // NOTE(kevin): in flux, only dim-components of diffusionVelocity will be used.
   double diffusionVelocity[gpudata::MAXSPECIES * gpudata::MAXDIM];
   transport->ComputeFluxTransportProperties(state, gradUp, Efield, transportBuffer, diffusionVelocity);
-  const double visc = transportBuffer[FluxTrns::VISCOSITY];
+  double visc = transportBuffer[FluxTrns::VISCOSITY];
   double bulkViscosity = transportBuffer[FluxTrns::BULK_VISCOSITY];
   bulkViscosity -= 2. / 3. * visc;
   double k = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY];
   double ke = transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY];
+  double Pr_Cp = visc / k;
+
+  // subgrid scale model
+  if (sgs_model_type_ > 0) {
+    double mu_sgs = 0.;
+    if (sgs_model_type_ == 1) sgsSmag(state, gradUp, delta, mu_sgs);
+    //if (sgs_model_type_ == 2) sgsSigma(state, gradUp, delta, mu_sgs);
+    bulkViscosity *= (1.0 + mu_sgs / visc);
+    visc += mu_sgs;
+    k += (mu_sgs / Pr_Cp);
+  }
 
   if (twoTemperature) {
     for (int d = 0; d < dim; d++) {
@@ -429,10 +473,10 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
   double Pr_Cp = visc / k;
 
   // subgrid scale model
-  if (config_ != NULL && config_->GetSgsModelType() > 0) {
+  if (sgs_model_type_ > 0) {
     double mu_sgs = 0.;
-    if (config_->GetSgsModelType() == 1) sgsSmag(state, gradUp, delta, mu_sgs);
-    if (config_->GetSgsModelType() == 2) sgsSigma(state, gradUp, delta, mu_sgs);
+    if (sgs_model_type_ == 1) sgsSmag(state, gradUp, delta, mu_sgs);
+    if (sgs_model_type_ == 2) sgsSigma(state, gradUp, delta, mu_sgs);
     bulkViscosity *= (1.0 + mu_sgs / visc);
     visc += mu_sgs;
     k += (mu_sgs / Pr_Cp);
@@ -688,19 +732,23 @@ void Fluxes::ComputeSplitFlux(const mfem::Vector &state, mfem::DenseMatrix &a_ma
 Basic Smagorinksy subgrid model with user-specified cutoff grid length
 */
 void Fluxes::sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu) {
-  Vector Sij(6);
+  sgsSmag(state.GetData(), gradUp.GetData(), delta, mu);
+}
+
+MFEM_HOST_DEVICE void Fluxes::sgsSmag(const double *state, const double *gradUp, double delta, double &mu) {
+  double Sij[6];
   double Smag = 0.;
   double Cd = 0.12;
   double l_floor;
   double d_model;
 
   // gradUp is in (eq,dim) form with eq=0 being rho slot
-  Sij[0] = gradUp(1, 0);
-  Sij[1] = gradUp(2, 1);
-  Sij[2] = gradUp(3, 2);
-  Sij[3] = 0.5 * (gradUp(1, 1) + gradUp(2, 0));
-  Sij[4] = 0.5 * (gradUp(1, 2) + gradUp(3, 0));
-  Sij[5] = 0.5 * (gradUp(2, 2) + gradUp(3, 1));
+  Sij[0] = gradUp[1 + 0 * num_equation];  // gradUp(1, 0);
+  Sij[1] = gradUp[2 + 1 * num_equation];  // gradUp(2, 1);
+  Sij[2] = gradUp[3 + 2 * num_equation];  // gradUp(3, 2);
+  Sij[3] = 0.5 * (gradUp[1 + 1 * num_equation] + gradUp[2 + 0 * num_equation]);  // 0.5 * (gradUp(1, 1) + gradUp(2, 0));
+  Sij[4] = 0.5 * (gradUp[1 + 2 * num_equation] + gradUp[3 + 0 * num_equation]);  // 0.5 * (gradUp(1, 2) + gradUp(3, 0));
+  Sij[5] = 0.5 * (gradUp[2 + 2 * num_equation] + gradUp[3 + 1 * num_equation]);  // 0.5 * (gradUp(2, 2) + gradUp(3, 1));
 
   // strain magnitude with silly sqrt(2) factor
   for (int i = 0; i < 3; i++) Smag += Sij[i] * Sij[i];
@@ -708,7 +756,7 @@ void Fluxes::sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delt
   Smag = sqrt(2.0 * Smag);
 
   // eddy viscosity with delta shift
-  l_floor = config_->GetSgsFloor();
+  l_floor = sgs_model_floor_;
   d_model = Cd * max(delta - l_floor, 0.0);
   mu = state[0] * d_model * d_model * Smag;
 }
@@ -745,7 +793,7 @@ void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double del
   }
 
   // shifted grid scale, d should really be sqrt of J^T*J
-  l_floor = config_->GetSgsFloor();
+  l_floor = sgs_model_floor_;
   d_model = max((delta - l_floor), sml);
   d4 = pow(d_model, 4);
   for (int j = 0; j < dim; j++) {
