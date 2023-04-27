@@ -282,6 +282,10 @@ struct interiorFaceIntegrationData {
 
   /** for each interior face, number of quadrature points */
   Array<int> num_quad;
+
+  /** Mesh spacings at interior face quadrature points */
+  Vector delta_el1;
+  Vector delta_el2;
 };
 
 /** @brief Data for boundary face integral calculations

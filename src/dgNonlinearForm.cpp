@@ -292,6 +292,8 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
   auto d_normal = face_data.normal.Read();
   auto d_face_nqp = face_data.num_quad.Read();
   auto d_xyz = face_data.xyz.Read();
+  auto d_delta1 = face_data.delta_el1.Read();
+  auto d_delta2 = face_data.delta_el2.Read();
 
   Mesh *mesh = fes->GetMesh();
   const int Nf = mesh->GetNumFaces();
@@ -355,8 +357,8 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
                          d_normal + offset + k * dim,
                          Rflux);
 
-      d_flux->ComputeViscousFluxes(u1, gradUp1, xyz[0], 0.0, vFlux1);
-      d_flux->ComputeViscousFluxes(u2, gradUp2, xyz[0], 0.0, vFlux2);
+      d_flux->ComputeViscousFluxes(u1, gradUp1, xyz[0], d_delta1[iface], vFlux1);
+      d_flux->ComputeViscousFluxes(u2, gradUp2, xyz[0], d_delta1[iface], vFlux2);
 
       for (int d = 0; d < dim; d++) {
         for (int eq = 0; eq < num_equation; eq++) {
