@@ -3415,15 +3415,6 @@ void M2ulPhyS::checkSolverOptions() const {
       exit(ERROR);
     }
   }
-
-  // if (config.sgsModelType != 0) {
-  //   if (mpi.Root()) {
-  //     std::cerr << "[ERROR]: GPU runs do not yet support SGS models."
-  //               << std::endl;
-  //     std::cerr << std::endl;
-  //     exit(ERROR);
-  //   }
-  // }
 #endif
 
   // Axisymmetric solver does not yet support all options.  Check that

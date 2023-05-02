@@ -357,6 +357,7 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
                          d_normal + offset + k * dim,
                          Rflux);
 
+      // NB: Using delta1 here on both sides b/c that is what cpu path currently does (although that should change)
       d_flux->ComputeViscousFluxes(u1, gradUp1, xyz[0], d_delta1[iface], vFlux1);
       d_flux->ComputeViscousFluxes(u2, gradUp2, xyz[0], d_delta1[iface], vFlux2);
 
