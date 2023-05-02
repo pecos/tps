@@ -442,6 +442,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
 void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, double delta,
                                      const BoundaryViscousFluxData &bcFlux, Vector &normalFlux) {
   normalFlux.SetSize(num_equation);
+#ifdef _BUILD_DEPRECATED_
   normalFlux = 0.;
   if (eqSystem == EULER) {
     return;
@@ -571,6 +572,9 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
     normalFlux(nvel + 1) -= normalPrimFlux(primFluxSize - 1);
     normalFlux(num_equation - 1) = -normalPrimFlux(primFluxSize - 1);
   }
+#else
+  ComputeBdrViscousFluxes(state.GetData(), gradUp.GetData(), radius, delta, bcFlux, normalFlux.GetData());
+#endif
 }
 
 MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius,
@@ -603,6 +607,17 @@ MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const
   bulkViscosity -= 2. / 3. * visc;
   double k = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY];
   double ke = transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY];
+  double Pr_Cp = visc / k;
+
+  // subgrid scale model
+  if (sgs_model_type_ > 0) {
+    double mu_sgs = 0.;
+    if (sgs_model_type_ == 1) sgsSmag(state, gradUp, delta, mu_sgs);
+    if (sgs_model_type_ == 2) sgsSigma(state, gradUp, delta, mu_sgs);
+    bulkViscosity *= (1.0 + mu_sgs / visc);
+    visc += mu_sgs;
+    k += (mu_sgs / Pr_Cp);
+  }
 
   // Primitive viscous fluxes.
   const int primFluxSize = (twoTemperature) ? numSpecies + nvel + 2 : numSpecies + nvel + 1;
