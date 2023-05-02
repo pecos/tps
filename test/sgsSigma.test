@@ -27,5 +27,8 @@ setup() {
 @test "[$TEST] verify tps output with input -> $RUNFILE" {
     test -s $SOLN_FILE
     test -s $REF_FILE
-    ./soln_differ -r $SOLN_FILE $REF_FILE
+    # Increase the tolerances here, b/c of sensitivity of the velocity
+    # gradient singular values when computed from sqrt(lam),
+    # lam=eig(g^T * g), where g = velocity gradient.
+    ./soln_differ -r -u 2e-10 -e 6e-14 $SOLN_FILE $REF_FILE
 }
