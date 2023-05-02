@@ -31,8 +31,8 @@
 // -----------------------------------------------------------------------------------el-
 #include "fluxes.hpp"
 
-Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
-               const int _num_equation, const int _dim, bool axisym)
+Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport, const int _num_equation,
+               const int _dim, bool axisym)
     : mixture(_mixture),
       eqSystem(_eqSystem),
       transport(_transport),
@@ -44,8 +44,8 @@ Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_
       sgs_model_type_(0),
       sgs_model_floor_(0.0) {}
 
-Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
-               const int _num_equation, const int _dim, bool axisym, RunConfiguration *config)
+Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport, const int _num_equation,
+               const int _dim, bool axisym, RunConfiguration *config)
     : mixture(_mixture),
       eqSystem(_eqSystem),
       transport(_transport),
@@ -69,7 +69,6 @@ MFEM_HOST_DEVICE Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, Trans
       config_(NULL),
       sgs_model_type_(sgs_type),
       sgs_model_floor_(sgs_floor) {}
-
 
 #ifdef _BUILD_DEPRECATED_
 void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, DenseMatrix &flux) {
@@ -743,9 +742,9 @@ MFEM_HOST_DEVICE void Fluxes::sgsSmag(const double *state, const double *gradUp,
   double d_model;
 
   // gradUp is in (eq,dim) form with eq=0 being rho slot
-  Sij[0] = gradUp[1 + 0 * num_equation];  // gradUp(1, 0);
-  Sij[1] = gradUp[2 + 1 * num_equation];  // gradUp(2, 1);
-  Sij[2] = gradUp[3 + 2 * num_equation];  // gradUp(3, 2);
+  Sij[0] = gradUp[1 + 0 * num_equation];                                         // gradUp(1, 0);
+  Sij[1] = gradUp[2 + 1 * num_equation];                                         // gradUp(2, 1);
+  Sij[2] = gradUp[3 + 2 * num_equation];                                         // gradUp(3, 2);
   Sij[3] = 0.5 * (gradUp[1 + 1 * num_equation] + gradUp[2 + 0 * num_equation]);  // 0.5 * (gradUp(1, 1) + gradUp(2, 0));
   Sij[4] = 0.5 * (gradUp[1 + 2 * num_equation] + gradUp[3 + 0 * num_equation]);  // 0.5 * (gradUp(1, 2) + gradUp(3, 0));
   Sij[5] = 0.5 * (gradUp[2 + 2 * num_equation] + gradUp[3 + 1 * num_equation]);  // 0.5 * (gradUp(2, 2) + gradUp(3, 1));
@@ -770,40 +769,68 @@ void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double del
 }
 
 MFEM_HOST_DEVICE void Fluxes::sgsSigma(const double *state, const double *gradUp, double delta, double &mu) {
-  double Qij[3][3];  // DenseMatrix Qij(dim, dim);
-  double du[3][3];  // DenseMatrix du(dim, dim);
-  double B[3][3];  // DenseMatrix B(dim, dim);
-  double ev[3];  // Vector ev(dim);
-  double sigma[3];  // Vector sigma(dim);
   double Cd = 0.135;
   double sml = 1.0e-12;
+  double l_floor, d_model, d4;
+
+  // shifted grid scale, d should really be sqrt of J^T*J
+  l_floor = sgs_model_floor_;
+  d_model = max((delta - l_floor), sml);
+
+#if !defined(_CUDA_) && !defined(_HIP_) && defined(MFEM_USE_LAPACK)
+  // If we have access to lapack---i.e., we're not on the device and
+  // we have mfem with lapack support---then compute the singular
+  // values of the velocity gradient directly.  This approach is more
+  // stable wrt perturbations in the incoming velocity gradient than
+  // first computing g^T * g as is done below.  But, we don't always
+  // have lapack, and it is more expensive.
+  DenseMatrix gmat(3, 3);
+  Vector sigma(3);
+
+  // gmat_ij = u_{i,j}
+  for (int j = 0; j < dim; j++) {
+    for (int i = 0; i < dim; i++) {
+      gmat(i, j) = gradUp[(i + 1) + j * num_equation];
+    }
+  }
+
+  gmat.SingularValues(sigma);
+  // printf("sigma: %.16e, %.16e, %.16e\n",sigma[0],sigma[1], sigma[2]); fflush(stdout);
+
+  // eddy viscosity
+  mu = sigma[2] * (sigma[0] - sigma[1]) * (sigma[1] - sigma[2]);
+  mu = max(mu, 0.0);
+  mu /= (sigma[0] * sigma[0]);
+  mu *= (Cd * Cd * d_model * d_model);
+  mu *= state[0];
+#else
+  // Otherwise, fall back to approach based on eigenvalues of g^T * g.
+  // This approach is more sensitive to perturbations in g, because
+  // the singular values are not as accurate, but doesn't use any
+  // external libraries, so we can always do it.
+
+  double Qij[3][3];
+  double B[3][3];
+  double ev[3];
+  double sigma[3];
   double pi = 3.14159265359;
   double onethird = 1. / 3.;
-  double l_floor, d_model, d4;
   double p1, p2, p, q, detB, r, phi;
 
   // Qij = u_{k,i}*u_{k,j}
-  for (int j = 0; j < dim; j++) {
-    for (int i = 0; i < dim; i++) {
-      Qij[i][j] = 0.;  // Qij(i, j) = 0.;
-    }
-  }
-  for (int k = 0; k < dim; k++) {
+  for (int i = 0; i < dim; i++) {
     for (int j = 0; j < dim; j++) {
-      for (int i = 0; i < dim; i++) {
+      Qij[i][j] = 0;
+      for (int k = 0; k < dim; k++) {
         // Qij(i, j) += gradUp(k + 1, i) * gradUp(k + 1, j);
         Qij[i][j] += gradUp[k + 1 + i * num_equation] * gradUp[k + 1 + j * num_equation];
       }
     }
   }
 
-  // shifted grid scale, d should really be sqrt of J^T*J
-  l_floor = sgs_model_floor_;
-  d_model = max((delta - l_floor), sml);
   d4 = pow(d_model, 4);
   for (int j = 0; j < dim; j++) {
     for (int i = 0; i < dim; i++) {
-      // Qij(i, j) *= d4;
       Qij[i][j] *= d4;
     }
   }
@@ -823,24 +850,20 @@ MFEM_HOST_DEVICE void Fluxes::sgsSigma(const double *state, const double *gradUp
 
   for (int j = 0; j < dim; j++) {
     for (int i = 0; i < dim; i++) {
-      // B(i, j) = Qij(i, j);
       B[i][j] = Qij[i][j];
     }
   }
   for (int i = 0; i < dim; i++) {
-    //B(i, i) -= q;
     B[i][i] -= q;
   }
   for (int j = 0; j < dim; j++) {
     for (int i = 0; i < dim; i++) {
-      //B(i, j) *= (1.0 / max(p, sml));
       B[i][j] *= (1.0 / max(p, sml));
     }
   }
   detB = B[0][0] * (B[1][1] * B[2][2] - B[2][1] * B[1][2]) - B[0][1] * (B[1][0] * B[2][2] - B[2][0] * B[1][2]) +
          B[0][2] * (B[1][0] * B[2][1] - B[2][0] * B[1][1]);
   r = 0.5 * detB;
-  // cout << "r: " << r << endl; fflush(stdout);
 
   if (r <= -1.0) {
     phi = onethird * pi;
@@ -860,6 +883,7 @@ MFEM_HOST_DEVICE void Fluxes::sgsSigma(const double *state, const double *gradUp
   sigma[1] = sqrt(max(ev[1], sml));
   sigma[2] = sqrt(max(ev[2], sml));
   // cout << "sigma: " << sigma[0] << " " << sigma[1] << " " << sigma[2] << endl; fflush(stdout);
+  // printf("sigma: %.16e, %.16e, %.16e\n",sigma[0],sigma[1], sigma[2]); fflush(stdout);
 
   // eddy viscosity
   mu = sigma[2] * (sigma[0] - sigma[1]) * (sigma[1] - sigma[2]);
@@ -867,10 +891,8 @@ MFEM_HOST_DEVICE void Fluxes::sgsSigma(const double *state, const double *gradUp
   mu /= (sigma[0] * sigma[0]);
   mu *= (Cd * Cd);
   mu *= state[0];
-  // cout << "mu: " << mu << endl; fflush(stdout);
+#endif
 
   // shouldnt be necessary
   if (mu != mu) mu = 0.0;
 }
-
-// clang-format on
