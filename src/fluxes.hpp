@@ -72,10 +72,10 @@ class Fluxes {
   const double sgs_model_floor_;
 
  public:
-  Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
-         const int _num_equation, const int _dim, bool axisym);
-  Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
-         const int _num_equation, const int _dim, bool axisym, RunConfiguration *config);
+  Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport, const int _num_equation,
+         const int _dim, bool axisym);
+  Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport, const int _num_equation,
+         const int _dim, bool axisym, RunConfiguration *config);
   MFEM_HOST_DEVICE Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
                           const int _num_equation, const int _dim, bool axisym, int sgs_type, double sgs_floor);
 
