@@ -4,17 +4,30 @@ dim=3
 report="-q"
 averages=no
 
-while getopts ":d:ra" args; do
+absTolrho=2e-13      # absolute tolerance to use for density
+absTolrhovel=2e-11   # absolute tolerance to use for rhou,rhov,rhow
+relTolrhoE=1e-14     # relative tolerance used for rhoE
+
+while getopts ":d:t:u:e:ra" args; do
     case "${args}" in
 	d)
 	    dim=${OPTARG}
 	    ;;
+        t)
+            absTolrho=${OPTARG}
+            ;;
+        u)
+            absTolrhovel=${OPTARG}
+            ;;
+        e)
+            relTolrhoE=${OPTARG}
+            ;;
 	r)
 	    report="-r"
 	    ;;
 	a)
 	    averages=yes
-	    ;;        
+	    ;;
     esac
 done
 shift $((OPTIND-1))
@@ -22,9 +35,12 @@ shift $((OPTIND-1))
 if [ $# -lt 2 ];then
     echo "Usage: soln_differ [-d] [-a] <file1.h5> <file2.h5>"
     echo ""
-    echo "   -d <dim>   set dimension (1,2,3=default)"
-    echo "   -r         report solution differences to stdout"
-    echo "   -a         check averages"
+    echo "   -d <dim>        set dimension (1,2,3=default)"
+    echo "   -t <rho_tol>    (absolute) tolerance on density diff (default = 2e-13)"
+    echo "   -u <rhou_tol>   (absolute) tolerance on momentum diff (default = 2e-11)"
+    echo "   -e <rhoE_tol>   (relative) tolerance on energy diff (default = 2e-14)"
+    echo "   -r              report solution differences to stdout"
+    echo "   -a              check averages"
    exit 1
 fi
 
@@ -33,10 +49,6 @@ file2=$2
 if [ $# -gt 2 ];then
     avg=$3
 fi
-
-absTolrho=2e-13      # absolute tolerance to use for density
-absTolrhovel=2e-11   # absolute tolerance to use for rhou,rhov,rhow
-relTolrhoE=1e-14     # relative tolerance used for rhoE
 
 h5diff ${report} --delta=${absTolrho}     $file1 $file2 /solution/density || exit 1
 h5diff ${report} --delta=${absTolrhovel}  $file1 $file2 /solution/rho-u   || exit 1
