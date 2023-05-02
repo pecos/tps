@@ -750,7 +750,6 @@ void M2ulPhyS::initIndirectionArrays() {
   face_data.delta_el2.UseDevice(true);
   face_data.delta_el2.SetSize(mesh->GetNumFaces());
 
-
   auto hshape1 = face_data.el1_shape.HostWrite();
   auto hshape2 = face_data.el2_shape.HostWrite();
   auto hweight = face_data.quad_weight.HostWrite();
