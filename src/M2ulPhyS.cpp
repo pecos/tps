@@ -505,7 +505,8 @@ void M2ulPhyS::initVariables() {
 #if defined(_CUDA_) || defined(_HIP_)
   tpsGpuMalloc((void **)&fluxClass, sizeof(Fluxes));
   gpu::instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(),
-                                         config.GetSgsModelType(), config.GetSgsFloor(), fluxClass);
+                                         config.GetSgsModelType(), config.GetSgsFloor(), config.GetSgsConstant(),
+                                         fluxClass);
 
   tpsGpuMalloc((void **)&rsolver, sizeof(RiemannSolver));
   gpu::instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, fluxClass, config.RoeRiemannSolver(),
@@ -2280,13 +2281,20 @@ void M2ulPhyS::parseFlowOptions() {
 
   std::string type;
   tpsP->getInput("flow/sgsModel", type, std::string("none"));
+  config.sgsModelType = sgsModel[type];
+
+  double sgs_const = 0.;
+  if (config.sgsModelType == 1) {
+    sgs_const = 0.12;
+  } else if (config.sgsModelType == 2) {
+    sgs_const = 0.135;
+  }
+  tpsP->getInput("flow/sgsModelConstant", config.sgs_model_const, sgs_const);
 
   assert(config.solOrder > 0);
   assert(config.numIters >= 0);
   assert(config.itersOut > 0);
   assert(config.refLength > 0);
-
-  config.sgsModelType = sgsModel[type];
 }
 
 void M2ulPhyS::parseTimeIntegrationOptions() {

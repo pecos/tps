@@ -70,6 +70,7 @@ class Fluxes {
 
   const int sgs_model_type_;
   const double sgs_model_floor_;
+  const double sgs_model_const_;
 
  public:
   Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport, const int _num_equation,
@@ -77,7 +78,8 @@ class Fluxes {
   Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport, const int _num_equation,
          const int _dim, bool axisym, RunConfiguration *config);
   MFEM_HOST_DEVICE Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
-                          const int _num_equation, const int _dim, bool axisym, int sgs_type, double sgs_floor);
+                          const int _num_equation, const int _dim, bool axisym, int sgs_type, double sgs_floor,
+                          double sgs_const);
 
   Equations GetEquationSystem() { return eqSystem; }
 

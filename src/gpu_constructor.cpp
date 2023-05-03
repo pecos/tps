@@ -70,8 +70,8 @@ __global__ void instantiateDeviceArgonMixtureTransport(GasMixture *mixture, cons
 
 __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
                                         const int _num_equation, const int _dim, bool axisym, int sgs_model,
-                                        double sgs_floor, void *f) {
-  f = new (f) Fluxes(_mixture, _eqSystem, _transport, _num_equation, _dim, axisym, sgs_model, sgs_floor);
+                                        double sgs_floor, double sgs_const, void *f) {
+  f = new (f) Fluxes(_mixture, _eqSystem, _transport, _num_equation, _dim, axisym, sgs_model, sgs_floor, sgs_const);
 }
 
 __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,

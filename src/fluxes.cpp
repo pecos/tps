@@ -42,7 +42,8 @@ Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_
       axisymmetric_(axisym),
       config_(NULL),
       sgs_model_type_(0),
-      sgs_model_floor_(0.0) {}
+      sgs_model_floor_(0.0),
+      sgs_model_const_(0.0) {}
 
 Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport, const int _num_equation,
                const int _dim, bool axisym, RunConfiguration *config)
@@ -55,10 +56,12 @@ Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_
       axisymmetric_(axisym),
       config_(config),
       sgs_model_type_(config->GetSgsModelType()),
-      sgs_model_floor_(config->GetSgsFloor()) {}
+      sgs_model_floor_(config->GetSgsFloor()),
+      sgs_model_const_(config->GetSgsConstant()) {}
 
 MFEM_HOST_DEVICE Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
-                                const int _num_equation, const int _dim, bool axisym, int sgs_type, double sgs_floor)
+                                const int _num_equation, const int _dim, bool axisym, int sgs_type, double sgs_floor,
+                                double sgs_const)
     : mixture(_mixture),
       eqSystem(_eqSystem),
       transport(_transport),
@@ -68,7 +71,8 @@ MFEM_HOST_DEVICE Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, Trans
       axisymmetric_(axisym),
       config_(NULL),
       sgs_model_type_(sgs_type),
-      sgs_model_floor_(sgs_floor) {}
+      sgs_model_floor_(sgs_floor),
+      sgs_model_const_(sgs_const) {}
 
 #ifdef _BUILD_DEPRECATED_
 void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, DenseMatrix &flux) {
@@ -752,7 +756,7 @@ void Fluxes::sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delt
 MFEM_HOST_DEVICE void Fluxes::sgsSmag(const double *state, const double *gradUp, double delta, double &mu) {
   double Sij[6];
   double Smag = 0.;
-  double Cd = 0.12;
+  double Cd = sgs_model_const_;  // user-set, defaults to 0.12
   double l_floor;
   double d_model;
 
@@ -784,7 +788,7 @@ void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double del
 }
 
 MFEM_HOST_DEVICE void Fluxes::sgsSigma(const double *state, const double *gradUp, double delta, double &mu) {
-  double Cd = 0.135;
+  double Cd = sgs_model_const_;  // user-set, defaults to 0.135
   double sml = 1.0e-12;
   double l_floor, d_model, d4;
 

@@ -156,6 +156,9 @@ class RunConfiguration {
   // minimum grid size for SGS
   double sgsFloor;
 
+  // SGS model constant
+  double sgs_model_const;
+
   // equations to be solved. Options thus far
   Equations eqSystem;
   bool axisymmetric_;
@@ -315,6 +318,7 @@ class RunConfiguration {
   double GetBulkViscMult() { return bulk_visc; }
   double GetReferenceLength() { return refLength; }
   double GetSgsFloor() { return sgsFloor; }
+  double GetSgsConstant() { return sgs_model_const; }
   Equations GetEquationSystem() const { return eqSystem; }
   bool isAxisymmetric() const { return axisymmetric_; }
   bool isSBP() { return SBP; }
