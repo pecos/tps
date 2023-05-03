@@ -496,6 +496,8 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
   const int *d_wallElems = wallElems.Read();
   const int *d_listElems = listElems.Read();
 
+  auto d_delta = boundary_face_data.delta_el1.Read();
+
   const int totDofs = x.Size() / num_equation_;
   // const int numBdrElem = listElems.Size();
 
@@ -592,8 +594,8 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
           d_mix->modifyStateFromPrimitive(u1, bcState, u2);
         }
         d_rsolver->Eval_LF(u1, u2, nor, Rflux);
-        d_fluxclass->ComputeViscousFluxes(u1, gradUp1, xyz[0], 0.0, vF1);
-        d_fluxclass->ComputeBdrViscousFluxes(u2, gradUp1, xyz[0], 0.0, bcFlux, vF2);
+        d_fluxclass->ComputeViscousFluxes(u1, gradUp1, xyz[0], d_delta[el_bdry], vF1);
+        d_fluxclass->ComputeBdrViscousFluxes(u2, gradUp1, xyz[0], d_delta[el_bdry], bcFlux, vF2);
         for (int eq = 0; eq < num_equation; eq++) vF2[eq] *= sqrt(normN);
 
         // add visc flux contribution

@@ -235,9 +235,31 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
   viscF2.SetSize(num_equation, dim);
 
   // element size
-  double delta;
   Mesh *mesh = vfes->GetMesh();
-  delta = mesh->GetElementSize(Tr.Elem1No, 1);
+  const double delta1 = mesh->GetElementSize(Tr.Elem1No, 1) / el1.GetOrder();
+
+  double delta2 = delta1;
+  const int no2 = Tr.Elem2->ElementNo;
+  const int NE = vfes->GetNE();
+  if (no2 >= NE) {
+    // On shared face where element 2 is by different rank.  In this
+    // case, mesh->GetElementSize fails.  Instead, compute spacing
+    // directly using the ElementTransformation object.  The code
+    // below is from the variant of Mesh::GetElementSize that takes an
+    // ElementTransformation as input, rather than an element index.
+    // We should simply call that function, but it is not public.
+    ElementTransformation *T = Tr.Elem2;
+    DenseMatrix J(dim, dim);
+
+    Geometry::Type geom = T->GetGeometryType();
+    T->SetIntPoint(&Geometries.GetCenter(geom));
+    Geometries.JacToPerfJac(geom, T->Jacobian(), J);
+
+    // (dim-1) singular value is h_min, consistent with type=1 in GetElementSize
+    delta2 = J.CalcSingularvalue(dim - 1) / el2.GetOrder();
+  } else {
+    delta2 = mesh->GetElementSize(Tr.Elem2No, 1) / el2.GetOrder();
+  }
 
   for (int i = 0; i < ir->GetNPoints(); i++) {
     const IntegrationPoint &ip = ir->IntPoint(i);
@@ -278,8 +300,8 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     // compute viscous fluxes
     viscF1 = viscF2 = 0.;
 
-    fluxClass->ComputeViscousFluxes(funval1, gradUp1i, radius, delta, viscF1);
-    fluxClass->ComputeViscousFluxes(funval2, gradUp2i, radius, delta, viscF2);
+    fluxClass->ComputeViscousFluxes(funval1, gradUp1i, radius, delta1, viscF1);
+    fluxClass->ComputeViscousFluxes(funval2, gradUp2i, radius, delta2, viscF2);
 
     // compute mean flux
     viscF1 += viscF2;

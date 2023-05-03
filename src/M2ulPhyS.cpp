@@ -804,8 +804,29 @@ void M2ulPhyS::initIndirectionArrays() {
       h_face_el2[face] = tr->Elem2No;
       h_face_num_quad[face] = ir->GetNPoints();
 
-      h_delta_el1[face] = mesh->GetElementSize(tr->Elem1No, 1);
-      h_delta_el2[face] = mesh->GetElementSize(tr->Elem2No, 1);
+      h_delta_el1[face] = mesh->GetElementSize(tr->Elem1No, 1) / fe1->GetOrder();
+
+      const int no2 = tr->Elem2->ElementNo;
+      const int NE = vfes->GetNE();
+      if (no2 >= NE) {
+        // On shared face where element 2 is by different rank.  In this
+        // case, mesh->GetElementSize fails.  Instead, compute spacing
+        // directly using the ElementTransformation object.  The code
+        // below is from the variant of Mesh::GetElementSize that takes an
+        // ElementTransformation as input, rather than an element index.
+        // We should simply call that function, but it is not public.
+        ElementTransformation *T = tr->Elem2;
+        DenseMatrix J(dim, dim);
+
+        Geometry::Type geom = T->GetGeometryType();
+        T->SetIntPoint(&Geometries.GetCenter(geom));
+        Geometries.JacToPerfJac(geom, T->Jacobian(), J);
+
+        // (dim-1) singular value is h_min, consistent with type=1 in GetElementSize
+        h_delta_el2[face] = J.CalcSingularvalue(dim - 1) / fe2->GetOrder();
+      } else {
+        h_delta_el2[face] = mesh->GetElementSize(tr->Elem2No, 1) / fe2->GetOrder();
+      }
 
       Vector shape1i, shape2i;
       shape1i.UseDevice(false);
@@ -881,6 +902,11 @@ void M2ulPhyS::initIndirectionArrays() {
     bdry_face_data.num_quad = 0;
     auto h_face_num_quad = bdry_face_data.num_quad.HostWrite();
 
+    bdry_face_data.delta_el1.UseDevice(true);
+    bdry_face_data.delta_el1.SetSize(NumBCelems);
+    bdry_face_data.delta_el1 = 0.;
+    auto h_bdry_delta_el1 = bdry_face_data.delta_el1.HostWrite();
+
     const FiniteElement *fe;
     FaceElementTransformations *tr;
     Mesh *mesh = fes->GetMesh();
@@ -904,6 +930,7 @@ void M2ulPhyS::initIndirectionArrays() {
 
         h_face_el[f] = tr->Elem1No;
         h_face_num_quad[f] = ir->GetNPoints();
+        h_bdry_delta_el1[f] = mesh->GetElementSize(tr->Elem1No, 1) / fe->GetOrder();
 
         for (int q = 0; q < ir->GetNPoints(); q++) {
           const IntegrationPoint &ip = ir->IntPoint(q);
@@ -988,6 +1015,16 @@ void M2ulPhyS::initIndirectionArrays() {
     shared_face_data.xyz = 0.;
     auto h_face_xyz = shared_face_data.xyz.HostWrite();
 
+    shared_face_data.delta_el1.UseDevice(true);
+    shared_face_data.delta_el1.SetSize(Nshared);
+    shared_face_data.delta_el1 = 0.;
+    auto h_shrd_delta_el1 = shared_face_data.delta_el1.HostWrite();
+
+    shared_face_data.delta_el2.UseDevice(true);
+    shared_face_data.delta_el2.SetSize(Nshared);
+    shared_face_data.delta_el2 = 0.;
+    auto h_shrd_delta_el2 = shared_face_data.delta_el2.HostWrite();
+
     std::vector<int> unicElems;
     unicElems.clear();
 
@@ -1001,6 +1038,25 @@ void M2ulPhyS::initIndirectionArrays() {
       const FiniteElement *fe2 = vfes->GetFaceNbrFE(Elem2NbrNo);
       const int dof1 = fe1->GetDof();
       const int dof2 = fe2->GetDof();
+
+      h_shrd_delta_el1[i] = mesh->GetElementSize(tr->Elem1No, 1) / fe1->GetOrder();
+
+      // On shared face, element 2 is owned by a different rank.  In
+      // this case, mesh->GetElementSize fails.  Instead, compute
+      // spacing directly using the ElementTransformation object.  The
+      // code below is from the variant of Mesh::GetElementSize that
+      // takes an ElementTransformation as input, rather than an
+      // element index.  We should simply call that function, but it
+      // is not public.
+      ElementTransformation *T = tr->Elem2;
+      DenseMatrix J(dim, dim);
+
+      Geometry::Type geom = T->GetGeometryType();
+      T->SetIntPoint(&Geometries.GetCenter(geom));
+      Geometries.JacToPerfJac(geom, T->Jacobian(), J);
+
+      // (dim-1) singular value is h_min, consistent with type=1 in GetElementSize
+      h_shrd_delta_el2[i] = J.CalcSingularvalue(dim - 1) / fe2->GetOrder();
 
       // vfes->GetElementVDofs(tr->Elem1No, vdofs1); // get these from nodesIDs
       vfes->GetFaceNbrElementVDofs(Elem2NbrNo, vdofs2);

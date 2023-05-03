@@ -314,7 +314,7 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
   // element size
   double delta;
   Mesh *mesh = vfes->GetMesh();
-  delta = mesh->GetElementSize(Tr.Elem1No, 1);
+  delta = mesh->GetElementSize(Tr.Elem1No, 1) / el1.GetOrder();
 
 #ifdef _GPU_
   retrieveGradientsData_gpu(gradUp, elGradUp, vdofs, num_equation, dim, vfes->GetNDofs(), eldDof);

@@ -152,7 +152,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
     int Ndofs = vdofs_here.Size();
     for (int n = 0; n < Ndofs; n++) {
       int idx = vdofs_here[n];
-      h_elSize[idx] = mesh->GetElementSize(j, 1);
+      h_elSize[idx] = mesh->GetElementSize(j, 1) / fes->GetElementOrder(j);
     }
   }
 
@@ -519,6 +519,8 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
       radius = (*coordsDof)[i + 0 * dof];
     }
 
+    // This element size is divided by element polynomial order when
+    // elSize is set, in the RHSoperator ctor
     const double delta = (*elSize)[i];
 
     fluxClass->ComputeConvectiveFluxes(state, f);
@@ -596,6 +598,8 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
 
   Fluxes *d_fluxClass = fluxClass;
 
+  // This element size is divided by element polynomial order when
+  // elSize is set, in the RHSoperator ctor
   auto d_elSize = elSize->Read();
 
   MFEM_FORALL(n, dof, {

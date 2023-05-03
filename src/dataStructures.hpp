@@ -283,8 +283,10 @@ struct interiorFaceIntegrationData {
   /** for each interior face, number of quadrature points */
   Array<int> num_quad;
 
-  /** Mesh spacings at interior face quadrature points */
+  /** Mesh spacing for element 1 on each interior face */
   Vector delta_el1;
+
+  /** Mesh spacing for element 2 on each interior face */
   Vector delta_el2;
 };
 
@@ -314,6 +316,9 @@ struct boundaryFaceIntegrationData {
 
   /** for each boundary face, number of quadrature points */
   Array<int> num_quad;
+
+  /** Mesh spacings for boundary face elements */
+  Vector delta_el1;
 };
 
 /** @brief Data for shared face integral calculations
@@ -369,6 +374,12 @@ struct sharedFaceIntegrationData {
 
   /** Degrees of freedom indices for the gradient variables for element 2 */
   Array<int> elem2_grad_dofs;
+
+  /** Mesh spacing for element 1 on each shared face */
+  Vector delta_el1;
+
+  /** Mesh spacing for element 2 on each shared face */
+  Vector delta_el2;
 };
 
 /** @brief Storage for data used in the _GPU_ code path
