@@ -9,6 +9,19 @@ RESTART="ref_solns/noSGM1K/restart_output.sol.h5"
 setup() {
     SOLN_FILE=restart_output.sol.h5
     REF_FILE=ref_solns/smag1K_1/restart_output.sol.h5
+
+    found=1
+
+    # defaut to mpirun if available
+    MPIRUN=$(type -P mpirun) || found=0
+
+    # if not, try flux
+    if [ $found -eq 0 ]; then
+        type -P flux && MPIRUN="$(type -P flux) run" || found=0
+    fi
+
+    # if neither mpirun or flux found, then MPIRUN is empty and tests
+    # below will be skipped
 }
 
 @test "[$TEST] check for input file $RUNFILE" {
@@ -16,15 +29,19 @@ setup() {
 }
 
 @test "[$TEST] run tps with input -> $RUNFILE" {
+    # don't run if we don't know how to launch a parallel job
+    [ "x$MPIRUN" != "x" ] || skip "Cannot launch parallel job"
+
     rm -f $SOLN_FILE
     cp $RESTART ./
-    touch DIE
-    $EXE --runFile $RUNFILE
+    $MPIRUN -n 2 $EXE --runFile $RUNFILE
     test -s $SOLN_FILE
-    test ! -e DIE
 }
 
 @test "[$TEST] verify tps output with input -> $RUNFILE" {
+    # don't try to compare solution if job didn't run
+    [ "x$MPIRUN" != "x" ] || skip "Did not run parallel job"
+
     test -s $SOLN_FILE
     test -s $REF_FILE
     ./soln_differ -r $SOLN_FILE $REF_FILE
