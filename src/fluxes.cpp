@@ -177,7 +177,8 @@ MFEM_HOST_DEVICE void Fluxes::ComputeConvectiveFluxes(const double *state, doubl
 }
 
 // TODO(kevin): check/complete axisymmetric setting for multi-component flow.
-void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip, double delta, DenseMatrix &flux) {
+void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip,
+                                  double delta, DenseMatrix &flux) {
 #ifdef _BUILD_DEPRECATED_
   flux = 0.;
   if (eqSystem == EULER) {
@@ -312,7 +313,8 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
 #endif
 }
 
-MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius, double *transip, double delta, double *flux) {
+MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius,
+                                                   double *transip, double delta, double *flux) {
   for (int d = 0; d < dim; d++) {
     for (int eq = 0; eq < num_equation; eq++) {
       flux[eq + d * num_equation] = 0.;
@@ -590,11 +592,14 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
     normalFlux(num_equation - 1) = -normalPrimFlux(primFluxSize - 1);
   }
 #else
-  ComputeBdrViscousFluxes(state.GetData(), gradUp.GetData(), radius, delta, bcFlux, normalFlux.GetData());
+  ComputeBdrViscousFluxes(state.GetData(), gradUp.GetData(), radius, transip.GetData(), delta, bcFlux,
+                          normalFlux.GetData());
 #endif
 }
 
-MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius, double *transip, double delta, const BoundaryViscousFluxData &bcFlux, double *normalFlux) {
+MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius,
+                                                      double *transip, double delta,
+                                                      const BoundaryViscousFluxData &bcFlux, double *normalFlux) {
   // normalFlux.SetSize(num_equation);
   for (int eq = 0; eq < num_equation; eq++) normalFlux[eq] = 0.;
   if (eqSystem == EULER) {
@@ -926,13 +931,11 @@ MFEM_HOST_DEVICE void Fluxes::sgsSigma(const double *state, const double *gradUp
   if (mu != mu) mu = 0.0;
 }
 
-
 /**
 Simple planar viscous sponge layer with smooth tanh-transtion using user-specified width and
 total amplification.  Note: duplicate in M2
 */
 void Fluxes::viscSpongePlanar(double *x, double &wgt) {
-
   double normal[3];
   double point[3];
   double s[3];
