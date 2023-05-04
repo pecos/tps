@@ -780,7 +780,7 @@ MFEM_HOST_DEVICE void Fluxes::sgsSmag(const double *state, const double *gradUp,
 }
 
 /**
-NOT TESTED: Sigma subgrid model following Nicoud et.al., "Using singular values to build a
+Sigma subgrid model following Nicoud et.al., "Using singular values to build a
 subgrid-scale model for large eddy simulations", PoF 2011.
 */
 void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu) {
@@ -814,7 +814,6 @@ MFEM_HOST_DEVICE void Fluxes::sgsSigma(const double *state, const double *gradUp
   }
 
   gmat.SingularValues(sigma);
-  // printf("sigma: %.16e, %.16e, %.16e\n",sigma[0],sigma[1], sigma[2]); fflush(stdout);
 
   // eddy viscosity
   mu = sigma[2] * (sigma[0] - sigma[1]) * (sigma[1] - sigma[2]);
@@ -827,7 +826,6 @@ MFEM_HOST_DEVICE void Fluxes::sgsSigma(const double *state, const double *gradUp
   // This approach is more sensitive to perturbations in g, because
   // the singular values are not as accurate, but doesn't use any
   // external libraries, so we can always do it.
-
   double Qij[3][3];
   double B[3][3];
   double ev[3];
@@ -841,7 +839,6 @@ MFEM_HOST_DEVICE void Fluxes::sgsSigma(const double *state, const double *gradUp
     for (int j = 0; j < dim; j++) {
       Qij[i][j] = 0;
       for (int k = 0; k < dim; k++) {
-        // Qij(i, j) += gradUp(k + 1, i) * gradUp(k + 1, j);
         Qij[i][j] += gradUp[k + 1 + i * num_equation] * gradUp[k + 1 + j * num_equation];
       }
     }
@@ -855,17 +852,11 @@ MFEM_HOST_DEVICE void Fluxes::sgsSigma(const double *state, const double *gradUp
   }
 
   // eigenvalues for symmetric pos-def 3x3
-  // p1 = Qij(0, 1) * Qij(0, 1) + Qij(0, 2) * Qij(0, 2) + Qij(1, 2) * Qij(1, 2);
-  // q = onethird * (Qij(0, 0) + Qij(1, 1) + Qij(2, 2));
-  // p2 = (Qij(0, 0) - q) * (Qij(0, 0) - q) + (Qij(1, 1) - q) * (Qij(1, 1) - q) + (Qij(2, 2) - q) * (Qij(2, 2) - q) +
-  //      2.0 * p1;
-
   p1 = Qij[0][1] * Qij[0][1] + Qij[0][2] * Qij[0][2] + Qij[1][2] * Qij[1][2];
   q = onethird * (Qij[0][0] + Qij[1][1] + Qij[2][2]);
   p2 = (Qij[0][0] - q) * (Qij[0][0] - q) + (Qij[1][1] - q) * (Qij[1][1] - q) + (Qij[2][2] - q) * (Qij[2][2] - q) +
        2.0 * p1;
   p = std::sqrt(max(p2, 0.0) / 6.0);
-  // cout << "p1, q, p2, p: " << p1 << " " << q << " " << p2 << " " << p << endl; fflush(stdout);
 
   for (int j = 0; j < dim; j++) {
     for (int i = 0; i < dim; i++) {
@@ -901,8 +892,6 @@ MFEM_HOST_DEVICE void Fluxes::sgsSigma(const double *state, const double *gradUp
   sigma[0] = sqrt(max(ev[0], sml));
   sigma[1] = sqrt(max(ev[1], sml));
   sigma[2] = sqrt(max(ev[2], sml));
-  // cout << "sigma: " << sigma[0] << " " << sigma[1] << " " << sigma[2] << endl; fflush(stdout);
-  // printf("sigma: %.16e, %.16e, %.16e\n",sigma[0],sigma[1], sigma[2]); fflush(stdout);
 
   // eddy viscosity
   mu = sigma[2] * (sigma[0] - sigma[1]) * (sigma[1] - sigma[2]);
