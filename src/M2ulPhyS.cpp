@@ -503,9 +503,26 @@ void M2ulPhyS::initVariables() {
   projectInitialSolution();
 
 #if defined(_CUDA_) || defined(_HIP_)
+  // prepare viscous sponge data to pass to gpu ctor
+  viscositySpongeData vsd;
+  vsd.enabled = config.linViscData.isEnabled;
+  vsd.n[0] = vsd.n[1] = vsd.n[2] = 0.;
+  vsd.p[0] = vsd.p[1] = vsd.p[2] = 0.;
+  vsd.ratio = 1.0;
+  vsd.width = 1.0;
+
+  if (vsd.enabled) {
+    for (int d = 0; d < dim; d++) {
+      vsd.n[d] = config.GetLinearVaryingData().normal(d);
+      vsd.p[d] = config.GetLinearVaryingData().point0(d);
+    }
+    vsd.ratio = config.GetLinearVaryingData().viscRatio;
+    vsd.width = config.GetLinearVaryingData().width;
+  }
+
   tpsGpuMalloc((void **)&fluxClass, sizeof(Fluxes));
   gpu::instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(),
-                                         config.GetSgsModelType(), config.GetSgsFloor(), config.GetSgsConstant(),
+                                         config.GetSgsModelType(), config.GetSgsFloor(), config.GetSgsConstant(), vsd,
                                          fluxClass);
 
   tpsGpuMalloc((void **)&rsolver, sizeof(RiemannSolver));

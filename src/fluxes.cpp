@@ -43,7 +43,13 @@ Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_
       config_(NULL),
       sgs_model_type_(0),
       sgs_model_floor_(0.0),
-      sgs_model_const_(0.0) {}
+      sgs_model_const_(0.0) {
+  vsd_.enabled = false;
+  vsd_.n[0] = vsd_.n[1] = vsd_.n[2] = 0.;
+  vsd_.p[0] = vsd_.p[1] = vsd_.p[2] = 0.;
+  vsd_.ratio = 1.0;
+  vsd_.width = 1.0;
+}
 
 Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport, const int _num_equation,
                const int _dim, bool axisym, RunConfiguration *config)
@@ -57,11 +63,27 @@ Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_
       config_(config),
       sgs_model_type_(config->GetSgsModelType()),
       sgs_model_floor_(config->GetSgsFloor()),
-      sgs_model_const_(config->GetSgsConstant()) {}
+      sgs_model_const_(config->GetSgsConstant()) {
+  vsd_.enabled = config_->linViscData.isEnabled;
+  vsd_.n[0] = vsd_.n[1] = vsd_.n[2] = 0.;
+  vsd_.p[0] = vsd_.p[1] = vsd_.p[2] = 0.;
+  vsd_.ratio = 1.0;
+  vsd_.width = 1.0;
+
+  // Pull viscous sponge data out of config if we are going to use it
+  if (vsd_.enabled) {
+    for (int d = 0; d < dim; d++) {
+      vsd_.n[d] = config_->GetLinearVaryingData().normal(d);
+      vsd_.p[d] = config_->GetLinearVaryingData().point0(d);
+    }
+    vsd_.ratio = config_->GetLinearVaryingData().viscRatio;
+    vsd_.width = config_->GetLinearVaryingData().width;
+  }
+}
 
 MFEM_HOST_DEVICE Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
                                 const int _num_equation, const int _dim, bool axisym, int sgs_type, double sgs_floor,
-                                double sgs_const)
+                                double sgs_const, viscositySpongeData vsd)
     : mixture(_mixture),
       eqSystem(_eqSystem),
       transport(_transport),
@@ -72,7 +94,23 @@ MFEM_HOST_DEVICE Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, Trans
       config_(NULL),
       sgs_model_type_(sgs_type),
       sgs_model_floor_(sgs_floor),
-      sgs_model_const_(sgs_const) {}
+      sgs_model_const_(sgs_const) {
+  vsd_.enabled = vsd.enabled;
+  vsd_.n[0] = vsd_.n[1] = vsd_.n[2] = 0.;
+  vsd_.p[0] = vsd_.p[1] = vsd_.p[2] = 0.;
+  vsd_.ratio = 1.0;
+  vsd_.width = 1.0;
+
+  // Pull viscous sponge data out of config if we are going to use it
+  if (vsd_.enabled) {
+    for (int d = 0; d < dim; d++) {
+      vsd_.n[d] = vsd.n[d];
+      vsd_.p[d] = vsd.p[d];
+    }
+    vsd_.ratio = vsd.ratio;
+    vsd_.width = vsd.width;
+  }
+}
 
 #ifdef _BUILD_DEPRECATED_
 void Fluxes::ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUpi, DenseMatrix &flux) {
@@ -361,7 +399,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
   }
 
   // viscous sponge
-  if (config_->linViscData.isEnabled) {
+  if (vsd_.enabled) {
     double wgt = 0.;
     viscSpongePlanar(transip, wgt);
     visc *= wgt;
@@ -641,7 +679,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const
   }
 
   // viscous sponge
-  if (config_->linViscData.isEnabled) {
+  if (vsd_.enabled) {
     double wgt = 0.;
     viscSpongePlanar(transip, wgt);
     visc *= wgt;
@@ -946,11 +984,11 @@ void Fluxes::viscSpongePlanar(double *x, double &wgt) {
   dist = 0.;
 
   // get settings
-  for (int d = 0; d < dim; d++) normal[d] = config_->GetLinearVaryingData().normal(d);
-  for (int d = 0; d < dim; d++) point[d] = config_->GetLinearVaryingData().point0(d);
-  factor = config_->GetLinearVaryingData().viscRatio;
+  for (int d = 0; d < dim; d++) normal[d] = vsd_.n[d];
+  for (int d = 0; d < dim; d++) point[d] = vsd_.p[d];
+  factor = vsd_.ratio;
   factor = max(factor, 1.0);
-  width = config_->GetLinearVaryingData().width;
+  width = vsd_.width;
 
   // ensure normal is actually a unit normal
   for (int d = 0; d < dim; d++) Nmag += normal[d] * normal[d];

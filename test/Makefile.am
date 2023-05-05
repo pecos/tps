@@ -50,7 +50,8 @@ TESTS += cyl3d.gpu.test \
 	 inflow_outflow.test \
 	 pipe.test \
 	 sgsSmag.test \
-	 sgsSigma.test
+	 sgsSigma.test \
+         plate.test
 
 if PYTHON_ENABLED
 TESTS += cyl3d.gpu.python.test

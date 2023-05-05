@@ -515,7 +515,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
     }
 
     double radius = 1;
-    Vector xyz(dim_);
+    Vector xyz(3);
     if (config_.isAxisymmetric()) {
       radius = (*coordsDof)[i + 0 * dof];
     }
@@ -549,7 +549,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
       DenseMatrix fvisc(num_equation_, dim);
       fluxClass->ComputeViscousFluxes(state, gradUpi, radius, xyz, delta, fvisc);
 
-      // TODO(kevin): This needs to be incorporated in Fluxes::ComputeViscousFluxes.
+      // FIXME: This shouldn't be here!
       if (spaceVaryViscMult != NULL) {
         auto *alpha = spaceVaryViscMult->GetData();
         for (int eq = 0; eq < num_equation_; eq++)
@@ -585,12 +585,7 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
   const int num_equation = num_equation_;
 
   const bool axisymmetric = config_.isAxisymmetric();
-  const double *d_coord;
-  if (axisymmetric) {
-    d_coord = coordsDof->Read();
-  } else {
-    d_coord = NULL;
-  }
+  const double *d_coord = coordsDof->Read();
   const double *d_gradUp = gradUp->Read();
 
   const double *d_spaceVaryViscMult;
@@ -624,16 +619,16 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
     double radius = 1.0;
     double delta;
     double xyz[3];
-    if (config_.isAxisymmetric()) {
+    if (axisymmetric) {
       radius = d_coord[n + 0 * dof];
     }
-    for (int d = 0; d < dim_; d++) xyz[d] = d_coord[n + d * dof];
+    for (int d = 0; d < dim; d++) xyz[d] = d_coord[n + d * dof];
 
     d_fluxClass->ComputeViscousFluxes(Un, gradUpn, radius, xyz, d_elSize[n], fvisc);
 
+    // FIXME: This shouldn't be here!
     if (d_spaceVaryViscMult != NULL) {
       linVisc = d_spaceVaryViscMult[n];
-
       for (int d = 0; d < dim; d++) {
         for (int eq = 0; eq < num_equation; eq++) {
           fvisc[eq + d * num_equation] *= linVisc;

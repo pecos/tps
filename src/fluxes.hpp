@@ -48,6 +48,14 @@
 
 using namespace mfem;
 
+struct viscositySpongeData {
+  bool enabled;
+  double n[3];
+  double p[3];
+  double ratio;
+  double width;
+};
+
 // TODO(kevin): In order to avoid repeated primitive variable evaluation,
 // Fluxes and RiemannSolver should take Vector Up (on the evaulation point) as input argument,
 // and FaceIntegrator should have a pointer to ParGridFunction *Up.
@@ -70,6 +78,8 @@ class Fluxes {
   const double sgs_model_floor_;
   const double sgs_model_const_;
 
+  viscositySpongeData vsd_;
+
   void viscSpongePlanar(double *x, double &wgt);
 
  public:
@@ -79,7 +89,7 @@ class Fluxes {
          const int _dim, bool axisym, RunConfiguration *config);
   MFEM_HOST_DEVICE Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
                           const int _num_equation, const int _dim, bool axisym, int sgs_type, double sgs_floor,
-                          double sgs_const);
+                          double sgs_const, viscositySpongeData vsd);
 
   Equations GetEquationSystem() { return eqSystem; }
 
