@@ -973,7 +973,7 @@ MFEM_HOST_DEVICE void Fluxes::sgsSigma(const double *state, const double *gradUp
 Simple planar viscous sponge layer with smooth tanh-transtion using user-specified width and
 total amplification.  Note: duplicate in M2
 */
-void Fluxes::viscSpongePlanar(double *x, double &wgt) {
+MFEM_HOST_DEVICE void Fluxes::viscSpongePlanar(double *x, double &wgt) {
   double normal[3];
   double point[3];
   double s[3];

@@ -80,7 +80,7 @@ class Fluxes {
 
   viscositySpongeData vsd_;
 
-  void viscSpongePlanar(double *x, double &wgt);
+  MFEM_HOST_DEVICE void viscSpongePlanar(double *x, double &wgt);
 
  public:
   Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport, const int _num_equation,
