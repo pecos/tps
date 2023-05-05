@@ -95,7 +95,7 @@ bool testComputeBdrViscousFlux(RunConfiguration &srcConfig, const int dim) {
   int numSpecies = mixture->GetNumSpecies();
   int primFluxSize = (mixture->IsTwoTemperature()) ? numSpecies + nvel + 2 : numSpecies + nvel + 1;
 
-  Fluxes *flux = new Fluxes(mixture, eqSystem, transport, num_equation, dim, srcConfig.axisymmetric_);
+  Fluxes *flux = new Fluxes(mixture, eqSystem, transport, num_equation, dim, srcConfig.axisymmetric_, &srcConfig);
   double radius = uniformRandomNumber();
   const double delta = 0.0;
   Vector xyz(3);
