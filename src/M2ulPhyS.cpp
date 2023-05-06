@@ -456,6 +456,43 @@ void M2ulPhyS::initVariables() {
   vfes = new ParFiniteElementSpace(mesh, fec, num_equation, Ordering::byNODES);
   gradUpfes = new ParFiniteElementSpace(mesh, fec, num_equation * dim, Ordering::byNODES);
 
+#if defined(_CUDA_) || defined(_HIP_)
+  // prepare viscous sponge data to pass to gpu ctor
+  viscositySpongeData vsd;
+  vsd.enabled = config.linViscData.isEnabled;
+  vsd.n[0] = vsd.n[1] = vsd.n[2] = 0.;
+  vsd.p[0] = vsd.p[1] = vsd.p[2] = 0.;
+  vsd.ratio = 1.0;
+  vsd.width = 1.0;
+
+  if (vsd.enabled) {
+    for (int d = 0; d < dim; d++) {
+      vsd.n[d] = config.GetLinearVaryingData().normal(d);
+      vsd.p[d] = config.GetLinearVaryingData().point0(d);
+    }
+    vsd.ratio = config.GetLinearVaryingData().viscRatio;
+    vsd.width = config.GetLinearVaryingData().width;
+  }
+
+  tpsGpuMalloc((void **)&d_fluxClass, sizeof(Fluxes));
+  gpu::instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(),
+                                         config.GetSgsModelType(), config.GetSgsFloor(), config.GetSgsConstant(), vsd,
+                                         d_fluxClass);
+
+  tpsGpuMalloc((void **)&rsolver, sizeof(RiemannSolver));
+  gpu::instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, d_fluxClass, config.RoeRiemannSolver(),
+                                          config.isAxisymmetric(), rsolver);
+#else
+
+  fluxClass =
+      new Fluxes(mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(), &config);  // modified
+  d_fluxClass = fluxClass;
+
+  rsolver =
+      new RiemannSolver(num_equation, mixture, eqSystem, d_fluxClass, config.RoeRiemannSolver(), config.isAxisymmetric());
+#endif
+
+
 #ifdef _GPU_
   initIndirectionArrays();
 #endif
@@ -502,40 +539,6 @@ void M2ulPhyS::initVariables() {
   ioData.initializeSerial(mpi.Root(), (config.RestartSerial() != "no"), serial_mesh);
   projectInitialSolution();
 
-#if defined(_CUDA_) || defined(_HIP_)
-  // prepare viscous sponge data to pass to gpu ctor
-  viscositySpongeData vsd;
-  vsd.enabled = config.linViscData.isEnabled;
-  vsd.n[0] = vsd.n[1] = vsd.n[2] = 0.;
-  vsd.p[0] = vsd.p[1] = vsd.p[2] = 0.;
-  vsd.ratio = 1.0;
-  vsd.width = 1.0;
-
-  if (vsd.enabled) {
-    for (int d = 0; d < dim; d++) {
-      vsd.n[d] = config.GetLinearVaryingData().normal(d);
-      vsd.p[d] = config.GetLinearVaryingData().point0(d);
-    }
-    vsd.ratio = config.GetLinearVaryingData().viscRatio;
-    vsd.width = config.GetLinearVaryingData().width;
-  }
-
-  tpsGpuMalloc((void **)&fluxClass, sizeof(Fluxes));
-  gpu::instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(),
-                                         config.GetSgsModelType(), config.GetSgsFloor(), config.GetSgsConstant(), vsd,
-                                         fluxClass);
-
-  tpsGpuMalloc((void **)&rsolver, sizeof(RiemannSolver));
-  gpu::instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, fluxClass, config.RoeRiemannSolver(),
-                                          config.isAxisymmetric(), rsolver);
-#else
-
-  fluxClass =
-      new Fluxes(mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(), &config);  // modified
-
-  rsolver =
-      new RiemannSolver(num_equation, mixture, eqSystem, fluxClass, config.RoeRiemannSolver(), config.isAxisymmetric());
-#endif
 
   alpha = 0.5;
   isSBP = config.isSBP();
@@ -547,14 +550,14 @@ void M2ulPhyS::initVariables() {
 
   bcIntegrator = NULL;
   if (local_attr.Size() > 0) {
-    bcIntegrator = new BCintegrator(groupsMPI, mesh, vfes, intRules, rsolver, dt, mixture, d_mixture, fluxClass, Up,
+    bcIntegrator = new BCintegrator(groupsMPI, mesh, vfes, intRules, rsolver, dt, mixture, d_mixture, d_fluxClass, Up,
                                     gradUp, gpu_precomputed_data_.boundary_face_data, dim, num_equation, max_char_speed,
                                     config, local_attr, maxIntPoints, maxDofs);
   }
 
   // A->SetAssemblyLevel(AssemblyLevel::PARTIAL);
 
-  A = new DGNonLinearForm(rsolver, fluxClass, vfes, gradUpfes, gradUp, bcIntegrator, intRules, dim, num_equation,
+  A = new DGNonLinearForm(rsolver, d_fluxClass, vfes, gradUpfes, gradUp, bcIntegrator, intRules, dim, num_equation,
                           mixture, gpu_precomputed_data_, maxIntPoints, maxDofs);
   if (local_attr.Size() > 0) A->AddBdrFaceIntegrator(bcIntegrator);
 
@@ -562,19 +565,19 @@ void M2ulPhyS::initVariables() {
     bool useLinearIntegration = false;
     //    if( basisType==1 && intRuleType==1 ) useLinearIntegration = true;
 
-    faceIntegrator = new FaceIntegrator(intRules, rsolver, fluxClass, vfes, useLinearIntegration, dim, num_equation,
+    faceIntegrator = new FaceIntegrator(intRules, rsolver, d_fluxClass, vfes, useLinearIntegration, dim, num_equation,
                                         gradUp, gradUpfes, max_char_speed, config.isAxisymmetric());
   }
   A->AddInteriorFaceIntegrator(faceIntegrator);
 #ifdef _BUILD_DEPRECATED_
   if (isSBP) {
-    SBPoperator = new SBPintegrator(mixture, fluxClass, intRules, dim, num_equation, alpha);
+    SBPoperator = new SBPintegrator(mixture, d_fluxClass, intRules, dim, num_equation, alpha);
     A->AddDomainIntegrator(SBPoperator);
   }
 #endif
 
   Aflux = new MixedBilinearForm(dfes, fes);
-  domainIntegrator = new DomainIntegrator(fluxClass, intRules, intRuleType, dim, num_equation, config.isAxisymmetric());
+  domainIntegrator = new DomainIntegrator(d_fluxClass, intRules, intRuleType, dim, num_equation, config.isAxisymmetric());
   Aflux->AddDomainIntegrator(domainIntegrator);
   Aflux->Assemble();
   Aflux->Finalize();
@@ -612,7 +615,7 @@ void M2ulPhyS::initVariables() {
   gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
 
   rhsOperator =
-      new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType, fluxClass,
+      new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType, d_fluxClass,
                       mixture, d_mixture, chemistry_, transportPtr, radiation_, vfes, fes, gpu_precomputed_data_,
                       maxIntPoints, maxDofs, A, Aflux, mesh, spaceVaryViscMult, U, Up, gradUp, gradUpfes, gradUp_A,
                       bcIntegrator, isSBP, alpha, config, plasma_conductivity_, joule_heating_);
@@ -1201,8 +1204,8 @@ M2ulPhyS::~M2ulPhyS() {
   gpu::freeDeviceRiemann<<<1, 1>>>(rsolver);
   tpsGpuFree(rsolver);
 
-  gpu::freeDeviceFluxes<<<1, 1>>>(fluxClass);
-  tpsGpuFree(fluxClass);
+  gpu::freeDeviceFluxes<<<1, 1>>>(d_fluxClass);
+  tpsGpuFree(d_fluxClass);
 
   gpu::freeDeviceChemistry<<<1, 1>>>(chemistry_);
   tpsGpuFree(chemistry_);
@@ -1217,12 +1220,12 @@ M2ulPhyS::~M2ulPhyS() {
   tpsGpuFree(d_mixture);
 #else
   delete rsolver;
-  delete fluxClass;
   delete chemistry_;
   delete radiation_;
   delete transportPtr;
 #endif
 
+  delete fluxClass;
   delete mixture;
 
   delete gradUpfes;
@@ -1487,32 +1490,14 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     double *viscMult = spaceVaryViscMult->HostWrite();
     double wgt = 0.;
     for (int n = 0; n < fes->GetNDofs(); n++) {
-      double alpha = 1.;
       auto hcoords = coordsDof.HostRead();  // get coords
 
-      Vector coords(3);
+      double coords[3];
       for (int d = 0; d < dim; d++) {
         coords[d] = hcoords[n + d * vfes->GetNDofs()];
       }
 
-      /*
-      double dist_pi = 0., dist_p0 = 0., dist_pi0 = 0.;
-      for (int d = 0; d < dim; d++) {
-        dist_pi += config.GetLinearVaryingData().normal(d) *
-                   (config.GetLinearVaryingData().pointInit(d) - hcoords[n + d * vfes->GetNDofs()]);
-        dist_p0 += config.GetLinearVaryingData().normal(d) *
-                   (config.GetLinearVaryingData().point0(d) - hcoords[n + d * vfes->GetNDofs()]);
-        dist_pi0 += config.GetLinearVaryingData().normal(d) *
-                    (config.GetLinearVaryingData().pointInit(d) - config.GetLinearVaryingData().point0(d));
-      }
-
-      if (dist_pi > 0. && dist_p0 < 0) {
-        alpha += (config.GetLinearVaryingData().viscRatio - 1.) / dist_pi0 * dist_pi;
-      }
-      viscMult[n] = alpha;
-      */
-
-      viscMultPlanar(coords, wgt);
+      fluxClass->viscSpongePlanar(coords, wgt);
       viscMult[n] = wgt;
     }
   }

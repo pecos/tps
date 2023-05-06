@@ -76,6 +76,13 @@ Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_
       vsd_.n[d] = config_->GetLinearVaryingData().normal(d);
       vsd_.p[d] = config_->GetLinearVaryingData().point0(d);
     }
+
+    // ensure normal is actually a unit normal
+    double Nmag = 0;
+    for (int d = 0; d < dim; d++) Nmag += vsd_.n[d] * vsd_.n[d];
+    Nmag = sqrt(Nmag);
+    for (int d = 0; d < dim; d++) vsd_.n[d] /= Nmag;
+
     vsd_.ratio = config_->GetLinearVaryingData().viscRatio;
     vsd_.width = config_->GetLinearVaryingData().width;
   }
@@ -977,27 +984,16 @@ MFEM_HOST_DEVICE void Fluxes::viscSpongePlanar(double *x, double &wgt) {
   double normal[3];
   double point[3];
   double s[3];
-  double Nmag, factor, width, dist;
-
-  // initialize
-  Nmag = 0.;
-  dist = 0.;
+  double factor, width, dist;
 
   // get settings
-  for (int d = 0; d < dim; d++) normal[d] = vsd_.n[d];
-  for (int d = 0; d < dim; d++) point[d] = vsd_.p[d];
-  factor = vsd_.ratio;
-  factor = max(factor, 1.0);
+  factor = max(vsd_.ratio, 1.0);
   width = vsd_.width;
 
-  // ensure normal is actually a unit normal
-  for (int d = 0; d < dim; d++) Nmag += normal[d] * normal[d];
-  Nmag = sqrt(Nmag);
-  for (int d = 0; d < dim; d++) normal[d] /= Nmag;
-
   // distance from plane
-  for (int d = 0; d < dim; d++) s[d] = (x[d] - point[d]);
-  for (int d = 0; d < dim; d++) dist += s[d] * normal[d];
+  dist = 0.;
+  for (int d = 0; d < dim; d++) s[d] = (x[d] - vsd_.p[d]);
+  for (int d = 0; d < dim; d++) dist += s[d] * vsd_.n[d];
 
   // weight
   wgt = 0.5 * (tanh(dist / width - 2.0) + 1.0);

@@ -162,7 +162,8 @@ class M2ulPhyS : public TPS::Solver {
   /// Distance to nearest no-slip wall
   ParGridFunction *distance_;
 
-  Fluxes *fluxClass;
+  Fluxes *fluxClass;    // valid on host
+  Fluxes *d_fluxClass;  // valid on device, when available; otherwise = fluxClass
 
   RHSoperator *rhsOperator;
 

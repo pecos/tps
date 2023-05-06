@@ -80,8 +80,6 @@ class Fluxes {
 
   viscositySpongeData vsd_;
 
-  MFEM_HOST_DEVICE void viscSpongePlanar(double *x, double &wgt);
-
  public:
   Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport, const int _num_equation,
          const int _dim, bool axisym);
@@ -110,6 +108,8 @@ class Fluxes {
   MFEM_HOST_DEVICE void sgsSmag(const double *state, const double *gradUp, double delta, double &mu_sgs);
   void sgsSigma(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu_sgs);
   MFEM_HOST_DEVICE void sgsSigma(const double *state, const double *gradUp, double delta, double &mu_sgs);
+
+  MFEM_HOST_DEVICE void viscSpongePlanar(double *x, double &wgt);
 
   // Compute viscous flux with prescribed boundary flux.
   void ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip,
