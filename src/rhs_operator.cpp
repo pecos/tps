@@ -548,13 +548,6 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
     if (eqSystem != EULER) {
       DenseMatrix fvisc(num_equation_, dim);
       fluxClass->ComputeViscousFluxes(state, gradUpi, radius, xyz, delta, fvisc);
-
-      // FIXME: This shouldn't be here!
-      if (spaceVaryViscMult != NULL) {
-        auto *alpha = spaceVaryViscMult->GetData();
-        for (int eq = 0; eq < num_equation_; eq++)
-          for (int d = 0; d < dim; d++) fvisc(eq, d) *= alpha[i];
-      }
       f -= fvisc;
     }
 
@@ -588,13 +581,6 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
   const double *d_coord = coordsDof->Read();
   const double *d_gradUp = gradUp->Read();
 
-  const double *d_spaceVaryViscMult;
-  if (spaceVaryViscMult != NULL) {
-    d_spaceVaryViscMult = spaceVaryViscMult->Read();
-  } else {
-    d_spaceVaryViscMult = NULL;
-  }
-
   Fluxes *d_fluxClass = fluxClass;
 
   // This element size is divided by element polynomial order when
@@ -605,7 +591,6 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
     double Un[gpudata::MAXEQUATIONS];  // double Un[20];
     double fluxn[gpudata::MAXEQUATIONS * gpudata::MAXDIM], fvisc[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
     double gradUpn[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
-    double linVisc;
 
     for (int eq = 0; eq < num_equation; eq++) {
       Un[eq] = dataIn[n + eq * dof];
@@ -625,16 +610,6 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
     for (int d = 0; d < dim; d++) xyz[d] = d_coord[n + d * dof];
 
     d_fluxClass->ComputeViscousFluxes(Un, gradUpn, radius, xyz, d_elSize[n], fvisc);
-
-    // FIXME: This shouldn't be here!
-    if (d_spaceVaryViscMult != NULL) {
-      linVisc = d_spaceVaryViscMult[n];
-      for (int d = 0; d < dim; d++) {
-        for (int eq = 0; eq < num_equation; eq++) {
-          fvisc[eq + d * num_equation] *= linVisc;
-        }
-      }
-    }
 
     for (int eq = 0; eq < num_equation; eq++) {
       for (int d = 0; d < dim; d++) {
