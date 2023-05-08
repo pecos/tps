@@ -108,9 +108,6 @@ class RHSoperator : public TimeDependentOperator {
   Vector invMArray_rad;
   Array<int> posDofInvM;
 
-  const bool &isSBP;
-  const double &alpha;
-
   // reference to conserved varibales
   ParGridFunction *U_;
 
@@ -153,8 +150,8 @@ class RHSoperator : public TimeDependentOperator {
               const precomputedIntegrationData &gpu_precomputed_data, const int &_maxIntPoints, const int &_maxDofs,
               DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult,
               ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes,
-              GradNonLinearForm *_gradUp_A, BCintegrator *_bcIntegrator, bool &_isSBP, double &_alpha,
-              RunConfiguration &_config, ParGridFunction *pc, ParGridFunction *jh);
+              GradNonLinearForm *_gradUp_A, BCintegrator *_bcIntegrator, RunConfiguration &_config, ParGridFunction *pc,
+              ParGridFunction *jh);
 
   virtual void Mult(const Vector &x, Vector &y) const;
   void updatePrimitives(const Vector &x) const;

@@ -44,8 +44,8 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
                          const int &_maxDofs, DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh,
                          ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
                          ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A,
-                         BCintegrator *_bcIntegrator, bool &_isSBP, double &_alpha, RunConfiguration &_config,
-                         ParGridFunction *pc, ParGridFunction *jh)
+                         BCintegrator *_bcIntegrator, RunConfiguration &_config, ParGridFunction *pc,
+                         ParGridFunction *jh)
     : TimeDependentOperator(_A->Height()),
       config_(_config),
       iter(_iter),
@@ -70,8 +70,6 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
       mesh(_mesh),
       spaceVaryViscMult(_spaceVaryViscMult),
       linViscData(_config.GetLinearVaryingData()),
-      isSBP(_isSBP),
-      alpha(_alpha),
       U_(U),
       Up(_Up),
       plasma_conductivity_(pc),
@@ -523,22 +521,6 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
     const double delta = (*elSize)[i];
 
     fluxClass->ComputeConvectiveFluxes(state, f);
-
-    // TODO(Kevin): - This needs to be incorporated in Fluxes::ComputeConvectiveFluxes.
-    // Kevin: we need to think through this.
-    if (isSBP) {
-      // NOTE(kevin): SBP part was never implemented for gpu, and it is outdated for cpu.
-      grvy_printf(GRVY_ERROR, "SBP capability is currently outdated and unsupported!\n");
-      exit(-1);
-
-      f *= alpha;  // *= alpha
-      double p = mixture->ComputePressure(state);
-      p *= 1. - alpha;
-      for (int d = 0; d < dim; d++) {
-        f(d + 1, d) += p;
-        f(dim + 1, d) += p * (state)(1 + d) / (state)(0);
-      }
-    }
 
     if (eqSystem != EULER) {
       DenseMatrix fvisc(num_equation_, dim);

@@ -544,10 +544,6 @@ void M2ulPhyS::initVariables() {
   ioData.initializeSerial(mpi.Root(), (config.RestartSerial() != "no"), serial_mesh);
   projectInitialSolution();
 
-  alpha = 0.5;
-  isSBP = config.isSBP();
-  assert(!isSBP);
-
   // Boundary attributes in present partition
   Array<int> local_attr;
   getAttributesInPartition(local_attr);
@@ -573,12 +569,6 @@ void M2ulPhyS::initVariables() {
                                         gradUp, gradUpfes, max_char_speed, config.isAxisymmetric());
   }
   A->AddInteriorFaceIntegrator(faceIntegrator);
-#ifdef _BUILD_DEPRECATED_
-  if (isSBP) {
-    SBPoperator = new SBPintegrator(mixture, d_fluxClass, intRules, dim, num_equation, alpha);
-    A->AddDomainIntegrator(SBPoperator);
-  }
-#endif
 
   Aflux = new MixedBilinearForm(dfes, fes);
   domainIntegrator =
@@ -623,7 +613,7 @@ void M2ulPhyS::initVariables() {
       new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType, d_fluxClass,
                       mixture, d_mixture, chemistry_, transportPtr, radiation_, vfes, fes, gpu_precomputed_data_,
                       maxIntPoints, maxDofs, A, Aflux, mesh, spaceVaryViscMult, U, Up, gradUp, gradUpfes, gradUp_A,
-                      bcIntegrator, isSBP, alpha, config, plasma_conductivity_, joule_heating_);
+                      bcIntegrator, config, plasma_conductivity_, joule_heating_);
 
   CFL = config.GetCFLNumber();
   rhsOperator->SetTime(time);
@@ -1196,9 +1186,7 @@ M2ulPhyS::~M2ulPhyS() {
   delete rhsOperator;
   // delete domainIntegrator;
   delete Aflux;  // fails to delete (follow this)
-#ifdef _BUILD_DEPRECATED_
-  if (isSBP) delete SBPoperator;
-#endif
+
   // delete faceIntegrator;
   delete A;  // fails to delete (follow this)
 
@@ -2162,7 +2150,6 @@ void M2ulPhyS::parseFlowOptions() {
   tpsP->getInput("flow/outputFreq", config.itersOut, 50);
   tpsP->getInput("flow/timingFreq", config.timingFreq, 100);
   tpsP->getInput("flow/useRoe", config.useRoe, false);
-  tpsP->getInput("flow/useSumByParts", config.SBP, false);
   tpsP->getInput("flow/refLength", config.refLength, 1.0);
   tpsP->getInput("flow/viscosityMultiplier", config.visc_mult, 1.0);
   tpsP->getInput("flow/bulkViscosityMultiplier", config.bulk_visc, 0.0);

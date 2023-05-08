@@ -32,7 +32,7 @@ endif
 cxx_sources          = averaging_and_rms.cpp faceGradientIntegration.cpp M2ulPhyS.cpp rhs_operator.cpp wallBC.cpp \
 		       BCintegrator.cpp face_integrator.cpp riemann_solver.cpp BoundaryCondition.cpp fluxes.cpp \
                        masa_handler.cpp run_configuration.cpp domain_integrator.cpp forcing_terms.cpp mpi_groups.cpp \
-	               sbp_integrators.cpp equation_of_state.cpp transport_properties.cpp inletBC.cpp outletBC.cpp utils.cpp io.cpp \
+	               equation_of_state.cpp transport_properties.cpp inletBC.cpp outletBC.cpp utils.cpp io.cpp \
 		       dgNonlinearForm.cpp gradients.cpp gradNonLinearForm.cpp quasimagnetostatic.cpp tps.cpp chemistry.cpp \
                        reaction.cpp collision_integrals.cpp argon_transport.cpp source_term.cpp gpu_constructor.cpp \
                        independent_coupling.cpp cycle_avg_joule_coupling.cpp table.cpp radiation.cpp lte_mixture.cpp \
@@ -42,7 +42,7 @@ mfem_extra_sources   = ../utils/mfem_extras/pfem_extras.cpp
 
 headers              = averaging_and_rms.hpp equation_of_state.hpp transport_properties.hpp forcing_terms.hpp mpi_groups.hpp \
 		       run_configuration.hpp BCintegrator.hpp faceGradientIntegration.hpp inletBC.hpp outletBC.hpp \
-	               sbp_integrators.hpp BoundaryCondition.hpp face_integrator.hpp M2ulPhyS.hpp rhs_operator.hpp \
+	               BoundaryCondition.hpp face_integrator.hpp M2ulPhyS.hpp rhs_operator.hpp \
 	               wallBC.hpp domain_integrator.hpp fluxes.hpp masa_handler.hpp riemann_solver.hpp \
 		       dgNonlinearForm.hpp gradNonLinearForm.hpp dataStructures.hpp utils.hpp io.hpp em_options.hpp \
 		       quasimagnetostatic.hpp gradients.hpp logger.hpp solver.hpp tps.hpp chemistry.hpp reaction.hpp \

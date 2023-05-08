@@ -72,7 +72,6 @@ class Tps;
 #include "rhs_operator.hpp"
 #include "riemann_solver.hpp"
 #include "run_configuration.hpp"
-#include "sbp_integrators.hpp"
 #include "solver.hpp"
 #include "tps.hpp"
 #include "tps_mfem_wrap.hpp"
@@ -217,19 +216,12 @@ class M2ulPhyS : public TPS::Solver {
   DGNonLinearForm *A;
 
   FaceIntegrator *faceIntegrator;
-#ifdef _BUILD_DEPRECATED_
-  SBPintegrator *SBPoperator;
-#endif
 
   MixedBilinearForm *Aflux;
   DomainIntegrator *domainIntegrator;
 
   // Boundary condition non-linear integrator
   BCintegrator *bcIntegrator;
-
-  // Coefficient for SBP operators and
-  bool isSBP;
-  double alpha;
 
   // Conservative variables
   ParGridFunction *U;

@@ -72,7 +72,6 @@ RunConfiguration::RunConfiguration() {
   visc_mult = 1.;
   bulk_visc = 0.;
   refLength = 1.;
-  SBP = false;
   for (int ii = 0; ii < 5; ii++) initRhoRhoVp[ii] = 0.;
 
   linViscData.normal.UseDevice(true);

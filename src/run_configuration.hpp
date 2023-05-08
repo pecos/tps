@@ -163,8 +163,6 @@ class RunConfiguration {
   Equations eqSystem;
   bool axisymmetric_;
 
-  bool SBP;
-
   // initial constant field
   double initRhoRhoVp[5];
 
@@ -317,7 +315,6 @@ class RunConfiguration {
   double GetSgsConstant() { return sgs_model_const; }
   Equations GetEquationSystem() const { return eqSystem; }
   bool isAxisymmetric() const { return axisymmetric_; }
-  bool isSBP() { return SBP; }
   double* GetConstantInitialCondition() { return &initRhoRhoVp[0]; }
 
   linearlyVaryingVisc& GetLinearVaryingData() { return linViscData; }
