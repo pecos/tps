@@ -3029,6 +3029,7 @@ void M2ulPhyS::parseBCInputs() {
   // Wall Bcs
   std::map<std::string, WallType> wallMapping;
   wallMapping["inviscid"] = INV;
+  wallMapping["slip"] = SLIP;
   wallMapping["viscous_adiabatic"] = VISC_ADIAB;
   wallMapping["viscous_isothermal"] = VISC_ISOTH;
   wallMapping["viscous_general"] = VISC_GNRL;
