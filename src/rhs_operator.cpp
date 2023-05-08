@@ -514,13 +514,8 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
       for (int d = 0; d < dim; d++) gradUpi(eq, d) = dataGradUp[i + eq * dof + d * num_equation_ * dof];
     }
 
-    double radius = 1;
-    Vector xyz(3);
-    if (config_.isAxisymmetric()) {
-      radius = (*coordsDof)[i + 0 * dof];
-    }
-
     // Extract position
+    Vector xyz(3);
     for (int d = 0; d < dim_; d++) xyz[d] = (*coordsDof)[i + d * dof];
 
     // This element size is divided by element polynomial order when
@@ -547,7 +542,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 
     if (eqSystem != EULER) {
       DenseMatrix fvisc(num_equation_, dim);
-      fluxClass->ComputeViscousFluxes(state, gradUpi, radius, xyz, delta, fvisc);
+      fluxClass->ComputeViscousFluxes(state, gradUpi, xyz, delta, fvisc);
       f -= fvisc;
     }
 
@@ -601,15 +596,10 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
 
     d_fluxClass->ComputeConvectiveFluxes(Un, fluxn);
 
-    double radius = 1.0;
-    double delta;
     double xyz[3];
-    if (axisymmetric) {
-      radius = d_coord[n + 0 * dof];
-    }
     for (int d = 0; d < dim; d++) xyz[d] = d_coord[n + d * dof];
 
-    d_fluxClass->ComputeViscousFluxes(Un, gradUpn, radius, xyz, d_elSize[n], fvisc);
+    d_fluxClass->ComputeViscousFluxes(Un, gradUpn, xyz, d_elSize[n], fvisc);
 
     for (int eq = 0; eq < num_equation; eq++) {
       for (int d = 0; d < dim; d++) {

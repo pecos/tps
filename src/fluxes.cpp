@@ -161,13 +161,13 @@ MFEM_HOST_DEVICE void Fluxes::ComputeConvectiveFluxes(const double *state, doubl
 }
 
 // TODO(kevin): check/complete axisymmetric setting for multi-component flow.
-void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip,
-                                  double delta, DenseMatrix &flux) {
-  ComputeViscousFluxes(state.GetData(), gradUp.GetData(), radius, transip.GetData(), delta, flux.GetData());
+void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, Vector transip, double delta,
+                                  DenseMatrix &flux) {
+  ComputeViscousFluxes(state.GetData(), gradUp.GetData(), transip.GetData(), delta, flux.GetData());
 }
 
-MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double radius,
-                                                   double *transip, double delta, double *flux) {
+MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double *transip,
+                                                   double delta, double *flux) {
   for (int d = 0; d < dim; d++) {
     for (int eq = 0; eq < num_equation; eq++) {
       flux[eq + d * num_equation] = 0.;
@@ -175,6 +175,12 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
   }
   if (eqSystem == EULER) {
     return;
+  }
+
+  // if axisymmetric, radius is the x coordinate
+  double radius = -1;
+  if (axisymmetric_) {
+    radius = transip[0];
   }
 
   double vel[gpudata::MAXDIM];
@@ -311,20 +317,25 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
   }
 }
 
-void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip,
-                                     double delta, const BoundaryViscousFluxData &bcFlux, Vector &normalFlux) {
+void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, Vector transip, double delta,
+                                     const BoundaryViscousFluxData &bcFlux, Vector &normalFlux) {
   normalFlux.SetSize(num_equation);
-  ComputeBdrViscousFluxes(state.GetData(), gradUp.GetData(), radius, transip.GetData(), delta, bcFlux,
-                          normalFlux.GetData());
+  ComputeBdrViscousFluxes(state.GetData(), gradUp.GetData(), transip.GetData(), delta, bcFlux, normalFlux.GetData());
 }
 
-MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius,
-                                                      double *transip, double delta,
-                                                      const BoundaryViscousFluxData &bcFlux, double *normalFlux) {
+MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double *transip,
+                                                      double delta, const BoundaryViscousFluxData &bcFlux,
+                                                      double *normalFlux) {
   // normalFlux.SetSize(num_equation);
   for (int eq = 0; eq < num_equation; eq++) normalFlux[eq] = 0.;
   if (eqSystem == EULER) {
     return;
+  }
+
+  // if axisymmetric, radius is the x coordinate
+  double radius = -1;
+  if (axisymmetric_) {
+    radius = transip[0];
   }
 
   double stress[gpudata::MAXDIM * gpudata::MAXDIM];

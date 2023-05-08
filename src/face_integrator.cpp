@@ -289,19 +289,15 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     CalcOrtho(Tr.Jacobian(), nor);
     rsolver->Eval(funval1, funval2, nor, fluxN);
 
-    double radius = 1;
     double x[3];
     Vector transip(x, 3);
     Tr.Transform(ip, transip);
-    if (axisymmetric_) {
-      radius = transip[0];
-    }
 
     // compute viscous fluxes
     viscF1 = viscF2 = 0.;
 
-    fluxClass->ComputeViscousFluxes(funval1, gradUp1i, radius, transip, delta1, viscF1);
-    fluxClass->ComputeViscousFluxes(funval2, gradUp2i, radius, transip, delta2, viscF2);
+    fluxClass->ComputeViscousFluxes(funval1, gradUp1i, transip, delta1, viscF1);
+    fluxClass->ComputeViscousFluxes(funval2, gradUp2i, transip, delta2, viscF2);
 
     // compute mean flux
     viscF1 += viscF2;
@@ -312,7 +308,7 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     fluxN *= ip.weight;
 
     if (axisymmetric_) {
-      fluxN *= radius;
+      fluxN *= transip[0];
     }
 
     // add to element vectors

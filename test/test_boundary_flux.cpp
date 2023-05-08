@@ -96,7 +96,6 @@ bool testComputeBdrViscousFlux(RunConfiguration &srcConfig, const int dim) {
   int primFluxSize = (mixture->IsTwoTemperature()) ? numSpecies + nvel + 2 : numSpecies + nvel + 1;
 
   Fluxes *flux = new Fluxes(mixture, eqSystem, transport, num_equation, dim, srcConfig.axisymmetric_, &srcConfig);
-  double radius = uniformRandomNumber();
   const double delta = 0.0;
   Vector xyz(3);
   xyz = 0.;
@@ -127,7 +126,7 @@ bool testComputeBdrViscousFlux(RunConfiguration &srcConfig, const int dim) {
   grvy_printf(GRVY_INFO, "\n ComputeViscousFluxes * normal. \n");
   DenseMatrix viscF(num_equation, dim);
   Vector viscFdotNorm(num_equation);
-  flux->ComputeViscousFluxes(testConserved, gradUp, radius, xyz, delta, viscF);
+  flux->ComputeViscousFluxes(testConserved, gradUp, xyz, delta, viscF);
   viscF.Mult(dir, viscFdotNorm);
   for (int eq = 0; eq < num_equation; eq++) {
     grvy_printf(GRVY_INFO, "%.8E\t", viscFdotNorm(eq));
@@ -143,7 +142,7 @@ bool testComputeBdrViscousFlux(RunConfiguration &srcConfig, const int dim) {
   for (int i = 0; i < primFluxSize; i++) bcFlux.primFluxIdxs[i] = false;
 
   Vector wallViscF(num_equation);
-  flux->ComputeBdrViscousFluxes(testConserved, gradUp, radius, xyz, delta, bcFlux, wallViscF);
+  flux->ComputeBdrViscousFluxes(testConserved, gradUp, xyz, delta, bcFlux, wallViscF);
   for (int eq = 0; eq < num_equation; eq++) {
     grvy_printf(GRVY_INFO, "%.8E\t", wallViscF(eq));
   }

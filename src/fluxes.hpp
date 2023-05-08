@@ -94,11 +94,11 @@ class Fluxes {
   void ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux);
   MFEM_HOST_DEVICE void ComputeConvectiveFluxes(const double *state, double *flux) const;
 
-  void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip, double delta,
+  void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, Vector transip, double delta,
                             DenseMatrix &flux);
 
-  MFEM_HOST_DEVICE void ComputeViscousFluxes(const double *state, const double *gradUp, double radius, double *transip,
-                                             double delta, double *flux);
+  MFEM_HOST_DEVICE void ComputeViscousFluxes(const double *state, const double *gradUp, double *transip, double delta,
+                                             double *flux);
 
   void sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu_sgs);
   MFEM_HOST_DEVICE void sgsSmag(const double *state, const double *gradUp, double delta, double &mu_sgs);
@@ -108,11 +108,11 @@ class Fluxes {
   MFEM_HOST_DEVICE void viscSpongePlanar(double *x, double &wgt);
 
   // Compute viscous flux with prescribed boundary flux.
-  void ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, Vector transip,
-                               double delta, const BoundaryViscousFluxData &bcFlux, Vector &normalFlux);
+  void ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, Vector transip, double delta,
+                               const BoundaryViscousFluxData &bcFlux, Vector &normalFlux);
 
-  MFEM_HOST_DEVICE void ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius,
-                                                double *transip, double delta, const BoundaryViscousFluxData &bcFlux,
+  MFEM_HOST_DEVICE void ComputeBdrViscousFluxes(const double *state, const double *gradUp, double *transip,
+                                                double delta, const BoundaryViscousFluxData &bcFlux,
                                                 double *normalFlux);
 
   MFEM_HOST_DEVICE bool isAxisymmetric() const { return axisymmetric_; }
