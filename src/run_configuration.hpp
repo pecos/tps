@@ -279,10 +279,6 @@ class RunConfiguration {
   RunConfiguration();
   ~RunConfiguration();
 
-#ifdef _BUILD_DEPRECATED_
-  void readInputFile(std::string inpuFileName);
-#endif
-
   bool GetPeriodic() { return periodic; }
   double GetXTrans() { return xTrans; }
   double GetYTrans() { return yTrans; }

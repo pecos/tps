@@ -99,10 +99,6 @@ class FaceIntegrator : public NonlinearFormIntegrator {
 
   void NonLinearFaceIntegration(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,
                                 const Vector &elfun, Vector &elvect);
-#ifdef _BUILD_DEPRECATED_
-  void MassMatrixFaceIntegral(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,
-                              const Vector &elfun, Vector &elvect);
-#endif
 
  public:
   FaceIntegrator(IntegrationRules *_intRules, RiemannSolver *rsolver_, Fluxes *_fluxClass, ParFiniteElementSpace *_vfes,

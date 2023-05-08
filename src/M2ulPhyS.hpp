@@ -336,10 +336,6 @@ class M2ulPhyS : public TPS::Solver {
   void writeHistoryFile();
 
   // i/o routines
-#ifdef _BUILD_DEPRECATED_
-  void write_restart_files();
-  void read_restart_files();
-#endif
   void read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data);
   void read_serialized_soln_data(hid_t file, string varName, int numDof, int varOffset, double *data, IOFamily &fam);
   void restart_files_hdf5(string mode, string inputFileName = std::string());

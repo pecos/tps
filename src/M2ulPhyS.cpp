@@ -1574,14 +1574,7 @@ void M2ulPhyS::projectInitialSolution() {
     if (config.use_mms_ && config.mmsSaveDetails_) projectExactSolution(0.0, masaU_);
 #endif
 
-#ifdef _BUILD_DEPRECATED_
-    if (config.RestartHDFConversion())
-      read_restart_files();
-    else
-      restart_files_hdf5("read");
-#else
     restart_files_hdf5("read");
-#endif
 
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
@@ -1988,125 +1981,6 @@ void M2ulPhyS::initGradUp() {
     }
   }
 }
-
-#ifdef _BUILD_DEPRECATED_
-void M2ulPhyS::write_restart_files() {
-  string serialName = "restart_p";
-  serialName.append(to_string(order));
-  serialName.append("_");
-  serialName.append(config.GetOutputName());
-  serialName.append(".sol");
-
-  string fileName = groupsMPI->getParallelName(serialName);
-  ofstream file(fileName, std::ofstream::trunc);
-  file.precision(8);
-
-  // write cycle and time
-  file << iter << " " << time << " " << dt << endl;
-
-  // double *data = Up->GetData();
-  const double *data = Up->HostRead();  // get data from GPU
-  int dof = vfes->GetNDofs();
-
-  for (int i = 0; i < dof * num_equation; i++) {
-    file << data[i] << endl;
-  }
-
-  Up->Write();  // sets data back to GPU
-
-  file.close();
-}
-
-void M2ulPhyS::read_restart_files() {
-  if (mpi.Root()) {
-    cout << endl;
-    cout << "================================================" << endl;
-    cout << "| Restarting simulation" << endl;
-    cout << "================================================" << endl;
-  }
-
-  if (loadFromAuxSol) {
-    cerr << "ERROR: Restart from auxOrder is not supported with ascii-based restarts." << endl;
-    cerr << "To change order, convert the ascii-based restart file to hdf5 and then change the order." << endl;
-    MPI_Abort(MPI_COMM_WORLD, 1);
-  }
-
-  assert(!loadFromAuxSol);
-
-  string serialName = "restart_p";
-  serialName.append(to_string(order));
-  serialName.append("_");
-  serialName.append(config.GetOutputName());
-  serialName.append(".sol");
-
-  string fileName = groupsMPI->getParallelName(serialName);
-  ifstream file(fileName);
-
-  if (!file.is_open()) {
-    cout << "Could not open file \"" << fileName << "\"" << endl;
-    return;
-  } else {
-    double *data;
-    data = Up->GetData();
-
-    string line;
-    // read time and iters
-    {
-      getline(file, line);
-      istringstream ss(line);
-      string word;
-      ss >> word;
-      iter = stoi(word);
-
-      if (mpi.Root()) cout << "--> restart iter = " << iter << endl;
-      config.SetRestartCycle(iter);
-
-      ss >> word;
-      time = stof(word);
-
-      ss >> word;
-      dt = stof(word);
-    }
-
-    int lines = 0;
-    while (getline(file, line)) {
-      istringstream ss(line);
-      string word;
-      ss >> word;
-
-      data[lines] = stof(word);
-      lines++;
-    }
-    file.close();
-
-    double *dataUp = Up->GetData();
-
-    // fill out U
-    double *dataU = U->GetData();
-    // double gamma = mixture->GetSpecificHeatRatio();
-    int dof = vfes->GetNDofs();
-    if (lines != dof * num_equation) {
-      cout << "# of lines in files does not match domain size" << endl;
-    } else {
-      dof = vfes->GetNDofs();
-      for (int i = 0; i < dof; i++) {
-        Vector primitiveState(num_equation);
-        Vector conservedState(num_equation);
-        for (int eq = 0; eq < num_equation; eq++) primitiveState[eq] = dataUp[i + eq * dof];
-        mixture->GetConservativesFromPrimitives(primitiveState, conservedState);
-        for (int eq = 0; eq < num_equation; eq++) dataU[i + eq * dof] = conservedState[eq];
-      }
-    }
-  }
-
-  // load data to GPU
-  // auto dUp = Up->ReadWrite();
-  // auto dU = U->ReadWrite();
-  Up->ReadWrite();
-  U->ReadWrite();
-  //  if( loadFromAuxSol ) auto dausUp = aux_Up->ReadWrite();
-}
-#endif
 
 void M2ulPhyS::Check_NAN() {
   int local_print = 0;
