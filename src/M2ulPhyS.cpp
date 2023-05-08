@@ -488,10 +488,9 @@ void M2ulPhyS::initVariables() {
       new Fluxes(mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(), &config);  // modified
   d_fluxClass = fluxClass;
 
-  rsolver =
-      new RiemannSolver(num_equation, mixture, eqSystem, d_fluxClass, config.RoeRiemannSolver(), config.isAxisymmetric());
+  rsolver = new RiemannSolver(num_equation, mixture, eqSystem, d_fluxClass, config.RoeRiemannSolver(),
+                              config.isAxisymmetric());
 #endif
-
 
 #ifdef _GPU_
   initIndirectionArrays();
@@ -539,7 +538,6 @@ void M2ulPhyS::initVariables() {
   ioData.initializeSerial(mpi.Root(), (config.RestartSerial() != "no"), serial_mesh);
   projectInitialSolution();
 
-
   alpha = 0.5;
   isSBP = config.isSBP();
   assert(!isSBP);
@@ -577,7 +575,8 @@ void M2ulPhyS::initVariables() {
 #endif
 
   Aflux = new MixedBilinearForm(dfes, fes);
-  domainIntegrator = new DomainIntegrator(d_fluxClass, intRules, intRuleType, dim, num_equation, config.isAxisymmetric());
+  domainIntegrator =
+      new DomainIntegrator(d_fluxClass, intRules, intRuleType, dim, num_equation, config.isAxisymmetric());
   Aflux->AddDomainIntegrator(domainIntegrator);
   Aflux->Assemble();
   Aflux->Finalize();
@@ -3661,43 +3660,6 @@ void M2ulPhyS::visualization() {
   if (mpi.Root()) cout << "Final timestep iteration = " << config.postprocessInput.endIter << endl;
 
   return;
-}
-
-/**
-Copy of viscous sponge code in fluxes.cpp.  This is currently only used for visualization purposes
-but should only be done once as opposed to repeating every step in fluxes.cpp.  Code structure
-makes this difficult to correct.
-*/
-void M2ulPhyS::viscMultPlanar(Vector x, double &wgt) {
-  Vector normal(3);
-  Vector point(3);
-  Vector s(3);
-  double Nmag, factor, width, dist;
-
-  // initialize
-  Nmag = 0.;
-  dist = 0.;
-
-  // get settings
-  for (int d = 0; d < dim; d++) normal[d] = config.GetLinearVaryingData().normal(d);
-  for (int d = 0; d < dim; d++) point[d] = config.GetLinearVaryingData().point0(d);
-  factor = config.GetLinearVaryingData().viscRatio;
-  factor = max(factor, 1.0);
-  width = config.GetLinearVaryingData().width;
-
-  // ensure normal is actually a unit normal
-  for (int d = 0; d < dim; d++) Nmag += normal[d] * normal[d];
-  Nmag = sqrt(Nmag);
-  for (int d = 0; d < dim; d++) normal[d] /= Nmag;
-
-  // distance from plane
-  for (int d = 0; d < dim; d++) s[d] = (x[d] - point[d]);
-  for (int d = 0; d < dim; d++) dist += s[d] * normal[d];
-
-  // weight
-  wgt = 0.5 * (tanh(dist / width - 2.0) + 1.0);
-  wgt *= (factor - 1.0);
-  wgt += 1.0;
 }
 
 void M2ulPhyS::updateVisualizationVariables() {
