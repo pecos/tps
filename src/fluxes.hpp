@@ -91,10 +91,6 @@ class Fluxes {
 
   Equations GetEquationSystem() { return eqSystem; }
 
-#ifdef _BUILD_DEPRECATED_
-  void ComputeTotalFlux(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &flux);
-#endif
-
   void ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux);
   MFEM_HOST_DEVICE void ComputeConvectiveFluxes(const double *state, double *flux) const;
 
@@ -118,10 +114,6 @@ class Fluxes {
   MFEM_HOST_DEVICE void ComputeBdrViscousFluxes(const double *state, const double *gradUp, double radius,
                                                 double *transip, double delta, const BoundaryViscousFluxData &bcFlux,
                                                 double *normalFlux);
-
-  // Compute the split fersion of the flux for SBP operations
-  // Output matrices a_mat, c_mat need not have the right size
-  void ComputeSplitFlux(const Vector &state, DenseMatrix &a_mat, DenseMatrix &c_mat);
 
   MFEM_HOST_DEVICE bool isAxisymmetric() const { return axisymmetric_; }
 };
