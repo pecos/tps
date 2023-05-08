@@ -482,10 +482,16 @@ void M2ulPhyS::initVariables() {
   tpsGpuMalloc((void **)&rsolver, sizeof(RiemannSolver));
   gpu::instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, d_fluxClass, config.RoeRiemannSolver(),
                                           config.isAxisymmetric(), rsolver);
+
+  // Note: This flux class is only used to compute the viscosity
+  // multiplier function on the host.  If you want or need it for
+  // anything else, be careful.  It does not have a valid pointer to a
+  // transport class!
+  fluxClass = new Fluxes(mixture, eqSystem, NULL, num_equation, dim, config.isAxisymmetric(), &config);
+
 #else
 
-  fluxClass =
-      new Fluxes(mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(), &config);  // modified
+  fluxClass = new Fluxes(mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(), &config);
   d_fluxClass = fluxClass;
 
   rsolver = new RiemannSolver(num_equation, mixture, eqSystem, d_fluxClass, config.RoeRiemannSolver(),
