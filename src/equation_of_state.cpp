@@ -253,24 +253,7 @@ bool DryAir::StateIsPhysical(const mfem::Vector &state) {
 // Diffusion velocity contributes to the characteristic speed, which mixture cannot handle or know.
 // Compute the maximum characteristic speed.
 double DryAir::ComputeMaxCharSpeed(const Vector &state) {
-#ifdef _BUILD_DEPRECATED_
-  const double den = state(0);
-  const Vector den_vel(state.GetData() + 1, nvel_);
-
-  double den_vel2 = 0;
-  for (int d = 0; d < nvel_; d++) {
-    den_vel2 += den_vel(d) * den_vel(d);
-  }
-  den_vel2 /= den;
-
-  const double pres = ComputePressure(state);
-  const double sound = sqrt(specific_heat_ratio * pres / den);
-  const double vel = sqrt(den_vel2 / den);
-
-  return vel + sound;
-#else
   return ComputeMaxCharSpeed(state.GetData());
-#endif
 }
 
 MFEM_HOST_DEVICE double DryAir::ComputeMaxCharSpeed(const double *state) const {
@@ -290,26 +273,7 @@ MFEM_HOST_DEVICE double DryAir::ComputeMaxCharSpeed(const double *state) const {
 }
 
 void DryAir::GetConservativesFromPrimitives(const Vector &primit, Vector &conserv) {
-#ifdef _BUILD_DEPRECATED_
-  conserv = primit;
-
-  double v2 = 0.;
-  for (int d = 0; d < nvel_; d++) {
-    v2 += primit[1 + d] * primit[1 + d];
-    conserv[1 + d] *= primit[0];
-  }
-  // total energy
-  conserv[1 + nvel_] = gas_constant * primit[0] * primit[1 + nvel_] / (specific_heat_ratio - 1.) + 0.5 * primit[0] * v2;
-
-  // case of passive scalar
-  if (num_equation > nvel_ + 2) {
-    for (int n = 0; n < num_equation - nvel_ - 2; n++) {
-      conserv[nvel_ + 2 + n] *= primit[0];
-    }
-  }
-#else
   GetConservativesFromPrimitives(primit.GetData(), conserv.GetData());
-#endif
 }
 
 MFEM_HOST_DEVICE void DryAir::GetConservativesFromPrimitives(const double *primit, double *conserv) {
@@ -332,23 +296,7 @@ MFEM_HOST_DEVICE void DryAir::GetConservativesFromPrimitives(const double *primi
 }
 
 void DryAir::GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit) {
-#ifdef _BUILD_DEPRECATED_
-  double T = ComputeTemperature(conserv);
-  primit = conserv;
-
-  for (int d = 0; d < nvel_; d++) primit[1 + d] /= conserv[0];
-
-  primit[nvel_ + 1] = T;
-
-  // case of passive scalar
-  if (num_equation > nvel_ + 2) {
-    for (int n = 0; n < num_equation - nvel_ - 2; n++) {
-      primit[nvel_ + 2 + n] /= primit[0];
-    }
-  }
-#else
   GetPrimitivesFromConservatives(conserv.GetData(), primit.GetData());
-#endif
 }
 
 MFEM_HOST_DEVICE void DryAir::GetPrimitivesFromConservatives(const double *conserv, double *primit) {

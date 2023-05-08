@@ -46,41 +46,7 @@ MFEM_HOST_DEVICE RiemannSolver::RiemannSolver(int _num_equation, GasMixture *_mi
 
 // Compute the scalar F(u).n
 void RiemannSolver::ComputeFluxDotN(const Vector &state, const Vector &nor, Vector &fluxN) {
-  // NOTE: nor in general is not a unit normal
-  // Kevin: Are we supposed to keep the magnitude of nor, or should we normalize it?
-  const int dim = nor.Size();
-  // const int nvel = (axisymmetric_ ? 3 : dim);
-
-  // const double den = state(0);
-  // const Vector den_vel(state.GetData() + 1, nvel);
-  // const double den_energy = state(1 + nvel);
-
-  // MFEM_ASSERT(eqState->StateIsPhysical(state, dim), "");
-
-  // const double pres = mixture->ComputePressure(state);
-  //
-  // double den_velN = 0;
-  // for (int d = 0; d < dim; d++) {
-  //   den_velN += den_vel(d) * nor(d);
-  // }
-  //
-  // fluxN(0) = den_velN;
-  // for (int d = 0; d < dim; d++) {
-  //   fluxN(1 + d) = den_velN * den_vel(d) / den + pres * nor(d);
-  // }
-  //
-  // const double H = (den_energy + pres) / den;
-  // fluxN(1 + dim) = den_velN * H;
-  //
-  // if (eqSystem == NS_PASSIVE) fluxN(num_equation - 1) = den_velN * state(num_equation - 1) / state(0);
-
-  // Kevin: used fluxClass to prevent rewriting in future.
-  DenseMatrix fluxes(num_equation, dim);
-  fluxClass->ComputeConvectiveFluxes(state, fluxes);
-  fluxN = 0.;
-  for (int eq = 0; eq < num_equation; eq++) {
-    for (int d = 0; d < dim; d++) fluxN[eq] += fluxes(eq, d) * nor[d];
-  }
+  ComputeFluxDotN(state.GetData(), nor.GetData(), fluxN.GetData());
 }
 
 // Compute the scalar F(u).n
@@ -117,37 +83,7 @@ MFEM_HOST_DEVICE void RiemannSolver::Eval(const double *state1, const double *st
 }
 
 void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux) {
-#ifdef _BUILD_DEPRECATED_
-  // NOTE: nor in general is not a unit normal
-  const int dim = nor.Size();
-  // const int nvel = (axisymmetric_ ? 3 : dim);
-
-  // MFEM_ASSERT(eqState->StateIsPhysical(state1, dim), "");
-  // MFEM_ASSERT(eqState->StateIsPhysical(state2, dim), "");
-
-  const double maxE1 = mixture->ComputeMaxCharSpeed(state1);
-  const double maxE2 = mixture->ComputeMaxCharSpeed(state2);
-
-  const double maxE = max(maxE1, maxE2);
-
-  Vector flux1(num_equation);
-  Vector flux2(num_equation);
-
-  ComputeFluxDotN(state1, nor, flux1);
-  ComputeFluxDotN(state2, nor, flux2);
-
-  double normag = 0;
-  for (int i = 0; i < dim; i++) {
-    normag += nor(i) * nor(i);
-  }
-  normag = sqrt(normag);
-
-  for (int i = 0; i < num_equation; i++) {
-    flux(i) = 0.5 * (flux1(i) + flux2(i)) - 0.5 * maxE * (state2(i) - state1(i)) * normag;
-  }
-#else
   Eval_LF(state1.GetData(), state2.GetData(), nor.GetData(), flux.GetData());
-#endif
 }
 
 MFEM_HOST_DEVICE void RiemannSolver::Eval_LF(const double *state1, const double *state2, const double *nor,
