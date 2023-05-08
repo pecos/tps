@@ -285,7 +285,6 @@ void AxisymmetricSource::updateTerms(Vector &in) {
   GasMixture *d_mix = mixture;
   TransportProperties *d_trans = transport_;
 
-  std::cout << "AxisymmetricSource::updateTerms..." << std::endl;
   MFEM_FORALL(n, dof, {
     double U[gpudata::MAXEQUATIONS];
     double Up[gpudata::MAXEQUATIONS];
@@ -359,7 +358,6 @@ void AxisymmetricSource::updateTerms(Vector &in) {
     //   d_y[n + 3 * dof] += (tau_tr) / fake_radius;
     // }
   });
-  std::cout << "done." << std::endl;
 
   // Commented out code below has the right structure if we want to
   // add axisym source terms to rhs of weak form (as opposed to
