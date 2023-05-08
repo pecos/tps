@@ -73,10 +73,13 @@ class LteMixture : public GasMixture {
   double evaluateGasConstant(const double &T, const double &rho) { return R_table_->eval(T, rho); }
 
   virtual double ComputePressure(const Vector &state, double *electronPressure = NULL);
+  virtual double ComputePressure(const double *state, double *electronPressure = NULL);
 
   virtual double ComputePressureFromPrimitives(const Vector &Up);
+  virtual double ComputePressureFromPrimitives(const double *Up);
 
   virtual double ComputeTemperature(const Vector &state);
+  virtual double ComputeTemperature(const double *state);
 
   double ComputeTemperatureFromDensityPressure(const double rho, const double p);
 
@@ -87,11 +90,16 @@ class LteMixture : public GasMixture {
   }
 
   virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit);
+  virtual void GetPrimitivesFromConservatives(const double *conserv, double *primit);
+
   virtual void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv);
+  virtual void GetConservativesFromPrimitives(const double *primit, double *conserv);
 
   virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true);
+  virtual double ComputeSpeedOfSound(const double *Uin, bool primitive = true);
 
   virtual double ComputeMaxCharSpeed(const Vector &state);
+  virtual double ComputeMaxCharSpeed(const double *state);
 
   /// only used in non-reflecting BCs... don't implement for now
   virtual double ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive = true);
@@ -118,8 +126,14 @@ class LteMixture : public GasMixture {
 
   // BC related functions
   virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut);
+  virtual void computeStagnantStateWithTemp(const double *stateIn, const double Temp, double *stateOut);
+
   virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p,
                                        bool modifyElectronEnergy = false);
+
+  virtual void modifyEnergyForPressure(const double *stateIn, double *stateOut, const double &p,
+                                       bool modifyElectronEnergy = false);
+
   virtual void computeSheathBdrFlux(const Vector &state, BoundaryViscousFluxData &bcFlux) {
     mfem_error("computeSheathBdrFlux not implemented");
   }

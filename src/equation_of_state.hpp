@@ -153,7 +153,7 @@ class GasMixture {
 
   virtual double ComputePressure(const Vector &state,
                                  double *electronPressure = NULL) = 0;  // pressure from conservatives
-  MFEM_HOST_DEVICE virtual double ComputePressure(const double *state, double *electronPressure = NULL) const {
+  MFEM_HOST_DEVICE virtual double ComputePressure(const double *state, double *electronPressure = NULL) {
     printf("ComputePressure not implemented");
     return 0;
   }
@@ -198,7 +198,7 @@ class GasMixture {
 
   // Compute the maximum characteristic speed.
   virtual double ComputeMaxCharSpeed(const Vector &state) = 0;
-  MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeed(const double *state) const {
+  MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeed(const double *state) {
     printf("ComputeMaxCharSpeed not implemented");
     return 0;
   }
@@ -337,7 +337,7 @@ class DryAir : public GasMixture {
 
   // implementation virtual methods
   virtual double ComputePressure(const Vector &state, double *electronPressure = NULL);
-  MFEM_HOST_DEVICE virtual double ComputePressure(const double *state, double *electronPressure = NULL) const;
+  MFEM_HOST_DEVICE virtual double ComputePressure(const double *state, double *electronPressure = NULL);
 
   virtual double ComputePressureFromPrimitives(const Vector &Up);
   MFEM_HOST_DEVICE virtual double ComputePressureFromPrimitives(const double *Up);
@@ -357,7 +357,7 @@ class DryAir : public GasMixture {
 
   // Compute the maximum characteristic speed.
   virtual double ComputeMaxCharSpeed(const Vector &state);
-  MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeed(const double *state) const;
+  MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeed(const double *state);
 
   virtual double ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive = true);
 
@@ -564,7 +564,7 @@ inline double DryAir::ComputePressure(const Vector &state, double *electronPress
 }
 
 // additional functions inlined for speed...
-MFEM_HOST_DEVICE inline double DryAir::ComputePressure(const double *state, double *electronPressure) const {
+MFEM_HOST_DEVICE inline double DryAir::ComputePressure(const double *state, double *electronPressure) {
   if (electronPressure != NULL) *electronPressure = 0.0;
   double den_vel2 = 0;
   for (int d = 0; d < nvel_; d++) den_vel2 += state[d + 1] * state[d + 1];
@@ -573,9 +573,7 @@ MFEM_HOST_DEVICE inline double DryAir::ComputePressure(const double *state, doub
   return (specific_heat_ratio - 1.0) * (state[1 + nvel_] - 0.5 * den_vel2);
 }
 
-inline double DryAir::ComputeTemperature(const Vector &state) {
-  return ComputeTemperature(state.GetData());
-}
+inline double DryAir::ComputeTemperature(const Vector &state) { return ComputeTemperature(state.GetData()); }
 
 MFEM_HOST_DEVICE inline double DryAir::ComputeTemperature(const double *state) {
   double den_vel2 = 0;
@@ -648,7 +646,7 @@ class PerfectMixture : public GasMixture {
   MFEM_HOST_DEVICE void computeNumberDensities(const double *conservedState, double *n_sp) const;
 
   virtual double ComputePressure(const Vector &state, double *electronPressure = NULL);
-  MFEM_HOST_DEVICE virtual double ComputePressure(const double *state, double *electronPressure = NULL) const;
+  MFEM_HOST_DEVICE virtual double ComputePressure(const double *state, double *electronPressure = NULL);
   virtual double ComputePressureFromPrimitives(const Vector &Up);
   MFEM_HOST_DEVICE virtual double ComputePressureFromPrimitives(const double *Up);
   MFEM_HOST_DEVICE virtual double computePressureBase(const double *n_sp, const double n_e, const double n_B,
@@ -677,7 +675,7 @@ class PerfectMixture : public GasMixture {
 
   // Compute the maximum characteristic speed.
   virtual double ComputeMaxCharSpeed(const Vector &state);
-  MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeed(const double *state) const;
+  MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeed(const double *state);
 
   virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true);
   MFEM_HOST_DEVICE virtual double ComputeSpeedOfSound(const double *Uin, bool primitive = true) const;

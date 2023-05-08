@@ -79,6 +79,10 @@ LteMixture::~LteMixture() {
 
 /// Compute pressure from conserved state
 double LteMixture::ComputePressure(const Vector &state, double *electronPressure) {
+  return ComputePressure(state.GetData(), electronPressure);
+}
+
+double LteMixture::ComputePressure(const double *state, double *electronPressure) {
   const double rho = state[0];
   const double T = ComputeTemperature(state);
   const double R = R_table_->eval(T, rho);
@@ -87,6 +91,10 @@ double LteMixture::ComputePressure(const Vector &state, double *electronPressure
 
 /// Compute pressure from primitive state
 double LteMixture::ComputePressureFromPrimitives(const Vector &Up) {
+  return ComputePressureFromPrimitives(Up.GetData());
+}
+
+double LteMixture::ComputePressureFromPrimitives(const double *Up) {
   const double rho = Up[0];
   const double T = Up[1 + nvel_];
   const double R = R_table_->eval(T, rho);
@@ -101,7 +109,9 @@ double LteMixture::ComputePressureFromPrimitives(const Vector &Up) {
  * internal energy given by the thermodynamic equilibrium look-up
  * table.
  */
-double LteMixture::ComputeTemperature(const Vector &state) {
+double LteMixture::ComputeTemperature(const Vector &state) { return ComputeTemperature(state.GetData()); }
+
+double LteMixture::ComputeTemperature(const double *state) {
   const double rho = state[0];
 
   double den_vel2 = 0;
@@ -228,8 +238,16 @@ void LteMixture::computeSpeciesEnthalpies(const Vector &state, Vector &speciesEn
 
 /// Compute primitive variables (rho, u, T) from conserved (rho, rho*u, rho*E)
 void LteMixture::GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit) {
+  primit.SetSize(conserv.Size());
+  GetPrimitivesFromConservatives(conserv.GetData(), primit.GetData());
+}
+
+void LteMixture::GetPrimitivesFromConservatives(const double *conserv, double *primit) {
   const double T = ComputeTemperature(conserv);
-  primit = conserv;
+
+  for (int i = 0; i < num_equation; i++) {
+    primit[i] = conserv[i];
+  }
 
   for (int d = 0; d < nvel_; d++) primit[1 + d] /= conserv[0];
 
@@ -238,7 +256,14 @@ void LteMixture::GetPrimitivesFromConservatives(const Vector &conserv, Vector &p
 
 /// Compute conserved variables (rho, rho*u, rho*E) from primitive (rho, u, T)
 void LteMixture::GetConservativesFromPrimitives(const Vector &primit, Vector &conserv) {
-  conserv = primit;
+  conserv.SetSize(primit.Size());
+  GetConservativesFromPrimitives(primit.GetData(), conserv.GetData());
+}
+
+void LteMixture::GetConservativesFromPrimitives(const double *primit, double *conserv) {
+  for (int i = 0; i < num_equation; i++) {
+    conserv[i] = primit[i];
+  }
 
   double v2 = 0.;
   for (int d = 0; d < nvel_; d++) {
@@ -256,6 +281,11 @@ void LteMixture::GetConservativesFromPrimitives(const Vector &primit, Vector &co
 
 /// Compute the speed of sound (from look-up table)
 double LteMixture::ComputeSpeedOfSound(const Vector &Uin, bool primitive) {
+  return ComputeSpeedOfSound(Uin.GetData(), primitive);
+}
+
+/// Compute the speed of sound (from look-up table)
+double LteMixture::ComputeSpeedOfSound(const double *Uin, bool primitive) {
   const double rho = Uin[0];
   double T;
   if (primitive) {
@@ -267,7 +297,10 @@ double LteMixture::ComputeSpeedOfSound(const Vector &Uin, bool primitive) {
 }
 
 /// Compute the maximum characteristic speed (u+a)
-double LteMixture::ComputeMaxCharSpeed(const Vector &state) {
+double LteMixture::ComputeMaxCharSpeed(const Vector &state) { return ComputeMaxCharSpeed(state.GetData()); }
+
+/// Compute the maximum characteristic speed (u+a)
+double LteMixture::ComputeMaxCharSpeed(const double *state) {
   const double den = state[0];
 
   double den_vel2 = 0;
@@ -300,18 +333,29 @@ bool LteMixture::StateIsPhysical(const Vector &state) {
 // BC related functions
 void LteMixture::computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut) {
   stateOut.SetSize(num_equation);
-  stateOut = stateIn;
+  computeStagnantStateWithTemp(stateIn.GetData(), Temp, stateOut.GetData());
+}
 
-  for (int d = 0; d < nvel_; d++) stateOut(1 + d) = 0.;
+void LteMixture::computeStagnantStateWithTemp(const double *stateIn, const double Temp, double *stateOut) {
+  for (int i = 0; i < num_equation; i++) {
+    stateOut[i] = stateIn[i];
+  }
 
-  const double rho = stateIn(0);
+  for (int d = 0; d < nvel_; d++) stateOut[1 + d] = 0.;
+
+  const double rho = stateIn[0];
   const double T = Temp;
   const double energy = energy_table_->eval(T, rho);
 
-  stateOut(1 + nvel_) = rho * energy;
+  stateOut[1 + nvel_] = rho * energy;
 }
 
 void LteMixture::modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p,
+                                         bool modifyElectronEnergy) {
+  modifyEnergyForPressure(stateIn.GetData(), stateOut.GetData(), p, modifyElectronEnergy);
+}
+
+void LteMixture::modifyEnergyForPressure(const double *stateIn, double *stateOut, const double &p,
                                          bool modifyElectronEnergy) {
   for (int eq = 0; eq < num_equation; eq++) stateOut[eq] = stateIn[eq];
 

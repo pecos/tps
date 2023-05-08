@@ -252,11 +252,9 @@ bool DryAir::StateIsPhysical(const mfem::Vector &state) {
 // TODO(kevin): We need to move this routine to upper level, i.e. M2ulPhys.
 // Diffusion velocity contributes to the characteristic speed, which mixture cannot handle or know.
 // Compute the maximum characteristic speed.
-double DryAir::ComputeMaxCharSpeed(const Vector &state) {
-  return ComputeMaxCharSpeed(state.GetData());
-}
+double DryAir::ComputeMaxCharSpeed(const Vector &state) { return ComputeMaxCharSpeed(state.GetData()); }
 
-MFEM_HOST_DEVICE double DryAir::ComputeMaxCharSpeed(const double *state) const {
+MFEM_HOST_DEVICE double DryAir::ComputeMaxCharSpeed(const double *state) {
   const double den = state[0];
 
   double den_vel2 = 0;
@@ -939,7 +937,7 @@ double PerfectMixture::ComputePressure(const Vector &state, double *electronPres
   return ComputePressure(&state[0], electronPressure);
 }
 
-MFEM_HOST_DEVICE double PerfectMixture::ComputePressure(const double *state, double *electronPressure) const {
+MFEM_HOST_DEVICE double PerfectMixture::ComputePressure(const double *state, double *electronPressure) {
   double n_sp[gpudata::MAXSPECIES];
   computeNumberDensities(state, n_sp);
 
@@ -1269,7 +1267,7 @@ double PerfectMixture::ComputeMaxCharSpeed(const Vector &state) {
   return ComputeMaxCharSpeed(&state[0]);
 }
 
-MFEM_HOST_DEVICE double PerfectMixture::ComputeMaxCharSpeed(const double *state) const {
+MFEM_HOST_DEVICE double PerfectMixture::ComputeMaxCharSpeed(const double *state) {
   const double den = state[0];
   // const double den_vel(state.GetData() + 1, nvel_);
 
