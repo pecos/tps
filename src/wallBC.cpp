@@ -709,21 +709,24 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
 
         if (computeSheath) d_mix->computeSheathBdrFlux(u2, bcFlux);
 
-        if (type == WallType::INV) {
+        if (type == WallType::INV || type == WallType::SLIP) {
           // compute mirror state
           computeInvWallState_gpu_serial(&u1[0], &u2[0], &nor[0], dim, num_equation);
         } else {
           d_mix->modifyStateFromPrimitive(u1, bcState, u2);
         }
         d_rsolver->Eval_LF(u1, u2, nor, Rflux);
-        d_fluxclass->ComputeViscousFluxes(u1, gradUp1, xyz[0], xyz, d_delta[el_bdry], vF1);
-        d_fluxclass->ComputeBdrViscousFluxes(u2, gradUp1, xyz[0], xyz, d_delta[el_bdry], bcFlux, vF2);
-        for (int eq = 0; eq < num_equation; eq++) vF2[eq] *= sqrt(normN);
 
-        // add visc flux contribution
-        for (int eq = 0; eq < num_equation; eq++) {
-          Rflux[eq] -= 0.5 * vF2[eq];
-          for (int d = 0; d < dim; d++) Rflux[eq] -= 0.5 * vF1[eq + d * num_equation] * nor[d];
+        if (type != WallType::SLIP) {
+          d_fluxclass->ComputeViscousFluxes(u1, gradUp1, xyz[0], xyz, d_delta[el_bdry], vF1);
+          d_fluxclass->ComputeBdrViscousFluxes(u2, gradUp1, xyz[0], xyz, d_delta[el_bdry], bcFlux, vF2);
+          for (int eq = 0; eq < num_equation; eq++) vF2[eq] *= sqrt(normN);
+
+          // add visc flux contribution
+          for (int eq = 0; eq < num_equation; eq++) {
+            Rflux[eq] -= 0.5 * vF2[eq];
+            for (int d = 0; d < dim; d++) Rflux[eq] -= 0.5 * vF1[eq + d * num_equation] * nor[d];
+          }
         }
 
         if (d_fluxclass->isAxisymmetric()) {
