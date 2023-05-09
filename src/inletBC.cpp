@@ -464,8 +464,8 @@ void InletBC::computeBdrPrimitiveStateForGradient(const int i, const Vector &pri
 
 
 void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
-  if (inletType_ == SUB_DENS_VEL) return;
   bdrN = 0;
+  if (inletType_ == SUB_DENS_VEL) return;
 
 #ifdef _GPU_
   DGNonLinearForm::setToZero_gpu(bdrUp, bdrUp.Size());
