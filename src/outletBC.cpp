@@ -472,9 +472,8 @@ void OutletBC::initBoundaryU(ParGridFunction *Up) {
 }
 
 void OutletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
-  if (outletType_ == SUB_P) return;
-
   bdrN = 0;
+  if (outletType_ == SUB_P) return;
 
 #ifdef _GPU_
   DGNonLinearForm::setToZero_gpu(bdrUp, bdrUp.Size());
