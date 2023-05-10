@@ -262,7 +262,6 @@ void BCintegrator::computeBdrFlux(const int attr, Vector &normal, Vector &stateI
 void BCintegrator::updateBCMean(ParGridFunction *U_, ParGridFunction *Up) {
   
   for (auto bc = inletBCmap.begin(); bc != inletBCmap.end(); bc++) {
-    //cout << "calling updateMean for inlet " << endl; fflush(stdout);       
     bc->second->updateMean(intRules, U_, Up);
   }
   for (auto bc = outletBCmap.begin(); bc != outletBCmap.end(); bc++) {

@@ -46,8 +46,8 @@ using namespace mfem;
 
 class InletBC : public BoundaryCondition {
  private:
+  
   MPI_Groups *groupsMPI;
-
   GasMixture *d_mixture_;  // used only in the device
 
   const InletType inletType_;
@@ -60,8 +60,10 @@ class InletBC : public BoundaryCondition {
   Vector meanUp;
 
   Vector boundaryU;
+  Vector boundaryUp;  
   Vector boundaryU_element;    
   int bdrN;
+  int bdrSize;  
   int total_bdrN;
   int bdrN_element;  
   bool bdrUInit;
@@ -85,12 +87,15 @@ class InletBC : public BoundaryCondition {
   Vector tangent2;
   Vector inverseNorm2cartesian;
 
+  //GradFaceIntegrator *gfi;
+  
   void initBdrElemsShape();
   void initBoundaryU(ParGridFunction *Up);
 
   void subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux);
   void subsonicReflectingDensityVelocityUser(Vector &normal, Vector &stateIn, Vector transip, double time, int ip, Vector &bdrFlux);
-  //  void subsonicReflectingDensityVelocityUser(Vector &normal, Vector &stateIn, Vector transip, Vector &bdrFlux);      
+  //  void subsonicReflectingDensityVelocityUser(Vector &normal, Vector &stateIn, Vector transip, Vector &bdrFlux);
+  void subsonicReflectingMassFlux(Vector &normal, Vector &stateIn, Vector &bdrFlux);  
   void subsonicReflectingTemperatureVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux);
   void subsonicReflectingAll(Vector &normal, Vector &stateIn, Vector &bdrFlux);  
   void subsonicReflectingTemperatureVelocityUser(Vector &normal, Vector &stateIn, Vector transip, Vector &bdrFlux);    
@@ -99,7 +104,12 @@ class InletBC : public BoundaryCondition {
   void subsonicNonReflectingTemperatureVelocityUser(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, Vector &bdrFlux);  
 
   virtual void updateMean(IntegrationRules *intRules, ParGridFunction *U_, ParGridFunction *Up);
+  //void initBdrN() {bdrN=0};
 
+  double getBoundaryUp(int ii) const { return boundaryUp[ii]; }
+  double getBoundaryU(int ii) const { return boundaryU[ii]; }  
+
+  
  public:
   InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *rsolver_, GasMixture *_mixture,
           GasMixture *d_mixture, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
@@ -108,15 +118,14 @@ class InletBC : public BoundaryCondition {
   ~InletBC();
 
   //  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux);
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius, 
-		      //		      Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux);
-		      Vector transip, double delta, double time, TransportProperties *_transport, int ip, Vector &bdrFlux);  
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius, Vector transip, double delta, double time, TransportProperties *_transport, int ip, Vector &bdrFlux);
+  void computeBdrPrimitiveStateForGradient(int &i, const int eq, const Vector &primIn, Vector &primBC) const override;    
 
   virtual void initBCs();
 
-  int GetBdrN() { return total_bdrN; }
+  int GetBdrN() { return bdrSize; }
   double GetBdrU(int ii) { return boundaryU[ii]; }
-  Vector *GetOutletBdrU_ptr() { return &boundaryU_element; }    
+  Vector *GetOutletBdrU_ptr() { return &boundaryU_element; }
   
   virtual void integrationBC(Vector &y,  // output
                              const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,

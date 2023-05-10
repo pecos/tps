@@ -52,6 +52,10 @@ BoundaryCondition::BoundaryCondition(RiemannSolver *_rsolver, GasMixture *_mixtu
 
 BoundaryCondition::~BoundaryCondition() {}
 
+void BoundaryCondition::computeBdrPrimitiveStateForGradient(int &i, const int eq, const Vector &stateIn, Vector &stateBC) const {
+  stateBC = stateIn;
+}
+
 double BoundaryCondition::aggregateArea(int bndry_patchnum, MPI_Comm bc_comm) {
   double area = 0;
 

@@ -44,6 +44,7 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, GasMixture *d_mixt
       fluxClass(_fluxClass),
       intPointsElIDBC(_intPointsElIDBC),
       maxIntPoints_(_maxIntPoints) {
+  
   // Initialize bc state.
   // bcState_.prim.SetSize(num_equation_);
   // bcState_.primIdxs.SetSize(num_equation_);
@@ -58,6 +59,54 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, GasMixture *d_mixt
   for (int i = 0; i < primFluxSize; i++) bcFlux_.primFlux[i] = 0.0;
   for (int i = 0; i < primFluxSize; i++) bcFlux_.primFluxIdxs[i] = false;
 
+
+  /**/
+  Array<double> coords;
+
+  // assuming planar outlets (for GPU only)
+  Vector normal;
+  normal.UseDevice(false);
+  normal.SetSize(dim_);
+  bool normalFull = false;  
+
+  // init boundary U
+  bdrN = 0;
+  for (int bel = 0; bel < vfes->GetNBE(); bel++) {
+    int attr = vfes->GetBdrAttribute(bel);
+    if (attr == patchNumber) {
+      FaceElementTransformations *Tr = vfes->GetMesh()->GetBdrFaceTransformations(bel);
+      Array<int> dofs;
+      vfes->GetElementVDofs(Tr->Elem1No, dofs);
+
+      int intorder = Tr->Elem1->OrderW() + 2 * vfes->GetFE(Tr->Elem1No)->GetOrder();
+      if (vfes->GetFE(Tr->Elem1No)->Space() == FunctionSpace::Pk) {
+        intorder++;
+      }
+      const IntegrationRule ir = intRules->Get(Tr->GetGeometryType(), intorder);
+      for (int i = 0; i < ir.GetNPoints(); i++) {
+        IntegrationPoint ip = ir.IntPoint(i);
+        Tr->SetAllIntPoints(&ip);
+        if (!normalFull) CalcOrtho(Tr->Jacobian(), normal);
+        double x[3];
+        Vector transip;
+        transip.UseDevice(false);
+        transip.SetDataAndSize(&x[0], 3);
+        Tr->Transform(ip, transip);
+        for (int d = 0; d < 3; d++) coords.Append(transip[d]);
+        bdrN++;
+      }
+    }
+  }
+  
+  bdrSize = bdrN;  
+  boundaryU.UseDevice(true);
+  boundaryU.SetSize(bdrN * num_equation_);
+  boundaryU = 0.;
+  boundaryUp.UseDevice(true);
+  boundaryUp.SetSize(bdrN * num_equation_);
+  boundaryUp = 0.;  
+  bdrN = 0;
+  /**/
   
   switch (wallType_) {
     case INV: {
@@ -161,6 +210,10 @@ void WallBC::initBCs() {
   }
 }
 
+
+
+
+
 void WallBC::buildWallElemsArray(const Array<int> &intPointsElIDBC) {
   auto hlistElems = listElems.HostRead();  // this is actually a list of faces
   auto hintPointsElIDBC = intPointsElIDBC.HostRead();
@@ -202,7 +255,6 @@ void WallBC::buildWallElemsArray(const Array<int> &intPointsElIDBC) {
 
 void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, 
 			    double radius, Vector transip, double delta, double time, TransportProperties *_transport,
-			    //			    Vector &bdrFlux) {
 			    int ip, Vector &bdrFlux) {
   
   switch (wallType_) {
@@ -224,6 +276,58 @@ void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradSt
   }
   
 }
+
+void WallBC::computeBdrPrimitiveStateForGradient(int &i, const int eq, const Vector &primIn, Vector &primBC) const {
+
+  primBC[eq] = primIn[eq];
+
+  // only need to add exceptions here
+  int kk = eq + i*num_equation_;      
+  switch (wallType_) {
+    case INV:
+      // this bc is broken and should not be used
+      primBC[eq] = primIn[eq];      
+      break;
+    case SLIP:
+      // not finished...
+      primBC[eq] = primIn[eq];            
+      //primBC[eq] = getBoundaryUp(kk);        
+      break;      
+    case VISC_ADIAB:
+      // no-slip
+      for (int j = 0; j < nvel_; j++) {
+        primBC[1 + j] = 0.;
+      }
+      // insulated
+      primBC[nvel_ + 1] = primIn[nvel_ + 1];
+      break;
+    case VISC_ISOTH:
+      //primBC[eq] = getBoundaryUp(kk);
+      // density
+      primBC[0] = primIn[0];            
+      // no-slip
+      for (int j = 0; j < nvel_; j++) {
+        primBC[1 + j] = 0.;
+      }
+      // isothermal
+      primBC[nvel_ + 1] = wallTemp_;
+      break;
+    case VISC_GNRL:
+      // TODO(trevilo): fix
+      break;
+  }
+
+
+}
+
+
+void WallBC::updateMean(IntegrationRules *intRules, ParGridFunction *U_, ParGridFunction *Up) {
+  
+  bdrN = 0; // incremented in computeBdr routine
+  
+}
+
+
 
 void WallBC::integrationBC(Vector &y, const Vector &x, const Array<int> &nodesIDs, const Array<int> &posDofIds,
                            ParGridFunction *Up, ParGridFunction *gradUp, Vector &shapesBC, Vector &normalsWBC,
@@ -463,7 +567,6 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
   // reflected state (rho*u only) to prevent penetration
   for (int eq = 0; eq < num_equation_; eq++) wallState[eq] = stateIn[eq];  
   for (int eq = 1; eq <= dim_; eq++) wallState[eq] = -stateIn[eq];
-  //for (int eq = 1; eq <= dim_; eq++) wallState[eq] = -wallState[eq];
   
   if (eqSystem == NS_PASSIVE) wallState[num_equation_ - 1] = stateIn[num_equation_ - 1];
 
@@ -491,6 +594,16 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
     bdrFlux[eq] -= 0.5 * wallViscF(eq);
     for (int d = 0; d < dim_; d++) bdrFlux[eq] -= 0.5 * viscF(eq, d) * normal[d];
   }
+
+  // store primitive in boundaryU for gradient calcs
+  /*
+  Vector iUp(num_equation_);  
+  mixture->GetPrimitivesFromConservatives(wallState, iUp);      
+  for (int eq = 0; eq < num_equation_; eq++) {
+    boundaryUp[eq + bdrN*num_equation_] = iUp[eq];
+  }
+  bdrN++;
+  */  
   
 }
 

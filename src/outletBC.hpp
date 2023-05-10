@@ -57,8 +57,9 @@ class OutletBC : public BoundaryCondition {
   Vector meanUp;
 
   Vector boundaryU;
+  Vector boundaryUp;  
   Vector boundaryU_element;  
-  int bdrN, total_bdrN;
+  int bdrN, total_bdrN, bdrSize;
   int bdrN_element;
   bool bdrUInit;
 
@@ -98,9 +99,13 @@ class OutletBC : public BoundaryCondition {
   void subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
 
   virtual void updateMean(IntegrationRules *intRules, ParGridFunction *U_, ParGridFunction *Up);
-
+  //void initBdrN() {bdrN=0};
+  
   void computeParallelArea();
 
+  double getBoundaryUp(int ii) const { return boundaryUp[ii]; }
+  double getBoundaryU(int ii) const { return boundaryU[ii]; }  
+  
  public:
   OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *rsolver_, GasMixture *mixture,
            GasMixture *d_mixture, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt,
@@ -108,9 +113,9 @@ class OutletBC : public BoundaryCondition {
            const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs, bool axisym);
   ~OutletBC();
 
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius, 
-		      //		      Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux);
-		      Vector transip, double delta, double time, TransportProperties *_transport, int ip, Vector &bdrFlux);  
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius, Vector transip, double delta, double time, TransportProperties *_transport, int ip, Vector &bdrFlux);
+  void computeBdrPrimitiveStateForGradient(int &i, const int eq, const Vector &primIn, Vector &primBC) const override;  
+  
 
   virtual void initBCs();
 

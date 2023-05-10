@@ -30,8 +30,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 #include "gradNonLinearForm.hpp"
-
 #include "riemann_solver.hpp"
+#include "faceGradientIntegration.hpp"
 
 GradNonLinearForm::GradNonLinearForm(ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, const int _dim,
                                      const int _num_equation, const volumeFaceIntegrationArrays &_gpuArrays,
@@ -47,8 +47,17 @@ GradNonLinearForm::GradNonLinearForm(ParFiniteElementSpace *_vfes, IntegrationRu
 
 
 void GradNonLinearForm::Mult(const ParGridFunction *Up, Vector &y) {
-  Vector x;
 
+  /*
+  Vector x;
+  const double *data = Up->GetData();  
+
+  // initialize boundaryU counter for each bounary type
+  GradFaceIntegrator *gfi = dynamic_cast<GradFaceIntegrator *>(bfnfi[0]);
+  gfi->initNbrInlet();
+  gfi->initNbrOutlet();
+  gfi->initNbrWall();
+  
 #ifdef _GPU_
   //   TestNonLinearForm::setToZero_gpu(y,y.Size()); already done in gradient.cpd
   x.UseDevice(true);
@@ -57,12 +66,32 @@ void GradNonLinearForm::Mult(const ParGridFunction *Up, Vector &y) {
     Mult_gpu(x, y);
   }
 #else
-  const double *data = Up->GetData();
+  //const double *data = Up->GetData();
   x.SetSize(vfes->GetNDofs() * num_equation * dim);
   x = 0.;
   for (int i = 0; i < vfes->GetNDofs() * num_equation; i++) x(i) = data[i];
   ParNonlinearForm::Mult(x, y);
 #endif
+  */
+
+  Vector x;
+  const double *data = Up->GetData();
+
+  // NB: Setting x here accounts for the fact that the space Up lives
+  // in is different from the space of the gradient.
+  x.SetSize(vfes->GetNDofs() * num_equation * dim);
+  x = 0.;
+  for (int i = 0; i < vfes->GetNDofs() * num_equation; i++) x(i) = data[i];
+
+  // initialize boundaryU counter for each bounary type
+  GradFaceIntegrator *gfi = dynamic_cast<GradFaceIntegrator *>(bfnfi[0]);
+  gfi->initNbrInlet();
+  gfi->initNbrOutlet();
+  gfi->initNbrWall();
+  
+  // After setting x as above, base class Mult does the right thing
+  ParNonlinearForm::Mult(x, y);
+  
 }
 
 

@@ -42,11 +42,14 @@
 #include "run_configuration.hpp"
 #include "tps_mfem_wrap.hpp"
 #include "unordered_map"
+//#include "GradFaceIntegrator.hpp"
 
 using namespace mfem;
 
 // Boundary face term: <F.n(u),[w]>
 class BCintegrator : public NonlinearFormIntegrator {
+  friend class GradFaceIntegrator;
+  
  protected:
   MPI_Groups *groupsMPI;
 
@@ -91,9 +94,7 @@ class BCintegrator : public NonlinearFormIntegrator {
   int rkStep;
   
   // void calcMeanState();
-  void computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius,
-		      //                      Vector transip, double delta, TransportProperties *_transport, Vector &bdrFlux); 
-                      Vector transip, double delta, double time, TransportProperties *_transport, int ip, Vector &bdrFlux);
+  void computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius, Vector transip, double delta, double time, TransportProperties *_transport, int ip, Vector &bdrFlux);
 
  public:
   BCintegrator(bool _mpiRoot, MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules,

@@ -218,9 +218,25 @@ BCintegrator::BCintegrator(bool _mpiRoot, MPI_Groups *_groupsMPI, ParMesh *_mesh
       if (wbc != wallBCmap.end()) wbc->second->setElementList(list);
     }
   }  
+
+  // initialize counter
+  nbdrInlet = 0;
+  nbdrOutlet = 0;
+  nbdrWall = 0;  
   
 }
 
+/*
+void GradFaceIntegrator::initNbdrInlet() {
+  nbdrInlet = 0;
+}
+void GradFaceIntegrator::initNbdrOutlet() {
+  nbdrOutlet = 0;
+}
+void GradFaceIntegrator::initNbdrWall() {
+  nbdrWall = 0;
+}
+*/
 
 void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2,
                                             FaceElementTransformations &Tr, const Vector &elfun, Vector &elvect) {
@@ -302,6 +318,7 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
     iUp2.UseDevice(false);
     iUp1.SetSize(num_equation);
     iUp2.SetSize(num_equation);
+    
     for (int eq = 0; eq < num_equation; eq++) {
       
       double sum = 0.;
@@ -329,24 +346,28 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
       //cout << "... " << endl; fflush(stdout);	      
       //if ( Tr.Elem1No == Tr.Elem2No ) {
       if ( Tr.Elem2No <= 0) {
-        //cout << "Caught BC: " << radius << endl; fflush(stdout);	
+	
+        //cout << "Caught BC: " << radius << endl; fflush(stdout);		
         const int attr = Tr.Attribute;
         std::unordered_map<int, BoundaryCondition *>::const_iterator ibc = inletBCmap.find(attr);
         std::unordered_map<int, BoundaryCondition *>::const_iterator obc = outletBCmap.find(attr);	
         std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = wallBCmap.find(attr);
-        if (ibc != inletBCmap.end()) {
-          iUp2(eq) = 0.0;
-          iUp1(eq) = 0.0;	  
-        }	
-        if (obc != outletBCmap.end()) {
-          iUp1(eq) = 0.0;	  
-          iUp2(eq) = 0.0;
-        }	
-        if (wbc != wallBCmap.end()) {
-	  //if (radius <= 0.02) cout << "Wall BC grad hack at: " << radius << endl; fflush(stdout);
-          if (eq==1 || eq==2 || eq==3) iUp2(eq) = 0.0;
-          if (eq==4) iUp2(eq) = wallTemp;	  
+	
+        if (ibc != inletBCmap.end()) {	  
+          ibc->second->computeBdrPrimitiveStateForGradient(nbdrInlet, eq, iUp1, iUp2);
+	  if( eq == (num_equation-1) ) nbdrInlet++;
         }
+
+        if (obc != outletBCmap.end()) {	  
+          obc->second->computeBdrPrimitiveStateForGradient(nbdrOutlet, eq, iUp1, iUp2);
+	  if( eq == (num_equation-1) ) nbdrOutlet++;
+        }
+
+        if (wbc != wallBCmap.end()) {	  
+          wbc->second->computeBdrPrimitiveStateForGradient(nbdrWall, eq, iUp1, iUp2);
+	  if( eq == (num_equation-1) ) nbdrWall++;
+        }
+	
       }           
       mean(eq) = 0.5 * (iUp1(eq) + iUp2(eq));
     }

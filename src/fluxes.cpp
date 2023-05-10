@@ -205,9 +205,11 @@ void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp
   // subgrid scale model
   assert(config_ != NULL);
   if (config_->GetSgsModelType() > 0) {
+    int porder = config_->GetSolutionOrder();
+    double deltaP = delta / ( (double)porder );
     double mu_sgs = 0.;
-    if (config_->GetSgsModelType() == 1) sgsSmag(state, gradUp, delta, mu_sgs);
-    if (config_->GetSgsModelType() == 2) sgsSigma(state, gradUp, delta, mu_sgs);
+    if (config_->GetSgsModelType() == 1) sgsSmag(state, gradUp, deltaP, mu_sgs);
+    if (config_->GetSgsModelType() == 2) sgsSigma(state, gradUp, deltaP, mu_sgs);
     bulkViscosity *= (1.0 + mu_sgs / visc);
     visc += mu_sgs;
     k += (mu_sgs / Pr_Cp);
@@ -463,31 +465,14 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
   double ke = transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY];
   double Pr_Cp = visc / k;
 
-  // viscous sponge..................................
-  /*
-  // make these input options
-  double Lmax_y = 0.0141948 + 0.004;
-  double sponge_y = 0.0091948;
-  double sponge_scale = 100.;
-  if (transip[2] > sponge_y) {
-    double wgt;
-    wgt = (transip[2] - sponge_y) / (Lmax_y - sponge_y) ;
-    wgt *= wgt;
-    wgt += 1.;
-    wgt *= sponge_scale;
-    visc *= wgt;
-    bulkViscosity *= wgt;
-    k *= wgt;
-  }
-  */
-  // ................................................
-
   // subgrid scale model
   assert(config_ != NULL);
   if (config_->GetSgsModelType() > 0) {
+    int porder = config_->GetSolutionOrder();    
+    double deltaP = delta / ( (double)porder );    
     double mu_sgs = 0.;
-    if (config_->GetSgsModelType() == 1) sgsSmag(state, gradUp, delta, mu_sgs);
-    if (config_->GetSgsModelType() == 2) sgsSigma(state, gradUp, delta, mu_sgs);
+    if (config_->GetSgsModelType() == 1) sgsSmag(state, gradUp, deltaP, mu_sgs);
+    if (config_->GetSgsModelType() == 2) sgsSigma(state, gradUp, deltaP, mu_sgs);
     bulkViscosity *= (1.0 + mu_sgs / visc);
     visc += mu_sgs;
     k += (mu_sgs / Pr_Cp);
@@ -497,9 +482,9 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
   if (config_->linViscData.isEnabled) {
     double wgt = 0.;
     viscSpongePlanar(transip, wgt);
-    visc *= wgt;
-    bulkViscosity *= wgt;
-    k *= wgt;
+    visc = visc*wgt;
+    bulkViscosity = bulkViscosity*wgt;
+    k = k*wgt;
   }
 
   // Primitive viscous fluxes.
@@ -866,6 +851,7 @@ void Fluxes::sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delt
   Vector Sij(6);
   double Smag = 0.;
   double Cd = 0.12;
+  //double Cd = 0.16;
   double l_floor;
   double d_model;
 

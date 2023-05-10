@@ -117,6 +117,7 @@ MFEM_HOST_DEVICE void RiemannSolver::Eval(const double *state1, const double *st
 }
 
 void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux) {
+  
   // NOTE: nor in general is not a unit normal
   const int dim = nor.Size();
   // const int nvel = (axisymmetric_ ? 3 : dim);
@@ -146,7 +147,23 @@ void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Ve
   }
   normag = sqrt(normag);
 
+  // state2 is assumed to be the "right" flux and state1 the "left" s.t. information
+  // flows from left to right, i.e. "normag" should really be u/|u|*n
+  /*
+  Vector unitNorm;
+  for (int i = 0; i < dim; i++) unitNorm(i) = nor(i)/normag;  
+  Vector Vel;
+  for (int i = 0; i < dim; i++) Vel(i) = state1(i+1)/state1(0);
+  double Umag = 0.;
+  for (int i = 0; i < dim; i++) Umag += Vel(i)*Vel(i);
+  Umag = sqrt(Umag);
+  double unNorm = 0.;
+  for (int i = 0; i < dim; i++) unNorm += Vel(i)*unitNorm(i);
+  unNorm = unNorm/Umag; // +1 for outflow, -1 for inflow
+  */
+  
   for (int i = 0; i < num_equation; i++) {
+    //flux(i) = (flux1(i) + flux2(i)) - (maxE*normag*unNorm) * (state2(i) - state1(i)); // fix for inflows
     flux(i) = (flux1(i) + flux2(i)) - (maxE*normag) * (state2(i) - state1(i));
     //flux(i) = (flux1(i) + flux2(i)) - maxE * (state2(i) - state1(i)); // with normal used in ComputeMaxCharSpeedNormal dimensional
     flux(i) *= 0.5;

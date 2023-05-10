@@ -41,6 +41,8 @@ using namespace mfem;
 using namespace std;
 
 class GradNonLinearForm : public ParNonlinearForm {
+  friend class GradFaceIntegrator;
+  
  private:
   ParFiniteElementSpace *vfes;
   IntegrationRules *intRules;

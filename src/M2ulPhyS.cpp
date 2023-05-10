@@ -3122,7 +3122,8 @@ void M2ulPhyS::parseBCInputs() {
   inletMapping["subsonic"] = SUB_DENS_VEL;
   inletMapping["subsonicUser"] = SUB_DENS_VEL_USR;    
   inletMapping["subsonicConstTemp"] = SUB_TEMP_VEL;
-  inletMapping["subsonicAll"] = SUB_ALL;  
+  inletMapping["subsonicAll"] = SUB_ALL;
+  inletMapping["subsonicMass"] = SUB_MASS;  
   inletMapping["subsonicConstTempUser"] = SUB_TEMP_VEL_USR;
   inletMapping["nonReflecting"] = SUB_DENS_VEL_NR;
   inletMapping["nonReflectingConstEntropy"] = SUB_VEL_CONST_ENT;

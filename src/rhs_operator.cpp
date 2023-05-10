@@ -341,6 +341,7 @@ RHSoperator::~RHSoperator() {
   if (transferGradUp.statuses != NULL) delete[] transferGradUp.statuses;
 }
 
+
 void RHSoperator::Mult(const Vector &x, Vector &y) const {
   max_char_speed = 0.;
 
@@ -362,7 +363,6 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
 #endif
 
   // update boundary conditions => all this does is initialize to interior values and updates the mean
-  //cout << "calling updateBCMean " << endl; fflush(stdout);  
   if (bcIntegrator != NULL) bcIntegrator->updateBCMean(U_,Up);
 
 #ifdef _GPU_

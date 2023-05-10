@@ -1,4 +1,4 @@
-// -----------------------------------------------------------------------------------bl-
+// -----------------------------------------------------------------------------------bl
 // BSD 3-Clause License
 //
 // Copyright (c) 2020-2022, The PECOS Development Team, University of Texas at Austin
@@ -66,13 +66,31 @@ class GradFaceIntegrator : public NonlinearFormIntegrator {
   const int &maxIntPoints;
   const int &maxDofs;
   MPI_Groups *groupsMPI;  
+
+  int nbdrInlet, nbdrOutlet, nbdrWall;  
   
  public:
   GradFaceIntegrator(IntegrationRules *_intRules, const int _dim, const int _num_equation,
 		     RunConfiguration &_runFile, Array<int> &local_attr, ParFiniteElementSpace *_vfes, RiemannSolver *rsolver_, GasMixture *_mixture, GasMixture *d_mixture, Fluxes *_fluxClass, double &_dt, Array<int> &_intPointsElIDBC, const int &_maxIntPoints, const int &_maxDofs, MPI_Groups *_groupsMPI);
 
-  virtual void AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,
-                                  const Vector &elfun, Vector &elvect);
+  virtual void AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr, const Vector &elfun, Vector &elvect);
+
+  void initNbrInlet() {
+    //cout << " RESET: " << nbdrInlet << endl; fflush(stdout);	        
+    nbdrInlet = 0;
+    //cout << " after: " << nbdrInlet << endl; fflush(stdout);	            
+  }
+  void initNbrOutlet() {nbdrOutlet = 0;}
+  void initNbrWall() {nbdrWall = 0;}
+
+  int getNbrInlet() {return nbdrInlet;}
+  int getNbrOutlet() {return nbdrOutlet;}
+  int getNbrWall() {return nbdrWall;}  
+
+  void incNbrInlet() {nbdrInlet++;}
+  void incNbrOutlet() {nbdrOutlet++;}
+  void incNbrWall() {nbdrWall++;}
+  
 };
 
 #endif  // FACEGRADIENTINTEGRATION_HPP_
