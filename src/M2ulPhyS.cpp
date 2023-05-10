@@ -597,8 +597,7 @@ void M2ulPhyS::initVariables() {
       cout << "Unknown ODE solver type: " << config.GetTimeIntegratorType() << '\n';
   }
 
-
-  gradUp_A = new GradNonLinearForm(gradUpfes, intRules, dim, num_equation);
+  gradUp_A = new GradNonLinearForm(gradUpfes, intRules, dim, num_equation, bcIntegrator);
   gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
   gradUp_A->AddBdrFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation, bcIntegrator, config.useBCinGrad));
 

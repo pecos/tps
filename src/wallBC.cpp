@@ -243,11 +243,11 @@ void WallBC::computeBdrPrimitiveStateForGradient(const int i, const Vector &prim
 
   switch (wallType_) {
     case INV:
-      primBC = primIn;      
+      primBC = primIn;
       break;
-    //case SLIP:
-    //   primBC = primIn;      
-    //   break;      
+    // case SLIP:
+    //    primBC = primIn;
+    //    break;
     case VISC_ADIAB:
       // TODO(trevilo): fix
       break;
@@ -273,6 +273,13 @@ void WallBC::integrationBC(Vector &y, const Vector &x, const elementIndexingData
   integrateWalls_gpu(y,  // output
                      x, elem_index_data, boundary_face_data, maxDofs);
 }
+
+void WallBC::integrateGradientBC(Vector &y, const Vector &x, const elementIndexingData &elem_index_data,
+                                 const boundaryFaceIntegrationData &boundary_face_data, const int &maxIntPoints,
+                                 const int &maxDofs) {
+
+}
+
 
 void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
                                 double delta, Vector &bdrFlux) {
