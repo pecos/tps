@@ -111,10 +111,10 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
     if (patchInMesh) {
       WallData wallData = config.GetWallData(w);
 
-      wallBCmap[patchType.first] = new WallBC(rsolver, mixture, d_mixture, _runFile.GetEquationSystem(), fluxClass,
-                                              vfes, intRules, _dt, dim, num_equation, patchType.first, patchType.second,
-                                              wallData, boundary_face_data_, _maxIntPoints, config.isAxisymmetric(),
-                                              config.useBCinGrad);
+      wallBCmap[patchType.first] =
+          new WallBC(rsolver, mixture, d_mixture, _runFile.GetEquationSystem(), fluxClass, vfes, intRules, _dt, dim,
+                     num_equation, patchType.first, patchType.second, wallData, boundary_face_data_, _maxIntPoints,
+                     config.isAxisymmetric(), config.useBCinGrad);
     }
   }
 
@@ -261,6 +261,12 @@ void BCintegrator::integrateBCs(Vector &y, const Vector &x, const elementIndexin
   for (auto bc = wallBCmap.begin(); bc != wallBCmap.end(); bc++) {
     bc->second->integrationBC(y,  // output
                               x, elem_index_data, Up, gradUp, boundary_face_data_, maxIntPoints, maxDofs);
+  }
+}
+
+void BCintegrator::integrateGradientBCs(Vector &y, const Vector &x, const elementIndexingData &elem_index_data) {
+  for (auto bc = wallBCmap.begin(); bc != wallBCmap.end(); bc++) {
+    bc->second->integrateGradientBC(y, x, elem_index_data, boundary_face_data_, maxIntPoints, maxDofs);
   }
 }
 

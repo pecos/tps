@@ -33,9 +33,10 @@
 #define FACEGRADIENTINTEGRATION_HPP_
 
 #include <tps_config.h>
+
 #include "BCintegrator.hpp"
-#include "tps_mfem_wrap.hpp"
 #include "gradNonLinearForm.hpp"
+#include "tps_mfem_wrap.hpp"
 
 using namespace mfem;
 
@@ -49,8 +50,8 @@ class GradFaceIntegrator : public NonlinearFormIntegrator {
   BCintegrator *bc_;  // NB: GradFaceIntegrator is a friend of BCintegrator
   const bool useBCinGrad_;
 
-  int nbdrInlet, nbdrOutlet, nbdrWall;  
-  
+  int nbdrInlet, nbdrOutlet, nbdrWall;
+
  public:
   GradFaceIntegrator(IntegrationRules *_intRules, const int _dim, const int _num_equation, BCintegrator *bc = NULL,
                      bool useBCinGrad = false);
@@ -58,10 +59,9 @@ class GradFaceIntegrator : public NonlinearFormIntegrator {
   virtual void AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,
                                   const Vector &elfun, Vector &elvect);
 
-  void initNbrInlet() {nbdrInlet = 0;}
-  void initNbrOutlet() {nbdrOutlet = 0;}
-  void initNbrWall() {nbdrWall = 0;}
-  
+  void initNbrInlet() { nbdrInlet = 0; }
+  void initNbrOutlet() { nbdrOutlet = 0; }
+  void initNbrWall() { nbdrWall = 0; }
 };
 
 #endif  // FACEGRADIENTINTEGRATION_HPP_

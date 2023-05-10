@@ -134,7 +134,6 @@ Gradients::~Gradients() {
   for (int n = 0; n < Ke.Size(); n++) delete Ke[n];
 }
 
-
 void Gradients::computeGradients() {
   const int totalDofs = vfes->GetNDofs();
   double *dataUp = Up->GetData();
@@ -255,6 +254,8 @@ void Gradients::computeGradients_domain() {
     int dof_el = h_elem_dof_num[elemOffset];
     computeGradients_gpu(elType, elemOffset, dof_el);
   }
+
+  gradUp_A->bc_->integrateGradientBCs(*gradUp, *Up, elem_data);
 }
 
 void Gradients::computeGradients_bdr() {

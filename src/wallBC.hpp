@@ -93,7 +93,6 @@ class WallBC : public BoundaryCondition {
          bool useBCinGrad = false);
   ~WallBC();
 
-
   void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
                       double delta, Vector &bdrFlux);
   void computeBdrPrimitiveStateForGradient(const int i, const Vector &primIn, Vector &primBC) const override;
@@ -107,6 +106,11 @@ class WallBC : public BoundaryCondition {
                              const Vector &x, const elementIndexingData &elem_index_data, ParGridFunction *Up,
                              ParGridFunction *gradUp, const boundaryFaceIntegrationData &boundary_face_data,
                              const int &maxIntPoints, const int &maxDofs);
+
+  virtual void integrateGradientBC(Vector &y, const Vector &x, const elementIndexingData &elem_index_data,
+                                   const boundaryFaceIntegrationData &boundary_face_data, const int &maxIntPoints,
+                                   const int &maxDofs);
+
 
   void integrateWalls_gpu(Vector &y,  // output
                           const Vector &x, const elementIndexingData &elem_index_data,

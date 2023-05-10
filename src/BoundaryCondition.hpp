@@ -106,6 +106,10 @@ class BoundaryCondition {
                              const boundaryFaceIntegrationData &boundary_face_data, const int &maxIntPoints,
                              const int &maxDofs) = 0;
 
+  virtual void integrateGradientBC(Vector &y, const Vector &x, const elementIndexingData &elem_index_data,
+                                   const boundaryFaceIntegrationData &boundary_face_data, const int &maxIntPoints,
+                                   const int &maxDofs) {}
+
   static void copyValues(const Vector &orig, Vector &target, const double &mult);
 };
 
