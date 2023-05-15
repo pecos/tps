@@ -151,8 +151,12 @@ class DryAirTransport : public TransportProperties {
   double bulk_visc_mult;
   double thermalConductivity;
 
+  // Constants for Sutherland's law: mu = C1_ * T^1.5 / (T + S0_)
+  const double C1_;
+  const double S0_;
+
   // Prandtl number
-  double Pr;         // Prandtl number
+  const double Pr_;  // Prandtl number
   double cp_div_pr;  // cp divided by Pr (used in conductivity calculation)
 
   // Fick's law
@@ -160,8 +164,8 @@ class DryAirTransport : public TransportProperties {
 
  public:
   DryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile);
-  MFEM_HOST_DEVICE DryAirTransport(GasMixture *_mixture, const double viscosity_multiplier,
-                                   const double bulk_viscosity);
+  MFEM_HOST_DEVICE DryAirTransport(GasMixture *_mixture, const double viscosity_multiplier, const double bulk_viscosity,
+                                   const double C1 = 1.458e-6, const double S = 110.4, const double Pr = 0.71);
 
   MFEM_HOST_DEVICE virtual ~DryAirTransport() {}
 
@@ -185,7 +189,7 @@ class DryAirTransport : public TransportProperties {
 MFEM_HOST_DEVICE inline void DryAirTransport::GetViscosities(const double *conserved, const double *primitive,
                                                              double *visc) {
   const double temp = primitive[1 + nvel_];
-  visc[0] = (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
+  visc[0] = (C1_ * visc_mult * pow(temp, 1.5) / (temp + S0_));
   visc[1] = bulk_visc_mult * visc[0];
 }
 

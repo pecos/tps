@@ -146,6 +146,12 @@ enum ThermalCondition {
   NONE_THMCND
 };
 
+struct SutherlandData {
+  double C1;
+  double S0;
+  double Pr;
+};
+
 // The following four keywords define two planes in which
 // a linearly varying viscosity can be defined between these two.
 // The planes are defined by the normal and one point being the

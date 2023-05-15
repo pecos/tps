@@ -203,19 +203,22 @@ MFEM_HOST_DEVICE void TransportProperties::CurtissHirschfelder(const double *X_s
 //////////////////////////////////////////////////////
 
 DryAirTransport::DryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile)
-    : DryAirTransport(_mixture, _runfile.GetViscMult(), _runfile.GetBulkViscMult()) {}
+    : DryAirTransport(_mixture, _runfile.GetViscMult(), _runfile.GetBulkViscMult(), _runfile.sutherland_.C1,
+                      _runfile.sutherland_.S0, _runfile.sutherland_.Pr) {}
 
 MFEM_HOST_DEVICE DryAirTransport::DryAirTransport(GasMixture *_mixture, const double viscosity_multiplier,
-                                                  const double bulk_viscosity)
-    : TransportProperties(_mixture) {
-  visc_mult = viscosity_multiplier;
-  bulk_visc_mult = bulk_viscosity;
-
-  Pr = 0.71;
+                                                  const double bulk_viscosity, const double C1, const double S,
+                                                  const double Pr)
+    : TransportProperties(_mixture),
+      visc_mult(viscosity_multiplier),
+      bulk_visc_mult(bulk_viscosity),
+      C1_(C1),
+      S0_(S),
+      Pr_(Pr) {
   Sc = 0.71;
   gas_constant = mixture->GetGasConstant();
   const double specific_heat_ratio = mixture->GetSpecificHeatRatio();
-  cp_div_pr = specific_heat_ratio * gas_constant / (Pr * (specific_heat_ratio - 1.));
+  cp_div_pr = specific_heat_ratio * gas_constant / (Pr_ * (specific_heat_ratio - 1.));
 }
 
 void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
@@ -226,7 +229,7 @@ void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const 
 
   transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   transportBuffer = 0.0;
-  double viscosity = (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
+  double viscosity = (C1_ * visc_mult * pow(temp, 1.5) / (temp + S0_));
   transportBuffer[FluxTrns::VISCOSITY] = viscosity;
   transportBuffer[FluxTrns::BULK_VISCOSITY] = bulk_visc_mult * viscosity;
   transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = cp_div_pr * transportBuffer[FluxTrns::VISCOSITY];
@@ -263,7 +266,7 @@ MFEM_HOST_DEVICE void DryAirTransport::ComputeFluxTransportProperties(const doub
   double temp = p / gas_constant / state[0];
 
   for (int i = 0; i < FluxTrns::NUM_FLUX_TRANS; i++) transportBuffer[i] = 0.0;
-  double viscosity = (1.458e-6 * visc_mult * pow(temp, 1.5) / (temp + 110.4));
+  double viscosity = (C1_ * visc_mult * pow(temp, 1.5) / (temp + S0_));
   transportBuffer[FluxTrns::VISCOSITY] = viscosity;
   transportBuffer[FluxTrns::BULK_VISCOSITY] = bulk_visc_mult * viscosity;
   transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = cp_div_pr * transportBuffer[FluxTrns::VISCOSITY];

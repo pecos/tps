@@ -96,7 +96,8 @@ __global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs
 
 //! Instantiate DryAirTransport object on the device with placement new
 __global__ void instantiateDeviceDryAirTransport(GasMixture *mixture, const double viscosity_multiplier,
-                                                 const double bulk_viscosity, void *transport);
+                                                 const double bulk_viscosity, const double C1, const double S0,
+                                                 const double Pr, void *transport);
 
 //! Instantiate ConstantTransport object on the device with placement new
 __global__ void instantiateDeviceConstantTransport(GasMixture *mixture, const constantTransportData inputs,

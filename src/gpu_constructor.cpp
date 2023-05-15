@@ -51,8 +51,9 @@ __global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs
 }
 
 __global__ void instantiateDeviceDryAirTransport(GasMixture *mixture, const double viscosity_multiplier,
-                                                 const double bulk_viscosity, void *transport) {
-  transport = new (transport) DryAirTransport(mixture, viscosity_multiplier, bulk_viscosity);
+                                                 const double bulk_viscosity, const double C1, const double S0,
+                                                 const double Pr, void *transport) {
+  transport = new (transport) DryAirTransport(mixture, viscosity_multiplier, bulk_viscosity, C1, S0, Pr);
 }
 
 __global__ void instantiateDeviceConstantTransport(GasMixture *mixture, const constantTransportData inputs,

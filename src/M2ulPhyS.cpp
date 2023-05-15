@@ -311,7 +311,8 @@ void M2ulPhyS::initVariables() {
 
       tpsGpuMalloc((void **)&transportPtr, sizeof(DryAirTransport));
       gpu::instantiateDeviceDryAirTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(),
-                                                      transportPtr);
+                                                      config.sutherland_.C1, config.sutherland_.S0,
+                                                      config.sutherland_.Pr, transportPtr);
 #else
       transportPtr = new DryAirTransport(mixture, config);
 #endif
@@ -2177,6 +2178,11 @@ void M2ulPhyS::parseFlowOptions() {
   assert(config.numIters >= 0);
   assert(config.itersOut > 0);
   assert(config.refLength > 0);
+
+  // Sutherland inputs default to dry air values
+  tpsP->getInput("flow/SutherlandC1", config.sutherland_.C1, 1.458e-6);
+  tpsP->getInput("flow/SutherlandS0", config.sutherland_.S0, 110.4);
+  tpsP->getInput("flow/SutherlandPr", config.sutherland_.Pr, 0.71);
 }
 
 void M2ulPhyS::parseTimeIntegrationOptions() {
