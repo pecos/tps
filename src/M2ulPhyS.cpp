@@ -2345,6 +2345,8 @@ void M2ulPhyS::parseFluidPreset() {
   tpsP->getInput("flow/fluid", fluidTypeStr, std::string("dry_air"));
   if (fluidTypeStr == "dry_air") {
     config.workFluid = DRY_AIR;
+    tpsP->getInput("flow/specific_heat_ratio", config.dryAirInput.specific_heat_ratio, 1.4);
+    tpsP->getInput("flow/gas_constant", config.dryAirInput.gas_constant, 287.058);
   } else if (fluidTypeStr == "user_defined") {
     config.workFluid = USER_DEFINED;
   } else if (fluidTypeStr == "lte_table") {

@@ -127,7 +127,10 @@ DryAir::DryAir(RunConfiguration &_runfile, int _dim, int nvel)
     // : DryAir(_runfile.workFluid, _runfile.GetEquationSystem(), _runfile.visc_mult, _runfile.bulk_visc, _dim, nvel) {}
     : DryAir(_runfile.dryAirInput, _dim, nvel) {}
 
-MFEM_HOST_DEVICE DryAir::DryAir(const DryAirInput inputs, int _dim, int nvel) : GasMixture(inputs.f, _dim, nvel) {
+MFEM_HOST_DEVICE DryAir::DryAir(const DryAirInput inputs, int _dim, int nvel)
+    : GasMixture(inputs.f, _dim, nvel),
+      specific_heat_ratio(inputs.specific_heat_ratio),
+      gas_constant(inputs.gas_constant) {
   numSpecies = (inputs.eq_sys == NS_PASSIVE) ? 2 : 1;
   ambipolar = false;
   twoTemperature_ = false;
@@ -138,9 +141,6 @@ MFEM_HOST_DEVICE DryAir::DryAir(const DryAirInput inputs, int _dim, int nvel) : 
   assert(nvel_ <= gpudata::MAXDIM);
   assert(numSpecies <= gpudata::MAXSPECIES);
 #endif
-
-  gas_constant = 287.058;
-  specific_heat_ratio = 1.4;
 
   // TODO(kevin): replace Nconservative/Nprimitive.
   // add extra equation for passive scalar

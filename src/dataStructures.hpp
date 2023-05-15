@@ -505,6 +505,9 @@ struct DryAirInput {
   double bulk_visc_mult;
 #else
 #endif
+
+  double specific_heat_ratio;
+  double gas_constant;
 };
 
 struct PerfectMixtureInput {
