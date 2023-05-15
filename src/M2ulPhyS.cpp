@@ -548,9 +548,12 @@ void M2ulPhyS::initVariables() {
   Array<int> local_attr;
   getAttributesInPartition(local_attr);
 
+  double * pTime;
+  pTime = &time;
+  
   bcIntegrator = NULL;
   if (local_attr.Size() > 0) {
-    bcIntegrator = new BCintegrator(groupsMPI, mesh, vfes, intRules, rsolver, dt, mixture, d_mixture, d_fluxClass, Up,
+    bcIntegrator = new BCintegrator(mpi.Root(),groupsMPI, mesh, vfes, intRules, rsolver, dt, pTime, mixture, d_mixture, d_fluxClass, Up,
                                     gradUp, gpu_precomputed_data_.boundary_face_data, dim, num_equation, max_char_speed,
                                     config, local_attr, maxIntPoints, maxDofs);
   }
@@ -2986,6 +2989,7 @@ void M2ulPhyS::parseBCInputs() {
   }
 
   // Inlet Bcs
+  /*
   std::map<std::string, InletType> inletMapping;
   inletMapping["subsonic"] = SUB_DENS_VEL;
   inletMapping["nonreflecting"] = SUB_DENS_VEL_NR;
@@ -3026,8 +3030,82 @@ void M2ulPhyS::parseBCInputs() {
     patchType.second = inletMapping[type];
     config.inletPatchType.push_back(patchType);
   }
+  */
+
+  std::map<std::string, InletType> inletMapping;
+  inletMapping["subsonic"] = SUB_DENS_VEL;
+  inletMapping["subsonicUser"] = SUB_DENS_VEL_USR;    
+  inletMapping["subsonicConstTemp"] = SUB_TEMP_VEL;
+  inletMapping["subsonicAll"] = SUB_ALL;
+  inletMapping["subsonicMass"] = SUB_MASS;  
+  inletMapping["subsonicConstTempUser"] = SUB_TEMP_VEL_USR;
+  inletMapping["nonReflecting"] = SUB_DENS_VEL_NR;
+  inletMapping["nonReflectingConstEntropy"] = SUB_VEL_CONST_ENT;
+  inletMapping["nonReflectingConstTemp"] = SUB_VEL_CONST_TMP;
+  inletMapping["nonReflectingConstTempUser"] = SUB_VEL_CONST_TMP_USR;  
+
+  
+  for (int i = 1; i <= numInlets; i++) {
+    
+    int patch;
+    double density;
+    double temperature;
+    std::string type;
+    std::string basepath("boundaryConditions/inlet" + std::to_string(i));
+
+    tpsP->getRequiredInput((basepath + "/patch").c_str(), patch);
+    tpsP->getRequiredInput((basepath + "/type").c_str(), type);
+    
+    // all inlet BCs require 4 inputs (density + vel(3))
+    {
+      Array<double> uvw;
+      if (type == "nonReflectingConstTemp" || type == "nonReflectingConstTempUser" || type == "subsonicConstTemp" || type == "subsonicConstTempUser") {
+        tpsP->getRequiredInput((basepath + "/temperature").c_str(), temperature);
+        config.inletBC.Append(temperature);
+      } else if (type == "subsonicALL"){
+        tpsP->getRequiredInput((basepath + "/density").c_str(), density);
+        config.inletBC.Append(density);
+      } else {
+        tpsP->getRequiredInput((basepath + "/density").c_str(), density);
+        config.inletBC.Append(density);
+      }
+
+      tpsP->getRequiredVec((basepath + "/uvw").c_str(), uvw, 3);
+      config.inletBC.Append(uvw, 3);
+      
+      /*
+      if (type == "subsonicALL"){
+        tpsP->getRequiredInput((basepath + "/temperature").c_str(), temperature);
+        config.inletBC.Append(temperature);
+      }
+      */
+      
+    }
+
+    
+    // For multi-component gas, require (numActiveSpecies)-more inputs.
+    if ((config.workFluid != DRY_AIR) && (config.numSpecies > 1)) {
+      grvy_printf(GRVY_INFO, "\nInlet mass fraction of background species will not be used. \n");
+      if (config.ambipolar) grvy_printf(GRVY_INFO, "\nInlet mass fraction of electron will not be used. \n");
+
+      for (int sp = 0; sp < config.numSpecies; sp++) {  // mixture species index
+        double Ysp;
+        // read mass fraction of species as listed in the input file.
+        int inputSp = config.mixtureToInputMap[sp];
+        std::string speciesBasePath(basepath + "/mass_fraction/species" + std::to_string(inputSp + 1));
+        tpsP->getRequiredInput(speciesBasePath.c_str(), Ysp);
+        config.inletBC.Append(Ysp);
+      }
+    }
+    std::pair<int, InletType> patchType;
+    patchType.first = patch;
+    patchType.second = inletMapping[type];
+    config.inletPatchType.push_back(patchType);
+  }
+  
 
   // Outlet Bcs
+  /*
   std::map<std::string, OutletType> outletMapping;
   outletMapping["subsonicPressure"] = SUB_P;
   outletMapping["nonReflectingPressure"] = SUB_P_NR;
@@ -3059,7 +3137,53 @@ void M2ulPhyS::parseBCInputs() {
     patchType.second = outletMapping[type];
     config.outletPatchType.push_back(patchType);
   }
+  */
+
+  std::map<std::string, OutletType> outletMapping;
+  outletMapping["subsonicPressure"] = SUB_P;
+  outletMapping["subsonicPressureMix"] = SUB_P_SEMI;  
+  outletMapping["nonReflectingPressure"] = SUB_P_NR;
+  outletMapping["nonReflectingMassFlow"] = SUB_MF_NR;
+  outletMapping["nonReflectingPointBasedMassFlow"] = SUB_MF_NR_PW;
+
+  for (int i = 1; i <= numOutlets; i++) {
+    int patch;
+    double pressure, massFlow, sigma;
+    std::string type;
+    std::string basepath("boundaryConditions/outlet" + std::to_string(i));
+
+    tpsP->getRequiredInput((basepath + "/patch").c_str(), patch);
+    tpsP->getRequiredInput((basepath + "/type").c_str(), type);
+
+    if (type == "subsonicPressure") {
+      tpsP->getRequiredInput((basepath + "/pressure").c_str(), pressure);
+      config.outletBC.Append(pressure);
+    } else if (type == "subsonicPressureMix") {
+      tpsP->getRequiredInput((basepath + "/pressure").c_str(), pressure);
+      config.outletBC.Append(pressure);
+      tpsP->getRequiredInput((basepath + "/sigma").c_str(), sigma);
+      config.outletBC.Append(sigma);      
+    } else if (type == "nonReflectingPressure") {
+      tpsP->getRequiredInput((basepath + "/pressure").c_str(), pressure);
+      config.outletBC.Append(pressure);
+      tpsP->getRequiredInput((basepath + "/sigma").c_str(), sigma);
+      config.outletBC.Append(sigma);
+    } else if ((type == "nonReflectingMassFlow") || (type == "nonReflectingPointBasedMassFlow")) {
+      tpsP->getRequiredInput((basepath + "/massFlow").c_str(), massFlow);
+      config.outletBC.Append(massFlow);
+    } else {
+      grvy_printf(GRVY_ERROR, "\nUnknown outlet BC supplied at runtime -> %s", type.c_str());
+      exit(ERROR);
+    }
+
+    std::pair<int, OutletType> patchType;
+    patchType.first = patch;
+    patchType.second = outletMapping[type];
+    config.outletPatchType.push_back(patchType);
+  }
+  
 }
+
 
 void M2ulPhyS::parseSpongeZoneInputs() {
   tpsP->getInput("spongezone/numSpongeZones", config.numSpongeRegions_, 0);

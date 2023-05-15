@@ -55,10 +55,18 @@ class OutletBC : public BoundaryCondition {
   // Mean boundary state
   Vector meanUp;
 
-  Vector boundaryU;
-  int bdrN;
-  bool bdrUInit;
+  //Vector boundaryU;
+  //int bdrN;
+  //bool bdrUInit;
 
+  Vector boundaryU;
+  Vector boundaryUp;  
+  Vector boundaryU_element;  
+  int bdrN, total_bdrN, bdrSize;
+  int bdrN_element;
+  bool bdrUInit;
+  Vector Ct;
+  
   // boundary mean calculation variables
   Vector bdrUp;          // Up at
   Array<int> bdrElemsQ;  // element dofs and face num. of integration points
@@ -84,18 +92,29 @@ class OutletBC : public BoundaryCondition {
   void initBdrElemsShape();
   void initBoundaryU(ParGridFunction *Up);
 
+  /*
   void subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vector &bdrFlux);
-
   void subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
-
   void subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
-
   void subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
+  */
 
-  virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up);
+  void subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vector &bdrFlux);
+  void subsonicSemiReflectingPressure(Vector &normal, Vector &stateIn, Vector &bdrFlux); 
+  void subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, TransportProperties *_transport, int ip, Vector &bdrFlux);
+  void subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
+  void subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
+  
+
+  //virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up);
+  virtual void updateMean(IntegrationRules *intRules, ParGridFunction *U_, ParGridFunction *Up);  
 
   void computeParallelArea();
 
+  double getBoundaryUp(int ii) const { return boundaryUp[ii]; }
+  double getBoundaryU(int ii) const { return boundaryU[ii]; }  
+
+  
  public:
   OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *rsolver_, GasMixture *mixture,
            GasMixture *d_mixture, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt,
@@ -103,12 +122,24 @@ class OutletBC : public BoundaryCondition {
            const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs, bool axisym);
   ~OutletBC();
 
+  /*
   void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
                       double delta, Vector &bdrFlux);
   void computeBdrPrimitiveStateForGradient(const int i, const Vector &primIn, Vector &primBC) const override;
+  */
 
+
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius, Vector transip, double delta, double time, TransportProperties *_transport, int ip, Vector &bdrFlux);
+  void computeBdrPrimitiveStateForGradient(const int i, const int eq, const Vector &primIn, Vector &primBC) const override;  
+
+  
   virtual void initBCs();
 
+  //int GetBdrN() { return bdrN_element; }
+  //double GetBdrU(int ii) { return boundaryU_element[ii]; }
+  //Vector *GetOutletBdrU_ptr() { return &boundaryU_element; }  
+
+  
   virtual void integrationBC(Vector &y,  // output
                              const Vector &x, const elementIndexingData &elem_index_data, ParGridFunction *Up,
                              ParGridFunction *gradUp, const boundaryFaceIntegrationData &boundary_face_data,

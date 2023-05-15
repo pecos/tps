@@ -62,6 +62,12 @@ class WallBC : public BoundaryCondition {
   const boundaryFaceIntegrationData &boundary_face_data_;
   const int &maxIntPoints_;
 
+  Vector boundaryU;
+  Vector boundaryUp;  
+  Vector boundaryU_element;
+  int bdrN, bdrSize;    
+  int total_bdrN, bdrN_element;  
+  
   Array<int> wallElems;
   void buildWallElemsArray();
 
@@ -74,6 +80,7 @@ class WallBC : public BoundaryCondition {
   void computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector &bdrFlux);
   */
 
+  /*
   void computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
                           double delta, Vector &bdrFlux);
   void computeSlipWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
@@ -84,6 +91,17 @@ class WallBC : public BoundaryCondition {
                                  double delta, Vector &bdrFlux);
   void computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
                               double delta, Vector &bdrFlux);
+  */
+
+  void computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, Vector &bdrFlux);
+  void computeSlipWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, Vector &bdrFlux);  
+  void computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, Vector &bdrFlux);
+  void computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, Vector &bdrFlux);
+  void computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, Vector &bdrFlux);
+
+  double getBoundaryUp(int ii) const { return boundaryUp[ii]; }
+  double getBoundaryU(int ii) const { return boundaryU[ii]; }  
+  
 
  public:
   WallBC(RiemannSolver *rsolver_, GasMixture *_mixture, GasMixture *d_mixture, Equations _eqSystem, Fluxes *_fluxClass,
@@ -93,14 +111,29 @@ class WallBC : public BoundaryCondition {
          bool useBCinGrad = false);
   ~WallBC();
 
+  /*
   void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
                       double delta, Vector &bdrFlux);
   void computeBdrPrimitiveStateForGradient(const int i, const Vector &primIn, Vector &primBC) const override;
+  */
+
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius, Vector transip, double delta, double time, TransportProperties *_transport, int ip, Vector &bdrFlux);
+  MFEM_HOST_DEVICE void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius, Vector transip, Vector &bdrFlux);
+
+  //void computeBdrPrimitiveStateForGradient(int &i, const int eq, const Vector &primIn, Vector &primBC); // const override;
+  void computeBdrPrimitiveStateForGradient(const int i, const int eq, const Vector &primIn, Vector &primBC) const override;
+  
 
   virtual void initBCs();
 
-  virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up) {}
+  //int GetBdrN() { return total_bdrN; }
+  //double GetBdrU(int ii) { return boundaryU[ii]; }
+  //Vector *GetOutletBdrU_ptr() { return &boundaryU_element; }
+  
+  //  virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up) {}
 
+  virtual void updateMean(IntegrationRules *intRules, ParGridFunction *U_, ParGridFunction *Up); //when having an init bdrN incrementer
+  
   // functions for BC integration on GPU
   virtual void integrationBC(Vector &y,  // output
                              const Vector &x, const elementIndexingData &elem_index_data, ParGridFunction *Up,

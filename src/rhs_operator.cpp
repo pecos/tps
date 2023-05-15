@@ -360,7 +360,8 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
 #endif
 
   // update boundary conditions: this also initializes Nbdr incrementer
-  if (bcIntegrator != NULL) bcIntegrator->updateBCMean(Up);
+  //if (bcIntegrator != NULL) bcIntegrator->updateBCMean(Up);
+  if (bcIntegrator != NULL) bcIntegrator->updateBCMean(U_,Up);  
 
 #ifdef _GPU_
   z = 0.;

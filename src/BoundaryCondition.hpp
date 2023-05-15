@@ -73,8 +73,8 @@ class BoundaryCondition {
                     const int _patchNumber, const double _refLength, bool axisym);
   virtual ~BoundaryCondition();
 
-  virtual void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip,
-                              double delta, Vector &bdrFlux) = 0;
+  //  virtual void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, Vector transip, double delta, Vector &bdrFlux) = 0;
+  virtual void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &delState, double radius, Vector transip, double delta, double time, TransportProperties *_transport, int ip, Vector &bdrFlux) = 0;  
 
   /** \brief Set the boundary state used in the gradient evaluation
    *
@@ -84,13 +84,22 @@ class BoundaryCondition {
    *  term is zero.  If that is not what you want, you must override
    *  this method in a derived class.
    */
-  virtual void computeBdrPrimitiveStateForGradient(const int i, const Vector &stateIn, Vector &stateBC) const;
+  ///virtual void computeBdrPrimitiveStateForGradient(int &i, const int eq, const Vector &stateIn, Vector &stateBC) const;
+  virtual void computeBdrPrimitiveStateForGradient(const int i, const int eq, const Vector &stateIn, Vector &stateBC) const;  
+  //  virtual void computeBdrPrimitiveStateForGradient(const int i, const Vector &stateIn, Vector &stateBC) const;
 
   // holding function for any miscellaneous items needed to initialize BCs
   // prior to use (and require MPI)
   virtual void initBCs() = 0;
 
-  virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up) = 0;
+  //int GetBdrN() { return total_bdrN; }
+  
+  //virtual int GetBdrN() = 0;
+  //virtual double GetBdrU(int ii) = 0;
+  //virtual Vector *GetOutletBdrU_ptr() = 0;  
+  
+  //  virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up) = 0;
+  virtual void updateMean(IntegrationRules *intRules, ParGridFunction *U_, ParGridFunction *Up) = 0;  
 
   // aggregate boundary area
   double aggregateArea(int bndry_attr, MPI_Comm bc_comm);

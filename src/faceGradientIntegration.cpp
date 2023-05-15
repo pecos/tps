@@ -101,6 +101,8 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
         std::unordered_map<int, BoundaryCondition *>::const_iterator ibc = bc_->inletBCmap.find(attr);
         std::unordered_map<int, BoundaryCondition *>::const_iterator obc = bc_->outletBCmap.find(attr);
         std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = bc_->wallBCmap.find(attr);
+
+	/*
         if (ibc != bc_->inletBCmap.end()) {
           ibc->second->computeBdrPrimitiveStateForGradient(nbdrInlet, iUp1, iUp2);
           nbdrInlet++;
@@ -113,6 +115,27 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
           wbc->second->computeBdrPrimitiveStateForGradient(nbdrWall, iUp1, iUp2);
           nbdrWall++;
         }
+	*/
+
+	// swh: not sure here, old method had an eq loop which i guess is obsolete
+    for (int eq = 0; eq < num_equation; eq++) {	
+        if (ibc != bc_->inletBCmap.end()) {	  
+          ibc->second->computeBdrPrimitiveStateForGradient(nbdrInlet, eq, iUp1, iUp2);
+	  if( eq == (num_equation-1) ) nbdrInlet++;
+        }
+
+        if (obc != bc_->outletBCmap.end()) {	  
+          obc->second->computeBdrPrimitiveStateForGradient(nbdrOutlet, eq, iUp1, iUp2);
+	  if( eq == (num_equation-1) ) nbdrOutlet++;
+        }
+
+        if (wbc != bc_->wallBCmap.end()) {	  
+          wbc->second->computeBdrPrimitiveStateForGradient(nbdrWall, eq, iUp1, iUp2);
+	  if( eq == (num_equation-1) ) nbdrWall++;
+        }
+    }
+
+	
       } else {
         iUp2 = iUp1;
       }
