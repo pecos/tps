@@ -64,23 +64,15 @@ RUN . /etc/profile.d/lmod.sh \
 RUN rm /tmp/v$gslib_ver.tar.gz
 
 
-#----------------------------
-# Add local install of mfem
-# (to get gslib support)
-#----------------------------
-# This mfem corresponds to the master branch as of July 30, 2022
-#
-# We use this version rather than the 4.4 release because it has
-# support for GSLIB interpolation with mixed meshes, which was landed
-# in PR 2948 (https://github.com/mfem/mfem/pull/2948) on May 30.
-
+# MFEM (w/ gslib support)
+ENV mfem_ver="4.5.2"
 ENV mfem_prefix="/usr/local"
-RUN cd /tmp; git clone https://github.com/mfem/mfem.git
-RUN cd /tmp/mfem; git checkout fcf50aae53db688bc22ed7c230cfbfae2d05ebaf
+RUN wget https://github.com/mfem/mfem/archive/refs/tags/v$mfem_ver.tar.gz -P /tmp
+RUN cd /tmp; tar xvf /tmp/v$mfem_ver.tar.gz
 
 RUN . /etc/profile.d/lmod.sh \
     && module load mvapich2 hypre metis netcdf superlu_dist \
-    && cd /tmp/mfem \
+    && cd /tmp/mfem-$mfem_ver \
     && make config \
     PREFIX=$mfem_prefix \
     CXXFLAGS="-O3 -fPIC -std=c++11" \
