@@ -53,6 +53,8 @@
 
 #endif
 
+#include "loMach_options.hpp"
+#include "loMach.hpp"
 #include "cycle_avg_joule_coupling.hpp"
 #include "independent_coupling.hpp"
 
@@ -233,6 +235,9 @@ void Tps::chooseSolver() {
     isEMOnlyMode_ = true;
     ElectromagneticOptions em_opt;
     solver_ = new QuasiMagnetostaticSolver3D(em_opt, this);
+  } else if (input_solver_type_ == "loMach") {
+    LoMachOptions lomach_opt;
+    solver_ = new LoMachSolver(mpi_, lomach_opt, this);
   } else if (input_solver_type_ == "em-axi") {
     isEMOnlyMode_ = true;
     ElectromagneticOptions em_opt;
