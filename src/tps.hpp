@@ -88,6 +88,7 @@ class Tps {
   // supported high-level physics configurations
   bool isFlowOnlyMode_;
   bool isEMOnlyMode_;
+  bool isLoMachOnlyMode_;  
   bool isFlowEMCoupledMode_;
 
   // mesh
