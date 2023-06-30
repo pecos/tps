@@ -230,9 +230,10 @@ void Tps::chooseSolver() {
     ElectromagneticOptions em_opt;
     solver_ = new QuasiMagnetostaticSolver3D(mpi_, em_opt, this);
   } else if (input_solver_type_ == "loMach") {
+    grvy_printf(GRVY_INFO, "\n Selected Low-Mach solver \n");        
     isLoMachOnlyMode_ = true;
     LoMachOptions lomach_opt;
-    solver_ = new LoMachSolver(mpi_, lomach_opt, this);    
+    solver_ = new LoMachSolver(mpi_, lomach_opt, this);
   } else if (input_solver_type_ == "em-axi") {
     isEMOnlyMode_ = true;
     ElectromagneticOptions em_opt;
