@@ -2,6 +2,10 @@
 import sys
 import os
 
+from mpi4py import MPI
+
+comm = MPI.COMM_WORLD
+
 # set path to C++ TPS library
 path = os.path.abspath(os.path.dirname(sys.argv[0]))
 sys.path.append(path + "/.libs")
