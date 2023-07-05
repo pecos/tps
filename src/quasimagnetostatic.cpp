@@ -43,15 +43,23 @@ using namespace mfem::common;
 static Vector axis(3);
 void JFun(const Vector &x, Vector &f);
 
-QuasiMagnetostaticSolverBase::QuasiMagnetostaticSolverBase(MPI_Session &mpi, ElectromagneticOptions em_opts,
+QuasiMagnetostaticSolverBase::QuasiMagnetostaticSolverBase(ElectromagneticOptions em_opts,
                                                            TPS::Tps *tps)
-    : mpi_(mpi), em_opts_(em_opts), offsets_(3) {
+    : em_opts_(em_opts), offsets_(3) {
+
+  MPI_Comm_size(tps->getTPSCommWorld(), &nprocs_);
+  MPI_Comm_rank(tps->getTPSCommWorld(), &rank_);
+  if (rank_ == 0)
+    rank0_ = true;
+  else
+    rank0_ = false;
+  
   tpsP_ = tps;
   pmesh_ = NULL;
 
   // verify running on cpu
   if (tpsP_->getDeviceConfig() != "cpu") {
-    if (mpi.Root()) {
+    if (rank0_) {
       grvy_printf(GRVY_ERROR, "[ERROR] EM simulation currently only supported on cpu.\n");
     }
     exit(1);
@@ -71,8 +79,8 @@ double JouleHeatingCoefficient3D::Eval(ElementTransformation &T, const Integrati
   return sig * (Er * Er + Ei * Ei);
 }
 
-QuasiMagnetostaticSolver3D::QuasiMagnetostaticSolver3D(MPI_Session &mpi, ElectromagneticOptions em_opts, TPS::Tps *tps)
-    : QuasiMagnetostaticSolverBase(mpi, em_opts, tps) {
+QuasiMagnetostaticSolver3D::QuasiMagnetostaticSolver3D(ElectromagneticOptions em_opts, TPS::Tps *tps)
+    : QuasiMagnetostaticSolverBase(em_opts, tps) {
   hcurl_ = NULL;
   h1_ = NULL;
   hdiv_ = NULL;
@@ -120,7 +128,7 @@ QuasiMagnetostaticSolver3D::~QuasiMagnetostaticSolver3D() {
 }
 
 void QuasiMagnetostaticSolver3D::initialize() {
-  bool verbose = mpi_.Root();
+  bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Initializing quasimagnetostatic solver.\n");
 
   // Prepare for the quasi-magnetostatic solve in four steps...
@@ -148,7 +156,7 @@ void QuasiMagnetostaticSolver3D::initialize() {
   }
 
   // 1c) Partition the mesh
-  pmesh_ = new ParMesh(MPI_COMM_WORLD, *mesh);
+  pmesh_ = new ParMesh(tpsP_->getTPSCommWorld(), *mesh);
   delete mesh;  // no longer need the serial mesh
   // pmesh_->ReorientTetMesh();
 
@@ -213,7 +221,7 @@ void QuasiMagnetostaticSolver3D::initialize() {
 }
 
 void QuasiMagnetostaticSolver3D::InitializeCurrent() {
-  bool verbose = mpi_.Root();
+  bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Initializing rhs using source current.\n");
 
   // ensure we've initialized the operators
@@ -324,13 +332,13 @@ void QuasiMagnetostaticSolver3D::parseSolverOptions() {
   tpsP_->getVec("em/current_axis", em_opts_.current_axis, 3, default_axis);
 
   // dump options to screen for user inspection
-  if (mpi_.Root()) {
+  if (rank0_) {
     em_opts_.print(std::cout);
   }
 }
 
 void QuasiMagnetostaticSolver3D::solve() {
-  bool verbose = mpi_.Root();
+  bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Solving the quasi-magnetostatic system for A (magnetic vector potential).\n");
 
   assert(operator_initialized_ && current_initialized_);
@@ -421,7 +429,7 @@ void QuasiMagnetostaticSolver3D::solve() {
   // 1) Solve QMS (i.e., i \omega A + curl(curl(A)) = J) for magnetic
   //    vector potential using operators set up by Initialize() and
   //    InitializeCurrent() fcns
-  FGMRESSolver solver(MPI_COMM_WORLD);
+  FGMRESSolver solver(tpsP_->getTPSCommWorld());
 
   solver.SetPreconditioner(BDP);
   solver.SetOperator(*qms);
@@ -495,13 +503,13 @@ void QuasiMagnetostaticSolver3D::solve() {
 
   paraview_dc.Save();
 
-  if (mpi_.Root()) {
+  if (verbose) {
     std::cout << "EM simulation complete" << std::endl;
   }
 }
 
 void QuasiMagnetostaticSolver3D::InterpolateToYAxis() const {
-  const bool root = mpi_.Root();
+  const bool root = rank0_;
 
   // quick return if there are no interpolation points
   if (em_opts_.nBy < 1) return;
@@ -687,9 +695,9 @@ static double radius(const Vector &x) { return x[0]; }
 
 static double oneOverRadius(const Vector &x) { return 1.0 / x[0]; }
 
-QuasiMagnetostaticSolverAxiSym::QuasiMagnetostaticSolverAxiSym(MPI_Session &mpi, ElectromagneticOptions em_opts,
+QuasiMagnetostaticSolverAxiSym::QuasiMagnetostaticSolverAxiSym(ElectromagneticOptions em_opts,
                                                                TPS::Tps *tps)
-    : QuasiMagnetostaticSolverBase(mpi, em_opts, tps) {
+    : QuasiMagnetostaticSolverBase(em_opts, tps) {
   h1_ = NULL;
   Atheta_space_ = NULL;
   K_ = NULL;
@@ -720,7 +728,7 @@ QuasiMagnetostaticSolverAxiSym::~QuasiMagnetostaticSolverAxiSym() {
 }
 
 void QuasiMagnetostaticSolverAxiSym::initialize() {
-  bool verbose = mpi_.Root();
+  bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Initializing axisymmetric quasimagnetostatic solver.\n");
 
   // Prepare for the quasi-magnetostatic solve in four steps...
@@ -749,7 +757,7 @@ void QuasiMagnetostaticSolverAxiSym::initialize() {
   }
 
   // 1c) Partition the mesh
-  pmesh_ = new ParMesh(MPI_COMM_WORLD, *mesh);
+  pmesh_ = new ParMesh(tpsP_->getTPSCommWorld(), *mesh);
   delete mesh;  // no longer need the serial mesh
   // pmesh_->ReorientTetMesh();
 
@@ -805,7 +813,7 @@ void QuasiMagnetostaticSolverAxiSym::initialize() {
 }
 
 void QuasiMagnetostaticSolverAxiSym::InitializeCurrent() {
-  bool verbose = mpi_.Root();
+  bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Initializing source current.\n");
 
   // ensure we've initialized the operators
@@ -880,13 +888,13 @@ void QuasiMagnetostaticSolverAxiSym::parseSolverOptions() {
   tpsP_->getInput("em/permeability", em_opts_.mu0, 1.0);
 
   // dump options to screen for user inspection
-  if (mpi_.Root()) {
+  if (rank0_) {
     em_opts_.print(std::cout);
   }
 }
 
 void QuasiMagnetostaticSolverAxiSym::solve() {
-  bool verbose = mpi_.Root();
+  bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Solving the axisymmetric quasi-magnetostatic system.\n");
 
   assert(operator_initialized_ && current_initialized_);
@@ -956,7 +964,7 @@ void QuasiMagnetostaticSolverAxiSym::solve() {
   BDP.SetDiagonalBlock(0, prec);
   BDP.SetDiagonalBlock(1, prec);
 
-  FGMRESSolver solver(MPI_COMM_WORLD);
+  FGMRESSolver solver(tpsP_->getTPSCommWorld());
 
   solver.SetPreconditioner(BDP);
   solver.SetOperator(*qms);
@@ -1012,7 +1020,7 @@ void QuasiMagnetostaticSolverAxiSym::solve() {
   delete qms;
   delete Kconductivity;
 
-  if (mpi_.Root()) {
+  if (verbose) {
     std::cout << "EM simulation complete" << std::endl;
   }
 }

@@ -35,22 +35,29 @@
 #include "em_options.hpp"
 #include "quasimagnetostatic.hpp"
 
-CycleAvgJouleCoupling::CycleAvgJouleCoupling(MPI_Session &mpi, string &inputFileName, TPS::Tps *tps, int max_out,
+CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps, int max_out,
                                              bool axisym, double input_power, double initial_input_power)
-    : mpi_(mpi),
-      em_opt_(),
+    : em_opt_(),
       max_outer_iters_(max_out),
       input_power_(input_power),
       initial_input_power_(initial_input_power) {
+
+  MPI_Comm_size(tps->getTPSCommWorld(), &nprocs_);
+  MPI_Comm_rank(tps->getTPSCommWorld(), &rank_);
+  if (rank_ == 0)
+    rank0_ = true;
+  else
+    rank0_ = false;
+
   if (axisym) {
-    qmsa_solver_ = new QuasiMagnetostaticSolverAxiSym(mpi, em_opt_, tps);
+    qmsa_solver_ = new QuasiMagnetostaticSolverAxiSym(em_opt_, tps);
   } else {
-    qmsa_solver_ = new QuasiMagnetostaticSolver3D(mpi, em_opt_, tps);
+    qmsa_solver_ = new QuasiMagnetostaticSolver3D(em_opt_, tps);
   }
-  flow_solver_ = new M2ulPhyS(mpi, inputFileName, tps);
+  flow_solver_ = new M2ulPhyS(inputFileName, tps);
 #ifdef HAVE_GSLIB
-  interp_flow_to_em_ = new FindPointsGSLIB(MPI_COMM_WORLD);
-  interp_em_to_flow_ = new FindPointsGSLIB(MPI_COMM_WORLD);
+  interp_flow_to_em_ = new FindPointsGSLIB(tps->getTPSCommWorld());
+  interp_em_to_flow_ = new FindPointsGSLIB(tps->getTPSCommWorld());
 #endif
 }
 
@@ -64,7 +71,7 @@ CycleAvgJouleCoupling::~CycleAvgJouleCoupling() {
 }
 
 void CycleAvgJouleCoupling::initializeInterpolationData() {
-  bool verbose = mpi_.Root();
+  const bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Initializing interpolation data.\n");
 
 #ifdef HAVE_GSLIB
@@ -105,7 +112,7 @@ void CycleAvgJouleCoupling::initializeInterpolationData() {
 }
 
 void CycleAvgJouleCoupling::interpConductivityFromFlowToEM() {
-  bool verbose = mpi_.Root();
+  const bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Interpolating conductivity to EM mesh.\n");
   const ParMesh *em_mesh = qmsa_solver_->getMesh();
   const ParFiniteElementSpace *em_fespace = qmsa_solver_->getFESpace();
@@ -177,7 +184,7 @@ void CycleAvgJouleCoupling::interpConductivityFromFlowToEM() {
 }
 
 void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
-  bool verbose = mpi_.Root();
+  const bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Interpolating Joule heating to flow mesh.\n");
   const ParMesh *flow_mesh = flow_solver_->GetMesh();
   const ParFiniteElementSpace *flow_fespace = flow_solver_->GetFESpace();
@@ -256,7 +263,7 @@ void CycleAvgJouleCoupling::solve() {
     interpConductivityFromFlowToEM();
     qmsa_solver_->solve();
     const double tot_jh = qmsa_solver_->totalJouleHeating();
-    if (mpi_.Root()) {
+    if (rank0_) {
       grvy_printf(GRVY_INFO, "The total input Joule heating = %.6e\n", tot_jh);
     }
 
@@ -265,7 +272,7 @@ void CycleAvgJouleCoupling::solve() {
       const double ratio = target_power / tot_jh;
       qmsa_solver_->scaleJouleHeating(ratio);
       const double upd_jh = qmsa_solver_->totalJouleHeating();
-      if (mpi_.Root()) {
+      if (rank0_) {
         grvy_printf(GRVY_INFO, "The total input Joule heating after scaling = %.6e\n", upd_jh);
       }
     }

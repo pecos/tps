@@ -52,7 +52,7 @@ class IndependentCoupling : public TPS::Solver {
   M2ulPhyS *flow_solver_;
 
  public:
-  IndependentCoupling(MPI_Session &mpi, string &inputFileName, TPS::Tps *tps);
+  IndependentCoupling(string &inputFileName, TPS::Tps *tps);
   ~IndependentCoupling();
 
   void parseSolverOptions() override;

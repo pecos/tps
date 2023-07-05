@@ -35,7 +35,7 @@
 
 using namespace std;
 
-MPI_Groups::MPI_Groups(MPI_Session* _mpi) : mpi(_mpi) {
+MPI_Groups::MPI_Groups(MPI_Comm TPSCommWorld) : TPSCommWorld_(TPSCommWorld) {
   patchList_.SetSize(0);
 
   patchGroupMap_.clear();
@@ -66,7 +66,7 @@ void MPI_Groups::init() {
   int localMaxPatch = 0;
   if (patchList_.Size() > 0) localMaxPatch = patchList_.Max();
   int globalMax = 0.;
-  MPI_Allreduce(&localMaxPatch, &globalMax, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+  MPI_Allreduce(&localMaxPatch, &globalMax, 1, MPI_INT, MPI_MAX, TPSCommWorld_);
 
   for (int p = 0; p <= globalMax; p++) {
     int processContainsPatch = 0;
@@ -74,12 +74,25 @@ void MPI_Groups::init() {
       if (patchList_[n] == p) processContainsPatch = p;
     }
 
-    MPI_Comm_split(MPI_COMM_WORLD, processContainsPatch, mpi->WorldRank(), &patchGroupMap_[p]);
+    MPI_Comm_split(TPSCommWorld_, processContainsPatch, this->getTPSWorldRank(), &patchGroupMap_[p]);
   }
 }
 
+int MPI_Groups::getTPSWorldRank()
+{
+  int rank;
+  MPI_Comm_rank(TPSCommWorld_, &rank);
+  return rank;
+}
+
+int MPI_Groups::getTPSWorldSize()
+{
+  int size;
+  MPI_Comm_size(TPSCommWorld_, &size);
+  return size;
+}
 string MPI_Groups::getParallelName(string serialName) {
-  if (mpi->WorldSize() == 1) {  // serial name
+  if (this->getTPSWorldSize() == 1) {  // serial name
     return serialName;
   } else {
     // find the dots
@@ -98,7 +111,7 @@ string MPI_Groups::getParallelName(string serialName) {
     string baseName = serialName.substr(0, lastPoint);
     string extension = serialName.substr(lastPoint + 1, serialName.length() - 1);
 
-    string parallelName = baseName + "." + to_string(mpi->WorldRank()) + "." + extension;
+    string parallelName = baseName + "." + to_string(this->getTPSWorldRank()) + "." + extension;
     return parallelName;
   }
 }

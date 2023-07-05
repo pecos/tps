@@ -31,13 +31,15 @@ int checkTrivialDistance(const ParGridFunction &distance, const ParGridFunction 
 
 int main (int argc, char *argv[]) {
   // This test is intended to be run with inputs/pipe.axisym.viscous.ini
-  TPS::Tps tps;
+  mfem::Mpi::Init(argc, argv);
+  TPS::Tps tps(MPI_COMM_WORLD);
+
   tps.parseCommandLineArgs(argc, argv);
   tps.parseInput();
   tps.chooseDevices();
 
   // Instantiate flow solver (NB: distance fcn happens internally)
-  M2ulPhyS *flow = new M2ulPhyS(tps.getMPISession(), tps.getInputFilename(), &tps);
+  M2ulPhyS *flow = new M2ulPhyS(tps.getInputFilename(), &tps);
 
   // Get mesh coordinates
   ParMesh *mesh = flow->GetMesh();

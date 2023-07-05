@@ -112,7 +112,9 @@ int check_em_plasma_conductivity(const ParFiniteElementSpace *vfes, ParGridFunct
 
 int main (int argc, char *argv[])
 {
-  TPS::Tps tps;
+  mfem::Mpi::Init(argc, argv);
+  TPS::Tps tps(MPI_COMM_WORLD);
+
   tps.parseCommandLineArgs(argc, argv);
   tps.parseInput();
   tps.chooseDevices();
@@ -122,7 +124,7 @@ int main (int argc, char *argv[])
   assert(tps.getSolverType() == "cycle-avg-joule-coupled");
 
   int max_out = 1;
-  CycleAvgJouleCoupling *solver = new CycleAvgJouleCoupling(tps.getMPISession(), tps.getInputFilename(), &tps,
+  CycleAvgJouleCoupling *solver = new CycleAvgJouleCoupling(tps.getInputFilename(), &tps,
                                                             max_out, true);
 
   solver->parseSolverOptions();

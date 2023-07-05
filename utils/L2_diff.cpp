@@ -9,13 +9,14 @@ using namespace std;
 
 int main (int argc, char *argv[])
 {
-  TPS::Tps tps;
+  mfem::Mpi::Init(argc, argv);
+  TPS::Tps tps(MPI_COMM_WORLD);
   tps.parseCommandLineArgs(argc, argv);
   tps.parseInput();
   tps.chooseDevices();
 
-  M2ulPhyS *srcField1 = new M2ulPhyS(tps.getMPISession(), tps.getInputFilename(), &tps);
-  M2ulPhyS *srcField2 = new M2ulPhyS(tps.getMPISession(), tps.getInputFilename(), &tps);
+  M2ulPhyS *srcField1 = new M2ulPhyS( tps.getInputFilename(), &tps);
+  M2ulPhyS *srcField2 = new M2ulPhyS( tps.getInputFilename(), &tps);
   //RunConfiguration& srcConfig = srcField1->GetConfig();
 
   GasMixture *mixture = srcField1->getMixture();

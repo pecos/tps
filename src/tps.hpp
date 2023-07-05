@@ -70,8 +70,8 @@ namespace TPS {
  */
 class Tps {
  private:
+  MPI_Comm TPSCommWorld_;   // top-level mpi context
   std::string tpsVersion_;  // code version
-  mfem::MPI_Session mpi_;   // top-level mpi context
   int rank_;                // local MPI rank
   int nprocs_;              // total number of MPI procs
   bool isRank0_;            // flag to indicate rank0
@@ -100,7 +100,8 @@ class Tps {
   bool isVisualizationMode_;
 
  public:
-  Tps();
+  Tps(): Tps(MPI_COMM_WORLD) {};
+  Tps(MPI_Comm world);
   ~Tps();
   GRVY::GRVY_Input_Class iparse_;  ///< runtime input parser (from libgrvy)
 
@@ -161,7 +162,11 @@ class Tps {
   void parseInputFile(std::string iFile);
   void closeInputFile() { iparse_.Close(); }
 
-  mfem::MPI_Session &getMPISession() { return mpi_; }
+  [[deprecated("Use getTPSCommWorld")]]
+  MPI_Comm getMPISession() { return TPSCommWorld_; }
+
+  MPI_Comm getTPSCommWorld() { return TPSCommWorld_; }
+
   std::string &getInputFilename() { return iFile_; }
   bool isFlowEMCoupled() const { return isFlowEMCoupledMode_; }
   bool isVisualizationMode() const { return isVisualizationMode_; }

@@ -10,7 +10,8 @@ using namespace std;
 
 int main (int argc, char *argv[])
 {
-  //MPI_Session mpi(argc, argv);
+  mfem::Mpi::Init(argc, argv);
+  TPS::Tps tps(MPI_COMM_WORLD);
 
 
   // Set the method's default parameters.
@@ -40,11 +41,10 @@ int main (int argc, char *argv[])
   // *source* run file....
   string srcFileName(src_input_file);
 
-  TPS::Tps tps;
   tps.parseInputFile(srcFileName);
   tps.chooseDevices();
 
-  M2ulPhyS srcField( tps.getMPISession(), srcFileName, &tps );
+  M2ulPhyS srcField( srcFileName, &tps );
   RunConfiguration& srcConfig = srcField.GetConfig();
   assert(srcConfig.GetRestartCycle()>0);
 
@@ -60,7 +60,7 @@ int main (int argc, char *argv[])
 
   tps.parseInputFile(tarFileName);
 
-  M2ulPhyS tarField( tps.getMPISession(), tarFileName, &tps );
+  M2ulPhyS tarField( tarFileName, &tps );
   RunConfiguration& tarConfig = tarField.GetConfig();
   assert(tarConfig.GetRestartCycle()==0);
 

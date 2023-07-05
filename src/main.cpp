@@ -37,9 +37,10 @@
 #include "tps.hpp"
 
 int main(int argc, char *argv[]) {
+  mfem::Mpi::Init(argc, argv);
   int status;
   {
-    TPS::Tps tps;
+    TPS::Tps tps(MPI_COMM_WORLD);
 
     tps.parseCommandLineArgs(argc, argv);
     tps.parseInput();

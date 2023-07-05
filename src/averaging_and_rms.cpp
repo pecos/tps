@@ -125,7 +125,7 @@ Averaging::~Averaging() {
 void Averaging::addSampleMean(const int &iter) {
   if (computeMean) {
     if (iter % sampleInterval == 0 && iter >= startMean) {
-      if (iter == startMean && groupsMPI->getSession()->Root()) cout << "Starting mean calculation." << endl;
+      if (iter == startMean && groupsMPI->isWorldRoot()) cout << "Starting mean calculation." << endl;
 #ifdef _GPU_
       addSample_gpu(meanUp, rms, samplesMean, mixture, Up, fes->GetNDofs(), dim, num_equation);
 #else

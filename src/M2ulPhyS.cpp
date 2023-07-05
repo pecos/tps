@@ -35,31 +35,23 @@
 
 #include "M2ulPhyS.hpp"
 
-M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, TPS::Tps *tps) : mpi(_mpi) {
-  tpsP = tps;
-  nprocs_ = mpi.WorldSize();
-  rank_ = mpi.WorldRank();
-  if (rank_ == 0)
-    rank0_ = true;
-  else
-    rank0_ = false;
-
-  groupsMPI = new MPI_Groups(&mpi);
-
+M2ulPhyS::M2ulPhyS(TPS::Tps *tps):
+  groupsMPI( new MPI_Groups(tps->getTPSCommWorld()) ),
+  nprocs_(groupsMPI->getTPSWorldSize()),
+  rank_(groupsMPI->getTPSWorldRank()),
+  rank0_(groupsMPI->isWorldRoot()),
+  tpsP(tps)
+{
   parseSolverOptions2();
 }
 
-M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps) : mpi(_mpi) {
-  tpsP = tps;
-  nprocs_ = mpi.WorldSize();
-  rank_ = mpi.WorldRank();
-  if (rank_ == 0)
-    rank0_ = true;
-  else
-    rank0_ = false;
-
-  groupsMPI = new MPI_Groups(&mpi);
-
+M2ulPhyS::M2ulPhyS(string &inputFileName, TPS::Tps *tps) : 
+  groupsMPI( new MPI_Groups(tps->getTPSCommWorld()) ),
+  nprocs_(groupsMPI->getTPSWorldSize()),
+  rank_(groupsMPI->getTPSWorldRank()),
+  rank0_(groupsMPI->isWorldRoot()),
+  tpsP(tps)
+{
   // koomie TODO: refactor order so we can use standard parseSolverOptions call from Solver base class
 #define NEWPARSER
 #ifdef NEWPARSER
@@ -107,7 +99,7 @@ void M2ulPhyS::initVariables() {
     Vector z_translation({0.0, 0.0, config.GetZTrans()});
     std::vector<Vector> translations = {x_translation, y_translation, z_translation};
 
-    if (mpi.Root()) {
+    if (rank0_) {
       std::cout << " Making the mesh periodic using the following offsets:" << std::endl;
       std::cout << "   xTrans: " << config.GetXTrans() << std::endl;
       std::cout << "   yTrans: " << config.GetYTrans() << std::endl;
@@ -123,7 +115,7 @@ void M2ulPhyS::initVariables() {
   // check if a simulation is being restarted
   if (config.GetRestartCycle() > 0) {
     if (config.GetUniformRefLevels() > 0) {
-      if (mpi.Root()) {
+      if (rank0_) {
         std::cerr << "ERROR: Uniform mesh refinement not supported upon restart." << std::endl;
       }
       MPI_Abort(MPI_COMM_WORLD, 1);
@@ -145,7 +137,7 @@ void M2ulPhyS::initVariables() {
 
   } else {
     // remove previous solution
-    if (mpi.Root()) {
+    if (rank0_) {
       string command = "rm -r ";
       command.append(config.GetOutputName());
       int err = system(command.c_str());
@@ -156,7 +148,7 @@ void M2ulPhyS::initVariables() {
 
     // uniform refinement, user-specified number of times
     for (int l = 0; l < config.GetUniformRefLevels(); l++) {
-      if (mpi.Root()) {
+      if (rank0_) {
         std::cout << "Uniform refinement number " << l << std::endl;
       }
       serial_mesh->UniformRefinement();
@@ -168,7 +160,7 @@ void M2ulPhyS::initVariables() {
       assert(serial_mesh->Conforming());
       partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
       if (rank0_) partitioning_file_hdf5("write");
-      MPI_Barrier(MPI_COMM_WORLD);
+      MPI_Barrier(groupsMPI->getTPSCommWorld());
     }
 
     time = 0.;
@@ -197,7 +189,7 @@ void M2ulPhyS::initVariables() {
 
     // Build a list of wall patches
     Array<int> wall_patch_list;
-    for (int i = 0; i < config.wallPatchType.size(); i++) {
+    for (size_t i = 0; i < config.wallPatchType.size(); i++) {
       if (config.wallPatchType[i].second != WallType::INV) {
         wall_patch_list.Append(config.wallPatchType[i].first);
       }
@@ -216,7 +208,7 @@ void M2ulPhyS::initVariables() {
   }
 
   // Instantiate parallel mesh
-  mesh = new ParMesh(MPI_COMM_WORLD, *serial_mesh, partitioning_);
+  mesh = new ParMesh(groupsMPI->getTPSCommWorld(), *serial_mesh, partitioning_);
 
   // If necessary, parallelize distance function
   if (config.compute_distance) {
@@ -230,7 +222,7 @@ void M2ulPhyS::initVariables() {
   }
 
   // only need serial mesh if on rank 0 and using single restart file option
-  if (!mpi.Root() || (config.RestartSerial() == "no")) delete serial_mesh;
+  if (!rank0_ || (config.RestartSerial() == "no")) delete serial_mesh;
 
   // Paraview setup
   paraviewColl = new ParaViewDataCollection(config.GetOutputName(), mesh);
@@ -267,7 +259,7 @@ void M2ulPhyS::initVariables() {
     locToGlobElem = new int[mesh->GetNE()];
     int lelem = 0;
     for (int gelem = 0; gelem < nelemGlobal_; gelem++) {
-      if (mpi.WorldRank() == partitioning_[gelem]) {
+      if (rank_ == partitioning_[gelem]) {
         locToGlobElem[lelem] = gelem;
         lelem += 1;
       }
@@ -281,8 +273,8 @@ void M2ulPhyS::initVariables() {
     int maxElems;
     int minElems;
     int localElems = mesh->GetNE();
-    MPI_Allreduce(&localElems, &minElems, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
-    MPI_Allreduce(&localElems, &maxElems, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+    MPI_Allreduce(&localElems, &minElems, 1, MPI_INT, MPI_MIN, groupsMPI->getTPSCommWorld());
+    MPI_Allreduce(&localElems, &maxElems, 1, MPI_INT, MPI_MAX, groupsMPI->getTPSCommWorld());
 
     if (rank0_) {
       grvy_printf(GRVY_INFO, "number of elements on rank 0 = %i\n", localElems);
@@ -542,7 +534,7 @@ void M2ulPhyS::initVariables() {
     ioData.registerIOVar("/rmsData", "vw", 5);
   }
 
-  ioData.initializeSerial(mpi.Root(), (config.RestartSerial() != "no"), serial_mesh);
+  ioData.initializeSerial(rank0_, (config.RestartSerial() != "no"), serial_mesh);
   projectInitialSolution();
 
   // Boundary attributes in present partition
@@ -643,13 +635,13 @@ void M2ulPhyS::initVariables() {
   gradUp->ExchangeFaceNbrData();
 
   if (config.GetRestartCycle() == 0) initialTimeStep();
-  if (mpi.Root()) cout << "Maximum element size: " << hmax << "m" << endl;
-  if (mpi.Root()) cout << "Minimum element size: " << hmin << "m" << endl;
-  if (mpi.Root()) cout << "Initial time-step: " << dt << "s" << endl;
+  if (rank0_) cout << "Maximum element size: " << hmax << "m" << endl;
+  if (rank0_) cout << "Minimum element size: " << hmin << "m" << endl;
+  if (rank0_) cout << "Initial time-step: " << dt << "s" << endl;
 
   // t_final = MaxIters*dt;
 
-  if (mpi.Root()) {
+  if (rank0_) {
     ios_base::openmode mode = std::fstream::trunc;
     if (config.GetRestartCycle() == 1) mode = std::fstream::app;
 
@@ -1166,7 +1158,7 @@ void M2ulPhyS::initIndirectionArrays() {
 }
 
 M2ulPhyS::~M2ulPhyS() {
-  if (mpi.Root()) histFile.close();
+  if (rank0_) histFile.close();
 
   delete gradUp;
 
@@ -1250,7 +1242,7 @@ M2ulPhyS::~M2ulPhyS() {
   //   }
 
 #ifdef HAVE_GRVY
-  if (mpi.WorldRank() == 0) grvy_timer_summarize();
+  if (rank0_) grvy_timer_summarize();
 #endif
 }
 
@@ -1514,7 +1506,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     paraviewColl->RegisterField("Te", electron_temp_field);
   }
 
-  for (int var = 0; var < visualizationVariables_.size(); var++) {
+  for (size_t var = 0; var < visualizationVariables_.size(); var++) {
     paraviewColl->RegisterField(visualizationNames_[var], visualizationVariables_[var]);
   }
 
@@ -1539,7 +1531,7 @@ void M2ulPhyS::projectInitialSolution() {
   //     VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
   //     U->ProjectCoefficient(u0);
   //   }
-  if (mpi.Root()) std::cout << "restart: " << config.GetRestartCycle() << std::endl;
+  if (rank0_) std::cout << "restart: " << config.GetRestartCycle() << std::endl;
 
 #ifdef HAVE_MASA
   if (config.use_mms_) {
@@ -1613,7 +1605,7 @@ void M2ulPhyS::solve() {
 
     // periodically report on time/iteratino
     if ((iter % config.timingFreq) == 0) {
-      if (mpi.Root()) {
+      if (rank0_) {
         double timePerIter = (grvy_timer_elapsed_global() - tlast) / config.timingFreq;
         grvy_printf(ginfo, "Iteration = %i: wall clock time/iter = %.3f (secs)\n", iter, timePerIter);
         tlast = grvy_timer_elapsed_global();
@@ -1647,10 +1639,10 @@ void M2ulPhyS::solve() {
         }
         checkSolutionError(time);
       } else {
-        if (mpi.Root()) cout << "time step: " << iter << ", physical time " << time << "s" << endl;
+        if (rank0_) cout << "time step: " << iter << ", physical time " << time << "s" << endl;
       }
 #else
-      if (mpi.Root()) cout << "time step: " << iter << ", physical time " << time << "s" << endl;
+      if (rank0_) cout << "time step: " << iter << ", physical time " << time << "s" << endl;
 #endif
 
       if (iter != MaxIters) {
@@ -1720,11 +1712,11 @@ void M2ulPhyS::solve() {
     if (config.use_mms_) {
       checkSolutionError(time, true);
     } else {
-      if (mpi.Root()) cout << "Final timestep iteration = " << MaxIters << endl;
+      if (rank0_) cout << "Final timestep iteration = " << MaxIters << endl;
     }
 #endif
 
-    if (mpi.Root()) cout << "Final timestep iteration = " << MaxIters << endl;
+    if (rank0_) cout << "Final timestep iteration = " << MaxIters << endl;
   }
 
   return;
@@ -1990,7 +1982,7 @@ void M2ulPhyS::Check_NAN() {
     for (int eq = 0; eq < num_equation; eq++) {
       if (std::isnan(dataU[i + eq * dof])) {
         // thereIsNan = true;
-        cout << "NaN at node: " << i << " partition: " << mpi.WorldRank() << endl;
+        cout << "NaN at node: " << i << " partition: " << rank_ << endl;
         local_print++;
         // MPI_Abort(MPI_COMM_WORLD,1);
       }
@@ -2003,14 +1995,14 @@ void M2ulPhyS::Check_NAN() {
   }
 #endif
   int print;
-  MPI_Allreduce(&local_print, &print, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+  MPI_Allreduce(&local_print, &print, 1, MPI_INT, MPI_SUM, groupsMPI->getTPSCommWorld());
   if (print > 0) {
     // auto hUp = Up->HostRead();  // get GPU data
     Up->HostRead();  // get GPU data
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
     paraviewColl->Save();
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(groupsMPI->getTPSCommWorld());
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
 }
@@ -2365,7 +2357,7 @@ void M2ulPhyS::parseFluidPreset() {
     exit(ERROR);
   }
 
-  if (mpi.Root() && (config.workFluid != USER_DEFINED))
+  if (rank0_ && (config.workFluid != USER_DEFINED))
     cout << "Fluid is set to the preset '" << fluidTypeStr << "'. Input options in [plasma_models] will not be used."
          << endl;
 }
@@ -2549,7 +2541,7 @@ void M2ulPhyS::parseSpeciesInputs() {
         config.speciesMapping[inputSpeciesNames[sp]] = targetIdx;
         config.speciesNames[targetIdx] = inputSpeciesNames[sp];
         config.mixtureToInputMap[targetIdx] = sp;
-        if (mpi.Root()) {
+        if (rank0_) {
           std::cout << "name, input index, mixture index: " << config.speciesNames[targetIdx] << ", " << sp << ", "
                     << targetIdx << std::endl;
         }
@@ -2862,7 +2854,7 @@ void M2ulPhyS::parseReactionInputs() {
       config.chemistryInput.electronIndex = -1;
     }
 
-    int rxn_param_idx = 0;
+    size_t rxn_param_idx = 0;
 
     config.chemistryInput.numReactions = config.numReactions;
     for (int r = 0; r < config.numReactions; r++) {
@@ -3363,7 +3355,7 @@ void M2ulPhyS::identifyCollisionType(const Array<ArgonSpcs> &speciesType, ArgonC
 void M2ulPhyS::checkSolverOptions() const {
 #ifdef _GPU_
   if (!config.isTimeStepConstant()) {
-    if (mpi.Root()) {
+    if (rank0_) {
       std::cerr << "[ERROR]: GPU runs must use a constant time step: Please set DT_CONSTANT in input file."
                 << std::endl;
       std::cerr << std::endl;
@@ -3377,7 +3369,7 @@ void M2ulPhyS::checkSolverOptions() const {
   if (config.isAxisymmetric()) {
     // Don't support passive scalars yet
     if (config.GetEquationSystem() == NS_PASSIVE) {
-      if (mpi.Root()) {
+      if (rank0_) {
         std::cerr << "[ERROR]: Passive scalars not supported for axisymmetric simulations." << std::endl;
         std::cerr << std::endl;
         exit(ERROR);
@@ -3385,7 +3377,7 @@ void M2ulPhyS::checkSolverOptions() const {
     }
     // Don't support Roe flux yet
     if (config.RoeRiemannSolver()) {
-      if (mpi.Root()) {
+      if (rank0_) {
         std::cerr << "[ERROR]: Roe flux not supported for axisymmetric simulations. Please use flow/useRoe = 0."
                   << std::endl;
         std::cerr << std::endl;
@@ -3396,7 +3388,7 @@ void M2ulPhyS::checkSolverOptions() const {
     for (size_t i = 0; i < config.GetInletPatchType()->size(); i++) {
       std::pair<int, InletType> patchANDtype = (*config.GetInletPatchType())[i];
       if (patchANDtype.second != SUB_DENS_VEL) {
-        if (mpi.Root()) {
+        if (rank0_) {
           std::cerr << "[ERROR]: Only SUB_DENS_VEL inlet supported for axisymmetric simulations." << std::endl;
           std::cerr << std::endl;
           exit(ERROR);
@@ -3406,7 +3398,7 @@ void M2ulPhyS::checkSolverOptions() const {
     for (size_t i = 0; i < config.GetOutletPatchType()->size(); i++) {
       std::pair<int, OutletType> patchANDtype = (*config.GetOutletPatchType())[i];
       if (patchANDtype.second != SUB_P) {
-        if (mpi.Root()) {
+        if (rank0_) {
           std::cerr << "[ERROR]: Only SUB_P outlet supported for axisymmetric simulations." << std::endl;
           std::cerr << std::endl;
           exit(ERROR);
@@ -3417,7 +3409,7 @@ void M2ulPhyS::checkSolverOptions() const {
 
 #ifndef HAVE_MASA
   if (config.use_mms_) {
-    if (mpi.Root()) {
+    if (rank0_) {
       std::cerr << "[ERROR]: Require MASA support to run manufactured solutions." << std::endl;
       std::cerr << std::endl;
       exit(ERROR);
@@ -3427,7 +3419,7 @@ void M2ulPhyS::checkSolverOptions() const {
 
   // Warn user if they requested fixed dt without setting enableConstantTimestep
   if ((config.GetFixedDT() > 0) && (!config.isTimeStepConstant())) {
-    if (mpi.Root()) {
+    if (rank0_) {
       std::cerr << "[WARNING]: Setting dt_fixed overrides enableConstantTimestep." << std::endl;
       std::cerr << std::endl;
     }
@@ -3471,7 +3463,7 @@ void M2ulPhyS::visualization() {
     grvy_timer_begin(__func__);
 
     // periodically report on time/iteratino
-    if (mpi.Root()) {
+    if (rank0_) {
       double timePerIter = (grvy_timer_elapsed_global() - tlast);
       grvy_printf(ginfo, "Iteration = %i: wall clock time/snapshot = %.3f (secs)\n", fileIter, timePerIter);
       tlast = grvy_timer_elapsed_global();
@@ -3506,10 +3498,10 @@ void M2ulPhyS::visualization() {
       }
       checkSolutionError(time);
     } else {
-      if (mpi.Root()) cout << "time step: " << iter << ", physical time " << time << "s" << endl;
+      if (rank0_) cout << "time step: " << iter << ", physical time " << time << "s" << endl;
     }
 #else
-    if (mpi.Root()) cout << "time step: " << iter << ", physical time " << time << "s" << endl;
+    if (rank0_) cout << "time step: " << iter << ", physical time " << time << "s" << endl;
 #endif
 
     // set iter and time based on the file.
@@ -3533,7 +3525,7 @@ void M2ulPhyS::visualization() {
     grvy_timer_end(__func__);
   }  // <-- end main timestep iteration loop
 
-  if (mpi.Root()) cout << "Final timestep iteration = " << config.postprocessInput.endIter << endl;
+  if (rank0_) cout << "Final timestep iteration = " << config.postprocessInput.endIter << endl;
 
   return;
 }

@@ -88,7 +88,6 @@ using namespace std;
 class M2ulPhyS : public TPS::Solver {
  private:
   MPI_Groups *groupsMPI;
-  MPI_Session &mpi;
   int nprocs_;  // total number of MPI procs
   int rank_;    // local MPI rank
   bool rank0_;  // flag to indicate rank 0
@@ -348,8 +347,8 @@ class M2ulPhyS : public TPS::Solver {
 #endif
 
  public:
-  M2ulPhyS(MPI_Session &_mpi, string &inputFileName, TPS::Tps *tps);
-  M2ulPhyS(MPI_Session &_mpi, TPS::Tps *tps);
+  M2ulPhyS(string &inputFileName, TPS::Tps *tps);
+  M2ulPhyS(TPS::Tps *tps);
   ~M2ulPhyS();
 
   void parseSolverOptions() override;

@@ -60,7 +60,7 @@ void testTableInterpolator1D(TPS::Tps &tps, int rank) {
 
   if (rank == 0) printf("findInterval test passed.\n");
 
-  M2ulPhyS *srcField = new M2ulPhyS(tps.getMPISession(), tps.getInputFilename(), &tps);
+  M2ulPhyS *srcField = new M2ulPhyS(tps.getInputFilename(), &tps);
   RunConfiguration& srcConfig = srcField->GetConfig();
   Chemistry *chem = srcField->getChemistry();
   assert(srcConfig.numReactions == 1);
@@ -209,15 +209,13 @@ int testGslTableInterpolator2D() {
 
 int main (int argc, char *argv[])
 {
-  TPS::Tps tps;
+  mfem::Mpi::Init(argc, argv);
+  TPS::Tps tps(MPI_COMM_WORLD);
   tps.parseCommandLineArgs(argc, argv);
   tps.parseInput();
   tps.chooseDevices();
 
-  MPI_Session mpi = tps.getMPISession();
-  int rank = mpi.WorldRank();
-
-  testTableInterpolator1D(tps, rank);
+  testTableInterpolator1D(tps, mfem::Mpi::WorldRank());
 
   int ierr = 0;
 #ifdef HAVE_GSL

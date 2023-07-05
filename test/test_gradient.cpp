@@ -91,7 +91,9 @@ int main (int argc, char *argv[])
 {
   srand (time(NULL));
 
-  TPS::Tps tps;
+  mfem::Mpi::Init(argc, argv);
+  TPS::Tps tps(MPI_COMM_WORLD);
+
   tps.parseCommandLineArgs(argc, argv);
   tps.parseInput();
   tps.chooseDevices();
@@ -100,7 +102,7 @@ int main (int argc, char *argv[])
   std::string filename;
   tps.getRequiredInput((basepath + "/filename").c_str(), filename);
 
-  M2ulPhyS *srcField = new M2ulPhyS(tps.getMPISession(), tps.getInputFilename(), &tps);
+  M2ulPhyS *srcField = new M2ulPhyS(tps.getInputFilename(), &tps);
   RunConfiguration& srcConfig = srcField->GetConfig();
   // Get meshes
   ParMesh* mesh = srcField->GetMesh();
@@ -245,8 +247,8 @@ int main (int argc, char *argv[])
   int localElems = mesh->GetNE();
   MPI_Allreduce(&localElems, &numElems, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
-  mfem::MPI_Session *mpi = &(tps.getMPISession());
-  if (mpi->Root()) {
+  
+  if (mfem::Mpi::Root()) {
     std::cout << numElems << ",\t";
     for (int i = 0; i < error.Size(); i++) {
       std::cout << error(i) << ",\t";

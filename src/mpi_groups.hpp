@@ -43,7 +43,7 @@ using namespace mfem;
 
 class MPI_Groups {
  private:
-  MPI_Session *mpi;
+  MPI_Comm TPSCommWorld_;
 
   Array<int> patchList_;  // list of patches visible to process
 
@@ -51,18 +51,28 @@ class MPI_Groups {
       patchGroupMap_;  // maps of all group communicators by patch, i.e. <patch, communicator_patch>
 
  public:
-  MPI_Groups(MPI_Session *mpi);
+  MPI_Groups(MPI_Comm TPSCommWorld);
   ~MPI_Groups();
 
-  bool isGroupRoot(MPI_Comm);  // check if rank 0 on local group
-  int groupSize(MPI_Comm);     // size of BC MPI group
+  bool isGroupRoot(MPI_Comm comm);  // check if rank 0 on local group
+  int groupSize(MPI_Comm comm);     // size of BC MPI group
 
   // function that creates the groups
   void init();
 
   void setPatch(int patchNum) { patchList_.Append(patchNum); }
 
-  MPI_Session *getSession() { return mpi; }
+  int getTPSWorldRank();
+
+  int getTPSWorldSize();
+
+  int isWorldRoot(){ return this->getTPSWorldRank() == 0;}
+
+
+  [[deprecated("Use getTPSCommWorld")]]
+  MPI_Comm getSession() { return TPSCommWorld_; }
+
+  MPI_Comm getTPSCommWorld() { return TPSCommWorld_; }
 
   MPI_Comm getComm(int patch) { return patchGroupMap_[patch]; }
 

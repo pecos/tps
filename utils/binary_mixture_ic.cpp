@@ -9,12 +9,13 @@ using namespace std;
 
 int main (int argc, char *argv[])
 {
-  TPS::Tps tps;
+  mfem::Mpi::Init(argc, argv);
+  TPS::Tps tps(MPI_COMM_WORLD);
   tps.parseCommandLineArgs(argc, argv);
   tps.parseInput();
   tps.chooseDevices();
 
-  M2ulPhyS *srcField = new M2ulPhyS(tps.getMPISession(), tps.getInputFilename(), &tps);
+  M2ulPhyS *srcField = new M2ulPhyS(tps.getInputFilename(), &tps);
   RunConfiguration& srcConfig = srcField->GetConfig();
   assert(srcConfig.GetWorkingFluid()==USER_DEFINED);
   assert(~srcConfig.GetRestartCycle());

@@ -9,7 +9,8 @@ using namespace std;
 
 int main (int argc, char *argv[])
 {
-  TPS::Tps tps;
+  mfem::Mpi::Init(argc, argv);
+  TPS::Tps tps(MPI_COMM_WORLD);
   tps.parseCommandLineArgs(argc, argv);
   tps.parseInput();
   tps.chooseDevices();
@@ -20,7 +21,7 @@ int main (int argc, char *argv[])
   tps.getRequiredInput((basepath + "/filename").c_str(), filename);
 #endif
 
-  M2ulPhyS *srcField = new M2ulPhyS(tps.getMPISession(), tps.getInputFilename(), &tps);
+  M2ulPhyS *srcField = new M2ulPhyS( tps.getInputFilename(), &tps);
 
 #ifdef HAVE_MASA
   RunConfiguration& srcConfig = srcField->GetConfig();
@@ -164,8 +165,8 @@ int main (int argc, char *argv[])
   int localElems = mesh->GetNE();
   MPI_Allreduce(&localElems, &numElems, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
-  mfem::MPI_Session *mpi = &(tps.getMPISession());
-  if (mpi->Root()) {
+  
+  if (mfem::Mpi::Root()) {
     std::cout << numElems << ",\t";
     for (int var = 0; var < numVariables; var++) {
       std::cout << error(var) << ",\t";

@@ -79,11 +79,11 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
   double *aux_U_data = NULL;
   int auxOrder = -1;
 
-  if (mpi.Root()) cout << "HDF5 restart files mode: " << mode << endl;
+  if (rank0_) cout << "HDF5 restart files mode: " << mode << endl;
 
   // open restart files
   if (mode == "write") {
-    if (mpi.Root() || config.isRestartPartitioned(mode)) {
+    if (rank0_ || config.isRestartPartitioned(mode)) {
       file = H5Fcreate(fileName.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
       assert(file >= 0);
     }
@@ -117,7 +117,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
   hid_t attr;
   if (mode == "write") {
     // note: all tasks save unless we are writing a serial restart file
-    if (mpi.Root() || config.isRestartPartitioned(mode)) {
+    if (rank0_ || config.isRestartPartitioned(mode)) {
       // current iteration count
       h5_save_attribute(file, "iteration", iter);
       // total time
@@ -237,7 +237,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
     IOFamily &fam = ioData.families_[n];
 
     if (mode == "write") {
-      if ((config.isRestartSerialized(mode)) && (nprocs_ > 1) && (mpi.Root())) {
+      if ((config.isRestartSerialized(mode)) && (nprocs_ > 1) && (rank0_)) {
         assert((locToGlobElem != NULL) && (partitioning_ != NULL));
         assert(fam.serial_fes != NULL);
         dims[0] = fam.serial_fes->GetNDofs();
@@ -272,7 +272,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
       vector<IOVar> vars = ioData.vars_[fam.group_];
 
       // save raw data
-      if (mpi.Root() || config.isRestartPartitioned(mode)) {
+      if (rank0_ || config.isRestartPartitioned(mode)) {
         for (auto var : vars) write_soln_data(group, var.varName_, dataspace, data + var.index_ * dims[0]);
       }
 
@@ -283,7 +283,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
       if (rank0_) cout << "Reading in solutiond data from restart..." << endl;
 
       // verify Dofs match expectations with current mesh
-      if (mpi.Root() || config.isRestartPartitioned(mode)) {
+      if (rank0_ || config.isRestartPartitioned(mode)) {
         hid_t dataspace;
 
         vector<IOVar> vars = ioData.vars_[fam.group_];
@@ -335,7 +335,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
   if (file >= 0) H5Fclose(file);
 
   if (mode == "read" && loadFromAuxSol) {
-    if (mpi.Root()) cout << "Interpolating from auxOrder = " << auxOrder << " to order = " << order << endl;
+    if (rank0_) cout << "Interpolating from auxOrder = " << auxOrder << " to order = " << order << endl;
 
     // Interpolate from aux to new order
     U->ProjectGridFunction(*aux_U);
@@ -346,7 +346,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
     VectorGridFunctionCoefficient lowOrderCoeff(aux_U);
     double err = U->ComputeL2Error(lowOrderCoeff);
 
-    if (mpi.Root()) cout << "|| interpolation error ||_2 = " << err << endl;
+    if (rank0_) cout << "|| interpolation error ||_2 = " << err << endl;
 
     // Update primitive variables.  This will be done automatically
     // before taking a time step, but we may write paraview output
@@ -417,7 +417,7 @@ void M2ulPhyS::partitioning_file_hdf5(std::string mode) {
 
   if (mode == "write") {
     // Attributes
-    h5_save_attribute(file, "numProcs", mpi.WorldSize());
+    h5_save_attribute(file, "numProcs", nprocs_);
 
     // Raw partition info
     hsize_t dims[1];
@@ -667,10 +667,10 @@ void M2ulPhyS::writeHistoryFile() {
   double global_dUdt[5];
   MPI_Allreduce(rhsOperator->getLocalTimeDerivatives(), &global_dUdt, 5, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
-  if (mpi.Root()) {
+  if (rank0_) {
     histFile << time << "," << iter;
     for (int eq = 0; eq < 5; eq++) {
-      histFile << "," << global_dUdt[eq] / static_cast<double>(mpi.WorldSize());
+      histFile << "," << global_dUdt[eq] / static_cast<double>(nprocs_);
     }
   }
 
@@ -678,13 +678,13 @@ void M2ulPhyS::writeHistoryFile() {
     double global_meanData[5 + 6];
     MPI_Allreduce(average->getLocalSums(), &global_meanData, 5 + 6, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
-    if (mpi.Root()) {
+    if (rank0_) {
       histFile << "," << average->GetSamplesMean();
-      for (int n = 0; n < 5 + 6; n++) histFile << "," << global_meanData[n] / static_cast<double>(mpi.WorldSize());
+      for (int n = 0; n < 5 + 6; n++) histFile << "," << global_meanData[n] / static_cast<double>(nprocs_);
     }
   }
 
-  if (mpi.Root()) histFile << endl;
+  if (rank0_) histFile << endl;
 }
 
 void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
@@ -698,7 +698,7 @@ void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
   int Ndata;
   Array<int> dims(2);
   bool success = false;
-  if (mpi.Root()) {
+  if (rank0_) {
     std::string filename;
     tpsP->getRequiredInput((inputPath + "/filename").c_str(), filename);
     success = h5ReadTable(filename, "table", config.tableHost[tableIndex], dims);
@@ -715,7 +715,7 @@ void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
   assert(dims[0] > 0);
   assert(dims[1] == 2);
 
-  if (!mpi.Root()) (config.tableHost[tableIndex]).SetSize(dims[0], dims[1]);
+  if (!rank0_) (config.tableHost[tableIndex]).SetSize(dims[0], dims[1]);
   double *d_table = config.tableHost[tableIndex].GetData();
   MPI_Bcast(d_table, dims[0] * dims[1], MPI_DOUBLE, 0, MPI_COMM_WORLD);
 

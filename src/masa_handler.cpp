@@ -146,7 +146,7 @@ void M2ulPhyS::checkSolutionError(const double _time, const bool final) {
     const double errorDen = dens->ComputeLpError(2, *DenMMS_);
     const double errorVel = vel->ComputeLpError(2, *VelMMS_);
     const double errorPre = press->ComputeLpError(2, *PreMMS_);
-    if (mpi.Root())
+    if (rank0_)
       cout << "time step: " << iter << ", physical time " << _time << "s"
            << ", Dens. error: " << errorDen << " Vel. " << errorVel << " press. " << errorPre << endl;
   } else {
@@ -168,7 +168,7 @@ void M2ulPhyS::checkSolutionError(const double _time, const bool final) {
       MPI_Allreduce(&localElems, &numElems, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
     }
 
-    if (mpi.Root()) {
+    if (rank0_) {
       grvy_printf(GRVY_INFO, "\ntime step: %d, physical time: %.5E\n", iter, _time);
       grvy_printf(GRVY_INFO, "component L2-error: (");
       for (int eq = 0; eq < num_equation; eq++) {

@@ -49,7 +49,6 @@ class Tps;
 
 class CycleAvgJouleCoupling : public TPS::Solver {
  private:
-  MPI_Session &mpi_;
   ElectromagneticOptions em_opt_;
   QuasiMagnetostaticSolverBase *qmsa_solver_;
   M2ulPhyS *flow_solver_;
@@ -67,8 +66,12 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   double input_power_;
   double initial_input_power_;
 
+  int rank_;
+  int nprocs_;
+  bool rank0_;
+
  public:
-  CycleAvgJouleCoupling(MPI_Session &mpi, string &inputFileName, TPS::Tps *tps, int max_out, bool axisym,
+  CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps, int max_out, bool axisym,
                         double input_power = -1., double initial_input_power = -1.);
   ~CycleAvgJouleCoupling();
 

@@ -58,9 +58,10 @@ namespace TPS {
  * call input parsing functions, choose solver, and initialize to set
  * information for simulation.  For an example, see main.cpp.
  */
-Tps::Tps() {
-  nprocs_ = mpi_.WorldSize();
-  rank_ = mpi_.WorldRank();
+Tps::Tps(MPI_Comm world): TPSCommWorld_(world)
+ {
+  MPI_Comm_size(world, &nprocs_);
+  MPI_Comm_rank(world, &rank_);
   if (rank_ == 0)
     isRank0_ = true;
   else
@@ -222,18 +223,18 @@ void Tps::chooseDevices() {
 void Tps::chooseSolver() {
   if (input_solver_type_ == "flow") {
     isFlowOnlyMode_ = true;
-    solver_ = new M2ulPhyS(mpi_, iFile_, this);
+    solver_ = new M2ulPhyS(iFile_, this);
   } else if (input_solver_type_ == "em") {
     isEMOnlyMode_ = true;
     ElectromagneticOptions em_opt;
-    solver_ = new QuasiMagnetostaticSolver3D(mpi_, em_opt, this);
+    solver_ = new QuasiMagnetostaticSolver3D(em_opt, this);
   } else if (input_solver_type_ == "em-axi") {
     isEMOnlyMode_ = true;
     ElectromagneticOptions em_opt;
-    solver_ = new QuasiMagnetostaticSolverAxiSym(mpi_, em_opt, this);
+    solver_ = new QuasiMagnetostaticSolverAxiSym(em_opt, this);
   } else if (input_solver_type_ == "independent-coupled") {
     isFlowEMCoupledMode_ = true;
-    solver_ = new IndependentCoupling(mpi_, iFile_, this);
+    solver_ = new IndependentCoupling(iFile_, this);
   } else if (input_solver_type_ == "cycle-avg-joule-coupled") {
     isFlowEMCoupledMode_ = true;
     int max_out;
@@ -244,7 +245,7 @@ void Tps::chooseSolver() {
     getInput("solver/input-power", input_power, -1.);
     double initial_input_power;
     getInput("solver/initial-input-power", initial_input_power, input_power);
-    solver_ = new CycleAvgJouleCoupling(mpi_, iFile_, this, max_out, axisym, input_power, initial_input_power);
+    solver_ = new CycleAvgJouleCoupling(iFile_, this, max_out, axisym, input_power, initial_input_power);
   } else if (input_solver_type_ == "coupled") {
     isFlowEMCoupledMode_ = true;
     grvy_printf(GRVY_ERROR, "\nSlow your roll.  Solid high-five for whoever implements this coupled solver mode!\n");

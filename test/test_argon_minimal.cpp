@@ -43,7 +43,9 @@ Array<int> readTable(const string fileName, const string datasetName, DenseMatri
 
 int main (int argc, char *argv[])
 {
-  TPS::Tps tps;
+  mfem::Mpi::Init(argc, argv);
+  TPS::Tps tps(MPI_COMM_WORLD);
+
   tps.parseCommandLineArgs(argc, argv);
   tps.parseInput();
   tps.chooseDevices();
@@ -51,7 +53,7 @@ int main (int argc, char *argv[])
   // srand (time(NULL));
   // double dummy = uniformRandomNumber();
 
-  M2ulPhyS *srcField = new M2ulPhyS(tps.getMPISession(), &tps);
+  M2ulPhyS *srcField = new M2ulPhyS(&tps);
 
   RunConfiguration& srcConfig = srcField->GetConfig();
   assert(srcConfig.GetWorkingFluid()==WorkingFluid::USER_DEFINED);

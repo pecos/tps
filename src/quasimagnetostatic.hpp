@@ -50,7 +50,6 @@ class Tps;
  */
 class QuasiMagnetostaticSolverBase : public TPS::Solver {
  protected:
-  mfem::MPI_Session &mpi_;
   ElectromagneticOptions em_opts_;
 
   // pointer to parent Tps class
@@ -66,8 +65,12 @@ class QuasiMagnetostaticSolverBase : public TPS::Solver {
 
   mfem::ParGridFunction *joule_heating_;
 
+  int rank_;
+  int nprocs_;
+  bool rank0_;
+
  public:
-  QuasiMagnetostaticSolverBase(mfem::MPI_Session &mpi, ElectromagneticOptions em_opts, TPS::Tps *tps);
+  QuasiMagnetostaticSolverBase(ElectromagneticOptions em_opts, TPS::Tps *tps);
   virtual ~QuasiMagnetostaticSolverBase() {}
 
   /** Initialize current for axisymmetric quasi-magnetostatic problem
@@ -148,7 +151,7 @@ class QuasiMagnetostaticSolver3D : public QuasiMagnetostaticSolverBase {
   void InterpolateToYAxis() const;
 
  public:
-  QuasiMagnetostaticSolver3D(mfem::MPI_Session &mpi, ElectromagneticOptions em_opts, TPS::Tps *tps);
+  QuasiMagnetostaticSolver3D(ElectromagneticOptions em_opts, TPS::Tps *tps);
   ~QuasiMagnetostaticSolver3D();
 
   /** Initialize quasi-magnetostatic problem
@@ -203,7 +206,7 @@ class QuasiMagnetostaticSolverAxiSym : public QuasiMagnetostaticSolverBase {  //
   void InterpolateToYAxis() const;
 
  public:
-  QuasiMagnetostaticSolverAxiSym(mfem::MPI_Session &mpi, ElectromagneticOptions em_opts, TPS::Tps *tps);
+  QuasiMagnetostaticSolverAxiSym(ElectromagneticOptions em_opts, TPS::Tps *tps);
   ~QuasiMagnetostaticSolverAxiSym();
 
   /** Initialize axisymmetric quasi-magnetostatic problem
