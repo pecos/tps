@@ -37,6 +37,7 @@
 #include "utils.hpp"
 
 void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
+MPI_Comm TPSCommWorld = this->groupsMPI->getTPSCommWorld();
 #ifdef HAVE_GRVY
   grvy_timer_begin(__func__);
 #endif
@@ -97,7 +98,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
       // verify we have all desired files and open on each process
       int gstatus;
       int status = static_cast<int>(file_exists(fileName));
-      MPI_Allreduce(&status, &gstatus, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+      MPI_Allreduce(&status, &gstatus, 1, MPI_INT, MPI_MIN, TPSCommWorld);
 
       if (gstatus == 0) {
         grvy_printf(gerror, "[ERROR]: Unable to access desired restart file -> %s\n", fileName.c_str());
@@ -158,7 +159,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
     if (!config.isRestartSerialized(mode)) {
       int ldofs = vfes->GetNDofs();
       int gdofs;
-      MPI_Allreduce(&ldofs, &gdofs, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+      MPI_Allreduce(&ldofs, &gdofs, 1, MPI_INT, MPI_SUM, TPSCommWorld);
       h5_save_attribute(file, "dofs_global", gdofs);
     }
   } else {  // read
@@ -183,15 +184,15 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
     }
 
     if (config.isRestartSerialized(mode)) {
-      MPI_Bcast(&iter, 1, MPI_INT, 0, MPI_COMM_WORLD);
-      MPI_Bcast(&time, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-      MPI_Bcast(&dt, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-      MPI_Bcast(&read_order, 1, MPI_INT, 0, MPI_COMM_WORLD);
+      MPI_Bcast(&iter, 1, MPI_INT, 0, TPSCommWorld);
+      MPI_Bcast(&time, 1, MPI_DOUBLE, 0, TPSCommWorld);
+      MPI_Bcast(&dt, 1, MPI_DOUBLE, 0, TPSCommWorld);
+      MPI_Bcast(&read_order, 1, MPI_INT, 0, TPSCommWorld);
       if (average->ComputeMean() && config.GetRestartMean()) {
         int sampMean = average->GetSamplesMean();
         int intervals = average->GetSamplesInterval();
-        MPI_Bcast(&sampMean, 1, MPI_INT, 0, MPI_COMM_WORLD);
-        MPI_Bcast(&intervals, 1, MPI_INT, 0, MPI_COMM_WORLD);
+        MPI_Bcast(&sampMean, 1, MPI_INT, 0, TPSCommWorld);
+        MPI_Bcast(&intervals, 1, MPI_INT, 0, TPSCommWorld);
       }
     }
 
@@ -301,7 +302,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
       int dof = fam.pfunc_->ParFESpace()->GetNDofs();
       if (config.isRestartSerialized(mode)) {
         int dof_global;
-        MPI_Reduce(&dof, &dof_global, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+        MPI_Reduce(&dof, &dof_global, 1, MPI_INT, MPI_SUM, 0, TPSCommWorld);
         dof = dof_global;
       }
 
@@ -379,6 +380,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
 }
 
 void M2ulPhyS::partitioning_file_hdf5(std::string mode) {
+  MPI_Comm TPSCommWorld = groupsMPI->getTPSCommWorld();
   grvy_timer_begin(__func__);
 
   // only rank 0 writes partitioning file
@@ -467,7 +469,7 @@ void M2ulPhyS::partitioning_file_hdf5(std::string mode) {
 
 #if 0
     // distribute partition vector to all procs
-    MPI_Bcast(partitioning_.GetData(), nelemGlobal_, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(partitioning_.GetData(), nelemGlobal_, MPI_INT, 0, TPSCommWorld);
 #endif
 
     // distribute partition vector to all procs (serialzed per process variant)
@@ -475,11 +477,11 @@ void M2ulPhyS::partitioning_file_hdf5(std::string mode) {
 
     if (rank0_) {
       for (int rank = 1; rank < nprocs_; rank++) {
-        MPI_Send(partitioning_.GetData(), nelemGlobal_, MPI_INT, rank, tag, MPI_COMM_WORLD);
+        MPI_Send(partitioning_.GetData(), nelemGlobal_, MPI_INT, rank, tag, TPSCommWorld);
         grvy_printf(gdebug, "Sent partitioning data to rank %i\n", rank);
       }
     } else {
-      MPI_Recv(partitioning_.GetData(), nelemGlobal_, MPI_INT, 0, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      MPI_Recv(partitioning_.GetData(), nelemGlobal_, MPI_INT, 0, tag, TPSCommWorld, MPI_STATUS_IGNORE);
     }
     if (rank0_) grvy_printf(ginfo, "--> partition file read complete\n");
   }
@@ -487,10 +489,11 @@ void M2ulPhyS::partitioning_file_hdf5(std::string mode) {
 }
 
 void M2ulPhyS::serialize_soln_for_write(IOFamily &fam) {
+  MPI_Comm TPSCommWorld = groupsMPI->getTPSCommWorld();
   // Get total number of elements
   const int local_ne = mesh->GetNE();
   int global_ne;
-  MPI_Reduce(&local_ne, &global_ne, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+  MPI_Reduce(&local_ne, &global_ne, 1, MPI_INT, MPI_SUM, 0, TPSCommWorld);
 
   // ks note: need to double check this routine when additional solution
   // families are added and then remove next assert
@@ -525,7 +528,7 @@ void M2ulPhyS::serialize_soln_for_write(IOFamily &fam) {
         fam.serial_fes->GetElementVDofs(gelem, gvdofs);
         lsoln.SetSize(gvdofs.Size());
 
-        MPI_Recv(lsoln.HostReadWrite(), gvdofs.Size(), MPI_DOUBLE, from_rank, gelem, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Recv(lsoln.HostReadWrite(), gvdofs.Size(), MPI_DOUBLE, from_rank, gelem, TPSCommWorld, MPI_STATUS_IGNORE);
 
         fam.serial_sol->SetSubVector(gvdofs, lsoln);
       }
@@ -542,7 +545,7 @@ void M2ulPhyS::serialize_soln_for_write(IOFamily &fam) {
       pfunc->GetSubVector(lvdofs, lsoln);  // work for gpu build?
 
       // send to task 0
-      MPI_Send(lsoln.HostReadWrite(), lsoln.Size(), MPI_DOUBLE, 0, gelem, MPI_COMM_WORLD);
+      MPI_Send(lsoln.HostReadWrite(), lsoln.Size(), MPI_DOUBLE, 0, gelem, TPSCommWorld);
     }
   }
 }  // end function: serialize_soln_for_write()
@@ -564,6 +567,7 @@ void M2ulPhyS::read_partitioned_soln_data(hid_t file, string varName, size_t ind
 // convenience function to read and distribute solution data for serialized restarts
 void M2ulPhyS::read_serialized_soln_data(hid_t file, string varName, int numDof, int varOffset, double *data,
                                          IOFamily &fam) {
+  MPI_Comm TPSCommWorld = this->groupsMPI->getTPSCommWorld();
   assert(config.isRestartSerialized("read"));
 
   hid_t data_soln;
@@ -628,7 +632,7 @@ void M2ulPhyS::read_serialized_soln_data(hid_t file, string varName, int numDof,
           for (int i = 0; i < numDof_per_this_elem; i++) packedData.push_back(data_serial[gvdofs[i]]);
         }
       int tag = 20;
-      MPI_Send(packedData.data(), packedData.size(), MPI_DOUBLE, rank, tag, MPI_COMM_WORLD);
+      MPI_Send(packedData.data(), packedData.size(), MPI_DOUBLE, rank, tag, TPSCommWorld);
     }
   } else {  // <-- end rank 0
     int numlDofs = fam.pfunc_->ParFESpace()->GetNDofs();
@@ -638,7 +642,7 @@ void M2ulPhyS::read_serialized_soln_data(hid_t file, string varName, int numDof,
     std::vector<double> packedData(numlDofs);
 
     // receive solution data from rank 0
-    MPI_Recv(packedData.data(), numlDofs, MPI_DOUBLE, 0, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Recv(packedData.data(), numlDofs, MPI_DOUBLE, 0, tag, TPSCommWorld, MPI_STATUS_IGNORE);
 
     // update local state vector
     for (int i = 0; i < numlDofs; i++) data[i + varOffset * numlDofs] = packedData[i];
@@ -664,8 +668,9 @@ void M2ulPhyS::write_soln_data(hid_t group, string varName, hid_t dataspace, dou
 }
 
 void M2ulPhyS::writeHistoryFile() {
+  MPI_Comm TPSCommWorld = this->groupsMPI->getTPSCommWorld();
   double global_dUdt[5];
-  MPI_Allreduce(rhsOperator->getLocalTimeDerivatives(), &global_dUdt, 5, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  MPI_Allreduce(rhsOperator->getLocalTimeDerivatives(), &global_dUdt, 5, MPI_DOUBLE, MPI_SUM, TPSCommWorld);
 
   if (rank0_) {
     histFile << time << "," << iter;
@@ -676,7 +681,7 @@ void M2ulPhyS::writeHistoryFile() {
 
   if (average->ComputeMean()) {
     double global_meanData[5 + 6];
-    MPI_Allreduce(average->getLocalSums(), &global_meanData, 5 + 6, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    MPI_Allreduce(average->getLocalSums(), &global_meanData, 5 + 6, MPI_DOUBLE, MPI_SUM, TPSCommWorld);
 
     if (rank0_) {
       histFile << "," << average->GetSamplesMean();
@@ -688,6 +693,7 @@ void M2ulPhyS::writeHistoryFile() {
 }
 
 void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
+  MPI_Comm TPSCommWorld = this->groupsMPI->getTPSCommWorld();
   tpsP->getInput((inputPath + "/x_log").c_str(), result.xLogScale, false);
   tpsP->getInput((inputPath + "/f_log").c_str(), result.fLogScale, false);
   tpsP->getInput((inputPath + "/order").c_str(), result.order, 1);
@@ -706,18 +712,18 @@ void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
     // TODO(kevin): extend for multi-column array?
     Ndata = dims[0];
   }
-  MPI_Bcast(&success, 1, MPI_CXX_BOOL, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&success, 1, MPI_CXX_BOOL, 0, TPSCommWorld);
   if (!success) exit(ERROR);
 
   int *d_dims = dims.GetData();
-  MPI_Bcast(&Ndata, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast(d_dims, 2, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&Ndata, 1, MPI_INT, 0, TPSCommWorld);
+  MPI_Bcast(d_dims, 2, MPI_INT, 0, TPSCommWorld);
   assert(dims[0] > 0);
   assert(dims[1] == 2);
 
   if (!rank0_) (config.tableHost[tableIndex]).SetSize(dims[0], dims[1]);
   double *d_table = config.tableHost[tableIndex].GetData();
-  MPI_Bcast(d_table, dims[0] * dims[1], MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast(d_table, dims[0] * dims[1], MPI_DOUBLE, 0, TPSCommWorld);
 
   result.Ndata = Ndata;
   result.xdata = (config.tableHost[tableIndex]).Read();

@@ -731,7 +731,7 @@ void SpongeZone::computeMixedOutValues() {
 
   // communicate different partitions
   Vector sum(num_equation + 1);
-  MPI_Allreduce(meanNormalFluxes.HostRead(), sum.HostWrite(), num_equation + 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  MPI_Allreduce(meanNormalFluxes.HostRead(), sum.HostWrite(), num_equation + 1, MPI_DOUBLE, MPI_SUM, vfes->GetComm());
   meanNormalFluxes = sum;
 
   // normalize

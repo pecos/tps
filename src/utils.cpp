@@ -64,6 +64,7 @@ bool slurm_job_almost_done(int threshold, int rank) {
   int64_t secsRemaining;
   if (rank == 0) secsRemaining = slurm_get_rem_time(atoi(SLURM_JOB_ID));
 
+  // UV this should be TPSCommWorld but it can not be grabbed here
   MPI_Bcast(&secsRemaining, 1, MPI_LONG, 0, MPI_COMM_WORLD);
 
   if (secsRemaining < 0) {
@@ -134,7 +135,7 @@ bool M2ulPhyS::Check_ExitEarly(int iter) {
       status = static_cast<int>(file_exists("DIE"));
       if (status == 1) grvy_printf(ginfo, "Detected DIE file, terminating early...\n");
     }
-    MPI_Bcast(&status, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&status, 1, MPI_INT, 0, groupsMPI->getTPSCommWorld());
     return (static_cast<bool>(status));
   } else {
     return (false);

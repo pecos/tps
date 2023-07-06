@@ -285,14 +285,14 @@ void Tps::parseInput() {
 
   // distribute buffer to remaining tasks
   int bufferSize = buffer.str().size();
-  MPI_Bcast(&bufferSize, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&bufferSize, 1, MPI_INT, 0, TPSCommWorld_);
 
   if (isRank0_)
     ss = buffer.str();
   else
     ss.resize(bufferSize);
 
-  MPI_Bcast(&ss[0], ss.capacity(), MPI_CHAR, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&ss[0], ss.capacity(), MPI_CHAR, 0, TPSCommWorld_);
   buffer.str(ss);
 
   // now, all procs can load the input file contents for subsequent parsing
