@@ -78,15 +78,13 @@ void MPI_Groups::init() {
   }
 }
 
-int MPI_Groups::getTPSWorldRank()
-{
+int MPI_Groups::getTPSWorldRank() {
   int rank;
   MPI_Comm_rank(TPSCommWorld_, &rank);
   return rank;
 }
 
-int MPI_Groups::getTPSWorldSize()
-{
+int MPI_Groups::getTPSWorldSize() {
   int size;
   MPI_Comm_size(TPSCommWorld_, &size);
   return size;

@@ -58,8 +58,7 @@ namespace TPS {
  * call input parsing functions, choose solver, and initialize to set
  * information for simulation.  For an example, see main.cpp.
  */
-Tps::Tps(MPI_Comm world): TPSCommWorld_(world)
- {
+Tps::Tps(MPI_Comm world): TPSCommWorld_(world) {
   MPI_Comm_size(world, &nprocs_);
   MPI_Comm_rank(world, &rank_);
   if (rank_ == 0)

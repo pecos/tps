@@ -66,7 +66,7 @@ class MPI_Groups {
 
   int getTPSWorldSize();
 
-  int isWorldRoot(){ return this->getTPSWorldRank() == 0;}
+  int isWorldRoot() { return this->getTPSWorldRank() == 0; }
 
 
   [[deprecated("Use getTPSCommWorld")]]

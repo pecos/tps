@@ -100,7 +100,7 @@ class Tps {
   bool isVisualizationMode_;
 
  public:
-  Tps(): Tps(MPI_COMM_WORLD) {};
+  Tps(): Tps(MPI_COMM_WORLD) {}
   Tps(MPI_Comm world);
   ~Tps();
   GRVY::GRVY_Input_Class iparse_;  ///< runtime input parser (from libgrvy)

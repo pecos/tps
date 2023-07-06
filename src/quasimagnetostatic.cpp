@@ -53,7 +53,7 @@ QuasiMagnetostaticSolverBase::QuasiMagnetostaticSolverBase(ElectromagneticOption
     rank0_ = true;
   else
     rank0_ = false;
-  
+
   tpsP_ = tps;
   pmesh_ = NULL;
 

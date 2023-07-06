@@ -40,18 +40,16 @@ M2ulPhyS::M2ulPhyS(TPS::Tps *tps):
   nprocs_(groupsMPI->getTPSWorldSize()),
   rank_(groupsMPI->getTPSWorldRank()),
   rank0_(groupsMPI->isWorldRoot()),
-  tpsP(tps)
-{
+  tpsP(tps) {
   parseSolverOptions2();
 }
 
-M2ulPhyS::M2ulPhyS(string &inputFileName, TPS::Tps *tps) : 
+M2ulPhyS::M2ulPhyS(string &inputFileName, TPS::Tps *tps) :
   groupsMPI( new MPI_Groups(tps->getTPSCommWorld()) ),
   nprocs_(groupsMPI->getTPSWorldSize()),
   rank_(groupsMPI->getTPSWorldRank()),
   rank0_(groupsMPI->isWorldRoot()),
-  tpsP(tps)
-{
+  tpsP(tps) {
   // koomie TODO: refactor order so we can use standard parseSolverOptions call from Solver base class
 #define NEWPARSER
 #ifdef NEWPARSER
