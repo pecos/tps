@@ -58,6 +58,7 @@
 #include "logger.hpp"
 #include "quasimagnetostatic.hpp"
 #include "solver.hpp"
+#include "support.hpp"
 #include "utils.hpp"
 
 namespace TPS {
@@ -97,6 +98,9 @@ class Tps {
   // pointer to solver implementation chosen at runtime
   TPS::Solver *solver_ = NULL;
 
+  // pointer to collection of supporting functions
+  TPS::Support *support_ = NULL;
+  
   // post-process visualization mode
   bool isVisualizationMode_;
 

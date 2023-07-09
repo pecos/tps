@@ -315,6 +315,7 @@ void Tps::parseInput() {
   getInput("gpu/numGpusPerRank", numGpusPerRank_, 1);
 #endif
 
+  
   return;
 }
 
