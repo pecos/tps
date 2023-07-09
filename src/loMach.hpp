@@ -9,11 +9,14 @@ class Tps;
 }
 
 #include <iostream>
+#include <hdf5.h>
+#include <tps_config.h>
+
 #include "../utils/mfem_extras/pfem_extras.hpp"
 #include "loMach_options.hpp"
 #include "tps.hpp"
 #include "tps_mfem_wrap.hpp"
-
+#include "run_configuration.hpp"
 #include "mfem.hpp"
 //#include "solvers.hpp"
 #include "mfem/linalg/solvers.hpp"
@@ -132,6 +135,22 @@ protected:
    mfem::MPI_Session &mpi_;
    LoMachOptions loMach_opts_;
 
+   MPI_Groups *groupsMPI;
+   //MPI_Session &mpi;
+   int nprocs_;  // total number of MPI procs
+   int rank_;    // local MPI rank
+   bool rank0_;  // flag to indicate rank 0
+
+   // Run options
+   RunConfiguration config;
+
+   // History file
+   std::ofstream histFile;
+
+   // Number of dimensions
+   int dim;
+   int nvel;
+  
    // pointer to parent Tps class
    TPS::Tps *tpsP_;
 
@@ -139,6 +158,12 @@ protected:
    int dim_;
    int true_size_;
    Array<int> offsets_;
+
+   // min/max element size
+   double hmin, hmax;
+
+   // exit status code;
+   int exit_status_;
   
    /// Print information about the Navier version.
    void PrintInfo();
@@ -175,9 +200,10 @@ protected:
 
    /// Enable/disable numerical integration rules of forms.
    bool numerical_integ = false;
-
+  
    /// The parallel mesh.
    ParMesh *pmesh = nullptr;
+   //Mesh *serial_mesh;  
 
    /// The order of the velocity and pressure space.
    int order;
@@ -301,6 +327,8 @@ protected:
    ParGridFunction un_gf, un_next_gf, curlu_gf, curlcurlu_gf, Lext_gf, FText_gf,
                    resu_gf;
 
+
+   //ParGridFunction rn_gf, resr_gf;  
    ParGridFunction pn_gf, resp_gf;
    ParGridFunction sml_gf, big_gf;
 
@@ -393,6 +421,20 @@ protected:
    ParGridFunction Tn_NM1_gf;
    ParGridFunction Tn_filtered_gf;
 
+   // stuff that really shouldnt be part of the solver but M2ulPhys is a disaster
+   /*
+   RunConfiguration config;
+   std::ofstream histFile;
+   int dim;
+   int nvel;
+   int num_equation;  
+   ParaViewDataCollection *paraviewColl = NULL;
+   double hmin;
+   double hmax;
+   int exit_status_;  
+   IODataOrganizer ioData;
+   */
+  
   
 public:
    /// Initialize data structures, set FE space order and kinematic viscosity.
@@ -413,6 +455,16 @@ public:
 
    void initialize();
    void parseSolverOptions() override;
+   void parseSolverOptions2();
+   void parsePeriodicInputs();
+   void parseFlowOptions();
+   void parseTimeIntegrationOptions();
+   void parseStatOptions();
+   void parseIOSettings();
+   void parseRMSJobOptions();  
+   void parseBCInputs();
+   void parseICOptions();
+   void parsePostProcessVisualizationInputs();  
    void solve();  
   
    /// Initialize forms, solvers and preconditioners.
@@ -452,8 +504,13 @@ public:
    ParGridFunction *GetCurrentPressure() { return &pn_gf; }
 
    /// Return a pointer to the current temperature ParGridFunction.
-   ParGridFunction *GetCurrentTemperature() { return &Tn_gf; }  
+   ParGridFunction *GetCurrentTemperature() { return &Tn_gf; }
 
+   /// Return a pointer to the current temperature ParGridFunction.
+   //ParGridFunction *GetCurrentDensity() { return &rn_gf; }    
+
+   LoMachOptions GetOptions() { return loMach_opts_; }
+  
    /// Add a Dirichlet boundary condition to the velocity field.
    void AddVelDirichletBC(VectorCoefficient *coeff, Array<int> &attr);
    void AddVelDirichletBC(VecFuncT *f, Array<int> &attr);
@@ -533,6 +590,9 @@ public:
 
    /// Compute CFL
    double ComputeCFL(ParGridFunction &u, double dt);
+
+   /// Enforce CFL
+   void EnforceCFL(double maxCFL, ParGridFunction &u, double &dt);  
 
    /// Set the number of modes to cut off in the interpolation filter
    void SetCutoffModes(int c) { filter_cutoff_modes = c; }

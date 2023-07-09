@@ -32,10 +32,33 @@ double temp_wall(const Vector &x, double t);
 
 
 LoMachSolver::LoMachSolver(MPI_Session &mpi, LoMachOptions loMach_opts, TPS::Tps *tps)
-    : mpi_(mpi), loMach_opts_(loMach_opts), offsets_(3) {
+//    : mpi_(mpi), loMach_opts_(loMach_opts), offsets_(3) {
+    : mpi_(mpi), loMach_opts_(loMach_opts) {
+  
   tpsP_ = tps;
   pmesh = NULL;
 
+  rank_ = mpi_.WorldRank();
+  if (rank_ == 0) { rank0_ = true; }
+  else { rank0_ = false; }
+  groupsMPI = new MPI_Groups(&mpi_);
+
+  parseSolverOptions();  
+  parseSolverOptions2();
+  
+  //groupsMPI->init();  
+
+  // set default solver state
+  exit_status_ = NORMAL;
+
+  // remove DIE file if present
+  if (rank0_) {
+    if (file_exists("DIE")) {
+      grvy_printf(gdebug, "Removing DIE file on startup\n");
+      remove("DIE");
+    }
+  }
+  
   // verify running on cpu
   /*
   if (tpsP_->getDeviceConfig() != "cpu") {
@@ -68,10 +91,11 @@ void LoMachSolver::initialize() {
    bool verbose = mpi_.Root();
    if (verbose) grvy_printf(ginfo, "Initializing loMach solver.\n");
 
-   // temporary hard-coding
-   order = 3;
-   porder = 3;
-   norder = 3;
+   order = loMach_opts_.order;
+   porder = loMach_opts_.order;
+   norder = loMach_opts_.order;
+
+   // temporary hard-coding   
    Re_tau = 182.0;   
    kin_vis = 1.0/Re_tau;
    Po = 101325.0;
@@ -82,13 +106,9 @@ void LoMachSolver::initialize() {
    //-----------------------------------------------------
    // 1) Prepare the mesh
    //-----------------------------------------------------
-
-   // 1a) Read the serial mesh (on each mpi rank)
-   //Mesh *mesh = new Mesh(lomach_opts_.mesh_file.c_str(), 1, 1);
-
    
    // temporary hard-coded mesh
-
+   /*
    // domain size
    double Lx = 2.0 * M_PI;
    double Ly = 1.0;
@@ -102,37 +122,62 @@ void LoMachSolver::initialize() {
    int NY = 2 * static_cast<int>(std::round(48.0 / N));
    int NZ = NL;
 
-   Mesh mesh = Mesh::MakeCartesian3D(NX, NY, NZ, Element::HEXAHEDRON, Lx, Ly, Lz);
-   Mesh *mesh_ptr = &mesh;
+   //Mesh mesh = Mesh::MakeCartesian3D(NX, NY, NZ, Element::HEXAHEDRON, Lx, Ly, Lz);
+   //Mesh *mesh_ptr = &mesh;
    //if (verbose) grvy_printf(ginfo, "Constructed mesh...\n");   
-   
-   for (int i = 0; i < mesh.GetNV(); ++i)
-   {
-      double *v = mesh.GetVertex(i);
-      v[1] = mesh_stretching_func(v[1]);
-   }
-   //if (verbose) grvy_printf(ginfo, "Stretched mesh...\n");      
+
+   //for (int i = 0; i < mesh.GetNV(); ++i)
+   //{
+   //   double *v = mesh.GetVertex(i);
+   //   v[1] = mesh_stretching_func(v[1]);
+   //}
 
    // Create translation vectors defining the periodicity
-   Vector x_translation({Lx, 0.0, 0.0});
-   Vector z_translation({0.0, 0.0, Lz});
-   std::vector<Vector> translations = {x_translation, z_translation};
+   //Vector x_translation({Lx, 0.0, 0.0});
+   //Vector z_translation({0.0, 0.0, Lz});
+   //std::vector<Vector> translations = {x_translation, z_translation};   
+   */
 
+    Vector x_translation({config.GetXTrans(), 0.0, 0.0});
+    Vector y_translation({0.0, config.GetYTrans(), 0.0});
+    Vector z_translation({0.0, 0.0, config.GetZTrans()});
+    std::vector<Vector> translations = {x_translation, y_translation, z_translation};
+
+    if (mpi_.Root()) {
+      std::cout << " Making the mesh periodic using the following offsets:" << std::endl;
+      std::cout << "   xTrans: " << config.GetXTrans() << std::endl;
+      std::cout << "   yTrans: " << config.GetYTrans() << std::endl;
+      std::cout << "   zTrans: " << config.GetZTrans() << std::endl;
+    }
+    
+
+   // 1a) Read the serial mesh (on each mpi rank)
+   //Mesh *mesh_ptr = new Mesh(lomach_opts_.mesh_file.c_str(), 1, 1);
+   //LoMachOptions loMach_opts_ = GetOptions();
+   Mesh mesh = Mesh(loMach_opts_.mesh_file.c_str());   
+   Mesh *mesh_ptr = &mesh;
+   
    // Create the periodic mesh using the vertex mapping defined by the translation vectors
    Mesh periodic_mesh = Mesh::MakePeriodic(mesh,mesh.CreatePeriodicVertexMapping(translations));
    //if (verbose) grvy_printf(ginfo, "Mesh made periodic...\n");         
    
-   
+
+   // underscore stuff is terrible
    dim_ = mesh_ptr->Dimension();
+   int dim = pmesh->Dimension();
+
+   
    //if (verbose) grvy_printf(ginfo, "Got mesh dim...\n");            
 
    // 1b) Refine the serial mesh, if requested
+   /*
    if (verbose && (loMach_opts_.ref_levels > 0)) {
      grvy_printf(ginfo, "Refining mesh: ref_levels %d\n", loMach_opts_.ref_levels);
    }
    for (int l = 0; l < loMach_opts_.ref_levels; l++) {
      mesh_ptr->UniformRefinement();
    }
+   */
 
 
    /*
@@ -158,8 +203,6 @@ void LoMachSolver::initialize() {
    //-----------------------------------------------------
    // 2) Prepare the required finite elements
    //-----------------------------------------------------
-
-   int dim = pmesh->Dimension();
    
    // velocity
    vfec = new H1_FECollection(order, dim);
@@ -326,22 +369,32 @@ void LoMachSolver::Setup(double dt)
    }
    */
 
-   int dim = pmesh->Dimension();
+   int dim = pmesh->Dimension();      
    
    // adding bits from old main here
    // Set the initial condition.
+   //ParGridFunction *r_gf = GetCurrentDensity();   
    ParGridFunction *u_gf = GetCurrentVelocity();
-   //std::cout << "Check 0..." << std::endl;   
    ParGridFunction *p_gf = GetCurrentPressure();
-   ParGridFunction *t_gf = GetCurrentTemperature();   
-   //std::cout << "Check 1..." << std::endl;
-   
-   VectorFunctionCoefficient u_ic_coef(dim, vel_ic);
-   //std::cout << "Check 1a..." << std::endl;      
-   u_gf->ProjectCoefficient(u_ic_coef);
-   //std::cout << "Check 1b..." << std::endl;   
+   ParGridFunction *t_gf = GetCurrentTemperature();
+   //std::cout << "Check 0..." << std::endl;   
 
-   FunctionCoefficient t_ic_coef(temp_ic);   
+   //ConstantCoefficient r_ic_coef;
+   //r_ic_coef.constant = config.initRhoRhoVp[0];
+   //r_gf->ProjectCoefficient(r_ic_coef);   
+   
+   //VectorFunctionCoefficient u_ic_coef(dim, vel_ic);
+   Vector uic_vec(3);
+   uic_vec(0) = config.initRhoRhoVp[1];
+   uic_vec(1) = config.initRhoRhoVp[2];
+   uic_vec(2) = config.initRhoRhoVp[3];      
+   VectorConstantCoefficient u_ic_coef(uic_vec);
+   u_gf->ProjectCoefficient(u_ic_coef);
+   //std::cout << "Check 1..." << std::endl;   
+
+   //FunctionCoefficient t_ic_coef(temp_ic);
+   ConstantCoefficient t_ic_coef;
+   t_ic_coef.constant = config.initRhoRhoVp[4] / (Rgas * config.initRhoRhoVp[0]);
    t_gf->ProjectCoefficient(t_ic_coef);   
    //std::cout << "Check 2..." << std::endl;
    
@@ -350,14 +403,39 @@ void LoMachSolver::Setup(double dt)
    AddAccelTerm(accel, domain_attr);
 
    Array<int> attr(pmesh->bdr_attributes.Max());
-   attr[1] = 1;
-   attr[3] = 1;
-   AddVelDirichletBC(vel_wall, attr);
+   //attr[1] = 1;
+   //attr[3] = 1;
+   //AddVelDirichletBC(vel_wall, attr);
+   Vector zero_vec(3); zero_vec = 0.0;
+   VectorConstantCoefficient u_bc_coef(zero_vec);
+   for (int i = 0; i < config.wallPatchType.size(); i++) {
+     for (int iFace = 0; iFace < pmesh->bdr_attributes.Max(); iFace++) {     
+       if (config.wallPatchType[i].second != WallType::INV) {
+         if (iFace == config.wallPatchType[i].first) {
+            attr[iFace] = 1;	 
+            AddVelDirichletBC(&u_bc_coef, attr);
+         }
+       }
+     }
+   }   
 
    Array<int> Tattr(pmesh->bdr_attributes.Max());
-   Tattr[1] = 1;
-   Tattr[3] = 1;
-   AddTempDirichletBC(temp_wall, Tattr);   
+   //Tattr[1] = 1;
+   //Tattr[3] = 1;
+   //AddTempDirichletBC(temp_wall, Tattr);
+   // config.wallBC.size()           
+   ConstantCoefficient t_bc_coef;
+   for (int i = 0; i < config.wallPatchType.size(); i++) {
+     t_bc_coef.constant = config.wallBC[i].Th;
+     for (int iFace = 0; iFace < pmesh->bdr_attributes.Max(); iFace++) {     
+       if (config.wallPatchType[i].second != WallType::INV) { // should only be isothermal
+         if (iFace == config.wallPatchType[i].first) {
+            Tattr[iFace] = 1;	 
+            AddTempDirichletBC(&t_bc_coef, Tattr);	  
+         }
+       }
+     }
+   }
    //std::cout << "Check 3..." << std::endl;  
 
    // returning to regular setup   
@@ -868,43 +946,6 @@ void LoMachSolver::UpdateTimestepHistory(double dt)
 }
 
 
-// query solver-specific runtime controls
-void LoMachSolver::parseSolverOptions() {
-
-  //if (verbose) grvy_printf(ginfo, "parsing solver options...\n");        
-  tpsP_->getRequiredInput("loMach/mesh", loMach_opts_.mesh_file);
-  tpsP_->getInput("loMach/order", loMach_opts_.order, 1);
-  tpsP_->getInput("loMach/ref_levels", loMach_opts_.ref_levels, 0);
-  tpsP_->getInput("loMach/max_iter", loMach_opts_.max_iter, 100);
-  tpsP_->getInput("loMach/rtol", loMach_opts_.rtol, 1.0e-6);
-  
-  //tpsP_->getInput("em/atol", em_opts_.atol, 1.0e-10);
-  //tpsP_->getInput("em/preconditioner_background_sigma", em_opts_.preconditioner_background_sigma, -1.0);
-  //tpsP_->getInput("em/evaluate_magnetic_field", em_opts_.evaluate_magnetic_field, true);
-  //tpsP_->getInput("em/nBy", em_opts_.nBy, 0);
-  //tpsP_->getInput("em/yinterp_min", em_opts_.yinterp_min, 0.0);
-  //tpsP_->getInput("em/yinterp_max", em_opts_.yinterp_max, 1.0);
-  //tpsP_->getInput("em/By_file", em_opts_.By_file, std::string("By.h5"));
-  //tpsP_->getInput("em/top_only", em_opts_.top_only, false);
-  //tpsP_->getInput("em/bot_only", em_opts_.bot_only, false);
-
-  //tpsP_->getInput("em/current_amplitude", em_opts_.current_amplitude, 1.0);
-  //tpsP_->getInput("em/current_frequency", em_opts_.current_frequency, 1.0);
-  //tpsP_->getInput("em/permeability", em_opts_.mu0, 1.0);
-
-  //Vector default_axis(3);
-  //default_axis[0] = 0;
-  //default_axis[1] = 1;
-  //default_axis[2] = 0;
-  //tpsP_->getVec("em/current_axis", em_opts_.current_axis, 3, default_axis);
-
-  // dump options to screen for user inspection
-  if (mpi_.Root()) {
-    loMach_opts_.print(std::cout);
-  }
-}
-
-
 void LoMachSolver::solve()
 {    
    //Mpi::Init();
@@ -934,12 +975,25 @@ void LoMachSolver::solve()
 
    //std::cout << "Check 6..." << std::endl;
 
-   // temporary hard-codes
+   // temporary hardcodes
    double t = 0.0;
-   double dt = 1.0e-4;
+   double dt, CFL, CFL_actual;
    double t_final = 1.0;
    bool last_step = false;
 
+   ParGridFunction *u_gf = GetCurrentVelocity();
+   dt = config.dt_fixed;
+   CFL = config.cflNum;
+   CFL_actual = ComputeCFL(*u_gf, dt);   
+   //EnforceCFL(config.cflNum, u_gf, &dt);
+   //dt = dt * max(cflMax_set/cflmax_actual,1.0);
+
+   if (!config.isTimeStepConstant()) {
+     //double dt_local = CFL * hmin / max_speed / static_cast<double>(dim);
+     //MPI_Allreduce(&dt_local, &dt, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
+     dt = dt * max(CFL/CFL_actual,1.0);
+   }   
+   
    Setup(dt);
 
    /*
@@ -970,6 +1024,7 @@ void LoMachSolver::solve()
      */
       
       if (t + dt >= t_final - dt / 2) { last_step = true; }
+      if (step == config.numIters) { last_step = true; }      
 
       if (Mpi::Root())
       {
@@ -980,9 +1035,21 @@ void LoMachSolver::solve()
       }
       
       Step(t, dt, step);
-      
-      if (t > 5.0) { dt = 1e-2; }
 
+      
+      // NECESSARY ADDITIONS:
+
+      // update dt periodically
+      if (!config.isTimeStepConstant()) {
+        //double dt_local = CFL * hmin / max_speed / static_cast<double>(dim);
+        //MPI_Allreduce(&dt_local, &dt, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
+        dt = dt * max(CFL/CFL_actual,1.0);	
+      }         
+
+      // restart files
+
+      // paraview
+      
    }
 
    //flowsolver.PrintTimingData();
@@ -1979,6 +2046,96 @@ double LoMachSolver::ComputeCFL(ParGridFunction &u, double dt)
 }
 
 
+void LoMachSolver::EnforceCFL(double maxCFL, ParGridFunction &u, double &dt)
+{
+   ParMesh *pmesh_u = u.ParFESpace()->GetParMesh();
+   FiniteElementSpace *fes = u.FESpace();
+   int vdim = fes->GetVDim();
+
+   Vector ux, uy, uz;
+   Vector ur, us, ut;
+   double cflx = 0.0;
+   double cfly = 0.0;
+   double cflz = 0.0;
+   double cflm = 0.0;
+   double cflmax = 0.0;
+
+   for (int e = 0; e < fes->GetNE(); ++e)
+   {
+      const FiniteElement *fe = fes->GetFE(e);
+      const IntegrationRule &ir = IntRules.Get(fe->GetGeomType(),
+                                               fe->GetOrder());
+      ElementTransformation *tr = fes->GetElementTransformation(e);
+
+      u.GetValues(e, ir, ux, 1);
+      ur.SetSize(ux.Size());
+      u.GetValues(e, ir, uy, 2);
+      us.SetSize(uy.Size());
+      if (vdim == 3)
+      {
+         u.GetValues(e, ir, uz, 3);
+         ut.SetSize(uz.Size());
+      }
+
+      double hmin = pmesh_u->GetElementSize(e, 1) /
+                    (double) fes->GetElementOrder(0);
+
+      for (int i = 0; i < ir.GetNPoints(); ++i)
+      {
+         const IntegrationPoint &ip = ir.IntPoint(i);
+         tr->SetIntPoint(&ip);
+         const DenseMatrix &invJ = tr->InverseJacobian();
+         const double detJinv = 1.0 / tr->Jacobian().Det();
+
+         if (vdim == 2)
+         {
+            ur(i) = (ux(i) * invJ(0, 0) + uy(i) * invJ(1, 0)) * detJinv;
+            us(i) = (ux(i) * invJ(0, 1) + uy(i) * invJ(1, 1)) * detJinv;
+         }
+         else if (vdim == 3)
+         {
+            ur(i) = (ux(i) * invJ(0, 0) + uy(i) * invJ(1, 0)
+                     + uz(i) * invJ(2, 0))
+                    * detJinv;
+            us(i) = (ux(i) * invJ(0, 1) + uy(i) * invJ(1, 1)
+                     + uz(i) * invJ(2, 1))
+                    * detJinv;
+            ut(i) = (ux(i) * invJ(0, 2) + uy(i) * invJ(1, 2)
+                     + uz(i) * invJ(2, 2))
+                    * detJinv;
+         }
+
+	 // here
+	 double dtx, dty, dtz;
+         //cflx = fabs(dt * ux(i) / hmin);
+         //cfly = fabs(dt * uy(i) / hmin);	 
+	 dtx = maxCFL * hmin / fabs(ux(i));
+	 dty = maxCFL * hmin / fabs(uy(i));	 
+         if (vdim == 3)
+         {
+	   //cflz = fabs(dt * uz(i) / hmin);
+	   dtz = maxCFL * hmin / fabs(uz(i)); 
+         }
+         //cflm = cflx + cfly + cflz;
+         //cflmax = fmax(cflmax, cflm);
+	 dt = fmin(dtx,dty);
+	 dt = fmin(dt,dtz);
+	 
+      }
+   }
+
+   double cflmax_global = 0.0;
+   MPI_Allreduce(&cflmax,
+                 &cflmax_global,
+                 1,
+                 MPI_DOUBLE,
+                 MPI_MAX,
+                 pmesh_u->GetComm());
+
+   return;
+}
+
+
 void LoMachSolver::AddVelDirichletBC(VectorCoefficient *coeff, Array<int> &attr)
 {
    vel_dbcs.emplace_back(attr, coeff);
@@ -2222,8 +2379,1239 @@ LoMachSolver::~LoMachSolver()
 }
 */
 
+// query solver-specific runtime controls
+void LoMachSolver::parseSolverOptions() {
 
-// temporary, remove when hooked up
+  //if (verbose) grvy_printf(ginfo, "parsing solver options...\n");        
+  tpsP_->getRequiredInput("loMach/mesh", loMach_opts_.mesh_file);
+  tpsP_->getInput("loMach/order", loMach_opts_.order, 1);
+  tpsP_->getInput("loMach/ref_levels", loMach_opts_.ref_levels, 0);
+  tpsP_->getInput("loMach/max_iter", loMach_opts_.max_iter, 100);
+  tpsP_->getInput("loMach/rtol", loMach_opts_.rtol, 1.0e-6);
+  
+  //tpsP_->getInput("em/atol", em_opts_.atol, 1.0e-10);
+  //tpsP_->getInput("em/preconditioner_background_sigma", em_opts_.preconditioner_background_sigma, -1.0);
+  //tpsP_->getInput("em/evaluate_magnetic_field", em_opts_.evaluate_magnetic_field, true);
+  //tpsP_->getInput("em/nBy", em_opts_.nBy, 0);
+  //tpsP_->getInput("em/yinterp_min", em_opts_.yinterp_min, 0.0);
+  //tpsP_->getInput("em/yinterp_max", em_opts_.yinterp_max, 1.0);
+  //tpsP_->getInput("em/By_file", em_opts_.By_file, std::string("By.h5"));
+  //tpsP_->getInput("em/top_only", em_opts_.top_only, false);
+  //tpsP_->getInput("em/bot_only", em_opts_.bot_only, false);
+
+  //tpsP_->getInput("em/current_amplitude", em_opts_.current_amplitude, 1.0);
+  //tpsP_->getInput("em/current_frequency", em_opts_.current_frequency, 1.0);
+  //tpsP_->getInput("em/permeability", em_opts_.mu0, 1.0);
+
+  //Vector default_axis(3);
+  //default_axis[0] = 0;
+  //default_axis[1] = 1;
+  //default_axis[2] = 0;
+  //tpsP_->getVec("em/current_axis", em_opts_.current_axis, 3, default_axis);
+
+  // dump options to screen for user inspection
+  if (mpi_.Root()) {
+    loMach_opts_.print(std::cout);
+  }
+}
+
+
+///* move these to separate support class *//
+void LoMachSolver::parseSolverOptions2() {
+  
+  //tpsP->getRequiredInput("flow/mesh", config.meshFile);
+
+  // flow/numerics
+  //parseFlowOptions();
+
+  // time integration controls
+  //parseTimeIntegrationOptions();
+
+  // statistics
+  //parseStatOptions();
+
+  // I/O settings
+  //parseIOSettings();
+
+  // RMS job management
+  //parseRMSJobOptions();
+
+  // heat source
+  //parseHeatSrcOptions();
+
+  // viscosity multiplier function
+  //parseViscosityOptions();
+
+  // MMS (check before IC b/c if MMS, IC not required)
+  //parseMMSOptions();
+
+  // initial conditions
+  if (!config.use_mms_) { parseICOptions(); }
+
+  // add passive scalar forcings
+  //parsePassiveScalarOptions();
+
+  // fluid presets
+  //parseFluidPreset();
+
+  //parseSystemType();
+
+  // plasma conditions.
+  /*
+  config.gasModel = NUM_GASMODEL;
+  config.transportModel = NUM_TRANSPORTMODEL;
+  config.chemistryModel_ = NUM_CHEMISTRYMODEL;
+  if (config.workFluid == USER_DEFINED) {
+    parsePlasmaModels();
+  } else {
+    // parse options for other plasma presets.
+  }
+  */
+
+  // species list.
+  //parseSpeciesInputs();
+
+  //if (config.workFluid == USER_DEFINED) {  // Transport model
+  //  parseTransportInputs();
+  //}
+
+  // Reaction list
+  //parseReactionInputs();
+
+  // changed the order of parsing in order to use species list.
+  // boundary conditions. The number of boundaries of each supported type if
+  // parsed first. Then, a section corresponding to each defined boundary is parsed afterwards
+  parseBCInputs();
+
+  // sponge zone
+  //parseSpongeZoneInputs();
+
+  // Pack up input parameters for device objects.
+  //packUpGasMixtureInput();
+
+  // Radiation model
+  //parseRadiationInputs();
+
+  // periodicity
+  parsePeriodicInputs();
+
+  // post-process visualization inputs
+  parsePostProcessVisualizationInputs();
+
+  return;
+}
+
+void LoMachSolver::parseFlowOptions() {
+  std::map<std::string, int> sgsModel;
+  sgsModel["none"] = 0;
+  sgsModel["smagorinsky"] = 1;
+  sgsModel["sigma"] = 2;
+  tpsP_->getInput("flow/order", config.solOrder, 4);
+  tpsP_->getInput("flow/integrationRule", config.integrationRule, 1);
+  tpsP_->getInput("flow/basisType", config.basisType, 1);
+  tpsP_->getInput("flow/maxIters", config.numIters, 10);
+  tpsP_->getInput("flow/outputFreq", config.itersOut, 50);
+  tpsP_->getInput("flow/timingFreq", config.timingFreq, 100);
+  //tpsP_->getInput("flow/useRoe", config.useRoe, false);
+  //tpsP_->getInput("flow/refLength", config.refLength, 1.0);
+  tpsP_->getInput("flow/viscosityMultiplier", config.visc_mult, 1.0);
+  tpsP_->getInput("flow/bulkViscosityMultiplier", config.bulk_visc, 0.0);
+  //tpsP_->getInput("flow/axisymmetric", config.axisymmetric_, false);
+  tpsP_->getInput("flow/enablePressureForcing", config.isForcing, false);
+  if (config.isForcing) {
+    for (int d = 0; d < 3; d++) tpsP_->getRequiredVecElem("flow/pressureGrad", config.gradPress[d], d);
+  }
+  tpsP_->getInput("flow/refinement_levels", config.ref_levels, 0);
+  tpsP_->getInput("flow/computeDistance", config.compute_distance, false);
+
+  std::string type;
+  tpsP_->getInput("flow/sgsModel", type, std::string("none"));
+  config.sgsModelType = sgsModel[type];
+
+  double sgs_const = 0.;
+  if (config.sgsModelType == 1) {
+    sgs_const = 0.12;
+  } else if (config.sgsModelType == 2) {
+    sgs_const = 0.135;
+  }
+  tpsP_->getInput("flow/sgsModelConstant", config.sgs_model_const, sgs_const);
+
+  assert(config.solOrder > 0);
+  assert(config.numIters >= 0);
+  assert(config.itersOut > 0);
+  assert(config.refLength > 0);
+
+  // Sutherland inputs default to dry air values
+  tpsP_->getInput("flow/SutherlandC1", config.sutherland_.C1, 1.458e-6);
+  tpsP_->getInput("flow/SutherlandS0", config.sutherland_.S0, 110.4);
+  tpsP_->getInput("flow/SutherlandPr", config.sutherland_.Pr, 0.71);
+}
+
+void LoMachSolver::parseTimeIntegrationOptions() {
+  //std::map<std::string, int> integrators;
+  //integrators["forwardEuler"] = 1;
+  //integrators["rk2"] = 2;
+  //integrators["rk3"] = 3;
+  //integrators["rk4"] = 4;
+  //integrators["rk6"] = 6;
+  std::string type;
+  tpsP_->getInput("time/cfl", config.cflNum, 0.2);
+  tpsP_->getInput("time/integrator", type, std::string("rk4"));
+  tpsP_->getInput("time/enableConstantTimestep", config.constantTimeStep, false);
+  tpsP_->getInput("time/dt_fixed", config.dt_fixed, -1.);
+  //if (integrators.count(type) == 1) {
+  //  config.timeIntegratorType = integrators[type];
+  //} else {
+  //  grvy_printf(GRVY_ERROR, "Unknown time integrator > %s\n", type.c_str());
+  //  exit(ERROR);
+  //}
+}
+
+void LoMachSolver::parseStatOptions() {
+  tpsP_->getInput("averaging/saveMeanHist", config.meanHistEnable, false);
+  tpsP_->getInput("averaging/startIter", config.startIter, 0);
+  tpsP_->getInput("averaging/sampleFreq", config.sampleInterval, 0);
+  tpsP_->getInput("averaging/enableContinuation", config.restartMean, false);
+}
+
+void LoMachSolver::parseIOSettings() {
+  tpsP_->getInput("io/outdirBase", config.outputFile, std::string("output-default"));
+  tpsP_->getInput("io/enableRestart", config.restart, false);
+  tpsP_->getInput("io/exitCheckFreq", config.exit_checkFrequency_, 500);
+
+  std::string restartMode;
+  tpsP_->getInput("io/restartMode", restartMode, std::string("standard"));
+  if (restartMode == "variableP") {
+    config.restartFromAux = true;
+  } else if (restartMode == "singleFileWrite") {
+    config.restart_serial = "write";
+  } else if (restartMode == "singleFileRead") {
+    config.restart_serial = "read";
+  } else if (restartMode == "singleFileReadWrite") {
+    config.restart_serial = "readwrite";
+  } else if (restartMode != "standard") {
+    grvy_printf(GRVY_ERROR, "\nUnknown restart mode -> %s\n", restartMode.c_str());
+    exit(ERROR);
+  }
+}
+
+void LoMachSolver::parseRMSJobOptions() {
+  tpsP_->getInput("jobManagement/enableAutoRestart", config.rm_enableMonitor_, false);
+  tpsP_->getInput("jobManagement/timeThreshold", config.rm_threshold_, 15 * 60);  // 15 minutes
+  tpsP_->getInput("jobManagement/checkFreq", config.rm_checkFrequency_, 500);     // 500 iterations
+}
+
+/*
+void M2ulPhyS::parseHeatSrcOptions() {
+  int numHeatSources;
+  tpsP->getInput("heatSource/numHeatSources", numHeatSources, 0);
+  config.numHeatSources = numHeatSources;
+
+  if (numHeatSources > 0) {
+    config.numHeatSources = numHeatSources;
+    config.heatSource = new heatSourceData[numHeatSources];
+
+    for (int s = 0; s < numHeatSources; s++) {
+      std::string base("heatSource" + std::to_string(s + 1));
+
+      tpsP->getInput((base + "/isEnabled").c_str(), config.heatSource[s].isEnabled, false);
+
+      if (config.heatSource[s].isEnabled) {
+        tpsP->getRequiredInput((base + "/value").c_str(), config.heatSource[s].value);
+
+        std::string type;
+        tpsP->getRequiredInput((base + "/distribution").c_str(), type);
+        if (type == "cylinder") {
+          config.heatSource[s].type = type;
+        } else {
+          grvy_printf(GRVY_ERROR, "\nUnknown heat source distribution -> %s\n", type.c_str());
+          exit(ERROR);
+        }
+
+        tpsP->getRequiredInput((base + "/radius").c_str(), config.heatSource[s].radius);
+        config.heatSource[s].point1.SetSize(3);
+        config.heatSource[s].point2.SetSize(3);
+
+        tpsP->getRequiredVec((base + "/point1").c_str(), config.heatSource[s].point1, 3);
+        tpsP->getRequiredVec((base + "/point2").c_str(), config.heatSource[s].point2, 3);
+      }
+    }
+  }
+}
+
+void M2ulPhyS::parseViscosityOptions() {
+  tpsP->getInput("viscosityMultiplierFunction/isEnabled", config.linViscData.isEnabled, false);
+  if (config.linViscData.isEnabled) {
+    auto normal = config.linViscData.normal.HostWrite();
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[0], 0);
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[1], 1);
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[2], 2);
+
+    auto point0 = config.linViscData.point0.HostWrite();
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[0], 0);
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[1], 1);
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[2], 2);
+
+    auto pointInit = config.linViscData.pointInit.HostWrite();
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[0], 0);
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[1], 1);
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[2], 2);
+    tpsP->getRequiredInput("viscosityMultiplierFunction/width", config.linViscData.width);
+    tpsP->getRequiredInput("viscosityMultiplierFunction/viscosityRatio", config.linViscData.viscRatio);
+  }
+}
+
+void M2ulPhyS::parseMMSOptions() {
+  tpsP->getInput("mms/isEnabled", config.use_mms_, false);
+
+  if (config.use_mms_) {
+    tpsP->getRequiredInput("mms/name", config.mms_name_);
+    tpsP->getInput("mms/compare_rhs", config.mmsCompareRhs_, false);
+    tpsP->getInput("mms/save_details", config.mmsSaveDetails_, false);
+  }
+}
+*/
+
+void LoMachSolver::parseICOptions() {
+  tpsP_->getRequiredInput("initialConditions/rho", config.initRhoRhoVp[0]);
+  tpsP_->getRequiredInput("initialConditions/rhoU", config.initRhoRhoVp[1]);
+  tpsP_->getRequiredInput("initialConditions/rhoV", config.initRhoRhoVp[2]);
+  tpsP_->getRequiredInput("initialConditions/rhoW", config.initRhoRhoVp[3]);
+  tpsP_->getRequiredInput("initialConditions/pressure", config.initRhoRhoVp[4]);
+}
+
+/*
+void M2ulPhyS::parsePassiveScalarOptions() {
+  int numForcings;
+  tpsP->getInput("passiveScalars/numScalars", numForcings, 0);
+  for (int i = 1; i <= numForcings; i++) {
+    // add new entry in arrayPassiveScalar
+    config.arrayPassiveScalar.Append(new passiveScalarData);
+    config.arrayPassiveScalar[i - 1]->coords.SetSize(3);
+
+    std::string basepath("passiveScalar" + std::to_string(i));
+
+    Array<double> xyz;
+    tpsP->getRequiredVec((basepath + "/xyz").c_str(), xyz, 3);
+    for (int d = 0; d < 3; d++) config.arrayPassiveScalar[i - 1]->coords[d] = xyz[d];
+
+    double radius;
+    tpsP->getRequiredInput((basepath + "/radius").c_str(), radius);
+    config.arrayPassiveScalar[i - 1]->radius = radius;
+
+    double value;
+    tpsP->getRequiredInput((basepath + "/value").c_str(), value);
+    config.arrayPassiveScalar[i - 1]->value = value;
+  }
+}
+
+void M2ulPhyS::parseFluidPreset() {
+  std::string fluidTypeStr;
+  tpsP->getInput("flow/fluid", fluidTypeStr, std::string("dry_air"));
+  if (fluidTypeStr == "dry_air") {
+    config.workFluid = DRY_AIR;
+    tpsP->getInput("flow/specific_heat_ratio", config.dryAirInput.specific_heat_ratio, 1.4);
+    tpsP->getInput("flow/gas_constant", config.dryAirInput.gas_constant, 287.058);
+  } else if (fluidTypeStr == "user_defined") {
+    config.workFluid = USER_DEFINED;
+  } else if (fluidTypeStr == "lte_table") {
+    config.workFluid = LTE_FLUID;
+    std::string thermo_file;
+    tpsP->getRequiredInput("flow/lte/thermo_table", thermo_file);
+    config.lteMixtureInput.thermo_file_name = thermo_file;
+    std::string trans_file;
+    tpsP->getRequiredInput("flow/lte/transport_table", trans_file);
+    config.lteMixtureInput.trans_file_name = trans_file;
+    std::string e_rev_file;
+    tpsP->getRequiredInput("flow/lte/e_rev_table", e_rev_file);
+    config.lteMixtureInput.e_rev_file_name = e_rev_file;
+  } else {
+    grvy_printf(GRVY_ERROR, "\nUnknown fluid preset supplied at runtime -> %s", fluidTypeStr.c_str());
+    exit(ERROR);
+  }
+
+  if (mpi.Root() && (config.workFluid != USER_DEFINED))
+    cout << "Fluid is set to the preset '" << fluidTypeStr << "'. Input options in [plasma_models] will not be used."
+         << endl;
+}
+
+void M2ulPhyS::parseSystemType() {
+  std::string systemType;
+  tpsP->getInput("flow/equation_system", systemType, std::string("navier-stokes"));
+  if (systemType == "euler") {
+    config.eqSystem = EULER;
+  } else if (systemType == "navier-stokes") {
+    config.eqSystem = NS;
+  } else if (systemType == "navier-stokes-passive") {
+    config.eqSystem = NS_PASSIVE;
+  } else {
+    grvy_printf(GRVY_ERROR, "\nUnknown equation_system -> %s", systemType.c_str());
+    exit(ERROR);
+  }
+}
+
+void M2ulPhyS::parsePlasmaModels() {
+  tpsP->getInput("plasma_models/ambipolar", config.ambipolar, false);
+  tpsP->getInput("plasma_models/two_temperature", config.twoTemperature, false);
+
+  if (config.twoTemperature) {
+    tpsP->getInput("plasma_models/electron_temp_ic", config.initialElectronTemperature, 300.0);
+  } else {
+    config.initialElectronTemperature = -1;
+  }
+
+  std::string gasModelStr;
+  tpsP->getInput("plasma_models/gas_model", gasModelStr, std::string("perfect_mixture"));
+  if (gasModelStr == "perfect_mixture") {
+    config.gasModel = PERFECT_MIXTURE;
+  } else {
+    grvy_printf(GRVY_ERROR, "\nUnknown gas_model -> %s", gasModelStr.c_str());
+    exit(ERROR);
+  }
+
+  std::string transportModelStr;
+  tpsP->getRequiredInput("plasma_models/transport_model", transportModelStr);
+  if (transportModelStr == "argon_minimal") {
+    config.transportModel = ARGON_MINIMAL;
+  } else if (transportModelStr == "argon_mixture") {
+    config.transportModel = ARGON_MIXTURE;
+  } else if (transportModelStr == "constant") {
+    config.transportModel = CONSTANT;
+  }
+  // } else {
+  //   grvy_printf(GRVY_ERROR, "\nUnknown transport_model -> %s", transportModelStr.c_str());
+  //   exit(ERROR);
+  // }
+
+  std::string chemistryModelStr;
+  tpsP->getInput("plasma_models/chemistry_model", chemistryModelStr, std::string(""));
+
+  tpsP->getInput("plasma_models/const_plasma_conductivity", config.const_plasma_conductivity_, 0.0);
+
+  // TODO(kevin): cantera wrapper
+  // if (chemistryModelStr == "cantera") {
+  //   config.chemistryModel_ = ChemistryModel::CANTERA;
+  // }
+}
+
+void M2ulPhyS::parseSpeciesInputs() {
+  // quick return if can't use these inputs
+  if (config.workFluid == LTE_FLUID) {
+    config.numSpecies = 1;
+    return;
+  }
+
+  // Take parameters from input. These will be sorted into config attributes.
+  DenseMatrix inputGasParams;
+  Vector inputCV, inputCP;
+  Vector inputInitialMassFraction;
+  std::vector<std::string> inputSpeciesNames;
+  DenseMatrix inputSpeciesComposition;
+
+  // number of species defined
+  if (config.eqSystem != NS_PASSIVE) {
+    tpsP->getInput("species/numSpecies", config.numSpecies, 1);
+    inputGasParams.SetSize(config.numSpecies, GasParams::NUM_GASPARAMS);
+    inputInitialMassFraction.SetSize(config.numSpecies);
+    inputSpeciesNames.resize(config.numSpecies);
+
+    if (config.gasModel == PERFECT_MIXTURE) {
+      inputCV.SetSize(config.numSpecies);
+      // config.constantMolarCP.SetSize(config.numSpecies);
+    }
+  }
+
+  
+   // NOTE: for now, we force the user to set the background species as the last,
+   // and the electron species as the second to last.
+   
+  config.numAtoms = 0;
+  if ((config.numSpecies > 1) && (config.eqSystem != NS_PASSIVE)) {
+    tpsP->getRequiredInput("species/background_index", config.backgroundIndex);
+
+    tpsP->getRequiredInput("atoms/numAtoms", config.numAtoms);
+    config.atomMW.SetSize(config.numAtoms);
+    for (int a = 1; a <= config.numAtoms; a++) {
+      std::string basepath("atoms/atom" + std::to_string(a));
+
+      std::string atomName;
+      tpsP->getRequiredInput((basepath + "/name").c_str(), atomName);
+      tpsP->getRequiredInput((basepath + "/mass").c_str(), config.atomMW(a - 1));
+      config.atomMap[atomName] = a - 1;
+    }
+  }
+
+  // Gas Params
+  if (config.workFluid != DRY_AIR) {
+    assert(config.numAtoms > 0);
+    inputSpeciesComposition.SetSize(config.numSpecies, config.numAtoms);
+    inputSpeciesComposition = 0.0;
+    for (int i = 1; i <= config.numSpecies; i++) {
+      // double mw, charge;
+      double formEnergy;
+      std::string type, speciesName;
+      std::vector<std::pair<std::string, std::string>> composition;
+      std::string basepath("species/species" + std::to_string(i));
+
+      tpsP->getRequiredInput((basepath + "/name").c_str(), speciesName);
+      inputSpeciesNames[i - 1] = speciesName;
+
+      tpsP->getRequiredPairs((basepath + "/composition").c_str(), composition);
+      for (size_t c = 0; c < composition.size(); c++) {
+        if (config.atomMap.count(composition[c].first)) {
+          int atomIdx = config.atomMap[composition[c].first];
+          inputSpeciesComposition(i - 1, atomIdx) = stoi(composition[c].second);
+        } else {
+          grvy_printf(GRVY_ERROR, "Requested atom %s for species %s is not available!\n", composition[c].first.c_str(),
+                      speciesName.c_str());
+        }
+      }
+
+      tpsP->getRequiredInput((basepath + "/formation_energy").c_str(), formEnergy);
+      inputGasParams(i - 1, GasParams::FORMATION_ENERGY) = formEnergy;
+
+      tpsP->getRequiredInput((basepath + "/initialMassFraction").c_str(), inputInitialMassFraction(i - 1));
+
+      if (config.gasModel == PERFECT_MIXTURE) {
+        tpsP->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(), inputCV(i - 1));
+        // NOTE: For perfect gas, CP will be automatically set from CV.
+      }
+    }
+
+    Vector speciesMass(config.numSpecies), speciesCharge(config.numSpecies);
+    inputSpeciesComposition.Mult(config.atomMW, speciesMass);
+    inputSpeciesComposition.GetColumn(config.atomMap["E"], speciesCharge);
+    speciesCharge *= -1.0;
+    inputGasParams.SetCol(GasParams::SPECIES_MW, speciesMass);
+    inputGasParams.SetCol(GasParams::SPECIES_CHARGES, speciesCharge);
+
+    // Sort the gas params for mixture and save mapping.
+    {
+      config.gasParams.SetSize(config.numSpecies, GasParams::NUM_GASPARAMS);
+      config.initialMassFractions.SetSize(config.numSpecies);
+      config.speciesNames.resize(config.numSpecies);
+      config.constantMolarCV.SetSize(config.numSpecies);
+
+      config.speciesComposition.SetSize(config.numSpecies, config.numAtoms);
+      config.speciesComposition = 0.0;
+
+      // TODO(kevin): electron species is enforced to be included in the input file.
+      bool isElectronIncluded = false;
+
+      config.gasParams = 0.0;
+      int paramIdx = 0;  // new species index.
+      int targetIdx;
+      for (int sp = 0; sp < config.numSpecies; sp++) {  // input file species index.
+        if (sp == config.backgroundIndex - 1) {
+          targetIdx = config.numSpecies - 1;
+        } else if (inputSpeciesNames[sp] == "E") {
+          targetIdx = config.numSpecies - 2;
+          isElectronIncluded = true;
+        } else {
+          targetIdx = paramIdx;
+          paramIdx++;
+        }
+        config.speciesMapping[inputSpeciesNames[sp]] = targetIdx;
+        config.speciesNames[targetIdx] = inputSpeciesNames[sp];
+        config.mixtureToInputMap[targetIdx] = sp;
+        if (mpi.Root()) {
+          std::cout << "name, input index, mixture index: " << config.speciesNames[targetIdx] << ", " << sp << ", "
+                    << targetIdx << std::endl;
+        }
+
+        for (int param = 0; param < GasParams::NUM_GASPARAMS; param++)
+          config.gasParams(targetIdx, param) = inputGasParams(sp, param);
+      }
+      assert(isElectronIncluded);
+
+      for (int sp = 0; sp < config.numSpecies; sp++) {
+        int inputIdx = config.mixtureToInputMap[sp];
+        config.initialMassFractions(sp) = inputInitialMassFraction(inputIdx);
+        config.constantMolarCV(sp) = inputCV(inputIdx);
+        for (int a = 0; a < config.numAtoms; a++)
+          config.speciesComposition(sp, a) = inputSpeciesComposition(inputIdx, a);
+      }
+    }
+  }
+}
+
+void M2ulPhyS::parseTransportInputs() {
+  switch (config.transportModel) {
+    case ARGON_MINIMAL: {
+      // Check if unsupported species are included.
+      for (int sp = 0; sp < config.numSpecies; sp++) {
+        if ((config.speciesNames[sp] != "Ar") && (config.speciesNames[sp] != "Ar.+1") &&
+            (config.speciesNames[sp] != "E")) {
+          grvy_printf(GRVY_ERROR, "\nArgon ternary mixture transport does not support the species: %s !",
+                      config.speciesNames[sp].c_str());
+          exit(ERROR);
+        }
+      }
+      tpsP->getInput("plasma_models/transport_model/argon_minimal/third_order_thermal_conductivity",
+                     config.thirdOrderkElectron, true);
+
+      // pack up argon minimal transport input.
+      {
+        if (config.speciesMapping.count("Ar")) {
+          config.argonTransportInput.neutralIndex = config.speciesMapping["Ar"];
+        } else {
+          grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar' !\n");
+          exit(ERROR);
+        }
+        if (config.speciesMapping.count("Ar.+1")) {
+          config.argonTransportInput.ionIndex = config.speciesMapping["Ar.+1"];
+        } else {
+          grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar.+1' !\n");
+          exit(ERROR);
+        }
+        if (config.speciesMapping.count("E")) {
+          config.argonTransportInput.electronIndex = config.speciesMapping["E"];
+        } else {
+          grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
+          exit(ERROR);
+        }
+
+        config.argonTransportInput.thirdOrderkElectron = config.thirdOrderkElectron;
+
+        // inputs for artificial transport multipliers.
+        {
+          tpsP->getInput("plasma_models/transport_model/artificial_multiplier/enabled",
+                         config.argonTransportInput.multiply, false);
+          if (config.argonTransportInput.multiply) {
+            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/viscosity",
+                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::VISCOSITY], 1.0);
+            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/bulk_viscosity",
+                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::BULK_VISCOSITY], 1.0);
+            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/heavy_thermal_conductivity",
+                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY], 1.0);
+            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/electron_thermal_conductivity",
+                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY], 1.0);
+            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/momentum_transfer_frequency",
+                           config.argonTransportInput.spcsTrnsMultiplier[SpeciesTrns::MF_FREQUENCY], 1.0);
+            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/diffusivity",
+                           config.argonTransportInput.diffMult, 1.0);
+            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/mobility",
+                           config.argonTransportInput.mobilMult, 1.0);
+          }
+        }
+      }
+    } break;
+    case ARGON_MIXTURE: {
+      tpsP->getInput("plasma_models/transport_model/argon_mixture/third_order_thermal_conductivity",
+                     config.thirdOrderkElectron, true);
+
+      // pack up argon transport input.
+      {
+        if (config.speciesMapping.count("E")) {
+          config.argonTransportInput.electronIndex = config.speciesMapping["E"];
+        } else {
+          grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
+          exit(ERROR);
+        }
+
+        config.argonTransportInput.thirdOrderkElectron = config.thirdOrderkElectron;
+
+        Array<ArgonSpcs> speciesType(config.numSpecies);
+        identifySpeciesType(speciesType);
+        identifyCollisionType(speciesType, config.argonTransportInput.collisionIndex);
+
+        // inputs for artificial transport multipliers.
+        {
+          tpsP->getInput("plasma_models/transport_model/artificial_multiplier/enabled",
+                         config.argonTransportInput.multiply, false);
+          if (config.argonTransportInput.multiply) {
+            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/viscosity",
+                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::VISCOSITY], 1.0);
+            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/bulk_viscosity",
+                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::BULK_VISCOSITY], 1.0);
+            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/heavy_thermal_conductivity",
+                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY], 1.0);
+            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/electron_thermal_conductivity",
+                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY], 1.0);
+            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/momentum_transfer_frequency",
+                           config.argonTransportInput.spcsTrnsMultiplier[SpeciesTrns::MF_FREQUENCY], 1.0);
+            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/diffusivity",
+                           config.argonTransportInput.diffMult, 1.0);
+            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/mobility",
+                           config.argonTransportInput.mobilMult, 1.0);
+          }
+        }
+      }
+    } break;
+    case CONSTANT: {
+      tpsP->getRequiredInput("plasma_models/transport_model/constant/viscosity", config.constantTransport.viscosity);
+      tpsP->getRequiredInput("plasma_models/transport_model/constant/bulk_viscosity",
+                             config.constantTransport.bulkViscosity);
+      tpsP->getRequiredInput("plasma_models/transport_model/constant/thermal_conductivity",
+                             config.constantTransport.thermalConductivity);
+      tpsP->getRequiredInput("plasma_models/transport_model/constant/electron_thermal_conductivity",
+                             config.constantTransport.electronThermalConductivity);
+      std::string diffpath("plasma_models/transport_model/constant/diffusivity");
+      // config.constantTransport.diffusivity.SetSize(config.numSpecies);
+      std::string mtpath("plasma_models/transport_model/constant/momentum_transfer_frequency");
+      // config.constantTransport.mtFreq.SetSize(config.numSpecies);
+      for (int sp = 0; sp < config.numSpecies; sp++) {
+        config.constantTransport.diffusivity[sp] = 0.0;
+        config.constantTransport.mtFreq[sp] = 0.0;
+      }
+      for (int sp = 0; sp < config.numSpecies; sp++) {  // mixture species index.
+        int inputSp = config.mixtureToInputMap[sp];
+        tpsP->getRequiredInput((diffpath + "/species" + std::to_string(inputSp + 1)).c_str(),
+                               config.constantTransport.diffusivity[sp]);
+        if (config.twoTemperature)
+          tpsP->getRequiredInput((mtpath + "/species" + std::to_string(inputSp + 1)).c_str(),
+                                 config.constantTransport.mtFreq[sp]);
+      }
+      config.constantTransport.electronIndex = -1;
+      if (config.IsTwoTemperature()) {
+        if (config.speciesMapping.count("E")) {
+          config.constantTransport.electronIndex = config.speciesMapping["E"];
+        } else {
+          grvy_printf(GRVY_ERROR, "\nConstant transport: two-temperature plasma requires the species 'E' !\n");
+          exit(ERROR);
+        }
+      }
+    } break;
+    default:
+      break;
+  }
+}
+
+void M2ulPhyS::parseReactionInputs() {
+  tpsP->getInput("reactions/number_of_reactions", config.numReactions, 0);
+  if (config.numReactions > 0) {
+    assert((config.workFluid != DRY_AIR) && (config.numSpecies > 1));
+    config.reactionEnergies.SetSize(config.numReactions);
+    config.reactionEquations.resize(config.numReactions);
+    config.reactionModels.SetSize(config.numReactions);
+    config.reactantStoich.SetSize(config.numSpecies, config.numReactions);
+    config.productStoich.SetSize(config.numSpecies, config.numReactions);
+
+    // config.reactionModelParams.resize(config.numReactions);
+    config.detailedBalance.SetSize(config.numReactions);
+    // config.equilibriumConstantParams.resize(config.numReactions);
+  }
+  config.rxnModelParamsHost.clear();
+
+  for (int r = 1; r <= config.numReactions; r++) {
+    std::string basepath("reactions/reaction" + std::to_string(r));
+
+    std::string equation, model;
+    tpsP->getRequiredInput((basepath + "/equation").c_str(), equation);
+    config.reactionEquations[r - 1] = equation;
+    tpsP->getRequiredInput((basepath + "/model").c_str(), model);
+
+    double energy;
+    tpsP->getRequiredInput((basepath + "/reaction_energy").c_str(), energy);
+    config.reactionEnergies[r - 1] = energy;
+
+    // NOTE: reaction inputs are stored directly into ChemistryInput.
+    // Initialize the pointers with null.
+    config.chemistryInput.reactionInputs[r - 1].modelParams = NULL;
+
+    if (model == "arrhenius") {
+      config.reactionModels[r - 1] = ARRHENIUS;
+
+      double A, b, E;
+      tpsP->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
+      tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
+      tpsP->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
+      config.rxnModelParamsHost.push_back(Vector({A, b, E}));
+
+    } else if (model == "hoffert_lien") {
+      config.reactionModels[r - 1] = HOFFERTLIEN;
+      double A, b, E;
+      tpsP->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
+      tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
+      tpsP->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
+      config.rxnModelParamsHost.push_back(Vector({A, b, E}));
+
+    } else if (model == "tabulated") {
+      config.reactionModels[r - 1] = TABULATED_RXN;
+      std::string inputPath(basepath + "/tabulated");
+      readTable(inputPath, config.chemistryInput.reactionInputs[r - 1].tableInput);
+    } else {
+      grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
+      exit(ERROR);
+    }
+
+    bool detailedBalance;
+    tpsP->getInput((basepath + "/detailed_balance").c_str(), detailedBalance, false);
+    config.detailedBalance[r - 1] = detailedBalance;
+    if (detailedBalance) {
+      double A, b, E;
+      tpsP->getRequiredInput((basepath + "/equilibrium_constant/A").c_str(), A);
+      tpsP->getRequiredInput((basepath + "/equilibrium_constant/b").c_str(), b);
+      tpsP->getRequiredInput((basepath + "/equilibrium_constant/E").c_str(), E);
+
+      // NOTE(kevin): this array keeps max param in the indexing, as reactions can have different number of params.
+      config.equilibriumConstantParams[0 + (r - 1) * gpudata::MAXCHEMPARAMS] = A;
+      config.equilibriumConstantParams[1 + (r - 1) * gpudata::MAXCHEMPARAMS] = b;
+      config.equilibriumConstantParams[2 + (r - 1) * gpudata::MAXCHEMPARAMS] = E;
+    }
+
+    Array<double> stoich(config.numSpecies);
+    tpsP->getRequiredVec((basepath + "/reactant_stoichiometry").c_str(), stoich, config.numSpecies);
+    for (int sp = 0; sp < config.numSpecies; sp++) {
+      int inputSp = config.mixtureToInputMap[sp];
+      config.reactantStoich(sp, r - 1) = stoich[inputSp];
+    }
+    tpsP->getRequiredVec((basepath + "/product_stoichiometry").c_str(), stoich, config.numSpecies);
+    for (int sp = 0; sp < config.numSpecies; sp++) {
+      int inputSp = config.mixtureToInputMap[sp];
+      config.productStoich(sp, r - 1) = stoich[inputSp];
+    }
+  }
+
+  // check conservations.
+  {
+    const int numReactions_ = config.numReactions;
+    const int numSpecies_ = config.numSpecies;
+    for (int r = 0; r < numReactions_; r++) {
+      Vector react(numSpecies_), product(numSpecies_);
+      config.reactantStoich.GetColumn(r, react);
+      config.productStoich.GetColumn(r, product);
+
+      // atom conservation.
+      DenseMatrix composition;
+      composition.Transpose(config.speciesComposition);
+      Vector reactAtom(config.numAtoms), prodAtom(config.numAtoms);
+      composition.Mult(react, reactAtom);
+      composition.Mult(product, prodAtom);
+      for (int a = 0; a < config.numAtoms; a++) {
+        if (reactAtom(a) != prodAtom(a)) {
+          grvy_printf(GRVY_ERROR, "Reaction %d does not conserve atom %d.\n", r, a);
+          exit(-1);
+        }
+      }
+
+      // mass conservation. (already ensured with atom but checking again.)
+      double reactMass = 0.0, prodMass = 0.0;
+      for (int sp = 0; sp < numSpecies_; sp++) {
+        // int inputSp = (*mixtureToInputMap_)[sp];
+        reactMass += react(sp) * config.gasParams(sp, SPECIES_MW);
+        prodMass += product(sp) * config.gasParams(sp, SPECIES_MW);
+      }
+      // This may be too strict..
+      if (abs(reactMass - prodMass) > 1.0e-15) {
+        grvy_printf(GRVY_ERROR, "Reaction %d does not conserve mass.\n", r);
+        grvy_printf(GRVY_ERROR, "%.8E =/= %.8E\n", reactMass, prodMass);
+        exit(-1);
+      }
+
+      // energy conservation.
+      // TODO(kevin): this will need an adjustion when radiation comes into play.
+      double reactEnergy = 0.0, prodEnergy = 0.0;
+      for (int sp = 0; sp < numSpecies_; sp++) {
+        // int inputSp = (*mixtureToInputMap_)[sp];
+        reactEnergy += react(sp) * config.gasParams(sp, FORMATION_ENERGY);
+        prodEnergy += product(sp) * config.gasParams(sp, FORMATION_ENERGY);
+      }
+      // This may be too strict..
+      if (reactEnergy + config.reactionEnergies[r] != prodEnergy) {
+        grvy_printf(GRVY_ERROR, "Reaction %d does not conserve energy.\n", r);
+        grvy_printf(GRVY_ERROR, "%.8E + %.8E = %.8E =/= %.8E\n", reactEnergy, config.reactionEnergies[r],
+                    reactEnergy + config.reactionEnergies[r], prodEnergy);
+        exit(-1);
+      }
+    }
+  }
+
+  // Pack up chemistry input for instantiation.
+  {
+    config.chemistryInput.model = config.chemistryModel_;
+    const int numSpecies = config.numSpecies;
+    if (config.speciesMapping.count("E")) {
+      config.chemistryInput.electronIndex = config.speciesMapping["E"];
+    } else {
+      config.chemistryInput.electronIndex = -1;
+    }
+
+    int rxn_param_idx = 0;
+
+    config.chemistryInput.numReactions = config.numReactions;
+    for (int r = 0; r < config.numReactions; r++) {
+      config.chemistryInput.reactionEnergies[r] = config.reactionEnergies[r];
+      config.chemistryInput.detailedBalance[r] = config.detailedBalance[r];
+      for (int sp = 0; sp < config.numSpecies; sp++) {
+        config.chemistryInput.reactantStoich[sp + r * numSpecies] = config.reactantStoich(sp, r);
+        config.chemistryInput.productStoich[sp + r * numSpecies] = config.productStoich(sp, r);
+      }
+
+      config.chemistryInput.reactionModels[r] = config.reactionModels[r];
+      for (int p = 0; p < gpudata::MAXCHEMPARAMS; p++) {
+        config.chemistryInput.equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS] =
+            config.equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS];
+      }
+
+      if (config.reactionModels[r] != TABULATED_RXN) {
+        assert(rxn_param_idx < config.rxnModelParamsHost.size());
+        config.chemistryInput.reactionInputs[r].modelParams = config.rxnModelParamsHost[rxn_param_idx].Read();
+        rxn_param_idx += 1;
+      }
+    }
+  }
+}
+*/
+
+void LoMachSolver::parseBCInputs() {
+  
+  // number of BC regions defined
+  int numWalls, numInlets, numOutlets;
+  tpsP_->getInput("boundaryConditions/numWalls", numWalls, 0);
+  tpsP_->getInput("boundaryConditions/numInlets", numInlets, 0);
+  tpsP_->getInput("boundaryConditions/numOutlets", numOutlets, 0);
+
+  // Wall.....................................
+  std::map<std::string, WallType> wallMapping;
+  wallMapping["inviscid"] = INV;
+  wallMapping["slip"] = SLIP;
+  wallMapping["viscous_adiabatic"] = VISC_ADIAB;
+  wallMapping["viscous_isothermal"] = VISC_ISOTH;
+  wallMapping["viscous_general"] = VISC_GNRL;
+
+  config.wallBC.resize(numWalls);
+  for (int i = 1; i <= numWalls; i++) {
+    int patch;
+    double temperature;
+    std::string type;
+    std::string basepath("boundaryConditions/wall" + std::to_string(i));
+
+    tpsP_->getRequiredInput((basepath + "/patch").c_str(), patch);
+    tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
+    if (type == "viscous_isothermal") {
+      tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature);
+      config.wallBC[i - 1].hvyThermalCond = ISOTH;
+      config.wallBC[i - 1].elecThermalCond = ISOTH;
+      config.wallBC[i - 1].Th = temperature;
+      config.wallBC[i - 1].Te = temperature;
+    } else if (type == "viscous_adiabatic") {
+      config.wallBC[i - 1].hvyThermalCond = ADIAB;
+      config.wallBC[i - 1].elecThermalCond = ADIAB;
+      config.wallBC[i - 1].Th = -1.0;
+      config.wallBC[i - 1].Te = -1.0;
+    } else if (type == "viscous_general") {
+      std::map<std::string, ThermalCondition> thmCondMap;
+      thmCondMap["adiabatic"] = ADIAB;
+      thmCondMap["isothermal"] = ISOTH;
+      thmCondMap["sheath"] = SHTH;
+      thmCondMap["none"] = NONE_THMCND;
+
+      std::string hvyType, elecType;
+      tpsP_->getRequiredInput((basepath + "/heavy_thermal_condition").c_str(), hvyType);
+      config.wallBC[i - 1].hvyThermalCond = thmCondMap[hvyType];
+
+      config.wallBC[i - 1].Th = -1.0;
+      switch (config.wallBC[i - 1].hvyThermalCond) {
+        case ISOTH: {
+          double Th;
+          tpsP_->getRequiredInput((basepath + "/temperature").c_str(), Th);
+          config.wallBC[i - 1].Th = Th;
+        } break;
+        case SHTH: {
+          grvy_printf(GRVY_ERROR, "Wall%d: sheath condition is only supported for electron!\n", i);
+          exit(-1);
+        } break;
+        case NONE_THMCND: {
+          grvy_printf(GRVY_ERROR, "Wall%d: must specify heavies' thermal condition!\n", i);
+          exit(-1);
+        }
+        default:
+          break;
+      }
+
+      // NOTE(kevin): sheath can exist even for single temperature.
+      if (config.twoTemperature) {
+        tpsP_->getRequiredInput((basepath + "/electron_thermal_condition").c_str(), elecType);
+        if (thmCondMap[elecType] == NONE_THMCND) {
+          grvy_printf(GRVY_ERROR, "Wall%d: electron thermal condition must be specified for two-temperature plasma!\n",
+                      i);
+          exit(-1);
+        }
+        config.wallBC[i - 1].elecThermalCond = thmCondMap[elecType];
+      } else {
+        tpsP_->getInput((basepath + "/electron_thermal_condition").c_str(), elecType, std::string("none"));
+        config.wallBC[i - 1].elecThermalCond = (thmCondMap[elecType] == SHTH) ? SHTH : NONE_THMCND;
+      }
+      config.wallBC[i - 1].Te = -1.0;
+      switch (config.wallBC[i - 1].elecThermalCond) {
+        case ISOTH: {
+          double Te;
+          tpsP_->getInput((basepath + "/electron_temperature").c_str(), Te, -1.0);
+          if (Te < 0.0) {
+            grvy_printf(GRVY_INFO, "Wall%d: no input for electron_temperature. Using temperature instead.\n", i);
+            tpsP_->getRequiredInput((basepath + "/temperature").c_str(), Te);
+          }
+          if (Te < 0.0) {
+            grvy_printf(GRVY_ERROR, "Wall%d: invalid electron temperature: %.8E!\n", i, Te);
+            exit(-1);
+          }
+          config.wallBC[i - 1].Te = Te;
+        } break;
+        case SHTH: {
+          if (!config.ambipolar) {
+            grvy_printf(GRVY_ERROR, "Wall%d: plasma must be ambipolar for sheath condition!\n", i);
+            exit(-1);
+          }
+        }
+        default:
+          break;
+      }
+    }
+
+    // NOTE(kevin): maybe redundant at this point. Kept this just in case.
+    std::pair<int, WallType> patchType;
+    patchType.first = patch;
+    patchType.second = wallMapping[type];
+    config.wallPatchType.push_back(patchType);
+  }
+
+  // Inlet......................................
+  std::map<std::string, InletType> inletMapping;
+  inletMapping["subsonic"] = SUB_DENS_VEL;
+  inletMapping["nonreflecting"] = SUB_DENS_VEL_NR;
+  inletMapping["nonreflectingConstEntropy"] = SUB_VEL_CONST_ENT;
+
+  for (int i = 1; i <= numInlets; i++) {
+    int patch;
+    double density;
+    std::string type;
+    std::string basepath("boundaryConditions/inlet" + std::to_string(i));
+
+    tpsP_->getRequiredInput((basepath + "/patch").c_str(), patch);
+    tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
+    // all inlet BCs require 4 inputs (density + vel(3))
+    {
+      Array<double> uvw;
+      tpsP_->getRequiredInput((basepath + "/density").c_str(), density);
+      tpsP_->getRequiredVec((basepath + "/uvw").c_str(), uvw, 3);
+      config.inletBC.Append(density);
+      config.inletBC.Append(uvw, 3);
+    }
+    // For multi-component gas, require (numActiveSpecies)-more inputs.
+    if ((config.workFluid != DRY_AIR) && (config.numSpecies > 1)) {
+      grvy_printf(GRVY_INFO, "\nInlet mass fraction of background species will not be used. \n");
+      if (config.ambipolar) grvy_printf(GRVY_INFO, "\nInlet mass fraction of electron will not be used. \n");
+
+      for (int sp = 0; sp < config.numSpecies; sp++) {  // mixture species index
+        double Ysp;
+        // read mass fraction of species as listed in the input file.
+        int inputSp = config.mixtureToInputMap[sp];
+        std::string speciesBasePath(basepath + "/mass_fraction/species" + std::to_string(inputSp + 1));
+        tpsP_->getRequiredInput(speciesBasePath.c_str(), Ysp);
+        config.inletBC.Append(Ysp);
+      }
+    }
+    std::pair<int, InletType> patchType;
+    patchType.first = patch;
+    patchType.second = inletMapping[type];
+    config.inletPatchType.push_back(patchType);
+  }
+
+  // Outlet.......................................
+  std::map<std::string, OutletType> outletMapping;
+  outletMapping["subsonicPressure"] = SUB_P;
+  outletMapping["nonReflectingPressure"] = SUB_P_NR;
+  outletMapping["nonReflectingMassFlow"] = SUB_MF_NR;
+  outletMapping["nonReflectingPointBasedMassFlow"] = SUB_MF_NR_PW;
+
+  for (int i = 1; i <= numOutlets; i++) {
+    int patch;
+    double pressure, massFlow;
+    std::string type;
+    std::string basepath("boundaryConditions/outlet" + std::to_string(i));
+
+    tpsP_->getRequiredInput((basepath + "/patch").c_str(), patch);
+    tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
+
+    if ((type == "subsonicPressure") || (type == "nonReflectingPressure")) {
+      tpsP_->getRequiredInput((basepath + "/pressure").c_str(), pressure);
+      config.outletBC.Append(pressure);
+    } else if ((type == "nonReflectingMassFlow") || (type == "nonReflectingPointBasedMassFlow")) {
+      tpsP_->getRequiredInput((basepath + "/massFlow").c_str(), massFlow);
+      config.outletBC.Append(massFlow);
+    } else {
+      grvy_printf(GRVY_ERROR, "\nUnknown outlet BC supplied at runtime -> %s", type.c_str());
+      exit(ERROR);
+    }
+
+    std::pair<int, OutletType> patchType;
+    patchType.first = patch;
+    patchType.second = outletMapping[type];
+    config.outletPatchType.push_back(patchType);
+  }
+}
+
+/*
+void M2ulPhyS::parseSpongeZoneInputs() {
+  tpsP->getInput("spongezone/numSpongeZones", config.numSpongeRegions_, 0);
+
+  if (config.numSpongeRegions_ > 0) {
+    config.spongeData_ = new SpongeZoneData[config.numSpongeRegions_];
+
+    for (int sz = 0; sz < config.numSpongeRegions_; sz++) {
+      std::string base("spongezone" + std::to_string(sz + 1));
+
+      std::string type;
+      tpsP->getInput((base + "/type").c_str(), type, std::string("none"));
+
+      if (type == "none") {
+        grvy_printf(GRVY_ERROR, "\nUnknown sponge zone type -> %s\n", type.c_str());
+        exit(ERROR);
+      } else if (type == "planar") {
+        config.spongeData_[sz].szType = SpongeZoneType::PLANAR;
+      } else if (type == "annulus") {
+        config.spongeData_[sz].szType = SpongeZoneType::ANNULUS;
+
+        tpsP->getInput((base + "/r1").c_str(), config.spongeData_[sz].r1, 0.);
+        tpsP->getInput((base + "/r2").c_str(), config.spongeData_[sz].r2, 0.);
+      }
+
+      config.spongeData_[sz].normal.SetSize(3);
+      config.spongeData_[sz].point0.SetSize(3);
+      config.spongeData_[sz].pointInit.SetSize(3);
+      config.spongeData_[sz].targetUp.SetSize(5 + config.numSpecies + 2);  // always large enough now
+
+      tpsP->getRequiredVec((base + "/normal").c_str(), config.spongeData_[sz].normal, 3);
+      tpsP->getRequiredVec((base + "/p0").c_str(), config.spongeData_[sz].point0, 3);
+      tpsP->getRequiredVec((base + "/pInit").c_str(), config.spongeData_[sz].pointInit, 3);
+      tpsP->getInput((base + "/tolerance").c_str(), config.spongeData_[sz].tol, 1e-5);
+      tpsP->getInput((base + "/multiplier").c_str(), config.spongeData_[sz].multFactor, 1.0);
+
+      tpsP->getRequiredInput((base + "/targetSolType").c_str(), type);
+      if (type == "userDef") {
+        config.spongeData_[sz].szSolType = SpongeZoneSolution::USERDEF;
+        auto hup = config.spongeData_[sz].targetUp.HostWrite();
+        tpsP->getRequiredInput((base + "/density").c_str(), hup[0]);   // rho
+        tpsP->getRequiredVecElem((base + "/uvw").c_str(), hup[1], 0);  // u
+        tpsP->getRequiredVecElem((base + "/uvw").c_str(), hup[2], 1);  // v
+        tpsP->getRequiredVecElem((base + "/uvw").c_str(), hup[3], 2);  // w
+        tpsP->getRequiredInput((base + "/pressure").c_str(), hup[4]);  // P
+
+        // For multi-component gas, require (numActiveSpecies)-more inputs.
+        if (config.workFluid != DRY_AIR) {
+          if (config.numSpecies > 1) {
+            grvy_printf(GRVY_INFO, "\nInlet mass fraction of background species will not be used. \n");
+            if (config.ambipolar) grvy_printf(GRVY_INFO, "\nInlet mass fraction of electron will not be used. \n");
+
+            for (int sp = 0; sp < config.numSpecies; sp++) {  // mixture species index.
+              // read mass fraction of species as listed in the input file.
+              int inputSp = config.mixtureToInputMap[sp];
+              std::string speciesBasePath(base + "/mass_fraction/species" + std::to_string(inputSp + 1));
+              tpsP->getRequiredInput(speciesBasePath.c_str(), hup[5 + sp]);
+            }
+          }
+
+          if (config.twoTemperature) {
+            tpsP->getInput((base + "/single_temperature").c_str(), config.spongeData_[sz].singleTemperature, false);
+            if (!config.spongeData_[sz].singleTemperature) {
+              tpsP->getRequiredInput((base + "/electron_temperature").c_str(), hup[5 + config.numSpecies]);  // P
+            }
+          }
+        }
+
+      } else if (type == "mixedOut") {
+        config.spongeData_[sz].szSolType = SpongeZoneSolution::MIXEDOUT;
+      } else {
+        grvy_printf(GRVY_ERROR, "\nUnknown sponge zone type -> %s\n", type.c_str());
+        exit(ERROR);
+      }
+    }
+  }
+}
+*/
+
+void LoMachSolver::parsePostProcessVisualizationInputs() {
+  if (tpsP_->isVisualizationMode()) {
+    tpsP_->getRequiredInput("post-process/visualization/prefix", config.postprocessInput.prefix);
+    tpsP_->getRequiredInput("post-process/visualization/start-iter", config.postprocessInput.startIter);
+    tpsP_->getRequiredInput("post-process/visualization/end-iter", config.postprocessInput.endIter);
+    tpsP_->getRequiredInput("post-process/visualization/frequency", config.postprocessInput.freq);
+  }
+}
+
+/*
+void M2ulPhyS::parseRadiationInputs() {
+  std::string type;
+  std::string basepath("plasma_models/radiation_model");
+
+  tpsP->getInput(basepath.c_str(), type, std::string("none"));
+  std::string modelInputPath(basepath + "/" + type);
+
+  if (type == "net_emission") {
+    config.radiationInput.model = NET_EMISSION;
+
+    std::string coefficientType;
+    tpsP->getRequiredInput((modelInputPath + "/coefficient").c_str(), coefficientType);
+    if (coefficientType == "tabulated") {
+      config.radiationInput.necModel = TABULATED_NEC;
+      std::string inputPath(modelInputPath + "/tabulated");
+      readTable(inputPath, config.radiationInput.necTableInput);
+    } else {
+      grvy_printf(GRVY_ERROR, "\nUnknown net emission coefficient type -> %s\n", coefficientType.c_str());
+      exit(ERROR);
+    }
+  } else if (type == "none") {
+    config.radiationInput.model = NONE_RAD;
+  } else {
+    grvy_printf(GRVY_ERROR, "\nUnknown radiation model -> %s\n", type.c_str());
+    exit(ERROR);
+  }
+}
+*/
+
+void LoMachSolver::parsePeriodicInputs() {
+  tpsP_->getInput("periodicity/enablePeriodic", config.periodic, false);
+  tpsP_->getInput("periodicity/xTrans", config.xTrans, 1.0e12);
+  tpsP_->getInput("periodicity/yTrans", config.yTrans, 1.0e12);
+  tpsP_->getInput("periodicity/zTrans", config.zTrans, 1.0e12);
+}
+
+/*
+void M2ulPhyS::packUpGasMixtureInput() {
+  if (config.workFluid == DRY_AIR) {
+    config.dryAirInput.f = config.workFluid;
+    config.dryAirInput.eq_sys = config.eqSystem;
+#if defined(_HIP_)
+    config.dryAirInput.visc_mult = config.visc_mult;
+    config.dryAirInput.bulk_visc_mult = config.bulk_visc;
+#endif
+  } else if (config.workFluid == USER_DEFINED) {
+    switch (config.gasModel) {
+      case PERFECT_MIXTURE: {
+        config.perfectMixtureInput.f = config.workFluid;
+        config.perfectMixtureInput.numSpecies = config.numSpecies;
+        if (config.speciesMapping.count("E")) {
+          config.perfectMixtureInput.isElectronIncluded = true;
+        } else {
+          config.perfectMixtureInput.isElectronIncluded = false;
+        }
+        config.perfectMixtureInput.ambipolar = config.ambipolar;
+        config.perfectMixtureInput.twoTemperature = config.twoTemperature;
+
+        for (int sp = 0; sp < config.numSpecies; sp++) {
+          for (int param = 0; param < (int)GasParams::NUM_GASPARAMS; param++) {
+            config.perfectMixtureInput.gasParams[sp + param * config.numSpecies] = config.gasParams(sp, param);
+          }
+          config.perfectMixtureInput.molarCV[sp] = config.constantMolarCV(sp);
+        }
+      } break;
+      default:
+        grvy_printf(GRVY_ERROR, "Gas model is not specified!\n");
+        exit(ERROR);
+        break;
+    }  // switch gasModel
+  } else if (config.workFluid == LTE_FLUID) {
+    config.lteMixtureInput.f = config.workFluid;
+    // config.lteMixtureInput.thermo_file_name // already set in parseFluidPreset
+    assert(config.numSpecies == 1);  // inconsistent to specify lte and carry species
+    assert(!config.twoTemperature);  // inconsistent to specify lte and have two temperatures
+  }
+}
+*/
+
+
+///* temporary, remove when hooked up *//
 double mesh_stretching_func(const double y)
 {
    double C = 1.8;
@@ -2296,5 +3684,6 @@ double temp_ic(const Vector &coords, double t)
 double temp_wall(const Vector &x, double t)  
 {
    double temp = 270.0;
+   //double temp = config.wallBC[0].Th;
    return temp;
 }
