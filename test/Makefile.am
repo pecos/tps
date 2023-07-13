@@ -21,7 +21,7 @@ endif
 
 TEST_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) $(top_srcdir)/test/tap-driver.sh
 
-EXTRA_DIST      = tap-driver.sh soln_differ inputs meshes ref_solns/*.h5 \
+EXTRA_DIST      = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes ref_solns/*.h5 \
 		  ref_solns/collisions/*.h5 ref_solns/transport/*.h5 ref_solns/reaction/*.h5 \
 		  ref_solns/noSGM1K/*.h5 ref_solns/smag1K_1/*.h5 ref_solns/sigma1K_1/*.h5 \
 	          ref_solns/plate150K/*.h5 ref_solns/plate150K_1step/*.h5 \
@@ -34,7 +34,7 @@ EXTRA_DIST      = tap-driver.sh soln_differ inputs meshes ref_solns/*.h5 \
 	 	  inflow_outflow.test mms.ternary_2d.test mms.ternary_2d_wall.test \
 	 	  mms.ternary_2d_inout.test cuda-memcheck.test mms.general_wall.test \
 		  independent_coupling.test interp_em.test mms.euler_2d.test mms.cns_2d.test \
-		  gradient.test coupled-3d.test tabulated.test lte_mixture.test distance_fcn.test \
+		  gradient.test coupled-3d.test coupled-3d.splitcomm.test tabulated.test lte_mixture.test distance_fcn.test \
                   sgsSmag.test sgsSigma.test plate.test
 
 TESTS = vpath.sh
@@ -80,6 +80,7 @@ TESTS += cyl3d.test \
 	 interp_em.test \
 	 gradient.test \
 	 coupled-3d.test \
+	 coupled-3d.splitcomm.test \
 	 tabulated.test \
 	 lte_mixture.test \
          sgsSmag.test \
@@ -87,7 +88,8 @@ TESTS += cyl3d.test \
          plate.test
 
 if PYTHON_ENABLED
-TESTS += cyl3d.python.test
+TESTS += cyl3d.python.test \
+         cyl3d.python.splitcomm.test
 endif
 
 endif
@@ -123,6 +125,12 @@ TESTS += mms.general_wall.test \
 	 mms.cns_2d.test
 endif
 endif
+
+check_PROGRAMS += tps_splitcomm_test
+tps_splitcomm_test_SOURCES  = test_tps_splitcomm.cpp
+tps_splitcomm_test_LDADD    = ../src/libtps.la
+tps_splitcomm_test_LDADD   += $(HDF5_LIBS)
+tps_splitcomm_test_LDADD   += $(GRVY_LIBS)
 
 if !GPU_ENABLED
 
