@@ -102,12 +102,12 @@ jobs:
     runs-on: [self-hosted, linux, x64, gpu, hip]
     name: Build/GPU (AMD/HIP)
     env:
-      MFEM_DIR: /home/karl/sw/mfem-hip-4.3
+      MFEM_DIR: /home/oliver/sw/mfem-4.5.2-hip
     steps:
       - name: Cancel previous runs
         uses: styfle/cancel-workflow-action@0.11.0
         with:
-          access_token: ${{ github.token }}    
+          access_token: ${{ github.token }}
       - name: Checkout code
         uses: actions/checkout@v3
         with:

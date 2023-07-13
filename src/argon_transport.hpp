@@ -50,7 +50,7 @@
 #include "transport_properties.hpp"
 
 using namespace mfem;
-using namespace std;
+// using namespace std;
 // using namespace charged;
 // using namespace argon;
 
@@ -74,10 +74,11 @@ class ArgonMinimalTransport : public TransportProperties {
   const double qeOverkB_ = qe_ / kB_;
 
   // standard Chapman-Enskog coefficients
-  const double viscosityFactor_ = 5. / 16. * sqrt(PI_ * kB_);
-  const double kOverEtaFactor_ = 15. / 4. * kB_;
-  const double diffusivityFactor_ = 3. / 16. * sqrt(2.0 * PI_ * kB_) / AVOGADRONUMBER;
-  const double mfFreqFactor_ = 4. / 3. * AVOGADRONUMBER * sqrt(8. * kB_ / PI_);
+  // evaluated in ctor to avoid confusing hip about sqrt
+  double viscosityFactor_;
+  double kOverEtaFactor_;
+  double diffusivityFactor_;
+  double mfFreqFactor_;
 
   // molecular mass per each particle. [kg^-1]
   double mw_[gpudata::MAXSPECIES];
