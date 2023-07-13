@@ -89,25 +89,25 @@ jobs:
       - name: MFEM Tree
         run: echo "MFEM_DIR=$MFEM_DIR"
       - name: Query modules loaded
-        run:  module restore tps-gpu; module list
+        run:  module restore tps-gpu-gnu9; module list
       - name: Bootstrap
-        run:  module restore tps-gpu; ./bootstrap
+        run:  module restore tps-gpu-gnu9; ./bootstrap
       - name: Configure
-        run: module restore tps-gpu; ./configure --enable-pybind11 --enable-gpu-cuda CUDA_ARCH=sm_75
+        run: module restore tps-gpu-gnu9; ./configure --enable-pybind11 --enable-gpu-cuda CUDA_ARCH=sm_75
       - name: Make
-        run: module restore tps-gpu; make -j 2
+        run: module restore tps-gpu-gnu9; make -j 2
       - name: Tests
-        run: module restore tps-gpu; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
+        run: module restore tps-gpu-gnu9; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
    build-hip:
     runs-on: [self-hosted, linux, x64, gpu, hip]
     name: Build/GPU (AMD/HIP)
     env:
-      MFEM_DIR: /home/karl/sw/mfem-hip-4.3
+      MFEM_DIR: /home/oliver/sw/mfem-4.5.2-hip
     steps:
       - name: Cancel previous runs
         uses: styfle/cancel-workflow-action@0.11.0
         with:
-          access_token: ${{ github.token }}    
+          access_token: ${{ github.token }}
       - name: Checkout code
         uses: actions/checkout@v3
         with:
@@ -133,6 +133,8 @@ jobs:
    build-gpu-cpu:
     runs-on: [self-hosted, linux, x64, gpu, hip]
     name: Build/GPU-CPU
+    env:
+      MFEM_DIR: /home/oliver/sw/mfem-4.5.2-cpu
     steps:
       - name: Cancel previous runs
         uses: styfle/cancel-workflow-action@0.11.0
@@ -142,6 +144,8 @@ jobs:
         uses: actions/checkout@v3
         with:
           lfs: true
+      - name: MFEM Tree
+        run: echo "MFEM_DIR=$MFEM_DIR"
       - name: Query modules loaded
         run:  module restore tps-gpu-cpu; module list
       - name: Bootstrap
@@ -241,21 +245,21 @@ jobs:
        - name: MFEM Tree
          run:  echo "MFEM_INC=$MFEM_INC, MFEM_LIB=$MFEM_LIB"
        - name: Query modules loaded
-         run:  module restore tps-gpu; module list         
+         run:  module restore tps-gpu-gnu9; module list         
        - name: Configure
-         run:  cd tps-*; module restore tps-gpu; ./configure --enable-gpu-cuda CUDA_ARCH=sm_75
+         run:  cd tps-*; module restore tps-gpu-gnu9; ./configure --enable-gpu-cuda CUDA_ARCH=sm_75
        - name: Make
-         run:  cd tps-*; module restore tps-gpu; make -j 2
+         run:  cd tps-*; module restore tps-gpu-gnu9; make -j 2
        - name: TPS version
-         run:  cd tps-*; module restore tps-gpu; ./src/tps --version         
+         run:  cd tps-*; module restore tps-gpu-gnu9; ./src/tps --version         
        - name: Tests
-         run:  cd tps-*; module restore tps-gpu; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
+         run:  cd tps-*; module restore tps-gpu-gnu9; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
        - name: Distclean
          run:  cd tps-*; make distclean
        - name: VPATH configure
-         run:  cd tps-*; mkdir build; cd build; module restore tps-gpu; ../configure --enable-gpu-cuda CUDA_ARCH=sm_75
+         run:  cd tps-*; mkdir build; cd build; module restore tps-gpu-gnu9; ../configure --enable-gpu-cuda CUDA_ARCH=sm_75
        - name: VPATH Make
-         run:  cd tps-*; cd build; module restore tps-gpu; make -j 2
+         run:  cd tps-*; cd build; module restore tps-gpu-gnu9; make -j 2
        - name: VPATH Tests
-         run:  cd tps-*; cd build; module restore tps-gpu; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
+         run:  cd tps-*; cd build; module restore tps-gpu-gnu9; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
  

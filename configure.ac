@@ -103,39 +103,6 @@ AM_CONDITIONAL(SLURM_ENABLED,test x$ENABLE_SLURM = xyes)
 
 
 
-#-- GSLIB support in MFEM?
-AC_MSG_CHECKING([if GSLIB is available])
-
-ENABLE_GSLIB=no
-
-AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
-#include <mfem/config/config.hpp>
-#ifndef MFEM_USE_GSLIB
-# error macro not defined
-#endif
-]])], [found_gslib_support="yes"], [found_gslib_support="no"])
-
-
-AH_TEMPLATE([HAVE_GSLIB],[Enable GSLIB support])
-if test "x$found_gslib_support" != "xno" ; then
-   AC_CHECK_HEADER([gslib.h],[found_gslib_header=yes],[found_gslib_header=no])
-
-   if test "x${found_gslib_header}" = "xyes" ; then
-      AC_CHECK_LIB([gs],gslib_findpts_3,[found_gslib_library=yes],[found_gslib_library=no],[-lm])
-      if test "x${found_gslib_library}" = "xyes" ; then
-         AC_DEFINE([HAVE_GSLIB])
-         ENABLE_GSLIB=yes
-      fi
-   fi
-fi
-
-if test "x$ENABLE_GSLIB" = "xno" ; then
-   AC_MSG_RESULT([no])
-else
-   AC_MSG_RESULT([yes])
-fi
-
-AM_CONDITIONAL(GSLIB_ENABLED,test x$ENABLE_GSLIB = xyes)
 
 AH_TEMPLATE([_GPU_], [Build in GPU support])
 AH_TEMPLATE([_CUDA_],[CUDA backend])
@@ -227,6 +194,38 @@ fi
 
 
 AX_PATH_MFEM([4.4],  [yes])
+
+#-- GSLIB support in MFEM?
+AC_MSG_CHECKING([if GSLIB is available in mfem])
+
+ENABLE_GSLIB=no
+
+AC_LANG_PUSH([C++])
+cxxflags_save=$CXXFLAGS
+CXXFLAGS="$CXXFLAGS $MFEM_CXXFLAGS"
+AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
+#include <mfem/config/config.hpp>
+#ifndef MFEM_USE_GSLIB
+# error macro not defined
+#endif
+]])], [found_gslib_support="yes"], [found_gslib_support="no"])
+CXXFLAGS=$cxxflags_save
+AC_LANG_POP([C++])
+
+AH_TEMPLATE([HAVE_GSLIB],[Enable GSLIB support])
+
+if test "x$found_gslib_support" = "xyes" ; then
+   AC_DEFINE([HAVE_GSLIB])
+   ENABLE_GSLIB=yes
+fi
+
+if test "x$ENABLE_GSLIB" = "xno" ; then
+   AC_MSG_RESULT([no])
+else
+   AC_MSG_RESULT([yes])
+fi
+
+AM_CONDITIONAL(GSLIB_ENABLED,test x$ENABLE_GSLIB = xyes)
 
 
 # -------------------------------------------------------------

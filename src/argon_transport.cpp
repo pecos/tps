@@ -41,6 +41,11 @@ ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture, RunConfigurat
 
 MFEM_HOST_DEVICE ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture, const ArgonTransportInput &inputs)
     : TransportProperties(_mixture) {
+  viscosityFactor_ = 5. / 16. * sqrt(PI_ * kB_);
+  kOverEtaFactor_ = 15. / 4. * kB_;
+  diffusivityFactor_ = 3. / 16. * sqrt(2.0 * PI_ * kB_) / AVOGADRONUMBER;
+  mfFreqFactor_ = 4. / 3. * AVOGADRONUMBER * sqrt(8. * kB_ / PI_);
+
   // if (!ambipolar) {
   //   grvy_printf(GRVY_ERROR, "\nArgon ternary transport currently supports ambipolar condition only. Set
   //   plasma_models/ambipolar = true.\n"); exit(ERROR);
@@ -109,7 +114,12 @@ MFEM_HOST_DEVICE ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixtu
   setArtificialMultipliers(inputs);
 }
 
-MFEM_HOST_DEVICE ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture) : TransportProperties(_mixture) {}
+MFEM_HOST_DEVICE ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture) : TransportProperties(_mixture) {
+  viscosityFactor_ = 5. / 16. * sqrt(PI_ * kB_);
+  kOverEtaFactor_ = 15. / 4. * kB_;
+  diffusivityFactor_ = 3. / 16. * sqrt(2.0 * PI_ * kB_) / AVOGADRONUMBER;
+  mfFreqFactor_ = 4. / 3. * AVOGADRONUMBER * sqrt(8. * kB_ / PI_);
+}
 
 // void ArgonMinimalTransport::computeEffectiveMass(const Vector &mw, DenseSymmetricMatrix &muw) {
 MFEM_HOST_DEVICE void ArgonMinimalTransport::computeEffectiveMass(const double *mw, double *muw) {
