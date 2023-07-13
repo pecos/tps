@@ -56,7 +56,11 @@ echo '  ' LIBS..................... : $MASA_LIBS
 fi
 echo Python interface............ : $enable_pybind11
 if test "$enable_pybind11" = "yes"; then
-echo '   ' CXX flags............... : $PYTHON_CPPFLAGS
+echo '  ' CXX flags............... : $PYTHON_CPPFLAGS
+fi
+if test "x$ENABLE_MPI4PY" = "xyes"; then
+echo '  ' CXX flags............... : $MPI4PY_CXXFLAGS
+echo '  ' LIBS..................... : $MPI4PY_LIBS
 fi
 echo GPU build enabled with CUDA. : $ENABLE_CUDA
 if test "$ENABLE_CUDA" = "yes"; then

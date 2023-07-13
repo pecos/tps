@@ -51,6 +51,9 @@
 /* Define if you have the MPI library. */
 #undef HAVE_MPI
 
+/* Define if MPI4PY is available */
+#undef HAVE_MPI4PY
+
 /* Enable MPI extensions declared in mpi-ext.h */
 #undef HAVE_MPI_EXT
 

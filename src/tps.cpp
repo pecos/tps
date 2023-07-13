@@ -42,13 +42,20 @@
 
 #include <sys/types.h>
 #include <unistd.h>
+
 #ifdef HAVE_PYTHON
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+
+#ifdef HAVE_MPI4PY
+#include <mpi4py/mpi4py.h>
+#endif
+
 #endif
 
 #include "cycle_avg_joule_coupling.hpp"
 #include "independent_coupling.hpp"
+
 
 namespace TPS {
 
@@ -464,10 +471,39 @@ template void Tps::getRequiredInput<std::string>(const char *name, std::string &
 
 namespace py = pybind11;
 
+#ifdef HAVE_MPI4PY
+/*! Return a TPS::Tps from mpi4py communicator object.
+Anonimous function for pybind interface
+ */
+TPS::Tps * createTpsFromPythonComm(py::object py_comm) {
+  auto comm_ptr = PyMPIComm_Get(py_comm.ptr());
+
+  if (!comm_ptr)
+    throw py::error_already_set();
+
+  return new TPS::Tps(*comm_ptr);
+}
+#endif
+
 PYBIND11_MODULE(libtps, m) {
+  #ifdef HAVE_MPI4PY
+  // initialize mpi4py's C-API
+  if (import_mpi4py() < 0) {
+    // mpi4py calls the Python C API
+    // we let pybind11 give us the detailed traceback
+    throw py::error_already_set();
+  }
+  #endif
+
   m.doc() = "TPS Python Interface";
   py::class_<TPS::Tps>(m, "Tps")
-      .def(py::init())
+      .def(py::init<>())
+      #ifdef HAVE_MPI4PY
+      .def(py::init([](py::object py_comm) {
+        auto comm_ptr = PyMPIComm_Get(py_comm.ptr());
+        if (!comm_ptr)  throw py::error_already_set();
+        return new TPS::Tps(*comm_ptr); }) )
+      #endif
       .def("chooseDevices", &TPS::Tps::chooseDevices)
       .def("chooseSolver", &TPS::Tps::chooseSolver)
       .def("getStatus", &TPS::Tps::getStatus)

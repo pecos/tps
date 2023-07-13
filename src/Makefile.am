@@ -22,7 +22,7 @@ tps_LDFLAGS=
 bin_PROGRAMS         = tps
 tps_SOURCES          = main.cpp
 tps_LDADD            = libtps.la
-tps_LDFLAGS         += $(PYTHON_LIBS) $(MFEM_LIBS)
+tps_LDFLAGS         += $(MPI4PY_LIBS) $(PYTHON_LIBS) $(MFEM_LIBS)
 
 if HIP_ENABLED
 tps_LDFLAGS += -fgpu-rdc

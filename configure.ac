@@ -33,17 +33,13 @@ if test ${enable_pybind11} == "yes" ; then
    AC_LANG_POP([C++])
 
    # check for mpi4py
-   AC_MSG_CHECKING([if mpi4py is available])
-   AS_IF([$PYTHON -m mpi4py.bench helloworld >& /dev/null], [found_mpi4py=yes], [found_mpi4py=no])
-   if test "x${found_mpi4py}" = "xno" ; then
-      AC_MSG_RESULT([no])
-      # for now, just notify user, but in future this failure will be an error
-      #AC_MSG_ERROR([mpi4py not found. Please verify mpi4py is installed locally.])
-   else
-      AC_MSG_RESULT([yes])
+   AX_PATH_MPI4PY([3.1], [no])
+   if test x$HAVE_MPI4PY = x1 ; then
+      ENABLE_MPI4PY=yes
    fi
 fi
 AM_CONDITIONAL(PYTHON_ENABLED,test x$enable_pybind11 = xyes)
+AM_CONDITIONAL(ENABLED_MPI4PY,test x$ENABLE_MPI4PY = xyes)
 
 # enable c++11 standard
 CXXFLAGS="-std=c++11 $CXXFLAGS"

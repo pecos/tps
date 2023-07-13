@@ -4,15 +4,14 @@ import os
 
 from mpi4py import MPI
 
-comm = MPI.COMM_WORLD
-
 # set path to C++ TPS library
 path = os.path.abspath(os.path.dirname(sys.argv[0]))
 sys.path.append(path + "/.libs")
 import libtps as tps
 
+comm = MPI.COMM_WORLD
 # TPS solver
-tps = tps.Tps()
+tps = tps.Tps(comm)
 
 tps.parseCommandLineArgs(sys.argv)
 tps.parseInput()
