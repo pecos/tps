@@ -2030,7 +2030,7 @@ void M2ulPhyS::initialTimeStep() {
   }
 
   double partition_C = max_char_speed;
-  MPI_Allreduce(&partition_C, &max_char_speed, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+  MPI_Allreduce(&partition_C, &max_char_speed, 1, MPI_DOUBLE, MPI_MAX, mesh->GetComm());
 
   dt = CFL * hmin / max_char_speed / static_cast<double>(dim);
 

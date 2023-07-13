@@ -162,7 +162,7 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
   // the debugger
   if (debugMode) {
     volatile int gdb = 1;
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(TPSCommWorld_);
     if (isRank0_) {
       gdb = 0;
       grvy_printf(GRVY_INFO, "\nDEBUG Mode enabled:\n");
@@ -170,7 +170,7 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
     }
 
     while (gdb == 0) sleep(5);
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(TPSCommWorld_);
   }
 
   return;

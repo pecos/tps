@@ -165,7 +165,7 @@ void M2ulPhyS::checkSolutionError(const double _time, const bool final) {
     int numElems;
     if (final) {
       int localElems = mesh->GetNE();
-      MPI_Allreduce(&localElems, &numElems, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+      MPI_Allreduce(&localElems, &numElems, 1, MPI_INT, MPI_SUM, mesh->GetComm());
     }
 
     if (rank0_) {
