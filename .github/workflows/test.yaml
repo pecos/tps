@@ -89,15 +89,15 @@ jobs:
       - name: MFEM Tree
         run: echo "MFEM_DIR=$MFEM_DIR"
       - name: Query modules loaded
-        run:  module restore tps-gpu; module list
+        run:  module restore tps-gpu-gnu9; module list
       - name: Bootstrap
-        run:  module restore tps-gpu; ./bootstrap
+        run:  module restore tps-gpu-gnu9; ./bootstrap
       - name: Configure
-        run: module restore tps-gpu; ./configure --enable-pybind11 --enable-gpu-cuda CUDA_ARCH=sm_75
+        run: module restore tps-gpu-gnu9; ./configure --enable-pybind11 --enable-gpu-cuda CUDA_ARCH=sm_75
       - name: Make
-        run: module restore tps-gpu; make -j 2
+        run: module restore tps-gpu-gnu9; make -j 2
       - name: Tests
-        run: module restore tps-gpu; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
+        run: module restore tps-gpu-gnu9; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
    build-hip:
     runs-on: [self-hosted, linux, x64, gpu, hip]
     name: Build/GPU (AMD/HIP)
