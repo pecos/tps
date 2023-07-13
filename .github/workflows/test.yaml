@@ -245,21 +245,21 @@ jobs:
        - name: MFEM Tree
          run:  echo "MFEM_INC=$MFEM_INC, MFEM_LIB=$MFEM_LIB"
        - name: Query modules loaded
-         run:  module restore tps-gpu; module list         
+         run:  module restore tps-gpu-gnu9; module list         
        - name: Configure
-         run:  cd tps-*; module restore tps-gpu; ./configure --enable-gpu-cuda CUDA_ARCH=sm_75
+         run:  cd tps-*; module restore tps-gpu-gnu9; ./configure --enable-gpu-cuda CUDA_ARCH=sm_75
        - name: Make
-         run:  cd tps-*; module restore tps-gpu; make -j 2
+         run:  cd tps-*; module restore tps-gpu-gnu9; make -j 2
        - name: TPS version
-         run:  cd tps-*; module restore tps-gpu; ./src/tps --version         
+         run:  cd tps-*; module restore tps-gpu-gnu9; ./src/tps --version         
        - name: Tests
-         run:  cd tps-*; module restore tps-gpu; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
+         run:  cd tps-*; module restore tps-gpu-gnu9; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
        - name: Distclean
          run:  cd tps-*; make distclean
        - name: VPATH configure
-         run:  cd tps-*; mkdir build; cd build; module restore tps-gpu; ../configure --enable-gpu-cuda CUDA_ARCH=sm_75
+         run:  cd tps-*; mkdir build; cd build; module restore tps-gpu-gnu9; ../configure --enable-gpu-cuda CUDA_ARCH=sm_75
        - name: VPATH Make
-         run:  cd tps-*; cd build; module restore tps-gpu; make -j 2
+         run:  cd tps-*; cd build; module restore tps-gpu-gnu9; make -j 2
        - name: VPATH Tests
-         run:  cd tps-*; cd build; module restore tps-gpu; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
+         run:  cd tps-*; cd build; module restore tps-gpu-gnu9; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
  
