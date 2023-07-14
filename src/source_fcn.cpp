@@ -46,7 +46,7 @@ AxisymmetricSourceFunction::AxisymmetricSourceFunction(const int dim, const int 
 
 AxisymmetricSourceFunction::~AxisymmetricSourceFunction() {}
 
-void AxisymmetricSourceFunction::evaluate(const Vector& x, const Vector& U, const DenseMatrix& gradUp, Vector& S) {
+void AxisymmetricSourceFunction::evaluate(const Vector& x, const Vector& U, const DenseMatrix& gradUp, double dist, Vector& S) {
   S.SetSize(neqn_);
   S = 0.;
 
@@ -75,12 +75,17 @@ void AxisymmetricSourceFunction::evaluate(const Vector& x, const Vector& U, cons
     const double uz_z = gradUp(2, 1);
     const double ut_r = gradUp(3, 0);
 
-    //double visc, bulkVisc;
     double visc_vec[2];
-    transport_->GetViscosities(U.GetData(), Up.GetData(), visc_vec);
-    double visc = visc_vec[0];
-    double bulkVisc = visc_vec[1];
+    double visc, bulkVisc;
+    transport_->GetViscosities(U.Read(), Up.Read(), gradUp.Read(), radius, dist, visc_vec);
+    visc = visc_vec[0];
+    bulkVisc = visc_vec[1];
     bulkVisc -= 2. / 3. * visc;
+
+    // transport_->GetViscosities(U.GetData(), Up.GetData(), visc_vec);
+    // double visc = visc_vec[0];
+    // double bulkVisc = visc_vec[1];
+    // bulkVisc -= 2. / 3. * visc;
 
     // TODO(trevilo): Handle spatially varying viscosity multiplier correctly
     // if (space_vary_viscosity_mult_ != NULL) {

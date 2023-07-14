@@ -177,7 +177,7 @@ void ElementIntegrator::AssembleElementVector(const FiniteElement &el, ElementTr
 
 
     if (srcFcn_ != NULL) {
-      srcFcn_->evaluate(transip, soln, soln_x, src);
+      srcFcn_->evaluate(transip, soln, soln_x, dval, src);
       src *= Tr.Weight() * ip.weight;
       AddMultVWt(shape, src, elvec_mat);
     }

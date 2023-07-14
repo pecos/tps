@@ -75,7 +75,7 @@ class SourceFunction {
    * @param[in]  gradUp Gradient of primitive variables at point
    * @param[out] S      Source term vector evaluated at point
    */
-  virtual void evaluate(const mfem::Vector& x, const mfem::Vector& U, const mfem::DenseMatrix& gradUp,
+  virtual void evaluate(const mfem::Vector& x, const mfem::Vector& U, const mfem::DenseMatrix& gradUp, double dist,
                         mfem::Vector& S) = 0;
 };
 
@@ -89,7 +89,7 @@ class AxisymmetricSourceFunction : public SourceFunction {
                              GasMixture* mix, TransportProperties* trans);
   ~AxisymmetricSourceFunction();
 
-  void evaluate(const mfem::Vector& x, const mfem::Vector& U, const mfem::DenseMatrix& gradUp,
+  void evaluate(const mfem::Vector& x, const mfem::Vector& U, const mfem::DenseMatrix& gradUp, double dist,
                 mfem::Vector& S) override;
 };
 
