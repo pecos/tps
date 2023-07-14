@@ -25,8 +25,9 @@ lassen:
    - module --force purge
    - module load StdEnv
    - module swap xl ${COMPILER}
-   - module load grvy mfem-cuda hypre metis cuda/${CUDA_VER}
+   - module load grvy hypre metis cuda/${CUDA_VER}
    - module list
+   - export MFEM_DIR=/usr/workspace/oliver33/lassen/sw/mfem-4.5.2-cuda/
    - ./bootstrap
    - ./configure CUDA_ARCH=${CUDA_ARCH} --disable-valgrind --enable-gpu-cuda --with-cuda=${CUDA_PATH}
    - make -j 2
