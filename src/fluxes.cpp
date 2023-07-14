@@ -134,6 +134,56 @@ MFEM_HOST_DEVICE void Fluxes::ComputeConvectiveFluxes(const double *state, doubl
   }
 }
 
+void Fluxes::ComputeConvectiveFluxJacobian(const Vector &state, DenseTensor &jacobian) {
+  const double pres = mixture->ComputePressure(state);
+
+  const double den = state(0);
+  const Vector den_vel(state.GetData() + 1, nvel);
+  const double den_energy = state(1 + nvel);
+
+  // Jacobian of the pressure
+  Vector p_U(num_equation);
+  mixture->computePressureJacobian(state, p_U);
+
+  // Jacobian of total enthalpy
+  const double H = (den_energy + pres) / den;
+  Vector H_U(num_equation);
+  H_U[0] = -H / den + p_U[0] / den;
+  for (int d = 0; d < nvel; d++) {
+    H_U[1 + d] = p_U[1 + d] / den;
+  }
+  H_U[1 + nvel] = (1. + p_U[1 + nvel]) / den;
+
+  // Finally, the flux Jacobian
+  jacobian.SetSize(num_equation, dim, num_equation);
+  jacobian = 0.;
+
+  for (int d = 0; d < dim; d++) {
+    // flux(0, d) = state(d + 1);
+    jacobian(0, d, d + 1) += 1.;
+
+    for (int i = 0; i < nvel; i++) {
+      // flux(1 + i, d) = state(i + 1) * state(d + 1) / state[0];
+      jacobian(1 + i, d, 0) += -state(i + 1) * state(d + 1) / state[0] / state[0];
+      jacobian(1 + i, d, 1 + i) += state(d + 1) / state[0];
+      jacobian(1 + i, d, 1 + d) += state(i + 1) / state[0];
+    }
+    // flux(1 + d, d) += pres;
+    for (int k = 0; k < num_equation; k++) {
+      jacobian(1 + d, d, k) += p_U[k];
+    }
+  }
+
+  for (int d = 0; d < dim; d++) {
+    // flux(1 + nvel, d) = state(d + 1) * H;
+    jacobian(1 + nvel, d, d + 1) += H;
+    for (int k = 0; k < num_equation; k++) {
+      jacobian(1 + nvel, d, k) += state(d + 1) * H_U[k];
+    }
+  }
+
+}
+
 // TODO(kevin): check/complete axisymmetric setting for multi-component flow.
 void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, double radius, double distance,
                                   DenseMatrix &flux) {

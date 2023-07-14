@@ -158,13 +158,17 @@ class GasMixture {
     return 0;
   }
 
+  virtual void computePressureJacobian(const Vector &state, Vector &p_U) {
+    mfem_error("computePressureJacobian is not implemented for this mixture.");
+  }
+
   virtual double ComputePressureFromPrimitives(const Vector &Up) = 0;  // pressure from primitive variables
   MFEM_HOST_DEVICE virtual double ComputePressureFromPrimitives(const double *Up) {
     // mfem_error("ComputePressureFromPrimitives is not implemented.");
     return -1.0;
   }
   virtual double ComputeTemperature(const Vector &state) = 0;
-  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state) {
+  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state) const {
     // mfem_error("ComputeTemperature is not implemented.");
     return -1.0;
   }
@@ -339,10 +343,12 @@ class DryAir : public GasMixture {
   virtual double ComputePressure(const Vector &state, double *electronPressure = NULL);
   MFEM_HOST_DEVICE virtual double ComputePressure(const double *state, double *electronPressure = NULL) const;
 
+  virtual void computePressureJacobian(const Vector &state, Vector &p_U);
+
   virtual double ComputePressureFromPrimitives(const Vector &Up);
   MFEM_HOST_DEVICE virtual double ComputePressureFromPrimitives(const double *Up);
   virtual double ComputeTemperature(const Vector &state);
-  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state);
+  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state) const;
   // virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / gas_constant / rho[0]; }
 
   virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies);
@@ -572,6 +578,27 @@ inline double DryAir::ComputePressure(const Vector &state, double *electronPress
 #endif
 }
 
+inline void DryAir::computePressureJacobian(const Vector &state, Vector &p_U) {
+  p_U = 0.;
+
+  const double gm1 = specific_heat_ratio - 1;
+
+  // Derivative of p wrt density
+  for (int d = 0; d < nvel_; d++) {
+    const double u = state[d + 1] / state[0];
+    p_U[0] += u * u;
+  }
+  p_U[0] *= 0.5 * gm1;
+
+  // Derivative of p wrt momentum
+  for (int d = 0; d < nvel_; d++) {
+    p_U[d + 1] = -gm1 * state[d + 1] / state[0];
+  }
+
+  // Derivative of p wrt total energy
+  p_U[nvel_ + 1] = gm1;
+}
+
 // additional functions inlined for speed...
 MFEM_HOST_DEVICE inline double DryAir::ComputePressure(const double *state, double *electronPressure) const {
   if (electronPressure != NULL) *electronPressure = 0.0;
@@ -594,7 +621,7 @@ inline double DryAir::ComputeTemperature(const Vector &state) {
 #endif
 }
 
-MFEM_HOST_DEVICE inline double DryAir::ComputeTemperature(const double *state) {
+MFEM_HOST_DEVICE inline double DryAir::ComputeTemperature(const double *state) const {
   double den_vel2 = 0;
   for (int d = 0; d < nvel_; d++) den_vel2 += state[d + 1] * state[d + 1];
   den_vel2 /= state[0];
@@ -675,7 +702,7 @@ class PerfectMixture : public GasMixture {
   virtual bool StateIsPhysical(const Vector &state);
 
   virtual double ComputeTemperature(const Vector &state);
-  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state);
+  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state) const;
   MFEM_HOST_DEVICE virtual void computeTemperaturesBase(const double *conservedState, const double *n_sp,
                                                         const double n_e, const double n_B, double &T_h,
                                                         double &T_e) const;

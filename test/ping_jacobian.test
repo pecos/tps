@@ -1,0 +1,23 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="ping_jacobian"
+RUNFILE="inputs/check.jacobian.ini"
+
+@test "[$TEST] Finite difference checks for local Jacobians" {
+    test -s $RUNFILE
+    test -e ./ping_jacobian_local
+    ./ping_jacobian_local
+}
+
+@test "[$TEST] Check global Jacobian assembly (serial)" {
+    test -s $RUNFILE
+    test -e ./ping_jacobian_global
+    ./ping_jacobian_global -run $RUNFILE
+}
+
+@test "[$TEST] Check global Jacobian assembly (parallel, np = 2)" {
+    test -s $RUNFILE
+    test -e ./ping_jacobian_global
+    mpirun -np 2 ./ping_jacobian_global -run $RUNFILE
+}

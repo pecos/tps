@@ -51,6 +51,7 @@ RunConfiguration::RunConfiguration() {
   dt_fixed = -1.0;
   numIters = 10;
   useRoe = false;
+  use_nodal_for_interior_ = true;
   restart = false;
   restart_hdf5_conversion = false;
   restart_serial = "no";

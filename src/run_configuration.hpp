@@ -99,6 +99,9 @@ class RunConfiguration {
   // Use Roe-type Riemann solver
   bool useRoe;
 
+  // Use nodal quadrature scheme for element interior integral
+  bool use_nodal_for_interior_;
+
   // restart controls
   bool restart;
   bool restart_hdf5_conversion;  // read in older ascii format
@@ -263,6 +266,8 @@ class RunConfiguration {
   PostProcessInput postprocessInput;
 
   bool compute_distance;
+  // String to select an IC function
+  std::string ic_fcn_;
 
   RunConfiguration();
   ~RunConfiguration();
@@ -288,6 +293,7 @@ class RunConfiguration {
   int GetNumIters() { return numIters; }
   int GetNumItersOutput() { return itersOut; }
   bool RoeRiemannSolver() const { return useRoe; }
+  bool isNodalInterior() const { return use_nodal_for_interior_; }
 
   int GetMeanStartIter() { return startIter; }
   int GetMeanSampleInterval() { return sampleInterval; }

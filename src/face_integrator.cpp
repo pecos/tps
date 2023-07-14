@@ -331,6 +331,129 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     // add to element vectors
     AddMultVWt(shape2, fluxN, elvect2_mat);
     AddMult_a_VWt(-1.0, shape1, fluxN, elvect1_mat);
+
+    // for (int ieqn=0; ieqn<num_equation; ieqn++) {
+    //   for (int idof=0; idof < dof2; idof++) {
+    //     elvect[num_equation*dof1 + ieqn*dof2 + idof] += shape2[idof]*fluxN[ieqn];
+    //   }
+    // }
+
+    // for (int ieqn=0; ieqn<num_equation; ieqn++) {
+    //   for (int idof=0; idof < dof1; idof++) {
+    //     elvect[ieqn*dof1 + idof] -= shape1[idof]*fluxN[ieqn];
+    //   }
+    // }
+  }
+}
+
+void FaceIntegrator::AssembleFaceGrad(const FiniteElement &el1, const FiniteElement &el2,
+                                      FaceElementTransformations &Tr, const Vector &elfun, DenseMatrix &elmat) {
+  // Compute the term <F.n(u),[w]> on the interior faces.
+
+  funval1.SetSize(num_equation);
+  funval2.SetSize(num_equation);
+  nor.SetSize(dim);
+  // fluxN.SetSize(num_equation);
+  fluxN_U1.SetSize(num_equation, num_equation);
+  fluxN_U2.SetSize(num_equation, num_equation);
+
+  const int dof1 = el1.GetDof();
+  const int dof2 = el2.GetDof();
+
+  shape1.SetSize(dof1);
+  shape2.SetSize(dof2);
+
+  elmat.SetSize((dof1 + dof2) * num_equation, (dof1 + dof2) * num_equation);
+  elmat = 0.0;
+
+  elfun1_mat.UseExternalData(elfun.GetData(), dof1, num_equation);
+  elfun2_mat.UseExternalData(elfun.GetData() + dof1 * num_equation, dof2, num_equation);
+
+  // Integration order calculation from DGTraceIntegrator
+  int intorder;
+  if (Tr.Elem2No >= 0) {
+    intorder = (min(Tr.Elem1->OrderW(), Tr.Elem2->OrderW()) + 2 * max(el1.GetOrder(), el2.GetOrder()));
+  } else {
+    intorder = Tr.Elem1->OrderW() + 2 * el1.GetOrder();
+  }
+  if (el1.Space() == FunctionSpace::Pk) {
+    intorder++;
+  }
+  // IntegrationRules IntRules2(0, Quadrature1D::GaussLobatto);
+  const IntegrationRule *ir = &intRules->Get(Tr.GetGeometryType(), intorder);
+
+  for (int i = 0; i < ir->GetNPoints(); i++) {
+    const IntegrationPoint &ip = ir->IntPoint(i);
+
+    Tr.SetAllIntPoints(&ip);  // set face and element int. points
+
+    // Calculate basis functions on both elements at the face
+    el1.CalcShape(Tr.GetElement1IntPoint(), shape1);
+    el2.CalcShape(Tr.GetElement2IntPoint(), shape2);
+
+    // Interpolate elfun at the point
+    elfun1_mat.MultTranspose(shape1, funval1);
+    elfun2_mat.MultTranspose(shape2, funval2);
+
+    // Get the normal vector and the convective flux Jacobian on the face
+    CalcOrtho(Tr.Jacobian(), nor);
+    rsolver->Jacobian(funval1, funval2, nor, fluxN_U1, fluxN_U2);
+
+    double radius = 1;
+    if (axisymmetric_) {
+      double x[3];
+      Vector transip(x, 3);
+      Tr.Transform(ip, transip);
+      radius = transip[0];
+    }
+
+    fluxN_U1 *= ip.weight;
+    fluxN_U2 *= ip.weight;
+
+    if (axisymmetric_) {
+      fluxN_U1 *= radius;
+      fluxN_U2 *= radius;
+    }
+
+    for (unsigned int ieqn = 0; ieqn < num_equation; ieqn++) {
+      for (unsigned int idof = 0; idof < dof2; idof++) {
+        const int res_ind = num_equation * dof1 + ieqn * dof2 + idof;
+        // elvect[res_ind] += shape2[idof]*fluxN[ieqn];
+
+        for (unsigned int jeqn = 0; jeqn < num_equation; jeqn++) {
+          for (unsigned int jdof = 0; jdof < dof1; jdof++) {
+            const int state_ind = jeqn * dof1 + jdof;
+            elmat(res_ind, state_ind) += shape2[idof] * fluxN_U1(ieqn, jeqn) * shape1[jdof];
+          }
+        }
+        for (unsigned int jeqn = 0; jeqn < num_equation; jeqn++) {
+          for (unsigned int jdof = 0; jdof < dof2; jdof++) {
+            const int state_ind = num_equation * dof1 + jeqn * dof1 + jdof;
+            elmat(res_ind, state_ind) += shape2[idof] * fluxN_U2(ieqn, jeqn) * shape2[jdof];
+          }
+        }
+      }
+    }
+
+    for (unsigned int ieqn = 0; ieqn < num_equation; ieqn++) {
+      for (unsigned int idof = 0; idof < dof1; idof++) {
+        const int res_ind = ieqn * dof1 + idof;
+        // elvect[res_ind] -= shape1[idof]*fluxN[ieqn];
+
+        for (unsigned int jeqn = 0; jeqn < num_equation; jeqn++) {
+          for (unsigned int jdof = 0; jdof < dof1; jdof++) {
+            const int state_ind = jeqn * dof1 + jdof;
+            elmat(res_ind, state_ind) -= shape1[idof] * fluxN_U1(ieqn, jeqn) * shape1[jdof];
+          }
+        }
+        for (unsigned int jeqn = 0; jeqn < num_equation; jeqn++) {
+          for (unsigned int jdof = 0; jdof < dof2; jdof++) {
+            const int state_ind = num_equation * dof1 + jeqn * dof1 + jdof;
+            elmat(res_ind, state_ind) -= shape1[idof] * fluxN_U2(ieqn, jeqn) * shape2[jdof];
+          }
+        }
+      }
+    }
   }
 }
 

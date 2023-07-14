@@ -34,6 +34,8 @@
  */
 
 #include "M2ulPhyS.hpp"
+#include "element_integrator.hpp"
+#include "flow_initial_conditions.hpp"
 
 M2ulPhyS::M2ulPhyS(MPI_Session &_mpi, TPS::Tps *tps) : mpi(_mpi) {
   tpsP = tps;
@@ -516,6 +518,12 @@ void M2ulPhyS::initVariables() {
 
   rsolver =
       new RiemannSolver(num_equation, mixture, eqSystem, fluxClass, config.RoeRiemannSolver(), config.isAxisymmetric());
+
+  if (config.isAxisymmetric() && !config.isNodalInterior()) {
+    srcFcn_ = new AxisymmetricSourceFunction(dim, nvel, num_equation, eqSystem, mixture, transportPtr);
+  } else {
+    srcFcn_ = NULL;
+  }
 #endif
 
   alpha = 0.5;
@@ -554,11 +562,21 @@ void M2ulPhyS::initVariables() {
   }
 #endif
 
-  Aflux = new MixedBilinearForm(dfes, fes);
-  domainIntegrator = new DomainIntegrator(fluxClass, intRules, intRuleType, dim, num_equation, config.isAxisymmetric());
-  Aflux->AddDomainIntegrator(domainIntegrator);
-  Aflux->Assemble();
-  Aflux->Finalize();
+  if (!config.isNodalInterior()) {
+    // Formulate interior contribution using 'standard' method
+    // (quadrature applied to each element)
+    Aflux = NULL;
+    A->AddDomainIntegrator(new ElementIntegrator(dim, num_equation, config.isAxisymmetric(), eqSystem, fluxClass, srcFcn_, intRules, vfes, gradUp));
+  } else {
+    // Formulation interior contributionas B * F, where B is operator
+    // from MixedBilinearForm and F is flux evaluated at nodes
+    Aflux = new MixedBilinearForm(dfes, fes);
+    domainIntegrator =
+        new DomainIntegrator(fluxClass, intRules, intRuleType, dim, num_equation, config.isAxisymmetric());
+    Aflux->AddDomainIntegrator(domainIntegrator);
+    Aflux->Assemble();
+    Aflux->Finalize();
+  }
 
   switch (config.GetTimeIntegratorType()) {
     case 1:
@@ -575,6 +593,10 @@ void M2ulPhyS::initVariables() {
       break;
     case 6:
       timeIntegrator = new RK6Solver;
+      break;
+    case 11:
+      if (mpi.Root()) cout << "Warning: Backward Euler is under development." << endl;
+      timeIntegrator = new BackwardEulerSolver;
       break;
     default:
       cout << "Unknown ODE solver type: " << config.GetTimeIntegratorType() << '\n';
@@ -609,7 +631,15 @@ void M2ulPhyS::initVariables() {
   Up->ExchangeFaceNbrData();
   gradUp->ExchangeFaceNbrData();
 
-  if (config.GetRestartCycle() == 0) initialTimeStep();
+  if (config.GetRestartCycle() == 0) {
+    initialTimeStep();
+  } else {
+    const double dt_fixed = config.GetFixedDT();
+    if (dt_fixed > 0) {
+      dt = dt_fixed;
+    }
+  }
+
   if (mpi.Root()) cout << "Initial time-step: " << dt << "s" << endl;
 
   // t_final = MaxIters*dt;
@@ -1457,6 +1487,15 @@ void M2ulPhyS::projectInitialSolution() {
 #endif
 
   if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
+    if (config.ic_fcn_ == std::string("none")) {
+      uniformInitialConditions();
+    } else if (config.ic_fcn_ == std::string("euler-vortex")) {
+      VectorFunctionCoefficient u0(num_equation, initializeEulerVortex);
+      U->ProjectCoefficient(u0);
+    } else {
+      assert(config.use_mms_);
+    }
+
     if (config.use_mms_) {
 #ifdef HAVE_MASA
       projectExactSolution(0.0, U);
@@ -1647,91 +1686,6 @@ void M2ulPhyS::solve() {
 //   }
 
   return;
-}
-
-// Initial conditions for debug/test case
-void M2ulPhyS::InitialConditionEulerVortex(const Vector &x, Vector &y) {
-  MFEM_ASSERT(x.Size() == 2, "");
-  int equations = 4;
-  if (x.Size() == 3) equations = 5;
-
-  int problem = 1;
-  DryAir *eqState = new DryAir();
-  const double gamma = eqState->GetSpecificHeatRatio();
-  const double Rg = eqState->GetGasConstant();
-
-  double radius = 0, Minf = 0, beta = 0;
-  if (problem == 1) {
-    // "Fast vortex"
-    radius = 0.2;
-    Minf = 0.5;
-    beta = 1. / 5.;
-
-    radius = 0.5;
-    Minf = 0.1;
-  } else if (problem == 2) {
-    // "Slow vortex"
-    radius = 0.2;
-    Minf = 0.05;
-    beta = 1. / 50.;
-  } else {
-    mfem_error(
-        "Cannot recognize problem."
-        "Options are: 1 - fast vortex, 2 - slow vortex");
-  }
-
-  int numVortices = 3;
-  Vector xc(numVortices), yc(numVortices);
-  yc = 0.;
-  for (int i = 0; i < numVortices; i++) {
-    xc[i] = 2. * M_PI / static_cast<double>(numVortices + 1);
-    xc[i] += static_cast<double>(i) * 2. * M_PI / static_cast<double>(numVortices);
-  }
-
-  const double Tt = 300.;
-  const double Pt = 102200;
-
-  const double funcGamma = 1. + 0.5 * (gamma - 1.) * Minf * Minf;
-
-  const double temp_inf = Tt / funcGamma;
-  const double pres_inf = Pt * pow(funcGamma, gamma / (gamma - 1.));
-  const double vel_inf = Minf * sqrt(gamma * Rg * temp_inf);
-  const double den_inf = pres_inf / (Rg * temp_inf);
-
-  double r2rad = 0.0;
-
-  const double shrinv1 = 1.0 / (gamma - 1.);
-
-  double velX = 0.;
-  double velY = 0.;
-  double temp = 0.;
-  for (int i = 0; i < numVortices; i++) {
-    r2rad = (x(0) - xc[i]) * (x(0) - xc[i]);
-    r2rad += (x(1) - yc[i]) * (x(1) - yc[i]);
-    r2rad /= radius * radius;
-    velX -= beta * (x(1) - yc[i]) / radius * exp(-0.5 * r2rad);
-    velY += beta * (x(0) - xc[i]) / radius * exp(-0.5 * r2rad);
-    temp += exp(-r2rad);
-  }
-
-  velX = vel_inf * (1 - velX);
-  velY = vel_inf * velY;
-  const double vel2 = velX * velX + velY * velY;
-
-  const double specific_heat = Rg * gamma * shrinv1;
-  temp = temp_inf - 0.5 * (vel_inf * beta) * (vel_inf * beta) / specific_heat * temp;
-
-  const double den = den_inf * pow(temp / temp_inf, shrinv1);
-  const double pres = den * Rg * temp;
-  const double energy = shrinv1 * pres / den + 0.5 * vel2;
-
-  y(0) = den;
-  y(1) = den * velX;
-  y(2) = den * velY;
-  if (x.Size() == 3) y(3) = 0.;
-  y(equations - 1) = den * energy;
-
-  delete eqState;
 }
 
 // Initial conditions for debug/test case
@@ -2185,6 +2139,7 @@ void M2ulPhyS::parseFlowOptions() {
   tpsP->getInput("flow/timingFreq", config.timingFreq, 100);
   tpsP->getInput("flow/useRoe", config.useRoe, false);
   tpsP->getInput("flow/useSumByParts", config.SBP, false);
+  tpsP->getInput("flow/useNodalInterior", config.use_nodal_for_interior_, true);
   tpsP->getInput("flow/refLength", config.refLength, 1.0);
   tpsP->getInput("flow/viscosityMultiplier", config.visc_mult, 1.0);
   tpsP->getInput("flow/bulkViscosityMultiplier", config.bulk_visc, 0.0);
@@ -2217,6 +2172,7 @@ void M2ulPhyS::parseTimeIntegrationOptions() {
   integrators["rk3"] = 3;
   integrators["rk4"] = 4;
   integrators["rk6"] = 6;
+  integrators["backwardEuler"] = 11;
   std::string type;
   tpsP->getInput("time/cfl", config.cflNum, 0.12);
   tpsP->getInput("time/integrator", type, std::string("rk4"));
@@ -2227,6 +2183,10 @@ void M2ulPhyS::parseTimeIntegrationOptions() {
   } else {
     grvy_printf(GRVY_ERROR, "Unknown time integrator > %s\n", type.c_str());
     exit(ERROR);
+  }
+
+  if (type == "backwardEuler") {
+    grvy_printf(GRVY_INFO, "\nWARNING: Backward Euler time marching is experimental\n");
   }
 }
 
@@ -2334,11 +2294,17 @@ void M2ulPhyS::parseMMSOptions() {
 }
 
 void M2ulPhyS::parseICOptions() {
-  tpsP->getRequiredInput("initialConditions/rho", config.initRhoRhoVp[0]);
-  tpsP->getRequiredInput("initialConditions/rhoU", config.initRhoRhoVp[1]);
-  tpsP->getRequiredInput("initialConditions/rhoV", config.initRhoRhoVp[2]);
-  tpsP->getRequiredInput("initialConditions/rhoW", config.initRhoRhoVp[3]);
-  tpsP->getRequiredInput("initialConditions/pressure", config.initRhoRhoVp[4]);
+  tpsP->getInput("initialConditions/function", config.ic_fcn_, std::string("none"));
+
+  // initial conditions
+  if (!config.use_mms_ && (config.ic_fcn_ == std::string("none"))) {
+    tpsP->getRequiredInput("initialConditions/rho", config.initRhoRhoVp[0]);
+    tpsP->getRequiredInput("initialConditions/rhoU", config.initRhoRhoVp[1]);
+    tpsP->getRequiredInput("initialConditions/rhoV", config.initRhoRhoVp[2]);
+    tpsP->getRequiredInput("initialConditions/rhoW", config.initRhoRhoVp[3]);
+    tpsP->getRequiredInput("initialConditions/pressure", config.initRhoRhoVp[4]);
+  }
+
 }
 
 void M2ulPhyS::parsePassiveScalarOptions() {
@@ -3472,6 +3438,10 @@ void M2ulPhyS::updatePrimitives() {
     mixture->GetPrimitivesFromConservatives(state, Upi);
     for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * dof] = Upi[eq];
   }
+}
+
+void M2ulPhyS::updatePlasmaConductivity() {
+
 }
 
 void M2ulPhyS::visualization() {

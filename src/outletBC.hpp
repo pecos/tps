@@ -85,6 +85,7 @@ class OutletBC : public BoundaryCondition {
   void initBoundaryU(ParGridFunction *Up);
 
   void subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vector &bdrFlux);
+  void subsonicReflectingPressureJacobian(Vector &normal, Vector &stateIn, DenseMatrix &bdrFluxJacobian);
 
   void subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
 
@@ -103,8 +104,9 @@ class OutletBC : public BoundaryCondition {
            const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs, bool axisym);
   ~OutletBC();
 
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, double distance,
-                      Vector &bdrFlux);
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, double distance, Vector &bdrFlux);
+  void computeBdrFluxJacobian(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                              DenseMatrix &bdrFluxJacobian);
 
   virtual void initBCs();
 

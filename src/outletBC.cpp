@@ -316,6 +316,21 @@ void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &grad
   }
 }
 
+void OutletBC::computeBdrFluxJacobian(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                      DenseMatrix &bdrFluxJacobian) {
+  switch (outletType_) {
+    case SUB_P:
+      subsonicReflectingPressureJacobian(normal, stateIn, bdrFluxJacobian);
+      break;
+    case SUB_P_NR:
+    case SUB_MF_NR:
+    case SUB_MF_NR_PW:
+    default:
+      MFEM_ASSERT(false, "OutletBC Jacobians are not yet supported.");
+      break;
+  }
+}
+
 void OutletBC::computeParallelArea() {
   if (parallelAreaComputed) return;
 
@@ -724,6 +739,34 @@ void OutletBC::subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vecto
   mixture->modifyEnergyForPressure(stateIn, state2, inputState[0]);
 
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
+}
+
+void OutletBC::subsonicReflectingPressureJacobian(Vector &normal, Vector &stateIn, DenseMatrix &bdrFluxJacobian) {
+  const double gamma = mixture->GetSpecificHeatRatio();
+  Vector state2(num_equation_);
+  state2 = stateIn;
+  double k = 0.;
+  for (int d = 0; d < nvel_; d++) k += stateIn[1 + d] * stateIn[1 + d];
+  state2[1 + nvel_] = inputState[0] / (gamma - 1.) + 0.5 * k / stateIn[0];
+
+  DenseMatrix UR_UL(num_equation_, num_equation_);
+  UR_UL = 0.;
+  for (int i=0; i<num_equation_; i++) {
+    UR_UL(i, i) = 1.0;
+  }
+  UR_UL(1 + nvel_, 0) = -0.5 * k / stateIn[0] / stateIn[0];
+  for (int d = 0; d < nvel_; d++) {
+    UR_UL(1 + nvel_, 1 + d) = stateIn[1 + d] / stateIn[0];
+  }
+  UR_UL(1 + nvel_, 1 + nvel_) = 0.0;
+
+  //rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
+  DenseMatrix F_UL, F_UR;
+  rsolver->Jacobian(stateIn, state2, normal, F_UL, F_UR, true);
+
+  bdrFluxJacobian = F_UL;
+  AddMult(F_UR, UR_UL, bdrFluxJacobian);
+
 }
 
 void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {

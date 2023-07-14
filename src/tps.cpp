@@ -85,6 +85,8 @@ Tps::Tps() {
 #else
   deviceConfig_ = "cpu";
 #endif
+
+  solver_ = NULL;
 }
 
 /// Destructor

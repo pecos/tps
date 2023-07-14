@@ -136,13 +136,15 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   }
 #endif
 
-  if (config_.isAxisymmetric()) {
-    // forcing.Append(new AxisymmetricSource(dim_, num_equation_, _order, d_mixture_, transport_, eqSystem, intRuleType,
-    //                                       intRules, vfes, U_, Up, gradUp, spaceVaryViscMult, gpu_precomputed_data_,
-    //                                       _config, distance_));
+  if (config_.isAxisymmetric() && config_.isNodalInterior()) {
     axi_src_ = new AxisymmetricSource(dim_, num_equation_, _order, d_mixture_, transport_, eqSystem, intRuleType,
                                       intRules, vfes, U_, Up, gradUp, spaceVaryViscMult, gpu_precomputed_data_,
                                       _config, distance_);
+    const FiniteElementCollection *fec = vfes->FEColl();
+    dfes = new ParFiniteElementSpace(mesh, fec, dim_, Ordering::byNODES);
+    coordsDof = new ParGridFunction(dfes);
+    mesh->GetNodes(*coordsDof);
+  } else if (config_.isAxisymmetric() && !config_.isNodalInterior()) {
     const FiniteElementCollection *fec = vfes->FEColl();
     dfes = new ParFiniteElementSpace(mesh, fec, dim_, Ordering::byNODES);
     coordsDof = new ParGridFunction(dfes);
@@ -320,9 +322,32 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
     }
   }
 #endif
+
+  if (Aflux == NULL) {
+    VectorMassIntegrator *vmi;
+    if (config_.isAxisymmetric()) {
+      vmi = new VectorMassIntegrator(radiusFcn, 1);
+    } else {
+      vmi = new VectorMassIntegrator();
+    }
+    vmi->SetVDim(num_equation_);
+
+    global_mass_bf_ = new ParBilinearForm(vfes);
+    global_mass_bf_->AddDomainIntegrator(vmi);
+    global_mass_bf_->Assemble(0);
+    global_mass_bf_->Finalize(0);
+
+    global_mass_matrix_.Reset(global_mass_bf_->ParallelAssemble(), true);
+
+    flow_linear_solver_ = new flowLinearSolver(vfes);
+  } else {
+    global_mass_bf_ = NULL;
+    flow_linear_solver_ = NULL;
+  }
 }
 
 RHSoperator::~RHSoperator() {
+  delete global_mass_bf_;
   delete coordsDof;
   delete dfes;
   delete gradients;
@@ -340,7 +365,7 @@ RHSoperator::~RHSoperator() {
   if (transferGradUp.statuses != NULL) delete[] transferGradUp.statuses;
 }
 
-void RHSoperator::Mult(const Vector &x, Vector &y) const {
+void RHSoperator::formResidual(const Vector &x) const {
   max_char_speed = 0.;
 
   // Update primite varibales
@@ -384,7 +409,9 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
     Vector zk(z.HostReadWrite() + eq * vfes->GetNDofs(), vfes->GetNDofs());
 #endif
 
-    Aflux->AddMult(fk, zk);
+    if (Aflux != NULL) {
+      Aflux->AddMult(fk, zk);
+    }
 #ifdef _GPU_
     RHSoperator::copyZk2Z_gpu(z, zk, eq, vfes->GetNDofs());
 #endif
@@ -409,8 +436,13 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
   if (axi_src_ != NULL) {
     axi_src_->updateTerms(z);
   }
+}
 
-  // 3. Multiply element-wise by the inverse mass matrices.
+void RHSoperator::Mult(const Vector &x, Vector &y) const {
+  // Evaluate the spatial part of the residual
+  formResidual(x);
+
+  // Multiply element-wise by the inverse mass matrices.
 #ifdef _GPU_
   const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
   auto h_elem_dof_num = elem_data.dof_number.HostRead();
@@ -464,6 +496,39 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
   }
 
   computeMeanTimeDerivatives(y);
+}
+
+void RHSoperator::ImplicitSolve(const double dt, const Vector &x, Vector &k) {
+  MFEM_ASSERT(flow_linear_solver_ != NULL, "Flow linear solver object is not initialized");
+
+  // Evaluate the spatial part of the Residual
+  formResidual(x);
+
+  // Evaluate spatial part of Jacobian
+  OperatorHandle Jh(&(A->GetGradient(x)), false);
+  HypreParMatrix &Jmat = *Jh.As<HypreParMatrix>();
+
+  // Form A = M - dt * J
+  // NB: The code below works b/c A->GetDiag gets the
+  // diagonal *block* rather than just the diagonal.
+  // See mfem/linalg/hypre.{hpp, cpp} for more details and
+  // mfem/examples/ex9p.cpp for an analogous usage.
+  HypreParMatrix *A;
+  A = Add(-dt, Jmat, 0, Jmat);
+  SparseMatrix A_diag;
+  A->GetDiag(A_diag);
+
+  HypreParMatrix &M = *global_mass_matrix_.As<HypreParMatrix>();
+  SparseMatrix M_diag;
+  M.GetDiag(M_diag);
+
+  A_diag.Add(1.0, M_diag);
+
+  // Solve (M - dt*J) k = R(x)
+  flow_linear_solver_->SetOperator(*A);
+  flow_linear_solver_->Mult(z, k);
+  delete A;
+
 }
 
 void RHSoperator::copyZk2Z_gpu(Vector &z, Vector &zk, const int eq, const int dof) {

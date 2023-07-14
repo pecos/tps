@@ -89,6 +89,9 @@ class BCintegrator : public NonlinearFormIntegrator {
   void computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
                       double distance, Vector &bdrFlux);
 
+  void computeBdrFluxJacobian(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                              DenseMatrix &bdrFluxJacobian);
+
  public:
   BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules,
                RiemannSolver *rsolver_, double &_dt, GasMixture *mixture, GasMixture *d_mixture, Fluxes *_fluxClass,
@@ -99,6 +102,10 @@ class BCintegrator : public NonlinearFormIntegrator {
 
   virtual void AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,
                                   const Vector &elfun, Vector &elvect);
+
+  virtual void AssembleFaceGrad(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,
+                                const Vector &elfun, DenseMatrix &elmat);
+
   void initBCs();
 
   void updateBCMean(ParGridFunction *Up);

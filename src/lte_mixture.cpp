@@ -79,10 +79,33 @@ LteMixture::~LteMixture() {
 
 /// Compute pressure from conserved state
 double LteMixture::ComputePressure(const Vector &state, double *electronPressure) {
+  return ComputePressure(state.GetData(), electronPressure);
+}
+
+double LteMixture::ComputePressure(const double *state, double *electronPressure) const {
   const double rho = state[0];
   const double T = ComputeTemperature(state);
   const double R = R_table_->eval(T, rho);
   return rho * R * T;
+}
+
+void LteMixture::computePressureJacobian(const Vector &state, Vector &p_U) {
+  const double rho = state[0];
+  const double T = ComputeTemperature(state);
+
+  Vector T_U(2 + nvel_);
+  computeTemperatureJacobian(state, T, T_U);
+  const double R = R_table_->eval(T, rho);
+  const double R_T = R_table_->eval_x(T, rho);
+  const double R_rho = R_table_->eval_y(T, rho);
+
+  // Jacobian wrt density
+  p_U[0] = R * T + rho * R_rho * T + rho * R * T_U[0];
+
+  // Jacobian wrt remaining state variables
+  for (int i = 1; i < 2 + nvel_; i++) {
+    p_U[i] = rho * (R_T * T_U[i]) * T + rho * R * T_U[i];
+  }
 }
 
 /// Compute pressure from primitive state
@@ -102,6 +125,10 @@ double LteMixture::ComputePressureFromPrimitives(const Vector &Up) {
  * table.
  */
 double LteMixture::ComputeTemperature(const Vector &state) {
+  return ComputeTemperature(state.GetData());
+}
+
+double LteMixture::ComputeTemperature(const double *state) const {
   const double rho = state[0];
 
   double den_vel2 = 0;
@@ -156,6 +183,31 @@ double LteMixture::ComputeTemperature(const Vector &state) {
   }
 
   return T;
+}
+
+void LteMixture::computeTemperatureJacobian(const Vector &state, const double T, Vector &T_U) {
+  const double rho = state[0];
+
+  double den_vel2 = 0;
+  for (int d = 0; d < nvel_; d++) den_vel2 += state[d + 1] * state[d + 1];
+  den_vel2 /= rho;
+
+  const double energy = (state[1 + nvel_] - 0.5 * den_vel2) / rho;
+
+  Vector energy_U(2 + nvel_);
+  energy_U[0] = -energy / rho + (0.5 * den_vel2 / rho / rho);
+  for (int i = 0; i < nvel_; i++) {
+    energy_U[i + 1] = -state[i + 1] / rho / rho;
+  }
+  energy_U[nvel_ + 1] = 1. / rho;
+
+  const double et_T = energy_table_->eval_x(T, rho);
+  const double et_rho = energy_table_->eval_y(T, rho);
+
+  for (int i = 0; i < 2 + nvel_; i++) {
+    T_U[i] = energy_U[i] / et_T;
+  }
+  T_U[0] -= et_rho / et_T;
 }
 
 /** \brief Compute temperature from density and pressure

@@ -76,6 +76,7 @@ class BoundaryCondition {
   virtual void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius, double distance,
                               Vector &bdrFlux) = 0;
 
+
   /** \brief Set the boundary state used in the gradient evaluation
    *
    *  The jump in the state at the boundary appears in the
@@ -85,6 +86,9 @@ class BoundaryCondition {
    *  this method in a derived class.
    */
   virtual void computeBdrPrimitiveStateForGradient(const Vector &stateIn, Vector &stateBC) const;
+
+  virtual void computeBdrFluxJacobian(Vector &normal, Vector &stateIn, DenseMatrix &gradState, double radius,
+                                      DenseMatrix &bdrFluxJacobian) = 0;
 
   // holding function for any miscellaneous items needed to initialize BCs
   // prior to use (and require MPI)

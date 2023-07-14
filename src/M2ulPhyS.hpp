@@ -75,6 +75,7 @@ class Tps;
 #include "run_configuration.hpp"
 #include "sbp_integrators.hpp"
 #include "solver.hpp"
+#include "source_fcn.hpp"
 #include "tps.hpp"
 #include "tps_mfem_wrap.hpp"
 #include "transport_properties.hpp"
@@ -164,6 +165,7 @@ class M2ulPhyS : public TPS::Solver {
   ParGridFunction *distance_;
 
   Fluxes *fluxClass;
+  SourceFunction *srcFcn_;
 
   RHSoperator *rhsOperator;
 
@@ -321,7 +323,13 @@ class M2ulPhyS : public TPS::Solver {
   void initSolutionAndVisualizationVectors();
   void initialTimeStep();
 
-  static void InitialConditionEulerVortex(const Vector &x, Vector &y);
+#ifdef HAVE_MASA
+  static void MASA_exactSol(const Vector &x, double tin, Vector &y);
+  static void MASA_exactDen(const Vector &x, double tin, Vector &y);
+  static void MASA_exactVel(const Vector &x, double tin, Vector &y);
+  static void MASA_exactPre(const Vector &x, double tin, Vector &y);
+#endif
+
   static void testInitialCondition(const Vector &x, Vector &y);
   // void dryAirUniformInitialConditions();
   void uniformInitialConditions();
@@ -423,9 +431,12 @@ class M2ulPhyS : public TPS::Solver {
   const ParGridFunction *getDistanceFcn() { return distance_; }
 
   void updatePrimitives();
+  void updatePlasmaConductivity();
 
   ParGridFunction *GetPlasmaConductivityGF() { return plasma_conductivity_; }
   ParGridFunction *GetJouleHeatingGF() { return joule_heating_; }
+
+  DGNonLinearForm *GetFaceIntegrator() { return A; }
 
   static int Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_print);
 

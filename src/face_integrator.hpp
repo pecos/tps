@@ -83,6 +83,8 @@ class FaceIntegrator : public NonlinearFormIntegrator {
   Vector funval2;
   Vector nor;
   Vector fluxN;
+  DenseMatrix fluxN_U1;
+  DenseMatrix fluxN_U2;
   // DenseMatrix gradUp1;
   // DenseMatrix gradUp2;
   DenseTensor gradUp1;
@@ -117,6 +119,9 @@ class FaceIntegrator : public NonlinearFormIntegrator {
 
   virtual void AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,
                                   const Vector &elfun, Vector &elvect);
+
+  virtual void AssembleFaceGrad(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,
+                                const Vector &elfun, DenseMatrix &elmat);
 
   static void getElementsGrads_gpu(const ParGridFunction *gradUp, ParFiniteElementSpace *vfes,
                                    const ParFiniteElementSpace *gradUpfes, FaceElementTransformations &Tr,
