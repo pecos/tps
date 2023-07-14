@@ -50,11 +50,26 @@
 #include "M2ulPhyS.hpp"
 #include "tps_mfem_wrap.hpp"
 
+// check if the amount of time left in SLURM job is less than desired threshold.
+// Subcommunicator safe version
+//Forward declaration
+bool slurm_job_almost_done_mpi(MPI_Comm comm, int threshold);
+
+// check if the amount of time left in SLURM job is less than desired threshold
+[[deprecated("Use slurm_job_almost_done(MPI_Comm comm, int threshold) instead")]]
+bool slurm_job_almost_done(int threshold, int rank)
+{
+  return slurm_job_almost_done_mpi(MPI_COMM_WORLD, threshold);
+}
+
 #ifdef HAVE_SLURM
 #include <slurm/slurm.h>
 
-// check if the amount of time left in SLURM job is less than desired threshold
-bool slurm_job_almost_done(int threshold, int rank) {
+// check if the amount of time left in SLURM job is less than desired threshold.
+// Subcommunicator safe version
+bool slurm_job_almost_done_mpi(MPI_Comm comm, int threshold) {
+  int rank;
+  MPI_Comm_rank(comm, &rank); 
   char *SLURM_JOB_ID = getenv("SLURM_JOB_ID");
   if (SLURM_JOB_ID == NULL) {
     printf("[ERROR]: SLURM_JOB_ID env variable not set. Unable to query how much time remaining\n");
@@ -64,8 +79,7 @@ bool slurm_job_almost_done(int threshold, int rank) {
   int64_t secsRemaining;
   if (rank == 0) secsRemaining = slurm_get_rem_time(atoi(SLURM_JOB_ID));
 
-  // UV this should be TPSCommWorld but it can not be grabbed here
-  MPI_Bcast(&secsRemaining, 1, MPI_LONG, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&secsRemaining, 1, MPI_LONG, 0, comm);
 
   if (secsRemaining < 0) {
     printf("[WARN]: Unable to query how much time left for current SLURM job\n");
@@ -103,19 +117,9 @@ int rm_restart(std::string jobFile, std::string mode) {
 
   return 0;
 }
-bool M2ulPhyS::Check_JobResubmit() {
-  if (config.isAutoRestart()) {
-    if (slurm_job_almost_done(config.rm_threshold(), mpi.WorldRank()))
-      return true;
-    else
-      return false;
-  } else {
-    return false;
-  }
-}
 
 #else
-bool slurm_job_almost_done(int threshold, int rank) {
+bool slurm_job_almost_done_mpi(MPI_Comm comm, int threshold) {
   std::cout << "SLURM functionality not enabled in this build" << std::endl;
   exit(1);
 }
@@ -127,6 +131,17 @@ int rm_restart(std::string jobFile, std::string mode) {
 
 #endif
 
+bool M2ulPhyS::Check_JobResubmit() {
+  if (config.isAutoRestart()) {
+    if (slurm_job_almost_done_mpi(this->tpsP->getTPSCommWorld(), config.rm_threshold()))
+      return true;
+    else
+      return false;
+  } else {
+    return false;
+  }
+}
+
 // Check for existence of DIE file on rank 0
 bool M2ulPhyS::Check_ExitEarly(int iter) {
   if ((iter % config.exit_checkFreq()) == 0) {
@@ -135,7 +150,7 @@ bool M2ulPhyS::Check_ExitEarly(int iter) {
       status = static_cast<int>(file_exists("DIE"));
       if (status == 1) grvy_printf(ginfo, "Detected DIE file, terminating early...\n");
     }
-    MPI_Bcast(&status, 1, MPI_INT, 0, groupsMPI->getTPSCommWorld());
+    MPI_Bcast(&status, 1, MPI_INT, 0, this->tpsP->getTPSCommWorld());
     return (static_cast<bool>(status));
   } else {
     return (false);

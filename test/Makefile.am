@@ -131,6 +131,7 @@ tps_splitcomm_test_SOURCES  = test_tps_splitcomm.cpp
 tps_splitcomm_test_LDADD    = ../src/libtps.la
 tps_splitcomm_test_LDADD   += $(HDF5_LIBS)
 tps_splitcomm_test_LDADD   += $(GRVY_LIBS)
+test_splitcomm_test_LDFLAGS = $(CUDA_LDFLAGS)
 
 if !GPU_ENABLED
 
