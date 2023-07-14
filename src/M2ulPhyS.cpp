@@ -566,7 +566,7 @@ void M2ulPhyS::initVariables() {
     // Formulate interior contribution using 'standard' method
     // (quadrature applied to each element)
     Aflux = NULL;
-    A->AddDomainIntegrator(new ElementIntegrator(dim, num_equation, config.isAxisymmetric(), eqSystem, fluxClass, srcFcn_, intRules, vfes, gradUp));
+    A->AddDomainIntegrator(new ElementIntegrator(dim, num_equation, config.isAxisymmetric(), eqSystem, fluxClass, srcFcn_, intRules, vfes, gradUp, distance_));
   } else {
     // Formulation interior contributionas B * F, where B is operator
     // from MixedBilinearForm and F is flux evaluated at nodes

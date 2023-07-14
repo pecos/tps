@@ -34,8 +34,8 @@
 using namespace mfem;
 
 ElementIntegrator::ElementIntegrator(int dim, int num_eqn, bool axisym, Equations eqSys, Fluxes *flux, SourceFunction *srcFcn, IntegrationRules *int_rules,
-                                     ParFiniteElementSpace *vfes, ParGridFunction *gradUp)
-  : dim_(dim), num_eqn_(num_eqn), axisym_(axisym), eqSys_(eqSys), flux_(flux), srcFcn_(srcFcn), int_rules_(int_rules), vfes_(vfes), gradUp_(gradUp) {}
+                                     ParFiniteElementSpace *vfes, ParGridFunction *gradUp, ParGridFunction *distance)
+  : dim_(dim), num_eqn_(num_eqn), axisym_(axisym), eqSys_(eqSys), flux_(flux), srcFcn_(srcFcn), int_rules_(int_rules), vfes_(vfes), gradUp_(gradUp), distance_(distance) {}
 
 void ElementIntegrator::getElementGrad(const int elemNo, const FiniteElement &el, DenseTensor &gradUpElem) {
   const int totDofs = vfes_->GetNDofs();
@@ -65,6 +65,7 @@ void ElementIntegrator::AssembleElementVector(const FiniteElement &el, ElementTr
   Vector shape;
   Vector soln;
   Vector src;
+  Vector dist;
   DenseMatrix adjJflux;
   DenseMatrix shape_r;
   DenseMatrix shape_x;
@@ -91,6 +92,16 @@ void ElementIntegrator::AssembleElementVector(const FiniteElement &el, ElementTr
   // Get gradient for this element
   getElementGrad(Tr.ElementNo, el, gradUpElem);
 
+  // Get distance function for this element (if necessary)
+  if (distance_ != NULL) {
+    const ParFiniteElementSpace *pfes = distance_->ParFESpace();
+    Array<int> dofs1;
+    pfes->GetElementVDofs(Tr.ElementNo, dofs1);
+    dist.SetSize(dofs1.Size());
+    distance_->GetSubVector(dofs1, dist);
+  }
+
+
   // Determine integration rule
   int intorder;
   intorder = Tr.OrderW() + 2 * el.GetOrder();
@@ -114,6 +125,12 @@ void ElementIntegrator::AssembleElementVector(const FiniteElement &el, ElementTr
     elfun_mat.MultTranspose(shape, soln);
     // elfun_mat.MultTranspose(shape_x, soln_x);
     // MultAtB(elfun_mat, shape_x, soln_x);
+
+    // Interpolate the distance function
+    double dval = 0;
+    if (distance_ != NULL) {
+      dval = dist * shape;
+    }
 
     // Evaluate the fluxes
     Fflux = 0.;
@@ -143,7 +160,7 @@ void ElementIntegrator::AssembleElementVector(const FiniteElement &el, ElementTr
       Gflux = 0.;
 
       // TODO: Evaluate distance fcn!
-      flux_->ComputeViscousFluxes(soln, soln_x, radius, -1, Gflux);
+      flux_->ComputeViscousFluxes(soln, soln_x, radius, dval, Gflux);
 
       // total flux
       Fflux -= Gflux;

@@ -55,6 +55,9 @@ class ElementIntegrator : public mfem::NonlinearFormIntegrator {
   mfem::ParFiniteElementSpace *vfes_;
   mfem::ParGridFunction *gradUp_;
 
+  // Distance function
+  mfem::ParGridFunction *distance_;
+
   Array<int> vdofs_;
 
   void getElementGrad(const int elemNo, const FiniteElement &el, DenseTensor &gradUpElem);
@@ -62,7 +65,7 @@ class ElementIntegrator : public mfem::NonlinearFormIntegrator {
  public:
   ElementIntegrator(int dim, int num_eqn, bool axisym, Equations eqSys, Fluxes *flux, SourceFunction *srcFcn,
                     mfem::IntegrationRules *int_rules, mfem::ParFiniteElementSpace *vfes,
-                    mfem::ParGridFunction *gradUp);
+                    mfem::ParGridFunction *gradUp, mfem::ParGridFunction *distance);
 
   virtual void AssembleElementVector(const mfem::FiniteElement &el, mfem::ElementTransformation &Tr,
                                      const mfem::Vector &elfun, mfem::Vector &elvec);
