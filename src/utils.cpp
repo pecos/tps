@@ -52,13 +52,12 @@
 
 // check if the amount of time left in SLURM job is less than desired threshold.
 // Subcommunicator safe version
-//Forward declaration
+// Forward declaration
 bool slurm_job_almost_done_mpi(MPI_Comm comm, int threshold);
 
 // check if the amount of time left in SLURM job is less than desired threshold
 [[deprecated("Use slurm_job_almost_done(MPI_Comm comm, int threshold) instead")]]
-bool slurm_job_almost_done(int threshold, int rank)
-{
+bool slurm_job_almost_done(int threshold, int rank) {
   return slurm_job_almost_done_mpi(MPI_COMM_WORLD, threshold);
 }
 
@@ -69,7 +68,7 @@ bool slurm_job_almost_done(int threshold, int rank)
 // Subcommunicator safe version
 bool slurm_job_almost_done_mpi(MPI_Comm comm, int threshold) {
   int rank;
-  MPI_Comm_rank(comm, &rank); 
+  MPI_Comm_rank(comm, &rank);
   char *SLURM_JOB_ID = getenv("SLURM_JOB_ID");
   if (SLURM_JOB_ID == NULL) {
     printf("[ERROR]: SLURM_JOB_ID env variable not set. Unable to query how much time remaining\n");
