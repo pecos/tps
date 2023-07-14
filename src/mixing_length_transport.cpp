@@ -151,8 +151,97 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
                                                                             const double *Efield, double radius,
                                                                             double distance, double *transportBuffer,
                                                                             double *diffusionVelocity) {
-  std::cout << "Why am I here??" << std::endl;
-  exit(1);
+  molecular_transport_->ComputeFluxTransportProperties(state, gradUp, Efield, radius, distance, transportBuffer,
+                                                       diffusionVelocity);
+
+  const double cp_over_Pr =
+      transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] / transportBuffer[FluxTrns::VISCOSITY];
+
+  const double kappa = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY];
+  const double mu = transportBuffer[FluxTrns::VISCOSITY];
+
+  // Add mixing length model results to computed molecular transport
+  double primitiveState[5];
+  mixture->GetPrimitivesFromConservatives(state, primitiveState);
+
+  const double rho = state[0];
+  const double Th = primitiveState[nvel_ + 1];
+
+  // Compute divergence
+  double divV = 0.;
+  for (int i = 0; i < dim; i++) {
+    divV += gradUp[(1 + i) + i * num_equation];
+    //divV += gradUp(1 + i, i);
+  }
+
+  // If axisymmetric
+  double ur = 0;
+  if (nvel_ != dim) {
+    ur = primitiveState[1];
+    if (radius > 0) divV += ur / radius;
+  }
+
+  // eddy viscosity
+  double S = 0;
+  for (int i = 0; i < dim; i++) {
+    for (int j = 0; j < dim; j++) {
+      const double ui_xj = gradUp[(1 + i) + j * num_equation]; //gradUp(1 + i, j);
+      const double uj_xi = gradUp[(1 + j) + i * num_equation]; //gradUp(1 + j, i);
+      double Sij = 0.5 * (ui_xj + uj_xi);
+      //if (i == j) Sij -= divV / 3.;
+      S += 2 * Sij * Sij;
+    }
+  }
+
+  // If axisymmetric, update S to account for utheta contributions
+  if (nvel_ != dim) {
+    const double ut = primitiveState[3];
+    const double ut_r = gradUp[3 + 0 * num_equation]; //gradUp(3, 0);
+    const double ut_z = gradUp[3 + 1 * num_equation]; //gradUp(3, 1);
+
+    double Szx = 0.5 * ut_r;
+    if (radius > 0) Szx -= 0.5 * ut / radius;
+    const double Szy = 0.5 * ut_z;
+    double Szz = 0.0; //- divV / 3.;
+    if (radius > 0) Szz += ur / radius;
+
+    S += 2 * (2 * Szx * Szx + 2 * Szy * Szy + Szz * Szz);
+  }
+
+  S = sqrt(S);
+
+  //const double mixing_length = std::min(0.41 * distance, max_mixing_length_);
+  double mixing_length = 0.41 * distance;
+  if (mixing_length > max_mixing_length_) {
+    mixing_length = max_mixing_length_;
+  }
+  double mut = rho * mixing_length * mixing_length * S;
+
+  transportBuffer[FluxTrns::VISCOSITY] += mut;
+  transportBuffer[FluxTrns::BULK_VISCOSITY] += mut;
+
+  // eddy thermal conductivity
+  const double Pr_over_Prt = Prt_;  // FIXME: change varaible name
+  double kappat = mut * cp_over_Pr * Pr_over_Prt;
+
+  // Don't update kappa... modeling choice
+  if (kappat / kappa > 10.0) {
+    kappat = 10. * kappa;
+  }
+
+  // torch specific... if way downstream, increase kappa a lot
+  if (distance > 0.04) {
+    double scaled_d = (distance - 0.04) / 0.01;
+    if (scaled_d < 1.) {
+      kappat += 20.0 * scaled_d * kappa;
+      //printf("distance = %.6e: Scaling kappa by %.6e\n", distance, 20. * scaled_d); fflush(stdout);
+    } else {
+      kappat += 20.0 * kappa;
+      //printf("distance = %.6e, Scaling kappa by %.6e\n", distance, 20.); fflush(stdout);
+    }
+  }
+
+  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] += kappat;
 }
 
 void MixingLengthTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up,
