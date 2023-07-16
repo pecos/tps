@@ -3145,7 +3145,8 @@ void M2ulPhyS::parseBCInputs() {
     // all inlet BCs require 4 inputs (density + vel(3))
     {
       Array<double> uvw;
-      if (type == "nonReflectingConstTemp" || type == "nonReflectingConstTempUser" || type == "subsonicConstTemp" || type == "subsonicConstTempUser") {
+      //      if (type == "nonReflectingConstTemp" || type == "nonReflectingConstTempUser" || type == "subsonicConstTemp" || type == "subsonicConstTempUser") {
+      if (type == "nonReflectingConstTemp" || type == "nonReflectingConstTempUser" || type == "subsonicConstTemp") { // hack for sctu to be density specified
         tpsP->getRequiredInput((basepath + "/temperature").c_str(), temperature);
         config.inletBC.Append(temperature);
       } else if (type == "subsonicALL"){

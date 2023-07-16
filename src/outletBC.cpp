@@ -762,14 +762,14 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
 
   // transverse
   double L3 = 0.;
-  for (int d = 0; d < dim_; d++) L3 += tangent1[d] * normGrad[1 + d];
-  L3 *= uFace[0];
+  //for (int d = 0; d < dim_; d++) L3 += tangent1[d] * normGrad[1 + d];
+  //L3 *= uFace[0];
 
   double L4 = 0.;
-  if (dim_ == 3) {
-    for (int d = 0; d < dim_; d++) L4 += tangent2[d] * normGrad[1 + d];
-    L4 *= uFace[0];
-  }
+  //if (dim_ == 3) {
+  //  for (int d = 0; d < dim_; d++) L4 += tangent2[d] * normGrad[1 + d];
+  //  L4 *= uFace[0];
+  //}
 
   // outgoing
   double L5 = 0.;
@@ -796,9 +796,10 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   
   // limit backflow: when inflow at outflow, want (u_n*d1) < 0 s.t. it is pos on rhs and accelerates rho*u1 in n direction
   // but u_n is already negative (relative to face), so want d1 > 0
-  double ulim = 0.0;
-  if (uFace[0]*unitNorm[0] < ulim) {
-    L1 = std::max(-(2.0*L2+L5),L1);    
+  double ulim = -1.0e-12;
+  if (uFace[0] < ulim) {
+    L1 = std::max(-(2.0*L2+L5) + std::abs(L2), L1);
+    //L1 = std::max(-(2.0*L2+L5) - 2.0*dt/(ulim-uFace[0])*uFace[0]/(speedSound*speedSound),L1);        
   }
   
   // calc vector d
@@ -984,6 +985,52 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
 void OutletBC::subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
   
   Vector state2(num_equation_);
+
+  Vector Up(num_equation_);
+  mixture->GetPrimitivesFromConservatives(stateIn, Up);
+  double rho = Up[0];
+  
+  // unit normal
+  Vector unitNorm = normal;
+  double normMag = 0.;  
+  for (int d = 0; d < dim_; d++) normMag += normal[d] * normal[d];
+  normMag = sqrt(max(normMag,1.0e-15));
+  unitNorm *= 1./normMag; // this is outward facing normal
+  
+  // velocity in inlet normal and tangent directions
+  Vector uFace(dim_);
+  uFace = 0.;
+  for (int d = 0; d < dim_; d++) {
+    uFace[0] += unitNorm[d] * Up[d + 1];
+    uFace[1] += tangent1[d] * Up[d + 1];
+  }
+  if (dim_ == 3) {
+    tangent2[0] = unitNorm[1] * tangent1[2] - unitNorm[2] * tangent1[1];
+    tangent2[1] = unitNorm[2] * tangent1[0] - unitNorm[0] * tangent1[2];
+    tangent2[2] = unitNorm[0] * tangent1[1] - unitNorm[1] * tangent1[0];
+    for (int d = 0; d < dim_; d++) uFace[2] += tangent2[d] * Up[d + 1];
+  }
+
+  // limit
+  if(uFace[0] < 0.0) uFace[0] = -uFace[0];
+
+  // transform back into x-y coords
+  {
+    DenseMatrix M(dim_, dim_);
+    for (int d = 0; d < dim_; d++) {
+      M(0, d) = unitNorm[d];
+      M(1, d) = tangent1[d];
+      if (dim_ == 3) M(2, d) = tangent2[d];
+    }
+    DenseMatrix invM(dim_, dim_);
+    mfem::CalcInverse(M, invM);
+    Vector momN(dim_), momX(dim_);
+    for (int d = 0; d < dim_; d++) momN[d] = uFace[d];
+    invM.Mult(momN, momX);
+    for (int d = 0; d < dim_; d++) Up[1 + d] = momX[d];
+  }   
+  mixture->GetConservativesFromPrimitives(Up,state2);        
+  
   mixture->modifyEnergyForPressure(stateIn, state2, inputState[0]);
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 

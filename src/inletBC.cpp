@@ -485,7 +485,7 @@ void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradS
       subsonicReflectingDensityVelocity(normal, stateIn, bdrFlux);
       break;
     case SUB_DENS_VEL_USR:
-      subsonicReflectingDensityVelocityUser(normal, stateIn, transip, time, ip, bdrFlux);
+      subsonicReflectingDensityVelocityUser(normal, stateIn, transip, time, gradState, bdrFlux);
       break;      
     case SUB_TEMP_VEL:
       subsonicReflectingTemperatureVelocity(normal, stateIn, bdrFlux);
@@ -497,7 +497,7 @@ void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradS
       subsonicReflectingAll(normal, stateIn, bdrFlux);
       break;      
     case SUB_TEMP_VEL_USR:
-      subsonicReflectingTemperatureVelocityUser(normal, stateIn, transip, bdrFlux);
+      subsonicReflectingTemperatureVelocityUser(normal, stateIn, transip, time, bdrFlux);
       break;            
     case SUB_DENS_VEL_NR:
       subsonicNonReflectingDensityVelocity(normal, stateIn, gradState, bdrFlux);
@@ -738,7 +738,7 @@ void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *U_, ParGri
       if(inlet[i].x < xmin) xmin = inlet[i].x;
     }    
     l_dia = xmax-xmin;
-    radius = 0.01*(0.5*l_dia);
+    radius = 0.2*(0.5*l_dia);
 
 
     // interpolation
@@ -1309,7 +1309,7 @@ void InletBC::subsonicNonReflectingTemperatureVelocityUser(Vector &normal, Vecto
   // specific for torch.................
   double pi = 3.14159265359;
   //double theta_injection = 49.0*pi/180.0; // off from from inlet center to torch center
-  double theta_injection = atan(inputState[2]/inputState[1]);
+  //double theta_injection = atan(inputState[2]/inputState[1]);
   double Un = inputState[1]; //inputState[1]*cos(theta_injection);
   double Ut = inputState[2]; //inputState[1]*sin(theta_injection);
   double l_diamond = 0.0012; // each edge of the diamond inlet
@@ -1884,7 +1884,7 @@ void InletBC::subsonicReflectingAll(Vector &normal, Vector &stateIn, Vector &bdr
 Reflecting inflow with a specified density and velocity profile.  Temperature is backed out with the interior pressure.
 For lack of a better method, this routine must be modified as desired for the particular run.
 */
-void InletBC::subsonicReflectingDensityVelocityUser(Vector &normal, Vector &stateIn, Vector transip, double time, int ip, Vector &bdrFlux) {
+void InletBC::subsonicReflectingDensityVelocityUser(Vector &normal, Vector &stateIn, Vector transip, double time, DenseMatrix &gradState, Vector &bdrFlux) {
 
   // unit normals pointing out of domain
   Vector unitNorm = normal;
@@ -1892,6 +1892,9 @@ void InletBC::subsonicReflectingDensityVelocityUser(Vector &normal, Vector &stat
   for (int d = 0; d < dim_; d++) mod += normal[d] * normal[d];
   unitNorm *= +1.0 / sqrt(mod); // outward-facing normal
 
+  // flipping norm to be inward for nscbc
+  for (int d = 0; d < dim_; d++) { unitNorm[d] = unitNorm[d]; } 
+  
   // aligned with x-axis
   tangent2[0] = 1.0;
   tangent2[1] = 0.0;
@@ -1904,7 +1907,7 @@ void InletBC::subsonicReflectingDensityVelocityUser(Vector &normal, Vector &stat
 
   double tRamp, wt;
   tRamp = 0.1; // make this readable
-  wt = time/tRamp;
+  wt = time/tRamp + 0.0001;
   wt = min(wt,1.0);
   //wt = 0.5*(tanh(time/tRamp - 4.0) + 1);  
   //cout << "time:" << time << " " << wt << endl; fflush(stdout);  
@@ -1920,12 +1923,12 @@ void InletBC::subsonicReflectingDensityVelocityUser(Vector &normal, Vector &stat
   // interior state variables
   Vector Up(num_equation_);
   mixture->GetPrimitivesFromConservatives(stateIn, Up);  
-  double rhoInt = stateIn[0];
+  double rhoInt = Up[0];
   double Pint = mixture->ComputePressure(stateIn);
   double cInt = mixture->ComputeSpeedOfSound(Up);  
   Vector VelInt(nvel_);
   double UInt = 0.;  
-  for (int i = 0; i < nvel_; i++) VelInt[i] = stateIn[i+1]/rhoInt;
+  for (int i = 0; i < nvel_; i++) VelInt[i] = Up[i+1];
   for (int i = 0; i < nvel_; i++) UInt += VelInt[i]*unitNorm[i];
 
   // u/|u|*n
@@ -1938,7 +1941,6 @@ void InletBC::subsonicReflectingDensityVelocityUser(Vector &normal, Vector &stat
   // Vector state2(num_equation_);
   // mixture->modifyEnergyForPressure(stateIn, state2, inputState[0]);
   // rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
-
   
   double maxE = cInt + abs(UInt);
   // is this is wrong for "inflows" with outflow regions!
@@ -1954,19 +1956,221 @@ void InletBC::subsonicReflectingDensityVelocityUser(Vector &normal, Vector &stat
   iUp[0] = (1.0-wt)*inputState[0] + wt*bU[0];
   iUp[1] = (1.0-wt)*inputState[1] + wt*bU[1]/bU[0];
   iUp[2] = (1.0-wt)*inputState[2] + wt*bU[2]/bU[0];
-  iUp[3] = (1.0-wt)*inputState[3] + wt*bU[3]/bU[0];    
+  iUp[3] = (1.0-wt)*inputState[3] + wt*bU[3]/bU[0];  
   iUp[4] = (1.0-wt)*Pint/(inputState[0]*Rgas) + wt*Pint/(bU[0]*Rgas);
 
+  // state for weak-prescribed flux
+  Vector state2(num_equation_);
+  state2 = stateIn;  
+  mixture->GetConservativesFromPrimitives(iUp, state2);    
+
+
+  
+  // mengaldo reimann invariants...
+  
+  /*
+  // exterior state
+  double rhoExt = iUp[0];
+  Vector VelExt(nvel_);
+  for (int i = 0; i < nvel_; i++) VelExt[i] = iUp[i+1];
+  double tempExt = iUp[4];
+  double Pext = (Rgas*rhoExt) * tempExt;
+  double c2Ext = (gamma*Pext) / rhoExt;
+  double cExt = std::sqrt(c2Ext);
+  double UExt = 0.;
+  for (int i = 0; i < nvel_; i++) UExt += VelExt[i]*unitNorm[i];    
+
+  // Reimann invariants
+  double Rp = UInt + 2.0*cInt / gmo;
+  double Rm = UExt - 2.0*cExt / gmo;  
+
+  // boundary values
+  double VbMag = 0.5 * (Rp+Rm);
+  double cB = 0.25 * gmo * (Rp-Rm);
+  Vector Vb(nvel_);
+  for (int i = 0; i < nvel_; i++) Vb[i] = VelExt[i] + (VbMag - UExt)*unitNorm[i];
+  double sB = c2Ext / (gamma * (std::pow(rhoExt,gmo)) );
+  double rhoB = (cB*cB) / (gamma*sB);
+  double Pb = rhoB * (cB*cB) / gamma;
+
+  //state2[0] = rhoB;
+  //for (int i = 0; i < nvel_; i++) state2[i+1] = Vb[i] * rhoB;
+  iUp[0] = rhoB;
+  for (int i = 0; i < nvel_; i++) iUp[i+1] = Vb[i];
+  iUp[4] = Pb / (rhoB * Rgas);
+  for (int i = 0; i < nvel_+1; i++) {
+    if(iUp[i] != iUp[i]) { std::cout << " Mengaldo state bad " << i << endl; }
+  }
+  for (int i = 1; i <= dim_; i++) iUp[i] = 2.0*iUp[i] - Up[i];  
+  mixture->GetConservativesFromPrimitives(iUp, state2);      
+  */
+
+
+
+  // NSCBC...
+  /*
+  double rho = Up[0];
+
+  // interior velocity in inlet normal and tangent directions
+  Vector meanVel(nvel_);
+  meanVel = 0.;
+  for (int d = 0; d < dim_; d++) {
+    meanVel[0] += unitNorm[d] * Up[d + 1];
+    meanVel[1] += tangent1[d] * Up[d + 1];
+  }
+  if (dim_ == 3) {
+    for (int d = 0; d < dim_; d++) meanVel[2] += tangent2[d] * Up[d + 1];
+  }
+
+  // desired velocity in inlet normal and tangent directions
+  Vector sVel(nvel_);
+  sVel = 0.;
+  for (int d = 0; d < dim_; d++) {
+    sVel[0] += unitNorm[d] * iUp[d + 1];
+    sVel[1] += tangent1[d] * iUp[d + 1];
+  }
+  if (dim_ == 3) {
+    for (int d = 0; d < dim_; d++) sVel[2] += tangent2[d] * iUp[d + 1];
+  }
+
+  
+  // gradients in inlet normal direction
+  Vector normGrad(num_equation_);
+  normGrad = 0.;
+  for (int eq = 0; eq < num_equation_; eq++) {
+    for (int d = 0; d < dim_; d++)
+      normGrad[eq] += unitNorm[d] * gradState(eq, d);  // phi_{eq,d} * n_d (n is INWARD facing normal)
+  }
+  // gradient of pressure in normal direction
+  double dpdn = mixture->ComputePressureDerivative(normGrad, stateIn, false);  // w.r.t. inward facing normal
+
+  // speed of sound
+  const double speedSound = mixture->ComputeSpeedOfSound(Up);
+
+  // kinetic energy
+  double meanK = 0.;
+  for (int d = 0; d < nvel_; d++) meanK += Up[1 + d] * Up[1 + d];
+  meanK *= 0.5;
+
+  // compute outgoing characteristic :: should be (u - c) * (dpdn - rho*c*dundn) => this assume inlet is LEFT side
+  double L1 = 0.;
+  for (int d = 0; d < dim_; d++) L1 += unitNorm[d] * normGrad[1 + d];  // dVn/dn
+  L1 = dpdn - rho * speedSound * L1;
+  L1 *= (meanVel[0] - speedSound);  // meanVel[0] is in inlet plane normal direction
+
+  // estimate ingoing characteristic :: should be L5 = L1 - 2*rho*c*dundt, meanDV is difference between actual and
+  // prescribed
+  double L5 = 0.;
+  if (time > tRamp) {
+    L5 = L1;    
+  } else {
+    L5 = L1 - 2.0*rho*speedSound*(1.0/tRamp*iUp[2]);    
+  }
+
+  // tangential part of incoming waves :: should be un * dutdn
+  double L3 = 0.;
+  for (int d = 0; d < dim_; d++) L3 += tangent1[d] * normGrad[1 + d];
+  L3 *= meanVel[1];
+
+  double L4 = 0.;
+  if (dim_ == 3) {
+    for (int d = 0; d < dim_; d++) L4 += tangent2[d] * normGrad[1 + d];
+    L4 *= meanVel[1];
+  }
+
+  // entropy waves
+  double L2 = 0.;
+  if (time > tRamp) {  
+    L2 = -0.5 * (L5 + L1);
+  } else {
+    L2 = -0.5 * (L5 + L1) + rho*speedSound*speedSound*(1.0/tRamp);    
+  }
+
+  // calc vector d
+  // d3,d4,d5 shift up one, d2 goes to d5 => he has energy in 5 slot:: rho, rhou, rhov, rhow, rhoe
+  const double d1 = (L2 + 0.5 * (L5 + L1)) / (speedSound * speedSound);
+  const double d2 = 0.5 * (L5 - L1) / (rho * speedSound);
+  const double d3 = L3;
+  const double d4 = L4;
+  const double d5 = 0.5 * (L5 + L1);
+
+  // dF/dx
+  bdrFlux[0] = d1;
+  bdrFlux[1] = meanVel[0] * d1 + rho * d2;
+  bdrFlux[2] = meanVel[1] * d1 + rho * d3;
+  if (nvel_ == 3) bdrFlux[3] = meanVel[2] * d1 + rho * d4;
+  bdrFlux[1 + nvel_] = rho * meanVel[0] * d2;
+  bdrFlux[1 + nvel_] += rho * meanVel[1] * d3;
+  if (nvel_ == 3) bdrFlux[1 + nvel_] += rho * meanVel[2] * d4;
+  bdrFlux[1 + nvel_] += meanK * d1 + d5 / (gamma - 1.);
+
+  // boundaryU_N copied to state2
+  for (int eq = 0; eq < num_equation_; eq++) state2[eq] = boundaryU[eq + bdrN * num_equation_];
+
+  // boundaryU_N coped to stateN and rotated to 1-dir in inward facing normal direction
+  Vector stateN = state2;
+  for (int d = 0; d < nvel_; d++) stateN[1 + d] = 0.;
+  for (int d = 0; d < dim_; d++) {
+    stateN[1] += state2[1 + d] * unitNorm[d];
+    stateN[2] += state2[1 + d] * tangent1[d];
+    if (dim_ == 3) stateN[3] += state2[1 + d] * tangent2[d];
+  }
+
+  // updates boundaryU_N(rotated) with U^{N+1} = U^{N} - dt*dFdn ?
+  Vector newU(num_equation_);
+  // for (int i = 0; i < num_equation_; i++) newU[i] = stateN[i] - dt*bdrFlux[i];
+  newU[0] = iUp[0];
+  newU[1] = iUp[0] * sVel[0];
+  newU[2] = iUp[0] * sVel[1];
+  if (nvel_ == 3) newU[3] = iUp[0] * sVel[2];
+  newU[4] = stateN[4] - dt * bdrFlux[4];  // floating T/energy
+  if (eqSystem == NS_PASSIVE) newU[num_equation_ - 1] = 0.;
+
+  // transform back into x-y coords
+  {
+    DenseMatrix M(dim_, dim_);
+    for (int d = 0; d < dim_; d++) {
+      M(0, d) = unitNorm[d];
+      M(1, d) = tangent1[d];
+      if (dim_ == 3) M(2, d) = tangent2[d];
+    }
+
+    DenseMatrix invM(dim_, dim_);
+    mfem::CalcInverse(M, invM);
+    Vector momN(dim_), momX(dim_);
+    for (int d = 0; d < dim_; d++) momN[d] = newU[1 + d];
+    invM.Mult(momN, momX);
+    for (int d = 0; d < dim_; d++) newU[1 + d] = momX[d];
+  }
+  for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + bdrN * num_equation_] = newU[eq];
+
+  // modify newU to Reimann
+  Vector tmpU(num_equation_);
+  //for (int i = 1; i <= dim_; i++) tmpU[i] = 2.0*newU[i] - stateIn[i];
+  for (int i = 1; i <= dim_; i++) tmpU[i] = newU[i];
+  mixture->modifyEnergyForPressure(tmpU, state2, Pint, true);  
+  rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
+  */  
+  // end nscbc
+
+
+
+ 
+
+
+  
   // desired bc
+  /*
   Vector VelB(nvel_);
   double UB = 0.;  
   double rhoB = iUp[0];  
   for (int i = 0; i < nvel_; i++) VelB[i] = iUp[i+1];
-  for (int i = 0; i < nvel_; i++) UB += VelB[i]*unitNorm[i];    
+  for (int i = 0; i < nvel_; i++) UB += VelB[i]*unitNorm[i];
+  */
   
   // back-out rho*u state from Reimann compatability condition
-  double rhoUn;
   /*
+  double rhoUn;    
   if(unNorm >= 0) {
     rhoUn = 2.0*rhoB*UB - rhoInt*UInt + maxE * (rhoB - rhoInt); // correct for outflow at inflow, i.e. B is the downwind state
   } else {
@@ -1974,28 +2178,35 @@ void InletBC::subsonicReflectingDensityVelocityUser(Vector &normal, Vector &stat
   }
   */
   // maybe not... rhoUn = 2.0*rhoB*UB - rhoInt*UInt + maxE * unNorm * (rhoB - rhoInt);
+  
+  // get energy bc  => this will overwrite all state2 using iUp...
+  //Vector state2(num_equation_);      
+  //mixture->GetConservativesFromPrimitives(iUp, state2);
+  //bU[4] = state2[4];
+
+  /*
   rhoUn = 2.0*rhoB*UB - rhoInt*UInt + maxE * (rhoB - rhoInt);  
-  Vector state2(num_equation_);    
-  state2 = stateIn;  
   state2[0] = iUp[0];
   state2[1] = iUp[1]*rhoB * rhoUn/(rhoB*UB);
   state2[2] = iUp[2]*rhoB * rhoUn/(rhoB*UB);
   if (nvel_ == 3) state2[3] = iUp[3]*rhoB * rhoUn/(rhoB*UB);
-  
-  // get energy bc  
-  mixture->GetConservativesFromPrimitives(iUp, state2);
-  bU[4] = state2[4];
+  */
 
+  // trying...
+  //for (int eq = 1; eq <= dim_; eq++) state2[eq] = 2.0*state2[eq] - stateIn[eq];
+  
   // NOTE: If two-temperature, BC for electron temperature is T_e = T_h, where the total pressure is p.
   mixture->modifyEnergyForPressure(state2, state2, Pint, true);
+  //mixture->modifyEnergyForPressure(state2, state2, Pb, true);
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
+  //rsolver->Eval(state2, state2, normal, bdrFlux, true);
   
   // store primitive in boundaryU for gradient calcs
   mixture->GetPrimitivesFromConservatives(state2, iUp);      
   for (int eq = 0; eq < num_equation_; eq++) {
     boundaryUp[eq + bdrN*num_equation_] = iUp[eq];
   }
-  bdrN++;   
+  bdrN++;
   
 }
 
@@ -2004,7 +2215,8 @@ void InletBC::subsonicReflectingDensityVelocityUser(Vector &normal, Vector &stat
 Reflecting inflow with a specified temperature and velocity profile.  Density is backed out with the interior pressure.
 For lack of a better method, this routine must be modified as desired for the particular run.
 */
-void InletBC::subsonicReflectingTemperatureVelocityUser(Vector &normal, Vector &stateIn, Vector transip, Vector &bdrFlux) {
+// HACKED FOR DIAMON INLETS
+void InletBC::subsonicReflectingTemperatureVelocityUser(Vector &normal, Vector &stateIn, Vector transip, double time, Vector &bdrFlux) {
   
   const double p = mixture->ComputePressure(stateIn);
 
@@ -2014,28 +2226,34 @@ void InletBC::subsonicReflectingTemperatureVelocityUser(Vector &normal, Vector &
   double Rgas = mixture->GetGasConstant();  
   Vector unitNorm;
 
+  double tRamp, wt;
+  tRamp = 0.1; // make this readable
+  wt = time/tRamp;
+  wt = min(wt,1.0);  
+
   // specific for torch.................
   double pi = 3.14159265359;
-  // double theta_injection = 49.0*pi/180.0; // off from from inlet center to torch center
-  double theta_injection = atan(inputState[2]/inputState[1]);
-  double Un = inputState[1]; //inputState[1]*cos(theta_injection);
-  double Ut = inputState[2]; //inputState[1]*sin(theta_injection);  
+  //double theta_injection = 49.0*pi/180.0; // tangent direction flipped
+  //double theta_injection = atan(inputState[2]/inputState[1]);
+  double Un = wt * inputState[1]; //inputState[1]*cos(theta_injection);
+  double Ut = wt * inputState[2]; //inputState[1]*sin(theta_injection);  
   double l_diamond = 0.0012; // each edge of the diamond inlet
-  double theta_diamond = 45.0*pi/180.0;
-  double h_diamond;
-  h_diamond = 2.0*l_diamond*cos(theta_diamond);
-  double r_diamond;
-  r_diamond = 0.5/sqrt(2.0) * h_diamond;
+  //double theta_diamond = 45.0*pi/180.0;
+  //double h_diamond;
+  //h_diamond = 2.0*l_diamond*cos(theta_diamond);
+  //double r_diamond;
+  //r_diamond = 0.5/sqrt(2.0) * h_diamond;
   
-  double h = transip[0];
-  double wgt = 1.0;
-  if (h > (r_diamond+0.5*h_diamond)) {
-    wgt = 0.0;
-  }
-  if (h < (0.5*h_diamond - r_diamond)) {
-    wgt = 0.0;
-  }  
+  //double h = transip[0];
+  //double wgt = 1.0;
+  //if (h > (r_diamond+0.5*h_diamond)) {
+  //  wgt = 0.0;
+  // }
+  //if (h < (0.5*h_diamond - r_diamond)) {
+  //  wgt = 0.0;
+  //}  
 
+  /*
   double r_torch = sqrt(transip[1]*transip[1] + transip[2]*transip[2]); 
   Vector jet1(3);
   Vector jet2(3);
@@ -2091,15 +2309,36 @@ void InletBC::subsonicReflectingTemperatureVelocityUser(Vector &normal, Vector &
   tangent1[0] = +(unitNorm[1]*tangent2[2] - unitNorm[2]*tangent2[1]);
   tangent1[1] = -(unitNorm[0]*tangent2[2] - unitNorm[2]*tangent2[0]);
   tangent1[2] = +(unitNorm[0]*tangent2[1] - unitNorm[1]*tangent2[0]);  
+  */
   
   // ...................................  
-    
+
+
+  // unit normals pointing INTO of domain
+  unitNorm = normal;
+  double mod = 0.;
+  for (int d = 0; d < dim_; d++) mod += normal[d] * normal[d];
+  unitNorm *= -1.0 / sqrt(mod); // inward-facing normal
+
+  // t2 aligned with +y-axis
+  tangent2[0] = 0.0;
+  tangent2[1] = 1.0;
+  tangent2[2] = 0.0;
+
+  // t1 is then orthogonal to both normal and y-axis (clockwise, looking down +)
+  tangent1[0] = +(unitNorm[1]*tangent2[2] - unitNorm[2]*tangent2[1]);
+  tangent1[1] = -(unitNorm[0]*tangent2[2] - unitNorm[2]*tangent2[0]);
+  tangent1[2] = +(unitNorm[0]*tangent2[1] - unitNorm[1]*tangent2[0]);  
+
+  //cout << "face coords N: " << unitNorm[0] << " " << unitNorm[1] << " " << unitNorm[2] << endl;
+  //cout << "face coords t1: " << tangent1[0] << " " << tangent1[1] << " " << tangent1[2] << endl;
+  //cout << "face coords t2: " << tangent2[0] << " " << tangent2[1] << " " << tangent2[2] << endl;  
   
   // aligned with face coords
-  state2[0] = p / (Rgas * inputState[0]);
-  state2[1] = state2[0] * wgt*Un; //inputState[1];
-  state2[2] = state2[0] * wgt*Ut; //inputState[2];
-  if (nvel_ == 3) state2[3] = state2[0] * 0.0; //inputState[3];
+  state2[0] = inputState[0]; //p / (Rgas * inputState[0]);
+  state2[1] = state2[0] * Un;
+  state2[2] = state2[0] * Ut;
+  if (nvel_ == 3) state2[3] = state2[0] * 0.0;
 
   if (eqSystem == NS_PASSIVE) {
     state2[num_equation_ - 1] = 0.;
@@ -2111,7 +2350,6 @@ void InletBC::subsonicReflectingTemperatureVelocityUser(Vector &normal, Vector &
     }
   }
 
-
   // transform from face coords to global
   {
     DenseMatrix M(dim_, dim_);
@@ -2120,7 +2358,6 @@ void InletBC::subsonicReflectingTemperatureVelocityUser(Vector &normal, Vector &
       M(1, d) = tangent1[d];
       if (dim_ == 3) M(2, d) = tangent2[d];
     }
-
     DenseMatrix invM(dim_, dim_);
     mfem::CalcInverse(M, invM);
     Vector momN(dim_), momX(dim_);
@@ -2128,16 +2365,27 @@ void InletBC::subsonicReflectingTemperatureVelocityUser(Vector &normal, Vector &
     invM.Mult(momN, momX);
     for (int d = 0; d < dim_; d++) state2[1 + d] = momX[d];
   }
+
+  if (eqSystem == NS_PASSIVE) {
+    state2[num_equation_ - 1] = 0.;
+  } else if (numActiveSpecies_ > 0) {
+    for (int sp = 0; sp < numActiveSpecies_; sp++) {
+      // NOTE: inlet BC does not specify total energy. therefore skips one index.
+      // NOTE: regardless of dim_ension, inletBC save the first 4 elements for density and velocity.
+      state2[nvel_ + 2 + sp] = inputState[4 + sp];
+    }
+  }
   
   // NOTE: If two-temperature, BC for electron temperature is T_e = T_h, where the total pressure is p.
-  //mixture->modifyEnergyForPressure(state2, state2, p, true);
-  Vector tmpU(num_equation_);      
+  Vector tmpU(num_equation_);
+  tmpU = state2;
   for (int eq = 1; eq <= dim_; eq++) tmpU[eq] = 2.0*state2[eq] - stateIn[eq];
-  rsolver->Eval(stateIn, tmpU, normal, bdrFlux, true); 
-
+  mixture->modifyEnergyForPressure(tmpU, tmpU, p, true);  
+  rsolver->Eval(stateIn, tmpU, normal, bdrFlux, true);
+  
   // store primitive in boundaryU for gradient calcs
   Vector iUp(num_equation_);  
-  mixture->GetPrimitivesFromConservatives(state2, iUp);      
+  mixture->GetPrimitivesFromConservatives(tmpU, iUp);        
   for (int eq = 0; eq < num_equation_; eq++) {
     boundaryUp[eq + bdrN*num_equation_] = iUp[eq];
   }
