@@ -91,6 +91,7 @@ void LoMachSolver::initialize() {
    bool verbose = mpi_.Root();
    if (verbose) grvy_printf(ginfo, "Initializing loMach solver.\n");
 
+   //LoMachOptions loMach_opts_ = GetOptions();   
    order = loMach_opts_.order;
    porder = loMach_opts_.order;
    norder = loMach_opts_.order;
@@ -122,22 +123,23 @@ void LoMachSolver::initialize() {
    int NY = 2 * static_cast<int>(std::round(48.0 / N));
    int NZ = NL;
 
-   //Mesh mesh = Mesh::MakeCartesian3D(NX, NY, NZ, Element::HEXAHEDRON, Lx, Ly, Lz);
-   //Mesh *mesh_ptr = &mesh;
-   //if (verbose) grvy_printf(ginfo, "Constructed mesh...\n");   
+   Mesh mesh = Mesh::MakeCartesian3D(NX, NY, NZ, Element::HEXAHEDRON, Lx, Ly, Lz);
+   Mesh *mesh_ptr = &mesh;
+   if (verbose) grvy_printf(ginfo, "Constructed mesh...\n");   
 
-   //for (int i = 0; i < mesh.GetNV(); ++i)
-   //{
-   //   double *v = mesh.GetVertex(i);
-   //   v[1] = mesh_stretching_func(v[1]);
-   //}
+   for (int i = 0; i < mesh.GetNV(); ++i)
+   {
+      double *v = mesh.GetVertex(i);
+      v[1] = mesh_stretching_func(v[1]);
+   }
 
    // Create translation vectors defining the periodicity
-   //Vector x_translation({Lx, 0.0, 0.0});
-   //Vector z_translation({0.0, 0.0, Lz});
-   //std::vector<Vector> translations = {x_translation, z_translation};   
+   Vector x_translation({Lx, 0.0, 0.0});
+   Vector z_translation({0.0, 0.0, Lz});
+   std::vector<Vector> translations = {x_translation, z_translation};   
    */
 
+   /**/
     Vector x_translation({config.GetXTrans(), 0.0, 0.0});
     Vector y_translation({0.0, config.GetYTrans(), 0.0});
     Vector z_translation({0.0, 0.0, config.GetZTrans()});
@@ -149,24 +151,28 @@ void LoMachSolver::initialize() {
       std::cout << "   yTrans: " << config.GetYTrans() << std::endl;
       std::cout << "   zTrans: " << config.GetZTrans() << std::endl;
     }
+    /**/
     
 
    // 1a) Read the serial mesh (on each mpi rank)
    //Mesh *mesh_ptr = new Mesh(lomach_opts_.mesh_file.c_str(), 1, 1);
-   //LoMachOptions loMach_opts_ = GetOptions();
-   Mesh mesh = Mesh(loMach_opts_.mesh_file.c_str());   
+
+   /**/
+   //std::cout << " Reading mesh from: " << loMach_opts_.mesh_file.c_str() << endl;
+   Mesh mesh = Mesh(loMach_opts_.mesh_file.c_str());
    Mesh *mesh_ptr = &mesh;
+   Mesh *serial_mesh = &mesh;   
+   //if (verbose) grvy_printf(ginfo, "Initial mesh read...\n");
+   /**/
    
    // Create the periodic mesh using the vertex mapping defined by the translation vectors
    Mesh periodic_mesh = Mesh::MakePeriodic(mesh,mesh.CreatePeriodicVertexMapping(translations));
    //if (verbose) grvy_printf(ginfo, "Mesh made periodic...\n");         
    
-
    // underscore stuff is terrible
    dim_ = mesh_ptr->Dimension();
-   int dim = pmesh->Dimension();
-
-   
+   //int dim = pmesh->Dimension();
+   int dim = dim_;
    //if (verbose) grvy_printf(ginfo, "Got mesh dim...\n");            
 
    // 1b) Refine the serial mesh, if requested
@@ -188,9 +194,234 @@ void LoMachSolver::initialize() {
    }
    */
 
+
+
+
+
+  eqSystem = config.GetEquationSystem();
+
+  mixture = NULL;
+
+  switch (config.GetWorkingFluid()) {
+    case WorkingFluid::DRY_AIR:
+      mixture = new DryAir(config, dim, nvel);
+
+#if defined(_CUDA_) || defined(_HIP_)
+      tpsGpuMalloc((void **)(&d_mixture), sizeof(DryAir));
+      gpu::instantiateDeviceDryAir<<<1, 1>>>(config.dryAirInput, dim, nvel, d_mixture);
+
+      tpsGpuMalloc((void **)&transportPtr, sizeof(DryAirTransport));
+      gpu::instantiateDeviceDryAirTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(),
+                                                      config.sutherland_.C1, config.sutherland_.S0,
+                                                      config.sutherland_.Pr, transportPtr);
+#else
+      transportPtr = new DryAirTransport(mixture, config);
+#endif
+      break;
+    case WorkingFluid::USER_DEFINED:
+      switch (config.GetGasModel()) {
+        case GasModel::PERFECT_MIXTURE:
+          mixture = new PerfectMixture(config, dim, nvel);
+#if defined(_CUDA_) || defined(_HIP_)
+          tpsGpuMalloc((void **)(&d_mixture), sizeof(PerfectMixture));
+          gpu::instantiateDevicePerfectMixture<<<1, 1>>>(config.perfectMixtureInput, dim, nvel, d_mixture);
+#endif
+          break;
+        default:
+          mfem_error("GasModel not recognized.");
+          break;
+      }
+      switch (config.GetTranportModel()) {
+        case ARGON_MINIMAL:
+#if defined(_CUDA_) || defined(_HIP_)
+          tpsGpuMalloc((void **)&transportPtr, sizeof(ArgonMinimalTransport));
+          gpu::instantiateDeviceArgonMinimalTransport<<<1, 1>>>(d_mixture, config.argonTransportInput, transportPtr);
+#else
+          transportPtr = new ArgonMinimalTransport(mixture, config);
+#endif
+          break;
+        case ARGON_MIXTURE:
+#if defined(_CUDA_) || defined(_HIP_)
+          tpsGpuMalloc((void **)&transportPtr, sizeof(ArgonMixtureTransport));
+          gpu::instantiateDeviceArgonMixtureTransport<<<1, 1>>>(d_mixture, config.argonTransportInput, transportPtr);
+#else
+          transportPtr = new ArgonMixtureTransport(mixture, config);
+#endif
+          break;
+        case CONSTANT:
+#if defined(_CUDA_) || defined(_HIP_)
+          tpsGpuMalloc((void **)&transportPtr, sizeof(ConstantTransport));
+          gpu::instantiateDeviceConstantTransport<<<1, 1>>>(d_mixture, config.constantTransport, transportPtr);
+#else
+          transportPtr = new ConstantTransport(mixture, config);
+#endif
+          break;
+        default:
+          mfem_error("TransportModel not recognized.");
+          break;
+      }
+      switch (config.GetChemistryModel()) {
+        default:
+#if defined(_CUDA_) || defined(_HIP_)
+          tpsGpuMalloc((void **)&chemistry_, sizeof(Chemistry));
+          gpu::instantiateDeviceChemistry<<<1, 1>>>(d_mixture, config.chemistryInput, chemistry_);
+#else
+          chemistry_ = new Chemistry(mixture, config.chemistryInput);
+#endif
+          break;
+      }
+      break;
+    case WorkingFluid::LTE_FLUID:
+#if defined(_GPU_)
+      mfem_error("LTE_FLUID not supported for GPU.");
+#else
+      mixture = new LteMixture(config, dim, nvel);
+      transportPtr = new LteTransport(mixture, config);
+#endif
+      break;
+    default:
+      mfem_error("WorkingFluid not recognized.");
+      break;
+  }
+  switch (config.radiationInput.model) {
+    case NET_EMISSION:
+#if defined(_CUDA_) || defined(_HIP_)
+      tpsGpuMalloc((void **)(&radiation_), sizeof(NetEmission));
+      gpu::instantiateDeviceNetEmission<<<1, 1>>>(config.radiationInput, radiation_);
+#else
+      radiation_ = new NetEmission(config.radiationInput);
+#endif
+      break;
+    case NONE_RAD:
+      break;
+    default:
+      mfem_error("RadiationModel not recognized.");
+      break;
+  }
+  assert(mixture != NULL);
+#if defined(_CUDA_) || defined(_HIP_)
+#else
+  d_mixture = mixture;
+#endif
+
+
+
    
 
-   // 1c) Partition the mesh
+
+
+  // check if a simulation is being restarted
+  if (config.GetRestartCycle() > 0) {
+    if (config.GetUniformRefLevels() > 0) {
+      if (mpi_.Root()) {
+        std::cerr << "ERROR: Uniform mesh refinement not supported upon restart." << std::endl;
+      }
+      MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    // read partitioning info from original decomposition (unless restarting from serial soln)
+    nelemGlobal_ = serial_mesh->GetNE();
+    //nelemGlobal_ = mesh->GetNE();
+    if (rank0_) grvy_printf(ginfo, "Total # of mesh elements = %i\n", nelemGlobal_);
+
+    if (nprocs_ > 1) {
+      /*
+      if (config.isRestartSerialized("read")) {
+        assert(serial_mesh->Conforming());
+        //assert(mesh->Conforming());	
+        partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
+	//partitioning_ = Array<int>(mesh->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
+        partitioning_file_hdf5("write");
+      } else {
+      */
+        partitioning_file_hdf5("read");
+      //}
+    }
+
+  } else {
+    // remove previous solution
+    if (mpi_.Root()) {
+      string command = "rm -r ";
+      command.append(config.GetOutputName());
+      int err = system(command.c_str());
+      if (err != 0) {
+        cout << "Error deleting previous data in " << config.GetOutputName() << endl;
+      }
+    }
+
+    // uniform refinement, user-specified number of times
+    for (int l = 0; l < config.GetUniformRefLevels(); l++) {
+      if (mpi_.Root()) {
+        std::cout << "Uniform refinement number " << l << std::endl;
+      }
+      serial_mesh->UniformRefinement();
+      //mesh->UniformRefinement();
+    }
+
+    // generate partitioning file (we assume conforming meshes)
+    nelemGlobal_ = serial_mesh->GetNE();
+    //nelemGlobal_ = mesh->GetNE();    
+    if (nprocs_ > 1) {
+      assert(serial_mesh->Conforming());
+      //assert(mesh->Conforming());
+      partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
+      //partitioning_ = Array<int>(mesh->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
+      if (rank0_) partitioning_file_hdf5("write");
+      MPI_Barrier(MPI_COMM_WORLD);
+    }
+
+    time = 0.;
+    iter = 0;
+  }
+
+  // If requested, evaluate the distance function (i.e., the distance to the nearest no-slip wall)
+  /*
+  distance_ = NULL;
+  GridFunction *serial_distance = NULL;
+  if (config.compute_distance) {
+    order = config.GetSolutionOrder();
+    dim = serial_mesh->Dimension();
+    basisType = config.GetBasisType();
+    DG_FECollection *tmp_fec = NULL;
+    if (basisType == 0) {
+      tmp_fec = new DG_FECollection(order, dim, BasisType::GaussLegendre);
+    } else if (basisType == 1) {
+      tmp_fec = new DG_FECollection(order, dim, BasisType::GaussLobatto);
+    }
+
+    // Serial FE space for scalar variable
+    FiniteElementSpace *serial_fes = new FiniteElementSpace(serial_mesh, tmp_fec);
+
+    // Serial grid function for scalar variable
+    serial_distance = new GridFunction(serial_fes);
+
+    // Build a list of wall patches
+    Array<int> wall_patch_list;
+    for (int i = 0; i < config.wallPatchType.size(); i++) {
+      if (config.wallPatchType[i].second != WallType::INV) {
+        wall_patch_list.Append(config.wallPatchType[i].first);
+      }
+    }
+
+    if (serial_mesh->GetNodes() == NULL) {
+      serial_mesh->SetCurvature(1);
+    }
+
+    FiniteElementSpace *tmp_dfes = new FiniteElementSpace(serial_mesh, tmp_fec, dim, Ordering::byNODES);
+    GridFunction coordinates(tmp_dfes);
+    serial_mesh->GetNodes(coordinates);
+
+    // Evaluate the distance function
+    evaluateDistanceSerial(*serial_mesh, wall_patch_list, coordinates, *serial_distance);
+  }
+  */
+   
+
+
+   
+   
+
+   // 1c) Partition the mesh (see partitioning_ in M2ulPhyS)
    //pmesh_ = new ParMesh(MPI_COMM_WORLD, *mesh);
    pmesh = new ParMesh(MPI_COMM_WORLD, periodic_mesh);
    //auto *pmesh = new ParMesh(MPI_COMM_WORLD, periodic_mesh);
@@ -220,6 +451,14 @@ void LoMachSolver::initialize() {
    tfec = new H1_FECollection(order);
    tfes = new ParFiniteElementSpace(pmesh, tfec);   
 
+   // density
+   rfec = new H1_FECollection(order);
+   rfes = new ParFiniteElementSpace(pmesh, rfec);   
+   
+   // full vector for compatability
+   fvfes = new ParFiniteElementSpace(pmesh, vfec, num_equation); //, Ordering::byNODES);
+
+   
    // Check if fully periodic mesh
    if (!(pmesh->bdr_attributes.Size() == 0))
    {
@@ -352,6 +591,20 @@ void LoMachSolver::initialize() {
    //if (verbose) grvy_printf(ginfo, "vectors and gf initialized...\n");      
    
    //PrintInfo();
+
+   // Paraview setup, not sure where this should go...
+   //std::cout << "GetOutputName: " << config.GetOutputName() << endl;
+   paraviewColl = new ParaViewDataCollection(config.GetOutputName(), pmesh);
+   paraviewColl->SetLevelsOfDetail(config.GetSolutionOrder());
+   paraviewColl->SetHighOrderOutput(true);
+   paraviewColl->SetPrecision(8);
+   
+   initSolutionAndVisualizationVectors();
+
+  average = new Averaging(Up, pmesh, tfec, tfes, vfes, fvfes, eqSystem, d_mixture, num_equation, dim, config, groupsMPI);
+  average->read_meanANDrms_restart_files();
+  
+   
 }
 
 
@@ -383,18 +636,22 @@ void LoMachSolver::Setup(double dt)
    //r_ic_coef.constant = config.initRhoRhoVp[0];
    //r_gf->ProjectCoefficient(r_ic_coef);   
    
-   //VectorFunctionCoefficient u_ic_coef(dim, vel_ic);
+   VectorFunctionCoefficient u_ic_coef(dim, vel_ic);
+   /*
    Vector uic_vec(3);
    uic_vec(0) = config.initRhoRhoVp[1];
    uic_vec(1) = config.initRhoRhoVp[2];
    uic_vec(2) = config.initRhoRhoVp[3];      
    VectorConstantCoefficient u_ic_coef(uic_vec);
+   */
    u_gf->ProjectCoefficient(u_ic_coef);
-   //std::cout << "Check 1..." << std::endl;   
-
-   //FunctionCoefficient t_ic_coef(temp_ic);
+   //std::cout << "Check 1..." << std::endl;
+   
+   FunctionCoefficient t_ic_coef(temp_ic);
+   /*
    ConstantCoefficient t_ic_coef;
    t_ic_coef.constant = config.initRhoRhoVp[4] / (Rgas * config.initRhoRhoVp[0]);
+   */
    t_gf->ProjectCoefficient(t_ic_coef);   
    //std::cout << "Check 2..." << std::endl;
    
@@ -402,41 +659,62 @@ void LoMachSolver::Setup(double dt)
    domain_attr = 1;
    AddAccelTerm(accel, domain_attr);
 
-   Array<int> attr(pmesh->bdr_attributes.Max());
-   //attr[1] = 1;
-   //attr[3] = 1;
-   //AddVelDirichletBC(vel_wall, attr);
-   Vector zero_vec(3); zero_vec = 0.0;
-   VectorConstantCoefficient u_bc_coef(zero_vec);
-   for (int i = 0; i < config.wallPatchType.size(); i++) {
-     for (int iFace = 0; iFace < pmesh->bdr_attributes.Max(); iFace++) {     
-       if (config.wallPatchType[i].second != WallType::INV) {
-         if (iFace == config.wallPatchType[i].first) {
-            attr[iFace] = 1;	 
-            AddVelDirichletBC(&u_bc_coef, attr);
-         }
-       }
-     }
-   }   
 
-   Array<int> Tattr(pmesh->bdr_attributes.Max());
-   //Tattr[1] = 1;
-   //Tattr[3] = 1;
-   //AddTempDirichletBC(temp_wall, Tattr);
-   // config.wallBC.size()           
-   ConstantCoefficient t_bc_coef;
-   for (int i = 0; i < config.wallPatchType.size(); i++) {
-     t_bc_coef.constant = config.wallBC[i].Th;
-     for (int iFace = 0; iFace < pmesh->bdr_attributes.Max(); iFace++) {     
-       if (config.wallPatchType[i].second != WallType::INV) { // should only be isothermal
+   
+   Vector zero_vec(3); zero_vec = 0.0;
+   Array<int> attr(pmesh->bdr_attributes.Max());
+   //std::cout << "attr bdr size: " << pmesh->bdr_attributes.Max() << endl;
+
+   buffer_ubc = new VectorConstantCoefficient(zero_vec);         
+   /*
+   attr[1] = 1;
+   attr[3] = 1;
+   AddVelDirichletBC(vel_wall, attr);
+   //AddVelDirichletBC(&u_bc_coef, attr);
+   */
+   /**/
+   //for (int i = 0; i < config.wallPatchType.size(); i++) {
+   for (int i = 0; i < numWalls; i++) {
+     for (int iFace = 1; iFace < pmesh->bdr_attributes.Max()+1; iFace++) {     
+       if (config.wallPatchType[i].second != WallType::INV) {
+	 //std::cout << " wall check " << i << " " << iFace << " " << config.wallPatchType[i].first << endl;
          if (iFace == config.wallPatchType[i].first) {
-            Tattr[iFace] = 1;	 
-            AddTempDirichletBC(&t_bc_coef, Tattr);	  
+            attr[iFace-1] = 1;	 
          }
        }
      }
    }
-   //std::cout << "Check 3..." << std::endl;  
+   AddVelDirichletBC(vel_wall, attr);
+   //AddVelDirichletBC(buffer_ubc, attr);
+   /**/
+   //std::cout << "Check 3..." << std::endl;    
+
+   
+   ConstantCoefficient t_bc_coef;
+   t_bc_coef.constant = config.wallBC[0].Th;   
+   Array<int> Tattr(pmesh->bdr_attributes.Max());
+   /*
+   Tattr[1] = 1;
+   Tattr[3] = 1;
+   AddTempDirichletBC(temp_wall, Tattr);
+   //AddTempDirichletBC(&t_bc_coef, Tattr);
+   */
+   /**/
+   //for (int i = 0; i < config.wallPatchType.size(); i++) {
+   for (int i = 0; i < numWalls; i++) {
+     t_bc_coef.constant = config.wallBC[i].Th;
+     for (int iFace = 1; iFace < pmesh->bdr_attributes.Max()+1; iFace++) {     
+       if (config.wallPatchType[i].second != WallType::INV) { // should only be isothermal
+         if (iFace == config.wallPatchType[i].first) {
+            Tattr[iFace-1] = 1;	 
+            //AddTempDirichletBC(&t_bc_coef, Tattr);	  
+         }
+       }
+     }
+   }
+   AddTempDirichletBC(temp_wall, Tattr); // FIX FIX FIX
+   /**/
+   //std::cout << "Check 4..." << std::endl;  
 
    // returning to regular setup   
    sw_setup.Start();
@@ -445,7 +723,7 @@ void LoMachSolver::Setup(double dt)
    pfes->GetEssentialTrueDofs(pres_ess_attr, pres_ess_tdof);
    tfes->GetEssentialTrueDofs(temp_ess_attr, temp_ess_tdof);
    nfes->GetEssentialTrueDofs(vel_ess_attr, vel_ess_tdof);    //  this may break?
-   //std::cout << "Check 4..." << std::endl;     
+   //std::cout << "Check 5..." << std::endl;     
 
    int Vdof = vfes->GetTrueVSize();   
    int Pdof = pfes->GetTrueVSize();
@@ -466,7 +744,7 @@ void LoMachSolver::Setup(double dt)
    const IntegrationRule &ir_nli = gll_rules.Get(nfes->GetFE(0)->GetGeomType(), 3 * norder - 1);
    const IntegrationRule &ir_pi = gll_rules.Get(pfes->GetFE(0)->GetGeomType(), 2 * porder);   
    const IntegrationRule &ir_i  = gll_rules.Get(tfes->GetFE(0)->GetGeomType(), 2 * order);
-   //std::cout << "Check 5..." << std::endl;     
+   //std::cout << "Check 6..." << std::endl;     
    
    // convection section, extrapolation
    nlcoeff.constant = -1.0;
@@ -483,7 +761,7 @@ void LoMachSolver::Setup(double dt)
       N->SetAssemblyLevel(AssemblyLevel::PARTIAL);
       N->Setup();
    }
-   //std::cout << "Check 6..." << std::endl;     
+   //std::cout << "Check 7..." << std::endl;     
 
    // mass matrix
    Mv_form = new ParBilinearForm(vfes);
@@ -499,7 +777,7 @@ void LoMachSolver::Setup(double dt)
    }
    Mv_form->Assemble();
    Mv_form->FormSystemMatrix(empty, Mv);
-   //std::cout << "Check 7..." << std::endl;     
+   //std::cout << "Check 8..." << std::endl;     
 
    // need to build another with q=1/rho
    // DiffusionIntegrator(MatrixCoefficient &q, const IntegrationRule *ir = nullptr)
@@ -520,7 +798,7 @@ void LoMachSolver::Setup(double dt)
    }
    //GridFunctionCoefficient invRho(&buffer1);    
    invRho = new GridFunctionCoefficient(bufferInvRho);
-   //std::cout << "Check 8..." << std::endl;     
+   //std::cout << "Check 9..." << std::endl;     
    
    // looks like this is the Laplacian for press eq
    Sp_form = new ParBilinearForm(pfes);
@@ -537,7 +815,7 @@ void LoMachSolver::Setup(double dt)
    }
    Sp_form->Assemble();
    Sp_form->FormSystemMatrix(pres_ess_tdof, Sp);
-   //std::cout << "Check 9..." << std::endl;  
+   //std::cout << "Check 10..." << std::endl;  
    
    // div(u)
    D_form = new ParMixedBilinearForm(vfes, tfes);
@@ -553,7 +831,7 @@ void LoMachSolver::Setup(double dt)
    }
    D_form->Assemble();
    D_form->FormRectangularSystemMatrix(empty, empty, D);
-   //std::cout << "Check 10..." << std::endl;  
+   //std::cout << "Check 11..." << std::endl;  
    
    // for grad(div(u))?
    G_form = new ParMixedBilinearForm(tfes, vfes);
@@ -569,7 +847,7 @@ void LoMachSolver::Setup(double dt)
    }
    G_form->Assemble();
    G_form->FormRectangularSystemMatrix(empty, empty, G);
-   //std::cout << "Check 11..." << std::endl;  
+   //std::cout << "Check 12..." << std::endl;  
    
    // viscosity field
    //ParGridFunction buffer2(vfes); // or pfes here?
@@ -585,7 +863,7 @@ void LoMachSolver::Setup(double dt)
    }
    //GridFunctionCoefficient viscField(&buffer2);
    viscField = new GridFunctionCoefficient(bufferVisc);
-   //std::cout << "Check 12..." << std::endl;     
+   //std::cout << "Check 13..." << std::endl;     
    
    // why is this even needed, kin_vis is applied manually in "Step"
    // this is used in the last velocity implicit solve, Step kin_vis is
@@ -609,7 +887,7 @@ void LoMachSolver::Setup(double dt)
    }
    H_form->Assemble();
    H_form->FormSystemMatrix(vel_ess_tdof, H);
-   //std::cout << "Check 13..." << std::endl;     
+   //std::cout << "Check 14..." << std::endl;     
    
    // boundary terms   
    FText_gfcoeff = new VectorGridFunctionCoefficient(&FText_gf);
@@ -982,19 +1260,27 @@ void LoMachSolver::solve()
    bool last_step = false;
 
    ParGridFunction *u_gf = GetCurrentVelocity();
+   ParGridFunction *p_gf = GetCurrentPressure();
+   ParGridFunction *t_gf = GetCurrentTemperature();   
    dt = config.dt_fixed;
    CFL = config.cflNum;
-   CFL_actual = ComputeCFL(*u_gf, dt);   
+   //CFL_actual = ComputeCFL(*u_gf, dt);   
    //EnforceCFL(config.cflNum, u_gf, &dt);
    //dt = dt * max(cflMax_set/cflmax_actual,1.0);
+   //if (verbose) grvy_printf(ginfo, "got timestep...\n");         
 
+   /*
    if (!config.isTimeStepConstant()) {
-     //double dt_local = CFL * hmin / max_speed / static_cast<double>(dim);
-     //MPI_Allreduce(&dt_local, &dt, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
-     dt = dt * max(CFL/CFL_actual,1.0);
-   }   
+     double dt_local = CFL * hmin / max_speed / static_cast<double>(dim);
+     MPI_Allreduce(&dt_local, &dt, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
+     //dt = dt * max(CFL/CFL_actual,1.0);
+   }
+   */
+   
+   dt = 1.0e-6; // HARD CODE
    
    Setup(dt);
+   //if (verbose) grvy_printf(ginfo, "setup good...\n");   
 
    /*
    ParaViewDataCollection pvdc("turbchan", pmesh);
@@ -1009,13 +1295,13 @@ void LoMachSolver::solve()
    pvdc.Save();
    */
 
-   //std::cout << "Check 7..." << std::endl;
+   //if (verbose) grvy_printf(ginfo, "starting main loop...\n");      
    
    for (int step = 0; !last_step; ++step)
    {
 
      /*
-      if (step % 100 == 0)
+      if (step % 10 == 0)
       {
          pvdc.SetCycle(step);
          pvdc.SetTime(t);
@@ -1033,18 +1319,21 @@ void LoMachSolver::solve()
 	printf("%o %4s %.5E %.5E\n", step, "    ", t, dt);
         fflush(stdout);
       }
-      
-      Step(t, dt, step);
 
+      //if (verbose) grvy_printf(ginfo, "calling step...\n");         
+      Step(t, dt, step);
+      
       
       // NECESSARY ADDITIONS:
 
       // update dt periodically
+      /*
       if (!config.isTimeStepConstant()) {
         //double dt_local = CFL * hmin / max_speed / static_cast<double>(dim);
         //MPI_Allreduce(&dt_local, &dt, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
         dt = dt * max(CFL/CFL_actual,1.0);	
-      }         
+      }
+      */
 
       // restart files
 
@@ -1063,6 +1352,7 @@ void LoMachSolver::solve()
 void LoMachSolver::Step(double &time, double dt, int current_step,
                         bool provisional)
 {
+  //if (verbose) grvy_printf(ginfo, "in step...\n");           
    sw_step.Start();
 
    int Vdof = vfes->GetTrueVSize();   
@@ -1403,25 +1693,34 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
 	SpInv->SetPreconditioner(*SpInvPC);
       }
    }
-   */   
+   */
+   //std::cout << "Check r1..." << std::endl;      
    
    Vector X1, B1;
    if (partial_assembly)
    {
       auto *SpC = Sp.As<ConstrainedOperator>();
+      //std::cout << "Check r3..." << std::endl;            
       EliminateRHS(*Sp_form, *SpC, pres_ess_tdof, pn_gf, resp_gf, X1, B1, 1);
+      //std::cout << "Check r4..." << std::endl;                  
    }
    else
    {
       Sp_form->FormLinearSystem(pres_ess_tdof, pn_gf, resp_gf, Sp, X1, B1, 1);
+      //std::cout << "Check r5..." << std::endl;                  
    }
 
    // actual implicit solve for p(n+1)
    sw_spsolve.Start();
+   //std::cout << "Check r6..." << std::endl;               
    SpInv->Mult(B1, X1);
+   //std::cout << "Check r7..." << std::endl;                  
    sw_spsolve.Stop();
+   //std::cout << "Check r8..." << std::endl;                  
    iter_spsolve = SpInv->GetNumIterations();
+   //std::cout << "Check r9..." << std::endl;   
    res_spsolve = SpInv->GetFinalNorm();
+   //std::cout << "Check r10..." << std::endl;   
    Sp_form->RecoverFEMSolution(X1, resp_gf, pn_gf);
    //std::cout << "Check s..." << std::endl;   
 
@@ -1678,6 +1977,25 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
    
    sw_step.Stop();
 
+   // copies for compatability => is conserved (U) even necessary with this method?
+  {
+    int vstart = rfes->GetNDofs();
+    int tstart = (1+nvel)*tfes->GetNDofs();
+    double *dataUp = Up->HostWrite();    
+    const auto d_un_gf = un_gf.Read();    
+    mfem::forall(un_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    {
+      dataUp[i + vstart] = d_un_gf[i];
+    });
+    const auto d_tn_gf = Tn_gf.Read();    
+    mfem::forall(Tn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    {
+      dataUp[i + tstart] = d_tn_gf[i];
+    });    
+  }
+  
+  
+   
    if (verbose && pmesh->GetMyRank() == 0)
    {
       mfem::out << std::setw(7) << "" << std::setw(3) << "It" << std::setw(8)
@@ -1966,6 +2284,7 @@ void LoMachSolver::ComputeCurl2D(ParGridFunction &u,
 
 double LoMachSolver::ComputeCFL(ParGridFunction &u, double dt)
 {
+  
    ParMesh *pmesh_u = u.ParFESpace()->GetParMesh();
    FiniteElementSpace *fes = u.FESpace();
    int vdim = fes->GetVDim();
@@ -2428,10 +2747,10 @@ void LoMachSolver::parseSolverOptions2() {
   //parseTimeIntegrationOptions();
 
   // statistics
-  //parseStatOptions();
+  parseStatOptions();
 
   // I/O settings
-  //parseIOSettings();
+  parseIOSettings();
 
   // RMS job management
   //parseRMSJobOptions();
@@ -2574,7 +2893,7 @@ void LoMachSolver::parseStatOptions() {
   tpsP_->getInput("averaging/enableContinuation", config.restartMean, false);
 }
 
-void LoMachSolver::parseIOSettings() {
+void LoMachSolver::parseIOSettings() {  
   tpsP_->getInput("io/outdirBase", config.outputFile, std::string("output-default"));
   tpsP_->getInput("io/enableRestart", config.restart, false);
   tpsP_->getInput("io/exitCheckFreq", config.exit_checkFrequency_, 500);
@@ -3257,7 +3576,7 @@ void M2ulPhyS::parseReactionInputs() {
 void LoMachSolver::parseBCInputs() {
   
   // number of BC regions defined
-  int numWalls, numInlets, numOutlets;
+  // int numWalls, numInlets, numOutlets;
   tpsP_->getInput("boundaryConditions/numWalls", numWalls, 0);
   tpsP_->getInput("boundaryConditions/numInlets", numInlets, 0);
   tpsP_->getInput("boundaryConditions/numOutlets", numOutlets, 0);
@@ -3280,6 +3599,7 @@ void LoMachSolver::parseBCInputs() {
     tpsP_->getRequiredInput((basepath + "/patch").c_str(), patch);
     tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
     if (type == "viscous_isothermal") {
+      //std::cout << "*Caught a wall type! " <<  i << " of " << numWalls << endl;
       tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature);
       config.wallBC[i - 1].hvyThermalCond = ISOTH;
       config.wallBC[i - 1].elecThermalCond = ISOTH;
@@ -3611,12 +3931,307 @@ void M2ulPhyS::packUpGasMixtureInput() {
 */
 
 
+/// HERE HERE HERE
+void LoMachSolver::initSolutionAndVisualizationVectors() {
+
+  //std::cout << " In initSol&Viz..." << endl;
+  visualizationVariables_.clear();
+  //std::cout << " check 1..." << endl;  
+  visualizationNames_.clear();
+  //std::cout << " check 2..." << endl;    
+
+  offsets = new Array<int>(num_equation + 1);
+  //std::cout << " check 2a..." << endl;      
+  for (int k = 0; k <= num_equation; k++) {
+    (*offsets)[k] = k * fvfes->GetNDofs();
+  }
+  //std::cout << " check 3..." << endl;    
+  u_block = new BlockVector(*offsets);
+  //std::cout << " check 4..." << endl;    
+  up_block = new BlockVector(*offsets);
+  //std::cout << " check 5..." << endl;    
+
+  // gradUp.SetSize(num_equation*dim*vfes->GetNDofs());
+  //gradUp = new ParGridFunction(gradUpfes);
+
+  U = new ParGridFunction(fvfes, u_block->HostReadWrite());
+  //std::cout << " check 6..." << endl;    
+  Up = new ParGridFunction(fvfes, up_block->HostReadWrite());
+  //std::cout << " check 7..." << endl;    
+  dens = new ParGridFunction(rfes, Up->HostReadWrite());
+  vel = new ParGridFunction(vfes, Up->HostReadWrite() + rfes->GetNDofs());
+  //std::cout << " check 8..." << endl;    
+  temperature = new ParGridFunction(tfes, Up->HostReadWrite() + (1 + nvel) * tfes->GetNDofs()); // this may break...
+  //std::cout << " check 9..." << endl;    
+  press = new ParGridFunction(pfes);
+  //std::cout << " check 10..." << endl;    
+
+
+  //if (config.isAxisymmetric()) {
+  //  vtheta = new ParGridFunction(fes, Up->HostReadWrite() + 3 * fes->GetNDofs());
+  //} else {
+  //  vtheta = NULL;
+  //}
+
+  //electron_temp_field = NULL;
+  //if (config.twoTemperature) {
+  //  electron_temp_field = new ParGridFunction(fes, Up->HostReadWrite() + (num_equation - 1) * fes->GetNDofs());
+  //}
+
+  /*
+  passiveScalar = NULL;
+  if (eqSystem == NS_PASSIVE) {
+    passiveScalar = new ParGridFunction(fes, Up->HostReadWrite() + (num_equation - 1) * fes->GetNDofs());
+  } else {
+    // TODO(kevin): for now, keep the number of primitive variables same as conserved variables.
+    // will need to add full list of species.
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      std::string speciesName = config.speciesNames[sp];
+      visualizationVariables_.push_back(
+          new ParGridFunction(fes, U->HostReadWrite() + (sp + nvel + 2) * fes->GetNDofs()));
+      visualizationNames_.push_back(std::string("partial_density_" + speciesName));
+    }
+  }
+  */
+
+  // add visualization variables if tps is run on post-process visualization mode.
+  // TODO(kevin): maybe enable users to specify what to visualize.
+  /*
+  if (tpsP->isVisualizationMode()) {
+    if (config.workFluid != DRY_AIR) {
+      // species primitives.
+      visualizationIndexes_.Xsp = visualizationVariables_.size();
+      for (int sp = 0; sp < numSpecies; sp++) {
+        std::string speciesName = config.speciesNames[sp];
+        visualizationVariables_.push_back(new ParGridFunction(fes));
+        visualizationNames_.push_back(std::string("X_" + speciesName));
+      }
+      visualizationIndexes_.Ysp = visualizationVariables_.size();
+      for (int sp = 0; sp < numSpecies; sp++) {
+        std::string speciesName = config.speciesNames[sp];
+        visualizationVariables_.push_back(new ParGridFunction(fes));
+        visualizationNames_.push_back(std::string("Y_" + speciesName));
+      }
+      visualizationIndexes_.nsp = visualizationVariables_.size();
+      for (int sp = 0; sp < numSpecies; sp++) {
+        std::string speciesName = config.speciesNames[sp];
+        visualizationVariables_.push_back(new ParGridFunction(fes));
+        visualizationNames_.push_back(std::string("n_" + speciesName));
+      }
+
+      // transport properties.
+      visualizationIndexes_.FluxTrns = visualizationVariables_.size();
+      for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++) {
+        std::string fieldName;
+        switch (t) {
+          case FluxTrns::VISCOSITY:
+            fieldName = "viscosity";
+            break;
+          case FluxTrns::BULK_VISCOSITY:
+            fieldName = "bulk_viscosity";
+            break;
+          case FluxTrns::HEAVY_THERMAL_CONDUCTIVITY:
+            fieldName = "thermal_cond_heavy";
+            break;
+          case FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY:
+            fieldName = "thermal_cond_elec";
+            break;
+          default:
+            grvy_printf(GRVY_ERROR, "Error in initializing visualization: Unknown flux transport property!");
+            exit(ERROR);
+            break;
+        }
+        visualizationVariables_.push_back(new ParGridFunction(fes));
+        visualizationNames_.push_back(fieldName);
+      }
+      visualizationIndexes_.diffVel = visualizationVariables_.size();
+      for (int sp = 0; sp < numSpecies; sp++) {
+        std::string speciesName = config.speciesNames[sp];
+        visualizationVariables_.push_back(new ParGridFunction(nvelfes));
+        visualizationNames_.push_back(std::string("diff_vel_" + speciesName));
+      }
+      visualizationIndexes_.SrcTrns = visualizationVariables_.size();
+      for (int t = 0; t < SrcTrns::NUM_SRC_TRANS; t++) {
+        std::string fieldName;
+        switch (t) {
+          case SrcTrns::ELECTRIC_CONDUCTIVITY:
+            fieldName = "electric_cond";
+            break;
+          default:
+            grvy_printf(GRVY_ERROR, "Error in initializing visualization: Unknown source transport property!");
+            exit(ERROR);
+            break;
+        }
+        visualizationVariables_.push_back(new ParGridFunction(fes));
+        visualizationNames_.push_back(fieldName);
+      }
+      visualizationIndexes_.SpeciesTrns = visualizationVariables_.size();
+      for (int t = 0; t < SpeciesTrns::NUM_SPECIES_COEFFS; t++) {
+        std::string fieldName;
+        switch (t) {
+          case SpeciesTrns::MF_FREQUENCY:
+            fieldName = "momentum_tranfer_freq";
+            break;
+          default:
+            grvy_printf(GRVY_ERROR, "Error in initializing visualization: Unknown species transport property!");
+            exit(ERROR);
+            break;
+        }
+        for (int sp = 0; sp < numSpecies; sp++) {
+          std::string speciesName = config.speciesNames[sp];
+          visualizationVariables_.push_back(new ParGridFunction(fes));
+          visualizationNames_.push_back(std::string(fieldName + "_" + speciesName));
+        }
+      }
+
+      // chemistry reaction rates.
+      visualizationIndexes_.rxn = visualizationVariables_.size();
+      for (int r = 0; r < config.numReactions; r++) {
+        visualizationVariables_.push_back(new ParGridFunction(fes));
+        visualizationNames_.push_back(std::string("rxn_rate_" + std::to_string(r + 1)));
+        // visualizationNames_.push_back(std::string("rxn_rate: " + config.reactionEquations[r]));
+      }
+    }  // if (config.workFluid != DRY_AIR)
+  }    // if tpsP->isVisualizationMode()
+
+  // If mms, add conserved and exact solution.
+#ifdef HAVE_MASA
+  if (config.use_mms_ && config.mmsSaveDetails_) {
+    // for visualization.
+    masaUBlock_ = new BlockVector(*offsets);
+    masaU_ = new ParGridFunction(vfes, masaUBlock_->HostReadWrite());
+    masaRhs_ = new ParGridFunction(*U);
+
+    for (int eq = 0; eq < num_equation; eq++) {
+      visualizationVariables_.push_back(new ParGridFunction(fes, U->HostReadWrite() + eq * fes->GetNDofs()));
+      visualizationNames_.push_back(std::string("U" + std::to_string(eq)));
+    }
+    for (int eq = 0; eq < num_equation; eq++) {
+      visualizationVariables_.push_back(new ParGridFunction(fes, masaU_->HostReadWrite() + eq * fes->GetNDofs()));
+      visualizationNames_.push_back(std::string("mms_U" + std::to_string(eq)));
+    }
+    for (int eq = 0; eq < num_equation; eq++) {
+      visualizationVariables_.push_back(new ParGridFunction(fes, masaRhs_->HostReadWrite() + eq * fes->GetNDofs()));
+      visualizationNames_.push_back(std::string("RHS" + std::to_string(eq)));
+    }
+  }
+#endif
+
+  plasma_conductivity_ = NULL;
+  if (tpsP->isFlowEMCoupled()) {
+    plasma_conductivity_ = new ParGridFunction(fes);
+    *plasma_conductivity_ = 0.0;
+  }
+
+  joule_heating_ = NULL;
+  if (tpsP->isFlowEMCoupled()) {
+    joule_heating_ = new ParGridFunction(fes);
+    *joule_heating_ = 0.0;
+  }
+  */
+
+  // define solution parameters for i/o
+  ioData.registerIOFamily("Solution state variables", "/solution", U);
+  //std::cout << " check 11..." << endl;      
+  //ioData.registerIOVar("/solution", "density", 0);
+  ioData.registerIOVar("/solution", "rho-u", 1);
+  //std::cout << " check 12..." << endl;      
+  ioData.registerIOVar("/solution", "rho-v", 2);
+  //std::cout << " check 13..." << endl;      
+  if (nvel == 3) {
+    ioData.registerIOVar("/solution", "rho-w", 3);
+    ioData.registerIOVar("/solution", "rho-E", 4);
+  } else {
+    ioData.registerIOVar("/solution", "rho-E", 3);
+  }
+  //std::cout << " check 14..." << endl;      
+
+  /*
+  // TODO(kevin): for now, keep the number of primitive variables same as conserved variables.
+  // will need to add full list of species.
+  for (int sp = 0; sp < numActiveSpecies; sp++) {
+    // Only for NS_PASSIVE.
+    if ((eqSystem == NS_PASSIVE) && (sp == 1)) break;
+
+    std::string speciesName = config.speciesNames[sp];
+    ioData.registerIOVar("/solution", "rho-Y_" + speciesName, sp + nvel + 2);
+  }
+
+  if (config.twoTemperature) {
+    ioData.registerIOVar("/solution", "rhoE_e", num_equation - 1);
+  }
+  */
+
+  // compute factor to multiply viscosity when this option is active
+  /*
+  spaceVaryViscMult = NULL;
+  ParGridFunction coordsDof(dfes);
+  mesh->GetNodes(coordsDof);
+  if (config.linViscData.isEnabled) {
+    spaceVaryViscMult = new ParGridFunction(fes);
+    double *viscMult = spaceVaryViscMult->HostWrite();
+    double wgt = 0.;
+    for (int n = 0; n < fes->GetNDofs(); n++) {
+      auto hcoords = coordsDof.HostRead();  // get coords
+
+      double coords[3];
+      for (int d = 0; d < dim; d++) {
+        coords[d] = hcoords[n + d * vfes->GetNDofs()];
+      }
+
+      fluxClass->viscSpongePlanar(coords, wgt);
+      viscMult[n] = wgt;
+    }
+  }
+  */
+
+  paraviewColl->SetCycle(0);
+  //std::cout << " check 15..." << endl;      
+  paraviewColl->SetTime(0.);
+  //std::cout << " check 16..." << endl;      
+
+  //paraviewColl->RegisterField("dens", dens);
+  paraviewColl->RegisterField("vel", vel);
+  //std::cout << " check 17..." << endl;      
+  paraviewColl->RegisterField("temp", temperature);
+  //std::cout << " check 18..." << endl;      
+  paraviewColl->RegisterField("press", press);
+  //std::cout << " check 19..." << endl;      
+  
+  //if (config.isAxisymmetric()) {
+  //  paraviewColl->RegisterField("vtheta", vtheta);
+  //}
+  
+  //if (eqSystem == NS_PASSIVE) {
+  //  paraviewColl->RegisterField("passiveScalar", passiveScalar);
+  //}
+
+  //if (config.twoTemperature) {
+  //  paraviewColl->RegisterField("Te", electron_temp_field);
+  //}
+
+  for (int var = 0; var < visualizationVariables_.size(); var++) {
+    paraviewColl->RegisterField(visualizationNames_[var], visualizationVariables_[var]);
+  }
+  //std::cout << " check 20..." << endl;    
+
+  //if (spaceVaryViscMult != NULL) paraviewColl->RegisterField("viscMult", spaceVaryViscMult);
+  //if (distance_ != NULL) paraviewColl->RegisterField("distance", distance_);
+
+  paraviewColl->SetOwnData(true);
+  //paraviewColl->Save(); 
+  //std::cout << " check 21..." << endl;
+  
+}
+
+
+
+
 ///* temporary, remove when hooked up *//
 double mesh_stretching_func(const double y)
 {
    double C = 1.8;
    double delta = 1.0;
-
    return delta * tanh(C * (2.0 * y - 1.0)) / tanh(C);
 }
 
@@ -3624,9 +4239,7 @@ void CopyDBFIntegrators(ParBilinearForm *src, ParBilinearForm *dst)
 {
    Array<BilinearFormIntegrator *> *bffis = src->GetDBFI();
    for (int i = 0; i < bffis->Size(); ++i)
-   {
-      dst->AddDomainIntegrator((*bffis)[i]);
-   }
+   { dst->AddDomainIntegrator((*bffis)[i]); }
 }
 
 
@@ -3684,6 +4297,5 @@ double temp_ic(const Vector &coords, double t)
 double temp_wall(const Vector &x, double t)  
 {
    double temp = 270.0;
-   //double temp = config.wallBC[0].Th;
    return temp;
 }
