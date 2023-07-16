@@ -14,12 +14,19 @@ class Tps;
 
 #include "../utils/mfem_extras/pfem_extras.hpp"
 #include "loMach_options.hpp"
+#include "io.hpp"
 #include "tps.hpp"
 #include "tps_mfem_wrap.hpp"
 #include "run_configuration.hpp"
 #include "mfem.hpp"
 //#include "solvers.hpp"
 #include "mfem/linalg/solvers.hpp"
+
+#include "argon_transport.hpp"
+#include "averaging_and_rms.hpp"
+#include "chemistry.hpp"
+#include "radiation.hpp"
+
 
 using VecFuncT = void(const Vector &x, double t, Vector &u);
 using ScalarFuncT = double(const Vector &x, double t);
@@ -133,6 +140,7 @@ class LoMachSolver : public TPS::Solver {
 protected:
 
    mfem::MPI_Session &mpi_;
+  //mfem::MPI_Session &mpi;  
    LoMachOptions loMach_opts_;
 
    MPI_Groups *groupsMPI;
@@ -150,6 +158,16 @@ protected:
    // Number of dimensions
    int dim;
    int nvel;
+
+   // Number of equations
+   int num_equation;  
+
+   // Average handler
+   Averaging *average;
+  
+   double dt;
+   double time;
+   int iter;
   
    // pointer to parent Tps class
    TPS::Tps *tpsP_;
@@ -164,6 +182,12 @@ protected:
 
    // exit status code;
    int exit_status_;
+
+   // mapping from local to global element index
+   int *locToGlobElem;
+  
+   // just keep these saved for ease
+   int numWalls, numInlets, numOutlets;
   
    /// Print information about the Navier version.
    void PrintInfo();
@@ -210,6 +234,13 @@ protected:
    int porder;
    int norder;  
 
+   // total number of mesh elements (serial)
+   int nelemGlobal_;
+
+   // original mesh partition info (stored on rank 0)
+   Array<int> partitioning_;
+   const int defaultPartMethod = 1;  
+  
    // temporary
    double Re_tau;
   
@@ -226,6 +257,9 @@ protected:
 
    /// Velocity \f$(H^1)^d\f$ finite element space.
    ParFiniteElementSpace *vfes = nullptr;
+
+   //// total space for compatibility
+   ParFiniteElementSpace *fvfes = nullptr;  
   
    /// Pressure \f$H^1\f$ finite element collection.
    FiniteElementCollection *pfec = nullptr;
@@ -239,6 +273,13 @@ protected:
    /// Temperature \f$H^1\f$ finite element space.
    ParFiniteElementSpace *tfes = nullptr;  
 
+   /// density \f$H^1\f$ finite element collection.
+   FiniteElementCollection *rfec = nullptr;
+
+   /// density \f$H^1\f$ finite element space.
+   ParFiniteElementSpace *rfes = nullptr;  
+
+  
    // nonlinear term
    FiniteElementCollection *nfec = nullptr;
    ParFiniteElementSpace *nfes = nullptr;
@@ -275,6 +316,13 @@ protected:
    ConstantCoefficient Ht_lincoeff;
    ConstantCoefficient Ht_bdfcoeff;  
 
+  //VectorConstantCoefficient u_bc_coef;
+  //ConstantCoefficient t_bc_coef;
+
+   VectorConstantCoefficient *buffer_ubc;
+   ConstantCoefficient *buffer_tbc;
+   VectorConstantCoefficient *wall_ubc;  
+  
    ParGridFunction *bufferInvRho;  
    ParGridFunction *bufferVisc;
    ParGridFunction *bufferAlpha;
@@ -305,7 +353,7 @@ protected:
    mfem::OrthoSolver *SpInvOrthoPC = nullptr;
 
    // if not using amg to solve pressure
-   //Solver *SpInvPC = nullptr; 
+   //mfem::Solver *SpInvPC = nullptr; 
 
    mfem::Solver *MtInvPC = nullptr;
    mfem::CGSolver *MtInv = nullptr;  
@@ -434,6 +482,46 @@ protected:
    int exit_status_;  
    IODataOrganizer ioData;
    */
+
+   // Equations solved
+   Equations eqSystem;
+  
+   // Pointers to the different classes
+   GasMixture *mixture;    // valid on host
+   GasMixture *d_mixture;  // valid on device, when available; otherwise = mixture  
+
+   TransportProperties *transportPtr = NULL;  // valid on both host and device
+   // TransportProperties *d_transport = NULL;  // valid on device, when available; otherwise = transportPtr
+
+   Chemistry *chemistry_ = NULL;
+   Radiation *radiation_ = NULL;
+  
+   // to interface with existing code
+   ParGridFunction *U;
+   ParGridFunction *Up;  
+
+   // The solution u has components {density, x-momentum, y-momentum, energy}.
+   // These are stored contiguously in the BlockVector u_block.
+   Array<int> *offsets;
+   BlockVector *u_block;
+   BlockVector *up_block;
+
+   // paraview collection pointer
+   ParaViewDataCollection *paraviewColl = NULL;
+   // DataCollection *visitColl = NULL;
+
+   // Visualization functions (these are pointers to Up)
+   ParGridFunction *temperature, *dens, *vel, *vtheta, *passiveScalar;
+   ParGridFunction *electron_temp_field;
+   ParGridFunction *press;
+   std::vector<ParGridFunction *> visualizationVariables_;
+   std::vector<std::string> visualizationNames_;
+   AuxiliaryVisualizationIndexes visualizationIndexes_;
+   ParGridFunction *plasma_conductivity_;
+   ParGridFunction *joule_heating_;
+
+   // I/O organizer
+   IODataOrganizer ioData;
   
   
 public:
@@ -464,8 +552,18 @@ public:
    void parseRMSJobOptions();  
    void parseBCInputs();
    void parseICOptions();
-   void parsePostProcessVisualizationInputs();  
+   void parsePostProcessVisualizationInputs();
+   void initSolutionAndVisualizationVectors();  
    void solve();  
+
+   // i/o routines
+   void read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data);
+  void read_serialized_soln_data(hid_t file, string varName, int numDof, int varOffset, double *data, IOFamily &fam);
+   void restart_files_hdf5(string mode, string inputFileName = std::string());
+   void partitioning_file_hdf5(string mode);
+  //void serialize_soln_for_write(IOFamily &fam);
+   void write_soln_data(hid_t group, string varName, hid_t dataspace, double *data);
+
   
    /// Initialize forms, solvers and preconditioners.
    void Setup(double dt);

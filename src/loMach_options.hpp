@@ -89,7 +89,7 @@ class LoMachOptions {
 
   void print(std::ostream &out) {
     out << std::endl;
-    out << "Electromagnetics options:" << std::endl;
+    out << "LoMach options:" << std::endl;
     out << "  mesh_file   = " << mesh_file << std::endl;
     out << "  order       = " << order << std::endl;
     out << "  ref_levels  = " << ref_levels << std::endl;
