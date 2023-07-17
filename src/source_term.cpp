@@ -130,7 +130,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
       for (int sp = 0; sp < _numSpecies; sp++) diffusionVelocity[sp + v * _numSpecies] = 0.0;
     double ns[gpudata::MAXSPECIES];
 
-    // TODO: Get distance
+    // TODO(trevilo): Get distance
     _transport->ComputeSourceTransportProperties(Un, upn, gradUpn, Efield, -1, globalTransport, speciesTransport,
                                                  diffusionVelocity, ns);
 
