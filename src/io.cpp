@@ -37,7 +37,7 @@
 #include "utils.hpp"
 
 void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
-MPI_Comm TPSCommWorld = this->groupsMPI->getTPSCommWorld();
+  MPI_Comm TPSCommWorld = this->groupsMPI->getTPSCommWorld();
 #ifdef HAVE_GRVY
   grvy_timer_begin(__func__);
 #endif

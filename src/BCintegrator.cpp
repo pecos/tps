@@ -42,7 +42,8 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
                            GasMixture *d_mixture, Fluxes *_fluxClass, ParGridFunction *_Up, ParGridFunction *_gradUp,
                            const boundaryFaceIntegrationData &boundary_face_data, const int _dim,
                            const int _num_equation, double &_max_char_speed, RunConfiguration &_runFile,
-                           Array<int> &local_attr, const int &_maxIntPoints, const int &_maxDofs, ParGridFunction *distance)
+                           Array<int> &local_attr, const int &_maxIntPoints, const int &_maxDofs,
+                           ParGridFunction *distance)
     : groupsMPI(_groupsMPI),
       config(_runFile),
       rsolver(rsolver_),
@@ -225,10 +226,12 @@ void BCintegrator::computeBdrFlux(const int attr, Vector &normal, Vector &stateI
   std::unordered_map<int, BoundaryCondition *>::const_iterator obc = outletBCmap.find(attr);
   std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = wallBCmap.find(attr);
 
-  if (ibc != inletBCmap.end()) ibc->second->computeBdrFlux(normal, stateIn, gradState, transip, delta, distance, bdrFlux);
+  if (ibc != inletBCmap.end())
+    ibc->second->computeBdrFlux(normal, stateIn, gradState, transip, delta, distance, bdrFlux);
   if (obc != outletBCmap.end())
     obc->second->computeBdrFlux(normal, stateIn, gradState, transip, delta, distance, bdrFlux);
-  if (wbc != wallBCmap.end()) wbc->second->computeBdrFlux(normal, stateIn, gradState, transip, delta, distance, bdrFlux);
+  if (wbc != wallBCmap.end())
+    wbc->second->computeBdrFlux(normal, stateIn, gradState, transip, delta, distance, bdrFlux);
 
   //   BCmap[attr]->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
 }
@@ -341,7 +344,6 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
     dist.SetSize(dofs.Size());
     distance_->GetSubVector(dofs, dist);
   }
-
 
   // Integration order calculation from DGTraceIntegrator
   int intorder;

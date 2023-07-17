@@ -100,7 +100,7 @@ class Tps {
   bool isVisualizationMode_;
 
  public:
-  Tps(): Tps(MPI_COMM_WORLD) {}
+  Tps() : Tps(MPI_COMM_WORLD) {}
   Tps(MPI_Comm world);
   ~Tps();
   GRVY::GRVY_Input_Class iparse_;  ///< runtime input parser (from libgrvy)
@@ -162,8 +162,7 @@ class Tps {
   void parseInputFile(std::string iFile);
   void closeInputFile() { iparse_.Close(); }
 
-  [[deprecated("Use getTPSCommWorld")]]
-  MPI_Comm getMPISession() { return TPSCommWorld_; }
+  [[deprecated("Use getTPSCommWorld")]] MPI_Comm getMPISession() { return TPSCommWorld_; }
 
   MPI_Comm getTPSCommWorld() { return TPSCommWorld_; }
 

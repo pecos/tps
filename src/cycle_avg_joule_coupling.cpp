@@ -35,13 +35,9 @@
 #include "em_options.hpp"
 #include "quasimagnetostatic.hpp"
 
-CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps, int max_out,
-                                             bool axisym, double input_power, double initial_input_power)
-    : em_opt_(),
-      max_outer_iters_(max_out),
-      input_power_(input_power),
-      initial_input_power_(initial_input_power) {
-
+CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps, int max_out, bool axisym,
+                                             double input_power, double initial_input_power)
+    : em_opt_(), max_outer_iters_(max_out), input_power_(input_power), initial_input_power_(initial_input_power) {
   MPI_Comm_size(tps->getTPSCommWorld(), &nprocs_);
   MPI_Comm_rank(tps->getTPSCommWorld(), &rank_);
   if (rank_ == 0)

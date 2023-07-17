@@ -159,8 +159,8 @@ void FaceIntegrator::getElementsGrads_gpu(const ParGridFunction *gradUp, ParFini
   }
 }
 
-void FaceIntegrator::getDistanceDofs(FaceElementTransformations &Tr, const FiniteElement &el1,
-                                     const FiniteElement &el2, Vector &dist1, Vector &dist2) {
+void FaceIntegrator::getDistanceDofs(FaceElementTransformations &Tr, const FiniteElement &el1, const FiniteElement &el2,
+                                     Vector &dist1, Vector &dist2) {
   assert(distance_ != NULL);
 
   const ParFiniteElementSpace *pfes = distance_->ParFESpace();
@@ -185,7 +185,6 @@ void FaceIntegrator::getDistanceDofs(FaceElementTransformations &Tr, const Finit
     distance_->GetSubVector(dofs2, dist2);
   }
 }
-
 
 void FaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2,
                                         FaceElementTransformations &Tr, const Vector &elfun, Vector &elvect) {

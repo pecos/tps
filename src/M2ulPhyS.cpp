@@ -35,21 +35,21 @@
 
 #include "M2ulPhyS.hpp"
 
-M2ulPhyS::M2ulPhyS(TPS::Tps *tps):
-  groupsMPI( new MPI_Groups(tps->getTPSCommWorld()) ),
-  nprocs_(groupsMPI->getTPSWorldSize()),
-  rank_(groupsMPI->getTPSWorldRank()),
-  rank0_(groupsMPI->isWorldRoot()),
-  tpsP(tps) {
+M2ulPhyS::M2ulPhyS(TPS::Tps *tps)
+    : groupsMPI(new MPI_Groups(tps->getTPSCommWorld())),
+      nprocs_(groupsMPI->getTPSWorldSize()),
+      rank_(groupsMPI->getTPSWorldRank()),
+      rank0_(groupsMPI->isWorldRoot()),
+      tpsP(tps) {
   parseSolverOptions2();
 }
 
-M2ulPhyS::M2ulPhyS(string &inputFileName, TPS::Tps *tps) :
-  groupsMPI( new MPI_Groups(tps->getTPSCommWorld()) ),
-  nprocs_(groupsMPI->getTPSWorldSize()),
-  rank_(groupsMPI->getTPSWorldRank()),
-  rank0_(groupsMPI->isWorldRoot()),
-  tpsP(tps) {
+M2ulPhyS::M2ulPhyS(string &inputFileName, TPS::Tps *tps)
+    : groupsMPI(new MPI_Groups(tps->getTPSCommWorld())),
+      nprocs_(groupsMPI->getTPSWorldSize()),
+      rank_(groupsMPI->getTPSWorldRank()),
+      rank0_(groupsMPI->isWorldRoot()),
+      tpsP(tps) {
   // koomie TODO: refactor order so we can use standard parseSolverOptions call from Solver base class
 #define NEWPARSER
 #ifdef NEWPARSER
@@ -2426,7 +2426,8 @@ void M2ulPhyS::parsePlasmaModels() {
   } else if (transportModelStr == "constant") {
     config.transportModel = CONSTANT;
   }
-  printf("config.transportModel = %s\n", transportModelStr.c_str()); fflush(stdout);
+  printf("config.transportModel = %s\n", transportModelStr.c_str());
+  fflush(stdout);
   // } else {
   //   grvy_printf(GRVY_ERROR, "\nUnknown transport_model -> %s", transportModelStr.c_str());
   //   exit(ERROR);

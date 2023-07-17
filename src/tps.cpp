@@ -56,7 +56,6 @@
 #include "cycle_avg_joule_coupling.hpp"
 #include "independent_coupling.hpp"
 
-
 namespace TPS {
 
 /** \brief Constructs default Tps object.
@@ -65,7 +64,7 @@ namespace TPS {
  * call input parsing functions, choose solver, and initialize to set
  * information for simulation.  For an example, see main.cpp.
  */
-Tps::Tps(MPI_Comm world): TPSCommWorld_(world) {
+Tps::Tps(MPI_Comm world) : TPSCommWorld_(world) {
   MPI_Comm_size(world, &nprocs_);
   MPI_Comm_rank(world, &rank_);
   if (rank_ == 0)
@@ -475,35 +474,35 @@ namespace py = pybind11;
 /*! Return a TPS::Tps from mpi4py communicator object.
 Anonimous function for pybind interface
  */
-TPS::Tps * createTpsFromPythonComm(py::object py_comm) {
+TPS::Tps *createTpsFromPythonComm(py::object py_comm) {
   auto comm_ptr = PyMPIComm_Get(py_comm.ptr());
 
-  if (!comm_ptr)
-    throw py::error_already_set();
+  if (!comm_ptr) throw py::error_already_set();
 
   return new TPS::Tps(*comm_ptr);
 }
 #endif
 
 PYBIND11_MODULE(libtps, m) {
-  #ifdef HAVE_MPI4PY
+#ifdef HAVE_MPI4PY
   // initialize mpi4py's C-API
   if (import_mpi4py() < 0) {
     // mpi4py calls the Python C API
     // we let pybind11 give us the detailed traceback
     throw py::error_already_set();
   }
-  #endif
+#endif
 
   m.doc() = "TPS Python Interface";
   py::class_<TPS::Tps>(m, "Tps")
       .def(py::init<>())
-      #ifdef HAVE_MPI4PY
+#ifdef HAVE_MPI4PY
       .def(py::init([](py::object py_comm) {
         auto comm_ptr = PyMPIComm_Get(py_comm.ptr());
-        if (!comm_ptr)  throw py::error_already_set();
-        return new TPS::Tps(*comm_ptr); }) )
-      #endif
+        if (!comm_ptr) throw py::error_already_set();
+        return new TPS::Tps(*comm_ptr);
+      }))
+#endif
       .def("chooseDevices", &TPS::Tps::chooseDevices)
       .def("chooseSolver", &TPS::Tps::chooseSolver)
       .def("getStatus", &TPS::Tps::getStatus)

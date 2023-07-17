@@ -71,8 +71,8 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   bool rank0_;
 
  public:
-  CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps, int max_out, bool axisym,
-                        double input_power = -1., double initial_input_power = -1.);
+  CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps, int max_out, bool axisym, double input_power = -1.,
+                        double initial_input_power = -1.);
   ~CycleAvgJouleCoupling();
 
   void initializeInterpolationData();

@@ -56,8 +56,8 @@
 bool slurm_job_almost_done_mpi(MPI_Comm comm, int threshold);
 
 // check if the amount of time left in SLURM job is less than desired threshold
-[[deprecated("Use slurm_job_almost_done(MPI_Comm comm, int threshold) instead")]]
-bool slurm_job_almost_done(int threshold, int rank) {
+[[deprecated("Use slurm_job_almost_done(MPI_Comm comm, int threshold) instead")]] bool slurm_job_almost_done(
+    int threshold, int rank) {
   return slurm_job_almost_done_mpi(MPI_COMM_WORLD, threshold);
 }
 

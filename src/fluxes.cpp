@@ -161,8 +161,8 @@ MFEM_HOST_DEVICE void Fluxes::ComputeConvectiveFluxes(const double *state, doubl
 }
 
 // TODO(kevin): check/complete axisymmetric setting for multi-component flow.
-void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, Vector transip, double delta, double distance,
-                                  DenseMatrix &flux) {
+void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, Vector transip, double delta,
+                                  double distance, DenseMatrix &flux) {
   ComputeViscousFluxes(state.GetData(), gradUp.GetData(), transip.GetData(), delta, distance, flux.GetData());
 }
 
@@ -327,8 +327,8 @@ void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gra
 }
 
 MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double *transip,
-                                                      double delta, double distance, const BoundaryViscousFluxData &bcFlux,
-                                                      double *normalFlux) {
+                                                      double delta, double distance,
+                                                      const BoundaryViscousFluxData &bcFlux, double *normalFlux) {
   // normalFlux.SetSize(num_equation);
   for (int eq = 0; eq < num_equation; eq++) normalFlux[eq] = 0.;
   if (eqSystem == EULER) {

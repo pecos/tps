@@ -84,8 +84,8 @@ class BCintegrator : public NonlinearFormIntegrator {
   std::unordered_map<int, BoundaryCondition *> wallBCmap;
 
   // void calcMeanState();
-  void computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState,
-                      Vector transip, double delta, double distance, Vector &bdrFlux);
+  void computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip,
+                      double delta, double distance, Vector &bdrFlux);
 
  public:
   BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules,

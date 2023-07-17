@@ -30,17 +30,24 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 
-#include <math.h>
 #include "mixing_length_transport.hpp"
+
+#include <math.h>
 
 using namespace std;
 using namespace mfem;
 
-MixingLengthTransport::MixingLengthTransport(GasMixture *mix, RunConfiguration &runfile, TransportProperties *molecular_transport)
+MixingLengthTransport::MixingLengthTransport(GasMixture *mix, RunConfiguration &runfile,
+                                             TransportProperties *molecular_transport)
     : MixingLengthTransport(mix, runfile.mix_length_trans_input_, molecular_transport) {}
 
-MFEM_HOST_DEVICE MixingLengthTransport::MixingLengthTransport(GasMixture *mix, const mixingLengthTransportData &inputs, TransportProperties *molecular_transport)
-    : TransportProperties(mix), max_mixing_length_(inputs.max_mixing_length_), Prt_(inputs.Prt_), Let_(inputs.Let_), molecular_transport_(molecular_transport) {}
+MFEM_HOST_DEVICE MixingLengthTransport::MixingLengthTransport(GasMixture *mix, const mixingLengthTransportData &inputs,
+                                                              TransportProperties *molecular_transport)
+    : TransportProperties(mix),
+      max_mixing_length_(inputs.max_mixing_length_),
+      Prt_(inputs.Prt_),
+      Let_(inputs.Let_),
+      molecular_transport_(molecular_transport) {}
 
 void MixingLengthTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
                                                            const Vector &Efield, double radius, double distance,
@@ -102,7 +109,7 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
     double Szx = 0.5 * ut_r;
     if (radius > 0) Szx -= 0.5 * ut / radius;
     const double Szy = 0.5 * ut_z;
-    double Szz = - divV / 3.;
+    double Szz = -divV / 3.;
     if (radius > 0) Szz += ur / radius;
 
     S += 2 * (2 * Szx * Szx + 2 * Szy * Szy + Szz * Szz);

@@ -43,10 +43,8 @@ using namespace mfem::common;
 static Vector axis(3);
 void JFun(const Vector &x, Vector &f);
 
-QuasiMagnetostaticSolverBase::QuasiMagnetostaticSolverBase(ElectromagneticOptions em_opts,
-                                                           TPS::Tps *tps)
+QuasiMagnetostaticSolverBase::QuasiMagnetostaticSolverBase(ElectromagneticOptions em_opts, TPS::Tps *tps)
     : em_opts_(em_opts), offsets_(3) {
-
   MPI_Comm_size(tps->getTPSCommWorld(), &nprocs_);
   MPI_Comm_rank(tps->getTPSCommWorld(), &rank_);
   if (rank_ == 0)
@@ -695,8 +693,7 @@ static double radius(const Vector &x) { return x[0]; }
 
 static double oneOverRadius(const Vector &x) { return 1.0 / x[0]; }
 
-QuasiMagnetostaticSolverAxiSym::QuasiMagnetostaticSolverAxiSym(ElectromagneticOptions em_opts,
-                                                               TPS::Tps *tps)
+QuasiMagnetostaticSolverAxiSym::QuasiMagnetostaticSolverAxiSym(ElectromagneticOptions em_opts, TPS::Tps *tps)
     : QuasiMagnetostaticSolverBase(em_opts, tps) {
   h1_ = NULL;
   Atheta_space_ = NULL;

@@ -125,7 +125,7 @@ MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double 
     double Szx = 0.5 * ut_r;
     if (radius > 0) Szx -= 0.5 * ut / radius;
     const double Szy = 0.5 * ut_z;
-    double Szz = - divV / 3.;
+    double Szz = -divV / 3.;
     if (radius > 0) Szz += ur / radius;
 
     S += 2 * (2 * Szx * Szx + 2 * Szy * Szy + Szz * Szz);
@@ -138,6 +138,5 @@ MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double 
 
   visc[0] += mut;
 }
-
 
 #endif  // MIXING_LENGTH_TRANSPORT_HPP_

@@ -68,9 +68,7 @@ class MPI_Groups {
 
   int isWorldRoot() { return this->getTPSWorldRank() == 0; }
 
-
-  [[deprecated("Use getTPSCommWorld")]]
-  MPI_Comm getSession() { return TPSCommWorld_; }
+  [[deprecated("Use getTPSCommWorld")]] MPI_Comm getSession() { return TPSCommWorld_; }
 
   MPI_Comm getTPSCommWorld() { return TPSCommWorld_; }
 

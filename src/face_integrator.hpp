@@ -105,7 +105,6 @@ class FaceIntegrator : public NonlinearFormIntegrator {
   void getDistanceDofs(FaceElementTransformations &Tr, const FiniteElement &el1, const FiniteElement &el2,
                        Vector &dist1, Vector &dist2);
 
-
  public:
   FaceIntegrator(IntegrationRules *_intRules, RiemannSolver *rsolver_, Fluxes *_fluxClass, ParFiniteElementSpace *_vfes,
                  bool _useLinear, const int _dim, const int _num_equation, ParGridFunction *_gradUp,
