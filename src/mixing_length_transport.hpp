@@ -41,6 +41,7 @@
 using namespace std;
 using namespace mfem;
 
+#if !defined(_CUDA_) && !defined(_HIP_)
 class MixingLengthTransport : public TransportProperties {
  protected:
   // for turbulent transport calculations
@@ -138,5 +139,5 @@ MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double 
 
   visc[0] += mut;
 }
-
+#endif
 #endif  // MIXING_LENGTH_TRANSPORT_HPP_

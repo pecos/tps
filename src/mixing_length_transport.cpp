@@ -37,6 +37,7 @@
 using namespace std;
 using namespace mfem;
 
+#if !defined(_CUDA_) && !defined(_HIP_)
 MixingLengthTransport::MixingLengthTransport(GasMixture *mix, RunConfiguration &runfile,
                                              TransportProperties *molecular_transport)
     : MixingLengthTransport(mix, runfile.mix_length_trans_input_, molecular_transport) {}
@@ -191,3 +192,4 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeSourceTransportProperties(
 
   // // TODO(trevilo): Call molecular transport
 }
+#endif
