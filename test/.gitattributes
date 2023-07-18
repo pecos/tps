@@ -40,3 +40,5 @@ ref_solns/annulus.restart.sol.h5 filter=lfs diff=lfs merge=lfs -text
 ref_solns/annulus.50100.sol.h5 filter=lfs diff=lfs merge=lfs -text
 ref_solns/pipe.100100.sol.h5 filter=lfs diff=lfs merge=lfs -text
 ref_solns/pipe.restart.sol.h5 filter=lfs diff=lfs merge=lfs -text
+ref_solns/pipe.mix.161100.sol.h5 filter=lfs diff=lfs merge=lfs -text
+ref_solns/pipe.mix.restart.sol.h5 filter=lfs diff=lfs merge=lfs -text

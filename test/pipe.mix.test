@@ -1,0 +1,27 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="axisymmetric/pipe.mix"
+RUNFILE_MIX="inputs/pipe.axisym.mix.ini"
+
+setup() {
+    SOLN_FILE_MIX=restart_output-pipe-mix.sol.h5
+    RSTRT_FILE_MIX=ref_solns/pipe.mix.restart.sol.h5
+    REF_FILE_MIX=ref_solns/pipe.mix.161100.sol.h5
+}
+
+@test "[$TEST] verify axisymmetric pipe case with mixing length model, input from -> $RUNFILE_MIX" {
+    # paraview+restart will fail if data in output-pipe is from after restart
+    rm -rf output-pipe-mix
+
+    test -s $RUNFILE_MIX
+    test -s $RSTRT_FILE_MIX
+    cp $RSTRT_FILE_MIX $SOLN_FILE_MIX
+
+    mpirun -np 2 ../src/tps --runFile $RUNFILE_MIX
+
+    test -s $SOLN_FILE_MIX
+    test -s $REF_FILE_MIX
+
+    ./soln_differ -r $SOLN_FILE_MIX $REF_FILE_MIX
+}
