@@ -1037,7 +1037,10 @@ void M2ulPhyS::initIndirectionArrays() {
   vfes->ExchangeFaceNbrData();
   gradUpfes->ExchangeFaceNbrData();
 
-  distance_->ExchangeFaceNbrData();
+  if (distance_ != NULL) {
+    distance_->ParFESpace()->ExchangeFaceNbrData();
+    distance_->ExchangeFaceNbrData();
+  }
 
   if (Nshared > 0) {
     shared_face_data.elem2_dofs.SetSize(Nshared * num_equation * maxDofs);
