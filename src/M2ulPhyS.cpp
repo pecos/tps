@@ -3614,7 +3614,15 @@ void M2ulPhyS::updateVisualizationVariables() {
       double diffVel[gpudata::MAXSPECIES * gpudata::MAXDIM];
       double distance = 0;
       if (distance_ != NULL) distance = (*distance_)[n];
-      in_transport->ComputeFluxTransportProperties(state, gradUpn, Efield, -1, distance, fluxTrns, diffVel);
+
+      double radius = -1;
+      if (config.isAxisymmetric()) {
+        ParGridFunction *xyz = new ParGridFunction(dfes);
+        mesh->GetNodes(*xyz);
+        radius = (*xyz)[n + 0 * ndofs];
+      }
+
+      in_transport->ComputeFluxTransportProperties(state, gradUpn, Efield, radius, distance, fluxTrns, diffVel);
       for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++) {
         dataVis[visualIdxs.FluxTrns + t][n] = fluxTrns[t];
       }
