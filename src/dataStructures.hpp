@@ -296,6 +296,12 @@ struct interiorFaceIntegrationData {
 
   /** Mesh spacing for element 2 on each interior face */
   Vector delta_el2;
+
+  /** Distance function from element 1 */
+  Vector dist1;
+
+  /** Distance function from element 2 */
+  Vector dist2;
 };
 
 /** @brief Data for boundary face integral calculations
@@ -388,6 +394,12 @@ struct sharedFaceIntegrationData {
 
   /** Mesh spacing for element 2 on each shared face */
   Vector delta_el2;
+
+  /** Distance function from element 1 */
+  Vector dist1;
+
+  /** Distance function from element 2 */
+  Vector dist2;
 };
 
 /** @brief Storage for data used in the _GPU_ code path

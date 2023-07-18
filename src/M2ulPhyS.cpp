@@ -774,6 +774,12 @@ void M2ulPhyS::initIndirectionArrays() {
   face_data.delta_el2.UseDevice(true);
   face_data.delta_el2.SetSize(mesh->GetNumFaces());
 
+  face_data.dist1.UseDevice(true);
+  face_data.dist1.SetSize(maxIntPoints * mesh->GetNumFaces());
+
+  face_data.dist2.UseDevice(true);
+  face_data.dist2.SetSize(maxIntPoints * mesh->GetNumFaces());
+
   auto hshape1 = face_data.el1_shape.HostWrite();
   auto hshape2 = face_data.el2_shape.HostWrite();
   auto hweight = face_data.quad_weight.HostWrite();
@@ -781,6 +787,8 @@ void M2ulPhyS::initIndirectionArrays() {
   auto h_xyz = face_data.xyz.HostWrite();
   auto h_delta_el1 = face_data.delta_el1.HostWrite();
   auto h_delta_el2 = face_data.delta_el2.HostWrite();
+  auto h_dist1 = face_data.dist1.HostWrite();
+  auto h_dist2 = face_data.dist1.HostWrite();
 
   Vector xyz(dim);
 
@@ -857,6 +865,29 @@ void M2ulPhyS::initIndirectionArrays() {
       shape2i.UseDevice(false);
       shape1i.SetSize(dof1);
       shape2i.SetSize(dof2);
+
+      Vector dist1, dist2;
+      if (distance_ != NULL) {
+        const ParFiniteElementSpace *dist_fes = distance_->ParFESpace();
+
+        Array<int> dist_dofs1;
+        dist_fes->GetElementVDofs(tr->Elem1->ElementNo, dist_dofs1);
+        dist1.SetSize(dist_dofs1.Size());
+        distance_->GetSubVector(dist_dofs1, dist1);
+
+        Array<int> dist_dofs2;
+        if (no2 >= NE) {
+          int Elem2NbrNo = no2 - NE;
+          dist_fes->GetFaceNbrElementVDofs(Elem2NbrNo, dist_dofs2);
+          dist2.SetSize(dist_dofs2.Size());
+          distance_->FaceNbrData().GetSubVector(dist_dofs2, dist2);
+        } else {
+          dist_fes->GetElementVDofs(no2, dist_dofs2);
+          dist2.SetSize(dist_dofs2.Size());
+          distance_->GetSubVector(dist_dofs2, dist2);
+        }
+      }
+
       for (int k = 0; k < ir->GetNPoints(); k++) {
         const IntegrationPoint &ip = ir->IntPoint(k);
         tr->SetAllIntPoints(&ip);
@@ -884,6 +915,17 @@ void M2ulPhyS::initIndirectionArrays() {
           hnormal[face * dim * maxIntPoints + k * dim + d] = nor[d];
           h_xyz[face * dim * maxIntPoints + k * dim + d] = xyz[d];
         }
+
+        // evaluate distance
+        double d1 = 0;
+        double d2 = 0;
+        if (distance_ != NULL) {
+          d1 = dist1 * shape1i;
+          d2 = dist2 * shape2i;
+        }
+
+        h_dist1[face * maxIntPoints + k] = d1;
+        h_dist2[face * maxIntPoints + k] = d2;
       }
     }
   }
@@ -995,6 +1037,8 @@ void M2ulPhyS::initIndirectionArrays() {
   vfes->ExchangeFaceNbrData();
   gradUpfes->ExchangeFaceNbrData();
 
+  distance_->ExchangeFaceNbrData();
+
   if (Nshared > 0) {
     shared_face_data.elem2_dofs.SetSize(Nshared * num_equation * maxDofs);
     shared_face_data.elem2_grad_dofs.SetSize(Nshared * num_equation * maxDofs * dim);
@@ -1009,6 +1053,8 @@ void M2ulPhyS::initIndirectionArrays() {
     shared_face_data.el2_shape.UseDevice(true);
     shared_face_data.quad_weight.UseDevice(true);
     shared_face_data.normal.UseDevice(true);
+    shared_face_data.dist1.UseDevice(true);
+    shared_face_data.dist2.UseDevice(true);
 
     shared_face_data.el1_shape.SetSize(Nshared * maxIntPoints * maxDofs);
     shared_face_data.el2_shape.SetSize(Nshared * maxIntPoints * maxDofs);
@@ -1017,6 +1063,9 @@ void M2ulPhyS::initIndirectionArrays() {
     shared_face_data.el1.SetSize(Nshared);
     shared_face_data.num_quad.SetSize(Nshared);
     shared_face_data.num_dof2.SetSize(Nshared);
+    shared_face_data.dist1.SetSize(Nshared * maxIntPoints);
+    shared_face_data.dist2.SetSize(Nshared * maxIntPoints);
+
 
     shared_face_data.el1_shape = 0.;
     shared_face_data.el2_shape = 0.;
@@ -1025,6 +1074,8 @@ void M2ulPhyS::initIndirectionArrays() {
     shared_face_data.el1 = 0;
     shared_face_data.num_quad = 0;
     shared_face_data.num_dof2 = 0;
+    shared_face_data.dist1 = 0.;
+    shared_face_data.dist2 = 0.;
 
     auto h_shape1 = shared_face_data.el1_shape.HostWrite();
     auto h_shape2 = shared_face_data.el2_shape.HostWrite();
@@ -1033,6 +1084,8 @@ void M2ulPhyS::initIndirectionArrays() {
     auto h_face_el1 = shared_face_data.el1.HostWrite();
     auto h_face_num_quad = shared_face_data.num_quad.HostWrite();
     auto h_face_num_dof2 = shared_face_data.num_dof2.HostWrite();
+    auto h_dist1 = shared_face_data.dist1.HostWrite();
+    auto h_dist2 = shared_face_data.dist2.HostWrite();
 
     shared_face_data.xyz.UseDevice(true);
     shared_face_data.xyz.SetSize(Nshared * maxIntPoints * dim);
@@ -1118,6 +1171,22 @@ void M2ulPhyS::initIndirectionArrays() {
       }
       if (!inList) unicElems.push_back(tr->Elem1No);
 
+      Vector dist1, dist2;
+      if (distance_ != NULL) {
+        const ParFiniteElementSpace *dist_fes = distance_->ParFESpace();
+
+        Array<int> dist_dofs1;
+        dist_fes->GetElementVDofs(tr->Elem1->ElementNo, dist_dofs1);
+        dist1.SetSize(dist_dofs1.Size());
+        distance_->GetSubVector(dist_dofs1, dist1);
+
+        Array<int> dist_dofs2;
+        dist_fes->GetFaceNbrElementVDofs(Elem2NbrNo, dist_dofs2);
+        dist2.SetSize(dist_dofs2.Size());
+        distance_->FaceNbrData().GetSubVector(dist_dofs2, dist2);
+      }
+
+
       Vector shape1, shape2, nor;
       shape1.UseDevice(false);
       shape2.UseDevice(false);
@@ -1148,6 +1217,17 @@ void M2ulPhyS::initIndirectionArrays() {
         for (int n = 0; n < dof2; n++) {
           h_shape2[i * maxIntPoints * maxDofs + q * maxDofs + n] = shape2[n];
         }
+
+        // evaluate distance
+        double d1 = 0;
+        double d2 = 0;
+        if (distance_ != NULL) {
+          d1 = dist1 * shape1;
+          d2 = dist2 * shape2;
+        }
+
+        h_dist1[i * maxIntPoints + q] = d1;
+        h_dist2[i * maxIntPoints + q] = d2;
       }
     }
 

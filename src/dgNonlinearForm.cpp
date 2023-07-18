@@ -294,6 +294,8 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
   auto d_xyz = face_data.xyz.Read();
   auto d_delta1 = face_data.delta_el1.Read();
   auto d_delta2 = face_data.delta_el2.Read();
+  auto d_dist1 = face_data.dist1.Read();
+  auto d_dist2 = face_data.dist2.Read();
 
   Mesh *mesh = fes->GetMesh();
   const int Nf = mesh->GetNumFaces();
@@ -312,6 +314,7 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
     double u2[gpudata::MAXEQUATIONS], gradUp2[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
     double vFlux1[gpudata::MAXEQUATIONS * gpudata::MAXDIM], vFlux2[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
     double Rflux[gpudata::MAXEQUATIONS], nor[gpudata::MAXDIM], xyz[gpudata::MAXDIM];
+    double d1, d2;
 
     const int Q = d_face_nqp[iface];
     const int offset = iface * maxIntPoints * dim;
@@ -341,6 +344,10 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
         }
       }
 
+      // get distance
+      d1 = d_dist1[iface * maxIntPoints + k];
+      d2 = d_dist2[iface * maxIntPoints + k];
+
       // evaluate flux
       // d_rsolver->Eval_LF(u1, u2, nor, Rflux);
 
@@ -357,8 +364,8 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
                          d_normal + offset + k * dim,
                          Rflux);
 
-      d_flux->ComputeViscousFluxes(u1, gradUp1, xyz, d_delta1[iface], -1, vFlux1);
-      d_flux->ComputeViscousFluxes(u2, gradUp2, xyz, d_delta2[iface], -1, vFlux2);
+      d_flux->ComputeViscousFluxes(u1, gradUp1, xyz, d_delta1[iface], d1, vFlux1);
+      d_flux->ComputeViscousFluxes(u2, gradUp2, xyz, d_delta2[iface], d2, vFlux2);
 
       for (int d = 0; d < dim; d++) {
         for (int eq = 0; eq < num_equation; eq++) {
@@ -627,6 +634,9 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
 
   auto d_delta_el1 = shared_face_data.delta_el1.Read();
   auto d_delta_el2 = shared_face_data.delta_el2.Read();
+  auto d_dist1 = shared_face_data.dist1.Read();
+  auto d_dist2 = shared_face_data.dist2.Read();
+
 
   const int maxNumElems = shared_face_data.shared_elements_to_shared_faces.Size() / 7;  // elements with shared faces
   const int Ndofs = vfes->GetNDofs();
@@ -718,10 +728,15 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
           }
         }
 
+        // get distance
+        double d1 = d_dist1[f * maxIntPoints + k];
+        double d2 = d_dist2[f * maxIntPoints + k];
+
+
         // evaluate flux
         d_rsolver->Eval_LF(u1, u2, nor, Rflux);
-        d_flux->ComputeViscousFluxes(u1, gradUp1, xyz, d_delta_el1[f], -1, vFlux1);
-        d_flux->ComputeViscousFluxes(u2, gradUp2, xyz, d_delta_el2[f], -1, vFlux2);
+        d_flux->ComputeViscousFluxes(u1, gradUp1, xyz, d_delta_el1[f], d1, vFlux1);
+        d_flux->ComputeViscousFluxes(u2, gradUp2, xyz, d_delta_el2[f], d2, vFlux2);
 
         for (int eq = 0; eq < num_equation; eq++) {
           for (int d = 0; d < dim; d++)

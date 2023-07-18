@@ -38,7 +38,7 @@ SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_or
                        ParGridFunction *_Up, ParGridFunction *_gradUp,
                        const precomputedIntegrationData &gpu_precomputed_data, RunConfiguration &_config,
                        GasMixture *mixture, GasMixture *d_mixture, TransportProperties *transport, Chemistry *chemistry,
-                       Radiation *radiation, ParGridFunction *pc)
+                       Radiation *radiation, ParGridFunction *pc, ParGridFunction *distance)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpu_precomputed_data,
                    _config.isAxisymmetric()),
       mixture_(mixture),
@@ -46,7 +46,8 @@ SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_or
       transport_(transport),
       chemistry_(chemistry),
       radiation_(radiation),
-      plasma_conductivity_(pc) {
+      plasma_conductivity_(pc),
+      distance_(distance) {
   numSpecies_ = mixture->GetNumSpecies();
   numActiveSpecies_ = mixture->GetNumActiveSpecies();
   numReactions_ = _config.chemistryInput.numReactions;
@@ -84,6 +85,11 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
   }
 
 #endif
+  const double *d_distance = NULL;
+  if (distance_ != NULL) {
+    d_distance = distance_->Read();
+  }
+
   TransportProperties *_transport = transport_;
   Chemistry *_chemistry = chemistry_;
   Radiation *_radiation = radiation_;
@@ -130,8 +136,9 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
       for (int sp = 0; sp < _numSpecies; sp++) diffusionVelocity[sp + v * _numSpecies] = 0.0;
     double ns[gpudata::MAXSPECIES];
 
-    // TODO(trevilo): Get distance
-    _transport->ComputeSourceTransportProperties(Un, upn, gradUpn, Efield, -1, globalTransport, speciesTransport,
+    double dist = 0.0;
+    if (d_distance != NULL) dist = d_distance[n];
+    _transport->ComputeSourceTransportProperties(Un, upn, gradUpn, Efield, dist, globalTransport, speciesTransport,
                                                  diffusionVelocity, ns);
 
     for (int eq = 0; eq < _num_equation; eq++) srcTerm[eq] = 0.0;

@@ -125,7 +125,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   if (_config.GetWorkingFluid() != WorkingFluid::DRY_AIR) {
     forcing.Append(new SourceTerm(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up, gradUp,
                                   gpu_precomputed_data_, _config, mixture, d_mixture_, _transport, _chemistry,
-                                  _radiation, plasma_conductivity_));
+                                  _radiation, plasma_conductivity_, distance_));
   }
 #ifdef HAVE_MASA
   if (config_.use_mms_) {
@@ -568,6 +568,11 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
   // elSize is set, in the RHSoperator ctor
   auto d_elSize = elSize->Read();
 
+  const double *d_distance = NULL;
+  if (distance_ != NULL) {
+    d_distance = distance_->Read();
+  }
+
   MFEM_FORALL(n, dof, {
     double Un[gpudata::MAXEQUATIONS];  // double Un[20];
     double fluxn[gpudata::MAXEQUATIONS * gpudata::MAXDIM], fvisc[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
@@ -585,7 +590,12 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
     double xyz[3];
     for (int d = 0; d < dim; d++) xyz[d] = d_coord[n + d * dof];
 
-    d_fluxClass->ComputeViscousFluxes(Un, gradUpn, xyz, d_elSize[n], -1, fvisc);
+    double dist = 0.0;
+    if (d_distance != NULL) {
+      dist = d_distance[n];
+    }
+
+    d_fluxClass->ComputeViscousFluxes(Un, gradUpn, xyz, d_elSize[n], dist, fvisc);
 
     for (int eq = 0; eq < num_equation; eq++) {
       for (int d = 0; d < dim; d++) {
