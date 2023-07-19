@@ -70,9 +70,7 @@ class LteTransport : public TransportProperties {
                                               DenseMatrix &diffusionVelocity);
   virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp, const double *Efield,
                                               double radius, double distance, double *transportBuffer,
-                                              double *diffusionVelocity) {
-    mfem_error("This variant of LteTransport::ComputeFluxTransportProperties is not implemented\n");
-  }
+                                              double *diffusionVelocity);
   virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
                                                 const Vector &Efield, double distance, Vector &globalTransport,
                                                 DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
