@@ -162,6 +162,12 @@ protected:
    // Number of equations
    int num_equation;  
 
+   // Is it ambipolar?
+   bool ambipolar = false;
+
+   // Is it two-temperature?
+   bool twoTemperature_ = false;  
+  
    // Average handler
    Averaging *average;
   
@@ -179,6 +185,11 @@ protected:
 
    // min/max element size
    double hmin, hmax;
+
+  int MaxIters;
+  double max_speed;
+  double CFL;
+  int numActiveSpecies, numSpecies;
 
    // exit status code;
    int exit_status_;
@@ -372,9 +383,8 @@ protected:
 
    Vector pnBig;
   
-   ParGridFunction un_gf, un_next_gf, curlu_gf, curlcurlu_gf, Lext_gf, FText_gf,
-                   resu_gf;
-
+   ParGridFunction un_gf, un_next_gf, curlu_gf, curlcurlu_gf,
+                   Lext_gf, FText_gf, resu_gf;
 
    //ParGridFunction rn_gf, resr_gf;  
    ParGridFunction pn_gf, resp_gf;
@@ -386,6 +396,11 @@ protected:
    Vector resT, tmpR0;
    ParGridFunction Tn_gf, Tn_next_gf, Text_gf, resT_gf;
 
+   // density, not actually solved for
+   Vector rn;
+   ParGridFunction rn_gf;
+
+   // swap spaces
    ParGridFunction R0PM0_gf;
    ParGridFunction R0PM1_gf;
    ParGridFunction R1PM0_gf;  
@@ -485,6 +500,9 @@ protected:
 
    // Equations solved
    Equations eqSystem;
+
+   // order of polynomials for auxiliary solution
+   bool loadFromAuxSol;
   
    // Pointers to the different classes
    GasMixture *mixture;    // valid on host
@@ -553,17 +571,28 @@ public:
    void parseBCInputs();
    void parseICOptions();
    void parsePostProcessVisualizationInputs();
-   void initSolutionAndVisualizationVectors();  
-   void solve();  
+   void initSolutionAndVisualizationVectors();
+   void initialTimeStep();  
+   void solve();
+   void updateU();
 
    // i/o routines
    void read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data);
   void read_serialized_soln_data(hid_t file, string varName, int numDof, int varOffset, double *data, IOFamily &fam);
    void restart_files_hdf5(string mode, string inputFileName = std::string());
    void partitioning_file_hdf5(string mode);
-  //void serialize_soln_for_write(IOFamily &fam);
+   // void serialize_soln_for_write(IOFamily &fam);
    void write_soln_data(hid_t group, string varName, hid_t dataspace, double *data);
 
+   void projectInitialSolution();  
+   void writeHDF5(string inputFileName = std::string()) { restart_files_hdf5("write", inputFileName); }
+   void readHDF5(string inputFileName = std::string()) { restart_files_hdf5("read", inputFileName); }
+   void writeParaview(int iter, double time) {
+    paraviewColl->SetCycle(iter);
+    paraviewColl->SetTime(time);
+    paraviewColl->Save();
+  }
+ 
   
    /// Initialize forms, solvers and preconditioners.
    void Setup(double dt);
