@@ -775,10 +775,12 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
 
   // open restart files
   if (mode == "write") {
+    
     if (mpi_.Root() || config.isRestartPartitioned(mode)) {
       file = H5Fcreate(fileName.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
       assert(file >= 0);
     }
+    
   } else if (mode == "read") {
     
     //if (config.isRestartSerialized(mode)) {

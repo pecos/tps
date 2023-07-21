@@ -1,19 +1,18 @@
 
 ///*  Add description later //
 
-#include "loMach.hpp"
 //#include "../../general/forall.hpp"
-#include "mfem/general/forall.hpp"
-#include "mfem/linalg/solvers.hpp"
 //#include "forall.hpp"
 //#include "solvers.hpp"
 
+#include "loMach.hpp"
+#include "mfem/general/forall.hpp"
+#include "mfem/linalg/solvers.hpp"
 #include <hdf5.h>
 #include "../utils/mfem_extras/pfem_extras.hpp"
 #include "loMach_options.hpp"
 #include "logger.hpp"
 #include "utils.hpp"
-
 #include <fstream>
 #include <iomanip>
 
@@ -37,16 +36,17 @@ LoMachSolver::LoMachSolver(MPI_Session &mpi, LoMachOptions loMach_opts, TPS::Tps
   
   tpsP_ = tps;
   pmesh = NULL;
-
+  nprocs_ = mpi.WorldSize();
   rank_ = mpi_.WorldRank();
   if (rank_ == 0) { rank0_ = true; }
   else { rank0_ = false; }
   groupsMPI = new MPI_Groups(&mpi_);
 
-  parseSolverOptions();  
-  parseSolverOptions2();
+  // is this needed?
+  groupsMPI->init();  
   
-  //groupsMPI->init();  
+  parseSolverOptions();  
+  parseSolverOptions2(); 
 
   // set default solver state
   exit_status_ = NORMAL;
@@ -271,6 +271,7 @@ void LoMachSolver::initialize() {
           break;
       }
       break;
+      
     case WorkingFluid::LTE_FLUID:
 #if defined(_GPU_)
       mfem_error("LTE_FLUID not supported for GPU.");
@@ -283,6 +284,8 @@ void LoMachSolver::initialize() {
       mfem_error("WorkingFluid not recognized.");
       break;
   }
+
+  /*
   switch (config.radiationInput.model) {
     case NET_EMISSION:
 #if defined(_CUDA_) || defined(_HIP_)
@@ -296,22 +299,32 @@ void LoMachSolver::initialize() {
       break;
     default:
       mfem_error("RadiationModel not recognized.");
-      break;
+      break;      
   }
+  */
   assert(mixture != NULL);
 #if defined(_CUDA_) || defined(_HIP_)
 #else
   d_mixture = mixture;
 #endif
-
+  //std::cout << " okay 1..." << endl;
 
 
    
+  MaxIters = config.GetNumIters();
+  max_speed = 0.;  
+  numSpecies = mixture->GetNumSpecies();
+  numActiveSpecies = mixture->GetNumActiveSpecies();
+  ambipolar = mixture->IsAmbipolar();
+  twoTemperature_ = mixture->IsTwoTemperature();
+  num_equation = mixture->GetNumEquations();
+  //std::cout << " okay 2..." << endl;  
 
-
-
+  
   // check if a simulation is being restarted
+  //std::cout << "RestartCycle: " << config.GetRestartCycle() << std::endl;  
   if (config.GetRestartCycle() > 0) {
+    
     if (config.GetUniformRefLevels() > 0) {
       if (mpi_.Root()) {
         std::cerr << "ERROR: Uniform mesh refinement not supported upon restart." << std::endl;
@@ -339,6 +352,7 @@ void LoMachSolver::initialize() {
     }
 
   } else {
+    
     // remove previous solution
     if (mpi_.Root()) {
       string command = "rm -r ";
@@ -370,10 +384,12 @@ void LoMachSolver::initialize() {
       MPI_Barrier(MPI_COMM_WORLD);
     }
 
+    // make sure these are actually hooked up!
     time = 0.;
     iter = 0;
   }
-
+  //std::cout << " okay 3..." << endl;
+  
   // If requested, evaluate the distance function (i.e., the distance to the nearest no-slip wall)
   /*
   distance_ = NULL;
@@ -418,7 +434,7 @@ void LoMachSolver::initialize() {
    
 
 
-   
+  // ADD VISCOUS SPONGE
    
 
    // 1c) Partition the mesh (see partitioning_ in M2ulPhyS)
@@ -428,7 +444,7 @@ void LoMachSolver::initialize() {
    //delete mesh_ptr;
    //delete mesh;  // no longer need the serial mesh
    // pmesh_->ReorientTetMesh();
-   //if (verbose) grvy_printf(ginfo, "Mesh partitioned...\n");      
+   if (verbose) grvy_printf(ginfo, "Mesh partitioned...\n");      
 
 
    //-----------------------------------------------------
@@ -471,13 +487,14 @@ void LoMachSolver::initialize() {
       temp_ess_attr.SetSize(pmesh->bdr_attributes.Max());
       temp_ess_attr = 0;            
    }
-   //if (verbose) grvy_printf(ginfo, "Spaces constructed...\n");   
+   if (verbose) grvy_printf(ginfo, "Spaces constructed...\n");   
    
    int vfes_truevsize = vfes->GetTrueVSize();
    int pfes_truevsize = pfes->GetTrueVSize();
    int tfes_truevsize = tfes->GetTrueVSize();
    int nfes_truevsize = nfes->GetTrueVSize();
-   //if (verbose) grvy_printf(ginfo, "Got sizes...\n");   
+   int rfes_truevsize = rfes->GetTrueVSize();   
+   if (verbose) grvy_printf(ginfo, "Got sizes...\n");   
    
    un.SetSize(vfes_truevsize);
    un = 0.0;
@@ -579,6 +596,12 @@ void LoMachSolver::initialize() {
 
    resT_gf.SetSpace(tfes);
 
+   // density, not actually solved for directly
+   rn.SetSize(rfes_truevsize);
+   rn = 0.0;
+   rn_gf.SetSpace(rfes);
+   rn_gf = 0.0;   
+   
    R0PM0_gf.SetSpace(tfes);
    R0PM0_gf = 0.0;
    R0PM1_gf.SetSpace(pfes);
@@ -588,7 +611,7 @@ void LoMachSolver::initialize() {
    R1PM0_gf = 0.0;   
    R1PX2_gf.SetSpace(nfes);
    R1PX2_gf = 0.0;
-   //if (verbose) grvy_printf(ginfo, "vectors and gf initialized...\n");      
+   if (verbose) grvy_printf(ginfo, "vectors and gf initialized...\n");      
    
    //PrintInfo();
 
@@ -598,13 +621,88 @@ void LoMachSolver::initialize() {
    paraviewColl->SetLevelsOfDetail(config.GetSolutionOrder());
    paraviewColl->SetHighOrderOutput(true);
    paraviewColl->SetPrecision(8);
+   if (verbose) grvy_printf(ginfo, "oaraview collection initialized...\n");         
    
    initSolutionAndVisualizationVectors();
+   if (verbose) grvy_printf(ginfo, "init Sol and Vis okay...\n");         
 
   average = new Averaging(Up, pmesh, tfec, tfes, vfes, fvfes, eqSystem, d_mixture, num_equation, dim, config, groupsMPI);
-  average->read_meanANDrms_restart_files();
+  //average->read_meanANDrms_restart_files(); this guy is empty
+  if (verbose) grvy_printf(ginfo, "average initialized...\n");        
+
+  // register rms and mean sol into ioData
+  if (average->ComputeMean()) {
+    if (verbose) grvy_printf(ginfo, "setting up mean stuff...\n");              
+    
+    // meanUp
+    ioData.registerIOFamily("Time-averaged primitive vars", "/meanSolution", average->GetMeanUp(), false,
+                            config.GetRestartMean());
+    ioData.registerIOVar("/meanSolution", "meanDens", 0);
+    ioData.registerIOVar("/meanSolution", "mean-u", 1);
+    ioData.registerIOVar("/meanSolution", "mean-v", 2);
+    if (nvel == 3) {
+      ioData.registerIOVar("/meanSolution", "mean-w", 3);
+      ioData.registerIOVar("/meanSolution", "mean-E", 4);
+    } else {
+      ioData.registerIOVar("/meanSolution", "mean-p", dim + 1);
+    }
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      // Only for NS_PASSIVE.
+      if ((eqSystem == NS_PASSIVE) && (sp == 1)) break;
+
+      // int inputSpeciesIndex = mixture->getInputIndexOf(sp);
+      std::string speciesName = config.speciesNames[sp];
+      ioData.registerIOVar("/meanSolution", "mean-Y" + speciesName, sp + nvel + 2);
+    }
+
+    // rms
+    ioData.registerIOFamily("RMS velocity fluctuation", "/rmsData", average->GetRMS(), false, config.GetRestartMean());
+    ioData.registerIOVar("/rmsData", "uu", 0);
+    ioData.registerIOVar("/rmsData", "vv", 1);
+    ioData.registerIOVar("/rmsData", "ww", 2);
+    ioData.registerIOVar("/rmsData", "uv", 3);
+    ioData.registerIOVar("/rmsData", "uw", 4);
+    ioData.registerIOVar("/rmsData", "vw", 5);
+  }
+
+  ioData.initializeSerial(mpi_.Root(), (config.RestartSerial() != "no"), serial_mesh);
+  if (verbose) grvy_printf(ginfo, " ioData.init thingy...\n");          
+  projectInitialSolution();
+  if (verbose) grvy_printf(ginfo, "initial sol projected...\n");        
+
+  CFL = config.GetCFLNumber();
+
+  // Determine the minimum element size.
+  {
+    double local_hmin = 1.0e18;
+    for (int i = 0; i < pmesh->GetNE(); i++) {
+      local_hmin = min(pmesh->GetElementSize(i, 1), local_hmin);
+    }
+    MPI_Allreduce(&local_hmin, &hmin, 1, MPI_DOUBLE, MPI_MIN, pmesh->GetComm());
+  }
+
+  // maximum size
+  {
+    double local_hmax = 1.0e-15;
+    for (int i = 0; i < pmesh->GetNE(); i++) {
+      local_hmax = max(pmesh->GetElementSize(i, 1), local_hmax);
+    }
+    MPI_Allreduce(&local_hmax, &hmax, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
+  }
+  if (verbose) grvy_printf(ginfo, " element size found...\n");      
   
-   
+  // ADD Up and U FILLER
+  
+  // estimate initial dt => how the hell does this work?
+  //Up->ExchangeFaceNbrData();
+
+  // 
+  if (config.GetRestartCycle() == 0) initialTimeStep();
+  if (mpi_.Root()) cout << "Maximum element size: " << hmax << "m" << endl;
+  if (mpi_.Root()) cout << "Minimum element size: " << hmin << "m" << endl;
+  //if (mpi_.Root()) cout << "Initial time-step: " << dt << "s" << endl;
+  
+  
 }
 
 
@@ -1224,6 +1322,116 @@ void LoMachSolver::UpdateTimestepHistory(double dt)
 }
 
 
+void LoMachSolver::projectInitialSolution() {
+  
+  // Initialize the state.
+
+  // particular case: Euler vortex
+  //   {
+  //     void (*initialConditionFunction)(const Vector&, Vector&);
+  //     t_final = 5.*  2./17.46;
+  //     initialConditionFunction = &(this->InitialConditionEulerVortex);
+  // initialConditionFunction = &(this->testInitialCondition);
+
+  //     VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
+  //     U->ProjectCoefficient(u0);
+  //   }
+  //if (mpi_.Root()) std::cout << "restart: " << config.GetRestartCycle() << std::endl;
+
+  /*  
+#ifdef HAVE_MASA
+  if (config.use_mms_) {
+    initMasaHandler();
+  }
+#endif
+
+  if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
+    if (config.use_mms_) {
+#ifdef HAVE_MASA
+      projectExactSolution(0.0, U);
+      if (config.mmsSaveDetails_) projectExactSolution(0.0, masaU_);
+#else
+      mfem_error("Require MASA support to use MMS.");
+#endif
+    } else {
+      uniformInitialConditions();
+    }
+  } else {
+#ifdef HAVE_MASA
+    if (config.use_mms_ && config.mmsSaveDetails_) projectExactSolution(0.0, masaU_);
+#endif
+
+    restart_files_hdf5("read");
+
+    paraviewColl->SetCycle(iter);
+    paraviewColl->SetTime(time);
+    paraviewColl->UseRestartMode(true);
+  }
+  */  
+
+
+  if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
+    // why would this be called if restart==0?  restart_files_hdf5("read");
+    paraviewColl->SetCycle(iter);
+    paraviewColl->SetTime(time);
+    paraviewColl->UseRestartMode(true);
+  }
+  if (verbose) grvy_printf(ginfo, " PIS 1...\n");            
+
+  
+  //initGradUp();
+
+  //updatePrimitives();
+
+  // update pressure grid function
+  mixture->UpdatePressureGridFunction(press, Up);
+  if (verbose) grvy_printf(ginfo, " PIS 2...\n");              
+
+  // update plasma electrical conductivity
+  if (tpsP_->isFlowEMCoupled()) {
+    mixture->SetConstantPlasmaConductivity(plasma_conductivity_, Up);
+  }
+  if (verbose) grvy_printf(ginfo, " PIS 3...\n");              
+
+  if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
+    // Only save IC from fresh start.  On restart, will save viz at
+    // next requested iter.  This avoids possibility of trying to
+    // overwrite existing paraview data for the current iteration.
+    /////// CAUSING SEG FAULT    if (!(tpsP_->isVisualizationMode())) paraviewColl->Save();
+  }
+  if (verbose) grvy_printf(ginfo, " PIS 4...\n");            
+  
+}
+
+
+void LoMachSolver::initialTimeStep() {
+  
+  auto dataU = U->HostReadWrite();
+  int dof = vfes->GetNDofs();
+
+  for (int n = 0; n < dof; n++) {
+    Vector state(num_equation);
+    for (int eq = 0; eq < num_equation; eq++) state[eq] = dataU[n + eq * dof];
+
+    // REMOVE SOS
+    double iC = mixture->ComputeMaxCharSpeed(state);
+    if (iC > max_speed) max_speed = iC;
+  }
+
+  double partition_C = max_speed;
+  MPI_Allreduce(&partition_C, &max_speed, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+
+  dt = CFL * hmin / max_speed / static_cast<double>(dim);
+
+  // dt_fixed is initialized to -1, so if it is positive, then the
+  // user requested a fixed dt run
+  const double dt_fixed = config.GetFixedDT();
+  if (dt_fixed > 0) {
+    dt = dt_fixed;
+  }
+}
+
+
 void LoMachSolver::solve()
 {    
    //Mpi::Init();
@@ -1254,8 +1462,8 @@ void LoMachSolver::solve()
    //std::cout << "Check 6..." << std::endl;
 
    // temporary hardcodes
-   double t = 0.0;
-   double dt, CFL, CFL_actual;
+   //double t = 0.0;
+   double CFL_actual;
    double t_final = 1.0;
    bool last_step = false;
 
@@ -1294,12 +1502,18 @@ void LoMachSolver::solve()
    pvdc.RegisterField("temperature", t_gf);   
    pvdc.Save();
    */
-
-   //if (verbose) grvy_printf(ginfo, "starting main loop...\n");      
    
-   for (int step = 0; !last_step; ++step)
+   int iter_start = iter;
+   //std::cout << " Starting main loop, from " << iter_start << " to " << MaxIters << endl;
+   
+   for (int step = iter_start; !last_step; step++)
    {
 
+     iter = step;
+     if (time + dt >= t_final - dt / 2) { last_step = true; }
+     //if (step + 1 == MaxIters) { last_step = true; }
+     if (step+1 == 1) { last_step = true; }      ///HACK
+     
      /*
       if (step % 10 == 0)
       {
@@ -1308,21 +1522,17 @@ void LoMachSolver::solve()
          pvdc.Save();
       }
      */
-      
-      if (t + dt >= t_final - dt / 2) { last_step = true; }
-      if (step == config.numIters) { last_step = true; }      
 
       if (Mpi::Root())
       {
 	printf("%1s\n", " ");	
 	printf("%2s %11s %11s\n", "N", "Time", "dt");
-	printf("%o %4s %.5E %.5E\n", step, "    ", t, dt);
+	printf("%o %4s %.5E %.5E\n", step, "    ", time, dt);
         fflush(stdout);
       }
 
       //if (verbose) grvy_printf(ginfo, "calling step...\n");         
-      Step(t, dt, step);
-      
+      Step(time, dt, step);      
       
       // NECESSARY ADDITIONS:
 
@@ -1341,9 +1551,9 @@ void LoMachSolver::solve()
       
    }
 
+   //std::cout << " Finished main loop"  << endl;   
    //flowsolver.PrintTimingData();
 
-   //return 0;
 }
 
 
@@ -1978,6 +2188,7 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
    sw_step.Stop();
 
    // copies for compatability => is conserved (U) even necessary with this method?
+   /*
   {
     int vstart = rfes->GetNDofs();
     int tstart = (1+nvel)*tfes->GetNDofs();
@@ -1993,7 +2204,7 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
       dataUp[i + tstart] = d_tn_gf[i];
     });    
   }
-  
+   */
   
    
    if (verbose && pmesh->GetMyRank() == 0)
@@ -2025,6 +2236,61 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
       mfem::out << std::setprecision(8);
       mfem::out << std::fixed;
    }
+}
+
+
+ // copies for compatability => is conserved (U) even necessary with this method?
+void LoMachSolver::updateU() {
+
+  double *dataU = U->HostReadWrite();
+  double *dataUp = Up->HostReadWrite();
+  int dof = tfes->GetNDofs();
+
+  // primitive state
+  {
+
+    const auto d_rn_gf = rn_gf.Read();    
+    mfem::forall(rn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    {
+      dataUp[i] = d_rn_gf[i];
+    });    
+    
+    int vstart = rfes->GetNDofs();
+    const auto d_un_gf = un_gf.Read();    
+    mfem::forall(un_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    {
+      dataUp[i + vstart] = d_un_gf[i];
+    });
+
+    int tstart = (1+nvel)*tfes->GetNDofs();    
+    const auto d_tn_gf = Tn_gf.Read();    
+    mfem::forall(Tn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    {
+      dataUp[i + tstart] = d_tn_gf[i];
+    });
+    
+  }
+
+  // conserved state
+  {  
+    Vector Upi;
+    Upi.UseDevice(false);
+    Upi.SetSize(num_equation);
+    Vector Ui;
+    Ui.UseDevice(false);
+    Ui.SetSize(num_equation);
+
+    for (int i = 0; i < dof; i++) {
+      for (int eq = 0; eq < num_equation; eq++) {
+         Upi(eq) = dataUp[i + eq * dof];
+      }    
+      mixture->GetConservativesFromPrimitives(Upi, Ui);
+      for (int eq = 0; eq < num_equation; eq++) {
+        dataU[i + eq * dof] = Ui(eq);
+      }    
+    }
+  }
+
 }
 
 

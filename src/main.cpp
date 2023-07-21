@@ -53,14 +53,21 @@ int main(int argc, char *argv[]) {
       tps.solve();
     }
 
+    //std::cout << " back in main..." << endl;
     status = tps.getStatus();
+    //std::cout << " getStatus..." << status << endl;
+    
   }
-
+  //std::cout << " here 1..." << status << endl;  
+  
 #if defined(_CUDA_)
   cudaDeviceReset();
 #elif defined(_HIP_)
   hipDeviceReset();
 #endif
 
+  //std::cout << " here 2..." << status << endl;  
   return status;
+  //std::cout << " returned..." << status << endl;
+  
 }
