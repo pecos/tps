@@ -1862,7 +1862,11 @@ MFEM_HOST_DEVICE void PerfectMixture::computeSheathBdrFlux(const double *state, 
 }
 
 
-  void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit , bool RestartFromPrimitives)  {
+
+
+void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInterpolator2D *energy_table, 
+              TableInterpolator2D *R_table, TableInterpolator2D *c_table, TableInterpolator2D *T_table)  {
+
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     conserv[nvel_ + 2 + sp] = 0.0;
     primit[nvel_ + 2 + sp] = 0.0;
@@ -1871,16 +1875,17 @@ MFEM_HOST_DEVICE void PerfectMixture::computeSheathBdrFlux(const double *state, 
   double n_sp[numSpecies];    // Define number densities temporarily as [mol/m^3]
                               // In the end, we convert conserved states for species back to [kg/m^3]
 
+  double rho = 0.0; // Density of the mixture
+
+
   // double gas_constant = 208.1; // [J/kg/K]   // For Argon
   // double specific_heat_ratio = 1.666666666; // For Monoatomic Gas
   // double gas_constant = 287.058; // [J/kg/K]   // For Air
   // double specific_heat_ratio = 1.4; // For Air
 
-  double gas_constant = 214.41; // ??? from the table. just a test.
-  double specific_heat_ratio = 1.4833993105634689; 
+  // double gas_constant = 214.41; // ??? from the table. just a test.
+  // double specific_heat_ratio = 1.4833993105634689; 
   
-  double rho = 0.0;
-
   // Is it better to define these in the header file?
   double T_h = 0.0, T_e = 0.0, p_0 = 0.0;
   double n_0 = 0.0, n_e = 0.0, n_neutral = 0.0;
@@ -1892,48 +1897,104 @@ MFEM_HOST_DEVICE void PerfectMixture::computeSheathBdrFlux(const double *state, 
   const double qeOverkB = ELECTRONCHARGE / BOLTZMANNCONSTANT;
 
 
+  //--------------------------------------------------------------------------
+  // GetPrimitivesFromConservatives assuming LTE conditions
+  rho = conserv[0];
+  primit[0] = rho;
+  for (int d = 0; d < nvel_; d++) primit[d + 1] = conserv[d + 1] / conserv[0];
+
+
+  //--------------------------------------------------------------------------
+  // Compute Temperature based from LTE tables. 
+  // const double T = ComputeTemperature(conserv);
   double den_vel2 = 0;
+  for (int d = 0; d < nvel_; d++) den_vel2 += conserv[d + 1] * conserv[d + 1];
+  den_vel2 /= rho;
 
+  const double energy = (conserv[1 + nvel_] - 0.5 * den_vel2) / rho;
 
-  if (!RestartFromPrimitives) {
+  double T;
+  T = T_table->eval(energy, rho);
 
-    rho = conserv[0];
-    for (int d = 0; d < nvel_; d++) den_vel2 += conserv[d + 1] * conserv[d + 1];
-    den_vel2 /= rho;
+  double res = energy - energy_table->eval(T, rho);
+  const double res0 = abs(res);
 
-    T_h = (specific_heat_ratio - 1.0) / gas_constant * (conserv[1 + nvel_] - 0.5 * den_vel2) / rho;
-    T_e = T_h;
-    p_0 = rho * gas_constant * T_h;
+  bool converged = false;
+  const double atol = 1e-18;
+  const double rtol = 1e-12;
+  const double dT_atol = 1e-12;
+  const double dT_rtol = 1e-8;
 
-  } else {
+  converged = ((abs(res) < atol) || (abs(res) / abs(res0) < rtol));
 
-    rho = primit[0];
-    T_h = primit[1 + nvel_];
-    T_e = T_h;
-    p_0 = rho * gas_constant * T_h;
+  const int niter_max = 20;
+  int niter = 0;
+  // printf("------------------------------------\n"); fflush(stdout);
+  // printf("Iter %d: res = %.6e, T = %.6e\n", niter, res, T); fflush(stdout);
 
+  // Newton loop
+  while (!converged && (niter < niter_max)) {
+    // get derivative of e wrt T
+    double dedT = energy_table->eval_x(T, rho);
+
+    // Newton step
+    double dT = res / dedT;
+    T += dT;
+    assert(T > 0);
+
+    // Update residual
+    res = energy - energy_table->eval(T, rho);
+
+    // Declare convergence if residual OR dT is sufficient small
+    converged = ((abs(res) < atol) || (abs(res) / res0 < rtol) || (abs(dT) < dT_atol) || (abs(dT) / T < dT_rtol));
+    niter++;
+    // printf("Iter %d: res = %.6e, T = %.6e\n", niter, res, T); fflush(stdout);
   }
-  
+
+  if (!converged) {
+    printf("WARNING: temperature did not converge.");
+    fflush(stdout);
+  } else {
+    // printf("Temperature converged to res = %.6e in %d steps\n", res, niter); fflush(stdout);
+  }
+
+  //--------------------------------------------------------------------------
+
+  T_h = T;
+  T_e = T_h;
+
+  const double R = R_table->eval(T, rho);
+  p_0 = rho * R * T_h;
+
+
+  primit[nvel_ + 1] = T_h;
+
+
+  //--------------------------------------------------------------------------
 
   //  Calculate partition functions from analytical expressions
   Q_n = 1+12*exp(-11.6/(T_e/qeOverkB));                          // Electronic partition function of neutral Argon
   Q_i = 4+2*exp(-0.178/(T_e/qeOverkB))+2*exp(-13.5/(T_e/qeOverkB));  // Electronic partition function of ion Argon
 
-
   /* 
   Saha relation
   Ionized ground states population assuimng two-temperature plasma
-  We assume constant pressure here. p_0 = p_n + p_i + p_e 
+  We assume constant pressure here.   p_0 = p_n + p_i + p_e 
+  We assume constant density here.   rho_0 = rho_n + rho_i + rho_e 
+
   */ 
   n_0 = p_0/T_h/UNIVERSALGASCONSTANT;  // [mol/m^3] Number density based on bulk temperature 
 
   tempRatio = (T_e/T_h + 1);
 
+  double C1 =  UNIVERSALGASCONSTANT/R/GetGasParams(iBackground, GasParams::SPECIES_MW);
+  double C2 =  (GetGasParams(iIon1, GasParams::SPECIES_MW) + GetGasParams(iElectron, GasParams::SPECIES_MW))/GetGasParams(iBackground, GasParams::SPECIES_MW);
+
   // solve for ionized state, considering only one ionized state
   lambda_e = PLANCKCONSTANT/(sqrt(2*PI*ELECTRONMASS*BOLTZMANNCONSTANT*T_e));
   tempSaha = Q_i/Q_n*2*pow(lambda_e,-3)*exp(-IonizationEnergy_Argon/(T_e/qeOverkB))/AVOGADRONUMBER; 
-  n_e = -tempRatio*tempSaha/2.0 + sqrt(tempRatio*tempRatio*tempSaha*tempSaha/4 + n_0*tempSaha);    
-  n_neutral = n_0 - tempRatio*n_e;
+  n_e = -tempSaha*C2/2.0 + sqrt(tempSaha*tempSaha*C2*C2/4 + C1*n_0*tempSaha);    
+  n_neutral = n_0*C1 - n_e*C2;
 
   // Boltzmann Distribution - Excited level populations 
   nPop = ambipolar ? (numActiveSpecies - 1) : (numActiveSpecies-2);
@@ -1945,18 +2006,30 @@ MFEM_HOST_DEVICE void PerfectMixture::computeSheathBdrFlux(const double *state, 
   n_sp[iElectron] = n_e;  // Electron species is assumed be to the second-to-last species.
   n_sp[iIon1] = n_e;  
   // n_sp[iIon2] = n_e;  // What about Ions?
+  n_sp[iBackground] = n_neutral/Q_n;  
 
-  if (!RestartFromPrimitives) {
-    for (int sp = 0; sp < numActiveSpecies; sp++) {
-      conserv[nvel_ + 2 + sp]  = n_sp[sp] * GetGasParams(sp, GasParams::SPECIES_MW);  
-    }
-    if (twoTemperature_) conserv[iTe] = n_e * molarCV_[iElectron] * T_e ;
+  //--------------------------------------------------------------------------
 
-  } else {
-    for (int sp = 0; sp < numActiveSpecies; sp++) {
-      primit[nvel_ + 2 + sp]  = n_sp[sp];  
-    }
-    if (twoTemperature_) primit[iTe] = T_e ;
+  for (int sp = 0; sp < numActiveSpecies; sp++) {
+    conserv[nvel_ + 2 + sp]  = n_sp[sp] * GetGasParams(sp, GasParams::SPECIES_MW);  
+    primit[nvel_ + 2 + sp] = n_sp[sp];
   }
+  if (twoTemperature_) {
+    conserv[iTe] = n_e * molarCV_[iElectron] * T_e ;
+    primit[iTe] = T_e; // electron temperature as primitive variable.
+  }
+
+//  double nh = 0.0;
+
+//  for (int sp = 0; sp < nPop; sp++) nh = nh + n_sp[sp]; 
+//  nh = nh + n_e + n_e + n_sp[iBackground];
+//  double p_Mycalc = nh*  UNIVERSALGASCONSTANT *T_h;
+
+//  double electronPressure = 0.0;
+//  double p_calc =  PerfectMixture::ComputePressure(conserv, &electronPressure);
+//  std::cout << p_0 << " " << p_calc << " " << p_Mycalc << " " <<  n_e << " " << T_h << " " << n_sp[0] << " " << n_sp[iBackground] << std::endl;
+//  exit(0);
+
+
 
 }

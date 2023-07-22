@@ -81,6 +81,21 @@ void LteTransport::ComputeFluxTransportProperties(const Vector &state, const Den
   diffusionVelocity = 0.0;
 }
 
+
+void LteTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp, const double *Efield,
+                                                  double radius, double distance, double *transportBuffer,
+                                                  double *diffusionVelocity) {
+
+  const double rho = state[0];
+  const double T = mixture->ComputeTemperature(state);
+
+  transportBuffer[FluxTrns::VISCOSITY] = mu_table_->eval(T, rho);
+  transportBuffer[FluxTrns::BULK_VISCOSITY] = 0.0;  // bulk_visc_mult * viscosity;
+  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = kappa_table_->eval(T, rho);
+}
+
+
+
 void LteTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
                                                     const Vector &Efield, double distance, Vector &globalTransport,
                                                     DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
