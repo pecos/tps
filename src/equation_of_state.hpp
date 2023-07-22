@@ -46,6 +46,9 @@
 #include "run_configuration.hpp"
 #include "tps_mfem_wrap.hpp"
 
+#include "table.hpp"
+
+
 using namespace mfem;
 using namespace std;
 
@@ -335,7 +338,8 @@ class GasMixture {
   MFEM_HOST_DEVICE virtual void computeElectronPressureGrad(const double n_e, const double T_e, const double *gradUp,
                                                             double *gradPe) = 0;
 
-  virtual void GetSpeciesFromLTE(double *conserv, double *primit, bool RestartFromPrimitives){
+  virtual void GetSpeciesFromLTE(double *conserv, double *primit, TableInterpolator2D *energy_table,
+              TableInterpolator2D *R_table, TableInterpolator2D *c_table, TableInterpolator2D *T_table){
     printf("GetSpeciesFromLTE is not implemented.");
     return;
   }
@@ -453,7 +457,8 @@ class DryAir : public GasMixture {
   }
 
   // Compute species mass densities based on LTE assumptions.
-  virtual void GetSpeciesFromLTE(double *conserv, double *primit, bool RestartFromPrimitives){
+  virtual void GetSpeciesFromLTE(double *conserv, double *primit, TableInterpolator2D *energy_table,
+              TableInterpolator2D *R_table, TableInterpolator2D *c_table, TableInterpolator2D *T_table){
     printf("GetSpeciesFromLTE is not implemented.");
     return;
   }
@@ -760,7 +765,8 @@ class PerfectMixture : public GasMixture {
                                                             double *gradPe);
 
   // Compute species mass densities based on LTE assumptions.
-  virtual void GetSpeciesFromLTE(double *conserv, double *primit, bool RestartFromPrimitives);
+  virtual void GetSpeciesFromLTE(double *conserv, double *primit, TableInterpolator2D *energy_table,
+              TableInterpolator2D *R_table, TableInterpolator2D *c_table, TableInterpolator2D *T_table);
 
 
   // GPU functions

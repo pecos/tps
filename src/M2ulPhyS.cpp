@@ -2016,46 +2016,6 @@ void M2ulPhyS::uniformInitialConditions() {
   //   delete eqState;
 }
 
-// void M2ulPhyS::uniformInitialConditions() {
-//   if (config.GetWorkingFluid() == DRY_AIR) {
-//     dryAirUniformInitialConditions();
-//     return;
-//   }
-//
-//   std::string basepath("initialConditions");
-//   Vector initCondition(num_equation);
-//   for (int eq = 0; eq < num_equation; eq++) {
-//     tpsP->getRequiredInput((basepath + "/Q" + std::to_string(eq+1)).c_str(), initCondition[eq]);
-//   }
-//
-//   double *data = U->HostWrite();
-//   double *dataUp = Up->HostWrite();
-//   double *dataGradUp = gradUp->HostWrite();
-//
-//   int dof = vfes->GetNDofs();
-//
-//   Vector state;
-//   state.UseDevice(false);
-//   state.SetSize(num_equation);
-//   Vector Upi;
-//   Upi.UseDevice(false);
-//   Upi.SetSize(num_equation);
-//
-//   for (int i = 0; i < dof; i++) {
-//     for (int eq = 0; eq < num_equation; eq++) {
-//       data[i + eq * dof] = initCondition(eq);
-//       state(eq) = data[i + eq * dof];
-//       for (int d = 0; d < dim; d++) {
-//         dataGradUp[i + eq * dof + d * num_equation * dof] = 0.;
-//       }
-//     }
-//
-//     mixture->GetPrimitivesFromConservatives(state, Upi);
-//     for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * dof] = Upi[eq];
-//   }
-//
-//   return;
-// }
 
 void M2ulPhyS::initGradUp() {
   double *dataGradUp = gradUp->HostWrite();
@@ -2071,7 +2031,7 @@ void M2ulPhyS::initGradUp() {
 }
 
 
-// NOTE(Mal): This is a method to be used when we restart from LTE simulation. 
+// NOTE(Mal): This is a method to be used when we restart from LTE simulation.
 // It initilzes species mass densities based on LTE assumptions.
 void M2ulPhyS::initilizeSpeciesFromLTE() {
   double *dataU = U->GetData();
@@ -2080,9 +2040,51 @@ void M2ulPhyS::initilizeSpeciesFromLTE() {
 
   int dof = vfes->GetNDofs();
 
-  assert (mixture->GetWorkingFluid() == WorkingFluid::USER_DEFINED); 
+  assert (mixture->GetWorkingFluid() == WorkingFluid::USER_DEFINED);
   const int numSpecies = mixture->GetNumSpecies();
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
+
+
+  std::string thermo_file;
+  tpsP->getRequiredInput("flow/lte/thermo_table", thermo_file);
+  config.lteMixtureInput.thermo_file_name = thermo_file;
+  std::string trans_file;
+  tpsP->getRequiredInput("flow/lte/transport_table", trans_file);
+  config.lteMixtureInput.trans_file_name = trans_file;
+  std::string e_rev_file;
+  tpsP->getRequiredInput("flow/lte/e_rev_table", e_rev_file);
+  config.lteMixtureInput.e_rev_file_name = e_rev_file;
+
+
+  TableInterpolator2D *energy_table;
+  TableInterpolator2D *R_table;
+  TableInterpolator2D *c_table;
+  TableInterpolator2D *T_table;
+
+#ifdef HAVE_GSL
+  energy_table = new GslTableInterpolator2D(config.lteMixtureInput.thermo_file_name, 0, /* temperature column */
+                                             1,                                            /* density column */
+                                             3 /* energy column */);
+  R_table = new GslTableInterpolator2D(config.lteMixtureInput.thermo_file_name, 0, /* temperature column */
+                                        1,                                            /* density column */
+                                        6 /* mixture gas constant column */);
+
+  c_table = new GslTableInterpolator2D(config.lteMixtureInput.thermo_file_name, 0, /* temperature column */
+                                        1,                                            /* density column */
+                                        8 /* speed of sound column */);
+
+  T_table = new GslTableInterpolator2D(config.lteMixtureInput.e_rev_file_name, /* (energy,density) -> temp data */
+                                        0,                                        /* energy column */
+                                        1,                                        /* density column */
+                                        2,                                        /* temperature column */
+                                        3);                                       /* number of columns */
+#else
+  energy_table_ = NULL;
+  R_table_ = NULL;
+  T_table_ = NULL;
+  mfem_error("Restart from LTE mixture requires GSL support.");
+#endif
+
 
   double state[num_equation] = {0.0};
   double prim[num_equation] = {0.0};
@@ -2105,10 +2107,10 @@ void M2ulPhyS::initilizeSpeciesFromLTE() {
       // }
     }
 
-    // Calculate species mass densities bases based at LTE at node level.
-    mixture->GetSpeciesFromLTE(state,prim,true);
+    // Calculate species mass densities bases based on LTE at node level.
 
-    // mixture->GetPrimitivesFromConservatives(state, prim);
+    mixture->GetSpeciesFromLTE(state,prim,energy_table,R_table,c_table,T_table);
+
 
     // Return new state at each node
     for (int eq = 0; eq < num_equation; eq++) {
@@ -2121,7 +2123,11 @@ void M2ulPhyS::initilizeSpeciesFromLTE() {
 
   }
 
-  //   delete eqState;
+  delete energy_table;
+  delete R_table;
+  delete c_table;
+  delete T_table;
+
 }
 
 void M2ulPhyS::Check_NAN() {
