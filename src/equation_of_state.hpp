@@ -92,7 +92,8 @@ class GasMixture {
   int iIon1;
   int iIon2;
   int iTe;
- 
+  int iTh;
+
 
   // DenseMatrix gasParams;
   // // TODO(kevin): not initialized at this point.
@@ -142,6 +143,7 @@ class GasMixture {
     iIon1       = numSpecies - 3;
     iIon2       = numSpecies - 4;
     if (twoTemperature_) {iTe = num_equation -1;}
+    iTh = nvel_ + 1;
   }
 
  public:

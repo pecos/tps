@@ -1967,7 +1967,8 @@ void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInt
   p_0 = rho * R * T_h;
 
 
-  primit[nvel_ + 1] = T_h;
+  // primit[nvel_ + 1] = T_h;
+  primit[iTh] = T_h;
 
 
   //--------------------------------------------------------------------------
@@ -2003,9 +2004,9 @@ void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInt
         *exp(-GetGasParams(sp, GasParams::FORMATION_ENERGY)/AVOGADRONUMBER/T_e/BOLTZMANNCONSTANT)/Q_n*n_neutral;
   }
 
-  n_sp[iElectron] = n_e;  // Electron species is assumed be to the second-to-last species.
   n_sp[iIon1] = n_e;  
   // n_sp[iIon2] = n_e;  // What about Ions?
+  n_sp[iElectron] = n_e;  // Electron species is assumed be to the second-to-last species.
   n_sp[iBackground] = n_neutral/Q_n;  
 
   //--------------------------------------------------------------------------
@@ -2019,6 +2020,39 @@ void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInt
     primit[iTe] = T_e; // electron temperature as primitive variable.
   }
 
+
+  //--------------------------------------------------------------------------
+  // Re-evaluate conserv[iTh] so that it matches Th after first iteration
+
+
+  // NOTE: For now, we do not include all species number densities into Up.
+  // This requires us to re-evaluate electron/background-species number density.
+
+  double nB = n_sp[iBackground]; 
+
+  // compute mixture heat capacity.
+  double totalHeatCapacity = computeHeaviesHeatCapacity(&primit[nvel_ + 2], nB);
+  if (!twoTemperature_) totalHeatCapacity += n_e * molarCV_[iElectron];
+
+  double totalEnergy = 0.0;
+  for (int d = 0; d < nvel_; d++) totalEnergy += primit[d + 1] * primit[d + 1];
+  totalEnergy *= 0.5 * primit[0];
+  totalEnergy += totalHeatCapacity * primit[nvel_ + 1];
+  if (twoTemperature_) {
+    totalEnergy += conserv[iTe];
+  }
+
+  for (int sp = 0; sp < numSpecies - 2; sp++) {
+    totalEnergy += primit[nvel_ + 2 + sp] * GetGasParams(sp, GasParams::FORMATION_ENERGY);
+  }
+
+  conserv[iTh] = totalEnergy;
+
+
+  //--------------------------------------------------------------------------
+
+
+
 //  double nh = 0.0;
 
 //  for (int sp = 0; sp < nPop; sp++) nh = nh + n_sp[sp]; 
@@ -2027,7 +2061,16 @@ void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInt
 
 //  double electronPressure = 0.0;
 //  double p_calc =  PerfectMixture::ComputePressure(conserv, &electronPressure);
-//  std::cout << p_0 << " " << p_calc << " " << p_Mycalc << " " <<  n_e << " " << T_h << " " << n_sp[0] << " " << n_sp[iBackground] << std::endl;
+
+//  double rho_calc = 0.0;
+//  for (int sp = 0; sp < nPop; sp++) rho_calc = rho_calc + n_sp[sp]* GetGasParams(sp, GasParams::SPECIES_MW); 
+//  rho_calc = rho_calc + n_sp[iIon1]* GetGasParams(iIon1, GasParams::SPECIES_MW); 
+//  rho_calc = rho_calc + n_sp[iElectron]* GetGasParams(iElectron, GasParams::SPECIES_MW); 
+//  rho_calc = rho_calc + n_sp[iBackground]* GetGasParams(iBackground, GasParams::SPECIES_MW); 
+
+//  std::cout << p_0 << " " << p_calc << " " << p_Mycalc << " " <<  n_e << " " << T_h 
+//       << " " << n_sp[0]*GetGasParams(0, GasParams::SPECIES_MW) << " " 
+//       << n_sp[iBackground]*GetGasParams(iBackground, GasParams::SPECIES_MW) << " " << rho_calc << std::endl;
 //  exit(0);
 
 
