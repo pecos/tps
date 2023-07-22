@@ -426,7 +426,6 @@ class M2ulPhyS : public TPS::Solver {
   const ParGridFunction *getDistanceFcn() { return distance_; }
 
   void updatePrimitives();
-  void updateConservatives();
 
   ParGridFunction *GetPlasmaConductivityGF() { return plasma_conductivity_; }
   ParGridFunction *GetJouleHeatingGF() { return joule_heating_; }

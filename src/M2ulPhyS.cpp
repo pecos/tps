@@ -1702,7 +1702,6 @@ void M2ulPhyS::projectInitialSolution() {
   initGradUp();
 
   updatePrimitives();
-  //updateConservatives();
 
   // update pressure grid function
   mixture->UpdatePressureGridFunction(press, Up);
@@ -3839,27 +3838,6 @@ void M2ulPhyS::updatePrimitives() {
     for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * dof] = Upi[eq];
   }
 }
-
-void M2ulPhyS::updateConservatives() {
-  double *data = U->HostWrite();
-  double *dataUp = Up->HostWrite();
-  int dof = vfes->GetNDofs();
-
-  Vector state;
-  state.UseDevice(false);
-  state.SetSize(num_equation);
-
-  Vector Upi;
-  Upi.UseDevice(false);
-  Upi.SetSize(num_equation);
-
-  for (int i = 0; i < dof; i++) {
-    for (int eq = 0; eq < num_equation; eq++) Upi(eq) = dataUp[i + eq * dof];
-    mixture->GetConservativesFromPrimitives(Upi, state);
-    for (int eq = 0; eq < num_equation; eq++) data[i + eq * dof] = state[eq];
-  }
-}
-
 
 
 
