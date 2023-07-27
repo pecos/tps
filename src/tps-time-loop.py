@@ -18,6 +18,19 @@ tps.parseInput()
 tps.chooseDevices()
 tps.chooseSolver()
 tps.initialize()
-tps.solve()
+
+
+it = 0
+max_iters = tps.getRequiredInput("flow/maxIters")
+print("Max Iters: ", max_iters)
+tps.solveBegin()
+
+while it < max_iters:
+    tps.solveStep()
+    it = it+1
+    print("it, ", it)
+
+tps.solveEnd()
+
 
 sys.exit (tps.getStatus())
