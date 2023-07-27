@@ -123,10 +123,18 @@ class Tps {
   void getRequiredInput(const char *name, T &var);
 
   template <typename T>
-  T getRequiredInput(const std::string & name){ T var; this->getRequiredInput(name.c_str(), var); return var;}
+  T getRequiredInput(const std::string &name) {
+    T var;
+    this->getRequiredInput(name.c_str(), var);
+    return var;
+  }
 
   template <typename T>
-  T getInput(const std::string & name, T varDefault){ T var; this->getInput(name.c_str(), var, varDefault); return var;}
+  T getInput(const std::string &name, T varDefault) {
+    T var;
+    this->getInput(name.c_str(), var, varDefault);
+    return var;
+  }
 
   /// Parsing support for required (vector) inputs
   void getRequiredVec(const char *name, std::vector<double> &var, size_t numElems);

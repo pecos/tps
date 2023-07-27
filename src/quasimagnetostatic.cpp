@@ -906,13 +906,9 @@ void QuasiMagnetostaticSolverAxiSym::solve() {
   this->solveStep();
 }
 
-void QuasiMagnetostaticSolverAxiSym::solveBegin() {
-  return ;
-}
+void QuasiMagnetostaticSolverAxiSym::solveBegin() { }
 
-void QuasiMagnetostaticSolverAxiSym::solveEnd() {
-  return ;
-}
+void QuasiMagnetostaticSolverAxiSym::solveEnd() { }
 
 void QuasiMagnetostaticSolverAxiSym::solveStep() {
   bool verbose = rank0_;
