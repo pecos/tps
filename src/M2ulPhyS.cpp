@@ -1671,10 +1671,8 @@ void M2ulPhyS::projectInitialSolution() {
   }
 }
 
-void M2ulPhyS::solve() {
-  double tlast = grvy_timer_elapsed_global();
-
-#ifdef HAVE_MASA
+void M2ulPhyS::solveBegin() {
+  #ifdef HAVE_MASA
   // instantiate function for exact solution
   // NOTE: this has been taken care of at M2ulPhyS::initMasaHandler.
   // initMMSCoefficients();
@@ -1682,25 +1680,10 @@ void M2ulPhyS::solve() {
   if (config.use_mms_) {
     checkSolutionError(time);
   }
-#endif
+  #endif
+}
 
-#ifdef HAVE_SLURM
-  bool readyForRestart = false;
-#endif
-
-  // Integrate in time.
-  while (iter < MaxIters) {
-    grvy_timer_begin(__func__);
-
-    // periodically report on time/iteratino
-    if ((iter % config.timingFreq) == 0) {
-      if (rank0_) {
-        double timePerIter = (grvy_timer_elapsed_global() - tlast) / config.timingFreq;
-        grvy_printf(ginfo, "Iteration = %i: wall clock time/iter = %.3f (secs)\n", iter, timePerIter);
-        tlast = grvy_timer_elapsed_global();
-      }
-    }
-
+void M2ulPhyS::solveStep() {
     timeIntegrator->Step(*U, time, dt);
 
     Check_NAN();
@@ -1751,30 +1734,10 @@ void M2ulPhyS::solve() {
       }
     }
 
-#ifdef HAVE_SLURM
-    // check if near end of a run and ready to submit restart
-    if ((iter % config.rm_checkFreq() == 0) && (iter != MaxIters)) {
-      readyForRestart = Check_JobResubmit();
-      if (readyForRestart) {
-        MaxIters = iter;
-        SetStatus(JOB_RESTART);
-        break;
-      }
-    }
-#endif
-
     average->addSampleMean(iter);
+}
 
-    // periodically check for DIE file which requests to terminate early
-    if (Check_ExitEarly(iter)) {
-      MaxIters = iter;
-      SetStatus(EARLY_EXIT);
-      break;
-    }
-
-    grvy_timer_end(__func__);
-  }  // <-- end main timestep iteration loop
-
+void M2ulPhyS::solveEnd() {
   if (iter == MaxIters) {
     // auto hUp = Up->HostRead();
     Up->HostRead();
@@ -1807,6 +1770,53 @@ void M2ulPhyS::solve() {
 
     if (rank0_) cout << "Final timestep iteration = " << MaxIters << endl;
   }
+}
+
+void M2ulPhyS::solve() {
+  this->solveBegin();
+  double tlast = grvy_timer_elapsed_global();
+  #ifdef HAVE_SLURM
+  bool readyForRestart = False;
+  #endif
+
+  // Integrate in time.
+  while (iter < MaxIters) {
+    grvy_timer_begin(__func__);
+
+    // periodically report on time/iteratino
+    if ((iter % config.timingFreq) == 0) {
+      if (rank0_) {
+        double timePerIter = (grvy_timer_elapsed_global() - tlast) / config.timingFreq;
+        grvy_printf(ginfo, "Iteration = %i: wall clock time/iter = %.3f (secs)\n", iter, timePerIter);
+        tlast = grvy_timer_elapsed_global();
+      }
+    }
+
+    //Do the step
+    this->solveStep();
+
+    #ifdef HAVE_SLURM
+    // check if near end of a run and ready to submit restart
+    if ((iter % config.rm_checkFreq() == 0) && (iter != MaxIters)) {
+      readyForRestart = Check_JobResubmit();
+      if (readyForRestart) {
+        MaxIters = iter;
+        SetStatus(JOB_RESTART);
+        break;
+      }
+    }
+    #endif
+
+    // periodically check for DIE file which requests to terminate early
+    if (Check_ExitEarly(iter)) {
+      MaxIters = iter;
+      SetStatus(EARLY_EXIT);
+      break;
+    }
+    grvy_timer_end(__func__);
+  }  // <-- end main timestep iteration loop
+
+  this->solveEnd();
 
   return;
 }

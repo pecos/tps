@@ -35,9 +35,38 @@
 #include "em_options.hpp"
 #include "quasimagnetostatic.hpp"
 
+CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps)
+    : em_opt_(), current_iter_(0.) {
+  MPI_Comm_size(tps->getTPSCommWorld(), &nprocs_);
+  MPI_Comm_rank(tps->getTPSCommWorld(), &rank_);
+  if (rank_ == 0)
+    rank0_ = true;
+  else
+    rank0_ = false;
+
+  tps->getRequiredInput("cycle-avg-joule-coupled/solve-em-every-n", solve_em_every_n_);
+  tps->getRequiredInput("cycle-avg-joule-coupled/max-iters", max_iters_ );
+  bool axisym = false;
+  tps->getInput("cycle-avg-joule-coupled/asymmetric", axisym, false);
+  tps->getInput("cycle-avg-joule-coupled/input-power", input_power_, -1.);
+  tps->getInput("cycle-avg-joule-coupled/initial-input-power", initial_input_power_, -1.);
+
+  if (axisym) {
+    qmsa_solver_ = new QuasiMagnetostaticSolverAxiSym(em_opt_, tps);
+  } else {
+    qmsa_solver_ = new QuasiMagnetostaticSolver3D(em_opt_, tps);
+  }
+  flow_solver_ = new M2ulPhyS(inputFileName, tps);
+
+#ifdef HAVE_GSLIB
+  interp_flow_to_em_ = new FindPointsGSLIB(tps->getTPSCommWorld());
+  interp_em_to_flow_ = new FindPointsGSLIB(tps->getTPSCommWorld());
+#endif
+}
+
 CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps, int max_out, bool axisym,
                                              double input_power, double initial_input_power)
-    : em_opt_(), max_outer_iters_(max_out), input_power_(input_power), initial_input_power_(initial_input_power) {
+    : em_opt_(), current_iter_(0.), input_power_(input_power), initial_input_power_(initial_input_power) {
   MPI_Comm_size(tps->getTPSCommWorld(), &nprocs_);
   MPI_Comm_rank(tps->getTPSCommWorld(), &rank_);
   if (rank_ == 0)
@@ -51,6 +80,9 @@ CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tp
     qmsa_solver_ = new QuasiMagnetostaticSolver3D(em_opt_, tps);
   }
   flow_solver_ = new M2ulPhyS(inputFileName, tps);
+
+  solve_em_every_n_ = flow_solver_->getMaximumIterations();
+  max_iters_ = max_out*solve_em_every_n_;
 #ifdef HAVE_GSLIB
   interp_flow_to_em_ = new FindPointsGSLIB(tps->getTPSCommWorld());
   interp_em_to_flow_ = new FindPointsGSLIB(tps->getTPSCommWorld());
@@ -245,26 +277,33 @@ void CycleAvgJouleCoupling::initialize() {
 }
 
 void CycleAvgJouleCoupling::solve() {
-  const int increment = flow_solver_->getMaximumIterations();
-  int curr_iter = flow_solver_->getCurrentIterations();
-  flow_solver_->setMaximumIterations(curr_iter + increment);
-
-  double delta_power = 0;
-  if (input_power_ > 0) {
-    delta_power = (input_power_ - initial_input_power_) / max_outer_iters_;
+  this->solveBegin();
+  while ( current_iter_ < max_iters_) {
+    this->solveStep();
   }
+  this->solveEnd();
+}
 
-  for (int outer_iters = 0; outer_iters < max_outer_iters_; outer_iters++) {
-    // EM
+void CycleAvgJouleCoupling::solveBegin() {
+  flow_solver_->solveBegin();
+  qmsa_solver_->solveBegin();
+}
+
+void CycleAvgJouleCoupling::solveStep() {
+  // Run the em solver when it is due
+  if (current_iter_ % solve_em_every_n_ == 0) {
+    double delta_power = 0;
+    if (input_power_ > 0) {
+      delta_power = (input_power_ - initial_input_power_)*static_cast<double>(solve_em_every_n_) / static_cast<double>(max_iters_);
+    }
     interpConductivityFromFlowToEM();
     qmsa_solver_->solve();
     const double tot_jh = qmsa_solver_->totalJouleHeating();
     if (rank0_) {
       grvy_printf(GRVY_INFO, "The total input Joule heating = %.6e\n", tot_jh);
     }
-
     if (input_power_ > 0) {
-      const double target_power = initial_input_power_ + (outer_iters + 1) * delta_power;
+      const double target_power = initial_input_power_ + (current_iter_/solve_em_every_n_+ 1) * delta_power;
       const double ratio = target_power / tot_jh;
       qmsa_solver_->scaleJouleHeating(ratio);
       const double upd_jh = qmsa_solver_->totalJouleHeating();
@@ -272,13 +311,15 @@ void CycleAvgJouleCoupling::solve() {
         grvy_printf(GRVY_INFO, "The total input Joule heating after scaling = %.6e\n", upd_jh);
       }
     }
-
-    // flow
     interpJouleHeatingFromEMToFlow();
-    flow_solver_->solve();
-
-    // update max solver iters so that on the next time through the flow solver does something
-    curr_iter = flow_solver_->getCurrentIterations();
-    flow_solver_->setMaximumIterations(curr_iter + increment);
   }
+  // Run a step of the flow solver
+  flow_solver_->solveStep();
+  // Increment the current iterate
+  ++current_iter_;
+}
+
+void CycleAvgJouleCoupling::solveEnd() {
+  flow_solver_->solveEnd();
+  qmsa_solver_->solveEnd();
 }

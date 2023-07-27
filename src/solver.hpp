@@ -58,6 +58,18 @@ class Solver {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
   }
+  virtual void solveStep() {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+  }
+  virtual void solveBegin() {
+     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);   
+  }
+  virtual void solveEnd()  {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+  }
   virtual void visualization() {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);

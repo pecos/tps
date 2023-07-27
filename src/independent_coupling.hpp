@@ -58,5 +58,8 @@ class IndependentCoupling : public TPS::Solver {
   void parseSolverOptions() override;
   void initialize() override;
   void solve() override;
+  void solveBegin() override;
+  void solveStep() override;
+  void solveEnd() override;
 };
 #endif  // INDEPENDENT_COUPLING_HPP_

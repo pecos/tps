@@ -336,6 +336,18 @@ void QuasiMagnetostaticSolver3D::parseSolverOptions() {
 }
 
 void QuasiMagnetostaticSolver3D::solve() {
+  this->solveStep();
+}
+
+void QuasiMagnetostaticSolver3D::solveBegin() {
+  return;
+}
+
+void QuasiMagnetostaticSolver3D::solveEnd() {
+  return;
+}
+
+void QuasiMagnetostaticSolver3D::solveStep() {
   bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Solving the quasi-magnetostatic system for A (magnetic vector potential).\n");
 
@@ -891,6 +903,18 @@ void QuasiMagnetostaticSolverAxiSym::parseSolverOptions() {
 }
 
 void QuasiMagnetostaticSolverAxiSym::solve() {
+  this->solveStep();
+}
+
+void QuasiMagnetostaticSolverAxiSym::solveBegin() {
+  return ;
+}
+
+void QuasiMagnetostaticSolverAxiSym::solveEnd() {
+  return ;
+}
+
+void QuasiMagnetostaticSolverAxiSym::solveStep() {
   bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Solving the axisymmetric quasi-magnetostatic system.\n");
 

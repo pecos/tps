@@ -242,15 +242,7 @@ void Tps::chooseSolver() {
     solver_ = new IndependentCoupling(iFile_, this);
   } else if (input_solver_type_ == "cycle-avg-joule-coupled") {
     isFlowEMCoupledMode_ = true;
-    int max_out;
-    getRequiredInput("solver/max-outer-iters", max_out);
-    bool axisym = false;
-    getInput("solver/axisymmetric", axisym, false);
-    double input_power;
-    getInput("solver/input-power", input_power, -1.);
-    double initial_input_power;
-    getInput("solver/initial-input-power", initial_input_power, input_power);
-    solver_ = new CycleAvgJouleCoupling(iFile_, this, max_out, axisym, input_power, initial_input_power);
+    solver_ = new CycleAvgJouleCoupling(iFile_, this);
   } else if (input_solver_type_ == "coupled") {
     isFlowEMCoupledMode_ = true;
     grvy_printf(GRVY_ERROR, "\nSlow your roll.  Solid high-five for whoever implements this coupled solver mode!\n");
@@ -509,6 +501,13 @@ PYBIND11_MODULE(libtps, m) {
       .def("initialize", &TPS::Tps::initialize)
       .def("parseCommandLineArgs", &TPS::Tps::parseArgs)
       .def("parseInput", &TPS::Tps::parseInput)
-      .def("solve", &TPS::Tps::solve);
+      .def("getRequiredInput", static_cast<double (TPS::Tps::*)(const std::string &)>(&TPS::Tps::getRequiredInput<double>) )
+      .def("getRequiredInput", static_cast<int (TPS::Tps::*)(const std::string &)>(&TPS::Tps::getRequiredInput<int>) )
+      .def("getInput", static_cast<double (TPS::Tps::*)(const std::string &, double)>(&TPS::Tps::getInput<double>) )
+      .def("getInput", static_cast<int (TPS::Tps::*)(const std::string &, int)>(&TPS::Tps::getInput<int>) )
+      .def("solve", &TPS::Tps::solve)
+      .def("solveBegin", &TPS::Tps::solveBegin)
+      .def("solveStep", &TPS::Tps::solve)
+      .def("solveEnd", &TPS::Tps::solveEnd);
 }
 #endif
