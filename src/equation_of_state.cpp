@@ -598,7 +598,7 @@ MFEM_HOST_DEVICE double PerfectMixture::computeBackgroundMassDensity(const doubl
   // assert(rhoB >= 0.0);
   if (rhoB < 0.) {
     // grvy_printf(GRVY_ERROR, "\nNegative background density -> %f\n", rhoB);
-    printf("\nERROR: Negative background density -> %f\n", rhoB);
+    printf("\nERROR: Negative background density -> %f\n", rhoB);   
 #ifdef _GPU_
     assert(rhoB >= 0.0);
 #else
@@ -1877,14 +1877,6 @@ void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInt
 
   double rho = 0.0; // Density of the mixture
 
-
-  // double gas_constant = 208.1; // [J/kg/K]   // For Argon
-  // double specific_heat_ratio = 1.666666666; // For Monoatomic Gas
-  // double gas_constant = 287.058; // [J/kg/K]   // For Air
-  // double specific_heat_ratio = 1.4; // For Air
-
-  // double gas_constant = 214.41; // ??? from the table. just a test.
-  // double specific_heat_ratio = 1.4833993105634689; 
   
   // Is it better to define these in the header file?
   double T_h = 0.0, T_e = 0.0, p_0 = 0.0;
@@ -1895,6 +1887,12 @@ void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInt
   int nPop = 0;
 
   const double qeOverkB = ELECTRONCHARGE / BOLTZMANNCONSTANT;
+
+
+  // Indexing: 
+  // 0            1           2            3           4           5
+  // Ar(m)       Ar(r)      Ar(4p)        Ar+          E          Ar(g)
+  // n/a         n/a         n/a         iIon1      iElectron  iBackground
 
 
   //--------------------------------------------------------------------------
@@ -1966,21 +1964,29 @@ void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInt
   const double R = R_table->eval(T, rho);
   p_0 = rho * R * T_h;
 
-
-  // primit[nvel_ + 1] = T_h;
   primit[iTh] = T_h;
-
 
   //--------------------------------------------------------------------------
 
   //  Calculate partition functions from analytical expressions
-  Q_n = 1+12*exp(-11.6/(T_e/qeOverkB));                          // Electronic partition function of neutral Argon
-  Q_i = 4+2*exp(-0.178/(T_e/qeOverkB))+2*exp(-13.5/(T_e/qeOverkB));  // Electronic partition function of ion Argon
+  // Q_n = 1.0+12.0*exp(-11.6/(T_e/qeOverkB));                          // Electronic partition function of neutral Argon
+  // Q_i = 4.0+2.0*exp(-0.178/(T_e/qeOverkB))+2.0*exp(-13.5/(T_e/qeOverkB));  // Electronic partition function of ion Argon
+
+  //  Calculate partition functions from levels considered
+  // Electronic partition function of neutral Argon 
+  Q_n = 1.0; // Add contribution of ground state.
+  nPop = ambipolar ? (numActiveSpecies - 1) : (numActiveSpecies-2);
+  for (int sp = 0; sp < nPop; sp++){ 
+    Q_n = Q_n + GetGasParams(sp, GasParams::SPECIES_DEGENERACY)
+        *exp(-GetGasParams(sp, GasParams::FORMATION_ENERGY)/AVOGADRONUMBER/T_e/BOLTZMANNCONSTANT);
+  }
+  
+  Q_i = GetGasParams(iIon1, GasParams::SPECIES_DEGENERACY);  // (= 4.0) Electronic partition function of ion Argon
+ 
 
   /* 
   Saha relation
   Ionized ground states population assuimng two-temperature plasma
-  We assume constant pressure here.   p_0 = p_n + p_i + p_e 
   We assume constant density here.   rho_0 = rho_n + rho_i + rho_e 
 
   */ 
@@ -2005,7 +2011,7 @@ void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInt
   }
 
   n_sp[iIon1] = n_e;  
-  // n_sp[iIon2] = n_e;  // What about Ions?
+  // n_sp[iIon2] = n_e;  // What about Ions2?
   n_sp[iElectron] = n_e;  // Electron species is assumed be to the second-to-last species.
   n_sp[iBackground] = n_neutral/Q_n;  
 
@@ -2053,25 +2059,26 @@ void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInt
 
 
 
-//  double nh = 0.0;
+    // double nh = 0.0;
 
-//  for (int sp = 0; sp < nPop; sp++) nh = nh + n_sp[sp]; 
-//  nh = nh + n_e + n_e + n_sp[iBackground];
-//  double p_Mycalc = nh*  UNIVERSALGASCONSTANT *T_h;
+    // for (int sp = 0; sp < nPop; sp++) nh = nh + n_sp[sp]; 
+    // nh = nh + n_e + n_e + n_sp[iBackground];
+    // double p_Mycalc = nh*  UNIVERSALGASCONSTANT *T_h;
 
-//  double electronPressure = 0.0;
-//  double p_calc =  PerfectMixture::ComputePressure(conserv, &electronPressure);
+    // double electronPressure = 0.0;
+    // double p_calc =  PerfectMixture::ComputePressure(conserv, &electronPressure);
 
-//  double rho_calc = 0.0;
-//  for (int sp = 0; sp < nPop; sp++) rho_calc = rho_calc + n_sp[sp]* GetGasParams(sp, GasParams::SPECIES_MW); 
-//  rho_calc = rho_calc + n_sp[iIon1]* GetGasParams(iIon1, GasParams::SPECIES_MW); 
-//  rho_calc = rho_calc + n_sp[iElectron]* GetGasParams(iElectron, GasParams::SPECIES_MW); 
-//  rho_calc = rho_calc + n_sp[iBackground]* GetGasParams(iBackground, GasParams::SPECIES_MW); 
+    // double rho_calc = 0.0;
+    // for (int sp = 0; sp < nPop; sp++) rho_calc = rho_calc + n_sp[sp]* GetGasParams(sp, GasParams::SPECIES_MW); 
+    // rho_calc = rho_calc + n_sp[iIon1]* GetGasParams(iIon1, GasParams::SPECIES_MW); 
+    // rho_calc = rho_calc + n_sp[iElectron]* GetGasParams(iElectron, GasParams::SPECIES_MW); 
+    // rho_calc = rho_calc + n_sp[iBackground]* GetGasParams(iBackground, GasParams::SPECIES_MW); 
 
-//  std::cout << p_0 << " " << p_calc << " " << p_Mycalc << " " <<  n_e << " " << T_h 
-//       << " " << n_sp[0]*GetGasParams(0, GasParams::SPECIES_MW) << " " 
-//       << n_sp[iBackground]*GetGasParams(iBackground, GasParams::SPECIES_MW) << " " << rho_calc << std::endl;
-//  exit(0);
+    // std::cout << p_0 << " " << p_calc << " " << p_Mycalc << " " <<  n_e << " " << T_h 
+    //           << " " << n_sp[0]*GetGasParams(0, GasParams::SPECIES_MW) << " " 
+    //           << n_sp[iBackground]*GetGasParams(iBackground, GasParams::SPECIES_MW) << " " << rho_calc << std::endl;
+    // exit(0);
+
 
 
 

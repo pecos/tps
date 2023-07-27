@@ -170,10 +170,10 @@ class GasMixture {
   // virtual std::map<int, int> *getMixtureToInputMap() { return NULL; }
   // virtual std::map<std::string, int> *getSpeciesMapping() { return NULL; }
   // DenseMatrix *getCompositions() { return &composition_; }
-  MFEM_HOST_DEVICE int GetiBackground() const { return iBackground; }
-  MFEM_HOST_DEVICE int GetiElectron() const { return iElectron; }
-  MFEM_HOST_DEVICE int GetiIon1() const { return iIon1; }
-  MFEM_HOST_DEVICE int GetiIon2() const { return iIon2; }
+  MFEM_HOST_DEVICE int GetiBackgroundIndex() const { return iBackground; }
+  MFEM_HOST_DEVICE int GetiElectronIndex() const { return iElectron; }
+  MFEM_HOST_DEVICE int GetiIon1Index() const { return iIon1; }
+  MFEM_HOST_DEVICE int GetiIon2Index() const { return iIon2; }
 
   MFEM_HOST_DEVICE virtual double GetGasParams(int species, GasParams param) const {
     printf("GetGasParams not implemented!\n");

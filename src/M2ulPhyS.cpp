@@ -2223,22 +2223,25 @@ void M2ulPhyS::initilizeSpeciesFromLTE() {
   TableInterpolator2D *T_table;
 
 #ifdef HAVE_GSL
-  energy_table = new GslTableInterpolator2D(config.lteMixtureInput.thermo_file_name, 0, /* temperature column */
-                                             1,                                            /* density column */
-                                             3 /* energy column */);
-  R_table = new GslTableInterpolator2D(config.lteMixtureInput.thermo_file_name, 0, /* temperature column */
-                                        1,                                            /* density column */
-                                        6 /* mixture gas constant column */);
+  energy_table = new GslTableInterpolator2D(config.lteMixtureInput.thermo_file_name,
+                                             0,                                     /* temperature column */
+                                             1,                                     /* density column */
+                                             3                                      /* energy column */);
+  R_table = new GslTableInterpolator2D(config.lteMixtureInput.thermo_file_name,
+                                        0,                                          /* temperature column */
+                                        1,                                          /* density column */
+                                        6                                           /* mixture gas constant column */);
 
-  c_table = new GslTableInterpolator2D(config.lteMixtureInput.thermo_file_name, 0, /* temperature column */
-                                        1,                                            /* density column */
-                                        8 /* speed of sound column */);
+  c_table = new GslTableInterpolator2D(config.lteMixtureInput.thermo_file_name,
+                                        0,                                          /* temperature column */
+                                        1,                                          /* density column */
+                                        8                                           /* speed of sound column */);
 
   T_table = new GslTableInterpolator2D(config.lteMixtureInput.e_rev_file_name, /* (energy,density) -> temp data */
-                                        0,                                        /* energy column */
-                                        1,                                        /* density column */
-                                        2,                                        /* temperature column */
-                                        3);                                       /* number of columns */
+                                        0,                                          /* energy column */
+                                        1,                                          /* density column */
+                                        2,                                          /* temperature column */
+                                        3);                                         /* number of columns */
 #else
   energy_table_ = NULL;
   R_table_ = NULL;
