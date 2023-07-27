@@ -63,10 +63,10 @@ class Solver {
     exit(1);
   }
   virtual void solveBegin() {
-     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
-    exit(1);   
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
   }
-  virtual void solveEnd()  {
+  virtual void solveEnd() {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
   }

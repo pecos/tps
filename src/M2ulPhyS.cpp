@@ -603,7 +603,6 @@ void M2ulPhyS::initVariables() {
       cout << "Unknown ODE solver type: " << config.GetTimeIntegratorType() << '\n';
   }
 
-
   gradUp_A = new GradNonLinearForm(gradUpfes, intRules, dim, num_equation);
   gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
   gradUp_A->AddBdrFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation, bcIntegrator, config.useBCinGrad));
@@ -1062,7 +1061,6 @@ void M2ulPhyS::initIndirectionArrays() {
     shared_face_data.dist1.SetSize(Nshared * maxIntPoints);
     shared_face_data.dist2.SetSize(Nshared * maxIntPoints);
 
-
     shared_face_data.el1_shape = 0.;
     shared_face_data.el2_shape = 0.;
     shared_face_data.quad_weight = 0.;
@@ -1181,7 +1179,6 @@ void M2ulPhyS::initIndirectionArrays() {
         dist2.SetSize(dist_dofs2.Size());
         distance_->FaceNbrData().GetSubVector(dist_dofs2, dist2);
       }
-
 
       Vector shape1, shape2, nor;
       shape1.UseDevice(false);
@@ -1672,7 +1669,7 @@ void M2ulPhyS::projectInitialSolution() {
 }
 
 void M2ulPhyS::solveBegin() {
-  #ifdef HAVE_MASA
+#ifdef HAVE_MASA
   // instantiate function for exact solution
   // NOTE: this has been taken care of at M2ulPhyS::initMasaHandler.
   // initMMSCoefficients();
@@ -1680,61 +1677,61 @@ void M2ulPhyS::solveBegin() {
   if (config.use_mms_) {
     checkSolutionError(time);
   }
-  #endif
+#endif
 }
 
 void M2ulPhyS::solveStep() {
-    timeIntegrator->Step(*U, time, dt);
+  timeIntegrator->Step(*U, time, dt);
 
-    Check_NAN();
+  Check_NAN();
 
-    if (!config.isTimeStepConstant()) {
-      double dt_local = CFL * hmin / max_char_speed / static_cast<double>(dim);
-      MPI_Allreduce(&dt_local, &dt, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
-    }
+  if (!config.isTimeStepConstant()) {
+    double dt_local = CFL * hmin / max_char_speed / static_cast<double>(dim);
+    MPI_Allreduce(&dt_local, &dt, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
+  }
 
-    iter++;
+  iter++;
 
-    const int vis_steps = config.GetNumItersOutput();
-    if (iter % vis_steps == 0) {
-      // dump history
-      // NOTE(kevin): this routine is currently obsolete.
-      // It computes `dof`-averaged state and time-derivative, which are useless at this point.
-      // This will not be supported.
-      writeHistoryFile();
+  const int vis_steps = config.GetNumItersOutput();
+  if (iter % vis_steps == 0) {
+    // dump history
+    // NOTE(kevin): this routine is currently obsolete.
+    // It computes `dof`-averaged state and time-derivative, which are useless at this point.
+    // This will not be supported.
+    writeHistoryFile();
 
 #ifdef HAVE_MASA
-      if (config.use_mms_) {
-        if (config.mmsSaveDetails_) {
-          rhsOperator->Mult(*U, *masaRhs_);
-          projectExactSolution(time, masaU_);
-        }
-        checkSolutionError(time);
-      } else {
-        if (rank0_) cout << "time step: " << iter << ", physical time " << time << "s" << endl;
+    if (config.use_mms_) {
+      if (config.mmsSaveDetails_) {
+        rhsOperator->Mult(*U, *masaRhs_);
+        projectExactSolution(time, masaU_);
       }
-#else
+      checkSolutionError(time);
+    } else {
       if (rank0_) cout << "time step: " << iter << ", physical time " << time << "s" << endl;
+    }
+#else
+    if (rank0_) cout << "time step: " << iter << ", physical time " << time << "s" << endl;
 #endif
 
-      if (iter != MaxIters) {
-        // auto hUp = Up->HostRead();
-        Up->HostRead();
-        mixture->UpdatePressureGridFunction(press, Up);
+    if (iter != MaxIters) {
+      // auto hUp = Up->HostRead();
+      Up->HostRead();
+      mixture->UpdatePressureGridFunction(press, Up);
 
-        restart_files_hdf5("write");
+      restart_files_hdf5("write");
 
-        paraviewColl->SetCycle(iter);
-        paraviewColl->SetTime(time);
-        paraviewColl->Save();
-        // auto dUp = Up->ReadWrite();  // sets memory to GPU
-        Up->ReadWrite();  // sets memory to GPU
+      paraviewColl->SetCycle(iter);
+      paraviewColl->SetTime(time);
+      paraviewColl->Save();
+      // auto dUp = Up->ReadWrite();  // sets memory to GPU
+      Up->ReadWrite();  // sets memory to GPU
 
-        average->write_meanANDrms_restart_files(iter, time);
-      }
+      average->write_meanANDrms_restart_files(iter, time);
     }
+  }
 
-    average->addSampleMean(iter);
+  average->addSampleMean(iter);
 }
 
 void M2ulPhyS::solveEnd() {
@@ -1775,9 +1772,9 @@ void M2ulPhyS::solveEnd() {
 void M2ulPhyS::solve() {
   this->solveBegin();
   double tlast = grvy_timer_elapsed_global();
-  #ifdef HAVE_SLURM
+#ifdef HAVE_SLURM
   bool readyForRestart = False;
-  #endif
+#endif
 
   // Integrate in time.
   while (iter < MaxIters) {
@@ -1792,10 +1789,10 @@ void M2ulPhyS::solve() {
       }
     }
 
-    //Do the step
+    // Do the step
     this->solveStep();
 
-    #ifdef HAVE_SLURM
+#ifdef HAVE_SLURM
     // check if near end of a run and ready to submit restart
     if ((iter % config.rm_checkFreq() == 0) && (iter != MaxIters)) {
       readyForRestart = Check_JobResubmit();
@@ -1805,7 +1802,7 @@ void M2ulPhyS::solve() {
         break;
       }
     }
-    #endif
+#endif
 
     // periodically check for DIE file which requests to terminate early
     if (Check_ExitEarly(iter)) {
