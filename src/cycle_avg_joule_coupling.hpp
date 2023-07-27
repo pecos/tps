@@ -53,7 +53,12 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   QuasiMagnetostaticSolverBase *qmsa_solver_;
   M2ulPhyS *flow_solver_;
 
-  int max_outer_iters_;
+  //! Maximum number of iterations
+  int max_iters_;
+  //! Current iteration
+  int current_iter_;
+  //! We call the em solver only every solve_em_every_n steps
+  int solve_em_every_n_;
 
 #ifdef HAVE_GSLIB
   FindPointsGSLIB *interp_flow_to_em_;
@@ -71,6 +76,17 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   bool rank0_;
 
  public:
+  /*!
+  * The input file will expect the following the directory [cycle-avg-joule-coupled]
+  * with fields:
+  * max-iters = Total number of iterations [int, required]
+  * solve-em-every-n = How often do we need to call the em solver [int, required]
+  * axisymmetric = True if using the axisymmetric formulation, False for 3D [bool, deafult = False]
+  * input-power = target power of em field [double, default = -1.]
+  * initial-input-power = the starting power of em field [double, default = -1.]
+  */
+  CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps);
+  [[deprecated("Use CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps instead")]]
   CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps, int max_out, bool axisym, double input_power = -1.,
                         double initial_input_power = -1.);
   ~CycleAvgJouleCoupling();
@@ -82,6 +98,10 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   void parseSolverOptions() override;
   void initialize() override;
   void solve() override;
+
+  void solveBegin() override;
+  void solveStep() override;
+  void solveEnd() override;
 
   M2ulPhyS *getFlowSolver() { return flow_solver_; }
   QuasiMagnetostaticSolverBase *getEMSolver() { return qmsa_solver_; }

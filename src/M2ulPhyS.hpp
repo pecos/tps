@@ -397,6 +397,9 @@ class M2ulPhyS : public TPS::Solver {
   }
 
   void solve() override;
+  void solveStep() override;
+  void solveBegin() override;
+  void solveEnd() override;
   void visualization() override;
   void updateVisualizationVariables();
 

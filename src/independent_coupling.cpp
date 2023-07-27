@@ -59,3 +59,16 @@ void IndependentCoupling::solve() {
   flow_solver_->solve();
   qmsa_solver_->solve();
 }
+
+void IndependentCoupling::solveBegin() {
+  flow_solver_->solveBegin();
+}
+
+void IndependentCoupling::solveStep() {
+  flow_solver_->solveStep();
+}
+
+void IndependentCoupling::solveEnd() {
+  flow_solver_->solveEnd();
+  qmsa_solver_->solve();
+}

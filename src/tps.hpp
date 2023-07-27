@@ -122,6 +122,12 @@ class Tps {
   template <typename T>
   void getRequiredInput(const char *name, T &var);
 
+  template <typename T>
+  T getRequiredInput(const std::string & name){ T var; this->getRequiredInput(name.c_str(), var); return var;}
+
+  template <typename T>
+  T getInput(const std::string & name, T varDefault){ T var; this->getInput(name.c_str(), var, varDefault); return var;}
+
   /// Parsing support for required (vector) inputs
   void getRequiredVec(const char *name, std::vector<double> &var, size_t numElems);
   void getRequiredVec(const char *name, Vector &var, size_t numElems);
@@ -145,6 +151,24 @@ class Tps {
   /// Execute the requested solve
   void solve() {
     solver_->solve();
+    return;
+  }
+
+  /// Prepare solver before starting time loop
+  void solveBegin() {
+    solver_->solveBegin();
+    return;
+  }
+
+  /// Advance the requested solver of one time step
+  void solveStep() {
+    solver_->solveStep();
+    return;
+  }
+
+  /// Operation performed after the time loop
+  void solveEnd() {
+    solver_->solveEnd();
     return;
   }
 
