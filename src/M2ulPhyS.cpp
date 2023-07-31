@@ -462,6 +462,14 @@ void M2ulPhyS::initVariables() {
   vfes = new ParFiniteElementSpace(mesh, fec, num_equation, Ordering::byNODES);
   gradUpfes = new ParFiniteElementSpace(mesh, fec, num_equation * dim, Ordering::byNODES);
 
+  
+  // Continuous spaces
+  dfecH1 = new H1_FECollection(order, dim);
+  dfesH1 = new ParFiniteElementSpace(mesh, dfecH1, dim);
+  fecH1 = new H1_FECollection(order);   
+  fesH1 = new ParFiniteElementSpace(mesh, fecH1);   
+  
+  
 #if defined(_CUDA_) || defined(_HIP_)
   // prepare viscous sponge data to pass to gpu ctor
   viscositySpongeData vsd;
@@ -1367,6 +1375,24 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   dens = new ParGridFunction(fes, Up->HostReadWrite());
   vel = new ParGridFunction(dfes, Up->HostReadWrite() + fes->GetNDofs());
 
+  
+  // c0 basis
+  dens_gf.SetSpace(fesH1);  
+  vel_gf.SetSpace(dfesH1);
+  temp_gf.SetSpace(fesH1);
+  pres_gf.SetSpace(fesH1);
+  dens_gf = 0.0;
+  vel_gf = 0.0;
+  temp_gf = 0.0;
+  pres_gf = 0.0;
+
+  // DG buffer spaces
+  bufferR0_gf.SetSpace(fes);  
+  bufferR1_gf.SetSpace(dfes);
+  bufferR0_gf = 0.0;
+  bufferR1_gf = 0.0;  
+
+  
   if (config.isAxisymmetric()) {
     vtheta = new ParGridFunction(fes, Up->HostReadWrite() + 3 * fes->GetNDofs());
   } else {
@@ -1580,6 +1606,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   paraviewColl->SetCycle(0);
   paraviewColl->SetTime(0.);
 
+  /*
   paraviewColl->RegisterField("dens", dens);
   paraviewColl->RegisterField("vel", vel);
   if (config.isAxisymmetric()) {
@@ -1587,6 +1614,21 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   }
   paraviewColl->RegisterField("temp", temperature);
   paraviewColl->RegisterField("press", press);
+  */
+
+  
+  // Continuous basis
+  ParGridFunction *rp_gf = GetCurrentDensity();   
+  ParGridFunction *up_gf = GetCurrentVelocity();
+  ParGridFunction *pp_gf = GetCurrentPressure();
+  ParGridFunction *tp_gf = GetCurrentTemperature();  
+  paraviewColl->RegisterField("dens", rp_gf);
+  paraviewColl->RegisterField("vel", up_gf);
+  paraviewColl->RegisterField("temp", tp_gf);
+  paraviewColl->RegisterField("press", pp_gf);  
+
+  
+  
   if (eqSystem == NS_PASSIVE) {
     paraviewColl->RegisterField("passiveScalar", passiveScalar);
   }
@@ -1741,6 +1783,45 @@ void M2ulPhyS::solve() {
 
         restart_files_hdf5("write");
 
+
+	
+	/// project to continuous basis ///
+        int dof = fes->GetTrueVSize();
+	
+        {
+          double *data = bufferR0_gf.HostReadWrite();
+          double *Udata = Up->HostReadWrite();   
+          for (int i = 0; i < dof; i++) {     
+            data[i] = Udata[i];
+          }
+        }   
+        dens_gf.ProjectGridFunction(bufferR0_gf);
+
+        {
+          double *data = bufferR1_gf.HostReadWrite();
+          double *Udata = Up->HostReadWrite();   
+          for (int i = 0; i < dof; i++) {
+	    for (int eq = 0; eq < dim; eq++) {     
+              data[i + eq * dof] = Udata[i + (1 + eq) * dof];
+	    }
+          }
+        }   
+        vel_gf.ProjectGridFunction(bufferR1_gf);
+
+        {
+          double *data = bufferR0_gf.HostReadWrite();
+          double *Pdata = press->HostReadWrite();   
+          for (int i = 0; i < dof; i++) {     
+            data[i] = Pdata[i];
+          }
+        }   
+        temp_gf.ProjectGridFunction(bufferR0_gf);
+	
+	
+	///////////////////////////////////
+
+
+	
         paraviewColl->SetCycle(iter);
         paraviewColl->SetTime(time);
         paraviewColl->Save();
@@ -3097,6 +3178,7 @@ void M2ulPhyS::parseBCInputs() {
   inletMapping["subsonic"] = SUB_DENS_VEL;
   inletMapping["nonreflecting"] = SUB_DENS_VEL_NR;
   inletMapping["nonreflectingConstEntropy"] = SUB_VEL_CONST_ENT;
+  inletMapping["subsonicConstTempUser"] = SUB_TEMP_VEL_USR;  
 
   for (int i = 1; i <= numInlets; i++) {
     int patch;

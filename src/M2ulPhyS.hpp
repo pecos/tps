@@ -191,6 +191,12 @@ class M2ulPhyS : public TPS::Solver {
   // Finite element space for all variables together (total thermodynamic state)
   ParFiniteElementSpace *vfes;
 
+  // continuous spaces
+  FiniteElementCollection *fecH1;
+  ParFiniteElementSpace *fesH1;
+  FiniteElementCollection *dfecH1;    
+  ParFiniteElementSpace *dfesH1;
+  
   // nodes IDs and indirection array
   const int maxIntPoints = gpudata::MAXINTPOINTS;  // corresponding to HEX face with p=5
   const int maxDofs = gpudata::MAXDOFS;            // corresponding to HEX with p=5
@@ -229,6 +235,10 @@ class M2ulPhyS : public TPS::Solver {
   // Primitive variables
   ParGridFunction *Up;
 
+  // continuous spaces to project onto
+  ParGridFunction vel_gf, dens_gf, temp_gf, pres_gf;
+  ParGridFunction bufferR0_gf, bufferR1_gf;
+  
   // Visualization functions (these are pointers to Up)
   ParGridFunction *temperature, *dens, *vel, *vtheta, *passiveScalar;
   ParGridFunction *electron_temp_field;
@@ -421,6 +431,14 @@ class M2ulPhyS : public TPS::Solver {
 
   static int Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_print);
 
+
+   ParGridFunction *GetCurrentVelocity() { return &vel_gf; }
+   ParGridFunction *GetCurrentPressure() { return &pres_gf; }
+   ParGridFunction *GetCurrentTemperature() { return &temp_gf; }
+   ParGridFunction *GetCurrentDensity() { return &dens_gf; }  
+
+
+  
   // Exit code access
   void SetStatus(int code) {
     exit_status_ = code;
