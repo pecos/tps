@@ -1935,7 +1935,7 @@ void M2ulPhyS::solve() {
   this->solveBegin();
   double tlast = grvy_timer_elapsed_global();
 #ifdef HAVE_SLURM
-  bool readyForRestart = False;
+  bool readyForRestart = false;
 #endif
 
   // Integrate in time.
