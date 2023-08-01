@@ -1052,7 +1052,10 @@ void LoMachSolver::Setup(double dt)
    std::cout << "Check 14..." << std::endl;     
    
    // boundary terms   
-   FText_gfcoeff = new VectorGridFunctionCoefficient(&FText_gf);
+   //FText_gfcoeff = new VectorGridFunctionCoefficient(&FText_gf);
+   Vector vec_one(3);
+   vec_one = 1.0;
+   FText_gfcoeff = new VectorConstantCoefficient(vec_one);
    FText_bdr_form = new ParLinearForm(pfes);
    //FText_bdr_form = new ParLinearForm(vfes); // maybe?
    auto *ftext_bnlfi = new BoundaryNormalLFIntegrator(*FText_gfcoeff);
@@ -1060,8 +1063,8 @@ void LoMachSolver::Setup(double dt)
    FText_bdr_form->AddBoundaryIntegrator(ftext_bnlfi, vel_ess_attr);
    // std::cout << "Check 14..." << std::endl;     
 
-   g_bdr_form = new ParLinearForm(vfes); //? was pfes
-   //g_bdr_form = new ParLinearForm(pfes);
+   //g_bdr_form = new ParLinearForm(vfes); //? was pfes
+   g_bdr_form = new ParLinearForm(pfes);
    for (auto &vel_dbc : vel_dbcs)
    {
       auto *gbdr_bnlfi = new BoundaryNormalLFIntegrator(*vel_dbc.coeff);
@@ -1114,18 +1117,22 @@ void LoMachSolver::Setup(double dt)
       SpInvPC = new HypreBoomerAMG(lor->GetAssembledMatrix());
       SpInvPC->SetPrintLevel(pl_amg);
       SpInvPC->Mult(resp, pn);
-      SpInvOrthoPC = new OrthoSolver(vfes->GetComm());
+      //SpInvOrthoPC = new OrthoSolver(vfes->GetComm());
+      SpInvOrthoPC = new OrthoSolver(pfes->GetComm());
       SpInvOrthoPC->SetSolver(*SpInvPC);
    }
    else
    {
       SpInvPC = new HypreBoomerAMG(*Sp.As<HypreParMatrix>());
       SpInvPC->SetPrintLevel(0);
-      SpInvOrthoPC = new OrthoSolver(vfes->GetComm());
+      //SpInvOrthoPC = new OrthoSolver(vfes->GetComm());
+      SpInvOrthoPC = new OrthoSolver(pfes->GetComm());
       SpInvOrthoPC->SetSolver(*SpInvPC);
    }
-   SpInv = new CGSolver(vfes->GetComm());
+   //SpInv = new CGSolver(vfes->GetComm());
+   SpInv = new CGSolver(pfes->GetComm());
    SpInv->iterative_mode = true;
+   //SpInv->iterative_mode = false;
    SpInv->SetOperator(*Sp);
    if (pres_dbcs.empty())
    {
@@ -2090,13 +2097,13 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      }
    }
    R0PM1_gf.ProjectGridFunction(R0PM0_gf);
-   {
-     double *data = resp.HostReadWrite();
-     double *d_buf = R0PM1_gf.HostReadWrite();   
-     for (int i = 0; i < Pdof; i++) {     
-       data[i] = d_buf[i];
-     }
-   }   
+   // {
+   //   double *data = resp.HostReadWrite();
+   //   double *d_buf = R0PM1_gf.HostReadWrite();   
+   //   for (int i = 0; i < Pdof; i++) {     
+   //     data[i] = d_buf[i];
+   //   }
+   // }   
    
    //resp.Add(1.0, FText_bdr);
    //resp.Add(-bd0 / dt, g_bdr);
