@@ -461,7 +461,6 @@ void M2ulPhyS::initVariables() {
   nvelfes = new ParFiniteElementSpace(mesh, fec, nvel, Ordering::byNODES);
   vfes = new ParFiniteElementSpace(mesh, fec, num_equation, Ordering::byNODES);
   gradUpfes = new ParFiniteElementSpace(mesh, fec, num_equation * dim, Ordering::byNODES);
-
   
   // Continuous spaces
   dfecH1 = new H1_FECollection(order, dim);
@@ -1283,6 +1282,13 @@ M2ulPhyS::~M2ulPhyS() {
   delete timeIntegrator;
   // delete inlet/outlet integrators
 
+  // for paraview
+  delete vel_gf;
+  delete dens_gf;
+  delete temp_gf;
+  delete pres_gf;
+
+  
 #if defined(_CUDA_) || defined(_HIP_)
   gpu::freeDeviceRiemann<<<1, 1>>>(rsolver);
   tpsGpuFree(rsolver);
@@ -1783,9 +1789,8 @@ void M2ulPhyS::solve() {
 
         restart_files_hdf5("write");
 
-
 	
-	/// project to continuous basis ///
+	/// ***project to continuous basis*** ///
         int dof = fes->GetTrueVSize();
 	
         {
@@ -1810,15 +1815,23 @@ void M2ulPhyS::solve() {
 
         {
           double *data = bufferR0_gf.HostReadWrite();
+          double *Udata = Up->HostReadWrite();   
+          for (int i = 0; i < dof; i++) {     
+            data[i] = Udata[i + (1 + dim) * dof];
+          }
+        }   
+        temp_gf.ProjectGridFunction(bufferR0_gf);
+	
+        {
+          double *data = bufferR0_gf.HostReadWrite();
           double *Pdata = press->HostReadWrite();   
           for (int i = 0; i < dof; i++) {     
             data[i] = Pdata[i];
           }
         }   
-        temp_gf.ProjectGridFunction(bufferR0_gf);
+        pres_gf.ProjectGridFunction(bufferR0_gf);
 	
-	
-	///////////////////////////////////
+	/////////////////////////////////////////
 
 
 	
