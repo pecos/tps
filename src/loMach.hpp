@@ -22,6 +22,7 @@ class Tps;
 //#include "solvers.hpp"
 #include "mfem/linalg/solvers.hpp"
 
+#include "transport_properties.hpp"
 #include "argon_transport.hpp"
 #include "averaging_and_rms.hpp"
 #include "chemistry.hpp"
@@ -253,13 +254,13 @@ protected:
    const int defaultPartMethod = 1;  
   
    // temporary
-   double Re_tau;
+  double Re_tau, Pr;
   
    /// Kinematic viscosity (dimensionless).
    double kin_vis;
 
    // make everything dimensionless after generalizing form channel
-   double Po, Rgas;  
+   double ambientPressure, Rgas;  
 
    IntegrationRules gll_rules;
 
@@ -289,7 +290,6 @@ protected:
 
    /// density \f$H^1\f$ finite element space.
    ParFiniteElementSpace *rfes = nullptr;  
-
   
    // nonlinear term
    FiniteElementCollection *nfec = nullptr;
@@ -414,7 +414,7 @@ protected:
    // All essential true dofs.
    Array<int> vel_ess_tdof;
    Array<int> pres_ess_tdof;
-   Array<int> temp_ess_tdof;  
+   Array<int> temp_ess_tdof;
 
    // Bookkeeping for velocity dirichlet bcs.
    std::vector<VelDirichletBC_T> vel_dbcs;
@@ -571,14 +571,16 @@ public:
    void parseBCInputs();
    void parseICOptions();
    void parsePostProcessVisualizationInputs();
+   void parseFluidPreset();  
    void initSolutionAndVisualizationVectors();
    void initialTimeStep();  
    void solve();
    void updateU();
+   void copyU();  
 
    // i/o routines
    void read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data);
-  void read_serialized_soln_data(hid_t file, string varName, int numDof, int varOffset, double *data, IOFamily &fam);
+   void read_serialized_soln_data(hid_t file, string varName, int numDof, int varOffset, double *data, IOFamily &fam);
    void restart_files_hdf5(string mode, string inputFileName = std::string());
    void partitioning_file_hdf5(string mode);
    // void serialize_soln_for_write(IOFamily &fam);
@@ -619,7 +621,7 @@ public:
     * linear multistep methods for time-dependent partial differential
     * equations
     */
-   void Step(double &time, double dt, int cur_step, bool provisional = false);
+   void Step(double &time, double dt, const int cur_step, const int start_step, bool provisional = false);
 
    /// Return a pointer to the provisional velocity ParGridFunction.
    ParGridFunction *GetProvisionalVelocity() { return &un_next_gf; }
@@ -632,6 +634,9 @@ public:
 
    /// Return a pointer to the current temperature ParGridFunction.
    ParGridFunction *GetCurrentTemperature() { return &Tn_gf; }
+
+   /// Return a pointer to the current density ParGridFunction.  
+   ParGridFunction *GetCurrentDensity() { return &rn_gf; }  
 
    /// Return a pointer to the current temperature ParGridFunction.
    //ParGridFunction *GetCurrentDensity() { return &rn_gf; }    
