@@ -35,10 +35,12 @@
  */
 
 #include "tps.hpp"
+#include "mfem.hpp"
+//#include "communication.hpp"
 
-#ifdef HAVE_MPI_EXT
+//#ifdef HAVE_MPI_EXT
 #include <mpi-ext.h>
-#endif
+//#endif
 
 #include <sys/types.h>
 #include <unistd.h>
@@ -47,8 +49,8 @@
 #include <pybind11/stl.h>
 #endif
 
-#include "loMach_options.hpp"
-#include "loMach.hpp"
+//#include "loMach_options.hpp"
+//#include "loMach.hpp"
 #include "cycle_avg_joule_coupling.hpp"
 #include "independent_coupling.hpp"
 
@@ -61,12 +63,14 @@ namespace TPS {
  * information for simulation.  For an example, see main.cpp.
  */
 Tps::Tps() {
+
+  //std::cout << " constructing tps..." << endl;
   nprocs_ = mpi_.WorldSize();
+  //std::cout << " ...got procs: " << nprocs_ << endl;  
   rank_ = mpi_.WorldRank();
-  if (rank_ == 0)
-    isRank0_ = true;
-  else
-    isRank0_ = false;
+  //std::cout << " ...got myrank: " << rank_ << endl;    
+  if (rank_ == 0) { isRank0_ = true; }
+  else { isRank0_ = false; }  
 
   // default input file
   iFile_ = "runfile.ini";
@@ -303,7 +307,7 @@ void Tps::parseInput() {
   buffer.str(ss);
 
   // now, all procs can load the input file contents for subsequent parsing
-  if (!iparse_.Load(buffer)) {
+  if (!iparse_.Load(buffer)) { // jump
     grvy_printf(GRVY_ERROR, "Unable to load runtime inputs from file -> %s\n", iFile_.c_str());
     exit(ERROR);
   }

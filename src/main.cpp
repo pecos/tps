@@ -35,23 +35,41 @@
  */
 
 #include "tps.hpp"
+#include "mfem.hpp"
 
 int main(int argc, char *argv[]) {
+
+  // apparaently mfem does this?
+  //int size, rank;
+  //MPI_Init(&argc, &argv);
+  //MPI_Comm_size(MPI_COMM_WORLD, &size);
+  //MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  
   int status;
+  
   {
+
+    //std::cout << " AND BEGIN..." << endl;
     TPS::Tps tps;
+    //std::cout << " check 1..." << endl;    
 
     tps.parseCommandLineArgs(argc, argv);
+    //std::cout << " check 2..." << endl;        
     tps.parseInput();
+    //std::cout << " check 3..." << endl;        
     tps.chooseDevices();
+    //std::cout << " check 4..." << endl;        
     tps.chooseSolver();
+    //std::cout << " check 5..." << endl;        
     tps.initialize();
+    //std::cout << " check 6..." << endl;        
 
     if (tps.isVisualizationMode()) {  // post-process visualization process.
       tps.visualization();
     } else {  // regular forward time-integration.
       tps.solve();
     }
+    //std::cout << " check 7..." << endl;        
 
     //std::cout << " back in main..." << endl;
     status = tps.getStatus();

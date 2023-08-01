@@ -33,17 +33,24 @@ double temp_wall(const Vector &x, double t);
 LoMachSolver::LoMachSolver(MPI_Session &mpi, LoMachOptions loMach_opts, TPS::Tps *tps)
 //    : mpi_(mpi), loMach_opts_(loMach_opts), offsets_(3) {
     : mpi_(mpi), loMach_opts_(loMach_opts) {
-  
+
+  //std::cout << "okay 1" << endl;
   tpsP_ = tps;
+  //std::cout << "okay 2" << endl;  
   pmesh = NULL;
-  nprocs_ = mpi.WorldSize();
+  //std::cout << "okay 3" << endl;  
+  nprocs_ = mpi_.WorldSize();
+  //std::cout << "okay 4" << endl;  
   rank_ = mpi_.WorldRank();
+  //std::cout << "okay 5" << endl;  
   if (rank_ == 0) { rank0_ = true; }
   else { rank0_ = false; }
   groupsMPI = new MPI_Groups(&mpi_);
+  //std::cout << "okay 6" << endl;  
 
   // is this needed?
-  groupsMPI->init();  
+  groupsMPI->init();
+  //std::cout << "okay 7" << endl;  
   
   parseSolverOptions();  
   parseSolverOptions2(); 
@@ -77,7 +84,6 @@ LoMachSolver::LoMachSolver(MPI_Session &mpi, LoMachOptions loMach_opts, TPS::Tps
 
 
 
-
 /*
 NavierSolver::NavierSolver(ParMesh *mesh, int order, int porder, int norder, double kin_vis, double Po, double Rgas)
    : pmesh(mesh), order(order), porder(porder), norder(norder), kin_vis(kin_vis), Po(Po), Rgas(Rgas),
@@ -86,21 +92,24 @@ NavierSolver::NavierSolver(ParMesh *mesh, int order, int porder, int norder, dou
 {
 */
 
+
+
 void LoMachSolver::initialize() {
   
    bool verbose = mpi_.Root();
    if (verbose) grvy_printf(ginfo, "Initializing loMach solver.\n");
 
    //LoMachOptions loMach_opts_ = GetOptions();   
-   order = loMach_opts_.order;
-   porder = loMach_opts_.order;
-   norder = loMach_opts_.order;
+   order = config.solOrder; //loMach_opts_.order;
+   porder = config.solOrder; //loMach_opts_.order;
+   norder = config.solOrder; //loMach_opts_.order;
 
    // temporary hard-coding   
    Re_tau = 182.0;   
    kin_vis = 1.0/Re_tau;
-   Po = 101325.0;
+   ambientPressure = 101325.0;
    Rgas = 287.0;
+   Pr = 1.2;
 
 
    
@@ -168,11 +177,14 @@ void LoMachSolver::initialize() {
    // Create the periodic mesh using the vertex mapping defined by the translation vectors
    Mesh periodic_mesh = Mesh::MakePeriodic(mesh,mesh.CreatePeriodicVertexMapping(translations));
    //if (verbose) grvy_printf(ginfo, "Mesh made periodic...\n");         
+
+   // HACK HARD CODE
+   nvel = 3;
    
    // underscore stuff is terrible
    dim_ = mesh_ptr->Dimension();
    //int dim = pmesh->Dimension();
-   int dim = dim_;
+   dim = dim_;
    //if (verbose) grvy_printf(ginfo, "Got mesh dim...\n");            
 
    // 1b) Refine the serial mesh, if requested
@@ -194,14 +206,15 @@ void LoMachSolver::initialize() {
    }
    */
 
-
-
-
-
   eqSystem = config.GetEquationSystem();
-
   mixture = NULL;
 
+
+  // HARD CODE
+  mixture = new DryAir(config, dim, nvel);  // conditional jump, must be using something in config that wasnt parsed?
+  transportPtr = new DryAirTransport(mixture, config);
+  
+  /*
   switch (config.GetWorkingFluid()) {
     case WorkingFluid::DRY_AIR:
       mixture = new DryAir(config, dim, nvel);
@@ -284,6 +297,8 @@ void LoMachSolver::initialize() {
       mfem_error("WorkingFluid not recognized.");
       break;
   }
+  */
+
 
   /*
   switch (config.radiationInput.model) {
@@ -302,22 +317,28 @@ void LoMachSolver::initialize() {
       break;      
   }
   */
+
+  /*
   assert(mixture != NULL);
 #if defined(_CUDA_) || defined(_HIP_)
 #else
   d_mixture = mixture;
 #endif
+  */
   //std::cout << " okay 1..." << endl;
 
 
    
   MaxIters = config.GetNumIters();
-  max_speed = 0.;  
+  max_speed = 0.;
+  num_equation = 5; // HARD CODE
+  /*
   numSpecies = mixture->GetNumSpecies();
   numActiveSpecies = mixture->GetNumActiveSpecies();
   ambipolar = mixture->IsAmbipolar();
   twoTemperature_ = mixture->IsTwoTemperature();
   num_equation = mixture->GetNumEquations();
+  */
   //std::cout << " okay 2..." << endl;  
 
   
@@ -387,6 +408,7 @@ void LoMachSolver::initialize() {
     // make sure these are actually hooked up!
     time = 0.;
     iter = 0;
+    
   }
   //std::cout << " okay 3..." << endl;
   
@@ -456,8 +478,8 @@ void LoMachSolver::initialize() {
    vfes = new ParFiniteElementSpace(pmesh, vfec, dim);
 
    // dealias nonlinear term 
-   nfec = new H1_FECollection(norder, dim);   
-   nfes = new ParFiniteElementSpace(pmesh, vfec, dim);   
+   //nfec = new H1_FECollection(norder, dim);   
+   //nfes = new ParFiniteElementSpace(pmesh, vfec, dim);   
 
    // pressure
    pfec = new H1_FECollection(porder);
@@ -492,7 +514,7 @@ void LoMachSolver::initialize() {
    int vfes_truevsize = vfes->GetTrueVSize();
    int pfes_truevsize = pfes->GetTrueVSize();
    int tfes_truevsize = tfes->GetTrueVSize();
-   int nfes_truevsize = nfes->GetTrueVSize();
+   //int nfes_truevsize = nfes->GetTrueVSize();
    int rfes_truevsize = rfes->GetTrueVSize();   
    if (verbose) grvy_printf(ginfo, "Got sizes...\n");   
    
@@ -507,25 +529,26 @@ void LoMachSolver::initialize() {
    unm2 = 0.0;
    
    fn.SetSize(vfes_truevsize);
-   
-   Nun.SetSize(nfes_truevsize);
+
+   // if dealiasing, use nfes 
+   Nun.SetSize(vfes_truevsize);
    Nun = 0.0;
-   Nunm1.SetSize(nfes_truevsize);
+   Nunm1.SetSize(vfes_truevsize);
    Nunm1 = 0.0;
-   Nunm2.SetSize(nfes_truevsize);
+   Nunm2.SetSize(vfes_truevsize);
    Nunm2 = 0.0;
 
-   uBn.SetSize(nfes_truevsize);
+   uBn.SetSize(vfes_truevsize);
    uBn = 0.0;   
-   uBnm1.SetSize(nfes_truevsize);
+   uBnm1.SetSize(vfes_truevsize);
    uBnm1 = 0.0;
-   uBnm2.SetSize(nfes_truevsize);
+   uBnm2.SetSize(vfes_truevsize);
    uBnm2 = 0.0;
 
    FBext.SetSize(vfes_truevsize);
    
    Fext.SetSize(vfes_truevsize);
-   FText.SetSize(vfes_truevsize);
+   FText.SetSize(vfes_truevsize); // why is this vfes while _bdr is pfes?
    Lext.SetSize(vfes_truevsize);
    resu.SetSize(vfes_truevsize);
 
@@ -535,8 +558,10 @@ void LoMachSolver::initialize() {
    pn = 0.0;
    resp.SetSize(pfes_truevsize);
    resp = 0.0;
-   FText_bdr.SetSize(pfes_truevsize);
-   g_bdr.SetSize(pfes_truevsize);
+   //FText_bdr.SetSize(pfes_truevsize);
+   FText_bdr.SetSize(vfes_truevsize);
+   //g_bdr.SetSize(pfes_truevsize);
+   g_bdr.SetSize(vfes_truevsize);
 
    pnBig.SetSize(tfes_truevsize);
    pnBig = 0.0;   
@@ -598,9 +623,9 @@ void LoMachSolver::initialize() {
 
    // density, not actually solved for directly
    rn.SetSize(rfes_truevsize);
-   rn = 0.0;
+   rn = 1.0;
    rn_gf.SetSpace(rfes);
-   rn_gf = 0.0;   
+   rn_gf = 1.0;   
    
    R0PM0_gf.SetSpace(tfes);
    R0PM0_gf = 0.0;
@@ -609,23 +634,30 @@ void LoMachSolver::initialize() {
    
    R1PM0_gf.SetSpace(vfes);
    R1PM0_gf = 0.0;   
-   R1PX2_gf.SetSpace(nfes);
+   //R1PX2_gf.SetSpace(nfes);
+   R1PX2_gf.SetSpace(vfes);
    R1PX2_gf = 0.0;
    if (verbose) grvy_printf(ginfo, "vectors and gf initialized...\n");      
    
    //PrintInfo();
 
+   /*
    // Paraview setup, not sure where this should go...
    //std::cout << "GetOutputName: " << config.GetOutputName() << endl;
    paraviewColl = new ParaViewDataCollection(config.GetOutputName(), pmesh);
    paraviewColl->SetLevelsOfDetail(config.GetSolutionOrder());
    paraviewColl->SetHighOrderOutput(true);
    paraviewColl->SetPrecision(8);
-   if (verbose) grvy_printf(ginfo, "oaraview collection initialized...\n");         
+   if (verbose) grvy_printf(ginfo, "paraview collection initialized...\n");
+   */
+
    
    initSolutionAndVisualizationVectors();
-   if (verbose) grvy_printf(ginfo, "init Sol and Vis okay...\n");         
+   if (verbose) grvy_printf(ginfo, "init Sol and Vis okay...\n");
+   
 
+
+   /*
   average = new Averaging(Up, pmesh, tfec, tfes, vfes, fvfes, eqSystem, d_mixture, num_equation, dim, config, groupsMPI);
   //average->read_meanANDrms_restart_files(); this guy is empty
   if (verbose) grvy_printf(ginfo, "average initialized...\n");        
@@ -664,11 +696,16 @@ void LoMachSolver::initialize() {
     ioData.registerIOVar("/rmsData", "uw", 4);
     ioData.registerIOVar("/rmsData", "vw", 5);
   }
+   */
 
+  
   ioData.initializeSerial(mpi_.Root(), (config.RestartSerial() != "no"), serial_mesh);
-  if (verbose) grvy_printf(ginfo, " ioData.init thingy...\n");          
+  if (verbose) grvy_printf(ginfo, " ioData.init thingy...\n");
+
+  /*
   projectInitialSolution();
-  if (verbose) grvy_printf(ginfo, "initial sol projected...\n");        
+  if (verbose) grvy_printf(ginfo, "initial sol projected...\n");
+  */
 
   CFL = config.GetCFLNumber();
 
@@ -690,6 +727,7 @@ void LoMachSolver::initialize() {
     MPI_Allreduce(&local_hmax, &hmax, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
   }
   if (verbose) grvy_printf(ginfo, " element size found...\n");      
+
   
   // ADD Up and U FILLER
   
@@ -697,7 +735,7 @@ void LoMachSolver::initialize() {
   //Up->ExchangeFaceNbrData();
 
   // 
-  if (config.GetRestartCycle() == 0) initialTimeStep();
+  //if (config.GetRestartCycle() == 0) initialTimeStep();
   if (mpi_.Root()) cout << "Maximum element size: " << hmax << "m" << endl;
   if (mpi_.Root()) cout << "Minimum element size: " << hmin << "m" << endl;
   //if (mpi_.Root()) cout << "Initial time-step: " << dt << "s" << endl;
@@ -708,8 +746,9 @@ void LoMachSolver::initialize() {
 
 void LoMachSolver::Setup(double dt)
 {
-  
-   //partial_assembly = false; // HACK
+
+   partial_assembly = true; // not working?
+   //partial_assembly = false;
    //if (verbose) grvy_printf(ginfo, "in Setup...\n");
    /*
    if (verbose && pmesh->GetMyRank() == 0)
@@ -720,7 +759,7 @@ void LoMachSolver::Setup(double dt)
    }
    */
 
-   int dim = pmesh->Dimension();      
+   //int dim = pmesh->Dimension();      
    
    // adding bits from old main here
    // Set the initial condition.
@@ -755,13 +794,14 @@ void LoMachSolver::Setup(double dt)
    
    Array<int> domain_attr(pmesh->attributes);
    domain_attr = 1;
-   AddAccelTerm(accel, domain_attr);
+   AddAccelTerm(accel, domain_attr); // HERE wire to input file
 
 
    
    Vector zero_vec(3); zero_vec = 0.0;
    Array<int> attr(pmesh->bdr_attributes.Max());
-   //std::cout << "attr bdr size: " << pmesh->bdr_attributes.Max() << endl;
+   attr = 0.0;
+   //std::cout << "attr bdr size: " << pmesh->bdr_attributes.Max() << endl;   
 
    buffer_ubc = new VectorConstantCoefficient(zero_vec);         
    /*
@@ -791,6 +831,8 @@ void LoMachSolver::Setup(double dt)
    ConstantCoefficient t_bc_coef;
    t_bc_coef.constant = config.wallBC[0].Th;   
    Array<int> Tattr(pmesh->bdr_attributes.Max());
+   Tattr = 0;
+   buffer_tbc = new ConstantCoefficient(t_bc_coef.constant);   
    /*
    Tattr[1] = 1;
    Tattr[3] = 1;
@@ -810,9 +852,11 @@ void LoMachSolver::Setup(double dt)
        }
      }
    }
-   AddTempDirichletBC(temp_wall, Tattr); // FIX FIX FIX
+   //AddTempDirichletBC(temp_wall, Tattr); // FIX FIX FIX
+   AddTempDirichletBC(buffer_tbc, Tattr);
+   //AddTempDirichletBC(t_bc_coef, Tattr);   
    /**/
-   //std::cout << "Check 4..." << std::endl;  
+   std::cout << "Check 4..." << std::endl;  
 
    // returning to regular setup   
    sw_setup.Start();
@@ -820,13 +864,13 @@ void LoMachSolver::Setup(double dt)
    vfes->GetEssentialTrueDofs(vel_ess_attr, vel_ess_tdof);
    pfes->GetEssentialTrueDofs(pres_ess_attr, pres_ess_tdof);
    tfes->GetEssentialTrueDofs(temp_ess_attr, temp_ess_tdof);
-   nfes->GetEssentialTrueDofs(vel_ess_attr, vel_ess_tdof);    //  this may break?
+   //nfes->GetEssentialTrueDofs(vel_ess_attr, vel_ess_tdof);    //  this may break?
    //std::cout << "Check 5..." << std::endl;     
 
    int Vdof = vfes->GetTrueVSize();   
    int Pdof = pfes->GetTrueVSize();
    int Tdof = tfes->GetTrueVSize();
-   int Ndof = nfes->GetTrueVSize();   
+   //int Ndof = nfes->GetTrueVSize();   
 
    //bufferPM0 = new ParGridFunction(tfes);
    //bufferPM1 = new ParGridFunction(pfes);      
@@ -839,15 +883,16 @@ void LoMachSolver::Setup(double dt)
    
    // GLL integration rule (Numerical Integration)
    const IntegrationRule &ir_ni = gll_rules.Get(vfes->GetFE(0)->GetGeomType(), 2 * order);
-   const IntegrationRule &ir_nli = gll_rules.Get(nfes->GetFE(0)->GetGeomType(), 3 * norder - 1);
+   //const IntegrationRule &ir_nli = gll_rules.Get(nfes->GetFE(0)->GetGeomType(), 3 * norder - 1);
+   const IntegrationRule &ir_nli = gll_rules.Get(vfes->GetFE(0)->GetGeomType(), 3 * norder - 1);
    const IntegrationRule &ir_pi = gll_rules.Get(pfes->GetFE(0)->GetGeomType(), 2 * porder);   
    const IntegrationRule &ir_i  = gll_rules.Get(tfes->GetFE(0)->GetGeomType(), 2 * order);
-   //std::cout << "Check 6..." << std::endl;     
+   std::cout << "Check 6..." << std::endl;     
    
    // convection section, extrapolation
    nlcoeff.constant = -1.0;
-   //N = new ParNonlinearForm(vfes);
-   N = new ParNonlinearForm(nfes);
+   N = new ParNonlinearForm(vfes);
+   //N = new ParNonlinearForm(nfes);
    auto *nlc_nlfi = new VectorConvectionNLFIntegrator(nlcoeff);
    if (numerical_integ)
    {
@@ -859,21 +904,21 @@ void LoMachSolver::Setup(double dt)
       N->SetAssemblyLevel(AssemblyLevel::PARTIAL);
       N->Setup();
    }
-   //std::cout << "Check 7..." << std::endl;     
+   std::cout << "Check 7..." << std::endl;     
 
    // mass matrix
    Mv_form = new ParBilinearForm(vfes);
+   //std::cout << "Check 7a..." << std::endl;        
    auto *mv_blfi = new VectorMassIntegrator;
-   if (numerical_integ)
-   {
-      mv_blfi->SetIntRule(&ir_ni);
-   }
+   //std::cout << "Check 7b..." << std::endl;        
+   if (numerical_integ) { mv_blfi->SetIntRule(&ir_ni); }
+   //std::cout << "Check 7c..." << std::endl;        
    Mv_form->AddDomainIntegrator(mv_blfi);
-   if (partial_assembly)
-   {
-      Mv_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-   }
+   //std::cout << "Check 7d..." << std::endl;           
+   if (partial_assembly) { Mv_form->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
+   //std::cout << "Check 7e..." << std::endl;           
    Mv_form->Assemble();
+   //std::cout << "Check 7f..." << std::endl;           
    Mv_form->FormSystemMatrix(empty, Mv);
    //std::cout << "Check 8..." << std::endl;     
 
@@ -883,14 +928,13 @@ void LoMachSolver::Setup(double dt)
    //ParGridFunction buffer1(pfes);
    bufferInvRho = new ParGridFunction(pfes);
    {
-   double *data = bufferInvRho->HostReadWrite();
-   double *Tdata = Tn.HostReadWrite();
-   double To = 298.0;
-   double rho_o = Po / (Rgas * To); // P = rho*RT
-   //for (int eq = 0; eq < pmesh->Dimension(); eq++) {
-     for (int i = 0; i < Pdof; i++) {     
-       // get rho here
-       //data1[i] = (Rgas * Tdata[i]) / Po * rho_o;
+     double *data = bufferInvRho->HostReadWrite();
+     //double *dataRho = rn_gf.HostReadWrite();   
+     //double *Tdata = Tn.HostReadWrite();
+     //for (int eq = 0; eq < pmesh->Dimension(); eq++) {
+     for (int i = 0; i < Tdof; i++) {     
+       //dataRho[i] = ambientPressure / (Rgas * Tdata[i]);       
+       //data[i] = (Rgas * Tdata[i]) / ambientPressure;
        data[i] = 1.0;
      }
    }
@@ -901,7 +945,7 @@ void LoMachSolver::Setup(double dt)
    // looks like this is the Laplacian for press eq
    Sp_form = new ParBilinearForm(pfes);
    auto *sp_blfi = new DiffusionIntegrator;
-   //auto *sp_blfi = new DiffusionIntegrator(*invRho);
+   //auto *sp_blfi = new DiffusionIntegrator(*invRho); // HERE breaks with amg
    if (numerical_integ)
    {
       sp_blfi->SetIntRule(&ir_pi);
@@ -913,7 +957,8 @@ void LoMachSolver::Setup(double dt)
    }
    Sp_form->Assemble();
    Sp_form->FormSystemMatrix(pres_ess_tdof, Sp);
-   //std::cout << "Check 10..." << std::endl;  
+   std::cout << "Check 10..." << std::endl;  
+
    
    // div(u)
    D_form = new ParMixedBilinearForm(vfes, tfes);
@@ -929,7 +974,7 @@ void LoMachSolver::Setup(double dt)
    }
    D_form->Assemble();
    D_form->FormRectangularSystemMatrix(empty, empty, D);
-   //std::cout << "Check 11..." << std::endl;  
+   std::cout << "Check 11..." << std::endl;  
    
    // for grad(div(u))?
    G_form = new ParMixedBilinearForm(tfes, vfes);
@@ -945,33 +990,39 @@ void LoMachSolver::Setup(double dt)
    }
    G_form->Assemble();
    G_form->FormRectangularSystemMatrix(empty, empty, G);
-   //std::cout << "Check 12..." << std::endl;  
+   std::cout << "Check 12..." << std::endl;  
    
    // viscosity field
    //ParGridFunction buffer2(vfes); // or pfes here?
    bufferVisc = new ParGridFunction(vfes);
    {
-   double *data = bufferVisc->HostReadWrite();   
-   for (int i = 0; i < Vdof; i++) {
-     // double rho = 1.0;
-     // get nu here
-     //transport->ComputeViscosities(rho, double* kin_vis, double* bulk_visc, double* therm_cond)
-     data[i] = kin_vis;
-   }
+     double *data = bufferVisc->HostReadWrite();
+     double *Tdata = Tn.HostReadWrite();     
+     double visc[2];
+     double prim[nvel+2];
+     for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
+     for (int i = 0; i < Tdof; i++) {
+       for (int eq = 0; eq < nvel; eq++) {
+         prim[1+nvel] = Tdata[i];
+         transportPtr->GetViscosities(prim, prim, visc);
+         data[i + eq * Tdof] = visc[0];	   
+         //data[i + eq * Tdof] = kin_vis; // static value
+       }
+     }
    }
    //GridFunctionCoefficient viscField(&buffer2);
    viscField = new GridFunctionCoefficient(bufferVisc);
-   //std::cout << "Check 13..." << std::endl;     
+   std::cout << "Check 13..." << std::endl;     
    
-   // why is this even needed, kin_vis is applied manually in "Step"
    // this is used in the last velocity implicit solve, Step kin_vis is
    // only for the pressure-poisson
    H_lincoeff.constant = kin_vis;
    H_bdfcoeff.constant = 1.0 / dt;
    H_form = new ParBilinearForm(vfes);
+   //H_form = new ParBilinearForm(pfes); // maybe?
    auto *hmv_blfi = new VectorMassIntegrator(H_bdfcoeff); // diagonal from unsteady term
-   //auto *hdv_blfi = new VectorDiffusionIntegrator(H_lincoeff);
-   auto *hdv_blfi = new VectorDiffusionIntegrator(*viscField); // Laplacian
+   auto *hdv_blfi = new VectorDiffusionIntegrator(H_lincoeff);
+   //auto *hdv_blfi = new VectorDiffusionIntegrator(*viscField); // Laplacian
    if (numerical_integ)
    {
       hmv_blfi->SetIntRule(&ir_ni);
@@ -985,17 +1036,19 @@ void LoMachSolver::Setup(double dt)
    }
    H_form->Assemble();
    H_form->FormSystemMatrix(vel_ess_tdof, H);
-   //std::cout << "Check 14..." << std::endl;     
+   std::cout << "Check 14..." << std::endl;     
    
    // boundary terms   
    FText_gfcoeff = new VectorGridFunctionCoefficient(&FText_gf);
-   FText_bdr_form = new ParLinearForm(pfes);
+   //FText_bdr_form = new ParLinearForm(pfes);
+   FText_bdr_form = new ParLinearForm(vfes); // maybe?
    auto *ftext_bnlfi = new BoundaryNormalLFIntegrator(*FText_gfcoeff);
    if (numerical_integ) { ftext_bnlfi->SetIntRule(&ir_ni); }
    FText_bdr_form->AddBoundaryIntegrator(ftext_bnlfi, vel_ess_attr);
    // std::cout << "Check 14..." << std::endl;     
 
-   g_bdr_form = new ParLinearForm(vfes); //? was pfes 
+   g_bdr_form = new ParLinearForm(vfes); //? was pfes
+   //g_bdr_form = new ParLinearForm(pfes);
    for (auto &vel_dbc : vel_dbcs)
    {
       auto *gbdr_bnlfi = new BoundaryNormalLFIntegrator(*vel_dbc.coeff);
@@ -1038,7 +1091,7 @@ void LoMachSolver::Setup(double dt)
    MvInv->SetPrintLevel(pl_mvsolve);
    MvInv->SetRelTol(1e-12);
    MvInv->SetMaxIter(500);
-   //std::cout << "Check 17..." << std::endl;     
+   std::cout << "Check 17..." << std::endl;     
 
    
    /**/
@@ -1073,8 +1126,9 @@ void LoMachSolver::Setup(double dt)
    SpInv->SetRelTol(rtol_spsolve);
    SpInv->SetMaxIter(500);
    /**/
-   //std::cout << "Check 18..." << std::endl;     
+   std::cout << "Check 18..." << std::endl;     
 
+   
    // this wont be as efficient but AMG merhod (above) wasnt allowing for updates to variable coeff
    /*
    if (partial_assembly)
@@ -1101,13 +1155,19 @@ void LoMachSolver::Setup(double dt)
    if (partial_assembly)
    {
       Vector diag_pa(vfes->GetTrueVSize());
-      H_form->AssembleDiagonal(diag_pa);
+      //Vector diag_pa(pfes->GetTrueVSize()); // maybe?
+      std::cout << "Check 18a..." << std::endl;
+      H_form->AssembleDiagonal(diag_pa); // invalid read
+      std::cout << "Check 18b..." << std::endl;                 
       HInvPC = new OperatorJacobiSmoother(diag_pa, vel_ess_tdof);
+      std::cout << "Check 18c..." << std::endl;                 
    }
    else
    {
-      HInvPC = new HypreSmoother(*H.As<HypreParMatrix>());
+      HInvPC = new HypreSmoother(*H.As<HypreParMatrix>()); // conditional jump
+      std::cout << "Check 18d..." << std::endl;                 
       dynamic_cast<HypreSmoother *>(HInvPC)->SetType(HypreSmoother::Jacobi, 1);
+      std::cout << "Check 18e..." << std::endl;                 
    }
    HInv = new CGSolver(vfes->GetComm());
    HInv->iterative_mode = true;
@@ -1116,12 +1176,19 @@ void LoMachSolver::Setup(double dt)
    HInv->SetPrintLevel(pl_hsolve);
    HInv->SetRelTol(rtol_hsolve);
    HInv->SetMaxIter(500);
-   //std::cout << "Check 19..." << std::endl;     
+   std::cout << "Check 19..." << std::endl;     
 
    // If the initial condition was set, it has to be aligned with dependent
    // Vectors and GridFunctions
    un_gf.GetTrueDofs(un);
-   un_next = un;
+   //un_next = un; // invalid read
+   {
+     double *data = un_next.HostReadWrite();
+     double *Udata = un.HostReadWrite();   
+     for (int i = 0; i < Vdof; i++) {     
+       data[i] = Udata[i];
+     }
+   }   
    un_next_gf.SetFromTrueDofs(un_next);
 
    
@@ -1134,7 +1201,7 @@ void LoMachSolver::Setup(double dt)
    if (partial_assembly) { Mt_form->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
    Mt_form->Assemble();
    Mt_form->FormSystemMatrix(empty, Mt);
-   //std::cout << "Check 20..." << std::endl;        
+   std::cout << "Check 20..." << std::endl;        
    
    // div(uT) for temperature
    Dt_form = new ParMixedBilinearForm(vfes, tfes);
@@ -1150,30 +1217,34 @@ void LoMachSolver::Setup(double dt)
    }
    Dt_form->Assemble();
    Dt_form->FormRectangularSystemMatrix(empty, empty, Dt);
-   //std::cout << "Check 21..." << std::endl;        
+   std::cout << "Check 21..." << std::endl;        
    
    // thermal diffusivity field
    //ParGridFunction buffer3(tfes);
-   double Pr = 1.2;
    bufferAlpha = new ParGridFunction(tfes);
    {
-   double *data = bufferAlpha->HostReadWrite();
-   for (int i = 0; i < Tdof; i++) {
-     // get alpha here
-     //transport->ComputeViscosities(rho, double* kin_vis, double* bulk_visc, double* therm_cond)
-     data[i] = kin_vis / Pr;
-   }
-   }
+     double *data = bufferAlpha->HostReadWrite();
+     double *Tdata = Tn.HostReadWrite();     
+     double visc[2];
+     double prim[nvel+2];
+     for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
+     for (int i = 0; i < Tdof; i++) {
+         prim[1+nvel] = Tdata[i];
+         transportPtr->GetViscosities(prim, prim, visc);
+         data[i] = visc[0] / Pr;	   
+         //data[i] = kin_vis; // static value
+     }
+   }   
    //GridFunctionCoefficient alphaField(&buffer3);
    alphaField = new GridFunctionCoefficient(bufferAlpha);
    //std::cout << "Check 22..." << std::endl;        
- 
+   
    Ht_lincoeff.constant = kin_vis / Pr; 
    Ht_bdfcoeff.constant = 1.0 / dt;
    Ht_form = new ParBilinearForm(tfes);
    auto *hmt_blfi = new MassIntegrator(Ht_bdfcoeff); // unsteady bit
-   //auto *hdt_blfi = new DiffusionIntegrator(Ht_lincoeff);
-   auto *hdt_blfi = new DiffusionIntegrator(*alphaField); // Laplacian bit
+   auto *hdt_blfi = new DiffusionIntegrator(Ht_lincoeff);
+   //auto *hdt_blfi = new DiffusionIntegrator(*alphaField); // Laplacian bit
    //std::cout << "Check 23..." << std::endl;        
    
    if (numerical_integ)
@@ -1191,7 +1262,7 @@ void LoMachSolver::Setup(double dt)
    Ht_form->FormSystemMatrix(temp_ess_tdof, Ht);
    //std::cout << "Check 24..." << std::endl;        
    
-   // boundary terms   
+   // temp boundary terms   
    Text_gfcoeff = new GridFunctionCoefficient(&Text_gf);
    Text_bdr_form = new ParLinearForm(tfes);
    auto *text_blfi = new BoundaryLFIntegrator(*Text_gfcoeff);
@@ -1225,7 +1296,7 @@ void LoMachSolver::Setup(double dt)
    MtInv->SetPrintLevel(pl_mtsolve);
    MtInv->SetRelTol(1e-12);
    MtInv->SetMaxIter(500);
-   //std::cout << "Check 26..." << std::endl;        
+   std::cout << "Check 26..." << std::endl;        
    
    if (partial_assembly)
    {
@@ -1250,8 +1321,22 @@ void LoMachSolver::Setup(double dt)
    // If the initial condition was set, it has to be aligned with dependent
    // Vectors and GridFunctions
    Tn_gf.GetTrueDofs(Tn);
-   Tn_next = Tn;
-   Tn_next_gf.SetFromTrueDofs(Tn_next);
+   //Tn_next = Tn;
+   {
+     double *data = Tn_next.HostReadWrite();
+     double *Tdata = Tn.HostReadWrite();   
+     for (int i = 0; i < Tdof; i++) {     
+       data[i] = Tdata[i];
+     }
+   }      
+   //Tn_next_gf.SetFromTrueDofs(Tn_next); // invalid read
+   {
+     double *data = Tn_next_gf.HostReadWrite();
+     double *Tdata = Tn_next.HostReadWrite();   
+     for (int i = 0; i < Tdof; i++) {     
+       data[i] = Tdata[i];
+     }
+   }    
    //std::cout << "Check 28..." << std::endl;     
 
    
@@ -1285,7 +1370,7 @@ void LoMachSolver::Setup(double dt)
    }
    
    sw_setup.Stop();
-   //std::cout << "Check 29..." << std::endl;     
+   std::cout << "Check 29..." << std::endl;     
    
 }
 
@@ -1369,37 +1454,42 @@ void LoMachSolver::projectInitialSolution() {
   }
   */  
 
-
+  /*
   if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
     // why would this be called if restart==0?  restart_files_hdf5("read");
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
     paraviewColl->UseRestartMode(true);
   }
-  if (verbose) grvy_printf(ginfo, " PIS 1...\n");            
-
+  */
+  //if (verbose) grvy_printf(ginfo, " PIS 1...\n");            
   
   //initGradUp();
 
   //updatePrimitives();
 
+  /*
   // update pressure grid function
   mixture->UpdatePressureGridFunction(press, Up);
-  if (verbose) grvy_printf(ginfo, " PIS 2...\n");              
+  //if (verbose) grvy_printf(ginfo, " PIS 2...\n");  
 
   // update plasma electrical conductivity
   if (tpsP_->isFlowEMCoupled()) {
     mixture->SetConstantPlasmaConductivity(plasma_conductivity_, Up);
   }
-  if (verbose) grvy_printf(ginfo, " PIS 3...\n");              
+  //if (verbose) grvy_printf(ginfo, " PIS 3...\n");
+  */
 
   if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
     // Only save IC from fresh start.  On restart, will save viz at
     // next requested iter.  This avoids possibility of trying to
     // overwrite existing paraview data for the current iteration.
-    /////// CAUSING SEG FAULT    if (!(tpsP_->isVisualizationMode())) paraviewColl->Save();
+    
+    /////// CAUSING SEG FAULT     // HERE HERE HERE
+    // if (!(tpsP_->isVisualizationMode())) paraviewColl->Save();
+    
   }
-  if (verbose) grvy_printf(ginfo, " PIS 4...\n");            
+  //if (verbose) grvy_printf(ginfo, " PIS 4...\n");            
   
 }
 
@@ -1414,8 +1504,9 @@ void LoMachSolver::initialTimeStep() {
     for (int eq = 0; eq < num_equation; eq++) state[eq] = dataU[n + eq * dof];
 
     // REMOVE SOS
-    double iC = mixture->ComputeMaxCharSpeed(state);
-    if (iC > max_speed) max_speed = iC;
+    //double iC = mixture->ComputeMaxCharSpeed(state);
+    //if (iC > max_speed) max_speed = iC;
+    
   }
 
   double partition_C = max_speed;
@@ -1459,19 +1550,71 @@ void LoMachSolver::solve()
    }
   */
 
+  
+  // just restart here
+  if (config.restart) {
+     restart_files_hdf5("read");
+     copyU();
+  }
+  
+  
    //std::cout << "Check 6..." << std::endl;
+
+   if (iter==0) { dt = 1.0e-6; } // HARD CODE
+
+   double Umax_lcl = 1.0e-12;
+   max_speed = Umax_lcl;
+   double Umag;
+   int dof = vfes->GetNDofs();   
 
    // temporary hardcodes
    //double t = 0.0;
    double CFL_actual;
-   double t_final = 1.0;
-   bool last_step = false;
+   double t_final = 1.0;   
+   double dtFactor = 0.1;   
+   //CFL = config.cflNum;
+   CFL = config.GetCFLNumber();
 
+   auto dataU = un_gf.HostRead();   
+   
+     /// make a seperate function ///
+   /*
+   if(iter == 0) {    
+       //std::cout << "okay 1a " << dof << " " << dim << endl;
+       for (int n = 0; n < dof; n++) {
+         Umag = 0.0;
+         for (int eq = 0; eq < dim; eq++) {
+           Umag += dataU[n + eq * dof]*dataU[n + eq * dof];
+         }
+         Umag = sqrt(Umag);
+         Umax_lcl = std::max(Umag,Umax_lcl);
+       }
+       //std::cout << "okay 1c " << endl;
+       std::cout << "values: " << Umax_lcl << " " << max_speed << endl;       
+       MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
+       //std::cout << "okay 1d " << endl;       
+       dt = CFL * hmin / max_speed; // this is conservative  ADD ORDER
+       if( rank0_ == true ) { std::cout << " Starting timestep dt: " << dt << endl; }
+       if( rank0_ == true ) { std::cout << " CFL / hmin / max_speed " << CFL << " " << hmin << " " << max_speed << endl; }              
+    }
+   */
+  
+
+   ParGridFunction *r_gf = GetCurrentDensity();   
    ParGridFunction *u_gf = GetCurrentVelocity();
    ParGridFunction *p_gf = GetCurrentPressure();
-   ParGridFunction *t_gf = GetCurrentTemperature();   
-   dt = config.dt_fixed;
-   CFL = config.cflNum;
+   ParGridFunction *t_gf = GetCurrentTemperature();
+
+  // dt_fixed is initialized to -1, so if it is positive, then the
+  // user requested a fixed dt run
+  const double dt_fixed = config.GetFixedDT();
+  if (dt_fixed > 0) {
+    dt = dt_fixed;
+  }   
+
+  
+   
+   //dt = config.dt_fixed;
    //CFL_actual = ComputeCFL(*u_gf, dt);   
    //EnforceCFL(config.cflNum, u_gf, &dt);
    //dt = dt * max(cflMax_set/cflmax_actual,1.0);
@@ -1485,34 +1628,70 @@ void LoMachSolver::solve()
    }
    */
    
-   dt = 1.0e-6; // HARD CODE
+
+
+   //updateU();
+   //if (verbose) grvy_printf(ginfo, "updateU 1 good...\n");      
    
    Setup(dt);
    //if (verbose) grvy_printf(ginfo, "setup good...\n");   
 
-   /*
+   updateU();
+   //copyU(); // testing   
+   //if (verbose) grvy_printf(ginfo, "updateU 2 good...\n");         
+   
+   /**/
    ParaViewDataCollection pvdc("turbchan", pmesh);
    pvdc.SetDataFormat(VTKFormat::BINARY32);
    pvdc.SetHighOrderOutput(true);
    pvdc.SetLevelsOfDetail(order);
    pvdc.SetCycle(0);
-   pvdc.SetTime(t);
+   pvdc.SetTime(time);
+   //pvdc.RegisterField("density", r_gf);   
    pvdc.RegisterField("velocity", u_gf);
    pvdc.RegisterField("pressure", p_gf);
-   pvdc.RegisterField("temperature", t_gf);   
-   pvdc.Save();
-   */
+   pvdc.RegisterField("temperature", t_gf); 
+   pvdc.Save(); // invalid read
+   if( rank0_ == true ) std::cout << " Saving final step to paraview: " << iter << endl;
+   /**/
+
    
    int iter_start = iter;
-   //std::cout << " Starting main loop, from " << iter_start << " to " << MaxIters << endl;
+   //MaxIters = 5000;
+   if( rank0_ == true ) std::cout << " Starting main loop, from " << iter_start << " to " << MaxIters << endl;
    
-   for (int step = iter_start; !last_step; step++)
+   for (int step = iter_start; step <= MaxIters; step++)
    {
 
      iter = step;
-     if (time + dt >= t_final - dt / 2) { last_step = true; }
+     //if (time + dt >= t_final - dt / 2) { break; }
      //if (step + 1 == MaxIters) { last_step = true; }
-     if (step+1 == 1) { last_step = true; }      ///HACK
+     //if (step+1 == 1) { last_step = true; }      ///HACK
+
+
+     /// make a seperate function ///
+
+       auto dataU = un_gf.HostRead();
+       //std::cout << "okay 1a " << dof << " " << dim << endl;
+       for (int n = 0; n < dof; n++) {
+         Umag = 0.0;
+         for (int eq = 0; eq < dim; eq++) {
+           Umag += dataU[n + eq * dof]*dataU[n + eq * dof];
+         }
+         Umag = sqrt(Umag);
+         Umax_lcl = std::max(Umag,Umax_lcl);
+       }
+       //std::cout << "okay 1c " << endl;
+       //std::cout << "values: " << Umax_lcl << " " << max_speed << endl;       
+       MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
+       //std::cout << "okay 1d " << endl;       
+       dt = (1.0-dtFactor) * dt + dtFactor * CFL*hmin/(max_speed*(double)order) ; // this is conservative
+       //std::cout << "okay 1e " << endl;
+       //if( rank0_ == true ) { std::cout << "dt: " << dt << endl; }
+       //if( rank0_ == true ) { std::cout << "Umax: " << max_speed << endl; }
+       
+     ////////////////////////////////
+
      
      /*
       if (step % 10 == 0)
@@ -1523,16 +1702,23 @@ void LoMachSolver::solve()
       }
      */
 
-      if (Mpi::Root())
-      {
-	printf("%1s\n", " ");	
-	printf("%2s %11s %11s\n", "N", "Time", "dt");
-	printf("%o %4s %.5E %.5E\n", step, "    ", time, dt);
-        fflush(stdout);
+       //if (Mpi::Root())
+      if (rank0_ == true) {
+	//printf("%1s\n", " ");	
+	//printf("%2s %11s %11s\n", "N", "Time", "dt");
+	//printf("%o %4s %.5E %.5E\n", step, "    ", time, dt);
+        //fflush(stdout);
+        std::cout << "  N    Time    dt   "<< endl;
+        std::cout << " " << step << "    " << time << " " << dt << endl; // conditional jump
       }
 
+      //std::cout << " step/Max: " << step << " " << MaxIters << endl;
+      if (step > MaxIters) { break; }
+
       //if (verbose) grvy_printf(ginfo, "calling step...\n");         
-      Step(time, dt, step);      
+      Step(time, dt, step, iter_start);      
+
+
       
       // NECESSARY ADDITIONS:
 
@@ -1546,11 +1732,50 @@ void LoMachSolver::solve()
       */
 
       // restart files
-
+      if ( iter%config.itersOut == 0) {
+        updateU();
+        restart_files_hdf5("write");
+      }
+      
       // paraview
+      /*
+      if (iter == MaxIters) {
+        // auto hUp = Up->HostRead();
+        Up->HostRead();
+        mixture->UpdatePressureGridFunction(press, Up);
+	
+        paraviewColl->SetCycle(iter);
+        paraviewColl->SetTime(time);
+        paraviewColl->Save();
+
+        average->write_meanANDrms_restart_files(iter, time);
+	
+      }
+      */
       
    }
 
+   //ParaViewDataCollection pvdc("turbchan", pmesh);
+   //pvdc.SetDataFormat(VTKFormat::BINARY32);
+   //pvdc.SetHighOrderOutput(true);
+   //pvdc.SetLevelsOfDetail(order);
+   pvdc.SetCycle(iter);
+   pvdc.SetTime(time);
+   //pvdc.RegisterField("velocity", u_gf);
+   //pvdc.RegisterField("pressure", p_gf);
+   //pvdc.RegisterField("temperature", t_gf);   
+   pvdc.Save(); // invalid read and conditional jump
+   if( rank0_ == true ) std::cout << " Saving final step to paraview: " << iter << endl;      
+   
+   /*
+   //Up->HostRead();
+   //mixture->UpdatePressureGridFunction(press, Up);
+   restart_files_hdf5("write");
+   paraviewColl->SetCycle(iter);
+   paraviewColl->SetTime(time);
+   paraviewColl->Save();
+   */
+   
    //std::cout << " Finished main loop"  << endl;   
    //flowsolver.PrintTimingData();
 
@@ -1559,8 +1784,7 @@ void LoMachSolver::solve()
 
 
 // all the variable coefficient operators musc be re-build every step...
-void LoMachSolver::Step(double &time, double dt, int current_step,
-                        bool provisional)
+void LoMachSolver::Step(double &time, double dt, const int current_step, const int start_step, bool provisional)
 {
   //if (verbose) grvy_printf(ginfo, "in step...\n");           
    sw_step.Start();
@@ -1568,10 +1792,10 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
    int Vdof = vfes->GetTrueVSize();   
    int Pdof = pfes->GetTrueVSize();
    int Tdof = tfes->GetTrueVSize();
-   int Ndof = nfes->GetTrueVSize();      
+   //int Ndof = nfes->GetTrueVSize();
    
    //std::cout << "Check a..." << std::endl;
-   SetTimeIntegrationCoefficients(current_step);
+   SetTimeIntegrationCoefficients(current_step-start_step);
 
    // Set current time for velocity Dirichlet boundary conditions.
    for (auto &vel_dbc : vel_dbcs) {vel_dbc.coeff->SetTime(time + dt);}
@@ -1580,12 +1804,31 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
    for (auto &pres_dbc : pres_dbcs) {pres_dbc.coeff->SetTime(time + dt);}
    //std::cout << "Check b..." << std::endl;
 
-   double Pr = 1.2;
+
+   /*
    double *dataVisc = bufferVisc->HostReadWrite();
    for (int i = 0; i < Vdof; i++) { // should this be dof of Vdof size?
      dataVisc[i] = kin_vis;
    }
-   //std::cout << "Check c..." << std::endl;   
+   */
+   //std::cout << "Check c..." << std::endl;
+
+   double *dataVisc = bufferVisc->HostReadWrite();   
+   {
+     double *Tdata = Tn.HostReadWrite();     
+     double visc[2];
+     double prim[nvel+2];
+     for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
+     for (int i = 0; i < Tdof; i++) {
+       for (int eq = 0; eq < nvel; eq++) {
+         prim[1+nvel] = Tdata[i];
+         transportPtr->GetViscosities(prim, prim, visc);
+         dataVisc[i + eq * Tdof] = visc[0];	   
+         //dataVisc[i + eq * Tdof] = kin_vis; // static value
+       }
+     }
+   }
+   
    
    H_bdfcoeff.constant = bd0 / dt;
    H_form->Update();
@@ -1598,7 +1841,7 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
    {
       delete HInvPC;
       Vector diag_pa(vfes->GetTrueVSize());
-      H_form->AssembleDiagonal(diag_pa);
+      H_form->AssembleDiagonal(diag_pa); // invalid read
       HInvPC = new OperatorJacobiSmoother(diag_pa, vel_ess_tdof);
       HInv->SetPreconditioner(*HInvPC);
    }
@@ -1634,7 +1877,8 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
    {
    double *data = R1PX2_gf.HostReadWrite();
    double *Udata = uBn.HostReadWrite();      
-   for (int i = 0; i < Ndof; i++) {     
+   //   for (int i = 0; i < Ndof; i++) {
+      for (int i = 0; i < Vdof; i++) {     
      Udata[i] = data[i];
    }
    }   
@@ -1650,7 +1894,8 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
    {
    double *data = R1PX2_gf.HostReadWrite();
    double *Udata = uBnm1.HostReadWrite();      
-   for (int i = 0; i < Ndof; i++) {     
+   //for (int i = 0; i < Ndof; i++) {
+   for (int i = 0; i < Vdof; i++) {     
      Udata[i] = data[i];
    }
    }      
@@ -1666,13 +1911,14 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
    {
    double *data = R1PX2_gf.HostReadWrite();
    double *Udata = uBnm2.HostReadWrite();      
-   for (int i = 0; i < Ndof; i++) {     
+   //for (int i = 0; i < Ndof; i++) {
+   for (int i = 0; i < Vdof; i++) {     
      Udata[i] = data[i];
    }
    }
    //std::cout << "Check g..." << std::endl;         
    
-   N->Mult(uBn, Nun);
+   N->Mult(uBn, Nun); // invalid read
    N->Mult(uBnm1, Nunm1);
    N->Mult(uBnm2, Nunm2);
    //std::cout << "Check h..." << std::endl;         
@@ -1699,7 +1945,8 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
    {
    double *data = R1PX2_gf.HostReadWrite();
    double *Fdata = FBext.HostReadWrite();   
-   for (int i = 0; i < Ndof; i++) {     
+   //for (int i = 0; i < Ndof; i++) {
+   for (int i = 0; i < Vdof; i++) {     
      data[i] = Fdata[i];
    }
    }   
@@ -1717,7 +1964,7 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
    Fext.Add(1.0, fn); 
 
    // Fext = M^{-1} (F(u^{n}) + f^{n+1}) (F* w/o known part of BDF)
-   MvInv->Mult(Fext, tmpR1);
+   MvInv->Mult(Fext, tmpR1); // conditional jump
    iter_mvsolve = MvInv->GetNumIterations();
    res_mvsolve = MvInv->GetFinalNorm();
    Fext.Set(1.0, tmpR1);
@@ -1805,13 +2052,13 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
 
    // add some if for porder != vorder
    // project FText to p-1
-   D->Mult(FText, tmpR0);  // tmp3 c p, tmp2 and resp c (p-1)
+   D->Mult(FText, tmpR0);  // tmp3 c p, tmp2 and resp c (p-1) // possible invalid read
    tmpR0.Neg();
    //std::cout << "Check p..." << std::endl;   
 
    // Add boundary terms.
    FText_gf.SetFromTrueDofs(FText);
-   FText_bdr_form->Assemble();
+   FText_bdr_form->Assemble();  // invalid read and conditional jump
    FText_bdr_form->ParallelAssemble(FText_bdr);
    g_bdr_form->Assemble();
    g_bdr_form->ParallelAssemble(g_bdr);
@@ -1820,19 +2067,19 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
 
    // project rhs to p-space
    {
-   double *data = R0PM0_gf.HostReadWrite();
-   double *d_buf = tmpR0.HostReadWrite();   
-   for (int i = 0; i < Tdof; i++) {     
-     data[i] = d_buf[i];
-   }
+     double *data = R0PM0_gf.HostReadWrite();
+     double *d_buf = tmpR0.HostReadWrite();   
+     for (int i = 0; i < Tdof; i++) {     
+       data[i] = d_buf[i];
+     }
    }
    R0PM1_gf.ProjectGridFunction(R0PM0_gf);
    {
-   double *data = resp.HostReadWrite();
-   double *d_buf = R0PM1_gf.HostReadWrite();   
-   for (int i = 0; i < Pdof; i++) {     
-     data[i] = d_buf[i];
-   }
+     double *data = resp.HostReadWrite();
+     double *d_buf = R0PM1_gf.HostReadWrite();   
+     for (int i = 0; i < Pdof; i++) {     
+       data[i] = d_buf[i];
+     }
    }   
    
    //resp.Add(1.0, FText_bdr);
@@ -1855,17 +2102,94 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
      data[i] = Tdata[i];
    }
    }
-   R0PM1_gf.ProjectGridFunction(R0PM0_gf);   
+   R0PM1_gf.ProjectGridFunction(R0PM0_gf);
+   */
    {
-   double To = 298.0;
-   //double invRho_o = (Rgas * To) / Po; // P = rho*RT
-   double *data = bufferInvRho->HostReadWrite(); // invRho
-   double *Tdata = R0PM1_gf.HostReadWrite();   
-   for (int i = 0; i < Pdof; i++) {     
-     data[i] = 1.0; // Tdata[i] / To;
-   }
+     double *data = bufferInvRho->HostReadWrite();
+     //double *dataRho = rn_gf.HostReadWrite();   
+     //     double *Tdata = Tn.HostReadWrite();          
+     for (int i = 0; i < Tdof; i++) {     
+       //dataRho[i] = ambientPressure / (Rgas * Tdata[i]);
+       //dataRho[i] = Tdata[i];              
+       //data[i] = (Rgas * Tdata[i]) / ambientPressure;
+       data[i] = 1.0;
+     }
    }
 
+
+   
+   /// REBUILD FROM SCRATCH EVERY TIMESTEP ///
+   /*
+   delete Sp_form;
+   delete SpInv;   
+   delete SpInvOrthoPC;
+   delete SpInvPC;
+   //delete lor;
+
+   const IntegrationRule &ir_pi = gll_rules.Get(pfes->GetFE(0)->GetGeomType(), 2 * porder);      
+   invRho = new GridFunctionCoefficient(bufferInvRho);
+   std::cout << "Check 1..." << std::endl;     
+   
+   // looks like this is the Laplacian for press eq
+   Sp_form = new ParBilinearForm(pfes);
+   //auto *sp_blfi = new DiffusionIntegrator;
+   std::cout << "Check 2..." << std::endl;        
+   auto *sp_blfi = new DiffusionIntegrator(*invRho); // HERE
+   if (numerical_integ)
+   {
+      sp_blfi->SetIntRule(&ir_pi);
+   }
+   Sp_form->AddDomainIntegrator(sp_blfi);
+   //if (partial_assembly)
+   //{
+   //   Sp_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+   //}
+   std::cout << "Check 3..." << std::endl;        
+   Sp_form->Assemble();
+   std::cout << "Check 4..." << std::endl;        
+   Sp_form->FormSystemMatrix(pres_ess_tdof, Sp);
+   std::cout << "Check 5..." << std::endl;
+
+   //if (partial_assembly)
+   //{
+   //   lor = new ParLORDiscretization(*Sp_form, pres_ess_tdof);
+   //   SpInvPC = new HypreBoomerAMG(lor->GetAssembledMatrix());
+   //   SpInvPC->SetPrintLevel(pl_amg);
+   //   SpInvPC->Mult(resp, pn);
+   //   SpInvOrthoPC = new OrthoSolver(vfes->GetComm());
+   //   SpInvOrthoPC->SetSolver(*SpInvPC);
+   //}
+   //else
+   //{
+      SpInvPC = new HypreBoomerAMG(*Sp.As<HypreParMatrix>());
+      SpInvPC->SetPrintLevel(0);
+      SpInvOrthoPC = new OrthoSolver(vfes->GetComm());
+      SpInvOrthoPC->SetSolver(*SpInvPC);
+      //}
+   SpInv = new CGSolver(vfes->GetComm());
+   std::cout << "Check 6..." << std::endl;   
+   SpInv->iterative_mode = true;
+   SpInv->SetOperator(*Sp);
+   std::cout << "Check 7..." << std::endl;   
+   if (pres_dbcs.empty())
+   {
+      SpInv->SetPreconditioner(*SpInvOrthoPC);
+   }
+   else
+   {
+      SpInv->SetPreconditioner(*SpInvPC);
+   }
+   SpInv->SetPrintLevel(pl_spsolve);
+   SpInv->SetRelTol(rtol_spsolve);
+   SpInv->SetMaxIter(500);
+   std::cout << "Check 8..." << std::endl;   
+   */
+   
+   ///////////////////////////////////////////
+
+
+   
+   /*
    Sp_form->Update();
    Sp_form->Assemble();
    Sp_form->FormSystemMatrix(pres_ess_tdof, Sp);
@@ -1881,23 +2205,30 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
    }
    */
 
+
    /* // broken for variable coeff
    Sp_form->Update();
+   std::cout << "Check s1..." << std::endl;         
    Sp_form->Assemble();
+   std::cout << "Check s2..." << std::endl;            
    Sp_form->FormSystemMatrix(pres_ess_tdof, Sp);
+   std::cout << "Check s3..." << std::endl;            
 
    SpInv->SetOperator(*Sp);
+   std::cout << "Check s4..." << std::endl;            
    if (partial_assembly)
    {
       delete lor;   	
       delete SpInvPC;
       lor = new ParLORDiscretization(*Sp_form, pres_ess_tdof);
       SpInvPC = new HypreBoomerAMG(lor->GetAssembledMatrix());
+      std::cout << "Check s5..." << std::endl;               
       if (pres_dbcs.empty()) {
         delete SpInvOrthoPC;           	
         SpInvOrthoPC = new OrthoSolver(vfes->GetComm());
         SpInvOrthoPC->SetSolver(*SpInvPC);      	
 	SpInv->SetPreconditioner(*SpInvOrthoPC);
+        std::cout << "Check s6..." << std::endl;         	
       }
       else {
 	SpInv->SetPreconditioner(*SpInvPC);
@@ -1921,9 +2252,9 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
    }
 
    // actual implicit solve for p(n+1)
-   sw_spsolve.Start();
+   sw_spsolve.Start(); 
    //std::cout << "Check r6..." << std::endl;               
-   SpInv->Mult(B1, X1);
+   SpInv->Mult(B1, X1); // conditional jump
    //std::cout << "Check r7..." << std::endl;                  
    sw_spsolve.Stop();
    //std::cout << "Check r8..." << std::endl;                  
@@ -1988,7 +2319,7 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
       H_form->FormLinearSystem(vel_ess_tdof, un_next_gf, resu_gf, H, X2, B2, 1);
    }
    sw_hsolve.Start();
-   HInv->Mult(B2, X2);
+   HInv->Mult(B2, X2); // conditional jump
    sw_hsolve.Stop();
    iter_hsolve = HInv->GetNumIterations();
    res_hsolve = HInv->GetFinalNorm();
@@ -2006,15 +2337,30 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
    //std::cout << "Check v..." << std::endl;
    
    // helmholtz (alphaField)
-   //double Pr = 1.2;
+   /*
    {
-   double *data = bufferAlpha->HostReadWrite();
-   for (int i = 0; i < Tdof; i++) {
-     data[i] = kin_vis / Pr;
+     double *data = bufferAlpha->HostReadWrite();
+     for (int i = 0; i < Tdof; i++) {
+       data[i] = kin_vis / Pr;
+     }
    }
-   }
+   */
+
+   {
+     double *data = bufferAlpha->HostReadWrite();
+     double *Tdata = Tn.HostReadWrite();     
+     double visc[2];
+     double prim[nvel+2];
+     for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
+     for (int i = 0; i < Tdof; i++) {
+         prim[1+nvel] = Tdata[i];
+         transportPtr->GetViscosities(prim, prim, visc);
+         data[i] = visc[0] / Pr;	   
+         //data[i] = kin_vis; // static value
+     }
+   }   
    
-   //Ht_lincoeff.constant = 1000.0 * kin_vis / Pr;   
+   
    Ht_bdfcoeff.constant = bd0 / dt;
    // update visc here
    Ht_form->Update();
@@ -2159,6 +2505,7 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
    }
 
    // explicit filter
+   /*
    if (filter_alpha != 0.0)
    {
      
@@ -2183,28 +2530,10 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
                       + filter_alpha_ * d_Tn_filtered_gf[i];
       });
       
-   }   
+   }
+   */
    
    sw_step.Stop();
-
-   // copies for compatability => is conserved (U) even necessary with this method?
-   /*
-  {
-    int vstart = rfes->GetNDofs();
-    int tstart = (1+nvel)*tfes->GetNDofs();
-    double *dataUp = Up->HostWrite();    
-    const auto d_un_gf = un_gf.Read();    
-    mfem::forall(un_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
-    {
-      dataUp[i + vstart] = d_un_gf[i];
-    });
-    const auto d_tn_gf = Tn_gf.Read();    
-    mfem::forall(Tn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
-    {
-      dataUp[i + tstart] = d_tn_gf[i];
-    });    
-  }
-   */
   
    
    if (verbose && pmesh->GetMyRank() == 0)
@@ -2223,11 +2552,11 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
       }
       mfem::out << std::setw(5) << "PRES " << std::setw(5) << std::fixed
                 << iter_spsolve << "   " << std::setw(3) << std::setprecision(2)
-                << std::scientific << res_spsolve << "   " << rtol_spsolve
+                << std::scientific << res_spsolve << "   " << rtol_spsolve // conditional jump
                 << "\n";
       mfem::out << std::setw(5) << "HELM " << std::setw(5) << std::fixed
                 << iter_hsolve << "   " << std::setw(3) << std::setprecision(2)
-                << std::scientific << res_hsolve << "   " << rtol_hsolve
+                << std::scientific << res_hsolve << "   " << rtol_hsolve // conditional jump
                 << "\n";
       mfem::out << std::setw(5) << "TEMP " << std::setw(5) << std::fixed
                 << iter_htsolve << "   " << std::setw(3) << std::setprecision(2)
@@ -2242,18 +2571,23 @@ void LoMachSolver::Step(double &time, double dt, int current_step,
  // copies for compatability => is conserved (U) even necessary with this method?
 void LoMachSolver::updateU() {
 
-  double *dataU = U->HostReadWrite();
-  double *dataUp = Up->HostReadWrite();
-  int dof = tfes->GetNDofs();
+  std::cout << " updating big U vector..." << endl;
+  //int dof = tfes->GetNDofs();
+  //std::cout << " check 0" << endl;      
 
   // primitive state
   {
 
+    //double *dataU = U->HostReadWrite();
+    double *dataUp = Up->HostReadWrite();
+    //std::cout << " check 1" << endl;    
+    
     const auto d_rn_gf = rn_gf.Read();    
     mfem::forall(rn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
     {
       dataUp[i] = d_rn_gf[i];
-    });    
+    });
+    //std::cout << " check 2" << endl;        
     
     int vstart = rfes->GetNDofs();
     const auto d_un_gf = un_gf.Read();    
@@ -2261,18 +2595,25 @@ void LoMachSolver::updateU() {
     {
       dataUp[i + vstart] = d_un_gf[i];
     });
+    //std::cout << " check 3" << endl;        
 
-    int tstart = (1+nvel)*tfes->GetNDofs();    
+    int tstart = (1+nvel)*(tfes->GetNDofs());    
     const auto d_tn_gf = Tn_gf.Read();    
     mfem::forall(Tn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
     {
       dataUp[i + tstart] = d_tn_gf[i];
     });
+    //std::cout << " check 4" << endl;
     
   }
 
   // conserved state
-  {  
+  /*
+  {
+
+    double *dataU = U->HostReadWrite();
+    double *dataUp = Up->HostReadWrite();
+  
     Vector Upi;
     Upi.UseDevice(false);
     Upi.SetSize(num_equation);
@@ -2290,8 +2631,50 @@ void LoMachSolver::updateU() {
       }    
     }
   }
+*/
 
 }
+
+
+void LoMachSolver::copyU() {
+
+  std::cout << " copying from U vector..." << endl;
+  //int dof = tfes->GetNDofs();
+  //std::cout << " check 0" << endl;      
+
+  // primitive state
+  {
+
+    double *dataUp = Up->HostReadWrite();
+    //std::cout << " check 1" << endl;    
+    
+    double *d_rn_gf = rn_gf.ReadWrite();    
+    mfem::forall(rn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    {
+      d_rn_gf[i] = dataUp[i];
+    });
+    //std::cout << " check 2" << endl;        
+    
+    int vstart = rfes->GetNDofs();
+    double *d_un_gf = un_gf.ReadWrite();    
+    mfem::forall(un_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    {
+       d_un_gf[i] = dataUp[i + vstart];
+    });
+    //std::cout << " check 3" << endl;        
+
+    int tstart = (1+nvel)*(tfes->GetNDofs());    
+    double *d_tn_gf = Tn_gf.ReadWrite();    
+    mfem::forall(Tn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    {
+       d_tn_gf[i] = dataUp[i + tstart];
+    });
+    //std::cout << " check 4" << endl;
+    
+  }
+
+}
+
 
 
 void LoMachSolver::MeanZero(ParGridFunction &v)
@@ -2728,9 +3111,8 @@ void LoMachSolver::AddVelDirichletBC(VectorCoefficient *coeff, Array<int> &attr)
    if (verbose && pmesh->GetMyRank() == 0)
    {
       mfem::out << "Adding Velocity Dirichlet BC to attributes ";
-      for (int i = 0; i < attr.Size(); ++i)
-      {
-         if (attr[i] == 1) { mfem::out << i << " "; }
+      for (int i = 0; i < attr.Size(); ++i) {
+	if (attr[i] == 1) { mfem::out << i << " "; }
       }
       mfem::out << std::endl;
    }
@@ -2783,8 +3165,7 @@ void LoMachSolver::AddTempDirichletBC(Coefficient *coeff, Array<int> &attr)
    if (verbose && pmesh->GetMyRank() == 0)
    {
       mfem::out << "Adding Temperature Dirichlet BC to attributes ";
-      for (int i = 0; i < attr.Size(); ++i)
-      {
+      for (int i = 0; i < attr.Size(); ++i) {
          if (attr[i] == 1) { mfem::out << i << " "; }
       }
       mfem::out << std::endl;
@@ -2932,35 +3313,56 @@ void LoMachSolver::PrintInfo()
 /*
 LoMachSolver::~LoMachSolver()
 {
+  
    delete FText_gfcoeff;
    delete g_bdr_form;
    delete FText_bdr_form;
+   delete Text_gfcoeff;
+   delete t_bdr_form;
+   delete Text_bdr_form;   
+   delete f_form;
+   
    delete mass_lf;
+   delete N;   
    delete Mv_form;
-   delete N;
+   delete Mt_form;   
    delete Sp_form;
    delete D_form;
+   delete Dt_form;   
    delete G_form;
-   delete HInvPC;
-   delete HInv;
    delete H_form;
-   delete SpInv;
-   delete MvInvPC;
+   delete Ht_form;   
    
+   delete MvInv;
+   delete MtInv;      
+   delete HInv;
+   delete HtInv;
+   delete HInvPC;   
+   delete HtInvPC;   
+   delete MvInvPC;
+   delete MtInvPC;   
+
+   delete SpInv;   
    delete SpInvOrthoPC;
    delete SpInvPC;
-   
    delete lor;
-   delete f_form;
-   delete MvInv;
+   
    delete vfec;
    delete pfec;
+   delete rfec;
+   delete tfec;
+   
    delete vfes;
    delete pfes;
+   delete rfes;
+   delete tfes;
+   delete fvfes;      
+   
    delete vfec_filter;
    delete vfes_filter;
    delete tfec_filter;
    delete tfes_filter;
+   
 }
 */
 
@@ -3007,10 +3409,10 @@ void LoMachSolver::parseSolverOptions2() {
   //tpsP->getRequiredInput("flow/mesh", config.meshFile);
 
   // flow/numerics
-  //parseFlowOptions();
+  parseFlowOptions();
 
   // time integration controls
-  //parseTimeIntegrationOptions();
+  parseTimeIntegrationOptions();
 
   // statistics
   parseStatOptions();
@@ -3031,13 +3433,14 @@ void LoMachSolver::parseSolverOptions2() {
   //parseMMSOptions();
 
   // initial conditions
-  if (!config.use_mms_) { parseICOptions(); }
+  //if (!config.use_mms_) { parseICOptions(); }
+  parseICOptions();
 
   // add passive scalar forcings
   //parsePassiveScalarOptions();
 
   // fluid presets
-  //parseFluidPreset();
+  parseFluidPreset();
 
   //parseSystemType();
 
@@ -3091,26 +3494,26 @@ void LoMachSolver::parseFlowOptions() {
   sgsModel["none"] = 0;
   sgsModel["smagorinsky"] = 1;
   sgsModel["sigma"] = 2;
-  tpsP_->getInput("flow/order", config.solOrder, 4);
-  tpsP_->getInput("flow/integrationRule", config.integrationRule, 1);
-  tpsP_->getInput("flow/basisType", config.basisType, 1);
-  tpsP_->getInput("flow/maxIters", config.numIters, 10);
-  tpsP_->getInput("flow/outputFreq", config.itersOut, 50);
-  tpsP_->getInput("flow/timingFreq", config.timingFreq, 100);
+  tpsP_->getInput("loMach/order", config.solOrder, 2);
+  tpsP_->getInput("loMach/integrationRule", config.integrationRule, 1);
+  tpsP_->getInput("loMach/basisType", config.basisType, 1);
+  tpsP_->getInput("loMach/maxIters", config.numIters, 10);
+  tpsP_->getInput("loMach/outputFreq", config.itersOut, 50);
+  tpsP_->getInput("loMach/timingFreq", config.timingFreq, 100);
   //tpsP_->getInput("flow/useRoe", config.useRoe, false);
   //tpsP_->getInput("flow/refLength", config.refLength, 1.0);
-  tpsP_->getInput("flow/viscosityMultiplier", config.visc_mult, 1.0);
-  tpsP_->getInput("flow/bulkViscosityMultiplier", config.bulk_visc, 0.0);
+  tpsP_->getInput("loMach/viscosityMultiplier", config.visc_mult, 1.0);
+  tpsP_->getInput("loMach/bulkViscosityMultiplier", config.bulk_visc, 0.0);
   //tpsP_->getInput("flow/axisymmetric", config.axisymmetric_, false);
-  tpsP_->getInput("flow/enablePressureForcing", config.isForcing, false);
+  tpsP_->getInput("loMach/enablePressureForcing", config.isForcing, false);
   if (config.isForcing) {
-    for (int d = 0; d < 3; d++) tpsP_->getRequiredVecElem("flow/pressureGrad", config.gradPress[d], d);
+    for (int d = 0; d < 3; d++) tpsP_->getRequiredVecElem("loMach/pressureGrad", config.gradPress[d], d);
   }
-  tpsP_->getInput("flow/refinement_levels", config.ref_levels, 0);
-  tpsP_->getInput("flow/computeDistance", config.compute_distance, false);
+  tpsP_->getInput("loMach/refinement_levels", config.ref_levels, 0);
+  tpsP_->getInput("loMach/computeDistance", config.compute_distance, false);
 
   std::string type;
-  tpsP_->getInput("flow/sgsModel", type, std::string("none"));
+  tpsP_->getInput("loMach/sgsModel", type, std::string("none"));
   config.sgsModelType = sgsModel[type];
 
   double sgs_const = 0.;
@@ -3119,7 +3522,7 @@ void LoMachSolver::parseFlowOptions() {
   } else if (config.sgsModelType == 2) {
     sgs_const = 0.135;
   }
-  tpsP_->getInput("flow/sgsModelConstant", config.sgs_model_const, sgs_const);
+  tpsP_->getInput("loMach/sgsModelConstant", config.sgs_model_const, sgs_const);
 
   assert(config.solOrder > 0);
   assert(config.numIters >= 0);
@@ -3127,9 +3530,11 @@ void LoMachSolver::parseFlowOptions() {
   assert(config.refLength > 0);
 
   // Sutherland inputs default to dry air values
+  /*
   tpsP_->getInput("flow/SutherlandC1", config.sutherland_.C1, 1.458e-6);
   tpsP_->getInput("flow/SutherlandS0", config.sutherland_.S0, 110.4);
   tpsP_->getInput("flow/SutherlandPr", config.sutherland_.Pr, 0.71);
+  */
 }
 
 void LoMachSolver::parseTimeIntegrationOptions() {
@@ -3139,9 +3544,12 @@ void LoMachSolver::parseTimeIntegrationOptions() {
   //integrators["rk3"] = 3;
   //integrators["rk4"] = 4;
   //integrators["rk6"] = 6;
+
+  //std::cout << "getting time options" << endl;
   std::string type;
   tpsP_->getInput("time/cfl", config.cflNum, 0.2);
-  tpsP_->getInput("time/integrator", type, std::string("rk4"));
+  //std::cout << "got cflNum" << config.cflNum << endl;  
+  //tpsP_->getInput("time/integrator", type, std::string("rk4"));
   tpsP_->getInput("time/enableConstantTimestep", config.constantTimeStep, false);
   tpsP_->getInput("time/dt_fixed", config.dt_fixed, -1.);
   //if (integrators.count(type) == 1) {
@@ -3156,6 +3564,7 @@ void LoMachSolver::parseStatOptions() {
   tpsP_->getInput("averaging/saveMeanHist", config.meanHistEnable, false);
   tpsP_->getInput("averaging/startIter", config.startIter, 0);
   tpsP_->getInput("averaging/sampleFreq", config.sampleInterval, 0);
+  std::cout << " sampleInterval: " << config.sampleInterval << endl;
   tpsP_->getInput("averaging/enableContinuation", config.restartMean, false);
 }
 
@@ -3289,37 +3698,39 @@ void M2ulPhyS::parsePassiveScalarOptions() {
     config.arrayPassiveScalar[i - 1]->value = value;
   }
 }
+*/
 
-void M2ulPhyS::parseFluidPreset() {
+void LoMachSolver::parseFluidPreset() {
   std::string fluidTypeStr;
-  tpsP->getInput("flow/fluid", fluidTypeStr, std::string("dry_air"));
+  tpsP_->getInput("loMach/fluid", fluidTypeStr, std::string("dry_air"));
   if (fluidTypeStr == "dry_air") {
     config.workFluid = DRY_AIR;
-    tpsP->getInput("flow/specific_heat_ratio", config.dryAirInput.specific_heat_ratio, 1.4);
-    tpsP->getInput("flow/gas_constant", config.dryAirInput.gas_constant, 287.058);
+    tpsP_->getInput("loMach/specific_heat_ratio", config.dryAirInput.specific_heat_ratio, 1.4);
+    tpsP_->getInput("loMach/gas_constant", config.dryAirInput.gas_constant, 287.058);
   } else if (fluidTypeStr == "user_defined") {
     config.workFluid = USER_DEFINED;
   } else if (fluidTypeStr == "lte_table") {
     config.workFluid = LTE_FLUID;
     std::string thermo_file;
-    tpsP->getRequiredInput("flow/lte/thermo_table", thermo_file);
+    tpsP_->getRequiredInput("loMach/lte/thermo_table", thermo_file);
     config.lteMixtureInput.thermo_file_name = thermo_file;
     std::string trans_file;
-    tpsP->getRequiredInput("flow/lte/transport_table", trans_file);
+    tpsP_->getRequiredInput("loMach/lte/transport_table", trans_file);
     config.lteMixtureInput.trans_file_name = trans_file;
     std::string e_rev_file;
-    tpsP->getRequiredInput("flow/lte/e_rev_table", e_rev_file);
+    tpsP_->getRequiredInput("loMach/lte/e_rev_table", e_rev_file);
     config.lteMixtureInput.e_rev_file_name = e_rev_file;
   } else {
     grvy_printf(GRVY_ERROR, "\nUnknown fluid preset supplied at runtime -> %s", fluidTypeStr.c_str());
     exit(ERROR);
   }
 
-  if (mpi.Root() && (config.workFluid != USER_DEFINED))
+  if ((rank0_ == true) && (config.workFluid != USER_DEFINED))
     cout << "Fluid is set to the preset '" << fluidTypeStr << "'. Input options in [plasma_models] will not be used."
          << endl;
 }
 
+/*
 void M2ulPhyS::parseSystemType() {
   std::string systemType;
   tpsP->getInput("flow/equation_system", systemType, std::string("navier-stokes"));
@@ -4223,13 +4634,14 @@ void LoMachSolver::initSolutionAndVisualizationVectors() {
   U = new ParGridFunction(fvfes, u_block->HostReadWrite());
   //std::cout << " check 6..." << endl;    
   Up = new ParGridFunction(fvfes, up_block->HostReadWrite());
-  //std::cout << " check 7..." << endl;    
-  dens = new ParGridFunction(rfes, Up->HostReadWrite());
-  vel = new ParGridFunction(vfes, Up->HostReadWrite() + rfes->GetNDofs());
+  //std::cout << " check 7..." << endl;
+  
+  //dens = new ParGridFunction(rfes, Up->HostReadWrite());
+  //vel = new ParGridFunction(vfes, Up->HostReadWrite() + rfes->GetNDofs());
   //std::cout << " check 8..." << endl;    
-  temperature = new ParGridFunction(tfes, Up->HostReadWrite() + (1 + nvel) * tfes->GetNDofs()); // this may break...
+  //temperature = new ParGridFunction(tfes, Up->HostReadWrite() + (1 + nvel) * tfes->GetNDofs()); // this may break...
   //std::cout << " check 9..." << endl;    
-  press = new ParGridFunction(pfes);
+  //press = new ParGridFunction(pfes);
   //std::cout << " check 10..." << endl;    
 
 
@@ -4397,21 +4809,31 @@ void LoMachSolver::initSolutionAndVisualizationVectors() {
   */
 
   // define solution parameters for i/o
+  /*
   ioData.registerIOFamily("Solution state variables", "/solution", U);
-  //std::cout << " check 11..." << endl;      
-  //ioData.registerIOVar("/solution", "density", 0);
+  ioData.registerIOVar("/solution", "density", 0);
   ioData.registerIOVar("/solution", "rho-u", 1);
-  //std::cout << " check 12..." << endl;      
   ioData.registerIOVar("/solution", "rho-v", 2);
-  //std::cout << " check 13..." << endl;      
   if (nvel == 3) {
     ioData.registerIOVar("/solution", "rho-w", 3);
     ioData.registerIOVar("/solution", "rho-E", 4);
   } else {
     ioData.registerIOVar("/solution", "rho-E", 3);
   }
-  //std::cout << " check 14..." << endl;      
+  */
 
+  ioData.registerIOFamily("Solution state variables", "/solution", Up);
+  ioData.registerIOVar("/solution", "density", 0);
+  ioData.registerIOVar("/solution", "u", 1);
+  ioData.registerIOVar("/solution", "v", 2);
+  if (nvel == 3) {
+    ioData.registerIOVar("/solution", "w", 3);
+    ioData.registerIOVar("/solution", "temperature", 4);
+  } else {
+    ioData.registerIOVar("/solution", "temperature", 3);
+  }
+
+  
   /*
   // TODO(kevin): for now, keep the number of primitive variables same as conserved variables.
   // will need to add full list of species.
@@ -4451,18 +4873,20 @@ void LoMachSolver::initSolutionAndVisualizationVectors() {
   }
   */
 
+  /*
   paraviewColl->SetCycle(0);
   //std::cout << " check 15..." << endl;      
   paraviewColl->SetTime(0.);
   //std::cout << " check 16..." << endl;      
 
-  //paraviewColl->RegisterField("dens", dens);
+  paraviewColl->RegisterField("dens", dens);
   paraviewColl->RegisterField("vel", vel);
   //std::cout << " check 17..." << endl;      
   paraviewColl->RegisterField("temp", temperature);
   //std::cout << " check 18..." << endl;      
   paraviewColl->RegisterField("press", press);
-  //std::cout << " check 19..." << endl;      
+  //std::cout << " check 19..." << endl;
+  */
   
   //if (config.isAxisymmetric()) {
   //  paraviewColl->RegisterField("vtheta", vtheta);
@@ -4476,6 +4900,7 @@ void LoMachSolver::initSolutionAndVisualizationVectors() {
   //  paraviewColl->RegisterField("Te", electron_temp_field);
   //}
 
+  /*
   for (int var = 0; var < visualizationVariables_.size(); var++) {
     paraviewColl->RegisterField(visualizationNames_[var], visualizationVariables_[var]);
   }
@@ -4487,6 +4912,7 @@ void LoMachSolver::initSolutionAndVisualizationVectors() {
   paraviewColl->SetOwnData(true);
   //paraviewColl->Save(); 
   //std::cout << " check 21..." << endl;
+  */
   
 }
 
@@ -4511,7 +4937,7 @@ void CopyDBFIntegrators(ParBilinearForm *src, ParBilinearForm *dst)
 
 void accel(const Vector &x, double t, Vector &f)
 {
-   f(0) = 1.0;
+   f(0) = 0.1;
    f(1) = 0.0;
    f(2) = 0.0;
 }
@@ -4524,22 +4950,37 @@ void vel_ic(const Vector &coords, double t, Vector &u)
    double y = coords(1);
    double z = coords(2);
 
-   double A = -1.0;
-   double B = -1.0;
-   double C = +2.0;
-   double aL = 2.0 / (2.0);
-   double bL = 2.0;
-   double cL = 2.0;   
-   double M = 4.0;
+   double pi = 3.14159265359;
+   double A = -1.0 * pi;
+   double B = -1.0 * pi;
+   double C = +2.0 * pi;
+   double aL = 2.0 / (2.0) * pi;
+   double bL = 2.0 * pi;
+   double cL = 2.0 * pi;   
+   double M = 1.0;
+   double scl;
 
    
-   u(0) = 22.0; // - std::pow(y/0.5,4);
+   u(0) = M;
    u(1) = 0.0;
    u(2) = 0.0;
 
-   u(0) += M * A * cos(aL*x) * sin(bL*y) * sin(cL*z);
-   u(1) += M * B * sin(aL*x) * cos(bL*y) * sin(cL*z);
-   u(2) += M * C * sin(aL*x) * sin(bL*y) * cos(cL*z);
+   u(0) += 0.2 * M * A * cos(aL*x) * sin(bL*y) * sin(cL*z);
+   u(1) += 0.2 * M * B * sin(aL*x) * cos(bL*y) * sin(cL*z);
+   u(2) += 0.2 * M * C * sin(aL*x) * sin(bL*y) * cos(cL*z);
+
+   u(0) -= 0.1 * M * A * cos(2.0*aL*x) * sin(2.0*bL*y) * sin(2.0*cL*z);
+   u(1) -= 0.1 * M * B * sin(2.0*aL*x) * cos(2.0*bL*y) * sin(2.0*cL*z);
+   u(2) -= 0.1 * M * C * sin(2.0*aL*x) * sin(2.0*bL*y) * cos(2.0*cL*z);
+
+   u(0) += 0.05 * M * A * cos(4.0*aL*x) * sin(4.0*bL*y) * sin(4.0*cL*z);
+   u(1) += 0.05 * M * B * sin(4.0*aL*x) * cos(4.0*bL*y) * sin(4.0*cL*z);
+   u(2) += 0.05 * M * C * sin(4.0*aL*x) * sin(4.0*bL*y) * cos(4.0*cL*z);
+
+   scl = std::max(1.0-std::pow((y-0.0)/0.2,4),0.0);
+   u(0) = u(0) * scl;
+   u(1) = u(1) * scl;
+   u(2) = u(2) * scl;
    
 }
 
@@ -4562,6 +5003,6 @@ double temp_ic(const Vector &coords, double t)
 
 double temp_wall(const Vector &x, double t)  
 {
-   double temp = 270.0;
+   double temp = 298.15;
    return temp;
 }

@@ -184,10 +184,12 @@ class DryAirTransport : public TransportProperties {
                                                                  double *diffusionVelocity, double *n_sp) {}
 
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
+
+  //double ComputeViscosity(const double *temp);
+  
 };
 
-MFEM_HOST_DEVICE inline void DryAirTransport::GetViscosities(const double *conserved, const double *primitive,
-                                                             double *visc) {
+MFEM_HOST_DEVICE inline void DryAirTransport::GetViscosities(const double *conserved, const double *primitive, double *visc) {
   const double temp = primitive[1 + nvel_];
   visc[0] = (C1_ * visc_mult * pow(temp, 1.5) / (temp + S0_));
   visc[1] = bulk_visc_mult * visc[0];

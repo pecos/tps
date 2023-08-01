@@ -39,6 +39,9 @@
 #include <grvy.h>
 #include <tps_config.h>
 
+#include "mfem.hpp"
+//#include "communication.hpp"
+
 #undef PACKAGE_NAME
 #undef PACKAGE_VERSION
 #undef PACKAGE_TARNAME
@@ -55,10 +58,11 @@
 #include <string>
 
 #include "M2ulPhyS.hpp"
+#include "loMach.hpp"
 #include "logger.hpp"
 #include "quasimagnetostatic.hpp"
 #include "solver.hpp"
-#include "support.hpp"
+//#include "support.hpp"
 #include "utils.hpp"
 
 namespace TPS {
@@ -99,7 +103,7 @@ class Tps {
   TPS::Solver *solver_ = NULL;
 
   // pointer to collection of supporting functions
-  TPS::Support *support_ = NULL;
+  //TPS::Support *support_ = NULL;
   
   // post-process visualization mode
   bool isVisualizationMode_;

@@ -221,6 +221,8 @@ MFEM_HOST_DEVICE DryAirTransport::DryAirTransport(GasMixture *_mixture, const do
   cp_div_pr = specific_heat_ratio * gas_constant / (Pr_ * (specific_heat_ratio - 1.));
 }
 
+
+
 void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
                                                      const Vector &Efield, Vector &transportBuffer,
                                                      DenseMatrix &diffusionVelocity) {
@@ -258,6 +260,16 @@ void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const 
     }
   }
 }
+
+
+
+//double DryAirTransport::ComputeViscosity(const double *temp) {  
+//  double viscosity = (C1_ * pow(temp, 1.5) / (temp + S0_));
+//  return viscosity;
+//}
+
+
+
 
 MFEM_HOST_DEVICE void DryAirTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,
                                                                       const double *Efield, double *transportBuffer,

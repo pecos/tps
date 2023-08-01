@@ -180,6 +180,15 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
         average->SetSamplesMean(samplesMean);
         average->SetSamplesInterval(intervals);
       }
+
+      std::cout << " " << endl;      
+      std::cout << " Restarting from:" << endl;
+      std::cout << " + iteration " << iter << endl;
+      std::cout << " + time " << iter << endl;
+      std::cout << " + dt " << dt << endl;
+      std::cout << " + order " << order << endl;
+      std::cout << " " << endl;            
+      
     }
 
     if (config.isRestartSerialized(mode)) {
@@ -737,8 +746,8 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
   hid_t data_soln;
   herr_t status;
   Vector dataSerial;
-
   string serialName;
+  
   if (inputFileName.length() > 0) {
     if (inputFileName.substr(inputFileName.length() - 3) != ".h5") {
       grvy_printf(gerror, "[ERROR]: M2ulPhyS::restart_files_hdf5 - input file name has a wrong format -> %s\n",
@@ -777,18 +786,25 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
   if (mode == "write") {
     
     if (mpi_.Root() || config.isRestartPartitioned(mode)) {
+      std::cout << " okay 1" << endl;      
       file = H5Fcreate(fileName.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+      std::cout << " okay 2" << endl;      
       assert(file >= 0);
     }
+
     
-  } else if (mode == "read") {
-    
+    //} else if (mode == "read") {
+  } else {    
+
+    std::cout << " in first read zone: " << endl;
+     
     //if (config.isRestartSerialized(mode)) {
     //  if (rank0_) {
     //    file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
     //    assert(file >= 0);
     //  }
     //} else {
+    
       // verify we have all desired files and open on each process
       int gstatus;
       int status = static_cast<int>(file_exists(fileName));
@@ -796,24 +812,29 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
 
       if (gstatus == 0) {
         grvy_printf(gerror, "[ERROR]: Unable to access desired restart file -> %s\n", fileName.c_str());
-        exit(ERROR);
-	
-      //  }
+        exit(ERROR);	
+      }
 
+      // open files to read	
       file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
       assert(file >= 0);
-    }
+      std::cout << " file in first read zone: " << fileName.c_str() << " " << file << endl;      
+      
   }
 
+  
   // -------------------------------------------------------------------
   // Attributes - relevant solution metadata saved as attributes
   // -------------------------------------------------------------------
 
   // hid_t aid, attr;
   hid_t attr;
+  
   if (mode == "write") {
     // note: all tasks save unless we are writing a serial restart file
     if (mpi_.Root() || config.isRestartPartitioned(mode)) {
+      
+      std::cout << " okay 3 " << iter << endl;      
       // current iteration count
       h5_save_attribute(file, "iteration", iter);
       // total time
@@ -824,12 +845,18 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
       h5_save_attribute(file, "order", order);
       // spatial dimension
       h5_save_attribute(file, "dimension", dim);
+      std::cout << " okay 3a " << endl;                  
+      //std::cout << " okay 3a " << average->ComputeMean() << endl;            
 
+      /*
       if (average->ComputeMean()) {
         // samples meanUp
         h5_save_attribute(file, "samplesMean", average->GetSamplesMean());
         h5_save_attribute(file, "samplesInterval", average->GetSamplesInterval());
       }
+      */
+      std::cout << " okay 3aa " << endl;            
+      
       // code revision
 #ifdef BUILD_VERSION
       {
@@ -837,19 +864,25 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
         int shaLength = strlen(BUILD_VERSION);
         hsize_t dims[1] = {1};
         H5Tset_size(ctype, shaLength);
+      std::cout << " okay 3ab " << endl;            	
 
         hid_t dspace1dim = H5Screate_simple(1, dims, NULL);
+      std::cout << " okay 3ac " << endl;            	
 
         attr = H5Acreate(file, "revision", ctype, dspace1dim, H5P_DEFAULT, H5P_DEFAULT);
+      std::cout << " okay 3ad " << endl;            	
         assert(attr >= 0);
         status = H5Awrite(attr, ctype, BUILD_VERSION);
+      std::cout << " okay 3ae " << endl;            	
         assert(status >= 0);
         H5Sclose(dspace1dim);
         H5Aclose(attr);
+      std::cout << " okay 3af " << endl;            		
       }
     }
 #endif
-
+    std::cout << " okay 3ag " << endl; 		
+    
     // included total dofs for partitioned files
     //if (!config.isRestartSerialized(mode)) {
     //  int ldofs = vfes->GetNDofs();
@@ -857,28 +890,38 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
     //  MPI_Allreduce(&ldofs, &gdofs, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
     //  h5_save_attribute(file, "dofs_global", gdofs);
     //}
-    
-    //} else {  // read
+
+
+    // read mode
+    }
+    else {  
     int read_order;
 
     // normal restarts have each process read their own portion of the
     // solution; a serial restart only reads on rank 0 and distributes to
     // the remaining processes
 
+    /**/
     if (rank0_ || config.isRestartPartitioned(mode)) {
+      std::cout << " okay 3ah " << file << endl; 		      
       h5_read_attribute(file, "iteration", iter);
+      std::cout << " okay 3ah1 " << iter << endl;      
       h5_read_attribute(file, "time", time);
+      std::cout << " okay 3ah2 " << endl;            
       h5_read_attribute(file, "dt", dt);
+      std::cout << " okay 3ah3 " << endl;            
       h5_read_attribute(file, "order", read_order);
-      if (average->ComputeMean() && config.GetRestartMean()) {
-        int samplesMean, intervals;
-        h5_read_attribute(file, "samplesMean", samplesMean);
-        h5_read_attribute(file, "samplesInterval", intervals);
-        average->SetSamplesMean(samplesMean);
-        average->SetSamplesInterval(intervals);
-      }
+      //if (average->ComputeMean() && config.GetRestartMean()) {
+      //  int samplesMean, intervals;
+      //  h5_read_attribute(file, "samplesMean", samplesMean);
+      //  h5_read_attribute(file, "samplesInterval", intervals);
+      //  average->SetSamplesMean(samplesMean);
+      //  average->SetSamplesInterval(intervals);
+      //}
     }
-
+    /**/
+    std::cout << " okay 3ai " << endl; 		
+    
     /*
     if (config.isRestartSerialized(mode)) {
       MPI_Bcast(&iter, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -911,34 +954,45 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
       aux_U = new ParGridFunction(aux_vfes, aux_U_data);
     } else {
     */
-      assert(read_order == order);
-      //}
+    assert(read_order == order);
+    //}
+    
+    std::cout << " okay 3aj " << endl; 		
 
+    /**/
     if (rank0_) {
       grvy_printf(ginfo, "Restarting from iteration = %i\n", iter);
       grvy_printf(ginfo, "--> time = %e\n", time);
       grvy_printf(ginfo, "--> dt   = %e\n", dt);
-      if (average != NULL) {
-        grvy_printf(ginfo, "Restarting averages with %i\n samples", average->GetSamplesMean());
-      }
+      //if (average != NULL) {
+      //  grvy_printf(ginfo, "Restarting averages with %i\n samples", average->GetSamplesMean());
+      //}
     }
+    std::cout << " okay 3ak " << endl;
+    /**/
   }
 
   // -------------------------------------------------------------------
   // Read/write solution data defined by IO families
   // -------------------------------------------------------------------
 
+  std::cout << " okay 3al" << endl;    
   hsize_t dims[1];
   // hsize_t maxdims[1];
   hsize_t numInSoln = 0;
+  std::cout << " okay 3b" << endl;  
 
   //-------------------------------------------------------
   // Loop over defined IO families to save desired output
   //-------------------------------------------------------
   for (size_t n = 0; n < ioData.families_.size(); n++) {
+      std::cout << " okay 3c" << endl;
+    
     IOFamily &fam = ioData.families_[n];
 
     if (mode == "write") {
+
+      std::cout << " okay 4" << endl;
       
       //if ((config.isRestartSerialized(mode)) && (nprocs_ > 1) && (mpi_.Root())) {
       //  assert((locToGlobElem != NULL) && (partitioning_ != NULL));
@@ -957,14 +1011,18 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
       hid_t group = -1;
       hid_t dataspace = -1;
 
-      /*
+      
       if (rank0_ || !config.isRestartSerialized(mode)) {
+        std::cout << " okay 5" << endl;	
         dataspace = H5Screate_simple(1, dims, NULL);
+        std::cout << " okay 6" << endl;		
         assert(dataspace >= 0);
+        std::cout << " okay 7" << endl;		
         group = H5Gcreate(file, fam.group_.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        std::cout << " okay 8" << endl;		
         assert(group >= 0);
       }
-      */
+      
 
       // get pointer to raw data
       double *data = fam.pfunc_->HostReadWrite();
@@ -987,7 +1045,10 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
       if (group >= 0) H5Gclose(group);
       if (dataspace >= 0) H5Sclose(dataspace);
 
-    } else if (fam.inReastartFile) {  // read mode
+
+    // read mode  
+    } else if (fam.inReastartFile) { 
+      
       if (rank0_) cout << "Reading in solutiond data from restart..." << endl;
 
       // verify Dofs match expectations with current mesh
@@ -1091,6 +1152,7 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
 #endif
   return;
 }
+
 
 void LoMachSolver::partitioning_file_hdf5(std::string mode) {
   grvy_timer_begin(__func__);
@@ -1364,6 +1426,7 @@ void LoMachSolver::read_serialized_soln_data(hid_t file, string varName, int num
 
 // convenience function to write HDF5 data
 void LoMachSolver::write_soln_data(hid_t group, string varName, hid_t dataspace, double *data) {
+  
   hid_t data_soln;
   herr_t status;
   assert(group >= 0);
