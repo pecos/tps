@@ -2250,8 +2250,8 @@ void M2ulPhyS::initilizeSpeciesFromLTE() {
 #endif
 
 
-  double state[num_equation] = {0.0};
-  double prim[num_equation] = {0.0};
+  double state[num_equation];
+  double prim[num_equation];
   // double gradUpn[num_equation * dim] = {0.0};
 
 
