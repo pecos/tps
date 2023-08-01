@@ -2081,9 +2081,9 @@ void M2ulPhyS::initilizeSpeciesFromLTE() {
                                         2,                                          /* temperature column */
                                         3);                                         /* number of columns */
 #else
-  energy_table_ = NULL;
-  R_table_ = NULL;
-  T_table_ = NULL;
+  energy_table = NULL;
+  R_table = NULL;
+  T_table = NULL;
   mfem_error("Restart from LTE mixture requires GSL support.");
 #endif
 
