@@ -211,6 +211,10 @@ void LoMachSolver::initialize() {
 
 
   // HARD CODE
+  config.dryAirInput.specific_heat_ratio = 1.4;
+  config.dryAirInput.gas_constant = 287.058;
+  config.dryAirInput.f = config.workFluid;
+  config.dryAirInput.eq_sys = config.eqSystem;
   mixture = new DryAir(config, dim, nvel);  // conditional jump, must be using something in config that wasnt parsed?
   transportPtr = new DryAirTransport(mixture, config);
 
@@ -494,6 +498,11 @@ void LoMachSolver::initialize() {
    rfes = new ParFiniteElementSpace(pmesh, rfec);   
    
    // full vector for compatability
+   //fvfes = new ParFiniteElementSpace(pmesh, vfec, num_equation); //, Ordering::byNODES);
+
+   // TAO: Shouldn't this be pfec (or tfec or rfec) rather than
+   // vfec---i.e., num_equation variables all in the same finite
+   // element space
    fvfes = new ParFiniteElementSpace(pmesh, vfec, num_equation); //, Ordering::byNODES);
 
    
@@ -516,8 +525,12 @@ void LoMachSolver::initialize() {
    int tfes_truevsize = tfes->GetTrueVSize();
    //int nfes_truevsize = nfes->GetTrueVSize();
    int rfes_truevsize = rfes->GetTrueVSize();   
-   if (verbose) grvy_printf(ginfo, "Got sizes...\n");   
-   
+   if (verbose) grvy_printf(ginfo, "Got sizes...\n");
+   printf("vfes_truevsize = %d", vfes_truevsize);
+   printf("pfes_truevsize = %d", pfes_truevsize);
+   printf("tfes_truevsize = %d", tfes_truevsize);
+   fflush(stdout);
+
    un.SetSize(vfes_truevsize);
    un = 0.0;
    un_next.SetSize(vfes_truevsize);
@@ -558,8 +571,8 @@ void LoMachSolver::initialize() {
    pn = 0.0;
    resp.SetSize(pfes_truevsize);
    resp = 0.0;
-   //FText_bdr.SetSize(pfes_truevsize);
-   FText_bdr.SetSize(vfes_truevsize);
+   FText_bdr.SetSize(pfes_truevsize);
+   //FText_bdr.SetSize(vfes_truevsize);
    //g_bdr.SetSize(pfes_truevsize);
    g_bdr.SetSize(vfes_truevsize);
 
@@ -1040,8 +1053,8 @@ void LoMachSolver::Setup(double dt)
    
    // boundary terms   
    FText_gfcoeff = new VectorGridFunctionCoefficient(&FText_gf);
-   //FText_bdr_form = new ParLinearForm(pfes);
-   FText_bdr_form = new ParLinearForm(vfes); // maybe?
+   FText_bdr_form = new ParLinearForm(pfes);
+   //FText_bdr_form = new ParLinearForm(vfes); // maybe?
    auto *ftext_bnlfi = new BoundaryNormalLFIntegrator(*FText_gfcoeff);
    if (numerical_integ) { ftext_bnlfi->SetIntRule(&ir_ni); }
    FText_bdr_form->AddBoundaryIntegrator(ftext_bnlfi, vel_ess_attr);
