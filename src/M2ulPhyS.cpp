@@ -2039,7 +2039,7 @@ void M2ulPhyS::initilizeSpeciesFromLTE() {
 
   int dof = vfes->GetNDofs();
 
-  assert (mixture->GetWorkingFluid() == WorkingFluid::USER_DEFINED);
+  assert(mixture->GetWorkingFluid() == WorkingFluid::USER_DEFINED);
   const int numSpecies = mixture->GetNumSpecies();
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
 
@@ -2088,17 +2088,18 @@ void M2ulPhyS::initilizeSpeciesFromLTE() {
 #endif
 
 
-  double state[num_equation];
-  double prim[num_equation];
+  Vector state(num_equation);
+  Vector prim(num_equation);
+  // double state[num_equation];
+  // double prim[num_equation];
   // double gradUpn[num_equation * dim] = {0.0};
 
 
   for (int i = 0; i < dof; i++) {
-
-    //  Put values to zero. Not needed actually. 
-    memset(state, 0.0, num_equation * sizeof(double)); 
-    memset(prim, 0.0, num_equation * sizeof(double)); 
-    // memset(gradUpn, 0.0, num_equation * sizeof(double)); 
+    //  Put values to zero. Not needed actually.
+    memset(state, 0.0, num_equation * sizeof(double));
+    memset(prim, 0.0, num_equation * sizeof(double));
+    // memset(gradUpn, 0.0, num_equation * sizeof(double));
 
     // Get state at each node.
     for (int eq = 0; eq < num_equation; eq++) {
@@ -2111,7 +2112,7 @@ void M2ulPhyS::initilizeSpeciesFromLTE() {
 
     // Calculate species mass densities bases based on LTE at node level.
 
-    mixture->GetSpeciesFromLTE(state,prim,energy_table,R_table,c_table,T_table);
+    mixture->GetSpeciesFromLTE(state, prim, energy_table, R_table, c_table, T_table);
 
 
     // Return new state at each node
@@ -2122,14 +2123,12 @@ void M2ulPhyS::initilizeSpeciesFromLTE() {
       //   dataGradUp[i + eq * dof + d * num_equation * dof] = gradUpn[eq + d * num_equation];
       // }
     }
-
   }
 
   delete energy_table;
   delete R_table;
   delete c_table;
   delete T_table;
-
 }
 
 void M2ulPhyS::Check_NAN() {
@@ -2678,7 +2677,7 @@ void M2ulPhyS::parseSpeciesInputs() {
       tpsP->getRequiredInput((basepath + "/formation_energy").c_str(), formEnergy);
       inputGasParams(i - 1, GasParams::FORMATION_ENERGY) = formEnergy;
 
-      //tpsP->getRequiredInput((basepath + "/level_degeneracy").c_str(), levelDegeneracy);
+      // tpsP->getRequiredInput((basepath + "/level_degeneracy").c_str(), levelDegeneracy);
       tpsP->getInput((basepath + "/level_degeneracy").c_str(), levelDegeneracy, 1.0);
       inputGasParams(i - 1, GasParams::SPECIES_DEGENERACY) = levelDegeneracy;
 
@@ -2721,11 +2720,14 @@ void M2ulPhyS::parseSpeciesInputs() {
         } else if (inputSpeciesNames[sp] == "E") {
           targetIdx = config.numSpecies - 2;
           isElectronIncluded = true;
+        } else {
+          targetIdx = paramIdx;
+          paramIdx++;
         }
-        // TODO(trevilo): I am commenting this out b/c it causes some
-        // tests to seg fault.  Need to discuss with Malamas what he
-        // is wanting to achieve here and figure out how to make it
-        // work.
+        // TODO(trevilo): I am commenting this out (previously part of
+        // if above) b/c it causes some tests to seg fault.  Need to
+        // discuss with Malamas what he is wanting to achieve here and
+        // figure out how to make it work.
         //
         // else if (inputSpeciesNames[sp] == "Ar.+1" ||  inputSpeciesNames[sp] == "Ar+1" ) {
         //   targetIdx = config.numSpecies - 3;
@@ -2734,10 +2736,7 @@ void M2ulPhyS::parseSpeciesInputs() {
         // } else if (inputSpeciesNames[sp] == "Ar2.+1" ||  inputSpeciesNames[sp] == "Ar2+1" ) {
         //   targetIdx = config.numSpecies - 5;
         // }
-        else {
-          targetIdx = paramIdx;
-          paramIdx++;
-        }
+
         config.speciesMapping[inputSpeciesNames[sp]] = targetIdx;
         config.speciesNames[targetIdx] = inputSpeciesNames[sp];
         config.mixtureToInputMap[targetIdx] = sp;

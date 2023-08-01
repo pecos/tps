@@ -333,8 +333,6 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
         }
       }
     }
-
-
   }
 
   if (file >= 0) H5Fclose(file);
