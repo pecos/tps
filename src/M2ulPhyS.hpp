@@ -238,6 +238,7 @@ class M2ulPhyS : public TPS::Solver {
   // continuous spaces to project onto
   ParGridFunction vel_gf, dens_gf, temp_gf, pres_gf;
   ParGridFunction bufferR0_gf, bufferR1_gf;
+  ParGridFunction *bufferVel, *bufferDens, *bufferTemp, *bufferPres;    
   
   // Visualization functions (these are pointers to Up)
   ParGridFunction *temperature, *dens, *vel, *vtheta, *passiveScalar;

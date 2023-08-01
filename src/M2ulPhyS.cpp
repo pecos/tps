@@ -1380,7 +1380,6 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   dens = new ParGridFunction(fes, Up->HostReadWrite());
   vel = new ParGridFunction(dfes, Up->HostReadWrite() + fes->GetNDofs());
-
   
   // c0 basis
   dens_gf.SetSpace(fesH1);  
@@ -1624,14 +1623,56 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   
   // Continuous basis
-  ParGridFunction *rp_gf = GetCurrentDensity();   
-  ParGridFunction *up_gf = GetCurrentVelocity();
-  ParGridFunction *pp_gf = GetCurrentPressure();
-  ParGridFunction *tp_gf = GetCurrentTemperature();  
-  paraviewColl->RegisterField("dens", rp_gf);
-  paraviewColl->RegisterField("vel", up_gf);
-  paraviewColl->RegisterField("temp", tp_gf);
-  paraviewColl->RegisterField("press", pp_gf);  
+  //ParGridFunction *rp_gf = GetCurrentDensity();   
+  //ParGridFunction *up_gf = GetCurrentVelocity();
+  //ParGridFunction *pp_gf = GetCurrentPressure();
+  //ParGridFunction *tp_gf = GetCurrentTemperature();
+
+  bufferDens = new ParGridFunction(fesH1);
+  bufferVel = new ParGridFunction(dfesH1);  
+  bufferTemp = new ParGridFunction(fesH1);
+  bufferPres = new ParGridFunction(fesH1);
+
+  {
+    int dof = fesH1->GetTrueVSize();
+    double *dataTo = bufferDens->HostReadWrite();
+    const auto dataFrom = dens_gf.HostReadWrite(); 
+    for (int i = 0; i < dof; i++) {
+      dataTo[i] = dataFrom[i];
+    }
+  }  
+
+  {
+    int dof = dfesH1->GetTrueVSize();
+    double *dataTo = bufferVel->HostReadWrite();
+    const auto *dataFrom = vel_gf.HostReadWrite(); 
+    for (int i = 0; i < dof; i++) {
+      dataTo[i] = dataFrom[i];
+    }
+  }
+
+  {
+    int dof = fesH1->GetTrueVSize();
+    double *dataTo = bufferTemp->HostReadWrite();
+    const auto *dataFrom = temp_gf.HostReadWrite(); 
+    for (int i = 0; i < dof; i++) {
+      dataTo[i] = dataFrom[i];
+    }
+  }    
+
+  {
+    int dof = fesH1->GetTrueVSize();
+    double *dataTo = bufferPres->HostReadWrite();
+    const auto *dataFrom = pres_gf.HostReadWrite(); 
+    for (int i = 0; i < dof; i++) {
+      dataTo[i] = dataFrom[i];
+    }
+  }      
+  
+  paraviewColl->RegisterField("dens", bufferDens); //rp_gf);
+  paraviewColl->RegisterField("vel", bufferVel); //up_gf);
+  paraviewColl->RegisterField("temp", bufferTemp); //tp_gf);
+  paraviewColl->RegisterField("press", bufferPres); //pp_gf);  
 
   
   
