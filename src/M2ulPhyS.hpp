@@ -289,7 +289,6 @@ class M2ulPhyS : public TPS::Solver {
 
   // I/O organizer
   IODataOrganizer ioData;
-  // bool inReastartFile_Var;
 
 #ifdef HAVE_MASA
   VectorFunctionCoefficient *DenMMS_, *VelMMS_, *PreMMS_;
@@ -397,7 +396,6 @@ class M2ulPhyS : public TPS::Solver {
     paraviewColl->SetTime(time);
     paraviewColl->Save();
   }
-
 
   void solve() override;
   void solveStep() override;

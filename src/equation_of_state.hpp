@@ -457,13 +457,6 @@ class DryAir : public GasMixture {
     printf("computeElectronPressureGrad not implemented");
   }
 
-  // Compute species mass densities based on LTE assumptions.
-  virtual void GetSpeciesFromLTE(double *conserv, double *primit, TableInterpolator2D *energy_table,
-              TableInterpolator2D *R_table, TableInterpolator2D *c_table, TableInterpolator2D *T_table) {
-    printf("GetSpeciesFromLTE is not implemented.");
-    return;
-  }
-
   // GPU functions
   // TODO(kevin): GPU part is not refactored for axisymmetric case.
 #ifdef _GPU_

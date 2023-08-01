@@ -2252,38 +2252,20 @@ void M2ulPhyS::initilizeSpeciesFromLTE() {
 
   Vector state(num_equation);
   Vector prim(num_equation);
-  // double state[num_equation];
-  // double prim[num_equation];
-  // double gradUpn[num_equation * dim] = {0.0};
-
 
   for (int i = 0; i < dof; i++) {
-    //  Put values to zero. Not needed actually.
-    memset(state, 0.0, num_equation * sizeof(double));
-    memset(prim, 0.0, num_equation * sizeof(double));
-    // memset(gradUpn, 0.0, num_equation * sizeof(double));
-
-    // Get state at each node.
     for (int eq = 0; eq < num_equation; eq++) {
       state[eq] = dataU[i + eq * dof];
       prim[eq]  = dataUp[i + eq * dof];
-      // for (int d = 0; d < dim; d++) {
-        // gradUpn[eq + d * num_equation] = dataGradUp[i + eq * dof + d * num_equation * dof];
-      // }
     }
 
     // Calculate species mass densities bases based on LTE at node level.
-
     mixture->GetSpeciesFromLTE(state, prim, energy_table, R_table, c_table, T_table);
-
 
     // Return new state at each node
     for (int eq = 0; eq < num_equation; eq++) {
       dataU[i + eq * dof] = state[eq];
       dataUp[i + eq * dof] = prim[eq];
-      // for (int d = 0; d < dim; d++) {
-      //   dataGradUp[i + eq * dof + d * num_equation * dof] = gradUpn[eq + d * num_equation];
-      // }
     }
   }
 
@@ -3840,7 +3822,6 @@ void M2ulPhyS::updatePrimitives() {
     for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * dof] = Upi[eq];
   }
 }
-
 
 
 void M2ulPhyS::visualization() {
