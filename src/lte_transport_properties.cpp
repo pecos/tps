@@ -85,7 +85,6 @@ void LteTransport::ComputeFluxTransportProperties(const Vector &state, const Den
 void LteTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp, const double *Efield,
                                                   double radius, double distance, double *transportBuffer,
                                                   double *diffusionVelocity) {
-
   const double rho = state[0];
   const double T = mixture->ComputeTemperature(state);
 

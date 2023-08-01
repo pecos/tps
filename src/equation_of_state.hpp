@@ -57,14 +57,14 @@ static const int MAXSPECIES = 200;
 static const double UNIVERSALGASCONSTANT = 8.3144598;  // J * mol^(-1) * K^(-1)
 static const double AVOGADRONUMBER = 6.0221409e+23;    // mol^(-1)
 static const double BOLTZMANNCONSTANT = UNIVERSALGASCONSTANT / AVOGADRONUMBER;
-static const double PLANCKCONSTANT = 6.62607015e-34; // m^2 kg / s
+static const double PLANCKCONSTANT = 6.62607015e-34;  // m^2 kg / s
 static const double VACUUMPERMITTIVITY = 8.8541878128e-12;
 static const double ELECTRONCHARGE = 1.60218e-19;
 static const double MOLARELECTRONCHARGE = ELECTRONCHARGE * AVOGADRONUMBER;
-static const double ELECTRONMASS = 9.1093837015e-31; // kg
+static const double ELECTRONMASS = 9.1093837015e-31;  // kg
 // static const double qeOverkB = ELECTRONCHARGE / BOLTZMANNCONSTANT;
 
-static const double IonizationEnergy_Argon = 13.598434599702; // eV
+static const double IonizationEnergy_Argon = 13.598434599702;  // eV
 
 static const double PI = 3.14159265358979323846;
 // NOTE(kevin): using atan when initializing static const variable is not allowed in the device.
@@ -86,7 +86,7 @@ class GasMixture {
   bool ambipolar;
   bool twoTemperature_;
 
-  // State Indices 
+  // State Indices
   int iBackground;
   int iElectron;
   int iIon1;
@@ -345,7 +345,6 @@ class GasMixture {
     printf("GetSpeciesFromLTE is not implemented.");
     return;
   }
-
 };
 
 //////////////////////////////////////////////////////
@@ -460,7 +459,7 @@ class DryAir : public GasMixture {
 
   // Compute species mass densities based on LTE assumptions.
   virtual void GetSpeciesFromLTE(double *conserv, double *primit, TableInterpolator2D *energy_table,
-              TableInterpolator2D *R_table, TableInterpolator2D *c_table, TableInterpolator2D *T_table){
+              TableInterpolator2D *R_table, TableInterpolator2D *c_table, TableInterpolator2D *T_table) {
     printf("GetSpeciesFromLTE is not implemented.");
     return;
   }
@@ -635,9 +634,6 @@ MFEM_HOST_DEVICE inline double DryAir::ComputeTemperature(const double *state) {
 //////////////////////////////////////////////////////////////////////////
 
 class PerfectMixture : public GasMixture {
- protected:
-
-
  private:
   // Vector specificHeatRatios_;
   // Vector specificGasConstants_;

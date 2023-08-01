@@ -156,11 +156,9 @@ class LteMixture : public GasMixture {
   }
 
   // Compute species mass densities based on LTE assumptions.
-  virtual void GetSpeciesFromLTE(double *conservedState){
+  virtual void GetSpeciesFromLTE(double *conservedState) {
     printf("computeElectronPressureGrad not implemented");
   }
-
-
 };
 
 #endif  // _GPU_
