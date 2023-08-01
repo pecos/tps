@@ -280,7 +280,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
       if (group >= 0) H5Gclose(group);
       if (dataspace >= 0) H5Sclose(dataspace);
 
-    } else if (fam.inReastartFile) {  // read mode
+    } else if (fam.inRestartFile) {  // read mode
       if (rank0_) cout << "Reading in solutiond data from restart..." << endl;
 
       // verify Dofs match expectations with current mesh
@@ -323,7 +323,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
 
       vector<IOVar> vars = ioData.vars_[fam.group_];
       for (auto var : vars) {
-        if (var.inReastartFile_) {
+        if (var.inRestartFile_) {
           std::string h5Path = fam.group_ + "/" + var.varName_;
           if (rank0_) grvy_printf(ginfo, "--> Reading h5 path = %s\n", h5Path.c_str());
           if (config.isRestartPartitioned(mode))
@@ -740,11 +740,11 @@ void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
 
 // register a new IO family which maps to a ParGridFunction
 void IODataOrganizer::registerIOFamily(std::string description, std::string group, ParGridFunction *pfunc,
-                                       bool auxRestart, bool _inReastartFile) {
+                                       bool auxRestart, bool _inRestartFile) {
   IOFamily family{description, group, pfunc};
   std::vector<IOVar> vars;
   family.allowsAuxRestart = auxRestart;
-  family.inReastartFile = _inReastartFile;
+  family.inRestartFile = _inRestartFile;
 
   families_.push_back(family);
   vars_[group] = vars;
@@ -753,8 +753,8 @@ void IODataOrganizer::registerIOFamily(std::string description, std::string grou
 }
 
 // register individual variables for IO family
-void IODataOrganizer::registerIOVar(std::string group, std::string varName, int index, bool inReastartFile) {
-  IOVar newvar{varName, index, inReastartFile};
+void IODataOrganizer::registerIOVar(std::string group, std::string varName, int index, bool inRestartFile) {
+  IOVar newvar{varName, index, inRestartFile};
   vars_[group].push_back(newvar);
 
   return;
