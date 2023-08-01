@@ -213,7 +213,7 @@ void LoMachSolver::initialize() {
   // HARD CODE
   mixture = new DryAir(config, dim, nvel);  // conditional jump, must be using something in config that wasnt parsed?
   transportPtr = new DryAirTransport(mixture, config);
-  
+
   /*
   switch (config.GetWorkingFluid()) {
     case WorkingFluid::DRY_AIR:
@@ -1932,7 +1932,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       const auto ab1_ = ab1;
       const auto ab2_ = ab2;
       const auto ab3_ = ab3;
-      mfem::forall(FBext.Size(), [=] MFEM_HOST_DEVICE (int i)
+      //mfem::forall(FBext.Size(), [=] MFEM_HOST_DEVICE (int i)
+      MFEM_FORALL(i, FBext.Size(),
       {
          d_Fext[i] = ab1_ * d_Nun[i] +
                      ab2_ * d_Nunm1[i] +
@@ -1979,7 +1980,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       const auto d_unm1 = unm1.Read();
       const auto d_unm2 = unm2.Read();
       auto d_Fext = Fext.ReadWrite();
-      mfem::forall(Fext.Size(), [=] MFEM_HOST_DEVICE (int i)
+      //mfem::forall(Fext.Size(), [=] MFEM_HOST_DEVICE (int i)
+      MFEM_FORALL(i, Fext.Size(),
       {
          d_Fext[i] += bd1idt * d_un[i] +
                       bd2idt * d_unm1[i] +
@@ -1999,7 +2001,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       const auto ab1_ = ab1;
       const auto ab2_ = ab2;
       const auto ab3_ = ab3;
-      mfem::forall(Lext.Size(), [=] MFEM_HOST_DEVICE (int i)
+      //mfem::forall(Lext.Size(), [=] MFEM_HOST_DEVICE (int i)
+      MFEM_FORALL(i, Lext.Size(),
       {
          d_Lext[i] = ab1_ * d_un[i] +
                      ab2_ * d_unm1[i] +
@@ -2397,7 +2400,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       const double *d_tnm1 = Tnm1.Read();
       const double *d_tnm2 = Tnm2.Read();
       double *d_Text = Text.HostReadWrite();
-      mfem::forall(Text.Size(), [=] MFEM_HOST_DEVICE (int i)
+      //mfem::forall(Text.Size(), [=] MFEM_HOST_DEVICE (int i)
+      MFEM_FORALL(i, Text.Size(),
       {
         //d_Text[i] = -bd0/dt * 298.0; //d_tn[i];	
         //d_Text[i] = 0.0;
@@ -2583,7 +2587,8 @@ void LoMachSolver::updateU() {
     //std::cout << " check 1" << endl;    
     
     const auto d_rn_gf = rn_gf.Read();    
-    mfem::forall(rn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    //mfem::forall(rn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    MFEM_FORALL(i, rn_gf.Size(),
     {
       dataUp[i] = d_rn_gf[i];
     });
@@ -2591,7 +2596,8 @@ void LoMachSolver::updateU() {
     
     int vstart = rfes->GetNDofs();
     const auto d_un_gf = un_gf.Read();    
-    mfem::forall(un_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    //mfem::forall(un_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    MFEM_FORALL(i, un_gf.Size(),
     {
       dataUp[i + vstart] = d_un_gf[i];
     });
@@ -2599,7 +2605,8 @@ void LoMachSolver::updateU() {
 
     int tstart = (1+nvel)*(tfes->GetNDofs());    
     const auto d_tn_gf = Tn_gf.Read();    
-    mfem::forall(Tn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    //mfem::forall(Tn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    MFEM_FORALL(i, Tn_gf.Size(),
     {
       dataUp[i + tstart] = d_tn_gf[i];
     });
@@ -2649,7 +2656,8 @@ void LoMachSolver::copyU() {
     //std::cout << " check 1" << endl;    
     
     double *d_rn_gf = rn_gf.ReadWrite();    
-    mfem::forall(rn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    //mfem::forall(rn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    MFEM_FORALL(i, rn_gf.Size(),
     {
       d_rn_gf[i] = dataUp[i];
     });
@@ -2657,7 +2665,8 @@ void LoMachSolver::copyU() {
     
     int vstart = rfes->GetNDofs();
     double *d_un_gf = un_gf.ReadWrite();    
-    mfem::forall(un_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    //mfem::forall(un_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    MFEM_FORALL(i, un_gf.Size(),
     {
        d_un_gf[i] = dataUp[i + vstart];
     });
@@ -2665,7 +2674,8 @@ void LoMachSolver::copyU() {
 
     int tstart = (1+nvel)*(tfes->GetNDofs());    
     double *d_tn_gf = Tn_gf.ReadWrite();    
-    mfem::forall(Tn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    //mfem::forall(Tn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    MFEM_FORALL(i, Tn_gf.Size(),
     {
        d_tn_gf[i] = dataUp[i + tstart];
     });
