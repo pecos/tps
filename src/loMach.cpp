@@ -1833,8 +1833,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    */
    //std::cout << "Check c..." << std::endl;
 
-   double *dataVisc = bufferVisc->HostReadWrite();   
    {
+     double *dataVisc = bufferVisc->HostWrite();   
      double *Tdata = Tn.HostReadWrite();     
      double visc[2];
      double prim[nvel+2];
@@ -1843,7 +1843,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
        for (int eq = 0; eq < nvel; eq++) {
          prim[1+nvel] = Tdata[i];
          transportPtr->GetViscosities(prim, prim, visc);
-         dataVisc[i + eq * Tdof] = visc[0];	   
+         dataVisc[i + eq * Tdof] = visc[0];
          //dataVisc[i + eq * Tdof] = kin_vis; // static value
        }
      }
@@ -2044,6 +2044,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       ComputeCurl3D(curlu_gf, curlcurlu_gf);
    }
 
+   // what is this trying to accomplish?
    curlcurlu_gf.GetTrueDofs(Lext);
    //std::cout << "Check n..." << std::endl;   
 
@@ -2051,18 +2052,34 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    // (!) must change to dynamic/rho
    //Lext *= kin_vis;
 
-   for (int eq = 0; eq < dim; eq++) {
-     for (int i = 0; i < Tdof; i++) {
-       //double rho = 1.0;
-       // get nu here
-       //transport->ComputeViscosities(rho, double* kin_vis, double* bulk_visc, double* therm_cond)
-       //Lext[i + eq * dof] = Lext[i + eq * dof] * kin_vis * 1.0;
-       Lext[i + eq * Tdof] = Lext[i + eq * Tdof] * dataVisc[i]; // data2 points to kin_vis
+   {
+     const double *dataVisc = bufferVisc->HostRead();
+     for (int eq = 0; eq < dim; eq++) {
+       for (int i = 0; i < Tdof; i++) {
+         //double rho = 1.0;
+         // get nu here
+         //transport->ComputeViscosities(rho, double* kin_vis, double* bulk_visc, double* therm_cond)
+         //Lext[i + eq * dof] = Lext[i + eq * dof] * kin_vis * 1.0;
+
+         // what if we don't do this?  Then all is well
+         //Lext[i + eq * Tdof] = Lext[i + eq * Tdof] * dataVisc[i]; // data2 points to kin_vis
+         Lext[i + eq * Tdof] *= dataVisc[i]; // data2 points to kin_vis
+       }
      }
    }
    //std::cout << "Check o..." << std::endl;   
-   
+
    sw_curlcurl.Stop();
+
+   // Lext alone is ok
+   //Lext = 0.0;
+
+   // Fext alone isn't enough
+   //Fext = 0.0;
+
+   // // zeroing both works
+   // Lext = 0.0;
+   // Fext = 0.0;
 
    // \tilde{F} = F - \nu CurlCurl(u), (F* + L*)
    FText.Set(-1.0, Lext);
@@ -2071,13 +2088,19 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    // p_r = \nabla \cdot FText ( i think "p_r" means rhs of pressure-poisson eq, so div(\tilde{F}))
    // applied divergence to full FText vector
    //D->Mult(FText, resp);
-   //resp.Neg();   
+   //resp.Neg();
+
+   // fixes uninitialized variables
+   //FText = 0.0;
 
    // add some if for porder != vorder
    // project FText to p-1
    D->Mult(FText, tmpR0);  // tmp3 c p, tmp2 and resp c (p-1) // possible invalid read
    tmpR0.Neg();
-   //std::cout << "Check p..." << std::endl;   
+   //std::cout << "Check p..." << std::endl;
+
+   // zero here, leads to no uninitialized variable errors in serial
+   //tmpR0 = 0.0;
 
    // Add boundary terms.
    FText_gf.SetFromTrueDofs(FText);
@@ -2088,6 +2111,9 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    tmpR0.Add(1.0, FText_bdr);
    tmpR0.Add(-bd0 / dt, g_bdr);
 
+   // zero here, leads to no uninitialized variable errors in serial
+   //tmpR0 = 0.0;
+
    // project rhs to p-space
    {
      double *data = R0PM0_gf.HostReadWrite();
@@ -2097,13 +2123,13 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      }
    }
    R0PM1_gf.ProjectGridFunction(R0PM0_gf);
-   // {
-   //   double *data = resp.HostReadWrite();
-   //   double *d_buf = R0PM1_gf.HostReadWrite();   
-   //   for (int i = 0; i < Pdof; i++) {     
-   //     data[i] = d_buf[i];
-   //   }
-   // }   
+   {
+     double *data = resp.HostReadWrite();
+     double *d_buf = R0PM1_gf.HostReadWrite();   
+     for (int i = 0; i < Pdof; i++) {     
+       data[i] = d_buf[i];
+     }
+   }   
    
    //resp.Add(1.0, FText_bdr);
    //resp.Add(-bd0 / dt, g_bdr);
@@ -3534,6 +3560,10 @@ void LoMachSolver::parseFlowOptions() {
   //tpsP_->getInput("flow/refLength", config.refLength, 1.0);
   tpsP_->getInput("loMach/viscosityMultiplier", config.visc_mult, 1.0);
   tpsP_->getInput("loMach/bulkViscosityMultiplier", config.bulk_visc, 0.0);
+  tpsP_->getInput("loMach/SutherlandC1", config.sutherland_.C1, 1.458e-6);
+  tpsP_->getInput("loMach/SutherlandS0", config.sutherland_.S0, 110.4);
+  tpsP_->getInput("loMach/SutherlandPr", config.sutherland_.Pr, 0.71);
+
   //tpsP_->getInput("flow/axisymmetric", config.axisymmetric_, false);
   tpsP_->getInput("loMach/enablePressureForcing", config.isForcing, false);
   if (config.isForcing) {
