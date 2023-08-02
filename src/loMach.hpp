@@ -266,13 +266,7 @@ protected:
    ParFiniteElementSpace *fvfes = nullptr;
 
    /// Pressure \f$H^1\f$ finite element space.
-   ParFiniteElementSpace *pfes = nullptr;
-
-   /// Temperature \f$H^1\f$ finite element space.
-   ParFiniteElementSpace *tfes = nullptr;
-
-   /// density \f$H^1\f$ finite element space.
-   ParFiniteElementSpace *rfes = nullptr;
+   ParFiniteElementSpace *sfes = nullptr;
 
    // nonlinear term
    ParFiniteElementSpace *nfes = nullptr;

@@ -172,29 +172,16 @@ void LoMachSolver::initialize() {
    //-----------------------------------------------------
    // 2) Prepare the required finite elements
    //-----------------------------------------------------
-   // velocity
    fec = new H1_FECollection(order, dim_);
 
+   // space for dim_ dimensional vector (i.e., velocity)
    vfes = new ParFiniteElementSpace(pmesh, fec, dim_);
 
-   // dealias nonlinear term
-   //nfec = new H1_FECollection(norder, dim_);
-   //nfes = new ParFiniteElementSpace(pmesh, vfec, dim_);
+   // space for scalar variables (e.g., pressure, temperature, etc)
+   sfes = new ParFiniteElementSpace(pmesh, fec, 1);
 
-   // pressure
-   pfes = new ParFiniteElementSpace(pmesh, fec);
-
-   // temperature
-   tfes = new ParFiniteElementSpace(pmesh, fec);
-
-   // density
-   rfes = new ParFiniteElementSpace(pmesh, fec);
-
-   // TAO: Shouldn't this be pfec (or tfec or rfec) rather than
-   // vfec---i.e., num_equation variables all in the same finite
-   // element space
+   // space for entire solution concatenated together
    fvfes = new ParFiniteElementSpace(pmesh, fec, num_equation); //, Ordering::byNODES);
-
 
    // Check if fully periodic mesh
    if (!(pmesh->bdr_attributes.Size() == 0))
@@ -211,15 +198,13 @@ void LoMachSolver::initialize() {
    if (verbose) grvy_printf(ginfo, "Spaces constructed...\n");
 
    int vfes_truevsize = vfes->GetTrueVSize();
-   int pfes_truevsize = pfes->GetTrueVSize();
-   int tfes_truevsize = tfes->GetTrueVSize();
-   //int nfes_truevsize = nfes->GetTrueVSize();
-   int rfes_truevsize = rfes->GetTrueVSize();
-   if (verbose) grvy_printf(ginfo, "Got sizes...\n");
-   printf("vfes_truevsize = %d", vfes_truevsize);
-   printf("pfes_truevsize = %d", pfes_truevsize);
-   printf("tfes_truevsize = %d", tfes_truevsize);
-   fflush(stdout);
+   int sfes_truevsize = sfes->GetTrueVSize();
+   if (verbose) {
+     grvy_printf(ginfo, "Got sizes...\n");
+     printf("vfes_truevsize = %d\n", vfes_truevsize);
+     printf("sfes_truevsize = %d\n", sfes_truevsize);
+     fflush(stdout);
+   }
 
    un.SetSize(vfes_truevsize);
    un = 0.0;
@@ -251,22 +236,22 @@ void LoMachSolver::initialize() {
    FBext.SetSize(vfes_truevsize);
 
    Fext.SetSize(vfes_truevsize);
-   FText.SetSize(vfes_truevsize); // why is this vfes while _bdr is pfes?
+   FText.SetSize(vfes_truevsize); // why is this vfes while _bdr is sfes?
    Lext.SetSize(vfes_truevsize);
    resu.SetSize(vfes_truevsize);
 
    tmpR1.SetSize(vfes_truevsize);
 
-   pn.SetSize(pfes_truevsize);
+   pn.SetSize(sfes_truevsize);
    pn = 0.0;
-   resp.SetSize(pfes_truevsize);
+   resp.SetSize(sfes_truevsize);
    resp = 0.0;
-   FText_bdr.SetSize(pfes_truevsize);
+   FText_bdr.SetSize(sfes_truevsize);
    //FText_bdr.SetSize(vfes_truevsize);
-   //g_bdr.SetSize(pfes_truevsize);
+   //g_bdr.SetSize(sfes_truevsize);
    g_bdr.SetSize(vfes_truevsize);
 
-   pnBig.SetSize(tfes_truevsize);
+   pnBig.SetSize(sfes_truevsize);
    pnBig = 0.0;
 
    un_gf.SetSpace(vfes);
@@ -274,8 +259,8 @@ void LoMachSolver::initialize() {
    un_next_gf.SetSpace(vfes);
    un_next_gf = 0.0;
 
-   sml_gf.SetSpace(pfes);
-   big_gf.SetSpace(tfes);
+   sml_gf.SetSpace(sfes);
+   big_gf.SetSpace(sfes);
 
    Lext_gf.SetSpace(vfes);
    curlu_gf.SetSpace(vfes);
@@ -283,56 +268,56 @@ void LoMachSolver::initialize() {
    FText_gf.SetSpace(vfes);
    resu_gf.SetSpace(vfes);
 
-   pn_gf.SetSpace(pfes);
+   pn_gf.SetSpace(sfes);
    pn_gf = 0.0;
-   resp_gf.SetSpace(pfes);
-   tmpR0PM1.SetSize(pfes_truevsize);
+   resp_gf.SetSpace(sfes);
+   tmpR0PM1.SetSize(sfes_truevsize);
 
    cur_step = 0;
 
    // adding temperature
-   Tn.SetSize(tfes_truevsize);
+   Tn.SetSize(sfes_truevsize);
    Tn = 0.0;
-   Tn_next.SetSize(tfes_truevsize);
+   Tn_next.SetSize(sfes_truevsize);
    Tn_next = 0.0;
 
-   Tnm1.SetSize(tfes_truevsize);
+   Tnm1.SetSize(sfes_truevsize);
    Tnm1 = 298.0; // fix hardcode
-   Tnm2.SetSize(tfes_truevsize);
+   Tnm2.SetSize(sfes_truevsize);
    Tnm2 = 298.0;
 
-   fTn.SetSize(tfes_truevsize); // forcing term
-   NTn.SetSize(tfes_truevsize); // advection terms
+   fTn.SetSize(sfes_truevsize); // forcing term
+   NTn.SetSize(sfes_truevsize); // advection terms
    NTn = 0.0;
-   NTnm1.SetSize(tfes_truevsize);
+   NTnm1.SetSize(sfes_truevsize);
    NTnm1 = 0.0;
-   NTnm2.SetSize(tfes_truevsize);
+   NTnm2.SetSize(sfes_truevsize);
    NTnm2 = 0.0;
 
-   Text.SetSize(tfes_truevsize);
-   Text_bdr.SetSize(tfes_truevsize);
-   Text_gf.SetSpace(tfes);
-   t_bdr.SetSize(tfes_truevsize);
+   Text.SetSize(sfes_truevsize);
+   Text_bdr.SetSize(sfes_truevsize);
+   Text_gf.SetSpace(sfes);
+   t_bdr.SetSize(sfes_truevsize);
 
-   resT.SetSize(tfes_truevsize);
-   tmpR0.SetSize(tfes_truevsize);
+   resT.SetSize(sfes_truevsize);
+   tmpR0.SetSize(sfes_truevsize);
 
-   Tn_gf.SetSpace(tfes); // bc?
+   Tn_gf.SetSpace(sfes); // bc?
    Tn_gf = 298.0; // fix hardcode
-   Tn_next_gf.SetSpace(tfes);
+   Tn_next_gf.SetSpace(sfes);
    Tn_next_gf = 298.0;
 
-   resT_gf.SetSpace(tfes);
+   resT_gf.SetSpace(sfes);
 
    // density, not actually solved for directly
-   rn.SetSize(rfes_truevsize);
+   rn.SetSize(sfes_truevsize);
    rn = 1.0;
-   rn_gf.SetSpace(rfes);
+   rn_gf.SetSpace(sfes);
    rn_gf = 1.0;
 
-   R0PM0_gf.SetSpace(tfes);
+   R0PM0_gf.SetSpace(sfes);
    R0PM0_gf = 0.0;
-   R0PM1_gf.SetSpace(pfes);
+   R0PM1_gf.SetSpace(sfes);
    R0PM1_gf = 0.0;
 
    R1PM0_gf.SetSpace(vfes);
@@ -429,12 +414,12 @@ void LoMachSolver::Setup(double dt) {
    sw_setup.Start();
 
    vfes->GetEssentialTrueDofs(vel_ess_attr, vel_ess_tdof);
-   pfes->GetEssentialTrueDofs(pres_ess_attr, pres_ess_tdof);
-   tfes->GetEssentialTrueDofs(temp_ess_attr, temp_ess_tdof);
+   sfes->GetEssentialTrueDofs(pres_ess_attr, pres_ess_tdof);
+   sfes->GetEssentialTrueDofs(temp_ess_attr, temp_ess_tdof);
 
    int Vdof = vfes->GetTrueVSize();
-   int Pdof = pfes->GetTrueVSize();
-   int Tdof = tfes->GetTrueVSize();
+   int Pdof = sfes->GetTrueVSize();
+   int Tdof = sfes->GetTrueVSize();
 
    Array<int> empty;
 
@@ -445,8 +430,8 @@ void LoMachSolver::Setup(double dt) {
    // GLL integration rule (Numerical Integration)
    const IntegrationRule &ir_ni = gll_rules.Get(vfes->GetFE(0)->GetGeomType(), 2 * order);
    const IntegrationRule &ir_nli = gll_rules.Get(vfes->GetFE(0)->GetGeomType(), 3 * norder - 1);
-   const IntegrationRule &ir_pi = gll_rules.Get(pfes->GetFE(0)->GetGeomType(), 2 * porder);
-   const IntegrationRule &ir_i  = gll_rules.Get(tfes->GetFE(0)->GetGeomType(), 2 * order);
+   const IntegrationRule &ir_pi = gll_rules.Get(sfes->GetFE(0)->GetGeomType(), 2 * porder);
+   const IntegrationRule &ir_i  = gll_rules.Get(sfes->GetFE(0)->GetGeomType(), 2 * order);
    std::cout << "Check 6..." << std::endl;
 
    // convection section, extrapolation
@@ -478,8 +463,8 @@ void LoMachSolver::Setup(double dt) {
    // need to build another with q=1/rho
    // DiffusionIntegrator(MatrixCoefficient &q, const IntegrationRule *ir = nullptr)
    // BilinearFormIntegrator *integ = new DiffusionIntegrator(sigma); with sigma some type of Coefficient class
-   //ParGridFunction buffer1(pfes);
-   bufferInvRho = new ParGridFunction(pfes);
+   //ParGridFunction buffer1(sfes);
+   bufferInvRho = new ParGridFunction(sfes);
    {
      double *data = bufferInvRho->HostReadWrite();
      for (int i = 0; i < Tdof; i++) {
@@ -490,7 +475,7 @@ void LoMachSolver::Setup(double dt) {
    invRho = new GridFunctionCoefficient(bufferInvRho);
 
    // looks like this is the Laplacian for press eq
-   Sp_form = new ParBilinearForm(pfes);
+   Sp_form = new ParBilinearForm(sfes);
    auto *sp_blfi = new DiffusionIntegrator;
    //auto *sp_blfi = new DiffusionIntegrator(*invRho); // HERE breaks with amg
    if (numerical_integ)
@@ -507,7 +492,7 @@ void LoMachSolver::Setup(double dt) {
    std::cout << "Check 10..." << std::endl;
 
    // div(u)
-   D_form = new ParMixedBilinearForm(vfes, tfes);
+   D_form = new ParMixedBilinearForm(vfes, sfes);
    auto *vd_mblfi = new VectorDivergenceIntegrator();
    if (numerical_integ)
    {
@@ -523,7 +508,7 @@ void LoMachSolver::Setup(double dt) {
    std::cout << "Check 11..." << std::endl;
 
    // for grad(div(u))?
-   G_form = new ParMixedBilinearForm(tfes, vfes);
+   G_form = new ParMixedBilinearForm(sfes, vfes);
    auto *g_mblfi = new GradientIntegrator();
    if (numerical_integ)
    {
@@ -539,7 +524,7 @@ void LoMachSolver::Setup(double dt) {
    std::cout << "Check 12..." << std::endl;
 
    // viscosity field
-   //ParGridFunction buffer2(vfes); // or pfes here?
+   //ParGridFunction buffer2(vfes); // or sfes here?
    bufferVisc = new ParGridFunction(vfes);
    {
      double *data = bufferVisc->HostReadWrite();
@@ -564,7 +549,7 @@ void LoMachSolver::Setup(double dt) {
    H_lincoeff.constant = kin_vis;
    H_bdfcoeff.constant = 1.0 / dt;
    H_form = new ParBilinearForm(vfes);
-   //H_form = new ParBilinearForm(pfes); // maybe?
+   //H_form = new ParBilinearForm(sfes); // maybe?
    auto *hmv_blfi = new VectorMassIntegrator(H_bdfcoeff); // diagonal from unsteady term
    auto *hdv_blfi = new VectorDiffusionIntegrator(H_lincoeff);
    //auto *hdv_blfi = new VectorDiffusionIntegrator(*viscField); // Laplacian
@@ -588,14 +573,14 @@ void LoMachSolver::Setup(double dt) {
    // Vector vec_one(3);
    // vec_one = 1.0;
    // FText_gfcoeff = new VectorConstantCoefficient(vec_one);
-   FText_bdr_form = new ParLinearForm(pfes);
+   FText_bdr_form = new ParLinearForm(sfes);
    //FText_bdr_form = new ParLinearForm(vfes); // maybe?
    auto *ftext_bnlfi = new BoundaryNormalLFIntegrator(*FText_gfcoeff);
    if (numerical_integ) { ftext_bnlfi->SetIntRule(&ir_ni); }
    FText_bdr_form->AddBoundaryIntegrator(ftext_bnlfi, vel_ess_attr);
 
-   //g_bdr_form = new ParLinearForm(vfes); //? was pfes
-   g_bdr_form = new ParLinearForm(pfes);
+   //g_bdr_form = new ParLinearForm(vfes); //? was sfes
+   g_bdr_form = new ParLinearForm(sfes);
    for (auto &vel_dbc : vel_dbcs)
    {
       auto *gbdr_bnlfi = new BoundaryNormalLFIntegrator(*vel_dbc.coeff);
@@ -646,7 +631,7 @@ void LoMachSolver::Setup(double dt) {
       SpInvPC->SetPrintLevel(pl_amg);
       SpInvPC->Mult(resp, pn);
       //SpInvOrthoPC = new OrthoSolver(vfes->GetComm());
-      SpInvOrthoPC = new OrthoSolver(pfes->GetComm());
+      SpInvOrthoPC = new OrthoSolver(sfes->GetComm());
       SpInvOrthoPC->SetSolver(*SpInvPC);
    }
    else
@@ -654,11 +639,11 @@ void LoMachSolver::Setup(double dt) {
       SpInvPC = new HypreBoomerAMG(*Sp.As<HypreParMatrix>());
       SpInvPC->SetPrintLevel(0);
       //SpInvOrthoPC = new OrthoSolver(vfes->GetComm());
-      SpInvOrthoPC = new OrthoSolver(pfes->GetComm());
+      SpInvOrthoPC = new OrthoSolver(sfes->GetComm());
       SpInvOrthoPC->SetSolver(*SpInvPC);
    }
    //SpInv = new CGSolver(vfes->GetComm());
-   SpInv = new CGSolver(pfes->GetComm());
+   SpInv = new CGSolver(sfes->GetComm());
    SpInv->iterative_mode = true;
    //SpInv->iterative_mode = false;
    SpInv->SetOperator(*Sp);
@@ -679,7 +664,7 @@ void LoMachSolver::Setup(double dt) {
    if (partial_assembly)
    {
       Vector diag_pa(vfes->GetTrueVSize());
-      //Vector diag_pa(pfes->GetTrueVSize()); // maybe?
+      //Vector diag_pa(sfes->GetTrueVSize()); // maybe?
       std::cout << "Check 18a..." << std::endl;
       H_form->AssembleDiagonal(diag_pa); // invalid read
       std::cout << "Check 18b..." << std::endl;
@@ -716,7 +701,7 @@ void LoMachSolver::Setup(double dt) {
    un_next_gf.SetFromTrueDofs(un_next);
 
    // temperature.....................................
-   Mt_form = new ParBilinearForm(tfes);
+   Mt_form = new ParBilinearForm(sfes);
    auto *mt_blfi = new MassIntegrator;
    if (numerical_integ) { mt_blfi->SetIntRule(&ir_i); }
    Mt_form->AddDomainIntegrator(mt_blfi);
@@ -726,7 +711,7 @@ void LoMachSolver::Setup(double dt) {
    std::cout << "Check 20..." << std::endl;
 
    // div(uT) for temperature
-   Dt_form = new ParMixedBilinearForm(vfes, tfes);
+   Dt_form = new ParMixedBilinearForm(vfes, sfes);
    auto *vtd_mblfi = new VectorDivergenceIntegrator();
    if (numerical_integ)
    {
@@ -742,8 +727,8 @@ void LoMachSolver::Setup(double dt) {
    std::cout << "Check 21..." << std::endl;
 
    // thermal diffusivity field
-   //ParGridFunction buffer3(tfes);
-   bufferAlpha = new ParGridFunction(tfes);
+   //ParGridFunction buffer3(sfes);
+   bufferAlpha = new ParGridFunction(sfes);
    {
      double *data = bufferAlpha->HostReadWrite();
      double *Tdata = Tn.HostReadWrite();
@@ -762,7 +747,7 @@ void LoMachSolver::Setup(double dt) {
 
    Ht_lincoeff.constant = kin_vis / Pr;
    Ht_bdfcoeff.constant = 1.0 / dt;
-   Ht_form = new ParBilinearForm(tfes);
+   Ht_form = new ParBilinearForm(sfes);
    auto *hmt_blfi = new MassIntegrator(Ht_bdfcoeff); // unsteady bit
    auto *hdt_blfi = new DiffusionIntegrator(Ht_lincoeff);
 
@@ -782,12 +767,12 @@ void LoMachSolver::Setup(double dt) {
 
    // temp boundary terms
    Text_gfcoeff = new GridFunctionCoefficient(&Text_gf);
-   Text_bdr_form = new ParLinearForm(tfes);
+   Text_bdr_form = new ParLinearForm(sfes);
    auto *text_blfi = new BoundaryLFIntegrator(*Text_gfcoeff);
    if (numerical_integ) { text_blfi->SetIntRule(&ir_i); }
    Text_bdr_form->AddBoundaryIntegrator(text_blfi, temp_ess_attr);
 
-   t_bdr_form = new ParLinearForm(tfes);
+   t_bdr_form = new ParLinearForm(sfes);
    for (auto &temp_dbc : temp_dbcs)
    {
       auto *tbdr_blfi = new BoundaryLFIntegrator(*temp_dbc.coeff);
@@ -797,7 +782,7 @@ void LoMachSolver::Setup(double dt) {
 
    if (partial_assembly)
    {
-      Vector diag_pa(tfes->GetTrueVSize());
+      Vector diag_pa(sfes->GetTrueVSize());
       Mt_form->AssembleDiagonal(diag_pa);
       MtInvPC = new OperatorJacobiSmoother(diag_pa, empty);
    }
@@ -806,7 +791,7 @@ void LoMachSolver::Setup(double dt) {
       MtInvPC = new HypreSmoother(*Mt.As<HypreParMatrix>());
       dynamic_cast<HypreSmoother *>(MtInvPC)->SetType(HypreSmoother::Jacobi, 1);
    }
-   MtInv = new CGSolver(tfes->GetComm());
+   MtInv = new CGSolver(sfes->GetComm());
    MtInv->iterative_mode = false;
    MtInv->SetOperator(*Mt);
    MtInv->SetPreconditioner(*MtInvPC);
@@ -817,7 +802,7 @@ void LoMachSolver::Setup(double dt) {
 
    if (partial_assembly)
    {
-      Vector diag_pa(tfes->GetTrueVSize());
+      Vector diag_pa(sfes->GetTrueVSize());
       Ht_form->AssembleDiagonal(diag_pa);
       HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof);
    }
@@ -826,7 +811,7 @@ void LoMachSolver::Setup(double dt) {
       HtInvPC = new HypreSmoother(*Ht.As<HypreParMatrix>());
       dynamic_cast<HypreSmoother *>(HtInvPC)->SetType(HypreSmoother::Jacobi, 1);
    }
-   HtInv = new CGSolver(tfes->GetComm());
+   HtInv = new CGSolver(sfes->GetComm());
    HtInv->iterative_mode = true;
    HtInv->SetOperator(*Ht);
    HtInv->SetPreconditioner(*HtInvPC);
@@ -877,7 +862,7 @@ void LoMachSolver::Setup(double dt) {
       Tn_NM1_gf.SetSpace(tfes_filter);
       Tn_NM1_gf = 0.0;
 
-      Tn_filtered_gf.SetSpace(tfes);
+      Tn_filtered_gf.SetSpace(sfes);
       Tn_filtered_gf = 0.0;
    }
 
@@ -1047,8 +1032,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    sw_step.Start();
 
    int Vdof = vfes->GetTrueVSize();
-   int Pdof = pfes->GetTrueVSize();
-   int Tdof = tfes->GetTrueVSize();
+   int Pdof = sfes->GetTrueVSize();
+   int Tdof = sfes->GetTrueVSize();
 
    SetTimeIntegrationCoefficients(current_step-start_step);
 
@@ -1319,7 +1304,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    for (auto &pres_dbc : pres_dbcs) { pn_gf.ProjectBdrCoefficient(*pres_dbc.coeff, pres_dbc.attr); }
 
    // ?
-   pfes->GetRestrictionMatrix()->MultTranspose(resp, resp_gf);
+   sfes->GetRestrictionMatrix()->MultTranspose(resp, resp_gf);
 
    {
      double *data = bufferInvRho->HostReadWrite();
@@ -1436,7 +1421,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    if (partial_assembly)
    {
       delete HtInvPC;
-      Vector diag_pa(tfes->GetTrueVSize());
+      Vector diag_pa(sfes->GetTrueVSize());
       Ht_form->AssembleDiagonal(diag_pa);
       HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof);
       HtInv->SetPreconditioner(*HtInvPC);
@@ -1500,7 +1485,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    for (auto &temp_dbc : temp_dbcs) { Tn_next_gf.ProjectBdrCoefficient(*temp_dbc.coeff, temp_dbc.attr); }
 
    // (?)
-   tfes->GetRestrictionMatrix()->MultTranspose(resT, resT_gf);
+   sfes->GetRestrictionMatrix()->MultTranspose(resT, resT_gf);
 
    Vector Xt2, Bt2;
    if (partial_assembly)
@@ -1580,7 +1565,7 @@ void LoMachSolver::updateU() {
       dataUp[i] = d_rn_gf[i];
     });
 
-    int vstart = rfes->GetNDofs();
+    int vstart = sfes->GetNDofs();
     const auto d_un_gf = un_gf.Read();
     //mfem::forall(un_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
     MFEM_FORALL(i, un_gf.Size(),
@@ -1588,7 +1573,7 @@ void LoMachSolver::updateU() {
       dataUp[i + vstart] = d_un_gf[i];
     });
 
-    int tstart = (1+nvel)*(tfes->GetNDofs());
+    int tstart = (1+nvel)*(sfes->GetNDofs());
     const auto d_tn_gf = Tn_gf.Read();
     //mfem::forall(Tn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
     MFEM_FORALL(i, Tn_gf.Size(),
@@ -1611,7 +1596,7 @@ void LoMachSolver::copyU() {
       d_rn_gf[i] = dataUp[i];
     });
 
-    int vstart = rfes->GetNDofs();
+    int vstart = sfes->GetNDofs();
     double *d_un_gf = un_gf.ReadWrite();
     //mfem::forall(un_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
     MFEM_FORALL(i, un_gf.Size(),
@@ -1619,7 +1604,7 @@ void LoMachSolver::copyU() {
        d_un_gf[i] = dataUp[i + vstart];
     });
 
-    int tstart = (1+nvel)*(tfes->GetNDofs());
+    int tstart = (1+nvel)*(sfes->GetNDofs());
     double *d_tn_gf = Tn_gf.ReadWrite();
     //mfem::forall(Tn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
     MFEM_FORALL(i, Tn_gf.Size(),
@@ -1685,8 +1670,8 @@ void LoMachSolver::Orthogonalize(Vector &v)
    int loc_size = v.Size();
    int global_size = 0;
 
-   MPI_Allreduce(&loc_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, pfes->GetComm());
-   MPI_Allreduce(&loc_size, &global_size, 1, MPI_INT, MPI_SUM, pfes->GetComm());
+   MPI_Allreduce(&loc_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, sfes->GetComm());
+   MPI_Allreduce(&loc_size, &global_size, 1, MPI_INT, MPI_SUM, sfes->GetComm());
 
    v -= global_sum / static_cast<double>(global_size);
 }
@@ -2247,7 +2232,7 @@ void LoMachSolver::PrintTimingData()
 void LoMachSolver::PrintInfo()
 {
    int fes_size0 = vfes->GlobalVSize();
-   int fes_size1 = pfes->GlobalVSize();
+   int fes_size1 = sfes->GlobalVSize();
 
    if (pmesh->GetMyRank() == 0)
    {
@@ -2298,9 +2283,7 @@ LoMachSolver::~LoMachSolver() {
    delete fec;
 
    delete vfes;
-   delete pfes;
-   delete rfes;
-   delete tfes;
+   delete sfes;
    delete fvfes;
 
    delete vfec_filter;
