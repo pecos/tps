@@ -844,7 +844,7 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
       // solution order
       h5_save_attribute(file, "order", order);
       // spatial dimension
-      h5_save_attribute(file, "dimension", dim);
+      h5_save_attribute(file, "dimension", dim_);
       std::cout << " okay 3a " << endl;                  
       //std::cout << " okay 3a " << average->ComputeMean() << endl;            
 

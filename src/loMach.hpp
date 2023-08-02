@@ -151,7 +151,7 @@ protected:
    std::ofstream histFile;
 
    // Number of dimensions
-   int dim;
+   int dim_;
    int nvel;
 
    // Number of equations
@@ -174,7 +174,6 @@ protected:
    TPS::Tps *tpsP_;
 
    mfem::ParMesh *pmesh_;
-   int dim_;
    int true_size_;
    Array<int> offsets_;
 

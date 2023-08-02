@@ -94,10 +94,10 @@ void LoMachSolver::initialize() {
    // Create the periodic mesh using the vertex mapping defined by the translation vectors
    Mesh periodic_mesh = Mesh::MakePeriodic(mesh,mesh.CreatePeriodicVertexMapping(translations));
 
-   // HACK HARD CODE
-   nvel = 3;
    dim_ = mesh_ptr->Dimension();
-   dim = dim_;
+
+   // for now number of velocity components is equal to dim
+   nvel = dim_;
 
   eqSystem = config.GetEquationSystem();
   mixture = NULL;
@@ -108,7 +108,7 @@ void LoMachSolver::initialize() {
   config.dryAirInput.gas_constant = 287.058;
   config.dryAirInput.f = config.workFluid;
   config.dryAirInput.eq_sys = config.eqSystem;
-  mixture = new DryAir(config, dim, nvel);  // conditional jump, must be using something in config that wasnt parsed?
+  mixture = new DryAir(config, dim_, nvel);  // conditional jump, must be using something in config that wasnt parsed?
   transportPtr = new DryAirTransport(mixture, config);
 
   MaxIters = config.GetNumIters();
@@ -173,12 +173,12 @@ void LoMachSolver::initialize() {
    // 2) Prepare the required finite elements
    //-----------------------------------------------------
    // velocity
-   vfec = new H1_FECollection(order, dim);
-   vfes = new ParFiniteElementSpace(pmesh, vfec, dim);
+   vfec = new H1_FECollection(order, dim_);
+   vfes = new ParFiniteElementSpace(pmesh, vfec, dim_);
 
    // dealias nonlinear term
-   //nfec = new H1_FECollection(norder, dim);
-   //nfes = new ParFiniteElementSpace(pmesh, vfec, dim);
+   //nfec = new H1_FECollection(norder, dim_);
+   //nfes = new ParFiniteElementSpace(pmesh, vfec, dim_);
 
    // pressure
    pfec = new H1_FECollection(porder);
@@ -383,7 +383,7 @@ void LoMachSolver::Setup(double dt) {
    ParGridFunction *p_gf = GetCurrentPressure();
    ParGridFunction *t_gf = GetCurrentTemperature();
 
-   VectorFunctionCoefficient u_ic_coef(dim, vel_ic);
+   VectorFunctionCoefficient u_ic_coef(dim_, vel_ic);
    u_gf->ProjectCoefficient(u_ic_coef);
 
    FunctionCoefficient t_ic_coef(temp_ic);
@@ -936,7 +936,7 @@ void LoMachSolver::initialTimeStep() {
   double partition_C = max_speed;
   MPI_Allreduce(&partition_C, &max_speed, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
-  dt = CFL * hmin / max_speed / static_cast<double>(dim);
+  dt = CFL * hmin / max_speed / static_cast<double>(dim_);
 
   // dt_fixed is initialized to -1, so if it is positive, then the
   // user requested a fixed dt run
@@ -1013,7 +1013,7 @@ void LoMachSolver::solve() {
        auto dataU = un_gf.HostRead();
        for (int n = 0; n < dof; n++) {
          Umag = 0.0;
-         for (int eq = 0; eq < dim; eq++) {
+         for (int eq = 0; eq < dim_; eq++) {
            Umag += dataU[n + eq * dof]*dataU[n + eq * dof];
          }
          Umag = sqrt(Umag);
@@ -1248,8 +1248,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    }
 
    Lext_gf.SetFromTrueDofs(Lext);
-   int dim = pmesh->Dimension();
-   if (dim == 2)
+   if (dim_ == 2)
    {
       ComputeCurl2D(Lext_gf, curlu_gf);
       ComputeCurl2D(curlu_gf, curlcurlu_gf, true);
@@ -1268,7 +1267,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 
    {
      const double *dataVisc = bufferVisc->HostRead();
-     for (int eq = 0; eq < dim; eq++) {
+     for (int eq = 0; eq < dim_; eq++) {
        for (int i = 0; i < Tdof; i++) {
          //double rho = 1.0;
          // get nu here
@@ -1488,7 +1487,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    const auto ab1_ = ab1;
    const auto ab2_ = ab2;
    const auto ab3_ = ab3;
-   for (int eq = 0; eq < dim; eq++) {
+   for (int eq = 0; eq < dim_; eq++) {
      for (int i = 0; i < Tdof; i++) {
        dataTemp[i + eq * Tdof] = ab1_ * Udnm0[i + eq * Tdof] * Tdnm0[i] +
         	                 ab2_ * Udnm1[i + eq * Tdof] * Tdnm1[i] +
@@ -1725,8 +1724,7 @@ void LoMachSolver::ComputeCurl3D(ParGridFunction &u, ParGridFunction &cu)
       ElementTransformation *tr = fes->GetElementTransformation(e);
       const FiniteElement *el = fes->GetFE(e);
       elndofs = el->GetDof();
-      int dim = el->GetDim();
-      dshape.SetSize(elndofs, dim);
+      dshape.SetSize(elndofs, dim_);
 
       for (int dof = 0; dof < elndofs; ++dof)
       {
@@ -1736,7 +1734,7 @@ void LoMachSolver::ComputeCurl3D(ParGridFunction &u, ParGridFunction &cu)
 
          // Eval and GetVectorGradientHat.
          el->CalcDShape(tr->GetIntPoint(), dshape);
-         grad_hat.SetSize(vdim, dim);
+         grad_hat.SetSize(vdim, dim_);
          DenseMatrix loc_data_mat(loc_data.GetData(), elndofs, vdim);
          MultAtB(loc_data_mat, dshape, grad_hat);
 
@@ -1819,8 +1817,7 @@ void LoMachSolver::ComputeCurl2D(ParGridFunction &u,
       ElementTransformation *tr = fes->GetElementTransformation(e);
       const FiniteElement *el = fes->GetFE(e);
       elndofs = el->GetDof();
-      int dim = el->GetDim();
-      dshape.SetSize(elndofs, dim);
+      dshape.SetSize(elndofs, dim_);
 
       for (int dof = 0; dof < elndofs; ++dof)
       {
@@ -1830,7 +1827,7 @@ void LoMachSolver::ComputeCurl2D(ParGridFunction &u,
 
          // Eval and GetVectorGradientHat.
          el->CalcDShape(tr->GetIntPoint(), dshape);
-         grad_hat.SetSize(vdim, dim);
+         grad_hat.SetSize(vdim, dim_);
          DenseMatrix loc_data_mat(loc_data.GetData(), elndofs, vdim);
          MultAtB(loc_data_mat, dshape, grad_hat);
 
