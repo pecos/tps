@@ -173,29 +173,27 @@ void LoMachSolver::initialize() {
    // 2) Prepare the required finite elements
    //-----------------------------------------------------
    // velocity
-   vfec = new H1_FECollection(order, dim_);
-   vfes = new ParFiniteElementSpace(pmesh, vfec, dim_);
+   fec = new H1_FECollection(order, dim_);
+
+   vfes = new ParFiniteElementSpace(pmesh, fec, dim_);
 
    // dealias nonlinear term
    //nfec = new H1_FECollection(norder, dim_);
    //nfes = new ParFiniteElementSpace(pmesh, vfec, dim_);
 
    // pressure
-   pfec = new H1_FECollection(porder);
-   pfes = new ParFiniteElementSpace(pmesh, pfec);
+   pfes = new ParFiniteElementSpace(pmesh, fec);
 
    // temperature
-   tfec = new H1_FECollection(order);
-   tfes = new ParFiniteElementSpace(pmesh, tfec);
+   tfes = new ParFiniteElementSpace(pmesh, fec);
 
    // density
-   rfec = new H1_FECollection(order);
-   rfes = new ParFiniteElementSpace(pmesh, rfec);
+   rfes = new ParFiniteElementSpace(pmesh, fec);
 
    // TAO: Shouldn't this be pfec (or tfec or rfec) rather than
    // vfec---i.e., num_equation variables all in the same finite
    // element space
-   fvfes = new ParFiniteElementSpace(pmesh, vfec, num_equation); //, Ordering::byNODES);
+   fvfes = new ParFiniteElementSpace(pmesh, fec, num_equation); //, Ordering::byNODES);
 
 
    // Check if fully periodic mesh
@@ -2297,10 +2295,7 @@ LoMachSolver::~LoMachSolver() {
    delete SpInvPC;
    delete lor;
 
-   delete vfec;
-   delete pfec;
-   delete rfec;
-   delete tfec;
+   delete fec;
 
    delete vfes;
    delete pfes;

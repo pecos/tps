@@ -257,7 +257,7 @@ protected:
    IntegrationRules gll_rules;
 
    /// Velocity \f$H^1\f$ finite element collection.
-   FiniteElementCollection *vfec = nullptr;
+   FiniteElementCollection *fec = nullptr;
 
    /// Velocity \f$(H^1)^d\f$ finite element space.
    ParFiniteElementSpace *vfes = nullptr;
@@ -265,26 +265,16 @@ protected:
    //// total space for compatibility
    ParFiniteElementSpace *fvfes = nullptr;
 
-   /// Pressure \f$H^1\f$ finite element collection.
-   FiniteElementCollection *pfec = nullptr;
-
    /// Pressure \f$H^1\f$ finite element space.
    ParFiniteElementSpace *pfes = nullptr;
 
-   /// Temperature \f$H^1\f$ finite element collection.
-   FiniteElementCollection *tfec = nullptr;
-
    /// Temperature \f$H^1\f$ finite element space.
    ParFiniteElementSpace *tfes = nullptr;
-
-   /// density \f$H^1\f$ finite element collection.
-   FiniteElementCollection *rfec = nullptr;
 
    /// density \f$H^1\f$ finite element space.
    ParFiniteElementSpace *rfes = nullptr;
 
    // nonlinear term
-   FiniteElementCollection *nfec = nullptr;
    ParFiniteElementSpace *nfes = nullptr;
 
    ParNonlinearForm *N = nullptr;
