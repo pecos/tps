@@ -51,69 +51,63 @@ LoMachSolver::LoMachSolver(MPI_Session &mpi, LoMachOptions loMach_opts, TPS::Tps
 }
 
 void LoMachSolver::initialize() {
-   bool verbose = mpi_.Root();
-   if (verbose) grvy_printf(ginfo, "Initializing loMach solver.\n");
+  bool verbose = mpi_.Root();
+  if (verbose) grvy_printf(ginfo, "Initializing loMach solver.\n");
 
-   order = config.solOrder; //loMach_opts_.order;
-   porder = config.solOrder; //loMach_opts_.order;
-   norder = config.solOrder; //loMach_opts_.order;
+  order = config.solOrder; //loMach_opts_.order;
+  porder = config.solOrder; //loMach_opts_.order;
+  norder = config.solOrder; //loMach_opts_.order;
 
-   // temporary hard-coding
-   Re_tau = 182.0;
-   kin_vis = 1.0/Re_tau;
-   ambientPressure = 101325.0;
-   Rgas = 287.0;
-   Pr = 1.2;
+  // temporary hard-coding
+  Re_tau = 182.0;
+  kin_vis = 1.0/Re_tau;
+  ambientPressure = 101325.0;
+  Rgas = 287.0;
+  Pr = 1.2;
 
-   //-----------------------------------------------------
-   // 1) Prepare the mesh
-   //-----------------------------------------------------
+  //-----------------------------------------------------
+  // 1) Prepare the mesh
+  //-----------------------------------------------------
 
-   /**/
-    Vector x_translation({config.GetXTrans(), 0.0, 0.0});
-    Vector y_translation({0.0, config.GetYTrans(), 0.0});
-    Vector z_translation({0.0, 0.0, config.GetZTrans()});
-    std::vector<Vector> translations = {x_translation, y_translation, z_translation};
+  // Read the serial mesh (on each mpi rank)
+  Mesh mesh = Mesh(loMach_opts_.mesh_file.c_str());
 
-    if (mpi_.Root()) {
-      std::cout << " Making the mesh periodic using the following offsets:" << std::endl;
-      std::cout << "   xTrans: " << config.GetXTrans() << std::endl;
-      std::cout << "   yTrans: " << config.GetYTrans() << std::endl;
-      std::cout << "   zTrans: " << config.GetZTrans() << std::endl;
-    }
-    /**/
+  Vector x_translation({config.GetXTrans(), 0.0, 0.0});
+  Vector y_translation({0.0, config.GetYTrans(), 0.0});
+  Vector z_translation({0.0, 0.0, config.GetZTrans()});
+  std::vector<Vector> translations = {x_translation, y_translation, z_translation};
 
-   // 1a) Read the serial mesh (on each mpi rank)
-   //Mesh *mesh_ptr = new Mesh(lomach_opts_.mesh_file.c_str(), 1, 1);
+  if (mpi_.Root()) {
+    std::cout << " Making the mesh periodic using the following offsets:" << std::endl;
+    std::cout << "   xTrans: " << config.GetXTrans() << std::endl;
+    std::cout << "   yTrans: " << config.GetYTrans() << std::endl;
+    std::cout << "   zTrans: " << config.GetZTrans() << std::endl;
+  }
 
-   /**/
-   Mesh mesh = Mesh(loMach_opts_.mesh_file.c_str());
-   Mesh *mesh_ptr = &mesh;
-   Mesh *serial_mesh = &mesh;
+  // NB: be careful here... periodic mesh is created but mesh is used some places below.
+  // It looks ok except in case where mesh refinement is requested.
 
-   // Create the periodic mesh using the vertex mapping defined by the translation vectors
-   Mesh periodic_mesh = Mesh::MakePeriodic(mesh,mesh.CreatePeriodicVertexMapping(translations));
+  // Create the periodic mesh using the vertex mapping defined by the translation vectors
+  Mesh periodic_mesh = Mesh::MakePeriodic(mesh,mesh.CreatePeriodicVertexMapping(translations));
+  dim_ = mesh.Dimension();
 
-   dim_ = mesh_ptr->Dimension();
-
-   // for now number of velocity components is equal to dim
-   nvel = dim_;
+  // for now number of velocity components is equal to dim
+  nvel = dim_;
 
   eqSystem = config.GetEquationSystem();
   mixture = NULL;
-
 
   // HARD CODE
   config.dryAirInput.specific_heat_ratio = 1.4;
   config.dryAirInput.gas_constant = 287.058;
   config.dryAirInput.f = config.workFluid;
   config.dryAirInput.eq_sys = config.eqSystem;
-  mixture = new DryAir(config, dim_, nvel);  // conditional jump, must be using something in config that wasnt parsed?
+  mixture = new DryAir(config, dim_, nvel);
   transportPtr = new DryAirTransport(mixture, config);
 
   MaxIters = config.GetNumIters();
   max_speed = 0.;
-  num_equation = 5; // HARD CODE
+  num_equation = nvel + 2;  // no species support yet
 
   // check if a simulation is being restarted
   if (config.GetRestartCycle() > 0) {
@@ -124,7 +118,7 @@ void LoMachSolver::initialize() {
       MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
-    nelemGlobal_ = serial_mesh->GetNE();
+    nelemGlobal_ = mesh.GetNE();
     if (rank0_) grvy_printf(ginfo, "Total # of mesh elements = %i\n", nelemGlobal_);
 
     if (nprocs_ > 1) {
@@ -147,15 +141,14 @@ void LoMachSolver::initialize() {
       if (mpi_.Root()) {
         std::cout << "Uniform refinement number " << l << std::endl;
       }
-      serial_mesh->UniformRefinement();
-      //mesh->UniformRefinement();
+      mesh.UniformRefinement();
     }
 
     // generate partitioning file (we assume conforming meshes)
-    nelemGlobal_ = serial_mesh->GetNE();
+    nelemGlobal_ = mesh.GetNE();
     if (nprocs_ > 1) {
-      assert(serial_mesh->Conforming());
-      partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
+      assert(mesh.Conforming());
+      partitioning_ = Array<int>(mesh.GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
       if (rank0_) partitioning_file_hdf5("write");
       MPI_Barrier(MPI_COMM_WORLD);
     }
@@ -164,28 +157,27 @@ void LoMachSolver::initialize() {
     time = 0.;
     iter = 0;
   }
-   // 1c) Partition the mesh (see partitioning_ in M2ulPhyS)
-   pmesh = new ParMesh(MPI_COMM_WORLD, periodic_mesh);
-   if (verbose) grvy_printf(ginfo, "Mesh partitioned...\n");
+  // 1c) Partition the mesh (see partitioning_ in M2ulPhyS)
+  pmesh = new ParMesh(MPI_COMM_WORLD, periodic_mesh);
+  if (verbose) grvy_printf(ginfo, "Mesh partitioned...\n");
 
+  //-----------------------------------------------------
+  // 2) Prepare the required finite elements
+  //-----------------------------------------------------
+  fec = new H1_FECollection(order, dim_);
 
-   //-----------------------------------------------------
-   // 2) Prepare the required finite elements
-   //-----------------------------------------------------
-   fec = new H1_FECollection(order, dim_);
+  // space for dim_ dimensional vector (i.e., velocity)
+  vfes = new ParFiniteElementSpace(pmesh, fec, dim_);
 
-   // space for dim_ dimensional vector (i.e., velocity)
-   vfes = new ParFiniteElementSpace(pmesh, fec, dim_);
+  // space for scalar variables (e.g., pressure, temperature, etc)
+  sfes = new ParFiniteElementSpace(pmesh, fec, 1);
 
-   // space for scalar variables (e.g., pressure, temperature, etc)
-   sfes = new ParFiniteElementSpace(pmesh, fec, 1);
+  // space for entire solution concatenated together
+  fvfes = new ParFiniteElementSpace(pmesh, fec, num_equation); //, Ordering::byNODES);
 
-   // space for entire solution concatenated together
-   fvfes = new ParFiniteElementSpace(pmesh, fec, num_equation); //, Ordering::byNODES);
-
-   // Check if fully periodic mesh
-   if (!(pmesh->bdr_attributes.Size() == 0))
-   {
+  // Check if fully periodic mesh
+  if (!(pmesh->bdr_attributes.Size() == 0))
+    {
       vel_ess_attr.SetSize(pmesh->bdr_attributes.Max());
       vel_ess_attr = 0;
 
@@ -194,143 +186,147 @@ void LoMachSolver::initialize() {
 
       temp_ess_attr.SetSize(pmesh->bdr_attributes.Max());
       temp_ess_attr = 0;
-   }
-   if (verbose) grvy_printf(ginfo, "Spaces constructed...\n");
+    }
+  if (verbose) grvy_printf(ginfo, "Spaces constructed...\n");
 
-   int vfes_truevsize = vfes->GetTrueVSize();
-   int sfes_truevsize = sfes->GetTrueVSize();
-   if (verbose) {
-     grvy_printf(ginfo, "Got sizes...\n");
-     printf("vfes_truevsize = %d\n", vfes_truevsize);
-     printf("sfes_truevsize = %d\n", sfes_truevsize);
-     fflush(stdout);
-   }
+  int vfes_truevsize = vfes->GetTrueVSize();
+  int sfes_truevsize = sfes->GetTrueVSize();
+  if (verbose) {
+    grvy_printf(ginfo, "Got sizes...\n");
+    printf("vfes_truevsize = %d\n", vfes_truevsize);
+    printf("sfes_truevsize = %d\n", sfes_truevsize);
+    fflush(stdout);
+  }
 
-   un.SetSize(vfes_truevsize);
-   un = 0.0;
-   un_next.SetSize(vfes_truevsize);
-   un_next = 0.0;
+  //*************************************************
+  // Allocate necessary fields and vectors
+  //*************************************************
 
-   unm1.SetSize(vfes_truevsize);
-   unm1 = 0.0;
-   unm2.SetSize(vfes_truevsize);
-   unm2 = 0.0;
+  // First, dim_ dimensional quantities at each node
+  un.SetSize(vfes_truevsize);
+  un = 0.0;
+  un_next.SetSize(vfes_truevsize);
+  un_next = 0.0;
 
-   fn.SetSize(vfes_truevsize);
+  unm1.SetSize(vfes_truevsize);
+  unm1 = 0.0;
+  unm2.SetSize(vfes_truevsize);
+  unm2 = 0.0;
 
-   // if dealiasing, use nfes
-   Nun.SetSize(vfes_truevsize);
-   Nun = 0.0;
-   Nunm1.SetSize(vfes_truevsize);
-   Nunm1 = 0.0;
-   Nunm2.SetSize(vfes_truevsize);
-   Nunm2 = 0.0;
+  fn.SetSize(vfes_truevsize);
 
-   uBn.SetSize(vfes_truevsize);
-   uBn = 0.0;
-   uBnm1.SetSize(vfes_truevsize);
-   uBnm1 = 0.0;
-   uBnm2.SetSize(vfes_truevsize);
-   uBnm2 = 0.0;
+  // if dealiasing, use nfes
+  Nun.SetSize(vfes_truevsize);
+  Nun = 0.0;
+  Nunm1.SetSize(vfes_truevsize);
+  Nunm1 = 0.0;
+  Nunm2.SetSize(vfes_truevsize);
+  Nunm2 = 0.0;
 
-   FBext.SetSize(vfes_truevsize);
+  uBn.SetSize(vfes_truevsize);
+  uBn = 0.0;
+  uBnm1.SetSize(vfes_truevsize);
+  uBnm1 = 0.0;
+  uBnm2.SetSize(vfes_truevsize);
+  uBnm2 = 0.0;
 
-   Fext.SetSize(vfes_truevsize);
-   FText.SetSize(vfes_truevsize); // why is this vfes while _bdr is sfes?
-   Lext.SetSize(vfes_truevsize);
-   resu.SetSize(vfes_truevsize);
+  FBext.SetSize(vfes_truevsize);
 
-   tmpR1.SetSize(vfes_truevsize);
+  Fext.SetSize(vfes_truevsize);
+  FText.SetSize(vfes_truevsize);
+  Lext.SetSize(vfes_truevsize);
+  resu.SetSize(vfes_truevsize);
 
-   pn.SetSize(sfes_truevsize);
-   pn = 0.0;
-   resp.SetSize(sfes_truevsize);
-   resp = 0.0;
-   FText_bdr.SetSize(sfes_truevsize);
-   //FText_bdr.SetSize(vfes_truevsize);
-   //g_bdr.SetSize(sfes_truevsize);
-   g_bdr.SetSize(vfes_truevsize);
+  tmpR1.SetSize(vfes_truevsize);
 
-   pnBig.SetSize(sfes_truevsize);
-   pnBig = 0.0;
+  un_gf.SetSpace(vfes);
+  un_gf = 0.0;
+  un_next_gf.SetSpace(vfes);
+  un_next_gf = 0.0;
 
-   un_gf.SetSpace(vfes);
-   un_gf = 0.0;
-   un_next_gf.SetSpace(vfes);
-   un_next_gf = 0.0;
+  Lext_gf.SetSpace(vfes);
+  curlu_gf.SetSpace(vfes);
+  curlcurlu_gf.SetSpace(vfes);
+  FText_gf.SetSpace(vfes);
+  resu_gf.SetSpace(vfes);
 
-   sml_gf.SetSpace(sfes);
-   big_gf.SetSpace(sfes);
+  R1PM0_gf.SetSpace(vfes);
+  R1PM0_gf = 0.0;
+  //R1PX2_gf.SetSpace(nfes);
+  R1PX2_gf.SetSpace(vfes);
+  R1PX2_gf = 0.0;
 
-   Lext_gf.SetSpace(vfes);
-   curlu_gf.SetSpace(vfes);
-   curlcurlu_gf.SetSpace(vfes);
-   FText_gf.SetSpace(vfes);
-   resu_gf.SetSpace(vfes);
+  // And second, scalar fields/vectors
+  pn.SetSize(sfes_truevsize);
+  pn = 0.0;
+  resp.SetSize(sfes_truevsize);
+  resp = 0.0;
+  FText_bdr.SetSize(sfes_truevsize);
+  g_bdr.SetSize(sfes_truevsize);
 
-   pn_gf.SetSpace(sfes);
-   pn_gf = 0.0;
-   resp_gf.SetSpace(sfes);
-   tmpR0PM1.SetSize(sfes_truevsize);
+  pnBig.SetSize(sfes_truevsize);
+  pnBig = 0.0;
 
-   cur_step = 0;
+  sml_gf.SetSpace(sfes);
+  big_gf.SetSpace(sfes);
 
-   // adding temperature
-   Tn.SetSize(sfes_truevsize);
-   Tn = 0.0;
-   Tn_next.SetSize(sfes_truevsize);
-   Tn_next = 0.0;
+  pn_gf.SetSpace(sfes);
+  pn_gf = 0.0;
+  resp_gf.SetSpace(sfes);
+  tmpR0PM1.SetSize(sfes_truevsize);
 
-   Tnm1.SetSize(sfes_truevsize);
-   Tnm1 = 298.0; // fix hardcode
-   Tnm2.SetSize(sfes_truevsize);
-   Tnm2 = 298.0;
+  // adding temperature
+  Tn.SetSize(sfes_truevsize);
+  Tn = 0.0;
+  Tn_next.SetSize(sfes_truevsize);
+  Tn_next = 0.0;
 
-   fTn.SetSize(sfes_truevsize); // forcing term
-   NTn.SetSize(sfes_truevsize); // advection terms
-   NTn = 0.0;
-   NTnm1.SetSize(sfes_truevsize);
-   NTnm1 = 0.0;
-   NTnm2.SetSize(sfes_truevsize);
-   NTnm2 = 0.0;
+  Tnm1.SetSize(sfes_truevsize);
+  Tnm1 = 298.0; // fix hardcode
+  Tnm2.SetSize(sfes_truevsize);
+  Tnm2 = 298.0;
 
-   Text.SetSize(sfes_truevsize);
-   Text_bdr.SetSize(sfes_truevsize);
-   Text_gf.SetSpace(sfes);
-   t_bdr.SetSize(sfes_truevsize);
+  fTn.SetSize(sfes_truevsize); // forcing term
+  NTn.SetSize(sfes_truevsize); // advection terms
+  NTn = 0.0;
+  NTnm1.SetSize(sfes_truevsize);
+  NTnm1 = 0.0;
+  NTnm2.SetSize(sfes_truevsize);
+  NTnm2 = 0.0;
 
-   resT.SetSize(sfes_truevsize);
-   tmpR0.SetSize(sfes_truevsize);
+  Text.SetSize(sfes_truevsize);
+  Text_bdr.SetSize(sfes_truevsize);
+  Text_gf.SetSpace(sfes);
+  t_bdr.SetSize(sfes_truevsize);
 
-   Tn_gf.SetSpace(sfes); // bc?
-   Tn_gf = 298.0; // fix hardcode
-   Tn_next_gf.SetSpace(sfes);
-   Tn_next_gf = 298.0;
+  resT.SetSize(sfes_truevsize);
+  tmpR0.SetSize(sfes_truevsize);
 
-   resT_gf.SetSpace(sfes);
+  Tn_gf.SetSpace(sfes); // bc?
+  Tn_gf = 298.0; // fix hardcode
+  Tn_next_gf.SetSpace(sfes);
+  Tn_next_gf = 298.0;
 
-   // density, not actually solved for directly
-   rn.SetSize(sfes_truevsize);
-   rn = 1.0;
-   rn_gf.SetSpace(sfes);
-   rn_gf = 1.0;
+  resT_gf.SetSpace(sfes);
 
-   R0PM0_gf.SetSpace(sfes);
-   R0PM0_gf = 0.0;
-   R0PM1_gf.SetSpace(sfes);
-   R0PM1_gf = 0.0;
+  // density, not actually solved for directly
+  rn.SetSize(sfes_truevsize);
+  rn = 1.0;
+  rn_gf.SetSpace(sfes);
+  rn_gf = 1.0;
 
-   R1PM0_gf.SetSpace(vfes);
-   R1PM0_gf = 0.0;
-   //R1PX2_gf.SetSpace(nfes);
-   R1PX2_gf.SetSpace(vfes);
-   R1PX2_gf = 0.0;
-   if (verbose) grvy_printf(ginfo, "vectors and gf initialized...\n");
+  R0PM0_gf.SetSpace(sfes);
+  R0PM0_gf = 0.0;
+  R0PM1_gf.SetSpace(sfes);
+  R0PM1_gf = 0.0;
+  if (verbose) grvy_printf(ginfo, "vectors and gf initialized...\n");
 
-   initSolutionAndVisualizationVectors();
-   if (verbose) grvy_printf(ginfo, "init Sol and Vis okay...\n");
+  cur_step = 0;
 
-  ioData.initializeSerial(mpi_.Root(), (config.RestartSerial() != "no"), serial_mesh);
+  initSolutionAndVisualizationVectors();
+  if (verbose) grvy_printf(ginfo, "init Sol and Vis okay...\n");
+
+  ioData.initializeSerial(mpi_.Root(), (config.RestartSerial() != "no"), &mesh);
   if (verbose) grvy_printf(ginfo, " ioData.init thingy...\n");
 
   CFL = config.GetCFLNumber();
