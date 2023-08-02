@@ -376,7 +376,8 @@ void LoMachSolver::Setup(double dt) {
    Array<int> attr(pmesh->bdr_attributes.Max());
    attr = 0.0;
 
-   buffer_ubc = new VectorConstantCoefficient(zero_vec);
+   // is this used?
+   //buffer_ubc = new VectorConstantCoefficient(zero_vec);
    for (int i = 0; i < numWalls; i++) {
      for (int iFace = 1; iFace < pmesh->bdr_attributes.Max()+1; iFace++) {
        if (config.wallPatchType[i].second != WallType::INV) {
@@ -430,6 +431,9 @@ void LoMachSolver::Setup(double dt) {
    const IntegrationRule &ir_i  = gll_rules.Get(sfes->GetFE(0)->GetGeomType(), 2 * order);
    std::cout << "Check 6..." << std::endl;
 
+   // used to form temperature advection term
+   bufferTemp = new ParGridFunction(vfes);
+
    // convection section, extrapolation
    nlcoeff.constant = -1.0;
    N = new ParNonlinearForm(vfes);
@@ -447,7 +451,7 @@ void LoMachSolver::Setup(double dt) {
    }
    std::cout << "Check 7..." << std::endl;
 
-   // mass matrix
+   // mass matrix (on velocity space)
    Mv_form = new ParBilinearForm(vfes);
    auto *mv_blfi = new VectorMassIntegrator;
    if (numerical_integ) { mv_blfi->SetIntRule(&ir_ni); }
@@ -1083,100 +1087,26 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    sw_extrap.Start();
 
    // Nonlinear term at previous steps
-   //N->Mult(un, Nun);
-   //N->Mult(unm1, Nunm1);
-   //N->Mult(unm2, Nunm2);
-
-   // project u to "padded" order space
-   {
-   double *data = R1PM0_gf.HostReadWrite();
-   double *Udata = un.HostReadWrite();
-   for (int i = 0; i < Vdof; i++) {
-     data[i] = Udata[i];
-   }
-   }
-   R1PX2_gf.ProjectGridFunction(R1PM0_gf);
-   {
-   double *data = R1PX2_gf.HostReadWrite();
-   double *Udata = uBn.HostReadWrite();
-   //   for (int i = 0; i < Ndof; i++) {
-      for (int i = 0; i < Vdof; i++) {
-     Udata[i] = data[i];
-   }
-   }
-
-   {
-   double *data = R1PM0_gf.HostReadWrite();
-   double *Udata = unm1.HostReadWrite();
-   for (int i = 0; i < Vdof; i++) {
-     data[i] = Udata[i];
-   }
-   }
-   R1PX2_gf.ProjectGridFunction(R1PM0_gf);
-   {
-   double *data = R1PX2_gf.HostReadWrite();
-   double *Udata = uBnm1.HostReadWrite();
-   //for (int i = 0; i < Ndof; i++) {
-   for (int i = 0; i < Vdof; i++) {
-     Udata[i] = data[i];
-   }
-   }
-
-   {
-   double *data = R1PM0_gf.HostReadWrite();
-   double *Udata = unm2.HostReadWrite();
-   for (int i = 0; i < Vdof; i++) {
-     data[i] = Udata[i];
-   }
-   }
-   R1PX2_gf.ProjectGridFunction(R1PM0_gf);
-   {
-   double *data = R1PX2_gf.HostReadWrite();
-   double *Udata = uBnm2.HostReadWrite();
-   //for (int i = 0; i < Ndof; i++) {
-   for (int i = 0; i < Vdof; i++) {
-     Udata[i] = data[i];
-   }
-   }
-
-   N->Mult(uBn, Nun); // invalid read
-   N->Mult(uBnm1, Nunm1);
-   N->Mult(uBnm2, Nunm2);
+   N->Mult(un, Nun);
+   N->Mult(unm1, Nunm1);
+   N->Mult(unm2, Nunm2);
 
    // ab-predictor of nonliner term at {n+1}
    {
       const auto d_Nun = Nun.Read();
       const auto d_Nunm1 = Nunm1.Read();
       const auto d_Nunm2 = Nunm2.Read();
-      auto d_Fext = FBext.Write();
+      auto d_Fext = Fext.Write();
       const auto ab1_ = ab1;
       const auto ab2_ = ab2;
       const auto ab3_ = ab3;
       //mfem::forall(FBext.Size(), [=] MFEM_HOST_DEVICE (int i)
-      MFEM_FORALL(i, FBext.Size(),
+      MFEM_FORALL(i, Fext.Size(),
       {
          d_Fext[i] = ab1_ * d_Nun[i] +
                      ab2_ * d_Nunm1[i] +
                      ab3_ * d_Nunm2[i];
       });
-   }
-
-   // project NL product back to v-space
-   {
-   double *data = R1PX2_gf.HostReadWrite();
-   double *Fdata = FBext.HostReadWrite();
-   //for (int i = 0; i < Ndof; i++) {
-   for (int i = 0; i < Vdof; i++) {
-     data[i] = Fdata[i];
-   }
-   }
-   R1PM0_gf.ProjectGridFunction(R1PX2_gf);
-   {
-   double *data = R1PM0_gf.HostReadWrite();
-   double *Fdata = Fext.HostReadWrite();
-   for (int i = 0; i < Vdof; i++) {
-     Fdata[i] = data[i];
-   }
    }
 
    // add forcing/accel term to Fext
@@ -1207,6 +1137,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    }
    sw_extrap.Stop();
 
+   // Up to here,
+   
    // Pressure Poisson (extrapolated curl(curl(u)) L*(n+1))
    sw_curlcurl.Start();
    {
@@ -1455,7 +1387,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    resT.Set(1.0, tmpR0);
 
    // advection => will break is t&u arent in the same space
-   bufferTemp = new ParGridFunction(vfes);
+   //bufferTemp = new ParGridFunction(vfes);
    double *dataTemp = bufferTemp->HostReadWrite();
    double *Udnm0 = un.HostReadWrite();
    double *Tdnm0 = Tn.HostReadWrite();
@@ -2286,6 +2218,26 @@ LoMachSolver::~LoMachSolver() {
    delete vfes_filter;
    delete tfec_filter;
    delete tfes_filter;
+
+   delete Up;
+   delete U;
+   delete up_block;
+   delete u_block;
+   delete offsets;
+
+   delete groupsMPI;
+   delete transportPtr;
+   delete mixture;
+
+   delete bufferAlpha;
+   delete alphaField;
+   delete bufferInvRho;
+   delete invRho;
+
+   delete viscField;
+   delete pmesh;
+   delete bufferTemp;
+   delete bufferVisc;
 }
 
 // query solver-specific runtime controls
