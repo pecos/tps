@@ -1049,13 +1049,13 @@ void LoMachSolver::Setup(double dt)
    }
    H_form->Assemble();
    H_form->FormSystemMatrix(vel_ess_tdof, H);
-   std::cout << "Check 14..." << std::endl;     
-   
-   // boundary terms   
-   //FText_gfcoeff = new VectorGridFunctionCoefficient(&FText_gf);
-   Vector vec_one(3);
-   vec_one = 1.0;
-   FText_gfcoeff = new VectorConstantCoefficient(vec_one);
+   std::cout << "Check 14..." << std::endl;
+
+   // boundary terms
+   FText_gfcoeff = new VectorGridFunctionCoefficient(&FText_gf);
+   // Vector vec_one(3);
+   // vec_one = 1.0;
+   // FText_gfcoeff = new VectorConstantCoefficient(vec_one);
    FText_bdr_form = new ParLinearForm(pfes);
    //FText_bdr_form = new ParLinearForm(vfes); // maybe?
    auto *ftext_bnlfi = new BoundaryNormalLFIntegrator(*FText_gfcoeff);

@@ -301,8 +301,8 @@ protected:
    ParMixedBilinearForm *D_form = nullptr;
    ParMixedBilinearForm *G_form = nullptr;
    ParBilinearForm *H_form = nullptr;
-   //VectorGridFunctionCoefficient *FText_gfcoeff = nullptr;
-   VectorConstantCoefficient *FText_gfcoeff = nullptr;
+   VectorGridFunctionCoefficient *FText_gfcoeff = nullptr;
+   //VectorConstantCoefficient *FText_gfcoeff = nullptr;
    ParLinearForm *FText_bdr_form = nullptr;
    ParLinearForm *f_form = nullptr;
    ParLinearForm *g_bdr_form = nullptr;
