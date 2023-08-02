@@ -50,22 +50,6 @@ class LoMachOptions {
   int max_iter;                           /**< Maximum number of linear solver iterations */
   double rtol;                            /**< Linear solver relative tolerance */
   double atol;                            /**< Linear solver absolute tolerance */
-  //double preconditioner_background_sigma; /**< Uniform conductivity to use to preconditioner (ignored if <= 0) */
-
-  //bool top_only; /**< Flag to specify current in top rings only */
-  //bool bot_only; /**< Flag to specify current in bottom rings only */
-
-  //bool evaluate_magnetic_field;
-  //std::string By_file; /**< Filename for vertical component of magnetic field on y-axis */
-  //int nBy;             /**< Number of uniformly spaced points for By output */
-  //double yinterp_min;  /**< Begin value for uniformly spaced points */
-  //double yinterp_max;  /**< End value for uniformly spaced points */
-
-  //double current_amplitude; /**< Amplitude of source current */
-  //double current_frequency; /**< Frequency of source current */
-  //double mu0;               /**< Permeability of free space */
-
-  //mfem::Vector current_axis;
 
   LoMachOptions() {
     order = 1;
@@ -73,18 +57,6 @@ class LoMachOptions {
     max_iter = 100;
     rtol = 1.0e-6;
     atol = 1.0e-10;
-    /*
-    preconditioner_background_sigma = -1;
-    evaluate_magnetic_field = true;
-    nBy = 0;
-    yinterp_min = 0.0;
-    yinterp_max = 1.0;
-    top_only = false;
-    bot_only = false;
-    current_amplitude = 1.0;
-    current_frequency = 1.0;
-    mu0 = 1.0;
-    */
   }
 
   void print(std::ostream &out) {
@@ -97,17 +69,6 @@ class LoMachOptions {
     out << "  max_iter    = " << max_iter << std::endl;
     out << "  rtol        = " << rtol << std::endl;
     out << "  atol        = " << atol << std::endl;
-    /*
-    out << "  top_only    = " << top_only << std::endl;
-    out << "  bot_only    = " << bot_only << std::endl;
-    out << "  By_file     = " << By_file << std::endl;
-    out << "  nBy         = " << nBy << std::endl;
-    out << "  yinterp_min = " << yinterp_min << std::endl;
-    out << "  yinterp_max = " << yinterp_max << std::endl;
-    out << "  current_amplitude = " << current_amplitude << std::endl;
-    out << "  current_frequency = " << current_frequency << std::endl;
-    out << "  mu0 = " << mu0 << std::endl;
-    */
     out << std::endl;
   }
 };

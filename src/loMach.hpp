@@ -19,7 +19,6 @@ class Tps;
 #include "tps_mfem_wrap.hpp"
 #include "run_configuration.hpp"
 #include "mfem.hpp"
-//#include "solvers.hpp"
 #include "mfem/linalg/solvers.hpp"
 
 #include "transport_properties.hpp"
@@ -57,7 +56,6 @@ public:
    VectorCoefficient *coeff;
 };
 
-  
 /// Container for a Dirichlet boundary condition of the pressure field.
 class PresDirichletBC_T
 {
@@ -82,7 +80,6 @@ public:
    Coefficient *coeff;
 };
 
-  
 /// Container for a Dirichlet boundary condition of the temperature field.
 class TempDirichletBC_T
 {
@@ -107,7 +104,6 @@ public:
    Coefficient *coeff;
 };
 
-  
 /// Container for an acceleration term.
 class AccelTerm_T
 {
@@ -141,11 +137,9 @@ class LoMachSolver : public TPS::Solver {
 protected:
 
    mfem::MPI_Session &mpi_;
-  //mfem::MPI_Session &mpi;  
    LoMachOptions loMach_opts_;
 
    MPI_Groups *groupsMPI;
-   //MPI_Session &mpi;
    int nprocs_;  // total number of MPI procs
    int rank_;    // local MPI rank
    bool rank0_;  // flag to indicate rank 0
@@ -161,21 +155,21 @@ protected:
    int nvel;
 
    // Number of equations
-   int num_equation;  
+   int num_equation;
 
    // Is it ambipolar?
    bool ambipolar = false;
 
    // Is it two-temperature?
-   bool twoTemperature_ = false;  
-  
+  bool twoTemperature_ = false;
+
    // Average handler
    Averaging *average;
-  
+
    double dt;
    double time;
    int iter;
-  
+
    // pointer to parent Tps class
    TPS::Tps *tpsP_;
 
@@ -197,10 +191,10 @@ protected:
 
    // mapping from local to global element index
    int *locToGlobElem;
-  
+
    // just keep these saved for ease
    int numWalls, numInlets, numOutlets;
-  
+
    /// Print information about the Navier version.
    void PrintInfo();
 
@@ -236,31 +230,30 @@ protected:
 
    /// Enable/disable numerical integration rules of forms.
    bool numerical_integ = false;
-  
+
    /// The parallel mesh.
    ParMesh *pmesh = nullptr;
-   //Mesh *serial_mesh;  
 
    /// The order of the velocity and pressure space.
    int order;
    int porder;
-   int norder;  
+   int norder;
 
    // total number of mesh elements (serial)
    int nelemGlobal_;
 
    // original mesh partition info (stored on rank 0)
    Array<int> partitioning_;
-   const int defaultPartMethod = 1;  
-  
+   const int defaultPartMethod = 1;
+
    // temporary
   double Re_tau, Pr;
-  
+
    /// Kinematic viscosity (dimensionless).
    double kin_vis;
 
    // make everything dimensionless after generalizing form channel
-   double ambientPressure, Rgas;  
+   double ambientPressure, Rgas;
 
    IntegrationRules gll_rules;
 
@@ -271,8 +264,8 @@ protected:
    ParFiniteElementSpace *vfes = nullptr;
 
    //// total space for compatibility
-   ParFiniteElementSpace *fvfes = nullptr;  
-  
+   ParFiniteElementSpace *fvfes = nullptr;
+
    /// Pressure \f$H^1\f$ finite element collection.
    FiniteElementCollection *pfec = nullptr;
 
@@ -283,18 +276,18 @@ protected:
    FiniteElementCollection *tfec = nullptr;
 
    /// Temperature \f$H^1\f$ finite element space.
-   ParFiniteElementSpace *tfes = nullptr;  
+   ParFiniteElementSpace *tfes = nullptr;
 
    /// density \f$H^1\f$ finite element collection.
    FiniteElementCollection *rfec = nullptr;
 
    /// density \f$H^1\f$ finite element space.
-   ParFiniteElementSpace *rfes = nullptr;  
-  
+   ParFiniteElementSpace *rfes = nullptr;
+
    // nonlinear term
    FiniteElementCollection *nfec = nullptr;
    ParFiniteElementSpace *nfes = nullptr;
-  
+
    ParNonlinearForm *N = nullptr;
    ParBilinearForm *Mv_form = nullptr;
    ParBilinearForm *Sp_form = nullptr;
@@ -309,13 +302,13 @@ protected:
 
    // temperature
    ParBilinearForm *Mt_form = nullptr;
-   ParMixedBilinearForm *Dt_form = nullptr;  
+   ParMixedBilinearForm *Dt_form = nullptr;
    ParBilinearForm *Ht_form = nullptr;
    GridFunctionCoefficient *Text_gfcoeff = nullptr;
    ParLinearForm *Text_bdr_form = nullptr;
    ParLinearForm *ft_form = nullptr;
-   ParLinearForm *t_bdr_form = nullptr;    
-  
+   ParLinearForm *t_bdr_form = nullptr;
+
    /// Linear form to compute the mass matrix in various subroutines.
    ParLinearForm *mass_lf = nullptr;
    ConstantCoefficient onecoeff;
@@ -326,25 +319,25 @@ protected:
    ConstantCoefficient H_lincoeff;
    ConstantCoefficient H_bdfcoeff;
    ConstantCoefficient Ht_lincoeff;
-   ConstantCoefficient Ht_bdfcoeff;  
+   ConstantCoefficient Ht_bdfcoeff;
 
   //VectorConstantCoefficient u_bc_coef;
   //ConstantCoefficient t_bc_coef;
 
    VectorConstantCoefficient *buffer_ubc;
    ConstantCoefficient *buffer_tbc;
-   VectorConstantCoefficient *wall_ubc;  
-  
-   ParGridFunction *bufferInvRho;  
+   VectorConstantCoefficient *wall_ubc;
+
+   ParGridFunction *bufferInvRho;
    ParGridFunction *bufferVisc;
    ParGridFunction *bufferAlpha;
    ParGridFunction *bufferTemp;
-   ParGridFunction *bufferPM0;      
-   ParGridFunction *bufferPM1;    
+   ParGridFunction *bufferPM0;
+   ParGridFunction *bufferPM1;
    GridFunctionCoefficient *viscField;
    GridFunctionCoefficient *invRho;
-   GridFunctionCoefficient *alphaField;    
-  
+   GridFunctionCoefficient *alphaField;
+
    OperatorHandle Mv;
    OperatorHandle Sp;
    OperatorHandle D;
@@ -352,30 +345,30 @@ protected:
    OperatorHandle H;
 
    OperatorHandle Mt;
-   OperatorHandle Dt;  
+   OperatorHandle Dt;
    OperatorHandle Ht;
 
    mfem::Solver *MvInvPC = nullptr;
-   mfem::CGSolver *MvInv = nullptr;  
+   mfem::CGSolver *MvInv = nullptr;
    mfem::Solver *HInvPC = nullptr;
    mfem::CGSolver *HInv = nullptr;
 
-   mfem::CGSolver *SpInv = nullptr;  
+   mfem::CGSolver *SpInv = nullptr;
    mfem::HypreBoomerAMG *SpInvPC = nullptr;
    mfem::OrthoSolver *SpInvOrthoPC = nullptr;
 
    // if not using amg to solve pressure
-   //mfem::Solver *SpInvPC = nullptr; 
+   //mfem::Solver *SpInvPC = nullptr;
 
    mfem::Solver *MtInvPC = nullptr;
-   mfem::CGSolver *MtInv = nullptr;  
+   mfem::CGSolver *MtInv = nullptr;
    mfem::Solver *HtInvPC = nullptr;
-   mfem::CGSolver *HtInv = nullptr;  
+   mfem::CGSolver *HtInv = nullptr;
 
    Vector fn, un, un_next, unm1, unm2;
-   Vector uBn, uBnm1, uBnm2;  
+   Vector uBn, uBnm1, uBnm2;
    Vector Nun, Nunm1, Nunm2;
-   Vector Fext, FText, Lext;          
+   Vector Fext, FText, Lext;
    Vector resu, tmpR1;
    Vector FBext;
 
@@ -383,11 +376,10 @@ protected:
    Vector tmpR0PM1;
 
    Vector pnBig;
-  
+
    ParGridFunction un_gf, un_next_gf, curlu_gf, curlcurlu_gf,
                    Lext_gf, FText_gf, resu_gf;
 
-   //ParGridFunction rn_gf, resr_gf;  
    ParGridFunction pn_gf, resp_gf;
    ParGridFunction sml_gf, big_gf;
 
@@ -404,13 +396,13 @@ protected:
    // swap spaces
    ParGridFunction R0PM0_gf;
    ParGridFunction R0PM1_gf;
-   ParGridFunction R1PM0_gf;  
-   ParGridFunction R1PX2_gf;    
-  
+   ParGridFunction R1PM0_gf;
+   ParGridFunction R1PX2_gf;
+
    // All essential attributes.
    Array<int> vel_ess_attr;
    Array<int> pres_ess_attr;
-   Array<int> temp_ess_attr;  
+   Array<int> temp_ess_attr;
 
    // All essential true dofs.
    Array<int> vel_ess_tdof;
@@ -425,7 +417,7 @@ protected:
 
    // Bookkeeping for temperature dirichlet bcs.
    std::vector<TempDirichletBC_T> temp_dbcs;
-  
+
    // Bookkeeping for acceleration (forcing) terms.
    std::vector<AccelTerm_T> accel_terms;
 
@@ -452,20 +444,20 @@ protected:
    int pl_spsolve = 0;
    int pl_hsolve = 0;
    int pl_amg = 0;
-   int pl_mtsolve = 0;  
+   int pl_mtsolve = 0;
 
    // Relative tolerances.
    double rtol_spsolve = 1e-6;
    double rtol_hsolve = 1e-8;
-   double rtol_htsolve = 1e-6;  
+   double rtol_htsolve = 1e-6;
 
    // Iteration counts.
    int iter_mvsolve = 0, iter_spsolve = 0, iter_hsolve = 0;
-   int iter_mtsolve = 0, iter_htsolve = 0;  
+   int iter_mtsolve = 0, iter_htsolve = 0;
 
    // Residuals.
    double res_mvsolve = 0.0, res_spsolve = 0.0, res_hsolve = 0.0;
-   double res_mtsolve = 0.0, res_htsolve = 0.0;  
+   double res_mtsolve = 0.0, res_htsolve = 0.0;
 
    // LOR related.
    ParLORDiscretization *lor = nullptr;
@@ -474,50 +466,36 @@ protected:
    int filter_cutoff_modes = 1;
    double filter_alpha = 0.0;
    //double filter_alpha = 1.0;
-  
+
    FiniteElementCollection *vfec_filter = nullptr;
    ParFiniteElementSpace *vfes_filter = nullptr;
    ParGridFunction un_NM1_gf;
    ParGridFunction un_filtered_gf;
-  
+
    FiniteElementCollection *tfec_filter = nullptr;
    ParFiniteElementSpace *tfes_filter = nullptr;
    ParGridFunction Tn_NM1_gf;
    ParGridFunction Tn_filtered_gf;
-
-   // stuff that really shouldnt be part of the solver but M2ulPhys is a disaster
-   /*
-   RunConfiguration config;
-   std::ofstream histFile;
-   int dim;
-   int nvel;
-   int num_equation;  
-   ParaViewDataCollection *paraviewColl = NULL;
-   double hmin;
-   double hmax;
-   int exit_status_;  
-   IODataOrganizer ioData;
-   */
 
    // Equations solved
    Equations eqSystem;
 
    // order of polynomials for auxiliary solution
    bool loadFromAuxSol;
-  
+
    // Pointers to the different classes
    GasMixture *mixture;    // valid on host
-   GasMixture *d_mixture;  // valid on device, when available; otherwise = mixture  
+   GasMixture *d_mixture;  // valid on device, when available; otherwise = mixture
 
    TransportProperties *transportPtr = NULL;  // valid on both host and device
    // TransportProperties *d_transport = NULL;  // valid on device, when available; otherwise = transportPtr
 
    Chemistry *chemistry_ = NULL;
    Radiation *radiation_ = NULL;
-  
+
    // to interface with existing code
    ParGridFunction *U;
-   ParGridFunction *Up;  
+   ParGridFunction *Up;
 
    // The solution u has components {density, x-momentum, y-momentum, energy}.
    // These are stored contiguously in the BlockVector u_block.
@@ -541,8 +519,7 @@ protected:
 
    // I/O organizer
    IODataOrganizer ioData;
-  
-  
+
 public:
    /// Initialize data structures, set FE space order and kinematic viscosity.
    /**
@@ -557,8 +534,7 @@ public:
     * Reynolds number directly, you can provide the inverse.
     */
   LoMachSolver(mfem::MPI_Session &mpi, LoMachOptions loMach_opts, TPS::Tps *tps);
-  virtual ~LoMachSolver() {}
-  //(ParMesh *mesh, int order, int porder, int norder, double kin_vis, double Po, double Rgas);
+  virtual ~LoMachSolver();
 
    void initialize();
    void parseSolverOptions() override;
@@ -568,16 +544,16 @@ public:
    void parseTimeIntegrationOptions();
    void parseStatOptions();
    void parseIOSettings();
-   void parseRMSJobOptions();  
+   void parseRMSJobOptions();
    void parseBCInputs();
    void parseICOptions();
    void parsePostProcessVisualizationInputs();
-   void parseFluidPreset();  
+   void parseFluidPreset();
    void initSolutionAndVisualizationVectors();
-   void initialTimeStep();  
+   void initialTimeStep();
    void solve();
    void updateU();
-   void copyU();  
+   void copyU();
 
    // i/o routines
    void read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data);
@@ -587,7 +563,7 @@ public:
    // void serialize_soln_for_write(IOFamily &fam);
    void write_soln_data(hid_t group, string varName, hid_t dataspace, double *data);
 
-   void projectInitialSolution();  
+   void projectInitialSolution();
    void writeHDF5(string inputFileName = std::string()) { restart_files_hdf5("write", inputFileName); }
    void readHDF5(string inputFileName = std::string()) { restart_files_hdf5("read", inputFileName); }
    void writeParaview(int iter, double time) {
@@ -595,8 +571,7 @@ public:
     paraviewColl->SetTime(time);
     paraviewColl->Save();
   }
- 
-  
+
    /// Initialize forms, solvers and preconditioners.
    void Setup(double dt);
 
@@ -636,14 +611,14 @@ public:
    /// Return a pointer to the current temperature ParGridFunction.
    ParGridFunction *GetCurrentTemperature() { return &Tn_gf; }
 
-   /// Return a pointer to the current density ParGridFunction.  
-   ParGridFunction *GetCurrentDensity() { return &rn_gf; }  
+   /// Return a pointer to the current density ParGridFunction.
+   ParGridFunction *GetCurrentDensity() { return &rn_gf; }
 
    /// Return a pointer to the current temperature ParGridFunction.
-   //ParGridFunction *GetCurrentDensity() { return &rn_gf; }    
+   //ParGridFunction *GetCurrentDensity() { return &rn_gf; }
 
    LoMachOptions GetOptions() { return loMach_opts_; }
-  
+
    /// Add a Dirichlet boundary condition to the velocity field.
    void AddVelDirichletBC(VectorCoefficient *coeff, Array<int> &attr);
    void AddVelDirichletBC(VecFuncT *f, Array<int> &attr);
@@ -654,7 +629,7 @@ public:
 
    /// Add a Dirichlet boundary condition to the temperature field.
    void AddTempDirichletBC(Coefficient *coeff, Array<int> &attr);
-   void AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr);  
+   void AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr);
 
    /// Add an acceleration term to the RHS of the equation.
    /**
@@ -739,11 +714,11 @@ public:
     * spectral element methods
     */
    void SetFilterAlpha(double a) { filter_alpha = a; }
-  
-};  
+
+};
 
 #endif
-  
+
 /// Transient incompressible Navier Stokes solver in a split scheme formulation.
 /**
  * This implementation of a transient incompressible Navier Stokes solver uses

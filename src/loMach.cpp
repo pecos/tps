@@ -1,10 +1,6 @@
 
 ///*  Add description later //
 
-//#include "../../general/forall.hpp"
-//#include "forall.hpp"
-//#include "solvers.hpp"
-
 #include "loMach.hpp"
 #include "mfem/general/forall.hpp"
 #include "mfem/linalg/solvers.hpp"
@@ -19,7 +15,6 @@
 using namespace mfem;
 using namespace mfem::common;
 
-
 // temporary
 double mesh_stretching_func(const double y);
 void CopyDBFIntegrators(ParBilinearForm *src, ParBilinearForm *dst);
@@ -29,31 +24,19 @@ void vel_wall(const Vector &x, double t, Vector &u);
 double temp_ic(const Vector &coords, double t);
 double temp_wall(const Vector &x, double t);
 
-
 LoMachSolver::LoMachSolver(MPI_Session &mpi, LoMachOptions loMach_opts, TPS::Tps *tps)
-//    : mpi_(mpi), loMach_opts_(loMach_opts), offsets_(3) {
     : mpi_(mpi), loMach_opts_(loMach_opts) {
-
-  //std::cout << "okay 1" << endl;
   tpsP_ = tps;
-  //std::cout << "okay 2" << endl;  
   pmesh = NULL;
-  //std::cout << "okay 3" << endl;  
   nprocs_ = mpi_.WorldSize();
-  //std::cout << "okay 4" << endl;  
   rank_ = mpi_.WorldRank();
-  //std::cout << "okay 5" << endl;  
   if (rank_ == 0) { rank0_ = true; }
   else { rank0_ = false; }
   groupsMPI = new MPI_Groups(&mpi_);
-  //std::cout << "okay 6" << endl;  
-
-  // is this needed?
   groupsMPI->init();
-  //std::cout << "okay 7" << endl;  
-  
-  parseSolverOptions();  
-  parseSolverOptions2(); 
+
+  parseSolverOptions();
+  parseSolverOptions2();
 
   // set default solver state
   exit_status_ = NORMAL;
@@ -65,88 +48,26 @@ LoMachSolver::LoMachSolver(MPI_Session &mpi, LoMachOptions loMach_opts, TPS::Tps
       remove("DIE");
     }
   }
-  
-  // verify running on cpu
-  /*
-  if (tpsP_->getDeviceConfig() != "cpu") {
-    if (mpi.Root()) {
-      grvy_printf(GRVY_ERROR, "[ERROR] Low Mach simulation currently only supported on cpu.\n");
-    }
-    exit(1);
-  }
-  */
-
-  //grvy_printf(GRVY_INFO, "Basic LoMachSolver empty \n");  
-  //plasma_conductivity_ = NULL;
-  //plasma_conductivity_coef_ = NULL;
-  //joule_heating_ = NULL;
 }
 
-
-
-/*
-NavierSolver::NavierSolver(ParMesh *mesh, int order, int porder, int norder, double kin_vis, double Po, double Rgas)
-   : pmesh(mesh), order(order), porder(porder), norder(norder), kin_vis(kin_vis), Po(Po), Rgas(Rgas),
-     gll_rules(0, Quadrature1D::GaussLobatto)
-     //gll_rules(0, Quadrature1D::GaussLegendre)          
-{
-*/
-
-
-
 void LoMachSolver::initialize() {
-  
    bool verbose = mpi_.Root();
    if (verbose) grvy_printf(ginfo, "Initializing loMach solver.\n");
 
-   //LoMachOptions loMach_opts_ = GetOptions();   
    order = config.solOrder; //loMach_opts_.order;
    porder = config.solOrder; //loMach_opts_.order;
    norder = config.solOrder; //loMach_opts_.order;
 
-   // temporary hard-coding   
-   Re_tau = 182.0;   
+   // temporary hard-coding
+   Re_tau = 182.0;
    kin_vis = 1.0/Re_tau;
    ambientPressure = 101325.0;
    Rgas = 287.0;
    Pr = 1.2;
 
-
-   
    //-----------------------------------------------------
    // 1) Prepare the mesh
    //-----------------------------------------------------
-   
-   // temporary hard-coded mesh
-   /*
-   // domain size
-   double Lx = 2.0 * M_PI;
-   double Ly = 1.0;
-   double Lz = M_PI;
-
-   // mesh size
-   int N = order + 1;
-   int NL = static_cast<int>(std::round(64.0 / N)); // Coarse
-   double LC = M_PI / NL;
-   int NX = 2 * NL;
-   int NY = 2 * static_cast<int>(std::round(48.0 / N));
-   int NZ = NL;
-
-   Mesh mesh = Mesh::MakeCartesian3D(NX, NY, NZ, Element::HEXAHEDRON, Lx, Ly, Lz);
-   Mesh *mesh_ptr = &mesh;
-   if (verbose) grvy_printf(ginfo, "Constructed mesh...\n");   
-
-   for (int i = 0; i < mesh.GetNV(); ++i)
-   {
-      double *v = mesh.GetVertex(i);
-      v[1] = mesh_stretching_func(v[1]);
-   }
-
-   // Create translation vectors defining the periodicity
-   Vector x_translation({Lx, 0.0, 0.0});
-   Vector z_translation({0.0, 0.0, Lz});
-   std::vector<Vector> translations = {x_translation, z_translation};   
-   */
 
    /**/
     Vector x_translation({config.GetXTrans(), 0.0, 0.0});
@@ -161,50 +82,22 @@ void LoMachSolver::initialize() {
       std::cout << "   zTrans: " << config.GetZTrans() << std::endl;
     }
     /**/
-    
 
    // 1a) Read the serial mesh (on each mpi rank)
    //Mesh *mesh_ptr = new Mesh(lomach_opts_.mesh_file.c_str(), 1, 1);
 
    /**/
-   //std::cout << " Reading mesh from: " << loMach_opts_.mesh_file.c_str() << endl;
    Mesh mesh = Mesh(loMach_opts_.mesh_file.c_str());
    Mesh *mesh_ptr = &mesh;
-   Mesh *serial_mesh = &mesh;   
-   //if (verbose) grvy_printf(ginfo, "Initial mesh read...\n");
-   /**/
-   
+   Mesh *serial_mesh = &mesh;
+
    // Create the periodic mesh using the vertex mapping defined by the translation vectors
    Mesh periodic_mesh = Mesh::MakePeriodic(mesh,mesh.CreatePeriodicVertexMapping(translations));
-   //if (verbose) grvy_printf(ginfo, "Mesh made periodic...\n");         
 
    // HACK HARD CODE
    nvel = 3;
-   
-   // underscore stuff is terrible
    dim_ = mesh_ptr->Dimension();
-   //int dim = pmesh->Dimension();
    dim = dim_;
-   //if (verbose) grvy_printf(ginfo, "Got mesh dim...\n");            
-
-   // 1b) Refine the serial mesh, if requested
-   /*
-   if (verbose && (loMach_opts_.ref_levels > 0)) {
-     grvy_printf(ginfo, "Refining mesh: ref_levels %d\n", loMach_opts_.ref_levels);
-   }
-   for (int l = 0; l < loMach_opts_.ref_levels; l++) {
-     mesh_ptr->UniformRefinement();
-   }
-   */
-
-
-   /*
-   if (Mpi::Root())
-   {
-      printf("NL=%i NX=%i NY=%i NZ=%i dx+=%f\n", NL, NX, NY, NZ, LC * Re_tau);
-      std::cout << "Number of elements: " << mesh.GetNE() << std::endl;
-   }
-   */
 
   eqSystem = config.GetEquationSystem();
   mixture = NULL;
@@ -218,138 +111,12 @@ void LoMachSolver::initialize() {
   mixture = new DryAir(config, dim, nvel);  // conditional jump, must be using something in config that wasnt parsed?
   transportPtr = new DryAirTransport(mixture, config);
 
-  /*
-  switch (config.GetWorkingFluid()) {
-    case WorkingFluid::DRY_AIR:
-      mixture = new DryAir(config, dim, nvel);
-
-#if defined(_CUDA_) || defined(_HIP_)
-      tpsGpuMalloc((void **)(&d_mixture), sizeof(DryAir));
-      gpu::instantiateDeviceDryAir<<<1, 1>>>(config.dryAirInput, dim, nvel, d_mixture);
-
-      tpsGpuMalloc((void **)&transportPtr, sizeof(DryAirTransport));
-      gpu::instantiateDeviceDryAirTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(),
-                                                      config.sutherland_.C1, config.sutherland_.S0,
-                                                      config.sutherland_.Pr, transportPtr);
-#else
-      transportPtr = new DryAirTransport(mixture, config);
-#endif
-      break;
-    case WorkingFluid::USER_DEFINED:
-      switch (config.GetGasModel()) {
-        case GasModel::PERFECT_MIXTURE:
-          mixture = new PerfectMixture(config, dim, nvel);
-#if defined(_CUDA_) || defined(_HIP_)
-          tpsGpuMalloc((void **)(&d_mixture), sizeof(PerfectMixture));
-          gpu::instantiateDevicePerfectMixture<<<1, 1>>>(config.perfectMixtureInput, dim, nvel, d_mixture);
-#endif
-          break;
-        default:
-          mfem_error("GasModel not recognized.");
-          break;
-      }
-      switch (config.GetTranportModel()) {
-        case ARGON_MINIMAL:
-#if defined(_CUDA_) || defined(_HIP_)
-          tpsGpuMalloc((void **)&transportPtr, sizeof(ArgonMinimalTransport));
-          gpu::instantiateDeviceArgonMinimalTransport<<<1, 1>>>(d_mixture, config.argonTransportInput, transportPtr);
-#else
-          transportPtr = new ArgonMinimalTransport(mixture, config);
-#endif
-          break;
-        case ARGON_MIXTURE:
-#if defined(_CUDA_) || defined(_HIP_)
-          tpsGpuMalloc((void **)&transportPtr, sizeof(ArgonMixtureTransport));
-          gpu::instantiateDeviceArgonMixtureTransport<<<1, 1>>>(d_mixture, config.argonTransportInput, transportPtr);
-#else
-          transportPtr = new ArgonMixtureTransport(mixture, config);
-#endif
-          break;
-        case CONSTANT:
-#if defined(_CUDA_) || defined(_HIP_)
-          tpsGpuMalloc((void **)&transportPtr, sizeof(ConstantTransport));
-          gpu::instantiateDeviceConstantTransport<<<1, 1>>>(d_mixture, config.constantTransport, transportPtr);
-#else
-          transportPtr = new ConstantTransport(mixture, config);
-#endif
-          break;
-        default:
-          mfem_error("TransportModel not recognized.");
-          break;
-      }
-      switch (config.GetChemistryModel()) {
-        default:
-#if defined(_CUDA_) || defined(_HIP_)
-          tpsGpuMalloc((void **)&chemistry_, sizeof(Chemistry));
-          gpu::instantiateDeviceChemistry<<<1, 1>>>(d_mixture, config.chemistryInput, chemistry_);
-#else
-          chemistry_ = new Chemistry(mixture, config.chemistryInput);
-#endif
-          break;
-      }
-      break;
-      
-    case WorkingFluid::LTE_FLUID:
-#if defined(_GPU_)
-      mfem_error("LTE_FLUID not supported for GPU.");
-#else
-      mixture = new LteMixture(config, dim, nvel);
-      transportPtr = new LteTransport(mixture, config);
-#endif
-      break;
-    default:
-      mfem_error("WorkingFluid not recognized.");
-      break;
-  }
-  */
-
-
-  /*
-  switch (config.radiationInput.model) {
-    case NET_EMISSION:
-#if defined(_CUDA_) || defined(_HIP_)
-      tpsGpuMalloc((void **)(&radiation_), sizeof(NetEmission));
-      gpu::instantiateDeviceNetEmission<<<1, 1>>>(config.radiationInput, radiation_);
-#else
-      radiation_ = new NetEmission(config.radiationInput);
-#endif
-      break;
-    case NONE_RAD:
-      break;
-    default:
-      mfem_error("RadiationModel not recognized.");
-      break;      
-  }
-  */
-
-  /*
-  assert(mixture != NULL);
-#if defined(_CUDA_) || defined(_HIP_)
-#else
-  d_mixture = mixture;
-#endif
-  */
-  //std::cout << " okay 1..." << endl;
-
-
-   
   MaxIters = config.GetNumIters();
   max_speed = 0.;
   num_equation = 5; // HARD CODE
-  /*
-  numSpecies = mixture->GetNumSpecies();
-  numActiveSpecies = mixture->GetNumActiveSpecies();
-  ambipolar = mixture->IsAmbipolar();
-  twoTemperature_ = mixture->IsTwoTemperature();
-  num_equation = mixture->GetNumEquations();
-  */
-  //std::cout << " okay 2..." << endl;  
 
-  
   // check if a simulation is being restarted
-  //std::cout << "RestartCycle: " << config.GetRestartCycle() << std::endl;  
   if (config.GetRestartCycle() > 0) {
-    
     if (config.GetUniformRefLevels() > 0) {
       if (mpi_.Root()) {
         std::cerr << "ERROR: Uniform mesh refinement not supported upon restart." << std::endl;
@@ -357,27 +124,14 @@ void LoMachSolver::initialize() {
       MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
-    // read partitioning info from original decomposition (unless restarting from serial soln)
     nelemGlobal_ = serial_mesh->GetNE();
-    //nelemGlobal_ = mesh->GetNE();
     if (rank0_) grvy_printf(ginfo, "Total # of mesh elements = %i\n", nelemGlobal_);
 
     if (nprocs_ > 1) {
-      /*
-      if (config.isRestartSerialized("read")) {
-        assert(serial_mesh->Conforming());
-        //assert(mesh->Conforming());	
-        partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
-	//partitioning_ = Array<int>(mesh->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
-        partitioning_file_hdf5("write");
-      } else {
-      */
-        partitioning_file_hdf5("read");
-      //}
+      partitioning_file_hdf5("read");
     }
 
   } else {
-    
     // remove previous solution
     if (mpi_.Root()) {
       string command = "rm -r ";
@@ -399,12 +153,9 @@ void LoMachSolver::initialize() {
 
     // generate partitioning file (we assume conforming meshes)
     nelemGlobal_ = serial_mesh->GetNE();
-    //nelemGlobal_ = mesh->GetNE();    
     if (nprocs_ > 1) {
       assert(serial_mesh->Conforming());
-      //assert(mesh->Conforming());
       partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
-      //partitioning_ = Array<int>(mesh->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
       if (rank0_) partitioning_file_hdf5("write");
       MPI_Barrier(MPI_COMM_WORLD);
     }
@@ -412,78 +163,22 @@ void LoMachSolver::initialize() {
     // make sure these are actually hooked up!
     time = 0.;
     iter = 0;
-    
   }
-  //std::cout << " okay 3..." << endl;
-  
-  // If requested, evaluate the distance function (i.e., the distance to the nearest no-slip wall)
-  /*
-  distance_ = NULL;
-  GridFunction *serial_distance = NULL;
-  if (config.compute_distance) {
-    order = config.GetSolutionOrder();
-    dim = serial_mesh->Dimension();
-    basisType = config.GetBasisType();
-    DG_FECollection *tmp_fec = NULL;
-    if (basisType == 0) {
-      tmp_fec = new DG_FECollection(order, dim, BasisType::GaussLegendre);
-    } else if (basisType == 1) {
-      tmp_fec = new DG_FECollection(order, dim, BasisType::GaussLobatto);
-    }
-
-    // Serial FE space for scalar variable
-    FiniteElementSpace *serial_fes = new FiniteElementSpace(serial_mesh, tmp_fec);
-
-    // Serial grid function for scalar variable
-    serial_distance = new GridFunction(serial_fes);
-
-    // Build a list of wall patches
-    Array<int> wall_patch_list;
-    for (int i = 0; i < config.wallPatchType.size(); i++) {
-      if (config.wallPatchType[i].second != WallType::INV) {
-        wall_patch_list.Append(config.wallPatchType[i].first);
-      }
-    }
-
-    if (serial_mesh->GetNodes() == NULL) {
-      serial_mesh->SetCurvature(1);
-    }
-
-    FiniteElementSpace *tmp_dfes = new FiniteElementSpace(serial_mesh, tmp_fec, dim, Ordering::byNODES);
-    GridFunction coordinates(tmp_dfes);
-    serial_mesh->GetNodes(coordinates);
-
-    // Evaluate the distance function
-    evaluateDistanceSerial(*serial_mesh, wall_patch_list, coordinates, *serial_distance);
-  }
-  */
-   
-
-
-  // ADD VISCOUS SPONGE
-   
-
    // 1c) Partition the mesh (see partitioning_ in M2ulPhyS)
-   //pmesh_ = new ParMesh(MPI_COMM_WORLD, *mesh);
    pmesh = new ParMesh(MPI_COMM_WORLD, periodic_mesh);
-   //auto *pmesh = new ParMesh(MPI_COMM_WORLD, periodic_mesh);
-   //delete mesh_ptr;
-   //delete mesh;  // no longer need the serial mesh
-   // pmesh_->ReorientTetMesh();
-   if (verbose) grvy_printf(ginfo, "Mesh partitioned...\n");      
+   if (verbose) grvy_printf(ginfo, "Mesh partitioned...\n");
 
 
    //-----------------------------------------------------
    // 2) Prepare the required finite elements
    //-----------------------------------------------------
-   
    // velocity
    vfec = new H1_FECollection(order, dim);
    vfes = new ParFiniteElementSpace(pmesh, vfec, dim);
 
-   // dealias nonlinear term 
-   //nfec = new H1_FECollection(norder, dim);   
-   //nfes = new ParFiniteElementSpace(pmesh, vfec, dim);   
+   // dealias nonlinear term
+   //nfec = new H1_FECollection(norder, dim);
+   //nfes = new ParFiniteElementSpace(pmesh, vfec, dim);
 
    // pressure
    pfec = new H1_FECollection(porder);
@@ -491,21 +186,18 @@ void LoMachSolver::initialize() {
 
    // temperature
    tfec = new H1_FECollection(order);
-   tfes = new ParFiniteElementSpace(pmesh, tfec);   
+   tfes = new ParFiniteElementSpace(pmesh, tfec);
 
    // density
    rfec = new H1_FECollection(order);
-   rfes = new ParFiniteElementSpace(pmesh, rfec);   
-   
-   // full vector for compatability
-   //fvfes = new ParFiniteElementSpace(pmesh, vfec, num_equation); //, Ordering::byNODES);
+   rfes = new ParFiniteElementSpace(pmesh, rfec);
 
    // TAO: Shouldn't this be pfec (or tfec or rfec) rather than
    // vfec---i.e., num_equation variables all in the same finite
    // element space
    fvfes = new ParFiniteElementSpace(pmesh, vfec, num_equation); //, Ordering::byNODES);
 
-   
+
    // Check if fully periodic mesh
    if (!(pmesh->bdr_attributes.Size() == 0))
    {
@@ -516,15 +208,15 @@ void LoMachSolver::initialize() {
       pres_ess_attr = 0;
 
       temp_ess_attr.SetSize(pmesh->bdr_attributes.Max());
-      temp_ess_attr = 0;            
+      temp_ess_attr = 0;
    }
-   if (verbose) grvy_printf(ginfo, "Spaces constructed...\n");   
-   
+   if (verbose) grvy_printf(ginfo, "Spaces constructed...\n");
+
    int vfes_truevsize = vfes->GetTrueVSize();
    int pfes_truevsize = pfes->GetTrueVSize();
    int tfes_truevsize = tfes->GetTrueVSize();
    //int nfes_truevsize = nfes->GetTrueVSize();
-   int rfes_truevsize = rfes->GetTrueVSize();   
+   int rfes_truevsize = rfes->GetTrueVSize();
    if (verbose) grvy_printf(ginfo, "Got sizes...\n");
    printf("vfes_truevsize = %d", vfes_truevsize);
    printf("pfes_truevsize = %d", pfes_truevsize);
@@ -535,15 +227,15 @@ void LoMachSolver::initialize() {
    un = 0.0;
    un_next.SetSize(vfes_truevsize);
    un_next = 0.0;
-   
+
    unm1.SetSize(vfes_truevsize);
    unm1 = 0.0;
    unm2.SetSize(vfes_truevsize);
    unm2 = 0.0;
-   
+
    fn.SetSize(vfes_truevsize);
 
-   // if dealiasing, use nfes 
+   // if dealiasing, use nfes
    Nun.SetSize(vfes_truevsize);
    Nun = 0.0;
    Nunm1.SetSize(vfes_truevsize);
@@ -552,14 +244,14 @@ void LoMachSolver::initialize() {
    Nunm2 = 0.0;
 
    uBn.SetSize(vfes_truevsize);
-   uBn = 0.0;   
+   uBn = 0.0;
    uBnm1.SetSize(vfes_truevsize);
    uBnm1 = 0.0;
    uBnm2.SetSize(vfes_truevsize);
    uBnm2 = 0.0;
 
    FBext.SetSize(vfes_truevsize);
-   
+
    Fext.SetSize(vfes_truevsize);
    FText.SetSize(vfes_truevsize); // why is this vfes while _bdr is pfes?
    Lext.SetSize(vfes_truevsize);
@@ -577,15 +269,15 @@ void LoMachSolver::initialize() {
    g_bdr.SetSize(vfes_truevsize);
 
    pnBig.SetSize(tfes_truevsize);
-   pnBig = 0.0;   
-   
+   pnBig = 0.0;
+
    un_gf.SetSpace(vfes);
    un_gf = 0.0;
    un_next_gf.SetSpace(vfes);
    un_next_gf = 0.0;
 
-   sml_gf.SetSpace(pfes);      
-   big_gf.SetSpace(tfes);   
+   sml_gf.SetSpace(pfes);
+   big_gf.SetSpace(tfes);
 
    Lext_gf.SetSpace(vfes);
    curlu_gf.SetSpace(vfes);
@@ -596,8 +288,8 @@ void LoMachSolver::initialize() {
    pn_gf.SetSpace(pfes);
    pn_gf = 0.0;
    resp_gf.SetSpace(pfes);
-   tmpR0PM1.SetSize(pfes_truevsize);   
-   
+   tmpR0PM1.SetSize(pfes_truevsize);
+
    cur_step = 0;
 
    // adding temperature
@@ -610,23 +302,23 @@ void LoMachSolver::initialize() {
    Tnm1 = 298.0; // fix hardcode
    Tnm2.SetSize(tfes_truevsize);
    Tnm2 = 298.0;
-   
+
    fTn.SetSize(tfes_truevsize); // forcing term
    NTn.SetSize(tfes_truevsize); // advection terms
-   NTn = 0.0; 
+   NTn = 0.0;
    NTnm1.SetSize(tfes_truevsize);
    NTnm1 = 0.0;
    NTnm2.SetSize(tfes_truevsize);
    NTnm2 = 0.0;
 
-   Text.SetSize(tfes_truevsize);   
-   Text_bdr.SetSize(tfes_truevsize);   
+   Text.SetSize(tfes_truevsize);
+   Text_bdr.SetSize(tfes_truevsize);
    Text_gf.SetSpace(tfes);
-   t_bdr.SetSize(tfes_truevsize);   
-   
+   t_bdr.SetSize(tfes_truevsize);
+
    resT.SetSize(tfes_truevsize);
    tmpR0.SetSize(tfes_truevsize);
-   
+
    Tn_gf.SetSpace(tfes); // bc?
    Tn_gf = 298.0; // fix hardcode
    Tn_next_gf.SetSpace(tfes);
@@ -638,87 +330,25 @@ void LoMachSolver::initialize() {
    rn.SetSize(rfes_truevsize);
    rn = 1.0;
    rn_gf.SetSpace(rfes);
-   rn_gf = 1.0;   
-   
+   rn_gf = 1.0;
+
    R0PM0_gf.SetSpace(tfes);
    R0PM0_gf = 0.0;
    R0PM1_gf.SetSpace(pfes);
    R0PM1_gf = 0.0;
-   
+
    R1PM0_gf.SetSpace(vfes);
-   R1PM0_gf = 0.0;   
+   R1PM0_gf = 0.0;
    //R1PX2_gf.SetSpace(nfes);
    R1PX2_gf.SetSpace(vfes);
    R1PX2_gf = 0.0;
-   if (verbose) grvy_printf(ginfo, "vectors and gf initialized...\n");      
-   
-   //PrintInfo();
+   if (verbose) grvy_printf(ginfo, "vectors and gf initialized...\n");
 
-   /*
-   // Paraview setup, not sure where this should go...
-   //std::cout << "GetOutputName: " << config.GetOutputName() << endl;
-   paraviewColl = new ParaViewDataCollection(config.GetOutputName(), pmesh);
-   paraviewColl->SetLevelsOfDetail(config.GetSolutionOrder());
-   paraviewColl->SetHighOrderOutput(true);
-   paraviewColl->SetPrecision(8);
-   if (verbose) grvy_printf(ginfo, "paraview collection initialized...\n");
-   */
-
-   
    initSolutionAndVisualizationVectors();
    if (verbose) grvy_printf(ginfo, "init Sol and Vis okay...\n");
-   
 
-
-   /*
-  average = new Averaging(Up, pmesh, tfec, tfes, vfes, fvfes, eqSystem, d_mixture, num_equation, dim, config, groupsMPI);
-  //average->read_meanANDrms_restart_files(); this guy is empty
-  if (verbose) grvy_printf(ginfo, "average initialized...\n");        
-
-  // register rms and mean sol into ioData
-  if (average->ComputeMean()) {
-    if (verbose) grvy_printf(ginfo, "setting up mean stuff...\n");              
-    
-    // meanUp
-    ioData.registerIOFamily("Time-averaged primitive vars", "/meanSolution", average->GetMeanUp(), false,
-                            config.GetRestartMean());
-    ioData.registerIOVar("/meanSolution", "meanDens", 0);
-    ioData.registerIOVar("/meanSolution", "mean-u", 1);
-    ioData.registerIOVar("/meanSolution", "mean-v", 2);
-    if (nvel == 3) {
-      ioData.registerIOVar("/meanSolution", "mean-w", 3);
-      ioData.registerIOVar("/meanSolution", "mean-E", 4);
-    } else {
-      ioData.registerIOVar("/meanSolution", "mean-p", dim + 1);
-    }
-    for (int sp = 0; sp < numActiveSpecies; sp++) {
-      // Only for NS_PASSIVE.
-      if ((eqSystem == NS_PASSIVE) && (sp == 1)) break;
-
-      // int inputSpeciesIndex = mixture->getInputIndexOf(sp);
-      std::string speciesName = config.speciesNames[sp];
-      ioData.registerIOVar("/meanSolution", "mean-Y" + speciesName, sp + nvel + 2);
-    }
-
-    // rms
-    ioData.registerIOFamily("RMS velocity fluctuation", "/rmsData", average->GetRMS(), false, config.GetRestartMean());
-    ioData.registerIOVar("/rmsData", "uu", 0);
-    ioData.registerIOVar("/rmsData", "vv", 1);
-    ioData.registerIOVar("/rmsData", "ww", 2);
-    ioData.registerIOVar("/rmsData", "uv", 3);
-    ioData.registerIOVar("/rmsData", "uw", 4);
-    ioData.registerIOVar("/rmsData", "vw", 5);
-  }
-   */
-
-  
   ioData.initializeSerial(mpi_.Root(), (config.RestartSerial() != "no"), serial_mesh);
   if (verbose) grvy_printf(ginfo, " ioData.init thingy...\n");
-
-  /*
-  projectInitialSolution();
-  if (verbose) grvy_printf(ginfo, "initial sol projected...\n");
-  */
 
   CFL = config.GetCFLNumber();
 
@@ -741,167 +371,86 @@ void LoMachSolver::initialize() {
   }
   if (verbose) grvy_printf(ginfo, " element size found...\n");      
 
-  
-  // ADD Up and U FILLER
-  
-  // estimate initial dt => how the hell does this work?
-  //Up->ExchangeFaceNbrData();
-
-  // 
-  //if (config.GetRestartCycle() == 0) initialTimeStep();
   if (mpi_.Root()) cout << "Maximum element size: " << hmax << "m" << endl;
   if (mpi_.Root()) cout << "Minimum element size: " << hmin << "m" << endl;
-  //if (mpi_.Root()) cout << "Initial time-step: " << dt << "s" << endl;
-  
-  
 }
 
 
-void LoMachSolver::Setup(double dt)
-{
-
+void LoMachSolver::Setup(double dt) {
    partial_assembly = true; // not working?
-   //partial_assembly = false;
-   //if (verbose) grvy_printf(ginfo, "in Setup...\n");
-   /*
-   if (verbose && pmesh->GetMyRank() == 0)
-   {
-      mfem::out << "Setup" << std::endl;
-      if (partial_assembly) { mfem::out << "Using Partial Assembly" << std::endl; }
-      else { mfem::out << "Using Full Assembly" << std::endl; }
-   }
-   */
 
-   //int dim = pmesh->Dimension();      
-   
-   // adding bits from old main here
-   // Set the initial condition.
-   //ParGridFunction *r_gf = GetCurrentDensity();   
    ParGridFunction *u_gf = GetCurrentVelocity();
    ParGridFunction *p_gf = GetCurrentPressure();
    ParGridFunction *t_gf = GetCurrentTemperature();
-   //std::cout << "Check 0..." << std::endl;   
 
-   //ConstantCoefficient r_ic_coef;
-   //r_ic_coef.constant = config.initRhoRhoVp[0];
-   //r_gf->ProjectCoefficient(r_ic_coef);   
-   
    VectorFunctionCoefficient u_ic_coef(dim, vel_ic);
-   /*
-   Vector uic_vec(3);
-   uic_vec(0) = config.initRhoRhoVp[1];
-   uic_vec(1) = config.initRhoRhoVp[2];
-   uic_vec(2) = config.initRhoRhoVp[3];      
-   VectorConstantCoefficient u_ic_coef(uic_vec);
-   */
    u_gf->ProjectCoefficient(u_ic_coef);
-   //std::cout << "Check 1..." << std::endl;
-   
+
    FunctionCoefficient t_ic_coef(temp_ic);
-   /*
-   ConstantCoefficient t_ic_coef;
-   t_ic_coef.constant = config.initRhoRhoVp[4] / (Rgas * config.initRhoRhoVp[0]);
-   */
-   t_gf->ProjectCoefficient(t_ic_coef);   
-   //std::cout << "Check 2..." << std::endl;
-   
+   t_gf->ProjectCoefficient(t_ic_coef);
+
    Array<int> domain_attr(pmesh->attributes);
    domain_attr = 1;
    AddAccelTerm(accel, domain_attr); // HERE wire to input file
 
-
-   
    Vector zero_vec(3); zero_vec = 0.0;
    Array<int> attr(pmesh->bdr_attributes.Max());
    attr = 0.0;
-   //std::cout << "attr bdr size: " << pmesh->bdr_attributes.Max() << endl;   
 
-   buffer_ubc = new VectorConstantCoefficient(zero_vec);         
-   /*
-   attr[1] = 1;
-   attr[3] = 1;
-   AddVelDirichletBC(vel_wall, attr);
-   //AddVelDirichletBC(&u_bc_coef, attr);
-   */
-   /**/
-   //for (int i = 0; i < config.wallPatchType.size(); i++) {
+   buffer_ubc = new VectorConstantCoefficient(zero_vec);
    for (int i = 0; i < numWalls; i++) {
-     for (int iFace = 1; iFace < pmesh->bdr_attributes.Max()+1; iFace++) {     
+     for (int iFace = 1; iFace < pmesh->bdr_attributes.Max()+1; iFace++) {
        if (config.wallPatchType[i].second != WallType::INV) {
-	 //std::cout << " wall check " << i << " " << iFace << " " << config.wallPatchType[i].first << endl;
          if (iFace == config.wallPatchType[i].first) {
-            attr[iFace-1] = 1;	 
+            attr[iFace-1] = 1;
          }
        }
      }
    }
    AddVelDirichletBC(vel_wall, attr);
-   //AddVelDirichletBC(buffer_ubc, attr);
-   /**/
-   //std::cout << "Check 3..." << std::endl;    
 
-   
    ConstantCoefficient t_bc_coef;
-   t_bc_coef.constant = config.wallBC[0].Th;   
+   t_bc_coef.constant = config.wallBC[0].Th;
    Array<int> Tattr(pmesh->bdr_attributes.Max());
    Tattr = 0;
-   buffer_tbc = new ConstantCoefficient(t_bc_coef.constant);   
-   /*
-   Tattr[1] = 1;
-   Tattr[3] = 1;
-   AddTempDirichletBC(temp_wall, Tattr);
-   //AddTempDirichletBC(&t_bc_coef, Tattr);
-   */
-   /**/
-   //for (int i = 0; i < config.wallPatchType.size(); i++) {
+   buffer_tbc = new ConstantCoefficient(t_bc_coef.constant);
    for (int i = 0; i < numWalls; i++) {
      t_bc_coef.constant = config.wallBC[i].Th;
-     for (int iFace = 1; iFace < pmesh->bdr_attributes.Max()+1; iFace++) {     
+     for (int iFace = 1; iFace < pmesh->bdr_attributes.Max()+1; iFace++) {
        if (config.wallPatchType[i].second != WallType::INV) { // should only be isothermal
          if (iFace == config.wallPatchType[i].first) {
-            Tattr[iFace-1] = 1;	 
-            //AddTempDirichletBC(&t_bc_coef, Tattr);	  
+            Tattr[iFace-1] = 1;
          }
        }
      }
    }
-   //AddTempDirichletBC(temp_wall, Tattr); // FIX FIX FIX
    AddTempDirichletBC(buffer_tbc, Tattr);
-   //AddTempDirichletBC(t_bc_coef, Tattr);   
-   /**/
-   std::cout << "Check 4..." << std::endl;  
+   std::cout << "Check 4..." << std::endl;
 
-   // returning to regular setup   
+   // returning to regular setup
    sw_setup.Start();
 
    vfes->GetEssentialTrueDofs(vel_ess_attr, vel_ess_tdof);
    pfes->GetEssentialTrueDofs(pres_ess_attr, pres_ess_tdof);
    tfes->GetEssentialTrueDofs(temp_ess_attr, temp_ess_tdof);
-   //nfes->GetEssentialTrueDofs(vel_ess_attr, vel_ess_tdof);    //  this may break?
-   //std::cout << "Check 5..." << std::endl;     
 
-   int Vdof = vfes->GetTrueVSize();   
+   int Vdof = vfes->GetTrueVSize();
    int Pdof = pfes->GetTrueVSize();
    int Tdof = tfes->GetTrueVSize();
-   //int Ndof = nfes->GetTrueVSize();   
 
-   //bufferPM0 = new ParGridFunction(tfes);
-   //bufferPM1 = new ParGridFunction(pfes);      
-   
    Array<int> empty;
 
    // unsteady: p+p = 2p
    // convection: p+p+(p-1) = 3p-1
    // diffusion: (p-1)+(p-1) [+p] = 2p-2 [3p-2]
-   
+
    // GLL integration rule (Numerical Integration)
    const IntegrationRule &ir_ni = gll_rules.Get(vfes->GetFE(0)->GetGeomType(), 2 * order);
-   //const IntegrationRule &ir_nli = gll_rules.Get(nfes->GetFE(0)->GetGeomType(), 3 * norder - 1);
    const IntegrationRule &ir_nli = gll_rules.Get(vfes->GetFE(0)->GetGeomType(), 3 * norder - 1);
-   const IntegrationRule &ir_pi = gll_rules.Get(pfes->GetFE(0)->GetGeomType(), 2 * porder);   
+   const IntegrationRule &ir_pi = gll_rules.Get(pfes->GetFE(0)->GetGeomType(), 2 * porder);
    const IntegrationRule &ir_i  = gll_rules.Get(tfes->GetFE(0)->GetGeomType(), 2 * order);
-   std::cout << "Check 6..." << std::endl;     
-   
+   std::cout << "Check 6..." << std::endl;
+
    // convection section, extrapolation
    nlcoeff.constant = -1.0;
    N = new ParNonlinearForm(vfes);
@@ -917,23 +466,16 @@ void LoMachSolver::Setup(double dt)
       N->SetAssemblyLevel(AssemblyLevel::PARTIAL);
       N->Setup();
    }
-   std::cout << "Check 7..." << std::endl;     
+   std::cout << "Check 7..." << std::endl;
 
    // mass matrix
    Mv_form = new ParBilinearForm(vfes);
-   //std::cout << "Check 7a..." << std::endl;        
    auto *mv_blfi = new VectorMassIntegrator;
-   //std::cout << "Check 7b..." << std::endl;        
    if (numerical_integ) { mv_blfi->SetIntRule(&ir_ni); }
-   //std::cout << "Check 7c..." << std::endl;        
    Mv_form->AddDomainIntegrator(mv_blfi);
-   //std::cout << "Check 7d..." << std::endl;           
    if (partial_assembly) { Mv_form->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
-   //std::cout << "Check 7e..." << std::endl;           
    Mv_form->Assemble();
-   //std::cout << "Check 7f..." << std::endl;           
    Mv_form->FormSystemMatrix(empty, Mv);
-   //std::cout << "Check 8..." << std::endl;     
 
    // need to build another with q=1/rho
    // DiffusionIntegrator(MatrixCoefficient &q, const IntegrationRule *ir = nullptr)
@@ -942,19 +484,13 @@ void LoMachSolver::Setup(double dt)
    bufferInvRho = new ParGridFunction(pfes);
    {
      double *data = bufferInvRho->HostReadWrite();
-     //double *dataRho = rn_gf.HostReadWrite();   
-     //double *Tdata = Tn.HostReadWrite();
-     //for (int eq = 0; eq < pmesh->Dimension(); eq++) {
-     for (int i = 0; i < Tdof; i++) {     
-       //dataRho[i] = ambientPressure / (Rgas * Tdata[i]);       
+     for (int i = 0; i < Tdof; i++) {
        //data[i] = (Rgas * Tdata[i]) / ambientPressure;
        data[i] = 1.0;
      }
    }
-   //GridFunctionCoefficient invRho(&buffer1);    
    invRho = new GridFunctionCoefficient(bufferInvRho);
-   //std::cout << "Check 9..." << std::endl;     
-   
+
    // looks like this is the Laplacian for press eq
    Sp_form = new ParBilinearForm(pfes);
    auto *sp_blfi = new DiffusionIntegrator;
@@ -970,9 +506,8 @@ void LoMachSolver::Setup(double dt)
    }
    Sp_form->Assemble();
    Sp_form->FormSystemMatrix(pres_ess_tdof, Sp);
-   std::cout << "Check 10..." << std::endl;  
+   std::cout << "Check 10..." << std::endl;
 
-   
    // div(u)
    D_form = new ParMixedBilinearForm(vfes, tfes);
    auto *vd_mblfi = new VectorDivergenceIntegrator();
@@ -987,8 +522,8 @@ void LoMachSolver::Setup(double dt)
    }
    D_form->Assemble();
    D_form->FormRectangularSystemMatrix(empty, empty, D);
-   std::cout << "Check 11..." << std::endl;  
-   
+   std::cout << "Check 11..." << std::endl;
+
    // for grad(div(u))?
    G_form = new ParMixedBilinearForm(tfes, vfes);
    auto *g_mblfi = new GradientIntegrator();
@@ -1003,14 +538,14 @@ void LoMachSolver::Setup(double dt)
    }
    G_form->Assemble();
    G_form->FormRectangularSystemMatrix(empty, empty, G);
-   std::cout << "Check 12..." << std::endl;  
-   
+   std::cout << "Check 12..." << std::endl;
+
    // viscosity field
    //ParGridFunction buffer2(vfes); // or pfes here?
    bufferVisc = new ParGridFunction(vfes);
    {
      double *data = bufferVisc->HostReadWrite();
-     double *Tdata = Tn.HostReadWrite();     
+     double *Tdata = Tn.HostReadWrite();
      double visc[2];
      double prim[nvel+2];
      for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
@@ -1018,15 +553,14 @@ void LoMachSolver::Setup(double dt)
        for (int eq = 0; eq < nvel; eq++) {
          prim[1+nvel] = Tdata[i];
          transportPtr->GetViscosities(prim, prim, visc);
-         data[i + eq * Tdof] = visc[0];	   
-         //data[i + eq * Tdof] = kin_vis; // static value
+         data[i + eq * Tdof] = visc[0];
        }
      }
    }
    //GridFunctionCoefficient viscField(&buffer2);
    viscField = new GridFunctionCoefficient(bufferVisc);
-   std::cout << "Check 13..." << std::endl;     
-   
+   std::cout << "Check 13..." << std::endl;
+
    // this is used in the last velocity implicit solve, Step kin_vis is
    // only for the pressure-poisson
    H_lincoeff.constant = kin_vis;
@@ -1061,7 +595,6 @@ void LoMachSolver::Setup(double dt)
    auto *ftext_bnlfi = new BoundaryNormalLFIntegrator(*FText_gfcoeff);
    if (numerical_integ) { ftext_bnlfi->SetIntRule(&ir_ni); }
    FText_bdr_form->AddBoundaryIntegrator(ftext_bnlfi, vel_ess_attr);
-   // std::cout << "Check 14..." << std::endl;     
 
    //g_bdr_form = new ParLinearForm(vfes); //? was pfes
    g_bdr_form = new ParLinearForm(pfes);
@@ -1071,8 +604,7 @@ void LoMachSolver::Setup(double dt)
       if (numerical_integ) { gbdr_bnlfi->SetIntRule(&ir_ni); }
       g_bdr_form->AddBoundaryIntegrator(gbdr_bnlfi, vel_dbc.attr);
    }
-   //std::cout << "Check 15..." << std::endl;     
-   
+
    f_form = new ParLinearForm(vfes);
    for (auto &accel_term : accel_terms)
    {
@@ -1087,8 +619,7 @@ void LoMachSolver::Setup(double dt)
       }
       f_form->AddDomainIntegrator(vdlfi);
    }
-   //std::cout << "Check 16..." << std::endl;     
-   
+
    if (partial_assembly)
    {
       Vector diag_pa(vfes->GetTrueVSize());
@@ -1107,9 +638,8 @@ void LoMachSolver::Setup(double dt)
    MvInv->SetPrintLevel(pl_mvsolve);
    MvInv->SetRelTol(1e-12);
    MvInv->SetMaxIter(500);
-   std::cout << "Check 17..." << std::endl;     
+   std::cout << "Check 17..." << std::endl;
 
-   
    /**/
    if (partial_assembly)
    {
@@ -1146,48 +676,24 @@ void LoMachSolver::Setup(double dt)
    SpInv->SetRelTol(rtol_spsolve);
    SpInv->SetMaxIter(500);
    /**/
-   std::cout << "Check 18..." << std::endl;     
+   std::cout << "Check 18..." << std::endl;
 
-   
-   // this wont be as efficient but AMG merhod (above) wasnt allowing for updates to variable coeff
-   /*
-   if (partial_assembly)
-   {
-      Vector diag_pa(pfes->GetTrueVSize());
-      Sp_form->AssembleDiagonal(diag_pa);
-      SpInvPC = new OperatorJacobiSmoother(diag_pa, pres_ess_tdof);
-   }
-   else
-   {
-      SpInvPC = new HypreSmoother(*Sp.As<HypreParMatrix>());
-      dynamic_cast<HypreSmoother *>(SpInvPC)->SetType(HypreSmoother::Jacobi, 1);
-   }
-   SpInv = new CGSolver(pfes->GetComm());
-   SpInv->iterative_mode = true;
-   SpInv->SetOperator(*Sp);
-   SpInv->SetPreconditioner(*SpInvPC);
-   SpInv->SetPrintLevel(pl_spsolve);
-   SpInv->SetRelTol(rtol_spsolve);
-   SpInv->SetMaxIter(500);
-   */
-
-   
    if (partial_assembly)
    {
       Vector diag_pa(vfes->GetTrueVSize());
       //Vector diag_pa(pfes->GetTrueVSize()); // maybe?
       std::cout << "Check 18a..." << std::endl;
       H_form->AssembleDiagonal(diag_pa); // invalid read
-      std::cout << "Check 18b..." << std::endl;                 
+      std::cout << "Check 18b..." << std::endl;
       HInvPC = new OperatorJacobiSmoother(diag_pa, vel_ess_tdof);
-      std::cout << "Check 18c..." << std::endl;                 
+      std::cout << "Check 18c..." << std::endl;
    }
    else
    {
       HInvPC = new HypreSmoother(*H.As<HypreParMatrix>()); // conditional jump
-      std::cout << "Check 18d..." << std::endl;                 
+      std::cout << "Check 18d..." << std::endl;
       dynamic_cast<HypreSmoother *>(HInvPC)->SetType(HypreSmoother::Jacobi, 1);
-      std::cout << "Check 18e..." << std::endl;                 
+      std::cout << "Check 18e..." << std::endl;
    }
    HInv = new CGSolver(vfes->GetComm());
    HInv->iterative_mode = true;
@@ -1196,7 +702,7 @@ void LoMachSolver::Setup(double dt)
    HInv->SetPrintLevel(pl_hsolve);
    HInv->SetRelTol(rtol_hsolve);
    HInv->SetMaxIter(500);
-   std::cout << "Check 19..." << std::endl;     
+   std::cout << "Check 19..." << std::endl;
 
    // If the initial condition was set, it has to be aligned with dependent
    // Vectors and GridFunctions
@@ -1204,16 +710,14 @@ void LoMachSolver::Setup(double dt)
    //un_next = un; // invalid read
    {
      double *data = un_next.HostReadWrite();
-     double *Udata = un.HostReadWrite();   
-     for (int i = 0; i < Vdof; i++) {     
+     double *Udata = un.HostReadWrite();
+     for (int i = 0; i < Vdof; i++) {
        data[i] = Udata[i];
      }
-   }   
+   }
    un_next_gf.SetFromTrueDofs(un_next);
 
-   
    // temperature.....................................
-
    Mt_form = new ParBilinearForm(tfes);
    auto *mt_blfi = new MassIntegrator;
    if (numerical_integ) { mt_blfi->SetIntRule(&ir_i); }
@@ -1221,8 +725,8 @@ void LoMachSolver::Setup(double dt)
    if (partial_assembly) { Mt_form->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
    Mt_form->Assemble();
    Mt_form->FormSystemMatrix(empty, Mt);
-   std::cout << "Check 20..." << std::endl;        
-   
+   std::cout << "Check 20..." << std::endl;
+
    // div(uT) for temperature
    Dt_form = new ParMixedBilinearForm(vfes, tfes);
    auto *vtd_mblfi = new VectorDivergenceIntegrator();
@@ -1237,42 +741,39 @@ void LoMachSolver::Setup(double dt)
    }
    Dt_form->Assemble();
    Dt_form->FormRectangularSystemMatrix(empty, empty, Dt);
-   std::cout << "Check 21..." << std::endl;        
-   
+   std::cout << "Check 21..." << std::endl;
+
    // thermal diffusivity field
    //ParGridFunction buffer3(tfes);
    bufferAlpha = new ParGridFunction(tfes);
    {
      double *data = bufferAlpha->HostReadWrite();
-     double *Tdata = Tn.HostReadWrite();     
+     double *Tdata = Tn.HostReadWrite();
      double visc[2];
      double prim[nvel+2];
      for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
      for (int i = 0; i < Tdof; i++) {
          prim[1+nvel] = Tdata[i];
          transportPtr->GetViscosities(prim, prim, visc);
-         data[i] = visc[0] / Pr;	   
+         data[i] = visc[0] / Pr;
          //data[i] = kin_vis; // static value
      }
-   }   
+   }
    //GridFunctionCoefficient alphaField(&buffer3);
    alphaField = new GridFunctionCoefficient(bufferAlpha);
-   //std::cout << "Check 22..." << std::endl;        
-   
-   Ht_lincoeff.constant = kin_vis / Pr; 
+
+   Ht_lincoeff.constant = kin_vis / Pr;
    Ht_bdfcoeff.constant = 1.0 / dt;
    Ht_form = new ParBilinearForm(tfes);
    auto *hmt_blfi = new MassIntegrator(Ht_bdfcoeff); // unsteady bit
    auto *hdt_blfi = new DiffusionIntegrator(Ht_lincoeff);
-   //auto *hdt_blfi = new DiffusionIntegrator(*alphaField); // Laplacian bit
-   //std::cout << "Check 23..." << std::endl;        
-   
+
    if (numerical_integ)
    {
      hmt_blfi->SetIntRule(&ir_i);
      hdt_blfi->SetIntRule(&ir_i);
    }
-   Ht_form->AddDomainIntegrator(hmt_blfi); 
+   Ht_form->AddDomainIntegrator(hmt_blfi);
    Ht_form->AddDomainIntegrator(hdt_blfi);
    if (partial_assembly)
    {
@@ -1280,15 +781,13 @@ void LoMachSolver::Setup(double dt)
    }
    Ht_form->Assemble();
    Ht_form->FormSystemMatrix(temp_ess_tdof, Ht);
-   //std::cout << "Check 24..." << std::endl;        
-   
-   // temp boundary terms   
+
+   // temp boundary terms
    Text_gfcoeff = new GridFunctionCoefficient(&Text_gf);
    Text_bdr_form = new ParLinearForm(tfes);
    auto *text_blfi = new BoundaryLFIntegrator(*Text_gfcoeff);
    if (numerical_integ) { text_blfi->SetIntRule(&ir_i); }
    Text_bdr_form->AddBoundaryIntegrator(text_blfi, temp_ess_attr);
-   //std::cout << "Check 25..." << std::endl;        
 
    t_bdr_form = new ParLinearForm(tfes);
    for (auto &temp_dbc : temp_dbcs)
@@ -1316,8 +815,8 @@ void LoMachSolver::Setup(double dt)
    MtInv->SetPrintLevel(pl_mtsolve);
    MtInv->SetRelTol(1e-12);
    MtInv->SetMaxIter(500);
-   std::cout << "Check 26..." << std::endl;        
-   
+   std::cout << "Check 26..." << std::endl;
+
    if (partial_assembly)
    {
       Vector diag_pa(tfes->GetTrueVSize());
@@ -1336,7 +835,6 @@ void LoMachSolver::Setup(double dt)
    HtInv->SetPrintLevel(pl_hsolve);
    HtInv->SetRelTol(rtol_hsolve);
    HtInv->SetMaxIter(500);
-   //std::cout << "Check 27..." << std::endl;        
 
    // If the initial condition was set, it has to be aligned with dependent
    // Vectors and GridFunctions
@@ -1344,23 +842,19 @@ void LoMachSolver::Setup(double dt)
    //Tn_next = Tn;
    {
      double *data = Tn_next.HostReadWrite();
-     double *Tdata = Tn.HostReadWrite();   
-     for (int i = 0; i < Tdof; i++) {     
+     double *Tdata = Tn.HostReadWrite();
+     for (int i = 0; i < Tdof; i++) {
        data[i] = Tdata[i];
      }
-   }      
+   }
    //Tn_next_gf.SetFromTrueDofs(Tn_next); // invalid read
    {
      double *data = Tn_next_gf.HostReadWrite();
-     double *Tdata = Tn_next.HostReadWrite();   
-     for (int i = 0; i < Tdof; i++) {     
+     double *Tdata = Tn_next.HostReadWrite();
+     for (int i = 0; i < Tdof; i++) {
        data[i] = Tdata[i];
      }
-   }    
-   //std::cout << "Check 28..." << std::endl;     
-
-   
-   // Set initial time step in the history array
+   }
    dthist[0] = dt;
 
    // Velocity filter
@@ -1388,10 +882,9 @@ void LoMachSolver::Setup(double dt)
       Tn_filtered_gf.SetSpace(tfes);
       Tn_filtered_gf = 0.0;
    }
-   
+
    sw_setup.Stop();
-   std::cout << "Check 29..." << std::endl;     
-   
+   std::cout << "Check 29..." << std::endl;
 }
 
 
@@ -1422,111 +915,22 @@ void LoMachSolver::UpdateTimestepHistory(double dt)
    Tnm1 = Tn;
    Tn_next_gf.GetTrueDofs(Tn_next);
    Tn = Tn_next;
-   Tn_gf.SetFromTrueDofs(Tn);   
-   
+   Tn_gf.SetFromTrueDofs(Tn);
 }
 
 
 void LoMachSolver::projectInitialSolution() {
-  
   // Initialize the state.
-
-  // particular case: Euler vortex
-  //   {
-  //     void (*initialConditionFunction)(const Vector&, Vector&);
-  //     t_final = 5.*  2./17.46;
-  //     initialConditionFunction = &(this->InitialConditionEulerVortex);
-  // initialConditionFunction = &(this->testInitialCondition);
-
-  //     VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
-  //     U->ProjectCoefficient(u0);
-  //   }
-  //if (mpi_.Root()) std::cout << "restart: " << config.GetRestartCycle() << std::endl;
-
-  /*  
-#ifdef HAVE_MASA
-  if (config.use_mms_) {
-    initMasaHandler();
-  }
-#endif
-
-  if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
-    if (config.use_mms_) {
-#ifdef HAVE_MASA
-      projectExactSolution(0.0, U);
-      if (config.mmsSaveDetails_) projectExactSolution(0.0, masaU_);
-#else
-      mfem_error("Require MASA support to use MMS.");
-#endif
-    } else {
-      uniformInitialConditions();
-    }
-  } else {
-#ifdef HAVE_MASA
-    if (config.use_mms_ && config.mmsSaveDetails_) projectExactSolution(0.0, masaU_);
-#endif
-
-    restart_files_hdf5("read");
-
-    paraviewColl->SetCycle(iter);
-    paraviewColl->SetTime(time);
-    paraviewColl->UseRestartMode(true);
-  }
-  */  
-
-  /*
-  if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
-    // why would this be called if restart==0?  restart_files_hdf5("read");
-    paraviewColl->SetCycle(iter);
-    paraviewColl->SetTime(time);
-    paraviewColl->UseRestartMode(true);
-  }
-  */
-  //if (verbose) grvy_printf(ginfo, " PIS 1...\n");            
-  
-  //initGradUp();
-
-  //updatePrimitives();
-
-  /*
-  // update pressure grid function
-  mixture->UpdatePressureGridFunction(press, Up);
-  //if (verbose) grvy_printf(ginfo, " PIS 2...\n");  
-
-  // update plasma electrical conductivity
-  if (tpsP_->isFlowEMCoupled()) {
-    mixture->SetConstantPlasmaConductivity(plasma_conductivity_, Up);
-  }
-  //if (verbose) grvy_printf(ginfo, " PIS 3...\n");
-  */
-
-  if (config.GetRestartCycle() == 0 && !loadFromAuxSol) {
-    // Only save IC from fresh start.  On restart, will save viz at
-    // next requested iter.  This avoids possibility of trying to
-    // overwrite existing paraview data for the current iteration.
-    
-    /////// CAUSING SEG FAULT     // HERE HERE HERE
-    // if (!(tpsP_->isVisualizationMode())) paraviewColl->Save();
-    
-  }
-  //if (verbose) grvy_printf(ginfo, " PIS 4...\n");            
-  
 }
 
 
 void LoMachSolver::initialTimeStep() {
-  
   auto dataU = U->HostReadWrite();
   int dof = vfes->GetNDofs();
 
   for (int n = 0; n < dof; n++) {
     Vector state(num_equation);
     for (int eq = 0; eq < num_equation; eq++) state[eq] = dataU[n + eq * dof];
-
-    // REMOVE SOS
-    //double iC = mixture->ComputeMaxCharSpeed(state);
-    //if (iC > max_speed) max_speed = iC;
-    
   }
 
   double partition_C = max_speed;
@@ -1543,84 +947,31 @@ void LoMachSolver::initialTimeStep() {
 }
 
 
-void LoMachSolver::solve()
-{    
-   //Mpi::Init();
-   //Hypre::Init();
-  
-   //if (verbose) grvy_printf(ginfo, "in solve...\n");      
-
-   /*
-   // Create translation vectors defining the periodicity
-   Vector x_translation({Lx, 0.0, 0.0});
-   Vector z_translation({0.0, 0.0, Lz});
-   std::vector<Vector> translations = {x_translation, z_translation};
-
-   // Create the periodic mesh using the vertex mapping defined by the translation vectors
-   Mesh periodic_mesh = Mesh::MakePeriodic(mesh,mesh.CreatePeriodicVertexMapping(translations));
-   */
-
-   //std::cout << "Check 2..." << std::endl;
-
-  /*
-   if (Mpi::Root())
-   {
-      printf("NL=%d NX=%d NY=%d NZ=%d dx+=%f\n", NL, NX, NY, NZ, LC * Re_tau);
-      std::cout << "Number of elements: " << mesh.GetNE() << std::endl;
-   }
-  */
-
-  
+void LoMachSolver::solve() {
   // just restart here
   if (config.restart) {
      restart_files_hdf5("read");
      copyU();
   }
-  
-  
-   //std::cout << "Check 6..." << std::endl;
 
    if (iter==0) { dt = 1.0e-6; } // HARD CODE
 
    double Umax_lcl = 1.0e-12;
    max_speed = Umax_lcl;
    double Umag;
-   int dof = vfes->GetNDofs();   
+   int dof = vfes->GetNDofs();
 
    // temporary hardcodes
    //double t = 0.0;
    double CFL_actual;
-   double t_final = 1.0;   
-   double dtFactor = 0.1;   
+   double t_final = 1.0;
+   double dtFactor = 0.1;
    //CFL = config.cflNum;
    CFL = config.GetCFLNumber();
 
-   auto dataU = un_gf.HostRead();   
-   
-     /// make a seperate function ///
-   /*
-   if(iter == 0) {    
-       //std::cout << "okay 1a " << dof << " " << dim << endl;
-       for (int n = 0; n < dof; n++) {
-         Umag = 0.0;
-         for (int eq = 0; eq < dim; eq++) {
-           Umag += dataU[n + eq * dof]*dataU[n + eq * dof];
-         }
-         Umag = sqrt(Umag);
-         Umax_lcl = std::max(Umag,Umax_lcl);
-       }
-       //std::cout << "okay 1c " << endl;
-       std::cout << "values: " << Umax_lcl << " " << max_speed << endl;       
-       MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
-       //std::cout << "okay 1d " << endl;       
-       dt = CFL * hmin / max_speed; // this is conservative  ADD ORDER
-       if( rank0_ == true ) { std::cout << " Starting timestep dt: " << dt << endl; }
-       if( rank0_ == true ) { std::cout << " CFL / hmin / max_speed " << CFL << " " << hmin << " " << max_speed << endl; }              
-    }
-   */
-  
+   auto dataU = un_gf.HostRead();
 
-   ParGridFunction *r_gf = GetCurrentDensity();   
+   ParGridFunction *r_gf = GetCurrentDensity();
    ParGridFunction *u_gf = GetCurrentVelocity();
    ParGridFunction *p_gf = GetCurrentPressure();
    ParGridFunction *t_gf = GetCurrentTemperature();
@@ -1630,36 +981,11 @@ void LoMachSolver::solve()
   const double dt_fixed = config.GetFixedDT();
   if (dt_fixed > 0) {
     dt = dt_fixed;
-  }   
+  }
 
-  
-   
-   //dt = config.dt_fixed;
-   //CFL_actual = ComputeCFL(*u_gf, dt);   
-   //EnforceCFL(config.cflNum, u_gf, &dt);
-   //dt = dt * max(cflMax_set/cflmax_actual,1.0);
-   //if (verbose) grvy_printf(ginfo, "got timestep...\n");         
-
-   /*
-   if (!config.isTimeStepConstant()) {
-     double dt_local = CFL * hmin / max_speed / static_cast<double>(dim);
-     MPI_Allreduce(&dt_local, &dt, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
-     //dt = dt * max(CFL/CFL_actual,1.0);
-   }
-   */
-   
-
-
-   //updateU();
-   //if (verbose) grvy_printf(ginfo, "updateU 1 good...\n");      
-   
    Setup(dt);
-   //if (verbose) grvy_printf(ginfo, "setup good...\n");   
-
    updateU();
-   //copyU(); // testing   
-   //if (verbose) grvy_printf(ginfo, "updateU 2 good...\n");         
-   
+
    /**/
    ParaViewDataCollection pvdc("turbchan", pmesh);
    pvdc.SetDataFormat(VTKFormat::BINARY32);
@@ -1667,32 +993,24 @@ void LoMachSolver::solve()
    pvdc.SetLevelsOfDetail(order);
    pvdc.SetCycle(0);
    pvdc.SetTime(time);
-   //pvdc.RegisterField("density", r_gf);   
+   //pvdc.RegisterField("density", r_gf);
    pvdc.RegisterField("velocity", u_gf);
    pvdc.RegisterField("pressure", p_gf);
-   pvdc.RegisterField("temperature", t_gf); 
+   pvdc.RegisterField("temperature", t_gf);
    pvdc.Save(); // invalid read
    if( rank0_ == true ) std::cout << " Saving final step to paraview: " << iter << endl;
    /**/
 
-   
    int iter_start = iter;
-   //MaxIters = 5000;
    if( rank0_ == true ) std::cout << " Starting main loop, from " << iter_start << " to " << MaxIters << endl;
-   
+
    for (int step = iter_start; step <= MaxIters; step++)
    {
 
      iter = step;
-     //if (time + dt >= t_final - dt / 2) { break; }
-     //if (step + 1 == MaxIters) { last_step = true; }
-     //if (step+1 == 1) { last_step = true; }      ///HACK
-
 
      /// make a seperate function ///
-
        auto dataU = un_gf.HostRead();
-       //std::cout << "okay 1a " << dof << " " << dim << endl;
        for (int n = 0; n < dof; n++) {
          Umag = 0.0;
          for (int eq = 0; eq < dim; eq++) {
@@ -1701,120 +1019,39 @@ void LoMachSolver::solve()
          Umag = sqrt(Umag);
          Umax_lcl = std::max(Umag,Umax_lcl);
        }
-       //std::cout << "okay 1c " << endl;
-       //std::cout << "values: " << Umax_lcl << " " << max_speed << endl;       
        MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
-       //std::cout << "okay 1d " << endl;       
        dt = (1.0-dtFactor) * dt + dtFactor * CFL*hmin/(max_speed*(double)order) ; // this is conservative
-       //std::cout << "okay 1e " << endl;
-       //if( rank0_ == true ) { std::cout << "dt: " << dt << endl; }
-       //if( rank0_ == true ) { std::cout << "Umax: " << max_speed << endl; }
-       
      ////////////////////////////////
 
-     
-     /*
-      if (step % 10 == 0)
-      {
-         pvdc.SetCycle(step);
-         pvdc.SetTime(t);
-         pvdc.Save();
-      }
-     */
-
-       //if (Mpi::Root())
       if (rank0_ == true) {
-	//printf("%1s\n", " ");	
-	//printf("%2s %11s %11s\n", "N", "Time", "dt");
-	//printf("%o %4s %.5E %.5E\n", step, "    ", time, dt);
-        //fflush(stdout);
         std::cout << "  N    Time    dt   "<< endl;
         std::cout << " " << step << "    " << time << " " << dt << endl; // conditional jump
       }
 
-      //std::cout << " step/Max: " << step << " " << MaxIters << endl;
       if (step > MaxIters) { break; }
-
-      //if (verbose) grvy_printf(ginfo, "calling step...\n");         
-      Step(time, dt, step, iter_start);      
-
-
-      
-      // NECESSARY ADDITIONS:
-
-      // update dt periodically
-      /*
-      if (!config.isTimeStepConstant()) {
-        //double dt_local = CFL * hmin / max_speed / static_cast<double>(dim);
-        //MPI_Allreduce(&dt_local, &dt, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
-        dt = dt * max(CFL/CFL_actual,1.0);	
-      }
-      */
+      Step(time, dt, step, iter_start);
 
       // restart files
       if ( iter%config.itersOut == 0) {
         updateU();
         restart_files_hdf5("write");
       }
-      
-      // paraview
-      /*
-      if (iter == MaxIters) {
-        // auto hUp = Up->HostRead();
-        Up->HostRead();
-        mixture->UpdatePressureGridFunction(press, Up);
-	
-        paraviewColl->SetCycle(iter);
-        paraviewColl->SetTime(time);
-        paraviewColl->Save();
-
-        average->write_meanANDrms_restart_files(iter, time);
-	
-      }
-      */
-      
    }
 
-   //ParaViewDataCollection pvdc("turbchan", pmesh);
-   //pvdc.SetDataFormat(VTKFormat::BINARY32);
-   //pvdc.SetHighOrderOutput(true);
-   //pvdc.SetLevelsOfDetail(order);
    pvdc.SetCycle(iter);
    pvdc.SetTime(time);
-   //pvdc.RegisterField("velocity", u_gf);
-   //pvdc.RegisterField("pressure", p_gf);
-   //pvdc.RegisterField("temperature", t_gf);   
    pvdc.Save(); // invalid read and conditional jump
-   if( rank0_ == true ) std::cout << " Saving final step to paraview: " << iter << endl;      
-   
-   /*
-   //Up->HostRead();
-   //mixture->UpdatePressureGridFunction(press, Up);
-   restart_files_hdf5("write");
-   paraviewColl->SetCycle(iter);
-   paraviewColl->SetTime(time);
-   paraviewColl->Save();
-   */
-   
-   //std::cout << " Finished main loop"  << endl;   
-   //flowsolver.PrintTimingData();
-
+   if( rank0_ == true ) std::cout << " Saving final step to paraview: " << iter << endl;
 }
 
-
-
 // all the variable coefficient operators musc be re-build every step...
-void LoMachSolver::Step(double &time, double dt, const int current_step, const int start_step, bool provisional)
-{
-  //if (verbose) grvy_printf(ginfo, "in step...\n");           
+void LoMachSolver::Step(double &time, double dt, const int current_step, const int start_step, bool provisional) {
    sw_step.Start();
 
-   int Vdof = vfes->GetTrueVSize();   
+   int Vdof = vfes->GetTrueVSize();
    int Pdof = pfes->GetTrueVSize();
    int Tdof = tfes->GetTrueVSize();
-   //int Ndof = nfes->GetTrueVSize();
-   
-   //std::cout << "Check a..." << std::endl;
+
    SetTimeIntegrationCoefficients(current_step-start_step);
 
    // Set current time for velocity Dirichlet boundary conditions.
@@ -1822,20 +1059,10 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 
    // Set current time for pressure Dirichlet boundary conditions.
    for (auto &pres_dbc : pres_dbcs) {pres_dbc.coeff->SetTime(time + dt);}
-   //std::cout << "Check b..." << std::endl;
-
-
-   /*
-   double *dataVisc = bufferVisc->HostReadWrite();
-   for (int i = 0; i < Vdof; i++) { // should this be dof of Vdof size?
-     dataVisc[i] = kin_vis;
-   }
-   */
-   //std::cout << "Check c..." << std::endl;
 
    {
-     double *dataVisc = bufferVisc->HostWrite();   
-     double *Tdata = Tn.HostReadWrite();     
+     double *dataVisc = bufferVisc->HostWrite();
+     double *Tdata = Tn.HostReadWrite();
      double visc[2];
      double prim[nvel+2];
      for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
@@ -1848,14 +1075,12 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
        }
      }
    }
-   
-   
+
    H_bdfcoeff.constant = bd0 / dt;
    H_form->Update();
    H_form->Assemble();
    H_form->FormSystemMatrix(vel_ess_tdof, H);
-   //std::cout << "Check d..." << std::endl;   
-   
+
    HInv->SetOperator(*H);
    if (partial_assembly)
    {
@@ -1865,8 +1090,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       HInvPC = new OperatorJacobiSmoother(diag_pa, vel_ess_tdof);
       HInv->SetPreconditioner(*HInvPC);
    }
-   //std::cout << "Check e..." << std::endl;       
-   
+
    // Extrapolated f^{n+1} (source term: f(n+1))
    for (auto &accel_term : accel_terms)
    {
@@ -1875,8 +1099,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 
    f_form->Assemble();
    f_form->ParallelAssemble(fn);
-   //std::cout << "Check f..." << std::endl;      
-   
+
    // Nonlinear extrapolated terms (convection: N*(n+1))
    sw_extrap.Start();
 
@@ -1888,61 +1111,59 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    // project u to "padded" order space
    {
    double *data = R1PM0_gf.HostReadWrite();
-   double *Udata = un.HostReadWrite();   
-   for (int i = 0; i < Vdof; i++) {     
+   double *Udata = un.HostReadWrite();
+   for (int i = 0; i < Vdof; i++) {
      data[i] = Udata[i];
    }
-   }   
+   }
    R1PX2_gf.ProjectGridFunction(R1PM0_gf);
    {
    double *data = R1PX2_gf.HostReadWrite();
-   double *Udata = uBn.HostReadWrite();      
+   double *Udata = uBn.HostReadWrite();
    //   for (int i = 0; i < Ndof; i++) {
-      for (int i = 0; i < Vdof; i++) {     
+      for (int i = 0; i < Vdof; i++) {
      Udata[i] = data[i];
    }
-   }   
+   }
 
    {
    double *data = R1PM0_gf.HostReadWrite();
-   double *Udata = unm1.HostReadWrite();   
-   for (int i = 0; i < Vdof; i++) {     
+   double *Udata = unm1.HostReadWrite();
+   for (int i = 0; i < Vdof; i++) {
      data[i] = Udata[i];
    }
-   }   
+   }
    R1PX2_gf.ProjectGridFunction(R1PM0_gf);
    {
    double *data = R1PX2_gf.HostReadWrite();
-   double *Udata = uBnm1.HostReadWrite();      
+   double *Udata = uBnm1.HostReadWrite();
    //for (int i = 0; i < Ndof; i++) {
-   for (int i = 0; i < Vdof; i++) {     
+   for (int i = 0; i < Vdof; i++) {
      Udata[i] = data[i];
    }
-   }      
+   }
 
    {
    double *data = R1PM0_gf.HostReadWrite();
-   double *Udata = unm2.HostReadWrite();   
-   for (int i = 0; i < Vdof; i++) {     
+   double *Udata = unm2.HostReadWrite();
+   for (int i = 0; i < Vdof; i++) {
      data[i] = Udata[i];
    }
-   }   
+   }
    R1PX2_gf.ProjectGridFunction(R1PM0_gf);
    {
    double *data = R1PX2_gf.HostReadWrite();
-   double *Udata = uBnm2.HostReadWrite();      
+   double *Udata = uBnm2.HostReadWrite();
    //for (int i = 0; i < Ndof; i++) {
-   for (int i = 0; i < Vdof; i++) {     
+   for (int i = 0; i < Vdof; i++) {
      Udata[i] = data[i];
    }
    }
-   //std::cout << "Check g..." << std::endl;         
-   
+
    N->Mult(uBn, Nun); // invalid read
    N->Mult(uBnm1, Nunm1);
    N->Mult(uBnm2, Nunm2);
-   //std::cout << "Check h..." << std::endl;         
-   
+
    // ab-predictor of nonliner term at {n+1}
    {
       const auto d_Nun = Nun.Read();
@@ -1960,36 +1181,33 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
                      ab3_ * d_Nunm2[i];
       });
    }
-   //std::cout << "Check i..." << std::endl;         
 
    // project NL product back to v-space
    {
    double *data = R1PX2_gf.HostReadWrite();
-   double *Fdata = FBext.HostReadWrite();   
+   double *Fdata = FBext.HostReadWrite();
    //for (int i = 0; i < Ndof; i++) {
-   for (int i = 0; i < Vdof; i++) {     
+   for (int i = 0; i < Vdof; i++) {
      data[i] = Fdata[i];
    }
-   }   
+   }
    R1PM0_gf.ProjectGridFunction(R1PX2_gf);
    {
    double *data = R1PM0_gf.HostReadWrite();
-   double *Fdata = Fext.HostReadWrite();      
-   for (int i = 0; i < Vdof; i++) {     
+   double *Fdata = Fext.HostReadWrite();
+   for (int i = 0; i < Vdof; i++) {
      Fdata[i] = data[i];
    }
    }
-   //std::cout << "Check j..." << std::endl;            
-      
-   // add forcing/accel term to Fext   
-   Fext.Add(1.0, fn); 
+
+   // add forcing/accel term to Fext
+   Fext.Add(1.0, fn);
 
    // Fext = M^{-1} (F(u^{n}) + f^{n+1}) (F* w/o known part of BDF)
    MvInv->Mult(Fext, tmpR1); // conditional jump
    iter_mvsolve = MvInv->GetNumIterations();
    res_mvsolve = MvInv->GetFinalNorm();
    Fext.Set(1.0, tmpR1);
-   //std::cout << "Check k..." << std::endl;   
 
    // for unsteady term, compute BDF terms (known part of BDF u for full F*)
    {
@@ -2009,7 +1227,6 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       });
    }
    sw_extrap.Stop();
-   //std::cout << "Check l..." << std::endl;   
 
    // Pressure Poisson (extrapolated curl(curl(u)) L*(n+1))
    sw_curlcurl.Start();
@@ -2029,7 +1246,6 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
                      ab3_ * d_unm2[i];
       });
    }
-   //std::cout << "Check m..." << std::endl;   
 
    Lext_gf.SetFromTrueDofs(Lext);
    int dim = pmesh->Dimension();
@@ -2044,9 +1260,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       ComputeCurl3D(curlu_gf, curlcurlu_gf);
    }
 
-   // what is this trying to accomplish?
    curlcurlu_gf.GetTrueDofs(Lext);
-   //std::cout << "Check n..." << std::endl;   
 
    // (!) with a field viscosity, this likely breaks
    // (!) must change to dynamic/rho
@@ -2067,40 +1281,16 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
        }
      }
    }
-   //std::cout << "Check o..." << std::endl;   
-
    sw_curlcurl.Stop();
-
-   // Lext alone is ok
-   //Lext = 0.0;
-
-   // Fext alone isn't enough
-   //Fext = 0.0;
-
-   // // zeroing both works
-   // Lext = 0.0;
-   // Fext = 0.0;
 
    // \tilde{F} = F - \nu CurlCurl(u), (F* + L*)
    FText.Set(-1.0, Lext);
    FText.Add(1.0, Fext);
 
-   // p_r = \nabla \cdot FText ( i think "p_r" means rhs of pressure-poisson eq, so div(\tilde{F}))
-   // applied divergence to full FText vector
-   //D->Mult(FText, resp);
-   //resp.Neg();
-
-   // fixes uninitialized variables
-   //FText = 0.0;
-
    // add some if for porder != vorder
    // project FText to p-1
    D->Mult(FText, tmpR0);  // tmp3 c p, tmp2 and resp c (p-1) // possible invalid read
    tmpR0.Neg();
-   //std::cout << "Check p..." << std::endl;
-
-   // zero here, leads to no uninitialized variable errors in serial
-   //tmpR0 = 0.0;
 
    // Add boundary terms.
    FText_gf.SetFromTrueDofs(FText);
@@ -2111,208 +1301,56 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    tmpR0.Add(1.0, FText_bdr);
    tmpR0.Add(-bd0 / dt, g_bdr);
 
-   // zero here, leads to no uninitialized variable errors in serial
-   //tmpR0 = 0.0;
-
    // project rhs to p-space
    {
      double *data = R0PM0_gf.HostReadWrite();
-     double *d_buf = tmpR0.HostReadWrite();   
-     for (int i = 0; i < Tdof; i++) {     
+     double *d_buf = tmpR0.HostReadWrite();
+     for (int i = 0; i < Tdof; i++) {
        data[i] = d_buf[i];
      }
    }
    R0PM1_gf.ProjectGridFunction(R0PM0_gf);
    {
      double *data = resp.HostReadWrite();
-     double *d_buf = R0PM1_gf.HostReadWrite();   
-     for (int i = 0; i < Pdof; i++) {     
+     double *d_buf = R0PM1_gf.HostReadWrite();
+     for (int i = 0; i < Pdof; i++) {
        data[i] = d_buf[i];
      }
-   }   
-   
-   //resp.Add(1.0, FText_bdr);
-   //resp.Add(-bd0 / dt, g_bdr);
-   //std::cout << "Check q..." << std::endl;   
+   }
 
-   if (pres_dbcs.empty()) { Orthogonalize(resp); }   
+   if (pres_dbcs.empty()) { Orthogonalize(resp); }
    for (auto &pres_dbc : pres_dbcs) { pn_gf.ProjectBdrCoefficient(*pres_dbc.coeff, pres_dbc.attr); }
 
    // ?
    pfes->GetRestrictionMatrix()->MultTranspose(resp, resp_gf);
-   //std::cout << "Check r..." << std::endl;   
-   
-   // update variable coeff pressure laplacian
-   /*
-   {
-   double *data = R0PM0_gf.HostReadWrite();
-   double *Tdata = Tn.HostReadWrite();      
-   for (int i = 0; i < Tdof; i++) {     
-     data[i] = Tdata[i];
-   }
-   }
-   R0PM1_gf.ProjectGridFunction(R0PM0_gf);
-   */
+
    {
      double *data = bufferInvRho->HostReadWrite();
-     //double *dataRho = rn_gf.HostReadWrite();   
-     //     double *Tdata = Tn.HostReadWrite();          
-     for (int i = 0; i < Tdof; i++) {     
-       //dataRho[i] = ambientPressure / (Rgas * Tdata[i]);
-       //dataRho[i] = Tdata[i];              
+     for (int i = 0; i < Tdof; i++) {
        //data[i] = (Rgas * Tdata[i]) / ambientPressure;
        data[i] = 1.0;
      }
    }
 
 
-   
-   /// REBUILD FROM SCRATCH EVERY TIMESTEP ///
-   /*
-   delete Sp_form;
-   delete SpInv;   
-   delete SpInvOrthoPC;
-   delete SpInvPC;
-   //delete lor;
-
-   const IntegrationRule &ir_pi = gll_rules.Get(pfes->GetFE(0)->GetGeomType(), 2 * porder);      
-   invRho = new GridFunctionCoefficient(bufferInvRho);
-   std::cout << "Check 1..." << std::endl;     
-   
-   // looks like this is the Laplacian for press eq
-   Sp_form = new ParBilinearForm(pfes);
-   //auto *sp_blfi = new DiffusionIntegrator;
-   std::cout << "Check 2..." << std::endl;        
-   auto *sp_blfi = new DiffusionIntegrator(*invRho); // HERE
-   if (numerical_integ)
-   {
-      sp_blfi->SetIntRule(&ir_pi);
-   }
-   Sp_form->AddDomainIntegrator(sp_blfi);
-   //if (partial_assembly)
-   //{
-   //   Sp_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-   //}
-   std::cout << "Check 3..." << std::endl;        
-   Sp_form->Assemble();
-   std::cout << "Check 4..." << std::endl;        
-   Sp_form->FormSystemMatrix(pres_ess_tdof, Sp);
-   std::cout << "Check 5..." << std::endl;
-
-   //if (partial_assembly)
-   //{
-   //   lor = new ParLORDiscretization(*Sp_form, pres_ess_tdof);
-   //   SpInvPC = new HypreBoomerAMG(lor->GetAssembledMatrix());
-   //   SpInvPC->SetPrintLevel(pl_amg);
-   //   SpInvPC->Mult(resp, pn);
-   //   SpInvOrthoPC = new OrthoSolver(vfes->GetComm());
-   //   SpInvOrthoPC->SetSolver(*SpInvPC);
-   //}
-   //else
-   //{
-      SpInvPC = new HypreBoomerAMG(*Sp.As<HypreParMatrix>());
-      SpInvPC->SetPrintLevel(0);
-      SpInvOrthoPC = new OrthoSolver(vfes->GetComm());
-      SpInvOrthoPC->SetSolver(*SpInvPC);
-      //}
-   SpInv = new CGSolver(vfes->GetComm());
-   std::cout << "Check 6..." << std::endl;   
-   SpInv->iterative_mode = true;
-   SpInv->SetOperator(*Sp);
-   std::cout << "Check 7..." << std::endl;   
-   if (pres_dbcs.empty())
-   {
-      SpInv->SetPreconditioner(*SpInvOrthoPC);
-   }
-   else
-   {
-      SpInv->SetPreconditioner(*SpInvPC);
-   }
-   SpInv->SetPrintLevel(pl_spsolve);
-   SpInv->SetRelTol(rtol_spsolve);
-   SpInv->SetMaxIter(500);
-   std::cout << "Check 8..." << std::endl;   
-   */
-   
-   ///////////////////////////////////////////
-
-
-   
-   /*
-   Sp_form->Update();
-   Sp_form->Assemble();
-   Sp_form->FormSystemMatrix(pres_ess_tdof, Sp);
-   
-   SpInv->SetOperator(*Sp);
-   if (partial_assembly)
-   {
-      delete SpInvPC;
-      Vector diag_pa(pfes->GetTrueVSize());
-      Sp_form->AssembleDiagonal(diag_pa);
-      SpInvPC = new OperatorJacobiSmoother(diag_pa, pres_ess_tdof);
-      SpInv->SetPreconditioner(*SpInvPC);
-   }
-   */
-
-
-   /* // broken for variable coeff
-   Sp_form->Update();
-   std::cout << "Check s1..." << std::endl;         
-   Sp_form->Assemble();
-   std::cout << "Check s2..." << std::endl;            
-   Sp_form->FormSystemMatrix(pres_ess_tdof, Sp);
-   std::cout << "Check s3..." << std::endl;            
-
-   SpInv->SetOperator(*Sp);
-   std::cout << "Check s4..." << std::endl;            
-   if (partial_assembly)
-   {
-      delete lor;   	
-      delete SpInvPC;
-      lor = new ParLORDiscretization(*Sp_form, pres_ess_tdof);
-      SpInvPC = new HypreBoomerAMG(lor->GetAssembledMatrix());
-      std::cout << "Check s5..." << std::endl;               
-      if (pres_dbcs.empty()) {
-        delete SpInvOrthoPC;           	
-        SpInvOrthoPC = new OrthoSolver(vfes->GetComm());
-        SpInvOrthoPC->SetSolver(*SpInvPC);      	
-	SpInv->SetPreconditioner(*SpInvOrthoPC);
-        std::cout << "Check s6..." << std::endl;         	
-      }
-      else {
-	SpInv->SetPreconditioner(*SpInvPC);
-      }
-   }
-   */
-   //std::cout << "Check r1..." << std::endl;      
-   
    Vector X1, B1;
    if (partial_assembly)
    {
       auto *SpC = Sp.As<ConstrainedOperator>();
-      //std::cout << "Check r3..." << std::endl;            
       EliminateRHS(*Sp_form, *SpC, pres_ess_tdof, pn_gf, resp_gf, X1, B1, 1);
-      //std::cout << "Check r4..." << std::endl;                  
    }
    else
    {
       Sp_form->FormLinearSystem(pres_ess_tdof, pn_gf, resp_gf, Sp, X1, B1, 1);
-      //std::cout << "Check r5..." << std::endl;                  
    }
 
    // actual implicit solve for p(n+1)
-   sw_spsolve.Start(); 
-   //std::cout << "Check r6..." << std::endl;               
+   sw_spsolve.Start();
    SpInv->Mult(B1, X1); // conditional jump
-   //std::cout << "Check r7..." << std::endl;                  
    sw_spsolve.Stop();
-   //std::cout << "Check r8..." << std::endl;                  
    iter_spsolve = SpInv->GetNumIterations();
-   //std::cout << "Check r9..." << std::endl;   
    res_spsolve = SpInv->GetFinalNorm();
-   //std::cout << "Check r10..." << std::endl;   
    Sp_form->RecoverFEMSolution(X1, resp_gf, pn_gf);
-   //std::cout << "Check s..." << std::endl;   
 
    // If the boundary conditions on the pressure are pure Neumann remove the
    // nullspace by removing the mean of the pressure solution. This is also
@@ -2328,29 +1366,26 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    // project p to v-space
    {
    double *data = R0PM1_gf.HostReadWrite();
-   double *d_buf = pn.HostReadWrite();      
-   for (int i = 0; i < Pdof; i++) {     
+   double *d_buf = pn.HostReadWrite();
+   for (int i = 0; i < Pdof; i++) {
      data[i] = d_buf[i];
    }
    }
    R0PM0_gf.ProjectGridFunction(R0PM1_gf);
    {
    double *d_buf = R0PM0_gf.HostReadWrite();
-   double *data = pnBig.HostReadWrite();   
-   for (int i = 0; i < Tdof; i++) {     
+   double *data = pnBig.HostReadWrite();
+   for (int i = 0; i < Tdof; i++) {
      data[i] = d_buf[i];
    }
-   }   
+   }
 
    // grad(P)
    G->Mult(pnBig, resu);
-   
+
    resu.Neg(); // -gradP
    Mv->Mult(Fext, tmpR1); //Mv{F*}
    resu.Add(1.0, tmpR1); // add to resu
-   //std::cout << "Check t..." << std::endl;
-   
-   // un_next_gf = un_gf;
 
    for (auto &vel_dbc : vel_dbcs) { un_next_gf.ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);}
 
@@ -2373,49 +1408,32 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    iter_hsolve = HInv->GetNumIterations();
    res_hsolve = HInv->GetFinalNorm();
    H_form->RecoverFEMSolution(X2, resu_gf, un_next_gf);
-   //std::cout << "Check 7a15..." << std::endl;   
 
    un_next_gf.GetTrueDofs(un_next);
 
 
    // begin temperature......................................
-   //std::cout << "Check u..." << std::endl;
 
    // Set current time for temperature Dirichlet boundary conditions.
    for (auto &temp_dbc : temp_dbcs) {temp_dbc.coeff->SetTime(time + dt);}   
-   //std::cout << "Check v..." << std::endl;
-   
-   // helmholtz (alphaField)
-   /*
    {
      double *data = bufferAlpha->HostReadWrite();
-     for (int i = 0; i < Tdof; i++) {
-       data[i] = kin_vis / Pr;
-     }
-   }
-   */
-
-   {
-     double *data = bufferAlpha->HostReadWrite();
-     double *Tdata = Tn.HostReadWrite();     
+     double *Tdata = Tn.HostReadWrite();
      double visc[2];
      double prim[nvel+2];
      for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
      for (int i = 0; i < Tdof; i++) {
          prim[1+nvel] = Tdata[i];
          transportPtr->GetViscosities(prim, prim, visc);
-         data[i] = visc[0] / Pr;	   
-         //data[i] = kin_vis; // static value
+         data[i] = visc[0] / Pr;
      }
-   }   
-   
-   
+   }
+
    Ht_bdfcoeff.constant = bd0 / dt;
    // update visc here
    Ht_form->Update();
    Ht_form->Assemble();
    Ht_form->FormSystemMatrix(temp_ess_tdof, Ht);
-   //std::cout << "Check w..." << std::endl;
 
    HtInv->SetOperator(*Ht);
    if (partial_assembly)
@@ -2426,17 +1444,10 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof);
       HtInv->SetPreconditioner(*HtInvPC);
    }
-   //std::cout << "Check x..." << std::endl;   
-   
-   // HACK
-   //Text.Set(0.0, tmp2);   
-   
-   //std::cout << "Check 7g..." << std::endl;
-   //std::cout << "bds: " << bd0 << " " << bd1 << " " << bd2 << " " << bd3 << std::endl;   
-   
+
    // add source terms to Text here (e.g. viscous heating)
-   
-   // for unsteady term, compute and add known part of BDF unsteady term   
+
+   // for unsteady term, compute and add known part of BDF unsteady term
    {
       const double bd1idt = -bd1 / dt;
       const double bd2idt = -bd2 / dt;
@@ -2449,37 +1460,24 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       //mfem::forall(Text.Size(), [=] MFEM_HOST_DEVICE (int i)
       MFEM_FORALL(i, Text.Size(),
       {
-        //d_Text[i] = -bd0/dt * 298.0; //d_tn[i];	
-        //d_Text[i] = 0.0;
-        d_Text[i] = bd1idt * d_tn[i] +	
+        d_Text[i] = bd1idt * d_tn[i] +
                     bd2idt * d_tnm1[i] +
                     bd3idt * d_tnm2[i];
       });
    }
-   //std::cout << "Check y..." << std::endl;
-   
+
    // Add boundary terms.
    Text_gf.SetFromTrueDofs(Text);
-   //std::cout << "Check y0..." << std::endl;      
    Text_bdr_form->Assemble();
-   //std::cout << "Check y1..." << std::endl;      
    Text_bdr_form->ParallelAssemble(Text_bdr);
-   //std::cout << "Check y2..." << std::endl;      
    t_bdr_form->Assemble();
-   //std::cout << "Check y3..." << std::endl;      
    t_bdr_form->ParallelAssemble(t_bdr);
-   //std::cout << "Check y4..." << std::endl;   
 
    Mt->Mult(Text, tmpR0);
-   //std::cout << "Check y5..." << std::endl;   
-   //resT.Add(1.0, tmp2); // part of unsteady and full extrapolated advection on lhs
-   resT.Set(1.0, tmpR0);      
-   //resT.Neg(); // move to rhs
-   //std::cout << "Check y6..." << std::endl;   
-
+   resT.Set(1.0, tmpR0);
 
    // advection => will break is t&u arent in the same space
-   bufferTemp = new ParGridFunction(vfes);      
+   bufferTemp = new ParGridFunction(vfes);
    double *dataTemp = bufferTemp->HostReadWrite();
    double *Udnm0 = un.HostReadWrite();
    double *Tdnm0 = Tn.HostReadWrite();
@@ -2487,38 +1485,22 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    double *Tdnm1 = Tnm1.HostReadWrite();
    double *Udnm2 = unm2.HostReadWrite();
    double *Tdnm2 = Tnm2.HostReadWrite();
-   //std::cout << "Check y4..." << std::endl;   
    const auto ab1_ = ab1;
    const auto ab2_ = ab2;
-   const auto ab3_ = ab3;   
-   for (int eq = 0; eq < dim; eq++) {   
+   const auto ab3_ = ab3;
+   for (int eq = 0; eq < dim; eq++) {
      for (int i = 0; i < Tdof; i++) {
        dataTemp[i + eq * Tdof] = ab1_ * Udnm0[i + eq * Tdof] * Tdnm0[i] +
         	                 ab2_ * Udnm1[i + eq * Tdof] * Tdnm1[i] +
 	                         ab3_ * Udnm2[i + eq * Tdof] * Tdnm2[i];
        }
    }
-   //std::cout << "Check z..." << std::endl;      
-   
+
    Dt->Mult(*bufferTemp, tmpR0); // explicit div(uT) at {n}
-   //Text.Add(-1.0, tmp2);
    resT.Add(-1.0, tmpR0);
 
-
-   
-   // M^-1 * advection -> not sure about this part...
-   /*
-   MtInv->Mult(Text, tmp2);
-   iter_mtsolve = MtInv->GetNumIterations();
-   res_mtsolve = MtInv->GetFinalNorm();
-   Text.Set(1.0, tmp2);
-   */
-   
-   //std::cout << "Check 7i..." << std::endl;   
-
-   // what is this?   
+   // what is this?
    for (auto &temp_dbc : temp_dbcs) { Tn_next_gf.ProjectBdrCoefficient(*temp_dbc.coeff, temp_dbc.attr); }
-   //std::cout << "Check 7j..." << std::endl;   
 
    // (?)
    tfes->GetRestrictionMatrix()->MultTranspose(resT, resT_gf);
@@ -2533,19 +1515,17 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    {
       Ht_form->FormLinearSystem(temp_ess_tdof, Tn_next_gf, resT_gf, Ht, Xt2, Bt2, 1);
    }
-   //std::cout << "Check 7k..." << std::endl;   
 
-   // solve helmholtz eq for temp   
+   // solve helmholtz eq for temp
    HtInv->Mult(Bt2, Xt2);
    iter_htsolve = HtInv->GetNumIterations();
    res_htsolve = HtInv->GetFinalNorm();
    Ht_form->RecoverFEMSolution(Xt2, resT_gf, Tn_next_gf);
    //Ht_form->RecoverFEMSolution(Xt2, resT, Tn_next_gf);
    Tn_next_gf.GetTrueDofs(Tn_next);
-   //std::cout << "Check 7l..." << std::endl;   
 
    // end temperature....................................
-   
+
    // If the current time step is not provisional, accept the computed solution
    // and update the time step history by default.
    if (!provisional)
@@ -2554,38 +1534,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       time += dt;
    }
 
-   // explicit filter
-   /*
-   if (filter_alpha != 0.0)
-   {
-     
-      un_NM1_gf.ProjectGridFunction(un_gf);
-      un_filtered_gf.ProjectGridFunction(un_NM1_gf);
-      const auto d_un_filtered_gf = un_filtered_gf.Read();
-      auto d_un_gf = un_gf.ReadWrite();
-      const auto filter_alpha_ = filter_alpha;
-      mfem::forall(un_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
-      {
-         d_un_gf[i] = (1.0 - filter_alpha_) * d_un_gf[i]
-                      + filter_alpha_ * d_un_filtered_gf[i];
-      });
-
-      Tn_NM1_gf.ProjectGridFunction(Tn_gf);
-      Tn_filtered_gf.ProjectGridFunction(Tn_NM1_gf);
-      const auto d_Tn_filtered_gf = Tn_filtered_gf.Read();
-      auto d_Tn_gf = Tn_gf.ReadWrite();
-      mfem::forall(Tn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
-      {
-         d_Tn_gf[i] = (1.0 - filter_alpha_) * d_Tn_gf[i]
-                      + filter_alpha_ * d_Tn_filtered_gf[i];
-      });
-      
-   }
-   */
-   
    sw_step.Stop();
-  
-   
+
    if (verbose && pmesh->GetMyRank() == 0)
    {
       mfem::out << std::setw(7) << "" << std::setw(3) << "It" << std::setw(8)
@@ -2611,7 +1561,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       mfem::out << std::setw(5) << "TEMP " << std::setw(5) << std::fixed
                 << iter_htsolve << "   " << std::setw(3) << std::setprecision(2)
                 << std::scientific << res_htsolve << "   " << rtol_htsolve
-                << "\n";      
+                << "\n";
       mfem::out << std::setprecision(8);
       mfem::out << std::fixed;
    }
@@ -2622,113 +1572,64 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 void LoMachSolver::updateU() {
 
   std::cout << " updating big U vector..." << endl;
-  //int dof = tfes->GetNDofs();
-  //std::cout << " check 0" << endl;      
-
   // primitive state
   {
-
-    //double *dataU = U->HostReadWrite();
     double *dataUp = Up->HostReadWrite();
-    //std::cout << " check 1" << endl;    
-    
-    const auto d_rn_gf = rn_gf.Read();    
+
+    const auto d_rn_gf = rn_gf.Read();
     //mfem::forall(rn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
     MFEM_FORALL(i, rn_gf.Size(),
     {
       dataUp[i] = d_rn_gf[i];
     });
-    //std::cout << " check 2" << endl;        
-    
+
     int vstart = rfes->GetNDofs();
-    const auto d_un_gf = un_gf.Read();    
+    const auto d_un_gf = un_gf.Read();
     //mfem::forall(un_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
     MFEM_FORALL(i, un_gf.Size(),
     {
       dataUp[i + vstart] = d_un_gf[i];
     });
-    //std::cout << " check 3" << endl;        
 
-    int tstart = (1+nvel)*(tfes->GetNDofs());    
-    const auto d_tn_gf = Tn_gf.Read();    
+    int tstart = (1+nvel)*(tfes->GetNDofs());
+    const auto d_tn_gf = Tn_gf.Read();
     //mfem::forall(Tn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
     MFEM_FORALL(i, Tn_gf.Size(),
     {
       dataUp[i + tstart] = d_tn_gf[i];
     });
-    //std::cout << " check 4" << endl;
-    
   }
-
-  // conserved state
-  /*
-  {
-
-    double *dataU = U->HostReadWrite();
-    double *dataUp = Up->HostReadWrite();
-  
-    Vector Upi;
-    Upi.UseDevice(false);
-    Upi.SetSize(num_equation);
-    Vector Ui;
-    Ui.UseDevice(false);
-    Ui.SetSize(num_equation);
-
-    for (int i = 0; i < dof; i++) {
-      for (int eq = 0; eq < num_equation; eq++) {
-         Upi(eq) = dataUp[i + eq * dof];
-      }    
-      mixture->GetConservativesFromPrimitives(Upi, Ui);
-      for (int eq = 0; eq < num_equation; eq++) {
-        dataU[i + eq * dof] = Ui(eq);
-      }    
-    }
-  }
-*/
-
 }
 
-
 void LoMachSolver::copyU() {
-
   std::cout << " copying from U vector..." << endl;
-  //int dof = tfes->GetNDofs();
-  //std::cout << " check 0" << endl;      
-
   // primitive state
   {
 
     double *dataUp = Up->HostReadWrite();
-    //std::cout << " check 1" << endl;    
-    
-    double *d_rn_gf = rn_gf.ReadWrite();    
+    double *d_rn_gf = rn_gf.ReadWrite();
     //mfem::forall(rn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
     MFEM_FORALL(i, rn_gf.Size(),
     {
       d_rn_gf[i] = dataUp[i];
     });
-    //std::cout << " check 2" << endl;        
-    
+
     int vstart = rfes->GetNDofs();
-    double *d_un_gf = un_gf.ReadWrite();    
+    double *d_un_gf = un_gf.ReadWrite();
     //mfem::forall(un_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
     MFEM_FORALL(i, un_gf.Size(),
     {
        d_un_gf[i] = dataUp[i + vstart];
     });
-    //std::cout << " check 3" << endl;        
 
-    int tstart = (1+nvel)*(tfes->GetNDofs());    
-    double *d_tn_gf = Tn_gf.ReadWrite();    
+    int tstart = (1+nvel)*(tfes->GetNDofs());
+    double *d_tn_gf = Tn_gf.ReadWrite();
     //mfem::forall(Tn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
     MFEM_FORALL(i, Tn_gf.Size(),
     {
        d_tn_gf[i] = dataUp[i + tstart];
     });
-    //std::cout << " check 4" << endl;
-    
   }
-
 }
 
 
@@ -2989,7 +1890,6 @@ void LoMachSolver::ComputeCurl2D(ParGridFunction &u,
 
 double LoMachSolver::ComputeCFL(ParGridFunction &u, double dt)
 {
-  
    ParMesh *pmesh_u = u.ParFESpace()->GetParMesh();
    FiniteElementSpace *fes = u.FESpace();
    int vdim = fes->GetVDim();
@@ -3132,19 +2032,18 @@ void LoMachSolver::EnforceCFL(double maxCFL, ParGridFunction &u, double &dt)
 	 // here
 	 double dtx, dty, dtz;
          //cflx = fabs(dt * ux(i) / hmin);
-         //cfly = fabs(dt * uy(i) / hmin);	 
+         //cfly = fabs(dt * uy(i) / hmin);
 	 dtx = maxCFL * hmin / fabs(ux(i));
-	 dty = maxCFL * hmin / fabs(uy(i));	 
+	 dty = maxCFL * hmin / fabs(uy(i));
          if (vdim == 3)
          {
 	   //cflz = fabs(dt * uz(i) / hmin);
-	   dtz = maxCFL * hmin / fabs(uz(i)); 
+	   dtz = maxCFL * hmin / fabs(uz(i));
          }
          //cflm = cflx + cfly + cflz;
          //cflmax = fmax(cflmax, cflm);
 	 dt = fmin(dtx,dty);
 	 dt = fmin(dt,dtz);
-	 
       }
    }
 
@@ -3366,91 +2265,67 @@ void LoMachSolver::PrintInfo()
 }
 
 
-/*
-LoMachSolver::~LoMachSolver()
-{
-  
+LoMachSolver::~LoMachSolver() {
+
    delete FText_gfcoeff;
    delete g_bdr_form;
    delete FText_bdr_form;
    delete Text_gfcoeff;
    delete t_bdr_form;
-   delete Text_bdr_form;   
+   delete Text_bdr_form;
    delete f_form;
-   
+
    delete mass_lf;
-   delete N;   
+   delete N;
    delete Mv_form;
-   delete Mt_form;   
+   delete Mt_form;
    delete Sp_form;
    delete D_form;
-   delete Dt_form;   
+   delete Dt_form;
    delete G_form;
    delete H_form;
-   delete Ht_form;   
-   
+   delete Ht_form;
+
    delete MvInv;
-   delete MtInv;      
+   delete MtInv;
    delete HInv;
    delete HtInv;
-   delete HInvPC;   
-   delete HtInvPC;   
+   delete HInvPC;
+   delete HtInvPC;
    delete MvInvPC;
-   delete MtInvPC;   
+   delete MtInvPC;
 
-   delete SpInv;   
+   delete SpInv;
    delete SpInvOrthoPC;
    delete SpInvPC;
    delete lor;
-   
+
    delete vfec;
    delete pfec;
    delete rfec;
    delete tfec;
-   
+
    delete vfes;
    delete pfes;
    delete rfes;
    delete tfes;
-   delete fvfes;      
-   
+   delete fvfes;
+
    delete vfec_filter;
    delete vfes_filter;
    delete tfec_filter;
    delete tfes_filter;
-   
 }
-*/
 
 // query solver-specific runtime controls
 void LoMachSolver::parseSolverOptions() {
 
-  //if (verbose) grvy_printf(ginfo, "parsing solver options...\n");        
+  //if (verbose) grvy_printf(ginfo, "parsing solver options...\n");
   tpsP_->getRequiredInput("loMach/mesh", loMach_opts_.mesh_file);
   tpsP_->getInput("loMach/order", loMach_opts_.order, 1);
   tpsP_->getInput("loMach/ref_levels", loMach_opts_.ref_levels, 0);
   tpsP_->getInput("loMach/max_iter", loMach_opts_.max_iter, 100);
   tpsP_->getInput("loMach/rtol", loMach_opts_.rtol, 1.0e-6);
-  
-  //tpsP_->getInput("em/atol", em_opts_.atol, 1.0e-10);
-  //tpsP_->getInput("em/preconditioner_background_sigma", em_opts_.preconditioner_background_sigma, -1.0);
-  //tpsP_->getInput("em/evaluate_magnetic_field", em_opts_.evaluate_magnetic_field, true);
-  //tpsP_->getInput("em/nBy", em_opts_.nBy, 0);
-  //tpsP_->getInput("em/yinterp_min", em_opts_.yinterp_min, 0.0);
-  //tpsP_->getInput("em/yinterp_max", em_opts_.yinterp_max, 1.0);
-  //tpsP_->getInput("em/By_file", em_opts_.By_file, std::string("By.h5"));
-  //tpsP_->getInput("em/top_only", em_opts_.top_only, false);
-  //tpsP_->getInput("em/bot_only", em_opts_.bot_only, false);
-
-  //tpsP_->getInput("em/current_amplitude", em_opts_.current_amplitude, 1.0);
-  //tpsP_->getInput("em/current_frequency", em_opts_.current_frequency, 1.0);
-  //tpsP_->getInput("em/permeability", em_opts_.mu0, 1.0);
-
-  //Vector default_axis(3);
-  //default_axis[0] = 0;
-  //default_axis[1] = 1;
-  //default_axis[2] = 0;
-  //tpsP_->getVec("em/current_axis", em_opts_.current_axis, 3, default_axis);
 
   // dump options to screen for user inspection
   if (mpi_.Root()) {
@@ -3461,7 +2336,6 @@ void LoMachSolver::parseSolverOptions() {
 
 ///* move these to separate support class *//
 void LoMachSolver::parseSolverOptions2() {
-  
   //tpsP->getRequiredInput("flow/mesh", config.meshFile);
 
   // flow/numerics
@@ -3476,65 +2350,17 @@ void LoMachSolver::parseSolverOptions2() {
   // I/O settings
   parseIOSettings();
 
-  // RMS job management
-  //parseRMSJobOptions();
-
-  // heat source
-  //parseHeatSrcOptions();
-
-  // viscosity multiplier function
-  //parseViscosityOptions();
-
-  // MMS (check before IC b/c if MMS, IC not required)
-  //parseMMSOptions();
-
   // initial conditions
   //if (!config.use_mms_) { parseICOptions(); }
   parseICOptions();
 
-  // add passive scalar forcings
-  //parsePassiveScalarOptions();
-
   // fluid presets
   parseFluidPreset();
-
-  //parseSystemType();
-
-  // plasma conditions.
-  /*
-  config.gasModel = NUM_GASMODEL;
-  config.transportModel = NUM_TRANSPORTMODEL;
-  config.chemistryModel_ = NUM_CHEMISTRYMODEL;
-  if (config.workFluid == USER_DEFINED) {
-    parsePlasmaModels();
-  } else {
-    // parse options for other plasma presets.
-  }
-  */
-
-  // species list.
-  //parseSpeciesInputs();
-
-  //if (config.workFluid == USER_DEFINED) {  // Transport model
-  //  parseTransportInputs();
-  //}
-
-  // Reaction list
-  //parseReactionInputs();
 
   // changed the order of parsing in order to use species list.
   // boundary conditions. The number of boundaries of each supported type if
   // parsed first. Then, a section corresponding to each defined boundary is parsed afterwards
   parseBCInputs();
-
-  // sponge zone
-  //parseSpongeZoneInputs();
-
-  // Pack up input parameters for device objects.
-  //packUpGasMixtureInput();
-
-  // Radiation model
-  //parseRadiationInputs();
 
   // periodicity
   parsePeriodicInputs();
@@ -3556,15 +2382,12 @@ void LoMachSolver::parseFlowOptions() {
   tpsP_->getInput("loMach/maxIters", config.numIters, 10);
   tpsP_->getInput("loMach/outputFreq", config.itersOut, 50);
   tpsP_->getInput("loMach/timingFreq", config.timingFreq, 100);
-  //tpsP_->getInput("flow/useRoe", config.useRoe, false);
-  //tpsP_->getInput("flow/refLength", config.refLength, 1.0);
   tpsP_->getInput("loMach/viscosityMultiplier", config.visc_mult, 1.0);
   tpsP_->getInput("loMach/bulkViscosityMultiplier", config.bulk_visc, 0.0);
   tpsP_->getInput("loMach/SutherlandC1", config.sutherland_.C1, 1.458e-6);
   tpsP_->getInput("loMach/SutherlandS0", config.sutherland_.S0, 110.4);
   tpsP_->getInput("loMach/SutherlandPr", config.sutherland_.Pr, 0.71);
 
-  //tpsP_->getInput("flow/axisymmetric", config.axisymmetric_, false);
   tpsP_->getInput("loMach/enablePressureForcing", config.isForcing, false);
   if (config.isForcing) {
     for (int d = 0; d < 3; d++) tpsP_->getRequiredVecElem("loMach/pressureGrad", config.gradPress[d], d);
@@ -3588,36 +2411,13 @@ void LoMachSolver::parseFlowOptions() {
   assert(config.numIters >= 0);
   assert(config.itersOut > 0);
   assert(config.refLength > 0);
-
-  // Sutherland inputs default to dry air values
-  /*
-  tpsP_->getInput("flow/SutherlandC1", config.sutherland_.C1, 1.458e-6);
-  tpsP_->getInput("flow/SutherlandS0", config.sutherland_.S0, 110.4);
-  tpsP_->getInput("flow/SutherlandPr", config.sutherland_.Pr, 0.71);
-  */
 }
 
 void LoMachSolver::parseTimeIntegrationOptions() {
-  //std::map<std::string, int> integrators;
-  //integrators["forwardEuler"] = 1;
-  //integrators["rk2"] = 2;
-  //integrators["rk3"] = 3;
-  //integrators["rk4"] = 4;
-  //integrators["rk6"] = 6;
-
-  //std::cout << "getting time options" << endl;
   std::string type;
   tpsP_->getInput("time/cfl", config.cflNum, 0.2);
-  //std::cout << "got cflNum" << config.cflNum << endl;  
-  //tpsP_->getInput("time/integrator", type, std::string("rk4"));
   tpsP_->getInput("time/enableConstantTimestep", config.constantTimeStep, false);
   tpsP_->getInput("time/dt_fixed", config.dt_fixed, -1.);
-  //if (integrators.count(type) == 1) {
-  //  config.timeIntegratorType = integrators[type];
-  //} else {
-  //  grvy_printf(GRVY_ERROR, "Unknown time integrator > %s\n", type.c_str());
-  //  exit(ERROR);
-  //}
 }
 
 void LoMachSolver::parseStatOptions() {
@@ -3628,7 +2428,7 @@ void LoMachSolver::parseStatOptions() {
   tpsP_->getInput("averaging/enableContinuation", config.restartMean, false);
 }
 
-void LoMachSolver::parseIOSettings() {  
+void LoMachSolver::parseIOSettings() {
   tpsP_->getInput("io/outdirBase", config.outputFile, std::string("output-default"));
   tpsP_->getInput("io/enableRestart", config.restart, false);
   tpsP_->getInput("io/exitCheckFreq", config.exit_checkFrequency_, 500);
@@ -3655,77 +2455,6 @@ void LoMachSolver::parseRMSJobOptions() {
   tpsP_->getInput("jobManagement/checkFreq", config.rm_checkFrequency_, 500);     // 500 iterations
 }
 
-/*
-void M2ulPhyS::parseHeatSrcOptions() {
-  int numHeatSources;
-  tpsP->getInput("heatSource/numHeatSources", numHeatSources, 0);
-  config.numHeatSources = numHeatSources;
-
-  if (numHeatSources > 0) {
-    config.numHeatSources = numHeatSources;
-    config.heatSource = new heatSourceData[numHeatSources];
-
-    for (int s = 0; s < numHeatSources; s++) {
-      std::string base("heatSource" + std::to_string(s + 1));
-
-      tpsP->getInput((base + "/isEnabled").c_str(), config.heatSource[s].isEnabled, false);
-
-      if (config.heatSource[s].isEnabled) {
-        tpsP->getRequiredInput((base + "/value").c_str(), config.heatSource[s].value);
-
-        std::string type;
-        tpsP->getRequiredInput((base + "/distribution").c_str(), type);
-        if (type == "cylinder") {
-          config.heatSource[s].type = type;
-        } else {
-          grvy_printf(GRVY_ERROR, "\nUnknown heat source distribution -> %s\n", type.c_str());
-          exit(ERROR);
-        }
-
-        tpsP->getRequiredInput((base + "/radius").c_str(), config.heatSource[s].radius);
-        config.heatSource[s].point1.SetSize(3);
-        config.heatSource[s].point2.SetSize(3);
-
-        tpsP->getRequiredVec((base + "/point1").c_str(), config.heatSource[s].point1, 3);
-        tpsP->getRequiredVec((base + "/point2").c_str(), config.heatSource[s].point2, 3);
-      }
-    }
-  }
-}
-
-void M2ulPhyS::parseViscosityOptions() {
-  tpsP->getInput("viscosityMultiplierFunction/isEnabled", config.linViscData.isEnabled, false);
-  if (config.linViscData.isEnabled) {
-    auto normal = config.linViscData.normal.HostWrite();
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[0], 0);
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[1], 1);
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[2], 2);
-
-    auto point0 = config.linViscData.point0.HostWrite();
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[0], 0);
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[1], 1);
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[2], 2);
-
-    auto pointInit = config.linViscData.pointInit.HostWrite();
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[0], 0);
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[1], 1);
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[2], 2);
-    tpsP->getRequiredInput("viscosityMultiplierFunction/width", config.linViscData.width);
-    tpsP->getRequiredInput("viscosityMultiplierFunction/viscosityRatio", config.linViscData.viscRatio);
-  }
-}
-
-void M2ulPhyS::parseMMSOptions() {
-  tpsP->getInput("mms/isEnabled", config.use_mms_, false);
-
-  if (config.use_mms_) {
-    tpsP->getRequiredInput("mms/name", config.mms_name_);
-    tpsP->getInput("mms/compare_rhs", config.mmsCompareRhs_, false);
-    tpsP->getInput("mms/save_details", config.mmsSaveDetails_, false);
-  }
-}
-*/
-
 void LoMachSolver::parseICOptions() {
   tpsP_->getRequiredInput("initialConditions/rho", config.initRhoRhoVp[0]);
   tpsP_->getRequiredInput("initialConditions/rhoU", config.initRhoRhoVp[1]);
@@ -3733,32 +2462,6 @@ void LoMachSolver::parseICOptions() {
   tpsP_->getRequiredInput("initialConditions/rhoW", config.initRhoRhoVp[3]);
   tpsP_->getRequiredInput("initialConditions/pressure", config.initRhoRhoVp[4]);
 }
-
-/*
-void M2ulPhyS::parsePassiveScalarOptions() {
-  int numForcings;
-  tpsP->getInput("passiveScalars/numScalars", numForcings, 0);
-  for (int i = 1; i <= numForcings; i++) {
-    // add new entry in arrayPassiveScalar
-    config.arrayPassiveScalar.Append(new passiveScalarData);
-    config.arrayPassiveScalar[i - 1]->coords.SetSize(3);
-
-    std::string basepath("passiveScalar" + std::to_string(i));
-
-    Array<double> xyz;
-    tpsP->getRequiredVec((basepath + "/xyz").c_str(), xyz, 3);
-    for (int d = 0; d < 3; d++) config.arrayPassiveScalar[i - 1]->coords[d] = xyz[d];
-
-    double radius;
-    tpsP->getRequiredInput((basepath + "/radius").c_str(), radius);
-    config.arrayPassiveScalar[i - 1]->radius = radius;
-
-    double value;
-    tpsP->getRequiredInput((basepath + "/value").c_str(), value);
-    config.arrayPassiveScalar[i - 1]->value = value;
-  }
-}
-*/
 
 void LoMachSolver::parseFluidPreset() {
   std::string fluidTypeStr;
@@ -3790,528 +2493,7 @@ void LoMachSolver::parseFluidPreset() {
          << endl;
 }
 
-/*
-void M2ulPhyS::parseSystemType() {
-  std::string systemType;
-  tpsP->getInput("flow/equation_system", systemType, std::string("navier-stokes"));
-  if (systemType == "euler") {
-    config.eqSystem = EULER;
-  } else if (systemType == "navier-stokes") {
-    config.eqSystem = NS;
-  } else if (systemType == "navier-stokes-passive") {
-    config.eqSystem = NS_PASSIVE;
-  } else {
-    grvy_printf(GRVY_ERROR, "\nUnknown equation_system -> %s", systemType.c_str());
-    exit(ERROR);
-  }
-}
-
-void M2ulPhyS::parsePlasmaModels() {
-  tpsP->getInput("plasma_models/ambipolar", config.ambipolar, false);
-  tpsP->getInput("plasma_models/two_temperature", config.twoTemperature, false);
-
-  if (config.twoTemperature) {
-    tpsP->getInput("plasma_models/electron_temp_ic", config.initialElectronTemperature, 300.0);
-  } else {
-    config.initialElectronTemperature = -1;
-  }
-
-  std::string gasModelStr;
-  tpsP->getInput("plasma_models/gas_model", gasModelStr, std::string("perfect_mixture"));
-  if (gasModelStr == "perfect_mixture") {
-    config.gasModel = PERFECT_MIXTURE;
-  } else {
-    grvy_printf(GRVY_ERROR, "\nUnknown gas_model -> %s", gasModelStr.c_str());
-    exit(ERROR);
-  }
-
-  std::string transportModelStr;
-  tpsP->getRequiredInput("plasma_models/transport_model", transportModelStr);
-  if (transportModelStr == "argon_minimal") {
-    config.transportModel = ARGON_MINIMAL;
-  } else if (transportModelStr == "argon_mixture") {
-    config.transportModel = ARGON_MIXTURE;
-  } else if (transportModelStr == "constant") {
-    config.transportModel = CONSTANT;
-  }
-  // } else {
-  //   grvy_printf(GRVY_ERROR, "\nUnknown transport_model -> %s", transportModelStr.c_str());
-  //   exit(ERROR);
-  // }
-
-  std::string chemistryModelStr;
-  tpsP->getInput("plasma_models/chemistry_model", chemistryModelStr, std::string(""));
-
-  tpsP->getInput("plasma_models/const_plasma_conductivity", config.const_plasma_conductivity_, 0.0);
-
-  // TODO(kevin): cantera wrapper
-  // if (chemistryModelStr == "cantera") {
-  //   config.chemistryModel_ = ChemistryModel::CANTERA;
-  // }
-}
-
-void M2ulPhyS::parseSpeciesInputs() {
-  // quick return if can't use these inputs
-  if (config.workFluid == LTE_FLUID) {
-    config.numSpecies = 1;
-    return;
-  }
-
-  // Take parameters from input. These will be sorted into config attributes.
-  DenseMatrix inputGasParams;
-  Vector inputCV, inputCP;
-  Vector inputInitialMassFraction;
-  std::vector<std::string> inputSpeciesNames;
-  DenseMatrix inputSpeciesComposition;
-
-  // number of species defined
-  if (config.eqSystem != NS_PASSIVE) {
-    tpsP->getInput("species/numSpecies", config.numSpecies, 1);
-    inputGasParams.SetSize(config.numSpecies, GasParams::NUM_GASPARAMS);
-    inputInitialMassFraction.SetSize(config.numSpecies);
-    inputSpeciesNames.resize(config.numSpecies);
-
-    if (config.gasModel == PERFECT_MIXTURE) {
-      inputCV.SetSize(config.numSpecies);
-      // config.constantMolarCP.SetSize(config.numSpecies);
-    }
-  }
-
-  
-   // NOTE: for now, we force the user to set the background species as the last,
-   // and the electron species as the second to last.
-   
-  config.numAtoms = 0;
-  if ((config.numSpecies > 1) && (config.eqSystem != NS_PASSIVE)) {
-    tpsP->getRequiredInput("species/background_index", config.backgroundIndex);
-
-    tpsP->getRequiredInput("atoms/numAtoms", config.numAtoms);
-    config.atomMW.SetSize(config.numAtoms);
-    for (int a = 1; a <= config.numAtoms; a++) {
-      std::string basepath("atoms/atom" + std::to_string(a));
-
-      std::string atomName;
-      tpsP->getRequiredInput((basepath + "/name").c_str(), atomName);
-      tpsP->getRequiredInput((basepath + "/mass").c_str(), config.atomMW(a - 1));
-      config.atomMap[atomName] = a - 1;
-    }
-  }
-
-  // Gas Params
-  if (config.workFluid != DRY_AIR) {
-    assert(config.numAtoms > 0);
-    inputSpeciesComposition.SetSize(config.numSpecies, config.numAtoms);
-    inputSpeciesComposition = 0.0;
-    for (int i = 1; i <= config.numSpecies; i++) {
-      // double mw, charge;
-      double formEnergy;
-      std::string type, speciesName;
-      std::vector<std::pair<std::string, std::string>> composition;
-      std::string basepath("species/species" + std::to_string(i));
-
-      tpsP->getRequiredInput((basepath + "/name").c_str(), speciesName);
-      inputSpeciesNames[i - 1] = speciesName;
-
-      tpsP->getRequiredPairs((basepath + "/composition").c_str(), composition);
-      for (size_t c = 0; c < composition.size(); c++) {
-        if (config.atomMap.count(composition[c].first)) {
-          int atomIdx = config.atomMap[composition[c].first];
-          inputSpeciesComposition(i - 1, atomIdx) = stoi(composition[c].second);
-        } else {
-          grvy_printf(GRVY_ERROR, "Requested atom %s for species %s is not available!\n", composition[c].first.c_str(),
-                      speciesName.c_str());
-        }
-      }
-
-      tpsP->getRequiredInput((basepath + "/formation_energy").c_str(), formEnergy);
-      inputGasParams(i - 1, GasParams::FORMATION_ENERGY) = formEnergy;
-
-      tpsP->getRequiredInput((basepath + "/initialMassFraction").c_str(), inputInitialMassFraction(i - 1));
-
-      if (config.gasModel == PERFECT_MIXTURE) {
-        tpsP->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(), inputCV(i - 1));
-        // NOTE: For perfect gas, CP will be automatically set from CV.
-      }
-    }
-
-    Vector speciesMass(config.numSpecies), speciesCharge(config.numSpecies);
-    inputSpeciesComposition.Mult(config.atomMW, speciesMass);
-    inputSpeciesComposition.GetColumn(config.atomMap["E"], speciesCharge);
-    speciesCharge *= -1.0;
-    inputGasParams.SetCol(GasParams::SPECIES_MW, speciesMass);
-    inputGasParams.SetCol(GasParams::SPECIES_CHARGES, speciesCharge);
-
-    // Sort the gas params for mixture and save mapping.
-    {
-      config.gasParams.SetSize(config.numSpecies, GasParams::NUM_GASPARAMS);
-      config.initialMassFractions.SetSize(config.numSpecies);
-      config.speciesNames.resize(config.numSpecies);
-      config.constantMolarCV.SetSize(config.numSpecies);
-
-      config.speciesComposition.SetSize(config.numSpecies, config.numAtoms);
-      config.speciesComposition = 0.0;
-
-      // TODO(kevin): electron species is enforced to be included in the input file.
-      bool isElectronIncluded = false;
-
-      config.gasParams = 0.0;
-      int paramIdx = 0;  // new species index.
-      int targetIdx;
-      for (int sp = 0; sp < config.numSpecies; sp++) {  // input file species index.
-        if (sp == config.backgroundIndex - 1) {
-          targetIdx = config.numSpecies - 1;
-        } else if (inputSpeciesNames[sp] == "E") {
-          targetIdx = config.numSpecies - 2;
-          isElectronIncluded = true;
-        } else {
-          targetIdx = paramIdx;
-          paramIdx++;
-        }
-        config.speciesMapping[inputSpeciesNames[sp]] = targetIdx;
-        config.speciesNames[targetIdx] = inputSpeciesNames[sp];
-        config.mixtureToInputMap[targetIdx] = sp;
-        if (mpi.Root()) {
-          std::cout << "name, input index, mixture index: " << config.speciesNames[targetIdx] << ", " << sp << ", "
-                    << targetIdx << std::endl;
-        }
-
-        for (int param = 0; param < GasParams::NUM_GASPARAMS; param++)
-          config.gasParams(targetIdx, param) = inputGasParams(sp, param);
-      }
-      assert(isElectronIncluded);
-
-      for (int sp = 0; sp < config.numSpecies; sp++) {
-        int inputIdx = config.mixtureToInputMap[sp];
-        config.initialMassFractions(sp) = inputInitialMassFraction(inputIdx);
-        config.constantMolarCV(sp) = inputCV(inputIdx);
-        for (int a = 0; a < config.numAtoms; a++)
-          config.speciesComposition(sp, a) = inputSpeciesComposition(inputIdx, a);
-      }
-    }
-  }
-}
-
-void M2ulPhyS::parseTransportInputs() {
-  switch (config.transportModel) {
-    case ARGON_MINIMAL: {
-      // Check if unsupported species are included.
-      for (int sp = 0; sp < config.numSpecies; sp++) {
-        if ((config.speciesNames[sp] != "Ar") && (config.speciesNames[sp] != "Ar.+1") &&
-            (config.speciesNames[sp] != "E")) {
-          grvy_printf(GRVY_ERROR, "\nArgon ternary mixture transport does not support the species: %s !",
-                      config.speciesNames[sp].c_str());
-          exit(ERROR);
-        }
-      }
-      tpsP->getInput("plasma_models/transport_model/argon_minimal/third_order_thermal_conductivity",
-                     config.thirdOrderkElectron, true);
-
-      // pack up argon minimal transport input.
-      {
-        if (config.speciesMapping.count("Ar")) {
-          config.argonTransportInput.neutralIndex = config.speciesMapping["Ar"];
-        } else {
-          grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar' !\n");
-          exit(ERROR);
-        }
-        if (config.speciesMapping.count("Ar.+1")) {
-          config.argonTransportInput.ionIndex = config.speciesMapping["Ar.+1"];
-        } else {
-          grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar.+1' !\n");
-          exit(ERROR);
-        }
-        if (config.speciesMapping.count("E")) {
-          config.argonTransportInput.electronIndex = config.speciesMapping["E"];
-        } else {
-          grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
-          exit(ERROR);
-        }
-
-        config.argonTransportInput.thirdOrderkElectron = config.thirdOrderkElectron;
-
-        // inputs for artificial transport multipliers.
-        {
-          tpsP->getInput("plasma_models/transport_model/artificial_multiplier/enabled",
-                         config.argonTransportInput.multiply, false);
-          if (config.argonTransportInput.multiply) {
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/viscosity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::VISCOSITY], 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/bulk_viscosity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::BULK_VISCOSITY], 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/heavy_thermal_conductivity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY], 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/electron_thermal_conductivity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY], 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/momentum_transfer_frequency",
-                           config.argonTransportInput.spcsTrnsMultiplier[SpeciesTrns::MF_FREQUENCY], 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/diffusivity",
-                           config.argonTransportInput.diffMult, 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/mobility",
-                           config.argonTransportInput.mobilMult, 1.0);
-          }
-        }
-      }
-    } break;
-    case ARGON_MIXTURE: {
-      tpsP->getInput("plasma_models/transport_model/argon_mixture/third_order_thermal_conductivity",
-                     config.thirdOrderkElectron, true);
-
-      // pack up argon transport input.
-      {
-        if (config.speciesMapping.count("E")) {
-          config.argonTransportInput.electronIndex = config.speciesMapping["E"];
-        } else {
-          grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
-          exit(ERROR);
-        }
-
-        config.argonTransportInput.thirdOrderkElectron = config.thirdOrderkElectron;
-
-        Array<ArgonSpcs> speciesType(config.numSpecies);
-        identifySpeciesType(speciesType);
-        identifyCollisionType(speciesType, config.argonTransportInput.collisionIndex);
-
-        // inputs for artificial transport multipliers.
-        {
-          tpsP->getInput("plasma_models/transport_model/artificial_multiplier/enabled",
-                         config.argonTransportInput.multiply, false);
-          if (config.argonTransportInput.multiply) {
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/viscosity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::VISCOSITY], 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/bulk_viscosity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::BULK_VISCOSITY], 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/heavy_thermal_conductivity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY], 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/electron_thermal_conductivity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY], 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/momentum_transfer_frequency",
-                           config.argonTransportInput.spcsTrnsMultiplier[SpeciesTrns::MF_FREQUENCY], 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/diffusivity",
-                           config.argonTransportInput.diffMult, 1.0);
-            tpsP->getInput("plasma_models/transport_model/artificial_multiplier/mobility",
-                           config.argonTransportInput.mobilMult, 1.0);
-          }
-        }
-      }
-    } break;
-    case CONSTANT: {
-      tpsP->getRequiredInput("plasma_models/transport_model/constant/viscosity", config.constantTransport.viscosity);
-      tpsP->getRequiredInput("plasma_models/transport_model/constant/bulk_viscosity",
-                             config.constantTransport.bulkViscosity);
-      tpsP->getRequiredInput("plasma_models/transport_model/constant/thermal_conductivity",
-                             config.constantTransport.thermalConductivity);
-      tpsP->getRequiredInput("plasma_models/transport_model/constant/electron_thermal_conductivity",
-                             config.constantTransport.electronThermalConductivity);
-      std::string diffpath("plasma_models/transport_model/constant/diffusivity");
-      // config.constantTransport.diffusivity.SetSize(config.numSpecies);
-      std::string mtpath("plasma_models/transport_model/constant/momentum_transfer_frequency");
-      // config.constantTransport.mtFreq.SetSize(config.numSpecies);
-      for (int sp = 0; sp < config.numSpecies; sp++) {
-        config.constantTransport.diffusivity[sp] = 0.0;
-        config.constantTransport.mtFreq[sp] = 0.0;
-      }
-      for (int sp = 0; sp < config.numSpecies; sp++) {  // mixture species index.
-        int inputSp = config.mixtureToInputMap[sp];
-        tpsP->getRequiredInput((diffpath + "/species" + std::to_string(inputSp + 1)).c_str(),
-                               config.constantTransport.diffusivity[sp]);
-        if (config.twoTemperature)
-          tpsP->getRequiredInput((mtpath + "/species" + std::to_string(inputSp + 1)).c_str(),
-                                 config.constantTransport.mtFreq[sp]);
-      }
-      config.constantTransport.electronIndex = -1;
-      if (config.IsTwoTemperature()) {
-        if (config.speciesMapping.count("E")) {
-          config.constantTransport.electronIndex = config.speciesMapping["E"];
-        } else {
-          grvy_printf(GRVY_ERROR, "\nConstant transport: two-temperature plasma requires the species 'E' !\n");
-          exit(ERROR);
-        }
-      }
-    } break;
-    default:
-      break;
-  }
-}
-
-void M2ulPhyS::parseReactionInputs() {
-  tpsP->getInput("reactions/number_of_reactions", config.numReactions, 0);
-  if (config.numReactions > 0) {
-    assert((config.workFluid != DRY_AIR) && (config.numSpecies > 1));
-    config.reactionEnergies.SetSize(config.numReactions);
-    config.reactionEquations.resize(config.numReactions);
-    config.reactionModels.SetSize(config.numReactions);
-    config.reactantStoich.SetSize(config.numSpecies, config.numReactions);
-    config.productStoich.SetSize(config.numSpecies, config.numReactions);
-
-    // config.reactionModelParams.resize(config.numReactions);
-    config.detailedBalance.SetSize(config.numReactions);
-    // config.equilibriumConstantParams.resize(config.numReactions);
-  }
-  config.rxnModelParamsHost.clear();
-
-  for (int r = 1; r <= config.numReactions; r++) {
-    std::string basepath("reactions/reaction" + std::to_string(r));
-
-    std::string equation, model;
-    tpsP->getRequiredInput((basepath + "/equation").c_str(), equation);
-    config.reactionEquations[r - 1] = equation;
-    tpsP->getRequiredInput((basepath + "/model").c_str(), model);
-
-    double energy;
-    tpsP->getRequiredInput((basepath + "/reaction_energy").c_str(), energy);
-    config.reactionEnergies[r - 1] = energy;
-
-    // NOTE: reaction inputs are stored directly into ChemistryInput.
-    // Initialize the pointers with null.
-    config.chemistryInput.reactionInputs[r - 1].modelParams = NULL;
-
-    if (model == "arrhenius") {
-      config.reactionModels[r - 1] = ARRHENIUS;
-
-      double A, b, E;
-      tpsP->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
-      tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
-      tpsP->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
-      config.rxnModelParamsHost.push_back(Vector({A, b, E}));
-
-    } else if (model == "hoffert_lien") {
-      config.reactionModels[r - 1] = HOFFERTLIEN;
-      double A, b, E;
-      tpsP->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
-      tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
-      tpsP->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
-      config.rxnModelParamsHost.push_back(Vector({A, b, E}));
-
-    } else if (model == "tabulated") {
-      config.reactionModels[r - 1] = TABULATED_RXN;
-      std::string inputPath(basepath + "/tabulated");
-      readTable(inputPath, config.chemistryInput.reactionInputs[r - 1].tableInput);
-    } else {
-      grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
-      exit(ERROR);
-    }
-
-    bool detailedBalance;
-    tpsP->getInput((basepath + "/detailed_balance").c_str(), detailedBalance, false);
-    config.detailedBalance[r - 1] = detailedBalance;
-    if (detailedBalance) {
-      double A, b, E;
-      tpsP->getRequiredInput((basepath + "/equilibrium_constant/A").c_str(), A);
-      tpsP->getRequiredInput((basepath + "/equilibrium_constant/b").c_str(), b);
-      tpsP->getRequiredInput((basepath + "/equilibrium_constant/E").c_str(), E);
-
-      // NOTE(kevin): this array keeps max param in the indexing, as reactions can have different number of params.
-      config.equilibriumConstantParams[0 + (r - 1) * gpudata::MAXCHEMPARAMS] = A;
-      config.equilibriumConstantParams[1 + (r - 1) * gpudata::MAXCHEMPARAMS] = b;
-      config.equilibriumConstantParams[2 + (r - 1) * gpudata::MAXCHEMPARAMS] = E;
-    }
-
-    Array<double> stoich(config.numSpecies);
-    tpsP->getRequiredVec((basepath + "/reactant_stoichiometry").c_str(), stoich, config.numSpecies);
-    for (int sp = 0; sp < config.numSpecies; sp++) {
-      int inputSp = config.mixtureToInputMap[sp];
-      config.reactantStoich(sp, r - 1) = stoich[inputSp];
-    }
-    tpsP->getRequiredVec((basepath + "/product_stoichiometry").c_str(), stoich, config.numSpecies);
-    for (int sp = 0; sp < config.numSpecies; sp++) {
-      int inputSp = config.mixtureToInputMap[sp];
-      config.productStoich(sp, r - 1) = stoich[inputSp];
-    }
-  }
-
-  // check conservations.
-  {
-    const int numReactions_ = config.numReactions;
-    const int numSpecies_ = config.numSpecies;
-    for (int r = 0; r < numReactions_; r++) {
-      Vector react(numSpecies_), product(numSpecies_);
-      config.reactantStoich.GetColumn(r, react);
-      config.productStoich.GetColumn(r, product);
-
-      // atom conservation.
-      DenseMatrix composition;
-      composition.Transpose(config.speciesComposition);
-      Vector reactAtom(config.numAtoms), prodAtom(config.numAtoms);
-      composition.Mult(react, reactAtom);
-      composition.Mult(product, prodAtom);
-      for (int a = 0; a < config.numAtoms; a++) {
-        if (reactAtom(a) != prodAtom(a)) {
-          grvy_printf(GRVY_ERROR, "Reaction %d does not conserve atom %d.\n", r, a);
-          exit(-1);
-        }
-      }
-
-      // mass conservation. (already ensured with atom but checking again.)
-      double reactMass = 0.0, prodMass = 0.0;
-      for (int sp = 0; sp < numSpecies_; sp++) {
-        // int inputSp = (*mixtureToInputMap_)[sp];
-        reactMass += react(sp) * config.gasParams(sp, SPECIES_MW);
-        prodMass += product(sp) * config.gasParams(sp, SPECIES_MW);
-      }
-      // This may be too strict..
-      if (abs(reactMass - prodMass) > 1.0e-15) {
-        grvy_printf(GRVY_ERROR, "Reaction %d does not conserve mass.\n", r);
-        grvy_printf(GRVY_ERROR, "%.8E =/= %.8E\n", reactMass, prodMass);
-        exit(-1);
-      }
-
-      // energy conservation.
-      // TODO(kevin): this will need an adjustion when radiation comes into play.
-      double reactEnergy = 0.0, prodEnergy = 0.0;
-      for (int sp = 0; sp < numSpecies_; sp++) {
-        // int inputSp = (*mixtureToInputMap_)[sp];
-        reactEnergy += react(sp) * config.gasParams(sp, FORMATION_ENERGY);
-        prodEnergy += product(sp) * config.gasParams(sp, FORMATION_ENERGY);
-      }
-      // This may be too strict..
-      if (reactEnergy + config.reactionEnergies[r] != prodEnergy) {
-        grvy_printf(GRVY_ERROR, "Reaction %d does not conserve energy.\n", r);
-        grvy_printf(GRVY_ERROR, "%.8E + %.8E = %.8E =/= %.8E\n", reactEnergy, config.reactionEnergies[r],
-                    reactEnergy + config.reactionEnergies[r], prodEnergy);
-        exit(-1);
-      }
-    }
-  }
-
-  // Pack up chemistry input for instantiation.
-  {
-    config.chemistryInput.model = config.chemistryModel_;
-    const int numSpecies = config.numSpecies;
-    if (config.speciesMapping.count("E")) {
-      config.chemistryInput.electronIndex = config.speciesMapping["E"];
-    } else {
-      config.chemistryInput.electronIndex = -1;
-    }
-
-    int rxn_param_idx = 0;
-
-    config.chemistryInput.numReactions = config.numReactions;
-    for (int r = 0; r < config.numReactions; r++) {
-      config.chemistryInput.reactionEnergies[r] = config.reactionEnergies[r];
-      config.chemistryInput.detailedBalance[r] = config.detailedBalance[r];
-      for (int sp = 0; sp < config.numSpecies; sp++) {
-        config.chemistryInput.reactantStoich[sp + r * numSpecies] = config.reactantStoich(sp, r);
-        config.chemistryInput.productStoich[sp + r * numSpecies] = config.productStoich(sp, r);
-      }
-
-      config.chemistryInput.reactionModels[r] = config.reactionModels[r];
-      for (int p = 0; p < gpudata::MAXCHEMPARAMS; p++) {
-        config.chemistryInput.equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS] =
-            config.equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS];
-      }
-
-      if (config.reactionModels[r] != TABULATED_RXN) {
-        assert(rxn_param_idx < config.rxnModelParamsHost.size());
-        config.chemistryInput.reactionInputs[r].modelParams = config.rxnModelParamsHost[rxn_param_idx].Read();
-        rxn_param_idx += 1;
-      }
-    }
-  }
-}
-*/
-
 void LoMachSolver::parseBCInputs() {
-  
   // number of BC regions defined
   // int numWalls, numInlets, numOutlets;
   tpsP_->getInput("boundaryConditions/numWalls", numWalls, 0);
@@ -4499,85 +2681,6 @@ void LoMachSolver::parseBCInputs() {
   }
 }
 
-/*
-void M2ulPhyS::parseSpongeZoneInputs() {
-  tpsP->getInput("spongezone/numSpongeZones", config.numSpongeRegions_, 0);
-
-  if (config.numSpongeRegions_ > 0) {
-    config.spongeData_ = new SpongeZoneData[config.numSpongeRegions_];
-
-    for (int sz = 0; sz < config.numSpongeRegions_; sz++) {
-      std::string base("spongezone" + std::to_string(sz + 1));
-
-      std::string type;
-      tpsP->getInput((base + "/type").c_str(), type, std::string("none"));
-
-      if (type == "none") {
-        grvy_printf(GRVY_ERROR, "\nUnknown sponge zone type -> %s\n", type.c_str());
-        exit(ERROR);
-      } else if (type == "planar") {
-        config.spongeData_[sz].szType = SpongeZoneType::PLANAR;
-      } else if (type == "annulus") {
-        config.spongeData_[sz].szType = SpongeZoneType::ANNULUS;
-
-        tpsP->getInput((base + "/r1").c_str(), config.spongeData_[sz].r1, 0.);
-        tpsP->getInput((base + "/r2").c_str(), config.spongeData_[sz].r2, 0.);
-      }
-
-      config.spongeData_[sz].normal.SetSize(3);
-      config.spongeData_[sz].point0.SetSize(3);
-      config.spongeData_[sz].pointInit.SetSize(3);
-      config.spongeData_[sz].targetUp.SetSize(5 + config.numSpecies + 2);  // always large enough now
-
-      tpsP->getRequiredVec((base + "/normal").c_str(), config.spongeData_[sz].normal, 3);
-      tpsP->getRequiredVec((base + "/p0").c_str(), config.spongeData_[sz].point0, 3);
-      tpsP->getRequiredVec((base + "/pInit").c_str(), config.spongeData_[sz].pointInit, 3);
-      tpsP->getInput((base + "/tolerance").c_str(), config.spongeData_[sz].tol, 1e-5);
-      tpsP->getInput((base + "/multiplier").c_str(), config.spongeData_[sz].multFactor, 1.0);
-
-      tpsP->getRequiredInput((base + "/targetSolType").c_str(), type);
-      if (type == "userDef") {
-        config.spongeData_[sz].szSolType = SpongeZoneSolution::USERDEF;
-        auto hup = config.spongeData_[sz].targetUp.HostWrite();
-        tpsP->getRequiredInput((base + "/density").c_str(), hup[0]);   // rho
-        tpsP->getRequiredVecElem((base + "/uvw").c_str(), hup[1], 0);  // u
-        tpsP->getRequiredVecElem((base + "/uvw").c_str(), hup[2], 1);  // v
-        tpsP->getRequiredVecElem((base + "/uvw").c_str(), hup[3], 2);  // w
-        tpsP->getRequiredInput((base + "/pressure").c_str(), hup[4]);  // P
-
-        // For multi-component gas, require (numActiveSpecies)-more inputs.
-        if (config.workFluid != DRY_AIR) {
-          if (config.numSpecies > 1) {
-            grvy_printf(GRVY_INFO, "\nInlet mass fraction of background species will not be used. \n");
-            if (config.ambipolar) grvy_printf(GRVY_INFO, "\nInlet mass fraction of electron will not be used. \n");
-
-            for (int sp = 0; sp < config.numSpecies; sp++) {  // mixture species index.
-              // read mass fraction of species as listed in the input file.
-              int inputSp = config.mixtureToInputMap[sp];
-              std::string speciesBasePath(base + "/mass_fraction/species" + std::to_string(inputSp + 1));
-              tpsP->getRequiredInput(speciesBasePath.c_str(), hup[5 + sp]);
-            }
-          }
-
-          if (config.twoTemperature) {
-            tpsP->getInput((base + "/single_temperature").c_str(), config.spongeData_[sz].singleTemperature, false);
-            if (!config.spongeData_[sz].singleTemperature) {
-              tpsP->getRequiredInput((base + "/electron_temperature").c_str(), hup[5 + config.numSpecies]);  // P
-            }
-          }
-        }
-
-      } else if (type == "mixedOut") {
-        config.spongeData_[sz].szSolType = SpongeZoneSolution::MIXEDOUT;
-      } else {
-        grvy_printf(GRVY_ERROR, "\nUnknown sponge zone type -> %s\n", type.c_str());
-        exit(ERROR);
-      }
-    }
-  }
-}
-*/
-
 void LoMachSolver::parsePostProcessVisualizationInputs() {
   if (tpsP_->isVisualizationMode()) {
     tpsP_->getRequiredInput("post-process/visualization/prefix", config.postprocessInput.prefix);
@@ -4587,36 +2690,6 @@ void LoMachSolver::parsePostProcessVisualizationInputs() {
   }
 }
 
-/*
-void M2ulPhyS::parseRadiationInputs() {
-  std::string type;
-  std::string basepath("plasma_models/radiation_model");
-
-  tpsP->getInput(basepath.c_str(), type, std::string("none"));
-  std::string modelInputPath(basepath + "/" + type);
-
-  if (type == "net_emission") {
-    config.radiationInput.model = NET_EMISSION;
-
-    std::string coefficientType;
-    tpsP->getRequiredInput((modelInputPath + "/coefficient").c_str(), coefficientType);
-    if (coefficientType == "tabulated") {
-      config.radiationInput.necModel = TABULATED_NEC;
-      std::string inputPath(modelInputPath + "/tabulated");
-      readTable(inputPath, config.radiationInput.necTableInput);
-    } else {
-      grvy_printf(GRVY_ERROR, "\nUnknown net emission coefficient type -> %s\n", coefficientType.c_str());
-      exit(ERROR);
-    }
-  } else if (type == "none") {
-    config.radiationInput.model = NONE_RAD;
-  } else {
-    grvy_printf(GRVY_ERROR, "\nUnknown radiation model -> %s\n", type.c_str());
-    exit(ERROR);
-  }
-}
-*/
-
 void LoMachSolver::parsePeriodicInputs() {
   tpsP_->getInput("periodicity/enablePeriodic", config.periodic, false);
   tpsP_->getInput("periodicity/xTrans", config.xTrans, 1.0e12);
@@ -4624,263 +2697,20 @@ void LoMachSolver::parsePeriodicInputs() {
   tpsP_->getInput("periodicity/zTrans", config.zTrans, 1.0e12);
 }
 
-/*
-void M2ulPhyS::packUpGasMixtureInput() {
-  if (config.workFluid == DRY_AIR) {
-    config.dryAirInput.f = config.workFluid;
-    config.dryAirInput.eq_sys = config.eqSystem;
-#if defined(_HIP_)
-    config.dryAirInput.visc_mult = config.visc_mult;
-    config.dryAirInput.bulk_visc_mult = config.bulk_visc;
-#endif
-  } else if (config.workFluid == USER_DEFINED) {
-    switch (config.gasModel) {
-      case PERFECT_MIXTURE: {
-        config.perfectMixtureInput.f = config.workFluid;
-        config.perfectMixtureInput.numSpecies = config.numSpecies;
-        if (config.speciesMapping.count("E")) {
-          config.perfectMixtureInput.isElectronIncluded = true;
-        } else {
-          config.perfectMixtureInput.isElectronIncluded = false;
-        }
-        config.perfectMixtureInput.ambipolar = config.ambipolar;
-        config.perfectMixtureInput.twoTemperature = config.twoTemperature;
-
-        for (int sp = 0; sp < config.numSpecies; sp++) {
-          for (int param = 0; param < (int)GasParams::NUM_GASPARAMS; param++) {
-            config.perfectMixtureInput.gasParams[sp + param * config.numSpecies] = config.gasParams(sp, param);
-          }
-          config.perfectMixtureInput.molarCV[sp] = config.constantMolarCV(sp);
-        }
-      } break;
-      default:
-        grvy_printf(GRVY_ERROR, "Gas model is not specified!\n");
-        exit(ERROR);
-        break;
-    }  // switch gasModel
-  } else if (config.workFluid == LTE_FLUID) {
-    config.lteMixtureInput.f = config.workFluid;
-    // config.lteMixtureInput.thermo_file_name // already set in parseFluidPreset
-    assert(config.numSpecies == 1);  // inconsistent to specify lte and carry species
-    assert(!config.twoTemperature);  // inconsistent to specify lte and have two temperatures
-  }
-}
-*/
-
-
 /// HERE HERE HERE
 void LoMachSolver::initSolutionAndVisualizationVectors() {
-
-  //std::cout << " In initSol&Viz..." << endl;
   visualizationVariables_.clear();
-  //std::cout << " check 1..." << endl;  
   visualizationNames_.clear();
-  //std::cout << " check 2..." << endl;    
 
   offsets = new Array<int>(num_equation + 1);
-  //std::cout << " check 2a..." << endl;      
   for (int k = 0; k <= num_equation; k++) {
     (*offsets)[k] = k * fvfes->GetNDofs();
   }
-  //std::cout << " check 3..." << endl;    
   u_block = new BlockVector(*offsets);
-  //std::cout << " check 4..." << endl;    
   up_block = new BlockVector(*offsets);
-  //std::cout << " check 5..." << endl;    
-
-  // gradUp.SetSize(num_equation*dim*vfes->GetNDofs());
-  //gradUp = new ParGridFunction(gradUpfes);
 
   U = new ParGridFunction(fvfes, u_block->HostReadWrite());
-  //std::cout << " check 6..." << endl;    
   Up = new ParGridFunction(fvfes, up_block->HostReadWrite());
-  //std::cout << " check 7..." << endl;
-  
-  //dens = new ParGridFunction(rfes, Up->HostReadWrite());
-  //vel = new ParGridFunction(vfes, Up->HostReadWrite() + rfes->GetNDofs());
-  //std::cout << " check 8..." << endl;    
-  //temperature = new ParGridFunction(tfes, Up->HostReadWrite() + (1 + nvel) * tfes->GetNDofs()); // this may break...
-  //std::cout << " check 9..." << endl;    
-  //press = new ParGridFunction(pfes);
-  //std::cout << " check 10..." << endl;    
-
-
-  //if (config.isAxisymmetric()) {
-  //  vtheta = new ParGridFunction(fes, Up->HostReadWrite() + 3 * fes->GetNDofs());
-  //} else {
-  //  vtheta = NULL;
-  //}
-
-  //electron_temp_field = NULL;
-  //if (config.twoTemperature) {
-  //  electron_temp_field = new ParGridFunction(fes, Up->HostReadWrite() + (num_equation - 1) * fes->GetNDofs());
-  //}
-
-  /*
-  passiveScalar = NULL;
-  if (eqSystem == NS_PASSIVE) {
-    passiveScalar = new ParGridFunction(fes, Up->HostReadWrite() + (num_equation - 1) * fes->GetNDofs());
-  } else {
-    // TODO(kevin): for now, keep the number of primitive variables same as conserved variables.
-    // will need to add full list of species.
-    for (int sp = 0; sp < numActiveSpecies; sp++) {
-      std::string speciesName = config.speciesNames[sp];
-      visualizationVariables_.push_back(
-          new ParGridFunction(fes, U->HostReadWrite() + (sp + nvel + 2) * fes->GetNDofs()));
-      visualizationNames_.push_back(std::string("partial_density_" + speciesName));
-    }
-  }
-  */
-
-  // add visualization variables if tps is run on post-process visualization mode.
-  // TODO(kevin): maybe enable users to specify what to visualize.
-  /*
-  if (tpsP->isVisualizationMode()) {
-    if (config.workFluid != DRY_AIR) {
-      // species primitives.
-      visualizationIndexes_.Xsp = visualizationVariables_.size();
-      for (int sp = 0; sp < numSpecies; sp++) {
-        std::string speciesName = config.speciesNames[sp];
-        visualizationVariables_.push_back(new ParGridFunction(fes));
-        visualizationNames_.push_back(std::string("X_" + speciesName));
-      }
-      visualizationIndexes_.Ysp = visualizationVariables_.size();
-      for (int sp = 0; sp < numSpecies; sp++) {
-        std::string speciesName = config.speciesNames[sp];
-        visualizationVariables_.push_back(new ParGridFunction(fes));
-        visualizationNames_.push_back(std::string("Y_" + speciesName));
-      }
-      visualizationIndexes_.nsp = visualizationVariables_.size();
-      for (int sp = 0; sp < numSpecies; sp++) {
-        std::string speciesName = config.speciesNames[sp];
-        visualizationVariables_.push_back(new ParGridFunction(fes));
-        visualizationNames_.push_back(std::string("n_" + speciesName));
-      }
-
-      // transport properties.
-      visualizationIndexes_.FluxTrns = visualizationVariables_.size();
-      for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++) {
-        std::string fieldName;
-        switch (t) {
-          case FluxTrns::VISCOSITY:
-            fieldName = "viscosity";
-            break;
-          case FluxTrns::BULK_VISCOSITY:
-            fieldName = "bulk_viscosity";
-            break;
-          case FluxTrns::HEAVY_THERMAL_CONDUCTIVITY:
-            fieldName = "thermal_cond_heavy";
-            break;
-          case FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY:
-            fieldName = "thermal_cond_elec";
-            break;
-          default:
-            grvy_printf(GRVY_ERROR, "Error in initializing visualization: Unknown flux transport property!");
-            exit(ERROR);
-            break;
-        }
-        visualizationVariables_.push_back(new ParGridFunction(fes));
-        visualizationNames_.push_back(fieldName);
-      }
-      visualizationIndexes_.diffVel = visualizationVariables_.size();
-      for (int sp = 0; sp < numSpecies; sp++) {
-        std::string speciesName = config.speciesNames[sp];
-        visualizationVariables_.push_back(new ParGridFunction(nvelfes));
-        visualizationNames_.push_back(std::string("diff_vel_" + speciesName));
-      }
-      visualizationIndexes_.SrcTrns = visualizationVariables_.size();
-      for (int t = 0; t < SrcTrns::NUM_SRC_TRANS; t++) {
-        std::string fieldName;
-        switch (t) {
-          case SrcTrns::ELECTRIC_CONDUCTIVITY:
-            fieldName = "electric_cond";
-            break;
-          default:
-            grvy_printf(GRVY_ERROR, "Error in initializing visualization: Unknown source transport property!");
-            exit(ERROR);
-            break;
-        }
-        visualizationVariables_.push_back(new ParGridFunction(fes));
-        visualizationNames_.push_back(fieldName);
-      }
-      visualizationIndexes_.SpeciesTrns = visualizationVariables_.size();
-      for (int t = 0; t < SpeciesTrns::NUM_SPECIES_COEFFS; t++) {
-        std::string fieldName;
-        switch (t) {
-          case SpeciesTrns::MF_FREQUENCY:
-            fieldName = "momentum_tranfer_freq";
-            break;
-          default:
-            grvy_printf(GRVY_ERROR, "Error in initializing visualization: Unknown species transport property!");
-            exit(ERROR);
-            break;
-        }
-        for (int sp = 0; sp < numSpecies; sp++) {
-          std::string speciesName = config.speciesNames[sp];
-          visualizationVariables_.push_back(new ParGridFunction(fes));
-          visualizationNames_.push_back(std::string(fieldName + "_" + speciesName));
-        }
-      }
-
-      // chemistry reaction rates.
-      visualizationIndexes_.rxn = visualizationVariables_.size();
-      for (int r = 0; r < config.numReactions; r++) {
-        visualizationVariables_.push_back(new ParGridFunction(fes));
-        visualizationNames_.push_back(std::string("rxn_rate_" + std::to_string(r + 1)));
-        // visualizationNames_.push_back(std::string("rxn_rate: " + config.reactionEquations[r]));
-      }
-    }  // if (config.workFluid != DRY_AIR)
-  }    // if tpsP->isVisualizationMode()
-
-  // If mms, add conserved and exact solution.
-#ifdef HAVE_MASA
-  if (config.use_mms_ && config.mmsSaveDetails_) {
-    // for visualization.
-    masaUBlock_ = new BlockVector(*offsets);
-    masaU_ = new ParGridFunction(vfes, masaUBlock_->HostReadWrite());
-    masaRhs_ = new ParGridFunction(*U);
-
-    for (int eq = 0; eq < num_equation; eq++) {
-      visualizationVariables_.push_back(new ParGridFunction(fes, U->HostReadWrite() + eq * fes->GetNDofs()));
-      visualizationNames_.push_back(std::string("U" + std::to_string(eq)));
-    }
-    for (int eq = 0; eq < num_equation; eq++) {
-      visualizationVariables_.push_back(new ParGridFunction(fes, masaU_->HostReadWrite() + eq * fes->GetNDofs()));
-      visualizationNames_.push_back(std::string("mms_U" + std::to_string(eq)));
-    }
-    for (int eq = 0; eq < num_equation; eq++) {
-      visualizationVariables_.push_back(new ParGridFunction(fes, masaRhs_->HostReadWrite() + eq * fes->GetNDofs()));
-      visualizationNames_.push_back(std::string("RHS" + std::to_string(eq)));
-    }
-  }
-#endif
-
-  plasma_conductivity_ = NULL;
-  if (tpsP->isFlowEMCoupled()) {
-    plasma_conductivity_ = new ParGridFunction(fes);
-    *plasma_conductivity_ = 0.0;
-  }
-
-  joule_heating_ = NULL;
-  if (tpsP->isFlowEMCoupled()) {
-    joule_heating_ = new ParGridFunction(fes);
-    *joule_heating_ = 0.0;
-  }
-  */
-
-  // define solution parameters for i/o
-  /*
-  ioData.registerIOFamily("Solution state variables", "/solution", U);
-  ioData.registerIOVar("/solution", "density", 0);
-  ioData.registerIOVar("/solution", "rho-u", 1);
-  ioData.registerIOVar("/solution", "rho-v", 2);
-  if (nvel == 3) {
-    ioData.registerIOVar("/solution", "rho-w", 3);
-    ioData.registerIOVar("/solution", "rho-E", 4);
-  } else {
-    ioData.registerIOVar("/solution", "rho-E", 3);
-  }
-  */
 
   ioData.registerIOFamily("Solution state variables", "/solution", Up);
   ioData.registerIOVar("/solution", "density", 0);
@@ -4892,92 +2722,7 @@ void LoMachSolver::initSolutionAndVisualizationVectors() {
   } else {
     ioData.registerIOVar("/solution", "temperature", 3);
   }
-
-  
-  /*
-  // TODO(kevin): for now, keep the number of primitive variables same as conserved variables.
-  // will need to add full list of species.
-  for (int sp = 0; sp < numActiveSpecies; sp++) {
-    // Only for NS_PASSIVE.
-    if ((eqSystem == NS_PASSIVE) && (sp == 1)) break;
-
-    std::string speciesName = config.speciesNames[sp];
-    ioData.registerIOVar("/solution", "rho-Y_" + speciesName, sp + nvel + 2);
-  }
-
-  if (config.twoTemperature) {
-    ioData.registerIOVar("/solution", "rhoE_e", num_equation - 1);
-  }
-  */
-
-  // compute factor to multiply viscosity when this option is active
-  /*
-  spaceVaryViscMult = NULL;
-  ParGridFunction coordsDof(dfes);
-  mesh->GetNodes(coordsDof);
-  if (config.linViscData.isEnabled) {
-    spaceVaryViscMult = new ParGridFunction(fes);
-    double *viscMult = spaceVaryViscMult->HostWrite();
-    double wgt = 0.;
-    for (int n = 0; n < fes->GetNDofs(); n++) {
-      auto hcoords = coordsDof.HostRead();  // get coords
-
-      double coords[3];
-      for (int d = 0; d < dim; d++) {
-        coords[d] = hcoords[n + d * vfes->GetNDofs()];
-      }
-
-      fluxClass->viscSpongePlanar(coords, wgt);
-      viscMult[n] = wgt;
-    }
-  }
-  */
-
-  /*
-  paraviewColl->SetCycle(0);
-  //std::cout << " check 15..." << endl;      
-  paraviewColl->SetTime(0.);
-  //std::cout << " check 16..." << endl;      
-
-  paraviewColl->RegisterField("dens", dens);
-  paraviewColl->RegisterField("vel", vel);
-  //std::cout << " check 17..." << endl;      
-  paraviewColl->RegisterField("temp", temperature);
-  //std::cout << " check 18..." << endl;      
-  paraviewColl->RegisterField("press", press);
-  //std::cout << " check 19..." << endl;
-  */
-  
-  //if (config.isAxisymmetric()) {
-  //  paraviewColl->RegisterField("vtheta", vtheta);
-  //}
-  
-  //if (eqSystem == NS_PASSIVE) {
-  //  paraviewColl->RegisterField("passiveScalar", passiveScalar);
-  //}
-
-  //if (config.twoTemperature) {
-  //  paraviewColl->RegisterField("Te", electron_temp_field);
-  //}
-
-  /*
-  for (int var = 0; var < visualizationVariables_.size(); var++) {
-    paraviewColl->RegisterField(visualizationNames_[var], visualizationVariables_[var]);
-  }
-  //std::cout << " check 20..." << endl;    
-
-  //if (spaceVaryViscMult != NULL) paraviewColl->RegisterField("viscMult", spaceVaryViscMult);
-  //if (distance_ != NULL) paraviewColl->RegisterField("distance", distance_);
-
-  paraviewColl->SetOwnData(true);
-  //paraviewColl->Save(); 
-  //std::cout << " check 21..." << endl;
-  */
-  
 }
-
-
-
 
 ///* temporary, remove when hooked up *//
 double mesh_stretching_func(const double y)
