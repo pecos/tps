@@ -38,9 +38,9 @@
 #include "mfem.hpp"
 //#include "communication.hpp"
 
-//#ifdef HAVE_MPI_EXT
+#ifdef HAVE_MPI_EXT
 #include <mpi-ext.h>
-//#endif
+#endif
 
 #include <sys/types.h>
 #include <unistd.h>
