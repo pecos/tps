@@ -209,8 +209,11 @@ void LoMachSolver::initialize() {
   eqSystem = config.GetEquationSystem();
   mixture = NULL;
 
-
   // HARD CODE
+  config.dryAirInput.specific_heat_ratio = 1.4;
+  config.dryAirInput.gas_constant = 287.058;
+  config.dryAirInput.f = config.workFluid;
+  config.dryAirInput.eq_sys = config.eqSystem;  
   mixture = new DryAir(config, dim, nvel);  // conditional jump, must be using something in config that wasnt parsed?
   transportPtr = new DryAirTransport(mixture, config);
   
@@ -558,10 +561,8 @@ void LoMachSolver::initialize() {
    pn = 0.0;
    resp.SetSize(pfes_truevsize);
    resp = 0.0;
-   //FText_bdr.SetSize(pfes_truevsize);
-   FText_bdr.SetSize(vfes_truevsize);
-   //g_bdr.SetSize(pfes_truevsize);
-   g_bdr.SetSize(vfes_truevsize);
+   FText_bdr.SetSize(pfes_truevsize);
+   g_bdr.SetSize(pfes_truevsize);
 
    pnBig.SetSize(tfes_truevsize);
    pnBig = 0.0;   
@@ -994,7 +995,8 @@ void LoMachSolver::Setup(double dt)
    
    // viscosity field
    //ParGridFunction buffer2(vfes); // or pfes here?
-   bufferVisc = new ParGridFunction(vfes);
+   //bufferVisc = new ParGridFunction(vfes);
+   bufferVisc = new ParGridFunction(pfes);
    {
      double *data = bufferVisc->HostReadWrite();
      double *Tdata = Tn.HostReadWrite();     
@@ -1002,12 +1004,13 @@ void LoMachSolver::Setup(double dt)
      double prim[nvel+2];
      for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
      for (int i = 0; i < Tdof; i++) {
-       for (int eq = 0; eq < nvel; eq++) {
+       //for (int eq = 0; eq < nvel; eq++) {
          prim[1+nvel] = Tdata[i];
          transportPtr->GetViscosities(prim, prim, visc);
-         data[i + eq * Tdof] = visc[0];	   
+	 data[i] = visc[0];	   
+         //data[i + eq * Tdof] = visc[0];	   
          //data[i + eq * Tdof] = kin_vis; // static value
-       }
+	 //}
      }
    }
    //GridFunctionCoefficient viscField(&buffer2);
@@ -1021,8 +1024,8 @@ void LoMachSolver::Setup(double dt)
    H_form = new ParBilinearForm(vfes);
    //H_form = new ParBilinearForm(pfes); // maybe?
    auto *hmv_blfi = new VectorMassIntegrator(H_bdfcoeff); // diagonal from unsteady term
-   auto *hdv_blfi = new VectorDiffusionIntegrator(H_lincoeff);
-   //auto *hdv_blfi = new VectorDiffusionIntegrator(*viscField); // Laplacian
+   //auto *hdv_blfi = new VectorDiffusionIntegrator(H_lincoeff);
+   auto *hdv_blfi = new VectorDiffusionIntegrator(*viscField); // Laplacian
    if (numerical_integ)
    {
       hmv_blfi->SetIntRule(&ir_ni);
@@ -1040,15 +1043,15 @@ void LoMachSolver::Setup(double dt)
    
    // boundary terms   
    FText_gfcoeff = new VectorGridFunctionCoefficient(&FText_gf);
-   //FText_bdr_form = new ParLinearForm(pfes);
-   FText_bdr_form = new ParLinearForm(vfes); // maybe?
+   FText_bdr_form = new ParLinearForm(pfes);
+   //FText_bdr_form = new ParLinearForm(vfes); // maybe?
    auto *ftext_bnlfi = new BoundaryNormalLFIntegrator(*FText_gfcoeff);
    if (numerical_integ) { ftext_bnlfi->SetIntRule(&ir_ni); }
    FText_bdr_form->AddBoundaryIntegrator(ftext_bnlfi, vel_ess_attr);
    // std::cout << "Check 14..." << std::endl;     
 
-   g_bdr_form = new ParLinearForm(vfes); //? was pfes
-   //g_bdr_form = new ParLinearForm(pfes);
+   //g_bdr_form = new ParLinearForm(vfes); //? was pfes
+   g_bdr_form = new ParLinearForm(pfes);
    for (auto &vel_dbc : vel_dbcs)
    {
       auto *gbdr_bnlfi = new BoundaryNormalLFIntegrator(*vel_dbc.coeff);
@@ -1243,8 +1246,8 @@ void LoMachSolver::Setup(double dt)
    Ht_bdfcoeff.constant = 1.0 / dt;
    Ht_form = new ParBilinearForm(tfes);
    auto *hmt_blfi = new MassIntegrator(Ht_bdfcoeff); // unsteady bit
-   auto *hdt_blfi = new DiffusionIntegrator(Ht_lincoeff);
-   //auto *hdt_blfi = new DiffusionIntegrator(*alphaField); // Laplacian bit
+   //auto *hdt_blfi = new DiffusionIntegrator(Ht_lincoeff);
+   auto *hdt_blfi = new DiffusionIntegrator(*alphaField); // Laplacian bit
    //std::cout << "Check 23..." << std::endl;        
    
    if (numerical_integ)
@@ -1820,12 +1823,13 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      double prim[nvel+2];
      for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
      for (int i = 0; i < Tdof; i++) {
-       for (int eq = 0; eq < nvel; eq++) {
+       //for (int eq = 0; eq < nvel; eq++) {
          prim[1+nvel] = Tdata[i];
          transportPtr->GetViscosities(prim, prim, visc);
-         dataVisc[i + eq * Tdof] = visc[0];	   
+         dataVisc[i] = visc[0]; 
+         //dataVisc[i + eq * Tdof] = visc[0];	   
          //dataVisc[i + eq * Tdof] = kin_vis; // static value
-       }
+	 //}
      }
    }
    
@@ -3505,6 +3509,10 @@ void LoMachSolver::parseFlowOptions() {
   tpsP_->getInput("loMach/viscosityMultiplier", config.visc_mult, 1.0);
   tpsP_->getInput("loMach/bulkViscosityMultiplier", config.bulk_visc, 0.0);
   //tpsP_->getInput("flow/axisymmetric", config.axisymmetric_, false);
+  tpsP_->getInput("loMach/SutherlandC1", config.sutherland_.C1, 1.458e-6);
+  tpsP_->getInput("loMach/SutherlandS0", config.sutherland_.S0, 110.4);
+  tpsP_->getInput("loMach/SutherlandPr", config.sutherland_.Pr, 0.71);
+  
   tpsP_->getInput("loMach/enablePressureForcing", config.isForcing, false);
   if (config.isForcing) {
     for (int d = 0; d < 3; d++) tpsP_->getRequiredVecElem("loMach/pressureGrad", config.gradPress[d], d);
