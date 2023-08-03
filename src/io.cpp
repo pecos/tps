@@ -786,9 +786,9 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
   if (mode == "write") {
     
     if (mpi_.Root() || config.isRestartPartitioned(mode)) {
-      std::cout << " okay 1" << endl;      
+      //std::cout << " okay 1" << endl;      
       file = H5Fcreate(fileName.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-      std::cout << " okay 2" << endl;      
+      //std::cout << " okay 2" << endl;      
       assert(file >= 0);
     }
 
@@ -796,7 +796,7 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
     //} else if (mode == "read") {
   } else {    
 
-    std::cout << " in first read zone: " << endl;
+    //std::cout << " in first read zone: " << endl;
      
     //if (config.isRestartSerialized(mode)) {
     //  if (rank0_) {
@@ -834,7 +834,7 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
     // note: all tasks save unless we are writing a serial restart file
     if (mpi_.Root() || config.isRestartPartitioned(mode)) {
       
-      std::cout << " okay 3 " << iter << endl;      
+      //std::cout << " okay 3 " << iter << endl;      
       // current iteration count
       h5_save_attribute(file, "iteration", iter);
       // total time
@@ -845,7 +845,7 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
       h5_save_attribute(file, "order", order);
       // spatial dimension
       h5_save_attribute(file, "dimension", dim);
-      std::cout << " okay 3a " << endl;                  
+      //std::cout << " okay 3a " << endl;                  
       //std::cout << " okay 3a " << average->ComputeMean() << endl;            
 
       /*
@@ -855,7 +855,7 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
         h5_save_attribute(file, "samplesInterval", average->GetSamplesInterval());
       }
       */
-      std::cout << " okay 3aa " << endl;            
+      //std::cout << " okay 3aa " << endl;            
       
       // code revision
 #ifdef BUILD_VERSION
@@ -864,24 +864,24 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
         int shaLength = strlen(BUILD_VERSION);
         hsize_t dims[1] = {1};
         H5Tset_size(ctype, shaLength);
-      std::cout << " okay 3ab " << endl;            	
+	//std::cout << " okay 3ab " << endl;            	
 
         hid_t dspace1dim = H5Screate_simple(1, dims, NULL);
-      std::cout << " okay 3ac " << endl;            	
+	//std::cout << " okay 3ac " << endl;            	
 
         attr = H5Acreate(file, "revision", ctype, dspace1dim, H5P_DEFAULT, H5P_DEFAULT);
-      std::cout << " okay 3ad " << endl;            	
+	//std::cout << " okay 3ad " << endl;            	
         assert(attr >= 0);
         status = H5Awrite(attr, ctype, BUILD_VERSION);
-      std::cout << " okay 3ae " << endl;            	
+	//std::cout << " okay 3ae " << endl;            	
         assert(status >= 0);
         H5Sclose(dspace1dim);
         H5Aclose(attr);
-      std::cout << " okay 3af " << endl;            		
+	//std::cout << " okay 3af " << endl;            		
       }
     }
 #endif
-    std::cout << " okay 3ag " << endl; 		
+    //std::cout << " okay 3ag " << endl; 		
     
     // included total dofs for partitioned files
     //if (!config.isRestartSerialized(mode)) {
@@ -903,13 +903,13 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
 
     /**/
     if (rank0_ || config.isRestartPartitioned(mode)) {
-      std::cout << " okay 3ah " << file << endl; 		      
+      //std::cout << " okay 3ah " << file << endl; 		      
       h5_read_attribute(file, "iteration", iter);
-      std::cout << " okay 3ah1 " << iter << endl;      
+      //std::cout << " okay 3ah1 " << iter << endl;      
       h5_read_attribute(file, "time", time);
-      std::cout << " okay 3ah2 " << endl;            
+      //std::cout << " okay 3ah2 " << endl;            
       h5_read_attribute(file, "dt", dt);
-      std::cout << " okay 3ah3 " << endl;            
+      //std::cout << " okay 3ah3 " << endl;            
       h5_read_attribute(file, "order", read_order);
       //if (average->ComputeMean() && config.GetRestartMean()) {
       //  int samplesMean, intervals;
@@ -920,7 +920,7 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
       //}
     }
     /**/
-    std::cout << " okay 3ai " << endl; 		
+    //std::cout << " okay 3ai " << endl; 		
     
     /*
     if (config.isRestartSerialized(mode)) {
@@ -957,7 +957,7 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
     assert(read_order == order);
     //}
     
-    std::cout << " okay 3aj " << endl; 		
+    //std::cout << " okay 3aj " << endl; 		
 
     /**/
     if (rank0_) {
@@ -968,7 +968,7 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
       //  grvy_printf(ginfo, "Restarting averages with %i\n samples", average->GetSamplesMean());
       //}
     }
-    std::cout << " okay 3ak " << endl;
+    //std::cout << " okay 3ak " << endl;
     /**/
   }
 
@@ -976,23 +976,23 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
   // Read/write solution data defined by IO families
   // -------------------------------------------------------------------
 
-  std::cout << " okay 3al" << endl;    
+  //std::cout << " okay 3al" << endl;    
   hsize_t dims[1];
   // hsize_t maxdims[1];
   hsize_t numInSoln = 0;
-  std::cout << " okay 3b" << endl;  
+  //std::cout << " okay 3b" << endl;  
 
   //-------------------------------------------------------
   // Loop over defined IO families to save desired output
   //-------------------------------------------------------
   for (size_t n = 0; n < ioData.families_.size(); n++) {
-      std::cout << " okay 3c" << endl;
+    //std::cout << " okay 3c" << endl;
     
     IOFamily &fam = ioData.families_[n];
 
     if (mode == "write") {
 
-      std::cout << " okay 4" << endl;
+      //std::cout << " okay 4" << endl;
       
       //if ((config.isRestartSerialized(mode)) && (nprocs_ > 1) && (mpi_.Root())) {
       //  assert((locToGlobElem != NULL) && (partitioning_ != NULL));
@@ -1013,13 +1013,13 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
 
       
       if (rank0_ || !config.isRestartSerialized(mode)) {
-        std::cout << " okay 5" << endl;	
+        //std::cout << " okay 5" << endl;	
         dataspace = H5Screate_simple(1, dims, NULL);
-        std::cout << " okay 6" << endl;		
+        //std::cout << " okay 6" << endl;		
         assert(dataspace >= 0);
-        std::cout << " okay 7" << endl;		
+        //std::cout << " okay 7" << endl;		
         group = H5Gcreate(file, fam.group_.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-        std::cout << " okay 8" << endl;		
+        //std::cout << " okay 8" << endl;		
         assert(group >= 0);
       }
       
