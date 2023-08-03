@@ -857,7 +857,7 @@ void LoMachSolver::Setup(double dt)
    AddTempDirichletBC(buffer_tbc, Tattr);
    //AddTempDirichletBC(t_bc_coef, Tattr);   
    /**/
-   std::cout << "Check 4..." << std::endl;  
+   //std::cout << "Check 4..." << std::endl;  
 
    // returning to regular setup   
    sw_setup.Start();
@@ -888,7 +888,7 @@ void LoMachSolver::Setup(double dt)
    const IntegrationRule &ir_nli = gll_rules.Get(vfes->GetFE(0)->GetGeomType(), 3 * norder - 1);
    const IntegrationRule &ir_pi = gll_rules.Get(pfes->GetFE(0)->GetGeomType(), 2 * porder);   
    const IntegrationRule &ir_i  = gll_rules.Get(tfes->GetFE(0)->GetGeomType(), 2 * order);
-   std::cout << "Check 6..." << std::endl;     
+   //std::cout << "Check 6..." << std::endl;     
    
    // convection section, extrapolation
    nlcoeff.constant = -1.0;
@@ -905,7 +905,7 @@ void LoMachSolver::Setup(double dt)
       N->SetAssemblyLevel(AssemblyLevel::PARTIAL);
       N->Setup();
    }
-   std::cout << "Check 7..." << std::endl;     
+   //std::cout << "Check 7..." << std::endl;     
 
    // mass matrix
    Mv_form = new ParBilinearForm(vfes);
@@ -958,7 +958,7 @@ void LoMachSolver::Setup(double dt)
    }
    Sp_form->Assemble();
    Sp_form->FormSystemMatrix(pres_ess_tdof, Sp);
-   std::cout << "Check 10..." << std::endl;  
+   //std::cout << "Check 10..." << std::endl;  
 
    
    // div(u)
@@ -975,7 +975,7 @@ void LoMachSolver::Setup(double dt)
    }
    D_form->Assemble();
    D_form->FormRectangularSystemMatrix(empty, empty, D);
-   std::cout << "Check 11..." << std::endl;  
+   //std::cout << "Check 11..." << std::endl;  
    
    // for grad(div(u))?
    G_form = new ParMixedBilinearForm(tfes, vfes);
@@ -991,7 +991,7 @@ void LoMachSolver::Setup(double dt)
    }
    G_form->Assemble();
    G_form->FormRectangularSystemMatrix(empty, empty, G);
-   std::cout << "Check 12..." << std::endl;  
+   //std::cout << "Check 12..." << std::endl;  
    
    // viscosity field
    //ParGridFunction buffer2(vfes); // or pfes here?
@@ -1015,7 +1015,7 @@ void LoMachSolver::Setup(double dt)
    }
    //GridFunctionCoefficient viscField(&buffer2);
    viscField = new GridFunctionCoefficient(bufferVisc);
-   std::cout << "Check 13..." << std::endl;     
+   //std::cout << "Check 13..." << std::endl;     
    
    // this is used in the last velocity implicit solve, Step kin_vis is
    // only for the pressure-poisson
@@ -1039,7 +1039,7 @@ void LoMachSolver::Setup(double dt)
    }
    H_form->Assemble();
    H_form->FormSystemMatrix(vel_ess_tdof, H);
-   std::cout << "Check 14..." << std::endl;     
+   //std::cout << "Check 14..." << std::endl;     
    
    // boundary terms   
    FText_gfcoeff = new VectorGridFunctionCoefficient(&FText_gf);
@@ -1094,7 +1094,7 @@ void LoMachSolver::Setup(double dt)
    MvInv->SetPrintLevel(pl_mvsolve);
    MvInv->SetRelTol(1e-12);
    MvInv->SetMaxIter(500);
-   std::cout << "Check 17..." << std::endl;     
+   //std::cout << "Check 17..." << std::endl;     
 
    
    /**/
@@ -1129,7 +1129,7 @@ void LoMachSolver::Setup(double dt)
    SpInv->SetRelTol(rtol_spsolve);
    SpInv->SetMaxIter(500);
    /**/
-   std::cout << "Check 18..." << std::endl;     
+   //std::cout << "Check 18..." << std::endl;     
 
    
    // this wont be as efficient but AMG merhod (above) wasnt allowing for updates to variable coeff
@@ -1159,18 +1159,18 @@ void LoMachSolver::Setup(double dt)
    {
       Vector diag_pa(vfes->GetTrueVSize());
       //Vector diag_pa(pfes->GetTrueVSize()); // maybe?
-      std::cout << "Check 18a..." << std::endl;
+      //std::cout << "Check 18a..." << std::endl;
       H_form->AssembleDiagonal(diag_pa); // invalid read
-      std::cout << "Check 18b..." << std::endl;                 
+      //std::cout << "Check 18b..." << std::endl;                 
       HInvPC = new OperatorJacobiSmoother(diag_pa, vel_ess_tdof);
-      std::cout << "Check 18c..." << std::endl;                 
+      //std::cout << "Check 18c..." << std::endl;                 
    }
    else
    {
       HInvPC = new HypreSmoother(*H.As<HypreParMatrix>()); // conditional jump
-      std::cout << "Check 18d..." << std::endl;                 
+      //std::cout << "Check 18d..." << std::endl;                 
       dynamic_cast<HypreSmoother *>(HInvPC)->SetType(HypreSmoother::Jacobi, 1);
-      std::cout << "Check 18e..." << std::endl;                 
+      //std::cout << "Check 18e..." << std::endl;                 
    }
    HInv = new CGSolver(vfes->GetComm());
    HInv->iterative_mode = true;
@@ -1179,7 +1179,7 @@ void LoMachSolver::Setup(double dt)
    HInv->SetPrintLevel(pl_hsolve);
    HInv->SetRelTol(rtol_hsolve);
    HInv->SetMaxIter(500);
-   std::cout << "Check 19..." << std::endl;     
+   //std::cout << "Check 19..." << std::endl;     
 
    // If the initial condition was set, it has to be aligned with dependent
    // Vectors and GridFunctions
@@ -1204,7 +1204,7 @@ void LoMachSolver::Setup(double dt)
    if (partial_assembly) { Mt_form->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
    Mt_form->Assemble();
    Mt_form->FormSystemMatrix(empty, Mt);
-   std::cout << "Check 20..." << std::endl;        
+   //std::cout << "Check 20..." << std::endl;        
    
    // div(uT) for temperature
    Dt_form = new ParMixedBilinearForm(vfes, tfes);
@@ -1220,7 +1220,7 @@ void LoMachSolver::Setup(double dt)
    }
    Dt_form->Assemble();
    Dt_form->FormRectangularSystemMatrix(empty, empty, Dt);
-   std::cout << "Check 21..." << std::endl;        
+   //std::cout << "Check 21..." << std::endl;        
    
    // thermal diffusivity field
    //ParGridFunction buffer3(tfes);
@@ -1299,7 +1299,7 @@ void LoMachSolver::Setup(double dt)
    MtInv->SetPrintLevel(pl_mtsolve);
    MtInv->SetRelTol(1e-12);
    MtInv->SetMaxIter(500);
-   std::cout << "Check 26..." << std::endl;        
+   //std::cout << "Check 26..." << std::endl;        
    
    if (partial_assembly)
    {
@@ -1373,7 +1373,7 @@ void LoMachSolver::Setup(double dt)
    }
    
    sw_setup.Stop();
-   std::cout << "Check 29..." << std::endl;     
+   //std::cout << "Check 29..." << std::endl;     
    
 }
 
