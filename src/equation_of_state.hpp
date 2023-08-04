@@ -64,7 +64,7 @@ static const double MOLARELECTRONCHARGE = ELECTRONCHARGE * AVOGADRONUMBER;
 static const double ELECTRONMASS = 9.1093837015e-31;  // kg
 // static const double qeOverkB = ELECTRONCHARGE / BOLTZMANNCONSTANT;
 
-static const double IonizationEnergy_Argon = 13.598434599702;  // eV
+static const double IonizationEnergy_Argon = 15.7596119;  // eV
 
 static const double PI = 3.14159265358979323846;
 // NOTE(kevin): using atan when initializing static const variable is not allowed in the device.
