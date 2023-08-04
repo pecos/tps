@@ -1675,6 +1675,13 @@ void M2ulPhyS::projectInitialSolution() {
     // overwrite existing paraview data for the current iteration.
     if (!(tpsP->isVisualizationMode())) paraviewColl->Save();
   }
+
+  // if restarting from LTE, write paraview and restart h5 immediately
+  if (config.restartFromLTE && !tpsP->isVisualizationMode()) {
+    if (rank0_) std::cout << "Writing non-equilibrium restart files!" << std::endl;
+    paraviewColl->Save();
+    restart_files_hdf5("write");
+  }
 }
 
 void M2ulPhyS::solveBegin() {
