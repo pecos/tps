@@ -1679,9 +1679,9 @@ void LoMachSolver::solve()
        for (int n = 0; n < dof; n++) {
          Umag = 0.0;
          for (int eq = 0; eq < dim; eq++) {
-           Umag += dataU[n + eq * dof]*dataU[n + eq * dof];
+           Umag += dataU[n + eq * dof] * dataU[n + eq * dof];
          }
-         Umag = sqrt(Umag);
+         Umag = std::sqrt(Umag);
          Umax_lcl = std::max(Umag,Umax_lcl);
        }
        //std::cout << "okay 1c " << endl;
@@ -2575,7 +2575,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
  // copies for compatability => is conserved (U) even necessary with this method?
 void LoMachSolver::updateU() {
 
-  std::cout << " updating big U vector..." << endl;
+  //std::cout << " updating big U vector..." << endl;
   //int dof = tfes->GetNDofs();
   //std::cout << " check 0" << endl;      
 
