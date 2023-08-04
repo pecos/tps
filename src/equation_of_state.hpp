@@ -44,10 +44,8 @@
 
 #include "dataStructures.hpp"
 #include "run_configuration.hpp"
-#include "tps_mfem_wrap.hpp"
-
 #include "table.hpp"
-
+#include "tps_mfem_wrap.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -62,7 +60,7 @@ static const double VACUUMPERMITTIVITY = 8.8541878128e-12;
 static const double ELECTRONCHARGE = 1.60218e-19;
 static const double MOLARELECTRONCHARGE = ELECTRONCHARGE * AVOGADRONUMBER;
 static const double ELECTRONMASS = 9.1093837015e-31;  // kg
-// static const double qeOverkB = ELECTRONCHARGE / BOLTZMANNCONSTANT;
+static const double qeOverkB = ELECTRONCHARGE / BOLTZMANNCONSTANT;
 
 static const double IonizationEnergy_Argon = 15.7596119;  // eV
 
@@ -93,7 +91,6 @@ class GasMixture {
   int iIon2;
   int iTe;
   int iTh;
-
 
   // DenseMatrix gasParams;
   // // TODO(kevin): not initialized at this point.
@@ -139,10 +136,12 @@ class GasMixture {
 
   MFEM_HOST_DEVICE void SetSpeciesStateIndices() {
     iBackground = numSpecies - 1;
-    iElectron   = numSpecies - 2;
-    iIon1       = numSpecies - 3;
-    iIon2       = numSpecies - 4;
-    if (twoTemperature_) {iTe = num_equation -1;}
+    iElectron = numSpecies - 2;
+    iIon1 = numSpecies - 3;
+    iIon2 = numSpecies - 4;
+    if (twoTemperature_) {
+      iTe = num_equation - 1;
+    }
     iTh = nvel_ + 1;
   }
 
@@ -156,7 +155,6 @@ class GasMixture {
   void SetFluid(WorkingFluid _fluid);
 
   WorkingFluid GetWorkingFluid() { return fluid; }
-
 
   MFEM_HOST_DEVICE int GetNumSpecies() const { return numSpecies; }
   MFEM_HOST_DEVICE int GetNumActiveSpecies() const { return numActiveSpecies; }
@@ -341,7 +339,8 @@ class GasMixture {
                                                             double *gradPe) = 0;
 
   virtual void GetSpeciesFromLTE(double *conserv, double *primit, TableInterpolator2D *energy_table,
-              TableInterpolator2D *R_table, TableInterpolator2D *c_table, TableInterpolator2D *T_table){
+                                 TableInterpolator2D *R_table, TableInterpolator2D *c_table,
+                                 TableInterpolator2D *T_table) {
     printf("GetSpeciesFromLTE is not implemented.");
     return;
   }
@@ -658,7 +657,6 @@ class PerfectMixture : public GasMixture {
     return gasParams[species + param * numSpecies];
   }
 
-
   virtual double getMolarCV(int species) { return molarCV_[species]; }
   virtual double getMolarCP(int species) { return molarCP_[species]; }
   virtual double getSpecificHeatRatio(int species) { return specificHeatRatios_[species]; }
@@ -744,9 +742,7 @@ class PerfectMixture : public GasMixture {
   virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
                                                        Vector &conservedState);
 
-  virtual double computeElectronEnergy(const double n_e, const double T_e) {
-    return n_e * molarCV_[iElectron] * T_e;
-  }
+  virtual double computeElectronEnergy(const double n_e, const double T_e) { return n_e * molarCV_[iElectron] * T_e; }
   virtual double computeElectronPressure(const double n_e, const double T_e) {
     return n_e * UNIVERSALGASCONSTANT * T_e;
   }
@@ -757,8 +753,8 @@ class PerfectMixture : public GasMixture {
 
   // Compute species mass densities based on LTE assumptions.
   virtual void GetSpeciesFromLTE(double *conserv, double *primit, TableInterpolator2D *energy_table,
-              TableInterpolator2D *R_table, TableInterpolator2D *c_table, TableInterpolator2D *T_table);
-
+                                 TableInterpolator2D *R_table, TableInterpolator2D *c_table,
+                                 TableInterpolator2D *T_table);
 
   // GPU functions
 #ifdef _GPU_
