@@ -524,7 +524,6 @@ MFEM_HOST_DEVICE PerfectMixture::PerfectMixture(PerfectMixtureInput inputs, int 
 
   SetSpeciesStateIndices();
 
-
   // We assume the background species is neutral.
   assert(gasParams[(iBackground) + GasParams::SPECIES_CHARGES * numSpecies] == 0.0);
   // TODO(kevin): release electron species enforcing.
@@ -552,7 +551,6 @@ MFEM_HOST_DEVICE PerfectMixture::PerfectMixture(PerfectMixtureInput inputs, int 
     specificHeatRatios_[sp] = molarCP_[sp] / molarCV_[sp];
   }
 }
-
 
 // compute heavy-species heat capacity from number densities.
 MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesHeatCapacity(const double *n_sp, const double &nB) const {
@@ -638,7 +636,6 @@ void PerfectMixture::GetPrimitivesFromConservatives(const Vector &conserv, Vecto
 
 MFEM_HOST_DEVICE void PerfectMixture::GetPrimitivesFromConservatives(const double *conserv, double *primit) {
   double n_sp[gpudata::MAXSPECIES];
-
 
   computeNumberDensities(conserv, n_sp);
 
@@ -1164,8 +1161,8 @@ double PerfectMixture::computePressureDerivativeFromPrimitives(const Vector &dUp
                   (1.0 - GetGasParams(sp, GasParams::SPECIES_MW) / GetGasParams(iBackground, GasParams::SPECIES_MW));
   }
   // Kevin: this electron-related term comes from background species.
-  numDenGrad -= dne_dx * GetGasParams(iElectron, GasParams::SPECIES_MW) /
-                GetGasParams(iBackground, GasParams::SPECIES_MW);
+  numDenGrad -=
+      dne_dx * GetGasParams(iElectron, GasParams::SPECIES_MW) / GetGasParams(iBackground, GasParams::SPECIES_MW);
   pressureGradient += numDenGrad * Uin[nvel_ + 1];
 
   if (twoTemperature_) {
@@ -1210,8 +1207,8 @@ double PerfectMixture::computePressureDerivativeFromConservatives(const Vector &
                   (1.0 - GetGasParams(sp, GasParams::SPECIES_MW) / GetGasParams(iBackground, GasParams::SPECIES_MW));
   }
   // Kevin: this electron-related term comes from background species.
-  numDenGrad -= dne_dx * GetGasParams(iElectron, GasParams::SPECIES_MW) /
-                GetGasParams(iBackground, GasParams::SPECIES_MW);
+  numDenGrad -=
+      dne_dx * GetGasParams(iElectron, GasParams::SPECIES_MW) / GetGasParams(iBackground, GasParams::SPECIES_MW);
   pressureGradient += numDenGrad * T_h;
 
   if (twoTemperature_) {
@@ -1368,8 +1365,7 @@ void PerfectMixture::ComputeMassFractionGradient(const double rho, const Vector 
         neGrad(d) += gradUp(nvel_ + 2 + sp, d) * GetGasParams(sp, GasParams::SPECIES_CHARGES);
     }
     for (int d = 0; d < dim; d++) {
-      massFractionGrad(iElectron, d) =
-          neGrad(d) / rho - numberDensities(iElectron) / rho / rho * gradUp(0, d);
+      massFractionGrad(iElectron, d) = neGrad(d) / rho - numberDensities(iElectron) / rho / rho * gradUp(0, d);
       massFractionGrad(iElectron, d) *= GetGasParams(iElectron, GasParams::SPECIES_MW);
     }
   }
@@ -1643,8 +1639,7 @@ MFEM_HOST_DEVICE void PerfectMixture::modifyEnergyForPressure(const double *stat
 
   double electronEnergy = 0.0;
   if (twoTemperature_) {
-    electronEnergy =
-        (modifyElectronEnergy) ? n_sp[iElectron] * molarCV_[iElectron] * Th : stateIn[num_equation - 1];
+    electronEnergy = (modifyElectronEnergy) ? n_sp[iElectron] * molarCV_[iElectron] * Th : stateIn[num_equation - 1];
     stateOut[num_equation - 1] = electronEnergy;
   } else {
     electronEnergy = n_sp[iElectron] * molarCV_[iElectron] * Th;
@@ -1860,48 +1855,45 @@ MFEM_HOST_DEVICE void PerfectMixture::computeSheathBdrFlux(const double *state, 
   }
 }
 
-
-
-
 void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInterpolator2D *energy_table,
-              TableInterpolator2D *R_table, TableInterpolator2D *c_table, TableInterpolator2D *T_table)  {
+                                       TableInterpolator2D *R_table, TableInterpolator2D *c_table,
+                                       TableInterpolator2D *T_table) {
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     conserv[nvel_ + 2 + sp] = 0.0;
     primit[nvel_ + 2 + sp] = 0.0;
   }
 
-  Vector n_sp(numSpecies);    // Define number densities temporarily as [mol/m^3]
-                              // In the end, we convert conserved states for species back to [kg/m^3]
-
-  double rho = 0.0;  // Density of the mixture
-
-  // Is it better to define these in the header file?
-  double T_h = 0.0, T_e = 0.0, p_0 = 0.0;
-  double n_0 = 0.0, n_e = 0.0, n_neutral = 0.0;
-  double lambda_e = 0.0;
-  double tempSaha = 0.0, tempRatio = 0.0;
-  double Q_n = 0.0, Q_i = 0.0;
-  int nPop = 0;
-
-  const double qeOverkB = ELECTRONCHARGE / BOLTZMANNCONSTANT;
-
+  // This routine makes the following assumptions:
+  //
+  // 1) There is only 1 charged specie and it is a positive ion with
+  //    charge +e
+  //
+  // 2) Only atomic species and electrons are in the mixture, because
+  //    we don't evaluate vibrational or rotational partition function
+  //    contributions
+  //
+  // 3) The plasma is "weakly" ionized---the results used here assume
+  //    we have a mixture of perfect gases, so no interatomic forces
+  //    are considered, which means we neglect Coulomb effects.
+  //
+  // TODO(trevilo): Relax these assumptions
 
   // Indexing:
   // 0            1           2            3           4           5
   // Ar(m)       Ar(r)      Ar(4p)        Ar+          E          Ar(g)
   // n/a         n/a         n/a         iIon1      iElectron  iBackground
 
-
   //--------------------------------------------------------------------------
   // GetPrimitivesFromConservatives assuming LTE conditions
-  rho = conserv[0];
+  const double rho = conserv[0];
   primit[0] = rho;
   for (int d = 0; d < nvel_; d++) primit[d + 1] = conserv[d + 1] / conserv[0];
 
+  // TODO(trevilo): The code below is duplicated from elsewhere (the
+  // LteMixture class).  Find a way to reuse rather than duplicate.
 
   //--------------------------------------------------------------------------
   // Compute Temperature based from LTE tables.
-  // const double T = ComputeTemperature(conserv);
   double den_vel2 = 0;
   for (int d = 0; d < nvel_; d++) den_vel2 += conserv[d + 1] * conserv[d + 1];
   den_vel2 /= rho;
@@ -1924,8 +1916,6 @@ void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInt
 
   const int niter_max = 20;
   int niter = 0;
-  // printf("------------------------------------\n"); fflush(stdout);
-  // printf("Iter %d: res = %.6e, T = %.6e\n", niter, res, T); fflush(stdout);
 
   // Newton loop
   while (!converged && (niter < niter_max)) {
@@ -1943,98 +1933,125 @@ void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInt
     // Declare convergence if residual OR dT is sufficient small
     converged = ((abs(res) < atol) || (abs(res) / res0 < rtol) || (abs(dT) < dT_atol) || (abs(dT) / T < dT_rtol));
     niter++;
-    // printf("Iter %d: res = %.6e, T = %.6e\n", niter, res, T); fflush(stdout);
   }
 
   if (!converged) {
     printf("WARNING: temperature did not converge.");
     fflush(stdout);
-  } else {
-    // printf("Temperature converged to res = %.6e in %d steps\n", res, niter); fflush(stdout);
   }
-
   //--------------------------------------------------------------------------
 
-  T_h = T;
-  T_e = T_h;
-
+  // Compute the pressure and the total mol density
   const double R = R_table->eval(T, rho);
-  p_0 = rho * R * T_h;
+  const double p_0 = rho * R * T;
+  const double n_0 = p_0 / T / UNIVERSALGASCONSTANT;  // [mol/m^3] Number density based on bulk temperature
 
-  primit[iTh] = T_h;
+  // Given the total number density, the equilibrium electron number
+  // density may be obtained from the Saha equation, which can be
+  // derived from the equilibrium constant for the ionization
+  // reaction.
 
-  //--------------------------------------------------------------------------
+  //  Calculate the necessary partition functions...
 
-  //  Calculate partition functions from analytical expressions
-  // Electronic partition function of neutral Argon
-  // Q_n = 1.0+12.0*exp(-11.6/(T_e/qeOverkB));
-  // Electronic partition function of ion Argon
-  // Q_i = 4.0+2.0*exp(-0.178/(T_e/qeOverkB))+2.0*exp(-13.5/(T_e/qeOverkB));
-
-  //  Calculate partition functions from levels considered
-  // Electronic partition function of neutral Argon
-  Q_n = 1.0;  // Add contribution of ground state.
-  nPop = ambipolar ? (numActiveSpecies - 1) : (numActiveSpecies-2);
+  // ... first for the neutral, considering all energy levels
+  double Q_n = 1.0;  // Add contribution of ground state.
+  const int nPop = ambipolar ? (numActiveSpecies - 1) : (numActiveSpecies - 2);
   for (int sp = 0; sp < nPop; sp++) {
-    Q_n = Q_n + GetGasParams(sp, GasParams::SPECIES_DEGENERACY)
-        *exp(-GetGasParams(sp, GasParams::FORMATION_ENERGY)/AVOGADRONUMBER/T_e/BOLTZMANNCONSTANT);
+    const double gsp = GetGasParams(sp, GasParams::SPECIES_DEGENERACY);
+    const double E0 = GetGasParams(sp, GasParams::FORMATION_ENERGY);
+    Q_n += gsp * exp(-E0 / UNIVERSALGASCONSTANT / T);  // E0 in J/mol, so e/kT = E0/NA/RT
   }
 
-  Q_i = GetGasParams(iIon1, GasParams::SPECIES_DEGENERACY);  // (= 4.0) Electronic partition function of ion Argon
+  // ... second for the ion, where all levels are lumped into one
+  const double Q_i = GetGasParams(iIon1, GasParams::SPECIES_DEGENERACY);
 
+  // ... finally for the electron, which is simply 2 (b/c spin)
+  const double Q_e = 2.0;
 
-  /*
-  Saha relation
-  Ionized ground states population assuimng two-temperature plasma
-  We assume constant density here.   rho_0 = rho_n + rho_i + rho_e
+  const double mw_neu = GetGasParams(iBackground, GasParams::SPECIES_MW);
+  const double mw_ion = GetGasParams(iIon1, GasParams::SPECIES_MW);
+  const double massratio = mw_ion / mw_neu;
+  const double mr32 = massratio * sqrt(massratio);
 
-  */
-  n_0 = p_0/T_h/UNIVERSALGASCONSTANT;  // [mol/m^3] Number density based on bulk temperature
+  const double lame = PLANCKCONSTANT / (sqrt(2 * PI * ELECTRONMASS * BOLTZMANNCONSTANT * T));
+  const double lame3 = lame * lame * lame;
+  const double Qrat = Q_e * Q_i / Q_n;
+  const double EF_ion = GetGasParams(iIon1, GasParams::FORMATION_ENERGY);  // in J/mol
+  const double tempSaha = mr32 * (Qrat / lame3) * exp(-EF_ion / UNIVERSALGASCONSTANT / T) / AVOGADRONUMBER;
+  const double n_e = -tempSaha + sqrt(tempSaha * tempSaha + n_0 * tempSaha);
 
-  tempRatio = (T_e/T_h + 1);
+  const double n_neutral = n_0 - 2 * n_e;  // 2 b/c charge-neutrality
 
-  double C1 =  UNIVERSALGASCONSTANT/R/GetGasParams(iBackground, GasParams::SPECIES_MW);
-  double C2 =  (GetGasParams(iIon1, GasParams::SPECIES_MW) +
-                GetGasParams(iElectron, GasParams::SPECIES_MW))/GetGasParams(iBackground, GasParams::SPECIES_MW);
+  // Now that we know the neutral number density, the distribution
+  // over energy levels is given by the Boltzmann distribution
 
-  // solve for ionized state, considering only one ionized state
-  lambda_e = PLANCKCONSTANT/(sqrt(2*PI*ELECTRONMASS*BOLTZMANNCONSTANT*T_e));
-  tempSaha = Q_i/Q_n*2*pow(lambda_e, -3)*exp(-IonizationEnergy_Argon/(T_e/qeOverkB))/AVOGADRONUMBER;
-  n_e = -tempSaha*C2/2.0 + sqrt(tempSaha*tempSaha*C2*C2/4 + C1*n_0*tempSaha);
-  n_neutral = n_0*C1 - n_e*C2;
+  // Vector to store all mol densities [mol/m^3]
+  Vector n_sp(numSpecies);
 
   // Boltzmann Distribution - Excited level populations
-  nPop = ambipolar ? (numActiveSpecies - 1) : (numActiveSpecies-2);
   for (int sp = 0; sp < nPop; sp++) {
-    n_sp[sp] = GetGasParams(sp, GasParams::SPECIES_DEGENERACY)
-        *exp(-GetGasParams(sp, GasParams::FORMATION_ENERGY)/AVOGADRONUMBER/T_e/BOLTZMANNCONSTANT)/Q_n*n_neutral;
+    const double gsp = GetGasParams(sp, GasParams::SPECIES_DEGENERACY);
+    const double E0 = GetGasParams(sp, GasParams::FORMATION_ENERGY);
+    n_sp[sp] = n_neutral * gsp * exp(-E0 / UNIVERSALGASCONSTANT / T) / Q_n;
   }
 
   n_sp[iIon1] = n_e;
-  // n_sp[iIon2] = n_e;  // What about Ions2?
-  n_sp[iElectron] = n_e;  // Electron species is assumed be to the second-to-last species.
-  n_sp[iBackground] = n_neutral/Q_n;
+  n_sp[iElectron] = n_e;
+  n_sp[iBackground] = n_neutral / Q_n;
+
+  // Brain dump
+  printf("----------------------------------------------\n");
+  fflush(stdout);
+  printf("Input conditions: T = %.6e, n0 = %.6e\n", T, n_0);
+  fflush(stdout);
+  printf("Local indices: iIon1 = %d, iElectron = %d, iBackground = %d\n", iIon1, iElectron, iBackground);
+  fflush(stdout);
+  printf("Output densities: n =");
+  for (int sp = 0; sp < numSpecies; sp++) {
+    printf(" %.6e", n_sp[sp]);
+  }
+  printf("\n");
+  fflush(stdout);
+
+  printf("Charges: n =");
+  for (int sp = 0; sp < numSpecies; sp++) {
+    printf(" %.6e", GetGasParams(sp, GasParams::SPECIES_CHARGES));
+  }
+  printf("\n");
+  fflush(stdout);
+
+  //------------------------------------------------------------------------
+  // Some sanity checks!!
+
+  // n_e must be non-negative
+  if (n_e < 0.0) {
+    printf("n_e = %.6e < 0!!!!!!!!!!!!!!", n_e);
+    fflush(stdout);
+  }
+
+  // Total number molar density should be (nearly) preserved
+  double n_0_check = 0.0;
+  for (int isp = 0; isp < numSpecies; isp++) {
+    n_0_check += n_sp[isp];
+  }
+
+  assert(abs(n_0 - n_0_check) / n_0 < 1e-14);
+  assert(n_e >= 0.0);
 
   //--------------------------------------------------------------------------
-
+  // Fill in the state, starting with  the species
   for (int sp = 0; sp < numActiveSpecies; sp++) {
-    conserv[nvel_ + 2 + sp]  = n_sp[sp] * GetGasParams(sp, GasParams::SPECIES_MW);
+    conserv[nvel_ + 2 + sp] = n_sp[sp] * GetGasParams(sp, GasParams::SPECIES_MW);
     primit[nvel_ + 2 + sp] = n_sp[sp];
   }
+
+  // and then the energies / temperatures
   if (twoTemperature_) {
-    conserv[iTe] = n_e * molarCV_[iElectron] * T_e;
-    primit[iTe] = T_e;  // electron temperature as primitive variable.
+    conserv[iTe] = n_e * molarCV_[iElectron] * T;
+    primit[iTe] = T;  // electron temperature as primitive variable.
   }
 
-
-  //--------------------------------------------------------------------------
-  // Re-evaluate conserv[iTh] so that it matches Th after first iteration
-
-
-  // NOTE: For now, we do not include all species number densities into Up.
-  // This requires us to re-evaluate electron/background-species number density.
-
-  double nB = n_sp[iBackground];
+  const double nB = n_sp[iBackground];
 
   // compute mixture heat capacity.
   double totalHeatCapacity = computeHeaviesHeatCapacity(&primit[nvel_ + 2], nB);
@@ -2043,7 +2060,7 @@ void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInt
   double totalEnergy = 0.0;
   for (int d = 0; d < nvel_; d++) totalEnergy += primit[d + 1] * primit[d + 1];
   totalEnergy *= 0.5 * primit[0];
-  totalEnergy += totalHeatCapacity * primit[nvel_ + 1];
+  totalEnergy += totalHeatCapacity * T;
   if (twoTemperature_) {
     totalEnergy += conserv[iTe];
   }
@@ -2053,29 +2070,5 @@ void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInt
   }
 
   conserv[iTh] = totalEnergy;
-
-
-  //--------------------------------------------------------------------------
-
-
-
-    // double nh = 0.0;
-
-    // for (int sp = 0; sp < nPop; sp++) nh = nh + n_sp[sp];
-    // nh = nh + n_e + n_e + n_sp[iBackground];
-    // double p_Mycalc = nh*  UNIVERSALGASCONSTANT *T_h;
-
-    // double electronPressure = 0.0;
-    // double p_calc =  PerfectMixture::ComputePressure(conserv, &electronPressure);
-
-    // double rho_calc = 0.0;
-    // for (int sp = 0; sp < nPop; sp++) rho_calc = rho_calc + n_sp[sp]* GetGasParams(sp, GasParams::SPECIES_MW);
-    // rho_calc = rho_calc + n_sp[iIon1]* GetGasParams(iIon1, GasParams::SPECIES_MW);
-    // rho_calc = rho_calc + n_sp[iElectron]* GetGasParams(iElectron, GasParams::SPECIES_MW);
-    // rho_calc = rho_calc + n_sp[iBackground]* GetGasParams(iBackground, GasParams::SPECIES_MW);
-
-    // std::cout << p_0 << " " << p_calc << " " << p_Mycalc << " " <<  n_e << " " << T_h
-    //           << " " << n_sp[0]*GetGasParams(0, GasParams::SPECIES_MW) << " "
-    //           << n_sp[iBackground]*GetGasParams(iBackground, GasParams::SPECIES_MW) << " " << rho_calc << std::endl;
-    // exit(0);
+  primit[iTh] = T;
 }
