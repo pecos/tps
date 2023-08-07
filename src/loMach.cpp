@@ -405,7 +405,7 @@ void LoMachSolver::Setup(double dt) {
      }
    }
    AddTempDirichletBC(buffer_tbc, Tattr);
-   std::cout << "Check 4..." << std::endl;
+   //std::cout << "Check 4..." << std::endl;
 
    // returning to regular setup
    sw_setup.Start();
@@ -429,7 +429,7 @@ void LoMachSolver::Setup(double dt) {
    const IntegrationRule &ir_nli = gll_rules.Get(vfes->GetFE(0)->GetGeomType(), 3 * norder - 1);
    const IntegrationRule &ir_pi = gll_rules.Get(sfes->GetFE(0)->GetGeomType(), 2 * porder);
    const IntegrationRule &ir_i  = gll_rules.Get(sfes->GetFE(0)->GetGeomType(), 2 * order);
-   std::cout << "Check 6..." << std::endl;
+   //std::cout << "Check 6..." << std::endl;
 
    // used to form temperature advection term
    bufferTemp = new ParGridFunction(vfes);
@@ -449,7 +449,7 @@ void LoMachSolver::Setup(double dt) {
       N->SetAssemblyLevel(AssemblyLevel::PARTIAL);
       N->Setup();
    }
-   std::cout << "Check 7..." << std::endl;
+   //std::cout << "Check 7..." << std::endl;
 
    // mass matrix (on velocity space)
    Mv_form = new ParBilinearForm(vfes);
@@ -489,7 +489,7 @@ void LoMachSolver::Setup(double dt) {
    }
    Sp_form->Assemble();
    Sp_form->FormSystemMatrix(pres_ess_tdof, Sp);
-   std::cout << "Check 10..." << std::endl;
+   //std::cout << "Check 10..." << std::endl;
 
    // div(u)
    D_form = new ParMixedBilinearForm(vfes, sfes);
@@ -505,7 +505,7 @@ void LoMachSolver::Setup(double dt) {
    }
    D_form->Assemble();
    D_form->FormRectangularSystemMatrix(empty, empty, D);
-   std::cout << "Check 11..." << std::endl;
+   //std::cout << "Check 11..." << std::endl;
 
    // for grad(div(u))?
    G_form = new ParMixedBilinearForm(sfes, vfes);
@@ -521,7 +521,7 @@ void LoMachSolver::Setup(double dt) {
    }
    G_form->Assemble();
    G_form->FormRectangularSystemMatrix(empty, empty, G);
-   std::cout << "Check 12..." << std::endl;
+   //std::cout << "Check 12..." << std::endl;
 
    // viscosity field
    //ParGridFunction buffer2(vfes); // or sfes here?
@@ -542,7 +542,7 @@ void LoMachSolver::Setup(double dt) {
    }
    //GridFunctionCoefficient viscField(&buffer2);
    viscField = new GridFunctionCoefficient(bufferVisc);
-   std::cout << "Check 13..." << std::endl;
+   //std::cout << "Check 13..." << std::endl;
 
    // this is used in the last velocity implicit solve, Step kin_vis is
    // only for the pressure-poisson
@@ -566,7 +566,7 @@ void LoMachSolver::Setup(double dt) {
    }
    H_form->Assemble();
    H_form->FormSystemMatrix(vel_ess_tdof, H);
-   std::cout << "Check 14..." << std::endl;
+   //std::cout << "Check 14..." << std::endl;
 
    // boundary terms
    FText_gfcoeff = new VectorGridFunctionCoefficient(&FText_gf);
@@ -621,7 +621,7 @@ void LoMachSolver::Setup(double dt) {
    MvInv->SetPrintLevel(pl_mvsolve);
    MvInv->SetRelTol(1e-12);
    MvInv->SetMaxIter(500);
-   std::cout << "Check 17..." << std::endl;
+   //std::cout << "Check 17..." << std::endl;
 
    /**/
    if (partial_assembly)
@@ -659,24 +659,24 @@ void LoMachSolver::Setup(double dt) {
    SpInv->SetRelTol(rtol_spsolve);
    SpInv->SetMaxIter(500);
    /**/
-   std::cout << "Check 18..." << std::endl;
+   //std::cout << "Check 18..." << std::endl;
 
    if (partial_assembly)
    {
       Vector diag_pa(vfes->GetTrueVSize());
       //Vector diag_pa(sfes->GetTrueVSize()); // maybe?
-      std::cout << "Check 18a..." << std::endl;
+      //std::cout << "Check 18a..." << std::endl;
       H_form->AssembleDiagonal(diag_pa); // invalid read
-      std::cout << "Check 18b..." << std::endl;
+      //std::cout << "Check 18b..." << std::endl;
       HInvPC = new OperatorJacobiSmoother(diag_pa, vel_ess_tdof);
-      std::cout << "Check 18c..." << std::endl;
+      //std::cout << "Check 18c..." << std::endl;
    }
    else
    {
       HInvPC = new HypreSmoother(*H.As<HypreParMatrix>()); // conditional jump
-      std::cout << "Check 18d..." << std::endl;
+      //std::cout << "Check 18d..." << std::endl;
       dynamic_cast<HypreSmoother *>(HInvPC)->SetType(HypreSmoother::Jacobi, 1);
-      std::cout << "Check 18e..." << std::endl;
+      //std::cout << "Check 18e..." << std::endl;
    }
    HInv = new CGSolver(vfes->GetComm());
    HInv->iterative_mode = true;
@@ -685,7 +685,7 @@ void LoMachSolver::Setup(double dt) {
    HInv->SetPrintLevel(pl_hsolve);
    HInv->SetRelTol(rtol_hsolve);
    HInv->SetMaxIter(500);
-   std::cout << "Check 19..." << std::endl;
+   //std::cout << "Check 19..." << std::endl;
 
    // If the initial condition was set, it has to be aligned with dependent
    // Vectors and GridFunctions
@@ -708,7 +708,7 @@ void LoMachSolver::Setup(double dt) {
    if (partial_assembly) { Mt_form->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
    Mt_form->Assemble();
    Mt_form->FormSystemMatrix(empty, Mt);
-   std::cout << "Check 20..." << std::endl;
+   //std::cout << "Check 20..." << std::endl;
 
    // div(uT) for temperature
    Dt_form = new ParMixedBilinearForm(vfes, sfes);
@@ -724,7 +724,7 @@ void LoMachSolver::Setup(double dt) {
    }
    Dt_form->Assemble();
    Dt_form->FormRectangularSystemMatrix(empty, empty, Dt);
-   std::cout << "Check 21..." << std::endl;
+   //std::cout << "Check 21..." << std::endl;
 
    // thermal diffusivity field
    //ParGridFunction buffer3(sfes);
@@ -798,7 +798,7 @@ void LoMachSolver::Setup(double dt) {
    MtInv->SetPrintLevel(pl_mtsolve);
    MtInv->SetRelTol(1e-12);
    MtInv->SetMaxIter(500);
-   std::cout << "Check 26..." << std::endl;
+   //std::cout << "Check 26..." << std::endl;
 
    if (partial_assembly)
    {
@@ -841,6 +841,7 @@ void LoMachSolver::Setup(double dt) {
    dthist[0] = dt;
 
    // Velocity filter
+   filter_alpha = 1.0;
    if (filter_alpha != 0.0)
    {
       vfec_filter = new H1_FECollection(order - filter_cutoff_modes, pmesh->Dimension());
@@ -867,7 +868,8 @@ void LoMachSolver::Setup(double dt) {
    }
 
    sw_setup.Stop();
-   std::cout << "Check 29..." << std::endl;
+   //std::cout << "Check 29..." << std::endl;
+   
 }
 
 
@@ -981,8 +983,20 @@ void LoMachSolver::solve() {
    pvdc.RegisterField("pressure", p_gf);
    pvdc.RegisterField("temperature", t_gf);
    pvdc.Save(); // invalid read
-   if( rank0_ == true ) std::cout << " Saving final step to paraview: " << iter << endl;
+   if( rank0_ == true ) std::cout << " Saving first step to paraview: " << iter << endl;
    /**/
+
+   /*
+   VisItDataCollection pvdc("turbchan", pmesh);
+   pvdc.SetLevelsOfDetail(order);
+   pvdc.SetCycle(0);
+   pvdc.SetTime(time);
+   //pvdc.RegisterField("density", r_gf);
+   pvdc.RegisterField("velocity", u_gf);
+   pvdc.RegisterField("pressure", p_gf);
+   pvdc.RegisterField("temperature", t_gf);
+   pvdc.Save(); // invalid read
+   */
 
    int iter_start = iter;
    if( rank0_ == true ) std::cout << " Starting main loop, from " << iter_start << " to " << MaxIters << endl;
@@ -1481,7 +1495,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
  // copies for compatability => is conserved (U) even necessary with this method?
 void LoMachSolver::updateU() {
 
-  std::cout << " updating big U vector..." << endl;
+  //std::cout << " updating big U vector..." << endl;
   // primitive state
   {
     double *dataUp = Up->HostReadWrite();
@@ -2685,7 +2699,7 @@ void vel_ic(const Vector &coords, double t, Vector &u)
    double aL = 2.0 / (2.0) * pi;
    double bL = 2.0 * pi;
    double cL = 2.0 * pi;   
-   double M = 1.0;
+   double M = 1000.0;
    double scl;
 
    
