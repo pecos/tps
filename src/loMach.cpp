@@ -100,9 +100,13 @@ void LoMachSolver::initialize() {
    if (verbose) grvy_printf(ginfo, "Initializing loMach solver.\n");
 
    //LoMachOptions loMach_opts_ = GetOptions();   
-   order = config.solOrder; //loMach_opts_.order;
-   porder = config.solOrder; //loMach_opts_.order;
-   norder = config.solOrder; //loMach_opts_.order;
+   order = config.solOrder;
+   porder = config.solOrder;
+   //norder = config.solOrder;
+   double no;
+   no = ceil( ((double)order * 1.5) );   
+   norder = int(no);
+   //std::cout << " NORDER: " << norder << endl;
 
    // temporary hard-coding   
    Re_tau = 182.0;   
@@ -481,9 +485,11 @@ void LoMachSolver::initialize() {
    vfes = new ParFiniteElementSpace(pmesh, vfec, dim);
 
    // dealias nonlinear term 
-   //nfec = new H1_FECollection(norder, dim);   
-   //nfes = new ParFiniteElementSpace(pmesh, vfec, dim);   
-
+   nfec = new H1_FECollection(norder, dim);   
+   nfes = new ParFiniteElementSpace(pmesh, nfec, dim);   
+   nfecR0 = new H1_FECollection(norder);   
+   nfesR0 = new ParFiniteElementSpace(pmesh, nfecR0);   
+   
    // pressure
    pfec = new H1_FECollection(porder);
    pfes = new ParFiniteElementSpace(pmesh, pfec);
@@ -517,7 +523,8 @@ void LoMachSolver::initialize() {
    int vfes_truevsize = vfes->GetTrueVSize();
    int pfes_truevsize = pfes->GetTrueVSize();
    int tfes_truevsize = tfes->GetTrueVSize();
-   //int nfes_truevsize = nfes->GetTrueVSize();
+   int nfes_truevsize = nfes->GetTrueVSize();
+   int nfesR0_truevsize = nfesR0->GetTrueVSize();   
    int rfes_truevsize = rfes->GetTrueVSize();   
    if (verbose) grvy_printf(ginfo, "Got sizes...\n");   
    
@@ -539,24 +546,24 @@ void LoMachSolver::initialize() {
    bufferR1sml = 0.0;   
    
    // if dealiasing, use nfes 
-   Nun.SetSize(vfes_truevsize);
+   Nun.SetSize(nfes_truevsize);
    Nun = 0.0;
-   Nunm1.SetSize(vfes_truevsize);
+   Nunm1.SetSize(nfes_truevsize);
    Nunm1 = 0.0;
-   Nunm2.SetSize(vfes_truevsize);
+   Nunm2.SetSize(nfes_truevsize);
    Nunm2 = 0.0;
 
-   uBn.SetSize(vfes_truevsize);
+   uBn.SetSize(nfes_truevsize);
    uBn = 0.0;   
-   uBnm1.SetSize(vfes_truevsize);
+   uBnm1.SetSize(nfes_truevsize);
    uBnm1 = 0.0;
-   uBnm2.SetSize(vfes_truevsize);
+   uBnm2.SetSize(nfes_truevsize);
    uBnm2 = 0.0;
 
-   FBext.SetSize(vfes_truevsize);
+   FBext.SetSize(nfes_truevsize);
    
    Fext.SetSize(vfes_truevsize);
-   FText.SetSize(vfes_truevsize); // why is this vfes while _bdr is pfes?
+   FText.SetSize(vfes_truevsize);
    Lext.SetSize(vfes_truevsize);
    resu.SetSize(vfes_truevsize);
 
@@ -577,6 +584,12 @@ void LoMachSolver::initialize() {
    un_next_gf.SetSpace(vfes);
    un_next_gf = 0.0;
 
+   unm1_gf.SetSpace(vfes);
+   unm1_gf = 0.0;
+   unm2_gf.SetSpace(vfes);
+   unm2_gf = 0.0;
+
+   
    sml_gf.SetSpace(pfes);      
    big_gf.SetSpace(tfes);   
 
@@ -603,6 +616,14 @@ void LoMachSolver::initialize() {
    Tnm1 = 298.0; // fix hardcode
    Tnm2.SetSize(tfes_truevsize);
    Tnm2 = 298.0;
+
+   TBn.SetSize(nfesR0_truevsize);
+   TBn = 298.0;   
+   TBnm1.SetSize(nfesR0_truevsize);
+   TBnm1 = 298.0;
+   TBnm2.SetSize(nfesR0_truevsize);
+   TBnm2 = 298.0;
+
    
    fTn.SetSize(tfes_truevsize); // forcing term
    NTn.SetSize(tfes_truevsize); // advection terms
@@ -625,6 +646,11 @@ void LoMachSolver::initialize() {
    Tn_next_gf.SetSpace(tfes);
    Tn_next_gf = 298.0;
 
+   Tnm1_gf.SetSpace(tfes);
+   Tnm1_gf = 0.0;
+   Tnm2_gf.SetSpace(tfes);
+   Tnm2_gf = 0.0;
+   
    resT_gf.SetSpace(tfes);
 
    viscSml.SetSize(pfes_truevsize);
@@ -643,9 +669,11 @@ void LoMachSolver::initialize() {
    
    R1PM0_gf.SetSpace(vfes);
    R1PM0_gf = 0.0;   
-   //R1PX2_gf.SetSpace(nfes);
-   R1PX2_gf.SetSpace(vfes);
+   R1PX2_gf.SetSpace(nfes); // padded space
    R1PX2_gf = 0.0;
+   R0PX2_gf.SetSpace(nfesR0); // padded space
+   R0PX2_gf = 0.0;
+   
    if (verbose) grvy_printf(ginfo, "vectors and gf initialized...\n");      
    
    //PrintInfo();
@@ -876,9 +904,10 @@ void LoMachSolver::Setup(double dt)
    //nfes->GetEssentialTrueDofs(vel_ess_attr, vel_ess_tdof);    //  this may break?
    //std::cout << "Check 5..." << std::endl;     
 
-   int Vdof = vfes->GetVSize();   
-   int Pdof = pfes->GetVSize();
-   int Tdof = tfes->GetVSize();
+   int Vdof = vfes->GetNDofs(); //vfes->GetVSize();   
+   int Pdof = pfes->GetNDofs(); //pfes->GetVSize();
+   int Tdof = tfes->GetNDofs(); //tfes->GetVSize();
+   int Ndof = nfes->GetNDofs();   
 
    //int Vdof = vfes->GetTrueVSize();   
    //int Pdof = pfes->GetTrueVSize();
@@ -887,7 +916,7 @@ void LoMachSolver::Setup(double dt)
    int VdofInt = vfes->GetTrueVSize();   
    int PdofInt = pfes->GetTrueVSize();
    int TdofInt = tfes->GetTrueVSize();
-   //int Ndof = nfes->GetTrueVSize();   
+   int NdofInt = nfes->GetTrueVSize();   
 
    //bufferPM0 = new ParGridFunction(tfes);
    //bufferPM1 = new ParGridFunction(pfes);      
@@ -908,8 +937,8 @@ void LoMachSolver::Setup(double dt)
    
    // convection section, extrapolation
    nlcoeff.constant = -1.0;
-   N = new ParNonlinearForm(vfes);
-   //N = new ParNonlinearForm(nfes);
+   //N = new ParNonlinearForm(vfes);
+   N = new ParNonlinearForm(nfes);
    auto *nlc_nlfi = new VectorConvectionNLFIntegrator(nlcoeff);
    if (numerical_integ)
    {
@@ -1015,9 +1044,12 @@ void LoMachSolver::Setup(double dt)
    bufferVisc = new ParGridFunction(pfes);
    {
      double *data = bufferVisc->HostReadWrite();
-     double *Tdata = Tn_gf.HostReadWrite();     
-     Vector visc(2);
-     Vector prim(nvel+2);
+     double *Tdata = Tn_gf.HostReadWrite();
+     //double *Tdata = Tn.HostReadWrite();     // TO version
+     //Vector visc(2);
+     //Vector prim(nvel+2);
+     double visc[2];  // TO version
+     double prim[nvel+2];     
      for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
      for (int i = 0; i < Tdof; i++) {
        //for (int eq = 0; eq < nvel; eq++) {
@@ -1025,8 +1057,10 @@ void LoMachSolver::Setup(double dt)
          transportPtr->GetViscosities(prim, prim, visc);
 	 //transportPtr->GetViscBasic(Tdata[i], visc);
 	 //std::cout << " visc: " << visc[0] << endl;
+	 
 	 data[i] = visc[0];
 	 //data[i] = kin_vis;
+	 
          //data[i + eq * Tdof] = visc[0];	   
          //data[i + eq * Tdof] = kin_vis; // static value
 	 //}
@@ -1122,17 +1156,20 @@ void LoMachSolver::Setup(double dt)
       SpInvPC = new HypreBoomerAMG(lor->GetAssembledMatrix());
       SpInvPC->SetPrintLevel(pl_amg);
       SpInvPC->Mult(resp, pn);
-      SpInvOrthoPC = new OrthoSolver(vfes->GetComm());
+      //SpInvOrthoPC = new OrthoSolver(vfes->GetComm());
+      SpInvOrthoPC = new OrthoSolver(pfes->GetComm());
       SpInvOrthoPC->SetSolver(*SpInvPC);
    }
    else
    {
       SpInvPC = new HypreBoomerAMG(*Sp.As<HypreParMatrix>());
       SpInvPC->SetPrintLevel(0);
-      SpInvOrthoPC = new OrthoSolver(vfes->GetComm());
+      //SpInvOrthoPC = new OrthoSolver(vfes->GetComm());
+      SpInvOrthoPC = new OrthoSolver(pfes->GetComm());
       SpInvOrthoPC->SetSolver(*SpInvPC);
    }
-   SpInv = new CGSolver(vfes->GetComm());
+   //SpInv = new CGSolver(vfes->GetComm());
+   SpInv = new CGSolver(pfes->GetComm());
    SpInv->iterative_mode = true;
    SpInv->SetOperator(*Sp);
    if (pres_dbcs.empty())
@@ -1246,16 +1283,18 @@ void LoMachSolver::Setup(double dt)
    bufferAlpha = new ParGridFunction(tfes);
    {
      double *data = bufferAlpha->HostReadWrite();
-     double *Tdata = Tn_gf.HostReadWrite();     
-     Vector visc(2);
-     Vector prim(nvel+2);
+     double *Tdata = Tn_gf.HostReadWrite();
+     //double *Tdata = Tn.HostReadWrite();     // TO version
+     //Vector visc(2);
+     //Vector prim(nvel+2);
+     double visc[2]; // TO version
+     double prim[nvel+2];     
      for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
      for (int i = 0; i < Tdof; i++) {
          prim[1+nvel] = Tdata[i];
          transportPtr->GetViscosities(prim, prim, visc);
-         //data[i] = visc[0] / Pr;
-	 data[i] = kin_vis / Pr;
-         //data[i] = kin_vis; // static value
+         data[i] = visc[0] / Pr;
+	 //data[i] = kin_vis / Pr;
      }
    }   
    //GridFunctionCoefficient alphaField(&buffer3);
@@ -1344,8 +1383,6 @@ void LoMachSolver::Setup(double dt)
    // If the initial condition was set, it has to be aligned with dependent
    // Vectors and GridFunctions
    Tn_gf.GetTrueDofs(Tn);
-
-   //Tn_next = Tn;
    {
      double *data = Tn_next.HostReadWrite();
      double *Tdata = Tn.HostReadWrite();   
@@ -1354,12 +1391,11 @@ void LoMachSolver::Setup(double dt)
      }
    }      
    Tn_next_gf.SetFromTrueDofs(Tn_next); // invalid read
-   
    /*
    {
      double *data = Tn_next_gf.HostReadWrite();
      double *Tdata = Tn_next.HostReadWrite();   
-     for (int i = 0; i < Tdof; i++) {     
+     for (int i = 0; i < TdofInt; i++) {     
        data[i] = Tdata[i];
      }
    }
@@ -1371,6 +1407,7 @@ void LoMachSolver::Setup(double dt)
    dthist[0] = dt;
 
    // Velocity filter
+   //filter_alpha = 1.0;
    if (filter_alpha != 0.0)
    {
       vfec_filter = new H1_FECollection(order - filter_cutoff_modes, pmesh->Dimension());
@@ -1814,9 +1851,11 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
   //if (verbose) grvy_printf(ginfo, "in step...\n");           
    sw_step.Start();
 
-   int Vdof = vfes->GetVSize();   
-   int Pdof = pfes->GetVSize();
-   int Tdof = tfes->GetVSize();
+   int Vdof = vfes->GetNDofs(); //vfes->GetVSize();   
+   int Pdof = pfes->GetNDofs(); //pfes->GetVSize();
+   int Tdof = tfes->GetNDofs(); //tfes->GetVSize();
+   int Ndof = nfes->GetNDofs();
+   int NdofR0 = nfesR0->GetNDofs();      
 
    //int Vdof = vfes->GetTrueVSize();   
    //int Pdof = pfes->GetTrueVSize();
@@ -1825,7 +1864,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    int VdofInt = vfes->GetTrueVSize();   
    int PdofInt = pfes->GetTrueVSize();
    int TdofInt = tfes->GetTrueVSize();
-   //int Ndof = nfes->GetTrueVSize();
+   int NdofInt = nfes->GetTrueVSize();
+   int NdofR0Int = nfesR0->GetTrueVSize();   
    
    //std::cout << "Check a..." << std::endl;
    SetTimeIntegrationCoefficients(current_step-start_step);
@@ -1847,25 +1887,31 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    //std::cout << "Check c..." << std::endl;
 
    //Tn_gf.SetFromTrueDofs(Tn);
-   double *dataVisc = bufferVisc->HostReadWrite();   
    {
-     double *Tdata = Tn_gf.HostReadWrite();     
-     Vector visc(2);
-     Vector prim(nvel+2);
+     double *dataVisc = bufferVisc->HostWrite();        
+     double *Tdata = Tn_gf.HostReadWrite();
+     //double *Tdata = Tn.HostReadWrite();     // TO version
+     //Vector visc(2); 
+     //Vector prim(nvel+2);
+     double visc[2];  // TO version
+     double prim[nvel+2];     
      for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
      for (int i = 0; i < Tdof; i++) {
        //for (int eq = 0; eq < nvel; eq++) {
          prim[1+nvel] = Tdata[i];
          transportPtr->GetViscosities(prim, prim, visc);
 	 //transportPtr->GetViscBasic(Tdata[i], visc);
+	 /*
 	 if(visc[0] != visc[0]) {
 	   std::cout << "NAN VISC VALUE!!! " << prim[1+nvel] << endl;
 	 }
 	 if(visc[0] <= 1.0e-8) {
 	   std::cout << "BAD VISC VALUE!!! " << prim[1+nvel] << endl;
-	 }	 
+	 }
+	 */
          dataVisc[i] = visc[0];
-	 //dataVisc[i] = kin_vis; 
+	 //dataVisc[i] = kin_vis;
+	 
          //dataVisc[i + eq * Tdof] = visc[0];	   
          //dataVisc[i + eq * Tdof] = kin_vis; // static value
 	 //}
@@ -1904,82 +1950,46 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    sw_extrap.Start();
 
    // Nonlinear term at previous steps
+   /*
    N->Mult(un, Nun);
    N->Mult(unm1, Nunm1);
    N->Mult(unm2, Nunm2);
-
-   /*
+   */
+   
    // project u to "padded" order space
-   {
-   double *data = R1PM0_gf.HostReadWrite();
-   double *Udata = un.HostReadWrite();   
-   for (int i = 0; i < VdofInt; i++) {     
-     data[i] = Udata[i];
-   }
-   }   
-   R1PX2_gf.ProjectGridFunction(R1PM0_gf);
-   {
-   double *data = R1PX2_gf.HostReadWrite();
-   double *Udata = uBn.HostReadWrite();      
-   //   for (int i = 0; i < Ndof; i++) {
-      for (int i = 0; i < VdofInt; i++) {     
-     Udata[i] = data[i];
-   }
-   }   
+   un_gf.SetFromTrueDofs(un);         
+   R1PX2_gf.ProjectGridFunction(un_gf);
+   R1PX2_gf.GetTrueDofs(uBn);
 
-   {
-   double *data = R1PM0_gf.HostReadWrite();
-   double *Udata = unm1.HostReadWrite();   
-   for (int i = 0; i < VdofInt; i++) {     
-     data[i] = Udata[i];
-   }
-   }   
-   R1PX2_gf.ProjectGridFunction(R1PM0_gf);
-   {
-   double *data = R1PX2_gf.HostReadWrite();
-   double *Udata = uBnm1.HostReadWrite();      
-   //for (int i = 0; i < Ndof; i++) {
-   for (int i = 0; i < VdofInt; i++) {     
-     Udata[i] = data[i];
-   }
-   }      
+   unm1_gf.SetFromTrueDofs(unm1);      
+   R1PX2_gf.ProjectGridFunction(unm1_gf);
+   R1PX2_gf.GetTrueDofs(uBnm1);
 
-   {
-   double *data = R1PM0_gf.HostReadWrite();
-   double *Udata = unm2.HostReadWrite();   
-   for (int i = 0; i < VdofInt; i++) {     
-     data[i] = Udata[i];
-   }
-   }   
-   R1PX2_gf.ProjectGridFunction(R1PM0_gf);
-   {
-   double *data = R1PX2_gf.HostReadWrite();
-   double *Udata = uBnm2.HostReadWrite();      
-   //for (int i = 0; i < Ndof; i++) {
-   for (int i = 0; i < VdofInt; i++) {     
-     Udata[i] = data[i];
-   }
-   }
+   unm2_gf.SetFromTrueDofs(unm2);         
+   R1PX2_gf.ProjectGridFunction(unm2_gf);
+   R1PX2_gf.GetTrueDofs(uBnm2);
    //std::cout << "Check g..." << std::endl;         
    
    N->Mult(uBn, Nun); // invalid read
    N->Mult(uBnm1, Nunm1);
    N->Mult(uBnm2, Nunm2);
    //std::cout << "Check h..." << std::endl;
-   */
+
    
    // ab-predictor of nonliner term at {n+1}
    {
       const auto d_Nun = Nun.Read();
       const auto d_Nunm1 = Nunm1.Read();
       const auto d_Nunm2 = Nunm2.Read();
-      //auto d_Fext = FBext.Write();
-      auto d_Fext = Fext.Write();      
+      auto d_Fext = FBext.Write();
+      //auto d_Fext = Fext.Write();      
       const auto ab1_ = ab1;
       const auto ab2_ = ab2;
       const auto ab3_ = ab3;
       //mfem::forall(FBext.Size(), [=] MFEM_HOST_DEVICE (int i)
-      mfem::forall(Fext.Size(), [=] MFEM_HOST_DEVICE (int i)	
+      //mfem::forall(Fext.Size(), [=] MFEM_HOST_DEVICE (int i)
+      //MFEM_FORALL(i, Fext.Size(),
+      MFEM_FORALL(i, FBext.Size(),
       {
          d_Fext[i] = ab1_ * d_Nun[i] +
                      ab2_ * d_Nunm1[i] +
@@ -1988,26 +1998,11 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    }
    //std::cout << "Check i..." << std::endl;         
 
-   /*
    // project NL product back to v-space
-   {
-   double *data = R1PX2_gf.HostReadWrite();
-   double *Fdata = FBext.HostReadWrite();   
-   //for (int i = 0; i < Ndof; i++) {
-   for (int i = 0; i < VdofInt; i++) {     
-     data[i] = Fdata[i];
-   }
-   }   
-   R1PM0_gf.ProjectGridFunction(R1PX2_gf);
-   {
-   double *data = R1PM0_gf.HostReadWrite();
-   double *Fdata = Fext.HostReadWrite();      
-   for (int i = 0; i < VdofInt; i++) {     
-     Fdata[i] = data[i];
-   }
-   }
+   R1PX2_gf.SetFromTrueDofs(FBext);
+   R1PM0_gf.ProjectGridFunction(R1PX2_gf);  
+   R1PM0_gf.GetTrueDofs(Fext);
    //std::cout << "Check j..." << std::endl;
-   */
       
    // add forcing/accel term to Fext   
    Fext.Add(1.0, fn); 
@@ -2028,7 +2023,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       const auto d_unm1 = unm1.Read();
       const auto d_unm2 = unm2.Read();
       auto d_Fext = Fext.ReadWrite();
-      mfem::forall(Fext.Size(), [=] MFEM_HOST_DEVICE (int i)
+      //mfem::forall(Fext.Size(), [=] MFEM_HOST_DEVICE (int i)
+      MFEM_FORALL(i, Fext.Size(),      
       {
          d_Fext[i] += bd1idt * d_un[i] +
                       bd2idt * d_unm1[i] +
@@ -2048,7 +2044,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       const auto ab1_ = ab1;
       const auto ab2_ = ab2;
       const auto ab3_ = ab3;
-      mfem::forall(Lext.Size(), [=] MFEM_HOST_DEVICE (int i)
+      //mfem::forall(Lext.Size(), [=] MFEM_HOST_DEVICE (int i)
+      MFEM_FORALL(i, Lext.Size(),	
       {
          d_Lext[i] = ab1_*d_un[i] + ab2_*d_unm1[i] + ab3_*d_unm2[i];
       });
@@ -2077,34 +2074,39 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    //Lext *= kin_vis;
 
 
+   /**/
    {
      double *dataViscSml = viscSml.HostReadWrite();                
      double *Tdata = Tn.HostReadWrite();     
-     Vector visc(2);
-     Vector prim(nvel+2);
+     //Vector visc(2);
+     //Vector prim(nvel+2);
+     double visc[2];  // TO version
+     double prim[nvel+2];          
      for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
      for (int i = 0; i < TdofInt; i++) {
          prim[1+nvel] = Tdata[i];
          transportPtr->GetViscosities(prim, prim, visc);
-         //dataViscSml[i] = visc[0];
-         dataViscSml[i] = kin_vis; 	 
+         dataViscSml[i] = visc[0];
+         //dataViscSml[i] = kin_vis; 	 
      }
    }
+   /**/
    
 
    // dataVisc is full size, Lext is only TrueSize
    {
-     double *dataViscSml = viscSml.HostReadWrite();
-     double *data = Lext.HostReadWrite();     
+     //const double *dataVisc = bufferVisc->HostRead();     // TO version
+     double *dataVisc = viscSml.HostReadWrite();
+     //double *data = Lext.HostReadWrite();     
      for (int eq = 0; eq < dim; eq++) {
-       for (int i = 0; i < TdofInt; i++) {       
+       for (int i = 0; i < TdofInt; i++) {
+         Lext[i + eq*TdofInt] *= dataVisc[i];
          //Lext[i + eq * Tdof] = Lext[i + eq * Tdof] * dataVisc[i];
-         data[i + eq * TdofInt] = data[i + eq * TdofInt] * dataViscSml[i]; // invalid read
+         //data[i + eq * TdofInt] = data[i + eq * TdofInt] * dataViscSml[i]; // invalid read
        }
      }
    }
-   //std::cout << "Check o..." << std::endl;   
-   
+   //std::cout << "Check o..." << std::endl;      
    sw_curlcurl.Stop();
 
    // \tilde{F} = F - \nu CurlCurl(u), (F* + L*)
@@ -2152,6 +2154,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    
    resp.Add(1.0, FText_bdr);
    resp.Add(-bd0/dt, g_bdr);
+   
    //std::cout << "Check q..." << std::endl;   
 
    if (pres_dbcs.empty()) { Orthogonalize(resp); }   
@@ -2176,7 +2179,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      double *data = bufferInvRho->HostReadWrite();
      //double *dataRho = rn_gf.HostReadWrite();   
      //     double *Tdata = Tn.HostReadWrite();          
-     for (int i = 0; i < Pdof; i++) {     
+     for (int i = 0; i < Tdof; i++) {     
        //dataRho[i] = ambientPressure / (Rgas * Tdata[i]);
        //dataRho[i] = Tdata[i];              
        //data[i] = (Rgas * Tdata[i]) / ambientPressure;
@@ -2321,15 +2324,10 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 
    // actual implicit solve for p(n+1)
    sw_spsolve.Start(); 
-   //std::cout << "Check r6..." << std::endl;               
    SpInv->Mult(B1, X1); // conditional jump
-   //std::cout << "Check r7..." << std::endl;                  
    sw_spsolve.Stop();
-   //std::cout << "Check r8..." << std::endl;                  
    iter_spsolve = SpInv->GetNumIterations();
-   //std::cout << "Check r9..." << std::endl;   
    res_spsolve = SpInv->GetFinalNorm();
-   //std::cout << "Check r10..." << std::endl;   
    Sp_form->RecoverFEMSolution(X1, resp_gf, pn_gf);
    //std::cout << "Check s..." << std::endl;   
 
@@ -2417,20 +2415,23 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 
    {
      double *data = bufferAlpha->HostReadWrite();
-     double *Tdata = Tn_gf.HostReadWrite();     
-     Vector visc(2);
-     Vector prim(nvel+2);
+     double *Tdata = Tn_gf.HostReadWrite();
+     //double *Tdata = Tn.HostReadWrite();     // TO version
+     //Vector visc(2);
+     //Vector prim(nvel+2);
+     double visc[2]; // TO version
+     double prim[nvel+2];     
      for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
      for (int i = 0; i < Tdof; i++) {
          prim[1 + nvel] = Tdata[i]; 
          transportPtr->GetViscosities(prim, prim, visc);
+         data[i] = visc[0] / Pr;	   	 
 	 //data[i] = kin_vis / Pr;
-         data[i] = visc[0] / Pr;	   
-         //data[i] = kin_vis; // static value
      }
    }   
      
    Ht_bdfcoeff.constant = bd0 / dt;
+   //Ht_bdfcoeff.constant = 1.0 / dt;
    Ht_form->Update();
    Ht_form->Assemble();
    Ht_form->FormSystemMatrix(temp_ess_tdof, Ht);
@@ -2454,79 +2455,125 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    //std::cout << "bds: " << bd0 << " " << bd1 << " " << bd2 << " " << bd3 << std::endl;   
    
    // add source terms to Text here (e.g. viscous heating)
+
+   // advection
+   /*
+   Tn_gf.SetFromTrueDofs(Tn);         
+   R0PX2_gf.ProjectGridFunction(Tn_gf);
+   R0PX2_gf.GetTrueDofs(TBn);
+   //std::cout << "Check 1..." << std::endl;      
+
+   Tnm1_gf.SetFromTrueDofs(Tnm1);      
+   R0PX2_gf.ProjectGridFunction(Tnm1_gf);
+   R0PX2_gf.GetTrueDofs(TBnm1);
+   //std::cout << "Check 2..." << std::endl;         
+
+   Tnm2_gf.SetFromTrueDofs(Tnm2);         
+   R0PX2_gf.ProjectGridFunction(Tnm2_gf);
+   R0PX2_gf.GetTrueDofs(TBnm2);
+   //std::cout << "Check 3..." << std::endl;
+   */
    
-   // for unsteady term, compute and add known part of BDF unsteady term   
-   {
-      const double bd1idt = -bd1 / dt;
-      const double bd2idt = -bd2 / dt;
-      const double bd3idt = -bd3 / dt;
-      const double *d_tn = Tn.Read();
-      const double *d_tnm1 = Tnm1.Read();
-      const double *d_tnm2 = Tnm2.Read();
-      double *d_Text = Text.HostReadWrite();
-      mfem::forall(Text.Size(), [=] MFEM_HOST_DEVICE (int i)
-      {
-        d_Text[i] = bd1idt*d_tn[i] + bd2idt*d_tnm1[i] + bd3idt*d_tnm2[i];
-      });
-   }
-   //std::cout << "Check y..." << std::endl;
-   
-   // Add boundary terms.
-   Text_gf.SetFromTrueDofs(Text);
-   //std::cout << "Check y0..." << std::endl;      
-   Text_bdr_form->Assemble();
-   //std::cout << "Check y1..." << std::endl;      
-   Text_bdr_form->ParallelAssemble(Text_bdr);
-   //std::cout << "Check y2..." << std::endl;      
-   t_bdr_form->Assemble();
-   //std::cout << "Check y3..." << std::endl;      
-   t_bdr_form->ParallelAssemble(t_bdr);
-   //std::cout << "Check y4..." << std::endl;   
-
-   Mt->Mult(Text, tmpR0);
-   //std::cout << "Check y5..." << std::endl;   
-   //resT.Add(1.0, tmp2); // part of unsteady and full extrapolated advection on lhs
-   resT.Set(1.0, tmpR0);      
-   //resT.Neg(); // move to rhs
-   //std::cout << "Check y6..." << std::endl;   
-
-
-   // advection => will break is t&u arent in the same space
    //bufferTemp = new ParGridFunction(vfes);      
    //double *dataTemp = bufferTemp->HostReadWrite();
    {
-     double *data = bufferR1sml.HostReadWrite();
-     double *Udnm0 = un.HostReadWrite();
-     double *Udnm1 = unm1.HostReadWrite();
-     double *Udnm2 = unm2.HostReadWrite();     
-     double *Tdnm0 = Tn.HostReadWrite();
-     double *Tdnm1 = Tnm1.HostReadWrite();
-     double *Tdnm2 = Tnm2.HostReadWrite();
+     // TO version uses bufferTemp and then Dt->Mult(*bufferTemp, tmpR0) 
+     //double *data = bufferR1sml.HostReadWrite();
+     //double *data = bufferTemp->HostReadWrite();
+     /*
+     //double *data = FBext.HostReadWrite(); // container
+     const double *Udnm0 = uBn.Read();
+     const double *Udnm1 = uBnm1.Read();
+     const double *Udnm2 = uBnm2.Read();     
+     const double *Tdnm0 = TBn.Read();
+     const double *Tdnm1 = TBnm1.Read();
+     const double *Tdnm2 = TBnm2.Read();
+     */
+     //double *data = Fext.HostReadWrite(); // container
+     const double *Udnm0 = un.Read();
+     const double *Udnm1 = unm1.Read();
+     const double *Udnm2 = unm2.Read();     
+     const double *Tdnm0 = Tn.Read();
+     const double *Tdnm1 = Tnm1.Read();
+     const double *Tdnm2 = Tnm2.Read();     
      const auto ab1_ = ab1;
      const auto ab2_ = ab2;
-     const auto ab3_ = ab3;   
-     for (int eq = 0; eq < dim; eq++) {   
-       for (int i = 0; i < TdofInt; i++) {
-         data[i + eq * TdofInt] = ab1_ * Udnm0[i + eq * TdofInt] * Tdnm0[i] +
-       	                          ab2_ * Udnm1[i + eq * TdofInt] * Tdnm1[i] +
-	                          ab3_ * Udnm2[i + eq * TdofInt] * Tdnm2[i];
+     const auto ab3_ = ab3;
+     for (int eq = 0; eq < dim; eq++) {
+       /*
+       for (int i = 0; i < NdofR0Int; i++) {
+         FBext[i + eq * NdofR0Int] = ab1_ * Udnm0[i + eq*NdofR0Int] * Tdnm0[i] +
+        	                     ab2_ * Udnm1[i + eq*NdofR0Int] * Tdnm1[i] +
+	                             ab3_ * Udnm2[i + eq*NdofR0Int] * Tdnm2[i];
        }
+       */
+       for (int i = 0; i < TdofInt; i++) {
+         Fext[i + eq * TdofInt] = ab1_ * Udnm0[i + eq*TdofInt] * Tdnm0[i] +
+       	                          ab2_ * Udnm1[i + eq*TdofInt] * Tdnm1[i] +
+	                          ab3_ * Udnm2[i + eq*TdofInt] * Tdnm2[i];
+       }       
+       
      }
    }
-   //std::cout << "Check z..." << std::endl;      
-   
-   Dt->Mult(bufferR1sml, tmpR0); // explicit div(uT) at {n}
-   //Text.Add(-1.0, tmp2);
-   resT.Add(-1.0, tmpR0);
+   //std::cout << "Check 5..." << std::endl;      
 
-   
-   // M^-1 * advection -> not sure about this part...
    /*
-   MtInv->Mult(Text, tmp2);
+   R1PX2_gf.SetFromTrueDofs(FBext);
+   R1PM0_gf.ProjectGridFunction(R1PX2_gf);
+   R1PM0_gf.GetTrueDofs(Fext);
+   */
+
+   Dt->Mult(Fext, tmpR0); // explicit div(uT) at {n}   
+   //Dt->Mult(bufferR1sml, tmpR0); // explicit div(uT) at {n}
+   //std::cout << "Check 7..." << std::endl;            
+   //Dt->Mult(*bufferTemp, tmpR0);
+   Text.Set(-1.0, tmpR0);
+   //resT.Add(-1.0, tmpR0);
+   //std::cout << "Check 8..." << std::endl;            
+
+   // M^-1 * advection => SOMETHING IS WRONG HERE!!! should be necessary but it makes the temp go crazy
+   MtInv->Mult(Text, tmpR0);
    iter_mtsolve = MtInv->GetNumIterations();
    res_mtsolve = MtInv->GetFinalNorm();
-   Text.Set(1.0, tmp2);
-   */
+   Text.Set(1.0, tmpR0);
+
+   
+   // for unsteady term, compute and add known part of BDF unsteady term   
+   {
+     //double *d_Text = Text.HostReadWrite();
+     //const double bd1idt = +1.0/dt; // 0s for other     
+     const double bd1idt = -bd1 / dt;
+     const double bd2idt = -bd2 / dt;
+     const double bd3idt = -bd3 / dt;
+     const double *d_tn = Tn.Read();
+     const double *d_tnm1 = Tnm1.Read();
+     const double *d_tnm2 = Tnm2.Read();
+     //mfem::forall(Text.Size(), [=] MFEM_HOST_DEVICE (int i)
+     MFEM_FORALL(i, Text.Size(),	
+     {
+       Text[i] += bd1idt*d_tn[i] + bd2idt*d_tnm1[i] + bd3idt*d_tnm2[i];
+     });
+   }
+   //std::cout << "Check y..." << std::endl;
+
+
+   // Add boundary terms.
+   Text_gf.SetFromTrueDofs(Text);
+   Text_bdr_form->Assemble();
+   Text_bdr_form->ParallelAssemble(Text_bdr);
+   t_bdr_form->Assemble();
+   t_bdr_form->ParallelAssemble(t_bdr);
+   resT.Add(1.0, Text_bdr);
+   resT.Add(-bd0/dt, t_bdr);
+   //std::cout << "Check y4..." << std::endl;   
+   
+   
+   Mt->Mult(Text, tmpR0);
+   //resT.Add(1.0, tmpR0); // part of unsteady and full extrapolated advection on lhs
+   resT.Set(1.0, tmpR0);      
+   //resT.Neg(); // move to rhs
+   //std::cout << "Check y6..." << std::endl;   
+ 
    
    //std::cout << "Check 7i..." << std::endl;   
 
@@ -2555,14 +2602,10 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 
    // solve helmholtz eq for temp   
    HtInv->Mult(Bt2, Xt2);
-   //std::cout << "Check 7kA..." << std::endl;      
    iter_htsolve = HtInv->GetNumIterations();
    res_htsolve = HtInv->GetFinalNorm();
-   //std::cout << "Check 7kB..." << std::endl;         
    Ht_form->RecoverFEMSolution(Xt2, resT_gf, Tn_next_gf);
-   //std::cout << "Check 7kC..." << std::endl;         
    Tn_next_gf.GetTrueDofs(Tn_next);
-   //std::cout << "Check 7l..." << std::endl;   
 
    // end temperature....................................
    
@@ -2653,7 +2696,8 @@ void LoMachSolver::updateU() {
     //std::cout << " check 1" << endl;    
     
     const auto d_rn_gf = rn_gf.Read();    
-    mfem::forall(rn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    //mfem::forall(rn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    MFEM_FORALL(i, rn_gf.Size(),      
     {
       dataUp[i] = d_rn_gf[i];
     });
@@ -2661,7 +2705,8 @@ void LoMachSolver::updateU() {
     
     int vstart = rfes->GetNDofs();
     const auto d_un_gf = un_gf.Read();    
-    mfem::forall(un_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    //mfem::forall(un_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    MFEM_FORALL(i, un_gf.Size(),      
     {
       dataUp[i + vstart] = d_un_gf[i];
     });
@@ -2669,7 +2714,8 @@ void LoMachSolver::updateU() {
 
     int tstart = (1+nvel)*(tfes->GetNDofs());    
     const auto d_tn_gf = Tn_gf.Read();    
-    mfem::forall(Tn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    //mfem::forall(Tn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    MFEM_FORALL(i, Tn_gf.Size(),      
     {
       dataUp[i + tstart] = d_tn_gf[i];
     });
@@ -2719,7 +2765,8 @@ void LoMachSolver::copyU() {
     //std::cout << " check 1" << endl;    
     
     double *d_rn_gf = rn_gf.ReadWrite();    
-    mfem::forall(rn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    //mfem::forall(rn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    MFEM_FORALL(i, rn_gf.Size(),      
     {
       d_rn_gf[i] = dataUp[i];
     });
@@ -2727,7 +2774,8 @@ void LoMachSolver::copyU() {
     
     int vstart = rfes->GetNDofs();
     double *d_un_gf = un_gf.ReadWrite();    
-    mfem::forall(un_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    //mfem::forall(un_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    MFEM_FORALL(i, un_gf.Size(),      
     {
        d_un_gf[i] = dataUp[i + vstart];
     });
@@ -2735,7 +2783,8 @@ void LoMachSolver::copyU() {
 
     int tstart = (1+nvel)*(tfes->GetNDofs());    
     double *d_tn_gf = Tn_gf.ReadWrite();    
-    mfem::forall(Tn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    //mfem::forall(Tn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+    MFEM_FORALL(i, Tn_gf.Size(),      
     {
        d_tn_gf[i] = dataUp[i + tstart];
     });
@@ -5031,7 +5080,7 @@ void vel_ic(const Vector &coords, double t, Vector &u)
    double aL = 2.0 / (2.0) * pi;
    double bL = 2.0 * pi;
    double cL = 2.0 * pi;   
-   double M = 0.1;
+   double M = 1.0;
    double scl;
 
    

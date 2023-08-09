@@ -294,6 +294,8 @@ protected:
    // nonlinear term
    FiniteElementCollection *nfec = nullptr;
    ParFiniteElementSpace *nfes = nullptr;
+   FiniteElementCollection *nfecR0 = nullptr;
+   ParFiniteElementSpace *nfesR0 = nullptr;  
   
    ParNonlinearForm *N = nullptr;
    ParBilinearForm *Mv_form = nullptr;
@@ -375,7 +377,8 @@ protected:
    mfem::CGSolver *HtInv = nullptr;  
 
    Vector fn, un, un_next, unm1, unm2;
-   Vector uBn, uBnm1, uBnm2;  
+   Vector uBn, uBnm1, uBnm2;
+   Vector TBn, TBnm1, TBnm2;    
    Vector Nun, Nunm1, Nunm2;
    Vector Fext, FText, Lext;          
    Vector resu, tmpR1;
@@ -391,6 +394,9 @@ protected:
    ParGridFunction un_gf, un_next_gf, curlu_gf, curlcurlu_gf,
                    Lext_gf, FText_gf, resu_gf;
 
+   ParGridFunction unm1_gf, unm2_gf;
+   ParGridFunction Tnm1_gf, Tnm2_gf;    
+  
    //ParGridFunction rn_gf, resr_gf;  
    ParGridFunction pn_gf, resp_gf;
    ParGridFunction sml_gf, big_gf;
@@ -411,7 +417,8 @@ protected:
    // swap spaces
    ParGridFunction R0PM0_gf;
    ParGridFunction R0PM1_gf;
-   ParGridFunction R1PM0_gf;  
+   ParGridFunction R1PM0_gf; 
+   ParGridFunction R0PX2_gf;     
    ParGridFunction R1PX2_gf;    
   
    // All essential attributes.
