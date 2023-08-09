@@ -750,7 +750,7 @@ void LoMachSolver::Setup(double dt) {
    Ht_form = new ParBilinearForm(sfes);
    auto *hmt_blfi = new MassIntegrator(Ht_bdfcoeff); // unsteady bit
    auto *hdt_blfi = new DiffusionIntegrator(Ht_lincoeff);
-
+   //auto *hdt_blfi = new DiffusionIntegrator(*alphaField);
    if (numerical_integ)
    {
      hmt_blfi->SetIntRule(&ir_i);
@@ -841,7 +841,7 @@ void LoMachSolver::Setup(double dt) {
    dthist[0] = dt;
 
    // Velocity filter
-   filter_alpha = 1.0;
+   filter_alpha = 0.0;
    if (filter_alpha != 0.0)
    {
       vfec_filter = new H1_FECollection(order - filter_cutoff_modes, pmesh->Dimension());
@@ -2699,7 +2699,7 @@ void vel_ic(const Vector &coords, double t, Vector &u)
    double aL = 2.0 / (2.0) * pi;
    double bL = 2.0 * pi;
    double cL = 2.0 * pi;   
-   double M = 1000.0;
+   double M = 0.1;
    double scl;
 
    
