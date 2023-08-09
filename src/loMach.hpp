@@ -339,10 +339,13 @@ protected:
    ParGridFunction *bufferAlpha;
    ParGridFunction *bufferTemp;
    ParGridFunction *bufferPM0;      
-   ParGridFunction *bufferPM1;    
-   GridFunctionCoefficient *viscField;
+   ParGridFunction *bufferPM1;
+   GridFunctionCoefficient *viscField;  
    GridFunctionCoefficient *invRho;
-   GridFunctionCoefficient *alphaField;    
+   GridFunctionCoefficient *alphaField;
+
+  //ParGridFunction *bufferViscSml;  
+  //GridFunctionCoefficient *viscFieldSml;  
   
    OperatorHandle Mv;
    OperatorHandle Sp;
@@ -378,6 +381,8 @@ protected:
    Vector resu, tmpR1;
    Vector FBext;
 
+   Vector bufferR0sml, bufferR1sml;
+
    Vector pn, resp, FText_bdr, g_bdr;
    Vector tmpR0PM1;
 
@@ -399,6 +404,9 @@ protected:
    // density, not actually solved for
    Vector rn;
    ParGridFunction rn_gf;
+
+   // for the extrapolated p rhs
+   Vector viscSml;
 
    // swap spaces
    ParGridFunction R0PM0_gf;
@@ -454,9 +462,9 @@ protected:
    int pl_mtsolve = 0;  
 
    // Relative tolerances.
-   double rtol_spsolve = 1e-6;
+   double rtol_spsolve = 1e-8;
    double rtol_hsolve = 1e-8;
-   double rtol_htsolve = 1e-6;  
+   double rtol_htsolve = 1e-8;  
 
    // Iteration counts.
    int iter_mvsolve = 0, iter_spsolve = 0, iter_hsolve = 0;

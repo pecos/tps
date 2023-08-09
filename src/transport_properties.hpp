@@ -115,6 +115,7 @@ class TransportProperties {
    * @param visc      Pointer to viscosities (visc[0] = dynamic viscosity, visc[1] = bulk viscosity)
    */
   MFEM_HOST_DEVICE virtual void GetViscosities(const double *conserved, const double *primitive, double *visc) = 0;
+  //MFEM_HOST_DEVICE virtual void GetViscBasic(const double *temperature, double *visc) = 0;  
 
   // For mixture-averaged diffusion, correct for mass conservation.
   void correctMassDiffusionFlux(const Vector &Y_sp, DenseMatrix &diffusionVelocity);
@@ -184,6 +185,7 @@ class DryAirTransport : public TransportProperties {
                                                                  double *diffusionVelocity, double *n_sp) {}
 
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
+  //MFEM_HOST_DEVICE void GetViscBasic(const double *temperature, double *visc) override;  
 
   //double ComputeViscosity(const double *temp);
   
@@ -194,6 +196,14 @@ MFEM_HOST_DEVICE inline void DryAirTransport::GetViscosities(const double *conse
   visc[0] = (C1_ * visc_mult * pow(temp, 1.5) / (temp + S0_));
   visc[1] = bulk_visc_mult * visc[0];
 }
+
+/*
+MFEM_HOST_DEVICE inline void DryAirTransport::GetViscBasic(const double *temperature, double *visc) {
+  const double temp = *temperature;
+  visc[0] = (C1_ * visc_mult * pow(temp, 1.5) / (temp + S0_));
+  visc[1] = bulk_visc_mult * visc[0];
+}
+*/
 
 //////////////////////////////////////////////////////
 //////// Constant Transport
@@ -232,6 +242,7 @@ class ConstantTransport : public TransportProperties {
                                                                  double *diffusionVelocity, double *n_sp);
 
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
+  //MFEM_HOST_DEVICE void GetViscBasic(const double *temperature, double *visc) override;  
 };
 
 MFEM_HOST_DEVICE inline void ConstantTransport::GetViscosities(const double *conserved, const double *primitive,
@@ -239,5 +250,13 @@ MFEM_HOST_DEVICE inline void ConstantTransport::GetViscosities(const double *con
   visc[0] = viscosity_;
   visc[1] = bulkViscosity_;
 }
+
+/*
+MFEM_HOST_DEVICE inline void ConstantTransport::GetViscBasic(const double *temperature, double *visc) {
+  visc[0] = viscosity_;
+  visc[1] = bulkViscosity_;
+}
+*/
+
 
 #endif  // TRANSPORT_PROPERTIES_HPP_
