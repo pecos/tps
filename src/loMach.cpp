@@ -102,14 +102,20 @@ void LoMachSolver::initialize() {
    //LoMachOptions loMach_opts_ = GetOptions();   
    order = config.solOrder;
    porder = config.solOrder;
-   //norder = config.solOrder;
-   double no;
-   no = ceil( ((double)order * 1.5) );   
-   norder = int(no);
-   //std::cout << " NORDER: " << norder << endl;
+   norder = config.solOrder;
+   //norder = 2*order;
+   //double no;
+   //no = ceil( ((double)order * 1.5) );   
+   //norder = int(no);
+
+   if (mpi_.Root()) {
+     std::cout << " ORDER: " << order << endl;
+     std::cout << " PORDER: " << porder << endl;          
+     std::cout << " NORDER: " << norder << endl;
+   }
 
    // temporary hard-coding   
-   Re_tau = 182.0;   
+   Re_tau = 1.0/1.48e-5; //182.0;   
    kin_vis = 1.0/Re_tau;
    ambientPressure = 101325.0;
    Rgas = 287.0;
@@ -784,7 +790,7 @@ void LoMachSolver::initialize() {
 void LoMachSolver::Setup(double dt)
 {
 
-   partial_assembly = true; // not working?
+  //partial_assembly = true; // not working?
    //partial_assembly = false;
    //if (verbose) grvy_printf(ginfo, "in Setup...\n");
    /*
@@ -929,14 +935,14 @@ void LoMachSolver::Setup(double dt)
    
    // GLL integration rule (Numerical Integration)
    const IntegrationRule &ir_ni = gll_rules.Get(vfes->GetFE(0)->GetGeomType(), 2 * order);
-   //const IntegrationRule &ir_nli = gll_rules.Get(nfes->GetFE(0)->GetGeomType(), 3 * norder - 1);
-   const IntegrationRule &ir_nli = gll_rules.Get(vfes->GetFE(0)->GetGeomType(), 3 * norder - 1);
+   const IntegrationRule &ir_nli = gll_rules.Get(nfes->GetFE(0)->GetGeomType(), 3 * norder - 1);
+   //const IntegrationRule &ir_nli = gll_rules.Get(vfes->GetFE(0)->GetGeomType(), 3 * norder - 1);
    const IntegrationRule &ir_pi = gll_rules.Get(pfes->GetFE(0)->GetGeomType(), 2 * porder);   
    const IntegrationRule &ir_i  = gll_rules.Get(tfes->GetFE(0)->GetGeomType(), 2 * order);
    //std::cout << "Check 6..." << std::endl;     
    
    // convection section, extrapolation
-   nlcoeff.constant = -1.0;
+   nlcoeff.constant = -1.0; // starts with negative
    //N = new ParNonlinearForm(vfes);
    N = new ParNonlinearForm(nfes);
    auto *nlc_nlfi = new VectorConvectionNLFIntegrator(nlcoeff);
@@ -1077,8 +1083,8 @@ void LoMachSolver::Setup(double dt)
    H_form = new ParBilinearForm(vfes);
    //H_form = new ParBilinearForm(pfes); // maybe?
    auto *hmv_blfi = new VectorMassIntegrator(H_bdfcoeff); // diagonal from unsteady term
-   //auto *hdv_blfi = new VectorDiffusionIntegrator(H_lincoeff);
-   auto *hdv_blfi = new VectorDiffusionIntegrator(*viscField); // Laplacian
+   auto *hdv_blfi = new VectorDiffusionIntegrator(H_lincoeff);
+   //auto *hdv_blfi = new VectorDiffusionIntegrator(*viscField); // Laplacian
    if (numerical_integ)
    {
       hmv_blfi->SetIntRule(&ir_ni);
@@ -1305,8 +1311,8 @@ void LoMachSolver::Setup(double dt)
    Ht_bdfcoeff.constant = 1.0 / dt;
    Ht_form = new ParBilinearForm(tfes);
    auto *hmt_blfi = new MassIntegrator(Ht_bdfcoeff); // unsteady bit
-   //auto *hdt_blfi = new DiffusionIntegrator(Ht_lincoeff);
-   auto *hdt_blfi = new DiffusionIntegrator(*alphaField); // Laplacian bit
+   auto *hdt_blfi = new DiffusionIntegrator(Ht_lincoeff);
+   //auto *hdt_blfi = new DiffusionIntegrator(*alphaField); // Laplacian bit
    //std::cout << "Check 23..." << std::endl;        
    
    if (numerical_integ)
@@ -1407,7 +1413,6 @@ void LoMachSolver::Setup(double dt)
    dthist[0] = dt;
 
    // Velocity filter
-   //filter_alpha = 1.0;
    if (filter_alpha != 0.0)
    {
       vfec_filter = new H1_FECollection(order - filter_cutoff_modes, pmesh->Dimension());
@@ -2005,7 +2010,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    //std::cout << "Check j..." << std::endl;
       
    // add forcing/accel term to Fext   
-   Fext.Add(1.0, fn); 
+   Fext.Add(1.0, fn);  // negative on rhs
 
    // Fext = M^{-1} (F(u^{n}) + f^{n+1}) (F* w/o known part of BDF)
    MvInv->Mult(Fext, tmpR1); // conditional jump
@@ -2043,7 +2048,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       auto d_Lext = Lext.Write();
       const auto ab1_ = ab1;
       const auto ab2_ = ab2;
-      const auto ab3_ = ab3;
+      const auto ab3_ = ab3;      
       //mfem::forall(Lext.Size(), [=] MFEM_HOST_DEVICE (int i)
       MFEM_FORALL(i, Lext.Size(),	
       {
@@ -2086,8 +2091,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      for (int i = 0; i < TdofInt; i++) {
          prim[1+nvel] = Tdata[i];
          transportPtr->GetViscosities(prim, prim, visc);
-         dataViscSml[i] = visc[0];
-         //dataViscSml[i] = kin_vis; 	 
+         //dataViscSml[i] = visc[0];
+         dataViscSml[i] = kin_vis; 	 
      }
    }
    /**/
@@ -2110,8 +2115,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    sw_curlcurl.Stop();
 
    // \tilde{F} = F - \nu CurlCurl(u), (F* + L*)
-   FText.Set(-1.0, Lext);
-   FText.Add(1.0, Fext);
+   FText.Set(-1.0, Lext); // negative from curl-curl
+   FText.Add(1.0, Fext); // unsteady also neg on rhs, see HIGH-ORDER MATRIX-FREE INCOMPRESSIBLE FLOW SOLVERS eq 42
 
    // p_r = \nabla \cdot FText ( i think "p_r" means rhs of pressure-poisson eq, so div(\tilde{F}))
    // applied divergence to full FText vector
@@ -2364,7 +2369,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    G->Mult(pnBig, resu);
    */
    
-   resu.Neg(); // -gradP
+   resu.Neg(); // -gradP => so res ARE on rhs
    Mv->Mult(Fext, tmpR1); //Mv{F*}
    resu.Add(1.0, tmpR1); // add to resu
    //std::cout << "Check t..." << std::endl;
@@ -2425,13 +2430,14 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      for (int i = 0; i < Tdof; i++) {
          prim[1 + nvel] = Tdata[i]; 
          transportPtr->GetViscosities(prim, prim, visc);
-         data[i] = visc[0] / Pr;	   	 
+	 ////         data[i] = visc[0] / Pr;
+	 data[i] = visc[0] / Pr;
 	 //data[i] = kin_vis / Pr;
      }
    }   
      
-   Ht_bdfcoeff.constant = bd0 / dt;
-   //Ht_bdfcoeff.constant = 1.0 / dt;
+   //Ht_bdfcoeff.constant = bd0 / dt;
+   Ht_bdfcoeff.constant = +1.0 / dt;
    Ht_form->Update();
    Ht_form->Assemble();
    Ht_form->FormSystemMatrix(temp_ess_tdof, Ht);
@@ -2456,13 +2462,69 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    
    // add source terms to Text here (e.g. viscous heating)
 
-   // advection
+
    /*
+   //Dt->Mult(bufferR1sml, tmpR0); // explicit div(uT) at {n}
+   //std::cout << "Check 7..." << std::endl;            
+   //Dt->Mult(*bufferTemp, tmpR0);
+   //Text.Set(-1.0, tmpR0);
+   Text.Set(+1.0, tmpR0); // not sure here!   
+   //resT.Add(-1.0, tmpR0);
+   //std::cout << "Check 8..." << std::endl;            
+
+   // M^-1 * advection => SOMETHING IS WRONG HERE!!! should be necessary but it makes the temp go crazy
+   MtInv->Mult(Text, tmpR0);
+   iter_mtsolve = MtInv->GetNumIterations();
+   res_mtsolve = MtInv->GetFinalNorm();
+   Text.Set(1.0, tmpR0);
+   */
+   
+   // for unsteady term, compute and add known part of BDF unsteady term
+   // moving this bit before advection to avoid the extra Minv
+   {
+     //double *d_Text = Text.HostReadWrite();
+     const double bd1idt = bd1 / dt;
+     const double bd2idt = bd2 / dt;
+     const double bd3idt = bd3 / dt;
+     const double *d_tn = Tn.Read();
+     const double *d_tnm1 = Tnm1.Read();
+     const double *d_tnm2 = Tnm2.Read();
+     //mfem::forall(Text.Size(), [=] MFEM_HOST_DEVICE (int i)
+     MFEM_FORALL(i, Text.Size(),	
+     {
+       //Text[i] = bd1idt*d_tn[i] + bd2idt*d_tnm1[i] + bd3idt*d_tnm2[i];
+       Text[i] = 1.0/dt * d_tn[i];
+     });
+   }
+   //std::cout << "Check y..." << std::endl;
+
+   //std::cout << "Check y4..." << std::endl;   
+      
+   Mt->Mult(Text, tmpR0);
+   //resT.Add(1.0, tmpR0); 
+   resT.Set(+1.0, tmpR0);
+   
+   //resT.Neg(); // move to rhs
+   //std::cout << "Check y6..." << std::endl;   
+
+   // Add boundary terms.
+   /*
+   Text_gf.SetFromTrueDofs(Text);
+   Text_bdr_form->Assemble();
+   Text_bdr_form->ParallelAssemble(Text_bdr);
+   t_bdr_form->Assemble();
+   t_bdr_form->ParallelAssemble(t_bdr);
+   resT.Add(1.0, Text_bdr);
+   resT.Add(-bd0/dt, t_bdr);
+   */   
+
+   // advection
    Tn_gf.SetFromTrueDofs(Tn);         
    R0PX2_gf.ProjectGridFunction(Tn_gf);
    R0PX2_gf.GetTrueDofs(TBn);
    //std::cout << "Check 1..." << std::endl;      
 
+   /*
    Tnm1_gf.SetFromTrueDofs(Tnm1);      
    R0PX2_gf.ProjectGridFunction(Tnm1_gf);
    R0PX2_gf.GetTrueDofs(TBnm1);
@@ -2480,7 +2542,6 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      // TO version uses bufferTemp and then Dt->Mult(*bufferTemp, tmpR0) 
      //double *data = bufferR1sml.HostReadWrite();
      //double *data = bufferTemp->HostReadWrite();
-     /*
      //double *data = FBext.HostReadWrite(); // container
      const double *Udnm0 = uBn.Read();
      const double *Udnm1 = uBnm1.Read();
@@ -2488,92 +2549,59 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      const double *Tdnm0 = TBn.Read();
      const double *Tdnm1 = TBnm1.Read();
      const double *Tdnm2 = TBnm2.Read();
-     */
+     /*
      //double *data = Fext.HostReadWrite(); // container
      const double *Udnm0 = un.Read();
      const double *Udnm1 = unm1.Read();
      const double *Udnm2 = unm2.Read();     
      const double *Tdnm0 = Tn.Read();
      const double *Tdnm1 = Tnm1.Read();
-     const double *Tdnm2 = Tnm2.Read();     
+     const double *Tdnm2 = Tnm2.Read();
+     */
      const auto ab1_ = ab1;
      const auto ab2_ = ab2;
      const auto ab3_ = ab3;
      for (int eq = 0; eq < dim; eq++) {
-       /*
+       
        for (int i = 0; i < NdofR0Int; i++) {
-         FBext[i + eq * NdofR0Int] = ab1_ * Udnm0[i + eq*NdofR0Int] * Tdnm0[i] +
-        	                     ab2_ * Udnm1[i + eq*NdofR0Int] * Tdnm1[i] +
-	                             ab3_ * Udnm2[i + eq*NdofR0Int] * Tdnm2[i];
+         FBext[i + eq * NdofR0Int] = Udnm0[i + eq*NdofR0Int] * Tdnm0[i];
+
+         //FBext[i + eq * NdofR0Int] = ab1_ * Udnm0[i + eq*NdofR0Int] * Tdnm0[i] +
+	 //	                     ab2_ * Udnm1[i + eq*NdofR0Int] * Tdnm1[i] +
+	 //                            ab3_ * Udnm2[i + eq*NdofR0Int] * Tdnm2[i];	 
        }
-       */
+       
+       /*
        for (int i = 0; i < TdofInt; i++) {
          Fext[i + eq * TdofInt] = ab1_ * Udnm0[i + eq*TdofInt] * Tdnm0[i] +
        	                          ab2_ * Udnm1[i + eq*TdofInt] * Tdnm1[i] +
 	                          ab3_ * Udnm2[i + eq*TdofInt] * Tdnm2[i];
-       }       
+       }
+       */
        
      }
    }
    //std::cout << "Check 5..." << std::endl;      
 
-   /*
+   // project back to p-space
    R1PX2_gf.SetFromTrueDofs(FBext);
    R1PM0_gf.ProjectGridFunction(R1PX2_gf);
    R1PM0_gf.GetTrueDofs(Fext);
-   */
 
-   Dt->Mult(Fext, tmpR0); // explicit div(uT) at {n}   
-   //Dt->Mult(bufferR1sml, tmpR0); // explicit div(uT) at {n}
-   //std::cout << "Check 7..." << std::endl;            
-   //Dt->Mult(*bufferTemp, tmpR0);
-   Text.Set(-1.0, tmpR0);
-   //resT.Add(-1.0, tmpR0);
-   //std::cout << "Check 8..." << std::endl;            
+   Dt->Mult(Fext, tmpR0); // explicit div(uT) at extrapolated {n+1}
 
-   // M^-1 * advection => SOMETHING IS WRONG HERE!!! should be necessary but it makes the temp go crazy
-   MtInv->Mult(Text, tmpR0);
-   iter_mtsolve = MtInv->GetNumIterations();
-   res_mtsolve = MtInv->GetFinalNorm();
-   Text.Set(1.0, tmpR0);
+   // WHWYWHY WHY?
+   /**/
+   Mt->Mult(tmpR0, Text);
+   //iter_mtsolve = MtInv->GetNumIterations();
+   //res_mtsolve = MtInv->GetFinalNorm();
+   tmpR0.Set(1.0, Text);
+   /**/
 
    
-   // for unsteady term, compute and add known part of BDF unsteady term   
-   {
-     //double *d_Text = Text.HostReadWrite();
-     //const double bd1idt = +1.0/dt; // 0s for other     
-     const double bd1idt = -bd1 / dt;
-     const double bd2idt = -bd2 / dt;
-     const double bd3idt = -bd3 / dt;
-     const double *d_tn = Tn.Read();
-     const double *d_tnm1 = Tnm1.Read();
-     const double *d_tnm2 = Tnm2.Read();
-     //mfem::forall(Text.Size(), [=] MFEM_HOST_DEVICE (int i)
-     MFEM_FORALL(i, Text.Size(),	
-     {
-       Text[i] += bd1idt*d_tn[i] + bd2idt*d_tnm1[i] + bd3idt*d_tnm2[i];
-     });
-   }
-   //std::cout << "Check y..." << std::endl;
+   // div(uT) should already be in integrated weak form and can be added directly
+   resT.Add(-1.0, tmpR0); // minus to move to rhs
 
-
-   // Add boundary terms.
-   Text_gf.SetFromTrueDofs(Text);
-   Text_bdr_form->Assemble();
-   Text_bdr_form->ParallelAssemble(Text_bdr);
-   t_bdr_form->Assemble();
-   t_bdr_form->ParallelAssemble(t_bdr);
-   resT.Add(1.0, Text_bdr);
-   resT.Add(-bd0/dt, t_bdr);
-   //std::cout << "Check y4..." << std::endl;   
-   
-   
-   Mt->Mult(Text, tmpR0);
-   //resT.Add(1.0, tmpR0); // part of unsteady and full extrapolated advection on lhs
-   resT.Set(1.0, tmpR0);      
-   //resT.Neg(); // move to rhs
-   //std::cout << "Check y6..." << std::endl;   
- 
    
    //std::cout << "Check 7i..." << std::endl;   
 
@@ -2618,7 +2646,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    }
 
    // explicit filter
-   /*
+   /**/
    if (filter_alpha != 0.0)
    {
      
@@ -2644,7 +2672,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       });
       
    }
-   */
+   /**/
    
    sw_step.Stop();
   
