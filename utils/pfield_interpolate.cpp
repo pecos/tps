@@ -72,13 +72,15 @@ int main(int argc, char *argv[]) {
   ParMesh *mesh_1 = srcField.getMesh();
   const int dim = mesh_1->Dimension();
 
-  // TODO(trevilo): Generalize how we generate the "target" for the
-  // case where we don't have a tps input file.
-
+  // Instantiate the "fine" (i.e., target) mesh.
+  // This must be done via the tps input file if the goal is to
+  // generate a tps restart on a new mesh.  Alternatively, if just a
+  // mesh is specified, using the option --mesh-h1, that mesh is read
+  // and decomposed here.
   M2ulPhyS *tarField = nullptr;
+  ParMesh *mesh_2 = nullptr;
   if (!tarFileName.empty()) {
     // Instantiate M2ulPhyS class for the "fine" (i.e., target) case
-
     // Note that the M2ulPhyS ctor is responsible for reading the
     // restart file, assuming that io/enableRestart = True in the tps
     // input file.  So, assuming there is not an existing restart file
@@ -90,17 +92,17 @@ int main(int argc, char *argv[]) {
     RunConfiguration &tarConfig = tarField->GetConfig();
     assert(tarConfig.GetRestartCycle() == 0);
     tps.closeInputFile();
+
+    mesh_2 = tarField->getMesh();
   } else {
-    // If the target case file doesn't exist, want to use H1 space,
-    // but this isn't ready yet
-    cout << "This capability is not implemented yet!" << endl;
-    return 1;
+    // Otherwise, read the mesh directly
+
+    // All mpi ranks read the serial mesh
+    Mesh serial_mesh(tarMeshH1.c_str());
+
+    // Decompose
+    mesh_2 = new ParMesh(MPI_COMM_WORLD, serial_mesh);
   }
-
-  // Get meshes
-  ParMesh *mesh_2 = tarField.getMesh();
-
-  // const int dim = mesh_1->Dimension();
 
   // GSLIB only works in 2 and 3 dimensions
   assert(dim > 1);
@@ -136,14 +138,21 @@ int main(int argc, char *argv[]) {
 
   std::cout << "Source FE collection: " << src_fec->Name() << std::endl;
 
-  // TODO(trevilo): Generalize how we generate the "target" finite
-  // element space and associated ParGridFunction for the H1 case
-  // (i.e., no tps input file).
-
   // Setup the FiniteElementSpace and GridFunction on the target mesh.
-  const FiniteElementCollection *tar_fec = tarField.getFEC();
-  ParFiniteElementSpace *tar_fes = tarField.getFESpace();
-  ParGridFunction *func_target = tarField.GetSolutionGF();
+  const FiniteElementCollection *tar_fec = nullptr;
+  ParFiniteElementSpace *tar_fes = nullptr;
+  ParGridFunction *func_target = nullptr;
+
+  if (!tarFileName.empty()) {
+    tar_fec = tarField->getFEC();
+    tar_fes = tarField->getFESpace();
+    func_target = tarField->GetSolutionGF();
+  } else {
+    // TODO(trevilo): Set up fe collection, space, and soln for target
+    cout << "Mesh file approach not fully implemented!" << endl;
+    return 1;
+  }
+
   std::cout << "Target FE collection: " << tar_fec->Name() << std::endl;
 
   const int NE = mesh_2->GetNE();
