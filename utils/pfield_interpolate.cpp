@@ -32,8 +32,7 @@ int main(int argc, char *argv[]) {
                  "-mh1 or -r2, but not both)");
   args.AddOption(&pv_output_dir, "-out", "--paraview-output",
                  "Paraview output directory (-mh1 only)");
-  args.AddOption(&order, "-p", "--order-h1",
-                 "FEM order (H1 only)");
+  args.AddOption(&order, "-p", "--order-h1", "FEM order (H1 only)");
 
   args.Parse();
   if (!args.Good()) {
@@ -122,8 +121,10 @@ int main(int argc, char *argv[]) {
     mesh_2->SetCurvature(1);
   }
   const int mesh_poly_deg = mesh_2->GetNodes()->FESpace()->GetElementOrder(0);
-  cout << "Source mesh curvature: " << mesh_1->GetNodes()->OwnFEC()->Name() << endl;
-  cout << "Target mesh curvature: " << mesh_2->GetNodes()->OwnFEC()->Name() << endl;
+  cout << "Source mesh curvature: " << mesh_1->GetNodes()->OwnFEC()->Name()
+       << endl;
+  cout << "Target mesh curvature: " << mesh_2->GetNodes()->OwnFEC()->Name()
+       << endl;
 
   // 2) Set up source field
   FiniteElementCollection *src_fec = srcField.GetFEC();
@@ -132,7 +133,8 @@ int main(int argc, char *argv[]) {
 
   // 3) Some checks
   const Geometry::Type gt = mesh_2->GetNodalFESpace()->GetFE(0)->GetGeomType();
-  MFEM_VERIFY(gt != Geometry::PRISM, "Wedge elements are not currently supported.");
+  MFEM_VERIFY(gt != Geometry::PRISM,
+              "Wedge elements are not currently supported.");
   MFEM_VERIFY(mesh_2->GetNumGeometries(mesh_2->Dimension()) == 1,
               "Mixed meshes are not currently supported.");
 
@@ -198,21 +200,21 @@ int main(int argc, char *argv[]) {
   finder.Interpolate(vxyz, *func_source, interp_vals);
 
   if (!tarFileName.empty()) {
-    // Set the target function (NB: works b/c target is DG field) and write restart
+    // Set the target function (NB: works b/c target is DG) and write restart
     func_target->SetFromTrueDofs(interp_vals);
     tarField->writeHDF5();
   } else {
     // Fill solution element-by-element
     Array<int> vdofs;
-    Vector elem_dof_vals(nsp*tar_ncomp);
+    Vector elem_dof_vals(nsp * tar_ncomp);
 
     for (int i = 0; i < mesh_2->GetNE(); i++) {
       tar_fes->GetElementVDofs(i, vdofs);
       for (int j = 0; j < nsp; j++) {
         for (int d = 0; d < tar_ncomp; d++) {
           // Arrange values byNodes
-          int idx = d*nsp*NE + i*nsp + j;
-          elem_dof_vals(j + d*nsp) = interp_vals(idx);
+          int idx = d * nsp * NE + i * nsp + j;
+          elem_dof_vals(j + d * nsp) = interp_vals(idx);
         }
       }
       func_target->SetSubVector(vdofs, elem_dof_vals);
@@ -229,15 +231,15 @@ int main(int argc, char *argv[]) {
     pvc.SetTime(srcField.getCurrentTime());
 
     ParFiniteElementSpace fes(mesh_2, tar_fec, 1);
+    int ndofs = fes.GetNDofs();
     for (unsigned int ivar = 0; ivar < tar_ncomp; ivar++) {
       string U("U_");
-      pvc.RegisterField(U+to_string(ivar), new ParGridFunction(&fes, func_target->HostReadWrite() + ivar * fes.GetNDofs()));
+      pvc.RegisterField(U + to_string(ivar),
+                        new ParGridFunction(&fes, func_target->HostReadWrite() +
+                                                      ivar * ndofs));
     }
     pvc.Save();
   }
-
-
-
 
   // Free the internal gslib data.
   finder.FreeData();
