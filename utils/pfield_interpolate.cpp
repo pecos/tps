@@ -12,6 +12,15 @@ int main(int argc, char *argv[]) {
   mfem::Mpi::Init(argc, argv);
   TPS::Tps tps(MPI_COMM_WORLD);
 
+  // TODO(trevilo): Generalize options.  If we give two tps input
+  // files, then operate in current mode, where we write a new tps
+  // restart file for the DG finite element space defined on the mesh
+  // in the "target" input file (specified by -r2 option).  But, add a
+  // mode where, instead of a specifying a tps input file, we just
+  // provide a mesh (and a polynomial order?).  Then, the src solution
+  // is interpolated onto the H1 space defined on that mesh and we
+  // dump paraview output for visualization.
+
   // Set the method's default parameters.
   const char *src_input_file = "coarse.run";
   const char *tar_input_file = "fine.run";
@@ -49,6 +58,9 @@ int main(int argc, char *argv[]) {
 
   ParMesh *mesh_1 = srcField.getMesh();
   const int dim = mesh_1->Dimension();
+
+  // TODO(trevilo): Generalize how we generate the "target" for the
+  // case where we don't have a tps input file.
 
   // but, we require that RESTART_CYCLE is *not* set in the
   // target run file, since the target restart files do not exist yet.
@@ -101,6 +113,10 @@ int main(int argc, char *argv[]) {
 
   std::cout << "Source FE collection: " << src_fec->Name() << std::endl;
 
+  // TODO(trevilo): Generalize how we generate the "target" finite
+  // element space and associated ParGridFunction for the H1 case
+  // (i.e., no tps input file).
+
   // Setup the FiniteElementSpace and GridFunction on the target mesh.
   const FiniteElementCollection *tar_fec = tarField.getFEC();
   ParFiniteElementSpace *tar_fes = tarField.getFESpace();
@@ -114,6 +130,12 @@ int main(int argc, char *argv[]) {
 
   // Generate list of points where the grid function will be evaluated.
   Vector vxyz;
+
+  // TODO(trevilo): Extend to CG target space.  See mfem miniapp for
+  // example.  This method of getting the nodal points is still ok,
+  // but since we go element by element, some nodes are duplicated,
+  // meaning we have to take more care when filling the the solution
+  // vector later.
 
   // NB: We assume DG here!
   vxyz.SetSize(nsp * NE * dim);
@@ -136,6 +158,7 @@ int main(int argc, char *argv[]) {
       pos.GetRow(2, rowz);
     }
   }
+
   const int nodes_cnt = vxyz.Size() / dim;
 
   // Evaluate source grid function.
@@ -146,7 +169,11 @@ int main(int argc, char *argv[]) {
 
   // Project the interpolated values to the target FiniteElementSpace.
   // NB: Assume DG
+  // TODO(trevilo): Extend to CG
   func_target->SetFromTrueDofs(interp_vals);
+
+  // TODO(trevilo): In case where tarField doesn't exist, write
+  // paraview file(s)
 
   // Write restart files
   tarField.writeHDF5();
