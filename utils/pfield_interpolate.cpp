@@ -12,25 +12,22 @@ int main(int argc, char *argv[]) {
   mfem::Mpi::Init(argc, argv);
   TPS::Tps tps(MPI_COMM_WORLD);
 
-  // TODO(trevilo): Generalize options.  If we give two tps input
-  // files, then operate in current mode, where we write a new tps
-  // restart file for the DG finite element space defined on the mesh
-  // in the "target" input file (specified by -r2 option).  But, add a
-  // mode where, instead of a specifying a tps input file, we just
-  // provide a mesh (and a polynomial order?).  Then, the src solution
-  // is interpolated onto the H1 space defined on that mesh and we
-  // dump paraview output for visualization.
-
   // Set the method's default parameters.
-  const char *src_input_file = "coarse.run";
-  const char *tar_input_file = "fine.run";
+  const char *src_input_file = "coarse.ini";
+  const char *tar_input_file = "";
+  const char *tar_mesh_h1 = "";
 
   // Parse command-line options.
   OptionsParser args(argc, argv);
   args.AddOption(&src_input_file, "-r1", "--runFile1",
-                 "runFile for source case");
+                 "TPS input file for source case---i.e., the original mesh and "
+                 "solution (required)");
   args.AddOption(&tar_input_file, "-r2", "--runFile2",
-                 "runFile for target case");
+                 "TPS input file for target case (optional--must use -r2 or "
+                 "-mh1, but not both)");
+  args.AddOption(&tar_mesh_h1, "-mh1", "--mesh-h1",
+                 "Mesh to interpolate to (using H1 space) (optional--must use "
+                 "-mh1 or -r2, but not both)");
 
   args.Parse();
   if (!args.Good()) {
@@ -39,14 +36,28 @@ int main(int argc, char *argv[]) {
   }
   args.PrintOptions(cout);
 
+  string srcFileName(src_input_file);
+  string tarFileName(tar_input_file);
+  string tarMeshH1(tar_mesh_h1);
+
+  // We have to have set one of these...
+  if (tarFileName.empty() && tarMeshH1.empty()) {
+    args.PrintUsage(cout);
+    return 1;
+  }
+
+  // but not both
+  if (!tarFileName.empty() && !tarMeshH1.empty()) {
+    args.PrintUsage(cout);
+    return 1;
+  }
+
   // Instantiate M2ulPhyS classes for *both* the coarse and fine
 
   // NB: the M2ulPhyS ctor calls M2ulPhyS::initVariables, which reads
   // the restart files, assuming that RESTART_CYCLE is set in the
   // input file.  So, we require that RESTART_CYCLE is set in the
   // *source* run file....
-  string srcFileName(src_input_file);
-
   tps.parseInputFile(srcFileName);
   tps.chooseDevices();
 
@@ -64,10 +75,7 @@ int main(int argc, char *argv[]) {
 
   // but, we require that RESTART_CYCLE is *not* set in the
   // target run file, since the target restart files do not exist yet.
-  string tarFileName(tar_input_file);
-
   tps.parseInputFile(tarFileName);
-
   M2ulPhyS tarField(tarFileName, &tps);
   RunConfiguration &tarConfig = tarField.GetConfig();
   assert(tarConfig.GetRestartCycle() == 0);
