@@ -470,6 +470,8 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   int getMaximumIterations() const { return MaxIters; }
   int getCurrentIterations() const { return iter; }
   void setMaximumIterations(int value) { MaxIters = value; }
+
+  double getCurrentTime() const { return time; }
 };
 
 #endif  // M2ULPHYS_HPP_

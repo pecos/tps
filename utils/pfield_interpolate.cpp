@@ -16,6 +16,8 @@ int main(int argc, char *argv[]) {
   const char *src_input_file = "coarse.ini";
   const char *tar_input_file = "";
   const char *tar_mesh_h1 = "";
+  const char *pv_output_dir = "pv_output";
+  int order = 1;
 
   // Parse command-line options.
   OptionsParser args(argc, argv);
@@ -28,6 +30,10 @@ int main(int argc, char *argv[]) {
   args.AddOption(&tar_mesh_h1, "-mh1", "--mesh-h1",
                  "Mesh to interpolate to (using H1 space) (optional--must use "
                  "-mh1 or -r2, but not both)");
+  args.AddOption(&pv_output_dir, "-out", "--paraview-output",
+                 "Paraview output directory (-mh1 only)");
+  args.AddOption(&order, "-p", "--order-h1",
+                 "FEM order (H1 only)");
 
   args.Parse();
   if (!args.Good()) {
@@ -147,9 +153,10 @@ int main(int argc, char *argv[]) {
     tar_fes = tarField->getFESpace();
     func_target = tarField->GetSolutionGF();
   } else {
-    // TODO(trevilo): Set up fe collection, space, and soln for target
-    cout << "Mesh file approach not fully implemented!" << endl;
-    return 1;
+    const int num_variables = func_source->VectorDim();
+    tar_fec = new H1_FECollection(order, dim);
+    tar_fes = new ParFiniteElementSpace(mesh_2, tar_fec, num_variables);
+    func_target = new ParGridFunction(tar_fes);
   }
 
   std::cout << "Target FE collection: " << tar_fec->Name() << std::endl;
@@ -162,13 +169,10 @@ int main(int argc, char *argv[]) {
   // Generate list of points where the grid function will be evaluated.
   Vector vxyz;
 
-  // TODO(trevilo): Extend to CG target space.  See mfem miniapp for
-  // example.  This method of getting the nodal points is still ok,
-  // but since we go element by element, some nodes are duplicated,
-  // meaning we have to take more care when filling the the solution
-  // vector later.
-
-  // NB: We assume DG here!
+  // The method for getting the necessary points here works for both
+  // H1 and L2 fields.  However, for H1, it will contain duplicate
+  // points, which means we must take care when setting the
+  // corresponding ParGridFunction below.
   vxyz.SetSize(nsp * NE * dim);
   for (int i = 0; i < NE; i++) {
     const FiniteElement *fe = tar_fes->GetFE(i);
@@ -198,19 +202,57 @@ int main(int argc, char *argv[]) {
   finder.Setup(*mesh_1);
   finder.Interpolate(vxyz, *func_source, interp_vals);
 
-  // Project the interpolated values to the target FiniteElementSpace.
-  // NB: Assume DG
-  // TODO(trevilo): Extend to CG
-  func_target->SetFromTrueDofs(interp_vals);
+  if (!tarFileName.empty()) {
+    // Set the target function (NB: works b/c target is DG field) and write restart
+    func_target->SetFromTrueDofs(interp_vals);
+    tarField->writeHDF5();
+  } else {
+    // Fill solution element-by-element
+    Array<int> vdofs;
+    Vector elem_dof_vals(nsp*tar_ncomp);
 
-  // TODO(trevilo): In case where tarField doesn't exist, write
-  // paraview file(s)
+    for (int i = 0; i < mesh_2->GetNE(); i++) {
+      tar_fes->GetElementVDofs(i, vdofs);
+      for (int j = 0; j < nsp; j++) {
+        for (int d = 0; d < tar_ncomp; d++) {
+          // Arrange values byNodes
+          int idx = d*nsp*NE + i*nsp + j;
+          elem_dof_vals(j + d*nsp) = interp_vals(idx);
+        }
+      }
+      func_target->SetSubVector(vdofs, elem_dof_vals);
+    }
+    func_target->SetFromTrueVector();
 
-  // Write restart files
-  tarField->writeHDF5();
+    // Dump paraview for visualization
+    ParaViewDataCollection pvc(pv_output_dir, mesh_2);
+    pvc.SetLevelsOfDetail(order);
+    pvc.SetHighOrderOutput(true);
+    pvc.SetPrecision(8);
+
+    pvc.SetCycle(srcField.getCurrentIterations());
+    pvc.SetTime(srcField.getCurrentTime());
+
+    ParFiniteElementSpace fes(mesh_2, tar_fec, 1);
+    for (int ivar = 0; ivar < tar_ncomp; ivar++) {
+      string U("U_");
+      pvc.RegisterField(U+to_string(ivar), new ParGridFunction(&fes, func_target->HostReadWrite() + ivar * fes.GetNDofs()));
+    }
+    pvc.Save();
+  }
+
+
+
 
   // Free the internal gslib data.
   finder.FreeData();
+
+  // If we own them, delete fe collection, etc
+  if (tarFileName.empty()) {
+    delete tar_fes;
+    delete tar_fec;
+    delete func_target;
+  }
 
   // delete the target M2ulPhyS class
   delete tarField;
