@@ -104,7 +104,6 @@ int main(int argc, char *argv[]) {
     mesh_2 = new ParMesh(MPI_COMM_WORLD, serial_mesh);
   }
 
-
   // GSLIB only works in 2 and 3 dimensions
   assert(dim > 1);
   // Input meshes must have same dimension
@@ -117,10 +116,8 @@ int main(int argc, char *argv[]) {
     mesh_2->SetCurvature(1);
   }
   const int mesh_poly_deg = mesh_2->GetNodes()->FESpace()->GetElementOrder(0);
-  cout << "Source mesh curvature: " << mesh_1->GetNodes()->OwnFEC()->Name()
-       << endl
-       << "Target mesh curvature: " << mesh_2->GetNodes()->OwnFEC()->Name()
-       << endl;
+  cout << "Source mesh curvature: " << mesh_1->GetNodes()->OwnFEC()->Name() << endl;
+  cout << "Target mesh curvature: " << mesh_2->GetNodes()->OwnFEC()->Name() << endl;
 
   // 2) Set up source field
   FiniteElementCollection *src_fec = srcField.GetFEC();
@@ -129,11 +126,9 @@ int main(int argc, char *argv[]) {
 
   // 3) Some checks
   const Geometry::Type gt = mesh_2->GetNodalFESpace()->GetFE(0)->GetGeomType();
-  MFEM_VERIFY(gt != Geometry::PRISM, "Wedge elements are not currently "
-                                     "supported.");
+  MFEM_VERIFY(gt != Geometry::PRISM, "Wedge elements are not currently supported.");
   MFEM_VERIFY(mesh_2->GetNumGeometries(mesh_2->Dimension()) == 1,
-              "Mixed meshes"
-              "are not currently supported.");
+              "Mixed meshes are not currently supported.");
 
   std::cout << "Source FE collection: " << src_fec->Name() << std::endl;
 
