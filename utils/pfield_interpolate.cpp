@@ -117,8 +117,8 @@ int main(int argc, char *argv[]) {
   }
 
   cout << "Source mesh curvature: " << mesh_1->GetNodes()->OwnFEC()->Name()
-       << endl
-       << "Target mesh curvature: " << mesh_2->GetNodes()->OwnFEC()->Name()
+       << endl;
+  cout << "Target mesh curvature: " << mesh_2->GetNodes()->OwnFEC()->Name()
        << endl;
 
   // 2) Set up source field
@@ -130,11 +130,10 @@ int main(int argc, char *argv[]) {
 
   // 3) Some checks
   const Geometry::Type gt = mesh_2->GetNodalFESpace()->GetFE(0)->GetGeomType();
-  MFEM_VERIFY(gt != Geometry::PRISM, "Wedge elements are not currently "
-                                     "supported.");
+  MFEM_VERIFY(gt != Geometry::PRISM,
+              "Wedge elements are not currently supported.");
   MFEM_VERIFY(mesh_2->GetNumGeometries(mesh_2->Dimension()) == 1,
-              "Mixed meshes"
-              "are not currently supported.");
+              "Mixed meshes are not currently supported.");
 
   std::cout << "Source FE collection: " << src_fec->Name() << std::endl;
 
