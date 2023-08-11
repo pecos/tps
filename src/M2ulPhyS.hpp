@@ -432,6 +432,8 @@ class M2ulPhyS : public TPS::Solver {
   int getCurrentIterations() const { return iter; }
   void setMaximumIterations(int value) { MaxIters = value; }
 
+  double getCurrentTime() const { return time; }
+
   void readTable(const std::string &inputPath, TableInput &result);
 };
 
