@@ -75,23 +75,30 @@ int main(int argc, char *argv[]) {
   // TODO(trevilo): Generalize how we generate the "target" for the
   // case where we don't have a tps input file.
 
-  // Instantiate M2ulPhyS class for the "fine" (i.e., target) case
+  M2ulPhyS *tarField = nullptr;
+  if (!tarFileName.empty()) {
+    // Instantiate M2ulPhyS class for the "fine" (i.e., target) case
 
-  // Note that the M2ulPhyS ctor is responsible for reading the
-  // restart file, assuming that io/enableRestart = True in the tps
-  // input file.  So, assuming the is not an existing restart file for
-  // the target mesh, you should not set this option, since if it is
-  // set, M2ulPhyS will try to read a file that doesn't exist and give
-  // an error.
-  tps.parseInputFile(tarFileName);
-  M2ulPhyS tarField(tarFileName, &tps);
-  RunConfiguration &tarConfig = tarField.GetConfig();
-  assert(tarConfig.GetRestartCycle() == 0);
-
-  tps.closeInputFile();
+    // Note that the M2ulPhyS ctor is responsible for reading the
+    // restart file, assuming that io/enableRestart = True in the tps
+    // input file.  So, assuming there is not an existing restart file
+    // for the target mesh, you should not set this option. If
+    // it is set, M2ulPhyS will try to read a file that doesn't exist
+    // and give an error.
+    tps.parseInputFile(tarFileName);
+    tarField = new M2ulPhyS(tarFileName, &tps);
+    RunConfiguration &tarConfig = tarField->GetConfig();
+    assert(tarConfig.GetRestartCycle() == 0);
+    tps.closeInputFile();
+  } else {
+    // If the target case file doesn't exist, want to use H1 space,
+    // but this isn't ready yet
+    cout << "This capability is not implemented yet!" << endl;
+    return 1;
+  }
 
   // Get meshes
-  ParMesh *mesh_2 = tarField.GetMesh();
+  ParMesh *mesh_2 = tarField->GetMesh();
 
   // const int dim = mesh_1->Dimension();
 
@@ -136,9 +143,9 @@ int main(int argc, char *argv[]) {
   // (i.e., no tps input file).
 
   // Setup the FiniteElementSpace and GridFunction on the target mesh.
-  FiniteElementCollection *tar_fec = tarField.GetFEC();
-  ParFiniteElementSpace *tar_fes = tarField.GetFESpace();
-  ParGridFunction *func_target = tarField.GetSolutionGF();
+  FiniteElementCollection *tar_fec = tarField->GetFEC();
+  ParFiniteElementSpace *tar_fes = tarField->GetFESpace();
+  ParGridFunction *func_target = tarField->GetSolutionGF();
   std::cout << "Target FE collection: " << tar_fec->Name() << std::endl;
 
   const int NE = mesh_2->GetNE();
@@ -194,10 +201,13 @@ int main(int argc, char *argv[]) {
   // paraview file(s)
 
   // Write restart files
-  tarField.writeHDF5();
+  tarField->writeHDF5();
 
   // Free the internal gslib data.
   finder.FreeData();
+
+  // delete the target M2ulPhyS class
+  delete tarField;
 
   return 0;
 }
