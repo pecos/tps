@@ -52,12 +52,14 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  // Instantiate M2ulPhyS classes for *both* the coarse and fine
+  // Instantiate M2ulPhyS class for the "coarse" (i.e., source) case
 
-  // NB: the M2ulPhyS ctor calls M2ulPhyS::initVariables, which reads
-  // the restart files, assuming that RESTART_CYCLE is set in the
-  // input file.  So, we require that RESTART_CYCLE is set in the
-  // *source* run file....
+  // Note that the M2ulPhyS ctor is responsible for reading the
+  // restart file, assuming that io/enableRestart = True in the tps
+  // input file.  So, you need to set this option if you want to
+  // interpolate from an existing restart file.  Otherwise, the
+  // M2ulPhyS ctor will initialize the field (to uniform by default)
+  // and then the code below will interpolate using that field.
   tps.parseInputFile(srcFileName);
   tps.chooseDevices();
 
@@ -73,8 +75,14 @@ int main(int argc, char *argv[]) {
   // TODO(trevilo): Generalize how we generate the "target" for the
   // case where we don't have a tps input file.
 
-  // but, we require that RESTART_CYCLE is *not* set in the
-  // target run file, since the target restart files do not exist yet.
+  // Instantiate M2ulPhyS class for the "fine" (i.e., target) case
+
+  // Note that the M2ulPhyS ctor is responsible for reading the
+  // restart file, assuming that io/enableRestart = True in the tps
+  // input file.  So, assuming the is not an existing restart file for
+  // the target mesh, you should not set this option, since if it is
+  // set, M2ulPhyS will try to read a file that doesn't exist and give
+  // an error.
   tps.parseInputFile(tarFileName);
   M2ulPhyS tarField(tarFileName, &tps);
   RunConfiguration &tarConfig = tarField.GetConfig();
