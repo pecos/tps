@@ -232,10 +232,12 @@ protected:
    bool verbose = true;
 
    /// Enable/disable partial assembly of forms.
-   bool partial_assembly = false;
+   //bool partial_assembly = false;
+   bool partial_assembly = true;
 
    /// Enable/disable numerical integration rules of forms.
-   bool numerical_integ = false;
+   //bool numerical_integ = false;
+   bool numerical_integ = true;
   
    /// The parallel mesh.
    ParMesh *pmesh = nullptr;
@@ -485,9 +487,10 @@ protected:
    ParLORDiscretization *lor = nullptr;
 
    // Filter-based stabilization => move to "input" options
-   int filter_cutoff_modes = 1;
-   double filter_alpha = 0.0;
-   //double filter_alpha = 1.0;
+   //int filter_cutoff_modes = 0;
+   //double filter_alpha = 0.0;
+   int filter_cutoff_modes = 1;  
+   double filter_alpha = 1.0;
   
    FiniteElementCollection *vfec_filter = nullptr;
    ParFiniteElementSpace *vfes_filter = nullptr;
