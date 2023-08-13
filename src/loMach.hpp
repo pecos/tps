@@ -445,8 +445,8 @@ protected:
    // Bookkeeping for acceleration (forcing) terms.
    std::vector<AccelTerm_T> accel_terms;
 
-   int max_bdf_order = 3;
-   //int max_bdf_order = 2;
+   //int max_bdf_order = 3;
+   int max_bdf_order = 2;
    //int max_bdf_order = 1;
    int cur_step = 0;
    std::vector<double> dthist = {0.0, 0.0, 0.0};
@@ -487,10 +487,10 @@ protected:
    ParLORDiscretization *lor = nullptr;
 
    // Filter-based stabilization => move to "input" options
-   //int filter_cutoff_modes = 0;
-   //double filter_alpha = 0.0;
-   int filter_cutoff_modes = 1;  
-   double filter_alpha = 1.0;
+   int filter_cutoff_modes = 0;
+   double filter_alpha = 0.0;
+   //int filter_cutoff_modes = 1;  
+   //double filter_alpha = 1.0;
   
    FiniteElementCollection *vfec_filter = nullptr;
    ParFiniteElementSpace *vfes_filter = nullptr;
