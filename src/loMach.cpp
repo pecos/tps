@@ -1,4 +1,10 @@
 
+
+
+// look at elasticity integrator
+
+
+
 ///*  Add description later //
 
 //#include "../../general/forall.hpp"
@@ -102,11 +108,11 @@ void LoMachSolver::initialize() {
    //LoMachOptions loMach_opts_ = GetOptions();   
    order = config.solOrder;
    porder = config.solOrder;
-   norder = config.solOrder;
+   //norder = config.solOrder;
    //norder = 2*order;
-   //double no;
-   //no = ceil( ((double)order * 1.5) );   
-   //norder = int(no);
+   double no;
+   no = ceil( ((double)order * 1.5) );   
+   norder = int(no);
 
    if (mpi_.Root()) {
      std::cout << " ORDER: " << order << endl;
@@ -960,17 +966,11 @@ void LoMachSolver::Setup(double dt)
 
    // mass matrix
    Mv_form = new ParBilinearForm(vfes);
-   //std::cout << "Check 7a..." << std::endl;        
    auto *mv_blfi = new VectorMassIntegrator;
-   //std::cout << "Check 7b..." << std::endl;        
    if (numerical_integ) { mv_blfi->SetIntRule(&ir_ni); }
-   //std::cout << "Check 7c..." << std::endl;        
    Mv_form->AddDomainIntegrator(mv_blfi);
-   //std::cout << "Check 7d..." << std::endl;           
    if (partial_assembly) { Mv_form->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
-   //std::cout << "Check 7e..." << std::endl;           
    Mv_form->Assemble();
-   //std::cout << "Check 7f..." << std::endl;           
    Mv_form->FormSystemMatrix(empty, Mv);
    //std::cout << "Check 8..." << std::endl;     
 
@@ -1083,8 +1083,8 @@ void LoMachSolver::Setup(double dt)
    H_form = new ParBilinearForm(vfes);
    //H_form = new ParBilinearForm(pfes); // maybe?
    auto *hmv_blfi = new VectorMassIntegrator(H_bdfcoeff); // diagonal from unsteady term
-   auto *hdv_blfi = new VectorDiffusionIntegrator(H_lincoeff);
-   //auto *hdv_blfi = new VectorDiffusionIntegrator(*viscField); // Laplacian
+   //auto *hdv_blfi = new VectorDiffusionIntegrator(H_lincoeff);
+   auto *hdv_blfi = new VectorDiffusionIntegrator(*viscField); // Laplacian
    if (numerical_integ)
    {
       hmv_blfi->SetIntRule(&ir_ni);
@@ -1311,8 +1311,8 @@ void LoMachSolver::Setup(double dt)
    Ht_bdfcoeff.constant = 1.0 / dt;
    Ht_form = new ParBilinearForm(tfes);
    auto *hmt_blfi = new MassIntegrator(Ht_bdfcoeff); // unsteady bit
-   auto *hdt_blfi = new DiffusionIntegrator(Ht_lincoeff);
-   //auto *hdt_blfi = new DiffusionIntegrator(*alphaField); // Laplacian bit
+   //auto *hdt_blfi = new DiffusionIntegrator(Ht_lincoeff);
+   auto *hdt_blfi = new DiffusionIntegrator(*alphaField); // Laplacian bit
    //std::cout << "Check 23..." << std::endl;        
    
    if (numerical_integ)
@@ -1392,20 +1392,9 @@ void LoMachSolver::Setup(double dt)
    {
      double *data = Tn_next.HostReadWrite();
      double *Tdata = Tn.HostReadWrite();   
-     for (int i = 0; i < TdofInt; i++) {     
-       data[i] = Tdata[i];
-     }
+     for (int i = 0; i < TdofInt; i++) { data[i] = Tdata[i]; }
    }      
-   Tn_next_gf.SetFromTrueDofs(Tn_next); // invalid read
-   /*
-   {
-     double *data = Tn_next_gf.HostReadWrite();
-     double *Tdata = Tn_next.HostReadWrite();   
-     for (int i = 0; i < TdofInt; i++) {     
-       data[i] = Tdata[i];
-     }
-   }
-   */
+   Tn_next_gf.SetFromTrueDofs(Tn_next);
    //std::cout << "Check 28..." << std::endl;     
 
    
@@ -2079,7 +2068,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    //Lext *= kin_vis;
 
 
-   /**/
+   // interior-sized visc needed for p-p rhs
    {
      double *dataViscSml = viscSml.HostReadWrite();                
      double *Tdata = Tn.HostReadWrite();     
@@ -2091,11 +2080,10 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      for (int i = 0; i < TdofInt; i++) {
          prim[1+nvel] = Tdata[i];
          transportPtr->GetViscosities(prim, prim, visc);
-         //dataViscSml[i] = visc[0];
-         dataViscSml[i] = kin_vis; 	 
+         dataViscSml[i] = visc[0];
+         //dataViscSml[i] = kin_vis; 	 
      }
    }
-   /**/
    
 
    // dataVisc is full size, Lext is only TrueSize
@@ -2121,7 +2109,18 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    // p_r = \nabla \cdot FText ( i think "p_r" means rhs of pressure-poisson eq, so div(\tilde{F}))
    // applied divergence to full FText vector
    //D->Mult(FText, resp);
-   //resp.Neg();   
+   //resp.Neg();
+
+
+   // can multiply rhs by rho prior to taking div instead of keeping in lhs?
+   {
+     double *data = FText.HostReadWrite();     
+     double *Tdata = Tn.HostReadWrite();
+     for (int i = 0; i < TdofInt; i++) {     
+       data[i] *= ambientPressure / (Rgas * Tdata[i]);
+       //std::cout << " rho: " << ambientPressure / (Rgas * Tdata[i]) << endl;
+     }
+   }   
 
    // add some if for porder != vorder
    // project FText to p-1
@@ -2135,30 +2134,20 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    FText_bdr_form->ParallelAssemble(FText_bdr);
    g_bdr_form->Assemble();
    g_bdr_form->ParallelAssemble(g_bdr);
-   //tmpR0.Add(1.0, FText_bdr);
-   //tmpR0.Add(-bd0 / dt, g_bdr);
-
+   tmpR0.Add(1.0, FText_bdr);
+   tmpR0.Add(-bd0 / dt, g_bdr);
+   
    // project rhs to p-space
    /*
-   {
-     double *data = R0PM0_gf.HostReadWrite();
-     double *d_buf = tmpR0.HostReadWrite();   
-     for (int i = 0; i < Tdof; i++) {     
-       data[i] = d_buf[i];
-     }
-   }
+   R0PM0_gf.SetFromTrueDofs(tmpR0);   
    R0PM1_gf.ProjectGridFunction(R0PM0_gf);
-   {
-     double *data = resp.HostReadWrite();
-     double *d_buf = R0PM1_gf.HostReadWrite();   
-     for (int i = 0; i < Pdof; i++) {     
-       data[i] = d_buf[i];
-     }
-   }
+   R0PM1_gf.GetTrueDofs(resp);
    */
+
+   resp.Set(1.0, tmpR0);
    
-   resp.Add(1.0, FText_bdr);
-   resp.Add(-bd0/dt, g_bdr);
+   //resp.Add(1.0, FText_bdr);
+   //resp.Add(-bd0/dt, g_bdr);
    
    //std::cout << "Check q..." << std::endl;   
 
@@ -2170,6 +2159,11 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    //std::cout << "Check r..." << std::endl;   
    
    // update variable coeff pressure laplacian
+   /*
+   R0PM0_gf.SetFromTrueDofs(Tn);   
+   R0PM1_gf.ProjectGridFunction(R0PM0_gf);
+   //R0PM1_gf.GetTrueDofs(resp);
+   */
    /*
    {
    double *data = R0PM0_gf.HostReadWrite();
@@ -2368,6 +2362,15 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    // grad(P)
    G->Mult(pnBig, resu);
    */
+
+   // multiply by 1/rho
+   {
+     double *data = resu.HostReadWrite();     
+     double *Tdata = Tn.HostReadWrite();
+     for (int i = 0; i < TdofInt; i++) {     
+       data[i] *=  (Rgas * Tdata[i]) / ambientPressure;       
+     }
+   }
    
    resu.Neg(); // -gradP => so res ARE on rhs
    Mv->Mult(Fext, tmpR1); //Mv{F*}
@@ -2436,8 +2439,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      }
    }   
      
-   //Ht_bdfcoeff.constant = bd0 / dt;
-   Ht_bdfcoeff.constant = +1.0 / dt;
+   Ht_bdfcoeff.constant = bd0 / dt;
+   //Ht_bdfcoeff.constant = +1.0 / dt;
    Ht_form->Update();
    Ht_form->Assemble();
    Ht_form->FormSystemMatrix(temp_ess_tdof, Ht);
@@ -2481,6 +2484,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    
    // for unsteady term, compute and add known part of BDF unsteady term
    // moving this bit before advection to avoid the extra Minv
+   // bd3 is unstable!!!
    {
      //double *d_Text = Text.HostReadWrite();
      const double bd1idt = bd1 / dt;
@@ -2492,8 +2496,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      //mfem::forall(Text.Size(), [=] MFEM_HOST_DEVICE (int i)
      MFEM_FORALL(i, Text.Size(),	
      {
-       //Text[i] = bd1idt*d_tn[i] + bd2idt*d_tnm1[i] + bd3idt*d_tnm2[i];
-       Text[i] = 1.0/dt * d_tn[i];
+       Text[i] = bd1idt*d_tn[i] + bd2idt*d_tnm1[i] + bd3idt*d_tnm2[i];
+       //Text[i] = -1.0/dt * d_tn[i];
      });
    }
    //std::cout << "Check y..." << std::endl;
@@ -2502,7 +2506,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       
    Mt->Mult(Text, tmpR0);
    //resT.Add(1.0, tmpR0); 
-   resT.Set(+1.0, tmpR0);
+   resT.Set(-1.0, tmpR0); // move to rhs
    
    //resT.Neg(); // move to rhs
    //std::cout << "Check y6..." << std::endl;   
@@ -2524,7 +2528,6 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    R0PX2_gf.GetTrueDofs(TBn);
    //std::cout << "Check 1..." << std::endl;      
 
-   /*
    Tnm1_gf.SetFromTrueDofs(Tnm1);      
    R0PX2_gf.ProjectGridFunction(Tnm1_gf);
    R0PX2_gf.GetTrueDofs(TBnm1);
@@ -2534,7 +2537,6 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    R0PX2_gf.ProjectGridFunction(Tnm2_gf);
    R0PX2_gf.GetTrueDofs(TBnm2);
    //std::cout << "Check 3..." << std::endl;
-   */
    
    //bufferTemp = new ParGridFunction(vfes);      
    //double *dataTemp = bufferTemp->HostReadWrite();
@@ -2564,11 +2566,10 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      for (int eq = 0; eq < dim; eq++) {
        
        for (int i = 0; i < NdofR0Int; i++) {
-         FBext[i + eq * NdofR0Int] = Udnm0[i + eq*NdofR0Int] * Tdnm0[i];
-
-         //FBext[i + eq * NdofR0Int] = ab1_ * Udnm0[i + eq*NdofR0Int] * Tdnm0[i] +
-	 //	                     ab2_ * Udnm1[i + eq*NdofR0Int] * Tdnm1[i] +
-	 //                            ab3_ * Udnm2[i + eq*NdofR0Int] * Tdnm2[i];	 
+         //FBext[i + eq * NdofR0Int] = Udnm0[i + eq*NdofR0Int] * Tdnm0[i];
+         FBext[i + eq * NdofR0Int] = ab1_ * Udnm0[i + eq*NdofR0Int] * Tdnm0[i] +
+	 	                     ab2_ * Udnm1[i + eq*NdofR0Int] * Tdnm1[i] +
+	                             ab3_ * Udnm2[i + eq*NdofR0Int] * Tdnm2[i];	 
        }
        
        /*
@@ -2589,19 +2590,9 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    R1PM0_gf.GetTrueDofs(Fext);
 
    Dt->Mult(Fext, tmpR0); // explicit div(uT) at extrapolated {n+1}
-
-   // WHWYWHY WHY?
-   /**/
-   Mt->Mult(tmpR0, Text);
-   //iter_mtsolve = MtInv->GetNumIterations();
-   //res_mtsolve = MtInv->GetFinalNorm();
-   tmpR0.Set(1.0, Text);
-   /**/
-
    
    // div(uT) should already be in integrated weak form and can be added directly
    resT.Add(-1.0, tmpR0); // minus to move to rhs
-
    
    //std::cout << "Check 7i..." << std::endl;   
 
@@ -5108,7 +5099,7 @@ void vel_ic(const Vector &coords, double t, Vector &u)
    double aL = 2.0 / (2.0) * pi;
    double bL = 2.0 * pi;
    double cL = 2.0 * pi;   
-   double M = 1.0;
+   double M = 100.0;
    double scl;
 
    
