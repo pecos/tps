@@ -45,6 +45,9 @@ class LoMachOptions {
   std::string mesh_file; /**< Mesh filename */
 
   int order;      /**< Element order */
+  int uOrder;
+  int pOrder;
+  int nOrder;
   int ref_levels; /**< Number of uniform mesh refinements */
 
   int max_iter;                           /**< Maximum number of linear solver iterations */
@@ -67,12 +70,15 @@ class LoMachOptions {
 
   //mfem::Vector current_axis;
 
+  int nFilter;
+  double filterWeight;
+  
   LoMachOptions() {
     order = 1;
     ref_levels = 0;
     max_iter = 100;
-    rtol = 1.0e-6;
-    atol = 1.0e-10;
+    rtol = 1.0e-8;
+    atol = 1.0e-12;
     /*
     preconditioner_background_sigma = -1;
     evaluate_magnetic_field = true;
