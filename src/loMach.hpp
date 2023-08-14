@@ -168,6 +168,11 @@ protected:
 
    // Is it two-temperature?
    bool twoTemperature_ = false;  
+
+   // loMach options to run as incompressible
+   bool constantViscosity = false;
+   bool constantDensity = false;
+   bool pFilter = false;
   
    // Average handler
    Averaging *average;
@@ -262,7 +267,7 @@ protected:
    double kin_vis;
 
    // make everything dimensionless after generalizing form channel
-   double ambientPressure, Rgas;  
+   double ambientPressure, static_rho, Rgas;  
 
    IntegrationRules gll_rules;
 
@@ -298,6 +303,9 @@ protected:
    ParFiniteElementSpace *nfes = nullptr;
    FiniteElementCollection *nfecR0 = nullptr;
    ParFiniteElementSpace *nfesR0 = nullptr;  
+
+   VectorDiffusionIntegrator *hdv_blfi = nullptr;
+   DiffusionIntegrator *hdt_blfi = nullptr;
   
    ParNonlinearForm *N = nullptr;
    ParBilinearForm *Mv_form = nullptr;
