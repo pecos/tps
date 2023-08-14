@@ -173,6 +173,9 @@ class RunConfiguration {
   // Imposed pressure gradient
   double gradPress[3];
 
+  // loMach specific additions  
+  double amb_pres, const_visc, const_dens;  
+
   // Inlet BC data
   Array<double> inletBC;
   std::vector<pair<int, InletType>> inletPatchType;
