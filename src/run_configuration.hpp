@@ -143,6 +143,8 @@ class RunConfiguration {
   // the plane defined by point0.
   linearlyVaryingVisc linViscData;
 
+  planeDumpData planeDump;  
+
   SutherlandData sutherland_;
 
   SpongeZoneData* spongeData_;

@@ -636,6 +636,57 @@ void M2ulPhyS::initVariables() {
     MPI_Allreduce(&local_hmax, &hmax, 1, MPI_DOUBLE, MPI_MAX, mesh->GetComm());
   }
 
+
+  ParGridFunction coordsDof(fes);
+  mesh->GetNodes(coordsDof);
+  if (config.linViscData.isEnabled) {
+    spaceVaryViscMult = new ParGridFunction(fes);
+    double *viscMult = spaceVaryViscMult->HostWrite();
+    double wgt = 0.;
+    for (int n = 0; n < fes->GetNDofs(); n++) {
+      auto hcoords = coordsDof.HostRead();  // get coords
+
+      double coords[3];
+      for (int d = 0; d < dim; d++) {
+        coords[d] = hcoords[n + d * vfes->GetNDofs()];
+      }
+
+      fluxClass->viscSpongePlanar(coords, wgt);
+      viscMult[n] = wgt;
+    }
+  }
+  
+  // Determine domain bounding box size
+  //ParGridFunction coordsDof(dfes);
+  mesh->GetNodes(coordsDof);  
+  {
+    double local_xmin = 1.0e18;
+    double local_ymin = 1.0e18;
+    double local_zmin = 1.0e18;    
+    double local_xmax = 1.0e-15;
+    double local_ymax = 1.0e-15;
+    double local_zmax = 1.0e-15;        
+    for (int n = 0; n < fes->GetNDofs(); n++) {
+      auto hcoords = coordsDof.HostRead();
+      double coords[3];
+      for (int d = 0; d < dim; d++) {
+        coords[d] = hcoords[n + d * dfes->GetNDofs()];
+      }      
+      local_xmin = min(coords[0], local_xmin);
+      local_ymin = min(coords[1], local_ymin);
+      if (dim == 3) {local_zmin = min(coords[2], local_zmin);}
+      local_xmax = max(coords[0], local_xmax);
+      local_ymax = max(coords[1], local_ymax);
+      if (dim == 3) {local_zmax = max(coords[2], local_zmax);}      
+    }
+    MPI_Allreduce(&local_xmin, &xmin, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
+    MPI_Allreduce(&local_ymin, &ymin, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
+    MPI_Allreduce(&local_zmin, &zmin, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());    
+    MPI_Allreduce(&local_xmax, &xmax, 1, MPI_DOUBLE, MPI_MAX, mesh->GetComm());
+    MPI_Allreduce(&local_ymax, &ymax, 1, MPI_DOUBLE, MPI_MAX, mesh->GetComm());
+    MPI_Allreduce(&local_zmax, &zmax, 1, MPI_DOUBLE, MPI_MAX, mesh->GetComm());    
+  }
+  
   // estimate initial dt
   Up->ExchangeFaceNbrData();
   gradUp->ExchangeFaceNbrData();
@@ -1749,6 +1800,105 @@ void M2ulPhyS::solve() {
 
         average->write_meanANDrms_restart_files(iter, time);
       }
+
+
+      // make a separate routine!
+      // plane interp and dump here, add gslib check (ifdef?)
+      {
+
+	// source 
+        ParGridFunction *u_gf = GetSolutionGF();
+	
+	// plane description
+        auto normal = config.planeDump.normal;
+        auto point = config.planeDump.point;
+        int nPts = config.planeDump.nPts;	
+	double ndotp = 0.0;
+  	for (int i = 0; i < dim; i++) { ndotp += normal[i]*point[i]; }
+        double majorD;
+	majorD = std::max(normal[0],normal[1]);
+	if (dim == 3) {
+	  majorD = std::max(majorD,normal[2]);
+	}
+
+	// plane points
+        Vector vxyz;
+        vxyz.SetSize(nPts*nPts*3);
+	int iCnt = 0;
+	double xp, yp, zp;
+        double Lx, Ly, Lz;
+	Lx = xmax - xmin;
+	Ly = ymax - ymin;
+	Lz = zmax - zmin;	
+        if (majorD == normal[0]) {
+  	  double dy = Ly/(double)(nPts-1);
+  	  double dz = Lz/(double)(nPts-1);	  
+   	  for (int j = 0; j < nPts; j++) {
+  	     for (int i = 0; i < nPts; i++) {
+	       yp = dy*(double)i + ymin;
+	       zp = dz*(double)j + zmin;
+	       xp = (ndotp - (normal[1]*yp) - (normal[2]*zp) ) / normal[0];
+	       vxyz[iCnt + 0*nPts*nPts] = xp;
+  	       vxyz[iCnt + 1*nPts*nPts] = yp;
+	       vxyz[iCnt + 2*nPts*nPts] = zp;
+	       iCnt++;
+	     }
+	  }	  
+	} else if (majorD == normal[1]) {
+  	  double dx = Lx/(double)(nPts-1);
+  	  double dz = Lz/(double)(nPts-1);	  
+   	  for (int j = 0; j < nPts; j++) {
+  	     for (int i = 0; i < nPts; i++) {
+	       xp = dx*(double)i + xmin;
+	       zp = dz*(double)j + zmin;
+	       yp = (ndotp - (normal[0]*xp) - (normal[2]*zp) ) / normal[1];
+	       vxyz[iCnt + 0*nPts*nPts] = xp;
+  	       vxyz[iCnt + 1*nPts*nPts] = yp;
+	       vxyz[iCnt + 2*nPts*nPts] = zp;	       
+	       iCnt++;
+	     }
+	  }	  
+	} else {
+  	  double dx = Lx/(double)(nPts-1);
+	  double dy = Ly/(double)(nPts-1);	  
+   	  for (int j = 0; j < nPts; j++) {
+  	     for (int i = 0; i < nPts; i++) {
+	       xp = dx*(double)i + xmin;
+	       yp = dy*(double)j + ymin;
+	       zp = (ndotp - (normal[0]*xp) - (normal[1]*yp) ) / normal[2];
+	       vxyz[iCnt + 0*nPts*nPts] = xp;
+  	       vxyz[iCnt + 1*nPts*nPts] = yp;
+	       vxyz[iCnt + 2*nPts*nPts] = zp;	       
+	       iCnt++;
+	     }
+	  }	  	  
+	}
+	            	
+	// get values at plane
+        Vector uInterp_vals(nPts*nPts*num_equation);
+        FindPointsGSLIB finder(MPI_COMM_WORLD);
+        finder.Setup(*mesh);
+        finder.Interpolate(vxyz, *u_gf, uInterp_vals);
+
+	// save plane values
+	if (rank0_) {
+          std::ofstream outfile;
+          outfile.open("plane.txt", std::ios_base::app);
+          outfile << "#plane point " << point[0] << " " << point[1] << " " << point[2] << endl;
+          outfile << "#plane normal " << normal[0] << " " << normal[1] << " " << normal[2] << endl;	  
+          //auto dU = uInterp_vals->HostReadWrite();
+          int dof = nPts*nPts; //fes->GetNDofs();
+          for (int n = 0; n < dof; n++) {
+	    outfile << vxyz[n+0*dof] << " " << vxyz[n+1*dof] << " " << vxyz[n+2*dof] << " " ;	    
+            for (int eq = 0; eq < num_equation; eq++) {
+  	      //outfile << dU[n + eq*dof] << " ";
+  	      outfile << uInterp_vals[n + eq*dof] << " ";	      
+	    }
+            outfile << endl;
+          }
+	  outfile.close();
+	}	
+      }      
     }
 
 #ifdef HAVE_SLURM
@@ -2386,6 +2536,29 @@ void M2ulPhyS::parseViscosityOptions() {
     tpsP->getRequiredInput("viscosityMultiplierFunction/viscosityRatio", config.linViscData.viscRatio);
   }
 }
+
+void M2ulPhyS::parsePlaneDump() {
+  
+  tpsP->getInput("planeDump/isEnabled", config.planeDump.isEnabled, false);
+  
+  if (config.planeDump.isEnabled) {
+    
+    auto normal = config.planeDump.normal.HostWrite();
+    tpsP->getRequiredVecElem("planeDump/norm", normal[0], 0);
+    tpsP->getRequiredVecElem("planeDump/norm", normal[1], 1);
+    tpsP->getRequiredVecElem("planeDump/norm", normal[2], 2);
+
+    auto point = config.planeDump.point.HostWrite();
+    tpsP->getRequiredVecElem("planeDump/p0", point[0], 0);
+    tpsP->getRequiredVecElem("planeDump/p0", point[1], 1);
+    tpsP->getRequiredVecElem("planeDump/p0", point[2], 2);
+
+    //auto samples = config.planeDump.nPts.HostWrite();
+    tpsP->getRequiredInput("pointDump/samples", config.planeDump.nPts);
+  }
+  
+}
+
 
 void M2ulPhyS::parseMMSOptions() {
   tpsP->getInput("mms/isEnabled", config.use_mms_, false);

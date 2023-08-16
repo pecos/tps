@@ -171,6 +171,13 @@ struct linearlyVaryingVisc {
   bool isEnabled;
 };
 
+struct planeDumpData {
+  Vector normal;
+  Vector point;
+  int nPts;
+  bool isEnabled;
+};
+
 enum SpongeZoneSolution {
   USERDEF,   // User defined target solution
   MIXEDOUT,  // Mixed-out values will be computed at the pInit plane and
