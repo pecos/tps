@@ -273,6 +273,10 @@ class M2ulPhyS : public TPS::Solver {
   // maximum element size
   double hmax;
 
+  // domain extent
+  double xmin, ymin, zmin;
+  double xmax, ymax, zmax;  
+  
   // exit status code;
   int exit_status_;
 
@@ -377,6 +381,7 @@ class M2ulPhyS : public TPS::Solver {
   void parsePeriodicInputs();
   void parsePostProcessVisualizationInputs();
   void parseRadiationInputs();
+  void parsePlaneDump();
 
   void packUpGasMixtureInput();
   void identifySpeciesType(Array<ArgonSpcs> &speciesType);

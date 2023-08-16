@@ -88,6 +88,17 @@ RunConfiguration::RunConfiguration() {
   linViscData.pointInit = 0.;
   linViscData.viscRatio = 0.;
 
+  planeDump.normal.UseDevice(true);
+  planeDump.point.UseDevice(true);
+
+  planeDump.normal.SetSize(3);
+  planeDump.point.SetSize(3);
+
+  planeDump.normal = 0.;
+  planeDump.point = 0.;
+  planeDump.samples = 0;
+
+  
   //   initSpongeData();
   numSpongeRegions_ = 0;
   spongeData_ = NULL;
