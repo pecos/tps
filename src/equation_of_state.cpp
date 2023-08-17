@@ -1999,31 +1999,6 @@ void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInt
   n_sp[iElectron] = n_e;
   n_sp[iBackground] = n_neutral / Q_n;
 
-  // Brain dump
-  printf("----------------------------------------------\n");
-  fflush(stdout);
-  printf("Input conditions: T = %.6e, n0 = %.6e\n", T, n_0);
-  fflush(stdout);
-  printf("Local indices: iIon1 = %d, iElectron = %d, iBackground = %d\n", iIon1, iElectron, iBackground);
-  fflush(stdout);
-  printf("Output densities: n =");
-  for (int sp = 0; sp < numSpecies; sp++) {
-    printf(" %.6e", n_sp[sp]);
-  }
-  printf("\n");
-  fflush(stdout);
-
-  printf("Charges: n =");
-  for (int sp = 0; sp < numSpecies; sp++) {
-    printf(" %.6e", GetGasParams(sp, GasParams::SPECIES_CHARGES));
-  }
-  printf("\n");
-  fflush(stdout);
-
-  //------------------------------------------------------------------------
-  // Some sanity checks!!
-
-  // n_e must be non-negative
   if (n_e < 0.0) {
     printf("n_e = %.6e < 0!!!!!!!!!!!!!!", n_e);
     fflush(stdout);
@@ -2031,15 +2006,35 @@ void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInt
 
   // Total number molar density should be (nearly) preserved
   double n_0_check = 0.0;
+  double rho_update = 0.0;
   for (int isp = 0; isp < numSpecies; isp++) {
     n_0_check += n_sp[isp];
+    rho_update += n_sp[isp] * GetGasParams(isp, GasParams::SPECIES_MW);
   }
 
   assert(abs(n_0 - n_0_check) / n_0 < 1e-14);
   assert(n_e >= 0.0);
 
   //--------------------------------------------------------------------------
-  // Fill in the state, starting with  the species
+  // Fill in the state
+
+  // First, update the mixture density and momentum.
+  //
+  // We note that the density may change, very slightly, say a few
+  // tenths of a percent, due to inconsistency between the excited
+  // levels used in generating the LTE tables and the excited levels
+  // carried in the reacting simulation.  This means that the new
+  // state at equilibrium cannot exactly preserve the temperature,
+  // pressure, and mass density from the original solution
+  // simultaneously.  Here, we choose to preserve temperature and
+  // pressure and modify (slightly) the density.  Note that larger
+  // density perturbations may be a sign of a mistake in the input or
+  // a bug and should be investigated.
+  conserv[0] = rho_update;
+  primit[0] = rho_update;
+
+  for (int d = 0; d < nvel_; d++) conserv[d + 1] = rho_update * primit[d + 1];
+
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     conserv[nvel_ + 2 + sp] = n_sp[sp] * GetGasParams(sp, GasParams::SPECIES_MW);
     primit[nvel_ + 2 + sp] = n_sp[sp];
