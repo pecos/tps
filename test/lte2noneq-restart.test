@@ -1,0 +1,40 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="lte2noneq-restart"
+RUNFILE="inputs/argon.plasma.lte2noneq.ini"
+EXE="../src/tps"
+
+setup() {
+    INIT_SOLN_FILE=ref_solns/restart_non-lte-restart-test.lte.h5
+    SOLN_FILE=restart_non-lte-restart-test.sol.h5
+    REF_SOLN_FILE=ref_solns/restart_non-lte-restart-test.noneq.h5
+}
+
+@test "[$TEST] check lte -> noneq restart from $RUNFILE" {
+    test -s $RUNFILE
+    rm -f $SOLN_FILE
+
+    # just in case, eliminate vis directory b/c tps will die if it
+    # tries to overwrite an existing vis file
+    rm -rf non-lte-restart-test
+
+    test -s $INIT_SOLN_FILE
+    cp $INIT_SOLN_FILE $SOLN_FILE
+
+    test -s $SOLN_FILE
+    run $EXE -run $RUNFILE
+    [[ "${status}" -eq 0 ]]
+
+    test -s $SOLN_FILE
+
+    run h5dump  -a iteration $SOLN_FILE
+    [[ "${output}" =~ "26500000" ]]
+
+    test -s $REF_SOLN_FILE
+    ./soln_differ -s $SOLN_FILE $REF_SOLN_FILE
+
+    # clean up
+    rm -f $SOLN_FILE
+    rm -rf non-lte-restart-test
+}

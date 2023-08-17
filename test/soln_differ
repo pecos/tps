@@ -7,8 +7,9 @@ averages=no
 absTolrho=2e-13      # absolute tolerance to use for density
 absTolrhovel=2e-11   # absolute tolerance to use for rhou,rhov,rhow
 relTolrhoE=1e-14     # relative tolerance used for rhoE
+relTolrhoY=1e-14     # relative tolerance for species densities
 
-while getopts ":d:t:u:e:ra" args; do
+while getopts ":d:t:u:e:ras" args; do
     case "${args}" in
 	d)
 	    dim=${OPTARG}
@@ -28,12 +29,15 @@ while getopts ":d:t:u:e:ra" args; do
 	a)
 	    averages=yes
 	    ;;
+        s)
+            species=yes
+            ;;
     esac
 done
 shift $((OPTIND-1))
 
 if [ $# -lt 2 ];then
-    echo "Usage: soln_differ [-d] [-a] <file1.h5> <file2.h5>"
+    echo "Usage: soln_differ [-d] [-a] [-s] <file1.h5> <file2.h5>"
     echo ""
     echo "   -d <dim>        set dimension (1,2,3=default)"
     echo "   -t <rho_tol>    (absolute) tolerance on density diff (default = 2e-13)"
@@ -41,6 +45,7 @@ if [ $# -lt 2 ];then
     echo "   -e <rhoE_tol>   (relative) tolerance on energy diff (default = 2e-14)"
     echo "   -r              report solution differences to stdout"
     echo "   -a              check averages"
+    echo "   -s              check species"
    exit 1
 fi
 
@@ -49,6 +54,7 @@ file2=$2
 if [ $# -gt 2 ];then
     avg=$3
 fi
+
 
 h5diff ${report} --delta=${absTolrho}     $file1 $file2 /solution/density || exit 1
 h5diff ${report} --delta=${absTolrhovel}  $file1 $file2 /solution/rho-u   || exit 1
@@ -79,3 +85,20 @@ if [ $averages == "yes" ]; then
    h5diff ${report} --delta=${absTolrhovel}  $file1 $file2 /rmsData/vw   || exit 1
 fi
 
+# Check species densities (rho-Y*) if requested
+if [ $species == "yes" ]; then
+    all_vars=$(h5ls -s $file1/solution | awk {'print $1'})  # Assumes both files have same variables
+    count=0 # count b/c want to throw and error if no species are found
+    for v in $all_vars; do
+        if [[ $v =~ "rho-Y" ]]; then
+            echo $v
+            let count++
+            h5diff ${report} --relative ${relTolrhoY} $file1 $file2 /solution/$v || exit 1
+        fi
+    done
+    # Error if no species
+    if [ $count -eq 0 ]; then
+        echo "Error: Requested species check, but no species were found in $file1"
+        exit 1
+    fi
+fi
