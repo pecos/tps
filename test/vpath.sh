@@ -16,6 +16,10 @@ if [ ! -d inputs ];then
     ln -s $testDir/inputs .
 fi
 
+if [ ! -d lte-data ];then
+    ln -s $testDir/lte-data .
+fi
+
 # reference solutions
 if [ ! -d ref_solns ];then
     ln -s $testDir/ref_solns .
