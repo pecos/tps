@@ -639,9 +639,10 @@ void M2ulPhyS::initVariables() {
   
   // Determine domain bounding box size
   ParGridFunction coordsDof(dfes);
-  //ParGridFunction coordsVert(dfes);  
+  ParGridFunction coordsVert(dfes);  
   mesh->GetNodes(coordsDof);
-  //mesh->GetVertices(coordsVert)
+  mesh->GetVertices(coordsVert);
+  int nVert = coordsVert.Size()/dim; 
   {
     
     //std::cout << " Starting domain size find..." << endl;
@@ -652,8 +653,10 @@ void M2ulPhyS::initVariables() {
     double local_xmax = 1.0e-15;
     double local_ymax = 1.0e-15;
     double local_zmax = 1.0e-15;        
-    for (int n = 0; n < fes->GetNDofs(); n++) {
-      auto hcoords = coordsDof.HostRead();
+    //for (int n = 0; n < fes->GetNDofs(); n++) {
+    for (int n = 0; n < nVert; n++) {      
+      //auto hcoords = coordsDof.HostRead();
+      auto hcoords = coordsVert.HostRead();      
       double coords[3];
       for (int d = 0; d < dim; d++) { coords[d] = hcoords[n + d * fes->GetNDofs()]; }
       local_xmin = min(coords[0], local_xmin);
