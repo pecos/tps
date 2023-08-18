@@ -174,7 +174,7 @@ struct linearlyVaryingVisc {
 struct planeDumpData {
   Vector normal;
   Vector point;
-  int nPts;
+  int samples;
   bool isEnabled;
 };
 
