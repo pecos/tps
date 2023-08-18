@@ -22,7 +22,7 @@ endif
 
 TEST_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) $(top_srcdir)/test/tap-driver.sh
 
-EXTRA_DIST      = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes ref_solns/*.h5 \
+EXTRA_DIST      = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-data ref_solns/*.h5 \
 		  ref_solns/collisions/*.h5 ref_solns/transport/*.h5 ref_solns/reaction/*.h5 \
 		  ref_solns/noSGM1K/*.h5 ref_solns/smag1K_1/*.h5 ref_solns/sigma1K_1/*.h5 \
 	          ref_solns/plate150K/*.h5 ref_solns/plate150K_1step/*.h5 \
