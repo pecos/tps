@@ -181,7 +181,11 @@ struct linearlyVaryingVisc {
 struct planeDumpData {
   Vector normal;
   Vector point;
+<<<<<<< HEAD
   int samples;
+=======
+  int nPts;
+>>>>>>> bed9fec (building with plane dump, not tested)
   bool isEnabled;
 };
 
