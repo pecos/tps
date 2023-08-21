@@ -275,8 +275,8 @@ class M2ulPhyS : public TPS::Solver {
 
   // domain extent
   double xmin, ymin, zmin;
-  double xmax, ymax, zmax;  
-  
+  double xmax, ymax, zmax;
+
   // exit status code;
   int exit_status_;
 

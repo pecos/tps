@@ -98,7 +98,6 @@ RunConfiguration::RunConfiguration() {
   planeDump.point = 0.;
   planeDump.samples = 0;
 
-  
   //   initSpongeData();
   numSpongeRegions_ = 0;
   spongeData_ = NULL;

@@ -144,7 +144,7 @@ class RunConfiguration {
   // the plane defined by point0.
   linearlyVaryingVisc linViscData;
 
-  planeDumpData planeDump;  
+  planeDumpData planeDump;
 
   SutherlandData sutherland_;
 
