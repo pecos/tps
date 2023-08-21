@@ -1878,18 +1878,6 @@ void M2ulPhyS::solveStep() {
       
   }  // step check
     
-#ifdef HAVE_SLURM
-    // check if near end of a run and ready to submit restart
-    if ((iter % config.rm_checkFreq() == 0) && (iter != MaxIters)) {
-      readyForRestart = Check_JobResubmit();
-      if (readyForRestart) {
-        MaxIters = iter;
-        SetStatus(JOB_RESTART);
-        break;
-      }
-    }
-
-
   average->addSampleMean(iter);
 }
 
