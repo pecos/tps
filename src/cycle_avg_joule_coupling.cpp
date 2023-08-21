@@ -46,7 +46,7 @@ CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tp
   tps->getRequiredInput("cycle-avg-joule-coupled/solve-em-every-n", solve_em_every_n_);
   tps->getRequiredInput("cycle-avg-joule-coupled/max-iters", max_iters_);
   bool axisym = false;
-  tps->getInput("cycle-avg-joule-coupled/asymmetric", axisym, false);
+  tps->getInput("cycle-avg-joule-coupled/axisymmetric", axisym, false);
   tps->getInput("cycle-avg-joule-coupled/input-power", input_power_, -1.);
   tps->getInput("cycle-avg-joule-coupled/initial-input-power", initial_input_power_, -1.);
 
