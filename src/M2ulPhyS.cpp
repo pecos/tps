@@ -1774,8 +1774,9 @@ void M2ulPhyS::solveStep() {
       average->write_meanANDrms_restart_files(iter, time);
     }
 
-    // make a separate routine! plane interp and dump here, add gslib check (ifdef?)
+    // make a separate routine! plane interp and dump here
     if ( config.planeDump.isEnabled == true ) {
+#ifdef HAVE_GSLIB
       // source
       ParGridFunction *u_gf = GetSolutionGF();
 
@@ -1872,6 +1873,10 @@ void M2ulPhyS::solveStep() {
         }
         outfile.close();
       }
+#else
+      grvy_printf(GRVY_ERROR, "\nPlane dump capability requires gslib support.\n");
+      exit(ERROR);
+#endif
     }  // plane dump
   }  // step check
 
