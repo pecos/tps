@@ -61,6 +61,8 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   int solve_em_every_n_;
   //! Report timings every timing_freq_ steps
   int timing_freq_;
+  //! Flag to specify the electrical conductivity should not be updated
+  bool fixed_conductivity_;
 
 #ifdef HAVE_GSLIB
   FindPointsGSLIB *interp_flow_to_em_;

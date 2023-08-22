@@ -437,6 +437,8 @@ class M2ulPhyS : public TPS::Solver {
     delete coordsDof;
   }
 
+  void evaluatePlasmaConductivityGF();
+
   // Exit code access
   void SetStatus(int code) {
     exit_status_ = code;

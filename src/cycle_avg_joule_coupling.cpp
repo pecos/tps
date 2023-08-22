@@ -50,6 +50,7 @@ CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tp
   tps->getInput("cycle-avg-joule-coupled/axisymmetric", axisym, false);
   tps->getInput("cycle-avg-joule-coupled/input-power", input_power_, -1.);
   tps->getInput("cycle-avg-joule-coupled/initial-input-power", initial_input_power_, -1.);
+  tps->getInput("cycle-avg-joule-coupled/fixed-conductivity", fixed_conductivity_, false);
 
   if (axisym) {
     qmsa_solver_ = new QuasiMagnetostaticSolverAxiSym(em_opt_, tps);
@@ -307,17 +308,27 @@ void CycleAvgJouleCoupling::solveBegin() {
 void CycleAvgJouleCoupling::solveStep() {
   // Run the em solver when it is due
   if (current_iter_ % solve_em_every_n_ == 0) {
+    // update the power if necessary
     double delta_power = 0;
     if (input_power_ > 0) {
       delta_power = (input_power_ - initial_input_power_) * static_cast<double>(solve_em_every_n_) /
                     static_cast<double>(max_iters_);
     }
+
+    // evaluate electric conductivity and interpolate it to EM mesh
+    if (!fixed_conductivity_) flow_solver_->evaluatePlasmaConductivityGF();
     interpConductivityFromFlowToEM();
+
+    // solve the EM system
     qmsa_solver_->solve();
+
+    // report the "raw" Joule heating
     const double tot_jh = qmsa_solver_->totalJouleHeating();
     if (rank0_) {
       grvy_printf(GRVY_INFO, "The total input Joule heating = %.6e\n", tot_jh);
     }
+
+    // scale the Joule heating (if we are controlling the power input)
     if (input_power_ > 0) {
       const double target_power = initial_input_power_ + (current_iter_ / solve_em_every_n_ + 1) * delta_power;
       const double ratio = target_power / tot_jh;
@@ -327,6 +338,8 @@ void CycleAvgJouleCoupling::solveStep() {
         grvy_printf(GRVY_INFO, "The total input Joule heating after scaling = %.6e\n", upd_jh);
       }
     }
+
+    // interpolate the Joule heating to the flow mesh
     interpJouleHeatingFromEMToFlow();
   }
   // Run a step of the flow solver

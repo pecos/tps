@@ -3998,3 +3998,67 @@ void M2ulPhyS::updateVisualizationVariables() {
     }  // if (!isDryAir)
   }    // for (int n = 0; n < ndofs; n++)
 }
+
+void M2ulPhyS::evaluatePlasmaConductivityGF() {
+  assert(plasma_conductivity_ != NULL);
+  double *d_pc = plasma_conductivity_->Write();
+
+  const double *d_Up = Up->Read();
+  const double *d_U = U->Read();
+  const double *d_gradUp = gradUp->Read();
+
+  const double *d_distance = NULL;
+  if (distance_ != NULL) {
+    d_distance = distance_->Read();
+  }
+
+  TransportProperties *d_transport = transportPtr;
+
+  const int nnodes = vfes->GetNDofs();
+  const int _dim = dim;
+  const int _nvel = nvel;
+  const int _num_equation = num_equation;
+  const int _numSpecies = numSpecies;
+
+#if defined(_GPU_)
+  MFEM_FORALL(n, nnodes, {
+    double upn[gpudata::MAXEQUATIONS];
+    double Un[gpudata::MAXEQUATIONS];
+    double gradUpn[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
+#else
+  double upn[gpudata::MAXEQUATIONS];
+  double Un[gpudata::MAXEQUATIONS];
+  double gradUpn[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
+  for (int n = 0; n < nnodes; n++) {
+#endif
+    for (int eq = 0; eq < _num_equation; eq++) {
+      upn[eq] = d_Up[n + eq * nnodes];
+      Un[eq] = d_U[n + eq * nnodes];
+      for (int d = 0; d < _dim; d++)
+        gradUpn[eq + d * _num_equation] = d_gradUp[n + eq * nnodes + d * _num_equation * nnodes];
+    }
+    // TODO(kevin): update E-field with EM coupling.
+    // E-field can have azimuthal component.
+    double Efield[gpudata::MAXDIM];
+    for (int v = 0; v < _nvel; v++) Efield[v] = 0.0;
+
+    double globalTransport[gpudata::MAXSPECIES];
+    double speciesTransport[gpudata::MAXSPECIES * SpeciesTrns::NUM_SPECIES_COEFFS];
+    // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
+    double diffusionVelocity[gpudata::MAXSPECIES * gpudata::MAXDIM];
+    for (int v = 0; v < _nvel; v++)
+      for (int sp = 0; sp < _numSpecies; sp++) diffusionVelocity[sp + v * _numSpecies] = 0.0;
+    double ns[gpudata::MAXSPECIES];
+
+    double dist = 0.0;
+    if (d_distance != NULL) dist = d_distance[n];
+    d_transport->ComputeSourceTransportProperties(Un, upn, gradUpn, Efield, dist, globalTransport, speciesTransport,
+                                                 diffusionVelocity, ns);
+
+    d_pc[n] = globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY];
+#if defined(_GPU_)
+  });  // MFEM_FORALL(n, nnodes, {
+#else
+  }  // for (int n = 0; n < nnodes; n++)
+#endif
+}
