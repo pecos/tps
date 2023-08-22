@@ -59,6 +59,8 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   int current_iter_;
   //! We call the em solver only every solve_em_every_n steps
   int solve_em_every_n_;
+  //! Report timings every timing_freq_ steps
+  int timing_freq_;
 
 #ifdef HAVE_GSLIB
   FindPointsGSLIB *interp_flow_to_em_;

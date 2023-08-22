@@ -45,6 +45,7 @@ CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tp
 
   tps->getRequiredInput("cycle-avg-joule-coupled/solve-em-every-n", solve_em_every_n_);
   tps->getRequiredInput("cycle-avg-joule-coupled/max-iters", max_iters_);
+  tps->getInput("cycle-avg-joule-coupled/timing-frequency", timing_freq_, 100);
   bool axisym = false;
   tps->getInput("cycle-avg-joule-coupled/axisymmetric", axisym, false);
   tps->getInput("cycle-avg-joule-coupled/input-power", input_power_, -1.);
@@ -277,9 +278,24 @@ void CycleAvgJouleCoupling::initialize() {
 
 void CycleAvgJouleCoupling::solve() {
   this->solveBegin();
+  double tlast = grvy_timer_elapsed_global();
+
   while (current_iter_ < max_iters_) {
+    grvy_timer_begin(__func__);
+
+    // periodically report on time/iteration
+    if ((current_iter_ % timing_freq_) == 0) {
+      if (rank0_) {
+        double timePerIter = (grvy_timer_elapsed_global() - tlast) / timing_freq_;
+        grvy_printf(ginfo, "Iteration = %i: wall clock time/iter = %.3f (secs)\n", current_iter_, timePerIter);
+        tlast = grvy_timer_elapsed_global();
+      }
+    }
+
     this->solveStep();
+    grvy_timer_end(__func__);
   }
+
   this->solveEnd();
 }
 
