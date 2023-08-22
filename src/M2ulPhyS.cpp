@@ -1765,12 +1765,18 @@ void M2ulPhyS::solveStep() {
 #endif
 
     if (iter != MaxIters) {
-      // Up->HostRead();
-      Up->ReadWrite();  // sets memory to GPU
+      // auto hUp = Up->HostRead();
+      Up->HostRead();
       mixture->UpdatePressureGridFunction(press, Up);
+
+      restart_files_hdf5("write");
+
       paraviewColl->SetCycle(iter);
       paraviewColl->SetTime(time);
       paraviewColl->Save();
+      // auto dUp = Up->ReadWrite();  // sets memory to GPU
+      Up->ReadWrite();  // sets memory to GPU
+
       average->write_meanANDrms_restart_files(iter, time);
     }
 
