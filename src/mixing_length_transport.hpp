@@ -112,7 +112,6 @@ MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double 
       const double ui_xj = gradUp[(1 + i) + j * num_equation];
       const double uj_xi = gradUp[(1 + j) + i * num_equation];
       double Sij = 0.5 * (ui_xj + uj_xi);
-      if (i == j) Sij -= divV / 3.;
       S += 2 * Sij * Sij;
     }
   }
@@ -126,7 +125,7 @@ MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double 
     double Szx = 0.5 * ut_r;
     if (radius > 0) Szx -= 0.5 * ut / radius;
     const double Szy = 0.5 * ut_z;
-    double Szz = -divV / 3.;
+    double Szz = 0.0;
     if (radius > 0) Szz += ur / radius;
 
     S += 2 * (2 * Szx * Szx + 2 * Szy * Szy + Szz * Szz);
@@ -135,9 +134,10 @@ MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double 
   S = sqrt(S);
 
   const double mixing_length = std::min(0.41 * distance, max_mixing_length_);
-  const double mut = rho * mixing_length * mixing_length * S;
+  double mut = rho * mixing_length * mixing_length * S;
 
   visc[0] += mut;
+  visc[1] += mut;
 }
 #endif
 #endif  // MIXING_LENGTH_TRANSPORT_HPP_

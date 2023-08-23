@@ -69,6 +69,10 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
   const double cp_over_Pr =
       transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] / transportBuffer[FluxTrns::VISCOSITY];
 
+  const double kappa = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY];
+  const double mu = transportBuffer[FluxTrns::VISCOSITY];
+
+
   // Add mixing length model results to computed molecular transport
   double primitiveState[gpudata::MAXEQUATIONS];
   mixture->GetPrimitivesFromConservatives(state, primitiveState);
@@ -96,7 +100,6 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
       const double ui_xj = gradUp[(1 + i) + j * num_equation];
       const double uj_xi = gradUp[(1 + j) + i * num_equation];
       double Sij = 0.5 * (ui_xj + uj_xi);
-      if (i == j) Sij -= divV / 3.;
       S += 2 * Sij * Sij;
     }
   }
@@ -110,7 +113,7 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
     double Szx = 0.5 * ut_r;
     if (radius > 0) Szx -= 0.5 * ut / radius;
     const double Szy = 0.5 * ut_z;
-    double Szz = -divV / 3.;
+    double Szz = 0.0;
     if (radius > 0) Szz += ur / radius;
 
     S += 2 * (2 * Szx * Szx + 2 * Szy * Szy + Szz * Szz);
@@ -119,9 +122,10 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
   S = sqrt(S);
 
   const double mixing_length = std::min(0.41 * distance, max_mixing_length_);
-  const double mut = rho * mixing_length * mixing_length * S;
+  double mut = rho * mixing_length * mixing_length * S;
 
   transportBuffer[FluxTrns::VISCOSITY] += mut;
+  transportBuffer[FluxTrns::BULK_VISCOSITY] += mut;
 
   // eddy thermal conductivity
   const double Pr_over_Prt = Prt_;  // FIXME: change varaible name
@@ -156,40 +160,5 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeSourceTransportProperties(
     double *globalTransport, double *speciesTransport, double *diffusionVelocity, double *n_sp) {
   molecular_transport_->ComputeSourceTransportProperties(state, Up, gradUp, Efield, distance, globalTransport,
                                                          speciesTransport, diffusionVelocity, n_sp);
-
-  // Add mixing length model results to computed molecular transport
-  //
-  // for (int i = 0; i < SrcTrns::NUM_SRC_TRANS; i++) globalTransport[i] = 0.0;
-  // for (int c = 0; c < SpeciesTrns::NUM_SPECIES_COEFFS; c++)
-  //   for (int sp = 0; sp < numSpecies; sp++) speciesTransport[sp + c * numSpecies] = 0.0;
-  // for (int sp = 0; sp < numSpecies; sp++) n_sp[sp] = 0.0;
-
-  // // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
-  // // diffusionVelocity.SetSize(numSpecies, nvel_);
-  // for (int v = 0; v < nvel_; v++)
-  //   for (int sp = 0; sp < numSpecies; sp++) diffusionVelocity[sp + v * numSpecies] = 0.0;
-
-  // double primitiveState[gpudata::MAXEQUATIONS];
-  // mixture->GetPrimitivesFromConservatives(state, primitiveState);
-
-  // const double rho = state[0];
-  // const double Th = primitiveState[nvel_ + 1];
-
-  // // eddy viscosity
-  // double S = 0;
-  // for (int i = 0; i < dim; i++) {
-  //   for (int j = 0; j < dim; j++) {
-  //     const double u_x = gradUp[(1 + i) + j * num_equation];
-  //     S += 2 * u_x * u_x; // todo: subtract divergence part
-  //   }
-  // }
-  // S = sqrt(S);
-
-  // //const double mut = rho * mixing_length_ * mixing_length_ * S;
-
-  // // eddy thermal conductivity
-  // //const double kappat = mut * cp / Prt_;
-
-  // // TODO(trevilo): Call molecular transport
 }
 #endif
