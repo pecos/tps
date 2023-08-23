@@ -1,8 +1,6 @@
 
 
-
 // look at elasticity integrator
-
 
 
 ///*  Add description later //
@@ -34,6 +32,7 @@ void vel_ic(const Vector &coords, double t, Vector &u);
 void vel_wall(const Vector &x, double t, Vector &u);
 double temp_ic(const Vector &coords, double t);
 double temp_wall(const Vector &x, double t);
+void vel_channelTest(const Vector &coords, double t, Vector &u);
 
 
 LoMachSolver::LoMachSolver(MPI_Session &mpi, LoMachOptions loMach_opts, TPS::Tps *tps)
@@ -863,9 +862,19 @@ void LoMachSolver::Setup(double dt)
    
    Array<int> domain_attr(pmesh->attributes);
    domain_attr = 1;
-   AddAccelTerm(accel, domain_attr); // HERE wire to input file
+   //AddAccelTerm(accel, domain_attr); // HERE wire to input file config.gradPress[3]
 
-
+   Vector accel_vec(3);
+   if ( config.isForcing ) {
+     for (int i = 0; i < nvel; i++) { accel_vec[i] = config.gradPress[i]; }
+   } else {
+     for (int i = 0; i < nvel; i++) { accel_vec[i] = 0.0; }     
+   }
+   buffer_accel = new VectorConstantCoefficient(accel_vec);
+   AddAccelTerm(buffer_accel, domain_attr);
+   if (rank0_ ) {
+     std::cout << " Acceleration: " << accel_vec[0] << " " << accel_vec[1] << " " << accel_vec[2] << endl;
+   }   
    
    Vector zero_vec(3); zero_vec = 0.0;
    Array<int> attr(pmesh->bdr_attributes.Max());
@@ -2712,7 +2721,13 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    /**/
    
    sw_step.Stop();
-  
+
+
+   if (channelTest == true) {
+     VectorFunctionCoefficient u_test(dim, vel_channelTest);     
+     un_gf.ComputeL2Error(u_test);
+   }
+
    
    if (verbose && pmesh->GetMyRank() == 0)
    {
@@ -3563,7 +3578,9 @@ void LoMachSolver::parseSolverOptions() {
   tpsP_->getInput("loMach/max_iter", loMach_opts_.max_iter, 100);
   tpsP_->getInput("loMach/rtol", loMach_opts_.rtol, 1.0e-6);
   tpsP_->getInput("loMach/nFilter", loMach_opts_.nFilter, 0);
-  tpsP_->getInput("loMach/filterWeight", loMach_opts_.filterWeight, 1.0);    
+  tpsP_->getInput("loMach/filterWeight", loMach_opts_.filterWeight, 1.0);
+
+  tpsP_->getInput("loMach/channelTest", loMach_opts_.channelTest, false);      
   
   //tpsP_->getInput("em/atol", em_opts_.atol, 1.0e-10);
   //tpsP_->getInput("em/preconditioner_background_sigma", em_opts_.preconditioner_background_sigma, -1.0);
@@ -3616,7 +3633,7 @@ void LoMachSolver::parseSolverOptions2() {
   //parseHeatSrcOptions();
 
   // viscosity multiplier function
-  //parseViscosityOptions();
+  parseViscosityOptions();
 
   // MMS (check before IC b/c if MMS, IC not required)
   //parseMMSOptions();
@@ -3831,29 +3848,34 @@ void M2ulPhyS::parseHeatSrcOptions() {
     }
   }
 }
+*/
 
-void M2ulPhyS::parseViscosityOptions() {
-  tpsP->getInput("viscosityMultiplierFunction/isEnabled", config.linViscData.isEnabled, false);
+void LoMachSolver::parseViscosityOptions() {
+  
+  tpsP_->getInput("viscosityMultiplierFunction/isEnabled", config.linViscData.isEnabled, false);
+  
   if (config.linViscData.isEnabled) {
     auto normal = config.linViscData.normal.HostWrite();
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[0], 0);
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[1], 1);
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[2], 2);
+    tpsP_->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[0], 0);
+    tpsP_->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[1], 1);
+    tpsP_->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[2], 2);
 
     auto point0 = config.linViscData.point0.HostWrite();
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[0], 0);
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[1], 1);
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[2], 2);
+    tpsP_->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[0], 0);
+    tpsP_->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[1], 1);
+    tpsP_->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[2], 2);
 
     auto pointInit = config.linViscData.pointInit.HostWrite();
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[0], 0);
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[1], 1);
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[2], 2);
-    tpsP->getRequiredInput("viscosityMultiplierFunction/width", config.linViscData.width);
-    tpsP->getRequiredInput("viscosityMultiplierFunction/viscosityRatio", config.linViscData.viscRatio);
+    tpsP_->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[0], 0);
+    tpsP_->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[1], 1);
+    tpsP_->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[2], 2);
+    tpsP_->getRequiredInput("viscosityMultiplierFunction/width", config.linViscData.width);
+    tpsP_->getRequiredInput("viscosityMultiplierFunction/viscosityRatio", config.linViscData.viscRatio);
   }
+  
 }
 
+/*
 void M2ulPhyS::parseMMSOptions() {
   tpsP->getInput("mms/isEnabled", config.use_mms_, false);
 
@@ -5050,27 +5072,24 @@ void LoMachSolver::initSolutionAndVisualizationVectors() {
   */
 
   // compute factor to multiply viscosity when this option is active
-  /*
   spaceVaryViscMult = NULL;
-  ParGridFunction coordsDof(dfes);
-  mesh->GetNodes(coordsDof);
+  ParGridFunction coordsDof(vfes);
+  pmesh->GetNodes(coordsDof);
   if (config.linViscData.isEnabled) {
-    spaceVaryViscMult = new ParGridFunction(fes);
+    spaceVaryViscMult = new ParGridFunction(tfes);
     double *viscMult = spaceVaryViscMult->HostWrite();
     double wgt = 0.;
-    for (int n = 0; n < fes->GetNDofs(); n++) {
+    for (int n = 0; n < tfes->GetNDofs(); n++) {
       auto hcoords = coordsDof.HostRead();  // get coords
-
       double coords[3];
       for (int d = 0; d < dim; d++) {
         coords[d] = hcoords[n + d * vfes->GetNDofs()];
       }
-
-      fluxClass->viscSpongePlanar(coords, wgt);
+      viscSpongePlanar(coords, wgt);
       viscMult[n] = wgt;
     }
   }
-  */
+  
 
   /*
   paraviewColl->SetCycle(0);
@@ -5116,6 +5135,30 @@ void LoMachSolver::initSolutionAndVisualizationVectors() {
 }
 
 
+/**
+Simple planar viscous sponge layer with smooth tanh-transtion using user-specified width and
+total amplification.  Note: duplicate in M2
+*/
+MFEM_HOST_DEVICE void LoMachSolver::viscSpongePlanar(double *x, double &wgt) {
+  double normal[3];
+  double point[3];
+  double s[3];
+  double factor, width, dist;
+
+  // get settings
+  factor = max(vsd_.ratio, 1.0);
+  width = vsd_.width;
+
+  // distance from plane
+  dist = 0.;
+  for (int d = 0; d < dim; d++) s[d] = (x[d] - vsd_.p[d]);
+  for (int d = 0; d < dim; d++) dist += s[d] * vsd_.n[d];
+
+  // weight
+  wgt = 0.5 * (tanh(dist / width - 2.0) + 1.0);
+  wgt *= (factor - 1.0);
+  wgt += 1.0;
+}
 
 
 ///* temporary, remove when hooked up *//
@@ -5159,7 +5202,7 @@ void vel_ic(const Vector &coords, double t, Vector &u)
    double M = 1.0;
    double scl;
 
-   
+   /**/
    u(0) = M;
    u(1) = 0.0;
    u(2) = 0.0;
@@ -5180,6 +5223,25 @@ void vel_ic(const Vector &coords, double t, Vector &u)
    u(0) = u(0) * scl;
    u(1) = u(1) * scl;
    u(2) = u(2) * scl;
+   /**/
+
+   //scl = std::max(1.0-std::pow((y-0.0)/0.2,4),0.0);
+   //u(0) = scl;
+   //u(1) = 0.0;
+   //u(2) = 0.0;
+   
+}
+
+void vel_channelTest(const Vector &coords, double t, Vector &u)
+{
+  
+   double x = coords(0);
+   double y = coords(1);
+   double z = coords(2);
+
+   u(0) = 1.0-std::pow((y-0.0)/0.2,2);
+   u(1) = 0.0;
+   u(2) = 0.0;
    
 }
 
@@ -5205,3 +5267,4 @@ double temp_wall(const Vector &x, double t)
    double temp = 298.15;
    return temp;
 }
+
