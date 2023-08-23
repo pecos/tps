@@ -3,6 +3,17 @@
 #ifndef LOMACH_HPP
 #define LOMACH_HPP
 
+/*
+using namespace mfem;
+struct viscositySpongeData {
+  bool enabled;
+  double n[3];
+  double p[3];
+  double ratio;
+  double width;
+};
+*/
+
 // forward-declaration for Tps support class
 namespace TPS {
 class Tps;
@@ -261,7 +272,7 @@ protected:
    const int defaultPartMethod = 1;  
   
    // temporary
-  double Re_tau, Pr;
+   double Re_tau, Pr;
   
    /// Kinematic viscosity (dimensionless).
    double kin_vis;
@@ -343,6 +354,7 @@ protected:
   //ConstantCoefficient t_bc_coef;
 
    VectorConstantCoefficient *buffer_ubc;
+   VectorConstantCoefficient *buffer_accel;  
    ConstantCoefficient *buffer_tbc;
    VectorConstantCoefficient *wall_ubc;  
   
@@ -566,7 +578,12 @@ protected:
 
    // I/O organizer
    IODataOrganizer ioData;
-  
+
+   // space varying viscosity multiplier  
+   ParGridFunction *spaceVaryViscMult;  
+   viscositySpongeData vsd_;
+
+   bool channelTest;
   
 public:
    /// Initialize data structures, set FE space order and kinematic viscosity.
@@ -597,7 +614,8 @@ public:
    void parseBCInputs();
    void parseICOptions();
    void parsePostProcessVisualizationInputs();
-   void parseFluidPreset();  
+   void parseFluidPreset();
+   void parseViscosityOptions();  
    void initSolutionAndVisualizationVectors();
    void initialTimeStep();  
    void solve();
@@ -755,6 +773,8 @@ public:
    /// Set the number of modes to cut off in the interpolation filter
    void SetCutoffModes(int c) { filter_cutoff_modes = c; }
 
+   MFEM_HOST_DEVICE void viscSpongePlanar(double *x, double &wgt);
+  
    /// Set the interpolation filter parameter @a a
    /**
     * If @a a is > 0, the filtering algorithm for the velocity field after every

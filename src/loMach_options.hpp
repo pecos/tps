@@ -72,6 +72,8 @@ class LoMachOptions {
 
   int nFilter;
   double filterWeight;
+
+  bool channelTest;
   
   LoMachOptions() {
     order = 1;
