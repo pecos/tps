@@ -183,6 +183,7 @@ protected:
    // loMach options to run as incompressible
    bool constantViscosity = false;
    bool constantDensity = false;
+   bool incompressibleSolve = false;  
    bool pFilter = false;
   
    // Average handler
@@ -402,9 +403,10 @@ protected:
    Vector uBn, uBnm1, uBnm2;
    Vector TBn, TBnm1, TBnm2;    
    Vector Nun, Nunm1, Nunm2;
-   Vector Fext, FText, Lext;          
-   Vector resu, tmpR1;
+   Vector Fext, FText, Lext, Uext, Ldiv;          
+   Vector resu, tmpR1, tmpR1b, tmpR1c;
    Vector FBext;
+   Vector divU;
 
    Vector bufferR0sml, bufferR1sml;
 
