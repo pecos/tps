@@ -36,33 +36,29 @@ void vel_channelTest(const Vector &coords, double t, Vector &u);
 
 
 LoMachSolver::LoMachSolver(MPI_Session &mpi, LoMachOptions loMach_opts, TPS::Tps *tps)
-//    : mpi_(mpi), loMach_opts_(loMach_opts), offsets_(3) {
     : mpi_(mpi), loMach_opts_(loMach_opts) {
 
-  //std::cout << "okay 1" << endl;
   tpsP_ = tps;
-  //std::cout << "okay 2" << endl;  
   pmesh = NULL;
-  //std::cout << "okay 3" << endl;  
   nprocs_ = mpi_.WorldSize();
-  //std::cout << "okay 4" << endl;  
   rank_ = mpi_.WorldRank();
-  //std::cout << "okay 5" << endl;  
   if (rank_ == 0) { rank0_ = true; }
   else { rank0_ = false; }
   groupsMPI = new MPI_Groups(&mpi_);
-  //std::cout << "okay 6" << endl;  
 
   // is this needed?
   groupsMPI->init();
-  //std::cout << "okay 7" << endl;  
-  
+
+  // ini file options
   parseSolverOptions();  
   parseSolverOptions2(); 
 
   // incomp version
   if (config.const_visc > 0.0) { constantViscosity = true; }
-  if (config.const_dens > 0.0) { constantDensity = true; }  
+  if (config.const_dens > 0.0) { constantDensity = true; }
+  if ( constantViscosity == true && constantDensity == true ) {
+    incompressibleSolve = true;
+  }
   
   // set default solver state
   exit_status_ = NORMAL;
@@ -213,7 +209,7 @@ void LoMachSolver::initialize() {
    Mesh periodic_mesh = Mesh::MakePeriodic(mesh,mesh.CreatePeriodicVertexMapping(translations));
    //if (verbose) grvy_printf(ginfo, "Mesh made periodic...\n");         
 
-   // HACK HARD CODE
+   // HACK HACK HACK HARD CODE
    nvel = 3;
    
    // underscore stuff is terrible
@@ -596,9 +592,16 @@ void LoMachSolver::initialize() {
    Fext.SetSize(vfes_truevsize);
    FText.SetSize(vfes_truevsize);
    Lext.SetSize(vfes_truevsize);
+   Uext.SetSize(vfes_truevsize);   
+   Ldiv.SetSize(vfes_truevsize);   
    resu.SetSize(vfes_truevsize);
 
    tmpR1.SetSize(vfes_truevsize);
+   tmpR1b.SetSize(vfes_truevsize);
+   tmpR1c.SetSize(vfes_truevsize);
+
+   divU.SetSize(tfes_truevsize);
+   divU = 0.0;
 
    pn.SetSize(pfes_truevsize);
    pn = 0.0;
@@ -1935,7 +1938,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      for (int i = 0; i < Tdof; i++) {
        //for (int eq = 0; eq < nvel; eq++) {
          prim[1+nvel] = Tdata[i];
-         transportPtr->GetViscosities(prim, prim, visc);
+         transportPtr->GetViscosities(prim, prim, visc); // returns dynamic
+	 
 	 //transportPtr->GetViscBasic(Tdata[i], visc);
 	 /*
 	 if(visc[0] != visc[0]) {
@@ -1945,7 +1949,9 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 	   std::cout << "BAD VISC VALUE!!! " << prim[1+nvel] << endl;
 	 }
 	 */
-         dataVisc[i] = visc[0];
+
+	 // kinematic needed for lhs of momentum
+         dataVisc[i] = visc[0] * (Rgas * Tdata[i]) / ambientPressure;
 	 //dataVisc[i] = kin_vis;
 	 
          //dataVisc[i + eq * Tdof] = visc[0];	   
@@ -2076,7 +2082,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       const auto d_un = un.Read();
       const auto d_unm1 = unm1.Read();
       const auto d_unm2 = unm2.Read();
-      auto d_Lext = Lext.Write();
+      //auto d_Lext = Lext.Write();
+      auto d_Lext = Uext.Write();
       const auto ab1_ = ab1;
       const auto ab2_ = ab2;
       const auto ab3_ = ab3;      
@@ -2088,7 +2095,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    }
    //std::cout << "Check m..." << std::endl;   
 
-   Lext_gf.SetFromTrueDofs(Lext);
+   //Lext_gf.SetFromTrueDofs(Lext);
+   Lext_gf.SetFromTrueDofs(Uext);
    
    int dim = pmesh->Dimension();
    if (dim == 2)
@@ -2122,12 +2130,11 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      for (int i = 0; i < TdofInt; i++) {
          prim[1+nvel] = Tdata[i];
          transportPtr->GetViscosities(prim, prim, visc);
-         dataViscSml[i] = visc[0];
-         //dataViscSml[i] = kin_vis; 	 
+         dataViscSml[i] = visc[0]; // dynamic
      }
    }
-   
 
+   
    // dataVisc is full size, Lext is only TrueSize
    if (constantViscosity != true) {
      //const double *dataVisc = bufferVisc->HostRead();     // TO version
@@ -2144,24 +2151,174 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      //double *data = Lext.HostReadWrite();     
      for (int eq = 0; eq < dim; eq++) {
        for (int i = 0; i < TdofInt; i++) {
-         Lext[i + eq*TdofInt] *= kin_vis;
+         Lext[i + eq*TdofInt] *= (static_rho * kin_vis);
        }
      }     
    }
    //std::cout << "Check o..." << std::endl;      
    sw_curlcurl.Stop();
 
-   // \tilde{F} = F - \nu CurlCurl(u), (F* + L*)
-   FText.Set(-1.0, Lext); // negative from curl-curl
-   FText.Add(1.0, Fext); // unsteady also neg on rhs, see HIGH-ORDER MATRIX-FREE INCOMPRESSIBLE FLOW SOLVERS eq 42
+   // add dj(mu)dj(u) to Lext
+   if (incompressibleSolve != true) {
 
-   // p_r = \nabla \cdot FText ( i think "p_r" means rhs of pressure-poisson eq, so div(\tilde{F}))
-   // applied divergence to full FText vector
-   //D->Mult(FText, resp);
-   //resp.Neg();
+     // viscosity gradient
+     G->Mult(viscSml, tmpR1);
+     MvInv->Mult(tmpR1, tmpR1b);
+
+     // TODO: make the next part (grad(mu)*grad(u_i)) a separate routine to avoid duplicating code
+
+     // gradu
+     {
+       int eq = 0;
+       double *dataU = Uext.HostReadWrite();
+       double *data = tmpR0.HostReadWrite();              
+       for (int i = 0; i < TdofInt; i++) {
+         data[i] = dataU[i + eq*TdofInt];
+       }
+     }     
+     G->Mult(tmpR0, tmpR1);
+     MvInv->Mult(tmpR1, tmpR1c);
+
+     // du into divU
+     {
+       int eq = 0;
+       double *dataDivU = tmpR1c.HostReadWrite();      
+       double *data = divU.HostReadWrite();
+       for (int i = 0; i < TdofInt; i++) {
+         data[i + TdofInt] = dataDivU[i + eq*TdofInt];
+       }
+     }
+     
+     // add u-part to Ldiv
+     {
+       int eq = 0;
+       double *data1 = tmpR1b.HostReadWrite(); 
+       double *data2 = tmpR1c.HostReadWrite();      
+       double *data = Ldiv.HostReadWrite();
+       for (int j = 0; j < dim; j++) {
+         for (int i = 0; i < TdofInt; i++) {
+           data[i + eq*TdofInt] += data1[i + j*TdofInt]*data2[i + j*TdofInt];
+         }
+       }
+     }
+
+     // gradv
+     {
+       int eq = 1;
+       double *dataU = Uext.HostReadWrite();
+       double *data = tmpR0.HostReadWrite();              
+       for (int i = 0; i < TdofInt; i++) {
+         data[i] = dataU[i + eq*TdofInt];
+       }
+     }     
+     G->Mult(tmpR0, tmpR1);
+     MvInv->Mult(tmpR1, tmpR1c);
+
+     // dv into divU
+     {
+       int eq = 1;
+       double *dataDivU = tmpR1c.HostReadWrite();      
+       double *data = divU.HostReadWrite();
+       for (int i = 0; i < TdofInt; i++) {
+         data[i + TdofInt] += dataDivU[i + eq*TdofInt];
+       }
+     }
+     
+     // add v-part to Ldiv
+     {
+       int eq = 1;
+       double *data1 = tmpR1b.HostReadWrite(); 
+       double *data2 = tmpR1c.HostReadWrite();      
+       double *data = Ldiv.HostReadWrite();
+       for (int j = 0; j < dim; j++) {
+         for (int i = 0; i < TdofInt; i++) {
+           data[i + eq*TdofInt] += data1[i + j*TdofInt]*data2[i + j*TdofInt];
+         }
+       }
+     }
+
+     // gradw
+     {
+       int eq = 2;
+       double *dataU = Uext.HostReadWrite();
+       double *data = tmpR0.HostReadWrite();              
+       for (int i = 0; i < TdofInt; i++) {
+         data[i] = dataU[i + eq*TdofInt];
+       }
+     }     
+     G->Mult(tmpR0, tmpR1);
+     MvInv->Mult(tmpR1, tmpR1c);
+
+     // dw into divU
+     {
+       int eq = 2;
+       double *dataDivU = tmpR1c.HostReadWrite();      
+       double *data = divU.HostReadWrite();
+       for (int i = 0; i < TdofInt; i++) {
+         data[i + TdofInt] += dataDivU[i + eq*TdofInt];
+       }
+     }
+     
+     // add w-part to Ldiv
+     {
+       int eq = 2;
+       double *data1 = tmpR1b.HostReadWrite(); 
+       double *data2 = tmpR1c.HostReadWrite();      
+       double *data = Ldiv.HostReadWrite();
+       for (int j = 0; j < dim; j++) {
+         for (int i = 0; i < TdofInt; i++) {
+           data[i + eq*TdofInt] -= data1[i + j*TdofInt]*data2[i + j*TdofInt];
+         }
+       }
+     }
+     
+   }
+   
+
+   // add Qt source here (requires divU from previous section)
+   if (incompressibleSolve != true) {     
+
+     // grad(divU)
+     G->Mult(divU, tmpR1);
+     MvInv->Mult(tmpR1, tmpR1b);
+
+     // mult by 4/3*mu
+     double factor = 4.0/3.0;
+     double *dataVisc = viscSml.HostReadWrite();
+     double *data = tmpR1b.HostReadWrite();     
+     for (int eq = 0; eq < dim; eq++) {
+       for (int i = 0; i < TdofInt; i++) {
+         data[i + eq*TdofInt] *= (factor * dataVisc[i]);
+       }
+     }
+
+     // add to Ldiv
+     {
+       double *dataQterm = tmpR1b.HostReadWrite(); 
+       double *data = Ldiv.HostReadWrite();
+       for (int eq = 0; eq < dim; eq++) {
+         for (int i = 0; i < TdofInt; i++) {
+           data[i + eq*TdofInt] += dataQterm[i + eq*TdofInt];
+         }
+       }
+     }
+
+     // add Ldiv to Lext
+     {
+       double *dataDiv = Ldiv.HostReadWrite(); 
+       double *data = Lext.HostReadWrite();
+       for (int eq = 0; eq < dim; eq++) {
+         for (int i = 0; i < TdofInt; i++) {
+           data[i + eq*TdofInt] -= dataDiv[i + eq*TdofInt];
+         }
+       }
+     }     
+     
+   }
 
 
-   // can multiply rhs by rho prior to taking div instead of keeping in lhs?
+   // can multiply rhs by rho prior to taking div instead of keeping in lhs,
+   // Lext already has rho in it
    if (constantDensity != true) {   
      double *data = FText.HostReadWrite();     
      double *Tdata = Tn.HostReadWrite();
@@ -2174,7 +2331,16 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      for (int i = 0; i < TdofInt; i++) {     
        data[i] *= static_rho;
      }     
-   }
+   }   
+   
+   // \tilde{F} = F - \nu CurlCurl(u), (F* + L*)
+   FText.Set(-1.0, Lext); // negative from curl-curl
+   FText.Add(1.0, Fext); // unsteady also neg on rhs, see HIGH-ORDER MATRIX-FREE INCOMPRESSIBLE FLOW SOLVERS eq 42
+
+   // p_r = \nabla \cdot FText ( i think "p_r" means rhs of pressure-poisson eq, so div(\tilde{F}))
+   // applied divergence to full FText vector
+   //D->Mult(FText, resp);
+   //resp.Neg();
 
    // add some if for porder != vorder
    // project FText to p-1
@@ -2184,7 +2350,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 
    // Add boundary terms.
    FText_gf.SetFromTrueDofs(FText);
-   FText_bdr_form->Assemble();  // invalid read and conditional jump
+   FText_bdr_form->Assemble();
    FText_bdr_form->ParallelAssemble(FText_bdr);
    g_bdr_form->Assemble();
    g_bdr_form->ParallelAssemble(g_bdr);
@@ -2375,7 +2541,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 
    // actual implicit solve for p(n+1)
    sw_spsolve.Start(); 
-   SpInv->Mult(B1, X1); // conditional jump
+   SpInv->Mult(B1, X1);
    sw_spsolve.Stop();
    iter_spsolve = SpInv->GetNumIterations();
    res_spsolve = SpInv->GetFinalNorm();
@@ -2400,8 +2566,13 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 
    // grad(P)
    G->Mult(pnBig, resu);
-   
 
+   // add Ldiv to rhs (has rho in it)
+   if (incompressibleSolve != true) {          
+     Mv->Mult(Ldiv,tmpR1);
+     resu.Add(1.0, tmpR1);
+   }         
+   
    // multiply by 1/rho
    if (constantDensity != true) {   
      double *data = resu.HostReadWrite();     
@@ -2439,12 +2610,11 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       H_form->FormLinearSystem(vel_ess_tdof, un_next_gf, resu_gf, H, X2, B2, 1);
    }
    sw_hsolve.Start();
-   HInv->Mult(B2, X2); // conditional jump
+   HInv->Mult(B2, X2);
    sw_hsolve.Stop();
    iter_hsolve = HInv->GetNumIterations();
    res_hsolve = HInv->GetFinalNorm();
    H_form->RecoverFEMSolution(X2, resu_gf, un_next_gf);
-   //std::cout << "Check 7a15..." << std::endl;   
    un_next_gf.GetTrueDofs(un_next);
 
 
