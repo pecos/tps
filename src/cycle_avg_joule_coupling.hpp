@@ -109,5 +109,13 @@ class CycleAvgJouleCoupling : public TPS::Solver {
 
   M2ulPhyS *getFlowSolver() { return flow_solver_; }
   QuasiMagnetostaticSolverBase *getEMSolver() { return qmsa_solver_; }
+
+  virtual mfem::ParMesh *  getFluidMesh() {
+    return flow_solver_->GetMesh();
+  }
+
+  virtual mfem::ParMesh *  getEmMesh() {
+    return qmsa_solver_->getMesh();
+  }
 };
 #endif  // CYCLE_AVG_JOULE_COUPLING_HPP_

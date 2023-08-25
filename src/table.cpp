@@ -176,7 +176,7 @@ GslTableInterpolator2D::GslTableInterpolator2D(std::string plato_file, int xcol,
   resize(nxt, nyt);
 
   // read data
-  char stmp;
+  //char stmp;
   double *ftmp = new double[ncol];
   for (unsigned int jj = 0; jj < ny_; ++jj) {
     for (unsigned int ii = 0; ii < nx_; ++ii) {

@@ -202,6 +202,10 @@ class Tps {
   bool isFlowEMCoupled() const { return isFlowEMCoupledMode_; }
   bool isVisualizationMode() const { return isVisualizationMode_; }
   const std::string &getSolverType() { return input_solver_type_; }
+  //! Get fluid domain mesh (return null if not a fluid (or coupled) solver)
+  mfem::ParMesh * getFluidMesh();
+  //! Get em domain mesh (return null if not a em (or coupled) solver)
+  mfem::ParMesh * getEmMesh();
 };
 
 std::string ltrim(const std::string &s);

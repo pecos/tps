@@ -36,6 +36,8 @@
 
 using namespace std;
 
+namespace mfem { class ParMesh; }
+
 namespace TPS {
 
 // Base class shared by all solver implementations
@@ -73,6 +75,14 @@ class Solver {
   virtual void visualization() {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
+  }
+
+  virtual mfem::ParMesh *  getFluidMesh() {
+    return NULL;
+  }
+
+  virtual mfem::ParMesh *  getEmMesh() {
+    return NULL;
   }
 };
 

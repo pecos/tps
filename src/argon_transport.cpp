@@ -441,7 +441,7 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeSourceMolecularTransport(con
   // double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
 
   double Qea = collision::argon::eAr11(Te);
-  double Qai = collision::argon::ArAr1P11(Th);
+  //double Qai = collision::argon::ArAr1P11(Th);
   double Qie = collision::charged::att11(nondimTe) * debyeCircle;
 
   double binaryDiff[3 * 3];

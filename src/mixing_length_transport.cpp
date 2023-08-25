@@ -76,7 +76,7 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
   mixture->GetPrimitivesFromConservatives(state, primitiveState);
 
   const double rho = state[0];
-  const double Th = primitiveState[nvel_ + 1];
+  //const double Th = primitiveState[nvel_ + 1];
 
   // Compute divergence
   double divV = 0.;
