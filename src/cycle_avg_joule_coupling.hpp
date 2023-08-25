@@ -81,18 +81,18 @@ class CycleAvgJouleCoupling : public TPS::Solver {
 
  public:
   /*!
-  * The input file will expect the following the directory [cycle-avg-joule-coupled]
-  * with fields:
-  * max-iters = Total number of iterations [int, required]
-  * solve-em-every-n = How often do we need to call the em solver [int, required]
-  * axisymmetric = True if using the axisymmetric formulation, False for 3D [bool, deafult = False]
-  * input-power = target power of em field [double, default = -1.]
-  * initial-input-power = the starting power of em field [double, default = -1.]
-  */
+   * The input file will expect the following the directory [cycle-avg-joule-coupled]
+   * with fields:
+   * max-iters = Total number of iterations [int, required]
+   * solve-em-every-n = How often do we need to call the em solver [int, required]
+   * axisymmetric = True if using the axisymmetric formulation, False for 3D [bool, deafult = False]
+   * input-power = target power of em field [double, default = -1.]
+   * initial-input-power = the starting power of em field [double, default = -1.]
+   */
   CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps);
-  [[deprecated("Use CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps instead")]]
-  CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps, int max_out, bool axisym, double input_power = -1.,
-                        double initial_input_power = -1.);
+  [[deprecated("Use CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps instead")]] CycleAvgJouleCoupling(
+      string &inputFileName, TPS::Tps *tps, int max_out, bool axisym, double input_power = -1.,
+      double initial_input_power = -1.);
   ~CycleAvgJouleCoupling();
 
   void initializeInterpolationData();

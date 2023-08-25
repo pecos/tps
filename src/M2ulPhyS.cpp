@@ -640,7 +640,7 @@ void M2ulPhyS::initVariables() {
   ParGridFunction coordsVert(dfes);
   mesh->GetNodes(coordsDof);
   mesh->GetVertices(coordsVert);
-  int nVert = coordsVert.Size()/dim;
+  int nVert = coordsVert.Size() / dim;
   {
     double local_xmin = 1.0e18;
     double local_ymin = 1.0e18;
@@ -651,13 +651,19 @@ void M2ulPhyS::initVariables() {
     for (int n = 0; n < nVert; n++) {
       auto hcoords = coordsVert.HostRead();
       double coords[3];
-      for (int d = 0; d < dim; d++) { coords[d] = hcoords[n + d * fes->GetNDofs()]; }
+      for (int d = 0; d < dim; d++) {
+        coords[d] = hcoords[n + d * fes->GetNDofs()];
+      }
       local_xmin = min(coords[0], local_xmin);
       local_ymin = min(coords[1], local_ymin);
-      if (dim == 3) {local_zmin = min(coords[2], local_zmin);}
+      if (dim == 3) {
+        local_zmin = min(coords[2], local_zmin);
+      }
       local_xmax = max(coords[0], local_xmax);
       local_ymax = max(coords[1], local_ymax);
-      if (dim == 3) {local_zmax = max(coords[2], local_zmax);}
+      if (dim == 3) {
+        local_zmax = max(coords[2], local_zmax);
+      }
     }
     MPI_Allreduce(&local_xmin, &xmin, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
     MPI_Allreduce(&local_ymin, &ymin, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
@@ -1786,7 +1792,7 @@ void M2ulPhyS::solveStep() {
     }
 
     // make a separate routine! plane interp and dump here
-    if ( config.planeDump.isEnabled == true ) {
+    if (config.planeDump.isEnabled == true) {
 #ifdef HAVE_GSLIB
       // source
       ParGridFunction *u_gf = GetSolutionGF();
@@ -1795,12 +1801,18 @@ void M2ulPhyS::solveStep() {
       Vector normal, point;
       normal.SetSize(3);
       point.SetSize(3);
-      for (int d = 0; d < dim; d++) { normal[d] = config.planeDump.normal(d); }
-      for (int d = 0; d < dim; d++) { point[d] = config.planeDump.point(d); }
+      for (int d = 0; d < dim; d++) {
+        normal[d] = config.planeDump.normal(d);
+      }
+      for (int d = 0; d < dim; d++) {
+        point[d] = config.planeDump.point(d);
+      }
       int nPts = config.planeDump.samples;
       double ndotp = 0.0;
       double majorD;
-      for (int i = 0; i < dim; i++) { ndotp += normal[i]*point[i]; }
+      for (int i = 0; i < dim; i++) {
+        ndotp += normal[i] * point[i];
+      }
       majorD = std::max(std::abs(normal[0]), std::abs(normal[1]));
       if (dim == 3) {
         majorD = std::max(majorD, std::abs(normal[2]));
@@ -1808,7 +1820,7 @@ void M2ulPhyS::solveStep() {
 
       // plane points
       Vector vxyz;
-      vxyz.SetSize(nPts*nPts*3);
+      vxyz.SetSize(nPts * nPts * 3);
       int iCnt = 0;
       double xp, yp, zp;
       double Lx, Ly, Lz;
@@ -1816,51 +1828,51 @@ void M2ulPhyS::solveStep() {
       Ly = ymax - ymin;
       Lz = zmax - zmin;
       if (majorD == normal[0]) {
-        double dy = Ly/(double)(nPts-1);
-        double dz = Lz/(double)(nPts-1);
+        double dy = Ly / (double)(nPts - 1);
+        double dz = Lz / (double)(nPts - 1);
         for (int j = 0; j < nPts; j++) {
           for (int i = 0; i < nPts; i++) {
-            yp = dy*(double)i + ymin;
-            zp = dz*(double)j + zmin;
-            xp = (ndotp - (normal[1]*yp) - (normal[2]*zp) ) / normal[0];
-            vxyz[iCnt + 0*nPts*nPts] = xp;
-            vxyz[iCnt + 1*nPts*nPts] = yp;
-            vxyz[iCnt + 2*nPts*nPts] = zp;
+            yp = dy * (double)i + ymin;
+            zp = dz * (double)j + zmin;
+            xp = (ndotp - (normal[1] * yp) - (normal[2] * zp)) / normal[0];
+            vxyz[iCnt + 0 * nPts * nPts] = xp;
+            vxyz[iCnt + 1 * nPts * nPts] = yp;
+            vxyz[iCnt + 2 * nPts * nPts] = zp;
             iCnt++;
           }
         }
       } else if (majorD == normal[1]) {
-        double dx = Lx/(double)(nPts-1);
-        double dz = Lz/(double)(nPts-1);
+        double dx = Lx / (double)(nPts - 1);
+        double dz = Lz / (double)(nPts - 1);
         for (int j = 0; j < nPts; j++) {
           for (int i = 0; i < nPts; i++) {
-            xp = dx*(double)i + xmin;
-            zp = dz*(double)j + zmin;
-            yp = (ndotp - (normal[0]*xp) - (normal[2]*zp) ) / normal[1];
-            vxyz[iCnt + 0*nPts*nPts] = xp;
-            vxyz[iCnt + 1*nPts*nPts] = yp;
-            vxyz[iCnt + 2*nPts*nPts] = zp;
+            xp = dx * (double)i + xmin;
+            zp = dz * (double)j + zmin;
+            yp = (ndotp - (normal[0] * xp) - (normal[2] * zp)) / normal[1];
+            vxyz[iCnt + 0 * nPts * nPts] = xp;
+            vxyz[iCnt + 1 * nPts * nPts] = yp;
+            vxyz[iCnt + 2 * nPts * nPts] = zp;
             iCnt++;
           }
         }
       } else {
-        double dx = Lx/(double)(nPts-1);
-        double dy = Ly/(double)(nPts-1);
+        double dx = Lx / (double)(nPts - 1);
+        double dy = Ly / (double)(nPts - 1);
         for (int j = 0; j < nPts; j++) {
           for (int i = 0; i < nPts; i++) {
-            xp = dx*(double)i + xmin;
-            yp = dy*(double)j + ymin;
-            zp = (ndotp - (normal[0]*xp) - (normal[1]*yp) ) / normal[2];
-            vxyz[iCnt + 0*nPts*nPts] = xp;
-            vxyz[iCnt + 1*nPts*nPts] = yp;
-            vxyz[iCnt + 2*nPts*nPts] = zp;
+            xp = dx * (double)i + xmin;
+            yp = dy * (double)j + ymin;
+            zp = (ndotp - (normal[0] * xp) - (normal[1] * yp)) / normal[2];
+            vxyz[iCnt + 0 * nPts * nPts] = xp;
+            vxyz[iCnt + 1 * nPts * nPts] = yp;
+            vxyz[iCnt + 2 * nPts * nPts] = zp;
             iCnt++;
           }
         }
       }
 
       // get values at plane
-      Vector uInterp_vals(nPts*nPts*num_equation);
+      Vector uInterp_vals(nPts * nPts * num_equation);
       FindPointsGSLIB finder(MPI_COMM_WORLD);
       finder.Setup(*mesh);
       finder.Interpolate(vxyz, *u_gf, uInterp_vals);
@@ -1874,11 +1886,11 @@ void M2ulPhyS::solveStep() {
         outfile.open(oname, std::ios_base::app);
         outfile << "#plane point " << point[0] << " " << point[1] << " " << point[2] << endl;
         outfile << "#plane normal " << normal[0] << " " << normal[1] << " " << normal[2] << endl;
-        int dof = nPts*nPts;
+        int dof = nPts * nPts;
         for (int n = 0; n < dof; n++) {
-          outfile << vxyz[n+0*dof] << " " << vxyz[n+1*dof] << " " << vxyz[n+2*dof] << " ";
+          outfile << vxyz[n + 0 * dof] << " " << vxyz[n + 1 * dof] << " " << vxyz[n + 2 * dof] << " ";
           for (int eq = 0; eq < num_equation; eq++) {
-            outfile << uInterp_vals[n + eq*dof] << " ";
+            outfile << uInterp_vals[n + eq * dof] << " ";
           }
           outfile << endl;
         }
@@ -1889,7 +1901,7 @@ void M2ulPhyS::solveStep() {
       exit(ERROR);
 #endif
     }  // plane dump
-  }  // step check
+  }    // step check
 
   average->addSampleMean(iter);
 }
@@ -2112,7 +2124,6 @@ void M2ulPhyS::uniformInitialConditions() {
       initState(2 + nvel + sp) = inputRhoRhoVp[0] * config.initialMassFractions(sp);
     }
 
-
     // electron energy
     if (mixture->IsTwoTemperature()) {
       double ne = 0.;
@@ -2166,7 +2177,6 @@ void M2ulPhyS::uniformInitialConditions() {
   //   delete eqState;
 }
 
-
 void M2ulPhyS::initGradUp() {
   double *dataGradUp = gradUp->HostWrite();
   int dof = vfes->GetNDofs();
@@ -2179,7 +2189,6 @@ void M2ulPhyS::initGradUp() {
     }
   }
 }
-
 
 // NOTE(Mal): This is a method to be used when we restart from LTE simulation.
 // It initilzes species mass densities based on LTE assumptions.
@@ -2194,7 +2203,6 @@ void M2ulPhyS::initilizeSpeciesFromLTE() {
   const int numSpecies = mixture->GetNumSpecies();
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
 
-
   std::string thermo_file;
   tpsP->getRequiredInput("flow/lte/thermo_table", thermo_file);
   config.lteMixtureInput.thermo_file_name = thermo_file;
@@ -2205,32 +2213,28 @@ void M2ulPhyS::initilizeSpeciesFromLTE() {
   tpsP->getRequiredInput("flow/lte/e_rev_table", e_rev_file);
   config.lteMixtureInput.e_rev_file_name = e_rev_file;
 
-
   TableInterpolator2D *energy_table;
   TableInterpolator2D *R_table;
   TableInterpolator2D *c_table;
   TableInterpolator2D *T_table;
 
 #ifdef HAVE_GSL
-  energy_table = new GslTableInterpolator2D(config.lteMixtureInput.thermo_file_name,
-                                             0,                                     /* temperature column */
-                                             1,                                     /* density column */
-                                             3                                      /* energy column */);
-  R_table = new GslTableInterpolator2D(config.lteMixtureInput.thermo_file_name,
-                                        0,                                          /* temperature column */
-                                        1,                                          /* density column */
-                                        6                                           /* mixture gas constant column */);
+  energy_table = new GslTableInterpolator2D(config.lteMixtureInput.thermo_file_name, 0, /* temperature column */
+                                            1,                                          /* density column */
+                                            3 /* energy column */);
+  R_table = new GslTableInterpolator2D(config.lteMixtureInput.thermo_file_name, 0, /* temperature column */
+                                       1,                                          /* density column */
+                                       6 /* mixture gas constant column */);
 
-  c_table = new GslTableInterpolator2D(config.lteMixtureInput.thermo_file_name,
-                                        0,                                          /* temperature column */
-                                        1,                                          /* density column */
-                                        8                                           /* speed of sound column */);
+  c_table = new GslTableInterpolator2D(config.lteMixtureInput.thermo_file_name, 0, /* temperature column */
+                                       1,                                          /* density column */
+                                       8 /* speed of sound column */);
 
   T_table = new GslTableInterpolator2D(config.lteMixtureInput.e_rev_file_name, /* (energy,density) -> temp data */
-                                        0,                                          /* energy column */
-                                        1,                                          /* density column */
-                                        2,                                          /* temperature column */
-                                        3);                                         /* number of columns */
+                                       0,                                      /* energy column */
+                                       1,                                      /* density column */
+                                       2,                                      /* temperature column */
+                                       3);                                     /* number of columns */
 #else
   energy_table = NULL;
   R_table = NULL;
@@ -2238,14 +2242,13 @@ void M2ulPhyS::initilizeSpeciesFromLTE() {
   mfem_error("Restart from LTE mixture requires GSL support.");
 #endif
 
-
   Vector state(num_equation);
   Vector prim(num_equation);
 
   for (int i = 0; i < dof; i++) {
     for (int eq = 0; eq < num_equation; eq++) {
       state[eq] = dataU[i + eq * dof];
-      prim[eq]  = dataUp[i + eq * dof];
+      prim[eq] = dataUp[i + eq * dof];
     }
 
     // Calculate species mass densities bases based on LTE at node level.
@@ -2624,7 +2627,6 @@ void M2ulPhyS::parsePlaneDump() {
   }
 }
 
-
 void M2ulPhyS::parseMMSOptions() {
   tpsP->getInput("mms/isEnabled", config.use_mms_, false);
 
@@ -2853,7 +2855,6 @@ void M2ulPhyS::parseSpeciesInputs() {
     speciesCharge *= -1.0;
     inputGasParams.SetCol(GasParams::SPECIES_MW, speciesMass);
     inputGasParams.SetCol(GasParams::SPECIES_CHARGES, speciesCharge);
-
 
     // Sort the gas params for mixture and save mapping.
     {
@@ -3806,7 +3807,6 @@ void M2ulPhyS::updatePrimitives() {
   }
 }
 
-
 void M2ulPhyS::visualization() {
   double tlast = grvy_timer_elapsed_global();
 
@@ -4053,7 +4053,7 @@ void M2ulPhyS::evaluatePlasmaConductivityGF() {
     double dist = 0.0;
     if (d_distance != NULL) dist = d_distance[n];
     d_transport->ComputeSourceTransportProperties(Un, upn, gradUpn, Efield, dist, globalTransport, speciesTransport,
-                                                 diffusionVelocity, ns);
+                                                  diffusionVelocity, ns);
 
     d_pc[n] = globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY];
 #if defined(_GPU_)

@@ -73,7 +73,6 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
   const double kappa = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY];
   const double mu = transportBuffer[FluxTrns::VISCOSITY];
 
-
   // Add mixing length model results to computed molecular transport
   double primitiveState[gpudata::MAXEQUATIONS];
   mixture->GetPrimitivesFromConservatives(state, primitiveState);

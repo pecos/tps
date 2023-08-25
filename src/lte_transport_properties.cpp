@@ -81,7 +81,6 @@ void LteTransport::ComputeFluxTransportProperties(const Vector &state, const Den
   diffusionVelocity = 0.0;
 }
 
-
 void LteTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp, const double *Efield,
                                                   double radius, double distance, double *transportBuffer,
                                                   double *diffusionVelocity) {
@@ -93,8 +92,6 @@ void LteTransport::ComputeFluxTransportProperties(const double *state, const dou
   transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = kappa_table_->eval(T, rho);
   transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] = 0.0;  // electron conductivity already accounted for
 }
-
-
 
 void LteTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
                                                     const Vector &Efield, double distance, Vector &globalTransport,

@@ -55,7 +55,7 @@ class IOVar {
  public:
   std::string varName_;  // solution variable
   int index_;            // variable index in the pargrid function
-  bool inRestartFile_;  // Check if we want to read this variable
+  bool inRestartFile_;   // Check if we want to read this variable
 };
 
 class IODataOrganizer {

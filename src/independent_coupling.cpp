@@ -60,13 +60,9 @@ void IndependentCoupling::solve() {
   qmsa_solver_->solve();
 }
 
-void IndependentCoupling::solveBegin() {
-  flow_solver_->solveBegin();
-}
+void IndependentCoupling::solveBegin() { flow_solver_->solveBegin(); }
 
-void IndependentCoupling::solveStep() {
-  flow_solver_->solveStep();
-}
+void IndependentCoupling::solveStep() { flow_solver_->solveStep(); }
 
 void IndependentCoupling::solveEnd() {
   flow_solver_->solveEnd();

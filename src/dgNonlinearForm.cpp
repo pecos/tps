@@ -637,7 +637,6 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
   auto d_dist1 = shared_face_data.dist1.Read();
   auto d_dist2 = shared_face_data.dist2.Read();
 
-
   const int maxNumElems = shared_face_data.shared_elements_to_shared_faces.Size() / 7;  // elements with shared faces
   const int Ndofs = vfes->GetNDofs();
   const int dim = dim_;
@@ -731,7 +730,6 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
         // get distance
         double d1 = d_dist1[f * maxIntPoints + k];
         double d2 = d_dist2[f * maxIntPoints + k];
-
 
         // evaluate flux
         d_rsolver->Eval_LF(u1, u2, nor, Rflux);
