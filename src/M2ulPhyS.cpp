@@ -3082,22 +3082,21 @@ void M2ulPhyS::parseSpeciesInputs() {
         } else if (inputSpeciesNames[sp] == "E") {
           targetIdx = config.numSpecies - 2;
           isElectronIncluded = true;
-        } else {
-          targetIdx = paramIdx;
-          paramIdx++;
-        }
         // TODO(trevilo): I am commenting this out (previously part of
         // if above) b/c it causes some tests to seg fault.  Need to
         // discuss with Malamas what he is wanting to achieve here and
         // figure out how to make it work.
-        //
-        // else if (inputSpeciesNames[sp] == "Ar.+1" ||  inputSpeciesNames[sp] == "Ar+1" ) {
-        //   targetIdx = config.numSpecies - 3;
-        // } else if (inputSpeciesNames[sp] == "Ar.+2" ||  inputSpeciesNames[sp] == "Ar+2" ) {
-        //   targetIdx = config.numSpecies - 4;
-        // } else if (inputSpeciesNames[sp] == "Ar2.+1" ||  inputSpeciesNames[sp] == "Ar2+1" ) {
-        //   targetIdx = config.numSpecies - 5;
-        // }
+        //          
+        } else if (inputSpeciesNames[sp] == "Ar.+1" ||  inputSpeciesNames[sp] == "Ar+1" ) {
+          targetIdx = config.numSpecies - 3;
+        } else if (inputSpeciesNames[sp] == "Ar.+2" ||  inputSpeciesNames[sp] == "Ar+2" ) {
+          targetIdx = config.numSpecies - 4;
+        } else if (inputSpeciesNames[sp] == "Ar2.+1" ||  inputSpeciesNames[sp] == "Ar2+1" ) {
+          targetIdx = config.numSpecies - 5;          
+        } else {
+          targetIdx = paramIdx;
+          paramIdx++;
+        }
 
         config.speciesMapping[inputSpeciesNames[sp]] = targetIdx;
         config.speciesNames[targetIdx] = inputSpeciesNames[sp];
