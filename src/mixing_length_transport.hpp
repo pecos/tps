@@ -133,7 +133,10 @@ MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double 
 
   S = sqrt(S);
 
-  const double mixing_length = std::min(0.41 * distance, max_mixing_length_);
+  double mixing_length = 0.41 * distance;
+  if (mixing_length > max_mixing_length_) {
+    mixing_length = max_mixing_length_;
+  }
   double mut = rho * mixing_length * mixing_length * S;
 
   visc[0] += mut;
