@@ -826,7 +826,7 @@ void M2ulPhyS::initIndirectionArrays() {
   auto h_delta_el1 = face_data.delta_el1.HostWrite();
   auto h_delta_el2 = face_data.delta_el2.HostWrite();
   auto h_dist1 = face_data.dist1.HostWrite();
-  auto h_dist2 = face_data.dist1.HostWrite();
+  auto h_dist2 = face_data.dist2.HostWrite();
 
   Vector xyz(dim);
 
@@ -909,7 +909,8 @@ void M2ulPhyS::initIndirectionArrays() {
         const ParFiniteElementSpace *dist_fes = distance_->ParFESpace();
 
         Array<int> dist_dofs1;
-        dist_fes->GetElementVDofs(tr->Elem1->ElementNo, dist_dofs1);
+        //dist_fes->GetElementVDofs(tr->Elem1->ElementNo, dist_dofs1);
+        dist_fes->GetElementVDofs(tr->Elem1No, dist_dofs1);
         dist1.SetSize(dist_dofs1.Size());
         distance_->GetSubVector(dist_dofs1, dist1);
 
