@@ -473,6 +473,7 @@ struct mixingLengthTransportData {
   double max_mixing_length_;  // user-specifed mixing length
   double Prt_;                // eddy Prandtl number
   double Let_;                // eddy Lewis number
+  double bulk_multiplier_;    // bulk eddy visc = bulk_multiplier_ * mut
 };
 
 struct collisionInputs {

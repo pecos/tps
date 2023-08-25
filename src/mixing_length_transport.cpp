@@ -48,6 +48,7 @@ MFEM_HOST_DEVICE MixingLengthTransport::MixingLengthTransport(GasMixture *mix, c
       max_mixing_length_(inputs.max_mixing_length_),
       Prt_(inputs.Prt_),
       Let_(inputs.Let_),
+      bulk_mult_(inputs.bulk_multiplier_),
       molecular_transport_(molecular_transport) {}
 
 void MixingLengthTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
@@ -125,12 +126,14 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
   double mut = rho * mixing_length * mixing_length * S;
 
   transportBuffer[FluxTrns::VISCOSITY] += mut;
-  transportBuffer[FluxTrns::BULK_VISCOSITY] += mut;
+  transportBuffer[FluxTrns::BULK_VISCOSITY] += bulk_mult_ * mut;
 
   // eddy thermal conductivity
   const double Pr_over_Prt = Prt_;  // FIXME: change varaible name
   const double kappat = mut * cp_over_Pr * Pr_over_Prt;
   transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] += kappat;
+
+  // TODO(trevilo): Deal with species diffusivities
 }
 
 void MixingLengthTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up,

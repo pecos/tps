@@ -2471,6 +2471,7 @@ void M2ulPhyS::parseFlowOptions() {
     tpsP->getInput("flow/mixing-length/max-mixing-length", config.mix_length_trans_input_.max_mixing_length_, 0.0);
     tpsP->getInput("flow/mixing-length/Pr_ratio", config.mix_length_trans_input_.Prt_, 1.0);
     tpsP->getInput("flow/mixing-length/Let", config.mix_length_trans_input_.Let_, 1.0);
+    tpsP->getInput("flow/mixing-length/bulk-multiplier", config.mix_length_trans_input_.bulk_multiplier_, 0.0);
   }
 
   assert(config.solOrder > 0);

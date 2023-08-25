@@ -48,6 +48,7 @@ class MixingLengthTransport : public TransportProperties {
   const double max_mixing_length_;  // user-specifed maximum mixing length
   const double Prt_;                // eddy Prandtl number
   const double Let_;                // eddy Lewis number
+  const double bulk_mult_;          // bulk viscosity multiplier
 
   // for molecular transport (owned)
   TransportProperties *molecular_transport_;
@@ -137,7 +138,7 @@ MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double 
   double mut = rho * mixing_length * mixing_length * S;
 
   visc[0] += mut;
-  visc[1] += mut;
+  visc[1] += bulk_mult_ * mut;
 }
 #endif
 #endif  // MIXING_LENGTH_TRANSPORT_HPP_
