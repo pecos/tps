@@ -58,7 +58,7 @@ using namespace mfem;
 //////// Argon Minimal Transport (ternary mixture)
 //////////////////////////////////////////////////////
 
-class ArgonMinimalTransport : public TransportProperties {
+class ArgonMinimalTransport : public MolecularTransport {
  protected:
   int electronIndex_ = -1;
   int ionIndex_ = -1;
@@ -107,31 +107,13 @@ class ArgonMinimalTransport : public TransportProperties {
   virtual collisionInputs computeCollisionInputs(const Vector &primitive, const Vector &n_sp);
   MFEM_HOST_DEVICE collisionInputs computeCollisionInputs(const double *primitive, const double *n_sp);
 
-  // Currently, transport properties are evaluated in flux and source term separately.
-  // Flux does not take primitive variables as input, rather evaluate them whenever needed.
-  // ComputeFluxTransportProperties also evaluates required primitive variables,
-  // but do not return it as output.
-  // TODO(kevin): need to discuss whether to reuse computed primitive variables in flux evaluation,
-  // or in general evaluation of primitive variables.
-  virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
-                                              double radius, double distance, Vector &transportBuffer,
-                                              DenseMatrix &diffusionVelocity);
-  MFEM_HOST_DEVICE virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                               const double *Efield, double radius, double distance,
-                                                               double *transportBuffer, double *diffusionVelocity);
+  MFEM_HOST_DEVICE void ComputeFluxMolecularTransport(const double *state, const double *gradUp, const double *Efield,
+                                                      double *transportBuffer, double *diffusionVelocity) override;
 
-  // Source term will be constructed using ForcingTerms, which have pointers to primitive variables.
-  // So we can use them in evaluating transport properties.
-  // If this routine evaluate additional primitive variables, can return them just as the routine above.
-  virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
-                                                const Vector &Efield, double distance, Vector &globalTransport,
-                                                DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
-                                                Vector &n_sp);
-  MFEM_HOST_DEVICE virtual void ComputeSourceTransportProperties(const double *state, const double *Up,
-                                                                 const double *gradUp, const double *Efield,
-                                                                 double distance, double *globalTransport,
-                                                                 double *speciesTransport, double *diffusionVelocity,
-                                                                 double *n_sp);
+  MFEM_HOST_DEVICE void ComputeSourceMolecularTransport(const double *state, const double *Up, const double *gradUp,
+                                                        const double *Efield, double *globalTransport,
+                                                        double *speciesTransport, double *diffusionVelocity,
+                                                        double *n_sp) override;
 
   // NOTE(kevin): only for AxisymmetricSource
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
@@ -192,34 +174,16 @@ class ArgonMixtureTransport : public ArgonMinimalTransport {
   MFEM_HOST_DEVICE double collisionIntegral(const int _spI, const int _spJ, const int l, const int r,
                                             const collisionInputs collInputs);
 
-  // Currently, transport properties are evaluated in flux and source term separately.
-  // Flux does not take primitive variables as input, rather evaluate them whenever needed.
-  // ComputeFluxTransportProperties also evaluates required primitive variables,
-  // but do not return it as output.
-  // TODO(kevin): need to discuss whether to reuse computed primitive variables in flux evaluation,
-  // or in general evaluation of primitive variables.
-  virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
-                                              double radius, double distance, Vector &transportBuffer,
-                                              DenseMatrix &diffusionVelocity);
-  MFEM_HOST_DEVICE virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                               const double *Efield, double radius, double distance,
-                                                               double *transportBuffer, double *diffusionVelocity);
+  MFEM_HOST_DEVICE void ComputeFluxMolecularTransport(const double *state, const double *gradUp, const double *Efield,
+                                                      double *transportBuffer, double *diffusionVelocity) final;
 
-  // Source term will be constructed using ForcingTerms, which have pointers to primitive variables.
-  // So we can use them in evaluating transport properties.
-  // If this routine evaluate additional primitive variables, can return them just as the routine above.
-  virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
-                                                const Vector &Efield, double distance, Vector &globalTransport,
-                                                DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
-                                                Vector &n_sp);
-  MFEM_HOST_DEVICE virtual void ComputeSourceTransportProperties(const double *state, const double *Up,
-                                                                 const double *gradUp, const double *Efield,
-                                                                 double distance, double *globalTransport,
-                                                                 double *speciesTransport, double *diffusionVelocity,
-                                                                 double *n_sp);
+  MFEM_HOST_DEVICE void ComputeSourceMolecularTransport(const double *state, const double *Up, const double *gradUp,
+                                                        const double *Efield, double *globalTransport,
+                                                        double *speciesTransport, double *diffusionVelocity,
+                                                        double *n_sp) final;
 
   // NOTE(kevin): only for AxisymmetricSource
-  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) final;
 
   MFEM_HOST_DEVICE virtual double computeThirdOrderElectronThermalConductivity(const double *X_sp,
                                                                                const collisionInputs &collInputs);

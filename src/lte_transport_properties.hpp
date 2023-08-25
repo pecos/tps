@@ -54,7 +54,7 @@
  * Here, tables are read and stored for all required properties in
  * terms of the mixture density (rho) and temperature (T).
  */
-class LteTransport : public TransportProperties {
+class LteTransport : public MolecularTransport {
  protected:
   TableInterpolator2D *mu_table_;     // dynamic viscosity
   TableInterpolator2D *kappa_table_;  // thermal conductivity
@@ -65,21 +65,15 @@ class LteTransport : public TransportProperties {
 
   virtual ~LteTransport();
 
-  virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
-                                              double radius, double distance, Vector &transportBuffer,
-                                              DenseMatrix &diffusionVelocity);
-  virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp, const double *Efield,
-                                              double radius, double distance, double *transportBuffer,
-                                              double *diffusionVelocity);
-  virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
-                                                const Vector &Efield, double distance, Vector &globalTransport,
-                                                DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
-                                                Vector &n_sp);
-  virtual void ComputeSourceTransportProperties(const double *state, const double *Up, const double *gradUp,
-                                                const double *Efield, double distance, double *globalTransport,
-                                                double *speciesTransport, double *diffusionVelocity, double *n_sp);
+  MFEM_HOST_DEVICE void ComputeFluxMolecularTransport(const double *state, const double *gradUp, const double *Efield,
+                                                      double *transportBuffer, double *diffusionVelocity) final;
 
-  void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
+  MFEM_HOST_DEVICE void ComputeSourceMolecularTransport(const double *state, const double *Up, const double *gradUp,
+                                                        const double *Efield, double *globalTransport,
+                                                        double *speciesTransport, double *diffusionVelocity,
+                                                        double *n_sp) final;
+
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) final;
 };
 
 #endif  // _GPU_

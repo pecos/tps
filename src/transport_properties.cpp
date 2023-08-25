@@ -209,7 +209,7 @@ DryAirTransport::DryAirTransport(GasMixture *_mixture, RunConfiguration &_runfil
 MFEM_HOST_DEVICE DryAirTransport::DryAirTransport(GasMixture *_mixture, const double viscosity_multiplier,
                                                   const double bulk_viscosity, const double C1, const double S,
                                                   const double Pr)
-    : TransportProperties(_mixture),
+    : MolecularTransport(_mixture),
       visc_mult(viscosity_multiplier),
       bulk_visc_mult(bulk_viscosity),
       C1_(C1),
@@ -221,48 +221,9 @@ MFEM_HOST_DEVICE DryAirTransport::DryAirTransport(GasMixture *_mixture, const do
   cp_div_pr = specific_heat_ratio * gas_constant / (Pr_ * (specific_heat_ratio - 1.));
 }
 
-void DryAirTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
-                                                     const Vector &Efield, double radius, double distance,
-                                                     Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
-  double p = mixture->ComputePressure(state);
-  double temp = p / gas_constant / state[0];
-
-  transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
-  transportBuffer = 0.0;
-  double viscosity = (C1_ * visc_mult * pow(temp, 1.5) / (temp + S0_));
-  transportBuffer[FluxTrns::VISCOSITY] = viscosity;
-  transportBuffer[FluxTrns::BULK_VISCOSITY] = bulk_visc_mult * viscosity;
-  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = cp_div_pr * transportBuffer[FluxTrns::VISCOSITY];
-
-  diffusionVelocity.SetSize(numSpecies, nvel_);
-  diffusionVelocity = 0.0;
-  if (numActiveSpecies > 0) {
-    for (int sp = 0; sp < numActiveSpecies; sp++) {
-      double diffusivity = transportBuffer[FluxTrns::VISCOSITY] / Sc;
-
-      // NOTE(kevin): only compute the first dim-components.
-      for (int d = 0; d < dim; d++) {
-        if (fabs(state[2 + nvel_ + sp]) > 1e-10) {
-          // compute mass fraction gradient
-          double dY = mixture->GetGasParams(sp, GasParams::SPECIES_MW) * gradUp(2 + nvel_ + sp, d);
-          dY -= state(2 + nvel_ + sp) / state(0) * gradUp(0, d);
-          dY /= state(0);
-
-          diffusionVelocity(sp, d) = diffusivity * dY / state[2 + nvel_ + sp];
-        }
-      }
-
-      for (int d = 0; d < nvel_; d++) {
-        assert(!std::isnan(diffusionVelocity(0, d)));
-      }
-    }
-  }
-}
-
-MFEM_HOST_DEVICE void DryAirTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                                      const double *Efield, double radius,
-                                                                      double distance, double *transportBuffer,
-                                                                      double *diffusionVelocity) {
+MFEM_HOST_DEVICE void DryAirTransport::ComputeFluxMolecularTransport(const double *state, const double *gradUp,
+                                                                     const double *Efield, double *transportBuffer,
+                                                                     double *diffusionVelocity) {
   double p = mixture->ComputePressure(state);
   double temp = p / gas_constant / state[0];
 
@@ -340,7 +301,7 @@ ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_ru
 // }
 
 MFEM_HOST_DEVICE ConstantTransport::ConstantTransport(GasMixture *_mixture, const constantTransportData &inputs)
-    : TransportProperties(_mixture) {
+    : MolecularTransport(_mixture) {
   viscosity_ = inputs.viscosity;
   bulkViscosity_ = inputs.bulkViscosity;
   thermalConductivity_ = inputs.thermalConductivity;
@@ -370,65 +331,9 @@ MFEM_HOST_DEVICE ConstantTransport::ConstantTransport(GasMixture *_mixture, cons
   }
 }
 
-void ConstantTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
-                                                       const Vector &Efield, double radius, double distance,
-                                                       Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
-  transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
-  diffusionVelocity.SetSize(numSpecies, nvel_);
-  ComputeFluxTransportProperties(&state[0], gradUp.Read(), &Efield[0], radius, distance, &transportBuffer[0],
-                                 diffusionVelocity.Write());
-  // transportBuffer[FluxTrns::VISCOSITY] = viscosity_;
-  // transportBuffer[FluxTrns::BULK_VISCOSITY] = bulkViscosity_;
-  // transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = thermalConductivity_;
-  // transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] = electronThermalConductivity_;
-  //
-  // Vector primitiveState(num_equation);
-  // mixture->GetPrimitivesFromConservatives(state, primitiveState);
-  // double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : primitiveState[nvel_ + 1];
-  // double Th = primitiveState[nvel_ + 1];
-  //
-  // Vector n_sp(numSpecies), X_sp(numSpecies), Y_sp(numSpecies);
-  // mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
-  //
-  // // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
-  // diffusionVelocity.SetSize(numSpecies, nvel_);
-  // diffusionVelocity = 0.0;
-  //
-  // // Compute mole fraction gradient from number density gradient.
-  // // concentration-driven diffusion only determines the first dim-components.
-  // DenseMatrix gradX(numSpecies, dim);
-  // mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
-  // for (int sp = 0; sp < numSpecies; sp++) {
-  //   for (int d = 0; d < dim; d++) diffusionVelocity(sp, d) = -diffusivity_(sp) * gradX(sp, d) / (X_sp(sp) + Xeps_);
-  // }
-  //
-  // Vector mobility(numSpecies);
-  // for (int sp = 0; sp < numSpecies; sp++) {
-  //   double temp = (sp == electronIndex_) ? Te : Th;
-  //   mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity_(sp);
-  // }
-  //
-  // if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
-  //
-  // addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
-  //
-  // correctMassDiffusionFlux(Y_sp, diffusionVelocity);
-
-  for (int sp = 0; sp < numSpecies; sp++) {
-    for (int d = 0; d < nvel_; d++) {
-      if (std::isnan(diffusionVelocity(sp, d))) {
-        grvy_printf(GRVY_ERROR, "\nDiffusion velocity of species %d is NaN! -> %f\n", sp, diffusionVelocity(sp, d));
-        exit(-1);
-      }
-    }
-  }
-}
-
-MFEM_HOST_DEVICE void ConstantTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                                        const double *Efield, double radius,
-                                                                        double distance, double *transportBuffer,
-                                                                        double *diffusionVelocity) {
-  // transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
+MFEM_HOST_DEVICE void ConstantTransport::ComputeFluxMolecularTransport(const double *state, const double *gradUp,
+                                                                       const double *Efield, double *transportBuffer,
+                                                                       double *diffusionVelocity) {
   transportBuffer[FluxTrns::VISCOSITY] = viscosity_;
   transportBuffer[FluxTrns::BULK_VISCOSITY] = bulkViscosity_;
   transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = thermalConductivity_;
@@ -481,72 +386,11 @@ MFEM_HOST_DEVICE void ConstantTransport::ComputeFluxTransportProperties(const do
   }
 }
 
-void ConstantTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up,
-                                                         const DenseMatrix &gradUp, const Vector &Efield,
-                                                         double distance, Vector &globalTransport,
-                                                         DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
-                                                         Vector &n_sp) {
-  globalTransport.SetSize(SrcTrns::NUM_SRC_TRANS);
-  speciesTransport.SetSize(numSpecies, SpeciesTrns::NUM_SPECIES_COEFFS);
-  n_sp.SetSize(numSpecies);
-  diffusionVelocity.SetSize(numSpecies, nvel_);
-  ComputeSourceTransportProperties(&state[0], &Up[0], gradUp.Read(), &Efield[0], distance, &globalTransport[0],
-                                   speciesTransport.Write(), diffusionVelocity.Write(), &n_sp[0]);
-  // globalTransport = 0.0;
-  // speciesTransport.SetSize(numSpecies, SpeciesTrns::NUM_SPECIES_COEFFS);
-  // speciesTransport = 0.0;
-  // n_sp.SetSize(numSpecies);
-  // // NOTE: diffusion has nvel components, as E-field can have azimuthal component.
-  // diffusionVelocity.SetSize(numSpecies, nvel_);
-  // diffusionVelocity = 0.0;
-  //
-  // Vector primitiveState(num_equation);
-  // mixture->GetPrimitivesFromConservatives(state, primitiveState);
-  // double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : primitiveState[nvel_ + 1];
-  // double Th = primitiveState[nvel_ + 1];
-  //
-  // Vector X_sp(numSpecies), Y_sp(numSpecies);
-  // mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
-  //
-  // // Compute mole fraction gradient from number density gradient.
-  // // concentration-driven diffusion only determines the first dim-components.
-  // DenseMatrix gradX(numSpecies, dim);
-  // mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
-  // for (int sp = 0; sp < numSpecies; sp++) {
-  //   for (int d = 0; d < dim; d++) diffusionVelocity(sp, d) = -diffusivity_(sp) * gradX(sp, d) / (X_sp(sp) + Xeps_);
-  // }
-  //
-  // Vector mobility(numSpecies);
-  // for (int sp = 0; sp < numSpecies; sp++) {
-  //   double temp = (sp == electronIndex_) ? Te : Th;
-  //   mobility(sp) = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity_(sp);
-  // }
-  // globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY) =
-  //     computeMixtureElectricConductivity(mobility, n_sp) * MOLARELECTRONCHARGE;
-  //
-  // if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
-  //
-  // addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
-  //
-  // correctMassDiffusionFlux(Y_sp, diffusionVelocity);
-  //
-  // for (int sp = 0; sp < numSpecies; sp++) speciesTransport(sp, SpeciesTrns::MF_FREQUENCY) = mtFreq_(sp);
-
-  for (int sp = 0; sp < numSpecies; sp++) {
-    for (int d = 0; d < nvel_; d++) {
-      if (std::isnan(diffusionVelocity(sp, d))) {
-        grvy_printf(GRVY_ERROR, "\nDiffusion velocity of species %d is NaN! -> %f\n", sp, diffusionVelocity(sp, d));
-        exit(-1);
-      }
-    }
-  }
-}
-
-MFEM_HOST_DEVICE void ConstantTransport::ComputeSourceTransportProperties(const double *state, const double *Up,
-                                                                          const double *gradUp, const double *Efield,
-                                                                          double distance, double *globalTransport,
-                                                                          double *speciesTransport,
-                                                                          double *diffusionVelocity, double *n_sp) {
+MFEM_HOST_DEVICE void ConstantTransport::ComputeSourceMolecularTransport(const double *state, const double *Up,
+                                                                         const double *gradUp, const double *Efield,
+                                                                         double *globalTransport,
+                                                                         double *speciesTransport,
+                                                                         double *diffusionVelocity, double *n_sp) {
   for (int i = 0; i < SrcTrns::NUM_SRC_TRANS; i++) globalTransport[i] = 0.0;
   for (int c = 0; c < SpeciesTrns::NUM_SPECIES_COEFFS; c++)
     for (int sp = 0; sp < numSpecies; sp++) speciesTransport[sp + c * numSpecies] = 0.0;

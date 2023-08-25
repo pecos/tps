@@ -34,7 +34,7 @@
 
 #ifndef _GPU_
 
-LteTransport::LteTransport(GasMixture *_mixture, RunConfiguration &_runfile) : TransportProperties(_mixture) {
+LteTransport::LteTransport(GasMixture *_mixture, RunConfiguration &_runfile) : MolecularTransport(_mixture) {
 #ifdef HAVE_GSL
   mu_table_ = new GslTableInterpolator2D(_runfile.lteMixtureInput.trans_file_name, 0, /* temperature column */
                                          1,                                           /* density column */
@@ -64,26 +64,8 @@ LteTransport::~LteTransport() {
   delete mu_table_;
 }
 
-void LteTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
-                                                  double radius, double distance, Vector &transportBuffer,
-                                                  DenseMatrix &diffusionVelocity) {
-  const double rho = state[0];
-  const double T = mixture->ComputeTemperature(state);
-
-  transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
-  transportBuffer = 0.0;
-  transportBuffer[FluxTrns::VISCOSITY] = mu_table_->eval(T, rho);
-  transportBuffer[FluxTrns::BULK_VISCOSITY] = 0.0;  // bulk_visc_mult * viscosity;
-  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = kappa_table_->eval(T, rho);
-
-  // Diffusion velocities are never needed in LTE model since we don't carry individual species
-  diffusionVelocity.SetSize(numSpecies, nvel_);
-  diffusionVelocity = 0.0;
-}
-
-void LteTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp, const double *Efield,
-                                                  double radius, double distance, double *transportBuffer,
-                                                  double *diffusionVelocity) {
+void LteTransport::ComputeFluxMolecularTransport(const double *state, const double *gradUp, const double *Efield,
+                                                 double *transportBuffer, double *diffusionVelocity) {
   const double rho = state[0];
   const double T = mixture->ComputeTemperature(state);
 
@@ -93,35 +75,9 @@ void LteTransport::ComputeFluxTransportProperties(const double *state, const dou
   transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] = 0.0;  // electron conductivity already accounted for
 }
 
-void LteTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
-                                                    const Vector &Efield, double distance, Vector &globalTransport,
-                                                    DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
-                                                    Vector &n_sp) {
-  globalTransport.SetSize(SrcTrns::NUM_SRC_TRANS);
-  speciesTransport.SetSize(numSpecies, SpeciesTrns::NUM_SPECIES_COEFFS);
-  n_sp.SetSize(numSpecies);
-  diffusionVelocity.SetSize(numSpecies, nvel_);
-
-  for (int i = 0; i < SrcTrns::NUM_SRC_TRANS; i++) globalTransport[i] = 0.0;
-  for (int c = 0; c < SpeciesTrns::NUM_SPECIES_COEFFS; c++)
-    for (int sp = 0; sp < numSpecies; sp++) speciesTransport(sp, c) = 0.0;
-  for (int sp = 0; sp < numSpecies; sp++) n_sp[sp] = 0.0;
-  for (int v = 0; v < nvel_; v++)
-    for (int sp = 0; sp < numSpecies; sp++) diffusionVelocity(sp, v) = 0.0;
-
-  const double rho = Up[0];
-  const double T = Up[1 + nvel_];
-
-  double sigma = sigma_table_->eval(T, rho);
-  if (sigma < 1.0) {
-    sigma = 1.0;
-  }
-  globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] = sigma;
-}
-
-void LteTransport::ComputeSourceTransportProperties(const double *state, const double *Up, const double *gradUp,
-                                                    const double *Efield, double distance, double *globalTransport,
-                                                    double *speciesTransport, double *diffusionVelocity, double *n_sp) {
+void LteTransport::ComputeSourceMolecularTransport(const double *state, const double *Up, const double *gradUp,
+                                                   const double *Efield, double *globalTransport,
+                                                   double *speciesTransport, double *diffusionVelocity, double *n_sp) {
   const double rho = Up[0];
   const double T = Up[1 + nvel_];
   double sigma = sigma_table_->eval(T, rho);

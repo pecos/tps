@@ -41,7 +41,6 @@
 using namespace std;
 using namespace mfem;
 
-#if !defined(_CUDA_) && !defined(_HIP_)
 class MixingLengthTransport : public TransportProperties {
  protected:
   // for turbulent transport calculations
@@ -51,12 +50,12 @@ class MixingLengthTransport : public TransportProperties {
   const double bulk_mult_;          // bulk viscosity multiplier
 
   // for molecular transport (owned)
-  TransportProperties *molecular_transport_;
+  MolecularTransport *molecular_transport_;
 
  public:
-  MixingLengthTransport(GasMixture *mix, RunConfiguration &runfile, TransportProperties *molecular_transport);
+  MixingLengthTransport(GasMixture *mix, RunConfiguration &runfile, MolecularTransport *molecular_transport);
   MFEM_HOST_DEVICE MixingLengthTransport(GasMixture *mix, const mixingLengthTransportData &inputs,
-                                         TransportProperties *molecular_transport);
+                                         MolecularTransport *molecular_transport);
 
   MFEM_HOST_DEVICE virtual ~MixingLengthTransport() { delete molecular_transport_; }
 
@@ -140,5 +139,4 @@ MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double 
   visc[0] += mut;
   visc[1] += bulk_mult_ * mut;
 }
-#endif
 #endif  // MIXING_LENGTH_TRANSPORT_HPP_

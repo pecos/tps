@@ -162,11 +162,62 @@ class TransportProperties {
                                             double *avgDiff);
 };
 
+/** Class for molecular transport (as opposed to turbulent transport) */
+class MolecularTransport : public TransportProperties {
+ public:
+  MFEM_HOST_DEVICE MolecularTransport(GasMixture *_mixture) : TransportProperties(_mixture) {}
+  MFEM_HOST_DEVICE virtual ~MolecularTransport() {}
+
+  MFEM_HOST_DEVICE virtual void ComputeFluxMolecularTransport(const double *state, const double *gradUp,
+                                                              const double *Efield, double *transportBuffer,
+                                                              double *diffusionVelocity) = 0;
+
+  void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
+                                      double radius, double distance, Vector &transportBuffer,
+                                      DenseMatrix &diffusionVelocity) final {
+    transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
+    diffusionVelocity.SetSize(numSpecies, nvel_);
+    ComputeFluxTransportProperties(&state[0], gradUp.Read(), &Efield[0], radius, distance, &transportBuffer[0],
+                                   diffusionVelocity.Write());
+  }
+
+  MFEM_HOST_DEVICE void ComputeFluxTransportProperties(const double *state, const double *gradUp, const double *Efield,
+                                                       double radius, double distance, double *transportBuffer,
+                                                       double *diffusionVelocity) final {
+    ComputeFluxMolecularTransport(state, gradUp, Efield, transportBuffer, diffusionVelocity);
+  }
+
+  MFEM_HOST_DEVICE virtual void ComputeSourceMolecularTransport(const double *state, const double *Up,
+                                                                const double *gradUp, const double *Efield,
+                                                                double *globalTransport, double *speciesTransport,
+                                                                double *diffusionVelocity, double *n_sp) = 0;
+
+  void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
+                                        const Vector &Efield, double distance, Vector &globalTransport,
+                                        DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
+                                        Vector &n_sp) final {
+    globalTransport.SetSize(SrcTrns::NUM_SRC_TRANS);
+    speciesTransport.SetSize(numSpecies, SpeciesTrns::NUM_SPECIES_COEFFS);
+    n_sp.SetSize(numSpecies);
+    diffusionVelocity.SetSize(numSpecies, nvel_);
+    ComputeSourceTransportProperties(&state[0], &Up[0], gradUp.Read(), &Efield[0], distance, &globalTransport[0],
+                                     speciesTransport.Write(), diffusionVelocity.Write(), &n_sp[0]);
+  }
+
+  MFEM_HOST_DEVICE void ComputeSourceTransportProperties(const double *state, const double *Up, const double *gradUp,
+                                                         const double *Efield, double distance, double *globalTransport,
+                                                         double *speciesTransport, double *diffusionVelocity,
+                                                         double *n_sp) final {
+    ComputeSourceMolecularTransport(state, Up, gradUp, Efield, globalTransport, speciesTransport, diffusionVelocity,
+                                    n_sp);
+  }
+};
+
 //////////////////////////////////////////////////////
 //////// Dry Air mixture
 //////////////////////////////////////////////////////
 
-class DryAirTransport : public TransportProperties {
+class DryAirTransport : public MolecularTransport {
  protected:
   double gas_constant;
   double visc_mult;
@@ -191,23 +242,15 @@ class DryAirTransport : public TransportProperties {
 
   MFEM_HOST_DEVICE virtual ~DryAirTransport() {}
 
-  virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
-                                              double radius, double distance, Vector &transportBuffer,
-                                              DenseMatrix &diffusionVelocity);
-  MFEM_HOST_DEVICE virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                               const double *Efield, double radius, double distance,
-                                                               double *transportBuffer, double *diffusionVelocity);
-  virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
-                                                const Vector &Efield, double distance, Vector &globalTransport,
-                                                DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
-                                                Vector &n_sp) {}
-  MFEM_HOST_DEVICE virtual void ComputeSourceTransportProperties(const double *state, const double *Up,
-                                                                 const double *gradUp, const double *Efield,
-                                                                 double distance, double *globalTransport,
-                                                                 double *speciesTransport, double *diffusionVelocity,
-                                                                 double *n_sp) {}
+  MFEM_HOST_DEVICE void ComputeFluxMolecularTransport(const double *state, const double *gradUp, const double *Efield,
+                                                      double *transportBuffer, double *diffusionVelocity) final;
 
-  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
+  MFEM_HOST_DEVICE void ComputeSourceMolecularTransport(const double *state, const double *Up, const double *gradUp,
+                                                        const double *Efield, double *globalTransport,
+                                                        double *speciesTransport, double *diffusionVelocity,
+                                                        double *n_sp) final {}
+
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) final;
 };
 
 MFEM_HOST_DEVICE inline void DryAirTransport::GetViscosities(const double *conserved, const double *primitive,
@@ -221,7 +264,7 @@ MFEM_HOST_DEVICE inline void DryAirTransport::GetViscosities(const double *conse
 //////// Constant Transport
 //////////////////////////////////////////////////////
 
-class ConstantTransport : public TransportProperties {
+class ConstantTransport : public MolecularTransport {
  protected:
   double viscosity_;
   double bulkViscosity_;
@@ -239,23 +282,15 @@ class ConstantTransport : public TransportProperties {
 
   MFEM_HOST_DEVICE virtual ~ConstantTransport() {}
 
-  virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
-                                              double radius, double distance, Vector &transportBuffer,
-                                              DenseMatrix &diffusionVelocity);
-  MFEM_HOST_DEVICE virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                               const double *Efield, double radius, double distance,
-                                                               double *transportBuffer, double *diffusionVelocity);
-  virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
-                                                const Vector &Efield, double distance, Vector &globalTransport,
-                                                DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
-                                                Vector &n_sp);
-  MFEM_HOST_DEVICE virtual void ComputeSourceTransportProperties(const double *state, const double *Up,
-                                                                 const double *gradUp, const double *Efield,
-                                                                 double distance, double *globalTransport,
-                                                                 double *speciesTransport, double *diffusionVelocity,
-                                                                 double *n_sp);
+  MFEM_HOST_DEVICE void ComputeFluxMolecularTransport(const double *state, const double *gradUp, const double *Efield,
+                                                      double *transportBuffer, double *diffusionVelocity) final;
 
-  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
+  MFEM_HOST_DEVICE void ComputeSourceMolecularTransport(const double *state, const double *Up, const double *gradUp,
+                                                        const double *Efield, double *globalTransport,
+                                                        double *speciesTransport, double *diffusionVelocity,
+                                                        double *n_sp) final;
+
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) final;
 };
 
 MFEM_HOST_DEVICE inline void ConstantTransport::GetViscosities(const double *conserved, const double *primitive,

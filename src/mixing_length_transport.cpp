@@ -37,13 +37,12 @@
 using namespace std;
 using namespace mfem;
 
-#if !defined(_CUDA_) && !defined(_HIP_)
 MixingLengthTransport::MixingLengthTransport(GasMixture *mix, RunConfiguration &runfile,
-                                             TransportProperties *molecular_transport)
+                                             MolecularTransport *molecular_transport)
     : MixingLengthTransport(mix, runfile.mix_length_trans_input_, molecular_transport) {}
 
 MFEM_HOST_DEVICE MixingLengthTransport::MixingLengthTransport(GasMixture *mix, const mixingLengthTransportData &inputs,
-                                                              TransportProperties *molecular_transport)
+                                                              MolecularTransport *molecular_transport)
     : TransportProperties(mix),
       max_mixing_length_(inputs.max_mixing_length_),
       Prt_(inputs.Prt_),
@@ -64,8 +63,7 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
                                                                             const double *Efield, double radius,
                                                                             double distance, double *transportBuffer,
                                                                             double *diffusionVelocity) {
-  molecular_transport_->ComputeFluxTransportProperties(state, gradUp, Efield, radius, distance, transportBuffer,
-                                                       diffusionVelocity);
+  molecular_transport_->ComputeFluxMolecularTransport(state, gradUp, Efield, transportBuffer, diffusionVelocity);
 
   const double cp_over_Pr =
       transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] / transportBuffer[FluxTrns::VISCOSITY];
@@ -160,7 +158,6 @@ void MixingLengthTransport::ComputeSourceTransportProperties(const Vector &state
 MFEM_HOST_DEVICE void MixingLengthTransport::ComputeSourceTransportProperties(
     const double *state, const double *Up, const double *gradUp, const double *Efield, double distance,
     double *globalTransport, double *speciesTransport, double *diffusionVelocity, double *n_sp) {
-  molecular_transport_->ComputeSourceTransportProperties(state, Up, gradUp, Efield, distance, globalTransport,
-                                                         speciesTransport, diffusionVelocity, n_sp);
+  molecular_transport_->ComputeSourceMolecularTransport(state, Up, gradUp, Efield, globalTransport, speciesTransport,
+                                                        diffusionVelocity, n_sp);
 }
-#endif
