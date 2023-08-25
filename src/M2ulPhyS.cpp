@@ -1953,6 +1953,9 @@ void M2ulPhyS::projectInitialSolution() {
   // if restarting from LTE, write paraview and restart h5 immediately
   if (config.restartFromLTE && !tpsP->isVisualizationMode()) {
     if (rank0_) std::cout << "Writing non-equilibrium restart files!" << std::endl;
+    paraviewColl->SetCycle(iter+1);  // We set iter+1 here. Since we have set paraviewColl->UseRestartMode(true); 
+                                     // above, paraview cannot overwrite existing files produced for the same 
+                                     // timestep and time, causing the code to crush.  
     paraviewColl->Save();
     restart_files_hdf5("write");
   }
