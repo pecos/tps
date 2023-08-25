@@ -57,6 +57,7 @@
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
 #include "fluxes.hpp"
+#include "mixing_length_transport.hpp"
 #include "radiation.hpp"
 #include "riemann_solver.hpp"
 #include "transport_properties.hpp"
@@ -110,6 +111,10 @@ __global__ void instantiateDeviceArgonMinimalTransport(GasMixture *mixture, cons
 //! Instantiate ArgonMixtureTransport object on the device with placement new
 __global__ void instantiateDeviceArgonMixtureTransport(GasMixture *mixture, const ArgonTransportInput inputs,
                                                        void *trans);
+
+//! Instantiate MixingLengthTransport object on the device with placement new
+__global__ void instantiateDeviceMixingLengthTransport(GasMixture *mixture, const mixingLengthTransportData inputs,
+                                                       TransportProperties *mol_trans, void *trans);
 
 //! Instantiate Fluxes object on the device with placement new
 __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,

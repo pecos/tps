@@ -378,11 +378,17 @@ void M2ulPhyS::initVariables() {
   }
 
   if (config.use_mixing_length) {
-    MolecularTransport *temporary_transport = dynamic_cast<MolecularTransport *>(transportPtr);
 #if defined(_CUDA_) || defined(_HIP_)
-    mfem_error("MixingLengthTransport is not yet supported for GPU builds!");
+    // dynamic_cast on a device-side pointer doesn't work, so instead
+    // pass the TransportProperties pointer and cast it within
+    // instantiateDeviceMixingLengthTransport
+    TransportProperties *temporary_transport = transportPtr;
+    tpsGpuMalloc((void **)&transportPtr, sizeof(MixingLengthTransport));
+    gpu::instantiateDeviceMixingLengthTransport<<<1, 1>>>(d_mixture, config.mix_length_trans_input_,
+                                                          temporary_transport, transportPtr);
 #else
     // Build mixing length transport using whatever molecular transport we've already instantiated
+    MolecularTransport *temporary_transport = dynamic_cast<MolecularTransport *>(transportPtr);
     transportPtr = new MixingLengthTransport(mixture, config, temporary_transport);
 #endif
   }

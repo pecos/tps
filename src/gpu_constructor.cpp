@@ -69,6 +69,13 @@ __global__ void instantiateDeviceArgonMixtureTransport(GasMixture *mixture, cons
   trans = new (trans) ArgonMixtureTransport(mixture, inputs);
 }
 
+__global__ void instantiateDeviceMixingLengthTransport(GasMixture *mixture, const mixingLengthTransportData inputs,
+                                                       TransportProperties *mol_trans, void *trans) {
+  // can't dynamic_cast on the device, so regular cast here
+  MolecularTransport *temporary_transport = (MolecularTransport *)mol_trans;
+  trans = new (trans) MixingLengthTransport(mixture, inputs, temporary_transport);
+}
+
 __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
                                         const int _num_equation, const int _dim, bool axisym, int sgs_model,
                                         double sgs_floor, double sgs_const, viscositySpongeData vsd, void *f) {
