@@ -116,6 +116,7 @@ class ArgonMinimalTransport : public MolecularTransport {
                                                         double *n_sp) override;
 
   // NOTE(kevin): only for AxisymmetricSource
+  using MolecularTransport::GetViscosities;
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
 
   // virtual double computeThirdOrderElectronThermalConductivity(const Vector &X_sp, const double debyeLength,
@@ -183,6 +184,7 @@ class ArgonMixtureTransport : public ArgonMinimalTransport {
                                                         double *n_sp) final;
 
   // NOTE(kevin): only for AxisymmetricSource
+  using ArgonMinimalTransport::GetViscosities;
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) final;
 
   MFEM_HOST_DEVICE virtual double computeThirdOrderElectronThermalConductivity(const double *X_sp,

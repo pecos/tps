@@ -134,9 +134,7 @@ class TransportProperties {
    * @param visc      Pointer to viscosities (visc[0] = dynamic viscosity, visc[1] = bulk viscosity)
    */
   MFEM_HOST_DEVICE virtual void GetViscosities(const double *conserved, const double *primitive, const double *gradUp,
-                                               double radius, double distance, double *visc) {
-    GetViscosities(conserved, primitive, visc);
-  }
+                                               double radius, double distance, double *visc) = 0;
 
   // For mixture-averaged diffusion, correct for mass conservation.
   void correctMassDiffusionFlux(const Vector &Y_sp, DenseMatrix &diffusionVelocity);
@@ -211,6 +209,12 @@ class MolecularTransport : public TransportProperties {
     ComputeSourceMolecularTransport(state, Up, gradUp, Efield, globalTransport, speciesTransport, diffusionVelocity,
                                     n_sp);
   }
+
+  using TransportProperties::GetViscosities;
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, const double *gradUp,
+                                       double radius, double distance, double *visc) final {
+    GetViscosities(conserved, primitive, visc);
+  }
 };
 
 //////////////////////////////////////////////////////
@@ -250,6 +254,7 @@ class DryAirTransport : public MolecularTransport {
                                                         double *speciesTransport, double *diffusionVelocity,
                                                         double *n_sp) final {}
 
+  using MolecularTransport::GetViscosities;
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) final;
 };
 
@@ -290,6 +295,7 @@ class ConstantTransport : public MolecularTransport {
                                                         double *speciesTransport, double *diffusionVelocity,
                                                         double *n_sp) final;
 
+  using MolecularTransport::GetViscosities;
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) final;
 };
 
