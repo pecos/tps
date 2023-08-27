@@ -273,7 +273,7 @@ protected:
    const int defaultPartMethod = 1;  
   
    // temporary
-   double Re_tau, Pr;
+  double Re_tau, Pr, Cp, gamma;
   
    /// Kinematic viscosity (dimensionless).
    double kin_vis;
@@ -322,6 +322,7 @@ protected:
    ParNonlinearForm *N = nullptr;
    ParBilinearForm *Mv_form = nullptr;
    ParBilinearForm *Sp_form = nullptr;
+   ParBilinearForm *Lt_form = nullptr;  
    ParMixedBilinearForm *D_form = nullptr;
    ParMixedBilinearForm *G_form = nullptr;
    ParBilinearForm *H_form = nullptr;
@@ -346,6 +347,7 @@ protected:
 
    ConstantCoefficient nlcoeff;
    ConstantCoefficient Sp_coeff;
+   ConstantCoefficient Lt_coeff;  
    ConstantCoefficient H_lincoeff;
    ConstantCoefficient H_bdfcoeff;
    ConstantCoefficient Ht_lincoeff;
@@ -374,6 +376,7 @@ protected:
   
    OperatorHandle Mv;
    OperatorHandle Sp;
+   OperatorHandle Lt;  
    OperatorHandle D;
    OperatorHandle G;
    OperatorHandle H;
@@ -406,7 +409,7 @@ protected:
    Vector Fext, FText, Lext, Uext, Ldiv;          
    Vector resu, tmpR1, tmpR1b, tmpR1c;
    Vector FBext;
-   Vector divU;
+   Vector divU, Qt;
 
    Vector bufferR0sml, bufferR1sml;
 
@@ -428,7 +431,7 @@ protected:
    // temperature additions
    Vector fTn, Tn, Tn_next, Tnm1, Tnm2, NTn, NTnm1, NTnm2;
    Vector Text, Text_bdr, t_bdr;
-   Vector resT, tmpR0;
+   Vector resT, tmpR0, tmpR0b, tmpR0c;
    ParGridFunction Tn_gf, Tn_next_gf, Text_gf, resT_gf;
 
    // density, not actually solved for
