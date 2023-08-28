@@ -62,22 +62,23 @@ namespace TPS {
     class Tps2Boltzmann{
         public:
 
-        typedef const std::size_t Index;
-
+        enum Index {
         //! Species densities (up to 6 species) [1/m^3]: TPS --> Bolzmann
-        Index SpeciesDensitiesIndex;
+        SpeciesDensities=0,
         //! Amplitute of electric field [V/m]: TPS --> Bolzmann
-        Index ElectricFieldIndex;
+        ElectricField=1,
         //! Heavy temperature [K]: TPS --> Bolzmann
-        Index HeavyTemperatureIndex;
+        HeavyTemperature=2,
         //! Electron temperature [eV]: TPS <--> Bolzmann
-        Index ElectronTemperatureIndex;
+        ElectronTemperature=3,
         //! Electron mobility: TPS <-- Bolzmann
-        Index ElectronMobilityIndex;
+        ElectronMobility=4,
         //! Electron diffusion: TPS <-- Bolzmann
-        Index ElectronDiffusionIndex;
+        ElectronDiffusion=5,
         //! Reaction rates: TPS <-- Bolzmann
-        Index ReactionRatesIndex;
+        ReactionRates=6
+        };
+
         //! Total number of fields
         const std::size_t NIndexes;
 

@@ -36,9 +36,13 @@
 
 using namespace std;
 
+// Forward declare mfem::ParMesh class
 namespace mfem { class ParMesh; }
 
 namespace TPS {
+
+// Forward declare Tps2Bolzmann class
+class Tps2Boltzmann;
 
 // Base class shared by all solver implementations
 class Solver {
@@ -73,6 +77,18 @@ class Solver {
     exit(1);
   }
   virtual void visualization() {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+  }
+
+  /// Push solver variables to interface
+  virtual void push(Tps2Boltzmann & interface) {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+  }
+
+  /// Fetch solver variables from interface
+  virtual void fetch(Tps2Boltzmann & interface) {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
   }

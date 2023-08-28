@@ -33,18 +33,18 @@
  * Implementation of the class Tps2Bolzmann
  */
 
+
 #include "tps2Boltzmann.hpp"
 
-namespace TPS{
+#ifdef HAVE_PYTHON
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#endif
+
+
+namespace TPS {
 
 Tps2Boltzmann::Tps2Boltzmann(Tps *tps): 
-        SpeciesDensitiesIndex(0),
-        ElectricFieldIndex(1),
-        HeavyTemperatureIndex(2),
-        ElectronTemperatureIndex(3),
-        ElectronMobilityIndex(4),
-        ElectronDiffusionIndex(5),
-        ReactionRatesIndex(6),
         NIndexes(7),
         tps_(tps) {
         // Assert we have a couple solver;
@@ -72,13 +72,13 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps):
         reaction_rates_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_, nreactions_ , mfem::Ordering::byNODES);
 
         mfem::ParFiniteElementSpace ** list_fes = new mfem::ParFiniteElementSpace*[NIndexes];
-        list_fes[SpeciesDensitiesIndex] = species_densities_fes_;
-        list_fes[ElectricFieldIndex] = scalar_fes_;
-        list_fes[HeavyTemperatureIndex] = scalar_fes_;
-        list_fes[ElectronTemperatureIndex] = scalar_fes_;
-        list_fes[ElectronMobilityIndex] = scalar_fes_;
-        list_fes[ElectronDiffusionIndex] = scalar_fes_;
-        list_fes[ReactionRatesIndex] = reaction_rates_fes_;
+        list_fes[Index::SpeciesDensities] = species_densities_fes_;
+        list_fes[Index::ElectricField] = scalar_fes_;
+        list_fes[Index::HeavyTemperature] = scalar_fes_;
+        list_fes[Index::ElectronTemperature] = scalar_fes_;
+        list_fes[Index::ElectronMobility] = scalar_fes_;
+        list_fes[Index::ElectronDiffusion] = scalar_fes_;
+        list_fes[Index::ReactionRates] = reaction_rates_fes_;
 
         all_ = new mfem::ParGridFunction(all_fes_);
         fields_ = new  mfem::ParGridFunction*[NIndexes];
@@ -115,3 +115,22 @@ Tps2Boltzmann::~Tps2Boltzmann() {
 }
 
 } /*end namespace*/
+
+#ifdef HAVE_PYTHON
+namespace py = pybind11;
+
+namespace tps_wrappers {
+    void tps2bolzmann(py::module& m) {
+  py::enum_<TPS::Tps2Boltzmann::Index>(m, "t2bIndex")
+    .value("SpeciesDensities", TPS::Tps2Boltzmann::Index::SpeciesDensities)
+    .value("ElectricField", TPS::Tps2Boltzmann::Index::ElectricField)
+    .value("HeavyTemperature", TPS::Tps2Boltzmann::Index::HeavyTemperature)
+    .value("ElectronTemperature", TPS::Tps2Boltzmann::Index::ElectronTemperature)
+    .value("ElectronMobility", TPS::Tps2Boltzmann::Index::ElectronMobility)
+    .value("ElectronDiffusion", TPS::Tps2Boltzmann::Index::ElectronDiffusion)
+    .value("ReactionRates", TPS::Tps2Boltzmann::Index::ReactionRates)
+  py::class_<TPS::Tps2Boltzmann>(m, "Tps2Bolzmann")
+    .def(py::init<TPS::Tps *>());
+}
+}
+#endif

@@ -59,6 +59,7 @@
 #include "quasimagnetostatic.hpp"
 #include "solver.hpp"
 #include "utils.hpp"
+#include "tps2Boltzmann.hpp"
 
 namespace TPS {
 
@@ -184,6 +185,16 @@ class Tps {
   void visualization() {
     solver_->visualization();
     return;
+  }
+
+  /// Push solver variables to interface
+  void push(Tps2Boltzmann & interface) {
+    solver_->push(interface);
+  }
+
+  /// Fetch solver variables from interface
+  void fetch(Tps2Boltzmann & interface) {
+    solver_->fetch(interface);
   }
 
   void printHeader();

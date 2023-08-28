@@ -36,7 +36,7 @@ cxx_sources          = averaging_and_rms.cpp faceGradientIntegration.cpp M2ulPhy
 		       dgNonlinearForm.cpp gradients.cpp gradNonLinearForm.cpp quasimagnetostatic.cpp tps.cpp chemistry.cpp \
                        reaction.cpp collision_integrals.cpp argon_transport.cpp source_term.cpp gpu_constructor.cpp \
                        independent_coupling.cpp cycle_avg_joule_coupling.cpp table.cpp radiation.cpp lte_mixture.cpp \
-                       lte_transport_properties.cpp mixing_length_transport.cpp tps2Boltzmann.cpp
+                       lte_transport_properties.cpp mixing_length_transport.cpp tps2Boltzmann.cpp pybindings.cpp
 
 mfem_extra_sources   = ../utils/mfem_extras/pfem_extras.cpp
 
