@@ -48,6 +48,7 @@ using namespace mfem;
 // Boundary face term: <F.n(u),[w]>
 class BCintegrator : public NonlinearFormIntegrator {
   friend class GradFaceIntegrator;
+  friend class M2ulPhyS;
 
  protected:
   MPI_Groups *groupsMPI;
@@ -108,6 +109,22 @@ class BCintegrator : public NonlinearFormIntegrator {
   static void retrieveGradientsData_gpu(ParGridFunction *gradUp, DenseTensor &elGradUp, Array<int> &vdofs,
                                         const int &num_equation, const int &dim, const int &totalDofs,
                                         const int &elDofs);
+
+  boundaryCategory getAttributeCategory(int attr) const {
+    std::unordered_map<int, BoundaryCondition *>::const_iterator ibc = inletBCmap.find(attr);
+    std::unordered_map<int, BoundaryCondition *>::const_iterator obc = outletBCmap.find(attr);
+    std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = wallBCmap.find(attr);
+    if (ibc != inletBCmap.end()) {
+      return INLET;
+    }
+    if (obc != outletBCmap.end()) {
+      return OUTLET;
+    }
+    if (wbc != wallBCmap.end()) {
+      return WALL;
+    }
+    return NUM_BC_CATEGORIES;
+  }
 };
 
 #endif  // BCINTEGRATOR_HPP_

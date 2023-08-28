@@ -316,6 +316,16 @@ class M2ulPhyS : public TPS::Solver {
    */
   void initIndirectionArrays();
 
+  /** @brief Fill BC part of precomputedIntegrationData struct
+   *
+   *  The _GPU_ path required some BC information to be evaluated and
+   *  stored at the beginning of a simulation.  These quantities are
+   *  set by this function, which is separate from
+   *  initIndirectionArrays() b/c it must be called after the boundary
+   *  conditions are initialized.
+   */
+  void initIndirectionBC();
+
   void initVariables();
   void initSolutionAndVisualizationVectors();
   void initialTimeStep();

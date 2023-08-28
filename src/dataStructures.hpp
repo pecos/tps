@@ -125,6 +125,8 @@ enum ArgonSpcs {
 // Also used for species output primitive variables.
 enum SpeciesPrimitiveType { MASS_FRACTION, MOLE_FRACTION, NUMBER_DENSITY, NUM_SPECIES_PRIMITIVES };
 
+enum boundaryCategory { INLET, OUTLET, WALL, NUM_BC_CATEGORIES };
+
 enum InletType {
   SUB_DENS_VEL,      // Subsonic inlet specified by the density and velocity components
   SUB_DENS_VEL_NR,   // Non-reflecting subsonic inlet specified by the density and velocity components
@@ -347,6 +349,18 @@ struct boundaryFaceIntegrationData {
 
   /** Mesh spacings for boundary face elements */
   Vector delta_el1;
+
+  /** Category of BC for each boundary face */
+  Array<boundaryCategory> bc_category;
+
+  /** Category of BC for each boundary face */
+  Array<bool> use_bc_in_grad;
+
+  /** Element to face data */
+  Array<int> elements_to_faces;
+
+  /** Map all boundary faces to real boundary faces.  See discussion in M2ulPhyS.cpp */
+  Array<int> rbf_to_abf;
 };
 
 /** @brief Data for shared face integral calculations

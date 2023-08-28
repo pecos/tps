@@ -84,6 +84,8 @@ class WallBC : public BoundaryCondition {
          bool useBCinGrad = false);
   ~WallBC();
 
+  WallType getType() { return wallType_; }
+
   void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, double delta,
                       double distance, Vector &bdrFlux);
   void computeBdrPrimitiveStateForGradient(const Vector &primIn, Vector &primBC) const override;

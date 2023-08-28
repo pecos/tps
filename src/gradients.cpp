@@ -71,6 +71,11 @@ Gradients::Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradU
   uk_el2 = 0.;
   dun_face = 0.;
 
+  const int nbfaces = vfes->GetMesh()->GetNBE();
+  dun_bdry_face.UseDevice(true);
+  dun_bdry_face.SetSize(nbfaces * maxIntPoints_ * num_equation_ * dim_);
+  dun_bdry_face = 0.;
+
   Ke_positions_.SetSize(vfes->GetNE());
   auto h_Ke_positions = Ke_positions_.HostWrite();
 
@@ -248,6 +253,13 @@ void Gradients::computeGradients_domain() {
     faceContrib_gpu(elType, elemOffset, dof_el);
   }
 
+  ParMesh *pmesh = vfes->GetParMesh();
+  const int Nbdry = pmesh->GetNFbyType(FaceType::Boundary);
+  if (Nbdry > 0) {
+    interpGradBdryFace_gpu();
+    integrationGradBdryFace_gpu();
+  }
+
   for (int elType = 0; elType < elem_data.num_elems_of_type.Size(); elType++) {
     int elemOffset = 0;
     for (int i = 0; i < elType; i++) elemOffset += h_num_elems_of_type[i];
@@ -263,7 +275,6 @@ void Gradients::computeGradients_bdr() {
     interpGradSharedFace_gpu();
     integrationGradSharedFace_gpu();
   }
-
   const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
   auto h_elem_dof_num = elem_data.dof_number.HostRead();
 
@@ -697,6 +708,168 @@ void Gradients::integrationGradSharedFace_gpu() {
       }
     }
   });
+}
+
+void Gradients::interpGradBdryFace_gpu() {
+  const double *d_up = Up->Read();
+
+  const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
+  const int *d_elem_dofs_list = elem_data.dofs_list.Read();
+  const int *d_elem_dof_off = elem_data.dof_offset.Read();
+  const int *d_elem_dof_num = elem_data.dof_number.Read();
+
+  const boundaryFaceIntegrationData &bdry_face_data = gpu_precomputed_data_.boundary_face_data;
+  const double *d_weight = bdry_face_data.quad_weight.Read();
+  const double *d_normal = bdry_face_data.normal.Read();
+  const double *d_shape = bdry_face_data.shape.Read();
+  const int *d_face_num_quad = bdry_face_data.num_quad.Read();
+  const int *d_el_index = bdry_face_data.el.Read();
+  const boundaryCategory *d_bc_cat = bdry_face_data.bc_category.Read();
+  const bool *d_bc_use = bdry_face_data.use_bc_in_grad.Read();
+
+  const int *d_rbf_to_abf = bdry_face_data.rbf_to_abf.Read();
+
+  const double *d_xyz = bdry_face_data.xyz.Read();
+
+  double *d_dun = dun_bdry_face.Write();
+
+  const int dim = dim_;
+  const int num_equation = num_equation_;
+  const int maxIntPoints = maxIntPoints_;
+  const int maxDofs = maxDofs_;
+  const int Ndofs = vfes->GetNDofs();
+
+  const int Nbdry = fes->GetMesh()->GetNFbyType(FaceType::Boundary);
+
+  // loop over boundary faces
+  MFEM_FORALL(iface, Nbdry, {
+    double u1[gpudata::MAXEQUATIONS], ubc[gpudata::MAXEQUATIONS];
+    double nor[gpudata::MAXDIM];
+    double phi[gpudata::MAXDOFS];
+    int index_i[gpudata::MAXDOFS];
+
+    const int true_face = d_rbf_to_abf[iface];
+
+    const int elind = d_el_index[true_face];
+    const int dof1 = d_elem_dof_num[elind];
+
+    // Get indices of dofs for this element
+    const int offsetEl = d_elem_dof_off[elind];
+    for (int i = 0; i < dof1; i++) {
+      index_i[i] = d_elem_dofs_list[offsetEl + i];
+    }
+
+    const int Q = d_face_num_quad[true_face];
+    const int weight_offset = true_face * maxIntPoints;
+    const int normal_offset = true_face * maxIntPoints * dim;
+
+    // Loop over quadrature points on this face
+    for (int k = 0; k < Q; k++) {
+      const double weight = d_weight[weight_offset + k];
+
+      for (int i = 0; i < dof1; i++) {
+        phi[i] = d_shape[true_face * maxIntPoints * maxDofs + k * maxDofs + i];
+      }
+
+      // Interpolate state to this quad point
+      for (int eq = 0; eq < num_equation; eq++) {
+        u1[eq] = 0.0;
+        for (int j = 0; j < dof1; j++) {
+          u1[eq] += d_up[index_i[j] + eq * Ndofs] * phi[j];
+        }
+
+        // init ubc (equivalent to useBCinGrad = False);
+        ubc[eq] = u1[eq];
+      }
+
+      // Change ubc if desired!
+      if (d_bc_cat[true_face] == WALL && d_bc_use[true_face]) {
+        ubc[1] = 0.0;
+        ubc[2] = 0.0;
+        ubc[3] = 0.0;
+        ubc[4] = 300.0;  // FIXME(trevilo): Get actual wall temp here!
+      }
+
+      // Evaluate difference
+      double du[gpudata::MAXEQUATIONS];
+      for (int eq = 0; eq < num_equation; eq++) {
+        du[eq] = ubc[eq] - u1[eq];
+      }
+
+      const int idx0 = true_face * dim * maxIntPoints * num_equation + k * num_equation;
+      for (int d = 0; d < dim; d++) {
+        const int idx1 = idx0 + d * maxIntPoints * num_equation;
+        // 0.5?
+        nor[d] = 0.5 * weight * d_normal[normal_offset + k * dim + d];
+        // nor[d] = weight * d_normal[normal_offset + k * dim + d];
+        for (int eq = 0; eq < num_equation; eq++) {
+          d_dun[eq + idx1] = du[eq] * nor[d];
+        }
+      }
+    }  // end loop over integration points
+  });  // end loop over faces
+}
+
+void Gradients::integrationGradBdryFace_gpu() {
+  double *d_gradUp = gradUp->ReadWrite();
+
+  const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
+  const int *d_elem_dofs_list = elem_data.dofs_list.Read();
+  const int *d_elem_dof_off = elem_data.dof_offset.Read();
+  const int *d_elem_dof_num = elem_data.dof_number.Read();
+
+  const boundaryFaceIntegrationData &bdry_face_data = gpu_precomputed_data_.boundary_face_data;
+  const double *d_shape = bdry_face_data.shape.Read();
+  const int *d_face_num_quad = bdry_face_data.num_quad.Read();
+  const int *d_elem_to_face = bdry_face_data.elements_to_faces.Read();
+  const double *d_xyz = bdry_face_data.xyz.Read();
+
+  const double *d_dun = dun_bdry_face.Read();
+
+  const int dim = dim_;
+  const int num_equation = num_equation_;
+  const int maxIntPoints = maxIntPoints_;
+  const int maxDofs = maxDofs_;
+  const int Ndofs = vfes->GetNDofs();
+
+  const int nbelem = bdry_face_data.elements_to_faces.Size() / 7;
+
+  const boundaryCategory *d_bc_cat = bdry_face_data.bc_category.Read();
+  const bool *d_bc_use = bdry_face_data.use_bc_in_grad.Read();
+
+  MFEM_FORALL(el, nbelem, {
+    const int elind = d_elem_to_face[0 + el * 7];
+    const int nface = d_elem_to_face[1 + el * 7];
+
+    const int dof1 = d_elem_dof_num[elind];
+
+    // Get indices of dofs for this element
+    const int offsetEl = d_elem_dof_off[elind];
+
+    for (int i = 0; i < dof1; i++) {
+      const int indexi = d_elem_dofs_list[offsetEl + i];
+
+      for (int f = 0; f < nface; f++) {
+        const int iface = d_elem_to_face[1 + f + 1 + el * 7];
+        const int Q = d_face_num_quad[iface];
+
+        // Loop over quadrature points on this face
+        for (int k = 0; k < Q; k++) {
+          const double phi = d_shape[iface * maxIntPoints * maxDofs + k * maxDofs + i];
+
+          const int idx0 = iface * dim * maxIntPoints * num_equation + k * num_equation;
+
+          for (int d = 0; d < dim; d++) {
+            const int idx1 = idx0 + d * maxIntPoints * num_equation;
+            for (int eq = 0; eq < num_equation; eq++) {
+              const int idxL = eq * Ndofs + d * num_equation * Ndofs;
+              d_gradUp[indexi + idxL] += d_dun[idx1 + eq] * phi;
+            }
+          }
+        }
+      }
+    }
+  });  // end loop over faces
 }
 
 void Gradients::multInverse_gpu(const int numElems, const int offsetElems, const int elDof) {

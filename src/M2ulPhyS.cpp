@@ -35,6 +35,8 @@
 
 #include "M2ulPhyS.hpp"
 
+#include "wallBC.hpp"
+
 M2ulPhyS::M2ulPhyS(TPS::Tps *tps)
     : groupsMPI(new MPI_Groups(tps->getTPSCommWorld())),
       nprocs_(groupsMPI->getTPSWorldSize()),
@@ -69,6 +71,8 @@ M2ulPhyS::M2ulPhyS(string &inputFileName, TPS::Tps *tps)
   if (bcIntegrator != NULL) {
     bcIntegrator->initBCs();
   }
+
+  initIndirectionBC();
 
   // set default solver state
   exit_status_ = NORMAL;
@@ -909,7 +913,7 @@ void M2ulPhyS::initIndirectionArrays() {
         const ParFiniteElementSpace *dist_fes = distance_->ParFESpace();
 
         Array<int> dist_dofs1;
-        //dist_fes->GetElementVDofs(tr->Elem1->ElementNo, dist_dofs1);
+        // dist_fes->GetElementVDofs(tr->Elem1->ElementNo, dist_dofs1);
         dist_fes->GetElementVDofs(tr->Elem1No, dist_dofs1);
         dist1.SetSize(dist_dofs1.Size());
         distance_->GetSubVector(dist_dofs1, dist1);
@@ -975,7 +979,17 @@ void M2ulPhyS::initIndirectionArrays() {
   boundaryFaceIntegrationData &bdry_face_data = gpu_precomputed_data_.boundary_face_data;
 
   // This is supposed to be number of boundary faces, and for
-  // non-periodic cases it is.  See #199 for more info.
+  // non-periodic cases it is.  But, for periodic meshes, it includes
+  // periodic boundary faces---i.e., not only "true" boundary faces.
+
+  // But, just switching to mesh->GetNFbyType(FaceType::Boundary) is
+  // problematic, since the face index expected by, for example, tr =
+  // mesh->GetBdrFaceTransformations(f) ranges over mesh->GetNBE().
+  // Here we set up another array (abf_to_rbf) that maps from the
+  // "actual" boundary faces to the index within the array of boundary
+  // faces that includes the periodic faces.
+
+  // See #199 for more info.
   const int NumBCelems = fes->GetNBE();
 
   if (NumBCelems > 0) {
@@ -1000,7 +1014,7 @@ void M2ulPhyS::initIndirectionArrays() {
     auto h_face_quad_weight = bdry_face_data.quad_weight.HostWrite();
 
     bdry_face_data.el.SetSize(NumBCelems);
-    bdry_face_data.el = 0;
+    bdry_face_data.el = -1;
     auto h_face_el = bdry_face_data.el.HostWrite();
 
     bdry_face_data.num_quad.SetSize(NumBCelems);
@@ -1012,13 +1026,34 @@ void M2ulPhyS::initIndirectionArrays() {
     bdry_face_data.delta_el1 = 0.;
     auto h_bdry_delta_el1 = bdry_face_data.delta_el1.HostWrite();
 
+    bdry_face_data.bc_category.SetSize(NumBCelems);
+    bdry_face_data.bc_category = NUM_BC_CATEGORIES;
+    auto h_bc_category = bdry_face_data.bc_category.HostWrite();
+
     const FiniteElement *fe;
     FaceElementTransformations *tr;
-    Mesh *mesh = fes->GetMesh();
+    // Mesh *mesh = fes->GetMesh();
+
+    // NB: *Must* call this here, as otherwise some faces are
+    // erroneously included as boundary faces and asserts below may
+    // fail
+    mesh->ExchangeFaceNbrNodes();
+    mesh->ExchangeFaceNbrData();
+
+    std::vector<int> uniqueElems;
+    uniqueElems.clear();
+
+    std::vector<int> rbf_to_abf;
+    rbf_to_abf.clear();
+
+    int numRealBCFaces = 0;
 
     for (int f = 0; f < NumBCelems; f++) {
       tr = mesh->GetBdrFaceTransformations(f);
       if (tr != NULL) {
+        rbf_to_abf.push_back(f);
+
+        numRealBCFaces += 1;
         fe = fes->GetFE(tr->Elem1No);
 
         const int elDof = fe->GetDof();
@@ -1036,6 +1071,12 @@ void M2ulPhyS::initIndirectionArrays() {
         h_face_el[f] = tr->Elem1No;
         h_face_num_quad[f] = ir->GetNPoints();
         h_bdry_delta_el1[f] = mesh->GetElementSize(tr->Elem1No, 1) / fe->GetOrder();
+
+        bool inList = false;
+        for (size_t n = 0; n < uniqueElems.size(); n++) {
+          if (uniqueElems[n] == tr->Elem1No) inList = true;
+        }
+        if (!inList) uniqueElems.push_back(tr->Elem1No);
 
         for (int q = 0; q < ir->GetNPoints(); q++) {
           const IntegrationPoint &ip = ir->IntPoint(q);
@@ -1058,6 +1099,42 @@ void M2ulPhyS::initIndirectionArrays() {
           shape1.SetSize(elDof);
           fe->CalcShape(tr->GetElement1IntPoint(), shape1);
           for (int n = 0; n < elDof; n++) hshapesBC[n + q * maxDofs + f * maxIntPoints * maxDofs] = shape1(n);
+        }
+      }
+    }
+
+    assert(rbf_to_abf.size() == mesh->GetNFbyType(FaceType::Boundary));
+    assert(rbf_to_abf.size() == numRealBCFaces);
+
+    bdry_face_data.rbf_to_abf.SetSize(rbf_to_abf.size());
+    auto h_rbf_to_abf = bdry_face_data.rbf_to_abf.HostWrite();
+
+    for (size_t i = 0; i < rbf_to_abf.size(); i++) {
+      printf("iface = %d, true_face = %d\n", i, rbf_to_abf[i]);
+      fflush(stdout);
+      h_rbf_to_abf[i] = rbf_to_abf[i];
+    }
+
+    bdry_face_data.elements_to_faces.SetSize(7 * uniqueElems.size());
+    bdry_face_data.elements_to_faces = -1;
+    auto h_elements_to_faces = bdry_face_data.elements_to_faces.HostWrite();
+    for (size_t i = 0; i < uniqueElems.size(); i++) {
+      const int eli = uniqueElems[i];
+      for (int f = 0; f < bdry_face_data.el.Size(); f++) {
+        if (eli == h_face_el[f]) {
+          // 0 + 7 * i = element number
+          h_elements_to_faces[0 + 7 * i] = h_face_el[f];
+
+          // 1 + 7 * i = number of boundary faces on this elem
+          int numFace = h_elements_to_faces[1 + 7 * i];
+          if (numFace == -1) numFace = 0;
+          numFace++;
+
+          // 1 + (j+1) + 7 * i = jth boundary face on ith unique boundary element
+          h_elements_to_faces[1 + numFace + 7 * i] = f;
+
+          // update number of faces
+          h_elements_to_faces[1 + 7 * i] = numFace;
         }
       }
     }
@@ -1284,6 +1361,47 @@ void M2ulPhyS::initIndirectionArrays() {
           numFace++;
           h_shared_elements_to_shared_faces[1 + numFace + 7 * el] = f;
           h_shared_elements_to_shared_faces[1 + 7 * el] = numFace;
+        }
+      }
+    }
+  }
+}
+
+void M2ulPhyS::initIndirectionBC() {
+  boundaryFaceIntegrationData &bdry_face_data = gpu_precomputed_data_.boundary_face_data;
+
+  // This is supposed to be number of boundary faces, and for
+  // non-periodic cases it is.  See #199 for more info.
+  const int NumBCelems = fes->GetNBE();
+
+  if (NumBCelems > 0) {
+    bdry_face_data.bc_category.SetSize(NumBCelems);
+    bdry_face_data.bc_category = NUM_BC_CATEGORIES;
+    auto h_bc_category = bdry_face_data.bc_category.HostWrite();
+
+    bdry_face_data.use_bc_in_grad.SetSize(NumBCelems);
+    bdry_face_data.use_bc_in_grad = false;
+    auto h_use_bc_in_grad = bdry_face_data.use_bc_in_grad.HostWrite();
+
+    FaceElementTransformations *tr;
+    Mesh *mesh = fes->GetMesh();
+
+    for (int f = 0; f < NumBCelems; f++) {
+      tr = mesh->GetBdrFaceTransformations(f);
+      if (tr != NULL && bcIntegrator != NULL) {
+        int attr = tr->Attribute;
+        h_bc_category[f] = bcIntegrator->getAttributeCategory(attr);
+        if (config.useBCinGrad && h_bc_category[f] == WALL) {
+          std::unordered_map<int, BoundaryCondition *>::const_iterator wbci = bcIntegrator->wallBCmap.find(attr);
+          if (wbci != bcIntegrator->wallBCmap.end()) {
+            WallBC *wbc = dynamic_cast<WallBC *>(wbci->second);
+            WallType wt = wbc->getType();
+            if (wt == VISC_ISOTH) {
+              printf("Using BC in Gradient!\n");
+              fflush(stdout);
+              h_use_bc_in_grad[f] = true;
+            }
+          }
         }
       }
     }

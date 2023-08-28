@@ -89,6 +89,7 @@ class Gradients : public ParNonlinearForm {
   dataTransferArrays *transferUp;
 
   Vector dun_shared_face;
+  Vector dun_bdry_face;
 
  public:
   Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradUpfes, int _dim, int _num_equation,
@@ -125,6 +126,9 @@ class Gradients : public ParNonlinearForm {
   void interpGradSharedFace_gpu();
 
   void integrationGradSharedFace_gpu();
+
+  void interpGradBdryFace_gpu();
+  void integrationGradBdryFace_gpu();
 
   void multInverse_gpu(const int numElems, const int offsetElems, const int elDof);
 
