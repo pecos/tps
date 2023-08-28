@@ -128,7 +128,8 @@ namespace tps_wrappers {
     .value("ElectronTemperature", TPS::Tps2Boltzmann::Index::ElectronTemperature)
     .value("ElectronMobility", TPS::Tps2Boltzmann::Index::ElectronMobility)
     .value("ElectronDiffusion", TPS::Tps2Boltzmann::Index::ElectronDiffusion)
-    .value("ReactionRates", TPS::Tps2Boltzmann::Index::ReactionRates)
+    .value("ReactionRates", TPS::Tps2Boltzmann::Index::ReactionRates);
+    
   py::class_<TPS::Tps2Boltzmann>(m, "Tps2Bolzmann")
     .def(py::init<TPS::Tps *>());
 }

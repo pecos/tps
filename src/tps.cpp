@@ -473,6 +473,15 @@ namespace py = pybind11;
 namespace tps_wrappers {
 
 void tps(py::module & m) {
+  #ifdef HAVE_MPI4PY
+  // initialize mpi4py's C-API
+  if (import_mpi4py() < 0) {
+    // mpi4py calls the Python C API
+    // we let pybind11 give us the detailed traceback
+    throw py::error_already_set();
+  }
+  #endif
+
   py::class_<TPS::Tps>(m, "Tps")
       .def(py::init<>())
 #ifdef HAVE_MPI4PY
