@@ -646,24 +646,20 @@ void M2ulPhyS::initVariables() {
   }
 
   // Determine domain bounding box size
-  ParGridFunction coordsDof(dfes);
-  ParGridFunction coordsVert(dfes);
-  mesh->GetNodes(coordsDof);
+  Vector coordsVert(dfes);
   mesh->GetVertices(coordsVert);
   int nVert = coordsVert.Size() / dim;
   {
     double local_xmin = 1.0e18;
     double local_ymin = 1.0e18;
     double local_zmin = 1.0e18;
-    double local_xmax = 1.0e-15;
-    double local_ymax = 1.0e-15;
-    double local_zmax = 1.0e-15;
+    double local_xmax = -1.0e-15;
+    double local_ymax = -1.0e-15;
+    double local_zmax = -1.0e-15;
     for (int n = 0; n < nVert; n++) {
       auto hcoords = coordsVert.HostRead();
       double coords[3];
-      for (int d = 0; d < dim; d++) {
-        coords[d] = hcoords[n + d * fes->GetNDofs()];
-      }
+      for (int d = 0; d < dim; d++) { coords[d] = hcoords[n + d * nVerts]; }
       local_xmin = min(coords[0], local_xmin);
       local_ymin = min(coords[1], local_ymin);
       if (dim == 3) {
@@ -1922,7 +1918,8 @@ void M2ulPhyS::solveStep() {
     // make a separate routine! plane interp and dump here
     if (config.planeDump.isEnabled == true) {
 #ifdef HAVE_GSLIB
-      // source
+      
+      // source, TODO: add option to select u, <u>, or <u'u'>
       ParGridFunction *u_gf = GetSolutionGF();
 
       // plane description
