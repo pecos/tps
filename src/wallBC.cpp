@@ -659,6 +659,7 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
   const WallType type = wallType_;
 
   const int dim = dim_;
+  const int nvel = nvel_;
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
   const BoundaryPrimitiveData d_bcState = bcState_;
@@ -669,6 +670,8 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
   const RiemannSolver *d_rsolver = rsolver;
   GasMixture *d_mix = d_mixture_;
   Fluxes *d_fluxclass = fluxClass;
+
+  const bool useBCinGrad = useBCinGrad_;
 
   // clang-format on
   // el_wall is index within wall boundary elements?
@@ -746,12 +749,27 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
           // compute mirror state
           computeInvWallState_gpu_serial(&u1[0], &u2[0], &nor[0], dim, num_equation);
         } else {
-          d_mix->modifyStateFromPrimitive(u1, bcState, u2);
+          if (useBCinGrad) {
+            for (int eq = 0; eq < num_equation; eq++) {
+              u2[eq] = u1[eq];
+            }
+            for (int i = 0; i < nvel; i++) {
+              u2[1 + i] *= -1.0;
+            }
+          } else {
+            d_mix->modifyStateFromPrimitive(u1, bcState, u2);
+          }
         }
         d_rsolver->Eval_LF(u1, u2, nor, Rflux);
 
         if (type != WallType::SLIP) {
           d_fluxclass->ComputeViscousFluxes(u1, gradUp1, xyz, d_delta[el_bdry], 0.0, vF1);
+
+          for (int eq = 0; eq < num_equation; eq++) {
+            u2[eq] = u1[eq];
+          }
+          d_mix->modifyStateFromPrimitive(u1, bcState, u2);
+
           d_fluxclass->ComputeBdrViscousFluxes(u2, gradUp1, xyz, d_delta[el_bdry], 0.0, bcFlux, vF2);
           for (int eq = 0; eq < num_equation; eq++) vF2[eq] *= sqrt(normN);
 
