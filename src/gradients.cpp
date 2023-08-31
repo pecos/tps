@@ -37,7 +37,8 @@ Gradients::Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradU
                      ParGridFunction *_Up, ParGridFunction *_gradUp, GasMixture *_mixture, GradNonLinearForm *_gradUp_A,
                      IntegrationRules *_intRules, int _intRuleType,
                      const precomputedIntegrationData &gpu_precomputed_data, Array<DenseMatrix *> &_Me_inv,
-                     Vector &_invMArray, Array<int> &_posDofInvM, const int &_maxIntPoints, const int &_maxDofs)
+                     Vector &_invMArray, Array<int> &_posDofInvM, const int &_maxIntPoints, const int &_maxDofs,
+                     int nvel)
     : ParNonlinearForm(_vfes),
       vfes(_vfes),
       gradUpfes(_gradUpfes),
@@ -54,7 +55,8 @@ Gradients::Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradU
       invMArray(_invMArray),
       posDofInvM(_posDofInvM),
       maxIntPoints_(_maxIntPoints),
-      maxDofs_(_maxDofs) {
+      maxDofs_(_maxDofs),
+      nvel_(nvel) {
   const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
   h_num_elems_of_type = elem_data.num_elems_of_type.HostRead();
 
@@ -726,6 +728,7 @@ void Gradients::interpGradBdryFace_gpu() {
   const int *d_el_index = bdry_face_data.el.Read();
   const boundaryCategory *d_bc_cat = bdry_face_data.bc_category.Read();
   const bool *d_bc_use = bdry_face_data.use_bc_in_grad.Read();
+  const double *d_wall_bc_temperature = bdry_face_data.wall_bc_temperature.Read();
 
   const int *d_rbf_to_abf = bdry_face_data.rbf_to_abf.Read();
 
@@ -734,6 +737,7 @@ void Gradients::interpGradBdryFace_gpu() {
   double *d_dun = dun_bdry_face.Write();
 
   const int dim = dim_;
+  const int nvel = nvel_;
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;
@@ -784,10 +788,10 @@ void Gradients::interpGradBdryFace_gpu() {
 
       // Change ubc if desired!
       if (d_bc_cat[true_face] == WALL && d_bc_use[true_face]) {
-        ubc[1] = 0.0;
-        ubc[2] = 0.0;
-        ubc[3] = 0.0;
-        ubc[4] = 300.0;  // FIXME(trevilo): Get actual wall temp here!
+        for (int i = 0; i < nvel; i++) {
+          ubc[1 + i] = 0.0;
+        }
+        ubc[1 + nvel] = d_wall_bc_temperature[true_face];
       }
 
       // Evaluate difference

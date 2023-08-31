@@ -361,6 +361,9 @@ struct boundaryFaceIntegrationData {
 
   /** Map all boundary faces to real boundary faces.  See discussion in M2ulPhyS.cpp */
   Array<int> rbf_to_abf;
+
+  /** Isothermal wall temperature (or -1 if not an isothermal wall) */
+  Vector wall_bc_temperature;
 };
 
 /** @brief Data for shared face integral calculations

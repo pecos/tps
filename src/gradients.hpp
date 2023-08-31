@@ -50,6 +50,7 @@ class Gradients : public ParNonlinearForm {
   ParFiniteElementSpace *gradUpfes;
   const int dim_;
   const int num_equation_;
+  const int nvel_;
 
   ParGridFunction *Up;
   ParGridFunction *gradUp;
@@ -96,7 +97,7 @@ class Gradients : public ParNonlinearForm {
             ParGridFunction *_Up, ParGridFunction *_gradUp, GasMixture *_mixture, GradNonLinearForm *_gradUp_A,
             IntegrationRules *_intRules, int _intRuleType, const precomputedIntegrationData &gpu_precomputed_data,
             Array<DenseMatrix *> &Me_inv, Vector &_invMArray, Array<int> &_posDofInvM, const int &_maxIntPoints,
-            const int &_maxDofs);
+            const int &_maxDofs, int nvel);
 
   ~Gradients();
 

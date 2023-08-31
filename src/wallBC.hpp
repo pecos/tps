@@ -108,6 +108,11 @@ class WallBC : public BoundaryCondition {
                        ParGridFunction *gradUp, const boundaryFaceIntegrationData &boundary_face_data,
                        const int &maxDofs);
 
+  double getWallTemp() const {
+    assert(wallType_ == VISC_ISOTH);
+    return wallTemp_;
+  }
+
 #ifdef _GPU_
   static MFEM_HOST_DEVICE void computeInvWallState(const double *u1, double *u2, const double *nor, const int &dim,
                                                    const int &num_equation, const int &thrd, const int &maxThreads) {

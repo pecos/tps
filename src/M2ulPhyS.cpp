@@ -1383,6 +1383,11 @@ void M2ulPhyS::initIndirectionBC() {
     bdry_face_data.use_bc_in_grad = false;
     auto h_use_bc_in_grad = bdry_face_data.use_bc_in_grad.HostWrite();
 
+    bdry_face_data.wall_bc_temperature.SetSize(NumBCelems);
+    bdry_face_data.wall_bc_temperature = false;
+    bdry_face_data.wall_bc_temperature.UseDevice(true);
+    auto h_wall_bc_temperature = bdry_face_data.wall_bc_temperature.HostWrite();
+
     FaceElementTransformations *tr;
     Mesh *mesh = fes->GetMesh();
 
@@ -1400,6 +1405,7 @@ void M2ulPhyS::initIndirectionBC() {
               printf("Using BC in Gradient!\n");
               fflush(stdout);
               h_use_bc_in_grad[f] = true;
+              h_wall_bc_temperature[f] = wbc->getWallTemp();
             }
           }
         }

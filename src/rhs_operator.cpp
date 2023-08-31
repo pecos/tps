@@ -243,7 +243,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
 
   // create gradients object
   gradients = new Gradients(vfes, gradUpfes, dim_, num_equation_, Up, gradUp, mixture, gradUp_A, intRules, intRuleType,
-                            gpu_precomputed_data_, Me_inv, invMArray, posDofInvM, maxIntPoints, maxDofs);
+                            gpu_precomputed_data_, Me_inv, invMArray, posDofInvM, maxIntPoints, maxDofs, nvel);
   gradients->setParallelData(&transferUp);
 
   local_timeDerivatives.UseDevice(true);
