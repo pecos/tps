@@ -329,6 +329,40 @@ bool h5ReadTable(const std::string &fileName, const std::string &datasetName, mf
   return success;
 }
 
+bool h5ReadBcastMultiColumnTable(const std::string &fileName, const std::string &datasetName, MPI_Comm TPSCommWorld,
+                                 mfem::DenseMatrix &output, std::vector<TableInput> &tables) {
+  int myrank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+  const bool rank0 = (myrank == 0);
+
+  int nrow = 0, ncol = 0;
+  bool success = false;
+  if (rank0) {
+    Array<int> dims(2);
+    success = h5ReadTable(fileName.c_str(), datasetName.c_str(), output, dims);
+    nrow = dims[0];
+    ncol = dims[1];
+  }
+  MPI_Bcast(&success, 1, MPI_CXX_BOOL, 0, TPSCommWorld);
+  if (!success) exit(ERROR);
+
+  MPI_Bcast(&nrow, 1, MPI_INT, 0, TPSCommWorld);
+  MPI_Bcast(&ncol, 1, MPI_INT, 0, TPSCommWorld);
+  assert(nrow > 0);
+  assert(ncol == tables.size() + 1);
+
+  if (!rank0) output.SetSize(nrow, ncol);
+  double *h_table = output.HostReadWrite();
+  MPI_Bcast(h_table, nrow * ncol, MPI_DOUBLE, 0, TPSCommWorld);
+
+  for (int icol = 0; icol < tables.size(); icol++) {
+    tables[icol].Ndata = nrow;
+    tables[icol].xdata = output.HostRead();
+    tables[icol].fdata = output.HostRead() + (icol + 1) * nrow;
+  }
+  return success;
+}
+
 void evaluateDistanceSerial(mfem::Mesh &mesh, const mfem::Array<int> &wall_patches, const mfem::GridFunction &coords,
                             mfem::GridFunction &distance) {
   distance = -1.0;  // Initialize with invalid data

@@ -46,6 +46,12 @@ LteMixture::LteMixture(RunConfiguration &_runfile, int _dim, int nvel)
   SetNumActiveSpecies();
   SetNumEquations();
 #ifdef HAVE_GSL
+#if defined(_CUDA_) || defined(_HIP_)
+  energy_table_ = NULL;
+  R_table_ = NULL;
+  T_table_ = NULL;
+  mfem_error("2D LTE mixture tables not available on device.");
+#else
   energy_table_ = new GslTableInterpolator2D(_runfile.lteMixtureInput.thermo_file_name, 0, /* temperature column */
                                              1,                                            /* density column */
                                              3 /* energy column */);
@@ -62,12 +68,38 @@ LteMixture::LteMixture(RunConfiguration &_runfile, int _dim, int nvel)
                                         1,                                        /* density column */
                                         2,                                        /* temperature column */
                                         3);                                       /* number of columns */
+#endif  // _CUDA_ or _HIP_
 #else
   energy_table_ = NULL;
   R_table_ = NULL;
   T_table_ = NULL;
-  mfem_error("LTE mixture requires GSL support.");
+  mfem_error("2D LTE mixture tables require GSL support.");
 #endif
+}
+
+LteMixture::LteMixture(WorkingFluid f, int _dim, int nvel, double pc, TableInput energy_table_input,
+                       TableInput R_table_input, TableInput c_table_input)
+    : GasMixture(f, _dim, nvel, pc) {
+  numSpecies = 1;
+  ambipolar = false;
+  twoTemperature_ = false;
+
+  SetNumActiveSpecies();
+  SetNumEquations();
+
+  energy_table_ = new LinearTable(energy_table_input);
+  R_table_ = new LinearTable(R_table_input);
+  c_table_ = new LinearTable(c_table_input);
+
+  TableInput T_table_input;
+  T_table_input.order = energy_table_input.order;
+  T_table_input.xLogScale = energy_table_input.xLogScale;
+  T_table_input.fLogScale = energy_table_input.fLogScale;
+  T_table_input.Ndata = energy_table_input.Ndata;
+  T_table_input.xdata = energy_table_input.fdata;
+  T_table_input.fdata = energy_table_input.xdata;
+
+  T_table_ = new LinearTable(T_table_input);
 }
 
 LteMixture::~LteMixture() {

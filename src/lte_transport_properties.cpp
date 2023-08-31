@@ -54,8 +54,16 @@ LteTransport::LteTransport(GasMixture *_mixture, RunConfiguration &_runfile) : M
   mu_table_ = NULL;
   kappa_table_ = NULL;
   sigma_table_ = NULL;
-  mfem_error("LTE transport requires GSL support.");
+  mfem_error("2D LTE transport tables require GSL support.");
 #endif
+}
+
+LteTransport::LteTransport(GasMixture *_mixture, TableInput mu_table_input, TableInput kappa_table_input,
+                           TableInput sigma_table_input)
+    : MolecularTransport(_mixture) {
+  mu_table_ = new LinearTable(mu_table_input);
+  kappa_table_ = new LinearTable(kappa_table_input);
+  sigma_table_ = new LinearTable(sigma_table_input);
 }
 
 LteTransport::~LteTransport() {

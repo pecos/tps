@@ -56,12 +56,14 @@
  */
 class LteTransport : public MolecularTransport {
  protected:
-  TableInterpolator2D *mu_table_;     // dynamic viscosity
-  TableInterpolator2D *kappa_table_;  // thermal conductivity
-  TableInterpolator2D *sigma_table_;  // electrical conductivity
+  TableInterface *mu_table_;     // dynamic viscosity
+  TableInterface *kappa_table_;  // thermal conductivity
+  TableInterface *sigma_table_;  // electrical conductivity
 
  public:
   LteTransport(GasMixture *_mixture, RunConfiguration &_runfile);
+  LteTransport(GasMixture *_mixture, TableInput mu_table_input, TableInput kappa_table_input,
+               TableInput sigma_table_input);
 
   virtual ~LteTransport();
 

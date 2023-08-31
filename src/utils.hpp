@@ -41,6 +41,7 @@
 
 #include <string>
 
+#include "dataStructures.hpp"
 #include "tps_mfem_wrap.hpp"
 
 // application exit codes
@@ -85,6 +86,16 @@ void h5_read_attribute(hid_t source, std::string attribute, T &value) {
 // Return result as boolean.
 bool h5ReadTable(const std::string &fileName, const std::string &datasetName, mfem::DenseMatrix &output,
                  mfem::Array<int> &shape);
+
+/** Read multi-column table
+ *
+ * Read multi-column table data from an hdf5 file into a set of input
+ * TableInput structs.  The read happens only on rank 0 and the data
+ * are broadcast to all ranks.  The length of the input std::vector of
+ * TableInput must match the number of columsn read.
+ */
+bool h5ReadBcastMultiColumnTable(const std::string &fileName, const std::string &datasetName, MPI_Comm TPSCommWorld,
+                                 mfem::DenseMatrix &output, std::vector<TableInput> &tables);
 
 // MFEM extensions
 

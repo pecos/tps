@@ -372,8 +372,54 @@ void M2ulPhyS::initVariables() {
 #if defined(_GPU_)
       mfem_error("LTE_FLUID not supported for GPU.");
 #else
-      mixture = new LteMixture(config, dim, nvel);
-      transportPtr = new LteTransport(mixture, config);
+      int table_dim;
+      tpsP->getInput("flow/lte/table_dim", table_dim, 2);
+      if (table_dim == 2) {
+        // for 2D case, table read happens internally to LteMixture and LteTransport
+        mixture = new LteMixture(config, dim, nvel);
+        transportPtr = new LteTransport(mixture, config);
+      } else if (table_dim == 1) {
+        MPI_Comm TPSCommWorld = this->groupsMPI->getTPSCommWorld();
+
+        // Initialize thermo TableInput (data read below)
+        std::vector<TableInput> thermo_tables(3);
+        for (int i = 0; i < thermo_tables.size(); i++) {
+          thermo_tables[i].order = 1;
+          thermo_tables[i].xLogScale = false;
+          thermo_tables[i].fLogScale = false;
+        }
+
+        // Read data from hdf5 file containing 4 columns: T, energy, gas constant, speed of sound
+        DenseMatrix thermo_data;
+        bool success;
+        success = h5ReadBcastMultiColumnTable(config.lteMixtureInput.thermo_file_name, std::string("T_energy_R_c"),
+                                              TPSCommWorld, thermo_data, thermo_tables);
+        if (!success) exit(ERROR);
+
+        // Instantiate LteMixture object
+        mixture = new LteMixture(config.lteMixtureInput.f, dim, nvel, config.const_plasma_conductivity_,
+                                 thermo_tables[0], thermo_tables[1], thermo_tables[2]);
+
+        // Initialize transport TableInput (data read below)
+        std::vector<TableInput> trans_tables(3);
+        for (int i = 0; i < trans_tables.size(); i++) {
+          trans_tables[i].order = 1;
+          trans_tables[i].xLogScale = false;
+          trans_tables[i].fLogScale = false;
+        }
+
+        // Read data from hdf5 file containing 4 columns: T, mu, kappa, sigma
+        // (i.e., temperature, dynamic viscosity, thermal conductivity, electrical conductivity)
+        DenseMatrix trans_data;
+        success = h5ReadBcastMultiColumnTable(config.lteMixtureInput.trans_file_name, std::string("T_mu_kappa_sigma"),
+                                              TPSCommWorld, trans_data, trans_tables);
+        if (!success) exit(ERROR);
+
+        // Instantiate LteTransport class
+        transportPtr = new LteTransport(mixture, trans_tables[0], trans_tables[1], trans_tables[2]);
+      } else {
+        mfem_error("flow/lte/table_dim must be 1 or 2.");
+      }
 #endif
       break;
     default:
@@ -2351,7 +2397,8 @@ void M2ulPhyS::initilizeSpeciesFromLTE() {
   TableInterpolator2D *c_table;
   TableInterpolator2D *T_table;
 
-#ifdef HAVE_GSL
+#if defined(HAVE_GSL) && !defined(_CUDA_) && !defined(_HIP_)
+
   energy_table = new GslTableInterpolator2D(config.lteMixtureInput.thermo_file_name, 0, /* temperature column */
                                             1,                                          /* density column */
                                             3 /* energy column */);

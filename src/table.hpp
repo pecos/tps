@@ -45,7 +45,19 @@
 
 #include "dataStructures.hpp"
 
-class TableInterpolator {
+class TableInterface {
+ public:
+  MFEM_HOST_DEVICE TableInterface() {}
+  MFEM_HOST_DEVICE virtual ~TableInterface() {}
+  MFEM_HOST_DEVICE virtual double eval(const double &xEval) = 0;
+  MFEM_HOST_DEVICE virtual double eval(const double &xEval, const double &yEval) = 0;
+
+  MFEM_HOST_DEVICE virtual double eval_x(const double &xEval) = 0;
+  MFEM_HOST_DEVICE virtual double eval_x(const double &xEval, const double &yEval) = 0;
+  MFEM_HOST_DEVICE virtual double eval_y(const double &xEval, const double &yEval) = 0;
+};
+
+class TableInterpolator : public TableInterface {
  protected:
   double xdata_[gpudata::MAXTABLE];
   double fdata_[gpudata::MAXTABLE];
@@ -61,11 +73,6 @@ class TableInterpolator {
   MFEM_HOST_DEVICE virtual ~TableInterpolator() {}
 
   MFEM_HOST_DEVICE int findInterval(const double &xEval);
-
-  MFEM_HOST_DEVICE virtual double eval(const double &xEval) {
-    printf("TableInterpolator not initialized!");
-    return nan("");
-  }
 };
 
 //////////////////////////////////////////////////////
@@ -83,7 +90,16 @@ class LinearTable : public TableInterpolator {
 
   MFEM_HOST_DEVICE virtual ~LinearTable() {}
 
-  MFEM_HOST_DEVICE virtual double eval(const double &xEval);
+  MFEM_HOST_DEVICE double eval(const double &xEval) final;
+  MFEM_HOST_DEVICE double eval(const double &xEval, const double &yEval) final { return eval(xEval); }
+
+  MFEM_HOST_DEVICE double eval_x(const double &xEval) final;
+  MFEM_HOST_DEVICE double eval_x(const double &xEval, const double &yEval) final { return eval_x(xEval); }
+
+  MFEM_HOST_DEVICE double eval_y(const double &xEval, const double &yEval) final {
+    assert(false);
+    return nan("");
+  }
 };
 
 /** \brief 2-D interpolation base class
@@ -91,7 +107,7 @@ class LinearTable : public TableInterpolator {
  * Specifies interface for two-dimensional table look-up (i.e.,
  * interpolation).
  */
-class TableInterpolator2D {
+class TableInterpolator2D : public TableInterface {
  protected:
   double *xdata_;
   double *ydata_;
@@ -101,34 +117,45 @@ class TableInterpolator2D {
   unsigned int ny_;
 
  public:
-  TableInterpolator2D();
-  TableInterpolator2D(unsigned int nx, unsigned int ny);
-  virtual ~TableInterpolator2D();
+  MFEM_HOST_DEVICE TableInterpolator2D();
+  MFEM_HOST_DEVICE TableInterpolator2D(unsigned int nx, unsigned int ny);
+  MFEM_HOST_DEVICE virtual ~TableInterpolator2D();
 
   /// Reset size and re-allocate data arrays
-  void resize(unsigned int nx, unsigned int ny);
+  MFEM_HOST_DEVICE void resize(unsigned int nx, unsigned int ny);
+
+  MFEM_HOST_DEVICE double eval(const double &xEval) final {
+    assert(false);
+    return nan("");
+  }
+  MFEM_HOST_DEVICE double eval_x(const double &xEval) final {
+    assert(false);
+    return nan("");
+  }
 
   /// Interpolate fcn to (x,y) --- must be implemented in derived class
-  virtual double eval(const double &x, const double &y) {
+  MFEM_HOST_DEVICE double eval(const double &x, const double &y) override {
     printf("TableInterpolator2D not initialized!");
     return -1.0;
   }
 
   /// Derivative of interpolant wrt x
-  virtual double eval_x(const double &x, const double &y) {
+  MFEM_HOST_DEVICE double eval_x(const double &x, const double &y) override {
     printf("TableInterpolator2D not initialized!");
     return -1.0;
   }
 
   /// Derivative of interpolant wrt y
-  virtual double eval_y(const double &x, const double &y) {
+  MFEM_HOST_DEVICE double eval_y(const double &x, const double &y) override {
     printf("TableInterpolator2D not initialized!");
     return -1.0;
   }
 };
 
 #ifdef HAVE_GSL
-
+#if defined(_CUDA_) || defined(_HIP_)
+/* No GslTableInterpolator2D for cuda or hip builds, even if GSL detected at configure */
+#else
 /** \brief 2-D interpolation using GSL
  *
  * Provided 2-D table look-up using the Gnu Scientific Library.  See
@@ -160,7 +187,6 @@ class GslTableInterpolator2D : public TableInterpolator2D {
     return gsl_spline2d_eval_deriv_y(spline_, x, y, xacc_, yacc_);
   }
 };
-
+#endif  // _CUDA_ or _HIP_
 #endif  // HAVE_GSL
-
 #endif  // TABLE_HPP_

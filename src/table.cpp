@@ -96,18 +96,30 @@ MFEM_HOST_DEVICE double LinearTable::eval(const double &xEval) {
   return ft;
 }
 
+MFEM_HOST_DEVICE double LinearTable::eval_x(const double &xEval) {
+  const int index = findInterval(xEval);
+  const double xt = (xLogScale_) ? log(xEval) : xEval;
+  const double xt_xt = (xLogScale_) ? 1./xEval : 1.0;
+  double ft_x = b_[index] * xt_xt;
+  if (fLogScale_) {
+    const double ft = a_[index] + b_[index] * xt;
+    ft_x *= exp(ft);
+  }
+  return ft_x;
+}
+
 /** \brief Default ctor
  *
  * Sizes set to zero.  Nothing allocated.
  */
-TableInterpolator2D::TableInterpolator2D() : nx_(0), ny_(0) {}
+MFEM_HOST_DEVICE TableInterpolator2D::TableInterpolator2D() : nx_(0), ny_(0) {}
 
 /** \brief Constructs 2-D interpolation base class
  *
  * Allocates memory for required data arrays based on input sizes.
  * Memory is uninitialized.
  */
-TableInterpolator2D::TableInterpolator2D(unsigned int nx, unsigned int ny) : nx_(nx), ny_(ny) {
+MFEM_HOST_DEVICE TableInterpolator2D::TableInterpolator2D(unsigned int nx, unsigned int ny) : nx_(nx), ny_(ny) {
   xdata_ = new double[nx_];
   ydata_ = new double[ny_];
   fdata_ = new double[nx_ * ny_];
@@ -117,7 +129,7 @@ TableInterpolator2D::TableInterpolator2D(unsigned int nx, unsigned int ny) : nx_
  *
  * Frees memory allocated by ctor
  */
-TableInterpolator2D::~TableInterpolator2D() {
+MFEM_HOST_DEVICE TableInterpolator2D::~TableInterpolator2D() {
   delete[] xdata_;
   delete[] ydata_;
   delete[] fdata_;
@@ -128,7 +140,7 @@ TableInterpolator2D::~TableInterpolator2D() {
  * pre-existing data is destroyed.  Resuling allocated arrays are not
  * initialized.
  */
-void TableInterpolator2D::resize(unsigned int nx, unsigned int ny) {
+MFEM_HOST_DEVICE void TableInterpolator2D::resize(unsigned int nx, unsigned int ny) {
   if (nx_ > 0) {
     delete[] xdata_;
   }
@@ -147,7 +159,9 @@ void TableInterpolator2D::resize(unsigned int nx, unsigned int ny) {
 }
 
 #ifdef HAVE_GSL
-
+#if defined(_CUDA_) || defined(_HIP_)
+/* No GslTableInterpolator2D for cuda or hip builds, even if GSL detected at configure */
+#else
 /** \brief Constructs GSL 2-D interpolation object
  *
  * Reads data from plato_file
@@ -242,5 +256,5 @@ GslTableInterpolator2D::~GslTableInterpolator2D() {
   gsl_interp_accel_free(xacc_);
   gsl_spline2d_free(spline_);
 }
-
+#endif  // _CUDA_ or _HIP_
 #endif  // HAVE_GSL

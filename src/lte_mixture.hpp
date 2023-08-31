@@ -39,6 +39,7 @@
 
 #include <tps_config.h>
 
+#include "dataStructures.hpp"
 #include "equation_of_state.hpp"
 #include "table.hpp"
 #include "tps_mfem_wrap.hpp"
@@ -57,16 +58,19 @@
  */
 class LteMixture : public GasMixture {
  private:
-  TableInterpolator2D *energy_table_;
-  TableInterpolator2D *R_table_;
-  TableInterpolator2D *c_table_;
+  TableInterface *energy_table_;
+  TableInterface *R_table_;
+  TableInterface *c_table_;
 
   // This table is used to get a good IC for the Newton solve when
   // evaluating the temperature from the converved variables.
-  TableInterpolator2D *T_table_;
+  TableInterface *T_table_;
 
  public:
   LteMixture(RunConfiguration &_runfile, int _dim, int nvel);
+  LteMixture(WorkingFluid f, int _dim, int nvel, double pc, TableInput energy_table_input, TableInput R_table_input,
+             TableInput c_table_input);
+
   virtual ~LteMixture();
 
   double evaluateInternalEnergy(const double &T, const double &rho) { return energy_table_->eval(T, rho); }
