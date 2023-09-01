@@ -96,6 +96,9 @@ RunConfiguration::RunConfiguration() {
   isForcing = false;
   for (int ii = 0; ii < 3; ii++) gradPress[ii] = 0.;
 
+  isGravity = false;
+  for (int ii = 0; ii < 3; ii++) gravity[ii] = 0.;
+  
   arrayPassiveScalar.DeleteAll();
 
   // Resource manager monitoring
