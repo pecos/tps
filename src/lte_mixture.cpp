@@ -35,8 +35,7 @@
 
 #include "lte_mixture.hpp"
 
-#ifndef _GPU_  // this class only available for CPU currently
-
+#ifndef _GPU_
 LteMixture::LteMixture(RunConfiguration &_runfile, int _dim, int nvel)
     : GasMixture(_runfile.lteMixtureInput.f, _dim, nvel, _runfile.const_plasma_conductivity_) {
   numSpecies = 1;
@@ -46,12 +45,6 @@ LteMixture::LteMixture(RunConfiguration &_runfile, int _dim, int nvel)
   SetNumActiveSpecies();
   SetNumEquations();
 #ifdef HAVE_GSL
-#if defined(_CUDA_) || defined(_HIP_)
-  energy_table_ = NULL;
-  R_table_ = NULL;
-  T_table_ = NULL;
-  mfem_error("2D LTE mixture tables not available on device.");
-#else
   energy_table_ = new GslTableInterpolator2D(_runfile.lteMixtureInput.thermo_file_name, 0, /* temperature column */
                                              1,                                            /* density column */
                                              3 /* energy column */);
@@ -68,7 +61,6 @@ LteMixture::LteMixture(RunConfiguration &_runfile, int _dim, int nvel)
                                         1,                                        /* density column */
                                         2,                                        /* temperature column */
                                         3);                                       /* number of columns */
-#endif  // _CUDA_ or _HIP_
 #else
   energy_table_ = NULL;
   R_table_ = NULL;
@@ -76,9 +68,26 @@ LteMixture::LteMixture(RunConfiguration &_runfile, int _dim, int nvel)
   mfem_error("2D LTE mixture tables require GSL support.");
 #endif
 }
+#endif
 
-LteMixture::LteMixture(WorkingFluid f, int _dim, int nvel, double pc, TableInput energy_table_input,
-                       TableInput R_table_input, TableInput c_table_input)
+#ifdef _GPU_
+MFEM_HOST_DEVICE LteMixture::LteMixture(WorkingFluid f, int _dim, int nvel, double pc, TableInput energy_table_input,
+                                        TableInput R_table_input, TableInput c_table_input, TableInput T_table_input)
+    : GasMixture(f, _dim, nvel, pc),
+      energy_table_(LinearTable(energy_table_input)),
+      R_table_(LinearTable(R_table_input)),
+      c_table_(LinearTable(c_table_input)),
+      T_table_(LinearTable(T_table_input)) {
+  numSpecies = 1;
+  ambipolar = false;
+  twoTemperature_ = false;
+
+  SetNumActiveSpecies();
+  SetNumEquations();
+}
+#else
+MFEM_HOST_DEVICE LteMixture::LteMixture(WorkingFluid f, int _dim, int nvel, double pc, TableInput energy_table_input,
+                                        TableInput R_table_input, TableInput c_table_input, TableInput T_table_input)
     : GasMixture(f, _dim, nvel, pc) {
   numSpecies = 1;
   ambipolar = false;
@@ -90,23 +99,17 @@ LteMixture::LteMixture(WorkingFluid f, int _dim, int nvel, double pc, TableInput
   energy_table_ = new LinearTable(energy_table_input);
   R_table_ = new LinearTable(R_table_input);
   c_table_ = new LinearTable(c_table_input);
-
-  TableInput T_table_input;
-  T_table_input.order = energy_table_input.order;
-  T_table_input.xLogScale = energy_table_input.xLogScale;
-  T_table_input.fLogScale = energy_table_input.fLogScale;
-  T_table_input.Ndata = energy_table_input.Ndata;
-  T_table_input.xdata = energy_table_input.fdata;
-  T_table_input.fdata = energy_table_input.xdata;
-
   T_table_ = new LinearTable(T_table_input);
 }
+#endif
 
-LteMixture::~LteMixture() {
+MFEM_HOST_DEVICE LteMixture::~LteMixture() {
+#ifndef _GPU_
   delete energy_table_;
   delete R_table_;
   delete c_table_;
   delete T_table_;
+#endif
 }
 
 /// Compute pressure from conserved state
@@ -114,10 +117,17 @@ double LteMixture::ComputePressure(const Vector &state, double *electronPressure
   return ComputePressure(state.GetData(), electronPressure);
 }
 
-double LteMixture::ComputePressure(const double *state, double *electronPressure) {
+MFEM_HOST_DEVICE double LteMixture::ComputePressure(const double *state, double *electronPressure) {
   const double rho = state[0];
-  const double T = ComputeTemperature(state);
+  // const double T = ComputeTemperature(state);
+  double T;
+  const bool success = ComputeTemperatureInternal(state, T);
+  assert(success);
+#ifdef _GPU_
+  const double R = R_table_.eval(T, rho);
+#else
   const double R = R_table_->eval(T, rho);
+#endif
   return rho * R * T;
 }
 
@@ -126,10 +136,14 @@ double LteMixture::ComputePressureFromPrimitives(const Vector &Up) {
   return ComputePressureFromPrimitives(Up.GetData());
 }
 
-double LteMixture::ComputePressureFromPrimitives(const double *Up) {
+MFEM_HOST_DEVICE double LteMixture::ComputePressureFromPrimitives(const double *Up) {
   const double rho = Up[0];
   const double T = Up[1 + nvel_];
+#ifdef _GPU_
+  const double R = R_table_.eval(T, rho);
+#else
   const double R = R_table_->eval(T, rho);
+#endif
   return rho * R * T;
 }
 
@@ -141,9 +155,7 @@ double LteMixture::ComputePressureFromPrimitives(const double *Up) {
  * internal energy given by the thermodynamic equilibrium look-up
  * table.
  */
-double LteMixture::ComputeTemperature(const Vector &state) { return ComputeTemperature(state.GetData()); }
-
-double LteMixture::ComputeTemperature(const double *state) {
+MFEM_HOST_DEVICE bool LteMixture::ComputeTemperatureInternal(const double *state, double &T) {
   const double rho = state[0];
 
   double den_vel2 = 0;
@@ -152,10 +164,13 @@ double LteMixture::ComputeTemperature(const double *state) {
 
   const double energy = (state[1 + nvel_] - 0.5 * den_vel2) / rho;
 
-  double T;
+#ifdef _GPU_
+  T = T_table_.eval(energy, rho);
+  double res = energy - energy_table_.eval(T, rho);
+#else
   T = T_table_->eval(energy, rho);
-
   double res = energy - energy_table_->eval(T, rho);
+#endif
   const double res0 = abs(res);
 
   bool converged = false;
@@ -174,7 +189,11 @@ double LteMixture::ComputeTemperature(const double *state) {
   // Newton loop
   while (!converged && (niter < niter_max)) {
     // get derivative of e wrt T
+#ifdef _GPU_
+    double dedT = energy_table_.eval_x(T, rho);
+#else
     double dedT = energy_table_->eval_x(T, rho);
+#endif
 
     // Newton step
     double dT = res / dedT;
@@ -182,7 +201,11 @@ double LteMixture::ComputeTemperature(const double *state) {
     assert(T > 0);
 
     // Update residual
+#ifdef _GPU_
+    res = energy - energy_table_.eval(T, rho);
+#else
     res = energy - energy_table_->eval(T, rho);
+#endif
 
     // Declare convergence if residual OR dT is sufficient small
     converged = ((abs(res) < atol) || (abs(res) / res0 < rtol) || (abs(dT) < dT_atol) || (abs(dT) / T < dT_rtol));
@@ -191,12 +214,17 @@ double LteMixture::ComputeTemperature(const double *state) {
   }
 
   if (!converged) {
-    printf("WARNING: temperature did not converge.");
-    fflush(stdout);
-  } else {
-    // printf("Temperature converged to res = %.6e in %d steps\n", res, niter); fflush(stdout);
+    return false;
   }
+  return true;
+}
 
+double LteMixture::ComputeTemperature(const Vector &state) { return ComputeTemperature(state.GetData()); }
+
+MFEM_HOST_DEVICE double LteMixture::ComputeTemperature(const double *state) {
+  double T;
+  const bool success = ComputeTemperatureInternal(state, T);
+  assert(success);
   return T;
 }
 
@@ -207,13 +235,17 @@ double LteMixture::ComputeTemperature(const double *state) {
  * the mixture gas constant given by the thermodynamic equilibrium
  * look-up table.
  */
-double LteMixture::ComputeTemperatureFromDensityPressure(const double rho, const double p) {
+MFEM_HOST_DEVICE double LteMixture::ComputeTemperatureFromDensityPressure(const double rho, const double p) {
   double T;
 
   // TODO(trevilo): How should we set initial guess?
   T = p / (rho * 208.);
 
+#ifdef _GPU_
+  double R = R_table_.eval(T, rho);
+#else
   double R = R_table_->eval(T, rho);
+#endif
   double res = p - rho * R * T;
   const double res0 = abs(res);
 
@@ -233,7 +265,11 @@ double LteMixture::ComputeTemperatureFromDensityPressure(const double rho, const
   // Newton loop
   while (!converged && (niter < niter_max)) {
     // get derivative of p wrt T
+#ifdef _GPU_
+    double R_T = R_table_.eval_x(T, rho);
+#else
     double R_T = R_table_->eval_x(T, rho);
+#endif
     double dpdT = rho * R + rho * R_T * T;
 
     // Newton step
@@ -242,7 +278,11 @@ double LteMixture::ComputeTemperatureFromDensityPressure(const double rho, const
     assert(T > 0);
 
     // Update residual
+#ifdef _GPU_
+    R = R_table_.eval(T, rho);
+#else
     R = R_table_->eval(T, rho);
+#endif
     res = p - rho * R * T;
 
     // Declare convergence if residual OR dT is sufficient small
@@ -253,7 +293,6 @@ double LteMixture::ComputeTemperatureFromDensityPressure(const double rho, const
 
   if (!converged) {
     printf("WARNING: temperature did not converge.");
-    fflush(stdout);
   } else {
     // printf("Temperature converged to res = %.6e in %d steps\n", res, niter); fflush(stdout);
   }
@@ -274,7 +313,7 @@ void LteMixture::GetPrimitivesFromConservatives(const Vector &conserv, Vector &p
   GetPrimitivesFromConservatives(conserv.GetData(), primit.GetData());
 }
 
-void LteMixture::GetPrimitivesFromConservatives(const double *conserv, double *primit) {
+MFEM_HOST_DEVICE void LteMixture::GetPrimitivesFromConservatives(const double *conserv, double *primit) {
   const double T = ComputeTemperature(conserv);
 
   for (int i = 0; i < num_equation; i++) {
@@ -292,7 +331,7 @@ void LteMixture::GetConservativesFromPrimitives(const Vector &primit, Vector &co
   GetConservativesFromPrimitives(primit.GetData(), conserv.GetData());
 }
 
-void LteMixture::GetConservativesFromPrimitives(const double *primit, double *conserv) {
+MFEM_HOST_DEVICE void LteMixture::GetConservativesFromPrimitives(const double *primit, double *conserv) {
   for (int i = 0; i < num_equation; i++) {
     conserv[i] = primit[i];
   }
@@ -305,7 +344,11 @@ void LteMixture::GetConservativesFromPrimitives(const double *primit, double *co
 
   const double rho = primit[0];
   const double T = primit[1 + nvel_];
+#ifdef _GPU_
+  const double energy = energy_table_.eval(T, rho);
+#else
   const double energy = energy_table_->eval(T, rho);
+#endif
 
   // total energy
   conserv[1 + nvel_] = primit[0] * (energy + 0.5 * v2);
@@ -317,22 +360,28 @@ double LteMixture::ComputeSpeedOfSound(const Vector &Uin, bool primitive) {
 }
 
 /// Compute the speed of sound (from look-up table)
-double LteMixture::ComputeSpeedOfSound(const double *Uin, bool primitive) {
+MFEM_HOST_DEVICE double LteMixture::ComputeSpeedOfSound(const double *Uin, bool primitive) {
   const double rho = Uin[0];
   double T;
   if (primitive) {
     T = Uin[1 + nvel_];
   } else {
-    T = ComputeTemperature(Uin);
+    // T = ComputeTemperature(Uin);
+    const bool success = ComputeTemperatureInternal(Uin, T);
+    assert(success);
   }
+#ifdef _GPU_
+  return c_table_.eval(T, rho);
+#else
   return c_table_->eval(T, rho);
+#endif
 }
 
 /// Compute the maximum characteristic speed (u+a)
 double LteMixture::ComputeMaxCharSpeed(const Vector &state) { return ComputeMaxCharSpeed(state.GetData()); }
 
 /// Compute the maximum characteristic speed (u+a)
-double LteMixture::ComputeMaxCharSpeed(const double *state) {
+MFEM_HOST_DEVICE double LteMixture::ComputeMaxCharSpeed(const double *state) {
   const double den = state[0];
 
   double den_vel2 = 0;
@@ -354,7 +403,11 @@ double LteMixture::ComputePressureDerivative(const Vector &dUp_dx, const Vector 
 bool LteMixture::StateIsPhysical(const Vector &state) {
   const double rho = state[0];
   const double T = ComputeTemperature(state);
-  const double R = R_table_->eval(T, rho);
+#ifdef _GPU_
+  double R = R_table_.eval(T, rho);
+#else
+  double R = R_table_->eval(T, rho);
+#endif
   const double p = rho * R * T;
   if (rho <= 0) return false;
   if (T <= 0) return false;
@@ -368,7 +421,8 @@ void LteMixture::computeStagnantStateWithTemp(const Vector &stateIn, const doubl
   computeStagnantStateWithTemp(stateIn.GetData(), Temp, stateOut.GetData());
 }
 
-void LteMixture::computeStagnantStateWithTemp(const double *stateIn, const double Temp, double *stateOut) {
+MFEM_HOST_DEVICE void LteMixture::computeStagnantStateWithTemp(const double *stateIn, const double Temp,
+                                                               double *stateOut) {
   for (int i = 0; i < num_equation; i++) {
     stateOut[i] = stateIn[i];
   }
@@ -377,8 +431,11 @@ void LteMixture::computeStagnantStateWithTemp(const double *stateIn, const doubl
 
   const double rho = stateIn[0];
   const double T = Temp;
+#ifdef _GPU_
+  const double energy = energy_table_.eval(T, rho);
+#else
   const double energy = energy_table_->eval(T, rho);
-
+#endif
   stateOut[1 + nvel_] = rho * energy;
 }
 
@@ -387,8 +444,8 @@ void LteMixture::modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut
   modifyEnergyForPressure(stateIn.GetData(), stateOut.GetData(), p, modifyElectronEnergy);
 }
 
-void LteMixture::modifyEnergyForPressure(const double *stateIn, double *stateOut, const double &p,
-                                         bool modifyElectronEnergy) {
+MFEM_HOST_DEVICE void LteMixture::modifyEnergyForPressure(const double *stateIn, double *stateOut, const double &p,
+                                                          bool modifyElectronEnergy) {
   for (int eq = 0; eq < num_equation; eq++) stateOut[eq] = stateIn[eq];
 
   const double rho = stateIn[0];
@@ -397,8 +454,11 @@ void LteMixture::modifyEnergyForPressure(const double *stateIn, double *stateOut
   ke *= 0.5 / rho;
 
   const double T = ComputeTemperatureFromDensityPressure(rho, p);
+#ifdef _GPU_
+  const double energy = energy_table_.eval(T, rho);
+#else
   const double energy = energy_table_->eval(T, rho);
+#endif
 
   stateOut[1 + nvel_] = rho * energy + ke;
 }
-#endif  // _GPU_

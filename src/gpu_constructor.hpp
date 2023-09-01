@@ -57,6 +57,8 @@
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
 #include "fluxes.hpp"
+#include "lte_mixture.hpp"
+#include "lte_transport_properties.hpp"
 #include "mixing_length_transport.hpp"
 #include "radiation.hpp"
 #include "riemann_solver.hpp"
@@ -95,6 +97,11 @@ __global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int 
 //! Instantiate PerfectMixture object on the device with placement new
 __global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, void *mix);
 
+//! Instantiate LteMixture object on the device with placement new
+__global__ void instantiateDeviceLteMixture(WorkingFluid f, int _dim, int nvel, double pc,
+                                            TableInput energy_table_input, TableInput R_table_input,
+                                            TableInput c_table_input, TableInput T_table_input, void *mix);
+
 //! Instantiate DryAirTransport object on the device with placement new
 __global__ void instantiateDeviceDryAirTransport(GasMixture *mixture, const double viscosity_multiplier,
                                                  const double bulk_viscosity, const double C1, const double S0,
@@ -111,6 +118,10 @@ __global__ void instantiateDeviceArgonMinimalTransport(GasMixture *mixture, cons
 //! Instantiate ArgonMixtureTransport object on the device with placement new
 __global__ void instantiateDeviceArgonMixtureTransport(GasMixture *mixture, const ArgonTransportInput inputs,
                                                        void *trans);
+
+//! Instantiate ConstantTransport object on the device with placement new
+__global__ void instantiateDeviceLteTransport(GasMixture *mixture, TableInput mu_table_input,
+                                              TableInput kappa_table_input, TableInput sigma_table_input, void *trans);
 
 //! Instantiate MixingLengthTransport object on the device with placement new
 __global__ void instantiateDeviceMixingLengthTransport(GasMixture *mixture, const mixingLengthTransportData inputs,

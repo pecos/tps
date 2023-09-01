@@ -369,15 +369,16 @@ void M2ulPhyS::initVariables() {
       }
       break;
     case WorkingFluid::LTE_FLUID:
-#if defined(_GPU_)
-      mfem_error("LTE_FLUID not supported for GPU.");
-#else
       int table_dim;
       tpsP->getInput("flow/lte/table_dim", table_dim, 2);
       if (table_dim == 2) {
+#if defined(_GPU_)
+        mfem_error("LTE_FLUID with 2D lookup tables not supported for GPU.");
+#else
         // for 2D case, table read happens internally to LteMixture and LteTransport
         mixture = new LteMixture(config, dim, nvel);
         transportPtr = new LteTransport(mixture, config);
+#endif
       } else if (table_dim == 1) {
         MPI_Comm TPSCommWorld = this->groupsMPI->getTPSCommWorld();
 
@@ -396,9 +397,25 @@ void M2ulPhyS::initVariables() {
                                               TPSCommWorld, thermo_data, thermo_tables);
         if (!success) exit(ERROR);
 
-        // Instantiate LteMixture object
+        // Construct e -> T table from T -> e
+        TableInput T_table_input;
+        T_table_input.order = 1;
+        T_table_input.xLogScale = false;
+        T_table_input.fLogScale = false;
+        T_table_input.xdata = thermo_tables[0].fdata;
+        T_table_input.fdata = thermo_tables[0].xdata;
+
+        // LteMixture object valid on host
         mixture = new LteMixture(config.lteMixtureInput.f, dim, nvel, config.const_plasma_conductivity_,
-                                 thermo_tables[0], thermo_tables[1], thermo_tables[2]);
+                                 thermo_tables[0], thermo_tables[1], thermo_tables[2], T_table_input);
+
+#if defined(_CUDA_) || defined(_HIP_)
+        // LteMixture object valid on device
+        tpsGpuMalloc((void **)(&d_mixture), sizeof(LteMixture));
+        gpu::instantiateDeviceLteMixture<<<1, 1>>>(config.lteMixtureInput.f, dim, nvel,
+                                                   config.const_plasma_conductivity_, thermo_tables[0],
+                                                   thermo_tables[1], thermo_tables[2], T_table_input, d_mixture);
+#endif
 
         // Initialize transport TableInput (data read below)
         std::vector<TableInput> trans_tables(3);
@@ -415,12 +432,17 @@ void M2ulPhyS::initVariables() {
                                               TPSCommWorld, trans_data, trans_tables);
         if (!success) exit(ERROR);
 
-        // Instantiate LteTransport class
+          // Instantiate LteTransport class
+#if defined(_CUDA_) || defined(_HIP_)
+        tpsGpuMalloc((void **)&transportPtr, sizeof(LteTransport));
+        gpu::instantiateDeviceLteTransport<<<1, 1>>>(d_mixture, trans_tables[0], trans_tables[1], trans_tables[2],
+                                                     transportPtr);
+#else
         transportPtr = new LteTransport(mixture, trans_tables[0], trans_tables[1], trans_tables[2]);
+#endif
       } else {
         mfem_error("flow/lte/table_dim must be 1 or 2.");
       }
-#endif
       break;
     default:
       mfem_error("WorkingFluid not recognized.");

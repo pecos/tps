@@ -44,8 +44,6 @@
 #include "table.hpp"
 #include "tps_mfem_wrap.hpp"
 
-#ifndef _GPU_  // this class only available for CPU currently
-
 /** \brief Mixture class assuming local thermodynamic equilibrium
  *
  * If the gas or plasma is in local thermodynamic equilibrium, then
@@ -58,52 +56,74 @@
  */
 class LteMixture : public GasMixture {
  private:
+#ifdef _GPU_
+  // On the device path, we only support LinearTable
+  LinearTable energy_table_;
+  LinearTable R_table_;
+  LinearTable c_table_;
+  LinearTable T_table_;
+#else
+  // On the cpu path, simultaneously support LinearTable and GslTableInterpolator2D
   TableInterface *energy_table_;
   TableInterface *R_table_;
   TableInterface *c_table_;
-
-  // This table is used to get a good IC for the Newton solve when
-  // evaluating the temperature from the converved variables.
   TableInterface *T_table_;
+#endif
+
+  MFEM_HOST_DEVICE bool ComputeTemperatureInternal(const double *state, double &T);
 
  public:
+  MFEM_HOST_DEVICE LteMixture(WorkingFluid f, int _dim, int nvel, double pc, TableInput energy_table_input,
+                              TableInput R_table_input, TableInput c_table_input, TableInput T_table_input);
+#ifndef _GPU_
   LteMixture(RunConfiguration &_runfile, int _dim, int nvel);
-  LteMixture(WorkingFluid f, int _dim, int nvel, double pc, TableInput energy_table_input, TableInput R_table_input,
-             TableInput c_table_input);
+#endif
 
-  virtual ~LteMixture();
+  MFEM_HOST_DEVICE virtual ~LteMixture();
 
-  double evaluateInternalEnergy(const double &T, const double &rho) { return energy_table_->eval(T, rho); }
-  double evaluateGasConstant(const double &T, const double &rho) { return R_table_->eval(T, rho); }
+  MFEM_HOST_DEVICE double evaluateInternalEnergy(const double &T, const double &rho) {
+#ifdef _GPU_
+    return energy_table_.eval(T, rho);
+#else
+    return energy_table_->eval(T, rho);
+#endif
+  }
+  MFEM_HOST_DEVICE double evaluateGasConstant(const double &T, const double &rho) {
+#ifdef _GPU_
+    return R_table_.eval(T, rho);
+#else
+    return R_table_->eval(T, rho);
+#endif
+  }
 
   virtual double ComputePressure(const Vector &state, double *electronPressure = NULL);
-  virtual double ComputePressure(const double *state, double *electronPressure = NULL);
+  MFEM_HOST_DEVICE virtual double ComputePressure(const double *state, double *electronPressure = NULL);
 
   virtual double ComputePressureFromPrimitives(const Vector &Up);
-  virtual double ComputePressureFromPrimitives(const double *Up);
+  MFEM_HOST_DEVICE virtual double ComputePressureFromPrimitives(const double *Up);
 
   virtual double ComputeTemperature(const Vector &state);
-  virtual double ComputeTemperature(const double *state);
+  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state);
 
-  double ComputeTemperatureFromDensityPressure(const double rho, const double p);
+  MFEM_HOST_DEVICE double ComputeTemperatureFromDensityPressure(const double rho, const double p);
 
   virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies);
-  virtual void computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies) {
+  MFEM_HOST_DEVICE virtual void computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies) {
     for (int sp = 0; sp < numSpecies; sp++) speciesEnthalpies[sp] = 0.0;
     return;
   }
 
   virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit);
-  virtual void GetPrimitivesFromConservatives(const double *conserv, double *primit);
+  MFEM_HOST_DEVICE virtual void GetPrimitivesFromConservatives(const double *conserv, double *primit);
 
   virtual void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv);
-  virtual void GetConservativesFromPrimitives(const double *primit, double *conserv);
+  MFEM_HOST_DEVICE virtual void GetConservativesFromPrimitives(const double *primit, double *conserv);
 
   virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true);
-  virtual double ComputeSpeedOfSound(const double *Uin, bool primitive = true);
+  MFEM_HOST_DEVICE virtual double ComputeSpeedOfSound(const double *Uin, bool primitive = true);
 
   virtual double ComputeMaxCharSpeed(const Vector &state);
-  virtual double ComputeMaxCharSpeed(const double *state);
+  MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeed(const double *state);
 
   /// only used in non-reflecting BCs... don't implement for now
   virtual double ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive = true);
@@ -119,24 +139,25 @@ class LteMixture : public GasMixture {
                                            DenseMatrix &moleFractionGrad) {
     mfem_error("computeMoleFractionGradient not implemented");
   }
-  virtual void ComputeMoleFractionGradient(const double *numberDensities, const double *gradUp,
-                                           double *moleFractionGrad) {
+  MFEM_HOST_DEVICE virtual void ComputeMoleFractionGradient(const double *numberDensities, const double *gradUp,
+                                                            double *moleFractionGrad) {
     printf("computeMoleFractionGradient not implemented");
     assert(false);
   }
 
-  virtual double GetSpecificHeatRatio() { return 0; }
-  virtual double GetGasConstant() { return 0; }
+  MFEM_HOST_DEVICE virtual double GetSpecificHeatRatio() { return 0; }
+  MFEM_HOST_DEVICE virtual double GetGasConstant() { return 0; }
 
   // BC related functions
   virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut);
-  virtual void computeStagnantStateWithTemp(const double *stateIn, const double Temp, double *stateOut);
+  MFEM_HOST_DEVICE virtual void computeStagnantStateWithTemp(const double *stateIn, const double Temp,
+                                                             double *stateOut);
 
   virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p,
                                        bool modifyElectronEnergy = false);
 
-  virtual void modifyEnergyForPressure(const double *stateIn, double *stateOut, const double &p,
-                                       bool modifyElectronEnergy = false);
+  MFEM_HOST_DEVICE virtual void modifyEnergyForPressure(const double *stateIn, double *stateOut, const double &p,
+                                                        bool modifyElectronEnergy = false);
 
   virtual void computeSheathBdrFlux(const Vector &state, BoundaryViscousFluxData &bcFlux) {
     mfem_error("computeSheathBdrFlux not implemented");
@@ -154,11 +175,11 @@ class LteMixture : public GasMixture {
                                            Vector &gradPe) {
     mfem_error("computeElectronPressureGrad not implemented");
   }
-  virtual void computeElectronPressureGrad(const double n_e, const double T_e, const double *gradUp, double *gradPe) {
+  MFEM_HOST_DEVICE virtual void computeElectronPressureGrad(const double n_e, const double T_e, const double *gradUp,
+                                                            double *gradPe) {
     printf("computeElectronPressureGrad not implemented");
     assert(false);
   }
 };
 
-#endif  // _GPU_
 #endif  // LTE_MIXTURE_HPP_

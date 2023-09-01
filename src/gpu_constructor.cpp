@@ -50,6 +50,12 @@ __global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs
   mix = new (mix) PerfectMixture(inputs, _dim, nvel);
 }
 
+__global__ void instantiateDeviceLteMixture(WorkingFluid f, int _dim, int nvel, double pc,
+                                            TableInput energy_table_input, TableInput R_table_input,
+                                            TableInput c_table_input, TableInput T_table_input, void *mix) {
+  mix = new (mix) LteMixture(f, _dim, nvel, pc, energy_table_input, R_table_input, c_table_input, T_table_input);
+}
+
 __global__ void instantiateDeviceDryAirTransport(GasMixture *mixture, const double viscosity_multiplier,
                                                  const double bulk_viscosity, const double C1, const double S0,
                                                  const double Pr, void *transport) {
@@ -67,6 +73,11 @@ __global__ void instantiateDeviceArgonMinimalTransport(GasMixture *mixture, cons
 __global__ void instantiateDeviceArgonMixtureTransport(GasMixture *mixture, const ArgonTransportInput inputs,
                                                        void *trans) {
   trans = new (trans) ArgonMixtureTransport(mixture, inputs);
+}
+
+__global__ void instantiateDeviceLteTransport(GasMixture *mixture, TableInput mu_table_input,
+                                              TableInput kappa_table_input, TableInput sigma_table_input, void *trans) {
+  trans = new (trans) LteTransport(mixture, mu_table_input, kappa_table_input, sigma_table_input);
 }
 
 __global__ void instantiateDeviceMixingLengthTransport(GasMixture *mixture, const mixingLengthTransportData inputs,

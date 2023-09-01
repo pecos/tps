@@ -43,8 +43,6 @@
 #include "table.hpp"
 #include "transport_properties.hpp"
 
-#ifndef _GPU_  // this class only available for CPU currently
-
 /** \brief Transport class assuming local thermodynamic equilibrium
  *
  * If the gas or plasma is in local thermodynamic equilibrium, then
@@ -56,16 +54,24 @@
  */
 class LteTransport : public MolecularTransport {
  protected:
+#ifdef _GPU_
+  LinearTable mu_table_;     // dynamic viscosity
+  LinearTable kappa_table_;  // thermal conductivity
+  LinearTable sigma_table_;  // electrical conductivity
+#else
   TableInterface *mu_table_;     // dynamic viscosity
   TableInterface *kappa_table_;  // thermal conductivity
   TableInterface *sigma_table_;  // electrical conductivity
+#endif
 
  public:
+#ifndef _GPU_
   LteTransport(GasMixture *_mixture, RunConfiguration &_runfile);
-  LteTransport(GasMixture *_mixture, TableInput mu_table_input, TableInput kappa_table_input,
-               TableInput sigma_table_input);
+#endif
+  MFEM_HOST_DEVICE LteTransport(GasMixture *_mixture, TableInput mu_table_input, TableInput kappa_table_input,
+                                TableInput sigma_table_input);
 
-  virtual ~LteTransport();
+  MFEM_HOST_DEVICE virtual ~LteTransport();
 
   MFEM_HOST_DEVICE void ComputeFluxMolecularTransport(const double *state, const double *gradUp, const double *Efield,
                                                       double *transportBuffer, double *diffusionVelocity) final;
@@ -78,5 +84,4 @@ class LteTransport : public MolecularTransport {
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) final;
 };
 
-#endif  // _GPU_
 #endif  // LTE_TRANSPORT_PROPERTIES_HPP_

@@ -33,7 +33,6 @@
 #include "lte_transport_properties.hpp"
 
 #ifndef _GPU_
-
 LteTransport::LteTransport(GasMixture *_mixture, RunConfiguration &_runfile) : MolecularTransport(_mixture) {
 #ifdef HAVE_GSL
   mu_table_ = new GslTableInterpolator2D(_runfile.lteMixtureInput.trans_file_name, 0, /* temperature column */
@@ -55,7 +54,7 @@ LteTransport::LteTransport(GasMixture *_mixture, RunConfiguration &_runfile) : M
   kappa_table_ = NULL;
   sigma_table_ = NULL;
   mfem_error("2D LTE transport tables require GSL support.");
-#endif
+#endif  // HAVE_GSL
 }
 
 LteTransport::LteTransport(GasMixture *_mixture, TableInput mu_table_input, TableInput kappa_table_input,
@@ -65,30 +64,51 @@ LteTransport::LteTransport(GasMixture *_mixture, TableInput mu_table_input, Tabl
   kappa_table_ = new LinearTable(kappa_table_input);
   sigma_table_ = new LinearTable(sigma_table_input);
 }
+#else
+MFEM_HOST_DEVICE LteTransport::LteTransport(GasMixture *_mixture, TableInput mu_table_input,
+                                            TableInput kappa_table_input, TableInput sigma_table_input)
+    : MolecularTransport(_mixture),
+      mu_table_(LinearTable(mu_table_input)),
+      kappa_table_(LinearTable(kappa_table_input)),
+      sigma_table_(LinearTable(sigma_table_input)) {}
+#endif  // _GPU_
 
-LteTransport::~LteTransport() {
+MFEM_HOST_DEVICE LteTransport::~LteTransport() {
+#ifndef _GPU_
   delete sigma_table_;
   delete kappa_table_;
   delete mu_table_;
+#endif
 }
 
-void LteTransport::ComputeFluxMolecularTransport(const double *state, const double *gradUp, const double *Efield,
-                                                 double *transportBuffer, double *diffusionVelocity) {
+MFEM_HOST_DEVICE void LteTransport::ComputeFluxMolecularTransport(const double *state, const double *gradUp,
+                                                                  const double *Efield, double *transportBuffer,
+                                                                  double *diffusionVelocity) {
   const double rho = state[0];
   const double T = mixture->ComputeTemperature(state);
 
+#ifdef _GPU_
+  transportBuffer[FluxTrns::VISCOSITY] = mu_table_.eval(T, rho);
+  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = kappa_table_.eval(T, rho);
+#else
   transportBuffer[FluxTrns::VISCOSITY] = mu_table_->eval(T, rho);
-  transportBuffer[FluxTrns::BULK_VISCOSITY] = 0.0;  // bulk_visc_mult * viscosity;
   transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = kappa_table_->eval(T, rho);
+#endif
+  transportBuffer[FluxTrns::BULK_VISCOSITY] = 0.0;                 // bulk_visc_mult * viscosity;
   transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] = 0.0;  // electron conductivity already accounted for
 }
 
-void LteTransport::ComputeSourceMolecularTransport(const double *state, const double *Up, const double *gradUp,
-                                                   const double *Efield, double *globalTransport,
-                                                   double *speciesTransport, double *diffusionVelocity, double *n_sp) {
+MFEM_HOST_DEVICE void LteTransport::ComputeSourceMolecularTransport(const double *state, const double *Up,
+                                                                    const double *gradUp, const double *Efield,
+                                                                    double *globalTransport, double *speciesTransport,
+                                                                    double *diffusionVelocity, double *n_sp) {
   const double rho = Up[0];
   const double T = Up[1 + nvel_];
+#ifdef _GPU_
+  double sigma = sigma_table_.eval(T, rho);
+#else
   double sigma = sigma_table_->eval(T, rho);
+#endif
 
   if (sigma < 1.0) {
     sigma = 1.0;
@@ -96,12 +116,15 @@ void LteTransport::ComputeSourceMolecularTransport(const double *state, const do
   globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] = sigma;
 }
 
-void LteTransport::GetViscosities(const double *conserved, const double *primitive, double *visc) {
+MFEM_HOST_DEVICE void LteTransport::GetViscosities(const double *conserved, const double *primitive, double *visc) {
   const double rho = primitive[0];
   const double T = primitive[1 + nvel_];
 
+#ifdef _GPU_
+  visc[0] = mu_table_.eval(T, rho);
+#else
   visc[0] = mu_table_->eval(T, rho);
+#endif
+
   visc[1] = 0.;
 }
-
-#endif  // _GPU_
