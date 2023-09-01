@@ -273,13 +273,14 @@ protected:
    const int defaultPartMethod = 1;  
   
    // temporary
-  double Re_tau, Pr, Cp, gamma;
+   double Re_tau, Pr, Cp, gamma;
   
    /// Kinematic viscosity (dimensionless).
    double kin_vis;
 
    // make everything dimensionless after generalizing form channel
-   double ambientPressure, static_rho, Rgas;  
+   double ambientPressure, thermoPressure, static_rho, Rgas, systemMass;
+   double tPm1, tPm2, dtP;
 
    IntegrationRules gll_rules;
 
@@ -330,6 +331,7 @@ protected:
    ParLinearForm *FText_bdr_form = nullptr;
    ParLinearForm *f_form = nullptr;
    ParLinearForm *g_bdr_form = nullptr;
+   ParLinearForm *gravity_form = nullptr;  
 
    // temperature
    ParBilinearForm *Mt_form = nullptr;
@@ -363,10 +365,12 @@ protected:
   
    ParGridFunction *bufferInvRho;  
    ParGridFunction *bufferVisc;
+   //ParGridFunction *bufferGravity;  
    ParGridFunction *bufferAlpha;
    ParGridFunction *bufferTemp;
    ParGridFunction *bufferPM0;      
    ParGridFunction *bufferPM1;
+   //GridFunctionCoefficient *bousField;    
    GridFunctionCoefficient *viscField;  
    GridFunctionCoefficient *invRho;
    GridFunctionCoefficient *alphaField;
@@ -410,6 +414,8 @@ protected:
    Vector resu, tmpR1, tmpR1b, tmpR1c;
    Vector FBext;
    Vector divU, Qt;
+   Vector gravity;
+   Vector boussinesqField;
 
    Vector bufferR0sml, bufferR1sml;
 
@@ -470,6 +476,9 @@ protected:
    // Bookkeeping for acceleration (forcing) terms.
    std::vector<AccelTerm_T> accel_terms;
 
+   // Bookkeeping for gravity (forcing) terms.
+   std::vector<AccelTerm_T> gravity_terms;
+  
    //int max_bdf_order = 3;
    int max_bdf_order = 2;
    //int max_bdf_order = 1;
@@ -712,6 +721,10 @@ public:
    void AddAccelTerm(VectorCoefficient *coeff, Array<int> &attr);
    void AddAccelTerm(VecFuncT *f, Array<int> &attr);
 
+   /// Add an Boussinesq term to the RHS of the equation.
+   void AddGravityTerm(VectorCoefficient *coeff, Array<int> &attr);
+   void AddGravityTerm(VecFuncT *g, Array<int> &attr);
+  
    /// Enable partial assembly for every operator.
    void EnablePA(bool pa) { partial_assembly = pa; }
 
