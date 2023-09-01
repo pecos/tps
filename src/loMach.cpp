@@ -135,7 +135,11 @@ void LoMachSolver::initialize() {
 
    static_rho = config.const_dens;
    kin_vis = config.const_visc;
-   ambientPressure = config.amb_pres;   
+   ambientPressure = config.amb_pres;
+   thermoPressure = config.amb_pres;
+   tPm1 = thermoPressure;
+   tPm2 = thermoPressure;
+   dtP = 0.0;
 
    // get for dry air
    Rgas = 287.0;
@@ -554,6 +558,9 @@ void LoMachSolver::initialize() {
    int nfesR0_truevsize = nfesR0->GetTrueVSize();   
    int rfes_truevsize = rfes->GetTrueVSize();   
    if (verbose) grvy_printf(ginfo, "Got sizes...\n");   
+
+   gravity.SetSize(3);
+   gravity = 0.0;
    
    un.SetSize(vfes_truevsize);
    un = 0.0;
@@ -600,6 +607,8 @@ void LoMachSolver::initialize() {
    tmpR1b.SetSize(vfes_truevsize);
    tmpR1c.SetSize(vfes_truevsize);
 
+   boussinesqField.SetSize(vfes_truevsize);
+   boussinesqField = 0.0;   
    divU.SetSize(tfes_truevsize);
    divU = 0.0;
    Qt.SetSize(tfes_truevsize);
@@ -871,6 +880,7 @@ void LoMachSolver::Setup(double dt)
    domain_attr = 1;
    //AddAccelTerm(accel, domain_attr); // HERE wire to input file config.gradPress[3]
 
+   // add mean pressure gradient term
    Vector accel_vec(3);
    if ( config.isForcing ) {
      for (int i = 0; i < nvel; i++) { accel_vec[i] = config.gradPress[i]; }
@@ -881,8 +891,9 @@ void LoMachSolver::Setup(double dt)
    AddAccelTerm(buffer_accel, domain_attr);
    if (rank0_ ) {
      std::cout << " Acceleration: " << accel_vec[0] << " " << accel_vec[1] << " " << accel_vec[2] << endl;
-   }   
+   }
    
+   // velocity bc
    Vector zero_vec(3); zero_vec = 0.0;
    Array<int> attr(pmesh->bdr_attributes.Max());
    attr = 0.0;
@@ -899,7 +910,8 @@ void LoMachSolver::Setup(double dt)
    //for (int i = 0; i < config.wallPatchType.size(); i++) {
    for (int i = 0; i < numWalls; i++) {
      for (int iFace = 1; iFace < pmesh->bdr_attributes.Max()+1; iFace++) {     
-       if (config.wallPatchType[i].second != WallType::INV) {
+       //if (config.wallPatchType[i].second != WallType::INV) { 
+       if (config.wallPatchType[i].second == WallType::VISC_ISOTH) {	   
 	 //std::cout << " wall check " << i << " " << iFace << " " << config.wallPatchType[i].first << endl;
          if (iFace == config.wallPatchType[i].first) {
             attr[iFace-1] = 1;	 
@@ -982,6 +994,43 @@ void LoMachSolver::Setup(double dt)
    const IntegrationRule &ir_pi = gll_rules.Get(pfes->GetFE(0)->GetGeomType(), 2 * porder);   
    const IntegrationRule &ir_i  = gll_rules.Get(tfes->GetFE(0)->GetGeomType(), 2 * order);
    //std::cout << "Check 6..." << std::endl;     
+
+
+   // add gravitational term term
+   Vector gravity(3);
+   if ( config.isGravity ) {
+     for (int i = 0; i < nvel; i++) { gravity[i] = config.gravity[i]; }
+   } else {
+     for (int i = 0; i < nvel; i++) { gravity[i] = 0.0; }     
+   }
+   /*
+   bufferGravity = new ParGridFunction(vfes);   
+   {
+     double *data = bufferGravity->HostReadWrite();
+     double *Tdata = Tn_gf.HostReadWrite();
+     for (int eq = 0; eq < nvel; eq++) {     
+       for (int i = 0; i < Tdof; i++) {
+  	 data[i] = ambientPressure / (Rgas * Tdata[i]) * gravity[eq];
+       }       
+     }
+   }   
+   bousField = new GridFunctionCoefficient(bufferGravity);
+   AddGravityTerm(bousField, domain_attr);
+   if (rank0_ ) {
+     std::cout << " Gravity: " << gravity_vec[0] << " " << gravity_vec[1] << " " << gravity_vec[2] << endl;
+   }   
+   gravity_form = new ParLinearForm(vfes);
+   for (auto &gravity_term : gravity_terms)
+   {
+      auto *grvdlfi = new VectorDomainLFIntegrator(*bousField);
+      if (numerical_integ)
+      {
+         grvdlfi->SetIntRule(&ir_ni);
+      }
+      gravity_form->AddDomainIntegrator(grvdlfi);
+   }
+   */
+
    
    // convection section, extrapolation
    nlcoeff.constant = -1.0; // starts with negative
@@ -1726,6 +1775,8 @@ void LoMachSolver::solve()
    ParGridFunction *p_gf = GetCurrentPressure();
    ParGridFunction *t_gf = GetCurrentTemperature();
 
+   int TdofInt = tfes->GetTrueVSize();
+   
   // dt_fixed is initialized to -1, so if it is positive, then the
   // user requested a fixed dt run
   const double dt_fixed = config.GetFixedDT();
@@ -1774,9 +1825,24 @@ void LoMachSolver::solve()
    if( rank0_ == true ) std::cout << " Saving first step to paraview: " << iter << endl;
    /**/
 
+   // if closed, mass is constant
+   if (config.isOpen != true) {
+     systemMass = 0.0;
+     double myMass = 0.0;
+     double *Tdata = Tn.HostReadWrite();
+     double *Rdata = rn.HostReadWrite();          
+     for (int i = 0; i < TdofInt; i++) {
+       Rdata[i] = thermoPressure / (Rgas * Tdata[i]);
+     }
+     Mt->Mult(rn,tmpR0);
+     for (int i = 0; i < TdofInt; i++) {
+       myMass += tmpR0[i];
+     }     
+     MPI_Allreduce(&myMass, &systemMass, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+     if( rank0_ == true ) std::cout << " Closed system mass: " << systemMass << " [kg]" << endl;     
+   }      
    
    int iter_start = iter;
-   //MaxIters = 5000;
    if( rank0_ == true ) std::cout << " Starting main loop, from " << iter_start << " to " << MaxIters << endl;
    
    for (int step = iter_start; step <= MaxIters; step++)
@@ -1933,7 +1999,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    
    //std::cout << "Check a..." << std::endl;
    SetTimeIntegrationCoefficients(current_step-start_step);
-
+   
    // extrapolated temp at {n+1}
    {
       const auto d_Tn = Tn.Read();
@@ -1969,10 +2035,14 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      double *data = rn.HostWrite();        
      double *Tdata = Text.HostReadWrite();
      for (int i = 0; i < TdofInt; i++) {
-         data[i] = ambientPressure / (Rgas * Tdata[i]);
+         data[i] = thermoPressure / (Rgas * Tdata[i]);
      }
    }   
 
+   // thermodynamic pressure for closed systems
+   if (config.isOpen != true) {     
+   }
+   
    // Set current time for velocity Dirichlet boundary conditions.
    for (auto &vel_dbc : vel_dbcs) {vel_dbc.coeff->SetTime(time + dt);}
 
@@ -2004,7 +2074,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
          transportPtr->GetViscosities(prim, prim, visc); // returns dynamic
 
 	 // kinematic needed for lhs of momentum
-         dataVisc[i] = visc[0] * (Rgas * Tdata[i]) / ambientPressure;
+         dataVisc[i] = visc[0] * (Rgas * Tdata[i]) / thermoPressure;
 	 //dataVisc[i] = kin_vis;
 
      }
@@ -2037,6 +2107,18 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    f_form->Assemble();
    f_form->ParallelAssemble(fn);
    //std::cout << "Check f..." << std::endl;      
+
+   // gravity term
+   {
+     double *data = tmpR1.HostReadWrite();
+     double *Rdata = rn.HostReadWrite();
+     for (int eq = 0; eq < nvel; eq++) {     
+       for (int i = 0; i < TdofInt; i++) {
+  	 data[i + eq*TdofInt] = Rdata[i] * gravity[eq];
+       }       
+     }
+   }
+   Mv->Mult(tmpR1,boussinesqField);
    
    // Nonlinear extrapolated terms (convection: N*(n+1))
    sw_extrap.Start();
@@ -2108,7 +2190,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    //std::cout << "Check j..." << std::endl;
       
    // add forcing/accel term to Fext   
-   Fext.Add(1.0, fn);  // negative on rhs
+   Fext.Add(1.0, fn);
+   Fext.Add(1.0, boussinesqField);
 
    // Fext = M^{-1} (F(u^{n}) + f^{n+1}) (F* w/o known part of BDF)
    MvInv->Mult(Fext, tmpR1); // conditional jump
@@ -2357,7 +2440,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      // laplace(T) => should be T{n+1}, move T-solve before u?
      Lt->Mult(Text,tmpR0);
      MtInv->Mult(tmpR0, Qt);
-
+     
      // multiple lapl(T) to get correct units
      // nabla(T) -> div(u): k/P = Cp*mu/Pr * 1/P
      {
@@ -2365,10 +2448,18 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
        double *Mdata = viscSml.HostReadWrite();       
        double *data = Qt.HostReadWrite();     
        for (int i = 0; i < TdofInt; i++) {
-         data[i] *= Cp * Mdata[i] / (Pr*ambientPressure);
+         data[i] *= Cp * Mdata[i] / (Pr*thermoPressure);
        }
      }
-          
+
+     // add closed-domain pressure term
+     if (config.isOpen != true) {
+       double *data = Qt.HostReadWrite();     
+       for (int i = 0; i < TdofInt; i++) {
+         data[i] += ((gamma - 1.0)/gamma - Cp) * 1.0 / (Cp*thermoPressure) * dtP;
+       }       
+     }
+     
      G->Mult(Qt, tmpR1);
      MvInv->Mult(tmpR1, tmpR1b);
      /**/
@@ -2431,7 +2522,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      double *data = FText.HostReadWrite();     
      double *Tdata = Tn.HostReadWrite();
      for (int i = 0; i < TdofInt; i++) {     
-       data[i] *= ambientPressure / (Rgas * Tdata[i]);
+       data[i] *= thermoPressure / (Rgas * Tdata[i]);
      }
    } else {
      double *data = FText.HostReadWrite();     
@@ -2584,7 +2675,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      double *data = resu.HostReadWrite();     
      double *Tdata = Tn.HostReadWrite();
      for (int i = 0; i < TdofInt; i++) {     
-       data[i] *=  (Rgas * Tdata[i]) / ambientPressure;       
+       data[i] *=  (Rgas * Tdata[i]) / thermoPressure;       
      }
    } else {
      double *data = resu.HostReadWrite();     
@@ -2907,6 +2998,26 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    }
    */
 
+   // update thermodynamic pressure
+   if (config.isOpen != true) {     
+     double myInvT = 0.0;
+     double systemInvT = 0.0;     
+     double *Tdata = Tn.HostReadWrite();
+     double *data = tmpR0.HostReadWrite();     
+     for (int i = 0; i < TdofInt; i++) {
+       data[i] = 1.0 / (Tdata[i]);
+     }
+     Mt->Mult(tmpR0,tmpR0b);
+     for (int i = 0; i < TdofInt; i++) {
+       myInvT += tmpR0b[i];
+     }     
+     MPI_Allreduce(&myInvT, &systemInvT, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+     tPm2 = tPm1;     
+     tPm1 = thermoPressure;
+     thermoPressure = Rgas * systemMass / systemInvT;
+     dtP = 1.5*thermoPressure - 2.0*tPm1 + 0.5*tPm2;
+     dtP = dtP / dt;
+   }      
 
    
    if (verbose && pmesh->GetMyRank() == 0)
@@ -3582,6 +3693,26 @@ void LoMachSolver::AddAccelTerm(VecFuncT *f, Array<int> &attr)
    AddAccelTerm(new VectorFunctionCoefficient(pmesh->Dimension(), f), attr);
 }
 
+void LoMachSolver::AddGravityTerm(VectorCoefficient *coeff, Array<int> &attr)
+{
+   gravity_terms.emplace_back(attr, coeff);
+
+   if (verbose && pmesh->GetMyRank() == 0)
+   {
+      mfem::out << "Adding Gravity term to attributes ";
+      for (int i = 0; i < attr.Size(); ++i)
+      {
+         if (attr[i] == 1) { mfem::out << i << " "; }
+      }
+      mfem::out << std::endl;
+   }
+}
+
+void LoMachSolver::AddGravityTerm(VecFuncT *g, Array<int> &attr)
+{
+   AddGravityTerm(new VectorFunctionCoefficient(pmesh->Dimension(), g), attr);
+}
+
 
 void LoMachSolver::SetTimeIntegrationCoefficients(int step)
 {
@@ -3900,11 +4031,18 @@ void LoMachSolver::parseFlowOptions() {
   tpsP_->getInput("loMach/constantViscosity", config.const_visc, -1.0);
   tpsP_->getInput("loMach/constantDensity", config.const_dens, -1.0);
   tpsP_->getInput("loMach/ambientPressure", config.amb_pres, 101325.0);  
+  tpsP_->getInput("loMach/openSystem", config.isOpen, true);
   
   tpsP_->getInput("loMach/enablePressureForcing", config.isForcing, false);
   if (config.isForcing) {
     for (int d = 0; d < 3; d++) tpsP_->getRequiredVecElem("loMach/pressureGrad", config.gradPress[d], d);
   }
+
+  tpsP_->getInput("loMach/enableGravity", config.isGravity, false);
+  if (config.isGravity) {
+    for (int d = 0; d < 3; d++) tpsP_->getRequiredVecElem("loMach/gravity", config.gravity[d], d);
+  }
+  
   tpsP_->getInput("loMach/refinement_levels", config.ref_levels, 0);
   tpsP_->getInput("loMach/computeDistance", config.compute_distance, false);
 

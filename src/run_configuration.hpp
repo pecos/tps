@@ -169,9 +169,16 @@ class RunConfiguration {
   // initial constant field
   double initRhoRhoVp[5];
 
+  // Imposed pressure gradient  
   bool isForcing;
-  // Imposed pressure gradient
   double gradPress[3];
+
+  // Boussinesq term
+  bool isGravity; 
+  double gravity[3];
+
+  // closed or open system
+  bool isOpen;  
 
   // loMach specific additions  
   double amb_pres, const_visc, const_dens;  
