@@ -1110,8 +1110,6 @@ void M2ulPhyS::initIndirectionArrays() {
     auto h_rbf_to_abf = bdry_face_data.rbf_to_abf.HostWrite();
 
     for (size_t i = 0; i < rbf_to_abf.size(); i++) {
-      printf("iface = %d, true_face = %d\n", i, rbf_to_abf[i]);
-      fflush(stdout);
       h_rbf_to_abf[i] = rbf_to_abf[i];
     }
 
@@ -1402,7 +1400,6 @@ void M2ulPhyS::initIndirectionBC() {
             WallBC *wbc = dynamic_cast<WallBC *>(wbci->second);
             WallType wt = wbc->getType();
             if (wt == VISC_ISOTH) {
-              printf("Using BC in Gradient!\n");
               fflush(stdout);
               h_use_bc_in_grad[f] = true;
               h_wall_bc_temperature[f] = wbc->getWallTemp();
