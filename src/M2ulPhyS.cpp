@@ -2683,6 +2683,7 @@ void M2ulPhyS::parseIOSettings() {
   tpsP->getInput("io/enableRestart", config.restart, false);
   tpsP->getInput("io/restartFromLTE", config.restartFromLTE, false);
   tpsP->getInput("io/exitCheckFreq", config.exit_checkFrequency_, 500);
+  assert(config.exit_checkFrequency_ > 0);
 
   std::string restartMode;
   tpsP->getInput("io/restartMode", restartMode, std::string("standard"));
