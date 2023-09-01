@@ -646,20 +646,20 @@ void M2ulPhyS::initVariables() {
   }
 
   // Determine domain bounding box size
-  Vector coordsVert(dfes);
+  ParGridFunction coordsVert(dfes);
   mesh->GetVertices(coordsVert);
   int nVert = coordsVert.Size() / dim;
   {
-    double local_xmin = 1.0e18;
-    double local_ymin = 1.0e18;
-    double local_zmin = 1.0e18;
-    double local_xmax = -1.0e-15;
-    double local_ymax = -1.0e-15;
-    double local_zmax = -1.0e-15;
+    local_xmin = 1.0e18;
+    local_ymin = 1.0e18;
+    local_zmin = 1.0e18;
+    local_xmax = -1.0e-15;
+    local_ymax = -1.0e-15;
+    local_zmax = -1.0e-15;
     for (int n = 0; n < nVert; n++) {
       auto hcoords = coordsVert.HostRead();
       double coords[3];
-      for (int d = 0; d < dim; d++) { coords[d] = hcoords[n + d * nVerts]; }
+      for (int d = 0; d < dim; d++) { coords[d] = hcoords[n + d * nVert]; }
       local_xmin = min(coords[0], local_xmin);
       local_ymin = min(coords[1], local_ymin);
       if (dim == 3) {
@@ -1996,9 +1996,54 @@ void M2ulPhyS::solveStep() {
         }
       }
 
+      // create subcomm for ranks owning part of plane => not prefect for not clean partitions
+      /*
+      int havePlane = 0;
+      int nPlaneRanks = 0;
+      int nRanks;
+      MPI_Group planeGroup;      
+      MPI_Comm MPI_COMM_PLANE;
+      for (int i = 0; i < nPts*nPts; i++) {
+	if ( (vxyz[i + 0*nPts*nPts] >= local_xmin) && (vxyz[i + 0*nPts*nPts] <= local_xmax) &&
+	     (vxyz[i + 1*nPts*nPts] >= local_ymin) && (vxyz[i + 1*nPts*nPts] <= local_ymax) &&
+	     (vxyz[i + 2*nPts*nPts] >= local_zmin) && (vxyz[i + 2*nPts*nPts] <= local_zmax) ) {
+	  havePlane = 1;
+	  break;
+	}
+      }
+      MPI_Allreduce(&havePlane, &nPlaneRanks, 1, MPI_INTEGER, MPI_SUM, mesh->GetComm());      
+      MPI_Comm_size(MPI_COMM_WORLD, &nRanks);
+      int planeRanks[nPlaneRanks];      
+      int rankList[nRanks];
+      int rSend;
+      if( havePlane>0 ) {
+       rSend = rank_;
+      } else {
+       rSend = -1;
+      }
+      MPI_Gather(&rSend,1,MPI_INTEGER,&rankList,1,MPI_INTEGER,0,MPI_COMM_WORLD);
+      if (rank0_) {
+        int jj = 0;
+        for (int i = 0; i < nRanks; i++) {
+	  if (rankList[i] >= 0) {
+	    planeRanks[jj] = rankList[i];
+	    jj++;
+	  }
+	}
+      }
+      MPI_Bcast(&planeRanks,nPlaneRanks,MPI_INTEGER,0,MPI_COMM_WORLD);
+      MPI_Comm_group(MPI_COMM_WORLD, &planeGroup);
+      MPI_Group_size(planeGroup, &nPlaneRanks);
+      MPI_Group world_group;
+      MPI_Comm_group(MPI_COMM_WORLD, &world_group);
+      MPI_Group_incl(world_group, nPlaneRanks, planeRanks, &planeGroup);      
+      MPI_Comm_create(MPI_COMM_WORLD,planeGroup,&MPI_COMM_PLANE);
+      */
+      
       // get values at plane
       Vector uInterp_vals(nPts * nPts * num_equation);
       FindPointsGSLIB finder(MPI_COMM_WORLD);
+      //FindPointsGSLIB finder(MPI_COMM_PLANE);
       finder.Setup(*mesh);
       finder.Interpolate(vxyz, *u_gf, uInterp_vals);
 
