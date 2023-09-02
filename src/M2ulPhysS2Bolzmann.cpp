@@ -40,16 +40,16 @@
 void M2ulPhyS::push(TPS::Tps2Boltzmann &interface) {
 
     if ( !interface.IsInitialized() )
-        interface.init(self);
+        interface.init(this);
 
     constexpr double avogadro(6.02214076e23);
     int nscalardofs = vfes->GetNDofs();
 
-    double *solver_data = U->HostRead();
+    const double *solver_data = U->HostRead();
 
-    mfem::ParGridFunction species( interface.NativeFes(TPS::Tps2Boltzmann::Index::SpeciesDensities) );
-    mfem::ParGridFunction heavyTemperature( interface.NativeFes(TPS::Tps2Boltzmann::Index::HeavyTemperature) );
-    mfem::ParGridFunction electronTemperature( interface.NativeFes(TPS::Tps2Boltzmann::Index::ElectronTemperature) );
+    mfem::ParGridFunction species( &interface.NativeFes(TPS::Tps2Boltzmann::Index::SpeciesDensities) );
+    mfem::ParGridFunction heavyTemperature( &interface.NativeFes(TPS::Tps2Boltzmann::Index::HeavyTemperature) );
+    mfem::ParGridFunction electronTemperature( &interface.NativeFes(TPS::Tps2Boltzmann::Index::ElectronTemperature) );
 
     double * species_data = species.HostWrite();
     double * heavyTemperature_data = heavyTemperature.HostWrite();
@@ -57,30 +57,29 @@ void M2ulPhyS::push(TPS::Tps2Boltzmann &interface) {
 
     double * state_local = new double[num_equation];
     double species_local[gpudata::MAXSPECIES];
-    double Th, Te;
   
-    for (int i = 0; i < dof; i++) {
+    for (int i = 0; i < nscalardofs; i++) {
         for (int eq = 0; eq < num_equation; eq++)
-            state[eq] = data[i + eq * dof];
+            state_local[eq] = solver_data[i + eq * nscalardofs];
 
-        mixture->computeNumberDensities(state, species_local);
+        mixture->computeNumberDensities(state_local, species_local);
 
-        mixture->computeTemperaturesBase(state, species_local],
+        mixture->computeTemperaturesBase(state_local, species_local,
                 species_local[mixture->GetiElectronIndex()],
                 species_local[mixture->GetiBackgroundIndex()], 
-                heavyTemperature_data[dof], 
-                electronTemperature_data[dof]);
+                heavyTemperature_data[i], 
+                electronTemperature_data[i]);
 
         for (int sp = 0; sp < interface.Nspecies(); sp++)
-            species_data[i + sp * dof] = avogadro*species_local[sp];
+            species_data[i + sp * nscalardofs] = avogadro*species_local[sp];
     }
 
     interface.interpolateFromNativeFES(species, TPS::Tps2Boltzmann::Index::SpeciesDensities);
-    interface.interpolateFromNativeFES(heavyTemperature, TPS::Tps2Boltzmann::Index::heavyTemperature);
-    interface.interpolateFromNativeFES(electronTemperature, TPS::Tps2Boltzmann::Index::electronTemperature);
+    interface.interpolateFromNativeFES(heavyTemperature, TPS::Tps2Boltzmann::Index::HeavyTemperature);
+    interface.interpolateFromNativeFES(electronTemperature, TPS::Tps2Boltzmann::Index::ElectronTemperature);
 
 }
 
-void M2ulPhyS::push(TPS::Tps2Boltzmann &interface) {
+void M2ulPhyS::fetch(TPS::Tps2Boltzmann &interface) {
     return;
 }

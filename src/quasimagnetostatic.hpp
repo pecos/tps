@@ -80,7 +80,6 @@ class QuasiMagnetostaticSolverBase : public TPS::Solver {
   virtual void InitializeCurrent() = 0;
 
   mfem::ParMesh *getMesh() const { return pmesh_; }
-  mfem::ParMesh *getEmMesh() const { return pmesh_; }
   mfem::ParGridFunction *getPlasmaConductivityGF() { return plasma_conductivity_; }
   mfem::ParGridFunction *getJouleHeatingGF() { return joule_heating_; }
 

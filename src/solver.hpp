@@ -36,11 +36,6 @@
 
 using namespace std;
 
-// Forward declare mfem::ParMesh class
-namespace mfem {
-class ParMesh;
-}
-
 namespace TPS {
 
 // Forward declare Tps2Bolzmann class

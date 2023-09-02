@@ -97,6 +97,8 @@ class Tps2Boltzmann {
   const mfem::ParGridFunction &Field(Index index) const { return *(fields_[index]); }
   mfem::ParGridFunction &Field(Index index) { return *(fields_[index]); }
 
+  void interpolateFromNativeFES(const ParGridFunction & input, Index index);
+
   //! Get the angular Frequency \omega of the electrical field:
   //! E(t) = Er*cos(\omega t) + Ei*sin(\omega t)
   double EfieldAngularFreq() { return EfieldAngularFreq_; }
@@ -133,11 +135,11 @@ class Tps2Boltzmann {
   mfem::ParFiniteElementSpace **list_native_fes_;
 
   //! Linear interpolators between native TPS fec to Interface fec
-  mfem::ParDiscreteLinearOperator * species_densities_interpolator_;
-  mfem::ParDiscreteLinearOperator * efield_interpolator_;
-  mfem::ParDiscreteLinearOperator * scalar_interpolator_;
-  mfem::ParDiscreteLinearOperator * reaction_rates_interpolator_;
-  mfem::ParDiscreteLinearOperator * list_interpolators_;
+  mfem::ParDiscreteLinearOperator *species_densities_interpolator_;
+  mfem::ParDiscreteLinearOperator *efield_interpolator_;
+  mfem::ParDiscreteLinearOperator *scalar_interpolator_;
+  mfem::ParDiscreteLinearOperator *reaction_rates_interpolator_;
+  mfem::ParDiscreteLinearOperator **list_interpolators_;
 
   //! array of fields see *Index for how to address this
   mfem::ParGridFunction **fields_;

@@ -270,6 +270,10 @@ class GasMixture {
 #endif
 
   virtual void computeNumberDensities(const Vector &conservedState, Vector &n_sp) {
+    computeNumberDensities(conservedState.Read(), n_sp.Write() );
+  }
+
+  MFEM_HOST_DEVICE virtual void computeNumberDensities(const double * conservedState, double * n_sp) const {
     mfem_error("computeNumberDensities not implemented");
   }
 
