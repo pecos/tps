@@ -58,8 +58,8 @@
 #include "logger.hpp"
 #include "quasimagnetostatic.hpp"
 #include "solver.hpp"
-#include "utils.hpp"
 #include "tps2Boltzmann.hpp"
+#include "utils.hpp"
 
 namespace TPS {
 
@@ -188,14 +188,10 @@ class Tps {
   }
 
   /// Push solver variables to interface
-  void push(Tps2Boltzmann & interface) {
-    solver_->push(interface);
-  }
+  void push(Tps2Boltzmann &interface) { solver_->push(interface); }
 
   /// Fetch solver variables from interface
-  void fetch(Tps2Boltzmann & interface) {
-    solver_->fetch(interface);
-  }
+  void fetch(Tps2Boltzmann &interface) { solver_->fetch(interface); }
 
   void printHeader();
   void parseCommandLineArgs(int argc, char *argv[]);  // variant used in C++ interface
@@ -214,9 +210,9 @@ class Tps {
   bool isVisualizationMode() const { return isVisualizationMode_; }
   const std::string &getSolverType() { return input_solver_type_; }
   //! Get fluid domain mesh (return null if not a fluid (or coupled) solver)
-  mfem::ParMesh * getFluidMesh();
+  mfem::ParMesh *getFluidMesh();
   //! Get em domain mesh (return null if not a em (or coupled) solver)
-  mfem::ParMesh * getEmMesh();
+  mfem::ParMesh *getEmMesh();
 };
 
 std::string ltrim(const std::string &s);

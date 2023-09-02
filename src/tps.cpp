@@ -452,13 +452,9 @@ template void Tps::getRequiredInput<int>(const char *name, int &var);
 template void Tps::getRequiredInput<double>(const char *name, double &var);
 template void Tps::getRequiredInput<std::string>(const char *name, std::string &var);
 
-mfem::ParMesh *  Tps::getFluidMesh() {
-  return solver_->getFluidMesh();
-}
+mfem::ParMesh *Tps::getFluidMesh() { return solver_->getFluidMesh(); }
 
-mfem::ParMesh *  Tps::getEmMesh() {
-  return solver_->getEmMesh();
-}
+mfem::ParMesh *Tps::getEmMesh() { return solver_->getEmMesh(); }
 
 }  // end namespace TPS
 
@@ -472,15 +468,15 @@ namespace py = pybind11;
 
 namespace tps_wrappers {
 
-void tps(py::module & m) {
-  #ifdef HAVE_MPI4PY
+void tps(py::module &m) {
+#ifdef HAVE_MPI4PY
   // initialize mpi4py's C-API
   if (import_mpi4py() < 0) {
     // mpi4py calls the Python C API
     // we let pybind11 give us the detailed traceback
     throw py::error_already_set();
   }
-  #endif
+#endif
 
   py::class_<TPS::Tps>(m, "Tps")
       .def(py::init<>())
@@ -510,5 +506,5 @@ void tps(py::module & m) {
       .def("fetch", &TPS::Tps::fetch);
 }
 
-} /*tps_wrapper namespace*/
+}  // namespace tps_wrappers
 #endif

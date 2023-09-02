@@ -52,71 +52,67 @@
 #undef PACKAGE_BUGREPORT
 #undef PACKAGE_STRING
 
-#include <string>
 #include <map>
+#include <string>
 
 #include "tps.hpp"
 
-
 namespace TPS {
-    class Tps2Boltzmann{
-        public:
+class Tps2Boltzmann {
+ public:
+  enum Index {
+    //! Species densities (up to 6 species) [1/m^3]: TPS --> Bolzmann
+    SpeciesDensities = 0,
+    //! Amplitute of electric field [V/m]: TPS --> Bolzmann
+    ElectricField = 1,
+    //! Heavy temperature [K]: TPS --> Bolzmann
+    HeavyTemperature = 2,
+    //! Electron temperature [eV]: TPS <--> Bolzmann
+    ElectronTemperature = 3,
+    //! Electron mobility: TPS <-- Bolzmann
+    ElectronMobility = 4,
+    //! Electron diffusion: TPS <-- Bolzmann
+    ElectronDiffusion = 5,
+    //! Reaction rates: TPS <-- Bolzmann
+    ReactionRates = 6,
+    //! All variables
+    All = 7
+  };
 
-        enum Index {
-        //! Species densities (up to 6 species) [1/m^3]: TPS --> Bolzmann
-        SpeciesDensities=0,
-        //! Amplitute of electric field [V/m]: TPS --> Bolzmann
-        ElectricField=1,
-        //! Heavy temperature [K]: TPS --> Bolzmann
-        HeavyTemperature=2,
-        //! Electron temperature [eV]: TPS <--> Bolzmann
-        ElectronTemperature=3,
-        //! Electron mobility: TPS <-- Bolzmann
-        ElectronMobility=4,
-        //! Electron diffusion: TPS <-- Bolzmann
-        ElectronDiffusion=5,
-        //! Reaction rates: TPS <-- Bolzmann
-        ReactionRates=6,
-        //! All variables
-        All = 7
-        };
+  //! Total number of fields
+  const std::size_t NIndexes;
 
-        //! Total number of fields
-        const std::size_t NIndexes;
+  Tps2Boltzmann(Tps *tps);
 
+  const mfem::ParGridFunction &Field(Index index) const { return *(fields_[index]); }
+  mfem::ParGridFunction &Field(Index index) { return *(fields_[index]); }
+  //! Get the angular Frequency \omega of the electrical field:
+  //! E(t) = Er*cos(\omega t) + Ei*sin(\omega t)
+  double EfieldAngularFreq() { return EfieldAngularFreq_; }
 
-        Tps2Boltzmann(Tps *tps);
+  ~Tps2Boltzmann();
 
-        const mfem::ParGridFunction & Field(Index index) const { return *(fields_[index]); }
-        mfem::ParGridFunction & Field(Index index) { return *(fields_[index]); }
-        //! Get the angular Frequency \omega of the electrical field:
-        //! E(t) = Er*cos(\omega t) + Ei*sin(\omega t)
-        double EfieldAngularFreq() { return EfieldAngularFreq_; }
+ private:
+  Tps *tps_;
 
-        ~Tps2Boltzmann();
+  int nspecies_;
+  int nEfieldComps_;
+  int nreactions_;
+  int nfields_;
+  mfem::Array<int> offsets;
 
+  mfem::FiniteElementCollection *fec_;
+  mfem::ParFiniteElementSpace *all_fes_;
+  mfem::ParFiniteElementSpace *species_densities_fes_;
+  mfem::ParFiniteElementSpace *efield_fes_;
+  mfem::ParFiniteElementSpace *scalar_fes_;
+  mfem::ParFiniteElementSpace *reaction_rates_fes_;
 
-        private:
-        Tps *tps_;
+  //! array of fields see *Index for how to address this
+  mfem::ParGridFunction **fields_;
 
-        int nspecies_;
-        int nEfieldComps_;
-        int nreactions_;
-        int nfields_;
-        mfem::Array<int> offsets;
-
-        mfem::FiniteElementCollection * fec_;
-        mfem::ParFiniteElementSpace * all_fes_;
-        mfem::ParFiniteElementSpace * species_densities_fes_;
-        mfem::ParFiniteElementSpace * efield_fes_;
-        mfem::ParFiniteElementSpace * scalar_fes_;
-        mfem::ParFiniteElementSpace * reaction_rates_fes_;
-
-        //! array of fields see *Index for how to address this
-        mfem::ParGridFunction ** fields_; 
-
-        double EfieldAngularFreq_;
-    };
-}
+  double EfieldAngularFreq_;
+};
+}  // namespace TPS
 
 #endif

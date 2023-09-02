@@ -37,7 +37,9 @@
 using namespace std;
 
 // Forward declare mfem::ParMesh class
-namespace mfem { class ParMesh; }
+namespace mfem {
+class ParMesh;
+}
 
 namespace TPS {
 
@@ -82,24 +84,20 @@ class Solver {
   }
 
   /// Push solver variables to interface
-  virtual void push(Tps2Boltzmann & interface) {
+  virtual void push(Tps2Boltzmann& interface) {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
   }
 
   /// Fetch solver variables from interface
-  virtual void fetch(Tps2Boltzmann & interface) {
+  virtual void fetch(Tps2Boltzmann& interface) {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
   }
 
-  virtual mfem::ParMesh *  getFluidMesh() {
-    return NULL;
-  }
+  virtual mfem::ParMesh* getFluidMesh() { return NULL; }
 
-  virtual mfem::ParMesh *  getEmMesh() {
-    return NULL;
-  }
+  virtual mfem::ParMesh* getEmMesh() { return NULL; }
 };
 
 }  // end namespace TPS
