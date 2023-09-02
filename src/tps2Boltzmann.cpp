@@ -39,10 +39,42 @@
 #ifdef HAVE_PYTHON
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/numpy.h>
 #endif
 
 
 namespace TPS {
+
+class CPUDataRead {
+  public:
+    CPUDataRead(const mfem::Vector & v):
+      data_( v.HostRead() ), size_( v.Size() ), stride_( 1 ) { };
+    double * data() const {return const_cast<double*>(data_); }
+    size_t size() const { return size_; }
+    size_t stride() const {return stride_; }
+
+  private:
+     const double * data_;
+     size_t size_;
+     size_t stride_;
+};
+
+class CPUData {
+  public:
+    CPUData(mfem::Vector & v, bool rw):
+      data_(rw ? v.HostReadWrite() : v.HostWrite() ),
+      size_( v.Size() ), stride_(1) { };
+    double * data() { return data_; }
+    size_t size() const { return size_; }
+    size_t stride() const {return stride_; }
+
+  private:
+     double * data_;
+     size_t size_;
+     size_t stride_;
+};
+
+
 
 Tps2Boltzmann::Tps2Boltzmann(Tps *tps): 
         NIndexes(7),
@@ -80,13 +112,14 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps):
         list_fes[Index::ElectronDiffusion] = scalar_fes_;
         list_fes[Index::ReactionRates] = reaction_rates_fes_;
 
-        all_ = new mfem::ParGridFunction(all_fes_);
-        fields_ = new  mfem::ParGridFunction*[NIndexes];
+        mfem::ParGridFunction * all = new mfem::ParGridFunction(all_fes_);
+        fields_ = new  mfem::ParGridFunction*[NIndexes+1];
         offsets[0] = 0;
         for (std::size_t index(0); index < NIndexes; ++ index) {
-            fields_[index]= new mfem::ParGridFunction(list_fes[index], *all_, offsets[index]);
+            fields_[index]= new mfem::ParGridFunction(list_fes[index], *all, offsets[index]);
             offsets[index+1] = offsets[index] + fields_[index]->Size();
         }
+        fields_[Index::All] = all;
 
         delete[] list_fes;
 }
@@ -98,9 +131,6 @@ Tps2Boltzmann::~Tps2Boltzmann() {
             delete fields_[i];
         // Delete array
         delete[] fields_;
-
-        // Delete monolithic field
-        delete all_; 
 
         // Delete view Finite Element Spaces
         delete species_densities_fes_;
@@ -120,7 +150,36 @@ Tps2Boltzmann::~Tps2Boltzmann() {
 namespace py = pybind11;
 
 namespace tps_wrappers {
-    void tps2bolzmann(py::module& m) {
+  void tps2bolzmann(py::module& m) {
+  
+  // Can by read in numpy as np.array(data_instance, copy = False)
+  py::class_<TPS::CPUDataRead>(m, "CPUDataRead", py::buffer_protocol())
+    .def_buffer([](TPS::CPUDataRead & d) -> py::buffer_info {
+      return py::buffer_info( d.data(), /*pointer to buffer*/
+                              sizeof(double), /*size of one element*/
+                              py::format_descriptor<double>::format(), /*python struct-style format descriptor*/
+                              1, /*number of dimensions*/
+                              {d.size()}, /*buffer dimension(s)*/
+                              {d.stride()*sizeof(const double)}, /*Stride in bytes for each index*/
+                              true /*read only*/
+                              ); 
+
+    });
+
+    py::class_<TPS::CPUData>(m, "CPUData", py::buffer_protocol())
+    .def_buffer([](TPS::CPUData & d) -> py::buffer_info {
+      return py::buffer_info( d.data(), /*pointer to buffer*/
+                              sizeof(double), /*size of one element*/
+                              py::format_descriptor<double>::format(), /*python struct-style format descriptor*/
+                              1, /*number of dimensions*/
+                              {d.size()}, /*buffer dimension(s)*/
+                              {d.stride()*sizeof(const double)}, /*Stride in bytes for each index*/
+                              false /*writetable*/
+                              ); 
+
+    });
+  
+  
   py::enum_<TPS::Tps2Boltzmann::Index>(m, "t2bIndex")
     .value("SpeciesDensities", TPS::Tps2Boltzmann::Index::SpeciesDensities)
     .value("ElectricField", TPS::Tps2Boltzmann::Index::ElectricField)
@@ -131,7 +190,13 @@ namespace tps_wrappers {
     .value("ReactionRates", TPS::Tps2Boltzmann::Index::ReactionRates);
     
   py::class_<TPS::Tps2Boltzmann>(m, "Tps2Bolzmann")
-    .def(py::init<TPS::Tps *>());
+    .def(py::init<TPS::Tps *>())
+    .def("HostRead", [](const TPS::Tps2Boltzmann & interface, TPS::Tps2Boltzmann::Index index)
+         { return std::unique_ptr<TPS::CPUDataRead>(new TPS::CPUDataRead(interface.Field(index)));})
+    .def("HostWrite", [](TPS::Tps2Boltzmann & interface, TPS::Tps2Boltzmann::Index index)
+         { return std::unique_ptr<TPS::CPUData>(new TPS::CPUData(interface.Field(index), false));})
+    .def("HostReadWrite", [](TPS::Tps2Boltzmann & interface, TPS::Tps2Boltzmann::Index index)
+         { return std::unique_ptr<TPS::CPUData>(new TPS::CPUData(interface.Field(index), true));});
 }
 }
 #endif

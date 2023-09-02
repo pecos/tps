@@ -76,7 +76,9 @@ namespace TPS {
         //! Electron diffusion: TPS <-- Bolzmann
         ElectronDiffusion=5,
         //! Reaction rates: TPS <-- Bolzmann
-        ReactionRates=6
+        ReactionRates=6,
+        //! All variables
+        All = 7
         };
 
         //! Total number of fields
@@ -85,11 +87,8 @@ namespace TPS {
 
         Tps2Boltzmann(Tps *tps);
 
-        const mfem::ParGridFunction & All() const;
-        mfem::ParGridFunction & All();
-
-        const mfem::ParGridFunction & Field(Index index) const;
-        mfem::ParGridFunction & Field(Index index);
+        const mfem::ParGridFunction & Field(Index index) const { return *(fields_[index]); }
+        mfem::ParGridFunction & Field(Index index) { return *(fields_[index]); }
 
         ~Tps2Boltzmann();
 
@@ -109,8 +108,6 @@ namespace TPS {
         mfem::ParFiniteElementSpace * scalar_fes_;
         mfem::ParFiniteElementSpace * reaction_rates_fes_;
 
-        //! all variables
-        mfem::ParGridFunction * all_; 
         //! array of fields see *Index for how to address this
         mfem::ParGridFunction ** fields_; 
     };
