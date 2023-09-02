@@ -78,17 +78,19 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps) : NIndexes(7), tps_(tps) {
   tps->getRequiredInput("species/numSpecies", nspecies_);
   // TODO: Get the number of reactions for the solver
   tps->getRequiredInput("boltzmannInterface/nreactios", nreactions_);
-  int order;
-  tps->getRequiredInput("boltzmannInterface/order", order);
-  int basis_type;
-  tps->getRequiredInput("boltzmannInterface/basis_type", basis_type);
-  assert(basis_type == 0 || basis_type == 1);
+  tps->getRequiredInput("boltzmannInterface/order", order_);
+  tps->getRequiredInput("boltzmannInterface/basis_type", basis_type_);
+  assert(basis_type_== 0 || basis_type_ == 1);
 
   offsets.SetSize(NIndexes + 1);
-  mfem::ParMesh *pmesh(tps->getFluidMesh());
-  assert(pmesh);
-  fec_ = new mfem::L2_FECollection(order, pmesh->Dimension(), basis_type);
 
+  }
+
+void Tps2Boltzmann::init(M2ulPhyS * flowSolver) {
+  
+
+  mfem::ParMesh *pmesh(flowSolver->GetMesh());
+  fec_ = new mfem::L2_FECollection(order_, pmesh->Dimension(), basis_type_);
   switch (pmesh->Dimension()) {
     case 2:
       nEfieldComps_ = 2;
@@ -108,25 +110,24 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps) : NIndexes(7), tps_(tps) {
   scalar_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_);
   reaction_rates_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_, nreactions_, mfem::Ordering::byNODES);
 
-  mfem::ParFiniteElementSpace **list_fes = new mfem::ParFiniteElementSpace *[NIndexes];
-  list_fes[Index::SpeciesDensities] = species_densities_fes_;
-  list_fes[Index::ElectricField] = scalar_fes_;
-  list_fes[Index::HeavyTemperature] = scalar_fes_;
-  list_fes[Index::ElectronTemperature] = scalar_fes_;
-  list_fes[Index::ElectronMobility] = scalar_fes_;
-  list_fes[Index::ElectronDiffusion] = scalar_fes_;
-  list_fes[Index::ReactionRates] = reaction_rates_fes_;
+  list_fes_ = new mfem::ParFiniteElementSpace *[NIndexes];
+  list_fes_[Index::ElectricField] = efield_fes_;
+  list_fes_[Index::SpeciesDensities] = species_densities_fes_;
+  list_fes_[Index::HeavyTemperature] = scalar_fes_;
+  list_fes_[Index::ElectronTemperature] = scalar_fes_;
+  list_fes_[Index::ElectronMobility] = scalar_fes_;
+  list_fes_[Index::ElectronDiffusion] = scalar_fes_;
+  list_fes_[Index::ReactionRates] = reaction_rates_fes_;
+  list_fes_[Index::All]           = all_fes_;
 
   mfem::ParGridFunction *all = new mfem::ParGridFunction(all_fes_);
   fields_ = new mfem::ParGridFunction *[NIndexes + 1];
   offsets[0] = 0;
   for (std::size_t index(0); index < NIndexes; ++index) {
-    fields_[index] = new mfem::ParGridFunction(list_fes[index], *all, offsets[index]);
+    fields_[index] = new mfem::ParGridFunction(list_fes_[index], *all, offsets[index]);
     offsets[index + 1] = offsets[index] + fields_[index]->Size();
   }
   fields_[Index::All] = all;
-
-  delete[] list_fes;
 }
 
 Tps2Boltzmann::~Tps2Boltzmann() {
@@ -137,8 +138,10 @@ Tps2Boltzmann::~Tps2Boltzmann() {
 
   // Delete view Finite Element Spaces
   delete species_densities_fes_;
+  delete efield_fes_;
   delete scalar_fes_;
   delete reaction_rates_fes_;
+  delete[] list_fes_;
 
   // Delete monolithic function space
   delete all_fes_;

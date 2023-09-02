@@ -3917,10 +3917,12 @@ void M2ulPhyS::checkSolverOptions() const {
 }
 
 void M2ulPhyS::updatePrimitives() {
+  //U.V.: should this be U->HostRead() instead? U->HostWrite() does not sync memory before returning the pointer.
   double *data = U->HostWrite();
   double *dataUp = Up->HostWrite();
   int dof = vfes->GetNDofs();
 
+  // Change this double * state = new double[num_equation] and same for Upi?
   Vector state;
   state.UseDevice(false);
   state.SetSize(num_equation);

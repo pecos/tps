@@ -198,6 +198,12 @@ class GasMixture {
     // mfem_error("ComputeTemperature is not implemented.");
     return -1.0;
   }
+  MFEM_HOST_DEVICE virtual void computeTemperaturesBase(const double *conservedState, const double *n_sp,
+                                                        const double n_e, const double n_B, double &T_h,
+                                                        double &T_e) const {
+    T_h = -1.;
+    T_e = -1.;
+  }
   // virtual double Temperature(double *rho, double *p,
   //                            int nsp) = 0;  // temperature given densities and pressures of all species
 

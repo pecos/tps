@@ -94,10 +94,6 @@ class Solver {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
   }
-
-  virtual mfem::ParMesh* getFluidMesh() { return NULL; }
-
-  virtual mfem::ParMesh* getEmMesh() { return NULL; }
 };
 
 }  // end namespace TPS

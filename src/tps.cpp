@@ -452,10 +452,6 @@ template void Tps::getRequiredInput<int>(const char *name, int &var);
 template void Tps::getRequiredInput<double>(const char *name, double &var);
 template void Tps::getRequiredInput<std::string>(const char *name, std::string &var);
 
-mfem::ParMesh *Tps::getFluidMesh() { return solver_->getFluidMesh(); }
-
-mfem::ParMesh *Tps::getEmMesh() { return solver_->getEmMesh(); }
-
 }  // end namespace TPS
 
 // --------------------------------

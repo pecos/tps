@@ -86,6 +86,8 @@ class Tps;
 using namespace mfem;
 using namespace std;
 
+namespace TPS { class Tps2Boltzmann; }
+
 class M2ulPhyS : public TPS::Solver {
  private:
   MPI_Groups *groupsMPI;
@@ -449,6 +451,12 @@ class M2ulPhyS : public TPS::Solver {
   }
 
   void evaluatePlasmaConductivityGF();
+
+  //tps2Bolzmann interface (implemented in M2ulPhysS2Bolzmann.cpp)
+  /// Push solver variables to interface
+  void push(TPS::Tps2Boltzmann &interface);
+  /// Fetch solver variables from interface
+  void fetch(TPS::Tps2Boltzmann &interface);
 
   // Exit code access
   void SetStatus(int code) {

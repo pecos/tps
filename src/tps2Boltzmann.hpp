@@ -57,14 +57,16 @@
 
 #include "tps.hpp"
 
+class M2ulPhyS;
+
 namespace TPS {
 class Tps2Boltzmann {
  public:
   enum Index {
+    //! Componentes of electric field [V/m]: TPS --> Bolzmann
+    ElectricField = 0,
     //! Species densities (up to 6 species) [1/m^3]: TPS --> Bolzmann
-    SpeciesDensities = 0,
-    //! Amplitute of electric field [V/m]: TPS --> Bolzmann
-    ElectricField = 1,
+    SpeciesDensities = 1,
     //! Heavy temperature [K]: TPS --> Bolzmann
     HeavyTemperature = 2,
     //! Electron temperature [eV]: TPS <--> Bolzmann
@@ -83,12 +85,22 @@ class Tps2Boltzmann {
   const std::size_t NIndexes;
 
   Tps2Boltzmann(Tps *tps);
+  void init(M2ulPhyS * flowSolver);
+  bool IsInitialized() const { return all_fes_ != 0; }
+
+  const mfem::ParFiniteElementSpace &Fes(Index index) const { return *(list_fes_[index]); }
+  mfem::ParFiniteElementSpace &Fes(Index index) { return *(list_fes_[index]); }
+
+  const mfem::ParFiniteElementSpace &NativeFes(Index index) const { return *(list_fes_[index]); }
+  mfem::ParFiniteElementSpace &NativeFes(Index index) { return *(list_fes_[index]); }
 
   const mfem::ParGridFunction &Field(Index index) const { return *(fields_[index]); }
   mfem::ParGridFunction &Field(Index index) { return *(fields_[index]); }
+
   //! Get the angular Frequency \omega of the electrical field:
   //! E(t) = Er*cos(\omega t) + Ei*sin(\omega t)
   double EfieldAngularFreq() { return EfieldAngularFreq_; }
+  int Nspecies() const { return nspecies_; }
 
   ~Tps2Boltzmann();
 
@@ -99,14 +111,33 @@ class Tps2Boltzmann {
   int nEfieldComps_;
   int nreactions_;
   int nfields_;
+  int order_;
+  int basis_type_;
   mfem::Array<int> offsets;
 
   mfem::FiniteElementCollection *fec_;
+
+  //! Function spaces in the Boltzmann interface
   mfem::ParFiniteElementSpace *all_fes_;
   mfem::ParFiniteElementSpace *species_densities_fes_;
   mfem::ParFiniteElementSpace *efield_fes_;
   mfem::ParFiniteElementSpace *scalar_fes_;
   mfem::ParFiniteElementSpace *reaction_rates_fes_;
+  mfem::ParFiniteElementSpace **list_fes_;
+
+  //! Function spaces using the native TPS fec
+  mfem::ParFiniteElementSpace *species_densities_native_fes_;
+  mfem::ParFiniteElementSpace *efield_native_fes_;
+  mfem::ParFiniteElementSpace *scalar_native_fes_;
+  mfem::ParFiniteElementSpace *reaction_rates_native_fes_;
+  mfem::ParFiniteElementSpace **list_native_fes_;
+
+  //! Linear interpolators between native TPS fec to Interface fec
+  mfem::ParDiscreteLinearOperator * species_densities_interpolator_;
+  mfem::ParDiscreteLinearOperator * efield_interpolator_;
+  mfem::ParDiscreteLinearOperator * scalar_interpolator_;
+  mfem::ParDiscreteLinearOperator * reaction_rates_interpolator_;
+  mfem::ParDiscreteLinearOperator * list_interpolators_;
 
   //! array of fields see *Index for how to address this
   mfem::ParGridFunction **fields_;
