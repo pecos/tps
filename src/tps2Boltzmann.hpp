@@ -89,6 +89,9 @@ namespace TPS {
 
         const mfem::ParGridFunction & Field(Index index) const { return *(fields_[index]); }
         mfem::ParGridFunction & Field(Index index) { return *(fields_[index]); }
+        //! Get the angular Frequency \omega of the electrical field:
+        //! E(t) = Er*cos(\omega t) + Ei*sin(\omega t)
+        double EfieldAngularFreq() { return EfieldAngularFreq_; }
 
         ~Tps2Boltzmann();
 
@@ -97,19 +100,22 @@ namespace TPS {
         Tps *tps_;
 
         int nspecies_;
+        int nEfieldComps_;
         int nreactions_;
-        int nvfields;
         int nfields_;
         mfem::Array<int> offsets;
 
         mfem::FiniteElementCollection * fec_;
         mfem::ParFiniteElementSpace * all_fes_;
         mfem::ParFiniteElementSpace * species_densities_fes_;
+        mfem::ParFiniteElementSpace * efield_fes_;
         mfem::ParFiniteElementSpace * scalar_fes_;
         mfem::ParFiniteElementSpace * reaction_rates_fes_;
 
         //! array of fields see *Index for how to address this
         mfem::ParGridFunction ** fields_; 
+
+        double EfieldAngularFreq_;
     };
 }
 

@@ -42,6 +42,8 @@
 #include <pybind11/numpy.h>
 #endif
 
+#include <cstdlib>
+
 
 namespace TPS {
 
@@ -85,7 +87,6 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps):
         tps->getRequiredInput("species/numSpecies", nspecies_);
         //TODO: Get the number of reactions for the solver
         tps->getRequiredInput("boltzmannInterface/nreactios", nreactions_); 
-        nfields_ = nspecies_ + 5 + nreactions_;
         int order;
         tps->getRequiredInput("boltzmannInterface/order", order);
         int basis_type;
@@ -98,8 +99,22 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps):
         assert( pmesh );
         fec_ = new mfem::L2_FECollection(order, pmesh->Dimension(), basis_type);
 
+        switch (pmesh->Dimension()) {
+          case 2:
+            nEfieldComps_ = 2;
+            break;
+          case 3:
+            nEfieldComps_ = 6;
+            break;
+          default:
+            std::abort();
+        }
+
+        nfields_ = nspecies_ + nEfieldComps_ +4 + nreactions_;
+
         all_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_, nfields_, mfem::Ordering::byNODES);
         species_densities_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_,nspecies_ , mfem::Ordering::byNODES);
+        efield_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_, nEfieldComps_ , mfem::Ordering::byNODES);
         scalar_fes_ =  new mfem::ParFiniteElementSpace(pmesh, fec_);
         reaction_rates_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_, nreactions_ , mfem::Ordering::byNODES);
 
