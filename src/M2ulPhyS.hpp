@@ -330,6 +330,7 @@ class M2ulPhyS : public TPS::Solver {
    */
   void initIndirectionBC();
 
+  void initMixtureAndTransportModels();
   void initVariables();
   void initSolutionAndVisualizationVectors();
   void initialTimeStep();

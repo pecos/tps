@@ -86,6 +86,184 @@ M2ulPhyS::M2ulPhyS(string &inputFileName, TPS::Tps *tps)
   }
 }
 
+void M2ulPhyS::initMixtureAndTransportModels() {
+  mixture = NULL;
+
+  switch (config.GetWorkingFluid()) {
+    case WorkingFluid::DRY_AIR:
+      mixture = new DryAir(config, dim, nvel);
+
+#if defined(_CUDA_) || defined(_HIP_)
+      tpsGpuMalloc((void **)(&d_mixture), sizeof(DryAir));
+      gpu::instantiateDeviceDryAir<<<1, 1>>>(config.dryAirInput, dim, nvel, d_mixture);
+
+      tpsGpuMalloc((void **)&transportPtr, sizeof(DryAirTransport));
+      gpu::instantiateDeviceDryAirTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(),
+                                                      config.sutherland_.C1, config.sutherland_.S0,
+                                                      config.sutherland_.Pr, transportPtr);
+#else
+      transportPtr = new DryAirTransport(mixture, config);
+#endif
+      break;
+    case WorkingFluid::USER_DEFINED:
+      switch (config.GetGasModel()) {
+        case GasModel::PERFECT_MIXTURE:
+          mixture = new PerfectMixture(config, dim, nvel);
+#if defined(_CUDA_) || defined(_HIP_)
+          tpsGpuMalloc((void **)(&d_mixture), sizeof(PerfectMixture));
+          gpu::instantiateDevicePerfectMixture<<<1, 1>>>(config.perfectMixtureInput, dim, nvel, d_mixture);
+#endif
+          break;
+        default:
+          mfem_error("GasModel not recognized.");
+          break;
+      }
+
+      switch (config.GetTranportModel()) {
+        case ARGON_MINIMAL:
+#if defined(_CUDA_) || defined(_HIP_)
+          tpsGpuMalloc((void **)&transportPtr, sizeof(ArgonMinimalTransport));
+          gpu::instantiateDeviceArgonMinimalTransport<<<1, 1>>>(d_mixture, config.argonTransportInput, transportPtr);
+#else
+          transportPtr = new ArgonMinimalTransport(mixture, config);
+#endif
+          break;
+        case ARGON_MIXTURE:
+#if defined(_CUDA_) || defined(_HIP_)
+          tpsGpuMalloc((void **)&transportPtr, sizeof(ArgonMixtureTransport));
+          gpu::instantiateDeviceArgonMixtureTransport<<<1, 1>>>(d_mixture, config.argonTransportInput, transportPtr);
+#else
+          transportPtr = new ArgonMixtureTransport(mixture, config);
+#endif
+          break;
+        case CONSTANT:
+#if defined(_CUDA_) || defined(_HIP_)
+          tpsGpuMalloc((void **)&transportPtr, sizeof(ConstantTransport));
+          gpu::instantiateDeviceConstantTransport<<<1, 1>>>(d_mixture, config.constantTransport, transportPtr);
+#else
+          transportPtr = new ConstantTransport(mixture, config);
+#endif
+          break;
+        default:
+          mfem_error("TransportModel not recognized.");
+          break;
+      }
+      switch (config.GetChemistryModel()) {
+        default:
+#if defined(_CUDA_) || defined(_HIP_)
+          tpsGpuMalloc((void **)&chemistry_, sizeof(Chemistry));
+          gpu::instantiateDeviceChemistry<<<1, 1>>>(d_mixture, config.chemistryInput, chemistry_);
+#else
+          chemistry_ = new Chemistry(mixture, config.chemistryInput);
+#endif
+          break;
+      }
+      break;
+    case WorkingFluid::LTE_FLUID:
+      int table_dim;
+      tpsP->getInput("flow/lte/table_dim", table_dim, 2);
+      if (table_dim == 2) {
+#if defined(_GPU_)
+        mfem_error("LTE_FLUID with 2D lookup tables not supported for GPU.");
+#else
+        // for 2D case, table read happens internally to LteMixture and LteTransport
+        mixture = new LteMixture(config, dim, nvel);
+        transportPtr = new LteTransport(mixture, config);
+#endif
+      } else if (table_dim == 1) {
+        MPI_Comm TPSCommWorld = this->groupsMPI->getTPSCommWorld();
+
+        // Initialize thermo TableInput (data read below)
+        std::vector<TableInput> thermo_tables(3);
+        for (int i = 0; i < thermo_tables.size(); i++) {
+          thermo_tables[i].order = 1;
+          thermo_tables[i].xLogScale = false;
+          thermo_tables[i].fLogScale = false;
+        }
+
+        // Read data from hdf5 file containing 4 columns: T, energy, gas constant, speed of sound
+        DenseMatrix thermo_data;
+        bool success;
+        success = h5ReadBcastMultiColumnTable(config.lteMixtureInput.thermo_file_name, std::string("T_energy_R_c"),
+                                              TPSCommWorld, thermo_data, thermo_tables);
+        if (!success) exit(ERROR);
+
+        // Construct e -> T table from T -> e
+        TableInput T_table_input;
+        T_table_input.order = 1;
+        T_table_input.xLogScale = false;
+        T_table_input.fLogScale = false;
+        T_table_input.Ndata = thermo_tables[0].Ndata;
+        T_table_input.xdata = thermo_tables[0].fdata;
+        T_table_input.fdata = thermo_tables[0].xdata;
+
+        // LteMixture object valid on host
+        mixture = new LteMixture(config.lteMixtureInput.f, dim, nvel, config.const_plasma_conductivity_,
+                                 thermo_tables[0], thermo_tables[1], thermo_tables[2], T_table_input);
+
+#if defined(_CUDA_) || defined(_HIP_)
+        // LteMixture object valid on device
+        tpsGpuMalloc((void **)(&d_mixture), sizeof(LteMixture));
+        gpu::instantiateDeviceLteMixture<<<1, 1>>>(config.lteMixtureInput.f, dim, nvel,
+                                                   config.const_plasma_conductivity_, thermo_tables[0],
+                                                   thermo_tables[1], thermo_tables[2], T_table_input, d_mixture);
+#endif
+
+        // Initialize transport TableInput (data read below)
+        std::vector<TableInput> trans_tables(3);
+        for (int i = 0; i < trans_tables.size(); i++) {
+          trans_tables[i].order = 1;
+          trans_tables[i].xLogScale = false;
+          trans_tables[i].fLogScale = false;
+        }
+
+        // Read data from hdf5 file containing 4 columns: T, mu, kappa, sigma
+        // (i.e., temperature, dynamic viscosity, thermal conductivity, electrical conductivity)
+        DenseMatrix trans_data;
+        success = h5ReadBcastMultiColumnTable(config.lteMixtureInput.trans_file_name, std::string("T_mu_kappa_sigma"),
+                                              TPSCommWorld, trans_data, trans_tables);
+        if (!success) exit(ERROR);
+
+          // Instantiate LteTransport class
+#if defined(_CUDA_) || defined(_HIP_)
+        tpsGpuMalloc((void **)&transportPtr, sizeof(LteTransport));
+        gpu::instantiateDeviceLteTransport<<<1, 1>>>(d_mixture, trans_tables[0], trans_tables[1], trans_tables[2],
+                                                     transportPtr);
+#else
+        transportPtr = new LteTransport(mixture, trans_tables[0], trans_tables[1], trans_tables[2]);
+#endif
+      } else {
+        mfem_error("flow/lte/table_dim must be 1 or 2.");
+      }
+      break;
+    default:
+      mfem_error("WorkingFluid not recognized.");
+      break;
+  }
+
+  if (config.use_mixing_length) {
+#if defined(_CUDA_) || defined(_HIP_)
+    // dynamic_cast on a device-side pointer doesn't work, so instead
+    // pass the TransportProperties pointer and cast it within
+    // instantiateDeviceMixingLengthTransport
+    TransportProperties *temporary_transport = transportPtr;
+    tpsGpuMalloc((void **)&transportPtr, sizeof(MixingLengthTransport));
+    gpu::instantiateDeviceMixingLengthTransport<<<1, 1>>>(d_mixture, config.mix_length_trans_input_,
+                                                          temporary_transport, transportPtr);
+#else
+    // Build mixing length transport using whatever molecular transport we've already instantiated
+    MolecularTransport *temporary_transport = dynamic_cast<MolecularTransport *>(transportPtr);
+    transportPtr = new MixingLengthTransport(mixture, config, temporary_transport);
+#endif
+  }
+
+  assert(mixture != NULL);
+#if defined(_CUDA_) || defined(_HIP_)
+#else
+  d_mixture = mixture;
+#endif
+}
+
 void M2ulPhyS::initVariables() {
 #ifdef HAVE_GRVY
   grvy_timer_init("TPS");
@@ -296,174 +474,7 @@ void M2ulPhyS::initVariables() {
 
   eqSystem = config.GetEquationSystem();
 
-  mixture = NULL;
-
-  switch (config.GetWorkingFluid()) {
-    case WorkingFluid::DRY_AIR:
-      mixture = new DryAir(config, dim, nvel);
-
-#if defined(_CUDA_) || defined(_HIP_)
-      tpsGpuMalloc((void **)(&d_mixture), sizeof(DryAir));
-      gpu::instantiateDeviceDryAir<<<1, 1>>>(config.dryAirInput, dim, nvel, d_mixture);
-
-      tpsGpuMalloc((void **)&transportPtr, sizeof(DryAirTransport));
-      gpu::instantiateDeviceDryAirTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(),
-                                                      config.sutherland_.C1, config.sutherland_.S0,
-                                                      config.sutherland_.Pr, transportPtr);
-#else
-      transportPtr = new DryAirTransport(mixture, config);
-#endif
-      break;
-    case WorkingFluid::USER_DEFINED:
-      switch (config.GetGasModel()) {
-        case GasModel::PERFECT_MIXTURE:
-          mixture = new PerfectMixture(config, dim, nvel);
-#if defined(_CUDA_) || defined(_HIP_)
-          tpsGpuMalloc((void **)(&d_mixture), sizeof(PerfectMixture));
-          gpu::instantiateDevicePerfectMixture<<<1, 1>>>(config.perfectMixtureInput, dim, nvel, d_mixture);
-#endif
-          break;
-        default:
-          mfem_error("GasModel not recognized.");
-          break;
-      }
-
-      switch (config.GetTranportModel()) {
-        case ARGON_MINIMAL:
-#if defined(_CUDA_) || defined(_HIP_)
-          tpsGpuMalloc((void **)&transportPtr, sizeof(ArgonMinimalTransport));
-          gpu::instantiateDeviceArgonMinimalTransport<<<1, 1>>>(d_mixture, config.argonTransportInput, transportPtr);
-#else
-          transportPtr = new ArgonMinimalTransport(mixture, config);
-#endif
-          break;
-        case ARGON_MIXTURE:
-#if defined(_CUDA_) || defined(_HIP_)
-          tpsGpuMalloc((void **)&transportPtr, sizeof(ArgonMixtureTransport));
-          gpu::instantiateDeviceArgonMixtureTransport<<<1, 1>>>(d_mixture, config.argonTransportInput, transportPtr);
-#else
-          transportPtr = new ArgonMixtureTransport(mixture, config);
-#endif
-          break;
-        case CONSTANT:
-#if defined(_CUDA_) || defined(_HIP_)
-          tpsGpuMalloc((void **)&transportPtr, sizeof(ConstantTransport));
-          gpu::instantiateDeviceConstantTransport<<<1, 1>>>(d_mixture, config.constantTransport, transportPtr);
-#else
-          transportPtr = new ConstantTransport(mixture, config);
-#endif
-          break;
-        default:
-          mfem_error("TransportModel not recognized.");
-          break;
-      }
-      switch (config.GetChemistryModel()) {
-        default:
-#if defined(_CUDA_) || defined(_HIP_)
-          tpsGpuMalloc((void **)&chemistry_, sizeof(Chemistry));
-          gpu::instantiateDeviceChemistry<<<1, 1>>>(d_mixture, config.chemistryInput, chemistry_);
-#else
-          chemistry_ = new Chemistry(mixture, config.chemistryInput);
-#endif
-          break;
-      }
-      break;
-    case WorkingFluid::LTE_FLUID:
-      int table_dim;
-      tpsP->getInput("flow/lte/table_dim", table_dim, 2);
-      if (table_dim == 2) {
-#if defined(_GPU_)
-        mfem_error("LTE_FLUID with 2D lookup tables not supported for GPU.");
-#else
-        // for 2D case, table read happens internally to LteMixture and LteTransport
-        mixture = new LteMixture(config, dim, nvel);
-        transportPtr = new LteTransport(mixture, config);
-#endif
-      } else if (table_dim == 1) {
-        MPI_Comm TPSCommWorld = this->groupsMPI->getTPSCommWorld();
-
-        // Initialize thermo TableInput (data read below)
-        std::vector<TableInput> thermo_tables(3);
-        for (int i = 0; i < thermo_tables.size(); i++) {
-          thermo_tables[i].order = 1;
-          thermo_tables[i].xLogScale = false;
-          thermo_tables[i].fLogScale = false;
-        }
-
-        // Read data from hdf5 file containing 4 columns: T, energy, gas constant, speed of sound
-        DenseMatrix thermo_data;
-        bool success;
-        success = h5ReadBcastMultiColumnTable(config.lteMixtureInput.thermo_file_name, std::string("T_energy_R_c"),
-                                              TPSCommWorld, thermo_data, thermo_tables);
-        if (!success) exit(ERROR);
-
-        // Construct e -> T table from T -> e
-        TableInput T_table_input;
-        T_table_input.order = 1;
-        T_table_input.xLogScale = false;
-        T_table_input.fLogScale = false;
-        T_table_input.xdata = thermo_tables[0].fdata;
-        T_table_input.fdata = thermo_tables[0].xdata;
-
-        // LteMixture object valid on host
-        mixture = new LteMixture(config.lteMixtureInput.f, dim, nvel, config.const_plasma_conductivity_,
-                                 thermo_tables[0], thermo_tables[1], thermo_tables[2], T_table_input);
-
-#if defined(_CUDA_) || defined(_HIP_)
-        // LteMixture object valid on device
-        tpsGpuMalloc((void **)(&d_mixture), sizeof(LteMixture));
-        gpu::instantiateDeviceLteMixture<<<1, 1>>>(config.lteMixtureInput.f, dim, nvel,
-                                                   config.const_plasma_conductivity_, thermo_tables[0],
-                                                   thermo_tables[1], thermo_tables[2], T_table_input, d_mixture);
-#endif
-
-        // Initialize transport TableInput (data read below)
-        std::vector<TableInput> trans_tables(3);
-        for (int i = 0; i < trans_tables.size(); i++) {
-          trans_tables[i].order = 1;
-          trans_tables[i].xLogScale = false;
-          trans_tables[i].fLogScale = false;
-        }
-
-        // Read data from hdf5 file containing 4 columns: T, mu, kappa, sigma
-        // (i.e., temperature, dynamic viscosity, thermal conductivity, electrical conductivity)
-        DenseMatrix trans_data;
-        success = h5ReadBcastMultiColumnTable(config.lteMixtureInput.trans_file_name, std::string("T_mu_kappa_sigma"),
-                                              TPSCommWorld, trans_data, trans_tables);
-        if (!success) exit(ERROR);
-
-          // Instantiate LteTransport class
-#if defined(_CUDA_) || defined(_HIP_)
-        tpsGpuMalloc((void **)&transportPtr, sizeof(LteTransport));
-        gpu::instantiateDeviceLteTransport<<<1, 1>>>(d_mixture, trans_tables[0], trans_tables[1], trans_tables[2],
-                                                     transportPtr);
-#else
-        transportPtr = new LteTransport(mixture, trans_tables[0], trans_tables[1], trans_tables[2]);
-#endif
-      } else {
-        mfem_error("flow/lte/table_dim must be 1 or 2.");
-      }
-      break;
-    default:
-      mfem_error("WorkingFluid not recognized.");
-      break;
-  }
-
-  if (config.use_mixing_length) {
-#if defined(_CUDA_) || defined(_HIP_)
-    // dynamic_cast on a device-side pointer doesn't work, so instead
-    // pass the TransportProperties pointer and cast it within
-    // instantiateDeviceMixingLengthTransport
-    TransportProperties *temporary_transport = transportPtr;
-    tpsGpuMalloc((void **)&transportPtr, sizeof(MixingLengthTransport));
-    gpu::instantiateDeviceMixingLengthTransport<<<1, 1>>>(d_mixture, config.mix_length_trans_input_,
-                                                          temporary_transport, transportPtr);
-#else
-    // Build mixing length transport using whatever molecular transport we've already instantiated
-    MolecularTransport *temporary_transport = dynamic_cast<MolecularTransport *>(transportPtr);
-    transportPtr = new MixingLengthTransport(mixture, config, temporary_transport);
-#endif
-  }
+  initMixtureAndTransportModels();
 
   switch (config.radiationInput.model) {
     case NET_EMISSION:
@@ -480,11 +491,6 @@ void M2ulPhyS::initVariables() {
       mfem_error("RadiationModel not recognized.");
       break;
   }
-  assert(mixture != NULL);
-#if defined(_CUDA_) || defined(_HIP_)
-#else
-  d_mixture = mixture;
-#endif
 
   order = config.GetSolutionOrder();
 
