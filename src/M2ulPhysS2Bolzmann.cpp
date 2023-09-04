@@ -39,8 +39,7 @@
 // CPU version (just for starting up)
 void M2ulPhyS::push(TPS::Tps2Boltzmann &interface) {
 
-    if ( !interface.IsInitialized() )
-        interface.init(this);
+    assert ( interface.IsInitialized() );
 
     constexpr double avogadro(6.02214076e23);
     int nscalardofs = vfes->GetNDofs();

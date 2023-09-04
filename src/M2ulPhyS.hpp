@@ -419,7 +419,6 @@ class M2ulPhyS : public TPS::Solver {
   // Accessors
   RHSoperator *getRHSoperator() { return rhsOperator; }
   ParMesh *GetMesh() { return mesh; }
-  ParMesh *GetFluidMesh() { return mesh; }
   FiniteElementCollection *GetFEC() { return fec; }
   ParFiniteElementSpace *GetFESpace() { return vfes; }
   ParFiniteElementSpace *GetScalarFES() { return fes; }

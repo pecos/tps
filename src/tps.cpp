@@ -499,7 +499,8 @@ void tps(py::module &m) {
       .def("solveStep", &TPS::Tps::solve)
       .def("solveEnd", &TPS::Tps::solveEnd)
       .def("push", &TPS::Tps::push)
-      .def("fetch", &TPS::Tps::fetch);
+      .def("fetch", &TPS::Tps::fetch)
+      .def("initInterface", &TPS::Tps::initInterface);
 }
 
 }  // namespace tps_wrappers

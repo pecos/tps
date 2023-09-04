@@ -107,6 +107,13 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   void solveStep() override;
   void solveEnd() override;
 
+  /// Push solver variables to interface
+  void initInterface(TPS::Tps2Boltzmann &interface) override;
+  /// Push solver variables to interface
+  void push(TPS::Tps2Boltzmann &interface) override;
+  /// Fetch solver variables from interface
+  void fetch(TPS::Tps2Boltzmann &interface) override;
+
   M2ulPhyS *getFlowSolver() { return flow_solver_; }
   QuasiMagnetostaticSolverBase *getEMSolver() { return qmsa_solver_; }
 };

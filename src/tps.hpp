@@ -187,6 +187,9 @@ class Tps {
     return;
   }
 
+  /// Initialize the interface
+  void initInterface(Tps2Boltzmann &interface) { solver_->initInterface(interface); }
+
   /// Push solver variables to interface
   void push(Tps2Boltzmann &interface) { solver_->push(interface); }
 
