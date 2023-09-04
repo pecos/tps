@@ -80,13 +80,12 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps) : NIndexes(7), tps_(tps) {
   tps->getRequiredInput("boltzmannInterface/nreactios", nreactions_);
   tps->getRequiredInput("boltzmannInterface/order", order_);
   tps->getRequiredInput("boltzmannInterface/basis_type", basis_type_);
-  assert(basis_type_== 0 || basis_type_ == 1);
+  assert(basis_type_ == 0 || basis_type_ == 1);
 
   offsets.SetSize(NIndexes + 1);
+}
 
-  }
-
-void Tps2Boltzmann::init(M2ulPhyS * flowSolver) {
+void Tps2Boltzmann::init(M2ulPhyS *flowSolver) {
   mfem::ParMesh *pmesh(flowSolver->GetMesh());
   fec_ = new mfem::L2_FECollection(order_, pmesh->Dimension(), basis_type_);
   switch (pmesh->Dimension()) {
@@ -108,7 +107,7 @@ void Tps2Boltzmann::init(M2ulPhyS * flowSolver) {
   scalar_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_);
   reaction_rates_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_, nreactions_, mfem::Ordering::byNODES);
 
-  list_fes_ = new mfem::ParFiniteElementSpace *[NIndexes+1];
+  list_fes_ = new mfem::ParFiniteElementSpace *[NIndexes + 1];
   list_fes_[Index::ElectricField] = efield_fes_;
   list_fes_[Index::SpeciesDensities] = species_densities_fes_;
   list_fes_[Index::HeavyTemperature] = scalar_fes_;
@@ -116,7 +115,7 @@ void Tps2Boltzmann::init(M2ulPhyS * flowSolver) {
   list_fes_[Index::ElectronMobility] = scalar_fes_;
   list_fes_[Index::ElectronDiffusion] = scalar_fes_;
   list_fes_[Index::ReactionRates] = reaction_rates_fes_;
-  list_fes_[Index::All]           = all_fes_;
+  list_fes_[Index::All] = all_fes_;
 
   mfem::ParGridFunction *all = new mfem::ParGridFunction(all_fes_);
   fields_ = new mfem::ParGridFunction *[NIndexes + 1];
@@ -127,14 +126,16 @@ void Tps2Boltzmann::init(M2ulPhyS * flowSolver) {
   }
   fields_[Index::All] = all;
 
-  //Native spaces
-  mfem::FiniteElementCollection *fec_native( flowSolver->GetFEC() );
-  species_densities_native_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_native, nspecies_, mfem::Ordering::byNODES);
+  // Native spaces
+  mfem::FiniteElementCollection *fec_native(flowSolver->GetFEC());
+  species_densities_native_fes_ =
+      new mfem::ParFiniteElementSpace(pmesh, fec_native, nspecies_, mfem::Ordering::byNODES);
   efield_native_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_native, nEfieldComps_, mfem::Ordering::byNODES);
   scalar_native_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_native);
-  reaction_rates_native_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_native, nreactions_, mfem::Ordering::byNODES);;
-  
-  list_native_fes_ = new mfem::ParFiniteElementSpace *[NIndexes+1];
+  reaction_rates_native_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_native, nreactions_, mfem::Ordering::byNODES);
+  ;
+
+  list_native_fes_ = new mfem::ParFiniteElementSpace *[NIndexes + 1];
   list_native_fes_[Index::ElectricField] = efield_native_fes_;
   list_native_fes_[Index::SpeciesDensities] = species_densities_native_fes_;
   list_native_fes_[Index::HeavyTemperature] = scalar_native_fes_;
@@ -143,13 +144,14 @@ void Tps2Boltzmann::init(M2ulPhyS * flowSolver) {
   list_native_fes_[Index::ElectronDiffusion] = scalar_native_fes_;
   list_native_fes_[Index::ReactionRates] = reaction_rates_native_fes_;
 
-  //Interpolator
+  // Interpolator
   auto assembly_level = mfem::AssemblyLevel::FULL;
   efield_interpolator_ = new mfem::ParDiscreteLinearOperator(efield_native_fes_, efield_fes_);
   efield_interpolator_->AddDomainInterpolator(new mfem::IdentityInterpolator());
   efield_interpolator_->SetAssemblyLevel(assembly_level);
   efield_interpolator_->Assemble();
-  species_densities_interpolator_ = new mfem::ParDiscreteLinearOperator(species_densities_native_fes_, species_densities_fes_);
+  species_densities_interpolator_ =
+      new mfem::ParDiscreteLinearOperator(species_densities_native_fes_, species_densities_fes_);
   species_densities_interpolator_->AddDomainInterpolator(new mfem::IdentityInterpolator());
   species_densities_interpolator_->SetAssemblyLevel(assembly_level);
   species_densities_interpolator_->Assemble();
@@ -157,12 +159,13 @@ void Tps2Boltzmann::init(M2ulPhyS * flowSolver) {
   scalar_interpolator_->AddDomainInterpolator(new mfem::IdentityInterpolator());
   scalar_interpolator_->SetAssemblyLevel(assembly_level);
   scalar_interpolator_->Assemble();
-  species_densities_interpolator_ = new mfem::ParDiscreteLinearOperator(species_densities_native_fes_, species_densities_fes_);
+  species_densities_interpolator_ =
+      new mfem::ParDiscreteLinearOperator(species_densities_native_fes_, species_densities_fes_);
   species_densities_interpolator_->AddDomainInterpolator(new mfem::IdentityInterpolator());
   species_densities_interpolator_->SetAssemblyLevel(assembly_level);
   species_densities_interpolator_->Assemble();
 
-  list_interpolators_= new mfem::ParDiscreteLinearOperator *[NIndexes+1];
+  list_interpolators_ = new mfem::ParDiscreteLinearOperator *[NIndexes + 1];
   list_interpolators_[Index::ElectricField] = efield_interpolator_;
   list_interpolators_[Index::SpeciesDensities] = species_densities_interpolator_;
   list_interpolators_[Index::HeavyTemperature] = scalar_interpolator_;
@@ -172,9 +175,8 @@ void Tps2Boltzmann::init(M2ulPhyS * flowSolver) {
   list_interpolators_[Index::ReactionRates] = reaction_rates_interpolator_;
 }
 
-void Tps2Boltzmann::interpolateFromNativeFES(const ParGridFunction & input,
-                                              Tps2Boltzmann::Index index) {
-list_interpolators_[index]->Mult(input, *(fields_[index]));
+void Tps2Boltzmann::interpolateFromNativeFES(const ParGridFunction &input, Tps2Boltzmann::Index index) {
+  list_interpolators_[index]->Mult(input, *(fields_[index]));
 }
 
 Tps2Boltzmann::~Tps2Boltzmann() {

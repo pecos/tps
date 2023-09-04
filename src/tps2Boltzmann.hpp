@@ -85,7 +85,7 @@ class Tps2Boltzmann {
   const std::size_t NIndexes;
 
   Tps2Boltzmann(Tps *tps);
-  void init(M2ulPhyS * flowSolver);
+  void init(M2ulPhyS *flowSolver);
   bool IsInitialized() const { return all_fes_ != 0; }
 
   const mfem::ParFiniteElementSpace &Fes(Index index) const { return *(list_fes_[index]); }
@@ -97,7 +97,7 @@ class Tps2Boltzmann {
   const mfem::ParGridFunction &Field(Index index) const { return *(fields_[index]); }
   mfem::ParGridFunction &Field(Index index) { return *(fields_[index]); }
 
-  void interpolateFromNativeFES(const ParGridFunction & input, Index index);
+  void interpolateFromNativeFES(const ParGridFunction &input, Index index);
 
   //! Get the angular Frequency \omega of the electrical field:
   //! E(t) = Er*cos(\omega t) + Ei*sin(\omega t)

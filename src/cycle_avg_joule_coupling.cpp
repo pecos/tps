@@ -353,19 +353,17 @@ void CycleAvgJouleCoupling::solveEnd() {
   qmsa_solver_->solveEnd();
 }
 
-  /// Push solver variables to interface
-  void CycleAvgJouleCoupling::initInterface(TPS::Tps2Boltzmann &interface) {
-    interface.init(flow_solver_);
-  }
+/// Push solver variables to interface
+void CycleAvgJouleCoupling::initInterface(TPS::Tps2Boltzmann &interface) { interface.init(flow_solver_); }
 
-  /// Push solver variables to interface
-  void CycleAvgJouleCoupling::push(TPS::Tps2Boltzmann &interface) {
-    flow_solver_->push(interface);
-    std::cout << "Need to push an electric field" << std::endl;
-  }
+/// Push solver variables to interface
+void CycleAvgJouleCoupling::push(TPS::Tps2Boltzmann &interface) {
+  flow_solver_->push(interface);
+  std::cout << "Need to push an electric field" << std::endl;
+}
 
-  /// Fetch solver variables from interface
-  void CycleAvgJouleCoupling::fetch(TPS::Tps2Boltzmann &interface) {
-    std::cout << "Nothing to be fetched in CycleAvgJouleCoupling" << std::endl;
-    flow_solver_->fetch(interface);
-  }
+/// Fetch solver variables from interface
+void CycleAvgJouleCoupling::fetch(TPS::Tps2Boltzmann &interface) {
+  std::cout << "Nothing to be fetched in CycleAvgJouleCoupling" << std::endl;
+  flow_solver_->fetch(interface);
+}

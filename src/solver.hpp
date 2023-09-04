@@ -79,7 +79,7 @@ class Solver {
   }
 
   /// Initialize the interface
-  virtual void initInterface(Tps2Boltzmann &interface)  {
+  virtual void initInterface(Tps2Boltzmann& interface) {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
   }
@@ -95,7 +95,6 @@ class Solver {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
   }
-
 };
 
 }  // end namespace TPS
