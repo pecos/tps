@@ -20,6 +20,10 @@ if [ ! -d lte-data ];then
     ln -s $testDir/lte-data .
 fi
 
+if [ ! -d rad-data ];then
+    ln -s $testDir/rad-data .
+fi
+
 # reference solutions
 if [ ! -d ref_solns ];then
     ln -s $testDir/ref_solns .

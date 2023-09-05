@@ -1,0 +1,74 @@
+#!./bats
+# -*- mode: sh -*-
+
+# NB: '_1D' here refs to the LTE tables being two-dimensional
+TEST="plasma.axisym"
+RUNFILE_1D="inputs/plasma.lte1d.ini"
+RUNFILE_1D_MOD="inputs/plasma.lte1d.ini.mod"
+
+setup() {
+    SOLN_FILE_1D=restart_output-plasma.sol.h5
+    RSTRT_FILE_1D=ref_solns/plasma.lte2d.restart.h5
+    REF_FILE_1D=ref_solns/plasma.lte1d.final.h5
+
+    found=1
+
+    # defaut to mpirun if available
+    MPIRUN=$(type -P mpirun) || found=0
+
+    # if not, try flux
+    if [ $found -eq 0 ]; then
+        type -P flux && MPIRUN="$(type -P flux) run" || found=0
+    fi
+
+    # if neither mpirun or flux found, then MPIRUN is empty and tests
+    # below will be skipped
+}
+
+@test "[$TEST] verify axisymmetric LTE (1D) plasma case with input from -> $RUNFILE_1D" {
+    # don't run if we don't know how to launch a parallel job
+    [ "x$MPIRUN" != "x" ] || skip "Cannot launch parallel job"
+
+    # paraview+restart will fail if data in output-pipe is from after restart
+    rm -rf output-plasma
+
+    test -s $RUNFILE_1D
+    test -s $RSTRT_FILE_1D
+    cp $RSTRT_FILE_1D $SOLN_FILE_1D
+
+    $MPIRUN -n 4 ../src/tps --runFile $RUNFILE_1D
+
+    test -s $SOLN_FILE_1D
+    test -s $REF_FILE_1D
+
+    # Relax tolerances here slightly to pass on some cuda platforms;
+    # cause of increased delta is unclear
+    ./soln_differ -r $SOLN_FILE_1D $REF_FILE_1D
+}
+
+@test "[$TEST] verify axisymmetric LTE (1D) plasma case restart consistency " {
+    # don't run if we don't know how to launch a parallel job
+    [ "x$MPIRUN" != "x" ] || skip "Cannot launch parallel job"
+
+    # paraview+restart will fail if data in output-pipe is from after restart
+    rm -rf output-plasma
+
+    test -s $RUNFILE_1D
+
+    rm -f $RUNFILE_1D_MOD
+    sed 's/max-iters = 100/max-iters = 50/' $RUNFILE_1D >& $RUNFILE_1D_MOD
+
+    test -s $RSTRT_FILE_1D
+    cp $RSTRT_FILE_1D $SOLN_FILE_1D
+
+    $MPIRUN -n 4 ../src/tps --runFile $RUNFILE_1D_MOD
+    $MPIRUN -n 4 ../src/tps --runFile $RUNFILE_1D_MOD
+
+    test -s $SOLN_FILE_1D
+    test -s $REF_FILE_1D
+
+    # Relax tolerances due to large Joule heating
+    ./soln_differ -r -t 3e-12 -u 1e-8 -e 1e-10 $SOLN_FILE_1D $REF_FILE_1D
+
+    rm -f $RUNFILE_1D_MOD
+}

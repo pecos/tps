@@ -1,0 +1,77 @@
+#!./bats
+# -*- mode: sh -*-
+
+# NB: '_2D' here refs to the LTE tables being two-dimensional
+TEST="plasma.axisym"
+RUNFILE_2D="inputs/plasma.lte2d.ini"
+RUNFILE_2D_MOD="inputs/plasma.lte2d.ini.mod"
+
+setup() {
+    SOLN_FILE_2D=restart_output-plasma.sol.h5
+    RSTRT_FILE_2D=ref_solns/plasma.lte2d.restart.h5
+    REF_FILE_2D=ref_solns/plasma.lte2d.final.h5
+
+    found=1
+
+    # defaut to mpirun if available
+    MPIRUN=$(type -P mpirun) || found=0
+
+    # if not, try flux
+    if [ $found -eq 0 ]; then
+        type -P flux && MPIRUN="$(type -P flux) run" || found=0
+    fi
+
+    # if neither mpirun or flux found, then MPIRUN is empty and tests
+    # below will be skipped
+}
+
+@test "[$TEST] verify axisymmetric LTE (2D) plasma case with input from -> $RUNFILE_2D" {
+    # don't run if we don't know how to launch a parallel job
+    [ "x$MPIRUN" != "x" ] || skip "Cannot launch parallel job"
+
+    # paraview+restart will fail if data in output-pipe is from after restart
+    rm -rf output-plasma
+
+    test -s $RUNFILE_2D
+    test -s $RSTRT_FILE_2D
+    cp $RSTRT_FILE_2D $SOLN_FILE_2D
+
+    $MPIRUN -n 4 ../src/tps --runFile $RUNFILE_2D
+
+    test -s $SOLN_FILE_2D
+    test -s $REF_FILE_2D
+
+    # Relax tolerances here slightly to pass on some cuda platforms;
+    # cause of increased delta is unclear
+    #./soln_differ -r -u 4e-11 -e 6e-14 $SOLN_FILE_MIX $REF_FILE_MIX
+    ./soln_differ -r $SOLN_FILE_2D $REF_FILE_2D
+}
+
+@test "[$TEST] verify axisymmetric LTE (2D) plasma case restart consistency " {
+    # don't run if we don't know how to launch a parallel job
+    [ "x$MPIRUN" != "x" ] || skip "Cannot launch parallel job"
+
+    # paraview+restart will fail if data in output-pipe is from after restart
+    rm -rf output-plasma
+
+    test -s $RUNFILE_2D
+
+    rm -f $RUNFILE_2D_MOD
+    sed 's/max-iters = 100/max-iters = 50/' $RUNFILE_2D >& tmp.ini
+    sed 's/outputFreq = 100/outputFreq = 50/' tmp.ini >& $RUNFILE_2D_MOD
+    rm -f tmp.ini
+
+    test -s $RSTRT_FILE_2D_MOD
+    cp $RSTRT_FILE_2D $SOLN_FILE_2D
+
+    $MPIRUN -n 4 ../src/tps --runFile $RUNFILE_2D_MOD
+    $MPIRUN -n 4 ../src/tps --runFile $RUNFILE_2D_MOD
+
+    test -s $SOLN_FILE_2D
+    test -s $REF_FILE_2D
+
+    # Relax tolerances due to large Joule heating
+    ./soln_differ -r -u 2e-10 -e 3e-12 $SOLN_FILE_2D $REF_FILE_2D
+
+    rm -f $RUNFILE_2D_MOD
+}

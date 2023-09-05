@@ -44,3 +44,6 @@ ref_solns/pipe.mix.161100.sol.h5 filter=lfs diff=lfs merge=lfs -text
 ref_solns/pipe.mix.restart.sol.h5 filter=lfs diff=lfs merge=lfs -text
 ref_solns/restart_non-lte-restart-test.lte.h5 filter=lfs diff=lfs merge=lfs -text
 ref_solns/restart_non-lte-restart-test.noneq.h5 filter=lfs diff=lfs merge=lfs -text
+ref_solns/plasma.lte1d.final.h5 filter=lfs diff=lfs merge=lfs -text
+lte-data/argon_thermo_1atm.h5 filter=lfs diff=lfs merge=lfs -text
+lte-data/argon_transport_1atm.h5 filter=lfs diff=lfs merge=lfs -text
