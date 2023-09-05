@@ -38,6 +38,7 @@
 
 // CPU version (just for starting up)
 void M2ulPhyS::push(TPS::Tps2Boltzmann &interface) {
+  std::cout << "Enter M2ulPhyS::push" << std::endl;
   assert(interface.IsInitialized());
 
   constexpr double avogadro(6.02214076e23);
@@ -45,17 +46,19 @@ void M2ulPhyS::push(TPS::Tps2Boltzmann &interface) {
 
   const double *solver_data = U->HostRead();
 
-  mfem::ParGridFunction species(&interface.NativeFes(TPS::Tps2Boltzmann::Index::SpeciesDensities));
-  mfem::ParGridFunction heavyTemperature(&interface.NativeFes(TPS::Tps2Boltzmann::Index::HeavyTemperature));
-  mfem::ParGridFunction electronTemperature(&interface.NativeFes(TPS::Tps2Boltzmann::Index::ElectronTemperature));
+  mfem::ParGridFunction *species = new mfem::ParGridFunction(&interface.NativeFes(TPS::Tps2Boltzmann::Index::SpeciesDensities));
+  mfem::ParGridFunction *heavyTemperature = new mfem::ParGridFunction(&interface.NativeFes(TPS::Tps2Boltzmann::Index::HeavyTemperature));
+  mfem::ParGridFunction *electronTemperature = new mfem::ParGridFunction(&interface.NativeFes(TPS::Tps2Boltzmann::Index::ElectronTemperature));
 
-  double *species_data = species.HostWrite();
-  double *heavyTemperature_data = heavyTemperature.HostWrite();
-  double *electronTemperature_data = electronTemperature.HostWrite();
+  
+  double *species_data = species->HostWrite();
+  double *heavyTemperature_data = heavyTemperature->HostWrite();
+  double *electronTemperature_data = electronTemperature->HostWrite();
 
-  double *state_local = new double[num_equation];
+  double state_local[gpudata::MAXEQUATIONS];
   double species_local[gpudata::MAXSPECIES];
 
+  std::cout << "Start to loop" << std::endl;
   for (int i = 0; i < nscalardofs; i++) {
     for (int eq = 0; eq < num_equation; eq++) state_local[eq] = solver_data[i + eq * nscalardofs];
 
@@ -68,9 +71,18 @@ void M2ulPhyS::push(TPS::Tps2Boltzmann &interface) {
     for (int sp = 0; sp < interface.Nspecies(); sp++) species_data[i + sp * nscalardofs] = avogadro * species_local[sp];
   }
 
-  interface.interpolateFromNativeFES(species, TPS::Tps2Boltzmann::Index::SpeciesDensities);
-  interface.interpolateFromNativeFES(heavyTemperature, TPS::Tps2Boltzmann::Index::HeavyTemperature);
-  interface.interpolateFromNativeFES(electronTemperature, TPS::Tps2Boltzmann::Index::ElectronTemperature);
+  std::cout << "Call interpolate" << std::endl;
+  interface.interpolateFromNativeFES(*species, TPS::Tps2Boltzmann::Index::SpeciesDensities);
+  interface.interpolateFromNativeFES(*heavyTemperature, TPS::Tps2Boltzmann::Index::HeavyTemperature);
+  interface.interpolateFromNativeFES(*electronTemperature, TPS::Tps2Boltzmann::Index::ElectronTemperature);
+
+  std::cout << "Delete native GridFunctions" << std::endl;
+
+  delete species;
+  delete heavyTemperature;
+  delete electronTemperature;
+
+  std::cout << "Exit M2ulPhyS::push" << std::endl;
 }
 
 void M2ulPhyS::fetch(TPS::Tps2Boltzmann &interface) { return; }

@@ -91,8 +91,8 @@ class Tps2Boltzmann {
   const mfem::ParFiniteElementSpace &Fes(Index index) const { return *(list_fes_[index]); }
   mfem::ParFiniteElementSpace &Fes(Index index) { return *(list_fes_[index]); }
 
-  const mfem::ParFiniteElementSpace &NativeFes(Index index) const { return *(list_fes_[index]); }
-  mfem::ParFiniteElementSpace &NativeFes(Index index) { return *(list_fes_[index]); }
+  const mfem::ParFiniteElementSpace &NativeFes(Index index) const { return *(list_native_fes_[index]); }
+  mfem::ParFiniteElementSpace &NativeFes(Index index) { return *(list_native_fes_[index]); }
 
   const mfem::ParGridFunction &Field(Index index) const { return *(fields_[index]); }
   mfem::ParGridFunction &Field(Index index) { return *(fields_[index]); }

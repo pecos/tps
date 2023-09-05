@@ -79,13 +79,14 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps) : NIndexes(7), tps_(tps) {
   // TODO: Get the number of reactions for the solver
   tps->getRequiredInput("boltzmannInterface/nreactios", nreactions_);
   tps->getRequiredInput("boltzmannInterface/order", order_);
-  tps->getRequiredInput("boltzmannInterface/basis_type", basis_type_);
+  tps->getRequiredInput("boltzmannInterface/basisType", basis_type_);
   assert(basis_type_ == 0 || basis_type_ == 1);
 
   offsets.SetSize(NIndexes + 1);
 }
 
 void Tps2Boltzmann::init(M2ulPhyS *flowSolver) {
+  std::cout<< "Tps2Boltzmann::init is called" << std::endl;
   mfem::ParMesh *pmesh(flowSolver->GetMesh());
   fec_ = new mfem::L2_FECollection(order_, pmesh->Dimension(), basis_type_);
   switch (pmesh->Dimension()) {
@@ -133,7 +134,6 @@ void Tps2Boltzmann::init(M2ulPhyS *flowSolver) {
   efield_native_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_native, nEfieldComps_, mfem::Ordering::byNODES);
   scalar_native_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_native);
   reaction_rates_native_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_native, nreactions_, mfem::Ordering::byNODES);
-  ;
 
   list_native_fes_ = new mfem::ParFiniteElementSpace *[NIndexes + 1];
   list_native_fes_[Index::ElectricField] = efield_native_fes_;
@@ -253,7 +253,7 @@ void tps2bolzmann(py::module &m) {
       .value("ElectronDiffusion", TPS::Tps2Boltzmann::Index::ElectronDiffusion)
       .value("ReactionRates", TPS::Tps2Boltzmann::Index::ReactionRates);
 
-  py::class_<TPS::Tps2Boltzmann>(m, "Tps2Bolzmann")
+  py::class_<TPS::Tps2Boltzmann>(m, "Tps2Boltzmann")
       .def(py::init<TPS::Tps *>())
       .def("HostRead",
            [](const TPS::Tps2Boltzmann &interface, TPS::Tps2Boltzmann::Index index) {
