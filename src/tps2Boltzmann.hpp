@@ -60,6 +60,11 @@
 class M2ulPhyS;
 
 namespace TPS {
+//TODO:
+/*
+- Add dictionaries for species
+- Reshape arrays as matrices
+*/
 class Tps2Boltzmann {
  public:
   enum Index {
@@ -69,7 +74,7 @@ class Tps2Boltzmann {
     SpeciesDensities = 1,
     //! Heavy temperature [K]: TPS --> Bolzmann
     HeavyTemperature = 2,
-    //! Electron temperature [eV]: TPS <--> Bolzmann
+    //! Electron temperature [K]: TPS <--> Bolzmann
     ElectronTemperature = 3,
     //! Electron mobility: TPS <-- Bolzmann
     ElectronMobility = 4,
@@ -86,7 +91,7 @@ class Tps2Boltzmann {
 
   Tps2Boltzmann(Tps *tps);
   void init(M2ulPhyS *flowSolver);
-  bool IsInitialized() const { return all_fes_ != 0; }
+  bool IsInitialized() const { return all_fes_ != nullptr; }
 
   const mfem::ParFiniteElementSpace &Fes(Index index) const { return *(list_fes_[index]); }
   mfem::ParFiniteElementSpace &Fes(Index index) { return *(list_fes_[index]); }
@@ -103,6 +108,7 @@ class Tps2Boltzmann {
   //! E(t) = Er*cos(\omega t) + Ei*sin(\omega t)
   double EfieldAngularFreq() { return EfieldAngularFreq_; }
   int Nspecies() const { return nspecies_; }
+  int NeFieldComps() const { return nEfieldComps_; }
 
   ~Tps2Boltzmann();
 

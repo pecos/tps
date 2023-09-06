@@ -41,6 +41,7 @@
 #include <pybind11/stl.h>
 #endif
 
+#include <cstddef>
 #include <cstdlib>
 
 namespace TPS {
@@ -71,7 +72,7 @@ class CPUData {
   size_t stride_;
 };
 
-Tps2Boltzmann::Tps2Boltzmann(Tps *tps) : NIndexes(7), tps_(tps) {
+Tps2Boltzmann::Tps2Boltzmann(Tps *tps) : NIndexes(7), tps_(tps), all_fes_(nullptr) {
   // Assert we have a couple solver;
   assert(tps->isFlowEMCoupled());
 

@@ -53,6 +53,14 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   QuasiMagnetostaticSolverBase *qmsa_solver_;
   M2ulPhyS *flow_solver_;
 
+  // Only needed for Boltzmann interface
+  mfem::FiniteElementCollection *efieldFEC_;
+  mfem::ParFiniteElementSpace *efieldFES_;
+  mfem::ParFiniteElementSpace *efieldFES1_;
+  mfem::ParGridFunction *efield_;
+  mfem::ParGridFunction *efieldR_;
+  mfem::ParGridFunction *efieldI_;
+
   //! Maximum number of iterations
   int max_iters_;
   //! Current iteration
@@ -96,8 +104,10 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   ~CycleAvgJouleCoupling();
 
   void initializeInterpolationData();
+  void interpolationPoints(mfem::Vector & vxyz, int n_interp_nodes, const mfem::ParFiniteElementSpace * fes);
   void interpConductivityFromFlowToEM();
   void interpJouleHeatingFromEMToFlow();
+  void interpElectricFieldFromEMToFlow();
 
   void parseSolverOptions() override;
   void initialize() override;
