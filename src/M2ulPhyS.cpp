@@ -1104,6 +1104,12 @@ void M2ulPhyS::initIndirectionArrays() {
     bdry_face_data.bc_category = NUM_BC_CATEGORIES;
     auto h_bc_category = bdry_face_data.bc_category.HostWrite();
 
+    bdry_face_data.dist.UseDevice(true);
+    bdry_face_data.dist.SetSize(NumBCelems * maxIntPoints);
+    bdry_face_data.dist = 0.;
+    auto h_bdry_dist = bdry_face_data.dist.HostWrite();
+
+
     const FiniteElement *fe;
     FaceElementTransformations *tr;
     // Mesh *mesh = fes->GetMesh();
@@ -1152,6 +1158,18 @@ void M2ulPhyS::initIndirectionArrays() {
         }
         if (!inList) uniqueElems.push_back(tr->Elem1No);
 
+        Vector dist;
+        if (distance_ != NULL) {
+          const ParFiniteElementSpace *dist_fes = distance_->ParFESpace();
+
+          Array<int> dist_dofs1;
+          // dist_fes->GetElementVDofs(tr->Elem1->ElementNo, dist_dofs1);
+          dist_fes->GetElementVDofs(tr->Elem1No, dist_dofs1);
+          dist.SetSize(dist_dofs1.Size());
+          distance_->GetSubVector(dist_dofs1, dist);
+        }
+
+
         for (int q = 0; q < ir->GetNPoints(); q++) {
           const IntegrationPoint &ip = ir->IntPoint(q);
           tr->SetAllIntPoints(&ip);
@@ -1173,6 +1191,14 @@ void M2ulPhyS::initIndirectionArrays() {
           shape1.SetSize(elDof);
           fe->CalcShape(tr->GetElement1IntPoint(), shape1);
           for (int n = 0; n < elDof; n++) hshapesBC[n + q * maxDofs + f * maxIntPoints * maxDofs] = shape1(n);
+
+          // evaluate distance
+          double d1 = 0;
+          if (distance_ != NULL) {
+            d1 = dist * shape1;
+          }
+
+          h_bdry_dist[f * maxIntPoints + q] = d1;
         }
       }
     }

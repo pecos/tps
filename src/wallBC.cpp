@@ -300,32 +300,14 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
   Vector wallViscF(num_equation_);
   DenseMatrix viscF(num_equation_, dim_);
 
-  if (axisymmetric_) {
-    // here we have hijacked the inviscid wall condition to implement
-    // the axis... but... should implement this separately
+  DenseMatrix viscFw(num_equation_, dim_);
 
-    // incoming visc flux
-    fluxClass->ComputeViscousFluxes(stateIn, gradState, transip, delta, distance, viscF);
+  // evaluate viscous fluxes at the wall
+  fluxClass->ComputeViscousFluxes(stateMirror, gradState, transip, delta, distance, viscFw);
+  viscFw.Mult(normal, wallViscF);
 
-    // modify gradients so that wall is adibatic
-    Vector unitNorm = normal;
-    double normN = 0.;
-    for (int d = 0; d < dim_; d++) normN += normal[d] * normal[d];
-    unitNorm *= 1. / sqrt(normN);
-
-    for (int d = 0; d < dim_; d++) bcFlux_.normal[d] = unitNorm[d];
-    fluxClass->ComputeBdrViscousFluxes(stateMirror, gradState, transip, delta, distance, bcFlux_, wallViscF);
-    wallViscF *= sqrt(normN);  // in case normal is not a unit vector..
-  } else {
-    DenseMatrix viscFw(num_equation_, dim_);
-
-    // evaluate viscous fluxes at the wall
-    fluxClass->ComputeViscousFluxes(stateMirror, gradState, transip, delta, distance, viscFw);
-    viscFw.Mult(normal, wallViscF);
-
-    // evaluate internal viscous fluxes
-    fluxClass->ComputeViscousFluxes(stateIn, gradState, transip, delta, distance, viscF);
-  }
+  // evaluate internal viscous fluxes
+  fluxClass->ComputeViscousFluxes(stateIn, gradState, transip, delta, distance, viscF);
 
   // Add visc fluxes (we skip density eq.)
   for (int eq = 1; eq < num_equation_; eq++) {
@@ -650,6 +632,7 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
   const int *d_face_el = boundary_face_data.el.Read();
   const int *d_wallElems = wallElems.Read();
   const int *d_listElems = listElems.Read();
+  const double *d_dist = boundary_face_data.dist.Read();
 
   auto d_delta = boundary_face_data.delta_el1.Read();
 
@@ -678,7 +661,7 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
   MFEM_FORALL_2D(el_wall, wallElems.Size() / 7, maxIntPoints, 1, 1, {
     double u1[gpudata::MAXEQUATIONS], u2[gpudata::MAXEQUATIONS], nor[gpudata::MAXDIM], Rflux[gpudata::MAXEQUATIONS];
     double xyz[gpudata::MAXDIM];
-    double vF1[gpudata::MAXEQUATIONS * gpudata::MAXDIM], vF2[gpudata::MAXEQUATIONS];
+    double vF1[gpudata::MAXEQUATIONS * gpudata::MAXDIM], vF2[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
     double gradUp1[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
     double shape[gpudata::MAXDOFS];
     int index_i[gpudata::MAXDOFS];
@@ -725,6 +708,7 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
 
           xyz[d] = d_xyz[el_bdry * maxIntPoints * dim + q * dim + d];
         }
+        const double distance = d_dist[el_bdry * maxIntPoints + q];
 
         // interpolate to this quad point
         for (int eq = 0; eq < num_equation; eq++) {
@@ -763,20 +747,33 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
         d_rsolver->Eval_LF(u1, u2, nor, Rflux);
 
         if (type != WallType::SLIP) {
-          d_fluxclass->ComputeViscousFluxes(u1, gradUp1, xyz, d_delta[el_bdry], 0.0, vF1);
+          if (type == WallType::INV) {
+            // evaluate viscous fluxes at the wall
+            d_fluxclass->ComputeViscousFluxes(u2, gradUp1, xyz, d_delta[el_bdry], distance, vF2);
+            d_fluxclass->ComputeViscousFluxes(u1, gradUp1, xyz, d_delta[el_bdry], distance, vF1);
 
-          for (int eq = 0; eq < num_equation; eq++) {
-            u2[eq] = u1[eq];
-          }
-          d_mix->modifyStateFromPrimitive(u1, bcState, u2);
+            // add visc flux contribution
+            for (int eq = 0; eq < num_equation; eq++) {
+              for (int d = 0; d < dim; d++) {
+                Rflux[eq] -= 0.5 * (vF1[eq + d * num_equation] + vF2[eq + d * num_equation]) * nor[d];
+              }
+            }
+          } else {
+            d_fluxclass->ComputeViscousFluxes(u1, gradUp1, xyz, d_delta[el_bdry], 0.0, vF1);
 
-          d_fluxclass->ComputeBdrViscousFluxes(u2, gradUp1, xyz, d_delta[el_bdry], 0.0, bcFlux, vF2);
-          for (int eq = 0; eq < num_equation; eq++) vF2[eq] *= sqrt(normN);
+            for (int eq = 0; eq < num_equation; eq++) {
+              u2[eq] = u1[eq];
+            }
+            d_mix->modifyStateFromPrimitive(u1, bcState, u2);
 
-          // add visc flux contribution
-          for (int eq = 0; eq < num_equation; eq++) {
-            Rflux[eq] -= 0.5 * vF2[eq];
-            for (int d = 0; d < dim; d++) Rflux[eq] -= 0.5 * vF1[eq + d * num_equation] * nor[d];
+            d_fluxclass->ComputeBdrViscousFluxes(u2, gradUp1, xyz, d_delta[el_bdry], 0.0, bcFlux, vF2);
+            for (int eq = 0; eq < num_equation; eq++) vF2[eq] *= sqrt(normN);
+
+            // add visc flux contribution
+            for (int eq = 0; eq < num_equation; eq++) {
+              Rflux[eq] -= 0.5 * vF2[eq];
+              for (int d = 0; d < dim; d++) Rflux[eq] -= 0.5 * vF1[eq + d * num_equation] * nor[d];
+            }
           }
         }
 

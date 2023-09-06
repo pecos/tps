@@ -364,6 +364,9 @@ struct boundaryFaceIntegrationData {
 
   /** Isothermal wall temperature (or -1 if not an isothermal wall) */
   Vector wall_bc_temperature;
+
+  /** Distance function */
+  Vector dist;
 };
 
 /** @brief Data for shared face integral calculations
