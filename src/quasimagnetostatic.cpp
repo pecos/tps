@@ -60,9 +60,8 @@ QuasiMagnetostaticSolverBase::QuasiMagnetostaticSolverBase(ElectromagneticOption
   // verify running on cpu
   if (tpsP_->getDeviceConfig() != "cpu") {
     if (rank0_) {
-      grvy_printf(GRVY_ERROR, "[ERROR] EM simulation currently only supported on cpu.\n");
+      grvy_printf(GRVY_INFO, "[INFO] Even in gpu run, EM simulation only uses the cpu.\n");
     }
-    exit(1);
   }
 
   plasma_conductivity_ = NULL;
