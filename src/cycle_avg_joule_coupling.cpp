@@ -301,7 +301,7 @@ void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlow() {
   interpolationPoints(vxyz, n_flow_interp_nodes_, efieldFES_);
 
   // Evaluate source grid function.
-  Vector interp_vals(n_flow_interp_nodes_*efield_ncomp_);
+  Vector interp_vals(n_flow_interp_nodes_ * efield_ncomp_);
 
   const ParGridFunction *efield_real_gf = qmsa_solver_->getElectricFieldreal();
   interp_em_to_flow_->Interpolate(vxyz, *efield_real_gf, interp_vals);
@@ -390,7 +390,7 @@ void CycleAvgJouleCoupling::solveStep() {
 
     // interpolate the Joule heating to the flow mesh
     interpJouleHeatingFromEMToFlow();
-    if( efieldFES_ ) interpElectricFieldFromEMToFlow();
+    if (efieldFES_) interpElectricFieldFromEMToFlow();
   }
   // Run a step of the flow solver
   flow_solver_->solveStep();
@@ -413,11 +413,11 @@ void CycleAvgJouleCoupling::initInterface(TPS::Tps2Boltzmann &interface) {
   // Set up efield function space
   if (efieldFES_) delete efieldFES_;
   efield_ncomp_ = interface.NeFieldComps() / 2;
-  efieldFES_ = new mfem::ParFiniteElementSpace(flow_solver_->GetMesh(), efieldFEC_, efield_ncomp_ *2,
-                                               mfem::Ordering::byNODES);
+  efieldFES_ =
+      new mfem::ParFiniteElementSpace(flow_solver_->GetMesh(), efieldFEC_, efield_ncomp_ * 2, mfem::Ordering::byNODES);
   if (efieldFES1_) delete efieldFES1_;
-  efieldFES1_ = new mfem::ParFiniteElementSpace(flow_solver_->GetMesh(), efieldFEC_, efield_ncomp_,
-                                                mfem::Ordering::byNODES);
+  efieldFES1_ =
+      new mfem::ParFiniteElementSpace(flow_solver_->GetMesh(), efieldFEC_, efield_ncomp_, mfem::Ordering::byNODES);
   if (efield_) delete efield_;
   efield_ = new mfem::ParGridFunction(efieldFES_);
   if (efieldR_) delete efieldR_;
