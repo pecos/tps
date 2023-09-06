@@ -358,6 +358,8 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
   }
 
   const IntegrationRule *ir = &intRules->Get(Tr.GetGeometryType(), intorder);
+  const int numActiveSpecies = mixture->GetNumActiveSpecies();
+  const int nvel = mixture->GetNumVels();
 
   for (int i = 0; i < ir->GetNPoints(); i++) {
     const IntegrationPoint &ip = ir->IntPoint(i);
@@ -378,7 +380,15 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
       for (int k = 0; k < eldDof; k++) {
         sum += elfun(k + eq * eldDof) * shape1(k);
       }
-      funval1(eq) = sum;
+
+      // NOTE(malamast): We force negative (unphysical) values of species that occur due to interpolation error to be
+      // zero.
+      int sp = eq - nvel - 2;
+      if (sp >= 0 && sp < numActiveSpecies) {
+        funval1(eq) = max(sum, 0.0);
+      } else {
+        funval1(eq) = sum;
+      }
 
       // interpolation gradients
       for (int d = 0; d < dim; d++) {
