@@ -74,6 +74,8 @@ class Fluxes {
   const bool axisymmetric_;
   const int num_equation;
 
+  int numActiveSpecies;
+
   const int sgs_model_type_;
   const double sgs_model_floor_;
   const double sgs_model_const_;
@@ -116,6 +118,9 @@ class Fluxes {
                                                 double *normalFlux);
 
   MFEM_HOST_DEVICE bool isAxisymmetric() const { return axisymmetric_; }
+
+  MFEM_HOST_DEVICE int GetNumActiveSpecies() const { return numActiveSpecies; }
+  MFEM_HOST_DEVICE int GetNumVels() const { return nvel; }
 };
 
 #endif  // FLUXES_HPP_

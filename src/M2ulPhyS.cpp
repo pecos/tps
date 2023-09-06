@@ -1967,6 +1967,10 @@ void M2ulPhyS::solveStep() {
   timeIntegrator->Step(*U, time, dt);
 
   Check_NAN();
+  if (mixture->GetWorkingFluid() == WorkingFluid::USER_DEFINED) Check_Undershoot();
+
+  // MPI_Barrier(MPI_COMM_WORLD);
+  // if (rank0_) cout << "skata : " << " Check_Undershoot 2" << endl;
 
   if (!config.isTimeStepConstant()) {
     double dt_local = CFL * hmin / max_char_speed / static_cast<double>(dim);
@@ -2085,7 +2089,7 @@ void M2ulPhyS::solveEnd() {
 
     // VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
     // const double error = U->ComputeLpError(2, u0);
-    // if (mpi.Root()) cout << "Solution error: " << error << endl;
+    // if (rank0_) cout << "Solution error: " << error << endl;
 #else
     if (config.use_mms_) {
       checkSolutionError(time, true);
@@ -2479,6 +2483,25 @@ int M2ulPhyS::Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_pri
 
   auto htemp = loc_print.HostRead();
   return htemp[0];
+}
+
+// Here, we force negative (unphysical) values of species to be zero.
+// Negative values can occur due to numerical oscillations in the solution of the
+// transport equations of scalars. The effect of oscilations can be mitigated by employing
+// a TVD scheme. Van Leer's scheme is a common practice.
+void M2ulPhyS::Check_Undershoot() {
+  int dof = vfes->GetNDofs();
+  // #ifdef _GPU_
+  // #else
+  // const double *dataU = U->HostRead();
+  double *dataU = U->GetData();
+  for (int i = 0; i < dof; i++) {
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      int eq = nvel + 2 + sp;
+      dataU[i + eq * dof] = max(dataU[i + eq * dof], 0.0);
+    }
+  }
+  // #endif
 }
 
 void M2ulPhyS::initialTimeStep() {

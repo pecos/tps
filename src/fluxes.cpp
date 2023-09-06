@@ -49,6 +49,9 @@ Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_
   vsd_.p[0] = vsd_.p[1] = vsd_.p[2] = 0.;
   vsd_.ratio = 1.0;
   vsd_.width = 1.0;
+
+  nvel = mixture->GetNumVels();
+  numActiveSpecies = mixture->GetNumActiveSpecies();
 }
 
 Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport, const int _num_equation,
@@ -86,6 +89,9 @@ Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_
     vsd_.ratio = config_->GetLinearVaryingData().viscRatio;
     vsd_.width = config_->GetLinearVaryingData().width;
   }
+
+  nvel = mixture->GetNumVels();
+  numActiveSpecies = mixture->GetNumActiveSpecies();
 }
 
 MFEM_HOST_DEVICE Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
@@ -117,6 +123,9 @@ MFEM_HOST_DEVICE Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, Trans
     vsd_.ratio = vsd.ratio;
     vsd_.width = vsd.width;
   }
+
+  nvel = mixture->GetNumVels();
+  numActiveSpecies = mixture->GetNumActiveSpecies();
 }
 
 void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
