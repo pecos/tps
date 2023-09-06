@@ -1918,6 +1918,13 @@ void M2ulPhyS::solveStep() {
     // make a separate routine! plane interp and dump here
     if (config.planeDump.isEnabled == true) {
 #ifdef HAVE_GSLIB
+
+      // hack to get all ranks owning at least one point
+      int nRanks;      
+      MPI_Comm_size(MPI_COMM_WORLD, &nRanks);
+      int nPts = config.planeDump.samples;      
+      int totalPts = nPts * nPts;
+      //int totalPts = nPts * nPts + nRanks;	      
       
       // source, TODO: add option to select u, <u>, or <u'u'>
       ParGridFunction *u_gf = GetSolutionGF();
@@ -1926,13 +1933,8 @@ void M2ulPhyS::solveStep() {
       Vector normal, point;
       normal.SetSize(3);
       point.SetSize(3);
-      for (int d = 0; d < dim; d++) {
-        normal[d] = config.planeDump.normal(d);
-      }
-      for (int d = 0; d < dim; d++) {
-        point[d] = config.planeDump.point(d);
-      }
-      int nPts = config.planeDump.samples;
+      for (int d = 0; d < dim; d++) { normal[d] = config.planeDump.normal(d); }
+      for (int d = 0; d < dim; d++) { point[d] = config.planeDump.point(d); }
       double ndotp = 0.0;
       double majorD;
       for (int i = 0; i < dim; i++) {
@@ -1945,56 +1947,106 @@ void M2ulPhyS::solveStep() {
 
       // plane points
       Vector vxyz;
-      vxyz.SetSize(nPts * nPts * 3);
+      vxyz.SetSize( totalPts * 3);
+      double xPlane[totalPts];
+      double yPlane[totalPts];
+      double zPlane[totalPts];
       int iCnt = 0;
       double xp, yp, zp;
       double Lx, Ly, Lz;
       Lx = xmax - xmin;
       Ly = ymax - ymin;
       Lz = zmax - zmin;
-      if (majorD == normal[0]) {
-        double dy = Ly / (double)(nPts - 1);
-        double dz = Lz / (double)(nPts - 1);
+      if (majorD == std::abs(normal[0])) {
+        double dy = Ly/(double)(nPts-1);
+        double dz = Lz/(double)(nPts-1);
+	if (rank0_) { std::cout << "Plane x-major " << Ly << " " << Lz << " with delta " << dy << " x "<< dz << endl; }	
         for (int j = 0; j < nPts; j++) {
           for (int i = 0; i < nPts; i++) {
-            yp = dy * (double)i + ymin;
-            zp = dz * (double)j + zmin;
-            xp = (ndotp - (normal[1] * yp) - (normal[2] * zp)) / normal[0];
-            vxyz[iCnt + 0 * nPts * nPts] = xp;
-            vxyz[iCnt + 1 * nPts * nPts] = yp;
-            vxyz[iCnt + 2 * nPts * nPts] = zp;
+            xp = (ndotp - (normal[1]*yp) - (normal[2]*zp) ) / normal[0];	    
+            yp = dy*(double)i + ymin;
+            zp = dz*(double)j + zmin;
+            vxyz[iCnt + 0*totalPts] = xp;
+	    vxyz[iCnt + 1*totalPts] = yp;
+	    vxyz[iCnt + 2*totalPts] = zp;
+            //xPlane[iCnt] = xp;
+            //yPlane[iCnt] = yp;
+            //zPlane[iCnt] = zp;	    	    
             iCnt++;
           }
         }
-      } else if (majorD == normal[1]) {
-        double dx = Lx / (double)(nPts - 1);
-        double dz = Lz / (double)(nPts - 1);
+      } else if (majorD == std::abs(normal[1])) {
+        double dx = Lx/(double)(nPts-1);
+        double dz = Lz/(double)(nPts-1);
+	if (rank0_) { std::cout << "Plane y-major " <<  Lx << " " << Lz << " with delta " << dx << " x "<< dz << endl; }	
         for (int j = 0; j < nPts; j++) {
           for (int i = 0; i < nPts; i++) {
-            xp = dx * (double)i + xmin;
-            zp = dz * (double)j + zmin;
-            yp = (ndotp - (normal[0] * xp) - (normal[2] * zp)) / normal[1];
-            vxyz[iCnt + 0 * nPts * nPts] = xp;
-            vxyz[iCnt + 1 * nPts * nPts] = yp;
-            vxyz[iCnt + 2 * nPts * nPts] = zp;
+            xp = dx*(double)i + xmin;
+            yp = (ndotp - (normal[0]*xp) - (normal[2]*zp) ) / normal[1];	    
+            zp = dz*(double)j + zmin;
+   	    if (rank0_) { std::cout << iCnt << ": " << xp << " " << yp << " " << zp << endl;}
+            vxyz[iCnt + 0*totalPts] = xp;
+            vxyz[iCnt + 1*totalPts] = yp;
+            vxyz[iCnt + 2*totalPts] = zp;
+            //xPlane[iCnt] = xp;
+            //yPlane[iCnt] = yp;
+            //zPlane[iCnt] = zp;	    
             iCnt++;
           }
         }
       } else {
-        double dx = Lx / (double)(nPts - 1);
-        double dy = Ly / (double)(nPts - 1);
+        double dx = Lx/(double)(nPts-1);
+        double dy = Ly/(double)(nPts-1);
+	if (rank0_) { std::cout << "Plane z-major" <<  Lx << " " << Ly  << " with delta " << dx << " x "<< dy << endl; }	  	
         for (int j = 0; j < nPts; j++) {
           for (int i = 0; i < nPts; i++) {
-            xp = dx * (double)i + xmin;
-            yp = dy * (double)j + ymin;
-            zp = (ndotp - (normal[0] * xp) - (normal[1] * yp)) / normal[2];
-            vxyz[iCnt + 0 * nPts * nPts] = xp;
-            vxyz[iCnt + 1 * nPts * nPts] = yp;
-            vxyz[iCnt + 2 * nPts * nPts] = zp;
+            xp = dx*(double)i + xmin;
+            yp = dy*(double)j + ymin;
+            zp = (ndotp - (normal[0]*xp) - (normal[1]*yp) ) / normal[2];
+            vxyz[iCnt + (0*totalPts)] = xp;
+            vxyz[iCnt + (1*totalPts)] = yp;
+            vxyz[iCnt + (2*totalPts)] = zp;
+            //xPlane[iCnt] = xp;
+            //yPlane[iCnt] = yp;
+            //zPlane[iCnt] = zp;	    	    
             iCnt++;
           }
         }
       }
+
+      // why is this necessary?
+      /*
+      MPI_Bcast(&xPlane,totalPts,MPI_DOUBLE,0,MPI_COMM_WORLD);
+      MPI_Bcast(&yPlane,totalPts,MPI_DOUBLE,0,MPI_COMM_WORLD);
+      MPI_Bcast(&zPlane,totalPts,MPI_DOUBLE,0,MPI_COMM_WORLD);                 
+      for (int i = 0; i < totalPts; i++) {
+        vxyz[i + 0*totalPts] = xPlane[i];
+	vxyz[i + 1*totalPts] = yPlane[i];
+	vxyz[i + 2*totalPts] = zPlane[i];
+      }
+      */
+      
+      // hack
+      /*
+      double xSend, ySend, zSend;
+      double xList[nRanks];
+      double yList[nRanks];
+      double zList[nRanks];      
+      xSend = 0.5 * (local_xmin + local_xmax);
+      ySend = 0.5 * (local_ymin + local_ymax);
+      zSend = 0.5 * (local_zmin + local_zmax);      
+      MPI_Gather(&xSend,1,MPI_DOUBLE,&xList,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+      MPI_Gather(&ySend,1,MPI_DOUBLE,&yList,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+      MPI_Gather(&zSend,1,MPI_DOUBLE,&zList,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+      MPI_Bcast(&xList,nRanks,MPI_DOUBLE,0,MPI_COMM_WORLD);
+      MPI_Bcast(&yList,nRanks,MPI_DOUBLE,0,MPI_COMM_WORLD);
+      MPI_Bcast(&zList,nRanks,MPI_DOUBLE,0,MPI_COMM_WORLD);            
+      for (int i = 0; i < nRanks; i++) {
+        vxyz[ (i+iCnt) + 0*totalPts ] = xList[i];
+	vxyz[ (i+iCnt) + 1*totalPts ] = yList[i];
+	vxyz[ (i+iCnt) + 2*totalPts ] = zList[i];
+      }
+      */
 
       // create subcomm for ranks owning part of plane => not prefect for not clean partitions
       /*
@@ -2039,9 +2091,20 @@ void M2ulPhyS::solveStep() {
       MPI_Group_incl(world_group, nPlaneRanks, planeRanks, &planeGroup);      
       MPI_Comm_create(MPI_COMM_WORLD,planeGroup,&MPI_COMM_PLANE);
       */
+
+      if (rank0_) {
+        for (int n = 0; n < totalPts; n++) {
+	  std::cout << n << ") ";	  
+          for (int d = 0; d < dim; d++) {	  
+	    std::cout << vxyz[n + d*totalPts] << " ";
+	  }
+	  std::cout << endl;	  
+	}
+      }
       
       // get values at plane
-      Vector uInterp_vals(nPts * nPts * num_equation);
+      Vector uInterp_vals;
+      uInterp_vals.SetSize( totalPts * num_equation );
       FindPointsGSLIB finder(MPI_COMM_WORLD);
       //FindPointsGSLIB finder(MPI_COMM_PLANE);
       finder.Setup(*mesh);
@@ -2056,11 +2119,13 @@ void M2ulPhyS::solveStep() {
         outfile.open(oname, std::ios_base::app);
         outfile << "#plane point " << point[0] << " " << point[1] << " " << point[2] << endl;
         outfile << "#plane normal " << normal[0] << " " << normal[1] << " " << normal[2] << endl;
-        int dof = nPts * nPts;
-        for (int n = 0; n < dof; n++) {
-          outfile << vxyz[n + 0 * dof] << " " << vxyz[n + 1 * dof] << " " << vxyz[n + 2 * dof] << " ";
+        for (int n = 0; n < totalPts; n++) {
+	  outfile << n << " ";	  
+          for (int d = 0; d < dim; d++) {	  
+	    outfile << vxyz[n + d*totalPts] << " ";
+	  }
           for (int eq = 0; eq < num_equation; eq++) {
-            outfile << uInterp_vals[n + eq * dof] << " ";
+            outfile << uInterp_vals[n + eq*totalPts] << " ";
           }
           outfile << endl;
         }
