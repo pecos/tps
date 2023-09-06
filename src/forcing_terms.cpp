@@ -436,53 +436,32 @@ JouleHeating::JouleHeating(const int &_dim, const int &_num_equation, const int 
 void JouleHeating::updateTerms(Vector &in) {
   assert(nvel == 3);
 
-  int numElem = vfes->GetNE();
-  int dof = vfes->GetNDofs();
+  const int dof = vfes->GetNDofs();
+  const int nvel_ = nvel;
+  const int neqn = num_equation;
 
-  double *data = in.GetData();
-  const double *jh = joule_heating_->GetData();
+  double *data = in.ReadWrite();
+  const double *jh = joule_heating_->Read();
 
-  // get coords
-  const FiniteElementCollection *fec = vfes->FEColl();
-  ParMesh *mesh = vfes->GetParMesh();
-  ParFiniteElementSpace dfes(mesh, fec, dim, Ordering::byNODES);
-  ParGridFunction coordsDof(&dfes);
-  mesh->GetNodes(coordsDof);
+  // NB: This GasMixture is valid on the HOST!
+  const bool twoT = mixture_->IsTwoTemperature();
 
-  for (int el = 0; el < numElem; el++) {
-    const FiniteElement *elem = vfes->GetFE(el);
-    const int dof_elem = elem->GetDof();
-
-    // nodes of the element
-    Array<int> nodes;
-    vfes->GetElementVDofs(el, nodes);
-
-    Array<double> ip_forcing(num_equation);
-    // Vector x(dim);
-
+  MFEM_FORALL(n, dof, {
     // Add Joule heating to total energy
-    for (int n = 0; n < dof_elem; n++) {
-      const int h_index = nodes[n];
-      const double heating = jh[h_index];
-      // std::cout << "heating = " << heating << std::endl;
-      const int e_index = h_index + (nvel + 1) * dof;
-      if (heating > 0.) {
-        data[e_index] += heating;
-      }
+    const double heating = jh[n];
+    const int e_index = n + (nvel_ + 1) * dof;
+    if (heating > 0.) {
+      data[e_index] += heating;
     }
 
     // Add Joule heating to electron energy (assumes ion Joule heating is negligible)
-    if (mixture_->IsTwoTemperature()) {
-      for (int n = 0; n < dof_elem; n++) {
-        const int h_index = nodes[n];
-        const double heating = jh[h_index];
-        const int ee_index = h_index + (num_equation - 1) * dof;
-        if (heating > 0.) {
-          data[ee_index] += heating;
-        }
+    if (twoT) {
+      const int ee_index = n + (neqn - 1) * dof;
+      if (heating > 0.) {
+        data[ee_index] += heating;
       }
     }
-  }
+  });
 }
 
 // TODO(kevin): implment gpu
