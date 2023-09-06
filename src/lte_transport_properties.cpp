@@ -96,6 +96,12 @@ MFEM_HOST_DEVICE void LteTransport::ComputeFluxMolecularTransport(const double *
 #endif
   transportBuffer[FluxTrns::BULK_VISCOSITY] = 0.0;                 // bulk_visc_mult * viscosity;
   transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] = 0.0;  // electron conductivity already accounted for
+
+  for (int v = 0; v < nvel_; v++) {
+    for (int sp = 0; sp < numSpecies; sp++) {
+      diffusionVelocity[sp + v * numSpecies] = 0.0;
+    }
+  }
 }
 
 MFEM_HOST_DEVICE void LteTransport::ComputeSourceMolecularTransport(const double *state, const double *Up,
