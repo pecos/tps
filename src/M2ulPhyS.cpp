@@ -202,6 +202,17 @@ void M2ulPhyS::initMixtureAndTransportModels() {
                                  thermo_tables[0], thermo_tables[1], thermo_tables[2], T_table_input);
 
 #if defined(_CUDA_) || defined(_HIP_)
+        // Tables from above have host pointers.  Must get device
+        // pointers here before instantiating device class
+        for (int icol = 0; icol < 3; icol++) {
+          const int nrow = thermo_tables[icol].Ndata;
+          thermo_tables[icol].xdata = thermo_data.Read();
+          thermo_tables[icol].fdata = thermo_data.Read() + (icol + 1) * nrow;
+        }
+
+        T_table_input.xdata = thermo_tables[0].fdata;
+        T_table_input.fdata = thermo_tables[0].xdata;
+
         // LteMixture object valid on device
         tpsGpuMalloc((void **)(&d_mixture), sizeof(LteMixture));
         gpu::instantiateDeviceLteMixture<<<1, 1>>>(config.lteMixtureInput.f, dim, nvel,
@@ -224,8 +235,16 @@ void M2ulPhyS::initMixtureAndTransportModels() {
                                               TPSCommWorld, trans_data, trans_tables);
         if (!success) exit(ERROR);
 
-          // Instantiate LteTransport class
+        // Instantiate LteTransport class
 #if defined(_CUDA_) || defined(_HIP_)
+        // Tables from above have host pointers.  Must get device
+        // pointers here before instantiating device class
+        for (int icol = 0; icol < 3; icol++) {
+          const int nrow = trans_tables[icol].Ndata;
+          trans_tables[icol].xdata = trans_data.Read();
+          trans_tables[icol].fdata = trans_data.Read() + (icol + 1) * nrow;
+        }
+
         tpsGpuMalloc((void **)&transportPtr, sizeof(LteTransport));
         gpu::instantiateDeviceLteTransport<<<1, 1>>>(d_mixture, trans_tables[0], trans_tables[1], trans_tables[2],
                                                      transportPtr);
