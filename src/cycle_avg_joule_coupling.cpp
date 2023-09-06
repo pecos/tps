@@ -35,8 +35,17 @@
 #include "em_options.hpp"
 #include "quasimagnetostatic.hpp"
 
-CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps) :
-  em_opt_(), qmsa_solver_(nullptr), flow_solver_(nullptr), efieldFEC_(nullptr),  efieldFES_(nullptr),efieldFES1_(nullptr), efield_(nullptr), efieldR_(nullptr), efieldI_(nullptr), current_iter_(0.) {
+CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps)
+    : em_opt_(),
+      qmsa_solver_(nullptr),
+      flow_solver_(nullptr),
+      efieldFEC_(nullptr),
+      efieldFES_(nullptr),
+      efieldFES1_(nullptr),
+      efield_(nullptr),
+      efieldR_(nullptr),
+      efieldI_(nullptr),
+      current_iter_(0.) {
   MPI_Comm_size(tps->getTPSCommWorld(), &nprocs_);
   MPI_Comm_rank(tps->getTPSCommWorld(), &rank_);
   if (rank_ == 0)
@@ -68,7 +77,18 @@ CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tp
 
 CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps, int max_out, bool axisym,
                                              double input_power, double initial_input_power)
-    : em_opt_(), qmsa_solver_(nullptr), flow_solver_(nullptr), efieldFEC_(nullptr), efieldFES_(nullptr),  efieldFES1_(nullptr), efield_(nullptr),  efieldR_(nullptr), efieldI_(nullptr), current_iter_(0.), input_power_(input_power), initial_input_power_(initial_input_power) {
+    : em_opt_(),
+      qmsa_solver_(nullptr),
+      flow_solver_(nullptr),
+      efieldFEC_(nullptr),
+      efieldFES_(nullptr),
+      efieldFES1_(nullptr),
+      efield_(nullptr),
+      efieldR_(nullptr),
+      efieldI_(nullptr),
+      current_iter_(0.),
+      input_power_(input_power),
+      initial_input_power_(initial_input_power) {
   MPI_Comm_size(tps->getTPSCommWorld(), &nprocs_);
   MPI_Comm_rank(tps->getTPSCommWorld(), &rank_);
   if (rank_ == 0)
@@ -93,7 +113,7 @@ CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tp
 
 CycleAvgJouleCoupling::~CycleAvgJouleCoupling() {
   if (efield_) delete efield_;
-  if (efieldFES_)delete efieldFES_;
+  if (efieldFES_) delete efieldFES_;
 #ifdef HAVE_GSLIB
   delete interp_flow_to_em_;
   delete interp_em_to_flow_;
@@ -215,7 +235,7 @@ void CycleAvgJouleCoupling::interpConductivityFromFlowToEM() {
 #endif
 }
 
-void CycleAvgJouleCoupling::interpolationPoints(Vector & vxyz, int n_interp_nodes, const ParFiniteElementSpace * fes) {
+void CycleAvgJouleCoupling::interpolationPoints(Vector &vxyz, int n_interp_nodes, const ParFiniteElementSpace *fes) {
   const ParMesh *mesh = fes->GetParMesh();
   const int NE = mesh->GetNE();
   const int dim = mesh->Dimension();
@@ -255,7 +275,7 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
 #ifdef HAVE_GSLIB
   // Generate list of points where the grid function will be evaluated.
   Vector vxyz;
-  interpolationPoints(vxyz,  n_flow_interp_nodes_, flow_fespace);
+  interpolationPoints(vxyz, n_flow_interp_nodes_, flow_fespace);
 
   // Evaluate source grid function.
   Vector interp_vals(n_flow_interp_nodes_);
@@ -271,23 +291,25 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
 }
 
 void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlow() {
-  assert ( efieldFES_ );
+  assert(efieldFES_);
   const bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Interpolating electric field to flow mesh.\n");
 
 #ifdef HAVE_GSLIB
   // Generate list of points where the grid function will be evaluated.
   Vector vxyz;
-  interpolationPoints(vxyz,  n_flow_interp_nodes_, efieldFES_);
+  interpolationPoints(vxyz, n_flow_interp_nodes_, efieldFES_);
 
   // Evaluate source grid function.
-  Vector interp_vals(n_flow_interp_nodes_);
+  Vector interp_vals(n_flow_interp_nodes_*efield_ncomp_);
 
-  const ParGridFunction *joule_heating_gf = qmsa_solver_->getJouleHeatingGF();
-  interp_em_to_flow_->Interpolate(vxyz, *joule_heating_gf, interp_vals);
+  const ParGridFunction *efield_real_gf = qmsa_solver_->getElectricFieldreal();
+  interp_em_to_flow_->Interpolate(vxyz, *efield_real_gf, interp_vals);
+  efieldR_->SetFromTrueDofs(interp_vals);
 
-  ParGridFunction *joule_heating_flow = flow_solver_->GetJouleHeatingGF();
-  joule_heating_flow->SetFromTrueDofs(interp_vals);
+  const ParGridFunction *efield_imag_gf = qmsa_solver_->getElectricFieldimag();
+  interp_em_to_flow_->Interpolate(vxyz, *efield_imag_gf, interp_vals);
+  efieldI_->SetFromTrueDofs(interp_vals);
 #else
   mfem_error("Cannot interpolate without GSLIB support.");
 #endif
@@ -368,6 +390,7 @@ void CycleAvgJouleCoupling::solveStep() {
 
     // interpolate the Joule heating to the flow mesh
     interpJouleHeatingFromEMToFlow();
+    if( efieldFES_ ) interpElectricFieldFromEMToFlow();
   }
   // Run a step of the flow solver
   flow_solver_->solveStep();
@@ -381,27 +404,32 @@ void CycleAvgJouleCoupling::solveEnd() {
 }
 
 /// Push solver variables to interface
-void CycleAvgJouleCoupling::initInterface(TPS::Tps2Boltzmann &interface) { 
-  assert( !interface.IsInitialized() );
+void CycleAvgJouleCoupling::initInterface(TPS::Tps2Boltzmann &interface) {
+  assert(!interface.IsInitialized());
   interface.init(flow_solver_);
+  qmsa_solver_->setStoreE(true);
   // Get the FEC of the efield from the flow solver
   efieldFEC_ = flow_solver_->GetFEC();
   // Set up efield function space
   if (efieldFES_) delete efieldFES_;
-  efieldFES_ = new mfem::ParFiniteElementSpace(flow_solver_->GetMesh(), efieldFEC_, interface.NeFieldComps(), mfem::Ordering::byNODES);
+  efield_ncomp_ = interface.NeFieldComps() / 2;
+  efieldFES_ = new mfem::ParFiniteElementSpace(flow_solver_->GetMesh(), efieldFEC_, efield_ncomp_ *2,
+                                               mfem::Ordering::byNODES);
   if (efieldFES1_) delete efieldFES1_;
-  efieldFES1_ = new mfem::ParFiniteElementSpace(flow_solver_->GetMesh(), efieldFEC_, interface.NeFieldComps()/2, mfem::Ordering::byNODES);
+  efieldFES1_ = new mfem::ParFiniteElementSpace(flow_solver_->GetMesh(), efieldFEC_, efield_ncomp_,
+                                                mfem::Ordering::byNODES);
   if (efield_) delete efield_;
   efield_ = new mfem::ParGridFunction(efieldFES_);
   if (efieldR_) delete efieldR_;
   efieldR_ = new mfem::ParGridFunction(efieldFES1_, *efield_, 0);
   if (efieldI_) delete efieldI_;
-  efieldI_ = new mfem::ParGridFunction(efieldFES1_, *efield_, efieldFES1_->GetVSize() );
+  efieldI_ = new mfem::ParGridFunction(efieldFES1_, *efield_, efieldFES1_->GetVSize());
 }
 
 /// Push solver variables to interface
 void CycleAvgJouleCoupling::push(TPS::Tps2Boltzmann &interface) {
   flow_solver_->push(interface);
+  interface.interpolateFromNativeFES(*efield_, TPS::Tps2Boltzmann::Index::ElectricField);
   std::cout << "Need to push an electric field" << std::endl;
 }
 

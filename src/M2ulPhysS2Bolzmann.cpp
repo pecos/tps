@@ -45,11 +45,13 @@ void M2ulPhyS::push(TPS::Tps2Boltzmann &interface) {
 
   const double *solver_data = U->HostRead();
 
-  mfem::ParGridFunction *species = new mfem::ParGridFunction(&interface.NativeFes(TPS::Tps2Boltzmann::Index::SpeciesDensities));
-  mfem::ParGridFunction *heavyTemperature = new mfem::ParGridFunction(&interface.NativeFes(TPS::Tps2Boltzmann::Index::HeavyTemperature));
-  mfem::ParGridFunction *electronTemperature = new mfem::ParGridFunction(&interface.NativeFes(TPS::Tps2Boltzmann::Index::ElectronTemperature));
+  mfem::ParGridFunction *species =
+      new mfem::ParGridFunction(&interface.NativeFes(TPS::Tps2Boltzmann::Index::SpeciesDensities));
+  mfem::ParGridFunction *heavyTemperature =
+      new mfem::ParGridFunction(&interface.NativeFes(TPS::Tps2Boltzmann::Index::HeavyTemperature));
+  mfem::ParGridFunction *electronTemperature =
+      new mfem::ParGridFunction(&interface.NativeFes(TPS::Tps2Boltzmann::Index::ElectronTemperature));
 
-  
   double *species_data = species->HostWrite();
   double *heavyTemperature_data = heavyTemperature->HostWrite();
   double *electronTemperature_data = electronTemperature->HostWrite();

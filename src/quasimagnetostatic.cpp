@@ -104,7 +104,7 @@ QuasiMagnetostaticSolver3D::QuasiMagnetostaticSolver3D(ElectromagneticOptions em
 }
 
 QuasiMagnetostaticSolver3D::~QuasiMagnetostaticSolver3D() {
-  if ( this->storeE_) {
+  if (this->storeE_) {
     delete Ereal_;
     delete Eimag_;
   }
@@ -475,49 +475,52 @@ void QuasiMagnetostaticSolver3D::solveStep() {
   }
 
   // Divergence free projection of A (so that we can evaluate E and Joule heating correctly)
-  if(!this->storeE_) {
+  if (!this->storeE_) {
     this->Ereal_ = new ParGridFunction(Aspace_);
     this->Eimag_ = new ParGridFunction(Aspace_);
   }
 
-  div_free_->Mult(*Areal_, *(this->Ereal_));
-  div_free_->Mult(*Aimag_, *(this->Eimag_));
+  // E = \grad phi + i omega A. Multiplication by i switches the real and imaginary part
+  div_free_->Mult(*Areal_, *(this->Eimag_));
+  div_free_->Mult(*Aimag_, *(this->Ereal_));
 
   // Compute Joule heating
   const double omega = (2 * M_PI * em_opts_.current_frequency);
-  *(this->Ereal_) *= omega;
+  *(this->Ereal_) *= (-omega);
   *(this->Eimag_) *= omega;
 
   JouleHeatingCoefficient3D jh_coeff(*plasma_conductivity_coef_, *(this->Ereal_), *(this->Eimag_));
   joule_heating_->ProjectCoefficient(jh_coeff);
 
   { /*open scope so that ParaViewDataCollection is destroyed before Ereal_, Eimag_ if needed*/
-  // 3) Output A and B fields for visualization using paraview
-  if (verbose) grvy_printf(ginfo, "Writing solution to paraview output.\n");
-  ParaViewDataCollection paraview_dc("magnetostatic", pmesh_);
-  paraview_dc.SetPrefixPath("ParaView");
-  paraview_dc.SetLevelsOfDetail(em_opts_.order);
-  paraview_dc.SetCycle(0);
-  paraview_dc.SetDataFormat(VTKFormat::BINARY);
-  paraview_dc.SetHighOrderOutput(true);
-  paraview_dc.SetTime(0.0);
-  paraview_dc.RegisterField("magvecpot_real", Areal_);
-  paraview_dc.RegisterField("magvecpot_imag", Aimag_);
-  paraview_dc.RegisterField("magEfield_real", this->Ereal_);
-  paraview_dc.RegisterField("magEfield_imag", this->Eimag_);
-  paraview_dc.RegisterField("joule_heating", joule_heating_);
+    // 3) Output A and B fields for visualization using paraview
+    if (verbose) grvy_printf(ginfo, "Writing solution to paraview output.\n");
+    ParaViewDataCollection paraview_dc("magnetostatic", pmesh_);
+    paraview_dc.SetPrefixPath("ParaView");
+    paraview_dc.SetLevelsOfDetail(em_opts_.order);
+    paraview_dc.SetCycle(0);
+    paraview_dc.SetDataFormat(VTKFormat::BINARY);
+    paraview_dc.SetHighOrderOutput(true);
+    paraview_dc.SetTime(0.0);
+    paraview_dc.RegisterField("magvecpot_real", Areal_);
+    paraview_dc.RegisterField("magvecpot_imag", Aimag_);
+    paraview_dc.RegisterField("magEfield_real", this->Ereal_);
+    paraview_dc.RegisterField("magEfield_imag", this->Eimag_);
+    paraview_dc.RegisterField("joule_heating", joule_heating_);
 
-  if (em_opts_.evaluate_magnetic_field) {
-    paraview_dc.RegisterField("magnfield_real", Breal_);
-    paraview_dc.RegisterField("magnfield_imag", Bimag_);
-  }
-  
-  paraview_dc.Save();
+    if (em_opts_.evaluate_magnetic_field) {
+      paraview_dc.RegisterField("magnfield_real", Breal_);
+      paraview_dc.RegisterField("magnfield_imag", Bimag_);
+    }
+
+    paraview_dc.Save();
   } /*Close scope*/
 
-  if(!this->storeE_) {
-    delete Ereal_; Ereal_ = NULL;
-    delete Eimag_; Eimag_ = NULL;
+  if (!this->storeE_) {
+    delete Ereal_;
+    Ereal_ = NULL;
+    delete Eimag_;
+    Eimag_ = NULL;
   }
 
   if (verbose) {
@@ -627,8 +630,7 @@ void QuasiMagnetostaticSolver3D::setStoreE(bool storeE) {
   if (storeE) {
     this->Ereal_ = new ParGridFunction(Aspace_);
     this->Eimag_ = new ParGridFunction(Aspace_);
-  }
-  else {
+  } else {
     delete this->Ereal_;
     delete this->Eimag_;
   }
@@ -744,7 +746,7 @@ QuasiMagnetostaticSolverAxiSym::QuasiMagnetostaticSolverAxiSym(ElectromagneticOp
 }
 
 QuasiMagnetostaticSolverAxiSym::~QuasiMagnetostaticSolverAxiSym() {
-  if ( this->storeE_) {
+  if (this->storeE_) {
     delete Ereal_;
     delete Eimag_;
   }
@@ -1036,10 +1038,10 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
 
   *joule_heating_ = tmp2;
 
-  if( this->storeE_) {
-    *(this->Ereal_) = (*Atheta_real_);
-    (*(this->Ereal_)) *= omega;
-    *(this->Eimag_) = (*Atheta_imag_);
+  if (this->storeE_) {
+    *(this->Ereal_) = (*Atheta_imag_);
+    (*(this->Ereal_)) *= (-omega);
+    *(this->Eimag_) = (*Atheta_real_);
     (*(this->Eimag_)) *= omega;
   }
 
@@ -1077,10 +1079,11 @@ void QuasiMagnetostaticSolverAxiSym::setStoreE(bool storeE) {
   if (storeE) {
     this->Ereal_ = new ParGridFunction(Atheta_space_);
     this->Eimag_ = new ParGridFunction(Atheta_space_);
-  }
-  else {
-    delete this->Ereal_; this->Ereal_=NULL;
-    delete this->Eimag_; this->Eimag_=NULL;
+  } else {
+    delete this->Ereal_;
+    this->Ereal_ = NULL;
+    delete this->Eimag_;
+    this->Eimag_ = NULL;
   }
 }
 

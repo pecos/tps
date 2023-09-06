@@ -78,7 +78,7 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps) : NIndexes(7), tps_(tps), all_fes_(nullpt
 
   tps->getRequiredInput("species/numSpecies", nspecies_);
   // TODO: Get the number of reactions for the solver
-  tps->getRequiredInput("boltzmannInterface/nreactios", nreactions_);
+  tps->getRequiredInput("boltzmannInterface/nreactions", nreactions_);
   tps->getRequiredInput("boltzmannInterface/order", order_);
   tps->getRequiredInput("boltzmannInterface/basisType", basis_type_);
   assert(basis_type_ == 0 || basis_type_ == 1);
@@ -87,7 +87,7 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps) : NIndexes(7), tps_(tps), all_fes_(nullpt
 }
 
 void Tps2Boltzmann::init(M2ulPhyS *flowSolver) {
-  std::cout<< "Tps2Boltzmann::init is called" << std::endl;
+  std::cout << "Tps2Boltzmann::init is called" << std::endl;
   mfem::ParMesh *pmesh(flowSolver->GetMesh());
   fec_ = new mfem::L2_FECollection(order_, pmesh->Dimension(), basis_type_);
   switch (pmesh->Dimension()) {

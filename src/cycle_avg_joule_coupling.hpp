@@ -54,6 +54,7 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   M2ulPhyS *flow_solver_;
 
   // Only needed for Boltzmann interface
+  int efield_ncomp_;
   mfem::FiniteElementCollection *efieldFEC_;
   mfem::ParFiniteElementSpace *efieldFES_;
   mfem::ParFiniteElementSpace *efieldFES1_;
@@ -104,7 +105,7 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   ~CycleAvgJouleCoupling();
 
   void initializeInterpolationData();
-  void interpolationPoints(mfem::Vector & vxyz, int n_interp_nodes, const mfem::ParFiniteElementSpace * fes);
+  void interpolationPoints(mfem::Vector &vxyz, int n_interp_nodes, const mfem::ParFiniteElementSpace *fes);
   void interpConductivityFromFlowToEM();
   void interpJouleHeatingFromEMToFlow();
   void interpElectricFieldFromEMToFlow();

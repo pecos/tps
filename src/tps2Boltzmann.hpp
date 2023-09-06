@@ -60,7 +60,7 @@
 class M2ulPhyS;
 
 namespace TPS {
-//TODO:
+// TODO:
 /*
 - Add dictionaries for species
 - Reshape arrays as matrices

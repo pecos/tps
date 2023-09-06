@@ -86,8 +86,14 @@ class QuasiMagnetostaticSolverBase : public TPS::Solver {
   mfem::ParMesh *getMesh() const { return pmesh_; }
   mfem::ParGridFunction *getPlasmaConductivityGF() { return plasma_conductivity_; }
   mfem::ParGridFunction *getJouleHeatingGF() { return joule_heating_; }
-  mfem::ParGridFunction *getElectricFieldreal() {assert(storeE_); return Ereal_; }
-  mfem::ParGridFunction *getElectricFieldimag() {assert(storeE_); return Eimag_; }
+  mfem::ParGridFunction *getElectricFieldreal() {
+    assert(storeE_);
+    return Ereal_;
+  }
+  mfem::ParGridFunction *getElectricFieldimag() {
+    assert(storeE_);
+    return Eimag_;
+  }
 
   virtual mfem::ParFiniteElementSpace *getFESpace() = 0;
   virtual void setStoreE(bool storeE) = 0;

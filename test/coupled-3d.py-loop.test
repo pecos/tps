@@ -2,7 +2,7 @@
 # -*- mode: sh -*-
 
 TEST="coupling/cycle-avg-joule-coupling-py-loop"
-RUNFILE="inputs/coupled-3d.ini"
+RUNFILE="inputs/coupled-3d-boltzmann.ini"
 EXE="../src/tps-time-loop.py"
 
 setup() {
