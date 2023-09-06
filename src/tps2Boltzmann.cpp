@@ -48,7 +48,7 @@ namespace TPS {
 
 class CPUDataRead {
  public:
-  CPUDataRead(const mfem::Vector &v) : data_(v.HostRead()), size_(v.Size()), stride_(1){};
+  CPUDataRead(const mfem::Vector &v) : data_(v.HostRead()), size_(v.Size()), stride_(1) {}
   double *data() const { return const_cast<double *>(data_); }
   size_t size() const { return size_; }
   size_t stride() const { return stride_; }
@@ -61,7 +61,7 @@ class CPUDataRead {
 
 class CPUData {
  public:
-  CPUData(mfem::Vector &v, bool rw) : data_(rw ? v.HostReadWrite() : v.HostWrite()), size_(v.Size()), stride_(1){};
+  CPUData(mfem::Vector &v, bool rw) : data_(rw ? v.HostReadWrite() : v.HostWrite()), size_(v.Size()), stride_(1) {}
   double *data() { return data_; }
   size_t size() const { return size_; }
   size_t stride() const { return stride_; }
@@ -77,7 +77,7 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps) : NIndexes(7), tps_(tps), all_fes_(nullpt
   assert(tps->isFlowEMCoupled());
 
   tps->getRequiredInput("species/numSpecies", nspecies_);
-  // TODO: Get the number of reactions for the solver
+  // TODO(Umberto): Get the number of reactions for the solver
   tps->getRequiredInput("boltzmannInterface/nreactions", nreactions_);
   tps->getRequiredInput("boltzmannInterface/order", order_);
   tps->getRequiredInput("boltzmannInterface/basisType", basis_type_);
@@ -230,8 +230,7 @@ void tps2bolzmann(py::module &m) {
                                1,                                       /*number of dimensions*/
                                {d.size()},                              /*buffer dimension(s)*/
                                {d.stride() * sizeof(const double)},     /*Stride in bytes for each index*/
-                               true                                     /*read only*/
-        );
+                               true                                     /*read only*/);
       });
 
   py::class_<TPS::CPUData>(m, "CPUData", py::buffer_protocol()).def_buffer([](TPS::CPUData &d) -> py::buffer_info {
@@ -241,8 +240,7 @@ void tps2bolzmann(py::module &m) {
                            1,                                       /*number of dimensions*/
                            {d.size()},                              /*buffer dimension(s)*/
                            {d.stride() * sizeof(const double)},     /*Stride in bytes for each index*/
-                           false                                    /*writetable*/
-    );
+                           false                                    /*writetable*/);
   });
 
   py::enum_<TPS::Tps2Boltzmann::Index>(m, "t2bIndex")

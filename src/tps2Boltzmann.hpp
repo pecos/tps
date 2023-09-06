@@ -60,7 +60,7 @@
 class M2ulPhyS;
 
 namespace TPS {
-// TODO:
+// TODO(Umberto):
 /*
 - Add dictionaries for species
 - Reshape arrays as matrices
@@ -154,4 +154,4 @@ class Tps2Boltzmann {
 };
 }  // namespace TPS
 
-#endif
+#endif  // TPS2BOLTZMANN_HPP_
