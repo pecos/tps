@@ -75,7 +75,7 @@ MFEM_HOST_DEVICE void RiemannSolver::Eval(const double *state1, const double *st
                                           bool LF) {
   if (useRoe && !LF) {
     // TODO(kevin): implement MFEM_HOST_DEVICE Eval_Roe.
-    printf("Roe RiemannSolver is not implmented for gpu!");
+    printf("Roe RiemannSolver is not implmented for gpu!"); 
     // Eval_Roe(state1, state2, nor, flux);
   } else {
     Eval_LF(state1, state2, nor, flux);
@@ -98,7 +98,7 @@ MFEM_HOST_DEVICE void RiemannSolver::Eval_LF(const double *state1, const double 
 
   double flux1[gpudata::MAXEQUATIONS];  // double flux1[5];
   double flux2[gpudata::MAXEQUATIONS];  // double flux2[5];
-
+  
   ComputeFluxDotN(state1, nor, flux1);
   ComputeFluxDotN(state2, nor, flux2);
 

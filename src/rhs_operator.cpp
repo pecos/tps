@@ -383,8 +383,8 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
     Vector fk(flux(eq).GetData(), dim_ * vfes->GetNDofs());
     Vector zk(z.HostReadWrite() + eq * vfes->GetNDofs(), vfes->GetNDofs());
 #endif
-
     Aflux->AddMult(fk, zk);
+
 #ifdef _GPU_
     RHSoperator::copyZk2Z_gpu(z, zk, eq, vfes->GetNDofs());
 #endif
@@ -459,7 +459,6 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
     forcing[i]->setTime(this->GetTime());
     forcing[i]->updateTerms(y);
   }
-
   computeMeanTimeDerivatives(y);
 }
 
@@ -640,6 +639,7 @@ void RHSoperator::updatePrimitives(const Vector &x_in) const {
   });
 #else
   double *dataUp = Up->GetData();
+  int numActiveSpecies_ =  mixture->GetNumActiveSpecies();
   for (int i = 0; i < vfes->GetNDofs(); i++) {
     Vector iState(num_equation_);
     Vector primitiveState(num_equation_);
