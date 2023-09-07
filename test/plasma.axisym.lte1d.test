@@ -36,7 +36,7 @@ setup() {
     test -s $RSTRT_FILE_1D
     cp $RSTRT_FILE_1D $SOLN_FILE_1D
 
-    $MPIRUN -n 4 ../src/tps --runFile $RUNFILE_1D
+    $MPIRUN -n 2 ../src/tps --runFile $RUNFILE_1D
 
     test -s $SOLN_FILE_1D
     test -s $REF_FILE_1D
@@ -61,8 +61,8 @@ setup() {
     test -s $RSTRT_FILE_1D
     cp $RSTRT_FILE_1D $SOLN_FILE_1D
 
-    $MPIRUN -n 4 ../src/tps --runFile $RUNFILE_1D_MOD
-    $MPIRUN -n 4 ../src/tps --runFile $RUNFILE_1D_MOD
+    $MPIRUN -n 2 ../src/tps --runFile $RUNFILE_1D_MOD
+    $MPIRUN -n 2 ../src/tps --runFile $RUNFILE_1D_MOD
 
     test -s $SOLN_FILE_1D
     test -s $REF_FILE_1D
