@@ -706,15 +706,19 @@ void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
   int Ndata;
   Array<int> dims(2);
   bool success = false;
+  int suc_int = 0;
   if (rank0_) {
     std::string filename;
     tpsP->getRequiredInput((inputPath + "/filename").c_str(), filename);
     success = h5ReadTable(filename, "table", config.tableHost[tableIndex], dims);
+    suc_int = (int)success;
 
     // TODO(kevin): extend for multi-column array?
     Ndata = dims[0];
   }
-  MPI_Bcast(&success, 1, MPI_CXX_BOOL, 0, TPSCommWorld);
+  // MPI_Bcast(&success, 1, MPI_CXX_BOOL, 0, TPSCommWorld);
+  MPI_Bcast(&suc_int, 1, MPI_INT, 0, TPSCommWorld);
+  success = (suc_int != 0);
   if (!success) exit(ERROR);
 
   int *d_dims = dims.GetData();

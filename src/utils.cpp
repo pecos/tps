@@ -337,13 +337,17 @@ bool h5ReadBcastMultiColumnTable(const std::string &fileName, const std::string 
 
   int nrow = 0, ncol = 0;
   bool success = false;
+  int suc_int;
   if (rank0) {
     Array<int> dims(2);
     success = h5ReadTable(fileName.c_str(), datasetName.c_str(), output, dims);
     nrow = dims[0];
     ncol = dims[1];
+    suc_int = (int)success;
   }
-  MPI_Bcast(&success, 1, MPI_CXX_BOOL, 0, TPSCommWorld);
+  // MPI_Bcast(&success, 1, MPI_CXX_BOOL, 0, TPSCommWorld);
+  MPI_Bcast(&suc_int, 1, MPI_INT, 0, TPSCommWorld);
+  success = (suc_int != 0);
   if (!success) exit(ERROR);
 
   MPI_Bcast(&nrow, 1, MPI_INT, 0, TPSCommWorld);
