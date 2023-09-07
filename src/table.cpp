@@ -99,7 +99,7 @@ MFEM_HOST_DEVICE double LinearTable::eval(const double &xEval) {
 MFEM_HOST_DEVICE double LinearTable::eval_x(const double &xEval) {
   const int index = findInterval(xEval);
   const double xt = (xLogScale_) ? log(xEval) : xEval;
-  const double xt_xt = (xLogScale_) ? 1./xEval : 1.0;
+  const double xt_xt = (xLogScale_) ? 1. / xEval : 1.0;
   double ft_x = b_[index] * xt_xt;
   if (fLogScale_) {
     const double ft = a_[index] + b_[index] * xt;

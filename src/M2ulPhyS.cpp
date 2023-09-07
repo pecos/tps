@@ -235,7 +235,7 @@ void M2ulPhyS::initMixtureAndTransportModels() {
                                               TPSCommWorld, trans_data, trans_tables);
         if (!success) exit(ERROR);
 
-        // Instantiate LteTransport class
+          // Instantiate LteTransport class
 #if defined(_CUDA_) || defined(_HIP_)
         // Tables from above have host pointers.  Must get device
         // pointers here before instantiating device class
@@ -1128,7 +1128,6 @@ void M2ulPhyS::initIndirectionArrays() {
     bdry_face_data.dist = 0.;
     auto h_bdry_dist = bdry_face_data.dist.HostWrite();
 
-
     const FiniteElement *fe;
     FaceElementTransformations *tr;
     // Mesh *mesh = fes->GetMesh();
@@ -1187,7 +1186,6 @@ void M2ulPhyS::initIndirectionArrays() {
           dist.SetSize(dist_dofs1.Size());
           distance_->GetSubVector(dist_dofs1, dist);
         }
-
 
         for (int q = 0; q < ir->GetNPoints(); q++) {
           const IntegrationPoint &ip = ir->IntPoint(q);
