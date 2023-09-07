@@ -38,7 +38,6 @@
 
 // CPU version (just for starting up)
 void M2ulPhyS::push(TPS::Tps2Boltzmann &interface) {
-  std::cout << "Enter M2ulPhyS::push" << std::endl;
   assert(interface.IsInitialized());
 
 
@@ -63,7 +62,6 @@ void M2ulPhyS::push(TPS::Tps2Boltzmann &interface) {
   PerfectMixture * pmixture = dynamic_cast<PerfectMixture *>(mixture);
   assert(pmixture);
 
-  std::cout << "Start to loop" << std::endl;
   for (int i = 0; i < nscalardofs; i++) {
     for (int eq = 0; eq < num_equation; eq++) state_local[eq] = solver_data[i + eq * nscalardofs];
 
@@ -77,18 +75,13 @@ void M2ulPhyS::push(TPS::Tps2Boltzmann &interface) {
       species_data[i + sp * nscalardofs] = AVOGADRONUMBER * species_local[sp];
   }
 
-  std::cout << "Call interpolate" << std::endl;
   interface.interpolateFromNativeFES(*species, TPS::Tps2Boltzmann::Index::SpeciesDensities);
   interface.interpolateFromNativeFES(*heavyTemperature, TPS::Tps2Boltzmann::Index::HeavyTemperature);
   interface.interpolateFromNativeFES(*electronTemperature, TPS::Tps2Boltzmann::Index::ElectronTemperature);
 
-  std::cout << "Delete native GridFunctions" << std::endl;
-
   delete species;
   delete heavyTemperature;
   delete electronTemperature;
-
-  std::cout << "Exit M2ulPhyS::push" << std::endl;
 }
 
 void M2ulPhyS::fetch(TPS::Tps2Boltzmann &interface) { return; }

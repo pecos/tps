@@ -37,7 +37,8 @@ EXTRA_DIST      = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes 
 		  independent_coupling.test interp_em.test mms.euler_2d.test mms.cns_2d.test \
 		  gradient.test coupled-3d.test coupled-3d.splitcomm.test coupled-3d.py-loop.test \
 		  tabulated.test lte_mixture.test distance_fcn.test \
-                  sgsSmag.test sgsSigma.test plate.test pipe.mix.test lte2noneq-restart.test
+                  sgsSmag.test sgsSigma.test plate.test pipe.mix.test lte2noneq-restart.test \
+				  coupled-3d.interface.test
 
 TESTS = vpath.sh
 XFAIL_TESTS =
@@ -90,7 +91,8 @@ TESTS += cyl3d.test \
          sgsSigma.test \
          plate.test \
          pipe.mix.test \
-	 lte2noneq-restart.test
+	 lte2noneq-restart.test \
+	 coupled-3d.interface.test
 
 if PYTHON_ENABLED
 TESTS += cyl3d.python.test \
@@ -138,6 +140,13 @@ tps_splitcomm_test_LDADD    = ../src/libtps.la
 tps_splitcomm_test_LDADD   += $(HDF5_LIBS)
 tps_splitcomm_test_LDADD   += $(GRVY_LIBS)
 test_splitcomm_test_LDFLAGS = $(CUDA_LDFLAGS)
+
+check_PROGRAMS += tps_interface_test
+tps_interface_test_SOURCES  = test_tps_interface.cpp
+tps_interface_test_LDADD    = ../src/libtps.la
+tps_interface_test_LDADD   += $(HDF5_LIBS)
+tps_interface_test_LDADD   += $(GRVY_LIBS)
+test_interface_test_LDFLAGS = $(CUDA_LDFLAGS)
 
 if !GPU_ENABLED
 

@@ -430,7 +430,6 @@ void CycleAvgJouleCoupling::initInterface(TPS::Tps2Boltzmann &interface) {
 void CycleAvgJouleCoupling::push(TPS::Tps2Boltzmann &interface) {
   flow_solver_->push(interface);
   interface.interpolateFromNativeFES(*efield_, TPS::Tps2Boltzmann::Index::ElectricField);
-  std::cout << "Need to push an electric field" << std::endl;
 }
 
 /// Fetch solver variables from interface

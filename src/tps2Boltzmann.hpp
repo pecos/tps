@@ -109,6 +109,7 @@ class Tps2Boltzmann {
   double EfieldAngularFreq() { return EfieldAngularFreq_; }
   int Nspecies() const { return nspecies_; }
   int NeFieldComps() const { return nEfieldComps_; }
+  int nComponents(Index index) const { return ncomps[index]; }
 
   ~Tps2Boltzmann();
 
@@ -122,6 +123,7 @@ class Tps2Boltzmann {
   int order_;
   int basis_type_;
   mfem::Array<int> offsets;
+  mfem::Array<int> ncomps;
 
   mfem::FiniteElementCollection *fec_;
 
@@ -140,12 +142,8 @@ class Tps2Boltzmann {
   mfem::ParFiniteElementSpace *reaction_rates_native_fes_;
   mfem::ParFiniteElementSpace **list_native_fes_;
 
-  //! Linear interpolators between native TPS fec to Interface fec
-  mfem::ParDiscreteLinearOperator *species_densities_interpolator_;
-  mfem::ParDiscreteLinearOperator *efield_interpolator_;
+  //! Linear interpolator between native TPS fec to Interface fec
   mfem::ParDiscreteLinearOperator *scalar_interpolator_;
-  mfem::ParDiscreteLinearOperator *reaction_rates_interpolator_;
-  mfem::ParDiscreteLinearOperator **list_interpolators_;
 
   //! array of fields see *Index for how to address this
   mfem::ParGridFunction **fields_;

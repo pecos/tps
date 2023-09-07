@@ -84,6 +84,7 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps) : NIndexes(7), tps_(tps), all_fes_(nullpt
   assert(basis_type_ == 0 || basis_type_ == 1);
 
   offsets.SetSize(NIndexes + 1);
+  ncomps.SetSize(NIndexes+1);
 }
 
 void Tps2Boltzmann::init(M2ulPhyS *flowSolver) {
@@ -111,13 +112,21 @@ void Tps2Boltzmann::init(M2ulPhyS *flowSolver) {
 
   list_fes_ = new mfem::ParFiniteElementSpace *[NIndexes + 1];
   list_fes_[Index::ElectricField] = efield_fes_;
+  ncomps[Index::ElectricField] = nEfieldComps_;
   list_fes_[Index::SpeciesDensities] = species_densities_fes_;
+  ncomps[Index::SpeciesDensities] = nspecies_;
   list_fes_[Index::HeavyTemperature] = scalar_fes_;
+  ncomps[Index::HeavyTemperature] = 1;
   list_fes_[Index::ElectronTemperature] = scalar_fes_;
+  ncomps[Index::ElectronTemperature] = 1;
   list_fes_[Index::ElectronMobility] = scalar_fes_;
+  ncomps[Index::ElectronMobility] = 1;
   list_fes_[Index::ElectronDiffusion] = scalar_fes_;
+  ncomps[Index::ElectronDiffusion] = 1;
   list_fes_[Index::ReactionRates] = reaction_rates_fes_;
+  ncomps[Index::ReactionRates] = nreactions_;
   list_fes_[Index::All] = all_fes_;
+  ncomps[Index::All] = nfields_;
 
   mfem::ParGridFunction *all = new mfem::ParGridFunction(all_fes_);
   fields_ = new mfem::ParGridFunction *[NIndexes + 1];
@@ -147,37 +156,24 @@ void Tps2Boltzmann::init(M2ulPhyS *flowSolver) {
 
   // Interpolator
   auto assembly_level = mfem::AssemblyLevel::FULL;
-  efield_interpolator_ = new mfem::ParDiscreteLinearOperator(efield_native_fes_, efield_fes_);
-  efield_interpolator_->AddDomainInterpolator(new mfem::IdentityInterpolator());
-  efield_interpolator_->SetAssemblyLevel(assembly_level);
-  efield_interpolator_->Assemble();
-  species_densities_interpolator_ =
-      new mfem::ParDiscreteLinearOperator(species_densities_native_fes_, species_densities_fes_);
-  species_densities_interpolator_->AddDomainInterpolator(new mfem::IdentityInterpolator());
-  species_densities_interpolator_->SetAssemblyLevel(assembly_level);
-  species_densities_interpolator_->Assemble();
   scalar_interpolator_ = new mfem::ParDiscreteLinearOperator(scalar_native_fes_, scalar_fes_);
   scalar_interpolator_->AddDomainInterpolator(new mfem::IdentityInterpolator());
   scalar_interpolator_->SetAssemblyLevel(assembly_level);
   scalar_interpolator_->Assemble();
-  species_densities_interpolator_ =
-      new mfem::ParDiscreteLinearOperator(species_densities_native_fes_, species_densities_fes_);
-  species_densities_interpolator_->AddDomainInterpolator(new mfem::IdentityInterpolator());
-  species_densities_interpolator_->SetAssemblyLevel(assembly_level);
-  species_densities_interpolator_->Assemble();
-
-  list_interpolators_ = new mfem::ParDiscreteLinearOperator *[NIndexes + 1];
-  list_interpolators_[Index::ElectricField] = efield_interpolator_;
-  list_interpolators_[Index::SpeciesDensities] = species_densities_interpolator_;
-  list_interpolators_[Index::HeavyTemperature] = scalar_interpolator_;
-  list_interpolators_[Index::ElectronTemperature] = scalar_interpolator_;
-  list_interpolators_[Index::ElectronMobility] = scalar_interpolator_;
-  list_interpolators_[Index::ElectronDiffusion] = scalar_interpolator_;
-  list_interpolators_[Index::ReactionRates] = reaction_rates_interpolator_;
 }
 
 void Tps2Boltzmann::interpolateFromNativeFES(const ParGridFunction &input, Tps2Boltzmann::Index index) {
-  list_interpolators_[index]->Mult(input, *(fields_[index]));
+  if ( ncomps[index] == 1 ) {
+    scalar_interpolator_->Mult(input, *(fields_[index]));
+  } else {
+    const int loc_size_native = list_native_fes_[index]->GetNDofs();
+    const int loc_size = list_fes_[index]->GetNDofs();
+    for (int icomp(0); icomp < ncomps[index]; ++icomp) {
+      const mfem::Vector view_input(const_cast<mfem::ParGridFunction&>(input), icomp*loc_size_native, loc_size_native);
+      mfem::Vector view_field(*(fields_[index]), icomp*loc_size, loc_size);
+      scalar_interpolator_->Mult(view_input, view_field);
+    }
+  }
 }
 
 Tps2Boltzmann::~Tps2Boltzmann() {
@@ -187,11 +183,7 @@ Tps2Boltzmann::~Tps2Boltzmann() {
   delete[] fields_;
 
   // Delete interpolators
-  delete[] list_interpolators_;
-  delete species_densities_interpolator_;
-  delete efield_interpolator_;
   delete scalar_interpolator_;
-  delete reaction_rates_interpolator_;
 
   // Delete view Native Finite Element Spaces
   delete species_densities_native_fes_;
