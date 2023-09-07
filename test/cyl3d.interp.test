@@ -18,6 +18,14 @@ setup() {
     RUNFILE_RESTART="inputs/input.dtconst.restart.cyl.ini"
     RUNFILE_INTERP0="inputs/input.refine0.cyl.ini"
 #    RUNFILE_INTERP1="inputs/input.refine1.cyl"
+
+    # defaut to mpirun if available
+    MPIRUN=$(type -P mpirun) || found=0
+
+    # if not, try flux
+    if [ $found -eq 0 ]; then
+        type -P flux && MPIRUN="$(type -P flux) run" || found=0
+    fi
 }
 
 @test "[$TEST] check for pfield_interpolate executable and input files" {
@@ -46,13 +54,16 @@ setup() {
 }
 
 @test "[$TEST] run parallel (np=2) interp with same input and output grids" {
+    # don't run if we don't know how to launch a parallel job
+    [ "x$MPIRUN" != "x" ] || skip "Cannot launch parallel job"
+
     # generate restart file
-    mpirun -np 2 $TPS --runFile $RUNFILE_FRESH
+    $MPIRUN -n 2 $TPS --runFile $RUNFILE_FRESH
     test -s $SOLN_FILE_P0
     test -s $SOLN_FILE_P1
 
     # interpolation
-    mpirun -np 2 $EXE -r1 $RUNFILE_RESTART -r2 $RUNFILE_INTERP0
+    $MPIRUN -n 2 $EXE -r1 $RUNFILE_RESTART -r2 $RUNFILE_INTERP0
     test -s $INTERP_FILE_P0
     test -s $INTERP_FILE_P1
 

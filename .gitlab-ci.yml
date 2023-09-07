@@ -55,7 +55,7 @@ tioga:
    - export GRVY_DIR=${SW_HOME}/grvy
    - export METIS_DIR=${SW_HOME}/metis
    - export HYPRE_DIR=${SW_HOME}/hypre-2.18.1
-   - export MFEM_DIR=${SW_HOME}/mfem
+   - export MFEM_DIR=${SW_HOME}/mfem-4.5.2-hip
    - export HDF5_DIR=${SW_HOME}/hdf5
    - export MPI_DIR=/usr/tce/packages/cray-mpich-tce/cray-mpich-8.1.21-rocmcc-5.4.1-cce-15.0.0c
    - export RESOLVE_CRAY_LIB=/usr/tce/packages/cce-tce/cce-15.0.0c/cce/x86_64/lib/
@@ -65,4 +65,4 @@ tioga:
    - ./bootstrap
    - ./configure CXXFLAGS="-g -O3" --enable-gpu-hip HIP_ARCH=gfx90a --without-masa --disable-valgrind
    - make -j2
-   - flux mini run -N1 make check
+   - flux run -N1 make check

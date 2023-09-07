@@ -230,7 +230,7 @@ jobs:
      needs: distbuild
      name: GPU/Cuda release tarball tests
      env:
-       MFEM_DIR: /home/karl/sw/mfem-gpu-4.4
+       MFEM_DIR: /home/oliver/sw/mfem-4.5.2-cuda
      steps:
        - name: Cancel previous runs
          uses: styfle/cancel-workflow-action@0.11.0
