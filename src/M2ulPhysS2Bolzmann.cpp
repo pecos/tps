@@ -41,7 +41,6 @@ void M2ulPhyS::push(TPS::Tps2Boltzmann &interface) {
   std::cout << "Enter M2ulPhyS::push" << std::endl;
   assert(interface.IsInitialized());
 
-  constexpr double avogadro(6.02214076e23);
   int nscalardofs = vfes->GetNDofs();
 
   const double *solver_data = U->HostRead();
@@ -58,17 +57,20 @@ void M2ulPhyS::push(TPS::Tps2Boltzmann &interface) {
   double state_local[gpudata::MAXEQUATIONS];
   double species_local[gpudata::MAXSPECIES];
 
+  PerfectMixture * pmixture = dynamic_cast<PerfectMixture *>(mixture);
+  assert(pmixture);
+
   std::cout << "Start to loop" << std::endl;
   for (int i = 0; i < nscalardofs; i++) {
     for (int eq = 0; eq < num_equation; eq++) state_local[eq] = solver_data[i + eq * nscalardofs];
 
-    mixture->computeNumberDensities(state_local, species_local);
+    pmixture->computeNumberDensities(state_local, species_local);
 
-    mixture->computeTemperaturesBase(state_local, species_local, species_local[mixture->GetiElectronIndex()],
+    pmixture->computeTemperaturesBase(state_local, species_local, species_local[mixture->GetiElectronIndex()],
                                      species_local[mixture->GetiBackgroundIndex()], heavyTemperature_data[i],
                                      electronTemperature_data[i]);
 
-    for (int sp = 0; sp < interface.Nspecies(); sp++) species_data[i + sp * nscalardofs] = avogadro * species_local[sp];
+    for (int sp = 0; sp < interface.Nspecies(); sp++) species_data[i + sp * nscalardofs] = AVOGADRONUMBER * species_local[sp];
   }
 
   std::cout << "Call interpolate" << std::endl;

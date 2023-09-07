@@ -198,12 +198,7 @@ class GasMixture {
     // mfem_error("ComputeTemperature is not implemented.");
     return -1.0;
   }
-  MFEM_HOST_DEVICE virtual void computeTemperaturesBase(const double *conservedState, const double *n_sp,
-                                                        const double n_e, const double n_B, double &T_h,
-                                                        double &T_e) const {
-    T_h = -1.;
-    T_e = -1.;
-  }
+
   // virtual double Temperature(double *rho, double *p,
   //                            int nsp) = 0;  // temperature given densities and pressures of all species
 
@@ -270,12 +265,10 @@ class GasMixture {
 #endif
 
   virtual void computeNumberDensities(const Vector &conservedState, Vector &n_sp) {
-    computeNumberDensities(conservedState.Read(), n_sp.Write());
+    mfem::mfem_error("GasMixture::computeNumberDensities not implemented");
   }
 
-  MFEM_HOST_DEVICE virtual void computeNumberDensities(const double *conservedState, double *n_sp) const {
-    mfem_error("computeNumberDensities not implemented");
-  }
+
 
   void SetConstantPlasmaConductivity(ParGridFunction *pc, const ParGridFunction *Up, const ParGridFunction *coords);
 
