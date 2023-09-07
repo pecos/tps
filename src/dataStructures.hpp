@@ -185,6 +185,10 @@ struct planeDumpData {
   Vector point;
   int samples;
   bool isEnabled;
+  bool conserved;
+  bool primitive;
+  bool mean;
+  bool reynolds;
 };
 
 enum SpongeZoneSolution {

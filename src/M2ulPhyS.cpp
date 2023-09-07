@@ -1927,8 +1927,26 @@ void M2ulPhyS::solveStep() {
       //int totalPts = nPts * nPts + nRanks;	      
       
       // source, TODO: add option to select u, <u>, or <u'u'>
-      ParGridFunction *u_gf = GetSolutionGF();
+      int interpNum;
+      ParGridFunction *u_gf;
+      if ( config.planeDump.conserved == true ) {
+        u_gf = GetSolutionGF();
+	interpNum = num_equation;
+      } else if ( config.planeDump.primitive == true ) {
+        u_gf = getPrimitiveGF();
+	interpNum = num_equation;
+      } else if ( config.planeDump.mean == true ) {
+        u_gf = average->GetMeanUp();	
+        interpNum = num_equation;
+      } else if ( config.planeDump.reynolds == true ) {            
+        u_gf = average->GetRMS();
+	interpNum = 6;
+      } else {
+        grvy_printf(GRVY_ERROR, "\nSpecified interpolation type not supported.\n");
+        exit(ERROR);	
+      }
 
+      
       // plane description
       Vector normal, point;
       normal.SetSize(3);
@@ -1960,7 +1978,7 @@ void M2ulPhyS::solveStep() {
       if (majorD == std::abs(normal[0])) {
         double dy = Ly/(double)(nPts-1);
         double dz = Lz/(double)(nPts-1);
-	if (rank0_) { std::cout << "Plane x-major " << Ly << " " << Lz << " with delta " << dy << " x "<< dz << endl; }	
+	//if (rank0_) { std::cout << "Plane x-major " << Ly << " " << Lz << " with delta " << dy << " x "<< dz << endl; }	
         for (int j = 0; j < nPts; j++) {
           for (int i = 0; i < nPts; i++) {
             xp = (ndotp - (normal[1]*yp) - (normal[2]*zp) ) / normal[0];	    
@@ -1978,7 +1996,7 @@ void M2ulPhyS::solveStep() {
       } else if (majorD == std::abs(normal[1])) {
         double dx = Lx/(double)(nPts-1);
         double dz = Lz/(double)(nPts-1);
-	if (rank0_) { std::cout << "Plane y-major " <<  Lx << " " << Lz << " with delta " << dx << " x "<< dz << endl; }	
+	//if (rank0_) { std::cout << "Plane y-major " <<  Lx << " " << Lz << " with delta " << dx << " x "<< dz << endl; }	
         for (int j = 0; j < nPts; j++) {
           for (int i = 0; i < nPts; i++) {
             xp = dx*(double)i + xmin;
@@ -1997,7 +2015,7 @@ void M2ulPhyS::solveStep() {
       } else {
         double dx = Lx/(double)(nPts-1);
         double dy = Ly/(double)(nPts-1);
-	if (rank0_) { std::cout << "Plane z-major" <<  Lx << " " << Ly  << " with delta " << dx << " x "<< dy << endl; }	  	
+	//if (rank0_) { std::cout << "Plane z-major" <<  Lx << " " << Ly  << " with delta " << dx << " x "<< dy << endl; }	  	
         for (int j = 0; j < nPts; j++) {
           for (int i = 0; i < nPts; i++) {
             xp = dx*(double)i + xmin;
@@ -2092,6 +2110,7 @@ void M2ulPhyS::solveStep() {
       MPI_Comm_create(MPI_COMM_WORLD,planeGroup,&MPI_COMM_PLANE);
       */
 
+      /*
       if (rank0_) {
         for (int n = 0; n < totalPts; n++) {
 	  std::cout << n << ") ";	  
@@ -2101,10 +2120,11 @@ void M2ulPhyS::solveStep() {
 	  std::cout << endl;	  
 	}
       }
+      */
       
       // get values at plane
       Vector uInterp_vals;
-      uInterp_vals.SetSize( totalPts * num_equation );
+      uInterp_vals.SetSize( totalPts * interpNum );
       FindPointsGSLIB finder(MPI_COMM_WORLD);
       //FindPointsGSLIB finder(MPI_COMM_PLANE);
       finder.Setup(*mesh);
@@ -2124,7 +2144,7 @@ void M2ulPhyS::solveStep() {
           for (int d = 0; d < dim; d++) {	  
 	    outfile << vxyz[n + d*totalPts] << " ";
 	  }
-          for (int eq = 0; eq < num_equation; eq++) {
+          for (int eq = 0; eq < interpNum; eq++) {
             outfile << uInterp_vals[n + eq*totalPts] << " ";
           }
           outfile << endl;
@@ -2848,6 +2868,7 @@ void M2ulPhyS::parsePlaneDump() {
   tpsP->getInput("planeDump/isEnabled", config.planeDump.isEnabled, false);
 
   if (config.planeDump.isEnabled) {
+    
     auto normal = config.planeDump.normal.HostWrite();
     tpsP->getRequiredVecElem("planeDump/norm", normal[0], 0);
     tpsP->getRequiredVecElem("planeDump/norm", normal[1], 1);
@@ -2859,6 +2880,13 @@ void M2ulPhyS::parsePlaneDump() {
     tpsP->getRequiredVecElem("planeDump/point", point[2], 2);
 
     tpsP->getRequiredInput("planeDump/samples", config.planeDump.samples);
+
+    // data to interpolate, only one selection is supported now
+    tpsP->getInput("planeDump/conserved", config.planeDump.conserved, false);
+    tpsP->getInput("planeDump/primitive", config.planeDump.primitive, false);
+    tpsP->getInput("planeDump/mean", config.planeDump.mean, false);
+    tpsP->getInput("planeDump/reynolds", config.planeDump.reynolds, false);    
+    
   }
 }
 
