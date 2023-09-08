@@ -361,6 +361,7 @@ protected:
    VectorConstantCoefficient *buffer_ubc;
    VectorConstantCoefficient *buffer_accel;  
    ConstantCoefficient *buffer_tbc;
+   //VectorConstantCoefficient *buffer_tbc;  
    VectorConstantCoefficient *wall_ubc;  
   
    ParGridFunction *bufferInvRho;  
@@ -412,6 +413,7 @@ protected:
    Vector Nun, Nunm1, Nunm2;
    Vector Fext, FText, Lext, Uext, Ldiv;          
    Vector resu, tmpR1, tmpR1b, tmpR1c;
+   Vector gradMu, gradU, gradV, gradW;
    Vector FBext;
    Vector divU, Qt;
    Vector gravity;
@@ -711,7 +713,10 @@ public:
 
    /// Add a Dirichlet boundary condition to the temperature field.
    void AddTempDirichletBC(Coefficient *coeff, Array<int> &attr);
-   void AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr);  
+   void AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr);    
+   //void AddTempDirichletBC(VectorCoefficient *coeff, Array<int> &attr);
+   //void AddTempDirichletBC(VecFuncT *f, Array<int> &attr);
+   //void AddTempDirichletBC(Array<int> &coeff, Array<int> &attr);  
 
    /// Add an acceleration term to the RHS of the equation.
    /**
