@@ -1966,9 +1966,6 @@ void M2ulPhyS::solveStep() {
       // plane points
       Vector vxyz;
       vxyz.SetSize( totalPts * 3);
-      double xPlane[totalPts];
-      double yPlane[totalPts];
-      double zPlane[totalPts];
       int iCnt = 0;
       double xp, yp, zp;
       double Lx, Ly, Lz;
@@ -1987,9 +1984,6 @@ void M2ulPhyS::solveStep() {
             vxyz[iCnt + 0*totalPts] = xp;
 	    vxyz[iCnt + 1*totalPts] = yp;
 	    vxyz[iCnt + 2*totalPts] = zp;
-            //xPlane[iCnt] = xp;
-            //yPlane[iCnt] = yp;
-            //zPlane[iCnt] = zp;	    	    
             iCnt++;
           }
         }
@@ -2006,9 +2000,6 @@ void M2ulPhyS::solveStep() {
             vxyz[iCnt + 0*totalPts] = xp;
             vxyz[iCnt + 1*totalPts] = yp;
             vxyz[iCnt + 2*totalPts] = zp;
-            //xPlane[iCnt] = xp;
-            //yPlane[iCnt] = yp;
-            //zPlane[iCnt] = zp;	    
             iCnt++;
           }
         }
@@ -2024,109 +2015,15 @@ void M2ulPhyS::solveStep() {
             vxyz[iCnt + (0*totalPts)] = xp;
             vxyz[iCnt + (1*totalPts)] = yp;
             vxyz[iCnt + (2*totalPts)] = zp;
-            //xPlane[iCnt] = xp;
-            //yPlane[iCnt] = yp;
-            //zPlane[iCnt] = zp;	    	    
             iCnt++;
           }
         }
       }
-
-      // why is this necessary?
-      /*
-      MPI_Bcast(&xPlane,totalPts,MPI_DOUBLE,0,MPI_COMM_WORLD);
-      MPI_Bcast(&yPlane,totalPts,MPI_DOUBLE,0,MPI_COMM_WORLD);
-      MPI_Bcast(&zPlane,totalPts,MPI_DOUBLE,0,MPI_COMM_WORLD);                 
-      for (int i = 0; i < totalPts; i++) {
-        vxyz[i + 0*totalPts] = xPlane[i];
-	vxyz[i + 1*totalPts] = yPlane[i];
-	vxyz[i + 2*totalPts] = zPlane[i];
-      }
-      */
-      
-      // hack
-      /*
-      double xSend, ySend, zSend;
-      double xList[nRanks];
-      double yList[nRanks];
-      double zList[nRanks];      
-      xSend = 0.5 * (local_xmin + local_xmax);
-      ySend = 0.5 * (local_ymin + local_ymax);
-      zSend = 0.5 * (local_zmin + local_zmax);      
-      MPI_Gather(&xSend,1,MPI_DOUBLE,&xList,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
-      MPI_Gather(&ySend,1,MPI_DOUBLE,&yList,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
-      MPI_Gather(&zSend,1,MPI_DOUBLE,&zList,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
-      MPI_Bcast(&xList,nRanks,MPI_DOUBLE,0,MPI_COMM_WORLD);
-      MPI_Bcast(&yList,nRanks,MPI_DOUBLE,0,MPI_COMM_WORLD);
-      MPI_Bcast(&zList,nRanks,MPI_DOUBLE,0,MPI_COMM_WORLD);            
-      for (int i = 0; i < nRanks; i++) {
-        vxyz[ (i+iCnt) + 0*totalPts ] = xList[i];
-	vxyz[ (i+iCnt) + 1*totalPts ] = yList[i];
-	vxyz[ (i+iCnt) + 2*totalPts ] = zList[i];
-      }
-      */
-
-      // create subcomm for ranks owning part of plane => not prefect for not clean partitions
-      /*
-      int havePlane = 0;
-      int nPlaneRanks = 0;
-      int nRanks;
-      MPI_Group planeGroup;      
-      MPI_Comm MPI_COMM_PLANE;
-      for (int i = 0; i < nPts*nPts; i++) {
-	if ( (vxyz[i + 0*nPts*nPts] >= local_xmin) && (vxyz[i + 0*nPts*nPts] <= local_xmax) &&
-	     (vxyz[i + 1*nPts*nPts] >= local_ymin) && (vxyz[i + 1*nPts*nPts] <= local_ymax) &&
-	     (vxyz[i + 2*nPts*nPts] >= local_zmin) && (vxyz[i + 2*nPts*nPts] <= local_zmax) ) {
-	  havePlane = 1;
-	  break;
-	}
-      }
-      MPI_Allreduce(&havePlane, &nPlaneRanks, 1, MPI_INTEGER, MPI_SUM, mesh->GetComm());      
-      MPI_Comm_size(MPI_COMM_WORLD, &nRanks);
-      int planeRanks[nPlaneRanks];      
-      int rankList[nRanks];
-      int rSend;
-      if( havePlane>0 ) {
-       rSend = rank_;
-      } else {
-       rSend = -1;
-      }
-      MPI_Gather(&rSend,1,MPI_INTEGER,&rankList,1,MPI_INTEGER,0,MPI_COMM_WORLD);
-      if (rank0_) {
-        int jj = 0;
-        for (int i = 0; i < nRanks; i++) {
-	  if (rankList[i] >= 0) {
-	    planeRanks[jj] = rankList[i];
-	    jj++;
-	  }
-	}
-      }
-      MPI_Bcast(&planeRanks,nPlaneRanks,MPI_INTEGER,0,MPI_COMM_WORLD);
-      MPI_Comm_group(MPI_COMM_WORLD, &planeGroup);
-      MPI_Group_size(planeGroup, &nPlaneRanks);
-      MPI_Group world_group;
-      MPI_Comm_group(MPI_COMM_WORLD, &world_group);
-      MPI_Group_incl(world_group, nPlaneRanks, planeRanks, &planeGroup);      
-      MPI_Comm_create(MPI_COMM_WORLD,planeGroup,&MPI_COMM_PLANE);
-      */
-
-      /*
-      if (rank0_) {
-        for (int n = 0; n < totalPts; n++) {
-	  std::cout << n << ") ";	  
-          for (int d = 0; d < dim; d++) {	  
-	    std::cout << vxyz[n + d*totalPts] << " ";
-	  }
-	  std::cout << endl;	  
-	}
-      }
-      */
       
       // get values at plane
       Vector uInterp_vals;
       uInterp_vals.SetSize( totalPts * interpNum );
       FindPointsGSLIB finder(MPI_COMM_WORLD);
-      //FindPointsGSLIB finder(MPI_COMM_PLANE);
       finder.Setup(*mesh);
       finder.Interpolate(vxyz, *u_gf, uInterp_vals);
 
