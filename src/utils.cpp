@@ -332,7 +332,7 @@ bool h5ReadTable(const std::string &fileName, const std::string &datasetName, mf
 bool h5ReadBcastMultiColumnTable(const std::string &fileName, const std::string &datasetName, MPI_Comm TPSCommWorld,
                                  mfem::DenseMatrix &output, std::vector<TableInput> &tables) {
   int myrank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+  MPI_Comm_rank(TPSCommWorld, &myrank);
   const bool rank0 = (myrank == 0);
 
   int nrow = 0, ncol = 0;
