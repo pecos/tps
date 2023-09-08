@@ -607,6 +607,11 @@ void LoMachSolver::initialize() {
    tmpR1b.SetSize(vfes_truevsize);
    tmpR1c.SetSize(vfes_truevsize);
 
+   gradMu.SetSize(vfes_truevsize);   
+   gradU.SetSize(vfes_truevsize);
+   gradV.SetSize(vfes_truevsize);
+   gradW.SetSize(vfes_truevsize);      
+
    boussinesqField.SetSize(vfes_truevsize);
    boussinesqField = 0.0;   
    divU.SetSize(tfes_truevsize);
@@ -925,11 +930,17 @@ void LoMachSolver::Setup(double dt)
    //std::cout << "Check 3..." << std::endl;    
 
    
+   Vector wallTemp(numWalls);
    ConstantCoefficient t_bc_coef;
-   t_bc_coef.constant = config.wallBC[0].Th;   
+   //ConstantCoefficient t_bc_coef(numWalls);
+   //VectorConstantCoefficient t_bc_coef(numWalls) ;
+   for (int i = 0; i < numWalls; i++) {
+     wallTemp[i] = config.wallBC[i].Th;
+   }
    Array<int> Tattr(pmesh->bdr_attributes.Max());
    Tattr = 0;
-   buffer_tbc = new ConstantCoefficient(t_bc_coef.constant);   
+   //ConstantCoefficient t_bc_coef(wallTemp);   
+   //buffer_tbc = new VectorConstantCoefficient(wallTemp);      
    /*
    Tattr[1] = 1;
    Tattr[3] = 1;
@@ -944,14 +955,18 @@ void LoMachSolver::Setup(double dt)
        if (config.wallPatchType[i].second != WallType::INV) { // should only be isothermal
          if (iFace == config.wallPatchType[i].first) {
             Tattr[iFace-1] = 1;	 
-            //AddTempDirichletBC(&t_bc_coef, Tattr);	  
+            //AddTempDirichletBC(&t_bc_coef, Tattr);
+            //AddTempDirichletBC(wallTemp, Tattr); 	    
          }
        }
      }
    }
-   //AddTempDirichletBC(temp_wall, Tattr); // FIX FIX FIX
-   AddTempDirichletBC(buffer_tbc, Tattr);
-   //AddTempDirichletBC(t_bc_coef, Tattr);   
+   //buffer_tbc = new ConstantCoefficient(t_bc_coef.constant);
+   buffer_tbc = new ConstantCoefficient(t_bc_coef);   
+   AddTempDirichletBC(temp_wall, Tattr); // FIX FIX FIX
+   //AddTempDirichletBC(buffer_tbc, Tattr);
+   //AddTempDirichletBC(t_bc_coef, Tattr);
+   if (rank0_) std::cout << "***NUMBER OF WALLS: " << numWalls << endl;
    /**/
    //std::cout << "Check 4..." << std::endl;  
 
@@ -2306,143 +2321,16 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    //std::cout << "Check o..." << std::endl;      
    sw_curlcurl.Stop();
 
-   // add dj(mu)dj(u) to Lext
-   /**/
+
+   // Qt ~= divU, thermal divergence
    if (incompressibleSolve != true) {
-
-     // viscosity gradient
-     G->Mult(viscSml, tmpR1);
-     MvInv->Mult(tmpR1, tmpR1b);
-
-     // TODO: make the next part (grad(mu)*grad(u_i)) a separate routine to avoid duplicating code
-
-     // gradu
-     {
-       int eq = 0;
-       double *dataU = Uext.HostReadWrite();
-       double *data = tmpR0.HostReadWrite();              
-       for (int i = 0; i < TdofInt; i++) {
-         data[i] = dataU[i + eq*TdofInt];
-       }
-     }     
-     G->Mult(tmpR0, tmpR1);
-     MvInv->Mult(tmpR1, tmpR1c);
-
-     // du into divU
-     {
-       int eq = 0;
-       double *dataGradU = tmpR1c.HostReadWrite();      
-       double *data = divU.HostReadWrite();
-       for (int i = 0; i < TdofInt; i++) {
-         data[i] = dataGradU[i + eq*TdofInt];
-       }
-     }
-
-     // add u-part to Ldiv
-     {
-       int eq = 0;
-       double *data1 = tmpR1b.HostReadWrite(); 
-       double *data2 = tmpR1c.HostReadWrite();      
-       double *data = Ldiv.HostReadWrite();
-       for (int j = 0; j < dim; j++) {
-         for (int i = 0; i < TdofInt; i++) {
-           data[i + eq*TdofInt] = data1[i + j*TdofInt]*data2[i + j*TdofInt];
-         }
-       }
-     }
-
-     // gradv
-     {
-       int eq = 1;
-       double *dataU = Uext.HostReadWrite();
-       double *data = tmpR0.HostReadWrite();              
-       for (int i = 0; i < TdofInt; i++) {
-         data[i] = dataU[i + eq*TdofInt];
-       }
-     }     
-     G->Mult(tmpR0, tmpR1);
-     MvInv->Mult(tmpR1, tmpR1c);
-
-     // dv into divU
-     {
-       int eq = 1;
-       double *dataGradU = tmpR1c.HostReadWrite();      
-       double *data = divU.HostReadWrite();
-       for (int i = 0; i < TdofInt; i++) {
-         data[i] += dataGradU[i + eq*TdofInt];
-       }
-     }
      
-     // add v-part to Ldiv
-     {
-       int eq = 1;
-       double *data1 = tmpR1b.HostReadWrite(); 
-       double *data2 = tmpR1c.HostReadWrite();      
-       double *data = Ldiv.HostReadWrite();
-       for (int j = 0; j < dim; j++) {
-         for (int i = 0; i < TdofInt; i++) {
-           data[i + eq*TdofInt] += data1[i + j*TdofInt]*data2[i + j*TdofInt];
-         }
-       }
-     }
-
-     // gradw
-     {
-       int eq = 2;
-       double *dataU = Uext.HostReadWrite();
-       double *data = tmpR0.HostReadWrite();              
-       for (int i = 0; i < TdofInt; i++) {
-         data[i] = dataU[i + eq*TdofInt];
-       }
-     }     
-     G->Mult(tmpR0, tmpR1);
-     MvInv->Mult(tmpR1, tmpR1c);
-
-     // dw into divU
-     {
-       int eq = 2;
-       double *dataGradU = tmpR1c.HostReadWrite();      
-       double *data = divU.HostReadWrite();
-       for (int i = 0; i < TdofInt; i++) {
-         data[i] += dataGradU[i + eq*TdofInt];
-       }
-     }
-     
-     // add w-part to Ldiv
-     {
-       int eq = 2;
-       double *data1 = tmpR1b.HostReadWrite(); 
-       double *data2 = tmpR1c.HostReadWrite();      
-       double *data = Ldiv.HostReadWrite();
-       for (int j = 0; j < dim; j++) {
-         for (int i = 0; i < TdofInt; i++) {
-           data[i + eq*TdofInt] += data1[i + j*TdofInt]*data2[i + j*TdofInt];
-         }
-       }
-     }
-     
-   }
-   /**/
-   // come out of above with divU and dmu*du part of momentum viscous term
-   
-
-   // add Qt source here (requires divU from previous section)
-
-   if (incompressibleSolve != true) {     
-
-     // grad(divU)
-     /*
-     G->Mult(divU, tmpR1);
-     MvInv->Mult(tmpR1, tmpR1b);
-     */
-
-     /**/
      // laplace(T) => should be T{n+1}, move T-solve before u?
      Lt->Mult(Text,tmpR0);
      MtInv->Mult(tmpR0, Qt);
-     
+
      // multiple lapl(T) to get correct units
-     // nabla(T) -> div(u): k/P = Cp*mu/Pr * 1/P
+     // nabla(T) -> div(u): k/P = a*rho*Cp/P =  Cp*mu/Pr * 1/P
      {
        double *Tdata = Text.HostReadWrite();
        double *Mdata = viscSml.HostReadWrite();       
@@ -2458,11 +2346,188 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
        for (int i = 0; i < TdofInt; i++) {
          data[i] += ((gamma - 1.0)/gamma - Cp) * 1.0 / (Cp*thermoPressure) * dtP;
        }       
+     }     
+     
+   }
+   
+   // dj(mu)(\tau/mu), have to store bits separately due to weak form helmholtz in momentum
+   // could use elasticity integrator to prevent need to include part of this in momentum
+   if (incompressibleSolve != true) {
+
+     // viscosity gradient
+     G->Mult(viscSml, tmpR1);
+     MvInv->Mult(tmpR1, gradMu);
+
+     // gradient of u_i
+     {
+       int eq = 0;
+       double *dataU = Uext.HostReadWrite();
+       double *data = tmpR0.HostReadWrite();              
+       for (int i = 0; i < TdofInt; i++) {
+         data[i] = dataU[i + eq*TdofInt];
+       }
+     }     
+     G->Mult(tmpR0, tmpR1);
+     MvInv->Mult(tmpR1, gradU);
+     {
+       int eq = 1;
+       double *dataU = Uext.HostReadWrite();
+       double *data = tmpR0.HostReadWrite();              
+       for (int i = 0; i < TdofInt; i++) {
+         data[i] = dataU[i + eq*TdofInt];
+       }
+     }     
+     G->Mult(tmpR0, tmpR1);
+     MvInv->Mult(tmpR1, gradV);
+     {
+       int eq = 2;
+       double *dataU = Uext.HostReadWrite();
+       double *data = tmpR0.HostReadWrite();              
+       for (int i = 0; i < TdofInt; i++) {
+         data[i] = dataU[i + eq*TdofInt];
+       }
+     }     
+     G->Mult(tmpR0, tmpR1);
+     MvInv->Mult(tmpR1, gradW);
+     
+     
+     // divergence of u_i
+     {
+       int eq = 0;
+       double *dataGradU = gradU.HostReadWrite();      
+       double *data = divU.HostReadWrite();
+       for (int i = 0; i < TdofInt; i++) {
+         data[i] = dataGradU[i + eq*TdofInt];
+       }
+     }
+     {
+       int eq = 1;
+       double *dataGradU = gradV.HostReadWrite();      
+       double *data = divU.HostReadWrite();
+       for (int i = 0; i < TdofInt; i++) {
+         data[i] += dataGradU[i + eq*TdofInt];
+       }
+     }
+     {
+       int eq = 2;
+       double *dataGradU = gradW.HostReadWrite();      
+       double *data = divU.HostReadWrite();
+       for (int i = 0; i < TdofInt; i++) {
+         data[i] += dataGradU[i + eq*TdofInt];
+       }
+     }
+
+
+     // momentum only portion, TODO: break-up loops, this will thrash
+     {
+       int eq = 0;
+       double *data1 = gradMu.HostReadWrite(); 
+       double *dU = gradU.HostReadWrite();
+       double *dV = gradV.HostReadWrite();
+       double *dW = gradW.HostReadWrite();             
+       double *data = Ldiv.HostReadWrite();
+       for (int i = 0; i < TdofInt; i++) {
+         data[i + eq*TdofInt] = data1[i + 0*TdofInt] * dU[i + eq*TdofInt]
+        	              + data1[i + 1*TdofInt] * dV[i + eq*TdofInt]
+	                      + data1[i + 2*TdofInt] * dW[i + eq*TdofInt];
+       }
+     }    
+     {
+       int eq = 1;
+       double *data1 = gradMu.HostReadWrite(); 
+       double *dU = gradU.HostReadWrite();
+       double *dV = gradV.HostReadWrite();
+       double *dW = gradW.HostReadWrite();             
+       double *data = Ldiv.HostReadWrite();
+       for (int i = 0; i < TdofInt; i++) {
+         data[i + eq*TdofInt] = data1[i + 0*TdofInt] * dU[i + eq*TdofInt]
+        	              + data1[i + 1*TdofInt] * dV[i + eq*TdofInt]
+	                      + data1[i + 2*TdofInt] * dW[i + eq*TdofInt];
+       }
+     }
+     {
+       int eq = 2;
+       double *data1 = gradMu.HostReadWrite(); 
+       double *dU = gradU.HostReadWrite();
+       double *dV = gradV.HostReadWrite();
+       double *dW = gradW.HostReadWrite();             
+       double *data = Ldiv.HostReadWrite();
+       for (int i = 0; i < TdofInt; i++) {
+         data[i + eq*TdofInt] = data1[i + 0*TdofInt] * dU[i + eq*TdofInt]
+        	              + data1[i + 1*TdofInt] * dV[i + eq*TdofInt]
+	                      + data1[i + 2*TdofInt] * dW[i + eq*TdofInt];
+       }
+     }         
+     {
+       double *data1 = gradMu.HostReadWrite(); 
+       //double *divU = divU.HostReadWrite();
+       double *divU = Qt.HostReadWrite(); // use only thermal-divergence
+       double *data = Ldiv.HostReadWrite();
+       double onethird = 1.0/3.0;
+       for (int eq = 0; eq < nvel; eq++) {       
+         for (int i = 0; i < TdofInt; i++) {
+           data[i + eq*TdofInt] -= onethird * data1[i + eq*TdofInt] * divU[i];
+         }
+       }
+     }         
+         
+     
+     // full contribution to pressure-possion
+     {
+       double *data1 = Ldiv.HostReadWrite(); 
+       double *data = tmpR1c.HostReadWrite();
+       for (int eq = 0; eq < dim; eq++) {
+         for (int i = 0; i < TdofInt; i++) {
+           data[i + eq*TdofInt] = data1[i + eq*TdofInt];
+         }
+       }
+     }
+     {
+       int eq = 0;
+       double *data1 = gradMu.HostReadWrite(); 
+       double *data2 = gradU.HostReadWrite();      
+       double *data = tmpR1c.HostReadWrite();
+       for (int j = 0; j < dim; j++) {
+         for (int i = 0; i < TdofInt; i++) {
+           data[i + eq*TdofInt] += data1[i + j*TdofInt]*data2[i + j*TdofInt];
+         }
+       }
+     }    
+     {
+       int eq = 1;
+       double *data1 = gradMu.HostReadWrite(); 
+       double *data2 = gradV.HostReadWrite();      
+       double *data = tmpR1c.HostReadWrite();
+       for (int j = 0; j < dim; j++) {
+         for (int i = 0; i < TdofInt; i++) {
+           data[i + eq*TdofInt] += data1[i + j*TdofInt]*data2[i + j*TdofInt];
+         }
+       }
+     }
+     {
+       int eq = 2;
+       double *data1 = gradMu.HostReadWrite(); 
+       double *data2 = gradW.HostReadWrite();      
+       double *data = tmpR1c.HostReadWrite();
+       for (int j = 0; j < dim; j++) {
+         for (int i = 0; i < TdofInt; i++) {
+           data[i + eq*TdofInt] += data1[i + j*TdofInt]*data2[i + j*TdofInt];
+         }
+       }
      }
      
+   }
+   /**/
+   // Ldiv => to rhs of momentum
+   // tmpR1c => to rhs of pressure-poisson
+   
+
+   // add Qt source here 
+   if (incompressibleSolve != true) {     
+
+     // gradient of Qt
      G->Mult(Qt, tmpR1);
      MvInv->Mult(tmpR1, tmpR1b);
-     /**/
 
      // mult by 4/3*mu
      {
@@ -2476,19 +2541,6 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
        }
      }
 
-     // add Ldiv to Lext (negative because Lext is added with neg for curl-curl term)
-     /*
-     {
-       double *dataDiv = Ldiv.HostReadWrite(); // still has grad(mu)grad(u)
-       double *data = Lext.HostReadWrite();
-       for (int eq = 0; eq < dim; eq++) {
-         for (int i = 0; i < TdofInt; i++) {
-           data[i + eq*TdofInt] -= dataDiv[i + eq*TdofInt];
-         }
-       }
-     }
-     */
-
      // add Qt part to Lext
      {
        double *dataDiv = tmpR1b.HostReadWrite();
@@ -2500,16 +2552,25 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
        }
      }     
 
-     
+     // add grad(mu) part to Lext
+     {
+       double *data1 = tmpR1c.HostReadWrite();
+       double *data = Lext.HostReadWrite();
+       for (int eq = 0; eq < dim; eq++) {
+         for (int i = 0; i < TdofInt; i++) {
+           data[i + eq*TdofInt] += data1[i + eq*TdofInt];
+         }
+       }
+     }     
+          
      // add Qt part to Ldiv (or substitute) for momentum
      {
        double *dataQterm = tmpR1b.HostReadWrite(); 
        double *data = Ldiv.HostReadWrite();
        for (int eq = 0; eq < dim; eq++) {
          for (int i = 0; i < TdofInt; i++) {
-           //data[i + eq*TdofInt] += dataQterm[i + eq*TdofInt]; // unstable
-           //data[i + eq*TdofInt] = dataQterm[i + eq*TdofInt] - data[i + eq*TdofInt];  
-           data[i + eq*TdofInt] = dataQterm[i + eq*TdofInt]; // if not adding
+           data[i + eq*TdofInt] += dataQterm[i + eq*TdofInt];
+           //data[i + eq*TdofInt] = dataQterm[i + eq*TdofInt]; // if not adding
          }
        }
      }
@@ -3648,6 +3709,7 @@ void LoMachSolver::AddPresDirichletBC(ScalarFuncT *f, Array<int> &attr)
 
 
 void LoMachSolver::AddTempDirichletBC(Coefficient *coeff, Array<int> &attr)
+//void LoMachSolver::AddTempDirichletBC(Array<int> &coeff, Array<int> &attr)
 {
 
    temp_dbcs.emplace_back(attr, coeff);
@@ -3656,7 +3718,9 @@ void LoMachSolver::AddTempDirichletBC(Coefficient *coeff, Array<int> &attr)
    {
       mfem::out << "Adding Temperature Dirichlet BC to attributes ";
       for (int i = 0; i < attr.Size(); ++i) {
-         if (attr[i] == 1) { mfem::out << i << " "; }
+         if (attr[i] == 1) {
+	   mfem::out << i << " ";
+	 }
       }
       mfem::out << std::endl;
    }
@@ -5580,9 +5644,16 @@ double temp_ic(const Vector &coords, double t)
    return temp;
 }
 
-double temp_wall(const Vector &x, double t)  
+double temp_wall(const Vector &coords, double t)  
 {
-   double temp = 298.15;
-   return temp;
+   double Thi = 400.0;  
+   double Tlo = 200.0;
+   double x = coords(0);
+   double y = coords(1);
+   double z = coords(2);
+   double temp;
+   if(y > 0.0) {temp = Thi;}
+   if(y < 0.0) {temp = Tlo;}   
+   return temp;   
 }
 
