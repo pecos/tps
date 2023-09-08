@@ -1532,23 +1532,23 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   gradUp = new ParGridFunction(gradUpfes);
 
   // TODO(Umberto) consider using new ParGridFunction(vfes, *u_block);
-  U = new ParGridFunction(vfes, u_block->HostReadWrite());
-  Up = new ParGridFunction(vfes, up_block->HostReadWrite());
+  U = new ParGridFunction(vfes, *u_block);
+  Up = new ParGridFunction(vfes, *up_block);
 
-  dens = new ParGridFunction(fes, Up->HostReadWrite());
-  vel = new ParGridFunction(dfes, Up->HostReadWrite() + fes->GetNDofs());
+  dens = new ParGridFunction(fes, *Up);
+  vel = new ParGridFunction(dfes, *Up, fes->GetNDofs());
 
   if (config.isAxisymmetric()) {
-    vtheta = new ParGridFunction(fes, Up->HostReadWrite() + 3 * fes->GetNDofs());
+    vtheta = new ParGridFunction(fes, *Up, 3 * fes->GetNDofs());
   } else {
     vtheta = NULL;
   }
 
-  temperature = new ParGridFunction(fes, Up->HostReadWrite() + (1 + nvel) * fes->GetNDofs());
+  temperature = new ParGridFunction(fes, *Up, (1 + nvel) * fes->GetNDofs());
 
   electron_temp_field = NULL;
   if (config.twoTemperature) {
-    electron_temp_field = new ParGridFunction(fes, Up->HostReadWrite() + (num_equation - 1) * fes->GetNDofs());
+    electron_temp_field = new ParGridFunction(fes, *Up, (num_equation - 1) * fes->GetNDofs());
   }
 
   // this variable is purely for visualization
@@ -1556,14 +1556,14 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   passiveScalar = NULL;
   if (eqSystem == NS_PASSIVE) {
-    passiveScalar = new ParGridFunction(fes, Up->HostReadWrite() + (num_equation - 1) * fes->GetNDofs());
+    passiveScalar = new ParGridFunction(fes, *Up, (num_equation - 1) * fes->GetNDofs());
   } else {
     // TODO(kevin): for now, keep the number of primitive variables same as conserved variables.
     // will need to add full list of species.
     for (int sp = 0; sp < numActiveSpecies; sp++) {
       std::string speciesName = config.speciesNames[sp];
       visualizationVariables_.push_back(
-          new ParGridFunction(fes, U->HostReadWrite() + (sp + nvel + 2) * fes->GetNDofs()));
+          new ParGridFunction(fes, *U, (sp + nvel + 2) * fes->GetNDofs()));
       visualizationNames_.push_back(std::string("partial_density_" + speciesName));
     }
   }
