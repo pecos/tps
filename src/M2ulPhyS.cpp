@@ -1418,14 +1418,6 @@ M2ulPhyS::~M2ulPhyS() {
 
   delete gradUp_A;
 
-  // ks (aug 2021) - following two lines cause unknown pointer errors with
-  // MFEM 4.3 (not 4.2). Commenting out for now.
-  // U.V We are now using MFEM 4.5 (let's try to restore this)
-  delete u_block;
-  delete up_block;
-
-  delete offsets;
-
   delete U;
   delete Up;
 
@@ -1477,6 +1469,7 @@ M2ulPhyS::~M2ulPhyS() {
   delete fec;
   delete intRules;
 
+  // Since own data is true, this will delete the mesh and fields
   delete paraviewColl;
   // delete mesh;
 
@@ -1484,7 +1477,8 @@ M2ulPhyS::~M2ulPhyS() {
 
   delete[] locToGlobElem;
 
-  delete serial_mesh;
+  // TODO(Uvilla) delete serial_mesh causes memory corruption
+  // delete serial_mesh;
 
   //   if ( mpi.Root() && (config.RestartSerial() != "no") )
   //   {
@@ -1498,6 +1492,12 @@ M2ulPhyS::~M2ulPhyS() {
   //       delete serial_RMS;
   //     }
   //   }
+
+  // The fields registered in paraviewColl are views of u_block, up_block.
+  // Therefore, this variables need to be deallocated at the end
+  delete u_block;
+  delete up_block;
+  delete offsets;
 
 #ifdef HAVE_GRVY
   if (rank0_) grvy_timer_summarize();
@@ -1531,6 +1531,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   // gradUp.SetSize(num_equation*dim*vfes->GetNDofs());
   gradUp = new ParGridFunction(gradUpfes);
 
+  // TODO(Umberto) consider using new ParGridFunction(vfes, *u_block);
   U = new ParGridFunction(vfes, u_block->HostReadWrite());
   Up = new ParGridFunction(vfes, up_block->HostReadWrite());
 
