@@ -1524,7 +1524,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   for (int k = 0; k <= num_equation; k++) {
     (*offsets)[k] = k * vfes->GetNDofs();
   }
-  
+
   u_block = new BlockVector(*offsets);
   up_block = new BlockVector(*offsets);
 

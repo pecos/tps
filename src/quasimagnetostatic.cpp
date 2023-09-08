@@ -32,6 +32,7 @@
 #include "quasimagnetostatic.hpp"
 
 #include <hdf5.h>
+
 #include <memory>
 
 #include "../utils/mfem_extras/pfem_extras.hpp"
@@ -401,7 +402,7 @@ void QuasiMagnetostaticSolver3D::solveStep() {
 
   Koffd_mat->EliminateRows(ess_bdr_tdofs_);
 
-  std::unique_ptr<BlockOperator> qms ( new BlockOperator(offsets_) );
+  std::unique_ptr<BlockOperator> qms(new BlockOperator(offsets_));
 
   qms->SetBlock(0, 0, Kdiag_mat);
   qms->SetBlock(0, 1, Koffd_mat, -1);
@@ -424,13 +425,13 @@ void QuasiMagnetostaticSolver3D::solveStep() {
   OperatorPtr Kpre_op;
   Kpre->FormSystemMatrix(ess_bdr_tdofs_, Kpre_op);
 
-  std::unique_ptr<HypreAMS> Paar( new HypreAMS(*Kpre_op.As<HypreParMatrix>(), Aspace_) );
+  std::unique_ptr<HypreAMS> Paar(new HypreAMS(*Kpre_op.As<HypreParMatrix>(), Aspace_));
   Paar->iterative_mode = false;
   if (!preconditioner_spd) {
     Paar->SetSingularProblem();
   }
 
-  std::unique_ptr<Operator> Paai( new ScaledOperator(Paar.get(), -1.0) );
+  std::unique_ptr<Operator> Paai(new ScaledOperator(Paar.get(), -1.0));
 
   BlockDiagonalPreconditioner BDP(offsets_);
   BDP.SetDiagonalBlock(0, Paar.get());
@@ -971,7 +972,7 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
   ProductCoefficient temp_coef(mu0_omega, *plasma_conductivity_coef_);
   ProductCoefficient mu_sigma_omega(temp_coef, radius_coeff);
 
-  std::unique_ptr<ParBilinearForm> Kconductivity ( new ParBilinearForm(Atheta_space_) );
+  std::unique_ptr<ParBilinearForm> Kconductivity(new ParBilinearForm(Atheta_space_));
   Kconductivity->AddDomainIntegrator(new MassIntegrator(mu_sigma_omega));
   Kconductivity->Assemble();
 
@@ -983,7 +984,7 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
 
   Koffd_mat->EliminateRows(ess_bdr_tdofs_);
 
-  std::unique_ptr<BlockOperator> qms( new BlockOperator(offsets_) );
+  std::unique_ptr<BlockOperator> qms(new BlockOperator(offsets_));
 
   qms->SetBlock(0, 0, Kdiag_mat);
   qms->SetBlock(0, 1, Koffd_mat, -1);
@@ -993,7 +994,7 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
   // Set up block preconditioner
   FunctionCoefficient one_over_radius_coeff(oneOverRadius);
 
-  std::unique_ptr<ParBilinearForm> Kpre( new ParBilinearForm(Atheta_space_) );
+  std::unique_ptr<ParBilinearForm> Kpre(new ParBilinearForm(Atheta_space_));
   Kpre->AddDomainIntegrator(new MassIntegrator(mu_sigma_omega));
   Kpre->AddDomainIntegrator(new DiffusionIntegrator(radius_coeff));
   Kpre->AddDomainIntegrator(new MassIntegrator(one_over_radius_coeff));
@@ -1002,7 +1003,7 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
   OperatorPtr KpreOp;
   Kpre->FormSystemMatrix(ess_bdr_tdofs_, KpreOp);
 
-  std::unique_ptr<HypreBoomerAMG> prec( new HypreBoomerAMG(*KpreOp.As<HypreParMatrix>()) );
+  std::unique_ptr<HypreBoomerAMG> prec(new HypreBoomerAMG(*KpreOp.As<HypreParMatrix>()));
   BlockDiagonalPreconditioner BDP(offsets_);
   BDP.SetDiagonalBlock(0, prec.get());
   BDP.SetDiagonalBlock(1, prec.get());

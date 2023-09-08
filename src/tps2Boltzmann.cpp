@@ -84,7 +84,7 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps) : NIndexes(7), tps_(tps), all_fes_(nullpt
   assert(basis_type_ == 0 || basis_type_ == 1);
 
   offsets.SetSize(NIndexes + 1);
-  ncomps.SetSize(NIndexes+1);
+  ncomps.SetSize(NIndexes + 1);
 }
 
 void Tps2Boltzmann::init(M2ulPhyS *flowSolver) {
@@ -163,14 +163,15 @@ void Tps2Boltzmann::init(M2ulPhyS *flowSolver) {
 }
 
 void Tps2Boltzmann::interpolateFromNativeFES(const ParGridFunction &input, Tps2Boltzmann::Index index) {
-  if ( ncomps[index] == 1 ) {
+  if (ncomps[index] == 1) {
     scalar_interpolator_->Mult(input, *(fields_[index]));
   } else {
     const int loc_size_native = list_native_fes_[index]->GetNDofs();
     const int loc_size = list_fes_[index]->GetNDofs();
     for (int icomp(0); icomp < ncomps[index]; ++icomp) {
-      const mfem::Vector view_input(const_cast<mfem::ParGridFunction&>(input), icomp*loc_size_native, loc_size_native);
-      mfem::Vector view_field(*(fields_[index]), icomp*loc_size, loc_size);
+      const mfem::Vector view_input(const_cast<mfem::ParGridFunction &>(input), icomp * loc_size_native,
+                                    loc_size_native);
+      mfem::Vector view_field(*(fields_[index]), icomp * loc_size, loc_size);
       scalar_interpolator_->Mult(view_input, view_field);
     }
   }
@@ -178,7 +179,7 @@ void Tps2Boltzmann::interpolateFromNativeFES(const ParGridFunction &input, Tps2B
 
 Tps2Boltzmann::~Tps2Boltzmann() {
   // Delete views
-  for (std::size_t i(0); i < NIndexes+1; ++i) delete fields_[i];
+  for (std::size_t i(0); i < NIndexes + 1; ++i) delete fields_[i];
   // Delete array
   delete[] fields_;
 
@@ -222,7 +223,7 @@ void tps2bolzmann(py::module &m) {
                                1,                                       /*number of dimensions*/
                                {d.size()},                              /*buffer dimension(s)*/
                                {d.stride() * sizeof(const double)},     /*Stride in bytes for each index*/
-                               true                                     /*read only*/);
+                               true /*read only*/);
       });
 
   py::class_<TPS::CPUData>(m, "CPUData", py::buffer_protocol()).def_buffer([](TPS::CPUData &d) -> py::buffer_info {
@@ -232,7 +233,7 @@ void tps2bolzmann(py::module &m) {
                            1,                                       /*number of dimensions*/
                            {d.size()},                              /*buffer dimension(s)*/
                            {d.stride() * sizeof(const double)},     /*Stride in bytes for each index*/
-                           false                                    /*writetable*/);
+                           false /*writetable*/);
   });
 
   py::enum_<TPS::Tps2Boltzmann::Index>(m, "t2bIndex")
