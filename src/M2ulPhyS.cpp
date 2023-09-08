@@ -1420,9 +1420,10 @@ M2ulPhyS::~M2ulPhyS() {
 
   // ks (aug 2021) - following two lines cause unknown pointer errors with
   // MFEM 4.3 (not 4.2). Commenting out for now.
+  // U.V We are now using MFEM 4.5 (let's try to restore this)
+  delete u_block;
+  delete up_block;
 
-  // delete u_block;
-  // delete up_block;
   delete offsets;
 
   delete U;
@@ -1470,6 +1471,7 @@ M2ulPhyS::~M2ulPhyS() {
 
   delete gradUpfes;
   delete vfes;
+  delete nvelfes;
   delete dfes;
   delete fes;
   delete fec;
@@ -1481,6 +1483,8 @@ M2ulPhyS::~M2ulPhyS() {
   delete groupsMPI;
 
   delete[] locToGlobElem;
+
+  delete serial_mesh;
 
   //   if ( mpi.Root() && (config.RestartSerial() != "no") )
   //   {
@@ -1520,6 +1524,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   for (int k = 0; k <= num_equation; k++) {
     (*offsets)[k] = k * vfes->GetNDofs();
   }
+  
   u_block = new BlockVector(*offsets);
   up_block = new BlockVector(*offsets);
 

@@ -178,7 +178,7 @@ void Tps2Boltzmann::interpolateFromNativeFES(const ParGridFunction &input, Tps2B
 
 Tps2Boltzmann::~Tps2Boltzmann() {
   // Delete views
-  for (std::size_t i(0); i < NIndexes; ++i) delete fields_[i];
+  for (std::size_t i(0); i < NIndexes+1; ++i) delete fields_[i];
   // Delete array
   delete[] fields_;
 

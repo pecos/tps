@@ -112,7 +112,10 @@ CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tp
 }
 
 CycleAvgJouleCoupling::~CycleAvgJouleCoupling() {
+  if (efieldR_) delete efieldR_;
+  if (efieldI_) delete efieldI_;
   if (efield_) delete efield_;
+  if (efieldFES1_) delete efieldFES1_;
   if (efieldFES_) delete efieldFES_;
 #ifdef HAVE_GSLIB
   delete interp_flow_to_em_;

@@ -32,6 +32,7 @@
 #include "quasimagnetostatic.hpp"
 
 #include <hdf5.h>
+#include <memory>
 
 #include "../utils/mfem_extras/pfem_extras.hpp"
 #include "logger.hpp"
@@ -110,6 +111,7 @@ QuasiMagnetostaticSolver3D::~QuasiMagnetostaticSolver3D() {
   }
   delete plasma_conductivity_coef_;
   delete plasma_conductivity_;
+  delete joule_heating_;
   delete Bimag_;
   delete Breal_;
   delete Aimag_;
@@ -387,7 +389,7 @@ void QuasiMagnetostaticSolver3D::solveStep() {
   const double mu0_omega = em_opts_.mu0 * em_opts_.current_frequency * 2 * M_PI;
   ProductCoefficient mu_sigma_omega(mu0_omega, *plasma_conductivity_coef_);
 
-  ParBilinearForm *Kconductivity = new ParBilinearForm(Aspace_);
+  std::unique_ptr<ParBilinearForm> Kconductivity(new ParBilinearForm(Aspace_));
   Kconductivity->AddDomainIntegrator(new VectorFEMassIntegrator(mu_sigma_omega));
   Kconductivity->Assemble();
 
@@ -399,7 +401,7 @@ void QuasiMagnetostaticSolver3D::solveStep() {
 
   Koffd_mat->EliminateRows(ess_bdr_tdofs_);
 
-  BlockOperator *qms = new BlockOperator(offsets_);
+  std::unique_ptr<BlockOperator> qms ( new BlockOperator(offsets_) );
 
   qms->SetBlock(0, 0, Kdiag_mat);
   qms->SetBlock(0, 1, Koffd_mat, -1);
@@ -407,7 +409,7 @@ void QuasiMagnetostaticSolver3D::solveStep() {
   qms->SetBlock(1, 1, Kdiag_mat);
 
   // preconditioner
-  ParBilinearForm *Kpre = new ParBilinearForm(Aspace_);
+  std::unique_ptr<ParBilinearForm> Kpre(new ParBilinearForm(Aspace_));
   Kpre->AddDomainIntegrator(new CurlCurlIntegrator);
   Kpre->AddDomainIntegrator(new VectorFEMassIntegrator(mu_sigma_omega));
 
@@ -422,17 +424,17 @@ void QuasiMagnetostaticSolver3D::solveStep() {
   OperatorPtr Kpre_op;
   Kpre->FormSystemMatrix(ess_bdr_tdofs_, Kpre_op);
 
-  HypreAMS *Paar = new HypreAMS(*Kpre_op.As<HypreParMatrix>(), Aspace_);
+  std::unique_ptr<HypreAMS> Paar( new HypreAMS(*Kpre_op.As<HypreParMatrix>(), Aspace_) );
   Paar->iterative_mode = false;
   if (!preconditioner_spd) {
     Paar->SetSingularProblem();
   }
 
-  Operator *Paai = new ScaledOperator(Paar, -1.0);
+  std::unique_ptr<Operator> Paai( new ScaledOperator(Paar.get(), -1.0) );
 
   BlockDiagonalPreconditioner BDP(offsets_);
-  BDP.SetDiagonalBlock(0, Paar);
-  BDP.SetDiagonalBlock(1, Paai);
+  BDP.SetDiagonalBlock(0, Paar.get());
+  BDP.SetDiagonalBlock(1, Paai.get());
 
   // 1) Solve QMS (i.e., i \omega A + curl(curl(A)) = J) for magnetic
   //    vector potential using operators set up by Initialize() and
@@ -456,10 +458,10 @@ void QuasiMagnetostaticSolver3D::solveStep() {
     // 2) Determine B from A according to B = curl(A).  Here we use an
     //    interpolator rather than a projection.
     if (verbose) grvy_printf(ginfo, "Evaluating curl(A) to get the magnetic field.\n");
-    Breal_ = new ParGridFunction(Bspace_);
+    if (Breal_ == NULL) Breal_ = new ParGridFunction(Bspace_);
     *Breal_ = 0;
 
-    Bimag_ = new ParGridFunction(Bspace_);
+    if (Bimag_ == NULL) Bimag_ = new ParGridFunction(Bspace_);
     *Breal_ = 0;
 
     ParDiscreteLinearOperator *curl = new ParDiscreteLinearOperator(Aspace_, Bspace_);
@@ -943,10 +945,10 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
   // Set up block soln and rhs
   BlockVector Atheta_vec(offsets_), rhs_vec(offsets_);
 
-  Atheta_real_ = new ParGridFunction(Atheta_space_);
+  if (Atheta_real_ == NULL) Atheta_real_ = new ParGridFunction(Atheta_space_);
   *Atheta_real_ = 0.0;
 
-  Atheta_imag_ = new ParGridFunction(Atheta_space_);
+  if (Atheta_imag_ == NULL) Atheta_imag_ = new ParGridFunction(Atheta_space_);
   *Atheta_imag_ = 0.0;
 
   Atheta_real_->ParallelAssemble(Atheta_vec.GetBlock(0));
@@ -969,7 +971,7 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
   ProductCoefficient temp_coef(mu0_omega, *plasma_conductivity_coef_);
   ProductCoefficient mu_sigma_omega(temp_coef, radius_coeff);
 
-  ParBilinearForm *Kconductivity = new ParBilinearForm(Atheta_space_);
+  std::unique_ptr<ParBilinearForm> Kconductivity ( new ParBilinearForm(Atheta_space_) );
   Kconductivity->AddDomainIntegrator(new MassIntegrator(mu_sigma_omega));
   Kconductivity->Assemble();
 
@@ -981,7 +983,7 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
 
   Koffd_mat->EliminateRows(ess_bdr_tdofs_);
 
-  BlockOperator *qms = new BlockOperator(offsets_);
+  std::unique_ptr<BlockOperator> qms( new BlockOperator(offsets_) );
 
   qms->SetBlock(0, 0, Kdiag_mat);
   qms->SetBlock(0, 1, Koffd_mat, -1);
@@ -991,7 +993,7 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
   // Set up block preconditioner
   FunctionCoefficient one_over_radius_coeff(oneOverRadius);
 
-  ParBilinearForm *Kpre = new ParBilinearForm(Atheta_space_);
+  std::unique_ptr<ParBilinearForm> Kpre( new ParBilinearForm(Atheta_space_) );
   Kpre->AddDomainIntegrator(new MassIntegrator(mu_sigma_omega));
   Kpre->AddDomainIntegrator(new DiffusionIntegrator(radius_coeff));
   Kpre->AddDomainIntegrator(new MassIntegrator(one_over_radius_coeff));
@@ -1000,10 +1002,10 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
   OperatorPtr KpreOp;
   Kpre->FormSystemMatrix(ess_bdr_tdofs_, KpreOp);
 
-  HypreBoomerAMG *prec = new HypreBoomerAMG(*KpreOp.As<HypreParMatrix>());
+  std::unique_ptr<HypreBoomerAMG> prec( new HypreBoomerAMG(*KpreOp.As<HypreParMatrix>()) );
   BlockDiagonalPreconditioner BDP(offsets_);
-  BDP.SetDiagonalBlock(0, prec);
-  BDP.SetDiagonalBlock(1, prec);
+  BDP.SetDiagonalBlock(0, prec.get());
+  BDP.SetDiagonalBlock(1, prec.get());
 
   FGMRESSolver solver(tpsP_->getTPSCommWorld());
 
@@ -1016,7 +1018,6 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
   solver.SetPrintLevel(1);
 
   solver.Mult(rhs_vec, Atheta_vec);
-  delete prec;
 
   Atheta_real_->Distribute(&(Atheta_vec.GetBlock(0)));
   Atheta_imag_->Distribute(&(Atheta_vec.GetBlock(1)));
@@ -1063,10 +1064,6 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
 
   // Compute and dump the magnetic field on the axis
   // InterpolateToYAxis();
-
-  // clean up
-  delete qms;
-  delete Kconductivity;
 
   if (verbose) {
     std::cout << "EM simulation complete" << std::endl;
