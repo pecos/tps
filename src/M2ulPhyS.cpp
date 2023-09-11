@@ -1562,8 +1562,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     // will need to add full list of species.
     for (int sp = 0; sp < numActiveSpecies; sp++) {
       std::string speciesName = config.speciesNames[sp];
-      visualizationVariables_.push_back(
-          new ParGridFunction(fes, *U, (sp + nvel + 2) * fes->GetNDofs()));
+      visualizationVariables_.push_back(new ParGridFunction(fes, *U, (sp + nvel + 2) * fes->GetNDofs()));
       visualizationNames_.push_back(std::string("partial_density_" + speciesName));
     }
   }

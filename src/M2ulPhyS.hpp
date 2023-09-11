@@ -453,7 +453,7 @@ class M2ulPhyS : public TPS::Solver {
 
   void evaluatePlasmaConductivityGF();
 
-  // tps2Bolzmann interface (implemented in M2ulPhysS2Bolzmann.cpp)
+  // tps2Bolzmann interface (implemented in M2ulPhySBolzmann.cpp)
   /// Push solver variables to interface
   void push(TPS::Tps2Boltzmann &interface);
   /// Fetch solver variables from interface
