@@ -650,16 +650,18 @@ void M2ulPhyS::initVariables() {
   mesh->GetVertices(coordsVert);
   int nVert = coordsVert.Size() / dim;
   {
-    local_xmin = 1.0e18;
-    local_ymin = 1.0e18;
-    local_zmin = 1.0e18;
-    local_xmax = -1.0e-15;
-    local_ymax = -1.0e-15;
-    local_zmax = -1.0e-15;
+    double local_xmin = 1.0e18;
+    double local_ymin = 1.0e18;
+    double local_zmin = 1.0e18;
+    double local_xmax = -1.0e18;
+    double local_ymax = -1.0e18;
+    double local_zmax = -1.0e18;
     for (int n = 0; n < nVert; n++) {
       auto hcoords = coordsVert.HostRead();
       double coords[3];
-      for (int d = 0; d < dim; d++) { coords[d] = hcoords[n + d * nVert]; }
+      for (int d = 0; d < dim; d++) {
+        coords[d] = hcoords[n + d * nVert];
+      }
       local_xmin = min(coords[0], local_xmin);
       local_ymin = min(coords[1], local_ymin);
       if (dim == 3) {
@@ -1919,40 +1921,40 @@ void M2ulPhyS::solveStep() {
     if (config.planeDump.isEnabled == true) {
 #ifdef HAVE_GSLIB
 
-      // hack to get all ranks owning at least one point
-      int nRanks;      
-      MPI_Comm_size(MPI_COMM_WORLD, &nRanks);
-      int nPts = config.planeDump.samples;      
+      int nPts = config.planeDump.samples;
       int totalPts = nPts * nPts;
-      //int totalPts = nPts * nPts + nRanks;	      
-      
-      // source, TODO: add option to select u, <u>, or <u'u'>
+
+      // source
+      // TODO: improve option to select u, <u>, or <u'u'> for multiple at once
       int interpNum;
       ParGridFunction *u_gf;
-      if ( config.planeDump.conserved == true ) {
+      if (config.planeDump.conserved == true) {
         u_gf = GetSolutionGF();
-	interpNum = num_equation;
-      } else if ( config.planeDump.primitive == true ) {
-        u_gf = getPrimitiveGF();
-	interpNum = num_equation;
-      } else if ( config.planeDump.mean == true ) {
-        u_gf = average->GetMeanUp();	
         interpNum = num_equation;
-      } else if ( config.planeDump.reynolds == true ) {            
+      } else if (config.planeDump.primitive == true) {
+        u_gf = getPrimitiveGF();
+        interpNum = num_equation;
+      } else if (config.planeDump.mean == true) {
+        u_gf = average->GetMeanUp();
+        interpNum = num_equation;
+      } else if (config.planeDump.reynolds == true) {
         u_gf = average->GetRMS();
-	interpNum = 6;
+        interpNum = 6;
       } else {
         grvy_printf(GRVY_ERROR, "\nSpecified interpolation type not supported.\n");
-        exit(ERROR);	
+        exit(ERROR);
       }
 
-      
       // plane description
       Vector normal, point;
       normal.SetSize(3);
       point.SetSize(3);
-      for (int d = 0; d < dim; d++) { normal[d] = config.planeDump.normal(d); }
-      for (int d = 0; d < dim; d++) { point[d] = config.planeDump.point(d); }
+      for (int d = 0; d < dim; d++) {
+        normal[d] = config.planeDump.normal(d);
+      }
+      for (int d = 0; d < dim; d++) {
+        point[d] = config.planeDump.point(d);
+      }
       double ndotp = 0.0;
       double majorD;
       for (int i = 0; i < dim; i++) {
@@ -1965,7 +1967,7 @@ void M2ulPhyS::solveStep() {
 
       // plane points
       Vector vxyz;
-      vxyz.SetSize( totalPts * 3);
+      vxyz.SetSize(totalPts * 3);
       int iCnt = 0;
       double xp, yp, zp;
       double Lx, Ly, Lz;
@@ -1973,56 +1975,55 @@ void M2ulPhyS::solveStep() {
       Ly = ymax - ymin;
       Lz = zmax - zmin;
       if (majorD == std::abs(normal[0])) {
-        double dy = Ly/(double)(nPts-1);
-        double dz = Lz/(double)(nPts-1);
-	//if (rank0_) { std::cout << "Plane x-major " << Ly << " " << Lz << " with delta " << dy << " x "<< dz << endl; }	
+        double dy = Ly / (double)(nPts - 1);
+        double dz = Lz / (double)(nPts - 1);
         for (int j = 0; j < nPts; j++) {
           for (int i = 0; i < nPts; i++) {
-            xp = (ndotp - (normal[1]*yp) - (normal[2]*zp) ) / normal[0];	    
-            yp = dy*(double)i + ymin;
-            zp = dz*(double)j + zmin;
-            vxyz[iCnt + 0*totalPts] = xp;
-	    vxyz[iCnt + 1*totalPts] = yp;
-	    vxyz[iCnt + 2*totalPts] = zp;
+            xp = (ndotp - (normal[1] * yp) - (normal[2] * zp)) / normal[0];
+            yp = dy * (double)i + ymin;
+            zp = dz * (double)j + zmin;
+            vxyz[iCnt + 0 * totalPts] = xp;
+            vxyz[iCnt + 1 * totalPts] = yp;
+            vxyz[iCnt + 2 * totalPts] = zp;
             iCnt++;
           }
         }
       } else if (majorD == std::abs(normal[1])) {
-        double dx = Lx/(double)(nPts-1);
-        double dz = Lz/(double)(nPts-1);
-	//if (rank0_) { std::cout << "Plane y-major " <<  Lx << " " << Lz << " with delta " << dx << " x "<< dz << endl; }	
+        double dx = Lx / (double)(nPts - 1);
+        double dz = Lz / (double)(nPts - 1);
         for (int j = 0; j < nPts; j++) {
           for (int i = 0; i < nPts; i++) {
-            xp = dx*(double)i + xmin;
-            yp = (ndotp - (normal[0]*xp) - (normal[2]*zp) ) / normal[1];	    
-            zp = dz*(double)j + zmin;
-   	    if (rank0_) { std::cout << iCnt << ": " << xp << " " << yp << " " << zp << endl;}
-            vxyz[iCnt + 0*totalPts] = xp;
-            vxyz[iCnt + 1*totalPts] = yp;
-            vxyz[iCnt + 2*totalPts] = zp;
+            xp = dx * (double)i + xmin;
+            yp = (ndotp - (normal[0] * xp) - (normal[2] * zp)) / normal[1];
+            zp = dz * (double)j + zmin;
+            if (rank0_) {
+              std::cout << iCnt << ": " << xp << " " << yp << " " << zp << endl;
+            }
+            vxyz[iCnt + 0 * totalPts] = xp;
+            vxyz[iCnt + 1 * totalPts] = yp;
+            vxyz[iCnt + 2 * totalPts] = zp;
             iCnt++;
           }
         }
       } else {
-        double dx = Lx/(double)(nPts-1);
-        double dy = Ly/(double)(nPts-1);
-	//if (rank0_) { std::cout << "Plane z-major" <<  Lx << " " << Ly  << " with delta " << dx << " x "<< dy << endl; }	  	
+        double dx = Lx / (double)(nPts - 1);
+        double dy = Ly / (double)(nPts - 1);
         for (int j = 0; j < nPts; j++) {
           for (int i = 0; i < nPts; i++) {
-            xp = dx*(double)i + xmin;
-            yp = dy*(double)j + ymin;
-            zp = (ndotp - (normal[0]*xp) - (normal[1]*yp) ) / normal[2];
-            vxyz[iCnt + (0*totalPts)] = xp;
-            vxyz[iCnt + (1*totalPts)] = yp;
-            vxyz[iCnt + (2*totalPts)] = zp;
+            xp = dx * (double)i + xmin;
+            yp = dy * (double)j + ymin;
+            zp = (ndotp - (normal[0] * xp) - (normal[1] * yp)) / normal[2];
+            vxyz[iCnt + (0 * totalPts)] = xp;
+            vxyz[iCnt + (1 * totalPts)] = yp;
+            vxyz[iCnt + (2 * totalPts)] = zp;
             iCnt++;
           }
         }
       }
-      
+
       // get values at plane
       Vector uInterp_vals;
-      uInterp_vals.SetSize( totalPts * interpNum );
+      uInterp_vals.SetSize(totalPts * interpNum);
       FindPointsGSLIB finder(MPI_COMM_WORLD);
       finder.Setup(*mesh);
       finder.Interpolate(vxyz, *u_gf, uInterp_vals);
@@ -2037,12 +2038,12 @@ void M2ulPhyS::solveStep() {
         outfile << "#plane point " << point[0] << " " << point[1] << " " << point[2] << endl;
         outfile << "#plane normal " << normal[0] << " " << normal[1] << " " << normal[2] << endl;
         for (int n = 0; n < totalPts; n++) {
-	  outfile << n << " ";	  
-          for (int d = 0; d < dim; d++) {	  
-	    outfile << vxyz[n + d*totalPts] << " ";
-	  }
+          outfile << n << " ";
+          for (int d = 0; d < dim; d++) {
+            outfile << vxyz[n + d * totalPts] << " ";
+          }
           for (int eq = 0; eq < interpNum; eq++) {
-            outfile << uInterp_vals[n + eq*totalPts] << " ";
+            outfile << uInterp_vals[n + eq * totalPts] << " ";
           }
           outfile << endl;
         }
@@ -2765,7 +2766,6 @@ void M2ulPhyS::parsePlaneDump() {
   tpsP->getInput("planeDump/isEnabled", config.planeDump.isEnabled, false);
 
   if (config.planeDump.isEnabled) {
-    
     auto normal = config.planeDump.normal.HostWrite();
     tpsP->getRequiredVecElem("planeDump/norm", normal[0], 0);
     tpsP->getRequiredVecElem("planeDump/norm", normal[1], 1);
@@ -2782,8 +2782,7 @@ void M2ulPhyS::parsePlaneDump() {
     tpsP->getInput("planeDump/conserved", config.planeDump.conserved, false);
     tpsP->getInput("planeDump/primitive", config.planeDump.primitive, false);
     tpsP->getInput("planeDump/mean", config.planeDump.mean, false);
-    tpsP->getInput("planeDump/reynolds", config.planeDump.reynolds, false);    
-    
+    tpsP->getInput("planeDump/reynolds", config.planeDump.reynolds, false);
   }
 }
 

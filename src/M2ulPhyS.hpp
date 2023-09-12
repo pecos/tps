@@ -156,11 +156,8 @@ class M2ulPhyS : public TPS::Solver {
 
   Radiation *radiation_ = NULL;
 
-  // grid function pointer to solution
-  //ParGridFunction *u_gf;
-
-  // space varying viscosity multiplier  
-  ParGridFunction *spaceVaryViscMult; 
+  // space varying viscosity multiplier
+  ParGridFunction *spaceVaryViscMult;
 
   /// Distance to nearest no-slip wall
   ParGridFunction *distance_;
@@ -280,8 +277,6 @@ class M2ulPhyS : public TPS::Solver {
   // domain extent
   double xmin, ymin, zmin;
   double xmax, ymax, zmax;
-  double local_xmin, local_ymin, local_zmin;
-  double local_xmax, local_ymax, local_zmax;  
 
   // exit status code;
   int exit_status_;
