@@ -160,7 +160,8 @@ class M2ulPhyS : public TPS::Solver {
 
   Radiation *radiation_ = NULL;
 
-  ParGridFunction *spaceVaryViscMult;  // space varying viscosity multiplier
+  // space varying viscosity multiplier
+  ParGridFunction *spaceVaryViscMult;
 
   /// Distance to nearest no-slip wall
   ParGridFunction *distance_;
