@@ -35,6 +35,7 @@
 
 #include "M2ulPhyS.hpp"
 
+#include "gslib_interpolator.hpp"
 #include "wallBC.hpp"
 
 M2ulPhyS::M2ulPhyS(TPS::Tps *tps)
@@ -2019,11 +2020,7 @@ void M2ulPhyS::solveStep() {
     // make a separate routine! plane interp and dump here
     if (config.planeDump.isEnabled == true) {
 #ifdef HAVE_GSLIB
-
-      int nPts = config.planeDump.samples;
-      int totalPts = nPts * nPts;
-
-      // source
+      // Get the source field for the interpolation
       // TODO(shaering): improve option to select u, <u>, or <u'u'> for multiple at once
       int interpNum;
       ParGridFunction *u_gf;
@@ -2044,110 +2041,27 @@ void M2ulPhyS::solveStep() {
         exit(ERROR);
       }
 
-      // plane description
-      Vector normal, point;
-      normal.SetSize(3);
-      point.SetSize(3);
-      for (int d = 0; d < dim; d++) {
-        normal[d] = config.planeDump.normal(d);
-      }
-      for (int d = 0; d < dim; d++) {
-        point[d] = config.planeDump.point(d);
-      }
-      double ndotp = 0.0;
-      double majorD;
-      for (int i = 0; i < dim; i++) {
-        ndotp += normal[i] * point[i];
-      }
-      majorD = std::max(std::abs(normal[0]), std::abs(normal[1]));
-      if (dim == 3) {
-        majorD = std::max(majorD, std::abs(normal[2]));
-      }
+      // Bounding box coordinates
+      Vector bb0(3);
+      bb0[0] = xmin;
+      bb0[1] = ymin;
+      bb0[2] = zmin;
+      Vector bb1(3);
+      bb1[0] = xmax;
+      bb1[1] = ymax;
+      bb1[2] = zmax;
 
-      // plane points
-      Vector vxyz;
-      vxyz.SetSize(totalPts * 3);
-      int iCnt = 0;
-      double xp, yp, zp;
-      double Lx, Ly, Lz;
-      Lx = xmax - xmin;
-      Ly = ymax - ymin;
-      Lz = zmax - zmin;
-      if (majorD == std::abs(normal[0])) {
-        double dy = Ly / (double)(nPts - 1);
-        double dz = Lz / (double)(nPts - 1);
-        for (int j = 0; j < nPts; j++) {
-          for (int i = 0; i < nPts; i++) {
-            xp = (ndotp - (normal[1] * yp) - (normal[2] * zp)) / normal[0];
-            yp = dy * (double)i + ymin;
-            zp = dz * (double)j + zmin;
-            vxyz[iCnt + 0 * totalPts] = xp;
-            vxyz[iCnt + 1 * totalPts] = yp;
-            vxyz[iCnt + 2 * totalPts] = zp;
-            iCnt++;
-          }
-        }
-      } else if (majorD == std::abs(normal[1])) {
-        double dx = Lx / (double)(nPts - 1);
-        double dz = Lz / (double)(nPts - 1);
-        for (int j = 0; j < nPts; j++) {
-          for (int i = 0; i < nPts; i++) {
-            xp = dx * (double)i + xmin;
-            yp = (ndotp - (normal[0] * xp) - (normal[2] * zp)) / normal[1];
-            zp = dz * (double)j + zmin;
-            if (rank0_) {
-              std::cout << iCnt << ": " << xp << " " << yp << " " << zp << endl;
-            }
-            vxyz[iCnt + 0 * totalPts] = xp;
-            vxyz[iCnt + 1 * totalPts] = yp;
-            vxyz[iCnt + 2 * totalPts] = zp;
-            iCnt++;
-          }
-        }
-      } else {
-        double dx = Lx / (double)(nPts - 1);
-        double dy = Ly / (double)(nPts - 1);
-        for (int j = 0; j < nPts; j++) {
-          for (int i = 0; i < nPts; i++) {
-            xp = dx * (double)i + xmin;
-            yp = dy * (double)j + ymin;
-            zp = (ndotp - (normal[0] * xp) - (normal[1] * yp)) / normal[2];
-            vxyz[iCnt + (0 * totalPts)] = xp;
-            vxyz[iCnt + (1 * totalPts)] = yp;
-            vxyz[iCnt + (2 * totalPts)] = zp;
-            iCnt++;
-          }
-        }
-      }
+      // The PlaneInterpolator class handles setting up the
+      // interpolation points and performing the interpolation (using
+      // FindPointsGSLIB)
+      PlaneInterpolator interp(config.planeDump.point, config.planeDump.normal, bb0, bb1, config.planeDump.samples);
+      interp.initializeFinder(mesh);
+      interp.setInterpolationPoints();
+      interp.interpolate(u_gf);
 
-      // get values at plane
-      Vector uInterp_vals;
-      uInterp_vals.SetSize(totalPts * interpNum);
-      FindPointsGSLIB finder(MPI_COMM_WORLD);
-      finder.Setup(*mesh);
-      finder.Interpolate(vxyz, *u_gf, uInterp_vals);
-
-      // save plane values
-      if (rank0_) {
-        std::ofstream outfile;
-        string oname;
-        oname = "./planeData/plane" + std::to_string(iter) + ".txt";
-        std::cout << " Writing plane data to " << oname << endl;
-        outfile.open(oname, std::ios_base::app);
-        outfile << "#plane point " << point[0] << " " << point[1] << " " << point[2] << endl;
-        outfile << "#plane normal " << normal[0] << " " << normal[1] << " " << normal[2] << endl;
-        for (int n = 0; n < totalPts; n++) {
-          outfile << n << " ";
-          for (int d = 0; d < dim; d++) {
-            outfile << vxyz[n + d * totalPts] << " ";
-          }
-          for (int eq = 0; eq < interpNum; eq++) {
-            outfile << uInterp_vals[n + eq * totalPts] << " ";
-          }
-          outfile << endl;
-        }
-        outfile.close();
-      }
+      string oname;
+      oname = "./planeData/plane" + std::to_string(iter) + ".txt";
+      interp.writeAscii(oname, rank0_);
 #else
       grvy_printf(GRVY_ERROR, "\nPlane dump capability requires gslib support.\n");
       exit(ERROR);
