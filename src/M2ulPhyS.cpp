@@ -739,40 +739,17 @@ void M2ulPhyS::initVariables() {
   }
 
   // Determine domain bounding box size
-  ParGridFunction coordsVert(dfes);
-  mesh->GetVertices(coordsVert);
-  int nVert = coordsVert.Size() / dim;
-  {
-    double local_xmin = 1.0e18;
-    double local_ymin = 1.0e18;
-    double local_zmin = 1.0e18;
-    double local_xmax = -1.0e18;
-    double local_ymax = -1.0e18;
-    double local_zmax = -1.0e18;
-    for (int n = 0; n < nVert; n++) {
-      auto hcoords = coordsVert.HostRead();
-      double coords[3];
-      for (int d = 0; d < dim; d++) {
-        coords[d] = hcoords[n + d * nVert];
-      }
-      local_xmin = min(coords[0], local_xmin);
-      local_ymin = min(coords[1], local_ymin);
-      if (dim == 3) {
-        local_zmin = min(coords[2], local_zmin);
-      }
-      local_xmax = max(coords[0], local_xmax);
-      local_ymax = max(coords[1], local_ymax);
-      if (dim == 3) {
-        local_zmax = max(coords[2], local_zmax);
-      }
-    }
-    MPI_Allreduce(&local_xmin, &xmin, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
-    MPI_Allreduce(&local_ymin, &ymin, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
-    MPI_Allreduce(&local_zmin, &zmin, 1, MPI_DOUBLE, MPI_MIN, mesh->GetComm());
-    MPI_Allreduce(&local_xmax, &xmax, 1, MPI_DOUBLE, MPI_MAX, mesh->GetComm());
-    MPI_Allreduce(&local_ymax, &ymax, 1, MPI_DOUBLE, MPI_MAX, mesh->GetComm());
-    MPI_Allreduce(&local_zmax, &zmax, 1, MPI_DOUBLE, MPI_MAX, mesh->GetComm());
-  }
+  Vector bb_min;
+  Vector bb_max;
+  mesh->GetBoundingBox(bb_min, bb_max);
+
+  xmin = bb_min[0];
+  ymin = bb_min[1];
+  (dim == 3) ? zmin = bb_min[2] : zmin = 0.0;
+
+  xmax = bb_max[0];
+  ymax = bb_max[1];
+  (dim == 3) ? zmax = bb_max[2] : zmin = 0.0;
 
   // estimate initial dt
   Up->ExchangeFaceNbrData();
