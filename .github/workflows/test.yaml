@@ -48,7 +48,7 @@ jobs:
        - name: Cancel previous runs
          uses: styfle/cancel-workflow-action@0.11.0
          with:
-           access_token: ${{ github.token }}     
+           access_token: ${{ github.token }}
        - name: Checkout code
          uses: actions/checkout@v3
          with:
@@ -58,7 +58,7 @@ jobs:
        - name: Bootstrap
          run:  ./bootstrap
        - name: Configure
-         run:  ./configure CXXFLAGS="-fdiagnostics-color=always" --enable-pybind11
+         run:  ./configure CXXFLAGS="-g -O2 -Wall -Werror -fdiagnostics-color=always" --enable-pybind11
        - name: Make
          run:  make -j 2
        - name: Tests
@@ -66,7 +66,7 @@ jobs:
        - name: Distclean
          run:  make distclean
        - name: VPATH configure
-         run:  mkdir build; cd build; ../configure
+         run:  mkdir build; cd build; ../configure CXXFLAGS="-g -O2 -Wall -Werror -fdiagnostics-color=always"
        - name: VPATH make
          run:  cd build; make -j 2
        - name: VPATH tests
@@ -183,7 +183,7 @@ jobs:
        - name: Bootstrap
          run:  ./bootstrap
        - name: Configure
-         run:  ./configure
+         run:  ./configure CXXFLAGS="-g -O2 -Wall -Werror -fdiagnostics-color=always"
        - name: Dist
          run:  make dist
        - name: Archive tarball
@@ -220,7 +220,7 @@ jobs:
        - name: Distclean
          run:  cd tps-*; make distclean
        - name: VPATH configure
-         run:  cd tps-*; mkdir build; cd build; ../configure
+         run:  cd tps-*; mkdir build; cd build; ../configure CXXFLAGS="-g -O2 -Wall -Werror -fdiagnostics-color=always"
        - name: VPATH make
          run:  cd tps-*; cd build; make -j 2
        - name: VPATH tests
