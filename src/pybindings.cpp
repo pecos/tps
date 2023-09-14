@@ -38,10 +38,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#ifdef HAVE_MPI4PY
-#include <mpi4py/mpi4py.h>
-#endif
-
 namespace py = pybind11;
 
 namespace tps_wrappers {
