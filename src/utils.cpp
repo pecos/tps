@@ -465,9 +465,9 @@ void evaluateDistanceSerial(mfem::Mesh &mesh, const mfem::Array<int> &wall_patch
 
           // Update reference coordinates
           Vector xi(ref, rdim);
-          ip.Get(xi.GetData(), rdim);
+          ip.Get(xi.HostWrite(), rdim);
           xi += dxi;
-          ip.Set(xi.GetData(), rdim);
+          ip.Set(xi.HostRead(), rdim);
 
           // Update dx and residual
           Tr->SetIntPoint(&ip);
