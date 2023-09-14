@@ -155,6 +155,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     Th = upn[1 + _nvel];
     if (_mixture->IsTwoTemperature()) {
       Te = upn[_num_equation - 1];
+      if (Te < Th) Te = Th;
     } else {
       Te = Th;
     }

@@ -92,6 +92,8 @@ Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_
 
   nvel = mixture->GetNumVels();
   numActiveSpecies = mixture->GetNumActiveSpecies();
+  twoTemperature_ = mixture->IsTwoTemperature();
+
 }
 
 MFEM_HOST_DEVICE Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
@@ -126,6 +128,8 @@ MFEM_HOST_DEVICE Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, Trans
 
   nvel = mixture->GetNumVels();
   numActiveSpecies = mixture->GetNumActiveSpecies();
+  twoTemperature_ = mixture->IsTwoTemperature();
+
 }
 
 void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
@@ -228,6 +232,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
     bulkViscosity *= (1.0 + mu_sgs / visc);
     visc += mu_sgs;
     k += (mu_sgs / Pr_Cp);
+    if (twoTemperature) ke += (mu_sgs / Pr_Cp); // NOTE(malamast): Do we need to add the sgs viscocity to ke?
   }
 
   // viscous sponge
@@ -250,7 +255,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
       double qeFlux = ke * gradUp[num_equation - 1 + d * num_equation];
       flux[1 + nvel + d * num_equation] += qeFlux;
       flux[num_equation - 1 + d * num_equation] += qeFlux;
-      flux[num_equation - 1 + d * num_equation] -=
+      flux[num_equation - 1 + d * num_equation] -= 
           speciesEnthalpies[numSpecies - 2] * diffusionVelocity[numSpecies - 2 + d * numSpecies];
     }
   } else {
@@ -390,6 +395,7 @@ MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const
     bulkViscosity *= (1.0 + mu_sgs / visc);
     visc += mu_sgs;
     k += (mu_sgs / Pr_Cp);
+    if (twoTemperature) ke += (mu_sgs / Pr_Cp); // NOTE(malamast): Do we need to add the sgs viscocity to ke?
   }
 
   // viscous sponge

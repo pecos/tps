@@ -1953,10 +1953,10 @@ void M2ulPhyS::projectInitialSolution() {
   // if restarting from LTE, write paraview and restart h5 immediately
   if (config.restartFromLTE && !tpsP->isVisualizationMode()) {
     if (rank0_) std::cout << "Writing non-equilibrium restart files!" << std::endl;
-    paraviewColl->SetCycle(iter+1);  // We set iter+1 here. Since we have set paraviewColl->UseRestartMode(true); 
+    // paraviewColl->SetCycle(iter+1);  // We set iter+1 here. Since we have set paraviewColl->UseRestartMode(true); 
                                      // above, paraview cannot overwrite existing files produced for the same 
                                      // timestep and time, causing the code to crush.  
-    paraviewColl->Save();
+    // paraviewColl->Save();
     restart_files_hdf5("write");
   }
 }
@@ -2534,12 +2534,20 @@ void M2ulPhyS::Check_Undershoot() {
   int dof = vfes->GetNDofs();
 // #ifdef _GPU_
 // #else
-  // const double *dataU = U->HostRead();
   double *dataU = U->GetData();
+  double *dataUp = Up->GetData();
+
+  int iTe = num_equation - 1;
+
   for (int i = 0; i < dof; i++) {
     for (int sp = 0; sp < numActiveSpecies; sp++) {
       int eq = nvel + 2 + sp;
       dataU[i + eq * dof] = max(dataU[i + eq * dof],0.0); 
+      dataUp[i + eq * dof] = max(dataUp[i + eq * dof],0.0); 
+    }
+    if (twoTemperature_) {
+      dataU[i + iTe * dof] = max(dataU[i + iTe * dof],0.0); 
+      dataUp[i + iTe * dof] = max(dataUp[i + iTe * dof],0.0); 
     }
   }
 // #endif

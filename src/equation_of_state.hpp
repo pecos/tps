@@ -111,6 +111,10 @@ class GasMixture {
   // number of conservative and primitive/visualization variables
   int Nconservative, Nprimitive;
 
+
+  const double Xeps_ = 1.0e-30;
+
+
 // TODO(kevin): GPU routines are not yet fully gas-agnostic. Need to be removed.
 #ifdef _GPU_
   double specific_heat_ratio;

@@ -360,6 +360,8 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
   const IntegrationRule *ir = &intRules->Get(Tr.GetGeometryType(), intorder);
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
   const int nvel = mixture->GetNumVels();
+  const bool twoTemperature_ = mixture->IsTwoTemperature();
+  const int iTe = num_equation - 1;
 
   for (int i = 0; i < ir->GetNPoints(); i++) {
     const IntegrationPoint &ip = ir->IntPoint(i);
@@ -388,6 +390,18 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
         funval1(eq) = max(sum, 0.0);
       } else {
         funval1(eq) = sum;
+      }
+
+      if (twoTemperature_ && eq == iTe) {
+        funval1(eq) = max(sum,0.0); 
+      }
+
+      if (twoTemperature_ && eq == iTe) {
+        funval1(eq) = max(sum,0.0); 
+      }
+
+      if (twoTemperature_ && eq == iTe) {
+        funval1(eq) = max(sum,0.0); 
       }
 
       // interpolation gradients

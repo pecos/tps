@@ -546,12 +546,12 @@ MFEM_HOST_DEVICE PerfectMixture::PerfectMixture(PerfectMixtureInput inputs, int 
   SetSpeciesStateIndices();
 
   // We assume the background species is neutral.
-  assert(gasParams[(iBackground) + GasParams::SPECIES_CHARGES * numSpecies] == 0.0);
+  assert(gasParams[iBackground + GasParams::SPECIES_CHARGES * numSpecies] == 0.0);
   // TODO(kevin): release electron species enforcing.
   assert(inputs.isElectronIncluded);
   // We assume the background species and electron have zero formation energy.
-  assert(gasParams[(iElectron) + GasParams::FORMATION_ENERGY * numSpecies] == 0.0);
-  assert(gasParams[(iBackground) + GasParams::FORMATION_ENERGY * numSpecies] == 0.0);
+  assert(gasParams[iElectron + GasParams::FORMATION_ENERGY * numSpecies] == 0.0);
+  assert(gasParams[iBackground + GasParams::FORMATION_ENERGY * numSpecies] == 0.0);
 
   for (int sp = 0; sp < gpudata::MAXSPECIES; sp++) {
     molarCV_[sp] = -1.0;
@@ -1099,8 +1099,15 @@ MFEM_HOST_DEVICE void PerfectMixture::computeTemperaturesBase(const double *cons
   // TODO(kevin): this will have a singularity when there is no electron.
   // It is highly unlikely to have zero electron in the simulation,
   // but it's better to have a capability to avoid this.
+  // NOTE(malamast): This caused problems when n_e = 0.0 so I set T_e = T_h when this occurs.
   if (twoTemperature_) {
-    T_e = conservedState[iTe] / n_e / molarCV_[iElectron];
+    if (n_e > 0.0) {
+      T_e = conservedState[iTe] / (n_e + Xeps_) / molarCV_[iElectron];
+    } else {
+      // T_e = 0.0;      
+      T_e = T_h;      
+    }
+    if (T_e < T_h) T_e = T_h;
   } else {
     T_e = T_h;
   }
@@ -1235,10 +1242,10 @@ double PerfectMixture::computePressureDerivativeFromConservatives(const Vector &
       dne_dx * GetGasParams(iElectron, GasParams::SPECIES_MW) / GetGasParams(iBackground, GasParams::SPECIES_MW);
   pressureGradient += numDenGrad * T_h;
 
-  if (twoTemperature_) {
+  if (twoTemperature_) { // This if statement is not needed since if twoTemperature_ = Flase the T_e = T_h 
     pressureGradient += n_sp[iElectron] * dUp_dx[iTe] + dne_dx * T_e;
   } else {
-    pressureGradient += n_sp[iElectron] * dUp_dx[iTh] + dne_dx * T_h;
+    pressureGradient += n_sp[iElectron] * dUp_dx[iTh] + dne_dx * T_h; 
   }
 
   pressureGradient *= UNIVERSALGASCONSTANT;
@@ -1643,7 +1650,7 @@ MFEM_HOST_DEVICE void PerfectMixture::modifyEnergyForPressure(const double *stat
 
   double Th = 0., pe = 0.0;
   if (twoTemperature_ && (!modifyElectronEnergy)) {
-    double Xeps = 1.0e-30;  // To avoid dividing by zero.
+    double Xeps = 1.0e-50;  // To avoid dividing by zero.
     double Te = stateIn[iTe] / (n_sp[iElectron] + Xeps) / molarCV_[iElectron];
     pe = n_sp[iElectron] * UNIVERSALGASCONSTANT * Te;
   }
@@ -2072,7 +2079,7 @@ void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInt
     conserv[iTe] = n_e * molarCV_[iElectron] * T;
     primit[iTe] = T;  // electron temperature as primitive variable.
   }
-
+ 
   const double nB = n_sp[iBackground];
 
   // compute mixture heat capacity.
@@ -2093,7 +2100,6 @@ void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInt
 
   conserv[iTh] = totalEnergy;
   primit[iTh] = T;
-
 
 
     // double nh = 0.0;

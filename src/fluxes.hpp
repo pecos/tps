@@ -75,6 +75,7 @@ class Fluxes {
   const int num_equation;
 
   int numActiveSpecies;
+  bool twoTemperature_;
 
   const int sgs_model_type_;
   const double sgs_model_floor_;
@@ -121,6 +122,10 @@ class Fluxes {
 
   MFEM_HOST_DEVICE int GetNumActiveSpecies() const { return numActiveSpecies; }
   MFEM_HOST_DEVICE int GetNumVels() const { return nvel; }
+
+  MFEM_HOST_DEVICE bool IsTwoTemperature() const { return twoTemperature_; }
+
+
 };
 
 #endif  // FLUXES_HPP_
