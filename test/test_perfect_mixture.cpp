@@ -997,7 +997,7 @@ int main (int argc, char *argv[])
     }
 
     double T_h, T_e;
-    mixture->computeTemperaturesBase(conservedState, &n_sp[0], n_sp[numSpecies-2], n_sp[numSpecies-1], T_h, T_e);
+    mixture->computeTemperaturesBase(conservedState.GetData(), &n_sp[0], n_sp[numSpecies-2], n_sp[numSpecies-1], T_h, T_e);
     if (abs( (T_h - testPrimitives[dim + 1]) / testPrimitives[dim + 1] ) > scalarErrorThreshold) {
       std::cout << T_h << " != " << testPrimitives[dim + 1] << std::endl;
       grvy_printf(GRVY_ERROR, "\n computeTemperaturesBase does not compute heavy-species temperature properly.");
@@ -1373,7 +1373,7 @@ int main (int argc, char *argv[])
     }
 
     double T_h, T_e;
-    mixture->computeTemperaturesBase(conservedState, &n_sp[0], n_sp[numSpecies-2], n_sp[numSpecies-1], T_h, T_e);
+    mixture->computeTemperaturesBase(conservedState.GetData(), &n_sp[0], n_sp[numSpecies-2], n_sp[numSpecies-1], T_h, T_e);
     if (abs( (T_h - testPrimitives[dim + 1]) / testPrimitives[dim + 1] ) > scalarErrorThreshold) {
       std::cout << T_h << " != " << testPrimitives[dim + 1] << std::endl;
       grvy_printf(GRVY_ERROR, "\n computeTemperaturesBase does not compute heavy-species temperature properly.");

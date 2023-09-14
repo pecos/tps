@@ -78,8 +78,7 @@ int main (int argc, char *argv[])
 
   if (mesh_1->GetNodes() == NULL) { mesh_1->SetCurvature(1); }
   if (mesh_2->GetNodes() == NULL) { mesh_2->SetCurvature(1); }
-  const int mesh_poly_deg =
-    mesh_2->GetNodes()->FESpace()->GetElementOrder(0);
+
   cout << "Source mesh curvature: "
        << mesh_1->GetNodes()->OwnFEC()->Name() << endl
        << "Target mesh curvature: "
@@ -87,11 +86,9 @@ int main (int argc, char *argv[])
 
   // 2) Set up source field
   FiniteElementCollection *src_fec = NULL;
-  ParFiniteElementSpace *src_fes = NULL;
   ParGridFunction *func_source = NULL;
 
   src_fec = srcField.GetFEC();
-  src_fes = srcField.GetFESpace();
   func_source = srcField.GetSolutionGF();
 
   // 3) Some checks

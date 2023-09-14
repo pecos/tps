@@ -44,6 +44,7 @@ Gradients::Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradU
       gradUpfes(_gradUpfes),
       dim_(_dim),
       num_equation_(_num_equation),
+      nvel_(nvel),
       Up(_Up),
       gradUp(_gradUp),
       mixture(_mixture),
@@ -55,8 +56,7 @@ Gradients::Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradU
       invMArray(_invMArray),
       posDofInvM(_posDofInvM),
       maxIntPoints_(_maxIntPoints),
-      maxDofs_(_maxDofs),
-      nvel_(nvel) {
+      maxDofs_(_maxDofs) {
   const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
   h_num_elems_of_type = elem_data.num_elems_of_type.HostRead();
 

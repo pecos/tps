@@ -123,9 +123,7 @@ int main (int argc, char *argv[])
   std::cout << "tps.getSolverType() = " << tps.getSolverType() << std::endl;
   assert(tps.getSolverType() == "cycle-avg-joule-coupled");
 
-  int max_out = 1;
-  CycleAvgJouleCoupling *solver = new CycleAvgJouleCoupling(tps.getInputFilename(), &tps,
-                                                            max_out, true);
+  CycleAvgJouleCoupling *solver = new CycleAvgJouleCoupling(tps.getInputFilename(), &tps);
 
   solver->parseSolverOptions();
   solver->initialize();

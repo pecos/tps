@@ -35,15 +35,15 @@ Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_
                const int _dim, bool axisym)
     : mixture(_mixture),
       eqSystem(_eqSystem),
-      transport(_transport),
-      num_equation(_num_equation),
-      dim(_dim),
-      nvel(axisym ? 3 : _dim),
-      axisymmetric_(axisym),
       config_(NULL),
+      transport(_transport),
+      dim(_dim),
+      axisymmetric_(axisym),
+      num_equation(_num_equation),
       sgs_model_type_(0),
       sgs_model_floor_(0.0),
       sgs_model_const_(0.0) {
+  nvel = axisym ? 3 : dim;
   vsd_.enabled = false;
   vsd_.n[0] = vsd_.n[1] = vsd_.n[2] = 0.;
   vsd_.p[0] = vsd_.p[1] = vsd_.p[2] = 0.;
@@ -55,15 +55,15 @@ Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_
                const int _dim, bool axisym, RunConfiguration *config)
     : mixture(_mixture),
       eqSystem(_eqSystem),
-      transport(_transport),
-      num_equation(_num_equation),
-      dim(_dim),
-      nvel(axisym ? 3 : _dim),
-      axisymmetric_(axisym),
       config_(config),
+      transport(_transport),
+      dim(_dim),
+      axisymmetric_(axisym),
+      num_equation(_num_equation),
       sgs_model_type_(config->GetSgsModelType()),
       sgs_model_floor_(config->GetSgsFloor()),
       sgs_model_const_(config->GetSgsConstant()) {
+  nvel = axisym ? 3 : dim;
   vsd_.enabled = config_->linViscData.isEnabled;
   vsd_.n[0] = vsd_.n[1] = vsd_.n[2] = 0.;
   vsd_.p[0] = vsd_.p[1] = vsd_.p[2] = 0.;
@@ -93,15 +93,15 @@ MFEM_HOST_DEVICE Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, Trans
                                 double sgs_const, viscositySpongeData vsd)
     : mixture(_mixture),
       eqSystem(_eqSystem),
-      transport(_transport),
-      num_equation(_num_equation),
-      dim(_dim),
-      nvel(axisym ? 3 : _dim),
-      axisymmetric_(axisym),
       config_(NULL),
+      transport(_transport),
+      dim(_dim),
+      axisymmetric_(axisym),
+      num_equation(_num_equation),
       sgs_model_type_(sgs_type),
       sgs_model_floor_(sgs_floor),
       sgs_model_const_(sgs_const) {
+  nvel = axisym ? 3 : dim;
   vsd_.enabled = vsd.enabled;
   vsd_.n[0] = vsd_.n[1] = vsd_.n[2] = 0.;
   vsd_.p[0] = vsd_.p[1] = vsd_.p[2] = 0.;
@@ -646,8 +646,6 @@ Simple planar viscous sponge layer with smooth tanh-transtion using user-specifi
 total amplification.  Note: duplicate in M2
 */
 MFEM_HOST_DEVICE void Fluxes::viscSpongePlanar(double *x, double &wgt) {
-  double normal[3];
-  double point[3];
   double s[3];
   double factor, width, dist;
 

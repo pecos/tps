@@ -51,13 +51,15 @@ void GasMixture::SetConstantPlasmaConductivity(ParGridFunction *pc, const ParGri
 
   // otherwise, set plasma conductivity
   double *plasma_conductivity_gf = pc->HostWrite();
-  const double *UpData = Up->HostRead();
 
   // To a constant
   const int nnode = pc->FESpace()->GetNDofs();
   for (int n = 0; n < nnode; n++) {
     plasma_conductivity_gf[n] = const_plasma_conductivity_;
   }
+
+  // You may use the primitive state if you wish
+  // const double *UpData = Up->HostRead();
 
   // To use a spatially varying conductivity, uncomment the code
   // below, and put in the function of space you wish to use.  Note

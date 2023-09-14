@@ -115,7 +115,6 @@ class RHSoperator : public TimeDependentOperator {
   ParGridFunction *Up;
   ParGridFunction *plasma_conductivity_;
   ParGridFunction *joule_heating_;
-  ParGridFunction *distance_;
 
   // gradients of primitives and associated forms&FE space
   ParGridFunction *gradUp;
@@ -124,6 +123,7 @@ class RHSoperator : public TimeDependentOperator {
   GradNonLinearForm *gradUp_A;
 
   BCintegrator *bcIntegrator;
+  ParGridFunction *distance_;
 
   Array<ForcingTerms *> forcing;
   int masaForcingIndex_ = -1;

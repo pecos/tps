@@ -558,7 +558,6 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
   const int dim = dim_;
   const int num_equation = num_equation_;
 
-  const bool axisymmetric = config_.isAxisymmetric();
   const double *d_coord = coordsDof->Read();
   const double *d_gradUp = gradUp->Read();
 

@@ -304,7 +304,7 @@ bool h5ReadTable(const std::string &fileName, const std::string &datasetName, mf
   datasetID = H5Dopen2(file, datasetName.c_str(), H5P_DEFAULT);
   if (datasetID < 0) return success;
   dataspace = H5Dget_space(datasetID);
-  const int ndims = H5Sget_simple_extent_ndims(dataspace);
+  // const int ndims = H5Sget_simple_extent_ndims(dataspace);
   hsize_t dims[gpudata::MAXTABLEDIM];
   // int dummy = H5Sget_simple_extent_dims(dataspace,dims,NULL);
   H5Sget_simple_extent_dims(dataspace, dims, NULL);
@@ -353,13 +353,13 @@ bool h5ReadBcastMultiColumnTable(const std::string &fileName, const std::string 
   MPI_Bcast(&nrow, 1, MPI_INT, 0, TPSCommWorld);
   MPI_Bcast(&ncol, 1, MPI_INT, 0, TPSCommWorld);
   assert(nrow > 0);
-  assert(ncol == tables.size() + 1);
+  assert(ncol == (int)tables.size() + 1);
 
   if (!rank0) output.SetSize(nrow, ncol);
   double *h_table = output.HostReadWrite();
   MPI_Bcast(h_table, nrow * ncol, MPI_DOUBLE, 0, TPSCommWorld);
 
-  for (int icol = 0; icol < tables.size(); icol++) {
+  for (size_t icol = 0; icol < tables.size(); icol++) {
     tables[icol].Ndata = nrow;
     tables[icol].xdata = output.HostRead();
     tables[icol].fdata = output.HostRead() + (icol + 1) * nrow;
@@ -465,9 +465,9 @@ void evaluateDistanceSerial(mfem::Mesh &mesh, const mfem::Array<int> &wall_patch
 
           // Update reference coordinates
           Vector xi(ref, rdim);
-          ip.Get(xi, rdim);
+          ip.Get(xi.GetData(), rdim);
           xi += dxi;
-          ip.Set(xi, rdim);
+          ip.Set(xi.GetData(), rdim);
 
           // Update dx and residual
           Tr->SetIntPoint(&ip);

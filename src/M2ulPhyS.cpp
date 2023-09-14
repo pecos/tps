@@ -176,7 +176,7 @@ void M2ulPhyS::initMixtureAndTransportModels() {
 
         // Initialize thermo TableInput (data read below)
         std::vector<TableInput> thermo_tables(3);
-        for (int i = 0; i < thermo_tables.size(); i++) {
+        for (size_t i = 0; i < thermo_tables.size(); i++) {
           thermo_tables[i].order = 1;
           thermo_tables[i].xLogScale = false;
           thermo_tables[i].fLogScale = false;
@@ -223,7 +223,7 @@ void M2ulPhyS::initMixtureAndTransportModels() {
 
         // Initialize transport TableInput (data read below)
         std::vector<TableInput> trans_tables(3);
-        for (int i = 0; i < trans_tables.size(); i++) {
+        for (size_t i = 0; i < trans_tables.size(); i++) {
           trans_tables[i].order = 1;
           trans_tables[i].xLogScale = false;
           trans_tables[i].fLogScale = false;
@@ -1095,10 +1095,6 @@ void M2ulPhyS::initIndirectionArrays() {
     bdry_face_data.delta_el1 = 0.;
     auto h_bdry_delta_el1 = bdry_face_data.delta_el1.HostWrite();
 
-    bdry_face_data.bc_category.SetSize(NumBCelems);
-    bdry_face_data.bc_category = NUM_BC_CATEGORIES;
-    auto h_bc_category = bdry_face_data.bc_category.HostWrite();
-
     bdry_face_data.dist.UseDevice(true);
     bdry_face_data.dist.SetSize(NumBCelems * maxIntPoints);
     bdry_face_data.dist = 0.;
@@ -1196,8 +1192,8 @@ void M2ulPhyS::initIndirectionArrays() {
       }
     }
 
-    assert(rbf_to_abf.size() == mesh->GetNFbyType(FaceType::Boundary));
-    assert(rbf_to_abf.size() == numRealBCFaces);
+    assert((int)rbf_to_abf.size() == mesh->GetNFbyType(FaceType::Boundary));
+    assert((int)rbf_to_abf.size() == numRealBCFaces);
 
     bdry_face_data.rbf_to_abf.SetSize(rbf_to_abf.size());
     auto h_rbf_to_abf = bdry_face_data.rbf_to_abf.HostWrite();
@@ -2022,20 +2018,15 @@ void M2ulPhyS::solveStep() {
 #ifdef HAVE_GSLIB
       // Get the source field for the interpolation
       // TODO(shaering): improve option to select u, <u>, or <u'u'> for multiple at once
-      int interpNum;
       ParGridFunction *u_gf;
       if (config.planeDump.conserved == true) {
         u_gf = GetSolutionGF();
-        interpNum = num_equation;
       } else if (config.planeDump.primitive == true) {
         u_gf = getPrimitiveGF();
-        interpNum = num_equation;
       } else if (config.planeDump.mean == true) {
         u_gf = average->GetMeanUp();
-        interpNum = num_equation;
       } else if (config.planeDump.reynolds == true) {
         u_gf = average->GetRMS();
-        interpNum = 6;
       } else {
         grvy_printf(GRVY_ERROR, "\nSpecified interpolation type not supported.\n");
         exit(ERROR);
@@ -2366,8 +2357,6 @@ void M2ulPhyS::initilizeSpeciesFromLTE() {
   int dof = vfes->GetNDofs();
 
   assert(mixture->GetWorkingFluid() == WorkingFluid::USER_DEFINED);
-  const int numSpecies = mixture->GetNumSpecies();
-  const int numActiveSpecies = mixture->GetNumActiveSpecies();
 
   std::string thermo_file;
   tpsP->getRequiredInput("flow/lte/thermo_table", thermo_file);
@@ -2419,7 +2408,7 @@ void M2ulPhyS::initilizeSpeciesFromLTE() {
     }
 
     // Calculate species mass densities bases based on LTE at node level.
-    mixture->GetSpeciesFromLTE(state, prim, energy_table, R_table, c_table, T_table);
+    mixture->GetSpeciesFromLTE(state.HostReadWrite(), prim.HostReadWrite(), energy_table, R_table, c_table, T_table);
 
     // Return new state at each node
     for (int eq = 0; eq < num_equation; eq++) {

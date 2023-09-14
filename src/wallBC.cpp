@@ -43,11 +43,11 @@ WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, GasMixture *d_mixt
                         axisym),  // so far walls do not require ref. length. Left at 1
       wallType_(_bcType),
       wallData_(_inputData),
+      useBCinGrad_(useBCinGrad),
       d_mixture_(d_mixture),
       fluxClass(_fluxClass),
       boundary_face_data_(boundary_face_data),
-      maxIntPoints_(_maxIntPoints),
-      useBCinGrad_(useBCinGrad) {
+      maxIntPoints_(_maxIntPoints) {
   // Initialize bc state.
   // bcState_.prim.SetSize(num_equation_);
   // bcState_.primIdxs.SetSize(num_equation_);
@@ -259,6 +259,9 @@ void WallBC::computeBdrPrimitiveStateForGradient(const Vector &primIn, Vector &p
     case VISC_GNRL:
       // TODO(trevilo): fix
       break;
+    default:
+      // If BC is unknown to this function, don't do anything
+      break;
   }
 }
 
@@ -324,7 +327,6 @@ void WallBC::computeSlipWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &g
                                  Vector &bdrFlux) {
   Vector prim(num_equation_);
   mixture->GetPrimitivesFromConservatives(stateIn, prim);
-  double wallT = prim[dim_ + 1];
 
   // stateIn is conserved
   Vector vel(nvel_);

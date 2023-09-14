@@ -45,10 +45,10 @@ FaceIntegrator::FaceIntegrator(IntegrationRules *_intRules, RiemannSolver *rsolv
       max_char_speed(_max_char_speed),
       gradUp(_gradUp),
       gradUpfes(_gradUpfes),
+      distance_(distance),
       intRules(_intRules),
       useLinear(_useLinear),
-      axisymmetric_(axisym),
-      distance_(distance) {
+      axisymmetric_(axisym) {
   assert(!useLinear);
   totDofs = vfes->GetNDofs();
 }

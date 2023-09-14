@@ -41,8 +41,8 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
                    const Array<double> &_inputData, const int &_maxIntPoints, const int &_maxDofs, bool axisym)
     : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
                         _refLength, axisym),
-      d_mixture_(d_mixture),
       groupsMPI(_groupsMPI),
+      d_mixture_(d_mixture),
       outletType_(_bcType),
       inputState(_inputData),
       maxIntPoints_(_maxIntPoints),

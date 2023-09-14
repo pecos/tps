@@ -77,6 +77,10 @@ int main (int argc, char *argv[])
     case ARGON_MIXTURE:
       transport = new ArgonMixtureTransport(mixture, srcConfig);
       break;
+    default:
+      printf("test_argon_minimal only supports argon transport models.\n"); fflush(stdout);
+      exit(ERROR);
+      break;
   }
   //ArgonMinimalTransport *transport = new ArgonMinimalTransport(mixture, srcConfig);
   int numSpecies = mixture->GetNumSpecies();
@@ -166,7 +170,7 @@ int main (int argc, char *argv[])
     transport->ComputeFluxTransportProperties(conservedState, gradUp, Efield, -1, -1, transportBuffer, diffusionVelocity);
 
     double visc, bulkVisc, visc_vec[2];
-    transport->GetViscosities(conservedState, primitiveState, visc_vec);
+    transport->GetViscosities(conservedState.GetData(), primitiveState.GetData(), visc_vec);
     visc = visc_vec[0];
     bulkVisc = visc_vec[1];
 

@@ -55,12 +55,12 @@ BCintegrator::BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElem
       vfes(_vfes),
       Up(_Up),
       gradUp(_gradUp),
+      distance_(distance),
       boundary_face_data_(boundary_face_data),
       dim(_dim),
       num_equation(_num_equation),
       maxIntPoints(_maxIntPoints),
-      maxDofs(_maxDofs),
-      distance_(distance) {
+      maxDofs(_maxDofs) {
   inletBCmap.clear();
   outletBCmap.clear();
   wallBCmap.clear();

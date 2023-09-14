@@ -90,7 +90,6 @@ MFEM_HOST_DEVICE void RiemannSolver::Eval_LF(const double *state1, const double 
                                              double *flux) const {
   const int dim = mixture->GetDimension();
 
-  double Pe = 0.0;
   const double maxE1 = mixture->ComputeMaxCharSpeed(state1);
   const double maxE2 = mixture->ComputeMaxCharSpeed(state2);
 
