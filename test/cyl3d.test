@@ -9,6 +9,8 @@ EXE="../src/tps"
 setup() {
     SOLN_FILE=restart_output.sol.h5
     REF_FILE=ref_solns/cyl3d_coarse.4iters.h5
+    rm -rf planeData
+    mkdir planeData
 }
 
 @test "[$TEST] check for input file $RUNFILE" {
