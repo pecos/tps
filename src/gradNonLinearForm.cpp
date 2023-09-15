@@ -37,7 +37,7 @@ GradNonLinearForm::GradNonLinearForm(ParFiniteElementSpace *_vfes, IntegrationRu
                                      const int _num_equation)
     : ParNonlinearForm(_vfes), vfes(_vfes), intRules(_intRules), dim(_dim), num_equation(_num_equation) {}
 
-void GradNonLinearForm::Mult(const ParGridFunction *Up, Vector &y) {
+void GradNonLinearForm::Apply(const ParGridFunction *Up, Vector &y) {
   Vector x;
   const double *data = Up->GetData();
 

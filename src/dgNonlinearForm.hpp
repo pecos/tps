@@ -82,8 +82,6 @@ class DGNonLinearForm : public ParNonlinearForm {
                   const int num_equation, GasMixture *mixture, const precomputedIntegrationData &gpu_precomputed_data,
                   const int &maxIntPoints, const int &maxDofs);
 
-  void Mult(const Vector &x, Vector &y);
-
   void setParallelData(dataTransferArrays *_transferU, dataTransferArrays *_transferGradUp);
 
   void faceIntegration_gpu(Vector &y, int elType, int elemOffset, int elDof);

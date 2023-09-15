@@ -50,7 +50,7 @@ class GradNonLinearForm : public ParNonlinearForm {
  public:
   GradNonLinearForm(ParFiniteElementSpace *f, IntegrationRules *intRules, const int dim, const int num_equation);
 
-  void Mult(const ParGridFunction *Up, Vector &y);
+  void Apply(const ParGridFunction *Up, Vector &y);
 };
 
 #endif  // GRADNONLINEARFORM_HPP_

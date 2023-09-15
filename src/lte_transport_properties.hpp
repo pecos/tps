@@ -81,6 +81,7 @@ class LteTransport : public MolecularTransport {
                                                         double *speciesTransport, double *diffusionVelocity,
                                                         double *n_sp) final;
 
+  using MolecularTransport::GetViscosities;
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) final;
 };
 

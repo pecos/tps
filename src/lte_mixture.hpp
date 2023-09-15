@@ -163,6 +163,11 @@ class LteMixture : public GasMixture {
     mfem_error("computeSheathBdrFlux not implemented");
   }
 
+  MFEM_HOST_DEVICE virtual void computeSheathBdrFlux(const double *state, BoundaryViscousFluxData &bcFlux) {
+    printf("ERROR: computeSheathBdrFlux is not supposed to be executed for LteMixture!");
+    return;
+  }
+
   virtual double computeElectronEnergy(const double n_e, const double T_e) {
     mfem_error("computeElectronEnergy not implemented");
     return 0;

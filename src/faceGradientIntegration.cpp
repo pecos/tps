@@ -56,7 +56,7 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
 
   // NB: Incoming Vector &elfun is in gradient space.  The first
   // component is the state, and the rest is zero.  See
-  // GradNonLinearForm::Mult in gradNonLinearForm.cpp for details.
+  // GradNonLinearForm::Apply in gradNonLinearForm.cpp for details.
   DenseMatrix elfun1_mat(elfun.GetData(), dof1, num_equation);
   DenseMatrix elfun2_mat(elfun.GetData() + dof1 * num_equation * dim, dof2, num_equation);
 

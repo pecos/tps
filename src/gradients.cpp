@@ -193,7 +193,7 @@ void Gradients::computeGradients() {
   }
 
   // Calc boundary contribution
-  gradUp_A->Mult(Up, faceContrib);
+  gradUp_A->Apply(Up, faceContrib);
 
   // Add contributions and multiply by invers mass matrix
   for (int el = 0; el < vfes->GetNE(); el++) {

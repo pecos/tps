@@ -397,7 +397,10 @@ MFEM_HOST_DEVICE double LteMixture::ComputeMaxCharSpeed(const double *state) {
 }
 
 // only used in non-reflecting BCs... don't implement for now
-double LteMixture::ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive) { assert(false); }
+double LteMixture::ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive) {
+  assert(false);
+  return 0.0;
+}
 
 /// Check if the density, temperature, and pressure are positive
 bool LteMixture::StateIsPhysical(const Vector &state) {

@@ -210,7 +210,10 @@ class MolecularTransport : public TransportProperties {
                                     n_sp);
   }
 
-  using TransportProperties::GetViscosities;
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) override {
+    printf("MolecularTransport::GetViscosities is not implemented!\n");
+  }
+
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, const double *gradUp,
                                        double radius, double distance, double *visc) final {
     GetViscosities(conserved, primitive, visc);

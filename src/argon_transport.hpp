@@ -121,9 +121,8 @@ class ArgonMinimalTransport : public MolecularTransport {
 
   // virtual double computeThirdOrderElectronThermalConductivity(const Vector &X_sp, const double debyeLength,
   //                                                             const double Te, const double nondimTe);
-  MFEM_HOST_DEVICE virtual double computeThirdOrderElectronThermalConductivity(const double *X_sp,
-                                                                               const double debyeLength,
-                                                                               const double Te, const double nondimTe);
+  MFEM_HOST_DEVICE double computeThirdOrderElectronThermalConductivity(const double *X_sp, const double debyeLength,
+                                                                       const double Te, const double nondimTe);
 
   virtual void computeMixtureAverageDiffusivity(const Vector &state, Vector &diffusivity);
   MFEM_HOST_DEVICE void computeMixtureAverageDiffusivity(const double *state, double *diffusivity);
@@ -187,8 +186,8 @@ class ArgonMixtureTransport : public ArgonMinimalTransport {
   using ArgonMinimalTransport::GetViscosities;
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) final;
 
-  MFEM_HOST_DEVICE virtual double computeThirdOrderElectronThermalConductivity(const double *X_sp,
-                                                                               const collisionInputs &collInputs);
+  MFEM_HOST_DEVICE double computeThirdOrderElectronThermalConductivity(const double *X_sp,
+                                                                       const collisionInputs &collInputs);
   //
   // virtual void computeMixtureAverageDiffusivity(const Vector &state, Vector &diffusivity);
 };
