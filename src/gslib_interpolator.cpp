@@ -149,9 +149,12 @@ void PlaneInterpolator::setInterpolationPoints() {
     const double dz = Lz / ncell;
     for (int j = 0; j < n_; j++) {
       for (int i = 0; i < n_; i++) {
-        xyz_[iCnt + 0 * totalPts] = ndotp / normal_[0];
-        xyz_[iCnt + 1 * totalPts] = dy * (double)i + bb0_[1];
-        xyz_[iCnt + 2 * totalPts] = dz * (double)j + bb0_[2];
+        const double yp = dy * (double)i + bb0_[1];
+        const double zp = dz * (double)j + bb0_[2];
+        const double xp = (ndotp - (normal_[1] * yp) - (normal_[2] * zp)) / normal_[0];
+        xyz_[iCnt + 0 * totalPts] = xp;
+        xyz_[iCnt + 1 * totalPts] = yp;
+        xyz_[iCnt + 2 * totalPts] = zp;
         iCnt++;
       }
     }
@@ -160,9 +163,12 @@ void PlaneInterpolator::setInterpolationPoints() {
     const double dz = Lz / ncell;
     for (int j = 0; j < n_; j++) {
       for (int i = 0; i < n_; i++) {
-        xyz_[iCnt + 0 * totalPts] = dx * (double)i + bb0_[0];
-        xyz_[iCnt + 1 * totalPts] = ndotp / normal_[1];
-        xyz_[iCnt + 2 * totalPts] = dz * (double)j + bb0_[2];
+        const double xp = dx * (double)i + bb0_[0];
+        const double zp = dz * (double)j + bb0_[2];
+        const double yp = (ndotp - (normal_[0] * xp) - (normal_[2] * zp)) / normal_[1];
+        xyz_[iCnt + 0 * totalPts] = xp;
+        xyz_[iCnt + 1 * totalPts] = yp;
+        xyz_[iCnt + 2 * totalPts] = zp;
         iCnt++;
       }
     }
@@ -171,9 +177,12 @@ void PlaneInterpolator::setInterpolationPoints() {
     const double dy = Ly / ncell;
     for (int j = 0; j < n_; j++) {
       for (int i = 0; i < n_; i++) {
-        xyz_[iCnt + (0 * totalPts)] = dx * (double)i + bb0_[0];
-        xyz_[iCnt + (1 * totalPts)] = dy * (double)j + bb0_[1];
-        xyz_[iCnt + (2 * totalPts)] = ndotp / normal_[2];
+        const double xp = dx * (double)i + bb0_[0];
+        const double yp = dy * (double)j + bb0_[1];
+        const double zp = (ndotp - (normal_[0] * xp) - (normal_[1] * yp)) / normal_[2];
+        xyz_[iCnt + (0 * totalPts)] = xp;
+        xyz_[iCnt + (1 * totalPts)] = yp;
+        xyz_[iCnt + (2 * totalPts)] = zp;
         iCnt++;
       }
     }
