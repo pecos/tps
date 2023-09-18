@@ -732,7 +732,7 @@ void Gradients::interpGradBdryFace_gpu() {
 
   const int *d_rbf_to_abf = bdry_face_data.rbf_to_abf.Read();
 
-  const double *d_xyz = bdry_face_data.xyz.Read();
+  // const double *d_xyz = bdry_face_data.xyz.Read();
 
   double *d_dun = dun_bdry_face.Write();
 
@@ -826,7 +826,6 @@ void Gradients::integrationGradBdryFace_gpu() {
   const double *d_shape = bdry_face_data.shape.Read();
   const int *d_face_num_quad = bdry_face_data.num_quad.Read();
   const int *d_elem_to_face = bdry_face_data.elements_to_faces.Read();
-  const double *d_xyz = bdry_face_data.xyz.Read();
 
   const double *d_dun = dun_bdry_face.Read();
 
@@ -838,8 +837,9 @@ void Gradients::integrationGradBdryFace_gpu() {
 
   const int nbelem = bdry_face_data.elements_to_faces.Size() / 7;
 
-  const boundaryCategory *d_bc_cat = bdry_face_data.bc_category.Read();
-  const bool *d_bc_use = bdry_face_data.use_bc_in_grad.Read();
+  // const double *d_xyz = bdry_face_data.xyz.Read();
+  // const boundaryCategory *d_bc_cat = bdry_face_data.bc_category.Read();
+  // const bool *d_bc_use = bdry_face_data.use_bc_in_grad.Read();
 
   MFEM_FORALL(el, nbelem, {
     const int elind = d_elem_to_face[0 + el * 7];

@@ -622,8 +622,8 @@ void QuasiMagnetostaticSolver3D::InterpolateToYAxis() const {
     H5Fclose(file);
   }
 
-  delete Byloc;
-  delete By;
+  delete[] Byloc;
+  delete[] By;
 }
 
 void QuasiMagnetostaticSolver3D::setStoreE(bool storeE) {
