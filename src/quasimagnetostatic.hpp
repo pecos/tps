@@ -102,6 +102,13 @@ class QuasiMagnetostaticSolverBase : public TPS::Solver {
   virtual double totalJouleHeating() = 0;
 
   void scaleJouleHeating(const double val) { (*joule_heating_) *= val; }
+
+  virtual double coilCurrent() const {
+    mfem::mfem_error("QuasiMagnetostaticSolverBase::coilCurrent is not implemented.");
+    return 0.0;
+  }
+
+  bool evalRplasma() const { return em_opts_.eval_Rplasma; }
 };
 
 /** Helper class for Joule heating evaluation
@@ -265,6 +272,9 @@ class QuasiMagnetostaticSolverAxiSym : public QuasiMagnetostaticSolverBase {  //
 
   double elementJouleHeating(const FiniteElement &el, ElementTransformation &Tr, const Vector &elfun) override;
   double totalJouleHeating() override;
+
+  /** Evaluate the total current in the coil */
+  double coilCurrent() const final;
 };
 
 #endif  // QUASIMAGNETOSTATIC_HPP_

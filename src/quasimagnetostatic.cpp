@@ -335,6 +335,8 @@ void QuasiMagnetostaticSolver3D::parseSolverOptions() {
   default_axis[2] = 0;
   tpsP_->getVec("em/current_axis", em_opts_.current_axis, 3, default_axis);
 
+  tpsP_->getInput("em/eval_Rplasma", em_opts_.eval_Rplasma, false);
+
   // dump options to screen for user inspection
   if (rank0_) {
     em_opts_.print(std::cout);
@@ -924,6 +926,8 @@ void QuasiMagnetostaticSolverAxiSym::parseSolverOptions() {
   tpsP_->getInput("em/current_frequency", em_opts_.current_frequency, 1.0);
   tpsP_->getInput("em/permeability", em_opts_.mu0, 1.0);
 
+  tpsP_->getInput("em/eval_Rplasma", em_opts_.eval_Rplasma, false);
+
   // dump options to screen for user inspection
   if (rank0_) {
     em_opts_.print(std::cout);
@@ -1168,4 +1172,44 @@ double QuasiMagnetostaticSolverAxiSym::totalJouleHeating() {
 
   // Factor of 2*pi from azimuthal direction integral
   return 2 * M_PI * total_int_jh;
+}
+
+double QuasiMagnetostaticSolverAxiSym::coilCurrent() const {
+  assert(current_initialized_);
+
+  // We re-build the current coefficient here, but only using 1 ring
+  // so that when we integrate over area, we obtain the correct
+  // current and not the current times number of rings
+  Vector J0(pmesh_->attributes.Max());
+  J0 = 0.0;
+  J0(1) = em_opts_.current_amplitude * 0.5;
+  PWConstCoefficient J0coef(J0);
+
+  // Integrate the current by looping over the elements.  Note that
+  // this is an area integral, not a volume integral, so there is no
+  // factor of 2 \pi radius
+  double current = 0;
+  const int NE = pmesh_->GetNE();
+  const ParFiniteElementSpace *fes = Atheta_space_;
+
+  for (int ielem = 0; ielem < NE; ielem++) {
+    const FiniteElement *fe = fes->GetFE(ielem);
+    ElementTransformation *T = fes->GetElementTransformation(ielem);
+
+    // B/c the current is piecewise constant, first order rule is sufficient
+    const int intorder = 1;
+    const IntegrationRule *ir = &IntRules.Get(fe->GetGeomType(), intorder);
+
+    for (int i = 0; i < ir->GetNPoints(); i++) {
+      const IntegrationPoint &ip = ir->IntPoint(i);
+      T->SetIntPoint(&ip);
+      current += ip.weight * T->Weight() * J0coef.Eval(*T, ip);
+    }
+  }
+
+  // sum over mpi ranks
+  double total_current = 0;
+  MPI_Allreduce(&current, &total_current, 1, MPI_DOUBLE, MPI_SUM, fes->GetComm());
+
+  return total_current;
 }
