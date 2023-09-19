@@ -876,7 +876,7 @@ void QuasiMagnetostaticSolverAxiSym::InitializeCurrent() {
   Vector J0(pmesh_->attributes.Max());
   J0 = 0.0;
 
-  const double mu0J = em_opts_.mu0 * em_opts_.current_amplitude;
+  const double mu0J = em_opts_.mu0 * em_opts_.current_amplitude * 0.5;
 
   if (em_opts_.bot_only) {
     // only bottom rings
@@ -1035,7 +1035,7 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
 
   tmp2 += tmp1;
   tmp2 *= (*plasma_conductivity_);
-  tmp2 *= omega2;
+  tmp2 *= 2.0 * omega2;
 
   *joule_heating_ = tmp2;
 
