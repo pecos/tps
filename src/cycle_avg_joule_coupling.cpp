@@ -397,6 +397,13 @@ void CycleAvgJouleCoupling::solveStep() {
         grvy_printf(GRVY_INFO, "The input current amplitude = %.6e\n", 2 * tot_I);
         grvy_printf(GRVY_INFO, "The effective plasma resistance = %.6e\n", Rplasma);
       }
+
+      const double magnetic_energy = qmsa_solver_->magneticEnergy();
+      const double Lplasma = 2 * magnetic_energy / (2 * tot_I * tot_I);
+      if (rank0_) {
+        grvy_printf(GRVY_INFO, "The magnetic field energy = %.6e\n", magnetic_energy);
+        grvy_printf(GRVY_INFO, "The effective plasma inductance = %.6e\n", Lplasma);
+      }
     }
 
     // scale the Joule heating (if we are controlling the power input)
