@@ -93,7 +93,7 @@ jobs:
       - name: Bootstrap
         run:  module restore tps-gpu-gnu9; ./bootstrap
       - name: Configure
-        run: module restore tps-gpu-gnu9; ./configure --enable-pybind11 --enable-gpu-cuda CUDA_ARCH=sm_75
+        run: module restore tps-gpu-gnu9; ./configure --enable-pybind11 --enable-gpu-cuda CUDA_ARCH=sm_75 USER_CUDA_CXXFLAGS="-Werror all-warnings -Xcompiler=-Wall -Xcompiler=-Werror"
       - name: Make
         run: module restore tps-gpu-gnu9; make -j 2
       - name: Tests
@@ -247,7 +247,7 @@ jobs:
        - name: Query modules loaded
          run:  module restore tps-gpu-gnu9; module list         
        - name: Configure
-         run:  cd tps-*; module restore tps-gpu-gnu9; ./configure --enable-gpu-cuda CUDA_ARCH=sm_75
+         run: cd tps-*; module restore tps-gpu-gnu9; ./configure --enable-pybind11 --enable-gpu-cuda CUDA_ARCH=sm_75 USER_CUDA_CXXFLAGS="-Werror all-warnings -Xcompiler=-Wall -Xcompiler=-Werror"
        - name: Make
          run:  cd tps-*; module restore tps-gpu-gnu9; make -j 2
        - name: TPS version
@@ -262,4 +262,4 @@ jobs:
          run:  cd tps-*; cd build; module restore tps-gpu-gnu9; make -j 2
        - name: VPATH Tests
          run:  cd tps-*; cd build; module restore tps-gpu-gnu9; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
- 
+
