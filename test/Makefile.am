@@ -28,7 +28,7 @@ EXTRA_DIST      = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes 
 		  ref_solns/noSGM1K/*.h5 ref_solns/smag1K_1/*.h5 ref_solns/sigma1K_1/*.h5 \
 	          ref_solns/plate150K/*.h5 ref_solns/plate150K_1step/*.h5 \
 		  vpath.sh die.sh cyl3d.gpu.test cyl3d.mflow.gpu.test wedge.gpu.test \
-	          averages.gpu.test cyl3d.test cyl3d.mflow.test cyl3d.dtconst.test \
+	          averages.gpu.test cyl3d.test cyl3d.gpu.python.test cyl3d.mflow.test cyl3d.dtconst.test \
 		  die.test averages.test wedge.test cyl3d.interp.test qms.rings.test qms.axisym.test \
 		  sponge_zone.test annulus.test pipe.test valgrind.test valgrind.suppressions \
 		  mms.euler.test reaction.test perfect_gas.test collision_integrals.test \
