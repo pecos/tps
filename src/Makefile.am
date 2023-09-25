@@ -88,7 +88,8 @@ libtps_la_LIBADD    += $(CUDA_LDFLAGS) -lcuda -lcusparse
 #
 libtool_cxx_objects = $(cxx_sources:.cpp=.lo)
 libtool_objects = $(libtool_cxx_objects) $(mfem_extra_sources:.cpp=.lo)
-raw_objects = $(addprefix .libs/, $(libtool_cxx_objects:.lo=.o))
+obj_list = $(libtool_cxx_objects:.lo=.o)
+raw_objects = `for f in $(obj_list); do echo .libs/$$f; done`
 raw_objects += ../utils/mfem_extras/.libs/pfem_extras.o
 
 tmp_cuda_object.lo: $(libtool_objects)
