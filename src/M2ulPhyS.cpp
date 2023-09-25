@@ -1794,6 +1794,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     *joule_heating_ = 0.0;
   }
 
+
   // define solution parameters for i/o
   ioData.registerIOFamily("Solution state variables", "/solution", U);
   ioData.registerIOVar("/solution", "density", 0);
@@ -1811,6 +1812,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     // Only for NS_PASSIVE.
     if ((eqSystem == NS_PASSIVE) && (sp == 1)) break;
 
+
     std::string speciesName = config.speciesNames[sp];
     if (config.restartFromLTE) {
       ioData.registerIOVar("/solution", "rho-Y_" + speciesName, sp + nvel + 2, false);
@@ -1825,6 +1827,18 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
       ioData.registerIOVar("/solution", "rhoE_e", num_equation - 1);
     }
   }
+
+
+  if (config.saveTemperatureField) {
+    ioData.registerIOFamily("Temperature field", "/temperature", temperature, true, false);
+    ioData.registerIOVar("/temperature", "temperature", 0, false);
+    // if (config.twoTemperature) {
+    //   ioData.registerIOFamily("Electron temperature field", "/temperature", electron_temp_field, true, false);
+    //   ioData.registerIOVar("/temperature", "electron_temperature", 0, false);
+    // }
+  }
+
+
 
   // compute factor to multiply viscosity when this option is active
   spaceVaryViscMult = NULL;
@@ -2756,6 +2770,8 @@ void M2ulPhyS::parseIOSettings() {
   tpsP->getInput("io/enableRestart", config.restart, false);
   tpsP->getInput("io/restartFromLTE", config.restartFromLTE, false);
   tpsP->getInput("io/exitCheckFreq", config.exit_checkFrequency_, 500);
+  tpsP->getInput("io/saveTemperatureField", config.saveTemperatureField, false);
+
   assert(config.exit_checkFrequency_ > 0);
 
   std::string restartMode;

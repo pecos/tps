@@ -4,9 +4,9 @@ cd test
 
 rm -R output-plasma
 
-cp restart_output-plasma.LTE.h5 restart_output-plasma.sol.h5
+cp Restart/restart_output-plasma.LTE.h5 restart_output-plasma.sol.h5
 
-cp Restart/restart_output-plasma.sol.* ./ 
+# cp Restart/restart_output-plasma.sol.* ./ 
 
 
 EXE=../src/tps

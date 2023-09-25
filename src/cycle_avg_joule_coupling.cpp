@@ -282,6 +282,7 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
   Vector vxyz;
   interpolationPoints(vxyz, n_flow_interp_nodes_, flow_fespace);
 
+
   // Evaluate source grid function.
   Vector interp_vals(n_flow_interp_nodes_);
 

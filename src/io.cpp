@@ -281,7 +281,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
       if (dataspace >= 0) H5Sclose(dataspace);
 
     } else if (fam.inRestartFile) {  // read mode
-      if (rank0_) cout << "Reading in solutiond data from restart..." << endl;
+      if (rank0_) cout << "Reading in solution data from restart..." << endl;
 
       // verify Dofs match expectations with current mesh
       if (rank0_ || config.isRestartPartitioned(mode)) {

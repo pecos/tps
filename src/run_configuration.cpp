@@ -55,6 +55,7 @@ RunConfiguration::RunConfiguration() {
   useRoe = false;
   restart = false;
   restartFromLTE = false;
+  saveTemperatureField = false;
   restart_hdf5_conversion = false;
   restart_serial = "no";
   restart_cycle = 0;
