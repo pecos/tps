@@ -458,3 +458,7 @@ void CycleAvgJouleCoupling::push(TPS::Tps2Boltzmann &interface) {
 
 /// Fetch solver variables from interface
 void CycleAvgJouleCoupling::fetch(TPS::Tps2Boltzmann &interface) { flow_solver_->fetch(interface); }
+
+void CycleAvgJouleCoupling::fetchCircuit(Tps2Circuit &interface) {}
+
+void CycleAvgJouleCoupling::pushCircuit(Tps2Circuit &interface) {}

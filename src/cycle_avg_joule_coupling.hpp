@@ -125,6 +125,9 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   /// Fetch solver variables from interface
   void fetch(TPS::Tps2Boltzmann &interface) override;
 
+  void fetchCircuit(Tps2Circuit &interface) override;
+  void pushCircuit(Tps2Circuit &interface) override;
+
   M2ulPhyS *getFlowSolver() { return flow_solver_; }
   QuasiMagnetostaticSolverBase *getEMSolver() { return qmsa_solver_; }
 };

@@ -196,6 +196,12 @@ class Tps {
   /// Fetch solver variables from interface
   void fetch(Tps2Boltzmann &interface) { solver_->fetch(interface); }
 
+  /// Fetch inputs to circuit model from solver
+  void fetchCircuit(Tps2Circuit &interface) { solver_->fetchCircuit(interface); }
+
+  /// Push inputs to plasma solver from circuit model
+  void pushCircuit(Tps2Circuit &interface) { solver_->pushCircuit(interface); }
+
   void printHeader();
   void parseCommandLineArgs(int argc, char *argv[]);  // variant used in C++ interface
   void parseArgs(std::vector<std::string> argv);      // variant used in python interface

@@ -659,4 +659,15 @@ struct RadiationInput {
   TableInput necTableInput;
 };
 
+struct Tps2Circuit {
+  /// Equivalent resistance of the plasma within a circuit model
+  double Rplasma;
+
+  /// Equivalent inductance of the plasma within a circuit model
+  double Lplasma;
+
+  /// Power deposited into the plasma
+  double Pplasma;
+};
+
 #endif  // DATASTRUCTURES_HPP_

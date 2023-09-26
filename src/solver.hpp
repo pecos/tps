@@ -95,6 +95,18 @@ class Solver {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
   }
+
+  /// Push inputs to plasma solver from circuit model
+  virtual void pushCircuit(Tps2Circuit& interface) {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+  }
+
+  /// Fetch inputs to circuit model from solver
+  virtual void fetchCircuit(Tps2Circuit& interface) {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+  }
 };
 
 }  // end namespace TPS
