@@ -59,25 +59,25 @@ class MixingLengthTransport : public TransportProperties {
 
   MFEM_HOST_DEVICE virtual ~MixingLengthTransport() { delete molecular_transport_; }
 
-  virtual void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
-                                              double radius, double distance, Vector &transportBuffer,
-                                              DenseMatrix &diffusionVelocity);
-  MFEM_HOST_DEVICE virtual void ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                               const double *Efield, double radius, double distance,
-                                                               double *transportBuffer, double *diffusionVelocity);
-  virtual void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
-                                                const Vector &Efield, double distance, Vector &globalTransport,
-                                                DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
-                                                Vector &n_sp);
-  MFEM_HOST_DEVICE virtual void ComputeSourceTransportProperties(const double *state, const double *Up,
-                                                                 const double *gradUp, const double *Efield,
-                                                                 double distance, double *globalTransport,
-                                                                 double *speciesTransport, double *diffusionVelocity,
-                                                                 double *n_sp);
+  void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
+                                      double radius, double distance, Vector &transportBuffer,
+                                      DenseMatrix &diffusionVelocity) final;
+  MFEM_HOST_DEVICE void ComputeFluxTransportProperties(const double *state, const double *gradUp,
+                                                       const double *Efield, double radius, double distance,
+                                                       double *transportBuffer, double *diffusionVelocity) final;
+  void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
+                                        const Vector &Efield, double distance, Vector &globalTransport,
+                                        DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
+                                        Vector &n_sp) final;
+  MFEM_HOST_DEVICE void ComputeSourceTransportProperties(const double *state, const double *Up,
+                                                         const double *gradUp, const double *Efield,
+                                                         double distance, double *globalTransport,
+                                                         double *speciesTransport, double *diffusionVelocity,
+                                                         double *n_sp) final;
 
-  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) final;
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, const double *gradUp,
-                                       double radius, double distance, double *visc) override;
+                                       double radius, double distance, double *visc) final;
 };
 
 MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double *conserved, const double *primitive,
@@ -92,17 +92,17 @@ MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double 
 
   const double rho = conserved[0];
 
-  // Compute divergence
-  double divV = 0.;
-  for (int i = 0; i < dim; i++) {
-    divV += gradUp[(1 + i) + i * num_equation];
-  }
+  // // Compute divergence
+  // double divV = 0.;
+  // for (int i = 0; i < dim; i++) {
+  //   divV += gradUp[(1 + i) + i * num_equation];
+  // }
 
   // If axisymmetric
   double ur = 0;
   if (nvel_ != dim) {
     ur = primitive[1];
-    if (radius > 0) divV += ur / radius;
+  //   if (radius > 0) divV += ur / radius;
   }
 
   // eddy viscosity

@@ -100,7 +100,7 @@ endif
 if HIP_ENABLED
 libtps_la_LIBADD    += $(HIP_LDFLAGS)
 # Need link to have -fgpu-rdc.  Protect with -Xcompiler to libtool does not strip.
-libtps_la_LDFLAGS += -Xcompiler -fgpu-rdc
+libtps_la_LDFLAGS += -Xcompiler -fgpu-rdc -Xcompiler -Wno-unused-command-line-argument
 endif
 
 if MASA_ENABLED

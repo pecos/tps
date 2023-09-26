@@ -180,7 +180,7 @@ class QuasiMagnetostaticSolver3D : public QuasiMagnetostaticSolverBase {
    *  Build the source current function and do a divergence free
    *  projection to form the RHS
    */
-  void InitializeCurrent();
+  void InitializeCurrent() override;
 
   void parseSolverOptions() override;
 
@@ -196,7 +196,7 @@ class QuasiMagnetostaticSolver3D : public QuasiMagnetostaticSolverBase {
   /** Does nothing */
   void solveEnd() override;
 
-  mfem::ParFiniteElementSpace *getFESpace() { return pspace_; }
+  mfem::ParFiniteElementSpace *getFESpace() override { return pspace_; }
   void setStoreE(bool storeE) override;
 
   double elementJouleHeating(const FiniteElement &el, ElementTransformation &Tr, const Vector &elfun) override;
@@ -244,7 +244,7 @@ class QuasiMagnetostaticSolverAxiSym : public QuasiMagnetostaticSolverBase {  //
    *
    *  Build the source current function
    */
-  void InitializeCurrent();
+  void InitializeCurrent() override;
 
   void parseSolverOptions() override;
 
@@ -260,7 +260,7 @@ class QuasiMagnetostaticSolverAxiSym : public QuasiMagnetostaticSolverBase {  //
   /** Does nothing */
   void solveEnd() override;
 
-  mfem::ParFiniteElementSpace *getFESpace() { return Atheta_space_; }
+  mfem::ParFiniteElementSpace *getFESpace() override { return Atheta_space_; }
   void setStoreE(bool storeE) override;
 
   double elementJouleHeating(const FiniteElement &el, ElementTransformation &Tr, const Vector &elfun) override;

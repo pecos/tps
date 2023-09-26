@@ -169,13 +169,14 @@ void CycleAvgJouleCoupling::initializeInterpolationData() {
 void CycleAvgJouleCoupling::interpConductivityFromFlowToEM() {
   const bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Interpolating conductivity to EM mesh.\n");
+
+#ifdef HAVE_GSLIB
   const ParMesh *em_mesh = qmsa_solver_->getMesh();
   const ParFiniteElementSpace *em_fespace = qmsa_solver_->getFESpace();
 
   const int NE = em_mesh->GetNE();
   const int dim = em_mesh->Dimension();
 
-#ifdef HAVE_GSLIB
   // Generate list of points where the grid function will be evaluated.
   Vector vxyz;
 
@@ -273,9 +274,10 @@ void CycleAvgJouleCoupling::interpolationPoints(Vector &vxyz, int n_interp_nodes
 void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
   const bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Interpolating Joule heating to flow mesh.\n");
-  const ParFiniteElementSpace *flow_fespace = flow_solver_->GetFESpace();
 
 #ifdef HAVE_GSLIB
+  const ParFiniteElementSpace *flow_fespace = flow_solver_->GetFESpace();
+
   // Generate list of points where the grid function will be evaluated.
   Vector vxyz;
   interpolationPoints(vxyz, n_flow_interp_nodes_, flow_fespace);

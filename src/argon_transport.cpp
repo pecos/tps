@@ -520,8 +520,8 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::GetViscosities(const double *conser
                                                             double *visc) {
   double n_sp[3], X_sp[3], Y_sp[3];
   mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
-  double nTotal = 0.0;
-  for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp[sp];
+  // double nTotal = 0.0;
+  // for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp[sp];
 
   double Te = (twoTemperature_) ? primitive[num_equation - 1] : primitive[nvel_ + 1];
   double Th = primitive[nvel_ + 1];
@@ -991,8 +991,8 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::GetViscosities(const double *conser
                                                             double *visc) {
   double n_sp[gpudata::MAXSPECIES], X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES];
   mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
-  double nTotal = 0.0;
-  for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp[sp];
+  // double nTotal = 0.0;
+  // for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp[sp];
 
   collisionInputs collInputs = computeCollisionInputs(primitive, n_sp);
 

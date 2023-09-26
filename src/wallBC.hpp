@@ -87,18 +87,18 @@ class WallBC : public BoundaryCondition {
   WallType getType() { return wallType_; }
 
   void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, double delta,
-                      double distance, Vector &bdrFlux);
+                      double distance, Vector &bdrFlux) override;
   void computeBdrPrimitiveStateForGradient(const Vector &primIn, Vector &primBC) const override;
 
-  virtual void initBCs();
+  void initBCs() override;
 
-  virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up) {}
+  void updateMean(IntegrationRules *intRules, ParGridFunction *Up) override {}
 
   // functions for BC integration on GPU
-  virtual void integrationBC(Vector &y,  // output
-                             const Vector &x, const elementIndexingData &elem_index_data, ParGridFunction *Up,
-                             ParGridFunction *gradUp, const boundaryFaceIntegrationData &boundary_face_data,
-                             const int &maxIntPoints, const int &maxDofs);
+  void integrationBC(Vector &y,  // output
+                     const Vector &x, const elementIndexingData &elem_index_data, ParGridFunction *Up,
+                     ParGridFunction *gradUp, const boundaryFaceIntegrationData &boundary_face_data,
+                     const int &maxIntPoints, const int &maxDofs) override;
 
   void integrateWalls_gpu(Vector &y,  // output
                           const Vector &x, const elementIndexingData &elem_index_data,

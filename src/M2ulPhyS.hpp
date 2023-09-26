@@ -457,9 +457,9 @@ class M2ulPhyS : public TPS::Solver {
 
   // tps2Boltzmann interface (implemented in M2ulPhyS2Boltzmann.cpp)
   /// Push solver variables to interface
-  void push(TPS::Tps2Boltzmann &interface);
+  void push(TPS::Tps2Boltzmann &interface) override;
   /// Fetch solver variables from interface
-  void fetch(TPS::Tps2Boltzmann &interface);
+  void fetch(TPS::Tps2Boltzmann &interface) override;
 
   // Exit code access
   void SetStatus(int code) {

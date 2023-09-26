@@ -76,17 +76,17 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
   const double rho = state[0];
   // const double Th = primitiveState[nvel_ + 1];
 
-  // Compute divergence
-  double divV = 0.;
-  for (int i = 0; i < dim; i++) {
-    divV += gradUp[(1 + i) + i * num_equation];
-  }
+  // // Compute divergence
+  // double divV = 0.;
+  // for (int i = 0; i < dim; i++) {
+  //   divV += gradUp[(1 + i) + i * num_equation];
+  // }
 
   // If axisymmetric
   double ur = 0;
   if (nvel_ != dim) {
     ur = primitiveState[1];
-    if (radius > 0) divV += ur / radius;
+    // if (radius > 0) divV += ur / radius;
   }
 
   // eddy viscosity
