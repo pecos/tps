@@ -151,7 +151,7 @@ jobs:
       - name: Bootstrap
         run:  module restore tps-gpu-cpu; ./bootstrap
       - name: Configure
-        run: module restore tps-gpu-cpu; ./configure --enable-pybind11 --enable-gpu-cpu
+        run: module restore tps-gpu-cpu; ./configure CXXFLAGS="-g -O2 -Wall -Wno-nonnull -Werror" --enable-pybind11 --enable-gpu-cpu
       - name: Make
         run: module restore tps-gpu-cpu; make -j 2
       - name: Tests
@@ -159,7 +159,7 @@ jobs:
       - name: Distclean
         run:  make distclean
       - name: VPATH configure
-        run:  mkdir build; cd build; module restore tps-gpu-cpu; ../configure --enable-pybind11 --enable-gpu-cpu
+        run:  mkdir build; cd build; module restore tps-gpu-cpu; ../configure CXXFLAGS="-g -O2 -Wall -Wno-nonnull -Werror" --enable-pybind11 --enable-gpu-cpu
       - name: VPATH make
         run:  cd build; module restore tps-gpu-cpu; make -j 2
       - name: VPATH tests
