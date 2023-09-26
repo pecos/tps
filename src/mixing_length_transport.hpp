@@ -62,16 +62,15 @@ class MixingLengthTransport : public TransportProperties {
   void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
                                       double radius, double distance, Vector &transportBuffer,
                                       DenseMatrix &diffusionVelocity) final;
-  MFEM_HOST_DEVICE void ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                       const double *Efield, double radius, double distance,
-                                                       double *transportBuffer, double *diffusionVelocity) final;
+  MFEM_HOST_DEVICE void ComputeFluxTransportProperties(const double *state, const double *gradUp, const double *Efield,
+                                                       double radius, double distance, double *transportBuffer,
+                                                       double *diffusionVelocity) final;
   void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
                                         const Vector &Efield, double distance, Vector &globalTransport,
                                         DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
                                         Vector &n_sp) final;
-  MFEM_HOST_DEVICE void ComputeSourceTransportProperties(const double *state, const double *Up,
-                                                         const double *gradUp, const double *Efield,
-                                                         double distance, double *globalTransport,
+  MFEM_HOST_DEVICE void ComputeSourceTransportProperties(const double *state, const double *Up, const double *gradUp,
+                                                         const double *Efield, double distance, double *globalTransport,
                                                          double *speciesTransport, double *diffusionVelocity,
                                                          double *n_sp) final;
 
@@ -102,7 +101,7 @@ MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double 
   double ur = 0;
   if (nvel_ != dim) {
     ur = primitive[1];
-  //   if (radius > 0) divV += ur / radius;
+    //   if (radius > 0) divV += ur / radius;
   }
 
   // eddy viscosity
