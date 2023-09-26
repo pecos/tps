@@ -121,7 +121,7 @@ jobs:
       - name: Bootstrap
         run:  module restore tps-gpu; ./bootstrap
       - name: Configure
-        run: module restore tps-gpu; ./configure --enable-pybind11 --enable-gpu-hip HIP_ARCH=gfx803
+        run: module restore tps-gpu; ./configure CXXFLAGS="-Wall -Wno-gpu-maybe-wrong-side -Wno-unused-private-field -Wno-pessimizing-move -Werror" --enable-pybind11 --enable-gpu-hip HIP_ARCH=gfx803
       - name: Make
         run: module restore tps-gpu; make -j 2
       - name: Distclean
