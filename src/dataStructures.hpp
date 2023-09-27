@@ -128,6 +128,8 @@ enum SpeciesPrimitiveType { MASS_FRACTION, MOLE_FRACTION, NUMBER_DENSITY, NUM_SP
 enum boundaryCategory { INLET, OUTLET, WALL, NUM_BC_CATEGORIES };
 
 enum InletType {
+  UNI_DENS_VEL,      // uniform inlet with density and vel specified
+  INTERPOLATE,       // from an external data file
   SUB_DENS_VEL,      // Subsonic inlet specified by the density and velocity components
   SUB_DENS_VEL_NR,   // Non-reflecting subsonic inlet specified by the density and velocity components
   SUB_VEL_CONST_ENT  // Subsonic non-reflecting. Specified vel, keeps entropy constant
