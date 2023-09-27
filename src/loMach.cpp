@@ -29,8 +29,11 @@ void CopyDBFIntegrators(ParBilinearForm *src, ParBilinearForm *dst);
 void accel(const Vector &x, double t, Vector &f);
 void vel_ic(const Vector &coords, double t, Vector &u);
 void vel_wall(const Vector &x, double t, Vector &u);
+void vel_inlet(const Vector &x, double t, Vector &u);
 double temp_ic(const Vector &coords, double t);
 double temp_wall(const Vector &x, double t);
+double temp_inlet(const Vector &x, double t);
+double pres_inlet(const Vector &x, double p);
 void vel_channelTest(const Vector &coords, double t, Vector &u);
 
 
@@ -143,7 +146,7 @@ void LoMachSolver::initialize() {
 
    // get for dry air
    Rgas = 287.0;
-   Pr = 1.2;
+   Pr = 0.76;
    Cp = 1.0;
    gamma = 1.4;
 
@@ -206,12 +209,12 @@ void LoMachSolver::initialize() {
    Mesh mesh = Mesh(loMach_opts_.mesh_file.c_str());
    Mesh *mesh_ptr = &mesh;
    Mesh *serial_mesh = &mesh;   
-   //if (verbose) grvy_printf(ginfo, "Initial mesh read...\n");
+   if (verbose) grvy_printf(ginfo, "Initial mesh read...\n");
    /**/
    
    // Create the periodic mesh using the vertex mapping defined by the translation vectors
    Mesh periodic_mesh = Mesh::MakePeriodic(mesh,mesh.CreatePeriodicVertexMapping(translations));
-   //if (verbose) grvy_printf(ginfo, "Mesh made periodic...\n");         
+   if (verbose) grvy_printf(ginfo, "Mesh made periodic...\n");         
 
    // HACK HACK HACK HARD CODE
    nvel = 3;
@@ -454,16 +457,22 @@ void LoMachSolver::initialize() {
   /*
   distance_ = NULL;
   GridFunction *serial_distance = NULL;
-  if (config.compute_distance) {
-    order = config.GetSolutionOrder();
-    dim = serial_mesh->Dimension();
-    basisType = config.GetBasisType();
-    DG_FECollection *tmp_fec = NULL;
-    if (basisType == 0) {
-      tmp_fec = new DG_FECollection(order, dim, BasisType::GaussLegendre);
-    } else if (basisType == 1) {
-      tmp_fec = new DG_FECollection(order, dim, BasisType::GaussLobatto);
-    }
+  //if (config.compute_distance) {
+  {
+    //order = config.GetSolutionOrder();
+    //dim = serial_mesh->Dimension();
+    //basisType = config.GetBasisType();
+    //DG_FECollection *tmp_fec = NULL;
+    //if (basisType == 0) {
+    //  tmp_fec = new DG_FECollection(order, dim, BasisType::GaussLegendre);
+    //} else if (basisType == 1) {
+    //  tmp_fec = new DG_FECollection(order, dim, BasisType::GaussLobatto);
+    //}w
+
+    order = loMach_opts_.uOrder;
+    dim = serial_mesh->Dimension();    
+    H1_FECollection *tmp_fec = NULL;    
+    tmp_fec = new H1_FECollection(order, dim);    
 
     // Serial FE space for scalar variable
     FiniteElementSpace *serial_fes = new FiniteElementSpace(serial_mesh, tmp_fec);
@@ -483,7 +492,8 @@ void LoMachSolver::initialize() {
       serial_mesh->SetCurvature(1);
     }
 
-    FiniteElementSpace *tmp_dfes = new FiniteElementSpace(serial_mesh, tmp_fec, dim, Ordering::byNODES);
+    //FiniteElementSpace *tmp_dfes = new FiniteElementSpace(serial_mesh, tmp_fec, dim, Ordering::byNODES);
+    FiniteElementSpace *tmp_dfes = new FiniteElementSpace(serial_mesh, tmp_fec, dim);    
     GridFunction coordinates(tmp_dfes);
     serial_mesh->GetNodes(coordinates);
 
@@ -511,7 +521,7 @@ void LoMachSolver::initialize() {
    // 2) Prepare the required finite elements
    //-----------------------------------------------------
    
-   // velocity
+   // velocity (DG_FECollection?)
    vfec = new H1_FECollection(order, dim);
    vfes = new ParFiniteElementSpace(pmesh, vfec, dim);
 
@@ -547,7 +557,10 @@ void LoMachSolver::initialize() {
       pres_ess_attr = 0;
 
       temp_ess_attr.SetSize(pmesh->bdr_attributes.Max());
-      temp_ess_attr = 0;            
+      temp_ess_attr = 0;
+
+      //vel4P_ess_attr.SetSize(pmesh->bdr_attributes.Max());
+      //vel4P_ess_attr = 0;      
    }
    if (verbose) grvy_printf(ginfo, "Spaces constructed...\n");   
    
@@ -686,12 +699,20 @@ void LoMachSolver::initialize() {
    Text.SetSize(tfes_truevsize);   
    Text_bdr.SetSize(tfes_truevsize);   
    Text_gf.SetSpace(tfes);
-   t_bdr.SetSize(tfes_truevsize);   
+   t_bdr.SetSize(tfes_truevsize);
+
+   Pext_bdr.SetSize(pfes_truevsize);   
+   Pext_gf.SetSpace(pfes);
+   p_bdr.SetSize(pfes_truevsize);      
    
    resT.SetSize(tfes_truevsize);
    tmpR0.SetSize(tfes_truevsize);
    tmpR0b.SetSize(tfes_truevsize);
-   tmpR0c.SetSize(tfes_truevsize);      
+   tmpR0c.SetSize(tfes_truevsize);
+   resT = 0.0;
+   tmpR0 = 0.0;
+   tmpR0b = 0.0;
+   tmpR0c = 0.0;
    
    Tn_gf.SetSpace(tfes);
    Tn_gf = 298.0; // fix hardcode
@@ -707,6 +728,15 @@ void LoMachSolver::initialize() {
 
    viscSml.SetSize(tfes_truevsize);
    viscSml = 1.0e-12;
+   viscMultSml.SetSize(tfes_truevsize);
+   viscMultSml = 1.0e-15;
+
+   //subgridVisc_gf.SetSpace(tfes);   
+   subgridViscSml.SetSize(tfes_truevsize);
+   subgridViscSml = 1.0e-15;
+
+   gridScaleSml.SetSize(tfes_truevsize);
+   gridScaleSml = 0.0;      
    
    // density, not actually solved for directly
    rn.SetSize(rfes_truevsize);
@@ -818,6 +848,86 @@ void LoMachSolver::initialize() {
   if (verbose) grvy_printf(ginfo, " element size found...\n");      
 
   
+  // Build grid size vector and grid function
+  bufferGridScale = new ParGridFunction(tfes);
+  ParGridFunction dofCount(tfes);
+  {
+    
+    double *data = bufferGridScale->HostReadWrite();
+    double *count = dofCount.HostReadWrite();
+    for (int i = 0; i < tfes->GetNDofs(); i++) {
+      data[i] = 0.0;
+      count[i] = 0.0;      
+    }
+    
+    for (int el = 0; el < pmesh->GetNE(); el++) {
+      
+      ElementTransformation *Tr = tfes->GetElementTransformation(el);      
+      if (Tr != NULL) {
+        double delta, d1;
+        Array<int> vdofs;	
+        delta = pmesh->GetElementSize(Tr->ElementNo, 1);
+        tfes->GetElementVDofs(el, vdofs);
+	int lDofs = vdofs.Size();
+	for (int n = 0; n < lDofs; n++) {
+	  int iDof = vdofs[n];	  
+          for (int i = 0; i < tfes->GetNDofs(); i++) {
+	    if (iDof == i) {
+              data[i] += delta;
+              count[i] += 1.0;  
+	    }
+	  }	  
+        }
+	
+      }
+    }
+
+    for (int i = 0; i < tfes->GetNDofs(); i++) {
+      if (count[i] >  0.0) { data[i] = data[i] / count[i]; }
+    }
+
+    bufferGridScale->GetTrueDofs(gridScaleSml);
+    
+  }
+  
+
+  // Determine domain bounding box size
+  ParGridFunction coordsVert(tfes);
+  pmesh->GetVertices(coordsVert);
+  int nVert = coordsVert.Size() / dim;
+  {
+    double local_xmin = 1.0e18;
+    double local_ymin = 1.0e18;
+    double local_zmin = 1.0e18;
+    double local_xmax = -1.0e18;
+    double local_ymax = -1.0e18;
+    double local_zmax = -1.0e18;
+    for (int n = 0; n < nVert; n++) {
+      auto hcoords = coordsVert.HostRead();
+      double coords[3];
+      for (int d = 0; d < dim; d++) {
+        coords[d] = hcoords[n + d * nVert];
+      }
+      local_xmin = min(coords[0], local_xmin);
+      local_ymin = min(coords[1], local_ymin);
+      if (dim == 3) {
+        local_zmin = min(coords[2], local_zmin);
+      }
+      local_xmax = max(coords[0], local_xmax);
+      local_ymax = max(coords[1], local_ymax);
+      if (dim == 3) {
+        local_zmax = max(coords[2], local_zmax);
+      }
+    }
+    MPI_Allreduce(&local_xmin, &xmin, 1, MPI_DOUBLE, MPI_MIN, pmesh->GetComm());
+    MPI_Allreduce(&local_ymin, &ymin, 1, MPI_DOUBLE, MPI_MIN, pmesh->GetComm());
+    MPI_Allreduce(&local_zmin, &zmin, 1, MPI_DOUBLE, MPI_MIN, pmesh->GetComm());
+    MPI_Allreduce(&local_xmax, &xmax, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
+    MPI_Allreduce(&local_ymax, &ymax, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
+    MPI_Allreduce(&local_zmax, &zmax, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
+  }
+  
+  
   // ADD Up and U FILLER
   
   // estimate initial dt => how the hell does this work?
@@ -836,7 +946,8 @@ void LoMachSolver::initialize() {
 void LoMachSolver::Setup(double dt)
 {
 
-  //partial_assembly = true; // not working?
+   // HARD CODE
+   partial_assembly = true; // not working?
    //partial_assembly = false;
    //if (verbose) grvy_printf(ginfo, "in Setup...\n");
    /*
@@ -849,7 +960,24 @@ void LoMachSolver::Setup(double dt)
    */
 
    //int dim = pmesh->Dimension();      
+
+   int Vdof = vfes->GetNDofs(); //vfes->GetVSize();   
+   int Pdof = pfes->GetNDofs(); //pfes->GetVSize();
+   int Tdof = tfes->GetNDofs(); //tfes->GetVSize();
+   int Ndof = nfes->GetNDofs();   
+
+   //int Vdof = vfes->GetTrueVSize();   
+   //int Pdof = pfes->GetTrueVSize();
+   //int Tdof = tfes->GetTrueVSize();
    
+   int VdofInt = vfes->GetTrueVSize();   
+   int PdofInt = pfes->GetTrueVSize();
+   int TdofInt = tfes->GetTrueVSize();
+   int NdofInt = nfes->GetTrueVSize();   
+
+   //bufferPM0 = new ParGridFunction(tfes);
+   //bufferPM1 = new ParGridFunction(pfes);      
+  
    // adding bits from old main here
    // Set the initial condition.
    //ParGridFunction *r_gf = GetCurrentDensity();   
@@ -897,10 +1025,139 @@ void LoMachSolver::Setup(double dt)
    if (rank0_ ) {
      std::cout << " Acceleration: " << accel_vec[0] << " " << accel_vec[1] << " " << accel_vec[2] << endl;
    }
+
+
+   // Boundary conditions
+   ConstantCoefficient t_bc_coef;
+   Array<int> attr(pmesh->bdr_attributes.Max());   
+   Array<int> Tattr(pmesh->bdr_attributes.Max());
+   Array<int> Pattr(pmesh->bdr_attributes.Max());   
    
-   // velocity bc
+   // inlet bc
+   /**/
+   attr = 0.0;
+   Tattr = 0.0;
+   Pattr = 0.0;
+   for (int i = 0; i < numInlets; i++) {
+     for (int iFace = 1; iFace < pmesh->bdr_attributes.Max()+1; iFace++) {     
+       if (iFace == config.inletPatchType[i].first) {
+         attr[iFace-1] = 1;
+         Tattr[iFace-1] = 1;
+         //Pattr[iFace-1] = 1;	 	 
+       }
+     }
+   }
+
+   for (int i = 0; i < numInlets; i++) {   
+     if (config.inletPatchType[i].second == InletType::UNI_DENS_VEL) {
+       if (rank0_) std::cout << "Caught uniform inlet conditions " << endl;   
+       
+       // set directly from input
+       Vector inlet_vec(3);
+       double inlet_temp;
+       double inlet_pres;            
+       for (int i = 0; i < dim; i++) {inlet_vec[i] = config.velInlet[i];}
+       inlet_temp = ambientPressure / (Rgas*config.densInlet);
+       inlet_pres = ambientPressure;       
+       bufferInlet_ubc = new VectorConstantCoefficient(inlet_vec);
+       bufferInlet_tbc = new ConstantCoefficient(inlet_temp);
+       bufferInlet_pbc = new ConstantCoefficient(inlet_pres);       
+       //AddVelDirichletBC(bufferInlet_ubc, attr);
+       //AddTempDirichletBC(bufferInlet_tbc, Tattr);
+       //AddPresDirichletBC(bufferInlet_pbc, Pattr);              
+       AddVelDirichletBC(vel_inlet, attr);
+       //AddVel4PDirichletBC(vel_inlet, attr);       
+       AddTempDirichletBC(temp_inlet, Tattr);
+       //AddPresDirichletBC(pres_inlet, Pattr);       
+     
+     } else if (config.inletPatchType[i].second == InletType::INTERPOLATE) {
+       if (rank0_) std::cout << "Caught interpolated inlet conditions " << endl;          
+
+       // interpolate from external file
+       buffer_uInlet = new ParGridFunction(vfes);
+       buffer_tInlet = new ParGridFunction(tfes);      
+       interpolateInlet();
+       if (rank0_) std::cout << "Interpolation complete... " << endl;
+       uInletField = new VectorGridFunctionCoefficient(buffer_uInlet);   
+       AddVelDirichletBC(uInletField, attr);
+
+       // testing, just so intial step contains this for inspection
+       /*
+       {
+         double *Udata = buffer_uInlet->HostReadWrite();
+         double *data = un_gf.HostReadWrite();   
+         for (int i = 0; i < Vdof; i++) {     
+           data[i] = Udata[i];
+         }
+       }
+       */
+       
+       if (rank0_) std::cout << "Interpolated velocity conditions applied " << endl;       
+       tInletField = new GridFunctionCoefficient(buffer_tInlet);   
+       AddTempDirichletBC(tInletField, Tattr);
+       if (rank0_) std::cout << "Interpolated temperature conditions applied " << endl;       
+
+     }     
+   }
+   if (rank0_) std::cout << "Inlet bc's completed: " << numInlets << endl;   
+   /**/
+
+
+   // outlet bc
+   /**/
+   attr = 0.0;
+   Tattr = 0.0;
+   Pattr = 0.0;
+   for (int i = 0; i < numOutlets; i++) {
+     for (int iFace = 1; iFace < pmesh->bdr_attributes.Max()+1; iFace++) {     
+       if (iFace == config.outletPatchType[i].first) {
+         Pattr[iFace-1] = 1;	 	 
+       }
+     }
+   }
+
+   for (int i = 0; i < numOutlets; i++) {   
+     if (config.outletPatchType[i].second == OutletType::SUB_P) {
+       if (rank0_) std::cout << "Caught pressure outlet bc" << endl;   
+       
+       // set directly from input
+       double outlet_pres;            
+       outlet_pres = config.outletPressure;       
+       bufferOutlet_pbc = new ConstantCoefficient(outlet_pres);       
+       AddPresDirichletBC(bufferOutlet_pbc, Pattr);
+
+       // field = > need to updateat every step
+       /*
+       buffer_pOutlet = new ParGridFunction(pfes);
+       pOutletField = new GridFunctionCoefficient(buffer_pOutlet);
+       ParGridFunction coordsDof(pfes);
+       pmesh->GetNodes(coordsDof);
+       double *data = pOutletField->HostWrite();
+       double *Udata = u_gf.HostWrite();
+       double *Tdata = T_gf.HostWrite();       
+       for (int n = 0; n < pfes->GetNDofs(); n++) {
+         auto hcoords = coordsDof.HostRead();
+         double coords[3];
+	 double Umag = 0.0;
+	 double rho;
+         for (int d = 0; d < dim; d++) { coords[d] = hcoords[n + d * vfes->GetNDofs()]; }
+         for (int d = 0; d < dim; d++) { Umag += Udata[n + d * vfes->GetNDofs()]; }
+	 Umag = std::sqrt(Umag);	 
+	 rho = thermoPressure / (Rgas * Tdata[i]);
+         data[n] = outlet_pres - 0.5 * rho * Umag;
+       }      
+       AddPresDirichletBC(pOutletField, Pattr);
+       */
+       
+     }     
+   }
+   if (rank0_) std::cout << "Outlet bc's completed: " << numOutlets << endl;   
+   /**/
+
+   
+   
+   // velocity wall bc
    Vector zero_vec(3); zero_vec = 0.0;
-   Array<int> attr(pmesh->bdr_attributes.Max());
    attr = 0.0;
    //std::cout << "attr bdr size: " << pmesh->bdr_attributes.Max() << endl;   
 
@@ -924,52 +1181,41 @@ void LoMachSolver::Setup(double dt)
        }
      }
    }
-   AddVelDirichletBC(vel_wall, attr);
+   AddVelDirichletBC(vel_wall, attr);   
    //AddVelDirichletBC(buffer_ubc, attr);
+   //AddVel4PDirichletBC(vel_wall, attr);
+   if (rank0_) std::cout << "Velocity wall bc completed: " << endl;   
    /**/
    //std::cout << "Check 3..." << std::endl;    
 
    
-   Vector wallTemp(numWalls);
-   ConstantCoefficient t_bc_coef;
-   //ConstantCoefficient t_bc_coef(numWalls);
-   //VectorConstantCoefficient t_bc_coef(numWalls) ;
-   for (int i = 0; i < numWalls; i++) {
-     wallTemp[i] = config.wallBC[i].Th;
-   }
-   Array<int> Tattr(pmesh->bdr_attributes.Max());
+   // temperature wall bc
    Tattr = 0;
-   //ConstantCoefficient t_bc_coef(wallTemp);   
-   //buffer_tbc = new VectorConstantCoefficient(wallTemp);      
    /*
    Tattr[1] = 1;
    Tattr[3] = 1;
    AddTempDirichletBC(temp_wall, Tattr);
    //AddTempDirichletBC(&t_bc_coef, Tattr);
    */
-   /**/
    //for (int i = 0; i < config.wallPatchType.size(); i++) {
    for (int i = 0; i < numWalls; i++) {
      t_bc_coef.constant = config.wallBC[i].Th;
      for (int iFace = 1; iFace < pmesh->bdr_attributes.Max()+1; iFace++) {     
-       if (config.wallPatchType[i].second != WallType::INV) { // should only be isothermal
+       if (config.wallPatchType[i].second == WallType::VISC_ISOTH) {	   	 
          if (iFace == config.wallPatchType[i].first) {
             Tattr[iFace-1] = 1;	 
-            //AddTempDirichletBC(&t_bc_coef, Tattr);
-            //AddTempDirichletBC(wallTemp, Tattr); 	    
          }
        }
      }
    }
-   //buffer_tbc = new ConstantCoefficient(t_bc_coef.constant);
    buffer_tbc = new ConstantCoefficient(t_bc_coef);   
    AddTempDirichletBC(temp_wall, Tattr); // FIX FIX FIX
    //AddTempDirichletBC(buffer_tbc, Tattr);
-   //AddTempDirichletBC(t_bc_coef, Tattr);
-   if (rank0_) std::cout << "***NUMBER OF WALLS: " << numWalls << endl;
-   /**/
+   if (rank0_) std::cout << "Temp wall bc completed: " << numWalls << endl;
+   //if (verbose) grvy_printf(ginfo, "Got sizes...\n");      
    //std::cout << "Check 4..." << std::endl;  
 
+   
    // returning to regular setup   
    sw_setup.Start();
 
@@ -977,24 +1223,9 @@ void LoMachSolver::Setup(double dt)
    pfes->GetEssentialTrueDofs(pres_ess_attr, pres_ess_tdof);
    tfes->GetEssentialTrueDofs(temp_ess_attr, temp_ess_tdof);
    //nfes->GetEssentialTrueDofs(vel_ess_attr, vel_ess_tdof);    //  this may break?
-   //std::cout << "Check 5..." << std::endl;     
+   //vfes->GetEssentialTrueDofs(vel4P_ess_attr, vel4P_ess_tdof);   
+   if (rank0_) std::cout << "Essential true dof step" << endl;
 
-   int Vdof = vfes->GetNDofs(); //vfes->GetVSize();   
-   int Pdof = pfes->GetNDofs(); //pfes->GetVSize();
-   int Tdof = tfes->GetNDofs(); //tfes->GetVSize();
-   int Ndof = nfes->GetNDofs();   
-
-   //int Vdof = vfes->GetTrueVSize();   
-   //int Pdof = pfes->GetTrueVSize();
-   //int Tdof = tfes->GetTrueVSize();
-   
-   int VdofInt = vfes->GetTrueVSize();   
-   int PdofInt = pfes->GetTrueVSize();
-   int TdofInt = tfes->GetTrueVSize();
-   int NdofInt = nfes->GetTrueVSize();   
-
-   //bufferPM0 = new ParGridFunction(tfes);
-   //bufferPM1 = new ParGridFunction(pfes);      
    
    Array<int> empty;
 
@@ -1008,9 +1239,9 @@ void LoMachSolver::Setup(double dt)
    //const IntegrationRule &ir_nli = gll_rules.Get(vfes->GetFE(0)->GetGeomType(), 3 * norder - 1);
    const IntegrationRule &ir_pi = gll_rules.Get(pfes->GetFE(0)->GetGeomType(), 2 * porder);   
    const IntegrationRule &ir_i  = gll_rules.Get(tfes->GetFE(0)->GetGeomType(), 2 * order);
-   //std::cout << "Check 6..." << std::endl;     
+   if (rank0_) std::cout << "Integration rules set" << endl;   
 
-
+   
    // add gravitational term term
    Vector gravity(3);
    if ( config.isGravity ) {
@@ -1111,6 +1342,25 @@ void LoMachSolver::Setup(double dt)
    Sp_form->FormSystemMatrix(pres_ess_tdof, Sp);
    //std::cout << "Check 10..." << std::endl;  
 
+
+   // pressure boundary terms => patterning off existing stuff
+   /*
+   Pext_gfcoeff = new GridFunctionCoefficient(&Pext_gf);
+   Pext_bdr_form = new ParLinearForm(pfes);
+   auto *Pext_blfi = new BoundaryLFIntegrator(*Pext_gfcoeff);
+   if (numerical_integ) { Pext_blfi->SetIntRule(&ir_i); }
+   Pext_bdr_form->AddBoundaryIntegrator(Pext_blfi, pres_ess_attr);
+   p_bdr_form = new ParLinearForm(pfes);
+   for (auto &pres_dbc : pres_dbcs)
+   {
+      auto *Pbdr_blfi = new BoundaryLFIntegrator(*pres_dbc.coeff);
+      if (numerical_integ) { Pbdr_blfi->SetIntRule(&ir_i); }
+      p_bdr_form->AddBoundaryIntegrator(Pbdr_blfi, pres_dbc.attr);
+   }
+   */
+
+
+   // temperature laplacian   
    Lt_form = new ParBilinearForm(tfes);
    auto *lt_blfi = new DiffusionIntegrator;
    if (numerical_integ)
@@ -1158,9 +1408,11 @@ void LoMachSolver::Setup(double dt)
    G_form->FormRectangularSystemMatrix(empty, empty, G);
    //std::cout << "Check 12..." << std::endl;  
    
-   // viscosity field
+   // viscosity field 
    //ParGridFunction buffer2(vfes); // or pfes here?
    //bufferVisc = new ParGridFunction(vfes);
+   bufferViscMult = new ParGridFunction(tfes);           
+   bufferSubgridVisc = new ParGridFunction(tfes);        
    bufferVisc = new ParGridFunction(tfes);
    {
      double *data = bufferVisc->HostReadWrite();
@@ -1225,15 +1477,19 @@ void LoMachSolver::Setup(double dt)
    auto *ftext_bnlfi = new BoundaryNormalLFIntegrator(*FText_gfcoeff);
    if (numerical_integ) { ftext_bnlfi->SetIntRule(&ir_ni); }
    FText_bdr_form->AddBoundaryIntegrator(ftext_bnlfi, vel_ess_attr);
+   //FText_bdr_form->AddBoundaryIntegrator(ftext_bnlfi, vel4P_ess_attr);   
    // std::cout << "Check 14..." << std::endl;     
 
    //g_bdr_form = new ParLinearForm(vfes); //? was pfes
    g_bdr_form = new ParLinearForm(tfes);
    for (auto &vel_dbc : vel_dbcs)
+   //for (auto &vel4P_dbc : vel4P_dbcs)     
    {
-      auto *gbdr_bnlfi = new BoundaryNormalLFIntegrator(*vel_dbc.coeff);
-      if (numerical_integ) { gbdr_bnlfi->SetIntRule(&ir_ni); }
-      g_bdr_form->AddBoundaryIntegrator(gbdr_bnlfi, vel_dbc.attr);
+     auto *gbdr_bnlfi = new BoundaryNormalLFIntegrator(*vel_dbc.coeff);
+     //auto *gbdr_bnlfi = new BoundaryNormalLFIntegrator(*vel4P_dbc.coeff);      
+     if (numerical_integ) { gbdr_bnlfi->SetIntRule(&ir_ni); }
+     g_bdr_form->AddBoundaryIntegrator(gbdr_bnlfi, vel_dbc.attr);
+     //g_bdr_form->AddBoundaryIntegrator(gbdr_bnlfi, vel4P_dbc.attr);      
    }
    //std::cout << "Check 15..." << std::endl;     
    
@@ -1670,7 +1926,6 @@ void LoMachSolver::projectInitialSolution() {
     // next requested iter.  This avoids possibility of trying to
     // overwrite existing paraview data for the current iteration.
     
-    /////// CAUSING SEG FAULT     // HERE HERE HERE
     // if (!(tpsP_->isVisualizationMode())) paraviewColl->Save();
     
   }
@@ -2052,14 +2307,109 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      for (int i = 0; i < TdofInt; i++) {
          data[i] = thermoPressure / (Rgas * Tdata[i]);
      }
-   }   
-
-   // thermodynamic pressure for closed systems
-   if (config.isOpen != true) {     
+   }     
+   
+   // gradient of extrapolated velocity
+   {
+     int eq = 0;
+     double *dataU = Uext.HostReadWrite();
+     double *data = tmpR0.HostReadWrite();              
+     for (int i = 0; i < TdofInt; i++) {
+       data[i] = dataU[i + eq*TdofInt];
+     }
+   }     
+   G->Mult(tmpR0, tmpR1);
+   MvInv->Mult(tmpR1, gradU);
+   {
+     int eq = 1;
+     double *dataU = Uext.HostReadWrite();
+     double *data = tmpR0.HostReadWrite();              
+     for (int i = 0; i < TdofInt; i++) {
+       data[i] = dataU[i + eq*TdofInt];
+     }
+   }     
+   G->Mult(tmpR0, tmpR1);
+   MvInv->Mult(tmpR1, gradV);
+   {
+     int eq = 2;
+     double *dataU = Uext.HostReadWrite();
+     double *data = tmpR0.HostReadWrite();              
+     for (int i = 0; i < TdofInt; i++) {
+       data[i] = dataU[i + eq*TdofInt];
+     }
+   }     
+   G->Mult(tmpR0, tmpR1);
+   MvInv->Mult(tmpR1, gradW);     
+     
+   // divergence of extrapolated velocity
+   {
+     int eq = 0;
+     double *dataGradU = gradU.HostReadWrite();      
+     double *data = divU.HostReadWrite();
+     for (int i = 0; i < TdofInt; i++) {
+       data[i] = dataGradU[i + eq*TdofInt];
+     }
    }
+   {
+     int eq = 1;
+     double *dataGradU = gradV.HostReadWrite();      
+     double *data = divU.HostReadWrite();
+     for (int i = 0; i < TdofInt; i++) {
+       data[i] += dataGradU[i + eq*TdofInt];
+     }
+   }
+   {
+     int eq = 2;
+     double *dataGradU = gradW.HostReadWrite();      
+     double *data = divU.HostReadWrite();
+     for (int i = 0; i < TdofInt; i++) {
+       data[i] += dataGradU[i + eq*TdofInt];
+     }
+   }
+
+     
+   // subgrid scale model: gradUp is in (eq,dim) form
+   /**/
+   if (config.sgsModelType > 0) {
+     double *dGradU = gradU.HostReadWrite();
+     double *dGradV = gradV.HostReadWrite();
+     double *dGradW = gradW.HostReadWrite(); 
+     double *rho = rn.HostReadWrite();
+     double *delta = gridScaleSml.HostReadWrite();
+     double *data = subgridViscSml.HostReadWrite();             
+     if (config.sgsModelType == 1) {
+       for (int i = 0; i < TdofInt; i++) {     
+         double deltaP = delta[i] / ((double)order);
+         double nu_sgs = 0.;
+	 DenseMatrix gradUp;
+	 gradUp.SetSize(nvel, dim);
+	 for (int dir = 0; dir < dim; dir++) { gradUp(0,dir) = dGradU[dir]; }
+	 for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[dir]; }
+	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[dir]; }
+         sgsSmag(gradUp, deltaP, nu_sgs);
+         data[i] = rho[i] * nu_sgs;
+       }
+     } else if (config.sgsModelType == 2) {
+       for (int i = 0; i < TdofInt; i++) {     
+         double deltaP = delta[i] / ((double)order);
+         double nu_sgs = 0.;
+	 DenseMatrix gradUp;
+	 gradUp.SetSize(nvel, dim);
+	 for (int dir = 0; dir < dim; dir++) { gradUp(0,dir) = dGradU[dir]; }
+	 for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[dir]; }
+	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[dir]; }
+         sgsSigma(gradUp, deltaP, nu_sgs);
+         data[i] = rho[i] * nu_sgs;
+       }       
+     }
+     bufferSubgridVisc->SetFromTrueDofs(subgridViscSml);     
+   }
+   /**/
+   
    
    // Set current time for velocity Dirichlet boundary conditions.
    for (auto &vel_dbc : vel_dbcs) {vel_dbc.coeff->SetTime(time + dt);}
+   //for (auto &vel4P_dbc : vel4P_dbcs) {vel4P_dbc.coeff->SetTime(time + dt);}   
 
    // Set current time for pressure Dirichlet boundary conditions.
    for (auto &pres_dbc : pres_dbcs) {pres_dbc.coeff->SetTime(time + dt);}
@@ -2077,23 +2427,36 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    if (constantViscosity != true) {
      double *dataVisc = bufferVisc->HostWrite();        
      double *Tdata = Tn_gf.HostReadWrite();
+     //double *viscMult = spaceVaryViscMult->HostWrite();          
      //double *Tdata = Tn.HostReadWrite();     // TO version
      //Vector visc(2); 
      //Vector prim(nvel+2);
      double visc[2];  // TO version
-     double prim[nvel+2];     
+     double prim[nvel+2];
      for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
      for (int i = 0; i < Tdof; i++) {
        //for (int eq = 0; eq < nvel; eq++) {
          prim[1+nvel] = Tdata[i];
          transportPtr->GetViscosities(prim, prim, visc); // returns dynamic
-
 	 // kinematic needed for lhs of momentum
-         dataVisc[i] = visc[0] * (Rgas * Tdata[i]) / thermoPressure;
+         dataVisc[i] = visc[0] * (Rgas * Tdata[i]) / thermoPressure;	 
+         //dataVisc[i] = viscMult[i] * visc[0] * (Rgas * Tdata[i]) / thermoPressure;
 	 //dataVisc[i] = kin_vis;
 
      }
    }
+
+   if (config.sgsModelType > 0) {
+     double *dataSubgrid = bufferSubgridVisc->HostReadWrite();
+     double *dataVisc = bufferVisc->HostWrite();
+     for (int i = 0; i < Tdof; i++) { dataVisc[i] += dataSubgrid[i]; }     
+   }
+   
+   if (config.linViscData.isEnabled) {
+     double *viscMult = bufferViscMult->HostWrite();
+     double *dataVisc = bufferVisc->HostWrite();
+     for (int i = 0; i < Tdof; i++) { dataVisc[i] *= viscMult[i]; }
+   }     
    
    
    H_bdfcoeff.constant = bd0 / dt;
@@ -2172,7 +2535,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    N->Mult(uBnm2, Nunm2);
    */
 
-   N->Mult(uBn, Nun); 
+   N->Mult(uBn, Nun);  // add sqrt(rho) to uBn?
    //std::cout << "Check h..." << std::endl;
    
    // ab-predictor of nonliner term at {n+1}
@@ -2216,6 +2579,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    //std::cout << "Check k..." << std::endl;   
 
    // for unsteady term, compute BDF terms (known part of BDF u for full F*)
+   // can add density here directly
    {
       const double bd1idt = -bd1 / dt;
       const double bd2idt = -bd2 / dt;
@@ -2282,9 +2646,12 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 
 
    // interior-sized visc needed for p-p rhs
+   bufferVisc->GetTrueDofs(viscSml);
+   /*
    if (constantViscosity != true) {
-     double *dataViscSml = viscSml.HostReadWrite();                
-     double *Tdata = Tn.HostReadWrite();     
+     double *dataViscSml = viscSml.HostReadWrite();
+     double *Tdata = Tn.HostReadWrite();
+     //double *viscMult = spaceVaryViscMult->HostWrite();     
      //Vector visc(2);
      //Vector prim(nvel+2);
      double visc[2];  // TO version
@@ -2296,7 +2663,12 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
          dataViscSml[i] = visc[0]; // dynamic
      }
    }
-
+   if (config.linViscData.isEnabled) {
+     double *viscMult = viscMultSml.HostReadWrite();         
+     double *dataVisc = viscSml.HostReadWrite();     
+     for (int i = 0; i < TdofInt; i++) { dataVisc[i] *= viscMult[i]; }
+   }
+   */
    
    // dataVisc is full size, Lext is only TrueSize
    if (constantViscosity != true) {
@@ -2358,6 +2730,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      G->Mult(viscSml, tmpR1);
      MvInv->Mult(tmpR1, gradMu);
 
+     /* moved up...
+     
      // gradient of u_i
      {
        int eq = 0;
@@ -2417,6 +2791,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
        }
      }
 
+     */
 
      // momentum only portion, TODO: break-up loops, this will thrash
      {
@@ -2608,6 +2983,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    //std::cout << "Check p..." << std::endl;   
 
    // unsteady div term, (-) on rhs rho * gamma * Qt/dt (after div term)
+   // can add rho here directly
    /**/
    if (incompressibleSolve != true) {
      //double *dataDivU = divU.HostReadWrite();
@@ -2628,14 +3004,16 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    FText_gf.SetFromTrueDofs(FText);
    FText_bdr_form->Assemble();
    FText_bdr_form->ParallelAssemble(FText_bdr);
+   //tmpR0.Add(1.0, FText_bdr);
+   
    g_bdr_form->Assemble();
    g_bdr_form->ParallelAssemble(g_bdr);
-   tmpR0.Add(1.0, FText_bdr);
-   tmpR0.Add(-bd0 / dt, g_bdr);
+   //tmpR0.Add(-bd0 / dt, g_bdr);
 
+   // these might actually be correct after all...
    //dont get why this is not correct
-   //tmpR0.Add(-1.0, FText_bdr); // because tmpR0 is already negged
-   //tmpR0.Add(+bd0 / dt, g_bdr);
+   tmpR0.Add(-1.0, FText_bdr); // because tmpR0 is already negged
+   tmpR0.Add(+bd0 / dt, g_bdr);
    
    
    // project rhs to p-space
@@ -2807,7 +3185,20 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
          transportPtr->GetViscosities(prim, prim, visc);
 	 data[i] = visc[0] / Pr;
      }
-   }   
+   }
+
+   if (config.sgsModelType > 0) {
+     double *dataSubgrid = bufferSubgridVisc->HostReadWrite();
+     double *data = bufferAlpha->HostReadWrite();     
+     for (int i = 0; i < Tdof; i++) { data[i] += dataSubgrid[i] / Pr; }     
+   }
+   
+   if (config.linViscData.isEnabled) {
+     double *viscMult = bufferViscMult->HostWrite();
+     double *data = bufferAlpha->HostReadWrite();          
+     for (int i = 0; i < Tdof; i++) { data[i] *= viscMult[i]; }
+   }     
+   
      
    Ht_bdfcoeff.constant = bd0 / dt;
    //Ht_bdfcoeff.constant = +1.0 / dt;
@@ -2906,6 +3297,9 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    R0PX2_gf.ProjectGridFunction(Tnm2_gf);
    R0PX2_gf.GetTrueDofs(TBnm2);
    //std::cout << "Check 3..." << std::endl;
+
+
+   // HERE HERE HERE => redo this to just be u*d(T) and remove divu part later...
    
    //bufferTemp = new ParGridFunction(vfes);      
    //double *dataTemp = bufferTemp->HostReadWrite();
@@ -3029,7 +3423,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       const auto d_un_filtered_gf = un_filtered_gf.Read();
       auto d_un_gf = un_gf.ReadWrite();
       const auto filter_alpha_ = filter_alpha;
-      mfem::forall(un_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+      //mfem::forall(un_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+      MFEM_FORALL(i, un_gf.Size(),		
       {
          d_un_gf[i] = (1.0 - filter_alpha_) * d_un_gf[i]
                       + filter_alpha_ * d_un_filtered_gf[i];
@@ -3039,7 +3434,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       Tn_filtered_gf.ProjectGridFunction(Tn_NM1_gf);
       const auto d_Tn_filtered_gf = Tn_filtered_gf.Read();
       auto d_Tn_gf = Tn_gf.ReadWrite();
-      mfem::forall(Tn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+      //mfem::forall(Tn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
+      MFEM_FORALL(i, Tn_gf.Size(),			
       {
          d_Tn_gf[i] = (1.0 - filter_alpha_) * d_Tn_gf[i]
                       + filter_alpha_ * d_Tn_filtered_gf[i];
@@ -3680,6 +4076,41 @@ void LoMachSolver::AddVelDirichletBC(VecFuncT *f, Array<int> &attr)
    AddVelDirichletBC(new VectorFunctionCoefficient(pmesh->Dimension(), f), attr);
 }
 
+/*
+void LoMachSolver::AddVel4PDirichletBC(VectorCoefficient *coeff, Array<int> &attr)
+{
+   vel4P_dbcs.emplace_back(attr, coeff);
+
+   if (verbose && pmesh->GetMyRank() == 0)
+   {
+      mfem::out << "Adding Velocity Dirichlet BC to attributes ";
+      for (int i = 0; i < attr.Size(); ++i) {
+	if (attr[i] == 1) { mfem::out << i << " "; }
+      }
+      mfem::out << std::endl;
+   }
+
+   for (int i = 0; i < attr.Size(); ++i)
+   {
+      MFEM_ASSERT((vel4P_ess_attr[i] && attr[i]) == 0,"Duplicate boundary definition deteceted.");
+      if (attr[i] == 1) { vel4P_ess_attr[i] = 1; }
+   }
+}
+
+void LoMachSolver::AddVel4PDirichletBC(VecFuncT *f, Array<int> &attr)
+{
+   AddVel4PDirichletBC(new VectorFunctionCoefficient(pmesh->Dimension(), f), attr);
+}
+*/
+
+/*
+void LoMachSolver::AddVelDirichletBC(VectorGridFunctionCoefficient *coeff, Array<int> &attr)
+{
+   VectorCoefficient *vel_coeff;
+   vel_coeff = new VectorGridFunctionCoefficient(*coeff);  
+   AddVelDirichletBC(vel_coeff, attr);
+}
+*/
 
 void LoMachSolver::AddPresDirichletBC(Coefficient *coeff, Array<int> &attr)
 {
@@ -4968,7 +5399,9 @@ void LoMachSolver::parseBCInputs() {
 
   // Inlet......................................
   std::map<std::string, InletType> inletMapping;
-  inletMapping["subsonic"] = SUB_DENS_VEL;
+  inletMapping["uniform"] = UNI_DENS_VEL;
+  inletMapping["interpolate"] = INTERPOLATE;    
+  inletMapping["subsonic"] = SUB_DENS_VEL; // remove the remaining for loMach
   inletMapping["nonreflecting"] = SUB_DENS_VEL_NR;
   inletMapping["nonreflectingConstEntropy"] = SUB_VEL_CONST_ENT;
 
@@ -4987,6 +5420,10 @@ void LoMachSolver::parseBCInputs() {
       tpsP_->getRequiredVec((basepath + "/uvw").c_str(), uvw, 3);
       config.inletBC.Append(density);
       config.inletBC.Append(uvw, 3);
+      config.velInlet[0] = uvw[0];
+      config.velInlet[1] = uvw[1];
+      config.velInlet[2] = uvw[2];      
+      config.densInlet = density;
     }
     // For multi-component gas, require (numActiveSpecies)-more inputs.
     if ((config.workFluid != DRY_AIR) && (config.numSpecies > 1)) {
@@ -5027,6 +5464,7 @@ void LoMachSolver::parseBCInputs() {
     if ((type == "subsonicPressure") || (type == "nonReflectingPressure")) {
       tpsP_->getRequiredInput((basepath + "/pressure").c_str(), pressure);
       config.outletBC.Append(pressure);
+      config.outletPressure = pressure;      
     } else if ((type == "nonReflectingMassFlow") || (type == "nonReflectingPointBasedMassFlow")) {
       tpsP_->getRequiredInput((basepath + "/massFlow").c_str(), massFlow);
       config.outletBC.Append(massFlow);
@@ -5211,7 +5649,6 @@ void M2ulPhyS::packUpGasMixtureInput() {
 */
 
 
-/// HERE HERE HERE
 void LoMachSolver::initSolutionAndVisualizationVectors() {
 
   //std::cout << " In initSol&Viz..." << endl;
@@ -5454,23 +5891,40 @@ void LoMachSolver::initSolutionAndVisualizationVectors() {
   */
 
   // compute factor to multiply viscosity when this option is active
-  spaceVaryViscMult = NULL;
+  //spaceVaryViscMult = NULL;
   ParGridFunction coordsDof(vfes);
   pmesh->GetNodes(coordsDof);
+  bufferViscMult = new ParGridFunction(tfes);  
   if (config.linViscData.isEnabled) {
-    spaceVaryViscMult = new ParGridFunction(tfes);
-    double *viscMult = spaceVaryViscMult->HostWrite();
+    double *viscMult = bufferViscMult->HostWrite();
     double wgt = 0.;
     for (int n = 0; n < tfes->GetNDofs(); n++) {
-      auto hcoords = coordsDof.HostRead();  // get coords
+      auto hcoords = coordsDof.HostRead();
       double coords[3];
-      for (int d = 0; d < dim; d++) {
-        coords[d] = hcoords[n + d * vfes->GetNDofs()];
-      }
+      for (int d = 0; d < dim; d++) { coords[d] = hcoords[n + d * vfes->GetNDofs()]; }
       viscSpongePlanar(coords, wgt);
       viscMult[n] = wgt;
     }
   }
+
+  //HERE HERE HERE
+  bufferViscMult->GetTrueDofs(viscMultSml);
+  /*
+  int TdofInt = tfes->GetTrueVSize();    
+  Vector coordsVec;
+  coordsVec.SetSize(3*TdofInt);
+  Tn_gf.GetTrueDofs(coordsVec);
+  if (config.linViscData.isEnabled) {
+    double *dataViscMultSml = viscMultSml.HostReadWrite();    
+    double wgt = 0.;
+    double coords[3];    
+    for (int n = 0; n < TdofInt; n++) {   
+      for (int d = 0; d < dim; d++) { coords[d] = coordsVec[n + d * TdofInt]; }
+      viscSpongePlanar(coords, wgt);
+      dataViscMultSml[n] = wgt;
+    }
+  }
+  */
   
 
   /*
@@ -5513,6 +5967,380 @@ void LoMachSolver::initSolutionAndVisualizationVectors() {
   //paraviewColl->Save(); 
   //std::cout << " check 21..." << endl;
   */
+  
+}
+
+
+void LoMachSolver::interpolateInlet() {
+
+  //MPI_Comm bcomm = groupsMPI->getComm(patchNumber);
+  //int gSize = groupsMPI->groupSize(bcomm);
+  int myRank;
+  //MPI_Comm_rank(bcomm, &myRank);
+  MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
+  int Tdof = tfes->GetNDofs();  
+
+    string fname;
+    fname = "./inputs/inletPlane.csv";
+    const int fname_length = fname.length();
+    char* char_array = new char[fname_length + 1];
+    strcpy(char_array, fname.c_str());
+    int nCount = 0;
+    
+    // open, find size    
+    //if (groupsMPI->isGroupRoot(bcomm)) {
+    if(rank0_) {
+
+      std::cout << " Attempting to open inlet file for counting... " << fname << endl; fflush(stdout);
+
+      FILE *inlet_file;
+      //if ( inlet_file = fopen(char_array,"r") ) {
+      if ( inlet_file = fopen("./inputs/inletPlane.csv","r") ) {
+	std::cout << " ...and open" << endl; fflush(stdout);
+      }
+      else {
+        std::cout << " ...CANNOT OPEN FILE" << endl; fflush(stdout);
+      }
+      
+      char* line = NULL;
+      int ch = 0;
+      size_t len = 0;
+      ssize_t read;
+
+      std::cout << " ...starting count" << endl; fflush(stdout);
+      for (ch = getc(inlet_file); ch != EOF; ch = getc(inlet_file)) {
+        if (ch == '\n') {
+          nCount++;
+	}
+      }      
+      fclose(inlet_file);      
+      std::cout << " final count: " << nCount << endl; fflush(stdout);
+
+    }
+
+    // broadcast size
+    //MPI_Bcast(&nCount, 1, MPI_INT, 0, bcomm);
+    MPI_Bcast(&nCount, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    
+    // set size
+    struct inlet_profile {
+      double x, y, z, rho, temp, u, v, w;
+    };  
+    struct inlet_profile inlet[nCount];
+    double junk;
+    
+    // paraview slice output from mean
+    // 0)"dens",1)"rms:0",2)"rms:1",3)"rms:2",4)"rms:3",5)"rms:4",6)"rms:5",7)"temp",8)"vel:0",9)"vel:1",10)"vel:2",11)"Points:0",12)"Points:1",13)"Points:2"
+    
+    // open, read data    
+    //if (groupsMPI->isGroupRoot(bcomm)) {
+    if (rank0_) {    
+    
+      std::cout << " Attempting to read line-by-line..." << endl; fflush(stdout);
+
+      /**/
+      ifstream file;
+      file.open("./inputs/inletPlane.csv");
+      string line;
+      getline(file, line);
+      int nLines = 0;
+      while (getline(file, line)) {
+        //cout << line << endl;
+	stringstream sline(line);
+	int entry = 0;
+        while (sline.good()) {
+          string substr;
+          getline(sline, substr, ',');
+          double buffer = std::stod(substr);
+	  entry++;
+	  if (entry == 1) {
+	    inlet[nLines].rho = buffer;
+	  } else if (entry == 8) {
+	    inlet[nLines].temp = buffer;	    
+	  } else if (entry == 9) {
+	    inlet[nLines].u = buffer;	    
+	  } else if (entry == 10) {
+	    inlet[nLines].v = buffer;
+	  } else if (entry == 11) {
+	    inlet[nLines].w = buffer;
+	  } else if (entry == 12) {
+	    inlet[nLines].x = buffer;
+
+            // HACK HACK ACHK, test mesh starts at -2 and not 0
+  	    inlet[nLines].x = inlet[nLines].x - 2.0;	  
+	    
+	  } else if (entry == 13) {
+	    inlet[nLines].y = buffer;
+	  } else if (entry == 14) {
+	    inlet[nLines].z = buffer;
+	  }
+	  
+        }
+        //std::cout << inlet[nLines].rho << " " << inlet[nLines].temp << " " << inlet[nLines].u << " " << inlet[nLines].x << " " << inlet[nLines].y << " " << inlet[nLines].z << endl; fflush(stdout);		
+	nLines++;
+      }
+      file.close();
+
+      //std::cout << " stream method ^" << endl; fflush(stdout);
+      std::cout << " " << endl; fflush(stdout);
+      /**/
+
+      /*
+      FILE *inlet_file;      
+      //inlet_file = fopen(char_array,"r");
+      inlet_file = fopen("./inputs/inletPlane.csv","r");
+      //std::cout << " ...opened" << endl; fflush(stdout);
+      std::cout << " " << endl; fflush(stdout);      
+      for (int i = 0; i < nCount; i++) {
+        int got;
+	//got = fscanf(inlet_file, "%lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf",
+	got = fscanf(inlet_file, "%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f",		     
+		     &inlet[i].rho, &junk, &junk, &junk, &junk, &junk, &junk, &inlet[i].temp, &inlet[i].u,
+		     &inlet[i].v, &inlet[i].w, &inlet[i].x, &inlet[i].y, &inlet[i].z);
+        std::cout << inlet[i].rho << " " << inlet[i].temp << " " << inlet[i].u << " " << inlet[i].v << " " << inlet[i].w << " " << inlet[i].x << endl; fflush(stdout);	
+      }
+      std::cout << " ...done" << endl; fflush(stdout); 
+      std::cout << " " << endl; fflush(stdout);                 
+      fclose(inlet_file);
+      */
+    
+    }
+  
+    // broadcast data
+    //MPI_Bcast(&inlet, nCount*8, MPI_DOUBLE, 0, bcomm);
+    MPI_Bcast(&inlet, nCount*8, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    if(rank0_) { std::cout << " communicated inlet data" << endl; fflush(stdout); }
+
+    // width of interpolation stencil
+    double Lx, Ly, Lz, Lmax, radius;
+    Lx = xmax - xmin;
+    Ly = ymax - ymin;
+    Lz = zmax - zmin;
+    Lmax = std::max(Lx,Ly);
+    Lmax = std::max(Lmax,Lz);    
+    radius = 0.01 * Lmax;
+ 
+    ParGridFunction coordsDof(vfes);
+    pmesh->GetNodes(coordsDof);
+    double *dataVel = buffer_uInlet->HostWrite();
+    double *dataTemp = buffer_tInlet->HostWrite();
+    for (int n = 0; n < tfes->GetNDofs(); n++) {
+      
+      auto hcoords = coordsDof.HostRead();  // get coords
+      double xp[3];      
+      for (int d = 0; d < dim; d++) {
+        xp[d] = hcoords[n + d * vfes->GetNDofs()];
+      }
+
+      int iCount = 0;      
+      double dist, wt;
+      double wt_tot = 0.0;          
+      double val_rho = 0.0;
+      double val_u = 0.0;
+      double val_v = 0.0;
+      double val_w = 0.0;
+      double val_T = 0.0;	  
+      double dmin = 1.0e15;
+
+      // find minimum distance in interpolant field to use as interpolation radius
+      /*
+      double distMin = 1.0e12;
+      for (int j=0; j < nCount; j++) {	    
+        dist = (xp[0]-inlet[j].x)*(xp[0]-inlet[j].x) + (xp[2]-inlet[j].z)*(xp[2]-inlet[j].z);
+        dist = sqrt(dist);
+	distMin = std::min(distMin,dist);
+      }
+      radius = 0.5 * (radius + distMin);
+      */
+
+      //std::cout << " radius for interpoaltion: " << 4.0*radius << endl; fflush(stdout);	      
+      for (int j=0; j < nCount; j++) {
+	    
+        dist = (xp[0]-inlet[j].x)*(xp[0]-inlet[j].x) + (xp[1]-inlet[j].y)*(xp[1]-inlet[j].y) + (xp[2]-inlet[j].z)*(xp[2]-inlet[j].z);
+        dist = sqrt(dist);
+        //std::cout << " Gaussian interpolation, point " << n << " with distance " << dist << endl; fflush(stdout);	
+
+	// gaussian
+	if(dist <= 4.0*radius) {
+          //std::cout << " Caught an interp point " << dist << endl; fflush(stdout);	  
+          wt = exp(-(dist*dist)/(radius*radius));
+          wt_tot = wt_tot + wt;	      
+          val_rho = val_rho + wt*inlet[j].rho;
+          val_u = val_u + wt*inlet[j].u;
+          val_v = val_v + wt*inlet[j].v;
+          val_w = val_w + wt*inlet[j].w;	  
+          val_T = val_T + wt*inlet[j].temp;
+   	  iCount++;
+          //std::cout << "* " << n << " "  << iCount << " " << wt_tot << " " << val_T << endl; fflush(stdout);	  	  
+	}
+	    // nearest, just for testing
+	    //if(dist <= dmin) {
+	    //  dmin = dist;
+	    //  wt_tot = 1.0;
+           //   val_rho = inlet[j].rho;
+           //   val_u = inlet[j].u;
+           //   val_v = inlet[j].v;
+           //   val_w = inlet[j].w;
+	   //   iCount = 1;	     
+	   // }	    
+        }
+
+        //if(rank0_) { std::cout << " attempting to record interpolated values in buffer" << endl; fflush(stdout); }      
+        if (wt_tot > 0.0) {
+          dataVel[n + 0*Tdof] = val_u / wt_tot;
+          dataVel[n + 1*Tdof] = val_v / wt_tot;
+          dataVel[n + 2*Tdof] = val_w / wt_tot;
+          dataTemp[n] = val_T / wt_tot;
+          //std::cout << n << " point set to: " << dataVel[n + 0*Tdof] << " " << dataTemp[n] << endl; fflush(stdout);
+	} else {
+          dataVel[n + 0*Tdof] = 0.0;
+          dataVel[n + 1*Tdof] = 0.0;
+          dataVel[n + 2*Tdof] = 0.0;
+          dataTemp[n] = 0.0;
+          //std::cout << " iCount of zero..." << endl; fflush(stdout);	  
+	}
+      
+    }
+  
+}
+
+
+/**
+Basic Smagorinksy subgrid model with user-specified cutoff grid length
+*/
+void LoMachSolver::sgsSmag(const DenseMatrix &gradUp, double delta, double &nu) {
+
+  Vector Sij(6);
+  double Smag = 0.;
+  double Cd = 0.12;
+  //double Cd = 0.16;
+  double l_floor;
+  double d_model;
+
+  // gradUp is in (eq,dim) form
+  Sij[0] = gradUp(0,0);
+  Sij[1] = gradUp(1,1);
+  Sij[2] = gradUp(2,2);  
+  Sij[3] = 0.5*(gradUp(0,1) + gradUp(1,0));
+  Sij[4] = 0.5*(gradUp(0,2) + gradUp(2,0));
+  Sij[5] = 0.5*(gradUp(1,2) + gradUp(2,1));
+
+  // strain magnitude with silly sqrt(2) factor
+  for (int i = 0; i < 3; i++) Smag += Sij[i]*Sij[i];
+  for (int i = 3; i < 6; i++) Smag += 2.0*Sij[i]*Sij[i];
+  Smag = sqrt(2.0*Smag);
+
+  // eddy viscosity with delta shift
+  //l_floor = config->GetSgsFloor();
+  //d_model = Cd * max(delta-l_floor,0.0);
+  d_model = Cd * delta;
+  nu = d_model * d_model * Smag;
+  
+}
+
+
+/**
+NOT TESTED: Sigma subgrid model following Nicoud et.al., "Using singular values to build a 
+subgrid-scale model for large eddy simulations", PoF 2011.
+*/
+void LoMachSolver::sgsSigma(const DenseMatrix &gradUp, double delta, double &nu) {
+
+  DenseMatrix Qij(dim,dim);
+  DenseMatrix du(dim,dim);
+  DenseMatrix B(dim,dim);  
+  Vector ev(dim);
+  Vector sigma(dim);  
+  double Cd = 0.135;
+  double sml = 1.0e-12;
+  double pi = 3.14159265359;
+  double onethird = 1./3.;  
+  double l_floor, d_model, d4;
+  double p1, p2, p, q, detB, r, phi;
+
+  
+  // Qij = u_{k,i}*u_{k,j}
+  for (int j = 0; j < dim; j++) {  
+    for (int i = 0; i < dim; i++) {
+      Qij(i,j) = 0.;
+    }    
+  }
+  for (int k = 0; k < dim; k++) {  
+    for (int j = 0; j < dim; j++) {
+      for (int i = 0; i < dim; i++) {
+        Qij(i,j) += gradUp(k,i) * gradUp(k,j);
+      }           
+    }    
+  }
+
+  // shifted grid scale, d should really be sqrt of J^T*J
+  //l_floor = config->GetSgsFloor();
+  //d_model = max((delta-l_floor), sml);
+  d_model = delta;
+  d4 = pow(d_model,4);
+  for (int j = 0; j < dim; j++) { 
+    for (int i = 0; i < dim; i++) {      
+      Qij(i,j) *= d4;
+    }    
+  }  
+  
+  // eigenvalues for symmetric pos-def 3x3
+  p1 = Qij(0,1) * Qij(0,1) + \
+       Qij(0,2) * Qij(0,2) + \
+       Qij(1,2) * Qij(1,2);
+  q = onethird * (Qij(0,0) + Qij(1,1) + Qij(2,2));
+  p2 = (Qij(0,0) - q) * (Qij(0,0) - q) + \
+       (Qij(1,1) - q) * (Qij(1,1) - q) + \
+       (Qij(2,2) - q) * (Qij(2,2) - q) + 2.0*p1;
+  p = std::sqrt(max(p2,0.0)/6.0);  
+  //cout << "p1, q, p2, p: " << p1 << " " << q << " " << p2 << " " << p << endl; fflush(stdout);
+  
+  for (int j = 0; j < dim; j++) {
+    for (int i = 0; i < dim; i++) {       
+      B(i,j) = Qij(i,j);
+    }    
+  }    
+  for (int i = 0; i < dim; i++) {
+     B(i,i) -= q;
+  }    
+  for (int j = 0; j < dim; j++) {
+    for (int i = 0; i < dim; i++) {       
+      B(i,j) *= (1.0/max(p,sml));
+    }    
+  }    
+  detB = B(0,0) * (B(1,1)*B(2,2) - B(2,1)*B(1,2)) - \
+         B(0,1) * (B(1,0)*B(2,2) - B(2,0)*B(1,2)) + \
+         B(0,2) * (B(1,0)*B(2,1) - B(2,0)*B(1,1));
+  r = 0.5*detB;
+  //cout << "r: " << r << endl; fflush(stdout);
+  
+  if (r <= -1.0) {
+    phi = onethird*pi;
+  } else if (r >= 1.0) {
+    phi = 0.0;
+  } else {
+    phi = onethird*acos(r);
+  }
+
+  // eigenvalues satisfy eig3 <= eig2 <= eig1 (L^4/T^2)
+  ev[0] = q + 2.0 * p * cos(phi);
+  ev[2] = q + 2.0 * p * cos(phi + (2.0*onethird*pi));
+  ev[1] = 3.0 * q - ev[0] - ev[2];
+
+  // actual sigma (L^2/T)
+  sigma[0] = sqrt(max(ev[0],sml));
+  sigma[1] = sqrt(max(ev[1],sml));
+  sigma[2] = sqrt(max(ev[2],sml));
+  //cout << "sigma: " << sigma[0] << " " << sigma[1] << " " << sigma[2] << endl; fflush(stdout);
+  
+  // eddy viscosity
+  nu = sigma[2] * (sigma[0]-sigma[1]) * (sigma[1]-sigma[2]);
+  nu = max(nu, 0.0);  
+  nu /= (sigma[0]*sigma[0]);
+  nu *= (Cd*Cd);
+  //cout << "mu: " << mu << endl; fflush(stdout);
+
+  // shouldnt be necessary
+  if (nu != nu) nu = 0.0;
   
 }
 
@@ -5611,6 +6439,11 @@ void vel_ic(const Vector &coords, double t, Vector &u)
    //u(0) = scl;
    //u(1) = 0.0;
    //u(2) = 0.0;
+
+   // FOR INLET TEST ONLY
+   u(0) = 1.0 - std::pow((y-0.0)/0.5,2);
+   u(1) = 0.0;
+   u(2) = 0.0;
    
 }
 
@@ -5621,7 +6454,7 @@ void vel_channelTest(const Vector &coords, double t, Vector &u)
    double y = coords(1);
    double z = coords(2);
 
-   u(0) = 1.0-std::pow((y-0.0)/0.2,2);
+   u(0) = 1.0 - std::pow((y-0.0)/0.2,2);
    u(1) = 0.0;
    u(2) = 0.0;
    
@@ -5635,13 +6468,30 @@ void vel_wall(const Vector &x, double t, Vector &u)
    u(2) = 0.0;   
 }
 
-double temp_ic(const Vector &coords, double t)
+void vel_inlet(const Vector &coords, double t, Vector &u)
 {
+  
    double x = coords(0);
    double y = coords(1);
    double z = coords(2);
-   double temp = 300.0;
-   return temp;
+  
+   u(0) = 1.0 - std::pow((y-0.0)/0.5,2);
+   u(1) = 0.0;
+   u(2) = 0.0;   
+}
+
+double temp_ic(const Vector &coords, double t)
+{
+
+   double Thi = 400.0;  
+   double Tlo = 200.0;
+   double x = coords(0);
+   double y = coords(1);
+   double z = coords(2);
+   double temp;
+   temp = Tlo + (y + 0.5) * (Thi - Tlo);
+   return temp;      
+   
 }
 
 double temp_wall(const Vector &coords, double t)  
@@ -5653,7 +6503,30 @@ double temp_wall(const Vector &coords, double t)
    double z = coords(2);
    double temp;
    if(y > 0.0) {temp = Thi;}
-   if(y < 0.0) {temp = Tlo;}   
+   if(y < 0.0) {temp = Tlo;}
+   //temp = 300.0;
    return temp;   
+}
+
+double temp_inlet(const Vector &coords, double t)  
+{
+   double Thi = 400.0;  
+   double Tlo = 200.0;
+   double x = coords(0);
+   double y = coords(1);
+   double z = coords(2);
+   double temp;
+   temp = Tlo + (y + 0.5) * (Thi - Tlo);
+   return temp;   
+}
+
+double pres_inlet(const Vector &coords, double p)  
+{
+   double x = coords(0);
+   double y = coords(1);
+   double z = coords(2);
+   double pres;
+   pres = 0.0; //101325.0;
+   return pres;   
 }
 

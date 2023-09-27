@@ -153,10 +153,10 @@ class M2ulPhyS : public TPS::Solver {
   // TransportProperties *d_transport = NULL;  // valid on device, when available; otherwise = transportPtr
 
   Chemistry *chemistry_ = NULL;
-
   Radiation *radiation_ = NULL;
 
-  ParGridFunction *spaceVaryViscMult;  // space varying viscosity multiplier
+  // space varying viscosity multiplier  
+  ParGridFunction *spaceVaryViscMult;
 
   /// Distance to nearest no-slip wall
   ParGridFunction *distance_;
