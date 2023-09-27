@@ -204,10 +204,14 @@ protected:
    // min/max element size
    double hmin, hmax;
 
-  int MaxIters;
-  double max_speed;
-  double CFL;
-  int numActiveSpecies, numSpecies;
+   // domain extent
+   double xmin, ymin, zmin;
+   double xmax, ymax, zmax;  
+  
+   int MaxIters;
+   double max_speed;
+   double CFL;
+   int numActiveSpecies, numSpecies;
 
    // exit status code;
    int exit_status_;
@@ -340,7 +344,12 @@ protected:
    GridFunctionCoefficient *Text_gfcoeff = nullptr;
    ParLinearForm *Text_bdr_form = nullptr;
    ParLinearForm *ft_form = nullptr;
-   ParLinearForm *t_bdr_form = nullptr;    
+   ParLinearForm *t_bdr_form = nullptr;
+
+   // pressure
+   GridFunctionCoefficient *Pext_gfcoeff = nullptr;
+   ParLinearForm *Pext_bdr_form = nullptr;
+   ParLinearForm *p_bdr_form = nullptr;  
   
    /// Linear form to compute the mass matrix in various subroutines.
    ParLinearForm *mass_lf = nullptr;
@@ -362,7 +371,11 @@ protected:
    VectorConstantCoefficient *buffer_accel;  
    ConstantCoefficient *buffer_tbc;
    //VectorConstantCoefficient *buffer_tbc;  
-   VectorConstantCoefficient *wall_ubc;  
+   VectorConstantCoefficient *wall_ubc;
+   VectorConstantCoefficient *bufferInlet_ubc;  
+   ConstantCoefficient *bufferInlet_tbc;
+   ConstantCoefficient *bufferInlet_pbc;
+   ConstantCoefficient *bufferOutlet_pbc;      
   
    ParGridFunction *bufferInvRho;  
    ParGridFunction *bufferVisc;
@@ -371,11 +384,19 @@ protected:
    ParGridFunction *bufferTemp;
    ParGridFunction *bufferPM0;      
    ParGridFunction *bufferPM1;
-   //GridFunctionCoefficient *bousField;    
+   ParGridFunction *bufferGridScale;  
+   //GridFunctionCoefficient *bousField;
    GridFunctionCoefficient *viscField;  
    GridFunctionCoefficient *invRho;
    GridFunctionCoefficient *alphaField;
 
+   ParGridFunction *buffer_uInlet;
+   ParGridFunction *buffer_tInlet;
+   ParGridFunction *buffer_pInlet;  
+   VectorGridFunctionCoefficient *uInletField;
+   GridFunctionCoefficient *tInletField;
+   GridFunctionCoefficient *pInletField;        
+  
   //ParGridFunction *bufferViscSml;  
   //GridFunctionCoefficient *viscFieldSml;  
   
@@ -425,9 +446,11 @@ protected:
    Vector tmpR0PM1;
 
    Vector pnBig;
+
+   Vector gridScale;
   
    ParGridFunction un_gf, un_next_gf, curlu_gf, curlcurlu_gf,
-                   Lext_gf, FText_gf, resu_gf;
+     Lext_gf, FText_gf, resu_gf, Pext_gf;
 
    ParGridFunction unm1_gf, unm2_gf;
    ParGridFunction Tnm1_gf, Tnm2_gf;    
@@ -442,12 +465,18 @@ protected:
    Vector resT, tmpR0, tmpR0b, tmpR0c;
    ParGridFunction Tn_gf, Tn_next_gf, Text_gf, resT_gf;
 
+   // pressure mimic
+   Vector Pext_bdr, p_bdr;
+  
    // density, not actually solved for
    Vector rn;
    ParGridFunction rn_gf;
 
-   // for the extrapolated p rhs
+   // TrueDof size
    Vector viscSml;
+   Vector viscMultSml;
+   Vector subgridViscSml;  
+   Vector gridScaleSml;
 
    // swap spaces
    ParGridFunction R0PM0_gf;
@@ -459,15 +488,18 @@ protected:
    // All essential attributes.
    Array<int> vel_ess_attr;
    Array<int> pres_ess_attr;
-   Array<int> temp_ess_attr;  
+   Array<int> temp_ess_attr;
+   //Array<int> vel4P_ess_attr;  
 
    // All essential true dofs.
    Array<int> vel_ess_tdof;
    Array<int> pres_ess_tdof;
    Array<int> temp_ess_tdof;
+   //Array<int> vel4P_ess_tdof;  
 
    // Bookkeeping for velocity dirichlet bcs.
    std::vector<VelDirichletBC_T> vel_dbcs;
+   //std::vector<VelDirichletBC_T> vel4P_dbcs;  
 
    // Bookkeeping for pressure dirichlet bcs.
    std::vector<PresDirichletBC_T> pres_dbcs;
@@ -567,6 +599,9 @@ protected:
 
    Chemistry *chemistry_ = NULL;
    Radiation *radiation_ = NULL;
+
+   /// Distance to nearest no-slip wall
+   ParGridFunction *distance_;
   
    // to interface with existing code
    ParGridFunction *U;
@@ -596,8 +631,12 @@ protected:
    IODataOrganizer ioData;
 
    // space varying viscosity multiplier  
-   ParGridFunction *spaceVaryViscMult;  
+   ParGridFunction *bufferViscMult;  
    viscositySpongeData vsd_;
+   ParGridFunction viscTotal;
+
+   // subgrid scale
+   ParGridFunction *bufferSubgridVisc;
 
    bool channelTest;
   
@@ -636,7 +675,8 @@ public:
    void initialTimeStep();  
    void solve();
    void updateU();
-   void copyU();  
+   void copyU();
+   void interpolateInlet();
 
    // i/o routines
    void read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data);
@@ -646,6 +686,10 @@ public:
    // void serialize_soln_for_write(IOFamily &fam);
    void write_soln_data(hid_t group, string varName, hid_t dataspace, double *data);
 
+   // subgrid scale models
+  void sgsSmag(const DenseMatrix &gradUp, double delta, double &nu_sgs);
+  void sgsSigma(const DenseMatrix &gradUp, double delta, double &nu_sgs);  
+  
    void projectInitialSolution();  
    void writeHDF5(string inputFileName = std::string()) { restart_files_hdf5("write", inputFileName); }
    void readHDF5(string inputFileName = std::string()) { restart_files_hdf5("read", inputFileName); }
@@ -654,7 +698,7 @@ public:
     paraviewColl->SetTime(time);
     paraviewColl->Save();
   }
- 
+  
   
    /// Initialize forms, solvers and preconditioners.
    void Setup(double dt);
@@ -706,6 +750,9 @@ public:
    /// Add a Dirichlet boundary condition to the velocity field.
    void AddVelDirichletBC(VectorCoefficient *coeff, Array<int> &attr);
    void AddVelDirichletBC(VecFuncT *f, Array<int> &attr);
+   //void AddVelDirichletBC(VectorGridFunctionCoefficient *coeff, Array<int> &attr);
+   //void AddVel4PDirichletBC(VectorCoefficient *coeff, Array<int> &attr);
+   //void AddVel4PDirichletBC(VecFuncT *f, Array<int> &attr);  
 
    /// Add a Dirichlet boundary condition to the pressure field.
    void AddPresDirichletBC(Coefficient *coeff, Array<int> &attr);
