@@ -181,15 +181,19 @@ class RunConfiguration {
   bool isOpen;  
 
   // loMach specific additions  
-  double amb_pres, const_visc, const_dens;  
+  double amb_pres, const_visc, const_dens;
 
   // Inlet BC data
   Array<double> inletBC;
   std::vector<pair<int, InletType>> inletPatchType;
+  double velInlet[3];
+  double tempInlet;
+  double densInlet;    
 
   // Outlet BC data
   Array<double> outletBC;
   std::vector<pair<int, OutletType>> outletPatchType;
+  double outletPressure;      
 
   // Wall BC data
   // Array<double> wallBC;
