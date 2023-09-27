@@ -500,7 +500,9 @@ void tps(py::module &m) {
       .def("solveEnd", &TPS::Tps::solveEnd)
       .def("push", &TPS::Tps::push)
       .def("fetch", &TPS::Tps::fetch)
-      .def("initInterface", &TPS::Tps::initInterface);
+      .def("initInterface", &TPS::Tps::initInterface)
+      .def("pushCircuit", &TPS::Tps::pushCircuit)
+      .def("fetchCircuit", &TPS::Tps::fetchCircuit);
 }
 
 }  // namespace tps_wrappers

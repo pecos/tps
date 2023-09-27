@@ -47,6 +47,7 @@ namespace py = pybind11;
 namespace tps_wrappers {
 void tps(py::module& m);
 void tps2bolzmann(py::module& m);
+void tps2circuit(py::module &m);
 }  // namespace tps_wrappers
 
 PYBIND11_MODULE(libtps, m) {
@@ -54,6 +55,7 @@ PYBIND11_MODULE(libtps, m) {
 
   tps_wrappers::tps(m);
   tps_wrappers::tps2bolzmann(m);
+  tps_wrappers::tps2circuit(m);
 }
 
 #endif

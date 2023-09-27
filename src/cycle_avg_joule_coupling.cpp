@@ -461,4 +461,25 @@ void CycleAvgJouleCoupling::fetch(TPS::Tps2Boltzmann &interface) { flow_solver_-
 
 void CycleAvgJouleCoupling::fetchCircuit(Tps2Circuit &interface) {}
 
-void CycleAvgJouleCoupling::pushCircuit(Tps2Circuit &interface) {}
+void CycleAvgJouleCoupling::pushCircuit(Tps2Circuit &interface) {
+  const double tot_jh = qmsa_solver_->totalJouleHeating();
+  const double tot_I = qmsa_solver_->coilCurrent();
+  const double magnetic_energy = qmsa_solver_->magneticEnergy();
+
+  interface.Rplasma = tot_jh / (2 * tot_I * tot_I);
+  interface.Lplasma = 2 * magnetic_energy / (2 * tot_I * tot_I);
+}
+
+#ifdef HAVE_PYTHON
+namespace py = pybind11;
+
+namespace tps_wrappers {
+void tps2circuit(py::module &m) {
+  py::class_<Tps2Circuit>(m, "Tps2Circuit")
+      .def(py::init<TPS::Tps *>())
+      .def_readwrite("Rplasma", &Tps2Circuit::Rplasma)
+      .def_readwrite("Lplasma", &Tps2Circuit::Lplasma)
+      .def_readwrite("Pplasma", &Tps2Circuit::Pplasma);
+}
+}  // namespace tps_wrappers
+#endif

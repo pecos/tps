@@ -31,7 +31,9 @@ fi
 
 # necessary binaries
 binaries="bats die.sh soln_differ ../src/tps.py ../src/tps-time-loop.py ../test/test_tps_splitcomm.py"
+binaries+=" ../src/tps-circuit-coupling.py"
 for binary in $binaries; do
+    echo $binary
     if [ ! -x $binary ];then
         if [ -x $testDir/$binary ];then
            ln -s $testDir/$binary $binary
