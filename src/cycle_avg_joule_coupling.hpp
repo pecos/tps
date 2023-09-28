@@ -88,6 +88,11 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   int nprocs_;
   bool rank0_;
 
+  // Solves the EM system, including interpolating the flow variables
+  // to the EM mesh, performing the solve, and interpolating the
+  // results back to the flow mesh.
+  void solveEM();
+
  public:
   /*!
    * The input file will expect the following the directory [cycle-avg-joule-coupled]

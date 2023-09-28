@@ -35,6 +35,11 @@
 #include "em_options.hpp"
 #include "quasimagnetostatic.hpp"
 
+#ifdef HAVE_PYTHON
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#endif
+
 CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps)
     : em_opt_(),
       qmsa_solver_(nullptr),
@@ -352,69 +357,78 @@ void CycleAvgJouleCoupling::solve() {
   this->solveEnd();
 }
 
+void CycleAvgJouleCoupling::solveEM() {
+  // update the power if necessary
+  double delta_power = 0;
+  if (input_power_ > 0) {
+    const double increase_factor = static_cast<double>(solve_em_every_n_) / static_cast<double>(max_iters_);
+    delta_power = (input_power_ - initial_input_power_) * increase_factor;
+  }
+
+  // evaluate electric conductivity and interpolate it to EM mesh
+  if (!fixed_conductivity_) flow_solver_->evaluatePlasmaConductivityGF();
+  interpConductivityFromFlowToEM();
+
+  // solve the EM system
+  qmsa_solver_->solve();
+
+  // report the "raw" Joule heating
+  const double tot_jh = qmsa_solver_->totalJouleHeating();
+  if (rank0_) {
+    grvy_printf(GRVY_INFO, "The total input Joule heating = %.6e\n", tot_jh);
+  }
+
+  if (qmsa_solver_->evalRplasma()) {
+    const double tot_I = qmsa_solver_->coilCurrent();
+
+    // the effective plasma resistance = < Sjoule > / < I^2 >, where < * > is the cycle average
+    //
+    // the cycle-average of the current squared = 2 * Re(\hat{I})^2,
+    // where \hat{I} is the Fourier coefficient of the driving current
+    const double Rplasma = tot_jh / (2 * tot_I * tot_I);
+    if (rank0_) {
+      grvy_printf(GRVY_INFO, "The input current amplitude = %.6e\n", 2 * tot_I);
+      grvy_printf(GRVY_INFO, "The effective plasma resistance = %.6e\n", Rplasma);
+    }
+
+    const double magnetic_energy = qmsa_solver_->magneticEnergy();
+    const double Lplasma = 2 * magnetic_energy / (2 * tot_I * tot_I);
+    if (rank0_) {
+      grvy_printf(GRVY_INFO, "The magnetic field energy = %.6e\n", magnetic_energy);
+      grvy_printf(GRVY_INFO, "The effective plasma inductance = %.6e\n", Lplasma);
+      std::cout << "C++ print says the magnetic field energy = " << magnetic_energy << std::endl;
+      std::cout << "C++ print says the effective plasma inductance = " << Lplasma << std::endl;
+    }
+  }
+
+  // scale the Joule heating (if we are controlling the power input)
+  if (input_power_ > 0) {
+    const double target_power = initial_input_power_ + (1.0 / solve_em_every_n_ + 1) * delta_power;
+    const double ratio = target_power / tot_jh;
+    qmsa_solver_->scaleJouleHeating(ratio);
+    const double upd_jh = qmsa_solver_->totalJouleHeating();
+    if (rank0_) {
+      grvy_printf(GRVY_INFO, "The total input Joule heating after scaling = %.6e\n", upd_jh);
+    }
+  }
+
+  // interpolate the Joule heating to the flow mesh
+  interpJouleHeatingFromEMToFlow();
+  if (efieldFES_) interpElectricFieldFromEMToFlow();
+}
+
 void CycleAvgJouleCoupling::solveBegin() {
   flow_solver_->solveBegin();
   qmsa_solver_->solveBegin();
+
+  // Always solve EM system on first pass
+  solveEM();
 }
 
 void CycleAvgJouleCoupling::solveStep() {
   // Run the em solver when it is due
-  if (current_iter_ % solve_em_every_n_ == 0) {
-    // update the power if necessary
-    double delta_power = 0;
-    if (input_power_ > 0) {
-      delta_power = (input_power_ - initial_input_power_) * static_cast<double>(solve_em_every_n_) /
-                    static_cast<double>(max_iters_);
-    }
-
-    // evaluate electric conductivity and interpolate it to EM mesh
-    if (!fixed_conductivity_) flow_solver_->evaluatePlasmaConductivityGF();
-    interpConductivityFromFlowToEM();
-
-    // solve the EM system
-    qmsa_solver_->solve();
-
-    // report the "raw" Joule heating
-    const double tot_jh = qmsa_solver_->totalJouleHeating();
-    if (rank0_) {
-      grvy_printf(GRVY_INFO, "The total input Joule heating = %.6e\n", tot_jh);
-    }
-
-    if (qmsa_solver_->evalRplasma()) {
-      const double tot_I = qmsa_solver_->coilCurrent();
-
-      // the effective plasma resistance = < Sjoule > / < I^2 >, where < * > is the cycle average
-      //
-      // the cycle-average of the current squared = 2 * Re(\hat{I})^2,
-      // where \hat{I} is the Fourier coefficient of the driving current
-      const double Rplasma = tot_jh / (2 * tot_I * tot_I);
-      if (rank0_) {
-        grvy_printf(GRVY_INFO, "The input current amplitude = %.6e\n", 2 * tot_I);
-        grvy_printf(GRVY_INFO, "The effective plasma resistance = %.6e\n", Rplasma);
-      }
-
-      const double magnetic_energy = qmsa_solver_->magneticEnergy();
-      const double Lplasma = 2 * magnetic_energy / (2 * tot_I * tot_I);
-      if (rank0_) {
-        grvy_printf(GRVY_INFO, "The magnetic field energy = %.6e\n", magnetic_energy);
-        grvy_printf(GRVY_INFO, "The effective plasma inductance = %.6e\n", Lplasma);
-      }
-    }
-
-    // scale the Joule heating (if we are controlling the power input)
-    if (input_power_ > 0) {
-      const double target_power = initial_input_power_ + (current_iter_ / solve_em_every_n_ + 1) * delta_power;
-      const double ratio = target_power / tot_jh;
-      qmsa_solver_->scaleJouleHeating(ratio);
-      const double upd_jh = qmsa_solver_->totalJouleHeating();
-      if (rank0_) {
-        grvy_printf(GRVY_INFO, "The total input Joule heating after scaling = %.6e\n", upd_jh);
-      }
-    }
-
-    // interpolate the Joule heating to the flow mesh
-    interpJouleHeatingFromEMToFlow();
-    if (efieldFES_) interpElectricFieldFromEMToFlow();
+  if (current_iter_ % solve_em_every_n_ == 0 && current_iter_ > 0) {
+    solveEM();
   }
   // Run a step of the flow solver
   flow_solver_->solveStep();
@@ -462,6 +476,17 @@ void CycleAvgJouleCoupling::fetch(TPS::Tps2Boltzmann &interface) { flow_solver_-
 void CycleAvgJouleCoupling::fetchCircuit(Tps2Circuit &interface) {}
 
 void CycleAvgJouleCoupling::pushCircuit(Tps2Circuit &interface) {
+  // To ensure that we get up to date circuit parameters, solve the EM
+  // before computing
+
+  // evaluate electric conductivity and interpolate it to EM mesh
+  if (!fixed_conductivity_) flow_solver_->evaluatePlasmaConductivityGF();
+  interpConductivityFromFlowToEM();
+
+  // solve the EM system
+  qmsa_solver_->solve();
+
+  // Compute the circuit model parameters
   const double tot_jh = qmsa_solver_->totalJouleHeating();
   const double tot_I = qmsa_solver_->coilCurrent();
   const double magnetic_energy = qmsa_solver_->magneticEnergy();
@@ -476,7 +501,7 @@ namespace py = pybind11;
 namespace tps_wrappers {
 void tps2circuit(py::module &m) {
   py::class_<Tps2Circuit>(m, "Tps2Circuit")
-      .def(py::init<TPS::Tps *>())
+      .def(py::init<>())
       .def_readwrite("Rplasma", &Tps2Circuit::Rplasma)
       .def_readwrite("Lplasma", &Tps2Circuit::Lplasma)
       .def_readwrite("Pplasma", &Tps2Circuit::Pplasma);
