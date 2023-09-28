@@ -68,6 +68,7 @@ class ElectromagneticOptions {
   mfem::Vector current_axis;
 
   bool eval_Rplasma;
+  int verbosity_level;
 
   ElectromagneticOptions() {
     order = 1;
@@ -86,6 +87,7 @@ class ElectromagneticOptions {
     current_frequency = 1.0;
     mu0 = 1.0;
     eval_Rplasma = false;
+    verbosity_level = 1;
   }
 
   void print(std::ostream &out) {
@@ -108,6 +110,7 @@ class ElectromagneticOptions {
     out << "  current_frequency = " << current_frequency << std::endl;
     out << "  mu0 = " << mu0 << std::endl;
     out << "  eval_Rplasma = " << eval_Rplasma << std::endl;
+    out << "  verbosity_level = " << verbosity_level << std::endl;
     out << std::endl;
   }
 };

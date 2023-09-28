@@ -336,6 +336,7 @@ void QuasiMagnetostaticSolver3D::parseSolverOptions() {
   tpsP_->getVec("em/current_axis", em_opts_.current_axis, 3, default_axis);
 
   tpsP_->getInput("em/eval_Rplasma", em_opts_.eval_Rplasma, false);
+  tpsP_->getInput("em/verbosity_level", em_opts_.verbosity_level, 1);
 
   // dump options to screen for user inspection
   if (rank0_) {
@@ -449,7 +450,7 @@ void QuasiMagnetostaticSolver3D::solveStep() {
   solver.SetRelTol(em_opts_.rtol);
   solver.SetAbsTol(em_opts_.atol);
   solver.SetMaxIter(em_opts_.max_iter);
-  solver.SetPrintLevel(1);
+  solver.SetPrintLevel(em_opts_.verbosity_level);
 
   solver.Mult(rhs, Avec);
 
@@ -927,6 +928,7 @@ void QuasiMagnetostaticSolverAxiSym::parseSolverOptions() {
   tpsP_->getInput("em/permeability", em_opts_.mu0, 1.0);
 
   tpsP_->getInput("em/eval_Rplasma", em_opts_.eval_Rplasma, false);
+  tpsP_->getInput("em/verbosity_level", em_opts_.verbosity_level, 1);
 
   // dump options to screen for user inspection
   if (rank0_) {
@@ -1007,6 +1009,8 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
   Kpre->FormSystemMatrix(ess_bdr_tdofs_, KpreOp);
 
   std::unique_ptr<HypreBoomerAMG> prec(new HypreBoomerAMG(*KpreOp.As<HypreParMatrix>()));
+  prec->SetPrintLevel(em_opts_.verbosity_level);
+
   BlockDiagonalPreconditioner BDP(offsets_);
   BDP.SetDiagonalBlock(0, prec.get());
   BDP.SetDiagonalBlock(1, prec.get());
@@ -1019,7 +1023,7 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
   solver.SetRelTol(em_opts_.rtol);
   solver.SetAbsTol(em_opts_.atol);
   solver.SetMaxIter(em_opts_.max_iter);
-  solver.SetPrintLevel(1);
+  solver.SetPrintLevel(em_opts_.verbosity_level);
 
   solver.Mult(rhs_vec, Atheta_vec);
 
