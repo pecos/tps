@@ -757,7 +757,7 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
     }
     serialName = inputFileName;
   } else {
-    serialName = "restart_";
+    serialName = "./restart/restart_";
     serialName.append(config.GetOutputName());
     serialName.append(".sol.h5");
   }

@@ -92,6 +92,10 @@ class RunConfiguration {
   // variable/constant time-step
   bool constantTimeStep;
   double dt_fixed;
+  double dt_initial;
+  double dt_factor;
+  int solver_iter;
+  double solver_tol;
 
   // num iterations. Defaults to 0
   int numIters;
@@ -187,7 +191,8 @@ class RunConfiguration {
   std::vector<pair<int, InletType>> inletPatchType;
   double velInlet[3];
   double tempInlet;
-  double densInlet;    
+  double densInlet;
+  int rampStepsInlet;
 
   // Outlet BC data
   Array<double> outletBC;
