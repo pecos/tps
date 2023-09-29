@@ -392,6 +392,8 @@ protected:
 
    ParGridFunction *buffer_uInlet;
    ParGridFunction *buffer_tInlet;
+   ParGridFunction *buffer_uInletInf;
+   ParGridFunction *buffer_tInletInf;  
    ParGridFunction *buffer_pInlet;  
    VectorGridFunctionCoefficient *uInletField;
    GridFunctionCoefficient *tInletField;
@@ -633,11 +635,14 @@ protected:
    // space varying viscosity multiplier  
    ParGridFunction *bufferViscMult;  
    viscositySpongeData vsd_;
-   ParGridFunction viscTotal;
+   ParGridFunction viscTotal_gf;  
 
    // subgrid scale
    ParGridFunction *bufferSubgridVisc;
 
+   // for plotting
+   ParGridFunction resolution_gf;  
+  
    bool channelTest;
   
 public:
@@ -742,6 +747,12 @@ public:
    /// Return a pointer to the current density ParGridFunction.  
    ParGridFunction *GetCurrentDensity() { return &rn_gf; }  
 
+   /// Return a pointer to the current total viscosity ParGridFunction.  
+   ParGridFunction *GetCurrentTotalViscosity() { return &viscTotal_gf; }  
+
+   /// Return a pointer to the current total resolution ParGridFunction.  
+   ParGridFunction *GetCurrentResolution() { return &resolution_gf; }    
+  
    /// Return a pointer to the current temperature ParGridFunction.
    //ParGridFunction *GetCurrentDensity() { return &rn_gf; }    
 
