@@ -1316,7 +1316,7 @@ void LoMachSolver::Setup(double dt)
       N->SetAssemblyLevel(AssemblyLevel::PARTIAL);
       N->Setup();
    }
-   //std::cout << "Check 7..." << std::endl;     
+   if (rank0_) std::cout << "Convection (NL) set" << endl;      
 
    // mass matrix
    Mv_form = new ParBilinearForm(vfes);
@@ -1363,7 +1363,7 @@ void LoMachSolver::Setup(double dt)
    }
    Sp_form->Assemble();
    Sp_form->FormSystemMatrix(pres_ess_tdof, Sp);
-   //std::cout << "Check 10..." << std::endl;  
+   if (rank0_) std::cout << "Pressure-poisson operator set" << endl;        
 
 
    // pressure boundary terms => patterning off existing stuff
@@ -1413,7 +1413,7 @@ void LoMachSolver::Setup(double dt)
    }
    D_form->Assemble();
    D_form->FormRectangularSystemMatrix(empty, empty, D);
-   //std::cout << "Check 11..." << std::endl;  
+   if (rank0_) std::cout << "Divergence operator set" << endl;        
    
    // for grad(div(u))?
    G_form = new ParMixedBilinearForm(tfes, vfes);
@@ -1429,13 +1429,17 @@ void LoMachSolver::Setup(double dt)
    }
    G_form->Assemble();
    G_form->FormRectangularSystemMatrix(empty, empty, G);
-   //std::cout << "Check 12..." << std::endl;  
+   if (rank0_) std::cout << "Gradient operator set" << endl;           
    
    // viscosity field 
    //ParGridFunction buffer2(vfes); // or pfes here?
    //bufferVisc = new ParGridFunction(vfes);
    //bufferViscMult = new ParGridFunction(tfes);           
    bufferVisc = new ParGridFunction(tfes);
+   {
+     double *data = bufferVisc->HostReadWrite();
+     for (int i = 0; i < Tdof; i++) { data[i] = 0.0; }
+   }   
    {
      double *data = bufferVisc->HostReadWrite();
      double *Tdata = Tn_gf.HostReadWrite();
@@ -1463,7 +1467,7 @@ void LoMachSolver::Setup(double dt)
    //GridFunctionCoefficient viscField(&buffer2);
    viscField = new GridFunctionCoefficient(bufferVisc);
    
-   bufferSubgridVisc = new ParGridFunction(tfes);        
+   bufferSubgridVisc = new ParGridFunction(tfes);
    {
      double *data = bufferSubgridVisc->HostReadWrite();
      for (int i = 0; i < Tdof; i++) {	 
@@ -1476,14 +1480,16 @@ void LoMachSolver::Setup(double dt)
    H_lincoeff.constant = kin_vis;
    H_bdfcoeff.constant = 1.0 / dt;
    H_form = new ParBilinearForm(vfes);
-   auto *hmv_blfi = new VectorMassIntegrator(H_bdfcoeff); // diagonal from unsteady term   
+   auto *hmv_blfi = new VectorMassIntegrator(H_bdfcoeff); // diagonal from unsteady term
+   /*
    if (constantViscosity == true) {
      //auto *hdv_blfi = new VectorDiffusionIntegrator(H_lincoeff);
      hdv_blfi = new VectorDiffusionIntegrator(H_lincoeff);     
    } else {
+   */
      //auto *hdv_blfi = new VectorDiffusionIntegrator(*viscField);
      hdv_blfi = new VectorDiffusionIntegrator(*viscField);
-   }
+     //}
    if (numerical_integ)
    {
       hmv_blfi->SetIntRule(&ir_ni);
@@ -1497,7 +1503,7 @@ void LoMachSolver::Setup(double dt)
    }
    H_form->Assemble();
    H_form->FormSystemMatrix(vel_ess_tdof, H);
-   //std::cout << "Check 14..." << std::endl;     
+   if (rank0_) std::cout << "Velocity Helmholtz operator set" << endl;              
    
    // boundary terms   
    FText_gfcoeff = new VectorGridFunctionCoefficient(&FText_gf);
@@ -1520,7 +1526,8 @@ void LoMachSolver::Setup(double dt)
      g_bdr_form->AddBoundaryIntegrator(gbdr_bnlfi, vel_dbc.attr);
      //g_bdr_form->AddBoundaryIntegrator(gbdr_bnlfi, vel4P_dbc.attr);      
    }
-   //std::cout << "Check 15..." << std::endl;     
+   //std::cout << "Check 15..." << std::endl;
+   if (rank0_) std::cout << "Pressure-poisson rhs bc terms set" << endl;                 
    
    f_form = new ParLinearForm(vfes);
    for (auto &accel_term : accel_terms)
@@ -1536,7 +1543,7 @@ void LoMachSolver::Setup(double dt)
       }
       f_form->AddDomainIntegrator(vdlfi);
    }
-   //std::cout << "Check 16..." << std::endl;
+   if (rank0_) std::cout << "Acceleration terms set" << endl;
    
    if (partial_assembly)
    {
@@ -1593,8 +1600,7 @@ void LoMachSolver::Setup(double dt)
    SpInv->SetRelTol(config.solver_tol);
    SpInv->SetMaxIter(config.solver_iter);
    /**/
-   //std::cout << "Check 18..." << std::endl;     
-
+   if (rank0_) std::cout << "Inverse operators set" << endl;
    
    // this wont be as efficient but AMG merhod (above) wasnt allowing for updates to variable coeff
    /*
@@ -1714,13 +1720,15 @@ void LoMachSolver::Setup(double dt)
    Ht_bdfcoeff.constant = 1.0 / dt;
    Ht_form = new ParBilinearForm(tfes);
    auto *hmt_blfi = new MassIntegrator(Ht_bdfcoeff); // unsteady bit
+   /*
    if (constantViscosity == true) {   
      //auto *hdt_blfi = new DiffusionIntegrator(Ht_lincoeff);
      hdt_blfi = new DiffusionIntegrator(Ht_lincoeff);     
    } else {
+   */
      //auto *hdt_blfi = new DiffusionIntegrator(*alphaField);
      hdt_blfi = new DiffusionIntegrator(*alphaField);     
-   }
+     //}
    //std::cout << "Check 23..." << std::endl;        
    
    if (numerical_integ)
@@ -1792,7 +1800,7 @@ void LoMachSolver::Setup(double dt)
    HtInv->SetPrintLevel(pl_hsolve);
    HtInv->SetRelTol(config.solver_tol);
    HtInv->SetMaxIter(config.solver_iter);
-   //std::cout << "Check 27..." << std::endl;        
+   if (rank0_) std::cout << "Temperature operators set" << endl;   
 
    // If the initial condition was set, it has to be aligned with dependent
    // Vectors and GridFunctions
@@ -2097,10 +2105,12 @@ void LoMachSolver::solve()
    //if (verbose) grvy_printf(ginfo, "updateU 1 good...\n");      
    
    Setup(dt);
-   //if (verbose) grvy_printf(ginfo, "setup good...\n");   
+   //if (verbose) grvy_printf(ginfo, "setup good...\n");
+   if (rank0_) std::cout << "Setup complete" << endl;         
 
    updateU();
-   //copyU(); // testing   
+   //copyU(); // testing
+   if (rank0_) std::cout << "Initial updateU complete" << endl;      
    //if (verbose) grvy_printf(ginfo, "updateU 2 good...\n");         
 
    // better ways to do this, just for plotting
@@ -2480,9 +2490,9 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
          double nu_sgs = 0.;
 	 DenseMatrix gradUp;
 	 gradUp.SetSize(nvel, dim);
-	 for (int dir = 0; dir < dim; dir++) { gradUp(0,dir) = dGradU[dir]; }
-	 for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[dir]; }
-	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[dir]; }
+	 for (int dir = 0; dir < dim; dir++) { gradUp(0,dir) = dGradU[i + dir * TdofInt]; }
+	 for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[i + dir * TdofInt]; }
+	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * TdofInt]; }
          sgsSmag(gradUp, delta[i], nu_sgs);
          //std::cout << " Smagorinsky: " << nu_sgs << " " << gradUp(0,0) << " " << gradUp(0,1) << " " << gradUp(0,2) << endl;	 
          data[i] = rho[i] * nu_sgs;
@@ -2493,9 +2503,9 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
          double nu_sgs = 0.;
 	 DenseMatrix gradUp;
 	 gradUp.SetSize(nvel, dim);
-	 for (int dir = 0; dir < dim; dir++) { gradUp(0,dir) = dGradU[dir]; }
-	 for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[dir]; }
-	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[dir]; }
+	 for (int dir = 0; dir < dim; dir++) { gradUp(0,dir) = dGradU[i + dir * TdofInt]; }
+	 for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[i + dir * TdofInt]; }
+	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * TdofInt]; }
          sgsSigma(gradUp, delta[i], nu_sgs);
          data[i] = rho[i] * nu_sgs;
        }       
@@ -2529,10 +2539,14 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      double prim[nvel+2];
      for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
      for (int i = 0; i < Tdof; i++) {
-         prim[1+nvel] = Tdata[i];
-         transportPtr->GetViscosities(prim, prim, visc); // returns dynamic
-         dataVisc[i] = visc[0] * (Rgas * Tdata[i]) / thermoPressure; // this give kinematic...
-	 //dataVisc[i] = kin_vis;
+       prim[1+nvel] = Tdata[i];
+       transportPtr->GetViscosities(prim, prim, visc); // returns dynamic
+       dataVisc[i] = visc[0] * (Rgas * Tdata[i]) / thermoPressure; // this give kinematic...
+     }
+   } else {
+     double *dataVisc = bufferVisc->HostReadWrite();        
+     for (int i = 0; i < Tdof; i++) {
+       dataVisc[i] = kin_vis;
      }
    }
 
@@ -3261,22 +3275,16 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    }
    */
 
-   if (constantViscosity != true) {
+   //if (constantViscosity != true) {
+   {
      double *data = bufferAlpha->HostReadWrite();
-     double *Tdata = Tn_gf.HostReadWrite();
-     //double *Tdata = Tn.HostReadWrite();     // TO version
-     //Vector visc(2);
-     //Vector prim(nvel+2);
-     double visc[2]; // TO version
-     double prim[nvel+2];     
-     for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
+     double *dataVisc = bufferVisc->HostReadWrite();     
      for (int i = 0; i < Tdof; i++) {
-         prim[1 + nvel] = Tdata[i]; 
-         transportPtr->GetViscosities(prim, prim, visc);
-	 data[i] = visc[0] / Pr;
+	 data[i] = dataVisc[i] / Pr;
      }
    }
 
+   /*
    if (config.sgsModelType > 0) {
      double *dataSubgrid = bufferSubgridVisc->HostReadWrite();
      double *data = bufferAlpha->HostReadWrite();     
@@ -3287,7 +3295,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      double *viscMult = bufferViscMult->HostReadWrite();
      double *data = bufferAlpha->HostReadWrite();          
      for (int i = 0; i < Tdof; i++) { data[i] *= viscMult[i]; }
-   }     
+   }
+   */
    
      
    Ht_bdfcoeff.constant = bd0 / dt;
@@ -6000,13 +6009,14 @@ void LoMachSolver::initSolutionAndVisualizationVectors() {
 
   // compute factor to multiply viscosity when this option is active
   //spaceVaryViscMult = NULL;
-  ParGridFunction coordsDof(vfes);
-  pmesh->GetNodes(coordsDof);
+  // this should be moved to Setup
   bufferViscMult = new ParGridFunction(tfes);
   {
     double *data = bufferViscMult->HostReadWrite();
     for (int i = 0; i < tfes->GetNDofs(); i++) { data[i] = 1.0; }
-  }     
+  }
+  ParGridFunction coordsDof(vfes);
+  pmesh->GetNodes(coordsDof);  
   if (config.linViscData.isEnabled) {
     double *viscMult = bufferViscMult->HostReadWrite();
     double *hcoords = coordsDof.HostReadWrite();
