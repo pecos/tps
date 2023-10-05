@@ -15,11 +15,11 @@ RUN yum -y --enablerepo powertools install lmod-ohpc
 RUN yum -y install metis-gnu9-ohpc
 RUN yum -y install phdf5-gnu9-mpich-ohpc
 RUN yum -y install netcdf-gnu9-mpich-ohpc
-#RUN yum -y install petsc-gnu9-mpich-ohpc
-#RUN yum -y install superlu_dist-gnu9-mpich-ohpc
-#RUN yum -y install openblas-gnu9-ohpc
-#RUN yum -y install scalapack-gnu9-mpich-ohpc
-#RUN yum -y install ptscotch-gnu9-mpich-ohpc
+RUN yum -y install petsc-gnu9-mpich-ohpc
+RUN yum -y install superlu_dist-gnu9-mpich-ohpc
+RUN yum -y install openblas-gnu9-ohpc
+RUN yum -y install scalapack-gnu9-mpich-ohpc
+RUN yum -y install ptscotch-gnu9-mpich-ohpc
 RUN yum -y install lmod-defaults-gnu9-mpich-ofi-ohpc
 RUN yum -y install gdb
 RUN yum -y install man
@@ -101,7 +101,8 @@ RUN . /etc/profile.d/lmod.sh \
     && cd /tmp/grvy-$grvy_ver \
     && ./configure CXXFLAGS="-std=c++11" LDFLAGS="-Wl,-rpath,$BOOST_LIB" \
     && make \
-    && make install
+    && make install \
+    && rm -rf /usr/local/lib/libgrvy.la /usr/local/lib/libgrvyf.la /usr/local/lib/libgrvy.a /usr/local/lib/libgrvyf.a
 RUN rm /tmp/grvy-$grvy_ver.tar.gz
 
 # gslib
@@ -173,6 +174,7 @@ RUN ldconfig
 RUN echo "module try-add metis" >> /etc/profile.d/lmod.sh
 RUN echo "module try-add phdf5" >> /etc/profile.d/lmod.sh
 RUN echo "module try-add petsc" >> /etc/profile.d/lmod.sh
+RUN echo "module try-add openblas" >> /etc/profile.d/lmod.sh
 RUN echo "module try-add boost" >> /etc/profile.d/lmod.sh
 RUN echo "module try-add valgrind" >> /etc/profile.d/lmod.sh
 RUN echo "module try-add gsl" >> /etc/profile.d/lmod.sh
