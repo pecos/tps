@@ -24,18 +24,18 @@ sudo apt install -y apptainer
 ## Running the GPU container with apptainer
 
 First you need to pull the container locally
-
+cd ..
 ```
-apptainer pull docker://uvilla/tps-gpu:latest
+apptainer pull docker://pecosut/tps_gpu_env:latest
 ```
 
-This will save the apptainer image `tps-gpu_latest.sif` in the current directory.
-`TODO:` move this image to `pecosut` account.
+This will save the apptainer image `tps_gpu_env_latest.sif` in the current directory.
+
 
 Next request an interactive shell on the container (use option `--nv` to enable GPU support)
 
 ```
-apptainer shell --nv tps-gpu_latest.sif
+apptainer shell --nv ps_gpu_env_latest.sif
 ```
 
 Inside apptainer, load the modules needed to build and run tps
