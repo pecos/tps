@@ -1,11 +1,10 @@
 name: gpuimage
 on:
-  workflow_call:
-    secrets:
-      DOCKERHUB_USERNAME:
-        required: true
-      DOCKERHUB_TOKEN:
-        required: true
+  push:
+    branches:
+      - main
+  pull_request:
+  
 jobs:
    docker-ci:
      runs-on: ubuntu-latest
