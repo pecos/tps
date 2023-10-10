@@ -508,6 +508,14 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
 
   for (int i = 0; i < dof; i++) {
     for (int k = 0; k < num_equation_; k++) (state)(k) = xmat(i, k);
+
+    // Make sure species are non-negative
+    int numActiveSpecies = mixture->GetNumActiveSpecies();
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      int eq = nvel + 2 + sp;
+      state[eq] = max(state[eq],0.0);
+    }
+
     DenseMatrix gradUpi(num_equation_, dim);
     for (int eq = 0; eq < num_equation_; eq++) {
       for (int d = 0; d < dim; d++) gradUpi(eq, d) = dataGradUp[i + eq * dof + d * num_equation_ * dof];
