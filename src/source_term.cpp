@@ -123,6 +123,15 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
       for (int d = 0; d < _dim; d++)
         gradUpn[eq + d * _num_equation] = h_gradUp[n + eq * nnodes + d * _num_equation * nnodes];
     }
+
+    const int numActiveSpecies = _mixture->GetNumActiveSpecies();
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      int eq = 3 + 2 + sp;
+      upn[eq] = max(upn[eq],0.0);
+      Un[eq] = max(Un[eq],0.0);
+    }
+
+
     // TODO(kevin): update E-field with EM coupling.
     // E-field can have azimuthal component.
     double Efield[gpudata::MAXDIM];

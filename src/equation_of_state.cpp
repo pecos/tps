@@ -592,6 +592,9 @@ MFEM_HOST_DEVICE double PerfectMixture::computeAmbipolarElectronNumberDensity(co
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     n_e += GetGasParams(sp, GasParams::SPECIES_CHARGES) * n_sp[sp];
   }  // Background species doesn't have to be included due to its neutral charge.
+  if (n_e < 0.0) {
+    n_e = 0.0;
+  }
   assert(n_e >= 0.0);
   return n_e;
 }
