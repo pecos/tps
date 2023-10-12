@@ -173,6 +173,12 @@ class RunConfiguration {
   // initial constant field
   double initRhoRhoVp[5];
 
+  // ic flag to use internal ic function definition
+  bool useICFunction;
+
+  // wall bc flag to use internal function definition
+  bool useWallFunction;  
+  
   // Imposed pressure gradient  
   bool isForcing;
   double gradPress[3];
