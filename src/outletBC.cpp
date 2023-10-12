@@ -1136,6 +1136,7 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;
+  const int nvel = nvel_;
 
   const RiemannSolver *d_rsolver = rsolver;
   GasMixture *d_mix = d_mixture_;
@@ -1161,6 +1162,8 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
     for (int i = 0; i < elDof; i++) {
       index_i[i] = d_elem_dofs_list[elOffset + i];
     }
+
+    const int numActiveSpecies = d_mix->GetNumActiveSpecies();
 
     // for (int q = 0; q < Q; q++) {
     MFEM_FOREACH_THREAD(q, x, Q) {
@@ -1192,6 +1195,13 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
             gradUp1[eq + d * num_equation] += d_gradUp[indexi + eq * totDofs + d * num_equation * totDofs] * shape[i];
         }
       }
+
+      // ensure non-negative densities
+      for (int sp = 0; sp < numActiveSpecies; sp++) {
+        const int sp_eq = nvel + 2 + sp;
+        u1[sp_eq] = max(u1[sp_eq], 0.0);
+      }
+
 
       // compute mirror state
       switch (type) {
