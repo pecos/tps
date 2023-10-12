@@ -357,7 +357,6 @@ class M2ulPhyS : public TPS::Solver {
   void write_soln_data(hid_t group, string varName, hid_t dataspace, double *data);
 
   void Check_NAN();
-  void Check_Undershoot();
   bool Check_JobResubmit();
   bool Check_ExitEarly(int iter);
   void Cache_Paraview_Timesteps();
@@ -446,6 +445,7 @@ class M2ulPhyS : public TPS::Solver {
   ParGridFunction *GetJouleHeatingGF() { return joule_heating_; }
 
   static int Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_print);
+  void Check_Undershoot();
 
   void setConstantPlasmaConductivityGF() {
     ParGridFunction *coordsDof = new ParGridFunction(dfes);
