@@ -3,10 +3,11 @@
 cd test
 
 rm -R output-plasma
+rm -R output-plasma-refine2
 
-cp Restart/restart_output-plasma.LTE.h5 restart_output-plasma.sol.h5
+cp Restart/lowP/restart_output-plasma.LTE.h5 restart_output-plasma.sol.h5
+cp Restart/highP/restart_output-plasma-refine2.sol.h5 restart_output-plasma-refine2.sol.h5
 
-# cp Restart/restart_output-plasma.sol.* ./ 
 
 
 EXE=../src/tps

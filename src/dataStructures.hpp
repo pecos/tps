@@ -52,7 +52,7 @@ const int MAXEQUATIONS = MAXDIM + 2 + MAXSPECIES;  // momentum + two energies + 
 const int MAXREACTIONS = 34;
 const int MAXCHEMPARAMS = 3;
 
-const int MAXTABLE = 512;
+const int MAXTABLE = 1024; // NOTE(malamast): The original value was 512!
 const int MAXTABLEDIM = 2;
 
 const int MAXVISUAL = 128;
@@ -76,9 +76,11 @@ enum ChemistryModel { /* CANTERA, */ NUM_CHEMISTRYMODEL };
 
 enum ReactionModel { ARRHENIUS, HOFFERTLIEN, TABULATED_RXN, NUM_REACTIONMODEL };
 
-enum RadiationModel { NONE_RAD, NET_EMISSION, NUM_RADIATIONMODEL };
+enum RadiationModel { NONE_RAD, NET_EMISSION, P1_MODEL, NUM_RADIATIONMODEL };
 
 enum NetEmissionCoefficientModel { TABULATED_NEC, NUM_NECMODEL };
+
+enum P1RadiationModelModel { TABULATED_P1, NUM_P1MODEL };
 
 enum GasParams {
   SPECIES_MW,
@@ -662,9 +664,21 @@ struct AuxiliaryVisualizationIndexes {
 
 struct RadiationInput {
   RadiationModel model;
+  bool visualization;
 
   NetEmissionCoefficientModel necModel;
   TableInput necTableInput;
+
+  P1RadiationModelModel P1Model;
+  int NumOfGroups;                               // Number of groups to be used in the P1 model.
+  std::string pathToFiles;
+  TableInput P1TableInput;
+  int solve_rad_every_n; // We call the radiation solver only every solve_rad_every_n steps
+
+  int MaxIters;
+  double P1_Tolerance;
+  int PrintLevels;
+
 };
 
 #endif  // DATASTRUCTURES_HPP_

@@ -185,7 +185,7 @@ void M2ulPhyS::initMixtureAndTransportModels() {
         // Read data from hdf5 file containing 4 columns: T, energy, gas constant, speed of sound
         DenseMatrix thermo_data;
         bool success;
-        success = h5ReadBcastMultiColumnTable(config.lteMixtureInput.thermo_file_name, std::string("T_energy_R_c"),
+        success = h5ReadBcastMultiColumnTable(config.lteMixtureInput.thermo_file_name, std::string(""), std::string("T_energy_R_c"),
                                               TPSCommWorld, thermo_data, thermo_tables);
         if (!success) exit(ERROR);
 
@@ -232,7 +232,7 @@ void M2ulPhyS::initMixtureAndTransportModels() {
         // Read data from hdf5 file containing 4 columns: T, mu, kappa, sigma
         // (i.e., temperature, dynamic viscosity, thermal conductivity, electrical conductivity)
         DenseMatrix trans_data;
-        success = h5ReadBcastMultiColumnTable(config.lteMixtureInput.trans_file_name, std::string("T_mu_kappa_sigma"),
+        success = h5ReadBcastMultiColumnTable(config.lteMixtureInput.trans_file_name, std::string(""), std::string("T_mu_kappa_sigma"),
                                               TPSCommWorld, trans_data, trans_tables);
         if (!success) exit(ERROR);
 
@@ -500,22 +500,6 @@ void M2ulPhyS::initVariables() {
 
   initMixtureAndTransportModels();
 
-  switch (config.radiationInput.model) {
-    case NET_EMISSION:
-#if defined(_CUDA_) || defined(_HIP_)
-      tpsGpuMalloc((void **)(&radiation_), sizeof(NetEmission));
-      gpu::instantiateDeviceNetEmission<<<1, 1>>>(config.radiationInput, radiation_);
-#else
-      radiation_ = new NetEmission(config.radiationInput);
-#endif
-      break;
-    case NONE_RAD:
-      break;
-    default:
-      mfem_error("RadiationModel not recognized.");
-      break;
-  }
-
   order = config.GetSolutionOrder();
 
   MaxIters = config.GetNumIters();
@@ -570,6 +554,7 @@ void M2ulPhyS::initVariables() {
   vfes = new ParFiniteElementSpace(mesh, fec, num_equation, Ordering::byNODES);
   gradUpfes = new ParFiniteElementSpace(mesh, fec, num_equation * dim, Ordering::byNODES);
 
+
 #if defined(_CUDA_) || defined(_HIP_)
   // prepare viscous sponge data to pass to gpu ctor
   viscositySpongeData vsd;
@@ -611,6 +596,28 @@ void M2ulPhyS::initVariables() {
   rsolver = new RiemannSolver(num_equation, mixture, eqSystem, d_fluxClass, config.RoeRiemannSolver(),
                               config.isAxisymmetric());
 #endif
+
+
+  // Initialise radiation model
+  switch (config.radiationInput.model) {
+    case NET_EMISSION:
+#if defined(_CUDA_) || defined(_HIP_)
+      tpsGpuMalloc((void **)(&radiation_), sizeof(NetEmission));
+      gpu::instantiateDeviceNetEmission<<<1, 1>>>(config.radiationInput, radiation_);
+#else
+      radiation_ = new NetEmission(config.radiationInput);
+#endif
+      break;
+    case P1_MODEL:
+      radiation_ = new P1Model(config.radiationInput, mesh, fec, fes, config.isAxisymmetric());
+      break;
+    case NONE_RAD:
+      break;
+    default:
+      mfem_error("RadiationModel not recognized.");
+      break;
+  }
+
 
 #ifdef _GPU_
   initIndirectionArrays();
@@ -719,7 +726,7 @@ void M2ulPhyS::initVariables() {
       new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType, d_fluxClass,
                       mixture, d_mixture, chemistry_, transportPtr, radiation_, vfes, fes, gpu_precomputed_data_,
                       maxIntPoints, maxDofs, A, Aflux, mesh, spaceVaryViscMult, U, Up, gradUp, gradUpfes, gradUp_A,
-                      bcIntegrator, config, plasma_conductivity_, joule_heating_, distance_);
+                      bcIntegrator, config, plasma_conductivity_, joule_heating_, distance_,energySinkRad);
 
   CFL = config.GetCFLNumber();
   rhsOperator->SetTime(time);
@@ -1646,6 +1653,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   // this variable is purely for visualization
   press = new ParGridFunction(fes);
+  energySinkRad = new ParGridFunction(fes), *energySinkRad = 0.0;
 
   passiveScalar = NULL;
   if (eqSystem == NS_PASSIVE) {
@@ -1828,7 +1836,6 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     }
   }
 
-
   if (config.saveTemperatureField) {
     ioData.registerIOFamily("Temperature field", "/temperature", temperature, true, false);
     ioData.registerIOVar("/temperature", "temperature", 0, false);
@@ -1837,8 +1844,6 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     //   ioData.registerIOVar("/temperature", "electron_temperature", 0, false);
     // }
   }
-
-
 
   // compute factor to multiply viscosity when this option is active
   spaceVaryViscMult = NULL;
@@ -1871,6 +1876,9 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   }
   paraviewColl->RegisterField("temp", temperature);
   paraviewColl->RegisterField("press", press);
+  if (radiation_->inputs.model == P1_MODEL) {
+    paraviewColl->RegisterField("energySink", energySinkRad);
+  }
   if (eqSystem == NS_PASSIVE) {
     paraviewColl->RegisterField("passiveScalar", passiveScalar);
   }
@@ -1988,6 +1996,15 @@ void M2ulPhyS::solveBegin() {
 }
 
 void M2ulPhyS::solveStep() {
+
+  if (radiation_->inputs.model == P1_MODEL) {
+    if (iter % radiation_->inputs.solve_rad_every_n == 0) {
+      radiation_->SetCycle(iter);
+      radiation_->SetTime(time);
+      radiation_->Solve(temperature, energySinkRad); 
+    }
+  } 
+
   timeIntegrator->Step(*U, time, dt);
 
   Check_NAN();
@@ -2098,6 +2115,7 @@ void M2ulPhyS::solveEnd() {
   if (iter == MaxIters) {
     // auto hUp = Up->HostRead();
     Up->HostRead();
+
     mixture->UpdatePressureGridFunction(press, Up);
 
     // write_restart_files();
@@ -3777,9 +3795,10 @@ void M2ulPhyS::parseRadiationInputs() {
   tpsP->getInput(basepath.c_str(), type, std::string("none"));
   std::string modelInputPath(basepath + "/" + type);
 
+  tpsP->getInput("plasma_models/visualization", config.radiationInput.visualization, false);
+
   if (type == "net_emission") {
     config.radiationInput.model = NET_EMISSION;
-
     std::string coefficientType;
     tpsP->getRequiredInput((modelInputPath + "/coefficient").c_str(), coefficientType);
     if (coefficientType == "tabulated") {
@@ -3788,6 +3807,29 @@ void M2ulPhyS::parseRadiationInputs() {
       readTable(inputPath, config.radiationInput.necTableInput);
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown net emission coefficient type -> %s\n", coefficientType.c_str());
+      exit(ERROR);
+    }
+  } else if (type == "p1_model") {
+    config.radiationInput.model = P1_MODEL;
+    std::string coefficientType;
+    tpsP->getRequiredInput((modelInputPath + "/coefficient").c_str(), coefficientType);
+
+    tpsP->getRequiredInput((modelInputPath + "/solve-rad-every-n").c_str(), config.radiationInput.solve_rad_every_n);
+    // tpsP->getInput((modelInputPath + "/timing-frequency").c_str(), config.radiationInput.timing_freq, 100);
+    tpsP->getInput((modelInputPath + "/MaxIters").c_str(), config.radiationInput.MaxIters, 200);
+    tpsP->getInput((modelInputPath + "/P1_Tolerance").c_str(), config.radiationInput.P1_Tolerance, 1e-10);
+    tpsP->getInput((modelInputPath + "/PrintLevels").c_str(), config.radiationInput.PrintLevels, -1);
+
+    if (coefficientType == "tabulated") {
+      config.radiationInput.P1Model = TABULATED_P1;
+      tpsP->getRequiredInput((modelInputPath + "/num_of_groups").c_str(), config.radiationInput.NumOfGroups);
+      std::string inputPath(modelInputPath + "/tabulated");
+      tpsP->getInput((inputPath + "/x_log").c_str(), config.radiationInput.P1TableInput.xLogScale, false);
+      tpsP->getInput((inputPath + "/f_log").c_str(), config.radiationInput.P1TableInput.fLogScale, false);
+      tpsP->getInput((inputPath + "/order").c_str(), config.radiationInput.P1TableInput.order, 1);
+      tpsP->getRequiredInput((inputPath + "/path_to_files").c_str(), config.radiationInput.pathToFiles);
+    } else {
+      grvy_printf(GRVY_ERROR, "\nUnknown P1 model. -> %s\n", coefficientType.c_str());
       exit(ERROR);
     }
   } else if (type == "none") {

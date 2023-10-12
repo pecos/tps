@@ -237,7 +237,7 @@ class M2ulPhyS : public TPS::Solver {
   // Visualization functions (these are pointers to Up)
   ParGridFunction *temperature, *dens, *vel, *vtheta, *passiveScalar;
   ParGridFunction *electron_temp_field;
-  ParGridFunction *press;
+  ParGridFunction *press, *energySinkRad;
   std::vector<ParGridFunction *> visualizationVariables_;
   std::vector<std::string> visualizationNames_;
   AuxiliaryVisualizationIndexes visualizationIndexes_;
@@ -433,6 +433,7 @@ class M2ulPhyS : public TPS::Solver {
   ParGridFunction *getPrimitiveGF() { return Up; }
   ParGridFunction *getGradientGF() { return gradUp; }
   ParGridFunction *getPressureGF() { return press; }
+  ParGridFunction *getTemperatureGF() { return temperature; }
   IntegrationRules *getIntegrationRules() { return intRules; }
   RunConfiguration &GetConfig() { return config; }
   GasMixture *getMixture() { return mixture; }

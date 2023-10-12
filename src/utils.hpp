@@ -84,8 +84,8 @@ void h5_read_attribute(hid_t source, std::string attribute, T &value) {
 
 // A simple HDF5 routine to read two-dimensional array into DenseMatrix.
 // Return result as boolean.
-bool h5ReadTable(const std::string &fileName, const std::string &datasetName, mfem::DenseMatrix &output,
-                 mfem::Array<int> &shape);
+bool h5ReadTable(const std::string &fileName, const std::string &groupName, const std::string &datasetName, 
+                 mfem::DenseMatrix &output, mfem::Array<int> &shape);
 
 /** Read multi-column table
  *
@@ -94,7 +94,8 @@ bool h5ReadTable(const std::string &fileName, const std::string &datasetName, mf
  * are broadcast to all ranks.  The length of the input std::vector of
  * TableInput must match the number of columsn read.
  */
-bool h5ReadBcastMultiColumnTable(const std::string &fileName, const std::string &datasetName, MPI_Comm TPSCommWorld,
+bool h5ReadBcastMultiColumnTable(const std::string &fileName, const std::string &groupName, 
+                                 const std::string &datasetName, MPI_Comm TPSCommWorld,
                                  mfem::DenseMatrix &output, std::vector<TableInput> &tables);
 
 // MFEM extensions

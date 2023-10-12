@@ -45,7 +45,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
                          ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
                          ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A,
                          BCintegrator *_bcIntegrator, RunConfiguration &_config, ParGridFunction *pc,
-                         ParGridFunction *jh, ParGridFunction *distance)
+                         ParGridFunction *jh, ParGridFunction *distance, ParGridFunction *_energySinkRad)
     : TimeDependentOperator(_A->Height()),
       config_(_config),
       iter(_iter),
@@ -78,7 +78,8 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
       gradUpfes(_gradUpfes),
       gradUp_A(_gradUp_A),
       bcIntegrator(_bcIntegrator),
-      distance_(distance) {
+      distance_(distance),
+      energySinkRad_(_energySinkRad) {
   flux.SetSize(vfes->GetNDofs(), dim_, num_equation_);
   z.UseDevice(true);
   z.SetSize(A->Height());
@@ -125,7 +126,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   if (_config.GetWorkingFluid() != WorkingFluid::DRY_AIR) {
     forcing.Append(new SourceTerm(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up, gradUp,
                                   gpu_precomputed_data_, _config, mixture, d_mixture_, _transport, _chemistry,
-                                  _radiation, plasma_conductivity_, distance_));
+                                  _radiation, plasma_conductivity_, distance_, energySinkRad_));
   }
 #ifdef HAVE_MASA
   if (config_.use_mms_) {
