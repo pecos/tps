@@ -866,6 +866,13 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const elementIndexingData &
         }
       }
 
+      // ensure non-negative densities
+      for (int sp = 0; sp < numActiveSpecies; sp++) {
+        const int sp_eq = nvel + 2 + sp;
+        u1[sp_eq] = max(u1[sp_eq], 0.0);
+      }
+
+
       // compute mirror state
       switch (type) {
         case InletType::SUB_DENS_VEL:

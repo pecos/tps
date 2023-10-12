@@ -592,6 +592,14 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
       }
     }
 
+    // Make sure species are non-negative
+    const int numActiveSpecies = d_fluxClass->GetNumActiveSpecies();
+    const int nvel = d_fluxClass->GetNumVels();
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      int eq = nvel + 2 + sp;
+      Un[eq] = max(Un[eq],0.0);
+    }
+
     d_fluxClass->ComputeConvectiveFluxes(Un, fluxn);
 
     double xyz[3];
