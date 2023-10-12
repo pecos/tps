@@ -63,7 +63,8 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
   if (computeMean) {
     //     mixture = new DryAir(config,dim);
 
-    rmsFes = new ParFiniteElementSpace(mesh, fec, numRMS, Ordering::byNODES);
+    //rmsFes = new ParFiniteElementSpace(mesh, fec, numRMS, Ordering::byNODES);
+    rmsFes = new ParFiniteElementSpace(mesh, fec, numRMS);    
 
     meanUp = new ParGridFunction(vfes);
     rms = new ParGridFunction(rmsFes);
@@ -85,10 +86,10 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
     paraviewMean->SetLevelsOfDetail(config.GetSolutionOrder());
     paraviewMean->SetHighOrderOutput(true);
     paraviewMean->SetPrecision(8);
-
     paraviewMean->RegisterField("dens", meanRho);
     paraviewMean->RegisterField("vel", meanV);
-    paraviewMean->RegisterField("press", meanP);
+    //paraviewMean->RegisterField("press", meanP);
+    paraviewMean->RegisterField("temp", meanP);
     paraviewMean->RegisterField("rms", rms);
     if (eqSystem == NS_PASSIVE) paraviewMean->RegisterField("passScalar", meanScalar);
 
@@ -137,28 +138,47 @@ void Averaging::addSampleMean(const int &iter) {
 }
 
 void Averaging::addSample_cpu() {
+
+  //std::cout << "Here we go, averages away!" << endl;
+  
   double *dataUp = Up->GetData();
   double *dataMean = meanUp->GetData();
   double *dataRMS = rms->GetData();
-  int dof = fes->GetNDofs();
-
+  int dof = fes->GetNDofs();  
   Vector iUp(num_equation);
 
+  //std::cout << "check 0" << endl;  
+
   for (int n = 0; n < dof; n++) {
-    for (int eq = 0; eq < num_equation; eq++) iUp[eq] = dataUp[n + eq * dof];
+    
+    for (int eq = 0; eq < num_equation; eq++) {
+      iUp[eq] = dataUp[n + eq * dof];
+    }
 
     // mean
     for (int eq = 0; eq < num_equation; eq++) {
       double mVal = double(samplesMean) * dataMean[n + eq * dof];
       dataMean[n + eq * dof] = (mVal + iUp[eq]) / double(samplesMean + 1);
 
-      // presseure-temperature change
+      //std::cout << "check 1 " << eq << " of " << num_equation << endl;  
+      
+      // pressure-temperature change
+      /*
       if (eq == dim + 1) {
+        std::cout << "... Calling ComputePressureFromPrimitives..." << endl;  		
         double p = mixture->ComputePressureFromPrimitives(iUp);
+        std::cout << "... and done" << endl;  	
         dataMean[n + eq * dof] = (mVal + p) / double(samplesMean + 1);
+        std::cout << "dataMean for p set" << endl;  		
       }
+      */
+
+      //std::cout << "check 2 " << eq << " of " << num_equation << endl;  
+      
     }
 
+    //std::cout << "check 3" << endl;  
+    
     // ----- RMS -----
     // velocities
     Vector meanVel(3), vel(3);
@@ -169,6 +189,8 @@ void Averaging::addSample_cpu() {
       vel[d] = dataUp[n + dof * (d + 1)];
     }
 
+    //std::cout << "check 4" << endl;  
+    
     // xx
     double val = dataRMS[n];
     dataRMS[n] = (val * double(samplesMean) + (vel[0] - meanVel[0]) * (vel[0] - meanVel[0])) / double(samplesMean + 1);
@@ -192,7 +214,11 @@ void Averaging::addSample_cpu() {
     val = dataRMS[n + 5 * dof];
     dataRMS[n + 5 * dof] =
         (val * double(samplesMean) + (vel[1] - meanVel[1]) * (vel[2] - meanVel[2])) / double(samplesMean + 1);
+
+    //std::cout << "check 5" << endl;  
+    
   }
+  
 }
 
 void Averaging::write_meanANDrms_restart_files(const int &iter, const double &time) {
@@ -201,7 +227,6 @@ void Averaging::write_meanANDrms_restart_files(const int &iter, const double &ti
       paraviewMean->SetCycle(iter);
       paraviewMean->SetTime(time);
     }
-
     paraviewMean->Save();
   }
 }

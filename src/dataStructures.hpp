@@ -128,6 +128,7 @@ enum InletType {
 
 enum OutletType {
   SUB_P,        // subsonic outlet specified with pressure
+  RESIST_IN,    // subsonic outlet specified with pressure which REDUCES with inflow
   SUB_P_NR,     // non-reflecting subsonic outlet specified with pressure
   SUB_MF_NR,    // Mass-flow non-reflecting
   SUB_MF_NR_PW  // point-based non-reflecting massflow BC

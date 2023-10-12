@@ -938,24 +938,24 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
     
     //}
 
-    /*
+    // HERE
     if (loadFromAuxSol) {
       assert(config.RestartSerial() == "no");  // koomie, check cis
       auxOrder = read_order;
-
+      /*
       if (basisType == 0)
         aux_fec = new DG_FECollection(auxOrder, dim, BasisType::GaussLegendre);
       else if (basisType == 1)
         aux_fec = new DG_FECollection(auxOrder, dim, BasisType::GaussLobatto);
-
-      aux_vfes = new ParFiniteElementSpace(mesh, aux_fec, num_equation, Ordering::byNODES);
-
+      aux_vfes = new ParFiniteElementSpace(pmesh, aux_fec, num_equation, Ordering::byNODES);	
+      */
+      aux_fec = new H1_FECollection(auxOrder, dim);
+      aux_vfes = new ParFiniteElementSpace(pmesh, aux_fec, num_equation);
       aux_U_data = new double[num_equation * aux_vfes->GetNDofs()];
       aux_U = new ParGridFunction(aux_vfes, aux_U_data);
     } else {
-    */
     assert(read_order == order);
-    //}
+    }
     
     //std::cout << " okay 3aj " << endl; 		
 
@@ -1076,14 +1076,14 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
       }
       */
 
-      //if (loadFromAuxSol && fam.allowsAuxRestart) dof = aux_vfes->GetNDofs();
+      if (loadFromAuxSol && fam.allowsAuxRestart) dof = aux_vfes->GetNDofs();
 
       if (rank0_ || config.isRestartPartitioned(mode)) assert((int)numInSoln == dof);
 
       // get pointer to raw data
       double *data = fam.pfunc_->HostReadWrite();
       // special case if starting from aux soln
-      /*
+      /**/
       if (loadFromAuxSol && fam.allowsAuxRestart) {
         data = aux_U->HostReadWrite();
 
@@ -1091,7 +1091,7 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
         // multiple pargridfunctions when changing the solution order
         assert(ioData.families_.size() == 1);
       }
-      */
+      /**/
 
       vector<IOVar> vars = ioData.vars_[fam.group_];
       for (auto var : vars) {
@@ -1107,13 +1107,14 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
 
   if (file >= 0) H5Fclose(file);
 
-  /*
   if (mode == "read" && loadFromAuxSol) {
     if (mpi_.Root()) cout << "Interpolating from auxOrder = " << auxOrder << " to order = " << order << endl;
 
     // Interpolate from aux to new order
-    U->ProjectGridFunction(*aux_U);
+    //U->ProjectGridFunction(*aux_U);
+    Up->ProjectGridFunction(*aux_U);    
 
+    /*    
     // If interpolation was successful, the L2 norm of the
     // difference between the auxOrder and order versions should be
     // zero (well... to within round-off-induced error)
@@ -1138,14 +1139,15 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
       mixture->GetConservativesFromPrimitives(iState, conservedState);
       for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * vfes->GetNDofs()] = conservedState[eq];
     }
-
+    */    
+    
     // clean up aux data
     delete aux_U;
     delete aux_U_data;
     delete aux_vfes;
     delete aux_fec;
+    
   }
-  */
 
 #ifdef HAVE_GRVY
   grvy_timer_end(__func__);

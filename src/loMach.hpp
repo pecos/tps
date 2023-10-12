@@ -436,7 +436,7 @@ protected:
    Vector Nun, Nunm1, Nunm2;
    Vector Fext, FText, Lext, Uext, Ldiv;          
    Vector resu, tmpR1, tmpR1b, tmpR1c;
-   Vector gradMu, gradU, gradV, gradW;
+   Vector gradMu, gradU, gradV, gradW, gradT;
    Vector FBext;
    Vector divU, Qt;
    Vector gravity;
@@ -452,7 +452,7 @@ protected:
    Vector gridScale;
   
    ParGridFunction un_gf, un_next_gf, curlu_gf, curlcurlu_gf,
-     Lext_gf, FText_gf, resu_gf, Pext_gf;
+     Lext_gf, FText_gf, resu_gf, Pext_gf, gradT_gf;
 
    ParGridFunction unm1_gf, unm2_gf;
    ParGridFunction Tnm1_gf, Tnm2_gf;    
@@ -682,6 +682,9 @@ public:
    void updateU();
    void copyU();
    void interpolateInlet();
+   void uniformInlet();
+   void updateTimestep();
+   void setTimestep();  
 
    // i/o routines
    void read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data);
