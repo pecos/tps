@@ -56,11 +56,28 @@ jobs:
            echo "echo --------------------------" >> ${{env.DOCKERPATH}}/motd.sh
            chmod 755 ${{env.DOCKERPATH}}/motd.sh
            cat ${{env.DOCKERPATH}}/motd.sh
-       - name: Docker Image - Build and push
+       - name: Docker Image - Build and push sm_70
          if: env.CI_NEEDS_REBUILD
          uses: docker/build-push-action@v3
          with:
            push: true
            context: ${{ env.DOCKERPATH }}
-           tags: ${{ steps.meta.outputs.tags }}
+           tags: pecosut/tps_gpu_env:sm_70
+           build-args: cuda_arch_number=70
+       - name: Docker Image - Build and push sm_75
+         if: env.CI_NEEDS_REBUILD
+         uses: docker/build-push-action@v3
+         with:
+           push: true
+           context: ${{ env.DOCKERPATH }}
+           tags: pecosut/tps_gpu_env:sm_75
+           build-args: cuda_arch_number=75
+       - name: Docker Image - Build and push sm_80
+         if: env.CI_NEEDS_REBUILD
+         uses: docker/build-push-action@v3
+         with:
+           push: true
+           context: ${{ env.DOCKERPATH }}
+           tags: pecosut/tps_gpu_env:sm_80
+           build-args: cuda_arch_number=80
 

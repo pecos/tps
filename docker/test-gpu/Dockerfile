@@ -48,6 +48,13 @@ RUN yum -y install perl-Data-Dumper
 RUN yum -y install flex
 RUN yum -y install bison
 
+RUN pip3 install gcovr
+
+RUN pip3 install "pybind11[global]"
+
+RUN . /etc/profile.d/lmod.sh \
+    && pip3 install mpi4py && pip3 install cupy
+
 # build doxygen from scratch (no package... really?)
 RUN wget https://www.doxygen.nl/files/doxygen-1.9.5.src.tar.gz -P /tmp
 RUN cd /tmp; tar xvf /tmp/doxygen-1.9.5.src.tar.gz
@@ -114,6 +121,8 @@ RUN . /etc/profile.d/lmod.sh \
     && make CC=mpicc CFLAGS="-O3 -fPIC" DESTDIR=/usr/local
 RUN rm /tmp/v$gslib_ver.tar.gz
 
+ARG cuda_arch_number=75
+
 # Hypre (w/ CUDA support)
 ENV CUDA_HOME=/usr/local/cuda
 RUN . /etc/profile.d/lmod.sh \
@@ -121,7 +130,7 @@ RUN . /etc/profile.d/lmod.sh \
     && wget  https://github.com/hypre-space/hypre/archive/refs/tags/v2.26.0.tar.gz \
     && tar -zxvf v2.26.0.tar.gz \
     && cd hypre-2.26.0/src/ \
-    && ./configure --enable-shared --with-cuda --with-gpu-arch="70" --disable-fortran --prefix=/usr/local \
+    && ./configure --enable-shared --with-cuda --enable-unified-memory --with-gpu-arch="${cuda_arch_number}" --disable-fortran --prefix=/usr/local \
     && make -j 6 \
     && make install
 
@@ -137,7 +146,7 @@ RUN cd /tmp; tar xvf /tmp/v$mfem_ver.tar.gz
 RUN . /etc/profile.d/lmod.sh \
     && module load  metis \
     && cd /tmp/mfem-$mfem_ver \
-    && make pcuda CUDA_ARCH=sm_70 \
+    && make pcuda CUDA_ARCH=sm_${cuda_arch_number} \
     PREFIX=$mfem_prefix \
     STATIC=NO SHARED=YES \
     HYPRE_OPT=-I$HYPRE_INC HYPRE_LIB="-L$HYPRE_LIB -lHYPRE" \
@@ -156,14 +165,11 @@ ENV GRVY_DIR=/usr/local
 ENV MASA_DIR=/usr/local
 
 #
-RUN pip3 install gcovr
+
 
 RUN yum -y install gsl-gnu9-ohpc
 
-RUN pip3 install "pybind11[global]"
 
-RUN . /etc/profile.d/lmod.sh \
-    && pip3 install mpi4py && pip3 install cupy
 
 # Register new libs installed into /usr/local/lib with linker
 RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/class.conf
@@ -180,7 +186,9 @@ RUN echo "module try-add valgrind" >> /etc/profile.d/lmod.sh
 RUN echo "module try-add gsl" >> /etc/profile.d/lmod.sh
 
 # include git sha in motd
-# COPY motd.sh /etc/profile.d/motd.sh
+COPY motd.sh /etc/profile.d/motd.sh
+
+ENV CUDA_ARCH=${cuda_arch_number}
 
 ## Define a user
 RUN useradd -u 1000 -m test
