@@ -14,10 +14,7 @@ setup() {
 
     # various GPU card detections
     SKIP="ASPEED"
-    NUM_GPUS=`/sbin/lspci | grep "VGA compatible controller" | grep -v $SKIP | wc -l`
-    if [ $NUM_GPUS -eq 0 ];then
-	NUM_GPUS=`/sbin/lspci | grep "controller: NVIDIA" | wc -l`
-    fi
+    NUM_GPUS=`./count_gpus.sh`
 }
 
 @test "[$TEST] check for input file $RUNFILE" {
