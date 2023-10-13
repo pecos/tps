@@ -20,8 +20,6 @@ jobs:
        - uses: Ana06/get-changed-files@v2.2.0       
          id: files
 #         continue-on-error: true
-       - name: Trigger build of cuda base image
-         uses: ./.github/workflows/docker-cuda-base.yaml
        - name: DockerPATH configuration
          run: echo "DOCKERPATH=$DOCKERPATH"
        - name: DockerPATH - check if files in docker path changed
@@ -59,6 +57,9 @@ jobs:
            echo "echo --------------------------" >> ${{env.DOCKERPATH}}/motd.sh
            chmod 755 ${{env.DOCKERPATH}}/motd.sh
            cat ${{env.DOCKERPATH}}/motd.sh
+       - name: Trigger build of cuda base image
+         if: env.CI_NEEDS_REBUILD
+         uses: ./.github/workflows/docker-cuda-base.yaml
        - name: Docker Image - Build and push sm_70
          if: env.CI_NEEDS_REBUILD
          uses: docker/build-push-action@v3
