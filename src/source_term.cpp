@@ -127,10 +127,9 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     const int numActiveSpecies = _mixture->GetNumActiveSpecies();
     for (int sp = 0; sp < numActiveSpecies; sp++) {
       int eq = 3 + 2 + sp;
-      upn[eq] = max(upn[eq],0.0);
-      Un[eq] = max(Un[eq],0.0);
+      upn[eq] = max(upn[eq], 0.0);
+      Un[eq] = max(Un[eq], 0.0);
     }
-
 
     // TODO(kevin): update E-field with EM coupling.
     // E-field can have azimuthal component.

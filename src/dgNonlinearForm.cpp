@@ -635,7 +635,6 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
     const int numActiveSpecies = d_flux->GetNumActiveSpecies();
     const int nvel = d_flux->GetNumVels();
 
-
     for (int elFace = 0; elFace < numFaces; elFace++) {
       const int f = d_shared_elements_to_shared_faces[1 + elFace + 1 + el * 7];
       const int dof2 = d_face_num_dof2[f];
@@ -698,7 +697,6 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
           u1[sp_eq] = max(u1[sp_eq], 0.0);
           u2[sp_eq] = max(u2[sp_eq], 0.0);
         }
-
 
         // get distance
         double d1 = d_dist1[f * maxIntPoints + k];
