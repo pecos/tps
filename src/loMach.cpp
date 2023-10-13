@@ -2,7 +2,6 @@
 
 // look at elasticity integrator
 ///*  Add description later //
-
 #include "loMach.hpp"
 #include "mfem/general/forall.hpp"
 #include "mfem/linalg/solvers.hpp"
@@ -448,7 +447,7 @@ void LoMachSolver::initialize() {
       partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
       //partitioning_ = Array<int>(mesh->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
       if (rank0_) partitioning_file_hdf5("write");
-      MPI_Barrier(MPI_COMM_WORLD);
+      //? MPI_Barrier(MPI_COMM_WORLD);
     }
 
     // make sure these are actually hooked up!
@@ -2468,7 +2467,6 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       MFEM_FORALL(i, Text.Size(),	
       {
 	d_Text[i] = ab1_*d_Tn[i] + ab2_*d_Tnm1[i] + ab3_*d_Tnm2[i];
-	//d_Text[i] = d_Tn[i]; //POS0	 
       });
    }
 
@@ -2491,11 +2489,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    if (constantDensity != true) {
      double *data = rn.HostWrite();        
      double *Tdata = Text.HostReadWrite();
-     //double *Tdata = Tn.HostReadWrite();
      for (int i = 0; i < TdofInt; i++) {
        data[i] = thermoPressure / (Rgas * Tdata[i]);
-       //std::cout << data[i] << " " << static_rho << endl;
-       //data[i] = static_rho;       
      }
    }
    else {
@@ -2588,9 +2583,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 	 for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[i + dir * TdofInt]; }
 	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * TdofInt]; }
          sgsSmag(gradUp, delta[i], nu_sgs);
-         //std::cout << " Smagorinsky: " << nu_sgs << " " << gradUp(0,0) << " " << gradUp(0,1) << " " << gradUp(0,2) << endl;
-         data[i] = nu_sgs;	 
-         //data[i] = rho[i] * nu_sgs;
+         data[i] = nu_sgs;
        }
      } else if (config.sgsModelType == 2) {
        for (int i = 0; i < TdofInt; i++) {     
@@ -2603,12 +2596,46 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * TdofInt]; }
          sgsSigma(gradUp, delta[i], nu_sgs);
 	 data[i] = nu_sgs;
-         //data[i] = rho[i] * nu_sgs;
        }       
      }
      bufferSubgridVisc->SetFromTrueDofs(subgridViscSml);     
    }
    /**/
+
+   // total viscosity
+   if (constantViscosity != true) {
+     double *dataVisc = bufferVisc->HostReadWrite();        
+     double *Tdata = Tn_gf.HostReadWrite();
+     double *Rdata = rn_gf.HostReadWrite();     
+     double visc[2];
+     double prim[nvel+2];
+     for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
+     for (int i = 0; i < Tdof; i++) {
+       prim[1+nvel] = Tdata[i];
+       transportPtr->GetViscosities(prim, prim, visc); // returns dynamic
+       dataVisc[i] = visc[0] * (Rgas * Tdata[i]) / thermoPressure; // this give kinematic...
+       //dataVisc[i] = visc[0] / Rdata[i];       
+     }
+   } else {
+     double *dataVisc = bufferVisc->HostReadWrite();        
+     for (int i = 0; i < Tdof; i++) {
+       dataVisc[i] = kin_vis;
+     }
+   }   
+   if (config.sgsModelType > 0) {
+     double *dataSubgrid = bufferSubgridVisc->HostReadWrite();
+     double *dataVisc = bufferVisc->HostReadWrite();
+     for (int i = 0; i < Tdof; i++) { dataVisc[i] += dataSubgrid[i]; }     
+   }      
+   if (config.linViscData.isEnabled) {
+     double *viscMult = bufferViscMult->HostReadWrite();
+     double *dataVisc = bufferVisc->HostReadWrite();
+     for (int i = 0; i < Tdof; i++) { dataVisc[i] *= viscMult[i]; }
+   }
+
+   // interior-sized visc needed for p-p rhs
+   bufferVisc->GetTrueDofs(viscSml);   
+   
    
    
    // Set current time for velocity Dirichlet boundary conditions.
@@ -2617,63 +2644,21 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 
    // Set current time for pressure Dirichlet boundary conditions.
    for (auto &pres_dbc : pres_dbcs) {pres_dbc.coeff->SetTime(time + dt);}
-   //std::cout << "Check b..." << std::endl;   
-
-   /*
-   double *dataVisc = bufferVisc->HostReadWrite();
-   for (int i = 0; i < Vdof; i++) { // should this be dof of Vdof size?
-     dataVisc[i] = kin_vis;
-   }
-   */
-   //std::cout << "Check c..." << std::endl;
-
-   //Tn_gf.SetFromTrueDofs(Tn);
-   if (constantViscosity != true) {
-     double *dataVisc = bufferVisc->HostReadWrite();        
-     double *Tdata = Tn_gf.HostReadWrite();
-     double visc[2];
-     double prim[nvel+2];
-     for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
-     for (int i = 0; i < Tdof; i++) {
-       prim[1+nvel] = Tdata[i];
-       transportPtr->GetViscosities(prim, prim, visc); // returns dynamic
-       dataVisc[i] = visc[0] * (Rgas * Tdata[i]) / thermoPressure; // this give kinematic...
-     }
-   } else {
-     double *dataVisc = bufferVisc->HostReadWrite();        
-     for (int i = 0; i < Tdof; i++) {
-       dataVisc[i] = kin_vis;
-     }
-   }
-   
-   if (config.sgsModelType > 0) {
-     double *dataSubgrid = bufferSubgridVisc->HostReadWrite();
-     double *dataVisc = bufferVisc->HostReadWrite();
-     for (int i = 0; i < Tdof; i++) { dataVisc[i] += dataSubgrid[i]; }     
-   }      
-
-   if (config.linViscData.isEnabled) {
-     double *viscMult = bufferViscMult->HostReadWrite();
-     double *dataVisc = bufferVisc->HostReadWrite();
-     for (int i = 0; i < Tdof; i++) { dataVisc[i] *= viscMult[i]; }
-   }        
    
    H_bdfcoeff.constant = bd0 / dt;
    H_form->Update();
    H_form->Assemble();
    H_form->FormSystemMatrix(vel_ess_tdof, H);
-   //std::cout << "Check d..." << std::endl;   
    
    HInv->SetOperator(*H);
    if (partial_assembly)
    {
       delete HInvPC;
       Vector diag_pa(vfes->GetTrueVSize());
-      H_form->AssembleDiagonal(diag_pa); // invalid read
+      H_form->AssembleDiagonal(diag_pa);
       HInvPC = new OperatorJacobiSmoother(diag_pa, vel_ess_tdof);
       HInv->SetPreconditioner(*HInvPC);
    }
-   //std::cout << "Check e..." << std::endl;       
    
    // Extrapolated f^{n+1} (source term: f(n+1))
    for (auto &accel_term : accel_terms)
@@ -2683,7 +2668,6 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 
    f_form->Assemble();
    f_form->ParallelAssemble(fn);
-   //std::cout << "Check f..." << std::endl;      
 
    // gravity term
    if ( config.isGravity ) {
@@ -2771,7 +2755,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    if ( config.isGravity ) { Fext.Add(1.0, boussinesqField); }
 
    // Fext = M^{-1} (F(u^{n}) + f^{n+1}) (F* w/o known part of BDF)
-   MvInv->Mult(Fext, tmpR1); // conditional jump
+   MvInv->Mult(Fext, tmpR1);
    iter_mvsolve = MvInv->GetNumIterations();
    res_mvsolve = MvInv->GetFinalNorm();
    Fext.Set(1.0, tmpR1);
@@ -2844,8 +2828,6 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    //Lext *= kin_vis;
 
 
-   // interior-sized visc needed for p-p rhs
-   bufferVisc->GetTrueDofs(viscSml);
    /*
    if (constantViscosity != true) {
      double *dataViscSml = viscSml.HostReadWrite();
@@ -2875,22 +2857,23 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      //const double *dataVisc = bufferVisc->HostRead();     // TO version
      double *dataVisc = viscSml.HostReadWrite();
      double *dataRho = rn.HostReadWrite();     
-     //double *data = Lext.HostReadWrite();     
+     double *data = Lext.HostReadWrite();     
      for (int eq = 0; eq < dim; eq++) {
        for (int i = 0; i < TdofInt; i++) {
-         Lext[i + eq*TdofInt] *= (dataRho[i] * dataVisc[i]);
-         //Lext[i + eq * Tdof] = Lext[i + eq * Tdof] * dataVisc[i];
-         //data[i + eq * TdofInt] = data[i + eq * TdofInt] * dataViscSml[i]; // invalid read
+	 //	 data[i + eq*TdofInt] *= (dataRho[i] * dataVisc[i]);
+	 	 data[i + eq*TdofInt] *= dataVisc[i];	 
        }
      }
    } else {
-     //double *data = Lext.HostReadWrite();     
+     double *data = Lext.HostReadWrite();     
      for (int eq = 0; eq < dim; eq++) {
        for (int i = 0; i < TdofInt; i++) {
-         Lext[i + eq*TdofInt] *= (static_rho * kin_vis);
+	 //         data[i + eq*TdofInt] *= (static_rho * kin_vis);
+         data[i + eq*TdofInt] *= kin_vis;	 
        }
      }     
-   }
+   }   
+   
    //std::cout << "Check o..." << std::endl;      
    sw_curlcurl.Stop();
 
@@ -2935,8 +2918,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
        double *data = Qt.HostReadWrite();     
        for (int i = 0; i < TdofInt; i++) {
 //         data[i] *= Cp * Rdata[i] * Ndata[i] / (Pr*thermoPressure);
-         data[i] *= Rgas * Rdata[i] * Ndata[i] / (Pr*thermoPressure);	 
-//         data[i] *= 0.0;
+//         data[i] *= Rgas * Rdata[i] * Ndata[i] / (Pr*thermoPressure);	 
+         data[i] *= 0.0;
        }
      }
 
@@ -2981,6 +2964,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    if (incompressibleSolve != true) {
 
      // viscosity gradient
+     /*
      {
        double *Ndata = viscSml.HostReadWrite();
        double *Rdata = rn.HostReadWrite();       
@@ -2989,71 +2973,22 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
          data[i] = Rdata[i] * Ndata[i];
        }
      }          
-     //G->Mult(viscSml, tmpR1);
      G->Mult(tmpR0, tmpR1);     
      MvInv->Mult(tmpR1, gradMu);
+     */
 
-     /* moved up...
-     
-     // gradient of u_i
+     G->Mult(viscSml, tmpR1);
+     MvInv->Mult(tmpR1, gradMu);
+     /*
      {
-       int eq = 0;
-       double *dataU = Uext.HostReadWrite();
-       double *data = tmpR0.HostReadWrite();              
-       for (int i = 0; i < TdofInt; i++) {
-         data[i] = dataU[i + eq*TdofInt];
-       }
-     }     
-     G->Mult(tmpR0, tmpR1);
-     MvInv->Mult(tmpR1, gradU);
-     {
-       int eq = 1;
-       double *dataU = Uext.HostReadWrite();
-       double *data = tmpR0.HostReadWrite();              
-       for (int i = 0; i < TdofInt; i++) {
-         data[i] = dataU[i + eq*TdofInt];
-       }
-     }     
-     G->Mult(tmpR0, tmpR1);
-     MvInv->Mult(tmpR1, gradV);
-     {
-       int eq = 2;
-       double *dataU = Uext.HostReadWrite();
-       double *data = tmpR0.HostReadWrite();              
-       for (int i = 0; i < TdofInt; i++) {
-         data[i] = dataU[i + eq*TdofInt];
-       }
-     }     
-     G->Mult(tmpR0, tmpR1);
-     MvInv->Mult(tmpR1, gradW);
-     
-     
-     // divergence of u_i
-     {
-       int eq = 0;
-       double *dataGradU = gradU.HostReadWrite();      
-       double *data = divU.HostReadWrite();
-       for (int i = 0; i < TdofInt; i++) {
-         data[i] = dataGradU[i + eq*TdofInt];
+       double *data = gradMu.HostReadWrite();
+       double *Rdata = rn.HostReadWrite();
+       for (int eq = 0; eq < dim; eq++) {
+         for (int i = 0; i < TdofInt; i++) {
+           data[i + eq * TdofInt] *= Rdata[i];
+         }
        }
      }
-     {
-       int eq = 1;
-       double *dataGradU = gradV.HostReadWrite();      
-       double *data = divU.HostReadWrite();
-       for (int i = 0; i < TdofInt; i++) {
-         data[i] += dataGradU[i + eq*TdofInt];
-       }
-     }
-     {
-       int eq = 2;
-       double *dataGradU = gradW.HostReadWrite();      
-       double *data = divU.HostReadWrite();
-       for (int i = 0; i < TdofInt; i++) {
-         data[i] += dataGradU[i + eq*TdofInt];
-       }
-     }
-
      */
 
      // momentum only portion, TODO: break-up loops, this will thrash
@@ -3107,7 +3042,9 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
            data[i + eq*TdofInt] -= onethird * data1[i + eq*TdofInt] * divU[i];
          }
        }
-     }         
+     }
+
+     // Ldiv MAY be w/o rho....
          
      
      // full contribution to pressure-possion
@@ -3216,31 +3153,31 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      
    }
 
+   // \tilde{F} = F - \nu CurlCurl(u), (F* + L*)
+   FText.Set(-1.0, Lext); // negative from curl-curl
+   FText.Add(1.0, Fext); // unsteady also neg on rhs, see HIGH-ORDER MATRIX-FREE INCOMPRESSIBLE FLOW SOLVERS eq 42
+   
    // negative sign on rn would change HERE   
    // can multiply rhs by rho prior to taking div instead of keeping in lhs,
-   // Lext already has rho in it
+   // (CHANGED FOR TESTING) Lext already has rho in it
    if (constantDensity != true) {  // POS2
-     //double *data = FText.HostReadWrite();      // this is empty...
-     double *data = Fext.HostReadWrite();     
+     double *data = FText.HostReadWrite(); // IF rho needs to be added to both Lext and Fext
+     //double *data = Fext.HostReadWrite();     
      double *Tdata = Tn.HostReadWrite();
      double *d_rn = rn.HostReadWrite();             
      for (int i = 0; i < TdofInt; i++) {     
        //data[i] *= thermoPressure / (Rgas * Tdata[i]);
        data[i] *= d_rn[i];
-       //data[i] *= static_rho;       
+       //data[i] *= 1.0; // does not help      
      }
    } else {
-     //double *data = FText.HostReadWrite();
-     double *data = Fext.HostReadWrite();          
+     double *data = FText.HostReadWrite();
+     //double *data = Fext.HostReadWrite();          
      for (int i = 0; i < TdofInt; i++) {     
        data[i] *= static_rho;
      }     
    }   
    
-   // \tilde{F} = F - \nu CurlCurl(u), (F* + L*)
-   FText.Set(-1.0, Lext); // negative from curl-curl
-   FText.Add(1.0, Fext); // unsteady also neg on rhs, see HIGH-ORDER MATRIX-FREE INCOMPRESSIBLE FLOW SOLVERS eq 42
-
    // p_r = \nabla \cdot FText ( i think "p_r" means rhs of pressure-poisson eq, so div(\tilde{F}))
    // applied divergence to full FText vector
    //D->Mult(FText, resp);
@@ -3284,8 +3221,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    //dont get why this is not correct
    //tmpR0.Add(-1.0, FText_bdr); // because tmpR0 is already negged
    //tmpR0.Add(+bd0 / dt, g_bdr);
-   
-   
+      
    // project rhs to p-space
    R0PM0_gf.SetFromTrueDofs(tmpR0);   
    R0PM1_gf.ProjectGridFunction(R0PM0_gf);
@@ -3375,27 +3311,12 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    // grad(P)
    G->Mult(pnBig, resu);
 
-   // add Ldiv to rhs (has rho in it)
-   if (incompressibleSolve != true) {          
-     Mv->Mult(Ldiv,tmpR1);
-     resu.Add(1.0, tmpR1);
-   }
-
-   resu.Neg(); // -gradP => so res ARE on rhs
-   Mv->Mult(Fext, tmpR1); //Mv{F*} has rho in it!
-   resu.Add(1.0, tmpR1); // add to resu
-
-   
-   // negative on rn would change HERE
-   // multiply by 1/rho
-   if (constantDensity != true) {  // POS3
+   // if only gradP needs 1/rho
+   if (constantDensity != true) {
      double *data = resu.HostReadWrite();
-     double *Tdata = Tn.HostReadWrite();
      double *d_rn = rn.HostReadWrite();                  
      for (int i = 0; i < TdofInt; i++) {     
-       //data[i] *= (Rgas * Tdata[i]) / thermoPressure;
        data[i] *= 1.0 / d_rn[i];
-       //data[i] *= 1.0 / static_rho;       
      }
    } else {
      double *data = resu.HostReadWrite();     
@@ -3403,6 +3324,38 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
        data[i] *= 1.0 / static_rho;
      }     
    }
+
+   
+   // add Ldiv to rhs (has rho in it => MAY NOT)
+   if (incompressibleSolve != true) {          
+     Mv->Mult(Ldiv,tmpR1);
+     resu.Add(1.0, tmpR1);
+   }
+
+   resu.Neg(); // -gradP => so res ARE on rhs
+   Mv->Mult(Fext, tmpR1); //Mv{F*} has rho in it! MAY NOT
+   resu.Add(1.0, tmpR1); // add to resu
+
+   
+   // negative on rn would change HERE
+   // multiply by 1/rho
+   /*
+   if (constantDensity != true) {  // POS3
+     double *data = resu.HostReadWrite();
+     double *Tdata = Tn.HostReadWrite();
+     double *d_rn = rn.HostReadWrite();                  
+     for (int i = 0; i < TdofInt; i++) {     
+       //data[i] *= (Rgas * Tdata[i]) / thermoPressure;
+       data[i] *= 1.0 / d_rn[i];
+       //data[i] *= 1.0; // does not help
+     }
+   } else {
+     double *data = resu.HostReadWrite();     
+     for (int i = 0; i < TdofInt; i++) {     
+       data[i] *= 1.0 / static_rho;
+     }     
+   }
+   */
 
    /*
    resu.Neg(); // -gradP => so res ARE on rhs
@@ -3578,7 +3531,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    {
      int eq = 0;
      double *dataGradT = gradT.HostReadWrite(); 
-     double *Udata = un_next.HostReadWrite();
+     //double *Udata = un_next.HostReadWrite();
+     double *Udata = Uext.HostReadWrite();     
      double *data = tmpR0.HostReadWrite();
      for (int i = 0; i < TdofInt; i++) {
        data[i] = 0.0;
@@ -3647,14 +3601,11 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    if (partial_assembly)
    {
       auto *HC = Ht.As<ConstrainedOperator>();
-      //std::cout << "Check 7jB..." << std::endl;                  
       EliminateRHS(*Ht_form, *HC, temp_ess_tdof, Tn_next_gf, resT_gf, Xt2, Bt2, 1);
-      //std::cout << "Check 7jC..." << std::endl;            
    }
    else
    {
       Ht_form->FormLinearSystem(temp_ess_tdof, Tn_next_gf, resT_gf, Ht, Xt2, Bt2, 1);
-      //std::cout << "Check 7jD..." << std::endl;                  
    }
    //std::cout << "Check 7k..." << std::endl;   
 
@@ -5014,7 +4965,10 @@ void LoMachSolver::parseViscosityOptions() {
     
     tpsP_->getRequiredInput("viscosityMultiplierFunction/width", config.linViscData.width);
     tpsP_->getRequiredInput("viscosityMultiplierFunction/viscosityRatio", config.linViscData.viscRatio);
+
+    tpsP_->getInput("viscosityMultiplierFunction/uniformMult", config.linViscData.uniformMult, 1.0);    
   }
+  
   
 }
 
@@ -6239,7 +6193,7 @@ void LoMachSolver::initSolutionAndVisualizationVectors() {
       double coords[3];
       for (int d = 0; d < dim; d++) { coords[d] = hcoords[n + d * tfes->GetNDofs()]; }
       viscSpongePlanar(coords, wgt);
-      viscMult[n] = wgt;
+      viscMult[n] = wgt + (config.linViscData.uniformMult - 1.0);
       //std::cout << pmesh->GetMyRank() << ")" << " Sponge weight: " << wgt << " coords: " << coords[0] << " " << coords[1] << " " << coords[2] << endl;
     }
   }
@@ -6319,6 +6273,7 @@ void LoMachSolver::interpolateInlet() {
 
     string fname;
     fname = "./inputs/inletPlane.csv";
+    //fname = "./inputs/inletPlane.txt";
     const int fname_length = fname.length();
     char* char_array = new char[fname_length + 1];
     strcpy(char_array, fname.c_str());
@@ -6333,6 +6288,7 @@ void LoMachSolver::interpolateInlet() {
       FILE *inlet_file;
       //if ( inlet_file = fopen(char_array,"r") ) {
       if ( inlet_file = fopen("./inputs/inletPlane.csv","r") ) {
+      //if ( inlet_file = fopen("./inputs/inletPlane.txt","r") ) {	
 	std::cout << " ...and open" << endl; fflush(stdout);
       }
       else {
@@ -6368,6 +6324,9 @@ void LoMachSolver::interpolateInlet() {
     
     // paraview slice output from mean
     // 0)"dens",1)"rms:0",2)"rms:1",3)"rms:2",4)"rms:3",5)"rms:4",6)"rms:5",7)"temp",8)"vel:0",9)"vel:1",10)"vel:2",11)"Points:0",12)"Points:1",13)"Points:2"
+
+    // mean output from plane interpolation
+    // 0) no, 1) x, 2) y, 3) z, 4) rho, 5) u, 6) v, 7) w 
     
     // open, read data    
     //if (groupsMPI->isGroupRoot(bcomm)) {
@@ -6378,6 +6337,7 @@ void LoMachSolver::interpolateInlet() {
       /**/
       ifstream file;
       file.open("./inputs/inletPlane.csv");
+      //file.open("./inputs/inletPlane.txt");      
       string line;
       getline(file, line);
       int nLines = 0;
@@ -6387,9 +6347,13 @@ void LoMachSolver::interpolateInlet() {
 	int entry = 0;
         while (sline.good()) {
           string substr;
-          getline(sline, substr, ',');
+          getline(sline, substr, ','); // csv delimited
+          //getline(sline, substr, ' ');  // space delimited
           double buffer = std::stod(substr);
 	  entry++;
+
+	  // using paraview dump
+	  /*
 	  if (entry == 1) {
 	    inlet[nLines].rho = buffer;
 	  } else if (entry == 8) {
@@ -6402,17 +6366,33 @@ void LoMachSolver::interpolateInlet() {
 	    inlet[nLines].w = buffer;
 	  } else if (entry == 12) {
 	    inlet[nLines].x = buffer;
-
-	    /*
-            // HACK HACK ACHK, test mesh starts at -2 and not 0
-  	    inlet[nLines].x = inlet[nLines].x - 2.0;
-	    */
-	    
 	  } else if (entry == 13) {
 	    inlet[nLines].y = buffer;
 	  } else if (entry == 14) {
 	    inlet[nLines].z = buffer;
 	  }
+	  */
+
+	  // using code plane interp
+	  /**/
+	  if (entry == 2) {
+	    inlet[nLines].x = buffer;
+	  } else if (entry == 3) {
+	    inlet[nLines].y = buffer;
+	  } else if (entry == 4) {
+	    inlet[nLines].z = buffer;
+	  } else if (entry == 5) {	    
+	    inlet[nLines].rho = buffer;
+	    // to prevent nans in temp in out-of-domain plane regions
+	    inlet[nLines].temp = thermoPressure / (Rgas * std::max(buffer,1.0));	    
+	  } else if (entry == 6) {
+	    inlet[nLines].u = buffer;	    
+	  } else if (entry == 7) {
+	    inlet[nLines].v = buffer;
+	  } else if (entry == 8) {
+	    inlet[nLines].w = buffer;
+	  }
+	  /**/	  
 	  
         }
         //std::cout << inlet[nLines].rho << " " << inlet[nLines].temp << " " << inlet[nLines].u << " " << inlet[nLines].x << " " << inlet[nLines].y << " " << inlet[nLines].z << endl; fflush(stdout);		
@@ -6491,8 +6471,18 @@ void LoMachSolver::interpolateInlet() {
         dist = sqrt(dist);
 	distMin = std::min(distMin,dist);
       }
+      // find penulitmate minimum distance;
+      double distMinSecond = 1.0e12;
+      for (int j = 0; j < nCount; j++) {	    
+        dist = (xp[0]-inlet[j].x)*(xp[0]-inlet[j].x) + (xp[2]-inlet[j].z)*(xp[2]-inlet[j].z);
+        dist = sqrt(dist);
+	if (dist != distMin) {
+	  distMinSecond = std::min(distMinSecond,dist);
+	}
+      }      
+      
       //radius = 0.5 * (radius + distMin);
-      radius = distMin;
+      radius = distMinSecond;
 
       //std::cout << " radius for interpoaltion: " << 4.0*radius << endl; fflush(stdout);	      
       for (int j=0; j < nCount; j++) {
