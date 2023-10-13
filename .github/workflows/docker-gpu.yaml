@@ -63,6 +63,7 @@ jobs:
             pwd
             ls
             git branch
+            ls -l ./.github/workflows/docker-cuda-base.yaml
        - name: Trigger build of cuda base image
          if: env.CI_NEEDS_REBUILD
          uses: ./.github/workflows/docker-cuda-base.yaml
