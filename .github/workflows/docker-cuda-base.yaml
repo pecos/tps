@@ -1,18 +1,17 @@
-name: gpuimage
+name: cuda_base_image
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-  
+  workflow_call:
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
 jobs:
    docker-ci:
-     uses: ./.github/workflows/docker-cuda-base.yaml
      runs-on: ubuntu-latest
-     name: "docker gpu env"
+     name: "docker cuda base"
      env:
-       DOCKERPATH: docker/test-gpu
-       BASEIMAGEPATH: docker/test-cuda-base
+       DOCKERPATH: docker/test-cuda-base
      steps:
        - uses: actions/checkout@v3
          with:
@@ -24,7 +23,7 @@ jobs:
        - name: DockerPATH configuration
          run: echo "DOCKERPATH=$DOCKERPATH"
        - name: DockerPATH - check if files in docker path changed
-         if: contains(steps.files.outputs.all,env.DOCKERPATH) || contains(steps.files.outputs.all,'docker-gpu.yaml') ||  contains(steps.files.outputs.all,env.BASEIMAGEPATH) || contains(steps.files.outputs.all,'docker-cuda-base.yaml')
+         if: contains(steps.files.outputs.all,env.DOCKERPATH) || contains(steps.files.outputs.all,'docker-cuda-base.yaml')
          run: |
            echo "CI container needs rebuilding..."
            echo "CI_NEEDS_REBUILD=true" >> $GITHUB_ENV
@@ -45,7 +44,7 @@ jobs:
          if: env.CI_NEEDS_REBUILD
          uses: docker/metadata-action@v4
          with:
-           images: pecosut/tps_gpu_env
+           images: pecosut/tps_cuda_base
            tags: type=sha
            flavor: latest=true
        - name: Build Container motd
@@ -53,33 +52,16 @@ jobs:
          run: |
            echo "#!/bin/bash" > ${{env.DOCKERPATH}}/motd.sh
            echo "echo --------------------------" >> ${{env.DOCKERPATH}}/motd.sh
-           echo "echo TPS/CI Development Container"  >> ${{env.DOCKERPATH}}/motd.sh
+           echo "echo TPS/CI CUDA base Container"  >> ${{env.DOCKERPATH}}/motd.sh
            echo "echo \"Revision: `echo ${GITHUB_SHA} | cut -c1-8`\"" >> ${{env.DOCKERPATH}}/motd.sh
            echo "echo --------------------------" >> ${{env.DOCKERPATH}}/motd.sh
            chmod 755 ${{env.DOCKERPATH}}/motd.sh
            cat ${{env.DOCKERPATH}}/motd.sh
-       - name: Docker Image - Build and push sm_70
+       - name: Docker Image - Build and push
          if: env.CI_NEEDS_REBUILD
          uses: docker/build-push-action@v3
          with:
            push: true
            context: ${{ env.DOCKERPATH }}
-           tags: pecosut/tps_gpu_env:sm_70
-           build-args: cuda_arch_number=70
-       - name: Docker Image - Build and push sm_75
-         if: env.CI_NEEDS_REBUILD
-         uses: docker/build-push-action@v3
-         with:
-           push: true
-           context: ${{ env.DOCKERPATH }}
-           tags: pecosut/tps_gpu_env:sm_75
-           build-args: cuda_arch_number=75
-       - name: Docker Image - Build and push sm_80
-         if: env.CI_NEEDS_REBUILD
-         uses: docker/build-push-action@v3
-         with:
-           push: true
-           context: ${{ env.DOCKERPATH }}
-           tags: pecosut/tps_gpu_env:sm_80
-           build-args: cuda_arch_number=80
+           tags: ${{ steps.meta.outputs.tags }}
 

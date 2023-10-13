@@ -11,18 +11,7 @@ setup() {
     RSTRT_FILE_1D=ref_solns/plasma.lte2d.restart.h5
     REF_FILE_1D=ref_solns/plasma.lte1d.final.h5
 
-    found=1
-
-    # defaut to mpirun if available
-    MPIRUN=$(type -P mpirun) || found=0
-
-    # if not, try flux
-    if [ $found -eq 0 ]; then
-        type -P flux && MPIRUN="$(type -P flux) run" || found=0
-    fi
-
-    # if neither mpirun or flux found, then MPIRUN is empty and tests
-    # below will be skipped
+    MPIRUN=`./sniff_mpirun.sh`
 }
 
 @test "[$TEST] verify axisymmetric LTE (1D) plasma case with input from -> $RUNFILE_1D" {
