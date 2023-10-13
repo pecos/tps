@@ -699,7 +699,6 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
           }
         }
 
-
         // extract shape functions at this quad point
         for (int j = 0; j < elDof; j++) {
           shape[j] = d_face_shape[j + q * maxDofs + el_bdry * maxIntPoints * maxDofs];

@@ -2491,9 +2491,9 @@ int M2ulPhyS::Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_pri
 // a TVD scheme. Van Leer's scheme is a common practice.
 void M2ulPhyS::Check_Undershoot() {
   int dof = vfes->GetNDofs();
+#ifdef _GPU_
   int nv = nvel;
   int nsp = numActiveSpecies;
-#ifdef _GPU_
   double *dataU = U->ReadWrite();
 
   MFEM_FORALL(i, dof, {
@@ -2502,7 +2502,6 @@ void M2ulPhyS::Check_Undershoot() {
       dataU[i + eq * dof] = max(dataU[i + eq * dof], 0.0);
     }
   });
-
 #else
   double *dataU = U->HostReadWrite();
   for (int i = 0; i < dof; i++) {

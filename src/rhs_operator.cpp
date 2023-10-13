@@ -513,7 +513,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
     int numActiveSpecies = mixture->GetNumActiveSpecies();
     for (int sp = 0; sp < numActiveSpecies; sp++) {
       int eq = nvel + 2 + sp;
-      state[eq] = max(state[eq],0.0);
+      state[eq] = max(state[eq], 0.0);
     }
 
     DenseMatrix gradUpi(num_equation_, dim);
@@ -597,7 +597,7 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
     const int nvel = d_fluxClass->GetNumVels();
     for (int sp = 0; sp < numActiveSpecies; sp++) {
       int eq = nvel + 2 + sp;
-      Un[eq] = max(Un[eq],0.0);
+      Un[eq] = max(Un[eq], 0.0);
     }
 
     d_fluxClass->ComputeConvectiveFluxes(Un, fluxn);

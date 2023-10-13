@@ -1202,7 +1202,6 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
         u1[sp_eq] = max(u1[sp_eq], 0.0);
       }
 
-
       // compute mirror state
       switch (type) {
         case OutletType::SUB_P:
