@@ -114,7 +114,7 @@ setup() {
     REF_FILE_0=ref_solns/cyl.r0.p2.iter4.h5
     REF_FILE_1=ref_solns/cyl.r1.p2.iter4.h5
 
-    $MPIRUN -np 2 $EXE --runFile $RUNFILE $OPTS
+    $MPIRUN -n 2 $EXE --runFile $RUNFILE $OPTS
 
     test -s $SOLN_FILE_0
     test -s $REF_FILE_0
