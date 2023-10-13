@@ -6,7 +6,13 @@ on:
   pull_request:
   
 jobs:
-   docker-ci:
+    gpubaseimage:
+     uses: ./.github/workflows/docker-cuda-base.yaml
+     secrets:
+       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+   docker-gpu-arch:
+     needs: [gpubaseimage]
      runs-on: ubuntu-latest
      name: "docker gpu env"
      env:
@@ -57,16 +63,6 @@ jobs:
            echo "echo --------------------------" >> ${{env.DOCKERPATH}}/motd.sh
            chmod 755 ${{env.DOCKERPATH}}/motd.sh
            cat ${{env.DOCKERPATH}}/motd.sh
-       - name: Check where am I
-         if: env.CI_NEEDS_REBUILD
-         run: |
-            pwd
-            ls
-            git branch
-            ls -l ./.github/workflows/docker-cuda-base.yaml
-       - name: Trigger build of cuda base image
-         if: env.CI_NEEDS_REBUILD
-         uses: ./.github/workflows/docker-cuda-base.yaml
        - name: Docker Image - Build and push sm_70
          if: env.CI_NEEDS_REBUILD
          uses: docker/build-push-action@v3
