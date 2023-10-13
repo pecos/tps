@@ -171,6 +171,7 @@ struct linearlyVaryingVisc {
   Vector pointInit;
   double viscRatio;
   double width;
+  double uniformMult;
   bool isEnabled;
 };
 
