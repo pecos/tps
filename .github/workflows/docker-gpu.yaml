@@ -57,6 +57,12 @@ jobs:
            echo "echo --------------------------" >> ${{env.DOCKERPATH}}/motd.sh
            chmod 755 ${{env.DOCKERPATH}}/motd.sh
            cat ${{env.DOCKERPATH}}/motd.sh
+       - name: Check where am I
+         if: env.CI_NEEDS_REBUILD
+         run: |
+            pwd
+            ls
+            git branch
        - name: Trigger build of cuda base image
          if: env.CI_NEEDS_REBUILD
          uses: ./.github/workflows/docker-cuda-base.yaml
