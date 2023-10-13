@@ -7,7 +7,6 @@ on:
   
 jobs:
    docker-ci:
-     uses: ./.github/workflows/docker-cuda-base.yaml
      runs-on: ubuntu-latest
      name: "docker gpu env"
      env:
@@ -21,6 +20,8 @@ jobs:
        - uses: Ana06/get-changed-files@v2.2.0       
          id: files
 #         continue-on-error: true
+       - name: Trigger build of cuda base image
+         uses: ./.github/workflows/docker-cuda-base.yaml
        - name: DockerPATH configuration
          run: echo "DOCKERPATH=$DOCKERPATH"
        - name: DockerPATH - check if files in docker path changed
