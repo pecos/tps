@@ -65,6 +65,6 @@ RUN echo "module try-add boost" >> /etc/profile.d/lmod.sh
 RUN echo "module try-add valgrind" >> /etc/profile.d/lmod.sh
 RUN echo "module try-add gsl" >> /etc/profile.d/lmod.sh
 
-ENV CUDA_ARCH=${cuda_arch_number}
+ENV CUDA_ARCH=sm_${cuda_arch_number}
 
 USER test
