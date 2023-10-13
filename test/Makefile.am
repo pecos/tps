@@ -22,24 +22,24 @@ endif
 
 TEST_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) $(top_srcdir)/test/tap-driver.sh
 
-EXTRA_DIST      = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-data rad-data \
-	          ref_solns/*.h5 \
-		  ref_solns/collisions/*.h5 ref_solns/transport/*.h5 ref_solns/reaction/*.h5 \
-		  ref_solns/noSGM1K/*.h5 ref_solns/smag1K_1/*.h5 ref_solns/sigma1K_1/*.h5 \
-	          ref_solns/plate150K/*.h5 ref_solns/plate150K_1step/*.h5 \
-		  vpath.sh die.sh cyl3d.gpu.test cyl3d.mflow.gpu.test wedge.gpu.test \
+EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-data rad-data \
+	          ref_solns/*.h5 ref_solns/collisions/*.h5 ref_solns/transport/*.h5 \
+			  ref_solns/reaction/*.h5 ref_solns/noSGM1K/*.h5 ref_solns/smag1K_1/*.h5 \
+			  ref_solns/sigma1K_1/*.h5 ref_solns/plate150K/*.h5 ref_solns/plate150K_1step/*.h5 \
+		      vpath.sh die.sh count_gpus.sh sniff_mpirun.sh \
+		      cyl3d.gpu.test cyl3d.mflow.gpu.test wedge.gpu.test \
 	          averages.gpu.test cyl3d.test cyl3d.gpu.python.test cyl3d.mflow.test cyl3d.dtconst.test \
-		  die.test averages.test wedge.test cyl3d.interp.test qms.rings.test qms.axisym.test \
-		  sponge_zone.test annulus.test pipe.test valgrind.test valgrind.suppressions \
-		  mms.euler.test reaction.test perfect_gas.test collision_integrals.test \
-	 	  argon_minimal.test argon_minimal.binary.test diffusion_wall.test \
-	 	  inflow_outflow.test mms.ternary_2d.test mms.ternary_2d_wall.test \
-	 	  mms.ternary_2d_inout.test cuda-memcheck.test mms.general_wall.test \
-		  independent_coupling.test interp_em.test mms.euler_2d.test mms.cns_2d.test \
-		  gradient.test coupled-3d.test coupled-3d.splitcomm.test coupled-3d.py-loop.test \
-		  tabulated.test lte_mixture.test distance_fcn.test \
-                  sgsSmag.test sgsSigma.test plate.test pipe.mix.test lte2noneq-restart.test \
-                  coupled-3d.interface.test plasma.axisym.test plasma.axisym.lte1d.test
+		      die.test averages.test wedge.test cyl3d.interp.test qms.rings.test qms.axisym.test \
+		      sponge_zone.test annulus.test pipe.test valgrind.test valgrind.suppressions \
+		      mms.euler.test reaction.test perfect_gas.test collision_integrals.test \
+	 	      argon_minimal.test argon_minimal.binary.test diffusion_wall.test \
+	 	      inflow_outflow.test mms.ternary_2d.test mms.ternary_2d_wall.test \
+	 	      mms.ternary_2d_inout.test cuda-memcheck.test mms.general_wall.test \
+		      independent_coupling.test interp_em.test mms.euler_2d.test mms.cns_2d.test \
+		      gradient.test coupled-3d.test coupled-3d.splitcomm.test coupled-3d.py-loop.test \
+		      tabulated.test lte_mixture.test distance_fcn.test \
+              sgsSmag.test sgsSigma.test plate.test pipe.mix.test lte2noneq-restart.test \
+              coupled-3d.interface.test plasma.axisym.test plasma.axisym.lte1d.test
 
 TESTS = vpath.sh
 XFAIL_TESTS =
