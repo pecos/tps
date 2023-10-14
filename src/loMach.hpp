@@ -437,6 +437,7 @@ protected:
    Vector Fext, FText, Lext, Uext, Ldiv;          
    Vector resu, tmpR1, tmpR1b, tmpR1c;
    Vector gradMu, gradU, gradV, gradW, gradT;
+   Vector dtRho;
    Vector FBext;
    Vector divU, Qt;
    Vector gravity;
@@ -466,13 +467,13 @@ protected:
    Vector Text, Text_bdr, t_bdr;
    Vector resT, tmpR0, tmpR0b, tmpR0c;
    ParGridFunction Tn_gf, Tn_next_gf, Text_gf, resT_gf;
-
+  
    // pressure mimic
    Vector Pext_bdr, p_bdr;
   
    // density, not actually solved for
-   Vector rn;
-   ParGridFunction rn_gf;
+   Vector rn, rn_next, rnm1, rnm2;
+   ParGridFunction rn_gf, rn_next_gf;    
 
    // TrueDof size
    Vector viscSml;
