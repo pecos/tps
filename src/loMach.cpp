@@ -1962,12 +1962,12 @@ void LoMachSolver::UpdateTimestepHistory(double dt)
    Tn = Tn_next;
    Tn_gf.SetFromTrueDofs(Tn);   
 
-   // density
+   // density 
    rnm2 = rnm1;
    rnm1 = rn;
    rn_next_gf.GetTrueDofs(rn_next);
    rn = rn_next;
-   rn_gf.SetFromTrueDofs(rn);   
+   rn_gf.SetFromTrueDofs(rn);
    
 }
 
@@ -2490,7 +2490,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       });
    }
 
-   // extrapolated temp at {n+1}   
+   // extrapolated velocity at {n+1}   
    {
       const auto d_un = un.Read();
       const auto d_unm1 = unm1.Read();
@@ -2585,7 +2585,6 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 
      
    // subgrid scale model: gradUp is in (eq,dim) form
-   /**/
    if (config.sgsModelType > 0) {
      double *dGradU = gradU.HostReadWrite();
      double *dGradV = gradV.HostReadWrite();
@@ -2620,7 +2619,6 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      }
      bufferSubgridVisc->SetFromTrueDofs(subgridViscSml);     
    }
-   /**/
 
    // total viscosity
    if (constantViscosity != true) {
@@ -2708,6 +2706,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    Mt->Mult(tmpR0b, tmpR0);
    resT.Set(-1.0, tmpR0); // move to rhs
 
+   // advection
    {
      int eq = 0;
      double *dataGradT = gradT.HostReadWrite(); 
@@ -2726,6 +2725,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    resT.Add(-1.0, tmpR0b);
 
    // Add boundary terms.
+   /*
    Text_gf.SetFromTrueDofs(Text);
    Text_bdr_form->Assemble();
    Text_bdr_form->ParallelAssemble(Text_bdr);
@@ -2733,6 +2733,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    t_bdr_form->Assemble();
    t_bdr_form->ParallelAssemble(t_bdr);
    resT.Add(-bd0/dt, t_bdr);
+   */
 
    
    // what is this?   THIS MAY BREAK THINGS, check temp_dbc.coeff is used or not
@@ -2790,8 +2791,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      double *TM1 = Tnm1.HostReadWrite();
      double *TM2 = Tnm2.HostReadWrite();               
      for (int i = 0; i < TdofInt; i++) {
-       //data[i] = (thermoPressure / Rgas) * 1.0 / ( TdataP1[i] - TdataP0[i]) * 1.0 / dt;
-       data[i] = bd0idt/TP1[i] + bd1idt/TP0[i] + bd2idt/TM1[i] + bd3idt/TM2[i];  
+       //data[i] = (thermoPressure / Rgas) * (1.0/TP1[i] - 1.0/TP0[i]) * (1.0 / dt);
+       data[i] = bd0idt/TP1[i] + bd1idt/TP0[i] + bd2idt/TM1[i] + bd3idt/TM2[i];
      }
    }
    
@@ -2827,7 +2828,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      double *Rdata = rn_next.HostReadWrite();
      for (int eq = 0; eq < nvel; eq++) {     
        for (int i = 0; i < TdofInt; i++) {
-  	 data[i + eq*TdofInt] = Rdata[i] * gravity[eq];
+  	 //data[i + eq*TdofInt] = Rdata[i] * gravity[eq];
+  	 data[i + eq*TdofInt] = gravity[eq]; // rhs is divided by rho
        }       
      }
      Mv->Mult(tmpR1,boussinesqField);     
@@ -2850,7 +2852,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
   	 data[i + eq*TdofInt] *= std::sqrt(Rdata[i]);
        }       
      }
-   }   
+   }
 
    // Convection in integrated weak from
    N->Mult(uBn, Nun);  
@@ -2858,13 +2860,24 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    // ab-predictor of nonliner term at {n+1}
    {
       const auto d_Nun = Nun.Read();
-      auto d_Fext = FBext.Write();     
+      auto d_Fext = FBext.Write();      
       MFEM_FORALL(i, FBext.Size(),
       {
          d_Fext[i] = d_Nun[i];	 
       });
    }
 
+   // for debugging form
+   {
+     double *data = FBext.HostReadWrite();
+     double *Rdata = rn_next.HostReadWrite();
+     for (int eq = 0; eq < nvel; eq++) {     
+       for (int i = 0; i < TdofInt; i++) {
+  	 data[i + eq*TdofInt] /= Rdata[i];
+       }       
+     }
+   }
+   
    // project NL product back to v-space
    R1PX2_gf.SetFromTrueDofs(FBext);
    R1PM0_gf.ProjectGridFunction(R1PX2_gf);  
@@ -2889,17 +2902,21 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       const auto d_un = un.Read();
       const auto d_unm1 = unm1.Read();
       const auto d_unm2 = unm2.Read();
-      const auto d_rn = rn.Read();
-      const auto d_rnm1 = rnm1.Read();
-      const auto d_rnm2 = rnm2.Read();      
+      //const auto d_rn = rn_next.Read();
+      //const auto d_rnm1 = rnm1.Read();
+      //const auto d_rnm2 = rnm2.Read();      
       auto d_Fext = Fext.ReadWrite();
+      // break this loop up
       for (int eq = 0; eq < nvel; eq++) {     
         for (int i = 0; i < TdofInt; i++) {
-          d_Fext[i + eq * TdofInt] += bd1idt * d_un[i + eq * TdofInt]   * d_rn[i] +
-                                      bd2idt * d_unm1[i + eq * TdofInt] * d_rnm1[i] +
-                                      bd3idt * d_unm2[i + eq * TdofInt] * d_rnm2[i];
+          //d_Fext[i + eq * TdofInt] += d_rn[i] * (bd1idt * d_un[i + eq * TdofInt]   +
+          //                                       bd2idt * d_unm1[i + eq * TdofInt] +
+	  //					 bd3idt * d_unm2[i + eq * TdofInt]);
+          d_Fext[i + eq * TdofInt] += (bd1idt * d_un[i + eq * TdofInt]   +
+                                       bd2idt * d_unm1[i + eq * TdofInt] +
+		      		       bd3idt * d_unm2[i + eq * TdofInt]);	  
 	}
-      }
+      }      
    }
    // Fext now has rho*v*/dt from eq 2.3 in orszag
    sw_extrap.Stop();
@@ -2930,14 +2947,16 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      double *data = Lext.HostReadWrite();     
      for (int eq = 0; eq < dim; eq++) {
        for (int i = 0; i < TdofInt; i++) {
-	 data[i + eq*TdofInt] *= (dataRho[i] * dataVisc[i]);
+	 //data[i + eq*TdofInt] *= (dataRho[i] * dataVisc[i]);
+	 data[i + eq*TdofInt] *= dataVisc[i];	 
        }
      }
    } else {
      double *data = Lext.HostReadWrite();     
      for (int eq = 0; eq < dim; eq++) {
        for (int i = 0; i < TdofInt; i++) {
-         data[i + eq*TdofInt] *= (static_rho * kin_vis);
+         //data[i + eq*TdofInt] *= (static_rho * kin_vis);
+         data[i + eq*TdofInt] *= kin_vis;	 
        }
      }     
    }   
@@ -3021,6 +3040,20 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      }          
      G->Mult(tmpR0, tmpR1);     
      MvInv->Mult(tmpR1, gradMu);
+
+     //G->Mult(viscSml, tmpR1);     
+     //MvInv->Mult(tmpR1, gradMu);
+
+     // for debugging form
+     {
+       double *Rdata = rn_next.HostReadWrite();       
+       double *data = gradMu.HostReadWrite();
+       for (int eq = 0; eq < dim; eq++) {
+         for (int i = 0; i < TdofInt; i++) {
+           data[i + eq * TdofInt] /= Rdata[i];
+         }
+       }
+     }               
 
      // momentum only portion, TODO: break-up loops, this will thrash
      {
@@ -3135,11 +3168,12 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      {
        double factor = 4.0/3.0;
        double *dataVisc = viscSml.HostReadWrite();
-       double *dataRho = rn_next.HostReadWrite();       
+       //double *dataRho = rn_next.HostReadWrite();       
        double *data = tmpR1b.HostReadWrite();     
        for (int eq = 0; eq < dim; eq++) {
          for (int i = 0; i < TdofInt; i++) {
-           data[i + eq*TdofInt] *= (factor * dataVisc[i] * dataRho[i]);
+           //data[i + eq*TdofInt] *= (factor * dataVisc[i] * dataRho[i]);
+           data[i + eq*TdofInt] *= (factor * dataVisc[i]);	   
          }
        }
      }
@@ -3183,6 +3217,17 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    // \tilde{F} = F - \nu CurlCurl(u), (F* + L*)
    FText.Set(-1.0, Lext); // negative from curl-curl
    FText.Add(1.0, Fext); // unsteady also neg on rhs, see HIGH-ORDER MATRIX-FREE INCOMPRESSIBLE FLOW SOLVERS eq 42
+
+   // for debugging form, when FText does not have rho
+   {
+     double *Rdata = rn_next.HostReadWrite();     
+     double *data = FText.HostReadWrite();
+     for (int eq = 0; eq < dim; eq++) {          
+       for (int i = 0; i < TdofInt; i++) {     
+         data[i + eq * TdofInt] *= Rdata[i];
+       }
+     }
+   }
    
    // add some if for porder != vorder
    // project FText to p-1
@@ -3193,7 +3238,6 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    // can add rho here directly
    /**/
    if (incompressibleSolve != true) {
-     //double *dataDivU = divU.HostReadWrite();
      double *dataQ = Qt.HostReadWrite();     
      double *Rdata = rn_next.HostReadWrite();     
      double *data = tmpR0b.HostReadWrite();     
@@ -3263,26 +3307,16 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 
    // grad(P)
    G->Mult(pnBig, resu);
-   resu.Neg(); // move to rhs
-   
-   // convection and part of unsteady
-   Mv->Mult(Fext, tmpR1); //Mv{F*} has rho in it and already on rhs
-   resu.Add(1.0, tmpR1); // add to resu   
-   
-   // add Ldiv to rhs
-   if (incompressibleSolve != true) {          
-     Mv->Mult(Ldiv,tmpR1);
-     resu.Add(1.0, tmpR1);
-   }
+   resu.Neg(); // move to rhs   
 
    // add Uext*dtRho to rhs
    if (constantDensity != true) {
-     double *Rdata = dtRho.HostWrite();
+     double *dtRdata = dtRho.HostWrite();
      double *Udata = Uext.HostReadWrite();
      double *data = tmpR1b.HostReadWrite();
      for (int eq = 0; eq < dim; eq++) {     
        for (int i = 0; i < TdofInt; i++) {
-         data[i + eq * TdofInt] = Udata[i + eq * TdofInt] * Rdata[i];
+         data[i + eq * TdofInt] = Udata[i + eq * TdofInt] * dtRdata[i];
        }
      }
      Mv->Mult(tmpR1b,tmpR1);
@@ -3302,6 +3336,17 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
        data[i] *= 1.0 / static_rho;
      }     
    }
+
+   // convection and part of unsteady (debug form w/o rho)
+   Mv->Mult(Fext, tmpR1);
+   resu.Add(1.0, tmpR1); // add to resu   
+   
+   // add Ldiv to rhs
+   if (incompressibleSolve != true) {          
+     Mv->Mult(Ldiv,tmpR1);
+     resu.Add(1.0, tmpR1);
+   }   
+   
   
    for (auto &vel_dbc : vel_dbcs) { un_next_gf.ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);}
 
