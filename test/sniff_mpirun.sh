@@ -9,7 +9,7 @@ MPIRUN=$(type -P mpirun) || found=0
 
 # if not, try flux
 if [ $found -eq 0 ]; then
-    type -P flux && MPIRUN="$(type -P flux) run" || found=0
+    tmp=$(type -P flux) && MPIRUN="$(type -P flux) run" || found=0
 fi
 
 # if neither mpirun or flux found, then MPIRUN is empty and tests can be skipped using this
