@@ -175,7 +175,7 @@ setup() {
     # now, restart and run 1 additional iteration using 2 mpi tasks
     sed -i 's/maxIters = 2/maxIters = 3/' $RUNFILE_MOD
     echo "enableRestart = True" >> $RUNFILE_MOD
-    $MPIRUN -n 2 $EXE --runFile $RUNFILE_MOD
+    run $MPIRUN -n 2 $EXE --runFile $RUNFILE_MOD
 
     test -s partition.2p.h5
     test -s ${SOLFILE_BASE}.h5
