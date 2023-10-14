@@ -17,10 +17,8 @@ setup() {
     
      # various GPU card detections
     SKIP="ASPEED"
-    NUM_GPUS=`/sbin/lspci | grep "VGA compatible controller" | grep -v $SKIP | wc -l`
-    if [ $NUM_GPUS -eq 0 ];then
-	NUM_GPUS=`/sbin/lspci | grep "controller: NVIDIA" | wc -l`
-    fi
+    NUM_GPUS=`./count_gpus.sh`
+    MPIRUN=`./sniff_mpirun.sh`
 }
 
 @test "[$TEST] caseA: run serial case" {
@@ -38,7 +36,7 @@ setup() {
     [ $NUM_GPUS -ge 4 ] || skip "Four GPUs not available" 
     
     test -s $RUNFILE_B
-    mpirun -n 4 ../src/tps -run $RUNFILE_B $OPT
+    $MPIRUN -n 4 ../src/tps -run $RUNFILE_B $OPT
     test -s $SOLN_FILE
     ./soln_differ -a -r -d 2 $SOLN_FILE $REF_FILE
     
@@ -50,7 +48,7 @@ setup() {
     [ $NUM_GPUS -ge 4 ] || skip "Four GPUs not available" 
     
     test -s $RUNFILE_C1
-    mpirun -n 4 ../src/tps -run $RUNFILE_C1 $OPT
+    $MPIRUN -n 4 ../src/tps -run $RUNFILE_C1 $OPT
     ../src/tps -run $RUNFILE_C2 $OPT
     test -s $SOLN_FILE
     ./soln_differ -a -d 2 $SOLN_FILE $REF_FILE
