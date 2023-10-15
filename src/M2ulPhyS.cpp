@@ -750,7 +750,7 @@ void M2ulPhyS::initVariables() {
 
   xmax = bb_max[0];
   ymax = bb_max[1];
-  (dim == 3) ? zmax = bb_max[2] : zmin = 0.0;
+  (dim == 3) ? zmax = bb_max[2] : zmax = 0.0;
 
   // estimate initial dt
   Up->ExchangeFaceNbrData();
