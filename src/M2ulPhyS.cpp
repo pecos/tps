@@ -370,11 +370,12 @@ void M2ulPhyS::initVariables() {
   // If requested, evaluate the distance function (i.e., the distance to the nearest no-slip wall)
   distance_ = NULL;
   GridFunction *serial_distance = NULL;
+  FiniteElementSpace *serial_fes = NULL;
+  DG_FECollection *tmp_fec = NULL;
   if (config.compute_distance) {
     order = config.GetSolutionOrder();
     dim = serial_mesh->Dimension();
     basisType = config.GetBasisType();
-    DG_FECollection *tmp_fec = NULL;
     if (basisType == 0) {
       tmp_fec = new DG_FECollection(order, dim, BasisType::GaussLegendre);
     } else if (basisType == 1) {
@@ -382,7 +383,7 @@ void M2ulPhyS::initVariables() {
     }
 
     // Serial FE space for scalar variable
-    FiniteElementSpace *serial_fes = new FiniteElementSpace(serial_mesh, tmp_fec);
+    serial_fes = new FiniteElementSpace(serial_mesh, tmp_fec);
 
     // Serial grid function for scalar variable
     serial_distance = new GridFunction(serial_fes);
@@ -405,6 +406,7 @@ void M2ulPhyS::initVariables() {
 
     // Evaluate the distance function
     evaluateDistanceSerial(*serial_mesh, wall_patch_list, coordinates, *serial_distance);
+    delete tmp_dfes;
   }
 
   // Instantiate parallel mesh
@@ -419,6 +421,8 @@ void M2ulPhyS::initVariables() {
     }
     // Done with serial_distance
     delete serial_distance;
+    delete serial_fes;
+    delete tmp_fec;
 
     distance_->ParFESpace()->ExchangeFaceNbrData();
     distance_->ExchangeFaceNbrData();
