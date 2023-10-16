@@ -156,9 +156,12 @@ void M2ulPhyS::initMixtureAndTransportModels() {
           gpu::instantiateDeviceChemistry<<<1, 1>>>(d_mixture, config.chemistryInput, chemistry_);
 #else
           chemistry_ = new Chemistry(mixture, config.chemistryInput);
+
 #endif
           break;
       }
+
+
       break;
     case WorkingFluid::LTE_FLUID:
       int table_dim;
@@ -3367,7 +3370,6 @@ void M2ulPhyS::parseReactionInputs() {
 
     if (model == "arrhenius") {
       config.reactionModels[r - 1] = ARRHENIUS;
-
       double A, b, E;
       tpsP->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
       tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
@@ -3386,6 +3388,9 @@ void M2ulPhyS::parseReactionInputs() {
       config.reactionModels[r - 1] = TABULATED_RXN;
       std::string inputPath(basepath + "/tabulated");
       readTable(inputPath, config.chemistryInput.reactionInputs[r - 1].tableInput);
+
+    } else if (model == "radiative_decay") {
+      config.reactionModels[r - 1] = RADIATIVE_DECAY;
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
       exit(ERROR);
@@ -3457,6 +3462,7 @@ void M2ulPhyS::parseReactionInputs() {
 
       // energy conservation.
       // TODO(kevin): this will need an adjustion when radiation comes into play.
+      // if (config.reactionModels[r] != RADIATIVE_DECAY) {
       double reactEnergy = 0.0, prodEnergy = 0.0;
       for (int sp = 0; sp < numSpecies_; sp++) {
         // int inputSp = (*mixtureToInputMap_)[sp];
@@ -3474,8 +3480,11 @@ void M2ulPhyS::parseReactionInputs() {
         grvy_printf(GRVY_ERROR, "Difference = %.8E\n", delta);
         exit(-1);
       }
+      // }
+
     }
   }
+
 
   // Pack up chemistry input for instantiation.
   {
@@ -3486,9 +3495,11 @@ void M2ulPhyS::parseReactionInputs() {
     } else {
       config.chemistryInput.electronIndex = -1;
     }
+    config.chemistryInput.speciesMapping = &config.speciesMapping;
+    config.chemistryInput.speciesNames = &config.speciesNames;
 
     size_t rxn_param_idx = 0;
-
+    bool RadiativeDecayReactionsIncluded = false;
     config.chemistryInput.numReactions = config.numReactions;
     for (int r = 0; r < config.numReactions; r++) {
       config.chemistryInput.reactionEnergies[r] = config.reactionEnergies[r];
@@ -3504,11 +3515,16 @@ void M2ulPhyS::parseReactionInputs() {
             config.equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS];
       }
 
-      if (config.reactionModels[r] != TABULATED_RXN) {
+      if (config.reactionModels[r] == ARRHENIUS ||  config.reactionModels[r] == HOFFERTLIEN) {
         assert(rxn_param_idx < config.rxnModelParamsHost.size());
         config.chemistryInput.reactionInputs[r].modelParams = config.rxnModelParamsHost[rxn_param_idx].Read();
         rxn_param_idx += 1;
       }
+
+      if (config.reactionModels[r] == RADIATIVE_DECAY) RadiativeDecayReactionsIncluded = true;
+    }
+    if (RadiativeDecayReactionsIncluded) {
+      tpsP->getRequiredInput("reactions/characteristic_length", config.chemistryInput.char_length);
     }
   }
 }
@@ -4287,7 +4303,7 @@ void M2ulPhyS::updateVisualizationVariables() {
       Th = prim[1 + _nvel];
       Te = (in_mix->IsTwoTemperature()) ? prim[_num_equation - 1] : Th;
       double kfwd[gpudata::MAXREACTIONS], kC[gpudata::MAXREACTIONS];
-      in_chem->computeForwardRateCoeffs(Th, Te, kfwd);
+      in_chem->computeForwardRateCoeffs(nsp, Th, Te, kfwd);
       in_chem->computeEquilibriumConstants(Th, Te, kC);
       // get reaction rates
       double progressRates[gpudata::MAXREACTIONS];

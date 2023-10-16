@@ -2100,46 +2100,4 @@ void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInt
 
   conserv[iTh] = totalEnergy;
   primit[iTh] = T;
-
-
-    // double nh = 0.0;
-           
-    // for (int sp = 0; sp < nPop; sp++) nh = nh + n_sp[sp]; 
-    // nh = nh + n_e + n_e + nB;
-    // double p_Mycalc = nh*  UNIVERSALGASCONSTANT *T;
-
-    // double electronPressure = 0.0;
-    // double p_calc =  PerfectMixture::ComputePressure(conserv, &electronPressure);
-
-    // double rho_calc = 0.0;
-    // for (int sp = 0; sp < nPop; sp++) rho_calc = rho_calc + n_sp[sp]* GetGasParams(sp, GasParams::SPECIES_MW); 
-    // rho_calc = rho_calc + n_sp[iIon1]* GetGasParams(iIon1, GasParams::SPECIES_MW); 
-    // rho_calc = rho_calc + n_sp[iElectron]* GetGasParams(iElectron, GasParams::SPECIES_MW); 
-    // rho_calc = rho_calc + n_sp[iBackground]* GetGasParams(iBackground, GasParams::SPECIES_MW); 
-
-    // std::cout << p_0 << " " << p_calc << " " << p_Mycalc << " " <<  n_e << " " << T << " " << rho_calc << std::endl;
-
-    // std::cout << " " << n_sp[0]*GetGasParams(0, GasParams::SPECIES_MW)/GetGasParams(0, GasParams::SPECIES_DEGENERACY) << " " 
-    //           << " " << n_sp[1]*GetGasParams(1, GasParams::SPECIES_MW)/GetGasParams(1, GasParams::SPECIES_DEGENERACY) << " " 
-    //           << " " << n_sp[2]*GetGasParams(2, GasParams::SPECIES_MW)/GetGasParams(2, GasParams::SPECIES_DEGENERACY) << " " 
-    //           << " " << n_sp[iIon1]*GetGasParams(iIon1, GasParams::SPECIES_MW)/GetGasParams(iIon1, GasParams::SPECIES_DEGENERACY) << " " 
-    //           << " " << n_sp[iElectron]*GetGasParams(iElectron, GasParams::SPECIES_MW)/GetGasParams(iElectron, GasParams::SPECIES_DEGENERACY) << " " 
-    //           << " " << n_sp[iBackground]*GetGasParams(iBackground, GasParams::SPECIES_MW)/GetGasParams(iBackground, GasParams::SPECIES_DEGENERACY) << " "
-    //           << std::endl;
-
-    // std::cout << " " << GetGasParams(0, GasParams::SPECIES_MW)*1000.0 << " " 
-    //           << " " << GetGasParams(1, GasParams::SPECIES_MW)*1000.0 << " " 
-    //           << " " << GetGasParams(2, GasParams::SPECIES_MW)*1000.0 << " " 
-    //           << " " << GetGasParams(iIon1, GasParams::SPECIES_MW)*1000.0 << " " 
-    //           << " " << GetGasParams(iElectron, GasParams::SPECIES_MW)*1000.0 << " " 
-    //           << " " << GetGasParams(iBackground, GasParams::SPECIES_MW)*1000.0 << " "
-    //           << std::endl;
-
-
-    // exit(0);
-
-
-
-
-
 }

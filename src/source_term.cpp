@@ -94,7 +94,6 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
   TransportProperties *_transport = transport_; // Why do we do that? The pointers are already set in the class.
   Chemistry *_chemistry = chemistry_;
   Radiation *_radiation = radiation_;
-  const bool _enableRadiation = enableRadiation_;
 
   const int nnodes = vfes->GetNDofs();
   const int _dim = dim;
@@ -164,7 +163,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     double progressRates[gpudata::MAXREACTIONS], creationRates[gpudata::MAXSPECIES];
     if (_numSpecies > 1 && _numReactions > 0) {
       double kfwd[gpudata::MAXREACTIONS], kC[gpudata::MAXREACTIONS];
-      _chemistry->computeForwardRateCoeffs(Th, Te, kfwd);
+      _chemistry->computeForwardRateCoeffs(ns, Th, Te, kfwd);
       _chemistry->computeEquilibriumConstants(Th, Te, kC);
 
       // get reaction rates
@@ -203,17 +202,18 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
 
     // TODO(kevin): energy sink for radiative reaction.
 
-    if (_enableRadiation) {
-      switch (radiation_->inputs.model) {
-        case NET_EMISSION:
-          srcTerm[1 + _nvel] += _radiation->computeEnergySink(Th);    
-          break;
-        case P1_MODEL:
-          srcTerm[1 + _nvel] += (*energySinkRad_)[n];
-          break;
-      }
-    }
 
+    // Radiation source term
+    switch (radiation_->inputs.model) {
+      case NET_EMISSION:
+        srcTerm[1 + _nvel] += _radiation->computeEnergySink(Th);    
+        break;
+      case P1_MODEL:
+        srcTerm[1 + _nvel] += (*energySinkRad_)[n];
+        break;
+      case NONE_RAD:
+        break;          
+    }
 
     if (_mixture->IsTwoTemperature()) {
       // energy sink from electron-impact reactions.

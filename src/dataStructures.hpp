@@ -74,7 +74,7 @@ enum TransportModel { ARGON_MINIMAL, ARGON_MIXTURE, CONSTANT, LTE_TRANSPORT, MIX
 
 enum ChemistryModel { /* CANTERA, */ NUM_CHEMISTRYMODEL };
 
-enum ReactionModel { ARRHENIUS, HOFFERTLIEN, TABULATED_RXN, NUM_REACTIONMODEL };
+enum ReactionModel { ARRHENIUS, HOFFERTLIEN, TABULATED_RXN, RADIATIVE_DECAY, NUM_REACTIONMODEL };
 
 enum RadiationModel { NONE_RAD, NET_EMISSION, P1_MODEL, NUM_RADIATIONMODEL };
 
@@ -629,7 +629,8 @@ struct ReactionInput {
 
 struct ChemistryInput {
   ChemistryModel model;
-
+  std::map<std::string, int> *speciesMapping; // Needed for rediative decay reactions
+  std::vector<std::string> *speciesNames;
   int electronIndex;
   int numReactions;
   double reactionEnergies[gpudata::MAXREACTIONS];
@@ -645,7 +646,7 @@ struct ChemistryInput {
   ReactionModel reactionModels[gpudata::MAXREACTIONS];
   double equilibriumConstantParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
   ReactionInput reactionInputs[gpudata::MAXREACTIONS];
-
+  double char_length;
   double minimumTemperature;
 };
 

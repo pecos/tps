@@ -57,10 +57,11 @@ static const double AVOGADRONUMBER = 6.0221409e+23;    // mol^(-1)
 static const double BOLTZMANNCONSTANT = UNIVERSALGASCONSTANT / AVOGADRONUMBER;
 static const double PLANCKCONSTANT = 6.62607015e-34;  // m^2 kg / s
 static const double VACUUMPERMITTIVITY = 8.8541878128e-12;
-static const double ELECTRONCHARGE = 1.60218e-19;
+static const double ELECTRONCHARGE = 1.602176634e-19;
 static const double MOLARELECTRONCHARGE = ELECTRONCHARGE * AVOGADRONUMBER;
 static const double ELECTRONMASS = 9.1093837015e-31;  // kg
 static const double qeOverkB = ELECTRONCHARGE / BOLTZMANNCONSTANT;
+static const double SPEEDOFLIGHT = 299792458.0; // m/s
 
 static const double IonizationEnergy_Argon = 15.7596119;  // eV
 
@@ -629,6 +630,7 @@ MFEM_HOST_DEVICE inline double DryAir::ComputeTemperature(const double *state) {
 //////////////////////////////////////////////////////////////////////////
 ////// Perfect Mixture GasMixture                     ////////////////////
 //////////////////////////////////////////////////////////////////////////
+
 
 class PerfectMixture : public GasMixture {
  private:
