@@ -409,8 +409,6 @@ void P1Model::readTable(const std::string &filename, const std::string  &groupNa
 
 void P1Model::findValuesOnWall() {
 
-  double *dataG = G->HostReadWrite();
-
   Array<int> wall_tdof_list; 
   Array<int> wall_bdr;
 
@@ -472,6 +470,11 @@ void P1Model::findValuesOnWall() {
   gfVars.push_back(Temperature), gfVarNames.push_back(std::string("Temperature"));
   gfVars.push_back(G_integratedRadiance), gfVarNames.push_back(std::string("G_tot"));
 
+  for (int ig = 0; ig < NumOfGroups; ig++) {
+    gfVars.push_back(Variables_G[ig]), gfVarNames.push_back(varNames_G[ig]);
+  }
+
+
   int nVars = gfVars.size();
 
   // Prepare file to be written
@@ -491,6 +494,7 @@ void P1Model::findValuesOnWall() {
     assert(file >= 0);
 
     h5_save_attribute(file, "NumOfVars", nVars);
+    h5_save_attribute(file, "NumOfGroups", NumOfGroups);
     h5_save_attribute(file, "NumOfWallData", tot_wdof);
     
     dims[0] = tot_wdof;

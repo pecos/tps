@@ -115,7 +115,6 @@ class RHSoperator : public TimeDependentOperator {
   ParGridFunction *Up;
   ParGridFunction *plasma_conductivity_;
   ParGridFunction *joule_heating_;
-  ParGridFunction *distance_;
   ParGridFunction *energySinkRad_;
 
   // gradients of primitives and associated forms&FE space

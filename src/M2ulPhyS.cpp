@@ -3124,12 +3124,12 @@ void M2ulPhyS::parseSpeciesInputs() {
         // discuss with Malamas what he is wanting to achieve here and
         // figure out how to make it work.
         //          
-        } else if (inputSpeciesNames[sp] == "Ar.+1" ||  inputSpeciesNames[sp] == "Ar+1" ) {
-          targetIdx = config.numSpecies - 3;
-        } else if (inputSpeciesNames[sp] == "Ar.+2" ||  inputSpeciesNames[sp] == "Ar+2" ) {
-          targetIdx = config.numSpecies - 4;
-        } else if (inputSpeciesNames[sp] == "Ar2.+1" ||  inputSpeciesNames[sp] == "Ar2+1" ) {
-          targetIdx = config.numSpecies - 5;          
+        // } else if (inputSpeciesNames[sp] == "Ar.+1" ||  inputSpeciesNames[sp] == "Ar+1" ) {
+        //   targetIdx = config.numSpecies - 3;
+        // } else if (inputSpeciesNames[sp] == "Ar.+2" ||  inputSpeciesNames[sp] == "Ar+2" ) {
+        //   targetIdx = config.numSpecies - 4;
+        // } else if (inputSpeciesNames[sp] == "Ar2.+1" ||  inputSpeciesNames[sp] == "Ar2+1" ) {
+        //   targetIdx = config.numSpecies - 5;          
         } else {
           targetIdx = paramIdx;
           paramIdx++;
