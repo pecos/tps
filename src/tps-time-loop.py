@@ -48,7 +48,7 @@ interface = libtps.Tps2Boltzmann(tps)
 tps.initInterface(interface)
 
 it = 0
-max_iters = tps.getRequiredInput("flow/maxIters")
+max_iters = tps.getRequiredInput("cycle-avg-joule-coupled/max-iters")
 print("Max Iters: ", max_iters)
 tps.solveBegin()
 
