@@ -58,7 +58,9 @@ RUN . /etc/profile.d/lmod.sh \
     && pip3 install numpy \
     && pip3 install scipy \
     && pip3 install matplotlib \
-    && pip3 install cupy 
+    && pip3 install cupy \
+    && pip3 install numba \
+    && pip3 install multiprocess
 
 # build doxygen from scratch (no package... really?)
 RUN wget https://www.doxygen.nl/files/doxygen-1.9.5.src.tar.gz -P /tmp
