@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
   tps.initInterface(interface);
   
   int max_iters;
-  tps.getRequiredInput("flow/maxIters", max_iters);
+  tps.getRequiredInput("cycle-avg-joule-coupled/max-iters", max_iters);
   
   tps.solveBegin();
 
