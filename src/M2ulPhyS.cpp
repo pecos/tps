@@ -2012,12 +2012,6 @@ void M2ulPhyS::solveStep() {
 
   Check_NAN();
   if (mixture->GetWorkingFluid() == WorkingFluid::USER_DEFINED) Check_Undershoot();
-<<<<<<< HEAD
-
-  // MPI_Barrier(MPI_COMM_WORLD);
-  // if (rank0_) cout << "skata : " << " Check_Undershoot 2" << endl;
-=======
->>>>>>> ab3da22 (Fix issue with negative unphisical number densities. Negative values odduc due to interpolation error so we force this value to zero in face_integrator.cpp and BCintegrator.cpp. We also check for negative values at the end of the iteration with Check_undershoot. undershoot can occur due to discretisation error in the solution of the transport equation. The use of a TVD scheme could mitigate this effect.)
 
   if (!config.isTimeStepConstant()) {
     double dt_local = CFL * hmin / max_char_speed / static_cast<double>(dim);
@@ -2533,7 +2527,6 @@ int M2ulPhyS::Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_pri
   return htemp[0];
 }
 
-<<<<<<< HEAD
 // Here, we force negative (unphysical) values of species to be zero.
 // Negative values can occur due to numerical oscillations in the solution of the
 // transport equations of scalars. The effect of oscilations can be mitigated by employing
@@ -2560,33 +2553,6 @@ void M2ulPhyS::Check_Undershoot() {
     }
   }
 #endif
-=======
-// Here, we force negative (unphysical) values of species to be zero. 
-// Negative values can occur due to numerical oscillations in the solution of the 
-// transport equations of scalars. The effect of oscilations can be mitigated by employing 
-// a TVD scheme. Van Leer's scheme is a common practice. 
-void M2ulPhyS::Check_Undershoot() {
-  int dof = vfes->GetNDofs();
-// #ifdef _GPU_
-// #else
-  double *dataU = U->GetData();
-  double *dataUp = Up->GetData();
-
-  int iTe = num_equation - 1;
-
-  for (int i = 0; i < dof; i++) {
-    for (int sp = 0; sp < numActiveSpecies; sp++) {
-      int eq = nvel + 2 + sp;
-      dataU[i + eq * dof] = max(dataU[i + eq * dof],0.0); 
-      dataUp[i + eq * dof] = max(dataUp[i + eq * dof],0.0); 
-    }
-    if (twoTemperature_) {
-      dataU[i + iTe * dof] = max(dataU[i + iTe * dof],0.0); 
-      dataUp[i + iTe * dof] = max(dataUp[i + iTe * dof],0.0); 
-    }
-  }
-// #endif
->>>>>>> ab3da22 (Fix issue with negative unphisical number densities. Negative values odduc due to interpolation error so we force this value to zero in face_integrator.cpp and BCintegrator.cpp. We also check for negative values at the end of the iteration with Check_undershoot. undershoot can occur due to discretisation error in the solution of the transport equation. The use of a TVD scheme could mitigate this effect.)
 }
 
 void M2ulPhyS::initialTimeStep() {
