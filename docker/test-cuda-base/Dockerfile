@@ -54,7 +54,11 @@ RUN pip3 install "pybind11[global]"
 RUN pip3 install lxcat_data_parser
 
 RUN . /etc/profile.d/lmod.sh \
-    && pip3 install mpi4py && pip3 install cupy
+    && pip3 install mpi4py \
+    && pip3 install numpy \
+    && pip3 install scipy \
+    && pip3 install matplotlib \
+    && pip3 install cupy 
 
 # build doxygen from scratch (no package... really?)
 RUN wget https://www.doxygen.nl/files/doxygen-1.9.5.src.tar.gz -P /tmp
