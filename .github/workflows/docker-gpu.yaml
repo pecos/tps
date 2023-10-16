@@ -85,3 +85,60 @@ jobs:
           context: ${{ env.DOCKERPATH }}
           tags: pecosut/tps_gpu_env:sm_80
           build-args: cuda_arch_number=80
+  docker-cpu-cupy:
+    needs: [gpubaseimage]
+    runs-on: ubuntu-latest
+    name: "docker cpu env with cuda"
+    env:
+      DOCKERPATH: docker/test-cpu-cupy
+      BASEIMAGEPATH: docker/test-cuda-base
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: Ana06/get-changed-files@v2.2.0       
+        id: files
+      - name: DockerPATH configuration
+        run: echo "DOCKERPATH=$DOCKERPATH"
+      - name: DockerPATH - check if files in docker path changed
+        if: contains(steps.files.outputs.all,env.DOCKERPATH) || contains(steps.files.outputs.all,'docker-gpu.yaml') ||  contains(steps.files.outputs.all,env.BASEIMAGEPATH) || contains(steps.files.outputs.all,'docker-cuda-base.yaml')
+        run: |
+          echo "CI container needs rebuilding..."
+          echo "CI_NEEDS_REBUILD=true" >> $GITHUB_ENV
+      - name: Docker Image - Set up QEMU
+        if: env.CI_NEEDS_REBUILD
+        uses: docker/setup-qemu-action@v2
+      - name: Docker Image - Setup Buildx
+        if: env.CI_NEEDS_REBUILD
+        uses: docker/setup-buildx-action@v2
+      - name: Docker Image - Dockerhub login
+        if: env.CI_NEEDS_REBUILD
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        if: env.CI_NEEDS_REBUILD
+        uses: docker/metadata-action@v4
+        with:
+          images: pecosut/tps_cpu_cupy_env
+          tags: type=sha
+          flavor: latest=true
+      - name: Build Container motd
+        if: env.CI_NEEDS_REBUILD
+        run: |
+          echo "#!/bin/bash" > ${{env.DOCKERPATH}}/motd.sh
+          echo "echo --------------------------" >> ${{env.DOCKERPATH}}/motd.sh
+          echo "echo TPS/CI Development Container"  >> ${{env.DOCKERPATH}}/motd.sh
+          echo "echo \"Revision: `echo ${GITHUB_SHA} | cut -c1-8`\"" >> ${{env.DOCKERPATH}}/motd.sh
+          echo "echo --------------------------" >> ${{env.DOCKERPATH}}/motd.sh
+          chmod 755 ${{env.DOCKERPATH}}/motd.sh
+          cat ${{env.DOCKERPATH}}/motd.sh
+      - name: Docker Image - Build and push
+        if: env.CI_NEEDS_REBUILD
+        uses: docker/build-push-action@v3
+        with:
+          push: true
+          context: ${{ env.DOCKERPATH }}
+          tags: ${{ steps.meta.outputs.tags }}
