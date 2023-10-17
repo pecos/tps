@@ -700,7 +700,6 @@ void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
   tpsP->getInput((inputPath + "/f_log").c_str(), result.fLogScale, false);
   tpsP->getInput((inputPath + "/order").c_str(), result.order, 1);
 
-  const int tableIndex = config.tableHost.size();
   config.tableHost.push_back(DenseMatrix());
 
   int Ndata;
@@ -710,7 +709,7 @@ void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
   if (rank0_) {
     std::string filename;
     tpsP->getRequiredInput((inputPath + "/filename").c_str(), filename);
-    success = h5ReadTable(filename, "table", config.tableHost[tableIndex], dims);
+    success = h5ReadTable(filename, "table", config.tableHost.back(), dims);
     suc_int = (int)success;
 
     // TODO(kevin): extend for multi-column array?
@@ -727,13 +726,13 @@ void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
   assert(dims[0] > 0);
   assert(dims[1] == 2);
 
-  if (!rank0_) (config.tableHost[tableIndex]).SetSize(dims[0], dims[1]);
-  double *d_table = config.tableHost[tableIndex].GetData();
+  if (!rank0_) config.tableHost.back().SetSize(dims[0], dims[1]);
+  double *d_table = config.tableHost.back().HostReadWrite();
   MPI_Bcast(d_table, dims[0] * dims[1], MPI_DOUBLE, 0, TPSCommWorld);
 
   result.Ndata = Ndata;
-  result.xdata = (config.tableHost[tableIndex]).Read();
-  result.fdata = (config.tableHost[tableIndex]).Read() + Ndata;
+  result.xdata = config.tableHost.back().Read();
+  result.fdata = config.tableHost.back().Read() + Ndata;
 
   return;
 }

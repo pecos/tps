@@ -35,6 +35,7 @@
 
 #include <tps_config.h>
 
+#include <list>
 #include <string>
 #include <utility>
 #include <vector>
@@ -226,7 +227,7 @@ class RunConfiguration {
   // NOTE(kevin): this vector of DenseMatrix stores all the tables and provides a proper pointer for both gpu and cpu.
   // note that this will store all types of tabulated data- rxn rate, collision integrals, etc.
   // Indexes of this vector therefore do not correspond exactly to rxn index or other quantities.
-  std::vector<mfem::DenseMatrix> tableHost;
+  std::list<mfem::DenseMatrix> tableHost;
 
   std::map<int, int> mixtureToInputMap;
   std::map<std::string, int> speciesMapping;
