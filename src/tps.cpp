@@ -496,7 +496,7 @@ void tps(py::module &m) {
       .def("getInput", static_cast<int (TPS::Tps::*)(const std::string &, int)>(&TPS::Tps::getInput<int>))
       .def("solve", &TPS::Tps::solve)
       .def("solveBegin", &TPS::Tps::solveBegin)
-      .def("solveStep", &TPS::Tps::solve)
+      .def("solveStep", &TPS::Tps::solveStep)
       .def("solveEnd", &TPS::Tps::solveEnd)
       .def("push", &TPS::Tps::push)
       .def("fetch", &TPS::Tps::fetch)
