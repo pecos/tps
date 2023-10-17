@@ -237,6 +237,12 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
     visc *= wgt;
     bulkViscosity *= wgt;
     k *= wgt;
+
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      for (int d = 0; d < dim; d++) {
+        diffusionVelocity[sp + d * numSpecies] *= wgt;
+      }
+    }
   }
 
   if (twoTemperature) {
@@ -393,6 +399,12 @@ MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const
     visc *= wgt;
     bulkViscosity *= wgt;
     k *= wgt;
+
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      for (int d = 0; d < dim; d++) {
+        diffusionVelocity[sp + d * numSpecies] *= wgt;
+      }
+    }
   }
 
   // Primitive viscous fluxes.
