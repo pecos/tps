@@ -829,6 +829,7 @@ void LoMachSolver::initialize() {
     ioData.registerIOVar("/rmsData", "vw", 5);
     
   }
+  if (verbose) grvy_printf(ginfo, "mean setup good...\n");  
   /**/
 
   
@@ -1869,6 +1870,14 @@ void LoMachSolver::Setup(double dt)
    HtInv->SetMaxIter(config.solver_iter);
    if (rank0_) std::cout << "Temperature operators set" << endl;   
 
+   if (config.resetTemp == true) {
+     double *data = Tn_gf.HostReadWrite();     
+     for (int i = 0; i < Tdof; i++) {
+       data[i] = config.initRhoRhoVp[4];
+     }
+     if (rank0_) std::cout << "Reset temperature to IC" << endl;        
+   }     
+   
    // If the initial condition was set, it has to be aligned with dependent
    // Vectors and GridFunctions
    Tn_gf.GetTrueDofs(Tn);
@@ -1879,7 +1888,6 @@ void LoMachSolver::Setup(double dt)
    }      
    Tn_next_gf.SetFromTrueDofs(Tn_next);
    //std::cout << "Check 28..." << std::endl;     
-
    
    // Set initial time step in the history array
    dthist[0] = dt;
@@ -2505,10 +2513,11 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    G->Mult(Text, tmpR1);
    MvInv->Mult(tmpR1, gradT);
    
-   // gradient of extrapolated velocity
+   // gradient of velocity
    {
      int eq = 0;
-     double *dataU = Uext.HostReadWrite();
+     //double *dataU = Uext.HostReadWrite();
+     double *dataU = un.HostReadWrite();     
      double *data = tmpR0.HostReadWrite();              
      for (int i = 0; i < TdofInt; i++) {
        data[i] = dataU[i + eq*TdofInt];
@@ -2518,7 +2527,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    MvInv->Mult(tmpR1, gradU);
    {
      int eq = 1;
-     double *dataU = Uext.HostReadWrite();
+     //double *dataU = Uext.HostReadWrite();
+     double *dataU = un.HostReadWrite();     
      double *data = tmpR0.HostReadWrite();              
      for (int i = 0; i < TdofInt; i++) {
        data[i] = dataU[i + eq*TdofInt];
@@ -2528,7 +2538,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    MvInv->Mult(tmpR1, gradV);
    {
      int eq = 2;
-     double *dataU = Uext.HostReadWrite();
+     //double *dataU = Uext.HostReadWrite();
+     double *dataU = un.HostReadWrite();          
      double *data = tmpR0.HostReadWrite();              
      for (int i = 0; i < TdofInt; i++) {
        data[i] = dataU[i + eq*TdofInt];
@@ -2537,7 +2548,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    G->Mult(tmpR0, tmpR1);
    MvInv->Mult(tmpR1, gradW);     
      
-   // divergence of extrapolated velocity
+   // divergence of velocity
    {
      int eq = 0;
      double *dataGradU = gradU.HostReadWrite();      
@@ -2675,11 +2686,93 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      double *Rdata = rn.HostReadWrite();
      for (int eq = 0; eq < nvel; eq++) {     
        for (int i = 0; i < TdofInt; i++) {
-  	 data[i + eq*TdofInt] = Rdata[i] * gravity[eq];
+	 //  	 data[i + eq*TdofInt] = Rdata[i] * gravity[eq];
+	 data[i + eq*TdofInt] = gravity[eq];
        }       
      }
      Mv->Mult(tmpR1,boussinesqField);     
    }
+
+   // Qt ~= divU, thermal divergence
+   if (incompressibleSolve != true) {
+
+     /*
+     G->Mult(Text, tmpR1);
+     MvInv->Mult(tmpR1, gradT);
+     gradT_gf.SetFromTrueDofs(gradT);       
+     {
+       double *dataGradT = gradT_gf.HostReadWrite();     
+       double *data = bufferGradT->HostReadWrite();
+       for (int eq = 0; eq < dim; eq++) {     
+         for (int i = 0; i < Tdof; i++) {
+           data[i + eq * Tdof] = dataGradT[i + eq * Tdof];
+         }
+       }
+     }
+     T_bdr_form->Update();  
+     T_bdr_form->Assemble();
+     T_bdr_form->ParallelAssemble(T_bdr);
+     */
+     
+     // laplace(T) => should be T{n+1}, move T-solve before u?
+     double TdivFactor = 0.0;
+     if (loMach_opts_.thermalDiv == true) {
+       Lt->Mult(Text,tmpR0);
+       //tmpR0.Add(1.0,T_bdr);
+       MtInv->Mult(tmpR0, Qt);
+       TdivFactor = 1.0;       
+     }
+
+     // multiple lapl(T) to get correct units
+     // lapl(T) -> div(u): k/P = a*rho*Cp/P =  Cp*mu/Pr * 1/P
+     // J/(kg*K) * kg/m^3 * m^2/s * m^2/N
+     // kg*m^2/s^2 * 1/(kg*K) * kg/m^3 *m^2/s * m^2 * s^2/(kg*m)
+     // m^2/s^2 * 1/K * kg/(m*s) * m*s^2/kg
+     // m^2 * 1/K * 1/s = m^2/(K*s)
+     // lapl(T) = K/m^2 & divU = 1/s 
+     {
+       //double *Tdata = Text.HostReadWrite();
+       double *Ndata = viscSml.HostReadWrite();
+       double *Rdata = rn.HostReadWrite();              
+       double *data = Qt.HostReadWrite();     
+       for (int i = 0; i < TdofInt; i++) {
+//         data[i] *= Cp * Rdata[i] * Ndata[i] / (Pr*thermoPressure);
+         data[i] *= TdivFactor * Rgas * Rdata[i] * Ndata[i] / (Pr*thermoPressure);	 
+       }
+     }
+     
+     // add closed-domain pressure term
+     if (config.isOpen != true) {
+       double *data = Qt.HostReadWrite();     
+       for (int i = 0; i < TdofInt; i++) {
+         data[i] += ((gamma - 1.0)/gamma - Cp) * 1.0 / (Cp*thermoPressure) * dtP;
+       }       
+     }     
+
+     if (loMach_opts_.realDiv == true) {
+       double *data = Qt.HostReadWrite();
+       double *dataDiv = divU.HostReadWrite();            
+       for (int i = 0; i < TdofInt; i++) {
+         data[i] = dataDiv[i];
+       }       
+     }
+     
+     // limit usings actual divU, only necessary with temp discontinuities
+     /*
+     {
+       double *data_divU = divU.HostReadWrite();       
+       double *data = Qt.HostReadWrite();
+       double Qsign;
+       for (int i = 0; i < TdofInt; i++) {
+	 Qsign = data[i] / std::abs(data[i]);
+         data[i] = std::min(std::abs(data[i]),std::abs(data_divU[i]));
+	 data[i] *= Qsign; 
+       }       
+     }
+     */
+     
+   }
+
    
    // Nonlinear extrapolated terms (convection: N*(n+1))
    sw_extrap.Start();
@@ -2706,17 +2799,11 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    R1PX2_gf.GetTrueDofs(uBnm2);
    */
 
+   /*
    un_gf.SetFromTrueDofs(Uext);         
    R1PX2_gf.ProjectGridFunction(un_gf);
    R1PX2_gf.GetTrueDofs(uBn);   
    //std::cout << "Check g..." << std::endl;         
-
-   // this is wastefull, just get Uext and apply N once
-   /*
-   N->Mult(uBn, Nun); 
-   N->Mult(uBnm1, Nunm1);
-   N->Mult(uBnm2, Nunm2);
-   */
 
    N->Mult(uBn, Nun);  // add sqrt(rho) to uBn?
    //std::cout << "Check h..." << std::endl;
@@ -2749,7 +2836,79 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    R1PM0_gf.ProjectGridFunction(R1PX2_gf);  
    R1PM0_gf.GetTrueDofs(Fext);
    //std::cout << "Check j..." << std::endl;
-      
+   */
+
+   
+   // expanded and shifted form with (rhoU)*divU using Qt
+     // TODO: break-up loops, this will thrash
+     {
+       int eq = 0;
+       double *data1 = Uext.HostReadWrite(); 
+       double *dU = gradU.HostReadWrite();
+       double *dV = gradV.HostReadWrite();
+       double *dW = gradW.HostReadWrite();             
+       double *data = Fext.HostReadWrite();
+       for (int i = 0; i < TdofInt; i++) {
+         data[i + eq*TdofInt] = data1[i + 0*TdofInt] * dU[i + eq*TdofInt]
+        	              + data1[i + 1*TdofInt] * dV[i + eq*TdofInt]
+	                      + data1[i + 2*TdofInt] * dW[i + eq*TdofInt];
+       }
+     }    
+     {
+       int eq = 1;
+       double *data1 = Uext.HostReadWrite(); 
+       double *dU = gradU.HostReadWrite();
+       double *dV = gradV.HostReadWrite();
+       double *dW = gradW.HostReadWrite();             
+       double *data = Fext.HostReadWrite();
+       for (int i = 0; i < TdofInt; i++) {
+         data[i + eq*TdofInt] = data1[i + 0*TdofInt] * dU[i + eq*TdofInt]
+        	              + data1[i + 1*TdofInt] * dV[i + eq*TdofInt]
+	                      + data1[i + 2*TdofInt] * dW[i + eq*TdofInt];
+       }
+     }
+     {
+       int eq = 2;
+       double *data1 = Uext.HostReadWrite(); 
+       double *dU = gradU.HostReadWrite();
+       double *dV = gradV.HostReadWrite();
+       double *dW = gradW.HostReadWrite();             
+       double *data = Fext.HostReadWrite();
+       for (int i = 0; i < TdofInt; i++) {
+         data[i + eq*TdofInt] = data1[i + 0*TdofInt] * dU[i + eq*TdofInt]
+        	              + data1[i + 1*TdofInt] * dV[i + eq*TdofInt]
+	                      + data1[i + 2*TdofInt] * dW[i + eq*TdofInt];
+       }
+     }
+
+     if (loMach_opts_.thermalDiv == true) {
+
+       double *dataDiv = Qt.HostReadWrite();
+       double *dataU = un.HostReadWrite();             
+       double *data = Fext.HostReadWrite();
+       for (int eq = 0; eq < dim; eq++) {       
+         for (int i = 0; i < TdofInt; i++) {
+           data[i + eq*TdofInt] += dataDiv[i] * dataU[i + eq*TdofInt];
+         }
+       }
+
+     } else if (loMach_opts_.realDiv == true) {
+
+       double *dataDiv = divU.HostReadWrite(); // should really be div(Uext)
+       double *dataU = un.HostReadWrite();             
+       double *data = Fext.HostReadWrite();
+       for (int eq = 0; eq < dim; eq++) {       
+         for (int i = 0; i < TdofInt; i++) {
+           data[i + eq*TdofInt] += dataDiv[i] * dataU[i + eq*TdofInt];
+         }
+       }
+       
+     }
+     Mv->Mult(Fext,tmpR1); // wasteful, just for testing
+     Fext.Set(-1.0,tmpR1);
+     //Fext.Neg(); // move to rhs
+
+     
    // add forcing/accel term to Fext   
    Fext.Add(1.0, fn);
    if ( config.isGravity ) { Fext.Add(1.0, boussinesqField); }
@@ -2878,86 +3037,6 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    sw_curlcurl.Stop();
 
 
-   // Qt ~= divU, thermal divergence
-   if (incompressibleSolve != true) {
-
-     /*
-     G->Mult(Text, tmpR1);
-     MvInv->Mult(tmpR1, gradT);
-     gradT_gf.SetFromTrueDofs(gradT);       
-     {
-       double *dataGradT = gradT_gf.HostReadWrite();     
-       double *data = bufferGradT->HostReadWrite();
-       for (int eq = 0; eq < dim; eq++) {     
-         for (int i = 0; i < Tdof; i++) {
-           data[i + eq * Tdof] = dataGradT[i + eq * Tdof];
-         }
-       }
-     }
-     T_bdr_form->Update();  
-     T_bdr_form->Assemble();
-     T_bdr_form->ParallelAssemble(T_bdr);
-     */
-     
-     // laplace(T) => should be T{n+1}, move T-solve before u?
-     Lt->Mult(Text,tmpR0);
-     //tmpR0.Add(1.0,T_bdr);
-     MtInv->Mult(tmpR0, Qt);
-
-     // multiple lapl(T) to get correct units
-     // lapl(T) -> div(u): k/P = a*rho*Cp/P =  Cp*mu/Pr * 1/P
-     // J/(kg*K) * kg/m^3 * m^2/s * m^2/N
-     // kg*m^2/s^2 * 1/(kg*K) * kg/m^3 *m^2/s * m^2 * s^2/(kg*m)
-     // m^2/s^2 * 1/K * kg/(m*s) * m*s^2/kg
-     // m^2 * 1/K * 1/s = m^2/(K*s)
-     // lapl(T) = K/m^2 & divU = 1/s 
-     {
-       //double *Tdata = Text.HostReadWrite();
-       double *Ndata = viscSml.HostReadWrite();
-       double *Rdata = rn.HostReadWrite();              
-       double *data = Qt.HostReadWrite();     
-       for (int i = 0; i < TdofInt; i++) {
-//         data[i] *= Cp * Rdata[i] * Ndata[i] / (Pr*thermoPressure);
-//         data[i] *= Rgas * Rdata[i] * Ndata[i] / (Pr*thermoPressure);	 
-         data[i] *= 0.0;
-       }
-     }
-
-     // add closed-domain pressure term
-     if (config.isOpen != true) {
-       double *data = Qt.HostReadWrite();     
-       for (int i = 0; i < TdofInt; i++) {
-         data[i] += ((gamma - 1.0)/gamma - Cp) * 1.0 / (Cp*thermoPressure) * dtP;
-       }       
-     }     
-
-     // limit usings actual divU, only necessary with temp discontinuities
-     /*
-     {
-       double *data_divU = divU.HostReadWrite();       
-       double *data = Qt.HostReadWrite();
-       double Qsign;
-       for (int i = 0; i < TdofInt; i++) {
-	 Qsign = data[i] / std::abs(data[i]);
-         data[i] = std::min(std::abs(data[i]),std::abs(data_divU[i]));
-	 data[i] *= Qsign; 
-       }       
-     }
-     */
-
-     // testing...
-     /*
-     {
-       double *data_divU = divU.HostReadWrite();       
-       double *data = Qt.HostReadWrite();
-       for (int i = 0; i < TdofInt; i++) {
-	 //std::cout << "Qt/divU: " << Qt[i] / data_divU[i] << endl;
-	 data[i] = data_divU[i];
-       }       
-     }
-     */
-     
-   }
    
    // dj(mu)(\tau/mu), have to store bits separately due to weak form helmholtz in momentum
    // could use elasticity integrator to prevent need to include part of this in momentum
@@ -3112,7 +3191,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
        double *data = tmpR1b.HostReadWrite();     
        for (int eq = 0; eq < dim; eq++) {
          for (int i = 0; i < TdofInt; i++) {
-           data[i + eq*TdofInt] *= (factor * dataVisc[i] * dataRho[i]);
+	   //           data[i + eq*TdofInt] *= (factor * dataVisc[i] * dataRho[i]);
+           data[i + eq*TdofInt] *= (factor * dataVisc[i]);	   
          }
        }
      }
@@ -3432,7 +3512,6 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    
      
    Ht_bdfcoeff.constant = bd0 / dt;
-   //Ht_bdfcoeff.constant = +1.0 / dt;
    Ht_form->Update();
    Ht_form->Assemble();
    Ht_form->FormSystemMatrix(temp_ess_tdof, Ht);
@@ -3502,9 +3581,10 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    Text_gf.SetFromTrueDofs(Text);
    Text_bdr_form->Assemble();
    Text_bdr_form->ParallelAssemble(Text_bdr);
+   resT.Add(1.0, Text_bdr);
+   
    t_bdr_form->Assemble();
    t_bdr_form->ParallelAssemble(t_bdr);
-   resT.Add(1.0, Text_bdr);
    resT.Add(-bd0/dt, t_bdr);
    */   
 
@@ -3543,8 +3623,30 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
        }
      }
    }
-   Mt->Mult(tmpR0, tmpR0b);        
+
+     if (loMach_opts_.thermalDiv == true) {
+
+       double *dataDiv = Qt.HostReadWrite();
+       double *dataT = Tn.HostReadWrite();             
+       double *data = tmpR0.HostReadWrite();
+       for (int i = 0; i < TdofInt; i++) {
+         data[i] += dataDiv[i] * dataT[i];
+       }
+
+     } else if (loMach_opts_.realDiv == true) {
+
+       double *dataDiv = divU.HostReadWrite();
+       double *dataT = Tn.HostReadWrite();             
+       double *data = tmpR0.HostReadWrite();
+       for (int i = 0; i < TdofInt; i++) {
+         data[i] += dataDiv[i] * dataT[i];
+       }
+       
+     }
+
+   Mt->Mult(tmpR0, tmpR0b);     
    resT.Add(-1.0, tmpR0b);
+     
    
    /*
    {
@@ -3635,10 +3737,10 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       un_NM1_gf.ProjectGridFunction(un_gf);
       un_filtered_gf.ProjectGridFunction(un_NM1_gf);
       const auto d_un_filtered_gf = un_filtered_gf.Read();
-      auto d_un_gf = un_gf.ReadWrite();
+      auto d_un_gf = un_next_gf.ReadWrite();
       const auto filter_alpha_ = filter_alpha;
       //mfem::forall(un_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
-      MFEM_FORALL(i, un_gf.Size(),		
+      MFEM_FORALL(i, un_next_gf.Size(),		
       {
          d_un_gf[i] = (1.0 - filter_alpha_) * d_un_gf[i]
                       + filter_alpha_ * d_un_filtered_gf[i];
@@ -3647,9 +3749,9 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       Tn_NM1_gf.ProjectGridFunction(Tn_gf);
       Tn_filtered_gf.ProjectGridFunction(Tn_NM1_gf);
       const auto d_Tn_filtered_gf = Tn_filtered_gf.Read();
-      auto d_Tn_gf = Tn_gf.ReadWrite();
+      auto d_Tn_gf = Tn_next_gf.ReadWrite();
       //mfem::forall(Tn_gf.Size(), [=] MFEM_HOST_DEVICE (int i)
-      MFEM_FORALL(i, Tn_gf.Size(),			
+      MFEM_FORALL(i, Tn_next_gf.Size(),			
       {
          d_Tn_gf[i] = (1.0 - filter_alpha_) * d_Tn_gf[i]
                       + filter_alpha_ * d_Tn_filtered_gf[i];
@@ -3737,13 +3839,14 @@ void LoMachSolver::updateTimestep()
    max_speed = Umax_lcl;
    double Umag;
    int dof = vfes->GetNDofs();
+   int Tdof = tfes->GetNDofs();   
    double dtFactor = config.dt_factor;      
   
        auto dataU = un_gf.HostRead();
-       for (int n = 0; n < dof; n++) {
+       for (int n = 0; n < Tdof; n++) {
          Umag = 0.0;
          for (int eq = 0; eq < dim; eq++) {
-           Umag += dataU[n + eq * dof] * dataU[n + eq * dof];
+           Umag += dataU[n + eq * Tdof] * dataU[n + eq * Tdof];
          }
          Umag = std::sqrt(Umag);
          Umax_lcl = std::max(Umag,Umax_lcl);
@@ -3767,13 +3870,14 @@ void LoMachSolver::setTimestep()
    max_speed = Umax_lcl;
    double Umag;
    int dof = vfes->GetNDofs();
+   int Tdof = tfes->GetNDofs();   
    double dtFactor = config.dt_factor;      
   
        auto dataU = un_gf.HostRead();
-       for (int n = 0; n < dof; n++) {
+       for (int n = 0; n < Tdof; n++) {
          Umag = 0.0;
          for (int eq = 0; eq < dim; eq++) {
-           Umag += dataU[n + eq * dof] * dataU[n + eq * dof];
+           Umag += dataU[n + eq * Tdof] * dataU[n + eq * Tdof];
          }
          Umag = std::sqrt(Umag);
          Umax_lcl = std::max(Umag,Umax_lcl);
@@ -4661,8 +4765,10 @@ void LoMachSolver::parseSolverOptions() {
   tpsP_->getInput("loMach/rtol", loMach_opts_.rtol, 1.0e-8);
   tpsP_->getInput("loMach/nFilter", loMach_opts_.nFilter, 0);
   tpsP_->getInput("loMach/filterWeight", loMach_opts_.filterWeight, 1.0);
-
-  tpsP_->getInput("loMach/channelTest", loMach_opts_.channelTest, false);      
+  tpsP_->getInput("loMach/thermalDiv", loMach_opts_.thermalDiv, true);
+  tpsP_->getInput("loMach/realDiv", loMach_opts_.realDiv, false);          
+  
+  //tpsP_->getInput("loMach/channelTest", loMach_opts_.channelTest, false);
   
   //tpsP_->getInput("em/atol", em_opts_.atol, 1.0e-10);
   //tpsP_->getInput("em/preconditioner_background_sigma", em_opts_.preconditioner_background_sigma, -1.0);
@@ -4860,7 +4966,9 @@ void LoMachSolver::parseTimeIntegrationOptions() {
   tpsP_->getInput("time/changeFactor", config.dt_factor, 0.05);    
   tpsP_->getInput("time/dt_fixed", config.dt_fixed, -1.);
   tpsP_->getInput("time/maxSolverIteration", config.solver_iter, 100);
-  tpsP_->getInput("time/solverRelTolerance", config.solver_tol, 1.0e-8);    
+  tpsP_->getInput("time/solverRelTolerance", config.solver_tol, 1.0e-8);
+  tpsP_->getInput("time/bdfOrder", config.bdfOrder, 2);
+  max_bdf_order = config.bdfOrder;
   //if (integrators.count(type) == 1) {
   //  config.timeIntegratorType = integrators[type];
   //} else {
@@ -4991,6 +5099,7 @@ void LoMachSolver::parseICOptions() {
   tpsP_->getRequiredInput("initialConditions/rhoW", config.initRhoRhoVp[3]);
   tpsP_->getRequiredInput("initialConditions/temperature", config.initRhoRhoVp[4]);
   tpsP_->getInput("initialConditions/useFunction", config.useICFunction, false);
+  tpsP_->getInput("initialConditions/resetTemp", config.resetTemp, false);
 }
 
 /*
@@ -6806,10 +6915,10 @@ void vel_ic(const Vector &coords, double t, Vector &u)
    u(1) += 0.025 * M * B * sin(4.0*aL*x) * cos(4.0*bL*y) * sin(4.0*cL*z);
    u(2) += 0.025 * M * C * sin(4.0*aL*x) * sin(4.0*bL*y) * cos(4.0*cL*z);
 
-   scl = std::max(1.0-std::pow((y-0.0)/0.2,4),0.0);
-   //if (y > 0) {
-   //  scl = scl + std::pow(y,4.0);
-   //}
+   scl = std::max(1.0-std::pow((y-0.0)/0.2,8),0.0);
+   if (y > 0) {
+     scl = scl + 0.1 * std::pow(y/0.2,4.0);
+   }
    u(0) = u(0) * scl;
    u(1) = u(1) * scl;
    u(2) = u(2) * scl;

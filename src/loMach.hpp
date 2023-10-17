@@ -514,9 +514,10 @@ protected:
 
    // Bookkeeping for gravity (forcing) terms.
    std::vector<AccelTerm_T> gravity_terms;
-  
+
+   int max_bdf_order; // input option now
    //int max_bdf_order = 3;
-   int max_bdf_order = 2;
+   //int max_bdf_order = 2;
    //int max_bdf_order = 1;
    int cur_step = 0;
    std::vector<double> dthist = {0.0, 0.0, 0.0};
