@@ -60,7 +60,7 @@ Then
 
 ```
 export CUDA_ARCH=sm_80
-apptainer pull docker://uvilla/tps_gpu_env:$CUDA_ARCH
+apptainer pull docker://pecosut/tps_gpu_env:$CUDA_ARCH
 apptainer exec --cleanenv --nv tps_gpu_env_$CUDA_ARCH.sif /bin/bash --login 
 ```
 
