@@ -376,6 +376,8 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;
 
+  Fluxes *d_fluxes = fluxes;
+
   // clang-format off
   MFEM_FORALL_2D(el, NumElemsType, maxIntPoints, 1, 1,
   {
@@ -394,6 +396,9 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
       int index = d_elem_dofs_list[offsetEl1 + i];
       indexes_i[i] = index;
     }
+
+    const int numActiveSpecies = d_fluxes->GetNumActiveSpecies();
+    const int nvel = d_fluxes->GetNumVels();
 
     // loop over faces
     for (int face = 0; face < elFaces; face++) {
@@ -442,6 +447,12 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
               gradUpk1[eq + d * num_equation] += d_gradUp[index + eq * Ndofs + d * num_equation * Ndofs] * shape[j];
             }
           }
+        }
+
+        // ensure non-negative densities
+        for (int sp = 0; sp < numActiveSpecies; sp++) {
+          const int sp_eq = nvel + 2 + sp;
+          uk1[sp_eq] = max(uk1[sp_eq], 0.0);
         }
 
         // save quad pt data to global memory
@@ -621,6 +632,9 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
       index_i[i] = d_elem_dofs_list[offsetEl1 + i];
     }
 
+    const int numActiveSpecies = d_flux->GetNumActiveSpecies();
+    const int nvel = d_flux->GetNumVels();
+
     for (int elFace = 0; elFace < numFaces; elFace++) {
       const int f = d_shared_elements_to_shared_faces[1 + elFace + 1 + el * 7];
       const int dof2 = d_face_num_dof2[f];
@@ -675,6 +689,13 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
               gradUp2[eq + d * num_equation] += l2[j] * G;
             }
           }
+        }
+
+        // ensure non-negative densities
+        for (int sp = 0; sp < numActiveSpecies; sp++) {
+          const int sp_eq = nvel + 2 + sp;
+          u1[sp_eq] = max(u1[sp_eq], 0.0);
+          u2[sp_eq] = max(u2[sp_eq], 0.0);
         }
 
         // get distance

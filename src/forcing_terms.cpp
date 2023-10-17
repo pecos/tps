@@ -309,6 +309,13 @@ void AxisymmetricSource::updateTerms(Vector &in) {
       }
     }
 
+    const int numActiveSpecies = d_mix->GetNumActiveSpecies();
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      int eq = 3 + 2 + sp;
+      U[eq] = max(U[eq], 0.0);
+      Up[eq] = max(Up[eq], 0.0);
+    }
+
     // Extract radius
     for (int d = 0; d < sdim; d++) x[d] = d_coords[n + d * dof];
     const double radius = x[0];

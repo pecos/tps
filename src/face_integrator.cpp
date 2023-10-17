@@ -275,6 +275,10 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     delta2 = mesh->GetElementSize(Tr.Elem2No, 1) / el2.GetOrder();
   }
 
+  // NOTE(malamast): Is there a better way to retrieve these values?
+  const int numActiveSpecies = fluxClass->GetNumActiveSpecies();
+  const int nvel = fluxClass->GetNumVels();
+
   for (int i = 0; i < ir->GetNPoints(); i++) {
     const IntegrationPoint &ip = ir->IntPoint(i);
 
@@ -287,6 +291,14 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     // Interpolate elfun at the point
     elfun1_mat.MultTranspose(shape1, funval1);
     elfun2_mat.MultTranspose(shape2, funval2);
+
+    // TODO(malamast): We force negative (unphysical) values of species that occur due to interpolation error to be
+    // zero.
+    for (int sp = 0; sp < numActiveSpecies; sp++) {
+      int eq = nvel + 2 + sp;
+      funval1[eq] = max(funval1[eq], 0.0);
+      funval2[eq] = max(funval2[eq], 0.0);
+    }
 
     // // Interpolate the distance function
     double d1 = 0;

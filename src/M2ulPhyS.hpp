@@ -445,6 +445,7 @@ class M2ulPhyS : public TPS::Solver {
   ParGridFunction *GetJouleHeatingGF() { return joule_heating_; }
 
   static int Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_print);
+  void Check_Undershoot();
 
   void setConstantPlasmaConductivityGF() {
     ParGridFunction *coordsDof = new ParGridFunction(dfes);

@@ -688,6 +688,8 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
         index_i[i] = d_elem_dofs_list[elOffset + i];
       }
 
+      const int numActiveSpecies = d_fluxclass->GetNumActiveSpecies();
+
       MFEM_FOREACH_THREAD(q, x, Q) {
         // zero state and gradient at this quad point
         for (int eq = 0; eq < num_equation; eq++) {
@@ -720,6 +722,12 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
             for (int d = 0; d < dim; d++)
               gradUp1[eq + d * num_equation] += d_gradUp[indexi + eq * totDofs + d * num_equation * totDofs] * shape[i];
           }
+        }
+
+        // ensure non-negative densities
+        for (int sp = 0; sp < numActiveSpecies; sp++) {
+          const int sp_eq = nvel + 2 + sp;
+          u1[sp_eq] = max(u1[sp_eq], 0.0);
         }
 
         // fill out the boundary data.
