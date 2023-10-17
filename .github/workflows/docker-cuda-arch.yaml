@@ -10,6 +10,7 @@ on:
       cuda-arch:
         description: "Cuda arch number: e.g. 70, 75, or 80"
         required: true
+        type: string
 jobs:
    docker-gpu-arch:
     runs-on: ubuntu-latest
