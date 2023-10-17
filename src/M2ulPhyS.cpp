@@ -1918,7 +1918,10 @@ void M2ulPhyS::projectInitialSolution() {
 
     restart_files_hdf5("read");
 
-    if (config.restartFromLTE) initilizeSpeciesFromLTE();
+    if (config.restartFromLTE) {
+      initilizeSpeciesFromLTE();
+      Check_Undershoot();
+    }
 
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
