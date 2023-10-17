@@ -1,46 +1,21 @@
-name: gpuimage
+name: cuda_arch_image
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-  
+  workflow_call:
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
+    inputs:
+      cuda-arch:
+        description: "Cuda arch number: e.g. 70, 75, or 80"
+        required: true
 jobs:
-  gpubaseimage:
-    uses: ./.github/workflows/docker-cuda-base.yaml
-    secrets:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-  docker-gpu-arch-70:
-    needs: [gpubaseimage]
-    uses: ./.github/workflows/docker-cuda-arch.yaml
-    secrets:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-    with:
-       cuda-arch: 70
-  docker-gpu-arch-75:
-    needs: [gpubaseimage]
-    uses: ./.github/workflows/docker-cuda-arch.yaml
-    secrets:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-    with:
-       cuda-arch: 75
-  docker-gpu-arch-80:
-    needs: [gpubaseimage]
-    uses: ./.github/workflows/docker-cuda-arch.yaml
-    secrets:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-    with:
-       cuda-arch: 80
-  docker-cpu-cupy:
-    needs: [gpubaseimage]
+   docker-gpu-arch:
     runs-on: ubuntu-latest
-    name: "docker cpu env with cuda"
+    name: "docker gpu env"
     env:
-      DOCKERPATH: docker/test-cpu-cupy
+      DOCKERPATH: docker/test-gpu
       BASEIMAGEPATH: docker/test-cuda-base
     steps:
       - uses: actions/checkout@v3
@@ -51,7 +26,12 @@ jobs:
       - name: DockerPATH configuration
         run: echo "DOCKERPATH=$DOCKERPATH"
       - name: DockerPATH - check if files in docker path changed
-        if: contains(steps.files.outputs.all,env.DOCKERPATH) || contains(steps.files.outputs.all,'docker-gpu.yaml') ||  contains(steps.files.outputs.all,env.BASEIMAGEPATH) || contains(steps.files.outputs.all,'docker-cuda-base.yaml')
+        if:  > 
+             contains(steps.files.outputs.all,env.DOCKERPATH) || 
+             contains(steps.files.outputs.all,'docker-gpu.yaml') ||
+             contains(steps.files.outputs.all,env.BASEIMAGEPATH) ||
+             contains(steps.files.outputs.all,'docker-cuda-base.yaml') ||
+             contains(steps.files.outputs.all,'docker-cuda-arch.yaml')
         run: |
           echo "CI container needs rebuilding..."
           echo "CI_NEEDS_REBUILD=true" >> $GITHUB_ENV
@@ -72,7 +52,7 @@ jobs:
         if: env.CI_NEEDS_REBUILD
         uses: docker/metadata-action@v4
         with:
-          images: pecosut/tps_cpu_cupy_env
+          images: pecosut/tps_gpu_env
           tags: type=sha
           flavor: latest=true
       - name: Build Container motd
@@ -91,4 +71,7 @@ jobs:
         with:
           push: true
           context: ${{ env.DOCKERPATH }}
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: pecosut/tps_gpu_env:sm_${{ inputs.cuda-arch }}
+          build-args: cuda_arch_number={{ inputs.cuda-arch }}
+      
+
