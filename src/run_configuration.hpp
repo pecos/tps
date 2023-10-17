@@ -96,6 +96,7 @@ class RunConfiguration {
   double dt_factor;
   int solver_iter;
   double solver_tol;
+  int bdfOrder;  
 
   // num iterations. Defaults to 0
   int numIters;
@@ -175,6 +176,9 @@ class RunConfiguration {
   // ic flag to use internal ic function definition
   bool useICFunction;
 
+  // reset Temp field to IC
+  bool resetTemp;  
+  
   // wall bc flag to use internal function definition
   bool useWallFunction;  
   
