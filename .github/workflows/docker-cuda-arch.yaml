@@ -73,6 +73,6 @@ jobs:
           push: true
           context: ${{ env.DOCKERPATH }}
           tags: pecosut/tps_gpu_env:sm_${{ inputs.cuda-arch }}
-          build-args: cuda_arch_number={{ inputs.cuda-arch }}
+          build-args: cuda_arch_number=${{ inputs.cuda-arch }}
       
 
