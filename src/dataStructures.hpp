@@ -49,7 +49,7 @@ const int MAXEQUATIONS = MAXDIM + 2 + MAXSPECIES;  // momentum + two energies + 
 // NOTE: (presumably from marc) lets make sure we don't have more than 20 eq.
 // NOTE(kevin): with MAXEQUATIONS=20, marvin fails with out-of-memery with 3 MPI process.
 
-const int MAXREACTIONS = 20;
+const int MAXREACTIONS = 34;
 const int MAXCHEMPARAMS = 3;
 
 const int MAXTABLE = 512;
