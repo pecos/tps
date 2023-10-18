@@ -431,6 +431,7 @@ protected:
    mfem::CGSolver *HtInv = nullptr;  
 
    Vector fn, un, un_next, unm1, unm2;
+   Vector u_star;
    Vector uBn, uBnm1, uBnm2;
    Vector TBn, TBnm1, TBnm2;    
    Vector Nun, Nunm1, Nunm2;
@@ -438,7 +439,7 @@ protected:
    Vector resu, tmpR1, tmpR1b, tmpR1c;
    Vector gradMu, gradU, gradV, gradW, gradT;
    Vector FBext;
-   Vector divU, Qt;
+   Vector divU, Qt, dtRho;
    Vector gravity;
    Vector boussinesqField;
 
@@ -451,8 +452,9 @@ protected:
 
    Vector gridScale;
   
-   ParGridFunction un_gf, un_next_gf, curlu_gf, curlcurlu_gf,
-     Lext_gf, FText_gf, resu_gf, Pext_gf, gradT_gf;
+   ParGridFunction un_gf, un_next_gf, curlu_gf, curlcurlu_gf;
+   ParGridFunction Lext_gf, FText_gf, resu_gf, Pext_gf, gradT_gf;
+   ParGridFunction u_star_gf;
 
    ParGridFunction unm1_gf, unm2_gf;
    ParGridFunction Tnm1_gf, Tnm2_gf;    
