@@ -632,8 +632,14 @@ struct ChemistryInput {
   int numReactions;
   double reactionEnergies[gpudata::MAXREACTIONS];
   bool detailedBalance[gpudata::MAXREACTIONS];
-  double reactantStoich[gpudata::MAXSPECIES * gpudata::MAXREACTIONS];
-  double productStoich[gpudata::MAXSPECIES * gpudata::MAXREACTIONS];
+  // NOTE(trevilo): reactantStoich and productStoich used to be
+  // double.  Changed to short int to conserve space to satisfy cuda
+  // parameter space limit, which was breached after increasing
+  // MAXREACTIONS.  Causes no issue now, since our stoichiometric
+  // coefficients are alwas small integers, but if ever need more
+  // generality for some reason, then it will have to be implemented.
+  short int reactantStoich[gpudata::MAXSPECIES * gpudata::MAXREACTIONS];
+  short int productStoich[gpudata::MAXSPECIES * gpudata::MAXREACTIONS];
   ReactionModel reactionModels[gpudata::MAXREACTIONS];
   double equilibriumConstantParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
   ReactionInput reactionInputs[gpudata::MAXREACTIONS];
