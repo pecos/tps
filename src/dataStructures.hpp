@@ -637,6 +637,8 @@ struct ChemistryInput {
   ReactionModel reactionModels[gpudata::MAXREACTIONS];
   double equilibriumConstantParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
   ReactionInput reactionInputs[gpudata::MAXREACTIONS];
+
+  double minimumTemperature;
 };
 
 struct PostProcessInput {

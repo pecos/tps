@@ -3267,6 +3267,7 @@ void M2ulPhyS::parseTransportInputs() {
 
 void M2ulPhyS::parseReactionInputs() {
   tpsP->getInput("reactions/number_of_reactions", config.numReactions, 0);
+  tpsP->getInput("reactions/minimum_chemistry_temperature", config.chemistryInput.minimumTemperature, 0.0);
   if (config.numReactions > 0) {
     assert((config.workFluid != DRY_AIR) && (config.numSpecies > 1));
     config.reactionEnergies.SetSize(config.numReactions);
