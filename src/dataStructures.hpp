@@ -638,8 +638,8 @@ struct ChemistryInput {
   // MAXREACTIONS.  Causes no issue now, since our stoichiometric
   // coefficients are alwas small integers, but if ever need more
   // generality for some reason, then it will have to be implemented.
-  short int reactantStoich[gpudata::MAXSPECIES * gpudata::MAXREACTIONS];
-  short int productStoich[gpudata::MAXSPECIES * gpudata::MAXREACTIONS];
+  int16_t reactantStoich[gpudata::MAXSPECIES * gpudata::MAXREACTIONS];
+  int16_t productStoich[gpudata::MAXSPECIES * gpudata::MAXREACTIONS];
   ReactionModel reactionModels[gpudata::MAXREACTIONS];
   double equilibriumConstantParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
   ReactionInput reactionInputs[gpudata::MAXREACTIONS];
