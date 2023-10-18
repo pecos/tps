@@ -2647,15 +2647,12 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    // interior-sized visc needed for p-p rhs
    bufferVisc->GetTrueDofs(viscSml);   
    
-   
-   
    // Set current time for velocity Dirichlet boundary conditions.
    for (auto &vel_dbc : vel_dbcs) {vel_dbc.coeff->SetTime(time + dt);}
-   //for (auto &vel4P_dbc : vel4P_dbcs) {vel4P_dbc.coeff->SetTime(time + dt);}   
+   for (auto &pres_dbc : pres_dbcs) {pres_dbc.coeff->SetTime(time + dt);}   
 
-   // Set current time for pressure Dirichlet boundary conditions.
-   for (auto &pres_dbc : pres_dbcs) {pres_dbc.coeff->SetTime(time + dt);}
    
+   // begin momentum........................   
    H_bdfcoeff.constant = bd0 / dt;
    H_form->Update();
    H_form->Assemble();
@@ -2713,6 +2710,13 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      T_bdr_form->Assemble();
      T_bdr_form->ParallelAssemble(T_bdr);
      */
+
+     {
+       double *data = Qt.HostReadWrite();
+       for (int i = 0; i < TdofInt; i++) {
+         data[i] = 0.0;
+       }       
+     }
      
      // laplace(T) => should be T{n+1}, move T-solve before u?
      double TdivFactor = 0.0;
@@ -2745,7 +2749,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      if (config.isOpen != true) {
        double *data = Qt.HostReadWrite();     
        for (int i = 0; i < TdofInt; i++) {
-         data[i] += ((gamma - 1.0)/gamma - Cp) * 1.0 / (Cp*thermoPressure) * dtP;
+         data[i] += TdivFactor * ((gamma - 1.0)/gamma - Cp) * 1.0 / (Cp*thermoPressure) * dtP;
        }       
      }     
 
@@ -2777,13 +2781,6 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    // Nonlinear extrapolated terms (convection: N*(n+1))
    sw_extrap.Start();
 
-   // Nonlinear term at previous steps
-   /*
-   N->Mult(un, Nun);
-   N->Mult(unm1, Nunm1);
-   N->Mult(unm2, Nunm2);
-   */
-   
    // project u to "padded" order space
    /*
    un_gf.SetFromTrueDofs(un);         
@@ -2799,20 +2796,25 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    R1PX2_gf.GetTrueDofs(uBnm2);
    */
 
+   
+   // Nonlinear term at previous steps
    /*
+   N->Mult(un, Nun);
+   N->Mult(unm1, Nunm1);
+   N->Mult(unm2, Nunm2);
+   */   
+
    un_gf.SetFromTrueDofs(Uext);         
    R1PX2_gf.ProjectGridFunction(un_gf);
    R1PX2_gf.GetTrueDofs(uBn);   
-   //std::cout << "Check g..." << std::endl;         
+   N->Mult(uBn, Nun);
 
-   N->Mult(uBn, Nun);  // add sqrt(rho) to uBn?
-   //std::cout << "Check h..." << std::endl;
-   
+   /**/
    // ab-predictor of nonliner term at {n+1}
    {
       const auto d_Nun = Nun.Read();
-      //const auto d_Nunm1 = Nunm1.Read();
-      //const auto d_Nunm2 = Nunm2.Read();
+      const auto d_Nunm1 = Nunm1.Read();
+      const auto d_Nunm2 = Nunm2.Read();
       auto d_Fext = FBext.Write();
       //auto d_Fext = Fext.Write();      
       const auto ab1_ = ab1;
@@ -2823,10 +2825,10 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       //MFEM_FORALL(i, Fext.Size(),
       MFEM_FORALL(i, FBext.Size(),
       {
-	//d_Fext[i] = ab1_ * d_Nun[i] +
-        //             ab2_ * d_Nunm1[i] +
-        //             ab3_ * d_Nunm2[i];
-         d_Fext[i] = d_Nun[i];	 
+	//d_Fext[i] = ab1_ * d_Nun[i]
+        //          + ab2_ * d_Nunm1[i]
+        //          + ab3_ * d_Nunm2[i];
+	d_Fext[i] = d_Nun[i];	 
       });
    }
    //std::cout << "Check i..." << std::endl;         
@@ -2836,9 +2838,23 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    R1PM0_gf.ProjectGridFunction(R1PX2_gf);  
    R1PM0_gf.GetTrueDofs(Fext);
    //std::cout << "Check j..." << std::endl;
-   */
 
-   
+   // subtract div part from convection
+   {
+     double *dataDiv = divU.HostReadWrite(); // should really be div(Uext)
+     double *dataU = Uext.HostReadWrite();             
+     double *data = tmpR1.HostReadWrite();
+     for (int eq = 0; eq < dim; eq++) {       
+       for (int i = 0; i < TdofInt; i++) {
+         data[i + eq*TdofInt] = dataDiv[i] * dataU[i + eq*TdofInt];
+       }
+     }      
+   }
+   Mv->Mult(tmpR1,tmpR1b); // wasteful
+   Fext.Add(+1.0,tmpR1b); // minus on rhs, pos on lhs
+   /**/
+
+   /*
    // expanded and shifted form with (rhoU)*divU using Qt
      // TODO: break-up loops, this will thrash
      {
@@ -2907,6 +2923,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      Mv->Mult(Fext,tmpR1); // wasteful, just for testing
      Fext.Set(-1.0,tmpR1);
      //Fext.Neg(); // move to rhs
+     */
 
      
    // add forcing/accel term to Fext   
@@ -2984,31 +3001,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 
    // (!) with a field viscosity, this likely breaks
    // (!) must change to dynamic/rho
-   //Lext *= kin_vis;
 
-
-   /*
-   if (constantViscosity != true) {
-     double *dataViscSml = viscSml.HostReadWrite();
-     double *Tdata = Tn.HostReadWrite();
-     //double *viscMult = spaceVaryViscMult->HostWrite();     
-     //Vector visc(2);
-     //Vector prim(nvel+2);
-     double visc[2];  // TO version
-     double prim[nvel+2];          
-     for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
-     for (int i = 0; i < TdofInt; i++) {
-         prim[1+nvel] = Tdata[i];
-         transportPtr->GetViscosities(prim, prim, visc);
-         dataViscSml[i] = visc[0]; // dynamic
-     }
-   }
-   if (config.linViscData.isEnabled) {
-     double *viscMult = viscMultSml.HostReadWrite();         
-     double *dataVisc = viscSml.HostReadWrite();     
-     for (int i = 0; i < TdofInt; i++) { dataVisc[i] *= viscMult[i]; }
-   }
-   */
 
    // negative on rn would affect HERE  
    // dataVisc is full size, Lext is only TrueSize
@@ -3058,6 +3051,19 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 
      G->Mult(viscSml, tmpR1);
      MvInv->Mult(tmpR1, gradMu);
+
+     // testing...
+     /*
+     {
+       double *data = gradMu.HostReadWrite();
+       for (int eq = 0; eq < dim; eq++) {
+         for (int i = 0; i < TdofInt; i++) {
+           data[i + eq * TdofInt] = 0.0;
+         }
+       }
+     }
+     */
+     
      /*
      {
        double *data = gradMu.HostReadWrite();
@@ -3112,8 +3118,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      }         
      {
        double *data1 = gradMu.HostReadWrite(); 
-       //double *divU = divU.HostReadWrite();
-       double *divU = Qt.HostReadWrite(); // use only thermal-divergence
+       double *divU = Qt.HostReadWrite();
        double *data = Ldiv.HostReadWrite();
        double onethird = 1.0/3.0;
        for (int eq = 0; eq < nvel; eq++) {       
@@ -3405,6 +3410,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      }     
    }
 
+   resu.Neg(); // -gradP => so res ARE on rhs   
    
    // add Ldiv to rhs (has rho in it => MAY NOT)
    if (incompressibleSolve != true) {          
@@ -3412,7 +3418,6 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      resu.Add(1.0, tmpR1);
    }
 
-   resu.Neg(); // -gradP => so res ARE on rhs
    Mv->Mult(Fext, tmpR1); //Mv{F*} has rho in it! MAY NOT
    resu.Add(1.0, tmpR1); // add to resu
 
@@ -3608,6 +3613,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 
 
    // HERE HERE HERE => redo this to just be u*d(T) and remove divu part later...
+   /*
    {
      int eq = 0;
      double *dataGradT = gradT.HostReadWrite(); 
@@ -3646,9 +3652,10 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 
    Mt->Mult(tmpR0, tmpR0b);     
    resT.Add(-1.0, tmpR0b);
+   */
      
    
-   /*
+   /**/
    {
      double *Udata = Uext.HostReadWrite();
      double *Tdata = Text.HostReadWrite(); 
@@ -3659,7 +3666,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
        }       
      }
    }
-   */
+   /**/
 
    // project back to p-space
    /*
@@ -3668,7 +3675,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    R1PM0_gf.GetTrueDofs(Fext);
    */
 
-   /*
+   /**/
    Dt->Mult(Fext, tmpR0); // explicit div(uT) at extrapolated {n+1}
    
    // div(uT) should already be in integrated weak form and can be added directly
@@ -3689,7 +3696,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    }
    Mt->Mult(tmpR0b, tmpR0);   
    resT.Add(+1.0, tmpR0); // minus on lhs and minus to move to rhs
-   */
+   /**/
 
    // what is this?   
    for (auto &temp_dbc : temp_dbcs) { Tn_next_gf.ProjectBdrCoefficient(*temp_dbc.coeff, temp_dbc.attr); }
