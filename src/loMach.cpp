@@ -3085,22 +3085,23 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    if ( config.isGravity ) { Fext.Add(1.0, boussinesqField); }
 
    // Fext = M^{-1} (F(u^{n}) + f^{n+1}) (F* w/o known part of BDF)
-   MvInv->Mult(Fext, tmpR1); 
+   MvInv->Mult(Fext, tmpR1c); 
    iter_mvsolve = MvInv->GetNumIterations();
    res_mvsolve = MvInv->GetFinalNorm();
-   resu.Set(1.0, tmpR1); // on rhs
+   resu.Set(1.0, tmpR1c); // on rhs
 
    // unsteady rho term
    if (constantDensity != true) {
      double *d_dtR = dtRho.HostWrite();
-     double *dataU = uBn.HostWrite();
-     double *data = tmpR1.HostWrite();     
+     //double *dataU = uBn.HostWrite();
+     double *dataU = tmpR1.HostWrite(); // still has u{n+1/2}
+     double *data = tmpR1c.HostWrite();     
      for (int eq = 0; eq < dim; eq++) {     
        for (int i = 0; i < TdofInt; i++) {
 	 data[i + eq * TdofInt] = dataU[i + eq * TdofInt] * d_dtR[i];
        }
      }
-     resu.Add(-1.0, tmpR1); // on rhs     
+     resu.Add(-1.0, tmpR1c); // on rhs     
    }      
 
    
