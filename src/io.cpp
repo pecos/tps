@@ -709,7 +709,7 @@ void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
   if (rank0_) {
     std::string filename,groupName;
     tpsP->getRequiredInput((inputPath + "/filename").c_str(), filename);
-    success = h5ReadTable(filename, groupName, "table", config.tableHost[tableIndex], dims);
+    success = h5ReadTable(filename, groupName, "table", config.tableHost.back(), dims);
     suc_int = (int)success;
 
     // TODO(kevin): extend for multi-column array?
