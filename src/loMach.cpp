@@ -3289,11 +3289,12 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
        data[i] += thermoPressure / (Rgas*dt*dt) * 0.5 * ( 1.0/Tp2[i] - 1.0/Tp0[i] ); 
      }
    }
-   Mt->Mult(tmpR0b,resp);
-
-   resp.Neg(); // from neg in Sp ibp
+   Mt->Mult(tmpR0b, tmpR0);
+   tmpR0.Neg();  
+   //resp.Neg(); // from neg in Sp ibp
    
    // Add boundary terms.
+   /*
    FText_gf.SetFromTrueDofs(FText);
    FText_bdr_form->Assemble();
    FText_bdr_form->ParallelAssemble(FText_bdr);
@@ -3303,13 +3304,12 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    g_bdr_form->ParallelAssemble(g_bdr);
    //tmpR0.Add(-bd0 / dt, g_bdr);
    tmpR0.Add(-1.0 / dt, g_bdr);
+   */
 
-   /*
    // project rhs to p-space
    R0PM0_gf.SetFromTrueDofs(tmpR0);   
    R0PM1_gf.ProjectGridFunction(R0PM0_gf);
    R0PM1_gf.GetTrueDofs(resp);
-   */
 
    if (pres_dbcs.empty()) { Orthogonalize(resp); }   
    for (auto &pres_dbc : pres_dbcs) { pn_gf.ProjectBdrCoefficient(*pres_dbc.coeff, pres_dbc.attr); }
@@ -3340,18 +3340,19 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    // the nullspace after every application.
    if (pres_dbcs.empty()) { MeanZero(pn_gf); }   
    pn_gf.GetTrueDofs(pn);
-
-   
+  
    // Project velocity
-   G->Mult(pn, tmpR1); // grad(P) in resu
-   MvInv->Mult(tmpR1, resu);
+   //G->Mult(pn, tmpR1); // grad(P) in resu
+   //MvInv->Mult(tmpR1, resu);
 
-   /*
    // project p to v-space
    R0PM1_gf.SetFromTrueDofs(pn);   
    R0PM0_gf.ProjectGridFunction(R0PM1_gf);
    R0PM0_gf.GetTrueDofs(pnBig);
-   */
+
+   G->Mult(pnBig, resu);
+   MvInv->Mult(resu,tmpR1);
+   resu.Set(1.0,tmpR1);   
 
    // dt/rho*gradP
    {
