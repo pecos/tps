@@ -12,10 +12,8 @@ cp Restart/highP/restart_output-plasma-refine2.LTE.h5 restart_output-plasma-refi
 
 
 EXE=../src/tps
-# RUNFILE="inputs/input.malamas.test.ini"
 RUNFILE="inputs/plasma.ini"
-# RUNFILE="inputs/input.plasma.nlte.test.ini"
-
+# RUNFILE="inputs/input.4iters.cyl.ini"
 
 NPROC=10
 

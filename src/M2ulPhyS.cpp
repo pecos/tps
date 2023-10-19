@@ -1879,7 +1879,8 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   }
   paraviewColl->RegisterField("temp", temperature);
   paraviewColl->RegisterField("press", press);
-  if (radiation_->inputs.model == P1_MODEL) {
+
+  if (config.radiationInput.model == P1_MODEL) {
     paraviewColl->RegisterField("energySink", energySinkRad);
   }
   if (eqSystem == NS_PASSIVE) {
@@ -2000,7 +2001,7 @@ void M2ulPhyS::solveBegin() {
 
 void M2ulPhyS::solveStep() {
 
-  if (radiation_->inputs.model == P1_MODEL) {
+  if (config.radiationInput.model == P1_MODEL) {
     if (iter % radiation_->inputs.solve_rad_every_n == 0) {
       radiation_->SetCycle(iter);
       radiation_->SetTime(time);
