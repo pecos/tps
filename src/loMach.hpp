@@ -326,9 +326,11 @@ protected:
   
    ParNonlinearForm *N = nullptr;
    ParBilinearForm *Mv_form = nullptr;
+   ParBilinearForm *Mv_big_form = nullptr;  
    ParBilinearForm *Sp_form = nullptr;
    ParBilinearForm *Lt_form = nullptr;  
    ParMixedBilinearForm *D_form = nullptr;
+  ParMixedBilinearForm *D_big_form = nullptr;  
    ParMixedBilinearForm *G_form = nullptr;
    ParBilinearForm *H_form = nullptr;
    VectorGridFunctionCoefficient *FText_gfcoeff = nullptr;
@@ -403,9 +405,11 @@ protected:
   //GridFunctionCoefficient *viscFieldSml;  
   
    OperatorHandle Mv;
+   OperatorHandle Mv_big;  
    OperatorHandle Sp;
    OperatorHandle Lt;  
    OperatorHandle D;
+   OperatorHandle D_big;  
    OperatorHandle G;
    OperatorHandle H;
 
@@ -414,7 +418,9 @@ protected:
    OperatorHandle Ht;
 
    mfem::Solver *MvInvPC = nullptr;
-   mfem::CGSolver *MvInv = nullptr;  
+   mfem::CGSolver *MvInv = nullptr;
+   mfem::Solver *MvInvPC_big = nullptr;
+   mfem::CGSolver *MvInv_big = nullptr;    
    mfem::Solver *HInvPC = nullptr;
    mfem::CGSolver *HInv = nullptr;
 
@@ -433,7 +439,8 @@ protected:
    Vector fn, un, un_next, unm1, unm2;
    Vector u_star;
    Vector uBn, uBnm1, uBnm2;
-   Vector TBn, TBnm1, TBnm2;    
+   Vector TBn, TBnm1, TBnm2;
+   Vector rBn, tmpR0_big;  
    Vector Nun, Nunm1, Nunm2;
    Vector Fext, FText, Lext, Uext, Ldiv;          
    Vector resu, tmpR1, tmpR1b, tmpR1c;

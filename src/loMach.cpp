@@ -609,8 +609,14 @@ void LoMachSolver::initialize() {
    uBnm1.SetSize(nfes_truevsize);
    uBnm1 = 0.0;
    uBnm2.SetSize(nfes_truevsize);
-   uBnm2 = 0.0;
+   uBnm2 = 0.0;   
 
+   rBn.SetSize(nfesR0_truevsize);
+   rBn = 0.0;
+
+   tmpR0_big.SetSize(nfesR0_truevsize);
+   tmpR0_big = 0.0;   
+   
    FBext.SetSize(nfes_truevsize);
    
    Fext.SetSize(vfes_truevsize);
@@ -1383,6 +1389,8 @@ void LoMachSolver::Setup(double dt)
    nlcoeff.constant = -1.0; // starts with negative
    //N = new ParNonlinearForm(vfes);
    N = new ParNonlinearForm(nfes);
+   //auto *nlc_nlfi = new SkewSymmetricVectorConvectionNLFIntegrator(nlcoeff);
+   //auto *nlc_nlfi = new ConvectiveVectorConvectionNLFIntegrator(nlcoeff);   
    auto *nlc_nlfi = new VectorConvectionNLFIntegrator(nlcoeff);
    if (numerical_integ)
    {
@@ -1404,6 +1412,16 @@ void LoMachSolver::Setup(double dt)
    if (partial_assembly) { Mv_form->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
    Mv_form->Assemble();
    Mv_form->FormSystemMatrix(empty, Mv);
+
+   /*
+   Mv_big_form = new ParBilinearForm(nfes);
+   auto *mv_big_blfi = new VectorMassIntegrator;
+   if (numerical_integ) { mv_big_blfi->SetIntRule(&ir_nli); }
+   Mv_big_form->AddDomainIntegrator(mv_big_blfi);
+   if (partial_assembly) { Mv_big_form->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
+   Mv_big_form->Assemble();
+   Mv_big_form->FormSystemMatrix(empty, Mv_big);
+   */
    //std::cout << "Check 8..." << std::endl;     
 
    // need to build another with q=1/rho
@@ -1502,7 +1520,23 @@ void LoMachSolver::Setup(double dt)
    }
    D_form->Assemble();
    D_form->FormRectangularSystemMatrix(empty, empty, D);
-   if (rank0_) std::cout << "Divergence operator set" << endl;        
+
+   /*
+   D_big_form = new ParMixedBilinearForm(nfes, nfesR0);
+   auto *vd_big_mblfi = new VectorDivergenceIntegrator();
+   if (numerical_integ)
+   {
+      vd_big_mblfi->SetIntRule(&ir_nli);
+   }
+   D_big_form->AddDomainIntegrator(vd_big_mblfi);
+   if (partial_assembly)
+   {
+      D_big_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+   }
+   D_big_form->Assemble();
+   D_big_form->FormRectangularSystemMatrix(empty, empty, D_big);
+   */
+   if (rank0_) std::cout << "Divergence operator(s) set" << endl;        
    
    // for grad(div(u))?
    G_form = new ParMixedBilinearForm(tfes, vfes);
@@ -1643,7 +1677,27 @@ void LoMachSolver::Setup(double dt)
    MvInv->SetPrintLevel(pl_mvsolve);
    MvInv->SetRelTol(config.solver_tol);
    MvInv->SetMaxIter(config.solver_iter);
-   //std::cout << "Check 17..." << std::endl;
+
+   /*
+   if (partial_assembly)
+   {
+      Vector diag_pa(nfes->GetTrueVSize());
+      Mv_big_form->AssembleDiagonal(diag_pa);
+      MvInvPC_big = new OperatorJacobiSmoother(diag_pa, empty);
+   }
+   else
+   {
+      MvInvPC_big = new HypreSmoother(*Mv_big.As<HypreParMatrix>());
+      dynamic_cast<HypreSmoother *>(MvInvPC_big)->SetType(HypreSmoother::Jacobi, 1);
+   }
+   MvInv_big = new CGSolver(nfes->GetComm());
+   MvInv_big->iterative_mode = false;
+   MvInv_big->SetOperator(*Mv_big);
+   MvInv_big->SetPreconditioner(*MvInvPC_big);
+   MvInv_big->SetPrintLevel(pl_mvsolve);
+   MvInv_big->SetRelTol(config.solver_tol);
+   MvInv_big->SetMaxIter(config.solver_iter);   
+   */
    
    /**/
    if (partial_assembly)
@@ -2799,7 +2853,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 
    if (pFilter == true)
    {
-      Tn_NM1_gf.ProjectGridFunction(Tn_gf);
+      Tn_NM1_gf.ProjectGridFunction(Tn_next_gf);
       Tn_filtered_gf.ProjectGridFunction(Tn_NM1_gf);
       const auto d_Tn_filtered_gf = Tn_filtered_gf.Read();
       auto d_Tn_gf = Tn_next_gf.ReadWrite();
@@ -2899,16 +2953,9 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    // Nonlinear extrapolated terms (convection: N*(n+1))
    //sw_extrap.Start();
    
-   // project u to "padded" order space
-   /*
-   un_gf.SetFromTrueDofs(Uext);         
-   R1PX2_gf.ProjectGridFunction(un_gf);
-   R1PX2_gf.GetTrueDofs(uBn);
-   */
-
    // u{n+1/2} in uBn
    {
-     double *data = uBn.HostReadWrite();
+     double *data = tmpR1.HostReadWrite();
      double *dataUp0 = un.HostReadWrite();
      double *dataUp1 = Uext.HostReadWrite();
      double *dataR = rn.HostReadWrite();         
@@ -2917,42 +2964,108 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 	 data[i + eq*TdofInt] = 0.5 * (dataUp1[i + eq*TdofInt] + dataUp0[i + eq*TdofInt]);
        }
      }
-   }   
-   N->Mult(uBn, Nun);   
+   }
 
-   // cant do sqrt way as N is u\cdot\nabla(u) => add all parts here
+   // divU{n+1/2}
+   //D->Mult(tmpR1, tmpR0);
+   //MtInv->Mult(tmpR0,tmpR0b);
+   
+   // project to "padded" order space
+   /*
+   rn_gf.SetFromTrueDofs(tmpR0b);         
+   R0PX2_gf.ProjectGridFunction(rn_gf);
+   R0PX2_gf.GetTrueDofs(tmpR0_big); // contains divU{n+1/2}
+   
+   rn_gf.SetFromTrueDofs(rn);         
+   R0PX2_gf.ProjectGridFunction(rn_gf);
+   R0PX2_gf.GetTrueDofs(rBn);
+   */   
+   
+   un_gf.SetFromTrueDofs(tmpR1);         
+   R1PX2_gf.ProjectGridFunction(un_gf);
+   R1PX2_gf.GetTrueDofs(uBn);
+   
+   N->Mult(uBn, Nun);
+   //std::cout << " okay 1" << endl;
+   //MvInv_big->Mult(Nun, Nunm1); // container
+   //std::cout << " okay 2" << endl;
+   //N->Mult(tmpR1, Nun);
+
+   R1PX2_gf.SetFromTrueDofs(Nun);
+   R1PM0_gf.ProjectGridFunction(R1PX2_gf);  
+   R1PM0_gf.GetTrueDofs(tmpR1b);   
+   MvInv->Mult(tmpR1b, tmpR1c); // container   
+
    {
+     //double *dataR = rBn.HostReadWrite();
      double *dataR = rn.HostReadWrite();
-     double *data = Nun.HostReadWrite();     
+     double *data = tmpR1c.HostReadWrite();               
      for (int eq = 0; eq < nvel; eq++) {     
+       //for (int i = 0; i < NdofR0Int; i++) {
+       // data[i + eq*NdofR0Int] *= dataR[i];
+       //}
        for (int i = 0; i < TdofInt; i++) {
 	 data[i + eq*TdofInt] *= dataR[i];
-       }              
+       }                     
      }
-   }
-
+   } // tmpR1c = rho*u*nabla{u}
+  
+   // cant do sqrt way as N is u\cdot\nabla(u) => add all parts here      
    {
      double *dataR = rn.HostReadWrite();
-     double *dataU = uBn.HostReadWrite();
-     double *data = tmpR1.HostReadWrite();     
+     double *dataU = tmpR1.HostReadWrite(); //contains u{n+1/2}
+     double *data = tmpR1b.HostReadWrite();
+     //double *dataR = rBn.HostReadWrite();
+     //double *data = tmpR0_big.HostReadWrite(); //contains div(u{n+1/2})
      for (int eq = 0; eq < nvel; eq++) {     
+       //for (int i = 0; i < NdofR0Int; i++) {
+       // data[i + eq*NdofR0Int] = dataR[i] * dataU[i + eq*NdofR0Int];
+       //}
        for (int i = 0; i < TdofInt; i++) {
 	 data[i + eq*TdofInt] = dataR[i] * dataU[i + eq*TdofInt];
-       }              
+       }                     
      }     
    }
-   D->Mult(tmpR1,tmpR0);
+   D->Mult(tmpR1b, tmpR0);
+   MtInv->Mult(tmpR0, tmpR0b);
+   
+   /*
+   // tmpR0 = \int{}div{rho*U}
+   //D->Mult(tmpR1c, tmpR0);   
+   D_big->Mult(Nunm1, tmpR0_big);
+   MInv_big->Mult(tmpR0_big, tmpR0_bigB) ; // container
+   */
+   
    {
-     double *dataU = uBn.HostReadWrite();
-     double *dataDivRU = tmpR0.HostReadWrite();          
-     double *data = tmpR1.HostReadWrite();     
+     double *dataU = tmpR1.HostReadWrite(); //contains u{n+1/2}     
+     double *dataDivRU = tmpR0b.HostReadWrite(); // div{rho*u}
+     double *data = tmpR1c.HostReadWrite();
+     //double *dataU = uBn.HostReadWrite(); //contains u{n+1/2}     
+     //double *dataDivRU = tmpR0_big.HostReadWrite();
+     //double *data = Nunm1.HostReadWrite();
      for (int eq = 0; eq < nvel; eq++) {     
+       //for (int i = 0; i < NdofR0Int; i++) {
+       // data[i + eq*NdofR0Int] -= dataDivRU[i] * dataU[i + eq*NdofR0Int]; // minus because on rhs
+       //}
        for (int i = 0; i < TdofInt; i++) {
-	 data[i + eq*TdofInt] = dataDivRU[i] * dataU[i + eq*TdofInt];
-       }              
+	 data[i + eq*TdofInt] -= dataDivRU[i] * dataU[i + eq*TdofInt]; // minus because on rhs
+       }                     
      }     
-   }   
-   Nun.Add(-1.0,tmpR1);
+   }
+   // tmpR1c = u * \int{}div{rho*U}
+   // std::cout << " okay 5" << endl;   
+   
+   // project NL product back to v-space
+   //R1PX2_gf.SetFromTrueDofs(Nun);
+   /*
+   R1PX2_gf.SetFromTrueDofs(Nunm1);   
+   R1PM0_gf.ProjectGridFunction(R1PX2_gf);  
+   R1PM0_gf.GetTrueDofs(tmpR1b);
+   //std::cout << " okay 6" << endl;
+   */
+   
+   //Nun.Add(-1.0,tmpR1);
+   //tmpR1b.Add(-1.0,tmpR1c);
    
    // project NL product back to v-space
    /*
@@ -2962,14 +3075,17 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    */
 
    // on rhs already due to -1 coeff in N   
-   Fext.Set(1.0,Nun); 
+   //Fext.Set(1.0,Nun);
+   //Fext.Set(1.0,tmpR1b);
+   Mv->Mult(tmpR1c,Fext);
+   //Mv->Mult(Nunm1,Fext);   
     
    // add forcing/accel term to Fext   
    Fext.Add(1.0, fn);
    if ( config.isGravity ) { Fext.Add(1.0, boussinesqField); }
 
    // Fext = M^{-1} (F(u^{n}) + f^{n+1}) (F* w/o known part of BDF)
-   MvInv->Mult(Fext, tmpR1);
+   MvInv->Mult(Fext, tmpR1); 
    iter_mvsolve = MvInv->GetNumIterations();
    res_mvsolve = MvInv->GetFinalNorm();
    resu.Set(1.0, tmpR1); // on rhs
@@ -3264,7 +3380,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    // explicit filter
    if (pFilter == true)
    {     
-      un_NM1_gf.ProjectGridFunction(un_gf);
+      un_NM1_gf.ProjectGridFunction(un_next_gf);
       un_filtered_gf.ProjectGridFunction(un_NM1_gf);
       const auto d_un_filtered_gf = un_filtered_gf.Read();
       auto d_un_gf = un_next_gf.ReadWrite();
