@@ -76,8 +76,7 @@ class Chemistry {
   bool detailedBalance_[gpudata::MAXREACTIONS];
   double equilibriumConstantParams_[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
 
-  ChemistryModel model_;
-  ChemistryInput inputs_;
+
   // /*
   //   From input file, reaction/reaction%d/equation will specify this mapping.
   // */
@@ -86,6 +85,9 @@ class Chemistry {
 
   // Kevin: currently, I doubt we need mixture class here. but left it just in case.
   GasMixture *mixture_ = NULL;
+  ChemistryInput inputs_;
+  ChemistryModel model_;
+
 
   double min_temperature_;
 

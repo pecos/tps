@@ -86,12 +86,19 @@ class GasMixture {
   bool twoTemperature_;
 
   // State Indices
-  int iBackground;
-  int iElectron;
-  int iIon1;
-  int iIon2;
+  int iRho;
+  int iuVel;
+  int ivVel;
+  int iwVel;
   int iTe;
   int iTh;
+
+  // Species Indices
+  // int iBackground;
+  // int iElectron;
+  // int iIon1;
+  // int iIon2;
+
 
   // DenseMatrix gasParams;
   // // TODO(kevin): not initialized at this point.
@@ -139,15 +146,13 @@ class GasMixture {
     num_equation = twoTemperature_ ? (nvel_ + 3 + numActiveSpecies) : (nvel_ + 2 + numActiveSpecies);
   }
 
-  MFEM_HOST_DEVICE void SetSpeciesStateIndices() {
-    iBackground = numSpecies - 1;
-    iElectron = numSpecies - 2;
-    iIon1 = numSpecies - 3;
-    iIon2 = numSpecies - 4;
-    if (twoTemperature_) {
-      iTe = num_equation - 1;
-    }
+  MFEM_HOST_DEVICE void SetStateIndices() {
+    iRho = 0;
+    iuVel = 1;
+    if (dim > 1) ivVel = 2;
+    if (dim > 2) iwVel = 3;
     iTh = nvel_ + 1;
+    if (twoTemperature_) iTe = num_equation - 1;
   }
 
  public:
@@ -168,15 +173,26 @@ class GasMixture {
   MFEM_HOST_DEVICE int GetNumVels() const { return nvel_; }
   MFEM_HOST_DEVICE bool IsAmbipolar() const { return ambipolar; }
   MFEM_HOST_DEVICE bool IsTwoTemperature() const { return twoTemperature_; }
+  
+  MFEM_HOST_DEVICE virtual int GetiBackgroundIndex() const { 
+    mfem::mfem_error("GasMixture::GetiBackgroundIndex not implemented");
+    return 0; 
+  }
+
+  MFEM_HOST_DEVICE virtual int GetiElectronIndex() const { 
+    mfem::mfem_error("GasMixture::GetiElectronIndex not implemented");
+    return 0; 
+  }
+
   // virtual int getInputIndexOf(int mixtureIndex) { return 0; }
   // int getElectronMixtureIndex() { return (speciesMapping_.count("E")) ? speciesMapping_["E"] : -1; }
   // virtual std::map<int, int> *getMixtureToInputMap() { return NULL; }
   // virtual std::map<std::string, int> *getSpeciesMapping() { return NULL; }
   // DenseMatrix *getCompositions() { return &composition_; }
-  MFEM_HOST_DEVICE int GetiBackgroundIndex() const { return iBackground; }
-  MFEM_HOST_DEVICE int GetiElectronIndex() const { return iElectron; }
-  MFEM_HOST_DEVICE int GetiIon1Index() const { return iIon1; }
-  MFEM_HOST_DEVICE int GetiIon2Index() const { return iIon2; }
+  // MFEM_HOST_DEVICE int GetiBackgroundIndex() const { return iBackground; }
+  // MFEM_HOST_DEVICE int GetiElectronIndex() const { return iElectron; }
+  // MFEM_HOST_DEVICE int GetiIon1Index() const { return iIon1; }
+  // MFEM_HOST_DEVICE int GetiIon2Index() const { return iIon2; }
 
   MFEM_HOST_DEVICE virtual double GetGasParams(int species, GasParams param) const {
     printf("GetGasParams not implemented!\n");
@@ -643,10 +659,19 @@ class PerfectMixture : public GasMixture {
   double molarCV_[gpudata::MAXSPECIES];
   double molarCP_[gpudata::MAXSPECIES];
 
+  // State Indices
+  int iBackground;
+  int iElectron;
+  int iIon1;
+  int iIon2;
+
   // DenseMatrix gasParams;
   double gasParams[gpudata::MAXSPECIES * GasParams::NUM_GASPARAMS];
   // std::map<int, int> mixtureToInputMap_;
   // std::map<std::string, int> speciesMapping_;
+
+  std::vector<std::string> *speciesNames;
+  std::map<std::string, int> *speciesMapping;
 
   // virtual void SetNumEquations();
  public:
@@ -657,12 +682,33 @@ class PerfectMixture : public GasMixture {
   // Vector dtor, which is only a __host__ function!
   MFEM_HOST_DEVICE virtual ~PerfectMixture() {}
 
+
+  MFEM_HOST_DEVICE void SetSpeciesIndices() {
+
+    iBackground = (*speciesMapping)["Ar"];
+    iElectron = (*speciesMapping)["E"];
+    iIon1 = (*speciesMapping)["Ar.+1"];
+    iIon2 = (*speciesMapping)["Ar.+2"]; 
+    // iIon2 = -1; // Update if you ever use that
+
+    // iBackground = numSpecies - 1;
+    // iElectron = numSpecies - 2;
+    // iIon1 = numSpecies - 3;
+    // iIon2 = numSpecies - 4;
+  }
+
+
   // virtual int getInputIndexOf(int mixtureIndex) { return mixtureToInputMap_[mixtureIndex]; }
   // virtual std::map<int, int> *getMixtureToInputMap() { return &mixtureToInputMap_; }
   // virtual std::map<std::string, int> *getSpeciesMapping() { return &speciesMapping_; }
   MFEM_HOST_DEVICE virtual double GetGasParams(int species, GasParams param) const {
     return gasParams[species + param * numSpecies];
   }
+
+  MFEM_HOST_DEVICE int GetiBackgroundIndex() const { return iBackground; }
+  MFEM_HOST_DEVICE int GetiElectronIndex() const { return iElectron; }
+  MFEM_HOST_DEVICE int GetiIon1Index() const { return iIon1; }
+  MFEM_HOST_DEVICE int GetiIon2Index() const { return iIon2; }
 
   virtual double getMolarCV(int species) { return molarCV_[species]; }
   virtual double getMolarCP(int species) { return molarCP_[species]; }

@@ -202,7 +202,6 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
 
     // TODO(kevin): energy sink for radiative reaction.
 
-
     // Radiation source term
     switch (radiation_->inputs.model) {
       case NET_EMISSION:
@@ -212,7 +211,9 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
         srcTerm[1 + _nvel] += (*energySinkRad_)[n];
         break;
       case NONE_RAD:
-        break;          
+        break;    
+      case NUM_RADIATIONMODEL: // Not needed but I have added it to supress the warning. 
+        break;        
     }
 
     if (_mixture->IsTwoTemperature()) {

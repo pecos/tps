@@ -34,6 +34,7 @@
 double getRadius(const Vector &pos) { return pos[0]; }
 FunctionCoefficient radiusFcn(getRadius);
 
+
 // Implementation of class RHSoperator
 RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, const int &_order,
                          const Equations &_eqSystem, double &_max_char_speed, IntegrationRules *_intRules,
@@ -74,12 +75,12 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
       Up(_Up),
       plasma_conductivity_(pc),
       joule_heating_(jh),
+      energySinkRad_(_energySinkRad),       
       gradUp(_gradUp),
       gradUpfes(_gradUpfes),
       gradUp_A(_gradUp_A),
       bcIntegrator(_bcIntegrator),
-      distance_(distance),
-      energySinkRad_(_energySinkRad) {
+      distance_(distance) {
   flux.SetSize(vfes->GetNDofs(), dim_, num_equation_);
   z.UseDevice(true);
   z.SetSize(A->Height());
@@ -640,7 +641,7 @@ void RHSoperator::updatePrimitives(const Vector &x_in) const {
   });
 #else
   double *dataUp = Up->GetData();
-  int numActiveSpecies_ =  mixture->GetNumActiveSpecies();
+  // int numActiveSpecies_ =  mixture->GetNumActiveSpecies();
   for (int i = 0; i < vfes->GetNDofs(); i++) {
     Vector iState(num_equation_);
     Vector primitiveState(num_equation_);

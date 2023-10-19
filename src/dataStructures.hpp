@@ -581,6 +581,9 @@ struct PerfectMixtureInput {
 
   double gasParams[gpudata::MAXSPECIES * GasParams::NUM_GASPARAMS];
   double molarCV[gpudata::MAXSPECIES];
+
+  std::map<std::string, int> *speciesMapping;
+  std::vector<std::string> *speciesNames;
 };
 
 struct LteMixtureInput {

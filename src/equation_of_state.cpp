@@ -157,11 +157,11 @@ MFEM_HOST_DEVICE DryAir::DryAir(const DryAirInput inputs, int _dim, int nvel)
 
   SetNumActiveSpecies();
   SetNumEquations();
+  SetStateIndices();
 #ifdef _GPU_
   assert(nvel_ <= gpudata::MAXDIM);
   assert(numSpecies <= gpudata::MAXSPECIES);
 #endif
-  SetSpeciesStateIndices();
 
   // TODO(kevin): replace Nconservative/Nprimitive.
   // add extra equation for passive scalar
@@ -540,10 +540,13 @@ MFEM_HOST_DEVICE PerfectMixture::PerfectMixture(PerfectMixtureInput inputs, int 
       gasParams[sp + param * numSpecies] = inputs.gasParams[sp + param * numSpecies];
   }
 
+  speciesNames = inputs.speciesNames;
+  speciesMapping = inputs.speciesMapping;
+
   SetNumActiveSpecies();
   SetNumEquations();
-
-  SetSpeciesStateIndices();
+  SetStateIndices();
+  SetSpeciesIndices();
 
   // We assume the background species is neutral.
   assert(gasParams[iBackground + GasParams::SPECIES_CHARGES * numSpecies] == 0.0);
@@ -1985,8 +1988,14 @@ void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInt
 
   // ... first for the neutral, considering all energy levels
   double Q_n = 1.0;  // Add contribution of ground state.
-  const int nPop = ambipolar ? (numActiveSpecies - 1) : (numActiveSpecies - 2);
-  for (int sp = 0; sp < nPop; sp++) {
+  // const int nPop = ambipolar ? (numActiveSpecies - 1) : (numActiveSpecies - 2);
+  // for (int sp = 0; sp < nPop; sp++) {
+  //   const double gsp = GetGasParams(sp, GasParams::SPECIES_DEGENERACY);
+  //   const double E0 = GetGasParams(sp, GasParams::FORMATION_ENERGY);
+  //   Q_n += gsp * exp(-E0 / UNIVERSALGASCONSTANT / T);  // E0 in J/mol, so e/kT = E0/NA/RT
+  // }
+  for (int sp = 0; sp < numSpecies; sp++) {
+    if (sp == iBackground || sp == iIon1 || sp == iElectron) continue;
     const double gsp = GetGasParams(sp, GasParams::SPECIES_DEGENERACY);
     const double E0 = GetGasParams(sp, GasParams::FORMATION_ENERGY);
     Q_n += gsp * exp(-E0 / UNIVERSALGASCONSTANT / T);  // E0 in J/mol, so e/kT = E0/NA/RT
@@ -2019,7 +2028,13 @@ void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInt
   Vector n_sp(numSpecies);
 
   // Boltzmann Distribution - Excited level populations
-  for (int sp = 0; sp < nPop; sp++) {
+  // for (int sp = 0; sp < nPop; sp++) {
+  //   const double gsp = GetGasParams(sp, GasParams::SPECIES_DEGENERACY);
+  //   const double E0 = GetGasParams(sp, GasParams::FORMATION_ENERGY);
+  //   n_sp[sp] = n_neutral * gsp * exp(-E0 / UNIVERSALGASCONSTANT / T) / Q_n;
+  // }
+  for (int sp = 0; sp < numSpecies; sp++) {
+    if (sp == iBackground || sp == iIon1 || sp == iElectron) continue;
     const double gsp = GetGasParams(sp, GasParams::SPECIES_DEGENERACY);
     const double E0 = GetGasParams(sp, GasParams::FORMATION_ENERGY);
     n_sp[sp] = n_neutral * gsp * exp(-E0 / UNIVERSALGASCONSTANT / T) / Q_n;

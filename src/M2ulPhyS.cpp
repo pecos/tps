@@ -3107,29 +3107,18 @@ void M2ulPhyS::parseSpeciesInputs() {
       config.speciesComposition = 0.0;
 
       // TODO(kevin): electron species is enforced to be included in the input file.
-      // TODO(Mal): We need to find a better way to define indices of the species. Probably through input file.
       bool isElectronIncluded = false;
 
       config.gasParams = 0.0;
       int paramIdx = 0;  // new species index.
       int targetIdx;
       for (int sp = 0; sp < config.numSpecies; sp++) {  // input file species index.
+        // if (inputSpeciesNames[sp] == "Ar")) {
         if (sp == config.backgroundIndex - 1) {
           targetIdx = config.numSpecies - 1;
         } else if (inputSpeciesNames[sp] == "E") {
           targetIdx = config.numSpecies - 2;
-          isElectronIncluded = true;
-        // TODO(trevilo): I am commenting this out (previously part of
-        // if above) b/c it causes some tests to seg fault.  Need to
-        // discuss with Malamas what he is wanting to achieve here and
-        // figure out how to make it work.
-        //          
-        // } else if (inputSpeciesNames[sp] == "Ar.+1" ||  inputSpeciesNames[sp] == "Ar+1" ) {
-        //   targetIdx = config.numSpecies - 3;
-        // } else if (inputSpeciesNames[sp] == "Ar.+2" ||  inputSpeciesNames[sp] == "Ar+2" ) {
-        //   targetIdx = config.numSpecies - 4;
-        // } else if (inputSpeciesNames[sp] == "Ar2.+1" ||  inputSpeciesNames[sp] == "Ar2+1" ) {
-        //   targetIdx = config.numSpecies - 5;          
+          isElectronIncluded = true;         
         } else {
           targetIdx = paramIdx;
           paramIdx++;
@@ -3856,6 +3845,8 @@ void M2ulPhyS::packUpGasMixtureInput() {
           }
           config.perfectMixtureInput.molarCV[sp] = config.constantMolarCV(sp);
         }
+        config.perfectMixtureInput.speciesMapping = &config.speciesMapping;
+        config.perfectMixtureInput.speciesNames = &config.speciesNames;
       } break;
       default:
         grvy_printf(GRVY_ERROR, "Gas model is not specified!\n");

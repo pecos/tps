@@ -44,7 +44,7 @@ LteMixture::LteMixture(RunConfiguration &_runfile, int _dim, int nvel)
 
   SetNumActiveSpecies();
   SetNumEquations();
-  SetSpeciesStateIndices();
+  SetStateIndices();
 #ifdef HAVE_GSL
   energy_table_ = new GslTableInterpolator2D(_runfile.lteMixtureInput.thermo_file_name, 0, /* temperature column */
                                              1,                                            /* density column */
@@ -85,7 +85,7 @@ MFEM_HOST_DEVICE LteMixture::LteMixture(WorkingFluid f, int _dim, int nvel, doub
 
   SetNumActiveSpecies();
   SetNumEquations();
-  SetSpeciesStateIndices();
+  SetStateIndices();
 }
 #else
 MFEM_HOST_DEVICE LteMixture::LteMixture(WorkingFluid f, int _dim, int nvel, double pc, TableInput energy_table_input,
@@ -97,7 +97,7 @@ MFEM_HOST_DEVICE LteMixture::LteMixture(WorkingFluid f, int _dim, int nvel, doub
 
   SetNumActiveSpecies();
   SetNumEquations();
-  SetSpeciesStateIndices();
+  SetStateIndices();
 
   energy_table_ = new LinearTable(energy_table_input);
   R_table_ = new LinearTable(R_table_input);
