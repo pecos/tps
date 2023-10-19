@@ -2720,9 +2720,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    // HERE HERE HERE => redo this to just be u*d(T) and remove divu part later...
    /*
    {
-     int eq = 0;
      double *dataGradT = gradT.HostReadWrite(); 
-     //double *Udata = un_next.HostReadWrite();
      double *Udata = Uext.HostReadWrite();     
      double *data = tmpR0.HostReadWrite();
      for (int i = 0; i < TdofInt; i++) {
@@ -2759,34 +2757,56 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    resT.Add(-1.0, tmpR0b);
    */
         
-   /**/
+
+   // T and u in padded space
+   /*
+   Tn_gf.SetFromTrueDofs(Text);         
+   R0PX2_gf.ProjectGridFunction(Tn_gf);
+   R0PX2_gf.GetTrueDofs(TBn);   
+   un_gf.SetFromTrueDofs(Uext);
+   R1PX2_gf.ProjectGridFunction(un_gf);
+   R1PX2_gf.GetTrueDofs(uBn);
+
    {
-     double *Udata = Uext.HostReadWrite();
-     double *Tdata = Text.HostReadWrite(); 
-     double *data = Fext.HostReadWrite();         
+     double *Udata = uBn.HostReadWrite();
+     double *Tdata = TBn.HostReadWrite(); 
+     double *data = FBext.HostReadWrite();     
      for (int eq = 0; eq < dim; eq++) {
-       for (int i = 0; i < TdofInt; i++) {
+       for (int i = 0; i < TBn.Size();  i++) {
          data[i + eq * TdofInt] = Udata[i + eq * TdofInt] * Tdata[i];
        }       
      }
    }
-   /**/
 
    // project back to p-space
-   /*
    R1PX2_gf.SetFromTrueDofs(FBext);
    R1PM0_gf.ProjectGridFunction(R1PX2_gf);
-   R1PM0_gf.GetTrueDofs(Fext);
+   R1PM0_gf.GetTrueDofs(Fext);   
+   
    */
+     
+   {
+     double *Udata = Uext.HostReadWrite();
+     double *Tdata = Text.HostReadWrite(); 
+     double *data = Fext.HostReadWrite();     
+     for (int eq = 0; eq < dim; eq++) {
+       for (int i = 0; i < TdofInt;  i++) {
+         data[i + eq * TdofInt] = Udata[i + eq * TdofInt] * Tdata[i];
+       }       
+     }
+   }
 
-   /**/
    Dt->Mult(Fext, tmpR0); // explicit div(uT) at extrapolated {n+1}
    
    // div(uT) should already be in integrated weak form and can be added directly
    resT.Add(-1.0, tmpR0); // minus to move to rhs
-
-   // subtract T*divU from lhs to prevent divu source?
-   //D->Mult(un, tmpR0);   
+   
+   // subtract T*divU from lhs to prevent divu source
+   /*
+   R0PM0_gf.SetFromTrueDofs(divU);
+   R0PX2_gf.ProjectGridFunction(R0PM0_gf);
+   R0PX2_gf.GetTrueDofs(TBnm1); // just a container for padded divU
+   */
    {
      double *data = tmpR0b.HostReadWrite();
      double *dataDivU = divU.HostReadWrite();     
@@ -2794,12 +2814,23 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      MFEM_FORALL(i, Text.Size(),	 
      {
        data[i] = Tdata[i] * dataDivU[i];
+       //data[i] *= Tdata[i];
      });
    }
+   /*
+   R0PX2_gf.SetFromTrueDofs(TBnm1);
+   R0PM0_gf.ProjectGridFunction(R0PX2_gf);
+   R0PM0_gf.GetTrueDofs(tmpR0b);
+   */
+   
    Mt->Mult(tmpR0b, tmpR0);   
    resT.Add(+1.0, tmpR0); // minus on lhs and minus to move to rhs
    /**/
 
+   // reset projection gfs, probably not necessary
+   //Tn_gf.SetFromTrueDofs(Tn);
+   //un_gf.SetFromTrueDofs(un);   
+   
    // Add boundary terms.
    /*
    Text_gf.SetFromTrueDofs(Text);
@@ -2980,7 +3011,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    sw_extrap.Start();
 
    // project u to "padded" order space
-   /*
+   /*   
    un_gf.SetFromTrueDofs(un);         
    R1PX2_gf.ProjectGridFunction(un_gf);
    R1PX2_gf.GetTrueDofs(uBn);
@@ -3009,7 +3040,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    // nonlinear convection is in \int(u\cdot\nabla{}v,w) form, i.e. div-free
    N->Mult(uBn, Nun);
 
-   /**/
+   /*
    // ab-predictor of nonliner term at {n+1}
    // comes out WITH A NEGATIVE
    {
@@ -3034,9 +3065,11 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 
       });
    }
+   */
 
    // project NL product back to v-space
-   R1PX2_gf.SetFromTrueDofs(FBext);
+   //R1PX2_gf.SetFromTrueDofs(FBext);
+   R1PX2_gf.SetFromTrueDofs(Nun);   
    R1PM0_gf.ProjectGridFunction(R1PX2_gf);  
    R1PM0_gf.GetTrueDofs(Fext);
 
@@ -3110,9 +3143,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      }     
    }   
    
-   //std::cout << "Check o..." << std::endl;      
    sw_curlcurl.Stop();
-
 
    
    // dj(mu)(\tau/mu), have to store bits separately due to weak form helmholtz in momentum
@@ -3388,6 +3419,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 
    // grad(P)
    G->Mult(pnBig, resu);
+   MvInv->Mult(resu,tmpR1);
+   resu.Set(1.0,tmpR1);
 
    // if only gradP needs 1/rho
    if (constantDensity != true) {
@@ -3402,6 +3435,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
        data[i] *= 1.0 / static_rho;
      }     
    }
+   Mv->Mult(resu, tmpR1);
+   resu.Set(1.0,tmpR1);   
 
    // -1/rho * grad{P} on rhs   
    resu.Neg(); 
@@ -3414,7 +3449,11 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 
    // add convection to rhs
    Mv->Mult(Fext, tmpR1); 
-   resu.Add(1.0, tmpR1); 
+   resu.Add(1.0, tmpR1);
+
+   //resu.Add(1.0, Fext);
+   //Mv->Mult(resu, tmpR1);
+   //resu.Set(1.0,tmpR1);
 
    for (auto &vel_dbc : vel_dbcs) { un_next_gf.ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);}
    vfes->GetRestrictionMatrix()->MultTranspose(resu, resu_gf);
