@@ -3358,6 +3358,32 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      Mt->Mult(tmpR0b, tmpR0c);
      tmpR0.Add(+1.0,tmpR0c); // because of the tmpR0.Neg()...
    }
+
+   // TODO: add grad{rho} \cdot (u*/dt - ab0 u{n+1})
+   //         = grad{rho} \cdot (Fext - ab0*Uext)
+   
+   if (incompressibleSolve != true) {
+
+     // gradient of rho{n+1}
+     G->Mult(rn, tmpR1);
+     MvInv->Mult(tmpR1, tmpR1b);
+     
+     double *dataGR = tmpR1b.HostReadWrite();     
+     double *dataU = Uext.HostReadWrite();     
+     double *dataF = Fext.HostReadWrite();
+     double *data = tmpR0b.HostReadWrite();
+     for (int i = 0; i < TdofInt; i++) {     
+       data[i] = 0.0;
+     }
+     for (int eq = 0; eq < dim; eq++) {
+       for (int i = 0; i < TdofInt; i++) {     
+         data[i] += dataGR[i + eq * TdofInt] * (dataF[i + eq * TdofInt] - (bd0/dt)*dataU[i + eq * TdofInt]);
+       }
+     }
+     Mt->Mult(tmpR0b, tmpR0c);
+     tmpR0.Add(-1.0,tmpR0c); // because of the tmpR0.Neg()...
+   }   
+   
    
    // Add boundary terms.
    FText_gf.SetFromTrueDofs(FText);
