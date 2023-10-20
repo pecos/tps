@@ -2012,7 +2012,7 @@ void M2ulPhyS::solveStep() {
   timeIntegrator->Step(*U, time, dt);
 
   Check_NAN();
-  if (mixture->GetWorkingFluid() == WorkingFluid::USER_DEFINED) Check_Undershoot();
+  if (config.GetWorkingFluid() == WorkingFluid::USER_DEFINED) Check_Undershoot();
 
   if (!config.isTimeStepConstant()) {
     double dt_local = CFL * hmin / max_char_speed / static_cast<double>(dim);

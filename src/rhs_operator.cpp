@@ -347,7 +347,7 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
 
   // Update primite varibales
   updatePrimitives(x);
-
+  
 #ifdef _GPU_
   // GPU version requires the exchange of data before gradient computation
   initNBlockDataTransfer(*Up, vfes, transferUp);
@@ -449,6 +449,7 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
     y.SetSubVector(vdofs, ymat.GetData());
   }
 #endif
+
 
   // add forcing terms
   for (int i = 0; i < forcing.Size(); i++) {

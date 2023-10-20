@@ -12,8 +12,10 @@ cp Restart/highP/restart_output-plasma-refine2.LTE.h5 restart_output-plasma-refi
 
 
 EXE=../src/tps
-RUNFILE="inputs/plasma.ini"
+# RUNFILE="inputs/plasma.ini"
 # RUNFILE="inputs/input.4iters.cyl.ini"
+
+RUNFILE="inputs/input.sponge_zone.periodic.species.ini"
 
 NPROC=10
 
