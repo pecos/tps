@@ -93,13 +93,6 @@ class GasMixture {
   int iTe;
   int iTh;
 
-  // Species Indices
-  // int iBackground;
-  // int iElectron;
-  // int iIon1;
-  // int iIon2;
-
-
   // DenseMatrix gasParams;
   // // TODO(kevin): not initialized at this point.
   // // DenseMatrix composition_;
@@ -149,8 +142,8 @@ class GasMixture {
   MFEM_HOST_DEVICE void SetStateIndices() {
     iRho = 0;
     iuVel = 1;
-    if (dim > 1) ivVel = 2;
-    if (dim > 2) iwVel = 3;
+    if (nvel_ > 1) ivVel = 2;
+    if (nvel_ > 2) iwVel = 3;
     iTh = nvel_ + 1;
     if (twoTemperature_) iTe = num_equation - 1;
   }

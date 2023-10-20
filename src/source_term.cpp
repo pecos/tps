@@ -204,21 +204,12 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
 
     // Radiation source term
     if (enableRadiation_) {
-      switch (radiation_->inputs.model) {
-        case NET_EMISSION:
+      if (radiation_->inputs.model == NET_EMISSION) {
           srcTerm[1 + _nvel] += _radiation->computeEnergySink(Th);    
-          break;
-        case P1_MODEL:
+      } else if (radiation_->inputs.model == P1_MODEL) {
           srcTerm[1 + _nvel] += (*energySinkRad_)[n];
-          break;
-        case NONE_RAD:
-          break;    
-        case NUM_RADIATIONMODEL: // Not needed but I have added it to supress the warning. 
-          break;        
       }
-
-    }
-
+    }    
 
     if (_mixture->IsTwoTemperature()) {
       // energy sink from electron-impact reactions.

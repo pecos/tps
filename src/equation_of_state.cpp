@@ -1105,16 +1105,24 @@ MFEM_HOST_DEVICE void PerfectMixture::computeTemperaturesBase(const double *cons
   // but it's better to have a capability to avoid this.
   // NOTE(malamast): This caused problems when n_e = 0.0 so I set T_e = T_h when this occurs.
   if (twoTemperature_) {
-    if (n_e > 0.0) {
-      T_e = conservedState[iTe] / (n_e + Xeps_) / molarCV_[iElectron];
-    } else {
-      // T_e = 0.0;      
-      T_e = T_h;      
-    }
-    if (T_e < T_h) T_e = T_h;
+    T_e = conservedState[iTe] / n_e / molarCV_[iElectron];
   } else {
     T_e = T_h;
   }
+
+
+  // if (twoTemperature_) {
+  //   if (n_e > 0.0) {
+  //     T_e = conservedState[iTe] / (n_e + Xeps_) / molarCV_[iElectron];
+  //   } else {
+  //     // T_e = 0.0;      
+  //     T_e = T_h;      
+  //   }
+  //   if (T_e < T_h) T_e = T_h;
+  // } else {
+  //   T_e = T_h;
+  // }
+
 
   return;
 }
