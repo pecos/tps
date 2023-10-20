@@ -28,8 +28,8 @@ RUN yum -y install gcc gcc-c++
 RUN yum -y install valgrind-ohpc
 RUN yum -y install boost-gnu9-mpich-ohpc
 
-RUN yum -y install python38-pip
-RUN pip3 install matplotlib
+RUN yum -y install python3.11-devel
+RUN yum -y install python3.11-pip
 
 RUN yum -y install procps-ng
 RUN yum -y install diffutils
@@ -43,24 +43,22 @@ RUN yum -y install bc
 RUN yum -y install clang-tools-extra
 RUN yum -y install zlib-devel
 RUN yum -y install libcurl-devel
-RUN yum -y install python38-devel
+
 RUN yum -y install perl-Data-Dumper
 RUN yum -y install flex
 RUN yum -y install bison
 
-RUN pip3 install gcovr
-
-RUN pip3 install "pybind11[global]"
-RUN pip3 install lxcat_data_parser
-
 RUN . /etc/profile.d/lmod.sh \
+    && pip3 install "pybind11[global]" \
     && pip3 install mpi4py \
     && pip3 install numpy \
     && pip3 install scipy \
     && pip3 install matplotlib \
     && pip3 install cupy \
     && pip3 install numba \
-    && pip3 install multiprocess
+    RUN pip3 install gcovr \
+    && pip3 install multiprocess \
+    && pip3 install lxcat_data_parser
 
 # build doxygen from scratch (no package... really?)
 RUN wget https://www.doxygen.nl/files/doxygen-1.9.5.src.tar.gz -P /tmp
