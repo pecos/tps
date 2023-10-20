@@ -3114,7 +3114,6 @@ void M2ulPhyS::parseSpeciesInputs() {
       int paramIdx = 0;  // new species index.
       int targetIdx;
       for (int sp = 0; sp < config.numSpecies; sp++) {  // input file species index.
-        // if (inputSpeciesNames[sp] == "Ar")) {
         if (sp == config.backgroundIndex - 1) {
           targetIdx = config.numSpecies - 1;
         } else if (inputSpeciesNames[sp] == "E") {
@@ -3848,6 +3847,7 @@ void M2ulPhyS::packUpGasMixtureInput() {
         }
         config.perfectMixtureInput.speciesMapping = &config.speciesMapping;
         config.perfectMixtureInput.speciesNames = &config.speciesNames;
+        config.perfectMixtureInput.iBackground = config.numSpecies - 1;
       } break;
       default:
         grvy_printf(GRVY_ERROR, "Gas model is not specified!\n");

@@ -664,6 +664,7 @@ class PerfectMixture : public GasMixture {
   int iElectron;
   int iIon1;
   int iIon2;
+  int iAr;
 
   // DenseMatrix gasParams;
   double gasParams[gpudata::MAXSPECIES * GasParams::NUM_GASPARAMS];
@@ -685,16 +686,12 @@ class PerfectMixture : public GasMixture {
 
   MFEM_HOST_DEVICE void SetSpeciesIndices() {
 
-    iBackground = (*speciesMapping)["Ar"];
+    // iBackground has already been set.
+    iAr = (*speciesMapping)["Ar"];
     iElectron = (*speciesMapping)["E"];
     iIon1 = (*speciesMapping)["Ar.+1"];
     iIon2 = (*speciesMapping)["Ar.+2"]; 
-    // iIon2 = -1; // Update if you ever use that
 
-    // iBackground = numSpecies - 1;
-    // iElectron = numSpecies - 2;
-    // iIon1 = numSpecies - 3;
-    // iIon2 = numSpecies - 4;
   }
 
 

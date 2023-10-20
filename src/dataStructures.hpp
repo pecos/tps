@@ -574,6 +574,7 @@ struct PerfectMixtureInput {
   WorkingFluid f;
 
   int numSpecies;
+  int iBackground;
 
   bool isElectronIncluded;
   bool ambipolar;
