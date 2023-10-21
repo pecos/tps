@@ -71,10 +71,11 @@ void testTableInterpolator1D(TPS::Tps &tps, int rank) {
 
   std::string fileName;
   tps.getRequiredInput((basePath + "/filename").c_str(), fileName);
+  std::string groupName;
   std::string datasetName = "table";
   DenseMatrix refValues;
   Array<int> dims1(2);
-  bool success = h5ReadTable(fileName, datasetName, refValues, dims1);
+  bool success = h5ReadTable(fileName, groupName, datasetName, refValues, dims1);
   if (!success) {
     grvy_printf(GRVY_ERROR, "Reading the table file %s failed!\n", fileName.c_str());
     exit(ERROR);
@@ -86,10 +87,11 @@ void testTableInterpolator1D(TPS::Tps &tps, int rank) {
   // will need a different test if inexact interpolator is used.
   for (int k = 0; k < dims1[0]; k++) {
     // double xtest = 300.0 * pow(1.0e4 / 300.0, 1.0 * k / Ntest);
+    double nstest[gpudata::MAXSPECIES];
     double xtest = refValues(k, 0);
     double fref = refValues(k, 1);
     double ftest[gpudata::MAXREACTIONS];
-    chem->computeForwardRateCoeffs(xtest, xtest, ftest);
+    chem->computeForwardRateCoeffs(nstest,xtest, xtest, ftest);
     double error = abs((fref - ftest[0]) / fref);
     if (error >= scalarErrorThreshold) {
       grvy_printf(GRVY_ERROR, "Rank %d - %.5E: %.5E\n", rank, xtest, abs((fref - ftest[0]) / fref));

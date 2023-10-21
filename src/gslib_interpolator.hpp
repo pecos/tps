@@ -110,4 +110,66 @@ class PlaneInterpolator : public InterpolatorBase {
   void writeAscii(std::string oname, bool rank0 = true) const final;
 };
 
+class FieldInterpolator : public InterpolatorBase {
+ private:
+
+
+  int nprocs_;  // total number of MPI procs
+  int rank_;    // local MPI rank
+  bool rank0_;  // flag to indicate rank 0
+
+  bool FromDGToH1Space = true;
+
+  // Auxiliary variables
+  int NE = 0; 
+  int nsp = 0;
+  int n_interp_nodes = 0;
+
+  // ***** Source field *****
+  mfem::ParMesh *src_mesh;
+
+  // Finite element collection
+  mfem::FiniteElementCollection *src_fec;
+
+  // Finite element space for a scalar (thermodynamic quantity)
+  mfem::ParFiniteElementSpace *src_fes;
+
+  // Finite element space for a mesh-dim vector quantity (momentum)
+  mfem::ParFiniteElementSpace *src_dfes;
+
+  // Finite element space for all variables together (total thermodynamic state)
+  mfem::ParFiniteElementSpace *src_vfes;
+
+
+
+  // ***** Target field *****
+  mfem::ParMesh *tar_mesh;
+
+  // Finite element collection
+  mfem::FiniteElementCollection *tar_fec;
+
+  // Finite element space for a scalar (thermodynamic quantity)
+  mfem::ParFiniteElementSpace *tar_fes;
+
+  // Finite element space for a mesh-dim vector quantity (momentum)
+  mfem::ParFiniteElementSpace *tar_dfes;
+
+  // Finite element space for all variables together (total thermodynamic state)
+  mfem::ParFiniteElementSpace *tar_vfes;
+
+ public:
+
+
+  FieldInterpolator(mfem::ParMesh *_mesh_1, mfem::FiniteElementCollection *_fec_1, mfem::ParFiniteElementSpace *_fes_1,
+                    mfem::ParMesh *_mesh_2, mfem::FiniteElementCollection *_fec_2, mfem::ParFiniteElementSpace *_fes_2);
+
+  ~FieldInterpolator();
+
+  void setInterpolationPoints() final;
+
+
+  void setFromDGToH1Space(bool value) { FromDGToH1Space = value; }
+  void PerformInterpolation(mfem::ParGridFunction *func_1, mfem::ParGridFunction *func_2);
+};
+
 #endif  // GSLIB_INTERPOLATOR_HPP_

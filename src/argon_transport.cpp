@@ -154,6 +154,7 @@ MFEM_HOST_DEVICE collisionInputs ArgonMinimalTransport::computeCollisionInputs(c
   collInputs.Te = (twoTemperature_) ? primitive[num_equation - 1] : primitive[nvel_ + 1];
   collInputs.Th = primitive[nvel_ + 1];
 
+
   // Add Xeps to avoid zero number density case.
   double nOverT = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) {
@@ -189,7 +190,7 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeFluxMolecularTransport(const
   // std::cout << "temp: " << Th << ",\t" << Te << std::endl;
 
   // Add Xeps to avoid zero number density case.
-  double nOverT = (n_sp[electronIndex_] + Xeps_) / Te + (n_sp[ionIndex_] + Xeps_) / Th;
+  double nOverT = (n_sp[electronIndex_] + Xeps_) / (Te + Xeps_) + (n_sp[ionIndex_] + Xeps_) / (Th + Xeps_);
   double debyeLength = sqrt(debyeFactor_ / AVOGADRONUMBER / nOverT);
   double debyeCircle = PI_ * debyeLength * debyeLength;
 
@@ -216,7 +217,7 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeFluxMolecularTransport(const
   } else {
     transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] = viscosityFactor_ * kOverEtaFactor_ *
                                                                sqrt(Te / mw_[electronIndex_]) * X_sp[electronIndex_] /
-                                                               (collision::charged::rep22(nondimTe) * debyeCircle);
+                                                               (collision::charged::rep22(nondimTe) * debyeCircle) + Xeps_;
   }
 
   double binaryDiff[3 * 3];
@@ -249,6 +250,7 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeFluxMolecularTransport(const
     }
   }
 
+
   // DenseMatrix gradX(numSpecies, dim);
   double gradX[gpudata::MAXSPECIES * gpudata::MAXDIM];
   mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
@@ -267,9 +269,7 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeFluxMolecularTransport(const
   }
 
   if (ambipolar) addAmbipolarEfield(mobility, n_sp, diffusionVelocity);
-
   addMixtureDrift(mobility, n_sp, Efield, diffusionVelocity);
-
   correctMassDiffusionFlux(Y_sp, diffusionVelocity);
 
   double charSpeed = 0.0;
@@ -283,6 +283,16 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeFluxMolecularTransport(const
     // charSpeed = max(charSpeed, speciesSpeed);
   }
   // std::cout << "max diff. vel: " << charSpeed << std::endl;
+
+  for (int sp = 0; sp < numSpecies; sp++) {
+    for (int d = 0; d < nvel_; d++) {
+      if (isnan(diffusionVelocity[sp + d * numSpecies])) {
+        printf("\nDiffusion velocity of species %d is NaN! -> %f\n", sp, diffusionVelocity[sp + d * numSpecies]);
+        assert(false);
+      }
+    }
+  }
+
 }
 
 MFEM_HOST_DEVICE double ArgonMinimalTransport::computeThirdOrderElectronThermalConductivity(const double *X_sp,
@@ -331,7 +341,7 @@ MFEM_HOST_DEVICE double ArgonMinimalTransport::computeThirdOrderElectronThermalC
   // std::cout << "L22: " << L22 << std::endl;
 
   return viscosityFactor_ * kOverEtaFactor_ * sqrt(2.0 * Te / mw_[electronIndex_]) * X_sp[electronIndex_] /
-         (L11 - L12 * L12 / L22);
+         (L11 - L12 * L12 / L22) + Xeps_;
 }
 
 void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state, Vector &diffusivity) {
@@ -466,9 +476,9 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeSourceMolecularTransport(con
   }
 
   speciesTransport[ionIndex_ + SpeciesTrns::MF_FREQUENCY * numSpecies] =
-      mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp[ionIndex_] * Qie;
+      mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp[ionIndex_] * Qie  + Xeps_;
   speciesTransport[neutralIndex_ + SpeciesTrns::MF_FREQUENCY * numSpecies] =
-      mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp[neutralIndex_] * Qea;
+      mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp[neutralIndex_] * Qea  + Xeps_;
 
   // Apply artificial multipliers.
   if (multiply_) {
@@ -480,7 +490,7 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeSourceMolecularTransport(con
   }
 
   globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] =
-      computeMixtureElectricConductivity(mobility, n_sp) * MOLARELECTRONCHARGE;
+      computeMixtureElectricConductivity(mobility, n_sp) * MOLARELECTRONCHARGE + Xeps_;
 
   double gradX[gpudata::MAXEQUATIONS * gpudata::MAXDIM];
   mixture->ComputeMoleFractionGradient(n_sp, gradUp, gradX);
@@ -514,6 +524,18 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeSourceMolecularTransport(con
     // charSpeed = max(charSpeed, speciesSpeed);
   }
   // std::cout << "max diff. vel: " << charSpeed << std::endl;
+
+
+  for (int sp = 0; sp < numSpecies; sp++) {
+    for (int d = 0; d < nvel_; d++) {
+      if (isnan(diffusionVelocity[sp + d * numSpecies])) {
+        printf("\nDiffusion velocity of species %d is NaN! -> %f\n", sp, diffusionVelocity[sp + d * numSpecies]);
+        assert(false);
+      }
+    }
+  }
+
+
 }
 
 MFEM_HOST_DEVICE void ArgonMinimalTransport::GetViscosities(const double *conserved, const double *primitive,
@@ -874,6 +896,13 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeFluxMolecularTransport(const
     // charSpeed = max(charSpeed, speciesSpeed);
   }
   // std::cout << "max diff. vel: " << charSpeed << std::endl;
+
+
+
+
+
+
+
 }
 
 MFEM_HOST_DEVICE double ArgonMixtureTransport::computeThirdOrderElectronThermalConductivity(

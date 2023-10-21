@@ -81,13 +81,14 @@ class SourceTerm : public ForcingTerms {
   Radiation *radiation_ = NULL;
   ParGridFunction *plasma_conductivity_;
   ParGridFunction *distance_;
+  ParGridFunction *energySinkRad_;
 
  public:
   SourceTerm(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
              IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up,
              ParGridFunction *_gradUp, const precomputedIntegrationData &gpuArrays, RunConfiguration &_config,
              GasMixture *mixture, GasMixture *d_mixture, TransportProperties *transport, Chemistry *chemistry,
-             Radiation *radiation, ParGridFunction *pc, ParGridFunction *distance);
+             Radiation *radiation, ParGridFunction *pc, ParGridFunction *distance, ParGridFunction *_energySinkRad);
   ~SourceTerm();
 
   // Terms do not need updating

@@ -156,9 +156,12 @@ void M2ulPhyS::initMixtureAndTransportModels() {
           gpu::instantiateDeviceChemistry<<<1, 1>>>(d_mixture, config.chemistryInput, chemistry_);
 #else
           chemistry_ = new Chemistry(mixture, config.chemistryInput);
+
 #endif
           break;
       }
+
+
       break;
     case WorkingFluid::LTE_FLUID:
       int table_dim;
@@ -185,7 +188,7 @@ void M2ulPhyS::initMixtureAndTransportModels() {
         // Read data from hdf5 file containing 4 columns: T, energy, gas constant, speed of sound
         DenseMatrix thermo_data;
         bool success;
-        success = h5ReadBcastMultiColumnTable(config.lteMixtureInput.thermo_file_name, std::string("T_energy_R_c"),
+        success = h5ReadBcastMultiColumnTable(config.lteMixtureInput.thermo_file_name, std::string(""), std::string("T_energy_R_c"),
                                               TPSCommWorld, thermo_data, thermo_tables);
         if (!success) exit(ERROR);
 
@@ -232,7 +235,7 @@ void M2ulPhyS::initMixtureAndTransportModels() {
         // Read data from hdf5 file containing 4 columns: T, mu, kappa, sigma
         // (i.e., temperature, dynamic viscosity, thermal conductivity, electrical conductivity)
         DenseMatrix trans_data;
-        success = h5ReadBcastMultiColumnTable(config.lteMixtureInput.trans_file_name, std::string("T_mu_kappa_sigma"),
+        success = h5ReadBcastMultiColumnTable(config.lteMixtureInput.trans_file_name, std::string(""), std::string("T_mu_kappa_sigma"),
                                               TPSCommWorld, trans_data, trans_tables);
         if (!success) exit(ERROR);
 
@@ -500,22 +503,6 @@ void M2ulPhyS::initVariables() {
 
   initMixtureAndTransportModels();
 
-  switch (config.radiationInput.model) {
-    case NET_EMISSION:
-#if defined(_CUDA_) || defined(_HIP_)
-      tpsGpuMalloc((void **)(&radiation_), sizeof(NetEmission));
-      gpu::instantiateDeviceNetEmission<<<1, 1>>>(config.radiationInput, radiation_);
-#else
-      radiation_ = new NetEmission(config.radiationInput);
-#endif
-      break;
-    case NONE_RAD:
-      break;
-    default:
-      mfem_error("RadiationModel not recognized.");
-      break;
-  }
-
   order = config.GetSolutionOrder();
 
   MaxIters = config.GetNumIters();
@@ -570,6 +557,7 @@ void M2ulPhyS::initVariables() {
   vfes = new ParFiniteElementSpace(mesh, fec, num_equation, Ordering::byNODES);
   gradUpfes = new ParFiniteElementSpace(mesh, fec, num_equation * dim, Ordering::byNODES);
 
+
 #if defined(_CUDA_) || defined(_HIP_)
   // prepare viscous sponge data to pass to gpu ctor
   viscositySpongeData vsd;
@@ -611,6 +599,28 @@ void M2ulPhyS::initVariables() {
   rsolver = new RiemannSolver(num_equation, mixture, eqSystem, d_fluxClass, config.RoeRiemannSolver(),
                               config.isAxisymmetric());
 #endif
+
+
+  // Initialise radiation model
+  switch (config.radiationInput.model) {
+    case NET_EMISSION:
+#if defined(_CUDA_) || defined(_HIP_)
+      tpsGpuMalloc((void **)(&radiation_), sizeof(NetEmission));
+      gpu::instantiateDeviceNetEmission<<<1, 1>>>(config.radiationInput, radiation_);
+#else
+      radiation_ = new NetEmission(config.radiationInput);
+#endif
+      break;
+    case P1_MODEL:
+      radiation_ = new P1Model(config.radiationInput, mesh, fec, fes, config.isAxisymmetric());
+      break;
+    case NONE_RAD:
+      break;
+    default:
+      mfem_error("RadiationModel not recognized.");
+      break;
+  }
+
 
 #ifdef _GPU_
   initIndirectionArrays();
@@ -719,7 +729,7 @@ void M2ulPhyS::initVariables() {
       new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType, d_fluxClass,
                       mixture, d_mixture, chemistry_, transportPtr, radiation_, vfes, fes, gpu_precomputed_data_,
                       maxIntPoints, maxDofs, A, Aflux, mesh, spaceVaryViscMult, U, Up, gradUp, gradUpfes, gradUp_A,
-                      bcIntegrator, config, plasma_conductivity_, joule_heating_, distance_);
+                      bcIntegrator, config, plasma_conductivity_, joule_heating_, distance_,energySinkRad);
 
   CFL = config.GetCFLNumber();
   rhsOperator->SetTime(time);
@@ -1646,6 +1656,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
 
   // this variable is purely for visualization
   press = new ParGridFunction(fes);
+  energySinkRad = new ParGridFunction(fes), *energySinkRad = 0.0;
 
   passiveScalar = NULL;
   if (eqSystem == NS_PASSIVE) {
@@ -1794,6 +1805,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     *joule_heating_ = 0.0;
   }
 
+
   // define solution parameters for i/o
   ioData.registerIOFamily("Solution state variables", "/solution", U);
   ioData.registerIOVar("/solution", "density", 0);
@@ -1811,6 +1823,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     // Only for NS_PASSIVE.
     if ((eqSystem == NS_PASSIVE) && (sp == 1)) break;
 
+
     std::string speciesName = config.speciesNames[sp];
     if (config.restartFromLTE) {
       ioData.registerIOVar("/solution", "rho-Y_" + speciesName, sp + nvel + 2, false);
@@ -1824,6 +1837,15 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     } else {
       ioData.registerIOVar("/solution", "rhoE_e", num_equation - 1);
     }
+  }
+
+  if (config.saveTemperatureField) {
+    ioData.registerIOFamily("Temperature field", "/temperature", temperature, true, false);
+    ioData.registerIOVar("/temperature", "temperature", 0, false);
+    // if (config.twoTemperature) {
+    //   ioData.registerIOFamily("Electron temperature field", "/temperature", electron_temp_field, true, false);
+    //   ioData.registerIOVar("/temperature", "electron_temperature", 0, false);
+    // }
   }
 
   // compute factor to multiply viscosity when this option is active
@@ -1857,6 +1879,10 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   }
   paraviewColl->RegisterField("temp", temperature);
   paraviewColl->RegisterField("press", press);
+
+  if (config.radiationInput.model == P1_MODEL) {
+    paraviewColl->RegisterField("energySink", energySinkRad);
+  }
   if (eqSystem == NS_PASSIVE) {
     paraviewColl->RegisterField("passiveScalar", passiveScalar);
   }
@@ -1953,7 +1979,10 @@ void M2ulPhyS::projectInitialSolution() {
   // if restarting from LTE, write paraview and restart h5 immediately
   if (config.restartFromLTE && !tpsP->isVisualizationMode()) {
     if (rank0_) std::cout << "Writing non-equilibrium restart files!" << std::endl;
-    paraviewColl->Save();
+    // paraviewColl->SetCycle(iter+1);  // We set iter+1 here. Since we have set paraviewColl->UseRestartMode(true); 
+                                     // above, paraview cannot overwrite existing files produced for the same 
+                                     // timestep and time, causing the code to crush.  
+    // paraviewColl->Save();
     restart_files_hdf5("write");
   }
 }
@@ -1971,13 +2000,19 @@ void M2ulPhyS::solveBegin() {
 }
 
 void M2ulPhyS::solveStep() {
+
+  if (config.radiationInput.model == P1_MODEL) {
+    if (iter % radiation_->inputs.solve_rad_every_n == 0) {
+      radiation_->SetCycle(iter);
+      radiation_->SetTime(time);
+      radiation_->Solve(temperature, energySinkRad); 
+    }
+  } 
+
   timeIntegrator->Step(*U, time, dt);
 
   Check_NAN();
-  if (mixture->GetWorkingFluid() == WorkingFluid::USER_DEFINED) Check_Undershoot();
-
-  // MPI_Barrier(MPI_COMM_WORLD);
-  // if (rank0_) cout << "skata : " << " Check_Undershoot 2" << endl;
+  if (config.GetWorkingFluid() == WorkingFluid::USER_DEFINED) Check_Undershoot();
 
   if (!config.isTimeStepConstant()) {
     double dt_local = CFL * hmin / max_char_speed / static_cast<double>(dim);
@@ -2078,6 +2113,7 @@ void M2ulPhyS::solveEnd() {
   if (iter == MaxIters) {
     // auto hUp = Up->HostRead();
     Up->HostRead();
+
     mixture->UpdatePressureGridFunction(press, Up);
 
     // write_restart_files();
@@ -2722,6 +2758,8 @@ void M2ulPhyS::parseIOSettings() {
   tpsP->getInput("io/enableRestart", config.restart, false);
   tpsP->getInput("io/restartFromLTE", config.restartFromLTE, false);
   tpsP->getInput("io/exitCheckFreq", config.exit_checkFrequency_, 500);
+  tpsP->getInput("io/saveTemperatureField", config.saveTemperatureField, false);
+
   assert(config.exit_checkFrequency_ > 0);
 
   std::string restartMode;
@@ -3070,7 +3108,6 @@ void M2ulPhyS::parseSpeciesInputs() {
       config.speciesComposition = 0.0;
 
       // TODO(kevin): electron species is enforced to be included in the input file.
-      // TODO(Mal): We need to find a better way to define indices of the species. Probably through input file.
       bool isElectronIncluded = false;
 
       config.gasParams = 0.0;
@@ -3081,23 +3118,11 @@ void M2ulPhyS::parseSpeciesInputs() {
           targetIdx = config.numSpecies - 1;
         } else if (inputSpeciesNames[sp] == "E") {
           targetIdx = config.numSpecies - 2;
-          isElectronIncluded = true;
+          isElectronIncluded = true;         
         } else {
           targetIdx = paramIdx;
           paramIdx++;
         }
-        // TODO(trevilo): I am commenting this out (previously part of
-        // if above) b/c it causes some tests to seg fault.  Need to
-        // discuss with Malamas what he is wanting to achieve here and
-        // figure out how to make it work.
-        //
-        // else if (inputSpeciesNames[sp] == "Ar.+1" ||  inputSpeciesNames[sp] == "Ar+1" ) {
-        //   targetIdx = config.numSpecies - 3;
-        // } else if (inputSpeciesNames[sp] == "Ar.+2" ||  inputSpeciesNames[sp] == "Ar+2" ) {
-        //   targetIdx = config.numSpecies - 4;
-        // } else if (inputSpeciesNames[sp] == "Ar2.+1" ||  inputSpeciesNames[sp] == "Ar2+1" ) {
-        //   targetIdx = config.numSpecies - 5;
-        // }
 
         config.speciesMapping[inputSpeciesNames[sp]] = targetIdx;
         config.speciesNames[targetIdx] = inputSpeciesNames[sp];
@@ -3300,7 +3325,6 @@ void M2ulPhyS::parseReactionInputs() {
 
     if (model == "arrhenius") {
       config.reactionModels[r - 1] = ARRHENIUS;
-
       double A, b, E;
       tpsP->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
       tpsP->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
@@ -3319,6 +3343,9 @@ void M2ulPhyS::parseReactionInputs() {
       config.reactionModels[r - 1] = TABULATED_RXN;
       std::string inputPath(basepath + "/tabulated");
       readTable(inputPath, config.chemistryInput.reactionInputs[r - 1].tableInput);
+
+    } else if (model == "radiative_decay") {
+      config.reactionModels[r - 1] = RADIATIVE_DECAY;
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
       exit(ERROR);
@@ -3390,6 +3417,7 @@ void M2ulPhyS::parseReactionInputs() {
 
       // energy conservation.
       // TODO(kevin): this will need an adjustion when radiation comes into play.
+      // if (config.reactionModels[r] != RADIATIVE_DECAY) {
       double reactEnergy = 0.0, prodEnergy = 0.0;
       for (int sp = 0; sp < numSpecies_; sp++) {
         // int inputSp = (*mixtureToInputMap_)[sp];
@@ -3407,8 +3435,11 @@ void M2ulPhyS::parseReactionInputs() {
         grvy_printf(GRVY_ERROR, "Difference = %.8E\n", delta);
         exit(-1);
       }
+      // }
+
     }
   }
+
 
   // Pack up chemistry input for instantiation.
   {
@@ -3419,9 +3450,11 @@ void M2ulPhyS::parseReactionInputs() {
     } else {
       config.chemistryInput.electronIndex = -1;
     }
+    config.chemistryInput.speciesMapping = &config.speciesMapping;
+    config.chemistryInput.speciesNames = &config.speciesNames;
 
     size_t rxn_param_idx = 0;
-
+    bool RadiativeDecayReactionsIncluded = false;
     config.chemistryInput.numReactions = config.numReactions;
     for (int r = 0; r < config.numReactions; r++) {
       config.chemistryInput.reactionEnergies[r] = config.reactionEnergies[r];
@@ -3437,11 +3470,16 @@ void M2ulPhyS::parseReactionInputs() {
             config.equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS];
       }
 
-      if (config.reactionModels[r] != TABULATED_RXN) {
+      if (config.reactionModels[r] == ARRHENIUS ||  config.reactionModels[r] == HOFFERTLIEN) {
         assert(rxn_param_idx < config.rxnModelParamsHost.size());
         config.chemistryInput.reactionInputs[r].modelParams = config.rxnModelParamsHost[rxn_param_idx].Read();
         rxn_param_idx += 1;
       }
+
+      if (config.reactionModels[r] == RADIATIVE_DECAY) RadiativeDecayReactionsIncluded = true;
+    }
+    if (RadiativeDecayReactionsIncluded) {
+      tpsP->getRequiredInput("reactions/characteristic_length", config.chemistryInput.char_length);
     }
   }
 }
@@ -3728,9 +3766,10 @@ void M2ulPhyS::parseRadiationInputs() {
   tpsP->getInput(basepath.c_str(), type, std::string("none"));
   std::string modelInputPath(basepath + "/" + type);
 
+  tpsP->getInput("plasma_models/visualization", config.radiationInput.visualization, false);
+
   if (type == "net_emission") {
     config.radiationInput.model = NET_EMISSION;
-
     std::string coefficientType;
     tpsP->getRequiredInput((modelInputPath + "/coefficient").c_str(), coefficientType);
     if (coefficientType == "tabulated") {
@@ -3739,6 +3778,29 @@ void M2ulPhyS::parseRadiationInputs() {
       readTable(inputPath, config.radiationInput.necTableInput);
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown net emission coefficient type -> %s\n", coefficientType.c_str());
+      exit(ERROR);
+    }
+  } else if (type == "p1_model") {
+    config.radiationInput.model = P1_MODEL;
+    std::string coefficientType;
+    tpsP->getRequiredInput((modelInputPath + "/coefficient").c_str(), coefficientType);
+
+    tpsP->getRequiredInput((modelInputPath + "/solve-rad-every-n").c_str(), config.radiationInput.solve_rad_every_n);
+    // tpsP->getInput((modelInputPath + "/timing-frequency").c_str(), config.radiationInput.timing_freq, 100);
+    tpsP->getInput((modelInputPath + "/MaxIters").c_str(), config.radiationInput.MaxIters, 200);
+    tpsP->getInput((modelInputPath + "/P1_Tolerance").c_str(), config.radiationInput.P1_Tolerance, 1e-10);
+    tpsP->getInput((modelInputPath + "/PrintLevels").c_str(), config.radiationInput.PrintLevels, -1);
+
+    if (coefficientType == "tabulated") {
+      config.radiationInput.P1Model = TABULATED_P1;
+      tpsP->getRequiredInput((modelInputPath + "/num_of_groups").c_str(), config.radiationInput.NumOfGroups);
+      std::string inputPath(modelInputPath + "/tabulated");
+      tpsP->getInput((inputPath + "/x_log").c_str(), config.radiationInput.P1TableInput.xLogScale, false);
+      tpsP->getInput((inputPath + "/f_log").c_str(), config.radiationInput.P1TableInput.fLogScale, false);
+      tpsP->getInput((inputPath + "/order").c_str(), config.radiationInput.P1TableInput.order, 1);
+      tpsP->getRequiredInput((inputPath + "/path_to_files").c_str(), config.radiationInput.pathToFiles);
+    } else {
+      grvy_printf(GRVY_ERROR, "\nUnknown P1 model. -> %s\n", coefficientType.c_str());
       exit(ERROR);
     }
   } else if (type == "none") {
@@ -3783,6 +3845,9 @@ void M2ulPhyS::packUpGasMixtureInput() {
           }
           config.perfectMixtureInput.molarCV[sp] = config.constantMolarCV(sp);
         }
+        config.perfectMixtureInput.speciesMapping = &config.speciesMapping;
+        config.perfectMixtureInput.speciesNames = &config.speciesNames;
+        config.perfectMixtureInput.iBackground = config.numSpecies - 1;
       } break;
       default:
         grvy_printf(GRVY_ERROR, "Gas model is not specified!\n");
@@ -4196,7 +4261,7 @@ void M2ulPhyS::updateVisualizationVariables() {
       Th = prim[1 + _nvel];
       Te = (in_mix->IsTwoTemperature()) ? prim[_num_equation - 1] : Th;
       double kfwd[gpudata::MAXREACTIONS], kC[gpudata::MAXREACTIONS];
-      in_chem->computeForwardRateCoeffs(Th, Te, kfwd);
+      in_chem->computeForwardRateCoeffs(nsp, Th, Te, kfwd);
       in_chem->computeEquilibriumConstants(Th, Te, kC);
       // get reaction rates
       double progressRates[gpudata::MAXREACTIONS];

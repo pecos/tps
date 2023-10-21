@@ -34,6 +34,7 @@
 double getRadius(const Vector &pos) { return pos[0]; }
 FunctionCoefficient radiusFcn(getRadius);
 
+
 // Implementation of class RHSoperator
 RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, const int &_order,
                          const Equations &_eqSystem, double &_max_char_speed, IntegrationRules *_intRules,
@@ -45,7 +46,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
                          ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
                          ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A,
                          BCintegrator *_bcIntegrator, RunConfiguration &_config, ParGridFunction *pc,
-                         ParGridFunction *jh, ParGridFunction *distance)
+                         ParGridFunction *jh, ParGridFunction *distance, ParGridFunction *_energySinkRad)
     : TimeDependentOperator(_A->Height()),
       config_(_config),
       iter(_iter),
@@ -74,6 +75,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
       Up(_Up),
       plasma_conductivity_(pc),
       joule_heating_(jh),
+      energySinkRad_(_energySinkRad),       
       gradUp(_gradUp),
       gradUpfes(_gradUpfes),
       gradUp_A(_gradUp_A),
@@ -125,7 +127,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   if (_config.GetWorkingFluid() != WorkingFluid::DRY_AIR) {
     forcing.Append(new SourceTerm(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up, gradUp,
                                   gpu_precomputed_data_, _config, mixture, d_mixture_, _transport, _chemistry,
-                                  _radiation, plasma_conductivity_, distance_));
+                                  _radiation, plasma_conductivity_, distance_, energySinkRad_));
   }
 #ifdef HAVE_MASA
   if (config_.use_mms_) {
@@ -345,7 +347,7 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
 
   // Update primite varibales
   updatePrimitives(x);
-
+  
 #ifdef _GPU_
   // GPU version requires the exchange of data before gradient computation
   initNBlockDataTransfer(*Up, vfes, transferUp);
@@ -383,8 +385,8 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
     Vector fk(flux(eq).GetData(), dim_ * vfes->GetNDofs());
     Vector zk(z.HostReadWrite() + eq * vfes->GetNDofs(), vfes->GetNDofs());
 #endif
-
     Aflux->AddMult(fk, zk);
+
 #ifdef _GPU_
     RHSoperator::copyZk2Z_gpu(z, zk, eq, vfes->GetNDofs());
 #endif
@@ -448,6 +450,7 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
   }
 #endif
 
+
   // add forcing terms
   for (int i = 0; i < forcing.Size(); i++) {
 #ifdef HAVE_MASA
@@ -459,7 +462,6 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
     forcing[i]->setTime(this->GetTime());
     forcing[i]->updateTerms(y);
   }
-
   computeMeanTimeDerivatives(y);
 }
 
@@ -640,6 +642,7 @@ void RHSoperator::updatePrimitives(const Vector &x_in) const {
   });
 #else
   double *dataUp = Up->GetData();
+  // int numActiveSpecies_ =  mixture->GetNumActiveSpecies();
   for (int i = 0; i < vfes->GetNDofs(); i++) {
     Vector iState(num_equation_);
     Vector primitiveState(num_equation_);

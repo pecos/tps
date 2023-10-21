@@ -288,12 +288,17 @@ void GlobalProjectDiscCoefficient(ParGridFunction &gf, VectorCoefficient &coeff)
   delete tv;
 }
 
-bool h5ReadTable(const std::string &fileName, const std::string &datasetName, mfem::DenseMatrix &output,
-                 mfem::Array<int> &shape) {
+bool h5ReadTable(const std::string &fileName, const std::string &groupName, const std::string &datasetName,
+                 mfem::DenseMatrix &output, mfem::Array<int> &shape) {
   bool success = false;
   hid_t file = -1;
+  hid_t grp = -1;
+
   if (file_exists(fileName)) {
     file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+    if (!groupName.empty()) {
+      grp  = H5Gopen(file, groupName.c_str(), H5P_DEFAULT); 
+    }    
   } else {
     grvy_printf(GRVY_ERROR, "[ERROR]: Unable to open file -> %s\n", fileName.c_str());
     return success;
@@ -301,7 +306,11 @@ bool h5ReadTable(const std::string &fileName, const std::string &datasetName, mf
   if (file < 0) return success;
 
   hid_t datasetID, dataspace;
-  datasetID = H5Dopen2(file, datasetName.c_str(), H5P_DEFAULT);
+  if (groupName.empty()) {
+    datasetID = H5Dopen2(file, datasetName.c_str(), H5P_DEFAULT);
+  }else{ 
+    datasetID = H5Dopen2(grp, datasetName.c_str(), H5P_DEFAULT);
+  }  
   if (datasetID < 0) return success;
   dataspace = H5Dget_space(datasetID);
   // const int ndims = H5Sget_simple_extent_ndims(dataspace);
@@ -316,6 +325,7 @@ bool h5ReadTable(const std::string &fileName, const std::string &datasetName, mf
   status = H5Dread(datasetID, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, output.HostReadWrite());
   if (status < 0) return success;
   H5Dclose(datasetID);
+  if (!groupName.empty()) H5Gclose(grp);
   H5Fclose(file);
 
   // DenseMatrix memory is column-major, while HDF5 follows row-major.
@@ -329,7 +339,11 @@ bool h5ReadTable(const std::string &fileName, const std::string &datasetName, mf
   return success;
 }
 
-bool h5ReadBcastMultiColumnTable(const std::string &fileName, const std::string &datasetName, MPI_Comm TPSCommWorld,
+    std::string filename,groupName;
+
+
+bool h5ReadBcastMultiColumnTable(const std::string &fileName, const std::string &groupName, 
+                                 const std::string &datasetName, MPI_Comm TPSCommWorld,
                                  mfem::DenseMatrix &output, std::vector<TableInput> &tables) {
   int myrank;
   MPI_Comm_rank(TPSCommWorld, &myrank);
@@ -340,7 +354,7 @@ bool h5ReadBcastMultiColumnTable(const std::string &fileName, const std::string 
   int suc_int;
   if (rank0) {
     Array<int> dims(2);
-    success = h5ReadTable(fileName.c_str(), datasetName.c_str(), output, dims);
+    success = h5ReadTable(fileName.c_str(), groupName.c_str(), datasetName.c_str(), output, dims);
     nrow = dims[0];
     ncol = dims[1];
     suc_int = (int)success;

@@ -344,6 +344,8 @@ MFEM_HOST_DEVICE void ConstantTransport::ComputeFluxMolecularTransport(const dou
   double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : primitiveState[nvel_ + 1];
   double Th = primitiveState[nvel_ + 1];
 
+  if (Te < Th) Te = Th;
+
   double n_sp[gpudata::MAXSPECIES], X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES];
   mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
 
@@ -405,6 +407,9 @@ MFEM_HOST_DEVICE void ConstantTransport::ComputeSourceMolecularTransport(const d
   mixture->GetPrimitivesFromConservatives(state, primitiveState);
   double Te = (twoTemperature_) ? primitiveState[num_equation - 1] : primitiveState[nvel_ + 1];
   double Th = primitiveState[nvel_ + 1];
+
+  if (Te < Th) Te = Th;
+
 
   double X_sp[gpudata::MAXEQUATIONS], Y_sp[gpudata::MAXEQUATIONS];
   mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);

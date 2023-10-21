@@ -247,6 +247,7 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
 
   viscF1.SetSize(num_equation, dim);
   viscF2.SetSize(num_equation, dim);
+ 
 
   // element size
   Mesh *mesh = vfes->GetMesh();
@@ -275,9 +276,10 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     delta2 = mesh->GetElementSize(Tr.Elem2No, 1) / el2.GetOrder();
   }
 
-  // NOTE(malamast): Is there a better way to retrieve these values?
   const int numActiveSpecies = fluxClass->GetNumActiveSpecies();
   const int nvel = fluxClass->GetNumVels();
+  const bool twoTemperature_ = fluxClass->IsTwoTemperature();
+  int iTe = num_equation - 1;
 
   for (int i = 0; i < ir->GetNPoints(); i++) {
     const IntegrationPoint &ip = ir->IntPoint(i);
@@ -292,13 +294,18 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     elfun1_mat.MultTranspose(shape1, funval1);
     elfun2_mat.MultTranspose(shape2, funval2);
 
-    // TODO(malamast): We force negative (unphysical) values of species that occur due to interpolation error to be
-    // zero.
+    // TODO(malamast): We force negative (unphysical) values of species, which occur due to interpolation error, to be zero.
     for (int sp = 0; sp < numActiveSpecies; sp++) {
       int eq = nvel + 2 + sp;
-      funval1[eq] = max(funval1[eq], 0.0);
-      funval2[eq] = max(funval2[eq], 0.0);
+      funval1[eq] = max(funval1[eq],0.0); 
+      funval2[eq] = max(funval2[eq],0.0);       
     }
+
+    if (twoTemperature_) {
+      funval1[iTe] = max(funval1[iTe],0.0); 
+      funval2[iTe] = max(funval2[iTe],0.0);  
+    }
+
 
     // // Interpolate the distance function
     double d1 = 0;
@@ -332,7 +339,7 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
 
     fluxClass->ComputeViscousFluxes(funval1, gradUp1i, transip, delta1, d1, viscF1);
     fluxClass->ComputeViscousFluxes(funval2, gradUp2i, transip, delta2, d2, viscF2);
-
+ 
     // compute mean flux
     viscF1 += viscF2;
     viscF1 *= -0.5;

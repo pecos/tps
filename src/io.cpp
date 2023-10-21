@@ -281,7 +281,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
       if (dataspace >= 0) H5Sclose(dataspace);
 
     } else if (fam.inRestartFile) {  // read mode
-      if (rank0_) cout << "Reading in solutiond data from restart..." << endl;
+      if (rank0_) cout << "Reading in solution data from restart..." << endl;
 
       // verify Dofs match expectations with current mesh
       if (rank0_ || config.isRestartPartitioned(mode)) {
@@ -707,9 +707,9 @@ void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
   bool success = false;
   int suc_int = 0;
   if (rank0_) {
-    std::string filename;
+    std::string filename,groupName;
     tpsP->getRequiredInput((inputPath + "/filename").c_str(), filename);
-    success = h5ReadTable(filename, "table", config.tableHost.back(), dims);
+    success = h5ReadTable(filename, groupName, "table", config.tableHost.back(), dims);
     suc_int = (int)success;
 
     // TODO(kevin): extend for multi-column array?

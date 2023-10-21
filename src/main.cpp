@@ -34,11 +34,13 @@
  * C++ driver application for TPS simulation.
  */
 
+#include <cfenv>
 #include "tps.hpp"
 
 int main(int argc, char *argv[]) {
   mfem::Mpi::Init(argc, argv);
   int status;
+  feenableexcept(FE_INVALID | FE_OVERFLOW); 
   {
     TPS::Tps tps(MPI_COMM_WORLD);
 

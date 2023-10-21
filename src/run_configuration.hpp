@@ -109,6 +109,7 @@ class RunConfiguration {
   // restart controls
   bool restart;
   bool restartFromLTE;
+  bool saveTemperatureField;
   bool restart_hdf5_conversion;  // read in older ascii format
   std::string restart_serial;    // mode for serial restarts
   int restart_cycle;

@@ -38,7 +38,7 @@ SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_or
                        ParGridFunction *_Up, ParGridFunction *_gradUp,
                        const precomputedIntegrationData &gpu_precomputed_data, RunConfiguration &_config,
                        GasMixture *mixture, GasMixture *d_mixture, TransportProperties *transport, Chemistry *chemistry,
-                       Radiation *radiation, ParGridFunction *pc, ParGridFunction *distance)
+                       Radiation *radiation, ParGridFunction *pc, ParGridFunction *distance, ParGridFunction *_energySinkRad)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpu_precomputed_data,
                    _config.isAxisymmetric()),
       mixture_(mixture),
@@ -47,7 +47,8 @@ SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_or
       chemistry_(chemistry),
       radiation_(radiation),
       plasma_conductivity_(pc),
-      distance_(distance) {
+      distance_(distance), 
+      energySinkRad_(_energySinkRad) {
   numSpecies_ = mixture->GetNumSpecies();
   numActiveSpecies_ = mixture->GetNumActiveSpecies();
   numReactions_ = _config.chemistryInput.numReactions;
@@ -90,10 +91,9 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     d_distance = distance_->Read();
   }
 
-  TransportProperties *_transport = transport_;
+  TransportProperties *_transport = transport_; // Why do we do that? The pointers are already set in the class.
   Chemistry *_chemistry = chemistry_;
   Radiation *_radiation = radiation_;
-  const bool _enableRadiation = enableRadiation_;
 
   const int nnodes = vfes->GetNDofs();
   const int _dim = dim;
@@ -155,6 +155,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     Th = upn[1 + _nvel];
     if (_mixture->IsTwoTemperature()) {
       Te = upn[_num_equation - 1];
+      if (Te < Th) Te = Th;
     } else {
       Te = Th;
     }
@@ -162,7 +163,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     double progressRates[gpudata::MAXREACTIONS], creationRates[gpudata::MAXSPECIES];
     if (_numSpecies > 1 && _numReactions > 0) {
       double kfwd[gpudata::MAXREACTIONS], kC[gpudata::MAXREACTIONS];
-      _chemistry->computeForwardRateCoeffs(Th, Te, kfwd);
+      _chemistry->computeForwardRateCoeffs(ns, Th, Te, kfwd);
       _chemistry->computeEquilibriumConstants(Th, Te, kC);
 
       // get reaction rates
@@ -200,9 +201,15 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     // TODO(kevin): may move axisymmetric source terms to here.
 
     // TODO(kevin): energy sink for radiative reaction.
-    if (_enableRadiation) {
-      srcTerm[1 + _nvel] += _radiation->computeEnergySink(Th);
-    }
+
+    // Radiation source term
+    if (enableRadiation_) {
+      if (radiation_->inputs.model == NET_EMISSION) {
+          srcTerm[1 + _nvel] += _radiation->computeEnergySink(Th);    
+      } else if (radiation_->inputs.model == P1_MODEL) {
+          srcTerm[1 + _nvel] += (*energySinkRad_)[n];
+      }
+    }    
 
     if (_mixture->IsTwoTemperature()) {
       // energy sink from electron-impact reactions.

@@ -37,7 +37,9 @@ using namespace std;
 
 Chemistry::Chemistry(GasMixture *mixture, RunConfiguration &config) : Chemistry(mixture, config.chemistryInput) {}
 
-MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput &inputs) : mixture_(mixture) {
+MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput &inputs) 
+: mixture_(mixture),
+  inputs_(inputs) {
   numEquations_ = mixture->GetNumEquations();
   numSpecies_ = mixture->GetNumSpecies();
   numActiveSpecies_ = mixture->GetNumActiveSpecies();
@@ -86,6 +88,12 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
       case TABULATED_RXN: {
         reactions_[r] = new Tabulated(inputs.reactionInputs[r].tableInput);
       } break;
+      case RADIATIVE_DECAY: {
+        reactions_[r] = new RadiativeDecay(inputs.char_length, inputs.speciesMapping, inputs.speciesNames, 
+                                            numSpecies_,
+                                            &reactantStoich_[0 + r * numSpecies_],
+                                            &productStoich_[0 + r * numSpecies_]);    
+      } break;
       default:
         printf("Unknown reactionModel.");
         assert(false);
@@ -106,13 +114,13 @@ MFEM_HOST_DEVICE Chemistry::~Chemistry() {
   }
 }
 
-void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, Vector &kfwd) {
+void Chemistry::computeForwardRateCoeffs(const mfem::Vector &ns, const double &T_h, const double &T_e, Vector &kfwd) {
   kfwd.SetSize(numReactions_);
 
   const double Thlim = max(T_h, min_temperature_);
   const double Telim = max(T_e, min_temperature_);
 
-  computeForwardRateCoeffs(Thlim, Telim, &kfwd[0]);
+  computeForwardRateCoeffs(&ns[0], Thlim, Telim, &kfwd[0]);
   // kfwd = 0.0;
   //
   // for (int r = 0; r < numReactions_; r++) {
@@ -123,8 +131,7 @@ void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, V
   return;
 }
 
-MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, double *kfwd) {
-  // kfwd.SetSize(numReactions_);
+MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double *ns, const double &T_h, const double &T_e, double *kfwd) {
   for (int r = 0; r < numReactions_; r++) kfwd[r] = 0.0;
 
   const double Thlim = max(T_h, min_temperature_);
@@ -132,7 +139,11 @@ MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double &T_h, con
 
   for (int r = 0; r < numReactions_; r++) {
     bool isElectronInvolved = isElectronInvolvedAt(r);
-    kfwd[r] = reactions_[r]->computeRateCoefficient(Thlim, Telim, isElectronInvolved);
+    if (inputs_.reactionModels[r] == RADIATIVE_DECAY) {
+      kfwd[r] = reactions_[r]->computeRateCoefficient(ns, Thlim, Telim);
+    } else {
+      kfwd[r] = reactions_[r]->computeRateCoefficient(Thlim, Telim, isElectronInvolved);
+    }
   }
 
   return;
@@ -240,7 +251,7 @@ MFEM_HOST_DEVICE void Chemistry::computeCreationRate(const double *progressRate,
   for (int sp = 0; sp < numSpecies_; sp++) {
     for (int r = 0; r < numReactions_; r++) {
       creationRate[sp] +=
-          progressRate[r] * (productStoich_[sp + r * numSpecies_] - reactantStoich_[sp + r * numSpecies_]);
+        progressRate[r] * (productStoich_[sp + r * numSpecies_] - reactantStoich_[sp + r * numSpecies_]);
     }
     creationRate[sp] *= mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
   }

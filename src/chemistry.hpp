@@ -76,7 +76,6 @@ class Chemistry {
   bool detailedBalance_[gpudata::MAXREACTIONS];
   double equilibriumConstantParams_[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
 
-  ChemistryModel model_;
 
   // /*
   //   From input file, reaction/reaction%d/equation will specify this mapping.
@@ -86,6 +85,9 @@ class Chemistry {
 
   // Kevin: currently, I doubt we need mixture class here. but left it just in case.
   GasMixture *mixture_ = NULL;
+  ChemistryInput inputs_;
+  ChemistryModel model_;
+
 
   double min_temperature_;
 
@@ -98,9 +100,9 @@ class Chemistry {
   // return Vector of reaction rate coefficients, with the size of numReaction_.
   // WARNING(marc) I have removed "virtual" qualifier here assuming these functions will not
   // change for child classes. Correct if wrong
-  void computeForwardRateCoeffs(const double &T_h, const double &T_e, Vector &kfwd);
-  MFEM_HOST_DEVICE void computeForwardRateCoeffs(const double &T_h, const double &T_e, double *kfwd);
-
+  void computeForwardRateCoeffs(const Vector &ns, const double &T_h, const double &T_e, Vector &kfwd);
+  MFEM_HOST_DEVICE void computeForwardRateCoeffs(const double *ns, const double &T_h, const double &T_e, 
+                                                 double *kfwd);
   void computeEquilibriumConstants(const double &T_h, const double &T_e, Vector &kC);
   MFEM_HOST_DEVICE void computeEquilibriumConstants(const double &T_h, const double &T_e, double *kC);
 

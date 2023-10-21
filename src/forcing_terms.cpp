@@ -648,6 +648,7 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
 
   targetCyl = targetU;
 
+
   // compute speed of sound
   // double gamma = mixture->GetSpecificHeatRatio();
   // double Rg = mixture->GetGasConstant();
@@ -703,7 +704,6 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
           MM.Mult(targetU.HostRead() + 1, targetCyl.HostReadWrite() + 1);
         }
       }
-
       for (int eq = 0; eq < num_equation; eq++) dataIn[n + eq * nnodes] -= speedSound * s * (Un[eq] - targetCyl[eq]);
     }
   }
