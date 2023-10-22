@@ -23,11 +23,11 @@ class BoltzmannSolverParams():
     ev_max        = 16          # v-space grid truncation (eV)
     n_grids       = 4           # number of v-space grids
 
-    dt            = 1e-2        # [] non-dimentionalized time w.r.t. oscilation period
-    cycles        = 10          # number of max cycles to evolve
+    dt            = 1e-3        # [] non-dimentionalized time w.r.t. oscilation period
+    cycles        = 3           # number of max cycles to evolve
     solver_type   = "transient" # two modes, "transient" or "steady-state"
-    atol          = 1e-16       # absolute tolerance
-    rtol          = 1e-12       # relative tolerance
+    atol          = 1e-10       # absolute tolerance
+    rtol          = 1e-10       # relative tolerance
     max_iter      = 1000        # max iterations for the newton solver
 
     ee_collisions = 0           # enable electron-electron Coulombic effects
@@ -72,8 +72,8 @@ class Boltzmann0D2VBactchedSolver:
         self.tps   = tps
         self.param = BoltzmannSolverParams()
         # overide the default params, based on the config.ini file.
-        self.param.Efreq = 0#tps.getRequiredInput("em/current_frequency")
-        self.param.solver_type = "steady-state"
+        self.param.Efreq = tps.getRequiredInput("em/current_frequency")
+        #self.param.solver_type = "steady-state"
         
         self.xp_module          = np
     
@@ -81,11 +81,20 @@ class Boltzmann0D2VBactchedSolver:
         xp                = self.xp_module
         Te                = xp.array(interface.HostRead(libtps.t2bIndex.ElectronTemperature), copy=False) / self.param.ev_to_K # [eV]
         Te_min, Te_max    = xp.min(Te), xp.max(Te)
-        Te_b              = xp.linspace(Te_min, Te_max + 1e-12, self.param.n_grids + 1)
+        Te_b              = xp.linspace(Te_min, Te_max, self.param.n_grids, endpoint=False)
+        
+        dist_mat          = xp.zeros((len(Te), self.param.n_grids))
+        
+        for i in range(self.param.n_grids):
+            dist_mat[:,i] = xp.abs(Te-Te_b[i])
+        
+        membership = xp.argmin(dist_mat, axis=1)
+        
         
         grid_idx_to_spatial_pts_map = list()
         for b_idx in range(self.param.n_grids):
-            grid_idx_to_spatial_pts_map.append(xp.argwhere(xp.logical_and(Te>= Te_b[b_idx], Te < Te_b[b_idx+1]))[:,0]) 
+            #grid_idx_to_spatial_pts_map.append(xp.argwhere(xp.logical_and(Te>= Te_b[b_idx], Te < Te_b[b_idx+1]))[:,0]) 
+            grid_idx_to_spatial_pts_map.append(xp.argwhere(membership==b_idx)[:,0]) 
         
         self.grid_idx_to_npts            = xp.array([len(a) for a in grid_idx_to_spatial_pts_map], dtype=xp.int32)
         self.grid_idx_to_spatial_idx_map = grid_idx_to_spatial_pts_map
@@ -114,6 +123,7 @@ class Boltzmann0D2VBactchedSolver:
         
         heavy_temp        = xp.array(interface.HostRead(libtps.t2bIndex.HeavyTemperature), copy=False)
         tps_npts          = len(heavy_temp)
+        self.tps_npts     = tps_npts
         
         electron_temp     = xp.array(interface.HostRead(libtps.t2bIndex.ElectronTemperature), copy=False)
         efield            = xp.array(interface.HostRead(libtps.t2bIndex.ElectricField), copy=False).reshape((2, tps_npts))
@@ -173,9 +183,14 @@ class Boltzmann0D2VBactchedSolver:
         return        
 
     def solve(self):
-        xp = self.xp_module
-        for grid_idx in range(self.param.n_grids):
+        xp               = self.xp_module
+        csv_write        = self.param.export_csv
+        gidx_to_pidx_map = self.grid_idx_to_spatial_idx_map
+        
+        if csv_write ==1 : 
+            data_csv = np.empty((self.tps_npts, 8 + len(self.param.collisions)))
             
+        for grid_idx in range(self.param.n_grids):
             if self.grid_idx_to_npts[grid_idx] ==0:
                 continue
             
@@ -200,8 +215,12 @@ class Boltzmann0D2VBactchedSolver:
                 self.bte_solver.set_efield_function(ef_t)            
                 
             f0       = self.bte_solver.get_boltzmann_parameter(grid_idx, "f0")
-            ff , qoi = self.bte_solver.solve(grid_idx, f0, self.param.atol, self.param.rtol, self.param.max_iter, self.param.solver_type)
-            
+            try:
+                ff , qoi = self.bte_solver.solve(grid_idx, f0, self.param.atol, self.param.rtol, self.param.max_iter, self.param.solver_type)
+            except:
+                print("solver failed for v-space gird no %d"%(grid_idx))
+                continue
+                
             ev       = np.linspace(1e-3, self.bte_solver._par_ev_range[grid_idx][1], 500)
             ff_r     = self.bte_solver.compute_radial_components(grid_idx, ev, ff)
 
@@ -212,43 +231,35 @@ class Boltzmann0D2VBactchedSolver:
                 ff_r     = cp.asnumpy(ff_r)
                 for k, v in qoi.items():
                     qoi[k] = cp.asnumpy(v)
-
-            csv_write = self.param.export_csv
-            if csv_write:
-                fname    = self.param.out_fname
-                csv_mode = 'a'
+                    
+            if csv_write==1:
+                data_csv[gidx_to_pidx_map[grid_idx], 0]    = self.bte_solver.get_boltzmann_parameter(grid_idx, "n0")
+                data_csv[gidx_to_pidx_map[grid_idx], 1]    = self.bte_solver.get_boltzmann_parameter(grid_idx, "ne")
+                data_csv[gidx_to_pidx_map[grid_idx], 2]    = self.bte_solver.get_boltzmann_parameter(grid_idx, "ni")
+                data_csv[gidx_to_pidx_map[grid_idx], 3]    = self.bte_solver.get_boltzmann_parameter(grid_idx, "Tg")
+                data_csv[gidx_to_pidx_map[grid_idx], 4]    = np.sqrt(self.bte_solver.get_boltzmann_parameter(grid_idx, "eRe")**2 + self.bte_solver.get_boltzmann_parameter(grid_idx, "eIm")**2)
+                data_csv[gidx_to_pidx_map[grid_idx], 5]    = qoi["energy"]
+                data_csv[gidx_to_pidx_map[grid_idx], 6]    = qoi["mobility"]
+                data_csv[gidx_to_pidx_map[grid_idx], 7]    = qoi["diffusion"]
                 
-                if grid_idx == 0:
-                    csv_mode = 'w'
+                for col_idx, g in enumerate(self.param.collisions):
+                    data_csv[gidx_to_pidx_map[grid_idx], 8 + col_idx]    = qoi["rates"][col_idx]
+                    
                 
-                with open("%s_qoi.csv"%fname, csv_mode, encoding='UTF8') as f:
-                    writer = csv.writer(f,delimiter=',')
-                    # write the header
-                    header = ["n0", "ne", "ni", "Tg", "E",  "energy", "mobility", "diffusion"]
-                    for col_idx, g in enumerate(self.param.collisions):
-                        header.append(str(g))
-                    
-                    if grid_idx ==0:                        
-                        writer.writerow(header)
-                    
-                    n0    = self.bte_solver.get_boltzmann_parameter(grid_idx, "n0")
-                    ne    = self.bte_solver.get_boltzmann_parameter(grid_idx, "ne")
-                    ni    = self.bte_solver.get_boltzmann_parameter(grid_idx, "ni")
-                    Tg    = self.bte_solver.get_boltzmann_parameter(grid_idx, "Tg")
-                    
-                    eRe   = self.bte_solver.get_boltzmann_parameter(grid_idx, "eRe")
-                    eIm   = self.bte_solver.get_boltzmann_parameter(grid_idx, "eIm")
-                    eMag  = np.sqrt(eRe**2 + eIm**2)
-                    
-                    data  = np.concatenate((n0.reshape(-1,1), ne.reshape(-1,1), ni.reshape(-1,1), Tg.reshape(-1,1), eMag.reshape(-1,1), qoi["energy"].reshape(-1,1), qoi["mobility"].reshape(-1,1), qoi["diffusion"].reshape(-1,1)), axis=1)
-                    for col_idx, g in enumerate(self.param.collisions):
-                        data = np.concatenate((data, qoi["rates"][col_idx].reshape(-1,1)), axis=1)
-                    
-                    writer.writerows(data)
-
+                
 
             plot_data    = self.param.plot_data
             if plot_data:
+                
+                n0    = self.bte_solver.get_boltzmann_parameter(grid_idx, "n0")
+                ne    = self.bte_solver.get_boltzmann_parameter(grid_idx, "ne")
+                ni    = self.bte_solver.get_boltzmann_parameter(grid_idx, "ni")
+                Tg    = self.bte_solver.get_boltzmann_parameter(grid_idx, "Tg")
+                
+                eRe   = self.bte_solver.get_boltzmann_parameter(grid_idx, "eRe")
+                eIm   = self.bte_solver.get_boltzmann_parameter(grid_idx, "eIm")
+                eMag  = np.sqrt(eRe**2 + eIm**2)
+                
                 num_sh       = len(self.bte_solver._par_lm[grid_idx])
                 num_subplots = num_sh 
                 num_plt_cols = min(num_sh, 4)
@@ -275,6 +286,31 @@ class Boltzmann0D2VBactchedSolver:
                 plt.savefig("%s_plot_%02d.png"%(self.param.out_fname, grid_idx))
                 plt.close()
         
+        
+        if csv_write:
+            fname    = self.param.out_fname
+            with open("%s_qoi.csv"%fname, 'w', encoding='UTF8') as f:
+                writer = csv.writer(f,delimiter=',')
+                # write the header
+                header = ["n0", "ne", "ni", "Tg", "E",  "energy", "mobility", "diffusion"]
+                for col_idx, g in enumerate(self.param.collisions):
+                    header.append(str(g))
+                
+                writer.writerow(header)
+                # n0    = self.bte_solver.get_boltzmann_parameter(grid_idx, "n0")
+                # ne    = self.bte_solver.get_boltzmann_parameter(grid_idx, "ne")
+                # ni    = self.bte_solver.get_boltzmann_parameter(grid_idx, "ni")
+                # Tg    = self.bte_solver.get_boltzmann_parameter(grid_idx, "Tg")
+                
+                # eRe   = self.bte_solver.get_boltzmann_parameter(grid_idx, "eRe")
+                # eIm   = self.bte_solver.get_boltzmann_parameter(grid_idx, "eIm")
+                # eMag  = np.sqrt(eRe**2 + eIm**2)
+                
+                # data  = np.concatenate((n0.reshape(-1,1), ne.reshape(-1,1), ni.reshape(-1,1), Tg.reshape(-1,1), eMag.reshape(-1,1), qoi["energy"].reshape(-1,1), qoi["mobility"].reshape(-1,1), qoi["diffusion"].reshape(-1,1)), axis=1)
+                # for col_idx, g in enumerate(self.param.collisions):
+                #     data = np.concatenate((data, qoi["rates"][col_idx].reshape(-1,1)), axis=1)
+                
+                writer.writerows(data_csv)
         
     def push(self, interface):
         pass
