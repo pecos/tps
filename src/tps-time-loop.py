@@ -6,6 +6,7 @@ import numpy as np
 import scipy.constants
 import csv
 import matplotlib.pyplot as plt
+from time import perf_counter as time
 
 # set path to C++ TPS library
 path = os.path.abspath(os.path.dirname(sys.argv[0]))
@@ -24,7 +25,7 @@ class BoltzmannSolverParams():
     n_grids       = 4           # number of v-space grids
 
     dt            = 1e-3        # [] non-dimentionalized time w.r.t. oscilation period
-    cycles        = 3           # number of max cycles to evolve
+    cycles        = 10             # number of max cycles to evolve
     solver_type   = "transient" # two modes, "transient" or "steady-state"
     atol          = 1e-10       # absolute tolerance
     rtol          = 1e-10       # relative tolerance
@@ -45,7 +46,7 @@ class BoltzmannSolverParams():
     threads       = 16          # number of threads to use to assemble operators
     grid_idx      = 0
     
-    output_dir    = "batched_bte"
+    output_dir    = "batched_bte1"
     out_fname     = output_dir + "/tps"
     
     # some useful units and conversion factors. 
@@ -72,29 +73,51 @@ class Boltzmann0D2VBactchedSolver:
         self.tps   = tps
         self.param = BoltzmannSolverParams()
         # overide the default params, based on the config.ini file.
-        self.param.Efreq = tps.getRequiredInput("em/current_frequency")
-        #self.param.solver_type = "steady-state"
+        self.param.Efreq = 0 #tps.getRequiredInput("em/current_frequency")
+        self.param.solver_type = "steady-state"
         
         self.xp_module          = np
+        
+        boltzmann_dir           = self.param.output_dir
+        isExist = os.path.exists(boltzmann_dir)
+        if not isExist:
+           # Create a new directory because it does not exist
+           os.makedirs(boltzmann_dir)
+           #print("directory %s is created!"%(dir_name))
+        return
+    
+    def parse_config_file(self):
+        """
+        add the configuaraion file parse code here, 
+        which overides the default BoltzmannSolverParams
+        """
+        pass
     
     def grid_setup(self, interface):
+        """
+        Perform the boltzmann grid setup. 
+        we generate v-space grid for each spatial point cluster in the parameter space, 
+        where, at the moment the clustering is determined based on the electron temperature
+        computed from the TPS code. 
+        """
         xp                = self.xp_module
         Te                = xp.array(interface.HostRead(libtps.t2bIndex.ElectronTemperature), copy=False) / self.param.ev_to_K # [eV]
         Te_min, Te_max    = xp.min(Te), xp.max(Te)
         Te_b              = xp.linspace(Te_min, Te_max, self.param.n_grids, endpoint=False)
         
+        t1                = time()
         dist_mat          = xp.zeros((len(Te), self.param.n_grids))
         
         for i in range(self.param.n_grids):
             dist_mat[:,i] = xp.abs(Te-Te_b[i])
         
         membership = xp.argmin(dist_mat, axis=1)
-        
-        
         grid_idx_to_spatial_pts_map = list()
         for b_idx in range(self.param.n_grids):
             #grid_idx_to_spatial_pts_map.append(xp.argwhere(xp.logical_and(Te>= Te_b[b_idx], Te < Te_b[b_idx+1]))[:,0]) 
             grid_idx_to_spatial_pts_map.append(xp.argwhere(membership==b_idx)[:,0]) 
+        
+        np.save("%s_gidx_to_pidx.npy"%(self.param.out_fname), np.array(grid_idx_to_spatial_pts_map, dtype=object), allow_pickle=True)
         
         self.grid_idx_to_npts            = xp.array([len(a) for a in grid_idx_to_spatial_pts_map], dtype=xp.int32)
         self.grid_idx_to_spatial_idx_map = grid_idx_to_spatial_pts_map
@@ -114,7 +137,9 @@ class Boltzmann0D2VBactchedSolver:
         for grid_idx in range(self.param.n_grids):
             print("setting up grid %d"%(grid_idx))
             self.bte_solver.assemble_operators(grid_idx)
-            
+        
+        t2=time()
+        print("time for boltzmann grid setup = %.4E"%(t2-t1))
         return
         
     def fetch(self, interface):
@@ -148,16 +173,6 @@ class Boltzmann0D2VBactchedSolver:
                 print("Efreq = %.4E [1/s]" %(self.param.Efreq))
                 print("n_pts = %d" % self.grid_idx_to_npts[grid_idx])
                 
-                # idx0 = np.argmin(eByn0)
-                # idx1 = np.argmax(eByn0)
-                # print("E/n0  (min)               = %.12E [Td]     \t E/n0 (max) = %.12E [Td]    "%(eByn0[idx0], eByn0[idx1]))
-                # print("at E/n0 min max, Tg       = %.12E [K]      \t Tg         = %.12E [K]     "%(Tg[idx0], Tg[idx1]))
-                # print("at E/n0 min max, Te       = %.12E [K]      \t Te         = %.12E [K]     "%(Te[idx0], Te[idx1]))
-                
-                # print("at E/n0 min max, ne       = %.12E [1/m^3]  \t ne         = %.12E [1/m^3] "%(ne[idx0], ne[idx1]))
-                # print("at E/n0 min max, ni       = %.12E [1/m^3]  \t ni         = %.12E [1/m^3] "%(ni[idx0], ni[idx1]))
-                # print("at E/n0 min max, n0       = %.12E [1/m^3]  \t n0         = %.12E [1/m^3] "%(n0[idx0], n0[idx1]))
-                
                 print("E/n0  (min)               = %.12E [Td]         \t E/n0 (max) = %.12E [Td]    "%(np.min(eByn0), np.max(eByn0)))
                 print("Tg    (min)               = %.12E [K]          \t Tg   (max) = %.12E [K]     "%(np.min(Tg), np.max(Tg)))
                 print("Te    (min)               = %.12E [K]          \t Te   (max) = %.12E [K]     "%(np.min(Te), np.max(Te)))
@@ -183,13 +198,19 @@ class Boltzmann0D2VBactchedSolver:
         return        
 
     def solve(self):
+        """
+        perform the BTE solve, supports both stead-state solution (static E-field) 
+        and time-periodic solutions for the oscillatory E-fields
+        """
         xp               = self.xp_module
         csv_write        = self.param.export_csv
         gidx_to_pidx_map = self.grid_idx_to_spatial_idx_map
         
         if csv_write ==1 : 
             data_csv = np.empty((self.tps_npts, 8 + len(self.param.collisions)))
-            
+        
+        t1 = time()
+        self.qoi = list()            
         for grid_idx in range(self.param.n_grids):
             if self.grid_idx_to_npts[grid_idx] ==0:
                 continue
@@ -217,9 +238,12 @@ class Boltzmann0D2VBactchedSolver:
             f0       = self.bte_solver.get_boltzmann_parameter(grid_idx, "f0")
             try:
                 ff , qoi = self.bte_solver.solve(grid_idx, f0, self.param.atol, self.param.rtol, self.param.max_iter, self.param.solver_type)
+                self.qoi.append(qoi)
             except:
                 print("solver failed for v-space gird no %d"%(grid_idx))
-                continue
+                # self.qoi.append(None)
+                # continue
+                sys.exit(0)
                 
             ev       = np.linspace(1e-3, self.bte_solver._par_ev_range[grid_idx][1], 500)
             ff_r     = self.bte_solver.compute_radial_components(grid_idx, ev, ff)
@@ -286,6 +310,8 @@ class Boltzmann0D2VBactchedSolver:
                 plt.savefig("%s_plot_%02d.png"%(self.param.out_fname, grid_idx))
                 plt.close()
         
+        t2 = time()
+        print("time for boltzmann v-space solve = %.4E"%(t2- t1))
         
         if csv_write:
             fname    = self.param.out_fname
@@ -313,10 +339,23 @@ class Boltzmann0D2VBactchedSolver:
                 writer.writerows(data_csv)
         
     def push(self, interface):
-        pass
-        #electron_temperature =  np.array(interface.HostWrite(libtps.t2bIndex.ElectronTemperature), copy=False)
-        #electron_temperature[:] = 1.
+        Te               = np.array(interface.HostWrite(libtps.t2bIndex.ElectronTemperature), copy=False)
+        rate_coeff       = np.array(interface.HostWrite(libtps.t2bIndex.ReactionRates), copy=False).reshape((2, self.tps_npts))
+        
+        gidx_to_pidx_map = self.grid_idx_to_spatial_idx_map
+        
+        for grid_idx in range(self.param.n_grids):
+            Te[gidx_to_pidx_map[grid_idx]]            = self.qoi[grid_idx]["energy"]/1.5
+            rr                                        = self.qoi[grid_idx]["rates"]
+            # here rr should be in the same ordering as the collision model prescribed to the Boltzmann solver. 
+            
+            rate_coeff[0][gidx_to_pidx_map[grid_idx]] = rr[0]
+            rate_coeff[1][gidx_to_pidx_map[grid_idx]] = rr[1]
 
+        rate_coeff[1][rate_coeff[1]<0] = 0.0
+            
+        return 
+        
 
 
 
@@ -345,6 +384,7 @@ tps.push(interface)
 boltzmann.grid_setup(interface)
 boltzmann.fetch(interface)
 boltzmann.solve()
+boltzmann.push(interface)
 
 # while it < max_iters:
 #     tps.solveStep()
