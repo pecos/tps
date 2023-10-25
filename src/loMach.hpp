@@ -167,6 +167,9 @@ protected:
    // History file
    std::ofstream histFile;
 
+   // Early terminatation flag
+   int earlyExit = 0;
+  
    // Number of dimensions
    int dim;
    int nvel;
@@ -384,7 +387,10 @@ protected:
    ParGridFunction *bufferTemp;
    ParGridFunction *bufferPM0;      
    ParGridFunction *bufferPM1;
-   ParGridFunction *bufferGridScale;  
+   ParGridFunction *bufferGridScale;
+   ParGridFunction *bufferGridScaleX;
+   ParGridFunction *bufferGridScaleY;
+   ParGridFunction *bufferGridScaleZ;  
    //GridFunctionCoefficient *bousField;
    GridFunctionCoefficient *viscField;  
    GridFunctionCoefficient *invRho;
