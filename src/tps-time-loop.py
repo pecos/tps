@@ -201,9 +201,22 @@ class Boltzmann0D2VBactchedSolver:
         Te                = xp.array(interface.HostRead(libtps.t2bIndex.ElectronTemperature), copy=False) / self.param.ev_to_K # [eV]
         Te_min, Te_max    = xp.min(Te), xp.max(Te)
         Te_b              = xp.linspace(Te_min, Te_max, self.param.n_grids, endpoint=False)
-        
         dist_mat          = xp.zeros((len(Te), self.param.n_grids))
         
+        for iter in range(50):
+            #print("clustering iteration ", iter, Te_b)
+            for i in range(self.param.n_grids):
+                dist_mat[:,i] = xp.abs(Te-Te_b[i])
+            
+            membership = xp.argmin(dist_mat, axis=1)
+            Te_b1      = np.array([np.mean(Te[xp.argwhere(membership==i)[:,0]]) for i in range(self.param.n_grids)])
+            rel_error  = np.max(np.abs(1 - Te_b1/Te_b))
+            Te_b       = Te_b1
+           
+            if rel_error < 1e-4:
+                break
+        
+        print("K-means Te clusters ", Te_b)                
         for i in range(self.param.n_grids):
             dist_mat[:,i] = xp.abs(Te-Te_b[i])
         
