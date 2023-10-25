@@ -882,7 +882,7 @@ void LoMachSolver::initialize() {
         double delta, d1;
         Array<int> vdofs;	
         delta = pmesh->GetElementSize(Tr->ElementNo, 1);
-	//delta = delta / ( (double)order );
+	delta = delta / ( (double)order );
         tfes->GetElementVDofs(el, vdofs);
 	int lDofs = vdofs.Size();
 	for (int n = 0; n < lDofs; n++) {
@@ -905,6 +905,103 @@ void LoMachSolver::initialize() {
     bufferGridScale->GetTrueDofs(gridScaleSml);
     
   }
+
+
+  // Build grid size vector and grid function
+  /*
+  bufferGridScale = new ParGridFunction(tfes);
+  bufferGridScaleX = new ParGridFunction(tfes);
+  bufferGridScaleY = new ParGridFunction(tfes);
+  bufferGridScaleZ = new ParGridFunction(tfes);  
+  ParGridFunction dofCount(tfes);
+  {
+    
+    double *data = bufferGridScale->HostReadWrite();
+    double *dataX = bufferGridScaleX->HostReadWrite();
+    double *dataY = bufferGridScaleY->HostReadWrite();
+    double *dataZ = bufferGridScaleZ->HostReadWrite();        
+    double *count = dofCount.HostReadWrite();
+    for (int i = 0; i < tfes->GetNDofs(); i++) {
+      data[i] = 0.0;
+      dataX[i] = 0.0;
+      dataY[i] = 0.0;
+      dataZ[i] = 0.0;      
+      count[i] = 0.0;      
+    }
+    
+    for (int el = 0; el < pmesh->GetNE(); el++) {
+      
+      ElementTransformation *Tr = tfes->GetElementTransformation(el);      
+      if (Tr != NULL) {
+        double delta, d1;
+        Array<int> vdofs;	
+        delta = pmesh->GetElementSize(Tr->ElementNo, 1);
+	delta = delta / ( (double)order );
+
+	double deltaX, deltaY, deltaZ;
+        Vector x_unit({1.0, 0.0, 0.0});
+        Vector y_unit({0.0, 1.0, 0.0});
+        Vector z_unit({0.0, 0.0, 1.0});		
+        deltaX = pmesh->GetElementSize(Tr->ElementNo, x_unit);
+        deltaY = pmesh->GetElementSize(Tr->ElementNo, y_unit);
+        deltaZ = pmesh->GetElementSize(Tr->ElementNo, z_unit);
+	deltaX = deltaX / ( (double)order );
+	deltaY = deltaY / ( (double)order );
+	deltaZ = deltaZ / ( (double)order );
+	
+        tfes->GetElementVDofs(el, vdofs);
+	int lDofs = vdofs.Size();
+	for (int n = 0; n < lDofs; n++) {
+	  int iDof = vdofs[n];	  
+          for (int i = 0; i < tfes->GetNDofs(); i++) {
+	    if (iDof == i) {
+              data[i] += delta;
+              count[i] += 1.0;  
+	    }
+	  }
+
+          for (int i = 0; i < tfes->GetNDofs(); i++) {
+	    if (iDof == i) { dataX[i] += deltaX; }
+	  }
+          for (int i = 0; i < tfes->GetNDofs(); i++) {
+	    if (iDof == i) { dataY[i] += deltaY; }
+	  }
+          for (int i = 0; i < tfes->GetNDofs(); i++) {
+	    if (iDof == i) { dataZ[i] += deltaZ; }
+	  }	  	  
+	  
+        }
+	
+      }
+    }
+
+    for (int i = 0; i < tfes->GetNDofs(); i++) {
+      if (count[i] >  0.0) { data[i] = data[i] / count[i]; }
+    }
+    for (int i = 0; i < tfes->GetNDofs(); i++) {
+      if (count[i] >  0.0) { dataX[i] = dataX[i] / count[i]; }
+    }    
+    for (int i = 0; i < tfes->GetNDofs(); i++) {
+      if (count[i] >  0.0) { dataY[i] = dataY[i] / count[i]; }
+    }    
+    for (int i = 0; i < tfes->GetNDofs(); i++) {
+      if (count[i] >  0.0) { dataZ[i] = dataZ[i] / count[i]; }
+    }    
+
+    // over-writing delta with diag (favors largest invariant)
+    //for (int i = 0; i < tfes->GetNDofs(); i++) {
+    //  data[i] = dataX[i]*dataX[i] + dataY[i]*dataY[i] + dataZ[i]*dataZ[i];
+    //  data[i] = std::sqrt(data[i]);
+    //}
+    
+    bufferGridScale->GetTrueDofs(gridScaleSml);
+    bufferGridScaleX->GetTrueDofs(gridScaleXSml);
+    bufferGridScaleY->GetTrueDofs(gridScaleYSml);
+    bufferGridScaleZ->GetTrueDofs(gridScaleZSml);    
+    
+  }
+  */
+  
   
 
   // Determine domain bounding box size
@@ -973,7 +1070,7 @@ void LoMachSolver::Setup(double dt)
       else { mfem::out << "Using Full Assembly" << std::endl; }
    }
    */
-
+   
    //int dim = pmesh->Dimension();      
 
    int Vdof = vfes->GetNDofs(); //vfes->GetVSize();   
@@ -2386,8 +2483,22 @@ void LoMachSolver::solve()
       */
 
       //if(rank0_) std::cout << pmesh->GetMyRank() << ") Done with step " << iter << endl;      
-      
-   }
+
+
+      // check for DIE
+      if ( iter%100 == 0 ) {      
+        if (rank0_) {
+          if (file_exists("DIE")) {
+            grvy_printf(gdebug, "Caught DIE file. Exiting...\n");
+            remove("DIE");
+  	    earlyExit = 1;	 
+          }
+	}
+        MPI_Bcast(&earlyExit, 1, MPI_INT, 0, MPI_COMM_WORLD);	 
+        if(earlyExit == 1) exit(-1);
+      }
+	
+    }
 
    //ParaViewDataCollection pvdc("turbchan", pmesh);
    //pvdc.SetDataFormat(VTKFormat::BINARY32);
@@ -3359,9 +3470,9 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      tmpR0.Add(+1.0,tmpR0c); // because of the tmpR0.Neg()...
    }
 
-   // TODO: add grad{rho} \cdot (u*/dt - ab0 u{n+1})
-   //         = grad{rho} \cdot (Fext - ab0*Uext)
-   
+   // extra terms from multiplying rhs by rho prior to taking fiv
+   /// rhs +: grad{rho} \cdot (u*/dt - ab0 u{n+1})
+   //       = grad{rho} \cdot (Fext - ab0*Uext)   
    if (incompressibleSolve != true) {
 
      // gradient of rho{n+1}
@@ -3633,6 +3744,48 @@ void LoMachSolver::updateTimestep()
        }
        
 } 
+
+/*
+void LoMachSolver::updateTimestep()
+{
+ 
+   double Umax_lcl = 1.0e-12;
+   max_speed = Umax_lcl;
+   double Umag;
+   int dof = vfes->GetNDofs();
+   int Tdof = tfes->GetNDofs();   
+   double dtFactor = config.dt_factor;      
+  
+   auto dataU = un_gf.HostRead();
+   double *dataD = bufferGridScale->HostReadWrite();       
+   double *dataX = bufferGridScaleX->HostReadWrite();
+   double *dataY = bufferGridScaleY->HostReadWrite();
+   double *dataZ = bufferGridScaleZ->HostReadWrite();
+
+   for (int n = 0; n < Tdof; n++) {
+     Umag = 0.0;
+     //Vector delta({dataX[n], dataY[n], dataZ[n]});	      
+     Vector delta({dataD[n], dataD[n], dataD[n]});	 
+     for (int eq = 0; eq < dim; eq++) {
+       Umag += (dataU[n + eq * Tdof]/delta[eq]) * (dataU[n + eq * Tdof]/delta[eq]);
+     }
+       Umag = std::sqrt(Umag);
+       Umax_lcl = std::max(Umag,Umax_lcl);
+     }
+     MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
+     //double dtInst = CFL / (max_speed * (double)order); //in deltas now
+     double dtInst = 0.5 * CFL / max_speed;       
+     if (dtInst > dt) {
+       dt = dt * (1.0 + dtFactor);
+       dt = std::min(dt,dtInst);
+     } else if (dtInst < dt) {
+       dt = dtInst;
+     }       
+   }
+   
+} 
+*/
+
 
 void LoMachSolver::setTimestep()
 {
@@ -6066,6 +6219,7 @@ void LoMachSolver::initSolutionAndVisualizationVectors() {
   ParGridFunction coordsDof(vfes);
   pmesh->GetNodes(coordsDof);  
   if (config.linViscData.isEnabled) {
+    if (rank0_) std::cout << "Viscous sponge active" << endl;
     double *viscMult = bufferViscMult->HostReadWrite();
     double *hcoords = coordsDof.HostReadWrite();
     double wgt = 0.;    
@@ -6371,6 +6525,9 @@ void LoMachSolver::interpolateInlet() {
         dist = sqrt(dist);
         //std::cout << " Gaussian interpolation, point " << n << " with distance " << dist << endl; fflush(stdout);	
 
+	// exclude points outside the domain
+	if (inlet[j].rho < 1.0e-8) { continue; }
+	
 	// gaussian
 	if(dist <= 4.0*radius) {
           //std::cout << " Caught an interp point " << dist << endl; fflush(stdout);	  
