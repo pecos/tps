@@ -4,7 +4,7 @@ MAINTAINER Umberto Villa <uvilla@oden.utexas.edu>
 
 USER root
 
-ARG parla_token=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
+ARG parla_token
 
 RUN . /etc/profile.d/lmod.sh &&\
     pip3 install --upgrade pip &&\
@@ -13,8 +13,14 @@ RUN . /etc/profile.d/lmod.sh &&\
     pip3 install scikit-build &&\
     pip3 install nvtx
 
+
+COPY parla-experimental parla-experimental
+
+RUN chown -R test parla-experimental
+
+USER test
+
 RUN . /etc/profile.d/lmod.sh && ml gnu9 && \ 
-    cd /tmp && git clone https://${parla_token}@github.com/ut-parla/parla-experimental.git &&\
     cd parla-experimental && \
     git checkout tps-interface && \
     sed -i 's\git@github.com:\https://github.com/\g' .gitmodules && \
@@ -23,5 +29,9 @@ RUN . /etc/profile.d/lmod.sh && ml gnu9 && \
     export CXX=/opt/ohpc/pub/compiler/gcc/9.4.0/bin/g++ && \
     python3 setup.py clean --all && pip3 install . --verbose
 
-USER test
+ENV PYTHONPATH=/home/test/.local/lib/python3.8/site-packages/:$PYTHONPATH
+RUN chmod -R a+rX /home/test/.local
+RUN chmod a+x /home/test/
+
+RUN python3 -c "import parla"
 
