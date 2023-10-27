@@ -73,6 +73,10 @@ class CPUData {
   size_t stride_;
 };
 
+void idenity_fun(const Vector & x, Vector & out) {
+  for ( int i(0); i < x.Size(); ++i ) out[i] = x[i];
+}
+
 Tps2Boltzmann::Tps2Boltzmann(Tps *tps) : NIndexes(7), tps_(tps), all_fes_(nullptr) {
   // Assert we have a couple solver;
   assert(tps->isFlowEMCoupled());
@@ -164,6 +168,13 @@ void Tps2Boltzmann::init(M2ulPhyS *flowSolver) {
   scalar_interpolator_->AddDomainInterpolator(new mfem::IdentityInterpolator());
   scalar_interpolator_->SetAssemblyLevel(assembly_level);
   scalar_interpolator_->Assemble();
+
+  // Spatial coordinates
+  spatial_coord_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_native, pmesh->Dimension(), mfem::Ordering::byNODES);
+  spatial_coordinates_ = new mfem::ParGridFunction(spatial_coord_fes_);
+  mfem::VectorFunctionCoefficient coord_fun(pmesh->Dimension(),
+                                            std::function<void(const Vector &, Vector &)>(idenity_fun));
+  spatial_coordinates_->ProjectCoefficient(coord_fun);
 }
 
 void Tps2Boltzmann::interpolateFromNativeFES(const ParGridFunction &input, Tps2Boltzmann::Index index) {
@@ -206,6 +217,9 @@ Tps2Boltzmann::~Tps2Boltzmann() {
 
   // Delete monolithic function space
   delete all_fes_;
+
+  delete spatial_coord_fes_;
+  delete spatial_coordinates_;
 
   // Delete finite element collection
   delete fec_;
@@ -251,6 +265,10 @@ void tps2bolzmann(py::module &m) {
 
   py::class_<TPS::Tps2Boltzmann>(m, "Tps2Boltzmann")
       .def(py::init<TPS::Tps *>())
+      .def("HostReadSpatialCoordinates",
+           [](const TPS::Tps2Boltzmann &interface) {
+             return std::unique_ptr<TPS::CPUDataRead>(new TPS::CPUDataRead(interface.SpatialCoordinates()));
+           })
       .def("HostRead",
            [](const TPS::Tps2Boltzmann &interface, TPS::Tps2Boltzmann::Index index) {
              return std::unique_ptr<TPS::CPUDataRead>(new TPS::CPUDataRead(interface.Field(index)));
@@ -261,7 +279,11 @@ void tps2bolzmann(py::module &m) {
            })
       .def("HostReadWrite", [](TPS::Tps2Boltzmann &interface, TPS::Tps2Boltzmann::Index index) {
         return std::unique_ptr<TPS::CPUData>(new TPS::CPUData(interface.Field(index), true));
-      });
+      })
+      .def("EfieldAngularFreq", &TPS::Tps2Boltzmann::EfieldAngularFreq)
+      .def("Nspecies", &TPS::Tps2Boltzmann::Nspecies)
+      .def("NeFiledComps", &TPS::Tps2Boltzmann::NeFieldComps)
+      .def("nComponents", &TPS::Tps2Boltzmann::nComponents);
 }
 }  // namespace tps_wrappers
 #endif

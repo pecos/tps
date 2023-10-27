@@ -99,6 +99,9 @@ class Tps2Boltzmann {
   const mfem::ParFiniteElementSpace &NativeFes(Index index) const { return *(list_native_fes_[index]); }
   mfem::ParFiniteElementSpace &NativeFes(Index index) { return *(list_native_fes_[index]); }
 
+  const mfem::ParGridFunction & SpatialCoordinates() const { return *spatial_coordinates_; }
+  mfem::ParGridFunction & SpatialCoordinates() { return *spatial_coordinates_; }
+
   const mfem::ParGridFunction &Field(Index index) const { return *(fields_[index]); }
   mfem::ParGridFunction &Field(Index index) { return *(fields_[index]); }
 
@@ -135,6 +138,8 @@ class Tps2Boltzmann {
   mfem::ParFiniteElementSpace *reaction_rates_fes_;
   mfem::ParFiniteElementSpace **list_fes_;
 
+  mfem::ParFiniteElementSpace *spatial_coord_fes_;
+
   //! Function spaces using the native TPS fec
   mfem::ParFiniteElementSpace *species_densities_native_fes_;
   mfem::ParFiniteElementSpace *efield_native_fes_;
@@ -147,6 +152,7 @@ class Tps2Boltzmann {
 
   //! array of fields see *Index for how to address this
   mfem::ParGridFunction **fields_;
+  mfem::ParGridFunction *spatial_coordinates_;
 
   double EfieldAngularFreq_;
 };
