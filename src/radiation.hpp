@@ -33,6 +33,7 @@
 #define RADIATION_HPP_
 
 #include <tps_config.h>
+#include "mpi_groups.hpp"
 
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
@@ -197,10 +198,12 @@ private:
   HypreParMatrix A;
   Vector B, X;
 
+  MPI_Groups *groupsMPI;
+
 public:
   P1Groups(ParMesh *_mesh, FiniteElementCollection *_fec, ParFiniteElementSpace *_fes, ParFiniteElementSpace *_dfes,
           const RadiationInput &inputs, double _rbc_a_val, std::vector<mfem::DenseMatrix> &_tableHost, bool _axisymmetric,
-          ParGridFunction *_G, ParGridFunction *_Radius, ParGridFunction *_OneOverRadius);
+          ParGridFunction *_G, ParGridFunction *_Radius, ParGridFunction *_OneOverRadius, MPI_Groups *_groupsMPI);
 
   int getNumOfGroups() const { return NumOfGroups; }
   int getGroupID() const { return GroupID; }
@@ -342,10 +345,13 @@ class P1Model : public Radiation {
   TableInput TableInputNEC_tps;
   LinearTable *linearTableNEC_tps;
 
+
+  MPI_Groups *groupsMPI;
+
  public:
 
   P1Model(const RadiationInput &_inputs, ParMesh *_mesh, FiniteElementCollection *_fec, 
-          ParFiniteElementSpace *_fes, bool _axisymmetric);
+          ParFiniteElementSpace *_fes, bool _axisymmetric, MPI_Groups *_groupsMPI);
   virtual ~P1Model();
 
 

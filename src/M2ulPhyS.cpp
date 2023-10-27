@@ -612,7 +612,7 @@ void M2ulPhyS::initVariables() {
 #endif
       break;
     case P1_MODEL:
-      radiation_ = new P1Model(config.radiationInput, mesh, fec, fes, config.isAxisymmetric());
+      radiation_ = new P1Model(config.radiationInput, mesh, fec, fes, config.isAxisymmetric(), groupsMPI);
       break;
     case NONE_RAD:
       break;

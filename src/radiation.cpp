@@ -56,12 +56,13 @@ MFEM_HOST_DEVICE NetEmission::~NetEmission() {}
 
 P1Model::P1Model(const RadiationInput &_inputs, ParMesh *_mesh, 
                  FiniteElementCollection *_fec, ParFiniteElementSpace *_fes, 
-                 bool _axisymmetric)
+                 bool _axisymmetric, MPI_Groups *_groupsMPI)
     :Radiation(_inputs),
      mesh(_mesh),
      fec(_fec),
      fes(_fes),
-     axisymmetric(_axisymmetric) {
+     axisymmetric(_axisymmetric),
+     groupsMPI(_groupsMPI) {
 
   assert(inputs.model == P1_MODEL);
   assert(inputs.P1TableInput.order == 1);
@@ -69,9 +70,14 @@ P1Model::P1Model(const RadiationInput &_inputs, ParMesh *_mesh,
   NumOfGroups = inputs.NumOfGroups;
   visualization = inputs.visualization;
 
-  nprocs_ = Mpi::WorldSize();
-  rank_ = Mpi::WorldRank();
-  rank0_ = Mpi::Root();
+  // nprocs_ = Mpi::WorldSize();
+  // rank_ = Mpi::WorldRank();
+  // rank0_ = Mpi::Root();
+
+  nprocs_ = groupsMPI->getTPSWorldSize();
+  rank_ = groupsMPI->getTPSWorldRank();
+  rank0_ = groupsMPI->isWorldRoot();
+
 
   dim = mesh->Dimension();
   order = 1;
@@ -149,7 +155,7 @@ P1Model::P1Model(const RadiationInput &_inputs, ParMesh *_mesh,
   P1Group = new P1Groups*[NumOfGroups];
   for (int ig = 0; ig < NumOfGroups; ig++) {
     P1Group[ig] = new P1Groups(mesh,fec_rad,fes_rad,dfes_rad,inputs,rbc_a_val,tableHost,axisymmetric,
-                               Variables_G[ig],Radius,OneOverRadius);
+                               Variables_G[ig],Radius,OneOverRadius,groupsMPI);
     P1Group[ig]->setGroupID(ig); 
     P1Group[ig]->setNumOfGroups(NumOfGroups); 
     P1Group[ig]->readDataAndSetLinearTables(); 
@@ -387,18 +393,18 @@ void P1Model::readTable(const std::string &filename, const std::string  &groupNa
     // TODO(kevin): extend for multi-column array?
     Ndata = dims[0];
   }
-  MPI_Bcast(&success, 1, MPI_CXX_BOOL, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&success, 1, MPI_CXX_BOOL, 0, groupsMPI->getTPSCommWorld());
   if (!success) exit(ERROR);
 
   int *d_dims = dims.GetData();
-  MPI_Bcast(&Ndata, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast(d_dims, 2, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&Ndata, 1, MPI_INT, 0, groupsMPI->getTPSCommWorld());
+  MPI_Bcast(d_dims, 2, MPI_INT, 0, groupsMPI->getTPSCommWorld());
   assert(dims[0] > 0);
   assert(dims[1] == 2);
 
   if (!rank0_) tableHost[tableIndex].SetSize(dims[0], dims[1]);
   double *d_table = tableHost[tableIndex].GetData();
-  MPI_Bcast(d_table, dims[0] * dims[1], MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast(d_table, dims[0] * dims[1], MPI_DOUBLE, 0, groupsMPI->getTPSCommWorld());
 
   result.Ndata = Ndata;
   result.xdata = tableHost[tableIndex].Read();
@@ -422,11 +428,11 @@ void P1Model::findValuesOnWall() {
   int wdof = wall_tdof_list.Size();
 
   int tot_wdof = 0;
-  MPI_Allreduce(&wdof, &tot_wdof, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+  MPI_Allreduce(&wdof, &tot_wdof, 1, MPI_INT, MPI_SUM, groupsMPI->getTPSCommWorld());
 
   // Gather local sizes on the root process
   std::vector<int> all_sizes(nprocs_);
-  MPI_Gather(&wdof, 1, MPI_INT, all_sizes.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Gather(&wdof, 1, MPI_INT, all_sizes.data(), 1, MPI_INT, 0, groupsMPI->getTPSCommWorld());
 
   std::vector<int> displacements(nprocs_, 0);
   if ( rank_ == 0) { 
@@ -436,8 +442,8 @@ void P1Model::findValuesOnWall() {
       displacements[i] = displacements[i - 1] + all_sizes[i - 1];
     }
   }
-  // MPI_Bcast(all_sizes.data(), nprocs_, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-  // MPI_Bcast(displacements.data(), nprocs_, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  // MPI_Bcast(all_sizes.data(), nprocs_, MPI_DOUBLE, 0, groupsMPI->getTPSCommWorld());
+  // MPI_Bcast(displacements.data(), nprocs_, MPI_DOUBLE, 0, groupsMPI->getTPSCommWorld());
 
   // Calculate the total size of the gathered data
   if ( rank_ == 0) {
@@ -521,9 +527,9 @@ void P1Model::findValuesOnWall() {
     std::vector<double> gathered_data(tot_wdof,0);
     // Use MPI_Gatherv to gather data from all processes
     MPI_Gatherv(local_data.data(), wdof, MPI_DOUBLE,gathered_data.data(), all_sizes.data(), 
-                displacements.data(), MPI_DOUBLE,0, MPI_COMM_WORLD);
+                displacements.data(), MPI_DOUBLE,0, groupsMPI->getTPSCommWorld());
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(groupsMPI->getTPSCommWorld());
 
     if (rank0_) {
       string varName = gfVarNames[iVar];
@@ -550,7 +556,7 @@ P1Groups::P1Groups(ParMesh *_mesh, FiniteElementCollection *_fec,
                    ParFiniteElementSpace *_fes, ParFiniteElementSpace *_dfes,
                    const RadiationInput &_inputs,double _rbc_a_val, 
                    std::vector<mfem::DenseMatrix> &_tableHost, bool _axisymmetric, 
-                   ParGridFunction *_G, ParGridFunction *_Radius, ParGridFunction *_OneOverRadius)
+                   ParGridFunction *_G, ParGridFunction *_Radius, ParGridFunction *_OneOverRadius, MPI_Groups *_groupsMPI)
     :mesh(_mesh),
      fec_rad(_fec),
      fes_rad(_fes),
@@ -561,13 +567,18 @@ P1Groups::P1Groups(ParMesh *_mesh, FiniteElementCollection *_fec,
      axisymmetric(_axisymmetric),
      g(_G),
      Radius(_Radius),
-     OneOverRadius(_OneOverRadius)
+     OneOverRadius(_OneOverRadius),
+     groupsMPI(_groupsMPI)
     { 
 
 
-  nprocs_ = Mpi::WorldSize();
-  rank_ = Mpi::WorldRank();
-  rank0_ = Mpi::Root();
+  // nprocs_ = Mpi::WorldSize();
+  // rank_ = Mpi::WorldRank();
+  // rank0_ = Mpi::Root();
+
+  nprocs_ = groupsMPI->getTPSWorldSize();
+  rank_ = groupsMPI->getTPSWorldRank();
+  rank0_ = groupsMPI->isWorldRoot();
 
   // Set some solver parameters
   MaxIters = inputs.MaxIters;
@@ -663,18 +674,18 @@ void P1Groups::readTable(const std::string &filename, const std::string  &groupN
     // TODO(kevin): extend for multi-column array?
     Ndata = dims[0];
   }
-  MPI_Bcast(&success, 1, MPI_CXX_BOOL, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&success, 1, MPI_CXX_BOOL, 0, groupsMPI->getTPSCommWorld());
   if (!success) exit(ERROR);
 
   int *d_dims = dims.GetData();
-  MPI_Bcast(&Ndata, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast(d_dims, 2, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&Ndata, 1, MPI_INT, 0, groupsMPI->getTPSCommWorld());
+  MPI_Bcast(d_dims, 2, MPI_INT, 0, groupsMPI->getTPSCommWorld());
   assert(dims[0] > 0);
   assert(dims[1] == 2);
 
   if (!rank0_) tableHost[tableIndex].SetSize(dims[0], dims[1]);
   double *d_table = tableHost[tableIndex].GetData();
-  MPI_Bcast(d_table, dims[0] * dims[1], MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast(d_table, dims[0] * dims[1], MPI_DOUBLE, 0, groupsMPI->getTPSCommWorld());
 
   result.Ndata = Ndata;
   result.xdata = tableHost[tableIndex].Read();
@@ -697,7 +708,8 @@ void P1Groups::readDataAndSetLinearTables() {
 
 
   std::string type("P1Model"); //  std::string type("NEC");
-  std::string caseGroups("Groups21");
+  // std::string caseGroups("Groups21");
+  std::string caseGroups("Groups7");
   std::string inputPath(inputs.pathToFiles + type + "/");
 
   std::string filename,groupName,datasetName;
