@@ -170,7 +170,7 @@ void Tps2Boltzmann::init(M2ulPhyS *flowSolver) {
   scalar_interpolator_->Assemble();
 
   // Spatial coordinates
-  spatial_coord_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_native, pmesh->Dimension(), mfem::Ordering::byNODES);
+  spatial_coord_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_, pmesh->Dimension(), mfem::Ordering::byNODES);
   spatial_coordinates_ = new mfem::ParGridFunction(spatial_coord_fes_);
   mfem::VectorFunctionCoefficient coord_fun(pmesh->Dimension(),
                                             std::function<void(const Vector &, Vector &)>(idenity_fun));
