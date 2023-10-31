@@ -70,14 +70,9 @@ P1Model::P1Model(const RadiationInput &_inputs, ParMesh *_mesh,
   NumOfGroups = inputs.NumOfGroups;
   visualization = inputs.visualization;
 
-  // nprocs_ = Mpi::WorldSize();
-  // rank_ = Mpi::WorldRank();
-  // rank0_ = Mpi::Root();
-
   nprocs_ = groupsMPI->getTPSWorldSize();
   rank_ = groupsMPI->getTPSWorldRank();
   rank0_ = groupsMPI->isWorldRoot();
-
 
   dim = mesh->Dimension();
   order = 1;
@@ -296,21 +291,27 @@ void P1Model::initializeInterpolationData() {
 void P1Model::Solve(ParGridFunction *src_Temperature, ParGridFunction *src_energySinkRad)
 {
 
+  // if (rank0_){
+  //   std::cout << " Solving radiation P1 Model... " << std::endl;
+  // }
+
   double *dataG = G->HostReadWrite();
 
   interp_flow_to_rad_->PerformInterpolation(src_Temperature,Temperature);
 
   for (int ig = 0; ig < NumOfGroups; ig++) {
-    if (rank0_){
-      std::cout << " " << std::endl;
-      std::cout << "**********************************************" << std::endl;
-      std::cout << "      Solving P1 equation for group: " << ig << std::endl;
-      std::cout << "**********************************************" << std::endl;
-    }
+    // if (rank0_){
+    //   std::cout << " " << std::endl;
+    //   std::cout << "**********************************************" << std::endl;
+    //   std::cout << "      Solving P1 equation for group: " << ig << std::endl;
+    //   std::cout << "**********************************************" << std::endl;
+    // }
     P1Group[ig]->Solve(Temperature);
   } 
 
+
   // Calculate the energy source term.
+  *energySinkOptIntermediate = 0.0;
   for (int ig = 0; ig < NumOfGroups; ig++) {
     for (int i = 0; i < dof; i++) {
       (*energySinkOptIntermediate)[i] =  (*energySinkOptIntermediate)[i] + P1Group[ig]->getValueEnergySink(i); 
@@ -329,18 +330,11 @@ void P1Model::Solve(ParGridFunction *src_Temperature, ParGridFunction *src_energ
 
   interp_rad_to_flow_->PerformInterpolation(energySink_P1,src_energySinkRad);
 
-
-  // src_energySinkRad can  in some cases be positive. This means that these regions 
-  // would be "warmed-up" due to heat transfer from radiation
-  // const int nnodes = src_energySinkRad->ParFESpace()->GetNDofs();
-  // for (int n = 0; n < nnodes; n++) {
-  //   (*src_energySinkRad)[n] = min((*src_energySinkRad)[n], 0.0);
-  // }
-
   if (visualization){
     G->HostRead();
 
     // Calculate/Assemble the energy source term.
+    *G_integratedRadiance = 0.0;
     for (int ig = 0; ig < NumOfGroups; ig++) {
       for (int i = 0; i < dof; i++) {
         (*G_integratedRadiance)[i] =  (*G_integratedRadiance)[i] + dataG[i + ig * dof]; 
@@ -572,10 +566,6 @@ P1Groups::P1Groups(ParMesh *_mesh, FiniteElementCollection *_fec,
     { 
 
 
-  // nprocs_ = Mpi::WorldSize();
-  // rank_ = Mpi::WorldRank();
-  // rank0_ = Mpi::Root();
-
   nprocs_ = groupsMPI->getTPSWorldSize();
   rank_ = groupsMPI->getTPSWorldRank();
   rank0_ = groupsMPI->isWorldRoot();
@@ -611,7 +601,6 @@ P1Groups::P1Groups(ParMesh *_mesh, FiniteElementCollection *_fec,
   (*nbc_bdr)[0] = 1;
   if (axisymmetric) (*nbc_bdr)[1] = 1;
   (*rbc_bdr)[2] = 1;
-  // (*dbc_bdr)[3] = 1;
   (*nbc_bdr)[3] = 1;
   (*rbc_bdr)[4] = 1;
   (*nbc_bdr)[5] = 1;
@@ -628,8 +617,12 @@ P1Groups::P1Groups(ParMesh *_mesh, FiniteElementCollection *_fec,
   emittedRad = new ParGridFunction(fes_rad);
   *AbsorptionCoef = 0.0, *oneOver3Absorp = 0.0, *emittedRad = 1.0;
 
-  b = new ParLinearForm(fes_rad);
-  a = new ParBilinearForm(fes_rad);
+
+  b = NULL;
+  a = NULL;
+
+  // b = new ParLinearForm(fes_rad);
+  // a = new ParBilinearForm(fes_rad);
 
   if (isAxisymmetric()){ 
     RadiusCoeff = new GridFunctionCoefficient(Radius);
@@ -641,22 +634,33 @@ P1Groups::P1Groups(ParMesh *_mesh, FiniteElementCollection *_fec,
   //     preconditioner from hypre. Extract the parallel grid function x
   //     corresponding to the finite element approximation X. This is the local
   //     solution on each processor.
-  amg = new HypreBoomerAMG(A);
-  pcg = new HyprePCG(_fes->GetComm());
-  pcg->SetTol(P1_Tolerance);
-  pcg->SetMaxIter(MaxIters);
-  pcg->SetPrintLevel(PrintLevels);
-  pcg->SetPreconditioner(*amg);
 
-  // G_prec = new HypreSmoother();
-  // G_solver = new CGSolver(_fes->GetComm());
-  // G_solver->iterative_mode = false;
-  // G_solver->SetRelTol(P1_Tolerance); // const double rel_tol = 1e-8;
-  // G_solver->SetAbsTol(0.0);
-  // G_solver->SetMaxIter(MaxIters);
-  // G_solver->SetPrintLevel(PrintLevels);
-  // G_prec->SetType(HypreSmoother::Jacobi);
-  // G_solver->SetPreconditioner(*G_prec);
+  // amg = new HypreBoomerAMG(A);
+  // pcg = new HyprePCG(_fes->GetComm());
+  // pcg->SetTol(P1_Tolerance);
+  // pcg->SetMaxIter(MaxIters);
+  // pcg->SetPrintLevel(PrintLevels);
+  // pcg->SetPreconditioner(*amg);
+
+  G_prec = new HypreSmoother();
+  G_solver = new CGSolver(_fes->GetComm());
+  G_solver->iterative_mode = false;
+  G_solver->SetRelTol(P1_Tolerance); // const double rel_tol = 1e-8;
+  G_solver->SetAbsTol(0.0);
+  G_solver->SetMaxIter(MaxIters);
+  G_solver->SetPrintLevel(PrintLevels);
+  G_prec->SetType(HypreSmoother::Jacobi);
+  G_solver->SetPreconditioner(*G_prec);
+
+  // amg = new HypreBoomerAMG(A);
+  // gmres = new GMRESSolver(_fes->GetComm());
+  // gmres->SetAbsTol(0.0);
+  // gmres->SetRelTol(P1_Tolerance);
+  // gmres->SetMaxIter(MaxIters);
+  // gmres->SetKDim(10);
+  // gmres->SetPrintLevel(PrintLevels);
+  // gmres->SetPreconditioner(*amg);
+
 }
 
 void P1Groups::readTable(const std::string &filename, const std::string  &groupName, const std::string &datasetName, TableInput &result) {
@@ -752,20 +756,11 @@ void P1Groups::Solve(ParGridFunction *_Temperature) {
   ProductCoefficient rbcBCoef_temp(*rbcBCoef, OneOverb_coeff); // ???
   ProductCoefficient m_rbcBCoef(rbcACoef, rbcBCoef_temp); // ???
 
-
-  if (isAxisymmetric()){ 
-    rf_coeff = new ProductCoefficient(*RadiusCoeff, f_coeff);
-    rk_coeff = new ProductCoefficient (*RadiusCoeff, k_coeff);
-    rb_coeff = new ProductCoefficient (*RadiusCoeff, b_coeff);
-    rm_rbcBCoef = new ProductCoefficient (*RadiusCoeff, m_rbcBCoef);
-    r_rbcACoef = new ProductCoefficient (*RadiusCoeff,rbcACoef);
-  } else {
-    rf_coeff = &f_coeff;
-    rk_coeff =  &k_coeff;
-    rb_coeff = &b_coeff;
-    rm_rbcBCoef = &m_rbcBCoef;
-    r_rbcACoef = &rbcACoef;
-  }    
+  ProductCoefficient rf_coeff(*RadiusCoeff, f_coeff);
+  ProductCoefficient rk_coeff(*RadiusCoeff, k_coeff);
+  ProductCoefficient rb_coeff(*RadiusCoeff, b_coeff);
+  ProductCoefficient rm_rbcBCoef(*RadiusCoeff, m_rbcBCoef);
+  ProductCoefficient r_rbcACoef(*RadiusCoeff,rbcACoef);
 
   // Set the Dirichlet values in the solution vector
   // g->ProjectBdrCoefficient(dbcCoef, *dbc_bdr); 
@@ -773,25 +768,42 @@ void P1Groups::Solve(ParGridFunction *_Temperature) {
   //    Set up the linear form b(.) which corresponds to the right-hand side of
   //    the FEM linear system, which in this case is (1,phi_i) where phi_i are
   //    the basis functions in the finite element fespace.
-  b->Update();
-  b->AddDomainIntegrator(new DomainLFIntegrator(*rf_coeff)); 
-
+  b = new ParLinearForm(fes_rad);
+  // b->Update();
+  if (isAxisymmetric()){ 
+    b->AddDomainIntegrator(new DomainLFIntegrator(rf_coeff)); 
+  } else {
+    b->AddDomainIntegrator(new DomainLFIntegrator(f_coeff)); 
+  }
   // Add the desired value for n.Grad(u) on the Neumann boundary
   b->AddBoundaryIntegrator(new BoundaryLFIntegrator(nbcCoef), *nbc_bdr); 
 
   // // Add the desired value for n.Grad(u) + a*u on the Robin boundary
-  b->AddBdrFaceIntegrator(new BoundaryLFIntegrator(*rm_rbcBCoef),*rbc_bdr);  // How do I assigne values to rbcBCoef?? This is for boundary but I evaluate at the domain!!
+  if (isAxisymmetric()){ 
+    b->AddBdrFaceIntegrator(new BoundaryLFIntegrator(rm_rbcBCoef),*rbc_bdr);  // How do I assigne values to rbcBCoef?? This is for boundary but I evaluate at the domain!!
+  } else {
+    b->AddBdrFaceIntegrator(new BoundaryLFIntegrator(m_rbcBCoef),*rbc_bdr);  // How do I assigne values to rbcBCoef?? This is for boundary but I evaluate at the domain!!
+  }
   b->Assemble(); 
 
   //    Set up the bilinear form a(.,.) on the finite element space
   //    corresponding to the Laplacian operator -Delta, by adding the Diffusion
   //    and Mass domain integrators.
-  a->Update();
-  a->AddDomainIntegrator(new DiffusionIntegrator(*rk_coeff));
-  a->AddDomainIntegrator(new MassIntegrator(*rb_coeff));
-
+  a = new ParBilinearForm(fes_rad);
+  // a->Update();
+  if (isAxisymmetric()){ 
+    a->AddDomainIntegrator(new DiffusionIntegrator(rk_coeff));
+    a->AddDomainIntegrator(new MassIntegrator(rb_coeff));
+  } else {
+    a->AddDomainIntegrator(new DiffusionIntegrator(k_coeff));
+    a->AddDomainIntegrator(new MassIntegrator(b_coeff));
+  }
   //     Add a Mass integrator on the Robin boundary
-  a->AddBoundaryIntegrator(new MassIntegrator(*r_rbcACoef), *rbc_bdr);
+  if (isAxisymmetric()){ 
+    a->AddBoundaryIntegrator(new MassIntegrator(r_rbcACoef), *rbc_bdr);
+  } else {
+    a->AddBoundaryIntegrator(new MassIntegrator(rbcACoef), *rbc_bdr);
+  } 
   a->Assemble();
 
   //     Form the linear system A X = B. This includes eliminating boundary
@@ -803,15 +815,22 @@ void P1Groups::Solve(ParGridFunction *_Temperature) {
   //     corresponding to the finite element approximation X. This is the local
   //     solution on each processor.   
   // amg->SetOperator(A); // NOTE(malamast): not sure if we need this call.
-  pcg->SetOperator(A); 
-  pcg->Mult(B, X);
+  // pcg->SetOperator(A); 
+  // pcg->Mult(B, X);
 
-  // G_solver->SetOperator(A); 
-  // G_solver->Mult(B, X);
+  G_solver->SetOperator(A); 
+  G_solver->Mult(B, X);
+
+  // amg->SetOperator(A); // NOTE(malamast): not sure if we need this call.
+  // gmres->SetOperator(A);
+  // gmres->Mult(B, X);
 
   //     Recover the solution x as a grid function and save to file. The output
   //     can be viewed using GLVis as follows: "glvis -np <np> -m mesh -g sol"
   a->RecoverFEMSolution(X, *b, *g);
+
+  delete b;
+  delete a;
 
   return;
 }
@@ -826,16 +845,25 @@ P1Groups::~P1Groups() {
   delete emittedRad;
   delete oneOver3Absorp;
 
+  delete[] dbc_bdr;
+  delete[] nbc_bdr;
   delete[] rbc_bdr;
 
-  delete b;
-  delete a;
+  delete RadiusCoeff;
+  delete OneOverRadiusCoeff;
+
+  delete rbcBCoef;
+
+  // delete b;
+  // delete a;
 
   delete linearTableAbsorption;
   delete linearTableEmittedRad;
 
   delete G_solver;
   delete G_prec;
+
+  delete gmres;
 
   delete pcg; 
   delete amg;

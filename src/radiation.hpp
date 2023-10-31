@@ -152,19 +152,11 @@ private:
   ParGridFunction *Radius;
   ParGridFunction *OneOverRadius;
 
-
   GridFunctionCoefficient *RadiusCoeff; 
   GridFunctionCoefficient *OneOverRadiusCoeff; 
 
-
   GridFunctionCoefficient *rbcBCoef; 
 
-  Coefficient *rf_coeff; 
-  Coefficient *rk_coeff; 
-  Coefficient *rb_coeff; 
-  
-  Coefficient *rm_rbcBCoef; 
-  Coefficient *r_rbcACoef; 
 
   // Linear tables
   TableInput TableInputAbsorption;
@@ -194,6 +186,8 @@ private:
 
   CGSolver *G_solver;    // Krylov solver for inverting the mass matrix A
   HypreSmoother *G_prec; // Preconditioner for the mass matrix A
+
+  GMRESSolver *gmres;
 
   HypreParMatrix A;
   Vector B, X;
