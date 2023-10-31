@@ -10,6 +10,8 @@ from time import perf_counter as time
 import configparser
 import cupy as cp
 import enum
+import pandas as pd
+import scipy.interpolate
 
 class profile_t:
     def __init__(self,name):
@@ -48,6 +50,19 @@ class profile_t:
 def min_mean_max(a, comm: MPI.Comm):
     return (comm.allreduce(a, MPI.MIN) , comm.allreduce(a, MPI.SUM)/comm.Get_size(), comm.allreduce(a, MPI.MAX))
 
+
+try:
+    df    = pd.read_csv("ionization_rates.csv")
+    Te    = np.array(df["Te[K]"]) 
+    r_arr = np.array(df["Arr[m3/s]"])
+    r_csc = np.array(df["CSC_Maxwellian[m3/s]"])
+    r_arr = scipy.interpolate.interp1d(Te, r_arr,bounds_error=False, fill_value=0.0)
+    r_csc = scipy.interpolate.interp1d(Te, r_csc,bounds_error=False, fill_value=0.0)
+    print("ionization coefficient read from file ")
+except:
+    print("ionization rate coefficient file not found!!")
+    r_arr = lambda Te : 1.235e-13 * np.exp(-18.687 / np.abs(Te * scipy.constants.Boltzmann/scipy.constants.electron_volt))
+    r_csc = lambda Te : 1.235e-13 * np.exp(-18.687 / np.abs(Te * scipy.constants.Boltzmann/scipy.constants.electron_volt))
 
 # set path to C++ TPS library
 path = os.path.abspath(os.path.dirname(sys.argv[0]))
@@ -624,21 +639,41 @@ class Boltzmann0D2VBactchedSolver:
                 writer.writerows(data_csv)
        
     def push(self, interface):
-        Te               = np.array(interface.HostWrite(libtps.t2bIndex.ElectronTemperature), copy=False)
-        rate_coeff       = np.array(interface.HostWrite(libtps.t2bIndex.ReactionRates), copy=False).reshape((2, self.tps_npts))
+        xp                = self.xp_module
+        Te_bte            = xp.array(interface.HostWrite(libtps.t2bIndex.ElectronTemperature), copy=False)
+        rate_bte          = xp.array(interface.HostWrite(libtps.t2bIndex.ReactionRates), copy=False).reshape((2, self.tps_npts))
+        Te_tps            = xp.array(interface.HostRead(libtps.t2bIndex.ElectronTemperature), copy=False)
         
-        gidx_to_pidx_map = self.grid_idx_to_spatial_idx_map
+        species_densities = xp.array(interface.HostRead(libtps.t2bIndex.SpeciesDensities), copy=False).reshape(3, self.tps_npts)
+        ni                = species_densities[TPSINDEX.ION_IDX]
+        n0                = species_densities[TPSINDEX.NEU_IDX]
+        ne                = species_densities[TPSINDEX.ELE_IDX]
+        
+        rate_tps_arr      = r_arr(Te_tps)
+        rate_tps_csc      = r_csc(Te_tps)
+        
+        rr_bte            = np.zeros_like(rate_tps_arr) 
+        gidx_to_pidx_map  = self.grid_idx_to_spatial_idx_map
         
         for grid_idx in range(self.param.n_grids):
-            Te[gidx_to_pidx_map[grid_idx]]            = self.qoi[grid_idx]["energy"]/1.5
+            Te_bte[gidx_to_pidx_map[grid_idx]]        = (self.qoi[grid_idx]["energy"]/1.5) * self.param.ev_to_K
             rr                                        = self.qoi[grid_idx]["rates"]
             # here rr should be in the same ordering as the collision model prescribed to the Boltzmann solver. 
-            
-            rate_coeff[0][gidx_to_pidx_map[grid_idx]] = rr[0]
-            rate_coeff[1][gidx_to_pidx_map[grid_idx]] = rr[1]
-
-        rate_coeff[1][rate_coeff[1]<0] = 0.0
-            
+            rr_bte[gidx_to_pidx_map[grid_idx]] = rr[1]
+        
+        rr_bte[rr_bte<0] = 0.0 
+        s0  = rate_tps_arr * n0 
+        s1  = rate_tps_csc * n0 
+        
+        s2  = rr_bte       * n0 
+        
+        tau = 1e-2
+        idx = s2 > tau
+        rate_bte[0][:]   =  0.0
+        rate_bte[1][:]   =  0.0
+        rate_bte[0]      = rr_bte
+        rate_bte[1][idx] = np.abs(1 - s1[idx]/s2[idx])
+        
         return 
         
 
@@ -660,6 +695,9 @@ boltzmann = Boltzmann0D2VBactchedSolver(tps, comm)
 interface = libtps.Tps2Boltzmann(tps)
 tps.initInterface(interface)
 
+coords = np.array(interface.HostReadSpatialCoordinates(), copy=False)
+print(coords.shape)
+
 it = 0
 max_iters = tps.getRequiredInput("cycle-avg-joule-coupled/max-iters")
 print("Max Iters: ", max_iters)
@@ -670,6 +708,7 @@ boltzmann.grid_setup(interface)
 boltzmann.fetch(interface)
 boltzmann.solve()
 boltzmann.push(interface)
+tps.fetch(interface)
 
 # while it < max_iters:
 #     tps.solveStep()
