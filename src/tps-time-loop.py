@@ -230,7 +230,7 @@ class Boltzmann0D2VBactchedSolver:
            
             if rel_error < 1e-4:
                 break
-        
+        Te_b = np.sort(Te_b)
         print("K-means Te clusters ", Te_b)                
         for i in range(self.param.n_grids):
             dist_mat[:,i] = xp.abs(Te-Te_b[i])
