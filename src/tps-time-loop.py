@@ -652,7 +652,7 @@ class Boltzmann0D2VBactchedSolver:
         rate_tps_arr      = r_arr(Te_tps)
         rate_tps_csc      = r_csc(Te_tps)
         
-        rr_bte            = np.zeros_like(rate_tps_arr) 
+        rr_bte            = xp.zeros_like(rate_tps_arr) 
         gidx_to_pidx_map  = self.grid_idx_to_spatial_idx_map
         
         for grid_idx in range(self.param.n_grids):
@@ -662,17 +662,17 @@ class Boltzmann0D2VBactchedSolver:
             rr_bte[gidx_to_pidx_map[grid_idx]] = rr[1]
         
         rr_bte[rr_bte<0] = 0.0 
-        s0  = rate_tps_arr * n0 
-        s1  = rate_tps_csc * n0 
+        s0  = rate_tps_arr * n0 * ni
+        s1  = rate_tps_csc * n0 * ni
         
-        s2  = rr_bte       * n0 
+        s2  = rr_bte       * n0 * ni
         
         tau = 1e-2
         idx = s2 > tau
         rate_bte[0][:]   =  0.0
         rate_bte[1][:]   =  0.0
         rate_bte[0]      = rr_bte
-        rate_bte[1][idx] = np.abs(1 - s1[idx]/s2[idx])
+        rate_bte[1][idx] = xp.abs(s2-s1)/xp.max(s2)
         
         return 
         
