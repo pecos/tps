@@ -667,12 +667,12 @@ class Boltzmann0D2VBactchedSolver:
         
         s2  = rr_bte       * n0 * ni
         
-        tau = 1e-2
-        idx = s2 > tau
+        # tau = 1e-2
+        # idx = s2 > tau
         rate_bte[0][:]   =  0.0
         rate_bte[1][:]   =  0.0
         rate_bte[0]      = rr_bte
-        rate_bte[1][idx] = xp.abs(s2-s1)/xp.max(s2)
+        rate_bte[1]      = xp.abs(s2-s1)/xp.max(s2)
         
         return 
         
