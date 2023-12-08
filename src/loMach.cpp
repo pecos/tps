@@ -256,6 +256,9 @@ void LoMachSolver::initialize() {
     } else if (config.sgsModelType == 2) {
       std::cout << "Sigma subgrid model active" << endl;    
     }
+    //} else if (config.sgsModelType == 3) {
+    //  std::cout << "Dynamic Smagorinsky subgrid model active" << endl;    
+    //}    
   }
 
   
@@ -546,7 +549,7 @@ void LoMachSolver::initialize() {
    
    // full vector for compatability
    fvfes = new ParFiniteElementSpace(pmesh, vfec, num_equation); //, Ordering::byNODES);
-
+   fvfes2 = new ParFiniteElementSpace(pmesh, tfec, num_equation);
    
    // Check if fully periodic mesh
    if (!(pmesh->bdr_attributes.Size() == 0))
@@ -620,6 +623,16 @@ void LoMachSolver::initialize() {
    tmpR1.SetSize(vfes_truevsize);
    tmpR1b.SetSize(vfes_truevsize);
    tmpR1c.SetSize(vfes_truevsize);
+
+   // padded spaces for non-linear products
+   r0pm0.SetSize(tfes_truevsize);
+   r1pm0.SetSize(vfes_truevsize);   
+   r0px2a.SetSize(nfesR0_truevsize);
+   r0px2b.SetSize(nfesR0_truevsize);
+   r0px2c.SetSize(nfesR0_truevsize);         
+   r1px2a.SetSize(nfes_truevsize);
+   r1px2b.SetSize(nfes_truevsize);
+   r1px2c.SetSize(nfes_truevsize);            
 
    gradMu.SetSize(vfes_truevsize);   
    gradU.SetSize(vfes_truevsize);
@@ -760,6 +773,9 @@ void LoMachSolver::initialize() {
    R0PX2_gf.SetSpace(nfesR0); // padded space
    R0PX2_gf = 0.0;
 
+   //meanUp_gf.SetSpace(fvfes);
+   //meanUp_gf = 0.0;   
+   
    viscTotal_gf.SetSpace(tfes);
    viscTotal_gf = 0.0;
    resolution_gf.SetSpace(tfes);
@@ -781,23 +797,31 @@ void LoMachSolver::initialize() {
 
    
    initSolutionAndVisualizationVectors();
+   MPI_Barrier(MPI_COMM_WORLD);       
    if (verbose) grvy_printf(ginfo, "init Sol and Vis okay...\n");
    
 
 
   /**/
   average = new Averaging(Up, pmesh, tfec, tfes, vfes, fvfes, eqSystem, d_mixture, num_equation, dim, config, groupsMPI);
+  //MPI_Barrier(MPI_COMM_WORLD);       
+  //if (verbose) grvy_printf(ginfo, "New Averaging okay...\n");
+  
   average->read_meanANDrms_restart_files();
-  if (verbose) grvy_printf(ginfo, "average initialized...\n");        
+  //MPI_Barrier(MPI_COMM_WORLD);         
+  //if (verbose) grvy_printf(ginfo, "average initialized...\n");        
 
   // register rms and mean sol into ioData
   if (average->ComputeMean()) {
-    
-    if (verbose) grvy_printf(ginfo, "setting up mean stuff...\n");
+
+    //MPI_Barrier(MPI_COMM_WORLD);             
+    //if (verbose) grvy_printf(ginfo, "setting up mean stuff...\n");
     
     // meanUp
-    ioData.registerIOFamily("Time-averaged primitive vars", "/meanSolution", average->GetMeanUp(), false,
-                            config.GetRestartMean());
+    ioData.registerIOFamily("Time-averaged primitive vars", "/meanSolution", average->GetMeanUp(), false, config.GetRestartMean());
+    //MPI_Barrier(MPI_COMM_WORLD);             
+    //if (verbose) grvy_printf(ginfo, "..IOFamily okay\n");
+    
     ioData.registerIOVar("/meanSolution", "meanDens", 0);
     ioData.registerIOVar("/meanSolution", "mean-u", 1);
     ioData.registerIOVar("/meanSolution", "mean-v", 2);
@@ -807,34 +831,47 @@ void LoMachSolver::initialize() {
     } else {
       ioData.registerIOVar("/meanSolution", "mean-p", dim + 1);
     }
-    
-    for (int sp = 0; sp < numActiveSpecies; sp++) {
-      
+
+    //MPI_Barrier(MPI_COMM_WORLD);             
+    //if (verbose) grvy_printf(ginfo, "..IOVar okay\n");
+
+    /*
+    for (int sp = 0; sp < numActiveSpecies; sp++) {      
       // Only for NS_PASSIVE.
       if ((eqSystem == NS_PASSIVE) && (sp == 1)) break;
-
       // int inputSpeciesIndex = mixture->getInputIndexOf(sp);
       std::string speciesName = config.speciesNames[sp];
-      ioData.registerIOVar("/meanSolution", "mean-Y" + speciesName, sp + nvel + 2);
-      
+      ioData.registerIOVar("/meanSolution", "mean-Y" + speciesName, sp + nvel + 2);      
     }
+    */
 
+    //MPI_Barrier(MPI_COMM_WORLD);             
+    //if (verbose) grvy_printf(ginfo, "On to rms...\n");
+    
     // rms
     ioData.registerIOFamily("RMS velocity fluctuation", "/rmsData", average->GetRMS(), false, config.GetRestartMean());
+    //MPI_Barrier(MPI_COMM_WORLD);             
+    //if (verbose) grvy_printf(ginfo, "..IOFamily (rms) okay\n");
+    
     ioData.registerIOVar("/rmsData", "uu", 0);
     ioData.registerIOVar("/rmsData", "vv", 1);
     ioData.registerIOVar("/rmsData", "ww", 2);
     ioData.registerIOVar("/rmsData", "uv", 3);
     ioData.registerIOVar("/rmsData", "uw", 4);
     ioData.registerIOVar("/rmsData", "vw", 5);
+
+    //MPI_Barrier(MPI_COMM_WORLD);             
+    //if (verbose) grvy_printf(ginfo, "..IOVar (rms) okay\n");
+
     
   }
+  MPI_Barrier(MPI_COMM_WORLD);    
   if (verbose) grvy_printf(ginfo, "mean setup good...\n");  
   /**/
-
   
   ioData.initializeSerial(mpi_.Root(), (config.RestartSerial() != "no"), serial_mesh);
-  if (verbose) grvy_printf(ginfo, " ioData.init thingy...\n");
+  MPI_Barrier(MPI_COMM_WORLD);  
+  if (verbose) grvy_printf(ginfo, "ioData.init thingy...\n");
 
   /*
   projectInitialSolution();
@@ -842,6 +879,7 @@ void LoMachSolver::initialize() {
   */
 
   CFL = config.GetCFLNumber();
+  if (verbose) grvy_printf(ginfo, "got CFL...\n");  
 
   // Determine the minimum element size.
   {
@@ -851,6 +889,7 @@ void LoMachSolver::initialize() {
     }
     MPI_Allreduce(&local_hmin, &hmin, 1, MPI_DOUBLE, MPI_MIN, pmesh->GetComm());
   }
+  if (verbose) grvy_printf(ginfo, "Min element size found...\n");        
 
   // maximum size
   {
@@ -860,7 +899,7 @@ void LoMachSolver::initialize() {
     }
     MPI_Allreduce(&local_hmax, &hmax, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
   }
-  if (verbose) grvy_printf(ginfo, " element size found...\n");      
+  if (verbose) grvy_printf(ginfo, "Max element size found...\n");      
 
   
   // Build grid size vector and grid function
@@ -1417,15 +1456,18 @@ void LoMachSolver::Setup(double dt)
    Array<int> empty;
 
    // unsteady: p+p = 2p
-   // convection: p+p+(p-1) = 3p-1
+   // convection: p+p+(p-1) = 3p-1 
    // diffusion: (p-1)+(p-1) [+p] = 2p-2 [3p-2]
    
    // GLL integration rule (Numerical Integration)
    const IntegrationRule &ir_ni = gll_rules.Get(vfes->GetFE(0)->GetGeomType(), 2 * order);
-   const IntegrationRule &ir_nli = gll_rules.Get(nfes->GetFE(0)->GetGeomType(), 3 * norder - 1);
-   //const IntegrationRule &ir_nli = gll_rules.Get(vfes->GetFE(0)->GetGeomType(), 3 * norder - 1);
+   //const IntegrationRule &ir_nli = gll_rules.Get(nfes->GetFE(0)->GetGeomType(), 3 * norder - 1);   
    const IntegrationRule &ir_pi = gll_rules.Get(pfes->GetFE(0)->GetGeomType(), 2 * porder);   
    const IntegrationRule &ir_i  = gll_rules.Get(tfes->GetFE(0)->GetGeomType(), 2 * order);
+
+   const IntegrationRule &ir_nli = gll_rules.Get(nfes->GetFE(0)->GetGeomType(), 4 * norder - 1);   
+   const IntegrationRule &ir_di  = gll_rules.Get(tfes->GetFE(0)->GetGeomType(), std::max( 3 * order - 2, 2));
+   
    if (rank0_) std::cout << "Integration rules set" << endl;   
 
    
@@ -1487,7 +1529,7 @@ void LoMachSolver::Setup(double dt)
    // mass matrix
    Mv_form = new ParBilinearForm(vfes);
    auto *mv_blfi = new VectorMassIntegrator;
-   if (numerical_integ) { mv_blfi->SetIntRule(&ir_ni); }
+   if (numerical_integ) { mv_blfi->SetIntRule(&ir_i); }
    Mv_form->AddDomainIntegrator(mv_blfi);
    if (partial_assembly) { Mv_form->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
    Mv_form->Assemble();
@@ -1556,7 +1598,7 @@ void LoMachSolver::Setup(double dt)
    auto *lt_blfi = new DiffusionIntegrator(Lt_coeff);
    if (numerical_integ)
    {
-      lt_blfi->SetIntRule(&ir_nli);
+      lt_blfi->SetIntRule(&ir_di);
    }
    Lt_form->AddDomainIntegrator(lt_blfi);
    if (partial_assembly)
@@ -1659,8 +1701,8 @@ void LoMachSolver::Setup(double dt)
      //}
    if (numerical_integ)
    {
-      hmv_blfi->SetIntRule(&ir_ni);
-      hdv_blfi->SetIntRule(&ir_ni);
+      hmv_blfi->SetIntRule(&ir_di);
+      hdv_blfi->SetIntRule(&ir_di);
    }
    H_form->AddDomainIntegrator(hmv_blfi);
    H_form->AddDomainIntegrator(hdv_blfi);
@@ -1705,7 +1747,7 @@ void LoMachSolver::Setup(double dt)
       // vdlfi->SetIntRule(&ir);
       if (numerical_integ)
       {
-         vdlfi->SetIntRule(&ir_ni);
+         vdlfi->SetIntRule(&ir_i);
       }
       f_form->AddDomainIntegrator(vdlfi);
    }
@@ -1848,7 +1890,7 @@ void LoMachSolver::Setup(double dt)
    auto *vtd_mblfi = new VectorDivergenceIntegrator();
    if (numerical_integ)
    {
-      vtd_mblfi->SetIntRule(&ir_nli);
+      vtd_mblfi->SetIntRule(&ir_i);
    }
    Dt_form->AddDomainIntegrator(vtd_mblfi);
    if (partial_assembly)
@@ -1899,8 +1941,8 @@ void LoMachSolver::Setup(double dt)
    
    if (numerical_integ)
    {
-     hmt_blfi->SetIntRule(&ir_i);
-     hdt_blfi->SetIntRule(&ir_i);
+     hmt_blfi->SetIntRule(&ir_di);
+     hdt_blfi->SetIntRule(&ir_di);
    }
    Ht_form->AddDomainIntegrator(hmt_blfi); 
    Ht_form->AddDomainIntegrator(hdt_blfi);
@@ -1916,7 +1958,7 @@ void LoMachSolver::Setup(double dt)
    Text_gfcoeff = new GridFunctionCoefficient(&Text_gf);
    Text_bdr_form = new ParLinearForm(tfes);
    auto *text_blfi = new BoundaryLFIntegrator(*Text_gfcoeff);
-   if (numerical_integ) { text_blfi->SetIntRule(&ir_i); }
+   if (numerical_integ) { text_blfi->SetIntRule(&ir_di); }
    Text_bdr_form->AddBoundaryIntegrator(text_blfi, temp_ess_attr);
    //std::cout << "Check 25..." << std::endl;        
 
@@ -1924,7 +1966,7 @@ void LoMachSolver::Setup(double dt)
    for (auto &temp_dbc : temp_dbcs)
    {
       auto *tbdr_blfi = new BoundaryLFIntegrator(*temp_dbc.coeff);
-      if (numerical_integ) { tbdr_blfi->SetIntRule(&ir_i); }
+      if (numerical_integ) { tbdr_blfi->SetIntRule(&ir_di); }
       t_bdr_form->AddBoundaryIntegrator(tbdr_blfi, temp_dbc.attr);
    }
 
@@ -2019,6 +2061,13 @@ void LoMachSolver::Setup(double dt)
       Tn_filtered_gf.SetSpace(tfes);
       Tn_filtered_gf = 0.0;
    }
+
+   //if (config.sgsExcludeMean == true) { bufferMeanUp = new ParGridFunction(fvfes); }
+   MPI_Barrier(MPI_COMM_WORLD);        
+   if(rank0_) std::cout << "Attempting to setup bufferMeanUp..." << endl;   
+   bufferMeanUp = new ParGridFunction(fvfes2);
+   MPI_Barrier(MPI_COMM_WORLD);        
+   if(rank0_) std::cout << "...complete" << endl;      
    
    sw_setup.Stop();
    //std::cout << "Check 29..." << std::endl;     
@@ -2659,7 +2708,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    }     
    G->Mult(tmpR0, tmpR1);
    MvInv->Mult(tmpR1, gradW);     
-     
+      
    // divergence of velocity
    {
      int eq = 0;
@@ -2690,6 +2739,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    // subgrid scale model: gradUp is in (eq,dim) form
    /**/
    if (config.sgsModelType > 0) {
+     double *dataU = un.HostReadWrite();     
      double *dGradU = gradU.HostReadWrite();
      double *dGradV = gradV.HostReadWrite();
      double *dGradW = gradW.HostReadWrite(); 
@@ -2721,6 +2771,74 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 	 data[i] = nu_sgs;
        }       
      }
+
+     /* incomplete....
+     } else if (config.sgsModelType == 3) {
+
+       // get filtered field
+       un_NM1_gf.ProjectGridFunction(un_gf);
+       un_filtered_gf.ProjectGridFunction(un_NM1_gf);
+
+       // calc high freq test field
+       {
+         double *dataUhi_gf = un_filtered_gf.Read();       
+         MFEM_FORALL(i, un_gf.Size(),			
+         {
+           dataUhi_gf[i] = dataUn_gf[i] - dataUhi_gf[i];
+         });
+       }
+       un_filtered_gf.GetTrueDofs(un_filtered);           
+
+       // calc high-freq gradients
+       {
+         int eq = 0;
+         double *dataUf = un_filtered.HostReadWrite(); 
+         double *data = tmpR0.HostReadWrite();              
+         for (int i = 0; i < TdofInt; i++) {
+           data[i] = dataUf[i + eq*TdofInt];
+         }
+       }     
+       G->Mult(tmpR0, tmpR1);
+       MvInv->Mult(tmpR1, gradUf);
+       {
+         int eq = 1;
+         double *dataUf = un_filtered.HostReadWrite();     
+         double *data = tmpR0.HostReadWrite();              
+         for (int i = 0; i < TdofInt; i++) {
+           data[i] = dataUf[i + eq*TdofInt];
+         }
+       }     
+       G->Mult(tmpR0, tmpR1);
+       MvInv->Mult(tmpR1, gradVf);
+       {
+         int eq = 2;
+         double *dataUf = un_filtered.HostReadWrite();          
+         double *data = tmpR0.HostReadWrite();              
+         for (int i = 0; i < TdofInt; i++) {
+           data[i] = dataUf[i + eq*TdofInt];
+         }
+       }     
+       G->Mult(tmpR0, tmpR1);
+       MvInv->Mult(tmpR1, gradWf);       
+       }
+
+       double nu_sgs = 0.;
+       DenseMatrix gradUp;
+       DenseMatrix gradUf;     
+       gradUp.SetSize(nvel, dim);
+       gradUf.SetSize(nvel, dim);     
+       for (int dir = 0; dir < dim; dir++) { gradUp(0,dir) = dGradU[i + dir * TdofInt]; }
+       for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[i + dir * TdofInt]; }
+       for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * TdofInt]; }
+       for (int dir = 0; dir < dim; dir++) { gradUf(0,dir) = dGradUf[i + dir * TdofInt]; }
+       for (int dir = 0; dir < dim; dir++) { gradUf(1,dir) = dGradVf[i + dir * TdofInt]; }
+       for (int dir = 0; dir < dim; dir++) { gradUf(2,dir) = dGradWf[i + dir * TdofInt]; }     
+       sgsDynamic(gradUp, gradUf, delta[i], Cdyn[i], nu_sgs);
+       data[i] = nu_sgs;
+   
+     }
+     */
+
      bufferSubgridVisc->SetFromTrueDofs(subgridViscSml);     
    }
    /**/
@@ -2744,17 +2862,17 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      for (int i = 0; i < Tdof; i++) {
        dataVisc[i] = kin_vis;
      }
-   }   
+   }
    if (config.sgsModelType > 0) {
      double *dataSubgrid = bufferSubgridVisc->HostReadWrite();
      double *dataVisc = bufferVisc->HostReadWrite();
      for (int i = 0; i < Tdof; i++) { dataVisc[i] += dataSubgrid[i]; }     
-   }      
+   }
    if (config.linViscData.isEnabled) {
      double *viscMult = bufferViscMult->HostReadWrite();
      double *dataVisc = bufferVisc->HostReadWrite();
      for (int i = 0; i < Tdof; i++) { dataVisc[i] *= viscMult[i]; }
-   }
+   }      
    
    // interior-sized visc needed for p-p rhs
    bufferVisc->GetTrueDofs(viscSml);
@@ -2773,7 +2891,9 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    for (auto &pres_dbc : pres_dbcs) {pres_dbc.coeff->SetTime(time + dt);}   
    for (auto &temp_dbc : temp_dbcs) {temp_dbc.coeff->SetTime(time + dt);}   
 
-
+   
+   if (incompressibleSolve != true) {
+   
    // begin temperature...................................... <warp>       
    Ht_bdfcoeff.constant = bd0 / dt;
    Ht_form->Update();
@@ -2994,6 +3114,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    
    // end temperature....................................
 
+   }
+   
    // update rn from with actual T{n+1}
    if (constantDensity != true) {
      double *data = rn.HostWrite();        
@@ -3592,6 +3714,236 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    //Mv->Mult(resu, tmpR1);
    //resu.Set(1.0,tmpR1);
 
+
+   /// removal of subgrid contribution from mean ///
+   /**/
+   //MPI_Barrier(MPI_COMM_WORLD);   
+   if ( config.sgsExcludeMean == true ) {
+     
+     //if(rank0_) {std::cout << "ABOUT to enter sgm mean exclusion..." << endl;}
+     int nSamples = average->GetSamplesMean();
+     //if(rank0_) {std::cout << "samples: " << nSamples << endl;}
+     
+     if ( config.sgsModelType > 0 && nSamples > 10 && average->ComputeMean() ) {     
+       //if(rank0_) {std::cout << "In sgm mean exclusion..." << endl;}
+
+       // samples weight
+       int sWidth;
+       double sWgt;
+       sWidth = 1000;
+       sWgt = (double)nSamples / (double)sWidth;
+       sWgt = std::min(sWgt, 1.0);
+       //if(rank0_) {std::cout << "...check 1" << endl;}     
+     
+       // get mean data
+       bufferMeanUp = average->GetMeanUp();
+       //if(rank0_) {std::cout << "...check 1b" << endl;}            
+       {
+         double *data = R1PM0_gf.HostReadWrite();
+         double *dataFrom = bufferMeanUp->HostReadWrite();
+         for (int eq = 0; eq < dim; eq++) { 
+           for (int i = 0; i < Tdof; i++) {
+             data[i + eq * Tdof] = dataFrom[i + (eq+1) * Tdof]; // exclude rho
+             //if( dataFrom[i + eq * Tdof] != dataFrom[i + eq * Tdof] ) {std::cout << " NAN FAILED " << endl;}	   	   
+           }
+         }     
+         R1PM0_gf.GetTrueDofs(tmpR1b);	 
+       }
+       //MPI_Barrier(MPI_COMM_WORLD);        
+       //if(rank0_) std::cout << "...check 2" << endl;
+
+       // nan check
+       /*
+       {
+         double *data = tmpR1b.HostReadWrite();       
+         for (int eq = 0; eq < dim; eq++) {
+           for (int i = 0; i < TdofInt; i++) {
+             if( data[i + eq * TdofInt] != data[i + eq * TdofInt] ) {std::cout << " NAN CHECK 1 FAILED " << endl;}	   
+           }
+         }
+       }
+       */
+
+       // mean gradient and div (rho occupies 0 in meanUp)     
+       {
+         int eq = 0;
+         double *dataU = tmpR1b.HostReadWrite();
+         double *data = tmpR0.HostReadWrite();
+         for (int i = 0; i < TdofInt; i++) {
+           data[i] = dataU[i + eq*TdofInt];
+         }
+       }     
+       G->Mult(tmpR0, tmpR1);
+       MvInv->Mult(tmpR1, gradU);
+       //MPI_Barrier(MPI_COMM_WORLD);             
+       //if(rank0_) {std::cout << "...check 3" << endl;}          
+       {
+         int eq = 1;
+         double *dataU = tmpR1b.HostReadWrite();       
+         double *data = tmpR0.HostReadWrite();              
+         for (int i = 0; i < TdofInt; i++) {
+           data[i] = dataU[i + eq*TdofInt];
+         }
+       }     
+       G->Mult(tmpR0, tmpR1);
+       MvInv->Mult(tmpR1, gradV);
+       {
+         int eq = 2;
+         double *dataU = tmpR1b.HostReadWrite();       
+         double *data = tmpR0.HostReadWrite();              
+         for (int i = 0; i < TdofInt; i++) {
+           data[i] = dataU[i + eq*TdofInt];
+         }
+       }     
+       G->Mult(tmpR0, tmpR1);
+       MvInv->Mult(tmpR1, gradW);
+       //MPI_Barrier(MPI_COMM_WORLD);             
+       //if(rank0_) {std::cout << "...check 4" << endl;}          
+
+       {
+         int eq = 0;
+         double *dataGradU = gradU.HostReadWrite();      
+         double *data = divU.HostReadWrite();
+         for (int i = 0; i < TdofInt; i++) {
+           data[i] = dataGradU[i + eq*TdofInt];
+         }
+       }
+       {
+         int eq = 1;
+         double *dataGradU = gradV.HostReadWrite();      
+         double *data = divU.HostReadWrite();
+         for (int i = 0; i < TdofInt; i++) {
+           data[i] += dataGradU[i + eq*TdofInt];
+         }
+       }
+       {
+         int eq = 2;
+         double *dataGradU = gradW.HostReadWrite();      
+         double *data = divU.HostReadWrite();
+         for (int i = 0; i < TdofInt; i++) {
+           data[i] += dataGradU[i + eq*TdofInt];
+         }
+       }
+       //MPI_Barrier(MPI_COMM_WORLD);             
+       //if(rank0_) {std::cout << "...check 5" << endl;}          
+     
+       // assemble tau_sg(<u>)
+       {
+       
+         double *dataGradU = gradU.HostReadWrite();        
+         double *dataGradV = gradV.HostReadWrite();                    
+         double *dataGradW = gradW.HostReadWrite();
+         double *dataDiv = divU.HostReadWrite();
+         double twth = 2.0/3.0;
+         //MPI_Barrier(MPI_COMM_WORLD);               
+         //if(rank0_) {std::cout << "...check 5a" << endl;}       
+
+         double *tau1 = tmpR1.HostReadWrite();       
+         for (int i = 0; i < TdofInt; i++) {
+  	   tau1[i + 0 * TdofInt] = 2.0 * dataGradU[i + 0 * TdofInt] - twth * dataDiv[i];
+	   tau1[i + 1 * TdofInt] = dataGradU[i + 1 * TdofInt] + dataGradV[i + 0 * TdofInt];
+	   tau1[i + 2 * TdofInt] = dataGradU[i + 2 * TdofInt] + dataGradW[i + 0 * TdofInt];	 
+         }
+         //MPI_Barrier(MPI_COMM_WORLD);               
+         //if(rank0_) {std::cout << "...check 6" << endl;}
+
+         double *tau2 = tmpR1b.HostReadWrite();       
+         for (int i = 0; i < TdofInt; i++) {
+  	   tau2[i + 0 * TdofInt] = dataGradV[i + 0 * TdofInt] + dataGradU[i + 1 * TdofInt];
+	   tau2[i + 1 * TdofInt] = 2.0 * dataGradV[i + 1 * TdofInt] - twth * dataDiv[i];	 
+	   tau2[i + 2 * TdofInt] = dataGradV[i + 2 * TdofInt] + dataGradW[i + 1 * TdofInt];	 
+         }
+
+         double *tau3 = tmpR1c.HostReadWrite();       
+         for (int i = 0; i < TdofInt; i++) {
+ 	   tau3[i + 0 * TdofInt] = dataGradW[i + 0 * TdofInt] + dataGradU[i + 2 * TdofInt];
+  	   tau3[i + 1 * TdofInt] = dataGradW[i + 1 * TdofInt] + dataGradV[i + 2 * TdofInt];
+	   tau3[i + 2 * TdofInt] = 2.0 * dataGradW[i + 2 * TdofInt] - twth * dataDiv[i];	 
+         }
+         //MPI_Barrier(MPI_COMM_WORLD);               
+         //if(rank0_) {std::cout << "...check 7" << endl;}     
+       
+         double *dataNuT = bufferSubgridVisc->HostReadWrite();
+         for (int eq = 0; eq < dim; eq++) {
+           for (int i = 0; i < TdofInt; i++) {
+  	     tau1[i + eq * TdofInt] *= dataNuT[i];
+	   }
+         }
+         for (int eq = 0; eq < dim; eq++) {
+           for (int i = 0; i < TdofInt; i++) {
+  	     tau2[i + eq * TdofInt] *= dataNuT[i];
+	   }
+         }
+         for (int eq = 0; eq < dim; eq++) {
+           for (int i = 0; i < TdofInt; i++) {
+	     tau3[i + eq * TdofInt] *= dataNuT[i];
+	   }
+         }
+         //MPI_Barrier(MPI_COMM_WORLD);               
+         //if(rank0_) {std::cout << "...check 8" << endl;}            
+       
+       }
+
+       // divergence of tau_sg(<u>)
+       {
+       
+         double *data = tmpR1.HostReadWrite();
+         double *dataFrom = tmpR0b.HostReadWrite();
+       
+         D->Mult(tmpR1, tmpR0);
+         MtInv->Mult(tmpR0, tmpR0b);     
+         for (int i = 0; i < TdofInt; i++) {
+           data[i + 0 * TdofInt] = dataFrom[i];
+         }
+         //MPI_Barrier(MPI_COMM_WORLD);               
+         //if(rank0_) {std::cout << "...check 9" << endl;}     
+       
+         D->Mult(tmpR1b, tmpR0);
+         MtInv->Mult(tmpR0, tmpR0b);     
+         for (int i = 0; i < TdofInt; i++) {
+           data[i + 1 * TdofInt] = dataFrom[i];
+         }
+       
+         D->Mult(tmpR1c, tmpR0);
+         MtInv->Mult(tmpR0, tmpR0b);     
+         for (int i = 0; i < TdofInt; i++) {
+           data[i + 2 * TdofInt] = dataFrom[i];
+         }
+         //MPI_Barrier(MPI_COMM_WORLD);               
+         //if(rank0_) {std::cout << "...check 10" << endl;}     
+       
+         // scale mean divtau term by sample weight
+         for (int eq = 0; eq < dim; eq++) {
+           for (int i = 0; i < TdofInt; i++) {
+	     data[i + eq * TdofInt] *= sWgt;
+           }
+         }
+         //if(rank0_) {std::cout << "...check 11" << endl;}            
+
+       }
+
+       /*
+       {
+         double *data = tmpR1.HostReadWrite();       
+         for (int eq = 0; eq < dim; eq++) {
+           for (int i = 0; i < TdofInt; i++) {
+             if( data[i + eq * TdofInt] != data[i + eq * TdofInt] ) {std::cout << " NAN CHECK last FAILED " << endl;} 
+           }
+         }
+       }
+       */
+       
+       // subtract divtau(<u>) from rhs
+       Mv->Mult(tmpR1, tmpR1b);
+       resu.Add(-1.0, tmpR1b);
+       //MPI_Barrier(MPI_COMM_WORLD);             
+       //if(rank0_) {std::cout << "...check 12" << endl;}          
+     
+     }
+   }
+   /// back to regular ///   
+   /**/
+   
    for (auto &vel_dbc : vel_dbcs) { un_next_gf.ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);}
    vfes->GetRestrictionMatrix()->MultTranspose(resu, resu_gf);
 
@@ -3711,6 +4063,14 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       mfem::out << std::setprecision(8);
       mfem::out << std::fixed;
    }
+
+   if (iflag == 1) {
+     if (rank0_) {
+        grvy_printf(GRVY_ERROR, "[ERROR] Solution not converging... \n");
+     }
+     exit(1);
+   }
+   
 }
 
 
@@ -4845,11 +5205,12 @@ void LoMachSolver::parseFlowOptions() {
   }
   
   tpsP_->getInput("loMach/refinement_levels", config.ref_levels, 0);
-  tpsP_->getInput("loMach/computeDistance", config.compute_distance, false);
+  tpsP_->getInput("loMach/computeDistance", config.compute_distance, false);  
 
   std::string type;
   tpsP_->getInput("loMach/sgsModel", type, std::string("none"));
   config.sgsModelType = sgsModel[type];
+  tpsP_->getInput("loMach/sgsExcludeMean", config.sgsExcludeMean, false);  
 
   double sgs_const = 0.;
   if (config.sgsModelType == 1) {
@@ -4905,7 +5266,6 @@ void LoMachSolver::parseStatOptions() {
   tpsP_->getInput("averaging/saveMeanHist", config.meanHistEnable, false);
   tpsP_->getInput("averaging/startIter", config.startIter, 0);
   tpsP_->getInput("averaging/sampleFreq", config.sampleInterval, 0);
-  //std::cout << " sampleInterval: " << config.sampleInterval << endl;
   tpsP_->getInput("averaging/enableContinuation", config.restartMean, false);
 }
 
@@ -4998,10 +5358,13 @@ void LoMachSolver::parseViscosityOptions() {
     tpsP_->getRequiredInput("viscosityMultiplierFunction/width", config.linViscData.width);
     tpsP_->getRequiredInput("viscosityMultiplierFunction/viscosityRatio", config.linViscData.viscRatio);
 
-    tpsP_->getInput("viscosityMultiplierFunction/uniformMult", config.linViscData.uniformMult, 1.0);    
+    tpsP_->getInput("viscosityMultiplierFunction/uniformMult", config.linViscData.uniformMult, 1.0);
+    tpsP_->getInput("viscosityMultiplierFunction/cylinderX", config.linViscData.cylXradius, -1.0);
+    tpsP_->getInput("viscosityMultiplierFunction/cylinderY", config.linViscData.cylYradius, -1.0);
+    tpsP_->getInput("viscosityMultiplierFunction/cylinderZ", config.linViscData.cylZradius, -1.0);    
+    
   }
-  
-  
+    
 }
 
 /*
@@ -6619,10 +6982,11 @@ void LoMachSolver::sgsSmag(const DenseMatrix &gradUp, double delta, double &nu) 
 
   Vector Sij(6);
   double Smag = 0.;
-  double Cd = 0.12;
-  //double Cd = 0.16;
+  double Cd;
   double l_floor;
   double d_model;
+  Cd = config.sgs_model_const;
+  
 
   // gradUp is in (eq,dim) form
   Sij[0] = gradUp(0,0);
@@ -6657,13 +7021,13 @@ void LoMachSolver::sgsSigma(const DenseMatrix &gradUp, double delta, double &nu)
   DenseMatrix B(dim,dim);  
   Vector ev(dim);
   Vector sigma(dim);  
-  double Cd = 0.135;
+  double Cd;
   double sml = 1.0e-12;
   double pi = 3.14159265359;
   double onethird = 1./3.;  
   double l_floor, d_model, d4;
   double p1, p2, p, q, detB, r, phi;
-
+  Cd = config.sgs_model_const;
   
   // Qij = u_{k,i}*u_{k,j}
   for (int j = 0; j < dim; j++) {  
@@ -6742,7 +7106,7 @@ void LoMachSolver::sgsSigma(const DenseMatrix &gradUp, double delta, double &nu)
   // eddy viscosity
   nu = sigma[2] * (sigma[0]-sigma[1]) * (sigma[1]-sigma[2]);
   nu = max(nu, 0.0);  
-  nu /= (sigma[0]*sigma[0]);
+  nu /= (sigma[0]*sigma[0]); 
   nu *= (Cd*Cd);
   //cout << "mu: " << mu << endl; fflush(stdout);
 
@@ -6750,6 +7114,164 @@ void LoMachSolver::sgsSigma(const DenseMatrix &gradUp, double delta, double &nu)
   if (nu != nu) nu = 0.0;
   
 }
+
+/**
+Dynamic Smagorinksy subgrid model
+*/
+/*
+void LoMachSolver::sgsDynamic(const DenseMatrix &gradUp, const DenseMatrix &gradUf, double delta, double Cdyn, double &nu) {
+
+  Vector Sij(6);
+  double Smag = 0.;
+  double Cd;
+  double l_floor;
+  double d_model;
+  Cd = config.sgs_model_const;
+  
+
+  // gradUp is in (eq,dim) form
+  Sij[0] = gradUp(0,0);
+  Sij[1] = gradUp(1,1);
+  Sij[2] = gradUp(2,2);  
+  Sij[3] = 0.5*(gradUp(0,1) + gradUp(1,0));
+  Sij[4] = 0.5*(gradUp(0,2) + gradUp(2,0));
+  Sij[5] = 0.5*(gradUp(1,2) + gradUp(2,1));
+
+  // strain magnitude with silly sqrt(2) factor
+  for (int i = 0; i < 3; i++) Smag += Sij[i]*Sij[i];
+  for (int i = 3; i < 6; i++) Smag += 2.0*Sij[i]*Sij[i];
+  Smag = sqrt(2.0*Smag);
+
+  // eddy viscosity with delta shift
+  //l_floor = config->GetSgsFloor();
+  //d_model = Cd * max(delta-l_floor,0.0);
+  d_model = Cd * delta;
+  nu = d_model * d_model * Smag;
+  
+}
+*/
+
+/*
+// De-aliased product of two fields of equal length 
+void LoMachSolver::multScalarScalar(Vector A, Vector B, Vector* C) {
+
+   R0PM0_gf.SetFromTrueDofs(A);
+   R0PX2a_gf.ProjectGridFunction(R0PM0_gf);
+   R0PX2a_gf.GetTrueDofs(r0px2a);
+
+   R0PM0_gf.SetFromTrueDofs(B);
+   R0PX2_gf.ProjectGridFunction(R0PM0_gf);
+   R0PX2_gf.GetTrueDofs(r0px2b);
+
+   {
+     double *dataA = r0px2a.HostReadWrite();     
+     double *dataB = r0px2b.HostReadWrite();
+     double *dataC = r0px2c.HostReadWrite();     
+     MFEM_FORALL(i, r0px2c.Size(), {dataC[i] = dataA[i] * dataB[i];} );
+   }
+
+   R0PX2_gf.SetFromTrueDofs(r0px2c);
+   R0PM0_gf.ProjectGridFunction(R0PX2_gf);
+   R0PM0_gf.GetTrueDofs(C);
+   
+}
+*/
+
+/*
+// De-aliased product of scalar and vector
+void LoMachSolver::multScalarVector(Vector A, Vector B, Vector* C) {
+
+   R0PM0_gf.SetFromTrueDofs(A);
+   R0PX2a_gf.ProjectGridFunction(R0PM0_gf);
+   R0PX2a_gf.GetTrueDofs(r0px2a);
+
+   R1PM0_gf.SetFromTrueDofs(B);
+   R1PX2_gf.ProjectGridFunction(R1PM0_gf);
+   R1PX2_gf.GetTrueDofs(r1px2a);
+
+   {
+     int Ndof = r0px2a.Size();
+     double *dataA = r0px2a.HostReadWrite();
+     double *dataB = r1px2a.HostReadWrite();          
+     double *dataC = r1px2b.HostReadWrite();
+     for (int eq = 0; eq < dim; eq++) { 
+       for (int i = 0; i < Ndof; i++) {
+         dataC[i + eq * Ndof] = dataA[i] * dataB[i +  eq * Ndof];
+       }
+     }          
+   }
+
+   R1PX2_gf.SetFromTrueDofs(r1px2b);
+   R1PM0_gf.ProjectGridFunction(R1PX2_gf);
+   R1PM0_gf.GetTrueDofs(C);
+   
+}
+*/
+
+
+/*
+// De-aliased product of vector and vector
+void LoMachSolver::multVectorVector(Vector A, Vector B, Vector* C1, Vector* C2, Vector* C3) {
+
+   R1PM0_gf.SetFromTrueDofs(A);
+   R1PX2a_gf.ProjectGridFunction(R1PM0_gf);
+   R1PX2a_gf.GetTrueDofs(r1px2a);
+
+   R1PM0_gf.SetFromTrueDofs(B);
+   R1PX2_gf.ProjectGridFunction(R1PM0_gf);
+   R1PX2_gf.GetTrueDofs(r1px2b);
+
+   {
+     int Ndof = r0px2a.Size();
+     double *dataA = r1px2a.HostReadWrite();          
+     double *dataB = r1px2b.HostReadWrite();
+     double *dataC = r1px2c.HostReadWrite();     
+     for (int eq = 0; eq < dim; eq++) { 
+       for (int i = 0; i < Ndof; i++) {
+         dataC[i + eq * Ndof] = dataA[i + 0 * Ndof] * dataB[i + eq * Ndof];
+       }
+     }          
+   }
+
+   R1PX2_gf.SetFromTrueDofs(r1px2c);
+   R1PM0_gf.ProjectGridFunction(R1PX2_gf);
+   R1PM0_gf.GetTrueDofs(C1);
+
+   {
+     int Ndof = r0px2a.Size();
+     double *dataA = r1px2a.HostReadWrite();          
+     double *dataB = r1px2b.HostReadWrite();
+     double *dataC = r1px2c.HostReadWrite();     
+     for (int eq = 0; eq < dim; eq++) { 
+       for (int i = 0; i < Ndof; i++) {
+         dataC[i + eq * Ndof] = dataA[i + 1 * Ndof] * dataB[i + eq * Ndof];
+       }
+     }          
+   }
+
+   R1PX2_gf.SetFromTrueDofs(r1px2c);
+   R1PM0_gf.ProjectGridFunction(R1PX2_gf);
+   R1PM0_gf.GetTrueDofs(C2);
+
+   {
+     int Ndof = r0px2a.Size();
+     double *dataA = r1px2a.HostReadWrite();          
+     double *dataB = r1px2b.HostReadWrite();
+     double *dataC = r1px2c.HostReadWrite();     
+     for (int eq = 0; eq < dim; eq++) { 
+       for (int i = 0; i < Ndof; i++) {
+         dataC[i + eq * Ndof] = dataA[i + 2 * Ndof] * dataB[i + eq * Ndof];
+       }
+     }          
+   }
+
+   R1PX2_gf.SetFromTrueDofs(r1px2c);
+   R1PM0_gf.ProjectGridFunction(R1PX2_gf);
+   R1PM0_gf.GetTrueDofs(C2);
+   
+   
+}
+*/
 
 
 /**
@@ -6761,7 +7283,7 @@ void LoMachSolver::viscSpongePlanar(double *x, double &wgt) {
   double normal[3];
   double point[3];
   double s[3];
-  double factor, width, dist;
+  double factor, width, dist, wgt0;
 
   for (int d = 0; d < dim; d++) normal[d] = config.linViscData.normal[d];
   for (int d = 0; d < dim; d++) point[d] = config.linViscData.point0[d];
@@ -6778,10 +7300,49 @@ void LoMachSolver::viscSpongePlanar(double *x, double &wgt) {
   for (int d = 0; d < dim; d++) dist += s[d] * normal[d];
 
   // weight
+  wgt0 = 0.5 * (tanh(0.0 / width - 2.0) + 1.0);  
   wgt = 0.5 * (tanh(dist / width - 2.0) + 1.0);
+  wgt = (wgt - wgt0) * 1.0/(1.0 - wgt0);
+  wgt = std::max(wgt,0.0);
   wgt *= (factor - 1.0);
   wgt += 1.0;
-  
+
+  double cylX = config.linViscData.cylXradius;
+  double cylY = config.linViscData.cylYradius;
+  double cylZ = config.linViscData.cylZradius;
+  double wgtCyl;
+  if (config.linViscData.cylXradius > 0.0) {
+    dist = x[1]*x[1] + x[2]*x[2];
+    dist = std::sqrt(dist);
+    dist = dist - cylX;    
+    wgtCyl = 0.5 * (tanh(dist / width - 2.0) + 1.0);
+    wgtCyl = (wgtCyl - wgt0) * 1.0/(1.0 - wgt0);
+    wgtCyl = std::max(wgtCyl,0.0);    
+    wgtCyl *= (factor - 1.0);
+    wgtCyl += 1.0;
+    wgt = std::max(wgt,wgtCyl);
+  } else if (config.linViscData.cylYradius > 0.0) {
+    dist = x[0]*x[0] + x[2]*x[2];
+    dist = std::sqrt(dist);
+    dist = dist - cylY;    
+    wgtCyl = 0.5 * (tanh(dist / width - 2.0) + 1.0);
+    wgtCyl = (wgtCyl - wgt0) * 1.0/(1.0 - wgt0);
+    wgtCyl = std::max(wgtCyl,0.0);    
+    wgtCyl *= (factor - 1.0);
+    wgtCyl += 1.0;
+    wgt = std::max(wgt,wgtCyl);
+  } else if (config.linViscData.cylZradius > 0.0) {  
+    dist = x[0]*x[0] + x[1]*x[1];
+    dist = std::sqrt(dist);
+    dist = dist - cylZ;    
+    wgtCyl = 0.5 * (tanh(dist / width - 2.0) + 1.0);
+    wgtCyl = (wgtCyl - wgt0) * 1.0/(1.0 - wgt0);
+    wgtCyl = std::max(wgtCyl,0.0);    
+    wgtCyl *= (factor - 1.0);
+    wgtCyl += 1.0;
+    wgt = std::max(wgt,wgtCyl);
+  }
+    
 }
 
 
@@ -6820,9 +7381,12 @@ void vel_ic(const Vector &coords, double t, Vector &u)
    double A = -1.0 * pi;
    double B = -1.0 * pi;
    double C = +2.0 * pi;
-   double aL = 2.0 / (2.0) * pi;
+   //double aL = 2.0 / (2.0) * pi;
+   //double bL = 2.0 * pi;
+   //double cL = 2.0 * pi;
+   double aL = 1.0;
    double bL = 2.0 * pi;
-   double cL = 2.0 * pi;   
+   double cL = 1.0;
    double M = 1.0;
    double scl;
 
@@ -6843,10 +7407,18 @@ void vel_ic(const Vector &coords, double t, Vector &u)
    u(1) += 0.025 * M * B * sin(4.0*aL*x) * cos(4.0*bL*y) * sin(4.0*cL*z);
    u(2) += 0.025 * M * C * sin(4.0*aL*x) * sin(4.0*bL*y) * cos(4.0*cL*z);
 
+   /*
    scl = std::max(1.0-std::pow((y-0.0)/0.2,8),0.0);
    if (y > 0) {
      scl = scl + 0.1 * std::pow(y/0.2,4.0);
    }
+   */
+
+   scl = std::max(1.0-std::pow((y-0.0)/1.0,8),0.0);
+   if (y > 0) {
+     scl = scl + 0.1 * std::pow((y-1.0)/1.0,4.0);
+   }   
+   
    u(0) = u(0) * scl;
    u(1) = u(1) * scl;
    u(2) = u(2) * scl;
