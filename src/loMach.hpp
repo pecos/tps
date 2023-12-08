@@ -298,7 +298,8 @@ protected:
    ParFiniteElementSpace *vfes = nullptr;
 
    //// total space for compatibility
-   ParFiniteElementSpace *fvfes = nullptr;  
+   ParFiniteElementSpace *fvfes = nullptr;
+   ParFiniteElementSpace *fvfes2 = nullptr;    
   
    /// Pressure \f$H^1\f$ finite element collection.
    FiniteElementCollection *pfec = nullptr;
@@ -403,7 +404,9 @@ protected:
    ParGridFunction *buffer_pInlet;  
    VectorGridFunctionCoefficient *uInletField;
    GridFunctionCoefficient *tInletField;
-   GridFunctionCoefficient *pInletField;        
+   GridFunctionCoefficient *pInletField;
+
+   ParGridFunction *bufferMeanUp;
   
   //ParGridFunction *bufferViscSml;  
   //GridFunctionCoefficient *viscFieldSml;  
@@ -492,6 +495,12 @@ protected:
    ParGridFunction R1PM0_gf; 
    ParGridFunction R0PX2_gf;     
    ParGridFunction R1PX2_gf;    
+
+   //Vector r0pm1;  
+   Vector r0pm0;
+   Vector r1pm0; 
+   Vector r0px2a, r0px2b, r0px2c;  
+   Vector r1px2a, r1px2b, r1px2c;    
   
    // All essential attributes.
    Array<int> vel_ess_attr;
@@ -702,8 +711,8 @@ public:
    void write_soln_data(hid_t group, string varName, hid_t dataspace, double *data);
 
    // subgrid scale models
-  void sgsSmag(const DenseMatrix &gradUp, double delta, double &nu_sgs);
-  void sgsSigma(const DenseMatrix &gradUp, double delta, double &nu_sgs);  
+   void sgsSmag(const DenseMatrix &gradUp, double delta, double &nu_sgs);
+   void sgsSigma(const DenseMatrix &gradUp, double delta, double &nu_sgs);  
   
    void projectInitialSolution();  
    void writeHDF5(string inputFileName = std::string()) { restart_files_hdf5("write", inputFileName); }
@@ -713,7 +722,11 @@ public:
     paraviewColl->SetTime(time);
     paraviewColl->Save();
   }
-  
+
+   // nonlinear product functions
+   void multScalarScalar(Vector A, Vector B, Vector* C);
+   void multScalarVector(Vector A, Vector B, Vector* C);
+   void multVectorVector(Vector A, Vector B, Vector* C1, Vector* C2, Vector* C3);  
   
    /// Initialize forms, solvers and preconditioners.
    void Setup(double dt);
