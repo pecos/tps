@@ -74,6 +74,9 @@ class RunConfiguration {
   //  2: Sigma
   int sgsModelType;
 
+  // only include fluctuating vel in sgs model
+  bool sgsExcludeMean;
+
   // order of the solution. Defaults to 4
   int solOrder;
 
