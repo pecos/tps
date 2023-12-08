@@ -1436,12 +1436,17 @@ void LoMachSolver::Setup(double dt)
    
    // GLL integration rule (Numerical Integration)
    const IntegrationRule &ir_ni = gll_rules.Get(vfes->GetFE(0)->GetGeomType(), (2 * order) * 1 );
-   const IntegrationRule &ir_nli = gll_rules.Get(nfes->GetFE(0)->GetGeomType(), (3 * norder - 1) * 1 );
-   //int nDealias = int( ((double)norder + 0.5) + ((double)norder + 0.5) + ((double)(norder-1) + 0.5) );
-   //const IntegrationRule &ir_nli = gll_rules.Get(nfes->GetFE(0)->GetGeomType(), nDealias);   
-   //const IntegrationRule &ir_nli = gll_rules.Get(vfes->GetFE(0)->GetGeomType(), 3 * norder - 1);
+   //const IntegrationRule &ir_nli = gll_rules.Get(nfes->GetFE(0)->GetGeomType(), (3 * norder - 1) * 1 );
    const IntegrationRule &ir_pi = gll_rules.Get(pfes->GetFE(0)->GetGeomType(), (2 * porder) * 1 );   
    const IntegrationRule &ir_i  = gll_rules.Get(tfes->GetFE(0)->GetGeomType(), (2 * order) * 1 );
+
+   const IntegrationRule &ir_nli = gll_rules.Get(nfes->GetFE(0)->GetGeomType(), 4 * norder - 1);   
+   const IntegrationRule &ir_di  = gll_rules.Get(tfes->GetFE(0)->GetGeomType(), std::max( 3 * order - 2, 2));
+   
+
+   //int nDealias = int( ((double)norder + 0.5) + ((double)norder + 0.5) + ((double)(norder-1) + 0.5) );
+   //const IntegrationRule &ir_nli = gll_rules.Get(nfes->GetFE(0)->GetGeomType(), nDealias);   
+   //const IntegrationRule &ir_nli = gll_rules.Get(vfes->GetFE(0)->GetGeomType(), 3 * norder - 1);   
    if (rank0_) std::cout << "Integration rules set" << endl;   
 
    
@@ -1503,7 +1508,7 @@ void LoMachSolver::Setup(double dt)
    // mass matrix
    Mv_form = new ParBilinearForm(vfes);
    auto *mv_blfi = new VectorMassIntegrator;
-   if (numerical_integ) { mv_blfi->SetIntRule(&ir_ni); }
+   if (numerical_integ) { mv_blfi->SetIntRule(&ir_i); }
    Mv_form->AddDomainIntegrator(mv_blfi);
    if (partial_assembly) { Mv_form->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
    Mv_form->Assemble();
@@ -1582,7 +1587,7 @@ void LoMachSolver::Setup(double dt)
    auto *lt_blfi = new DiffusionIntegrator(Lt_coeff);
    if (numerical_integ)
    {
-      lt_blfi->SetIntRule(&ir_nli);
+      lt_blfi->SetIntRule(&ir_di);
    }
    Lt_form->AddDomainIntegrator(lt_blfi);
    if (partial_assembly)
@@ -1702,8 +1707,8 @@ void LoMachSolver::Setup(double dt)
      //}
    if (numerical_integ)
    {
-      hmv_blfi->SetIntRule(&ir_nli);
-      hdv_blfi->SetIntRule(&ir_nli);
+      hmv_blfi->SetIntRule(&ir_di);
+      hdv_blfi->SetIntRule(&ir_di);
    }
    H_form->AddDomainIntegrator(hmv_blfi);
    H_form->AddDomainIntegrator(hdv_blfi);
@@ -1749,7 +1754,7 @@ void LoMachSolver::Setup(double dt)
       // vdlfi->SetIntRule(&ir);
       if (numerical_integ)
       {
-         vdlfi->SetIntRule(&ir_ni);
+         vdlfi->SetIntRule(&ir_i);
       }
       f_form->AddDomainIntegrator(vdlfi);
    }
@@ -1912,7 +1917,7 @@ void LoMachSolver::Setup(double dt)
    auto *vtd_mblfi = new VectorDivergenceIntegrator();
    if (numerical_integ)
    {
-      vtd_mblfi->SetIntRule(&ir_nli);
+      vtd_mblfi->SetIntRule(&ir_i);
    }
    Dt_form->AddDomainIntegrator(vtd_mblfi);
    if (partial_assembly)
@@ -1963,8 +1968,8 @@ void LoMachSolver::Setup(double dt)
    
    if (numerical_integ)
    {
-     hmt_blfi->SetIntRule(&ir_nli);
-     hdt_blfi->SetIntRule(&ir_nli);
+     hmt_blfi->SetIntRule(&ir_di);
+     hdt_blfi->SetIntRule(&ir_di);
    }
    Ht_form->AddDomainIntegrator(hmt_blfi); 
    Ht_form->AddDomainIntegrator(hdt_blfi);
@@ -1980,7 +1985,7 @@ void LoMachSolver::Setup(double dt)
    Text_gfcoeff = new GridFunctionCoefficient(&Text_gf);
    Text_bdr_form = new ParLinearForm(tfes);
    auto *text_blfi = new BoundaryLFIntegrator(*Text_gfcoeff);
-   if (numerical_integ) { text_blfi->SetIntRule(&ir_i); }
+   if (numerical_integ) { text_blfi->SetIntRule(&ir_ni); }
    Text_bdr_form->AddBoundaryIntegrator(text_blfi, temp_ess_attr);
    //std::cout << "Check 25..." << std::endl;        
 
@@ -1988,7 +1993,7 @@ void LoMachSolver::Setup(double dt)
    for (auto &temp_dbc : temp_dbcs)
    {
       auto *tbdr_blfi = new BoundaryLFIntegrator(*temp_dbc.coeff);
-      if (numerical_integ) { tbdr_blfi->SetIntRule(&ir_i); }
+      if (numerical_integ) { tbdr_blfi->SetIntRule(&ir_ni); }
       t_bdr_form->AddBoundaryIntegrator(tbdr_blfi, temp_dbc.attr);
    }
 
@@ -2824,17 +2829,17 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      for (int i = 0; i < Tdof; i++) {
        dataVisc[i] = kin_vis;
      }
-   }   
+   }
    if (config.sgsModelType > 0) {
      double *dataSubgrid = bufferSubgridVisc->HostReadWrite();
      double *dataVisc = bufferVisc->HostReadWrite();
      for (int i = 0; i < Tdof; i++) { dataVisc[i] += dataSubgrid[i]; }     
-   }      
+   }
    if (config.linViscData.isEnabled) {
      double *viscMult = bufferViscMult->HostReadWrite();
      double *dataVisc = bufferVisc->HostReadWrite();
      for (int i = 0; i < Tdof; i++) { dataVisc[i] *= viscMult[i]; }
-   }
+   }      
 
    // interior-sized visc needed for p-p rhs
    bufferVisc->GetTrueDofs(viscSml);   
@@ -2853,8 +2858,10 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    for (auto &vel_dbc : vel_dbcs) {vel_dbc.coeff->SetTime(time + dt);}
    for (auto &pres_dbc : pres_dbcs) {pres_dbc.coeff->SetTime(time + dt);}  
    for (auto &temp_dbc : temp_dbcs) {temp_dbc.coeff->SetTime(time + dt);}   
-      
 
+   
+   if( incompressibleSolve != true) {
+   
    // begin temperature...................................... <warp>     
    //Ht_bdfcoeff.constant = bd0 / dt;
    Ht_bdfcoeff.constant = 1.0 / dt;   
@@ -3022,6 +3029,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    }
    // Text now has {n+2}, Tn_next has {n+1}, and Tn has {n}
 
+   }
    
    // begin momentum....................................   
    //H_bdfcoeff.constant = bd0 / dt;
@@ -3094,7 +3102,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    un_gf.SetFromTrueDofs(tmpR1);         
    R1PX2_gf.ProjectGridFunction(un_gf);
    R1PX2_gf.GetTrueDofs(uBn);
-   
+
+   // \int(u \cdot grad{u}, v)
    N->Mult(uBn, Nun);
    //std::cout << " okay 1" << endl;
    //MvInv_big->Mult(Nun, Nunm1); // container
@@ -3145,7 +3154,8 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    D_big->Mult(Nunm1, tmpR0_big);
    MInv_big->Mult(tmpR0_big, tmpR0_bigB) ; // container
    */
-   
+
+   // u \cdot div{ru}
    {
      double *dataU = tmpR1.HostReadWrite(); //contains u{n+1/2}     
      double *dataDivRU = tmpR0b.HostReadWrite(); // div{rho*u}
@@ -3588,6 +3598,14 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
       mfem::out << std::setprecision(8);
       mfem::out << std::fixed;
    }
+
+   if (iflag == 1) {
+     if (rank0_) {
+        grvy_printf(GRVY_ERROR, "[ERROR] Solution not converging... \n");
+     }
+     exit(1);
+   }
+   
 }
 
 
@@ -4769,7 +4787,7 @@ void LoMachSolver::parseTimeIntegrationOptions() {
   tpsP_->getInput("time/dt_fixed", config.dt_fixed, -1.);
   tpsP_->getInput("time/maxSolverIteration", config.solver_iter, 100);
   tpsP_->getInput("time/solverRelTolerance", config.solver_tol, 1.0e-8);
-  tpsP_->getInput("time/bdfOrder", config.bdfOrder, 2);
+  tpsP_->getInput("time/bdfOrder", config.bdfOrder, 1);
   max_bdf_order = config.bdfOrder;
   //if (integrators.count(type) == 1) {
   //  config.timeIntegratorType = integrators[type];
@@ -4877,8 +4895,11 @@ void LoMachSolver::parseViscosityOptions() {
     tpsP_->getRequiredInput("viscosityMultiplierFunction/viscosityRatio", config.linViscData.viscRatio);
 
     tpsP_->getInput("viscosityMultiplierFunction/uniformMult", config.linViscData.uniformMult, 1.0);    
-  }
-  
+    tpsP_->getInput("viscosityMultiplierFunction/cylinderX", config.linViscData.cylXradius, -1.0);
+    tpsP_->getInput("viscosityMultiplierFunction/cylinderY", config.linViscData.cylYradius, -1.0);
+    tpsP_->getInput("viscosityMultiplierFunction/cylinderZ", config.linViscData.cylZradius, -1.0);
+
+  }    
   
 }
 
@@ -6402,9 +6423,7 @@ void LoMachSolver::interpolateInlet() {
         dist = sqrt(dist);
         //std::cout << " Gaussian interpolation, point " << n << " with distance " << dist << endl; fflush(stdout);	
 
-        if (inlet[j].rho < 1.0e-8) {
-          continue;
-        }
+        if (inlet[j].rho < 1.0e-8) { continue; }
 	
 	// gaussian
 	if(dist <= 4.0*radius) {
@@ -6497,10 +6516,10 @@ void LoMachSolver::sgsSmag(const DenseMatrix &gradUp, double delta, double &nu) 
 
   Vector Sij(6);
   double Smag = 0.;
-  double Cd = 0.12;
-  //double Cd = 0.16;
+  double Cd;
   double l_floor;
   double d_model;
+  Cd = config.sgs_model_const;
 
   // gradUp is in (eq,dim) form
   Sij[0] = gradUp(0,0);
@@ -6535,13 +6554,14 @@ void LoMachSolver::sgsSigma(const DenseMatrix &gradUp, double delta, double &nu)
   DenseMatrix B(dim,dim);  
   Vector ev(dim);
   Vector sigma(dim);  
-  double Cd = 0.135;
+  double Cd;
   double sml = 1.0e-12;
   double pi = 3.14159265359;
   double onethird = 1./3.;  
   double l_floor, d_model, d4;
   double p1, p2, p, q, detB, r, phi;
-
+  Cd = config.sgs_model_const;
+  
   
   // Qij = u_{k,i}*u_{k,j}
   for (int j = 0; j < dim; j++) {  
@@ -6639,7 +6659,7 @@ void LoMachSolver::viscSpongePlanar(double *x, double &wgt) {
   double normal[3];
   double point[3];
   double s[3];
-  double factor, width, dist;
+  double factor, width, dist, wgt0;
 
   for (int d = 0; d < dim; d++) normal[d] = config.linViscData.normal[d];
   for (int d = 0; d < dim; d++) point[d] = config.linViscData.point0[d];
@@ -6656,9 +6676,55 @@ void LoMachSolver::viscSpongePlanar(double *x, double &wgt) {
   for (int d = 0; d < dim; d++) dist += s[d] * normal[d];
 
   // weight
+  /*
   wgt = 0.5 * (tanh(dist / width - 2.0) + 1.0);
   wgt *= (factor - 1.0);
   wgt += 1.0;
+  */
+  
+  // weight
+  wgt0 = 0.5 * (tanh(0.0 / width - 2.0) + 1.0);  
+  wgt = 0.5 * (tanh(dist / width - 2.0) + 1.0);
+  wgt = (wgt - wgt0) * 1.0/(1.0 - wgt0);
+  wgt = std::max(wgt,0.0);
+  wgt *= (factor - 1.0);
+  wgt += 1.0;
+
+  double cylX = config.linViscData.cylXradius;
+  double cylY = config.linViscData.cylYradius;
+  double cylZ = config.linViscData.cylZradius;
+  double wgtCyl;
+  if (config.linViscData.cylXradius > 0.0) {
+    dist = x[1]*x[1] + x[2]*x[2];
+    dist = std::sqrt(dist);
+    dist = dist - cylX;    
+    wgtCyl = 0.5 * (tanh(dist / width - 2.0) + 1.0);
+    wgtCyl = (wgtCyl - wgt0) * 1.0/(1.0 - wgt0);
+    wgtCyl = std::max(wgtCyl,0.0);    
+    wgtCyl *= (factor - 1.0);
+    wgtCyl += 1.0;
+    wgt = std::max(wgt,wgtCyl);
+  } else if (config.linViscData.cylYradius > 0.0) {
+    dist = x[0]*x[0] + x[2]*x[2];
+    dist = std::sqrt(dist);
+    dist = dist - cylY;    
+    wgtCyl = 0.5 * (tanh(dist / width - 2.0) + 1.0);
+    wgtCyl = (wgtCyl - wgt0) * 1.0/(1.0 - wgt0);
+    wgtCyl = std::max(wgtCyl,0.0);    
+    wgtCyl *= (factor - 1.0);
+    wgtCyl += 1.0;
+    wgt = std::max(wgt,wgtCyl);
+  } else if (config.linViscData.cylZradius > 0.0) {  
+    dist = x[0]*x[0] + x[1]*x[1];
+    dist = std::sqrt(dist);
+    dist = dist - cylZ;    
+    wgtCyl = 0.5 * (tanh(dist / width - 2.0) + 1.0);
+    wgtCyl = (wgtCyl - wgt0) * 1.0/(1.0 - wgt0);
+    wgtCyl = std::max(wgtCyl,0.0);    
+    wgtCyl *= (factor - 1.0);
+    wgtCyl += 1.0;
+    wgt = std::max(wgt,wgtCyl);
+  }
   
 }
 
