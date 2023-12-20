@@ -174,6 +174,10 @@ struct linearlyVaryingVisc {
   double uniformMult;
   double cylXradius, cylYradius, cylZradius;  
   bool isEnabled;
+  Vector pointA;
+  double viscRatioAnnulus;
+  double annulusRadius;
+  double annulusThickness;
 };
 
 enum SpongeZoneSolution {

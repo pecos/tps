@@ -76,14 +76,17 @@ RunConfiguration::RunConfiguration() {
 
   linViscData.normal.UseDevice(true);
   linViscData.point0.UseDevice(true);
+  linViscData.pointA.UseDevice(true);  
   linViscData.pointInit.UseDevice(true);
 
   linViscData.normal.SetSize(3);
   linViscData.point0.SetSize(3);
+  linViscData.pointA.SetSize(3);  
   linViscData.pointInit.SetSize(3);
 
   linViscData.normal = 0.;
   linViscData.point0 = 0.;
+  linViscData.pointA = 0.;  
   linViscData.pointInit = 0.;
   linViscData.viscRatio = 0.;
 

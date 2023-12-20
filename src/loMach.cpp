@@ -1393,7 +1393,7 @@ void LoMachSolver::Setup(double dt)
    /**/
    //for (int i = 0; i < config.wallPatchType.size(); i++) {
    for (int i = 0; i < numWalls; i++) {
-     for (int iFace = 1; iFace < pmesh->bdr_attributes.Max()+1; iFace++) {     
+     for (int iFace = 1; iFace < pmesh->bdr_attributes.Max()+1; iFace++) {
        //if (config.wallPatchType[i].second != WallType::INV) { 
        if (config.wallPatchType[i].second == WallType::VISC_ISOTH) {	   
 	 //std::cout << " wall check " << i << " " << iFace << " " << config.wallPatchType[i].first << endl;
@@ -2867,12 +2867,12 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
      double *dataSubgrid = bufferSubgridVisc->HostReadWrite();
      double *dataVisc = bufferVisc->HostReadWrite();
      for (int i = 0; i < Tdof; i++) { dataVisc[i] += dataSubgrid[i]; }     
-   }
+   }   
    if (config.linViscData.isEnabled) {
      double *viscMult = bufferViscMult->HostReadWrite();
      double *dataVisc = bufferVisc->HostReadWrite();
      for (int i = 0; i < Tdof; i++) { dataVisc[i] *= viscMult[i]; }
-   }      
+   }
    
    // interior-sized visc needed for p-p rhs
    bufferVisc->GetTrueDofs(viscSml);
@@ -5340,6 +5340,11 @@ void LoMachSolver::parseViscosityOptions() {
   tpsP_->getInput("viscosityMultiplierFunction/isEnabled", config.linViscData.isEnabled, false);
   
   if (config.linViscData.isEnabled) {
+
+    //config.linViscData.normal.SetSize(dim);
+    //config.linViscData.point0.SetSize(dim);
+    //config.linViscData.pointA.SetSize(dim);      
+    
     auto normal = config.linViscData.normal.HostWrite();
     tpsP_->getRequiredVecElem("viscosityMultiplierFunction/normal", normal[0], 0);
     tpsP_->getRequiredVecElem("viscosityMultiplierFunction/normal", normal[1], 1);
@@ -5362,7 +5367,21 @@ void LoMachSolver::parseViscosityOptions() {
     tpsP_->getInput("viscosityMultiplierFunction/cylinderX", config.linViscData.cylXradius, -1.0);
     tpsP_->getInput("viscosityMultiplierFunction/cylinderY", config.linViscData.cylYradius, -1.0);
     tpsP_->getInput("viscosityMultiplierFunction/cylinderZ", config.linViscData.cylZradius, -1.0);    
-    
+
+    /**/    
+    auto pointA = config.linViscData.pointA.HostWrite();
+    double pointA0, pointA1, pointA2;
+    tpsP_->getInput("viscosityMultiplierFunction/pointA0", pointA0, 0.0);
+    tpsP_->getInput("viscosityMultiplierFunction/pointA1", pointA1, 0.0);
+    tpsP_->getInput("viscosityMultiplierFunction/pointA2", pointA2, 0.0);
+    pointA[0] = pointA0;
+    pointA[1] = pointA1;
+    pointA[2] = pointA2;
+    tpsP_->getInput("viscosityMultiplierFunction/viscosityRatioAnnulus", config.linViscData.viscRatioAnnulus, 1.0);
+    tpsP_->getInput("viscosityMultiplierFunction/annulusRadius", config.linViscData.annulusRadius, 1.0e8);
+    tpsP_->getInput("viscosityMultiplierFunction/annulusThickness", config.linViscData.annulusThickness, 1.0e-8);
+    /**/
+  
   }
     
 }
@@ -6862,6 +6881,7 @@ void LoMachSolver::interpolateInlet() {
       double dmin = 1.0e15;
 
       // find minimum distance in interpolant field to use as interpolation radius
+      /*
       double distMin = 1.0e12;
       for (int j = 0; j < nCount; j++) {	    
         dist = (xp[0]-inlet[j].x)*(xp[0]-inlet[j].x) + (xp[2]-inlet[j].z)*(xp[2]-inlet[j].z);
@@ -6880,6 +6900,7 @@ void LoMachSolver::interpolateInlet() {
       
       //radius = 0.5 * (radius + distMin);
       radius = distMinSecond;
+      */
 
       //std::cout << " radius for interpoaltion: " << 4.0*radius << endl; fflush(stdout);	      
       for (int j=0; j < nCount; j++) {
@@ -7284,7 +7305,7 @@ void LoMachSolver::viscSpongePlanar(double *x, double &wgt) {
   double point[3];
   double s[3];
   double factor, width, dist, wgt0;
-
+  
   for (int d = 0; d < dim; d++) normal[d] = config.linViscData.normal[d];
   for (int d = 0; d < dim; d++) point[d] = config.linViscData.point0[d];
   width = config.linViscData.width;
@@ -7307,6 +7328,7 @@ void LoMachSolver::viscSpongePlanar(double *x, double &wgt) {
   wgt *= (factor - 1.0);
   wgt += 1.0;
 
+  // add cylindrical area
   double cylX = config.linViscData.cylXradius;
   double cylY = config.linViscData.cylYradius;
   double cylZ = config.linViscData.cylZradius;
@@ -7342,7 +7364,54 @@ void LoMachSolver::viscSpongePlanar(double *x, double &wgt) {
     wgtCyl += 1.0;
     wgt = std::max(wgt,wgtCyl);
   }
-    
+
+  // add annulus sponge => NOT GENERAL, only for annulus aligned with y
+  /**/
+  double centerAnnulus[3];  
+  //for (int d = 0; d < dim; d++) normalAnnulus[d] = config.linViscData.normalA[d];  
+  for (int d = 0; d < dim; d++) centerAnnulus[d] = config.linViscData.pointA[d];
+  double rad1 = config.linViscData.annulusRadius;
+  double rad2 = config.linViscData.annulusThickness;  
+  double factorA = config.linViscData.viscRatioAnnulus;
+  
+  // distance to center
+  double dist1 = x[0]*x[0] + x[2]*x[2];
+  dist1 = std::sqrt(dist1);
+
+  // coordinates of nearest point on annulus center ring
+  for (int d = 0; d < dim; d++) s[d] = (rad1/dist1) * x[d];
+  s[1] = centerAnnulus[1];
+  
+  // distance to ring
+  for (int d = 0; d < dim; d++) s[d] = x[d] - s[d];  
+  double dist2 = s[0]*s[0] + s[1]*s[1] + s[2]*s[2];
+  dist2 = std::sqrt(dist2);
+
+  //if (x[1] <= centerAnnulus[1]+rad2) { 
+  //  std::cout << " rad ratio: " << rad1/dist1 << " ring dist: " << dist2 << endl;
+  //}  
+
+  //if (dist2 <= rad2) { 
+  //  std::cout << " rad ratio: " << rad1/dist1 << " ring dist: " << dist2 << " fA: " << factorA << endl;
+  //}  
+  
+  // sponge weight
+  double wgtAnn;
+  wgtAnn = 0.5 * (tanh( 10.0*(1.0 - dist2/rad2) ) + 1.0);
+  wgtAnn = (wgtAnn - wgt0) * 1.0/(1.0 - wgt0);
+  wgtAnn = std::max(wgtAnn,0.0);
+  //if (dist2 <= rad2) wgtAnn = 1.0; // testing....
+  wgtAnn *= (factorA - 1.0);
+  wgtAnn += 1.0;
+  wgt = std::max(wgt,wgtAnn);
+
+  //if (dist2 <= rad2) {
+  //   std::cout << " wgtAnn: " << wgtAnn << " d1: " << dist1 << " d2: " << dist2 << endl;
+  //   std::cout << " x: " << x[0] << " " << x[1] << " " << x[2] << endl;
+  // }
+  
+  /**/
+  
 }
 
 
@@ -7480,7 +7549,7 @@ double temp_ic(const Vector &coords, double t)
    double y = coords(1);
    double z = coords(2);
    double temp;
-   temp = Tlo + (y + 0.5) * (Thi - Tlo);
+   temp = Tlo + 0.5 * (y + 1.0) * (Thi - Tlo);
    return temp;      
    
 }
