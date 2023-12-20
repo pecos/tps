@@ -771,8 +771,12 @@ void LoMachSolver::initialize() {
    R1PM0_gf = 0.0;   
    R1PX2_gf.SetSpace(nfes); // padded space
    R1PX2_gf = 0.0;
+   R1PX2a_gf.SetSpace(nfes); // padded space
+   R1PX2a_gf = 0.0;   
    R0PX2_gf.SetSpace(nfesR0); // padded space
    R0PX2_gf = 0.0;
+   R0PX2a_gf.SetSpace(nfesR0); // padded space
+   R0PX2a_gf = 0.0;   
 
    //meanUp_gf.SetSpace(fvfes);
    //meanUp_gf = 0.0;   
@@ -8157,7 +8161,7 @@ void LoMachSolver::sgsDynamic(const DenseMatrix &gradUp, const DenseMatrix &grad
 }
 */
 
-/*
+/**/
 // De-aliased product of two fields of equal length 
 void LoMachSolver::multScalarScalar(Vector A, Vector B, Vector* C) {
 
@@ -8178,12 +8182,12 @@ void LoMachSolver::multScalarScalar(Vector A, Vector B, Vector* C) {
 
    R0PX2_gf.SetFromTrueDofs(r0px2c);
    R0PM0_gf.ProjectGridFunction(R0PX2_gf);
-   R0PM0_gf.GetTrueDofs(C);
+   R0PM0_gf.GetTrueDofs(*C);
    
 }
-*/
+/**/
 
-/*
+/**/
 // De-aliased product of scalar and vector
 void LoMachSolver::multScalarVector(Vector A, Vector B, Vector* C) {
 
@@ -8209,13 +8213,13 @@ void LoMachSolver::multScalarVector(Vector A, Vector B, Vector* C) {
 
    R1PX2_gf.SetFromTrueDofs(r1px2b);
    R1PM0_gf.ProjectGridFunction(R1PX2_gf);
-   R1PM0_gf.GetTrueDofs(C);
+   R1PM0_gf.GetTrueDofs(*C);
    
 }
-*/
+/**/
 
 
-/*
+/**/
 // De-aliased product of vector and vector
 void LoMachSolver::multVectorVector(Vector A, Vector B, Vector* C1, Vector* C2, Vector* C3) {
 
@@ -8241,7 +8245,7 @@ void LoMachSolver::multVectorVector(Vector A, Vector B, Vector* C1, Vector* C2, 
 
    R1PX2_gf.SetFromTrueDofs(r1px2c);
    R1PM0_gf.ProjectGridFunction(R1PX2_gf);
-   R1PM0_gf.GetTrueDofs(C1);
+   R1PM0_gf.GetTrueDofs(*C1);
 
    {
      int Ndof = r0px2a.Size();
@@ -8257,7 +8261,7 @@ void LoMachSolver::multVectorVector(Vector A, Vector B, Vector* C1, Vector* C2, 
 
    R1PX2_gf.SetFromTrueDofs(r1px2c);
    R1PM0_gf.ProjectGridFunction(R1PX2_gf);
-   R1PM0_gf.GetTrueDofs(C2);
+   R1PM0_gf.GetTrueDofs(*C2);
 
    {
      int Ndof = r0px2a.Size();
@@ -8273,11 +8277,11 @@ void LoMachSolver::multVectorVector(Vector A, Vector B, Vector* C1, Vector* C2, 
 
    R1PX2_gf.SetFromTrueDofs(r1px2c);
    R1PM0_gf.ProjectGridFunction(R1PX2_gf);
-   R1PM0_gf.GetTrueDofs(C2);
+   R1PM0_gf.GetTrueDofs(*C2);
    
    
 }
-*/
+/**/
 
 
 /**
