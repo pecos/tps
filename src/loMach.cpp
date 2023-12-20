@@ -3336,12 +3336,12 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
 
    // explicit part of unsteady term
    {
-      const double bd1idt = -bd1 / dt;
-      const double bd2idt = -bd2 / dt;
-      const double bd3idt = -bd3 / dt;
+     //const double bd1idt = -bd1 / dt;
+     //const double bd2idt = -bd2 / dt;
+     //const double bd3idt = -bd3 / dt;
       const auto d_un = un.Read();
-      const auto d_unm1 = unm1.Read();
-      const auto d_unm2 = unm2.Read();
+     //const auto d_unm1 = unm1.Read();
+     //const auto d_unm2 = unm2.Read();
       auto d_resu = resu.ReadWrite();
       MFEM_FORALL(i, resu.Size(),      
       {
@@ -3420,12 +3420,12 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    FText_bdr_form->Assemble();
    FText_bdr_form->ParallelAssemble(FText_bdr);
    tmpR0.Add(1.0, FText_bdr);
+   */
    
    g_bdr_form->Assemble();
    g_bdr_form->ParallelAssemble(g_bdr);
    //tmpR0.Add(-bd0 / dt, g_bdr);
    tmpR0.Add(-1.0 / dt, g_bdr);
-   */
 
    // project rhs to p-space
    R0PM0_gf.SetFromTrueDofs(tmpR0);   
@@ -6752,6 +6752,7 @@ void accel(const Vector &x, double t, Vector &f)
    f(2) = 0.0;
 }
 
+
 void vel_ic(const Vector &coords, double t, Vector &u)
 {
   
@@ -6764,9 +6765,12 @@ void vel_ic(const Vector &coords, double t, Vector &u)
    double A = -1.0 * pi;
    double B = -1.0 * pi;
    double C = +2.0 * pi;
-   double aL = 2.0 / (2.0) * pi;
+   //double aL = 2.0 / (2.0) * pi;
+   //double bL = 2.0 * pi;
+   //double cL = 2.0 * pi;
+   double aL = 1.0;
    double bL = 2.0 * pi;
-   double cL = 2.0 * pi;   
+   double cL = 1.0;
    double M = 1.0;
    double scl;
 
@@ -6787,10 +6791,18 @@ void vel_ic(const Vector &coords, double t, Vector &u)
    u(1) += 0.025 * M * B * sin(4.0*aL*x) * cos(4.0*bL*y) * sin(4.0*cL*z);
    u(2) += 0.025 * M * C * sin(4.0*aL*x) * sin(4.0*bL*y) * cos(4.0*cL*z);
 
+   /*
    scl = std::max(1.0-std::pow((y-0.0)/0.2,8),0.0);
    if (y > 0) {
      scl = scl + 0.1 * std::pow(y/0.2,4.0);
    }
+   */
+
+   scl = std::max(1.0-std::pow((y-0.0)/1.0,8),0.0);
+   if (y > 0) {
+     scl = scl + 0.1 * std::pow((y-1.0)/1.0,4.0);
+   }   
+   
    u(0) = u(0) * scl;
    u(1) = u(1) * scl;
    u(2) = u(2) * scl;
@@ -6809,6 +6821,7 @@ void vel_ic(const Vector &coords, double t, Vector &u)
    */
    
 }
+
 
 void vel_channelTest(const Vector &coords, double t, Vector &u)
 {
