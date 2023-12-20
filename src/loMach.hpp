@@ -492,9 +492,11 @@ protected:
    ParGridFunction R0PM0_gf;
    ParGridFunction R0PM1_gf;
    ParGridFunction R1PM0_gf; 
-   ParGridFunction R0PX2_gf;     
-   ParGridFunction R1PX2_gf;    
-
+   ParGridFunction R0PX2_gf;
+   ParGridFunction R0PX2a_gf;  
+   ParGridFunction R1PX2_gf;   
+   ParGridFunction R1PX2a_gf;     
+  
    //Vector r0pm1;  
    Vector r0pm0;
    Vector r1pm0; 
