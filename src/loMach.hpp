@@ -307,17 +307,11 @@ protected:
    /// Pressure \f$H^1\f$ finite element space.
    ParFiniteElementSpace *pfes = nullptr;
 
-   /// Temperature \f$H^1\f$ finite element collection.
-   FiniteElementCollection *tfec = nullptr;
+   /// Scalar \f$H^1\f$ finite element collection.
+   FiniteElementCollection *sfec = nullptr;
 
-   /// Temperature \f$H^1\f$ finite element space.
-   ParFiniteElementSpace *tfes = nullptr;  
-
-   /// density \f$H^1\f$ finite element collection.
-   FiniteElementCollection *rfec = nullptr;
-
-   /// density \f$H^1\f$ finite element space.
-   ParFiniteElementSpace *rfes = nullptr;  
+   /// Scalar \f$H^1\f$ finite element space.
+   ParFiniteElementSpace *sfes = nullptr;  
   
    // nonlinear term
    FiniteElementCollection *nfec = nullptr;
@@ -440,6 +434,7 @@ protected:
    mfem::CGSolver *HtInv = nullptr;  
 
    Vector fn, un, un_next, unm1, unm2;
+   Vector u_star;  
    Vector uBn, uBnm1, uBnm2;
    Vector TBn, TBnm1, TBnm2;    
    Vector Nun, Nunm1, Nunm2;
@@ -447,7 +442,7 @@ protected:
    Vector resu, tmpR1, tmpR1b, tmpR1c;
    Vector gradMu, gradU, gradV, gradW, gradT;
    Vector FBext;
-   Vector divU, Qt;
+  Vector divU, Qt, dtRho;
    Vector gravity;
    Vector boussinesqField;
 
@@ -464,7 +459,8 @@ protected:
      Lext_gf, FText_gf, resu_gf, Pext_gf, gradT_gf;
 
    ParGridFunction unm1_gf, unm2_gf;
-   ParGridFunction Tnm1_gf, Tnm2_gf;    
+   ParGridFunction Tnm1_gf, Tnm2_gf;
+   ParGridFunction u_star_gf;  
   
    //ParGridFunction rn_gf, resr_gf;  
    ParGridFunction pn_gf, resp_gf;
@@ -488,6 +484,9 @@ protected:
    Vector viscMultSml;
    Vector subgridViscSml;  
    Vector gridScaleSml;
+   Vector gridScaleXSml;
+   Vector gridScaleYSml;
+   Vector gridScaleZSml;  
 
    // swap spaces
    ParGridFunction R0PM0_gf;
@@ -583,8 +582,8 @@ protected:
    ParGridFunction un_NM1_gf;
    ParGridFunction un_filtered_gf;
   
-   FiniteElementCollection *tfec_filter = nullptr;
-   ParFiniteElementSpace *tfes_filter = nullptr;
+   FiniteElementCollection *sfec_filter = nullptr;
+   ParFiniteElementSpace *sfes_filter = nullptr;
    ParGridFunction Tn_NM1_gf;
    ParGridFunction Tn_filtered_gf;
 
@@ -753,7 +752,9 @@ public:
     * linear multistep methods for time-dependent partial differential
     * equations
     */
-   void Step(double &time, double dt, const int cur_step, const int start_step, bool provisional = false);
+   //void Step(double &time, double dt, const int cur_step, const int start_step, bool provisional = false);
+   void curlcurlStep(double &time, double dt, const int cur_step, const int start_step, bool provisional = false);
+   void staggeredTimeStep(double &time, double dt, const int cur_step, const int start_step, bool provisional = false);  
 
    /// Return a pointer to the provisional velocity ParGridFunction.
    ParGridFunction *GetProvisionalVelocity() { return &un_next_gf; }
