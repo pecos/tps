@@ -5452,109 +5452,38 @@ void LoMachSolver::ComputeCurl3D(ParGridFunction &u, ParGridFunction &cu)
 
 void LoMachSolver::vectorGrad3D(ParGridFunction &u, ParGridFunction &gu, ParGridFunction &gv, ParGridFunction &gw)
 {
-   FiniteElementSpace *fes = u.FESpace();
 
-   // AccumulateAndCountZones.
-   Array<int> zones_per_vdof;
-   zones_per_vdof.SetSize(fes->GetVSize());
-   zones_per_vdof = 0;
+   ParGridFunction uSub;
+   uSub.SetSpace(sfes);
+   int nSize = uSub.Size();   
 
-   gu = 0.0;
-   gv = 0.0;
-   gw = 0.0;   
-
-   // Local interpolation.
-   int elndofs;
-   Array<int> vdofs;
-   Vector valsU, valsV, valsW;
-   Vector loc_data;
-   int vdim = fes->GetVDim();
-   DenseMatrix grad_hat;
-   DenseMatrix dshape;
-   DenseMatrix grad;
-
-   for (int e = 0; e < fes->GetNE(); ++e)
    {
-      fes->GetElementVDofs(e, vdofs);
-      u.GetSubVector(vdofs, loc_data);
-      valsU.SetSize(dim * vdofs.Size());
-      valsV.SetSize(dim * vdofs.Size());
-      valsW.SetSize(dim * vdofs.Size());      
-      ElementTransformation *tr = fes->GetElementTransformation(e);
-      const FiniteElement *el = fes->GetFE(e);
-      elndofs = el->GetDof();
-      int dim = el->GetDim();
-      dshape.SetSize(elndofs, dim);
+     double *dataSub = uSub.HostReadWrite();
+     double *data = u.HostReadWrite();   
+     for (int i = 0; i < nSize; i++) {     
+       dataSub[i] = data[i + 0 * nSize];
+     }
+   }      
+   scalarGrad3D(uSub, gu);
 
-      for (int dof = 0; dof < elndofs; ++dof)
-      {
-         // Project.
-         const IntegrationPoint &ip = el->GetNodes().IntPoint(dof);
-         tr->SetIntPoint(&ip);
-
-         // Eval and GetVectorGradientHat.
-         el->CalcDShape(tr->GetIntPoint(), dshape);
-         grad_hat.SetSize(vdim, dim);
-         DenseMatrix loc_data_mat(loc_data.GetData(), elndofs, vdim);
-         MultAtB(loc_data_mat, dshape, grad_hat);
-
-         const DenseMatrix &Jinv = tr->InverseJacobian();
-         grad.SetSize(grad_hat.Height(), Jinv.Width());
-         Mult(grad_hat, Jinv, grad);
-
-         for (int j = 0; j < dim; ++j)
-         {
- 	   valsU(elndofs * j + dof) = grad(1,j);
- 	   valsV(elndofs * j + dof) = grad(2,j);
- 	   valsW(elndofs * j + dof) = grad(3,j);	    
-         }
-      }
-
-      // Accumulate values in all dofs, count the zones.
-      for (int j = 0; j < dim * vdofs.Size(); j++)
-      {
-         int ldof = vdofs[j];
-         gu(ldof) += valsU[j];
-         gv(ldof) += valsV[j];
-         gw(ldof) += valsW[j];	 
-         zones_per_vdof[ldof]++;
-      }
-   }
-
-   // Communication
-
-   // Count the zones globally.
-   GroupCommunicator &gcomm = u.ParFESpace()->GroupComm();
-   gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
-   gcomm.Bcast(zones_per_vdof);
-
-   // Accumulate for all vdofs.
-   gcomm.Reduce<double>(gu.GetData(), GroupCommunicator::Sum);
-   gcomm.Bcast<double>(gu.GetData());
-   gcomm.Reduce<double>(gv.GetData(), GroupCommunicator::Sum);
-   gcomm.Bcast<double>(gv.GetData());
-   gcomm.Reduce<double>(gw.GetData(), GroupCommunicator::Sum);
-   gcomm.Bcast<double>(gw.GetData());   
-
-   // Compute means.
-   for (int i = 0; i < gu.Size(); i++)
    {
-      const int nz = zones_per_vdof[i];
-      if (nz) { gu(i) /= nz; }
-   }
-
-   for (int i = 0; i < gv.Size(); i++)
-   {
-      const int nz = zones_per_vdof[i];
-      if (nz) { gv(i) /= nz; }
-   }
-
-   for (int i = 0; i < gw.Size(); i++)
-   {
-      const int nz = zones_per_vdof[i];
-      if (nz) { gw(i) /= nz; }
+     double *dataSub = uSub.HostReadWrite();
+     double *data = u.HostReadWrite();   
+     for (int i = 0; i < nSize; i++) {     
+       dataSub[i] = data[i + 1 * nSize];
+     }
    }   
-   
+   scalarGrad3D(uSub, gv);
+
+   {
+     double *dataSub = uSub.HostReadWrite();
+     double *data = u.HostReadWrite();   
+     for (int i = 0; i < nSize; i++) {     
+       dataSub[i] = data[i + 2 * nSize];
+     }
+   }   
+   scalarGrad3D(uSub, gw);
+
 }
 
 void LoMachSolver::scalarGrad3D(ParGridFunction &u, ParGridFunction &gu)  
