@@ -851,6 +851,9 @@ public:
    /// Compute \f$\nabla \times \nabla \times u\f$ for \f$u \in (H^1)^3\f$.
    void ComputeCurl3D(ParGridFunction &u, ParGridFunction &cu);
 
+   void vectorGrad3D(ParGridFunction &u, ParGridFunction &gu, ParGridFunction &gv, ParGridFunction &gw);
+   void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu);  
+
    /// Remove mean from a Vector.
    /**
     * Modify the Vector @a v by subtracting its mean using
