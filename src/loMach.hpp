@@ -441,8 +441,9 @@ protected:
    Vector Fext, FText, Lext, Uext, Ldiv;          
    Vector resu, tmpR1, tmpR1b, tmpR1c;
    Vector gradMu, gradU, gradV, gradW, gradT;
+   Vector gradX, gradY, gradZ;  
    Vector FBext;
-  Vector divU, Qt, dtRho;
+   Vector divU, Qt, dtRho;
    Vector gravity;
    Vector boussinesqField;
 
@@ -727,7 +728,17 @@ public:
    // nonlinear product functions
    void multScalarScalar(Vector A, Vector B, Vector* C);
    void multScalarVector(Vector A, Vector B, Vector* C);
-   void multVectorVector(Vector A, Vector B, Vector* C1, Vector* C2, Vector* C3);  
+   void multVectorVector(Vector A, Vector B, Vector* C1, Vector* C2, Vector* C3);
+   void multConstScalar(double A, Vector B, Vector* C);
+   void multConstVector(double A, Vector B, Vector* C);
+   void multScalarVectorInv(Vector A, Vector B, Vector* C);  
+   void multConstScalarInv(double A, Vector B, Vector* C);  
+   void multScalarScalarIP(Vector A, Vector* C);
+   void multScalarVectorIP(Vector A, Vector* C);
+   void multConstScalarIP(double A, Vector* C);
+   void multConstVectorIP(double A, Vector* C);
+   void multConstScalarInvIP(double A, Vector* C);
+   void dotVector(Vector A, Vector B, Vector* C);  
   
    /// Initialize forms, solvers and preconditioners.
    void Setup(double dt);
