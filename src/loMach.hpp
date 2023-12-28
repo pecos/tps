@@ -470,7 +470,7 @@ protected:
    // temperature additions
    Vector fTn, Tn, Tn_next, Tnm1, Tnm2, NTn, NTnm1, NTnm2;
    Vector Text, Text_bdr, t_bdr;
-   Vector resT, tmpR0, tmpR0b, tmpR0c;
+  Vector resT, tmpR0, tmpR0a, tmpR0b, tmpR0c;
    ParGridFunction Tn_gf, Tn_next_gf, Text_gf, resT_gf;
 
    // pressure mimic
@@ -492,7 +492,10 @@ protected:
    // swap spaces
    ParGridFunction R0PM0_gf;
    ParGridFunction R0PM1_gf;
-   ParGridFunction R1PM0_gf; 
+   ParGridFunction R1PM0_gf;
+   ParGridFunction R1PM0a_gf;
+   ParGridFunction R1PM0b_gf;
+   ParGridFunction R1PM0c_gf;   
    ParGridFunction R0PX2_gf;
    ParGridFunction R0PX2a_gf;  
    ParGridFunction R1PX2_gf;   
@@ -725,14 +728,15 @@ public:
     paraviewColl->Save();
   }
 
-   // nonlinear product functions
+   // nonlinear product functions and helpers
    void multScalarScalar(Vector A, Vector B, Vector* C);
    void multScalarVector(Vector A, Vector B, Vector* C);
    void multVectorVector(Vector A, Vector B, Vector* C1, Vector* C2, Vector* C3);
    void multConstScalar(double A, Vector B, Vector* C);
    void multConstVector(double A, Vector B, Vector* C);
-   void multScalarVectorInv(Vector A, Vector B, Vector* C);  
-   void multConstScalarInv(double A, Vector B, Vector* C);  
+   void multScalarInvVector(Vector A, Vector B, Vector* C);  
+   void multConstScalarInv(double A, Vector B, Vector* C);
+   void multScalarInvScalarIP(Vector A, Vector* C);  
    void multScalarScalarIP(Vector A, Vector* C);
    void multScalarVectorIP(Vector A, Vector* C);
    void multConstScalarIP(double A, Vector* C);
