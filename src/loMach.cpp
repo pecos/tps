@@ -723,10 +723,12 @@ void LoMachSolver::initialize() {
    
    resT.SetSize(sfes_truevsize);
    tmpR0.SetSize(sfes_truevsize);
+   tmpR0a.SetSize(sfes_truevsize);   
    tmpR0b.SetSize(sfes_truevsize);
    tmpR0c.SetSize(sfes_truevsize);
    resT = 0.0;
    tmpR0 = 0.0;
+   tmpR0a = 0.0;   
    tmpR0b = 0.0;
    tmpR0c = 0.0;
    
@@ -780,7 +782,14 @@ void LoMachSolver::initialize() {
    R0PX2_gf.SetSpace(nfesR0); // padded space
    R0PX2_gf = 0.0;
    R0PX2a_gf.SetSpace(nfesR0); // padded space
-   R0PX2a_gf = 0.0;   
+   R0PX2a_gf = 0.0;
+
+   R1PM0a_gf.SetSpace(vfes);
+   R1PM0a_gf = 0.0;
+   R1PM0b_gf.SetSpace(vfes);
+   R1PM0b_gf = 0.0;
+   R1PM0c_gf.SetSpace(vfes);
+   R1PM0c_gf = 0.0;      
 
    //meanUp_gf.SetSpace(fvfes);
    //meanUp_gf = 0.0;   
@@ -1121,16 +1130,16 @@ void LoMachSolver::Setup(double dt)
 
    int Vdof = vfes->GetNDofs(); //vfes->GetVSize();   
    int Pdof = pfes->GetNDofs(); //pfes->GetVSize();
-   int Tdof = sfes->GetNDofs(); //sfes->GetVSize();
+   int Sdof = sfes->GetNDofs(); //sfes->GetVSize();
    int Ndof = nfes->GetNDofs();   
 
    //int Vdof = vfes->GetTrueVSize();   
    //int Pdof = pfes->GetTrueVSize();
-   //int Tdof = sfes->GetTrueVSize();
+   //int Sdof = sfes->GetTrueVSize();
    
    int VdofInt = vfes->GetTrueVSize();   
    int PdofInt = pfes->GetTrueVSize();
-   int TdofInt = sfes->GetTrueVSize();
+   int SdofInt = sfes->GetTrueVSize();
    int NdofInt = nfes->GetTrueVSize();   
 
    //bufferPM0 = new ParGridFunction(sfes);
@@ -1305,7 +1314,7 @@ void LoMachSolver::Setup(double dt)
        {
          double *Tdata = buffer_tInlet->HostReadWrite();
          double *data = Tn_gf.HostReadWrite();   
-         for (int i = 0; i < Tdof; i++) {     
+         for (int i = 0; i < Sdof; i++) {     
            data[i] = Tdata[i];
          }
        }
@@ -1463,16 +1472,17 @@ void LoMachSolver::Setup(double dt)
    Array<int> empty;
 
    // unsteady: p+p = 2p
-   // convection: p+p+(p-1) = 3p-1 
+   // convection: p+p+p+(p-1) = 4p-1
+   // advection (project nl-products back to p): p+(p-1) = 2p-1
    // diffusion: (p-1)+(p-1) [+p] = 2p-2 [3p-2]
    
    // GLL integration rule (Numerical Integration)
    const IntegrationRule &ir_ni = gll_rules.Get(vfes->GetFE(0)->GetGeomType(), 2 * order);
-   //const IntegrationRule &ir_nli = gll_rules.Get(nfes->GetFE(0)->GetGeomType(), 3 * norder - 1);   
+   const IntegrationRule &ir_nli = gll_rules.Get(nfes->GetFE(0)->GetGeomType(), 3 * norder - 1);   
    const IntegrationRule &ir_pi = gll_rules.Get(pfes->GetFE(0)->GetGeomType(), 2 * porder);   
    const IntegrationRule &ir_i  = gll_rules.Get(sfes->GetFE(0)->GetGeomType(), 2 * order);
 
-   const IntegrationRule &ir_nli = gll_rules.Get(nfes->GetFE(0)->GetGeomType(), 4 * norder - 1);   
+   //const IntegrationRule &ir_nli = gll_rules.Get(nfes->GetFE(0)->GetGeomType(), 4 * norder - 1);   
    const IntegrationRule &ir_di  = gll_rules.Get(sfes->GetFE(0)->GetGeomType(), std::max( 3 * order - 2, 2));
    
    if (rank0_) std::cout << "Integration rules set" << endl;   
@@ -1491,7 +1501,7 @@ void LoMachSolver::Setup(double dt)
      double *data = bufferGravity->HostReadWrite();
      double *Tdata = Tn_gf.HostReadWrite();
      for (int eq = 0; eq < nvel; eq++) {     
-       for (int i = 0; i < Tdof; i++) {
+       for (int i = 0; i < Sdof; i++) {
   	 data[i] = ambientPressure / (Rgas * Tdata[i]) * gravity[eq];
        }       
      }
@@ -1553,7 +1563,7 @@ void LoMachSolver::Setup(double dt)
      //double *dataRho = rn_gf.HostReadWrite();   
      //double *Tdata = Tn.HostReadWrite();
      //for (int eq = 0; eq < pmesh->Dimension(); eq++) {
-     for (int i = 0; i < Tdof; i++) {     
+     for (int i = 0; i < Sdof; i++) {     
        //dataRho[i] = ambientPressure / (Rgas * Tdata[i]);       
        //data[i] = (Rgas * Tdata[i]) / ambientPressure;
        data[i] = 1.0;
@@ -1664,7 +1674,7 @@ void LoMachSolver::Setup(double dt)
    bufferVisc = new ParGridFunction(sfes);
    {
      double *data = bufferVisc->HostReadWrite();
-     for (int i = 0; i < Tdof; i++) { data[i] = 0.0; }
+     for (int i = 0; i < Sdof; i++) { data[i] = 0.0; }
    }   
    {
      double *data = bufferVisc->HostReadWrite();
@@ -1675,7 +1685,7 @@ void LoMachSolver::Setup(double dt)
      double visc[2];  // TO version
      double prim[nvel+2];     
      for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
-     for (int i = 0; i < Tdof; i++) {
+     for (int i = 0; i < Sdof; i++) {
        prim[1+nvel] = Tdata[i];
        transportPtr->GetViscosities(prim, prim, visc);
        data[i] = visc[0];
@@ -1686,7 +1696,7 @@ void LoMachSolver::Setup(double dt)
    bufferSubgridVisc = new ParGridFunction(sfes);
    {
      double *data = bufferSubgridVisc->HostReadWrite();
-     for (int i = 0; i < Tdof; i++) {	 
+     for (int i = 0; i < Sdof; i++) {	 
        data[i] = 0.0;
      }
    }   
@@ -1914,7 +1924,7 @@ void LoMachSolver::Setup(double dt)
      double visc[2]; // TO version
      double prim[nvel+2];     
      for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
-     for (int i = 0; i < Tdof; i++) {
+     for (int i = 0; i < Sdof; i++) {
          prim[1+nvel] = Tdata[i];
          transportPtr->GetViscosities(prim, prim, visc);
          data[i] = visc[0] / Pr;
@@ -2013,7 +2023,7 @@ void LoMachSolver::Setup(double dt)
 
    if (config.resetTemp == true) {
      double *data = Tn_gf.HostReadWrite();     
-     for (int i = 0; i < Tdof; i++) {
+     for (int i = 0; i < Sdof; i++) {
        data[i] = config.initRhoRhoVp[4];
      }
      if (rank0_) std::cout << "Reset temperature to IC" << endl;        
@@ -2025,7 +2035,7 @@ void LoMachSolver::Setup(double dt)
    {
      double *data = Tn_next.HostReadWrite();
      double *Tdata = Tn.HostReadWrite();   
-     for (int i = 0; i < TdofInt; i++) { data[i] = Tdata[i]; }
+     for (int i = 0; i < SdofInt; i++) { data[i] = Tdata[i]; }
    }      
    Tn_next_gf.SetFromTrueDofs(Tn_next);
    //std::cout << "Check 28..." << std::endl;     
@@ -2301,8 +2311,8 @@ void LoMachSolver::solve()
    */
 
 
-   int TdofInt = sfes->GetTrueVSize();
-   int Tdof = sfes->GetNDofs();   
+   int SdofInt = sfes->GetTrueVSize();
+   int Sdof = sfes->GetNDofs();   
       
    // dt_fixed is initialized to -1, so if it is positive, then the
    // user requested a fixed dt run
@@ -2342,7 +2352,7 @@ void LoMachSolver::solve()
    {
      double *visc = bufferVisc->HostReadWrite();
      double *data = viscTotal_gf.HostReadWrite();
-     for (int i = 0; i < Tdof; i++) {
+     for (int i = 0; i < Sdof; i++) {
        data[i] = visc[i];
        //std::cout << pmesh->GetMyRank() << ")" << " ViscTotal: " << visc[i] << endl; 
      }
@@ -2350,7 +2360,7 @@ void LoMachSolver::solve()
    {
      double *res = bufferGridScale->HostReadWrite();     
      double *data = resolution_gf.HostReadWrite();
-     for (int i = 0; i < Tdof; i++) {
+     for (int i = 0; i < Sdof; i++) {
        data[i] = res[i];
      }
    }
@@ -2385,11 +2395,11 @@ void LoMachSolver::solve()
      double myMass = 0.0;
      double *Tdata = Tn.HostReadWrite();
      double *Rdata = rn.HostReadWrite();          
-     for (int i = 0; i < TdofInt; i++) {
+     for (int i = 0; i < SdofInt; i++) {
        Rdata[i] = thermoPressure / (Rgas * Tdata[i]);
      }
      Mt->Mult(rn,tmpR0);
-     for (int i = 0; i < TdofInt; i++) {
+     for (int i = 0; i < SdofInt; i++) {
        myMass += tmpR0[i];
      }     
      MPI_Allreduce(&myMass, &systemMass, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
@@ -2468,7 +2478,7 @@ void LoMachSolver::solve()
       {
         double *visc = bufferVisc->HostReadWrite();
         double *data = viscTotal_gf.HostReadWrite();
-        for (int i = 0; i < Tdof; i++) {
+        for (int i = 0; i < Sdof; i++) {
           data[i] = visc[i];
           //std::cout << pmesh->GetMyRank() << ")" << " ViscTotal: " << visc[i] << " " << data[i] << endl; 	  
         }
@@ -2477,7 +2487,7 @@ void LoMachSolver::solve()
       /*
       {
         double *data = viscTotal_gf.HostReadWrite();
-        for (int i = 0; i < Tdof; i++) {
+        for (int i = 0; i < Sdof; i++) {
           std::cout << pmesh->GetMyRank() << ")" << " ViscTotal: " << data[i] << endl; 	  
         }
       }
@@ -2553,17 +2563,17 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
 
    int Vdof = vfes->GetNDofs(); //vfes->GetVSize();   
    int Pdof = pfes->GetNDofs(); //pfes->GetVSize();
-   int Tdof = sfes->GetNDofs(); //sfes->GetVSize();
+   int Sdof = sfes->GetNDofs(); //sfes->GetVSize();
    int Ndof = nfes->GetNDofs();
    int NdofR0 = nfesR0->GetNDofs();      
 
    //int Vdof = vfes->GetTrueVSize();   
    //int Pdof = pfes->GetTrueVSize();
-   //int Tdof = sfes->GetTrueVSize();
+   //int Sdof = sfes->GetTrueVSize();
    
    int VdofInt = vfes->GetTrueVSize();   
    int PdofInt = pfes->GetTrueVSize();
-   int TdofInt = sfes->GetTrueVSize();
+   int SdofInt = sfes->GetTrueVSize();
    int NdofInt = nfes->GetTrueVSize();
    int NdofR0Int = nfesR0->GetTrueVSize();   
    
@@ -2581,12 +2591,12 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      double wt = std::pow(std::min((double)current_step/(double)nRamp, 1.0),1.0);
      //double wt = 0.5 * (tanh((time-tRamp)/tRamp) + 1.0);
      //if(rank0_) {std::cout << "Inlet ramp weight: " << wt << " using ramp steps " << nRamp << endl;}
-     for (int i = 0; i < Tdof; i++) {
+     for (int i = 0; i < Sdof; i++) {
        for (int eq = 0; eq < nvel; eq++) {
-         du[i + eq * Tdof] = wt * duInf[i + eq * Tdof] + (1.0-wt) * config.initRhoRhoVp[eq+1] / config.initRhoRhoVp[0];
+         du[i + eq * Sdof] = wt * duInf[i + eq * Sdof] + (1.0-wt) * config.initRhoRhoVp[eq+1] / config.initRhoRhoVp[0];
        }
      }
-     for (int i = 0; i < Tdof; i++) {
+     for (int i = 0; i < Sdof; i++) {
        dT[i] = wt * dTInf[i] + (1.0-wt) * config.initRhoRhoVp[nvel+1];
      }     
    }
@@ -2625,21 +2635,24 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    if (constantDensity != true) {
      double *data = rn.HostWrite();        
      double *Tdata = Text.HostReadWrite();
-     for (int i = 0; i < TdofInt; i++) {
+     for (int i = 0; i < SdofInt; i++) {
        data[i] = thermoPressure / (Rgas * Tdata[i]);
      }
    }
    else {
      double *data = rn.HostWrite();        
-     for (int i = 0; i < TdofInt; i++) {
+     for (int i = 0; i < SdofInt; i++) {
        data[i] = static_rho;
      }     
    }
    rn_gf.SetFromTrueDofs(rn);
 
    // gradient of extrapolated temperature
-   G->Mult(Text, tmpR1);
-   MvInv->Mult(tmpR1, gradT);
+   //G->Mult(Text, tmpR1);
+   //MvInv->Mult(tmpR1, gradT);
+   Tn_next_gf.SetFromTrueDofs(Text);   
+   scalarGrad3D(Tn_next_gf, R1PM0_gf);
+   R1PM0_gf.GetTrueDofs(gradT);
 
    // testing...
    /*
@@ -2651,9 +2664,9 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      double *data2 = gradU.HostReadWrite();
      double tol = 1.0e-12;
      for (int eq = 0; eq < dim; eq++) {    
-       for (int i = 0; i < TdofInt; i++) {
-         if (data1[i + eq*TdofInt] >= data2[i + eq*TdofInt]+tol || data1[i + eq*TdofInt] <= data2[i + eq*TdofInt]-tol) {
-           std::cout << "PROBLEM WITH scalarGrad3D!!! " << data1[i + eq*TdofInt] << " vs " << data2[i + eq*TdofInt] << " " << i << " " << eq << endl;	 
+       for (int i = 0; i < SdofInt; i++) {
+         if (data1[i + eq*SdofInt] >= data2[i + eq*SdofInt]+tol || data1[i + eq*SdofInt] <= data2[i + eq*SdofInt]-tol) {
+           std::cout << "PROBLEM WITH scalarGrad3D!!! " << data1[i + eq*SdofInt] << " vs " << data2[i + eq*SdofInt] << " " << i << " " << eq << endl;	 
          }
        }
      }
@@ -2661,13 +2674,19 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    */
    
    // gradient of velocity => TODO: replace with new local grad functions
+   vectorGrad3D(un_gf, R1PM0a_gf, R1PM0b_gf, R1PM0c_gf);
+   R1PM0a_gf.GetTrueDofs(gradU);
+   R1PM0b_gf.GetTrueDofs(gradV);
+   R1PM0c_gf.GetTrueDofs(gradW);
+
+   /*
    {
      int eq = 0;
      //double *dataU = Uext.HostReadWrite();
      double *dataU = un.HostReadWrite();     
      double *data = tmpR0.HostReadWrite();              
-     for (int i = 0; i < TdofInt; i++) {
-       data[i] = dataU[i + eq*TdofInt];
+     for (int i = 0; i < SdofInt; i++) {
+       data[i] = dataU[i + eq*SdofInt];
      }
    }     
    G->Mult(tmpR0, tmpR1);
@@ -2677,8 +2696,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      //double *dataU = Uext.HostReadWrite();
      double *dataU = un.HostReadWrite();     
      double *data = tmpR0.HostReadWrite();              
-     for (int i = 0; i < TdofInt; i++) {
-       data[i] = dataU[i + eq*TdofInt];
+     for (int i = 0; i < SdofInt; i++) {
+       data[i] = dataU[i + eq*SdofInt];
      }
    }     
    G->Mult(tmpR0, tmpR1);
@@ -2688,12 +2707,13 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      //double *dataU = Uext.HostReadWrite();
      double *dataU = un.HostReadWrite();          
      double *data = tmpR0.HostReadWrite();              
-     for (int i = 0; i < TdofInt; i++) {
-       data[i] = dataU[i + eq*TdofInt];
+     for (int i = 0; i < SdofInt; i++) {
+       data[i] = dataU[i + eq*SdofInt];
      }
    }     
    G->Mult(tmpR0, tmpR1);
-   MvInv->Mult(tmpR1, gradW);     
+   MvInv->Mult(tmpR1, gradW);
+   */
 
    // shifted storage for efficient access later
    {
@@ -2701,14 +2721,14 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      double *dataU = gradU.HostReadWrite();
      double *dataV = gradV.HostReadWrite();
      double *dataW = gradW.HostReadWrite();     
-     for (int i = 0; i < TdofInt; i++) {
-       dataX[i + 0*TdofInt] = dataU[i + 0*TdofInt];
+     for (int i = 0; i < SdofInt; i++) {
+       dataX[i + 0*SdofInt] = dataU[i + 0*SdofInt];
      }
-     for (int i = 0; i < TdofInt; i++) {
-       dataX[i + 1*TdofInt] = dataV[i + 0*TdofInt];
+     for (int i = 0; i < SdofInt; i++) {
+       dataX[i + 1*SdofInt] = dataV[i + 0*SdofInt];
      }
-     for (int i = 0; i < TdofInt; i++) {
-       dataX[i + 2*TdofInt] = dataW[i + 0*TdofInt];
+     for (int i = 0; i < SdofInt; i++) {
+       dataX[i + 2*SdofInt] = dataW[i + 0*SdofInt];
      }          
    }
    {
@@ -2716,14 +2736,14 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      double *dataU = gradU.HostReadWrite();
      double *dataV = gradV.HostReadWrite();
      double *dataW = gradW.HostReadWrite();     
-     for (int i = 0; i < TdofInt; i++) {
-       dataY[i + 0*TdofInt] = dataU[i + 1*TdofInt];
+     for (int i = 0; i < SdofInt; i++) {
+       dataY[i + 0*SdofInt] = dataU[i + 1*SdofInt];
      }
-     for (int i = 0; i < TdofInt; i++) {
-       dataY[i + 1*TdofInt] = dataV[i + 1*TdofInt];
+     for (int i = 0; i < SdofInt; i++) {
+       dataY[i + 1*SdofInt] = dataV[i + 1*SdofInt];
      }
-     for (int i = 0; i < TdofInt; i++) {
-       dataY[i + 2*TdofInt] = dataW[i + 1*TdofInt];
+     for (int i = 0; i < SdofInt; i++) {
+       dataY[i + 2*SdofInt] = dataW[i + 1*SdofInt];
      }          
    }
    {
@@ -2731,14 +2751,14 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      double *dataU = gradU.HostReadWrite();
      double *dataV = gradV.HostReadWrite();
      double *dataW = gradW.HostReadWrite();     
-     for (int i = 0; i < TdofInt; i++) {
-       dataZ[i + 0*TdofInt] = dataU[i + 2*TdofInt];
+     for (int i = 0; i < SdofInt; i++) {
+       dataZ[i + 0*SdofInt] = dataU[i + 2*SdofInt];
      }
-     for (int i = 0; i < TdofInt; i++) {
-       dataZ[i + 1*TdofInt] = dataV[i + 2*TdofInt];
+     for (int i = 0; i < SdofInt; i++) {
+       dataZ[i + 1*SdofInt] = dataV[i + 2*SdofInt];
      }
-     for (int i = 0; i < TdofInt; i++) {
-       dataZ[i + 2*TdofInt] = dataW[i + 2*TdofInt];
+     for (int i = 0; i < SdofInt; i++) {
+       dataZ[i + 2*SdofInt] = dataW[i + 2*SdofInt];
      }          
    }
    
@@ -2748,24 +2768,24 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      int eq = 0;
      double *dataGradU = gradU.HostReadWrite();      
      double *data = divU.HostReadWrite();
-     for (int i = 0; i < TdofInt; i++) {
-       data[i] = dataGradU[i + eq*TdofInt];
+     for (int i = 0; i < SdofInt; i++) {
+       data[i] = dataGradU[i + eq*SdofInt];
      }
    }
    {
      int eq = 1;
      double *dataGradU = gradV.HostReadWrite();      
      double *data = divU.HostReadWrite();
-     for (int i = 0; i < TdofInt; i++) {
-       data[i] += dataGradU[i + eq*TdofInt];
+     for (int i = 0; i < SdofInt; i++) {
+       data[i] += dataGradU[i + eq*SdofInt];
      }
    }
    {
      int eq = 2;
      double *dataGradU = gradW.HostReadWrite();      
      double *data = divU.HostReadWrite();
-     for (int i = 0; i < TdofInt; i++) {
-       data[i] += dataGradU[i + eq*TdofInt];
+     for (int i = 0; i < SdofInt; i++) {
+       data[i] += dataGradU[i + eq*SdofInt];
      }
    }
 
@@ -2781,26 +2801,26 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      double *delta = gridScaleSml.HostReadWrite();
      double *data = subgridViscSml.HostReadWrite();             
      if (config.sgsModelType == 1) {
-       for (int i = 0; i < TdofInt; i++) {     
+       for (int i = 0; i < SdofInt; i++) {     
          //double deltaP = delta[i] / ((double)order);  incl. in delta now
          double nu_sgs = 0.;
 	 DenseMatrix gradUp;
 	 gradUp.SetSize(nvel, dim);
-	 for (int dir = 0; dir < dim; dir++) { gradUp(0,dir) = dGradU[i + dir * TdofInt]; }
-	 for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[i + dir * TdofInt]; }
-	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * TdofInt]; }
+	 for (int dir = 0; dir < dim; dir++) { gradUp(0,dir) = dGradU[i + dir * SdofInt]; }
+	 for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[i + dir * SdofInt]; }
+	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * SdofInt]; }
          sgsSmag(gradUp, delta[i], nu_sgs);
          data[i] = nu_sgs;
        }
      } else if (config.sgsModelType == 2) {
-       for (int i = 0; i < TdofInt; i++) {     
+       for (int i = 0; i < SdofInt; i++) {     
          //double deltaP = delta[i] / ((double)order);
          double nu_sgs = 0.;
 	 DenseMatrix gradUp;
 	 gradUp.SetSize(nvel, dim);
-	 for (int dir = 0; dir < dim; dir++) { gradUp(0,dir) = dGradU[i + dir * TdofInt]; }
-	 for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[i + dir * TdofInt]; }
-	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * TdofInt]; }
+	 for (int dir = 0; dir < dim; dir++) { gradUp(0,dir) = dGradU[i + dir * SdofInt]; }
+	 for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[i + dir * SdofInt]; }
+	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * SdofInt]; }
          sgsSigma(gradUp, delta[i], nu_sgs);
 	 data[i] = nu_sgs;
        }       
@@ -2828,8 +2848,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
          int eq = 0;
          double *dataUf = un_filtered.HostReadWrite(); 
          double *data = tmpR0.HostReadWrite();              
-         for (int i = 0; i < TdofInt; i++) {
-           data[i] = dataUf[i + eq*TdofInt];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i] = dataUf[i + eq*SdofInt];
          }
        }     
        G->Mult(tmpR0, tmpR1);
@@ -2838,8 +2858,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
          int eq = 1;
          double *dataUf = un_filtered.HostReadWrite();     
          double *data = tmpR0.HostReadWrite();              
-         for (int i = 0; i < TdofInt; i++) {
-           data[i] = dataUf[i + eq*TdofInt];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i] = dataUf[i + eq*SdofInt];
          }
        }     
        G->Mult(tmpR0, tmpR1);
@@ -2848,8 +2868,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
          int eq = 2;
          double *dataUf = un_filtered.HostReadWrite();          
          double *data = tmpR0.HostReadWrite();              
-         for (int i = 0; i < TdofInt; i++) {
-           data[i] = dataUf[i + eq*TdofInt];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i] = dataUf[i + eq*SdofInt];
          }
        }     
        G->Mult(tmpR0, tmpR1);
@@ -2861,12 +2881,12 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
        DenseMatrix gradUf;     
        gradUp.SetSize(nvel, dim);
        gradUf.SetSize(nvel, dim);     
-       for (int dir = 0; dir < dim; dir++) { gradUp(0,dir) = dGradU[i + dir * TdofInt]; }
-       for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[i + dir * TdofInt]; }
-       for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * TdofInt]; }
-       for (int dir = 0; dir < dim; dir++) { gradUf(0,dir) = dGradUf[i + dir * TdofInt]; }
-       for (int dir = 0; dir < dim; dir++) { gradUf(1,dir) = dGradVf[i + dir * TdofInt]; }
-       for (int dir = 0; dir < dim; dir++) { gradUf(2,dir) = dGradWf[i + dir * TdofInt]; }     
+       for (int dir = 0; dir < dim; dir++) { gradUp(0,dir) = dGradU[i + dir * SdofInt]; }
+       for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[i + dir * SdofInt]; }
+       for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * SdofInt]; }
+       for (int dir = 0; dir < dim; dir++) { gradUf(0,dir) = dGradUf[i + dir * SdofInt]; }
+       for (int dir = 0; dir < dim; dir++) { gradUf(1,dir) = dGradVf[i + dir * SdofInt]; }
+       for (int dir = 0; dir < dim; dir++) { gradUf(2,dir) = dGradWf[i + dir * SdofInt]; }     
        sgsDynamic(gradUp, gradUf, delta[i], Cdyn[i], nu_sgs);
        data[i] = nu_sgs;
    
@@ -2884,41 +2904,51 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      double *Rdata = rn_gf.HostReadWrite();     
      double visc[2];
      double prim[nvel+2];
+     
      for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
-     for (int i = 0; i < Tdof; i++) {
+     for (int i = 0; i < Sdof; i++) {
        prim[1+nvel] = Tdata[i];
        transportPtr->GetViscosities(prim, prim, visc); // returns dynamic
        dataVisc[i] = visc[0] * (Rgas * Tdata[i]) / thermoPressure; // this give kinematic...
        //dataVisc[i] = visc[0] / Rdata[i];       
      }
+
+     //goto kinematic
+     /* need to add gf versions
+     multScalarInvScalarIP(Tdata,&visc);
+     multConstScalarIP((Rgas/thermoPressure),&visc);
+     */
+     
    } else {
      double *dataVisc = bufferVisc->HostReadWrite();        
-     for (int i = 0; i < Tdof; i++) {
+     for (int i = 0; i < Sdof; i++) {
        dataVisc[i] = kin_vis;
      }
    }
    if (config.sgsModelType > 0) {
      double *dataSubgrid = bufferSubgridVisc->HostReadWrite();
      double *dataVisc = bufferVisc->HostReadWrite();
-     for (int i = 0; i < Tdof; i++) { dataVisc[i] += dataSubgrid[i]; }     
+     for (int i = 0; i < Sdof; i++) { dataVisc[i] += dataSubgrid[i]; }     
    }   
    if (config.linViscData.isEnabled) {
      double *viscMult = bufferViscMult->HostReadWrite();
      double *dataVisc = bufferVisc->HostReadWrite();
-     for (int i = 0; i < Tdof; i++) { dataVisc[i] *= viscMult[i]; }
+     for (int i = 0; i < Sdof; i++) { dataVisc[i] *= viscMult[i]; }
    }
    
    // interior-sized visc needed for p-p rhs
    bufferVisc->GetTrueDofs(viscSml);
 
-   // thermal diffusity 
+   // thermal diffusity
    {
      double *data = bufferAlpha->HostReadWrite();
-     double *dataVisc = bufferVisc->HostReadWrite();     
-     for (int i = 0; i < Tdof; i++) {
-	 data[i] = dataVisc[i] / Pr;
+     double *dataVisc = bufferVisc->HostReadWrite();
+     double tmp = 1.0/Pr;
+     for (int i = 0; i < Sdof; i++) {
+	 data[i] = dataVisc[i] * tmp;
      }
-   }   
+   }
+   //add gf versions... multConstScalarIP((1.0/Pr),&bufferAlpha);
    
    // Set current time for velocity Dirichlet boundary conditions.
    for (auto &vel_dbc : vel_dbcs) {vel_dbc.coeff->SetTime(time + dt);}
@@ -2963,172 +2993,24 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    Mt->Mult(tmpR0b, tmpR0);
    resT.Set(-1.0, tmpR0); // move to rhs
 
+   /*
    // advection
-   /*
-   Tn_gf.SetFromTrueDofs(Tn);         
-   R0PX2_gf.ProjectGridFunction(Tn_gf);
-   R0PX2_gf.GetTrueDofs(TBn);
-   //std::cout << "Check 1..." << std::endl;      
-
-   Tnm1_gf.SetFromTrueDofs(Tnm1);      
-   R0PX2_gf.ProjectGridFunction(Tnm1_gf);
-   R0PX2_gf.GetTrueDofs(TBnm1);
-   //std::cout << "Check 2..." << std::endl;         
-
-   Tnm2_gf.SetFromTrueDofs(Tnm2);         
-   R0PX2_gf.ProjectGridFunction(Tnm2_gf);
-   R0PX2_gf.GetTrueDofs(TBnm2);
-   */
-   //std::cout << "Check 3..." << std::endl;
-
-
-   // HERE HERE HERE => redo this to just be u*d(T) and remove divu part later...
-   /*
-   {
-     double *dataGradT = gradT.HostReadWrite(); 
-     double *Udata = Uext.HostReadWrite();     
-     double *data = tmpR0.HostReadWrite();
-     for (int i = 0; i < TdofInt; i++) {
-       data[i] = 0.0;
-     }       
-     for (int eq = 0; eq < dim; eq++) {       
-       for (int i = 0; i < TdofInt; i++) {
-         data[i] += Udata[i + eq*TdofInt] * dataGradT[i + eq*TdofInt];
-       }
-     }
-   }
-
-     if (loMach_opts_.thermalDiv == true) {
-
-       double *dataDiv = Qt.HostReadWrite();
-       double *dataT = Tn.HostReadWrite();             
-       double *data = tmpR0.HostReadWrite();
-       for (int i = 0; i < TdofInt; i++) {
-         data[i] += dataDiv[i] * dataT[i];
-       }
-
-     } else if (loMach_opts_.realDiv == true) {
-
-       double *dataDiv = divU.HostReadWrite();
-       double *dataT = Tn.HostReadWrite();             
-       double *data = tmpR0.HostReadWrite();
-       for (int i = 0; i < TdofInt; i++) {
-         data[i] += dataDiv[i] * dataT[i];
-       }
-       
-     }
-
-   Mt->Mult(tmpR0, tmpR0b);     
-   resT.Add(-1.0, tmpR0b);
-   */
-        
-
-   // T and u in padded space
-   /*
-   Tn_gf.SetFromTrueDofs(Text);         
-   R0PX2_gf.ProjectGridFunction(Tn_gf);
-   R0PX2_gf.GetTrueDofs(TBn);   
-   un_gf.SetFromTrueDofs(Uext);
-   R1PX2_gf.ProjectGridFunction(un_gf);
-   R1PX2_gf.GetTrueDofs(uBn);
-
-   {
-     double *Udata = uBn.HostReadWrite();
-     double *Tdata = TBn.HostReadWrite(); 
-     double *data = FBext.HostReadWrite();     
-     for (int eq = 0; eq < dim; eq++) {
-       for (int i = 0; i < TBn.Size();  i++) {
-         data[i + eq * TdofInt] = Udata[i + eq * TdofInt] * Tdata[i];
-       }       
-     }
-   }
-
-   // project back to p-space
-   R1PX2_gf.SetFromTrueDofs(FBext);
-   R1PM0_gf.ProjectGridFunction(R1PX2_gf);
-   R1PM0_gf.GetTrueDofs(Fext);   
-   
-   */
-
-   /*
-   {
-     double *Udata = Uext.HostReadWrite();
-     double *Tdata = Text.HostReadWrite(); 
-     double *data = Fext.HostReadWrite();     
-     for (int eq = 0; eq < dim; eq++) {
-       for (int i = 0; i < TdofInt;  i++) {
-         data[i + eq * TdofInt] = Udata[i + eq * TdofInt] * Tdata[i];
-       }       
-     }
-   }
-   */
-   multScalarVector(Text, Uext, &Fext);   
-
-   /*
-   // testing
-   multScalarVector(Text, Uext, &Fext);
-   {
-     double *Udata = Uext.HostReadWrite();
-     double *Tdata = Text.HostReadWrite(); 
-     double *data = Fext.HostReadWrite();     
-     for (int eq = 0; eq < dim; eq++) {
-       for (int i = 0; i < TdofInt;  i++) {
-         if (data[i + eq * TdofInt] != Udata[i + eq * TdofInt] * Tdata[i]) {
-	   std::cout << "PROBLEM WITH multScalarVector!!!" << endl;
-	 }
-       }       
-     }
-     }
-   */
-     
+   multScalarVector(Text, Uext, &Fext);        
    Dt->Mult(Fext, tmpR0); // explicit div(uT) at extrapolated {n+1}
    
    // div(uT) should already be in integrated weak form and can be added directly
    resT.Add(-1.0, tmpR0); // minus to move to rhs
-   
-   // subtract T*divU from lhs to prevent divu source
-   /*
-   R0PM0_gf.SetFromTrueDofs(divU);
-   R0PX2_gf.ProjectGridFunction(R0PM0_gf);
-   R0PX2_gf.GetTrueDofs(TBnm1); // just a container for padded divU
-   */
-   /*
-   {
-     double *data = tmpR0b.HostReadWrite();
-     double *dataDivU = divU.HostReadWrite();     
-     double *Tdata = Text.HostReadWrite();     
-     MFEM_FORALL(i, Text.Size(),	 
-     {
-       data[i] = Tdata[i] * dataDivU[i];
-       //data[i] *= Tdata[i];
-     });
-   }
-   */
-   multScalarScalar(Text, divU, &tmpR0b);
-
-   /*
-   //testing...
-   {
-     double *data = tmpR0b.HostReadWrite();
-     double *dataDivU = divU.HostReadWrite();     
-     double *Tdata = Text.HostReadWrite();     
-     MFEM_FORALL(i, Text.Size(),	 
-     {
-       if(data[i] != Tdata[i] * dataDivU[i]) {std::cout << "PROBLEM WITH multScalarScalar!!!" << endl;}
-     });
-   }
-   */
-   
-   /*
-   R0PX2_gf.SetFromTrueDofs(TBnm1);
-   R0PM0_gf.ProjectGridFunction(R0PX2_gf);
-   R0PM0_gf.GetTrueDofs(tmpR0b);
-   */
-   
+   multScalarScalar(Text, divU, &tmpR0b);   
    Mt->Mult(tmpR0b, tmpR0);   
    resT.Add(+1.0, tmpR0); // minus on lhs and minus to move to rhs
-   /**/
+   */
 
+   // simpler way
+   dotVector(Uext,gradT,&tmpR0b);
+   Mt->Mult(tmpR0b, tmpR0);   
+   resT.Add(-1.0, tmpR0);
+
+   
    // reset projection gfs, probably not necessary
    //Tn_gf.SetFromTrueDofs(Tn);
    //un_gf.SetFromTrueDofs(un);   
@@ -3193,14 +3075,12 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      /*
      double *data = rn.HostWrite();        
      double *Tdata = Tn_next.HostReadWrite();
-     for (int i = 0; i < TdofInt; i++) {
+     for (int i = 0; i < SdofInt; i++) {
        data[i] = thermoPressure / (Rgas * Tdata[i]);
        //std::cout << i << ": " << data[i] << " " << Tdata[i] << endl;       
      }
      */
-
-     double tmp = thermoPressure/Rgas;     
-     multConstScalarInv(tmp, Tn_next, &rn);     
+     multConstScalarInv((thermoPressure/Rgas), Tn_next, &rn);     
 
      /*
      //testing...
@@ -3210,7 +3090,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      if(rank0_) { std::cout << "back from multConstScalar" << endl; }     
      double *data = rn.HostWrite();        
      double *Tdata = Tn_next.HostReadWrite();
-     for (int i = 0; i < TdofInt; i++) {
+     for (int i = 0; i < SdofInt; i++) {
        double tol = 1.0e-12;
        if( data[i] >= thermoPressure / (Rgas * Tdata[i]) + tol || data[i] <= thermoPressure / (Rgas * Tdata[i]) - tol) {
 	 std::cout << "PROBLEM with multConstScalar!!!" << data[i] << " " << thermoPressure / (Rgas * Tdata[i]) << endl;
@@ -3221,7 +3101,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    }
    else {
      double *data = rn.HostWrite();        
-     for (int i = 0; i < TdofInt; i++) { data[i] = static_rho; }
+     for (int i = 0; i < SdofInt; i++) { data[i] = static_rho; }
    }
    rn_gf.SetFromTrueDofs(rn);
 
@@ -3257,8 +3137,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      double *data = tmpR1.HostReadWrite();
      //double *Rdata = rn.HostReadWrite();
      for (int eq = 0; eq < nvel; eq++) {     
-       for (int i = 0; i < TdofInt; i++) {
-	 data[i + eq*TdofInt] = gravity[eq];
+       for (int i = 0; i < SdofInt; i++) {
+	 data[i + eq*SdofInt] = gravity[eq];
        }       
      }
      Mv->Mult(tmpR1,boussinesqField);     
@@ -3269,7 +3149,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
 
      {
        double *data = Qt.HostReadWrite();
-       for (int i = 0; i < TdofInt; i++) { data[i] = 0.0; }
+       for (int i = 0; i < SdofInt; i++) { data[i] = 0.0; }
      }
      
      // laplace(T)
@@ -3293,7 +3173,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
        double *Ndata = viscSml.HostReadWrite();
        double *Rdata = rn.HostReadWrite();              
        double *data = Qt.HostReadWrite();     
-       for (int i = 0; i < TdofInt; i++) {
+       for (int i = 0; i < SdofInt; i++) {
          //data[i] *= Cp * Rdata[i] * Ndata[i] / (Pr*thermoPressure);
          data[i] *= TdivFactor * Rgas * Rdata[i] * Ndata[i] / (Pr*thermoPressure);	 
        }
@@ -3301,14 +3181,14 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      */
      multScalarScalar(rn,viscSml,&tmpR0);
      multScalarScalarIP(tmpR0,&Qt);
-     double tmp = TdivFactor * Rgas / (Pr*thermoPressure);
+     double tmp = TdivFactor * Rgas / (Pr * thermoPressure);
      multConstScalarIP(tmp,&Qt);
 
      
      // add closed-domain pressure term
      if (config.isOpen != true) {
        double *data = Qt.HostReadWrite();     
-       for (int i = 0; i < TdofInt; i++) {
+       for (int i = 0; i < SdofInt; i++) {
          data[i] += TdivFactor * ((gamma - 1.0)/gamma - Cp) * 1.0 / (Cp*thermoPressure) * dtP;
        }       
      }     
@@ -3316,7 +3196,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      if (loMach_opts_.realDiv == true) {
        double *data = Qt.HostReadWrite();
        double *dataDiv = divU.HostReadWrite();            
-       for (int i = 0; i < TdofInt; i++) {
+       for (int i = 0; i < SdofInt; i++) {
          data[i] = dataDiv[i];
        }       
      }
@@ -3327,7 +3207,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
        double *data_divU = divU.HostReadWrite();       
        double *data = Qt.HostReadWrite();
        double Qsign;
-       for (int i = 0; i < TdofInt; i++) {
+       for (int i = 0; i < SdofInt; i++) {
 	 Qsign = data[i] / std::abs(data[i]);
          data[i] = std::min(std::abs(data[i]),std::abs(data_divU[i]));
 	 data[i] *= Qsign; 
@@ -3364,6 +3244,10 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    N->Mult(unm2, Nunm2);
    */   
 
+   // TODO: compute as Div with de-aliased nl-product and only p*(p-1) int order
+   // have gradU already, dotVector(u,gradU,Nun(0)), dotVector(u,gradV,Nun(1)), dotVector(u,gradW,Nun(2))
+
+   /*
    un_gf.SetFromTrueDofs(Uext);         
    R1PX2_gf.ProjectGridFunction(un_gf);
    R1PX2_gf.GetTrueDofs(uBn);
@@ -3371,45 +3255,35 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    // nonlinear convection is in \int(u\cdot\nabla{}v,w) form, i.e. div-free
    N->Mult(uBn, Nun);
 
-   /*
-   // ab-predictor of nonliner term at {n+1}
-   // comes out WITH A NEGATIVE
-   {
-      const auto d_Nun = Nun.Read();
-      const auto d_Nunm1 = Nunm1.Read();
-      const auto d_Nunm2 = Nunm2.Read();
-      auto d_Fext = FBext.Write();
-      //auto d_Fext = Fext.Write();      
-      const auto ab1_ = ab1;
-      const auto ab2_ = ab2;
-      const auto ab3_ = ab3;
-      //mfem::forall(FBext.Size(), [=] MFEM_HOST_DEVICE (int i)
-      //mfem::forall(Fext.Size(), [=] MFEM_HOST_DEVICE (int i)
-      //MFEM_FORALL(i, Fext.Size(),
-      MFEM_FORALL(i, FBext.Size(),
-      {
-	//d_Fext[i] = ab1_ * d_Nun[i]
-        //          + ab2_ * d_Nunm1[i]
-        //          + ab3_ * d_Nunm2[i];
-	
-	d_Fext[i] = d_Nun[i];
-
-      });
-   }
-   */
-
    // project NL product back to v-space
    //R1PX2_gf.SetFromTrueDofs(FBext);
    R1PX2_gf.SetFromTrueDofs(Nun);   
    R1PM0_gf.ProjectGridFunction(R1PX2_gf);  
    R1PM0_gf.GetTrueDofs(Fext);
+   */
+
+   // w/o N operator
+   dotVector(Uext,gradU,&tmpR0a);
+   dotVector(Uext,gradV,&tmpR0b);
+   dotVector(Uext,gradW,&tmpR0c);
+   {
+     double *dataA = tmpR0a.HostReadWrite();
+     double *dataB = tmpR0b.HostReadWrite();
+     double *dataC = tmpR0c.HostReadWrite();     
+     double *data = Fext.HostReadWrite();
+     for (int i = 0; i < SdofInt; i++) { data[i + 0*SdofInt] = dataA[i]; }
+     for (int i = 0; i < SdofInt; i++) { data[i + 1*SdofInt] = dataB[i]; }
+     for (int i = 0; i < SdofInt; i++) { data[i + 2*SdofInt] = dataC[i]; }     
+   }
+   Mv->Mult(Fext, tmpR1);
+   Fext.Set(-1.0,tmpR1); // minus from moving to rhs
    
    // add forcing/accel term to Fext   
    Fext.Add(1.0, fn);
    if ( config.isGravity ) { Fext.Add(1.0, boussinesqField); }
 
    // Fext = M^{-1} (F(u^{n}) + f^{n+1}) (F* w/o known part of BDF)
-   MvInv->Mult(Fext, tmpR1);
+   MvInv->Mult(Fext, tmpR1); // this inv is wasteful...
    iter_mvsolve = MvInv->GetNumIterations();
    res_mvsolve = MvInv->GetFinalNorm();
    Fext.Set(1.0, tmpR1);
@@ -3462,8 +3336,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      double *dataRho = rn.HostReadWrite();     
      double *data = Lext.HostReadWrite();     
      for (int eq = 0; eq < dim; eq++) {
-       for (int i = 0; i < TdofInt; i++) {
-         data[i + eq*TdofInt] *= dataVisc[i];	 
+       for (int i = 0; i < SdofInt; i++) {
+         data[i + eq*SdofInt] *= dataVisc[i];	 
        }
      }
      */
@@ -3474,8 +3348,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      /*
      double *data = Lext.HostReadWrite();     
      for (int eq = 0; eq < dim; eq++) {
-       for (int i = 0; i < TdofInt; i++) {
-         data[i + eq*TdofInt] *= kin_vis;	 
+       for (int i = 0; i < SdofInt; i++) {
+         data[i + eq*SdofInt] *= kin_vis;	 
        }
      }
      */
@@ -3502,16 +3376,16 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
        double *dV = gradV.HostReadWrite();
        double *dW = gradW.HostReadWrite();             
        double *data = Ldiv.HostReadWrite();
-       for (int i = 0; i < TdofInt; i++) {
-         data[i + eq*TdofInt] = dataGM[i + 0*TdofInt] * dU[i + eq*TdofInt]
-        	              + dataGM[i + 1*TdofInt] * dV[i + eq*TdofInt]
-	                      + dataGM[i + 2*TdofInt] * dW[i + eq*TdofInt];
+       for (int i = 0; i < SdofInt; i++) {
+         data[i + eq*SdofInt] = dataGM[i + 0*SdofInt] * dU[i + eq*SdofInt]
+        	              + dataGM[i + 1*SdofInt] * dV[i + eq*SdofInt]
+	                      + dataGM[i + 2*SdofInt] * dW[i + eq*SdofInt];
        }
        */
        dotVector(gradMu,gradX,&tmpR0);
        double *dataB = tmpR0.HostReadWrite();       
        double *data = Ldiv.HostReadWrite();
-       for (int i = 0; i < TdofInt; i++) { data[i + 0*TdofInt] = dataB[i]; }
+       for (int i = 0; i < SdofInt; i++) { data[i + 0*SdofInt] = dataB[i]; }
      }     
      {
        /*
@@ -3521,16 +3395,16 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
        double *dV = gradV.HostReadWrite();
        double *dW = gradW.HostReadWrite();             
        double *data = Ldiv.HostReadWrite();
-       for (int i = 0; i < TdofInt; i++) {
-         data[i + eq*TdofInt] = dataGM[i + 0*TdofInt] * dU[i + eq*TdofInt]
-        	              + dataGM[i + 1*TdofInt] * dV[i + eq*TdofInt]
-	                      + dataGM[i + 2*TdofInt] * dW[i + eq*TdofInt];
+       for (int i = 0; i < SdofInt; i++) {
+         data[i + eq*SdofInt] = dataGM[i + 0*SdofInt] * dU[i + eq*SdofInt]
+        	              + dataGM[i + 1*SdofInt] * dV[i + eq*SdofInt]
+	                      + dataGM[i + 2*SdofInt] * dW[i + eq*SdofInt];
        }
        */
        dotVector(gradMu,gradY,&tmpR0);
        double *dataB = tmpR0.HostReadWrite();       
        double *data = Ldiv.HostReadWrite();
-       for (int i = 0; i < TdofInt; i++) { data[i + 1*TdofInt] = dataB[i]; }
+       for (int i = 0; i < SdofInt; i++) { data[i + 1*SdofInt] = dataB[i]; }
      }
      {
        /*
@@ -3540,16 +3414,16 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
        double *dV = gradV.HostReadWrite();
        double *dW = gradW.HostReadWrite();             
        double *data = Ldiv.HostReadWrite();
-       for (int i = 0; i < TdofInt; i++) {
-         data[i + eq*TdofInt] = dataGM[i + 0*TdofInt] * dU[i + eq*TdofInt]
-        	              + dataGM[i + 1*TdofInt] * dV[i + eq*TdofInt]
-	                      + dataGM[i + 2*TdofInt] * dW[i + eq*TdofInt];
+       for (int i = 0; i < SdofInt; i++) {
+         data[i + eq*SdofInt] = dataGM[i + 0*SdofInt] * dU[i + eq*SdofInt]
+        	              + dataGM[i + 1*SdofInt] * dV[i + eq*SdofInt]
+	                      + dataGM[i + 2*SdofInt] * dW[i + eq*SdofInt];
        }
        */
        dotVector(gradMu,gradZ,&tmpR0);
        double *dataB = tmpR0.HostReadWrite();       
        double *data = Ldiv.HostReadWrite();
-       for (int i = 0; i < TdofInt; i++) { data[i + 2*TdofInt] = dataB[i]; }
+       for (int i = 0; i < SdofInt; i++) { data[i + 2*SdofInt] = dataB[i]; }
      }         
      {
        double *data = Ldiv.HostReadWrite();
@@ -3558,15 +3432,15 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
        double *dataGM = gradMu.HostReadWrite(); 
        double *divU = Qt.HostReadWrite();	 
        for (int eq = 0; eq < nvel; eq++) {       
-         for (int i = 0; i < TdofInt; i++) {
-           data[i + eq*TdofInt] -= twothird * dataGM[i + eq*TdofInt] * divU[i];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i + eq*SdofInt] -= twothird * dataGM[i + eq*SdofInt] * divU[i];
          }
        }
        */
        multScalarVector(Qt,gradMu,&tmpR1);
        for (int eq = 0; eq < nvel; eq++) {       
-         for (int i = 0; i < TdofInt; i++) {
-           data[i + eq*TdofInt] -= twothird * tmpR1[i + eq*TdofInt];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i + eq*SdofInt] -= twothird * tmpR1[i + eq*SdofInt];
          }
        }       
      }
@@ -3576,8 +3450,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
        double *data1 = Ldiv.HostReadWrite(); 
        double *data = tmpR1c.HostReadWrite();
        for (int eq = 0; eq < dim; eq++) {
-         for (int i = 0; i < TdofInt; i++) {
-           data[i + eq*TdofInt] = data1[i + eq*TdofInt];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i + eq*SdofInt] = data1[i + eq*SdofInt];
          }
        }
      }
@@ -3590,15 +3464,15 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
        double *dataGM = gradMu.HostReadWrite(); 
        double *dataGU = gradU.HostReadWrite();             
        for (int j = 0; j < dim; j++) {
-         for (int i = 0; i < TdofInt; i++) {
-           data[i + eq*TdofInt] += dataGM[i + j*TdofInt] * dataGU[i + j*TdofInt];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i + eq*SdofInt] += dataGM[i + j*SdofInt] * dataGU[i + j*SdofInt];
          }
        }
        */
        dotVector(gradMu,gradU,&tmpR0);
        double *dataB = tmpR0.HostReadWrite();       
        double *data = tmpR1c.HostReadWrite();
-       for (int i = 0; i < TdofInt; i++) { data[i + 0*TdofInt] += dataB[i]; }       
+       for (int i = 0; i < SdofInt; i++) { data[i + 0*SdofInt] += dataB[i]; }       
      }    
      {
        /*
@@ -3607,15 +3481,15 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
        double *dataGU = gradV.HostReadWrite();      
        double *data = tmpR1c.HostReadWrite();
        for (int j = 0; j < dim; j++) {
-         for (int i = 0; i < TdofInt; i++) {
-           data[i + eq*TdofInt] += dataGM[i + j*TdofInt] * dataGU[i + j*TdofInt];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i + eq*SdofInt] += dataGM[i + j*SdofInt] * dataGU[i + j*SdofInt];
          }
        }
        */
        dotVector(gradMu,gradV,&tmpR0);
        double *dataB = tmpR0.HostReadWrite();       
        double *data = tmpR1c.HostReadWrite();
-       for (int i = 0; i < TdofInt; i++) { data[i + 1*TdofInt] += dataB[i]; }              
+       for (int i = 0; i < SdofInt; i++) { data[i + 1*SdofInt] += dataB[i]; }              
      }
      {
        /*
@@ -3624,15 +3498,15 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
        double *dataGU = gradW.HostReadWrite();      
        double *data = tmpR1c.HostReadWrite();
        for (int j = 0; j < dim; j++) {
-         for (int i = 0; i < TdofInt; i++) {
-           data[i + eq*TdofInt] += dataGM[i + j*TdofInt] * dataGU[i + j*TdofInt];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i + eq*SdofInt] += dataGM[i + j*SdofInt] * dataGU[i + j*SdofInt];
          }
        }
        */
        dotVector(gradMu,gradW,&tmpR0);
        double *dataB = tmpR0.HostReadWrite();       
        double *data = tmpR1c.HostReadWrite();
-       for (int i = 0; i < TdofInt; i++) { data[i + 2*TdofInt] += dataB[i]; }       
+       for (int i = 0; i < SdofInt; i++) { data[i + 2*SdofInt] += dataB[i]; }       
      }
      
    }
@@ -3658,8 +3532,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
        double *dataVisc = viscSml.HostReadWrite();       
        double *data = Ldiv.HostReadWrite();
        for (int eq = 0; eq < dim; eq++) {
-         for (int i = 0; i < TdofInt; i++) {
-           data[i + eq*TdofInt] += factor * dataVisc[i] * dataQterm[i + eq*TdofInt];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i + eq*SdofInt] += factor * dataVisc[i] * dataQterm[i + eq*SdofInt];
          }
        }
        */
@@ -3667,8 +3541,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
        double *dataB = tmpR1.HostReadWrite();
        double *data = Ldiv.HostReadWrite();       
        for (int eq = 0; eq < dim; eq++) {
-         for (int i = 0; i < TdofInt; i++) {
-           data[i + eq*TdofInt] += factor * dataB[i + eq*TdofInt];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i + eq*SdofInt] += factor * dataB[i + eq*SdofInt];
          }
        }       
      }
@@ -3681,8 +3555,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
        double *dataVisc = viscSml.HostReadWrite();       
        double *data = tmpR1c.HostReadWrite();
        for (int eq = 0; eq < dim; eq++) {
-         for (int i = 0; i < TdofInt; i++) {
-           data[i + eq*TdofInt] += factor * dataVisc[i] * dataQterm[i + eq*TdofInt];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i + eq*SdofInt] += factor * dataVisc[i] * dataQterm[i + eq*SdofInt];
          }
        }
        */
@@ -3690,12 +3564,13 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
        double *dataB = tmpR1.HostReadWrite();
        double *data = tmpR1c.HostReadWrite();       
        for (int eq = 0; eq < dim; eq++) {
-         for (int i = 0; i < TdofInt; i++) {
-           data[i + eq*TdofInt] += factor * dataB[i + eq*TdofInt];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i + eq*SdofInt] += factor * dataB[i + eq*SdofInt];
          }
        }              
      }     
 
+     // TODO TODO TODO
      //TODO: DOUBLE CHECK THESE, seems redundant
      
      // 4/3 part of expanded del{u} form for rhs of p/p
@@ -3706,8 +3581,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
        double *dataVisc = viscSml.HostReadWrite();       
        double *data = tmpR1c.HostReadWrite();
        for (int eq = 0; eq < dim; eq++) {
-         for (int i = 0; i < TdofInt; i++) {
-           data[i + eq*TdofInt] += factor * dataVisc[i] * dataQterm[i + eq*TdofInt];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i + eq*SdofInt] += factor * dataVisc[i] * dataQterm[i + eq*SdofInt];
          }
        }
        */
@@ -3715,8 +3590,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
        double *dataB = tmpR1.HostReadWrite();       
        double *data = tmpR1c.HostReadWrite();
        for (int eq = 0; eq < dim; eq++) {
-         for (int i = 0; i < TdofInt; i++) {
-           data[i + eq*TdofInt] += factor * dataB[i + eq*TdofInt];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i + eq*SdofInt] += factor * dataB[i + eq*SdofInt];
          }
        }
        
@@ -3727,8 +3602,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
        double *dataDiv = tmpR1c.HostReadWrite();
        double *data = Lext.HostReadWrite();
        for (int eq = 0; eq < dim; eq++) {
-         for (int i = 0; i < TdofInt; i++) {
-           data[i + eq*TdofInt] -= dataDiv[i + eq*TdofInt];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i + eq*SdofInt] -= dataDiv[i + eq*SdofInt];
          }
        }
      }     
@@ -3744,7 +3619,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      /*
      double *data = FText.HostReadWrite();
      double *d_rn = rn.HostReadWrite();             
-     for (int i = 0; i < TdofInt; i++) {     
+     for (int i = 0; i < SdofInt; i++) {     
        data[i] *= d_rn[i];  
      }
      */
@@ -3752,7 +3627,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    } else {
      /*
      double *data = FText.HostReadWrite();
-     for (int i = 0; i < TdofInt; i++) {     
+     for (int i = 0; i < SdofInt; i++) {     
        data[i] *= static_rho;
      }
      */
@@ -3777,7 +3652,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      double *dataQ = Qt.HostReadWrite();     
      double *Rdata = rn.HostReadWrite();     
      double *data = tmpR0b.HostReadWrite();     
-     for (int i = 0; i < TdofInt; i++) {     
+     for (int i = 0; i < SdofInt; i++) {     
        data[i] = Rdata[i] * (bd0 / dt) * dataQ[i];       
      }
      */
@@ -3800,12 +3675,12 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      double *dataU = Uext.HostReadWrite();     
      double *dataF = Fext.HostReadWrite();
      double *data = tmpR0b.HostReadWrite();
-     for (int i = 0; i < TdofInt; i++) {     
+     for (int i = 0; i < SdofInt; i++) {     
        data[i] = 0.0;
      }
      for (int eq = 0; eq < dim; eq++) {
-       for (int i = 0; i < TdofInt; i++) {     
-         data[i] += dataGR[i + eq * TdofInt] * (dataF[i + eq * TdofInt] - (bd0/dt)*dataU[i + eq * TdofInt]);
+       for (int i = 0; i < SdofInt; i++) {     
+         data[i] += dataGR[i + eq * SdofInt] * (dataF[i + eq * SdofInt] - (bd0/dt)*dataU[i + eq * SdofInt]);
        }
      }
      */
@@ -3813,8 +3688,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      double *dataU = Uext.HostReadWrite();     
      double *dataF = Fext.HostReadWrite();     
      for (int eq = 0; eq < dim; eq++) {
-       for (int i = 0; i < TdofInt; i++) {     
-         data[i + eq * TdofInt] = dataF[i + eq * TdofInt] - (bd0/dt) * dataU[i + eq * TdofInt];
+       for (int i = 0; i < SdofInt; i++) {     
+         data[i + eq * SdofInt] = dataF[i + eq * SdofInt] - (bd0/dt) * dataU[i + eq * SdofInt];
        }
      }
      dotVector(tmpR1,tmpR1b,&tmpR0b);
@@ -3896,7 +3771,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
        data[i] *= 1.0 / d_rn[i];
      }
      */
-     multScalarVectorInv(rn,resu,&tmpR1);
+     multScalarInvVector(rn,resu,&tmpR1);
    } else {
      /*
      double *data = resu.HostReadWrite();     
@@ -3957,9 +3832,9 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
          double *data = R1PM0_gf.HostReadWrite();
          double *dataFrom = bufferMeanUp->HostReadWrite();
          for (int eq = 0; eq < dim; eq++) { 
-           for (int i = 0; i < Tdof; i++) {
-             data[i + eq * Tdof] = dataFrom[i + (eq+1) * Tdof]; // exclude rho
-             //if( dataFrom[i + eq * Tdof] != dataFrom[i + eq * Tdof] ) {std::cout << " NAN FAILED " << endl;}	   	   
+           for (int i = 0; i < Sdof; i++) {
+             data[i + eq * Sdof] = dataFrom[i + (eq+1) * Sdof]; // exclude rho
+             //if( dataFrom[i + eq * Sdof] != dataFrom[i + eq * Sdof] ) {std::cout << " NAN FAILED " << endl;}	   	   
            }
          }     
          R1PM0_gf.GetTrueDofs(tmpR1b);	 
@@ -3972,8 +3847,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
        {
          double *data = tmpR1b.HostReadWrite();       
          for (int eq = 0; eq < dim; eq++) {
-           for (int i = 0; i < TdofInt; i++) {
-             if( data[i + eq * TdofInt] != data[i + eq * TdofInt] ) {std::cout << " NAN CHECK 1 FAILED " << endl;}	   
+           for (int i = 0; i < SdofInt; i++) {
+             if( data[i + eq * SdofInt] != data[i + eq * SdofInt] ) {std::cout << " NAN CHECK 1 FAILED " << endl;}	   
            }
          }
        }
@@ -3984,8 +3859,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
          int eq = 0;
          double *dataU = tmpR1b.HostReadWrite();
          double *data = tmpR0.HostReadWrite();
-         for (int i = 0; i < TdofInt; i++) {
-           data[i] = dataU[i + eq*TdofInt];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i] = dataU[i + eq*SdofInt];
          }
        }     
        G->Mult(tmpR0, tmpR1);
@@ -3996,8 +3871,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
          int eq = 1;
          double *dataU = tmpR1b.HostReadWrite();       
          double *data = tmpR0.HostReadWrite();              
-         for (int i = 0; i < TdofInt; i++) {
-           data[i] = dataU[i + eq*TdofInt];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i] = dataU[i + eq*SdofInt];
          }
        }     
        G->Mult(tmpR0, tmpR1);
@@ -4006,8 +3881,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
          int eq = 2;
          double *dataU = tmpR1b.HostReadWrite();       
          double *data = tmpR0.HostReadWrite();              
-         for (int i = 0; i < TdofInt; i++) {
-           data[i] = dataU[i + eq*TdofInt];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i] = dataU[i + eq*SdofInt];
          }
        }     
        G->Mult(tmpR0, tmpR1);
@@ -4019,24 +3894,24 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
          int eq = 0;
          double *dataGradU = gradU.HostReadWrite();      
          double *data = divU.HostReadWrite();
-         for (int i = 0; i < TdofInt; i++) {
-           data[i] = dataGradU[i + eq*TdofInt];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i] = dataGradU[i + eq*SdofInt];
          }
        }
        {
          int eq = 1;
          double *dataGradU = gradV.HostReadWrite();      
          double *data = divU.HostReadWrite();
-         for (int i = 0; i < TdofInt; i++) {
-           data[i] += dataGradU[i + eq*TdofInt];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i] += dataGradU[i + eq*SdofInt];
          }
        }
        {
          int eq = 2;
          double *dataGradU = gradW.HostReadWrite();      
          double *data = divU.HostReadWrite();
-         for (int i = 0; i < TdofInt; i++) {
-           data[i] += dataGradU[i + eq*TdofInt];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i] += dataGradU[i + eq*SdofInt];
          }
        }
        //MPI_Barrier(MPI_COMM_WORLD);             
@@ -4054,44 +3929,44 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
          //if(rank0_) {std::cout << "...check 5a" << endl;}       
 
          double *tau1 = tmpR1.HostReadWrite();       
-         for (int i = 0; i < TdofInt; i++) {
-  	   tau1[i + 0 * TdofInt] = 2.0 * dataGradU[i + 0 * TdofInt] - twth * dataDiv[i];
-	   tau1[i + 1 * TdofInt] = dataGradU[i + 1 * TdofInt] + dataGradV[i + 0 * TdofInt];
-	   tau1[i + 2 * TdofInt] = dataGradU[i + 2 * TdofInt] + dataGradW[i + 0 * TdofInt];	 
+         for (int i = 0; i < SdofInt; i++) {
+  	   tau1[i + 0 * SdofInt] = 2.0 * dataGradU[i + 0 * SdofInt] - twth * dataDiv[i];
+	   tau1[i + 1 * SdofInt] = dataGradU[i + 1 * SdofInt] + dataGradV[i + 0 * SdofInt];
+	   tau1[i + 2 * SdofInt] = dataGradU[i + 2 * SdofInt] + dataGradW[i + 0 * SdofInt];	 
          }
          //MPI_Barrier(MPI_COMM_WORLD);               
          //if(rank0_) {std::cout << "...check 6" << endl;}
 
          double *tau2 = tmpR1b.HostReadWrite();       
-         for (int i = 0; i < TdofInt; i++) {
-  	   tau2[i + 0 * TdofInt] = dataGradV[i + 0 * TdofInt] + dataGradU[i + 1 * TdofInt];
-	   tau2[i + 1 * TdofInt] = 2.0 * dataGradV[i + 1 * TdofInt] - twth * dataDiv[i];	 
-	   tau2[i + 2 * TdofInt] = dataGradV[i + 2 * TdofInt] + dataGradW[i + 1 * TdofInt];	 
+         for (int i = 0; i < SdofInt; i++) {
+  	   tau2[i + 0 * SdofInt] = dataGradV[i + 0 * SdofInt] + dataGradU[i + 1 * SdofInt];
+	   tau2[i + 1 * SdofInt] = 2.0 * dataGradV[i + 1 * SdofInt] - twth * dataDiv[i];	 
+	   tau2[i + 2 * SdofInt] = dataGradV[i + 2 * SdofInt] + dataGradW[i + 1 * SdofInt];	 
          }
 
          double *tau3 = tmpR1c.HostReadWrite();       
-         for (int i = 0; i < TdofInt; i++) {
- 	   tau3[i + 0 * TdofInt] = dataGradW[i + 0 * TdofInt] + dataGradU[i + 2 * TdofInt];
-  	   tau3[i + 1 * TdofInt] = dataGradW[i + 1 * TdofInt] + dataGradV[i + 2 * TdofInt];
-	   tau3[i + 2 * TdofInt] = 2.0 * dataGradW[i + 2 * TdofInt] - twth * dataDiv[i];	 
+         for (int i = 0; i < SdofInt; i++) {
+ 	   tau3[i + 0 * SdofInt] = dataGradW[i + 0 * SdofInt] + dataGradU[i + 2 * SdofInt];
+  	   tau3[i + 1 * SdofInt] = dataGradW[i + 1 * SdofInt] + dataGradV[i + 2 * SdofInt];
+	   tau3[i + 2 * SdofInt] = 2.0 * dataGradW[i + 2 * SdofInt] - twth * dataDiv[i];	 
          }
          //MPI_Barrier(MPI_COMM_WORLD);               
          //if(rank0_) {std::cout << "...check 7" << endl;}     
        
          double *dataNuT = bufferSubgridVisc->HostReadWrite();
          for (int eq = 0; eq < dim; eq++) {
-           for (int i = 0; i < TdofInt; i++) {
-  	     tau1[i + eq * TdofInt] *= dataNuT[i];
+           for (int i = 0; i < SdofInt; i++) {
+  	     tau1[i + eq * SdofInt] *= dataNuT[i];
 	   }
          }
          for (int eq = 0; eq < dim; eq++) {
-           for (int i = 0; i < TdofInt; i++) {
-  	     tau2[i + eq * TdofInt] *= dataNuT[i];
+           for (int i = 0; i < SdofInt; i++) {
+  	     tau2[i + eq * SdofInt] *= dataNuT[i];
 	   }
          }
          for (int eq = 0; eq < dim; eq++) {
-           for (int i = 0; i < TdofInt; i++) {
-	     tau3[i + eq * TdofInt] *= dataNuT[i];
+           for (int i = 0; i < SdofInt; i++) {
+	     tau3[i + eq * SdofInt] *= dataNuT[i];
 	   }
          }
          //MPI_Barrier(MPI_COMM_WORLD);               
@@ -4107,30 +3982,30 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
        
          D->Mult(tmpR1, tmpR0);
          MtInv->Mult(tmpR0, tmpR0b);     
-         for (int i = 0; i < TdofInt; i++) {
-           data[i + 0 * TdofInt] = dataFrom[i];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i + 0 * SdofInt] = dataFrom[i];
          }
          //MPI_Barrier(MPI_COMM_WORLD);               
          //if(rank0_) {std::cout << "...check 9" << endl;}     
        
          D->Mult(tmpR1b, tmpR0);
          MtInv->Mult(tmpR0, tmpR0b);     
-         for (int i = 0; i < TdofInt; i++) {
-           data[i + 1 * TdofInt] = dataFrom[i];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i + 1 * SdofInt] = dataFrom[i];
          }
        
          D->Mult(tmpR1c, tmpR0);
          MtInv->Mult(tmpR0, tmpR0b);     
-         for (int i = 0; i < TdofInt; i++) {
-           data[i + 2 * TdofInt] = dataFrom[i];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i + 2 * SdofInt] = dataFrom[i];
          }
          //MPI_Barrier(MPI_COMM_WORLD);               
          //if(rank0_) {std::cout << "...check 10" << endl;}     
        
          // scale mean divtau term by sample weight
          for (int eq = 0; eq < dim; eq++) {
-           for (int i = 0; i < TdofInt; i++) {
-	     data[i + eq * TdofInt] *= sWgt;
+           for (int i = 0; i < SdofInt; i++) {
+	     data[i + eq * SdofInt] *= sWgt;
            }
          }
          //if(rank0_) {std::cout << "...check 11" << endl;}            
@@ -4141,8 +4016,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
        {
          double *data = tmpR1.HostReadWrite();       
          for (int eq = 0; eq < dim; eq++) {
-           for (int i = 0; i < TdofInt; i++) {
-             if( data[i + eq * TdofInt] != data[i + eq * TdofInt] ) {std::cout << " NAN CHECK last FAILED " << endl;} 
+           for (int i = 0; i < SdofInt; i++) {
+             if( data[i + eq * SdofInt] != data[i + eq * SdofInt] ) {std::cout << " NAN CHECK last FAILED " << endl;} 
            }
          }
        }
@@ -4226,11 +4101,11 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      double systemInvT = 0.0;     
      double *Tdata = Tn.HostReadWrite();
      double *data = tmpR0.HostReadWrite();     
-     for (int i = 0; i < TdofInt; i++) {
+     for (int i = 0; i < SdofInt; i++) {
        data[i] = 1.0 / (Tdata[i]);
      }
      Mt->Mult(tmpR0,tmpR0b);
-     for (int i = 0; i < TdofInt; i++) {
+     for (int i = 0; i < SdofInt; i++) {
        myInvT += tmpR0b[i];
      }     
      MPI_Allreduce(&myInvT, &systemInvT, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
@@ -4298,13 +4173,13 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
 
    int Vdof = vfes->GetNDofs();
    int Pdof = pfes->GetNDofs();
-   int Tdof = sfes->GetNDofs();
+   int Sdof = sfes->GetNDofs();
    int Ndof = nfes->GetNDofs();
    int NdofR0 = nfesR0->GetNDofs();      
    
    int VdofInt = vfes->GetTrueVSize();   
    int PdofInt = pfes->GetTrueVSize();
-   int TdofInt = sfes->GetTrueVSize();
+   int SdofInt = sfes->GetTrueVSize();
    int NdofInt = nfes->GetTrueVSize();
    int NdofR0Int = nfesR0->GetTrueVSize();   
    
@@ -4322,12 +4197,12 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
      double wt = std::pow(std::min((double)current_step/(double)nRamp, 1.0),1.0);
      //double wt = 0.5 * (tanh((time-tRamp)/tRamp) + 1.0);
      //if(rank0_) {std::cout << "Inlet ramp weight: " << wt << " using ramp steps " << nRamp << endl;}
-     for (int i = 0; i < Tdof; i++) {
+     for (int i = 0; i < Sdof; i++) {
        for (int eq = 0; eq < nvel; eq++) {
-         du[i + eq * Tdof] = wt * duInf[i + eq * Tdof] + (1.0-wt) * config.initRhoRhoVp[eq+1] / config.initRhoRhoVp[0];
+         du[i + eq * Sdof] = wt * duInf[i + eq * Sdof] + (1.0-wt) * config.initRhoRhoVp[eq+1] / config.initRhoRhoVp[0];
        }
      }
-     for (int i = 0; i < Tdof; i++) {
+     for (int i = 0; i < Sdof; i++) {
        dT[i] = wt * dTInf[i] + (1.0-wt) * config.initRhoRhoVp[nvel+1];
      }     
    }
@@ -4387,13 +4262,13 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
    if (constantDensity != true) {
      double *data = rn.HostWrite();        
      double *Tdata = Text.HostReadWrite();
-     for (int i = 0; i < TdofInt; i++) {
+     for (int i = 0; i < SdofInt; i++) {
        data[i] = thermoPressure / (Rgas * Tdata[i]);
      }
    }
    else {
      double *data = rn.HostWrite();        
-     for (int i = 0; i < TdofInt; i++) {
+     for (int i = 0; i < SdofInt; i++) {
        data[i] = static_rho;
      }     
    }
@@ -4410,8 +4285,8 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
      double *dataU = Uext.HostReadWrite();
      //double *dataU = un.HostReadWrite();     
      double *data = tmpR0.HostReadWrite();              
-     for (int i = 0; i < TdofInt; i++) {
-       data[i] = dataU[i + eq*TdofInt];
+     for (int i = 0; i < SdofInt; i++) {
+       data[i] = dataU[i + eq*SdofInt];
      }
    }     
    G->Mult(tmpR0, tmpR1);
@@ -4421,8 +4296,8 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
      double *dataU = Uext.HostReadWrite();
      //double *dataU = un.HostReadWrite();     
      double *data = tmpR0.HostReadWrite();              
-     for (int i = 0; i < TdofInt; i++) {
-       data[i] = dataU[i + eq*TdofInt];
+     for (int i = 0; i < SdofInt; i++) {
+       data[i] = dataU[i + eq*SdofInt];
      }
    }     
    G->Mult(tmpR0, tmpR1);
@@ -4432,8 +4307,8 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
      double *dataU = Uext.HostReadWrite();
      //double *dataU = un.HostReadWrite();          
      double *data = tmpR0.HostReadWrite();              
-     for (int i = 0; i < TdofInt; i++) {
-       data[i] = dataU[i + eq*TdofInt];
+     for (int i = 0; i < SdofInt; i++) {
+       data[i] = dataU[i + eq*SdofInt];
      }
    }     
    G->Mult(tmpR0, tmpR1);
@@ -4444,24 +4319,24 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
      int eq = 0;
      double *dataGradU = gradU.HostReadWrite();      
      double *data = divU.HostReadWrite();
-     for (int i = 0; i < TdofInt; i++) {
-       data[i] = dataGradU[i + eq*TdofInt];
+     for (int i = 0; i < SdofInt; i++) {
+       data[i] = dataGradU[i + eq*SdofInt];
      }
    }
    {
      int eq = 1;
      double *dataGradU = gradV.HostReadWrite();      
      double *data = divU.HostReadWrite();
-     for (int i = 0; i < TdofInt; i++) {
-       data[i] += dataGradU[i + eq*TdofInt];
+     for (int i = 0; i < SdofInt; i++) {
+       data[i] += dataGradU[i + eq*SdofInt];
      }
    }
    {
      int eq = 2;
      double *dataGradU = gradW.HostReadWrite();      
      double *data = divU.HostReadWrite();
-     for (int i = 0; i < TdofInt; i++) {
-       data[i] += dataGradU[i + eq*TdofInt];
+     for (int i = 0; i < SdofInt; i++) {
+       data[i] += dataGradU[i + eq*SdofInt];
      }
    }
 
@@ -4475,26 +4350,26 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
      double *delta = gridScaleSml.HostReadWrite();
      double *data = subgridViscSml.HostReadWrite();             
      if (config.sgsModelType == 1) {
-       for (int i = 0; i < TdofInt; i++) {     
+       for (int i = 0; i < SdofInt; i++) {     
          //double deltaP = delta[i] / ((double)order);  incl. in delta now
          double nu_sgs = 0.;
 	 DenseMatrix gradUp;
 	 gradUp.SetSize(nvel, dim);
-	 for (int dir = 0; dir < dim; dir++) { gradUp(0,dir) = dGradU[i + dir * TdofInt]; }
-	 for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[i + dir * TdofInt]; }
-	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * TdofInt]; }
+	 for (int dir = 0; dir < dim; dir++) { gradUp(0,dir) = dGradU[i + dir * SdofInt]; }
+	 for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[i + dir * SdofInt]; }
+	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * SdofInt]; }
          sgsSmag(gradUp, delta[i], nu_sgs);
          data[i] = nu_sgs;
        }
      } else if (config.sgsModelType == 2) {
-       for (int i = 0; i < TdofInt; i++) {     
+       for (int i = 0; i < SdofInt; i++) {     
          //double deltaP = delta[i] / ((double)order);
          double nu_sgs = 0.;
 	 DenseMatrix gradUp;
 	 gradUp.SetSize(nvel, dim);
-	 for (int dir = 0; dir < dim; dir++) { gradUp(0,dir) = dGradU[i + dir * TdofInt]; }
-	 for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[i + dir * TdofInt]; }
-	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * TdofInt]; }
+	 for (int dir = 0; dir < dim; dir++) { gradUp(0,dir) = dGradU[i + dir * SdofInt]; }
+	 for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[i + dir * SdofInt]; }
+	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * SdofInt]; }
          sgsSigma(gradUp, delta[i], nu_sgs);
 	 data[i] = nu_sgs;
        }       
@@ -4510,26 +4385,26 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
      double visc[2];
      double prim[nvel+2];
      for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
-     for (int i = 0; i < Tdof; i++) {
+     for (int i = 0; i < Sdof; i++) {
        prim[1+nvel] = Tdata[i];
        transportPtr->GetViscosities(prim, prim, visc); // returns dynamic
        dataVisc[i] = visc[0] / Rdata[i];       
      }
    } else {
      double *dataVisc = bufferVisc->HostReadWrite();        
-     for (int i = 0; i < Tdof; i++) {
+     for (int i = 0; i < Sdof; i++) {
        dataVisc[i] = kin_vis;
      }
    }
    if (config.sgsModelType > 0) {
      double *dataSubgrid = bufferSubgridVisc->HostReadWrite();
      double *dataVisc = bufferVisc->HostReadWrite();
-     for (int i = 0; i < Tdof; i++) { dataVisc[i] += dataSubgrid[i]; }     
+     for (int i = 0; i < Sdof; i++) { dataVisc[i] += dataSubgrid[i]; }     
    }
    if (config.linViscData.isEnabled) {
      double *viscMult = bufferViscMult->HostReadWrite();
      double *dataVisc = bufferVisc->HostReadWrite();
-     for (int i = 0; i < Tdof; i++) { dataVisc[i] *= viscMult[i]; }
+     for (int i = 0; i < Sdof; i++) { dataVisc[i] *= viscMult[i]; }
    }      
 
    // interior-sized visc needed for p-p rhs
@@ -4539,7 +4414,7 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
    {
      double *data = bufferAlpha->HostReadWrite();
      double *dataVisc = bufferVisc->HostReadWrite();     
-     for (int i = 0; i < Tdof; i++) {
+     for (int i = 0; i < Sdof; i++) {
 	 data[i] = dataVisc[i] / Pr;
      }
    }
@@ -4597,8 +4472,8 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
      double *Udata = Uext.HostReadWrite();     
      double *data = resT.HostReadWrite();
      for (int eq = 0; eq < dim; eq++) {       
-       for (int i = 0; i < TdofInt; i++) {
-         data[i] += Udata[i + eq*TdofInt] * dataGradT[i + eq*TdofInt];
+       for (int i = 0; i < SdofInt; i++) {
+         data[i] += Udata[i + eq*SdofInt] * dataGradT[i + eq*SdofInt];
        }
      }
    }
@@ -4609,14 +4484,14 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
      double *dataDiv = Qt.HostReadWrite();
      double *dataT = Tn.HostReadWrite();             
      double *data = tmpR0.HostReadWrite();
-     for (int i = 0; i < TdofInt; i++) {
+     for (int i = 0; i < SdofInt; i++) {
        data[i] += dataDiv[i] * dataT[i];
      }
    } else if (loMach_opts_.realDiv == true) {
      double *dataDiv = divU.HostReadWrite();
      double *dataT = Tn.HostReadWrite();             
      double *data = tmpR0.HostReadWrite();
-     for (int i = 0; i < TdofInt; i++) {
+     for (int i = 0; i < SdofInt; i++) {
        data[i] += dataDiv[i] * dataT[i];
      }       
    }
@@ -4681,13 +4556,13 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
    if (constantDensity != true) {
      double *data = rn.HostWrite();        
      double *Tdata = Tn_next.HostReadWrite();
-     for (int i = 0; i < TdofInt; i++) {
+     for (int i = 0; i < SdofInt; i++) {
        data[i] = thermoPressure / (Rgas * Tdata[i]);
      }
    }
    else {
      double *data = rn.HostWrite();        
-     for (int i = 0; i < TdofInt; i++) {
+     for (int i = 0; i < SdofInt; i++) {
        data[i] = static_rho;
      }     
    }
@@ -4698,7 +4573,7 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
      double *data = dtRho.HostWrite();
      double *TP1 = Tn_next.HostReadWrite();     
      double *TP0 = Tn.HostReadWrite();     
-     for (int i = 0; i < TdofInt; i++) {
+     for (int i = 0; i < SdofInt; i++) {
        data[i] = (thermoPressure/Rgas) * (1.0/dt) * (1.0/TP1[i] - 1.0/TP0[i]);
      }
    }      
@@ -4752,8 +4627,8 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
      double *data = tmpR1.HostReadWrite();
      double *Rdata = rn.HostReadWrite();
      for (int eq = 0; eq < nvel; eq++) {     
-       for (int i = 0; i < TdofInt; i++) {
-  	 data[i + eq*TdofInt] = Rdata[i] * gravity[eq];
+       for (int i = 0; i < SdofInt; i++) {
+  	 data[i + eq*SdofInt] = Rdata[i] * gravity[eq];
        }       
      }
      Mv->Mult(tmpR1,boussinesqField);     
@@ -4769,8 +4644,8 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
      double *dataUp1 = Uext.HostReadWrite();
      double *dataR = rn.HostReadWrite();         
      for (int eq = 0; eq < nvel; eq++) {     
-       for (int i = 0; i < TdofInt; i++) {
-	 data[i + eq*TdofInt] = 0.5 * (dataUp1[i + eq*TdofInt] + dataUp0[i + eq*TdofInt]);
+       for (int i = 0; i < SdofInt; i++) {
+	 data[i + eq*SdofInt] = 0.5 * (dataUp1[i + eq*SdofInt] + dataUp0[i + eq*SdofInt]);
        }
      }
    }
@@ -4814,8 +4689,8 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
        //for (int i = 0; i < NdofR0Int; i++) {
        // data[i + eq*NdofR0Int] *= dataR[i];
        //}
-       for (int i = 0; i < TdofInt; i++) {
-	 data[i + eq*TdofInt] *= dataR[i];
+       for (int i = 0; i < SdofInt; i++) {
+	 data[i + eq*SdofInt] *= dataR[i];
        }                     
      }
    } // tmpR1c = rho*u*nabla{u}
@@ -4831,8 +4706,8 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
        //for (int i = 0; i < NdofR0Int; i++) {
        // data[i + eq*NdofR0Int] = dataR[i] * dataU[i + eq*NdofR0Int];
        //}
-       for (int i = 0; i < TdofInt; i++) {
-	 data[i + eq*TdofInt] = dataR[i] * dataU[i + eq*TdofInt];
+       for (int i = 0; i < SdofInt; i++) {
+	 data[i + eq*SdofInt] = dataR[i] * dataU[i + eq*SdofInt];
        }                     
      }     
    }
@@ -4858,8 +4733,8 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
        //for (int i = 0; i < NdofR0Int; i++) {
        // data[i + eq*NdofR0Int] -= dataDivRU[i] * dataU[i + eq*NdofR0Int]; // minus because on rhs
        //}
-       for (int i = 0; i < TdofInt; i++) {
-	 data[i + eq*TdofInt] -= dataDivRU[i] * dataU[i + eq*TdofInt]; // minus because on rhs
+       for (int i = 0; i < SdofInt; i++) {
+	 data[i + eq*SdofInt] -= dataDivRU[i] * dataU[i + eq*SdofInt]; // minus because on rhs
        }                     
      }     
    }
@@ -4908,8 +4783,8 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
      double *dataU = tmpR1.HostWrite(); // still has u{n+1/2}
      double *data = tmpR1c.HostWrite();     
      for (int eq = 0; eq < dim; eq++) {     
-       for (int i = 0; i < TdofInt; i++) {
-	 data[i + eq * TdofInt] = dataU[i + eq * TdofInt] * d_dtR[i];
+       for (int i = 0; i < SdofInt; i++) {
+	 data[i + eq * SdofInt] = dataU[i + eq * SdofInt] * d_dtR[i];
        }
      }
      resu.Add(-1.0, tmpR1c); // on rhs     
@@ -4925,7 +4800,7 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
        double *Ndata = viscSml.HostReadWrite();
        double *Rdata = rn.HostReadWrite();       
        double *data = tmpR0.HostReadWrite();              
-       for (int i = 0; i < TdofInt; i++) {
+       for (int i = 0; i < SdofInt; i++) {
          data[i] = Rdata[i] * Ndata[i];
        }
      }          
@@ -4940,10 +4815,10 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
        double *dV = gradV.HostReadWrite();
        double *dW = gradW.HostReadWrite();             
        double *data = Ldiv.HostReadWrite();
-       for (int i = 0; i < TdofInt; i++) {
-         data[i + eq*TdofInt] = dataGradMu[i + 0*TdofInt] * dU[i + eq*TdofInt]
-        	              + dataGradMu[i + 1*TdofInt] * dV[i + eq*TdofInt]
-	                      + dataGradMu[i + 2*TdofInt] * dW[i + eq*TdofInt];
+       for (int i = 0; i < SdofInt; i++) {
+         data[i + eq*SdofInt] = dataGradMu[i + 0*SdofInt] * dU[i + eq*SdofInt]
+        	              + dataGradMu[i + 1*SdofInt] * dV[i + eq*SdofInt]
+	                      + dataGradMu[i + 2*SdofInt] * dW[i + eq*SdofInt];
        }
      }    
      {
@@ -4953,10 +4828,10 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
        double *dV = gradV.HostReadWrite();
        double *dW = gradW.HostReadWrite();             
        double *data = Ldiv.HostReadWrite();
-       for (int i = 0; i < TdofInt; i++) {
-         data[i + eq*TdofInt] = dataGradMu[i + 0*TdofInt] * dU[i + eq*TdofInt]
-        	              + dataGradMu[i + 1*TdofInt] * dV[i + eq*TdofInt]
-	                      + dataGradMu[i + 2*TdofInt] * dW[i + eq*TdofInt];
+       for (int i = 0; i < SdofInt; i++) {
+         data[i + eq*SdofInt] = dataGradMu[i + 0*SdofInt] * dU[i + eq*SdofInt]
+        	              + dataGradMu[i + 1*SdofInt] * dV[i + eq*SdofInt]
+	                      + dataGradMu[i + 2*SdofInt] * dW[i + eq*SdofInt];
        }
      }
      {
@@ -4966,10 +4841,10 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
        double *dV = gradV.HostReadWrite();
        double *dW = gradW.HostReadWrite();             
        double *data = Ldiv.HostReadWrite();
-       for (int i = 0; i < TdofInt; i++) {
-         data[i + eq*TdofInt] = dataGradMu[i + 0*TdofInt] * dU[i + eq*TdofInt]
-        	              + dataGradMu[i + 1*TdofInt] * dV[i + eq*TdofInt]
-	                      + dataGradMu[i + 2*TdofInt] * dW[i + eq*TdofInt];
+       for (int i = 0; i < SdofInt; i++) {
+         data[i + eq*SdofInt] = dataGradMu[i + 0*SdofInt] * dU[i + eq*SdofInt]
+        	              + dataGradMu[i + 1*SdofInt] * dV[i + eq*SdofInt]
+	                      + dataGradMu[i + 2*SdofInt] * dW[i + eq*SdofInt];
        }
      }
 
@@ -4979,8 +4854,8 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
        double *dataDivU = divU.HostReadWrite();
        double *data = Ldiv.HostReadWrite();
        for (int eq = 0; eq < nvel; eq++) {       
-         for (int i = 0; i < TdofInt; i++) {
-           data[i + eq*TdofInt] -= twothird * dataGradMu[i + eq*TdofInt] * dataDivU[i];
+         for (int i = 0; i < SdofInt; i++) {
+           data[i + eq*SdofInt] -= twothird * dataGradMu[i + eq*SdofInt] * dataDivU[i];
          }
        }
      }
@@ -5001,8 +4876,8 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
        double *dataRho = rn.HostReadWrite();       
        double *data = tmpR1b.HostReadWrite();     
        for (int eq = 0; eq < dim; eq++) {
-         for (int i = 0; i < TdofInt; i++) {
-           data[i + eq*TdofInt] *= (factor * dataVisc[i] * dataRho[i]);
+         for (int i = 0; i < SdofInt; i++) {
+           data[i + eq*SdofInt] *= (factor * dataVisc[i] * dataRho[i]);
          }
        }
      }
@@ -5019,8 +4894,8 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
      double *data = resu.HostReadWrite(); 
      double *dataR = rn.HostReadWrite();
      for (int eq = 0; eq < dim; eq++) {
-       for (int i = 0; i < TdofInt; i++) {
-         data[i + eq*TdofInt] /= dataR[i];
+       for (int i = 0; i < SdofInt; i++) {
+         data[i + eq*SdofInt] /= dataR[i];
        }
      }
    }   
@@ -5084,8 +4959,8 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
      double *Rdata = rn.HostReadWrite(); 
      double *data = tmpR1.HostReadWrite();
      for (int eq = 0; eq < dim; eq++) {     
-       for (int i = 0; i < TdofInt; i++) {
-	 data[i + eq * TdofInt] = 1.0/dt * Rdata[i] * Udata[i + eq * TdofInt];
+       for (int i = 0; i < SdofInt; i++) {
+	 data[i + eq * SdofInt] = 1.0/dt * Rdata[i] * Udata[i + eq * SdofInt];
        }
      }
    }
@@ -5097,7 +4972,7 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
      double *Tp2 = Text.HostReadWrite(); // {n+2}
      double *Tp0 = Tn.HostReadWrite();   // {n}
      double *data = tmpR0b.HostReadWrite();         
-     for (int i = 0; i < TdofInt; i++) {
+     for (int i = 0; i < SdofInt; i++) {
        data[i] += thermoPressure / (Rgas*dt*dt) * 0.5 * ( 1.0/Tp2[i] - 1.0/Tp0[i] ); 
      }
    }
@@ -5171,8 +5046,8 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
      double *data = resu.HostReadWrite();
      double *d_rn = rn.HostReadWrite();
      for (int eq = 0; eq < dim; eq++) {               
-       for (int i = 0; i < TdofInt; i++) {     
-         data[i + eq * TdofInt] *= dt / d_rn[i];
+       for (int i = 0; i < SdofInt; i++) {     
+         data[i + eq * SdofInt] *= dt / d_rn[i];
        }
      }
    }
@@ -5183,8 +5058,8 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
      double *Udata = u_star.HostReadWrite();     
      double *data = un_next.HostReadWrite();
      for (int eq = 0; eq < dim; eq++) {          
-       for (int i = 0; i < TdofInt; i++) {     
-         data[i + eq * TdofInt] = Udata[i + eq * TdofInt] - dataGP[i + eq * TdofInt];
+       for (int i = 0; i < SdofInt; i++) {     
+         data[i + eq * SdofInt] = Udata[i + eq * SdofInt] - dataGP[i + eq * SdofInt];
        }
      }
    }      
@@ -5237,11 +5112,11 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
      double systemInvT = 0.0;     
      double *Tdata = Tn.HostReadWrite();
      double *data = tmpR0.HostReadWrite();     
-     for (int i = 0; i < TdofInt; i++) {
+     for (int i = 0; i < SdofInt; i++) {
        data[i] = 1.0 / (Tdata[i]);
      }
      Mt->Mult(tmpR0,tmpR0b);
-     for (int i = 0; i < TdofInt; i++) {
+     for (int i = 0; i < SdofInt; i++) {
        myInvT += tmpR0b[i];
      }     
      MPI_Allreduce(&myInvT, &systemInvT, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
@@ -5308,14 +5183,14 @@ void LoMachSolver::updateTimestep()
    max_speed = Umax_lcl;
    double Umag;
    int dof = vfes->GetNDofs();
-   int Tdof = sfes->GetNDofs();   
+   int Sdof = sfes->GetNDofs();   
    double dtFactor = config.dt_factor;      
   
        auto dataU = un_gf.HostRead();
-       for (int n = 0; n < Tdof; n++) {
+       for (int n = 0; n < Sdof; n++) {
          Umag = 0.0;
          for (int eq = 0; eq < dim; eq++) {
-           Umag += dataU[n + eq * Tdof] * dataU[n + eq * Tdof];
+           Umag += dataU[n + eq * Sdof] * dataU[n + eq * Sdof];
          }
          Umag = std::sqrt(Umag);
          Umax_lcl = std::max(Umag,Umax_lcl);
@@ -5340,7 +5215,7 @@ void LoMachSolver::updateTimestep()
    max_speed = Umax_lcl;
    double Umag;
    int dof = vfes->GetNDofs();
-   int Tdof = sfes->GetNDofs();   
+   int Sdof = sfes->GetNDofs();   
    double dtFactor = config.dt_factor;        
    auto dataU = un_gf.HostRead();
 
@@ -5350,12 +5225,12 @@ void LoMachSolver::updateTimestep()
    double *dataY = bufferGridScaleY->HostReadWrite();
    double *dataZ = bufferGridScaleZ->HostReadWrite();
 
-   for (int n = 0; n < Tdof; n++) {
+   for (int n = 0; n < Sdof; n++) {
      Umag = 0.0;
      //Vector delta({dataX[n], dataY[n], dataZ[n]});	      
      Vector delta({dataD[n], dataD[n], dataD[n]}); // use smallest delta for all
      for (int eq = 0; eq < dim; eq++) {
-       Umag += (dataU[n + eq * Tdof]/delta[eq]) * (dataU[n + eq * Tdof]/delta[eq]);
+       Umag += (dataU[n + eq * Sdof]/delta[eq]) * (dataU[n + eq * Sdof]/delta[eq]);
      }
      Umag = std::sqrt(Umag);
      Umax_lcl = std::max(Umag,Umax_lcl);
@@ -5381,14 +5256,14 @@ void LoMachSolver::setTimestep()
    max_speed = Umax_lcl;
    double Umag;
    int dof = vfes->GetNDofs();
-   int Tdof = sfes->GetNDofs();   
+   int Sdof = sfes->GetNDofs();   
    double dtFactor = config.dt_factor;      
   
        auto dataU = un_gf.HostRead();
-       for (int n = 0; n < Tdof; n++) {
+       for (int n = 0; n < Sdof; n++) {
          Umag = 0.0;
          for (int eq = 0; eq < dim; eq++) {
-           Umag += dataU[n + eq * Tdof] * dataU[n + eq * Tdof];
+           Umag += dataU[n + eq * Sdof] * dataU[n + eq * Sdof];
          }
          Umag = std::sqrt(Umag);
          Umax_lcl = std::max(Umag,Umax_lcl);
@@ -7988,16 +7863,16 @@ void LoMachSolver::initSolutionAndVisualizationVectors() {
   //HERE HERE HERE
   bufferViscMult->GetTrueDofs(viscMultSml);
   /*
-  int TdofInt = sfes->GetTrueVSize();    
+  int SdofInt = sfes->GetTrueVSize();    
   Vector coordsVec;
-  coordsVec.SetSize(3*TdofInt);
+  coordsVec.SetSize(3*SdofInt);
   Tn_gf.GetTrueDofs(coordsVec);
   if (config.linViscData.isEnabled) {
     double *dataViscMultSml = viscMultSml.HostReadWrite();    
     double wgt = 0.;
     double coords[3];    
-    for (int n = 0; n < TdofInt; n++) {   
-      for (int d = 0; d < dim; d++) { coords[d] = coordsVec[n + d * TdofInt]; }
+    for (int n = 0; n < SdofInt; n++) {   
+      for (int d = 0; d < dim; d++) { coords[d] = coordsVec[n + d * SdofInt]; }
       viscSpongePlanar(coords, wgt);
       dataViscMultSml[n] = wgt;
     }
@@ -8056,7 +7931,7 @@ void LoMachSolver::interpolateInlet() {
   int myRank;
   //MPI_Comm_rank(bcomm, &myRank);
   MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
-  int Tdof = sfes->GetNDofs();  
+  int Sdof = sfes->GetNDofs();  
 
     string fname;
     fname = "./inputs/inletPlane.csv";
@@ -8310,23 +8185,23 @@ void LoMachSolver::interpolateInlet() {
 
         //if(rank0_) { std::cout << " attempting to record interpolated values in buffer" << endl; fflush(stdout); }      
         if (wt_tot > 0.0) {
-          dataVel[n + 0*Tdof] = val_u / wt_tot;
-          dataVel[n + 1*Tdof] = val_v / wt_tot;
-          dataVel[n + 2*Tdof] = val_w / wt_tot;
+          dataVel[n + 0*Sdof] = val_u / wt_tot;
+          dataVel[n + 1*Sdof] = val_v / wt_tot;
+          dataVel[n + 2*Sdof] = val_w / wt_tot;
           dataTemp[n] = val_T / wt_tot;
-          dataVelInf[n + 0*Tdof] = val_u / wt_tot;
-          dataVelInf[n + 1*Tdof] = val_v / wt_tot;
-          dataVelInf[n + 2*Tdof] = val_w / wt_tot;
+          dataVelInf[n + 0*Sdof] = val_u / wt_tot;
+          dataVelInf[n + 1*Sdof] = val_v / wt_tot;
+          dataVelInf[n + 2*Sdof] = val_w / wt_tot;
           dataTempInf[n] = val_T / wt_tot;	  
-          //std::cout << n << " point set to: " << dataVel[n + 0*Tdof] << " " << dataTemp[n] << endl; fflush(stdout);
+          //std::cout << n << " point set to: " << dataVel[n + 0*Sdof] << " " << dataTemp[n] << endl; fflush(stdout);
 	} else {
-          dataVel[n + 0*Tdof] = 0.0;
-          dataVel[n + 1*Tdof] = 0.0;
-          dataVel[n + 2*Tdof] = 0.0;
+          dataVel[n + 0*Sdof] = 0.0;
+          dataVel[n + 1*Sdof] = 0.0;
+          dataVel[n + 2*Sdof] = 0.0;
           dataTemp[n] = 0.0;
-          dataVelInf[n + 0*Tdof] = 0.0;
-          dataVelInf[n + 1*Tdof] = 0.0;
-          dataVelInf[n + 2*Tdof] = 0.0;
+          dataVelInf[n + 0*Sdof] = 0.0;
+          dataVelInf[n + 1*Sdof] = 0.0;
+          dataVelInf[n + 2*Sdof] = 0.0;
           dataTempInf[n] = 0.0;	  
           //std::cout << " iCount of zero..." << endl; fflush(stdout);	  
 	}
@@ -8340,7 +8215,7 @@ void LoMachSolver::uniformInlet() {
 
     int myRank;
     MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
-    int Tdof = sfes->GetNDofs();  
+    int Sdof = sfes->GetNDofs();  
  
     ParGridFunction coordsDof(vfes);
     pmesh->GetNodes(coordsDof);
@@ -8359,8 +8234,8 @@ void LoMachSolver::uniformInlet() {
       auto hcoords = coordsDof.HostRead();
       double xp[3];      
       for (int d = 0; d < dim; d++) { xp[d] = hcoords[n + d * vfes->GetNDofs()]; }
-      for (int d = 0; d < dim; d++) { dataVel[n + d*Tdof] = inlet_vec[d]; }
-      for (int d = 0; d < dim; d++) { dataVelInf[n + d*Tdof] = inlet_vec[d]; }      
+      for (int d = 0; d < dim; d++) { dataVel[n + d*Sdof] = inlet_vec[d]; }
+      for (int d = 0; d < dim; d++) { dataVelInf[n + d*Sdof] = inlet_vec[d]; }      
       dataTemp[n] = inlet_temp;
       dataTempInf[n] = inlet_temp;      
     }
@@ -8646,7 +8521,7 @@ void LoMachSolver::multScalarVector(Vector A, Vector B, Vector* C) {
 }
 /**/
 
-void LoMachSolver::multScalarVectorInv(Vector A, Vector B, Vector* C) {
+void LoMachSolver::multScalarInvVector(Vector A, Vector B, Vector* C) {
 
    R0PM0_gf.SetFromTrueDofs(A);
    R0PX2a_gf.ProjectGridFunction(R0PM0_gf);
@@ -8792,6 +8667,29 @@ void LoMachSolver::multScalarScalarIP(Vector A, Vector* C) {
    
 }
 /**/
+
+void LoMachSolver::multScalarInvScalarIP(Vector A, Vector* C) {
+
+   R0PM0_gf.SetFromTrueDofs(A);
+   R0PX2a_gf.ProjectGridFunction(R0PM0_gf);
+   R0PX2a_gf.GetTrueDofs(r0px2a);
+
+   R0PM0_gf.SetFromTrueDofs(*C);
+   R0PX2_gf.ProjectGridFunction(R0PM0_gf);
+   R0PX2_gf.GetTrueDofs(r0px2b);
+
+   {
+     double *dataA = r0px2a.HostReadWrite();     
+     double *dataB = r0px2b.HostReadWrite();
+     MFEM_FORALL(i, r0px2b.Size(), {dataB[i] = 1.0/dataA[i] * dataB[i];} );
+   }
+
+   R0PX2_gf.SetFromTrueDofs(r0px2b);
+   R0PM0_gf.ProjectGridFunction(R0PX2_gf);
+   R0PM0_gf.GetTrueDofs(*C);
+   
+}
+
 
 /**/
 // De-aliased product of scalar and vector
