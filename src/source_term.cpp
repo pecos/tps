@@ -162,7 +162,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
     double progressRates[gpudata::MAXREACTIONS], creationRates[gpudata::MAXSPECIES];
     if (_numSpecies > 1 && _numReactions > 0) {
       double kfwd[gpudata::MAXREACTIONS], kC[gpudata::MAXREACTIONS];
-      _chemistry->computeForwardRateCoeffs(Th, Te, kfwd);
+      _chemistry->computeForwardRateCoeffs(Th, Te, n, kfwd);
       _chemistry->computeEquilibriumConstants(Th, Te, kC);
 
       // get reaction rates

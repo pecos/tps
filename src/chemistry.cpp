@@ -105,6 +105,7 @@ MFEM_HOST_DEVICE Chemistry::~Chemistry() {
   }
 }
 
+#if 0 
 void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, Vector &kfwd) {
   kfwd.SetSize(numReactions_);
   computeForwardRateCoeffs(T_h, T_e, &kfwd[0]);
@@ -117,19 +118,21 @@ void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, V
 
   return;
 }
+#endif
 
-MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, double *kfwd) {
+MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, const int & dofindex, double *kfwd) {
   // kfwd.SetSize(numReactions_);
   for (int r = 0; r < numReactions_; r++) kfwd[r] = 0.0;
 
   for (int r = 0; r < numReactions_; r++) {
     bool isElectronInvolved = isElectronInvolvedAt(r);
-    kfwd[r] = reactions_[r]->computeRateCoefficient(T_h, T_e, isElectronInvolved);
+    kfwd[r] = reactions_[r]->computeRateCoefficient(T_h, T_e, dofindex, isElectronInvolved);
   }
 
   return;
 }
 
+#if 0
 // NOTE: if not detailedBalance, equilibrium constant is returned as zero, though it cannot be used.
 void Chemistry::computeEquilibriumConstants(const double &T_h, const double &T_e, Vector &kC) {
   kC.SetSize(numReactions_);
@@ -147,6 +150,7 @@ void Chemistry::computeEquilibriumConstants(const double &T_h, const double &T_e
 
   return;
 }
+#endif
 
 MFEM_HOST_DEVICE void Chemistry::computeEquilibriumConstants(const double &T_h, const double &T_e, double *kC) {
   for (int r = 0; r < numReactions_; r++) kC[r] = 0.0;

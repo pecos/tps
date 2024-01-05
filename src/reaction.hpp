@@ -58,6 +58,7 @@ class Reaction {
   MFEM_HOST_DEVICE virtual ~Reaction() {}
 
   MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double &T_h, const double &T_e,
+                                                         [[maybe_unused]] const int & dofindex,
                                                          const bool isElectronInvolved = false) {
     printf("computeRateCoefficient not implemented");
     return 0;
@@ -77,6 +78,7 @@ class Arrhenius : public Reaction {
   MFEM_HOST_DEVICE virtual ~Arrhenius() {}
 
   MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double &T_h, const double &T_e,
+                                                         [[maybe_unused]] const int & dofindex,
                                                          const bool isElectronInvolved = false);
 };
 
@@ -97,6 +99,7 @@ class HoffertLien : public Reaction {
   MFEM_HOST_DEVICE virtual ~HoffertLien() {}
 
   MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double &T_h, const double &T_e,
+                                                         [[maybe_unused]] const int & dofindex,
                                                          const bool isElectronInvolved = false);
 };
 
@@ -110,6 +113,7 @@ class Tabulated : public Reaction {
   MFEM_HOST_DEVICE virtual ~Tabulated();
 
   MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double &T_h, const double &T_e,
+                                                         [[maybe_unused]] const int & dofindex,
                                                          const bool isElectronInvolved = false);
 };
 

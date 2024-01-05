@@ -39,6 +39,7 @@ MFEM_HOST_DEVICE Arrhenius::Arrhenius(const double &A, const double &b, const do
     : Reaction(), A_(A), b_(b), E_(E) {}
 
 MFEM_HOST_DEVICE double Arrhenius::computeRateCoefficient(const double &T_h, const double &T_e,
+                                                          [[maybe_unused]] const int & dofindex,
                                                           const bool isElectronInvolved) {
   double temp = (isElectronInvolved) ? T_e : T_h;
 
@@ -49,6 +50,7 @@ MFEM_HOST_DEVICE HoffertLien::HoffertLien(const double &A, const double &b, cons
     : Reaction(), A_(A), b_(b), E_(E) {}
 
 MFEM_HOST_DEVICE double HoffertLien::computeRateCoefficient(const double &T_h, const double &T_e,
+                                                            [[maybe_unused]] const int & dofindex,
                                                             const bool isElectronInvolved) {
   double temp = (isElectronInvolved) ? T_e : T_h;
   double tempFactor = E_ / BOLTZMANNCONSTANT / temp;
@@ -71,6 +73,7 @@ MFEM_HOST_DEVICE Tabulated::Tabulated(const TableInput &input) : Reaction() {
 MFEM_HOST_DEVICE Tabulated::~Tabulated() { delete table_; }
 
 MFEM_HOST_DEVICE double Tabulated::computeRateCoefficient(const double &T_h, const double &T_e,
+                                                          [[maybe_unused]] const int & dofindex,
                                                           const bool isElectronInvolved) {
   double temp = (isElectronInvolved) ? T_e : T_h;
   return table_->eval(temp);
