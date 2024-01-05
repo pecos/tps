@@ -118,7 +118,7 @@ void Chemistry::setGridFunctionRates(const mfem::GridFunction &f) {
   }
 }
 
-#if 0 
+#if 0
 void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, Vector &kfwd) {
   kfwd.SetSize(numReactions_);
 
