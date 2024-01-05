@@ -499,7 +499,7 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
       for (int sp = 0; sp < numActiveSpecies_; sp++) {
         // int inputIndex = (*mixtureToInputMap)[sp];
         // store species density into inputState in the order of mixture-sorted index.
-        conserved[dim + 2 + sp] = szData.targetUp[0] * szData.targetUp[5 + sp];
+        conserved[nvel + 2 + sp] = szData.targetUp[0] * szData.targetUp[5 + sp];
       }
     }
 

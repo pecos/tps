@@ -335,6 +335,8 @@ void QuasiMagnetostaticSolver3D::parseSolverOptions() {
   default_axis[2] = 0;
   tpsP_->getVec("em/current_axis", em_opts_.current_axis, 3, default_axis);
 
+  tpsP_->getInput("em/eval_Rplasma", em_opts_.eval_Rplasma, false);
+
   // dump options to screen for user inspection
   if (rank0_) {
     em_opts_.print(std::cout);
@@ -876,7 +878,7 @@ void QuasiMagnetostaticSolverAxiSym::InitializeCurrent() {
   Vector J0(pmesh_->attributes.Max());
   J0 = 0.0;
 
-  const double mu0J = em_opts_.mu0 * em_opts_.current_amplitude;
+  const double mu0J = em_opts_.mu0 * em_opts_.current_amplitude * 0.5;
 
   if (em_opts_.bot_only) {
     // only bottom rings
@@ -923,6 +925,8 @@ void QuasiMagnetostaticSolverAxiSym::parseSolverOptions() {
   tpsP_->getInput("em/current_amplitude", em_opts_.current_amplitude, 1.0);
   tpsP_->getInput("em/current_frequency", em_opts_.current_frequency, 1.0);
   tpsP_->getInput("em/permeability", em_opts_.mu0, 1.0);
+
+  tpsP_->getInput("em/eval_Rplasma", em_opts_.eval_Rplasma, false);
 
   // dump options to screen for user inspection
   if (rank0_) {
@@ -1035,7 +1039,7 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
 
   tmp2 += tmp1;
   tmp2 *= (*plasma_conductivity_);
-  tmp2 *= omega2;
+  tmp2 *= 2.0 * omega2;
 
   *joule_heating_ = tmp2;
 
@@ -1168,4 +1172,163 @@ double QuasiMagnetostaticSolverAxiSym::totalJouleHeating() {
 
   // Factor of 2*pi from azimuthal direction integral
   return 2 * M_PI * total_int_jh;
+}
+
+double QuasiMagnetostaticSolverAxiSym::coilCurrent() const {
+  assert(current_initialized_);
+
+  // We re-build the current coefficient here, but only using 1 ring
+  // so that when we integrate over area, we obtain the correct
+  // current and not the current times number of rings
+  Vector J0(pmesh_->attributes.Max());
+  J0 = 0.0;
+  J0(1) = em_opts_.current_amplitude * 0.5;
+  PWConstCoefficient J0coef(J0);
+
+  // Integrate the current by looping over the elements.  Note that
+  // this is an area integral, not a volume integral, so there is no
+  // factor of 2 \pi radius
+  double current = 0;
+  const int NE = pmesh_->GetNE();
+  const ParFiniteElementSpace *fes = Atheta_space_;
+
+  for (int ielem = 0; ielem < NE; ielem++) {
+    const FiniteElement *fe = fes->GetFE(ielem);
+    ElementTransformation *T = fes->GetElementTransformation(ielem);
+
+    // B/c the current is piecewise constant, first order rule is sufficient
+    const int intorder = 1;
+    const IntegrationRule *ir = &IntRules.Get(fe->GetGeomType(), intorder);
+
+    for (int i = 0; i < ir->GetNPoints(); i++) {
+      const IntegrationPoint &ip = ir->IntPoint(i);
+      T->SetIntPoint(&ip);
+      current += ip.weight * T->Weight() * J0coef.Eval(*T, ip);
+    }
+  }
+
+  // sum over mpi ranks
+  double total_current = 0;
+  MPI_Allreduce(&current, &total_current, 1, MPI_DOUBLE, MPI_SUM, fes->GetComm());
+
+  return total_current;
+}
+
+double QuasiMagnetostaticSolverAxiSym::magneticEnergy() const {
+  double magnetic_energy = 0;
+
+  const double mu0 = em_opts_.mu0;
+  const int NE = pmesh_->GetNE();
+  const ParFiniteElementSpace *fes = Atheta_space_;
+
+  for (int ielem = 0; ielem < NE; ielem++) {
+    const FiniteElement *fe = fes->GetFE(ielem);
+    ElementTransformation *T = fes->GetElementTransformation(ielem);
+
+    // Get size info
+    const int dof = fe->GetDof();
+    const int dim = fe->GetDim();
+    const int nvar = 1;
+
+    assert(dim == 2);
+
+    // Storage for basis fcns, derivatives, fluxes
+    Vector shape;
+    shape.SetSize(dof);
+
+    DenseMatrix dshape;
+    dshape.SetSize(dof, dim);
+
+    Vector Areal, Aimag;
+    Areal.SetSize(nvar);
+    Aimag.SetSize(nvar);
+
+    DenseMatrix Areal_x, Aimag_x;
+    Areal_x.SetSize(nvar, dim);
+    Aimag_x.SetSize(nvar, dim);
+
+    Vector Breal, Bimag;
+    Breal.SetSize(dim);
+    Bimag.SetSize(dim);
+
+    // Get solution (Atheta) dofs for this element
+    Array<int> vdofs;
+    Vector el_Areal;
+    Vector el_Aimag;
+
+    DofTransformation *doftrans = fes->GetElementVDofs(ielem, vdofs);
+    Atheta_real_->GetSubVector(vdofs, el_Areal);
+    if (doftrans) {
+      doftrans->InvTransformPrimal(el_Areal);
+    }
+    Atheta_imag_->GetSubVector(vdofs, el_Aimag);
+    if (doftrans) {
+      doftrans->InvTransformPrimal(el_Aimag);
+    }
+
+    // View element dofs as matrices (make life easy below)
+    const DenseMatrix el_Areal_mat(el_Areal.HostReadWrite(), dof, nvar);
+    const DenseMatrix el_Aimag_mat(el_Aimag.HostReadWrite(), dof, nvar);
+
+    // Get quadrature rule
+    const int order = fe->GetOrder();
+    const int intorder = 2 * order + 1;
+    const IntegrationRule *ir = &IntRules.Get(fe->GetGeomType(), intorder);
+
+    // for every quadrature point...
+    for (int i = 0; i < ir->GetNPoints(); i++) {
+      const IntegrationPoint &ip = ir->IntPoint(i);
+      T->SetIntPoint(&ip);
+
+      // evaluate radius
+      double x[3];
+      Vector transip(x, 3);
+      T->Transform(ip, transip);
+      const double radius = transip[0];
+
+      // evaluate basis functions
+      fe->CalcShape(ip, shape);
+      fe->CalcPhysDShape(*T, dshape);
+
+      // Interpolate solution and gradient
+      el_Areal_mat.MultTranspose(shape, Areal);
+      el_Aimag_mat.MultTranspose(shape, Aimag);
+
+      // el_Areal_mat.MultTranspose(dshape, Areal_x);
+      // el_Aimag_mat.MultTranspose(dshape, Aimag_x);
+
+      MultAtB(el_Areal_mat, dshape, Areal_x);
+      MultAtB(el_Aimag_mat, dshape, Aimag_x);
+
+      const double *hAr = Areal.HostRead();
+      const double *hAi = Aimag.HostRead();
+      const double *hAr_x = Areal_x.HostRead();
+      const double *hAi_x = Aimag_x.HostRead();
+
+      double *hBr = Breal.HostWrite();
+      double *hBi = Bimag.HostWrite();
+
+      // B = curl(A)
+      hBr[0] = -hAr_x[1];
+      hBr[1] = hAr_x[0] + hAr[0] / radius;
+
+      hBi[0] = -hAi_x[1];
+      hBi[1] = hAi_x[0] + hAi[0] / radius;
+
+      const double BdotConjB = (hBr[0] * hBr[0] + hBi[0] * hBi[0] + hBr[1] * hBr[1] + hBi[1] * hBi[1]);
+
+      // Add quad point contribution to integral
+      double qpcontrib = BdotConjB * radius;
+
+      const double wt = ip.weight * T->Weight();
+      magnetic_energy += qpcontrib * wt;
+    }
+  }
+  magnetic_energy *= 2 * M_PI / mu0;
+
+  // sum over mpi ranks
+  double total_magnetic_energy = 0;
+  MPI_Allreduce(&magnetic_energy, &total_magnetic_energy, 1, MPI_DOUBLE, MPI_SUM, fes->GetComm());
+
+  return total_magnetic_energy;
 }

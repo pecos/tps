@@ -370,11 +370,12 @@ void M2ulPhyS::initVariables() {
   // If requested, evaluate the distance function (i.e., the distance to the nearest no-slip wall)
   distance_ = NULL;
   GridFunction *serial_distance = NULL;
+  FiniteElementSpace *serial_fes = NULL;
+  DG_FECollection *tmp_fec = NULL;
   if (config.compute_distance) {
     order = config.GetSolutionOrder();
     dim = serial_mesh->Dimension();
     basisType = config.GetBasisType();
-    DG_FECollection *tmp_fec = NULL;
     if (basisType == 0) {
       tmp_fec = new DG_FECollection(order, dim, BasisType::GaussLegendre);
     } else if (basisType == 1) {
@@ -382,7 +383,7 @@ void M2ulPhyS::initVariables() {
     }
 
     // Serial FE space for scalar variable
-    FiniteElementSpace *serial_fes = new FiniteElementSpace(serial_mesh, tmp_fec);
+    serial_fes = new FiniteElementSpace(serial_mesh, tmp_fec);
 
     // Serial grid function for scalar variable
     serial_distance = new GridFunction(serial_fes);
@@ -405,6 +406,7 @@ void M2ulPhyS::initVariables() {
 
     // Evaluate the distance function
     evaluateDistanceSerial(*serial_mesh, wall_patch_list, coordinates, *serial_distance);
+    delete tmp_dfes;
   }
 
   // Instantiate parallel mesh
@@ -419,6 +421,8 @@ void M2ulPhyS::initVariables() {
     }
     // Done with serial_distance
     delete serial_distance;
+    delete serial_fes;
+    delete tmp_fec;
 
     distance_->ParFESpace()->ExchangeFaceNbrData();
     distance_->ExchangeFaceNbrData();
@@ -750,7 +754,7 @@ void M2ulPhyS::initVariables() {
 
   xmax = bb_max[0];
   ymax = bb_max[1];
-  (dim == 3) ? zmax = bb_max[2] : zmin = 0.0;
+  (dim == 3) ? zmax = bb_max[2] : zmax = 0.0;
 
   // estimate initial dt
   Up->ExchangeFaceNbrData();
@@ -1914,7 +1918,10 @@ void M2ulPhyS::projectInitialSolution() {
 
     restart_files_hdf5("read");
 
-    if (config.restartFromLTE) initilizeSpeciesFromLTE();
+    if (config.restartFromLTE) {
+      initilizeSpeciesFromLTE();
+      Check_Undershoot();
+    }
 
     paraviewColl->SetCycle(iter);
     paraviewColl->SetTime(time);
@@ -3260,6 +3267,7 @@ void M2ulPhyS::parseTransportInputs() {
 
 void M2ulPhyS::parseReactionInputs() {
   tpsP->getInput("reactions/number_of_reactions", config.numReactions, 0);
+  tpsP->getInput("reactions/minimum_chemistry_temperature", config.chemistryInput.minimumTemperature, 0.0);
   if (config.numReactions > 0) {
     assert((config.workFluid != DRY_AIR) && (config.numSpecies > 1));
     config.reactionEnergies.SetSize(config.numReactions);
@@ -3388,11 +3396,15 @@ void M2ulPhyS::parseReactionInputs() {
         reactEnergy += react(sp) * config.gasParams(sp, FORMATION_ENERGY);
         prodEnergy += product(sp) * config.gasParams(sp, FORMATION_ENERGY);
       }
-      // This may be too strict..
-      if (reactEnergy + config.reactionEnergies[r] != prodEnergy) {
+
+      double max_e = max(reactEnergy, prodEnergy);
+      const double delta = abs(reactEnergy + config.reactionEnergies[r] - prodEnergy);
+      const double rel_delta = delta / max_e;
+      if (rel_delta > 5e-16) {
         grvy_printf(GRVY_ERROR, "Reaction %d does not conserve energy.\n", r);
         grvy_printf(GRVY_ERROR, "%.8E + %.8E = %.8E =/= %.8E\n", reactEnergy, config.reactionEnergies[r],
                     reactEnergy + config.reactionEnergies[r], prodEnergy);
+        grvy_printf(GRVY_ERROR, "Difference = %.8E\n", delta);
         exit(-1);
       }
     }

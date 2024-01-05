@@ -87,6 +87,8 @@ class Chemistry {
   // Kevin: currently, I doubt we need mixture class here. but left it just in case.
   GasMixture *mixture_ = NULL;
 
+  double min_temperature_;
+
  public:
   Chemistry(GasMixture *mixture, RunConfiguration &config);
   MFEM_HOST_DEVICE Chemistry(GasMixture *mixture, const ChemistryInput &inputs);

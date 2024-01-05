@@ -46,6 +46,7 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
   dim_ = mixture->GetDimension();
 
   model_ = inputs.model;
+  min_temperature_ = inputs.minimumTemperature;
 
   electronIndex_ = inputs.electronIndex;
 
@@ -108,7 +109,11 @@ MFEM_HOST_DEVICE Chemistry::~Chemistry() {
 #if 0 
 void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, Vector &kfwd) {
   kfwd.SetSize(numReactions_);
-  computeForwardRateCoeffs(T_h, T_e, &kfwd[0]);
+
+  const double Thlim = max(T_h, min_temperature_);
+  const double Telim = max(T_e, min_temperature_);
+
+  computeForwardRateCoeffs(Thlim, Telim, &kfwd[0]);
   // kfwd = 0.0;
   //
   // for (int r = 0; r < numReactions_; r++) {
@@ -124,9 +129,12 @@ MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double &T_h, con
   // kfwd.SetSize(numReactions_);
   for (int r = 0; r < numReactions_; r++) kfwd[r] = 0.0;
 
+  const double Thlim = max(T_h, min_temperature_);
+  const double Telim = max(T_e, min_temperature_);
+
   for (int r = 0; r < numReactions_; r++) {
     bool isElectronInvolved = isElectronInvolvedAt(r);
-    kfwd[r] = reactions_[r]->computeRateCoefficient(T_h, T_e, dofindex, isElectronInvolved);
+    kfwd[r] = reactions_[r]->computeRateCoefficient(Thlim , Telim, dofindex, isElectronInvolved);
   }
 
   return;
@@ -136,7 +144,11 @@ MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double &T_h, con
 // NOTE: if not detailedBalance, equilibrium constant is returned as zero, though it cannot be used.
 void Chemistry::computeEquilibriumConstants(const double &T_h, const double &T_e, Vector &kC) {
   kC.SetSize(numReactions_);
-  computeEquilibriumConstants(T_h, T_e, &kC[0]);
+
+  const double Thlim = max(T_h, min_temperature_);
+  const double Telim = max(T_e, min_temperature_);
+
+  computeEquilibriumConstants(Thlim, Telim, &kC[0]);
   // kC = 0.0;
   //
   // for (int r = 0; r < numReactions_; r++) {
@@ -155,8 +167,11 @@ void Chemistry::computeEquilibriumConstants(const double &T_h, const double &T_e
 MFEM_HOST_DEVICE void Chemistry::computeEquilibriumConstants(const double &T_h, const double &T_e, double *kC) {
   for (int r = 0; r < numReactions_; r++) kC[r] = 0.0;
 
+  const double Thlim = max(T_h, min_temperature_);
+  const double Telim = max(T_e, min_temperature_);
+
   for (int r = 0; r < numReactions_; r++) {
-    double temp = (isElectronInvolvedAt(r)) ? T_e : T_h;
+    double temp = (isElectronInvolvedAt(r)) ? Telim : Thlim;
     if (detailedBalance_[r]) {
       kC[r] = equilibriumConstantParams_[0 + r * gpudata::MAXCHEMPARAMS] *
               pow(temp, equilibriumConstantParams_[1 + r * gpudata::MAXCHEMPARAMS]) *

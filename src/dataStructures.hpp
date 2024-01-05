@@ -49,7 +49,7 @@ const int MAXEQUATIONS = MAXDIM + 2 + MAXSPECIES;  // momentum + two energies + 
 // NOTE: (presumably from marc) lets make sure we don't have more than 20 eq.
 // NOTE(kevin): with MAXEQUATIONS=20, marvin fails with out-of-memery with 3 MPI process.
 
-const int MAXREACTIONS = 20;
+const int MAXREACTIONS = 34;
 const int MAXCHEMPARAMS = 3;
 
 const int MAXTABLE = 512;
@@ -632,11 +632,19 @@ struct ChemistryInput {
   int numReactions;
   double reactionEnergies[gpudata::MAXREACTIONS];
   bool detailedBalance[gpudata::MAXREACTIONS];
-  double reactantStoich[gpudata::MAXSPECIES * gpudata::MAXREACTIONS];
-  double productStoich[gpudata::MAXSPECIES * gpudata::MAXREACTIONS];
+  // NOTE(trevilo): reactantStoich and productStoich used to be
+  // double.  Changed to short int to conserve space to satisfy cuda
+  // parameter space limit, which was breached after increasing
+  // MAXREACTIONS.  Causes no issue now, since our stoichiometric
+  // coefficients are alwas small integers, but if ever need more
+  // generality for some reason, then it will have to be implemented.
+  int16_t reactantStoich[gpudata::MAXSPECIES * gpudata::MAXREACTIONS];
+  int16_t productStoich[gpudata::MAXSPECIES * gpudata::MAXREACTIONS];
   ReactionModel reactionModels[gpudata::MAXREACTIONS];
   double equilibriumConstantParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
   ReactionInput reactionInputs[gpudata::MAXREACTIONS];
+
+  double minimumTemperature;
 };
 
 struct PostProcessInput {

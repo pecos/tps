@@ -349,9 +349,16 @@ void WallBC::computeSlipWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &g
 
   // dominant direction
   int dir, next_dir, previous_dir;
-  if (abs(unitNorm[0]) >= abs(unitNorm[1]) && abs(unitNorm[0]) >= abs(unitNorm[2])) dir = 0;
-  if (abs(unitNorm[1]) >= abs(unitNorm[0]) && abs(unitNorm[1]) >= abs(unitNorm[2])) dir = 1;
-  if (abs(unitNorm[2]) >= abs(unitNorm[0]) && abs(unitNorm[2]) >= abs(unitNorm[1])) dir = 2;
+  if (dim_ == 3) {
+    if (abs(unitNorm[0]) >= abs(unitNorm[1]) && abs(unitNorm[0]) >= abs(unitNorm[2])) dir = 0;
+    if (abs(unitNorm[1]) >= abs(unitNorm[0]) && abs(unitNorm[1]) >= abs(unitNorm[2])) dir = 1;
+    if (abs(unitNorm[2]) >= abs(unitNorm[0]) && abs(unitNorm[2]) >= abs(unitNorm[1])) dir = 2;
+  } else if (dim_ == 2) {
+    if (abs(unitNorm[0]) >= abs(unitNorm[1])) dir = 0;
+    if (abs(unitNorm[1]) >= abs(unitNorm[0])) dir = 1;
+  } else {
+    assert(false);
+  }
   next_dir = (dir + 1) % (dim_);
   previous_dir = (dir + 2) % (dim_);
 
@@ -365,12 +372,20 @@ void WallBC::computeSlipWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &g
   tangent1 *= 1. / max(sqrt(mod), sml);
 
   // tangent 2
-  tangent2[0] = +(unitNorm[1] * tangent1[2] - unitNorm[2] * tangent1[1]);
-  tangent2[1] = -(unitNorm[0] * tangent1[2] - unitNorm[2] * tangent1[0]);
-  tangent2[2] = +(unitNorm[0] * tangent1[1] - unitNorm[1] * tangent1[0]);
-  mod = 0.;
-  for (int d = 0; d < dim_; d++) mod += tangent2[d] * tangent2[d];
-  tangent2 *= 1. / max(sqrt(mod), sml);
+  if (dim_ == 3) {
+    tangent2[0] = +(unitNorm[1] * tangent1[2] - unitNorm[2] * tangent1[1]);
+    tangent2[1] = -(unitNorm[0] * tangent1[2] - unitNorm[2] * tangent1[0]);
+    tangent2[2] = +(unitNorm[0] * tangent1[1] - unitNorm[1] * tangent1[0]);
+    mod = 0.;
+    for (int d = 0; d < dim_; d++) mod += tangent2[d] * tangent2[d];
+    tangent2 *= 1. / max(sqrt(mod), sml);
+  } else if (dim_ == 2) {
+    // tangent2 is not used in 2d
+    tangent2[0] = 0.0;
+    tangent2[1] = 0.0;
+  } else {
+    assert(false);
+  }
 
   // velocity in wall coordinate system
   Vector nVel(dim_);
