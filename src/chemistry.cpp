@@ -109,11 +109,10 @@ MFEM_HOST_DEVICE Chemistry::~Chemistry() {
   }
 }
 
-void Chemistry::setGridFunctionRates(const mfem::GridFunction & f)
-{
+void Chemistry::setGridFunctionRates(const mfem::GridFunction &f) {
   for (int r = 0; r < numReactions_; r++) {
     if (reactions_[r]->reactionModel == GRIDFUNCTION_RXN) {
-      GridFunctionReaction * rx = dynamic_cast<GridFunctionReaction*>(reactions_[r]);
+      GridFunctionReaction *rx = dynamic_cast<GridFunctionReaction *>(reactions_[r]);
       rx->setGridFunctionData(f);
     }
   }
@@ -138,7 +137,8 @@ void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, V
 }
 #endif
 
-MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, const int & dofindex, double *kfwd) {
+MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, const int &dofindex,
+                                                          double *kfwd) {
   // kfwd.SetSize(numReactions_);
   for (int r = 0; r < numReactions_; r++) kfwd[r] = 0.0;
 
@@ -147,7 +147,7 @@ MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double &T_h, con
 
   for (int r = 0; r < numReactions_; r++) {
     bool isElectronInvolved = isElectronInvolvedAt(r);
-    kfwd[r] = reactions_[r]->computeRateCoefficient(Thlim , Telim, dofindex, isElectronInvolved);
+    kfwd[r] = reactions_[r]->computeRateCoefficient(Thlim, Telim, dofindex, isElectronInvolved);
   }
 
   return;

@@ -39,7 +39,7 @@ MFEM_HOST_DEVICE Arrhenius::Arrhenius(const double &A, const double &b, const do
     : Reaction(ARRHENIUS), A_(A), b_(b), E_(E) {}
 
 MFEM_HOST_DEVICE double Arrhenius::computeRateCoefficient(const double &T_h, const double &T_e,
-                                                          [[maybe_unused]] const int & dofindex,
+                                                          [[maybe_unused]] const int &dofindex,
                                                           const bool isElectronInvolved) {
   double temp = (isElectronInvolved) ? T_e : T_h;
 
@@ -50,7 +50,7 @@ MFEM_HOST_DEVICE HoffertLien::HoffertLien(const double &A, const double &b, cons
     : Reaction(HOFFERTLIEN), A_(A), b_(b), E_(E) {}
 
 MFEM_HOST_DEVICE double HoffertLien::computeRateCoefficient(const double &T_h, const double &T_e,
-                                                            [[maybe_unused]] const int & dofindex,
+                                                            [[maybe_unused]] const int &dofindex,
                                                             const bool isElectronInvolved) {
   double temp = (isElectronInvolved) ? T_e : T_h;
   double tempFactor = E_ / BOLTZMANNCONSTANT / temp;
@@ -73,29 +73,29 @@ MFEM_HOST_DEVICE Tabulated::Tabulated(const TableInput &input) : Reaction(TABULA
 MFEM_HOST_DEVICE Tabulated::~Tabulated() { delete table_; }
 
 MFEM_HOST_DEVICE double Tabulated::computeRateCoefficient(const double &T_h, const double &T_e,
-                                                          [[maybe_unused]] const int & dofindex,
+                                                          [[maybe_unused]] const int &dofindex,
                                                           const bool isElectronInvolved) {
   double temp = (isElectronInvolved) ? T_e : T_h;
   return table_->eval(temp);
 }
 
-MFEM_HOST_DEVICE GridFunctionReaction::GridFunctionReaction(int comp):
-Reaction(GRIDFUNCTION_RXN), data( nullptr ), comp(comp) { }
+MFEM_HOST_DEVICE GridFunctionReaction::GridFunctionReaction(int comp)
+    : Reaction(GRIDFUNCTION_RXN), data(nullptr), comp(comp) {}
 
-MFEM_HOST_DEVICE GridFunctionReaction::~GridFunctionReaction() { }
+MFEM_HOST_DEVICE GridFunctionReaction::~GridFunctionReaction() {}
 
-void GridFunctionReaction::setGridFunctionData(const mfem::GridFunction & f) {
-  assert( f.Size() >= (comp+1)*f.FESpace()->GetNDofs() );
-  #ifdef _GPU_
-  data = f.Read() + comp*f.FESpace()->GetNDofs();
-  #else
-  data = f.HostRead() + comp*f.FESpace()->GetNDofs();
-  #endif
+void GridFunctionReaction::setGridFunctionData(const mfem::GridFunction &f) {
+  assert(f.Size() >= (comp + 1) * f.FESpace()->GetNDofs());
+#ifdef _GPU_
+  data = f.Read() + comp * f.FESpace()->GetNDofs();
+#else
+  data = f.HostRead() + comp * f.FESpace()->GetNDofs();
+#endif
 }
 
-MFEM_HOST_DEVICE double GridFunctionReaction::computeRateCoefficient([[maybe_unused]] const double &T_h, 
-                                                       [[maybe_unused]] const double &T_e,
-                                                       const int & dofindex,
-                                                       [[maybe_unused]] const bool isElectronInvolved) {
+MFEM_HOST_DEVICE double GridFunctionReaction::computeRateCoefficient([[maybe_unused]] const double &T_h,
+                                                                     [[maybe_unused]] const double &T_e,
+                                                                     const int &dofindex,
+                                                                     [[maybe_unused]] const bool isElectronInvolved) {
   return data[dofindex];
 }

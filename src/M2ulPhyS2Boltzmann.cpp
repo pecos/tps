@@ -83,22 +83,16 @@ void M2ulPhyS::push(TPS::Tps2Boltzmann &interface) {
   delete electronTemperature;
 }
 
-void M2ulPhyS::fetch(TPS::Tps2Boltzmann &interface) { 
-
+void M2ulPhyS::fetch(TPS::Tps2Boltzmann &interface) {
   mfem::ParaViewDataCollection paraview_dc("interface", mesh);
   paraview_dc.SetPrefixPath("BoltzmannInterface");
   paraview_dc.SetCycle(0);
   paraview_dc.SetDataFormat(VTKFormat::BINARY);
   paraview_dc.SetTime(0.0);
-  paraview_dc.RegisterField("Heavy temperature",
-                            &interface.Field(TPS::Tps2Boltzmann::Index::HeavyTemperature));
-  paraview_dc.RegisterField("Electron temperature",
-                            &interface.Field(TPS::Tps2Boltzmann::Index::ElectronTemperature));
-  paraview_dc.RegisterField("Electric field",
-                            &interface.Field(TPS::Tps2Boltzmann::Index::ElectricField));
-  paraview_dc.RegisterField("Species",
-                            &interface.Field(TPS::Tps2Boltzmann::Index::SpeciesDensities));
-  paraview_dc.RegisterField("Reaction rates",
-                             &interface.Field(TPS::Tps2Boltzmann::Index::ReactionRates));
+  paraview_dc.RegisterField("Heavy temperature", &interface.Field(TPS::Tps2Boltzmann::Index::HeavyTemperature));
+  paraview_dc.RegisterField("Electron temperature", &interface.Field(TPS::Tps2Boltzmann::Index::ElectronTemperature));
+  paraview_dc.RegisterField("Electric field", &interface.Field(TPS::Tps2Boltzmann::Index::ElectricField));
+  paraview_dc.RegisterField("Species", &interface.Field(TPS::Tps2Boltzmann::Index::SpeciesDensities));
+  paraview_dc.RegisterField("Reaction rates", &interface.Field(TPS::Tps2Boltzmann::Index::ReactionRates));
   paraview_dc.Save();
- }
+}

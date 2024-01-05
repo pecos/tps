@@ -41,9 +41,10 @@
 #include <pybind11/stl.h>
 #endif
 
+#include <math.h>
+
 #include <cstddef>
 #include <cstdlib>
-#include <math.h>
 
 namespace TPS {
 
@@ -73,8 +74,8 @@ class CPUData {
   size_t stride_;
 };
 
-void idenity_fun(const Vector & x, Vector & out) {
-  for ( int i(0); i < x.Size(); ++i ) out[i] = x[i];
+void idenity_fun(const Vector &x, Vector &out) {
+  for (int i(0); i < x.Size(); ++i) out[i] = x[i];
 }
 
 Tps2Boltzmann::Tps2Boltzmann(Tps *tps) : NIndexes(7), tps_(tps), all_fes_(nullptr) {
@@ -89,7 +90,7 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps) : NIndexes(7), tps_(tps), all_fes_(nullpt
   assert(basis_type_ == 0 || basis_type_ == 1);
 
   tps->getRequiredInput("em/current_frequency", EfieldAngularFreq_);
-  EfieldAngularFreq_ *= 2.*M_PI;
+  EfieldAngularFreq_ *= 2. * M_PI;
 
   offsets.SetSize(NIndexes + 1);
   ncomps.SetSize(NIndexes + 1);
@@ -277,9 +278,10 @@ void tps2bolzmann(py::module &m) {
            [](TPS::Tps2Boltzmann &interface, TPS::Tps2Boltzmann::Index index) {
              return std::unique_ptr<TPS::CPUData>(new TPS::CPUData(interface.Field(index), false));
            })
-      .def("HostReadWrite", [](TPS::Tps2Boltzmann &interface, TPS::Tps2Boltzmann::Index index) {
-        return std::unique_ptr<TPS::CPUData>(new TPS::CPUData(interface.Field(index), true));
-      })
+      .def("HostReadWrite",
+           [](TPS::Tps2Boltzmann &interface, TPS::Tps2Boltzmann::Index index) {
+             return std::unique_ptr<TPS::CPUData>(new TPS::CPUData(interface.Field(index), true));
+           })
       .def("EfieldAngularFreq", &TPS::Tps2Boltzmann::EfieldAngularFreq)
       .def("Nspecies", &TPS::Tps2Boltzmann::Nspecies)
       .def("NeFiledComps", &TPS::Tps2Boltzmann::NeFieldComps)

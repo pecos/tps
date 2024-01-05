@@ -99,8 +99,8 @@ class Tps2Boltzmann {
   const mfem::ParFiniteElementSpace &NativeFes(Index index) const { return *(list_native_fes_[index]); }
   mfem::ParFiniteElementSpace &NativeFes(Index index) { return *(list_native_fes_[index]); }
 
-  const mfem::ParGridFunction & SpatialCoordinates() const { return *spatial_coordinates_; }
-  mfem::ParGridFunction & SpatialCoordinates() { return *spatial_coordinates_; }
+  const mfem::ParGridFunction &SpatialCoordinates() const { return *spatial_coordinates_; }
+  mfem::ParGridFunction &SpatialCoordinates() { return *spatial_coordinates_; }
 
   const mfem::ParGridFunction &Field(Index index) const { return *(fields_[index]); }
   mfem::ParGridFunction &Field(Index index) { return *(fields_[index]); }
