@@ -86,6 +86,9 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
       case TABULATED_RXN: {
         reactions_[r] = new Tabulated(inputs.reactionInputs[r].tableInput);
       } break;
+      case GRIDFUNCTION_RXN: {
+        reactions_[r] = new GridFunctionReaction(inputs.reactionInputs[r].indexInput);
+      } break;
       default:
         printf("Unknown reactionModel.");
         assert(false);
@@ -103,6 +106,16 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
 MFEM_HOST_DEVICE Chemistry::~Chemistry() {
   for (int r = 0; r < numReactions_; r++) {
     if (reactions_[r] != NULL) delete reactions_[r];
+  }
+}
+
+void Chemistry::setGridFunctionRates(const mfem::GridFunction & f)
+{
+  for (int r = 0; r < numReactions_; r++) {
+    if (reactions_[r]->reactionModel == GRIDFUNCTION_RXN) {
+      GridFunctionReaction * rx = dynamic_cast<GridFunctionReaction*>(reactions_[r]);
+      rx->setGridFunctionData(f);
+    }
   }
 }
 

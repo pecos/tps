@@ -36,7 +36,7 @@ using namespace mfem;
 using namespace std;
 
 MFEM_HOST_DEVICE Arrhenius::Arrhenius(const double &A, const double &b, const double &E)
-    : Reaction(), A_(A), b_(b), E_(E) {}
+    : Reaction(ARRHENIUS), A_(A), b_(b), E_(E) {}
 
 MFEM_HOST_DEVICE double Arrhenius::computeRateCoefficient(const double &T_h, const double &T_e,
                                                           [[maybe_unused]] const int & dofindex,
@@ -47,7 +47,7 @@ MFEM_HOST_DEVICE double Arrhenius::computeRateCoefficient(const double &T_h, con
 }
 
 MFEM_HOST_DEVICE HoffertLien::HoffertLien(const double &A, const double &b, const double &E)
-    : Reaction(), A_(A), b_(b), E_(E) {}
+    : Reaction(HOFFERTLIEN), A_(A), b_(b), E_(E) {}
 
 MFEM_HOST_DEVICE double HoffertLien::computeRateCoefficient(const double &T_h, const double &T_e,
                                                             [[maybe_unused]] const int & dofindex,
@@ -58,7 +58,7 @@ MFEM_HOST_DEVICE double HoffertLien::computeRateCoefficient(const double &T_h, c
   return A_ * pow(temp, b_) * (tempFactor + 2.0) * exp(-tempFactor);
 }
 
-MFEM_HOST_DEVICE Tabulated::Tabulated(const TableInput &input) : Reaction() {
+MFEM_HOST_DEVICE Tabulated::Tabulated(const TableInput &input) : Reaction(TABULATED_RXN) {
   switch (input.order) {
     case 1: {
       table_ = new LinearTable(input);
@@ -79,17 +79,19 @@ MFEM_HOST_DEVICE double Tabulated::computeRateCoefficient(const double &T_h, con
   return table_->eval(temp);
 }
 
-MFEM_HOST_DEVICE GridFunctionReaction::GridFunctionReaction(const mfem::GridFunction & f, int comp):
-#ifdef _GPU_
-data( f.Read() + comp*f.FESpace()->GetNDofs() )
-#else
-data( f.HostRead() + comp*f.FESpace()->GetNDofs() )
-#endif
-{
-  assert( f.Size() >= (comp+1)*f.FESpace()->GetNDofs() );
-}
+MFEM_HOST_DEVICE GridFunctionReaction::GridFunctionReaction(int comp):
+Reaction(GRIDFUNCTION_RXN), data( nullptr ), comp(comp) { }
 
 MFEM_HOST_DEVICE GridFunctionReaction::~GridFunctionReaction() { }
+
+void GridFunctionReaction::setGridFunctionData(const mfem::GridFunction & f) {
+  assert( f.Size() >= (comp+1)*f.FESpace()->GetNDofs() );
+  #ifdef _GPU_
+  data = f.Read() + comp*f.FESpace()->GetNDofs();
+  #else
+  data = f.HostRead() + comp*f.FESpace()->GetNDofs();
+  #endif
+}
 
 MFEM_HOST_DEVICE double GridFunctionReaction::computeRateCoefficient([[maybe_unused]] const double &T_h, 
                                                        [[maybe_unused]] const double &T_e,

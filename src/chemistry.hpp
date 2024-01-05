@@ -95,6 +95,9 @@ class Chemistry {
 
   MFEM_HOST_DEVICE ~Chemistry();
 
+  // Set the grid function rates for GRIDFUNCTION_RXN reaction types
+  void setGridFunctionRates(const mfem::GridFunction & f);
+
   // return Vector of reaction rate coefficients, with the size of numReaction_.
   // WARNING(marc) I have removed "virtual" qualifier here assuming these functions will not
   // change for child classes. Correct if wrong

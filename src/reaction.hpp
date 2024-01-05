@@ -53,7 +53,8 @@ using namespace std;
 class Reaction {
  protected:
  public:
-  MFEM_HOST_DEVICE Reaction() {}
+  const ReactionModel reactionModel;
+  MFEM_HOST_DEVICE Reaction(ReactionModel rm): reactionModel(rm) {}
 
   MFEM_HOST_DEVICE virtual ~Reaction() {}
 
@@ -120,11 +121,14 @@ class Tabulated : public Reaction {
 class GridFunctionReaction : public Reaction {
  private:
   const double * data;
+  const int comp;
 
  public:
-  MFEM_HOST_DEVICE GridFunctionReaction(const mfem::GridFunction & f, int comp);
+  MFEM_HOST_DEVICE GridFunctionReaction(int comp);
 
   MFEM_HOST_DEVICE virtual ~GridFunctionReaction();
+
+  void setGridFunctionData(const mfem::GridFunction & f);
 
   MFEM_HOST_DEVICE virtual double computeRateCoefficient([[maybe_unused]] const double &T_h, 
                                                          [[maybe_unused]] const double &T_e,
