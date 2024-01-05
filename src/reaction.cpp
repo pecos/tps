@@ -78,3 +78,22 @@ MFEM_HOST_DEVICE double Tabulated::computeRateCoefficient(const double &T_h, con
   double temp = (isElectronInvolved) ? T_e : T_h;
   return table_->eval(temp);
 }
+
+MFEM_HOST_DEVICE GridFunctionReaction::GridFunctionReaction(const mfem::GridFunction & f, int comp):
+#ifdef _GPU_
+data( f.Read() + comp*f.FESpace()->GetNDofs() )
+#else
+data( f.HostRead() + comp*f.FESpace()->GetNDofs() )
+#endif
+{
+  assert( f.Size() >= (comp+1)*f.FESpace()->GetNDofs() );
+}
+
+MFEM_HOST_DEVICE GridFunctionReaction::~GridFunctionReaction() { }
+
+MFEM_HOST_DEVICE double GridFunctionReaction::computeRateCoefficient([[maybe_unused]] const double &T_h, 
+                                                       [[maybe_unused]] const double &T_e,
+                                                       const int & dofindex,
+                                                       [[maybe_unused]] const bool isElectronInvolved) {
+  return data[dofindex];
+}

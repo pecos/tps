@@ -117,4 +117,19 @@ class Tabulated : public Reaction {
                                                          const bool isElectronInvolved = false);
 };
 
+class GridFunctionReaction : public Reaction {
+ private:
+  const double * data;
+
+ public:
+  MFEM_HOST_DEVICE GridFunctionReaction(const mfem::GridFunction & f, int comp);
+
+  MFEM_HOST_DEVICE virtual ~GridFunctionReaction();
+
+  MFEM_HOST_DEVICE virtual double computeRateCoefficient([[maybe_unused]] const double &T_h, 
+                                                         [[maybe_unused]] const double &T_e,
+                                                         const int & dofindex,
+                                                         [[maybe_unused]] const bool isElectronInvolved = false);
+};
+
 #endif  // REACTION_HPP_
