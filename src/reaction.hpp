@@ -120,6 +120,7 @@ class Tabulated : public Reaction {
 
 class GridFunctionReaction : public Reaction {
  private:
+  std::shared_ptr<mfem::GridFunction> f_;
   const double *data;
   const int comp;
 
@@ -128,7 +129,7 @@ class GridFunctionReaction : public Reaction {
 
   MFEM_HOST_DEVICE virtual ~GridFunctionReaction();
 
-  void setGridFunctionData(const mfem::GridFunction &f);
+  void setGridFunctionData(std::shared_ptr<mfem::ParGridFunction> &f);
 
   MFEM_HOST_DEVICE virtual double computeRateCoefficient([[maybe_unused]] const double &T_h,
                                                          [[maybe_unused]] const double &T_e, const int &dofindex,

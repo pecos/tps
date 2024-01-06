@@ -78,7 +78,12 @@ void idenity_fun(const Vector &x, Vector &out) {
   for (int i(0); i < x.Size(); ++i) out[i] = x[i];
 }
 
-Tps2Boltzmann::Tps2Boltzmann(Tps *tps) : NIndexes(7), tps_(tps), all_fes_(nullptr) {
+Tps2Boltzmann::Tps2Boltzmann(Tps *tps) : 
+  NIndexes(7),
+  tps_(tps),
+  all_fes_(nullptr),
+  save_to_paraview_dc(false),
+  paraview_dc(nullptr) {
   // Assert we have a couple solver;
   assert(tps->isFlowEMCoupled());
 
@@ -91,6 +96,8 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps) : NIndexes(7), tps_(tps), all_fes_(nullpt
 
   tps->getRequiredInput("em/current_frequency", EfieldAngularFreq_);
   EfieldAngularFreq_ *= 2. * M_PI;
+
+  tps->getInput("boltzmannInterface/save_to_paraview", save_to_paraview_dc);
 
   offsets.SetSize(NIndexes + 1);
   ncomps.SetSize(NIndexes + 1);
@@ -170,12 +177,28 @@ void Tps2Boltzmann::init(M2ulPhyS *flowSolver) {
   scalar_interpolator_->SetAssemblyLevel(assembly_level);
   scalar_interpolator_->Assemble();
 
+  scalar_interpolator_to_nativeFES_= new mfem::ParDiscreteLinearOperator(scalar_fes_, scalar_native_fes_);
+  scalar_interpolator_to_nativeFES_->AddDomainInterpolator(new mfem::IdentityInterpolator());
+  scalar_interpolator_to_nativeFES_->SetAssemblyLevel(assembly_level);
+  scalar_interpolator_to_nativeFES_->Assemble();
+
   // Spatial coordinates
   spatial_coord_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_, pmesh->Dimension(), mfem::Ordering::byNODES);
   spatial_coordinates_ = new mfem::ParGridFunction(spatial_coord_fes_);
   mfem::VectorFunctionCoefficient coord_fun(pmesh->Dimension(),
                                             std::function<void(const Vector &, Vector &)>(idenity_fun));
   spatial_coordinates_->ProjectCoefficient(coord_fun);
+
+  if(save_to_paraview_dc) {
+      paraview_dc = new mfem::ParaViewDataCollection("interface", pmesh);
+      paraview_dc->SetPrefixPath("BoltzmannInterface");
+      paraview_dc->SetDataFormat(VTKFormat::BINARY);
+      paraview_dc->RegisterField("Heavy temperature", &(this->Field(TPS::Tps2Boltzmann::Index::HeavyTemperature)));
+      paraview_dc->RegisterField("Electron temperature", &(this->Field(TPS::Tps2Boltzmann::Index::ElectronTemperature)));
+      paraview_dc->RegisterField("Electric field", &(this->Field(TPS::Tps2Boltzmann::Index::ElectricField)));
+      paraview_dc->RegisterField("Species", &(this->Field(TPS::Tps2Boltzmann::Index::SpeciesDensities)));
+      paraview_dc->RegisterField("Reaction rates", &(this->Field(TPS::Tps2Boltzmann::Index::ReactionRates)));
+  }
 }
 
 void Tps2Boltzmann::interpolateFromNativeFES(const ParGridFunction &input, Tps2Boltzmann::Index index) {
@@ -193,6 +216,29 @@ void Tps2Boltzmann::interpolateFromNativeFES(const ParGridFunction &input, Tps2B
   }
 }
 
+void Tps2Boltzmann::interpolateToNativeFES(ParGridFunction &output, Index index) {
+  if (ncomps[index] == 1) {
+    scalar_interpolator_to_nativeFES_->Mult(*(fields_[index]), output);
+  } else {
+    const int loc_size_native = list_native_fes_[index]->GetNDofs();
+    const int loc_size = list_fes_[index]->GetNDofs();
+    for (int icomp(0); icomp < ncomps[index]; ++icomp) {
+      mfem::Vector view_output(output, icomp * loc_size_native,
+                                    loc_size_native);
+      mfem::Vector view_field(*(fields_[index]), icomp * loc_size, loc_size);
+      scalar_interpolator_to_nativeFES_->Mult(view_field, view_output);
+    }
+  }
+}
+
+void Tps2Boltzmann::saveDataCollection(int cycle, double time) {
+  if ( paraview_dc) {
+    paraview_dc->SetCycle(cycle);
+    paraview_dc->SetTime(time);
+    paraview_dc->Save();
+  }
+}
+
 Tps2Boltzmann::~Tps2Boltzmann() {
   // Delete views
   for (std::size_t i(0); i < NIndexes + 1; ++i) delete fields_[i];
@@ -200,6 +246,7 @@ Tps2Boltzmann::~Tps2Boltzmann() {
   delete[] fields_;
 
   // Delete interpolators
+  delete scalar_interpolator_to_nativeFES_;
   delete scalar_interpolator_;
 
   // Delete view Native Finite Element Spaces
@@ -285,7 +332,11 @@ void tps2bolzmann(py::module &m) {
       .def("EfieldAngularFreq", &TPS::Tps2Boltzmann::EfieldAngularFreq)
       .def("Nspecies", &TPS::Tps2Boltzmann::Nspecies)
       .def("NeFiledComps", &TPS::Tps2Boltzmann::NeFieldComps)
-      .def("nComponents", &TPS::Tps2Boltzmann::nComponents);
+      .def("nComponents", &TPS::Tps2Boltzmann::nComponents)
+      .def("saveDataCollection",
+           &TPS::Tps2Boltzmann::saveDataCollection,
+           "Save the data collection in Paraview format",
+           py::arg("cycle"), py::arg("time") );
 }
 }  // namespace tps_wrappers
 #endif

@@ -84,12 +84,13 @@ MFEM_HOST_DEVICE GridFunctionReaction::GridFunctionReaction(int comp)
 
 MFEM_HOST_DEVICE GridFunctionReaction::~GridFunctionReaction() {}
 
-void GridFunctionReaction::setGridFunctionData(const mfem::GridFunction &f) {
-  assert(f.Size() >= (comp + 1) * f.FESpace()->GetNDofs());
+void GridFunctionReaction::setGridFunctionData(std::shared_ptr<mfem::ParGridFunction> &f) {
+  f_ = f;
+  assert(f->Size() >= (comp + 1) * f->FESpace()->GetNDofs());
 #ifdef _GPU_
-  data = f.Read() + comp * f.FESpace()->GetNDofs();
+  data = f_->Read() + comp * f_->FESpace()->GetNDofs();
 #else
-  data = f.HostRead() + comp * f.FESpace()->GetNDofs();
+  data = f_->HostRead() + comp * f_->FESpace()->GetNDofs();
 #endif
 }
 
