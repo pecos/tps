@@ -84,8 +84,8 @@ void M2ulPhyS::push(TPS::Tps2Boltzmann &interface) {
 }
 
 void M2ulPhyS::fetch(TPS::Tps2Boltzmann &interface) {
-  mfem::ParFiniteElementSpace * reaction_rates_fes(&(interface.NativeFes(TPS::Tps2Boltzmann::Index::ReactionRates)));
-  std::shared_ptr<mfem::ParGridFunction> reaction_rates(new mfem::ParGridFunction( reaction_rates_fes ) );
+  mfem::ParFiniteElementSpace *reaction_rates_fes(&(interface.NativeFes(TPS::Tps2Boltzmann::Index::ReactionRates)));
+  std::shared_ptr<mfem::ParGridFunction> reaction_rates(new mfem::ParGridFunction(reaction_rates_fes));
   interface.interpolateToNativeFES(*reaction_rates, TPS::Tps2Boltzmann::Index::ReactionRates);
   chemistry_->setGridFunctionRates(reaction_rates);
 }

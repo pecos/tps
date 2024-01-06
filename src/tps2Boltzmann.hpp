@@ -161,7 +161,7 @@ class Tps2Boltzmann {
   double EfieldAngularFreq_;
 
   bool save_to_paraview_dc;
-  mfem::ParaViewDataCollection * paraview_dc;
+  mfem::ParaViewDataCollection *paraview_dc;
 };
 }  // namespace TPS
 
