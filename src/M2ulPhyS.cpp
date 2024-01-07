@@ -3319,6 +3319,11 @@ void M2ulPhyS::parseReactionInputs() {
       config.reactionModels[r - 1] = TABULATED_RXN;
       std::string inputPath(basepath + "/tabulated");
       readTable(inputPath, config.chemistryInput.reactionInputs[r - 1].tableInput);
+    } else if (model == "bte") {
+      config.reactionModels[r - 1] = GRIDFUNCTION_RXN;
+      int index;
+      tpsP->getRequiredInput((basepath + "index").c_str(), index);
+      config.chemistryInput.reactionInputs[r - 1].indexInput = index;
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
       exit(ERROR);
