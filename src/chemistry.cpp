@@ -37,7 +37,7 @@ using namespace std;
 
 Chemistry::Chemistry(GasMixture *mixture, RunConfiguration &config) : Chemistry(mixture, config.chemistryInput) {}
 
-MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput &inputs) : mixture_(mixture) {
+Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput &inputs) : mixture_(mixture) {
   numEquations_ = mixture->GetNumEquations();
   numSpecies_ = mixture->GetNumSpecies();
   numActiveSpecies_ = mixture->GetNumActiveSpecies();
