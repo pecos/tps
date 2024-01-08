@@ -103,12 +103,12 @@ int Tps2Boltzmann::_countBTEReactions() {
   int bte_reactions(0);
   tps_->getRequiredInput("reactions/number_of_reactions", total_reactions);
   reaction_eqs_.reserve(total_reactions);
-  for ( int r(0); r<total_reactions; ++r) {
-    std::string basepath("reactions/reaction" + std::to_string(r+1));
+  for (int r(0); r < total_reactions; ++r) {
+    std::string basepath("reactions/reaction" + std::to_string(r + 1));
     std::string equation, model;
     tps_->getRequiredInput((basepath + "/equation").c_str(), equation);
     tps_->getRequiredInput((basepath + "/model").c_str(), model);
-    if ( model == "bte" ) {
+    if (model == "bte") {
       ++bte_reactions;
       reaction_eqs_.push_back(equation);
     }
@@ -347,7 +347,8 @@ void tps2bolzmann(py::module &m) {
       .def("nComponents", &TPS::Tps2Boltzmann::nComponents)
       .def("saveDataCollection", &TPS::Tps2Boltzmann::saveDataCollection, "Save the data collection in Paraview format",
            py::arg("cycle"), py::arg("time"))
-      .def("getReactionEquation", &TPS::Tps2Boltzmann::getReactionEquation, "Return the equation of the reaction", py::arg("index"));
+      .def("getReactionEquation", &TPS::Tps2Boltzmann::getReactionEquation, "Return the equation of the reaction",
+           py::arg("index"));
 }
 }  // namespace tps_wrappers
 #endif

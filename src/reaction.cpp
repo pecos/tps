@@ -98,7 +98,7 @@ MFEM_HOST_DEVICE double GridFunctionReaction::computeRateCoefficient([[maybe_unu
                                                                      [[maybe_unused]] const double &T_e,
                                                                      const int &dofindex,
                                                                      [[maybe_unused]] const bool isElectronInvolved) {
-  if(data)
+  if (data)
     return data[dofindex];
   else
     return 0.;
