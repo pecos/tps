@@ -123,6 +123,7 @@ class GridFunctionReaction : public Reaction {
   std::shared_ptr<mfem::GridFunction> f_;
   const double *data;
   const int comp;
+  int size_;
 
  public:
   MFEM_HOST_DEVICE GridFunctionReaction(int comp);

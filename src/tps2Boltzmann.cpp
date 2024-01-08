@@ -92,7 +92,7 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps)
   tps->getRequiredInput("em/current_frequency", EfieldAngularFreq_);
   EfieldAngularFreq_ *= 2. * M_PI;
 
-  tps->getInput("boltzmannInterface/save_to_paraview", save_to_paraview_dc);
+  save_to_paraview_dc = tps->getInput("boltzmannInterface/save_to_paraview", false);
 
   offsets.SetSize(NIndexes + 1);
   ncomps.SetSize(NIndexes + 1);

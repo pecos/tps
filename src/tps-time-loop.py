@@ -26,6 +26,9 @@ class ArrheniusSolver:
         self.efield = np.array(interface.HostRead(libtps.t2bIndex.ElectricField), copy=False)
         self.heavy_temperature = np.array(interface.HostRead(libtps.t2bIndex.HeavyTemperature), copy=False)
 
+        efieldAngularFreq = interface.EfieldAngularFreq()
+        print("Electric field angular frequency: ", efieldAngularFreq)
+
 
 
     def solve(self):
