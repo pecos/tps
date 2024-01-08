@@ -126,9 +126,9 @@ class GridFunctionReaction : public Reaction {
   int size_;
 
  public:
-  MFEM_HOST_DEVICE GridFunctionReaction(int comp);
+  GridFunctionReaction(int comp);
 
-  MFEM_HOST_DEVICE virtual ~GridFunctionReaction();
+  virtual ~GridFunctionReaction();
 
   void setGridFunctionData(std::shared_ptr<mfem::ParGridFunction> &f);
 

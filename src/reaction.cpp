@@ -79,10 +79,10 @@ MFEM_HOST_DEVICE double Tabulated::computeRateCoefficient(const double &T_h, con
   return table_->eval(temp);
 }
 
-MFEM_HOST_DEVICE GridFunctionReaction::GridFunctionReaction(int comp)
+GridFunctionReaction::GridFunctionReaction(int comp)
     : Reaction(GRIDFUNCTION_RXN), data(nullptr), comp(comp), size_(0) {}
 
-MFEM_HOST_DEVICE GridFunctionReaction::~GridFunctionReaction() {}
+GridFunctionReaction::~GridFunctionReaction() {}
 
 void GridFunctionReaction::setGridFunctionData(std::shared_ptr<mfem::ParGridFunction> &f) {
   f_ = f;
