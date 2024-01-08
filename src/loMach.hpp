@@ -210,6 +210,10 @@ protected:
    // domain extent
    double xmin, ymin, zmin;
    double xmax, ymax, zmax;  
+
+   // space sizes;
+  int Sdof, Pdof, Vdof, Ndof, NdofR0;
+  int SdofInt, PdofInt, VdofInt, NdofInt, NdofR0Int;
   
    int MaxIters;
    double max_speed;
@@ -319,6 +323,7 @@ protected:
    FiniteElementCollection *nfecR0 = nullptr;
    ParFiniteElementSpace *nfesR0 = nullptr;  
 
+   VectorMassIntegrator *hmv_blfi = nullptr;  
    VectorDiffusionIntegrator *hdv_blfi = nullptr;
    DiffusionIntegrator *hdt_blfi = nullptr;
   
@@ -377,6 +382,7 @@ protected:
   
    ParGridFunction *bufferInvRho;  
    ParGridFunction *bufferVisc;
+   ParGridFunction *bufferRhoDt;  
    //ParGridFunction *bufferGravity;  
    ParGridFunction *bufferAlpha;
    ParGridFunction *bufferTemp;
@@ -387,7 +393,8 @@ protected:
    ParGridFunction *bufferGridScaleY;
    ParGridFunction *bufferGridScaleZ;  
    //GridFunctionCoefficient *bousField;
-   GridFunctionCoefficient *viscField;  
+   GridFunctionCoefficient *viscField;
+   GridFunctionCoefficient *rhoDtField;    
    GridFunctionCoefficient *invRho;
    GridFunctionCoefficient *alphaField;
 
@@ -434,18 +441,19 @@ protected:
    mfem::CGSolver *HtInv = nullptr;  
 
    Vector fn, un, un_next, unm1, unm2;
-   Vector u_star;  
+   Vector u_star, u_half;  
    Vector uBn, uBnm1, uBnm2;
    Vector TBn, TBnm1, TBnm2;    
    Vector Nun, Nunm1, Nunm2;
-   Vector Fext, FText, Lext, Uext, Ldiv;          
-   Vector resu, tmpR1, tmpR1b, tmpR1c;
-   Vector gradMu, gradU, gradV, gradW, gradT;
+   Vector Fext, FText, Lext, Uext, Ldiv, LdivImp;  
+   Vector resu, tmpR1, tmpR1a, tmpR1b, tmpR1c;
+   Vector gradMu, gradRho, gradU, gradV, gradW, gradT;
    Vector gradX, gradY, gradZ;  
    Vector FBext;
    Vector divU, Qt, dtRho;
    Vector gravity;
    Vector boussinesqField;
+   Vector uns;
 
    Vector bufferR0sml, bufferR1sml;
 
@@ -734,7 +742,8 @@ public:
    void multVectorVector(Vector A, Vector B, Vector* C1, Vector* C2, Vector* C3);
    void multConstScalar(double A, Vector B, Vector* C);
    void multConstVector(double A, Vector B, Vector* C);
-   void multScalarInvVector(Vector A, Vector B, Vector* C);  
+   void multScalarInvVector(Vector A, Vector B, Vector* C);
+   void multScalarInvVectorIP(Vector A, Vector* C);    
    void multConstScalarInv(double A, Vector B, Vector* C);
    void multScalarInvScalarIP(Vector A, Vector* C);  
    void multScalarScalarIP(Vector A, Vector* C);
@@ -743,6 +752,26 @@ public:
    void multConstVectorIP(double A, Vector* C);
    void multConstScalarInvIP(double A, Vector* C);
    void dotVector(Vector A, Vector B, Vector* C);  
+
+   // common routines used for multiple integration methods
+   void extrapolateState(int current_step);
+   void updateDensity(int tStep);
+   void updateGradients(double uStep);
+   void updateGradientsOP(double uStep);  
+   void updateBC(int current_step);  
+   void updateDiffusivity();
+   void computeExplicitForcing();
+   void computeExplicitUnsteady();
+   void computeExplicitUnsteadyBDF();    
+   void computeExplicitConvection(double uStep);
+   void computeExplicitConvectionOP(double uStep);  
+   void computeExplicitDiffusion();
+   void computeImplicitDiffusion();
+   void computeQt();
+   void makeDivFree();
+   void makeDivFreeOP();  
+   void makeDivFreeLessQt();
+   void computeLaplace(Vector u, Vector* Lu);  
   
    /// Initialize forms, solvers and preconditioners.
    void Setup(double dt);
@@ -867,7 +896,10 @@ public:
    void ComputeCurl3D(ParGridFunction &u, ParGridFunction &cu);
 
    void vectorGrad3D(ParGridFunction &u, ParGridFunction &gu, ParGridFunction &gv, ParGridFunction &gw);
-   void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu);  
+   void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu);
+
+  void vectorGrad3DV(Vector u, Vector* gu, Vector* gv, Vector* gw);    
+   void scalarGrad3DV(Vector u, Vector* gu);    
 
    /// Remove mean from a Vector.
    /**
