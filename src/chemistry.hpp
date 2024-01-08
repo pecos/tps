@@ -91,7 +91,7 @@ class Chemistry {
 
  public:
   Chemistry(GasMixture *mixture, RunConfiguration &config);
-  Chemistry(GasMixture *mixture, const ChemistryInput &inputs);
+  MFEM_HOST_DEVICE Chemistry(GasMixture *mixture, const ChemistryInput &inputs);
 
   MFEM_HOST_DEVICE ~Chemistry();
 
