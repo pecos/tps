@@ -87,7 +87,7 @@ MFEM_HOST_DEVICE GridFunctionReaction::~GridFunctionReaction() {}
 void GridFunctionReaction::setGridFunctionData(std::shared_ptr<mfem::ParGridFunction> &f) {
   f_ = f;
   size_ = f->FESpace()->GetNDofs();
-  assert(comp < f->FESpace()->GetVDim() );
+  assert(comp < f->FESpace()->GetVDim());
   assert(f->FESpace()->GetOrdering() == mfem::Ordering::byNODES);
 #ifdef _GPU_
   data = f_->Read() + comp * size_;
@@ -103,7 +103,6 @@ MFEM_HOST_DEVICE double GridFunctionReaction::computeRateCoefficient([[maybe_unu
   if (data) {
     assert(dofindex < size_);
     return data[dofindex];
-  }
-  else 
+  } else
     return 0.;
 }
