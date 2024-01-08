@@ -121,5 +121,16 @@ __global__ void freeDeviceRadiation(Radiation *radiation) {
   if (radiation != NULL) radiation->~Radiation();
 }
 
+//---------------------------------------------------
+// And finally devise setters
+//---------------------------------------------------
+__global__ void deviceSetGridFunctionReactionData(const double * data, int size, GridFunctionReaction * reaction) {
+  reaction->setData(ata, size);
+}
+
+__global__ void deviceSetChemistryReactionData(const double * data, int size, Chemistry * chem) {
+  chem->setRates(data, size);
+}
+
 #endif  // cuda or hip
 }  // namespace gpu

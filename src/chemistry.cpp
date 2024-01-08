@@ -109,11 +109,20 @@ MFEM_HOST_DEVICE Chemistry::~Chemistry() {
   }
 }
 
-void Chemistry::setGridFunctionRates(std::shared_ptr<mfem::ParGridFunction> &f) {
+MFEM_HOST_DEVICE void Chemistry::setRates(const double * data, int size) {
   for (int r = 0; r < numReactions_; r++) {
     if (reactions_[r]->reactionModel == GRIDFUNCTION_RXN) {
       GridFunctionReaction *rx = dynamic_cast<GridFunctionReaction *>(reactions_[r]);
-      rx->setGridFunctionData(f);
+      rx->setData(data, size);
+    }
+  }
+}
+
+void Chemistry::setGridFunctionRates(mfem::GridFunction &f) {
+  for (int r = 0; r < numReactions_; r++) {
+    if (reactions_[r]->reactionModel == GRIDFUNCTION_RXN) {
+      GridFunctionReaction *rx = dynamic_cast<GridFunctionReaction *>(reactions_[r]);
+      rx->setGridFunction(f);
     }
   }
 }

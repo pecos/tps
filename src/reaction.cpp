@@ -80,19 +80,23 @@ MFEM_HOST_DEVICE double Tabulated::computeRateCoefficient(const double &T_h, con
 }
 
 MFEM_HOST_DEVICE GridFunctionReaction::GridFunctionReaction(int comp)
-    : Reaction(GRIDFUNCTION_RXN), data(nullptr), comp(comp), size_(0) {}
+    : Reaction(GRIDFUNCTION_RXN), data_(nullptr), comp_(comp), size_(0) {}
 
 MFEM_HOST_DEVICE GridFunctionReaction::~GridFunctionReaction() {}
 
-void GridFunctionReaction::setGridFunctionData(std::shared_ptr<mfem::ParGridFunction> &f) {
-  f_ = f;
-  size_ = f->FESpace()->GetNDofs();
-  assert(comp < f->FESpace()->GetVDim());
-  assert(f->FESpace()->GetOrdering() == mfem::Ordering::byNODES);
+MFEM_HOST_DEVICE void GridFunctionReaction::setData(const double * data, int size) {
+  data_ = data + comp_ * size_;
+  size_ = size;
+}
+
+void GridFunctionReaction::setGridFunction(const mfem::GridFunction & f) {
+  size_ = f.FESpace()->GetNDofs();
+  assert(comp_ < f.FESpace()->GetVDim());
+  assert(f.FESpace()->GetOrdering() == mfem::Ordering::byNODES);
 #ifdef _GPU_
-  data = f_->Read() + comp * size_;
+  data_ = f.Read() + comp_ * size_;
 #else
-  data = f_->HostRead() + comp * size_;
+  data_ = f.HostRead() + comp_ * size_;
 #endif
 }
 
@@ -100,9 +104,9 @@ MFEM_HOST_DEVICE double GridFunctionReaction::computeRateCoefficient([[maybe_unu
                                                                      [[maybe_unused]] const double &T_e,
                                                                      const int &dofindex,
                                                                      [[maybe_unused]] const bool isElectronInvolved) {
-  if (data) {
+  if (data_) {
     assert(dofindex < size_);
-    return data[dofindex];
+    return data_[dofindex];
   } else {
     return 0.;
   }
