@@ -19,6 +19,9 @@ class ArrheniusSolver:
         self.E = [1176329.772504, -377725.908714] # [J/mol]
 
     def fetch(self, interface):
+        n_reactions =interface.nComponents(libtps.t2bIndex.ReactionRates)
+        for r in range(n_reactions):
+            print("Reaction ", r+1, ": ", interface.getReactionEquation(r))
         self.species_densities = np.array(interface.HostRead(libtps.t2bIndex.SpeciesDensities), copy=False)
         self.efield = np.array(interface.HostRead(libtps.t2bIndex.ElectricField), copy=False)
         self.heavy_temperature = np.array(interface.HostRead(libtps.t2bIndex.HeavyTemperature), copy=False)
@@ -27,14 +30,16 @@ class ArrheniusSolver:
 
     def solve(self):
         #A_ * pow(temp, b_) * exp(-E_ / UNIVERSALGASCONSTANT / temp);
-        self.reaction_rates = [A * np.pow(self.heavy_temperature, b) * 
+        self.reaction_rates = [A * np.power(self.heavy_temperature, b) * 
                                np.exp(-E/(self.UNIVERSALGASCONSTANT * self.heavy_temperature))
                                for A,b,E in zip(self.A, self.b, self.E) ]
 
     def push(self, interface):
-        rates =  np.array(interface.HostWrite(libtps.t2bIndex.ReactionRates), copy=False)
-        rates[0:self.heavy_temperature.shape[0]] = self.reaction_rates[0]
-        rates[self.heavy_temperature.shape[0]:] = self.reaction_rates[1]
+        n_reactions =interface.nComponents(libtps.t2bIndex.ReactionRates)
+        if n_reactions >= 2:
+            rates =  np.array(interface.HostWrite(libtps.t2bIndex.ReactionRates), copy=False)
+            rates[0:self.heavy_temperature.shape[0]] = self.reaction_rates[0]
+            rates[self.heavy_temperature.shape[0]:] = self.reaction_rates[1]
 
 
 
@@ -69,6 +74,7 @@ while it < max_iters:
     boltzmann.fetch(interface)
     boltzmann.solve()
     boltzmann.push(interface)
+    interface.saveDataCollection(cycle=it, time=it)
     tps.fetch(interface)
     
     it = it+1

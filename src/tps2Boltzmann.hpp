@@ -114,12 +114,14 @@ class Tps2Boltzmann {
   int Nspecies() const { return nspecies_; }
   int NeFieldComps() const { return nEfieldComps_; }
   int nComponents(Index index) const { return ncomps[index]; }
+  std::string getReactionEquation(int index) const { return reaction_eqs_[index]; }
 
   void saveDataCollection(int cycle, double time);
 
   ~Tps2Boltzmann();
 
  private:
+  int _countBTEReactions();
   Tps *tps_;
 
   int nspecies_;
@@ -162,6 +164,7 @@ class Tps2Boltzmann {
 
   bool save_to_paraview_dc;
   mfem::ParaViewDataCollection *paraview_dc;
+  std::vector<std::string> reaction_eqs_;
 };
 }  // namespace TPS
 

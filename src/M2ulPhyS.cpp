@@ -3322,7 +3322,7 @@ void M2ulPhyS::parseReactionInputs() {
     } else if (model == "bte") {
       config.reactionModels[r - 1] = GRIDFUNCTION_RXN;
       int index;
-      tpsP->getRequiredInput((basepath + "index").c_str(), index);
+      tpsP->getRequiredInput((basepath + "bte/index").c_str(), index);
       config.chemistryInput.reactionInputs[r - 1].indexInput = index;
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());

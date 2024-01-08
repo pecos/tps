@@ -84,8 +84,7 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps)
   assert(tps->isFlowEMCoupled());
 
   tps->getRequiredInput("species/numSpecies", nspecies_);
-  // TODO(Umberto): Get the number of reactions for the solver
-  tps->getRequiredInput("boltzmannInterface/nreactions", nreactions_);
+  nreactions_ = _countBTEReactions();
   tps->getRequiredInput("boltzmannInterface/order", order_);
   tps->getRequiredInput("boltzmannInterface/basisType", basis_type_);
   assert(basis_type_ == 0 || basis_type_ == 1);
@@ -97,6 +96,24 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps)
 
   offsets.SetSize(NIndexes + 1);
   ncomps.SetSize(NIndexes + 1);
+}
+
+int Tps2Boltzmann::_countBTEReactions() {
+  int total_reactions(0);
+  int bte_reactions(0);
+  tps_->getRequiredInput("reactions/number_of_reactions", total_reactions);
+  reaction_eqs_.reserve(total_reactions);
+  for ( int r(0); r<total_reactions; ++r) {
+    std::string basepath("reactions/reaction" + std::to_string(r+1));
+    std::string equation, model;
+    tps_->getRequiredInput((basepath + "/equation").c_str(), equation);
+    tps_->getRequiredInput((basepath + "/model").c_str(), model);
+    if ( model == "bte" ) {
+      ++bte_reactions;
+      reaction_eqs_.push_back(equation);
+    }
+  }
+  return bte_reactions;
 }
 
 void Tps2Boltzmann::init(M2ulPhyS *flowSolver) {
@@ -329,7 +346,8 @@ void tps2bolzmann(py::module &m) {
       .def("NeFiledComps", &TPS::Tps2Boltzmann::NeFieldComps)
       .def("nComponents", &TPS::Tps2Boltzmann::nComponents)
       .def("saveDataCollection", &TPS::Tps2Boltzmann::saveDataCollection, "Save the data collection in Paraview format",
-           py::arg("cycle"), py::arg("time"));
+           py::arg("cycle"), py::arg("time"))
+      .def("getReactionEquation", &TPS::Tps2Boltzmann::getReactionEquation, "Return the equation of the reaction", py::arg("index"));
 }
 }  // namespace tps_wrappers
 #endif
