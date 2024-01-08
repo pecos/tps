@@ -103,6 +103,7 @@ MFEM_HOST_DEVICE double GridFunctionReaction::computeRateCoefficient([[maybe_unu
   if (data) {
     assert(dofindex < size_);
     return data[dofindex];
-  } else
+  } else {
     return 0.;
+  }
 }
