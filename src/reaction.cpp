@@ -93,7 +93,7 @@ void GridFunctionReaction::setGridFunction(const mfem::GridFunction & f) {
   size_ = f.FESpace()->GetNDofs();
   assert(comp_ < f.FESpace()->GetVDim());
   assert(f.FESpace()->GetOrdering() == mfem::Ordering::byNODES);
-#ifdef _GPU_
+#if defined(_CUDA_) || defined(_HIP_)
   data_ = f.Read() + comp_ * size_;
 #else
   data_ = f.HostRead() + comp_ * size_;
