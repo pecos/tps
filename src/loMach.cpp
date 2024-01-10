@@ -631,7 +631,8 @@ void LoMachSolver::initialize() {
    r1px2c.SetSize(nfes_truevsize);            
 
    gradMu.SetSize(vfes_truevsize);
-   gradRho.SetSize(vfes_truevsize);      
+   gradRho.SetSize(vfes_truevsize);
+   gradDivU.SetSize(vfes_truevsize);         
    gradU.SetSize(vfes_truevsize);
    gradV.SetSize(vfes_truevsize);
    gradW.SetSize(vfes_truevsize);
@@ -1125,8 +1126,8 @@ void LoMachSolver::Setup(double dt)
 {
 
    // HARD CODE
-   partial_assembly = true;
-   //partial_assembly = false;
+   //partial_assembly = true;
+   partial_assembly = false;
    //if (verbose) grvy_printf(ginfo, "in Setup...\n");
    /*
    if (verbose && pmesh->GetMyRank() == 0)
@@ -1703,7 +1704,7 @@ void LoMachSolver::Setup(double dt)
    viscField = new GridFunctionCoefficient(bufferVisc);
 
 
-   /*   
+   /**/   
    bufferRhoDt = new ParGridFunction(sfes);
    {
      double *data = bufferRhoDt->HostReadWrite();
@@ -1713,11 +1714,11 @@ void LoMachSolver::Setup(double dt)
      double *data = bufferRhoDt->HostReadWrite();
      double *Rdata = rn_gf.HostReadWrite();
      for (int i = 0; i < Sdof; i++) {
-       data[i] = Rdata[i]/dt;
+       data[i] = Rdata[i] / dt;
      }
    }
    rhoDtField = new GridFunctionCoefficient(bufferRhoDt);
-   */
+   /**/
 
    
    
@@ -1729,13 +1730,13 @@ void LoMachSolver::Setup(double dt)
      }
    }   
    
-   // this is used in the last velocity implicit solve, Step kin_vis is
-   // only for the pressure-poisson
+   // helmholtz for velocity
    H_lincoeff.constant = kin_vis;
    H_bdfcoeff.constant = 1.0 / dt;
    H_form = new ParBilinearForm(vfes);
-   auto *hmv_blfi = new VectorMassIntegrator(H_bdfcoeff); // diagonal from unsteady term
-   // not supported... hmv_blfi = new VectorMassIntegrator(*rhoDtField);
+   //> auto *hmv_blfi = new VectorMassIntegrator(H_bdfcoeff); // diagonal from unsteady term
+   // not supported...
+   hmv_blfi = new VectorMassIntegrator(*rhoDtField);
    /*
    if (constantViscosity == true) {
      //auto *hdv_blfi = new VectorDiffusionIntegrator(H_lincoeff);
@@ -2828,12 +2829,12 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    
    
    // begin momentum.....................................
-   H_bdfcoeff.constant = bd0 / dt;
-   //{ mfem says NO!
-   //  double *data = bufferRhoDt->HostReadWrite();
-   //  double *Rdata = rn_gf.HostReadWrite();               
-   //  for (int i = 0; i < Sdof; i++) { data[i] = Rdata[i] * bd0 / dt; }
-   //}         
+   //H_bdfcoeff.constant = bd0 / dt;
+   { 
+     double *data = bufferRhoDt->HostReadWrite();
+     double *Rdata = rn_gf.HostReadWrite();               
+     for (int i = 0; i < Sdof; i++) { data[i] = Rdata[i] * bd0 / dt; }
+   }         
    H_form->Update();
    H_form->Assemble();
    H_form->FormSystemMatrix(vel_ess_tdof, H);
@@ -3385,7 +3386,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    resu.Add(1.0,fn);
    resu.Add(1.0,Ldiv);      
 
-   multScalarInvVectorIP(rn,&resu);      
+   //multScalarInvVectorIP(rn,&resu);      
    Mv->Mult(resu, tmpR1);
    resu.Set(1.0,tmpR1);
    
@@ -3929,12 +3930,12 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
    // begin momentum....................................
 
    // update Helmholtz operator
-   H_bdfcoeff.constant = 1.0 / dt;
-   //{ not allowed by mfem... X(```
-   //  double *data = bufferRhoDt->HostReadWrite();
-   //  double *Rdata = rn_gf.HostReadWrite();               
-   //  for (int i = 0; i < Sdof; i++) { data[i] = Rdata[i] / dt; }
-   //}      
+   //H_bdfcoeff.constant = 1.0 / dt;
+   {
+     double *data = bufferRhoDt->HostReadWrite();
+     double *Rdata = rn_gf.HostReadWrite();               
+     for (int i = 0; i < Sdof; i++) { data[i] = Rdata[i] / dt; }
+   }      
    H_form->Update();
    H_form->Assemble();
    H_form->FormSystemMatrix(vel_ess_tdof, H);   
@@ -3986,7 +3987,7 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
    resu.Add(1.0,Ldiv);      
    
    // divide by rho
-   multScalarInvVectorIP(rn,&resu);
+   // multScalarInvVectorIP(rn,&resu);
    
    // integrated weak form
    Mv->Mult(resu, tmpR1); 
@@ -8086,9 +8087,9 @@ void LoMachSolver::updateDiffusivity() {
      }
 
      // kinematic
-     bufferVisc->GetTrueDofs(viscSml);
-     multScalarInvScalarIP(rn,&viscSml);
-     bufferVisc->SetFromTrueDofs(viscSml);     
+     //bufferVisc->GetTrueDofs(viscSml);     
+     //multScalarInvScalarIP(rn,&viscSml);
+     //bufferVisc->SetFromTrueDofs(viscSml);     
      
    } else {
      double *dataVisc = bufferVisc->HostReadWrite();        
@@ -8098,8 +8099,8 @@ void LoMachSolver::updateDiffusivity() {
    if (config.sgsModelType > 0) {
      double *dataSubgrid = bufferSubgridVisc->HostReadWrite();
      double *dataVisc = bufferVisc->HostReadWrite();
-     //double *Rdata = rn_gf.HostReadWrite();          
-     for (int i = 0; i < Sdof; i++) { dataVisc[i] += dataSubgrid[i]; }     
+     double *Rdata = rn_gf.HostReadWrite();          
+     for (int i = 0; i < Sdof; i++) { dataVisc[i] += Rdata[i] * dataSubgrid[i]; }     
    }
    if (config.linViscData.isEnabled) {
      double *viscMult = bufferViscMult->HostReadWrite();
@@ -8114,9 +8115,9 @@ void LoMachSolver::updateDiffusivity() {
    {
      double *data = bufferAlpha->HostReadWrite();
      double *dataVisc = bufferVisc->HostReadWrite();
-     //double *Rdata = rn_gf.HostReadWrite();
+     double *Rdata = rn_gf.HostReadWrite();
      double Ctmp = 1.0/Pr;
-     for (int i = 0; i < Sdof; i++) { data[i] = Ctmp * dataVisc[i]; }
+     for (int i = 0; i < Sdof; i++) { data[i] = Ctmp * dataVisc[i] / Rdata[i]; }
    }
 
 }
@@ -8149,7 +8150,7 @@ void LoMachSolver::computeQt() {
        TdivFactor = 1.0;       
      }
 
-     multScalarScalar(rn,viscSml,&tmpR0);
+     //multScalarScalar(rn,viscSml,&tmpR0);
      multScalarScalarIP(viscSml,&Qt);
      double tmp = TdivFactor * Rgas / (Pr * thermoPressure);
      multConstScalarIP(tmp,&Qt);
@@ -8190,9 +8191,12 @@ void LoMachSolver::computeQt() {
 void LoMachSolver::makeDivFree() {  
   
    // for divU
+   /*
    updateGradients(0.0);
    tmpR0b.Set(-1.0,divU);
    Mv->Mult(tmpR0b,tmpR0);
+   */
+   D->Mult(un,tmpR0);
    //if (rank0_) { std::cout << "okay 1" << endl; }   
 
    // diagnostics
@@ -8251,13 +8255,16 @@ void LoMachSolver::makeDivFree() {
    //if (rank0_) { std::cout << "okay 3" << endl; }   
 
    // grad(p)
-   G->Mult(pnBig, tmpR1);
-   MvInv->Mult(tmpR1,tmpR1b);
-   //if (rank0_) { std::cout << "okay 4" << endl; }      
+   G->Mult(pnBig, tmpR1b);
+   //MvInv->Mult(tmpR1b,tmpR1);
+   //scalarGrad3DV(pnBig,&tmpR1);
+   //if (rank0_) { std::cout << "okay 4" << endl; }   
 
    // solenoidal part of u
+   Mv->Mult(un,tmpR1);   
    {
-     double *d_u = un.HostReadWrite();     
+     //double *d_u = un.HostReadWrite();
+     double *d_u = tmpR1.HostReadWrite();     
      double *d_gradP = tmpR1b.HostReadWrite();
      for (int eq = 0; eq < dim; eq++) {     
        for (int i = 0; i < SdofInt; i++) {
@@ -8265,6 +8272,7 @@ void LoMachSolver::makeDivFree() {
        }
      }       
    }
+   MvInv->Mult(tmpR1,un);
    un_gf.SetFromTrueDofs(un);
    //if (rank0_) { std::cout << "okay 5" << endl; }      
 
@@ -8543,12 +8551,12 @@ void LoMachSolver::computeExplicitDiffusion() {
      // density gradient, TODO: replace with local gradient calc
      G->Mult(rn, tmpR1);     
      MvInv->Mult(tmpR1, gradRho);
-     */
 
      // gradient of divU => TODO replace with local gradient calc
      //G->Mult(divU, tmpR1); 
      //MvInv->Mult(tmpR1, tmpR1b);
      scalarGrad3DV(divU,&tmpR1b);
+     */
      
      
      // PART 1: rho*d_j(nu)*d_i(u_j)
@@ -8570,26 +8578,13 @@ void LoMachSolver::computeExplicitDiffusion() {
        double *data = tmpR1.HostReadWrite();
        for (int i = 0; i < SdofInt; i++) { data[i + 2*SdofInt] = dataB[i]; }              
      }
-     multScalarVectorIP(rn,&tmpR1);
+     //// multScalarVectorIP(rn,&tmpR1);
      Ldiv.Set(1.0,tmpR1);
 
      
-     // PART 2: 1/3*rho*nu*d_i(divU)
-     /*
-     {
-       double factor = 1.0/3.0;
-       double *dataVisc = viscSml.HostReadWrite();
-       double *dataRho = rn.HostReadWrite();       
-       double *data = tmpR1b.HostReadWrite();     
-       for (int eq = 0; eq < dim; eq++) {
-         for (int i = 0; i < SdofInt; i++) {
-           data[i + eq*SdofInt] *= (factor * dataVisc[i] * dataRho[i]);
-         }
-       }
-     }
-     */       
-     multScalarScalar(rn,viscSml,&tmpR1c);
-     multScalarVectorIP(tmpR1c,&tmpR1b); // tmpR1b has grad(divU)
+     // PART 2: 1/3*rho*nu*d_i(divU)     
+     //// multScalarScalar(rn,viscSml,&tmpR1c);
+     multScalarVector(viscSml,gradDivU,&tmpR1b);
      Ldiv.Add((1.0/3.0),tmpR1b);
 
      
@@ -8608,7 +8603,7 @@ void LoMachSolver::computeExplicitDiffusion() {
        }
      */
      multScalarVector(divU,gradMu,&tmpR1a);
-     multScalarVectorIP(rn,&tmpR1a);
+     //// multScalarVectorIP(rn,&tmpR1a);
      Ldiv.Add((-2.0/3.0),tmpR1a);     
 
      
@@ -8704,18 +8699,18 @@ void LoMachSolver::computeImplicitDiffusion() {
     double *data = tmpR1.HostReadWrite();
     for (int i = 0; i < SdofInt; i++) { data[i + 2*SdofInt] = dataB[i]; }              
   }
-  multScalarVectorIP(rn,&tmpR1);
+  //// multScalarVectorIP(rn,&tmpR1);
   LdivImp.Set(1.0,tmpR1);
   
-
+ 
   // PART 2a: rho*nu*d_i(divU)
 
   // gradient of divU => TODO replace with local gradient calc
-  G->Mult(divU, tmpR1); 
-  MvInv->Mult(tmpR1, tmpR1b);
+  //G->Mult(divU, tmpR1); 
+  //MvInv->Mult(tmpR1, tmpR1b);
   
-  multScalarScalar(rn,viscSml,&tmpR1c);
-  multScalarVectorIP(tmpR1c,&tmpR1b);
+  //// multScalarScalar(rn,viscSml,&tmpR1c);
+  multScalarVector(viscSml,gradDivU, &tmpR1b);
   Ldiv.Add(1.0,tmpR1b);
   
 
@@ -8732,7 +8727,8 @@ void LoMachSolver::computeImplicitDiffusion() {
   }
   curlcurlu_gf.GetTrueDofs(Lext);
 
-  multScalarVector(tmpR1c,Lext,&tmpR1b); // tmpR1c still has mu
+  //// multScalarVector(tmpR1c,Lext,&tmpR1b); // tmpR1c still has mu
+  multScalarVector(viscSml,Lext,&tmpR1b);
   Ldiv.Add(-1.0,tmpR1b);	   
   
 }
@@ -8742,9 +8738,8 @@ void LoMachSolver::computeExplicitForcing() {
 
    // Extrapolated f^{n+1} (source term: f(n+1))
    /*
-   for (auto &accel_term : accel_terms)
-   {
-      accel_term.coeff->SetTime(time + dt);
+   for (auto &accel_term : accel_terms) {
+     accel_term.coeff->SetTime(time + dt);
    }
    f_form->Assemble();
    f_form->ParallelAssemble(fn);
@@ -8995,12 +8990,16 @@ void LoMachSolver::updateGradients(double uStep) {
      for (int i = 0; i < SdofInt; i++) { data[i] += dataGradU[i + eq*SdofInt]; }
    }
 
-     // viscosity gradient, really grad(nu)...     
+     // additional gradients
      scalarGrad3DV(viscSml, &gradMu);     
-
-     // density gradient, TODO: replace with local gradient calc
      scalarGrad3DV(rn, &gradRho);          
-   
+     scalarGrad3DV(divU, &gradDivU);
+
+     // hacking out
+     gradMu = 0.0;
+     gradRho = 0.0;
+     gradDivU = 0.0;
+     
 }
 
 
@@ -9097,7 +9096,15 @@ void LoMachSolver::updateGradientsOP(double uStep) {
      // density gradient
      G->Mult(rn, tmpR1);     
      MvInv->Mult(tmpR1, gradRho);  
-   
+
+     // divergence of velocity gradient
+     G->Mult(divU, tmpR1);     
+     MvInv->Mult(tmpR1, gradDivU);  
+
+     // hacking out
+     gradMu = 0.0;
+     gradRho = 0.0;
+     gradDivU = 0.0;     
 }
 
 
@@ -9256,11 +9263,11 @@ void vel_ic(const Vector &coords, double t, Vector &u)
    //double aL = 2.0 / (2.0) * pi;
    //double bL = 2.0 * pi;
    //double cL = 2.0 * pi;
-   double aL = 1.0;
+   double aL = 4.0;
    double bL = 2.0 * pi;
-   double cL = 1.0;
+   double cL = 2.0;
    double M = 1.0;
-   double L = 0.1;   
+   double L = 0.01;   
    double scl;
 
    /**/
@@ -9289,7 +9296,7 @@ void vel_ic(const Vector &coords, double t, Vector &u)
 
    scl = std::max(1.0-std::pow((y-0.0)/1.0,4),0.0);
    //if (y > 0) {
-   //  scl = scl + 0.01 * std::pow((y-1.0)/1.0,4.0);
+   //  scl = scl + 0.001 * std::pow((y-1.0)/1.0,4.0);
    //}   
    //scl = 1.0;
    
@@ -9354,7 +9361,8 @@ double temp_ic(const Vector &coords, double t)
    double y = coords(1);
    double z = coords(2);
    double temp;
-   temp = Tlo + 0.5 * (y + 1.0) * (Thi - Tlo);
+   //temp = Tlo + 0.5 * (y + 1.0) * (Thi - Tlo);
+   temp = 0.5 * (Thi + Tlo);
    return temp;      
    
 }
@@ -9363,12 +9371,18 @@ double temp_wall(const Vector &coords, double t)
 {
    double Thi = 400.0;  
    double Tlo = 200.0;
+   double Tmean, tRamp, wt;
    double x = coords(0);
    double y = coords(1);
    double z = coords(2);
    double temp;
-   if(y > 0.0) {temp = Thi;}
-   if(y < 0.0) {temp = Tlo;}
+
+   Tmean = 0.5 * (Thi + Tlo);
+   tRamp = 100.0;
+   wt = min(t/tRamp,1.0);
+   
+   if(y > 0.0) {temp = Tmean + wt * (Thi-Tmean);}
+   if(y < 0.0) {temp = Tmean + wt * (Tlo-Tmean);}
    //temp = 300.0;
    return temp;   
 }

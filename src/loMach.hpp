@@ -447,7 +447,8 @@ protected:
    Vector Nun, Nunm1, Nunm2;
    Vector Fext, FText, Lext, Uext, Ldiv, LdivImp;  
    Vector resu, tmpR1, tmpR1a, tmpR1b, tmpR1c;
-   Vector gradMu, gradRho, gradU, gradV, gradW, gradT;
+   Vector gradMu, gradRho, gradDivU;
+   Vector gradU, gradV, gradW, gradT;
    Vector gradX, gradY, gradZ;  
    Vector FBext;
    Vector divU, Qt, dtRho;
