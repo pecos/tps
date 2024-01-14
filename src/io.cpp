@@ -288,7 +288,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
       if (group >= 0) H5Gclose(group);
       if (dataspace >= 0) H5Sclose(dataspace);
 
-    } else if (fam.inReastartFile) {  // read mode
+    } else if (fam.inRestartFile) {  // read mode
       if (rank0_) cout << "Reading in solutiond data from restart..." << endl;
 
       // verify Dofs match expectations with current mesh
@@ -848,13 +848,13 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
       //std::cout << " okay 3a " << endl;                  
       //std::cout << " okay 3a " << average->ComputeMean() << endl;            
 
-      /*
+      /**/
       if (average->ComputeMean()) {
         // samples meanUp
         h5_save_attribute(file, "samplesMean", average->GetSamplesMean());
         h5_save_attribute(file, "samplesInterval", average->GetSamplesInterval());
       }
-      */
+      /**/
       //std::cout << " okay 3aa " << endl;            
       
       // code revision
@@ -911,13 +911,13 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
       h5_read_attribute(file, "dt", dt);
       //std::cout << " okay 3ah3 " << endl;            
       h5_read_attribute(file, "order", read_order);
-      //if (average->ComputeMean() && config.GetRestartMean()) {
-      //  int samplesMean, intervals;
-      //  h5_read_attribute(file, "samplesMean", samplesMean);
-      //  h5_read_attribute(file, "samplesInterval", intervals);
-      //  average->SetSamplesMean(samplesMean);
-      //  average->SetSamplesInterval(intervals);
-      //}
+      if (average->ComputeMean() && config.GetRestartMean()) {
+        int samplesMean, intervals;
+        h5_read_attribute(file, "samplesMean", samplesMean);
+        h5_read_attribute(file, "samplesInterval", intervals);
+        average->SetSamplesMean(samplesMean);
+        average->SetSamplesInterval(intervals);
+      }
     }
     /**/
     //std::cout << " okay 3ai " << endl; 		
@@ -1047,7 +1047,7 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
 
 
     // read mode  
-    } else if (fam.inReastartFile) { 
+    } else if (fam.inRestartFile) { 
       
       if (rank0_) cout << "Reading in solutiond data from restart..." << endl;
 
@@ -1521,11 +1521,11 @@ void LoMachSolver::readTable(const std::string &inputPath, TableInput &result) {
 
 // register a new IO family which maps to a ParGridFunction
 void IODataOrganizer::registerIOFamily(std::string description, std::string group, ParGridFunction *pfunc,
-                                       bool auxRestart, bool _inReastartFile) {
+                                       bool auxRestart, bool _inRestartFile) {
   IOFamily family{description, group, pfunc};
   std::vector<IOVar> vars;
   family.allowsAuxRestart = auxRestart;
-  family.inReastartFile = _inReastartFile;
+  family.inRestartFile = _inRestartFile;
 
   families_.push_back(family);
   vars_[group] = vars;
@@ -1534,8 +1534,19 @@ void IODataOrganizer::registerIOFamily(std::string description, std::string grou
 }
 
 // register individual variables for IO family
+/*
 void IODataOrganizer::registerIOVar(std::string group, std::string varName, int index) {
   IOVar newvar{varName, index};
+  vars_[group].push_back(newvar);
+
+  return;  
+}
+*/
+
+// from dg main
+// register individual variables for IO family
+void IODataOrganizer::registerIOVar(std::string group, std::string varName, int index, bool inRestartFile) {
+  IOVar newvar{varName, index, inRestartFile};
   vars_[group].push_back(newvar);
 
   return;

@@ -1539,7 +1539,8 @@ void M2ulPhyS::projectInitialSolution() {
   //     VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
   //     U->ProjectCoefficient(u0);
   //   }
-  if (mpi.Root()) std::cout << "restart: " << config.GetRestartCycle() << std::endl;
+  //if (mpi.Root()) std::cout << "restart: " << config.GetRestartCycle() << std::endl;
+  if (rank0_) std::cout << "restart: " << config.GetRestartCycle() << std::endl;
 
 #ifdef HAVE_MASA
   if (config.use_mms_) {
