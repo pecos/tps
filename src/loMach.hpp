@@ -260,8 +260,8 @@ protected:
    bool verbose = true;
 
    /// Enable/disable partial assembly of forms.
-   //bool partial_assembly = false;
-   bool partial_assembly = true;
+   bool partial_assembly = false;
+   bool partial_assembly_pressure = true;  
 
    /// Enable/disable numerical integration rules of forms.
    //bool numerical_integ = false;
@@ -323,8 +323,11 @@ protected:
    FiniteElementCollection *nfecR0 = nullptr;
    ParFiniteElementSpace *nfesR0 = nullptr;  
 
+   ParFiniteElementSpace *HCurlFESpace = nullptr;  
+  
    VectorMassIntegrator *hmv_blfi = nullptr;  
-   VectorDiffusionIntegrator *hdv_blfi = nullptr;
+   //VectorDiffusionIntegrator *hdv_blfi = nullptr;
+   ElasticityIntegrator *hdv_blfi = nullptr;
    DiffusionIntegrator *hdt_blfi = nullptr;
   
    ParNonlinearForm *N = nullptr;
@@ -333,6 +336,7 @@ protected:
    ParBilinearForm *Lt_form = nullptr;  
    ParMixedBilinearForm *D_form = nullptr;
    ParMixedBilinearForm *G_form = nullptr;
+   ParMixedBilinearForm *Gp_form = nullptr;  
    ParBilinearForm *H_form = nullptr;
    VectorGridFunctionCoefficient *FText_gfcoeff = nullptr;
    ParLinearForm *FText_bdr_form = nullptr;
@@ -380,8 +384,9 @@ protected:
    ConstantCoefficient *bufferInlet_pbc;
    ConstantCoefficient *bufferOutlet_pbc;      
   
-   ParGridFunction *bufferInvRho;  
+  //ParGridFunction *bufferInvRho;  
    ParGridFunction *bufferVisc;
+   ParGridFunction *bufferBulkVisc;  
    ParGridFunction *bufferRhoDt;  
    //ParGridFunction *bufferGravity;  
    ParGridFunction *bufferAlpha;
@@ -394,8 +399,9 @@ protected:
    ParGridFunction *bufferGridScaleZ;  
    //GridFunctionCoefficient *bousField;
    GridFunctionCoefficient *viscField;
+   GridFunctionCoefficient *bulkViscField;  
    GridFunctionCoefficient *rhoDtField;    
-   GridFunctionCoefficient *invRho;
+   //GridFunctionCoefficient *invRho;
    GridFunctionCoefficient *alphaField;
 
    ParGridFunction *buffer_uInlet;
@@ -416,9 +422,9 @@ protected:
    OperatorHandle Sp;
    OperatorHandle Lt;  
    OperatorHandle D;
-   OperatorHandle G;
+   OperatorHandle G; 
+   OperatorHandle Gp; 
    OperatorHandle H;
-
    OperatorHandle Mt;
    OperatorHandle Dt;  
    OperatorHandle Ht;
@@ -456,6 +462,8 @@ protected:
    Vector boussinesqField;
    Vector uns;
 
+   Vector curlSpace;
+
    Vector bufferR0sml, bufferR1sml;
 
    Vector pn, resp, FText_bdr, g_bdr;
@@ -468,6 +476,8 @@ protected:
    ParGridFunction un_gf, un_next_gf, curlu_gf, curlcurlu_gf,
      Lext_gf, FText_gf, resu_gf, Pext_gf, gradT_gf;
 
+   ParGridFunction curl_gf;
+  
    ParGridFunction unm1_gf, unm2_gf;
    ParGridFunction Tnm1_gf, Tnm2_gf;
    ParGridFunction u_star_gf;  
@@ -491,6 +501,7 @@ protected:
 
    // TrueDof size
    Vector viscSml;
+   Vector alphaSml;  
    Vector viscMultSml;
    Vector subgridViscSml;  
    Vector gridScaleSml;
@@ -665,7 +676,8 @@ protected:
    // space varying viscosity multiplier  
    ParGridFunction *bufferViscMult;  
    viscositySpongeData vsd_;
-   ParGridFunction viscTotal_gf;  
+   ParGridFunction viscTotal_gf;
+   ParGridFunction alphaTotal_gf;    
 
    // subgrid scale
    ParGridFunction *bufferSubgridVisc;
@@ -821,6 +833,9 @@ public:
    /// Return a pointer to the current total viscosity ParGridFunction.  
    ParGridFunction *GetCurrentTotalViscosity() { return &viscTotal_gf; }  
 
+   /// Return a pointer to the current total thermal diffusivity ParGridFunction.    
+   ParGridFunction *GetCurrentTotalThermalDiffusivity() { return &alphaTotal_gf; }  
+  
    /// Return a pointer to the current total resolution ParGridFunction.  
    ParGridFunction *GetCurrentResolution() { return &resolution_gf; }    
   

@@ -526,6 +526,7 @@ void LoMachSolver::initialize() {
 
    // pressure
    pfec = new H1_FECollection(porder);
+   //pfec = new L2_FECollection(porder,dim);
    pfes = new ParFiniteElementSpace(pmesh, pfec);   
    
    // dealias nonlinear term 
@@ -537,6 +538,10 @@ void LoMachSolver::initialize() {
    // full vector for compatability
    fvfes = new ParFiniteElementSpace(pmesh, vfec, num_equation); //, Ordering::byNODES);
    fvfes2 = new ParFiniteElementSpace(pmesh, sfec, num_equation);
+
+   // testing...
+   HCurlFESpace = new ND_ParFESpace(pmesh,order,pmesh->Dimension());
+
    
    // Check if fully periodic mesh
    if (!(pmesh->bdr_attributes.Size() == 0))
@@ -564,6 +569,11 @@ void LoMachSolver::initialize() {
 
    gravity.SetSize(3);
    gravity = 0.0;
+
+   curlSpace.SetSize(HCurlFESpace->GetTrueVSize());
+   curlSpace = 0.0;
+   curl_gf.SetSpace(HCurlFESpace);
+   curl_gf = 0.0;   
    
    un.SetSize(vfes_truevsize);
    un = 0.0;
@@ -760,6 +770,8 @@ void LoMachSolver::initialize() {
    viscSml = 1.0e-12;
    viscMultSml.SetSize(sfes_truevsize);
    viscMultSml = 1.0;
+   alphaSml.SetSize(sfes_truevsize);
+   alphaSml = 1.0e-12;   
 
    //subgridVisc_gf.SetSpace(sfes);   
    subgridViscSml.SetSize(sfes_truevsize);
@@ -808,6 +820,8 @@ void LoMachSolver::initialize() {
    
    viscTotal_gf.SetSpace(sfes);
    viscTotal_gf = 0.0;
+   alphaTotal_gf.SetSpace(sfes);
+   alphaTotal_gf = 0.0;   
    resolution_gf.SetSpace(sfes);
    resolution_gf = 0.0;   
    
@@ -837,7 +851,7 @@ void LoMachSolver::initialize() {
   //MPI_Barrier(MPI_COMM_WORLD);       
   //if (verbose) grvy_printf(ginfo, "New Averaging okay...\n");
   
-  average->read_meanANDrms_restart_files();
+  //deprecated? average->read_meanANDrms_restart_files();
   //MPI_Barrier(MPI_COMM_WORLD);         
   //if (verbose) grvy_printf(ginfo, "average initialized...\n");        
 
@@ -933,6 +947,7 @@ void LoMachSolver::initialize() {
 
   
   // Build grid size vector and grid function
+  /*
   bufferGridScale = new ParGridFunction(sfes);
   ParGridFunction dofCount(sfes);
   {
@@ -974,14 +989,100 @@ void LoMachSolver::initialize() {
     bufferGridScale->GetTrueDofs(gridScaleSml);
     
   }
+  */
 
-
+  ///...
   // Build grid size vector and grid function
   bufferGridScale = new ParGridFunction(sfes);
   bufferGridScaleX = new ParGridFunction(sfes);
   bufferGridScaleY = new ParGridFunction(sfes);
   bufferGridScaleZ = new ParGridFunction(sfes);  
-  //ParGridFunction dofCount(sfes);
+  ParGridFunction dofCount(sfes);  
+  {
+
+    int elndofs;
+    Array<int> vdofs;
+    Vector vals;   
+    Vector loc_data;
+    int vdim = sfes->GetVDim();
+    int nSize = bufferGridScale->Size();    
+    Array<int> zones_per_vdof;
+    zones_per_vdof.SetSize(sfes->GetVSize());
+    zones_per_vdof = 0;
+    Array<int> zones_per_vdofALL;
+    zones_per_vdofALL.SetSize(sfes->GetVSize());
+    zones_per_vdofALL = 0;    
+    
+    double *data = bufferGridScale->HostReadWrite();
+    double *dataTMP = bufferGridScaleX->HostReadWrite();    
+    double *count = dofCount.HostReadWrite();
+    
+    for (int i = 0; i < sfes->GetNDofs(); i++) {
+      data[i] = 0.0;
+      count[i] = 0.0;      
+    }
+
+    // element loop    
+    for (int e = 0; e < sfes->GetNE(); ++e)
+    {
+      sfes->GetElementVDofs(e, vdofs);
+      vals.SetSize(vdofs.Size());
+      ElementTransformation *tr = sfes->GetElementTransformation(e);
+      const FiniteElement *el = sfes->GetFE(e);
+      elndofs = el->GetDof();
+      double delta, d1;      
+
+      // element dof
+      for (int dof = 0; dof < elndofs; ++dof)
+      {
+         const IntegrationPoint &ip = el->GetNodes().IntPoint(dof);
+         tr->SetIntPoint(&ip);
+         delta = pmesh->GetElementSize(tr->ElementNo, 1);
+ 	 delta = delta / ( (double)order );	 
+	 vals(dof) = delta;	 
+      }
+      
+      // Accumulate values in all dofs, count the zones.
+      for (int j = 0; j < vdofs.Size(); j++) {
+        int ldof = vdofs[j];	
+        data[ldof + 0 * nSize] += vals[j];
+      }
+      
+      for (int j = 0; j < vdofs.Size(); j++) {
+        int ldof = vdofs[j];	
+        zones_per_vdof[ldof]++;
+      }
+      
+    }
+
+    // Count the zones globally.
+    GroupCommunicator &gcomm = bufferGridScale->ParFESpace()->GroupComm();    
+    gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
+    gcomm.Bcast(zones_per_vdof);
+    //MPI_Allreduce(&zones_per_vdof, &zones_per_vdofALL, sfes->GetVSize(), MPI_INT, MPI_SUM, MPI_COMM_WORLD);    
+
+    // Accumulate for all vdofs.
+    gcomm.Reduce<double>(bufferGridScale->GetData(), GroupCommunicator::Sum);
+    gcomm.Bcast<double>(bufferGridScale->GetData());
+    //for (int i = 0; i < nSize; i++) { dataTMP[i] = data[i]; }
+    //MPI_Allreduce(&bufferGridScaleX, &bufferGridScale, sfes->GetVSize(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);  
+
+    // Compute means.
+    for (int i = 0; i < nSize; i++) {
+      const int nz = zones_per_vdof[i];
+      if (nz) { data[i] /= nz; }
+    }
+
+    bufferGridScale->GetTrueDofs(gridScaleSml);
+    bufferGridScaleX->GetTrueDofs(gridScaleXSml);
+    bufferGridScaleY->GetTrueDofs(gridScaleYSml);
+    bufferGridScaleZ->GetTrueDofs(gridScaleZSml);    
+    
+  }
+  ///...
+
+
+  /*
   {
     
     double *data = bufferGridScale->HostReadWrite();
@@ -1068,7 +1169,7 @@ void LoMachSolver::initialize() {
     bufferGridScaleZ->GetTrueDofs(gridScaleZSml);    
     
   }
-  
+  */  
   
 
   // Determine domain bounding box size
@@ -1118,6 +1219,27 @@ void LoMachSolver::initialize() {
   if (mpi_.Root()) cout << "Maximum element size: " << hmax << "m" << endl;
   if (mpi_.Root()) cout << "Minimum element size: " << hmin << "m" << endl;
   //if (mpi_.Root()) cout << "Initial time-step: " << dt << "s" << endl;
+
+
+  // possible missing bit for restart stats?
+  /*
+  if (mpi_.Root()) {
+    ios_base::openmode mode = std::fstream::trunc;
+    if (config.GetRestartCycle() == 1) mode = std::fstream::app;
+
+    histFile.open("history.hist", mode);
+    if (!histFile.is_open()) {
+      std::cout << "Could not open history file!" << std::endl;
+    } else {
+      if (histFile.tellp() == 0) {
+        histFile << "time,iter,drdt,drudt,drvdt,drwdt,dredt";
+        if (average->ComputeMean()) histFile << ",avrgSamples,mean_rho,mean_u,mean_v,mean_w,mean_p,uu,vv,ww,uv,uw,vw";
+        histFile << std::endl;
+      }
+    }
+  }
+  */
+
   
 }
 
@@ -1128,6 +1250,7 @@ void LoMachSolver::Setup(double dt)
    // HARD CODE
    //partial_assembly = true;
    partial_assembly = false;
+   partial_assembly_pressure = true;   
    //if (verbose) grvy_printf(ginfo, "in Setup...\n");
    /*
    if (verbose && pmesh->GetMyRank() == 0)
@@ -1488,10 +1611,10 @@ void LoMachSolver::Setup(double dt)
    
    // GLL integration rule (Numerical Integration)
    const IntegrationRule &ir_ni = gll_rules.Get(vfes->GetFE(0)->GetGeomType(), 2 * order);
-   const IntegrationRule &ir_nli = gll_rules.Get(nfes->GetFE(0)->GetGeomType(), 3 * norder - 1);   
-   const IntegrationRule &ir_pi = gll_rules.Get(pfes->GetFE(0)->GetGeomType(), 2 * porder);   
    const IntegrationRule &ir_i  = gll_rules.Get(sfes->GetFE(0)->GetGeomType(), 2 * order);
-
+   const IntegrationRule &ir_pi = gll_rules.Get(pfes->GetFE(0)->GetGeomType(), 2 * porder);
+   //const IntegrationRule &ir_pi = gll_rules.Get(pfes->GetFE(0)->GetGeomType(), 1);      
+   const IntegrationRule &ir_nli = gll_rules.Get(nfes->GetFE(0)->GetGeomType(), 3 * norder - 1);      
    //const IntegrationRule &ir_nli = gll_rules.Get(nfes->GetFE(0)->GetGeomType(), 4 * norder - 1);   
    const IntegrationRule &ir_di  = gll_rules.Get(sfes->GetFE(0)->GetGeomType(), std::max( 3 * order - 2, 2));
    
@@ -1538,9 +1661,9 @@ void LoMachSolver::Setup(double dt)
    nlcoeff.constant = -1.0; // starts with negative
    //N = new ParNonlinearForm(vfes);
    N = new ParNonlinearForm(nfes);
-   //auto *nlc_nlfi = new SkewSymmetricVectorConvectionNLFIntegrator(nlcoeff);
+   auto *nlc_nlfi = new SkewSymmetricVectorConvectionNLFIntegrator(nlcoeff);
    //auto *nlc_nlfi = new ConvectiveVectorConvectionNLFIntegrator(nlcoeff);
-   auto *nlc_nlfi = new VectorConvectionNLFIntegrator(nlcoeff);
+   //auto *nlc_nlfi = new VectorConvectionNLFIntegrator(nlcoeff);
    if (numerical_integ)
    {
       nlc_nlfi->SetIntRule(&ir_nli);
@@ -1567,6 +1690,7 @@ void LoMachSolver::Setup(double dt)
    // DiffusionIntegrator(MatrixCoefficient &q, const IntegrationRule *ir = nullptr)
    // BilinearFormIntegrator *integ = new DiffusionIntegrator(sigma); with sigma some type of Coefficient class
    //ParGridFunction buffer1(pfes);
+   /*
    bufferInvRho = new ParGridFunction(sfes);
    {
      double *data = bufferInvRho->HostReadWrite();
@@ -1581,7 +1705,8 @@ void LoMachSolver::Setup(double dt)
    }
    //GridFunctionCoefficient invRho(&buffer1);    
    invRho = new GridFunctionCoefficient(bufferInvRho);
-   //std::cout << "Check 9..." << std::endl;     
+   //std::cout << "Check 9..." << std::endl;
+   */
    
    // looks like this is the Laplacian for press eq
    Sp_form = new ParBilinearForm(pfes);
@@ -1592,7 +1717,7 @@ void LoMachSolver::Setup(double dt)
       sp_blfi->SetIntRule(&ir_pi);
    }
    Sp_form->AddDomainIntegrator(sp_blfi);
-   if (partial_assembly)
+   if (partial_assembly_pressure)
    {
       Sp_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
    }
@@ -1676,6 +1801,22 @@ void LoMachSolver::Setup(double dt)
    G_form->Assemble();
    G_form->FormRectangularSystemMatrix(empty, empty, G);
    if (rank0_) std::cout << "Gradient operator set" << endl;           
+
+   // gradient of pressure
+   Gp_form = new ParMixedBilinearForm(pfes, vfes);
+   auto *gp_mblfi = new GradientIntegrator();
+   if (numerical_integ)
+   {
+      gp_mblfi->SetIntRule(&ir_ni);
+   }
+   Gp_form->AddDomainIntegrator(gp_mblfi);
+   if (partial_assembly)
+   {
+      Gp_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+   }
+   Gp_form->Assemble();
+   Gp_form->FormRectangularSystemMatrix(empty, empty, Gp);
+   if (rank0_) std::cout << "Gradient of pressure operator set" << endl;           
    
    // viscosity field 
    //ParGridFunction buffer2(vfes); // or pfes here?
@@ -1684,15 +1825,8 @@ void LoMachSolver::Setup(double dt)
    bufferVisc = new ParGridFunction(sfes);
    {
      double *data = bufferVisc->HostReadWrite();
-     for (int i = 0; i < Sdof; i++) { data[i] = 0.0; }
-   }   
-   {
-     double *data = bufferVisc->HostReadWrite();
      double *Tdata = Tn_gf.HostReadWrite();
-     //double *Tdata = Tn.HostReadWrite();     // TO version
-     //Vector visc(2);
-     //Vector prim(nvel+2);
-     double visc[2];  // TO version
+     double visc[2];
      double prim[nvel+2];     
      for (int i = 0; i < nvel+2; i++) { prim[i] = 0.0; }
      for (int i = 0; i < Sdof; i++) {
@@ -1703,6 +1837,15 @@ void LoMachSolver::Setup(double dt)
    }
    viscField = new GridFunctionCoefficient(bufferVisc);
 
+   bufferBulkVisc = new ParGridFunction(sfes);
+   {
+     double *data = bufferBulkVisc->HostReadWrite();
+     double *dataMu = bufferVisc->HostReadWrite();
+     double onethird = 1.0/3.0;
+     for (int i = 0; i < Sdof; i++) { data[i] = onethird * dataMu[i]; }
+   }
+   bulkViscField = new GridFunctionCoefficient(bufferBulkVisc);
+   
 
    /**/   
    bufferRhoDt = new ParGridFunction(sfes);
@@ -1744,7 +1887,11 @@ void LoMachSolver::Setup(double dt)
    } else {
    */
      //auto *hdv_blfi = new VectorDiffusionIntegrator(*viscField);
-     hdv_blfi = new VectorDiffusionIntegrator(*viscField);
+     //hdv_blfi = new VectorDiffusionIntegrator(*viscField);
+
+     // a(u,v) = (lambda div(u), div(v)) + (2 mu e(u), e(v)), e = Sij
+     // moves all divU parts from explicit to implicit diffusion calc
+     hdv_blfi = new ElasticityIntegrator(*bulkViscField, *viscField); 
      //}
    if (numerical_integ)
    {
@@ -1821,7 +1968,7 @@ void LoMachSolver::Setup(double dt)
    //std::cout << "Check 17..." << std::endl;
    
    /**/
-   if (partial_assembly) {
+   if (partial_assembly_pressure) {
       lor = new ParLORDiscretization(*Sp_form, pres_ess_tdof);
       SpInvPC = new HypreBoomerAMG(lor->GetAssembledMatrix());
       SpInvPC->SetPrintLevel(pl_amg);
@@ -2076,9 +2223,9 @@ void LoMachSolver::Setup(double dt)
    // Velocity filter
    filter_alpha = loMach_opts_.filterWeight;
    filter_cutoff_modes = loMach_opts_.nFilter;
-   if (filter_cutoff_modes > 0) { pFilter = true; }
+   //if (filter_cutoff_modes > 0) { pFilter = true; }
    
-   if (pFilter == true)
+   if (loMach_opts_.filterVel == true)
    {
       vfec_filter = new H1_FECollection(order - filter_cutoff_modes, pmesh->Dimension());
       vfes_filter = new ParFiniteElementSpace(pmesh, vfec_filter, pmesh->Dimension());
@@ -2090,8 +2237,7 @@ void LoMachSolver::Setup(double dt)
       un_filtered_gf = 0.0;
    }
 
-   // add filter to temperature field later...
-   if (pFilter == true)     
+   if (loMach_opts_.filterTemp == true)     
    {
       sfec_filter = new H1_FECollection(order - filter_cutoff_modes);
       sfes_filter = new ParFiniteElementSpace(pmesh, sfec_filter);
@@ -2384,9 +2530,15 @@ void LoMachSolver::solve()
      double *data = viscTotal_gf.HostReadWrite();
      for (int i = 0; i < Sdof; i++) {
        data[i] = visc[i];
-       //std::cout << pmesh->GetMyRank() << ")" << " ViscTotal: " << visc[i] << endl; 
      }
    }
+   {
+     double *alpha = bufferAlpha->HostReadWrite();
+     double *data = alphaTotal_gf.HostReadWrite();
+     for (int i = 0; i < Sdof; i++) {
+       data[i] = alpha[i];
+     }
+   }   
    {
      double *res = bufferGridScale->HostReadWrite();     
      double *data = resolution_gf.HostReadWrite();
@@ -2400,7 +2552,8 @@ void LoMachSolver::solve()
    ParGridFunction *p_gf = GetCurrentPressure();
    ParGridFunction *t_gf = GetCurrentTemperature();
    ParGridFunction *res_gf = GetCurrentResolution();
-   ParGridFunction *mu_gf = GetCurrentTotalViscosity();   
+   ParGridFunction *mu_gf = GetCurrentTotalViscosity();
+   ParGridFunction *alpha_gf = GetCurrentTotalThermalDiffusivity();      
    
    /**/
    ParaViewDataCollection pvdc("output", pmesh);
@@ -2410,7 +2563,8 @@ void LoMachSolver::solve()
    pvdc.SetCycle(iter);
    pvdc.SetTime(time);
    pvdc.RegisterField("resolution", res_gf);
-   pvdc.RegisterField("viscosity", mu_gf);      
+   pvdc.RegisterField("viscosity", mu_gf);
+   pvdc.RegisterField("alpha", alpha_gf);         
    pvdc.RegisterField("density", r_gf);   
    pvdc.RegisterField("velocity", u_gf);
    pvdc.RegisterField("pressure", p_gf);
@@ -2516,6 +2670,8 @@ void LoMachSolver::solve()
 
       // just for plotting
       viscTotal_gf.SetFromTrueDofs(viscSml);
+      alphaTotal_gf.SetFromTrueDofs(alphaSml);      
+
       /*
       {
         double *visc = bufferVisc->HostReadWrite();
@@ -2699,7 +2855,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    for (auto &temp_dbc : temp_dbcs) {temp_dbc.coeff->SetTime(time + dt);}   
 
    
-   if (incompressibleSolve != true) {
+   if (incompressibleSolve != true || loMach_opts_.solveTemp != true) {
    
    // begin temperature...................................... <warp>       
    Ht_bdfcoeff.constant = bd0 / dt;
@@ -2793,7 +2949,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    Tn_next_gf.GetTrueDofs(Tn_next);
 
    // explicit filter
-   if (pFilter == true)
+   if (loMach_opts_.filterTemp == true)
    {
       const auto filter_alpha_ = filter_alpha;
       Tn_NM1_gf.ProjectGridFunction(Tn_next_gf);
@@ -2849,221 +3005,27 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
       HInv->SetPreconditioner(*HInvPC);
    }
 
-
+   fn = 0.0;   
+   Fext = 0.0;
+   uns = 0.0;
+   LdivImp = 0.0;
+   Ldiv = 0.0;   
+   
    // total forcing
-   fn = 0.0;
    computeExplicitForcing(); // ->fn   
-
-   // Extrapolated f^{n+1} (source term: f(n+1))
-   /*
-   for (auto &accel_term : accel_terms)
-   {
-      accel_term.coeff->SetTime(time + dt);
-   }
-   f_form->Assemble();
-   f_form->ParallelAssemble(fn);
-
-   // gravity term
-   if ( config.isGravity ) {
-     double *data = tmpR1.HostReadWrite();
-     //double *Rdata = rn.HostReadWrite();
-     for (int eq = 0; eq < nvel; eq++) {     
-       for (int i = 0; i < SdofInt; i++) {
-	 data[i + eq*SdofInt] = gravity[eq];
-       }       
-     }
-     Mv->Mult(tmpR1,boussinesqField);     
-   }
-   */
 
    // Qt ~= divU, thermal divergence
    computeQt();
    
-   /*
-   if (incompressibleSolve != true) {
-
-     {
-       double *data = Qt.HostReadWrite();
-       for (int i = 0; i < SdofInt; i++) { data[i] = 0.0; }
-     }
-     
-     // laplace(T)
-     double TdivFactor = 0.0;
-     if (loMach_opts_.thermalDiv == true) {
-       Lt->Mult(Tn_next,tmpR0);
-       MtInv->Mult(tmpR0, Qt);
-       TdivFactor = 1.0;       
-     }
-
-     // multiple lapl(T) to get correct units
-     // lapl(T) -> div(u): k/P = a*rho*Cp/P =  Cp*mu/Pr * 1/P
-     // J/(kg*K) * kg/m^3 * m^2/s * m^2/N
-     // kg*m^2/s^2 * 1/(kg*K) * kg/m^3 *m^2/s * m^2 * s^2/(kg*m)
-     // m^2/s^2 * 1/K * kg/(m*s) * m*s^2/kg
-     // m^2 * 1/K * 1/s = m^2/(K*s)
-     // lapl(T) = K/m^2 & divU = 1/s
-     multScalarScalar(rn,viscSml,&tmpR0);
-     multScalarScalarIP(viscSml,&Qt);
-     double tmp = TdivFactor * Rgas / (Pr * thermoPressure);
-     multConstScalarIP(tmp,&Qt);
-     
-     // add closed-domain pressure term
-     if (config.isOpen != true) {
-       double *data = Qt.HostReadWrite();     
-       for (int i = 0; i < SdofInt; i++) {
-         data[i] += TdivFactor * ((gamma - 1.0)/gamma - Cp) * 1.0 / (Cp*thermoPressure) * dtP;
-       }       
-     }     
-
-     //if (loMach_opts_.realDiv == true) {
-     //  double *data = Qt.HostReadWrite();
-     //  double *dataDiv = divU.HostReadWrite();            
-     //  for (int i = 0; i < SdofInt; i++) {
-     //    data[i] = dataDiv[i];
-     //  }       
-     //}
-
-
-     // replace divU with Qt for viscous term calcs
-     {
-       double *data = Qt.HostReadWrite();
-       double *dataDiv = divU.HostReadWrite();            
-       for (int i = 0; i < SdofInt; i++) {
-         dataDiv[i] = data[i];
-       }       
-     }
-     
-   }
-*/
-  
-   
    // Nonlinear extrapolated terms (convection: N*(n+1))
    sw_extrap.Start();
 
-   // project u to "padded" order space
-   /*   
-   un_gf.SetFromTrueDofs(un);         
-   R1PX2_gf.ProjectGridFunction(un_gf);
-   R1PX2_gf.GetTrueDofs(uBn);
-
-   unm1_gf.SetFromTrueDofs(unm1);      
-   R1PX2_gf.ProjectGridFunction(unm1_gf);
-   R1PX2_gf.GetTrueDofs(uBnm1);
-
-   unm2_gf.SetFromTrueDofs(unm2);         
-   R1PX2_gf.ProjectGridFunction(unm2_gf);
-   R1PX2_gf.GetTrueDofs(uBnm2);
-   */
-
-   
-   // Nonlinear term at previous steps
-   /*
-   N->Mult(un, Nun);
-   N->Mult(unm1, Nunm1);
-   N->Mult(unm2, Nunm2);
-   */   
-
-   // TODO: compute as Div with de-aliased nl-product and only p*(p-1) int order
-   // have gradU already, dotVector(u,gradU,Nun(0)), dotVector(u,gradV,Nun(1)), dotVector(u,gradW,Nun(2))
-
-   /*
-   un_gf.SetFromTrueDofs(Uext);         
-   R1PX2_gf.ProjectGridFunction(un_gf);
-   R1PX2_gf.GetTrueDofs(uBn);
-
-   // nonlinear convection is in \int(u\cdot\nabla{}v,w) form, i.e. div-free
-   N->Mult(uBn, Nun);
-
-   // project NL product back to v-space
-   //R1PX2_gf.SetFromTrueDofs(FBext);
-   R1PX2_gf.SetFromTrueDofs(Nun);   
-   R1PM0_gf.ProjectGridFunction(R1PX2_gf);  
-   R1PM0_gf.GetTrueDofs(Fext);
-   */
-
-   Fext = 0.0;
+   // convection in cont form
    //computeExplicitConvection(1.0); // ->Fext     
    computeExplicitConvectionOP(1.0); // ->Fext  
 
-   /*
-   // w/o N operator
-   dotVector(Uext,gradU,&tmpR0a);
-   dotVector(Uext,gradV,&tmpR0b);
-   dotVector(Uext,gradW,&tmpR0c);
-   {
-     double *dataA = tmpR0a.HostReadWrite();
-     double *dataB = tmpR0b.HostReadWrite();
-     double *dataC = tmpR0c.HostReadWrite();     
-     double *data = Fext.HostReadWrite();
-     for (int i = 0; i < SdofInt; i++) { data[i + 0*SdofInt] = dataA[i]; }
-     for (int i = 0; i < SdofInt; i++) { data[i + 1*SdofInt] = dataB[i]; }
-     for (int i = 0; i < SdofInt; i++) { data[i + 2*SdofInt] = dataC[i]; } 
-   }
-
-   tmpR1c.Set(-1.0,Fext); // on rhs
-   multScalarVectorIP(rn,&tmpR1c); // (rho*u)*nabla(u)   
-   multScalarVector(rn,Uext,&tmpR1b); //rho*u{n+1}
-   D->Mult(tmpR1b, tmpR0); // div(rho*u{n+1})   
-   MtInv->Mult(tmpR0, tmpR0b);
-   multScalarVector(tmpR0b,un,&tmpR1b); // u * div(rho*u) 
-   tmpR1c.Add(-1.0,tmpR1b); // full convection on rhs
-   multScalarInvVectorIP(rn,&tmpR1c); // removing rho from convective for compatibility, clean up later   
-   Mv->Mult(tmpR1c,Fext); // wasteful, just lump body forcings   
-     
-   //Mv->Mult(Fext, tmpR1);
-   //Fext.Set(-1.0,tmpR1); // minus from moving to rhs
-   
-   // add forcing/accel term to Fext   
-   Fext.Add(1.0, fn);
-   if ( config.isGravity ) { Fext.Add(1.0, boussinesqField); }
-
-   // Fext = M^{-1} (F(u^{n}) + f^{n+1}) (F* w/o known part of BDF)
-   MvInv->Mult(Fext, tmpR1); // this inv is wasteful...
-   iter_mvsolve = MvInv->GetNumIterations();
-   res_mvsolve = MvInv->GetFinalNorm();
-   Fext.Set(1.0, tmpR1);
-   */
-
-
    // total unsteady contribution
-   uns = 0.0;
    computeExplicitUnsteadyBDF(); // ->uns   
-   
-   // unsteady rho term
-   /*
-   if (constantDensity != true) {
-     //double *d_dtR = dtRho.HostWrite();
-     //double *dataU = tmpR1.HostWrite(); // still has u{n+1/2}
-     //double *data = tmpR1c.HostWrite();     
-     //for (int eq = 0; eq < dim; eq++) {     
-     //  for (int i = 0; i < SdofInt; i++) {
-     //	 data[i + eq * SdofInt] = dataU[i + eq * SdofInt] * d_dtR[i];
-     //  }
-     //}
-     multScalarVector(dtRho,Uext,&tmpR1);
-     multScalarInvVectorIP(rn,&tmpR1); // removing rho from convective for compatibility, clean up later        
-     Fext.Add(-1.0, tmpR1); // on rhs     
-   }
-   */
-   
-   // for unsteady term, compute BDF terms (known part of BDF u for full F*)
-   /*
-   {
-      const double bd1idt = -bd1 / dt;
-      const double bd2idt = -bd2 / dt;
-      const double bd3idt = -bd3 / dt;
-      const auto d_un = un.Read();
-      const auto d_unm1 = unm1.Read();
-      const auto d_unm2 = unm2.Read();
-      auto d_Fext = Fext.ReadWrite();
-      MFEM_FORALL(i, Fext.Size(),      
-      {
-         d_Fext[i] += bd1idt * d_un[i] 
-                    + bd2idt * d_unm1[i]
-                    + bd3idt * d_unm2[i];
-      });
-   }
-   */
    
    // Fext now has v*/dt from eq 2.3 in orszag
    sw_extrap.Stop();
@@ -3071,174 +3033,13 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    // Pressure Poisson (extrapolated curl(curl(u)) L*(n+1))
    sw_curlcurl.Start();
 
-   // these curls use dof-shared averages, may not be correct for p-p source
-   // curl-curl of Uext, comes out positive
-   /*
-   Lext_gf.SetFromTrueDofs(Uext);   
-   //int dim = pmesh->Dimension();
-   if (dim == 2)
-   {
-      ComputeCurl2D(Lext_gf, curlu_gf);
-      ComputeCurl2D(curlu_gf, curlcurlu_gf, true);
-   }
-   else
-   {
-      ComputeCurl3D(Lext_gf, curlu_gf);
-      ComputeCurl3D(curlu_gf, curlcurlu_gf);
-   }
-   curlcurlu_gf.GetTrueDofs(Lext);
-
-   // dataVisc is full size, Lext is only TrueSize   
-   multScalarVectorIP(viscSml,&Lext);
-   multScalarScalarIP(rn,&Lext);
-   */
-
-   LdivImp = 0.0;
+   // implicit part of diff term (calculated explicitly) using elasticity op
    computeImplicitDiffusion(); // ->LdivImp
    
    sw_curlcurl.Stop();
 
-   Ldiv = 0.0;
+   // explicit part of diff term using elasticity op
    computeExplicitDiffusion(); // ->Ldiv
-   
-
-   /*
-   // dj(mu)(\tau/mu), have to store bits separately due to weak form helmholtz in momentum
-   // could use elasticity integrator to prevent need to include part of this in momentum
-   if (incompressibleSolve != true) {
-
-     // TOD0 replace with local grad calc...
-     // viscosity gradient
-     /// visc is dynamic now multScalarScalar(rn,viscSml,&tmpR0);     
-     G->Mult(viscSml, tmpR1);
-     MvInv->Mult(tmpR1, gradMu);
-
-     // momentum only portion, TODO: break-up loops, this will thrash     
-     {
-       dotVector(gradMu,gradX,&tmpR0);
-       double *dataB = tmpR0.HostReadWrite();       
-       double *data = Ldiv.HostReadWrite();
-       for (int i = 0; i < SdofInt; i++) { data[i + 0*SdofInt] = dataB[i]; }
-     }     
-     {
-       dotVector(gradMu,gradY,&tmpR0);
-       double *dataB = tmpR0.HostReadWrite();       
-       double *data = Ldiv.HostReadWrite();
-       for (int i = 0; i < SdofInt; i++) { data[i + 1*SdofInt] = dataB[i]; }
-     }
-     {
-       dotVector(gradMu,gradZ,&tmpR0);
-       double *dataB = tmpR0.HostReadWrite();       
-       double *data = Ldiv.HostReadWrite();
-       for (int i = 0; i < SdofInt; i++) { data[i + 2*SdofInt] = dataB[i]; }
-     }         
-     {
-       double *data = Ldiv.HostReadWrite();
-       double twothird = 2.0/3.0;
-       multScalarVector(Qt,gradMu,&tmpR1);
-       for (int eq = 0; eq < nvel; eq++) {       
-         for (int i = 0; i < SdofInt; i++) {
-           data[i + eq*SdofInt] -= twothird * tmpR1[i + eq*SdofInt];
-         }
-       }       
-     }
-     
-     // Ldiv, as above, contributes to both pressure-possion and momentum
-     // tuck away for both eq's
-     tmpR1c.Set(1.0,Ldiv);
-
-     // add portion included in weak form of helmholtz to p/p rhs
-     {
-       dotVector(gradMu,gradU,&tmpR0);
-       double *dataB = tmpR0.HostReadWrite();       
-       double *data = tmpR1c.HostReadWrite();
-       for (int i = 0; i < SdofInt; i++) { data[i + 0*SdofInt] += dataB[i]; }       
-     }    
-     {
-       dotVector(gradMu,gradV,&tmpR0);
-       double *dataB = tmpR0.HostReadWrite();       
-       double *data = tmpR1c.HostReadWrite();
-       for (int i = 0; i < SdofInt; i++) { data[i + 1*SdofInt] += dataB[i]; }              
-     }
-     {
-       dotVector(gradMu,gradW,&tmpR0);
-       double *dataB = tmpR0.HostReadWrite();       
-       double *data = tmpR1c.HostReadWrite();
-       for (int i = 0; i < SdofInt; i++) { data[i + 2*SdofInt] += dataB[i]; }       
-     }
-     
-     // neither complete yet:
-     // Ldiv => to rhs of momentum
-     // tmpR1c => to rhs of pressure-poisson
-   
-
-     // add grad(Qt) source.................................
-
-     // gradient of Qt => TODO: replace with local gradient
-     G->Mult(Qt, tmpR1);
-     MvInv->Mult(tmpR1, tmpR1b);
-
-     // visc is dynamic now multScalarScalar(rn,viscSml,&tmpR0);          
-     multScalarVector(viscSml,tmpR1b,&tmpR1);
-     
-     // add Qt part to Ldiv for momentum
-     {
-       double factor = 1.0/3.0;              
-       double *dataB = tmpR1.HostReadWrite();
-       double *data = Ldiv.HostReadWrite();       
-       for (int eq = 0; eq < dim; eq++) {
-         for (int i = 0; i < SdofInt; i++) {
-           data[i + eq*SdofInt] += factor * dataB[i + eq*SdofInt];
-         }
-       }       
-     }
-     
-     // add Qt part to tmpR1c for p/p
-     {
-       double factor = 4.0/3.0;              
-       double *dataB = tmpR1.HostReadWrite();
-       double *data = tmpR1c.HostReadWrite();       
-       for (int eq = 0; eq < dim; eq++) {
-         for (int i = 0; i < SdofInt; i++) {
-           data[i + eq*SdofInt] += factor * dataB[i + eq*SdofInt];
-         }
-       }              
-     }     
-         
-     // add full explicit part of d(tau) to Lext, opposite sign of curl-curl
-     {
-       double *dataDiv = tmpR1c.HostReadWrite();
-       double *data = Lext.HostReadWrite();
-       for (int eq = 0; eq < dim; eq++) {
-         for (int i = 0; i < SdofInt; i++) {
-           data[i + eq*SdofInt] -= dataDiv[i + eq*SdofInt];
-         }
-       }
-     }     
-     
-   } // end incomp check   
-
-   // \tilde{F} = F - \nu CurlCurl(u), (F* + L*)
-   FText.Set(-1.0, Lext); // negative from curl-curl, has rho now
-   multScalarScalar(rn,Fext,&tmpR0); // u* part needs a rho(for now), keep Fext w/o rho for now
-   FText.Add(1.0, tmpR0); // unsteady already on rhs, see HIGH-ORDER MATRIX-FREE INCOMPRESSIBLE FLOW SOLVERS eq 42
-   */
-
-   // can multiply rhs by rho prior to taking div instead of keeping in lhs,
-   /*
-   if (constantDensity != true) {
-     multScalarScalarIP(rn,&FText);
-   } else {
-     multConstScalarIP(static_rho,&FText);     
-   }
-   */
-   
-   
-   // p_r = \nabla \cdot FText ( i think "p_r" means rhs of pressure-poisson eq, so div(\tilde{F}))
-   // applied divergence to full FText vector
-   //D->Mult(FText, resp);
-   //resp.Neg();
-
 
    // sum contributions to rhs of p-p
    FText.Set(1.0,fn);
@@ -3246,7 +3047,6 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    FText.Add(1.0,Fext);
    FText.Add(1.0,Ldiv);
    FText.Add(1.0,LdivImp);         
-
    
    // add some if for porder != vorder
    // project FText to p-1
@@ -3257,14 +3057,6 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
 
    // unsteady div term, (-) on rhs rho * gamma * Qt/dt (after div term)
    {
-     /*
-     double *dataQ = Qt.HostReadWrite();     
-     double *Rdata = rn.HostReadWrite();     
-     double *data = tmpR0b.HostReadWrite();     
-     for (int i = 0; i < SdofInt; i++) {     
-       data[i] = Rdata[i] * (bd0 / dt) * dataQ[i];       
-     }
-     */
      //multScalarScalar(rn,Qt,&tmpR0b);
      multScalarScalar(rn,divU,&tmpR0b); // divU contains Qt
      multConstScalarIP((bd0/dt),&tmpR0b);     
@@ -3272,50 +3064,28 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      tmpR0.Add(+1.0,tmpR0c); // because of the tmpR0.Neg()...
    }
 
+
+   // CHECK HERE, just calc u*...
+   // inconsisnt with paper, they have v* as conv+uns w/o diff, i.e. no reason to chain here
+   
    // extra terms from multiplying rhs by rho prior to taking div
    /// rhs +: grad{rho} \cdot (u*/dt - ab0 u{n+1})
-   //       = grad{rho} \cdot (Fext - ab0*Uext)   
+   //       = grad{rho} \cdot (Fext - ab0*Uext)
    {
-
-     /* in updateGrads now
-     // gradient of rho{n+1} => TODO: replace with local gradient calc
-     G->Mult(rn, tmpR1);
-     MvInv->Mult(tmpR1, gradRho);
-     */
-     
-     //scalarGrad3D(rn_gf,tmpR1_gf);
-     //tmpR1_gf.GetTrueDofs(tmpR1);
-     
-     /*
-     double *dataGR = tmpR1b.HostReadWrite();     
-     double *dataU = Uext.HostReadWrite();     
-     double *dataF = Fext.HostReadWrite();
-     double *data = tmpR0b.HostReadWrite();
-     for (int i = 0; i < SdofInt; i++) {     
-       data[i] = 0.0;
-     }
-     for (int eq = 0; eq < dim; eq++) {
-       for (int i = 0; i < SdofInt; i++) {     
-         data[i] += dataGR[i + eq * SdofInt] * (dataF[i + eq * SdofInt] - (bd0/dt)*dataU[i + eq * SdofInt]);
-       }
-     }
-     */
      double *data = tmpR1.HostReadWrite();
      double *dataU = Uext.HostReadWrite();     
-     double *dataF = Fext.HostReadWrite();     
+     double *dataF = FText.HostReadWrite();     
      for (int eq = 0; eq < dim; eq++) {
        for (int i = 0; i < SdofInt; i++) {     
-         data[i + eq * SdofInt] = dataF[i + eq * SdofInt] - (bd0/dt) * dataU[i + eq * SdofInt];
+         //data[i + eq * SdofInt] = dataF[i + eq * SdofInt] - (bd0/dt) * dataU[i + eq * SdofInt];
+         data[i + eq * SdofInt] = - (bd0/dt) * dataU[i + eq * SdofInt];	 
        }
      }
      dotVector(tmpR1,gradRho,&tmpR0b);
      
      Mt->Mult(tmpR0b, tmpR0c);
      tmpR0.Add(-1.0,tmpR0c); // because of the tmpR0.Neg()...
-     //tmpR0.Add(0.0,tmpR0c); // HACK HACK HACK
-     
-   }   
-   
+   }
    
    // Add boundary terms.
    FText_gf.SetFromTrueDofs(FText);
@@ -3341,7 +3111,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    pfes->GetRestrictionMatrix()->MultTranspose(resp, resp_gf); 
    
    Vector X1, B1;
-   if (partial_assembly)
+   if (partial_assembly_pressure)
    {
       auto *SpC = Sp.As<ConstrainedOperator>();
       EliminateRHS(*Sp_form, *SpC, pres_ess_tdof, pn_gf, resp_gf, X1, B1, 1);
@@ -3371,13 +3141,17 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    //G->Mult(pn, resu); // grad(P) in resu
 
    // project p to v-space
-   R0PM1_gf.SetFromTrueDofs(pn);   
-   R0PM0_gf.ProjectGridFunction(R0PM1_gf);
-   R0PM0_gf.GetTrueDofs(pnBig);
+   //R0PM1_gf.SetFromTrueDofs(pn);   
+   //R0PM0_gf.ProjectGridFunction(R0PM1_gf);
+   //R0PM0_gf.GetTrueDofs(pnBig);
 
    // grad(P) => TODO: use local gradient calc (?)
-   G->Mult(pnBig, resu);
-   MvInv->Mult(resu,tmpR1);
+   //G->Mult(pnBig, resu);
+   //MvInv->Mult(resu,tmpR1);
+
+   // using mixed orders op directly
+   Gp->Mult(pn, resu);
+   MvInv->Mult(resu,tmpR1);   
 
    // assemble rhs for u solve
    resu.Set(-1.0,tmpR1);
@@ -3390,42 +3164,9 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    Mv->Mult(resu, tmpR1);
    resu.Set(1.0,tmpR1);
    
-   // if only gradP needs 1/rho
-   /*
-   if (constantDensity != true) {
-     multScalarInvVector(rn,resu,&tmpR1);
-   } else {
-     multConstVector((1.0/static_rho),resu,&tmpR1);   
-   }
-   resu.Set(1.0,tmpR1);
-   Mv->Mult(resu, tmpR1);
-   resu.Set(1.0,tmpR1);
-   */
-
-   /*
-   // -1/rho * grad{P} on rhs   
-   resu.Neg(); 
-   
-   // add explicit part of div{tau} (Ldiv) to rhs
-   if (incompressibleSolve != true) {          
-     Mv->Mult(Ldiv,tmpR1);
-     resu.Add(1.0, tmpR1);
-   }
-
-   // Fext does not have a rho while tau part does
-   multScalarInvVectorIP(rn,&resu);   
-   
-   // add convection to rhs
-   Mv->Mult(Fext, tmpR1); 
-   resu.Add(1.0, tmpR1);
-
-   //resu.Add(1.0, Fext);
-   //Mv->Mult(resu, tmpR1);
-   //resu.Set(1.0,tmpR1);
-   */
 
    /// removal of subgrid contribution from mean ///
-   // INCOMPLETE
+   // INCOMPLETE => IGNORE FOR NOW
    //MPI_Barrier(MPI_COMM_WORLD);
 
    // TODO: mean-excluding sg term not updated for de-aliasing
@@ -3679,7 +3420,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
 
    
    // explicit filter
-   if (pFilter == true)
+   if (loMach_opts_.filterVel == true)
    {     
       un_NM1_gf.ProjectGridFunction(un_next_gf);
       un_filtered_gf.ProjectGridFunction(un_NM1_gf);
@@ -3812,6 +3553,9 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
    // update difusivities, including subgrid model contribution and sponge
    updateDiffusivity();   
 
+   // testing
+   //curl_gf.ProjectGridFunction(un_gf);   
+   
    // Set current time for Dirichlet boundary conditions.
    for (auto &vel_dbc : vel_dbcs) {vel_dbc.coeff->SetTime(time + dt);}
    for (auto &pres_dbc : pres_dbcs) {pres_dbc.coeff->SetTime(time + dt);}  
@@ -3819,7 +3563,7 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
 
    
    // begin temperature...................................... <warp>        
-   if( incompressibleSolve != true) {
+   if(incompressibleSolve != true || loMach_opts_.solveTemp != true) {
    
    Ht_bdfcoeff.constant = 1.0 / dt;
    Ht_form->Update();
@@ -3837,20 +3581,13 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
    }   
    
    // unsteady term
-   /*
-   {
-     double *d_tn = Tn.HostReadWrite();     
-     double *data = resT.HostReadWrite();     
-     MFEM_FORALL(i, resT.Size(), { data[i] = -1.0/dt * d_tn[i]; });
-   }
-   */
    multConstScalar((-1.0/dt),Tn,&resT);
    
    // advection
    dotVector(Uext,gradT,&tmpR0);
    resT.Add(1.0, tmpR0);
    
-   // Add boundary terms.
+   // Add boundary terms, only necessary for prescribed heat flux
    /*
    Text_gf.SetFromTrueDofs(Text);
    Text_bdr_form->Assemble();
@@ -3887,7 +3624,7 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
    Ht_form->RecoverFEMSolution(Xt2, resT_gf, Tn_next_gf);
    Tn_next_gf.GetTrueDofs(Tn_next);
 
-   if (pFilter == true)
+   if (loMach_opts_.filterTemp == true)
    {
       Tn_NM1_gf.ProjectGridFunction(Tn_next_gf);
       Tn_filtered_gf.ProjectGridFunction(Tn_NM1_gf);
@@ -3906,7 +3643,7 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
 
    
    // update density, set rn{n+1} from Tn{n+1}
-   updateDensity(1);
+   updateDensity(0.5);
    
    // have T{n+1} in Tn_next and T{n} in Tn, extrapolate again to get T{n+2} 
    {
@@ -3948,6 +3685,7 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
       HInvPC = new OperatorJacobiSmoother(diag_pa, vel_ess_tdof);
       HInv->SetPreconditioner(*HInvPC);
    }
+   //if(rank0_) std::cout << " H setup" << endl;    
 
    
    // RULE FOR COMPUTE ROUTINES:
@@ -3962,7 +3700,7 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
    uns = 0.0;
    Ldiv = 0.0;
 
-   // replaces divU with Qt
+   // if replacing divU with Qt
    //computeQt(); // -> Qt
    
    // total forcing
@@ -4014,6 +3752,7 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
    res_hsolve = HInv->GetFinalNorm();
    H_form->RecoverFEMSolution(X2, resu_gf, un_next_gf);
    un_next_gf.GetTrueDofs(un_next);
+   //if(rank0_) std::cout << " u* found" << endl;    
 
    // copy un_next to u_star
    u_star.Set(1.0,un_next);
@@ -4027,6 +3766,7 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
    // remember: Text now has {n+2}, Tn_next has {n+1}, and Tn has {n}   
 
    // 1/dt * (rho*u_star)
+   updateDensity(1.0);   
    multScalarVector(rn,u_star,&tmpR1);
    multConstVectorIP((1.0/dt),&tmpR1);   
 
@@ -4044,8 +3784,8 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
      double *data = tmpR0b.HostReadWrite();
      double tmpC =  0.5 * thermoPressure / (Rgas*dt*dt);
      for (int i = 0; i < SdofInt; i++) {
-       //data[i] += tmpC * ( 1.0/Tp2[i] - 1.0/Tp0[i] );  // adding
-       data[i] += tmpC * 2.0 * ( 1.0/Tp1[i] - 1.0/Tp0[i] );  // maybe? if T is already staggered at n+1/2 wrt u...
+       data[i] += tmpC * ( 1.0/Tp2[i] - 1.0/Tp0[i] );  // adding
+       //data[i] += tmpC * 2.0 * ( 1.0/Tp1[i] - 1.0/Tp0[i] );  // maybe? if T is already staggered at n+1/2 wrt u...
      }
    }
    Mt->Mult(tmpR0b, tmpR0);
@@ -4074,9 +3814,7 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
    FText_bdr_form->Assemble();
    FText_bdr_form->ParallelAssemble(FText_bdr);
    tmpR0.Add(1.0, FText_bdr);
-   */
 
-   /*
    g_bdr_form->Assemble();
    g_bdr_form->ParallelAssemble(g_bdr);
    tmpR0.Add((-1.0/dt), g_bdr);
@@ -4092,7 +3830,7 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
    pfes->GetRestrictionMatrix()->MultTranspose(resp, resp_gf);
    
    Vector X1, B1;
-   if (partial_assembly)
+   if (partial_assembly_pressure)
    {
       auto *SpC = Sp.As<ConstrainedOperator>();
       EliminateRHS(*Sp_form, *SpC, pres_ess_tdof, pn_gf, resp_gf, X1, B1, 1);
@@ -4116,22 +3854,28 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
    // the nullspace after every application.
    if (pres_dbcs.empty()) { MeanZero(pn_gf); }   
    pn_gf.GetTrueDofs(pn);
+   //if(rank0_) std::cout << " pressure found" << endl;    
   
-   // Project velocity
-   //G->Mult(pn, tmpR1); // grad(P) in resu
-   //MvInv->Mult(tmpR1, resu);
-
+   /*
    // project p to v-space
    R0PM1_gf.SetFromTrueDofs(pn);   
    R0PM0_gf.ProjectGridFunction(R0PM1_gf);
    R0PM0_gf.GetTrueDofs(pnBig);
 
    // replace with local calc
-   G->Mult(pnBig, resu);
+   G->Mult(pnBig, resu);   
+   MvInv->Mult(resu,tmpR1);
+   resu.Set(1.0,tmpR1);
+   //scalarGrad3DV(pnBig,&resu);
+   */
+
+   // skip extra projection step
+   Gp->Mult(pn, resu);
    MvInv->Mult(resu,tmpR1);
    resu.Set(1.0,tmpR1);   
 
    // dt/rho*gradP
+   updateDensity(0.5);      
    multScalarInvVectorIP(rn,&resu);
    multConstVectorIP(dt,&resu);
 
@@ -4148,8 +3892,42 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
    }      
    un_next_gf.SetFromTrueDofs(un_next);
 
+
+   /*
+   // trying re-solve?.................   
+   computeExplicitConvectionOP(0.5); // recompute at {n+1/2}   
+   resu.Set(-1.0,tmpR1); // still has gradP 
+   resu.Add(1.0,fn);
+   resu.Add(1.0,uns);
+   resu.Add(1.0,Fext);
+   resu.Add(1.0,Ldiv);      
+   Mv->Mult(resu, tmpR1); 
+   resu.Set(1.0, tmpR1); 
+   for (auto &vel_dbc : vel_dbcs) { un_next_gf.ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);}
+   vfes->GetRestrictionMatrix()->MultTranspose(resu, resu_gf);
+   Vector X2b, B2b;
+   if (partial_assembly)
+   {
+      auto *HC = H.As<ConstrainedOperator>();
+      EliminateRHS(*H_form, *HC, vel_ess_tdof, un_next_gf, resu_gf, X2b, B2b, 1);
+   }
+   else
+   {
+      H_form->FormLinearSystem(vel_ess_tdof, un_next_gf, resu_gf, H, X2b, B2b, 1);
+   }
+   sw_hsolve.Start();
+   HInv->Mult(B2b, X2b);
+   sw_hsolve.Stop();
+   iter_hsolve = HInv->GetNumIterations();
+   res_hsolve = HInv->GetFinalNorm();
+   H_form->RecoverFEMSolution(X2b, resu_gf, un_next_gf);
+   un_next_gf.GetTrueDofs(un_next);   
+   //.................................
+   */
+
+   
    // explicit filter
-   if (pFilter == true)
+   if (loMach_opts_.filterVel == true)
    {     
       un_NM1_gf.ProjectGridFunction(un_next_gf);
       un_filtered_gf.ProjectGridFunction(un_NM1_gf);
@@ -5450,8 +5228,11 @@ void LoMachSolver::parseSolverOptions() {
   tpsP_->getInput("loMach/rtol", loMach_opts_.rtol, 1.0e-8);
   tpsP_->getInput("loMach/nFilter", loMach_opts_.nFilter, 0);
   tpsP_->getInput("loMach/filterWeight", loMach_opts_.filterWeight, 1.0);
+  tpsP_->getInput("loMach/filterTemp", loMach_opts_.filterTemp, false);
+  tpsP_->getInput("loMach/filterVel", loMach_opts_.filterVel, false);    
   tpsP_->getInput("loMach/thermalDiv", loMach_opts_.thermalDiv, true);
-  tpsP_->getInput("loMach/realDiv", loMach_opts_.realDiv, false);          
+  tpsP_->getInput("loMach/realDiv", loMach_opts_.realDiv, false);
+  tpsP_->getInput("loMach/solveTemp", loMach_opts_.solveTemp, true);  
   
   //tpsP_->getInput("loMach/channelTest", loMach_opts_.channelTest, false);
   
@@ -5594,6 +5375,7 @@ void LoMachSolver::parseFlowOptions() {
   tpsP_->getInput("loMach/constantDensity", config.const_dens, -1.0);
   tpsP_->getInput("loMach/ambientPressure", config.amb_pres, 101325.0);  
   tpsP_->getInput("loMach/openSystem", config.isOpen, true);
+  //tpsP_->getInput("loMach/solveTemp", config.solveTemp, true);  
   
   tpsP_->getInput("loMach/enablePressureForcing", config.isForcing, false);
   if (config.isForcing) {
@@ -8111,6 +7893,15 @@ void LoMachSolver::updateDiffusivity() {
    // interior-sized visc needed for p-p rhs
    bufferVisc->GetTrueDofs(viscSml);   
 
+   // for elasticity operator
+   {
+     double *data = bufferBulkVisc->HostReadWrite();
+     double *dataMu = bufferVisc->HostReadWrite();
+     double onethird = 1.0/3.0;
+     for (int i = 0; i < Sdof; i++) { data[i] = onethird * dataMu[i]; }
+   }
+
+   
    // thermal diffusivity => TODO: use mult function
    {
      double *data = bufferAlpha->HostReadWrite();
@@ -8119,6 +7910,7 @@ void LoMachSolver::updateDiffusivity() {
      double Ctmp = 1.0/Pr;
      for (int i = 0; i < Sdof; i++) { data[i] = Ctmp * dataVisc[i] / Rdata[i]; }
    }
+   bufferAlpha->GetTrueDofs(alphaSml);      
 
 }
 
@@ -8542,23 +8334,8 @@ void LoMachSolver::computeExplicitDiffusion() {
 
   
      //  Additional necessary bits:
-
-     /* in updateGrads now
-     // viscosity gradient, TODO: replace with local gradient calc
-     G->Mult(viscSml, tmpR1);     
-     MvInv->Mult(tmpR1, gradMu); // really grad(nu)...
-
-     // density gradient, TODO: replace with local gradient calc
-     G->Mult(rn, tmpR1);     
-     MvInv->Mult(tmpR1, gradRho);
-
-     // gradient of divU => TODO replace with local gradient calc
-     //G->Mult(divU, tmpR1); 
-     //MvInv->Mult(tmpR1, tmpR1b);
-     scalarGrad3DV(divU,&tmpR1b);
-     */
      
-     
+     /*
      // PART 1: rho*d_j(nu)*d_i(u_j)
      {
        dotVector(gradMu,gradX,&tmpR0);
@@ -8589,23 +8366,12 @@ void LoMachSolver::computeExplicitDiffusion() {
 
      
      // PART 3: rho*(d_i(nu))*(-2/3*divU)
-     /*
-     {
-       double twothird = 2.0/3.0;       
-       double *dataGradMu = gradMu.HostReadWrite(); 
-       double *dataDivU = divU.HostReadWrite();
-       double *data = Ldiv.HostReadWrite();
-       for (int eq = 0; eq < nvel; eq++) {       
-         for (int i = 0; i < SdofInt; i++) {
-           data[i + eq*SdofInt] -= twothird * dataGradMu[i + eq*SdofInt] * dataDivU[i];
-         }
-       }
-       }
-     */
+
      multScalarVector(divU,gradMu,&tmpR1a);
      //// multScalarVectorIP(rn,&tmpR1a);
      Ldiv.Add((-2.0/3.0),tmpR1a);     
-
+     */
+     
      
      // PART 4: d_j(rho) * nu * (d_j(u_i) + d_i(u_j) - 2/3*divU*I)
      /*
@@ -8674,13 +8440,6 @@ void LoMachSolver::computeImplicitDiffusion() {
     
   
   // PART 1: rho*nu*d_j(nu)d_j(u_i)
-
-  /* in updateGrads now
-  // viscosity gradient, TODO: replace with local gradient calc
-  G->Mult(viscSml, tmpR1);     
-  MvInv->Mult(tmpR1, gradMu); // really grad(nu)...
-  */
-
   {
     dotVector(gradMu,gradU,&tmpR0);
     double *dataB = tmpR0.HostReadWrite();       
@@ -8688,7 +8447,7 @@ void LoMachSolver::computeImplicitDiffusion() {
     for (int i = 0; i < SdofInt; i++) { data[i + 0*SdofInt] = dataB[i]; }       
   }    
   {
-    dotVector(gradMu,gradU,&tmpR0);
+    dotVector(gradMu,gradV,&tmpR0);
     double *dataB = tmpR0.HostReadWrite();       
     double *data = tmpR1.HostReadWrite();
     for (int i = 0; i < SdofInt; i++) { data[i + 1*SdofInt] = dataB[i]; }              
@@ -8703,15 +8462,10 @@ void LoMachSolver::computeImplicitDiffusion() {
   LdivImp.Set(1.0,tmpR1);
   
  
-  // PART 2a: rho*nu*d_i(divU)
-
-  // gradient of divU => TODO replace with local gradient calc
-  //G->Mult(divU, tmpR1); 
-  //MvInv->Mult(tmpR1, tmpR1b);
-  
+  // PART 2a: rho*nu*d_i(divU)  
   //// multScalarScalar(rn,viscSml,&tmpR1c);
   multScalarVector(viscSml,gradDivU, &tmpR1b);
-  Ldiv.Add(1.0,tmpR1b);
+  LdivImp.Add(1.0,tmpR1b);
   
 
   // PART 2b: -rho*nu*curl(curl(u_i))
@@ -8729,7 +8483,46 @@ void LoMachSolver::computeImplicitDiffusion() {
 
   //// multScalarVector(tmpR1c,Lext,&tmpR1b); // tmpR1c still has mu
   multScalarVector(viscSml,Lext,&tmpR1b);
-  Ldiv.Add(-1.0,tmpR1b);	   
+  LdivImp.Add(-1.0,tmpR1b);	   
+
+
+  // Parts which were in explicit part but are in implicit when
+  // using elasticity integrator
+  /**/
+     // PART 1: rho*d_j(nu)*d_i(u_j)
+     {
+       dotVector(gradMu,gradX,&tmpR0);
+       double *dataB = tmpR0.HostReadWrite();       
+       double *data = tmpR1.HostReadWrite();
+       for (int i = 0; i < SdofInt; i++) { data[i + 0*SdofInt] = dataB[i]; }       
+     }    
+     {
+       dotVector(gradMu,gradY,&tmpR0);
+       double *dataB = tmpR0.HostReadWrite();       
+       double *data = tmpR1.HostReadWrite();
+       for (int i = 0; i < SdofInt; i++) { data[i + 1*SdofInt] = dataB[i]; }              
+     }
+     {
+       dotVector(gradMu,gradZ,&tmpR0);
+       double *dataB = tmpR0.HostReadWrite();       
+       double *data = tmpR1.HostReadWrite();
+       for (int i = 0; i < SdofInt; i++) { data[i + 2*SdofInt] = dataB[i]; }              
+     }
+     //// multScalarVectorIP(rn,&tmpR1);
+     LdivImp.Add(1.0,tmpR1);
+
+     
+     // PART 2: 1/3*rho*nu*d_i(divU)     
+     //// multScalarScalar(rn,viscSml,&tmpR1c);
+     multScalarVector(viscSml,gradDivU,&tmpR1b);
+     LdivImp.Add((1.0/3.0),tmpR1b);
+
+     
+     // PART 3: rho*(d_i(nu))*(-2/3*divU)
+     multScalarVector(divU,gradMu,&tmpR1a);
+     //// multScalarVectorIP(rn,&tmpR1a);
+     LdivImp.Add((-2.0/3.0),tmpR1a);     
+     /**/
   
 }
 
@@ -8846,7 +8639,7 @@ void LoMachSolver::computeExplicitConvectionOP(double uStep) {
    } else if (uStep == 0.5) {
      un_next_gf.SetFromTrueDofs(u_half);      
    } else {
-     un_next_gf.SetFromTrueDofs(Uext);              
+     un_next_gf.SetFromTrueDofs(un_next);              
    }
    R1PX2_gf.ProjectGridFunction(un_next_gf);
    R1PX2_gf.GetTrueDofs(uBn);   
@@ -8996,9 +8789,9 @@ void LoMachSolver::updateGradients(double uStep) {
      scalarGrad3DV(divU, &gradDivU);
 
      // hacking out
-     gradMu = 0.0;
-     gradRho = 0.0;
-     gradDivU = 0.0;
+     //gradMu = 0.0;
+     //gradRho = 0.0;
+     //gradDivU = 0.0;
      
 }
 
@@ -9102,9 +8895,9 @@ void LoMachSolver::updateGradientsOP(double uStep) {
      MvInv->Mult(tmpR1, gradDivU);  
 
      // hacking out
-     gradMu = 0.0;
-     gradRho = 0.0;
-     gradDivU = 0.0;     
+     //gradMu = 0.0;
+     //gradRho = 0.0;
+     //gradDivU = 0.0;     
 }
 
 
@@ -9211,6 +9004,15 @@ void LoMachSolver::updateDensity(int tStep) {
    if (constantDensity != true) {
      if(tStep == 1) {
        multConstScalarInv((thermoPressure/Rgas), Tn_next, &rn);
+     } else if(tStep == 0.5) {
+       multConstScalarInv((thermoPressure/Rgas), Tn_next, &tmpR0a);
+       multConstScalarInv((thermoPressure/Rgas), Tn, &tmpR0b);
+       {
+         double *data = rn.HostWrite();
+         double *data1 = tmpR0a.HostWrite();
+         double *data2 = tmpR0b.HostWrite();        	 
+         for (int i = 0; i < SdofInt; i++) { data[i] = 0.5 * (data1[i] + data2[i]); }
+       }
      } else {
        multConstScalarInv((thermoPressure/Rgas), Tn, &rn);       
      }
@@ -9267,7 +9069,7 @@ void vel_ic(const Vector &coords, double t, Vector &u)
    double bL = 2.0 * pi;
    double cL = 2.0;
    double M = 1.0;
-   double L = 0.01;   
+   double L = 0.1;   
    double scl;
 
    /**/
@@ -9363,6 +9165,7 @@ double temp_ic(const Vector &coords, double t)
    double temp;
    //temp = Tlo + 0.5 * (y + 1.0) * (Thi - Tlo);
    temp = 0.5 * (Thi + Tlo);
+   
    return temp;      
    
 }
@@ -9380,10 +9183,11 @@ double temp_wall(const Vector &coords, double t)
    Tmean = 0.5 * (Thi + Tlo);
    tRamp = 100.0;
    wt = min(t/tRamp,1.0);
+   //wt = 1.0; // HACK
    
    if(y > 0.0) {temp = Tmean + wt * (Thi-Tmean);}
    if(y < 0.0) {temp = Tmean + wt * (Tlo-Tmean);}
-   //temp = 300.0;
+
    return temp;   
 }
 
