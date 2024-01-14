@@ -75,6 +75,8 @@ class LoMachOptions {
 
   int nFilter;
   double filterWeight;
+  bool filterTemp, filterVel;
+  bool solveTemp;
 
   bool channelTest;
   
