@@ -326,9 +326,10 @@ protected:
    ParFiniteElementSpace *HCurlFESpace = nullptr;  
   
    VectorMassIntegrator *hmv_blfi = nullptr;  
-   //VectorDiffusionIntegrator *hdv_blfi = nullptr;
-   ElasticityIntegrator *hdv_blfi = nullptr;
+   VectorDiffusionIntegrator *hdv_blfi = nullptr;
+   ElasticityIntegrator *hev_blfi = nullptr;
    DiffusionIntegrator *hdt_blfi = nullptr;
+   MassIntegrator *hmt_blfi = nullptr;    
   
    ParNonlinearForm *N = nullptr;
    ParBilinearForm *Mv_form = nullptr;
@@ -466,7 +467,7 @@ protected:
 
    Vector bufferR0sml, bufferR1sml;
 
-   Vector pn, resp, FText_bdr, g_bdr;
+   Vector pn, pnm1, deltaP, resp, FText_bdr, g_bdr;
    Vector tmpR0PM1;
 
    Vector pnBig;
@@ -768,19 +769,21 @@ public:
 
    // common routines used for multiple integration methods
    void extrapolateState(int current_step);
-   void updateDensity(int tStep);
+   void updateDensity(double tStep);
    void updateGradients(double uStep);
    void updateGradientsOP(double uStep);  
    void updateBC(int current_step);  
-   void updateDiffusivity();
+   void updateDiffusivity(bool bulkViscFlag);
+   void updateThermoP();
    void computeExplicitForcing();
    void computeExplicitUnsteady();
    void computeExplicitUnsteadyBDF();    
    void computeExplicitConvection(double uStep);
-   void computeExplicitConvectionOP(double uStep);  
+   void computeExplicitConvectionOP(double uStep, bool extrap);  
    void computeExplicitDiffusion();
    void computeImplicitDiffusion();
    void computeQt();
+   void computeDtRho();
    void makeDivFree();
    void makeDivFreeOP();  
    void makeDivFreeLessQt();
@@ -813,7 +816,8 @@ public:
     */
    //void Step(double &time, double dt, const int cur_step, const int start_step, bool provisional = false);
    void curlcurlStep(double &time, double dt, const int cur_step, const int start_step, bool provisional = false);
-   void staggeredTimeStep(double &time, double dt, const int cur_step, const int start_step, bool provisional = false);  
+   void staggeredTimeStep(double &time, double dt, const int cur_step, const int start_step, bool provisional = false);
+   void deltaPStep(double &time, double dt, const int cur_step, const int start_step, bool provisional = false);    
 
    /// Return a pointer to the provisional velocity ParGridFunction.
    ParGridFunction *GetProvisionalVelocity() { return &un_next_gf; }
