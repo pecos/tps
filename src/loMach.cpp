@@ -9500,13 +9500,15 @@ void LoMachSolver::updateThermoP() {
   
   if (config.isOpen != true) {
 
-    multScalarScalar(alphaSml,Tn,&tmpR0);
-    R0PM0_gf.SetFromTrueDofs(tmpR0);
-
+    //multScalarScalar(alphaSml,Tn,&tmpR0);
+    //R0PM0_gf.SetFromTrueDofs(tmpR0);
+    R0PM0_gf.SetFromTrueDofs(Tn);
+    
     int elndofs;
     Array<int> vdofs;
     Vector loc_data;
     int vdim = sfes->GetVDim();
+    Vector shape;
     DenseMatrix grad_hat;
     DenseMatrix dshape;
     DenseMatrix grad;
@@ -9516,22 +9518,26 @@ void LoMachSolver::updateThermoP() {
     double mydtP = 0.0;
     
     for (int be = 0; be < pmesh->GetNBE(); be++) {
-      
-      Element *ele = pmesh->GetBdrElement(be);
+
       //Array<int> dofs;            
       //sfes->GetElementDofs(ele, vdofs);
-      sfes->GetBdrElementVDofs(be, vdofs);
-      ElementTransformation *tr = pmesh->GetBdrElementTransformation(be);
       //const FiniteElement *fe = nd_fespace.GetBE(be);
       //const FiniteElement *el = sfes->GetFE(ele->GetElement());
-      const FiniteElement *el = sfes->GetBE(be);            
       //const IntegrationRule &ir = IntRules.Get(fe->GetGeomType(),2*order + 2);
+      //sfes->GetElementVDofs(el, vdofs);      
+      
+      Element *ele = pmesh->GetBdrElement(be);
+      sfes->GetBdrElementVDofs(be, vdofs);
+      ElementTransformation *tr = pmesh->GetBdrElementTransformation(be);
+      const FiniteElement *el = sfes->GetBE(be);            
       const IntegrationRule &ir = gll_rules.Get(sfes->GetFE(0)->GetGeomType(), 2*order + 2);      
       
-      //sfes->GetElementVDofs(el, vdofs);
       R0PM0_gf.GetSubVector(vdofs, loc_data);
       elndofs = el->GetDof();
-      dshape.SetSize(elndofs, dim);      
+      dshape.SetSize(elndofs, dim);
+      shape.SetSize(elndofs);
+
+      DenseMatrix elfun_mat(alphaSml.GetData(), elndofs, 1); 
       
       for (int iq = 0; iq < ir.GetNPoints(); iq++ ) {
 	
@@ -9539,8 +9545,9 @@ void LoMachSolver::updateThermoP() {
 	tr->SetIntPoint(&ip);
         CalcOrtho(tr->Jacobian(), normal);
         Vector dT(dim);
-        double kappa;
+        Vector kappa(1);
 
+        el->CalcShape(tr->GetIntPoint(), shape);	
         el->CalcDShape(tr->GetIntPoint(), dshape);
 	grad_hat.SetSize(vdim,dim);
         DenseMatrix loc_data_mat(loc_data.GetData(), elndofs, 1);
@@ -9552,8 +9559,11 @@ void LoMachSolver::updateThermoP() {
  	kdT[1] = grad(0,1);
  	kdT[2] = grad(0,2);	
 
+        elfun_mat.MultTranspose(shape, kappa);
+	
 	kdTn = 0.0;
         for (int eq = 0; eq < dim; eq++) {kdTn += kdT[eq] * normal[eq];}
+	kdTn *= kappa[0];
         mydtP += tr->Weight() * kdTn;
       }    
     }
