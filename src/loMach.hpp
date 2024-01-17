@@ -388,7 +388,8 @@ protected:
   //ParGridFunction *bufferInvRho;  
    ParGridFunction *bufferVisc;
    ParGridFunction *bufferBulkVisc;  
-   ParGridFunction *bufferRhoDt;  
+   ParGridFunction *bufferRhoDt;
+   ParGridFunction *bufferRhoDtR1;    
    //ParGridFunction *bufferGravity;  
    ParGridFunction *bufferAlpha;
    ParGridFunction *bufferTemp;
@@ -401,7 +402,8 @@ protected:
    //GridFunctionCoefficient *bousField;
    GridFunctionCoefficient *viscField;
    GridFunctionCoefficient *bulkViscField;  
-   GridFunctionCoefficient *rhoDtField;    
+   GridFunctionCoefficient *rhoDtField;
+   VectorGridFunctionCoefficient *rhoDtFieldR1;      
    //GridFunctionCoefficient *invRho;
    GridFunctionCoefficient *alphaField;
 
