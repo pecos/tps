@@ -348,15 +348,26 @@ protected:
    ParLinearForm *gravity_form = nullptr;  
 
    // temperature
+   ParBilinearForm *At_form = nullptr;  
    ParBilinearForm *Ms_form = nullptr;
    ParBilinearForm *MsRho_form = nullptr;  
    ParMixedBilinearForm *Ds_form = nullptr;  
    ParBilinearForm *Ht_form = nullptr;
+   ParBilinearForm *LQ_form = nullptr;
+   ParLinearForm *LQ_bdry = nullptr;  
    GridFunctionCoefficient *Text_gfcoeff = nullptr;
    ParLinearForm *Text_bdr_form = nullptr;
    ParLinearForm *ft_form = nullptr;
    ParLinearForm *t_bdr_form = nullptr;
 
+   VectorGridFunctionCoefficient *un_next_coeff = nullptr;
+   GridFunctionCoefficient *rhon_next_coeff = nullptr;
+   ScalarVectorProductCoefficient *rhou_coeff = nullptr;  
+
+   GridFunctionCoefficient *thermal_diff_coeff = nullptr;
+   GradientGridFunctionCoefficient *gradT_coeff = nullptr;
+   ScalarVectorProductCoefficient *kap_gradT_coeff = nullptr;
+  
    // pressure
    GridFunctionCoefficient *Pext_gfcoeff = nullptr;
    ParLinearForm *Pext_bdr_form = nullptr;
@@ -429,7 +440,9 @@ protected:
    OperatorHandle Mv;
    OperatorHandle MvRho;  
    OperatorHandle Sp;
-   OperatorHandle Lt;  
+   OperatorHandle Lt;
+   OperatorHandle LQ;  
+   OperatorHandle At;    
    OperatorHandle D;
    OperatorHandle DRho;  
    OperatorHandle G; 
@@ -793,6 +806,7 @@ public:
    void computeExplicitDiffusion();
    void computeImplicitDiffusion();
    void computeQt();
+   void computeQtTO();  
    void computeDtRho();
    void makeDivFree();
    void makeDivFreeOP();  
