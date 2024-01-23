@@ -333,9 +333,11 @@ protected:
   
    ParNonlinearForm *N = nullptr;
    ParBilinearForm *Mv_form = nullptr;
+   ParBilinearForm *MvRho_form = nullptr;  
    ParBilinearForm *Sp_form = nullptr;
    ParBilinearForm *Lt_form = nullptr;  
    ParMixedBilinearForm *D_form = nullptr;
+   ParMixedBilinearForm *DRho_form = nullptr;  
    ParMixedBilinearForm *G_form = nullptr;
    ParMixedBilinearForm *Gp_form = nullptr;  
    ParBilinearForm *H_form = nullptr;
@@ -346,8 +348,9 @@ protected:
    ParLinearForm *gravity_form = nullptr;  
 
    // temperature
-   ParBilinearForm *Mt_form = nullptr;
-   ParMixedBilinearForm *Dt_form = nullptr;  
+   ParBilinearForm *Ms_form = nullptr;
+   ParBilinearForm *MsRho_form = nullptr;  
+   ParMixedBilinearForm *Ds_form = nullptr;  
    ParBilinearForm *Ht_form = nullptr;
    GridFunctionCoefficient *Text_gfcoeff = nullptr;
    ParLinearForm *Text_bdr_form = nullptr;
@@ -387,7 +390,8 @@ protected:
   
   //ParGridFunction *bufferInvRho;  
    ParGridFunction *bufferVisc;
-   ParGridFunction *bufferBulkVisc;  
+   ParGridFunction *bufferBulkVisc;
+   ParGridFunction *bufferRho;  
    ParGridFunction *bufferRhoDt;
    ParGridFunction *bufferRhoDtR1;    
    //ParGridFunction *bufferGravity;  
@@ -405,6 +409,7 @@ protected:
    GridFunctionCoefficient *rhoDtField;
    VectorGridFunctionCoefficient *rhoDtFieldR1;      
    //GridFunctionCoefficient *invRho;
+   GridFunctionCoefficient *Rho;  
    GridFunctionCoefficient *alphaField;
 
    ParGridFunction *buffer_uInlet;
@@ -422,14 +427,17 @@ protected:
   //GridFunctionCoefficient *viscFieldSml;  
   
    OperatorHandle Mv;
+   OperatorHandle MvRho;  
    OperatorHandle Sp;
    OperatorHandle Lt;  
    OperatorHandle D;
+   OperatorHandle DRho;  
    OperatorHandle G; 
    OperatorHandle Gp; 
    OperatorHandle H;
-   OperatorHandle Mt;
-   OperatorHandle Dt;  
+   OperatorHandle Ms;
+   OperatorHandle MsRho;    
+   OperatorHandle Ds;  
    OperatorHandle Ht;
 
    mfem::Solver *MvInvPC = nullptr;
@@ -444,8 +452,8 @@ protected:
    // if not using amg to solve pressure
    //mfem::Solver *SpInvPC = nullptr; 
 
-   mfem::Solver *MtInvPC = nullptr;
-   mfem::CGSolver *MtInv = nullptr;  
+   mfem::Solver *MsInvPC = nullptr;
+   mfem::CGSolver *MsInv = nullptr;  
    mfem::Solver *HtInvPC = nullptr;
    mfem::CGSolver *HtInv = nullptr;  
 
@@ -492,7 +500,7 @@ protected:
    // temperature additions
    Vector fTn, Tn, Tn_next, Tnm1, Tnm2, NTn, NTnm1, NTnm2;
    Vector Text, Text_bdr, t_bdr;
-  Vector resT, tmpR0, tmpR0a, tmpR0b, tmpR0c;
+   Vector resT, tmpR0, tmpR0a, tmpR0b, tmpR0c;
    ParGridFunction Tn_gf, Tn_next_gf, Text_gf, resT_gf;
 
    // pressure mimic
