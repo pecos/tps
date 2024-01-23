@@ -183,7 +183,8 @@ class RunConfiguration {
   bool resetTemp;  
   
   // wall bc flag to use internal function definition
-  bool useWallFunction;  
+  bool useWallFunction;
+  bool useWallBox; // NEED A BETTER WAY TO DO THIS!
   
   // Imposed pressure gradient  
   bool isForcing;
