@@ -399,7 +399,7 @@ protected:
    ConstantCoefficient *bufferInlet_pbc;
    ConstantCoefficient *bufferOutlet_pbc;      
   
-  //ParGridFunction *bufferInvRho;  
+   ParGridFunction *bufferInvRho;  
    ParGridFunction *bufferVisc;
    ParGridFunction *bufferBulkVisc;
    ParGridFunction *bufferRho;  
@@ -419,7 +419,7 @@ protected:
    GridFunctionCoefficient *bulkViscField;  
    GridFunctionCoefficient *rhoDtField;
    VectorGridFunctionCoefficient *rhoDtFieldR1;      
-   //GridFunctionCoefficient *invRho;
+   GridFunctionCoefficient *invRho;
    GridFunctionCoefficient *Rho;  
    GridFunctionCoefficient *alphaField;
 
@@ -459,11 +459,11 @@ protected:
    mfem::CGSolver *HInv = nullptr;
 
    mfem::CGSolver *SpInv = nullptr;  
-   mfem::HypreBoomerAMG *SpInvPC = nullptr;
+  //mfem::HypreBoomerAMG *SpInvPC = nullptr;
    mfem::OrthoSolver *SpInvOrthoPC = nullptr;
 
    // if not using amg to solve pressure
-   //mfem::Solver *SpInvPC = nullptr; 
+   mfem::Solver *SpInvPC = nullptr; 
 
    mfem::Solver *MsInvPC = nullptr;
    mfem::CGSolver *MsInv = nullptr;  
