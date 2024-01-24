@@ -1255,7 +1255,8 @@ void LoMachSolver::Setup(double dt)
    // HARD CODE
    //partial_assembly = true;
    partial_assembly = false;
-   partial_assembly_pressure = true;   
+   //partial_assembly_pressure = true;
+   partial_assembly_pressure = false;   
    //if (verbose) grvy_printf(ginfo, "in Setup...\n");
    /*
    if (verbose && pmesh->GetMyRank() == 0)
@@ -1778,28 +1779,20 @@ void LoMachSolver::Setup(double dt)
    // DiffusionIntegrator(MatrixCoefficient &q, const IntegrationRule *ir = nullptr)
    // BilinearFormIntegrator *integ = new DiffusionIntegrator(sigma); with sigma some type of Coefficient class
    //ParGridFunction buffer1(pfes);
-   /*
-   bufferInvRho = new ParGridFunction(sfes);
+   /**/
+   bufferInvRho = new ParGridFunction(pfes);
    {
      double *data = bufferInvRho->HostReadWrite();
-     //double *dataRho = rn_gf.HostReadWrite();   
-     //double *Tdata = Tn.HostReadWrite();
-     //for (int eq = 0; eq < pmesh->Dimension(); eq++) {
-     for (int i = 0; i < Sdof; i++) {     
-       //dataRho[i] = ambientPressure / (Rgas * Tdata[i]);       
-       //data[i] = (Rgas * Tdata[i]) / ambientPressure;
-       data[i] = 1.0;
-     }
+     for (int i = 0; i < Pdof; i++) { data[i] = 1.0; }
    }
-   //GridFunctionCoefficient invRho(&buffer1);    
    invRho = new GridFunctionCoefficient(bufferInvRho);
    //std::cout << "Check 9..." << std::endl;
-   */
+   /**/
    
    // looks like this is the Laplacian for press eq
    Sp_form = new ParBilinearForm(pfes);
-   auto *sp_blfi = new DiffusionIntegrator;
-   //auto *sp_blfi = new DiffusionIntegrator(*invRho); // HERE breaks with amg
+   //auto *sp_blfi = new DiffusionIntegrator;
+   auto *sp_blfi = new DiffusionIntegrator(*invRho); // HERE breaks with amg
    if (numerical_integ)
    {
       sp_blfi->SetIntRule(&ir_pi);
@@ -2087,7 +2080,7 @@ void LoMachSolver::Setup(double dt)
    MvInv->SetMaxIter(config.solver_iter);
    //std::cout << "Check 17..." << std::endl;
    
-   /**/
+   /*
    if (partial_assembly_pressure) {
       lor = new ParLORDiscretization(*Sp_form, pres_ess_tdof);
       SpInvPC = new HypreBoomerAMG(lor->GetAssembledMatrix());
@@ -2115,12 +2108,11 @@ void LoMachSolver::Setup(double dt)
    SpInv->SetPrintLevel(pl_spsolve);
    SpInv->SetRelTol(config.solver_tol);
    SpInv->SetMaxIter(config.solver_iter);
-   /**/
-   if (rank0_) std::cout << "Inverse operators set" << endl;
+   */
    
    // this wont be as efficient but AMG merhod (above) wasnt allowing for updates to variable coeff
    /*
-   if (partial_assembly)
+   if (partial_assembly_pressure)
    {
       Vector diag_pa(pfes->GetTrueVSize());
       Sp_form->AssembleDiagonal(diag_pa);
@@ -2137,8 +2129,38 @@ void LoMachSolver::Setup(double dt)
    SpInv->SetPreconditioner(*SpInvPC);
    SpInv->SetPrintLevel(pl_spsolve);
    SpInv->SetRelTol(rtol_spsolve);
-   SpInv->SetMaxIter(500);
+   SpInv->SetMaxIter(1000);
    */
+
+  if (partial_assembly_pressure) {
+    lor = new ParLORDiscretization(*Sp_form, pres_ess_tdof);
+    SpInvPC = new HypreBoomerAMG(lor->GetAssembledMatrix());
+    //SpInvPC->SetPrintLevel(pl_amg);
+    SpInvPC->Mult(resp, pn);
+    SpInvOrthoPC = new OrthoSolver(vfes->GetComm());
+    SpInvOrthoPC->SetSolver(*SpInvPC);
+  } else {
+    //SpInvPC = new HypreBoomerAMG(*Sp.As<HypreParMatrix>());
+    //SpInvPC->SetPrintLevel(0);
+    SpInvPC = new HypreSmoother(*Sp.As<HypreParMatrix>());
+    dynamic_cast<HypreSmoother *>(SpInvPC)->SetType(HypreSmoother::Jacobi, 1);
+
+    SpInvOrthoPC = new OrthoSolver(vfes->GetComm());
+    SpInvOrthoPC->SetSolver(*SpInvPC);
+  }
+  SpInv = new CGSolver(vfes->GetComm());
+  SpInv->iterative_mode = true;
+  SpInv->SetOperator(*Sp);
+  if (pres_dbcs.empty()) {
+    SpInv->SetPreconditioner(*SpInvOrthoPC);
+  } else {
+    SpInv->SetPreconditioner(*SpInvPC);
+  }
+  SpInv->SetPrintLevel(pl_spsolve);
+  SpInv->SetRelTol(rtol_spsolve);
+  SpInv->SetMaxIter(1000);
+   
+   if (rank0_) std::cout << "Inverse operators set" << endl;
 
    
    if (partial_assembly)
@@ -3186,11 +3208,13 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    FText.Add(1.0,uns);
    FText.Add(1.0,Fext); // if rho not added to the integrator
    tmpR1.Set(1.0,FText);
+
+   D->Mult(tmpR1,FText); // with 1/rho in p-p op
    
-   DRho_form->Update();
-   DRho_form->Assemble();
-   DRho_form->FormRectangularSystemMatrix(empty, empty, DRho);   
-   DRho->Mult(tmpR1,FText);
+   //DRho_form->Update();
+   //DRho_form->Assemble();
+   //DRho_form->FormRectangularSystemMatrix(empty, empty, DRho);   
+   //DRho->Mult(tmpR1,FText);
 
    //MvRho_form->Update();
    //MvRho_form->Assemble();
@@ -3201,6 +3225,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    
    tmpR1.Set(1.0,Ldiv);
    tmpR1.Add(1.0,LdivImp);
+   multScalarInvVectorIP(rn,&tmpR1); // with 1/rho in p-p op
    //tmpR1.Add(1.0,Fext);   
    D->Mult(tmpR1,tmpR1b);
    FText.Add(1.0,tmpR1b);   
@@ -3213,13 +3238,14 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    tmpR0.Set(-1.0,FText);
 
    // unsteady div term, (-) on rhs rho * gamma * Qt/dt (after div term)
-   MsRho_form->Update();
-   MsRho_form->Assemble();
-   MsRho_form->FormSystemMatrix(empty, MsRho);
+   //MsRho_form->Update();
+   //MsRho_form->Assemble();
+   //MsRho_form->FormSystemMatrix(empty, MsRho);
    //multScalarScalar(rn,Qt,&tmpR0b);
    //multScalarScalar(rn,divU,&tmpR0b); // divU contains Qt
    multConstScalar((bd0/dt),Qt,&tmpR0b);     
-   MsRho->Mult(tmpR0b, tmpR0c);
+   //MsRho->Mult(tmpR0b, tmpR0c);
+   Ms->Mult(tmpR0b, tmpR0c); // with 1/rho in p-p op
    tmpR0.Add(+1.0,tmpR0c); // because of the tmpR0.Neg()...
 
    // inconsisnt with paper, they have v* as conv+uns w/o diff, i.e. no reason to chain u* here, just th qt term   
@@ -3238,12 +3264,14 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
        }
      }
      */
+     /* // not used with 1/rho in p-p op
      multConstVector((-bd0/dt),Uext,&tmpR1);
      dotVector(tmpR1,gradRho,&tmpR0b);
      multScalarInvVectorIP(rn,&tmpR0b);
      //Ms->Mult(tmpR0b, tmpR0c);
      MsRho->Mult(tmpR0b, tmpR0c);
      tmpR0.Add(-1.0,tmpR0c); // because of the tmpR0.Neg()...
+     */
    }
 
    // store old p
@@ -3266,11 +3294,19 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
 
    //resp.Set(1.0, tmpR0);   
    //resp.Add(1.0, FText_bdr);
-   //resp.Add(-bd0/dt, g_bdr);   
+   //resp.Add(-bd0/dt, g_bdr);
+
+   //if(rank0_) {std::cout << "starting Sp_form..." << endl;}
+   Sp_form->Update();
+   Sp_form->Assemble();
+   Sp_form->FormSystemMatrix(pres_ess_tdof, Sp);
+   SpInv->SetOperator(*Sp);   
+   //if(rank0_) {std::cout << "...update complete" << endl;}   
 
    if (pres_dbcs.empty()) { Orthogonalize(resp); }   
    for (auto &pres_dbc : pres_dbcs) { pn_gf.ProjectBdrCoefficient(*pres_dbc.coeff, pres_dbc.attr); }
-   pfes->GetRestrictionMatrix()->MultTranspose(resp, resp_gf); 
+   pfes->GetRestrictionMatrix()->MultTranspose(resp, resp_gf);
+   //if(rank0_) {std::cout << "...p1 complete" << endl;}      
    
    Vector X1, B1;
    if (partial_assembly_pressure)
@@ -3282,6 +3318,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    {
       Sp_form->FormLinearSystem(pres_ess_tdof, pn_gf, resp_gf, Sp, X1, B1, 1);
    }
+   //if(rank0_) {std::cout << "...p2 complete" << endl;}         
 
    // actual implicit solve for p(n+1)
    sw_spsolve.Start(); 
@@ -3290,6 +3327,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    iter_spsolve = SpInv->GetNumIterations();
    res_spsolve = SpInv->GetFinalNorm();
    Sp_form->RecoverFEMSolution(X1, resp_gf, pn_gf);
+   //if(rank0_) {std::cout << "...p3 complete" << endl;}         
 
    // If the boundary conditions on the pressure are pure Neumann remove the
    // nullspace by removing the mean of the pressure solution. This is also
@@ -9756,6 +9794,16 @@ void LoMachSolver::updateDensity(double tStep) {
      for (int i = 0; i < Sdof; i++) { data[i] = rho[i]; }
    }    
 
+
+   R0PM0_gf.SetFromTrueDofs(rn);   
+   R0PM1_gf.ProjectGridFunction(R0PM0_gf);
+   {
+     double *data = bufferInvRho->HostReadWrite();
+     double *rho = R0PM1_gf.HostReadWrite();     
+     for (int i = 0; i < Pdof; i++) { data[i] = 1.0/rho[i]; }
+   }    
+
+   
 }
 
 
