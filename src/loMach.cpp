@@ -2788,6 +2788,13 @@ void LoMachSolver::solve()
         std::cout << "====================================================================="<< endl;	
       }
 
+      // move this
+      if(iter == 0) {
+	Tnm1 = Tn;
+	Tnm2 = Tn;
+	unm1 = un;
+	unm2 = un;		
+      }
 
    double time_previous = 0.0;      
    for (int step = iter_start; step <= MaxIters; step++)
@@ -3010,30 +3017,6 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    
    // begin temperature...................................... <warp>
    resT = 0.0;
-
-   //Ht_bdfcoeff.constant = bd0 / dt;
-   { 
-     double *data = bufferRhoDt->HostReadWrite();
-     double *Rdata = rn_gf.HostReadWrite();
-     double coeff = Cp*bd0/dt;
-     //double *d_imp = R0PM0_gf.HostReadWrite();
-     //for (int i = 0; i < Sdof; i++) { data[i] = coeff; }
-     for (int i = 0; i < Sdof; i++) { data[i] = coeff * Rdata[i]; }
-     //for (int i = 0; i < Sdof; i++) {data[i] = coeff * Rdata[i] + d_imp[i]; }     
-   }         
-   Ht_form->Update();
-   Ht_form->Assemble();
-   Ht_form->FormSystemMatrix(temp_ess_tdof, Ht);
-
-   HtInv->SetOperator(*Ht);
-   if (partial_assembly)
-   {
-      delete HtInvPC;
-      Vector diag_pa(sfes->GetTrueVSize());
-      Ht_form->AssembleDiagonal(diag_pa);
-      HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof);
-      HtInv->SetPreconditioner(*HtInvPC);
-   }
    
    /*
    // advection
@@ -3052,17 +3035,10 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    dotVector(Uext,gradT,&tmpR0);
    //multScalarScalarIP(rn,&tmpR0);
    multConstScalarIP(Cp,&tmpR0);
+   MsRho->Mult(tmpR0,tmpR0b);   
+   resT.Set(-1.0, tmpR0);  
    */
 
-   At_form->Update();
-   At_form->Assemble();
-   At_form->FormSystemMatrix(empty, At);
-   At->Mult(Text,tmpR0);
-   multConstScalarIP(Cp,&tmpR0);
-
-   //HACK
-   //tmpR0 = 0.0;
-   
    /*
    tmpR0a = 0.0;
    tmpR0b = 0.0;        
@@ -3077,13 +3053,27 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
 	 d_imp[i] = data[i];
        }
      }
-   }            
-   resT.Add(-1.0, tmpR0a);
-   //multScalarInvScalarIP(Tn,&tmpR0b);
-   multScalarInvScalarIP(Text,&tmpR0b);
+   }
+
+   // exp to rhs
+   MsRho->Mult(tmpR0a,tmpR0c);      
+   resT.Set(-1.0, tmpR0c);
+
+   // imp to diag
+   multScalarInvScalarIP(Tn,&tmpR0b);
    R0PM0_gf.SetFromTrueDofs(tmpR0b);
    */
-   resT.Set(-1.0, tmpR0);          
+   //resT.Set(-1.0, tmpR0);          
+   
+   /**/
+   At_form->Update();
+   At_form->Assemble();
+   At_form->FormSystemMatrix(empty, At);
+   At->Mult(Text,tmpR0);
+   multConstScalarIP(Cp,&tmpR0);
+   resT.Set(-1.0, tmpR0);             
+   /**/
+   
    
    // for unsteady term, compute and add known part of BDF unsteady term
    // bd3 is unstable!!!
@@ -3101,7 +3091,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      });
    }
    //multScalarScalarIP(rn,&tmpR0);
-   multConstScalarIP(Cp,&tmpR0);
+   multConstScalarIP(Cp,&tmpR0);   
    MsRho->Mult(tmpR0,tmpR0b);
    resT.Add(-1.0,tmpR0b);
    
@@ -3110,11 +3100,37 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    //resT.Set(1.0,tmpR0);
 
    // dPo/dt
-   tmpR0 = dtP;
-   Ms->Mult(tmpR0,tmpR0b);
-   resT.Add(1.0, tmpR0b);
+   //tmpR0 = dtP;
+   //Ms->Mult(tmpR0,tmpR0b);
+   //??? resT.Add(1.0, tmpR0b);
 
    // Add natural boundary terms
+
+
+   //Ht_bdfcoeff.constant = bd0 / dt;
+   { 
+     double *data = bufferRhoDt->HostReadWrite();
+     double *Rdata = rn_gf.HostReadWrite();
+     double coeff = Cp*bd0/dt;
+     double *d_imp = R0PM0_gf.HostReadWrite();
+     //for (int i = 0; i < Sdof; i++) { data[i] = coeff; }
+     for (int i = 0; i < Sdof; i++) { data[i] = coeff * Rdata[i]; }
+     //for (int i = 0; i < Sdof; i++) {data[i] = Rdata[i] * (coeff + d_imp[i]); }     
+   }         
+   Ht_form->Update();
+   Ht_form->Assemble();
+   Ht_form->FormSystemMatrix(temp_ess_tdof, Ht);
+
+   HtInv->SetOperator(*Ht);
+   if (partial_assembly)
+   {
+      delete HtInvPC;
+      Vector diag_pa(sfes->GetTrueVSize());
+      Ht_form->AssembleDiagonal(diag_pa);
+      HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof);
+      HtInv->SetPreconditioner(*HtInvPC);
+   }
+
    
    // what is this?   
    for (auto &temp_dbc : temp_dbcs) { Tn_next_gf.ProjectBdrCoefficient(*temp_dbc.coeff, temp_dbc.attr); }
@@ -9721,6 +9737,8 @@ void LoMachSolver::updateThermoP() {
 
 void LoMachSolver::updateDensity(double tStep) {
 
+   Array<int> empty;
+  
    // set rn
    if (constantDensity != true) {
      if(tStep == 1) {
@@ -9749,7 +9767,9 @@ void LoMachSolver::updateDensity(double tStep) {
      double *rho = rn_gf.HostReadWrite();     
      for (int i = 0; i < Sdof; i++) { data[i] = rho[i]; }
    }    
-
+   MsRho_form->Update();
+   MsRho_form->Assemble();
+   MsRho_form->FormSystemMatrix(empty, MsRho);   
 
    R0PM0_gf.SetFromTrueDofs(rn);   
    R0PM1_gf.ProjectGridFunction(R0PM0_gf);
@@ -9758,7 +9778,7 @@ void LoMachSolver::updateDensity(double tStep) {
      double *rho = R0PM1_gf.HostReadWrite();     
      for (int i = 0; i < Pdof; i++) { data[i] = 1.0/rho[i]; }
    }    
-
+   
    // density gradient
    G->Mult(rn, tmpR1);     
    MvInv->Mult(tmpR1, gradRho);   
