@@ -457,9 +457,13 @@ protected:
    mfem::CGSolver *MvInv = nullptr;  
    mfem::Solver *HInvPC = nullptr;
    mfem::CGSolver *HInv = nullptr;
+   //mfem::GMRESSolver *HInv = nullptr;
+   //mfem::BiCGSTABSolver *HInv = nullptr;  
 
-   mfem::CGSolver *SpInv = nullptr;  
-  //mfem::HypreBoomerAMG *SpInvPC = nullptr;
+   mfem::CGSolver *SpInv = nullptr;
+   //mfem::GMRESSolver *SpInv = nullptr;
+   //mfem::BiCGSTABSolver *SpInv = nullptr;
+   //mfem::HypreBoomerAMG *SpInvPC = nullptr;
    mfem::OrthoSolver *SpInvOrthoPC = nullptr;
 
    // if not using amg to solve pressure
@@ -468,7 +472,9 @@ protected:
    mfem::Solver *MsInvPC = nullptr;
    mfem::CGSolver *MsInv = nullptr;  
    mfem::Solver *HtInvPC = nullptr;
-   mfem::CGSolver *HtInv = nullptr;  
+   mfem::CGSolver *HtInv = nullptr;
+   //mfem::GMRESSolver *HtInv = nullptr;  
+   //mfem::BiCGSTABSolver *HtInv = nullptr;  
 
    Vector fn, un, un_next, unm1, unm2;
    Vector u_star, u_half;  
