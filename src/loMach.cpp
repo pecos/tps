@@ -3018,6 +3018,10 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    resT.Add(+1.0, tmpR0); // minus on lhs and minus to move to rhs
    */
 
+   MsRho_form->Update();
+   MsRho_form->Assemble();
+   MsRho_form->FormSystemMatrix(empty, MsRho);      
+   
    // simpler way
    /*
    dotVector(Uext,gradT,&tmpR0);
@@ -3132,9 +3136,10 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    // unsteady rho term
    // computeDtRho();
    
-   // update rn from with actual T{n+1}
+   // update rn and mu from with actual T{n+1}
    updateDensity(1.0);
-   
+   updateDiffusivity(false);      
+
    
    // begin momentum.....................................
 
@@ -3239,7 +3244,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      }
      */
      multConstVector((-bd0/dt),Uext,&tmpR1);
-     tmpR1.Add(1.0,tmpR1c);
+     tmpR1.Add(1.0,tmpR1c); // has summed v* bits
      dotVector(tmpR1,gradRho,&tmpR0b);
      multScalarInvVectorIP(rn,&tmpR0b);
      //Ms->Mult(tmpR0b, tmpR0c);
