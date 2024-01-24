@@ -3185,12 +3185,12 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    FText.Set(1.0,fn);
    FText.Add(1.0,uns);
    FText.Add(1.0,Fext); // if rho not added to the integrator
-   tmpR1.Set(1.0,FText);
+   tmpR1c.Set(1.0,FText);
    
    DRho_form->Update();
    DRho_form->Assemble();
    DRho_form->FormRectangularSystemMatrix(empty, empty, DRho);   
-   DRho->Mult(tmpR1,FText);
+   DRho->Mult(tmpR1c,FText);
 
    //MvRho_form->Update();
    //MvRho_form->Assemble();
@@ -3239,6 +3239,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      }
      */
      multConstVector((-bd0/dt),Uext,&tmpR1);
+     tmpR1.Add(1.0,tmpR1c);
      dotVector(tmpR1,gradRho,&tmpR0b);
      multScalarInvVectorIP(rn,&tmpR0b);
      //Ms->Mult(tmpR0b, tmpR0c);
@@ -8475,6 +8476,8 @@ void LoMachSolver::computeQt() {
 
 void LoMachSolver::computeQtTO() {  
 
+    Array<int> empty;
+  
     if (incompressibleSolve == true) {
       Qt = 0.0;
     } else {
@@ -8484,6 +8487,10 @@ void LoMachSolver::computeQtTO() {
       LQ_bdry->ParallelAssemble(tmpR0);
       tmpR0.Neg();
 
+      LQ_form->Update();
+      LQ_form->Assemble();
+      LQ_form->FormSystemMatrix(empty, LQ);
+      
       LQ->AddMult(Tn_next, tmpR0);
       MsInv->Mult(tmpR0, Qt);
 
