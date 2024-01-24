@@ -3174,13 +3174,6 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    //computeQt();
    computeQtTO();
 
-   // testing, add extra divU to Qt 
-   //multScalarInvScalarIP(rn,&dtRho);
-   //Qt.Add(1.0,dtRho);
-   
-   // Nonlinear extrapolated terms (convection: N*(n+1))
-   //sw_extrap.Start();
-
    // convection in cont form
    //computeExplicitConvection(1.0); // ->Fext
    //computeExplicitConvectionOP(1.0,false); // use extrap u
@@ -3188,17 +3181,9 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
 
    // total unsteady contribution
    computeExplicitUnsteadyBDF(); // ->uns   
-   
-   // Fext now has v*/dt from eq 2.3 in orszag
-   //sw_extrap.Stop();
-
-   // Pressure Poisson (extrapolated curl(curl(u)) L*(n+1))
-   //sw_curlcurl.Start();
 
    // implicit part of diff term (calculated explicitly) using elasticity op
    computeImplicitDiffusion(); // ->LdivImp (has rho via mu)
-   
-   //sw_curlcurl.Stop();
 
    // explicit part of diff term using elasticity op
    computeExplicitDiffusion(); // ->Ldiv (has rho via mu)
@@ -3364,7 +3349,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    // assemble rhs for u solve
    tmpR1.Set(1.0,uns);
    tmpR1.Add(1.0,fn);
-   tmpR1.Set(1.0,Fext); // if rho inc in coeff
+   tmpR1.Add(1.0,Fext); // if rho inc in coeff
    MvRho_form->Update();
    MvRho_form->Assemble();
    MvRho_form->FormSystemMatrix(empty, MvRho);      
