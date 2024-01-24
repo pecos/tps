@@ -2977,7 +2977,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    for (auto &temp_dbc : temp_dbcs) {temp_dbc.coeff->SetTime(time + dt);}   
 
    
-   if (incompressibleSolve != true || loMach_opts_.solveTemp != true) {
+   if (loMach_opts_.solveTemp == true) {
    
    // begin temperature...................................... <warp>
    resT = 0.0;
