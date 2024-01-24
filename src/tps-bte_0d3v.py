@@ -145,10 +145,8 @@ class Boltzmann0D2VBactchedSolver:
         self.comm : MPI.Comm  = comm
         self.param = BoltzmannSolverParams()
         # overide the default params, based on the config.ini file.
-        self.parse_config_file(sys.argv[2])
-        
+        self.__parse_config_file__(sys.argv[2])
         self.xp_module          = np
-        
         boltzmann_dir           = self.param.output_dir
         isExist = os.path.exists(boltzmann_dir)
         if not isExist:
@@ -163,10 +161,13 @@ class Boltzmann0D2VBactchedSolver:
         
         self.profile_tt = profile_tt
         self.profile_nn = profile_nn
+        
+        # how to map each grid to the GPU devices on the node
+        self.gidx_to_device_map = lambda gidx, num_grids : gidx % 2
 
         return
     
-    def parse_config_file(self, fname):
+    def __parse_config_file__(self, fname):
         """
         add the configuaraion file parse code here, 
         which overides the default BoltzmannSolverParams
@@ -209,7 +210,7 @@ class Boltzmann0D2VBactchedSolver:
         where, at the moment the clustering is determined based on the electron temperature
         computed from the TPS code. 
         """
-        
+        assert self.xp_module==np, "grid setup only supported in CPU"
         self.profile_tt[pp.SETUP].start()
         
         xp                = self.xp_module
@@ -261,48 +262,113 @@ class Boltzmann0D2VBactchedSolver:
         for grid_idx in range(self.param.n_grids):
             print("setting up grid %d"%(grid_idx), flush = True)
             self.bte_solver.assemble_operators(grid_idx)
+            
+        n_grids              = self.param.n_grids
+        gidx_to_device_map   = self.gidx_to_device_map
+
+        for grid_idx in range(n_grids):
+            assert self.grid_idx_to_npts[grid_idx] > 0
+
+            print("setting initial Maxwellian at %.4E eV" %(self.bte_solver._par_ap_Te[grid_idx]), flush=True)
+            f0 = self.bte_solver.initialize(grid_idx, self.grid_idx_to_npts[grid_idx], "maxwellian")
+            self.bte_solver.set_boltzmann_parameter(grid_idx, "f0", f0)
+            
+            print("setting grid %d to device %d"%(grid_idx, gidx_to_device_map(grid_idx, n_grids)))
+            self.bte_solver.host_to_device_setup(gidx_to_device_map(grid_idx, n_grids), grid_idx)
+            self.xp_module = cp
         
         self.profile_tt[pp.SETUP].stop()
         return
+
+    def __efield_setup__(self):
+        
+        """
+        Here we set the E-field for 1-way coupling
+        """
+        
+        use_gpu   = self.param.use_gpu
+        n_grids   = self.param.n_grids
+        xp        = self.xp_module
+        if(use_gpu==1):
+            def Et(t, grid_idx):
+                dev_id = self.gidx_to_device_map(grid_idx, n_grids)
+                with cp.cuda.Device(dev_id):
+                    eRe_d     = self.bte_solver.get_boltzmann_parameter(grid_idx, "eRe")
+                    eIm_d     = self.bte_solver.get_boltzmann_parameter(grid_idx, "eIm")
+
+                    if self.param.Efreq == 0:
+                        return xp.sqrt(eRe_d**2 + eIm_d**2)
+                    else:
+                        return eRe_d * xp.cos(2 * xp.pi * self.param.Efreq * t) + eIm_d * xp.sin(2 * xp.pi * self.param.Efreq * t)
+        else:
+            def Et(t, grid_idx):
+                eRe_d     = self.bte_solver.get_boltzmann_parameter(grid_idx, "eRe")
+                eIm_d     = self.bte_solver.get_boltzmann_parameter(grid_idx, "eIm")
+
+                if self.param.Efreq == 0:
+                    return xp.sqrt(eRe_d**2 + eIm_d**2)
+                else:
+                    return eRe_d * xp.cos(2 * xp.pi * self.param.Efreq * t) + eIm_d * xp.sin(2 * xp.pi * self.param.Efreq * t)
+                            
+        for grid_idx in range(n_grids):
+            et = lambda t, gid=grid_idx: Et(t, gid)
+            self.bte_solver.set_efield_function(grid_idx, et)   
+        
+        return
         
     def fetch(self, interface):
-        xp                = self.xp_module
         gidx_to_pidx_map  = self.grid_idx_to_spatial_idx_map
         
-        heavy_temp        = xp.array(interface.HostRead(libtps.t2bIndex.HeavyTemperature), copy=False)
+        heavy_temp        = np.array(interface.HostRead(libtps.t2bIndex.HeavyTemperature), copy=False)
         tps_npts          = len(heavy_temp)
         self.tps_npts     = tps_npts
         
-        electron_temp     = xp.array(interface.HostRead(libtps.t2bIndex.ElectronTemperature), copy=False)
-        efield            = xp.array(interface.HostRead(libtps.t2bIndex.ElectricField), copy=False).reshape((2, tps_npts))
-        species_densities = xp.array(interface.HostRead(libtps.t2bIndex.SpeciesDensities), copy=False).reshape(3, tps_npts)
+        electron_temp     = np.array(interface.HostRead(libtps.t2bIndex.ElectronTemperature), copy=False)
+        efield            = np.array(interface.HostRead(libtps.t2bIndex.ElectricField), copy=False).reshape((2, tps_npts))
+        species_densities = np.array(interface.HostRead(libtps.t2bIndex.SpeciesDensities), copy=False).reshape(3, tps_npts)
+        n_grids           = self.param.n_grids 
+        use_gpu           = self.param.use_gpu
         
-        for grid_idx in range(self.param.n_grids):
+        for grid_idx in range(n_grids):
             bte_idx           = gidx_to_pidx_map[grid_idx]
+            dev_id            = self.gidx_to_device_map(grid_idx, n_grids)
+            
             ni                = species_densities[TPSINDEX.ION_IDX][bte_idx]
             ne                = species_densities[TPSINDEX.ELE_IDX][bte_idx]
             n0                = species_densities[TPSINDEX.NEU_IDX][bte_idx]
             Tg                = heavy_temp[bte_idx]
             Te                = electron_temp[bte_idx]
-            
-            
             eRe               = efield[TPSINDEX.EF_RE_IDX][bte_idx]
             eIm               = efield[TPSINDEX.EF_IM_IDX][bte_idx]
+            
             eMag              = np.sqrt(eRe**2 + eIm **2)
             eByn0             = eMag/n0/self.param.Td_fac
-        
+            
             if self.param.verbose == 1 :
                 print("Boltzmann solver inputs for v-space grid id %d"%(grid_idx))
                 print("Efreq = %.4E [1/s]" %(self.param.Efreq))
                 print("n_pts = %d" % self.grid_idx_to_npts[grid_idx])
                 
                 print("E/n0  (min)               = %.12E [Td]         \t E/n0 (max) = %.12E [Td]    "%(np.min(eByn0), np.max(eByn0)))
-                print("Tg    (min)               = %.12E [K]          \t Tg   (max) = %.12E [K]     "%(np.min(Tg), np.max(Tg)))
-                print("Te    (min)               = %.12E [K]          \t Te   (max) = %.12E [K]     "%(np.min(Te), np.max(Te)))
+                print("Tg    (min)               = %.12E [K]          \t Tg   (max) = %.12E [K]     "%(np.min(Tg)   , np.max(Tg)))
+                print("Te    (min)               = %.12E [K]          \t Te   (max) = %.12E [K]     "%(np.min(Te)   , np.max(Te)))
                 
-                print("ne    (min)               = %.12E [1/m^3]      \t ne   (max) = %.12E [1/m^3] "%(np.min(ne), np.max(ne)))
-                print("ni    (min)               = %.12E [1/m^3]      \t ni   (max) = %.12E [1/m^3] "%(np.min(ni), np.max(ni)))
-                print("n0    (min)               = %.12E [1/m^3]      \t n0   (max) = %.12E [1/m^3] "%(np.min(n0), np.max(n0)))
+                print("ne    (min)               = %.12E [1/m^3]      \t ne   (max) = %.12E [1/m^3] "%(np.min(ne)   , np.max(ne)))
+                print("ni    (min)               = %.12E [1/m^3]      \t ni   (max) = %.12E [1/m^3] "%(np.min(ni)   , np.max(ni)))
+                print("n0    (min)               = %.12E [1/m^3]      \t n0   (max) = %.12E [1/m^3] "%(np.min(n0)   , np.max(n0)))
+            
+            if (use_gpu == 1):
+                with cp.cuda.Device(dev_id):
+                    ne        = cp.array(ne)
+                    ni        = cp.array(ni)
+                    n0        = cp.array(n0)
+                    Tg        = cp.array(Tg)
+                    Te        = cp.array(Te)
+                    eRe       = cp.array(eRe)
+                    eIm       = cp.array(eIm)
+                     
+                    eMag      = cp.sqrt(eRe**2 + eIm **2)
+                    eByn0     = eMag/n0/self.param.Td_fac
             
             #self.bte_solver.set_boltzmann_parameters(grid_idx, n0, ne, ni, Tg, self.param.solver_type)
             self.bte_solver.set_boltzmann_parameter(grid_idx, "n0", n0)
@@ -321,323 +387,282 @@ class Boltzmann0D2VBactchedSolver:
         """
         
         if WITH_PARLA==1:
-            self.solve_with_parla()
+            self.solve_w_parla()
             return
         else:
-            self.solve_seq()
+            self.solve_wo_parla()
             return
         
-    def solve_seq(self):
-        xp               = self.xp_module
-        csv_write        = self.param.export_csv
-        gidx_to_pidx_map = self.grid_idx_to_spatial_idx_map
+    def solve_wo_parla(self):
+        xp                      = self.xp_module
+        csv_write               = self.param.export_csv
+        plot_data               = self.param.plot_data
+        gidx_to_pidx_map        = self.grid_idx_to_spatial_idx_map
+        use_gpu                 = self.param.use_gpu
+        dev_id                  = self.param.dev_id
+        verbose                 = self.param.verbose
+        n_grids                 = self.param.n_grids
+        gidx_to_device_map      = self.gidx_to_device_map
         
         self.qoi         = [None for grid_idx in range(self.param.n_grids)]
         self.ff          = [None for grid_idx in range(self.param.n_grids)]
         
-        if csv_write ==1 : 
+        if csv_write: 
             data_csv = np.empty((self.tps_npts, 8 + len(self.param.collisions)))
         
-        t1 = time()
+        self.__efield_setup__()
         
-        for grid_idx in range(self.param.n_grids):
-            
-            if self.grid_idx_to_npts[grid_idx] ==0:
-                continue
-            
-            if self.param.verbose==1:
-                print("setting initial Maxwellian at %.4E eV" %(self.bte_solver._par_ap_Te[grid_idx]), flush=True)
-                f0 = self.bte_solver.initialize(grid_idx, self.grid_idx_to_npts[grid_idx], "maxwellian")
-                self.bte_solver.set_boltzmann_parameter(grid_idx, "f0", f0)
-            
-            if self.param.use_gpu==1:
-                dev_id   = self.param.dev_id
-                self.bte_solver.host_to_device_setup(dev_id, grid_idx)
-                
-                with cp.cuda.Device(dev_id):
-                    eRe_d     = self.bte_solver.get_boltzmann_parameter(grid_idx, "eRe")
-                    eIm_d     = self.bte_solver.get_boltzmann_parameter(grid_idx, "eIm")
-
+        t1 = time()
+        for grid_idx in range(n_grids):
+            dev_id   = gidx_to_device_map(grid_idx, n_grids)
+            if (use_gpu==0):
+                try:
+                    eRe_d    = self.bte_solver.get_boltzmann_parameter(grid_idx, "eRe")
+                    eIm_d    = self.bte_solver.get_boltzmann_parameter(grid_idx, "eIm")
                     if self.param.Efreq == 0:
                         ef_t = lambda t : xp.sqrt(eRe_d**2 + eIm_d**2)
                     else:
                         ef_t = lambda t : eRe_d * xp.cos(2 * xp.pi * self.param.Efreq * t) + eIm_d * xp.sin(2 * xp.pi * self.param.Efreq * t)
-                        
+                    
+                    self.bte_solver.set_efield_function(grid_idx, ef_t)
+                    
+                    f0 = self.bte_solver.get_boltzmann_parameter(grid_idx, "f0")
+                    ff , qoi = self.bte_solver.solve(grid_idx, f0, self.param.atol, self.param.rtol, self.param.max_iter, self.param.solver_type)
+                    self.qoi[grid_idx] = qoi
+                    self.ff [grid_idx] = ff
+                except:
+                    print("solver failed for v-space gird no %d"%(grid_idx))
+                    sys.exit(0)
             else:
-                eRe_d     = self.bte_solver.get_boltzmann_parameter(grid_idx, "eRe")
-                eIm_d     = self.bte_solver.get_boltzmann_parameter(grid_idx, "eIm")
-            
-                if self.param.Efreq == 0:
-                    ef_t = lambda t : xp.sqrt(eRe_d**2 + eIm_d**2)
-                else:
-                    ef_t = lambda t : eRe_d * xp.cos(2 * xp.pi * self.param.Efreq * t) + eIm_d * xp.sin(2 * xp.pi * self.param.Efreq * t)
-                            
-            self.bte_solver.set_efield_function(grid_idx, ef_t)            
-            f0       = self.bte_solver.get_boltzmann_parameter(grid_idx, "f0")
-            try:
-                ff , qoi = self.bte_solver.solve(grid_idx, f0, self.param.atol, self.param.rtol, self.param.max_iter, self.param.solver_type)
-                self.qoi[grid_idx] = qoi
-                self.ff [grid_idx] = ff
-            except:
-                print("solver failed for v-space gird no %d"%(grid_idx))
-                # self.qoi.append(None)
-                # continue
-                sys.exit(0)
-            
-            if self.param.export_csv ==0 and self.param.plot_data==0:
-                continue
-            
-            ev       = np.linspace(1e-3, self.bte_solver._par_ev_range[grid_idx][1], 500)
-            ff_r     = self.bte_solver.compute_radial_components(grid_idx, ev, ff)
-
-            if self.param.use_gpu==1:
-                self.bte_solver.device_to_host_setup(self.param.dev_id,grid_idx)
-                
-            with cp.cuda.Device(dev_id):
-                ff_r     = cp.asnumpy(ff_r)
-                for k, v in qoi.items():
-                    qoi[k] = cp.asnumpy(v)
+                with xp.cuda.Device(dev_id):
+                    f0       = self.bte_solver.get_boltzmann_parameter(grid_idx, "f0")
+                    ff , qoi = self.bte_solver.solve(grid_idx, f0, self.param.atol, self.param.rtol, self.param.max_iter, self.param.solver_type)
+                    self.qoi[grid_idx] = qoi
+                    self.ff [grid_idx] = ff
+                    # try:
+                    #     f0 = self.bte_solver.get_boltzmann_parameter(grid_idx, "f0")
+                    #     ff , qoi = self.bte_solver.solve(grid_idx, f0, self.param.atol, self.param.rtol, self.param.max_iter, self.param.solver_type)
+                    #     self.qoi[grid_idx] = qoi
+                    #     self.ff [grid_idx] = ff
+                    # except:
+                    #     print("solver failed for v-space gird no %d"%(grid_idx))
+                    #     sys.exit(0)
                     
-            if csv_write==1:
-                data_csv[gidx_to_pidx_map[grid_idx], 0]    = self.bte_solver.get_boltzmann_parameter(grid_idx, "n0")
-                data_csv[gidx_to_pidx_map[grid_idx], 1]    = self.bte_solver.get_boltzmann_parameter(grid_idx, "ne")
-                data_csv[gidx_to_pidx_map[grid_idx], 2]    = self.bte_solver.get_boltzmann_parameter(grid_idx, "ni")
-                data_csv[gidx_to_pidx_map[grid_idx], 3]    = self.bte_solver.get_boltzmann_parameter(grid_idx, "Tg")
-                data_csv[gidx_to_pidx_map[grid_idx], 4]    = np.sqrt(self.bte_solver.get_boltzmann_parameter(grid_idx, "eRe")**2 + self.bte_solver.get_boltzmann_parameter(grid_idx, "eIm")**2)
-                data_csv[gidx_to_pidx_map[grid_idx], 5]    = qoi["energy"]
-                data_csv[gidx_to_pidx_map[grid_idx], 6]    = qoi["mobility"]
-                data_csv[gidx_to_pidx_map[grid_idx], 7]    = qoi["diffusion"]
-                
-                for col_idx, g in enumerate(self.param.collisions):
-                    data_csv[gidx_to_pidx_map[grid_idx], 8 + col_idx]    = qoi["rates"][col_idx]
-                    
-            plot_data    = self.param.plot_data
-            if plot_data:
-                
-                n0    = self.bte_solver.get_boltzmann_parameter(grid_idx, "n0")
-                ne    = self.bte_solver.get_boltzmann_parameter(grid_idx, "ne")
-                ni    = self.bte_solver.get_boltzmann_parameter(grid_idx, "ni")
-                Tg    = self.bte_solver.get_boltzmann_parameter(grid_idx, "Tg")
-                
-                eRe   = self.bte_solver.get_boltzmann_parameter(grid_idx, "eRe")
-                eIm   = self.bte_solver.get_boltzmann_parameter(grid_idx, "eIm")
-                eMag  = np.sqrt(eRe**2 + eIm**2)
-                
-                num_sh       = len(self.bte_solver._par_lm[grid_idx])
-                num_subplots = num_sh 
-                num_plt_cols = min(num_sh, 4)
-                num_plt_rows = np.int64(np.ceil(num_subplots/num_plt_cols))
-                fig          = plt.figure(figsize=(num_plt_cols * 8 + 0.5*(num_plt_cols-1), num_plt_rows * 8 + 0.5*(num_plt_rows-1)), dpi=300, constrained_layout=True)
-                plt_idx      =  1
-                n_pts_step   =  self.grid_idx_to_npts[grid_idx] // 20
-
-                for lm_idx, lm in enumerate(self.bte_solver._par_lm[grid_idx]):
-                    plt.subplot(num_plt_rows, num_plt_cols, plt_idx)
-                    for ii in range(0, self.grid_idx_to_npts[grid_idx], n_pts_step):
-                        fr = np.abs(ff_r[ii, lm_idx, :])
-                        plt.semilogy(ev, fr, label=r"$T_g$=%.2E [K], $E/n_0$=%.2E [Td], $n_e/n_0$ = %.2E "%(Tg[ii], eMag[ii]/n0[ii]/1e-21, ne[ii]/n0[ii]))
-                    
-                    plt.xlabel(r"energy (eV)")
-                    plt.ylabel(r"$f_%d$"%(lm[0]))
-                    plt.grid(visible=True)
-                    if lm_idx==0:
-                        plt.legend(prop={'size': 6})
-                        
-                    plt_idx +=1
-                
-                #plt_idx = num_sh
-                plt.savefig("%s_plot_%02d.png"%(self.param.out_fname, grid_idx))
-                plt.close()
-        
         t2 = time()
         print("time for boltzmann v-space solve = %.4E"%(t2- t1))
         
-        if csv_write:
-            fname    = self.param.out_fname
-            with open("%s_qoi.csv"%fname, 'w', encoding='UTF8') as f:
-                writer = csv.writer(f,delimiter=',')
-                # write the header
-                header = ["n0", "ne", "ni", "Tg", "E",  "energy", "mobility", "diffusion"]
-                for col_idx, g in enumerate(self.param.collisions):
-                    header.append(str(g))
+        if (self.param.export_csv ==1 or self.param.plot_data==1):
+            for grid_idx in range(n_grids):
+                dev_id   = gidx_to_device_map(grid_idx, n_grids)
+                ff       = self.ff[grid_idx]
+                qoi      = self.qoi[grid_idx]
                 
-                writer.writerow(header)
-                writer.writerows(data_csv)
+                def asnumpy(a):
+                    if cp.get_array_module(a)==cp:
+                        with cp.cuda.Device(dev_id):
+                            return cp.asnumpy(a)
+                    else:
+                        return a
+                
+                ff_cpu   = asnumpy(ff)
+                ev       = np.linspace(1e-3, self.bte_solver._par_ev_range[grid_idx][1], 500)
+                ff_r     = self.bte_solver.compute_radial_components(grid_idx, ev, ff_cpu)
+                
+                n0    = asnumpy(self.bte_solver.get_boltzmann_parameter(grid_idx, "n0"))
+                ne    = asnumpy(self.bte_solver.get_boltzmann_parameter(grid_idx, "ne"))
+                ni    = asnumpy(self.bte_solver.get_boltzmann_parameter(grid_idx, "ni"))
+                Tg    = asnumpy(self.bte_solver.get_boltzmann_parameter(grid_idx, "Tg"))
+                eRe   = asnumpy(self.bte_solver.get_boltzmann_parameter(grid_idx, "eRe"))
+                eIm   = asnumpy(self.bte_solver.get_boltzmann_parameter(grid_idx, "eIm"))
+                eMag  = np.sqrt(eRe**2 + eIm**2)
+                
+                if csv_write:
+                    data_csv[gidx_to_pidx_map[grid_idx], 0]    = n0
+                    data_csv[gidx_to_pidx_map[grid_idx], 1]    = ne
+                    data_csv[gidx_to_pidx_map[grid_idx], 2]    = ni
+                    data_csv[gidx_to_pidx_map[grid_idx], 3]    = Tg
+                    data_csv[gidx_to_pidx_map[grid_idx], 4]    = eMag
+                    data_csv[gidx_to_pidx_map[grid_idx], 5]    = asnumpy(qoi["energy"])
+                    data_csv[gidx_to_pidx_map[grid_idx], 6]    = asnumpy(qoi["mobility"])
+                    data_csv[gidx_to_pidx_map[grid_idx], 7]    = asnumpy(qoi["diffusion"])
+                    
+                    for col_idx, g in enumerate(self.param.collisions):
+                        data_csv[gidx_to_pidx_map[grid_idx], 8 + col_idx]    = asnumpy(qoi["rates"][col_idx])
+
+                if plot_data:
+                    num_sh       = len(self.bte_solver._par_lm[grid_idx])
+                    num_subplots = num_sh 
+                    num_plt_cols = min(num_sh, 4)
+                    num_plt_rows = np.int64(np.ceil(num_subplots/num_plt_cols))
+                    fig          = plt.figure(figsize=(num_plt_cols * 8 + 0.5*(num_plt_cols-1), num_plt_rows * 8 + 0.5*(num_plt_rows-1)), dpi=300, constrained_layout=True)
+                    plt_idx      =  1
+                    n_pts_step   =  self.grid_idx_to_npts[grid_idx] // 20
+
+                    for lm_idx, lm in enumerate(self.bte_solver._par_lm[grid_idx]):
+                        plt.subplot(num_plt_rows, num_plt_cols, plt_idx)
+                        for ii in range(0, self.grid_idx_to_npts[grid_idx], n_pts_step):
+                            fr = np.abs(ff_r[ii, lm_idx, :])
+                            plt.semilogy(ev, fr, label=r"$T_g$=%.2E [K], $E/n_0$=%.2E [Td], $n_e/n_0$ = %.2E "%(Tg[ii], eMag[ii]/n0[ii]/1e-21, ne[ii]/n0[ii]))
+                        
+                        plt.xlabel(r"energy (eV)")
+                        plt.ylabel(r"$f_%d$"%(lm[0]))
+                        plt.grid(visible=True)
+                        if lm_idx==0:
+                            plt.legend(prop={'size': 6})
+                            
+                        plt_idx +=1
+                    
+                    plt.savefig("%s_plot_%02d.png"%(self.param.out_fname, grid_idx))
+                    plt.close()
+            
+            if csv_write:
+                fname    = self.param.out_fname
+                with open("%s_qoi.csv"%fname, 'w', encoding='UTF8') as f:
+                    writer = csv.writer(f,delimiter=',')
+                    # write the header
+                    header = ["n0", "ne", "ni", "Tg", "E",  "energy", "mobility", "diffusion"]
+                    for col_idx, g in enumerate(self.param.collisions):
+                        header.append(str(g))
+                    
+                    writer.writerow(header)
+                    writer.writerows(data_csv)
 
         return
     
-    def solve_with_parla(self):
-        csv_write        = self.param.export_csv
-        gidx_to_pidx_map = self.grid_idx_to_spatial_idx_map
+    def solve_w_parla(self):
+        rank                    = self.comm.Get_rank()
+        npes                    = self.comm.Get_size()
+        xp                      = self.xp_module
+        csv_write               = self.param.export_csv
+        plot_data               = self.param.plot_data
+        gidx_to_pidx_map        = self.grid_idx_to_spatial_idx_map
+        use_gpu                 = self.param.use_gpu
+        dev_id                  = self.param.dev_id
+        verbose                 = self.param.verbose
+        n_grids                 = self.param.n_grids
+        gidx_to_device_map      = self.gidx_to_device_map
+        
         self.qoi         = [None for grid_idx in range(self.param.n_grids)]
         self.ff          = [None for grid_idx in range(self.param.n_grids)]
         
-        if csv_write ==1 : 
+        if csv_write: 
             data_csv = np.empty((self.tps_npts, 8 + len(self.param.collisions)))
         
-        
-        rank = self.comm.Get_rank()
-        npes = self.comm.Get_size()
+        self.profile_tt[pp.SETUP].start()
+        self.__efield_setup__()
+        self.profile_tt[pp.SETUP].stop()
         
         with Parla():
             num_gpus         = len(gpu)
-            grid_to_device_map = lambda gidx : gidx % num_gpus
+            if (use_gpu==1):
+                parla_placement = [gpu(gidx_to_device_map(grid_idx,n_grids)) for grid_idx in range(n_grids)]
+            else:
+                parla_placement = [cpu for grid_idx in range(n_grids)]
+            print(parla_placement)
+            
             @spawn(placement=cpu, vcus=0)
             async def __main__():
-                self.profile_tt[pp.SETUP].start()
-                ts_0 = TaskSpace("T")
-                for grid_idx in range(self.param.n_grids):
-                    @spawn(ts_0[grid_idx], placement=[cpu], vcus=0.0)
-                    def t0():
-                        print("setting initial Maxwellian at %.4E eV" %(self.bte_solver._par_ap_Te[grid_idx]), flush=True)
-                        f0 = self.bte_solver.initialize(grid_idx, self.grid_idx_to_npts[grid_idx], "maxwellian")
-                        self.bte_solver.set_boltzmann_parameter(grid_idx, "f0", f0)
-                        
-                        if self.param.use_gpu == 1:
-                            dev_id  = grid_to_device_map(grid_idx)
-                            self.bte_solver.host_to_device_setup(dev_id, grid_idx)
-                            xp      = cp
-
-                            with cp.cuda.Device(dev_id):
-                                eRe_d     = self.bte_solver.get_boltzmann_parameter(grid_idx, "eRe")
-                                eIm_d     = self.bte_solver.get_boltzmann_parameter(grid_idx, "eIm")
-            
-                                if self.param.Efreq == 0:
-                                    ef_t = lambda t : xp.sqrt(eRe_d**2 + eIm_d**2)
-                                else:
-                                    ef_t = lambda t : eRe_d * xp.cos(2 * xp.pi * self.param.Efreq * t) + eIm_d * xp.sin(2 * xp.pi * self.param.Efreq * t)
-                        else:
-                            xp = np
-                            eRe_d     = self.bte_solver.get_boltzmann_parameter(grid_idx, "eRe")
-                            eIm_d     = self.bte_solver.get_boltzmann_parameter(grid_idx, "eIm")
-        
-                            if self.param.Efreq == 0:
-                                ef_t = lambda t : xp.sqrt(eRe_d**2 + eIm_d**2)
-                            else:
-                                ef_t = lambda t : eRe_d * xp.cos(2 * xp.pi * self.param.Efreq * t) + eIm_d * xp.sin(2 * xp.pi * self.param.Efreq * t)
-                                    
-                        self.bte_solver.set_efield_function(grid_idx, ef_t)
-                        return
-                
-                await ts_0
-                
-                self.profile_tt[pp.SETUP].stop()
-                if self.param.use_gpu==1:
-                    p1 = [gpu(grid_to_device_map(grid_idx)) for grid_idx in range(self.param.n_grids)]
-                else:
-                    p1 = [cpu for grid_idx in range(self.param.n_grids)]
-                
                 self.profile_tt[pp.SOLVE].start()
                 ts_1 = TaskSpace("T")
                 for grid_idx in range(self.param.n_grids):
-                    @spawn(ts_1[grid_idx], placement=[p1[grid_idx]], dependencies=ts_0[grid_idx], vcus=0.0)
+                    @spawn(ts_1[grid_idx], placement=[parla_placement[grid_idx]], vcus=0.0)
                     def t1():
                         f0 = self.bte_solver.get_boltzmann_parameter(grid_idx, "f0")
-                        print("[Boltzmann] %d / %d launching grid %d on %s"%(rank, npes, grid_idx, p1[grid_idx]))
+                        print("[Boltzmann] %d / %d launching grid %d on %s"%(rank, npes, grid_idx, parla_placement[grid_idx]))
                         try:
                             ff , qoi = self.bte_solver.solve(grid_idx, f0, self.param.atol, self.param.rtol, self.param.max_iter, self.param.solver_type)
                             self.ff[grid_idx]  = ff
                             self.qoi[grid_idx] = qoi
                         except:
                             print("solver failed for v-space gird no %d"%(grid_idx))
-                            # self.qoi.append(None)
-                            # continue
-                            sys.exit(0)
+                            sys.exit(-1)
                             
                 await ts_1
                 self.profile_tt[pp.SOLVE].stop()
         
-        
         t1 = min_mean_max(self.profile_tt[pp.SETUP].seconds, self.comm)
         t2 = min_mean_max(self.profile_tt[pp.SOLVE].seconds, self.comm)
         print("[Boltzmann] setup (min) = %.4E (s) setup (mean) = %.4E (s) setup (max) = %.4E (s)" % (t1[0],t1[1],t1[2]))
-        print("[Boltzmann] solve (min) = %.4E (s) solve (mean) = %.4E (s) solve (max) = %.4E (s)" % (t2[0],t2[1],t2[2]))        
-        if self.param.export_csv ==0 and self.param.plot_data==0:
-            return
+        print("[Boltzmann] solve (min) = %.4E (s) solve (mean) = %.4E (s) solve (max) = %.4E (s)" % (t2[0],t2[1],t2[2]))
         
-        for grid_idx in range(self.param.n_grids):
-            dev_id = grid_idx % num_gpus
-            
-            if self.param.use_gpu==1:
-                gpu_id = cp.cuda.Device(dev_id)
-                gpu_id.use()
-            
-            ff       = self.ff[grid_idx]
-            ev       = np.linspace(1e-3, self.bte_solver._par_ev_range[grid_idx][1], 500)
-            ff_r     = self.bte_solver.compute_radial_components(grid_idx, ev, ff)
-
-            if self.param.use_gpu==1:
-                self.bte_solver.device_to_host_setup(self.param.dev_id,grid_idx)
+        if (self.param.export_csv ==1 or self.param.plot_data==1):
+            for grid_idx in range(n_grids):
+                dev_id   = gidx_to_device_map(grid_idx, n_grids)
+                ff       = self.ff[grid_idx]
+                qoi      = self.qoi[grid_idx]
                 
-                qoi = self.qoi[grid_idx]    
-                with cp.cuda.Device(dev_id):
-                    ff_r     = cp.asnumpy(ff_r)
-                    for k, v in qoi.items():
-                        qoi[k] = cp.asnumpy(v)
-                    
-            if csv_write==1:
-                data_csv[gidx_to_pidx_map[grid_idx], 0]    = self.bte_solver.get_boltzmann_parameter(grid_idx, "n0")
-                data_csv[gidx_to_pidx_map[grid_idx], 1]    = self.bte_solver.get_boltzmann_parameter(grid_idx, "ne")
-                data_csv[gidx_to_pidx_map[grid_idx], 2]    = self.bte_solver.get_boltzmann_parameter(grid_idx, "ni")
-                data_csv[gidx_to_pidx_map[grid_idx], 3]    = self.bte_solver.get_boltzmann_parameter(grid_idx, "Tg")
-                data_csv[gidx_to_pidx_map[grid_idx], 4]    = np.sqrt(self.bte_solver.get_boltzmann_parameter(grid_idx, "eRe")**2 + self.bte_solver.get_boltzmann_parameter(grid_idx, "eIm")**2)
-                data_csv[gidx_to_pidx_map[grid_idx], 5]    = qoi["energy"]
-                data_csv[gidx_to_pidx_map[grid_idx], 6]    = qoi["mobility"]
-                data_csv[gidx_to_pidx_map[grid_idx], 7]    = qoi["diffusion"]
+                def asnumpy(a):
+                    if cp.get_array_module(a)==cp:
+                        with cp.cuda.Device(dev_id):
+                            return cp.asnumpy(a)
+                    else:
+                        return a
                 
-                for col_idx, g in enumerate(self.param.collisions):
-                    data_csv[gidx_to_pidx_map[grid_idx], 8 + col_idx]    = qoi["rates"][col_idx]
-
-            plot_data    = self.param.plot_data
-            if plot_data:
+                ff_cpu   = asnumpy(ff)
+                ev       = np.linspace(1e-3, self.bte_solver._par_ev_range[grid_idx][1], 500)
+                ff_r     = self.bte_solver.compute_radial_components(grid_idx, ev, ff_cpu)
                 
-                n0    = self.bte_solver.get_boltzmann_parameter(grid_idx, "n0")
-                ne    = self.bte_solver.get_boltzmann_parameter(grid_idx, "ne")
-                ni    = self.bte_solver.get_boltzmann_parameter(grid_idx, "ni")
-                Tg    = self.bte_solver.get_boltzmann_parameter(grid_idx, "Tg")
-                
-                eRe   = self.bte_solver.get_boltzmann_parameter(grid_idx, "eRe")
-                eIm   = self.bte_solver.get_boltzmann_parameter(grid_idx, "eIm")
+                n0    = asnumpy(self.bte_solver.get_boltzmann_parameter(grid_idx, "n0"))
+                ne    = asnumpy(self.bte_solver.get_boltzmann_parameter(grid_idx, "ne"))
+                ni    = asnumpy(self.bte_solver.get_boltzmann_parameter(grid_idx, "ni"))
+                Tg    = asnumpy(self.bte_solver.get_boltzmann_parameter(grid_idx, "Tg"))
+                eRe   = asnumpy(self.bte_solver.get_boltzmann_parameter(grid_idx, "eRe"))
+                eIm   = asnumpy(self.bte_solver.get_boltzmann_parameter(grid_idx, "eIm"))
                 eMag  = np.sqrt(eRe**2 + eIm**2)
                 
-                num_sh       = len(self.bte_solver._par_lm[grid_idx])
-                num_subplots = num_sh 
-                num_plt_cols = min(num_sh, 4)
-                num_plt_rows = np.int64(np.ceil(num_subplots/num_plt_cols))
-                fig          = plt.figure(figsize=(num_plt_cols * 8 + 0.5*(num_plt_cols-1), num_plt_rows * 8 + 0.5*(num_plt_rows-1)), dpi=300, constrained_layout=True)
-                plt_idx      =  1
-                n_pts_step   =  self.grid_idx_to_npts[grid_idx] // 20
-
-                for lm_idx, lm in enumerate(self.bte_solver._par_lm[grid_idx]):
-                    plt.subplot(num_plt_rows, num_plt_cols, plt_idx)
-                    for ii in range(0, self.grid_idx_to_npts[grid_idx], n_pts_step):
-                        fr = np.abs(ff_r[ii, lm_idx, :])
-                        plt.semilogy(ev, fr, label=r"$T_g$=%.2E [K], $E/n_0$=%.2E [Td], $n_e/n_0$ = %.2E "%(Tg[ii], eMag[ii]/n0[ii]/1e-21, ne[ii]/n0[ii]))
+                if csv_write:
+                    data_csv[gidx_to_pidx_map[grid_idx], 0]    = n0
+                    data_csv[gidx_to_pidx_map[grid_idx], 1]    = ne
+                    data_csv[gidx_to_pidx_map[grid_idx], 2]    = ni
+                    data_csv[gidx_to_pidx_map[grid_idx], 3]    = Tg
+                    data_csv[gidx_to_pidx_map[grid_idx], 4]    = eMag
+                    data_csv[gidx_to_pidx_map[grid_idx], 5]    = asnumpy(qoi["energy"])
+                    data_csv[gidx_to_pidx_map[grid_idx], 6]    = asnumpy(qoi["mobility"])
+                    data_csv[gidx_to_pidx_map[grid_idx], 7]    = asnumpy(qoi["diffusion"])
                     
-                    plt.xlabel(r"energy (eV)")
-                    plt.ylabel(r"$f_%d$"%(lm[0]))
-                    plt.grid(visible=True)
-                    if lm_idx==0:
-                        plt.legend(prop={'size': 6})
+                    for col_idx, g in enumerate(self.param.collisions):
+                        data_csv[gidx_to_pidx_map[grid_idx], 8 + col_idx]    = asnumpy(qoi["rates"][col_idx])
+
+                if plot_data:
+                    num_sh       = len(self.bte_solver._par_lm[grid_idx])
+                    num_subplots = num_sh 
+                    num_plt_cols = min(num_sh, 4)
+                    num_plt_rows = np.int64(np.ceil(num_subplots/num_plt_cols))
+                    fig          = plt.figure(figsize=(num_plt_cols * 8 + 0.5*(num_plt_cols-1), num_plt_rows * 8 + 0.5*(num_plt_rows-1)), dpi=300, constrained_layout=True)
+                    plt_idx      =  1
+                    n_pts_step   =  self.grid_idx_to_npts[grid_idx] // 20
+
+                    for lm_idx, lm in enumerate(self.bte_solver._par_lm[grid_idx]):
+                        plt.subplot(num_plt_rows, num_plt_cols, plt_idx)
+                        for ii in range(0, self.grid_idx_to_npts[grid_idx], n_pts_step):
+                            fr = np.abs(ff_r[ii, lm_idx, :])
+                            plt.semilogy(ev, fr, label=r"$T_g$=%.2E [K], $E/n_0$=%.2E [Td], $n_e/n_0$ = %.2E "%(Tg[ii], eMag[ii]/n0[ii]/1e-21, ne[ii]/n0[ii]))
                         
-                    plt_idx +=1
-                
-                #plt_idx = num_sh
-                plt.savefig("%s_plot_%02d.png"%(self.param.out_fname, grid_idx))
-                plt.close()
-        
-        if csv_write:
-            fname    = self.param.out_fname
-            with open("%s_qoi.csv"%fname, 'w', encoding='UTF8') as f:
-                writer = csv.writer(f,delimiter=',')
-                # write the header
-                header = ["n0", "ne", "ni", "Tg", "E",  "energy", "mobility", "diffusion"]
-                for col_idx, g in enumerate(self.param.collisions):
-                    header.append(str(g))
-                
-                writer.writerow(header)
-                writer.writerows(data_csv)
-       
+                        plt.xlabel(r"energy (eV)")
+                        plt.ylabel(r"$f_%d$"%(lm[0]))
+                        plt.grid(visible=True)
+                        if lm_idx==0:
+                            plt.legend(prop={'size': 6})
+                            
+                        plt_idx +=1
+                    
+                    plt.savefig("%s_plot_%02d.png"%(self.param.out_fname, grid_idx))
+                    plt.close()
+            
+            if csv_write:
+                fname    = self.param.out_fname
+                with open("%s_qoi.csv"%fname, 'w', encoding='UTF8') as f:
+                    writer = csv.writer(f,delimiter=',')
+                    # write the header
+                    header = ["n0", "ne", "ni", "Tg", "E",  "energy", "mobility", "diffusion"]
+                    for col_idx, g in enumerate(self.param.collisions):
+                        header.append(str(g))
+                    
+                    writer.writerow(header)
+                    writer.writerows(data_csv)
+
+        return
+    
     def push(self, interface):
         xp                = self.xp_module
         Te_bte            = xp.array(interface.HostWrite(libtps.t2bIndex.ElectronTemperature), copy=False)
@@ -661,18 +686,18 @@ class Boltzmann0D2VBactchedSolver:
             # here rr should be in the same ordering as the collision model prescribed to the Boltzmann solver. 
             rr_bte[gidx_to_pidx_map[grid_idx]] = rr[1]
         
-        rr_bte[rr_bte<0] = 0.0 
-        s0  = rate_tps_arr * n0 * ni
-        s1  = rate_tps_csc * n0 * ni
+        # rr_bte[rr_bte<0] = 0.0 
+        # s0  = rate_tps_arr * n0 * ni
+        # s1  = rate_tps_csc * n0 * ni
         
-        s2  = rr_bte       * n0 * ni
+        # s2  = rr_bte       * n0 * ni
         
-        # tau = 1e-2
-        # idx = s2 > tau
-        rate_bte[0][:]   =  0.0
-        rate_bte[1][:]   =  0.0
-        rate_bte[0]      = rr_bte
-        rate_bte[1]      = xp.abs(s2-s1)/xp.max(s2)
+        # # tau = 1e-2
+        # # idx = s2 > tau
+        # rate_bte[0][:]   =  0.0
+        # rate_bte[1][:]   =  0.0
+        # rate_bte[0]      = rr_bte
+        # rate_bte[1]      = xp.abs(s2-s1)/xp.max(s2)
         
         return 
         
@@ -707,8 +732,8 @@ tps.push(interface)
 boltzmann.grid_setup(interface)
 boltzmann.fetch(interface)
 boltzmann.solve()
-boltzmann.push(interface)
-tps.fetch(interface)
+# boltzmann.push(interface)
+# tps.fetch(interface)
 
 # while it < max_iters:
 #     tps.solveStep()
