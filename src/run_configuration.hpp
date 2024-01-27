@@ -99,7 +99,8 @@ class RunConfiguration {
   double dt_factor;
   int solver_iter;
   double solver_tol;
-  int bdfOrder;  
+  int bdfOrder;
+  int abOrder;    
 
   // num iterations. Defaults to 0
   int numIters;
