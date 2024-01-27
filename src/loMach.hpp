@@ -118,6 +118,29 @@ public:
    Coefficient *coeff;
 };
 
+class QtDirichletBC_T
+{
+public:
+   QtDirichletBC_T(Array<int> attr, Coefficient *coeff)
+      : attr(attr), coeff(coeff)
+   {}
+
+   QtDirichletBC_T(QtDirichletBC_T &&obj)
+   {
+      // Deep copy the attribute array
+      this->attr = obj.attr;
+
+      // Move the coefficient pointer
+      this->coeff = obj.coeff;
+      obj.coeff = nullptr;
+   }
+
+   ~QtDirichletBC_T() { delete coeff; }
+
+   Array<int> attr;
+   Coefficient *coeff;
+};
+
   
 /// Container for an acceleration term.
 class AccelTerm_T
@@ -353,6 +376,7 @@ protected:
    ParBilinearForm *MsRho_form = nullptr;  
    ParMixedBilinearForm *Ds_form = nullptr;  
    ParBilinearForm *Ht_form = nullptr;
+   ParBilinearForm *Mq_form = nullptr;  
    ParBilinearForm *LQ_form = nullptr;
    ParLinearForm *LQ_bdry = nullptr;  
    GridFunctionCoefficient *Text_gfcoeff = nullptr;
@@ -392,6 +416,7 @@ protected:
    VectorConstantCoefficient *buffer_ubc;
    VectorConstantCoefficient *buffer_accel;  
    ConstantCoefficient *buffer_tbc;
+   ConstantCoefficient *buffer_qbc;  
    //VectorConstantCoefficient *buffer_tbc;  
    VectorConstantCoefficient *wall_ubc;
    VectorConstantCoefficient *bufferInlet_ubc;  
@@ -449,7 +474,8 @@ protected:
    OperatorHandle Gp; 
    OperatorHandle H;
    OperatorHandle Ms;
-   OperatorHandle MsRho;    
+   OperatorHandle MsRho;
+   OperatorHandle Mq;  
    OperatorHandle Ds;  
    OperatorHandle Ht;
 
@@ -470,7 +496,9 @@ protected:
    mfem::Solver *SpInvPC = nullptr; 
 
    mfem::Solver *MsInvPC = nullptr;
-   mfem::CGSolver *MsInv = nullptr;  
+   mfem::CGSolver *MsInv = nullptr;
+   mfem::Solver *MqInvPC = nullptr;
+   mfem::CGSolver *MqInv = nullptr;    
    mfem::Solver *HtInvPC = nullptr;
    mfem::CGSolver *HtInv = nullptr;
    //mfem::GMRESSolver *HtInv = nullptr;  
@@ -478,8 +506,8 @@ protected:
 
    Vector fn, un, un_next, unm1, unm2;
    Vector u_star, u_half;  
-   Vector uBn, uBnm1, uBnm2;
-   Vector TBn, TBnm1, TBnm2;    
+   Vector uBn; //, uBnm1, uBnm2;
+   //Vector TBn, TBnm1, TBnm2;    
    Vector Nun, Nunm1, Nunm2;
    Vector Fext, FText, Lext, Uext, Ldiv, LdivImp;  
    Vector resu, tmpR1, tmpR1a, tmpR1b, tmpR1c;
@@ -561,23 +589,25 @@ protected:
    Array<int> vel_ess_attr;
    Array<int> pres_ess_attr;
    Array<int> temp_ess_attr;
-   //Array<int> vel4P_ess_attr;  
+   Array<int> Qt_ess_attr;  
 
    // All essential true dofs.
    Array<int> vel_ess_tdof;
    Array<int> pres_ess_tdof;
    Array<int> temp_ess_tdof;
-   //Array<int> vel4P_ess_tdof;  
-
+   Array<int> Qt_ess_tdof;
+  
    // Bookkeeping for velocity dirichlet bcs.
    std::vector<VelDirichletBC_T> vel_dbcs;
-   //std::vector<VelDirichletBC_T> vel4P_dbcs;  
 
    // Bookkeeping for pressure dirichlet bcs.
    std::vector<PresDirichletBC_T> pres_dbcs;
 
    // Bookkeeping for temperature dirichlet bcs.
    std::vector<TempDirichletBC_T> temp_dbcs;
+
+   // Bookkeeping for Qt dirichlet bcs.
+   std::vector<QtDirichletBC_T> Qt_dbcs;
   
    // Bookkeeping for acceleration (forcing) terms.
    std::vector<AccelTerm_T> accel_terms;
@@ -808,7 +838,8 @@ public:
    void computeExplicitUnsteady();
    void computeExplicitUnsteadyBDF();    
    void computeExplicitConvection(double uStep);
-   void computeExplicitConvectionOP(double uStep, bool extrap);  
+   void computeExplicitConvectionOP(double uStep, bool extrap);
+   void computeExplicitTempConvectionOP(bool extrap);    
    void computeExplicitDiffusion();
    void computeImplicitDiffusion();
    void computeQt();
@@ -896,6 +927,9 @@ public:
    //void AddTempDirichletBC(VecFuncT *f, Array<int> &attr);
    //void AddTempDirichletBC(Array<int> &coeff, Array<int> &attr);  
 
+   void AddQtDirichletBC(Coefficient *coeff, Array<int> &attr);
+   void AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr);    
+  
    /// Add an acceleration term to the RHS of the equation.
    /**
     * The VecFuncT @a f is evaluated at the current time t and extrapolated
