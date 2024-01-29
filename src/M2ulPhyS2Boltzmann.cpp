@@ -78,6 +78,9 @@ void M2ulPhyS::push(TPS::Tps2Boltzmann &interface) {
   interface.interpolateFromNativeFES(*heavyTemperature, TPS::Tps2Boltzmann::Index::HeavyTemperature);
   interface.interpolateFromNativeFES(*electronTemperature, TPS::Tps2Boltzmann::Index::ElectronTemperature);
 
+  interface.setTimeStep(this->dt);
+  interface.setCurrentTime(this->time);
+
   delete species;
   delete heavyTemperature;
   delete electronTemperature;

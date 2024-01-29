@@ -342,6 +342,8 @@ void tps2bolzmann(py::module &m) {
              return std::unique_ptr<TPS::CPUData>(new TPS::CPUData(interface.Field(index), true));
            })
       .def("EfieldAngularFreq", &TPS::Tps2Boltzmann::EfieldAngularFreq)
+      .def("timeStep", &TPS::Tps2Boltzmann::timeStep)
+      .def("currentTime", &TPS::Tps2Boltzmann::currentTime)
       .def("Nspecies", &TPS::Tps2Boltzmann::Nspecies)
       .def("NeFiledComps", &TPS::Tps2Boltzmann::NeFieldComps)
       .def("nComponents", &TPS::Tps2Boltzmann::nComponents)
