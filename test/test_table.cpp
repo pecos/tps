@@ -89,7 +89,7 @@ void testTableInterpolator1D(TPS::Tps &tps, int rank) {
     double xtest = refValues(k, 0);
     double fref = refValues(k, 1);
     double ftest[gpudata::MAXREACTIONS];
-    chem->computeForwardRateCoeffs(xtest, xtest, ftest);
+    chem->computeForwardRateCoeffs(xtest, xtest, k, ftest);
     double error = abs((fref - ftest[0]) / fref);
     if (error >= scalarErrorThreshold) {
       grvy_printf(GRVY_ERROR, "Rank %d - %.5E: %.5E\n", rank, xtest, abs((fref - ftest[0]) / fref));

@@ -74,7 +74,7 @@ enum TransportModel { ARGON_MINIMAL, ARGON_MIXTURE, CONSTANT, LTE_TRANSPORT, MIX
 
 enum ChemistryModel { /* CANTERA, */ NUM_CHEMISTRYMODEL };
 
-enum ReactionModel { ARRHENIUS, HOFFERTLIEN, TABULATED_RXN, NUM_REACTIONMODEL };
+enum ReactionModel { ARRHENIUS, HOFFERTLIEN, TABULATED_RXN, GRIDFUNCTION_RXN, NUM_REACTIONMODEL };
 
 enum RadiationModel { NONE_RAD, NET_EMISSION, NUM_RADIATIONMODEL };
 
@@ -623,6 +623,7 @@ struct ReactionInput {
   TableInput tableInput;
   // NOTE(kevin): with gpu, this pointer is only valid on the device.
   const double *modelParams;
+  int indexInput;
 };
 
 struct ChemistryInput {

@@ -53,11 +53,13 @@ using namespace std;
 class Reaction {
  protected:
  public:
-  MFEM_HOST_DEVICE Reaction() {}
+  const ReactionModel reactionModel;
+  MFEM_HOST_DEVICE Reaction(ReactionModel rm) : reactionModel(rm) {}
 
   MFEM_HOST_DEVICE virtual ~Reaction() {}
 
   MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double &T_h, const double &T_e,
+                                                         [[maybe_unused]] const int &dofindex,
                                                          const bool isElectronInvolved = false) {
     printf("computeRateCoefficient not implemented");
     return 0;
@@ -77,6 +79,7 @@ class Arrhenius : public Reaction {
   MFEM_HOST_DEVICE virtual ~Arrhenius() {}
 
   MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double &T_h, const double &T_e,
+                                                         [[maybe_unused]] const int &dofindex,
                                                          const bool isElectronInvolved = false);
 };
 
@@ -97,6 +100,7 @@ class HoffertLien : public Reaction {
   MFEM_HOST_DEVICE virtual ~HoffertLien() {}
 
   MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double &T_h, const double &T_e,
+                                                         [[maybe_unused]] const int &dofindex,
                                                          const bool isElectronInvolved = false);
 };
 
@@ -110,7 +114,28 @@ class Tabulated : public Reaction {
   MFEM_HOST_DEVICE virtual ~Tabulated();
 
   MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double &T_h, const double &T_e,
+                                                         [[maybe_unused]] const int &dofindex,
                                                          const bool isElectronInvolved = false);
+};
+
+class GridFunctionReaction : public Reaction {
+ private:
+  const double *data_;
+  const int comp_;
+  int size_;
+
+ public:
+  MFEM_HOST_DEVICE GridFunctionReaction(int comp);
+
+  MFEM_HOST_DEVICE virtual ~GridFunctionReaction();
+
+  void setGridFunction(const mfem::GridFunction & f);
+
+  MFEM_HOST_DEVICE void setData(const double * data, int size);
+
+  MFEM_HOST_DEVICE virtual double computeRateCoefficient([[maybe_unused]] const double &T_h,
+                                                         [[maybe_unused]] const double &T_e, const int &dofindex,
+                                                         [[maybe_unused]] const bool isElectronInvolved = false);
 };
 
 #endif  // REACTION_HPP_

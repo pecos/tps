@@ -313,7 +313,6 @@ void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlow() {
   efieldR_->SetFromTrueDofs(interp_vals);
   efieldR_->HostRead();
 
-
   const ParGridFunction *efield_imag_gf = qmsa_solver_->getElectricFieldimag();
   interp_em_to_flow_->Interpolate(vxyz, *efield_imag_gf, interp_vals);
   efieldI_->SetFromTrueDofs(interp_vals);

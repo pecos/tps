@@ -3319,6 +3319,11 @@ void M2ulPhyS::parseReactionInputs() {
       config.reactionModels[r - 1] = TABULATED_RXN;
       std::string inputPath(basepath + "/tabulated");
       readTable(inputPath, config.chemistryInput.reactionInputs[r - 1].tableInput);
+    } else if (model == "bte") {
+      config.reactionModels[r - 1] = GRIDFUNCTION_RXN;
+      int index;
+      tpsP->getRequiredInput((basepath + "/bte/index").c_str(), index);
+      config.chemistryInput.reactionInputs[r - 1].indexInput = index;
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
       exit(ERROR);
@@ -3437,7 +3442,7 @@ void M2ulPhyS::parseReactionInputs() {
             config.equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS];
       }
 
-      if (config.reactionModels[r] != TABULATED_RXN) {
+      if (config.reactionModels[r] == ARRHENIUS || config.reactionModels[r] == HOFFERTLIEN) {
         assert(rxn_param_idx < config.rxnModelParamsHost.size());
         config.chemistryInput.reactionInputs[r].modelParams = config.rxnModelParamsHost[rxn_param_idx].Read();
         rxn_param_idx += 1;
@@ -4196,7 +4201,7 @@ void M2ulPhyS::updateVisualizationVariables() {
       Th = prim[1 + _nvel];
       Te = (in_mix->IsTwoTemperature()) ? prim[_num_equation - 1] : Th;
       double kfwd[gpudata::MAXREACTIONS], kC[gpudata::MAXREACTIONS];
-      in_chem->computeForwardRateCoeffs(Th, Te, kfwd);
+      in_chem->computeForwardRateCoeffs(Th, Te, n, kfwd);
       in_chem->computeEquilibriumConstants(Th, Te, kC);
       // get reaction rates
       double progressRates[gpudata::MAXREACTIONS];
