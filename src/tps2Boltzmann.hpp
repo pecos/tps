@@ -116,8 +116,8 @@ class Tps2Boltzmann {
   int nComponents(Index index) const { return ncomps[index]; }
   std::string getReactionEquation(int index) const { return reaction_eqs_[index]; }
 
-  void setTimeStep(double dt) { timestep_=dt; }
-  void setCurrentTime(double time) { currentTime_=time; }
+  void setTimeStep(double dt) { timestep_ = dt; }
+  void setCurrentTime(double time) { currentTime_ = time; }
 
   double timeStep() const { return timestep_; }
   double currentTime() const { return currentTime_; }
