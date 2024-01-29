@@ -430,18 +430,18 @@ class Boltzmann0D2VBactchedSolver:
             eMag              = np.sqrt(eRe**2 + eIm **2)
             eByn0             = eMag/n0/self.param.Td_fac
             
-            if self.param.verbose == 1 :
-                print("Boltzmann solver inputs for v-space grid id %d"%(grid_idx))
-                print("Efreq = %.4E [1/s]" %(self.param.Efreq))
-                print("n_pts = %d" % self.grid_idx_to_npts[grid_idx])
+            # if self.param.verbose == 1 :
+            #     print("Boltzmann solver inputs for v-space grid id %d"%(grid_idx))
+            #     print("Efreq = %.4E [1/s]" %(self.param.Efreq))
+            #     print("n_pts = %d" % self.grid_idx_to_npts[grid_idx])
                 
-                print("E/n0  (min)               = %.12E [Td]         \t E/n0 (max) = %.12E [Td]    "%(np.min(eByn0), np.max(eByn0)))
-                print("Tg    (min)               = %.12E [K]          \t Tg   (max) = %.12E [K]     "%(np.min(Tg)   , np.max(Tg)))
-                print("Te    (min)               = %.12E [K]          \t Te   (max) = %.12E [K]     "%(np.min(Te)   , np.max(Te)))
+            #     print("E/n0  (min)               = %.12E [Td]         \t E/n0 (max) = %.12E [Td]    "%(np.min(eByn0), np.max(eByn0)))
+            #     print("Tg    (min)               = %.12E [K]          \t Tg   (max) = %.12E [K]     "%(np.min(Tg)   , np.max(Tg)))
+            #     print("Te    (min)               = %.12E [K]          \t Te   (max) = %.12E [K]     "%(np.min(Te)   , np.max(Te)))
                 
-                print("ne    (min)               = %.12E [1/m^3]      \t ne   (max) = %.12E [1/m^3] "%(np.min(ne)   , np.max(ne)))
-                print("ni    (min)               = %.12E [1/m^3]      \t ni   (max) = %.12E [1/m^3] "%(np.min(ni)   , np.max(ni)))
-                print("n0    (min)               = %.12E [1/m^3]      \t n0   (max) = %.12E [1/m^3] "%(np.min(n0)   , np.max(n0)))
+            #     print("ne    (min)               = %.12E [1/m^3]      \t ne   (max) = %.12E [1/m^3] "%(np.min(ne)   , np.max(ne)))
+            #     print("ni    (min)               = %.12E [1/m^3]      \t ni   (max) = %.12E [1/m^3] "%(np.min(ni)   , np.max(ni)))
+            #     print("n0    (min)               = %.12E [1/m^3]      \t n0   (max) = %.12E [1/m^3] "%(np.min(n0)   , np.max(n0)))
             
             
             if (use_gpu == 1):
@@ -728,30 +728,40 @@ if __name__=="__main__":
         tps.push(interface)
         boltzmann.grid_setup(interface)
         
-        max_iters = tps.getRequiredInput("cycle-avg-joule-coupled/max-iters")
-        iter      = 0
-        tt        = 0
-        dt        = 1e-3 /boltzmann.param.Efreq
-    
         @spawn(placement=cpu, vcus=0)
         async def __main__():
             await boltzmann.solve_init()    
             xp = boltzmann.bte_solver.xp_module
-    
+
+            max_iters = tps.getRequiredInput("cycle-avg-joule-coupled/max-iters")
+            iter      = 0
+            tt        = 0
+            tau       = (1/boltzmann.param.Efreq)
+            dt        = 5e-3 * tau
             
             while (iter<max_iters):
+                t1 = time()
                 tps.solveStep()
+                t2 = time()
+                
+                t1 = min_mean_max(t2-t1, comm)
+                print("[TPS] simulation time = %.4E cycle step (min) = %.4E (s) step (mean) = %.4E (s) step (max) = %.4E (s)" % (tt/tau, t1[0],t1[1],t1[2]))
                 
                 tps.push(interface)
                 await boltzmann.fetch(interface)
                 
+                t1 = time()
                 await boltzmann.solve_step(tt, dt)
                 for grid_idx in range(boltzmann.param.n_grids):
                     u1 = boltzmann.bte_solver.get_boltzmann_parameter(grid_idx, "u1")
                     boltzmann.bte_solver.set_boltzmann_parameter(grid_idx, "u0", u1)
+                t2 = time()
+                t1 = min_mean_max(t2-t1, comm)
+                print("[BTE] simulation time = %.4E cycle step (min) = %.4E (s) step (mean) = %.4E (s) step (max) = %.4E (s)" % (tt/tau, t1[0],t1[1],t1[2]))
                 
                 await boltzmann.push(interface)
                 tps.fetch(interface)
+                tt += dt
         
 
     tps.solveEnd()
