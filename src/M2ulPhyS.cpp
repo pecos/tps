@@ -1988,12 +1988,6 @@ void M2ulPhyS::solveStep() {
 
   const int vis_steps = config.GetNumItersOutput();
   if (iter % vis_steps == 0) {
-    // dump history
-    // NOTE(kevin): this routine is currently obsolete.
-    // It computes `dof`-averaged state and time-derivative, which are useless at this point.
-    // This will not be supported.
-    writeHistoryFile();
-
 #ifdef HAVE_MASA
     if (config.use_mms_) {
       if (config.mmsSaveDetails_) {
