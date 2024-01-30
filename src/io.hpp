@@ -52,8 +52,15 @@ class IOFamily {
   // true if the family is to be found in restart files
   bool inRestartFile;
 
+  // space and grid function used for serial read/write
   mfem::FiniteElementSpace *serial_fes = nullptr;
   mfem::GridFunction *serial_sol = nullptr;
+
+  // Variables used for "auxilliary" read (i.e., restart from different order soln)
+  mfem::FiniteElementCollection *fec_ = nullptr;  // collection used to instantiate pfunc_
+  mfem::FiniteElementCollection *aux_fec_ = nullptr;
+  mfem::ParFiniteElementSpace *aux_pfes_ = nullptr;
+  mfem::ParGridFunction *aux_pfunc_ = nullptr;
 
   IOFamily(std::string desc, std::string grp, mfem::ParGridFunction *pf)
       : description_(desc), group_(grp), pfunc_(pf) {}
@@ -75,7 +82,7 @@ class IODataOrganizer {
   std::map<std::string, std::vector<IOVar>> vars_;  // solution var info for each IO family
 
   void registerIOFamily(std::string description, std::string group, mfem::ParGridFunction *pfunc,
-                        bool auxRestart = true, bool inRestartFile = true);
+                        bool auxRestart = true, bool inRestartFile = true, mfem::FiniteElementCollection *fec = NULL);
   ~IODataOrganizer();
 
   void registerIOVar(std::string group, std::string varName, int index, bool inRestartFile = true);
@@ -86,6 +93,10 @@ class IODataOrganizer {
   void write(hid_t file, bool rank0);
   void writeSerial(hid_t file, MPI_Comm comm, int local_ne, int global_ne, const int *locToGlobElem,
                    const Array<int> &partitioning);
+
+  void read(hid_t file, bool rank0);
+  void readSerial(hid_t file, bool rank0, MPI_Groups *groupsMPI, Array<int> partitioning, int global_ne);
+  void readChangeOrder(hid_t file, bool rank0, int read_order);
 };
 
 void read_partitioned_soln_data(hid_t file, std::string varName, size_t index, double *data);
