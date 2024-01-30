@@ -669,31 +669,6 @@ void M2ulPhyS::write_soln_data(hid_t group, string varName, hid_t dataspace, dou
   return;
 }
 
-void M2ulPhyS::writeHistoryFile() {
-  MPI_Comm TPSCommWorld = this->groupsMPI->getTPSCommWorld();
-  double global_dUdt[5];
-  MPI_Allreduce(rhsOperator->getLocalTimeDerivatives(), &global_dUdt, 5, MPI_DOUBLE, MPI_SUM, TPSCommWorld);
-
-  if (rank0_) {
-    histFile << time << "," << iter;
-    for (int eq = 0; eq < 5; eq++) {
-      histFile << "," << global_dUdt[eq] / static_cast<double>(nprocs_);
-    }
-  }
-
-  if (average->ComputeMean()) {
-    double global_meanData[5 + 6];
-    MPI_Allreduce(average->getLocalSums(), &global_meanData, 5 + 6, MPI_DOUBLE, MPI_SUM, TPSCommWorld);
-
-    if (rank0_) {
-      histFile << "," << average->GetSamplesMean();
-      for (int n = 0; n < 5 + 6; n++) histFile << "," << global_meanData[n] / static_cast<double>(nprocs_);
-    }
-  }
-
-  if (rank0_) histFile << endl;
-}
-
 void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
   MPI_Comm TPSCommWorld = this->groupsMPI->getTPSCommWorld();
   tpsP->getInput((inputPath + "/x_log").c_str(), result.xLogScale, false);
