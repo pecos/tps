@@ -344,12 +344,7 @@ class M2ulPhyS : public TPS::Solver {
   void initilizeSpeciesFromLTE();
 
   // i/o routines
-  void read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data);
-  void read_serialized_soln_data(hid_t file, string varName, int numDof, int varOffset, double *data, IOFamily &fam);
   void restart_files_hdf5(string mode, string inputFileName = std::string());
-  void partitioning_file_hdf5(string mode);
-  void serialize_soln_for_write(IOFamily &fam);
-  void write_soln_data(hid_t group, string varName, hid_t dataspace, double *data);
 
   void Check_NAN();
   bool Check_JobResubmit();
