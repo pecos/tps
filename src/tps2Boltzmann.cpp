@@ -41,9 +41,10 @@
 #include <pybind11/stl.h>
 #endif
 
+#include <math.h>
+
 #include <cstddef>
 #include <cstdlib>
-#include <math.h>
 
 namespace TPS {
 
@@ -85,7 +86,7 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps) : NIndexes(7), tps_(tps), all_fes_(nullpt
   assert(basis_type_ == 0 || basis_type_ == 1);
 
   tps->getRequiredInput("em/current_frequency", EfieldAngularFreq_);
-  EfieldAngularFreq_ *= 2.*M_PI;
+  EfieldAngularFreq_ *= 2. * M_PI;
 
   offsets.SetSize(NIndexes + 1);
   ncomps.SetSize(NIndexes + 1);
