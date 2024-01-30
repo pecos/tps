@@ -329,9 +329,9 @@ void M2ulPhyS::initVariables() {
       if (config.isRestartSerialized("read")) {
         assert(serial_mesh->Conforming());
         partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
-        partitioning_file_hdf5("write");
+        partitioning_file_hdf5("write", config, groupsMPI, nelemGlobal_, partitioning_);
       } else {
-        partitioning_file_hdf5("read");
+        partitioning_file_hdf5("read", config, groupsMPI, nelemGlobal_, partitioning_);
       }
     }
 
@@ -359,7 +359,7 @@ void M2ulPhyS::initVariables() {
     if (nprocs_ > 1) {
       assert(serial_mesh->Conforming());
       partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
-      if (rank0_) partitioning_file_hdf5("write");
+      if (rank0_) partitioning_file_hdf5("write", config, groupsMPI, nelemGlobal_, partitioning_);
       MPI_Barrier(groupsMPI->getTPSCommWorld());
     }
 

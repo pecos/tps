@@ -298,7 +298,7 @@ class RunConfiguration {
 
   string GetMeshFileName() { return meshFile; }
   string GetOutputName() { return outputFile; }
-  string GetPartitionBaseName() { return partFile; }
+  string GetPartitionBaseName() const { return partFile; }
   int GetUniformRefLevels() { return ref_levels; }
 
   int GetTimeIntegratorType() { return timeIntegratorType; }

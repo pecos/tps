@@ -32,8 +32,13 @@
 #ifndef IO_HPP_
 #define IO_HPP_
 
+#include <hdf5.h>
+
+#include <string>
 #include <vector>
 
+#include "mpi_groups.hpp"
+#include "run_configuration.hpp"
 #include "tps_mfem_wrap.hpp"
 
 class IOFamily {
@@ -73,4 +78,12 @@ class IODataOrganizer {
   void initializeSerial(bool root, bool serial, mfem::Mesh *serial_mesh);
 };
 
+void read_partitioned_soln_data(hid_t file, std::string varName, size_t index, double *data);
+void read_serialized_soln_data(hid_t file, std::string varName, int numDof, int varOffset, double *data, IOFamily &fam,
+                               MPI_Groups *groupsMPI, mfem::Array<int> partitioning, int nelemGlobal);
+void write_soln_data(hid_t group, std::string varName, hid_t dataspace, double *data, bool rank0);
+void partitioning_file_hdf5(std::string mode, const RunConfiguration &config, MPI_Groups *groupsMPI, int nelemGlobal,
+                            mfem::Array<int> &partitioning);
+void serialize_soln_for_write(IOFamily &fam, MPI_Groups *groupsMPI, int local_ne, int global_ne,
+                              const int *locToGlobElem, const mfem::Array<int> &partitioning);
 #endif  // IO_HPP_
