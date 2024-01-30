@@ -1795,7 +1795,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   }
 
   // define solution parameters for i/o
-  ioData.registerIOFamily("Solution state variables", "/solution", U);
+  ioData.registerIOFamily("Solution state variables", "/solution", U, true, true, fec);
   ioData.registerIOVar("/solution", "density", 0);
   ioData.registerIOVar("/solution", "rho-u", 1);
   ioData.registerIOVar("/solution", "rho-v", 2);
