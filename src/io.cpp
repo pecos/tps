@@ -36,42 +36,118 @@
 #include "M2ulPhyS.hpp"
 #include "utils.hpp"
 
-void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
+void M2ulPhyS::write_restart_files_hdf5(hid_t file, bool serialized_write) {
   MPI_Comm TPSCommWorld = this->groupsMPI->getTPSCommWorld();
-#ifdef HAVE_GRVY
-  grvy_timer_begin(__func__);
+
+  // -------------------------------------------------------------------
+  // Attributes - relevant solution metadata saved as attributes
+  // -------------------------------------------------------------------
+
+  // note: all tasks save unless we are writing a serial restart file
+  if (rank0_ || !serialized_write) {
+    // current iteration count
+    h5_save_attribute(file, "iteration", iter);
+    // total time
+    h5_save_attribute(file, "time", time);
+    // timestep
+    h5_save_attribute(file, "dt", dt);
+    // solution order
+    h5_save_attribute(file, "order", order);
+    // spatial dimension
+    h5_save_attribute(file, "dimension", dim);
+
+    if (average->ComputeMean()) {
+      // samples meanUp
+      h5_save_attribute(file, "samplesMean", average->GetSamplesMean());
+      h5_save_attribute(file, "samplesInterval", average->GetSamplesInterval());
+    }
+    // code revision
+#ifdef BUILD_VERSION
+    {
+      hid_t ctype = H5Tcopy(H5T_C_S1);
+      int shaLength = strlen(BUILD_VERSION);
+      hsize_t dims[1] = {1};
+      H5Tset_size(ctype, shaLength);
+
+      hid_t dspace1dim = H5Screate_simple(1, dims, NULL);
+
+      hid_t attr = H5Acreate(file, "revision", ctype, dspace1dim, H5P_DEFAULT, H5P_DEFAULT);
+      assert(attr >= 0);
+      herr_t status = H5Awrite(attr, ctype, BUILD_VERSION);
+      assert(status >= 0);
+      H5Sclose(dspace1dim);
+      H5Aclose(attr);
+    }
+  }
 #endif
 
-  hid_t file = -1;
-  hid_t data_soln;
-  herr_t status;
-  Vector dataSerial;
+  // included total dofs for partitioned files
+  if (!serialized_write) {
+    int ldofs = vfes->GetNDofs();
+    int gdofs;
+    MPI_Allreduce(&ldofs, &gdofs, 1, MPI_INT, MPI_SUM, TPSCommWorld);
+    h5_save_attribute(file, "dofs_global", gdofs);
+  }
 
-  string serialName;
-  if (inputFileName.length() > 0) {
-    if (inputFileName.substr(inputFileName.length() - 3) != ".h5") {
-      grvy_printf(gerror, "[ERROR]: M2ulPhyS::restart_files_hdf5 - input file name has a wrong format -> %s\n",
-                  inputFileName.c_str());
-      grvy_printf(GRVY_INFO, "format: %s\n", (inputFileName.substr(inputFileName.length() - 3)).c_str());
-      exit(ERROR);
+  // -------------------------------------------------------------------
+  // Write solution data defined by IO families
+  // -------------------------------------------------------------------
+  hsize_t dims[1];
+
+  //-------------------------------------------------------
+  // Loop over defined IO families to save desired output
+  //-------------------------------------------------------
+  for (size_t n = 0; n < ioData.families_.size(); n++) {
+    IOFamily &fam = ioData.families_[n];
+
+    if (serialized_write && (nprocs_ > 1) && (rank0_)) {
+      assert((locToGlobElem != NULL) && (partitioning_ != NULL));
+      assert(fam.serial_fes != NULL);
+      dims[0] = fam.serial_fes->GetNDofs();
+    } else {
+      dims[0] = fam.pfunc_->ParFESpace()->GetNDofs();
     }
-    serialName = inputFileName;
-  } else {
-    serialName = "restart_";
-    serialName.append(config.GetOutputName());
-    serialName.append(".sol.h5");
+    // define groups based on defined IO families
+    if (rank0_) {
+      grvy_printf(ginfo, "\nCreating HDF5 group for defined IO families\n");
+      grvy_printf(ginfo, "--> %s : %s\n", fam.group_.c_str(), fam.description_.c_str());
+    }
+
+    hid_t group = -1;
+    hid_t dataspace = -1;
+
+    if (rank0_ || !serialized_write) {
+      dataspace = H5Screate_simple(1, dims, NULL);
+      assert(dataspace >= 0);
+      group = H5Gcreate(file, fam.group_.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      assert(group >= 0);
+    }
+
+    // get pointer to raw data
+    double *data = fam.pfunc_->HostReadWrite();
+    // special case if writing a serial restart
+    if (serialized_write && (nprocs_ > 1)) {
+      serialize_soln_for_write(fam, groupsMPI, mesh->GetNE(), nelemGlobal_, locToGlobElem, partitioning_);
+      if (rank0_) data = fam.serial_sol->HostReadWrite();
+    }
+
+    // get defined variables for this IO family
+    vector<IOVar> vars = ioData.vars_[fam.group_];
+
+    // save raw data
+    if (rank0_ || !serialized_write) {
+      for (auto var : vars) write_soln_data(group, var.varName_, dataspace, data + var.index_ * dims[0], rank0_);
+    }
+
+    if (group >= 0) H5Gclose(group);
+    if (dataspace >= 0) H5Sclose(dataspace);
   }
-  string fileName;
+}
 
-  assert((mode == "read") || (mode == "write"));
+void M2ulPhyS::read_restart_files_hdf5(hid_t file, bool serialized_read) {
+  MPI_Comm TPSCommWorld = this->groupsMPI->getTPSCommWorld();
 
-  // determine restart file name (either serial or partitioned)
-
-  if (config.isRestartSerialized(mode)) {
-    fileName = serialName;
-  } else {
-    fileName = groupsMPI->getParallelName(serialName);
-  }
+  int read_order;
 
   // Variables used if (and only if) restarting from different order
   FiniteElementCollection *aux_fec = NULL;
@@ -80,211 +156,79 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
   double *aux_U_data = NULL;
   int auxOrder = -1;
 
-  if (rank0_) cout << "HDF5 restart files mode: " << mode << endl;
+  // normal restarts have each process read their own portion of the
+  // solution; a serial restart only reads on rank 0 and distributes to
+  // the remaining processes
 
-  // open restart files
-  if (mode == "write") {
-    if (rank0_ || config.isRestartPartitioned(mode)) {
-      file = H5Fcreate(fileName.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-      assert(file >= 0);
-    }
-  } else if (mode == "read") {
-    if (config.isRestartSerialized(mode)) {
-      if (rank0_) {
-        file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
-        assert(file >= 0);
-      }
-    } else {
-      // verify we have all desired files and open on each process
-      int gstatus;
-      int status = static_cast<int>(file_exists(fileName));
-      MPI_Allreduce(&status, &gstatus, 1, MPI_INT, MPI_MIN, TPSCommWorld);
-
-      if (gstatus == 0) {
-        grvy_printf(gerror, "[ERROR]: Unable to access desired restart file -> %s\n", fileName.c_str());
-        exit(ERROR);
-      }
-
-      file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
-      assert(file >= 0);
+  if (rank0_ || !serialized_read) {
+    h5_read_attribute(file, "iteration", iter);
+    h5_read_attribute(file, "time", time);
+    h5_read_attribute(file, "dt", dt);
+    h5_read_attribute(file, "order", read_order);
+    if (average->ComputeMean() && config.GetRestartMean()) {
+      int samplesMean, intervals;
+      h5_read_attribute(file, "samplesMean", samplesMean);
+      h5_read_attribute(file, "samplesInterval", intervals);
+      average->SetSamplesMean(samplesMean);
+      average->SetSamplesInterval(intervals);
     }
   }
 
-  // -------------------------------------------------------------------
-  // Attributes - relevant solution metadata saved as attributes
-  // -------------------------------------------------------------------
-
-  // hid_t aid, attr;
-  hid_t attr;
-  if (mode == "write") {
-    // note: all tasks save unless we are writing a serial restart file
-    if (rank0_ || config.isRestartPartitioned(mode)) {
-      // current iteration count
-      h5_save_attribute(file, "iteration", iter);
-      // total time
-      h5_save_attribute(file, "time", time);
-      // timestep
-      h5_save_attribute(file, "dt", dt);
-      // solution order
-      h5_save_attribute(file, "order", order);
-      // spatial dimension
-      h5_save_attribute(file, "dimension", dim);
-
-      if (average->ComputeMean()) {
-        // samples meanUp
-        h5_save_attribute(file, "samplesMean", average->GetSamplesMean());
-        h5_save_attribute(file, "samplesInterval", average->GetSamplesInterval());
-      }
-      // code revision
-#ifdef BUILD_VERSION
-      {
-        hid_t ctype = H5Tcopy(H5T_C_S1);
-        int shaLength = strlen(BUILD_VERSION);
-        hsize_t dims[1] = {1};
-        H5Tset_size(ctype, shaLength);
-
-        hid_t dspace1dim = H5Screate_simple(1, dims, NULL);
-
-        attr = H5Acreate(file, "revision", ctype, dspace1dim, H5P_DEFAULT, H5P_DEFAULT);
-        assert(attr >= 0);
-        status = H5Awrite(attr, ctype, BUILD_VERSION);
-        assert(status >= 0);
-        H5Sclose(dspace1dim);
-        H5Aclose(attr);
-      }
+  if (serialized_read) {
+    MPI_Bcast(&iter, 1, MPI_INT, 0, TPSCommWorld);
+    MPI_Bcast(&time, 1, MPI_DOUBLE, 0, TPSCommWorld);
+    MPI_Bcast(&dt, 1, MPI_DOUBLE, 0, TPSCommWorld);
+    MPI_Bcast(&read_order, 1, MPI_INT, 0, TPSCommWorld);
+    if (average->ComputeMean() && config.GetRestartMean()) {
+      int sampMean = average->GetSamplesMean();
+      int intervals = average->GetSamplesInterval();
+      MPI_Bcast(&sampMean, 1, MPI_INT, 0, TPSCommWorld);
+      MPI_Bcast(&intervals, 1, MPI_INT, 0, TPSCommWorld);
     }
-#endif
+  }
 
-    // included total dofs for partitioned files
-    if (!config.isRestartSerialized(mode)) {
-      int ldofs = vfes->GetNDofs();
-      int gdofs;
-      MPI_Allreduce(&ldofs, &gdofs, 1, MPI_INT, MPI_SUM, TPSCommWorld);
-      h5_save_attribute(file, "dofs_global", gdofs);
-    }
-  } else {  // read
-    int read_order;
+  if (loadFromAuxSol) {
+    assert(!serialized_read);  // koomie, check cis
+    auxOrder = read_order;
 
-    // normal restarts have each process read their own portion of the
-    // solution; a serial restart only reads on rank 0 and distributes to
-    // the remaining processes
+    if (basisType == 0)
+      aux_fec = new DG_FECollection(auxOrder, dim, BasisType::GaussLegendre);
+    else if (basisType == 1)
+      aux_fec = new DG_FECollection(auxOrder, dim, BasisType::GaussLobatto);
 
-    if (rank0_ || config.isRestartPartitioned(mode)) {
-      h5_read_attribute(file, "iteration", iter);
-      h5_read_attribute(file, "time", time);
-      h5_read_attribute(file, "dt", dt);
-      h5_read_attribute(file, "order", read_order);
-      if (average->ComputeMean() && config.GetRestartMean()) {
-        int samplesMean, intervals;
-        h5_read_attribute(file, "samplesMean", samplesMean);
-        h5_read_attribute(file, "samplesInterval", intervals);
-        average->SetSamplesMean(samplesMean);
-        average->SetSamplesInterval(intervals);
-      }
-    }
+    aux_vfes = new ParFiniteElementSpace(mesh, aux_fec, num_equation, Ordering::byNODES);
 
-    if (config.isRestartSerialized(mode)) {
-      MPI_Bcast(&iter, 1, MPI_INT, 0, TPSCommWorld);
-      MPI_Bcast(&time, 1, MPI_DOUBLE, 0, TPSCommWorld);
-      MPI_Bcast(&dt, 1, MPI_DOUBLE, 0, TPSCommWorld);
-      MPI_Bcast(&read_order, 1, MPI_INT, 0, TPSCommWorld);
-      if (average->ComputeMean() && config.GetRestartMean()) {
-        int sampMean = average->GetSamplesMean();
-        int intervals = average->GetSamplesInterval();
-        MPI_Bcast(&sampMean, 1, MPI_INT, 0, TPSCommWorld);
-        MPI_Bcast(&intervals, 1, MPI_INT, 0, TPSCommWorld);
-      }
-    }
+    aux_U_data = new double[num_equation * aux_vfes->GetNDofs()];
+    aux_U = new ParGridFunction(aux_vfes, aux_U_data);
+  } else {
+    assert(read_order == order);
+  }
 
-    if (loadFromAuxSol) {
-      assert(config.RestartSerial() == "no");  // koomie, check cis
-      auxOrder = read_order;
-
-      if (basisType == 0)
-        aux_fec = new DG_FECollection(auxOrder, dim, BasisType::GaussLegendre);
-      else if (basisType == 1)
-        aux_fec = new DG_FECollection(auxOrder, dim, BasisType::GaussLobatto);
-
-      aux_vfes = new ParFiniteElementSpace(mesh, aux_fec, num_equation, Ordering::byNODES);
-
-      aux_U_data = new double[num_equation * aux_vfes->GetNDofs()];
-      aux_U = new ParGridFunction(aux_vfes, aux_U_data);
-    } else {
-      assert(read_order == order);
-    }
-
-    if (rank0_) {
-      grvy_printf(ginfo, "Restarting from iteration = %i\n", iter);
-      grvy_printf(ginfo, "--> time = %e\n", time);
-      grvy_printf(ginfo, "--> dt   = %e\n", dt);
-      if (average != NULL) {
-        grvy_printf(ginfo, "Restarting averages with %i\n samples", average->GetSamplesMean());
-      }
+  if (rank0_) {
+    grvy_printf(ginfo, "Restarting from iteration = %i\n", iter);
+    grvy_printf(ginfo, "--> time = %e\n", time);
+    grvy_printf(ginfo, "--> dt   = %e\n", dt);
+    if (average != NULL) {
+      grvy_printf(ginfo, "Restarting averages with %i\n samples", average->GetSamplesMean());
     }
   }
 
   // -------------------------------------------------------------------
   // Read/write solution data defined by IO families
   // -------------------------------------------------------------------
-
-  hsize_t dims[1];
-  // hsize_t maxdims[1];
   hsize_t numInSoln = 0;
+  hid_t data_soln;
 
   //-------------------------------------------------------
   // Loop over defined IO families to save desired output
   //-------------------------------------------------------
   for (size_t n = 0; n < ioData.families_.size(); n++) {
     IOFamily &fam = ioData.families_[n];
-
-    if (mode == "write") {
-      if ((config.isRestartSerialized(mode)) && (nprocs_ > 1) && (rank0_)) {
-        assert((locToGlobElem != NULL) && (partitioning_ != NULL));
-        assert(fam.serial_fes != NULL);
-        dims[0] = fam.serial_fes->GetNDofs();
-      } else {
-        dims[0] = fam.pfunc_->ParFESpace()->GetNDofs();
-      }
-      // define groups based on defined IO families
-      if (rank0_) {
-        grvy_printf(ginfo, "\nCreating HDF5 group for defined IO families\n");
-        grvy_printf(ginfo, "--> %s : %s\n", fam.group_.c_str(), fam.description_.c_str());
-      }
-
-      hid_t group = -1;
-      hid_t dataspace = -1;
-
-      if (rank0_ || !config.isRestartSerialized(mode)) {
-        dataspace = H5Screate_simple(1, dims, NULL);
-        assert(dataspace >= 0);
-        group = H5Gcreate(file, fam.group_.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-        assert(group >= 0);
-      }
-
-      // get pointer to raw data
-      double *data = fam.pfunc_->HostReadWrite();
-      // special case if writing a serial restart
-      if ((config.isRestartSerialized(mode)) && (nprocs_ > 1)) {
-        serialize_soln_for_write(fam, groupsMPI, mesh->GetNE(), nelemGlobal_, locToGlobElem, partitioning_);
-        if (rank0_) data = fam.serial_sol->HostReadWrite();
-      }
-
-      // get defined variables for this IO family
-      vector<IOVar> vars = ioData.vars_[fam.group_];
-
-      // save raw data
-      if (rank0_ || config.isRestartPartitioned(mode)) {
-        for (auto var : vars) write_soln_data(group, var.varName_, dataspace, data + var.index_ * dims[0], rank0_);
-      }
-
-      if (group >= 0) H5Gclose(group);
-      if (dataspace >= 0) H5Sclose(dataspace);
-
-    } else if (fam.inRestartFile) {  // read mode
+    if (fam.inRestartFile) {  // read mode
       if (rank0_) cout << "Reading in solutiond data from restart..." << endl;
 
       // verify Dofs match expectations with current mesh
-      if (rank0_ || config.isRestartPartitioned(mode)) {
+      if (rank0_ || !serialized_read) {
         hid_t dataspace;
 
         vector<IOVar> vars = ioData.vars_[fam.group_];
@@ -300,7 +244,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
       }
 
       int dof = fam.pfunc_->ParFESpace()->GetNDofs();
-      if (config.isRestartSerialized(mode)) {
+      if (serialized_read) {
         int dof_global;
         MPI_Reduce(&dof, &dof_global, 1, MPI_INT, MPI_SUM, 0, TPSCommWorld);
         dof = dof_global;
@@ -308,7 +252,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
 
       if (loadFromAuxSol && fam.allowsAuxRestart) dof = aux_vfes->GetNDofs();
 
-      if (rank0_ || config.isRestartPartitioned(mode)) assert((int)numInSoln == dof);
+      if (rank0_ || !serialized_read) assert((int)numInSoln == dof);
 
       // get pointer to raw data
       double *data = fam.pfunc_->HostReadWrite();
@@ -326,11 +270,11 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
         if (var.inRestartFile_) {
           std::string h5Path = fam.group_ + "/" + var.varName_;
           if (rank0_) grvy_printf(ginfo, "--> Reading h5 path = %s\n", h5Path.c_str());
-          if (config.isRestartPartitioned(mode)) {
+          if (!serialized_read) {
             read_partitioned_soln_data(file, h5Path.c_str(), var.index_ * numInSoln, data);
           } else {
             assert(partitioning_ != NULL);
-            assert(config.isRestartSerialized("read"));
+            assert(serialized_read);
             read_serialized_soln_data(file, h5Path.c_str(), dof, var.index_, data, fam, groupsMPI, partitioning_,
                                       nelemGlobal_);
           }
@@ -339,9 +283,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
     }
   }
 
-  if (file >= 0) H5Fclose(file);
-
-  if (mode == "read" && loadFromAuxSol) {
+  if (loadFromAuxSol) {
     if (rank0_) cout << "Interpolating from auxOrder = " << auxOrder << " to order = " << order << endl;
 
     // Interpolate from aux to new order
@@ -378,6 +320,80 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
     delete aux_vfes;
     delete aux_fec;
   }
+}
+
+void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
+  assert((mode == "read") || (mode == "write"));
+  MPI_Comm TPSCommWorld = this->groupsMPI->getTPSCommWorld();
+#ifdef HAVE_GRVY
+  grvy_timer_begin(__func__);
+#endif
+
+  string serialName;
+  if (inputFileName.length() > 0) {
+    if (inputFileName.substr(inputFileName.length() - 3) != ".h5") {
+      grvy_printf(gerror, "[ERROR]: M2ulPhyS::restart_files_hdf5 - input file name has a wrong format -> %s\n",
+                  inputFileName.c_str());
+      grvy_printf(GRVY_INFO, "format: %s\n", (inputFileName.substr(inputFileName.length() - 3)).c_str());
+      exit(ERROR);
+    }
+    serialName = inputFileName;
+  } else {
+    serialName = "restart_";
+    serialName.append(config.GetOutputName());
+    serialName.append(".sol.h5");
+  }
+
+  // determine restart file name (either serial or partitioned)
+  string fileName;
+  if (config.isRestartSerialized(mode)) {
+    fileName = serialName;
+  } else {
+    fileName = groupsMPI->getParallelName(serialName);
+  }
+
+  if (rank0_) cout << "HDF5 restart files mode: " << mode << endl;
+
+  // open restart files
+  hid_t file = -1;
+  if (mode == "write") {
+    if (rank0_ || config.isRestartPartitioned(mode)) {
+      file = H5Fcreate(fileName.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+      assert(file >= 0);
+    }
+  } else if (mode == "read") {
+    if (config.isRestartSerialized(mode)) {
+      if (rank0_) {
+        file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+        assert(file >= 0);
+      }
+    } else {
+      // verify we have all desired files and open on each process
+      int gstatus;
+      int status = static_cast<int>(file_exists(fileName));
+      MPI_Allreduce(&status, &gstatus, 1, MPI_INT, MPI_MIN, TPSCommWorld);
+
+      if (gstatus == 0) {
+        grvy_printf(gerror, "[ERROR]: Unable to access desired restart file -> %s\n", fileName.c_str());
+        exit(ERROR);
+      }
+
+      file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+      assert(file >= 0);
+    }
+  }
+
+  // -------------------------------------------------------------------
+  // Attributes - relevant solution metadata saved as attributes
+  // -------------------------------------------------------------------
+
+  if (mode == "write") {
+    write_restart_files_hdf5(file, config.isRestartSerialized(mode));
+  } else {  // read
+    read_restart_files_hdf5(file, config.isRestartSerialized(mode));
+  }
+
+  if (file >= 0) H5Fclose(file);
 
 #ifdef HAVE_GRVY
   grvy_timer_end(__func__);

@@ -345,6 +345,8 @@ class M2ulPhyS : public TPS::Solver {
 
   // i/o routines
   void restart_files_hdf5(string mode, string inputFileName = std::string());
+  void write_restart_files_hdf5(hid_t file, bool serialized_write);
+  void read_restart_files_hdf5(hid_t file, bool serialized_read);
 
   void Check_NAN();
   bool Check_JobResubmit();
