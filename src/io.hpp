@@ -52,8 +52,14 @@ class IOFamily {
   // true if the family is to be found in restart files
   bool inRestartFile;
 
-  mfem::FiniteElementSpace *serial_fes;
-  mfem::GridFunction *serial_sol;
+  mfem::FiniteElementSpace *serial_fes = nullptr;
+  mfem::GridFunction *serial_sol = nullptr;
+
+  IOFamily(std::string desc, std::string grp, mfem::ParGridFunction *pf)
+      : description_(desc), group_(grp), pfunc_(pf) {}
+
+  void serializeForWrite(MPI_Comm comm, int local_ne, int global_ne, const int *locToGlobElem,
+                         const Array<int> &partitioning);
 };
 
 class IOVar {
@@ -76,6 +82,10 @@ class IODataOrganizer {
   int getIOFamilyIndex(std::string group);
 
   void initializeSerial(bool root, bool serial, mfem::Mesh *serial_mesh);
+
+  void write(hid_t file, bool rank0);
+  void writeSerial(hid_t file, MPI_Comm comm, int local_ne, int global_ne, const int *locToGlobElem,
+                   const Array<int> &partitioning);
 };
 
 void read_partitioned_soln_data(hid_t file, std::string varName, size_t index, double *data);
@@ -84,6 +94,4 @@ void read_serialized_soln_data(hid_t file, std::string varName, int numDof, int 
 void write_soln_data(hid_t group, std::string varName, hid_t dataspace, double *data, bool rank0);
 void partitioning_file_hdf5(std::string mode, const RunConfiguration &config, MPI_Groups *groupsMPI, int nelemGlobal,
                             mfem::Array<int> &partitioning);
-void serialize_soln_for_write(IOFamily &fam, MPI_Groups *groupsMPI, int local_ne, int global_ne,
-                              const int *locToGlobElem, const mfem::Array<int> &partitioning);
 #endif  // IO_HPP_
