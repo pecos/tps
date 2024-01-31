@@ -98,15 +98,12 @@ class IODataOrganizer {
   void initializeSerial(bool root, bool serial, mfem::Mesh *serial_mesh, int *locToGlob, mfem::Array<int> *part);
 
   void write(hid_t file, bool serial);
-
-  void read(hid_t file, bool rank0);
-  void readSerial(hid_t file, bool rank0, MPI_Groups *groupsMPI, Array<int> partitioning, int global_ne);
-  void readChangeOrder(hid_t file, bool rank0, int read_order);
+  void read(hid_t file, bool serial, int read_order = -1);
 };
 
 void read_partitioned_soln_data(hid_t file, std::string varName, size_t index, double *data);
 void read_serialized_soln_data(hid_t file, std::string varName, int numDof, int varOffset, double *data, IOFamily &fam,
-                               MPI_Groups *groupsMPI, mfem::Array<int> partitioning, int nelemGlobal);
+                               mfem::Array<int> partitioning);
 void write_soln_data(hid_t group, std::string varName, hid_t dataspace, const double *data, bool rank0);
 void partitioning_file_hdf5(std::string mode, const RunConfiguration &config, MPI_Groups *groupsMPI, int nelemGlobal,
                             mfem::Array<int> &partitioning);
