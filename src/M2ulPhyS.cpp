@@ -655,7 +655,7 @@ void M2ulPhyS::initVariables() {
     ioData.registerIOVar("/rmsData", "vw", 5);
   }
 
-  ioData.initializeSerial(rank0_, (config.RestartSerial() != "no"), serial_mesh);
+  ioData.initializeSerial(rank0_, (config.RestartSerial() != "no"), serial_mesh, locToGlobElem, &partitioning_);
   projectInitialSolution();
 
   // Boundary attributes in present partition

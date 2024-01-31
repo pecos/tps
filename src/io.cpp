@@ -92,11 +92,7 @@ void M2ulPhyS::write_restart_files_hdf5(hid_t file, bool serialized_write) {
   // -------------------------------------------------------------------
   // Data - actual data write handled by IODataOrganizer class
   // -------------------------------------------------------------------
-  if (serialized_write) {
-    ioData.writeSerial(file, groupsMPI->getTPSCommWorld(), mesh->GetNE(), nelemGlobal_, locToGlobElem, partitioning_);
-  } else {
-    ioData.write(file, rank0_);
-  }
+  ioData.write(file, serialized_write);
 }
 
 void M2ulPhyS::read_restart_files_hdf5(hid_t file, bool serialized_read) {
@@ -468,7 +464,7 @@ void read_serialized_soln_data(hid_t file, string varName, int numDof, int varOf
 }
 
 // convenience function to write HDF5 data
-void write_soln_data(hid_t group, string varName, hid_t dataspace, double *data, bool rank0) {
+void write_soln_data(hid_t group, string varName, hid_t dataspace, const double *data, bool rank0) {
   hid_t data_soln;
   herr_t status;
   assert(group >= 0);
@@ -532,17 +528,20 @@ void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
 // Routines for I/O data organizer helper class
 // ---------------------------------------------
 
-void IOFamily::serializeForWrite(MPI_Comm comm, int local_ne, int global_ne, const int *locToGlobElem,
-                                 const Array<int> &partitioning) {
-  int rank;
-  MPI_Comm_rank(comm, &rank);
+void IOFamily::serializeForWrite() {
+  MPI_Comm comm = this->pfunc_->ParFESpace()->GetComm();
+  const int rank = this->pfunc_->ParFESpace()->GetMyRank();
   const bool rank0 = (rank == 0);
 
+  const int local_ne = this->pfunc_->ParFESpace()->GetParMesh()->GetNE();
+
+  const Array<int> &partitioning = *(this->partitioning_);
+  const int *locToGlobElem = this->local_to_global_elem_;
+
   // Ensure consistency
-  int global_ne_check;
-  MPI_Reduce(&local_ne, &global_ne_check, 1, MPI_INT, MPI_SUM, 0, comm);
+  int global_ne;
+  MPI_Reduce(&local_ne, &global_ne, 1, MPI_INT, MPI_SUM, 0, comm);
   if (rank0) {
-    assert(global_ne_check == global_ne);
     assert(partitioning.Size() == global_ne);
   }
   assert(locToGlobElem != NULL);
@@ -624,119 +623,102 @@ int IODataOrganizer::getIOFamilyIndex(std::string group) {
   return (-1);
 }
 
-void IODataOrganizer::initializeSerial(bool root, bool serial, Mesh *serial_mesh) {
+void IODataOrganizer::initializeSerial(bool root, bool serial, Mesh *serial_mesh, int *locToGlob, Array<int> *part) {
+  supports_serial_ = serial;
+
   // loop through families
   for (size_t n = 0; n < families_.size(); n++) {
     IOFamily &fam = families_[n];
     fam.serial_fes = NULL;
     fam.serial_sol = NULL;
-    if (root && serial) {
-      const FiniteElementCollection *fec = fam.pfunc_->ParFESpace()->FEColl();
-      int numVars = fam.pfunc_->Size() / fam.pfunc_->ParFESpace()->GetNDofs();
 
-      fam.serial_fes = new FiniteElementSpace(serial_mesh, fec, numVars, Ordering::byNODES);
-      fam.serial_sol = new GridFunction(fam.serial_fes);
-      //       cout<<"I/O organizer for group "<<fam.group_<<" initialized."<<endl;
+    // If serial support is requested, need to initialize required data
+    if (supports_serial_) {
+      fam.local_to_global_elem_ = locToGlob;
+      fam.partitioning_ = part;
+      if (root) {
+        const FiniteElementCollection *fec = fam.pfunc_->ParFESpace()->FEColl();
+        int numVars = fam.pfunc_->Size() / fam.pfunc_->ParFESpace()->GetNDofs();
+
+        fam.serial_fes = new FiniteElementSpace(serial_mesh, fec, numVars, Ordering::byNODES);
+        fam.serial_sol = new GridFunction(fam.serial_fes);
+        //       cout<<"I/O organizer for group "<<fam.group_<<" initialized."<<endl;
+      }
     }
   }
 }
 
-void IODataOrganizer::write(hid_t file, bool rank0) {
-  // -------------------------------------------------------------------
-  // Write solution data defined by IO families
-  // -------------------------------------------------------------------
-  hsize_t dims[1];
+void IODataOrganizer::write(hid_t file, bool serial) {
+  if (serial) assert(supports_serial_);
 
-  //-------------------------------------------------------
-  // Loop over defined IO families to save desired output
-  //-------------------------------------------------------
-  for (size_t n = 0; n < families_.size(); n++) {
-    IOFamily &fam = families_[n];
-
-    dims[0] = fam.pfunc_->ParFESpace()->GetNDofs();
-
-    // define groups based on defined IO families
-    if (rank0) {
-      grvy_printf(ginfo, "\nCreating HDF5 group for defined IO families\n");
-      grvy_printf(ginfo, "--> %s : %s\n", fam.group_.c_str(), fam.description_.c_str());
+  // NOTE(trevilo): this loop envisions families that have different
+  // number of mpi ranks, but rest of the code is not general enough
+  // to support this configuration yet (or at a minimum there are no
+  // tests of such a set up)
+  int nprocs_max = 0;
+  for (auto fam : families_) {
+    int nprocs_tmp = fam.pfunc_->ParFESpace()->GetNRanks();
+    if (nprocs_tmp > nprocs_max) {
+      nprocs_max = nprocs_tmp;
     }
+  }
+  assert(nprocs_max > 0);
 
-    hid_t group = -1;
-    hid_t dataspace = -1;
+  // Do we need to serialize the data prior to the write?
+  const bool require_serialization = (serial && nprocs_max > 1);
 
-    dataspace = H5Screate_simple(1, dims, NULL);
-    assert(dataspace >= 0);
-    group = H5Gcreate(file, fam.group_.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    assert(group >= 0);
-
-    // get pointer to raw data
-    double *data = fam.pfunc_->HostReadWrite();
+  // Loop over defined IO families to save desired output
+  for (auto fam : families_) {
+    if (require_serialization) fam.serializeForWrite();
 
     // get defined variables for this IO family
     vector<IOVar> vars = vars_[fam.group_];
 
-    // save raw data
-    for (auto var : vars) write_soln_data(group, var.varName_, dataspace, data + var.index_ * dims[0], rank0);
+    // determine if rank 0
+    const int rank = fam.pfunc_->ParFESpace()->GetMyRank();
+    const bool rank0 = (rank == 0);
 
-    if (group >= 0) H5Gclose(group);
-    if (dataspace >= 0) H5Sclose(dataspace);
-  }
-}
-
-void IODataOrganizer::writeSerial(hid_t file, MPI_Comm comm, int local_ne, int global_ne, const int *locToGlobElem,
-                                  const Array<int> &partitioning) {
-  int rank;
-  MPI_Comm_rank(comm, &rank);
-  int nprocs;
-  MPI_Comm_size(comm, &nprocs);
-  const bool rank0 = (rank == 0);
-
-  // if running serially, writeSerial and write are logically the
-  // same, but infrastructure is different.  Thus, for serial run,
-  // just call write() here
-  if (nprocs == 1) {
-    this->write(file, rank0);
-    return;
-  }
-
-  hsize_t dims[1];
-
-  // Loop over defined IO families to save desired output
-  for (size_t n = 0; n < families_.size(); n++) {
-    IOFamily &fam = families_[n];
-
-    if (rank0) {
-      assert((locToGlobElem != NULL) && (partitioning.Size() == global_ne));
-      assert(fam.serial_fes != NULL);
-      dims[0] = fam.serial_fes->GetNDofs();
-      grvy_printf(ginfo, "\nCreating HDF5 group for defined IO families\n");
-      grvy_printf(ginfo, "--> %s : %s\n", fam.group_.c_str(), fam.description_.c_str());
-    }
-
+    hsize_t dims[1];
     hid_t group = -1;
     hid_t dataspace = -1;
 
     if (rank0) {
+      grvy_printf(ginfo, "\nCreating HDF5 group for defined IO families\n");
+      grvy_printf(ginfo, "--> %s : %s\n", fam.group_.c_str(), fam.description_.c_str());
+    }
+
+    if (require_serialization) {
+      // if require_serialization, then we just populated fam.serial_sol above, and now we use only rank0 to write
+      if (rank0) {
+        assert(fam.serial_fes != NULL);
+        dims[0] = fam.serial_fes->GetNDofs();
+
+        dataspace = H5Screate_simple(1, dims, NULL);
+        assert(dataspace >= 0);
+        group = H5Gcreate(file, fam.group_.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        assert(group >= 0);
+
+        // get pointer to raw data
+        assert(fam.serial_sol != NULL);
+        const double *data = fam.serial_sol->HostRead();
+
+        // save raw data
+        for (auto var : vars) write_soln_data(group, var.varName_, dataspace, data + var.index_ * dims[0], rank0);
+      }
+    } else {
+      // otherwise, use all ranks to write data from fam.pfunc_
+      dims[0] = fam.pfunc_->ParFESpace()->GetNDofs();
       dataspace = H5Screate_simple(1, dims, NULL);
       assert(dataspace >= 0);
       group = H5Gcreate(file, fam.group_.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
       assert(group >= 0);
-    }
 
-    fam.serializeForWrite(comm, local_ne, global_ne, locToGlobElem, partitioning);
+      // get pointer to raw data
+      const double *data = fam.pfunc_->HostRead();
 
-    // get pointer to raw data
-    double *data = nullptr;
-    if (rank0) data = fam.serial_sol->HostReadWrite();
-
-    // get defined variables for this IO family
-    vector<IOVar> vars = vars_[fam.group_];
-
-    // save raw data
-    if (rank0) {
+      // save raw data
       for (auto var : vars) write_soln_data(group, var.varName_, dataspace, data + var.index_ * dims[0], rank0);
     }
-
     if (group >= 0) H5Gclose(group);
     if (dataspace >= 0) H5Sclose(dataspace);
   }
