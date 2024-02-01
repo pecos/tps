@@ -521,10 +521,13 @@ void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
 // Routines for I/O data organizer helper class
 // ---------------------------------------------
 
+IOFamily::IOFamily(std::string desc, std::string grp, mfem::ParGridFunction *pf)
+    : description_(desc), group_(grp), pfunc_(pf) {
+  rank0_ = (pfunc_->ParFESpace()->GetMyRank() == 0);
+}
+
 void IOFamily::serializeForWrite() {
   MPI_Comm comm = this->pfunc_->ParFESpace()->GetComm();
-  const int rank = this->pfunc_->ParFESpace()->GetMyRank();
-  const bool rank0 = (rank == 0);
 
   const int local_ne = this->pfunc_->ParFESpace()->GetParMesh()->GetNE();
 
@@ -534,13 +537,13 @@ void IOFamily::serializeForWrite() {
   // Ensure consistency
   int global_ne;
   MPI_Reduce(&local_ne, &global_ne, 1, MPI_INT, MPI_SUM, 0, comm);
-  if (rank0) {
+  if (rank0_) {
     assert(partitioning.Size() == global_ne);
   }
   assert(locToGlobElem != NULL);
 
   ParGridFunction *pfunc = this->pfunc_;
-  if (rank0) {
+  if (rank0_) {
     grvy_printf(ginfo, "Generating serialized restart file (group %s...)\n", this->group_.c_str());
     // copy my own data
     Array<int> lvdofs, gvdofs;
@@ -582,11 +585,150 @@ void IOFamily::serializeForWrite() {
   }
 }
 
+void IOFamily::readPartitioned(hid_t file) {
+  hid_t dataspace;
+  hsize_t numInSoln = 0;
+  hid_t data_soln;
+
+  string varGroupName = group_;
+  varGroupName.append("/");
+  varGroupName.append(vars_[0].varName_);
+
+  data_soln = H5Dopen2(file, varGroupName.c_str(), H5P_DEFAULT);
+  assert(data_soln >= 0);
+  dataspace = H5Dget_space(data_soln);
+  numInSoln = H5Sget_simple_extent_npoints(dataspace);
+  H5Dclose(data_soln);
+
+  int dof = pfunc_->ParFESpace()->GetNDofs();
+
+  // verify Dofs match expectations with current mesh
+  assert((int)numInSoln == dof);
+
+  // get pointer to raw data
+  double *data = pfunc_->HostWrite();
+
+  // read from file into appropriate spot in data
+  for (auto var : vars_) {
+    if (var.inRestartFile_) {
+      std::string h5Path = group_ + "/" + var.varName_;
+      if (rank0_) grvy_printf(ginfo, "--> Reading h5 path = %s\n", h5Path.c_str());
+      read_partitioned_soln_data(file, h5Path.c_str(), var.index_ * numInSoln, data);
+    }
+  }
+}
+
+void IOFamily::readSerial(hid_t file) {
+  const Array<int> &partitioning = *partitioning_;
+  MPI_Comm comm = pfunc_->ParFESpace()->GetComm();
+
+  hsize_t numInSoln = 0;
+  hid_t data_soln;
+
+  // verify Dofs match expectations with current mesh
+  if (rank0_) {
+    hid_t dataspace;
+
+    string varGroupName = group_;
+    varGroupName.append("/");
+    varGroupName.append(vars_[0].varName_);
+
+    data_soln = H5Dopen2(file, varGroupName.c_str(), H5P_DEFAULT);
+    assert(data_soln >= 0);
+    dataspace = H5Dget_space(data_soln);
+    numInSoln = H5Sget_simple_extent_npoints(dataspace);
+    H5Dclose(data_soln);
+  }
+
+  int dof = pfunc_->ParFESpace()->GetNDofs();
+
+  int dof_global;
+  MPI_Reduce(&dof, &dof_global, 1, MPI_INT, MPI_SUM, 0, comm);
+  dof = dof_global;
+
+  if (rank0_) assert((int)numInSoln == dof);
+
+  // get pointer to raw data
+  double *data = pfunc_->HostWrite();
+
+  for (auto var : vars_) {
+    if (var.inRestartFile_) {
+      std::string h5Path = group_ + "/" + var.varName_;
+      if (rank0_) grvy_printf(ginfo, "--> Reading h5 path = %s\n", h5Path.c_str());
+      read_serialized_soln_data(file, h5Path.c_str(), dof, var.index_, data, *this, partitioning);
+    }
+  }
+}
+
+void IOFamily::readChangeOrder(hid_t file, int read_order) {
+  if (allowsAuxRestart) {
+    hid_t dataspace;
+    hsize_t numInSoln = 0;
+    hid_t data_soln;
+
+    double *aux_U_data = NULL;
+
+    string varGroupName = group_;
+    varGroupName.append("/");
+    varGroupName.append(vars_[0].varName_);
+
+    data_soln = H5Dopen2(file, varGroupName.c_str(), H5P_DEFAULT);
+    assert(data_soln >= 0);
+    dataspace = H5Dget_space(data_soln);
+    numInSoln = H5Sget_simple_extent_npoints(dataspace);
+    H5Dclose(data_soln);
+
+    assert(fec_ != NULL);
+    aux_fec_ = fec_->Clone(read_order);
+
+    int nvars = vars_.size();
+    aux_pfes_ = new ParFiniteElementSpace(pfunc_->ParFESpace()->GetParMesh(), aux_fec_, nvars, Ordering::byNODES);
+
+    aux_U_data = new double[nvars * aux_pfes_->GetNDofs()];
+    aux_pfunc_ = new ParGridFunction(aux_pfes_, aux_U_data);
+
+    int dof = aux_pfes_->GetNDofs();
+
+    assert((int)numInSoln == dof);
+
+    // get pointer to raw data
+    double *data = aux_pfunc_->HostWrite();
+
+    for (auto var : vars_) {
+      if (var.inRestartFile_) {
+        std::string h5Path = group_ + "/" + var.varName_;
+        if (rank0_) grvy_printf(ginfo, "--> Reading h5 path = %s\n", h5Path.c_str());
+        read_partitioned_soln_data(file, h5Path.c_str(), var.index_ * numInSoln, data);
+      }
+    }
+
+    if (rank0_) cout << "Interpolating from read_order = " << read_order << " to solution space" << endl;
+
+    // Interpolate from aux to new order
+    pfunc_->ProjectGridFunction(*aux_pfunc_);
+
+    // If interpolation was successful, the L2 norm of the
+    // difference between the auxOrder and order versions should be
+    // zero (well... to within round-off-induced error)
+    VectorGridFunctionCoefficient lowOrderCoeff(aux_pfunc_);
+    double err = pfunc_->ComputeL2Error(lowOrderCoeff);
+
+    if (rank0_) cout << "|| interpolation error ||_2 = " << err << endl;
+
+    // clean up aux data
+    delete aux_pfunc_;
+    delete[] aux_U_data;
+    delete aux_pfes_;
+    delete aux_fec_;
+  } else {
+    if (rank0_) cout << "Skipping family " << group_ << " doesn't allow changing order." << endl;
+  }
+}
+
 // register a new IO family which maps to a ParGridFunction
 void IODataOrganizer::registerIOFamily(std::string description, std::string group, ParGridFunction *pfunc,
                                        bool auxRestart, bool _inRestartFile, FiniteElementCollection *fec) {
   IOFamily family(description, group, pfunc);
-  std::vector<IOVar> vars;
   family.allowsAuxRestart = auxRestart;
   family.inRestartFile = _inRestartFile;
   family.fec_ = fec;
@@ -595,17 +737,14 @@ void IODataOrganizer::registerIOFamily(std::string description, std::string grou
   }
 
   families_.push_back(family);
-  vars_[group] = vars;
-
-  return;
 }
 
 // register individual variables for IO family
 void IODataOrganizer::registerIOVar(std::string group, std::string varName, int index, bool inRestartFile) {
   IOVar newvar{varName, index, inRestartFile};
-  vars_[group].push_back(newvar);
-
-  return;
+  const int f = getIOFamilyIndex(group);
+  assert(f >= 0);
+  families_[f].vars_.push_back(newvar);
 }
 
 // return the index to IO family given a group name
@@ -664,9 +803,6 @@ void IODataOrganizer::write(hid_t file, bool serial) {
   for (auto fam : families_) {
     if (require_serialization) fam.serializeForWrite();
 
-    // get defined variables for this IO family
-    vector<IOVar> vars = vars_[fam.group_];
-
     // determine if rank 0
     const int rank = fam.pfunc_->ParFESpace()->GetMyRank();
     const bool rank0 = (rank == 0);
@@ -696,7 +832,7 @@ void IODataOrganizer::write(hid_t file, bool serial) {
         const double *data = fam.serial_sol->HostRead();
 
         // save raw data
-        for (auto var : vars) write_soln_data(group, var.varName_, dataspace, data + var.index_ * dims[0], rank0);
+        for (auto var : fam.vars_) write_soln_data(group, var.varName_, dataspace, data + var.index_ * dims[0], rank0);
       }
     } else {
       // otherwise, use all ranks to write data from fam.pfunc_
@@ -710,7 +846,7 @@ void IODataOrganizer::write(hid_t file, bool serial) {
       const double *data = fam.pfunc_->HostRead();
 
       // save raw data
-      for (auto var : vars) write_soln_data(group, var.varName_, dataspace, data + var.index_ * dims[0], rank0);
+      for (auto var : fam.vars_) write_soln_data(group, var.varName_, dataspace, data + var.index_ * dims[0], rank0);
     }
     if (group >= 0) H5Gclose(group);
     if (dataspace >= 0) H5Sclose(dataspace);
@@ -733,16 +869,13 @@ void IODataOrganizer::read(hid_t file, bool serial, int read_order) {
   }
   assert(nprocs_max > 0);
 
-  hsize_t numInSoln = 0;
-  hid_t data_soln;
-
   // Loop over defined IO families to load desired input
   for (auto fam : families_) {
     if (fam.inRestartFile) {  // read mode
       const int rank = fam.pfunc_->ParFESpace()->GetMyRank();
       const bool rank0 = (rank == 0);
 
-      if (rank0) cout << "Reading in solutiond data from restart..." << endl;
+      if (rank0) cout << "Reading in solution data from restart..." << endl;
 
       int fam_order;
       bool change_order = false;
@@ -757,139 +890,12 @@ void IODataOrganizer::read(hid_t file, bool serial, int read_order) {
           if (rank0) grvy_printf(gerror, "[ERROR]: Serial read does not support order change.\n");
           exit(ERROR);
         }
-
-        if (fam.allowsAuxRestart) {  // read mode
-          double *aux_U_data = NULL;
-
-          // verify Dofs match expectations with current mesh
-          hid_t dataspace;
-
-          vector<IOVar> vars = vars_[fam.group_];
-          string varGroupName = fam.group_;
-          varGroupName.append("/");
-          varGroupName.append(vars[0].varName_);
-
-          data_soln = H5Dopen2(file, varGroupName.c_str(), H5P_DEFAULT);
-          assert(data_soln >= 0);
-          dataspace = H5Dget_space(data_soln);
-          numInSoln = H5Sget_simple_extent_npoints(dataspace);
-          H5Dclose(data_soln);
-
-          assert(fam.fec_ != NULL);
-          fam.aux_fec_ = fam.fec_->Clone(read_order);
-
-          int nvars = vars_[fam.group_].size();
-          fam.aux_pfes_ =
-              new ParFiniteElementSpace(fam.pfunc_->ParFESpace()->GetParMesh(), fam.aux_fec_, nvars, Ordering::byNODES);
-
-          aux_U_data = new double[nvars * fam.aux_pfes_->GetNDofs()];
-          fam.aux_pfunc_ = new ParGridFunction(fam.aux_pfes_, aux_U_data);
-
-          int dof = fam.aux_pfes_->GetNDofs();
-
-          assert((int)numInSoln == dof);
-
-          // get pointer to raw data
-          double *data = fam.aux_pfunc_->HostReadWrite();
-
-          for (auto var : vars) {
-            if (var.inRestartFile_) {
-              std::string h5Path = fam.group_ + "/" + var.varName_;
-              if (rank0) grvy_printf(ginfo, "--> Reading h5 path = %s\n", h5Path.c_str());
-              read_partitioned_soln_data(file, h5Path.c_str(), var.index_ * numInSoln, data);
-            }
-          }
-
-          if (rank0) cout << "Interpolating from read_order = " << read_order << " to solution space" << endl;
-
-          // Interpolate from aux to new order
-          fam.pfunc_->ProjectGridFunction(*fam.aux_pfunc_);
-
-          // If interpolation was successful, the L2 norm of the
-          // difference between the auxOrder and order versions should be
-          // zero (well... to within round-off-induced error)
-          VectorGridFunctionCoefficient lowOrderCoeff(fam.aux_pfunc_);
-          double err = fam.pfunc_->ComputeL2Error(lowOrderCoeff);
-
-          if (rank0) cout << "|| interpolation error ||_2 = " << err << endl;
-
-          // clean up aux data
-          delete fam.aux_pfunc_;
-          delete[] aux_U_data;
-          delete fam.aux_pfes_;
-          delete fam.aux_fec_;
-        } else {
-          if (rank0) cout << "Skipping family " << fam.group_ << " doesn't allow changing order." << endl;
-        }
+        fam.readChangeOrder(file, read_order);
       } else {
         if (serial && nprocs_max > 1) {
-          const Array<int> &partitioning = *(fam.partitioning_);
-          MPI_Comm comm = fam.pfunc_->ParFESpace()->GetComm();
-
-          // verify Dofs match expectations with current mesh
-          if (rank0) {
-            hid_t dataspace;
-
-            vector<IOVar> vars = vars_[fam.group_];
-            string varGroupName = fam.group_;
-            varGroupName.append("/");
-            varGroupName.append(vars[0].varName_);
-
-            data_soln = H5Dopen2(file, varGroupName.c_str(), H5P_DEFAULT);
-            assert(data_soln >= 0);
-            dataspace = H5Dget_space(data_soln);
-            numInSoln = H5Sget_simple_extent_npoints(dataspace);
-            H5Dclose(data_soln);
-          }
-
-          int dof = fam.pfunc_->ParFESpace()->GetNDofs();
-
-          int dof_global;
-          MPI_Reduce(&dof, &dof_global, 1, MPI_INT, MPI_SUM, 0, comm);
-          dof = dof_global;
-
-          if (rank0) assert((int)numInSoln == dof);
-
-          // get pointer to raw data
-          double *data = fam.pfunc_->HostReadWrite();
-
-          vector<IOVar> vars = vars_[fam.group_];
-          for (auto var : vars) {
-            if (var.inRestartFile_) {
-              std::string h5Path = fam.group_ + "/" + var.varName_;
-              if (rank0) grvy_printf(ginfo, "--> Reading h5 path = %s\n", h5Path.c_str());
-              read_serialized_soln_data(file, h5Path.c_str(), dof, var.index_, data, fam, partitioning);
-            }
-          }
+          fam.readSerial(file);
         } else {
-          // verify Dofs match expectations with current mesh
-          hid_t dataspace;
-
-          vector<IOVar> vars = vars_[fam.group_];
-          string varGroupName = fam.group_;
-          varGroupName.append("/");
-          varGroupName.append(vars[0].varName_);
-
-          data_soln = H5Dopen2(file, varGroupName.c_str(), H5P_DEFAULT);
-          assert(data_soln >= 0);
-          dataspace = H5Dget_space(data_soln);
-          numInSoln = H5Sget_simple_extent_npoints(dataspace);
-          H5Dclose(data_soln);
-
-          int dof = fam.pfunc_->ParFESpace()->GetNDofs();
-          assert((int)numInSoln == dof);
-
-          // get pointer to raw data
-          double *data = fam.pfunc_->HostReadWrite();
-
-          // read from file into appropriate spot in data
-          for (auto var : vars) {
-            if (var.inRestartFile_) {
-              std::string h5Path = fam.group_ + "/" + var.varName_;
-              if (rank0) grvy_printf(ginfo, "--> Reading h5 path = %s\n", h5Path.c_str());
-              read_partitioned_soln_data(file, h5Path.c_str(), var.index_ * numInSoln, data);
-            }
-          }
+          fam.readPartitioned(file);
         }
       }
     }
