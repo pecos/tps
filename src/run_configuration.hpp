@@ -128,6 +128,7 @@ class RunConfiguration {
   int sampleInterval;
   int startIter;
   bool restartMean;
+  bool restartRMS;    
   bool meanHistEnable;
 
   // working fluid. Options thus far
@@ -180,6 +181,7 @@ class RunConfiguration {
 
   // ic flag to use internal ic function definition
   bool useICFunction;
+  bool useICBoxFunction;  
 
   // reset Temp field to IC
   bool resetTemp;  
