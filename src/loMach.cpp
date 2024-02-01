@@ -2704,10 +2704,16 @@ void LoMachSolver::solve()
    int iter_start = iter;
    if( rank0_ == true ) std::cout << " Starting main loop, from " << iter_start << " to " << MaxIters << endl;
 
-      if (rank0_ == true) {
-        std::cout << " "<< endl;		
-        std::cout << " N     Time           dt      time/step    minT    maxT    max|U|"<< endl;
-        std::cout << "====================================================================="<< endl;	
+      if (rank0_ == true) {   
+        if (dt_fixed < 0) {
+          std::cout << " "<< endl;		
+          std::cout << " N     Time        dt      time/step    minT    maxT    max|U|"<< endl;
+          std::cout << "=================================================================="<< endl;	
+        } else {
+          std::cout << " "<< endl;		
+          std::cout << " N     Time        cfl      time/step    minT    maxT    max|U|"<< endl;
+          std::cout << "=================================================================="<< endl;
+	}
       }
 
       // move this
@@ -2788,11 +2794,21 @@ void LoMachSolver::solve()
           MPI_Allreduce(&maxT, &maxTall, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
           MPI_Allreduce(&maxU, &maxUall, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);	  	  
 
-        if (rank0_ == true) {	  
-	  std::cout << " " << step << "    " << time << "   " << dt << "   " <<
-	    sw_step.RealTime() - time_previous << "   " << minTall << "   " <<
-	    maxTall << "   " << maxUall << endl;
-        }
+	if(dt_fixed < 0) { 	  
+          if (rank0_ == true) {	  
+  	    std::cout << " " << step << "    " << time << "   " << dt << "   " <<
+  	      sw_step.RealTime() - time_previous << "   " << minTall << "   " <<
+	      maxTall << "   " << maxUall << endl;
+          }
+
+	} else {
+          CFL_actual = ComputeCFL(un_gf, dt);
+          if (rank0_ == true) {	  
+  	    std::cout << " " << step << "    " << time << "   " << CFL_actual << "   " <<
+  	      sw_step.RealTime() - time_previous << "   " << minTall << "   " <<
+	      maxTall << "   " << maxUall << endl;
+          }	  
+	}
       }
       time_previous = sw_step.RealTime();      
 
@@ -3007,9 +3023,10 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    //resT.Set(1.0,tmpR0);
 
    // dPo/dt
-   tmpR0 = dtP;
-   Ms->Mult(tmpR0,tmpR0b);
-   resT.Add(1.0, tmpR0b);
+   //tmpR0 = (gamma-1.0)/gamma * dtP;
+   //tmpR0 = dtP;   
+   //Ms->Mult(tmpR0,tmpR0b);
+   //resT.Add(1.0, tmpR0b);
 
    // Add natural boundary terms here later
 
@@ -9611,7 +9628,8 @@ void LoMachSolver::updateThermoP() {
     thermoPressure = systemMass/allMass * PNM1;
     dtP = (thermoPressure - PNM1) / dt;
     //if( rank0_ == true ) std::cout << " Original closed system mass: " << systemMass << " [kg]" << endl;
-    //if( rank0_ == true ) std::cout << " New (closed) system mass: " << allMass << " [kg]" << endl;             
+    //if( rank0_ == true ) std::cout << " New (closed) system mass: " << allMass << " [kg]" << endl;
+    //if( rank0_ == true ) std::cout << " ThermoP: " << thermoPressure << " dtP: " << dtP << endl;             
     /**/
     
     /*
