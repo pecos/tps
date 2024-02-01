@@ -29,6 +29,9 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
+/** @file
+ * @copydoc io.hpp
+ */
 #include "io.hpp"
 
 #include <hdf5.h>
@@ -371,7 +374,7 @@ hsize_t get_variable_size_hdf5(hid_t file, std::string name) {
 }
 
 // convenience function to read solution data for parallel restarts
-void read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data) {
+void read_variable_data_hdf5(hid_t file, string varName, size_t index, double *data) {
   hid_t data_soln;
   herr_t status;
 
@@ -407,7 +410,7 @@ void IOFamily::readDistributeSerializedVariable(hid_t file, const IOVar &var, in
     Vector data_serial;
     data_serial.SetSize(numDof);
 
-    read_partitioned_soln_data(file, varName, 0, data_serial.HostWrite());
+    read_variable_data_hdf5(file, varName, 0, data_serial.HostWrite());
 
     // assign solution owned by rank 0
     Array<int> lvdofs, gvdofs;
@@ -462,7 +465,7 @@ void IOFamily::readDistributeSerializedVariable(hid_t file, const IOVar &var, in
 }
 
 // convenience function to write HDF5 data
-void write_soln_data(hid_t group, string varName, hid_t dataspace, const double *data) {
+void write_variable_data_hdf5(hid_t group, string varName, hid_t dataspace, const double *data) {
   hid_t data_soln;
   herr_t status;
   assert(group >= 0);
@@ -607,7 +610,7 @@ void IOFamily::writePartitioned(hid_t file) {
   // save raw data
   for (auto var : vars_) {
     if (rank0_) grvy_printf(ginfo, "  --> Saving (%s)\n", var.varName_.c_str());
-    write_soln_data(group, var.varName_, dataspace, data + var.index_ * dims[0]);
+    write_variable_data_hdf5(group, var.varName_, dataspace, data + var.index_ * dims[0]);
   }
 
   if (group >= 0) H5Gclose(group);
@@ -639,7 +642,7 @@ void IOFamily::writeSerial(hid_t file) {
     // save raw data
     for (auto var : vars_) {
       grvy_printf(ginfo, "  --> Saving (%s)\n", var.varName_.c_str());
-      write_soln_data(group, var.varName_, dataspace, data + var.index_ * dims[0]);
+      write_variable_data_hdf5(group, var.varName_, dataspace, data + var.index_ * dims[0]);
     }
 
     if (group >= 0) H5Gclose(group);
@@ -661,7 +664,7 @@ void IOFamily::readPartitioned(hid_t file) {
     if (var.inRestartFile_) {
       std::string h5Path = group_ + "/" + var.varName_;
       if (rank0_) grvy_printf(ginfo, "--> Reading h5 path = %s\n", h5Path.c_str());
-      read_partitioned_soln_data(file, h5Path.c_str(), var.index_ * numInSoln, data);
+      read_variable_data_hdf5(file, h5Path.c_str(), var.index_ * numInSoln, data);
     }
   }
 }
@@ -710,7 +713,7 @@ void IOFamily::readChangeOrder(hid_t file, int read_order) {
       if (var.inRestartFile_) {
         std::string h5Path = group_ + "/" + var.varName_;
         if (rank0_) grvy_printf(ginfo, "--> Reading h5 path = %s\n", h5Path.c_str());
-        read_partitioned_soln_data(file, h5Path.c_str(), var.index_ * aux_dof, data);
+        read_variable_data_hdf5(file, h5Path.c_str(), var.index_ * aux_dof, data);
       }
     }
 
@@ -761,7 +764,7 @@ void IODataOrganizer::registerIOVar(std::string group, std::string varName, int 
 }
 
 // return the index to IO family given a group name
-int IODataOrganizer::getIOFamilyIndex(std::string group) {
+int IODataOrganizer::getIOFamilyIndex(std::string group) const {
   for (size_t i = 0; i < families_.size(); i++)
     if (families_[i].group_ == group) return (i);
 
