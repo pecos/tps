@@ -52,6 +52,8 @@ class IOFamily {
  protected:
   bool rank0_;
 
+  void serializeForWrite();
+
  public:
   std::string description_;       // family description
   std::string group_;             // HDF5 group name
@@ -80,7 +82,8 @@ class IOFamily {
 
   IOFamily(std::string desc, std::string grp, mfem::ParGridFunction *pf);
 
-  void serializeForWrite();
+  void writePartitioned(hid_t file);
+  void writeSerial(hid_t file);
   void readPartitioned(hid_t file);
   void readSerial(hid_t file);
   void readChangeOrder(hid_t file, int read_order);

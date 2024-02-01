@@ -585,6 +585,58 @@ void IOFamily::serializeForWrite() {
   }
 }
 
+void IOFamily::writePartitioned(hid_t file) {
+  hsize_t dims[1];
+  hid_t group = -1;
+  hid_t dataspace = -1;
+
+  // use all ranks to write data from this->.pfunc_
+  dims[0] = pfunc_->ParFESpace()->GetNDofs();
+  dataspace = H5Screate_simple(1, dims, NULL);
+  assert(dataspace >= 0);
+  group = H5Gcreate(file, group_.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  assert(group >= 0);
+
+  // get pointer to raw data
+  const double *data = pfunc_->HostRead();
+
+  // save raw data
+  for (auto var : vars_) write_soln_data(group, var.varName_, dataspace, data + var.index_ * dims[0], rank0_);
+
+  if (group >= 0) H5Gclose(group);
+  if (dataspace >= 0) H5Sclose(dataspace);
+}
+
+void IOFamily::writeSerial(hid_t file) {
+  // Only get here if need to serialize
+  serializeForWrite();
+
+  // Only rank 0 writes data (which has just been collected into this->serial_sol)
+  if (rank0_) {
+    hsize_t dims[1];
+    hid_t group = -1;
+    hid_t dataspace = -1;
+
+    assert(serial_fes != NULL);
+    dims[0] = serial_fes->GetNDofs();
+
+    dataspace = H5Screate_simple(1, dims, NULL);
+    assert(dataspace >= 0);
+    group = H5Gcreate(file, group_.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    assert(group >= 0);
+
+    // get pointer to raw data
+    assert(serial_sol != NULL);
+    const double *data = serial_sol->HostRead();
+
+    // save raw data
+    for (auto var : vars_) write_soln_data(group, var.varName_, dataspace, data + var.index_ * dims[0], rank0_);
+
+    if (group >= 0) H5Gclose(group);
+    if (dataspace >= 0) H5Sclose(dataspace);
+  }
+}
+
 void IOFamily::readPartitioned(hid_t file) {
   hid_t dataspace;
   hsize_t numInSoln = 0;
@@ -801,55 +853,20 @@ void IODataOrganizer::write(hid_t file, bool serial) {
 
   // Loop over defined IO families to save desired output
   for (auto fam : families_) {
-    if (require_serialization) fam.serializeForWrite();
-
-    // determine if rank 0
     const int rank = fam.pfunc_->ParFESpace()->GetMyRank();
     const bool rank0 = (rank == 0);
-
-    hsize_t dims[1];
-    hid_t group = -1;
-    hid_t dataspace = -1;
 
     if (rank0) {
       grvy_printf(ginfo, "\nCreating HDF5 group for defined IO families\n");
       grvy_printf(ginfo, "--> %s : %s\n", fam.group_.c_str(), fam.description_.c_str());
     }
 
+    // Write handled by appropriate method from IOFamily
     if (require_serialization) {
-      // if require_serialization, then we just populated fam.serial_sol above, and now we use only rank0 to write
-      if (rank0) {
-        assert(fam.serial_fes != NULL);
-        dims[0] = fam.serial_fes->GetNDofs();
-
-        dataspace = H5Screate_simple(1, dims, NULL);
-        assert(dataspace >= 0);
-        group = H5Gcreate(file, fam.group_.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-        assert(group >= 0);
-
-        // get pointer to raw data
-        assert(fam.serial_sol != NULL);
-        const double *data = fam.serial_sol->HostRead();
-
-        // save raw data
-        for (auto var : fam.vars_) write_soln_data(group, var.varName_, dataspace, data + var.index_ * dims[0], rank0);
-      }
+      fam.writeSerial(file);
     } else {
-      // otherwise, use all ranks to write data from fam.pfunc_
-      dims[0] = fam.pfunc_->ParFESpace()->GetNDofs();
-      dataspace = H5Screate_simple(1, dims, NULL);
-      assert(dataspace >= 0);
-      group = H5Gcreate(file, fam.group_.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-      assert(group >= 0);
-
-      // get pointer to raw data
-      const double *data = fam.pfunc_->HostRead();
-
-      // save raw data
-      for (auto var : fam.vars_) write_soln_data(group, var.varName_, dataspace, data + var.index_ * dims[0], rank0);
+      fam.writePartitioned(file);
     }
-    if (group >= 0) H5Gclose(group);
-    if (dataspace >= 0) H5Sclose(dataspace);
   }
 }
 
@@ -885,6 +902,7 @@ void IODataOrganizer::read(hid_t file, bool serial, int read_order) {
         change_order = (fam_order != read_order);
       }
 
+      // Read handled by appropriate method from IOFamily
       if (change_order) {
         if (serial) {
           if (rank0) grvy_printf(gerror, "[ERROR]: Serial read does not support order change.\n");
