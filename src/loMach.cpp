@@ -1170,18 +1170,20 @@ void LoMachSolver::Setup(double dt)
      uic_vec[2] = config.initRhoRhoVp[3] / rho;
      if(rank0_) { std::cout << " Initial velocity conditions: " << uic_vec[0] << " " << uic_vec[1] << " " << uic_vec[2] << endl; }
      VectorConstantCoefficient u_ic_coef(uic_vec);
-     if (!config.restart) u_gf->ProjectCoefficient(u_ic_coef);
+     //if (!config.restart) u_gf->ProjectCoefficient(u_ic_coef);
+     if (!config.restart) un_gf.ProjectCoefficient(u_ic_coef);     
    } else {
      VectorFunctionCoefficient u_ic_coef(dim, vel_ic);
-     if (!config.restart) u_gf->ProjectCoefficient(u_ic_coef);     
+     //if (!config.restart) u_gf->ProjectCoefficient(u_ic_coef);
+     if (!config.restart) un_gf.ProjectCoefficient(u_ic_coef);          
    }
-   u_gf->GetTrueDofs(un);
-   un_gf.SetFromTrueDofs(un);   
+   un_gf.GetTrueDofs(un);
    //std::cout << "Check 1..." << std::endl;
    
    if (config.useICFunction == true) {   
      FunctionCoefficient t_ic_coef(temp_ic);
-     if (!config.restart) t_gf->ProjectCoefficient(t_ic_coef);
+     //if (!config.restart) t_gf->ProjectCoefficient(t_ic_coef);
+     if (!config.restart) Tn_gf.ProjectCoefficient(t_ic_coef);          
      if(rank0_) { std::cout << "Using initial condition function" << endl;}     
    } else if (config.useICBoxFunction == true) {
      FunctionCoefficient t_ic_coef(temp_wallBox);
@@ -1192,11 +1194,10 @@ void LoMachSolver::Setup(double dt)
      ConstantCoefficient t_ic_coef;
      //t_ic_coef.constant = config.initRhoRhoVp[4] / (Rgas * config.initRhoRhoVp[0]);
      t_ic_coef.constant = config.initRhoRhoVp[4];
-     if (!config.restart) t_gf->ProjectCoefficient(t_ic_coef);
+     //if (!config.restart) t_gf->ProjectCoefficient(t_ic_coef);
+     if (!config.restart) Tn_gf.ProjectCoefficient(t_ic_coef);          
      if(rank0_) { std::cout << "Initial temperature set from input file: " << config.initRhoRhoVp[4] << endl;}
    }
-   //t_gf->GetTrueDofs(Tn);
-   //Tn_gf.SetFromTrueDofs(Tn);
    Tn_gf.GetTrueDofs(Tn);
    //std::cout << "Check 2..." << std::endl;
    
