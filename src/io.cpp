@@ -373,37 +373,32 @@ void read_partitioned_soln_data(hid_t file, string varName, size_t index, double
 }
 
 // convenience function to read and distribute solution data for serialized restarts
-void read_serialized_soln_data(hid_t file, string varName, int numDof, int varOffset, double *data, IOFamily &fam,
-                               Array<int> partitioning) {
-  MPI_Comm comm = fam.pfunc_->ParFESpace()->GetComm();
-  const int rank = fam.pfunc_->ParFESpace()->GetMyRank();
-  const bool rank0 = (rank == 0);
-  const int nprocs = fam.pfunc_->ParFESpace()->GetNRanks();
+void IOFamily::readDistributeSerializedVariable(hid_t file, string varName, int numDof, int varOffset, double *data) {
+  MPI_Comm comm = pfunc_->ParFESpace()->GetComm();
+  const int myrank = pfunc_->ParFESpace()->GetMyRank();
+  const int nprocs = pfunc_->ParFESpace()->GetNRanks();
 
   // Ensure number of elements is consistent with partition array
-  const int local_ne = fam.pfunc_->ParFESpace()->GetParMesh()->GetNE();
+  const int local_ne = pfunc_->ParFESpace()->GetParMesh()->GetNE();
   int global_ne;
   MPI_Allreduce(&local_ne, &global_ne, 1, MPI_INT, MPI_SUM, comm);
+
+  Array<int> &partitioning = *partitioning_;
   assert(partitioning.Size() == global_ne);
 
-  hid_t data_soln;
-  herr_t status;
   int numStateVars;
 
-  numStateVars = fam.pfunc_->Size() / fam.pfunc_->ParFESpace()->GetNDofs();
+  numStateVars = pfunc_->Size() / pfunc_->ParFESpace()->GetNDofs();
 
   const int tag = 20;
 
-  if (rank0) {
+  if (rank0_) {
     grvy_printf(ginfo, "[RestartSerial]: Reading %s for distribution\n", varName.c_str());
 
     Vector data_serial;
     data_serial.SetSize(numDof);
-    data_soln = H5Dopen2(file, varName.c_str(), H5P_DEFAULT);
-    assert(data_soln >= 0);
-    status = H5Dread(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, data_serial.HostReadWrite());
-    assert(status >= 0);
-    H5Dclose(data_soln);
+
+    read_partitioned_soln_data(file, varName, 0, data_serial.HostWrite());
 
     // assign solution owned by rank 0
     Array<int> lvdofs, gvdofs;
@@ -414,14 +409,14 @@ void read_serialized_soln_data(hid_t file, string varName, int numDof, int varOf
     for (int gelem = 0; gelem < global_ne; gelem++) {
       if (partitioning[gelem] == 0) {
         // cull out subset of local vdof vector to use for this solution var
-        fam.pfunc_->ParFESpace()->GetElementVDofs(counter, lvdofs);
+        pfunc_->ParFESpace()->GetElementVDofs(counter, lvdofs);
         int numDof_per_this_elem = lvdofs.Size() / numStateVars;
         int ldof_start_index = varOffset * numDof_per_this_elem;
 
         // cull out global vdofs - [subtle note]: we only use the
         // indexing corresponding to the first state vector reference in
         // gvdofs() since data_serial() holds the solution for a single state vector
-        fam.serial_fes->GetElementVDofs(gelem, gvdofs);
+        serial_fes->GetElementVDofs(gelem, gvdofs);
         int gdof_start_index = 0;
 
         for (int i = 0; i < numDof_per_this_elem; i++)
@@ -435,7 +430,7 @@ void read_serialized_soln_data(hid_t file, string varName, int numDof, int varOf
       std::vector<double> packedData;
       for (int gelem = 0; gelem < global_ne; gelem++)
         if (partitioning[gelem] == rank) {
-          fam.serial_fes->GetElementVDofs(gelem, gvdofs);
+          serial_fes->GetElementVDofs(gelem, gvdofs);
           int numDof_per_this_elem = gvdofs.Size() / numStateVars;
           for (int i = 0; i < numDof_per_this_elem; i++) packedData.push_back(data_serial[gvdofs[i]]);
         }
@@ -443,8 +438,9 @@ void read_serialized_soln_data(hid_t file, string varName, int numDof, int varOf
       MPI_Send(packedData.data(), packedData.size(), MPI_DOUBLE, rank, tag, comm);
     }
   } else {  // <-- end rank 0
-    int numlDofs = fam.pfunc_->ParFESpace()->GetNDofs();
-    grvy_printf(gdebug, "[%i]: local number of state vars to receive = %i (var=%s)\n", rank, numlDofs, varName.c_str());
+    int numlDofs = pfunc_->ParFESpace()->GetNDofs();
+    grvy_printf(gdebug, "[%i]: local number of state vars to receive = %i (var=%s)\n", myrank, numlDofs,
+                varName.c_str());
 
     std::vector<double> packedData(numlDofs);
 
@@ -457,12 +453,10 @@ void read_serialized_soln_data(hid_t file, string varName, int numDof, int varOf
 }
 
 // convenience function to write HDF5 data
-void write_soln_data(hid_t group, string varName, hid_t dataspace, const double *data, bool rank0) {
+void write_soln_data(hid_t group, string varName, hid_t dataspace, const double *data) {
   hid_t data_soln;
   herr_t status;
   assert(group >= 0);
-
-  if (rank0) grvy_printf(ginfo, "  --> Saving (%s)\n", varName.c_str());
 
   data_soln = H5Dcreate2(group, varName.c_str(), H5T_NATIVE_DOUBLE, dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
   assert(data_soln >= 0);
@@ -470,8 +464,6 @@ void write_soln_data(hid_t group, string varName, hid_t dataspace, const double 
   status = H5Dwrite(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
   assert(status >= 0);
   H5Dclose(data_soln);
-
-  return;
 }
 
 void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
@@ -601,7 +593,10 @@ void IOFamily::writePartitioned(hid_t file) {
   const double *data = pfunc_->HostRead();
 
   // save raw data
-  for (auto var : vars_) write_soln_data(group, var.varName_, dataspace, data + var.index_ * dims[0], rank0_);
+  for (auto var : vars_) {
+    if (rank0_) grvy_printf(ginfo, "  --> Saving (%s)\n", var.varName_.c_str());
+    write_soln_data(group, var.varName_, dataspace, data + var.index_ * dims[0]);
+  }
 
   if (group >= 0) H5Gclose(group);
   if (dataspace >= 0) H5Sclose(dataspace);
@@ -630,7 +625,10 @@ void IOFamily::writeSerial(hid_t file) {
     const double *data = serial_sol->HostRead();
 
     // save raw data
-    for (auto var : vars_) write_soln_data(group, var.varName_, dataspace, data + var.index_ * dims[0], rank0_);
+    for (auto var : vars_) {
+      grvy_printf(ginfo, "  --> Saving (%s)\n", var.varName_.c_str());
+      write_soln_data(group, var.varName_, dataspace, data + var.index_ * dims[0]);
+    }
 
     if (group >= 0) H5Gclose(group);
     if (dataspace >= 0) H5Sclose(dataspace);
@@ -671,7 +669,6 @@ void IOFamily::readPartitioned(hid_t file) {
 }
 
 void IOFamily::readSerial(hid_t file) {
-  const Array<int> &partitioning = *partitioning_;
   MPI_Comm comm = pfunc_->ParFESpace()->GetComm();
 
   hsize_t numInSoln = 0;
@@ -707,7 +704,7 @@ void IOFamily::readSerial(hid_t file) {
     if (var.inRestartFile_) {
       std::string h5Path = group_ + "/" + var.varName_;
       if (rank0_) grvy_printf(ginfo, "--> Reading h5 path = %s\n", h5Path.c_str());
-      read_serialized_soln_data(file, h5Path.c_str(), dof, var.index_, data, *this, partitioning);
+      readDistributeSerializedVariable(file, h5Path.c_str(), dof, var.index_, data);
     }
   }
 }

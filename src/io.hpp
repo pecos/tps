@@ -53,6 +53,7 @@ class IOFamily {
   bool rank0_;
 
   void serializeForWrite();
+  void readDistributeSerializedVariable(hid_t file, string varName, int numDof, int varOffset, double *data);
 
  public:
   std::string description_;       // family description
@@ -110,9 +111,7 @@ class IODataOrganizer {
 };
 
 void read_partitioned_soln_data(hid_t file, std::string varName, size_t index, double *data);
-void read_serialized_soln_data(hid_t file, std::string varName, int numDof, int varOffset, double *data, IOFamily &fam,
-                               mfem::Array<int> partitioning);
-void write_soln_data(hid_t group, std::string varName, hid_t dataspace, const double *data, bool rank0);
+void write_soln_data(hid_t group, std::string varName, hid_t dataspace, const double *data);
 void partitioning_file_hdf5(std::string mode, const RunConfiguration &config, MPI_Groups *groupsMPI, int nelemGlobal,
                             mfem::Array<int> &partitioning);
 #endif  // IO_HPP_
