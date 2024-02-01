@@ -41,11 +41,22 @@
 #include "run_configuration.hpp"
 #include "tps_mfem_wrap.hpp"
 
+class IOVar {
+ public:
+  std::string varName_;  // solution variable
+  int index_;            // variable index in the pargrid function
+  bool inRestartFile_;   // Check if we want to read this variable
+};
+
 class IOFamily {
+ protected:
+  bool rank0_;
+
  public:
   std::string description_;       // family description
   std::string group_;             // HDF5 group name
   mfem::ParGridFunction *pfunc_;  // pargrid function owning the data for this IO family
+  std::vector<IOVar> vars_;       // solution var info for this family
 
   bool allowsAuxRestart;
 
@@ -67,17 +78,12 @@ class IOFamily {
   mfem::ParFiniteElementSpace *aux_pfes_ = nullptr;
   mfem::ParGridFunction *aux_pfunc_ = nullptr;
 
-  IOFamily(std::string desc, std::string grp, mfem::ParGridFunction *pf)
-      : description_(desc), group_(grp), pfunc_(pf) {}
+  IOFamily(std::string desc, std::string grp, mfem::ParGridFunction *pf);
 
   void serializeForWrite();
-};
-
-class IOVar {
- public:
-  std::string varName_;  // solution variable
-  int index_;            // variable index in the pargrid function
-  bool inRestartFile_;   // Check if we want to read this variable
+  void readPartitioned(hid_t file);
+  void readSerial(hid_t file);
+  void readChangeOrder(hid_t file, int read_order);
 };
 
 class IODataOrganizer {
@@ -85,8 +91,7 @@ class IODataOrganizer {
   bool supports_serial_ = false;
 
  public:
-  std::vector<IOFamily> families_;                  // registered IO families
-  std::map<std::string, std::vector<IOVar>> vars_;  // solution var info for each IO family
+  std::vector<IOFamily> families_;  // registered IO families
 
   void registerIOFamily(std::string description, std::string group, mfem::ParGridFunction *pfunc,
                         bool auxRestart = true, bool inRestartFile = true, mfem::FiniteElementCollection *fec = NULL);
