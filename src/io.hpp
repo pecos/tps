@@ -113,16 +113,16 @@ class IOFamily {
   std::vector<IOVar> vars_;
 
   /** Whether this family allows initialization (read) from other order elements */
-  bool allowsAuxRestart;
+  bool allowsAuxRestart_;
 
   /** true if the family is to be found in restart files */
-  bool inRestartFile;
+  bool inRestartFile_;
 
   /** mfem::FiniteElementSpace for serial mesh (used if serial read and/or write requested) */
-  mfem::FiniteElementSpace *serial_fes = nullptr;
+  mfem::FiniteElementSpace *serial_fes_ = nullptr;
 
   /** mfem::GridFunction on serial mesh (used if serial read and/or write requested) */
-  mfem::GridFunction *serial_sol = nullptr;
+  mfem::GridFunction *serial_sol_ = nullptr;
 
   /** Map from local to global element numbering (used for serial read/write) */
   int *local_to_global_elem_ = nullptr;

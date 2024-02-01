@@ -428,7 +428,7 @@ void IOFamily::readDistributeSerializedVariable(hid_t file, const IOVar &var, in
         // cull out global vdofs - [subtle note]: we only use the
         // indexing corresponding to the first state vector reference in
         // gvdofs() since data_serial() holds the solution for a single state vector
-        serial_fes->GetElementVDofs(gelem, gvdofs);
+        serial_fes_->GetElementVDofs(gelem, gvdofs);
         int gdof_start_index = 0;
 
         for (int i = 0; i < numDof_per_this_elem; i++)
@@ -442,7 +442,7 @@ void IOFamily::readDistributeSerializedVariable(hid_t file, const IOVar &var, in
       std::vector<double> packedData;
       for (int gelem = 0; gelem < global_ne_; gelem++)
         if (partitioning[gelem] == rank) {
-          serial_fes->GetElementVDofs(gelem, gvdofs);
+          serial_fes_->GetElementVDofs(gelem, gvdofs);
           int numDof_per_this_elem = gvdofs.Size() / numStateVars;
           for (int i = 0; i < numDof_per_this_elem; i++) packedData.push_back(data_serial[gvdofs[i]]);
         }
@@ -559,20 +559,20 @@ void IOFamily::serializeForWrite() {
       int gelem = locToGlobElem[elem];
       this->pfunc_->ParFESpace()->GetElementVDofs(elem, lvdofs);
       pfunc->GetSubVector(lvdofs, lsoln);
-      this->serial_fes->GetElementVDofs(gelem, gvdofs);
-      this->serial_sol->SetSubVector(gvdofs, lsoln);
+      this->serial_fes_->GetElementVDofs(gelem, gvdofs);
+      this->serial_sol_->SetSubVector(gvdofs, lsoln);
     }
 
     // have rank 0 receive data from other tasks and copy its own
     for (int gelem = 0; gelem < global_ne_; gelem++) {
       int from_rank = partitioning[gelem];
       if (from_rank != 0) {
-        this->serial_fes->GetElementVDofs(gelem, gvdofs);
+        this->serial_fes_->GetElementVDofs(gelem, gvdofs);
         lsoln.SetSize(gvdofs.Size());
 
         MPI_Recv(lsoln.HostReadWrite(), gvdofs.Size(), MPI_DOUBLE, from_rank, gelem, comm, MPI_STATUS_IGNORE);
 
-        this->serial_sol->SetSubVector(gvdofs, lsoln);
+        this->serial_sol_->SetSubVector(gvdofs, lsoln);
       }
     }
 
@@ -621,14 +621,14 @@ void IOFamily::writeSerial(hid_t file) {
   // Only get here if need to serialize
   serializeForWrite();
 
-  // Only rank 0 writes data (which has just been collected into this->serial_sol)
+  // Only rank 0 writes data (which has just been collected into this->serial_sol_)
   if (rank0_) {
     hsize_t dims[1];
     hid_t group = -1;
     hid_t dataspace = -1;
 
-    assert(serial_fes != NULL);
-    dims[0] = serial_fes->GetNDofs();
+    assert(serial_fes_ != NULL);
+    dims[0] = serial_fes_->GetNDofs();
 
     dataspace = H5Screate_simple(1, dims, NULL);
     assert(dataspace >= 0);
@@ -636,8 +636,8 @@ void IOFamily::writeSerial(hid_t file) {
     assert(group >= 0);
 
     // get pointer to raw data
-    assert(serial_sol != NULL);
-    const double *data = serial_sol->HostRead();
+    assert(serial_sol_ != NULL);
+    const double *data = serial_sol_->HostRead();
 
     // save raw data
     for (auto var : vars_) {
@@ -689,7 +689,7 @@ void IOFamily::readSerial(hid_t file) {
 }
 
 void IOFamily::readChangeOrder(hid_t file, int read_order) {
-  if (allowsAuxRestart) {
+  if (allowsAuxRestart_) {
     // Set up "auxilliary" FiniteElementCollection, which matches original, but with different order
     assert(fec_ != NULL);
     aux_fec_ = fec_->Clone(read_order);
@@ -743,12 +743,12 @@ void IOFamily::readChangeOrder(hid_t file, int read_order) {
 
 // register a new IO family which maps to a ParGridFunction
 void IODataOrganizer::registerIOFamily(std::string description, std::string group, ParGridFunction *pfunc,
-                                       bool auxRestart, bool _inRestartFile, FiniteElementCollection *fec) {
+                                       bool auxRestart, bool inRestartFile, FiniteElementCollection *fec) {
   IOFamily family(description, group, pfunc);
-  family.allowsAuxRestart = auxRestart;
-  family.inRestartFile = _inRestartFile;
+  family.allowsAuxRestart_ = auxRestart;
+  family.inRestartFile_ = inRestartFile;
   family.fec_ = fec;
-  if (family.allowsAuxRestart) {
+  if (family.allowsAuxRestart_) {
     assert(family.fec_ != NULL);
   }
 
@@ -777,8 +777,8 @@ void IODataOrganizer::initializeSerial(bool root, bool serial, Mesh *serial_mesh
   // loop through families
   for (size_t n = 0; n < families_.size(); n++) {
     IOFamily &fam = families_[n];
-    fam.serial_fes = NULL;
-    fam.serial_sol = NULL;
+    fam.serial_fes_ = NULL;
+    fam.serial_sol_ = NULL;
 
     // If serial support is requested, need to initialize required data
     if (supports_serial_) {
@@ -788,8 +788,8 @@ void IODataOrganizer::initializeSerial(bool root, bool serial, Mesh *serial_mesh
         const FiniteElementCollection *fec = fam.pfunc_->ParFESpace()->FEColl();
         int numVars = fam.pfunc_->Size() / fam.pfunc_->ParFESpace()->GetNDofs();
 
-        fam.serial_fes = new FiniteElementSpace(serial_mesh, fec, numVars, Ordering::byNODES);
-        fam.serial_sol = new GridFunction(fam.serial_fes);
+        fam.serial_fes_ = new FiniteElementSpace(serial_mesh, fec, numVars, Ordering::byNODES);
+        fam.serial_sol_ = new GridFunction(fam.serial_fes_);
         //       cout<<"I/O organizer for group "<<fam.group_<<" initialized."<<endl;
       }
     }
@@ -852,7 +852,7 @@ void IODataOrganizer::read(hid_t file, bool serial, int read_order) {
 
   // Loop over defined IO families to load desired input
   for (auto fam : families_) {
-    if (fam.inRestartFile) {  // read mode
+    if (fam.inRestartFile_) {  // read mode
       const int rank = fam.pfunc_->ParFESpace()->GetMyRank();
       const bool rank0 = (rank == 0);
 
@@ -887,7 +887,7 @@ void IODataOrganizer::read(hid_t file, bool serial, int read_order) {
 IODataOrganizer::~IODataOrganizer() {
   for (size_t n = 0; n < families_.size(); n++) {
     IOFamily fam = families_[n];
-    if (fam.serial_fes != NULL) delete fam.serial_fes;
-    if (fam.serial_sol != NULL) delete fam.serial_sol;
+    if (fam.serial_fes_ != NULL) delete fam.serial_fes_;
+    if (fam.serial_sol_ != NULL) delete fam.serial_sol_;
   }
 }
