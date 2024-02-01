@@ -62,6 +62,7 @@ void LoMachSolver::write_restart_files_hdf5(hid_t file, bool serialized_write) {
     if (average->ComputeMean()) {
       // samples meanUp
       h5_save_attribute(file, "samplesMean", average->GetSamplesMean());
+      h5_save_attribute(file, "samplesRMS", average->GetSamplesRMS());
       h5_save_attribute(file, "samplesInterval", average->GetSamplesInterval());
     }
     // code revision
@@ -116,11 +117,23 @@ void LoMachSolver::read_restart_files_hdf5(hid_t file, bool serialized_read) {
     h5_read_attribute(file, "dt", dt);
     h5_read_attribute(file, "order", read_order);
     if (average->ComputeMean() && config.GetRestartMean()) {
-      int samplesMean, intervals;
+      int samplesMean, samplesRMS, intervals;
       h5_read_attribute(file, "samplesMean", samplesMean);
       h5_read_attribute(file, "samplesInterval", intervals);
       average->SetSamplesMean(samplesMean);
       average->SetSamplesInterval(intervals);
+
+      int istatus = H5Aexists(file,"samplesRMS");
+      if(istatus > 0) {
+        h5_read_attribute(file, "samplesRMS", samplesRMS);
+      } else {
+        samplesRMS = samplesMean;
+      }
+
+      if (config.restartRMS == true) {
+        samplesRMS = 0;
+      }
+      average->SetSamplesRMS(samplesRMS);
     }
   }
 
@@ -131,9 +144,14 @@ void LoMachSolver::read_restart_files_hdf5(hid_t file, bool serialized_read) {
     MPI_Bcast(&read_order, 1, MPI_INT, 0, TPSCommWorld);
     if (average->ComputeMean() && config.GetRestartMean()) {
       int sampMean = average->GetSamplesMean();
+      int sampRMS = average->GetSamplesRMS();
       int intervals = average->GetSamplesInterval();
       MPI_Bcast(&sampMean, 1, MPI_INT, 0, TPSCommWorld);
       MPI_Bcast(&intervals, 1, MPI_INT, 0, TPSCommWorld);
+      MPI_Bcast(&sampRMS, 1, MPI_INT, 0, TPSCommWorld);
+      average->SetSamplesMean(sampMean);
+      average->SetSamplesInterval(intervals);
+      average->SetSamplesRMS(sampRMS);
     }
   }
 

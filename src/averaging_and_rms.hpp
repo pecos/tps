@@ -71,6 +71,7 @@ class Averaging {
   // time averaged primitive variables
   ParGridFunction *meanUp;
   ParGridFunction *rms;
+  ParGridFunction *diss;
 
   // time averaged p, rho, vel (pointers to meanUp) for Visualization
   ParGridFunction *meanP, *meanRho, *meanV;
@@ -79,6 +80,7 @@ class Averaging {
   ParaViewDataCollection *paraviewMean = NULL;
 
   int samplesMean;
+  int samplesRMS;
 
   // iteration interval between samples
   int sampleInterval;
@@ -103,6 +105,7 @@ class Averaging {
   void read_meanANDrms_restart_files();
 
   int GetSamplesMean() { return samplesMean; }
+  int GetSamplesRMS() { return samplesRMS; }
   int GetSamplesInterval() { return sampleInterval; }
   bool ComputeMean() { return computeMean; }
 
@@ -110,6 +113,7 @@ class Averaging {
   ParGridFunction *GetRMS() { return rms; }
 
   void SetSamplesMean(int &samples) { samplesMean = samples; }
+  void SetSamplesRMS(int &samples) { samplesRMS = samples; }
   void SetSamplesInterval(int &interval) { sampleInterval = interval; }
 
   const double *getLocalSums();

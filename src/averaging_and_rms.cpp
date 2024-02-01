@@ -132,6 +132,7 @@ void Averaging::addSampleMean(const int &iter) {
       addSample_cpu();
 #endif
       samplesMean++;
+      samplesRMS++;
     }
   }
 }
@@ -143,6 +144,16 @@ void Averaging::addSample_cpu() {
   int dof = fes->GetNDofs();
 
   Vector iUp(num_equation);
+
+  // TODO(trevilo): Propagate samplesRMS change to gpu (or better yet,
+  // just refactor averaging to unify cpu and gpu paths)
+  if (samplesRMS == 0) {
+    for (int n = 0; n < dof; n++) {
+      for (int eq = 0; eq < 6; eq++) {
+        dataRMS[n + eq * dof] = 0.0;
+      }
+    }
+  }
 
   for (int n = 0; n < dof; n++) {
     for (int eq = 0; eq < num_equation; eq++) iUp[eq] = dataUp[n + eq * dof];
@@ -171,27 +182,27 @@ void Averaging::addSample_cpu() {
 
     // xx
     double val = dataRMS[n];
-    dataRMS[n] = (val * double(samplesMean) + (vel[0] - meanVel[0]) * (vel[0] - meanVel[0])) / double(samplesMean + 1);
+    dataRMS[n] = (val * double(samplesRMS) + (vel[0] - meanVel[0]) * (vel[0] - meanVel[0])) / double(samplesRMS + 1);
     // yy
     val = dataRMS[n + dof];
     dataRMS[n + dof] =
-        (val * double(samplesMean) + (vel[1] - meanVel[1]) * (vel[1] - meanVel[1])) / double(samplesMean + 1);
+        (val * double(samplesRMS) + (vel[1] - meanVel[1]) * (vel[1] - meanVel[1])) / double(samplesRMS + 1);
     // zz
     val = dataRMS[n + 2 * dof];
     dataRMS[n + 2 * dof] =
-        (val * double(samplesMean) + (vel[2] - meanVel[2]) * (vel[2] - meanVel[2])) / double(samplesMean + 1);
+        (val * double(samplesRMS) + (vel[2] - meanVel[2]) * (vel[2] - meanVel[2])) / double(samplesRMS + 1);
     // xy
     val = dataRMS[n + 3 * dof];
     dataRMS[n + 3 * dof] =
-        (val * double(samplesMean) + (vel[0] - meanVel[0]) * (vel[1] - meanVel[1])) / double(samplesMean + 1);
+        (val * double(samplesRMS) + (vel[0] - meanVel[0]) * (vel[1] - meanVel[1])) / double(samplesRMS + 1);
     // xz
     val = dataRMS[n + 4 * dof];
     dataRMS[n + 4 * dof] =
-        (val * double(samplesMean) + (vel[0] - meanVel[0]) * (vel[2] - meanVel[2])) / double(samplesMean + 1);
+        (val * double(samplesRMS) + (vel[0] - meanVel[0]) * (vel[2] - meanVel[2])) / double(samplesRMS + 1);
     // yz
     val = dataRMS[n + 5 * dof];
     dataRMS[n + 5 * dof] =
-        (val * double(samplesMean) + (vel[1] - meanVel[1]) * (vel[2] - meanVel[2])) / double(samplesMean + 1);
+        (val * double(samplesRMS) + (vel[1] - meanVel[1]) * (vel[2] - meanVel[2])) / double(samplesRMS + 1);
   }
 }
 

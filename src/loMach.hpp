@@ -406,8 +406,12 @@ protected:
    ConstantCoefficient Ht_lincoeff;
    ConstantCoefficient Ht_bdfcoeff;  
 
-  //VectorConstantCoefficient u_bc_coef;
-  //ConstantCoefficient t_bc_coef;
+   //VectorConstantCoefficient u_bc_coef;
+   //ConstantCoefficient t_bc_coef;
+   ConstantCoefficient t_bc_coef0;
+   ConstantCoefficient t_bc_coef1;
+   ConstantCoefficient t_bc_coef2;
+   ConstantCoefficient t_bc_coef3;    
 
    VectorConstantCoefficient *buffer_ubc;
    VectorConstantCoefficient *buffer_accel;  
