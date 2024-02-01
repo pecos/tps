@@ -41,6 +41,8 @@
 #include "run_configuration.hpp"
 #include "tps_mfem_wrap.hpp"
 
+class IODataOrganizer;
+
 class IOVar {
  public:
   std::string varName_;  // solution variable
@@ -49,13 +51,17 @@ class IOVar {
 };
 
 class IOFamily {
+  friend class IODataOrganizer;
+
  protected:
-  bool rank0_;
+  bool rank0_ = false;
 
-  void serializeForWrite();
-  void readDistributeSerializedVariable(hid_t file, string varName, int numDof, int varOffset, double *data);
+  int local_ne_ = -1;
+  int global_ne_ = -1;
 
- public:
+  int local_ndofs_ = -1;
+  int global_ndofs_ = -1;
+
   std::string description_;       // family description
   std::string group_;             // HDF5 group name
   mfem::ParGridFunction *pfunc_;  // pargrid function owning the data for this IO family
@@ -81,6 +87,10 @@ class IOFamily {
   mfem::ParFiniteElementSpace *aux_pfes_ = nullptr;
   mfem::ParGridFunction *aux_pfunc_ = nullptr;
 
+  void serializeForWrite();
+  void readDistributeSerializedVariable(hid_t file, const IOVar &var, int numDof, double *data);
+
+ public:
   IOFamily(std::string desc, std::string grp, mfem::ParGridFunction *pf);
 
   void writePartitioned(hid_t file);
@@ -110,6 +120,7 @@ class IODataOrganizer {
   void read(hid_t file, bool serial, int read_order = -1);
 };
 
+hsize_t get_variable_size_hdf5(hid_t file, std::string name);
 void read_partitioned_soln_data(hid_t file, std::string varName, size_t index, double *data);
 void write_soln_data(hid_t group, std::string varName, hid_t dataspace, const double *data);
 void partitioning_file_hdf5(std::string mode, const RunConfiguration &config, MPI_Groups *groupsMPI, int nelemGlobal,
