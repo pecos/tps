@@ -132,7 +132,7 @@ void LoMachSolver::initialize() {
    // HARD CODE HARDCODE get for dry air
    Rgas = 287.0;
    Pr = 0.76;
-   Cp = 1.0;
+   Cp = 1000.5;
    gamma = 1.4;
 
    
@@ -3021,10 +3021,9 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    //resT.Set(1.0,tmpR0);
 
    // dPo/dt
-   //tmpR0 = (gamma-1.0)/gamma * dtP;
-   //tmpR0 = dtP;   
-   //Ms->Mult(tmpR0,tmpR0b);
-   //resT.Add(1.0, tmpR0b);
+   tmpR0 = dtP;   
+   Ms->Mult(tmpR0,tmpR0b);
+   resT.Add(1.0, tmpR0b);
 
    // Add natural boundary terms here later
 
@@ -3304,8 +3303,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    //resu.Add(1.0,tmpR1);
 
    // for c-n
-   Mv->Mult(LdivImp,tmpR1);
-   resu.Add(0.5,tmpR1);   
+   //Mv->Mult(LdivImp,tmpR1);
+   //resu.Add(0.5,tmpR1);   
    
    //multScalarInvVectorIP(rn,&resu);      
    //Mv->Mult(resu, tmpR1);
@@ -8392,7 +8391,7 @@ void LoMachSolver::updateDiffusivity(bool bulkViscFlag) {
    {
      double *data = bufferAlpha->HostReadWrite();
      double *dataVisc = bufferVisc->HostReadWrite();
-     double Ctmp = 1.0/(Cp*Pr);
+     double Ctmp = 1.0 / Pr;
      for (int i = 0; i < Sdof; i++) { data[i] = Ctmp * dataVisc[i]; }
    }
    bufferAlpha->GetTrueDofs(alphaSml);
@@ -8405,10 +8404,10 @@ void LoMachSolver::updateDiffusivity(bool bulkViscFlag) {
    MvInv->Mult(tmpR1, gradMu);
 
    // for c-n, can get away with this because nothign else uses bufferVisc besides HInv
-   {
-     double *data = bufferVisc->HostReadWrite();
-     for (int i = 0; i < Sdof; i++) { data[i] = 0.5 * data[i]; }
-   }   
+   //{
+   //  double *data = bufferVisc->HostReadWrite();
+   //  for (int i = 0; i < Sdof; i++) { data[i] = 0.5 * data[i]; }
+   //}   
    
 }
 
