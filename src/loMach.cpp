@@ -33,16 +33,14 @@ double pres_inlet(const Vector &x, double p);
 void vel_channelTest(const Vector &coords, double t, Vector &u);
 
 
-LoMachSolver::LoMachSolver(MPI_Session &mpi, LoMachOptions loMach_opts, TPS::Tps *tps)
-    : mpi_(mpi), loMach_opts_(loMach_opts) {
-
-  tpsP_ = tps;
+LoMachSolver::LoMachSolver(LoMachOptions loMach_opts, TPS::Tps *tps)
+  : groupsMPI(new MPI_Groups(tps->getTPSCommWorld())),
+    nprocs_(groupsMPI->getTPSWorldSize()),
+    rank_(groupsMPI->getTPSWorldRank()),
+    rank0_(groupsMPI->isWorldRoot()),
+    tpsP_(tps),
+    loMach_opts_(loMach_opts) {
   pmesh = NULL;
-  nprocs_ = mpi_.WorldSize();
-  rank_ = mpi_.WorldRank();
-  if (rank_ == 0) { rank0_ = true; }
-  else { rank0_ = false; }
-  groupsMPI = new MPI_Groups(&mpi_);
 
   // is this needed?
   groupsMPI->init();
@@ -99,8 +97,7 @@ NavierSolver::NavierSolver(ParMesh *mesh, int order, int porder, int norder, dou
 
 
 void LoMachSolver::initialize() {
-  
-   bool verbose = mpi_.Root();
+   bool verbose = rank0_;
    if (verbose) grvy_printf(ginfo, "Initializing loMach solver.\n");
 
    if ( loMach_opts_.uOrder == -1) {
@@ -115,7 +112,7 @@ void LoMachSolver::initialize() {
      norder = loMach_opts_.nOrder;
    }
    
-   if (mpi_.Root()) {
+   if (rank0_) {
      std::cout << "  " << endl;
      std::cout << " Order of solution-spaces " << endl;     
      std::cout << " +velocity : " << order << endl;
@@ -180,7 +177,7 @@ void LoMachSolver::initialize() {
     Vector z_translation({0.0, 0.0, config.GetZTrans()});
     std::vector<Vector> translations = {x_translation, y_translation, z_translation};
 
-    if (mpi_.Root()) {
+    if (rank0_) {
       std::cout << " Making the mesh periodic using the following offsets:" << std::endl;
       std::cout << "   xTrans: " << config.GetXTrans() << std::endl;
       std::cout << "   yTrans: " << config.GetYTrans() << std::endl;
@@ -388,7 +385,7 @@ void LoMachSolver::initialize() {
   if (config.GetRestartCycle() > 0) {
     
     if (config.GetUniformRefLevels() > 0) {
-      if (mpi_.Root()) {
+      if (rank0_) {
         std::cerr << "ERROR: Uniform mesh refinement not supported upon restart." << std::endl;
       }
       MPI_Abort(MPI_COMM_WORLD, 1);
@@ -409,14 +406,15 @@ void LoMachSolver::initialize() {
         partitioning_file_hdf5("write");
       } else {
       */
-        partitioning_file_hdf5("read");
+        partitioning_file_hdf5("read", config, groupsMPI, nelemGlobal_, partitioning_);
+
       //}
     }
     
   } else {
     
     // remove previous solution
-    if (mpi_.Root()) {
+    if (rank0_) {
       string command = "rm -r ";
       command.append(config.GetOutputName());
       int err = system(command.c_str());
@@ -427,7 +425,7 @@ void LoMachSolver::initialize() {
 
     // uniform refinement, user-specified number of times
     for (int l = 0; l < config.GetUniformRefLevels(); l++) {
-      if (mpi_.Root()) {
+      if (rank0_) {
         std::cout << "Uniform refinement number " << l << std::endl;
       }
       serial_mesh->UniformRefinement();
@@ -442,7 +440,7 @@ void LoMachSolver::initialize() {
       //assert(mesh->Conforming());
       partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
       //partitioning_ = Array<int>(mesh->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
-      if (rank0_) partitioning_file_hdf5("write");
+      if (rank0_) partitioning_file_hdf5("write", config, groupsMPI, nelemGlobal_, partitioning_);
       //? MPI_Barrier(MPI_COMM_WORLD);
     }
 
@@ -919,7 +917,7 @@ void LoMachSolver::initialize() {
   if (verbose) grvy_printf(ginfo, "mean setup good...\n");  
   /**/
   
-  ioData.initializeSerial(mpi_.Root(), (config.RestartSerial() != "no"), serial_mesh);
+  ioData.initializeSerial(rank0_, (config.RestartSerial() != "no"), serial_mesh, locToGlobElem, &partitioning_);
   MPI_Barrier(MPI_COMM_WORLD);  
   if (verbose) grvy_printf(ginfo, "ioData.init thingy...\n");
 
@@ -1222,14 +1220,14 @@ void LoMachSolver::initialize() {
 
   // 
   //if (config.GetRestartCycle() == 0) initialTimeStep();
-  if (mpi_.Root()) cout << "Maximum element size: " << hmax << "m" << endl;
-  if (mpi_.Root()) cout << "Minimum element size: " << hmin << "m" << endl;
-  //if (mpi_.Root()) cout << "Initial time-step: " << dt << "s" << endl;
+  if (rank0_) cout << "Maximum element size: " << hmax << "m" << endl;
+  if (rank0_) cout << "Minimum element size: " << hmin << "m" << endl;
+  //if (rank0_) cout << "Initial time-step: " << dt << "s" << endl;
 
 
   // possible missing bit for restart stats?
   /*
-  if (mpi_.Root()) {
+  if (rank0_) {
     ios_base::openmode mode = std::fstream::trunc;
     if (config.GetRestartCycle() == 1) mode = std::fstream::app;
 
@@ -2527,7 +2525,7 @@ void LoMachSolver::projectInitialSolution() {
   //     VectorFunctionCoefficient u0(num_equation, initialConditionFunction);
   //     U->ProjectCoefficient(u0);
   //   }
-  //if (mpi_.Root()) std::cout << "restart: " << config.GetRestartCycle() << std::endl;
+  //if (rank0_) std::cout << "restart: " << config.GetRestartCycle() << std::endl;
 
   /*  
 #ifdef HAVE_MASA
@@ -5840,7 +5838,7 @@ void LoMachSolver::parseSolverOptions() {
   //tpsP_->getVec("em/current_axis", em_opts_.current_axis, 3, default_axis);
 
   // dump options to screen for user inspection
-  if (mpi_.Root()) {
+  if (rank0_) {
     loMach_opts_.print(std::cout);
   }
 }
