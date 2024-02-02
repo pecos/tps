@@ -8393,7 +8393,7 @@ void LoMachSolver::updateDiffusivity(bool bulkViscFlag) {
    {
      double *data = bufferAlpha->HostReadWrite();
      double *dataVisc = bufferVisc->HostReadWrite();
-     double Ctmp = 1.0 / Pr;
+     double Ctmp = 1.0 * Cp / Pr;
      for (int i = 0; i < Sdof; i++) { data[i] = Ctmp * dataVisc[i]; }
    }
    bufferAlpha->GetTrueDofs(alphaSml);
