@@ -173,13 +173,9 @@ public:
  */
 class LoMachSolver : public TPS::Solver {
 protected:
-
-   mfem::MPI_Session &mpi_;
-  //mfem::MPI_Session &mpi;  
    LoMachOptions loMach_opts_;
 
    MPI_Groups *groupsMPI;
-   //MPI_Session &mpi;
    int nprocs_;  // total number of MPI procs
    int rank_;    // local MPI rank
    bool rank0_;  // flag to indicate rank 0
@@ -760,7 +756,7 @@ public:
     * automatically converted to the Reynolds number. If you want to set the
     * Reynolds number directly, you can provide the inverse.
     */
-  LoMachSolver(mfem::MPI_Session &mpi, LoMachOptions loMach_opts, TPS::Tps *tps);
+  LoMachSolver(LoMachOptions loMach_opts, TPS::Tps *tps);
   virtual ~LoMachSolver() {}
   //(ParMesh *mesh, int order, int porder, int norder, double kin_vis, double Po, double Rgas);
 
@@ -789,12 +785,9 @@ public:
    void setTimestep();  
 
    // i/o routines
-   void read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data);
-   void read_serialized_soln_data(hid_t file, string varName, int numDof, int varOffset, double *data, IOFamily &fam);
    void restart_files_hdf5(string mode, string inputFileName = std::string());
-   void partitioning_file_hdf5(string mode);
-   // void serialize_soln_for_write(IOFamily &fam);
-   void write_soln_data(hid_t group, string varName, hid_t dataspace, double *data);
+   void write_restart_files_hdf5(hid_t file, bool serialized_write);
+   void read_restart_files_hdf5(hid_t file, bool serialized_read);
 
    // subgrid scale models
    void sgsSmag(const DenseMatrix &gradUp, double delta, double &nu_sgs);

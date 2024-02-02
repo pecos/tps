@@ -237,7 +237,7 @@ void Tps::chooseSolver() {
     solver_ = new QuasiMagnetostaticSolver3D(em_opt, this);
   } else if (input_solver_type_ == "loMach") {
     LoMachOptions lomach_opt;
-    solver_ = new LoMachSolver(mpi_, lomach_opt, this);
+    solver_ = new LoMachSolver(lomach_opt, this);
   } else if (input_solver_type_ == "em-axi") {
     isEMOnlyMode_ = true;
     ElectromagneticOptions em_opt;
