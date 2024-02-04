@@ -2607,7 +2607,8 @@ void LoMachSolver::solve()
    }     
    
    //dt = config.dt_fixed;
-   //CFL_actual = ComputeCFL(*u_gf, dt);   
+   //CFL_actual = ComputeCFL(*u_gf, dt);
+   //CFL_actual = computeCFL(dt);   
    //EnforceCFL(config.cflNum, u_gf, &dt);
    //dt = dt * max(cflMax_set/cflmax_actual,1.0);
    //if (verbose) grvy_printf(ginfo, "got timestep...\n");         
@@ -2800,10 +2801,10 @@ void LoMachSolver::solve()
           }
 
 	} else {
-          CFL_actual = ComputeCFL(un_gf, dt);
+          //CFL_actual = ComputeCFL(un_gf, dt);
+	  CFL_actual = computeCFL(dt);	  
           if (rank0_ == true) {	  
-  	    std::cout << " " << step << "    " << time << "   " << CFL_actual << "   " <<
-  	      sw_step.RealTime() - time_previous << "   " << minTall << "   " <<
+  	    std::cout << " " << step << "    " << time << "   " << CFL_actual << "   " << sw_step.RealTime() - time_previous << "   " << minTall << "   " <<
 	      maxTall << "   " << maxUall << endl;
           }	  
 	}
@@ -3014,14 +3015,15 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    //multScalarScalarIP(rn,&tmpR0);
    MsRho->Mult(tmpR0,tmpR0b);
    resT.Add(-1.0,tmpR0b);
-   multConstScalarIP(Cp,&resT);      
+   //multConstScalarIP(Cp,&resT);      
    
    //resT.Add(-1.0, tmpR0); // move to rhs
    //Ms->Mult(resT,tmpR0);
    //resT.Set(1.0,tmpR0);
 
    // dPo/dt
-   tmpR0 = dtP;   
+   //tmpR0 = dtP;
+   tmpR0 = (dtP/Cp);   
    Ms->Mult(tmpR0,tmpR0b);
    resT.Add(1.0, tmpR0b);
 
@@ -3032,7 +3034,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    { 
      double *data = bufferRhoDt->HostReadWrite();
      double *Rdata = rn_gf.HostReadWrite();
-     double coeff = Cp*bd0/dt;
+     //double coeff = Cp*bd0/dt;
+     double coeff = bd0/dt;     
      double *d_imp = R0PM0_gf.HostReadWrite();
      for (int i = 0; i < Sdof; i++) { data[i] = coeff * Rdata[i]; }
      //for (int i = 0; i < Sdof; i++) {data[i] = coeff*Rdata[i] + d_imp[i]; }     
@@ -4554,7 +4557,36 @@ void LoMachSolver::updateTimestep()
    }
    
    MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
-   double dtInst = 0.5 * CFL / max_speed;
+   double dtInst_conv = 0.5 * CFL / max_speed;
+
+
+   double *dGradU = gradU.HostReadWrite();
+   double *dGradV = gradV.HostReadWrite();
+   double *dGradW = gradW.HostReadWrite(); 
+   double *dVisc = viscSml.HostReadWrite();
+   double *rho = rn.HostReadWrite();
+   Umax_lcl = 1.0e-12;   
+   for (int n = 0; n < SdofInt; n++) {
+     DenseMatrix gradU;
+     gradU.SetSize(nvel, dim);
+     for (int dir = 0; dir < dim; dir++) { gradU(0,dir) = dGradU[n + dir * SdofInt]; }
+     for (int dir = 0; dir < dim; dir++) { gradU(1,dir) = dGradV[n + dir * SdofInt]; }
+     for (int dir = 0; dir < dim; dir++) { gradU(2,dir) = dGradW[n + dir * SdofInt]; }
+     double duMag = 0.0;
+     for (int dir = 0; dir < dim; dir++) {
+       for (int eq = 0; eq < nvel; eq++) {
+	 duMag += gradU(eq,dir) * gradU(eq,dir);
+       }
+     }
+     duMag = sqrt(duMag);
+     double viscVel = sqrt(duMag * dVisc[n] / rho[n]);
+     viscVel /= dataD[n];
+     Umax_lcl = std::max(viscVel,Umax_lcl);     
+   }
+   MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
+   double dtInst_visc = 0.5 * CFL / max_speed;   
+
+   double dtInst = max(dtInst_conv,dtInst_visc);
    
    if (dtInst > dt) {
      dt = dt * (1.0 + dtFactor);
@@ -4581,6 +4613,72 @@ void LoMachSolver::updateTimestep()
      exit(ERROR);
      
    }
+   
+}
+
+
+double LoMachSolver::computeCFL(double dt)
+{
+
+   // minimum timestep to not waste comp time
+   double dtMin = 1.0e-9;
+  
+   double Umax_lcl = 1.0e-12;
+   max_speed = Umax_lcl;
+   double Umag;
+   int dof = vfes->GetNDofs();
+   int Sdof = sfes->GetNDofs();   
+   double dtFactor = config.dt_factor;  
+
+   // come in divided by order
+   double *dataD = bufferGridScale->HostReadWrite();       
+   double *dataX = bufferGridScaleX->HostReadWrite();
+   double *dataY = bufferGridScaleY->HostReadWrite();
+   double *dataZ = bufferGridScaleZ->HostReadWrite();
+   auto dataU = un_gf.HostRead();
+   
+   for (int n = 0; n < Sdof; n++) {
+     Umag = 0.0;
+     //Vector delta({dataX[n], dataY[n], dataZ[n]});	      
+     Vector delta({dataD[n], dataD[n], dataD[n]}); // use smallest delta for all
+     for (int eq = 0; eq < dim; eq++) {
+       Umag += (dataU[n + eq * Sdof]/delta[eq]) * (dataU[n + eq * Sdof]/delta[eq]);
+     }
+     Umag = std::sqrt(Umag);
+     Umax_lcl = std::max(Umag,Umax_lcl);
+   }   
+   MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
+   double CFL_conv = 2.0 * dt * max_speed;
+
+   double *dGradU = gradU.HostReadWrite();
+   double *dGradV = gradV.HostReadWrite();
+   double *dGradW = gradW.HostReadWrite(); 
+   double *dVisc = viscSml.HostReadWrite();
+   double *rho = rn.HostReadWrite();
+   Umax_lcl = 1.0e-12;   
+   for (int n = 0; n < SdofInt; n++) {
+     DenseMatrix gradU;
+     gradU.SetSize(nvel, dim);
+     for (int dir = 0; dir < dim; dir++) { gradU(0,dir) = dGradU[n + dir * SdofInt]; }
+     for (int dir = 0; dir < dim; dir++) { gradU(1,dir) = dGradV[n + dir * SdofInt]; }
+     for (int dir = 0; dir < dim; dir++) { gradU(2,dir) = dGradW[n + dir * SdofInt]; }
+     double duMag = 0.0;
+     for (int dir = 0; dir < dim; dir++) {
+       for (int eq = 0; eq < nvel; eq++) {
+	 duMag += gradU(eq,dir) * gradU(eq,dir);
+       }
+     }
+     duMag = sqrt(duMag);
+     double viscVel = sqrt(duMag * dVisc[n] / rho[n]);
+     viscVel /= dataD[n];
+     Umax_lcl = std::max(viscVel,Umax_lcl);     
+   }
+   MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
+   double CFL_visc = 2.0 * dt * max_speed;
+
+   double CFL_here = max(CFL_conv,CFL_visc);
+   
+   return CFL_here;
    
 }
 
@@ -5175,6 +5273,7 @@ void LoMachSolver::ComputeCurl2D(ParGridFunction &u,
    }
 }
 
+/*
 double LoMachSolver::ComputeCFL(ParGridFunction &u, double dt)
 {
   
@@ -5256,7 +5355,7 @@ double LoMachSolver::ComputeCFL(ParGridFunction &u, double dt)
 
    return cflmax_global;
 }
-
+*/
 
 void LoMachSolver::EnforceCFL(double maxCFL, ParGridFunction &u, double &dt)
 {
@@ -8391,7 +8490,8 @@ void LoMachSolver::updateDiffusivity(bool bulkViscFlag) {
    {
      double *data = bufferAlpha->HostReadWrite();
      double *dataVisc = bufferVisc->HostReadWrite();
-     double Ctmp = 1.0 * Cp / Pr;
+     //double Ctmp = Cp / Pr;
+     double Ctmp = 1.0 / Pr;
      for (int i = 0; i < Sdof; i++) { data[i] = Ctmp * dataVisc[i]; }
    }
    bufferAlpha->GetTrueDofs(alphaSml);
