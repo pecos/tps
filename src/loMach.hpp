@@ -309,8 +309,9 @@ protected:
    // temporary
    double Re_tau, Pr, Cp, gamma;
   
-   /// Kinematic viscosity (dimensionless).
+   /// Kinematic viscosity
    double kin_vis;
+   double dyn_vis;  
 
    // make everything dimensionless after generalizing form channel
    double ambientPressure, thermoPressure, static_rho, Rgas, systemMass;
@@ -1010,7 +1011,8 @@ public:
    void SetMaxBDFOrder(int maxbdforder) { max_bdf_order = maxbdforder; };
 
    /// Compute CFL
-   double ComputeCFL(ParGridFunction &u, double dt);
+   //double ComputeCFL(ParGridFunction &u, double dt);
+   double computeCFL(double dt);
 
    /// Enforce CFL
    void EnforceCFL(double maxCFL, ParGridFunction &u, double &dt);  
