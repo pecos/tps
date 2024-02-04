@@ -1003,7 +1003,8 @@ public:
    void SetMaxBDFOrder(int maxbdforder) { max_bdf_order = maxbdforder; };
 
    /// Compute CFL
-   double ComputeCFL(ParGridFunction &u, double dt);
+   //double ComputeCFL(ParGridFunction &u, double dt);
+   double computeCFL(double dt);  
 
    /// Enforce CFL
    void EnforceCFL(double maxCFL, ParGridFunction &u, double &dt);  
